@@ -59,19 +59,6 @@ void sctp_inq_init(struct sctp_inq *queue)
 	queue->malloced = 0;
 }
 
-/* Create an initialized sctp_inq.  */
-struct sctp_inq *sctp_inq_new(void)
-{
-	struct sctp_inq *retval;
-
-	retval = t_new(struct sctp_inq, GFP_ATOMIC);
-	if (retval) {
-		sctp_inq_init(retval);
-		retval->malloced = 1;
-	}
-        return retval;
-}
-
 /* Release the memory associated with an SCTP inqueue.  */
 void sctp_inq_free(struct sctp_inq *queue)
 {

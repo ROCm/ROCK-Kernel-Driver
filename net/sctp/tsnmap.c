@@ -52,29 +52,6 @@ static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 				     int *started, __u16 *start,
 				     int *ended, __u16 *end);
 
-/* Create a new sctp_tsnmap.
- * Allocate room to store at least 'len' contiguous TSNs.
- */
-struct sctp_tsnmap *sctp_tsnmap_new(__u16 len, __u32 initial_tsn, int gfp)
-{
-	struct sctp_tsnmap *retval;
-
-	retval = kmalloc(sizeof(struct sctp_tsnmap) +
-			 sctp_tsnmap_storage_size(len), gfp);
-	if (!retval)
-		goto fail;
-
-	if (!sctp_tsnmap_init(retval, len, initial_tsn))
-		goto fail_map;
-	retval->malloced = 1;
-	return retval;
-
-fail_map:
-	kfree(retval);
-fail:
-	return NULL;
-}
-
 /* Initialize a block of memory as a tsnmap.  */
 struct sctp_tsnmap *sctp_tsnmap_init(struct sctp_tsnmap *map, __u16 len,
 				     __u32 initial_tsn)
@@ -168,16 +145,9 @@ void sctp_tsnmap_mark(struct sctp_tsnmap *map, __u32 tsn)
 }
 
 
-/* Dispose of a tsnmap.  */
-void sctp_tsnmap_free(struct sctp_tsnmap *map)
-{
-	if (map->malloced)
-		kfree(map);
-}
-
 /* Initialize a Gap Ack Block iterator from memory being provided.  */
-void sctp_tsnmap_iter_init(const struct sctp_tsnmap *map,
-			   struct sctp_tsnmap_iter *iter)
+SCTP_STATIC void sctp_tsnmap_iter_init(const struct sctp_tsnmap *map,
+				       struct sctp_tsnmap_iter *iter)
 {
 	/* Only start looking one past the Cumulative TSN Ack Point.  */
 	iter->start = map->cumulative_tsn_ack_point + 1;
@@ -186,8 +156,9 @@ void sctp_tsnmap_iter_init(const struct sctp_tsnmap *map,
 /* Get the next Gap Ack Blocks. Returns 0 if there was not another block
  * to get.
  */
-int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
-	struct sctp_tsnmap_iter *iter, __u16 *start, __u16 *end)
+SCTP_STATIC int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *map,
+					 struct sctp_tsnmap_iter *iter,
+					 __u16 *start, __u16 *end)
 {
 	int started, ended;
 	__u16 _start, _end, offset;

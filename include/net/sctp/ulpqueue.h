@@ -57,7 +57,6 @@ struct sctp_ulpq {
 };
 
 /* Prototypes. */
-struct sctp_ulpq *sctp_ulpq_new(struct sctp_association *asoc, int gfp);
 struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *,
 				 struct sctp_association *);
 void sctp_ulpq_free(struct sctp_ulpq *);

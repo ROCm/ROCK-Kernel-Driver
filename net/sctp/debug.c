@@ -98,23 +98,6 @@ const char *sctp_cname(const sctp_subtype_t cid)
 	return "unknown chunk";
 }
 
-/* These are printable form of variable-length parameters. */
-const char *sctp_param_tbl[SCTP_PARAM_ECN_CAPABLE + 1] = {
-	"",
-	"PARAM_HEARTBEAT_INFO",
-	"",
-	"",
-	"",
-	"PARAM_IPV4_ADDRESS",
-	"PARAM_IPV6_ADDRESS",
-	"PARAM_STATE_COOKIE",
-	"PARAM_UNRECOGNIZED_PARAMETERS",
-	"PARAM_COOKIE_PRESERVATIVE",
-	"",
-	"PARAM_HOST_NAME_ADDRESS",
-	"PARAM_SUPPORTED_ADDRESS_TYPES",
-};
-
 /* These are printable forms of the states.  */
 const char *sctp_state_tbl[SCTP_STATE_NUM_STATES] = {
 	"STATE_EMPTY",

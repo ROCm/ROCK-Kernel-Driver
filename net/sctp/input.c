@@ -63,11 +63,15 @@
 
 /* Forward declarations for internal helpers. */
 static int sctp_rcv_ootb(struct sk_buff *);
-struct sctp_association *__sctp_rcv_lookup(struct sk_buff *skb,
+static struct sctp_association *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *laddr,
 				      const union sctp_addr *paddr,
 				      struct sctp_transport **transportp);
-struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr);
+static struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr);
+static struct sctp_association *__sctp_lookup_association(
+					const union sctp_addr *local,
+					const union sctp_addr *peer,
+					struct sctp_transport **pt);
 
 
 /* Calculate the SCTP checksum of an SCTP packet.  */
@@ -523,7 +527,7 @@ discard:
 }
 
 /* Insert endpoint into the hash table.  */
-void __sctp_hash_endpoint(struct sctp_endpoint *ep)
+static void __sctp_hash_endpoint(struct sctp_endpoint *ep)
 {
 	struct sctp_ep_common **epp;
 	struct sctp_ep_common *epb;
@@ -553,7 +557,7 @@ void sctp_hash_endpoint(struct sctp_endpoint *ep)
 }
 
 /* Remove endpoint from the hash table.  */
-void __sctp_unhash_endpoint(struct sctp_endpoint *ep)
+static void __sctp_unhash_endpoint(struct sctp_endpoint *ep)
 {
 	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
@@ -585,7 +589,7 @@ void sctp_unhash_endpoint(struct sctp_endpoint *ep)
 }
 
 /* Look up an endpoint. */
-struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr)
+static struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr)
 {
 	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
@@ -611,16 +615,8 @@ hit:
 	return ep;
 }
 
-/* Add an association to the hash. Local BH-safe. */
-void sctp_hash_established(struct sctp_association *asoc)
-{
-	sctp_local_bh_disable();
-	__sctp_hash_established(asoc);
-	sctp_local_bh_enable();
-}
-
 /* Insert association into the hash table.  */
-void __sctp_hash_established(struct sctp_association *asoc)
+static void __sctp_hash_established(struct sctp_association *asoc)
 {
 	struct sctp_ep_common **epp;
 	struct sctp_ep_common *epb;
@@ -643,16 +639,16 @@ void __sctp_hash_established(struct sctp_association *asoc)
 	sctp_write_unlock(&head->lock);
 }
 
-/* Remove association from the hash table.  Local BH-safe. */
-void sctp_unhash_established(struct sctp_association *asoc)
+/* Add an association to the hash. Local BH-safe. */
+void sctp_hash_established(struct sctp_association *asoc)
 {
 	sctp_local_bh_disable();
-	__sctp_unhash_established(asoc);
+	__sctp_hash_established(asoc);
 	sctp_local_bh_enable();
 }
 
 /* Remove association from the hash table.  */
-void __sctp_unhash_established(struct sctp_association *asoc)
+static void __sctp_unhash_established(struct sctp_association *asoc)
 {
 	struct sctp_hashbucket *head;
 	struct sctp_ep_common *epb;
@@ -676,8 +672,16 @@ void __sctp_unhash_established(struct sctp_association *asoc)
 	sctp_write_unlock(&head->lock);
 }
 
+/* Remove association from the hash table.  Local BH-safe. */
+void sctp_unhash_established(struct sctp_association *asoc)
+{
+	sctp_local_bh_disable();
+	__sctp_unhash_established(asoc);
+	sctp_local_bh_enable();
+}
+
 /* Look up an association. */
-struct sctp_association *__sctp_lookup_association(
+static struct sctp_association *__sctp_lookup_association(
 					const union sctp_addr *local,
 					const union sctp_addr *peer,
 					struct sctp_transport **pt)
@@ -714,8 +718,9 @@ hit:
 }
 
 /* Look up an association. BH-safe. */
+SCTP_STATIC
 struct sctp_association *sctp_lookup_association(const union sctp_addr *laddr,
-					    const union sctp_addr *paddr,
+						 const union sctp_addr *paddr,
 					    struct sctp_transport **transportp)
 {
 	struct sctp_association *asoc;
@@ -822,7 +827,7 @@ static struct sctp_association *__sctp_rcv_init_lookup(struct sk_buff *skb,
 }
 
 /* Lookup an association for an inbound skb. */
-struct sctp_association *__sctp_rcv_lookup(struct sk_buff *skb,
+static struct sctp_association *__sctp_rcv_lookup(struct sk_buff *skb,
 				      const union sctp_addr *paddr,
 				      const union sctp_addr *laddr,
 				      struct sctp_transport **transportp)

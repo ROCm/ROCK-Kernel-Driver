@@ -406,7 +406,6 @@ struct sctp_ssnmap {
 	int malloced;
 };
 
-struct sctp_ssnmap *sctp_ssnmap_init(struct sctp_ssnmap *, __u16, __u16);
 struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int gfp);
 void sctp_ssnmap_free(struct sctp_ssnmap *map);
 void sctp_ssnmap_clear(struct sctp_ssnmap *map);
@@ -538,12 +537,9 @@ struct sctp_datamsg {
 struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *,
 					    struct sctp_sndrcvinfo *,
 					    struct msghdr *, int len);
-struct sctp_datamsg *sctp_datamsg_new(int gfp);
 void sctp_datamsg_put(struct sctp_datamsg *);
-void sctp_datamsg_hold(struct sctp_datamsg *);
 void sctp_datamsg_free(struct sctp_datamsg *);
 void sctp_datamsg_track(struct sctp_chunk *);
-void sctp_datamsg_assign(struct sctp_datamsg *, struct sctp_chunk *);
 void sctp_chunk_fail(struct sctp_chunk *, int error);
 int sctp_chunk_abandoned(struct sctp_chunk *);
 
@@ -651,8 +647,6 @@ void sctp_chunk_hold(struct sctp_chunk *);
 void sctp_chunk_put(struct sctp_chunk *);
 int sctp_user_addto_chunk(struct sctp_chunk *chunk, int off, int len,
 			  struct iovec *data);
-struct sctp_chunk *sctp_make_chunk(const struct sctp_association *, __u8 type,
-				   __u8 flags, int size);
 void sctp_chunk_free(struct sctp_chunk *);
 void  *sctp_addto_chunk(struct sctp_chunk *, int len, const void *data);
 struct sctp_chunk *sctp_chunkify(struct sk_buff *,
@@ -922,15 +916,12 @@ struct sctp_transport {
 };
 
 struct sctp_transport *sctp_transport_new(const union sctp_addr *, int);
-struct sctp_transport *sctp_transport_init(struct sctp_transport *,
-					   const union sctp_addr *, int);
 void sctp_transport_set_owner(struct sctp_transport *,
 			      struct sctp_association *);
 void sctp_transport_route(struct sctp_transport *, union sctp_addr *,
 			  struct sctp_opt *);
 void sctp_transport_pmtu(struct sctp_transport *);
 void sctp_transport_free(struct sctp_transport *);
-void sctp_transport_destroy(struct sctp_transport *);
 void sctp_transport_reset_timers(struct sctp_transport *);
 void sctp_transport_hold(struct sctp_transport *);
 void sctp_transport_put(struct sctp_transport *);
@@ -961,7 +952,6 @@ struct sctp_inq {
 	int malloced;	     /* Is this structure kfree()able?	*/
 };
 
-struct sctp_inq *sctp_inq_new(void);
 void sctp_inq_init(struct sctp_inq *);
 void sctp_inq_free(struct sctp_inq *);
 void sctp_inq_push(struct sctp_inq *, struct sctp_chunk *packet);
@@ -1029,7 +1019,6 @@ struct sctp_outq {
 	char malloced;
 };
 
-struct sctp_outq *sctp_outq_new(struct sctp_association *);
 void sctp_outq_init(struct sctp_association *, struct sctp_outq *);
 void sctp_outq_teardown(struct sctp_outq *);
 void sctp_outq_free(struct sctp_outq*);
@@ -1070,7 +1059,6 @@ struct sctp_bind_addr {
 	int malloced;	     /* Are we kfree()able?  */
 };
 
-struct sctp_bind_addr *sctp_bind_addr_new(int gfp_mask);
 void sctp_bind_addr_init(struct sctp_bind_addr *, __u16 port);
 void sctp_bind_addr_free(struct sctp_bind_addr *);
 int sctp_bind_addr_copy(struct sctp_bind_addr *dest,
@@ -1220,8 +1208,6 @@ static inline struct sctp_endpoint *sctp_ep(struct sctp_ep_common *base)
 
 /* These are function signatures for manipulating endpoints.  */
 struct sctp_endpoint *sctp_endpoint_new(struct sock *, int);
-struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *,
-					 struct sock *, int gfp);
 void sctp_endpoint_free(struct sctp_endpoint *);
 void sctp_endpoint_put(struct sctp_endpoint *);
 void sctp_endpoint_hold(struct sctp_endpoint *);
@@ -1243,8 +1229,6 @@ int sctp_verify_init(const struct sctp_association *asoc, sctp_cid_t,
 int sctp_process_init(struct sctp_association *, sctp_cid_t cid,
 		      const union sctp_addr *peer,
 		      sctp_init_chunk_t *init, int gfp);
-int sctp_process_param(struct sctp_association *, union sctp_params param,
-		       const union sctp_addr *from, int gfp);
 __u32 sctp_generate_tag(const struct sctp_endpoint *);
 __u32 sctp_generate_tsn(const struct sctp_endpoint *);
 
@@ -1690,10 +1674,6 @@ static inline struct sctp_association *sctp_assoc(struct sctp_ep_common *base)
 struct sctp_association *
 sctp_association_new(const struct sctp_endpoint *, const struct sock *,
 		     sctp_scope_t scope, int gfp);
-struct sctp_association *
-sctp_association_init(struct sctp_association *, const struct sctp_endpoint *,
-		      const struct sock *, sctp_scope_t scope,
-		      int gfp);
 void sctp_association_free(struct sctp_association *);
 void sctp_association_put(struct sctp_association *);
 void sctp_association_hold(struct sctp_association *);
@@ -1722,7 +1702,6 @@ void sctp_assoc_update(struct sctp_association *old,
 		       struct sctp_association *new);
 
 __u32 sctp_association_get_next_tsn(struct sctp_association *);
-__u32 sctp_association_get_tsn_block(struct sctp_association *, int);
 
 void sctp_assoc_sync_pmtu(struct sctp_association *);
 void sctp_assoc_rwnd_increase(struct sctp_association *, unsigned);
@@ -1736,7 +1715,6 @@ int sctp_assoc_set_bind_addr_from_cookie(struct sctp_association *,
 int sctp_cmp_addr_exact(const union sctp_addr *ss1,
 			const union sctp_addr *ss2);
 struct sctp_chunk *sctp_get_ecne_prepend(struct sctp_association *asoc);
-struct sctp_chunk *sctp_get_no_prepend(struct sctp_association *asoc);
 
 /* A convenience structure to parse out SCTP specific CMSGs. */
 typedef struct sctp_cmsgs {

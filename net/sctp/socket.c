@@ -208,7 +208,7 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
  * id are specified, the associations matching the address and the id should be
  * the same.
  */
-struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
+static struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
 					      struct sockaddr_storage *addr,
 					      sctp_assoc_t id)
 {
@@ -245,7 +245,7 @@ struct sctp_transport *sctp_addr_id2transport(struct sock *sk,
  *             sockaddr_in6 [RFC 2553]),
  *   addr_len - the size of the address structure.
  */
-int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
+SCTP_STATIC int sctp_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	int retval = 0;
 

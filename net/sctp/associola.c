@@ -66,33 +66,8 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc);
 
 /* 1st Level Abstractions. */
 
-/* Allocate and initialize a new association */
-struct sctp_association *sctp_association_new(const struct sctp_endpoint *ep,
-					 const struct sock *sk,
-					 sctp_scope_t scope, int gfp)
-{
-	struct sctp_association *asoc;
-
-	asoc = t_new(struct sctp_association, gfp);
-	if (!asoc)
-		goto fail;
-
-	if (!sctp_association_init(asoc, ep, sk, scope, gfp))
-		goto fail_init;
-
-	asoc->base.malloced = 1;
-	SCTP_DBG_OBJCNT_INC(assoc);
-
-	return asoc;
-
-fail_init:
-	kfree(asoc);
-fail:
-	return NULL;
-}
-
 /* Initialize a new association from provided memory. */
-struct sctp_association *sctp_association_init(struct sctp_association *asoc,
+static struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 					  const struct sctp_endpoint *ep,
 					  const struct sock *sk,
 					  sctp_scope_t scope,
@@ -293,6 +268,31 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 fail_init:
 	sctp_endpoint_put(asoc->ep);
 	sock_put(asoc->base.sk);
+	return NULL;
+}
+
+/* Allocate and initialize a new association */
+struct sctp_association *sctp_association_new(const struct sctp_endpoint *ep,
+					 const struct sock *sk,
+					 sctp_scope_t scope, int gfp)
+{
+	struct sctp_association *asoc;
+
+	asoc = t_new(struct sctp_association, gfp);
+	if (!asoc)
+		goto fail;
+
+	if (!sctp_association_init(asoc, ep, sk, scope, gfp))
+		goto fail_init;
+
+	asoc->base.malloced = 1;
+	SCTP_DBG_OBJCNT_INC(assoc);
+
+	return asoc;
+
+fail_init:
+	kfree(asoc);
+fail:
 	return NULL;
 }
 
@@ -714,18 +714,6 @@ __u32 sctp_association_get_next_tsn(struct sctp_association *asoc)
 	return retval;
 }
 
-/* Allocate 'num' TSNs by incrementing the association's TSN by num. */
-__u32 sctp_association_get_tsn_block(struct sctp_association *asoc, int num)
-{
-	__u32 retval = asoc->next_tsn;
-
-	asoc->next_tsn += num;
-	asoc->unack_data += num;
-
-	return retval;
-}
-
-
 /* Compare two addresses to see if they match.  Wildcard addresses
  * only match themselves.
  */
@@ -758,14 +746,6 @@ struct sctp_chunk *sctp_get_ecne_prepend(struct sctp_association *asoc)
 		chunk = NULL;
 
 	return chunk;
-}
-
-/* Use this function for the packet prepend callback when no ECNE
- * packet is desired (e.g. some packets don't like to be bundled).
- */
-struct sctp_chunk *sctp_get_no_prepend(struct sctp_association *asoc)
-{
-	return NULL;
 }
 
 /*

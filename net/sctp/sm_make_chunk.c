@@ -67,6 +67,19 @@
 
 extern kmem_cache_t *sctp_chunk_cachep;
 
+SCTP_STATIC
+struct sctp_chunk *sctp_make_chunk(const struct sctp_association *asoc,
+				   __u8 type, __u8 flags, int paylen);
+static sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
+					const struct sctp_association *asoc,
+					const struct sctp_chunk *init_chunk,
+					int *cookie_len,
+					const __u8 *raw_addrs, int addrs_len);
+static int sctp_process_param(struct sctp_association *asoc,
+			      union sctp_params param,
+			      const union sctp_addr *peer_addr,
+			      int gfp);
+
 /* What was the inbound interface for this chunk? */
 int sctp_chunk_iif(const struct sctp_chunk *chunk)
 {
@@ -559,52 +572,6 @@ nodata:
 	return retval;
 }
 
-/* Make a DATA chunk for the given association.  Populate the data
- * payload.
- */
-struct sctp_chunk *sctp_make_datafrag(struct sctp_association *asoc,
-				 const struct sctp_sndrcvinfo *sinfo,
-				 int data_len, const __u8 *data,
-				 __u8 flags, __u16 ssn)
-{
-	struct sctp_chunk *retval;
-
-	retval = sctp_make_datafrag_empty(asoc, sinfo, data_len, flags, ssn);
-	if (retval)
-		sctp_addto_chunk(retval, data_len, data);
-
-	return retval;
-}
-
-/* Make a DATA chunk for the given association to ride on stream id
- * 'stream', with a payload id of 'payload', and a body of 'data'.
- */
-struct sctp_chunk *sctp_make_data(struct sctp_association *asoc,
-			     const struct sctp_sndrcvinfo *sinfo,
-			     int data_len, const __u8 *data)
-{
-	struct sctp_chunk *retval = NULL;
-
-	retval = sctp_make_data_empty(asoc, sinfo, data_len);
-	if (retval)
-		sctp_addto_chunk(retval, data_len, data);
-        return retval;
-}
-
-/* Make a DATA chunk for the given association to ride on stream id
- * 'stream', with a payload id of 'payload', and a body big enough to
- * hold 'data_len' octets of data.  We use this version when we need
- * to build the message AFTER allocating memory.
- */
-struct sctp_chunk *sctp_make_data_empty(struct sctp_association *asoc,
-				   const struct sctp_sndrcvinfo *sinfo,
-				   int data_len)
-{
-	__u8 flags = SCTP_DATA_NOT_FRAG;
-
-	return sctp_make_datafrag_empty(asoc, sinfo, data_len, flags, 0);
-}
-
 /* Create a selective ackowledgement (SACK) for the given
  * association.  This reports on which TSN's we've seen to date,
  * including duplicates and gaps.
@@ -933,7 +900,7 @@ nodata:
 /* Create an Operation Error chunk with the specified space reserved.
  * This routine can be used for containing multiple causes in the chunk.
  */
-struct sctp_chunk *sctp_make_op_error_space(
+static struct sctp_chunk *sctp_make_op_error_space(
 	const struct sctp_association *asoc,
 	const struct sctp_chunk *chunk,
 	size_t size)
@@ -1062,6 +1029,7 @@ const union sctp_addr *sctp_source(const struct sctp_chunk *chunk)
 /* Create a new chunk, setting the type and flags headers from the
  * arguments, reserving enough space for a 'paylen' byte payload.
  */
+SCTP_STATIC
 struct sctp_chunk *sctp_make_chunk(const struct sctp_association *asoc,
 				   __u8 type, __u8 flags, int paylen)
 {
@@ -1261,7 +1229,7 @@ fail:
 /* Build a cookie representing asoc.
  * This INCLUDES the param header needed to put the cookie in the INIT ACK.
  */
-sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
+static sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 				      const struct sctp_association *asoc,
 				      const struct sctp_chunk *init_chunk,
 				      int *cookie_len,
@@ -1912,8 +1880,10 @@ nomem:
  * work we do.  In particular, we should not build transport
  * structures for the addresses.
  */
-int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
-		       const union sctp_addr *peer_addr, int gfp)
+static int sctp_process_param(struct sctp_association *asoc,
+			      union sctp_params param,
+			      const union sctp_addr *peer_addr,
+			      int gfp)
 {
 	union sctp_addr addr;
 	int i;
@@ -2078,8 +2048,9 @@ __u32 sctp_generate_tsn(const struct sctp_endpoint *ep)
  *
  * Address Parameter and other parameter will not be wrapped in this function 
  */
-struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
-				    union sctp_addr *addr, int vparam_len)
+static struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
+					   union sctp_addr *addr,
+					   int vparam_len)
 {
 	sctp_addiphdr_t asconf;
 	struct sctp_chunk *retval;
@@ -2248,8 +2219,8 @@ struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
  *
  * Create an ASCONF_ACK chunk with enough space for the parameter responses. 
  */
-struct sctp_chunk *sctp_make_asconf_ack(const struct sctp_association *asoc,
-					__u32 serial, int vparam_len)
+static struct sctp_chunk *sctp_make_asconf_ack(const struct sctp_association *asoc,
+					       __u32 serial, int vparam_len)
 {
 	sctp_addiphdr_t		asconf;
 	struct sctp_chunk	*retval;

@@ -54,34 +54,10 @@
 
 /* 1st Level Abstractions.  */
 
-/* Allocate and initialize a new transport.  */
-struct sctp_transport *sctp_transport_new(const union sctp_addr *addr, int gfp)
-{
-        struct sctp_transport *transport;
-
-        transport = t_new(struct sctp_transport, gfp);
-	if (!transport)
-		goto fail;
-
-	if (!sctp_transport_init(transport, addr, gfp))
-		goto fail_init;
-
-	transport->malloced = 1;
-	SCTP_DBG_OBJCNT_INC(transport);
-
-	return transport;
-
-fail_init:
-	kfree(transport);
-
-fail:
-	return NULL;
-}
-
 /* Initialize a new transport from provided memory.  */
-struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
-					   const union sctp_addr *addr,
-					   int gfp)
+static struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
+						  const union sctp_addr *addr,
+						  int gfp)
 {
 	/* Copy in the address.  */
 	peer->ipaddr = *addr;
@@ -144,6 +120,30 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	return peer;
 }
 
+/* Allocate and initialize a new transport.  */
+struct sctp_transport *sctp_transport_new(const union sctp_addr *addr, int gfp)
+{
+        struct sctp_transport *transport;
+
+        transport = t_new(struct sctp_transport, gfp);
+	if (!transport)
+		goto fail;
+
+	if (!sctp_transport_init(transport, addr, gfp))
+		goto fail_init;
+
+	transport->malloced = 1;
+	SCTP_DBG_OBJCNT_INC(transport);
+
+	return transport;
+
+fail_init:
+	kfree(transport);
+
+fail:
+	return NULL;
+}
+
 /* This transport is no longer needed.  Free up if possible, or
  * delay until it last reference count.
  */
@@ -161,7 +161,7 @@ void sctp_transport_free(struct sctp_transport *transport)
 /* Destroy the transport data structure.
  * Assumes there are no more users of this structure.
  */
-void sctp_transport_destroy(struct sctp_transport *transport)
+static void sctp_transport_destroy(struct sctp_transport *transport)
 {
 	SCTP_ASSERT(transport->dead, "Transport is not dead", return);
 

@@ -65,6 +65,33 @@
 #include <net/sctp/sm.h>
 #include <net/sctp/structs.h>
 
+static struct sctp_packet *sctp_abort_pkt_new(const struct sctp_endpoint *ep,
+				  const struct sctp_association *asoc,
+				  struct sctp_chunk *chunk,
+				  const void *payload,
+				  size_t paylen);
+static int sctp_eat_data(const struct sctp_association *asoc,
+			 struct sctp_chunk *chunk,
+			 sctp_cmd_seq_t *commands);
+static struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
+					     const struct sctp_chunk *chunk);
+static void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
+				       const struct sctp_association *asoc,
+				       const struct sctp_chunk *chunk,
+				       sctp_cmd_seq_t *commands,
+				       struct sctp_chunk *err_chunk);
+static sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
+						 const struct sctp_association *asoc,
+						 const sctp_subtype_t type,
+						 void *arg,
+						 sctp_cmd_seq_t *commands);
+static sctp_disposition_t sctp_sf_shut_8_4_5(const struct sctp_endpoint *ep,
+					     const struct sctp_association *asoc,
+					     const sctp_subtype_t type,
+					     void *arg,
+					     sctp_cmd_seq_t *commands);
+static struct sctp_sackhdr *sctp_sm_pull_sack(struct sctp_chunk *chunk);
+
 /**********************************************************
  * These are the state functions for handling chunk events.
  **********************************************************/
@@ -748,11 +775,11 @@ nomem:
 }
 
 /* Generate and sendout a heartbeat packet.  */
-sctp_disposition_t sctp_sf_heartbeat(const struct sctp_endpoint *ep,
-				     const struct sctp_association *asoc,
-				     const sctp_subtype_t type,
-				     void *arg,
-				     sctp_cmd_seq_t *commands)
+static sctp_disposition_t sctp_sf_heartbeat(const struct sctp_endpoint *ep,
+					    const struct sctp_association *asoc,
+					    const sctp_subtype_t type,
+					    void *arg,
+					    sctp_cmd_seq_t *commands)
 {
 	struct sctp_transport *transport = (struct sctp_transport *) arg;
 	struct sctp_chunk *reply;
@@ -1928,11 +1955,11 @@ sctp_disposition_t sctp_sf_cookie_echoed_err(const struct sctp_endpoint *ep,
  *
  * The return value is the disposition of the chunk.
  */
-sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
-					  const struct sctp_association *asoc,
-					  const sctp_subtype_t type,
-					  void *arg,
-					  sctp_cmd_seq_t *commands)
+static sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
+						 const struct sctp_association *asoc,
+						 const sctp_subtype_t type,
+						 void *arg,
+						 sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
 	time_t stale;
@@ -2853,11 +2880,11 @@ sctp_disposition_t sctp_sf_ootb(const struct sctp_endpoint *ep,
  *
  * The return value is the disposition of the chunk.
  */
-sctp_disposition_t sctp_sf_shut_8_4_5(const struct sctp_endpoint *ep,
-				      const struct sctp_association *asoc,
-				      const sctp_subtype_t type,
-				      void *arg,
-				      sctp_cmd_seq_t *commands)
+static sctp_disposition_t sctp_sf_shut_8_4_5(const struct sctp_endpoint *ep,
+					     const struct sctp_association *asoc,
+					     const sctp_subtype_t type,
+					     void *arg,
+					     sctp_cmd_seq_t *commands)
 {
 	struct sctp_packet *packet = NULL;
 	struct sctp_chunk *chunk = arg;
@@ -4537,7 +4564,7 @@ sctp_disposition_t sctp_sf_timer_ignore(const struct sctp_endpoint *ep,
  ********************************************************************/
 
 /* Pull the SACK chunk based on the SACK header. */
-struct sctp_sackhdr *sctp_sm_pull_sack(struct sctp_chunk *chunk)
+static struct sctp_sackhdr *sctp_sm_pull_sack(struct sctp_chunk *chunk)
 {
 	struct sctp_sackhdr *sack;
 	unsigned int len;
@@ -4564,7 +4591,7 @@ struct sctp_sackhdr *sctp_sm_pull_sack(struct sctp_chunk *chunk)
 /* Create an ABORT packet to be sent as a response, with the specified
  * error causes.
  */
-struct sctp_packet *sctp_abort_pkt_new(const struct sctp_endpoint *ep,
+static struct sctp_packet *sctp_abort_pkt_new(const struct sctp_endpoint *ep,
 				  const struct sctp_association *asoc,
 				  struct sctp_chunk *chunk,
 				  const void *payload,
@@ -4600,8 +4627,8 @@ struct sctp_packet *sctp_abort_pkt_new(const struct sctp_endpoint *ep,
 }
 
 /* Allocate a packet for responding in the OOTB conditions.  */
-struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
-				 const struct sctp_chunk *chunk)
+static struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
+					     const struct sctp_chunk *chunk)
 {
 	struct sctp_packet *packet;
 	struct sctp_transport *transport;
@@ -4664,11 +4691,11 @@ void sctp_ootb_pkt_free(struct sctp_packet *packet)
 }
 
 /* Send a stale cookie error when a invalid COOKIE ECHO chunk is found  */
-void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const struct sctp_chunk *chunk,
-				sctp_cmd_seq_t *commands,
-				struct sctp_chunk *err_chunk)
+static void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
+				       const struct sctp_association *asoc,
+				       const struct sctp_chunk *chunk,
+				       sctp_cmd_seq_t *commands,
+				       struct sctp_chunk *err_chunk)
 {
 	struct sctp_packet *packet;
 
@@ -4694,9 +4721,9 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 
 
 /* Process a data chunk */
-int sctp_eat_data(const struct sctp_association *asoc,
-		  struct sctp_chunk *chunk,
-		  sctp_cmd_seq_t *commands)
+static int sctp_eat_data(const struct sctp_association *asoc,
+			 struct sctp_chunk *chunk,
+			 sctp_cmd_seq_t *commands)
 {
 	sctp_datahdr_t *data_hdr;
 	struct sctp_chunk *err;

@@ -39,7 +39,7 @@
 #include <linux/init.h>
 #include <net/sctp/sctp.h>
 
-struct snmp_mib sctp_snmp_list[] = {
+static struct snmp_mib sctp_snmp_list[] = {
 	SNMP_MIB_ITEM("SctpCurrEstab", SCTP_MIB_CURRESTAB),
 	SNMP_MIB_ITEM("SctpActiveEstabs", SCTP_MIB_ACTIVEESTABS),
 	SNMP_MIB_ITEM("SctpPassiveEstabs", SCTP_MIB_PASSIVEESTABS),

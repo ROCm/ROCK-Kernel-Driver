@@ -162,17 +162,9 @@ __u32 sctp_update_copy_cksum(__u8 *, __u8 *, __u16 count, __u32 cksum);
 int sctp_rcv(struct sk_buff *skb);
 void sctp_v4_err(struct sk_buff *skb, u32 info);
 void sctp_hash_established(struct sctp_association *);
-void __sctp_hash_established(struct sctp_association *);
 void sctp_unhash_established(struct sctp_association *);
-void __sctp_unhash_established(struct sctp_association *);
 void sctp_hash_endpoint(struct sctp_endpoint *);
-void __sctp_hash_endpoint(struct sctp_endpoint *);
 void sctp_unhash_endpoint(struct sctp_endpoint *);
-void __sctp_unhash_endpoint(struct sctp_endpoint *);
-struct sctp_association *__sctp_lookup_association(
-	const union sctp_addr *,
-	const union sctp_addr *,
-	struct sctp_transport **);
 struct sock *sctp_err_lookup(int family, struct sk_buff *,
 			     struct sctphdr *, struct sctp_endpoint **,
 			     struct sctp_association **,
@@ -310,8 +302,6 @@ static inline int sctp_sysctl_jiffies_ms(ctl_table *table, int __user *name, int
 
 int sctp_v6_init(void);
 void sctp_v6_exit(void);
-void sctp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
-			int type, int code, int offset, __u32 info);
 
 #else /* #ifdef defined(CONFIG_IPV6) */
 

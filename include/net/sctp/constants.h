@@ -155,10 +155,6 @@ SCTP_SUBTYPE_CONSTRUCTOR(PRIMITIVE,	sctp_event_primitive_t,	primitive)
 		       		- (unsigned long)(c->chunk_hdr)\
 				- sizeof(sctp_data_chunk_t)))
 
-/* This is a table of printable names of sctp_param_t's.  */
-extern const char *sctp_param_tbl[];
-
-
 #define SCTP_MAX_ERROR_CAUSE  SCTP_ERROR_NONEXIST_IP
 #define SCTP_NUM_ERROR_CAUSE  10
 
