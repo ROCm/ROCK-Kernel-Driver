@@ -174,7 +174,7 @@ static int w9966_i2c_wbyte(struct w9966_dev* cam, int data);
 static int w9966_i2c_rbyte(struct w9966_dev* cam);
 
 static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, void *arg);
+			   unsigned int cmd, unsigned long arg);
 static int w9966_v4l_read(struct file *file, char *buf,
 			  size_t count, loff_t *ppos);
 
@@ -182,7 +182,7 @@ static struct file_operations w9966_fops = {
 	owner:		THIS_MODULE,
 	open:           video_exclusive_open,
 	release:        video_exclusive_release,
-	ioctl:          video_generic_ioctl,
+	ioctl:          w9966_v4l_ioctl,
 	read:           w9966_v4l_read,
 	llseek:         no_llseek,
 };
@@ -192,7 +192,6 @@ static struct video_device w9966_template = {
 	type:           VID_TYPE_CAPTURE | VID_TYPE_SCALES,
 	hardware:       VID_HARDWARE_W9966,
 	fops:           &w9966_fops,
-	kernel_ioctl:   w9966_v4l_ioctl,
 };
 
 /*
@@ -700,8 +699,8 @@ static int w9966_wReg_i2c(struct w9966_dev* cam, int reg, int data)
  *	Video4linux interfacing
  */
 
-static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, void *arg)
+static int w9966_v4l_do_ioctl(struct inode *inode, struct file *file,
+			      unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = video_devdata(file);
 	struct w9966_dev *cam = (struct w9966_dev*)vdev->priv;
@@ -851,6 +850,12 @@ static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
 		return -ENOIOCTLCMD;
 	}
 	return 0;
+}
+
+static int w9966_v4l_ioctl(struct inode *inode, struct file *file,
+			   unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, w9966_v4l_do_ioctl);
 }
 
 // Capture data
