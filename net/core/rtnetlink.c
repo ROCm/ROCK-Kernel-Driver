@@ -52,16 +52,30 @@
 
 DECLARE_MUTEX(rtnl_sem);
 
-void rtnl_lock(void)
+struct net_device **rtnl_netdev_unregister_list;
+
+void rtnl_lock(struct net_device **unregister_list)
 {
 	rtnl_shlock();
 	rtnl_exlock();
+	BUG_ON(rtnl_netdev_unregister_list);
+	if (unregister_list) {
+		*unregister_list = NULL;
+		rtnl_netdev_unregister_list = unregister_list;
+	}
 }
  
 void rtnl_unlock(void)
 {
+	struct net_device **list = rtnl_netdev_unregister_list;
+
+	rtnl_netdev_unregister_list = NULL;
+
 	rtnl_exunlock();
 	rtnl_shunlock();
+
+	if (list)
+		netdev_wait_and_finish_unregister(list);
 }
 
 int rtattr_parse(struct rtattr *tb[], int maxattr, struct rtattr *rta, int len)
@@ -484,9 +498,12 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 {
 	do {
 		struct sk_buff *skb;
+		struct net_device *unregister_list;
 
 		if (rtnl_shlock_nowait())
 			return;
+
+		rtnl_netdev_unregister_list = &unregister_list;
 
 		while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
 			if (rtnetlink_rcv_skb(skb)) {
@@ -498,6 +515,9 @@ static void rtnetlink_rcv(struct sock *sk, int len)
 			}
 			kfree_skb(skb);
 		}
+
+		rtnl_netdev_unregister_list = NULL;
+		netdev_wait_and_finish_unregister(&unregister_list);
 
 		up(&rtnl_sem);
 	} while (rtnl && rtnl->receive_queue.qlen);

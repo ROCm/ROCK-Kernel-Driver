@@ -82,8 +82,6 @@ extern int udp_port_rover;
 
 #endif
 
-extern int netdev_finish_unregister(struct net_device *dev);
-
 #include <linux/rtnetlink.h>
 
 #ifdef CONFIG_IPX_MODULE
@@ -562,7 +560,6 @@ EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);
 EXPORT_SYMBOL(__dev_get_by_name);
 EXPORT_SYMBOL(dev_getbyhwaddr);
-EXPORT_SYMBOL(netdev_finish_unregister);
 EXPORT_SYMBOL(netdev_set_master);
 EXPORT_SYMBOL(eth_type_trans);
 #ifdef CONFIG_FDDI

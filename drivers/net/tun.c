@@ -379,7 +379,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		tun->owner = -1;
 		tun->dev.init = tun_net_init;
 		tun->dev.priv = tun;
-		tun->dev.owner = THIS_MODULE;
+		SET_MODULE_OWNER(&tun->dev);
 
 		err = -EINVAL;
 
@@ -438,7 +438,7 @@ static int tun_chr_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 		ifr.ifr_name[IFNAMSIZ-1] = '\0';
 
-		rtnl_lock();
+		rtnl_lock(NULL);
 		err = tun_set_iff(file, &ifr);
 		rtnl_unlock();
 
@@ -531,6 +531,7 @@ static int tun_chr_open(struct inode *inode, struct file * file)
 static int tun_chr_close(struct inode *inode, struct file *file)
 {
 	struct tun_struct *tun = (struct tun_struct *)file->private_data;
+	struct net_device *unregister_list;
 
 	if (!tun)
 		return 0;
@@ -539,7 +540,7 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 
 	tun_chr_fasync(-1, file, 0);
 
-	rtnl_lock();
+	rtnl_lock(&unregister_list);
 
 	/* Detach from net device */
 	file->private_data = NULL;

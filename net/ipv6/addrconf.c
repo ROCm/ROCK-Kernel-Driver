@@ -1480,7 +1480,7 @@ int addrconf_set_dstaddr(void *arg)
 	struct net_device *dev;
 	int err = -EINVAL;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 
 	err = -EFAULT;
 	if (copy_from_user(&ireq, arg, sizeof(struct in6_ifreq)))
@@ -1605,7 +1605,7 @@ int addrconf_add_ifaddr(void *arg)
 	if (copy_from_user(&ireq, arg, sizeof(struct in6_ifreq)))
 		return -EFAULT;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = inet6_addr_add(ireq.ifr6_ifindex, &ireq.ifr6_addr, ireq.ifr6_prefixlen);
 	rtnl_unlock();
 	return err;
@@ -1622,7 +1622,7 @@ int addrconf_del_ifaddr(void *arg)
 	if (copy_from_user(&ireq, arg, sizeof(struct in6_ifreq)))
 		return -EFAULT;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = inet6_addr_del(ireq.ifr6_ifindex, &ireq.ifr6_addr, ireq.ifr6_prefixlen);
 	rtnl_unlock();
 	return err;
@@ -2705,7 +2705,7 @@ void __init addrconf_init(void)
 
 #ifdef MODULE
 	/* This takes sense only during module load. */
-	rtnl_lock();
+	rtnl_lock(NULL);
 	for (dev = dev_base; dev; dev = dev->next) {
 		if (!(dev->flags&IFF_UP))
 			continue;
@@ -2754,7 +2754,7 @@ void addrconf_cleanup(void)
 	addrconf_sysctl_unregister(&ipv6_devconf);
 #endif
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 
 	/*
 	 *	clean dev list.

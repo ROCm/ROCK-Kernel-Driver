@@ -770,17 +770,11 @@ int dev_open(struct net_device *dev)
 	/*
 	 *	Call device private open method
 	 */
-	if (try_module_get(dev->owner)) {
-		set_bit(__LINK_STATE_START, &dev->state);
-		if (dev->open) {
-			ret = dev->open(dev);
-			if (ret) {
-				clear_bit(__LINK_STATE_START, &dev->state);
-				module_put(dev->owner);
-			}
-		}
-	} else {
-		ret = -ENODEV;
+	set_bit(__LINK_STATE_START, &dev->state);
+	if (dev->open) {
+		ret = dev->open(dev);
+		if (ret)
+			clear_bit(__LINK_STATE_START, &dev->state);
 	}
 
 	/*
@@ -905,10 +899,6 @@ int dev_close(struct net_device *dev)
 	 */
 	notifier_call_chain(&netdev_chain, NETDEV_DOWN, dev);
 
-	/*
-	 * Drop the module refcount
-	 */
-	module_put(dev->owner);
 	return 0;
 }
 
@@ -2365,6 +2355,7 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 
 int dev_ioctl(unsigned int cmd, void *arg)
 {
+	struct net_device *rtnl_list;
 	struct ifreq ifr;
 	int ret;
 	char *colon;
@@ -2436,11 +2427,9 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);
-			dev_probe_lock();
-			rtnl_lock();
+			rtnl_lock(&rtnl_list);
 			ret = dev_ifsioc(&ifr, cmd);
 			rtnl_unlock();
-			dev_probe_unlock();
 			if (!ret) {
 				if (colon)
 					*colon = ':';
@@ -2477,11 +2466,9 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);
-			dev_probe_lock();
-			rtnl_lock();
+			rtnl_lock(&rtnl_list);
 			ret = dev_ifsioc(&ifr, cmd);
 			rtnl_unlock();
-			dev_probe_unlock();
 			return ret;
 
 		case SIOCGIFMEM:
@@ -2501,11 +2488,9 @@ int dev_ioctl(unsigned int cmd, void *arg)
 			    (cmd >= SIOCDEVPRIVATE &&
 			     cmd <= SIOCDEVPRIVATE + 15)) {
 				dev_load(ifr.ifr_name);
-				dev_probe_lock();
-				rtnl_lock();
+				rtnl_lock(&rtnl_list);
 				ret = dev_ifsioc(&ifr, cmd);
 				rtnl_unlock();
-				dev_probe_unlock();
 				if (!ret && copy_to_user(arg, &ifr,
 							 sizeof(struct ifreq)))
 					ret = -EFAULT;
@@ -2522,7 +2507,7 @@ int dev_ioctl(unsigned int cmd, void *arg)
 						return -EPERM;
 				}
 				dev_load(ifr.ifr_name);
-				rtnl_lock();
+				rtnl_lock(&rtnl_list);
 				/* Follow me in net/core/wireless.c */
 				ret = wireless_process_ioctl(&ifr, cmd);
 				rtnl_unlock();
@@ -2673,7 +2658,7 @@ out_err:
  *	Destroy and free a dead device. A value of zero is returned on
  *	success.
  */
-int netdev_finish_unregister(struct net_device *dev)
+static int netdev_finish_unregister(struct net_device *dev)
 {
 	BUG_TRAP(!dev->ip_ptr);
 	BUG_TRAP(!dev->ip6_ptr);
@@ -2688,9 +2673,94 @@ int netdev_finish_unregister(struct net_device *dev)
 	printk(KERN_DEBUG "netdev_finish_unregister: %s%s.\n", dev->name,
 	       (dev->destructor != NULL)?"":", old style");
 #endif
+
+	/* It must be the very last action, after this 'dev' may point
+	 * to freed up memory.
+	 */
 	if (dev->destructor)
 		dev->destructor(dev);
+
 	return 0;
+}
+
+static void netdev_wait_allrefs(struct net_device *dev)
+{
+	unsigned long rebroadcast_time, warning_time;
+
+	rebroadcast_time = warning_time = jiffies;
+	while (atomic_read(&dev->refcnt) != 0) {
+		if (time_after(jiffies, rebroadcast_time + 1 * HZ)) {
+			rtnl_shlock();
+			rtnl_exlock();
+
+			/* Rebroadcast unregister notification */
+			notifier_call_chain(&netdev_chain,
+					    NETDEV_UNREGISTER, dev);
+
+			if (test_bit(__LINK_STATE_LINKWATCH_PENDING,
+				     &dev->state)) {
+				/* We must not have linkwatch events
+				 * pending on unregister. If this
+				 * happens, we simply run the queue
+				 * unscheduled, resulting in a noop
+				 * for this device.
+				 */
+				linkwatch_run_queue();
+			}
+
+			rtnl_exunlock();
+			rtnl_shunlock();
+
+			rebroadcast_time = jiffies;
+		}
+
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(HZ / 4);
+		current->state = TASK_RUNNING;
+
+		if (time_after(jiffies, warning_time + 10 * HZ)) {
+			printk(KERN_EMERG "unregister_netdevice: "
+			       "waiting for %s to become free. Usage "
+			       "count = %d\n",
+			       dev->name, atomic_read(&dev->refcnt));
+			warning_time = jiffies;
+		}
+	}
+}
+
+/* The sequence is:
+ *
+ *	struct net_device *local_list;
+ *
+ *	rtnl_lock(&local_list);
+ *	unregister_netdevice(x1);
+ *	unregister_netdevice(x2);
+ *      ...
+ *	rtnl_unlock();
+ *
+ * We are invoked by rtnl_unlock() after it drops the semaphore.
+ * This allows us to deal with two problems:
+ * 1) We can invoke hotplug without deadlocking with linkwatch via
+ *    keventd.
+ * 2) Since we run with the RTNL semaphore not held, we can sleep
+ *    safely in order to wait for the netdev refcnt to drop to zero.
+ */
+void netdev_wait_and_finish_unregister(struct net_device **devp)
+{
+	struct net_device *dev;
+
+	while ((dev = *devp) != NULL) {
+		*devp = dev->next;
+		dev->next = NULL;
+
+		net_run_sbin_hotplug(dev, "unregister");
+
+		netdev_wait_allrefs(dev);
+
+		BUG_ON(atomic_read(&dev->refcnt));
+
+		netdev_finish_unregister(dev);
+	}
 }
 
 /* Synchronize with packet receive processing. */
@@ -2715,10 +2785,11 @@ void synchronize_net(void)
 
 int unregister_netdevice(struct net_device *dev)
 {
-	unsigned long now, warning_time;
 	struct net_device *d, **dp;
 
 	BUG_ON(dev_boot_phase);
+	ASSERT_RTNL();
+	BUG_ON(!rtnl_netdev_unregister_list);
 
 	/* If device is running, close it first. */
 	if (dev->flags & IFF_UP)
@@ -2732,6 +2803,8 @@ int unregister_netdevice(struct net_device *dev)
 		if (d == dev) {
 			write_lock_bh(&dev_base_lock);
 			*dp = d->next;
+			d->next = *rtnl_netdev_unregister_list;
+			*rtnl_netdev_unregister_list = d;
 			write_unlock_bh(&dev_base_lock);
 			break;
 		}
@@ -2773,76 +2846,6 @@ int unregister_netdevice(struct net_device *dev)
 	free_divert_blk(dev);
 #endif
 
-	if (dev->destructor != NULL) {
-#ifdef NET_REFCNT_DEBUG
-		if (atomic_read(&dev->refcnt) != 1)
-			printk(KERN_DEBUG "unregister_netdevice: holding %s "
-					  "refcnt=%d\n",
-			       dev->name, atomic_read(&dev->refcnt) - 1);
-#endif
-		goto out;
-	}
-
-	/* Last reference is our one */
-	if (atomic_read(&dev->refcnt) == 1)
-		goto out;
-
-#ifdef NET_REFCNT_DEBUG
-	printk(KERN_DEBUG "unregister_netdevice: waiting %s refcnt=%d\n",
-	       dev->name, atomic_read(&dev->refcnt));
-#endif
-
-	/* EXPLANATION. If dev->refcnt is not now 1 (our own reference)
-	   it means that someone in the kernel still has a reference
-	   to this device and we cannot release it.
-
-	   "New style" devices have destructors, hence we can return from this
-	   function and destructor will do all the work later. As of kernel
-	   2.4.0 there are very few "New Style" devices.
-
-	   "Old style" devices expect that the device is free of any references
-	   upon exit from this function.
-	   We cannot return from this function until all such references have
-	   fallen away. This is because the caller of this function will
-	   probably immediately kfree(*dev) and then be unloaded via
-	   sys_delete_module.
-
-	   So, we linger until all references fall away.  The duration of the
-	   linger is basically unbounded! It is driven by, for example, the
-	   current setting of sysctl_ipfrag_time.
-
-	   After 1 second, we start to rebroadcast unregister notifications
-	   in hope that careless clients will release the device.
-
-	 */
-
-	now = warning_time = jiffies;
-	while (atomic_read(&dev->refcnt) != 1) {
-		if ((jiffies - now) > 1 * HZ) {
-			/* Rebroadcast unregister notification */
-			notifier_call_chain(&netdev_chain,
-					    NETDEV_UNREGISTER, dev);
-
-			if (test_bit(__LINK_STATE_LINKWATCH_PENDING, &dev->state)) {
-				/* We must not have linkwatch events pending
-				 * on unregister. If this happens, we simply
-				 * run the queue unscheduled, resulting in a
-				 * noop for this device
-				 */
-				linkwatch_run_queue();
-			}
-		}
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(HZ / 4);
-		current->state = TASK_RUNNING;
-		if ((jiffies - warning_time) > 10 * HZ) {
-			printk(KERN_EMERG "unregister_netdevice: waiting for "
-			       "%s to become free. Usage count = %d\n",
-			       dev->name, atomic_read(&dev->refcnt));
-			warning_time = jiffies;
-		}
-	}
-out:
 	kobject_unregister(&dev->kobj);
 	dev_put(dev);
 	return 0;

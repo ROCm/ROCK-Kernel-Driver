@@ -348,7 +348,7 @@ static int ali_ircc_open(int i, chipio_t *info)
 	dev->do_ioctl        = ali_ircc_net_ioctl;
 	dev->get_stats	     = ali_ircc_net_get_stats;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
@@ -391,7 +391,9 @@ static int __exit ali_ircc_close(struct ali_ircc_cb *self)
 
 	/* Remove netdevice */
 	if (self->netdev) {
-		rtnl_lock();
+		struct net_device *unregister_list;
+
+		rtnl_lock(&unregister_list);
 		unregister_netdevice(self->netdev);
 		rtnl_unlock();
 	}

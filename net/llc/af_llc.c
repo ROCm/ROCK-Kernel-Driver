@@ -250,7 +250,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 		goto out;
 	/* bind to a specific mac, optional. */
 	if (!llc_mac_null(addr->sllc_smac)) {
-		rtnl_lock();
+		rtnl_lock(NULL);
 		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
 		rtnl_unlock();
 		rc = -ENETUNREACH;
@@ -414,7 +414,7 @@ static int llc_ui_connect(struct socket *sock, struct sockaddr *uaddr,
 			goto out;
 	}
 	if (!llc->dev) {
-		rtnl_lock();
+		rtnl_lock(NULL);
 		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
 		rtnl_unlock();
 		if (!dev)
@@ -764,7 +764,7 @@ static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
 			goto release;
 	}
 	if (!llc->dev) {
-		rtnl_lock();
+		rtnl_lock(NULL);
 		dev = dev_getbyhwaddr(addr->sllc_arphrd, addr->sllc_smac);
 		rtnl_unlock();
 		rc = -ENETUNREACH;

@@ -112,9 +112,9 @@ static int __init vlan_proto_init(void)
  */
 static void __exit vlan_cleanup_devices(void)
 {
-	struct net_device *dev, *nxt;
+	struct net_device *dev, *nxt, *unregister_list;
 
-	rtnl_lock();
+	rtnl_lock(&unregister_list);
 	for (dev = dev_base; dev; dev = nxt) {
 		nxt = dev->next;
 		if (dev->priv_flags & IFF_802_1Q_VLAN) {
@@ -304,7 +304,9 @@ static int unregister_vlan_device(const char *vlan_IF_name)
 	ret = -EINVAL;
 	if (dev) {
 		if (dev->priv_flags & IFF_802_1Q_VLAN) {
-			rtnl_lock();
+			struct net_device *unregister_list;
+
+			rtnl_lock(&unregister_list);
 
 			ret = unregister_vlan_dev(VLAN_DEV_INFO(dev)->real_dev,
 						  VLAN_DEV_INFO(dev)->vlan_id);
@@ -342,6 +344,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 					       unsigned short VLAN_ID)
 {
 	struct vlan_group *grp;
+	struct net_device *unregister_list;
 	struct net_device *new_dev;
 	struct net_device *real_dev; /* the ethernet device */
 	int malloc_size = 0;
@@ -385,7 +388,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* From this point on, all the data structures must remain
 	 * consistent.
 	 */
-	rtnl_lock();
+	rtnl_lock(&unregister_list);
 
 	/* The real device must be up and operating in order to
 	 * assosciate a VLAN device with it.
@@ -454,7 +457,7 @@ static struct net_device *register_vlan_device(const char *eth_IF_name,
 	/* set up method calls */
 	new_dev->init = vlan_dev_init;
 	new_dev->destructor = vlan_dev_destruct;
-	new_dev->owner = THIS_MODULE;
+	SET_MODULE_OWNER(new_dev);
 	    
 	/* new_dev->ifindex = 0;  it will be set when added to
 	 * the global list.

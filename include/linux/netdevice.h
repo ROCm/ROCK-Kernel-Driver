@@ -427,9 +427,6 @@ struct net_device
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
 
-	/* open/release and usage marking */
-	struct module *owner;
-
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;
 
@@ -448,6 +445,7 @@ struct net_device
 	struct kobject kobj;
 };
 
+#define SET_MODULE_OWNER(dev) do { } while (0)
 
 struct packet_type 
 {
@@ -626,12 +624,12 @@ static inline int netif_rx_ni(struct sk_buff *skb)
        return err;
 }
 
-extern int netdev_finish_unregister(struct net_device *dev);
+/* Called by rtnetlink.c:rtnl_unlock() */
+extern void netdev_wait_and_finish_unregister(struct net_device **list);
 
 static inline void dev_put(struct net_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt))
-		netdev_finish_unregister(dev);
+	atomic_dec(&dev->refcnt);
 }
 
 #define __dev_put(dev) atomic_dec(&(dev)->refcnt)

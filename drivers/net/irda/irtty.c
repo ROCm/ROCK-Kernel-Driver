@@ -241,7 +241,7 @@ static int irtty_open(struct tty_struct *tty)
 	dev->get_stats	     = irtty_net_get_stats;
 	dev->do_ioctl        = irtty_net_ioctl;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
@@ -283,7 +283,9 @@ static void irtty_close(struct tty_struct *tty)
 
 	/* Remove netdevice */
 	if (self->netdev) {
-		rtnl_lock();
+		struct net_device *unregister_list;
+
+		rtnl_lock(&unregister_list);
 		unregister_netdevice(self->netdev);
 		rtnl_unlock();
 	}

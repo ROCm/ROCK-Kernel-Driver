@@ -344,7 +344,7 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 	dev->do_ioctl        = nsc_ircc_net_ioctl;
 	dev->get_stats	     = nsc_ircc_net_get_stats;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
@@ -392,7 +392,8 @@ static int __exit nsc_ircc_close(struct nsc_ircc_cb *self)
 
 	/* Remove netdevice */
 	if (self->netdev) {
-		rtnl_lock();
+		struct net_device *unregister_list;
+		rtnl_lock(&unregister_list);
 		unregister_netdevice(self->netdev);
 		rtnl_unlock();
 	}

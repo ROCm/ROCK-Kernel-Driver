@@ -1650,7 +1650,7 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_mc_socklist *iml, **imlp;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	for (imlp = &inet->mc_list; (iml = *imlp) != NULL; imlp = &iml->next) {
 		if (iml->multi.imr_multiaddr.s_addr==imr->imr_multiaddr.s_addr &&
 		    iml->multi.imr_address.s_addr==imr->imr_address.s_addr &&
@@ -2028,7 +2028,7 @@ void ip_mc_drop_socket(struct sock *sk)
 	if (inet->mc_list == NULL)
 		return;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	while ((iml = inet->mc_list) != NULL) {
 		struct in_device *in_dev;
 		inet->mc_list = iml->next;

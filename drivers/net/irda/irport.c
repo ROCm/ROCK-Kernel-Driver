@@ -234,7 +234,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	dev->base_addr = iobase;
 	dev->irq = irq;
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
@@ -257,7 +257,9 @@ int irport_close(struct irport_cb *self)
 	
 	/* Remove netdevice */
 	if (self->netdev) {
-		rtnl_lock();
+		struct net_device *unregister_list;
+
+		rtnl_lock(&unregister_list);
 		unregister_netdevice(self->netdev);
 		rtnl_unlock();
 	}

@@ -48,7 +48,8 @@ struct lw_event {
 static struct lw_event singleevent;
 
 /* Must be called with the rtnl semaphore held */
-void linkwatch_run_queue(void) {
+void linkwatch_run_queue(void)
+{
 	LIST_HEAD(head);
 	struct list_head *n, *next;
 
@@ -90,7 +91,7 @@ static void linkwatch_event(void *dummy)
 	linkwatch_nextevent = jiffies + HZ;
 	clear_bit(LW_RUNNING, &linkwatch_flags);
 
-	rtnl_lock();
+	rtnl_lock(NULL);
 	linkwatch_run_queue();
 	rtnl_unlock();
 }
