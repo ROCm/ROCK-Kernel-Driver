@@ -23,6 +23,8 @@
 #include <linux/dump.h>
 #include <linux/ltt.h>
 
+#include <asm/kerntypes.h>
+
 #ifdef LINUX_COMPILE_VERSION_ID_TYPE
 /* Define version type for version validation of dump and kerntypes */
 LINUX_COMPILE_VERSION_ID_TYPE;
