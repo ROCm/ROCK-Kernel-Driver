@@ -124,7 +124,7 @@ static void del_br(struct net_bridge *br)
  	unregister_netdevice(br->dev);
 }
 
-static struct net_bridge *new_nb(const char *name)
+static struct net_device *new_bridge_dev(const char *name)
 {
 	struct net_bridge *br;
 	struct net_device *dev;
@@ -135,7 +135,7 @@ static struct net_bridge *new_nb(const char *name)
 	if (!dev)
 		return NULL;
 
-	br = dev->priv;
+	br = netdev_priv(dev);
 	br->dev = dev;
 
 	br->lock = SPIN_LOCK_UNLOCKED;
@@ -160,7 +160,7 @@ static struct net_bridge *new_nb(const char *name)
 
 	br_stp_timer_init(br);
 
-	return br;
+	return dev;
 }
 
 /* find an available port number */
@@ -218,15 +218,16 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 
 int br_add_bridge(const char *name)
 {
-	struct net_bridge *br;
+	struct net_device *dev;
 	int ret;
 
-	if ((br = new_nb(name)) == NULL) 
+	dev = new_bridge_dev(name);
+	if (!dev) 
 		return -ENOMEM;
 
-	ret = register_netdev(br->dev);
+	ret = register_netdev(dev);
 	if (ret)
-		free_netdev(br->dev);
+		free_netdev(dev);
 	return ret;
 }
 
@@ -251,7 +252,7 @@ int br_del_bridge(const char *name)
 	} 
 
 	else 
-		del_br(dev->priv);
+		del_br(netdev_priv(dev));
 
 	rtnl_unlock();
 	return ret;
