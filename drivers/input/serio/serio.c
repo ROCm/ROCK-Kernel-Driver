@@ -68,8 +68,7 @@ static void serio_find_dev(struct serio *serio)
 	list_for_each_entry(dev, &serio_dev_list, node) {
 		if (serio->dev)
 			break;
-		if (dev->connect)
-			dev->connect(serio, dev);
+		dev->connect(serio, dev);
 	}
 }
 
@@ -160,7 +159,7 @@ static void serio_handle_events(void)
 				/* reconnect failed - fall through to rescan */
 
 			case SERIO_RESCAN :
-				if (event->serio->dev && event->serio->dev->disconnect)
+				if (event->serio->dev)
 					event->serio->dev->disconnect(event->serio);
 				serio_find_dev(event->serio);
 				break;
@@ -282,7 +281,7 @@ void __serio_unregister_port(struct serio *serio)
 {
 	serio_remove_pending_events(serio);
 	list_del_init(&serio->node);
-	if (serio->dev && serio->dev->disconnect)
+	if (serio->dev)
 		serio->dev->disconnect(serio);
 }
 
@@ -296,7 +295,7 @@ void serio_register_device(struct serio_dev *dev)
 	down(&serio_sem);
 	list_add_tail(&dev->node, &serio_dev_list);
 	list_for_each_entry(serio, &serio_list, node)
-		if (!serio->dev && dev->connect)
+		if (!serio->dev)
 			dev->connect(serio, dev);
 	up(&serio_sem);
 }
@@ -309,7 +308,7 @@ void serio_unregister_device(struct serio_dev *dev)
 	list_del_init(&dev->node);
 
 	list_for_each_entry(serio, &serio_list, node) {
-		if (serio->dev == dev && dev->disconnect)
+		if (serio->dev == dev)
 			dev->disconnect(serio);
 		serio_find_dev(serio);
 	}
