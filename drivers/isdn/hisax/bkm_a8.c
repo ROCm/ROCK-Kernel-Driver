@@ -430,7 +430,6 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &ipac_dc_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;
 	cs->irq_func = &bkm_interrupt_ipac;
 

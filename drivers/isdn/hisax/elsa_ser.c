@@ -375,6 +375,10 @@ static inline void transmit_chars(struct IsdnCardState *cs, int *intr_done)
 	}
 }
 
+static struct bc_l1_ops modem_l1_ops = {
+	.fill_fifo = modem_fill,
+};
+
 
 static void rs_interrupt_elsa(int irq, struct IsdnCardState *cs)
 {
@@ -609,7 +613,7 @@ setstack_elsa(struct PStack *st, struct BCState *bcs)
 			bcs->tx_cnt = 0;
 			bcs->cs->hw.elsa.bcs = bcs;
 			st->l1.l2l1 = modem_l2l1;
-			bcs->cs->BC_Send_Data = modem_fill;
+			bcs->cs->bc_l1_ops = &modem_l1_ops;
 			break;
 	}
 	st->l1.bcs = bcs;

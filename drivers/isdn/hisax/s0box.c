@@ -268,7 +268,6 @@ setup_s0box(struct IsdnCard *card)
 	       cs->hw.teles3.hscx[0], cs->hw.teles3.hscx[1]);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &S0Box_card_msg;
 	cs->irq_func = &s0box_interrupt;
 	ISACVersion(cs, "S0Box:");

@@ -679,7 +679,6 @@ setup_gazel(struct IsdnCard *card)
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Gazel_card_msg;
 
 	switch (cs->subtyp) {

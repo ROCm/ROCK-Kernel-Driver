@@ -372,7 +372,6 @@ setup_enternow_pci(struct IsdnCard *card)
 	cs->dc_hw_ops = &enternow_ops;
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 
-	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &enpci_card_msg;
 	cs->irq_func = &enpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

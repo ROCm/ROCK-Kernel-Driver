@@ -306,7 +306,6 @@ setup_ix1micro(struct IsdnCard *card)
 	ix1_reset(cs);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &ix1_card_msg;
 	cs->irq_func = &ix1micro_interrupt;
 	ISACVersion(cs, "ix1-Micro:");

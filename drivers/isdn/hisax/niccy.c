@@ -383,7 +383,6 @@ setup_niccy(struct IsdnCard *card)
 		cs->irq, cs->hw.niccy.isac, cs->hw.niccy.isac_ale);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &niccy_card_msg;
 	cs->irq_func = &niccy_interrupt;
 	ISACVersion(cs, "Niccy:");

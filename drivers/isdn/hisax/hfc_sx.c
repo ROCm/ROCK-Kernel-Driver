@@ -1112,6 +1112,9 @@ hfcsx_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
+static struct bc_l1_ops hfcsx_l1_ops = {
+	.fill_fifo = hfcsx_fill_fifo,
+};
 
 /********************************/
 /* called for card init message */
@@ -1124,7 +1127,7 @@ inithfcsx(struct IsdnCardState *cs)
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
 	INIT_WORK(&cs->work, hfcsx_bh, cs);
-	cs->BC_Send_Data = hfcsx_fill_fifo;
+	cs->bc_l1_ops = &hfcsx_l1_ops;
 	cs->DC_Send_Data = hfcsx_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;

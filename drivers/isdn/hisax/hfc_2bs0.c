@@ -544,12 +544,16 @@ init_send(struct BCState *bcs)
 		bcs->hw.hfc.send[i] = 0x1fff;
 }
 
+static struct bc_l1_ops hfc_l1_ops = {
+	.fill_fifo = hfc_fill_fifo,
+};
+
 void __init
 inithfc(struct IsdnCardState *cs)
 {
 	init_send(&cs->bcs[0]);
 	init_send(&cs->bcs[1]);
-	cs->BC_Send_Data = &hfc_fill_fifo;
+	cs->bc_l1_ops = &hfc_l1_ops;
 	cs->bcs[0].BC_SetStack = setstack_hfc;
 	cs->bcs[1].BC_SetStack = setstack_hfc;
 	cs->bcs[0].BC_Close = close_hfcstate;

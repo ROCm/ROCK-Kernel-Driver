@@ -292,7 +292,6 @@ setup_isurf(struct IsdnCard *card)
 	test_and_set_bit(HW_ISAR, &cs->HW_Flags);
 	ISACVersion(cs, "ISurf:");
 	cs->bc_hw_ops = &isar_ops;
-	cs->BC_Send_Data = &isar_fill_fifo;
 	ver = ISARVersion(cs, "ISurf:");
 	if (ver < 0) {
 		printk(KERN_WARNING

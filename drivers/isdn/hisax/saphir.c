@@ -291,7 +291,6 @@ setup_saphir(struct IsdnCard *card)
 	}
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &saphir_card_msg;
 	cs->irq_func = &saphir_interrupt;
 	ISACVersion(cs, "saphir:");

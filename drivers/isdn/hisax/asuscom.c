@@ -398,7 +398,6 @@ setup_asuscom(struct IsdnCard *card)
 	printk(KERN_INFO "ISDNLink: defined at 0x%x IRQ %d\n",
 		cs->hw.asus.cfg_reg, cs->irq);
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Asus_card_msg;
 	cs->hw.asus.adr = cs->hw.asus.cfg_reg + ASUS_IPAC_ALE;
 	val = readreg(cs, cs->hw.asus.cfg_reg + ASUS_IPAC_DATA, IPAC_ID);

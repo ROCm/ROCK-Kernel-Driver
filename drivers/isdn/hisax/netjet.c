@@ -935,9 +935,15 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
 }
 
  
+static struct bc_l1_ops netjet_l1_ops = {
+	.fill_fifo = netjet_fill_dma,
+};
+
 void __init
 inittiger(struct IsdnCardState *cs)
 {
+	cs->bc_l1_ops = &netjet_l1_ops;
+
 	cs->bcs[0].hw.tiger.send = 
 		pci_alloc_consistent(cs->hw.njet.pdev,
 				     NETJET_DMA_TXSIZE * sizeof(unsigned int),

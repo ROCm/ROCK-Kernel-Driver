@@ -820,6 +820,10 @@ clear_pending_ints(struct IsdnCardState *cs)
   if (ista &0x01) ipacx_read_reg(cs, IPACX_ISTAD); 
 }
 
+static struct bc_l1_ops ipacx_bc_l1_ops = {
+	.fill_fifo = ipacx_fill_fifo,
+};
+
 //----------------------------------------------------------
 // Does chip configuration work
 // Work to do depends on bit mask in part
@@ -828,6 +832,7 @@ void __init
 init_ipacx(struct IsdnCardState *cs, int part)
 {
 	if (part &1) {  // initialise chip
+		cs->bc_l1_ops = &ipacx_bc_l1_ops;
 		clear_pending_ints(cs);
 		bch_init(cs, 0);
 		bch_init(cs, 1);

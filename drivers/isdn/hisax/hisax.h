@@ -348,15 +348,6 @@ struct l3_process {
 	 } prot;
 };
 
-struct IsdnCardState;
-
-struct bc_hw_ops {
-	u8     (*read_reg)   (struct IsdnCardState *, int, u8);
-	void   (*write_reg)  (struct IsdnCardState *, int, u8, u8);
-	void   (*read_fifo)  (struct IsdnCardState *, int, u8 *, int);
-	void   (*write_fifo) (struct IsdnCardState *, int, u8 *, int);
-};
-
 struct hscx_hw {
 	int hscx;
 	int rcvidx;
@@ -868,11 +859,29 @@ struct icc_chip {
 	u8 adf2;
 };
 
+struct IsdnCardState;
+
+/* Card specific drivers provide methods to access the
+ * chips to the chip drivers */
+
+struct bc_hw_ops {
+	u8     (*read_reg)   (struct IsdnCardState *, int, u8);
+	void   (*write_reg)  (struct IsdnCardState *, int, u8, u8);
+	void   (*read_fifo)  (struct IsdnCardState *, int, u8 *, int);
+	void   (*write_fifo) (struct IsdnCardState *, int, u8 *, int);
+};
+
 struct dc_hw_ops {
 	u8     (*read_reg)   (struct IsdnCardState *, u8);
 	void   (*write_reg)  (struct IsdnCardState *, u8, u8);
 	void   (*read_fifo)  (struct IsdnCardState *, u8 *, int);
 	void   (*write_fifo) (struct IsdnCardState *, u8 *, int);
+};
+
+/* Methods provided to shared FIFO handling */
+
+struct bc_l1_ops {
+	void   (*fill_fifo)  (struct BCState *);
 };
 
 #define HW_IOM1			0
@@ -933,7 +942,7 @@ struct IsdnCardState {
 	u8 *status_end;
 	struct dc_hw_ops *dc_hw_ops;
 	struct bc_hw_ops *bc_hw_ops;
-	void   (*BC_Send_Data) (struct BCState *);
+	struct bc_l1_ops *bc_l1_ops;
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);
 	void   (*setstack_d) (struct PStack *, struct IsdnCardState *);
 	void   (*DC_Send_Data) (struct IsdnCardState *);

@@ -225,7 +225,6 @@ setup_netjet_u(struct IsdnCard *card)
 	}
 	reset_netjet_u(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
-	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_func = &netjet_u_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

@@ -1169,7 +1169,6 @@ setup_elsa(struct IsdnCard *card)
 		printk(KERN_INFO "Elsa: timer OK; resetting card\n");
 	}
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Elsa_card_msg;
 	reset_elsa(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {

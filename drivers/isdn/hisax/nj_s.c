@@ -227,7 +227,6 @@ setup_netjet_s(struct IsdnCard *card)
 	}
 	reset_netjet_s(cs);
 	cs->dc_hw_ops = &netjet_dc_ops;
-	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_func = &netjet_s_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

@@ -307,7 +307,6 @@ setup_telespci(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &TelesPCI_card_msg;
 	cs->irq_func = &telespci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

@@ -307,7 +307,7 @@ hdlc_empty_fifo(struct BCState *bcs, int count)
 	}
 }
 
-static inline void
+static void
 hdlc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
@@ -359,6 +359,10 @@ reset_xmit(struct BCState *bcs)
 	write_ctrl(bcs, 1);
 	hdlc_fill_fifo(bcs);
 }
+
+static struct bc_l1_ops hdlc_l1_ops = {
+	.fill_fifo = hdlc_fill_fifo,
+};
 
 static inline void
 HDLC_irq(struct BCState *bcs, u_int stat)
@@ -772,7 +776,7 @@ ready:
 		cs->irq, cs->hw.avm.cfg_reg);
 
 	cs->dc_hw_ops = &isac_ops;
-	cs->BC_Send_Data = &hdlc_fill_fifo;
+	cs->bc_l1_ops = &hdlc_l1_ops;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");

@@ -864,7 +864,6 @@ init2bds0(struct IsdnCardState *cs)
 		cs->bcs[0].hw.hfc.send = init_send_hfcd(32);
 	if (!cs->bcs[1].hw.hfc.send)
 		cs->bcs[1].hw.hfc.send = init_send_hfcd(32);
-	cs->BC_Send_Data = hfc_fill_fifo;
 	cs->DC_Send_Data = hfc_fill_dfifo;
 	cs->bcs[0].BC_SetStack = setstack_2b;
 	cs->bcs[1].BC_SetStack = setstack_2b;

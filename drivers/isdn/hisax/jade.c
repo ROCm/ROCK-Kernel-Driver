@@ -263,11 +263,16 @@ setstack_jade(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+static struct bc_l1_ops jade_l1_ops = {
+	.fill_fifo = jade_fill_fifo,
+};
+
 void __init
 initjade(struct IsdnCardState *cs)
 {
 	int val;
 
+	cs->bc_l1_ops = &jade_l1_ops;
 	cs->bcs[0].BC_SetStack = setstack_jade;
 	cs->bcs[1].BC_SetStack = setstack_jade;
 	cs->bcs[0].BC_Close = close_jadestate;

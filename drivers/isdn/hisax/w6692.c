@@ -772,6 +772,10 @@ w6692_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return (0);
 }
 
+static struct bc_l1_ops w6692_bc_l1_ops = {
+	.fill_fifo = W6692B_fill_fifo,
+};
+
 static int id_idx ;
 
 static struct pci_dev *dev_w6692 __initdata = NULL;
@@ -862,7 +866,7 @@ setup_w6692(struct IsdnCard *card)
 	       id_list[cs->subtyp].card_name, cs->irq,
 	       cs->hw.w6692.iobase);
 
-	cs->BC_Send_Data = &W6692B_fill_fifo;
+	cs->bc_l1_ops = &w6692_bc_l1_ops;
 	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;
 	cs->irq_func = &W6692_interrupt;

@@ -334,7 +334,6 @@ setup_bkm_a4t(struct IsdnCard *card)
 	reset_bkm(cs);
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &jade_ops;
-	cs->BC_Send_Data = &jade_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;
 	cs->irq_func = &bkm_interrupt;
 	cs->irq_flags |= SA_SHIRQ;

@@ -228,11 +228,16 @@ setstack_hscx(struct PStack *st, struct BCState *bcs)
 	return (0);
 }
 
+static struct bc_l1_ops hscx_l1_ops = {
+	.fill_fifo = hscx_fill_fifo,
+};
+
 void __init
 inithscx(struct IsdnCardState *cs)
 {
 	int val, eval;
-
+	
+	cs->bc_l1_ops = &hscx_l1_ops;
 	cs->bcs[0].BC_SetStack = setstack_hscx;
 	cs->bcs[1].BC_SetStack = setstack_hscx;
 	cs->bcs[0].BC_Close = close_hscxstate;

@@ -261,7 +261,6 @@ setup_sportster(struct IsdnCard *card)
 
 	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Sportster_card_msg;
 	cs->irq_func = &sportster_interrupt;
 	ISACVersion(cs, "Sportster:");

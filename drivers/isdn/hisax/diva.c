@@ -499,6 +499,10 @@ Memhscx_fill_fifo(struct BCState *bcs)
 	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
 }
 
+static struct bc_l1_ops mem_hscx_l1_ops = {
+	.fill_fifo = Memhscx_fill_fifo,
+};
+
 static inline void
 Memhscx_interrupt(struct IsdnCardState *cs, u8 val, u8 hscx)
 {
@@ -1095,7 +1099,6 @@ ready:
 	}
 	reset_diva(cs);
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
 		cs->dc_hw_ops = &ipac_dc_ops;
@@ -1105,14 +1108,13 @@ ready:
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
 		cs->dc_hw_ops = &mem_ipac_dc_ops;
 		cs->bc_hw_ops = &mem_hscx_ops;
-		cs->BC_Send_Data = &Memhscx_fill_fifo;
+		cs->bc_l1_ops = &mem_hscx_l1_ops;
 		cs->irq_func = &diva_irq_ipac_pci;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPACX_PCI) {
 		cs->dc_hw_ops = &ipacx_dc_ops;
 		cs->bc_hw_ops = &ipacx_bc_ops;
-		cs->BC_Send_Data = &ipacx_fill_fifo;
 		cs->irq_func = &diva_irq_ipacx_pci;
 		printk(KERN_INFO "Diva: IPACX Design Id: %x\n", 
 		       ipacx_dc_read(cs, IPACX_ID) &0x3F);

@@ -707,7 +707,6 @@ ready:
 	       cs->irq);
 
 	cs->bc_hw_ops = &hscx_ops;
-	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Sedl_card_msg;
 
 /*
@@ -789,7 +788,6 @@ ready:
 			cs->auxcmd = &isar_auxcmd;
 			ISACVersion(cs, "Sedlbauer:");
 			cs->bc_hw_ops = &isar_ops;
-			cs->BC_Send_Data = &isar_fill_fifo;
 			ver = ISARVersion(cs, "Sedlbauer:");
 			if (ver < 0) {
 				printk(KERN_WARNING
