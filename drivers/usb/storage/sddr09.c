@@ -1496,7 +1496,9 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
-		return USB_STOR_TRANSPORT_ERROR;
+		sensekey = 0x05;	/* illegal request */
+		sensecode = 0x24;	/* invalid field in CDB */
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 
 	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
@@ -1542,8 +1544,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	if (srb->cmnd[0] != TEST_UNIT_READY &&
 	    srb->cmnd[0] != REQUEST_SENSE) {
+		sensekey = 0x05;	/* illegal request */
+		sensecode = 0x20;	/* invalid command */
 		havefakesense = 1;
-		return USB_STOR_TRANSPORT_ERROR;
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 
 	for (; srb->cmd_len<12; srb->cmd_len++)
