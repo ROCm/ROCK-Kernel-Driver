@@ -8,7 +8,9 @@
  *
  */
 
-#include <asm/pgalloc.h>
+#include <linux/module.h>
+#include <asm/cacheflush.h>
+#include <asm/system.h>
 
 /**
  * sn_flush_all_caches - flush a range of address from all caches (incl. L4)
@@ -26,3 +28,4 @@ sn_flush_all_caches(long flush_addr, long bytes)
 	flush_icache_range(flush_addr, flush_addr+bytes);
 	mb();
 }
+EXPORT_SYMBOL(sn_flush_all_caches);
