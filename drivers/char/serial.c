@@ -4912,7 +4912,7 @@ MODULE_DEVICE_TABLE(pci, serial_pci_tbl);
 static struct pci_driver serial_pci_driver = {
        name:           "serial",
        probe:          serial_init_one,
-       remove:	       serial_remove_one,
+       remove:	       __devexit_p(serial_remove_one),
        id_table:       serial_pci_tbl,
 };
 

@@ -174,11 +174,13 @@ typedef void (*__cleanup_module_func_t)(void);
 #define __devinitdata
 #define __devexit
 #define __devexitdata
+#define __devexit_p(x)  &(x)
 #else
 #define __devinit __init
 #define __devinitdata __initdata
 #define __devexit __exit
 #define __devexitdata __exitdata
+#define __devexit_p(x)  0
 #endif
 
 #endif /* _LINUX_INIT_H */
