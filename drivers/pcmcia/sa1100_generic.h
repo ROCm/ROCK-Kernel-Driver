@@ -73,8 +73,8 @@ struct pcmcia_low_level {
   /*
    * Calculate MECR timing clock wait states
    */
-  int (*socket_get_timing)(unsigned int sock, unsigned int cpu_speed,
-		  unsigned int cmd_time );
+  unsigned int (*socket_get_timing)(unsigned int sock,
+		unsigned int cpu_speed, unsigned int cmd_time);
 };
 
 extern int sa1100_register_pcmcia(struct pcmcia_low_level *);

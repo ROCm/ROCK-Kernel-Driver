@@ -17,6 +17,7 @@
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/errno.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>

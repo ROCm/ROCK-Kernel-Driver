@@ -7,6 +7,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>

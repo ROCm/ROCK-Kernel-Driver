@@ -31,6 +31,7 @@
 #include <asm/irq.h>
 #include <asm/system.h>
 #include <asm/mach/pci.h>
+#include <asm/mach-types.h>
 
 /* 
  * A small note about bridges and interrupts.  The DECchip 21050 (and
@@ -112,7 +113,7 @@ static int __init integrator_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 extern void pci_v3_init(void *);
 
-struct hw_pci integrator_pci __initdata = {
+static struct hw_pci integrator_pci __initdata = {
 	swizzle:		integrator_swizzle,
 	map_irq:		integrator_map_irq,
 	setup:			pci_v3_setup,
@@ -121,3 +122,12 @@ struct hw_pci integrator_pci __initdata = {
 	preinit:		pci_v3_preinit,
 	postinit:		pci_v3_postinit,
 };
+
+static int __init integrator_pci_init(void)
+{
+	if (machine_is_integrator())
+		pci_common_init(&integrator_pci);
+	return 0;
+}
+
+subsys_initcall(integrator_pci_init);

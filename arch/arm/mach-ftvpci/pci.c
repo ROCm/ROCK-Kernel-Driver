@@ -11,6 +11,7 @@
 
 #include <asm/irq.h>
 #include <asm/mach/pci.h>
+#include <asm/mach-types.h>
 
 /*
  * Owing to a PCB cockup, issue A backplanes are wired thus:
@@ -43,9 +44,17 @@ static u8 __init ftv_swizzle(struct pci_dev *dev, u8 *pin)
 }
 
 /* ftv host-specific stuff */
-struct hw_pci ftv_pci __initdata = {
+static struct hw_pci ftv_pci __initdata = {
 	init:		plx90x0_init,
 	swizzle:	ftv_swizzle,
 	map_irq:	ftv_map_irq,
 };
 
+static int __init ftv_pci_init(void)
+{
+	if (machine_is_ftvpci())
+		pci_common_init(&ftv_pci);
+	return 0;
+}
+
+subsys_initcall(ftv_pci_init);

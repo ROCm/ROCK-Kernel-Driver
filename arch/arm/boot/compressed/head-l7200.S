@@ -8,6 +8,7 @@
  */
 
 #include <linux/config.h>
+#include <asm/mach-types.h>
 
 #ifndef CONFIG_ARCH_L7200
 #error What am I doing here...
@@ -26,4 +27,4 @@ __L7200_start:
 		ble	1b
 
 		mov	r8, #0			@ Zero it out
-		mov	r7, #19			@ Set architecture ID
+		mov	r7, #MACH_TYPE_L7200	@ Set architecture ID

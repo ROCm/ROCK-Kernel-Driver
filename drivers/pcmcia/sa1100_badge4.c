@@ -14,6 +14,8 @@
  */
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/device.h>
+#include <linux/errno.h>
 #include <linux/init.h>
 
 #include <asm/hardware.h>
@@ -56,7 +58,7 @@
 
 static int badge4_pcmvcc = 50;
 static int badge4_pcmvpp = 50;
-static int badge4_cfvcc = 0;
+static int badge4_cfvcc = 33;
 
 static int badge4_pcmcia_init(struct pcmcia_init *init)
 {
@@ -90,8 +92,6 @@ static void complain_about_jumpering(const char *whom,
 	       supply,
 	       given / 10, given % 10);
 }
-
-static unsigned badge4_need_5V_bitmap = 0;
 
 static int
 badge4_pcmcia_configure_socket(const struct pcmcia_configure *conf)

@@ -19,6 +19,8 @@
 extern void setup_initrd(unsigned int start, unsigned int size);
 extern void setup_ramdisk(int doload, int prompt, int start, unsigned int rd_sz);
 
+struct tag;
+
 struct machine_desc {
 	/*
 	 * Note! The first four elements are used
@@ -41,7 +43,7 @@ struct machine_desc {
 	unsigned int		reserve_lp2 :1;	/* never has lp2	*/
 	unsigned int		soft_reboot :1;	/* soft reboot		*/
 	void			(*fixup)(struct machine_desc *,
-					 struct param_struct *, char **,
+					 struct tag *, char **,
 					 struct meminfo *);
 	void			(*map_io)(void);/* IO mapping function	*/
 	void			(*init_irq)(void);
