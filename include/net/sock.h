@@ -167,6 +167,9 @@ struct sock_common {
   *	@sk_socket - Identd and reporting IO signals
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
+  *	@sk_send_head - front of stuff to transmit
+  *	@sk_write_pending - a write to stream socket waits to start
+  *	@sk_queue_shrunk - write queue has been shrunk recently
   *	@sk_state_change - callback to indicate change in the state of the sock
   *	@sk_data_ready - callback to indicate there is data to be processed
   *	@sk_write_space - callback to indicate there is bf sending space available
@@ -246,8 +249,12 @@ struct sock {
 	struct timeval		sk_stamp;
 	struct socket		*sk_socket;
 	void			*sk_user_data;
+	struct sk_buff		*sk_send_head;
 	struct module		*sk_owner;
+	int			sk_write_pending;
 	void			*sk_security;
+	__u8			sk_queue_shrunk;
+	/* three bytes hole, try to pack */
 	void			(*sk_state_change)(struct sock *sk);
 	void			(*sk_data_ready)(struct sock *sk, int bytes);
 	void			(*sk_write_space)(struct sock *sk);
@@ -434,6 +441,24 @@ static inline int sk_stream_memory_free(struct sock *sk)
 	return sk->sk_wmem_queued < sk->sk_sndbuf;
 }
 
+extern void sk_stream_rfree(struct sk_buff *skb);
+
+static inline void sk_stream_set_owner_r(struct sk_buff *skb, struct sock *sk)
+{
+	skb->sk = sk;
+	skb->destructor = sk_stream_rfree;
+	atomic_add(skb->truesize, &sk->sk_rmem_alloc);
+	sk->sk_forward_alloc -= skb->truesize;
+}
+
+static inline void sk_stream_free_skb(struct sock *sk, struct sk_buff *skb)
+{
+	sk->sk_queue_shrunk   = 1;
+	sk->sk_wmem_queued   -= skb->truesize;
+	sk->sk_forward_alloc += skb->truesize;
+	__kfree_skb(skb);
+}
+
 /* The per-socket spinlock must be held here. */
 #define sk_add_backlog(__sk, __skb)				\
 do {	if (!(__sk)->sk_backlog.tail) {				\
@@ -457,6 +482,11 @@ do {	if (!(__sk)->sk_backlog.tail) {				\
 	lock_sock(__sk);					\
 	rc;							\
 })
+
+extern int sk_stream_wait_connect(struct sock *sk, long *timeo_p);
+extern int sk_stream_wait_memory(struct sock *sk, long *timeo_p);
+extern void sk_stream_wait_close(struct sock *sk, long timeo_p);
+extern int sk_stream_error(struct sock *sk, int flags, int err);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 
@@ -1066,6 +1096,20 @@ static inline void sk_wake_async(struct sock *sk, int how, int band)
 
 #define SOCK_MIN_SNDBUF 2048
 #define SOCK_MIN_RCVBUF 256
+
+static inline void sk_stream_moderate_sndbuf(struct sock *sk)
+{
+	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK)) {
+		sk->sk_sndbuf = min(sk->sk_sndbuf, sk->sk_wmem_queued / 2);
+		sk->sk_sndbuf = max(sk->sk_sndbuf, SOCK_MIN_SNDBUF);
+	}
+}
+
+#define sk_stream_for_retrans_queue(skb, sk)				\
+		for (skb = (sk)->sk_write_queue.next;			\
+		     (skb != (sk)->sk_send_head) &&			\
+		     (skb != (struct sk_buff *)&(sk)->sk_write_queue);	\
+		     skb = skb->next)
 
 /*
  *	Default write policy as shown to user space via poll/select/SIGIO

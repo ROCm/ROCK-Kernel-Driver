@@ -156,6 +156,7 @@ struct skb_shared_info {
  *	@sk: Socket we are owned by
  *	@stamp: Time we arrived
  *	@dev: Device we arrived on/are leaving by
+ *	@input_dev: Device we arrived on
  *      @real_dev: The real device we are using
  *	@h: Transport layer header
  *	@nh: Network layer header
@@ -198,6 +199,7 @@ struct sk_buff {
 	struct sock		*sk;
 	struct timeval		stamp;
 	struct net_device	*dev;
+	struct net_device	*input_dev;
 	struct net_device	*real_dev;
 
 	union {
@@ -263,8 +265,14 @@ struct sk_buff {
 	} private;
 #endif
 #ifdef CONFIG_NET_SCHED
-       __u32			tc_index;               /* traffic control index */
+       __u32			tc_index;        /* traffic control index */
+#ifdef CONFIG_NET_CLS_ACT
+	__u32           tc_verd;               /* traffic control verdict */
+	__u32           tc_classid;            /* traffic control classid */
+ #endif
+
 #endif
+
 
 	/* These elements must be at the end, see alloc_skb() for details.  */
 	unsigned int		truesize;
@@ -1109,6 +1117,14 @@ static inline void nf_conntrack_get(struct nf_ct_info *nfct)
 	if (nfct)
 		atomic_inc(&nfct->master->use);
 }
+static inline void nf_reset(struct sk_buff *skb)
+{
+	nf_conntrack_put(skb->nfct);
+	skb->nfct = NULL;
+#ifdef CONFIG_NETFILTER_DEBUG
+	skb->nf_debug = 0;
+#endif
+}
 
 #ifdef CONFIG_BRIDGE_NETFILTER
 static inline void nf_bridge_put(struct nf_bridge_info *nf_bridge)
@@ -1121,9 +1137,10 @@ static inline void nf_bridge_get(struct nf_bridge_info *nf_bridge)
 	if (nf_bridge)
 		atomic_inc(&nf_bridge->use);
 }
-#endif
-
-#endif
+#endif /* CONFIG_BRIDGE_NETFILTER */
+#else /* CONFIG_NETFILTER */
+static inline void nf_reset(struct sk_buff *skb) {}
+#endif /* CONFIG_NETFILTER */
 
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */

@@ -11,6 +11,7 @@
  * Changes:
  *
  * Eduardo J. Blanco <ejbs@netlabs.com.uy> :990222: kmod support
+ *
  */
 
 #include <asm/uaccess.h>
@@ -35,6 +36,12 @@
 #include <linux/kmod.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
+
+#if 0 /* control */
+#define DPRINTK(format,args...) printk(KERN_DEBUG format,##args)
+#else
+#define DPRINTK(format,args...)
+#endif
 
 /* The list of all installed classifier types */
 
@@ -132,7 +139,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
 	unsigned long cl = 0;
-	unsigned long fh;
+	unsigned long fh, fh_s;
 	int err;
 
 	if (prio == 0) {
@@ -238,7 +245,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	} else if (tca[TCA_KIND-1] && rtattr_strcmp(tca[TCA_KIND-1], tp->ops->kind))
 		goto errout;
 
-	fh = tp->ops->get(tp, t->tcm_handle);
+	fh_s = fh = tp->ops->get(tp, t->tcm_handle);
 
 	if (fh == 0) {
 		if (n->nlmsg_type == RTM_DELTFILTER && t->tcm_handle == 0) {
@@ -247,6 +254,7 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			*back = tp->next;
 			spin_unlock_bh(&dev->queue_lock);
 			write_unlock(&qdisc_tree_lock);
+			tfilter_notify(skb, n, tp, fh_s, RTM_DELTFILTER);
 			tcf_destroy(tp);
 			err = 0;
 			goto errout;
@@ -264,6 +272,8 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 			break;
 		case RTM_DELTFILTER:
 			err = tp->ops->delete(tp, fh);
+			if (err == 0)
+				tfilter_notify(skb, n, tp, fh_s, RTM_DELTFILTER);
 			goto errout;
 		case RTM_GETTFILTER:
 			err = tfilter_notify(skb, n, tp, fh, RTM_NEWTFILTER);
@@ -298,11 +308,14 @@ tcf_fill_node(struct sk_buff *skb, struct tcf_proto *tp, unsigned long fh,
 	tcm->tcm_family = AF_UNSPEC;
 	tcm->tcm_ifindex = tp->q->dev->ifindex;
 	tcm->tcm_parent = tp->classid;
-	tcm->tcm_handle = 0;
 	tcm->tcm_info = TC_H_MAKE(tp->prio, tp->protocol);
 	RTA_PUT(skb, TCA_KIND, IFNAMSIZ, tp->ops->kind);
-	if (tp->ops->dump && tp->ops->dump(tp, fh, skb, tcm) < 0)
-		goto rtattr_failure;
+	tcm->tcm_handle = fh;
+	if (RTM_DELTFILTER != event) {
+		tcm->tcm_handle = 0;
+		if (tp->ops->dump && tp->ops->dump(tp, fh, skb, tcm) < 0)
+			goto rtattr_failure;
+	}
 	nlh->nlmsg_len = skb->tail - b;
 	return skb->len;
 

@@ -199,7 +199,7 @@ superio_exit(void)
 #define W83627THF_REG_PWM2		0x03	/* 697HF and 637HF too */
 #define W83627THF_REG_PWM3		0x11	/* 637HF too */
 
-#define W83627THF_REG_VRM_OVT_CFG 	0x18	/* 637HF too, unused yet */
+#define W83627THF_REG_VRM_OVT_CFG 	0x18	/* 637HF too */
 
 static const u8 regpwm_627hf[] = { W83627HF_REG_PWM1, W83627HF_REG_PWM2 };
 static const u8 regpwm[] = { W83627THF_REG_PWM1, W83627THF_REG_PWM2,
@@ -222,7 +222,7 @@ static const u8 BIT_SCFG2[] = { 0x10, 0x20, 0x40 };
    these macros are called: arguments may be evaluated more than once.
    Fixing this is just not worth it. */
 #define IN_TO_REG(val)  (SENSORS_LIMIT((((val) + 8)/16),0,255))
-#define IN_FROM_REG(val) ((val) * 16 + 5)
+#define IN_FROM_REG(val) ((val) * 16)
 
 static inline u8 FAN_TO_REG(long rpm, int div)
 {
@@ -312,6 +312,7 @@ struct w83627hf_data {
 				   Default = 3435.
 				   Other Betas unimplemented */
 	u8 vrm;
+	u8 vrm_ovt;		/* Register value, 627thf & 637hf only */
 };
 
 
@@ -370,7 +371,7 @@ show_regs_in_##offset (struct device *dev, char *buf) \
 { \
         return show_in(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL);
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
@@ -384,22 +385,104 @@ store_regs_in_##reg##offset (struct device *dev, \
 	return store_in_##reg (dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, \
-		  show_regs_in_##reg##offset, store_regs_in_##reg##offset)
+		  show_regs_in_##reg##offset, store_regs_in_##reg##offset);
 
 #define sysfs_in_offsets(offset) \
 sysfs_in_offset(offset) \
 sysfs_in_reg_offset(min, offset) \
 sysfs_in_reg_offset(max, offset)
 
-sysfs_in_offsets(0)
-sysfs_in_offsets(1)
-sysfs_in_offsets(2)
-sysfs_in_offsets(3)
-sysfs_in_offsets(4)
-sysfs_in_offsets(5)
-sysfs_in_offsets(6)
-sysfs_in_offsets(7)
-sysfs_in_offsets(8)
+sysfs_in_offsets(1);
+sysfs_in_offsets(2);
+sysfs_in_offsets(3);
+sysfs_in_offsets(4);
+sysfs_in_offsets(5);
+sysfs_in_offsets(6);
+sysfs_in_offsets(7);
+sysfs_in_offsets(8);
+
+/* use a different set of functions for in0 */
+static ssize_t show_in_0(struct w83627hf_data *data, char *buf, u8 reg)
+{
+	long in0;
+
+	if ((data->vrm_ovt & 0x01) &&
+		(w83627thf == data->type || w83637hf == data->type))
+
+		/* use VRM9 calculation */
+		in0 = (long)((reg * 488 + 70000 + 50) / 100);
+	else
+		/* use VRM8 (standard) calculation */
+		in0 = (long)IN_FROM_REG(reg);
+
+	return sprintf(buf,"%ld\n", in0);
+}
+
+static ssize_t show_regs_in_0(struct device *dev, char *buf)
+{
+	struct w83627hf_data *data = w83627hf_update_device(dev);
+	return show_in_0(data, buf, data->in[0]);
+}
+
+static ssize_t show_regs_in_min0(struct device *dev, char *buf)
+{
+	struct w83627hf_data *data = w83627hf_update_device(dev);
+	return show_in_0(data, buf, data->in_min[0]);
+}
+
+static ssize_t show_regs_in_max0(struct device *dev, char *buf)
+{
+	struct w83627hf_data *data = w83627hf_update_device(dev);
+	return show_in_0(data, buf, data->in_max[0]);
+}
+
+static ssize_t store_regs_in_min0(struct device *dev,
+	const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct w83627hf_data *data = i2c_get_clientdata(client);
+	u32 val;
+
+	val = simple_strtoul(buf, NULL, 10);
+	if ((data->vrm_ovt & 0x01) &&
+		(w83627thf == data->type || w83637hf == data->type))
+
+		/* use VRM9 calculation */
+		data->in_min[0] = (u8)(((val * 100) - 70000 + 244) / 488);
+	else
+		/* use VRM8 (standard) calculation */
+		data->in_min[0] = IN_TO_REG(val);
+
+	w83627hf_write_value(client, W83781D_REG_IN_MIN(0), data->in_min[0]);
+	return count;
+}
+
+static ssize_t store_regs_in_max0(struct device *dev,
+	const char *buf, size_t count)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct w83627hf_data *data = i2c_get_clientdata(client);
+	u32 val;
+
+	val = simple_strtoul(buf, NULL, 10);
+	if ((data->vrm_ovt & 0x01) &&
+		(w83627thf == data->type || w83637hf == data->type))
+		
+		/* use VRM9 calculation */
+		data->in_max[0] = (u8)(((val * 100) - 70000 + 244) / 488);
+	else
+		/* use VRM8 (standard) calculation */
+		data->in_max[0] = IN_TO_REG(val);
+
+	w83627hf_write_value(client, W83781D_REG_IN_MAX(0), data->in_max[0]);
+	return count;
+}
+
+static DEVICE_ATTR(in0_input, S_IRUGO, show_regs_in_0, NULL);
+static DEVICE_ATTR(in0_min, S_IRUGO | S_IWUSR,
+	show_regs_in_min0, store_regs_in_min0);
+static DEVICE_ATTR(in0_max, S_IRUGO | S_IWUSR,
+	show_regs_in_max0, store_regs_in_max0);
 
 #define device_create_file_in(client, offset) \
 do { \
@@ -416,8 +499,8 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 		FAN_FROM_REG(data->reg[nr-1], \
 			    (long)DIV_FROM_REG(data->fan_div[nr-1]))); \
 }
-show_fan_reg(fan)
-show_fan_reg(fan_min)
+show_fan_reg(fan);
+show_fan_reg(fan_min);
 
 static ssize_t
 store_fan_min(struct device *dev, const char *buf, size_t count, int nr)
@@ -440,7 +523,7 @@ static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL)
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL);
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
@@ -453,14 +536,14 @@ store_regs_fan_min##offset (struct device *dev, const char *buf, size_t count) \
 	return store_fan_min(dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, \
-		  show_regs_fan_min##offset, store_regs_fan_min##offset)
+		  show_regs_fan_min##offset, store_regs_fan_min##offset);
 
-sysfs_fan_offset(1)
-sysfs_fan_min_offset(1)
-sysfs_fan_offset(2)
-sysfs_fan_min_offset(2)
-sysfs_fan_offset(3)
-sysfs_fan_min_offset(3)
+sysfs_fan_offset(1);
+sysfs_fan_min_offset(1);
+sysfs_fan_offset(2);
+sysfs_fan_min_offset(2);
+sysfs_fan_offset(3);
+sysfs_fan_min_offset(3);
 
 #define device_create_file_fan(client, offset) \
 do { \
@@ -479,9 +562,9 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 		return sprintf(buf,"%ld\n", (long)TEMP_FROM_REG(data->reg)); \
 	} \
 }
-show_temp_reg(temp)
-show_temp_reg(temp_max)
-show_temp_reg(temp_max_hyst)
+show_temp_reg(temp);
+show_temp_reg(temp_max);
+show_temp_reg(temp_max_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t \
@@ -505,8 +588,8 @@ store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
 	 \
 	return count; \
 }
-store_temp_reg(OVER, max)
-store_temp_reg(HYST, max_hyst)
+store_temp_reg(OVER, max);
+store_temp_reg(HYST, max_hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -514,7 +597,7 @@ show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL)
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL);
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
@@ -528,16 +611,16 @@ store_regs_temp_##reg##offset (struct device *dev, \
 	return store_temp_##reg (dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, \
-		  show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
+		  show_regs_temp_##reg##offset, store_regs_temp_##reg##offset);
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset) \
 sysfs_temp_reg_offset(max, offset) \
 sysfs_temp_reg_offset(max_hyst, offset)
 
-sysfs_temp_offsets(1)
-sysfs_temp_offsets(2)
-sysfs_temp_offsets(3)
+sysfs_temp_offsets(1);
+sysfs_temp_offsets(2);
+sysfs_temp_offsets(3);
 
 #define device_create_file_temp(client, offset) \
 do { \
@@ -552,7 +635,7 @@ show_vid_reg(struct device *dev, char *buf)
 	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
-static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL);
 #define device_create_file_vid(client) \
 device_create_file(&client->dev, &dev_attr_in0_ref)
 
@@ -574,7 +657,7 @@ store_vrm_reg(struct device *dev, const char *buf, size_t count)
 
 	return count;
 }
-static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg)
+static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg);
 #define device_create_file_vrm(client) \
 device_create_file(&client->dev, &dev_attr_vrm)
 
@@ -584,7 +667,7 @@ show_alarms_reg(struct device *dev, char *buf)
 	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->alarms);
 }
-static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
+static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL);
 #define device_create_file_alarms(client) \
 device_create_file(&client->dev, &dev_attr_alarms)
 
@@ -641,10 +724,10 @@ store_regs_beep_##reg (struct device *dev, const char *buf, size_t count) \
 	return store_beep_reg(dev, buf, count, BEEP_##REG); \
 } \
 static DEVICE_ATTR(beep_##reg, S_IRUGO | S_IWUSR, \
-		  show_regs_beep_##reg, store_regs_beep_##reg)
+		  show_regs_beep_##reg, store_regs_beep_##reg);
 
-sysfs_beep(ENABLE, enable)
-sysfs_beep(MASK, mask)
+sysfs_beep(ENABLE, enable);
+sysfs_beep(MASK, mask);
 
 #define device_create_file_beep(client) \
 do { \
@@ -707,11 +790,11 @@ store_regs_fan_div_##offset (struct device *dev, \
 	return store_fan_div_reg(dev, buf, count, offset - 1); \
 } \
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, \
-		  show_regs_fan_div_##offset, store_regs_fan_div_##offset)
+		  show_regs_fan_div_##offset, store_regs_fan_div_##offset);
 
-sysfs_fan_div(1)
-sysfs_fan_div(2)
-sysfs_fan_div(3)
+sysfs_fan_div(1);
+sysfs_fan_div(2);
+sysfs_fan_div(3);
 
 #define device_create_file_fan_div(client, offset) \
 do { \
@@ -763,11 +846,11 @@ store_regs_pwm_##offset (struct device *dev, const char *buf, size_t count) \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, \
-		  show_regs_pwm_##offset, store_regs_pwm_##offset)
+		  show_regs_pwm_##offset, store_regs_pwm_##offset);
 
-sysfs_pwm(1)
-sysfs_pwm(2)
-sysfs_pwm(3)
+sysfs_pwm(1);
+sysfs_pwm(2);
+sysfs_pwm(3);
 
 #define device_create_file_pwm(client, offset) \
 do { \
@@ -836,11 +919,11 @@ store_regs_sensor_##offset (struct device *dev, const char *buf, size_t count) \
     return store_sensor_reg(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, \
-		  show_regs_sensor_##offset, store_regs_sensor_##offset)
+		  show_regs_sensor_##offset, store_regs_sensor_##offset);
 
-sysfs_sensor(1)
-sysfs_sensor(2)
-sysfs_sensor(3)
+sysfs_sensor(1);
+sysfs_sensor(2);
+sysfs_sensor(3);
 
 #define device_create_file_sensor(client, offset) \
 do { \
@@ -1157,7 +1240,7 @@ static int w83627hf_write_value(struct i2c_client *client, u16 reg, u16 value)
 static void w83627hf_init_client(struct i2c_client *client)
 {
 	struct w83627hf_data *data = i2c_get_clientdata(client);
-	int vid = 0, i;
+	int i;
 	int type = data->type;
 	u8 tmp;
 
@@ -1191,10 +1274,15 @@ static void w83627hf_init_client(struct i2c_client *client)
 		data->vid = w83627thf_read_gpio5(client) & 0x1f;
 	}
 
-	/* Convert VID to voltage based on default VRM */
-	data->vrm = DEFAULT_VRM;
-	if (type != w83697hf)
-		vid = vid_from_reg(vid, data->vrm);
+	/* Read VRM & OVT Config only once */
+	if (w83627thf == data->type || w83637hf == data->type) {
+		data->vrm_ovt = 
+			w83627hf_read_value(client, W83627THF_REG_VRM_OVT_CFG);
+		data->vrm = (data->vrm_ovt & 0x01) ? 90 : 82;
+	} else {
+		/* Convert VID to voltage based on default VRM */
+		data->vrm = DEFAULT_VRM;
+	}
 
 	tmp = w83627hf_read_value(client, W83781D_REG_SCFG1);
 	for (i = 1; i <= 3; i++) {

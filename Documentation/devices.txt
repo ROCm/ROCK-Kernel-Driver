@@ -2377,16 +2377,16 @@ Your cooperation is appreciated.
 		  1 = /dev/gpib1	Second GPIB bus
 		    ...
 
-160 block       Carmel 8-port SATA Disks on First Controller
-		  0 = /dev/carmel/0     SATA disk 0 whole disk
-		  1 = /dev/carmel/0p1   SATA disk 0 partition 1
+160 block       Promise SX8 8-port SATA Disks on First Controller
+		  0 = /dev/sx8/0     SATA disk 0 whole disk
+		  1 = /dev/sx8/0p1   SATA disk 0 partition 1
 		    ...
-		 31 = /dev/carmel/0p31  SATA disk 0 partition 31
+		 31 = /dev/sx8/0p31  SATA disk 0 partition 31
 
-		 32 = /dev/carmel/1     SATA disk 1 whole disk
-		 64 = /dev/carmel/2     SATA disk 2 whole disk
+		 32 = /dev/sx8/1     SATA disk 1 whole disk
+		 64 = /dev/sx8/2     SATA disk 2 whole disk
 		    ...
-		224 = /dev/carmel/7     SATA disk 7 whole disk
+		224 = /dev/sx8/7     SATA disk 7 whole disk
 
 		Partitions are handled in the same way as for IDE
 		disks (see major number 3) except that the limit on
@@ -2400,16 +2400,16 @@ Your cooperation is appreciated.
 		 17 = /dev/irlpt1	Second IrLPT device
 		    ...
 
-161 block       Carmel 8-port SATA Disks on Second Controller
-		  0 = /dev/carmel/8     SATA disk 8 whole disk
-		  1 = /dev/carmel/8p1   SATA disk 8 partition 1
+161 block       Promise SX8 8-port SATA Disks on Second Controller
+		  0 = /dev/sx8/8     SATA disk 8 whole disk
+		  1 = /dev/sx8/8p1   SATA disk 8 partition 1
 		    ...
-		 31 = /dev/carmel/8p31  SATA disk 8 partition 31
+		 31 = /dev/sx8/8p31  SATA disk 8 partition 31
 
-		 32 = /dev/carmel/9     SATA disk 9 whole disk
-		 64 = /dev/carmel/10    SATA disk 10 whole disk
+		 32 = /dev/sx8/9     SATA disk 9 whole disk
+		 64 = /dev/sx8/10    SATA disk 10 whole disk
 		    ...
-		224 = /dev/carmel/15    SATA disk 15 whole disk
+		224 = /dev/sx8/15    SATA disk 15 whole disk
 
 		Partitions are handled in the same way as for IDE
 		disks (see major number 3) except that the limit on

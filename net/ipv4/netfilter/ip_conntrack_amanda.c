@@ -107,7 +107,7 @@ static int help(struct sk_buff *skb,
 		exp->mask.dst.u.tcp.port = 0xFFFF;
 
 		exp_amanda_info = &exp->help.exp_amanda_info;
-		exp_amanda_info->offset = data - amanda_buffer;
+		exp_amanda_info->offset = tmp - amanda_buffer;
 		exp_amanda_info->port   = port;
 		exp_amanda_info->len    = len;
 

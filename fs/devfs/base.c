@@ -2490,7 +2490,8 @@ static int devfs_mknod(struct inode *dir, struct dentry *dentry, int mode,
 	return 0;
 }				/*  End Function devfs_mknod  */
 
-static int devfs_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int devfs_readlink(struct dentry *dentry, char __user *buffer,
+			  int buflen)
 {
 	int err;
 	struct devfs_entry *de;

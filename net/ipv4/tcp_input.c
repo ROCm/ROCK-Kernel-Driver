@@ -1009,7 +1009,7 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 		if (after(end_seq, tp->high_seq))
 			flag |= FLAG_DATA_LOST;
 
-		for_retrans_queue(skb, sk, tp) {
+		sk_stream_for_retrans_queue(skb, sk) {
 			u8 sacked = TCP_SKB_CB(skb)->sacked;
 			int in_sack;
 
@@ -1113,7 +1113,7 @@ tcp_sacktag_write_queue(struct sock *sk, struct sk_buff *ack_skb, u32 prior_snd_
 	if (lost_retrans && tp->ca_state == TCP_CA_Recovery) {
 		struct sk_buff *skb;
 
-		for_retrans_queue(skb, sk, tp) {
+		sk_stream_for_retrans_queue(skb, sk) {
 			if (after(TCP_SKB_CB(skb)->seq, lost_retrans))
 				break;
 			if (!after(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
@@ -1179,7 +1179,7 @@ void tcp_enter_frto(struct sock *sk)
 	tp->undo_marker = tp->snd_una;
 	tp->undo_retrans = 0;
 
-	for_retrans_queue(skb, sk, tp) {
+	sk_stream_for_retrans_queue(skb, sk) {
 		TCP_SKB_CB(skb)->sacked &= ~TCPCB_RETRANS;
 	}
 	tcp_sync_left_out(tp);
@@ -1202,7 +1202,7 @@ static void tcp_enter_frto_loss(struct sock *sk)
 	tp->lost_out = 0;
 	tp->fackets_out = 0;
 
-	for_retrans_queue(skb, sk, tp) {
+	sk_stream_for_retrans_queue(skb, sk) {
 		cnt++;
 		TCP_SKB_CB(skb)->sacked &= ~TCPCB_LOST;
 		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_ACKED)) {
@@ -1275,7 +1275,7 @@ void tcp_enter_loss(struct sock *sk, int how)
 	if (!how)
 		tp->undo_marker = tp->snd_una;
 
-	for_retrans_queue(skb, sk, tp) {
+	sk_stream_for_retrans_queue(skb, sk) {
 		cnt++;
 		if (TCP_SKB_CB(skb)->sacked&TCPCB_RETRANS)
 			tp->undo_marker = 0;
@@ -1518,7 +1518,7 @@ tcp_mark_head_lost(struct sock *sk, struct tcp_opt *tp, int packets, u32 high_se
 
 	BUG_TRAP(cnt <= tp->packets_out);
 
-	for_retrans_queue(skb, sk, tp) {
+	sk_stream_for_retrans_queue(skb, sk) {
 		if (--cnt < 0 || after(TCP_SKB_CB(skb)->end_seq, high_seq))
 			break;
 		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_TAGBITS)) {
@@ -1550,7 +1550,7 @@ static void tcp_update_scoreboard(struct sock *sk, struct tcp_opt *tp)
 	if (tcp_head_timedout(sk, tp)) {
 		struct sk_buff *skb;
 
-		for_retrans_queue(skb, sk, tp) {
+		sk_stream_for_retrans_queue(skb, sk) {
 			if (tcp_skb_timedout(tp, skb) &&
 			    !(TCP_SKB_CB(skb)->sacked&TCPCB_TAGBITS)) {
 				TCP_SKB_CB(skb)->sacked |= TCPCB_LOST;
@@ -1719,7 +1719,7 @@ static int tcp_try_undo_loss(struct sock *sk, struct tcp_opt *tp)
 {
 	if (tcp_may_undo(tp)) {
 		struct sk_buff *skb;
-		for_retrans_queue(skb, sk, tp) {
+		sk_stream_for_retrans_queue(skb, sk) {
 			TCP_SKB_CB(skb)->sacked &= ~TCPCB_LOST;
 		}
 		DBGUNDO(sk, tp, "partial loss");
@@ -2328,7 +2328,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 	int acked = 0;
 	__s32 seq_rtt = -1;
 
-	while ((skb = skb_peek(&sk->sk_write_queue)) && skb != tp->send_head) {
+	while ((skb = skb_peek(&sk->sk_write_queue)) && skb != sk->sk_send_head) {
 		struct tcp_skb_cb *scb = TCP_SKB_CB(skb); 
 		__u8 sacked = scb->sacked;
 
@@ -2376,7 +2376,7 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 			tp->fackets_out--;
 		tp->packets_out--;
 		__skb_unlink(skb, skb->list);
-		tcp_free_skb(sk, skb);
+		sk_stream_free_skb(sk, skb);
 	}
 
 	if (acked&FLAG_ACKED) {
@@ -2416,7 +2416,7 @@ static void tcp_ack_probe(struct sock *sk)
 
 	/* Was it a usable window open? */
 
-	if (!after(TCP_SKB_CB(tp->send_head)->end_seq,
+	if (!after(TCP_SKB_CB(sk->sk_send_head)->end_seq,
 		   tp->snd_una + tp->snd_wnd)) {
 		tp->backoff = 0;
 		tcp_clear_xmit_timer(sk, TCP_TIME_PROBE0);
@@ -2857,7 +2857,7 @@ no_queue:
 	 * being used to time the probes, and is probably far higher than
 	 * it needs to be for normal retransmission.
 	 */
-	if (tp->send_head)
+	if (sk->sk_send_head)
 		tcp_ack_probe(sk);
 	return 1;
 
@@ -3461,7 +3461,7 @@ queue_and_out:
 				if (tcp_prune_queue(sk) < 0 || !tcp_rmem_schedule(sk, skb))
 					goto drop;
 			}
-			tcp_set_owner_r(skb, sk);
+			sk_stream_set_owner_r(skb, sk);
 			__skb_queue_tail(&sk->sk_receive_queue, skb);
 		}
 		tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
@@ -3542,7 +3542,7 @@ drop:
 	SOCK_DEBUG(sk, "out of order segment: rcv_next %X seq %X - %X\n",
 		   tp->rcv_nxt, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
 
-	tcp_set_owner_r(skb, sk);
+	sk_stream_set_owner_r(skb, sk);
 
 	if (!skb_peek(&tp->out_of_order_queue)) {
 		/* Initial out of order segment, build 1 SACK. */
@@ -3681,7 +3681,7 @@ tcp_collapse(struct sock *sk, struct sk_buff *head,
 		memcpy(nskb->cb, skb->cb, sizeof(skb->cb));
 		TCP_SKB_CB(nskb)->seq = TCP_SKB_CB(nskb)->end_seq = start;
 		__skb_insert(nskb, skb->prev, skb, skb->list);
-		tcp_set_owner_r(nskb, sk);
+		sk_stream_set_owner_r(nskb, sk);
 
 		/* Copy data, releasing collapsed skbs. */
 		while (copy > 0) {
@@ -3837,7 +3837,7 @@ void tcp_cwnd_application_limited(struct sock *sk)
 
 
 /* When incoming ACK allowed to free some skb from write_queue,
- * we remember this event in flag tp->queue_shrunk and wake up socket
+ * we remember this event in flag sk->sk_queue_shrunk and wake up socket
  * on the exit from tcp input handler.
  *
  * PROBLEM: sndbuf expansion does not work well with largesend.
@@ -3865,10 +3865,8 @@ static void tcp_new_space(struct sock *sk)
 
 static inline void tcp_check_space(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
-
-	if (tp->queue_shrunk) {
-		tp->queue_shrunk = 0;
+	if (sk->sk_queue_shrunk) {
+		sk->sk_queue_shrunk = 0;
 		if (sk->sk_socket &&
 		    test_bit(SOCK_NOSPACE, &sk->sk_socket->flags))
 			tcp_new_space(sk);
@@ -3887,8 +3885,7 @@ static void __tcp_data_snd_check(struct sock *sk, struct sk_buff *skb)
 
 static __inline__ void tcp_data_snd_check(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
-	struct sk_buff *skb = tp->send_head;
+	struct sk_buff *skb = sk->sk_send_head;
 
 	if (skb != NULL)
 		__tcp_data_snd_check(sk, skb);
@@ -4242,7 +4239,7 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 				/* Bulk data transfer: receiver */
 				__skb_pull(skb,tcp_header_len);
 				__skb_queue_tail(&sk->sk_receive_queue, skb);
-				tcp_set_owner_r(skb, sk);
+				sk_stream_set_owner_r(skb, sk);
 				tp->rcv_nxt = TCP_SKB_CB(skb)->end_seq;
 			}
 
@@ -4482,7 +4479,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			sk_wake_async(sk, 0, POLL_OUT);
 		}
 
-		if (tp->write_pending || tp->defer_accept || tp->ack.pingpong) {
+		if (sk->sk_write_pending || tp->defer_accept || tp->ack.pingpong) {
 			/* Save one ACK. Data will be ready after
 			 * several ticks, if write_pending is set.
 			 *

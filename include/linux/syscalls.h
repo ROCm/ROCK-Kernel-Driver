@@ -382,7 +382,7 @@ asmlinkage long sys_fchdir(unsigned int fd);
 asmlinkage long sys_rmdir(const char __user *pathname);
 asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user *buf, size_t len);
 asmlinkage long sys_quotactl(unsigned int cmd, const char __user *special,
-				qid_t id, caddr_t addr);
+				qid_t id, void __user *addr);
 asmlinkage long sys_getdents(unsigned int fd,
 				struct linux_dirent __user *dirent,
 				unsigned int count);

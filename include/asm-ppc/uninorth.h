@@ -142,6 +142,12 @@
  */
 #define UNI_N_HWINIT_STATE_CPU1_FLAG	0x10000000
 
+/* This register controls AACK delay, which is set when 2004 iBook/PowerBook
+ * is in low speed mode.
+ */
+#define UNI_N_AACK_DELAY		0x0100
+#define UNI_N_AACK_DELAY_ENABLE		0x00000001
+
 /* Uninorth 1.5 rev. has additional perf. monitor registers at 0xf00-0xf50 */
 
 

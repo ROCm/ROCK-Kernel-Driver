@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/time-acorn.c
+ *  linux/arch/arm/common/time-acorn.c
  *
  *  Copyright (c) 1996-2000 Russell King.
  *
@@ -11,6 +11,7 @@
  *   24-Sep-1996	RMK	Created
  *   10-Oct-1996	RMK	Brought up to date with arch-sa110eval
  *   04-Dec-1997	RMK	Updated for new arch/arm/time.c
+ *   13=Jun-2004	DS	Moved to arch/arm/common b/c shared w/CLPS7500
  */
 #include <linux/timex.h>
 #include <linux/init.h>
@@ -19,7 +20,7 @@
 #include <asm/io.h>
 #include <asm/hardware/ioc.h>
 
-extern unsigned long (*gettimeoffset)(void);
+#include <asm/mach/time.h>
 
 static unsigned long ioctime_gettimeoffset(void)
 {

@@ -57,6 +57,7 @@ enum {
 	ich5_pata		= 0,
 	ich5_sata		= 1,
 	piix4_pata		= 2,
+	ich6_sata		= 3,
 };
 
 static int piix_init_one (struct pci_dev *pdev,
@@ -91,10 +92,8 @@ static struct pci_device_id piix_pci_tbl[] = {
 	 * and enhanced mode, with queueing and other fancy stuff.
 	 * This is distinguished by PCI class code.
 	 */
-	{ 0x8086, 0x2651, PCI_ANY_ID, PCI_ANY_ID,
-	  PCI_CLASS_STORAGE_IDE << 8, 0xffff00, ich5_sata },
-	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID,
-	  PCI_CLASS_STORAGE_IDE << 8, 0xffff00, ich5_sata },
+	{ 0x8086, 0x2651, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
+	{ 0x8086, 0x2652, PCI_ANY_ID, PCI_ANY_ID, 0, 0, ich6_sata },
 
 	{ }	/* terminate list */
 };
@@ -138,7 +137,7 @@ static struct ata_port_operations piix_pata_ops = {
 
 	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
@@ -161,7 +160,7 @@ static struct ata_port_operations piix_sata_ops = {
 
 	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
-	.fill_sg		= ata_fill_sg,
+	.qc_prep		= ata_qc_prep,
 	.eng_timeout		= ata_eng_timeout,
 
 	.irq_handler		= ata_interrupt,
@@ -198,6 +197,17 @@ static struct ata_port_info piix_port_info[] = {
 		.pio_mask	= 0x03, /* pio3-4 */
 		.udma_mask	= ATA_UDMA_MASK_40C, /* FIXME: cbl det */
 		.port_ops	= &piix_pata_ops,
+	},
+
+	/* ich6_sata */
+	{
+		.sht		= &piix_sht,
+		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_SRST |
+				  PIIX_FLAG_COMBINED | PIIX_FLAG_CHECKINTR |
+				  ATA_FLAG_SLAVE_POSS,
+		.pio_mask	= 0x03,	/* pio3-4 */
+		.udma_mask	= 0x7f,	/* udma0-6 ; FIXME */
+		.port_ops	= &piix_sata_ops,
 	},
 };
 
@@ -327,13 +337,6 @@ static int piix_sata_probe (struct ata_port *ap)
 
 static void piix_sata_phy_reset(struct ata_port *ap)
 {
-	if (!pci_test_config_bits(ap->host_set->pdev,
-				  &piix_enable_bits[ap->port_no])) {
-		ata_port_disable(ap);
-		printk(KERN_INFO "ata%u: port disabled. ignoring.\n", ap->id);
-		return;
-	}
-
 	if (!piix_sata_probe(ap)) {
 		ata_port_disable(ap);
 		printk(KERN_INFO "ata%u: SATA port has no device.\n", ap->id);

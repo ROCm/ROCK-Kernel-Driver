@@ -173,7 +173,9 @@ ipt_local_hook(unsigned int hook,
 	if (ret != NF_DROP && ret != NF_STOLEN && ret != NF_QUEUE
 	    && ((*pskb)->nh.iph->saddr != saddr
 		|| (*pskb)->nh.iph->daddr != daddr
+#ifdef CONFIG_IP_ROUTE_FWMARK
 		|| (*pskb)->nfmark != nfmark
+#endif
 		|| (*pskb)->nh.iph->tos != tos))
 		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 
