@@ -700,28 +700,28 @@ typedef struct smb_com_read_req {
 	struct smb_hdr hdr;	/* wct = 12 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
+	__le16 AndXOffset;
 	__u16 Fid;
-	__u32 OffsetLow;
-	__u16 MaxCount;
-	__u16 MinCount;		/* obsolete */
-	__u32 MaxCountHigh;
-	__u16 Remaining;
-	__u32 OffsetHigh;
-	__u16 ByteCount;
+	__le32 OffsetLow;
+	__le16 MaxCount;
+	__le16 MinCount;		/* obsolete */
+	__le32 MaxCountHigh;
+	__le16 Remaining;
+	__le32 OffsetHigh;
+	__le16 ByteCount;
 } READ_REQ;
 
 typedef struct smb_com_read_rsp {
 	struct smb_hdr hdr;	/* wct = 12 */
 	__u8 AndXCommand;
 	__u8 AndXReserved;
-	__u16 AndXOffset;
-	__u16 Remaining;
-	__u16 DataCompactionMode;
-	__u16 Reserved;
-	__u16 DataLength;
-	__u16 DataOffset;
-	__u16 DataLengthHigh;
+	__le16 AndXOffset;
+	__le16 Remaining;
+	__le16 DataCompactionMode;
+	__le16 Reserved;
+	__le16 DataLength;
+	__le16 DataOffset;
+	__le16 DataLengthHigh;
 	__u64 Reserved2;
 	__u16 ByteCount;
 	__u8 Pad;		/* BB check for whether padded to DWORD boundary and optimum performance here */

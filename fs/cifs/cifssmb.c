@@ -697,24 +697,24 @@ CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 	if (rc) {
 		cERROR(1, ("Send error in read = %d", rc));
 	} else {
-		pSMBr->DataLength = le16_to_cpu(pSMBr->DataLength);
-		*nbytes = pSMBr->DataLength;
+		__u16 data_length = le16_to_cpu(pSMBr->DataLength);
+		*nbytes = data_length;
 		/*check that DataLength would not go beyond end of SMB */
-		if ((pSMBr->DataLength > CIFS_MAX_MSGSIZE) 
-				|| (pSMBr->DataLength > count)) {
-			cFYI(1,("bad length %d for count %d",pSMBr->DataLength,count));
+		if ((data_length > CIFS_MAX_MSGSIZE) 
+				|| (data_length > count)) {
+			cFYI(1,("bad length %d for count %d",data_length,count));
 			rc = -EIO;
 			*nbytes = 0;
 		} else {
 			pReadData =
 			    (char *) (&pSMBr->hdr.Protocol) +
 			    le16_to_cpu(pSMBr->DataOffset);
-/*			if(rc = copy_to_user(buf, pReadData, pSMBr->DataLength)) {
+/*			if(rc = copy_to_user(buf, pReadData, data_length)) {
 				cERROR(1,("Faulting on read rc = %d",rc));
 				rc = -EFAULT;
 			}*/ /* can not use copy_to_user when using page cache*/
 			if(*buf)
-			    memcpy(*buf,pReadData,pSMBr->DataLength);
+			    memcpy(*buf,pReadData,data_length);
 		}
 	}
 	if (pSMB) {
