@@ -314,32 +314,17 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
  * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
  */
 UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
-                "ASAHI PENTAX",
-                "PENTAX OPTIO 430",
+                "Pentax",
+                "Optio 2/3/400",
                 US_SC_8070, US_PR_CBI, NULL,
                 US_FL_FIX_INQUIRY ),
 
-/* This Pentax still camera is not conformant
- * to the USB storage specification: -
- * - It does not like the INQUIRY command. So we must handle this command
- *   of the SCSI layer ourselves.
- * Tested on Rev. 10.00 (0x1000)
- * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
- */
-UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
-                "ASAHI PENTAX",
-                "PENTAX OPTIO 430",
+/* Submitted by Per Winkvist <per.winkvist@uk.com> */
+UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
+                "Pentax",
+                "Optio S",
                 US_SC_8070, US_PR_CBI, NULL,
                 US_FL_FIX_INQUIRY ),
-
-/* Pentax Optio S digital camera
- * submitted by Stefan M. Brandl <smb@smbnet.de>
- */
-UNUSUAL_DEV( 0x0a17, 0x0006, 0x0000, 0xffff,
-		"Pentax",
-		"Optio S",
-		US_SC_8070, US_PR_CB, NULL,
-		US_FL_MODE_XLATE|US_FL_FIX_INQUIRY),
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
@@ -638,26 +623,6 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x0001,
 		"EasyDisk EDxxxx",
 		US_SC_SCSI, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE | US_FL_START_STOP | US_FL_FIX_INQUIRY ),
-
-/* This Pentax still camera is not conformant
- * to the USB storage specification: -
- * - It does not like the INQUIRY command. So we must handle this command
- *   of the SCSI layer ourselves.
- * Tested on Rev. 10.00 (0x1000)
- * Submitted by James Courtier-Dutton <James@superbug.demon.co.uk>
- */
-UNUSUAL_DEV( 0x0a17, 0x0004, 0x1000, 0x1000,
-                "Pentax",
-                "Optio 2/3/400",
-                US_SC_8070, US_PR_CBI, NULL,
-                US_FL_FIX_INQUIRY ),
-
-/* Submitted by Per Winkvist <per.winkvist@uk.com> */
-UNUSUAL_DEV( 0x0a17, 0x006, 0x1000, 0x9009,
-                "Pentax",
-                "Optio S",
-                US_SC_8070, US_PR_CBI, NULL,
-                US_FL_FIX_INQUIRY ),
 
 /* Submitted by Brian Hall <brihall@pcisys.net>
  * Needed for START_STOP flag */
