@@ -1534,7 +1534,7 @@ static int rt6_fill_node(struct sk_buff *skb, struct rt6_info *rt,
 	if (rt->u.dst.dev)
 		RTA_PUT(skb, RTA_OIF, sizeof(int), &rt->rt6i_dev->ifindex);
 	RTA_PUT(skb, RTA_PRIORITY, 4, &rt->rt6i_metric);
-	ci.rta_lastuse = jiffies - rt->u.dst.lastuse;
+	ci.rta_lastuse = jiffies_to_clock_t(jiffies - rt->u.dst.lastuse);
 	if (rt->rt6i_expires)
 		ci.rta_expires = jiffies_to_clock_t(rt->rt6i_expires - jiffies);
 	else
