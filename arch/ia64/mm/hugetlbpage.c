@@ -504,7 +504,7 @@ set_hugetlb_mem_size (int count)
 		lcount = count - htlbzone_pages;
 	if (lcount > 0) {	/*Increase the mem size. */
 		while (lcount--) {
-			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
 			map = page;

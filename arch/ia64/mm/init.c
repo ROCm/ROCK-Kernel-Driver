@@ -457,7 +457,7 @@ mem_init (void)
 			htlbzone_pages = (max_low_pfn >> ((HPAGE_SHIFT - PAGE_SHIFT) + 1));
 		INIT_LIST_HEAD(&htlbpage_freelist);
 		for (i = 0; i < htlbzone_pages; i++) {
-			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (!page)
 				break;
 			map = page;

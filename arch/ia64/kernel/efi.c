@@ -411,8 +411,8 @@ efi_init (void)
 #ifdef CONFIG_HUGETLB_PAGE
 	/* Just duplicating the above algo for lpzone start */
 	for (cp = saved_command_line; *cp; ) {
-		if (memcmp(cp, "lpmem=", 8) == 0) {
-			cp += 8;
+		if (memcmp(cp, "lpmem=", 6) == 0) {
+			cp += 6;
 			htlbzone_pages = memparse(cp, &end);
 			htlbzone_pages = (htlbzone_pages >> HPAGE_SHIFT);
 			if (end != cp)
