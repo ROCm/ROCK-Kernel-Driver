@@ -60,6 +60,9 @@ extern int thread_flag_fixme(void);
 	case TIF_NEED_RESCHED:				\
 		tsk->thread.work.need_resched = val;	\
 		break;					\
+	case TIF_SYSCALL_TRACE:				\
+		tsk->thread.work.syscall_trace = val;	\
+		break;					\
 	default:					\
 		thread_flag_fixme();			\
 	}						\
@@ -73,6 +76,9 @@ extern int thread_flag_fixme(void);
 		break;					\
 	case TIF_NEED_RESCHED:				\
 		___res = tsk->thread.work.need_resched;	\
+		break;					\
+	case TIF_SYSCALL_TRACE:				\
+		___res = tsk->thread.work.syscall_trace;\
 		break;					\
 	default:					\
 		___res = thread_flag_fixme();		\
