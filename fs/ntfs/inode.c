@@ -844,7 +844,7 @@ skip_attr_list_load:
 				ctx->attr->_ANR(allocated_size));
 		/*
 		 * We are done with the mft record, so we release it. Otherwise
-		 *
+		 * we would deadlock in ntfs_attr_iget().
 		 */
 		put_attr_search_ctx(ctx);
 		unmap_mft_record(ni);
