@@ -565,7 +565,8 @@ static void hamachi_error(struct net_device *dev, int intr_status);
 static int hamachi_close(struct net_device *dev);
 static struct net_device_stats *hamachi_get_stats(struct net_device *dev);
 static void set_rx_mode(struct net_device *dev);
-
+static struct ethtool_ops ethtool_ops;
+static struct ethtool_ops ethtool_ops_no_mii;
 
 static int __devinit hamachi_init_one (struct pci_dev *pdev,
 				    const struct pci_device_id *ent)
@@ -725,6 +726,10 @@ static int __devinit hamachi_init_one (struct pci_dev *pdev,
 	dev->get_stats = &hamachi_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &netdev_ioctl;
+	if (chip_tbl[hmp->chip_id].flags & CanHaveMII)
+		SET_ETHTOOL_OPS(dev, &ethtool_ops);
+	else
+		SET_ETHTOOL_OPS(dev, &ethtool_ops_no_mii);
 	dev->tx_timeout = &hamachi_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	if (mtu)
@@ -1867,70 +1872,65 @@ static void set_rx_mode(struct net_device *dev)
 	}
 }
 
-static int netdev_ethtool_ioctl(struct net_device *dev, void __user *useraddr)
+static int check_if_running(struct net_device *dev)
+{
+	if (!netif_running(dev))
+		return -EINVAL;
+	return 0;
+}
+
+static void hamachi_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct hamachi_private *np = netdev_priv(dev);
-	u32 ethcmd;
-		
-	if (copy_from_user(&ethcmd, useraddr, sizeof(ethcmd)))
-		return -EFAULT;
-
-        switch (ethcmd) {
-        case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
-		strcpy(info.driver, DRV_NAME);
-		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_name(np->pci_dev));
-		if (copy_to_user(useraddr, &info, sizeof(info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get settings */
-	case ETHTOOL_GSET: {
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		if (!(chip_tbl[np->chip_id].flags & CanHaveMII))
-			return -EINVAL;
-		spin_lock_irq(&np->lock);
-		mii_ethtool_gset(&np->mii_if, &ecmd);
-		spin_unlock_irq(&np->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int r;
-		struct ethtool_cmd ecmd;
-		if (!(chip_tbl[np->chip_id].flags & CanHaveMII))
-			return -EINVAL;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&np->lock);
-		r = mii_ethtool_sset(&np->mii_if, &ecmd);
-		spin_unlock_irq(&np->lock);
-		return r;
-	}
-	/* restart autonegotiation */
-	case ETHTOOL_NWAY_RST: {
-		if (!(chip_tbl[np->chip_id].flags & CanHaveMII))
-			return -EINVAL;
-		return mii_nway_restart(&np->mii_if);
-	}
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = {ETHTOOL_GLINK};
-		if (!(chip_tbl[np->chip_id].flags & CanHaveMII))
-			return -EINVAL;
-		edata.data = mii_link_ok(&np->mii_if);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-        }
-	
-	return -EOPNOTSUPP;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
 }
+
+static int hamachi_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct hamachi_private *np = netdev_priv(dev);
+	spin_lock_irq(&np->lock);
+	mii_ethtool_gset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	return 0;
+}
+
+static int hamachi_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
+	struct hamachi_private *np = netdev_priv(dev);
+	int res;
+	spin_lock_irq(&np->lock);
+	res = mii_ethtool_sset(&np->mii_if, ecmd);
+	spin_unlock_irq(&np->lock);
+	return res;
+}
+
+static int hamachi_nway_reset(struct net_device *dev)
+{
+	struct hamachi_private *np = netdev_priv(dev);
+	return mii_nway_restart(&np->mii_if);
+}
+
+static u32 hamachi_get_link(struct net_device *dev)
+{
+	struct hamachi_private *np = netdev_priv(dev);
+	return mii_link_ok(&np->mii_if);
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.begin = check_if_running,
+	.get_drvinfo = hamachi_get_drvinfo,
+	.get_settings = hamachi_get_settings,
+	.set_settings = hamachi_set_settings,
+	.nway_reset = hamachi_nway_reset,
+	.get_link = hamachi_get_link,
+};
+
+static struct ethtool_ops ethtool_ops_no_mii = {
+	.begin = check_if_running,
+	.get_drvinfo = hamachi_get_drvinfo,
+};
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
@@ -1941,10 +1941,7 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd == SIOCETHTOOL)
-		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
-
-	else if (cmd == (SIOCDEVPRIVATE+3)) { /* set rx,tx intr params */
+	if (cmd == (SIOCDEVPRIVATE+3)) { /* set rx,tx intr params */
 		u32 *d = (u32 *)&rq->ifr_ifru;
 		/* Should add this check here or an ordinary user can do nasty
 		 * things. -KDU
