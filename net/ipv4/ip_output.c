@@ -567,7 +567,7 @@ slow_path:
 #ifdef CONFIG_BRIDGE_NETFILTER
 	/* for bridged IP traffic encapsulated inside f.e. a vlan header,
 	 * we need to make room for the encapsulating header */
-	ll_rs = LL_RESERVED_SPACE(rt->u.dst.dev + nf_bridge_pad(skb));
+	ll_rs = LL_RESERVED_SPACE_EXTRA(rt->u.dst.dev, nf_bridge_pad(skb));
 	mtu -= nf_bridge_pad(skb);
 #else
 	ll_rs = LL_RESERVED_SPACE(rt->u.dst.dev);
