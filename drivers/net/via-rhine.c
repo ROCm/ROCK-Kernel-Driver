@@ -93,6 +93,8 @@
 	- transmit frame queue message is off by one - fixed
 	- adds IntrNormalSummary to "Something Wicked" exclusion list
 	  so normal interrupts will not trigger the message (src: Donald Becker)
+	(Roger Lahti)
+	- cosmetic cleanups, remove 3 unused members of struct netdev_private
 
 */
 
@@ -386,6 +388,11 @@ enum register_offsets {
 	StickyHW=0x83, WOLcrClr=0xA4, WOLcgClr=0xA7, PwrcsrClr=0xAC,
 };
 
+/* Bits in ConfigD (select backoff algorithm (Ethernet capture effect)) */
+enum backoff_bits {
+	BackOpt=0x01, BackAMD=0x02, BackDEC=0x04, BackRandom=0x08
+};
+
 #ifdef USE_MEM
 /* Registers we check that mmio and reg are the same. */
 int mmio_verify_registers[] = {
@@ -434,11 +441,11 @@ struct tx_desc {
 	u32 next_desc;
 };
 
-/* Bits in *_desc.status */
 enum rx_status_bits {
 	RxOK=0x8000, RxWholePkt=0x0300, RxErr=0x008F
 };
 
+/* Bits in *_desc.status */
 enum desc_status_bits {
 	DescOwn=0x80000000, DescEndPacket=0x4000, DescIntr=0x1000,
 };
@@ -486,13 +493,10 @@ struct netdev_private {
 	u16 chip_cmd;						/* Current setting for ChipCmd */
 
 	/* These values are keep track of the transceiver/media in use. */
-	unsigned int full_duplex:1;			/* Full-duplex operation requested. */
-	unsigned int duplex_lock:1;
 	unsigned int default_port:4;		/* Last dev->if_port value. */
 	u8 tx_thresh, rx_thresh;
 
 	/* MII transceiver section. */
-	u16 advertising;					/* NWay media advertisement */
 	unsigned char phys[MAX_MII_CNT];			/* MII device addresses. */
 	unsigned int mii_cnt;			/* number of MIIs found, but only the first one is used */
 	u16 mii_status;						/* last read MII status */
@@ -792,7 +796,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 				   (option & 0x300 ? 100 : 10),
 				   (option & 0x220 ? "full" : "half"));
 			if (np->mii_cnt)
-				mdio_write(dev, np->phys[0], 0,
+				mdio_write(dev, np->phys[0], MII_BMCR,
 						   ((option & 0x300) ? 0x2000 : 0) |  /* 100mbps? */
 						   ((option & 0x220) ? 0x0100 : 0));  /* Full duplex? */
 		}
@@ -976,9 +980,9 @@ static void init_registers(struct net_device *dev)
 		writeb(dev->dev_addr[i], ioaddr + StationAddr + i);
 
 	/* Initialize other registers. */
-	writew(0x0006, ioaddr + PCIBusConfig);	/* Tune configuration??? */
-	/* Configure the FIFO thresholds. */
-	writeb(0x20, ioaddr + TxConfig);	/* Initial threshold 32 bytes */
+	writew(0x0006, ioaddr + PCIBusConfig);	/* Store & forward */
+	/* Configure initial FIFO thresholds. */
+	writeb(0x20, ioaddr + TxConfig);
 	np->tx_thresh = 0x20;
 	np->rx_thresh = 0x60;			/* Written in via_rhine_set_rx_mode(). */
 
@@ -1037,13 +1041,13 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 
 	if (phy_id == np->phys[0]) {
 		switch (regnum) {
-		case 0:							/* Is user forcing speed/duplex? */
+		case MII_BMCR:					/* Is user forcing speed/duplex? */
 			if (value & 0x9000)			/* Autonegotiation. */
 				np->mii_if.duplex_lock = 0;
 			else
 				np->mii_if.full_duplex = (value & 0x0100) ? 1 : 0;
 			break;
-		case 4:
+		case MII_ADVERTISE:
 			np->mii_if.advertising = value;
 			break;
 		}
