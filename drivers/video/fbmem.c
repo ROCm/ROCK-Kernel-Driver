@@ -426,12 +426,13 @@ static int ofonly __initdata = 0;
 /*
  * Drawing helpers.
  */
-u8 sys_inbuf(struct fb_info *info, u8 *src)
-{	
+static u8 fb_sys_inbuf(struct fb_info *info, u8 *src)
+{
 	return *src;
 }
 
-void sys_outbuf(struct fb_info *info, u8 *dst, u8 *src, unsigned int size)
+static void fb_sys_outbuf(struct fb_info *info, u8 *dst,
+				u8 *src, unsigned int size)
 {
 	memcpy(dst, src, size);
 }	
@@ -1306,9 +1307,9 @@ register_framebuffer(struct fb_info *fb_info)
 	}	
 	fb_info->pixmap.offset = 0;
 	if (fb_info->pixmap.outbuf == NULL)
-		fb_info->pixmap.outbuf = sys_outbuf;
+		fb_info->pixmap.outbuf = fb_sys_outbuf;
 	if (fb_info->pixmap.inbuf == NULL)
-		fb_info->pixmap.inbuf = sys_inbuf;
+		fb_info->pixmap.inbuf = fb_sys_inbuf;
 
 	if (fb_info->sprite.addr == NULL) {
 		fb_info->sprite.addr = kmalloc(FBPIXMAPSIZE, GFP_KERNEL);
@@ -1322,9 +1323,9 @@ register_framebuffer(struct fb_info *fb_info)
 	}
 	fb_info->sprite.offset = 0;
 	if (fb_info->sprite.outbuf == NULL)
-		fb_info->sprite.outbuf = sys_outbuf;
+		fb_info->sprite.outbuf = fb_sys_outbuf;
 	if (fb_info->sprite.inbuf == NULL)
-		fb_info->sprite.inbuf = sys_inbuf;
+		fb_info->sprite.inbuf = fb_sys_inbuf;
 
 	registered_fb[i] = fb_info;
 
