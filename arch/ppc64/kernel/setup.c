@@ -214,6 +214,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 	else
 		initrd_start = initrd_end = 0;
 #endif /* CONFIG_BLK_DEV_INITRD */
+	ROOT_DEV = Root_SDA3;
 
 #ifdef CONFIG_BOOTX_TEXT
 	map_boot_text();

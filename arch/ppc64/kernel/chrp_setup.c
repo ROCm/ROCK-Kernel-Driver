@@ -179,7 +179,7 @@ void __init
 chrp_init2(void)
 {
 	/* Manually leave the kernel version on the panel. */
-	ppc_md.progress("Linux ppc64\n", 0);
+	ppc_md.progress("SuSE Linux ppc64\n", 0);
 	ppc_md.progress(UTS_RELEASE, 0);
 }
 
