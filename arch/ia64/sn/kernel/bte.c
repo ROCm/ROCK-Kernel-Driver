@@ -15,6 +15,7 @@
 #include <asm/sn/pda.h>
 #include "shubio.h"
 #include <asm/nodedata.h>
+#include <asm/delay.h>
 
 #include <linux/bootmem.h>
 #include <linux/string.h>
@@ -69,6 +70,7 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 	struct bteinfo_s *bte;
 	bte_result_t bte_status;
 	unsigned long irq_flags;
+	unsigned long itc_end = 0;
 	struct bteinfo_s *btes_to_try[MAX_INTERFACES_TO_TRY];
 	int bte_if_index;
 
@@ -107,6 +109,7 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 		}
 	}
 
+retry_bteop:
 	do {
 		local_irq_save(irq_flags);
 
@@ -121,7 +124,7 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 			}
 
 			if (spin_trylock(&bte->spinlock)) {
-				if ((*bte->most_rcnt_na & BTE_ACTIVE) ||
+				if (!(*bte->most_rcnt_na & BTE_WORD_AVAILABLE) ||
 				    (BTE_LNSTAT_LOAD(bte) & BTE_ACTIVE)) {
 					/* Got the lock but BTE still busy */
 					spin_unlock(&bte->spinlock);
@@ -155,7 +158,7 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 	transfer_size = ((len >> L1_CACHE_SHIFT) & BTE_LEN_MASK);
 
 	/* Initialize the notification to a known value. */
-	*bte->most_rcnt_na = -1L;
+	*bte->most_rcnt_na = BTE_WORD_BUSY;
 
 	/* Set the status reg busy bit and transfer length */
 	BTE_PRINTKV(("IBLS = 0x%lx\n", IBLS_BUSY | transfer_size));
@@ -177,13 +180,25 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 	BTE_PRINTK(("IBCT = 0x%lx)\n", BTE_VALID_MODE(mode)));
 	BTE_CTRL_STORE(bte, BTE_VALID_MODE(mode));
 
+	itc_end = ia64_get_itc() + (40000000 * local_cpu_data->cyc_per_usec);
+
 	spin_unlock_irqrestore(&bte->spinlock, irq_flags);
 
 	if (notification != NULL) {
 		return BTE_SUCCESS;
 	}
 
-	while ((transfer_stat = *bte->most_rcnt_na) == -1UL) {
+	while ((transfer_stat = *bte->most_rcnt_na) == BTE_WORD_BUSY) {
+		if (ia64_get_itc() > itc_end) {
+			BTE_PRINTK(("BTE timeout nasid 0x%x bte%d IBLS = 0x%lx na 0x%lx\n",
+				NASID_GET(bte->bte_base_addr), bte->bte_num,
+				BTE_LNSTAT_LOAD(bte), *bte->most_rcnt_na) );
+			bte->bte_error_count++;
+			bte->bh_error = IBLS_ERROR;
+			bte_error_handler((unsigned long)NODEPDA(bte->bte_cnode));
+			*bte->most_rcnt_na = BTE_WORD_AVAILABLE;
+			goto retry_bteop;
+		}
 	}
 
 	BTE_PRINTKV((" Delay Done.  IBLS = 0x%lx, most_rcnt_na = 0x%lx\n",
@@ -191,10 +206,11 @@ bte_result_t bte_copy(u64 src, u64 dest, u64 len, u64 mode, void *notification)
 
 	if (transfer_stat & IBLS_ERROR) {
 		bte_status = transfer_stat & ~IBLS_ERROR;
-		*bte->most_rcnt_na = 0L;
 	} else {
 		bte_status = BTE_SUCCESS;
 	}
+	*bte->most_rcnt_na = BTE_WORD_AVAILABLE;
+
 	BTE_PRINTK(("Returning status is 0x%lx and most_rcnt_na is 0x%lx\n",
 		    BTE_LNSTAT_LOAD(bte), *bte->most_rcnt_na));
 
@@ -414,7 +430,7 @@ void bte_init_node(nodepda_t * mynodepda, cnodeid_t cnode)
 		 */
 		mynodepda->bte_if[i].most_rcnt_na =
 		    &(mynodepda->bte_if[i].notify);
-		mynodepda->bte_if[i].notify = 0L;
+		mynodepda->bte_if[i].notify = BTE_WORD_AVAILABLE;
 		spin_lock_init(&mynodepda->bte_if[i].spinlock);
 
 		mynodepda->bte_if[i].bte_cnode = cnode;
