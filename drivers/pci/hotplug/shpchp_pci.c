@@ -664,9 +664,27 @@ int shpchp_save_used_resources (struct controller *ctrl, struct pci_func *func, 
 		func = shpchp_slot_find(func->bus, func->device, index++);
 	}
 
-	return(0);
+	return 0;
 }
 
+/**
+ * kfree_resource_list: release memory of all list members
+ * @res: resource list to free
+ */
+static inline void
+return_resource_list(struct pci_resource **func, struct pci_resource **res)
+{
+	struct pci_resource *node;
+	struct pci_resource *t_node;
+
+	node = *func;
+	*func = NULL;
+	while (node) {
+		t_node = node->next;
+		return_resource(res, node);
+		node = t_node;
+	}
+}
 
 /*
  * shpchp_return_board_resources
@@ -676,95 +694,39 @@ int shpchp_save_used_resources (struct controller *ctrl, struct pci_func *func, 
  *
  * returns 0 if success
  */
-int shpchp_return_board_resources(struct pci_func * func, struct resource_lists * resources)
+int shpchp_return_board_resources(struct pci_func * func,
+					struct resource_lists * resources)
 {
-	int rc = 0;
-	struct pci_resource *node;
-	struct pci_resource *t_node;
+	int rc;
 	dbg("%s\n", __FUNCTION__);
 
 	if (!func)
-		return(1);
+		return 1;
 
-	node = func->io_head;
-	func->io_head = NULL;
-	while (node) {
-		t_node = node->next;
-		return_resource(&(resources->io_head), node);
-		node = t_node;
-	}
+	return_resource_list(&(func->io_head),&(resources->io_head));
+	return_resource_list(&(func->mem_head),&(resources->mem_head));
+	return_resource_list(&(func->p_mem_head),&(resources->p_mem_head));
+	return_resource_list(&(func->bus_head),&(resources->bus_head));
 
-	node = func->mem_head;
-	func->mem_head = NULL;
-	while (node) {
-		t_node = node->next;
-		return_resource(&(resources->mem_head), node);
-		node = t_node;
-	}
-
-	node = func->p_mem_head;
-	func->p_mem_head = NULL;
-	while (node) {
-		t_node = node->next;
-		return_resource(&(resources->p_mem_head), node);
-		node = t_node;
-	}
-
-	node = func->bus_head;
-	func->bus_head = NULL;
-	while (node) {
-		t_node = node->next;
-		return_resource(&(resources->bus_head), node);
-		node = t_node;
-	}
-
-	rc |= shpchp_resource_sort_and_combine(&(resources->mem_head));
+	rc = shpchp_resource_sort_and_combine(&(resources->mem_head));
 	rc |= shpchp_resource_sort_and_combine(&(resources->p_mem_head));
 	rc |= shpchp_resource_sort_and_combine(&(resources->io_head));
 	rc |= shpchp_resource_sort_and_combine(&(resources->bus_head));
 
-	return(rc);
+	return rc;
 }
 
-
-/*
- * shpchp_destroy_resource_list
- *
- * Puts node back in the resource list pointed to by head
+/**
+ * kfree_resource_list: release memory of all list members
+ * @res: resource list to free
  */
-void shpchp_destroy_resource_list (struct resource_lists * resources)
+static inline void
+kfree_resource_list(struct pci_resource **r)
 {
 	struct pci_resource *res, *tres;
 
-	res = resources->io_head;
-	resources->io_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = resources->mem_head;
-	resources->mem_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = resources->p_mem_head;
-	resources->p_mem_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = resources->bus_head;
-	resources->bus_head = NULL;
+	res = *r;
+	*r = NULL;
 
 	while (res) {
 		tres = res;
@@ -773,50 +735,26 @@ void shpchp_destroy_resource_list (struct resource_lists * resources)
 	}
 }
 
-
-/*
- * shpchp_destroy_board_resources
- *
- * Puts node back in the resource list pointed to by head
+/**
+ * shpchp_destroy_resource_list: put node back in the resource list
+ * @resources: list to put nodes back
  */
-void shpchp_destroy_board_resources (struct pci_func * func)
+void shpchp_destroy_resource_list(struct resource_lists *resources)
 {
-	struct pci_resource *res, *tres;
-
-	res = func->io_head;
-	func->io_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = func->mem_head;
-	func->mem_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = func->p_mem_head;
-	func->p_mem_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
-
-	res = func->bus_head;
-	func->bus_head = NULL;
-
-	while (res) {
-		tres = res;
-		res = res->next;
-		kfree(tres);
-	}
+	kfree_resource_list(&(resources->io_head));
+	kfree_resource_list(&(resources->mem_head));
+	kfree_resource_list(&(resources->p_mem_head));
+	kfree_resource_list(&(resources->bus_head));
 }
 
+/**
+ * shpchp_destroy_board_resources: put node back in the resource list
+ * @resources: list to put nodes back
+ */
+void shpchp_destroy_board_resources(struct pci_func * func)
+{
+	kfree_resource_list(&(func->io_head));
+	kfree_resource_list(&(func->mem_head));
+	kfree_resource_list(&(func->p_mem_head));
+	kfree_resource_list(&(func->bus_head));
+}

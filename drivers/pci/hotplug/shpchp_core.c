@@ -531,49 +531,35 @@ static int shpc_start_thread(void)
 	return retval;
 }
 
+static inline void __exit
+free_shpchp_res(struct pci_resource *res)
+{
+	struct pci_resource *tres;
 
-static void unload_shpchpd(void)
+	while (res) {
+		tres = res;
+		res = res->next;
+		kfree(tres);
+	}
+}
+
+static void __exit unload_shpchpd(void)
 {
 	struct pci_func *next;
 	struct pci_func *TempSlot;
 	int loop;
 	struct controller *ctrl;
 	struct controller *tctrl;
-	struct pci_resource *res;
-	struct pci_resource *tres;
 
 	ctrl = shpchp_ctrl_list;
 
 	while (ctrl) {
 		cleanup_slots(ctrl);
 
-		res = ctrl->io_head;
-		while (res) {
-			tres = res;
-			res = res->next;
-			kfree(tres);
-		}
-
-		res = ctrl->mem_head;
-		while (res) {
-			tres = res;
-			res = res->next;
-			kfree(tres);
-		}
-
-		res = ctrl->p_mem_head;
-		while (res) {
-			tres = res;
-			res = res->next;
-			kfree(tres);
-		}
-
-		res = ctrl->bus_head;
-		while (res) {
-			tres = res;
-			res = res->next;
-			kfree(tres);
-		}
+		free_shpchp_res(ctrl->io_head);
+		free_shpchp_res(ctrl->mem_head);
+		free_shpchp_res(ctrl->p_mem_head);
+		free_shpchp_res(ctrl->bus_head);
 
 		kfree (ctrl->pci_bus);
 
@@ -589,33 +575,10 @@ static void unload_shpchpd(void)
 	for (loop = 0; loop < 256; loop++) {
 		next = shpchp_slot_list[loop];
 		while (next != NULL) {
-			res = next->io_head;
-			while (res) {
-				tres = res;
-				res = res->next;
-				kfree(tres);
-			}
-
-			res = next->mem_head;
-			while (res) {
-				tres = res;
-				res = res->next;
-				kfree(tres);
-			}
-
-			res = next->p_mem_head;
-			while (res) {
-				tres = res;
-				res = res->next;
-				kfree(tres);
-			}
-
-			res = next->bus_head;
-			while (res) {
-				tres = res;
-				res = res->next;
-				kfree(tres);
-			}
+			free_shpchp_res(ctrl->io_head);
+			free_shpchp_res(ctrl->mem_head);
+			free_shpchp_res(ctrl->p_mem_head);
+			free_shpchp_res(ctrl->bus_head);
 
 			TempSlot = next;
 			next = next->next;
@@ -697,8 +660,5 @@ static void __exit shpcd_cleanup(void)
 	info(DRIVER_DESC " version: " DRIVER_VERSION " unloaded\n");
 }
 
-
 module_init(shpcd_init);
 module_exit(shpcd_cleanup);
-
-
