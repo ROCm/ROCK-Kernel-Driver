@@ -64,36 +64,37 @@ xfs_dir2_trace_enter(
 	char		*where,
 	char		*name,
 	int		namelen,
-	__psunsigned_t	a0,
-	__psunsigned_t	a1,
-	__psunsigned_t	a2,
-	__psunsigned_t	a3,
-	__psunsigned_t	a4,
-	__psunsigned_t	a5,
-	__psunsigned_t	a6)
+	void		*a0,
+	void		*a1,
+	void		*a2,
+	void		*a3,
+	void		*a4,
+	void		*a5,
+	void		*a6,
+	void		*a7)
 {
-	__psunsigned_t	n[6];
+	void		*n[5];
 
 	ASSERT(xfs_dir2_trace_buf);
 	ASSERT(dp->i_dir_trace);
 	if (name)
-		memcpy(n, name, min(sizeof(n), namelen));
+		memcpy(n, name, min((int)sizeof(n), namelen));
 	else
 		memset((char *)n, 0, sizeof(n));
 	ktrace_enter(xfs_dir2_trace_buf,
-		(void *)(__psunsigned_t)type, (void *)where,
+		(void *)type, (void *)where,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
-		(void *)a4, (void *)a5, (void *)a6,
-		(void *)(__psunsigned_t)namelen,
+		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
+		(void *)namelen,
 		(void *)n[0], (void *)n[1], (void *)n[2],
-		(void *)n[3], (void *)n[4], (void *)n[5]);
+		(void *)n[3], (void *)n[4]);
 	ktrace_enter(dp->i_dir_trace,
-		(void *)(__psunsigned_t)type, (void *)where,
+		(void *)type, (void *)where,
 		(void *)a0, (void *)a1, (void *)a2, (void *)a3,
-		(void *)a4, (void *)a5, (void *)a6,
-		(void *)(__psunsigned_t)namelen,
+		(void *)a4, (void *)a5, (void *)a6, (void *)a7,
+		(void *)namelen,
 		(void *)n[0], (void *)n[1], (void *)n[2],
-		(void *)n[3], (void *)n[4], (void *)n[5]);
+		(void *)n[3], (void *)n[4]);
 }
 
 void
@@ -103,9 +104,11 @@ xfs_dir2_trace_args(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck, 0, 0);
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck, NULL, NULL);
 }
 
 void
@@ -116,10 +119,12 @@ xfs_dir2_trace_args_b(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_B, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck,
-		(__psunsigned_t)(bp ? bp->bps[0] : NULL), 0);
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck,
+		(void *)(bp ? bp->bps[0] : NULL), NULL);
 }
 
 void
@@ -131,11 +136,13 @@ xfs_dir2_trace_args_bb(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_BB, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck,
-		(__psunsigned_t)(lbp ? lbp->bps[0] : NULL),
-		(__psunsigned_t)(dbp ? dbp->bps[0] : NULL));
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck,
+		(void *)(lbp ? lbp->bps[0] : NULL),
+		(void *)(dbp ? dbp->bps[0] : NULL));
 }
 
 void
@@ -150,10 +157,10 @@ xfs_dir2_trace_args_bibii(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_BIBII, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)(bs ? bs->bps[0] : NULL), (__psunsigned_t)ss,
-		(__psunsigned_t)(bd ? bd->bps[0] : NULL), (__psunsigned_t)sd,
-		(__psunsigned_t)c);
+		(void *)args->dp, (void *)args->trans,
+		(void *)(bs ? bs->bps[0] : NULL), (void *)ss,
+		(void *)(bd ? bd->bps[0] : NULL), (void *)sd,
+		(void *)c, NULL);
 }
 
 void
@@ -165,10 +172,12 @@ xfs_dir2_trace_args_db(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_DB, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck, (__psunsigned_t)db,
-		(__psunsigned_t)(bp ? bp->bps[0] : NULL));
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck, (void *)db,
+		(void *)(bp ? bp->bps[0] : NULL));
 }
 
 void
@@ -179,9 +188,13 @@ xfs_dir2_trace_args_i(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_I, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck, (__psunsigned_t)i, 0);
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck,
+		(void *)((unsigned long)(i >> 32)),
+		(void *)((unsigned long)(i & 0xFFFFFFFF)));
 }
 
 void
@@ -192,9 +205,11 @@ xfs_dir2_trace_args_s(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_S, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck, (__psunsigned_t)s, 0);
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck, (void *)s, 0);
 }
 
 void
@@ -206,9 +221,11 @@ xfs_dir2_trace_args_sb(
 {
 	xfs_dir2_trace_enter(args->dp, XFS_DIR2_KTRACE_ARGS_SB, where,
 		(char *)args->name, (int)args->namelen,
-		(__psunsigned_t)args->hashval, (__psunsigned_t)args->inumber,
-		(__psunsigned_t)args->dp, (__psunsigned_t)args->trans,
-		(__psunsigned_t)args->justcheck, (__psunsigned_t)s,
-		(__psunsigned_t)(bp ? bp->bps[0] : NULL));
+		(void *)args->hashval,
+		(void *)((unsigned long)(args->inumber >> 32)),
+		(void *)((unsigned long)(args->inumber & 0xFFFFFFFF)),
+		(void *)args->dp, (void *)args->trans,
+		(void *)(unsigned long)args->justcheck, (void *)s,
+		(void *)(bp ? bp->bps[0] : NULL));
 }
 #endif	/* XFS_DIR2_TRACE */

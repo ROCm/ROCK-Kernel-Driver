@@ -81,6 +81,13 @@ STATIC int xfs_bmbt_updkey(xfs_btree_cur_t *, xfs_bmbt_key_t *, int);
 
 
 #if defined(XFS_BMBT_TRACE)
+
+static char	ARGS[] = "args";
+static char	ENTRY[] = "entry";
+static char	ERROR[] = "error";
+#undef EXIT
+static char	EXIT[] = "exit";
+
 /*
  * Add a trace buffer entry for the arguments given to the routine,
  * generic form.
@@ -305,11 +312,6 @@ xfs_bmbt_trace_cursor(
 	xfs_bmbt_trace_argik(fname, c, i, k, __LINE__)
 #define	XFS_BMBT_TRACE_CURSOR(c,s)	\
 	xfs_bmbt_trace_cursor(fname, c, s, __LINE__)
-static char	ARGS[] = "args";
-static char	ENTRY[] = "entry";
-static char	ERROR[] = "error";
-#undef EXIT
-static char	EXIT[] = "exit";
 #else
 #define	XFS_BMBT_TRACE_ARGBI(c,b,i)
 #define	XFS_BMBT_TRACE_ARGBII(c,b,i,j)

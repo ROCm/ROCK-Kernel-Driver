@@ -36,20 +36,15 @@
  * Tracing for xfs v2 directories.
  */
 
+#if defined(XFS_DIR2_TRACE)
+
 struct ktrace;
 struct xfs_dabuf;
 struct xfs_da_args;
 
-#ifdef XFS_ALL_TRACE
-#define XFS_DIR2_TRACE
-#endif	/* XFS_ALL_TRACE */
-
-#if !defined(DEBUG)
-#undef XFS_DIR2_TRACE
-#endif	/* !DEBUG */
-
 #define	XFS_DIR2_GTRACE_SIZE		4096	/* global buffer */
 #define	XFS_DIR2_KTRACE_SIZE		32	/* per-inode buffer */
+extern struct ktrace *xfs_dir2_trace_buf;
 
 #define	XFS_DIR2_KTRACE_ARGS		1	/* args only */
 #define	XFS_DIR2_KTRACE_ARGS_B		2	/* args + buffer */
@@ -59,8 +54,6 @@ struct xfs_da_args;
 #define	XFS_DIR2_KTRACE_ARGS_S		6	/* args, int */
 #define	XFS_DIR2_KTRACE_ARGS_SB		7	/* args, int, buffer */
 #define	XFS_DIR2_KTRACE_ARGS_BIBII	8	/* args, buf/int/buf/int/int */
-
-#ifdef XFS_DIR2_TRACE
 
 void xfs_dir2_trace_args(char *where, struct xfs_da_args *args);
 void xfs_dir2_trace_args_b(char *where, struct xfs_da_args *args,
@@ -89,7 +82,5 @@ void xfs_dir2_trace_args_sb(char *where, struct xfs_da_args *args, int s,
 #define	xfs_dir2_trace_args_sb(where, args, s, bp)
 
 #endif	/* XFS_DIR2_TRACE */
-
-extern struct ktrace *xfs_dir2_trace_buf;
 
 #endif	/* __XFS_DIR2_TRACE_H__ */

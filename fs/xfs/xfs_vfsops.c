@@ -74,24 +74,11 @@ STATIC int xfs_sync(bhv_desc_t *, int, cred_t *);
 int
 xfs_init(void)
 {
-	extern kmem_zone_t	*xfs_da_state_zone;
 	extern kmem_zone_t	*xfs_bmap_free_item_zone;
 	extern kmem_zone_t	*xfs_btree_cur_zone;
-	extern kmem_zone_t	*xfs_inode_zone;
-	extern kmem_zone_t	*xfs_chashlist_zone;
 	extern kmem_zone_t	*xfs_trans_zone;
 	extern kmem_zone_t	*xfs_buf_item_zone;
-	extern kmem_zone_t	*xfs_efd_zone;
-	extern kmem_zone_t	*xfs_efi_zone;
 	extern kmem_zone_t	*xfs_dabuf_zone;
-#ifdef DEBUG_NOT
-	extern ktrace_t	        *xfs_alloc_trace_buf;
-	extern ktrace_t	        *xfs_bmap_trace_buf;
-	extern ktrace_t	        *xfs_bmbt_trace_buf;
-	extern ktrace_t	        *xfs_dir_trace_buf;
-	extern ktrace_t	        *xfs_attr_trace_buf;
-	extern ktrace_t	        *xfs_dir2_trace_buf;
-#endif	/* DEBUG */
 #ifdef XFS_DABUF_DEBUG
 	extern lock_t	        xfs_dabuf_global_lock;
 	spinlock_init(&xfs_dabuf_global_lock, "xfsda");

@@ -506,9 +506,6 @@ xfs_inode_lock_init(
 	mrlock_init(&ip->i_lock, MRLOCK_ALLOW_EQUAL_PRI|MRLOCK_BARRIER,
 		     "xfsino", (long)vp->v_number);
 	mrlock_init(&ip->i_iolock, MRLOCK_BARRIER, "xfsio", vp->v_number);
-#ifdef NOTYET
-	mutex_init(&ip->i_range_lock.r_spinlock, MUTEX_SPIN, "xrange");
-#endif /* NOTYET */
 	init_waitqueue_head(&ip->i_ipin_wait);
 	atomic_set(&ip->i_pincount, 0);
 	init_sema(&ip->i_flock, 1, "xfsfino", vp->v_number);
@@ -830,9 +827,7 @@ xfs_ilock(xfs_inode_t	*ip,
 	} else if (lock_flags & XFS_ILOCK_SHARED) {
 		mraccess(&ip->i_lock);
 	}
-#ifdef XFS_ILOCK_TRACE
-	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)return_address);
-#endif
+	xfs_ilock_trace(ip, 1, lock_flags, (inst_t *)__return_address);
 }
 
 /*
@@ -895,9 +890,7 @@ xfs_ilock_nowait(xfs_inode_t	*ip,
 			return 0;
 		}
 	}
-#ifdef XFS_ILOCK_TRACE
 	xfs_ilock_trace(ip, 2, lock_flags, (inst_t *)__return_address);
-#endif
 	return 1;
 }
 
@@ -955,9 +948,7 @@ xfs_iunlock(xfs_inode_t	*ip,
 						(xfs_log_item_t*)(ip->i_itemp));
 		}
 	}
-#ifdef XFS_ILOCK_TRACE
 	xfs_ilock_trace(ip, 3, lock_flags, (inst_t *)__return_address);
-#endif
 }
 
 /*

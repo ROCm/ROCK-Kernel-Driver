@@ -100,6 +100,11 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 #define xfs_inherit_nodump	xfs_params.inherit_nodump.val
 #define xfs_inherit_noatime	xfs_params.inherit_noatim.val
 
+#define current_cpu()		smp_processor_id()
+#define current_pid()		(current->pid)
+#define current_fsuid(cred)	(current->fsuid)
+#define current_fsgid(cred)	(current->fsgid)
+
 #define NBPP		PAGE_SIZE
 #define DPPSHFT		(PAGE_SHIFT - 9)
 #define NDPP		(1 << (PAGE_SHIFT - 9))

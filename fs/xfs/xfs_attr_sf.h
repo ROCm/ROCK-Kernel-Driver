@@ -104,14 +104,7 @@ int xfs_attr_sf_totsize(struct xfs_inode *dp);
 	(INT_GET(((xfs_attr_shortform_t *)((dp)->i_afp->if_u1.if_data))->hdr.totsize, ARCH_CONVERT))
 #endif
 
-#ifdef XFS_ALL_TRACE
-#define	XFS_ATTR_TRACE
-#endif
-
-#if !defined(DEBUG)
-#undef	XFS_ATTR_TRACE
-#endif
-
+#if defined(XFS_ATTR_TRACE)
 /*
  * Kernel tracing support for attribute lists
  */
@@ -121,6 +114,7 @@ struct xfs_da_node_entry;
 struct xfs_attr_leafblock;
 
 #define	XFS_ATTR_TRACE_SIZE	4096	/* size of global trace buffer */
+extern ktrace_t	*xfs_attr_trace_buf;
 
 /*
  * Trace record types.
@@ -129,8 +123,6 @@ struct xfs_attr_leafblock;
 #define	XFS_ATTR_KTRACE_L_CN	2	/* context, node */
 #define	XFS_ATTR_KTRACE_L_CB	3	/* context, btree */
 #define	XFS_ATTR_KTRACE_L_CL	4	/* context, leaf */
-
-#if defined(XFS_ATTR_TRACE)
 
 void xfs_attr_trace_l_c(char *where, struct xfs_attr_list_context *context);
 void xfs_attr_trace_l_cn(char *where, struct xfs_attr_list_context *context,

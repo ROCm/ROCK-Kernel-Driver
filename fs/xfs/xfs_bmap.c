@@ -68,9 +68,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_buf_item.h"
 
-#ifdef DEBUG
-ktrace_t	*xfs_bmap_trace_buf;
-#endif
 
 #ifdef XFSDEBUG
 STATIC void
@@ -404,7 +401,7 @@ xfs_bmap_validate_ret(
 #define	xfs_bmap_validate_ret(bno,len,flags,mval,onmap,nmap)
 #endif /* DEBUG */
 
-#if defined(DEBUG) && defined(XFS_RW_TRACE)
+#if defined(XFS_RW_TRACE)
 STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
@@ -414,7 +411,7 @@ xfs_bunmap_trace(
 	inst_t			*ra);
 #else
 #define	xfs_bunmap_trace(ip, bno, len, flags, ra)
-#endif	/* DEBUG && XFS_RW_TRACE */
+#endif	/* XFS_RW_TRACE */
 
 STATIC int
 xfs_bmap_count_tree(
@@ -3543,6 +3540,8 @@ xfs_bmap_search_extents(
 
 
 #ifdef XFS_BMAP_TRACE
+ktrace_t	*xfs_bmap_trace_buf;
+
 /*
  * Add a bmap trace buffer entry.  Base routine for the others.
  */
@@ -3722,7 +3721,7 @@ xfs_bmap_worst_indlen(
 	return rval;
 }
 
-#if defined(DEBUG) && defined(XFS_RW_TRACE)
+#if defined(XFS_RW_TRACE)
 STATIC void
 xfs_bunmap_trace(
 	xfs_inode_t		*ip,
@@ -3742,7 +3741,7 @@ xfs_bunmap_trace(
 		(void *)(__psint_t)((xfs_dfiloff_t)bno & 0xffffffff),
 		(void *)(__psint_t)len,
 		(void *)(__psint_t)flags,
-		(void *)(__psint_t)private.p_cpuid,
+		(void *)current_cpu(),
 		(void *)ra,
 		(void *)0,
 		(void *)0,

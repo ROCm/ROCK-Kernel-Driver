@@ -908,9 +908,6 @@ xfs_iread(
 #ifdef XFS_RW_TRACE
 	ip->i_rwtrace = ktrace_alloc(XFS_RW_KTRACE_SIZE, KM_SLEEP);
 #endif
-#ifdef XFS_STRAT_TRACE
-	ip->i_strat_trace = ktrace_alloc(XFS_STRAT_KTRACE_SIZE, KM_SLEEP);
-#endif
 #ifdef XFS_ILOCK_TRACE
 	ip->i_lock_trace = ktrace_alloc(XFS_ILOCK_KTRACE_SIZE, KM_SLEEP);
 #endif
@@ -1144,8 +1141,8 @@ xfs_ialloc(
 	ip->i_d.di_onlink = 0;
 	ip->i_d.di_nlink = nlink;
 	ASSERT(ip->i_d.di_nlink == nlink);
-	ip->i_d.di_uid = current->fsuid;
-	ip->i_d.di_gid = current->fsgid;
+	ip->i_d.di_uid = current_fsuid(cr);
+	ip->i_d.di_gid = current_fsgid(cr);
 	ip->i_d.di_projid = prid;
 	memset(&(ip->i_d.di_pad[0]), 0, sizeof(ip->i_d.di_pad));
 
@@ -1362,16 +1359,16 @@ xfs_itrunc_trace(
 	ktrace_enter(ip->i_rwtrace,
 		     (void*)((long)tag),
 		     (void*)ip,
-		     (void*)((ip->i_d.di_size >> 32) & 0xffffffff),
-		     (void*)(ip->i_d.di_size & 0xffffffff),
+		     (void*)(unsigned long)((ip->i_d.di_size >> 32) & 0xffffffff),
+		     (void*)(unsigned long)(ip->i_d.di_size & 0xffffffff),
 		     (void*)((long)flag),
-		     (void*)((new_size >> 32) & 0xffffffff),
-		     (void*)(new_size & 0xffffffff),
-		     (void*)((toss_start >> 32) & 0xffffffff),
-		     (void*)(toss_start & 0xffffffff),
-		     (void*)((toss_finish >> 32) & 0xffffffff),
-		     (void*)(toss_finish & 0xffffffff),
-		     (void*)((long)private.p_cpuid),
+		     (void*)(unsigned long)((new_size >> 32) & 0xffffffff),
+		     (void*)(unsigned long)(new_size & 0xffffffff),
+		     (void*)(unsigned long)((toss_start >> 32) & 0xffffffff),
+		     (void*)(unsigned long)(toss_start & 0xffffffff),
+		     (void*)(unsigned long)((toss_finish >> 32) & 0xffffffff),
+		     (void*)(unsigned long)(toss_finish & 0xffffffff),
+		     (void*)current_cpu(),
 		     (void*)0,
 		     (void*)0,
 		     (void*)0,
@@ -2755,17 +2752,8 @@ xfs_idestroy(
 	}
 	if (ip->i_afp)
 		xfs_idestroy_fork(ip, XFS_ATTR_FORK);
-#ifdef NOTYET
-	if (ip->i_range_lock.r_sleep != NULL) {
-		freesema(ip->i_range_lock.r_sleep);
-		kmem_free(ip->i_range_lock.r_sleep, sizeof(sema_t));
-	}
-#endif /* NOTYET */
 	mrfree(&ip->i_lock);
 	mrfree(&ip->i_iolock);
-#ifdef NOTYET
-	mutex_destroy(&ip->i_range_lock.r_spinlock);
-#endif /* NOTYET */
 	freesema(&ip->i_flock);
 #ifdef XFS_BMAP_TRACE
 	ktrace_free(ip->i_xtrace);
@@ -2775,9 +2763,6 @@ xfs_idestroy(
 #endif
 #ifdef XFS_RW_TRACE
 	ktrace_free(ip->i_rwtrace);
-#endif
-#ifdef XFS_STRAT_TRACE
-	ktrace_free(ip->i_strat_trace);
 #endif
 #ifdef XFS_ILOCK_TRACE
 	ktrace_free(ip->i_lock_trace);
@@ -3707,7 +3692,7 @@ xfs_iaccess(
 	if ((error = _ACL_XFS_IACCESS(ip, mode, cr)) != -1)
 		return error ? XFS_ERROR(error) : 0;
 
-	if (current->fsuid != ip->i_d.di_uid) {
+	if (current_fsuid(cr) != ip->i_d.di_uid) {
 		mode >>= 3;
 		if (!in_group_p((gid_t)ip->i_d.di_gid))
 			mode >>= 3;
@@ -3859,17 +3844,18 @@ xfs_ichgtime(xfs_inode_t *ip,
 }
 
 #ifdef XFS_ILOCK_TRACE
+ktrace_t	*xfs_ilock_trace_buf;
+
 void
 xfs_ilock_trace(xfs_inode_t *ip, int lock, unsigned int lockflags, inst_t *ra)
 {
 	ktrace_enter(ip->i_lock_trace,
 		     (void *)ip,
-		      (void *)(__psint_t)lock,		/* 1 = LOCK, 3=UNLOCK, etc */
-		     (void *)(__psint_t)lockflags,	/* XFS_ILOCK_EXCL etc */
-		     (void *)ra,			/* caller of ilock */
-		     (void *)(__psint_t)cpuid(),
-		     (void *)(__psint_t)current_pid(),
+		     (void *)lock,		/* 1 = LOCK, 3=UNLOCK, etc */
+		     (void *)lockflags,		/* XFS_ILOCK_EXCL etc */
+		     (void *)ra,		/* caller of ilock */
+		     (void *)current_cpu(),
+		     (void *)current_pid(),
 		     0,0,0,0,0,0,0,0,0,0);
-
 }
-#endif /* ILOCK_TRACE */
+#endif
