@@ -480,7 +480,7 @@
 
 #include "de4x5.h"
 
-static char version[] __initdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
+static char version[] __devinitdata = "de4x5.c:V0.546 2001/02/22 davies@maniac.ultranet.com\n";
 
 #define c_char const char
 #define TWIDDLE(a) (u_short)le16_to_cpu(get_unaligned((u_short *)(a)))
@@ -1082,7 +1082,7 @@ static int (*dc_infoblock[])(struct net_device *dev, u_char, u_char *) = {
 }
 
 
-static int __init 
+static int __devinit 
 de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
 {
     char name[DE4X5_NAME_LENGTH + 1];
@@ -2132,7 +2132,7 @@ static struct eisa_driver de4x5_eisa_driver = {
 ** DECchips, we can find the base SROM irrespective of the BIOS scan direction.
 ** For single port cards this is a time waster...
 */
-static void __init 
+static void __devinit 
 srom_search(struct net_device *dev, struct pci_dev *pdev)
 {
     u_char pb;
@@ -2213,7 +2213,7 @@ srom_search(struct net_device *dev, struct pci_dev *pdev)
 ** kernels use the V0.535[n] drivers.
 */
 
-static int __init de4x5_pci_probe (struct pci_dev *pdev,
+static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 				   const struct pci_device_id *ent)
 {
 	u_char pb, pbus = 0, dev_num, dnum = 0, timer;

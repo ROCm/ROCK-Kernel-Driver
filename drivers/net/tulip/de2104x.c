@@ -50,7 +50,7 @@
 #include <asm/unaligned.h>
 
 /* These identify the driver base version and may not be removed. */
-static char version[] __initdata =
+static char version[] =
 KERN_INFO DRV_NAME " PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Jeff Garzik <jgarzik@pobox.com>");
@@ -1932,7 +1932,7 @@ bad_srom:
 	goto fill_defaults;
 }
 
-static int __init de_init_one (struct pci_dev *pdev,
+static int __devinit de_init_one (struct pci_dev *pdev,
 				  const struct pci_device_id *ent)
 {
 	struct net_device *dev;

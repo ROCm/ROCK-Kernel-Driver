@@ -107,7 +107,7 @@ static int RxTimerHandler(struct via_ircc_cb *self, int iobase);
 void hwreset(struct via_ircc_cb *self);
 static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase);
 static int upload_rxdata(struct via_ircc_cb *self, int iobase);
-static int __init via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id);
+static int __devinit via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id);
 static void __exit via_remove_one (struct pci_dev *pdev);
 
 /* Should use udelay() instead, even if we are x86 only - Jean II */
@@ -168,7 +168,7 @@ int __init via_ircc_init(void)
 
 }
 
-static int __init via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id)
+static int __devinit via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id)
 {
 	int rc;
         u8 temp,oldPCI_40,oldPCI_44,bTmp,bTmp1;
@@ -326,7 +326,7 @@ static void __exit via_ircc_cleanup(void)
  *    Open driver instance
  *
  */
-static __init int via_ircc_open(int i, chipio_t * info, unsigned int id)
+static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 {
 	struct net_device *dev;
 	struct via_ircc_cb *self;
