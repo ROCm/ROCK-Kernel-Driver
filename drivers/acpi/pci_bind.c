@@ -185,7 +185,7 @@ acpi_pci_bind (
 	 */
 	data->dev = pci_find_slot(data->id.bus, PCI_DEVFN(data->id.device, data->id.function));
 	if (!data->dev) {
-		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 			"Device %02x:%02x:%02x.%02x not present in PCI namespace\n",
 			data->id.segment, data->id.bus, 
 			data->id.device, data->id.function));

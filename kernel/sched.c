@@ -940,8 +940,17 @@ asmlinkage void schedule(void)
 	struct list_head *queue;
 	int idx;
 
-	if (unlikely(in_atomic()))
-		BUG();
+	/*
+	 * Test if we are atomic.  Since do_exit() needs to call into
+	 * schedule() atomically, we ignore that path for now.
+	 * Otherwise, whine if we are scheduling when we should not be.
+	 */
+	if (likely(current->state != TASK_ZOMBIE)) {
+		if (unlikely(in_atomic())) {
+			printk(KERN_ERR "bad: scheduling while atomic!\n");
+			dump_stack();
+		}
+	}
 
 #if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
