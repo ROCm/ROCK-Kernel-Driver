@@ -104,19 +104,22 @@ acpi_processor_power_activate (
 	if (!pr)
 		return;
 
-	old = &pr->power.states[pr->power.state];
+	old = pr->power.state;
 	new = &pr->power.states[state];
 
- 	old->promotion.count = 0;
+	if (old)
+		old->promotion.count = 0;
  	new->demotion.count = 0;
 
 	/* Cleanup from old state. */
-	switch (old->type) {
-	case ACPI_STATE_C3:
-		/* Disable bus master reload */
-		if (new->type != ACPI_STATE_C3)
-			acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
-		break;
+	if (old) {
+		switch (old->type) {
+		case ACPI_STATE_C3:
+			/* Disable bus master reload */
+			if (new->type != ACPI_STATE_C3)
+				acpi_set_register(ACPI_BITREG_BUS_MASTER_RLD, 0, ACPI_MTX_DO_NOT_LOCK);
+			break;
+		}
 	}
 
 	/* Prepare to use new state. */
@@ -128,7 +131,7 @@ acpi_processor_power_activate (
 		break;
 	}
 
-	pr->power.state = state;
+	pr->power.state = new;
 
 	return;
 }
@@ -161,7 +164,9 @@ void acpi_processor_idle (void)
 		return;
 	}
 
-	cx = &(pr->power.states[pr->power.state]);
+	cx = pr->power.state;
+	if (!cx)
+		goto easy_out;
 
 	/*
 	 * Check BM Activity
@@ -276,7 +281,7 @@ void acpi_processor_idle (void)
 		return;
 	}
 
-	next_state = pr->power.state;
+	next_state = pr->power.state - pr->power.states;
 
 	/*
 	 * Promotion?
@@ -326,8 +331,9 @@ end:
 	/*
 	 * Demote if current state exceeds max_cstate
 	 */
-	if (pr->power.state > max_cstate) {
-		next_state = max_cstate;
+	if (pr->power.state->type > max_cstate) {
+		if (cx->demotion.state)
+			next_state = cx->demotion.state;
 	}
 
 	/*
@@ -336,9 +342,17 @@ end:
 	 * If we're going to start using a new Cx state we must clean up
 	 * from the previous and prepare to use the new.
 	 */
-	if (next_state != pr->power.state)
+	if (&pr->power.states[next_state] != pr->power.state)
 		acpi_processor_power_activate(pr, next_state);
 
+	return;
+
+ easy_out:
+	/* do C1 instead of busy loop */
+	if (pm_idle_save)
+		pm_idle_save();
+	else
+		safe_halt();
 	return;
 }
 
@@ -365,7 +379,7 @@ acpi_processor_set_power_policy (
 	 * C0/C1
 	 * -----
 	 */
-	pr->power.state = ACPI_STATE_C1;
+	pr->power.state = &pr->power.states[ACPI_STATE_C1];
 
 	/*
 	 * C1/C2
@@ -636,9 +650,9 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 		goto end;
 
 	seq_printf(seq, "active state:            %d\n"
-			"max_cstate:              %d\n"
+			"max_cstate:              C%d\n"
 			"bus master activity:     %08x\n",
-			pr->power.state,
+			pr->power.state ? pr->power.state - pr->power.states : 0,
 			max_cstate,
 			pr->power.bm_activity);
 
@@ -646,7 +660,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 	for (i = 1; i < ACPI_C_STATE_COUNT; i++) {
 		seq_printf(seq, "   %c%d:                  ",
-			(i == pr->power.state?'*':' '), i);
+			(&pr->power.states[i] == pr->power.state?'*':' '), i);
 
 		if (!pr->power.states[i].valid) {
 			seq_puts(seq, "<not supported>\n");
