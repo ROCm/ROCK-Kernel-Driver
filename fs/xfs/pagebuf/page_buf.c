@@ -1769,8 +1769,6 @@ pagebuf_delwri_flush(
 			blk_run_queues();
 			flush_cnt = 0;
 		}
-
-		spin_lock(&pbd_delwrite_lock);
 	}
 
 	spin_unlock(&pbd_delwrite_lock);
