@@ -227,12 +227,12 @@ int os_set_fd_block(int fd, int blocking)
 
 int os_accept_connection(int fd)
 {
-	int err;
+	int new;
 
-	err = accept(fd, NULL, 0);
-	if(err) 
+	new = accept(fd, NULL, 0);
+	if(new < 0) 
 		return(-errno);
-	return(0);
+	return(new);
 }
 
 #ifndef SHUT_RD

@@ -280,11 +280,6 @@ static int eth_configure(struct uml_net *device, int n)
 	device->dev = dev;
 
 	(*device->kern->init)(dev, device->transport_index);
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
-	if(err)
-		return(1);
 
 	dev->mtu = device->user->max_packet;
 	dev->open = uml_net_open;
@@ -298,7 +293,38 @@ static int eth_configure(struct uml_net *device, int n)
 	dev->do_ioctl = uml_net_ioctl;
 	dev->watchdog_timeo = (HZ >> 1);
 	dev->irq = UM_ETH_IRQ;
+	dev->init = NULL;
+	dev->master = NULL;
+	dev->neigh_setup = NULL;
+	dev->owner = NULL;
+	dev->state = 0;
+	dev->next_sched = 0;
+	dev->get_wireless_stats = 0;
+	dev->wireless_handlers = 0;
+	dev->gflags = 0;
+	dev->mc_list = NULL;
+	dev->mc_count = 0;
+	dev->promiscuity = 0;
+	dev->atalk_ptr = NULL;
+	dev->ip_ptr = NULL;
+	dev->dn_ptr = NULL;
+	dev->ip6_ptr = NULL;
+	dev->ec_ptr = NULL;
+	atomic_set(&dev->refcnt, 0);
+	dev->features = 0;
+	dev->uninit = NULL;
+	dev->destructor = NULL;
+	dev->set_config = NULL;
+	dev->accept_fastpath = 0;
+	dev->br_port = 0;
+ 	dev->mem_start = 0;
+ 	dev->mem_end = 0;
 
+	rtnl_lock();
+	err = register_netdevice(dev);
+	rtnl_unlock();
+	if(err)
+		return(1);
 	lp = dev->priv;
 
 	/* lp.user is the first four bytes of the transport data, which
