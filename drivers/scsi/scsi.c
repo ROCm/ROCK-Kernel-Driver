@@ -440,29 +440,18 @@ int scsi_dispatch_cmd(struct scsi_cmnd *cmd)
 		goto out;
 	}
 
-	if (host->can_queue) {
-		SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
-					   host->hostt->queuecommand));
+	SCSI_LOG_MLQUEUE(3, printk("queuecommand : routine at %p\n",
+				   host->hostt->queuecommand));
 
-		spin_lock_irqsave(host->host_lock, flags);
-		rtn = host->hostt->queuecommand(cmd, scsi_done);
-		spin_unlock_irqrestore(host->host_lock, flags);
-		if (rtn) {
-			scsi_queue_insert(cmd,
+	spin_lock_irqsave(host->host_lock, flags);
+	rtn = host->hostt->queuecommand(cmd, scsi_done);
+	spin_unlock_irqrestore(host->host_lock, flags);
+	if (rtn) {
+		scsi_queue_insert(cmd,
 				(rtn == SCSI_MLQUEUE_DEVICE_BUSY) ?
-					rtn : SCSI_MLQUEUE_HOST_BUSY);
-			SCSI_LOG_MLQUEUE(3,
-			    printk("queuecommand : request rejected\n"));
-		}
-	} else {
-		SCSI_LOG_MLQUEUE(3, printk("command() :  routine at %p\n",
-					host->hostt->command));
-
-		spin_lock_irqsave(host->host_lock, flags);
-		cmd->result = host->hostt->command(cmd);
-		scsi_done(cmd);
-		spin_unlock_irqrestore(host->host_lock, flags);
-		rtn = 0;
+				 rtn : SCSI_MLQUEUE_HOST_BUSY);
+		SCSI_LOG_MLQUEUE(3,
+		    printk("queuecommand : request rejected\n"));
 	}
 
  out:

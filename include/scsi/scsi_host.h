@@ -95,24 +95,10 @@ struct scsi_host_template {
 	 * I/O pressure in the system if there are no other outstanding
 	 * commands.
 	 *
-	 * STATUS: REQUIRED	(for exceptions see below)
+	 * STATUS: REQUIRED
 	 */
 	int (* queuecommand)(struct scsi_cmnd *,
 			     void (*done)(struct scsi_cmnd *));
-
-	/*
-	 * This is used instead of queuecommand if can_queue == 0;
-	 *
-	 * The return value has the following meaning:
-	 * Byte What:
-	 * 0    SCSI status code
-	 * 1    SCSI 1 byte message
-	 * 2    host error return.
-	 * 3    mid level error return
-	 *
-	 * Status: OBSOLETE
-	 */
-	int (* command)(struct scsi_cmnd *);
 
 	/*
 	 * This is an error handling strategy routine.  You don't need to
