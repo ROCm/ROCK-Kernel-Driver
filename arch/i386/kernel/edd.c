@@ -763,7 +763,16 @@ static void edd_populate_dir(struct edd_device * edev)
 	
 	if (!error) {
 		edd_create_symlink_to_pcidev(edev);
-		edd_create_symlink_to_scsidev(edev);
+
+		/* FIXME - as of 15-Jan-2003, there are some
+		   non-"scsi_device"s on the scsi_bus list.  The following
+		   function could possibly mis-access memory in that
+		   case.  This is actually a problem with the SCSI
+		   layer, which is being addressed there.  Until then,
+		   don't call this function.
+		   		   
+		   edd_create_symlink_to_scsidev(edev);
+		*/
 	}
 }
 
