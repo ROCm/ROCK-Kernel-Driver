@@ -27,8 +27,6 @@
 #include <linux/proc_fs.h>
 #include <linux/delay.h>
 
-#include <video/fbcon.h>
-
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/uaccess.h>
@@ -216,14 +214,12 @@ static struct fb_ops clps7111fb_ops = {
 	.owner		= THIS_MODULE,
 	.fb_check_var	= clps7111fb_check_var,
 	.fb_set_par	= clps7111fb_set_par,
-	.fb_set_var	= gen_set_var,
-	.fb_set_cmap	= gen_set_cmap,
-	.fb_get_cmap	= gen_get_cmap,
 	.fb_setcolreg	= clps7111fb_setcolreg,
 	.fb_blank	= clps7111fb_blank,
 	.fb_fillrect	= cfb_fillrect,
 	.fb_copyarea	= cfb_copyarea,
 	.fb_imageblit	= cfb_imageblit,
+	.fb_cursor	= cfb_cursor,
 };
 
 static int 
@@ -368,20 +364,15 @@ int __init clps711xfb_init(void)
 {
 	int err = -ENOMEM;
 
-	cfb = kmalloc(sizeof(*cfb) + sizeof(struct display), GFP_KERNEL);
+	cfb = kmalloc(sizeof(*cfb), GFP_KERNEL);
 	if (!cfb)
 		goto out;
 
-	memset(cfb, 0, sizeof(*cfb) + sizeof(struct display));
+	memset(cfb, 0, sizeof(*cfb));
 	strcpy(cfb->fix.id, "clps711x");
 
-	cfb->currcon		= -1;
 	cfb->fbops		= &clps7111fb_ops;
-	cfb->changevar		= NULL;
-	cfb->switch_con		= gen_switch;
-	cfb->updatevar		= gen_update_var;
 	cfb->flags		= FBINFO_FLAG_DEFAULT;
-	cfb->disp		= (struct display *)(cfb + 1);
 
 	clps711x_guess_lcd_params(cfb);
 
@@ -422,7 +413,6 @@ int __init clps711xfb_init(void)
 		clps_writeb(clps_readb(PDDR) | EDB_PD3_LCDBL, PDDR);
 	}
 
-	gen_set_var(&cfb->var, -1, cfb);
 	err = register_framebuffer(cfb);
 
 out:	return err;
