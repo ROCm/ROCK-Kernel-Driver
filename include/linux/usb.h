@@ -40,9 +40,22 @@ struct usb_driver;
  * Devices may also have class-specific or vendor-specific descriptors.
  */
 
-/* host-side wrapper for parsed endpoint descriptors */
+/**
+ * struct usb_host_endpoint - host-side endpoint descriptor and queue
+ * @desc: descriptor for this endpoint, wMaxPacketSize in native byteorder
+ * @urb_list: urbs queued to this endpoint; maintained by usbcore
+ * @hcpriv: for use by HCD; typically holds hardware dma queue head (QH)
+ *	with one or more transfer descriptors (TDs) per urb
+ * @extra: descriptors following this endpoint in the configuration
+ * @extralen: how many bytes of "extra" are valid
+ *
+ * USB requests are always queued to a given endpoint, identified by a
+ * descriptor within an active interface in a given USB configuration.
+ */
 struct usb_host_endpoint {
 	struct usb_endpoint_descriptor	desc;
+	struct list_head		urb_list;
+	void				*hcpriv;
 
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
@@ -325,8 +338,6 @@ struct usb_device {
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
 
-	void *hcpriv;			/* Host Controller private data */
-	
 	struct list_head filelist;
 	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the device */
 

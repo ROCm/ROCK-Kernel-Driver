@@ -66,7 +66,6 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	const char		*description;	/* "ehci-hcd" etc */
 
 	struct timer_list	rh_timer;	/* drives root hub */
-	struct list_head	dev_list;	/* devices on this bus */
 
 	/*
 	 * hardware info/state
@@ -113,14 +112,6 @@ static inline struct usb_bus *hcd_to_bus (struct usb_hcd *hcd)
 }
 
 
-struct hcd_dev {	/* usb_device.hcpriv points to this */
-	struct list_head	dev_list;	/* on this hcd */
-	struct list_head	urb_list;	/* pending on this dev */
-
-	/* per-configuration HC/HCD state, such as QH or ED */
-	void			*ep[32];
-};
-
 // urb.hcpriv is really hardware-specific
 
 struct hcd_timeout {	/* timeouts we allocate */
@@ -136,8 +127,6 @@ struct hcd_timeout {	/* timeouts we allocate */
  */
 
 struct usb_operations {
-	int (*allocate)(struct usb_device *);
-	int (*deallocate)(struct usb_device *);
 	int (*get_frame_number) (struct usb_device *usb_dev);
 	int (*submit_urb) (struct urb *urb, int mem_flags);
 	int (*unlink_urb) (struct urb *urb, int status);
@@ -149,7 +138,8 @@ struct usb_operations {
 	void (*buffer_free)(struct usb_bus *bus, size_t size,
 			void *addr, dma_addr_t dma);
 
-	void (*disable)(struct usb_device *udev, int bEndpointAddress);
+	void (*disable)(struct usb_device *udev,
+			struct usb_host_endpoint *ep);
 
 	/* global suspend/resume of bus */
 	int (*hub_suspend)(struct usb_bus *);
@@ -200,13 +190,15 @@ struct hc_driver {
 	struct usb_hcd	*(*hcd_alloc) (void);
 
 	/* manage i/o requests, device state */
-	int	(*urb_enqueue) (struct usb_hcd *hcd, struct urb *urb,
+	int	(*urb_enqueue) (struct usb_hcd *hcd,
+					struct usb_host_endpoint *ep,
+					struct urb *urb,
 					int mem_flags);
 	int	(*urb_dequeue) (struct usb_hcd *hcd, struct urb *urb);
 
 	/* hw synch, freeing endpoint resources that urb_dequeue can't */
 	void 	(*endpoint_disable)(struct usb_hcd *hcd,
-			struct hcd_dev *dev, int bEndpointAddress);
+			struct usb_host_endpoint *ep);
 
 	/* root hub support */
 	int		(*hub_status_data) (struct usb_hcd *hcd, char *buf);
