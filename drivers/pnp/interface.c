@@ -168,7 +168,8 @@ static void pnp_print_mem(pnp_info_buffer_t *buffer, char *space, struct pnp_mem
 	pnp_printf(buffer, ", %s\n", s);
 }
 
-static void pnp_print_resources(pnp_info_buffer_t *buffer, char *space, struct pnp_resources *res, int dep)
+static void pnp_print_option(pnp_info_buffer_t *buffer, char *space,
+			     struct pnp_option *option, int dep)
 {
 	char *s;
 	struct pnp_port *port;
@@ -176,49 +177,55 @@ static void pnp_print_resources(pnp_info_buffer_t *buffer, char *space, struct p
 	struct pnp_dma *dma;
 	struct pnp_mem *mem;
 
-	switch (res->priority) {
-	case PNP_RES_PRIORITY_PREFERRED:
-		s = "preferred";
-		break;
-	case PNP_RES_PRIORITY_ACCEPTABLE:
-		s = "acceptable";
-		break;
-	case PNP_RES_PRIORITY_FUNCTIONAL:
-		s = "functional";
-		break;
-	default:
-		s = "invalid";
-	}
-	if (dep > 0)
+	if (dep) {
+		switch (option->priority) {
+			case PNP_RES_PRIORITY_PREFERRED:
+			s = "preferred";
+			break;
+			case PNP_RES_PRIORITY_ACCEPTABLE:
+			s = "acceptable";
+			break;
+			case PNP_RES_PRIORITY_FUNCTIONAL:
+			s = "functional";
+			break;
+			default:
+			s = "invalid";
+		}
 		pnp_printf(buffer, "Dependent: %02i - Priority %s\n",dep, s);
-	for (port = res->port; port; port = port->next)
+	}
+
+	for (port = option->port; port; port = port->next)
 		pnp_print_port(buffer, space, port);
-	for (irq = res->irq; irq; irq = irq->next)
+	for (irq = option->irq; irq; irq = irq->next)
 		pnp_print_irq(buffer, space, irq);
-	for (dma = res->dma; dma; dma = dma->next)
+	for (dma = option->dma; dma; dma = dma->next)
 		pnp_print_dma(buffer, space, dma);
-	for (mem = res->mem; mem; mem = mem->next)
+	for (mem = option->mem; mem; mem = mem->next)
 		pnp_print_mem(buffer, space, mem);
 }
 
-static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf)
+
+static ssize_t pnp_show_options(struct device *dmdev, char *buf)
 {
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
-	struct pnp_resources * res = dev->possible;
-	int ret, dep = 0;
+	struct pnp_option * independent = dev->independent;
+	struct pnp_option * dependent = dev->dependent;
+	int ret, dep = 1;
+
 	pnp_info_buffer_t *buffer = (pnp_info_buffer_t *)
 				 pnp_alloc(sizeof(pnp_info_buffer_t));
 	if (!buffer)
 		return -ENOMEM;
+
 	buffer->len = PAGE_SIZE;
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;
-	while (res){
-		if (dep == 0)
-			pnp_print_resources(buffer, "", res, dep);
-		else
-			pnp_print_resources(buffer, "   ", res, dep);
-		res = res->dep;
+	if (independent)
+		pnp_print_option(buffer, "", independent, 0);
+
+	while (dependent){
+		pnp_print_option(buffer, "   ", dependent, dep);
+		dependent = dependent->next;
 		dep++;
 	}
 	ret = (buffer->curr - buf);
@@ -226,97 +233,8 @@ static ssize_t pnp_show_possible_resources(struct device *dmdev, char *buf)
 	return ret;
 }
 
-static DEVICE_ATTR(possible,S_IRUGO,pnp_show_possible_resources,NULL);
+static DEVICE_ATTR(options,S_IRUGO,pnp_show_options,NULL);
 
-static void pnp_print_conflict_node(pnp_info_buffer_t *buffer, struct pnp_dev * dev)
-{
-	if (!dev)
-		return;
-	pnp_printf(buffer, "'%s'.\n", dev->dev.bus_id);
-}
-
-static void pnp_print_conflict_desc(pnp_info_buffer_t *buffer, int conflict)
-{
-	if (!conflict)
-		return;
-	pnp_printf(buffer, "  Conflict Detected: %2x - ", conflict);
-	switch (conflict) {
-	case CONFLICT_TYPE_RESERVED:
-		pnp_printf(buffer, "manually reserved.\n");
-		break;
-
-	case CONFLICT_TYPE_IN_USE:
-		pnp_printf(buffer, "currently in use.\n");
-		break;
-
-	case CONFLICT_TYPE_PCI:
-		pnp_printf(buffer, "PCI device.\n");
-		break;
-
-	case CONFLICT_TYPE_INVALID:
-		pnp_printf(buffer, "invalid.\n");
-		break;
-
-	case CONFLICT_TYPE_INTERNAL:
-		pnp_printf(buffer, "another resource on this device.\n");
-		break;
-
-	case CONFLICT_TYPE_PNP_WARM:
-		pnp_printf(buffer, "active PnP device ");
-		break;
-
-	case CONFLICT_TYPE_PNP_COLD:
-		pnp_printf(buffer, "disabled PnP device ");
-		break;
-	default:
-		pnp_printf(buffer, "Unknown conflict.\n");
-		break;
-	}
-}
-
-static void pnp_print_conflict(pnp_info_buffer_t *buffer, struct pnp_dev * dev, int idx, int type)
-{
-	struct pnp_dev * cdev, * wdev = NULL;
-	int conflict;
-	switch (type) {
-	case IORESOURCE_IO:
-		conflict = pnp_check_port(dev, idx);
-		if (conflict == CONFLICT_TYPE_PNP_WARM)
-			wdev = pnp_check_port_conflicts(dev, idx, SEARCH_WARM);
-		cdev = pnp_check_port_conflicts(dev, idx, SEARCH_COLD);
-		break;
-	case IORESOURCE_MEM:
-		conflict = pnp_check_mem(dev, idx);
-		if (conflict == CONFLICT_TYPE_PNP_WARM)
-			wdev = pnp_check_mem_conflicts(dev, idx, SEARCH_WARM);
-		cdev = pnp_check_mem_conflicts(dev, idx, SEARCH_COLD);
-		break;
-	case IORESOURCE_IRQ:
-		conflict = pnp_check_irq(dev, idx);
-		if (conflict == CONFLICT_TYPE_PNP_WARM)
-			wdev = pnp_check_irq_conflicts(dev, idx, SEARCH_WARM);
-		cdev = pnp_check_irq_conflicts(dev, idx, SEARCH_COLD);
-		break;
-	case IORESOURCE_DMA:
-		conflict = pnp_check_dma(dev, idx);
-		if (conflict == CONFLICT_TYPE_PNP_WARM)
-			wdev = pnp_check_dma_conflicts(dev, idx, SEARCH_WARM);
-		cdev = pnp_check_dma_conflicts(dev, idx, SEARCH_COLD);
-		break;
-	default:
-		return;
-	}
-
-	pnp_print_conflict_desc(buffer, conflict);
-
-	if (wdev)
-		pnp_print_conflict_node(buffer, wdev);
-
-	if (cdev) {
-		pnp_print_conflict_desc(buffer, CONFLICT_TYPE_PNP_COLD);
-		pnp_print_conflict_node(buffer, cdev);
-	}
-}
 
 static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 {
@@ -332,12 +250,6 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	buffer->buffer = buf;
 	buffer->curr = buffer->buffer;
 
-	pnp_printf(buffer,"mode = ");
-	if (dev->config_mode & PNP_CONFIG_MANUAL)
-		pnp_printf(buffer,"manual\n");
-	else
-		pnp_printf(buffer,"auto\n");
-
 	pnp_printf(buffer,"state = ");
 	if (dev->active)
 		pnp_printf(buffer,"active\n");
@@ -350,7 +262,6 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 			pnp_printf(buffer," 0x%lx-0x%lx \n",
 						pnp_port_start(dev, i),
 						pnp_port_end(dev, i));
-			pnp_print_conflict(buffer, dev, i, IORESOURCE_IO);
 		}
 	}
 	for (i = 0; i < PNP_MAX_MEM; i++) {
@@ -359,21 +270,18 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 			pnp_printf(buffer," 0x%lx-0x%lx \n",
 						pnp_mem_start(dev, i),
 						pnp_mem_end(dev, i));
-			pnp_print_conflict(buffer, dev, i, IORESOURCE_MEM);
 		}
 	}
 	for (i = 0; i < PNP_MAX_IRQ; i++) {
 		if (pnp_irq_valid(dev, i)) {
 			pnp_printf(buffer,"irq");
 			pnp_printf(buffer," %ld \n", pnp_irq(dev, i));
-			pnp_print_conflict(buffer, dev, i, IORESOURCE_IRQ);
 		}
 	}
 	for (i = 0; i < PNP_MAX_DMA; i++) {
 		if (pnp_dma_valid(dev, i)) {
 			pnp_printf(buffer,"dma");
 			pnp_printf(buffer," %ld \n", pnp_dma(dev, i));
-			pnp_print_conflict(buffer, dev, i, IORESOURCE_DMA);
 		}
 	}
 	ret = (buffer->curr - buf);
@@ -381,7 +289,7 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	return ret;
 }
 
-extern int pnp_resolve_conflicts(struct pnp_dev *dev);
+extern struct semaphore pnp_res_mutex;
 
 static ssize_t
 pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count)
@@ -389,6 +297,12 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 	struct pnp_dev *dev = to_pnp_dev(dmdev);
 	char	*buf = (void *)ubuf;
 	int	retval = 0;
+
+	if (dev->status & PNP_ATTACHED) {
+		retval = -EBUSY;
+		pnp_info("Device %s cannot be configured because it is in use.", dev->dev.bus_id);
+		goto done;
+	}
 
 	while (isspace(*buf))
 		++buf;
@@ -400,41 +314,23 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		retval = pnp_activate_dev(dev);
 		goto done;
 	}
-	if (!strnicmp(buf,"reset",5)) {
-		if (!dev->active)
+	if (!strnicmp(buf,"fill",4)) {
+		if (dev->active)
 			goto done;
-		retval = pnp_disable_dev(dev);
-		if (retval)
-			goto done;
-		retval = pnp_activate_dev(dev);
+		retval = pnp_auto_config_dev(dev);
 		goto done;
 	}
 	if (!strnicmp(buf,"auto",4)) {
 		if (dev->active)
 			goto done;
+		pnp_init_resources(&dev->res);
 		retval = pnp_auto_config_dev(dev);
 		goto done;
 	}
 	if (!strnicmp(buf,"clear",5)) {
 		if (dev->active)
 			goto done;
-		spin_lock(&pnp_lock);
-		dev->config_mode = PNP_CONFIG_MANUAL;
-		pnp_init_resource_table(&dev->res);
-		if (dev->rule)
-			dev->rule->depnum = 0;
-		spin_unlock(&pnp_lock);
-		goto done;
-	}
-	if (!strnicmp(buf,"resolve",7)) {
-		retval = pnp_resolve_conflicts(dev);
-		goto done;
-	}
-	if (!strnicmp(buf,"get",3)) {
-		spin_lock(&pnp_lock);
-		if (pnp_can_read(dev))
-			dev->protocol->get(dev, &dev->res);
-		spin_unlock(&pnp_lock);
+		pnp_init_resources(&dev->res);
 		goto done;
 	}
 	if (!strnicmp(buf,"set",3)) {
@@ -442,9 +338,8 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 		if (dev->active)
 			goto done;
 		buf += 3;
-		spin_lock(&pnp_lock);
-		dev->config_mode = PNP_CONFIG_MANUAL;
-		pnp_init_resource_table(&dev->res);
+		pnp_init_resources(&dev->res);
+		down(&pnp_res_mutex);
 		while (1) {
 			while (isspace(*buf))
 				++buf;
@@ -514,7 +409,7 @@ pnp_set_current_resources(struct device * dmdev, const char * ubuf, size_t count
 			}
 			break;
 		}
-		spin_unlock(&pnp_lock);
+		up(&pnp_res_mutex);
 		goto done;
 	}
  done:
@@ -543,7 +438,7 @@ static DEVICE_ATTR(id,S_IRUGO,pnp_show_current_ids,NULL);
 
 int pnp_interface_attach_device(struct pnp_dev *dev)
 {
-	device_create_file(&dev->dev,&dev_attr_possible);
+	device_create_file(&dev->dev,&dev_attr_options);
 	device_create_file(&dev->dev,&dev_attr_resources);
 	device_create_file(&dev->dev,&dev_attr_id);
 	return 0;
