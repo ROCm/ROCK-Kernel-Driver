@@ -4661,22 +4661,6 @@ static int tg3_reset_hw(struct tg3 *tp)
 		return -ENODEV;
 	}
 
-#if 0	/* Remove FTQ reset because it is redundant and can cause */
-	/* race condition with ASF */
-	tw32(FTQ_RESET, 0xffffffff);
-	tw32(FTQ_RESET, 0x00000000);
-	for (i = 0; i < 2000; i++) {
-		if (tr32(FTQ_RESET) == 0x00000000)
-			break;
-		udelay(10);
-	}
-	if (i >= 2000) {
-		printk(KERN_ERR PFX "tg3_reset_hw cannot reset FTQ for %s.\n",
-		       tp->dev->name);
-		return -ENODEV;
-	}
-#endif
-
 	/* Clear statistics/status block in chip, and status block in ram. */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
 		for (i = NIC_SRAM_STATS_BLK;
