@@ -69,6 +69,7 @@
 
 #define	_LVM_KERNEL_H_VERSION	"LVM 0.9.1_beta2 (18/01/2001)"
 
+#include <linux/config.h>
 #include <linux/version.h>
 
 /*

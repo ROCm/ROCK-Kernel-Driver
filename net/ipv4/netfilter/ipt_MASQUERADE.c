@@ -1,5 +1,6 @@
 /* Masquerade.  Simple mapping which alters range to a local IP address
    (depending on route). */
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/ip.h>
 #include <linux/timer.h>

@@ -937,18 +937,22 @@ int do_coredump(long signr, struct pt_regs * regs)
 #else
 	corename[4] = '\0';
 #endif
-	file = filp_open(corename, O_CREAT | 2 | O_TRUNC | O_NOFOLLOW, 0600);
+	file = filp_open(corename, O_CREAT | 2 | O_NOFOLLOW, 0600);
 	if (IS_ERR(file))
 		goto fail;
 	inode = file->f_dentry->d_inode;
 	if (inode->i_nlink > 1)
 		goto close_fail;	/* multiple links - don't dump */
+	if (d_unhashed(file->f_dentry))
+		goto close_fail;
 
 	if (!S_ISREG(inode->i_mode))
 		goto close_fail;
 	if (!file->f_op)
 		goto close_fail;
 	if (!file->f_op->write)
+		goto close_fail;
+	if (do_truncate(file->f_dentry, 0) != 0)
 		goto close_fail;
 	if (!binfmt->core_dump(signr, regs, file))
 		goto close_fail;

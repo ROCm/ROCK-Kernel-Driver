@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 4
 SUBLEVEL = 1
-EXTRAVERSION =-pre12
+EXTRAVERSION =
 
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
@@ -110,8 +110,7 @@ export ROOT_DEV = CURRENT
 export SVGA_MODE = -DSVGA_MODE=NORMAL_VGA
 
 #
-# if you want the RAM disk device, define this to be the
-# size in blocks.
+# if you want the RAM disk device, define this to be the size in blocks.
 # This is i386 specific.
 #
 

@@ -25,10 +25,9 @@
  * loads pretty fast by getting whole tracks at a time whenever possible.
  */
 
-#include <linux/config.h>		/* for CONFIG_ROOT_RDONLY */
 #include <asm/boot.h>
 
-SETUPSECS	= 4			/* default nr of setup-sectors */
+SETUPSECTS	= 4			/* default nr of setup-sectors */
 BOOTSEG		= 0x07C0		/* original address of boot-sector */
 INITSEG		= DEF_INITSEG		/* we move boot here - out of the way */
 SETUPSEG	= DEF_SETUPSEG		/* setup starts here */
@@ -46,8 +45,8 @@ SWAP_DEV	= 0			/* SWAP_DEV is now written by "build" */
 #define RAMDISK 0
 #endif 
 
-#ifndef CONFIG_ROOT_RDONLY
-#define CONFIG_ROOT_RDONLY 1
+#ifndef ROOT_RDONLY
+#define ROOT_RDONLY 1
 #endif
 
 .code16
@@ -394,11 +393,11 @@ disksizes:	.byte 36, 18, 15, 9
 msg1:		.byte 13, 10
 		.ascii "Loading"
 
-# XXX: This is a *very* snug fit.
+# XXX: This is a fairly snug fit.
 
 .org 497
-setup_sects:	.byte SETUPSECS
-root_flags:	.word CONFIG_ROOT_RDONLY
+setup_sects:	.byte SETUPSECTS
+root_flags:	.word ROOT_RDONLY
 syssize:	.word SYSSIZE
 swap_dev:	.word SWAP_DEV
 ram_size:	.word RAMDISK
