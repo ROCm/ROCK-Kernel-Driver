@@ -332,7 +332,7 @@ int line_setup(struct line *lines, int num, char *init, int all_allowed)
 	init++;
 	if((n >= 0) && (n >= num)){
 		printk("line_setup - %d out of range ((0 ... %d) allowed)\n",
-		       n, num);
+		       n, num - 1);
 		return(0);
 	}
 	else if(n >= 0){

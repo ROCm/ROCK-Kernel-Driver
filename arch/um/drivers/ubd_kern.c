@@ -299,7 +299,7 @@ static int ubd_setup_common(char *str, int *index_out)
 	}
 	if(n >= MAX_DEV){
 		printk(KERN_ERR "ubd_setup : index %d out of range "
-		       "(%d devices)\n", n, MAX_DEV);
+		       "(%d devices, from 0 to %d)\n", n, MAX_DEV, MAX_DEV - 1);
 		return(1);
 	}
 
