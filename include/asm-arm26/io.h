@@ -386,7 +386,7 @@ extern void _memset_io(unsigned long, int, size_t);
  * ioremap and friends.
  *
  * ioremap takes a PCI memory address, as specified in
- * linux/Documentation/IO-mapping.txt.
+ * Documentation/IO-mapping.txt.
  */
 extern void * __ioremap(unsigned long, size_t, unsigned long, unsigned long);
 extern void __iounmap(void *addr);
