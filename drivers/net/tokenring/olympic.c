@@ -384,7 +384,7 @@ static int __devinit olympic_init(struct net_device *dev)
 }
 #endif	
 	if(readw(init_srb+6)) {
-		printk(KERN_INFO "tokenring card intialization failed. errorcode : %x\n",readw(init_srb+6));
+		printk(KERN_INFO "tokenring card initialization failed. errorcode : %x\n",readw(init_srb+6));
 		return -ENODEV;
 	}
 

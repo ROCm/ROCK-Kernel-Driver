@@ -2071,7 +2071,7 @@ static int tx_init(struct atm_dev *dev)
 		- UBR Table size is 4K  
 		- UBR wait queue is 4K  
 	   since the table and wait queues are contiguous, all the bytes   
-	   can be intialized by one memeset.  
+	   can be initialized by one memeset.  
 	*/  
         
         vcsize_sel = 0;

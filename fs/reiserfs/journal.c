@@ -1931,7 +1931,7 @@ static int journal_init_dev( struct super_block *super,
 			printk( "journal_init_dev: '%s' is not a block device", jdev_name );
 			result = -ENOTBLK;
 		} else if( jdev_inode -> i_bdev == NULL ) {
-			printk( "journal_init_dev: bdev unintialized for '%s'", jdev_name );
+			printk( "journal_init_dev: bdev uninitialized for '%s'", jdev_name );
 			result = -ENOMEM;
 		} else  {
 			/* ok */

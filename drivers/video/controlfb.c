@@ -554,7 +554,7 @@ static void control_set_hardware(struct fb_info_control *p, struct fb_par_contro
 
 
 /*
- * Called from fbmem.c for probing & intializing
+ * Called from fbmem.c for probing & initializing
  */
 int __init control_init(void)
 {

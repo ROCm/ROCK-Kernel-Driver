@@ -45,7 +45,7 @@ History:
   May 23nd, 1999
 	can receive frames, send frames
   May 24th, 1999
-        modularized intialization of LANCE
+        modularized initialization of LANCE
         loadable as module
 	still Tx problem :-(
   May 26th, 1999

@@ -4166,7 +4166,7 @@ orinoco_proc_dev_init(struct net_device *dev)
 	e = create_proc_read_entry("buf", S_IFREG | S_IRUGO,
 					       priv->dir_dev, orinoco_proc_get_hermes_buf, priv);
 	if (! e) {
-		printk(KERN_ERR "Unable to intialize /proc/hermes/%s/buf\n", dev->name);
+		printk(KERN_ERR "Unable to initialize /proc/hermes/%s/buf\n", dev->name);
 		goto fail;
 	}
 

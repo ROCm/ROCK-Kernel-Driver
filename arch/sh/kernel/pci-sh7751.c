@@ -285,7 +285,7 @@ void __init pcibios_init(void)
 	struct pci_ops *bios = NULL;
 	struct pci_ops *dir = NULL;
 
-	PCIDBG(1,"PCI: Starting intialization.\n");
+	PCIDBG(1,"PCI: Starting initialization.\n");
 #ifdef CONFIG_PCI_BIOS
 	if ((pci_probe & PCI_PROBE_BIOS) && ((bios = pci_find_bios()))) {
 		pci_probe |= PCI_BIOS_SORT;

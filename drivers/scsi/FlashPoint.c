@@ -7529,7 +7529,7 @@ void sinits(PSCCB p_sccb, UCHAR p_card)
  *
  *   $Workfile:   phase.c  $
  *
- *   Description:  Functions to intially handle the SCSI bus phase when
+ *   Description:  Functions to initially handle the SCSI bus phase when
  *                 the target asserts request (and the automation is not
  *                 enabled to handle the situation).
  *

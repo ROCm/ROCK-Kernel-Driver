@@ -153,7 +153,7 @@ sn_map_nr (unsigned long addr)
 /**
  * early_sn_setup - early setup routine for SN platforms
  *
- * Sets up an intial console to aid debugging.  Intended primarily
+ * Sets up an initial console to aid debugging.  Intended primarily
  * for bringup, it's only called if %BRINGUP and %CONFIG_IA64_EARLY_PRINTK
  * are turned on.  See start_kernel() in init/main.c.
  */

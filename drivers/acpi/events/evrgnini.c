@@ -410,7 +410,7 @@ acpi_ev_default_region_setup (
  *              Get the appropriate address space handler for a newly
  *              created region.
  *
- *              This also performs address space specific intialization.  For
+ *              This also performs address space specific initialization.  For
  *              example, PCI regions must have an _ADR object that contains
  *              a PCI address in the scope of the definition.  This address is
  *              required to perform an access to PCI config space.

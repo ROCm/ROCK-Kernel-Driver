@@ -316,7 +316,7 @@ V.  Recent Changes
     the new buffer or the function returns non-zero which should case the
     scheduler to reschedule the buffer later.
 
-01/15/1999 EPK Some adjustments were made to the chip intialization.  
+01/15/1999 EPK Some adjustments were made to the chip initialization.  
     End-to-end flow control should now be fully active and the interrupt 
     algorithm vars have been changed.  These could probably use further tuning.
 

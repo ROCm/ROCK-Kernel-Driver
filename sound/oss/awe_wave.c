@@ -562,7 +562,7 @@ static int __init _attach_awe(void)
 	/* clear all samples */
 	awe_reset_samples();
 
-	/* intialize AWE32 hardware */
+	/* initialize AWE32 hardware */
 	awe_initialize();
 
 	sprintf(awe_info.name, "AWE32-%s (RAM%dk)",

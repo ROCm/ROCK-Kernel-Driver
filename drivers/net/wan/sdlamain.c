@@ -38,7 +38,7 @@
 *				replaced it with 'wandev->enable_tx_int'. 
 * May 29, 1997	Jaspreet Singh	Flow Control Problem
 *				added "wandev->tx_int_enabled=1" line in the
-*				init module. This line intializes the flag for 
+*				init module. This line initializes the flag for 
 *				preventing Interrupt disabled with device set to
 *				busy
 * Jan 15, 1997	Gene Kozin	Version 3.1.0

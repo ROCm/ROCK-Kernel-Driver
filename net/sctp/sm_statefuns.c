@@ -1413,7 +1413,7 @@ nomem:
  *      at about the same time but the peer endpoint started its INIT
  *      after responding to the local endpoint's INIT
  */
-/* This case represents an intialization collision.  */
+/* This case represents an initialization collision.  */
 static sctp_disposition_t sctp_sf_do_dupcook_b(const sctp_endpoint_t *ep,
 					       const sctp_association_t *asoc,
 					       sctp_chunk_t *chunk,

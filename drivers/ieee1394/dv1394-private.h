@@ -488,7 +488,7 @@ struct video_card {
 	struct frame *frames[DV1394_MAX_FRAMES];
 	
 	/* n_frames also serves as an indicator that this struct video_card is
-	   intialized and ready to run DMA buffers */
+	   initialized and ready to run DMA buffers */
 
 	int n_frames;
 
