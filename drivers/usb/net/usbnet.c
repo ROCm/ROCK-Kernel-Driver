@@ -449,10 +449,24 @@ static void gl_interrupt_complete (struct urb *urb)
 {
 	int status = urb->status;
 	
+	switch (status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, status);
+		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
+	}
+
+	status = usb_submit_urb (urb, GFP_ATOMIC);
 	if (status)
-		dbg ("gl_interrupt_complete fail - %X", status);
-	else
-		dbg ("gl_interrupt_complete success...");
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static int gl_interrupt_read (struct usbnet *dev)
