@@ -72,6 +72,8 @@ MODULE_PARM_DESC (usbfs_snoop, "true to log all usbfs traffic");
 	} while (0)
 
 
+#define	MAX_USBFS_BUFFER_SIZE	16384
+
 static inline int connected (struct usb_device *dev)
 {
 	return dev->state != USB_STATE_NOTATTACHED;
@@ -623,6 +625,8 @@ static int proc_bulk(struct dev_state *ps, void __user *arg)
 	if (!usb_maxpacket(dev, pipe, !(bulk.ep & USB_DIR_IN)))
 		return -EINVAL;
 	len1 = bulk.len;
+	if (len1 > MAX_USBFS_BUFFER_SIZE)
+		return -EINVAL;
 	if (!(tbuf = kmalloc(len1, GFP_KERNEL)))
 		return -ENOMEM;
 	tmo = (bulk.timeout * HZ + 999) / 1000;
@@ -857,7 +861,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 
 	case USBDEVFS_URB_TYPE_BULK:
 		uurb.number_of_packets = 0;
-		if (uurb.buffer_length > 16384)
+		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
 			return -EFAULT;
@@ -899,7 +903,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 			interval = 1 << min (15, ep_desc->bInterval - 1);
 		else
 			interval = ep_desc->bInterval;
-		if (uurb.buffer_length > 16384)
+		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
 			return -EFAULT;
