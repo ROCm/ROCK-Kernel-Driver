@@ -9675,7 +9675,9 @@ aic7xxx_detect(Scsi_Host_Template *template)
           found++;
 	  continue;
 skip_pci_controller:
+#ifdef CONFIG_PCI
 	  pci_release_regions(temp_p->pdev);
+#endif
 	  kfree(temp_p);
         }  /* Found an Adaptec PCI device. */
         else /* Well, we found one, but we couldn't get any memory */
@@ -10967,8 +10969,10 @@ aic7xxx_release(struct Scsi_Host *host)
 #endif /* MMAPIO */
   if(!p->pdev)
     release_region(p->base, MAXREG - MINREG);
+#ifdef CONFIG_PCI
   else
     pci_release_regions(p->pdev);
+#endif
   prev = NULL;
   next = first_aic7xxx;
   while(next != NULL)
