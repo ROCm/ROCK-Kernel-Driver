@@ -1253,7 +1253,7 @@ static void snd_timer_user_copy_id(snd_timer_id_t *id, snd_timer_t *timer)
 	id->subdevice = timer->tmr_subdevice;
 }
 
-static int snd_timer_user_next_device(snd_timer_id_t *_tid)
+static int snd_timer_user_next_device(snd_timer_id_t __user *_tid)
 {
 	snd_timer_id_t id;
 	snd_timer_t *timer;
@@ -1344,7 +1344,7 @@ static int snd_timer_user_next_device(snd_timer_id_t *_tid)
 	return 0;
 } 
 
-static int snd_timer_user_ginfo(struct file *file, snd_timer_ginfo_t *_ginfo)
+static int snd_timer_user_ginfo(struct file *file, snd_timer_ginfo_t __user *_ginfo)
 {
 	snd_timer_ginfo_t ginfo;
 	snd_timer_id_t tid;
@@ -1382,7 +1382,7 @@ static int snd_timer_user_ginfo(struct file *file, snd_timer_ginfo_t *_ginfo)
 	return err;
 }
 
-static int snd_timer_user_gparams(struct file *file, snd_timer_gparams_t *_gparams)
+static int snd_timer_user_gparams(struct file *file, snd_timer_gparams_t __user *_gparams)
 {
 	snd_timer_gparams_t gparams;
 	snd_timer_t *t;
@@ -1408,7 +1408,7 @@ static int snd_timer_user_gparams(struct file *file, snd_timer_gparams_t *_gpara
 	return err;
 }
 
-static int snd_timer_user_gstatus(struct file *file, snd_timer_gstatus_t *_gstatus)
+static int snd_timer_user_gstatus(struct file *file, snd_timer_gstatus_t __user *_gstatus)
 {
 	snd_timer_gstatus_t gstatus;
 	snd_timer_id_t tid;
@@ -1442,7 +1442,7 @@ static int snd_timer_user_gstatus(struct file *file, snd_timer_gstatus_t *_gstat
 	return err;
 }
 
-static int snd_timer_user_tselect(struct file *file, snd_timer_select_t *_tselect)
+static int snd_timer_user_tselect(struct file *file, snd_timer_select_t __user *_tselect)
 {
 	snd_timer_user_t *tu;
 	snd_timer_select_t tselect;
@@ -1489,7 +1489,7 @@ static int snd_timer_user_tselect(struct file *file, snd_timer_select_t *_tselec
 	return 0;
 }
 
-static int snd_timer_user_info(struct file *file, snd_timer_info_t *_info)
+static int snd_timer_user_info(struct file *file, snd_timer_info_t __user *_info)
 {
 	snd_timer_user_t *tu;
 	snd_timer_info_t info;
@@ -1511,7 +1511,7 @@ static int snd_timer_user_info(struct file *file, snd_timer_info_t *_info)
 	return 0;
 }
 
-static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
+static int snd_timer_user_params(struct file *file, snd_timer_params_t __user *_params)
 {
 	snd_timer_user_t *tu;
 	snd_timer_params_t params;
@@ -1603,7 +1603,7 @@ static int snd_timer_user_params(struct file *file, snd_timer_params_t *_params)
 	return err;
 }
 
-static int snd_timer_user_status(struct file *file, snd_timer_status_t *_status)
+static int snd_timer_user_status(struct file *file, snd_timer_status_t __user *_status)
 {
 	snd_timer_user_t *tu;
 	snd_timer_status_t status;
@@ -1661,38 +1661,40 @@ static int snd_timer_user_ioctl(struct inode *inode, struct file *file,
 				unsigned int cmd, unsigned long arg)
 {
 	snd_timer_user_t *tu;
+	void __user *argp = (void __user *)arg;
+	int __user *p = argp;
 	
 	tu = snd_magic_cast(snd_timer_user_t, file->private_data, return -ENXIO);
 	switch (cmd) {
 	case SNDRV_TIMER_IOCTL_PVERSION:
-		return put_user(SNDRV_TIMER_VERSION, (int *)arg) ? -EFAULT : 0;
+		return put_user(SNDRV_TIMER_VERSION, p) ? -EFAULT : 0;
 	case SNDRV_TIMER_IOCTL_NEXT_DEVICE:
-		return snd_timer_user_next_device((snd_timer_id_t *)arg);
+		return snd_timer_user_next_device(argp);
 	case SNDRV_TIMER_IOCTL_TREAD:
 	{
 		int xarg;
 		
 		if (tu->timeri)		/* too late */
 			return -EBUSY;
-		if (get_user(xarg, (int *) arg))
+		if (get_user(xarg, p))
 			return -EFAULT;
 		tu->tread = xarg ? 1 : 0;
 		return 0;
 	}
 	case SNDRV_TIMER_IOCTL_GINFO:
-		return snd_timer_user_ginfo(file, (snd_timer_ginfo_t *)arg);
+		return snd_timer_user_ginfo(file, argp);
 	case SNDRV_TIMER_IOCTL_GPARAMS:
-		return snd_timer_user_gparams(file, (snd_timer_gparams_t *)arg);
+		return snd_timer_user_gparams(file, argp);
 	case SNDRV_TIMER_IOCTL_GSTATUS:
-		return snd_timer_user_gstatus(file, (snd_timer_gstatus_t *)arg);
+		return snd_timer_user_gstatus(file, argp);
 	case SNDRV_TIMER_IOCTL_SELECT:
-		return snd_timer_user_tselect(file, (snd_timer_select_t *)arg);
+		return snd_timer_user_tselect(file, argp);
 	case SNDRV_TIMER_IOCTL_INFO:
-		return snd_timer_user_info(file, (snd_timer_info_t *)arg);
+		return snd_timer_user_info(file, argp);
 	case SNDRV_TIMER_IOCTL_PARAMS:
-		return snd_timer_user_params(file, (snd_timer_params_t *)arg);
+		return snd_timer_user_params(file, argp);
 	case SNDRV_TIMER_IOCTL_STATUS:
-		return snd_timer_user_status(file, (snd_timer_status_t *)arg);
+		return snd_timer_user_status(file, argp);
 	case SNDRV_TIMER_IOCTL_START:
 		return snd_timer_user_start(file);
 	case SNDRV_TIMER_IOCTL_STOP:
@@ -1715,7 +1717,7 @@ static int snd_timer_user_fasync(int fd, struct file * file, int on)
 	return 0;
 }
 
-static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count, loff_t *offset)
+static ssize_t snd_timer_user_read(struct file *file, char __user *buffer, size_t count, loff_t *offset)
 {
 	snd_timer_user_t *tu;
 	long result = 0, unit;
