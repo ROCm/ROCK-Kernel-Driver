@@ -210,7 +210,8 @@ struct fb_var_screeninfo {
 	__u32 vsync_len;		/* length of vertical sync	*/
 	__u32 sync;			/* see FB_SYNC_*		*/
 	__u32 vmode;			/* see FB_VMODE_*		*/
-	__u32 reserved[6];		/* Reserved for future compatibility */
+	__u32 rotate;			/* angle we rotate counter clockwise */
+	__u32 reserved[5];		/* Reserved for future compatibility */
 };
 
 struct fb_cmap {
@@ -371,6 +372,8 @@ struct fb_ops {
     void (*fb_imageblit)(struct fb_info *info, struct fb_image *image);
     /* Draws cursor */
     int (*fb_cursor)(struct fb_info *info, struct fbcursor *cursor);
+    /* Rotates the display */
+    void (*fb_rotate)(struct fb_info *info, int angle);
     /* perform polling on fb device */
     int (*fb_poll)(struct fb_info *info, poll_table *wait);
     /* wait for blit idle, optional */

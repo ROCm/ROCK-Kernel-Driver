@@ -365,13 +365,15 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	unsigned long *dst;
 	int dst_idx, left;
 	u32 bpp = p->var.bits_per_pixel;
+
+	/* We want rotation but lack hardware to do it for us. */
+	if (!p->fbops->fb_rotate && p->var.rotate) {
+	}	
 	
 	vxres = p->var.xres_virtual;
 	vyres = p->var.yres_virtual;
 
-	if (!rect->width || !rect->height ||
-	    rect->dx > vxres ||
-	    rect->dy > vyres)
+	if (!rect->width || !rect->height || rect->dx > vxres || rect->dy > vyres)
 		return;
 
 	/* We could use hardware clipping but on many cards you get around
