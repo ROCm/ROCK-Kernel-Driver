@@ -90,8 +90,6 @@ struct machdep_calls {
 	unsigned char	(*udbg_getc)(void);
 	int		(*udbg_getc_poll)(void);
 
-	/* this is for modules, since _machine can be a define -- Cort */
-	int ppc_machine;
 #ifdef CONFIG_SMP
 	/* functions for dealing with other cpus */
 	struct smp_ops_t smp_ops;

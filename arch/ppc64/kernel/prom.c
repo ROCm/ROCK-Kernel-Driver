@@ -769,10 +769,18 @@ prom_initialize_tce_table(void)
 		 * By doing this, we avoid the pitfalls of trying to DMA to
 		 * MMIO space and the DMA alias hole.
 		 */
-		minsize = 4UL << 20;
+		/* 
+		 * On POWER4, firmware sets the TCE region by assuming
+		 * each TCE table is 8MB. Using this memory for anything
+		 * else will impact performance, so we always allocate 8MB.
+		 * Anton
+		 *
+		 * XXX FIXME use a cpu feature here
+		 */
+		minsize = 8UL << 20;
 
 		/* Align to the greater of the align or size */
-		align = (minalign < minsize) ? minsize : minalign;
+		align = max(minalign, minsize);
 
 		/* Carve out storage for the TCE table. */
 		base = lmb_alloc(minsize, align);
@@ -1113,31 +1121,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	}
 	_prom->encode_phys_size = (getprop_rval==1) ? 32 : 64;
 
-
-	/* Find the OF version */
-	prom_op = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/openprom"));
-	if (prom_op != (ihandle)-1) {
-		char model[64];
-		sz = (long)call_prom(RELOC("getprop"), 4, 1, prom_op,
-				    RELOC("model"), model, 64);
-		if (sz > 0) {
-			char *c;
-			/* hack to skip the ibm chrp firmware # */
-			if ( strncmp(model,RELOC("IBM"),3) ) {
-				for (c = model; *c; c++)
-					if (*c >= '0' && *c <= '9') {
-						_prom->version = *c - '0';
-						break;
-					}
-			}
-			else
-				chrp = 1;
-		}
-	}
-	if (_prom->version >= 3)
-		prom_print(RELOC("OF Version 3 detected.\n"));
-
-
 	/* Determine which cpu is actually running right _now_ */
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
 			    RELOC("cpu"), &getprop_rval,
@@ -1207,35 +1190,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
- 	if ((long) call_prom(RELOC("getprop"), 4, 1,
-				_prom->chosen,
-				RELOC("mmu"),
-				&getprop_rval,
-				sizeof(getprop_rval)) <= 0) {	
-		prom_print(RELOC(" no MMU found\n"));
-                prom_exit();
-	}
-
-	/* We assume the phys. address size is 3 cells */
-	RELOC(prom_mmu) = (ihandle)(unsigned long)getprop_rval;
-
-	if ((long)call_prom(RELOC("call-method"), 4, 4,
-				RELOC("translate"),
-				prom_mmu,
-				(void *)(KERNELBASE - offset),
-				(void *)1) != 0) {
-		prom_print(RELOC(" (translate failed) "));
-	} else {
-		prom_print(RELOC(" (translate ok) "));
-		phys = (unsigned long)_prom->args.rets[3];
-	}
-
-	/* If OpenFirmware version >= 3, then use quiesce call */
-	if (_prom->version >= 3) {
-		prom_print(RELOC("Calling quiesce ...\n"));
-		call_prom(RELOC("quiesce"), 0, 0);
-		phys = KERNELBASE - offset;
-	}
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
+	phys = KERNELBASE - offset;
 
 	prom_print(RELOC("returning from prom_init\n"));
 	return phys;
