@@ -1201,11 +1201,17 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 	if (rcu_pending(cpu))
 		rcu_check_callbacks(cpu, user_ticks);
 
+	/* note: this timer irq context must be accounted for as well */
+	if (hardirq_count() - HARDIRQ_OFFSET) {
+		cpustat->irq += sys_ticks;
+		sys_ticks = 0;
+	} else if (softirq_count()) {
+		cpustat->softirq += sys_ticks;
+		sys_ticks = 0;
+	}
+
 	if (p == rq->idle) {
-		/* note: this timer irq context must be accounted for as well */
-		if (irq_count() - HARDIRQ_OFFSET >= SOFTIRQ_OFFSET)
-			cpustat->system += sys_ticks;
-		else if (atomic_read(&rq->nr_iowait) > 0)
+		if (atomic_read(&rq->nr_iowait) > 0)
 			cpustat->iowait += sys_ticks;
 		else
 			cpustat->idle += sys_ticks;

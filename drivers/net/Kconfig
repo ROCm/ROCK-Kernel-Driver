@@ -2042,6 +2042,17 @@ config R8169
 	  say M here and read <file:Documentation/modules.txt>.  This is
 	  recommended.  The module will be called r8169.
 
+config SIS190
+	tristate "SiS190 gigabit ethernet support (EXPERIMENTAL)"
+	depends on PCI && EXPERIMENTAL
+	---help---
+	  Say Y here if you have a SiS 190 PCI Gigabit Ethernet adapter.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>.  This is
+	  recommended.  The module will be called sis190.
+
 config SK98LIN
 	tristate "Marvell Yukon Chipset / SysKonnect SK-98xx Support"
 	depends on PCI
