@@ -451,9 +451,6 @@ static __inline__ int parport_yield_blocking(struct pardevice *dev)
 
 #define PARPORT_FLAG_EXCL		(1<<1)	/* EXCL driver registered. */
 
-extern int parport_parse_irqs(int, const char *[], int irqval[]);
-extern int parport_parse_dmas(int, const char *[], int dmaval[]);
-
 /* IEEE1284 functions */
 extern void parport_ieee1284_interrupt (int, void *, struct pt_regs *);
 extern int parport_negotiate (struct parport *, int mode);

@@ -1078,44 +1078,4 @@ EXPORT_SYMBOL(parport_put_port);
 EXPORT_SYMBOL(parport_find_number);
 EXPORT_SYMBOL(parport_find_base);
 
-EXPORT_SYMBOL(parport_parse_irqs);
-EXPORT_SYMBOL(parport_parse_dmas);
-
-static int parport_parse_params (int nports, const char *str[], int val[],
-				 int automatic, int none, int nofifo)
-{
-	unsigned int i;
-	for (i = 0; i < nports && str[i]; i++) {
-		if (!strncmp(str[i], "auto", 4))
-			val[i] = automatic;
-		else if (!strncmp(str[i], "none", 4))
-			val[i] = none;
-		else if (nofifo && !strncmp(str[i], "nofifo", 4))
-			val[i] = nofifo;
-		else {
-			char *ep;
-			unsigned long r = simple_strtoul(str[i], &ep, 0);
-			if (ep != str[i])
-				val[i] = r;
-			else {
-				printk(KERN_ERR "parport: bad specifier `%s'\n", str[i]);
-				return -1;
-			}
-		}
-	}
-
-	return 0;
-}
-
-int parport_parse_irqs(int nports, const char *irqstr[], int irqval[])
-{
-	return parport_parse_params (nports, irqstr, irqval, PARPORT_IRQ_AUTO,
-				     PARPORT_IRQ_NONE, 0);
-}
-
-int parport_parse_dmas(int nports, const char *dmastr[], int dmaval[])
-{
-	return parport_parse_params (nports, dmastr, dmaval, PARPORT_DMA_AUTO,
-				     PARPORT_DMA_NONE, PARPORT_DMA_NOFIFO);
-}
 MODULE_LICENSE("GPL");
