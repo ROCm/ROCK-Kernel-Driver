@@ -149,13 +149,24 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	};
 
 	lock_page(page);
-
-	BUG_ON(page_mapping(page));
+	/*
+	 * This library call can be only used to do I/O
+	 * on _private_ pages just allocated with alloc_pages().
+	 */
+	BUG_ON(page->mapping);
+	BUG_ON(PageSwapCache(page));
+	BUG_ON(PageAnon(page));
+	BUG_ON(PageLRU(page));
 	ret = add_to_page_cache(page, &swapper_space, entry.val, GFP_KERNEL);
 	if (unlikely(ret)) {
 		unlock_page(page);
 		return ret;
 	}
+	/*
+	 * get one more reference to make page non-exclusive so
+	 * remove_exclusive_swap_page won't mess with it.
+	 */
+	page_cache_get(page);
 
 	if (rw == READ) {
 		ret = swap_readpage(NULL, page);
@@ -168,6 +179,7 @@ int rw_swap_page_sync(int rw, swp_entry_t entry, struct page *page)
 	lock_page(page);
 	remove_from_page_cache(page);
 	unlock_page(page);
+	page_cache_release(page);
 	page_cache_release(page);	/* For add_to_page_cache() */
 
 	if (ret == 0 && (!PageUptodate(page) || PageError(page)))
