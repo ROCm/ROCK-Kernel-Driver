@@ -1288,24 +1288,28 @@ asmlinkage long sys_accept(int fd, struct sockaddr *upeer_sockaddr, int *upeer_a
 	if (err)
 		goto out_release;
 
+	err = -EBUSY;
+	if (!net_family_get(sock->ops->family))
+		goto out_release;
+
 	err = sock->ops->accept(sock, newsock, sock->file->f_flags);
 	if (err < 0)
-		goto out_release;
+		goto out_family_put;
 
 	if (upeer_sockaddr) {
 		if(newsock->ops->getname(newsock, (struct sockaddr *)address, &len, 2)<0) {
 			err = -ECONNABORTED;
-			goto out_release;
+			goto out_family_put;
 		}
 		err = move_addr_to_user(address, len, upeer_sockaddr, upeer_addrlen);
 		if (err < 0)
-			goto out_release;
+			goto out_family_put;
 	}
 
 	/* File flags are not inherited via accept() unlike another OSes. */
 
 	if ((err = sock_map_fd(newsock)) < 0)
-		goto out_release;
+		goto out_family_put;
 
 	security_socket_post_accept(sock, newsock);
 
@@ -1313,7 +1317,8 @@ out_put:
 	sockfd_put(sock);
 out:
 	return err;
-
+out_family_put:
+	net_family_put(sock->ops->family);
 out_release:
 	sock_release(newsock);
 	goto out_put;
