@@ -182,7 +182,7 @@ static int __vsyscall(0) asmlinkage vgettimeofday(struct timeval * tv, struct ti
 	 * just call gettimeofday()
 	 */
 	if (__vsyscall_timesource == VSYSCALL_GTOD_NONE) 
-		return  gettimeofday(tv, tz);
+		return __NR_gettimeofday;
 
 	if (tv)
 		ret = do_vgettimeofday(tv);

@@ -18,6 +18,7 @@ __kernel_vsyscall:
 #ifdef CONFIG_VSYSCALL_GTOD
 	cmp $__NR_gettimeofday, %eax
 	je .Lvgettimeofday
+.Lvgettimeofday_disabled:
 #endif /* CONFIG_VSYSCALL_GTOD */
 	int $0x80
 	ret
@@ -32,6 +33,9 @@ __kernel_vsyscall:
 	popl %ebx
 	popl %ecx
 	popl %edx
+	/* don't take the slow path if vgettimeofday is disabled */
+	cmpl $__NR_gettimeofday, %eax
+	je vgettimeofday_disabled
 	ret
 #endif /* CONFIG_VSYSCALL_GTOD */
 

@@ -1076,6 +1076,10 @@ static void pci_do_fixups(struct pci_dev *dev, int pass, struct pci_fixup *f)
 		}
 		f++;
 	}
+	if (pdev->class == ((PCI_CLASS_SERIAL_USB << 8) | 0x20)) { /* EHCI */
+		/* we'd need some code from ehci-hcd:bios_handoff() here */
+		//printk("bios handoff for ehci not yet implemented in quirks\n");
+	}
 }
 
 void pci_fixup_device(int pass, struct pci_dev *dev)
