@@ -17,5 +17,3 @@ obj-$(CONFIG_DEBUG_LL)	+= debug.o
 EXTRA_TARGETS 		:= head.o
 
 AFLAGS_head.o		:= -DTEXTADDR=$(TEXTADDR)
-
-include $(TOPDIR)/Rules.make

@@ -13,5 +13,3 @@ obj-$(CONFIG_SND_TRIDENT) += snd-trident.o
 ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_TRIDENT) += snd-trident-synth.o
 endif
-
-include $(TOPDIR)/Rules.make

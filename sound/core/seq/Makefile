@@ -76,5 +76,3 @@ obj-$(CONFIG_SND_YMFPCI) += snd-seq-midi.o snd-seq.o snd-seq-device.o snd-seq-mi
 obj-$(CONFIG_SND_USB_AUDIO) += snd-seq.o snd-seq-device.o snd-seq-midi-event.o
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

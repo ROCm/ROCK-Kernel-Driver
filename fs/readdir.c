@@ -133,18 +133,26 @@ static int filldir(void * __buf, const char * name, int namlen, loff_t offset,
 	if (reclen > buf->count)
 		return -EINVAL;
 	dirent = buf->previous;
-	if (dirent)
-		__put_user(offset, &dirent->d_off);
+	if (dirent) {
+		if (__put_user(offset, &dirent->d_off))
+			goto efault;
+	}
 	dirent = buf->current_dir;
 	buf->previous = dirent;
-	__put_user(ino, &dirent->d_ino);
-	__put_user(reclen, &dirent->d_reclen);
-	copy_to_user(dirent->d_name, name, namlen);
-	__put_user(0, dirent->d_name + namlen);
+	if (__put_user(ino, &dirent->d_ino))
+		goto efault;
+	if (__put_user(reclen, &dirent->d_reclen))
+		goto efault;
+	if (copy_to_user(dirent->d_name, name, namlen))
+		goto efault;
+	if (__put_user(0, dirent->d_name + namlen))
+		goto efault;
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;
 	return 0;
+efault:
+	return -EFAULT;
 }
 
 asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count)
@@ -174,8 +182,10 @@ asmlinkage long sys_getdents(unsigned int fd, void * dirent, unsigned int count)
 	error = buf.error;
 	lastdirent = buf.previous;
 	if (lastdirent) {
-		put_user(file->f_pos, &lastdirent->d_off);
-		error = count - buf.count;
+		if (put_user(file->f_pos, &lastdirent->d_off))
+			error = -EFAULT;
+		else
+			error = count - buf.count;
 	}
 
 out_putf:

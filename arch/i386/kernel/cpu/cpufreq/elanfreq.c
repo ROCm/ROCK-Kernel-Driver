@@ -296,7 +296,6 @@ static int __init elanfreq_init(void)
 		max_freq = elanfreq_get_cpu_frequency();
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq[0] = 1000;
 	driver->cpu_cur_freq[0] = elanfreq_get_cpu_frequency();
 #endif
 
@@ -307,7 +306,9 @@ static int __init elanfreq_init(void)
 	driver->policy[0].min    = 1000;
 	driver->policy[0].max    = max_freq;
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
-	driver->policy[0].max_cpu_freq  = max_freq;
+	driver->policy[0].cpuinfo.max_freq = max_freq;
+	driver->policy[0].cpuinfo.min_freq = min_freq;
+	driver->policy[0].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 
 	elanfreq_driver = driver;
 

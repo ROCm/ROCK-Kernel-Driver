@@ -166,11 +166,14 @@ struct menu {
 	struct symbol *sym;
 	struct property *prompt;
 	struct expr *dep;
+	unsigned int flags;
 	//char *help;
 	struct file *file;
 	int lineno;
 	void *data;
 };
+
+#define MENU_CHANGED		0x0001
 
 #ifndef SWIG
 

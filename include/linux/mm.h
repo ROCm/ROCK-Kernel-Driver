@@ -70,7 +70,6 @@ struct vm_area_struct {
 	unsigned long vm_pgoff;		/* Offset (within vm_file) in PAGE_SIZE
 					   units, *not* PAGE_CACHE_SIZE */
 	struct file * vm_file;		/* File we map to (can be NULL). */
-	unsigned long vm_raend;		/* XXX: put full readahead info here. */
 	void * vm_private_data;		/* was vm_pte (shared mem) */
 };
 
@@ -355,7 +354,6 @@ extern struct page *mem_map;
 
 extern void show_free_areas(void);
 
-extern int fail_writepage(struct page *);
 struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int unused);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 extern void shmem_lock(struct file * file, int lock);
@@ -517,6 +515,7 @@ void page_cache_readaround(struct address_space *mapping,
 			   unsigned long offset);
 void handle_ra_miss(struct address_space *mapping, 
 		    struct file_ra_state *ra);
+unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */
 extern int expand_stack(struct vm_area_struct * vma, unsigned long address);

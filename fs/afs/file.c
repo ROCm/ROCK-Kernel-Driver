@@ -37,7 +37,7 @@ struct inode_operations afs_file_inode_operations = {
 struct file_operations afs_file_file_operations = {
 	.read		= generic_file_read,
 	.write		= afs_file_write,
-	.mmap		= generic_file_mmap,
+	.mmap		= generic_file_readonly_mmap,
 #if 0
 	.open		= afs_file_open,
 	.release	= afs_file_release,

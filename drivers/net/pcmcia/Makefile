@@ -21,5 +21,3 @@ obj-$(CONFIG_PCMCIA_RAYCS)	+= ray_cs.o
 obj-$(CONFIG_AIRONET4500_CS)	+= aironet4500_cs.o
 
 obj-$(CONFIG_PCMCIA_IBMTR)	+= ibmtr_cs.o
-
-include $(TOPDIR)/Rules.make

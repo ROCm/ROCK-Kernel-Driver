@@ -13,5 +13,3 @@ obj-$(CONFIG_SCSI_ECOSCSI)	+= ecoscsi.o
 obj-$(CONFIG_SCSI_OAK1)		+= oak.o
 obj-$(CONFIG_SCSI_POWERTECSCSI)	+= powertec.o fas216.o queue.o msgqueue.o
 obj-$(CONFIG_SCSI_EESOXSCSI)	+= eesox.o fas216.o queue.o msgqueue.o
-
-include $(TOPDIR)/Rules.make

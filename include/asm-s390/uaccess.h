@@ -84,7 +84,7 @@ extern inline int __put_user_asm_8(void *x, void *ptr)
 {
         int err;
 
-        __asm__ __volatile__ (  "   sr    %0,01\n"
+        __asm__ __volatile__ (  "   sr    %0,%0\n"
 				"   lr    2,%1\n"
 				"   lr    4,%2\n"
                                 "   sacf  512\n"

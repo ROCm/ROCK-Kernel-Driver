@@ -5,5 +5,3 @@
 export-objs := pageattr.o
 
 obj-y	 := init.o fault.o ioremap.o extable.o modutil.o pageattr.o
-
-include $(TOPDIR)/Rules.make

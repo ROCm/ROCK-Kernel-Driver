@@ -8,5 +8,3 @@
 export-objs := sba_iommu.o
 
 obj-y := sba_iommu.o
-
-include $(TOPDIR)/Rules.make

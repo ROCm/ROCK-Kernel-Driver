@@ -229,9 +229,9 @@ int hfs_notify_change_hdr(struct dentry *dentry, struct iattr * attr)
 	return __hfs_notify_change(dentry, attr, HFS_HDR);
 }
 
-static int hfs_writepage(struct page *page)
+static int hfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,hfs_get_block);
+	return block_write_full_page(page,hfs_get_block, wbc);
 }
 static int hfs_readpage(struct file *file, struct page *page)
 {

@@ -85,21 +85,21 @@ int sym53c8xx_release(struct Scsi_Host *);
 
 #if	LINUX_VERSION_CODE >= LinuxVersionCode(2,1,75)
 
-#define SYM53C8XX {     name:           "",			\
-			detect:         sym53c8xx_detect,	\
-			release:        sym53c8xx_release,	\
-			info:           sym53c8xx_info, 	\
-			queuecommand:   sym53c8xx_queue_command,\
-			slave_configure:sym53c8xx_slave_configure,\
-			abort:          sym53c8xx_abort,	\
-			reset:          sym53c8xx_reset,	\
-			can_queue:      SCSI_NCR_CAN_QUEUE,	\
-			this_id:        7,			\
-			sg_tablesize:   SCSI_NCR_SG_TABLESIZE,	\
-			cmd_per_lun:    SCSI_NCR_CMD_PER_LUN,	\
-			max_sectors:	MAX_HW_SEGMENTS*8,	\
-			use_clustering: DISABLE_CLUSTERING,	\
-			highmem_io:	1} 
+#define SYM53C8XX {     .name           = "",			\
+			.detect         = sym53c8xx_detect,	\
+			.release        = sym53c8xx_release,	\
+			.info           = sym53c8xx_info, 	\
+			.queuecommand   = sym53c8xx_queue_command,\
+			.slave_configure = sym53c8xx_slave_configure,\
+			.abort          = sym53c8xx_abort,	\
+			.reset          = sym53c8xx_reset,	\
+			.can_queue      = SCSI_NCR_CAN_QUEUE,	\
+			.this_id        = 7,			\
+			.sg_tablesize   = SCSI_NCR_SG_TABLESIZE,	\
+			.cmd_per_lun    = SCSI_NCR_CMD_PER_LUN,	\
+			.max_sectors	= MAX_HW_SEGMENTS*8,	\
+			.use_clustering = DISABLE_CLUSTERING,	\
+			.highmem_io	= 1} 
 
 #else
 

@@ -10,7 +10,7 @@ obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
 
 obj-$(CONFIG_BLK_DEV_INITRD) += initrd_kern.o initrd_user.o
 
-# user_syms.o not included here because Rules.make has its own ideas about
+# user_syms.o not included here because kbuild has its own ideas about
 # building anything in export-objs
 
 USER_OBJS := $(filter %_user.o,$(obj-y)) config.o helper.o process.o \
@@ -38,8 +38,6 @@ CFLAGS_user_syms.o = -D__AUTOCONF_INCLUDED__ $(DMODULES) $(DMODVERSIONS) \
 	-I/usr/include -I../include
 
 CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
-
-include $(TOPDIR)/Rules.make
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<

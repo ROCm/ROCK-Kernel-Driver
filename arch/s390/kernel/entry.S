@@ -47,7 +47,8 @@ SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
 SP_SIZE      =  (SP_TRAP+4)
 
-_TIF_WORK_MASK = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
+_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
+_TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 
 /*
  * Base Address of this Module --- saved in __LC_ENTRY_BASE
@@ -181,6 +182,7 @@ system_call:
         GET_THREAD_INFO           # load pointer to task_struct to R9
 	sll	%r7,2
         stosm   24(%r15),0x03     # reenable interrupts
+sysc_do_restart:
         l       %r8,sys_call_table-entry_base(%r7,%r13) # get system call addr.
 	tm	__TI_flags+3(%r9),_TIF_SYSCALL_TRACE
         bo      BASED(sysc_tracesys)
@@ -191,7 +193,7 @@ system_call:
 
 sysc_return:
 	stnsm   24(%r15),0xfc     # disable I/O and ext. interrupts
-	tm	__TI_flags+3(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+3(%r9),_TIF_WORK_SVC
 	bnz	BASED(sysc_work)  # there is work to do (signals etc.)
 sysc_leave:
         RESTORE_ALL 1
@@ -202,7 +204,7 @@ sysc_leave:
 sysc_work_loop:
 	stnsm   24(%r15),0xfc     # disable I/O and ext. interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
-	tm	__TI_flags+3(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+3(%r9),_TIF_WORK_SVC
 	bz	BASED(sysc_leave)      # there is no work to do
 #
 # One of the work bits is on. Find out which one.
@@ -213,6 +215,8 @@ sysc_work:
 	bo	BASED(sysc_reschedule)
 	tm	__TI_flags+3(%r9),_TIF_SIGPENDING
 	bo	BASED(sysc_sigpending)
+	tm	__TI_flags+3(%r9),_TIF_RESTART_SVC
+	bo	BASED(sysc_restart)
 	b	BASED(sysc_leave)
 
 #
@@ -237,14 +241,26 @@ sysc_sigpending:
 	b	BASED(sysc_leave)      # out of here, do NOT recheck
 
 #
+# _TIF_RESTART_SVC is set, set up registers and restart svc
+#
+sysc_restart:
+	ni	__TI_flags+3(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
+	stosm	24(%r15),0x03          # reenable interrupts
+	l	%r7,SP_R2(%r15)        # load new svc number
+	sll	%r7,2
+	mvc	SP_R2(4,%r15),SP_ORIG_R2(%r15) # restore first argument
+	lm	%r2,%r6,SP_R2(%r15)    # load svc arguments
+	b	BASED(sysc_do_restart) # restart svc
+
+#
 # call trace before and after sys_call
 #
 sysc_tracesys:
         l       %r1,BASED(.Ltrace)
 	srl	%r7,2
-	st	%r7,SP_R2(4,%r15)
+	st	%r7,SP_R2(%r15)
 	basr	%r14,%r1
-	l	%r7,SP_R2(4,%r15)      # strace might have changed the 
+	l	%r7,SP_R2(%r15)        # strace might have changed the 
 	n	%r7,BASED(.Lc256)      #  system call
 	sll	%r7,2
 	l	%r8,sys_call_table-entry_base(%r7,%r13)
@@ -354,7 +370,7 @@ sys_call_table:
         .long  sys_write
         .long  sys_open                  /* 5 */
         .long  sys_close
-        .long  sys_ni_syscall           /* old waitpid syscall holder */
+        .long  sys_restart_syscall
         .long  sys_creat
         .long  sys_link
         .long  sys_unlink                /* 10 */
@@ -752,7 +768,7 @@ io_return:
 #else
         bno     BASED(io_leave)        # no-> skip resched & signal
 #endif
-	tm	__TI_flags+3(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+3(%r9),_TIF_WORK_INT
 	bnz	BASED(io_work)         # there is work to do (signals etc.)
 io_leave:
         RESTORE_ALL 0
@@ -788,7 +804,7 @@ io_resume_loop:
 io_work_loop:
         stnsm   24(%r15),0xfc          # disable I/O and ext. interrupts
         GET_THREAD_INFO                # load pointer to task_struct to R9
-	tm	__TI_flags+3(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+3(%r9),_TIF_WORK_INT
 	bz	BASED(io_leave)        # there is no work to do
 #
 # One of the work bits is on. Find out which one.

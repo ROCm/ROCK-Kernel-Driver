@@ -27,5 +27,3 @@ obj-$(CONFIG_MODULES) += module.o
 ifdef CONFIG_SUNOS_EMUL
 obj-y += sys_sunos.o sunos_ioctl.o
 endif
-
-include $(TOPDIR)/Rules.make

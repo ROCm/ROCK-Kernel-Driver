@@ -10,5 +10,3 @@ obj-y	 := decstation.o
 
 clean:
 	rm -f nbImage
-
-include $(TOPDIR)/Rules.make

@@ -12,5 +12,3 @@ snd-hdsp-objs := hdsp.o
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_RME9652) += snd-rme9652.o snd-hammerfall-mem.o
 obj-$(CONFIG_SND_HDSP) += snd-hdsp.o snd-hammerfall-mem.o
-
-include $(TOPDIR)/Rules.make

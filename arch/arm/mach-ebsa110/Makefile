@@ -12,5 +12,3 @@ obj-			:=
 export-objs		:= io.o
 
 obj-$(CONFIG_LEDS)	+= leds.o
-
-include $(TOPDIR)/Rules.make

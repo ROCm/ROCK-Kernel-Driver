@@ -92,5 +92,3 @@ obj-y    += irq_pyxis.o
 endif
 
 endif # GENERIC
-
-include $(TOPDIR)/Rules.make

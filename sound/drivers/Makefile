@@ -15,5 +15,3 @@ obj-$(CONFIG_SND_SERIAL_U16550) += snd-serial-u16550.o
 obj-$(CONFIG_SND_MTPAV) += snd-mtpav.o
 
 obj-$(CONFIG_SND) += opl3/ mpu401/
-
-include $(TOPDIR)/Rules.make

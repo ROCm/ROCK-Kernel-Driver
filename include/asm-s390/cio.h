@@ -262,8 +262,6 @@ struct diag210 {
 
 extern int diag210(struct diag210 *addr);
 
-extern int chsc(void *data);
-
 extern void wait_cons_dev(void);
 
 #endif

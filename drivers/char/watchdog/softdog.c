@@ -139,7 +139,7 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
 	static struct watchdog_info ident = {
-		identity: "Software Watchdog",
+		.identity = "Software Watchdog",
 	};
 	switch (cmd) {
 		default:
@@ -158,17 +158,17 @@ static int softdog_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations softdog_fops = {
-	owner:		THIS_MODULE,
-	write:		softdog_write,
-	ioctl:		softdog_ioctl,
-	open:		softdog_open,
-	release:	softdog_release,
+	.owner		= THIS_MODULE,
+	.write		= softdog_write,
+	.ioctl		= softdog_ioctl,
+	.open		= softdog_open,
+	.release	= softdog_release,
 };
 
 static struct miscdevice softdog_miscdev = {
-	minor:		WATCHDOG_MINOR,
-	name:		"watchdog",
-	fops:		&softdog_fops,
+	.minor		= WATCHDOG_MINOR,
+	.name		= "watchdog",
+	.fops		= &softdog_fops,
 };
 
 static char banner[] __initdata = KERN_INFO "Software Watchdog Timer: 0.06, soft_margin: %d sec, nowayout: %d\n";

@@ -31,18 +31,18 @@ extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			 int hostno, int inout);
 
 
-#define MCA_53C9X         { proc_name:		"esp", \
-			    name:		"NCR 53c9x SCSI", \
-			    detect:		mca_esp_detect, \
-			    release:		mca_esp_release, \
-			    queuecommand:	esp_queue, \
-			    abort:		esp_abort, \
-			    reset:		esp_reset, \
-			    can_queue:          7, \
-			    sg_tablesize:	SG_ALL, \
-			    cmd_per_lun:	1, \
-                            unchecked_isa_dma:  1, \
-			    use_clustering:	DISABLE_CLUSTERING }
+#define MCA_53C9X         { .proc_name		= "esp", \
+			    .name		= "NCR 53c9x SCSI", \
+			    .detect		= mca_esp_detect, \
+			    .release		= mca_esp_release, \
+			    .queuecommand	= esp_queue, \
+			    .abort		= esp_abort, \
+			    .reset		= esp_reset, \
+			    .can_queue          = 7, \
+			    .sg_tablesize	= SG_ALL, \
+			    .cmd_per_lun	= 1, \
+                            .unchecked_isa_dma  = 1, \
+			    .use_clustering	= DISABLE_CLUSTERING }
 
 /* Ports the ncr's 53c94 can be put at; indexed by pos register value */
 

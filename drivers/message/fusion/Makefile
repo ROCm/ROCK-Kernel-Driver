@@ -52,5 +52,3 @@ obj-$(CONFIG_FUSION)		+= mptbase.o mptscsih.o
 obj-$(CONFIG_FUSION_ISENSE)	+= isense.o
 obj-$(CONFIG_FUSION_CTL)	+= mptctl.o
 obj-$(CONFIG_FUSION_LAN)	+= mptlan.o
-
-include $(TOPDIR)/Rules.make

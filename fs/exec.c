@@ -1268,7 +1268,7 @@ static void coredump_wait(struct mm_struct *mm)
 	BUG_ON(mm->core_waiters);
 }
 
-int do_coredump(long signr, struct pt_regs * regs)
+int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 {
 	char corename[CORENAME_MAX_SIZE + 1];
 	struct mm_struct *mm = current->mm;
@@ -1288,6 +1288,8 @@ int do_coredump(long signr, struct pt_regs * regs)
 	}
 	mm->dumpable = 0;
 	init_completion(&mm->core_done);
+	current->sig->group_exit = 1;
+	current->sig->group_exit_code = exit_code;
 	coredump_wait(mm);
 
 	if (current->rlim[RLIMIT_CORE].rlim_cur < binfmt->min_coredump)
@@ -1314,6 +1316,7 @@ int do_coredump(long signr, struct pt_regs * regs)
 
 	retval = binfmt->core_dump(signr, regs, file);
 
+	current->sig->group_exit_code |= 0x80;
 close_fail:
 	filp_close(file, NULL);
 fail_unlock:

@@ -235,6 +235,7 @@
 #define __NR_epoll_create		1243
 #define __NR_epoll_ctl			1244
 #define __NR_epoll_wait			1245
+#define __NR_semtimedop			1246
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

@@ -47,7 +47,8 @@ SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
 SP_SIZE      =  (SP_TRAP+4)
 
-_TIF_WORK_MASK = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
+_TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
+_TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 
 /*
  * Register usage in interrupt handlers:
@@ -161,6 +162,7 @@ system_call:
 	llgh    %r7,__LC_SVC_INT_CODE # get svc number from lowcore
         GET_THREAD_INFO           # load pointer to task_struct to R9
 	stosm   48(%r15),0x03     # reenable interrupts
+sysc_do_restart:
 	larl    %r10,sys_call_table
         sll     %r7,3
         tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?
@@ -177,7 +179,7 @@ sysc_noemu:
 
 sysc_return:
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
-	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+7(%r9),_TIF_WORK_SVC
 	jnz	sysc_work         # there is work to do (signals etc.)
 sysc_leave:
         RESTORE_ALL 1
@@ -188,7 +190,7 @@ sysc_leave:
 sysc_work_loop:
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
         GET_THREAD_INFO           # load pointer to task_struct to R9
-	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+7(%r9),_TIF_WORK_SVC
 	jz	sysc_leave        # there is no work to do
 #
 # One of the work bits is on. Find out which one.
@@ -199,6 +201,8 @@ sysc_work:
 	jo	sysc_reschedule
 	tm	__TI_flags+7(%r9),_TIF_SIGPENDING
 	jo	sysc_sigpending
+	tm	__TI_flags+7(%r9),_TIF_RESTART_SVC
+	jo	sysc_restart
 	j	sysc_leave
 
 #
@@ -219,6 +223,17 @@ sysc_sigpending:
 	brasl	%r14,do_signal    # call do_signal
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
 	j	sysc_leave        # out of here, do NOT recheck
+
+#
+# _TIF_RESTART_SVC is set, set up registers and restart svc
+#
+sysc_restart:
+	ni	__TI_flags+3(%r9),255-_TIF_RESTART_SVC # clear TIF_RESTART_SVC
+	stosm	48(%r15),0x03          # reenable interrupts
+	lg	%r7,SP_R2(%r15)        # load new svc number
+	mvc	SP_R2(8,%r15),SP_ORIG_R2(%r15) # restore first argument
+	lmg	%r2,%r6,SP_R2(%r15)    # load svc arguments
+	j	sysc_do_restart        # restart svc
 
 #
 # call syscall_trace before and after system call
@@ -383,7 +398,7 @@ sys_call_table:
         .long  SYSCALL(sys_write,sys32_write_wrapper)
         .long  SYSCALL(sys_open,sys32_open_wrapper)             /* 5 */
         .long  SYSCALL(sys_close,sys32_close_wrapper)
-        .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old waitpid syscall */
+        .long  SYSCALL(sys_restart_syscall,sys_ni_syscall)
         .long  SYSCALL(sys_creat,sys32_creat_wrapper)
         .long  SYSCALL(sys_link,sys32_link_wrapper)
         .long  SYSCALL(sys_unlink,sys32_unlink_wrapper)         /* 10 */
@@ -777,7 +792,7 @@ io_return:
 #else
         jno     io_leave               # no-> skip resched & signal
 #endif
-	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+7(%r9),_TIF_WORK_INT
 	jnz	io_work                # there is work to do (signals etc.)
 io_leave:
         RESTORE_ALL 0
@@ -813,7 +828,7 @@ io_resume_loop:
 io_work_loop:
         stnsm   48(%r15),0xfc          # disable I/O and ext. interrupts
         GET_THREAD_INFO                # load pointer to task_struct to R9
-	tm	__TI_flags+7(%r9),_TIF_WORK_MASK
+	tm	__TI_flags+7(%r9),_TIF_WORK_INT
 	jz	io_leave               # there is no work to do
 #
 # One of the work bits is on. Find out which one.

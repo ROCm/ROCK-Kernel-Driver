@@ -5,5 +5,3 @@
 EXTRA_CFLAGS	+= -I../kernel
 
 obj-y				:= setup.o topology.o
-
-include $(TOPDIR)/Rules.make

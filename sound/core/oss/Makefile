@@ -12,5 +12,3 @@ snd-pcm-oss-objs := pcm_oss.o pcm_plugin.o \
 
 obj-$(CONFIG_SND_MIXER_OSS) += snd-mixer-oss.o
 obj-$(CONFIG_SND_PCM_OSS) += snd-pcm-oss.o
-
-include $(TOPDIR)/Rules.make

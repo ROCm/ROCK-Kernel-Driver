@@ -181,10 +181,10 @@ static __inline__ void tx_dump_ring(struct happy_meal *hp)
 
 struct pci_device_id happymeal_pci_ids[] __initdata = {
 	{
-	  vendor: PCI_VENDOR_ID_SUN,
-	  device: PCI_DEVICE_ID_SUN_HAPPYMEAL,
-	  subvendor: PCI_ANY_ID,
-	  subdevice: PCI_ANY_ID,
+	  .vendor	= PCI_VENDOR_ID_SUN,
+	  .device	= PCI_DEVICE_ID_SUN_HAPPYMEAL,
+	  .subvendor	= PCI_ANY_ID,
+	  .subdevice	= PCI_ANY_ID,
 	},
 	{ }			/* Terminating entry */
 };

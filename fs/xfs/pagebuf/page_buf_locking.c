@@ -75,7 +75,7 @@ pagebuf_cond_lock(			/* lock buffer, if not locked	*/
 
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 
-	locked = down_trylock(&PBP(pb)->pb_sema) == 0;
+	locked = down_trylock(&pb->pb_sema) == 0;
 	if (locked) {
 		PB_SET_OWNER(pb);
 	}
@@ -95,7 +95,7 @@ pagebuf_lock_value(
 	page_buf_t		*pb)
 {
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
-	return(atomic_read(&PBP(pb)->pb_sema.count));
+	return(atomic_read(&pb->pb_sema.count));
 }
 
 /*
@@ -114,7 +114,7 @@ pagebuf_lock(
 
 	PB_TRACE(pb, PB_TRACE_REC(lock), 0);
 	pagebuf_run_queues(pb);
-	down(&PBP(pb)->pb_sema);
+	down(&pb->pb_sema);
 	PB_SET_OWNER(pb);
 	PB_TRACE(pb, PB_TRACE_REC(locked), 0);
 	return 0;
@@ -133,6 +133,6 @@ pagebuf_unlock(				/* unlock buffer		*/
 {
 	ASSERT(pb->pb_flags & _PBF_LOCKABLE);
 	PB_CLEAR_OWNER(pb);
-	up(&PBP(pb)->pb_sema);
+	up(&pb->pb_sema);
 	PB_TRACE(pb, PB_TRACE_REC(unlock), 0);
 }

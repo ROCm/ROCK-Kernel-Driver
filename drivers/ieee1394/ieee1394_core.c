@@ -29,7 +29,7 @@
 #include <linux/interrupt.h>
 #include <linux/module.h>
 #include <linux/proc_fs.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
 
@@ -42,6 +42,8 @@
 #include "csr.h"
 #include "nodemgr.h"
 #include "ieee1394_hotplug.h"
+#include "dma.h"
+#include "iso.h"
 
 /*
  * Disable the nodemgr detection and config rom reading functionality.
@@ -76,28 +78,31 @@ static void dump_packet(const char *text, quadlet_t *data, int size)
         printk("\n");
 }
 
-static void process_complete_tasks(struct hpsb_packet *packet)
+static void run_packet_complete(struct hpsb_packet *packet)
 {
-	struct list_head *lh, *next;
-
-	list_for_each_safe(lh, next, &packet->complete_tq) {
-		struct hpsb_queue_struct *tq =
-			list_entry(lh, struct hpsb_queue_struct, hpsb_queue_list);
-		list_del(&tq->hpsb_queue_list);
-		hpsb_schedule_work(tq);
+	if (packet->complete_routine != NULL) {
+		packet->complete_routine(packet->complete_data);
+		packet->complete_routine = NULL;
+		packet->complete_data = NULL;
 	}
-
 	return;
 }
 
 /**
- * hpsb_add_packet_complete_task - add a new task for when a packet completes
+ * hpsb_set_packet_complete_task - set the task that runs when a packet
+ * completes. You cannot call this more than once on a single packet
+ * before it is sent.
+ *
  * @packet: the packet whose completion we want the task added to
- * @tq: the hpsb_queue_struct describing the task to add
+ * @routine: function to call
+ * @data: data (if any) to pass to the above function
  */
-void hpsb_add_packet_complete_task(struct hpsb_packet *packet, struct hpsb_queue_struct *tq)
+void hpsb_set_packet_complete_task(struct hpsb_packet *packet,
+				   void (*routine)(void *), void *data)
 {
-	list_add_tail(&tq->hpsb_queue_list, &packet->complete_tq);
+	BUG_ON(packet->complete_routine != NULL);
+	packet->complete_routine = routine;
+	packet->complete_data = data;
 	return;
 }
 
@@ -145,9 +150,10 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
                 packet->data_size = data_size;
         }
 
-        INIT_LIST_HEAD(&packet->complete_tq);
         INIT_LIST_HEAD(&packet->list);
         sema_init(&packet->state_change, 0);
+	packet->complete_routine = NULL;
+	packet->complete_data = NULL;
         packet->state = hpsb_unused;
         packet->generation = -1;
         packet->data_be = 1;
@@ -372,6 +378,7 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
                         /* selfid stage did not complete without error */
                         HPSB_NOTICE("Error in SelfID stage, resetting");
 			host->in_bus_reset = 0;
+			/* this should work from ohci1394 now... */
                         hpsb_reset_bus(host, LONG_RESET);
                         return;
                 } else {
@@ -397,7 +404,6 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
                 host->is_irm = 0;
         }
 
-        host->reset_retries = 0;
         if (isroot) {
 		host->driver->devctl(host, ACT_CYCLE_MASTER, 1);
 		host->is_cycmst = 1;
@@ -405,6 +411,29 @@ void hpsb_selfid_complete(struct hpsb_host *host, int phyid, int isroot)
 	atomic_inc(&host->generation);
 	host->in_bus_reset = 0;
         highlevel_host_reset(host);
+
+        /* check for common cycle master error */
+        hpsb_check_cycle_master(host);
+}
+
+
+void hpsb_check_cycle_master(struct hpsb_host *host)
+{
+	/* check if host is IRM and not ROOT */
+	if (host->is_irm && !host->is_root) {
+		HPSB_NOTICE("Host is IRM but not root, resetting");
+		if (host->reset_retries++ < 4) {
+			/* selfid stage did not yield valid cycle master */
+			hpsb_reset_bus(host, LONG_RESET_FORCE_ROOT);
+		} else {
+			host->reset_retries = 0;
+			HPSB_NOTICE("Stopping out-of-control reset loop");
+			HPSB_NOTICE("Warning - Cycle Master not set correctly");
+		}
+		return;
+	}
+
+	host->reset_retries = 0;
 }
 
 
@@ -425,7 +454,7 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
                 packet->state = hpsb_complete;
                 up(&packet->state_change);
                 up(&packet->state_change);
-                process_complete_tasks(packet);
+                run_packet_complete(packet);
                 return;
         }
 
@@ -614,7 +643,7 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
 
         packet->state = hpsb_complete;
         up(&packet->state_change);
-	process_complete_tasks(packet);
+	run_packet_complete(packet);
 }
 
 
@@ -645,6 +674,54 @@ static struct hpsb_packet *create_reply_packet(struct hpsb_host *host,
         }
 
         return p;
+}
+
+#define PREP_ASYNC_HEAD_RCODE(tc) \
+	packet->tcode = tc; \
+	packet->header[0] = (packet->node_id << 16) | (packet->tlabel << 10) \
+		| (1 << 8) | (tc << 4); \
+	packet->header[1] = (packet->host->node_id << 16) | (rcode << 12); \
+	packet->header[2] = 0
+
+static void fill_async_readquad_resp(struct hpsb_packet *packet, int rcode,
+                              quadlet_t data)
+{
+	PREP_ASYNC_HEAD_RCODE(TCODE_READQ_RESPONSE);
+	packet->header[3] = data;
+	packet->header_size = 16;
+	packet->data_size = 0;
+}
+
+static void fill_async_readblock_resp(struct hpsb_packet *packet, int rcode,
+                               int length)
+{
+	if (rcode != RCODE_COMPLETE)
+		length = 0;
+
+	PREP_ASYNC_HEAD_RCODE(TCODE_READB_RESPONSE);
+	packet->header[3] = length << 16;
+	packet->header_size = 16;
+	packet->data_size = length + (length % 4 ? 4 - (length % 4) : 0);
+}
+
+static void fill_async_write_resp(struct hpsb_packet *packet, int rcode)
+{
+	PREP_ASYNC_HEAD_RCODE(TCODE_WRITE_RESPONSE);
+	packet->header[2] = 0;
+	packet->header_size = 12;
+	packet->data_size = 0;
+}
+
+static void fill_async_lock_resp(struct hpsb_packet *packet, int rcode, int extcode,
+                          int length)
+{
+	if (rcode != RCODE_COMPLETE)
+		length = 0;
+
+	PREP_ASYNC_HEAD_RCODE(TCODE_LOCK_RESPONSE);
+	packet->header[3] = (length << 16) | extcode;
+	packet->header_size = 16;
+	packet->data_size = length;
 }
 
 #define PREP_REPLY_PACKET(length) \
@@ -848,7 +925,7 @@ void abort_requests(struct hpsb_host *host)
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
                 up(&packet->state_change);
-		process_complete_tasks(packet);
+		run_packet_complete(packet);
         }
 }
 
@@ -890,7 +967,7 @@ void abort_timedouts(struct hpsb_host *host)
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
                 up(&packet->state_change);
-		process_complete_tasks(packet);
+		run_packet_complete(packet);
         }
 }
 
@@ -1143,14 +1220,17 @@ module_init(ieee1394_init);
 module_exit(ieee1394_cleanup);
 
 /* Exported symbols */
+
+/** hosts.c **/
 EXPORT_SYMBOL(hpsb_alloc_host);
 EXPORT_SYMBOL(hpsb_add_host);
 EXPORT_SYMBOL(hpsb_remove_host);
 EXPORT_SYMBOL(hpsb_ref_host);
 EXPORT_SYMBOL(hpsb_unref_host);
-EXPORT_SYMBOL(hpsb_speedto_str);
-EXPORT_SYMBOL(hpsb_add_packet_complete_task);
 
+/** ieee1394_core.c **/
+EXPORT_SYMBOL(hpsb_speedto_str);
+EXPORT_SYMBOL(hpsb_set_packet_complete_task);
 EXPORT_SYMBOL(alloc_hpsb_packet);
 EXPORT_SYMBOL(free_hpsb_packet);
 EXPORT_SYMBOL(hpsb_send_packet);
@@ -1158,35 +1238,30 @@ EXPORT_SYMBOL(hpsb_reset_bus);
 EXPORT_SYMBOL(hpsb_bus_reset);
 EXPORT_SYMBOL(hpsb_selfid_received);
 EXPORT_SYMBOL(hpsb_selfid_complete);
+EXPORT_SYMBOL(hpsb_check_cycle_master);
 EXPORT_SYMBOL(hpsb_packet_sent);
 EXPORT_SYMBOL(hpsb_packet_received);
+EXPORT_SYMBOL(ieee1394_register_chardev);
+EXPORT_SYMBOL(ieee1394_unregister_chardev);
+EXPORT_SYMBOL(ieee1394_devfs_handle);
+EXPORT_SYMBOL(ieee1394_procfs_entry);
 
-EXPORT_SYMBOL(get_tlabel);
-EXPORT_SYMBOL(free_tlabel);
-EXPORT_SYMBOL(fill_async_readquad);
-EXPORT_SYMBOL(fill_async_readquad_resp);
-EXPORT_SYMBOL(fill_async_readblock);
-EXPORT_SYMBOL(fill_async_readblock_resp);
-EXPORT_SYMBOL(fill_async_writequad);
-EXPORT_SYMBOL(fill_async_writeblock);
-EXPORT_SYMBOL(fill_async_write_resp);
-EXPORT_SYMBOL(fill_async_lock);
-EXPORT_SYMBOL(fill_async_lock_resp);
-EXPORT_SYMBOL(fill_iso_packet);
-EXPORT_SYMBOL(fill_phy_packet);
-EXPORT_SYMBOL(hpsb_make_readqpacket);
-EXPORT_SYMBOL(hpsb_make_readbpacket);
-EXPORT_SYMBOL(hpsb_make_writeqpacket);
-EXPORT_SYMBOL(hpsb_make_writebpacket);
+/** ieee1394_transactions.c **/
+EXPORT_SYMBOL(hpsb_get_tlabel);
+EXPORT_SYMBOL(hpsb_free_tlabel);
+EXPORT_SYMBOL(hpsb_make_readpacket);
+EXPORT_SYMBOL(hpsb_make_writepacket);
 EXPORT_SYMBOL(hpsb_make_lockpacket);
 EXPORT_SYMBOL(hpsb_make_lock64packet);
 EXPORT_SYMBOL(hpsb_make_phypacket);
-EXPORT_SYMBOL(hpsb_packet_success);
-EXPORT_SYMBOL(hpsb_make_packet);
+EXPORT_SYMBOL(hpsb_make_isopacket);
 EXPORT_SYMBOL(hpsb_read);
 EXPORT_SYMBOL(hpsb_write);
 EXPORT_SYMBOL(hpsb_lock);
+EXPORT_SYMBOL(hpsb_lock64);
+EXPORT_SYMBOL(hpsb_packet_success);
 
+/** highlevel.c **/
 EXPORT_SYMBOL(hpsb_register_highlevel);
 EXPORT_SYMBOL(hpsb_unregister_highlevel);
 EXPORT_SYMBOL(hpsb_register_addrspace);
@@ -1201,20 +1276,42 @@ EXPORT_SYMBOL(highlevel_add_host);
 EXPORT_SYMBOL(highlevel_remove_host);
 EXPORT_SYMBOL(highlevel_host_reset);
 
+/** nodemgr.c **/
 EXPORT_SYMBOL(hpsb_guid_get_entry);
 EXPORT_SYMBOL(hpsb_nodeid_get_entry);
+EXPORT_SYMBOL(hpsb_check_nodeid);
 EXPORT_SYMBOL(hpsb_node_fill_packet);
 EXPORT_SYMBOL(hpsb_node_read);
 EXPORT_SYMBOL(hpsb_node_write);
 EXPORT_SYMBOL(hpsb_node_lock);
-EXPORT_SYMBOL(hpsb_update_config_rom);
-EXPORT_SYMBOL(hpsb_get_config_rom);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(hpsb_release_unit_directory);
 
-EXPORT_SYMBOL(ieee1394_register_chardev);
-EXPORT_SYMBOL(ieee1394_unregister_chardev);
-EXPORT_SYMBOL(ieee1394_devfs_handle);
+/** csr.c **/
+EXPORT_SYMBOL(hpsb_update_config_rom);
+EXPORT_SYMBOL(hpsb_get_config_rom);
 
-EXPORT_SYMBOL(ieee1394_procfs_entry);
+/** dma.c **/
+EXPORT_SYMBOL(dma_prog_region_init);
+EXPORT_SYMBOL(dma_prog_region_alloc);
+EXPORT_SYMBOL(dma_prog_region_free);
+EXPORT_SYMBOL(dma_region_init);
+EXPORT_SYMBOL(dma_region_alloc);
+EXPORT_SYMBOL(dma_region_free);
+EXPORT_SYMBOL(dma_region_sync);
+EXPORT_SYMBOL(dma_region_mmap);
+EXPORT_SYMBOL(dma_region_offset_to_bus);
+
+/** iso.c **/
+EXPORT_SYMBOL(hpsb_iso_xmit_init);
+EXPORT_SYMBOL(hpsb_iso_recv_init);
+EXPORT_SYMBOL(hpsb_iso_xmit_start);
+EXPORT_SYMBOL(hpsb_iso_recv_start);
+EXPORT_SYMBOL(hpsb_iso_stop);
+EXPORT_SYMBOL(hpsb_iso_shutdown);
+EXPORT_SYMBOL(hpsb_iso_xmit_queue_packets);
+EXPORT_SYMBOL(hpsb_iso_recv_release_packets);
+EXPORT_SYMBOL(hpsb_iso_n_ready);
+EXPORT_SYMBOL(hpsb_iso_packet_data);
+EXPORT_SYMBOL(hpsb_iso_packet_info);

@@ -65,14 +65,14 @@ static int eata_pio_proc_info(char *, char **, off_t, int, int, int);
 static int eata_pio_release(struct Scsi_Host *);
 
 #define EATA_PIO {							\
-	proc_info:         	eata_pio_proc_info, /* procinfo	  */	\
-	name:              	"EATA (Extended Attachment) PIO driver",\
-	detect:            	eata_pio_detect,			\
-	release:           	eata_pio_release,			\
-	queuecommand:      	eata_pio_queue,				\
-	eh_abort_handler:  	eata_pio_abort,				\
-	eh_host_reset_handler:	eata_pio_host_reset,			\
-	use_clustering:    	ENABLE_CLUSTERING 			\
+	.proc_info         	= eata_pio_proc_info, /* procinfo	  */	\
+	.name              	= "EATA (Extended Attachment) PIO driver",\
+	.detect            	= eata_pio_detect,			\
+	.release           	= eata_pio_release,			\
+	.queuecommand      	= eata_pio_queue,				\
+	.eh_abort_handler  	= eata_pio_abort,				\
+	.eh_host_reset_handler	= eata_pio_host_reset,			\
+	.use_clustering    	= ENABLE_CLUSTERING 			\
 }
 
 #endif				/* _EATA_PIO_H */

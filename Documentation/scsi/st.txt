@@ -1,8 +1,8 @@
 This file contains brief information about the SCSI tape driver.
-The driver is currently maintained by Kai M{kisara (email
+The driver is currently maintained by Kai Mäkisara (email
 Kai.Makisara@metla.fi)
 
-Last modified: Fri Jul 26 16:01:39 2002 by makisara
+Last modified: Sat Dec 14 14:35:30 2002 by makisara
 
 
 BASICS
@@ -89,7 +89,10 @@ The compile options are defined in the file linux/drivers/scsi/st_options.h.
 4. If the open option O_NONBLOCK is used, open succeeds even if the
 drive is not ready. If O_NONBLOCK is not used, the driver waits for
 the drive to become ready. If this does not happen in ST_BLOCK_SECONDS
-seconds, open fails with the errno value EIO.
+seconds, open fails with the errno value EIO. With O_NONBLOCK the
+device can be opened for writing even if there is a write protected
+tape in the drive (commands trying to write something return error if
+attempted).
 
 
 BSD AND SYS V SEMANTICS

@@ -40,5 +40,3 @@ obj-$(CONFIG_ACTISYS_DONGLE)	+= actisys-sir.o
 
 # The SIR helper module
 sir-dev-objs := sir_core.o sir_dev.o sir_dongle.o sir_kthread.o
-
-include $(TOPDIR)/Rules.make

@@ -40,18 +40,18 @@ extern int esp_proc_info(char *buffer, char **start, off_t offset, int length,
 			int hostno, int inout);
 
 #define SCSI_OKTAGON_ESP {                       \
-   proc_name:           "esp-oktagon",           \
-   proc_info:           &esp_proc_info,          \
-   name:                "BSC Oktagon SCSI",      \
-   detect:              oktagon_esp_detect,      \
-   release:             oktagon_esp_release,     \
-   queuecommand:        esp_queue,               \
-   abort:               esp_abort,               \
-   reset:               esp_reset,               \
-   can_queue:           7,                       \
-   this_id:             7,                       \
-   sg_tablesize:        SG_ALL,                  \
-   cmd_per_lun:         1,                       \
-   use_clustering:      ENABLE_CLUSTERING }
+   .proc_name           = "esp-oktagon",           \
+   .proc_info           = &esp_proc_info,          \
+   .name                = "BSC Oktagon SCSI",      \
+   .detect              = oktagon_esp_detect,      \
+   .release             = oktagon_esp_release,     \
+   .queuecommand        = esp_queue,               \
+   .abort               = esp_abort,               \
+   .reset               = esp_reset,               \
+   .can_queue           = 7,                       \
+   .this_id             = 7,                       \
+   .sg_tablesize        = SG_ALL,                  \
+   .cmd_per_lun         = 1,                       \
+   .use_clustering      = ENABLE_CLUSTERING }
 
 #endif /* OKTAGON_ESP_H */

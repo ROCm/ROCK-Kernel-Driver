@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.44 $
+ *   $Revision: 1.45 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -362,18 +362,28 @@ io_subchannel_register(void *data)
 		sch->dev.driver_data = 0;
 		kfree (cdev->private);
 		kfree (cdev);
-		return;
+		goto out;
 	}
 
 	ret = subchannel_add_files(cdev->dev.parent);
 	if (ret)
 		printk(KERN_WARNING "%s: could not add attributes to %04x\n",
 		       __func__, sch->irq);
+out:
+	put_device(&sch->dev);
 }
 
 static void
 io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 {
+	int rc;
+
+	if (!get_device(&sch->dev)) {
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
+		return;
+	}
+
 	sch->dev.driver_data = cdev;
 	sch->driver = &io_subchannel_driver;
 	cdev->ccwlock = &sch->lock;
@@ -392,12 +402,17 @@ io_subchannel_recog(struct ccw_device *cdev, struct subchannel *sch)
 
 	/* Do first half of device_register. */
 	device_initialize(&cdev->dev);
-	get_device(&sch->dev);	/* keep parent refcount in sync. */
 
 	/* Start async. device sensing. */
 	spin_lock_irq(cdev->ccwlock);
-	ccw_device_recognition(cdev);
+	rc = ccw_device_recognition(cdev);
 	spin_unlock_irq(cdev->ccwlock);
+	if (rc) {
+		sch->dev.driver_data = 0;
+		put_device(&sch->dev);
+		if (cdev->dev.release)
+			cdev->dev.release(&cdev->dev);
+	}
 }
 
 static int

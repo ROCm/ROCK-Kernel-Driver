@@ -41,8 +41,6 @@ obj-y		+= io-writesl.o
 
 obj-$(CONFIG_CPU_26) += uaccess-armo.o
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/csumpartialcopy.o:	$(obj)/csumpartialcopygeneric.S
 $(obj)/csumpartialcopyuser.o:	$(obj)/csumpartialcopygeneric.S
 

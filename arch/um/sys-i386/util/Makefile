@@ -4,8 +4,6 @@ host-progs	:= mk_sc
 
 mk_sc-objs	:= mk_sc.o
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/mk_thread : $(obj)/mk_thread_kern.o $(obj)/mk_thread_user.o
 	$(CC) $(CFLAGS) -o $@ $^
 

@@ -8,6 +8,7 @@
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include <linux/cdrom.h>
+#include <asm/io.h>
 
 #include "scsi.h"
 #include "hosts.h"

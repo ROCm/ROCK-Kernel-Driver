@@ -44,21 +44,21 @@ static int wd7000_biosparam(struct scsi_device *, struct block_device *,
 #define WD7000_SG   16
 
 #define WD7000 {						\
-	proc_name:		"wd7000",			\
-	proc_info:		wd7000_proc_info,		\
-	name:			"Western Digital WD-7000",	\
-	detect:			wd7000_detect,			\
-	command:		wd7000_command,			\
-	queuecommand:		wd7000_queuecommand,		\
-	eh_bus_reset_handler:	wd7000_bus_reset,		\
-	eh_device_reset_handler:wd7000_device_reset,		\
-	eh_host_reset_handler:	wd7000_host_reset,		\
-	bios_param:		wd7000_biosparam,		\
-	can_queue:		WD7000_Q,			\
-	this_id:		7,				\
-	sg_tablesize:		WD7000_SG,			\
-	cmd_per_lun:		1,				\
-	unchecked_isa_dma:	1,				\
-	use_clustering:		ENABLE_CLUSTERING,		\
+	.proc_name		= "wd7000",			\
+	.proc_info		= wd7000_proc_info,		\
+	.name			= "Western Digital WD-7000",	\
+	.detect			= wd7000_detect,			\
+	.command		= wd7000_command,			\
+	.queuecommand		= wd7000_queuecommand,		\
+	.eh_bus_reset_handler	= wd7000_bus_reset,		\
+	.eh_device_reset_handler = wd7000_device_reset,		\
+	.eh_host_reset_handler	= wd7000_host_reset,		\
+	.bios_param		= wd7000_biosparam,		\
+	.can_queue		= WD7000_Q,			\
+	.this_id		= 7,				\
+	.sg_tablesize		= WD7000_SG,			\
+	.cmd_per_lun		= 1,				\
+	.unchecked_isa_dma	= 1,				\
+	.use_clustering		= ENABLE_CLUSTERING,		\
 }
 #endif

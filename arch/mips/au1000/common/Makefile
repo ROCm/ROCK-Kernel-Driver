@@ -16,7 +16,5 @@ obj-$(CONFIG_BLK_DEV_INITRD) += ramdisk.o
 
 EXTRA_AFLAGS := $(CFLAGS)
 
-include $(TOPDIR)/Rules.make
-
 ramdisk.o: 
 	mkramobj ramdisk ramdisk.o

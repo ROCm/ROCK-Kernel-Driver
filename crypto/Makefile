@@ -22,5 +22,3 @@ obj-$(CONFIG_CRYPTO_TWOFISH) += twofish.o
 obj-$(CONFIG_CRYPTO_SERPENT) += serpent.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
-
-include $(TOPDIR)/Rules.make

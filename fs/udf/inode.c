@@ -39,6 +39,7 @@
 #include <linux/module.h>
 #include <linux/pagemap.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 #include <linux/slab.h>
 
 #include "udf_i.h"
@@ -137,9 +138,9 @@ void udf_discard_prealloc(struct inode * inode)
 	}
 }
 
-static int udf_writepage(struct page *page)
+static int udf_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page, udf_get_block);
+	return block_write_full_page(page, udf_get_block, wbc);
 }
 
 static int udf_readpage(struct file *file, struct page *page)
@@ -170,6 +171,10 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 {
 	struct page *page;
 	char *kaddr;
+	struct writeback_control udf_wbc = {
+		.sync_mode = WB_SYNC_NONE,
+		.nr_to_write = 1,
+	};
 
 	/* from now on we have normal address_space methods */
 	inode->i_data.a_ops = &udf_aops;
@@ -206,8 +211,7 @@ void udf_expand_file_adinicb(struct inode * inode, int newsize, int * err)
 	else
 		UDF_I_ALLOCTYPE(inode) = ICBTAG_FLAG_AD_LONG;
 
-	if (inode->i_data.a_ops->writepage(page) == -EAGAIN)
-		__set_page_dirty_nobuffers(page);
+	inode->i_data.a_ops->writepage(page, &udf_wbc);
 	page_cache_release(page);
 
 	mark_inode_dirty(inode);

@@ -448,7 +448,6 @@ static int hugetlbfs_symlink(struct inode * dir, struct dentry *dentry, const ch
 
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
-	.writepage	= fail_writepage,
 	.prepare_write	= hugetlbfs_prepare_write,
 	.commit_write	= hugetlbfs_commit_write
 };
@@ -529,6 +528,8 @@ struct file *hugetlb_zero_setup(size_t size)
 	if (!capable(CAP_IPC_LOCK))
 		return ERR_PTR(-EPERM);
 
+	if (!is_hugepage_mem_enough(size))
+		return ERR_PTR(-ENOMEM);
 	n = atomic_read(&hugetlbfs_counter);
 	atomic_inc(&hugetlbfs_counter);
 

@@ -467,9 +467,8 @@ config SCSI_EATA
 	---help---
 	  This driver supports all EATA/DMA-compliant SCSI host adapters.  DPT
 	  ISA and all EISA I/O addresses are probed looking for the "EATA"
-	  signature.  If you chose "BIOS" at the question "PCI access mode",
-	  the addresses of all the PCI SCSI controllers reported by the PCI
-	  subsystem are probed as well.
+	  signature. The addresses of all the PCI SCSI controllers reported
+          by the PCI subsystem are probed as well.
 
 	  You want to read the start of <file:drivers/scsi/eata.c> and the
 	  SCSI-HOWTO, available from
@@ -490,9 +489,8 @@ config SCSI_EATA_TAGGED_QUEUE
 	help
 	  This is a feature of SCSI-2 which improves performance: the host
 	  adapter can send several SCSI commands to a device's queue even if
-	  previous commands haven't finished yet. Most EATA adapters negotiate
-	  this feature automatically with the device, even if your answer is
-	  N. The safe answer is N.
+	  previous commands haven't finished yet.
+	  This is equivalent to the "eata=tc:y" boot option.
 
 config SCSI_EATA_LINKED_COMMANDS
 	bool "enable elevator sorting"
@@ -502,7 +500,7 @@ config SCSI_EATA_LINKED_COMMANDS
 	  CD-ROMs. It definitely reduces the average seek distance when doing
 	  random seeks, but this does not necessarily result in a noticeable
 	  performance improvement: your mileage may vary...
-	  The safe answer is N.
+	  This is equivalent to the "eata=lc:y" boot option.
 
 config SCSI_EATA_MAX_TAGS
 	int "maximum number of queued commands"
@@ -515,6 +513,7 @@ config SCSI_EATA_MAX_TAGS
 	  Minimum is 2 and maximum is 62. This value is also the window size
 	  used by the elevator sorting option above. The effective value used
 	  by the driver for each probed SCSI device is reported at boot time.
+	  This is equivalent to the "eata=mq:8" boot option.
 
 config SCSI_EATA_DMA
 	tristate "EATA-DMA [Obsolete] (DPT, NEC, AT&T, SNI, AST, Olivetti, Alphatronix) support"
@@ -1487,6 +1486,15 @@ config SCSI_U14_34F
 	  The module will be called u14-34f.o.  If you want to compile it as a
 	  module, say M here and read <file:Documentation/modules.txt>.
 
+config SCSI_U14_34F_TAGGED_QUEUE
+	bool "enable tagged command queueing"
+	depends on SCSI_U14_34F
+	help
+	  This is a feature of SCSI-2 which improves performance: the host
+	  adapter can send several SCSI commands to a device's queue even if
+	  previous commands haven't finished yet.
+	  This is equivalent to the "u14-34f=tc:y" boot option.
+
 config SCSI_U14_34F_LINKED_COMMANDS
 	bool "enable elevator sorting"
 	depends on SCSI_U14_34F
@@ -1495,8 +1503,7 @@ config SCSI_U14_34F_LINKED_COMMANDS
 	  CD-ROMs. It definitely reduces the average seek distance when doing
 	  random seeks, but this does not necessarily result in a noticeable
 	  performance improvement: your mileage may vary...
-
-	  The safe answer is N.
+	  This is equivalent to the "u14-34f=lc:y" boot option.
 
 config SCSI_U14_34F_MAX_TAGS
 	int "maximum number of queued commands"
@@ -1509,6 +1516,7 @@ config SCSI_U14_34F_MAX_TAGS
 	  Minimum is 2 and maximum is 14. This value is also the window size
 	  used by the elevator sorting option above. The effective value used
 	  by the driver for each probed SCSI device is reported at boot time.
+	  This is equivalent to the "u14-34f=mq:8" boot option.
 
 config SCSI_ULTRASTOR
 	tristate "UltraStor SCSI support"

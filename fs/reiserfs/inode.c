@@ -1917,7 +1917,7 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
     }
 }
 
-static int reiserfs_write_full_page(struct page *page) {
+static int reiserfs_write_full_page(struct page *page, struct writeback_control *wbc) {
     struct inode *inode = page->mapping->host ;
     unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT ;
     unsigned last_offset = PAGE_CACHE_SIZE;
@@ -2018,11 +2018,11 @@ static int reiserfs_readpage (struct file *f, struct page * page)
 }
 
 
-static int reiserfs_writepage (struct page * page)
+static int reiserfs_writepage (struct page * page, struct writeback_control *wbc)
 {
     struct inode *inode = page->mapping->host ;
     reiserfs_wait_on_write_block(inode->i_sb) ;
-    return reiserfs_write_full_page(page) ;
+    return reiserfs_write_full_page(page, wbc) ;
 }
 
 

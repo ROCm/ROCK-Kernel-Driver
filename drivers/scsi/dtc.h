@@ -54,19 +54,19 @@ static int dtc_proc_info (char *buffer, char **start, off_t offset,
  */
 
 #define DTC3x80 {						\
-	name:				"DTC 3180/3280 ",	\
-	detect:				dtc_detect,		\
-	queuecommand:			dtc_queue_command,	\
-	eh_abort_handler:		dtc_abort,		\
-	eh_bus_reset_handler:		dtc_bus_reset,		\
-	eh_device_reset_handler:	dtc_device_reset,	\
-	eh_host_reset_handler:          dtc_host_reset,		\
-	bios_param:     dtc_biosparam,				\
-	can_queue:      CAN_QUEUE,				\
-	this_id:        7,					\
-	sg_tablesize:   SG_ALL,					\
-	cmd_per_lun:    CMD_PER_LUN ,				\
-	use_clustering: DISABLE_CLUSTERING}
+	.name				= "DTC 3180/3280 ",	\
+	.detect				= dtc_detect,		\
+	.queuecommand			= dtc_queue_command,	\
+	.eh_abort_handler		= dtc_abort,		\
+	.eh_bus_reset_handler		= dtc_bus_reset,		\
+	.eh_device_reset_handler	= dtc_device_reset,	\
+	.eh_host_reset_handler          = dtc_host_reset,		\
+	.bios_param     = dtc_biosparam,				\
+	.can_queue      = CAN_QUEUE,				\
+	.this_id        = 7,					\
+	.sg_tablesize   = SG_ALL,					\
+	.cmd_per_lun    = CMD_PER_LUN ,				\
+	.use_clustering = DISABLE_CLUSTERING}
 
 #define NCR5380_implementation_fields \
     unsigned int base

@@ -91,19 +91,15 @@ typedef void (*exitcall_t)(void);
 #define __exitcall(fn)							\
 	static exitcall_t __exitcall_##fn __exit_call = fn
 
-/*
- * Used for kernel command line parameter setup
- */
-struct kernel_param {
+struct obs_kernel_param {
 	const char *str;
 	int (*setup_func)(char *);
 };
 
-extern struct kernel_param __setup_start, __setup_end;
-
+/* OBSOLETE: see moduleparam.h for the right way. */
 #define __setup(str, fn)						\
 	static char __setup_str_##fn[] __initdata = str;		\
-	static struct kernel_param __setup_##fn				\
+	static struct obs_kernel_param __setup_##fn			\
 		 __attribute__((unused,__section__ (".init.setup")))	\
 		= { __setup_str_##fn, fn }
 
@@ -165,6 +161,16 @@ extern struct kernel_param __setup_start, __setup_end;
 
 /* Data marked not to be saved by software_suspend() */
 #define __nosavedata __attribute__ ((__section__ (".data.nosave")))
+
+/* This means "can be init if no module support, otherwise module load
+   may call it." */
+#ifdef CONFIG_MODULES
+#define __init_or_module
+#define __initdata_or_module
+#else
+#define __init_or_module __init
+#define __initdata_or_module __initdata
+#endif /*CONFIG_MODULES*/
 
 #ifdef CONFIG_HOTPLUG
 #define __devinit

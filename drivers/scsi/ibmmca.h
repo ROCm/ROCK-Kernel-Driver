@@ -27,22 +27,22 @@ static int ibmmca_biosparam (struct scsi_device *, struct block_device *, sector
  * about this, but it will break things in the future.
  */
 #define IBMMCA {                                                      \
-          proc_name:      "ibmmca",             /*proc_name*/         \
-	  proc_info:	  ibmmca_proc_info,     /*proc info fn*/      \
-          name:           "IBM SCSI-Subsystem", /*name*/              \
-          detect:         ibmmca_detect,        /*detect fn*/         \
-          release:        ibmmca_release,       /*release fn*/        \
-          command:        ibmmca_command,       /*command fn*/        \
-          queuecommand:   ibmmca_queuecommand,  /*queuecommand fn*/   \
-	  eh_abort_handler:ibmmca_abort,         /*abort fn*/          \
-	  eh_host_reset_handler:ibmmca_host_reset,         /*reset fn*/          \
-          bios_param:     ibmmca_biosparam,     /*bios fn*/           \
-          can_queue:      16,                   /*can_queue*/         \
-          this_id:        7,                    /*set by detect*/     \
-          sg_tablesize:   16,                   /*sg_tablesize*/      \
-          cmd_per_lun:    1,                    /*cmd_per_lun*/       \
-          unchecked_isa_dma: 0,                 /*32-Bit Busmaster */ \
-          use_clustering: ENABLE_CLUSTERING     /*use_clustering*/    \
+          .proc_name      = "ibmmca",             /*proc_name*/         \
+	  .proc_info	  = ibmmca_proc_info,     /*proc info fn*/      \
+          .name           = "IBM SCSI-Subsystem", /*name*/              \
+          .detect         = ibmmca_detect,        /*detect fn*/         \
+          .release        = ibmmca_release,       /*release fn*/        \
+          .command        = ibmmca_command,       /*command fn*/        \
+          .queuecommand   = ibmmca_queuecommand,  /*queuecommand fn*/   \
+	  .eh_abort_handler = ibmmca_abort,         /*abort fn*/          \
+	  .eh_host_reset_handler = ibmmca_host_reset,         /*reset fn*/          \
+          .bios_param     = ibmmca_biosparam,     /*bios fn*/           \
+          .can_queue      = 16,                   /*can_queue*/         \
+          .this_id        = 7,                    /*set by detect*/     \
+          .sg_tablesize   = 16,                   /*sg_tablesize*/      \
+          .cmd_per_lun    = 1,                    /*cmd_per_lun*/       \
+          .unchecked_isa_dma = 0,                 /*32-Bit Busmaster */ \
+          .use_clustering = ENABLE_CLUSTERING     /*use_clustering*/    \
           }
 
 #endif /* _IBMMCA_H */

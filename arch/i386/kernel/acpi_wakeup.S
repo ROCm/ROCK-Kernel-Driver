@@ -239,19 +239,10 @@ bogus_magic2:
 #
 ENTRY(acpi_copy_wakeup_routine)
 
-	pushl	%esi
-	pushl	%edi
-
 	sgdt	saved_gdt
 	sidt	saved_idt
 	sldt	saved_ldt
 	str	saved_tss
-
-	movl	%eax, %edi
-	leal	wakeup_start, %esi
-	movl	$(wakeup_end - wakeup_start + 3) >> 2, %ecx
-
-	rep ;  movsl
 
 	movl    %cr3, %edx
 	movl    %edx, real_save_cr3 - wakeup_start (%eax)
@@ -265,10 +256,6 @@ ENTRY(acpi_copy_wakeup_routine)
 	movl	%edx, video_mode - wakeup_start (%eax)
 	movl	$0x12345678, real_magic - wakeup_start (%eax)
 	movl	$0x12345678, saved_magic
-
-	# restore the regs we used
-	popl	%edi
-	popl	%esi
 	ret
 
 .data

@@ -8,8 +8,6 @@ obj-$(CONFIG_REMOTE_DEBUG)	+= kgdb.o
 
 obj-$(CONFIG_BLK_DEV_INITRD)	+= ramdisk.o
 
-include $(TOPDIR)/Rules.make
-
 ramdisk.o:
 		$(MAKE) -C ramdisk
 		mv ramdisk/ramdisk.o ramdisk.o

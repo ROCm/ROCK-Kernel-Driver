@@ -43,6 +43,3 @@ endif
 ifeq ($(CONFIG_FT_PROC_FS),y)
 ftape-objs += ftape-proc.o
 endif
-
-include $(TOPDIR)/Rules.make
-

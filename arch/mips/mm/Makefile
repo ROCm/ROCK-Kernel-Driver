@@ -17,5 +17,3 @@ obj-$(CONFIG_CPU_MIPS32)	+= mips32.o
 obj-$(CONFIG_CPU_MIPS64)	+= mips32.o
 obj-$(CONFIG_SGI_IP22)		+= umap.o
 obj-$(CONFIG_BAGET_MIPS)	+= umap.o
-
-include $(TOPDIR)/Rules.make

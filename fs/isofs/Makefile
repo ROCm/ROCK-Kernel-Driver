@@ -8,5 +8,3 @@ isofs-objs-y 			:= namei.o inode.o dir.o util.o rock.o
 isofs-objs-$(CONFIG_JOLIET)	+= joliet.o
 isofs-objs-$(CONFIG_ZISOFS)	+= compress.o
 isofs-objs			:= $(isofs-objs-y)
-
-include $(TOPDIR)/Rules.make
