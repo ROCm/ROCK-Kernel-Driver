@@ -82,18 +82,6 @@ EXPORT_SYMBOL(irda_param_unpack);
 /* IrLAP */
 EXPORT_SYMBOL(irda_init_max_qos_capabilies);
 EXPORT_SYMBOL(irda_qos_bits_to_value);
-EXPORT_SYMBOL(irda_device_setup);
-EXPORT_SYMBOL(alloc_irdadev);
-EXPORT_SYMBOL(irda_device_set_media_busy);
-EXPORT_SYMBOL(irda_device_txqueue_empty);
-
-EXPORT_SYMBOL(irda_device_dongle_init);
-EXPORT_SYMBOL(irda_device_dongle_cleanup);
-EXPORT_SYMBOL(irda_device_register_dongle);
-EXPORT_SYMBOL(irda_device_unregister_dongle);
-EXPORT_SYMBOL(irda_task_execute);
-EXPORT_SYMBOL(irda_task_next_state);
-EXPORT_SYMBOL(irda_task_delete);
 
 
 #ifdef CONFIG_IRDA_DEBUG
