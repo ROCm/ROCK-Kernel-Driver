@@ -250,6 +250,7 @@ static void x25_asy_bump(struct x25_asy *sl)
 	else
 	{
 		netif_rx(skb);
+		sl->dev->last_rx = jiffies;
 		sl->rx_packets++;
 	}
 }
@@ -397,6 +398,7 @@ static int x25_asy_xmit(struct sk_buff *skb, struct net_device *dev)
   
 static int x25_asy_data_indication(void *token, struct sk_buff *skb)
 {
+	skb->dev->last_rx = jiffies;
 	return netif_rx(skb);
 }
 
@@ -449,6 +451,7 @@ static void x25_asy_connected(void *token, int reason)
 	skb->pkt_type = PACKET_HOST;
 
 	netif_rx(skb);
+	sl->dev->last_rx = jiffies;
 }
 
 static void x25_asy_disconnected(void *token, int reason)
@@ -471,6 +474,7 @@ static void x25_asy_disconnected(void *token, int reason)
 	skb->pkt_type = PACKET_HOST;
 
 	netif_rx(skb);
+	sl->dev->last_rx = jiffies;
 }
 
 

@@ -2352,6 +2352,7 @@ static void rx_intr (sdla_t* card)
 		
 
 		/* Send a packed up the IP stack */
+		skb->dev->last_rx = jiffies;
 		netif_rx(skb);
 		++chan->drvstats_rx_intr.rx_intr_bfr_passed_to_stack;
 		++chan->ifstats.rx_packets;

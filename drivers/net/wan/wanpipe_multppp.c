@@ -1572,6 +1572,7 @@ static void rx_intr (sdla_t* card)
                 skb->dev = dev;
                 skb->mac.raw  = skb->data;
                 netif_rx(skb);
+                dev->last_rx = jiffies;
 	}
 
 rx_exit:
@@ -2175,6 +2176,7 @@ static int process_udp_mgmt_pkt(sdla_t* card, netdevice_t* dev,
 	    		new_skb->mac.raw  = new_skb->data;
 	
 			netif_rx(new_skb);
+			dev->last_rx = jiffies;
 		} else {
 	    	
 			printk(KERN_INFO "%s: no socket buffers available!\n",
@@ -2470,6 +2472,7 @@ static void send_ppp_term_request (netdevice_t *dev)
 		new_skb->mac.raw  = new_skb->data;
 
 		netif_rx(new_skb);
+		dev->last_rx = jiffies;
 	}
 }
 
