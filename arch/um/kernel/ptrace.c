@@ -307,6 +307,25 @@ long sys_ptrace(long request, long pid, long addr, long data)
 	return ret;
 }
 
+void send_sigtrap(struct task_struct *tsk, union uml_pt_regs *regs,
+		  int error_code)
+{
+	struct siginfo info;
+
+	memset(&info, 0, sizeof(info));
+	info.si_signo = SIGTRAP;
+	info.si_code = TRAP_BRKPT;
+
+	/* User-mode eip? */
+	info.si_addr = UPT_IS_USER(regs) ? (void __user *) UPT_IP(regs) : NULL;
+
+	/* Send us the fakey SIGTRAP */
+	force_sig_info(SIGTRAP, &info, tsk);
+}
+
+/* XXX Check PT_DTRACE vs TIF_SINGLESTEP for singlestepping check and
+ * PT_PTRACED vs TIF_SYSCALL_TRACE for syscall tracing check
+ */
 void syscall_trace(union uml_pt_regs *regs, int entryexit)
 {
 	int is_singlestep = (current->ptrace & PT_DTRACE) && entryexit;
@@ -321,14 +340,19 @@ void syscall_trace(union uml_pt_regs *regs, int entryexit)
 			audit_syscall_exit(current, regs->eax);
 	}
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE) && !is_singlestep)
+	/* Fake a debug trap */
+	if (is_singlestep)
+		send_sigtrap(current, regs, 0);
+
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
 		return;
+
 	if (!(current->ptrace & PT_PTRACED))
 		return;
 
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
-	tracesysgood = (current->ptrace & PT_TRACESYSGOOD) && !is_singlestep;
+	tracesysgood = (current->ptrace & PT_TRACESYSGOOD);
 	ptrace_notify(SIGTRAP | (tracesysgood ? 0x80 : 0));
 
 	if (entryexit) /* force do_signal() --> is_syscall() */
