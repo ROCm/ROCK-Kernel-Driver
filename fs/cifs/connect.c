@@ -136,8 +136,8 @@ cifs_reconnect(struct TCP_Server_Info *server)
 int
 cifs_demultiplex_thread(struct TCP_Server_Info *server)
 {
-	int length, total_read;
-	unsigned int pdu_length;
+	int length;
+	unsigned int pdu_length, total_read;
 	struct smb_hdr *smb_buffer = NULL;
 	struct msghdr smb_msg;
 	mm_segment_t temp_fs;
