@@ -646,6 +646,7 @@ sub output_struct_sgml(%) {
     print "  <programlisting>\n";
     print $args{'type'}." ".$args{'struct'}." {\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	defined($args{'parameterdescs'}{$parameter}) || next;
         ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
 	$type = $args{'parametertypes'}{$parameter};
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
@@ -666,6 +667,7 @@ sub output_struct_sgml(%) {
 
     print "  <variablelist>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+      defined($args{'parameterdescs'}{$parameter}) || next;
       ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
       print "    <varlistentry>";
       print "      <term>$parameter</term>\n";
