@@ -138,7 +138,6 @@ int jfs_create(struct inode *dip, struct dentry *dentry, int mode)
 	mark_inode_dirty(ip);
 	d_instantiate(dentry, ip);
 
-	dip->i_version = ++event;
 	dip->i_ctime = dip->i_mtime = CURRENT_TIME;
 
 	mark_inode_dirty(dip);
@@ -264,7 +263,6 @@ int jfs_mkdir(struct inode *dip, struct dentry *dentry, int mode)
 
 	/* update parent directory inode */
 	dip->i_nlink++;		/* for '..' from child directory */
-	dip->i_version = ++event;
 	dip->i_ctime = dip->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dip);
 
@@ -359,7 +357,6 @@ int jfs_rmdir(struct inode *dip, struct dentry *dentry)
 	 */
 	dip->i_nlink--;
 	dip->i_ctime = dip->i_mtime = CURRENT_TIME;
-	dip->i_version = ++event;
 	mark_inode_dirty(dip);
 
 	/*
@@ -473,7 +470,6 @@ int jfs_unlink(struct inode *dip, struct dentry *dentry)
 	ASSERT(ip->i_nlink);
 
 	ip->i_ctime = dip->i_ctime = dip->i_mtime = CURRENT_TIME;
-	dip->i_version = ++event;
 	mark_inode_dirty(dip);
 
 	/* update target's inode */
@@ -797,8 +793,6 @@ int jfs_link(struct dentry *old_dentry,
 	if ((rc = dtInsert(tid, dir, &dname, &ino, &btstack)))
 		goto out;
 
-	dir->i_version = ++event;
-
 	/* update object inode */
 	ip->i_nlink++;		/* for new link */
 	ip->i_ctime = CURRENT_TIME;
@@ -993,7 +987,6 @@ int jfs_symlink(struct inode *dip, struct dentry *dentry, const char *name)
 			goto out2;
 		}
 	}
-	dip->i_version = ++event;
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
@@ -1227,7 +1220,6 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	old_ip->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(old_ip);
 
-	new_dir->i_version = ++event;
 	new_dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(new_dir);
 
@@ -1240,7 +1232,6 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
 
 	if (old_dir != new_dir) {
 		iplist[ipcount++] = new_dir;
-		old_dir->i_version = ++event;
 		old_dir->i_ctime = CURRENT_TIME;
 		mark_inode_dirty(old_dir);
 	}
@@ -1363,7 +1354,6 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 	mark_inode_dirty(ip);
 	d_instantiate(dentry, ip);
 
-	dir->i_version = ++event;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 
 	mark_inode_dirty(dir);
