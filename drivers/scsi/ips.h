@@ -59,15 +59,20 @@
    extern int ips_eh_abort(Scsi_Cmnd *);
    extern int ips_eh_reset(Scsi_Cmnd *);
    extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-   extern int ips_slave_configure(Scsi_Device *);
    extern const char * ips_info(struct Scsi_Host *);
-   extern void do_ips(int, void *, struct pt_regs *);
 
    /*
     * Some handy macros
     */
    #ifndef LinuxVersionCode
       #define LinuxVersionCode(x,y,z)  (((x)<<16)+((y)<<8)+(z))
+   #endif
+
+   #if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,20) || defined CONFIG_HIGHIO
+      #define IPS_HIGHIO
+      #define IPS_HIGHMEM_IO     .highmem_io = 1,
+   #else
+      #define IPS_HIGHMEM_IO
    #endif
 
    #define IPS_HA(x)                   ((ips_ha_t *) x->hostdata)
@@ -87,6 +92,11 @@
                                          ((IPS_IS_TROMBONE(ha) || IPS_IS_CLARINET(ha)) && \
                                           (ips_force_memio))) ? 1 : 0)
 
+    #define IPS_HAS_ENH_SGLIST(ha)    (IPS_IS_MORPHEUS(ha) || IPS_IS_MARCO(ha))
+    #define IPS_USE_ENH_SGLIST(ha)    ((ha)->flags & IPS_HA_ENH_SG)
+    #define IPS_SGLIST_SIZE(ha)       (IPS_USE_ENH_SGLIST(ha) ? \
+                                         sizeof(IPS_ENH_SG_LIST) : sizeof(IPS_STD_SG_LIST))
+
    #if LINUX_VERSION_CODE < LinuxVersionCode(2,4,4)
       #define pci_set_dma_mask(dev,mask) (1)
       #define scsi_set_pci_device(sh,dev) (0)
@@ -103,6 +113,24 @@
 
    #ifndef min
       #define min(x,y) ((x) < (y) ? x : y)
+   #endif
+
+   #define pci_dma_lo32(a)         (a & 0xffffffff)
+
+   #if (BITS_PER_LONG > 32) || (defined CONFIG_HIGHMEM64G && defined IPS_HIGHIO)
+      #define IPS_ENABLE_DMA64        (1)
+      #define pci_dma_hi32(a)         (a >> 32)
+   #else
+      #define IPS_ENABLE_DMA64        (0)
+      #define pci_dma_hi32(a)         (0)
+   #endif
+
+   #if defined(__ia64__)
+      #define IPS_ATOMIC_GFP	(GFP_DMA | GFP_ATOMIC)
+      #define IPS_INIT_GFP	GFP_DMA
+   #else
+      #define IPS_ATOMIC_GFP    GFP_ATOMIC
+      #define IPS_INIT_GFP	GFP_KERNEL
    #endif
 
    /*
@@ -458,7 +486,7 @@
 #endif
 
 /*
- * IBM PCI Raid Command Formats
+ * Raid Command Formats
  */
 typedef struct {
    uint8_t  op_code;
@@ -468,7 +496,8 @@ typedef struct {
    uint32_t lba;
    uint32_t sg_addr;
    uint16_t sector_count;
-   uint16_t reserved;
+   uint8_t  segment_4G;
+   uint8_t  enhanced_sg;
    uint32_t ccsar;
    uint32_t cccr;
 } IPS_IO_CMD, *PIPS_IO_CMD;
@@ -519,7 +548,9 @@ typedef struct {
    uint16_t reserved;
    uint32_t reserved2;
    uint32_t dcdb_address;
-   uint32_t reserved3;
+   uint16_t reserved3;
+   uint8_t  segment_4G;
+   uint8_t  enhanced_sg;
    uint32_t ccsar;
    uint32_t cccr;
 } IPS_DCDB_CMD, *PIPS_DCDB_CMD;
@@ -963,7 +994,20 @@ typedef struct {
 typedef struct ips_sglist {
    uint32_t address;
    uint32_t length;
-} IPS_SG_LIST, *PIPS_SG_LIST;
+} IPS_STD_SG_LIST;
+
+typedef struct ips_enh_sglist {
+   uint32_t address_lo;
+   uint32_t address_hi;
+   uint32_t length;
+   uint32_t reserved;
+} IPS_ENH_SG_LIST;
+
+typedef union {
+   void             *list;
+   IPS_STD_SG_LIST  *std_list;
+   IPS_ENH_SG_LIST  *enh_list;
+} IPS_SG_LIST;
 
 typedef struct _IPS_INFOSTR {
    char *buffer;
@@ -1063,6 +1107,7 @@ typedef struct ips_ha {
    char              *ioctl_data;         /* IOCTL data area            */
    uint32_t           ioctl_datasize;     /* IOCTL data size            */
    uint32_t           cmd_in_progress;    /* Current command in progress*/
+   int                flags;              /*                            */
    uint8_t            waitflag;           /* are we waiting for cmd     */
    uint8_t            active;
    int                ioctl_reset;        /* IOCTL Requested Reset Flag */
@@ -1110,7 +1155,7 @@ typedef struct ips_scb {
    uint32_t          sg_len;
    uint32_t          flags;
    uint32_t          op_code;
-   IPS_SG_LIST      *sg_list;
+   IPS_SG_LIST       sg_list;
    Scsi_Cmnd        *scsi_cmd;
    struct ips_scb   *q_next;
    ips_scb_callback  callback;
