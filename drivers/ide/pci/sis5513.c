@@ -703,7 +703,6 @@ static int sis5513_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	/* Config chip for mode */
 	switch(speed) {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_UDMA_6:
 		case XFER_UDMA_5:
 		case XFER_UDMA_4:
@@ -745,7 +744,6 @@ static int sis5513_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 		case XFER_SW_DMA_1:
 		case XFER_SW_DMA_0:
 			break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		case XFER_PIO_4: return((int) config_chipset_for_pio(drive, 4));
 		case XFER_PIO_3: return((int) config_chipset_for_pio(drive, 3));
 		case XFER_PIO_2: return((int) config_chipset_for_pio(drive, 2));
@@ -764,7 +762,6 @@ static void sis5513_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) config_chipset_for_pio(drive, pio);
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * ((id->hw_config & 0x4000|0x2000) && (HWIF(drive)->udma_four))
  */
@@ -834,8 +831,6 @@ static int sis5513_config_xfer_rate (ide_drive_t *drive)
 	config_art_rwp_pio(drive, 5);
 	return sis5513_config_drive_xfer_rate(drive);
 }
-
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /* Chip detection and general config */
 static unsigned int __init init_chipset_sis5513 (struct pci_dev *dev, const char *name)
@@ -999,7 +994,6 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!host_dev)
 		return;
 
@@ -1013,7 +1007,6 @@ static void __init init_hwif_sis5513 (ide_hwif_t *hwif)
 	}
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif
 	return;
 }
 

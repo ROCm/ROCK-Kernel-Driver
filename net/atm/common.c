@@ -287,7 +287,7 @@ int atm_connect_vcc(struct atm_vcc *vcc,int itf,short vpi,int vci)
 	if (vpi != ATM_VPI_UNSPEC && vci != ATM_VCI_UNSPEC)
 		clear_bit(ATM_VF_PARTIAL,&vcc->flags);
 	else if (test_bit(ATM_VF_PARTIAL,&vcc->flags)) return -EINVAL;
-	printk(KERN_DEBUG "atm_connect (TX: cl %d,bw %d-%d,sdu %d; "
+	DPRINTK("atm_connect (TX: cl %d,bw %d-%d,sdu %d; "
 	    "RX: cl %d,bw %d-%d,sdu %d,AAL %s%d)\n",
 	    vcc->qos.txtp.traffic_class,vcc->qos.txtp.min_pcr,
 	    vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu,

@@ -153,11 +153,17 @@ static struct miscdevice our_mouse = {
 __init ourmouse_init(void)
 {
 
-        if(check_region(OURMOUSE_BASE, 3))
+        if (request_region(OURMOUSE_BASE, 3, "ourmouse") < 0) {
+		printk(KERN_ERR "ourmouse: request_region failed.\n");
                 return -ENODEV;
-        request_region(OURMOUSE_BASE, 3, "ourmouse");
+	}
 
-        misc_register(&amp;our_mouse);
+        if (misc_register(&amp;our_mouse) < 0) {
+		printk(KERN_ERR "ourmouse: cannot register misc device.\n");
+		release_region(OURMOUSE_BASE, 3);
+		return -EBUSY;
+	}
+
         return 0;
 }
   </programlisting>
@@ -177,18 +183,20 @@ __init ourmouse_init(void)
     so it is a good idea to obtain a current copy of this file first.
   </para>
   <para>
-    Our code then is fairly simple. We check nobody else has taken our 
-    address space. Having done so we reserve it to ensure nobody stamps 
-    on our device while probing for other ISA bus devices. Such a probe 
-    might confuse our device.
+    Our code then is fairly simple. We reserve our I/O address space with
+    request_region, checking to make sure that it succeeded (i.e. the
+    space wasn't reserved by anyone else). 
   </para>
   <para>
-    Then we tell the misc driver that we wish to own a minor number. We also
+    Then we ask the misc driver to allocate our minor device number. We also
     hand it our name (which is used in 
     <filename class="directory">/proc/misc</filename>) and a set of file 
     operations that are to be used. The file operations work exactly like the 
     file operations you would register for a normal character device. The misc 
     device itself is simply acting as a redirector for requests.
+    Since misc_register can fail, it is important to check for failure
+    and act accordingly (which in the case of a mouse driver is to abort,
+    since you can't use the mouse without a working device node).
   </para>
   <para>
     Next, in order to be able to use and test our code we need to add some 

@@ -2090,14 +2090,14 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 #if defined(DEBUG) || defined(DEBUG_MMAP)
 		printk("SNDCTL_DSP_SETTRIGGER 0x%x\n", val);
 #endif
-		if( !(val & PCM_ENABLE_INPUT) && dmabuf->enable == ADC_RUNNING) {
+		if((file->f_mode & FMODE_READ) && !(val & PCM_ENABLE_INPUT) && dmabuf->enable == ADC_RUNNING) {
 			stop_adc(state);
 		}
-		if( !(val & PCM_ENABLE_OUTPUT) && dmabuf->enable == DAC_RUNNING) {
+		if((file->f_mode & FMODE_WRITE) && !(val & PCM_ENABLE_OUTPUT) && dmabuf->enable == DAC_RUNNING) {
 			stop_dac(state);
 		}
 		dmabuf->trigger = val;
-		if(val & PCM_ENABLE_OUTPUT && !(dmabuf->enable & DAC_RUNNING)) {
+		if((file->f_mode & FMODE_WRITE) && (val & PCM_ENABLE_OUTPUT) && !(dmabuf->enable & DAC_RUNNING)) {
 			if (!dmabuf->write_channel) {
 				dmabuf->ready = 0;
 				dmabuf->write_channel = state->card->alloc_pcm_channel(state->card);
@@ -2118,7 +2118,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 			} else
 				start_dac(state);
 		}
-		if(val & PCM_ENABLE_INPUT && !(dmabuf->enable & ADC_RUNNING)) {
+		if((file->f_mode & FMODE_READ) && (val & PCM_ENABLE_INPUT) && !(dmabuf->enable & ADC_RUNNING)) {
 			if (!dmabuf->read_channel) {
 				dmabuf->ready = 0;
 				dmabuf->read_channel = state->card->alloc_rec_pcm_channel(state->card);
@@ -3134,6 +3134,7 @@ static int __init i810_init_module (void)
 
 	printk(KERN_INFO "Intel 810 + AC97 Audio, version "
 	       DRIVER_VERSION ", " __TIME__ " " __DATE__ "\n");
+	printk(KERN_WARNING "This driver is deprecated, please use the ALSA drivers.\n");
 
 	if (!pci_register_driver(&i810_pci_driver)) {
 		pci_unregister_driver(&i810_pci_driver);

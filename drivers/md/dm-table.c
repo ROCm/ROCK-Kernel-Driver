@@ -146,6 +146,25 @@ static int setup_btree_index(int l, struct dm_table *t)
 	return 0;
 }
 
+static void *dm_vcalloc(unsigned long nmemb, unsigned long elem_size)
+{
+	unsigned long size;
+	void *addr;
+
+	/*
+	 * Check that we're not going to overflow.
+	 */
+	if (nmemb > (ULONG_MAX / elem_size))
+		return NULL;
+
+	size = nmemb * elem_size;
+	addr = vmalloc(size);
+	if (addr)
+		memset(addr, 0, size);
+
+	return addr;
+}
+
 /*
  * highs, and targets are managed as dynamic arrays during a
  * table load.
@@ -159,9 +178,8 @@ static int alloc_targets(struct dm_table *t, int num)
 	/*
 	 * Allocate both the target array and offset array at once.
 	 */
-	n_highs = (sector_t *) vcalloc(sizeof(struct dm_target) +
-				       sizeof(sector_t),
-				       num);
+	n_highs = (sector_t *) dm_vcalloc(sizeof(struct dm_target) +
+					  sizeof(sector_t), num);
 	if (!n_highs)
 		return -ENOMEM;
 
@@ -624,7 +642,7 @@ static int setup_indexes(struct dm_table *t)
 		total += t->counts[i];
 	}
 
-	indexes = (sector_t *) vcalloc(total, (unsigned long) NODE_SIZE);
+	indexes = (sector_t *) dm_vcalloc(total, (unsigned long) NODE_SIZE);
 	if (!indexes)
 		return -ENOMEM;
 

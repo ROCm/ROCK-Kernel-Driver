@@ -1412,24 +1412,6 @@ static int do_idedisk_standby (ide_drive_t *drive)
 	return call_idedisk_standby(drive, 0);
 }
 
-static int call_idedisk_suspend (ide_drive_t *drive, int arg)
-{
-	ide_task_t args;
-	u8 suspend = (arg) ? WIN_SLEEPNOW2 : WIN_SLEEPNOW1;
-	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_COMMAND_OFFSET]	= suspend;
-	args.command_type			= ide_cmd_type_parser(&args);
-	return ide_raw_taskfile(drive, &args, NULL);
-}
-
-static int do_idedisk_suspend (ide_drive_t *drive)
-{
-	if (drive->suspend_reset)
-		return 1;
-
-	return call_idedisk_suspend(drive, 0);
-}
-
 #if 0
 static int call_idedisk_checkpower (ide_drive_t *drive, int arg)
 {
@@ -1455,13 +1437,6 @@ static int do_idedisk_checkpower (ide_drive_t *drive)
 	return call_idedisk_checkpower(drive, 0);
 }
 #endif
-
-static int do_idedisk_resume (ide_drive_t *drive)
-{
-	if (!drive->suspend_reset)
-		return 1;
-	return 0;
-}
 
 static int do_idedisk_flushcache (ide_drive_t *drive)
 {
@@ -1561,6 +1536,39 @@ static void idedisk_add_settings(ide_drive_t *drive)
 #endif
 }
 
+static int idedisk_suspend(struct device *dev, u32 state, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+
+	printk("Suspending device %p\n", dev->driver_data);
+
+	/* I hope that every freeze operation from the upper levels have
+	 * already been done...
+	 */
+
+	if (level != SUSPEND_SAVE_STATE)
+		return 0;
+
+	/* set the drive to standby */
+	printk(KERN_INFO "suspending: %s ", drive->name);
+	do_idedisk_standby(drive);
+	drive->blocked = 1;
+
+	BUG_ON (HWGROUP(drive)->handler);
+	return 0;
+}
+
+static int idedisk_resume(struct device *dev, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+
+	if (level != RESUME_RESTORE_STATE)
+		return 0;
+	BUG_ON(!drive->blocked);
+	drive->blocked = 0;
+	return 0;
+}
+
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -1641,10 +1649,8 @@ static void idedisk_setup (ide_drive_t *drive)
 
 	printk(", CHS=%d/%d/%d", 
 	       drive->bios_cyl, drive->bios_head, drive->bios_sect);
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) HWIF(drive)->ide_dma_verbose(drive);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 
 	drive->mult_count = 0;
@@ -1671,6 +1677,7 @@ static int idedisk_cleanup (ide_drive_t *drive)
 {
 	struct gendisk *g = drive->disk;
 
+	do_idedisk_standby(drive);
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
 		if (do_idedisk_flushcache(drive))
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
@@ -1696,9 +1703,6 @@ static ide_driver_t idedisk_driver = {
 	.supports_dma		= 1,
 	.supports_dsc_overlap	= 0,
 	.cleanup		= idedisk_cleanup,
-	.standby		= do_idedisk_standby,
-	.suspend		= do_idedisk_suspend,
-	.resume			= do_idedisk_resume,
 	.flushcache		= do_idedisk_flushcache,
 	.do_request		= do_rw_disk,
 	.sense			= idedisk_dump_status,
@@ -1709,6 +1713,10 @@ static ide_driver_t idedisk_driver = {
 	.proc			= idedisk_proc,
 	.attach			= idedisk_attach,
 	.drives			= LIST_HEAD_INIT(idedisk_driver.drives),
+	.gen_driver		= {
+		.suspend	= idedisk_suspend,
+		.resume		= idedisk_resume,
+	}
 };
 
 static int idedisk_open(struct inode *inode, struct file *filp)
@@ -1835,8 +1843,7 @@ static void __exit idedisk_exit (void)
 
 static int idedisk_init (void)
 {
-	ide_register_driver(&idedisk_driver);
-	return 0;
+	return ide_register_driver(&idedisk_driver);
 }
 
 module_init(idedisk_init);

@@ -1885,14 +1885,14 @@ static u32 bios_tab[] in2000__INITDATA = {
 	0
 };
 
-static const unsigned short base_tab[] in2000__INITDATA = {
+static unsigned short base_tab[] in2000__INITDATA = {
 	0x220,
 	0x200,
 	0x110,
 	0x100,
 };
 
-static const int int_tab[] in2000__INITDATA = {
+static int int_tab[] in2000__INITDATA = {
 	15,
 	14,
 	11,

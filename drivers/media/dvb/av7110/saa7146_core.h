@@ -1,17 +1,11 @@
 #ifndef __SAA7146_CORE__
 #define __SAA7146_CORE__
 
-#include <asm/io.h>		/* definitions of u32 etc. */
-#include "../dvb-core/dvbdev.h"
+#include <asm/io.h>
+#include <asm/semaphore.h>
 
-#if LINUX_VERSION_CODE < 0x020300
-#define DECLARE_MUTEX(foo)         struct semaphore foo = MUTEX
-#define DECLARE_MUTEX_LOCKED(foo)  struct semaphore foo = MUTEX_LOCKED
-#define WAIT_QUEUE                 struct wait_queue*
-#define init_waitqueue_head(wq)    *(wq) = NULL;
-#else
-#define WAIT_QUEUE                 wait_queue_head_t
-#endif
+#include "dvbdev.h"
+
 
 /* maximum number of capture frames we support */
 #define SAA7146_MAX_BUF		5
@@ -37,11 +31,12 @@ struct saa7146 {
         char			name[32];	/* give it a nice name */
 
 	struct list_head	list_head;
-
-	dvb_adapter_t		*dvb_adapter;
-	struct dvb_i2c_bus	*i2c_bus;	
 	struct pci_dev		*device;
 	int 			card_type;
+
+	struct dvb_adapter	*dvb_adapter;
+	struct dvb_i2c_bus	*i2c_bus;
+	struct semaphore	i2c_sem;
 
 	void*			  data[SAA7146_MAX_EXTENSIONS];	/* data hooks for extensions */
 
@@ -70,8 +65,8 @@ struct saa7146 {
 	int grab_format[SAA7146_MAX_BUF];	/* video format of grabs */
 	int grab_port[SAA7146_MAX_BUF];		/* video port for grab */
 
-        WAIT_QUEUE rps0_wq;                /* rps0 interrupt queue (=> capture) */
-        WAIT_QUEUE rps1_wq;                /* rps1 interrupt queue (=> i2c, ...) */
+        wait_queue_head_t rps0_wq;     /* rps0 interrupt queue (=> capture) */
+        wait_queue_head_t rps1_wq;     /* rps1 interrupt queue (=> i2c, ...) */
 };
 
 #define	SAA7146_IRQ_RPS0  

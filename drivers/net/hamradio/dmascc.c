@@ -235,6 +235,8 @@ struct scc_priv {
   int state;
   unsigned long tx_start;
   int rr0;
+  spinlock_t *register_lock;	/* Per scc_info */
+  spinlock_t ring_lock;
 };
 
 struct scc_info {
@@ -243,6 +245,7 @@ struct scc_info {
   struct net_device dev[2];
   struct scc_priv priv[2];
   struct scc_info *next;
+  spinlock_t register_lock;	/* Per device register lock */
 };
 
 
@@ -371,7 +374,7 @@ int __init dmascc_init(void) {
   /* Cards found = 0 */
   n = 0;
   /* Warning message */
-  if (!io[0]) printk("dmascc: autoprobing (dangerous)\n");
+  if (!io[0]) printk(KERN_INFO "dmascc: autoprobing (dangerous)\n");
 
   /* Run autodetection for each card type */
   for (h = 0; h < NUM_TYPES; h++) {
@@ -456,7 +459,7 @@ int __init dmascc_init(void) {
   if (n) return 0;
 
   /* If no adapter found, return error */
-  printk("dmascc: no adapters found\n");
+  printk(KERN_INFO "dmascc: no adapters found\n");
   return -EIO;
 }
 
@@ -475,18 +478,21 @@ int __init setup_adapter(int card_base, int type, int n) {
   /* Allocate memory */
   info = kmalloc(sizeof(struct scc_info), GFP_KERNEL | GFP_DMA);
   if (!info) {
-    printk("dmascc: could not allocate memory for %s at %#3x\n",
+    printk(KERN_ERR "dmascc: could not allocate memory for %s at %#3x\n",
 	   hw[type].name, card_base);
     return -1;
   }
 
   /* Initialize what is necessary for write_scc and write_scc_data */
   memset(info, 0, sizeof(struct scc_info));
+  spin_lock_init(&info->register_lock);
+  
   priv = &info->priv[0];
   priv->type = type;
   priv->card_base = card_base;
   priv->scc_cmd = scc_base + SCCA_CMD;
   priv->scc_data = scc_base + SCCA_DATA;
+  priv->register_lock = &info->register_lock;
 
   /* Reset SCC */
   write_scc(priv, R9, FHWRES | MIE | NV);
@@ -510,7 +516,6 @@ int __init setup_adapter(int card_base, int type, int n) {
   write_scc(priv, R15, 0);
 
   /* Start IRQ auto-detection */
-  sti();
   irqs = probe_irq_on();
 
   /* Enable interrupts */
@@ -543,7 +548,7 @@ int __init setup_adapter(int card_base, int type, int n) {
   }
 
   if (irq <= 0) {
-    printk("dmascc: could not find irq of %s at %#3x (irq=%d)\n",
+    printk(KERN_ERR "dmascc: could not find irq of %s at %#3x (irq=%d)\n",
 	   hw[type].name, card_base, irq);
     kfree(info);
     return -1;
@@ -558,6 +563,8 @@ int __init setup_adapter(int card_base, int type, int n) {
     priv->dev = dev;
     priv->info = info;
     priv->channel = i;
+    spin_lock_init(&priv->ring_lock);
+    priv->register_lock = &info->register_lock;
     priv->card_base = card_base;
     priv->scc_cmd = scc_base + (i ? SCCB_CMD : SCCA_CMD);
     priv->scc_data = scc_base + (i ? SCCB_DATA : SCCA_DATA);
@@ -594,7 +601,7 @@ int __init setup_adapter(int card_base, int type, int n) {
     memcpy(dev->dev_addr, ax25_test, 7);
     rtnl_lock();
     if (register_netdevice(dev)) {
-      printk("dmascc: could not register %s\n", dev->name);
+      printk(KERN_ERR "dmascc: could not register %s\n", dev->name);
     }
     rtnl_unlock();
   }
@@ -603,7 +610,7 @@ int __init setup_adapter(int card_base, int type, int n) {
 
   info->next = first;
   first = info;
-  printk("dmascc: found %s (%s) at %#3x, irq %d\n", hw[type].name,
+  printk(KERN_INFO "dmascc: found %s (%s) at %#3x, irq %d\n", hw[type].name,
 	 chipnames[chip], card_base, irq);
   return 0;
 }
@@ -623,13 +630,12 @@ static void write_scc(struct scc_priv *priv, int reg, int val) {
     outb_p(val, priv->scc_cmd);
     return;
   default:
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(priv->register_lock, flags);
     outb_p(0, priv->card_base + PI_DREQ_MASK);
     if (reg) outb_p(reg, priv->scc_cmd);
     outb_p(val, priv->scc_cmd);
     outb(1, priv->card_base + PI_DREQ_MASK);
-    restore_flags(flags);
+    spin_unlock_irqrestore(priv->register_lock, flags);
     return;
   }
 }
@@ -647,12 +653,11 @@ static void write_scc_data(struct scc_priv *priv, int val, int fast) {
   default:
     if (fast) outb_p(val, priv->scc_data);
     else {
-      save_flags(flags);
-      cli();
+      spin_lock_irqsave(priv->register_lock, flags);
       outb_p(0, priv->card_base + PI_DREQ_MASK);
       outb_p(val, priv->scc_data);
       outb(1, priv->card_base + PI_DREQ_MASK);
-      restore_flags(flags);
+      spin_unlock_irqrestore(priv->register_lock, flags);
     }
     return;
   }
@@ -670,13 +675,12 @@ static int read_scc(struct scc_priv *priv, int reg) {
     if (reg) outb_p(reg, priv->scc_cmd);
     return inb_p(priv->scc_cmd);
   default:
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(&priv->register_lock, flags);
     outb_p(0, priv->card_base + PI_DREQ_MASK);
     if (reg) outb_p(reg, priv->scc_cmd);
     rc = inb_p(priv->scc_cmd);
     outb(1, priv->card_base + PI_DREQ_MASK);
-    restore_flags(flags);
+    spin_unlock_irqrestore(priv->register_lock, flags);
     return rc;
   }
 }
@@ -691,12 +695,11 @@ static int read_scc_data(struct scc_priv *priv) {
   case TYPE_TWIN:
     return inb_p(priv->scc_data);
   default:
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(priv->register_lock, flags);
     outb_p(0, priv->card_base + PI_DREQ_MASK);
     rc = inb_p(priv->scc_data);
     outb(1, priv->card_base + PI_DREQ_MASK);
-    restore_flags(flags);
+    spin_unlock_irqrestore(priv->register_lock, flags);
     return rc;
   }
 }
@@ -905,9 +908,8 @@ static int scc_send_packet(struct sk_buff *skb, struct net_device *dev) {
   priv->tx_len[i] = skb->len-1;
 
   /* Clear interrupts while we touch our circular buffers */
-  save_flags(flags);
-  cli();
 
+  spin_lock_irqsave(&priv->ring_lock, flags);
   /* Move the ring buffer's head */
   priv->tx_head = (i + 1) % NUM_TX_BUF;
   priv->tx_count++;
@@ -928,7 +930,7 @@ static int scc_send_packet(struct sk_buff *skb, struct net_device *dev) {
   }
 
   /* Turn interrupts back on and free buffer */
-  restore_flags(flags);
+  spin_unlock_irqrestore(&priv->ring_lock, flags);
   dev_kfree_skb(skb);
 
   return 0;
@@ -951,6 +953,7 @@ static int scc_set_mac_address(struct net_device *dev, void *sa) {
 static void scc_isr(int irq, void *dev_id, struct pt_regs * regs) {
   struct scc_info *info = dev_id;
 
+  spin_lock(info->priv[0].register_lock);
   /* At this point interrupts are enabled, and the interrupt under service
      is already acknowledged, but masked off.
 
@@ -978,6 +981,7 @@ static void scc_isr(int irq, void *dev_id, struct pt_regs * regs) {
       }
     }
   } else z8530_isr(info);
+  spin_unlock(info->priv[0].register_lock);
 }
 
 
@@ -1002,7 +1006,7 @@ static inline void z8530_isr(struct scc_info *info) {
     i++;
   }
   if (i < 0) {
-    printk("dmascc: stuck in ISR with RR3=0x%02x.\n", is);
+    printk(KERN_ERR "dmascc: stuck in ISR with RR3=0x%02x.\n", is);
   }
   /* Ok, no interrupts pending from this 8530. The INT line should
      be inactive now. */
@@ -1099,11 +1103,9 @@ static void rx_bh(void *arg) {
   struct sk_buff *skb;
   unsigned char *data;
 
-  save_flags(flags);
-  cli();
-
+  spin_lock_irqsave(&priv->ring_lock, flags);
   while (priv->rx_count) {
-    restore_flags(flags);
+    spin_unlock_irqrestore(&priv->ring_lock, flags);
     cb = priv->rx_len[i];
     /* Allocate buffer */
     skb = dev_alloc_skb(cb+1);
@@ -1123,14 +1125,12 @@ static void rx_bh(void *arg) {
       priv->stats.rx_packets++;
       priv->stats.rx_bytes += cb;
     }
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(&priv->ring_lock, flags);
     /* Move tail */
     priv->rx_tail = i = (i + 1) % NUM_RX_BUF;
     priv->rx_count--;
   }
-
-  restore_flags(flags);
+  spin_unlock_irqrestore(&priv->ring_lock, flags);
 }
 
 
@@ -1319,12 +1319,11 @@ static inline void tx_on(struct scc_priv *priv) {
     else
       write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | WT_RDY_ENAB);
     /* Write first byte(s) */
-    save_flags(flags);
-    cli();
+    spin_lock_irqsave(priv->register_lock, flags);
     for (i = 0; i < n; i++)
       write_scc_data(priv, priv->tx_buf[priv->tx_tail][i], 1);
     enable_dma(priv->param.dma);
-    restore_flags(flags);
+    spin_unlock_irqrestore(priv->register_lock, flags);
   } else {
     write_scc(priv, R15, TxUIE);
     write_scc(priv, R1, EXT_INT_ENAB | WT_FN_RDYFN | TxINT_ENAB);

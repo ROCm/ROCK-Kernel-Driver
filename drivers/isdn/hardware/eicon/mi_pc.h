@@ -65,7 +65,7 @@
 #define _MP_LED1         0x04        /* 1 = on      */
 #define _MP_DSP_RESET    0x02        /* active lo   */
 #define _MP_RISC_RESET   0x81        /* active hi, bit 7 for compatibility with old boards */
-/* CPU exeption context structure in MP shared ram after trap */
+/* CPU exception context structure in MP shared ram after trap */
 typedef struct mp_xcptcontext_s MP_XCPTC;
 struct mp_xcptcontext_s {
     dword       sr;

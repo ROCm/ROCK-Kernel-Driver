@@ -126,7 +126,7 @@ extern void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
 extern void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
 extern void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * cmnd);
 extern void orc_interrupt(ORC_HCS * hcsp);
-extern int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target, unsigned int ResetFlags);
+extern int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target);
 extern int orc_reset_scsi_bus(ORC_HCS * pHCB);
 extern int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb);
 extern int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt);
@@ -514,7 +514,7 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+static int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 {
 	register ORC_SCB *pSCB;
 	ORC_HCS *pHCB;		/* Point to Host adapter control block */
@@ -541,7 +541,7 @@ int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int inia100_abort(Scsi_Cmnd * SCpnt)
+static int inia100_abort(Scsi_Cmnd * SCpnt)
 {
 	ORC_HCS *hcsp;
 
@@ -557,15 +557,25 @@ int inia100_abort(Scsi_Cmnd * SCpnt)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-int inia100_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
 	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	return orc_reset_scsi_bus(pHCB);
+}
 
-	if (reset_flags & (SCSI_RESET_SUGGEST_BUS_RESET | SCSI_RESET_SUGGEST_HOST_RESET))
-		return orc_reset_scsi_bus(pHCB);
-	else
-		return orc_device_reset(pHCB, SCpnt, SCpnt->target, reset_flags);
+/*****************************************************************************
+ Function name  : inia100_device_reset
+ Description    : Reset the device
+ Input          : pHCB  -       Pointer to host adapter structure
+ Output         : None.
+ Return         : pSRB  -       Pointer to SCSI request block.
+*****************************************************************************/
+static int inia100_device_reset(Scsi_Cmnd * SCpnt)
+{				/* I need Host Control Block Information */
+	ORC_HCS *pHCB;
+	pHCB = (ORC_HCS *) SCpnt->host->hostdata;
+	return orc_device_reset(pHCB, SCpnt, SCpnt->target);
 
 }
 
@@ -648,41 +658,6 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 	return;
 }
 
-/*****************************************************************************
- Function name  : inia100_biosparam
- Description    : Return the "logical geometry"
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-int inia100_biosparam(struct scsi_device *sdev, struct block_device *bdev,
-		sector_t capacity, int *info_array)
-{
-	ORC_HCS *pHcb;		/* Point to Host adapter control block */
-	ORC_TCS *pTcb;
-
-	pHcb = (ORC_HCS *) sdev->host->hostdata;
-	pTcb = &pHcb->HCS_Tcs[sdev->id];
-
-	if (pTcb->TCS_DrvHead) {
-		info_array[0] = pTcb->TCS_DrvHead;
-		info_array[1] = pTcb->TCS_DrvSector;
-		info_array[2] = (unsigned long)capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
-	} else {
-		if (pTcb->TCS_DrvFlags & TCF_DRV_255_63) {
-			info_array[0] = 255;
-			info_array[1] = 63;
-			info_array[2] = (unsigned long)capacity / 255 / 63;
-		} else {
-			info_array[0] = 64;
-			info_array[1] = 32;
-			info_array[2] = capacity >> 11;
-		}
-	}
-	return 0;
-}
-
-
 /*
  * Interrupt handler (main routine of the driver)
  */
@@ -710,7 +685,7 @@ static void inia100_panic(char *msg)
 /*
  * Release ressources
  */
-int inia100_release(struct Scsi_Host *hreg)
+static int inia100_release(struct Scsi_Host *hreg)
 {
 	ORC_HCS *pHCB = (ORC_HCS *)hreg->hostdata;
 

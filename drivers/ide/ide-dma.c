@@ -90,6 +90,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
+#define CONFIG_IDEDMA_NEW_DRIVE_LISTINGS
 #ifdef CONFIG_IDEDMA_NEW_DRIVE_LISTINGS
 
 struct drive_list_entry {
@@ -145,11 +146,20 @@ struct drive_list_entry drive_blacklist [] = {
 
 };
 
-int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
+/**
+ *	in_drive_list	-	look for drive in black/white list
+ *	@id: drive identifier
+ *	@drive_table: list to inspect
+ *
+ *	Look for a drive in the blacklist and the whitelist tables
+ *	Returns 1 if the drive is found in the table.
+ */
+
+static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
 {
 	for ( ; drive_table->id_model ; drive_table++)
 		if ((!strcmp(drive_table->id_model, id->model)) &&
-		    ((!strstr(drive_table->id_firmware, id->fw_rev)) ||
+		    ((strstr(drive_table->id_firmware, id->fw_rev)) ||
 		     (!strcmp(drive_table->id_firmware, "ALL"))))
 			return 1;
 	return 0;
@@ -189,9 +199,14 @@ const char *bad_dma_drives[] = {"WDC AC11000H",
 
 #endif /* CONFIG_IDEDMA_NEW_DRIVE_LISTINGS */
 
-/*
- * dma_intr() is the handler for disk read/write DMA interrupts
+/**
+ *	ide_dma_intr	-	IDE DMA interrupt handler
+ *	@drive: the drive the interrupt is for
+ *
+ *	Handle an interrupt completing a read/write DMA transfer on an 
+ *	IDE device
  */
+ 
 ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 {
 	u8 stat = 0, dma_stat = 0;
@@ -205,7 +220,7 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 			DRIVER(drive)->end_request(drive, 1, rq->nr_sectors);
 			return ide_stopped;
 		}
-		printk("%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
+		printk(KERN_ERR "%s: dma_intr: bad DMA status (dma_stat=%x)\n", 
 		       drive->name, dma_stat);
 	}
 	return DRIVER(drive)->error(drive, "dma_intr", stat);
@@ -213,6 +228,17 @@ ide_startstop_t ide_dma_intr (ide_drive_t *drive)
 
 EXPORT_SYMBOL_GPL(ide_dma_intr);
 
+/**
+ *	ide_build_sglist	-	map IDE scatter gather for DMA I/O
+ *	@drive: the drive to build the DMA table for
+ *	@rq: the request holding the sg list
+ *
+ *	Perform the PCI mapping magic neccessary to access the source or
+ *	target buffers of a request via PCI DMA. The lower layers of the
+ *	kernel provide the neccessary cache management so that we can
+ *	operate in a portable fashion
+ */
+ 
 static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -232,6 +258,17 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
+/**
+ *	ide_raw_build_sglist	-	map IDE scatter gather for DMA
+ *	@drive: the drive to build the DMA table for
+ *	@rq: the request holding the sg list
+ *
+ *	Perform the PCI mapping magic neccessary to access the source or
+ *	target buffers of a taskfile request via PCI DMA. The lower layers 
+ *	of the  kernel provide the neccessary cache management so that we can
+ *	operate in a portable fashion
+ */
+ 
 static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -246,6 +283,9 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 	else
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 #if 1
+	if (sector_count > 256)
+		BUG();
+		
 	if (sector_count > 128) {
 		memset(&sg[nents], 0, sizeof(*sg));
 		sg[nents].page = virt_to_page(virt_addr);
@@ -279,11 +319,18 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
-/*
- * ide_build_dmatable() prepares a dma request.
- * Returns 0 if all went okay, returns 1 otherwise.
- * May also be invoked from trm290.c
+/**
+ *	ide_build_dmatable	-	build IDE DMA table
+ *
+ *	ide_build_dmatable() prepares a dma request. We map the command
+ *	to get the pci bus addresses of the buffers and then build up
+ *	the PRD table that the IDE layer wants to be fed. The code
+ *	knows about the 64K wrap bug in the CS5530.
+ *
+ *	Returns 0 if all went okay, returns 1 otherwise.
+ *	May also be invoked from trm290.c
  */
+ 
 int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
@@ -317,7 +364,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 
 		while (cur_len) {
 			if (count++ >= PRD_ENTRIES) {
-				printk("%s: DMA table too small\n", drive->name);
+				printk(KERN_ERR "%s: DMA table too small\n", drive->name);
 				goto use_pio_instead;
 			} else {
 				u32 xcount, bcount = 0x10000 - (cur_addr & 0xffff);
@@ -335,7 +382,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 	 * So here we break the 64KB entry into two 32KB entries instead.
 	 */
 					if (count++ >= PRD_ENTRIES) {
-						printk("%s: DMA table too small\n", drive->name);
+						printk(KERN_ERR "%s: DMA table too small\n", drive->name);
 						goto use_pio_instead;
 					}
 					*table++ = cpu_to_le32(0x8000);
@@ -357,7 +404,7 @@ int ide_build_dmatable (ide_drive_t *drive, struct request *rq)
 			*--table |= cpu_to_le32(0x80000000);
 		return count;
 	}
-	printk("%s: empty DMA table?\n", drive->name);
+	printk(KERN_ERR "%s: empty DMA table?\n", drive->name);
 use_pio_instead:
 	pci_unmap_sg(hwif->pci_dev,
 		     hwif->sg_table,
@@ -369,7 +416,17 @@ use_pio_instead:
 
 EXPORT_SYMBOL_GPL(ide_build_dmatable);
 
-/* Teardown mappings after DMA has completed.  */
+/**
+ *	ide_destroy_dmatable	-	clean up DMA mapping
+ *	@drive: The drive to unmap
+ *
+ *	Teardown mappings after DMA has completed. This must be called
+ *	after the completion of each use of ide_build_dmatable and before
+ *	the next use of ide_build_dmatable. Failure to do so will cause
+ *	an oops as only one mapping can be live for each target at a given
+ *	time.
+ */
+ 
 void ide_destroy_dmatable (ide_drive_t *drive)
 {
 	struct pci_dev *dev = HWIF(drive)->pci_dev;
@@ -382,6 +439,17 @@ void ide_destroy_dmatable (ide_drive_t *drive)
 
 EXPORT_SYMBOL_GPL(ide_destroy_dmatable);
 
+/**
+ *	config_drive_for_dma	-	attempt to activate IDE DMA
+ *	@drive: the drive to place in DMA mode
+ *
+ *	If the drive supports at least mode 2 DMA or UDMA of any kind
+ *	then attempt to place it into DMA mode. Drives that are known to
+ *	support DMA but predate the DMA properties or that are known
+ *	to have DMA handling bugs are also set up appropriately based
+ *	on the good/bad drive lists.
+ */
+ 
 static int config_drive_for_dma (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
@@ -415,15 +483,25 @@ static int config_drive_for_dma (ide_drive_t *drive)
 	return hwif->ide_dma_off_quietly(drive);
 }
 
-/*
- * 1 dmaing, 2 error, 4 intr
+/**
+ *	dma_timer_expiry	-	handle a DMA timeout
+ *	@drive: Drive that timed out
+ *
+ *	An IDE DMA transfer timed out. In the event of an error we ask
+ *	the driver to resolve the problem, if a DMA transfer is still
+ *	in progress we continue to wait (arguably we need to add a 
+ *	secondary 'I dont care what the drive thinks' timeout here)
+ *	Finally if we have an interrupt but for some reason got the
+ *	timeout first we complete the I/O. This can occur if an 
+ *	interrupt is lost or due to bugs.
  */
+ 
 static int dma_timer_expiry (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	u8 dma_stat		= hwif->INB(hwif->dma_status);
 
-	printk("%s: dma_timer_expiry: dma status == 0x%02x\n",
+	printk(KERN_WARNING "%s: dma_timer_expiry: dma status == 0x%02x\n",
 		drive->name, dma_stat);
 
 	if ((dma_stat & 0x18) == 0x18)	/* BUSY Stupid Early Timer !! */
@@ -431,6 +509,8 @@ static int dma_timer_expiry (ide_drive_t *drive)
 
 	HWGROUP(drive)->expiry = NULL;	/* one free ride for now */
 
+	/* 1 dmaing, 2 error, 4 intr */
+	
 	if (dma_stat & 2) {	/* ERROR */
 		(void) hwif->ide_dma_end(drive);
 		return DRIVER(drive)->error(drive,
@@ -445,6 +525,14 @@ static int dma_timer_expiry (ide_drive_t *drive)
 	return 0;
 }
 
+/**
+ *	__ide_dma_host_off	-	Generic DMA kill
+ *	@drive: drive to control
+ *
+ *	Perform the generic IDE controller DMA off operation. This
+ *	works for most IDE bus mastering controllers
+ */
+
 int __ide_dma_host_off (ide_drive_t *drive)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
@@ -456,6 +544,13 @@ int __ide_dma_host_off (ide_drive_t *drive)
 }
 
 EXPORT_SYMBOL(__ide_dma_host_off);
+
+/**
+ *	__ide_dma_host_off_quietly	-	Generic DMA kill
+ *	@drive: drive to control
+ *
+ *	Turn off the current DMA on this IDE controller. 
+ */
 
 int __ide_dma_off_quietly (ide_drive_t *drive)
 {
@@ -473,14 +568,30 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_off_quietly);
 
+/**
+ *	__ide_dma_host_off	-	Generic DMA kill
+ *	@drive: drive to control
+ *
+ *	Turn off the current DMA on this IDE controller. Inform the
+ *	user that DMA has been disabled. 
+ */
+
 int __ide_dma_off (ide_drive_t *drive)
 {
-	printk("%s: DMA disabled\n", drive->name);
+	printk(KERN_INFO "%s: DMA disabled\n", drive->name);
 	return HWIF(drive)->ide_dma_off_quietly(drive);
 }
 
 EXPORT_SYMBOL(__ide_dma_off);
 
+/**
+ *	__ide_dma_host_on	-	Enable DMA on a host
+ *	@drive: drive to enable for DMA
+ *
+ *	Enable DMA on an IDE controller following generic bus mastering
+ *	IDE controller behaviour
+ */
+ 
 int __ide_dma_host_on (ide_drive_t *drive)
 {
 	if (drive->using_dma) {
@@ -496,6 +607,13 @@ int __ide_dma_host_on (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_host_on);
 
+/**
+ *	__ide_dma_on		-	Enable DMA on a device
+ *	@drive: drive to enable DMA on
+ *
+ *	Enable IDE DMA for a device on this IDE controller.
+ */
+ 
 int __ide_dma_on (ide_drive_t *drive)
 {
 	drive->using_dma = 1;
@@ -512,6 +630,13 @@ int __ide_dma_on (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_on);
 
+/**
+ *	__ide_dma_check		-	check DMA setup
+ *	@drive: drive to check
+ *
+ *	Don't use - due for extermination
+ */
+ 
 int __ide_dma_check (ide_drive_t *drive)
 {
 	return config_drive_for_dma(drive);
@@ -519,6 +644,21 @@ int __ide_dma_check (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_check);
 
+/**
+ *	ide_start_dma	-	begin a DMA phase
+ *	@hwif: interface
+ *	@drive: target device
+ *	@reading: set if reading, clear if writing
+ *
+ *	Build an IDE DMA PRD (IDE speak for scatter gather table)
+ *	and then set up the DMA transfer registers for a device
+ *	that follows generic IDE PCI DMA behaviour. Controllers can
+ *	override this function if they need to
+ *
+ *	Returns 0 on success. If a PIO fallback is required then 1
+ *	is returned. 
+ */
+ 
 int ide_start_dma(ide_hwif_t *hwif, ide_drive_t *drive, int reading)
 {
 	struct request *rq = HWGROUP(drive)->rq;
@@ -566,6 +706,10 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
 	command = (lba48) ? WIN_READDMA_EXT : WIN_READDMA;
+	
+	if (drive->vdma)
+		command = (lba48) ? WIN_READ_EXT: WIN_READ;
+		
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
@@ -600,6 +744,9 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
 	command = (lba48) ? WIN_WRITEDMA_EXT : WIN_WRITEDMA;
+	if (drive->vdma)
+		command = (lba48) ? WIN_WRITE_EXT: WIN_WRITE;
+		
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
 		ide_task_t *args = rq->special;
 		command = args->tfRegister[IDE_COMMAND_OFFSET];
@@ -791,9 +938,17 @@ int __ide_dma_verbose (ide_drive_t *drive)
 
 EXPORT_SYMBOL(__ide_dma_verbose);
 
+/**
+ *	__ide_dma_retune	-	default retune handler
+ *	@drive: drive to retune
+ *
+ *	Default behaviour when we decide to return the IDE DMA setup.
+ *	The default behaviour is "we don't"
+ */
+ 
 int __ide_dma_retune (ide_drive_t *drive)
 {
-	printk("%s: chipset supported call only\n", __FUNCTION__);
+	printk(KERN_WARNING "%s: chipset supported call only\n", __FUNCTION__);
 	return 1;
 }
 
@@ -809,7 +964,7 @@ EXPORT_SYMBOL(__ide_dma_lostirq);
 
 int __ide_dma_timeout (ide_drive_t *drive)
 {
-	printk("%s: timeout waiting for DMA\n", drive->name);
+	printk(KERN_ERR "%s: timeout waiting for DMA\n", drive->name);
 	if (HWIF(drive)->ide_dma_test_irq(drive))
 		return 0;
 
@@ -882,7 +1037,7 @@ int ide_allocate_dma_engine (ide_hwif_t *hwif)
 	if ((hwif->dmatable_cpu) && (hwif->sg_table))
 		return 0;
 
-	printk("%s: -- Error, unable to allocate%s%s table(s).\n",
+	printk(KERN_ERR "%s: -- Error, unable to allocate%s%s table(s).\n",
 		(hwif->dmatable_cpu == NULL) ? " CPU" : "",
 		(hwif->sg_table == NULL) ?  " SG DMA" : " DMA",
 		hwif->cds->name);
@@ -893,7 +1048,7 @@ int ide_allocate_dma_engine (ide_hwif_t *hwif)
 
 int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
-	printk("    %s: MMIO-DMA at 0x%08lx-0x%08lx",
+	printk(KERN_INFO "    %s: MMIO-DMA at 0x%08lx-0x%08lx",
 		hwif->name, base, base + ports - 1);
 	if (check_mem_region(base, ports)) {
 		printk(" -- Error, MMIO ports already in use.\n");
@@ -905,7 +1060,11 @@ int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 		request_region(base+16, hwif->cds->extra, hwif->cds->name);
 		hwif->dma_extra = hwif->cds->extra;
 	}
-	hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	
+	if(hwif->mate)
+		hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	else
+		hwif->dma_master = base;
 	if (hwif->dma_base2) {
 		if (!check_mem_region(hwif->dma_base2, ports))
 			request_mem_region(hwif->dma_base2, ports, hwif->name);
@@ -915,7 +1074,7 @@ int ide_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 
 int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
-	printk("    %s: BM-DMA at 0x%04lx-0x%04lx",
+	printk(KERN_INFO "    %s: BM-DMA at 0x%04lx-0x%04lx",
 		hwif->name, base, base + ports - 1);
 	if (!request_region(base, ports, hwif->name)) {
 		printk(" -- Error, ports in use.\n");
@@ -926,7 +1085,11 @@ int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 		request_region(base+16, hwif->cds->extra, hwif->cds->name);
 		hwif->dma_extra = hwif->cds->extra;
 	}
-	hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	
+	if(hwif->mate)
+		hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	else
+		hwif->dma_master = base;
 	if (hwif->dma_base2) {
 		if (!request_region(hwif->dma_base2, ports, hwif->name))
 		{

@@ -39,14 +39,14 @@
 
 #define DVB_DEMUX_MASK_MAX 18
 
-typedef struct dvb_demux_filter_s {
+struct dvb_demux_filter {
         dmx_section_filter_t filter;
         u8 maskandmode    [DMX_MAX_FILTER_SIZE]; 
         u8 maskandnotmode [DMX_MAX_FILTER_SIZE]; 
 	int doneq;
 		
-        struct dvb_demux_filter_s *next;
-        struct dvb_demux_feed_s *feed;
+        struct dvb_demux_filter *next;
+        struct dvb_demux_feed *feed;
         int index;
         int state;
         int type;
@@ -56,11 +56,10 @@ typedef struct dvb_demux_filter_s {
         u16 hw_handle;
         struct timer_list timer;
 	int ts_state;
+};
 
-        //u16 pid;  //to be removed
-} dvb_demux_filter_t;
 
-typedef struct dvb_demux_feed_s {
+struct dvb_demux_feed {
         union {
 	        dmx_ts_feed_t ts;
 	        dmx_section_feed_t sec;
@@ -71,7 +70,7 @@ typedef struct dvb_demux_feed_s {
 	        dmx_section_cb sec;
 	} cb;
 
-        struct dvb_demux_s *demux;
+        struct dvb_demux *demux;
         int type;
         int state;
         u16 pid;
@@ -81,7 +80,7 @@ typedef struct dvb_demux_feed_s {
         int check_crc;
 
         struct timespec timeout; 
-        dvb_demux_filter_t *filter;
+        struct dvb_demux_filter *filter;
         int cb_length;
   
         int ts_type;
@@ -93,42 +92,43 @@ typedef struct dvb_demux_feed_s {
         int cc;
 
         u16 peslen;
-} dvb_demux_feed_t;
+};
 
-typedef struct dvb_demux_s {
+struct dvb_demux {
         dmx_demux_t dmx;
         void *priv;
         int filternum;
         int feednum;
-        int (*start_feed)(dvb_demux_feed_t *);
-        int (*stop_feed)(dvb_demux_feed_t *);
-        int (*write_to_decoder)(dvb_demux_feed_t *, u8 *, size_t);
+        int (*start_feed)(struct dvb_demux_feed *);
+        int (*stop_feed)(struct dvb_demux_feed *);
+        int (*write_to_decoder)(struct dvb_demux_feed *, u8 *, size_t);
 
   
         int users;
 #define MAX_DVB_DEMUX_USERS 10
-        dvb_demux_filter_t *filter;
-        dvb_demux_feed_t *feed;
+        struct dvb_demux_filter *filter;
+        struct dvb_demux_feed *feed;
 
         struct list_head frontend_list;
 
-        dvb_demux_feed_t *pesfilter[DMX_TS_PES_OTHER];
+        struct dvb_demux_feed *pesfilter[DMX_TS_PES_OTHER];
         u16 pids[DMX_TS_PES_OTHER];
         int playing; 
         int recording; 
 
 #define DMX_MAX_PID 0x2000
-        dvb_demux_feed_t *pid2feed[DMX_MAX_PID+1];
+        struct dvb_demux_feed *pid2feed[DMX_MAX_PID+1];
         u8 tsbuf[188];
         int tsbufp;
 
 	struct semaphore mutex;
 	spinlock_t lock;
-} dvb_demux_t;
+};
 
 
-int DvbDmxInit(dvb_demux_t *dvbdemux);
-int DvbDmxRelease(dvb_demux_t *dvbdemux);
-void DvbDmxSWFilterPackets(dvb_demux_t *dvbdmx, const u8 *buf, int count);
+int dvb_dmx_init(struct dvb_demux *dvbdemux);
+int dvb_dmx_release(struct dvb_demux *dvbdemux);
+void dvb_dmx_swfilter_packet(struct dvb_demux *dvbdmx, const u8 *buf);
+void dvb_dmx_swfilter_packets(struct dvb_demux *dvbdmx, const u8 *buf, int count);
 
 #endif /* _DVB_DEMUX_H_ */

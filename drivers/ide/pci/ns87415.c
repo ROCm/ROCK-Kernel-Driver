@@ -83,7 +83,6 @@ static void ns87415_selectproc (ide_drive_t *drive)
 	ns87415_prepare_drive (drive, drive->using_dma);
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int ns87415_ide_dma_end (ide_drive_t *drive)
 {
 	ide_hwif_t      *hwif = HWIF(drive);
@@ -132,7 +131,6 @@ static int ns87415_ide_dma_check (ide_drive_t *drive)
 		return HWIF(drive)->ide_dma_off_quietly(drive);
 	return __ide_dma_check(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 {
@@ -209,7 +207,6 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 	if (!hwif->dma_base)
 		return;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->OUTB(0x60, hwif->dma_status);
 	hwif->ide_dma_read = &ns87415_ide_dma_read;
 	hwif->ide_dma_write = &ns87415_ide_dma_write;
@@ -220,7 +217,6 @@ static void __init init_hwif_ns87415 (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_ns87415 (ide_hwif_t *hwif, unsigned long dmabase)

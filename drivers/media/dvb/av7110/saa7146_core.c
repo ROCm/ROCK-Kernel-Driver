@@ -33,8 +33,8 @@
 #include "saa7146_core.h"
 #include "saa7146_v4l.h"
 #include "av7110.h"
-#include "../dvb-core/compat.h"
-#include "../dvb-core/dvb_i2c.h"
+#include "compat.h"
+#include "dvb_i2c.h"
 
 /* insmod parameter: here you can specify the number of video-buffers
    to be allocated. for simple capturing 2 buffers (double-buffering)
@@ -197,23 +197,23 @@ static
 int do_master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 {
 	struct saa7146 *a = i2c->data;
-	int result, count;
+	int count;
 	int i = 0;
 	
 	dprintk(KERN_ERR "saa7146_core.o: master_xfer called, num:%d\n",num);
 
 	/* prepare the message(s), get number of u32s to transfer */
 	count = prepare(msgs, num, a->i2c);
-	if ( 0 > count ) {
-		hprintk(KERN_ERR "saa7146_core.o: master_xfer: could not prepare i2c-message\n");
+
+	if (count < 0) {
+		hprintk(KERN_ERR "saa7146_core.o: could not prepare i2c-message\n");
 		return -EIO;
 	}
 
 	/* reset the i2c-device if necessary */
-	result = i2c_reset( a );
-	if ( 0 > result ) {
-		hprintk(KERN_ERR "saa7146_core.o: master_xfer: could not reset i2c-bus\n");
-		return result;
+	if (i2c_reset(a) < 0) {
+		hprintk(KERN_ERR "saa7146_core.o: could not reset i2c-bus\n");
+		return -EIO;
 	}	
 
 	for(i = 0; i < count; i++) {
@@ -222,31 +222,17 @@ int do_master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 		 * we do not start the whole rps1-engine...
 		 */
 
-		result = i2c_write_out( a, &a->i2c[i],
-					SAA7146_I2C_TIMEOUT );
-
-		if ( 0 != result) {
 			/* if address-error occured, don't retry */
-			if ( result == -EREMOTEIO )
-			{
-				hprintk(KERN_ERR "saa7146_core.o: master_xfer: error in address phase\n");
-				return result;
-			}
-			hprintk(KERN_ERR "saa7146_core.o: master_xfer: error transferring, trying again\n");
-			break;
-		}
+		if (i2c_write_out(a, &a->i2c[i], SAA7146_I2C_TIMEOUT) < 0) {
+			hprintk (KERN_ERR "saa7146_core.o: "
+				"i2c error in address phase\n");
+			return -EREMOTEIO;
 	}
-
-	/* see if an error occured & the last retry failed */
-	if (0 != result) {
-		hprintk(KERN_ERR "saa7146_core.o: master_xfer: could not transfer i2c-message\n");
-		return -EIO;
 	}
 
 	/* if any things had to be read, get the results */
-	result = clean_up(msgs, num, a->i2c);
-	if ( 0 > result ) {
-		hprintk(KERN_ERR "saa7146_core.o: master_xfer: could not cleanup\n");
+	if (clean_up(msgs, num, a->i2c) < 0) {
+		hprintk(KERN_ERR "saa7146_core.o: i2c cleanup failed!\n");
 		return -EIO;
 	}
 
@@ -259,12 +245,18 @@ int do_master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 static
 int master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 {
+	struct saa7146 *saa = i2c->data;
 	int retries = SAA7146_I2C_RETRIES;
 	int ret;
+
+	if (down_interruptible (&saa->i2c_sem))
+		return -ERESTARTSYS;
 
 	do {
 		ret = do_master_xfer (i2c, msgs, num);
 	} while (ret != num && retries--);
+
+	up (&saa->i2c_sem);
 
 	return ret;
 }
@@ -273,6 +265,8 @@ int master_xfer (struct dvb_i2c_bus *i2c, struct i2c_msg msgs[], int num)
 /* registering functions to load algorithms at runtime */
 int i2c_saa7146_add_bus (struct saa7146 *saa)
 {
+	init_MUTEX(&saa->i2c_sem);
+
 	/* enable i2c-port pins */
 	saa7146_write (saa->mem, MC1, (MASK_08 | MASK_24));
 
@@ -389,9 +383,9 @@ static int saa7146_core_command (struct dvb_i2c_bus *i2c, unsigned int cmd, void
 		
 			struct saa7146_debi_transfer *dt = arg;
 
-			printk("saa7146_core.o: SAA7146_DEBI_TRANSFER\n");
-			printk("saa7146_core.o: timeout:%d, swap:%d, slave16:%d, increment:%d, intel:%d, tien:%d\n", dt->timeout, dt->swap, dt->slave16, dt->increment, dt->intel, dt->tien);
-			printk("saa7146_core.o: address:0x%04x, num_bytes:%d, direction:%d, mem:0x%08x\n",dt->address,dt->address,dt->direction,dt->mem);						
+			dprintk("saa7146_core.o: SAA7146_DEBI_TRANSFER\n");
+			dprintk("saa7146_core.o: timeout:%d, swap:%d, slave16:%d, increment:%d, intel:%d, tien:%d\n", dt->timeout, dt->swap, dt->slave16, dt->increment, dt->intel, dt->tien);
+			dprintk("saa7146_core.o: address:0x%04x, num_bytes:%d, direction:%d, mem:0x%08x\n",dt->address,dt->address,dt->direction,dt->mem);						
 
 			debi_transfer(saa, dt);
 			break;
@@ -622,7 +616,7 @@ int configure_saa7146 (struct saa7146 *saa)
 	}
 	
 	/* print status message */
-    	printk(KERN_ERR "saa7146_core.o: %s: bus:%d, rev:%d, mem:0x%08x.\n", saa->name, saa->device->bus->number, saa->revision, (unsigned int) saa->mem);
+    	dprintk("saa7146_core.o: %s: bus:%d, rev:%d, mem:0x%08x.\n", saa->name, saa->device->bus->number, saa->revision, (unsigned int) saa->mem);
 
 	/* enable bus-mastering */
  	pci_set_master( saa->device );
@@ -827,7 +821,7 @@ static
 int __devinit saa7146_init_one (struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
-	struct dvb_adapter_s *adap;
+	struct dvb_adapter *adap;
 	struct saa7146 *saa;
 	int card_type;
 	struct card_info *cinfo= (struct card_info *) ent->driver_data;

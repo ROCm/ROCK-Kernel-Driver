@@ -584,8 +584,6 @@ running once the system is up.
 
 	sound=		[SOUND]
 
-	soundmodem=	[HW,AX25,SOUND] Use sound card as packet radio modem.
-
 	specialix=	[HW,SERIAL] Specialix multi-serial port adapter.
 
 	sscape=		[HW,SOUND]

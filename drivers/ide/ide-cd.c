@@ -2965,10 +2965,8 @@ int ide_cdrom_probe_capabilities (ide_drive_t *drive)
 
 	printk(", %dkB Cache", be16_to_cpu(cap.buffer_size));
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (drive->using_dma)
 		(void) HWIF(drive)->ide_dma_verbose(drive);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 	printk("\n");
 
 	return nslots;

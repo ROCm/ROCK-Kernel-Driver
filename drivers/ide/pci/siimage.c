@@ -205,7 +205,6 @@ static int siimage_tune_chipset (ide_drive_t *drive, byte xferspeed)
 			siimage_tuneproc(drive, (speed - XFER_PIO_0));
 			mode |= ((unit) ? 0x10 : 0x01);
 			break;
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case XFER_MW_DMA_2:
 		case XFER_MW_DMA_1:
 		case XFER_MW_DMA_0:
@@ -226,7 +225,6 @@ static int siimage_tune_chipset (ide_drive_t *drive, byte xferspeed)
 			mode |= ((unit) ? 0x30 : 0x03);
 			config_siimage_chipset_for_pio(drive, 0);
 			break;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 		default:
 			return 1;
 	}
@@ -246,7 +244,6 @@ static int siimage_tune_chipset (ide_drive_t *drive, byte xferspeed)
 	return (ide_config_drive_speed(drive, speed));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 static int config_chipset_for_dma (ide_drive_t *drive)
 {
 	u8 speed	= ide_dma_speed(drive, siimage_ratemask(drive));
@@ -256,7 +253,7 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	if ((!(speed)))
 		return 0;
 
-	if (HWIF(drive)->speedproc(drive, speed))
+	if (ide_set_xfer_rate(drive, speed))
 		return 0;
 
 	if (!drive->init_speed)
@@ -392,7 +389,6 @@ static int siimage_mmio_ide_dma_verbose (ide_drive_t *drive)
 #endif
 	return temp;
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 static int siimage_busproc (ide_drive_t * drive, int state)
 {
@@ -811,7 +807,6 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 	if (hwif->pci_dev->device != PCI_DEVICE_ID_SII_3112)
 		hwif->atapi_dma = 1;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_check = &siimage_config_drive_for_dma;
 	if (!(hwif->udma_four))
 		hwif->udma_four = ata66_siimage(hwif);
@@ -827,7 +822,6 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_siimage (ide_hwif_t *hwif, unsigned long dmabase)

@@ -216,7 +216,6 @@ static u8 hpt3xx_ratemask (ide_drive_t *drive)
 
 static u8 hpt3xx_ratefilter (ide_drive_t *drive, u8 speed)
 {
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 	u8 mode			= hpt3xx_ratemask(drive);
 
@@ -264,9 +263,6 @@ static u8 hpt3xx_ratefilter (ide_drive_t *drive, u8 speed)
 			break;
 	}
 	return speed;
-#else
-	return min(speed, (u8)XFER_PIO_4);
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static int check_in_drive_lists (ide_drive_t *drive, const char **list)
@@ -297,7 +293,7 @@ static void hpt366_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 {
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 	u8 speed		= hpt3xx_ratefilter(drive, xferspeed);
-//	u8 speed	= ide_rate_filter(hpt3xx_ratemask(drive), xferspeed);
+//	u8 speed		= ide_rate_filter(hpt3xx_ratemask(drive), xferspeed);
 	u8 regtime		= (drive->select.b.unit & 0x01) ? 0x44 : 0x40;
 	u8 regfast		= (HWIF(drive)->channel) ? 0x55 : 0x51;
 	u8 drive_fast		= 0;
@@ -444,7 +440,6 @@ static void hpt3xx_tune_drive (ide_drive_t *drive, u8 pio)
 	(void) hpt3xx_tune_chipset(drive, (XFER_PIO_0 + pio));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * This allows the configuration of ide_pci chipset registers
  * for cards that learn about the drive's UDMA, DMA, PIO capabilities
@@ -654,7 +649,6 @@ static int hpt374_ide_dma_end (ide_drive_t *drive)
 		pci_write_config_byte(dev, mscreg, msc_stat|0x30);
 	return __ide_dma_end(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * Since SUN Cobalt is attempting to do this operation, I should disclose
@@ -1030,7 +1024,6 @@ static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
 	hwif->ultra_mask = 0x7f;
 	hwif->mwdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!(hwif->udma_four))
 		hwif->udma_four = ((ata66 & regmask) ? 0 : 1);
 	hwif->ide_dma_check = &hpt366_config_drive_xfer_rate;
@@ -1053,7 +1046,6 @@ static void __init init_hwif_hpt366 (ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static void __init init_dma_hpt366 (ide_hwif_t *hwif, unsigned long dmabase)

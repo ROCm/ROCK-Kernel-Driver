@@ -1068,7 +1068,6 @@ ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct h
 		case DISABLE_SEAGATE:
 		case EXABYTE_ENABLE_NEST:
 			return &task_no_data_intr;
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case WIN_READDMA:
 	//	case WIN_READDMA_ONCE:
 		case WIN_IDENTIFY_DMA:
@@ -1080,7 +1079,6 @@ ide_handler_t * ide_handler_parser (struct hd_drive_task_hdr *taskfile, struct h
 		case WIN_WRITEDMA_QUEUED:
 		case WIN_WRITEDMA_EXT:
 		case WIN_WRITEDMA_QUEUED_EXT:
-#endif
 		case WIN_FORMAT:
 		case WIN_INIT:
 		case WIN_DEVICE_RESET:
@@ -1164,7 +1162,6 @@ int ide_cmd_type_parser (ide_task_t *args)
 				default:
 					return IDE_DRIVE_TASK_NO_DATA;
 			}
-#ifdef CONFIG_BLK_DEV_IDEDMA
 		case WIN_READDMA:
 	//	case WIN_READDMA_ONCE:
 		case WIN_IDENTIFY_DMA:
@@ -1178,7 +1175,6 @@ int ide_cmd_type_parser (ide_task_t *args)
 		case WIN_WRITEDMA_EXT:
 		case WIN_WRITEDMA_QUEUED_EXT:
 			return IDE_DRIVE_TASK_RAW_WRITE;
-#endif
 		case WIN_SETFEATURES:
 			switch(args->tfRegister[IDE_FEATURE_OFFSET]) {
 				case SETFEATURES_EN_8BIT:
@@ -1669,8 +1665,7 @@ int ide_cmd_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 
 	if (!err && xfer_rate) {
 		/* active-retuning-calls future */
-		if ((HWIF(drive)->speedproc) != NULL)
-			HWIF(drive)->speedproc(drive, xfer_rate);
+		ide_set_xfer_rate(drive, xfer_rate);
 		ide_driveid_update(drive);
 	}
 abort:
@@ -1724,8 +1719,7 @@ abort:
 
 	if (!err && xfer_rate) {
 		/* active-retuning-calls future */
-		if ((HWIF(drive)->speedproc) != NULL)
-			HWIF(drive)->speedproc(drive, xfer_rate);
+		ide_set_xfer_rate(driver, xfer_rate);
 		ide_driveid_update(drive);
 	}
 abort:

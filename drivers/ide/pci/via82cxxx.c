@@ -383,8 +383,6 @@ static void via82cxxx_tune_drive(ide_drive_t *drive, u8 pio)
 	via_set_drive(drive, XFER_PIO_0 + MIN(pio, 5));
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
-
 /**
  *	via82cxxx_ide_dma_check		-	set up for DMA if possible
  *	@drive: IDE drive to set up
@@ -410,8 +408,6 @@ static int via82cxxx_ide_dma_check (ide_drive_t *drive)
 		return HWIF(drive)->ide_dma_on(drive);
 	return HWIF(drive)->ide_dma_off_quietly(drive);
 }
-
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /**
  *	init_chipset_via82cxxx	-	initialization handler
@@ -608,7 +604,6 @@ static void __init init_hwif_via82cxxx(ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x07;
 	hwif->swdma_mask = 0x07;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	if (!(hwif->udma_four))
 		hwif->udma_four = ((via_enabled & via_80w) >> hwif->channel) & 1;
 	hwif->ide_dma_check = &via82cxxx_ide_dma_check;
@@ -616,7 +611,6 @@ static void __init init_hwif_via82cxxx(ide_hwif_t *hwif)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 /**

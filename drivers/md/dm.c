@@ -15,7 +15,7 @@
 #include <linux/slab.h>
 
 static const char *_name = DM_NAME;
-#define MAX_DEVICES 256
+#define MAX_DEVICES (1 << KDEV_MINOR_BITS)
 #define SECTOR_SHIFT 9
 
 static int major = 0;
@@ -41,8 +41,6 @@ struct deferred_io {
 
 struct mapped_device {
 	struct rw_semaphore lock;
-
-	kdev_t kdev;
 	atomic_t holders;
 
 	unsigned long flags;
@@ -485,13 +483,25 @@ static int dm_request(request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
+/*-----------------------------------------------------------------
+ * A bitset is used to keep track of allocated minor numbers.
+ *---------------------------------------------------------------*/
+static spinlock_t _minor_lock = SPIN_LOCK_UNLOCKED;
+static unsigned long _minor_bits[MAX_DEVICES / BITS_PER_LONG];
+
+static void free_minor(int minor)
+{
+	spin_lock(&_minor_lock);
+	clear_bit(minor, _minor_bits);
+	spin_unlock(&_minor_lock);
+}
+
 /*
  * See if the device with a specific minor # is free.
  */
-static int specific_dev(int minor, struct mapped_device *md)
+static int specific_minor(int minor)
 {
-	struct gendisk *disk;
-	int part;
+	int r = -EBUSY;
 
 	if (minor >= MAX_DEVICES) {
 		DMWARN("request for a mapped_device beyond MAX_DEVICES (%d)",
@@ -499,26 +509,27 @@ static int specific_dev(int minor, struct mapped_device *md)
 		return -EINVAL;
 	}
 
-	disk = get_gendisk(MKDEV(_major, minor), &part);
-	if (disk) {
-		put_disk(disk);
-		return -EBUSY;
-	}
+	spin_lock(&_minor_lock);
+	if (!test_and_set_bit(minor, _minor_bits))
+		r = minor;
+	spin_unlock(&_minor_lock);
 
-	return minor;
+	return r;
 }
 
-static int any_old_dev(struct mapped_device *md)
+static int next_free_minor(void)
 {
-	int i;
+	int minor, r = -EBUSY;
 
-	for (i = 0; i < MAX_DEVICES; i++)
-		if (specific_dev(i, md) >= 0) {
-			DMWARN("allocating minor = %d", i);
-			return i;
-		}
+	spin_lock(&_minor_lock);
+	minor = find_first_zero_bit(_minor_bits, MAX_DEVICES);
+	if (minor != MAX_DEVICES) {
+		set_bit(minor, _minor_bits);
+		r = minor;
+	}
+	spin_unlock(&_minor_lock);
 
-	return -EBUSY;
+	return r;
 }
 
 /*
@@ -534,15 +545,15 @@ static struct mapped_device *alloc_dev(int minor)
 	}
 
 	/* get a minor number for the dev */
-	minor = (minor < 0) ? any_old_dev(md) : specific_dev(minor, md);
+	minor = (minor < 0) ? next_free_minor() : specific_minor(minor);
 	if (minor < 0) {
 		kfree(md);
 		return NULL;
 	}
 
+	DMWARN("allocating minor %d.", minor);
 	memset(md, 0, sizeof(*md));
 	init_rwsem(&md->lock);
-	md->kdev = mk_kdev(_major, minor);
 	atomic_set(&md->holders, 1);
 
 	md->queue.queuedata = md;
@@ -550,6 +561,7 @@ static struct mapped_device *alloc_dev(int minor)
 
 	md->disk = alloc_disk(1);
 	if (!md->disk) {
+		free_minor(md->disk->first_minor);
 		kfree(md);
 		return NULL;
 	}
@@ -569,6 +581,7 @@ static struct mapped_device *alloc_dev(int minor)
 
 static void free_dev(struct mapped_device *md)
 {
+	free_minor(md->disk->first_minor);
 	del_gendisk(md->disk);
 	put_disk(md->disk);
 	kfree(md);
@@ -749,6 +762,10 @@ int dm_resume(struct mapped_device *md)
 	return 0;
 }
 
+/*
+ * The gendisk is only valid as long as you have a reference
+ * count on 'md'.
+ */
 struct gendisk *dm_disk(struct mapped_device *md)
 {
 	return md->disk;

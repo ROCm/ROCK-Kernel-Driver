@@ -54,7 +54,6 @@
 #include <linux/kmod.h>
 #include <linux/hdlcdrv.h>
 #include <linux/baycom.h>
-#include <linux/soundmodem.h>
 #if defined(CONFIG_AX25) || defined(CONFIG_AX25_MODULE)
 /* prototypes for ax25_encapsulate and ax25_rebuild_header */
 #include <net/ax25.h> 
@@ -1200,7 +1199,6 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct baycom_state *bc;
 	struct baycom_ioctl bi;
 	struct hdlcdrv_ioctl hi;
-	struct sm_ioctl si;
 
 	baycom_paranoia_check(dev, "baycom_ioctl", -EINVAL);
 	bc = (struct baycom_state *)dev->priv;
@@ -1208,28 +1206,6 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return -ENOIOCTLCMD;
 	if (get_user(cmd, (int *)ifr->ifr_data))
 		return -EFAULT;
-#ifdef BAYCOM_DEBUG
-	if (cmd == BAYCOMCTL_GETDEBUG) {
-		bi.data.dbg.debug1 = bc->ptt_keyed;
-		bi.data.dbg.debug2 = bc->debug_vals.last_intcnt;
-		bi.data.dbg.debug3 = bc->debug_vals.last_pllcorr;
-		bc->debug_vals.last_intcnt = 0;
-		if (copy_to_user(ifr->ifr_data, &bi, sizeof(bi)))
-			return -EFAULT;
-		return 0;
-	}
-	if (cmd == SMCTL_GETDEBUG) {
-                si.data.dbg.int_rate = bc->debug_vals.last_intcnt;
-                si.data.dbg.mod_cycles = bc->debug_vals.mod_cycles;
-                si.data.dbg.demod_cycles = bc->debug_vals.demod_cycles;
-                si.data.dbg.dma_residue = 0;
-                bc->debug_vals.mod_cycles = bc->debug_vals.demod_cycles = 0;
-		bc->debug_vals.last_intcnt = 0;
-                if (copy_to_user(ifr->ifr_data, &si, sizeof(si)))
-                        return -EFAULT;
-                return 0;
-	}
-#endif /* BAYCOM_DEBUG */
 
 	if (copy_from_user(&hi, ifr->ifr_data, sizeof(hi)))
 		return -EFAULT;

@@ -212,6 +212,19 @@ static void __devinit quirk_io_region(struct pci_dev *dev, unsigned region, unsi
 }	
 
 /*
+ *	ATI Northbridge setups MCE the processor if you even
+ *	read somewhere between 0x3b0->0x3bb or read 0x3d3
+ */
+ 
+static void __devinit quirk_ati_exploding_mce(struct pci_dev *dev)
+{
+	printk(KERN_INFO "ATI Northbridge, reserving I/O ports 0x3b0 to 0x3bb.\n");
+	/* Mae rhaid in i beidio a edrych ar y lleoliad I/O hyn */
+	request_region(0x3b0, 0x0C, "RadeonIGP");
+	request_region(0x3d3, 0x01, "RadeonIGP");
+}
+
+/*
  * Let's make the southbridge information explicit instead
  * of having to worry about people probing the ACPI areas,
  * for example.. (Yes, it happens, and if you read the wrong
@@ -313,6 +326,35 @@ static void __devinit quirk_via_ioapic(struct pci_dev *dev)
 	pci_write_config_byte (dev, 0x58, tmp);
 }
 
+/*
+ * The AMD io apic can hang the box when an apic irq is masked.
+ * We check all revs >= B0 (yet not in the pre production!) as the bug
+ * is currently marked NoFix
+ *
+ * We have multiple reports of hangs with this chipset that went away with
+ * noapic specified. For the moment we assume its the errata. We may be wrong
+ * of course. However the advice is demonstrably good even if so..
+ */
+ 
+static void __devinit quirk_amd_ioapic(struct pci_dev *dev)
+{
+	u8 rev;
+
+	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
+	if(rev >= 0x02)
+	{
+		printk(KERN_WARNING "I/O APIC: AMD Errata #22 may be present. In the event of instability try\n");
+		printk(KERN_WARNING "        : booting with the \"noapic\" option.\n");
+	}
+}
+
+static void __init quirk_ioapic_rmw(struct pci_dev *dev)
+{
+	if (dev->devfn == 0 && dev->bus->number == 0)
+		sis_apic_bug = 1;
+}
+
+
 #endif /* CONFIG_X86_IO_APIC */
 
 
@@ -412,28 +454,6 @@ static void __devinit quirk_cardbus_legacy(struct pci_dev *dev)
 }
 
 /*
- * The AMD io apic can hang the box when an apic irq is masked.
- * We check all revs >= B0 (yet not in the pre production!) as the bug
- * is currently marked NoFix
- *
- * We have multiple reports of hangs with this chipset that went away with
- * noapic specified. For the moment we assume its the errata. We may be wrong
- * of course. However the advice is demonstrably good even if so..
- */
- 
-static void __devinit quirk_amd_ioapic(struct pci_dev *dev)
-{
-	u8 rev;
-
-	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
-	if(rev >= 0x02)
-	{
-		printk(KERN_WARNING "I/O APIC: AMD Errata #22 may be present. In the event of instability try\n");
-		printk(KERN_WARNING "        : booting with the \"noapic\" option.\n");
-	}
-}
-
-/*
  * Following the PCI ordering rules is optional on the AMD762. I'm not
  * sure what the designers were smoking but let's not inhale...
  *
@@ -477,6 +497,24 @@ static void __devinit quirk_transparent_bridge(struct pci_dev *dev)
 }
 
 /*
+ * Common misconfiguration of the MediaGX/Geode PCI master that will
+ * reduce PCI bandwidth from 70MB/s to 25MB/s.  See the GXM/GXLV/GX1
+ * datasheets found at http://www.national.com/ds/GX for info on what
+ * these bits do.  <christer@weinigel.se>
+ */
+ 
+static void __init quirk_mediagx_master(struct pci_dev *dev)
+{
+	u8 reg;
+	pci_read_config_byte(dev, 0x41, &reg);
+	if (reg & 2) {
+		reg &= ~2;
+		printk(KERN_INFO "PCI: Fixup for MediaGX/Geode Slave Disconnect Boundary (0x41=0x%02x)\n", reg);
+                pci_write_config_byte(dev, 0x41, reg);
+	}
+}
+
+/*
  *  The main table of quirks.
  */
 
@@ -491,6 +529,7 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_0,	quirk_isa_dma_hangs },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C596,	quirk_isa_dma_hangs },
 	{ PCI_FIXUP_FINAL,      PCI_VENDOR_ID_INTEL,    PCI_DEVICE_ID_INTEL_82371SB_0,  quirk_isa_dma_hangs },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_NEC,	PCI_DEVICE_ID_NEC_CBUS_1,	quirk_isa_dma_hangs },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_S3,	PCI_DEVICE_ID_S3_868,		quirk_s3_64M },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_S3,	PCI_DEVICE_ID_S3_968,		quirk_s3_64M },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_INTEL, 	PCI_DEVICE_ID_INTEL_82437, 	quirk_triton }, 
@@ -521,6 +560,8 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 
 #ifdef CONFIG_X86_IO_APIC 
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686,	quirk_via_ioapic },
+	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_SIS,	PCI_ANY_ID,			quirk_ioapic_rmw },
 #endif
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C586_3,	quirk_via_acpi },
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_4,	quirk_via_acpi },
@@ -528,8 +569,8 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_5,	quirk_via_irqpic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_VIA,	PCI_DEVICE_ID_VIA_82C686_6,	quirk_via_irqpic },
 
-	{ PCI_FIXUP_FINAL, 	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_VIPER_7410,	quirk_amd_ioapic },
 	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_AMD,	PCI_DEVICE_ID_AMD_FE_GATE_700C, quirk_amd_ordering },
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_ATI,	PCI_DEVICE_ID_ATI_RADEON_IGP,   quirk_ati_exploding_mce },
 	/*
 	 * i82380FB mobile docking controller: its PCI-to-PCI bridge
 	 * is subtractive decoding (transparent), and does indicate this
@@ -537,6 +578,9 @@ static struct pci_fixup pci_fixups[] __devinitdata = {
 	 * instead of 0x01.
 	 */
 	{ PCI_FIXUP_HEADER,	PCI_VENDOR_ID_INTEL,	PCI_DEVICE_ID_INTEL_82380FB,	quirk_transparent_bridge },
+
+	{ PCI_FIXUP_FINAL,	PCI_VENDOR_ID_CYRIX,	PCI_DEVICE_ID_CYRIX_PCI_MASTER, quirk_mediagx_master },
+	
 
 	{ 0 }
 };

@@ -314,7 +314,7 @@ extern int zft_compressor_init(void);
 /*  Called by modules package when installing the driver or by kernel
  *  during the initialization phase
  */
-int __init zft_init(void)
+static int __init zft_init(void)
 {
 	int i;
 	TRACE_FUN(ft_t_flow);
@@ -392,27 +392,9 @@ KERN_INFO
 }
 
 
-#ifdef MODULE
-/* Called by modules package before trying to unload the module
- */
-static int can_unload(void)
-{
-	return (GET_USE_COUNT(THIS_MODULE)||zft_dirty()||test_bit(0,&busy_flag))?-EBUSY:0;
-}
-/* Called by modules package when installing the driver
- */
-int init_module(void)
-{
-	if (!mod_member_present(&__this_module, can_unload)) {
-		return -EBUSY;
-	}
-	__this_module.can_unload = can_unload;
-	return zft_init();
-}
-
 /* Called by modules package when removing the driver 
  */
-void cleanup_module(void)
+static void zft_exit(void)
 {
 	int i;
 	TRACE_FUN(ft_t_flow);
@@ -435,4 +417,5 @@ void cleanup_module(void)
 	TRACE_EXIT;
 }
 
-#endif /* MODULE */
+module_init(zft_init);
+module_exit(zft_exit);

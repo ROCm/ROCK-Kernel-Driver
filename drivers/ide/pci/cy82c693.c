@@ -123,10 +123,10 @@ static void compute_clocks (u8 pio, pio_clocks_t *p_pclk)
 	p_pclk->time_8 = (u8)clk1;
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 /*
  * set DMA mode a specific channel for CY82C693
  */
+
 static void cy82c693_dma_enable (ide_drive_t *drive, int mode, int single)
 {
 	u8 index = 0, data = 0;
@@ -213,7 +213,6 @@ int cy82c693_ide_dma_on (ide_drive_t *drive)
 	}
         return __ide_dma_on(drive);
 }
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 
 /*
  * tune ide drive - set PIO mode
@@ -405,13 +404,11 @@ void __init init_hwif_cy82c693(ide_hwif_t *hwif)
 	hwif->mwdma_mask = 0x04;
 	hwif->swdma_mask = 0x04;
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 	hwif->ide_dma_on = &cy82c693_ide_dma_on;
 	if (!noautodma)
 		hwif->autodma = 1;
 	hwif->drives[0].autodma = hwif->autodma;
 	hwif->drives[1].autodma = hwif->autodma;
-#endif /* CONFIG_BLK_DEV_IDEDMA */
 }
 
 static __initdata ide_hwif_t *primary;

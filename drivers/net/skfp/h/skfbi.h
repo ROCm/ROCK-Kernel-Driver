@@ -1308,7 +1308,7 @@
 #define IS_I2C_READY	(1L<<27)	/* Bit 27: (ML)	IRQ on end of I2C tx */
 #define IS_IRQ_SW	(1L<<26)	/* Bit 26: (ML)	SW forced IRQ	     */
 #define IS_EXT_REG	(1L<<25)	/* Bit 25: (ML) IRQ from external reg*/
-#define	IS_IRQ_STAT	(1L<<24)	/* Bit 24:	IRQ status execption */
+#define	IS_IRQ_STAT	(1L<<24)	/* Bit 24:	IRQ status exception */
 					/*   PERR, RMABORT, RTABORT DATAPERR */
 #define	IS_IRQ_MST_ERR	(1L<<23)	/* Bit 23:	IRQ master error     */
 					/*   RMABORT, RTABORT, DATAPERR	     */
@@ -1360,7 +1360,7 @@
 #define IRQ_I2C_READY	(1L<<27)	/* Bit 27: (ML)	IRQ on end of I2C tx */
 #define IRQ_SW		(1L<<26)	/* Bit 26: (ML)	SW forced IRQ	     */
 #define IRQ_EXT_REG	(1L<<25)	/* Bit 25: (ML) IRQ from external reg*/
-#define	IRQ_STAT	(1L<<24)	/* Bit 24:	IRQ status execption */
+#define	IRQ_STAT	(1L<<24)	/* Bit 24:	IRQ status exception */
 					/*   PERR, RMABORT, RTABORT DATAPERR */
 #define	IRQ_MST_ERR	(1L<<23)	/* Bit 23:	IRQ master error     */
 					/*   RMABORT, RTABORT, DATAPERR	     */

@@ -3344,6 +3344,9 @@ void i2o_report_status(const char *severity, const char *str, u32 *msg)
 	u16 detailed_status = msg[4]&0xFFFF;
 	struct i2o_handler *h = i2o_handlers[msg[2] & (MAX_I2O_MODULES-1)];
 
+	if (cmd == I2O_CMD_UTIL_EVT_REGISTER)
+		return;				// No status in this reply
+
 	printk("%s%s: ", severity, str);
 
 	if (cmd < 0x1F) 			// Utility cmd

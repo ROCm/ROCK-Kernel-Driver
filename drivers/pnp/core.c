@@ -164,7 +164,7 @@ static int __init pnp_init(void)
 	return bus_register(&pnp_bus_type);
 }
 
-core_initcall(pnp_init);
+subsys_initcall(pnp_init);
 
 EXPORT_SYMBOL(pnp_protocol_register);
 EXPORT_SYMBOL(pnp_protocol_unregister);

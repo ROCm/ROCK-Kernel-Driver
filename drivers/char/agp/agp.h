@@ -294,7 +294,14 @@ struct agp_bridge_data {
 #define I810_DRAM_ROW_0		0x00000001
 #define I810_DRAM_ROW_0_SDRAM	0x00000001
 
-
+/* Intel 7505 registers */
+#define INTEL_I7505_NAPBASELO	0x10
+#define INTEL_I7505_APSIZE	0x74
+#define INTEL_I7505_NCAPID	0x60
+#define INTEL_I7505_NISTAT	0x6c
+#define INTEL_I7505_ATTBASE	0x78
+#define INTEL_I7505_ERRSTS	0x42
+#define INTEL_I7505_AGPCTRL	0x70
 
 /* VIA register */
 #define VIA_APBASE	0x10

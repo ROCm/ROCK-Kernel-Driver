@@ -10,6 +10,7 @@
  *	Split the set up function into multiple functions
  *	Use pci_set_master
  *	Fix misreporting of I/O v MMIO problems
+ *	Initial fixups for simplex devices
  */
 
 /*
@@ -42,6 +43,8 @@
  *	based on io_base port if possible. Return the matching hwif,
  *	or a new hwif. If we find an error (clashing, out of devices, etc)
  *	return NULL
+ *
+ *	FIXME: we need to handle mmio matches here too
  */
 
 static ide_hwif_t *ide_match_hwif(unsigned long io_base, u8 bootable, const char *name)
@@ -144,34 +147,9 @@ static int ide_setup_pci_baseregs (struct pci_dev *dev, const char *name)
 			return -EOPNOTSUPP;
 		}
 	}
-
-#if 0
-	/*
-	 * At this point we have enabled the device, but may previously
-	 * have done a BAR4 enable alone. We should be prepared to assign
-	 * resources here.
-	 */
-	
-	/*
-	 * Setup base registers for IDE command/control
-	 * spaces for each interface:
-	 */
-	for (reg = 0; reg < 4; reg++) {
-		struct resource *res = dev->resource + reg;
-		if ((res->flags & IORESOURCE_IO) == 0)
-			continue;
-		if (!res->start) {
-			if(pci_assign_resource(dev, reg)) {
-				printk(KERN_ERR "%s: Missing I/O address #%d\n", name, reg);
-				return -ENXIO;
-			}
-		}
-	}
-#endif
 	return 0;
 }
 
-#ifdef CONFIG_BLK_DEV_IDEDMA
 #ifdef CONFIG_BLK_DEV_IDEDMA_FORCED
 /*
  * Long lost data from 2.0.34 that is now in 2.0.39
@@ -192,9 +170,6 @@ static int ide_setup_pci_baseregs (struct pci_dev *dev, const char *name)
  *	Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
  *	If need be we set up the DMA base. Where a device has a partner that
  *	is already in DMA mode we check and enforce IDE simplex rules.
- *
- *	FIXME: currently we are sometimes enforicng simplex when it is not
- *	needed. We fail the safe way but why is it occurring ??
  */
 
 static unsigned long __init ide_get_or_set_dma_base (ide_hwif_t *hwif)
@@ -274,7 +249,14 @@ second_chance_to_dma:
 				simplex_stat = hwif->INB(dma_base + 2);
 				if (simplex_stat & 0x80) {
 					/* simplex device? */
-					
+#if 0					
+/*
+ *	At this point we haven't probed the drives so we can't make the
+ *	appropriate decision. Really we should defer this problem
+ *	until we tune the drive then try to grab DMA ownership if we want
+ *	to be the DMA end. This has to be become dynamic to handle hot
+ *	plug.
+ */
 					/* Don't enable DMA on a simplex channel with no drives */
 					if (!hwif->drives[0].present && !hwif->drives[1].present)
 					{
@@ -283,7 +265,9 @@ second_chance_to_dma:
 						dma_base = 0;
 					}
 					/* If our other channel has DMA then we cannot */
-					else if(hwif->mate && hwif->mate->dma_base) 
+					else 
+#endif					
+					if(hwif->mate && hwif->mate->dma_base) 
 					{
 						printk(KERN_INFO "%s: simplex device: "
 							"DMA disabled\n",
@@ -295,9 +279,8 @@ second_chance_to_dma:
 	}
 	return dma_base;
 }
-#endif	/* CONFIG_BLK_DEV_IDEDMA */
 
-static void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
+void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
 {
 	if ((d->vendor != dev->vendor) && (d->device != dev->device)) {
 		printk(KERN_INFO "%s: unknown IDE controller at PCI slot "
@@ -308,6 +291,9 @@ static void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
 			d->name, dev->slot_name);
 	}
 }
+
+EXPORT_SYMBOL_GPL(ide_setup_pci_noise);
+
 
 /**
  *	ide_pci_enable	-	do PCI enables
@@ -414,8 +400,7 @@ static int ide_pci_check_iomem(struct pci_dev *dev, ide_pci_device_t *d, int bar
 			"<andre@linux-ide.org>.\n", d->name);
 	return -EINVAL;
 }
-	
-		
+
 /**
  *	ide_hwif_configure	-	configure an IDE interface
  *	@dev: PCI device holding interface
@@ -434,16 +419,19 @@ static ide_hwif_t *ide_hwif_configure(struct pci_dev *dev, ide_pci_device_t *d, 
 	unsigned long ctl = 0, base = 0;
 	ide_hwif_t *hwif;
 
-	/*  Possibly we should fail if these checks report true */
-	ide_pci_check_iomem(dev, d, 2*port);
-	ide_pci_check_iomem(dev, d, 2*port+1);
+	if(!d->isa_ports)
+	{
+		/*  Possibly we should fail if these checks report true */
+		ide_pci_check_iomem(dev, d, 2*port);
+		ide_pci_check_iomem(dev, d, 2*port+1);
  
-	ctl  = pci_resource_start(dev, 2*port+1);
-	base = pci_resource_start(dev, 2*port);
-	if ((ctl && !base) || (base && !ctl)) {
-		printk(KERN_ERR "%s: inconsistent baseregs (BIOS) "
-			"for port %d, skipping\n", d->name, port);
-		return NULL;
+		ctl  = pci_resource_start(dev, 2*port+1);
+		base = pci_resource_start(dev, 2*port);
+		if ((ctl && !base) || (base && !ctl)) {
+			printk(KERN_ERR "%s: inconsistent baseregs (BIOS) "
+				"for port %d, skipping\n", d->name, port);
+			return NULL;
+		}
 	}
 	if (!ctl)
 	{
@@ -500,8 +488,9 @@ static void ide_hwif_setup_dma(struct pci_dev *dev, ide_pci_device_t *d, ide_hwi
  			 * Set up BM-DMA capability
 			 * (PnP BIOS should have done this)
  			 */
-			if ((d->device != PCI_DEVICE_ID_CYRIX_5530_IDE)
-			    && (d->vendor != PCI_VENDOR_ID_CYRIX)) {
+			if (!((d->device == PCI_DEVICE_ID_CYRIX_5530_IDE && d->vendor == PCI_VENDOR_ID_CYRIX)
+			    ||(d->device == PCI_DEVICE_ID_NS_SCx200_IDE && d->vendor == PCI_VENDOR_ID_NS)))
+			{
 				/*
 				 * default DMA off if we had to
 				 * configure it here
@@ -575,6 +564,120 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	return ret;
 }
 
+/**
+ *	ide_pci_setup_ports	-	configure ports/devices on PCI IDE
+ *	@dev: PCI device
+ *	@d: IDE pci device info
+ *	@autodma: Should we enable DMA
+ *	@pciirq: IRQ line
+ *	@index: ata index to update
+ *
+ *	Scan the interfaces attached to this device and do any
+ *	neccessary per port setup. Attach the devices and ask the
+ *	generic DMA layer to do its work for us.
+ *
+ *	Normally called automaticall from do_ide_pci_setup_device,
+ *	but is also used directly as a helper function by some controllers
+ *	where the chipset setup is not the default PCI IDE one.
+ */
+ 
+void ide_pci_setup_ports(struct pci_dev *dev, ide_pci_device_t *d, int autodma, int pciirq, ata_index_t *index)
+{
+	int port;
+	int at_least_one_hwif_enabled = 0;
+	ide_hwif_t *hwif, *mate = NULL;
+	static int secondpdc = 0;
+	int drive0_tune, drive1_tune;
+	u8 tmp;
+
+	index->all = 0xf0f0;
+
+	/*
+	 * Set up the IDE ports
+	 */
+	 
+	for (port = 0; port <= 1; ++port) {
+		ide_pci_enablebit_t *e = &(d->enablebits[port]);
+	
+		/* 
+		 * If this is a Promise FakeRaid controller,
+		 * the 2nd controller will be marked as 
+		 * disabled while it is actually there and enabled
+		 * by the bios for raid purposes. 
+		 * Skip the normal "is it enabled" test for those.
+		 */
+		if (((d->vendor == PCI_VENDOR_ID_PROMISE) &&
+		     ((d->device == PCI_DEVICE_ID_PROMISE_20262) ||
+		      (d->device == PCI_DEVICE_ID_PROMISE_20265))) &&
+		    (secondpdc++==1) && (port==1))
+			goto controller_ok;
+			
+		if (e->reg && (pci_read_config_byte(dev, e->reg, &tmp) ||
+		    (tmp & e->mask) != e->val))
+			continue;	/* port not enabled */
+controller_ok:
+
+		if (d->channels	<= port)
+			break;
+	
+		if ((hwif = ide_hwif_configure(dev, d, mate, port, pciirq)) == NULL)
+			continue;
+
+		/* setup proper ancestral information */
+		hwif->gendev.parent = &dev->dev;
+
+		if (hwif->channel) {
+			index->b.high = hwif->index;
+		} else {
+			index->b.low = hwif->index;
+		}
+
+		
+		if (d->init_iops)
+			d->init_iops(hwif);
+
+		if (d->autodma == NODMA)
+			goto bypass_legacy_dma;
+		if (d->autodma == NOAUTODMA)
+			autodma = 0;
+		if (autodma)
+			hwif->autodma = 1;
+			
+		if(d->init_setup_dma)
+			d->init_setup_dma(dev, d, hwif);
+		else
+			ide_hwif_setup_dma(dev, d, hwif);
+bypass_legacy_dma:
+
+		drive0_tune = hwif->drives[0].autotune;
+		drive1_tune = hwif->drives[1].autotune;
+
+		if (d->init_hwif)
+			/* Call chipset-specific routine
+			 * for each enabled hwif
+			 */
+			d->init_hwif(hwif);
+
+		/*
+		 *	This is in the wrong place. The driver may
+		 *	do set up based on the autotune value and this
+		 *	will then trash it. Torben please move it and
+		 *	propogate the fixes into the drivers
+		 */		
+		if (drive0_tune == IDE_TUNE_BIOS) /* biostimings */
+			hwif->drives[0].autotune = IDE_TUNE_BIOS;
+		if (drive1_tune == IDE_TUNE_BIOS)
+			hwif->drives[1].autotune = IDE_TUNE_BIOS;
+
+		mate = hwif;
+		at_least_one_hwif_enabled = 1;
+	}
+	if (!at_least_one_hwif_enabled)
+		printk(KERN_INFO "%s: neither IDE port enabled (BIOS)\n", d->name);
+}
+
+EXPORT_SYMBOL_GPL(ide_pci_setup_ports);
+
 /*
  * ide_setup_pci_device() looks at the primary/secondary interfaces
  * on a PCI IDE device and, if they are enabled, prepares the IDE driver
@@ -587,16 +690,10 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
  */
 static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d, u8 noisy)
 {
-	u32 port, at_least_one_hwif_enabled = 0, autodma = 0;
+	int autodma = 0;
 	int pciirq = 0;
 	int tried_config = 0;
-	int drive0_tune, drive1_tune;
 	ata_index_t index;
-	u8 tmp = 0;
-	ide_hwif_t *hwif, *mate = NULL;
-	static int secondpdc = 0;
-
-	index.all = 0xf0f0;
 
 	if((autodma = ide_setup_pci_controller(dev, d, noisy, &tried_config)) < 0)
 		return index;
@@ -645,80 +742,8 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 	if(pciirq < 0)		/* Error not an IRQ */
 		return index;
 
-	/*
-	 * Set up the IDE ports
-	 */
-	 
-	for (port = 0; port <= 1; ++port) {
-		ide_pci_enablebit_t *e = &(d->enablebits[port]);
-	
-		/* 
-		 * If this is a Promise FakeRaid controller,
-		 * the 2nd controller will be marked as 
-		 * disabled while it is actually there and enabled
-		 * by the bios for raid purposes. 
-		 * Skip the normal "is it enabled" test for those.
-		 */
-		if (((d->vendor == PCI_VENDOR_ID_PROMISE) &&
-		     ((d->device == PCI_DEVICE_ID_PROMISE_20262) ||
-		      (d->device == PCI_DEVICE_ID_PROMISE_20265))) &&
-		    (secondpdc++==1) && (port==1))
-			goto controller_ok;
-			
-		if (e->reg && (pci_read_config_byte(dev, e->reg, &tmp) ||
-		    (tmp & e->mask) != e->val))
-			continue;	/* port not enabled */
-controller_ok:
+	ide_pci_setup_ports(dev, d, autodma, pciirq, &index);
 
-		if (d->channels	<= port)
-			return index;
-	
-		if ((hwif = ide_hwif_configure(dev, d, mate, port, pciirq)) == NULL)
-			continue;
-
-		/* setup proper ancestral information */
-		hwif->gendev.parent = &dev->dev;
-
-		if (hwif->channel) {
-			index.b.high = hwif->index;
-		} else {
-			index.b.low = hwif->index;
-		}
-
-		
-		if (d->init_iops)
-			d->init_iops(hwif);
-
-#ifdef CONFIG_BLK_DEV_IDEDMA
-		if (d->autodma == NODMA)
-			goto bypass_legacy_dma;
-		if (d->autodma == NOAUTODMA)
-			autodma = 0;
-		if (autodma)
-			hwif->autodma = 1;
-		ide_hwif_setup_dma(dev, d, hwif);
-bypass_legacy_dma:
-#endif	/* CONFIG_BLK_DEV_IDEDMA */
-
-		drive0_tune = hwif->drives[0].autotune;
-		drive1_tune = hwif->drives[1].autotune;
-
-		if (d->init_hwif)
-			/* Call chipset-specific routine
-			 * for each enabled hwif
-			 */
-			d->init_hwif(hwif);
-		
-		if (drive0_tune == IDE_TUNE_BIOS) /* biostimings */
-			hwif->drives[0].autotune = IDE_TUNE_BIOS;
-		if (drive1_tune == IDE_TUNE_BIOS)
-			hwif->drives[1].autotune = IDE_TUNE_BIOS;
-
-		mate = hwif;
-		at_least_one_hwif_enabled = 1;
-	}
-	if (!at_least_one_hwif_enabled)
-		printk(KERN_INFO "%s: neither IDE port enabled (BIOS)\n", d->name);
 	return index;
 }
 

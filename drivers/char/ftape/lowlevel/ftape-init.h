@@ -40,15 +40,4 @@
 #define QIC117_TAPE_MAJOR 27
 #endif
 
-/*      ftape-init.c defined global variables.
- */
-
-
-/*      ftape-init.c defined global functions not defined in ftape.h
- */
-#ifdef MODULE
-asmlinkage extern int  init_module   (void);
-asmlinkage extern void cleanup_module(void);
-#endif
-
 #endif

@@ -8,13 +8,14 @@
 
 #include <linux/module.h>
 #include <linux/vmalloc.h>
-#include <linux/compatmac.h>
 #include <linux/miscdevice.h>
 #include <linux/dm-ioctl.h>
 #include <linux/init.h>
 #include <linux/wait.h>
 #include <linux/blk.h>
 #include <linux/slab.h>
+
+#include <asm/uaccess.h>
 
 #define DM_DRIVER_EMAIL "dm@uk.sistina.com"
 
@@ -177,6 +178,7 @@ static void free_cell(struct hash_cell *hc)
 static int register_with_devfs(struct hash_cell *hc)
 {
 	struct gendisk *disk = dm_disk(hc->md);
+
 	hc->devfs_entry =
 	    devfs_register(_dev_dir, hc->name, DEVFS_FL_CURRENT_OWNER,
 			   disk->major, disk->first_minor,
@@ -459,11 +461,11 @@ static int __info(struct mapped_device *md, struct dm_ioctl *param)
 	if (!bdev)
 		return -ENXIO;
 
-	if (disk->policy)
-		param->flags |= DM_READONLY_FLAG;
-
 	param->open_count = bdev->bd_openers;
 	bdput(bdev);
+
+	if (disk->policy)
+		param->flags |= DM_READONLY_FLAG;
 
 	table = dm_get_table(md);
 	param->target_count = dm_table_get_num_targets(table);

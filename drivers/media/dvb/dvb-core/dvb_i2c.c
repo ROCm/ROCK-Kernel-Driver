@@ -173,7 +173,7 @@ struct dvb_i2c_bus*
 dvb_register_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 				   struct i2c_msg msgs[], int num),
 		      void *data,
-		      struct dvb_adapter_s *adapter,
+		      struct dvb_adapter *adapter,
 		      int id)
 {
 	struct dvb_i2c_bus *i2c;
@@ -200,7 +200,7 @@ dvb_register_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 struct dvb_i2c_bus*
 dvb_find_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
                                    struct i2c_msg msgs[], int num),
-                  struct dvb_adapter_s *adapter,
+                  struct dvb_adapter *adapter,
 		  int id)
 {
 	struct list_head *entry;
@@ -231,7 +231,7 @@ dvb_find_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 
 void dvb_unregister_i2c_bus (int (*xfer) (struct dvb_i2c_bus *i2c,
 					  struct i2c_msg msgs[], int num),
-			     struct dvb_adapter_s *adapter,
+			     struct dvb_adapter *adapter,
 			     int id)
 {
 	struct dvb_i2c_bus *i2c = dvb_find_i2c_bus (xfer, adapter, id);
