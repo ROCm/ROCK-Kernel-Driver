@@ -43,6 +43,7 @@
 #include <asm/pgalloc.h>
 #include <asm/pda.h>
 #include <asm/proto.h>
+#include <asm/nmi.h>
 
 #include <linux/irq.h>
 
@@ -376,6 +377,22 @@ static inline void die_if_kernel(const char * str, struct pt_regs * regs, long e
 		die(str, regs, err);
 }
 
+void die_nmi(char *str, struct pt_regs *regs)
+{
+	oops_begin();
+	/*
+	 * We are in trouble anyway, lets at least try
+	 * to get a message out.
+	 */
+	printk(str, safe_smp_processor_id());
+	show_registers(regs);
+	if (panic_on_timeout || panic_on_oops)
+		panic("nmi watchdog");
+	printk("console shuts up ...\n");
+	oops_end();
+	do_exit(SIGSEGV);
+}
+
 static inline unsigned long get_cr2(void)
 {
 	unsigned long address;
@@ -565,7 +582,7 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 
 asmlinkage void default_do_nmi(struct pt_regs * regs)
 {
-	unsigned char reason = inb(0x61);
+	unsigned char reason = get_nmi_reason();
 
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
@@ -586,6 +603,9 @@ asmlinkage void default_do_nmi(struct pt_regs * regs)
 	}
 	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return; 
+
+	/* AK: following checks seem to be broken on modern chipsets. FIXME */
+
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
 	if (reason & 0x40)
@@ -877,7 +897,9 @@ void __init trap_init(void)
 	set_intr_gate(15,&spurious_interrupt_bug);
 	set_intr_gate(16,&coprocessor_error);
 	set_intr_gate(17,&alignment_check);
+#ifdef CONFIG_X86_MCE
 	set_intr_gate_ist(18,&machine_check, MCE_STACK); 
+#endif
 	set_intr_gate(19,&simd_coprocessor_error);
 
 #ifdef CONFIG_IA32_EMULATION

@@ -53,124 +53,11 @@
 	mtsp        %r1,%sr1
 	.endm
 
-	/*
-	 * unsigned long
-	 * lcopy_to_user(void *to, const void *from, unsigned long n)
-	 *
-	 * Returns 0 for success.
-	 * otherwise, returns number of bytes not transferred.
-	 */
-
-	.export lcopy_to_user,code
-lcopy_to_user:
-	.proc
-	.callinfo NO_CALLS
-	.entry
-	comib,=,n   0,%r24,$lctu_done
-	get_sr
-$lctu_loop:
-	ldbs,ma     1(%r25),%r1
-	addib,<>    -1,%r24,$lctu_loop
-1:      stbs,ma     %r1,1(%sr1,%r26)
-$lctu_done:
-	bv          %r0(%r2)
-	copy        %r24,%r28
-	.exit
-
-2:      b $lctu_done
-	ldo         1(%r24),%r24
-
-	.section __ex_table,"a"
-#ifdef __LP64__
-	.dword      1b,(2b-1b)
-#else
-	.word       1b,(2b-1b)
-#endif
-	.previous
-
-	.procend
-
-	/*
-	 * unsigned long
-	 * lcopy_from_user(void *to, const void *from, unsigned long n)
-	 *
-	 * Returns 0 for success.
-	 * otherwise, returns number of bytes not transferred.
-	 *
-	 * NOTE: This routine will also zero any bytes in the
-	 *       destination that were not copied due to a fault.
-	 *
-	 */
-
-	.export lcopy_from_user,code
-lcopy_from_user:
-	.proc
-	.callinfo NO_CALLS
-	.entry
-	comib,=,n   0,%r24,$lcfu_done
-	get_sr
-$lcfu_loop:
-1:      ldbs,ma     1(%sr1,%r25),%r1
-	addib,<>    -1,%r24,$lcfu_loop
-	stbs,ma     %r1,1(%r26)
-$lcfu_done:
-	bv          %r0(%r2)
-	copy        %r24,%r28
-	.exit
-
-2:      copy        %r24,%r23
-$lcfu_zero_loop:
-	addib,<>    -1,%r23,$lcfu_zero_loop
-	stbs,ma     %r0,1(%r26)
-	b           $lcfu_done
-	nop
-
-	.section __ex_table,"a"
-#ifdef __LP64__
-	.dword      1b,(2b-1b)
-#else
-	.word       1b,(2b-1b)
-#endif
-	.previous
-
-	.procend
-
-	/*
-	 * unsigned long
-	 * lcopy_in_user(void *to, const void *from, unsigned long n)
-	 *
-	 * Returns 0 for success.
-	 * otherwise, returns number of bytes not transferred.
-	 */
-
-	.export lcopy_in_user,code
-lcopy_in_user:
-	.proc
-	.callinfo NO_CALLS
-	.entry
-	comib,=,n   0,%r24,$lciu_done
-	get_sr
-$lciu_loop:
-	ldbs,ma     1(%sr1,%r25),%r1
-	addib,<>    -1,%r24,$lciu_loop
-1:      stbs,ma     %r1,1(%sr1,%r26)
-$lciu_done:
-	bv          %r0(%r2)
-	copy        %r24,%r28
-	.exit
-
-2:      b $lciu_done
-	ldo         1(%r24),%r24
-
-	.section __ex_table,"a"
-#ifdef __LP64__
-	.dword      1b,(2b-1b)
-#else
-	.word       1b,(2b-1b)
-#endif
-	.previous
-
-	.procend
+	.macro fixup_branch lbl
+	ldil	    L%\lbl, %r1
+	ldo	    R%\lbl(%r1), %r1
+	bv          %r0(%r1)
+	.endm
 
 	/*
 	 * long lstrncpy_from_user(char *dst, const char *src, long n)
@@ -201,16 +88,18 @@ $lsfu_exit:
 	nop
 	.exit
 
-3:      b           $lsfu_exit
+	.section .fixup,"ax"
+3:      fixup_branch $lsfu_exit
 	ldi         -EFAULT,%r28
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(3b-1b)
-	.dword      2b,(3b-2b)
+	.dword      1b,3b
+	.dword      2b,3b
 #else
-	.word       1b,(3b-1b)
-	.word       2b,(3b-2b)
+	.word       1b,3b
+	.word       2b,3b
 #endif
 	.previous
 
@@ -239,14 +128,16 @@ $lclu_done:
 	copy        %r25,%r28
 	.exit
 
-2:      b $lclu_done
+	.section .fixup,"ax"
+2:      fixup_branch $lclu_done
 	ldo        1(%r25),%r25
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(2b-1b)
+	.dword      1b,2b
 #else
-	.word       1b,(2b-1b)
+	.word       1b,2b
 #endif
 	.previous
 
@@ -282,16 +173,18 @@ $lslen_nzero:
 	b           $lslen_done
 	ldo         1(%r26),%r26 /* special case for N == 0 */
 
-3:      b           $lslen_done
+	.section .fixup,"ax"
+3:      fixup_branch $lslen_done
 	copy        %r24,%r26    /* reset r26 so 0 is returned on fault */
+	.previous
 
-	.section __ex_table,"a"
+	.section __ex_table,"aw"
 #ifdef __LP64__
-	.dword      1b,(3b-1b)
-	.dword      2b,(3b-2b)
+	.dword      1b,3b
+	.dword      2b,3b
 #else
-	.word       1b,(3b-1b)
-	.word       2b,(3b-2b)
+	.word       1b,3b
+	.word       2b,3b
 #endif
 	.previous
 

@@ -2015,7 +2015,7 @@ static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 	}
 	mdelay(500);
 
-	return timeout ? -1 : 0;
+	return timeout ? 0 : -EIO;
 }
 
 static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)

@@ -1936,7 +1936,7 @@ store_edid:
 
 	movl	$0x13131313, %eax		# memset block with 0x13
 	movw    $32, %cx
-	movw	$0x440, %di
+	movw	$0x140, %di
 	cld
 	rep
 	stosl
@@ -1945,7 +1945,7 @@ store_edid:
 	movw	$0x01, %bx
 	movw	$0x00, %cx
 	movw    $0x01, %dx
-	movw	$0x440, %di
+	movw	$0x140, %di
 	int	$0x10
 
 	popw	%di				# restore all registers

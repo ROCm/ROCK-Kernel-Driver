@@ -4,6 +4,8 @@
 #include <linux/config.h>
 #include <asm/scatterlist.h>
 
+
+
 /*
 ** HP PCI platforms generally support multiple bus adapters.
 **    (workstations 1-~4, servers 2-~32)
@@ -35,6 +37,7 @@ struct pci_hba_data {
 	struct resource lmmio_space;	/* bus addresses < 4Gb */
 	struct resource elmmio_space;	/* additional bus addresses < 4Gb */
 	struct resource gmmio_space;	/* bus addresses > 4Gb */
+
 	/* NOTE: Dino code assumes it can use *all* of the lmmio_space,
 	 * elmmio_space and gmmio_space as a contiguous array of
 	 * resources.  This #define represents the array size */
@@ -43,6 +46,12 @@ struct pci_hba_data {
 	unsigned long   lmmio_space_offset;  /* CPU view - PCI view */
 	void *          iommu;          /* IOMMU this device is under */
 	/* REVISIT - spinlock to protect resources? */
+
+	#define HBA_NAME_SIZE 16
+	char io_name[HBA_NAME_SIZE];
+	char lmmio_name[HBA_NAME_SIZE];
+	char elmmio_name[HBA_NAME_SIZE];
+	char gmmio_name[HBA_NAME_SIZE];
 };
 
 #define HBA_DATA(d)		((struct pci_hba_data *) (d))
@@ -60,12 +69,35 @@ struct pci_hba_data {
 #define PCI_PORT_HBA(a)		((a) >> HBA_PORT_SPACE_BITS)
 #define PCI_PORT_ADDR(a)	((a) & (HBA_PORT_SPACE_SIZE - 1))
 
+#if CONFIG_PARISC64
+#define PCI_F_EXTEND		0xffffffff00000000UL
+#define PCI_IS_LMMIO(hba,a)	pci_is_lmmio(hba,a)
+
+/* We need to know if an address is LMMMIO or GMMIO.
+ * LMMIO requires mangling and GMMIO we must use as-is.
+ */
+static __inline__  int pci_is_lmmio(struct pci_hba_data *hba, unsigned long a)
+{
+	return(((a) & PCI_F_EXTEND) == PCI_F_EXTEND);
+}
+
 /*
 ** Convert between PCI (IO_VIEW) addresses and processor (PA_VIEW) addresses.
-** Note that we currently support only LMMIO.
+** See pcibios.c for more conversions used by Generic PCI code.
 */
-#define PCI_BUS_ADDR(hba,a)	((a) - hba->lmmio_space_offset)
+#define PCI_BUS_ADDR(hba,a)	(PCI_IS_LMMIO(hba,a)	\
+		?  ((a) - hba->lmmio_space_offset)	/* mangle LMMIO */ \
+		: (a))					/* GMMIO */
 #define PCI_HOST_ADDR(hba,a)	((a) + hba->lmmio_space_offset)
+
+#else	/* !CONFIG_PARISC64 */
+
+#define PCI_BUS_ADDR(hba,a)	(a)
+#define PCI_HOST_ADDR(hba,a)	(a)
+#define PCI_F_EXTEND		0UL
+#define PCI_IS_LMMIO(hba,a)	(1)	/* 32-bit doesn't support GMMIO */
+
+#endif /* !CONFIG_PARISC64 */
 
 /*
 ** KLUGE: linux/pci.h include asm/pci.h BEFORE declaring struct pci_bus

@@ -681,13 +681,21 @@ openpic_init_nmi_irq(u_int irq)
 /*
  * Hookup a cascade to the OpenPIC.
  */
+
+static struct irqaction openpic_cascade_irqaction = {
+	.handler = no_action,
+	.flags = SA_INTERRUPT,
+	.mask = CPU_MASK_NONE,
+};
+
 void __init
 openpic_hookup_cascade(u_int irq, char *name,
 	int (*cascade_fn)(struct pt_regs *))
 {
 	openpic_cascade_irq = irq;
 	openpic_cascade_fn = cascade_fn;
-	if (request_irq(irq, no_action, SA_INTERRUPT, name, NULL))
+
+	if (setup_irq(irq, &openpic_cascade_irqaction))
 		printk("Unable to get OpenPIC IRQ %d for cascade\n",
 				irq - open_pic_irq_offset);
 }

@@ -313,14 +313,6 @@ ebony_setup_arch(void)
 	struct ocp_def *def;
 	struct ocp_func_emac_data *emacdata;
 
-#if !defined(CONFIG_BDI_SWITCH)
-	/*
-	 * The Abatron BDI JTAG debugger does not tolerate others
-	 * mucking with the debug registers.
-	 */
-        mtspr(SPRN_DBCR0, (DBCR0_TDE | DBCR0_IDM));
-#endif
-
 	/* Set mac_addr for each EMAC */
 	vpd_base = ioremap64(EBONY_VPD_BASE, EBONY_VPD_SIZE);
 	def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, 0);

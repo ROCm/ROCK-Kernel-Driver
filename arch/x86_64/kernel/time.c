@@ -746,6 +746,7 @@ static __init int late_hpet_init(void)
 	 * Register with driver.
 	 * Timer0 and Timer1 is used by platform.
 	 */
+	hd.hd_phys_address = vxtime.hpet_address;
 	hd.hd_address = (void *)fix_to_virt(FIX_HPET_BASE);
 	hd.hd_nirqs = ntimer;
 	hd.hd_flags = HPET_DATA_PLATFORM;
@@ -928,13 +929,16 @@ void __init time_init_smp(void)
 	 * the TSC.
 	 *
 	 * Exceptions:
-	 * IBM Summit. Will need to be special cased later.
+	 * IBM Summit2 checked by oem_force_hpet_timer().
  	 * AMD dual core may also not need HPET. Check me.
 	 *
 	 * Can be turned off with "notsc".
 	 */
 	if (num_online_cpus() > 1 &&
 	    boot_cpu_data.x86_vendor == X86_VENDOR_AMD)
+		notsc = 1;
+	/* Some systems will want to disable TSC and use HPET. */
+	if (oem_force_hpet_timer())
 		notsc = 1;
 	if (vxtime.hpet_address && notsc) {
 		timetype = "HPET";

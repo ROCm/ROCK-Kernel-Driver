@@ -29,6 +29,19 @@
 #else
 	.level		1.1
 #endif
+
+#ifndef __LP64__
+	.macro fixup_branch,lbl
+	b	    \lbl
+	.endm
+#else
+	.macro fixup_branch,lbl
+	ldil	    L%\lbl, %r1
+	ldo	    R%\lbl(%r1), %r1
+	bv,n        %r0(%r1)
+	.endm
+#endif
+
 	.text
 
 	.import syscall_exit,code

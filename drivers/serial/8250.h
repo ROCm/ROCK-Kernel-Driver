@@ -19,7 +19,6 @@
 
 int serial8250_register_port(struct uart_port *);
 void serial8250_unregister_port(int line);
-void serial8250_get_irq_map(unsigned int *map);
 void serial8250_suspend_port(int line);
 void serial8250_resume_port(int line);
 
@@ -72,4 +71,15 @@ struct serial8250_config {
 #define SERIAL8250_SHARE_IRQS 1
 #else
 #define SERIAL8250_SHARE_IRQS 0
+#endif
+
+#if defined(__alpha__) && !defined(CONFIG_PCI)
+/*
+ * Digital did something really horribly wrong with the OUT1 and OUT2
+ * lines on at least some ALPHA's.  The failure mode is that if either
+ * is cleared, the machine locks up with endless interrupts.
+ */
+#define ALPHA_KLUDGE_MCR  (UART_MCR_OUT2 | UART_MCR_OUT1)
+#else
+#define ALPHA_KLUDGE_MCR 0
 #endif

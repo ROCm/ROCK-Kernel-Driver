@@ -38,6 +38,7 @@
 #include <asm/ptrace.h>
 #include <asm/processor.h>
 #include <asm/pdc.h>
+#include <asm/uaccess.h>
 
 #define DEFINE(sym, val) \
 	asm volatile("\n->" #sym " %0 " #val : : "i" (val))
@@ -291,5 +292,8 @@ int main(void)
 	DEFINE(ASM_PT_INITIAL, PT_INITIAL);
 	DEFINE(ASM_PAGE_SIZE, PAGE_SIZE);
 	BLANK();
+	DEFINE(EXCDATA_IP, offsetof(struct exception_data, fault_ip));
+	DEFINE(EXCDATA_SPACE, offsetof(struct exception_data, fault_space));
+	DEFINE(EXCDATA_ADDR, offsetof(struct exception_data, fault_addr));
 	return 0;
 }
