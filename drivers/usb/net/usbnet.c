@@ -720,7 +720,7 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 					(gpio_bits >> (i * 8)) & 0xff, 0, 0,
 					buf)) < 0)
 			return ret;
-		wait_ms(5);
+		msleep(5);
 	}
 
 	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_RX_CTL, 0x80, 0, 0, buf)) < 0) {

@@ -417,7 +417,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 		writel (OHCI_INTR_OC, &ohci->regs->intrenable);
 		writel (OHCI_OCR, &ohci->regs->cmdstatus);
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-			msec_delay (10);
+			msleep (10);
 			if (--temp == 0) {
 				ohci_err (ohci, "USB HC TakeOver failed!\n");
 				return -1;
@@ -451,7 +451,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	}
 	// flush those pci writes
 	(void) readl (&ohci->regs->control);
-	msec_delay (50);
+	msleep (50);
 
 	/* HC Reset requires max 10 us delay */
 	writel (OHCI_HCR,  &ohci->regs->cmdstatus);

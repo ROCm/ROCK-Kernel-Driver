@@ -267,6 +267,15 @@ static void __devinit vio_dev_release(struct device *dev)
 	kfree(viodev);
 }
 
+static ssize_t viodev_show_devspec(struct device *dev, char *buf)
+{
+	struct vio_dev *viodev = to_vio_dev(dev);
+	struct device_node *of_node = viodev->archdata;
+
+	return sprintf(buf, "%s\n", of_node->full_name);
+}
+DEVICE_ATTR(devspec, S_IRUSR | S_IRGRP | S_IROTH, viodev_show_devspec, NULL);
+
 static ssize_t viodev_show_name(struct device *dev, char *buf)
 {
 	struct vio_dev *viodev = to_vio_dev(dev);
@@ -345,6 +354,7 @@ struct vio_dev * __devinit vio_register_device(struct device_node *of_node)
 		return NULL;
 	}
 	device_create_file(&viodev->dev, &dev_attr_name);
+	device_create_file(&viodev->dev, &dev_attr_devspec);
 
 	return viodev;
 }
@@ -353,6 +363,8 @@ EXPORT_SYMBOL(vio_register_device);
 void __devinit vio_unregister_device(struct vio_dev *viodev)
 {
 	DBGENTER();
+	device_remove_file(&viodev->dev, &dev_attr_devspec);
+	device_remove_file(&viodev->dev, &dev_attr_name);
 	device_unregister(&viodev->dev);
 }
 EXPORT_SYMBOL(vio_unregister_device);

@@ -122,7 +122,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 
 	/* suspend root hub, hoping it keeps power during suspend */
 	while (time_before (jiffies, ohci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 
 #ifdef	CONFIG_USB_SUSPEND
 	(void) usb_suspend_device (hcd->self.root_hub);
@@ -133,7 +133,7 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 #endif
 
 	/* let things settle down a bit */
-	msec_delay (100);
+	msleep (100);
 	
 #ifdef CONFIG_PMAC_PBOOK
 	if (_machine == _MACH_Pmac)
@@ -170,7 +170,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 
 	/* resume root hub */
 	while (time_before (jiffies, ohci->next_statechange))
-		msec_delay (100);
+		msleep (100);
 #ifdef	CONFIG_USB_SUSPEND
 	/* get extra cleanup even if remote wakeup isn't in use */
 	retval = usb_resume_device (hcd->self.root_hub);

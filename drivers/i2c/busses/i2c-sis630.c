@@ -51,6 +51,7 @@
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
@@ -165,7 +166,7 @@ static int sis630_transaction_wait(struct i2c_adapter *adap, int size)
 
 	/* We will always wait for a fraction of a second! */
 	do {
-		i2c_delay(1);
+		msleep(1);
 		temp = sis630_read(SMB_STS);
 		/* check if block transmitted */
 		if (size == SIS630_BLOCK_DATA && (temp & 0x10))

@@ -173,14 +173,14 @@ ppc4xx_uic_enable(unsigned int irq)
 			desc->status |= IRQ_LEVEL;
 		else
 			desc->status = desc->status & ~IRQ_LEVEL;
-	break;
+		break;
 	case 2:
 		mtdcr(DCRN_UIC_ER(UIC2), ppc_cached_irq_mask[word]);
 		if ((mfdcr(DCRN_UIC_TR(UIC2)) & (1 << (31 - bit))) == 0)
 			desc->status |= IRQ_LEVEL;
 		else
 			desc->status = desc->status & ~IRQ_LEVEL;
-	break;
+		break;
 	}
 
 }
@@ -268,6 +268,9 @@ ppc4xx_uic_end(unsigned int irq)
 		break;
 	case 1:
 		tr_bits = mfdcr(DCRN_UIC_TR(UIC1));
+		break;
+	case 2:
+		tr_bits = mfdcr(DCRN_UIC_TR(UIC2));
 		break;
 	}
 

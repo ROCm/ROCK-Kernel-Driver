@@ -692,7 +692,7 @@ int __init rtas_flash_init(void)
 	if (rc != 0)
 		goto cleanup;
 
-	manage_pde = create_flash_pde("ppc64/rtas" MANAGE_FLASH_NAME,
+	manage_pde = create_flash_pde("ppc64/rtas/" MANAGE_FLASH_NAME,
 				      &manage_flash_operations);
 	if (manage_pde == NULL) {
 		rc = -ENOMEM;

@@ -38,4 +38,6 @@ extern unsigned long loops_per_jiffy;
 #define ndelay(x)	udelay(((x)+999)/1000)
 #endif
 
+void msleep(unsigned int msecs);
+
 #endif /* defined(_LINUX_DELAY_H) */

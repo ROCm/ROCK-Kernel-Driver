@@ -321,7 +321,7 @@ static int datafab_determine_lun(struct us_data *us,
 			goto leave;
 		}
 
-		wait_ms(20);
+		msleep(20);
 	}
 
 	rc = USB_STOR_TRANSPORT_ERROR;

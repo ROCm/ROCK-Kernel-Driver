@@ -4294,7 +4294,7 @@ trident_game_open(struct gameport *gameport, int mode)
 	switch (mode) {
 	case GAMEPORT_MODE_COOKED:
 		outb(0x80, TRID_REG(card, T4D_GAME_CR));
-		wait_ms(20);
+		msleep(20);
 		return 0;
 	case GAMEPORT_MODE_RAW:
 		outb(0x00, TRID_REG(card, T4D_GAME_CR));

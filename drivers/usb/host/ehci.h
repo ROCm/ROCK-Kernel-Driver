@@ -596,12 +596,6 @@ ehci_port_speed(struct ehci_hcd *ehci, unsigned int portsc)
 
 /*-------------------------------------------------------------------------*/
 
-static inline void msec_delay(unsigned msec)
-{
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(msecs_to_jiffies(msec));
-}
-
 #ifndef DEBUG
 #define STUB_DEBUG_FILES
 #endif	/* DEBUG */
