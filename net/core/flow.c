@@ -12,7 +12,6 @@
 #include <linux/random.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/interrupt.h>
 #include <linux/smp.h>
 #include <linux/completion.h>
 #include <linux/percpu.h>
