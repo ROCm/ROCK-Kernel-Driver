@@ -128,6 +128,7 @@ nfs_direct_read_seg(struct inode *inode, struct file *file,
 		.inode		= inode,
 		.args		= {
 			.fh		= NFS_FH(inode),
+			.lockowner	= current->files,
 		},
 		.res		= {
 			.fattr		= &rdata.fattr,
@@ -258,6 +259,7 @@ nfs_direct_write_seg(struct inode *inode, struct file *file,
 		.inode		= inode,
 		.args		= {
 			.fh		= NFS_FH(inode),
+			.lockowner	= current->files,
 		},
 		.res		= {
 			.fattr		= &wdata.fattr,
@@ -335,8 +337,7 @@ retry:
 						VERF_SIZE) != 0)
 			goto sync_retry;
 	}
-	nfs_end_data_update(inode);
-	NFS_FLAGS(inode) |= NFS_INO_INVALID_DATA;
+	nfs_end_data_update_defer(inode);
 
 	return tot_bytes;
 
@@ -395,10 +396,6 @@ nfs_direct_write(struct inode *inode, struct file *file,
 		if (result < size)
 			break;
 	}
-	/* Zap the page cache if we managed to write */
-	if (tot_bytes > 0)
-		invalidate_remote_inode(inode);
-
 	return tot_bytes;
 }
 

@@ -55,7 +55,8 @@ struct xdr_buf {
 	unsigned int	page_base,	/* Start of page data */
 			page_len;	/* Length of page data */
 
-	unsigned int	len;		/* Total length of data */
+	unsigned int	buflen,		/* Total length of storage buffer */
+			len;		/* Length of XDR encoded message */
 
 };
 
@@ -87,7 +88,8 @@ struct xdr_buf {
 /*
  * Miscellaneous XDR helper functions
  */
-u32 *	xdr_encode_array(u32 *p, const void *s, unsigned int len);
+u32 *	xdr_encode_opaque_fixed(u32 *p, const void *ptr, unsigned int len);
+u32 *	xdr_encode_opaque(u32 *p, const void *ptr, unsigned int len);
 u32 *	xdr_encode_string(u32 *p, const char *s);
 u32 *	xdr_decode_string(u32 *p, char **sp, int *lenp, int maxlen);
 u32 *	xdr_decode_string_inplace(u32 *p, char **sp, int *lenp, int maxlen);
@@ -99,6 +101,11 @@ void	xdr_encode_pages(struct xdr_buf *, struct page **, unsigned int,
 			 unsigned int);
 void	xdr_inline_pages(struct xdr_buf *, unsigned int,
 			 struct page **, unsigned int, unsigned int);
+
+static inline u32 *xdr_encode_array(u32 *p, const void *s, unsigned int len)
+{
+	return xdr_encode_opaque(p, s, len);
+}
 
 /*
  * Decode 64bit quantities (NFSv3 support)
@@ -178,85 +185,13 @@ struct xdr_stream {
 	struct iovec *iov;	/* pointer to the current iovec */
 };
 
-/*
- * Initialize an xdr_stream for encoding data.
- *
- * Note: at the moment the RPC client only passes the length of our
- *	 scratch buffer in the xdr_buf's header iovec. Previously this
- *	 meant we needed to call xdr_adjust_iovec() after encoding the
- *	 data. With the new scheme, the xdr_stream manages the details
- *	 of the buffer length, and takes care of adjusting the iovec
- *	 length for us.
- */
-static inline void
-xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p)
-{
-	struct iovec *iov = buf->head;
-
-	xdr->buf = buf;
-	xdr->iov = iov;
-	xdr->end = (uint32_t *)((char *)iov->iov_base + iov->iov_len);
-	buf->len = iov->iov_len = (char *)p - (char *)iov->iov_base;
-	xdr->p = p;
-}
-
-/*
- * Check that we have enough buffer space to encode 'nbytes' more
- * bytes of data. If so, update the total xdr_buf length, and
- * adjust the length of the current iovec.
- */
-static inline uint32_t *
-xdr_reserve_space(struct xdr_stream *xdr, size_t nbytes)
-{
-	uint32_t *p = xdr->p;
-	uint32_t *q;
-
-	/* align nbytes on the next 32-bit boundary */
-	nbytes += 3;
-	nbytes &= ~3;
-	q = p + (nbytes >> 2);
-	if (unlikely(q > xdr->end || q < p))
-		return NULL;
-	xdr->p = q;
-	xdr->iov->iov_len += nbytes;
-	xdr->buf->len += nbytes;
-	return p;
-}
-
+extern void xdr_init_encode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p);
+extern uint32_t *xdr_reserve_space(struct xdr_stream *xdr, size_t nbytes);
 extern void xdr_write_pages(struct xdr_stream *xdr, struct page **pages,
 		unsigned int base, unsigned int len);
+extern void xdr_init_decode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p);
+extern uint32_t *xdr_inline_decode(struct xdr_stream *xdr, size_t nbytes);
 extern void xdr_read_pages(struct xdr_stream *xdr, unsigned int len);
-
-/*
- * Initialize an xdr_stream for decoding data.
- */
-static inline void
-xdr_init_decode(struct xdr_stream *xdr, struct xdr_buf *buf, uint32_t *p)
-{
-	struct iovec *iov = buf->head;
-	xdr->buf = buf;
-	xdr->iov = iov;
-	xdr->p = p;
-	xdr->end = (uint32_t *)((char *)iov->iov_base + iov->iov_len);
-}
-
-/*
- * Check if the input buffer is long enough to enable us to decode
- * 'nbytes' more bytes of data starting at the current position.
- * If so return the current pointer, then update the current
- * position.
- */
-static inline uint32_t *
-xdr_inline_decode(struct xdr_stream *xdr, size_t nbytes)
-{
-	uint32_t *p = xdr->p;
-	uint32_t *q = p + XDR_QUADLEN(nbytes);
-
-	if (unlikely(q > xdr->end || q < p))
-		return NULL;
-	xdr->p = q;
-	return p;
-}
 
 #endif /* __KERNEL__ */
 

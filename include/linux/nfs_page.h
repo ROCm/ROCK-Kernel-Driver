@@ -17,10 +17,14 @@
 #include <linux/sunrpc/auth.h>
 #include <linux/nfs_xdr.h>
 
+#include <asm/atomic.h>
+
 /*
  * Valid flags for a dirty buffer
  */
 #define PG_BUSY			0
+#define PG_NEED_COMMIT		1
+#define PG_NEED_RESCHED		2
 
 struct nfs_page {
 	struct list_head	wb_list,	/* Defines state of page: */
@@ -31,6 +35,7 @@ struct nfs_page {
 	struct rpc_cred		*wb_cred;
 	struct nfs4_state	*wb_state;
 	struct page		*wb_page;	/* page to read in/write out */
+	atomic_t		wb_complete;	/* i/os we're waiting for */
 	wait_queue_head_t	wb_wait;	/* wait queue */
 	unsigned long		wb_index;	/* Offset >> PAGE_CACHE_SHIFT */
 	unsigned int		wb_offset,	/* Offset & ~PAGE_CACHE_MASK */
@@ -42,6 +47,8 @@ struct nfs_page {
 };
 
 #define NFS_WBACK_BUSY(req)	(test_bit(PG_BUSY,&(req)->wb_flags))
+#define NFS_NEED_COMMIT(req)	(test_bit(PG_NEED_COMMIT,&(req)->wb_flags))
+#define NFS_NEED_RESCHED(req)	(test_bit(PG_NEED_RESCHED,&(req)->wb_flags))
 
 extern	struct nfs_page *nfs_create_request(struct file *, struct inode *,
 					    struct page *,
@@ -93,8 +100,7 @@ nfs_unlock_request(struct nfs_page *req)
 	smp_mb__before_clear_bit();
 	clear_bit(PG_BUSY, &req->wb_flags);
 	smp_mb__after_clear_bit();
-	if (waitqueue_active(&req->wb_wait))
-		wake_up_all(&req->wb_wait);
+	wake_up_all(&req->wb_wait);
 	nfs_release_request(req);
 }
 
@@ -113,6 +119,38 @@ nfs_list_remove_request(struct nfs_page *req)
 	}
 	list_del_init(&req->wb_list);
 	req->wb_list_head = NULL;
+}
+
+static inline int
+nfs_defer_commit(struct nfs_page *req)
+{
+	if (test_and_set_bit(PG_NEED_COMMIT, &req->wb_flags))
+		return 0;
+	return 1;
+}
+
+static inline void
+nfs_clear_commit(struct nfs_page *req)
+{
+	smp_mb__before_clear_bit();
+	clear_bit(PG_NEED_COMMIT, &req->wb_flags);
+	smp_mb__after_clear_bit();
+}
+
+static inline int
+nfs_defer_reschedule(struct nfs_page *req)
+{
+	if (test_and_set_bit(PG_NEED_RESCHED, &req->wb_flags))
+		return 0;
+	return 1;
+}
+
+static inline void
+nfs_clear_reschedule(struct nfs_page *req)
+{
+	smp_mb__before_clear_bit();
+	clear_bit(PG_NEED_RESCHED, &req->wb_flags);
+	smp_mb__after_clear_bit();
 }
 
 static inline struct nfs_page *

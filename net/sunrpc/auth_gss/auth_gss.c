@@ -365,7 +365,7 @@ retry:
 	gss_msg = gss_new;
 	memset(gss_new, 0, sizeof(*gss_new));
 	INIT_LIST_HEAD(&gss_new->list);
-	INIT_RPC_WAITQ(&gss_new->waitq, "RPCSEC_GSS upcall waitq");
+	rpc_init_wait_queue(&gss_new->waitq, "RPCSEC_GSS upcall waitq");
 	atomic_set(&gss_new->count, 2);
 	msg = &gss_new->msg;
 	msg->data = &gss_new->uid;
@@ -721,8 +721,7 @@ gss_marshal(struct rpc_task *task, u32 *p, int ruid)
 		printk("gss_marshal: gss_get_mic FAILED (%d)\n", maj_stat);
 		goto out_put_ctx;
 	}
-	*p++ = htonl(mic.len);
-	p += XDR_QUADLEN(mic.len);
+	p = xdr_encode_opaque(p, NULL, mic.len);
 	gss_put_ctx(ctx);
 	return p;
 out_put_ctx:
@@ -857,9 +856,7 @@ gss_wrap_req(struct rpc_task *task,
 			status = -EIO; /* XXX? */
 			if (maj_stat)
 				goto out;
-			q = p;
-			*q++ = htonl(mic.len);
-			q += XDR_QUADLEN(mic.len);
+			q = xdr_encode_opaque(p, NULL, mic.len);
 
 			offset = (u8 *)q - (u8 *)p;
 			iov->iov_len += offset;

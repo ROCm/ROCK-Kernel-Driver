@@ -105,7 +105,7 @@ nfs4_alloc_client(struct in_addr *addr)
 		INIT_WORK(&clp->cl_renewd, nfs4_renew_state, clp);
 		INIT_LIST_HEAD(&clp->cl_superblocks);
 		init_waitqueue_head(&clp->cl_waitq);
-		INIT_RPC_WAITQ(&clp->cl_rpcwaitq, "NFS4 client");
+		rpc_init_wait_queue(&clp->cl_rpcwaitq, "NFS4 client");
 		clp->cl_state = 1 << NFS4CLNT_NEW;
 	}
 	return clp;

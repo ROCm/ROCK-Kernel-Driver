@@ -120,7 +120,6 @@ EXPORT_SYMBOL(svcauth_unix_purge);
 EXPORT_SYMBOL(unix_domain_find);
 
 /* Generic XDR */
-EXPORT_SYMBOL(xdr_encode_array);
 EXPORT_SYMBOL(xdr_encode_string);
 EXPORT_SYMBOL(xdr_decode_string);
 EXPORT_SYMBOL(xdr_decode_string_inplace);
@@ -129,8 +128,6 @@ EXPORT_SYMBOL(xdr_encode_netobj);
 EXPORT_SYMBOL(xdr_encode_pages);
 EXPORT_SYMBOL(xdr_inline_pages);
 EXPORT_SYMBOL(xdr_shift_buf);
-EXPORT_SYMBOL(xdr_write_pages);
-EXPORT_SYMBOL(xdr_read_pages);
 EXPORT_SYMBOL(xdr_buf_from_iov);
 EXPORT_SYMBOL(xdr_buf_subsegment);
 EXPORT_SYMBOL(xdr_buf_read_netobj);
