@@ -18,12 +18,7 @@
 
 #include <linux/mm.h>
 #include <linux/pagemap.h>
-#include <linux/highmem.h>
-#include <linux/swap.h>
-#include <linux/slab.h>
-#include <linux/compiler.h>
-
-#include <linux/kernel_stat.h>
+#include <linux/mempool.h>
 
 /*
  * Virtual_count is not a pure "count".
@@ -191,16 +186,36 @@ void kunmap_high(struct page *page)
 
 #define POOL_SIZE 64
 
-/*
- * This lock gets no contention at all, normally.
- */
-static spinlock_t emergency_lock = SPIN_LOCK_UNLOCKED;
+static mempool_t *page_pool;
 
-int nr_emergency_pages;
-static LIST_HEAD(emergency_pages);
+static void * page_pool_alloc(int gfp_mask, void *data)
+{
+	return alloc_page(gfp_mask & ~ __GFP_HIGHIO);
+}
 
-int nr_emergency_bhs;
-static LIST_HEAD(emergency_bhs);
+static void page_pool_free(void *page, void *data)
+{
+	__free_page(page);
+}
+
+static __init int init_emergency_pool(void)
+{
+	struct sysinfo i;
+	si_meminfo(&i);
+	si_swapinfo(&i);
+        
+	if (!i.totalhigh)
+		return 0;
+
+	page_pool = mempool_create(POOL_SIZE, page_pool_alloc, page_pool_free, NULL);
+	if (!page_pool)
+		BUG();
+	printk("highmem bounce pool size: %d pages and bhs.\n", POOL_SIZE);
+
+	return 0;
+}
+
+__initcall(init_emergency_pool);
 
 /*
  * Simple bounce buffer support for highmem pages. Depending on the
@@ -233,37 +248,10 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	}
 }
 
-static __init int init_emergency_pool(void)
-{
-	struct sysinfo i;
-        si_meminfo(&i);
-        si_swapinfo(&i);
-        
-        if (!i.totalhigh)
-        	return 0;
-
-	spin_lock_irq(&emergency_lock);
-	while (nr_emergency_pages < POOL_SIZE) {
-		struct page * page = alloc_page(GFP_ATOMIC);
-		if (!page) {
-			printk("couldn't refill highmem emergency pages");
-			break;
-		}
-		list_add(&page->list, &emergency_pages);
-		nr_emergency_pages++;
-	}
-	spin_unlock_irq(&emergency_lock);
-	printk("allocated %d pages reserved for the highmem bounces\n", nr_emergency_pages);
-	return 0;
-}
-
-__initcall(init_emergency_pool);
-
 static inline int bounce_end_io (struct bio *bio, int nr_sectors)
 {
 	struct bio *bio_orig = bio->bi_private;
 	struct bio_vec *bvec, *org_vec;
-	unsigned long flags;
 	int ret, i;
 
 	if (!test_bit(BIO_UPTODATE, &bio->bi_flags))
@@ -274,24 +262,13 @@ static inline int bounce_end_io (struct bio *bio, int nr_sectors)
 	/*
 	 * free up bounce indirect pages used
 	 */
-	spin_lock_irqsave(&emergency_lock, flags);
 	__bio_for_each_segment(bvec, bio, i, 0) {
 		org_vec = &bio_orig->bi_io_vec[i];
 		if (bvec->bv_page == org_vec->bv_page)
 			continue;
-	
-		if (nr_emergency_pages >= POOL_SIZE)
-			__free_page(bvec->bv_page);
-		else {
-			/*
-			 * We are abusing page->list to manage
-			 * the highmem emergency pool:
-			 */
-			list_add(&bvec->bv_page->list, &emergency_pages);
-			nr_emergency_pages++;
-		}
+
+		mempool_free(bvec->bv_page, page_pool);	
 	}
-	spin_unlock_irqrestore(&emergency_lock, flags);
 
 out_eio:
 	ret = bio_orig->bi_end_io(bio_orig, nr_sectors);
@@ -313,44 +290,6 @@ static int bounce_end_io_read (struct bio *bio, int nr_sectors)
 		copy_to_high_bio_irq(bio_orig, bio);
 
 	return bounce_end_io(bio, nr_sectors);
-}
-
-struct page *alloc_bounce_page(int gfp_mask)
-{
-	struct list_head *tmp;
-	struct page *page;
-
-	page = alloc_page(gfp_mask);
-	if (page)
-		return page;
-	/*
-	 * No luck. First, kick the VM so it doesnt idle around while
-	 * we are using up our emergency rations.
-	 */
-	wakeup_bdflush();
-
-repeat_alloc:
-	/*
-	 * Try to allocate from the emergency pool.
-	 */
-	tmp = &emergency_pages;
-	spin_lock_irq(&emergency_lock);
-	if (!list_empty(tmp)) {
-		page = list_entry(tmp->next, struct page, list);
-		list_del(tmp->next);
-		nr_emergency_pages--;
-	}
-	spin_unlock_irq(&emergency_lock);
-	if (page)
-		return page;
-
-	/* we need to wait I/O completion */
-	run_task_queue(&tq_disk);
-
-	current->policy |= SCHED_YIELD;
-	__set_current_state(TASK_RUNNING);
-	schedule();
-	goto repeat_alloc;
 }
 
 void create_bounce(unsigned long pfn, struct bio **bio_orig)
@@ -379,7 +318,7 @@ void create_bounce(unsigned long pfn, struct bio **bio_orig)
 
 		to = &bio->bi_io_vec[i];
 
-		to->bv_page = alloc_bounce_page(GFP_NOHIGHIO);
+		to->bv_page = mempool_alloc(page_pool, GFP_NOHIGHIO);
 		to->bv_len = from->bv_len;
 		to->bv_offset = from->bv_offset;
 

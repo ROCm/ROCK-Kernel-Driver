@@ -560,3 +560,8 @@ void dump_stack(void)
 		}
 	}
 }
+
+void show_trace_task(struct task_struct *tsk)
+{
+	printk("Backtrace not yet implemented for SH.\n");
+}

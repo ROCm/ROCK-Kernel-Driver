@@ -16,41 +16,28 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-
  *
  */
-#include <linux/config.h>
-#include <linux/fs.h>
 #include <linux/mm.h>
-#include <linux/pagemap.h>
+#include <linux/blk.h>
 #include <linux/slab.h>
-#include <linux/swap.h>
+#include <linux/iobuf.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/init.h>
-#include <linux/iobuf.h>
-#include <linux/blk.h>
-#include <linux/vmalloc.h>
-#include <linux/interrupt.h>
-#include <linux/prefetch.h>
-#include <linux/compiler.h>
+#include <linux/mempool.h>
 
-#include <asm/uaccess.h>
-#include <asm/io.h>
+#define BIO_POOL_SIZE 256
 
-kmem_cache_t *bio_cachep;
-static spinlock_t __cacheline_aligned bio_lock = SPIN_LOCK_UNLOCKED;
-static struct bio *bio_pool;
-static DECLARE_WAIT_QUEUE_HEAD(bio_pool_wait);
-static DECLARE_WAIT_QUEUE_HEAD(biovec_pool_wait);
-
-static unsigned int bio_pool_free;
+static mempool_t *bio_pool;
+static kmem_cache_t *bio_slab;
 
 #define BIOVEC_NR_POOLS 6
 
 struct biovec_pool {
-	int bp_size;
-	kmem_cache_t *bp_cachep;
+	int size;
+	kmem_cache_t *slab;
+	mempool_t *pool;
 };
 
-static struct biovec_pool bvec_list[BIOVEC_NR_POOLS];
+static struct biovec_pool bvec_array[BIOVEC_NR_POOLS];
 
 /*
  * if you change this list, also change bvec_alloc or things will
@@ -61,123 +48,42 @@ static const int bvec_pool_sizes[BIOVEC_NR_POOLS] = { 1, 4, 16, 64, 128, 256 };
 
 #define BIO_MAX_PAGES	(bvec_pool_sizes[BIOVEC_NR_POOLS - 1])
 
-/*
- * TODO: change this to use slab reservation scheme once that infrastructure
- * is in place...
- */
-#define BIO_POOL_SIZE		(256)
-
-/*
- * if need be, add bio_pool_get_irq() to match...
- */
-static inline struct bio *__bio_pool_get(void)
+static void * slab_pool_alloc(int gfp_mask, void *data)
 {
-	struct bio *bio;
-
-	if ((bio = bio_pool)) {
-		BIO_BUG_ON(bio_pool_free <= 0);
-		bio_pool = bio->bi_next;
-		bio->bi_next = NULL;
-		bio_pool_free--;
-	}
-
-	return bio;
+	return kmem_cache_alloc(data, gfp_mask);
 }
 
-static inline struct bio *bio_pool_get(void)
+static void slab_pool_free(void *ptr, void *data)
 {
-	unsigned long flags;
-	struct bio *bio;
-
-	spin_lock_irqsave(&bio_lock, flags);
-	bio = __bio_pool_get();
-	BIO_BUG_ON(!bio && bio_pool_free);
-	spin_unlock_irqrestore(&bio_lock, flags);
-
-	return bio;
+	kmem_cache_free(data, ptr);
 }
-
-static inline void bio_pool_put(struct bio *bio)
-{
-	unsigned long flags;
-	int wake_pool = 0;
-
-	spin_lock_irqsave(&bio_lock, flags);
-
-	/*
-	 * if the pool has enough free entries, just slab free the bio
-	 */
-	if (bio_pool_free < BIO_POOL_SIZE) {
-		bio->bi_next = bio_pool;
-		bio_pool = bio;
-		bio_pool_free++;
-		wake_pool = waitqueue_active(&bio_pool_wait);
-		spin_unlock_irqrestore(&bio_lock, flags);
-
-		if (wake_pool)
-			wake_up_nr(&bio_pool_wait, 1);
-	} else {
-		spin_unlock_irqrestore(&bio_lock, flags);
-		kmem_cache_free(bio_cachep, bio);
-	}
-}
-
-#define BIO_CAN_WAIT(gfp_mask)	((gfp_mask) & __GFP_WAIT)
 
 static inline struct bio_vec *bvec_alloc(int gfp_mask, int nr, int *idx)
 {
-	struct bio_vec *bvl = NULL;
 	struct biovec_pool *bp;
+	struct bio_vec *bvl;
 
 	/*
 	 * see comment near bvec_pool_sizes define!
 	 */
 	switch (nr) {
-		case 1:
-			*idx = 0;
-			break;
-		case 2 ... 4:
-			*idx = 1;
-			break;
-		case 5 ... 16:
-			*idx = 2;
-			break;
-		case 17 ... 64:
-			*idx = 3;
-			break;
-		case 65 ... 128:
-			*idx = 4;
-			break;
-		case 129 ... 256:
-			*idx = 5;
-			break;
+		case   1        : *idx = 0; break;
+		case   2 ...   4: *idx = 1; break;
+		case   5 ...  16: *idx = 2; break;
+		case  17 ...  64: *idx = 3; break;
+		case  65 ... 128: *idx = 4; break;
+		case 129 ... 256: *idx = 5; break;
 		default:
 			return NULL;
 	}
-	bp = &bvec_list[*idx];
-
 	/*
-	 * ok, so idx now points to the slab we want to allocate from
+	 * idx now points to the pool we want to allocate from
 	 */
-	if ((bvl = kmem_cache_alloc(bp->bp_cachep, gfp_mask)))
-		goto out_gotit;
+	bp = bvec_array + *idx;
 
-	if (!BIO_CAN_WAIT(gfp_mask))
-		return NULL;
-
-	do {
-		bvl = kmem_cache_alloc(bp->bp_cachep, gfp_mask);
-		if (bvl)
-			break;
-
-		run_task_queue(&tq_disk);
-		__set_current_state(TASK_RUNNING);
-		current->policy |= SCHED_YIELD;
-		schedule();
-	} while (1);
-
-out_gotit:
-	memset(bvl, 0, bp->bp_size);
+	bvl = mempool_alloc(bp->pool, gfp_mask);
+	if (bvl)
+		memset(bvl, 0, bp->size);
 	return bvl;
 }
 
@@ -186,17 +92,16 @@ out_gotit:
  */
 void bio_destructor(struct bio *bio)
 {
-	struct biovec_pool *bp = &bvec_list[bio->bi_max];
+	struct biovec_pool *bp = bvec_array + bio->bi_max;
 
 	BIO_BUG_ON(bio->bi_max >= BIOVEC_NR_POOLS);
-
 	/*
 	 * cloned bio doesn't own the veclist
 	 */
 	if (!(bio->bi_flags & (1 << BIO_CLONED)))
-		kmem_cache_free(bp->bp_cachep, bio->bi_io_vec);
+		mempool_free(bio->bi_io_vec, bp->pool);
 
-	bio_pool_put(bio);
+	mempool_free(bio, bio_pool);
 }
 
 inline void bio_init(struct bio *bio)
@@ -212,88 +117,32 @@ inline void bio_init(struct bio *bio)
 	atomic_set(&bio->bi_cnt, 1);
 }
 
-static inline struct bio *__bio_alloc(int gfp_mask, bio_destructor_t *dest)
-{
-	struct bio *bio;
-
-	/*
-	 * first try our reserved pool
-	 */
-	if ((bio = bio_pool_get()))
-		goto gotit;
-
-	/*
-	 * no such luck, try slab alloc
-	 */
-	if ((bio = kmem_cache_alloc(bio_cachep, gfp_mask)))
-		goto gotit;
-
-	/*
-	 * hrmpf, not much luck. if we are allowed to wait, wait on
-	 * bio_pool to be replenished
-	 */
-	if (BIO_CAN_WAIT(gfp_mask)) {
-		DECLARE_WAITQUEUE(wait, current);
-
-		add_wait_queue_exclusive(&bio_pool_wait, &wait);
-		for (;;) {
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			if ((bio = bio_pool_get()))
-				break;
-
-			run_task_queue(&tq_disk);
-			schedule();
-		}
-		remove_wait_queue(&bio_pool_wait, &wait);
-		__set_current_state(TASK_RUNNING);
-	}
-
-	if (bio) {
-gotit:
-		bio_init(bio);
-		bio->bi_io_vec = NULL;
-		bio->bi_destructor = dest;
-	}
-
-	return bio;
-}
-
 /**
  * bio_alloc - allocate a bio for I/O
  * @gfp_mask:   the GFP_ mask given to the slab allocator
  * @nr_iovecs:	number of iovecs to pre-allocate
  *
  * Description:
- *   bio_alloc will first try it's on internal pool to satisfy the allocation
- *   and if that fails fall back to the bio slab cache. In the latter case,
- *   the @gfp_mask specifies the priority of the allocation. In particular,
- *   if %__GFP_WAIT is set then we will block on the internal pool waiting
+ *   bio_alloc will first try it's on mempool to satisfy the allocation.
+ *   If %__GFP_WAIT is set then we will block on the internal pool waiting
  *   for a &struct bio to become free.
  **/
 struct bio *bio_alloc(int gfp_mask, int nr_iovecs)
 {
-	struct bio *bio = __bio_alloc(gfp_mask, bio_destructor);
+	struct bio *bio = mempool_alloc(bio_pool, gfp_mask);
 	struct bio_vec *bvl = NULL;
 
 	if (unlikely(!bio))
 		return NULL;
 
 	if (!nr_iovecs || (bvl = bvec_alloc(gfp_mask,nr_iovecs,&bio->bi_max))) {
+		bio_init(bio);
+		bio->bi_destructor = bio_destructor;
 		bio->bi_io_vec = bvl;
 		return bio;
 	}
-
-	bio_pool_put(bio);
+	mempool_free(bio, bio_pool);
 	return NULL;
-}
-
-/*
- * queue lock assumed held!
- */
-static inline void bio_free(struct bio *bio)
-{
-	bio->bi_next = NULL;
-	bio->bi_destructor(bio);
 }
 
 /**
@@ -311,8 +160,10 @@ void bio_put(struct bio *bio)
 	/*
 	 * last put frees it
 	 */
-	if (atomic_dec_and_test(&bio->bi_cnt))
-		bio_free(bio);
+	if (atomic_dec_and_test(&bio->bi_cnt)) {
+		bio->bi_next = NULL;
+		bio->bi_destructor(bio);
+	}
 }
 
 inline int bio_hw_segments(request_queue_t *q, struct bio *bio)
@@ -386,59 +237,59 @@ struct bio *bio_copy(struct bio *bio, int gfp_mask, int copy)
 {
 	struct bio *b = bio_alloc(gfp_mask, bio->bi_vcnt);
 	unsigned long flags = 0; /* gcc silly */
+	struct bio_vec *bv;
 	int i;
 
-	if (b) {
-		struct bio_vec *bv;
+	if (unlikely(!b))
+		return NULL;
+
+	/*
+	 * iterate iovec list and alloc pages + copy data
+	 */
+	__bio_for_each_segment(bv, bio, i, 0) {
+		struct bio_vec *bbv = &b->bi_io_vec[i];
+		char *vfrom, *vto;
+
+		bbv->bv_page = alloc_page(gfp_mask);
+		if (bbv->bv_page == NULL)
+			goto oom;
+
+		bbv->bv_len = bv->bv_len;
+		bbv->bv_offset = bv->bv_offset;
 
 		/*
-		 * iterate iovec list and alloc pages + copy data
+		 * if doing a copy for a READ request, no need
+		 * to memcpy page data
 		 */
-		__bio_for_each_segment(bv, bio, i, 0) {
-			struct bio_vec *bbv = &b->bi_io_vec[i];
-			char *vfrom, *vto;
+		if (!copy)
+			continue;
 
-			bbv->bv_page = alloc_page(gfp_mask);
-			if (bbv->bv_page == NULL)
-				goto oom;
-
-			bbv->bv_len = bv->bv_len;
-			bbv->bv_offset = bv->bv_offset;
-
-			/*
-			 * if doing a copy for a READ request, no need
-			 * to memcpy page data
-			 */
-			if (!copy)
-				continue;
-
-			if (gfp_mask & __GFP_WAIT) {
-				vfrom = kmap(bv->bv_page);
-				vto = kmap(bbv->bv_page);
-			} else {
-				local_irq_save(flags);
-				vfrom = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
-				vto = kmap_atomic(bbv->bv_page, KM_BIO_IRQ);
-			}
-
-			memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
-			if (gfp_mask & __GFP_WAIT) {
-				kunmap(bbv->bv_page);
-				kunmap(bv->bv_page);
-			} else {
-				kunmap_atomic(vto, KM_BIO_IRQ);
-				kunmap_atomic(vfrom, KM_BIO_IRQ);
-				local_irq_restore(flags);
-			}
+		if (gfp_mask & __GFP_WAIT) {
+			vfrom = kmap(bv->bv_page);
+			vto = kmap(bbv->bv_page);
+		} else {
+			local_irq_save(flags);
+			vfrom = kmap_atomic(bv->bv_page, KM_BIO_IRQ);
+			vto = kmap_atomic(bbv->bv_page, KM_BIO_IRQ);
 		}
 
-		b->bi_sector = bio->bi_sector;
-		b->bi_dev = bio->bi_dev;
-		b->bi_rw = bio->bi_rw;
-
-		b->bi_vcnt = bio->bi_vcnt;
-		b->bi_size = bio->bi_size;
+		memcpy(vto + bbv->bv_offset, vfrom + bv->bv_offset, bv->bv_len);
+		if (gfp_mask & __GFP_WAIT) {
+			kunmap(bbv->bv_page);
+			kunmap(bv->bv_page);
+		} else {
+			kunmap_atomic(vto, KM_BIO_IRQ);
+			kunmap_atomic(vfrom, KM_BIO_IRQ);
+			local_irq_restore(flags);
+		}
 	}
+
+	b->bi_sector = bio->bi_sector;
+	b->bi_dev = bio->bi_dev;
+	b->bi_rw = bio->bi_rw;
+
+	b->bi_vcnt = bio->bi_vcnt;
+	b->bi_size = bio->bi_size;
 
 	return b;
 
@@ -446,7 +297,7 @@ oom:
 	while (--i >= 0)
 		__free_page(b->bi_io_vec[i].bv_page);
 
-	bio_pool_put(b);
+	mempool_free(b, bio_pool);
 	return NULL;
 }
 
@@ -481,32 +332,6 @@ static int bio_end_io_kio(struct bio *bio, int nr_sectors)
 	return 0;
 }
 
-/*
- * obviously doesn't work for stacking drivers, but ll_rw_blk will split
- * bio for those
- */
-int get_max_segments(kdev_t dev)
-{
-	int segments = MAX_SEGMENTS;
-	request_queue_t *q;
-
-	if ((q = blk_get_queue(dev)))
-		segments = q->max_segments;
-
-	return segments;
-}
-
-int get_max_sectors(kdev_t dev)
-{
-	int sectors = MAX_SECTORS;
-	request_queue_t *q;
-
-	if ((q = blk_get_queue(dev)))
-		sectors = q->max_sectors;
-
-	return sectors;
-}
-
 /**
  * ll_rw_kio - submit a &struct kiobuf for I/O
  * @rw:   %READ or %WRITE
@@ -522,7 +347,6 @@ int get_max_sectors(kdev_t dev)
 void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
 {
 	int i, offset, size, err, map_i, total_nr_pages, nr_pages;
-	int max_bytes, max_segments;
 	struct bio_vec *bvec;
 	struct bio *bio;
 
@@ -539,19 +363,6 @@ void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
 	}
 
 	/*
-	 * rudimentary max sectors/segments checks and setup. once we are
-	 * sure that drivers can handle requests that cannot be completed in
-	 * one go this will die
-	 */
-	max_bytes = get_max_sectors(dev) << 9;
-	max_segments = get_max_segments(dev);
-	if ((max_bytes >> PAGE_SHIFT) < (max_segments + 1))
-		max_segments = (max_bytes >> PAGE_SHIFT);
-
-	if (max_segments > BIO_MAX_PAGES)
-		max_segments = BIO_MAX_PAGES;
-
-	/*
 	 * maybe kio is bigger than the max we can easily map into a bio.
 	 * if so, split it up in appropriately sized chunks.
 	 */
@@ -564,9 +375,11 @@ void ll_rw_kio(int rw, struct kiobuf *kio, kdev_t dev, sector_t sector)
 	map_i = 0;
 
 next_chunk:
+	nr_pages = BIO_MAX_SECTORS >> (PAGE_SHIFT - 9);
+	if (nr_pages > total_nr_pages)
+		nr_pages = total_nr_pages;
+
 	atomic_inc(&kio->io_count);
-	if ((nr_pages = total_nr_pages) > max_segments)
-		nr_pages = max_segments;
 
 	/*
 	 * allocate bio and do initial setup
@@ -591,7 +404,7 @@ next_chunk:
 
 		BUG_ON(kio->maplist[map_i] == NULL);
 
-		if (bio->bi_size + nbytes > max_bytes)
+		if (bio->bi_size + nbytes > (BIO_MAX_SECTORS << 9))
 			goto queue_io;
 
 		bio->bi_vcnt++;
@@ -645,31 +458,15 @@ int bio_endio(struct bio *bio, int uptodate, int nr_sectors)
 	return bio->bi_end_io(bio, nr_sectors);
 }
 
-static int __init bio_init_pool(void)
-{
-	struct bio *bio;
-	int i;
-
-	for (i = 0; i < BIO_POOL_SIZE; i++) {
-		bio = kmem_cache_alloc(bio_cachep, GFP_ATOMIC);
-		if (!bio)
-			panic("bio: cannot init bio pool\n");
-
-		bio_pool_put(bio);
-	}
-
-	return i;
-}
-
 static void __init biovec_init_pool(void)
 {
 	char name[16];
 	int i, size;
 
-	memset(&bvec_list, 0, sizeof(bvec_list));
+	memset(&bvec_array, 0, sizeof(bvec_array));
 
 	for (i = 0; i < BIOVEC_NR_POOLS; i++) {
-		struct biovec_pool *bp = &bvec_list[i];
+		struct biovec_pool *bp = bvec_array + i;
 
 		size = bvec_pool_sizes[i] * sizeof(struct bio_vec);
 
@@ -677,27 +474,29 @@ static void __init biovec_init_pool(void)
 						bvec_pool_sizes[i], size);
 
 		snprintf(name, sizeof(name) - 1,"biovec-%d",bvec_pool_sizes[i]);
-		bp->bp_cachep = kmem_cache_create(name, size, 0,
+		bp->slab = kmem_cache_create(name, size, 0,
 						SLAB_HWCACHE_ALIGN, NULL, NULL);
-
-		if (!bp->bp_cachep)
-			panic("biovec: can't init slab pools\n");
-
-		bp->bp_size = size;
+		if (!bp->slab)
+			panic("biovec: can't init slab cache\n");
+		bp->pool = mempool_create(BIO_POOL_SIZE, slab_pool_alloc,
+					slab_pool_free, bp->slab);
+		if (!bp->pool)
+			panic("biovec: can't init mempool\n");
+		bp->size = size;
 	}
 }
 
 static int __init init_bio(void)
 {
-	int nr;
-
-	bio_cachep = kmem_cache_create("bio", sizeof(struct bio), 0,
+	bio_slab = kmem_cache_create("bio", sizeof(struct bio), 0,
 					SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!bio_cachep)
-		panic("bio: can't create bio_cachep slab cache\n");
+	if (!bio_slab)
+		panic("bio: can't create slab cache\n");
+	bio_pool = mempool_create(BIO_POOL_SIZE, slab_pool_alloc, slab_pool_free, bio_slab);
+	if (!bio_pool)
+		panic("bio: can't create mempool\n");
 
-	nr = bio_init_pool();
-	printk("BIO: pool of %d setup, %uKb (%d bytes/bio)\n", nr, nr * sizeof(struct bio) >> 10, sizeof(struct bio));
+	printk("BIO: pool of %d setup, %uKb (%d bytes/bio)\n", BIO_POOL_SIZE, BIO_POOL_SIZE * sizeof(struct bio) >> 10, sizeof(struct bio));
 
 	biovec_init_pool();
 
@@ -714,3 +513,4 @@ EXPORT_SYMBOL(bio_init);
 EXPORT_SYMBOL(bio_copy);
 EXPORT_SYMBOL(__bio_clone);
 EXPORT_SYMBOL(bio_clone);
+EXPORT_SYMBOL(bio_hw_segments);

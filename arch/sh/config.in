@@ -189,7 +189,7 @@ if [ "$CONFIG_PCI" = "y" ]; then
    if [ "$CONFIG_PCI_GODIRECT" = "y" -o "$CONFIG_PCI_GOANY" = "y" ]; then
       define_bool CONFIG_PCI_DIRECT y
    fi
-   define_bool CONFIG_SH_PCIDMA_NONCOHERENT n
+   bool 'Cache and PCI noncoherent' CONFIG_SH_PCIDMA_NONCOHERENT n
 fi
 
 source drivers/pci/Config.in

@@ -9,12 +9,12 @@
 
 O_TARGET := mm.o
 
-export-objs := shmem.o filemap.o
+export-objs := shmem.o filemap.o mempool.o
 
 obj-y	 := memory.o mmap.o filemap.o mprotect.o mlock.o mremap.o \
 	    vmalloc.o slab.o bootmem.o swap.o vmscan.o page_io.o \
 	    page_alloc.o swap_state.o swapfile.o numa.o oom_kill.o \
-	    shmem.o
+	    shmem.o mempool.o
 
 obj-$(CONFIG_HIGHMEM) += highmem.o
 

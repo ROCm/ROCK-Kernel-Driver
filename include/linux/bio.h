@@ -28,6 +28,8 @@
 #define BIO_BUG_ON
 #endif
 
+#define BIO_MAX_SECTORS	128
+
 /*
  * was unsigned short, but we might as well be ready for > 64kB I/O pages
  */
@@ -60,7 +62,7 @@ struct bio {
 	unsigned short		bi_vcnt;	/* how many bio_vec's */
 	unsigned short		bi_idx;		/* current index into bvl_vec */
 	unsigned short		bi_hw_seg;	/* actual mapped segments */
-	unsigned int		bi_size;	/* total size in bytes */
+	unsigned int		bi_size;	/* residual I/O count */
 	unsigned int		bi_max;		/* max bvl_vecs we can hold,
 						   used as index into pool */
 

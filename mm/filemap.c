@@ -1485,8 +1485,8 @@ static ssize_t generic_file_direct_IO(int rw, struct file * filp, char * buf, si
 	ssize_t retval;
 	int new_iobuf, chunk_size, blocksize_mask, blocksize, blocksize_bits, iosize, progress;
 	struct kiobuf * iobuf;
-	struct inode * inode = filp->f_dentry->d_inode;
-	struct address_space * mapping = inode->i_mapping;
+	struct address_space * mapping = filp->f_dentry->d_inode->i_mapping;
+	struct inode * inode = mapping->host;
 
 	new_iobuf = 0;
 	iobuf = filp->f_iobuf;

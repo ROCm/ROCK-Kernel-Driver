@@ -261,7 +261,7 @@ static void idescsi_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 	ide_drive_t *drive = hwgroup->drive;
 	idescsi_scsi_t *scsi = drive->driver_data;
 	struct request *rq = hwgroup->rq;
-	idescsi_pc_t *pc = (idescsi_pc_t *) rq->buffer;
+	idescsi_pc_t *pc = (idescsi_pc_t *) rq->special;
 	int log = test_bit(IDESCSI_LOG_CMD, &scsi->log);
 	struct Scsi_Host *host;
 	u8 *scsi_buf;
@@ -464,7 +464,7 @@ static ide_startstop_t idescsi_do_request (ide_drive_t *drive, struct request *r
 #endif /* IDESCSI_DEBUG_LOG */
 
 	if (rq->flags & REQ_SPECIAL) {
-		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->buffer);
+		return idescsi_issue_pc (drive, (idescsi_pc_t *) rq->special);
 	}
 	blk_dump_rq_flags(rq, "ide-scsi: unsup command");
 	idescsi_end_request (0,HWGROUP (drive));
@@ -662,6 +662,7 @@ static inline struct bio *idescsi_kmalloc_bio (int count)
 	if ((first_bh = bhp = bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
 		goto abort;
 	bio_init(bh);
+	bh->bi_vcnt = 1;
 	while (--count) {
 		if ((bh = bio_alloc(GFP_ATOMIC, 1)) == NULL)
 			goto abort;
@@ -802,7 +803,7 @@ int idescsi_queue (Scsi_Cmnd *cmd, void (*done)(Scsi_Cmnd *))
 	}
 
 	ide_init_drive_cmd (rq);
-	rq->buffer = (char *) pc;
+	rq->special = (char *) pc;
 	rq->bio = idescsi_dma_bio (drive, pc);
 	rq->flags = REQ_SPECIAL;
 	spin_unlock(&cmd->host->host_lock);

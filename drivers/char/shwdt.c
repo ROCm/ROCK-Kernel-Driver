@@ -10,7 +10,6 @@
  * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
  */
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
@@ -177,7 +176,7 @@ static int sh_wdt_close(struct inode *inode, struct file *file)
  * 	sh_wdt_read - Read from Device
  *
  * 	@file: file handle of device
- * 	@char: buffer to write to
+ * 	@buf: buffer to write to
  * 	@count: length of buffer
  * 	@ppos: offset
  *
@@ -193,7 +192,7 @@ static ssize_t sh_wdt_read(struct file *file, char *buf,
  * 	sh_wdt_write - Write to Device
  *
  * 	@file: file handle of device
- * 	@char: buffer to write
+ * 	@buf: buffer to write
  * 	@count: length of buffer
  * 	@ppos: offset
  *
@@ -269,7 +268,7 @@ static int sh_wdt_ioctl(struct inode *inode, struct file *file,
 static int sh_wdt_notify_sys(struct notifier_block *this,
 			     unsigned long code, void *unused)
 {
-	if (code == SYS_DOWN || SYS_HALT) {
+	if (code == SYS_DOWN || code == SYS_HALT) {
 		sh_wdt_stop();
 	}
 

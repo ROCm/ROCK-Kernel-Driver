@@ -205,8 +205,10 @@ recount_segments(Scsi_Cmnd * SCpnt)
 
 static inline int scsi_new_mergeable(request_queue_t * q,
 				     struct request * req,
-				     int nr_segs)
+				     struct bio *bio)
 {
+	int nr_segs = bio_hw_segments(q, bio);
+
 	/*
 	 * pci_map_sg will be able to merge these two
 	 * into a single hardware sg entry, check if
@@ -223,8 +225,9 @@ static inline int scsi_new_mergeable(request_queue_t * q,
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct bio *bio, int nr_segs)
+				   struct bio *bio)
 {
+	int nr_segs = bio_hw_segments(q, bio);
 	/*
 	 * pci_map_sg won't be able to map these two
 	 * into a single hardware sg entry, so we have to
@@ -244,8 +247,10 @@ static inline int scsi_new_segment(request_queue_t * q,
 
 static inline int scsi_new_segment(request_queue_t * q,
 				   struct request * req,
-				   struct bio *bio, int nr_segs)
+				   struct bio *bio)
 {
+	int nr_segs = bio_hw_segments(q, bio);
+
 	if (req->nr_segments + nr_segs > q->max_segments) {
 		req->flags |= REQ_NOMERGE;
 		return 0;
@@ -296,45 +301,33 @@ __inline static int __scsi_back_merge_fn(request_queue_t * q,
 					 struct request *req,
 					 struct bio *bio)
 {
-	int bio_segs;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
 		return 0;
 	}
 
-	bio_segs = bio_hw_segments(q, bio);
-	if (blk_contig_segment(q, req->biotail, bio))
-		bio_segs--;
-
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(bio, req->bio))
-		return scsi_new_mergeable(q, req, bio_segs);
+		return scsi_new_mergeable(q, req, bio);
 #endif
 
-	return scsi_new_segment(q, req, bio, bio_segs);
+	return scsi_new_segment(q, req, bio);
 }
 
 __inline static int __scsi_front_merge_fn(request_queue_t * q,
 					  struct request *req,
 					  struct bio *bio)
 {
-	int bio_segs;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
 		return 0;
 	}
 
-	bio_segs = bio_hw_segments(q, bio);
-	if (blk_contig_segment(q, req->biotail, bio))
-		bio_segs--;
-
 #ifdef DMA_CHUNK_SIZE
 	if (MERGEABLE_BUFFERS(bio, req->bio))
-		return scsi_new_mergeable(q, req, bio_segs);
+		return scsi_new_mergeable(q, req, bio);
 #endif
-	return scsi_new_segment(q, req, bio, bio_segs);
+	return scsi_new_segment(q, req, bio);
 }
 
 /*
@@ -370,32 +363,23 @@ MERGEFCT(scsi_back_merge_fn, back)
 MERGEFCT(scsi_front_merge_fn, front)
 
 /*
- * Function:    __scsi_merge_requests_fn()
+ * Function:    scsi_merge_requests_fn_()
  *
- * Purpose:     Prototype for queue merge function.
+ * Purpose:     queue merge function.
  *
  * Arguments:   q       - Queue for which we are merging request.
  *              req     - request into which we wish to merge.
- *              next    - 2nd request that we might want to combine with req
- *              dma_host - 1 if this host has ISA DMA issues (bus doesn't
- *                      expose all of the address lines, so that DMA cannot
- *                      be done from an arbitrary address).
+ *              next    - Block which we may wish to merge into request
  *
- * Returns:     1 if it is OK to merge the two requests.  0
+ * Returns:     1 if it is OK to merge the block into the request.  0
  *              if it is not OK.
  *
  * Lock status: queue lock is assumed to be held here.
  *
- * Notes:       Some drivers have limited scatter-gather table sizes, and
- *              thus they cannot queue an infinitely large command.  This
- *              function is called from ll_rw_blk before it attempts to merge
- *              a new block into a request to make sure that the request will
- *              not become too large.
  */
-__inline static int __scsi_merge_requests_fn(request_queue_t * q,
-					     struct request *req,
-					     struct request *next,
-					     int dma_host)
+inline static int scsi_merge_requests_fn(request_queue_t * q,
+					 struct request *req,
+					 struct request *next)
 {
 	int bio_segs;
 
@@ -445,35 +429,6 @@ __inline static int __scsi_merge_requests_fn(request_queue_t * q,
 	return 1;
 }
 
-/*
- * Function:    scsi_merge_requests_fn_()
- *
- * Purpose:     queue merge function.
- *
- * Arguments:   q       - Queue for which we are merging request.
- *              req     - request into which we wish to merge.
- *              bio     - Block which we may wish to merge into request
- *
- * Returns:     1 if it is OK to merge the block into the request.  0
- *              if it is not OK.
- *
- * Lock status: queue lock is assumed to be held here.
- *
- * Notes:       Optimized for different cases depending upon whether
- *              ISA DMA is in use and whether clustering should be used.
- */
-#define MERGEREQFCT(_FUNCTION, _DMA)			\
-static int _FUNCTION(request_queue_t * q,		\
-		     struct request * req,		\
-		     struct request * next)		\
-{							\
-    int ret;						\
-    ret =  __scsi_merge_requests_fn(q, req, next, _DMA); \
-    return ret;						\
-}
-
-MERGEREQFCT(scsi_merge_requests_fn_, 0)
-MERGEREQFCT(scsi_merge_requests_fn_d, 1)
 /*
  * Function:    __init_io()
  *
@@ -811,15 +766,13 @@ void initialize_merge_fn(Scsi_Device * SDpnt)
 	 * is simply easier to do it ourselves with our own functions
 	 * rather than rely upon the default behavior of ll_rw_blk.
 	 */
+	q->back_merge_fn = scsi_back_merge_fn;
+	q->front_merge_fn = scsi_front_merge_fn;
+	q->merge_requests_fn = scsi_merge_requests_fn;
+
 	if (SHpnt->unchecked_isa_dma == 0) {
-		q->back_merge_fn = scsi_back_merge_fn;
-		q->front_merge_fn = scsi_front_merge_fn;
-		q->merge_requests_fn = scsi_merge_requests_fn_;
 		SDpnt->scsi_init_io_fn = scsi_init_io_v;
 	} else {
-		q->back_merge_fn = scsi_back_merge_fn;
-		q->front_merge_fn = scsi_front_merge_fn;
-		q->merge_requests_fn = scsi_merge_requests_fn_d;
 		SDpnt->scsi_init_io_fn = scsi_init_io_vd;
 	}
 

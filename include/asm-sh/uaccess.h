@@ -216,6 +216,7 @@ __asm__ __volatile__( \
 	: "r" (val), "m" (__m(addr)), "i" (-EFAULT) \
         : "memory"); })
 #else
+#define __put_user_u64(val,addr,retval) \
 ({ \
 __asm__ __volatile__( \
 	"1:\n\t" \

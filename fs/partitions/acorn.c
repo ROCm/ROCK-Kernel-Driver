@@ -162,12 +162,12 @@ adfspart_check_CUMANA(struct gendisk *hd, struct block_device *bdev,
 		struct adfs_discrecord *dr;
 		unsigned int nr_sects;
 
-		if (!(minor & mask))
-			break;
-
 		data = read_dev_sector(bdev, start_blk * 2 + 6, &sect);
 		if (!data)
 			return -1;
+
+		if (!(minor & mask))
+			break;
 
 		dr = adfs_partition(hd, name, data, first_sector, minor++);
 		if (!dr)

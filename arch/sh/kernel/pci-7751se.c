@@ -37,7 +37,6 @@
  */
 int __init pcibios_init_platform(void)
 {
-   unsigned long data;
    unsigned long bcr1, wcr1, wcr2, wcr3, mcr;
    unsigned short bcr2;
 

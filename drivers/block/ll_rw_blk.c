@@ -358,6 +358,8 @@ inline int blk_contig_segment(request_queue_t *q, struct bio *bio,
 
 	if (!BIO_CONTIG(bio, nxt))
 		return 0;
+	if (bio->bi_size + nxt->bi_size > q->max_segment_size)
+		return 0;
 
 	/*
 	 * bio and nxt are contigous in memory, check if the queue allows
@@ -429,8 +431,10 @@ new_segment:
  * specific ones if so desired
  */
 static inline int ll_new_segment(request_queue_t *q, struct request *req,
-				 struct bio *bio, int nr_segs)
+				 struct bio *bio)
 {
+	int nr_segs = bio_hw_segments(q, bio);
+
 	if (req->nr_segments + nr_segs <= q->max_segments) {
 		req->nr_segments += nr_segs;
 		return 1;
@@ -443,41 +447,23 @@ static inline int ll_new_segment(request_queue_t *q, struct request *req,
 static int ll_back_merge_fn(request_queue_t *q, struct request *req, 
 			    struct bio *bio)
 {
-	int bio_segs;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
 		return 0;
 	}
 
-	bio_segs = bio_hw_segments(q, bio);
-	if (blk_contig_segment(q, req->biotail, bio))
-		bio_segs--;
-
-	if (!bio_segs)
-		return 1;
-
-	return ll_new_segment(q, req, bio, bio_segs);
+	return ll_new_segment(q, req, bio);
 }
 
 static int ll_front_merge_fn(request_queue_t *q, struct request *req, 
 			     struct bio *bio)
 {
-	int bio_segs;
-
 	if (req->nr_sectors + bio_sectors(bio) > q->max_sectors) {
 		req->flags |= REQ_NOMERGE;
 		return 0;
 	}
 
-	bio_segs = bio_hw_segments(q, bio);
-	if (blk_contig_segment(q, bio, req->bio))
-		bio_segs--;
-
-	if (!bio_segs)
-		return 1;
-
-	return ll_new_segment(q, req, bio, bio_segs);
+	return ll_new_segment(q, req, bio);
 }
 
 static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
@@ -1235,11 +1221,6 @@ end_io:
 			break;
 		}
 
-		/*
-		 * this needs to be handled by q->make_request_fn, to just
-		 * setup a part of the bio in the request to enable easy
-		 * multiple passing
-		 */
 		BUG_ON(bio_sectors(bio) > q->max_sectors);
 
 		/*
@@ -1497,6 +1478,7 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 	while ((bio = req->bio)) {
 		nsect = bio_iovec(bio)->bv_len >> 9;
 
+		BIO_BUG_ON(bio_iovec(bio)->bv_len > bio->bi_size);
 
 		/*
 		 * not a complete bvec done
@@ -1515,11 +1497,12 @@ int end_that_request_first(struct request *req, int uptodate, int nr_sectors)
 		 * account transfer
 		 */
 		bio->bi_size -= bio_iovec(bio)->bv_len;
+		bio->bi_idx++;
 
 		nr_sectors -= nsect;
 		total_nsect += nsect;
 
-		if (++bio->bi_idx >= bio->bi_vcnt) {
+		if (!bio->bi_size) {
 			req->bio = bio->bi_next;
 
 			if (unlikely(bio_endio(bio, uptodate, total_nsect)))
@@ -1619,7 +1602,9 @@ EXPORT_SYMBOL(blk_queue_max_sectors);
 EXPORT_SYMBOL(blk_queue_max_segments);
 EXPORT_SYMBOL(blk_queue_max_segment_size);
 EXPORT_SYMBOL(blk_queue_hardsect_size);
+EXPORT_SYMBOL(blk_queue_segment_boundary);
 EXPORT_SYMBOL(blk_rq_map_sg);
 EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
 EXPORT_SYMBOL(submit_bio);
+EXPORT_SYMBOL(blk_contig_segment);

@@ -1,0 +1,77 @@
+The multiple machine support relies on redirecting all functions which will
+need to be machine specific through a table of function pointers, the
+machvec. These functions fall into a number of categories:
+
+ - I/O functions to IO memory (inb etc) and PCI/main memory (readb etc).
+ - I/O remapping functions (ioremap etc)
+ - some initialisation functions
+ - a 'heartbeat' function
+ - some miscellaneous flags
+
+The tree can be built in two ways:
+ - as a fully generic build. All drivers are linked in, and all functions
+   go through the machvec
+ - as a machine specific build. In this case only the required drivers
+   will be linked in, and some macros may be redefined to not go through
+   the machvec where performance is important (in particular IO functions).
+
+There are three ways in which IO can be performed:
+ - none at all. This is really only useful for the 'unknown' machine type,
+   which us designed to run on a machine about which we know nothing, and
+   so all all IO instructions do nothing.
+ - fully custom. In this case all IO functions go to a machine specific
+   set of functions which can do what they like
+ - a generic set of functions. These will cope with most situations,
+   and rely on a single function, mv_port2addr, which is called through the
+   machine vector, and converts an IO address into a memory address, which
+   can be read from/written to directly.
+
+Thus adding a new machine involves the following steps (I will assume I am
+adding a machine called fred):
+
+ - add a new file include/asm-sh/io_fred.h which contains prototypes for
+   any machine specific IO functions prefixed with the machine name, for
+   example fred_inb. These will be needed when filling out the machine
+   vector. In addition, a section is required which defines what to do when
+   building a machine specific version. For example:
+
+     #ifdef __WANT_IO_DEF
+     #define inb  fred_inb
+     ...
+     #endif
+
+   This is the minimum that is required, however there are ample
+   opportunities to optimise this. In particular, by making the prototypes
+   inline function definitions, it is possible to inline the function when
+   building machine specific versions. Note that the machine vector
+   functions will still be needed, so that a module built for a generic
+   setup can be loaded.
+
+ - add a new file arch/sh/kernel/mach_fred.c. This contains the definition
+   of the machine vector. When building the machine specific version, this
+   will be the real machine vector (via an alias), while in the generic
+   version is used to initialise the machine vector, and then freed, by
+   making it initdata. This should be defined as:
+
+     struct sh_machine_vector mv_fred __initmv = {
+       mv_name: "Fred"
+     }
+     ALIAS_MV(se)
+
+ - finally add a file arch/sh/kernel/io_fred.c, which contains
+   definitions of the machine specific io functions.
+
+A note about initialisation functions. Three initialisation functions are
+provided in the machine vector:
+ - mv_arch_init - called very early on from setup_arch
+ - mv_init_irq - called from init_IRQ, after the generic SH interrupt
+   initialisation
+ - mv_init_pci - currently not used
+
+Any other remaining functions which need to be called at start up can be
+added to the list using the __initcalls macro (or module_init if the code
+can be built as a module). Many generic drivers probe to see if the device
+they are targeting is present, however this may not always be appropriate,
+so a flag can be added to the machine vector which will be set on those
+machines which have the hardware in question, reducing the probe to a
+single conditional.

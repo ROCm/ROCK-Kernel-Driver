@@ -1,3 +1,5 @@
+#include <linux/pagemap.h>
+
 /*
  * add_gd_partition adds a partitions details to the devices partition
  * description.
