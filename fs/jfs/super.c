@@ -492,8 +492,5 @@ static void __exit exit_jfs_fs(void)
 	kmem_cache_destroy(jfs_inode_cachep);
 }
 
-
-EXPORT_NO_SYMBOLS;
-
 module_init(init_jfs_fs)
 module_exit(exit_jfs_fs)

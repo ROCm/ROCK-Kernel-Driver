@@ -104,8 +104,6 @@ static void __exit exit_efs_fs(void) {
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_efs_fs)
 module_exit(exit_efs_fs)
 

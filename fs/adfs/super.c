@@ -477,7 +477,5 @@ static void __exit exit_adfs_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_adfs_fs)
 module_exit(exit_adfs_fs)

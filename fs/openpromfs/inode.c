@@ -1064,8 +1064,6 @@ static void __exit exit_openprom_fs(void)
 	nodes = NULL;
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_openprom_fs)
 module_exit(exit_openprom_fs)
 MODULE_LICENSE("GPL");

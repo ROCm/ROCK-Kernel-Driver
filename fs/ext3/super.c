@@ -1809,8 +1809,6 @@ static void __exit exit_ext3_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Remy Card, Stephen Tweedie, Andrew Morton, Andreas Dilger, Theodore Ts'o and others");
 MODULE_DESCRIPTION("Second Extended Filesystem with journaling extensions");
 MODULE_LICENSE("GPL");

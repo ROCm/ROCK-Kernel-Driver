@@ -627,8 +627,6 @@ static void __exit exit_romfs_fs(void)
 
 /* Yes, works even as a module... :) */
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_romfs_fs)
 module_exit(exit_romfs_fs)
 MODULE_LICENSE("GPL");

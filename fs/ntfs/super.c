@@ -1934,7 +1934,6 @@ static void __exit exit_ntfs_fs(void)
 	ntfs_sysctl(0);
 }
 
-EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
 MODULE_DESCRIPTION("NTFS 1.2/3.x driver");
 MODULE_LICENSE("GPL");

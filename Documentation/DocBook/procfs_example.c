@@ -245,5 +245,3 @@ module_exit(cleanup_procfs_example);
 
 MODULE_AUTHOR("Erik Mouw");
 MODULE_DESCRIPTION("procfs examples");
-
-EXPORT_NO_SYMBOLS;

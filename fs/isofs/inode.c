@@ -1469,8 +1469,6 @@ static void __exit exit_iso9660_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_iso9660_fs)
 module_exit(exit_iso9660_fs)
 MODULE_LICENSE("GPL");

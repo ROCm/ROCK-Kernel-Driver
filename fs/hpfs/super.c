@@ -646,7 +646,5 @@ static void __exit exit_hpfs_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_hpfs_fs)
 module_exit(exit_hpfs_fs)

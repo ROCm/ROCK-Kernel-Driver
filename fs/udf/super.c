@@ -208,8 +208,6 @@ static void __exit exit_udf_fs(void)
 	destroy_inodecache();
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_udf_fs)
 module_exit(exit_udf_fs)
 
