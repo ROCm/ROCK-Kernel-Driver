@@ -687,11 +687,13 @@ find_psb_table(void)
 			if (ppst[j].vid < rvo) {	/* vid+rvo >= 0 */
 				printk(KERN_ERR BFX
 				       "0 vid exceeded with pstate %d\n", j);
+				kfree(ppst);
 				return -ENODEV;
 			}
 			if (ppst[j].vid < maxvid+rvo) { /* vid+rvo >= maxvid */
 				printk(KERN_ERR BFX
 				       "maxvid exceeded with pstate %d\n", j);
+				kfree(ppst);
 				return -ENODEV;
 			}
 		}
@@ -706,7 +708,7 @@ find_psb_table(void)
 
 		for (j = 0; j < numps; j++)
 			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid))
-				return (0);
+				return 0;
 
 		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
 		return 0;
