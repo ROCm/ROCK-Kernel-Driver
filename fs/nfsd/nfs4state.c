@@ -82,6 +82,8 @@ u32 free_delegation= 0;
 /* forward declarations */
 struct nfs4_stateid * find_stateid(stateid_t *stid, int flags);
 static struct nfs4_delegation * find_delegation_stateid(struct inode *ino, stateid_t *stid);
+static void release_delegation(struct nfs4_delegation *dp);
+static void release_stateid_lockowner(struct nfs4_stateid *open_stp);
 
 /* Locking:
  *
@@ -164,6 +166,67 @@ alloc_init_deleg(struct nfs4_client *clp, struct nfs4_file *fp, struct svc_fh *c
 	list_add(&dp->dl_del_perclnt, &clp->cl_del_perclnt);
 	alloc_delegation++;
 	return dp;
+}
+
+/*
+ * Free the delegation structure.
+ * Called with the recall_lock held.
+ */
+static void
+nfs4_free_delegation(struct nfs4_delegation *dp)
+{
+	dprintk("NFSD: nfs4_free_delegation freeing dp %p\n",dp);
+	list_del(&dp->dl_recall_lru);
+	kfree(dp);
+	free_delegation++;
+}
+
+/* release_delegation:
+ *
+ * Remove the associated file_lock first, then remove the delegation.
+ * lease_modify() is called to remove the FS_LEASE file_lock from
+ * the i_flock list, eventually calling nfsd's lock_manager
+ * fl_release_callback.
+ *
+ * call either:
+ *   nfsd_close : if last close, locks_remove_flock calls lease_modify.
+ *                otherwise, recalled state set to NFS4_RECALL_COMPLETE
+ *                so that it will be reaped by the laundromat service.
+ * or
+ *   remove_lease (calls time_out_lease which calls lease_modify).
+ *   and nfs4_free_delegation.
+ *
+ * Called with nfs_lock_state() held.
+ * Called with the recall_lock held.
+ */
+
+static void
+release_delegation(struct nfs4_delegation *dp)
+{
+	/* delayed nfsd_close */
+	if (dp->dl_stp) {
+		struct file *filp = dp->dl_stp->st_vfs_file;
+
+		dprintk("NFSD: release_delegation CLOSE\n");
+		release_stateid_lockowner(dp->dl_stp);
+		kfree(dp->dl_stp);
+		dp->dl_stp = NULL;
+		atomic_set(&dp->dl_state, NFS4_RECALL_COMPLETE);
+		nfsd_close(filp);
+		vfsclose++;
+	} else {
+		dprintk("NFSD: release_delegation remove lease dl_flock %p\n",
+			dp->dl_flock);
+		remove_lease(dp->dl_flock);
+		list_del_init(&dp->dl_del_perfile);
+		list_del_init(&dp->dl_del_perclnt);
+		/* dl_count > 0 => outstanding recall rpc */
+		dprintk("NFSD: release_delegation free deleg dl_count %d\n",
+			           atomic_read(&dp->dl_count));
+		if ((atomic_read(&dp->dl_state) == NFS4_REAP_DELEG)
+		     || atomic_dec_and_test(&dp->dl_count))
+			nfs4_free_delegation(dp);
+	}
 }
 
 /* 
