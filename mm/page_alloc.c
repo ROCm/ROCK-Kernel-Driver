@@ -443,7 +443,6 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page *page;
-	int cflags;
 	int i;
 	int cold;
 
@@ -514,10 +513,9 @@ rebalance:
 		goto nopage;
 
 	inc_page_state(allocstall);
-	cflags = current->flags;
 	current->flags |= PF_MEMALLOC;
 	try_to_free_pages(classzone, gfp_mask, order);
-	current->flags = cflags;
+	current->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
 	min = 1UL << order;

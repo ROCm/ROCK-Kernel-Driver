@@ -120,6 +120,7 @@ int add_to_swap(struct page * page)
 {
 	swp_entry_t entry;
 	int pf_flags;
+	int err;
 
 	if (!PageLocked(page))
 		BUG();
@@ -149,9 +150,15 @@ int add_to_swap(struct page * page)
 		/*
 		 * Add it to the swap cache and mark it dirty
 		 */
-		switch (add_to_page_cache(page, &swapper_space, entry.val)) {
+		err = add_to_page_cache(page, &swapper_space, entry.val);
+
+		if (!(pf_flags & PF_NOWARN))
+			current->flags &= ~PF_NOWARN;
+		if (pf_flags & PF_MEMALLOC)
+			current->flags |= PF_MEMALLOC;
+
+		switch (err) {
 		case 0:				/* Success */
-			current->flags = pf_flags;
 			SetPageUptodate(page);
 			ClearPageDirty(page);
 			set_page_dirty(page);
@@ -159,13 +166,11 @@ int add_to_swap(struct page * page)
 			return 1;
 		case -EEXIST:
 			/* Raced with "speculative" read_swap_cache_async */
-			current->flags = pf_flags;
 			INC_CACHE_INFO(exist_race);
 			swap_free(entry);
 			continue;
 		default:
 			/* -ENOMEM radix-tree allocation failure */
-			current->flags = pf_flags;
 			swap_free(entry);
 			return 0;
 		}
