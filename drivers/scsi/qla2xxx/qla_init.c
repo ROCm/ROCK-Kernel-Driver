@@ -783,7 +783,6 @@ qla2x00_init_response_q_entries(scsi_qla_host_t *ha)
 static void
 qla2x00_update_fw_options(scsi_qla_host_t *ha)
 {
-	/* Setup seriallink options */
 	uint16_t swing, emphasis;
 
 	memset(ha->fw_options, 0, sizeof(ha->fw_options));
@@ -807,7 +806,6 @@ qla2x00_update_fw_options(scsi_qla_host_t *ha)
 	emphasis = ha->fw_seriallink_options[0] & (BIT_4 | BIT_3);
 	emphasis >>= 3;
 	ha->fw_options[10] = (emphasis << 14) | (swing << 8) | 0x3;
-
 	/*  2G settings */
 	swing = ha->fw_seriallink_options[0] & (BIT_7 | BIT_6 | BIT_5);
 	swing >>= 5;
@@ -818,7 +816,7 @@ qla2x00_update_fw_options(scsi_qla_host_t *ha)
 	/*  Return command IOCBs without waiting for an ABTS to complete. */
 	ha->fw_options[3] |= BIT_13;
 
-	/* Update Serial Link options. */
+	/* Update firmware options. */
 	qla2x00_set_fw_options(ha, ha->fw_options);
 }
 
@@ -869,15 +867,15 @@ qla2x00_init_rings(scsi_qla_host_t *ha)
 
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
+	/* Update any ISP specific firmware options before initialization. */
+	qla2x00_update_fw_options(ha);
+
 	DEBUG(printk("scsi(%ld): Issue init firmware.\n", ha->host_no));
 	rval = qla2x00_init_firmware(ha, sizeof(init_cb_t));
 	if (rval) {
 		DEBUG2_3(printk("scsi(%ld): Init firmware **** FAILED ****.\n",
 		    ha->host_no));
 	} else {
-		/* Update any ISP specific firmware options. */
-		qla2x00_update_fw_options(ha);
-
 		DEBUG3(printk("scsi(%ld): Init firmware -- success.\n",
 		    ha->host_no));
 	}
