@@ -958,7 +958,7 @@ static int pegasus_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd
 static int pegasus_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
 	pegasus_t *pegasus = netdev_priv(dev);
-	return mii_ethtool_sset(&pegasus->mii, &ecmd);
+	return mii_ethtool_sset(&pegasus->mii, ecmd);
 }
 
 static int pegasus_nway_reset(struct net_device *dev)
@@ -975,15 +975,19 @@ static u32 pegasus_get_link(struct net_device *dev)
 
 static u32 pegasus_get_msglevel(struct net_device *dev)
 {
-	pegasus_t *pegasus = netdev_priv(dev);
-	/* return pegasus->msg_enable; FIXME */
+	/*
+	 * pegasus_t *pegasus = netdev_priv(dev);
+	 * return pegasus->msg_enable; FIXME
+	 */
 	return 0;
 }
 
 static void pegasus_set_msglevel(struct net_device *dev, u32 v)
 {
-	pegasus_t *pegasus = netdev_priv(dev);
-	/* pegasus->msg_enable = edata.data; FIXME */
+	/*
+	 * pegasus_t *pegasus = netdev_priv(dev);
+	 * pegasus->msg_enable = edata.data; FIXME
+	 */
 }
 
 static struct ethtool_ops ops = {
