@@ -52,6 +52,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <scsi/scsi_devinfo.h>
+#include <scsi/scsi_host.h>
 
 
 /***********************************************************************
@@ -346,8 +347,34 @@ static ssize_t show_info(struct device *dev, char *buffer)
 
 static DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
 
+/* Output routine for the sysfs max_sectors file */
+static ssize_t show_max_sectors(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+
+	return sprintf(buf, "%u\n", sdev->request_queue->max_sectors);
+}
+
+/* Input routine for the sysfs max_sectors file */
+static ssize_t store_max_sectors(struct device *dev, const char *buf,
+		size_t count)
+{
+	struct scsi_device *sdev = to_scsi_device(dev);
+	unsigned short ms;
+
+	if (sscanf(buf, "%hu", &ms) > 0 && ms <= SCSI_DEFAULT_MAX_SECTORS) {
+		blk_queue_max_sectors(sdev->request_queue, ms);
+		return strlen(buf);
+	}
+	return -EINVAL;	
+}
+
+static DEVICE_ATTR(max_sectors, S_IRUGO | S_IWUSR, show_max_sectors,
+		store_max_sectors);
+
 static struct device_attribute *sysfs_device_attr_list[] = {
 		&dev_attr_info,
+		&dev_attr_max_sectors,
 		NULL,
 		};
 
