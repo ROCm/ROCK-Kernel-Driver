@@ -15,7 +15,7 @@
 #include <linux/swap.h>
 #include <linux/fs.h>
 #include <linux/highmem.h>
-#include <linux/rmap-locking.h>
+#include <linux/rmap.h>
 #include <linux/security.h>
 
 #include <asm/uaccess.h>

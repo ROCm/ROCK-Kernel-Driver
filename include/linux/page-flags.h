@@ -69,7 +69,7 @@
 #define PG_private		12	/* Has something at ->private */
 #define PG_writeback		13	/* Page is under writeback */
 #define PG_nosave		14	/* Used for system suspend/resume */
-#define PG_chainlock		15	/* lock bit for ->pte_chain */
+#define PG_maplock		15	/* Lock bit for rmap to ptes */
 
 #define PG_direct		16	/* ->pte_chain points directly at pte */
 #define PG_mappedtodisk		17	/* Has blocks allocated on-disk */

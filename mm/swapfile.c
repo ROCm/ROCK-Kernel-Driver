@@ -21,7 +21,7 @@
 #include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/module.h>
-#include <linux/rmap-locking.h>
+#include <linux/rmap.h>
 #include <linux/security.h>
 #include <linux/backing-dev.h>
 

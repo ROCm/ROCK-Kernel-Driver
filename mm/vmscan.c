@@ -28,7 +28,7 @@
 #include <linux/mm_inline.h>
 #include <linux/pagevec.h>
 #include <linux/backing-dev.h>
-#include <linux/rmap-locking.h>
+#include <linux/rmap.h>
 #include <linux/topology.h>
 #include <linux/cpu.h>
 #include <linux/notifier.h>
@@ -173,7 +173,7 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
 	return 0;
 }
 
-/* Must be called with page's pte_chain_lock held. */
+/* Must be called with page's rmap lock held. */
 static inline int page_mapping_inuse(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
@@ -278,11 +278,11 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (PageWriteback(page))
 			goto keep_locked;
 
-		pte_chain_lock(page);
+		rmap_lock(page);
 		referenced = page_referenced(page);
 		if (referenced && page_mapping_inuse(page)) {
 			/* In active use or really unfreeable.  Activate it. */
-			pte_chain_unlock(page);
+			rmap_unlock(page);
 			goto activate_locked;
 		}
 
@@ -296,10 +296,10 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * XXX: implement swap clustering ?
 		 */
 		if (page_mapped(page) && !mapping && !PagePrivate(page)) {
-			pte_chain_unlock(page);
+			rmap_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
-			pte_chain_lock(page);
+			rmap_lock(page);
 			mapping = page->mapping;
 		}
 #endif /* CONFIG_SWAP */
@@ -314,16 +314,16 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_FAIL:
-				pte_chain_unlock(page);
+				rmap_unlock(page);
 				goto activate_locked;
 			case SWAP_AGAIN:
-				pte_chain_unlock(page);
+				rmap_unlock(page);
 				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
 		}
-		pte_chain_unlock(page);
+		rmap_unlock(page);
 
 		/*
 		 * If the page is dirty, only perform writeback if that write
@@ -657,13 +657,13 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			pte_chain_lock(page);
+			rmap_lock(page);
 			if (page_referenced(page)) {
-				pte_chain_unlock(page);
+				rmap_unlock(page);
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			pte_chain_unlock(page);
+			rmap_unlock(page);
 		}
 		/*
 		 * FIXME: need to consider page_count(page) here if/when we
