@@ -87,7 +87,7 @@ config ATARI
 
 config HADES
 	bool "Hades support"
-	depends on ATARI
+	depends on ATARI && BROKEN
 	help
 	  This option enables support for the Hades Atari clone. If you plan
 	  to use this kernel on a Hades, say Y here; otherwise say N.
