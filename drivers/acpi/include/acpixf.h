@@ -153,7 +153,7 @@ acpi_walk_namespace (
 
 acpi_status
 acpi_get_devices (
-	NATIVE_CHAR             *HID,
+	char                    *HID,
 	acpi_walk_callback      user_function,
 	void                    *context,
 	void                    **return_value);

@@ -2,7 +2,7 @@
  *
  * Module Name: nseval - Object evaluation interfaces -- includes control
  *                       method lookup and execution.
- *              $Revision: 119 $
+ *              $Revision: 120 $
  *
  ******************************************************************************/
 
@@ -60,14 +60,14 @@
 acpi_status
 acpi_ns_evaluate_relative (
 	acpi_namespace_node     *handle,
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object)
 {
 	acpi_namespace_node     *prefix_node;
 	acpi_status             status;
 	acpi_namespace_node     *node = NULL;
-	NATIVE_CHAR             *internal_path = NULL;
+	char                    *internal_path = NULL;
 	acpi_generic_state      scope_info;
 
 
@@ -158,13 +158,13 @@ cleanup:
 
 acpi_status
 acpi_ns_evaluate_by_name (
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_operand_object     **params,
 	acpi_operand_object     **return_object)
 {
 	acpi_status             status;
 	acpi_namespace_node     *node = NULL;
-	NATIVE_CHAR             *internal_path = NULL;
+	char                    *internal_path = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("Ns_evaluate_by_name");

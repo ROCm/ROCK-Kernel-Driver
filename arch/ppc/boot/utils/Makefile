@@ -18,5 +18,3 @@ $(UTILS):
 
 clean:
 	rm -f $(UTILS)
-
-include $(TOPDIR)/Rules.make

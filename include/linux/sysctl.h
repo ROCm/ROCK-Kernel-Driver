@@ -154,6 +154,7 @@ enum
 	VM_PAGEBUF=17,		/* struct: Control pagebuf parameters */
 	VM_HUGETLB_PAGES=18,	/* int: Number of available Huge Pages */
 	VM_SWAPPINESS=19,	/* Tendency to steal mapped memory */
+	VM_LOWER_ZONE_PROTECTION=20,/* Amount of protection of lower zones */
 };
 
 

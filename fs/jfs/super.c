@@ -97,6 +97,11 @@ static void jfs_destroy_inode(struct inode *inode)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 
+	if (ji->active_ag != -1) {
+		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
+		atomic_dec(&bmap->db_active[ji->active_ag]);
+	}
+
 #ifdef CONFIG_JFS_POSIX_ACL
 	if (ji->i_acl && (ji->i_acl != JFS_ACL_NOT_CACHED))
 		posix_acl_release(ji->i_acl);
@@ -412,7 +417,6 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 	if ((flags & (SLAB_CTOR_VERIFY | SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
 		INIT_LIST_HEAD(&jfs_ip->anon_inode_list);
-		INIT_LIST_HEAD(&jfs_ip->mp_list);
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
 		jfs_ip->atlhead = 0;

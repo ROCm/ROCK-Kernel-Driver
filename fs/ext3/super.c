@@ -47,6 +47,7 @@ static void ext3_mark_recovery_complete(struct super_block * sb,
 					struct ext3_super_block * es);
 static void ext3_clear_journal_err(struct super_block * sb,
 				   struct ext3_super_block * es);
+static int ext3_sync_fs(struct super_block *sb, int wait);
 
 #ifdef CONFIG_JBD_DEBUG
 int journal_no_write[2];
@@ -495,18 +496,19 @@ static void ext3_clear_inode(struct inode *inode)
 static struct super_operations ext3_sops = {
 	.alloc_inode	= ext3_alloc_inode,
 	.destroy_inode	= ext3_destroy_inode,
-	.read_inode	= ext3_read_inode,	/* BKL held */
-	.write_inode	= ext3_write_inode,	/* BKL not held.  Don't need */
-	.dirty_inode	= ext3_dirty_inode,	/* BKL not held.  We take it */
-	.put_inode	= ext3_put_inode,		/* BKL not held.  Don't need */
-	.delete_inode	= ext3_delete_inode,	/* BKL not held.  We take it */
-	.put_super	= ext3_put_super,		/* BKL held */
-	.write_super	= ext3_write_super,	/* BKL not held. We take it. Needed? */
-	.write_super_lockfs = ext3_write_super_lockfs, /* BKL not held. Take it */
-	.unlockfs	= ext3_unlockfs,		/* BKL not held.  We take it */
-	.statfs		= ext3_statfs,		/* BKL not held. */
-	.remount_fs	= ext3_remount,		/* BKL held */
-	.clear_inode	= ext3_clear_inode,	/* BKL not needed. */
+	.read_inode	= ext3_read_inode,
+	.write_inode	= ext3_write_inode,
+	.dirty_inode	= ext3_dirty_inode,
+	.put_inode	= ext3_put_inode,
+	.delete_inode	= ext3_delete_inode,
+	.put_super	= ext3_put_super,
+	.write_super	= ext3_write_super,
+	.sync_fs	= ext3_sync_fs,
+	.write_super_lockfs = ext3_write_super_lockfs,
+	.unlockfs	= ext3_unlockfs,
+	.statfs		= ext3_statfs,
+	.remount_fs	= ext3_remount,
+	.clear_inode	= ext3_clear_inode,
 };
 
 struct dentry *ext3_get_parent(struct dentry *child);
@@ -1714,25 +1716,27 @@ int ext3_force_commit(struct super_block *sb)
  * This implicitly triggers the writebehind on sync().
  */
 
-static int do_sync_supers = 0;
-MODULE_PARM(do_sync_supers, "i");
-MODULE_PARM_DESC(do_sync_supers, "Write superblocks synchronously");
-
 void ext3_write_super (struct super_block * sb)
 {
-	tid_t target;
 	lock_kernel();	
 	if (down_trylock(&sb->s_lock) == 0)
-		BUG();		/* aviro detector */
+		BUG();
+	sb->s_dirt = 0;
+	log_start_commit(EXT3_SB(sb)->s_journal, NULL);
+	unlock_kernel();
+}
+
+static int ext3_sync_fs(struct super_block *sb, int wait)
+{
+	tid_t target;
+
+	lock_kernel();	
 	sb->s_dirt = 0;
 	target = log_start_commit(EXT3_SB(sb)->s_journal, NULL);
-
-	if (do_sync_supers) {
-		unlock_super(sb);
+	if (wait)
 		log_wait_commit(EXT3_SB(sb)->s_journal, target);
-		lock_super(sb);
-	}
 	unlock_kernel();
+	return 0;
 }
 
 /*

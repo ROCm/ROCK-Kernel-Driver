@@ -12,5 +12,3 @@ obj-y		+= legacy.o
 
 
 obj-y		+= irq.o common.o
-
-include $(TOPDIR)/Rules.make

@@ -8,5 +8,3 @@
 subdir-m	+= char
 
 obj-y		+= char/
-
-include $(TOPDIR)/Rules.make

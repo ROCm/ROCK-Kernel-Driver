@@ -3,5 +3,3 @@
 #
 
 obj-y		:= config.o dn_ints.o dma.o
-
-include $(TOPDIR)/Rules.make

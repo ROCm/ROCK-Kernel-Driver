@@ -1050,9 +1050,9 @@ static int is_exec(char *extension)
 	return 0;
 }
 
-static int fat_writepage(struct page *page)
+static int fat_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page,fat_get_block);
+	return block_write_full_page(page,fat_get_block, wbc);
 }
 static int fat_readpage(struct file *file, struct page *page)
 {

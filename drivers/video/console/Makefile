@@ -50,8 +50,6 @@ obj-$(CONFIG_FB_STI)              += sticore.o
 # Files generated that shall be removed upon make clean
 clean-files := promcon_tbl.c
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/promcon_tbl.c: $(src)/prom.uni
 	$(objtree)/scripts/conmakehash $< | \
 	sed -e '/#include <[^>]*>/p' -e 's/types/init/' \

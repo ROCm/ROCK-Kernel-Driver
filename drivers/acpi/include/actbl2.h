@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actbl2.h - ACPI Specification Revision 2.0 Tables
- *       $Revision: 28 $
+ *       $Revision: 29 $
  *
  *****************************************************************************/
 
@@ -75,7 +75,7 @@ typedef struct
  */
 typedef struct
 {
-	NATIVE_CHAR             signature[4];           /* ACPI signature */
+	char                    signature[4];           /* ACPI signature */
 	u32                     length;                 /* Length of structure, in bytes */
 	u32                     hardware_signature;     /* Hardware configuration signature */
 	u32                     firmware_waking_vector; /* 32bit physical address of the Firmware Waking Vector. */

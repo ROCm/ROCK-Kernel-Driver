@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: actables.h - ACPI table management
- *       $Revision: 42 $
+ *       $Revision: 43 $
  *
  *****************************************************************************/
 
@@ -132,7 +132,7 @@ acpi_tb_install_table (
 
 acpi_status
 acpi_tb_match_signature (
-	NATIVE_CHAR             *signature,
+	char                    *signature,
 	acpi_table_desc         *table_info,
 	u8                      search_type);
 
@@ -197,9 +197,9 @@ acpi_tb_find_rsdp (
 
 acpi_status
 acpi_tb_find_table (
-	NATIVE_CHAR             *signature,
-	NATIVE_CHAR             *oem_id,
-	NATIVE_CHAR             *oem_table_id,
+	char                    *signature,
+	char                    *oem_id,
+	char                    *oem_table_id,
 	acpi_table_header       **table_ptr);
 
 acpi_status

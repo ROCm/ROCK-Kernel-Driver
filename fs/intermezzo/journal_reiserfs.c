@@ -43,8 +43,8 @@
 #include <linux/reiserfs_fs_i.h>
 #endif
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 #if defined(CONFIG_REISERFS_FS) || defined(CONFIG_REISERFS_FS_MODULE)
 

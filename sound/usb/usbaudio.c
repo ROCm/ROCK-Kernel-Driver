@@ -526,7 +526,7 @@ static struct snd_urb_ops audio_urb_ops[2] = {
 /*
  * complete callback from data urb
  */
-static void snd_complete_urb(struct urb *urb)
+static void snd_complete_urb(struct urb *urb, struct pt_regs *regs)
 {
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;
@@ -551,7 +551,7 @@ static void snd_complete_urb(struct urb *urb)
 /*
  * complete callback from sync urb
  */
-static void snd_complete_sync_urb(struct urb *urb)
+static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
 {
 	snd_urb_ctx_t *ctx = (snd_urb_ctx_t *)urb->context;
 	snd_usb_substream_t *subs = ctx->subs;

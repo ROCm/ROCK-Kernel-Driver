@@ -64,12 +64,12 @@ int get_option (char **str, int *pint)
  *	completely parseable).
  */
  
-char *get_options (char *str, int nints, int *ints)
+char *get_options(const char *str, int nints, int *ints)
 {
 	int res, i = 1;
 
 	while (i < nints) {
-		res = get_option (&str, ints + i);
+		res = get_option ((char **)&str, ints + i);
 		if (res == 0)
 			break;
 		i++;
@@ -77,7 +77,7 @@ char *get_options (char *str, int nints, int *ints)
 			break;
 	}
 	ints[0] = i - 1;
-	return (str);
+	return (char *)str;
 }
 
 /**

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exconvrt - Object conversion routines
- *              $Revision: 45 $
+ *              $Revision: 47 $
  *
  *****************************************************************************/
 
@@ -274,6 +274,7 @@ acpi_ex_convert_to_buffer (
  * PARAMETERS:  Integer         - Value to be converted
  *              Base            - 10 or 16
  *              String          - Where the string is returned
+ *              Data_width      - Size of data item to be converted
  *
  * RETURN:      Actual string length
  *
@@ -285,7 +286,8 @@ u32
 acpi_ex_convert_to_ascii (
 	acpi_integer            integer,
 	u32                     base,
-	u8                      *string)
+	u8                      *string,
+	u8                      data_width)
 {
 	u32                     i;
 	u32                     j;
@@ -293,11 +295,20 @@ acpi_ex_convert_to_ascii (
 	char                    hex_digit;
 	acpi_integer            digit;
 	u32                     remainder;
-	u32                     length = sizeof (acpi_integer);
-	u8                      leading_zero = TRUE;
+	u32                     length;
+	u8                      leading_zero;
 
 
 	ACPI_FUNCTION_ENTRY ();
+
+	if (data_width < sizeof (acpi_integer)) {
+		leading_zero = FALSE;
+		length = data_width;
+	}
+	else {
+		leading_zero = TRUE;
+		length = sizeof (acpi_integer);
+	}
 
 
 	switch (base) {
@@ -357,8 +368,8 @@ acpi_ex_convert_to_ascii (
 		string [0] = ACPI_ASCII_ZERO;
 		k = 1;
 	}
-	string [k] = 0;
 
+	string [k] = 0;
 	return (k);
 }
 
@@ -437,7 +448,7 @@ acpi_ex_convert_to_string (
 
 		/* Convert */
 
-		i = acpi_ex_convert_to_ascii (obj_desc->integer.value, base, new_buf);
+		i = acpi_ex_convert_to_ascii (obj_desc->integer.value, base, new_buf, sizeof (acpi_integer));
 
 		/* Null terminate at the correct place */
 
@@ -495,7 +506,7 @@ acpi_ex_convert_to_string (
 		pointer = obj_desc->buffer.pointer;
 		index = 0;
 		for (i = 0, index = 0; i < obj_desc->buffer.length; i++) {
-			index = acpi_ex_convert_to_ascii ((acpi_integer) pointer[i], base, &new_buf[index]);
+			index += acpi_ex_convert_to_ascii ((acpi_integer) pointer[i], base, &new_buf[index], 1);
 
 			new_buf[index] = ' ';
 			index++;

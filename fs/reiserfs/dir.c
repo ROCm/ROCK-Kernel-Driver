@@ -18,9 +18,9 @@ static int reiserfs_readdir (struct file *, void *, filldir_t);
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) ;
 
 struct file_operations reiserfs_dir_operations = {
-    read:	generic_read_dir,
-    readdir:	reiserfs_readdir,
-    fsync:	reiserfs_dir_fsync,
+    .read	= generic_read_dir,
+    .readdir	= reiserfs_readdir,
+    .fsync	= reiserfs_dir_fsync,
 };
 
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {

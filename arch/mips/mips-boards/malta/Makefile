@@ -24,5 +24,3 @@
 #
 
 obj-y := malta_int.o malta_rtc.o malta_setup.o
-
-include $(TOPDIR)/Rules.make

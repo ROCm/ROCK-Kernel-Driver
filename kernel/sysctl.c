@@ -28,6 +28,7 @@
 #include <linux/capability.h>
 #include <linux/smp_lock.h>
 #include <linux/init.h>
+#include <linux/kernel.h>
 #include <linux/sysrq.h>
 #include <linux/highuid.h>
 #include <linux/writeback.h>
@@ -53,6 +54,7 @@ extern int core_uses_pid;
 extern char core_pattern[];
 extern int cad_pid;
 extern int pid_max;
+extern int sysctl_lower_zone_protection;
 
 /* this is needed for the proc_dointvec_minmax for [fs_]overflow UID and GID */
 static int maxolduid = 65535;
@@ -310,8 +312,13 @@ static ctl_table vm_table[] = {
 	 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL, &zero,
 	 &one_hundred },
 #ifdef CONFIG_HUGETLB_PAGE
-	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644, NULL, &hugetlb_sysctl_handler},
+	 {VM_HUGETLB_PAGES, "nr_hugepages", &htlbpage_max, sizeof(int), 0644,
+	  NULL, &hugetlb_sysctl_handler},
 #endif
+	{VM_LOWER_ZONE_PROTECTION, "lower_zone_protection",
+	 &sysctl_lower_zone_protection, sizeof(sysctl_lower_zone_protection),
+	 0644, NULL, &proc_dointvec_minmax, &sysctl_intvec, NULL, &zero,
+	 NULL, },
 	{0}
 };
 

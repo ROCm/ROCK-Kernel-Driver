@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 71 $
+ *              $Revision: 73 $
  *
  *****************************************************************************/
 
@@ -719,7 +719,7 @@ acpi_ds_get_current_walk_state (
 		return (NULL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Ds_get_current_walk_state, =%p\n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Current Walk_state %p\n",
 		thread->walk_state_list));
 
 	return (thread->walk_state_list);

@@ -37,5 +37,3 @@ obj-$(CONFIG_VIDEO_CPIA_USB) += cpia_usb.o
 obj-$(CONFIG_VIDEO_MEYE) += meye.o
 obj-$(CONFIG_VIDEO_SAA7134) += saa7134/ tuner.o tda9887.o video-buf.o
 obj-$(CONFIG_TUNER_3036) += tuner-3036.o
-
-include $(TOPDIR)/Rules.make

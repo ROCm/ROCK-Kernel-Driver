@@ -470,6 +470,40 @@ usb_match_id(struct usb_interface *interface, const struct usb_device_id *id)
 	return NULL;
 }
 
+/**
+ * usb_find_interface - find usb_interface pointer for driver and device
+ * @drv: the driver whose current configuration is considered
+ * @kdev: the desired device
+ *
+ * This walks the driver device list and returns a pointer to the interface 
+ * with the matching kdev_t.
+ */
+struct usb_interface *usb_find_interface(struct usb_driver *drv, kdev_t kdev)
+{
+	struct list_head *entry;
+	struct device *dev;
+	struct usb_interface *intf;
+
+	list_for_each(entry, &drv->driver.devices) {
+		dev = container_of(entry, struct device, driver_list);
+
+		/* can't look at usb devices, only interfaces */
+		if (dev->driver == &usb_generic_driver)
+			continue;
+
+		intf = to_usb_interface(dev);
+		if (!intf)
+			continue;
+
+		if (kdev_same(intf->kdev,kdev)) {
+			return intf;
+		}
+	}
+
+	/* no device found that matches */
+	return NULL;	
+}
+
 static int usb_device_match (struct device *dev, struct device_driver *drv)
 {
 	struct usb_interface *intf;
@@ -1445,6 +1479,7 @@ EXPORT_SYMBOL(usb_driver_claim_interface);
 EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);
 EXPORT_SYMBOL(usb_match_id);
+EXPORT_SYMBOL(usb_find_interface);
 
 EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);

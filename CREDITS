@@ -1272,11 +1272,13 @@ S: Germany
 
 N: Christoph Hellwig
 E: hch@infradead.org
-D: misc driver & makefile hacking
+E: hch@sgi.com
+D: all kinds of driver, filesystem & core kernel hacking
 D: freevxfs driver
 D: sysvfs maintainer
-S: Triftstraﬂe 26
-S: 38644 Goslar
+D: chief codingstyle nitpicker
+S: Auweg 38
+S: 85748 Garching
 S: Germany
 
 N: Richard Henderson

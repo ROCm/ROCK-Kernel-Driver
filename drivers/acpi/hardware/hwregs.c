@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 137 $
+ *              $Revision: 138 $
  *
  ******************************************************************************/
 
@@ -58,7 +58,7 @@ acpi_hw_clear_acpi_status (void)
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %04X to %04X\n",
 		ACPI_BITMASK_ALL_FIXED_STATUS,
-		(u16) ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm1a_evt_blk.address)));
+		(u16) acpi_gbl_FADT->Xpm1a_evt_blk.address));
 
 
 	status = acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
@@ -74,7 +74,7 @@ acpi_hw_clear_acpi_status (void)
 
 	/* Clear the fixed events */
 
-	if (ACPI_VALID_ADDRESS (acpi_gbl_FADT->Xpm1b_evt_blk.address)) {
+	if (acpi_gbl_FADT->Xpm1b_evt_blk.address) {
 		status = acpi_hw_low_level_write (16, ACPI_BITMASK_ALL_FIXED_STATUS,
 				 &acpi_gbl_FADT->Xpm1b_evt_blk, 0);
 		if (ACPI_FAILURE (status)) {
@@ -139,7 +139,7 @@ acpi_get_sleep_type_data (
 	/*
 	 * Evaluate the namespace object containing the values for this state
 	 */
-	status = acpi_ns_evaluate_by_name ((NATIVE_CHAR *) acpi_gbl_db_sleep_states[sleep_state],
+	status = acpi_ns_evaluate_by_name ((char *) acpi_gbl_db_sleep_states[sleep_state],
 			  NULL, &obj_desc);
 	if (ACPI_FAILURE (status)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s while evaluating Sleep_state [%s]\n",
@@ -403,16 +403,16 @@ acpi_set_register (
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM2 control: Read %X from %8.8X%8.8X\n",
 			register_value,
-			ACPI_HIDWORD (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address)),
-			ACPI_LODWORD (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address))));
+			ACPI_HIDWORD (acpi_gbl_FADT->Xpm2_cnt_blk.address),
+			ACPI_LODWORD (acpi_gbl_FADT->Xpm2_cnt_blk.address)));
 
 		ACPI_REGISTER_INSERT_VALUE (register_value, bit_reg_info->bit_position,
 				bit_reg_info->access_bit_mask, value);
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %4.4X to %8.8X%8.8X\n",
 			register_value,
-			ACPI_HIDWORD (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address)),
-			ACPI_LODWORD (ACPI_GET_ADDRESS (acpi_gbl_FADT->Xpm2_cnt_blk.address))));
+			ACPI_HIDWORD (acpi_gbl_FADT->Xpm2_cnt_blk.address),
+			ACPI_LODWORD (acpi_gbl_FADT->Xpm2_cnt_blk.address)));
 
 		status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK,
 				   ACPI_REGISTER_PM2_CONTROL, (u8) (register_value));
@@ -700,7 +700,7 @@ acpi_hw_low_level_read (
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
 	if ((!reg) ||
-		(!ACPI_VALID_ADDRESS (reg->address))) {
+		(!reg->address)) {
 		return (AE_OK);
 	}
 	*value = 0;
@@ -712,7 +712,7 @@ acpi_hw_low_level_read (
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
-		mem_address = (ACPI_GET_ADDRESS (reg->address)
+		mem_address = (reg->address
 				  + (ACPI_PHYSICAL_ADDRESS) offset);
 
 		status = acpi_os_read_memory (mem_address, value, width);
@@ -721,7 +721,7 @@ acpi_hw_low_level_read (
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		io_address = (ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (reg->address)
+		io_address = (ACPI_IO_ADDRESS) (reg->address
 				   + (ACPI_PHYSICAL_ADDRESS) offset);
 
 		status = acpi_os_read_port (io_address, value, width);
@@ -732,9 +732,9 @@ acpi_hw_low_level_read (
 
 		pci_id.segment = 0;
 		pci_id.bus     = 0;
-		pci_id.device  = ACPI_PCI_DEVICE (ACPI_GET_ADDRESS (reg->address));
-		pci_id.function = ACPI_PCI_FUNCTION (ACPI_GET_ADDRESS (reg->address));
-		pci_register   = (u16) (ACPI_PCI_REGISTER (ACPI_GET_ADDRESS (reg->address))
+		pci_id.device  = ACPI_PCI_DEVICE (reg->address);
+		pci_id.function = ACPI_PCI_FUNCTION (reg->address);
+		pci_register   = (u16) (ACPI_PCI_REGISTER (reg->address)
 				  + offset);
 
 		status = acpi_os_read_pci_configuration (&pci_id, pci_register, value, width);
@@ -790,7 +790,7 @@ acpi_hw_low_level_write (
 	 * because the PM1A/B code must not fail if B isn't present.
 	 */
 	if ((!reg) ||
-		(!ACPI_VALID_ADDRESS (reg->address))) {
+		(!reg->address)) {
 		return (AE_OK);
 	}
 	/*
@@ -800,7 +800,7 @@ acpi_hw_low_level_write (
 	switch (reg->address_space_id) {
 	case ACPI_ADR_SPACE_SYSTEM_MEMORY:
 
-		mem_address = (ACPI_GET_ADDRESS (reg->address)
+		mem_address = (reg->address
 				  + (ACPI_PHYSICAL_ADDRESS) offset);
 
 		status = acpi_os_write_memory (mem_address, (acpi_integer) value, width);
@@ -809,7 +809,7 @@ acpi_hw_low_level_write (
 
 	case ACPI_ADR_SPACE_SYSTEM_IO:
 
-		io_address = (ACPI_IO_ADDRESS) (ACPI_GET_ADDRESS (reg->address)
+		io_address = (ACPI_IO_ADDRESS) (reg->address
 				   + (ACPI_PHYSICAL_ADDRESS) offset);
 
 		status = acpi_os_write_port (io_address, (acpi_integer) value, width);
@@ -820,9 +820,9 @@ acpi_hw_low_level_write (
 
 		pci_id.segment = 0;
 		pci_id.bus     = 0;
-		pci_id.device  = ACPI_PCI_DEVICE (ACPI_GET_ADDRESS (reg->address));
-		pci_id.function = ACPI_PCI_FUNCTION (ACPI_GET_ADDRESS (reg->address));
-		pci_register   = (u16) (ACPI_PCI_REGISTER (ACPI_GET_ADDRESS (reg->address))
+		pci_id.device  = ACPI_PCI_DEVICE (reg->address);
+		pci_id.function = ACPI_PCI_FUNCTION (reg->address);
+		pci_register   = (u16) (ACPI_PCI_REGISTER (reg->address)
 				  + offset);
 
 		status = acpi_os_write_pci_configuration (&pci_id, pci_register, (acpi_integer) value, width);

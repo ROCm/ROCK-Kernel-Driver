@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 96 $
+ *              $Revision: 97 $
  *
  *****************************************************************************/
 
@@ -628,6 +628,13 @@ cleanup:
 		 */
 		acpi_ds_delete_result_if_not_used (op, walk_state->result_obj, walk_state);
 	}
+
+#if _UNDER_DEVELOPMENT
+
+	if (walk_state->parser_state.aml == walk_state->parser_state.aml_end) {
+		acpi_db_method_end (walk_state);
+	}
+#endif
 
 	/* Always clear the object stack */
 

@@ -490,7 +490,7 @@ static inline int _allocate_block(struct reiserfs_transaction_handle *th,
 	return reiserfs_new_unf_blocknrs2(th, inode, allocated_block_nr, path, block);
     }
 #endif
-    return reiserfs_new_unf_blocknrs (th, allocated_block_nr, path, block);
+    return reiserfs_new_unf_blocknrs (th, inode, allocated_block_nr, path, block);
 }
 
 int reiserfs_get_block (struct inode * inode, sector_t block,
@@ -1917,7 +1917,7 @@ static inline void submit_bh_for_writepage(struct buffer_head **bhp, int nr) {
     }
 }
 
-static int reiserfs_write_full_page(struct page *page) {
+static int reiserfs_write_full_page(struct page *page, struct writeback_control *wbc) {
     struct inode *inode = page->mapping->host ;
     unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT ;
     unsigned last_offset = PAGE_CACHE_SIZE;
@@ -2018,11 +2018,11 @@ static int reiserfs_readpage (struct file *f, struct page * page)
 }
 
 
-static int reiserfs_writepage (struct page * page)
+static int reiserfs_writepage (struct page * page, struct writeback_control *wbc)
 {
     struct inode *inode = page->mapping->host ;
     reiserfs_wait_on_write_block(inode->i_sb) ;
-    return reiserfs_write_full_page(page) ;
+    return reiserfs_write_full_page(page, wbc) ;
 }
 
 
@@ -2113,11 +2113,11 @@ static int reiserfs_releasepage(struct page *page, int unused_gfp_flags)
 }
 
 struct address_space_operations reiserfs_address_space_operations = {
-    writepage: reiserfs_writepage,
-    readpage: reiserfs_readpage, 
-    releasepage: reiserfs_releasepage,
-    sync_page: block_sync_page,
-    prepare_write: reiserfs_prepare_write,
-    commit_write: reiserfs_commit_write,
-    bmap: reiserfs_aop_bmap
+    .writepage = reiserfs_writepage,
+    .readpage = reiserfs_readpage, 
+    .releasepage = reiserfs_releasepage,
+    .sync_page = block_sync_page,
+    .prepare_write = reiserfs_prepare_write,
+    .commit_write = reiserfs_commit_write,
+    .bmap = reiserfs_aop_bmap
 } ;

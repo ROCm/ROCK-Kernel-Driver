@@ -6,5 +6,3 @@
 #
 
 obj-$(CONFIG_IPHASE5526)	+= iph5526.o
-
-include $(TOPDIR)/Rules.make

@@ -6,7 +6,3 @@
 
 obj-$(CONFIG_TOUCHSCREEN_BITSY)	+= h3600_ts_input.o
 obj-$(CONFIG_TOUCHSCREEN_GUNZE)	+= gunze.o
-
-# The global Rules.make.
-
-include $(TOPDIR)/Rules.make

@@ -12,5 +12,3 @@ obj-$(CONFIG_CPU_R5000)		+= r4xx0.o
 obj-$(CONFIG_CPU_NEVADA)	+= r4xx0.o
 obj-$(CONFIG_CPU_R10000)	+= andes.o
 obj-$(CONFIG_SGI_IP22)		+= umap.o
-
-include $(TOPDIR)/Rules.make

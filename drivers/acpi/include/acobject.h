@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of acpi_operand_object  (Internal object only)
- *       $Revision: 114 $
+ *       $Revision: 115 $
  *
  *****************************************************************************/
 
@@ -125,7 +125,7 @@ typedef struct acpi_object_string                   /* Null terminated, ASCII ch
 {
 	ACPI_OBJECT_COMMON_HEADER
 	ACPI_COMMON_BUFFER_INFO
-	NATIVE_CHAR                 *pointer;           /* String in AML stream or allocated string */
+	char                        *pointer;           /* String in AML stream or allocated string */
 
 } ACPI_OBJECT_STRING;
 

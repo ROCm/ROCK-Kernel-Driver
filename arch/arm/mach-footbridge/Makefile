@@ -25,5 +25,3 @@ obj-$(CONFIG_ARCH_NETWINDER) += netwinder-hw.o
 
 obj-$(CONFIG_PCI)	+=$(pci-y)
 obj-$(CONFIG_LEDS)	+=$(leds-y)
-
-include $(TOPDIR)/Rules.make

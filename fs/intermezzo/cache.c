@@ -39,8 +39,8 @@
 #include <linux/blkdev.h>
 #include <linux/init.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 /*
    This file contains the routines associated with managing a

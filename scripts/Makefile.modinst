@@ -16,8 +16,8 @@ include scripts/Makefile.lib
 # ==========================================================================
 
 quiet_cmd_modules_install = INSTALL $(obj-m:.o=.ko)
-      cmd_modules_install = mkdir -p $(MODLIB)/kernel && \
-		      cp $(obj-m:.o=.ko) $(MODLIB)/kernel/
+      cmd_modules_install = mkdir -p $(MODLIB)/kernel/$(obj); \
+			    cp $(obj-m:.o=.ko) $(MODLIB)/kernel/$(obj)
 
 modules_install: $(subdir-ym)
 ifneq ($(obj-m:.o=.ko),)

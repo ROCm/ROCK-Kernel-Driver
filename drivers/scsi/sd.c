@@ -1217,7 +1217,7 @@ static int sd_attach(struct scsi_device * sdp)
 	gd->minors = 16;
 	gd->fops = &sd_fops;
 
-	if (index > 26) {
+	if (index >= 26) {
 		sprintf(gd->disk_name, "sd%c%c",
 			'a' + index/26-1,'a' + index % 26);
 	} else {

@@ -28,7 +28,3 @@ obj-$(CONFIG_JOYSTICK_TWIDJOY)		+= twidjoy.o
 obj-$(CONFIG_JOYSTICK_WARRIOR)		+= warrior.o
 
 obj-$(CONFIG_JOYSTICK_IFORCE)		+= iforce/
-
-# The global Rules.make.
-
-include $(TOPDIR)/Rules.make

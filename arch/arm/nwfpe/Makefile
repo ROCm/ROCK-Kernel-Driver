@@ -17,5 +17,3 @@ nwfpe-objs		+= entry26.o
 else
 nwfpe-objs		+= entry.o
 endif
-
-include $(TOPDIR)/Rules.make

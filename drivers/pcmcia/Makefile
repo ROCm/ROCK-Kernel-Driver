@@ -47,5 +47,3 @@ sa1100_cs-objs-$(CONFIG_SA1100_STORK)		+= sa1100_stork.o
 sa1100_cs-objs-$(CONFIG_SA1100_TRIZEPS) 	+= sa1100_trizeps.o
 sa1100_cs-objs-$(CONFIG_SA1100_YOPY)		+= sa1100_yopy.o
 sa1100_cs-objs					:= $(sa1100_cs-objs-y)
-
-include $(TOPDIR)/Rules.make

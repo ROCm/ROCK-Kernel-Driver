@@ -34,5 +34,3 @@ EXTRA_AFLAGS   := -traditional
 
 export-objs += scx200.o
 obj-$(CONFIG_SCx200)		+= scx200.o
-
-include $(TOPDIR)/Rules.make

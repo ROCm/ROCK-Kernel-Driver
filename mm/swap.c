@@ -61,6 +61,7 @@ int rotate_reclaimable_page(struct page *page)
 	if (PageLRU(page) && !PageActive(page)) {
 		list_del(&page->lru);
 		list_add_tail(&page->lru, &zone->inactive_list);
+		inc_page_state(pgrotated);
 	}
 	if (!TestClearPageWriteback(page))
 		BUG();

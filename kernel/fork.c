@@ -334,8 +334,10 @@ static struct mm_struct * mm_init(struct mm_struct * mm)
 	mm->default_kioctx = (struct kioctx)INIT_KIOCTX(mm->default_kioctx, *mm);
 	mm->free_area_cache = TASK_UNMAPPED_BASE;
 
-	if (likely(!mm_alloc_pgd(mm)))
+	if (likely(!mm_alloc_pgd(mm))) {
+		mm->def_flags = 0;
 		return mm;
+	}
 	free_mm(mm);
 	return NULL;
 }

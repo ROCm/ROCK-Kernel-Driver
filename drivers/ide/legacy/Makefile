@@ -18,5 +18,3 @@ obj-$(CONFIG_BLK_DEV_IDECS)		+= ide-cs.o
 obj-$(CONFIG_BLK_DEV_HD)		+= hd.o
 
 EXTRA_CFLAGS	:= -Idrivers/ide
-
-include $(TOPDIR)/Rules.make

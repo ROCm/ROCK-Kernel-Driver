@@ -4,5 +4,3 @@
 
 
 obj-$(CONFIG_SERIAL_SICC)		+= serial_sicc.o
-
-include $(TOPDIR)/Rules.make

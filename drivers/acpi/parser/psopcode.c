@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psopcode - Parser/Interpreter opcode information table
- *              $Revision: 74 $
+ *              $Revision: 75 $
  *
  *****************************************************************************/
 
@@ -730,7 +730,7 @@ acpi_ps_get_opcode_info (
  *
  ******************************************************************************/
 
-NATIVE_CHAR *
+char *
 acpi_ps_get_opcode_name (
 	u16                     opcode)
 {

@@ -398,6 +398,7 @@ open_scanner(struct inode * inode, struct file * file)
 {
 	struct scn_usb_data *scn;
 	struct usb_device *dev;
+	struct usb_interface *intf;
 
 	int scn_minor;
 
@@ -409,13 +410,13 @@ open_scanner(struct inode * inode, struct file * file)
 
 	dbg("open_scanner: scn_minor:%d", scn_minor);
 
-	if (!p_scn_table[scn_minor]) {
+	intf = usb_find_interface(&scanner_driver, mk_kdev(USB_MAJOR,scn_minor));
+	if (!intf) {
 		up(&scn_mutex);
 		err("open_scanner(%d): Unable to access minor data", scn_minor);
 		return -ENODEV;
 	}
-
-	scn = p_scn_table[scn_minor];
+	scn = dev_get_drvdata (&intf->dev);
 
 	dev = scn->scn_dev;
 
@@ -458,7 +459,7 @@ out_error:
 static int
 close_scanner(struct inode * inode, struct file * file)
 {
-	struct scn_usb_data *scn;
+	struct scn_usb_data *scn = file->private_data;
 
 	int scn_minor;
 
@@ -466,15 +467,9 @@ close_scanner(struct inode * inode, struct file * file)
 
 	dbg("close_scanner: scn_minor:%d", scn_minor);
 
-	if (!p_scn_table[scn_minor]) {
-		err("close_scanner(%d): invalid scn_minor", scn_minor);
-		return -ENODEV;
-	}
-
 	down(&scn_mutex);
-
-	scn = p_scn_table[scn_minor];
 	down(&(scn->sem));
+
 	scn->isopen = 0;
 
 	file->private_data = NULL;
@@ -695,17 +690,12 @@ ioctl_scanner(struct inode *inode, struct file *file,
 	      unsigned int cmd, unsigned long arg)
 {
 	struct usb_device *dev;
-
+	struct scn_usb_data *scn = file->private_data;
 	int scn_minor;
 
 	scn_minor = USB_SCN_MINOR(inode);
 
-	if (!p_scn_table[scn_minor]) {
-		err("ioctl_scanner(%d): invalid scn_minor", scn_minor);
-		return -ENODEV;
-	}
-
-	dev = p_scn_table[scn_minor]->scn_dev;
+	dev = scn->scn_dev;
 
 	switch (cmd)
 	{
@@ -987,13 +977,6 @@ probe_scanner(struct usb_interface *intf,
 		return -ENOMEM;
 	}
 
-/* Check to make sure that the last slot isn't already taken */
-	if (p_scn_table[scn_minor]) {
-		err("probe_scanner: No more minor devices remaining.");
-		up(&scn_mutex);
-		return -ENOMEM;
-	}
-
 	dbg("probe_scanner: Allocated minor:%d", scn_minor);
 
 	if (!(scn = kmalloc (sizeof (struct scn_usb_data), GFP_KERNEL))) {
@@ -1082,17 +1065,19 @@ probe_scanner(struct usb_interface *intf,
 	
 	scn->devfs = devfs_register(usb_devfs_handle, name,
 				    DEVFS_FL_DEFAULT, USB_MAJOR,
-				    SCN_BASE_MNR + scn->scn_minor,
+				    scn->scn_minor,
 				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
 				    S_IWGRP | S_IROTH | S_IWOTH, &usb_scanner_fops, NULL);
 	if (scn->devfs == NULL)
 		dbg("scanner%d: device node registration failed", scn_minor);
 
-	p_scn_table[scn_minor] = scn;
-
 	up(&scn_mutex);
 
 	dev_set_drvdata(&intf->dev, scn);
+
+	/* add device id so the device works when advertised */
+	intf->kdev = mk_kdev(USB_MAJOR,scn->scn_minor);
+
 	return 0;
 }
 
@@ -1100,6 +1085,9 @@ static void
 disconnect_scanner(struct usb_interface *intf)
 {
 	struct scn_usb_data *scn = dev_get_drvdata(&intf->dev);
+
+	/* remove device id to disable open() */
+	intf->kdev = NODEV;
 
 	dev_set_drvdata(&intf->dev, NULL);
 	if (scn) {
@@ -1119,7 +1107,6 @@ disconnect_scanner(struct usb_interface *intf)
 		dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
 		devfs_unregister(scn->devfs);
 		usb_deregister_dev(1, scn->scn_minor);
-		p_scn_table[scn->scn_minor] = NULL;
 		usb_free_urb(scn->scn_irq);
 		up (&(scn->sem));
 		kfree (scn);

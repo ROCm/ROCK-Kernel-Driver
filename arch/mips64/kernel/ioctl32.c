@@ -9,6 +9,7 @@
  */
 #include <linux/config.h>
 #include <linux/types.h>
+#include <linux/compat.h>
 #include <linux/kernel.h>
 #include <linux/fs.h>
 #include <linux/sched.h>
@@ -65,14 +66,9 @@ static int rw_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 
 #define A(__x) ((unsigned long)(__x))
 
-struct timeval32 {
-	int tv_sec;
-	int tv_usec;
-};
-
 static int do_siocgstamp(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct timeval32 *up = (struct timeval32 *)arg;
+	struct compat_timeval *up = (struct compat_timeval *)arg;
 	struct timeval ktv;
 	mm_segment_t old_fs = get_fs();
 	int err;

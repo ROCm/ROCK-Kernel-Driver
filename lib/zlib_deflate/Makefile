@@ -11,5 +11,3 @@ export-objs := deflate_syms.o
 obj-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate.o
 
 zlib_deflate-objs := deflate.o deftree.o deflate_syms.o
-
-include $(TOPDIR)/Rules.make

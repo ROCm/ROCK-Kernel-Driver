@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exutils - interpreter/scanner utilities
- *              $Revision: 106 $
+ *              $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -298,7 +298,7 @@ acpi_ex_digits_needed (
 void
 acpi_ex_eisa_id_to_string (
 	u32                     numeric_id,
-	NATIVE_CHAR             *out_string)
+	char                    *out_string)
 {
 	u32                     eisa_id;
 
@@ -335,7 +335,7 @@ acpi_ex_eisa_id_to_string (
 void
 acpi_ex_unsigned_integer_to_string (
 	acpi_integer            value,
-	NATIVE_CHAR             *out_string)
+	char                    *out_string)
 {
 	u32                     count;
 	u32                     digits_needed;
@@ -351,7 +351,7 @@ acpi_ex_unsigned_integer_to_string (
 
 	for (count = digits_needed; count > 0; count--) {
 		(void) acpi_ut_short_divide (&value, 10, &quotient, &remainder);
-		out_string[count-1] = (NATIVE_CHAR) ('0' + remainder);\
+		out_string[count-1] = (char) ('0' + remainder);\
 		value = quotient;
 	}
 }

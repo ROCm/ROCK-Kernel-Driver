@@ -257,7 +257,6 @@ int __init cpufreq_p4_init(void)
 
 #ifdef CONFIG_CPU_FREQ_24_API
 	for (i=0;i<NR_CPUS;i++) {
-		driver->cpu_min_freq[i] = stock_freq / 8;
 		driver->cpu_cur_freq[i] = stock_freq;
 	}
 #endif
@@ -272,7 +271,10 @@ int __init cpufreq_p4_init(void)
 			driver->policy[i].min    = stock_freq / 8;
 		driver->policy[i].max    = stock_freq;
 		driver->policy[i].policy = CPUFREQ_POLICY_PERFORMANCE;
-		driver->policy[i].max_cpu_freq  = stock_freq;
+		driver->policy[i].cpuinfo.min_freq  = driver->policy[i].min;
+		driver->policy[i].cpuinfo.max_freq  = stock_freq;
+		driver->policy[i].cpuinfo.transition_latency = CPUFREQ_ETERNAL;
+
 		driver->policy[i].cpu    = i;
 	}
 

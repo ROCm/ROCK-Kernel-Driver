@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfname - Public interfaces to the ACPI subsystem
  *                         ACPI Namespace oriented interfaces
- *              $Revision: 92 $
+ *              $Revision: 93 $
  *
  *****************************************************************************/
 
@@ -182,7 +182,7 @@ acpi_get_name (
 
 	ACPI_STRNCPY (buffer->pointer, node->name.ascii,
 			 ACPI_NAME_SIZE);
-	((NATIVE_CHAR *) buffer->pointer) [ACPI_NAME_SIZE] = 0;
+	((char *) buffer->pointer) [ACPI_NAME_SIZE] = 0;
 	status = AE_OK;
 
 

@@ -10,8 +10,6 @@ ifeq ($(CONFIG_M68328),y)
 EXTRA_TARGETS := $(BOARD)/bootlogo.rh $(BOARD)/crt0_$(MODEL).o
 endif
 
-include $(TOPDIR)/Rules.make
-
 $(obj)/$(BOARD)/bootlogo.rh: $(src)/bootlogo.h
 	perl $(src)/bootlogo.pl < $(src)/bootlogo.h > $(obj)/$(BOARD)/bootlogo.rh
 

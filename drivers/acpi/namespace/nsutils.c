@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 118 $
+ *              $Revision: 120 $
  *
  *****************************************************************************/
 
@@ -51,7 +51,7 @@
 
 void
 acpi_ns_report_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	char                    *internal_name,
@@ -103,7 +103,7 @@ acpi_ns_report_error (
 
 void
 acpi_ns_report_method_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	char                    *message,
@@ -144,7 +144,7 @@ acpi_ns_report_method_error (
 void
 acpi_ns_print_node_pathname (
 	acpi_namespace_node     *node,
-	NATIVE_CHAR             *msg)
+	char                    *msg)
 {
 	acpi_buffer             buffer;
 	acpi_status             status;
@@ -176,7 +176,7 @@ acpi_ns_print_node_pathname (
 
 u8
 acpi_ns_valid_root_prefix (
-	NATIVE_CHAR             prefix)
+	char                    prefix)
 {
 
 	return ((u8) (prefix == '\\'));
@@ -197,7 +197,7 @@ acpi_ns_valid_root_prefix (
 
 u8
 acpi_ns_valid_path_separator (
-	NATIVE_CHAR             sep)
+	char                    sep)
 {
 
 	return ((u8) (sep == '.'));
@@ -277,7 +277,7 @@ void
 acpi_ns_get_internal_name_length (
 	acpi_namestring_info    *info)
 {
-	NATIVE_CHAR             *next_external_char;
+	char                    *next_external_char;
 	u32                     i;
 
 
@@ -352,9 +352,9 @@ acpi_ns_build_internal_name (
 	acpi_namestring_info    *info)
 {
 	u32                     num_segments = info->num_segments;
-	NATIVE_CHAR             *internal_name = info->internal_name;
-	NATIVE_CHAR             *external_name = info->next_external_char;
-	NATIVE_CHAR             *result = NULL;
+	char                    *internal_name = info->internal_name;
+	char                    *external_name = info->next_external_char;
+	char                    *result = NULL;
 	NATIVE_UINT             i;
 
 
@@ -470,10 +470,10 @@ acpi_ns_build_internal_name (
 
 acpi_status
 acpi_ns_internalize_name (
-	NATIVE_CHAR             *external_name,
-	NATIVE_CHAR             **converted_name)
+	char                    *external_name,
+	char                    **converted_name)
 {
-	NATIVE_CHAR             *internal_name;
+	char                    *internal_name;
 	acpi_namestring_info    info;
 	acpi_status             status;
 
@@ -865,14 +865,14 @@ acpi_ns_opens_scope (
 
 acpi_status
 acpi_ns_get_node_by_path (
-	NATIVE_CHAR             *pathname,
+	char                    *pathname,
 	acpi_namespace_node     *start_node,
 	u32                     flags,
 	acpi_namespace_node     **return_node)
 {
 	acpi_generic_state      scope_info;
 	acpi_status             status;
-	NATIVE_CHAR             *internal_path = NULL;
+	char                    *internal_path = NULL;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ns_get_node_by_path", pathname);

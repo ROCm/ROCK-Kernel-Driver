@@ -11,5 +11,3 @@ nfs-$(CONFIG_NFS_V3)	+= nfs3proc.o nfs3xdr.o
 nfs-$(CONFIG_NFS_V4)	+= nfs4proc.o nfs4xdr.o nfs4state.o nfs4renewd.o
 nfs-$(CONFIG_NFS_DIRECTIO) += direct.o
 nfs-objs		:= $(nfs-y)
-
-include $(TOPDIR)/Rules.make

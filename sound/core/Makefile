@@ -103,5 +103,3 @@ endif
 obj-$(CONFIG_SND_USB_AUDIO) += snd-pcm.o snd-timer.o snd.o snd-rawmidi.o
 
 obj-m := $(sort $(obj-m))
-
-include $(TOPDIR)/Rules.make

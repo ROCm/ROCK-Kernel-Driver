@@ -72,5 +72,3 @@ obj-$(CONFIG_SH_DREAMCAST)	+= mach_dc.o setup_dc.o io_dc.o rtc-aica.o
 ifeq ($(CONFIG_SH_GENERIC),y)
 obj-y		+= $(machine-specific-objs)
 endif
-
-include $(TOPDIR)/Rules.make

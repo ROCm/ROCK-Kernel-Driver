@@ -126,9 +126,9 @@ blkdev_direct_IO(int rw, struct file *file, const struct iovec *iov,
 				nr_segs, blkdev_get_blocks);
 }
 
-static int blkdev_writepage(struct page * page)
+static int blkdev_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page, blkdev_get_block);
+	return block_write_full_page(page, blkdev_get_block, wbc);
 }
 
 static int blkdev_readpage(struct file * file, struct page * page)

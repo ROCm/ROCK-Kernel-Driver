@@ -2,7 +2,7 @@
  *
  * Module Name: nsxfeval - Public interfaces to the ACPI subsystem
  *                         ACPI Object evaluation interfaces
- *              $Revision: 4 $
+ *              $Revision: 6 $
  *
  ******************************************************************************/
 
@@ -518,7 +518,7 @@ acpi_ns_get_device_callback (
 
 acpi_status
 acpi_get_devices (
-	NATIVE_CHAR             *HID,
+	char                    *HID,
 	acpi_walk_callback      user_function,
 	void                    *context,
 	void                    **return_value)

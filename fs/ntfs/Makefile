@@ -14,6 +14,3 @@ endif
 ifeq ($(CONFIG_NTFS_RW),y)
 EXTRA_CFLAGS += -DNTFS_RW
 endif
-
-include $(TOPDIR)/Rules.make
-

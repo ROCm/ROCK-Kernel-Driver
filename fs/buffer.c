@@ -219,8 +219,10 @@ int fsync_super(struct super_block *sb)
 	sync_inodes_sb(sb, 0);
 	DQUOT_SYNC(sb);
 	lock_super(sb);
-	if (sb->s_dirt && sb->s_op && sb->s_op->write_super)
+	if (sb->s_dirt && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
+	if (sb->s_op->sync_fs)
+		sb->s_op->sync_fs(sb, 1);
 	unlock_super(sb);
 	sync_blockdev(sb->s_bdev);
 	sync_inodes_sb(sb, 1);
@@ -251,10 +253,12 @@ int fsync_bdev(struct block_device *bdev)
 asmlinkage long sys_sync(void)
 {
 	wakeup_bdflush(0);
-	sync_inodes(0);	/* All mappings and inodes, including block devices */
+	sync_inodes(0);		/* All mappings, inodes and their blockdevs */
 	DQUOT_SYNC(NULL);
-	sync_supers();	/* Write the superblocks */
-	sync_inodes(1);	/* All the mappings and inodes, again. */
+	sync_supers();		/* Write the superblocks */
+	sync_filesystems(0);	/* Start syncing the filesystems */
+	sync_filesystems(1);	/* Waitingly sync the filesystems */
+	sync_inodes(1);		/* Mappings, inodes and blockdevs, again. */
 	return 0;
 }
 
@@ -276,7 +280,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	/* sync the superblock to buffers */
 	sb = inode->i_sb;
 	lock_super(sb);
-	if (sb->s_op && sb->s_op->write_super)
+	if (sb->s_op->write_super)
 		sb->s_op->write_super(sb);
 	unlock_super(sb);
 
@@ -1622,16 +1626,15 @@ EXPORT_SYMBOL(unmap_underlying_metadata);
  * state inside lock_buffer().
  *
  * If block_write_full_page() is called for regular writeback
- * (called_for_sync() is false) then it will return -EAGAIN for a locked
+ * (called_for_sync() is false) then it will redirty a page which has a locked
  * buffer.   This only can happen if someone has written the buffer directly,
  * with submit_bh().  At the address_space level PageWriteback prevents this
  * contention from occurring.
  */
-static int __block_write_full_page(struct inode *inode,
-			struct page *page, get_block_t *get_block)
+static int __block_write_full_page(struct inode *inode, struct page *page,
+			get_block_t *get_block, struct writeback_control *wbc)
 {
 	int err;
-	int ret = 0;
 	unsigned long block;
 	unsigned long last_block;
 	struct buffer_head *bh, *head;
@@ -1701,11 +1704,11 @@ static int __block_write_full_page(struct inode *inode,
 	do {
 		get_bh(bh);
 		if (buffer_mapped(bh) && buffer_dirty(bh)) {
-			if (called_for_sync()) {
+			if (wbc->sync_mode != WB_SYNC_NONE) {
 				lock_buffer(bh);
 			} else {
 				if (test_set_buffer_locked(bh)) {
-					ret = -EAGAIN;
+					__set_page_dirty_nobuffers(page);
 					continue;
 				}
 			}
@@ -1757,8 +1760,6 @@ done:
 			SetPageUptodate(page);
 		end_page_writeback(page);
 	}
-	if (err == 0)
-		return ret;
 	return err;
 
 recover:
@@ -2483,7 +2484,8 @@ out:
 /*
  * The generic ->writepage function for buffer-backed address_spaces
  */
-int block_write_full_page(struct page *page, get_block_t *get_block)
+int block_write_full_page(struct page *page, get_block_t *get_block,
+			struct writeback_control *wbc)
 {
 	struct inode * const inode = page->mapping->host;
 	const unsigned long end_index = inode->i_size >> PAGE_CACHE_SHIFT;
@@ -2492,7 +2494,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 
 	/* Is the page fully inside i_size? */
 	if (page->index < end_index)
-		return __block_write_full_page(inode, page, get_block);
+		return __block_write_full_page(inode, page, get_block, wbc);
 
 	/* Is the page fully outside i_size? (truncate in progress) */
 	offset = inode->i_size & (PAGE_CACHE_SIZE-1);
@@ -2512,7 +2514,7 @@ int block_write_full_page(struct page *page, get_block_t *get_block)
 	memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
 	flush_dcache_page(page);
 	kunmap_atomic(kaddr, KM_USER0);
-	return __block_write_full_page(inode, page, get_block);
+	return __block_write_full_page(inode, page, get_block, wbc);
 }
 
 sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
@@ -2757,11 +2759,25 @@ int block_sync_page(struct page *page)
 /*
  * There are no bdflush tunables left.  But distributions are
  * still running obsolete flush daemons, so we terminate them here.
+ *
+ * Use of bdflush() is deprecated and will be removed in a future kernel.
+ * The `pdflush' kernel threads fully replace bdflush daemons and this call.
  */
 asmlinkage long sys_bdflush(int func, long data)
 {
+	static int msg_count;
+
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
+
+	if (msg_count < 5) {
+		msg_count++;
+		printk(KERN_INFO
+			"warning: process `%s' used the obsolete bdflush"
+			" system call\n", current->comm);
+		printk(KERN_INFO "Fix your initscripts?\n");
+	}
+
 	if (func == 1)
 		do_exit(0);
 	return 0;

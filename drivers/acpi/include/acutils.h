@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 149 $
+ *       $Revision: 150 $
  *
  *****************************************************************************/
 
@@ -96,25 +96,25 @@ acpi_ut_validate_fadt (
 
 #if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_mutex_name (
 	u32                     mutex_id);
 
 #endif
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_type_name (
 	acpi_object_type        type);
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_object_type_name (
 	acpi_operand_object     *obj_desc);
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_region_name (
 	u8                      space_id);
 
-NATIVE_CHAR *
+char *
 acpi_ut_get_event_name (
 	u32                     event_id);
 
@@ -140,51 +140,51 @@ acpi_ut_allocate_owner_id (
 
 ACPI_SIZE
 acpi_ut_strlen (
-	const NATIVE_CHAR       *string);
+	const char              *string);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strcpy (
-	NATIVE_CHAR             *dst_string,
-	const NATIVE_CHAR       *src_string);
+	char                    *dst_string,
+	const char              *src_string);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strncpy (
-	NATIVE_CHAR             *dst_string,
-	const NATIVE_CHAR       *src_string,
+	char                    *dst_string,
+	const char              *src_string,
 	ACPI_SIZE               count);
 
 int
 acpi_ut_strncmp (
-	const NATIVE_CHAR       *string1,
-	const NATIVE_CHAR       *string2,
+	const char              *string1,
+	const char              *string2,
 	ACPI_SIZE               count);
 
 int
 acpi_ut_strcmp (
-	const NATIVE_CHAR       *string1,
-	const NATIVE_CHAR       *string2);
+	const char              *string1,
+	const char              *string2);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strcat (
-	NATIVE_CHAR             *dst_string,
-	const NATIVE_CHAR       *src_string);
+	char                    *dst_string,
+	const char              *src_string);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strncat (
-	NATIVE_CHAR             *dst_string,
-	const NATIVE_CHAR       *src_string,
+	char                    *dst_string,
+	const char              *src_string,
 	ACPI_SIZE               count);
 
 u32
 acpi_ut_strtoul (
-	const NATIVE_CHAR       *string,
-	NATIVE_CHAR             **terminator,
+	const char              *string,
+	char                    **terminator,
 	u32                     base);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strstr (
-	NATIVE_CHAR             *string1,
-	NATIVE_CHAR             *string2);
+	char                    *string1,
+	char                    *string2);
 
 void *
 acpi_ut_memcpy (
@@ -342,7 +342,7 @@ void
 acpi_ut_trace_str (
 	u32                     line_number,
 	acpi_debug_print_info   *dbg_info,
-	NATIVE_CHAR             *string);
+	char                    *string);
 
 void
 acpi_ut_exit (
@@ -369,19 +369,19 @@ acpi_ut_ptr_exit (
 
 void
 acpi_ut_report_info (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id);
 
 void
 acpi_ut_report_error (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id);
 
 void
 acpi_ut_report_warning (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id);
 
@@ -450,13 +450,13 @@ acpi_ut_delete_internal_object_list (
 acpi_status
 acpi_ut_evaluate_object (
 	acpi_namespace_node     *prefix_node,
-	NATIVE_CHAR             *path,
+	char                    *path,
 	u32                     expected_return_btypes,
 	acpi_operand_object     **return_desc);
 
 acpi_status
 acpi_ut_evaluate_numeric_object (
-	NATIVE_CHAR             *object_name,
+	char                    *object_name,
 	acpi_namespace_node     *device_node,
 	acpi_integer            *address);
 
@@ -516,14 +516,14 @@ acpi_ut_release_mutex (
 
 acpi_operand_object  *
 acpi_ut_create_internal_object_dbg (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id,
 	acpi_object_type        type);
 
 void *
 acpi_ut_allocate_object_desc_dbg (
-	NATIVE_CHAR             *module_name,
+	char                    *module_name,
 	u32                     line_number,
 	u32                     component_id);
 
@@ -673,17 +673,17 @@ acpi_ut_valid_acpi_name (
 
 u8
 acpi_ut_valid_acpi_character (
-	NATIVE_CHAR             character);
+	char                    character);
 
 acpi_status
 acpi_ut_strtoul64 (
-	NATIVE_CHAR             *string,
+	char                    *string,
 	u32                     base,
 	acpi_integer            *ret_integer);
 
-NATIVE_CHAR *
+char *
 acpi_ut_strupr (
-	NATIVE_CHAR             *src_string);
+	char                    *src_string);
 
 u8 *
 acpi_ut_get_resource_end_tag (
@@ -745,14 +745,14 @@ void *
 acpi_ut_allocate (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 void *
 acpi_ut_callocate (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 
@@ -762,21 +762,21 @@ void *
 acpi_ut_allocate_and_track (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 void *
 acpi_ut_callocate_and_track (
 	ACPI_SIZE               size,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 void
 acpi_ut_free_and_track (
 	void                    *address,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 acpi_debug_mem_block *
@@ -791,7 +791,7 @@ acpi_ut_track_allocation (
 	ACPI_SIZE               size,
 	u8                      alloc_type,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 acpi_status
@@ -799,7 +799,7 @@ acpi_ut_remove_allocation (
 	u32                     list_id,
 	acpi_debug_mem_block    *address,
 	u32                     component,
-	NATIVE_CHAR             *module,
+	char                    *module,
 	u32                     line);
 
 void
@@ -809,7 +809,7 @@ acpi_ut_dump_allocation_info (
 void
 acpi_ut_dump_allocations (
 	u32                     component,
-	NATIVE_CHAR             *module);
+	char                    *module);
 #endif
 
 

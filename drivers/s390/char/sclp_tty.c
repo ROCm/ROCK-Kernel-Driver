@@ -466,7 +466,7 @@ sclp_tty_flush_buffer(struct tty_struct *tty)
 /*
  * push input to tty
  */
-void sclp_tty_input(unsigned char* buf, unsigned int count)
+static void sclp_tty_input(unsigned char* buf, unsigned int count)
 {
 	unsigned int cchar;
 
@@ -694,7 +694,7 @@ sclp_tty_state_change(struct sclp_register *reg)
 {
 }
 
-struct sclp_register sclp_input_event =
+static struct sclp_register sclp_input_event =
 {
 	.receive_mask = EvTyp_OpCmd_Mask | EvTyp_PMsgCmd_Mask,
 	.state_change_fn = sclp_tty_state_change,

@@ -16,5 +16,3 @@ endif
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-tea6330t.o snd-i2c.o
 obj-$(CONFIG_SND_ICE1712) += snd-cs8427.o snd-i2c.o
-
-include $(TOPDIR)/Rules.make

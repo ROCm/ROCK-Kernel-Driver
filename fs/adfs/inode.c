@@ -51,9 +51,9 @@ abort_toobig:
 	return 0;
 }
 
-static int adfs_writepage(struct page *page)
+static int adfs_writepage(struct page *page, struct writeback_control *wbc)
 {
-	return block_write_full_page(page, adfs_get_block);
+	return block_write_full_page(page, adfs_get_block, wbc);
 }
 
 static int adfs_readpage(struct file *file, struct page *page)

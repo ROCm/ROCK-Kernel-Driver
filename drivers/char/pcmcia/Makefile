@@ -5,5 +5,3 @@
 #
 
 obj-$(CONFIG_SYNCLINK_CS) += synclink_cs.o
-
-include $(TOPDIR)/Rules.make

@@ -13,5 +13,3 @@ export-objs		:=
 
 obj-$(CONFIG_PCI)	+= pci.o
 obj-$(CONFIG_LEDS)	+= leds.o
-
-include $(TOPDIR)/Rules.make

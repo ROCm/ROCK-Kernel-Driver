@@ -2,9 +2,9 @@
 #define __INTERMEZZO_KML_H
 
 #include <linux/version.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_psdev.h"
 #include <linux/fs.h>
-#include <linux/intermezzo_journal.h>
+#include "intermezzo_journal.h"
 
 #define PRESTO_KML_MAJOR_VERSION 0x00010000
 #define PRESTO_KML_MINOR_VERSION 0x00002001

@@ -47,8 +47,8 @@
 #include <linux/vmalloc.h>
 #include <asm/segment.h>
 
-#include <linux/intermezzo_fs.h>
-#include <linux/intermezzo_psdev.h>
+#include "intermezzo_fs.h"
+#include "intermezzo_psdev.h"
 
 extern void presto_free_cache(struct presto_cache *);
 

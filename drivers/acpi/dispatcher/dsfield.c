@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dsfield - Dispatcher field routines
- *              $Revision: 69 $
+ *              $Revision: 70 $
  *
  *****************************************************************************/
 
@@ -242,7 +242,7 @@ acpi_ds_get_field_names (
 			/* Lookup the name */
 
 			status = acpi_ns_lookup (walk_state->scope_info,
-					  (NATIVE_CHAR *) &arg->named.name,
+					  (char *) &arg->named.name,
 					  info->field_type, ACPI_IMODE_EXECUTE, ACPI_NS_DONT_OPEN_SCOPE,
 					  walk_state, &info->field_node);
 			if (ACPI_FAILURE (status)) {
@@ -409,7 +409,7 @@ acpi_ds_init_field_objects (
 
 		if (arg->common.aml_opcode == AML_INT_NAMEDFIELD_OP) {
 			status = acpi_ns_lookup (walk_state->scope_info,
-					  (NATIVE_CHAR *) &arg->named.name,
+					  (char *) &arg->named.name,
 					  type, ACPI_IMODE_LOAD_PASS1,
 					  ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE | ACPI_NS_ERROR_IF_FOUND,
 					  walk_state, &node);
