@@ -5507,10 +5507,14 @@ struct _snd_pcm_runtime {
 	Suppose that you'll create a new PCI driver for the card
 	<quote>xyz</quote>.  The card module name would be
 	snd-xyz.  The new driver is usually put into alsa-driver
-	tree.  Then the driver is evaluated, audited and tested
+	tree, <filename>alsa-driver/pci</filename> directory in
+	the case of PCI cards.
+	Then the driver is evaluated, audited and tested
 	by developers and users.  After a certain time, the driver
-	will go to alsa-kernel tree and eventually integrated into
-	Linux 2.6 tree.
+	will go to alsa-kernel tree (to the corresponding directory,
+	such as <filename>alsa-kernel/pci</filename>) and eventually
+	integrated into Linux 2.6 tree (the directory would be
+	<filename>linux/sound/pci</filename>).
 	</para>
 
 	<para>
@@ -5537,7 +5541,7 @@ struct _snd_pcm_runtime {
         <programlisting>
 <![CDATA[
   snd-xyz-objs := xyz.o
-  extra-obj-$(CONFIG_SND_XYZ) += snd-xyz.o
+  obj-$(CONFIG_SND_XYZ) += snd-xyz.o
 ]]>
         </programlisting>
       </informalexample>
@@ -5554,8 +5558,8 @@ struct _snd_pcm_runtime {
       <informalexample>
         <programlisting>
 <![CDATA[
-  config SND_BT87X
-          tristate "Foobar XYX"
+  config SND_XYZ
+          tristate "Foobar XYZ"
           depends on SND
           select SND_PCM
           help
@@ -5606,7 +5610,8 @@ struct _snd_pcm_runtime {
 	<orderedlist>
 	<listitem>
 	<para>
-	Add a new directory (xyz) to extra-subdir-y list in alsa-driver/pci/Makefile
+	Add a new directory (<filename>xyz</filename>) in
+	<filename>alsa-driver/pci/Makefile</filename> like below
 
       <informalexample>
         <programlisting>
@@ -5620,7 +5625,7 @@ struct _snd_pcm_runtime {
 
 	<listitem>
 	<para>
-	Under the directory xyz, create a Makefile
+	Under the directory <filename>xyz</filename>, create a Makefile
 
       <example>
 	<title>Sample Makefile for a driver xyz</title>
