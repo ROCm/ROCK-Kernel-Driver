@@ -193,6 +193,10 @@ config I2C_IBM_OCP_ADAP
 	tristate "IBM on-chip I2C Adapter"
 	depends on I2C_IBM_OCP_ALGO
 
+config I2C_IOP3XX
+	tristate "Intel XScale IOP3xx on-chip I2C interface"
+	depends on ARCH_IOP3XX && I2C
+
 config I2C_CHARDEV
 	tristate "I2C device interface"
 	depends on I2C
