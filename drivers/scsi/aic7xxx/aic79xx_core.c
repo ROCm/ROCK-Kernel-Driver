@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#148 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#150 $
  *
  * $FreeBSD$
  */
@@ -2321,13 +2321,13 @@ ahd_find_syncrate(struct ahd_softc *ahd, u_int *period,
 
 	/* Skip all PACED only entries if IU is not available */
 	if ((*ppr_options & MSG_EXT_PPR_IU_REQ) == 0
-	 && maxsync < AHD_SYNCRATE_DT)
-		maxsync = AHD_SYNCRATE_DT;
+	 && *period < AHD_SYNCRATE_DT)
+		*period = AHD_SYNCRATE_DT;
 
 	/* Skip all DT only entries if DT is not available */
 	if ((*ppr_options & MSG_EXT_PPR_DT_REQ) == 0
-	 && maxsync < AHD_SYNCRATE_ULTRA2)
-		maxsync = AHD_SYNCRATE_ULTRA2;
+	 && *period < AHD_SYNCRATE_ULTRA2)
+		*period = AHD_SYNCRATE_ULTRA2;
 }
 
 /*
@@ -5680,7 +5680,8 @@ ahd_init(struct ahd_softc *ahd)
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
-			       /*maxsize*/MAXBSIZE, /*nsegments*/AHD_NSEG,
+			       /*maxsize*/(AHD_NSEG - 1) * PAGE_SIZE,
+			       /*nsegments*/AHD_NSEG,
 			       /*maxsegsz*/AHD_MAXTRANSFER_SIZE,
 			       /*flags*/BUS_DMA_ALLOCNOW,
 			       &ahd->buffer_dmat) != 0) {
@@ -7856,7 +7857,8 @@ ahd_calc_residual(struct ahd_softc *ahd, struct scb *scb)
 #ifdef AHD_DEBUG
 	if ((ahd_debug & AHD_SHOW_MISC) != 0) {
 		ahd_print_path(ahd, scb);
-		printf("Handled Residual of %d bytes\n", resid);
+		printf("Handled %sResidual of %d bytes\n",
+		       (scb->flags & SCB_SENSE) ? "Sense " : "", resid);
 	}
 #endif
 }

@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#19 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm_pci.c#20 $
  */
 
 #include "aic79xx_osm.h"
@@ -170,6 +170,9 @@ ahd_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 			ahd->platform_data->hw_dma_mask =
 			    (bus_addr_t)(0x7FFFFFFFFFULL & (bus_addr_t)~0);
 		}
+	} else {
+		ahd_pci_set_dma_mask(pdev, 0xFFFFFFFF);
+		ahd->platform_data->hw_dma_mask = 0xFFFFFFFF;
 	}
 #endif
 	ahd->dev_softc = pci;
