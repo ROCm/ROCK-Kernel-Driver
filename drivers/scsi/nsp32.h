@@ -667,10 +667,5 @@ static inline struct Scsi_Host *scsi_host_hn_get(unsigned short hostno)
 }
 #endif
 
-/* for Kernel 2.6 */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0))
-# define __devinitdata /* */
-#endif
-
 #endif /* _NSP32_H */
 /* end */
