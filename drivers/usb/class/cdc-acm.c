@@ -367,7 +367,7 @@ static int acm_tty_write(struct tty_struct *tty, int from_user, const unsigned c
 	acm->writeurb->dev = acm->dev;
 
 	acm->ready_for_write = 0;
-	stat = usb_submit_urb(acm->writeurb, GFP_NOIO);
+	stat = usb_submit_urb(acm->writeurb, from_user ? GFP_KERNEL : GFP_ATOMIC);
 	if (stat < 0) {
 		dbg("usb_submit_urb(write bulk) failed");
 		acm->ready_for_write = 1;

@@ -115,7 +115,7 @@ MODULE_PARM_DESC(debug, "Debug enabled or not");
  * In this case read_buffer_size should exceed the maximal packet length
  * (417 for datalog uploads), and packet_timeout should be set.
  */
-static size_t read_buffer_size = 480;
+static int read_buffer_size = 480;
 module_param(read_buffer_size, int, 0);
 MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
 
@@ -125,7 +125,7 @@ MODULE_PARM_DESC(read_buffer_size, "Read buffer size");
  * A problem with long writes is that the following read may time out
  * if the software is not prepared to wait long enough.
  */
-static size_t write_buffer_size = 480;
+static int write_buffer_size = 480;
 module_param(write_buffer_size, int, 0);
 MODULE_PARM_DESC(write_buffer_size, "Write buffer size");
 
@@ -714,7 +714,7 @@ static ssize_t tower_write (struct file *file, const char __user *buffer, size_t
 	}
 
 	/* write the data into interrupt_out_buffer from userspace */
-	bytes_to_write = min(count, write_buffer_size);
+	bytes_to_write = min_t(int, count, write_buffer_size);
 	dbg(4, "%s: count = %Zd, bytes_to_write = %Zd", __FUNCTION__, count, bytes_to_write);
 
 	if (copy_from_user (dev->interrupt_out_buffer, buffer, bytes_to_write)) {
