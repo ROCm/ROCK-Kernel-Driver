@@ -229,7 +229,7 @@ static struct inet_protocol ipip_protocol = {
 
 static int __init ipip_init(void)
 {
-	SET_MODULE_OWNER(&ipip_type);
+	ipip_type.owner = THIS_MODULE;
 	if (xfrm_register_type(&ipip_type, AF_INET) < 0) {
 		printk(KERN_INFO "ipip init: can't add xfrm type\n");
 		return -EAGAIN;

@@ -315,14 +315,14 @@ static inline u32 __flow_hash4(struct flowi *fl)
 
 static inline u32 __flow_hash6(struct flowi *fl)
 {
-	u32 hash = fl->fl6_src->s6_addr32[2] ^
-		   fl->fl6_src->s6_addr32[3] ^ 
+	u32 hash = fl->fl6_src.s6_addr32[2] ^
+		   fl->fl6_src.s6_addr32[3] ^ 
 		   fl->fl_ip_sport;
 
 	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
 
-	hash ^= fl->fl6_dst->s6_addr32[2] ^
-		fl->fl6_dst->s6_addr32[3] ^ 
+	hash ^= fl->fl6_dst.s6_addr32[2] ^
+		fl->fl6_dst.s6_addr32[3] ^ 
 		fl->fl_ip_dport;
 	hash ^= (hash >> 10);
 	hash ^= (hash >> 20);
@@ -471,8 +471,8 @@ __xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 static inline int
 __xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
-	return  addr_match(fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
-		addr_match(fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
+	return  addr_match(&fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
+		addr_match(&fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
 		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
 		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
@@ -654,7 +654,7 @@ xfrm_address_t *xfrm_flowi_daddr(struct flowi *fl, unsigned short family)
 	case AF_INET:
 		return (xfrm_address_t *)&fl->fl4_dst;
 	case AF_INET6:
-		return (xfrm_address_t *)fl->fl6_dst;
+		return (xfrm_address_t *)&fl->fl6_dst;
 	}
 	return NULL;
 }
@@ -666,7 +666,7 @@ xfrm_address_t *xfrm_flowi_saddr(struct flowi *fl, unsigned short family)
 	case AF_INET:
 		return (xfrm_address_t *)&fl->fl4_src;
 	case AF_INET6:
-		return (xfrm_address_t *)fl->fl6_src;
+		return (xfrm_address_t *)&fl->fl6_src;
 	}
 	return NULL;
 }

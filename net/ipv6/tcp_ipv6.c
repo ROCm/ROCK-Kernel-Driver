@@ -571,7 +571,8 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	if (usin->sin6_family != AF_INET6) 
 		return(-EAFNOSUPPORT);
 
-	fl.fl6_flowlabel = 0;
+	memset(&fl, 0, sizeof(fl));
+
 	if (np->sndflow) {
 		fl.fl6_flowlabel = usin->sin6_flowinfo&IPV6_FLOWINFO_MASK;
 		IP6_ECN_flow_init(fl.fl6_flowlabel);
@@ -666,19 +667,17 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		saddr = &np->rcv_saddr;
 
 	fl.proto = IPPROTO_TCP;
-	fl.fl6_dst = &np->daddr;
-	fl.fl6_src = saddr;
+	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+	ipv6_addr_copy(&fl.fl6_src,
+		       (saddr ? saddr : &np->saddr));
 	fl.oif = sk->bound_dev_if;
 	fl.fl_ip_dport = usin->sin6_port;
 	fl.fl_ip_sport = inet->sport;
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
-
-	if (!fl.fl6_src)
-		fl.fl6_src = &np->saddr;
 
 	dst = ip6_route_output(sk, &fl);
 
@@ -794,9 +793,10 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			   to handle rthdr case. Ignore this complexity
 			   for now.
 			 */
+			memset(&fl, 0, sizeof(fl));
 			fl.proto = IPPROTO_TCP;
-			fl.fl6_dst = &np->daddr;
-			fl.fl6_src = &np->saddr;
+			ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+			ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 			fl.oif = sk->bound_dev_if;
 			fl.fl_ip_dport = inet->dport;
 			fl.fl_ip_sport = inet->sport;
@@ -879,9 +879,10 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 	struct flowi fl;
 	int err = -1;
 
+	memset(&fl, 0, sizeof(fl));
 	fl.proto = IPPROTO_TCP;
-	fl.fl6_dst = &req->af.v6_req.rmt_addr;
-	fl.fl6_src = &req->af.v6_req.loc_addr;
+	ipv6_addr_copy(&fl.fl6_dst, &req->af.v6_req.rmt_addr);
+	ipv6_addr_copy(&fl.fl6_src, &req->af.v6_req.loc_addr);
 	fl.fl6_flowlabel = 0;
 	fl.oif = req->af.v6_req.iif;
 	fl.fl_ip_dport = req->rmt_port;
@@ -900,7 +901,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 
 		if (opt && opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-			fl.fl6_dst = rt0->addr;
+			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
 		dst = ip6_route_output(sk, &fl);
@@ -916,7 +917,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 					 &req->af.v6_req.loc_addr, &req->af.v6_req.rmt_addr,
 					 csum_partial((char *)th, skb->len, skb->csum));
 
-		fl.fl6_dst = &req->af.v6_req.rmt_addr;
+		ipv6_addr_copy(&fl.fl6_dst, &req->af.v6_req.rmt_addr);
 		err = ip6_xmit(sk, skb, &fl, opt);
 		if (err == NET_XMIT_CN)
 			err = 0;
@@ -1018,11 +1019,11 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 
 	buff->csum = csum_partial((char *)t1, sizeof(*t1), 0);
 
-	fl.fl6_dst = &skb->nh.ipv6h->saddr;
-	fl.fl6_src = &skb->nh.ipv6h->daddr;
-	fl.fl6_flowlabel = 0;
+	memset(&fl, 0, sizeof(fl));
+	ipv6_addr_copy(&fl.fl6_dst, &skb->nh.ipv6h->saddr);
+	ipv6_addr_copy(&fl.fl6_src, &skb->nh.ipv6h->daddr);
 
-	t1->check = csum_ipv6_magic(fl.fl6_src, fl.fl6_dst, 
+	t1->check = csum_ipv6_magic(&fl.fl6_src, &fl.fl6_dst,
 				    sizeof(*t1), IPPROTO_TCP,
 				    buff->csum);
 
@@ -1082,11 +1083,11 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 
 	buff->csum = csum_partial((char *)t1, tot_len, 0);
 
-	fl.fl6_dst = &skb->nh.ipv6h->saddr;
-	fl.fl6_src = &skb->nh.ipv6h->daddr;
-	fl.fl6_flowlabel = 0;
+	memset(&fl, 0, sizeof(fl));
+	ipv6_addr_copy(&fl.fl6_dst, &skb->nh.ipv6h->saddr);
+	ipv6_addr_copy(&fl.fl6_src, &skb->nh.ipv6h->daddr);
 
-	t1->check = csum_ipv6_magic(fl.fl6_src, fl.fl6_dst, 
+	t1->check = csum_ipv6_magic(&fl.fl6_src, &fl.fl6_dst,
 				    tot_len, IPPROTO_TCP,
 				    buff->csum);
 
@@ -1261,7 +1262,6 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 {
 	struct ipv6_pinfo *newnp, *np = inet6_sk(sk);
 	struct tcp6_sock *newtcp6sk;
-	struct flowi fl;
 	struct inet_opt *newinet;
 	struct tcp_opt *newtp;
 	struct sock *newsk;
@@ -1330,14 +1330,16 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	}
 
 	if (dst == NULL) {
+		struct flowi fl;
+
+		memset(&fl, 0, sizeof(fl));
 		fl.proto = IPPROTO_TCP;
-		fl.fl6_dst = &req->af.v6_req.rmt_addr;
+		ipv6_addr_copy(&fl.fl6_dst, &req->af.v6_req.rmt_addr);
 		if (opt && opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-			fl.fl6_dst = rt0->addr;
+			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
-		fl.fl6_src = &req->af.v6_req.loc_addr;
-		fl.fl6_flowlabel = 0;
+		ipv6_addr_copy(&fl.fl6_src, &req->af.v6_req.loc_addr);
 		fl.oif = sk->bound_dev_if;
 		fl.fl_ip_dport = req->rmt_port;
 		fl.fl_ip_sport = inet_sk(sk)->sport;
@@ -1725,9 +1727,10 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 		struct inet_opt *inet = inet_sk(sk);
 		struct flowi fl;
 
+		memset(&fl, 0, sizeof(fl));
 		fl.proto = IPPROTO_TCP;
-		fl.fl6_dst = &np->daddr;
-		fl.fl6_src = &np->saddr;
+		ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+		ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 		fl.fl6_flowlabel = np->flow_label;
 		fl.oif = sk->bound_dev_if;
 		fl.fl_ip_dport = inet->dport;
@@ -1735,7 +1738,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 
 		if (np->opt && np->opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
-			fl.fl6_dst = rt0->addr;
+			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
 		dst = ip6_route_output(sk, &fl);
@@ -1762,9 +1765,10 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	struct flowi fl;
 	struct dst_entry *dst;
 
+	memset(&fl, 0, sizeof(fl));
 	fl.proto = IPPROTO_TCP;
-	fl.fl6_dst = &np->daddr;
-	fl.fl6_src = &np->saddr;
+	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
+	ipv6_addr_copy(&fl.fl6_src, &np->saddr);
 	fl.fl6_flowlabel = np->flow_label;
 	IP6_ECN_flow_xmit(sk, fl.fl6_flowlabel);
 	fl.oif = sk->bound_dev_if;
@@ -1773,7 +1777,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
-		fl.fl6_dst = rt0->addr;
+		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
 	dst = __sk_dst_check(sk, np->dst_cookie);
@@ -1793,7 +1797,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	skb->dst = dst_clone(dst);
 
 	/* Restore final destination back after routing done */
-	fl.fl6_dst = &np->daddr;
+	ipv6_addr_copy(&fl.fl6_dst, &np->daddr);
 
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }

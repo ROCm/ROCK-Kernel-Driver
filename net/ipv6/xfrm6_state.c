@@ -25,8 +25,8 @@ __xfrm6_init_tempsel(struct xfrm_state *x, struct flowi *fl,
 {
 	/* Initialize temporary selector matching only
 	 * to current session. */
-	ipv6_addr_copy((struct in6_addr *)&x->sel.daddr, fl->fl6_dst);
-	ipv6_addr_copy((struct in6_addr *)&x->sel.saddr, fl->fl6_src);
+	ipv6_addr_copy((struct in6_addr *)&x->sel.daddr, &fl->fl6_dst);
+	ipv6_addr_copy((struct in6_addr *)&x->sel.saddr, &fl->fl6_src);
 	x->sel.dport = fl->fl_ip_dport;
 	x->sel.dport_mask = ~0;
 	x->sel.sport = fl->fl_ip_sport;
