@@ -954,13 +954,13 @@ test_ctrl_queue (struct usbtest_dev *dev, struct usbtest_param *param)
 		case 13:	// short read, resembling case 10
 			req.wValue = cpu_to_le16 ((USB_DT_CONFIG << 8) | 0);
 			// last data packet "should" be DATA1, not DATA0
-			len = 1024 - udev->epmaxpacketin [0];
+			len = 1024 - udev->descriptor.bMaxPacketSize0;
 			expected = -EREMOTEIO;
 			break;
 		case 14:	// short read; try to fill the last packet
 			req.wValue = cpu_to_le16 ((USB_DT_DEVICE << 8) | 0);
 			// device descriptor size == 18 bytes 
-			len = udev->epmaxpacketin [0];
+			len = udev->descriptor.bMaxPacketSize0;
 			switch (len) {
 			case 8:		len = 24; break;
 			case 16:	len = 32; break;
