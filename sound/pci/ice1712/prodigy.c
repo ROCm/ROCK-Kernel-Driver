@@ -163,8 +163,6 @@ static void wm_put(ice1712_t *ice, int reg, unsigned short val)
 
 static int prodigy_hpamp_info(snd_kcontrol_t *k, snd_ctl_elem_info_t *uinfo)
 {
-        uinfo->type= SNDRV_CTL_ELEM_TYPE_INTEGER;
-
 	static char *texts[2] = {
 		"Off", "On"
 	};
