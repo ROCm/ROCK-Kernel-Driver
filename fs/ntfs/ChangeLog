@@ -118,6 +118,10 @@ ToDo/Notes:
 	  inode semaphore around the code thst sets ni->itype.index.bmp_ino to
 	  NULL and reorganize the code to optimize it a bit.  (Thanks to
 	  Christoph Hellwig for spotting this.)
+	- Modify fs/ntfs/aops.c::mark_ntfs_record_dirty() to no longer take the
+	  ntfs inode as a parameter as this is confusing and misleading and the
+	  needed ntfs inode is available via NTFS_I(page->mapping->host).
+	  Adapt all callers to this change.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 

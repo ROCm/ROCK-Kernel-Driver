@@ -380,8 +380,7 @@ void __mark_mft_record_dirty(ntfs_inode *ni)
 
 	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
 	BUG_ON(NInoAttr(ni));
-	mark_ntfs_record_dirty(NTFS_I(ni->vol->mft_ino), ni->page,
-			ni->page_ofs);
+	mark_ntfs_record_dirty(ni->page, ni->page_ofs);
 	/* Determine the base vfs inode and mark it dirty, too. */
 	down(&ni->extent_lock);
 	if (likely(ni->nr_extents >= 0))
