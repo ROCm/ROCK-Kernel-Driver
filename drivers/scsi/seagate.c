@@ -503,7 +503,7 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
 	hostno = instance->host_no;
 	if (request_irq (irq, do_seagate_reconnect_intr, SA_INTERRUPT,
 			 (controller_type == SEAGATE) ? "seagate" : "tmc-8xx",
-			 NULL)) {
+			 instance)) {
 		printk ("scsi%d : unable to allocate IRQ%d\n", hostno, irq);
 		return 0;
 	}
@@ -629,10 +629,11 @@ static int should_reconnect = 0;
 static void do_seagate_reconnect_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave (&io_request_lock, flags);
+	struct Scsi_Host *dev = dev_id;
+	
+	spin_lock_irqsave (dev->host_lock, flags);
 	seagate_reconnect_intr (irq, dev_id, regs);
-	spin_unlock_irqrestore (&io_request_lock, flags);
+	spin_unlock_irqrestore (dev->host_lock, flags);
 }
 
 static void seagate_reconnect_intr (int irq, void *dev_id, struct pt_regs *regs)

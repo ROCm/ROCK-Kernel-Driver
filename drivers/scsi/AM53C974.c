@@ -1021,10 +1021,11 @@ static void AM53C974_main(void)
 static void do_AM53C974_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
+	struct Scsi_Host *dev = dev_id;
+	
+	spin_lock_irqsave(dev->host_lock, flags);
 	AM53C974_intr(irq, dev_id, regs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 /************************************************************************

@@ -120,7 +120,7 @@ int jazz_esp_detect(Scsi_Host_Template *tpnt)
 	
 	esp->irq = JAZZ_SCSI_IRQ;
 	request_irq(JAZZ_SCSI_IRQ, esp_intr, SA_INTERRUPT, "JAZZ SCSI",
-	            NULL);
+	            esp->ehost);
 
 	/*
 	 * FIXME, look if the scsi id is availabe from NVRAM

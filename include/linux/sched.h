@@ -229,19 +229,29 @@ extern struct user_struct root_user;
 
 typedef struct prio_array prio_array_t;
 
+/* this struct must occupy one 32-bit chunk so that is can be read in one go */
+struct task_work {
+	__s8	need_resched;
+	__u8	syscall_trace;	/* count of syscall interceptors */
+	__u8	sigpending;
+	__u8	notify_resume;	/* request for notification on
+				   userspace execution resumption */
+} __attribute__((packed));
+
 struct task_struct {
 	/*
 	 * offsets of these are hardcoded elsewhere - touch with care
 	 */
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	unsigned long flags;	/* per process flags, defined below */
-	int sigpending;
+	volatile struct task_work work;
+
 	mm_segment_t addr_limit;	/* thread address space:
 					 	0-0xBFFFFFFF for user-thead
 						0-0xFFFFFFFF for kernel-thread
 					 */
 	struct exec_domain *exec_domain;
-	volatile long need_resched;
+	long __pad;
 	unsigned long ptrace;
 
 	int lock_depth;		/* Lock depth */
@@ -381,7 +391,7 @@ struct task_struct {
  */
 
 #define PT_PTRACED	0x00000001
-#define PT_TRACESYS	0x00000002
+#define PT_SYSCALLTRACE	0x00000002	/* T if syscall_trace is +1 for ptrace() */
 #define PT_DTRACE	0x00000004	/* delayed trace (used on m68k, i386) */
 #define PT_TRACESYSGOOD	0x00000008
 #define PT_PTRACE_CAP	0x00000010	/* ptracer can follow suid-exec */
@@ -575,12 +585,12 @@ extern int do_sigaltstack(const stack_t *, stack_t *, unsigned long);
 
 static inline int signal_pending(struct task_struct *p)
 {
-	return (p->sigpending != 0);
+	return (p->work.sigpending != 0);
 }
   
 static inline int need_resched(void)
 {
-	return unlikely(current->need_resched != 0);
+	return unlikely(current->work.need_resched != 0);
 }
 
 static inline void cond_resched(void)
@@ -625,7 +635,7 @@ static inline int has_pending_signals(sigset_t *signal, sigset_t *blocked)
 
 static inline void recalc_sigpending(struct task_struct *t)
 {
-	t->sigpending = has_pending_signals(&t->pending.signal, &t->blocked);
+	t->work.sigpending = has_pending_signals(&t->pending.signal, &t->blocked);
 }
 
 /* True if we are on the alternate signal stack.  */

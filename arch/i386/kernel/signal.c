@@ -28,8 +28,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
-
 int copy_siginfo_to_user(siginfo_t *to, siginfo_t *from)
 {
 	if (!access_ok (VERIFY_WRITE, to, sizeof(siginfo_t)))

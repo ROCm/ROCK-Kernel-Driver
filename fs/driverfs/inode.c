@@ -294,6 +294,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	struct driver_file_entry * entry;
 	struct device * dev;
 	ssize_t retval = 0;
+	char * page;
 
 	entry = (struct driver_file_entry *)file->private_data;
 	if (!entry) {
@@ -305,10 +306,20 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 
 	dev = list_entry(entry->parent,struct device, dir);
 
+	page = (char *)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+
+	if (count >= PAGE_SIZE)
+		count = PAGE_SIZE - 1;
+	if (copy_from_user(page,buf,count))
+		goto done;
+	*(page + count) = '\0';
+
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->store(dev,buf,count,*ppos);
+		len = entry->store(dev,page + retval,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -320,6 +331,8 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 		*ppos += len;
 		buf += len;
 	}
+ done:
+	free_page((unsigned long)page);
 	return retval;
 }
 
@@ -361,7 +374,7 @@ static int driverfs_open_file(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static int driverfs_flush(struct file * filp)
+static int driverfs_release(struct inode * inode, struct file * filp)
 {
 	struct driver_file_entry * entry;
 	struct device * dev;
@@ -402,7 +415,7 @@ static struct file_operations driverfs_file_operations = {
 	llseek:		driverfs_file_lseek,
 	mmap:		generic_file_mmap,
 	open:		driverfs_open_file,
-	flush:		driverfs_flush,
+	release:	driverfs_release,
 	fsync:		driverfs_sync_file,
 };
 

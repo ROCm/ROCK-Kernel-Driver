@@ -1508,18 +1508,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 	__u8 pun = 0xff, lun = 0xff;
 	unsigned long flags;
 
-	/* Unfortunately, we have to take the io_request_lock here
-	 * rather than the host lock hostdata->lock because we're
-	 * looking to exclude queuecommand from messing with the
-	 * registers while we're processing the interrupt.  Since
-	 * queuecommand is called holding io_request_lock, and we have
-	 * to take io_request_lock before we call the command
-	 * scsi_done, we would get a deadlock if we took
-	 * hostdata->lock here and in queuecommand (because the order
-	 * of locking in queuecommand: 1) io_request_lock then 2)
-	 * hostdata->lock would be the reverse of taking it in this
-	 * routine */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(host->host_lock, flags);
 	if((istat = NCR_700_readb(host, ISTAT_REG))
 	      & (SCSI_INT_PENDING | DMA_INT_PENDING)) {
 		__u32 dsps;
@@ -1764,7 +1753,7 @@ NCR_700_intr(int irq, void *dev_id, struct pt_regs *regs)
 		}
 	}
  out_unlock:
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(host->host_lock, flags);
 }
 
 /* FIXME: Need to put some proc information in and plumb it

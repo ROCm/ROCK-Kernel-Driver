@@ -717,19 +717,19 @@ int inia100_biosparam(Scsi_Disk * disk, kdev_t dev, int *info_array)
 }
 
 
-static void subIntr(ORC_HCS * pHCB, int irqno)
+static void subIntr(ORC_HCS * pHCB, int irqno, struct Scsi_Host *dev)
 {
 	unsigned long flags;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	if (pHCB->HCS_Intr != irqno) {
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	orc_interrupt(pHCB);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 /*
@@ -737,42 +737,42 @@ static void subIntr(ORC_HCS * pHCB, int irqno)
  */
 static void inia100_intr0(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[0], irqno);
+	subIntr(&orc_hcs[0], irqno, dev_id);
 }
 
 static void inia100_intr1(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[1], irqno);
+	subIntr(&orc_hcs[1], irqno, dev_id);
 }
 
 static void inia100_intr2(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[2], irqno);
+	subIntr(&orc_hcs[2], irqno, dev_id);
 }
 
 static void inia100_intr3(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[3], irqno);
+	subIntr(&orc_hcs[3], irqno, dev_id);
 }
 
 static void inia100_intr4(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[4], irqno);
+	subIntr(&orc_hcs[4], irqno, dev_id);
 }
 
 static void inia100_intr5(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[5], irqno);
+	subIntr(&orc_hcs[5], irqno, dev_id);
 }
 
 static void inia100_intr6(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[6], irqno);
+	subIntr(&orc_hcs[6], irqno, dev_id);
 }
 
 static void inia100_intr7(int irqno, void *dev_id, struct pt_regs *regs)
 {
-	subIntr(&orc_hcs[7], irqno);
+	subIntr(&orc_hcs[7], irqno, dev_id);
 }
 
 /* 

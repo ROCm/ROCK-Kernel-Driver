@@ -12,13 +12,13 @@ int main()
 	printf("#define TASK_FLAGS %ld\n",
 	       (long)offsetof(struct task_struct, flags));
 	printf("#define TASK_SIGPENDING %ld\n",
-	       (long)offsetof(struct task_struct, sigpending));
+#error	       (long)offsetof(struct task_struct, sigpending));
 	printf("#define TASK_ADDR_LIMIT %ld\n",
 	       (long)offsetof(struct task_struct, addr_limit));
 	printf("#define TASK_EXEC_DOMAIN %ld\n",
 	       (long)offsetof(struct task_struct, exec_domain));
 	printf("#define TASK_NEED_RESCHED %ld\n",
-	       (long)offsetof(struct task_struct, need_resched));
+#error	       (long)offsetof(struct task_struct, work.need_resched));
 	printf("#define TASK_SIZE %ld\n", sizeof(struct task_struct));
 	printf("#define STACK_SIZE %ld\n", sizeof(union task_union));
 

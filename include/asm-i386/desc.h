@@ -18,23 +18,31 @@
  *   9 - APM BIOS support
  *  10 - APM BIOS support
  *  11 - APM BIOS support
+ *  12 - PNPBIOS support
+ *  13 - PNPBIOS support
+ *  14 - PNPBIOS support
+ *  15 - PNPBIOS support
+ *  16 - PNPBIOS support
+ *  17 - not used
+ *  18 - not used
+ *  19 - not used
  *
  * The TSS+LDT descriptors are spread out a bit so that every CPU
  * has an exclusive cacheline for the per-CPU TSS and LDT:
  *
- *  12 - CPU#0 TSS                          <-- new cacheline 
- *  13 - CPU#0 LDT
- *  14 - not used 
- *  15 - not used 
- *  16 - CPU#1 TSS                          <-- new cacheline 
- *  17 - CPU#1 LDT
- *  18 - not used 
- *  19 - not used 
+ *  20 - CPU#0 TSS                          <-- new cacheline 
+ *  21 - CPU#0 LDT
+ *  22 - not used 
+ *  23 - not used 
+ *  24 - CPU#1 TSS                          <-- new cacheline 
+ *  25 - CPU#1 LDT
+ *  26 - not used 
+ *  27 - not used 
  *  ... NR_CPUS per-CPU TSS+LDT's if on SMP
  *
  * Entry into gdt where to find first TSS.
  */
-#define __FIRST_TSS_ENTRY 12
+#define __FIRST_TSS_ENTRY 20
 #define __FIRST_LDT_ENTRY (__FIRST_TSS_ENTRY+1)
 
 #define __TSS(n) (((n)<<2) + __FIRST_TSS_ENTRY)

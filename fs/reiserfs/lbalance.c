@@ -63,7 +63,7 @@ static void leaf_copy_dir_entries (struct buffer_info * dest_bi, struct buffer_h
 
 	/* form item header */
 	memcpy (&new_ih.ih_key, &ih->ih_key, KEY_SIZE);
-	put_ih_version( &new_ih, ITEM_VERSION_1 );
+	put_ih_version( &new_ih, KEY_FORMAT_3_5 );
 	/* calculate item len */
 	put_ih_item_len( &new_ih, DEH_SIZE * copy_count + copy_records_len );
 	put_ih_entry_count( &new_ih, 0 );
@@ -78,7 +78,7 @@ static void leaf_copy_dir_entries (struct buffer_info * dest_bi, struct buffer_h
 		set_le_ih_k_offset (&new_ih, U32_MAX);
 		/* this item is not yet valid, but we want I_IS_DIRECTORY_ITEM to return 1 for it, so we -1 */
 	    }
-	    set_le_key_k_type (ITEM_VERSION_1, &(new_ih.ih_key), TYPE_DIRENTRY);
+	    set_le_key_k_type (KEY_FORMAT_3_5, &(new_ih.ih_key), TYPE_DIRENTRY);
 	}
     
 	/* insert item into dest buffer */

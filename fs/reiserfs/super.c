@@ -24,8 +24,39 @@
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
 
-char reiserfs_super_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
-char reiser2fs_super_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
+const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
+const char reiserfs_3_6_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
+const char reiserfs_jr_magic_string[] = REISER2FS_JR_SUPER_MAGIC_STRING;
+
+int is_reiserfs_3_5 (struct reiserfs_super_block * rs)
+{
+  return !strncmp (rs->s_v1.s_magic, reiserfs_3_5_magic_string,
+		   strlen (reiserfs_3_5_magic_string));
+}
+
+
+int is_reiserfs_3_6 (struct reiserfs_super_block * rs)
+{
+  return !strncmp (rs->s_v1.s_magic, reiserfs_3_6_magic_string,
+ 		   strlen (reiserfs_3_6_magic_string));
+}
+
+
+int is_reiserfs_jr (struct reiserfs_super_block * rs)
+{
+  return !strncmp (rs->s_v1.s_magic, reiserfs_jr_magic_string,
+ 		   strlen (reiserfs_jr_magic_string));
+}
+
+
+static int is_any_reiserfs_magic_string (struct reiserfs_super_block * rs)
+{
+  return (is_reiserfs_3_5 (rs) || is_reiserfs_3_6 (rs) ||
+	  is_reiserfs_jr (rs));
+}
+
+static int reiserfs_remount (struct super_block * s, int * flags, char * data);
+static int reiserfs_statfs (struct super_block * s, struct statfs * buf);
 
 //
 // a portion of this function, particularly the VFS interface portion,
@@ -34,7 +65,7 @@ char reiser2fs_super_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-void reiserfs_write_super (struct super_block * s)
+static void reiserfs_write_super (struct super_block * s)
 {
 
   int dirty = 0 ;
@@ -53,7 +84,7 @@ void reiserfs_write_super (struct super_block * s)
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-void reiserfs_write_super_lockfs (struct super_block * s)
+static void reiserfs_write_super_lockfs (struct super_block * s)
 {
 
   int dirty = 0 ;
@@ -74,6 +105,247 @@ void reiserfs_unlockfs(struct super_block *s) {
   reiserfs_allow_writes(s) ;
 }
 
+extern const struct key  MAX_KEY;
+
+
+/* this is used to delete "save link" when there are no items of a
+   file it points to. It can either happen if unlink is completed but
+   "save unlink" removal, or if file has both unlink and truncate
+   pending and as unlink completes first (because key of "save link"
+   protecting unlink is bigger that a key lf "save link" which
+   protects truncate), so there left no items to make truncate
+   completion on */
+static void remove_save_link_only (struct super_block * s, struct key * key)
+{
+    struct reiserfs_transaction_handle th;
+
+     /* we are going to do one balancing */
+     journal_begin (&th, s, JOURNAL_PER_BALANCE_CNT);
+ 
+     reiserfs_delete_solid_item (&th, key);
+     if (is_direct_le_key (KEY_FORMAT_3_5, key))
+        /* removals are protected by direct items */
+        reiserfs_release_objectid (&th, le32_to_cpu (key->k_objectid));
+
+     journal_end (&th, s, JOURNAL_PER_BALANCE_CNT);
+}
+ 
+ 
+/* look for uncompleted unlinks and truncates and complete them */
+static void finish_unfinished (struct super_block * s)
+{
+    INITIALIZE_PATH (path);
+    struct cpu_key max_cpu_key, obj_key;
+    struct key save_link_key;
+    int retval;
+    struct item_head * ih;
+    struct buffer_head * bh;
+    int item_pos;
+    char * item;
+    int done;
+    struct inode * inode;
+    int truncate;
+ 
+ 
+    /* compose key to look for "save" links */
+    max_cpu_key.version = KEY_FORMAT_3_5;
+    max_cpu_key.on_disk_key = MAX_KEY;
+    max_cpu_key.key_length = 3;
+ 
+    done = 0;
+    s -> u.reiserfs_sb.s_is_unlinked_ok = 1;
+    while (1) {
+        retval = search_item (s, &max_cpu_key, &path);
+        if (retval != ITEM_NOT_FOUND) {
+            reiserfs_warning ("vs-2140: finish_unfinished: search_by_key returned %d\n",
+                              retval);
+            break;
+        }
+        
+        bh = get_last_bh (&path);
+        item_pos = get_item_pos (&path);
+        if (item_pos != B_NR_ITEMS (bh)) {
+            reiserfs_warning ("vs-2060: finish_unfinished: wrong position found\n");
+            break;
+        }
+        item_pos --;
+        ih = B_N_PITEM_HEAD (bh, item_pos);
+ 
+        if (le32_to_cpu (ih->ih_key.k_dir_id) != MAX_KEY_OBJECTID)
+            /* there are no "save" links anymore */
+            break;
+ 
+        save_link_key = ih->ih_key;
+        if (is_indirect_le_ih (ih))
+            truncate = 1;
+        else
+            truncate = 0;
+ 
+        /* reiserfs_iget needs k_dirid and k_objectid only */
+        item = B_I_PITEM (bh, ih);
+        obj_key.on_disk_key.k_dir_id = le32_to_cpu (*(__u32 *)item);
+        obj_key.on_disk_key.k_objectid = le32_to_cpu (ih->ih_key.k_objectid);
+	obj_key.on_disk_key.u.k_offset_v1.k_offset = 0;
+	obj_key.on_disk_key.u.k_offset_v1.k_uniqueness = 0;
+	
+        pathrelse (&path);
+ 
+        inode = reiserfs_iget (s, &obj_key);
+        if (!inode) {
+            /* the unlink almost completed, it just did not manage to remove
+	       "save" link and release objectid */
+            reiserfs_warning ("vs-2180: finish_unfinished: iget failed for %K\n",
+                              &obj_key);
+            remove_save_link_only (s, &save_link_key);
+            continue;
+        }
+
+	if (!truncate && inode->i_nlink) {
+	    /* file is not unlinked */
+            reiserfs_warning ("vs-2185: finish_unfinished: file %K is not unlinked\n",
+                              &obj_key);
+            remove_save_link_only (s, &save_link_key);
+            continue;
+	}
+ 
+        if (truncate) {
+            REISERFS_I(inode) -> i_flags |= i_link_saved_truncate_mask;
+            /* not completed truncate found. New size was committed together
+	       with "save" link */
+            reiserfs_warning ("Truncating %k to %Ld ..",
+                              INODE_PKEY (inode), inode->i_size);
+            reiserfs_truncate_file (inode, 0/*don't update modification time*/);
+            remove_save_link (inode, truncate);
+        } else {
+            REISERFS_I(inode) -> i_flags |= i_link_saved_unlink_mask;
+            /* not completed unlink (rmdir) found */
+            reiserfs_warning ("Removing %k..", INODE_PKEY (inode));
+            /* removal gets completed in iput */
+        }
+ 
+        iput (inode);
+        printk ("done\n");
+        done ++;
+    }
+    s -> u.reiserfs_sb.s_is_unlinked_ok = 0;
+     
+    pathrelse (&path);
+    if (done)
+        reiserfs_warning ("There were %d uncompleted unlinks/truncates. "
+                          "Completed\n", done);
+}
+ 
+/* to protect file being unlinked from getting lost we "safe" link files
+   being unlinked. This link will be deleted in the same transaction with last
+   item of file. mounting the filesytem we scan all these links and remove
+   files which almost got lost */
+void add_save_link (struct reiserfs_transaction_handle * th,
+		    struct inode * inode, int truncate)
+{
+    INITIALIZE_PATH (path);
+    int retval;
+    struct cpu_key key;
+    struct item_head ih;
+    __u32 link;
+
+    /* file can only get one "save link" of each kind */
+    RFALSE( truncate && 
+	    ( REISERFS_I(inode) -> i_flags & i_link_saved_truncate_mask ),
+	    "saved link already exists for truncated inode %lx",
+	    ( long ) inode -> i_ino );
+    RFALSE( !truncate && 
+	    ( REISERFS_I(inode) -> i_flags & i_link_saved_unlink_mask ),
+	    "saved link already exists for unlinked inode %lx",
+	    ( long ) inode -> i_ino );
+
+    /* setup key of "save" link */
+    key.version = KEY_FORMAT_3_5;
+    key.on_disk_key.k_dir_id = MAX_KEY_OBJECTID;
+    key.on_disk_key.k_objectid = inode->i_ino;
+    if (!truncate) {
+	/* unlink, rmdir, rename */
+	set_cpu_key_k_offset (&key, 1 + inode->i_sb->s_blocksize);
+	set_cpu_key_k_type (&key, TYPE_DIRECT);
+
+	/* item head of "safe" link */
+	make_le_item_head (&ih, &key, key.version, 1 + inode->i_sb->s_blocksize, TYPE_DIRECT,
+			   4/*length*/, 0xffff/*free space*/);
+    } else {
+	/* truncate */
+	set_cpu_key_k_offset (&key, 1);
+	set_cpu_key_k_type (&key, TYPE_INDIRECT);
+
+	/* item head of "safe" link */
+	make_le_item_head (&ih, &key, key.version, 1, TYPE_INDIRECT,
+			   4/*length*/, 0/*free space*/);
+    }
+    key.key_length = 3;
+
+    /* look for its place in the tree */
+    retval = search_item (inode->i_sb, &key, &path);
+    if (retval != ITEM_NOT_FOUND) {
+	reiserfs_warning ("vs-2100: add_save_link:"
+			  "search_by_key (%K) returned %d\n", &key, retval);
+	pathrelse (&path);
+	return;
+    }
+
+    /* body of "save" link */
+    link = cpu_to_le32 (INODE_PKEY (inode)->k_dir_id);
+
+    /* put "save" link inot tree */
+    retval = reiserfs_insert_item (th, &path, &key, &ih, (char *)&link);
+    if (retval)
+	reiserfs_warning ("vs-2120: add_save_link: insert_item returned %d\n",
+			  retval);
+    else {
+	if( truncate )
+	    REISERFS_I(inode) -> i_flags |= i_link_saved_truncate_mask;
+	else
+	    REISERFS_I(inode) -> i_flags |= i_link_saved_unlink_mask;
+    }
+}
+
+
+/* this opens transaction unlike add_save_link */
+void remove_save_link (struct inode * inode, int truncate)
+{
+    struct reiserfs_transaction_handle th;
+    struct key key;
+ 
+ 
+    /* we are going to do one balancing only */
+    journal_begin (&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT);
+ 
+    /* setup key of "save" link */
+    key.k_dir_id = cpu_to_le32 (MAX_KEY_OBJECTID);
+    key.k_objectid = INODE_PKEY (inode)->k_objectid;
+    if (!truncate) {
+        /* unlink, rmdir, rename */
+        set_le_key_k_offset (KEY_FORMAT_3_5, &key,
+			     1 + inode->i_sb->s_blocksize);
+        set_le_key_k_type (KEY_FORMAT_3_5, &key, TYPE_DIRECT);
+    } else {
+        /* truncate */
+        set_le_key_k_offset (KEY_FORMAT_3_5, &key, 1);
+        set_le_key_k_type (KEY_FORMAT_3_5, &key, TYPE_INDIRECT);
+    }
+ 
+    if( ( truncate && 
+          ( REISERFS_I(inode) -> i_flags & i_link_saved_truncate_mask ) ) ||
+        ( !truncate && 
+          ( REISERFS_I(inode) -> i_flags & i_link_saved_unlink_mask ) ) )
+	reiserfs_delete_solid_item (&th, &key);
+    if (!truncate) {
+	reiserfs_release_objectid (&th, inode->i_ino);
+	REISERFS_I(inode) -> i_flags &= ~i_link_saved_unlink_mask;
+    } else
+	REISERFS_I(inode) -> i_flags &= ~i_link_saved_truncate_mask;
+ 
+    journal_end (&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT);
+}
+
+
 //
 // a portion of this function, particularly the VFS interface portion,
 // was derived from minix or ext2's analog and evolved as the
@@ -81,7 +353,7 @@ void reiserfs_unlockfs(struct super_block *s) {
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-void reiserfs_put_super (struct super_block * s)
+static void reiserfs_put_super (struct super_block * s)
 {
   int i;
   struct reiserfs_transaction_handle th ;
@@ -90,7 +362,7 @@ void reiserfs_put_super (struct super_block * s)
   if (!(s->s_flags & MS_RDONLY)) {
     journal_begin(&th, s, 10) ;
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    set_sb_state( SB_DISK_SUPER_BLOCK(s), s->u.reiserfs_sb.s_mount_state );
+    set_sb_umount_state( SB_DISK_SUPER_BLOCK(s), s->u.reiserfs_sb.s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
   }
 
@@ -168,6 +440,26 @@ static void destroy_inodecache(void)
 		printk(KERN_INFO "reiserfs_inode_cache: not all structures were freed\n");
 }
 
+/* we don't mark inodes dirty, we just log them */
+static void reiserfs_dirty_inode (struct inode * inode) {
+    struct reiserfs_transaction_handle th ;
+
+    if (inode->i_sb->s_flags & MS_RDONLY) {
+        reiserfs_warning("clm-6006: writing inode %lu on readonly FS\n", 
+	                  inode->i_ino) ;
+        return ;
+    }
+    lock_kernel() ;
+
+    /* this is really only used for atime updates, so they don't have
+    ** to be included in O_SYNC or fsync
+    */
+    journal_begin(&th, inode->i_sb, 1) ;
+    reiserfs_update_sd (&th, inode);
+    journal_end(&th, inode->i_sb, 1) ;
+    unlock_kernel() ;
+}
+
 struct super_operations reiserfs_sops = 
 {
   alloc_inode: reiserfs_alloc_inode,
@@ -190,7 +482,7 @@ struct super_operations reiserfs_sops =
 };
 
 /* this was (ext2)parse_options */
-static int parse_options (char * options, unsigned long * mount_options, unsigned long * blocks)
+static int parse_options (char * options, unsigned long * mount_options, unsigned long * blocks, char **jdev_name)
 {
     char * this_char;
     char * value;
@@ -257,6 +549,13 @@ static int parse_options (char * options, unsigned long * mount_options, unsigne
 	  	printk("reiserfs: hash option requires a value\n");
 		return 0 ;
 	    }
+	} else if (!strcmp (this_char, "jdev")) {
+	    if (value && *value && jdev_name) {
+		    *jdev_name = value;
+	    } else {
+		    printk("reiserfs: jdev option requires a value\n");
+		    return 0 ;
+	    }
 	} else {
 	    printk ("reiserfs: Unrecognized mount option %s\n", this_char);
 	    return 0;
@@ -278,7 +577,7 @@ int reiserfs_is_super(struct super_block *s) {
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-int reiserfs_remount (struct super_block * s, int * flags, char * data)
+static int reiserfs_remount (struct super_block * s, int * flags, char * data)
 {
   struct reiserfs_super_block * rs;
   struct reiserfs_transaction_handle th ;
@@ -286,8 +585,7 @@ int reiserfs_remount (struct super_block * s, int * flags, char * data)
   unsigned long mount_options;
 
   rs = SB_DISK_SUPER_BLOCK (s);
-
-  if (!parse_options(data, &mount_options, &blocks))
+  if (!parse_options(data, &mount_options, &blocks, NULL))
   	return 0;
 
   if(blocks) {
@@ -303,26 +601,26 @@ int reiserfs_remount (struct super_block * s, int * flags, char * data)
   
   if (*flags & MS_RDONLY) {
     /* try to remount file system with read-only permissions */
-    if (sb_state(rs) == REISERFS_VALID_FS || s->u.reiserfs_sb.s_mount_state != REISERFS_VALID_FS) {
+    if (sb_umount_state(rs) == REISERFS_VALID_FS || s->u.reiserfs_sb.s_mount_state != REISERFS_VALID_FS) {
       return 0;
     }
 
     journal_begin(&th, s, 10) ;
     /* Mounting a rw partition read-only. */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    set_sb_state( rs, s->u.reiserfs_sb.s_mount_state );
+    set_sb_umount_state( rs, s->u.reiserfs_sb.s_mount_state );
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
   } else {
-    s->u.reiserfs_sb.s_mount_state = sb_state(rs) ;
+    s->u.reiserfs_sb.s_mount_state = sb_umount_state(rs) ;
     s->s_flags &= ~MS_RDONLY ; /* now it is safe to call journal_begin */
     journal_begin(&th, s, 10) ;
 
     /* Mount a partition which is read-only, read-write */
     reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
-    s->u.reiserfs_sb.s_mount_state = sb_state(rs);
+    s->u.reiserfs_sb.s_mount_state = sb_umount_state(rs);
     s->s_flags &= ~MS_RDONLY;
-    set_sb_state( rs, REISERFS_ERROR_FS );
+    set_sb_umount_state( rs, REISERFS_ERROR_FS );
     /* mark_buffer_dirty (SB_BUFFER_WITH_SB (s), 1); */
     journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
     s->s_dirt = 0;
@@ -331,6 +629,10 @@ int reiserfs_remount (struct super_block * s, int * flags, char * data)
   /* this will force a full flush of all journal lists */
   SB_JOURNAL(s)->j_must_wait = 1 ;
   journal_end(&th, s, 10) ;
+
+  if (!( *flags & MS_RDONLY ) )
+    finish_unfinished( s );
+
   return 0;
 }
 
@@ -410,17 +712,14 @@ static int read_super_block (struct super_block * s, int offset)
 
     bh = sb_bread (s, offset / s->s_blocksize);
     if (!bh) {
-      printk ("read_super_block: "
-              "bread failed (dev %s, block %ld, size %ld)\n",
+      printk ("sh-2006: read_super_block: "
+              "bread failed (dev %s, block %lu, size %lu)\n",
               s->s_id, offset / s->s_blocksize, s->s_blocksize);
       return 1;
     }
  
     rs = (struct reiserfs_super_block *)bh->b_data;
-    if (!is_reiserfs_magic_string (rs)) {
-      printk ("read_super_block: "
-              "can't find a reiserfs filesystem on (dev %s, block %lu, size %ld)\n",
-              s->s_id, bh->b_blocknr, s->s_blocksize);
+    if (!is_any_reiserfs_magic_string (rs)) {
       brelse (bh);
       return 1;
     }
@@ -431,39 +730,48 @@ static int read_super_block (struct super_block * s, int offset)
     brelse (bh);
     
     sb_set_blocksize (s, sb_blocksize(rs));
-
+    
     bh = reiserfs_bread (s, offset / s->s_blocksize);
     if (!bh) {
-	printk("read_super_block: "
-                "bread failed (dev %s, block %ld, size %ld)\n",
+	printk("sh-2007: read_super_block: "
+                "bread failed (dev %s, block %lu, size %lu)\n",
                 s->s_id, offset / s->s_blocksize, s->s_blocksize);
 	return 1;
     }
     
     rs = (struct reiserfs_super_block *)bh->b_data;
-    if (!is_reiserfs_magic_string (rs) || sb_blocksize(rs) != s->s_blocksize) {
-	printk ("read_super_block: "
-		"can't find a reiserfs filesystem on (dev %s, block %lu, size %ld)\n",
+    if (sb_blocksize(rs) != s->s_blocksize) {
+	printk ("sh-2011: read_super_block: "
+		"can't find a reiserfs filesystem on (dev %s, block %lu, size %lu)\n",
 		s->s_id, bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
-	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", s->s_id);
 	return 1;
     }
-    /* must check to be sure we haven't pulled an old format super out
-    ** of the old format's log.  This is a kludge of a check, but it
-    ** will work.  If block we've just read in is inside the
-    ** journal for that super, it can't be valid.  
-    */
-    if (bh->b_blocknr >= sb_journal_block(rs) && 
-	bh->b_blocknr < (sb_journal_block(rs) + JOURNAL_BLOCK_COUNT)) {
-	brelse(bh) ;
-	printk("super-459: read_super_block: "
-	       "super found at block %lu is within its own log. "
-	       "It must not be of this format type.\n", bh->b_blocknr) ;
-	return 1 ;
-    }
+
     SB_BUFFER_WITH_SB (s) = bh;
     SB_DISK_SUPER_BLOCK (s) = rs;
+
+    if (is_reiserfs_jr (rs)) {
+	/* magic is of non-standard journal filesystem, look at s_version to
+	   find which format is in use */
+	if (sb_version(rs) == REISERFS_VERSION_2)
+	  printk ("read_super_block: found reiserfs format \"3.6\" "
+		  "with non-standard journal\n");
+	else if (sb_version(rs) == REISERFS_VERSION_1)
+	  printk ("read_super_block: found reiserfs format \"3.5\" "
+		  "with non-standard journal\n");
+	else {
+	  printk ("sh-2012: read_super_block: found unknown format \"%u\" "
+	            "of reiserfs with non-standard magic\n", sb_version(rs));
+	return 1;
+	}
+    }
+    else
+      /* s_version of standard format may contain incorrect information,
+	 so we just look at the magic string */
+      printk ("found reiserfs format \"%s\" with standard journal\n",
+	      is_reiserfs_3_5 (rs) ? "3.5" : "3.6");
+
     s->s_op = &reiserfs_sops;
 
     /* new format is limited by the 32 bit wide i_blocks field, want to
@@ -648,7 +956,7 @@ int function2code (hashf_t func)
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-struct super_block * reiserfs_read_super (struct super_block * s, void * data, int silent)
+static struct super_block * reiserfs_read_super (struct super_block * s, void * data, int silent)
 {
     int size;
     struct inode *root_inode;
@@ -658,11 +966,12 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
     unsigned long blocks;
     int jinit_done = 0 ;
     struct reiserfs_iget4_args args ;
-
+    struct reiserfs_super_block * rs;
+    char *jdev_name;
 
     memset (&s->u.reiserfs_sb, 0, sizeof (struct reiserfs_sb_info));
-
-    if (parse_options ((char *) data, &(s->u.reiserfs_sb.s_mount_opt), &blocks) == 0) {
+    jdev_name = NULL;
+    if (parse_options ((char *) data, &(s->u.reiserfs_sb.s_mount_opt), &blocks, &jdev_name) == 0) {
 	return NULL;
     }
 
@@ -673,17 +982,15 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 
     size = block_size(s->s_dev);
     sb_set_blocksize(s, size);
-
-    /* read block (64-th 1k block), which can contain reiserfs super block */
-    if (read_super_block (s, REISERFS_DISK_OFFSET_IN_BYTES)) {
-	// try old format (undistributed bitmap, super block in 8-th 1k block of a device)
-	sb_set_blocksize(s, size);
-	if (read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
-	    goto error;
-	else
-	    old_format = 1;
+    
+    /* try old format (undistributed bitmap, super block in 8-th 1k block of a device) */
+    if (!read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
+      old_format = 1;
+    /* try new format (64-th 1k block), which can contain reiserfs super block */
+    else if (read_super_block (s, REISERFS_DISK_OFFSET_IN_BYTES)) {
+      printk("sh-2021: reiserfs_read_super: can not find reiserfs on %s\n", s->s_id);
+      goto error;    
     }
-
     s->u.reiserfs_sb.s_mount_state = SB_REISERFS_STATE(s);
     s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;
 
@@ -697,8 +1004,8 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 #endif
 
     // set_device_ro(s->s_dev, 1) ;
-    if (journal_init(s)) {
-	printk("reiserfs_read_super: unable to initialize journal space\n") ;
+    if( journal_init(s, jdev_name, old_format) ) {
+	printk("sh-2022: reiserfs_read_super: unable to initialize journal space\n") ;
 	goto error ;
     } else {
 	jinit_done = 1 ; /* once this is set, journal_release must be called
@@ -738,54 +1045,56 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
       goto error ;
     }
 
+    rs = SB_DISK_SUPER_BLOCK (s);
+    if (is_reiserfs_3_5 (rs) || (is_reiserfs_jr (rs) && SB_VERSION (s) == REISERFS_VERSION_1))
+	set_bit(REISERFS_3_5, &(s->u.reiserfs_sb.s_properties));
+    else
+	set_bit(REISERFS_3_6, &(s->u.reiserfs_sb.s_properties));
+    
     if (!(s->s_flags & MS_RDONLY)) {
-	struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
-        int old_magic;
-
-      old_magic = strncmp (rs->s_magic,  REISER2FS_SUPER_MAGIC_STRING,
-                           strlen ( REISER2FS_SUPER_MAGIC_STRING));
-	if( old_magic && le16_to_cpu(rs->s_version) != 0 ) {
-	  dput(s->s_root) ;
-	  s->s_root = NULL ;
-	  reiserfs_warning("reiserfs: wrong version/magic combination in the super-block\n") ;
-	  goto error ;
-	}
 
 	journal_begin(&th, s, 1) ;
 	reiserfs_prepare_for_journal(s, SB_BUFFER_WITH_SB(s), 1) ;
 
-        set_sb_state( rs, REISERFS_ERROR_FS );
-
-        if ( old_magic ) {
-	    // filesystem created under 3.5.x found
-	    if (!old_format_only (s)) {
-		reiserfs_warning("reiserfs: converting 3.5.x filesystem to the new format\n") ;
-		// after this 3.5.x will not be able to mount this partition
-		memcpy (rs->s_magic, REISER2FS_SUPER_MAGIC_STRING, 
-			sizeof (REISER2FS_SUPER_MAGIC_STRING));
-
-		reiserfs_convert_objectid_map_v1(s) ;
-	    } else {
-		reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
-	    }
-	} else {
-	    // new format found
-	    set_bit (REISERFS_CONVERT, &(s->u.reiserfs_sb.s_mount_opt));
+        set_sb_umount_state( rs, REISERFS_ERROR_FS );
+	set_sb_fs_state (rs, 0);
+	
+	if (old_format_only(s)) {
+	  /* filesystem of format 3.5 either with standard or non-standard
+	     journal */       
+	  if (convert_reiserfs (s)) {
+	    /* and -o conv is given */ 
+	    reiserfs_warning ("reiserfs: converting 3.5 filesystem to the 3.6 format\n") ;
+	    
+	    if (is_reiserfs_3_5 (rs))
+	      /* put magic string of 3.6 format. 2.2 will not be able to
+		 mount this filesystem anymore */
+	      memcpy (rs->s_v1.s_magic, reiserfs_3_6_magic_string, 
+		      sizeof (reiserfs_3_6_magic_string));
+	    
+	    set_sb_version(rs,REISERFS_VERSION_2);
+	    reiserfs_convert_objectid_map_v1(s) ;
+	    set_bit(REISERFS_3_6, &(s->u.reiserfs_sb.s_properties));
+	    clear_bit(REISERFS_3_5, &(s->u.reiserfs_sb.s_properties));
+	  } else {
+	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
+	  }
 	}
-
-	// mark hash in super block: it could be unset. overwrite should be ok
-        set_sb_hash_function_code( rs, function2code(s->u.reiserfs_sb.s_hash_function ) );
 
 	journal_mark_dirty(&th, s, SB_BUFFER_WITH_SB (s));
 	journal_end(&th, s, 1) ;
+	
+	/* look for files which were to be removed in previous session */
+	finish_unfinished (s);
+
 	s->s_dirt = 0;
     } else {
-	struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
-	if (strncmp (rs->s_magic,  REISER2FS_SUPER_MAGIC_STRING, 
-		     strlen ( REISER2FS_SUPER_MAGIC_STRING))) {
+	if ( old_format_only(s) ) {
 	    reiserfs_warning("reiserfs: using 3.5.x disk format\n") ;
 	}
     }
+    // mark hash in super block: it could be unset. overwrite should be ok
+    set_sb_hash_function_code( rs, function2code(s->u.reiserfs_sb.s_hash_function ) );
 
     reiserfs_proc_info_init( s );
     reiserfs_proc_register( s, "version", reiserfs_version_in_proc );
@@ -797,7 +1106,6 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
     reiserfs_proc_register( s, "journal", reiserfs_journal_in_proc );
     init_waitqueue_head (&(s->u.reiserfs_sb.s_wait));
 
-    printk("%s\n", reiserfs_get_version_string()) ;
     return s;
 
  error:
@@ -826,7 +1134,7 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 // at the ext2 code and comparing. It's subfunctions contain no code
 // used as a template unless they are so labeled.
 //
-int reiserfs_statfs (struct super_block * s, struct statfs * buf)
+static int reiserfs_statfs (struct super_block * s, struct statfs * buf)
 {
   struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK (s);
   
@@ -866,6 +1174,7 @@ out:
 out1:
 	return err;
 }
+
 
 MODULE_DESCRIPTION("ReiserFS journaled filesystem");
 MODULE_AUTHOR("Hans Reiser <reiser@namesys.com>");

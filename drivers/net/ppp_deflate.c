@@ -39,7 +39,7 @@
 #include <linux/ppp_defs.h>
 #include <linux/ppp-comp.h>
 
-#include "zlib.c"
+#include <linux/zlib.h>
 
 /*
  * State for a Deflate (de)compressor.
@@ -56,10 +56,6 @@ struct ppp_deflate_state {
 
 #define DEFLATE_OVHD	2		/* Deflate overhead/packet */
 
-static void	*zalloc __P((void *, unsigned int items, unsigned int size));
-static void	*zalloc_init __P((void *, unsigned int items,
-				  unsigned int size));
-static void	zfree __P((void *, void *ptr));
 static void	*z_comp_alloc __P((unsigned char *options, int opt_len));
 static void	*z_decomp_alloc __P((unsigned char *options, int opt_len));
 static void	z_comp_free __P((void *state));
@@ -80,72 +76,6 @@ static void	z_comp_reset __P((void *state));
 static void	z_decomp_reset __P((void *state));
 static void	z_comp_stats __P((void *state, struct compstat *stats));
 
-struct chunk_header {
-	int valloced;		/* allocated with valloc, not kmalloc */
-	int guard;		/* check for overwritten header */
-};
-
-#define GUARD_MAGIC	0x77a8011a
-#define MIN_VMALLOC	2048	/* use kmalloc for blocks < this */
-
-/*
- * Space allocation and freeing routines for use by zlib routines.
- */
-void
-zfree(arg, ptr)
-    void *arg;
-    void *ptr;
-{
-	struct chunk_header *hdr = ((struct chunk_header *)ptr) - 1;
-
-	if (hdr->guard != GUARD_MAGIC) {
-		printk(KERN_WARNING "zfree: header corrupted (%x %x) at %p\n",
-		       hdr->valloced, hdr->guard, hdr);
-		return;
-	}
-	if (hdr->valloced)
-		vfree(hdr);
-	else
-		kfree(hdr);
-}
-
-void *
-zalloc(arg, items, size)
-    void *arg;
-    unsigned int items, size;
-{
-	struct chunk_header *hdr;
-	unsigned nbytes;
-
-	nbytes = items * size + sizeof(*hdr);
-	hdr = kmalloc(nbytes, GFP_ATOMIC);
-	if (hdr == 0)
-		return 0;
-	hdr->valloced = 0;
-	hdr->guard = GUARD_MAGIC;
-	return (void *) (hdr + 1);
-}
-
-void *
-zalloc_init(arg, items, size)
-    void *arg;
-    unsigned int items, size;
-{
-	struct chunk_header *hdr;
-	unsigned nbytes;
-
-	nbytes = items * size + sizeof(*hdr);
-	if (nbytes >= MIN_VMALLOC)
-		hdr = vmalloc(nbytes);
-	else
-		hdr = kmalloc(nbytes, GFP_KERNEL);
-	if (hdr == 0)
-		return 0;
-	hdr->valloced = nbytes >= MIN_VMALLOC;
-	hdr->guard = GUARD_MAGIC;
-	return (void *) (hdr + 1);
-}
-
 static void
 z_comp_free(arg)
     void *arg;
@@ -153,7 +83,9 @@ z_comp_free(arg)
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
 	if (state) {
-		deflateEnd(&state->strm);
+		zlib_deflateEnd(&state->strm);
+		if (state->strm.workspace)
+			kfree(state->strm.workspace);
 		kfree(state);
 		MOD_DEC_USE_COUNT;
 	}
@@ -180,22 +112,24 @@ z_comp_alloc(options, opt_len)
 	if (w_size < DEFLATE_MIN_SIZE || w_size > DEFLATE_MAX_SIZE)
 		return NULL;
 
-	state = (struct ppp_deflate_state *) kmalloc(sizeof(*state), GFP_KERNEL);
+	state = (struct ppp_deflate_state *) kmalloc(sizeof(*state),
+						     GFP_KERNEL);
 	if (state == NULL)
 		return NULL;
 
 	MOD_INC_USE_COUNT;
 	memset (state, 0, sizeof (struct ppp_deflate_state));
-	state->strm.next_in = NULL;
-	state->strm.zalloc  = zalloc_init;
-	state->strm.zfree   = zfree;
-	state->w_size       = w_size;
+	state->strm.next_in   = NULL;
+	state->w_size         = w_size;
+	state->strm.workspace = kmalloc(zlib_deflate_workspacesize(),
+					GFP_KERNEL);
+	if (state->strm.workspace == NULL)
+		goto out_free;
 
-	if (deflateInit2(&state->strm, Z_DEFAULT_COMPRESSION,
+	if (zlib_deflateInit2(&state->strm, Z_DEFAULT_COMPRESSION,
 			 DEFLATE_METHOD_VAL, -w_size, 8, Z_DEFAULT_STRATEGY)
 	    != Z_OK)
 		goto out_free;
-	state->strm.zalloc = zalloc;
 	return (void *) state;
 
 out_free:
@@ -224,7 +158,7 @@ z_comp_init(arg, options, opt_len, unit, hdrlen, debug)
 	state->unit  = unit;
 	state->debug = debug;
 
-	deflateReset(&state->strm);
+	zlib_deflateReset(&state->strm);
 
 	return 1;
 }
@@ -236,7 +170,7 @@ z_comp_reset(arg)
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
 	state->seqno = 0;
-	deflateReset(&state->strm);
+	zlib_deflateReset(&state->strm);
 }
 
 int
@@ -286,7 +220,7 @@ z_compress(arg, rptr, obuf, isize, osize)
 	state->strm.avail_in = (isize - off);
 
 	for (;;) {
-		r = deflate(&state->strm, Z_PACKET_FLUSH);
+		r = zlib_deflate(&state->strm, Z_PACKET_FLUSH);
 		if (r != Z_OK) {
 			if (state->debug)
 				printk(KERN_ERR
@@ -337,7 +271,9 @@ z_decomp_free(arg)
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
 	if (state) {
-		inflateEnd(&state->strm);
+		zlib_inflateEnd(&state->strm);
+		if (state->strm.workspace)
+			kfree(state->strm.workspace);
 		kfree(state);
 		MOD_DEC_USE_COUNT;
 	}
@@ -370,14 +306,15 @@ z_decomp_alloc(options, opt_len)
 
 	MOD_INC_USE_COUNT;
 	memset (state, 0, sizeof (struct ppp_deflate_state));
-	state->w_size        = w_size;
-	state->strm.next_out = NULL;
-	state->strm.zalloc   = zalloc_init;
-	state->strm.zfree    = zfree;
-
-	if (inflateInit2(&state->strm, -w_size) != Z_OK)
+	state->w_size         = w_size;
+	state->strm.next_out  = NULL;
+	state->strm.workspace = kmalloc(zlib_inflate_workspacesize(),
+					GFP_KERNEL);
+	if (state->strm.workspace == NULL)
 		goto out_free;
-	state->strm.zalloc = zalloc;
+
+	if (zlib_inflateInit2(&state->strm, -w_size) != Z_OK)
+		goto out_free;
 	return (void *) state;
 
 out_free:
@@ -407,7 +344,7 @@ z_decomp_init(arg, options, opt_len, unit, hdrlen, mru, debug)
 	state->debug = debug;
 	state->mru   = mru;
 
-	inflateReset(&state->strm);
+	zlib_inflateReset(&state->strm);
 
 	return 1;
 }
@@ -419,7 +356,7 @@ z_decomp_reset(arg)
 	struct ppp_deflate_state *state = (struct ppp_deflate_state *) arg;
 
 	state->seqno = 0;
-	inflateReset(&state->strm);
+	zlib_inflateReset(&state->strm);
 }
 
 /*
@@ -492,7 +429,7 @@ z_decompress(arg, ibuf, isize, obuf, osize)
 	 * Call inflate, supplying more input or output as needed.
 	 */
 	for (;;) {
-		r = inflate(&state->strm, Z_PACKET_FLUSH);
+		r = zlib_inflate(&state->strm, Z_PACKET_FLUSH);
 		if (r != Z_OK) {
 			if (state->debug)
 				printk(KERN_DEBUG "z_decompress%d: inflate returned %d (%s)\n",
@@ -575,7 +512,7 @@ z_incomp(arg, ibuf, icnt)
 		++state->strm.avail_in;
 	}
 
-	r = inflateIncomp(&state->strm);
+	r = zlib_inflateIncomp(&state->strm);
 	if (r != Z_OK) {
 		/* gak! */
 		if (state->debug) {

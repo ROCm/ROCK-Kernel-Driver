@@ -699,113 +699,121 @@ static void i91uSCBPost(BYTE * pHcb, BYTE * pScb)
 static void i91u_intr0(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[0].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[0]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr1(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[1].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[1]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr2(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[2].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[2]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr3(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[3].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[3]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr4(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[4].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[4]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr5(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[5].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[5]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr6(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[6].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[6]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void i91u_intr7(int irqno, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	if (tul_hcs[7].HCS_Intr != irqno)
 		return;
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 
 	tul_isr(&tul_hcs[7]);
 
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 /* 

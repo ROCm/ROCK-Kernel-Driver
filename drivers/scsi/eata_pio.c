@@ -110,10 +110,11 @@ void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs * regs);
 void do_eata_pio_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 {
     unsigned long flags;
-
-    spin_lock_irqsave(&io_request_lock, flags);
+    struct Scsi_Host *dev = dev_id;
+    
+    spin_lock_irqsave(dev->host_lock, flags);
     eata_pio_int_handler(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 void eata_pio_int_handler(int irq, void *dev_id, struct pt_regs * regs)
@@ -704,25 +705,6 @@ int register_pio_HBA(long base, struct get_conf *gc, Scsi_Host_Template * tpnt)
 	return (FALSE);
     }
     
-    if (!reg_IRQ[gc->IRQ]) {    /* Interrupt already registered ? */
-	if (!request_irq(gc->IRQ, do_eata_pio_int_handler, SA_INTERRUPT, 
-			 "EATA-PIO", NULL)){
-	    reg_IRQ[gc->IRQ]++;
-	    if (!gc->IRQ_TR)
-		reg_IRQL[gc->IRQ] = TRUE;   /* IRQ is edge triggered */
-	} else {
-	    printk("Couldn't allocate IRQ %d, Sorry.\n", gc->IRQ);
-	    return (FALSE);
-	}
-    } else {            /* More than one HBA on this IRQ */
-	if (reg_IRQL[gc->IRQ] == TRUE) {
-	    printk("Can't support more than one HBA on this IRQ,\n"
-		   "  if the IRQ is edge triggered. Sorry.\n");
-	    return (FALSE);
-	} else
-	    reg_IRQ[gc->IRQ]++;
-    }
-    
     request_region(base, 8, "eata_pio");
     
     size = sizeof(hostdata) + (sizeof(struct eata_ccb) * ntohs(gc->queuesiz));
@@ -732,6 +714,27 @@ int register_pio_HBA(long base, struct get_conf *gc, Scsi_Host_Template * tpnt)
     {
     	release_region(base, 8);
     	return FALSE;
+    }
+    
+    if (!reg_IRQ[gc->IRQ]) {    /* Interrupt already registered ? */
+	if (!request_irq(gc->IRQ, do_eata_pio_int_handler, SA_INTERRUPT, 
+			 "EATA-PIO", sh)){
+	    reg_IRQ[gc->IRQ]++;
+	    if (!gc->IRQ_TR)
+		reg_IRQL[gc->IRQ] = TRUE;   /* IRQ is edge triggered */
+	} else {
+	    printk("Couldn't allocate IRQ %d, Sorry.\n", gc->IRQ);
+	    release_region(base, 8);
+	    return (FALSE);
+	}
+    } else {            /* More than one HBA on this IRQ */
+	if (reg_IRQL[gc->IRQ] == TRUE) {
+	    printk("Can't support more than one HBA on this IRQ,\n"
+		   "  if the IRQ is edge triggered. Sorry.\n");
+	    release_region(base, 8);
+	    return (FALSE);
+	} else
+	    reg_IRQ[gc->IRQ]++;
     }
     
     hd = SD(sh);                   

@@ -261,9 +261,9 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	.globl	ret_from_fork
 ret_from_fork:
 	bl	schedule_tail
-	lwz	r0,TASK_PTRACE(r2)
+#error	lwz	r0,TASK_PTRACE(r2)
 	andi.	r0,r0,PT_TRACESYS
-	bnel-	syscall_trace
+#error	bnel-	syscall_trace
 	b	ret_from_except
 
 	.globl	ret_from_intercept
@@ -279,16 +279,16 @@ ret_from_except:
 	lwz	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
 	beq+	do_signal_ret	/* if so, check need_resched and signals */
-	lwz	r3,NEED_RESCHED(r2)
+#error	lwz	r3,NEED_RESCHED(r2)
 	cmpi	0,r3,0		/* check need_resched flag */
 	beq+	7f
 	bl	schedule
-7:	lwz	r5,SIGPENDING(r2) /* Check for pending unblocked signals */
+#error 7:	lwz	r5,SIGPENDING(r2) /* Check for pending unblocked signals */
 	cmpwi	0,r5,0
 	beq+	do_signal_ret
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
-	bl	do_signal
+#error	bl	do_signal
 	.globl	do_signal_ret
 do_signal_ret:
 	.globl ret_to_user_hook	

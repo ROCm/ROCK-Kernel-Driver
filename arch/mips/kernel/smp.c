@@ -179,7 +179,7 @@ void __init smp_commence(void)
 
 static void reschedule_this_cpu(void *dummy)
 {
-	current->need_resched = 1;
+	current->work.need_resched = 1;
 }
 
 void FASTCALL(smp_send_reschedule(int cpu))

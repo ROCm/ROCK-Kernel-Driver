@@ -41,8 +41,8 @@
 /* current version of this driver-source: */
 #define IBMMCA_SCSI_DRIVER_VERSION "4.0b"
 
-#define IBMLOCK spin_lock_irqsave(&io_request_lock, flags);
-#define IBMUNLOCK spin_unlock_irqrestore(&io_request_lock, flags);
+#define IBMLOCK(dev) spin_lock_irqsave(dev->host_lock, flags);
+#define IBMUNLOCK(dev) spin_unlock_irqrestore(dev->host_lock, flags);
 
 /* driver configuration */
 #define IM_MAX_HOSTS     8 /* maximum number of host adapters */
@@ -505,14 +505,14 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    Scsi_Cmnd *cmd;
    int lastSCSI;
 
-   IBMLOCK
+   IBMLOCK(dev_id)
    /* search for one adapter-response on shared interrupt */
    for (host_index=0;
 	hosts[host_index] && !(inb(IM_STAT_REG(host_index)) & IM_INTR_REQUEST);
 	host_index++);
    /* return if some other device on this IRQ caused the interrupt */
    if (!hosts[host_index]) {
-      IBMUNLOCK
+      IBMUNLOCK(dev_id)
       return;
    }
 
@@ -521,15 +521,15 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    if ((reset_status(host_index) == IM_RESET_NOT_IN_PROGRESS_NO_INT)||
        (reset_status(host_index) == IM_RESET_FINISHED_OK_NO_INT)) {
       reset_status(host_index) = IM_RESET_NOT_IN_PROGRESS;
-      IBMUNLOCK
+      IBMUNLOCK(dev_id)
       return;
    }
 
    /*must wait for attention reg not busy, then send EOI to subsystem */
    while (1) {
       if (!(inb (IM_STAT_REG(host_index)) & IM_BUSY)) break;
-      IBMUNLOCK /* cycle interrupt */
-      IBMLOCK
+      IBMUNLOCK(dev_id) /* cycle interrupt */
+      IBMLOCK(dev_id)
    }
    ihost_index=host_index;
    /*get command result and logical device */
@@ -539,7 +539,7 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    /* get the last_scsi_command here */
    lastSCSI = last_scsi_command(ihost_index)[ldn];
    outb (IM_EOI | ldn, IM_ATTN_REG(ihost_index));
-   IBMUNLOCK
+   IBMUNLOCK(dev_id)
    /*these should never happen (hw fails, or a local programming bug) */
    if (!global_command_error_excuse) {
       switch (cmd_result) {
@@ -731,14 +731,14 @@ static void issue_cmd (int host_index, unsigned long cmd_reg,
    unsigned long flags;
    /* must wait for attention reg not busy */
    while (1) {
-      IBMLOCK
+      IBMLOCK(hosts[host_index])
       if (!(inb(IM_STAT_REG(host_index)) & IM_BUSY)) break;
-      IBMUNLOCK
+      IBMUNLOCK(hosts[host_index])
    }
    /* write registers and enable system interrupts */
    outl (cmd_reg, IM_CMD_REG(host_index));
    outb (attn_reg, IM_ATTN_REG(host_index));
-   IBMUNLOCK
+   IBMUNLOCK(hosts[host_index])
    return;
 }
 
@@ -1442,7 +1442,7 @@ static int ibmmca_getinfo (char *buf, int slot, void *dev)
    unsigned int pos[8];
    unsigned long flags;
 
-   IBMLOCK
+   IBMLOCK(dev)
    shpnt = dev; /* assign host-structure to local pointer */
    len = 0; /* set filled text-buffer index to 0 */
    /* get the _special contents of the hostdata structure */
@@ -1496,7 +1496,7 @@ static int ibmmca_getinfo (char *buf, int slot, void *dev)
    while ( len % sizeof( int ) != ( sizeof ( int ) - 1 ) )
      len += sprintf (buf+len, " ");
    len += sprintf (buf+len, "\n");
-   IBMUNLOCK
+   IBMUNLOCK(shpnt)
    return len;
 }
 
@@ -2192,7 +2192,7 @@ int ibmmca_abort (Scsi_Cmnd * cmd)
 #ifdef IM_DEBUG_PROBE
    printk("IBM MCA SCSI: Abort subroutine called...\n");
 #endif
-   IBMLOCK
+   IBMLOCK(cmd->host)
    shpnt = cmd->host;
    /* search for the right hostadapter */
    for (host_index = 0; hosts[host_index] && hosts[host_index]->host_no != shpnt->host_no; host_index++);
@@ -2201,7 +2201,7 @@ int ibmmca_abort (Scsi_Cmnd * cmd)
       cmd->result = DID_NO_CONNECT << 16;
       if (cmd->scsi_done) (cmd->scsi_done) (cmd);
       shpnt = cmd->host;
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
 #ifdef IM_DEBUG_PROBE
       printk("IBM MCA SCSI: Abort adapter selection failed!\n");
 #endif
@@ -2224,7 +2224,7 @@ int ibmmca_abort (Scsi_Cmnd * cmd)
 
    /*if cmd for this ldn has already finished, no need to abort */
    if (!ld(host_index)[ldn].cmd) {
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
       return SCSI_ABORT_NOT_RUNNING;
    }
 
@@ -2244,13 +2244,13 @@ int ibmmca_abort (Scsi_Cmnd * cmd)
    while (1) {
       if (!(inb (IM_STAT_REG(host_index)) & IM_BUSY))
 	break;
-      IBMUNLOCK
-      IBMLOCK
+      IBMUNLOCK(shpnt)
+      IBMLOCK(shpnt)
    }
    /* write registers and enable system interrupts */
    outl (imm_command, IM_CMD_REG(host_index));
    outb (IM_IMM_CMD | ldn, IM_ATTN_REG(host_index));
-   IBMUNLOCK
+   IBMUNLOCK(shpnt)
 #ifdef IM_DEBUG_PROBE
    printk("IBM MCA SCSI: Abort queued to adapter...\n");
 #endif
@@ -2262,21 +2262,21 @@ int ibmmca_abort (Scsi_Cmnd * cmd)
 
    /*if abort went well, call saved done, then return success or error */
    if (cmd->result == (DID_ABORT << 16)) {
-      IBMLOCK
+      IBMLOCK(shpnt)
       cmd->result |= DID_ABORT << 16;
       if (cmd->scsi_done) (cmd->scsi_done) (cmd);
       ld(host_index)[ldn].cmd = NULL;
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
 #ifdef IM_DEBUG_PROBE
       printk("IBM MCA SCSI: Abort finished with success.\n");
 #endif
       return SCSI_ABORT_SUCCESS;
    } else {
-      IBMLOCK
+      IBMLOCK(shpnt)
       cmd->result |= DID_NO_CONNECT << 16;
       if (cmd->scsi_done) (cmd->scsi_done) (cmd);
       ld(host_index)[ldn].cmd = NULL;
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
 #ifdef IM_DEBUG_PROBE
       printk("IBM MCA SCSI: Abort failed.\n");
 #endif
@@ -2297,7 +2297,7 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
       printk("IBM MCA SCSI: Reset called with NULL-command!\n");
       return(SCSI_RESET_SNOOZE);
    }
-   IBMLOCK
+   IBMLOCK(cmd->host)
    ticks = IM_RESET_DELAY*HZ;
    shpnt = cmd->host;
    /* search for the right hostadapter */
@@ -2308,7 +2308,7 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
 
    if (local_checking_phase_flag(host_index)) {
       printk("IBM MCA SCSI: unable to reset while checking devices.\n");
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
       return SCSI_RESET_SNOOZE;
    }
 
@@ -2324,8 +2324,8 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
    while (1) {
       if (!(inb (IM_STAT_REG(host_index)) & IM_BUSY))
 	break;
-      IBMUNLOCK
-      IBMLOCK
+      IBMUNLOCK(shpnt)
+      IBMLOCK(shpnt)
    }
    /*write registers and enable system interrupts */
    outl (imm_command, IM_CMD_REG(host_index));
@@ -2342,7 +2342,7 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
       printk("IBM MCA SCSI: reset did not complete within %d seconds.\n",
 	     IM_RESET_DELAY);
       reset_status(host_index) = IM_RESET_FINISHED_FAIL;
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
       return SCSI_RESET_ERROR;
    }
 
@@ -2360,13 +2360,13 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
    /* if reset failed, just return an error */
    if (reset_status(host_index) == IM_RESET_FINISHED_FAIL) {
       printk("IBM MCA SCSI: reset failed.\n");
-      IBMUNLOCK
+      IBMUNLOCK(shpnt)
       return SCSI_RESET_ERROR;
    }
 
    /* so reset finished ok - call outstanding done's, and return success */
    printk ("IBM MCA SCSI: Reset successfully completed.\n");
-   IBMUNLOCK
+   IBMUNLOCK(shpnt)
    for (i = 0; i < MAX_LOG_DEV; i++) {
       cmd_aid = ld(host_index)[i].cmd;
       if (cmd_aid && cmd_aid->scsi_done) {
@@ -2454,8 +2454,8 @@ int ibmmca_proc_info (char *buffer, char **start, off_t offset, int length,
    unsigned long flags;
    int max_pun;
 
-   IBMLOCK
    for (i = 0; hosts[i] && hosts[i]->host_no != hostno; i++);
+   IBMLOCK(hosts[i]) /* Check it */
    shpnt = hosts[i];
    host_index = i;
    if (!shpnt) {
@@ -2537,7 +2537,7 @@ int ibmmca_proc_info (char *buffer, char **start, off_t offset, int length,
    *start = buffer + offset;
    len -= offset;
    if (len > length) len = length;
-   IBMUNLOCK
+   IBMUNLOCK(shpnt)
    return len;
 }
 

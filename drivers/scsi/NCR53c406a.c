@@ -537,7 +537,7 @@ NCR53c406a_detect(Scsi_Host_Template * tpnt){
     DEB(printk("NCR53c406a: using port_base %x\n", port_base));
     
     if(irq_level > 0) {
-        if(request_irq(irq_level, do_NCR53c406a_intr, 0, "NCR53c406a", NULL)){
+        if(request_irq(irq_level, do_NCR53c406a_intr, 0, "NCR53c406a", shpnt)){
             printk("NCR53c406a: unable to allocate IRQ %d\n", irq_level);
             goto err_release;
         }
@@ -780,10 +780,11 @@ NCR53c406a_biosparm(Scsi_Disk *disk, kdev_t dev, int* info_array){
      static void
 do_NCR53c406a_intr(int unused, void *dev_id, struct pt_regs *regs){
     unsigned long flags;
-
-    spin_lock_irqsave(&io_request_lock, flags);
+    struct Scsi_Host * dev = dev_id;
+    
+    spin_lock_irqsave(dev->host_lock, flags);
     NCR53c406a_intr(0, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
      static void

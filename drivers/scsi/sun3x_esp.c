@@ -112,7 +112,7 @@ int sun3x_esp_detect(Scsi_Host_Template *tpnt)
 
 	esp->irq = 2;
 	if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
-			"SUN3X SCSI", NULL)) {
+			"SUN3X SCSI", esp->ehost)) {
 		esp_deallocate(esp);
 		return 0;
 	}

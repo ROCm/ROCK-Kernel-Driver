@@ -72,12 +72,19 @@
  * the documentation/chipset releases. An on-line errata would be welcome.
  *
  * TODO:
- * - some trivial error lurk,
- * - the stats are fscked,
+ * - syncppp oopses. X25 untested.
  * - use polling at high irq/s,
  * - performance analysis,
  * - endianness.
  *
+ * 2001/12/10	Daniela Squassoni  <daniela@cyclades.com>
+ * - Contribution to support the new generic HDLC layer.
+ *
+ * 2002/01	Ueimor
+ * - old style interface removal
+ * - dscc4_release_ring fix (related to DMA mapping)
+ * - hard_start_xmit fix (hint: TxSizeMax)
+ * - misc crapectomy.
  */
 
 #include <linux/version.h>
@@ -107,17 +114,34 @@
 #include <linux/hdlc.h>
 
 /* Version */
-static const char version[] = "$Id: dscc4.c,v 1.130 2001/02/25 15:27:34 romieu Exp $\n";
+static const char version[] = "$Id: dscc4.c,v 1.157 2002/01/28 01:54:19 romieu Exp $\n";
 static int debug;
+static int quartz;
 
+#define	DRV_NAME	"dscc4"
+
+#undef DSCC4_POLLING
+#define DEBUG
 
 /* Module parameters */
+
 MODULE_AUTHOR("Maintainer: Francois Romieu <romieu@cogenit.fr>");
-MODULE_DESCRIPTION("Siemens PEB20534 PCI Controller");
+MODULE_DESCRIPTION("Siemens PEB20534 PCI Controler");
 MODULE_LICENSE("GPL");
 MODULE_PARM(debug,"i");
+MODULE_PARM_DESC(debug,"Enable/disable extra messages");
+MODULE_PARM(quartz,"i");
+MODULE_PARM_DESC(quartz,"If present, on-board quartz frequency (Hz)");
+
+EXPORT_NO_SYMBOLS;
 
 /* Structures */
+
+struct thingie {
+	int define;
+	u32 bits;
+};
+
 struct TxFD {
 	u32 state;
 	u32 next;
@@ -135,18 +159,19 @@ struct RxFD {
 };
 
 #define DEBUG
-#define DEBUG_PARANOID
+#define DEBUG_PARANOIA
 #define TX_RING_SIZE    32
 #define RX_RING_SIZE    32
 #define IRQ_RING_SIZE   64 /* Keep it A multiple of 32 */
 #define TX_TIMEOUT      (HZ/10)
+#define DSCC4_HZ_MAX	33000000
 #define BRR_DIVIDER_MAX 64*0x00008000
 #define dev_per_card	4
 
 #define SOURCE_ID(flags) ((flags >> 28 ) & 0x03)
 #define TO_SIZE(state) ((state >> 16) & 0x1fff)
 #define TO_STATE(len) cpu_to_le32((len & TxSizeMax) << 16)
-#define RX_MAX(len) ((((len) >> 5) + 1) << 5)
+#define RX_MAX(len) ((((len) >> 5) + 1)<< 5)
 #define SCC_REG_START(id) SCC_START+(id)*SCC_OFFSET
 
 #undef DEBUG
@@ -157,7 +182,7 @@ struct dscc4_pci_priv {
         spinlock_t lock;
         struct pci_dev *pdev;
 
-        struct net_device *root;
+        struct dscc4_dev_priv *root;
         dma_addr_t iqcfg_dma;
 	u32 xtal_hz;
 };
@@ -186,19 +211,21 @@ struct dscc4_dev_priv {
         dma_addr_t iqtx_dma;
         dma_addr_t iqrx_dma;
 
-        struct net_device_stats stats;
 	struct timer_list timer;
 
         struct dscc4_pci_priv *pci_priv;
         spinlock_t lock;
 
         int dev_id;
-	u32 flags;
+	volatile u32 flags;
 	u32 timer_help;
 	u32 hi_expected;
 
-	struct hdlc_device_struct hdlc;
-	int usecount;
+	hdlc_device hdlc;
+	sync_serial_settings settings;
+	unsigned short encoding;
+	unsigned short parity;
+	u32 pad __attribute__ ((aligned (4)));
 };
 
 /* GLOBAL registers definitions */
@@ -232,6 +259,9 @@ struct dscc4_dev_priv {
 #define ISR     0x58
 
 /* Bit masks */
+#define EncodingMask	0x00700000
+#define CrcMask		0x00000003
+
 #define IntRxScc0       0x10000000
 #define IntTxScc0       0x01000000
 
@@ -242,10 +272,9 @@ struct dscc4_dev_priv {
 #define Rdt		0x00200000
 #define Idr		0x00100000
 #define Idt		0x00080000
-#define TxSccRes       0x01000000
-#define RxSccRes       0x00010000
-#define TxSizeMax	0x1ffc
-#define RxSizeMax	0x1ffc
+#define TxSccRes	0x01000000
+#define RxSccRes	0x00010000
+#define TxSizeMax	0x1fff
 
 #define Ccr0ClockMask	0x0000003f
 #define Ccr1LoopMask	0x00000200
@@ -258,6 +287,7 @@ struct dscc4_dev_priv {
 #define FrameVfr	0x80
 #define FrameRdo	0x40
 #define FrameCrc	0x20
+#define FrameRab	0x10
 #define FrameAborted	0x00000200
 #define FrameEnd	0x80000000
 #define DataComplete	0x40000000
@@ -293,30 +323,55 @@ struct dscc4_dev_priv {
 #define RdoSet		0x00000004
 
 /* Functions prototypes */
-static __inline__ void dscc4_rx_irq(struct dscc4_pci_priv *, struct net_device *);
-static __inline__ void dscc4_tx_irq(struct dscc4_pci_priv *, struct net_device *);
+static inline void dscc4_rx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
+static inline void dscc4_tx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
 static int dscc4_found1(struct pci_dev *, unsigned long ioaddr);
 static int dscc4_init_one(struct pci_dev *, const struct pci_device_id *ent);
 static int dscc4_open(struct net_device *);
 static int dscc4_start_xmit(struct sk_buff *, struct net_device *);
 static int dscc4_close(struct net_device *);
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
-static int dscc4_change_mtu(struct net_device *dev, int mtu);
 static int dscc4_init_ring(struct net_device *);
 static void dscc4_release_ring(struct dscc4_dev_priv *);
 static void dscc4_timer(unsigned long);
 static void dscc4_tx_timeout(struct net_device *);
 static void dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
-static struct net_device_stats *dscc4_get_stats(struct net_device *);
-static int dscc4_attach_hdlc_device(struct net_device *);
-static void dscc4_unattach_hdlc_device(struct net_device *);
-static int dscc4_hdlc_open(struct hdlc_device_struct *);
-static void dscc4_hdlc_close(struct hdlc_device_struct *);
-static int dscc4_hdlc_ioctl(struct hdlc_device_struct *, struct ifreq *, int);
-static int dscc4_hdlc_xmit(hdlc_device *, struct sk_buff *);
-#ifdef EXPERIMENTAL_POLLING
+static int dscc4_hdlc_attach(hdlc_device *, unsigned short, unsigned short);
+static int dscc4_set_iface(struct net_device *);
+static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
+#ifdef DSCC4_POLLING
 static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
 #endif
+
+static inline void dscc4_patch_register(u32 ioaddr, u32 mask, u32 value)
+{
+	u32 state;
+
+	state = readl(ioaddr);
+	state &= ~mask;
+	state |= value;
+	writel(state, ioaddr); 
+}
+
+int state_check(u32 state, struct dscc4_dev_priv *dpriv, 
+	struct net_device *dev, const char *msg)
+{
+#ifdef DEBUG_PARANOIA
+	if (SOURCE_ID(state) != dpriv->dev_id) {
+		printk(KERN_DEBUG "%s (%s): Source Id=%d, state=%08x\n",
+		       dev->name, msg, SOURCE_ID(state), state );
+		return -1;
+	}
+	if (state & 0x0df80c00) {
+		printk(KERN_DEBUG "%s (%s): state=%08x (UFO alert)\n",
+		       dev->name, msg, state);
+		return -1;
+	}
+	return 0;
+#else
+	return 1;
+#endif
+}
 
 void inline reset_TxFD(struct TxFD *tx_fd) {
 	/* FIXME: test with the last arg (size specification) = 0 */
@@ -324,32 +379,47 @@ void inline reset_TxFD(struct TxFD *tx_fd) {
 	tx_fd->complete = 0x00000000;
 }
 
-void inline dscc4_release_ring_skbuff(struct sk_buff **p, int n)
-{
-	for(; n > 0; n--) {
-		if (*p)
-			dev_kfree_skb(*p);
-		p++;
-	}
-}
-
 static void dscc4_release_ring(struct dscc4_dev_priv *dpriv)
 {
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
+	struct TxFD *tx_fd = dpriv->tx_fd;
+	struct RxFD *rx_fd = dpriv->rx_fd;
+	struct sk_buff **skbuff;
+	int i;
 
-	pci_free_consistent(pdev, TX_RING_SIZE*sizeof(struct TxFD),
-			    dpriv->tx_fd, dpriv->tx_fd_dma);
-	pci_free_consistent(pdev, RX_RING_SIZE*sizeof(struct RxFD),
-			    dpriv->rx_fd, dpriv->rx_fd_dma);
-	dscc4_release_ring_skbuff(dpriv->tx_skbuff, TX_RING_SIZE);
-	dscc4_release_ring_skbuff(dpriv->rx_skbuff, RX_RING_SIZE);
+	pci_free_consistent(pdev, TX_RING_SIZE*sizeof(struct TxFD), tx_fd, 
+			    dpriv->tx_fd_dma);
+	pci_free_consistent(pdev, RX_RING_SIZE*sizeof(struct RxFD), rx_fd, 
+			    dpriv->rx_fd_dma);
+
+	skbuff = dpriv->tx_skbuff;
+	for (i = 0; i < TX_RING_SIZE; i++) {
+		if (*skbuff) {
+			pci_unmap_single(pdev, tx_fd->data, (*skbuff)->len, 
+				PCI_DMA_TODEVICE);
+			dev_kfree_skb(*skbuff);
+		}
+		skbuff++;
+		tx_fd++;
+	}
+
+	skbuff = dpriv->rx_skbuff;
+	for (i = 0; i < RX_RING_SIZE; i++) {
+		if (*skbuff) {
+			pci_unmap_single(pdev, rx_fd->data, (*skbuff)->len, 
+				PCI_DMA_FROMDEVICE);
+			dev_kfree_skb(*skbuff);
+		}
+		skbuff++;
+		rx_fd++;
+	}
 }
 
 void inline try_get_rx_skb(struct dscc4_dev_priv *priv, int cur, struct net_device *dev)
 {
 	struct sk_buff *skb;
 
-	skb = dev_alloc_skb(RX_MAX(HDLC_MAX_MRU+2));
+	skb = dev_alloc_skb(RX_MAX(HDLC_MAX_MRU));
 	priv->rx_skbuff[cur] = skb;
 	if (!skb) {
 		priv->rx_fd[cur--].data = (u32) NULL;
@@ -376,6 +446,7 @@ static int dscc4_wait_ack_cec(u32 ioaddr, struct net_device *dev, char *msg)
 			printk(KERN_ERR "%s: %s timeout\n", dev->name, msg);
 			return -1;
 		}
+		rmb();
 	}
 	printk(KERN_DEBUG "%s: %s ack (%d try)\n", dev->name, msg, i);
 	return 0;
@@ -406,22 +477,26 @@ static int dscc4_do_action(struct net_device *dev, char *msg)
 	return -1;
 }
 
-static __inline__ int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
+static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 {
-	int cur;
+	int cur, ret = 0;
 	s16 i;
 
 	cur = dpriv->iqtx_current%IRQ_RING_SIZE;
 	for (i = 0; i >= 0; i++) {
 		if (!(dpriv->flags & (NeedIDR | NeedIDT)) ||
 		    (dpriv->iqtx[cur] & Xpr))
-			return 0;
+			break;
+		smp_rmb();
 	}
-	printk(KERN_ERR "%s: %s timeout\n", "dscc4", "XPR");
-	return -1;
+	if (i < 0) {
+		printk(KERN_ERR "%s: %s timeout\n", "dscc4", "XPR");
+		ret = -1;
+	}
+	return ret;
 }
 
-static __inline__ void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
+static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 	struct RxFD *rx_fd, struct net_device *dev)
 {
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
@@ -433,24 +508,23 @@ static __inline__ void dscc4_rx_skb(struct dscc4_dev_priv *dpriv, int cur,
 	pci_dma_sync_single(pdev, rx_fd->data, pkt_len + 1, PCI_DMA_FROMDEVICE);
 	if((skb->data[pkt_len] & FrameOk) == FrameOk) {
 		pci_unmap_single(pdev, rx_fd->data, skb->len, PCI_DMA_FROMDEVICE);
-		dpriv->stats.rx_packets++;
-		dpriv->stats.rx_bytes += pkt_len;
+		dev_to_hdlc(dev)->stats.rx_packets++;
+		dev_to_hdlc(dev)->stats.rx_bytes += pkt_len;
 		skb->tail += pkt_len;
 		skb->len = pkt_len;
        		if (netif_running(hdlc_to_dev(&dpriv->hdlc)))
-			hdlc_netif_rx(&dpriv->hdlc, skb);
-		else
-			netif_rx(skb);
+			skb->protocol = htons(ETH_P_HDLC);
+		netif_rx(skb);
 		try_get_rx_skb(dpriv, cur, dev);
 	} else {
 		if(skb->data[pkt_len] & FrameRdo)
-			dpriv->stats.rx_fifo_errors++;
+			dev_to_hdlc(dev)->stats.rx_fifo_errors++;
 		else if(!(skb->data[pkt_len] | ~FrameCrc))
-			dpriv->stats.rx_crc_errors++;
-		else if(!(skb->data[pkt_len] | ~FrameVfr))
-			dpriv->stats.rx_length_errors++;
+			dev_to_hdlc(dev)->stats.rx_crc_errors++;
+		else if(!(skb->data[pkt_len] | ~(FrameVfr | FrameRab)))
+			dev_to_hdlc(dev)->stats.rx_length_errors++;
 		else
-			dpriv->stats.rx_errors++;
+			dev_to_hdlc(dev)->stats.rx_errors++;
 	}
 	rx_fd->state1 |= Hold;
 	rx_fd->state2 = 0x00000000;
@@ -468,9 +542,9 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 {
 	struct dscc4_pci_priv *priv;
 	struct dscc4_dev_priv *dpriv;
-	int i;
 	static int cards_found = 0;
 	unsigned long ioaddr;
+	int i;
 
 	printk(KERN_DEBUG "%s", version);
 
@@ -478,26 +552,29 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 		goto err_out;
 	if (!request_mem_region(pci_resource_start(pdev, 0),
 	                	pci_resource_len(pdev, 0), "registers")) {
-	        printk (KERN_ERR "dscc4: can't reserve MMIO region (regs)\n");
+	        printk(KERN_ERR "%s: can't reserve MMIO region (regs)\n",
+			DRV_NAME);
 	        goto err_out;
 	}
 	if (!request_mem_region(pci_resource_start(pdev, 1),
 	                        pci_resource_len(pdev, 1), "LBI interface")) {
-	        printk (KERN_ERR "dscc4: can't reserve MMIO region (lbi)\n");
+	        printk(KERN_ERR "%s: can't reserve MMIO region (lbi)\n",
+			DRV_NAME);
 	        goto err_out_free_mmio_region0;
 	}
 	ioaddr = (unsigned long)ioremap(pci_resource_start(pdev, 0),
 					pci_resource_len(pdev, 0));
 	if (!ioaddr) {
-		printk(KERN_ERR "dscc4: cannot remap MMIO region %lx @ %lx\n",
-	                pci_resource_len(pdev, 0), pci_resource_start(pdev, 0));
+		printk(KERN_ERR "%s: cannot remap MMIO region %lx @ %lx\n", 
+			DRV_NAME, pci_resource_len(pdev, 0),
+			pci_resource_start(pdev, 0));
 		goto err_out_free_mmio_region;
 	}
-	printk(KERN_DEBUG "Siemens DSCC4, MMIO at %#lx (regs), %#lx (lbi), IRQ %d.\n",
+	printk(KERN_DEBUG "Siemens DSCC4, MMIO at %#lx (regs), %#lx (lbi), IRQ %d\n",
 	        pci_resource_start(pdev, 0),
 	        pci_resource_start(pdev, 1), pdev->irq);
 
-	/* High PCI latency useless. Cf app. note. */
+	/* No need for High PCI latency. Cf app. note. */
 	pci_write_config_byte(pdev, PCI_LATENCY_TIMER, 0x10);
 	pci_set_master(pdev);
 
@@ -506,11 +583,10 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 
 	priv = (struct dscc4_pci_priv *)pci_get_drvdata(pdev);
 
-	if (request_irq(pdev->irq, &dscc4_irq, SA_SHIRQ, "dscc4", priv->root)) {
-		printk(KERN_WARNING "dscc4: IRQ %d is busy\n", pdev->irq);
+	if (request_irq(pdev->irq, &dscc4_irq, SA_SHIRQ, DRV_NAME, priv->root)){
+		printk(KERN_WARNING "%s: IRQ %d busy\n", DRV_NAME, pdev->irq);
 		goto err_out_iounmap;
 	}
-	priv->pdev = pdev;
 
 	/* power up/little endian/dma core controlled via hold bit */
 	writel(0x00000000, ioaddr + GMODE);
@@ -537,7 +613,7 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 	 * IQRX/TXi needs to be set soon. Learned it the hard way...
 	 */
 	for(i = 0; i < dev_per_card; i++) {
-		dpriv = (struct dscc4_dev_priv *)(priv->root + i)->priv;
+		dpriv = priv->root + i;
 		dpriv->iqtx = (u32 *) pci_alloc_consistent(pdev,
 			IRQ_RING_SIZE*sizeof(u32), &dpriv->iqtx_dma);
 		if (!dpriv->iqtx)
@@ -545,7 +621,7 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 		writel(dpriv->iqtx_dma, ioaddr + IQTX0 + i*4);
 	}
 	for(i = 0; i < dev_per_card; i++) {
-		dpriv = (struct dscc4_dev_priv *)(priv->root + i)->priv;
+		dpriv = priv->root + i;
 		dpriv->iqrx = (u32 *) pci_alloc_consistent(pdev,
 			IRQ_RING_SIZE*sizeof(u32), &dpriv->iqrx_dma);
 		if (!dpriv->iqrx)
@@ -553,10 +629,7 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 		writel(dpriv->iqrx_dma, ioaddr + IQRX0 + i*4);
 	}
 
-	/* 
-	 * Cf application hint. Beware of hard-lock condition on 
-	 * threshold .
-	 */
+	/* Cf application hint. Beware of hard-lock condition on threshold. */
 	writel(0x42104000, ioaddr + FIFOCR1);
 	//writel(0x9ce69800, ioaddr + FIFOCR2);
 	writel(0xdef6d800, ioaddr + FIFOCR2);
@@ -572,14 +645,14 @@ static int __init dscc4_init_one (struct pci_dev *pdev,
 
 err_out_free_iqrx:
 	while (--i >= 0) {
-		dpriv = (struct dscc4_dev_priv *)(priv->root + i)->priv;
+		dpriv = priv->root + i;
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
 				    dpriv->iqrx, dpriv->iqrx_dma);
 	}
 	i = dev_per_card;
 err_out_free_iqtx:
 	while (--i >= 0) {
-		dpriv = (struct dscc4_dev_priv *)(priv->root + i)->priv;
+		dpriv = priv->root + i;
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
 				    dpriv->iqtx, dpriv->iqtx_dma);
 	}
@@ -599,88 +672,102 @@ err_out:
 	return -ENODEV;
 };
 
+/* 
+ * Let's hope the default values are decent enough to protect my
+ * feet from the user's gun - Ueimor
+ */
+static void dscc4_init_registers(u32 base_addr, int dev_id)
+{
+	u32 ioaddr = base_addr + SCC_REG_START(dev_id);
+
+	writel(0x80001000, ioaddr + CCR0);
+
+	writel(LengthCheck | (HDLC_MAX_MRU >> 5), ioaddr + RLCR);
+
+	/* no address recognition/crc-CCITT/cts enabled */
+	writel(0x021c8000, ioaddr + CCR1);
+
+	/* crc not forwarded */
+	writel(0x00050008 & ~RxActivate, ioaddr + CCR2);
+	// crc forwarded
+	//writel(0x00250008 & ~RxActivate, ioaddr + CCR2);
+
+	/* Don't mask RDO. Ever. */
+#ifdef DSCC4_POLLING
+	writel(0xfffeef7f, ioaddr + IMR); /* Interrupt mask */
+#else
+	//writel(0xfffaef7f, ioaddr + IMR); /* Interrupt mask */
+	writel(0xfffaef7e, ioaddr + IMR); /* Interrupt mask */
+#endif
+}
+
 static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	struct dscc4_pci_priv *ppriv;
-	struct dscc4_dev_priv *dpriv;
-	struct net_device *dev;
+	struct dscc4_dev_priv *root;
 	int i = 0;
 
-	dpriv = (struct dscc4_dev_priv *)
-		kmalloc(dev_per_card*sizeof(struct dscc4_dev_priv), GFP_KERNEL);
-	if (!dpriv) {
-		printk(KERN_ERR "dscc4: can't allocate data\n");
+	root = (struct dscc4_dev_priv *)
+		kmalloc(dev_per_card*sizeof(*root), GFP_KERNEL);
+	if (!root) {
+		printk(KERN_ERR "%s: can't allocate data\n", DRV_NAME);
 		goto err_out;
 	}
-	memset(dpriv, 0, dev_per_card*sizeof(struct dscc4_dev_priv));
+	memset(root, 0, dev_per_card*sizeof(*root));
 
-	dev = (struct net_device *)
-	      kmalloc(dev_per_card*sizeof(struct net_device), GFP_KERNEL);
-	if (!dev) {
-		printk(KERN_ERR "dscc4: can't allocate net_device\n");
-		goto err_dealloc_priv;
-	}
-	memset(dev, 0, dev_per_card*sizeof(struct net_device));
-
-	ppriv = (struct dscc4_pci_priv *)
-		kmalloc(sizeof(struct dscc4_pci_priv), GFP_KERNEL);
+	ppriv = (struct dscc4_pci_priv *) kmalloc(sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
-		printk(KERN_ERR "dscc4: can't allocate pci private data.\n");
-		goto err_dealloc_dev;
+		printk(KERN_ERR "%s: can't allocate private data\n", DRV_NAME);
+		goto err_free_dev;
 	}
 	memset(ppriv, 0, sizeof(struct dscc4_pci_priv));
 
 	for (i = 0; i < dev_per_card; i++) {
-		struct dscc4_dev_priv *p;
-		struct net_device *d;
+		struct dscc4_dev_priv *dpriv = root + i;
+		hdlc_device *hdlc = &dpriv->hdlc;
+		struct net_device *d = hdlc_to_dev(hdlc);
 
-	        d = dev + i;
 	        d->base_addr = ioaddr;
 		d->init = NULL;
 	        d->irq = pdev->irq;
-		/* The card adds the crc */
-		d->type = ARPHRD_RAWHDLC;
 	        d->open = dscc4_open;
 	        d->stop = dscc4_close;
-	        d->hard_start_xmit = dscc4_start_xmit;
 		d->set_multicast_list = NULL;
 	        d->do_ioctl = dscc4_ioctl;
-		d->get_stats = dscc4_get_stats;
-		d->change_mtu = dscc4_change_mtu;
-	        d->mtu = HDLC_MAX_MTU;
-	        d->flags = IFF_MULTICAST|IFF_POINTOPOINT|IFF_NOARP;
 		d->tx_timeout = dscc4_tx_timeout;
 		d->watchdog_timeo = TX_TIMEOUT;
 
-		p = dpriv + i;
-		p->dev_id = i;
-		p->pci_priv = ppriv;
-		spin_lock_init(&p->lock);
-		d->priv = p;
+		dpriv->dev_id = i;
+		dpriv->pci_priv = ppriv;
+		spin_lock_init(&dpriv->lock);
+		d->priv = dpriv;
 
-		if (dev_alloc_name(d, "scc%d")<0) {
-			printk(KERN_ERR "dev_alloc_name failed for scc.\n");
-			goto err_dealloc_dev;
-		}
-	        if (register_netdev(d)) {
-			printk(KERN_ERR "%s: register_netdev != 0.\n", d->name);
-			goto err_dealloc_dev;
+		hdlc->xmit = dscc4_start_xmit;
+		hdlc->attach = dscc4_hdlc_attach;
+
+	        if (register_hdlc_device(hdlc)) {
+			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
+			goto err_unregister;
 	        }
-		dscc4_attach_hdlc_device(d);
+		hdlc->proto = IF_PROTO_HDLC;
 		SET_MODULE_OWNER(d);
+		dscc4_init_registers(ioaddr, i);
+		dpriv->parity = PARITY_CRC16_PR0_CCITT;
+		dpriv->encoding = ENCODING_NRZ;
 	}
-	ppriv->root = dev;
-	ppriv->pdev = pdev;
+	if (dscc4_set_quartz(root, quartz) < 0)
+		goto err_unregister;
+	ppriv->root = root;
 	spin_lock_init(&ppriv->lock);
 	pci_set_drvdata(pdev, ppriv);
 	return 0;
 
-err_dealloc_dev:
+err_unregister:
 	while (--i >= 0)
-		unregister_netdev(dev + i);
-	kfree(dev);
-err_dealloc_priv:
-	kfree(dpriv);
+		unregister_hdlc_device(&root[i].hdlc);
+	kfree(ppriv);
+err_free_dev:
+	kfree(root);
 err_out:
 	return -1;
 };
@@ -701,7 +788,7 @@ static void dscc4_timer(unsigned long data)
 			printk(KERN_DEBUG "%s: pending events\n", dev->name);
 			dev->trans_start = jiffies;
 			spin_lock_irqsave(&ppriv->lock, flags);
-			dscc4_tx_irq(ppriv, dev);
+			dscc4_tx_irq(ppriv, dpriv);
 			spin_unlock_irqrestore(&ppriv->lock, flags);
 		} else {
 			struct TxFD *tx_fd;
@@ -711,7 +798,7 @@ static void dscc4_timer(unsigned long data)
 			printk(KERN_DEBUG "%s: missing events\n", dev->name);
 			i = dpriv->tx_dirty%TX_RING_SIZE; 
 			j = dpriv->tx_current - dpriv->tx_dirty;
-			dpriv->stats.tx_dropped += j;
+			dev_to_hdlc(dev)->stats.tx_dropped += j;
 			while(j--) {
 				skb = dpriv->tx_skbuff[i];
 				tx_fd = dpriv->tx_fd + i;
@@ -740,13 +827,34 @@ static void dscc4_timer(unsigned long data)
 static void dscc4_tx_timeout(struct net_device *dev)
 {
 	/* FIXME: something is missing there */
-};
+}
+
+static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
+{
+	sync_serial_settings *settings = &dpriv->settings;
+
+	if (settings->loopback && (settings->clock_type != CLOCK_INT)) {
+		struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+
+		printk(KERN_INFO "%s: loopback requires clock\n", dev->name);
+		return -1;
+	}
+	return 0;
+}
 
 static int dscc4_open(struct net_device *dev)
 {
-	struct dscc4_dev_priv *dpriv = (struct dscc4_dev_priv *)dev->priv;
+	struct dscc4_dev_priv *dpriv = dev->priv;
+	hdlc_device *hdlc = &dpriv->hdlc;
 	struct dscc4_pci_priv *ppriv;
-	u32 ioaddr = 0;
+	u32 ioaddr;
+	int ret = -EAGAIN;
+
+	if ((dscc4_loopback_check(dpriv) < 0) || !dev->hard_start_xmit)
+		goto err;
+
+	if ((ret = hdlc_open(hdlc)))
+		goto err;
 
 	MOD_INC_USE_COUNT;
 
@@ -757,24 +865,6 @@ static int dscc4_open(struct net_device *dev)
 
 	ioaddr = dev->base_addr + SCC_REG_START(dpriv->dev_id);
 
-	/* FIXME: VIS */
-	writel(readl(ioaddr + CCR0) | 0x80001000, ioaddr + CCR0);
-
-	writel(LengthCheck | (HDLC_MAX_MRU >> 5), ioaddr + RLCR);
-
-	/* no address recognition/crc-CCITT/cts enabled */
-	writel(readl(ioaddr + CCR1) | 0x021c8000, ioaddr + CCR1);
-
-	/* Ccr2.Rac = 0 */
-	writel(0x00050008 & ~RxActivate, ioaddr + CCR2);
-
-#ifdef EXPERIMENTAL_POLLING
-	writel(0xfffeef7f, ioaddr + IMR); /* Interrupt mask */
-#else
-	/* Don't mask RDO. Ever. */
-	//writel(0xfffaef7f, ioaddr + IMR); /* Interrupt mask */
-	writel(0xfffaef7e, ioaddr + IMR); /* Interrupt mask */
-#endif
 	/* IDT+IDR during XPR */
 	dpriv->flags = NeedIDR | NeedIDT;
 
@@ -789,9 +879,10 @@ static int dscc4_open(struct net_device *dev)
 		printk(KERN_ERR "%s busy. Try later\n", dev->name);
 		goto err_free_ring;
 	}
+
+	/* Posted write is flushed in the busy-waiting loop */
 	writel(TxSccRes | RxSccRes, ioaddr + CMDR);
 
-	/* ... the following isn't */
 	if (dscc4_wait_ack_cec(ioaddr, dev, "Cec"))
 		goto err_free_ring;
 
@@ -819,16 +910,18 @@ static int dscc4_open(struct net_device *dev)
 err_free_ring:
 	dscc4_release_ring(dpriv);
 err_out:
+	hdlc_close(hdlc);
 	MOD_DEC_USE_COUNT;
-	return -EAGAIN;
+err:
+	return ret;
 }
 
-#ifdef EXPERIMENTAL_POLLING
+#ifdef DSCC4_POLLING
 static int dscc4_tx_poll(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	/* FIXME: it's gonna be easy (TM), for sure */
 }
-#endif /* EXPERIMENTAL_POLLING */
+#endif /* DSCC4_POLLING */
 
 static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
@@ -842,13 +935,14 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	next = dpriv->tx_current%TX_RING_SIZE;
 	dpriv->tx_skbuff[next] = skb;
 	tx_fd = dpriv->tx_fd + next;
-	tx_fd->state = FrameEnd | Hold | TO_STATE(skb->len & TxSizeMax);
+	printk(KERN_DEBUG "%s: %d sent\n", dev->name, skb->len);
+	tx_fd->state = FrameEnd | Hold | TO_STATE(skb->len);
 	tx_fd->data = pci_map_single(ppriv->pdev, skb->data, skb->len,
 				     PCI_DMA_TODEVICE);
 	tx_fd->complete = 0x00000000;
 	mb(); // FIXME: suppress ?
 
-#ifdef EXPERIMENTAL_POLLING
+#ifdef DSCC4_POLLING
 	spin_lock(&dpriv->lock);
 	while(dscc4_tx_poll(dpriv, dev));
 	spin_unlock(&dpriv->lock);
@@ -881,6 +975,7 @@ static int dscc4_close(struct net_device *dev)
 	struct dscc4_dev_priv *dpriv = (struct dscc4_dev_priv *)dev->priv;
 	u32 ioaddr = dev->base_addr;
 	int dev_id;
+	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	del_timer_sync(&dpriv->timer);
 	netif_stop_queue(dev);
@@ -890,11 +985,28 @@ static int dscc4_close(struct net_device *dev)
 	writel(0x00050000, ioaddr + SCC_REG_START(dev_id) + CCR2);
 	writel(MTFi|Rdr|Rdt, ioaddr + CH0CFG + dev_id*0x0c); /* Reset Rx/Tx */
 	writel(0x00000001, ioaddr + GCMDR);
+	readl(ioaddr + GCMDR);
 
+	/* 
+	 * FIXME: wait for the command ack before returning the memory
+	 * structures to the kernel.
+	 */
+	hdlc_close(hdlc);
 	dscc4_release_ring(dpriv);
 
 	MOD_DEC_USE_COUNT;
 	return 0;
+}
+
+static inline int dscc4_check_clock_ability(int port)
+{
+	int ret = 0;
+
+#ifdef CONFIG_DSCC4_CLOCK_ON_TWO_PORTS_ONLY
+	if (port >= 2)
+		ret = -1;
+#endif
+	return ret;
 }
 
 static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
@@ -903,12 +1015,14 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 	u32 brr;
 
 	*state &= ~Ccr0ClockMask;
-	if (*bps) { /* DCE */
+	if (*bps) { /* Clock generated - required for DCE */
 		u32 n = 0, m = 0, divider;
 		int xtal;
 
 		xtal = dpriv->pci_priv->xtal_hz;
 		if (!xtal)
+			return -1;
+		if (dscc4_check_clock_ability(dpriv->dev_id) < 0)
 			return -1;
 		divider = xtal / *bps;
 		if (divider > BRR_DIVIDER_MAX) {
@@ -933,8 +1047,9 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 		if (!(*state & 0x00000001)) /* Clock mode 6b */
 			divider <<= 4;
 		*bps = xtal / divider;
-	} else { /* DTE */
+	} else {
 		/* 
+		 * External clock - DTE 
 		 * "state" already reflects Clock mode 0a. 
 		 * Nothing more to be done 
 		 */
@@ -945,214 +1060,201 @@ static int dscc4_set_clock(struct net_device *dev, u32 *bps, u32 *state)
 	return 0;
 }
 
-#ifdef LATER_PLEASE
-/*
- * -*- [RFC] Configuring Synchronous Interfaces in Linux -*-
- */
-
-// FIXME: MEDIA already defined in linux/hdlc.h
-#define HDLC_MEDIA_V35		0
-#define HDLC_MEDIA_RS232	1
-#define HDLC_MEDIA_X21		2
-#define HDLC_MEDIA_E1		3
-#define HDLC_MEDIA_HSSI		4
-
-#define HDLC_CODING_NRZ		0
-#define HDLC_CODING_NRZI	1
-#define HDLC_CODING_FM0		2
-#define HDLC_CODING_FM1		3
-#define HDLC_CODING_MANCHESTER	4
-
-#define HDLC_CRC_NONE		0
-#define HDLC_CRC_16		1
-#define HDLC_CRC_32		2
-#define HDLC_CRC_CCITT		3
-
-/* RFC: add the crc reset value ? */
-struct hdlc_physical {
-	u8 media;
-	u8 coding;
-	u32 rate;
-	u8 crc;
-	u8 crc_siz;		/* 2 or 4 bytes */
-	u8 shared_flags;	/* Discouraged on the DSCC4 */
-};
-
-// FIXME: PROTO already defined in linux/hdlc.h
-#define HDLC_PROTO_RAW		0
-#define HDLC_PROTO_FR		1
-#define HDLC_PROTO_X25		2
-#define HDLC_PROTO_PPP		3
-#define HDLC_PROTO_CHDLC	4
-
-struct hdlc_protocol {
-	u8 proto; 
-	
-	union {
-	} u;
-};
-
-struct screq {
-	u16 media_group;
-
-	union {
-		struct hdlc_physical hdlc_phy;
-		struct hdlc_protocol hdlc_proto;
-	} u;
-};
-
-// FIXME: go sub-module 
-static struct {
-	u16 coding;
-	u16 bits;
-} map[] = {
-	{HDLC_CODING_NRZ,		0x00},
-	{HDLC_CODING_NRZI,		0x20},
-	{HDLC_CODING_FM0,		0x40},
-	{HDLC_CODING_FM1,		0x50},
-	{HDLC_CODING_MANCHESTER,	0x60},
-	{65535,	0x00}
-};
-#endif /* LATER_PLEASE */
-
 static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	struct dscc4_dev_priv *dpriv = dev->priv;
-	u32 state, ioaddr;
+	struct if_settings *if_s = &ifr->ifr_settings;
+	const size_t size = sizeof(dpriv->settings);
+	int ret = 0;
 
         if (dev->flags & IFF_UP)
                 return -EBUSY;
 
-	switch (cmd) {
-		/* Set built-in quartz frequency */
-		case SIOCDEVPRIVATE: {
-			u32 hz;
+	if (cmd != SIOCDEVICE)
+		return -EOPNOTSUPP;
 
-			hz = ifr->ifr_ifru.ifru_ivalue;
-			if (hz >= 33000000) /* 33 MHz */
-				return -EOPNOTSUPP;
-			dpriv->pci_priv->xtal_hz = hz;
+	switch(ifr->ifr_settings.type) {
+	case IF_GET_IFACE:
+		if_s->type = IF_IFACE_SYNC_SERIAL;
+		if (if_s->data_length == 0)
 			return 0;
-		}
-		/* Set/unset loopback */
-		case SIOCDEVPRIVATE+1: {
-			u32 flags;
-	
-			ioaddr = dev->base_addr + CCR1 +
-				 SCC_REG_START(dpriv->dev_id);
-			state = readl(ioaddr);
-			flags = ifr->ifr_ifru.ifru_ivalue;
-			if (flags & 0x00000001) {
-				printk(KERN_DEBUG "%s: loopback\n", dev->name);
-				state |= 0x00000100;
-			} else {
-				printk(KERN_DEBUG "%s: normal\n", dev->name);
-				state &= ~0x00000100;
-			}
-			writel(state, ioaddr);
-			return 0;
-		}
+		if (if_s->data_length < size)
+			return -ENOMEM;
+		if (copy_to_user(if_s->data, &dpriv->settings, size))
+			return -EFAULT;
+		if_s->data_length = size;
+		break;
 
-#ifdef LATER_PLEASE
-		case SIOCDEVPRIVATE+2: {
-		{
-			struct screq scr;
+	case IF_IFACE_SYNC_SERIAL:
+		if(!capable(CAP_NET_ADMIN))
+			return -EPERM;
 
-			err = copy_from_user(&scr, ifr->ifr_ifru.ifru_data, sizeof(struct screq));
-			if (err)
-				return err;
-			do {
-				if (scr.u.hdlc_phy.coding == map[i].coding)
-					break;
-			} while (map[++i].coding != 65535);
-			if (!map[i].coding)
-				return -EOPNOTSUPP;
-			
-			ioaddr = dev->base_addr + CCR0 +
-				 SCC_REG_START(dpriv->dev_id);
-			state = readl(ioaddr) & ~EncodingMask;
-			state |= (u32)map[i].bits << 16;
-			writel(state, ioaddr);	
-			printk("state: %08x\n", state); /* DEBUG */
-			return 0;
-		}
-		case SIOCDEVPRIVATE+3: {
-			struct screq *scr = (struct screq *)ifr->ifr_ifru.ifru_data;
+		if (if_s->data_length != size)
+			return -ENOMEM;
 
-			ioaddr = dev->base_addr + CCR0 +
-				 SCC_REG_START(dpriv->dev_id);
-			state = (readl(ioaddr) & EncodingMask) >> 16;
-			do {
-				if (state == map[i].bits)
-					break;
-			} while (map[++i].coding);
-			return put_user(map[i].coding, (u16 *)scr->u.hdlc_phy.coding);
-		}
-#endif /* LATER_PLEASE */
+		if (copy_from_user(&dpriv->settings, if_s->data, size))
+			return -EFAULT;
+		ret = dscc4_set_iface(dev);
+		break;
 
-		case HDLCSCLOCKRATE:
-		{
-			u32 state, bps;
- 
-			bps = ifr->ifr_ifru.ifru_ivalue;
-			ioaddr = dev->base_addr + CCR0 +
-				 SCC_REG_START(dpriv->dev_id);
-			state = readl(ioaddr);
-			if(dscc4_set_clock(dev, &bps, &state) < 0)
-				return -EOPNOTSUPP;
-			if (bps) { /* DCE */
-				printk(KERN_DEBUG "%s: generated RxClk (DCE)\n",
-				       dev->name);
-				ifr->ifr_ifru.ifru_ivalue = bps;
-			} else { /* DTE */
-				state = 0x80001000;
-				printk(KERN_DEBUG "%s: external RxClk (DTE)\n",
-				       dev->name);
-			}
-			writel(state, ioaddr);	
-			return 0;
-		}
-		case HDLCGCLOCKRATE: {
-			u32 brr;
-			int bps;
-
-			brr = readl(dev->base_addr + BRR + 
-				    SCC_REG_START(dpriv->dev_id));
-			bps = dpriv->pci_priv->xtal_hz >> (brr >> 8);
-			bps /= (brr & 0x3f) + 1;
-			ifr->ifr_ifru.ifru_ivalue = bps;
-			return 0;
-		}
-
-		default:
-			return -EOPNOTSUPP;
+	default:
+		ret = hdlc_ioctl(dev, ifr, cmd);
+		break;
 	}
+
+	return ret;
 }
 
-static int dscc4_change_mtu(struct net_device *dev, int mtu)
+static inline int dscc4_set_quartz(struct dscc4_dev_priv *dpriv, int hz)
 {
-	/* FIXME: chainsaw coded... */
-	if ((mtu <= 3) || (mtu > 65531))
-		return -EINVAL;
-        if(dev->flags & IFF_UP)
-                return -EBUSY;
-	dev->mtu = mtu;
-        return(0);
+	int ret = 0;
+
+	if ((hz < 0) || (hz > DSCC4_HZ_MAX))
+		ret = -EOPNOTSUPP;
+	else
+		dpriv->pci_priv->xtal_hz = hz;
+
+	return ret;
 }
 
-static void dscc4_irq(int irq, void *dev_instance, struct pt_regs *ptregs)
+static int dscc4_match(struct thingie *p, int value)
 {
-	struct net_device *dev = dev_instance;
+	int i;
+
+	for (i = 0; p[i].define != -1; i++) {
+		if (value == p[i].define)
+			break;
+	}
+	if (p[i].define == -1)
+		return -1;
+	else
+		return i;
+}
+
+static int dscc4_clock_setting(struct net_device *dev)
+{
+	struct dscc4_dev_priv *dpriv = dev->priv;
+	sync_serial_settings *settings = &dpriv->settings;
+	u32 bps, state;
+	u32 ioaddr;
+
+	bps = settings->clock_rate;
+	ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv->dev_id);
+	state = readl(ioaddr);
+	if(dscc4_set_clock(dev, &bps, &state) < 0)
+		return -EOPNOTSUPP;
+	if (bps) { /* DCE */
+		printk(KERN_DEBUG "%s: generated RxClk (DCE)\n", dev->name);
+		if (settings->clock_rate != bps) {
+			settings->clock_rate = bps;
+			printk(KERN_DEBUG "%s: clock adjusted from %08d to %08d \n",
+				dev->name, dpriv->settings.clock_rate, bps);
+		}
+	} else { /* DTE */
+		state = 0x80001000;
+		printk(KERN_DEBUG "%s: external RxClk (DTE)\n", dev->name);
+	}
+	writel(state, ioaddr); 
+	return 0;
+}
+
+static int dscc4_encoding_setting(struct net_device *dev)
+{
+	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct thingie encoding[] = {
+		{ ENCODING_NRZ,		0x00000000 },
+		{ ENCODING_NRZI,	0x00200000 },
+		{ ENCODING_FM_MARK,	0x00400000 },
+		{ ENCODING_FM_SPACE,	0x00500000 },
+		{ ENCODING_MANCHESTER,	0x00600000 },
+		{ -1,			0}
+	};
+	int i, ret = 0;
+
+	i = dscc4_match(encoding, dpriv->encoding);
+	if (i >= 0) {
+		u32 ioaddr;
+
+		ioaddr = dev->base_addr + CCR0 + SCC_REG_START(dpriv->dev_id);
+		dscc4_patch_register(ioaddr, EncodingMask, encoding[i].bits);
+	} else
+		ret = -EOPNOTSUPP;
+	return ret;
+}
+
+static int dscc4_loopback_setting(struct net_device *dev)
+{
+	struct dscc4_dev_priv *dpriv = dev->priv;
+	sync_serial_settings *settings = &dpriv->settings;
+	u32 ioaddr, state;
+
+	ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv->dev_id);
+	state = readl(ioaddr);
+	if (settings->loopback) {
+		printk(KERN_DEBUG "%s: loopback\n", dev->name);
+		state |= 0x00000100;
+	} else {
+		printk(KERN_DEBUG "%s: normal\n", dev->name);
+		state &= ~0x00000100;
+	}
+	writel(state, ioaddr);
+	return 0;
+}
+
+static int dscc4_crc_setting(struct net_device *dev)
+{
+	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct thingie crc[] = {
+		{ PARITY_CRC16_PR0_CCITT,	0x00000010 },
+		{ PARITY_CRC16_PR1_CCITT,	0x00000000 },
+		{ PARITY_CRC32_PR0_CCITT,	0x00000011 },
+		{ PARITY_CRC32_PR1_CCITT,	0x00000001 }
+	};
+	int i, ret = 0;
+
+	i = dscc4_match(crc, dpriv->parity);
+	if (i >= 0) {
+		u32 ioaddr;
+
+		ioaddr = dev->base_addr + CCR1 + SCC_REG_START(dpriv->dev_id);
+		dscc4_patch_register(ioaddr, CrcMask, crc[i].bits);
+	} else
+		ret = -EOPNOTSUPP;
+	return ret;
+}
+
+static int dscc4_set_iface(struct net_device *dev)
+{
+	struct {
+		int (*action)(struct net_device *);
+	} *p, do_setting[] = {
+		{ dscc4_encoding_setting },
+		{ dscc4_clock_setting },
+		{ dscc4_loopback_setting },
+		{ dscc4_crc_setting },
+		{ NULL }
+	};
+	int ret = 0;
+
+	for (p = do_setting; p->action; p++) {
+		if ((ret = p->action(dev)) < 0)
+			break;
+	}
+	return ret;
+}
+
+static void dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
+{
+	struct dscc4_dev_priv *root = token;
 	struct dscc4_pci_priv *priv;
+	struct net_device *dev;
 	u32 ioaddr, state;
 	unsigned long flags;
 	int i;
 
-	priv = ((struct dscc4_dev_priv *)dev->priv)->pci_priv;
-	/* 
-	 * FIXME: shorten the protected area (set some bit telling we're
-	 * in an interrupt or increment some work-to-do counter etc...)
-	 */
+	priv = root->pci_priv;
+	dev = hdlc_to_dev(&root->hdlc);
+
 	spin_lock_irqsave(&priv->lock, flags);
 
 	ioaddr = dev->base_addr;
@@ -1179,14 +1281,14 @@ static void dscc4_irq(int irq, void *dev_instance, struct pt_regs *ptregs)
 	if (state & RxEvt) {
 		i = dev_per_card - 1;
 		do {
-			dscc4_rx_irq(priv, dev + i);
+			dscc4_rx_irq(priv, root + i);
 		} while (--i >= 0);
 		state &= ~RxEvt;
 	}
 	if (state & TxEvt) {
 		i = dev_per_card - 1;
 		do {
-			dscc4_tx_irq(priv, dev + i);
+			dscc4_tx_irq(priv, root + i);
 		} while (--i >= 0);
 		state &= ~TxEvt;
 	}
@@ -1194,10 +1296,9 @@ out:
 	spin_unlock_irqrestore(&priv->lock, flags);
 }
 
-static __inline__ void dscc4_tx_irq(struct dscc4_pci_priv *ppriv, 
-				    struct net_device *dev)
+static inline void dscc4_tx_irq(struct dscc4_pci_priv *ppriv, struct dscc4_dev_priv *dpriv)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
 	u32 state;
 	int cur, loop = 0;
 
@@ -1218,18 +1319,9 @@ try:
 	dpriv->iqtx[cur] = 0;
 	dpriv->iqtx_current++;
 
-#ifdef DEBUG_PARANOID
-	if (SOURCE_ID(state) != dpriv->dev_id) {
-		printk(KERN_DEBUG "%s (Tx): Source Id=%d, state=%08x\n",
-		       dev->name, SOURCE_ID(state), state );
+	if (state_check(state, dpriv, dev, "Tx"))
 		return;
-	}
-	if (state & 0x0df80c00) {
-		printk(KERN_DEBUG "%s (Tx): state=%08x (UFO alert)\n",
-		       dev->name, state);
-		return;
-	}
-#endif
+
 	// state &= 0x0fffffff; /* Tracking the analyzed bits */
 	if (state & SccEvt) {
 		if (state & Alls) {
@@ -1259,12 +1351,12 @@ try:
 				       "%s: DataComplete=0 cur=%d isr=%08x state=%08x\n",
 				       dev->name, cur, isr, state);
 				writel(isr, ioaddr);
-				dpriv->stats.tx_dropped++;
+				dev_to_hdlc(dev)->stats.tx_dropped++;
 			} else {
 				tx_fd->complete &= ~DataComplete;
 				if (tx_fd->state & FrameEnd) {
-					dpriv->stats.tx_packets++;
-					dpriv->stats.tx_bytes += skb->len;
+					dev_to_hdlc(dev)->stats.tx_packets++;
+					dev_to_hdlc(dev)->stats.tx_bytes += skb->len;
 				}
 			}
 
@@ -1285,7 +1377,7 @@ try:
 		 * Transmit Data Underrun
 		 */
 		if (state & Xdu) {
-			printk(KERN_ERR "dscc4: XDU. Contact maintainer\n");
+			printk(KERN_ERR "%s: XDU. Ask maintainer\n", DRV_NAME);
 			dpriv->flags = NeedIDT; 
 			/* Tx reset */
 			writel(MTFi | Rdt, 
@@ -1340,7 +1432,7 @@ try:
 		}
 	} else { /* ! SccEvt */
 		if (state & Hi) {
-#ifdef EXPERIMENTAL_POLLING
+#ifdef DSCC4_POLLING
 			while(!dscc4_tx_poll(dpriv, dev));
 #endif
 			state &= ~Hi;
@@ -1349,17 +1441,18 @@ try:
 		 * FIXME: it may be avoided. Re-re-re-read the manual.
 		 */
 		if (state & Err) {
-			printk(KERN_ERR "%s: Tx ERR\n", dev->name);
-			dpriv->stats.tx_errors++;
+			printk(KERN_ERR "%s (Tx): ERR\n", dev->name);
+			dev_to_hdlc(dev)->stats.tx_errors++;
 			state &= ~Err;
 		}
 	}
 	goto try;
 }
 
-static __inline__ void dscc4_rx_irq(struct dscc4_pci_priv *priv, struct net_device *dev)
+static inline void dscc4_rx_irq(struct dscc4_pci_priv *priv,
+				    struct dscc4_dev_priv *dpriv)
 {
-	struct dscc4_dev_priv *dpriv = dev->priv;
+	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
 	u32 state;
 	int cur;
 
@@ -1371,18 +1464,9 @@ try:
 	dpriv->iqrx[cur] = 0;
 	dpriv->iqrx_current++;
 
-#ifdef DEBUG_PARANOID
-	if (SOURCE_ID(state) != dpriv->dev_id) {
-		printk(KERN_DEBUG "%s (Rx): Source Id=%d, state=%08x\n",
-		       dev->name, SOURCE_ID(state), state);
-		goto try;
-	}
-	if (state & 0x0df80c00) {
-		printk(KERN_DEBUG "%s (Rx): state=%08x (UFO alert)\n",
-		       dev->name, state);
-		goto try;
-	}
-#endif
+	if (state_check(state, dpriv, dev, "Tx"))
+		return;
+
 	if (!(state & SccEvt)){
 		struct RxFD *rx_fd;
 
@@ -1450,8 +1534,8 @@ try:
 #ifdef DEBUG_PARANOIA
 		for (i = 0; evts[i].irq_name; i++) {
 			if (state & evts[i].mask) {
-				printk(KERN_DEBUG "dscc4(%s): %s\n",
-					dev->name, evts[i].irq_name);
+				printk(KERN_DEBUG "%s: %s\n", dev->name, 
+					evts[i].irq_name);
 				if (!(state &= ~evts[i].mask))
 					goto try;
 			}
@@ -1492,7 +1576,7 @@ try:
 				if (!(rx_fd->state2 & DataComplete))
 					break;
 				if (rx_fd->state2 & FrameAborted) {
-					dpriv->stats.rx_over_errors++;
+					dev_to_hdlc(dev)->stats.rx_over_errors++;
 					rx_fd->state1 |= Hold;
 					rx_fd->state2 = 0x00000000;
 					rx_fd->end = 0xbabeface;
@@ -1503,7 +1587,7 @@ try:
 			if (debug) {
 				if (dpriv->flags & RdoSet)
 					printk(KERN_DEBUG 
-					       "dscc4: no RDO in Rx data\n");
+					       "%s: no RDO in Rx data\n", DRV_NAME);
 			}
 #ifdef DSCC4_RDO_EXPERIMENTAL_RECOVERY
 			/*
@@ -1540,6 +1624,7 @@ try:
 				goto try;
 		}
 		if (state & Flex) {
+			printk(KERN_DEBUG "%s: Flex. Ttttt...\n", DRV_NAME);
 			if (!(state &= ~Flex))
 				goto try;
 		}
@@ -1588,7 +1673,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	 * - Fe=1 (required by No=0 or we got an Err irq and must reset).
 	 * Alas, it fails (and locks solid). Thus the introduction of a dummy
 	 * skb to avoid No=0 (choose one: Ugly [ ] Tasteless [ ] VMS [ ]).
-	 * TODO: fiddle the tx threshold when time permits.
+	 * 2002/01: errata sheet acknowledges the problem [X].
 	 */
 	struct sk_buff *skb;
 
@@ -1609,7 +1694,7 @@ static int dscc4_init_ring(struct net_device *dev)
 	        rx_fd->state1 = HiDesc; /* Hi, no Hold */
 	        rx_fd->state2 = 0x00000000;
 	        rx_fd->end = 0xbabeface;
-	        rx_fd->state1 |= ((u32)(HDLC_MAX_MRU & RxSizeMax)) << 16;
+	        rx_fd->state1 |= (RX_MAX(HDLC_MAX_MRU) << 16);
 		try_get_rx_skb(dpriv, i, dev);
 		i++;
 		rx_fd->next = (u32)(dpriv->rx_fd_dma + i*sizeof(struct RxFD));
@@ -1627,44 +1712,36 @@ err_out:
 	return -1;
 }
 
-static struct net_device_stats *dscc4_get_stats(struct net_device *dev)
-{
-	struct dscc4_dev_priv *priv = (struct dscc4_dev_priv *)dev->priv;
-
-	return &priv->stats;
-}
-
 static void __exit dscc4_remove_one(struct pci_dev *pdev)
 {
 	struct dscc4_pci_priv *ppriv;
-	struct net_device *root;
+	struct dscc4_dev_priv *root;
+	u32 ioaddr;
 	int i;
 
 	ppriv = pci_get_drvdata(pdev);
 	root = ppriv->root;
 
+	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
 	free_irq(pdev->irq, root);
 	pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), ppriv->iqcfg, 
 			    ppriv->iqcfg_dma);
-	for (i=0; i < dev_per_card; i++) {
-		struct dscc4_dev_priv *dpriv;
-		struct net_device *dev;
+	for (i = 0; i < dev_per_card; i++) {
+		struct dscc4_dev_priv *dpriv = root + i;
+		hdlc_device *hdlc = &dpriv->hdlc;
 
-		dev = ppriv->root + i;
-		dscc4_unattach_hdlc_device(dev);
+		unregister_hdlc_device(hdlc);
 
-		dpriv = (struct dscc4_dev_priv *)dev->priv;
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
 				    dpriv->iqrx, dpriv->iqrx_dma);
 		pci_free_consistent(pdev, IRQ_RING_SIZE*sizeof(u32), 
 				    dpriv->iqtx, dpriv->iqtx_dma);
-		unregister_netdev(dev);
 	}
-	kfree(root->priv);
 
-	iounmap((void *)root->base_addr);
+	iounmap((void *)ioaddr);
 	kfree(root);
 
+	pci_set_drvdata(pdev, NULL);
 	kfree(ppriv);
 
 	release_mem_region(pci_resource_start(pdev, 1),
@@ -1673,72 +1750,28 @@ static void __exit dscc4_remove_one(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 0));
 }
 
-static int dscc4_hdlc_ioctl(struct hdlc_device_struct *hdlc, struct ifreq *ifr, int cmd)
+static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding, 
+	unsigned short parity)
 {
-	struct net_device *dev = (struct net_device *)hdlc->netdev.base_addr;
-	int result;
+	struct dscc4_dev_priv *dpriv = hdlc_to_dev(hdlc)->priv;
 
-	/* FIXME: locking ? */
-	result = dscc4_ioctl(dev, ifr, cmd);
-	return result;
-}
+	if (encoding != ENCODING_NRZ &&
+	    encoding != ENCODING_NRZI &&
+	    encoding != ENCODING_FM_MARK &&
+	    encoding != ENCODING_FM_SPACE &&
+	    encoding != ENCODING_MANCHESTER)
+		return -EINVAL;
 
-static int dscc4_hdlc_open(struct hdlc_device_struct *hdlc)
-{
-	struct net_device *dev = (struct net_device *)(hdlc->netdev.base_addr);
+	if (parity != PARITY_NONE &&
+	    parity != PARITY_CRC16_PR0_CCITT &&
+	    parity != PARITY_CRC16_PR1_CCITT &&
+	    parity != PARITY_CRC32_PR0_CCITT &&
+	    parity != PARITY_CRC32_PR1_CCITT)
+		return -EINVAL;
 
-        if (netif_running(dev)) {
-		printk(KERN_DEBUG "%s: already running\n", dev->name); // DEBUG
-		return 0;
-	}
-	return dscc4_open(dev);
-}
-
-static int dscc4_hdlc_xmit(hdlc_device *hdlc, struct sk_buff *skb)
-{
-	struct net_device *dev = (struct net_device *)hdlc->netdev.base_addr;
-
-	return dscc4_start_xmit(skb, dev);
-}
-
-static void dscc4_hdlc_close(struct hdlc_device_struct *hdlc)
-{
-	struct net_device *dev = (struct net_device *)hdlc->netdev.base_addr;
-	struct dscc4_dev_priv *dpriv;
-
-	dpriv = dev->priv;
-	--dpriv->usecount;
-}
-
-/* Operated under dev lock */
-static int dscc4_attach_hdlc_device(struct net_device *dev) 
-{
-	struct dscc4_dev_priv *dpriv = dev->priv;
-	struct hdlc_device_struct *hdlc;
-	int result;
-
-	hdlc = &dpriv->hdlc;
-	/* XXX: Don't look at the next line */
-	hdlc->netdev.base_addr = (unsigned long)dev;
-	hdlc->set_mode = NULL;
-	hdlc->open = dscc4_hdlc_open;
-	hdlc->close = dscc4_hdlc_close;
-	hdlc->ioctl = dscc4_hdlc_ioctl;
-	hdlc->xmit = dscc4_hdlc_xmit;
-
-	result = register_hdlc_device(hdlc);
-	if (!result)
-		dpriv->usecount++;
-	return result;
-}
-
-/* Operated under dev lock */
-static void dscc4_unattach_hdlc_device(struct net_device *dev) 
-{
-	struct dscc4_dev_priv *dpriv = dev->priv;
-
-	unregister_hdlc_device(&dpriv->hdlc);
-	dpriv->usecount--;
+        dpriv->encoding = encoding;
+        dpriv->parity = parity;
+	return 0;
 }
 
 static struct pci_device_id dscc4_pci_tbl[] __devinitdata = {

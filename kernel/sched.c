@@ -194,9 +194,9 @@ static inline void resched_task(task_t *p)
 {
 	int need_resched;
 
-	need_resched = p->need_resched;
+	need_resched = p->work.need_resched;
 	wmb();
-	p->need_resched = 1;
+	p->work.need_resched = 1;
 	if (!need_resched && (p->cpu != smp_processor_id()))
 		smp_send_reschedule(p->cpu);
 }
@@ -523,7 +523,7 @@ skip_queue:
 	this_rq->nr_running++;
 	enqueue_task(next, this_rq->active);
 	if (next->prio < current->prio)
-		current->need_resched = 1;
+		current->work.need_resched = 1;
 	if (!idle && --imbalance) {
 		if (array == busiest->expired) {
 			array = busiest->active;
@@ -572,7 +572,7 @@ void scheduler_tick(task_t *p)
 #endif
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
-		p->need_resched = 1;
+		p->work.need_resched = 1;
 		return;
 	}
 	spin_lock(&rq->lock);
@@ -583,7 +583,7 @@ void scheduler_tick(task_t *p)
 		 */
 		if ((p->policy == SCHED_RR) && !--p->time_slice) {
 			p->time_slice = NICE_TO_TIMESLICE(p->__nice);
-			p->need_resched = 1;
+			p->work.need_resched = 1;
 
 			/* put it at the end of the queue: */
 			dequeue_task(p, rq->active);
@@ -603,7 +603,7 @@ void scheduler_tick(task_t *p)
 		p->sleep_avg--;
 	if (!--p->time_slice) {
 		dequeue_task(p, rq->active);
-		p->need_resched = 1;
+		p->work.need_resched = 1;
 		p->prio = effective_prio(p);
 		p->time_slice = NICE_TO_TIMESLICE(p->__nice);
 
@@ -684,7 +684,7 @@ pick_next_task:
 
 switch_tasks:
 	prefetch(next);
-	prev->need_resched = 0;
+	prev->work.need_resched = 0;
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;
@@ -1318,7 +1318,7 @@ void __init init_idle(task_t *idle, int cpu)
 	idle->state = TASK_RUNNING;
 	idle->cpu = cpu;
 	double_rq_unlock(idle_rq, rq);
-	idle->need_resched = 1;
+	idle->work.need_resched = 1;
 	__restore_flags(flags);
 }
 

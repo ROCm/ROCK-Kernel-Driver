@@ -72,10 +72,13 @@ VM_MASK		= 0x00020000
  */
 state		=  0
 flags		=  4
-sigpending	=  8
+work		=  8
+need_resched	= work+0
+syscall_trace	= work+1
+sigpending	= work+2
+notify_resume	= work+3
 addr_limit	= 12
 exec_domain	= 16
-need_resched	= 20
 tsk_ptrace	= 24
 cpu		= 32
 
@@ -151,7 +154,7 @@ ENTRY(lcall7)
 	call *%edx
 	addl $4, %esp
 	popl %eax
-	jmp ret_from_sys_call
+	jmp resume_userspace
 
 ENTRY(lcall27)
 	pushfl			# We get a different stack layout with call gates,
@@ -172,7 +175,7 @@ ENTRY(lcall27)
 	call *%edx
 	addl $4, %esp
 	popl %eax
-	jmp ret_from_sys_call
+	jmp resume_userspace
 
 
 ENTRY(ret_from_fork)
@@ -180,9 +183,7 @@ ENTRY(ret_from_fork)
 	call SYMBOL_NAME(schedule_tail)
 	addl $4, %esp
 	GET_CURRENT(%ebx)
-	testb $0x02,tsk_ptrace(%ebx)	# PT_TRACESYS
-	jne tracesys_exit
-	jmp	ret_from_sys_call
+	jmp syscall_exit
 
 /*
  * Return to user mode is not as complex as all this looks,
@@ -191,73 +192,105 @@ ENTRY(ret_from_fork)
  * less clear than it otherwise should be.
  */
 
-ENTRY(system_call)
-	pushl %eax			# save orig_eax
-	SAVE_ALL
-	GET_CURRENT(%ebx)
-	testb $0x02,tsk_ptrace(%ebx)	# PT_TRACESYS
-	jne tracesys
-	cmpl $(NR_syscalls),%eax
-	jae badsys
-	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
-	movl %eax,EAX(%esp)		# save the return value
-ENTRY(ret_from_sys_call)
-	cli				# need_resched and signals atomic test
-	cmpl $0,need_resched(%ebx)
-	jne reschedule
-	cmpl $0,sigpending(%ebx)
-	jne signal_return
-restore_all:
-	RESTORE_ALL
-
-	ALIGN
-signal_return:
-	sti				# we can get here from an interrupt handler
-	testl $(VM_MASK),EFLAGS(%esp)
-	movl %esp,%eax
-	jne v86_signal_return
-	xorl %edx,%edx
-	call SYMBOL_NAME(do_signal)
-	jmp restore_all
-
-	ALIGN
-v86_signal_return:
-	call SYMBOL_NAME(save_v86_state)
-	movl %eax,%esp
-	xorl %edx,%edx
-	call SYMBOL_NAME(do_signal)
-	jmp restore_all
-
-	ALIGN
-tracesys:
-	movl $-ENOSYS,EAX(%esp)
-	call SYMBOL_NAME(syscall_trace)
-	movl ORIG_EAX(%esp),%eax
-	cmpl $(NR_syscalls),%eax
-	jae tracesys_exit
-	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
-	movl %eax,EAX(%esp)		# save the return value
-tracesys_exit:
-	call SYMBOL_NAME(syscall_trace)
-	jmp ret_from_sys_call
-badsys:
-	movl $-ENOSYS,EAX(%esp)
-	jmp ret_from_sys_call
-
+	# userspace resumption stub bypassing syscall exit tracing
 	ALIGN
 ENTRY(ret_from_intr)
 	GET_CURRENT(%ebx)
 ret_from_exception:
 	movl EFLAGS(%esp),%eax		# mix EFLAGS and CS
 	movb CS(%esp),%al
-	testl $(VM_MASK | 3),%eax	# return to VM86 mode or non-supervisor?
-	jne ret_from_sys_call
+	testl $(VM_MASK | 3),%eax
+	jz restore_all			# returning to kernel-space or vm86-space
+ENTRY(resume_userspace)
+	cli				# make sure need_resched and sigpending don't change
+					# between sampling and the iret
+	movl work(%ebx),%ecx
+	andl $0xffff00ff,%ecx		# current->work (ignoring syscall_trace)
+	jne work_pending
+	jmp restore_all
+
+	# system call handler stub
+	ALIGN
+ENTRY(system_call)
+	pushl %eax			# save orig_eax
+	SAVE_ALL
+	GET_CURRENT(%ebx)
+	cmpl $(NR_syscalls),%eax
+	jae syscall_badsys
+	testb $0xff,syscall_trace(%ebx)	# system call tracing in operation
+	jnz syscall_trace_entry
+syscall_traced:
+	call *SYMBOL_NAME(sys_call_table)(,%eax,4)
+	movl %eax,EAX(%esp)		# store the return value
+syscall_exit:
+	cli				# make sure need_resched and sigpending don't change
+					# between sampling and the iret
+	movl work(%ebx),%ecx
+	testl %ecx,%ecx			# current->work
+	jne syscall_exit_work
+restore_all:
+	RESTORE_ALL
+
+	# perform work that needs to be done immediately before resumption
+	ALIGN
+work_pending:
+	testb %cl,%cl			# current->work.need_resched
+	jz work_notifysig
+work_resched:
+	call SYMBOL_NAME(schedule)
+	cli				# make sure need_resched and sigpending don't change
+					# between sampling and the iret
+	movl work(%ebx),%ecx
+	andl $0xffff00ff,%ecx		# ignore the syscall trace counter
+	jz restore_all
+	testb %cl,%cl			# current->work.need_resched
+	jnz work_resched
+
+work_notifysig:				# deal with pending signals and notify-resume requests
+	testl $(VM_MASK),EFLAGS(%esp)
+	movl %esp,%eax
+	jne work_notifysig_v86		# returning to kernel-space or vm86-space
+	xorl %edx,%edx
+	call SYMBOL_NAME(do_notify_resume)
 	jmp restore_all
 
 	ALIGN
-reschedule:
-	call SYMBOL_NAME(schedule)    # test
-	jmp ret_from_sys_call
+work_notifysig_v86:
+	pushl %ecx
+	call SYMBOL_NAME(save_v86_state)
+	popl %ecx
+	movl %eax,%esp
+	xorl %edx,%edx
+	call SYMBOL_NAME(do_notify_resume)
+	jmp restore_all
+
+	# perform syscall exit tracing
+	ALIGN
+syscall_trace_entry:
+	movl $-ENOSYS,EAX(%esp)
+	movl %esp,%eax
+	xorl %edx,%edx
+	call SYMBOL_NAME(do_syscall_trace)
+	movl ORIG_EAX(%esp),%eax
+	cmpl $(NR_syscalls),%eax
+	jnae syscall_traced
+	jmp syscall_exit
+
+	# perform syscall exit tracing
+	ALIGN
+syscall_exit_work:
+	testb %ch,%ch			# current->work.syscall_trace
+	jz work_pending
+	sti				# could let do_syscall_trace() call schedule() instead
+	movl %esp,%eax
+	movl $1,%edx
+	call SYMBOL_NAME(do_syscall_trace)
+	jmp resume_userspace
+
+	ALIGN
+syscall_badsys:
+	movl $-ENOSYS,EAX(%esp)
+	jmp resume_userspace
 
 ENTRY(divide_error)
 	pushl $0		# no error code
@@ -622,6 +655,18 @@ ENTRY(sys_call_table)
 	.long SYMBOL_NAME(sys_ni_syscall)	/* Reserved for Security */
 	.long SYMBOL_NAME(sys_gettid)
 	.long SYMBOL_NAME(sys_readahead)	/* 225 */
+	.long SYMBOL_NAME(sys_setxattr)
+	.long SYMBOL_NAME(sys_lsetxattr)
+	.long SYMBOL_NAME(sys_fsetxattr)
+	.long SYMBOL_NAME(sys_getxattr)
+	.long SYMBOL_NAME(sys_lgetxattr)	/* 230 */
+	.long SYMBOL_NAME(sys_fgetxattr)
+	.long SYMBOL_NAME(sys_listxattr)
+	.long SYMBOL_NAME(sys_llistxattr)
+	.long SYMBOL_NAME(sys_flistxattr)
+	.long SYMBOL_NAME(sys_removexattr)	/* 235 */
+	.long SYMBOL_NAME(sys_lremovexattr)
+	.long SYMBOL_NAME(sys_fremovexattr)
 
 	.rept NR_syscalls-(.-sys_call_table)/4
 		.long SYMBOL_NAME(sys_ni_syscall)

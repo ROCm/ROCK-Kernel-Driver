@@ -29,6 +29,9 @@ loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 	struct inode *i = filp->f_dentry->d_inode;
 	struct hpfs_inode_info *hpfs_inode = hpfs_i(i);
 	struct super_block *s = i->i_sb;
+
+	lock_kernel();
+
 	/*printk("dir lseek\n");*/
 	if (new_off == 0 || new_off == 1 || new_off == 11 || new_off == 12 || new_off == 13) goto ok;
 	hpfs_lock_inode(i);
@@ -40,10 +43,12 @@ loff_t hpfs_dir_lseek(struct file *filp, loff_t off, int whence)
 	}
 	hpfs_unlock_inode(i);
 	ok:
+	unlock_kernel();
 	return filp->f_pos = new_off;
 	fail:
 	hpfs_unlock_inode(i);
 	/*printk("illegal lseek: %016llx\n", new_off);*/
+	unlock_kernel();
 	return -ESPIPE;
 }
 

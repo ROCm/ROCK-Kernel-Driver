@@ -296,7 +296,7 @@ static void Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 		goto out;
 		}
 
-	spin_lock_irqsave(&shost->host_lock, flags);
+	spin_lock_irqsave(shost->host_lock, flags);
 	padapter = HOSTDATA(shost);
 
 	tag0 = tag & 0x7F;															// mask off the error bit

@@ -304,7 +304,7 @@ lockd_down(void)
 	 * Wait for the lockd process to exit, but since we're holding
 	 * the lockd semaphore, we can't wait around forever ...
 	 */
-	current->sigpending = 0;
+	current->work.sigpending = 0;
 	interruptible_sleep_on_timeout(&lockd_exit, HZ);
 	if (nlmsvc_pid) {
 		printk(KERN_WARNING 

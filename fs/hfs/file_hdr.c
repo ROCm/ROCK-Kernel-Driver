@@ -347,6 +347,8 @@ loff_t hdr_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
 
+	lock_kernel();
+
 	switch (origin) {
 		case 2:
 			offset += file->f_dentry->d_inode->i_size;
@@ -362,6 +364,7 @@ loff_t hdr_llseek(struct file *file, loff_t offset, int origin)
 		}
 		retval = offset;
 	}
+	unlock_kernel();
 	return retval;
 }
 

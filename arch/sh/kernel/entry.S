@@ -61,11 +61,11 @@
  * These are offsets into the task-struct.
  */
 flags		=  4
-sigpending	=  8
-need_resched	= 20
-tsk_ptrace	= 24
+#error sigpending	=  8
+#error need_resched	= 20
+#error tsk_ptrace	= 24
 
-PT_TRACESYS  = 0x00000002
+#error PT_TRACESYS  = 0x00000002
 
 ENOSYS = 38
 EINVAL = 22
@@ -300,8 +300,8 @@ ENTRY(ret_from_fork)
 	! If we're being traced, return via syscall_ret_trace, otherwise
 	! return directly to ret_from_syscall
 	stc	k_current, r0
-	mov.l	@(tsk_ptrace,r0), r0	! Is current PTRACE_SYSCALL'd?
-	mov	#PT_TRACESYS, r1
+#error	mov.l	@(tsk_ptrace,r0), r0	! Is current PTRACE_SYSCALL'd?
+#error	mov	#PT_TRACESYS, r1
 	tst	r1, r0
 	bt	ret_from_syscall
 	bra	syscall_ret_trace
@@ -371,8 +371,8 @@ system_call:
 	STI()
 	!
 	stc	k_current, r11
-	mov.l	@(tsk_ptrace,r11), r10	! Is current PTRACE_SYSCALL'd?
-	mov	#PT_TRACESYS, r11
+#error	mov.l	@(tsk_ptrace,r11), r10	! Is current PTRACE_SYSCALL'd?
+#error	mov	#PT_TRACESYS, r11
 	tst	r11, r10
 	bt	5f
 	!                     	Yes it is traced.
@@ -497,7 +497,7 @@ fixup_syscall_argerr:
 	.align	2
 __TRA:	.long	TRA
 __syscall_trace:
-    	.long	SYMBOL_NAME(syscall_trace)
+#error    	.long	SYMBOL_NAME(syscall_trace)
 __n_sys:.long	NR_syscalls
 __sct:	.long	SYMBOL_NAME(sys_call_table)
 __syscall_ret_trace:
@@ -545,10 +545,10 @@ ENTRY(ret_from_syscall)
 	ldc	r0, sr
 	!
 	stc	k_current, r1
-	mov.l	@(need_resched,r1), r0
+#error	mov.l	@(need_resched,r1), r0
 	tst	r0, r0
 	bf	reschedule
-	mov.l	@(sigpending,r1), r0
+#error	mov.l	@(sigpending,r1), r0
 	tst	r0, r0
 	bt	restore_all
 signal_return:
@@ -560,7 +560,7 @@ signal_return:
 	 lds	r0, pr
 	.align	2
 __do_signal:
-	.long	SYMBOL_NAME(do_signal)
+#error	.long	SYMBOL_NAME(do_signal)
 __irq_stat:
 	.long	SYMBOL_NAME(irq_stat)
 

@@ -1523,11 +1523,11 @@ void qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
         return;
     }
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,95)
-    spin_lock_irqsave(&io_request_lock, cpu_flags);
+    spin_lock_irqsave(ha->host->host_lock, cpu_flags);
     if(test_and_set_bit(QLA1280_IN_ISR_BIT, &ha->flags))
     {
         COMTRACE('X')
-        spin_unlock_irqrestore(&io_request_lock, cpu_flags);
+        spin_unlock_irqrestore(ha->host->host_lock, cpu_flags);
         return;
     }
     ha->isr_count++;
@@ -1548,7 +1548,7 @@ void qla1280_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
         qla1280_done(ha, (srb_t **)&ha->done_q_first, (srb_t **)&ha->done_q_last);
 
     clear_bit(QLA1280_IN_ISR_BIT, &ha->flags);
-    spin_unlock_irqrestore(&io_request_lock, cpu_flags);
+    spin_unlock_irqrestore(ha->host->host_lock, cpu_flags);
 #else  /* LINUX_VERSION_CODE < KERNEL_VERSION(2,1,95) */
 
     if( test_bit(QLA1280_IN_ISR_BIT, (int *)&ha->flags) )
@@ -1619,7 +1619,7 @@ static void qla1280_do_dpc(void *p)
 
     COMTRACE('p')  
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,95)
-    spin_lock_irqsave(&io_request_lock, cpu_flags);
+    spin_lock_irqsave(ha->host->host_lock, cpu_flags);
 #endif
     if (ha->flags.isp_abort_needed)
         qla1280_abort_isp(ha);
@@ -1631,7 +1631,7 @@ static void qla1280_do_dpc(void *p)
         qla1280_done(ha, (srb_t **)&ha->done_q_first, (srb_t **)&ha->done_q_last);
     ha->flags.dpc_sched = FALSE;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,95)
-    spin_unlock_irqrestore(&io_request_lock, cpu_flags);
+    spin_unlock_irqrestore(ha->host->host_lock, cpu_flags);
 #endif
 }
 

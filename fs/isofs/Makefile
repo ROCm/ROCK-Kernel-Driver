@@ -15,6 +15,4 @@ obj-$(CONFIG_ZISOFS) += compress.o
 
 obj-m  := $(O_TARGET)
 
-CFLAGS_compress.o := -I $(TOPDIR)/fs/inflate_fs
-
 include $(TOPDIR)/Rules.make

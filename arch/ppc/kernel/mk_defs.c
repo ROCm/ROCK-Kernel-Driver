@@ -39,7 +39,7 @@ main(void)
 	DEFINE(NEXT_TASK, offsetof(struct task_struct, next_task));
 	DEFINE(COUNTER, offsetof(struct task_struct, counter));
 	DEFINE(PROCESSOR, offsetof(struct task_struct, processor));
-	DEFINE(SIGPENDING, offsetof(struct task_struct, sigpending));
+#error	DEFINE(SIGPENDING, offsetof(struct task_struct, sigpending));
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
 	DEFINE(MM, offsetof(struct task_struct, mm));
 	DEFINE(ACTIVE_MM, offsetof(struct task_struct, active_mm));
@@ -50,8 +50,8 @@ main(void)
 	DEFINE(PT_REGS, offsetof(struct thread_struct, regs));
 	DEFINE(PT_TRACESYS, PT_TRACESYS);
 	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
-	DEFINE(TASK_PTRACE, offsetof(struct task_struct, ptrace));
-	DEFINE(NEED_RESCHED, offsetof(struct task_struct, need_resched));
+#error	DEFINE(TASK_PTRACE, offsetof(struct task_struct, ptrace));
+#error	DEFINE(NEED_RESCHED, offsetof(struct task_struct, need_resched));
 	DEFINE(THREAD_FPR0, offsetof(struct thread_struct, fpr[0]));
 	DEFINE(THREAD_FPSCR, offsetof(struct thread_struct, fpscr));
 #ifdef CONFIG_ALTIVEC

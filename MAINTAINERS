@@ -154,8 +154,6 @@ S:	Maintained
 
 AD1816 SOUND DRIVER
 P:	Thorsten Knabe
-M:	Thorsten Knabe <tek@rbg.informatik.tu-darmstadt.de>
-M:	Thorsten Knabe <tek01@hrzpub.tu-darmstadt.de>
 W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
 W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
 S:	Maintained
@@ -216,7 +214,6 @@ S:	Maintained
 
 ARPD SUPPORT
 P:	Jonathan Layes
-M:	layes@loran.com
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
@@ -235,7 +232,6 @@ S:	Maintained
 
 BERKSHIRE PRODUCTS PC WATCHDOG DRIVER
 P:	Kenji Hollis
-M:	kenji@bitgate.com
 W:	http://ftp.bitgate.com/pcwd/
 S:	Maintained
 
@@ -433,13 +429,11 @@ S:	Maintained
 DIGI INTL. EPCA DRIVER
 P:	Chad Schwartz
 M:      support@dgii.com
-M:      chads@dgii.com
 L:      digilnux@dgii.com
 S:      Maintained
 
 DIGI RIGHTSWITCH NETWORK DRIVER
 P:	Rick Richardson
-M:	rick@remotepoint.com
 L:	linux-net@vger.kernel.org
 W:	http://www.dgii.com/linux/
 S:	Maintained
@@ -485,7 +479,7 @@ S:	Maintained
 
 DRM DRIVERS
 P:	Rik Faith
-M:	faith@valinux.com
+M:	faith@redhat.com
 L:	dri-devel@lists.sourceforge.net
 S:	Supported
 
@@ -497,7 +491,6 @@ S:	Maintained
 
 EATA-DMA SCSI DRIVER
 P:	Michael Neuffer
-M:	mike@i-Connect.Net
 L:	linux-eata@i-connect.net, linux-scsi@vger.kernel.org
 S:	Maintained
 
@@ -927,7 +920,6 @@ S:	Maintained
 
 LOGICAL VOLUME MANAGER
 P:     Heinz Mauelshagen
-M:     mge@sistina.de
 L:     linux-LVM@sistina.com
 W:     http://www.sistina.com/lvm
 S:     Maintained 
@@ -1134,7 +1126,7 @@ S:	Maintained
 
 OLYMPIC NETWORK DRIVER
 P:	Peter De Shrijver
-M:	p2@ace.ulyssis.sutdent.kuleuven.ac.be	
+M:	p2@ace.ulyssis.student.ac.be
 P:	Mike Phillips
 M:	mikep@linuxtr.net 
 L:	linux-net@vger.kernel.org
@@ -1293,7 +1285,6 @@ S:	Maintained
 
 RISCOM8 DRIVER
 P:	Dmitry Gorodchanin
-M:	pgmdsg@ibi.com
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -1660,13 +1651,11 @@ W:	http://www.kroah.com/linux-usb/
 USB SERIAL BELKIN F5U103 DRIVER
 P:	William Greathouse
 M:	wgreathouse@smva.com
-M:	wgreathouse@myfavoritei.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
 USB SERIAL CYBERJACK PINPAD/E-COM DRIVER
-M:	linux-usb@sii.li
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Supported
@@ -1792,7 +1781,6 @@ S:	Maintained
 
 ZF MACHZ WATCHDOG
 P:	Fernando Fuganti
-M:	fuganti@conectiva.com.br
 M:	fuganti@netbank.com.br
 W:	http://cvs.conectiva.com.br/drivers/ZFL-watchdog/
 S:	Maintained

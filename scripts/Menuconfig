@@ -357,19 +357,18 @@ function choice () {
 
 
 #
-# Extract available help for an option from Configure.help
+# Extract available help for an option from Config.help
 # and send it to standard output.
 #
 # Most of this function was borrowed from the original kernel
 # Configure script.
 #
 function extract_help () {
-  if [ -f Documentation/Configure.help ]
-  then
-     #first escape regexp special characters in the argument:
-     var=$(echo "$1"|sed 's/[][\/.^$*]/\\&/g')
-     #now pick out the right help text:
-     text=$(sed -n "/^$var[ 	]*\$/,\${
+   #first escape regexp special characters in the argument:
+   var=$(echo "$1"|sed 's/[][\/.^$*]/\\&/g')
+   #now pick out the right help text:
+   text=$(cat /dev/null $(find . -name Config.help) |
+          sed -n "/^$var[ 	]*\$/,\${
                         /^$var[ 	]*\$/c\\
 ${var}:\\
 
@@ -378,19 +377,15 @@ ${var}:\\
                         s/^  //
 			/<file:\\([^>]*\\)>/s//\\1/g
                         p
-                    }" Documentation/Configure.help)
+                    }")
 
-     if [ -z "$text" ]
-     then
-          echo "There is no help available for this kernel option."
-	  return 1
-     else
-	  echo "$text"
-     fi
-  else
-	 echo "There is no help available for this kernel option."
-         return 1
-  fi
+   if [ -z "$text" ]
+   then
+        echo "There is no help available for this kernel option."
+        return 1
+   else
+	echo "$text"
+   fi
 }
 
 #

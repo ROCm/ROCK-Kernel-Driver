@@ -499,6 +499,7 @@ repeat:
 	ei->i_dir_acl = 0;
 	ei->i_dtime = 0;
 #ifdef EXT3_PREALLOCATE
+	ei->i_prealloc_block = 0;
 	ei->i_prealloc_count = 0;
 #endif
 	ei->i_block_group = i;

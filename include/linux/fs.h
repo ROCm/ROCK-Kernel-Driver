@@ -813,6 +813,10 @@ struct inode_operations {
 	int (*revalidate) (struct dentry *);
 	int (*setattr) (struct dentry *, struct iattr *);
 	int (*getattr) (struct dentry *, struct iattr *);
+	int (*setxattr) (struct dentry *, char *, void *, size_t, int);
+	int (*getxattr) (struct dentry *, char *, void *, size_t);
+	int (*listxattr) (struct dentry *, char *, size_t);
+	int (*removexattr) (struct dentry *, char *);
 };
 
 struct seq_file;
@@ -1428,6 +1432,7 @@ extern int block_read_full_page(struct page*, get_block_t*);
 extern int block_prepare_write(struct page*, unsigned, unsigned, get_block_t*);
 extern int cont_prepare_write(struct page*, unsigned, unsigned, get_block_t*,
 				unsigned long *);
+extern int generic_cont_expand(struct inode *inode, loff_t size) ;
 extern int block_commit_write(struct page *page, unsigned from, unsigned to);
 extern int block_sync_page(struct page *);
 

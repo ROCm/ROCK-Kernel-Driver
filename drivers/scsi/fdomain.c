@@ -1266,9 +1266,9 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	 printk( " AFAIL " );
 #endif
-         spin_lock_irqsave(&current_SC->host->host_lock, flags);
+         spin_lock_irqsave(current_SC->host->host_lock, flags);
 	 my_done( DID_BUS_BUSY << 16 );
-         spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
+         spin_unlock_irqrestore(current_SC->host->host_lock, flags);
 	 return;
       }
       current_SC->SCp.phase = in_selection;
@@ -1292,9 +1292,9 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	    printk( " SFAIL " );
 #endif
-            spin_lock_irqsave(&current_SC->host->host_lock, flags);
+            spin_lock_irqsave(current_SC->host->host_lock, flags);
 	    my_done( DID_NO_CONNECT << 16 );
-            spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
+            spin_unlock_irqrestore(current_SC->host->host_lock, flags);
 	    return;
 	 } else {
 #if EVERY_ACCESS
@@ -1639,10 +1639,10 @@ void do_fdomain_16x0_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
       printk( "BEFORE MY_DONE. . ." );
 #endif
-      spin_lock_irqsave(&current_SC->host->host_lock, flags);
+      spin_lock_irqsave(current_SC->host->host_lock, flags);
       my_done( (current_SC->SCp.Status & 0xff)
 	       | ((current_SC->SCp.Message & 0xff) << 8) | (DID_OK << 16) );
-      spin_unlock_irqrestore(&current_SC->host->host_lock, flags);
+      spin_unlock_irqrestore(current_SC->host->host_lock, flags);
 #if EVERY_ACCESS
       printk( "RETURNING.\n" );
 #endif

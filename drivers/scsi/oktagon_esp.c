@@ -198,7 +198,7 @@ int oktagon_esp_detect(Scsi_Host_Template *tpnt)
 
 		esp->irq = IRQ_AMIGA_PORTS;
 		request_irq(IRQ_AMIGA_PORTS, esp_intr, SA_SHIRQ,
-			    "BSC Oktagon SCSI", esp_intr);
+			    "BSC Oktagon SCSI", esp->ehost);
 
 		/* Figure out our scsi ID on the bus */
 		esp->scsi_id = 7;

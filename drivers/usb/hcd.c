@@ -996,6 +996,9 @@ static int hcd_submit_urb (struct urb *urb)
 	// hcd_monitor_hook(MONITOR_URB_SUBMIT, urb)
 	// It would catch submission paths for all urbs.
 
+	/* increment the reference count of the urb, as we now also control it. */
+	urb = usb_get_urb(urb);
+
 	/*
 	 * Atomically queue the urb,  first to our records, then to the HCD.
 	 * Access to urb->status is controlled by urb->lock ... changes on
@@ -1328,5 +1331,6 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	/* pass ownership to the completion handler */
 	usb_dec_dev_use (dev);
 	urb->complete (urb);
+	usb_put_urb (urb);
 }
 EXPORT_SYMBOL (usb_hcd_giveback_urb);

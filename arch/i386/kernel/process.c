@@ -89,7 +89,7 @@ static void default_idle(void)
 
 /*
  * On SMP it's slightly faster (but much more power-consuming!)
- * to poll the ->need_resched flag instead of waiting for the
+ * to poll the ->work.need_resched flag instead of waiting for the
  * cross-CPU IPI to arrive. Use this option with caution.
  */
 static void poll_idle (void)
@@ -102,15 +102,15 @@ static void poll_idle (void)
 	 * Deal with another CPU just having chosen a thread to
 	 * run here:
 	 */
-	oldval = xchg(&current->need_resched, -1);
+	oldval = xchg(&current->work.need_resched, -1);
 
 	if (!oldval)
 		asm volatile(
 			"2:"
-			"cmpl $-1, %0;"
+			"cmpb $-1, %0;"
 			"rep; nop;"
 			"je 2b;"
-				: :"m" (current->need_resched));
+				: :"m" (current->work.need_resched));
 }
 
 /*

@@ -445,6 +445,16 @@ ENTRY(gdt_table)
 	.quad 0x00409a0000000000	/* 0x48 APM CS    code */
 	.quad 0x00009a0000000000	/* 0x50 APM CS 16 code (16 bit) */
 	.quad 0x0040920000000000	/* 0x58 APM DS    data */
+	/* Segments used for calling PnP BIOS */
+	.quad 0x00c09a0000000000	/* 0x60 32-bit code */
+	.quad 0x00809a0000000000	/* 0x68 16-bit code */
+	.quad 0x0080920000000000	/* 0x70 16-bit data */
+	.quad 0x0080920000000000	/* 0x78 16-bit data */
+	.quad 0x0080920000000000	/* 0x80 16-bit data */
+	.quad 0x0000000000000000	/* 0x88 not used */
+	.quad 0x0000000000000000	/* 0x90 not used */
+	.quad 0x0000000000000000	/* 0x98 not used */
+	/* Per CPU segments */
 	.fill NR_CPUS*4,8,0		/* space for TSS's and LDT's */
 		
 /*

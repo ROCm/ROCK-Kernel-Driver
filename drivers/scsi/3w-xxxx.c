@@ -1326,7 +1326,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	TW_Command *command_packet;
 	if (test_and_set_bit(TW_IN_INTR, &tw_dev->flags))
 		return;
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(tw_dev->host->host_lock, flags);
 
 	if (tw_dev->tw_pci_dev->irq == irq) {
 		spin_lock(&tw_dev->tw_lock);
@@ -1475,7 +1475,7 @@ static void tw_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		}
 		spin_unlock(&tw_dev->tw_lock);
 	}
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(tw_dev->host->host_lock, flags);
 	clear_bit(TW_IN_INTR, &tw_dev->flags);
 }	/* End tw_interrupt() */
 
@@ -1902,9 +1902,7 @@ int tw_scsi_detect(Scsi_Host_Template *tw_host)
 		return 0;
 	}
 
-	spin_unlock_irq(&io_request_lock);
 	ret = tw_findcards(tw_host);
-	spin_lock_irq(&io_request_lock);
 
 	return ret;
 } /* End tw_scsi_detect() */
@@ -1929,9 +1927,9 @@ int tw_scsi_eh_abort(Scsi_Cmnd *SCpnt)
 	}
 
 	/* We have to let AEN requests through before the reset */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(tw_dev->host->host_lock);
 	mdelay(TW_AEN_WAIT_TIME);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(tw_dev->host->host_lock);
 
 	spin_lock(&tw_dev->tw_lock);
 	tw_dev->num_aborts++;
@@ -1993,9 +1991,9 @@ int tw_scsi_eh_reset(Scsi_Cmnd *SCpnt)
 	}
 
 	/* We have to let AEN requests through before the reset */
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(tw_dev->host->host_lock);
 	mdelay(TW_AEN_WAIT_TIME);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(tw_dev->host->host_lock);
 
 	spin_lock(&tw_dev->tw_lock);
 	tw_dev->num_resets++;

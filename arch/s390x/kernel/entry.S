@@ -76,9 +76,9 @@ _TSS_FLAGS   = (_TSS_IEEE+8)
  */
 state        =  0
 flags        =  8
-sigpending   = 16
-need_resched = 32
-tsk_ptrace   = 40
+#error sigpending   = 16
+#error need_resched = 32
+#error tsk_ptrace   = 40
 processor    = 92
 
 /*
@@ -220,10 +220,10 @@ sysc_return:
 #
 # check, if reschedule is needed
 #
-	lg      %r0,need_resched(%r9) # get need_resched from task_struct
+#error	lg      %r0,need_resched(%r9) # get need_resched from task_struct
 	ltgr    %r0,%r0
         jnz     sysc_reschedule
-        icm     %r0,15,sigpending(%r9)     # get sigpending from task_struct
+#error        icm     %r0,15,sigpending(%r9)     # get sigpending from task_struct
         jnz     sysc_signal_return
 sysc_leave:
         tm      SP_PGM_OLD_ILC(%r15),0xff
@@ -246,7 +246,7 @@ sysc_signal_return:
 sysc_tracesys:
 	lghi    %r2,-ENOSYS
 	stg     %r2,SP_R2(%r15)     # give sysc_trace an -ENOSYS retval
-        brasl   %r14,syscall_trace
+#error        brasl   %r14,syscall_trace
 	lg      %r2,SP_R2(%r15)
 	cghi    %r2,-ENOSYS
 	je      sysc_tracesys_dn1   
@@ -263,7 +263,7 @@ sysc_tracesys_dn1:
         basr    %r14,%r8            # call sys_xxx
         stg     %r2,SP_R2(%r15)     # store return value
 	larl    %r14,sysc_return
-        jg      syscall_trace       # return point is sysc_return
+#error        jg      syscall_trace       # return point is sysc_return
 
 #
 # call schedule with sysc_return as return-address
@@ -734,10 +734,10 @@ io_return_bh:
 #
 # check, if reschedule is needed
 #
-	lg      %r0,need_resched(%r9)  # get need_resched from task_struct
+#error	lg      %r0,need_resched(%r9)  # get need_resched from task_struct
 	ltgr    %r0,%r0
         jnz     io_reschedule
-        icm     %r0,15,sigpending(%r9) # get sigpending from task_struct
+#error        icm     %r0,15,sigpending(%r9) # get sigpending from task_struct
         jnz     io_signal_return
 io_leave:
         stnsm   48(%r15),0xfc          # disable I/O and ext. interrupts

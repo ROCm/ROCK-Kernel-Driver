@@ -219,7 +219,7 @@ prototypes:
 locking rules:
 	All except ->poll() may block.
 		BKL
-llseek:		yes
+llseek:		yes	(see below)
 read:		no
 write:		no
 readdir:	yes	(see below)
@@ -234,6 +234,10 @@ fasync:		yes	(see below)
 lock:		yes
 readv:		no
 writev:		no
+
+->llseek() locking has moved from llseek to the individual llseek
+implementations.  If your fs is not using generic_file_llseek, you
+need to acquire and release the BKL in your ->llseek().
 
 ->open() locking is in-transit: big lock partially moved into the methods.
 The only exception is ->open() in the instances of file_operations that never

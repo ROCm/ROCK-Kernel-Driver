@@ -11,7 +11,7 @@
 
 
 COMPR_OBJS	:= compr.o compr_rubin.o compr_rtime.o pushpull.o \
-			compr_zlib.o zlib.o
+			compr_zlib.o
 JFFS2_OBJS	:= dir.o file.o ioctl.o nodelist.o malloc.o \
 	read.o nodemgmt.o readinode.o super.o write.o scan.o gc.o \
 	symlink.o build.o erase.o background.o

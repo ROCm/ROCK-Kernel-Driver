@@ -47,7 +47,7 @@ static void intel_machine_check(struct pt_regs * regs, long error_code)
 			{
 				rdmsr(MSR_IA32_MC0_ADDR+i*4, alow, ahigh);
 				printk(" at %08x%08x", 
-					high, low);
+					ahigh, alow);
 			}
 			printk("\n");
 			/* Clear it */

@@ -58,15 +58,15 @@ C_LABEL(ret_trap_lockless_ipi):
 	 nop
 
 1:
-	ld	[%curptr + AOFF_task_need_resched], %g2
+#error	ld	[%curptr + AOFF_task_need_resched], %g2
 	orcc	%g2, %g0, %g0
 	be	signal_p
-	 ld	[%curptr + AOFF_task_sigpending], %g2
+#error	 ld	[%curptr + AOFF_task_sigpending], %g2
 
 	call	C_LABEL(schedule)
 	 nop
 
-	ld	[%curptr + AOFF_task_sigpending], %g2
+#error	ld	[%curptr + AOFF_task_sigpending], %g2
 signal_p:
 	cmp	%g2, 0
 	bz,a	ret_trap_continue
@@ -98,7 +98,7 @@ ret_trap_continue:
 	 add	%sp, REGWIN_SZ, %o0
 
 	b	signal_p
-	 ld	[%curptr + AOFF_task_sigpending], %g2
+#error	 ld	[%curptr + AOFF_task_sigpending], %g2
 
 ret_trap_nobufwins:
 	/* Load up the user's out registers so we can pull
@@ -168,7 +168,7 @@ ret_trap_unaligned_pc:
 	 nop
 
 	b	signal_p
-	 ld	[%curptr + AOFF_task_sigpending], %g2
+#error	 ld	[%curptr + AOFF_task_sigpending], %g2
 
 ret_trap_kernel:
 		/* Will the rett land us in the invalid window? */
@@ -218,7 +218,7 @@ ret_trap_user_stack_is_bolixed:
 	 add	%sp, REGWIN_SZ, %o0
 
 	b	signal_p
-	 ld	[%curptr + AOFF_task_sigpending], %g2
+#error	 ld	[%curptr + AOFF_task_sigpending], %g2
 
 	.globl	C_LABEL(sun4c_rett_stackchk)
 C_LABEL(sun4c_rett_stackchk):

@@ -46,7 +46,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
         return -EINVAL ;
     }
     /* ioctl already done */
-    if (REISERFS_I(inode)->nopack) {
+    if (REISERFS_I(inode)->i_flags & i_nopack_mask) {
         return 0 ;
     }
     lock_kernel();
@@ -59,7 +59,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
     write_from = inode->i_size & (blocksize - 1) ;
     /* if we are on a block boundary, we are already unpacked.  */
     if ( write_from == 0) {
-	REISERFS_I(inode)->nopack = 1;
+	REISERFS_I(inode)->i_flags |= i_nopack_mask;
 	goto out ;
     }
 
@@ -79,7 +79,7 @@ int reiserfs_unpack (struct inode * inode, struct file * filp)
 
     /* conversion can change page contents, must flush */
     flush_dcache_page(page) ;
-    REISERFS_I(inode)->nopack = 1;
+    REISERFS_I(inode)->i_flags |= i_nopack_mask;
     kunmap(page) ; /* mapped by prepare_write */
 
 out_unlock:

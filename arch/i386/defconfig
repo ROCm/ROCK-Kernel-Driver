@@ -681,7 +681,6 @@ CONFIG_LOCKD=y
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
 # CONFIG_ZISOFS_FS is not set
-# CONFIG_ZLIB_FS_INFLATE is not set
 
 #
 # Partition Types
@@ -846,3 +845,5 @@ CONFIG_USB_STORAGE=y
 # Library routines
 #
 # CONFIG_CRC32 is not set
+# CONFIG_ZLIB_INFLATE is not set
+# CONFIG_ZLIB_DEFLATE is not set

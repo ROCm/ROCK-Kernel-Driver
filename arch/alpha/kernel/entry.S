@@ -30,11 +30,11 @@
  */
 #define TASK_STATE		0
 #define TASK_FLAGS		8
-#define TASK_SIGPENDING		16
+#error #define TASK_SIGPENDING		16
 #define TASK_ADDR_LIMIT		24
 #define TASK_EXEC_DOMAIN	32
-#define TASK_NEED_RESCHED	40
-#define TASK_PTRACE		48
+#error #define TASK_NEED_RESCHED	40
+#error #define TASK_PTRACE		48
 #define TASK_PROCESSOR		100
 
 /*
@@ -580,11 +580,11 @@ ret_from_sys_call:
 	and	$0,8,$0
 	beq	$0,restore_all
 ret_from_reschedule:
-	ldq	$2,TASK_NEED_RESCHED($8)
+#error	ldq	$2,TASK_NEED_RESCHED($8)
 	lda	$4,init_task_union
 	bne	$2,reschedule
 	xor	$4,$8,$4
-	ldl	$5,TASK_SIGPENDING($8)
+#error	ldl	$5,TASK_SIGPENDING($8)
 	beq	$4,restore_all
 	bne	$5,signal_return
 restore_all:

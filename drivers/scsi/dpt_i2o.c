@@ -1158,12 +1158,12 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 	timeout *= HZ;
 	if((status = adpt_i2o_post_this(pHba, msg, len)) == 0){
 		set_current_state(TASK_INTERRUPTIBLE);
-		spin_unlock_irq(&pHba->host->host_lock);
+		spin_unlock_irq(pHba->host->host_lock);
 		if (!timeout)
 			schedule();
 		else
 			schedule_timeout(timeout*HZ);
-		spin_lock_irq(&pHba->host->host_lock);
+		spin_lock_irq(pHba->host->host_lock);
 	}
 	wq_write_lock_irq(&adpt_wq_i2o_post.lock);
 	__remove_wait_queue(&adpt_wq_i2o_post, &wait);
@@ -1701,7 +1701,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 	}
 
 	do {
-		spin_lock_irqsave(&pHba->host->host_lock, flags);
+		spin_lock_irqsave(pHba->host->host_lock, flags);
 		// This state stops any new commands from enterring the
 		// controller while processing the ioctl
 //		pHba->state |= DPTI_STATE_IOCTL;
@@ -1709,7 +1709,7 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32* arg)
 //		the queue empties and stops.  We need a way to restart the queue
 		rcode = adpt_i2o_post_wait(pHba, msg, size, FOREVER);
 //		pHba->state &= ~DPTI_STATE_IOCTL;
-		spin_unlock_irqrestore(&pHba->host->host_lock, flags);
+		spin_unlock_irqrestore(pHba->host->host_lock, flags);
 	} while(rcode == -ETIMEDOUT);  
 
 	if(rcode){
@@ -1947,9 +1947,9 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 		break;
 		}
 	case I2ORESETCMD:
-		spin_lock_irqsave(&pHba->host->host_lock, flags);
+		spin_lock_irqsave(pHba->host->host_lock, flags);
 		adpt_hba_reset(pHba);
-		spin_unlock_irqrestore(&pHba->host->host_lock, flags);
+		spin_unlock_irqrestore(pHba->host->host_lock, flags);
 		break;
 	case I2ORESCANCMD:
 		adpt_rescan(pHba);
@@ -1996,7 +1996,7 @@ static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING"adpt_isr: NULL dev_id\n");
 		return;
 	}
-	spin_lock_irqsave(&pHba->host->host_lock, flags);
+	spin_lock_irqsave(pHba->host->host_lock, flags);
 	while( readl(pHba->irq_mask) & I2O_INTERRUPT_PENDING_B) {
 		m = readl(pHba->reply_port);
 		if(m == EMPTY_QUEUE){
@@ -2061,7 +2061,7 @@ static void adpt_isr(int irq, void *dev_id, struct pt_regs *regs)
 		wmb();
 		rmb();
 	}
-out:	spin_unlock_irqrestore(&pHba->host->host_lock, flags);
+out:	spin_unlock_irqrestore(pHba->host->host_lock, flags);
 }
 
 static s32 adpt_scsi_to_i2o(adpt_hba* pHba, Scsi_Cmnd* cmd, struct adpt_device* d)
@@ -2334,13 +2334,13 @@ static s32 adpt_rescan(adpt_hba* pHba)
 	s32 rcode;
 	ulong flags;
 
-	spin_lock_irqsave(&pHba->host->host_lock, flags);
+	spin_lock_irqsave(pHba->host->host_lock, flags);
 	if ((rcode=adpt_i2o_lct_get(pHba)) < 0)
 		goto out;
 	if ((rcode=adpt_i2o_reparse_lct(pHba)) < 0)
 		goto out;
 	rcode = 0;
-out:	spin_unlock_irqrestore(&pHba->host->host_lock, flags);
+out:	spin_unlock_irqrestore(pHba->host->host_lock, flags);
 	return rcode;
 }
 

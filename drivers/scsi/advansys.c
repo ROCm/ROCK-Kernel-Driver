@@ -5871,7 +5871,7 @@ advansys_queuecommand(Scsi_Cmnd *scp, void (*done)(Scsi_Cmnd *))
 
     /* host_lock taken by mid-level prior to call but need to protect */
     /* against own ISR */
-    spin_lock_irqsave(&boardp->lock, flags);
+    spin_lock_irqsave(boardp->lock, flags);
 
     /*
      * Block new commands while handling a reset or abort request.
@@ -6413,10 +6413,10 @@ asc_scsi_done_list(Scsi_Cmnd *scp, int from_isr)
         ASC_STATS(scp->host, done);
         ASC_ASSERT(scp->scsi_done != NULL);
 	if (from_isr)
-	    spin_lock_irqsave(&scp->host->host_lock, flags);
+	    spin_lock_irqsave(scp->host->host_lock, flags);
         scp->scsi_done(scp);
 	if (from_isr)
-	    spin_unlock_irqrestore(&scp->host->host_lock, flags);
+	    spin_unlock_irqrestore(scp->host->host_lock, flags);
         scp = tscp;
     }
     ASC_DBG(2, "asc_scsi_done_list: done\n");

@@ -153,7 +153,7 @@ int mca_esp_detect(Scsi_Host_Template *tpnt)
 			esp->slot = slot;
 
 			if (request_irq(esp->irq, esp_intr, 0,
-			 "NCR 53c9x SCSI", esp_intr))
+			 "NCR 53c9x SCSI", esp->ehost))
 			{
 				printk("Unable to request IRQ %d.\n", esp->irq);
 				esp_deallocate(esp);

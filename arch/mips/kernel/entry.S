@@ -36,7 +36,7 @@
 EXPORT(ret_from_fork)
 		move	a0, v0			# prev
 		jal	schedule_tail
-		lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+#error		lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
 		andi	t0, PT_TRACESYS
 		bnez	t0, tracesys_exit
 		j	ret_from_sys_call
@@ -62,8 +62,8 @@ EXPORT(ret_from_sys_call)
 		mtc0	t0, CP0_STATUS
 		nop; nop; nop
 
-		lw	v0, TASK_NEED_RESCHED($28)
-		lw	v1, TASK_SIGPENDING($28)
+#error		lw	v0, TASK_NEED_RESCHED($28)
+#error		lw	v1, TASK_SIGPENDING($28)
 		bnez	v0, reschedule
 		bnez	v1, signal_return
 restore_all:	.set	noat
@@ -80,7 +80,7 @@ signal_return:
 
 		move	a0, zero
 		move	a1, sp
-		jal	do_signal
+#error		jal	do_signal
 		b	restore_all
 
 /*

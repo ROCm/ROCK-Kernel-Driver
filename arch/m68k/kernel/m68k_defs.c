@@ -25,8 +25,8 @@ int main(void)
 	DEFINE(TASK_STATE, offsetof(struct task_struct, state));
 	DEFINE(TASK_FLAGS, offsetof(struct task_struct, flags));
 	DEFINE(TASK_PTRACE, offsetof(struct task_struct, ptrace));
-	DEFINE(TASK_SIGPENDING, offsetof(struct task_struct, sigpending));
-	DEFINE(TASK_NEEDRESCHED, offsetof(struct task_struct, need_resched));
+#error	DEFINE(TASK_SIGPENDING, offsetof(struct task_struct, work.sigpending));
+#error	DEFINE(TASK_NEEDRESCHED, offsetof(struct task_struct, work.need_resched));
 	DEFINE(TASK_THREAD, offsetof(struct task_struct, thread));
 	DEFINE(TASK_MM, offsetof(struct task_struct, mm));
 	DEFINE(TASK_ACTIVE_MM, offsetof(struct task_struct, active_mm));

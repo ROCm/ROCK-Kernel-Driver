@@ -37,10 +37,10 @@
 
 void func(void)
 {
-DEFN("TSK_SIGPENDING",		OFF_TSK(sigpending));
+#error DEFN("TSK_SIGPENDING",		OFF_TSK(sigpending));
 DEFN("TSK_ADDR_LIMIT",		OFF_TSK(addr_limit));
-DEFN("TSK_NEED_RESCHED",	OFF_TSK(need_resched));
-DEFN("TSK_PTRACE",		OFF_TSK(ptrace));
+#error DEFN("TSK_NEED_RESCHED",	OFF_TSK(need_resched));
+#error DEFN("TSK_PTRACE",		OFF_TSK(ptrace));
 DEFN("TSK_USED_MATH",		OFF_TSK(used_math));
 
 DEFN("TSS_SAVE",		OFF_TSK(thread.save));

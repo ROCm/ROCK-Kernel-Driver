@@ -292,10 +292,11 @@ static void
 do_mac53c94_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
+	struct Scsi_Host *dev = ((struct fsc_state *) dev_id)->current_req->host;
+	
+	spin_lock_irqsave(dev->host_lock, flags);
 	mac53c94_interrupt(irq, dev_id, ptregs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void

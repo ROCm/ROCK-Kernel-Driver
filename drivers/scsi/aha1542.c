@@ -425,9 +425,9 @@ static void do_aha1542_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	if (!shost)
 		panic("Splunge!");
 
-	spin_lock_irqsave(&shost->host_lock, flags);
+	spin_lock_irqsave(shost->host_lock, flags);
 	aha1542_intr_handle(shost, dev_id, regs);
-	spin_unlock_irqrestore(&shost->host_lock, flags);
+	spin_unlock_irqrestore(shost->host_lock, flags);
 }
 
 /* A "high" level interrupt handler */
@@ -1475,9 +1475,9 @@ static int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
 	 * check for timeout, and if we are doing something like this
 	 * we are pretty desperate anyways.
 	 */
-	spin_unlock_irq(&SCpnt->host->host_lock);
+	spin_unlock_irq(SCpnt->host->host_lock);
 	scsi_sleep(4 * HZ);
-	spin_lock_irq(&SCpnt->host->host_lock);
+	spin_lock_irq(SCpnt->host->host_lock);
 
 	WAIT(STATUS(SCpnt->host->io_port),
 	     STATMASK, INIT | IDLE, STST | DIAGF | INVDCMD | DF | CDF);
@@ -1539,9 +1539,9 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt)
 	 * check for timeout, and if we are doing something like this
 	 * we are pretty desperate anyways.
 	 */
-	spin_unlock_irq(&SCpnt->host->host_lock);
+	spin_unlock_irq(SCpnt->host->host_lock);
 	scsi_sleep(4 * HZ);
-	spin_lock_irq(&SCpnt->host->host_lock);
+	spin_lock_irq(SCpnt->host->host_lock);
 
 	WAIT(STATUS(SCpnt->host->io_port),
 	     STATMASK, INIT | IDLE, STST | DIAGF | INVDCMD | DF | CDF);

@@ -417,9 +417,9 @@ int mac_esp_detect(Scsi_Host_Template * tpnt)
 
 			esp->irq = IRQ_MAC_SCSI;
 
-			request_irq(IRQ_MAC_SCSI, esp_intr, 0, "Mac ESP SCSI", esp);
+			request_irq(IRQ_MAC_SCSI, esp_intr, 0, "Mac ESP SCSI", esp->ehost);
 #if 0	/* conflicts with IOP ADB */
-			request_irq(IRQ_MAC_SCSIDRQ, fake_drq, 0, "Mac ESP DRQ", esp);
+			request_irq(IRQ_MAC_SCSIDRQ, fake_drq, 0, "Mac ESP DRQ", esp->ehost);
 #endif
 
 			if (macintosh_config->scsi_type == MAC_SCSI_QUADRA) {
@@ -433,7 +433,7 @@ int mac_esp_detect(Scsi_Host_Template * tpnt)
 
 			esp->irq = IRQ_MAC_SCSIDRQ;
 #if 0	/* conflicts with IOP ADB */
-			request_irq(IRQ_MAC_SCSIDRQ, esp_intr, 0, "Mac ESP SCSI 2", esp);
+			request_irq(IRQ_MAC_SCSIDRQ, esp_intr, 0, "Mac ESP SCSI 2", esp->ehost);
 #endif
 
 			esp->cfreq = 25000000;

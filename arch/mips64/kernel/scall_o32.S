@@ -22,7 +22,7 @@
 #include <asm/sysmips.h>
 
 /* This duplicates the definition from <linux/sched.h> */
-#define PT_TRACESYS	0x00000002	/* tracing system calls */
+#error #define PT_TRACESYS	0x00000002	/* tracing system calls */
 
 /* This duplicates the definition from <asm/signal.h> */
 #define SIGILL		4		/* Illegal instruction (ANSI).  */
@@ -54,8 +54,8 @@ NESTED(handle_sys, PT_SIZE, sp)
 	bgez	t0, stackargs
 
 stack_done:
-		ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
-		andi	t0, PT_TRACESYS
+#error		ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+#error		andi	t0, PT_TRACESYS
 		bnez	t0, trace_a_syscall
 
 		jalr	t2			# Do The Real Thing (TM)
@@ -75,9 +75,9 @@ FEXPORT(o32_ret_from_sys_call)
 		xori	t0, t0, 1
 		mtc0	t0, CP0_STATUS
 
-		ld	t2, TASK_NEED_RESCHED($28)
+#error		ld	t2, TASK_NEED_RESCHED($28)
 		bnez	t2, o32_reschedule
-		lw	v0, TASK_SIGPENDING($28)
+#error		lw	v0, TASK_SIGPENDING($28)
 		bnez	v0, signal_return
 
 restore_all:	RESTORE_SOME
@@ -92,7 +92,7 @@ signal_return:	mfc0	t0, CP0_STATUS	# need_resched and signals atomic test
 		move	a0, zero
 		move	a1, sp
 		SAVE_STATIC
-		jal	do_signal
+#error		jal	do_signal
 
 o32_reschedule:
 		SAVE_STATIC
@@ -130,7 +130,7 @@ trace_a_syscall:
 	sd	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sd	v0, PT_R2(sp)		# result
 
-	jal	syscall_trace
+#error	jal	syscall_trace
 	j	o32_ret_from_sys_call
 
 /* ------------------------------------------------------------------------ */
@@ -213,13 +213,13 @@ illegal_syscall:
 1:	sd	v0, PT_R2(sp)		# result
 
 	/* Success, so skip usual error handling garbage.  */
-	ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
-	andi	t0, PT_TRACESYS
+#error	ld	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+#error	andi	t0, PT_TRACESYS
 	bnez	t0, 1f
 	b	o32_ret_from_sys_call
 
 1:	SAVE_STATIC
-	jal	syscall_trace
+#error	jal	syscall_trace
 	li	a3, 0			# success
 	j	ret_from_sys_call
 

@@ -47,6 +47,8 @@ static long long ufs_file_lseek(
 	long long retval;
 	struct inode *inode = file->f_dentry->d_inode;
 
+	lock_kernel();
+
 	switch (origin) {
 		case 2:
 			offset += inode->i_size;
@@ -64,6 +66,7 @@ static long long ufs_file_lseek(
 		}
 		retval = offset;
 	}
+	unlock_kernel();
 	return retval;
 }
 

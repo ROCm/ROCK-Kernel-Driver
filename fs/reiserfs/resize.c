@@ -111,8 +111,8 @@ int reiserfs_resize (struct super_block * s, unsigned long block_count_new)
 	    for (i = 0; i < bmap_nr; i++)
 		bitmap[i] = SB_AP_BITMAP(s)[i];
 	    for (i = bmap_nr; i < bmap_nr_new; i++) {
-		bitmap[i] = reiserfs_getblk(s, i * s->s_blocksize * 8);
-		memset(bitmap[i]->b_data, 0, sb->s_blocksize);
+		bitmap[i] = sb_getblk(s, i * s->s_blocksize * 8);
+		memset(bitmap[i]->b_data, 0, sb_blocksize(sb));
 		reiserfs_test_and_set_le_bit(0, bitmap[i]->b_data);
 
 		mark_buffer_dirty(bitmap[i]) ;

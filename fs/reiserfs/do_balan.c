@@ -274,13 +274,6 @@ static int balance_leaf (struct tree_balance * tb,
     int pos_in_item;
     int zeros_num;
 
-#if 0
-    if (tb->insert_size [0] % 4) {
-	reiserfs_panic (tb->tb_sb, "balance_leaf: wrong insert_size %d", 
-			tb->insert_size [0]);
-    }
-#endif
-
     PROC_INFO_INC( tb -> tb_sb, balance_at[ 0 ] );
 
     /* Make balance in case insert_size[0] < 0 */

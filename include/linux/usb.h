@@ -641,11 +641,11 @@ typedef void (*usb_complete_t)(struct urb *);
  * @iso_frame_desc: Used to provide arrays of ISO transfer buffers and to 
  *	collect the transfer status for each buffer.
  *
- * This structure identifies USB transfer requests.  URBs may be allocated
- * in any way, although usb_alloc_urb() is often convenient.  Initialization
- * may be done using various usb_fill_*_urb() functions.  URBs are submitted
- * using usb_submit_urb(), and pending requests may be canceled using
- * usb_unlink_urb().
+ * This structure identifies USB transfer requests.  URBs must be allocated by
+ * calling usb_alloc_urb() and freed with a call to usb_free_urb().
+ * Initialization may be done using various usb_fill_*_urb() functions.  URBs
+ * are submitted using usb_submit_urb(), and pending requests may be canceled
+ * using usb_unlink_urb().
  *
  * Initialization:
  *
@@ -721,6 +721,7 @@ typedef void (*usb_complete_t)(struct urb *);
 struct urb
 {
 	spinlock_t lock;		/* lock for the URB */
+	atomic_t count;			/* reference count of the URB */
 	void *hcpriv;			/* private data for host controller */
 	struct list_head urb_list;	/* list pointer to all active urbs */
 	struct urb *next; 		/* (in) pointer to next URB */
@@ -854,6 +855,8 @@ static inline void usb_fill_int_urb (struct urb *urb,
 
 extern struct urb *usb_alloc_urb(int iso_packets);
 extern void usb_free_urb(struct urb *urb);
+#define usb_put_urb usb_free_urb
+extern struct urb *usb_get_urb(struct urb *urb);
 extern int usb_submit_urb(struct urb *urb);
 extern int usb_unlink_urb(struct urb *urb);
 

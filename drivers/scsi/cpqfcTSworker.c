@@ -200,7 +200,7 @@ void cpqfcTSWorkerThread( void *host)
     PCI_TRACE( 0x90)
     // first, take the IO lock so the SCSI upper layers can't call
     // into our _quecommand function (this also disables INTs)
-    spin_lock_irqsave( &HostAdapter->host_lock, flags); // STOP _que function
+    spin_lock_irqsave( HostAdapter->host_lock, flags); // STOP _que function
     PCI_TRACE( 0x90)
          
     CPQ_SPINLOCK_HBA( cpqfcHBAdata)
@@ -214,7 +214,7 @@ void cpqfcTSWorkerThread( void *host)
     PCI_TRACE( 0x90)
 
     // release the IO lock (and re-enable interrupts)
-    spin_unlock_irqrestore( &HostAdapter->host_lock, flags);
+    spin_unlock_irqrestore( HostAdapter->host_lock, flags);
 
     // disable OUR HBA interrupt (keep them off as much as possible
     // during error recovery)
@@ -3051,7 +3051,7 @@ void cpqfcTSheartbeat( unsigned long ptr )
     goto Skip;
 
   // STOP _que function
-  spin_lock_irqsave( &cpqfcHBAdata->HostAdapter->host_lock, flags); 
+  spin_lock_irqsave( cpqfcHBAdata->HostAdapter->host_lock, flags); 
 
   PCI_TRACE( 0xA8)
 
@@ -3059,7 +3059,7 @@ void cpqfcTSheartbeat( unsigned long ptr )
   cpqfcHBAdata->BoardLock = &BoardLock; // stop Linux SCSI command queuing
   
   // release the IO lock (and re-enable interrupts)
-  spin_unlock_irqrestore( &cpqfcHBAdata->HostAdapter->host_lock, flags);
+  spin_unlock_irqrestore( cpqfcHBAdata->HostAdapter->host_lock, flags);
   
   // Ensure no contention from  _quecommand or Worker process 
   CPQ_SPINLOCK_HBA( cpqfcHBAdata)

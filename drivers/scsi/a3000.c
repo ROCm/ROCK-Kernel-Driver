@@ -30,14 +30,15 @@ static void a3000_intr (int irq, void *dummy, struct pt_regs *fp)
 {
 	unsigned long flags;
 	unsigned int status = DMA(a3000_host)->ISTR;
-
+	struct Scsi_Host *dev = dummy;
+	
 	if (!(status & ISTR_INT_P))
 		return;
 	if (status & ISTR_INTS)
 	{
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		wd33c93_intr (a3000_host);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 	} else
 		printk("Non-serviced A3000 SCSI-interrupt? ISTR = %02x\n",
 		       status);

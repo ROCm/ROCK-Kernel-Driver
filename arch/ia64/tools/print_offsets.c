@@ -51,9 +51,9 @@ tab[] =
     { "SIGFRAME_SIZE",			sizeof (struct sigframe) },
     { "UNW_FRAME_INFO_SIZE",		sizeof (struct unw_frame_info) },
     { "", 0 },			/* spacer */
-    { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
-    { "IA64_TASK_SIGPENDING_OFFSET",	offsetof (struct task_struct, sigpending) },
-    { "IA64_TASK_NEED_RESCHED_OFFSET",	offsetof (struct task_struct, need_resched) },
+#error    { "IA64_TASK_PTRACE_OFFSET",	offsetof (struct task_struct, ptrace) },
+#error    { "IA64_TASK_SIGPENDING_OFFSET",	offsetof (struct task_struct, sigpending) },
+#error    { "IA64_TASK_NEED_RESCHED_OFFSET",	offsetof (struct task_struct, need_resched) },
     { "IA64_TASK_PROCESSOR_OFFSET",	offsetof (struct task_struct, processor) },
     { "IA64_TASK_THREAD_OFFSET",	offsetof (struct task_struct, thread) },
     { "IA64_TASK_THREAD_KSP_OFFSET",	offsetof (struct task_struct, thread.ksp) },

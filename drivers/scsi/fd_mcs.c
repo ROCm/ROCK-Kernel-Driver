@@ -740,9 +740,9 @@ static void fd_mcs_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
       printk( " AFAIL " );
 #endif
-      spin_lock_irqsave(&io_request_lock, flags);
+      spin_lock_irqsave(shpnt->host_lock, flags);
       my_done( shpnt, DID_BUS_BUSY << 16 );
-      spin_unlock_irqrestore(&io_request_lock, flags);
+      spin_unlock_irqrestore(shpnt->host_lock, flags);
       return;
     }
     current_SC->SCp.phase = in_selection;
@@ -766,9 +766,9 @@ static void fd_mcs_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
 	printk( " SFAIL " );
 #endif
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(shpnt->host_lock, flags);
 	my_done( shpnt, DID_NO_CONNECT << 16 );
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(shpnt->host_lock, flags);
 	return;
       } else {
 #if EVERY_ACCESS
@@ -1117,11 +1117,11 @@ static void fd_mcs_intr( int irq, void *dev_id, struct pt_regs * regs )
 #if EVERY_ACCESS
     printk( "BEFORE MY_DONE. . ." );
 #endif
-    spin_lock_irqsave(&io_request_lock, flags);
+    spin_lock_irqsave(shpnt->host_lock, flags);
     my_done( shpnt,
 	     (current_SC->SCp.Status & 0xff)
 	     | ((current_SC->SCp.Message & 0xff) << 8) | (DID_OK << 16) );
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(shpnt->host_lock, flags);
 #if EVERY_ACCESS
     printk( "RETURNING.\n" );
 #endif
@@ -1342,9 +1342,9 @@ int fd_mcs_abort( Scsi_Cmnd *SCpnt)
   restore_flags( flags );
    
   /* Aborts are not done well. . . */
-  spin_lock_irqsave(&io_request_lock, flags);
+  spin_lock_irqsave(shpnt->host_lock, flags);
   my_done( shpnt, DID_ABORT << 16 );
-  spin_unlock_irqrestore(&io_request_lock, flags);
+  spin_unlock_irqrestore(shpnt->host_lock, flags);
 
   return SCSI_ABORT_SUCCESS;
 }

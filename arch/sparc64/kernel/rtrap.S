@@ -42,14 +42,14 @@ __handle_user_windows:
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 		/* Redo sched+sig checks */
-		ldx			[%g6 + AOFF_task_need_resched], %l0
+#error		ldx			[%g6 + AOFF_task_need_resched], %l0
 		brz,pt			%l0, 1f
 		 nop
 		call			schedule
 
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-1:		lduw			[%g6 + AOFF_task_sigpending], %l0
+#error1:		lduw			[%g6 + AOFF_task_sigpending], %l0
 		brz,pt			%l0, __handle_user_windows_continue
 		 nop
 		clr			%o0
@@ -82,14 +82,14 @@ __handle_perfctrs:
 		call			fault_in_user_windows
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-1:		ldx			[%g6 + AOFF_task_need_resched], %l0
+#error 1:		ldx			[%g6 + AOFF_task_need_resched], %l0
 		brz,pt			%l0, 1f
 		 nop
 		call			schedule
 		 wrpr			%g0, RTRAP_PSTATE, %pstate
 
 		wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
-1:		lduw			[%g6 + AOFF_task_sigpending], %l0
+#error 1:		lduw			[%g6 + AOFF_task_sigpending], %l0
 		brz,pt			%l0, __handle_perfctrs_continue
 		 sethi			%hi(TSTATE_PEF), %o0
 		clr			%o0
@@ -173,9 +173,9 @@ __handle_softirq_continue:
 		 */
 to_user:	wrpr			%g0, RTRAP_PSTATE_IRQOFF, %pstate
 __handle_preemption_continue:
-		ldx			[%g6 + AOFF_task_need_resched], %l0
+#error		ldx			[%g6 + AOFF_task_need_resched], %l0
 		brnz,pn			%l0, __handle_preemption
-		 lduw			[%g6 + AOFF_task_sigpending], %l0
+#error		 lduw			[%g6 + AOFF_task_sigpending], %l0
 		brnz,pn			%l0, __handle_signal
 		 nop
 __handle_signal_continue:

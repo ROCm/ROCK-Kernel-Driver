@@ -130,7 +130,7 @@ int __init cyberII_esp_detect(Scsi_Host_Template *tpnt)
 
 		esp->irq = IRQ_AMIGA_PORTS;
 		request_irq(IRQ_AMIGA_PORTS, esp_intr, SA_SHIRQ,
-			    "CyberStorm SCSI Mk II", esp_intr);
+			    "CyberStorm SCSI Mk II", esp->ehost);
 
 		/* Figure out our scsi ID on the bus */
 		esp->scsi_id = 7;

@@ -241,11 +241,11 @@ void output_task_defines(void)
 	text("/* PARISC task_struct offsets. */");
 	offset("#define TASK_STATE         ", struct task_struct, state);
 	offset("#define TASK_FLAGS         ", struct task_struct, flags);
-	offset("#define TASK_SIGPENDING    ", struct task_struct, sigpending);
+#error	offset("#define TASK_SIGPENDING    ", struct task_struct, sigpending);
 	offset("#define TASK_SEGMENT       ", struct task_struct, addr_limit);
-	offset("#define TASK_NEED_RESCHED  ", struct task_struct, need_resched);
+#error	offset("#define TASK_NEED_RESCHED  ", struct task_struct, need_resched);
 	offset("#define TASK_COUNTER       ", struct task_struct, counter);
-	offset("#define TASK_PTRACE        ", struct task_struct, ptrace);
+#error	offset("#define TASK_PTRACE        ", struct task_struct, ptrace);
 	offset("#define TASK_NICE          ", struct task_struct, nice);
 	offset("#define TASK_MM            ", struct task_struct, mm);
 	offset("#define TASK_PROCESSOR     ", struct task_struct, processor);

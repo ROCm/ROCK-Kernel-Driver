@@ -225,7 +225,7 @@ inline void le_key2cpu_key (struct cpu_key * to, const struct key * from)
     
     // find out version of the key
     to->version = le_key_version (from);
-    if (to->version == ITEM_VERSION_1) {
+    if (to->version == KEY_FORMAT_3_5) {
 	to->on_disk_key.u.k_offset_v1.k_offset = le32_to_cpu (from->u.k_offset_v1.k_offset);
 	to->on_disk_key.u.k_offset_v1.k_uniqueness = le32_to_cpu (from->u.k_offset_v1.k_uniqueness);
     } else {
@@ -604,7 +604,7 @@ static void search_by_key_reada (struct super_block * s, int blocknr)
     if (blocknr == 0)
 	return;
 
-    bh = reiserfs_getblk (s, blocknr);
+    bh = sb_getblk (s, blocknr);
   
     if (!buffer_uptodate (bh)) {
 	ll_rw_block (READA, 1, &bh);
@@ -726,7 +726,11 @@ int search_by_key (struct super_block * p_s_sb,
 	    continue;
 	}
 
-	RFALSE( ! key_in_buffer(p_s_search_path, p_s_key, p_s_sb),
+        /* only check that the key is in the buffer if p_s_key is not
+           equal to the MAX_KEY. Latter case is only possible in
+           "finish_unfinished()" processing during mount. */
+        RFALSE( COMP_KEYS( &MAX_KEY, p_s_key ) && 
+                ! key_in_buffer(p_s_search_path, p_s_key, p_s_sb),
 		"PAP-5130: key is not in the buffer");
 #ifdef CONFIG_REISERFS_CHECK
 	if ( cur_tb ) {
@@ -916,7 +920,7 @@ static inline int prepare_for_direct_item (struct path * path,
     }
 	
     // new file gets truncated
-    if (inode_items_version (inode) == ITEM_VERSION_2) {
+    if (get_inode_item_key_version (inode) == KEY_FORMAT_3_6) {
 	// 
 	round_len = ROUND_UP (new_file_length); 
 	/* this was n_new_file_length < le_ih ... */
@@ -991,10 +995,6 @@ static char  prepare_for_delete_or_cut(
     struct item_head    * p_le_ih = PATH_PITEM_HEAD(p_s_path);
     struct buffer_head  * p_s_bh = PATH_PLAST_BUFFER(p_s_path);
 
-#ifdef CONFIG_REISERFS_CHECK
-    int n_repeat_counter = 0;
-#endif
-
     /* Stat_data item. */
     if ( is_statdata_le_ih (p_le_ih) ) {
 
@@ -1019,13 +1019,11 @@ static char  prepare_for_delete_or_cut(
     {
 	int                   n_unfm_number,    /* Number of the item unformatted nodes. */
 	    n_counter,
-	    n_retry,        /* Set to one if there is unformatted node buffer in use. */
 	    n_blk_size;
 	__u32               * p_n_unfm_pointer; /* Pointer to the unformatted node number. */
 	__u32 tmp;
 	struct item_head      s_ih;           /* Item header. */
 	char                  c_mode;           /* Returned mode of the balance. */
-	struct buffer_head  * p_s_un_bh;
 	int need_research;
 
 
@@ -1098,8 +1096,8 @@ static char  prepare_for_delete_or_cut(
 	    // note: path could be changed, first line in for loop takes care
 	    // of it
 
-	    for ( n_retry = 0, n_counter = *p_n_removed;
-		  n_counter < n_unfm_number; n_counter++, p_n_unfm_pointer-- )  {
+	    for (n_counter = *p_n_removed;
+		 n_counter < n_unfm_number; n_counter++, p_n_unfm_pointer-- ) {
 
 		if (item_moved (&s_ih, p_s_path)) {
 		    need_research = 1 ;
@@ -1109,69 +1107,23 @@ static char  prepare_for_delete_or_cut(
 			p_n_unfm_pointer > (__u32 *)B_I_PITEM(p_s_bh, &s_ih) + I_UNFM_NUM(&s_ih) - 1,
 			"vs-5265: pointer out of range");
 
-		if ( ! get_block_num(p_n_unfm_pointer,0) )  { /* Hole, nothing to remove. */
-		    if ( ! n_retry )
+		/* Hole, nothing to remove. */
+		if ( ! get_block_num(p_n_unfm_pointer,0) )  {
 			(*p_n_removed)++;
-		    continue;
+			continue;
 		}
-		/* Search for the buffer in cache. */
-		p_s_un_bh = sb_get_hash_table(p_s_sb, get_block_num(p_n_unfm_pointer,0));
 
-		if (p_s_un_bh) {
-		    mark_buffer_clean(p_s_un_bh) ;
-		    if (buffer_locked(p_s_un_bh)) {
-		  __wait_on_buffer(p_s_un_bh) ;
-		    }
-		    /* even if the item moves, the block number of the
-		    ** unformatted node we want to cut won't.  So, it was
-		    ** safe to clean the buffer here, this block _will_
-		    ** get freed during this call to prepare_for_delete_or_cut
-		    */
-		  if ( item_moved (&s_ih, p_s_path) )  {
-		      need_research = 1;
-		      brelse(p_s_un_bh) ;
-		      break ;
-		  }
-		}
-		if ( p_s_un_bh && block_in_use (p_s_un_bh)) {
-		    /* Block is locked or held more than by one holder and by
-                       journal. */
-
-#ifdef CONFIG_REISERFS_CHECK
-		    if (n_repeat_counter && (n_repeat_counter % 100000) == 0) {
-		      printk("prepare_for_delete, waiting on buffer %lu, b_count %d, %s%cJDIRTY %cJDIRTY_WAIT\n", 
-			     p_s_un_bh->b_blocknr, atomic_read (&p_s_un_bh->b_count),
-			     buffer_locked (p_s_un_bh) ? "locked, " : "",
-			     buffer_journaled(p_s_un_bh) ? ' ' : '!', 
-			     buffer_journal_dirty(p_s_un_bh) ? ' ' : '!') ;
-
-		    }
-#endif
-		    n_retry = 1;
-		    brelse (p_s_un_bh);
-		    continue;
-		}
-      
-		if ( ! n_retry )
-		    (*p_n_removed)++;
-      
-		RFALSE( p_s_un_bh &&
-                     get_block_num(p_n_unfm_pointer, 0) != p_s_un_bh->b_blocknr,
-		    // note: minix_truncate allows that. As truncate is
-		    // protected by down (inode->i_sem), two truncates can not
-		    // co-exist
-		    "PAP-5280: blocks numbers are different");	
+		(*p_n_removed)++;
 
 		tmp = get_block_num(p_n_unfm_pointer,0);
 		put_block_num(p_n_unfm_pointer, 0, 0);
 		journal_mark_dirty (th, p_s_sb, p_s_bh);
-		bforget (p_s_un_bh);
 		inode->i_blocks -= p_s_sb->s_blocksize / 512;
 		reiserfs_free_block(th, tmp);
 		if ( item_moved (&s_ih, p_s_path) )  {
-		    need_research = 1;
-		    break ;
-		    }
+			need_research = 1;
+			break ;
+		}
 	    }
 
 	    /* a trick.  If the buffer has been logged, this
@@ -1181,27 +1133,6 @@ static char  prepare_for_delete_or_cut(
 	    */
 	    reiserfs_restore_prepared_buffer(p_s_sb, p_s_bh);
 
-	    if ( n_retry ) {
-		/* There is block in use. Wait, they should release it soon */
-
-		RFALSE( *p_n_removed >= n_unfm_number, "PAP-5290: illegal case");
-#ifdef CONFIG_REISERFS_CHECK
-		if ( !(++n_repeat_counter % 500000) ) {
-		    reiserfs_warning("PAP-5300: prepare_for_delete_or_cut: (pid %u): "
-				     "could not delete item %k in (%d) iterations. New file length %Lu. (inode %Ld), Still trying\n",
-				     current->pid, p_s_item_key, n_repeat_counter, n_new_file_length, inode->i_size);
-		    if (n_repeat_counter == 5000000) {
-			print_block (PATH_PLAST_BUFFER(p_s_path), 3, 
-				     PATH_LAST_POSITION (p_s_path) - 2, PATH_LAST_POSITION (p_s_path) + 2);
-			reiserfs_panic(p_s_sb, "PAP-5305: prepare_for_delete_or_cut: key %k, new_file_length %Ld",
-				       p_s_item_key, n_new_file_length);
-		    }
-		}
-#endif
-
-		run_task_queue(&tq_disk);
-		yield();
-	    }
 	    /* This loop can be optimized. */
 	} while ( (*p_n_removed < n_unfm_number || need_research) &&
 		  search_for_position_by_key(p_s_sb, p_s_item_key, p_s_path) == POSITION_FOUND );
@@ -1386,8 +1317,8 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
 
 
 /* this deletes item which never gets split */
-static void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
-					struct key * key)
+void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
+				 struct key * key)
 {
     struct tree_balance tb;
     INITIALIZE_PATH (path);
@@ -1401,13 +1332,13 @@ static void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
     while (1) {
 	retval = search_item (th->t_super, &cpu_key, &path);
 	if (retval == IO_ERROR) {
-	    reiserfs_warning ("vs-: reiserfs_delete_solid_item: "
+	    reiserfs_warning ("vs-5350: reiserfs_delete_solid_item: "
 			      "i/o failure occurred trying to delete %K\n", &cpu_key);
 	    break;
 	}
 	if (retval != ITEM_FOUND) {
 	    pathrelse (&path);
-	    reiserfs_warning ("vs-: reiserfs_delete_solid_item: %k not found",
+	    reiserfs_warning ("vs-5355: reiserfs_delete_solid_item: %k not found",
 			      key);
 	    break;
 	}
@@ -1427,7 +1358,7 @@ static void reiserfs_delete_solid_item (struct reiserfs_transaction_handle *th,
 	}
 
 	// IO_ERROR, NO_DISK_SPACE, etc
-	reiserfs_warning ("vs-: reiserfs_delete_solid_item: "
+	reiserfs_warning ("vs-5360: reiserfs_delete_solid_item: "
 			  "could not delete %K due to fix_nodes failure\n", &cpu_key);
 	unfix_nodes (&tb);
 	break;
@@ -1444,15 +1375,6 @@ void reiserfs_delete_object (struct reiserfs_transaction_handle *th, struct inod
     /* for directory this deletes item containing "." and ".." */
     reiserfs_do_truncate (th, inode, NULL, 0/*no timestamp updates*/);
     
-    /* delete stat data */
-    /* this debug code needs to go away.  Trying to find a truncate race
-    ** -- clm -- 4/1/2000
-    */
-#if 0
-    if (inode->i_nlink != 0) {
-        reiserfs_warning("clm-4001: deleting inode with link count==%d\n", inode->i_nlink) ;
-    }
-#endif
 #if defined( USE_INODE_GENERATION_COUNTER )
     if( !old_format_only ( th -> t_super ) )
       {
@@ -1489,7 +1411,7 @@ static int maybe_indirect_to_direct (struct reiserfs_transaction_handle *th,
     */
     if (atomic_read(&p_s_inode->i_count) > 1 || 
         !tail_has_to_be_packed (p_s_inode) || 
-	!page || REISERFS_I(p_s_inode)->nopack) {
+	!page || (REISERFS_I(p_s_inode)->i_flags & i_nopack_mask)) {
 	// leave tail in an unformatted node	
 	*p_c_mode = M_SKIP_BALANCING;
 	cut_bytes = n_block_size - (n_new_file_size & (n_block_size - 1));
@@ -1691,7 +1613,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	** be flushed before the transaction commits, so we don't need to 
 	** deal with it here.
 	*/
-	REISERFS_I(p_s_inode)->i_pack_on_close = 0 ;
+	REISERFS_I(p_s_inode)->i_flags &= ~i_pack_on_close_mask ;
     }
     return n_ret_value;
 }
@@ -1700,14 +1622,14 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 static void truncate_directory (struct reiserfs_transaction_handle *th, struct inode * inode)
 {
     if (inode->i_nlink)
-	reiserfs_warning ("vs-5655: truncate_directory: link count != 0");
+	reiserfs_warning ("vs-5655: truncate_directory: link count != 0\n");
 
-    set_le_key_k_offset (ITEM_VERSION_1, INODE_PKEY (inode), DOT_OFFSET);
-    set_le_key_k_type (ITEM_VERSION_1, INODE_PKEY (inode), TYPE_DIRENTRY);
+    set_le_key_k_offset (KEY_FORMAT_3_5, INODE_PKEY (inode), DOT_OFFSET);
+    set_le_key_k_type (KEY_FORMAT_3_5, INODE_PKEY (inode), TYPE_DIRENTRY);
     reiserfs_delete_solid_item (th, INODE_PKEY (inode));
 
-    set_le_key_k_offset (ITEM_VERSION_1, INODE_PKEY (inode), SD_OFFSET);
-    set_le_key_k_type (ITEM_VERSION_1, INODE_PKEY (inode), TYPE_STAT_DATA);    
+    set_le_key_k_offset (KEY_FORMAT_3_5, INODE_PKEY (inode), SD_OFFSET);
+    set_le_key_k_type (KEY_FORMAT_3_5, INODE_PKEY (inode), TYPE_STAT_DATA);    
 }
 
 
@@ -1780,6 +1702,7 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 	pathrelse(&s_search_path);
 	return;
     }
+
     /* Update key to search for the last file item. */
     set_cpu_key_k_offset (&s_item_key, n_file_size);
 
@@ -1816,7 +1739,6 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 
 	  if (update_timestamps) {
 	      p_s_inode->i_mtime = p_s_inode->i_ctime = CURRENT_TIME;
-	      // FIXME: sd gets wrong size here
 	  } 
 	  reiserfs_update_sd(th, p_s_inode) ;
 

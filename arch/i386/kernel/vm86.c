@@ -212,7 +212,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	info->regs.__null_ds = 0;
 	info->regs.__null_es = 0;
 
-/* we are clearing fs,gs later just before "jmp ret_from_sys_call",
+/* we are clearing fs,gs later just before "jmp resume_userspace",
  * because starting with Linux 2.1.x they aren't no longer saved/restored
  */
 
@@ -255,7 +255,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	__asm__ __volatile__(
 		"xorl %%eax,%%eax; movl %%eax,%%fs; movl %%eax,%%gs\n\t"
 		"movl %0,%%esp\n\t"
-		"jmp ret_from_sys_call"
+		"jmp resume_userspace"
 		: /* no outputs */
 		:"r" (&info->regs), "b" (tsk) : "ax");
 	/* we never return here */
@@ -268,7 +268,7 @@ static inline void return_to_32bit(struct kernel_vm86_regs * regs16, int retval)
 	regs32 = save_v86_state(regs16);
 	regs32->eax = retval;
 	__asm__ __volatile__("movl %0,%%esp\n\t"
-		"jmp ret_from_sys_call"
+		"jmp resume_userspace"
 		: : "r" (regs32), "b" (current));
 }
 

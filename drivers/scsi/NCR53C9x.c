@@ -3546,9 +3546,10 @@ void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 	struct NCR_ESP *esp;
 	unsigned long flags;
 	int again;
+	struct Scsi_Host *dev = dev_id;
 
 	/* Handle all ESP interrupts showing at this IRQ level. */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 repeat:
 	again = 0;
 	for_each_esp(esp) {
@@ -3572,7 +3573,7 @@ repeat:
 	}
 	if(again)
 		goto repeat;
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 #else
 /* For SMP we only service one ESP on the list list at our IRQ level! */
@@ -3580,9 +3581,10 @@ void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 {
 	struct NCR_ESP *esp;
 	unsigned long flags;
-
+	struct Scsi_Host *dev = dev_id;
+	
 	/* Handle all ESP interrupts showing at this IRQ level. */
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(dev->host_lock, flags);
 	for_each_esp(esp) {
 		if(((esp)->irq & 0xf) == irq) {
 			if(esp->dma_irq_p(esp)) {
@@ -3599,7 +3601,7 @@ void esp_intr(int irq, void *dev_id, struct pt_regs *pregs)
 		}
 	}
 out:
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 #endif
 

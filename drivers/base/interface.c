@@ -113,7 +113,7 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	if (!dev->driver)
 		goto done;
 
-	num_args = sscanf(buf,"%s %s %u",str_command,str_stage,&state);
+	num_args = sscanf(buf,"%10s %10s %u",str_command,str_stage,&state);
 
 	error = -EINVAL;
 

@@ -304,8 +304,8 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 #  define DC390_IFLAGS unsigned long iflags;
 #  define DC390_DFLAGS unsigned long dflags; 
 
-#  define DC390_LOCK_IO spin_lock_irqsave (&io_request_lock, iflags)
-#  define DC390_UNLOCK_IO spin_unlock_irqrestore (&io_request_lock, iflags)
+#  define DC390_LOCK_IO spin_lock_irqsave (((struct Scsi_Host *)dev)->host_lock, iflags)
+#  define DC390_UNLOCK_IO spin_unlock_irqrestore (((struct Scsi_Host *)dev)->host_lock, iflags)
 
 #  define DC390_LOCK_DRV spin_lock_irqsave (&dc390_drvlock, dflags)
 #  define DC390_UNLOCK_DRV spin_unlock_irqrestore (&dc390_drvlock, dflags)
@@ -331,8 +331,8 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 #   define DC390_AFLAGS unsigned long aflags;
 #   define DC390_IFLAGS 
 #  define DC390_DFLAGS unsigned long dflags; 
-#   define DC390_LOCK_IO /* spin_lock_irqsave (&io_request_lock, iflags) */
-#   define DC390_UNLOCK_IO /* spin_unlock_irqrestore (&io_request_lock, iflags) */
+#   define DC390_LOCK_IO(dev) /* spin_lock_irqsave (&io_request_lock, iflags) */
+#   define DC390_UNLOCK_IO(dev) /* spin_unlock_irqrestore (&io_request_lock, iflags) */
 #   define DC390_LOCK_DRV spin_lock_irqsave (&dc390_drvlock, dflags)
 #   define DC390_UNLOCK_DRV spin_unlock_irqrestore (&dc390_drvlock, dflags)
 #   define DC390_LOCK_DRV_NI spin_lock (&dc390_drvlock)
@@ -349,8 +349,8 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 #   define DC390_IFLAGS unsigned long iflags;
 #   define DC390_DFLAGS unsigned long dflags; 
     spinlock_t dc390_drvlock = SPIN_LOCK_UNLOCKED;
-#   define DC390_LOCK_IO spin_lock_irqsave (&io_request_lock, iflags)
-#   define DC390_UNLOCK_IO spin_unlock_irqrestore (&io_request_lock, iflags)
+#   define DC390_LOCK_IO(dev) spin_lock_irqsave (((struct Scsi_Host *)dev)->host_lock, iflags)
+#   define DC390_UNLOCK_IO(dev) spin_unlock_irqrestore (((struct Scsi_Host *)dev)->host_lock, iflags)
 #   define DC390_LOCK_DRV spin_lock_irqsave (&dc390_drvlock, dflags)
 #   define DC390_UNLOCK_DRV spin_unlock_irqrestore (&dc390_drvlock, dflags)
 #   define DC390_LOCK_DRV_NI spin_lock (&dc390_drvlock)
@@ -1074,11 +1074,11 @@ void DC390_waiting_timed_out (unsigned long ptr)
 	DC390_IFLAGS
 	DC390_AFLAGS
 	DEBUG0(printk ("DC390: Debug: Waiting queue woken up by timer!\n");)
-	DC390_LOCK_IO;
+	DC390_LOCK_IO(pACB.pScsiHost);
 	DC390_LOCK_ACB;
 	dc390_Waiting_process (pACB);
 	DC390_UNLOCK_ACB;
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
 }
 
 /***********************************************************************
@@ -2558,7 +2558,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
   DC390_AFLAGS 
   pos[length] = 0;
 
-  DC390_LOCK_IO;
+  DC390_LOCK_IO(pACB.pScsiHost);
   DC390_LOCK_ACB;
   /* UPPERCASE */ 
   /* Don't use kernel toupper, because of 2.0.x bug: ctmp unexported */
@@ -2726,7 +2726,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
   DC390_UNLOCK_ACB;
   if (needs_inquiry) 
      { dc390_updateDCB (pACB, pDCB); dc390_inquiry (pACB, pDCB); };
-  DC390_UNLOCK_IO;
+  DC390_UNLOCK_IO(pACB.pScsiHost);
   return (length);
 
  einv2:
@@ -2734,7 +2734,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
  einv:
   /* spin_unlock (strtok_lock); */
   DC390_UNLOCK_ACB;
-  DC390_UNLOCK_IO;
+  DC390_UNLOCK_IO(pACB.pScsiHost);
   printk (KERN_WARNING "DC390: parse error near \"%s\"\n", (pos? pos: "NULL"));
   return (-EINVAL);
    
@@ -2744,7 +2744,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 	printk (KERN_WARNING "DC390: Driver reset requested!\n");
 	DC390_UNLOCK_ACB;
 	DC390_reset (&cmd, 0);
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
      };
   return (length);
 
@@ -2752,7 +2752,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
      {
 	dc390_dumpinfo (pACB, 0, 0);
 	DC390_UNLOCK_ACB;
-	DC390_UNLOCK_IO;       
+	DC390_UNLOCK_IO(pACB.pScsiHost);       
      }
   return (length);
 	
@@ -2766,7 +2766,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 		dev, pDCB->TargetID, pDCB->TargetLUN);
 	DC390_UNLOCK_ACB;
 	dc390_inquiry (pACB, pDCB);
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
      };
    return (length);
 
@@ -2781,7 +2781,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 	/* TO DO: We should make sure no pending commands are left */
 	dc390_remove_dev (pACB, pDCB);
 	DC390_UNLOCK_ACB;
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
      };
    return (length);
 
@@ -2796,7 +2796,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 	dc390_initDCB (pACB, &pDCB, id, lun);
 	DC390_UNLOCK_ACB;
 	dc390_inquiry (pACB, pDCB);
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
      };
    return (length);
 
@@ -2812,7 +2812,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
 	DC390_UNLOCK_ACB;
 	dc390_sendstart (pACB, pDCB);
 	dc390_inquiry (pACB, pDCB);
-	DC390_UNLOCK_IO;
+	DC390_UNLOCK_IO(pACB.pScsiHost);
      };
    return (length);
 
@@ -2820,7 +2820,7 @@ int dc390_set_info (char *buffer, int length, PACB pACB)
    printk (KERN_WARNING "DC390: Ignore cmnd to illegal Dev(Idx) %i. Valid range: 0 - %i.\n", 
 	   dev, pACB->DCBCnt - 1);
    DC390_UNLOCK_ACB;
-   DC390_UNLOCK_IO;
+   DC390_UNLOCK_IO(pACB.pScsiHost);
    return (-EINVAL);
 	     
 	     
@@ -3041,7 +3041,7 @@ int DC390_release (struct Scsi_Host *host)
     DC390_AFLAGS DC390_IFLAGS
     PACB pACB = (PACB)(host->hostdata);
 
-    DC390_LOCK_IO;
+    DC390_LOCK_IO(host);
     DC390_LOCK_ACB;
 
     /* TO DO: We should check for outstanding commands first. */
@@ -3056,7 +3056,7 @@ int DC390_release (struct Scsi_Host *host)
     release_region(host->io_port,host->n_io_port);
     dc390_freeDCBs (host);
     DC390_UNLOCK_ACB;
-    DC390_UNLOCK_IO;
+    DC390_UNLOCK_IO(host);
     return( 1 );
 }
 #endif /* def MODULE */

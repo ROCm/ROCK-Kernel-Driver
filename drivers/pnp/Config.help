@@ -27,3 +27,19 @@ CONFIG_ISAPNP
 
   If unsure, say Y.
 
+CONFIG_PNPBIOS
+  Linux uses the PNPBIOS as defined in "Plug and Play BIOS
+  Specification Version 1.0A May 5, 1994" to autodetect built-in
+  mainboard resources (e.g. parallel port resources).
+
+  Other features (e.g. change resources, ESCD, event notification,
+  Docking station information, ISAPNP services) are not used.
+
+  Note: ACPI is expected to supersede PNPBIOS some day, currently it
+  co-exists nicely.
+
+  See latest pcmcia-cs (stand-alone package) for a nice "lspnp" tools,
+  or have a look at /proc/bus/pnp.
+
+  If unsure, say Y.
+

@@ -106,7 +106,7 @@ void smp_message_recv(int msg, struct pt_regs *regs)
 		smp_call_function_interrupt();
 		break;
 	case PPC_MSG_RESCHEDULE: 
-		current->need_resched = 1;
+		current->work.need_resched = 1;
 		break;
 	case PPC_MSG_INVALIDATE_TLB:
 		_tlbia();

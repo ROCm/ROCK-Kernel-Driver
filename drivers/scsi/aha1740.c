@@ -224,7 +224,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 
     if (!host)
 	panic("aha1740.c: Irq from unknown host!\n");
-    spin_lock_irqsave(&host->host_lock, flags);
+    spin_lock_irqsave(host->host_lock, flags);
     base = host->io_port;
     number_serviced = 0;
 
@@ -299,7 +299,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 	number_serviced++;
     }
 
-    spin_unlock_irqrestore(&host->host_lock, flags);
+    spin_unlock_irqrestore(host->host_lock, flags);
 }
 
 int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))

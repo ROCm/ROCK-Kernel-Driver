@@ -54,7 +54,7 @@ int cpu_idle(void)
 
 	/* endless idle loop with no priority at all */
 	for (;;) {
-		/* If current->need_resched is zero we should really
+		/* If current->work.need_resched is zero we should really
 		 * setup for a system wakup event and execute a shutdown
 		 * instruction.
 		 *

@@ -3,51 +3,46 @@
 
 #include <linux/list.h>
 
+/** bitmasks for i_flags field in reiserfs-specific part of inode */
+typedef enum {
+    /** this says what format of key do all items (but stat data) of
+      an object have.  If this is set, that format is 3.6 otherwise
+      - 3.5 */
+    i_item_key_version_mask    =  0x0001,
+    /** If this is unset, object has 3.5 stat data, otherwise, it has
+      3.6 stat data with 64bit size, 32bit nlink etc. */
+    i_stat_data_version_mask   =  0x0002,
+    /** file might need tail packing on close */
+    i_pack_on_close_mask       =  0x0004,
+    /** don't pack tail of file */
+    i_nopack_mask              =  0x0008,
+    /** If those is set, "safe link" was created for this file during
+      truncate or unlink. Safe link is used to avoid leakage of disk
+      space on crash with some files open, but unlinked. */
+    i_link_saved_unlink_mask   =  0x0010,
+    i_link_saved_truncate_mask =  0x0020
+} reiserfs_inode_flags;
+
+
 struct reiserfs_inode_info {
-  __u32 i_key [4];/* key is still 4 32 bit integers */
-  
-				/* this comment will be totally
-                                   cryptic to readers not familiar
-                                   with 3.5/3.6 format conversion, and
-                                   it does not consider that that 3.6
-                                   might not be the last version */
-  int i_version;  // this says whether file is old or new
+    __u32 i_key [4];/* key is still 4 32 bit integers */
+    /** transient inode flags that are never stored on disk. Bitmasks
+      for this field are defined above. */
+    __u32 i_flags;
 
-  int i_pack_on_close ; // file might need tail packing on close 
+    __u32 i_first_direct_byte; // offset of first byte stored in direct item.
 
-  __u32 i_first_direct_byte; // offset of first byte stored in direct item.
+    int i_prealloc_block; /* first unused block of a sequence of unused blocks */
+    int i_prealloc_count; /* length of that sequence */
+    struct list_head i_prealloc_list; /* per-transaction list of inodes which
+                                       * have preallocated blocks */
 
-				/* My guess is this contains the first
-                                   unused block of a sequence of
-                                   blocks plus the length of the
-                                   sequence, which I think is always
-                                   at least two at the time of the
-                                   preallocation.  I really prefer
-                                   allocate on flush conceptually.....
-
-				   You know, it really annoys me when
-				   code is this badly commented that I
-				   have to guess what it does.
-				   Neither I nor anyone else has time
-				   for guessing what your
-				   datastructures mean.  -Hans */
-  //For preallocation
-  int i_prealloc_block;
-  int i_prealloc_count;
-  struct list_head i_prealloc_list;	/* per-transaction list of inodes which
-				 * have preallocated blocks */
-				/* I regret that you think the below
-                                   is a comment you should make.... -Hans */
-  //nopack-attribute
-  int nopack;
-  
-  /* we use these for fsync or O_SYNC to decide which transaction needs
-  ** to be committed in order for this inode to be properly flushed
-  */
-  unsigned long i_trans_id ;
-  unsigned long i_trans_index ;
-  struct inode vfs_inode;
+    /* we use these for fsync or O_SYNC to decide which transaction
+    ** needs to be committed in order for this inode to be properly
+    ** flushed */
+    unsigned long i_trans_id ;
+    unsigned long i_trans_index ;
+    struct inode vfs_inode;
 };
-
 
 #endif

@@ -795,15 +795,15 @@ finish_cmds(void *data)
 	unsigned long flags;
 
 	for (;;) {
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(ms->host->host_lock, flags);
 		cmd = ms->completed_q;
 		if (cmd == NULL) {
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(ms->host->host_lock, flags);
 			break;
 		}
 		ms->completed_q = (Scsi_Cmnd *) cmd->host_scribble;
 		(*cmd->scsi_done)(cmd);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(ms->host->host_lock, flags);
 	}
 }
 #endif /* MESH_NEW_STYLE_EH */
@@ -1458,10 +1458,11 @@ static void
 do_mesh_interrupt(int irq, void *dev_id, struct pt_regs *ptregs)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
+	struct Scsi_Host *dev = ((struct mech_state *)dev_id)->host;
+	
+	spin_lock_irqsave(dev->host_lock, flags);
 	mesh_interrupt(irq, dev_id, ptregs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 static void handle_error(struct mesh_state *ms)

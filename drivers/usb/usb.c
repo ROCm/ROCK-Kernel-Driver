@@ -1074,16 +1074,18 @@ void usb_inc_dev_use(struct usb_device *dev)
  * ----------------------------------------------------------------------*/
 
 /**
- *	usb_alloc_urb - creates a new urb for a USB driver to use
- *	@iso_packets: number of iso packets for this urb
+ * usb_alloc_urb - creates a new urb for a USB driver to use
+ * @iso_packets: number of iso packets for this urb
  *
- *	Creates an urb for the USB driver to use and returns a pointer to it.
- *	If no memory is available, NULL is returned.
+ * Creates an urb for the USB driver to use, initializes a few internal
+ * structures, incrementes the usage counter, and returns a pointer to it.
  *
- *	If the driver want to use this urb for interrupt, control, or bulk
- *	endpoints, pass '0' as the number of iso packets.
+ * If no memory is available, NULL is returned.
  *
- *	The driver should call usb_free_urb() when it is finished with the urb.
+ * If the driver want to use this urb for interrupt, control, or bulk
+ * endpoints, pass '0' as the number of iso packets.
+ *
+ * The driver must call usb_free_urb() when it is finished with the urb.
  */
 struct urb *usb_alloc_urb(int iso_packets)
 {
@@ -1098,25 +1100,49 @@ struct urb *usb_alloc_urb(int iso_packets)
 	}
 
 	memset(urb, 0, sizeof(*urb));
-
+	atomic_inc(&urb->count);
 	spin_lock_init(&urb->lock);
 
 	return urb;
 }
 
 /**
- *	usb_free_urb - frees the memory used by a urb
- *	@urb: pointer to the urb to free
+ * usb_free_urb - frees the memory used by a urb when all users of it are finished
+ * @urb: pointer to the urb to free
  *
- *	If an urb is created with a call to usb_create_urb() it should be
- *	cleaned up with a call to usb_free_urb() when the driver is finished
- *	with it.
+ * Must be called when a user of a urb is finished with it.  When the last user
+ * of the urb calls this function, the memory of the urb is freed.
+ *
+ * Note: The transfer buffer associated with the urb is not freed, that must be
+ * done elsewhere.
  */
 void usb_free_urb(struct urb *urb)
 {
 	if (urb)
-		kfree(urb);
+		if (atomic_dec_and_test(&urb->count))
+			kfree(urb);
 }
+
+/**
+ * usb_get_urb - incrementes the reference count of the urb
+ * @urb: pointer to the urb to modify
+ *
+ * This must be  called whenever a urb is transfered from a device driver to a
+ * host controller driver.  This allows proper reference counting to happen
+ * for urbs.
+ *
+ * A pointer to the urb with the incremented reference counter is returned.
+ */
+struct urb * usb_get_urb(struct urb *urb)
+{
+	if (urb) {
+		atomic_inc(&urb->count);
+		return urb;
+	} else
+		return NULL;
+}
+		
+		
 /*-------------------------------------------------------------------*/
 
 /**
@@ -1129,7 +1155,7 @@ void usb_free_urb(struct urb *urb)
  * This call may be issued in interrupt context.
  *
  * The caller must have correctly initialized the URB before submitting
- * it.  Macros such as FILL_BULK_URB() and FILL_CONTROL_URB() are
+ * it.  Functions such as usb_fill_bulk_urb() and usb_fill_control_urb() are
  * available to ensure that most fields are correctly initialized, for
  * the particular kind of transfer, although they will not initialize
  * any transfer flags.
@@ -2794,6 +2820,7 @@ EXPORT_SYMBOL(usb_get_current_frame_number);
 // asynchronous request completion model
 EXPORT_SYMBOL(usb_alloc_urb);
 EXPORT_SYMBOL(usb_free_urb);
+EXPORT_SYMBOL(usb_get_urb);
 EXPORT_SYMBOL(usb_submit_urb);
 EXPORT_SYMBOL(usb_unlink_urb);
 

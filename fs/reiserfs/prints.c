@@ -109,7 +109,7 @@ static void sprintf_de_head( char *buf, struct reiserfs_de_head *deh )
 static void sprintf_item_head (char * buf, struct item_head * ih)
 {
     if (ih) {
-	sprintf (buf, "%s", (ih_version (ih) == ITEM_VERSION_2) ? "*NEW* " : "*OLD*");
+	sprintf (buf, "%s", (ih_version (ih) == KEY_FORMAT_3_6) ? "*3.6* " : "*3.5*");
 	sprintf_le_key (buf + strlen (buf), &(ih->ih_key));
 	sprintf (buf + strlen (buf), ", item_len %d, item_location %d, "
 		 "free_space(entry_count) %d",
@@ -485,12 +485,13 @@ static int print_super_block (struct buffer_head * bh)
     char *version;
     
 
-    if (strncmp (rs->s_magic,  REISERFS_SUPER_MAGIC_STRING,
-                 strlen ( REISERFS_SUPER_MAGIC_STRING)) == 0) {
+    if (is_reiserfs_3_5(rs)) {
         version = "3.5";
-    } else if( strncmp (rs->s_magic,  REISER2FS_SUPER_MAGIC_STRING,
-                        strlen ( REISER2FS_SUPER_MAGIC_STRING)) == 0) {
+    } else if (is_reiserfs_3_6(rs)) {
         version = "3.6";
+    } else if (is_reiserfs_jr(rs)) {
+      version = ((sb_version(rs) == REISERFS_VERSION_2) ?
+ 		 "3.6" : "3.5");  
     } else {
 	return 1;
     }
@@ -505,27 +506,25 @@ static int print_super_block (struct buffer_head * bh)
     // someone stores reiserfs super block in some data block ;)
 //    skipped = (bh->b_blocknr * bh->b_size) / sb_blocksize(rs);
     skipped = bh->b_blocknr;
-    data_blocks = sb_block_count(rs) - skipped - 1 -
-                  sb_bmap_nr(rs) - (sb_orig_journal_size(rs) + 1) -
-                  sb_free_blocks(rs);
-    printk ("Busy blocks (skipped %d, bitmaps - %d, journal blocks - %d\n"
-	    "1 super blocks, %d data blocks\n", 
-	    skipped, sb_bmap_nr(rs), 
-	    (sb_orig_journal_size(rs) + 1), data_blocks);
+    data_blocks = sb_block_count(rs) - skipped - 1 - sb_bmap_nr(rs) -
+	    (!is_reiserfs_jr(rs) ? sb_jp_journal_size(rs) + 1 : sb_reserved_for_journal(rs)) -	    
+	    sb_free_blocks(rs);
+    printk ("Busy blocks (skipped %d, bitmaps - %d, journal (or reserved) blocks - %d\n"
+	    "1 super block, %d data blocks\n", 
+	    skipped, sb_bmap_nr(rs), (!is_reiserfs_jr(rs) ? (sb_jp_journal_size(rs) + 1) :
+				      sb_reserved_for_journal(rs)) , data_blocks);
     printk ("Root block %u\n", sb_root_block(rs));
-    printk ("Journal block (first) %d\n", sb_journal_block(rs));
-    printk ("Journal dev %d\n", sb_journal_dev(rs));
-    printk ("Journal orig size %d\n", sb_orig_journal_size(rs));
-    printk ("Filesystem state %s\n", 
-	    (sb_state(rs) == REISERFS_VALID_FS) ? "VALID" : "ERROR");
+    printk ("Journal block (first) %d\n", sb_jp_journal_1st_block(rs));
+    printk ("Journal dev %d\n", sb_jp_journal_dev(rs));
+    printk ("Journal orig size %d\n", sb_jp_journal_size(rs));
+    printk ("FS state %d\n", sb_fs_state(rs));
     printk ("Hash function \"%s\"\n",
             sb_hash_function_code(rs) == TEA_HASH ? "tea" :
 	    ( sb_hash_function_code(rs) == YURA_HASH ? "rupasov" : (sb_hash_function_code(rs) == R5_HASH ? "r5" : "unknown")));
-
+    
     printk ("Tree height %d\n", sb_tree_height(rs));
     return 0;
 }
-
 
 static int print_desc_block (struct buffer_head * bh)
 {

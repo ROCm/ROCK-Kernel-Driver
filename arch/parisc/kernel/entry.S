@@ -650,14 +650,14 @@ intr_check_resched:
 	copy    %r30,%r1
 	/* FIXME! depi below has hardcoded dependency on kernel stack size */
 	depi    0,31,14,%r1 /* get task pointer */
-	LDREG     TASK_NEED_RESCHED(%r1),%r19	/* sched.h: long need_resched */
+#error	LDREG     TASK_NEED_RESCHED(%r1),%r19	/* sched.h: long need_resched */
 	comib,<>,n 0,%r19,intr_do_resched /* forward */
 
 intr_check_sig:
 	/* As above */
 	copy    %r30,%r1
 	depi    0,31,14,%r1 /* get task pointer */
-	ldw	TASK_SIGPENDING(%r1),%r19	/* sched.h: int sigpending */
+#error	ldw	TASK_SIGPENDING(%r1),%r19	/* sched.h: int sigpending */
 	comib,<>,n 0,%r19,intr_do_signal /* forward */
 
 intr_restore:
@@ -719,7 +719,7 @@ intr_do_signal:
 	copy	%r0, %r24			/* unsigned long in_syscall */
 	copy	%r16, %r25			/* struct pt_regs *regs */
 	ssm     PSW_SM_I, %r0
-	bl	do_signal,%r2
+#error	bl	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	b	intr_restore
@@ -1699,20 +1699,20 @@ syscall_check_resched:
 
 	/* check for reschedule */
 
-	LDREG  TASK_NEED_RESCHED-TASK_SZ_ALGN-FRAME_SIZE(%r30),%r19	/* long */
+#error	LDREG  TASK_NEED_RESCHED-TASK_SZ_ALGN-FRAME_SIZE(%r30),%r19	/* long */
 	comib,<>,n 0,%r19,syscall_do_resched /* forward */
 
 syscall_check_sig:
 	ldo     -TASK_SZ_ALGN-FRAME_SIZE(%r30),%r1         /* get task ptr */
 	/* check for pending signals */
-	ldw     TASK_SIGPENDING(%r1),%r19
+#error	ldw     TASK_SIGPENDING(%r1),%r19
 	comib,<>,n 0,%r19,syscall_do_signal  /* forward */
 
 syscall_restore:
 	/* disable interrupts while dicking with the kernel stack, */
 	/* or life can become unpleasant */
 	rsm	PSW_SM_I, %r20
-	LDREG	TASK_PTRACE(%r1), %r19		/* Are we being ptraced? */
+#error	LDREG	TASK_PTRACE(%r1), %r19		/* Are we being ptraced? */
 	bb,<,n	%r19,31,syscall_restore_rfi
 	LDREG	TASK_PT_GR20(%r1),%r19
 	mtctl	%r19, %cr27
@@ -1840,7 +1840,7 @@ syscall_do_signal:
 
 	ldi	1, %r24				/* unsigned long in_syscall */
 
-	bl	do_signal,%r2
+#error	bl	do_signal,%r2
 	copy	%r0, %r26			/* sigset_t *oldset = NULL */
 
 	ldo     -TASK_SZ_ALGN-FRAME_SIZE(%r30), %r1     /* reload task ptr */

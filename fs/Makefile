@@ -14,7 +14,7 @@ obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
 		bio.o super.o block_dev.o char_dev.o stat.o exec.o pipe.o \
 		namei.o fcntl.o ioctl.o readdir.o select.o fifo.o locks.o \
 		dcache.o inode.o attr.o bad_inode.o file.o iobuf.o dnotify.o \
-		filesystems.o namespace.o seq_file.o
+		filesystems.o namespace.o seq_file.o xattr.o
 
 ifeq ($(CONFIG_QUOTA),y)
 obj-y += dquot.o
@@ -30,7 +30,6 @@ subdir-y			+= driverfs
 subdir-$(CONFIG_EXT3_FS)	+= ext3    # Before ext2 so root fs can be ext3
 subdir-$(CONFIG_JBD)		+= jbd
 subdir-$(CONFIG_EXT2_FS)	+= ext2
-subdir-$(CONFIG_ZLIB_FS_INFLATE) += inflate_fs
 subdir-$(CONFIG_CRAMFS)		+= cramfs
 subdir-$(CONFIG_RAMFS)		+= ramfs
 subdir-$(CONFIG_CODA_FS)	+= coda

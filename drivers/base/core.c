@@ -208,5 +208,7 @@ int __init device_driver_init(void)
 }
 
 EXPORT_SYMBOL(device_register);
+EXPORT_SYMBOL(put_device);
 EXPORT_SYMBOL(iobus_register);
+EXPORT_SYMBOL(put_iobus);
 EXPORT_SYMBOL(device_driver_init);

@@ -629,19 +629,19 @@ static unchar gdth_direction_tab[0x100] = {
 #define GDTH_LOCK_HA(ha,flags)          spin_lock_irqsave(&(ha)->smp_lock,flags)
 #define GDTH_UNLOCK_HA(ha,flags)        spin_unlock_irqrestore(&(ha)->smp_lock,flags)
 
-#define GDTH_LOCK_SCSI_DONE(flags)      spin_lock_irqsave(&io_request_lock,flags)
-#define GDTH_UNLOCK_SCSI_DONE(flags)    spin_unlock_irqrestore(&io_request_lock,flags)
-#define GDTH_LOCK_SCSI_DOCMD()          spin_lock_irq(&io_request_lock)
-#define GDTH_UNLOCK_SCSI_DOCMD()        spin_unlock_irq(&io_request_lock)
+#define GDTH_LOCK_SCSI_DONE(dev, flags)      spin_lock_irqsave(dev->host_lock,flags)
+#define GDTH_UNLOCK_SCSI_DONE(flags)    spin_unlock_irqrestore(dev->host_lock,flags)
+#define GDTH_LOCK_SCSI_DOCMD(dev)          spin_lock_irq(dev->host_lock)
+#define GDTH_UNLOCK_SCSI_DOCMD(dev)        spin_unlock_irq(dev->host_lock)
 #else
 #define GDTH_INIT_LOCK_HA(ha)           do {} while (0)
 #define GDTH_LOCK_HA(ha,flags)          do {save_flags(flags); cli();} while (0)
 #define GDTH_UNLOCK_HA(ha,flags)        do {restore_flags(flags);} while (0)
 
-#define GDTH_LOCK_SCSI_DONE(flags)      do {} while (0)
-#define GDTH_UNLOCK_SCSI_DONE(flags)    do {} while (0)
-#define GDTH_LOCK_SCSI_DOCMD()          do {} while (0)
-#define GDTH_UNLOCK_SCSI_DOCMD()        do {} while (0)
+#define GDTH_LOCK_SCSI_DONE(dev, flags)      do {} while (0)
+#define GDTH_UNLOCK_SCSI_DONE(dev, flags)    do {} while (0)
+#define GDTH_LOCK_SCSI_DOCMD(dev)          do {} while (0)
+#define GDTH_UNLOCK_SCSI_DOCMD(dev)        do {} while (0)
 #endif
 
 /* LILO and modprobe/insmod parameters */
@@ -3339,9 +3339,9 @@ static void gdth_interrupt(int irq,struct pt_regs *regs)
     if (rval == 2) {
         gdth_putq(hanum,scp,scp->SCp.this_residual);
     } else if (rval == 1) {
-        GDTH_LOCK_SCSI_DONE(flags);
+        GDTH_LOCK_SCSI_DONE(scp->host, flags);
         scp->scsi_done(scp);
-        GDTH_UNLOCK_SCSI_DONE(flags);
+        GDTH_UNLOCK_SCSI_DONE(scp->host,flags);
     }
     gdth_next(hanum);
 }

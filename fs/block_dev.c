@@ -170,6 +170,8 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	loff_t size = file->f_dentry->d_inode->i_bdev->bd_inode->i_size;
 	loff_t retval;
 
+	lock_kernel();
+
 	switch (origin) {
 		case 2:
 			offset += size;
@@ -186,6 +188,7 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 		}
 		retval = offset;
 	}
+	unlock_kernel();
 	return retval;
 }
 	

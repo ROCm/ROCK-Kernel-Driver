@@ -189,10 +189,10 @@ int dec_esp_detect(Scsi_Host_Template * tpnt)
 		esp_initialize(esp);
 
 		if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
-				"NCR 53C94 SCSI", NULL))
+				"NCR 53C94 SCSI", esp->ehost))
 			goto err_dealloc;
 		if (request_irq(SCSI_DMA_INT, scsi_dma_int, SA_INTERRUPT, 
-				"JUNKIO SCSI DMA", NULL))
+				"JUNKIO SCSI DMA", esp->ehost))
 			goto err_free_irq;
  			
 	}
@@ -253,7 +253,7 @@ int dec_esp_detect(Scsi_Host_Template * tpnt)
 			esp->dma_advance_sg = 0;
 
  			if (request_irq(esp->irq, esp_intr, SA_INTERRUPT, 
- 					 "PMAZ_AA", NULL)) {
+ 					 "PMAZ_AA", esp->ehost)) {
  				esp_deallocate(esp);
  				release_tc_card(slot);
  				continue;

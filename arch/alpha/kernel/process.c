@@ -82,9 +82,9 @@ cpu_idle(void)
 
 		/* Although we are an idle CPU, we do not want to 
 		   get into the scheduler unnecessarily.  */
-		long oldval = xchg(&current->need_resched, -1UL);
+		long oldval = xchg(&current->work.need_resched, -1UL);
 		if (!oldval)
-			while (current->need_resched < 0);
+			while (current->work.need_resched < 0);
 		schedule();
 		check_pgt_cache();
 	}

@@ -20,6 +20,13 @@ ifneq ($(CONFIG_HAVE_DEC_LOCK),y)
 endif
 
 obj-$(CONFIG_CRC32)	+= crc32.o
+
+subdir-$(CONFIG_ZLIB_INFLATE) += zlib_inflate
+subdir-$(CONFIG_ZLIB_DEFLATE) += zlib_deflate
+
+# Include the subdirs, if necessary.
+obj-y += $(join $(subdir-y),$(subdir-y:%=/%.o))
+
 include $(TOPDIR)/drivers/net/Makefile.lib
 include $(TOPDIR)/drivers/usb/Makefile.lib
 include $(TOPDIR)/fs/Makefile.lib

@@ -631,7 +631,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 	}
 	spin_lock_init(&p->alloc_lock);
 
-	p->sigpending = 0;
+	p->work.sigpending = 0;
 	init_sigpending(&p->pending);
 
 	p->it_real_value = p->it_virt_value = p->it_prof_value = 0;
@@ -755,7 +755,7 @@ int do_fork(unsigned long clone_flags, unsigned long stack_start,
 		 * Let the child process run first, to avoid most of the
 		 * COW overhead when the child exec()s afterwards.
 		 */
-		current->need_resched = 1;
+		current->work.need_resched = 1;
 
 fork_out:
 	return retval;

@@ -1769,13 +1769,13 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
       char      *kern_area;
       u_int32_t  datasize;
 
-      spin_unlock_irq(&SC->host->host_lock);
+      spin_unlock_irq(SC->host->host_lock);
 
       /* wait for the command to finish */
       down(&ha->ioctl_sem);
 
       /* reobtain the lock */
-      spin_lock_irq(&SC->host->host_lock);
+      spin_lock_irq(SC->host->host_lock);
 
       /* command finished -- copy back */
       user_area = *((char **) &SC->cmnd[4]);
@@ -1916,24 +1916,24 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 
    METHOD_TRACE("do_ipsintr", 2);
 
-   spin_lock_irqsave(&host->host_lock, cpu_flags);
+   spin_lock_irqsave(host->host_lock, cpu_flags);
 
    if (test_and_set_bit(IPS_IN_INTR, &ha->flags)) {
-      spin_unlock_irqrestore(&host->host_lock, cpu_flags);
+      spin_unlock_irqrestore(host->host_lock, cpu_flags);
 
       return ;
    }
 
    if (!ha) {
       clear_bit(IPS_IN_INTR, &ha->flags);
-      spin_unlock_irqrestore(&host->host_lock, cpu_flags);
+      spin_unlock_irqrestore(host->host_lock, cpu_flags);
 
       return;
    }
 
    if (!ha->active) {
       clear_bit(IPS_IN_INTR, &ha->flags);
-      spin_unlock_irqrestore(&host->host_lock, cpu_flags);
+      spin_unlock_irqrestore(host->host_lock, cpu_flags);
 
       return;
    }
@@ -1942,7 +1942,7 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 
    clear_bit(IPS_IN_INTR, &ha->flags);
 
-   spin_unlock_irqrestore(&host->host_lock, cpu_flags);
+   spin_unlock_irqrestore(host->host_lock, cpu_flags);
 
    /* start the next command */
    ips_next(ha, IPS_INTR_ON);
@@ -2487,7 +2487,7 @@ ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
             task.data = (void *) &flash_data;
 
             /* Unlock the per-board lock */
-            spin_unlock_irq(&SC->host->host_lock);
+            spin_unlock_irq(SC->host->host_lock);
 
             queue_task(&task, &tq_immediate);
             mark_bh(IMMEDIATE_BH);
@@ -2496,7 +2496,7 @@ ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
             down(&ha->flash_ioctl_sem);
 
             /* Obtain the per-board lock */
-            spin_lock_irq(&SC->host->host_lock);
+            spin_lock_irq(SC->host->host_lock);
 
             return (flash_data.retcode);
          }
@@ -2604,7 +2604,7 @@ ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
             task.data = (void *) &flash_data;
 
             /* Unlock the per-board lock */
-            spin_unlock_irq(&SC->host->host_lock);
+            spin_unlock_irq(SC->host->host_lock);
 
             queue_task(&task, &tq_immediate);
             mark_bh(IMMEDIATE_BH);
@@ -2613,7 +2613,7 @@ ips_make_passthru(ips_ha_t *ha, Scsi_Cmnd *SC, ips_scb_t *scb, int intr) {
             down(&ha->flash_ioctl_sem);
 
             /* Obtain the per-board lock */
-            spin_lock_irq(&SC->host->host_lock);
+            spin_lock_irq(SC->host->host_lock);
 
             return (flash_data.retcode);
          }
@@ -3585,7 +3585,7 @@ ips_next(ips_ha_t *ha, int intr) {
     * this command won't time out
     */
    if (intr == IPS_INTR_ON) {
-       spin_lock_irqsave(&host->host_lock, cpu_flags2);
+       spin_lock_irqsave(host->host_lock, cpu_flags2);
        intr_status = IPS_INTR_IORL;
    } else {
        intr_status = intr;
@@ -3610,7 +3610,7 @@ ips_next(ips_ha_t *ha, int intr) {
    }
 
    if (intr == IPS_INTR_ON)
-       spin_unlock_irqrestore(&host->host_lock, cpu_flags2);
+       spin_unlock_irqrestore(host->host_lock, cpu_flags2);
 
 #ifndef NO_IPS_CMDLINE
    /*
@@ -6625,7 +6625,7 @@ ips_wait(ips_ha_t *ha, int time, int intr) {
           * We were called under the HA lock so we can assume that interrupts
           * are masked.
           */
-         spin_lock(&host->host_lock);
+         spin_lock(host->host_lock);
 
          while (test_and_set_bit(IPS_IN_INTR, &ha->flags))
             udelay(1000);
@@ -6634,7 +6634,7 @@ ips_wait(ips_ha_t *ha, int time, int intr) {
 
          clear_bit(IPS_IN_INTR, &ha->flags);
 
-         spin_unlock(&host->host_lock);
+         spin_unlock(host->host_lock);
       }
 
       udelay(1000); /* 1 milisecond */

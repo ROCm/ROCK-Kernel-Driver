@@ -586,10 +586,10 @@ MODULE_LICENSE ("GPL");
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
 #define IO_LOCK_T unsigned long io_flags = 0
-#define IO_LOCK(host) spin_lock_irqsave(&(host)->host_lock,io_flags)
-#define IO_UNLOCK(host) spin_unlock_irqrestore(&(host)->host_lock,io_flags)
-#define IO_LOCK_IRQ(host) spin_lock_irq(&(host)->host_lock)
-#define IO_UNLOCK_IRQ(host) spin_unlock_irq(&(host)->host_lock)
+#define IO_LOCK(host) spin_lock_irqsave(host->host_lock,io_flags)
+#define IO_UNLOCK(host) spin_unlock_irqrestore(host->host_lock,io_flags)
+#define IO_LOCK_IRQ(host) spin_lock_irq(host->host_lock)
+#define IO_UNLOCK_IRQ(host) spin_unlock_irq(host->host_lock)
 
 #define queue_task_irq(a,b)     queue_task(a,b)
 #define queue_task_irq_off(a,b) queue_task(a,b)
@@ -614,8 +614,8 @@ MODULE_DESCRIPTION ("LSI Logic MegaRAID driver");
 #define DRIVER_LOCK(p)
 #define DRIVER_UNLOCK(p)
 #define IO_LOCK_T unsigned long io_flags = 0
-#define IO_LOCK(host) spin_lock_irqsave(&io_request_lock,io_flags);
-#define IO_UNLOCK(host) spin_unlock_irqrestore(&io_request_lock,io_flags);
+#define IO_LOCK(host) spin_lock_irqsave(host->host_lock,io_flags);
+#define IO_UNLOCK(host) spin_unlock_irqrestore(host->host_lock,io_flags);
 
 #define pci_free_consistent(a,b,c,d)
 #define pci_unmap_single(a,b,c,d)

@@ -119,7 +119,6 @@ int ppa_detect(Scsi_Host_Template * host)
      * unlock to allow the lowlevel parport driver to probe
      * the irqs
      */
-    spin_unlock_irq(&io_request_lock);
     pb = parport_enumerate();
 
     printk("ppa: Version %s\n", PPA_VERSION);
@@ -128,7 +127,6 @@ int ppa_detect(Scsi_Host_Template * host)
 
     if (!pb) {
 	printk("ppa: parport reports no devices.\n");
-	spin_lock_irq(&io_request_lock);
 	return 0;
     }
   retry_entry:
@@ -154,7 +152,7 @@ int ppa_detect(Scsi_Host_Template * host)
 		      "pardevice is owning the port for too longtime!\n",
 			   i);
 		    parport_unregister_device(ppa_hosts[i].dev);
-		    spin_lock_irq(&io_request_lock);
+		    spin_lock_irq(ppa_hosts[i].cur_cmd->host->host_lock);
 		    return 0;
 		}
 	    }
@@ -223,13 +221,13 @@ int ppa_detect(Scsi_Host_Template * host)
 	    printk("  supported by the imm (ZIP Plus) driver. If the\n");
 	    printk("  cable is marked with \"AutoDetect\", this is what has\n");
 	    printk("  happened.\n");
-	    spin_lock_irq(&io_request_lock);
+	    spin_lock_irq(hreg->host_lock);
 	    return 0;
 	}
 	try_again = 1;
 	goto retry_entry;
     } else {
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(hreg->host_lock);
 	return 1;		/* return number of hosts detected */
     }
 }
@@ -847,9 +845,9 @@ static void ppa_interrupt(void *data)
 
     tmp->cur_cmd = 0;
     
-    spin_lock_irqsave(&io_request_lock, flags);
+    spin_lock_irqsave(cmd->host->host_lock, flags);
     cmd->scsi_done(cmd);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(cmd->host->host_lock, flags);
     return;
 }
 

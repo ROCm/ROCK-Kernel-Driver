@@ -229,10 +229,11 @@ void eata_int_handler(int, void *, struct pt_regs *);
 void do_eata_int_handler(int irq, void *dev_id, struct pt_regs * regs)
 {
     unsigned long flags;
-
-    spin_lock_irqsave(&io_request_lock, flags);
+    struct Scsi_Host *dev = dev_id;
+    
+    spin_lock_irqsave(dev->host_lock, flags);
     eata_int_handler(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 void eata_int_handler(int irq, void *dev_id, struct pt_regs * regs)
@@ -1503,7 +1504,7 @@ int eata_detect(Scsi_Host_Template * tpnt)
 	if (reg_IRQ[i] >= 1){       /* exchange the interrupt handler which  */
 	    free_irq(i, NULL);      /* we used for probing with the real one */
 	    request_irq(i, (void *)(do_eata_int_handler), SA_INTERRUPT|SA_SHIRQ, 
-			"eata_dma", NULL);
+			"eata_dma", first_HBA); /* Check it */
 	}
     }
 

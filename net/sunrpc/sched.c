@@ -1109,7 +1109,7 @@ rpciod_killall(void)
 	unsigned long flags;
 
 	while (all_tasks) {
-		current->sigpending = 0;
+		current->work.sigpending = 0;
 		rpc_killall_tasks(NULL);
 		__rpc_schedule();
 		if (all_tasks) {
@@ -1183,7 +1183,7 @@ rpciod_down(void)
 	 * Usually rpciod will exit very quickly, so we
 	 * wait briefly before checking the process id.
 	 */
-	current->sigpending = 0;
+	current->work.sigpending = 0;
 	yield();
 	/*
 	 * Display a message if we're going to wait longer.

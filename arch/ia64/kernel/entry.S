@@ -433,7 +433,7 @@ GLOBAL_ENTRY(invoke_syscall_trace)
 	.body
 	mov loc2=b6
 	;;
-	br.call.sptk.many rp=syscall_trace
+#error	br.call.sptk.many rp=syscall_trace
 .ret3:	mov rp=loc0
 	mov ar.pfs=loc1
 	mov b6=loc2
@@ -454,7 +454,7 @@ END(invoke_syscall_trace)
 
 GLOBAL_ENTRY(ia64_trace_syscall)
 	PT_REGS_UNWIND_INFO(0)
-	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch syscall args
+#error	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch syscall args
 .ret6:	br.call.sptk.many rp=b6			// do the syscall
 strace_check_retval:
 	cmp.lt p6,p0=r8,r0			// syscall failed?
@@ -467,7 +467,7 @@ strace_save_retval:
 .mem.offset 0,0;	st8.spill [r2]=r8	// store return value in slot for r8
 .mem.offset 8,0;	st8.spill [r3]=r10	// clear error indication in slot for r10
 ia64_strace_leave_kernel:
-	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch return value
+#error	br.call.sptk.many rp=invoke_syscall_trace // give parent a chance to catch return value
 .rety:	br.cond.sptk ia64_leave_kernel
 
 strace_error:
@@ -530,14 +530,14 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 #ifdef CONFIG_PERFMON
 (pUser)	ld8 r19=[r19]				// load current->thread.pfm_must_block
 #endif
-(pUser)	ld8 r17=[r17]				// load current->need_resched
-(pUser)	ld4 r18=[r18]				// load current->sigpending
+#error (pUser)	ld8 r17=[r17]				// load current->need_resched
+#error (pUser)	ld4 r18=[r18]				// load current->sigpending
 	;;
 #ifdef CONFIG_PERFMON
 (pUser)	cmp.ne.unc p9,p0=r19,r0			// current->thread.pfm_must_block != 0?
 #endif
-(pUser)	cmp.ne.unc p7,p0=r17,r0			// current->need_resched != 0?
-(pUser)	cmp.ne.unc p8,p0=r18,r0			// current->sigpending != 0?
+#error (pUser)	cmp.ne.unc p7,p0=r17,r0			// current->need_resched != 0?
+#errror (pUser)	cmp.ne.unc p8,p0=r18,r0			// current->sigpending != 0?
 	;;
 	adds r2=PT(R8)+16,r12
 	adds r3=PT(R9)+16,r12
@@ -816,7 +816,7 @@ ENTRY(handle_signal_delivery)
 	.spillpsp ar.unat, 16			// (note that offset is relative to psp+0x10!)
 	st8 [sp]=r9,-16				// allocate space for ar.unat and save it
 	.body
-	br.call.sptk.many rp=ia64_do_signal
+#error	br.call.sptk.many rp=ia64_do_signal
 .ret15:	.restore sp
 	adds sp=16,sp				// pop scratch stack space
 	;;

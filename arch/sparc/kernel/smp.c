@@ -247,7 +247,7 @@ void smp_flush_sig_insns(struct mm_struct *mm, unsigned long insn_addr)
 /* Reschedule call back. */
 void smp_reschedule_irq(void)
 {
-	current->need_resched = 1;
+	current->work.need_resched = 1;
 }
 
 /* Stopping processors. */

@@ -692,9 +692,9 @@ void NCR5380_timer_fn(unsigned long surplus_to_requirements)
 	}
 	restore_flags(flags);
 
-	spin_lock_irqsave(&io_request_lock, flags);
+	spin_lock_irqsave(instance->host_lock, flags);
 	run_main();
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(instance->host_lock, flags);
 }
 #endif				/* def USLEEP */
 
@@ -745,7 +745,7 @@ static int __init NCR5380_probe_irq(struct Scsi_Host *instance, int possible)
 	NCR5380_setup(instance);
 
 	for (trying_irqs = i = 0, mask = 1; i < 16; ++i, mask <<= 1)
-		if ((mask & possible) && (request_irq(i, &probe_intr, SA_INTERRUPT, "NCR-probe", NULL)
+		if ((mask & possible) && (request_irq(i, &probe_intr, SA_INTERRUPT, "NCR-probe", instance)
 					  == 0))
 			trying_irqs |= mask;
 
@@ -1271,7 +1271,7 @@ static void NCR5380_main(void) {
 	 * this should prevent any race conditions.
 	 */
 
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(instance->host_lock);
 	
 	save_flags(flags);
 	
@@ -1424,7 +1424,7 @@ static void NCR5380_main(void) {
 				break;
 		}		/* for instance */
 	} while (!done);
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(instance->host_lock);
   /* 	cli();*/
 	main_running = 0;
 }
@@ -1521,10 +1521,10 @@ static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs) {
 							{
 								unsigned long timeout = jiffies + NCR_TIMEOUT;
 
-								spin_unlock_irq(&io_request_lock);
+								spin_unlock_irq(instance->host_lock);
 								while (NCR5380_read(BUS_AND_STATUS_REG) & BASR_ACK
 								       && time_before(jiffies, timeout));
-								spin_lock_irq(&io_request_lock);
+								spin_lock_irq(instance->host_lock);
 								
 								if (time_after_eq(jiffies, timeout) )
 									printk("scsi%d: timeout at NCR5380.c:%d\n",
@@ -1554,10 +1554,12 @@ static void NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs) {
 
 static void do_NCR5380_intr(int irq, void *dev_id, struct pt_regs *regs) {
 	unsigned long flags;
-
-	 spin_lock_irqsave(&io_request_lock, flags);
+	 
+	 struct Scsi_Host *dev = dev_id;
+	
+	 spin_lock_irqsave(dev->host_lock, flags);
 	 NCR5380_intr(irq, dev_id, regs);
-	 spin_unlock_irqrestore(&io_request_lock, flags);
+	 spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 #endif
@@ -1669,12 +1671,12 @@ static int NCR5380_select(struct Scsi_Host *instance, Scsi_Cmnd * cmd, int tag) 
 	{
 		unsigned long timeout = jiffies + 2 * NCR_TIMEOUT;
 
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(instance->host_lock);
 
 		while (!(NCR5380_read(INITIATOR_COMMAND_REG) & ICR_ARBITRATION_PROGRESS)
 		       && time_before(jiffies,timeout));
 
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(instance->host_lock);
 		       
 		if (time_after_eq(jiffies,timeout)) {
 			printk("scsi: arbitration timeout at %d\n", __LINE__);
@@ -1834,10 +1836,10 @@ part2:
 	hostdata->selecting = 0; /* clear this pointer, because we passed the
 				waiting period */
 #else
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irq(instance->host_lock);
 	while (time_before(jiffies, timeout) && !(NCR5380_read(STATUS_REG) &
 					(SR_BSY | SR_IO)));
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irq(instance->host_lock);
 #endif
 	if ((NCR5380_read(STATUS_REG) & (SR_SEL | SR_IO)) ==
 	    (SR_SEL | SR_IO)) {
@@ -1905,9 +1907,9 @@ part2:
 	{
 		unsigned long timeout = jiffies + NCR_TIMEOUT;
 
-		spin_unlock_irq(&io_request_lock);
+		spin_unlock_irq(instance->host_lock);
 		while (!(NCR5380_read(STATUS_REG) & SR_REQ) && time_before(jiffies, timeout));
-		spin_lock_irq(&io_request_lock);
+		spin_lock_irq(instance->host_lock);
 		
 		if (time_after_eq(jiffies, timeout)) {
 			printk("scsi%d: timeout at NCR5380.c:%d\n", instance->host_no, __LINE__);

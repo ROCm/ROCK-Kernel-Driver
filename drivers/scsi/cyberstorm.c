@@ -136,7 +136,7 @@ int __init cyber_esp_detect(Scsi_Host_Template *tpnt)
 
 		esp->irq = IRQ_AMIGA_PORTS;
 		request_irq(IRQ_AMIGA_PORTS, esp_intr, SA_SHIRQ,
-			    "CyberStorm SCSI", esp_intr);
+			    "CyberStorm SCSI", esp->ehost);
 		/* Figure out our scsi ID on the bus */
 		/* The DMA cond flag contains a hardcoded jumper bit
 		 * which can be used to select host number 6 or 7.

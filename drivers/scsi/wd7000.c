@@ -866,18 +866,18 @@ static inline Scb *alloc_scbs(struct Scsi_Host *host, int needed)
     save_flags (flags);
     cli ();
     while (busy) {		/* someone else is allocating */
-	spin_unlock_irq(&host->host_lock);
+	spin_unlock_irq(host->host_lock);
 	for (now = jiffies; now == jiffies; );	/* wait a jiffy */
-	spin_lock_irq(&host->host_lock);
+	spin_lock_irq(host->host_lock);
     }
     busy = 1;			/* not busy now; it's our turn */
 
     while (freescbs < needed) {
 	timeout = jiffies + WAITnexttimeout;
 	do {
-	    spin_unlock_irq(&host->host_lock);
+	    spin_unlock_irq(host->host_lock);
 	    for (now = jiffies; now == jiffies; );	/* wait a jiffy */
-	    spin_lock_irq(&host->host_lock);
+	    spin_lock_irq(host->host_lock);
 	} while (freescbs < needed && time_before_eq(jiffies, timeout));
 	/*
 	 *  If we get here with enough free Scbs, we can take them.
@@ -1144,9 +1144,9 @@ void do_wd7000_intr_handle (int irq, void *dev_id, struct pt_regs *regs)
     unsigned long flags;
     struct Scsi_Host *host = dev_id;
 
-    spin_lock_irqsave(&host->host_lock, flags);
+    spin_lock_irqsave(host->host_lock, flags);
     wd7000_intr_handle(irq, dev_id, regs);
-    spin_unlock_irqrestore(&host->host_lock, flags);
+    spin_unlock_irqrestore(host->host_lock, flags);
 }
 
 

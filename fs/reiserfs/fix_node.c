@@ -806,7 +806,7 @@ static int  get_empty_nodes(
     RFALSE( ! *p_n_blocknr,
 	    "PAP-8135: reiserfs_new_blocknrs failed when got new blocks");
 
-    p_s_new_bh = reiserfs_getblk(p_s_sb, *p_n_blocknr);
+    p_s_new_bh = sb_getblk(p_s_sb, *p_n_blocknr);
     if (atomic_read (&(p_s_new_bh->b_count)) > 1) {
 /*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
 /*
@@ -2021,23 +2021,6 @@ static int get_virtual_node_size (struct super_block * sb, struct buffer_head * 
   // entry would eat 2 byte of virtual node space
   return sb->s_blocksize;
 
-#if 0
-  size = sizeof (struct virtual_node) + sizeof (struct virtual_item);
-  ih = B_N_PITEM_HEAD (bh, 0);
-  nr_items = B_NR_ITEMS (bh);
-  for (i = 0; i < nr_items; i ++, ih ++) {
-    /* each item occupies some space in virtual node */
-    size += sizeof (struct virtual_item);
-    if (is_direntry_le_ih (ih))
-      /* each entry and new one occupeis 2 byte in the virtual node */
-      size += (ih_entry_count(ih) + 1) * sizeof( __u16 );
-  }
-  
-  /* 1 bit for each bitmap block to note whether bitmap block was
-     dirtied in the operation */
- /* size += (SB_BMAP_NR (sb) * 2 / 8 + 4);*/
-  return size;
-#endif
 }
 
 
@@ -2342,15 +2325,6 @@ int fix_nodes (int n_op_mode,
 	reiserfs_panic (p_s_tb->tb_sb, "PAP-8320: fix_nodes: S[0] (%b %z) is not uptodate "
 			"at the beginning of fix_nodes or not in tree (mode %c)", p_s_tbS0, p_s_tbS0, n_op_mode);
     }
-
-    // FIXME: new items have to be of 8 byte multiples. Including new
-    // directory items those look like old ones
-    /*
-    if (p_s_tb->insert_size[0] % 8)
-	reiserfs_panic (p_s_tb->tb_sb, "vs-: fix_nodes: incorrect insert_size %d, "
-			"mode %c",
-			p_s_tb->insert_size[0], n_op_mode);
-    */
 
     /* Check parameters. */
     switch (n_op_mode) {

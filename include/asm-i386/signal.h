@@ -2,6 +2,7 @@
 #define _ASMi386_SIGNAL_H
 
 #include <linux/types.h>
+#include <linux/linkage.h>
 
 /* Avoid too many header ordering problems.  */
 struct siginfo;
@@ -215,6 +216,9 @@ static __inline__ int sigfindinword(unsigned long word)
 	__asm__("bsfl %1,%0" : "=r"(word) : "rm"(word) : "cc");
 	return word;
 }
+
+struct pt_regs;
+extern int FASTCALL(do_signal(struct pt_regs *regs, sigset_t *oldset));
 
 #endif /* __KERNEL__ */
 

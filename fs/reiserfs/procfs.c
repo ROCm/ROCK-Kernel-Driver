@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/reiserfs_fs_sb.h>
 #include <linux/smp_lock.h>
 #include <linux/locks.h>
 #include <linux/init.h>
@@ -76,12 +77,21 @@ int reiserfs_version_in_proc( char *buffer, char **start, off_t offset,
 {
 	int len = 0;
 	struct super_block *sb;
+	char *format;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
+	if ( sb->u.reiserfs_sb.s_properties & (1 << REISERFS_3_6) ) {
+		format = "3.6";
+	} else if ( sb->u.reiserfs_sb.s_properties & (1 << REISERFS_3_5) ) {
+		format = "3.5";
+	} else {
+		format = "unknown";
+	}
+
 	len += sprintf( &buffer[ len ], "%s format\twith checks %s\n",
-			old_format_only( sb ) ? "old" : "new",
+			format,
 #if defined( CONFIG_REISERFS_CHECK )
 			"on"
 #else
@@ -96,15 +106,6 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 				     int count, int *eof, void *data )
 {
 	int len = 0;
-    
-	len += sprintf( &buffer[ len ], "%s [%s]\n", 
-			reiserfs_get_version_string(),
-#if defined( CONFIG_REISERFS_FS_MODULE )
-			"as module"
-#else
-			"built into kernel"
-#endif
-			);
 	return reiserfs_proc_tail( len, buffer, start, offset, count, eof );
 }
 
@@ -116,8 +117,8 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 
 #define D2C( x ) le16_to_cpu( x )
 #define D4C( x ) le32_to_cpu( x )
-#define DF( x ) D2C( rs -> x )
-#define DFL( x ) D4C( rs -> x )
+#define DF( x ) D2C( rs -> s_v1.x )
+#define DFL( x ) D4C( rs -> s_v1.x )
 
 #define objectid_map( s, rs ) (old_format_only (s) ?				\
                          (__u32 *)((struct reiserfs_super_block_v1 *)rs + 1) :	\
@@ -125,6 +126,8 @@ int reiserfs_global_version_in_proc( char *buffer, char **start, off_t offset,
 #define MAP( i ) D4C( objectid_map( sb, rs )[ i ] )
 
 #define DJF( x ) le32_to_cpu( rs -> x )
+#define DJV( x ) le32_to_cpu( s_v1 -> x )
+#define DJP( x ) le32_to_cpu( jp -> x ) 
 #define JF( x ) ( r -> s_journal -> x )
 
 int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
@@ -134,7 +137,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r;
 	int len = 0;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	r = &sb->u.reiserfs_sb;
@@ -179,7 +182,7 @@ int reiserfs_super_in_proc( char *buffer, char **start, off_t offset,
 			dont_have_tails( sb ) ? "NO_TAILS " : "TAILS ",
 			replay_only( sb ) ? "REPLAY_ONLY " : "",
 			reiserfs_dont_log( sb ) ? "DONT_LOG " : "LOG ",
-			old_format_only( sb ) ? "CONV " : "",
+			convert_reiserfs( sb ) ? "CONV " : "",
 
 			atomic_read( &r -> s_generation_counter ),
 			SF( s_kmallocs ),
@@ -214,7 +217,7 @@ int reiserfs_per_level_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int level;
 	
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	r = &sb->u.reiserfs_sb;
@@ -293,7 +296,7 @@ int reiserfs_bitmap_in_proc( char *buffer, char **start, off_t offset,
 	struct reiserfs_sb_info *r = &sb->u.reiserfs_sb;
 	int len = 0;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	r = &sb->u.reiserfs_sb;
@@ -334,7 +337,7 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 	int hash_code;
 	int len = 0;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = &sb->u.reiserfs_sb;
@@ -348,12 +351,14 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 			"blocksize: \t%i\n"
 			"oid_maxsize: \t%i\n"
 			"oid_cursize: \t%i\n"
-			"state: \t%i\n"
-			"magic: \t%12.12s\n"
+			"umount_state: \t%i\n"
+			"magic: \t%10.10s\n"
+			"fs_state: \t%i\n"
 			"hash: \t%s\n"
 			"tree_height: \t%i\n"
 			"bmap_nr: \t%i\n"
-			"version: \t%i\n",
+			"version: \t%i\n"
+			"reserved_for_journal: \t%i\n",
 
 			DFL( s_block_count ),
 			DFL( s_free_blocks ),
@@ -361,15 +366,17 @@ int reiserfs_on_disk_super_in_proc( char *buffer, char **start, off_t offset,
 			DF( s_blocksize ),
 			DF( s_oid_maxsize ),
 			DF( s_oid_cursize ),
-			DF( s_state ),
-			rs -> s_magic,
+			DF( s_umount_state ),
+			rs -> s_v1.s_magic,
+			DF( s_fs_state ),
 			hash_code == TEA_HASH ? "tea" :
 			( hash_code == YURA_HASH ) ? "rupasov" :
 			( hash_code == R5_HASH ) ? "r5" :
 			( hash_code == UNSET_HASH ) ? "unset" : "unknown",
 			DF( s_tree_height ),
 			DF( s_bmap_nr ),
-			DF( s_version ) );
+			DF( s_version ),
+			DF (s_reserved_for_journal));
 
 	procinfo_epilogue( sb );
 	return reiserfs_proc_tail( len, buffer, start, offset, count, eof );
@@ -387,12 +394,12 @@ int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
 	int len = 0;
 	int exact;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	sb_info = &sb->u.reiserfs_sb;
 	rs = sb_info -> s_rs;
-	mapsize = le16_to_cpu( rs -> s_oid_cursize );
+	mapsize = le16_to_cpu( rs -> s_v1.s_oid_cursize );
 	total_used = 0;
 
 	for( i = 0 ; i < mapsize ; ++i ) {
@@ -423,7 +430,7 @@ int reiserfs_oidmap_in_proc( char *buffer, char **start, off_t offset,
 	}
 	len += sprintf( &buffer[ len ], "total: \t%i [%i/%i] used: %lu [%s]\n", 
 			i, 
-			mapsize, le16_to_cpu( rs -> s_oid_maxsize ),
+			mapsize, le16_to_cpu( rs -> s_v1.s_oid_maxsize ),
 			total_used, exact ? "exact" : "estimation" );
 
 	procinfo_epilogue( sb );
@@ -436,25 +443,28 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 	struct super_block *sb;
 	struct reiserfs_sb_info *r;
 	struct reiserfs_super_block *rs;
+	struct journal_params *jp;	
 	int len = 0;
     
-	sb = procinfo_prologue( ( kdev_t ) ( int ) data );
+	sb = procinfo_prologue( to_kdev_t((int)data) );
 	if( sb == NULL )
 		return -ENOENT;
 	r = &sb->u.reiserfs_sb;
 	rs = r -> s_rs;
+	jp = &rs->s_v1.s_journal;
 
 	len += sprintf( &buffer[ len ], 
 			/* on-disk fields */
-			"s_journal_block: \t%i\n"
-			"s_journal_dev: \t%s[%x]\n"
-			"s_orig_journal_size: \t%i\n"
-			"s_journal_trans_max: \t%i\n"
-			"s_journal_block_count: \t%i\n"
-			"s_journal_max_batch: \t%i\n"
-			"s_journal_max_commit_age: \t%i\n"
-			"s_journal_max_trans_age: \t%i\n"
+ 			"jp_journal_1st_block: \t%i\n"
+ 			"jp_journal_dev: \t%s[%x]\n"
+ 			"jp_journal_size: \t%i\n"
+ 			"jp_journal_trans_max: \t%i\n"
+ 			"jp_journal_magic: \t%i\n"
+ 			"jp_journal_max_batch: \t%i\n"
+ 			"jp_journal_max_commit_age: \t%i\n"
+ 			"jp_journal_max_trans_age: \t%i\n"
 			/* incore fields */
+			"j_1st_reserved_block: \t%i\n"	  
 			"j_state: \t%i\n"			
 			"j_trans_id: \t%lu\n"
 			"j_mount_id: \t%lu\n"
@@ -490,16 +500,17 @@ int reiserfs_journal_in_proc( char *buffer, char **start, off_t offset,
 			"prepare: \t%12lu\n"
 			"prepare_retry: \t%12lu\n",
 
-			DJF( s_journal_block ),
-			DJF( s_journal_dev ) == 0 ? "none" : bdevname( DJF( s_journal_dev ) ), 
-			DJF( s_journal_dev ),
-			DJF( s_orig_journal_size ),
-			DJF( s_journal_trans_max ),
-			DJF( s_journal_block_count ),
-			DJF( s_journal_max_batch ),
-			DJF( s_journal_max_commit_age ),
-			DJF( s_journal_max_trans_age ),
-			
+                        DJP( jp_journal_1st_block ),
+                        DJP( jp_journal_dev ) == 0 ? "none" : bdevname(to_kdev_t(DJP( jp_journal_dev ))),
+                        DJP( jp_journal_dev ),
+                        DJP( jp_journal_size ),
+                        DJP( jp_journal_trans_max ),
+                        DJP( jp_journal_magic ),
+                        DJP( jp_journal_max_batch ),
+                        DJP( jp_journal_max_commit_age ),
+                        DJP( jp_journal_max_trans_age ),
+
+			JF( j_1st_reserved_block ),			
 			JF( j_state ),			
 			JF( j_trans_id ),
 			JF( j_mount_id ),
@@ -578,7 +589,7 @@ struct proc_dir_entry *reiserfs_proc_register( struct super_block *sb,
 {
 	return ( sb->u.reiserfs_sb.procdir ) ? create_proc_read_entry
 		( name, 0, sb->u.reiserfs_sb.procdir, func, 
-		  ( void * ) ( int ) sb -> s_dev ) : NULL;
+		  ( void * ) kdev_t_to_nr( sb -> s_dev ) ) : NULL;
 }
 
 void reiserfs_proc_unregister( struct super_block *sb, const char *name )

@@ -49,7 +49,7 @@ NESTED(handle_sys, PT_SIZE, sp)
 
 stack_done:
         sw      a3, PT_R26(sp)          # save for syscall restart
-	lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+#error	lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
 	andi	t0, PT_TRACESYS
 	bnez	t0, trace_a_syscall
 
@@ -70,9 +70,9 @@ EXPORT(o32_ret_from_sys_call)
 	xori	t0, t0, 1
 	mtc0	t0, CP0_STATUS
 
-	lw	t2, TASK_NEED_RESCHED($28)
+#error	lw	t2, TASK_NEED_RESCHED($28)
 	bnez	t2, o32_reschedule
-	lw	v0, TASK_SIGPENDING($28)
+#error	lw	v0, TASK_SIGPENDING($28)
 	bnez	v0, signal_return
 restore_all:
 	RESTORE_SOME
@@ -88,7 +88,7 @@ signal_return:
 
 	move	a0, zero
 	move	a1, sp
-	jal	do_signal
+#error	jal	do_signal
 	b	restore_all
 
 o32_reschedule:
@@ -101,7 +101,7 @@ o32_reschedule:
 trace_a_syscall:
 	SAVE_STATIC
 	sw	t2, PT_R1(sp)
-	jal	syscall_trace
+#error	jal	syscall_trace
 	lw	t2, PT_R1(sp)
 
 	lw	a0, PT_R4(sp)		# Restore argument registers
@@ -119,7 +119,7 @@ trace_a_syscall:
 	sw	v0, PT_R0(sp)		# set flag for syscall restarting
 1:	sw	v0, PT_R2(sp)		# result
 
-	jal	syscall_trace
+#error	jal	syscall_trace
 	j	ret_from_sys_call
 
 /* ------------------------------------------------------------------------ */

@@ -16,6 +16,7 @@
 #include <linux/stat.h>
 #define __NO_VERSION__
 #include <linux/module.h>
+#include <linux/smp_lock.h>
 #include <asm/bitops.h>
 
 static ssize_t proc_file_read(struct file * file, char * buf,
@@ -140,22 +141,30 @@ proc_file_write(struct file * file, const char * buffer,
 static loff_t
 proc_file_lseek(struct file * file, loff_t offset, int orig)
 {
+    lock_kernel();
+
     switch (orig) {
     case 0:
 	if (offset < 0)
-	    return -EINVAL;    
+	    goto out;
 	file->f_pos = offset;
+	unlock_kernel();
 	return(file->f_pos);
     case 1:
 	if (offset + file->f_pos < 0)
-	    return -EINVAL;    
+	    goto out;
 	file->f_pos += offset;
+	unlock_kernel();
 	return(file->f_pos);
     case 2:
-	return(-EINVAL);
+	goto out;
     default:
-	return(-EINVAL);
+	goto out;
     }
+
+out:
+    unlock_kernel();
+    return -EINVAL;
 }
 
 /*

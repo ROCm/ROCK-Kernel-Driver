@@ -337,6 +337,7 @@ static __inline__ unsigned int sym53c416_write(int base, unsigned char *buffer, 
 
 static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
+	struct Scsi_Host *dev = dev_id;
 	int base = 0;
 	int i;
 	unsigned long flags = 0;
@@ -359,11 +360,11 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	}
 	/* Now we have the base address and we can start handling the interrupt */
 
-	spin_lock_irqsave(&io_request_lock,flags);
+	spin_lock_irqsave(dev->host_lock,flags);
 	status_reg = inb(base + STATUS_REG);
 	pio_int_reg = inb(base + PIO_INT_REG);
 	int_reg = inb(base + INT_REG);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 
 	/* First, we handle error conditions */
 	if(int_reg & SCI)         /* SCSI Reset */
@@ -371,9 +372,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_DEBUG "sym53c416: Reset received\n");
 		current_command->SCp.phase = idle;
 		current_command->result = DID_RESET << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	if(int_reg & ILCMD)       /* Illegal Command */
@@ -381,9 +382,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "sym53c416: Illegal Command: 0x%02x.\n", inb(base + COMMAND_REG));
 		current_command->SCp.phase = idle;
 		current_command->result = DID_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	if(status_reg & GE)         /* Gross Error */
@@ -391,9 +392,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "sym53c416: Controller reports gross error.\n");
 		current_command->SCp.phase = idle;
 		current_command->result = DID_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	if(status_reg & PE)         /* Parity Error */
@@ -401,9 +402,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "sym53c416:SCSI parity error.\n");
 		current_command->SCp.phase = idle;
 		current_command->result = DID_PARITY << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	if(pio_int_reg & (CE | OUE))
@@ -411,9 +412,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		printk(KERN_WARNING "sym53c416: PIO interrupt error.\n");
 		current_command->SCp.phase = idle;
 		current_command->result = DID_ERROR << 16;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	if(int_reg & DIS)           /* Disconnect */
@@ -423,9 +424,9 @@ static void sym53c416_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		else
 			current_command->result = (current_command->SCp.Status & 0xFF) | ((current_command->SCp.Message & 0xFF) << 8) | (DID_OK << 16);
 		current_command->SCp.phase = idle;
-		spin_lock_irqsave(&io_request_lock, flags);
+		spin_lock_irqsave(dev->host_lock, flags);
 		current_command->scsi_done(current_command);
-		spin_unlock_irqrestore(&io_request_lock, flags);
+		spin_unlock_irqrestore(dev->host_lock, flags);
 		return;
 	}
 	/* Now we handle SCSI phases         */
@@ -719,7 +720,7 @@ int sym53c416_detect(Scsi_Host_Template *tpnt)
 				cli();
 				/* FIXME: Request_irq with CLI is not safe */
 				/* Request for specified IRQ */
-				if(request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, NULL))
+				if(request_irq(hosts[i].irq, sym53c416_intr_handle, 0, ID, shpnt))
 				{
 					restore_flags(flags);
 					printk(KERN_ERR "sym53c416: Unable to assign IRQ %d\n", hosts[i].irq);

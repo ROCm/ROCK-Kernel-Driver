@@ -34,8 +34,8 @@ ENTRY(__do_softirq)
  * stack.
  */
 ret_fast_syscall:
-	ldr	r1, [tsk, #TSK_NEED_RESCHED]
-	ldr	r2, [tsk, #TSK_SIGPENDING]
+#error	ldr	r1, [tsk, #TSK_NEED_RESCHED]
+#error	ldr	r2, [tsk, #TSK_SIGPENDING]
 	teq	r1, #0				@ need_resched || sigpending
 	teqeq	r2, #0
 	bne	slow
@@ -54,8 +54,8 @@ reschedule:
 	bl	SYMBOL_NAME(schedule)
 ENTRY(ret_to_user)
 ret_slow_syscall:
-	ldr	r1, [tsk, #TSK_NEED_RESCHED]
-	ldr	r2, [tsk, #TSK_SIGPENDING]
+#error	ldr	r1, [tsk, #TSK_NEED_RESCHED]
+#error	ldr	r2, [tsk, #TSK_SIGPENDING]
 1:	teq	r1, #0				@ need_resched => schedule()
 	bne	reschedule
 	teq	r2, #0				@ sigpending => do_signal()
@@ -66,7 +66,7 @@ __do_signal:
 	mov	r0, #0				@ NULL 'oldset'
 	mov	r1, sp				@ 'regs'
 	mov	r2, why				@ 'syscall'
-	b	SYMBOL_NAME(do_signal)		@ note the bl above sets lr
+#error	b	SYMBOL_NAME(do_signal)		@ note the bl above sets lr
 
 /*
  * This is how we return from a fork.  __switch_to will be calling us
@@ -82,7 +82,7 @@ ENTRY(ret_from_fork)
 	beq	ret_slow_syscall
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-	bl	SYMBOL_NAME(syscall_trace)
+#error	bl	SYMBOL_NAME(syscall_trace)
 	b	ret_slow_syscall
 	
 
@@ -160,7 +160,7 @@ ENTRY(vector_swi)
 __sys_trace:
 	add	r1, sp, #S_OFF
 	mov	r0, #0				@ trace entry [IP = 0]
-	bl	SYMBOL_NAME(syscall_trace)
+#error	bl	SYMBOL_NAME(syscall_trace)
 
 	adrsvc	al, lr, __sys_trace_return	@ return address
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
@@ -173,7 +173,7 @@ __sys_trace_return:
 	str	r0, [sp, #S_R0 + S_OFF]!	@ save returned r0
 	mov	r1, sp
 	mov	r0, #1				@ trace exit [IP = 1]
-	bl	SYMBOL_NAME(syscall_trace)
+#error	bl	SYMBOL_NAME(syscall_trace)
 	b	ret_slow_syscall
 
 	.align	5

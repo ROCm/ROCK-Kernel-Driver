@@ -1108,9 +1108,9 @@ NCR53c7x0_init (struct Scsi_Host *host) {
 
     if (!search) {
 #ifdef __powerpc__
-	if (request_irq(host->irq, do_NCR53c7x0_intr, SA_SHIRQ, "53c7,8xx", NULL)) 
+	if (request_irq(host->irq, do_NCR53c7x0_intr, SA_SHIRQ, "53c7,8xx", host)) 
 #else
-	if (request_irq(host->irq, do_NCR53c7x0_intr, SA_INTERRUPT, "53c7,8xx", NULL))
+	if (request_irq(host->irq, do_NCR53c7x0_intr, SA_INTERRUPT, "53c7,8xx", host))
 #endif
 	  {
 	  
@@ -4360,9 +4360,11 @@ static void
 do_NCR53c7x0_intr(int irq, void *dev_id, struct pt_regs * regs) {
     unsigned long flags;
 
-    spin_lock_irqsave(&io_request_lock, flags);
+    struct Scsi_Host *dev = dev_id;
+    
+    spin_lock_irqsave(dev->host_lock, flags);
     NCR53c7x0_intr(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 /*

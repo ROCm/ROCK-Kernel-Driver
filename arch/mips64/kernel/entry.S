@@ -17,7 +17,7 @@
 #include <asm/stackframe.h>
 
 /* This duplicates the definition from <linux/sched.h> */
-#define PT_TRACESYS	0x00000002		/* tracing system calls */
+#error #define PT_TRACESYS	0x00000002		/* tracing system calls */
 
 #define KU_USER 0x10
 
@@ -26,8 +26,8 @@
 FEXPORT(ret_from_fork)
 		move	a0, v0			# prev
 		jal	schedule_tail
-		lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
-		andi	t0, PT_TRACESYS
+#error		lw	t0, TASK_PTRACE($28)	# syscall tracing enabled?
+#error		andi	t0, PT_TRACESYS
 		bnez	t0, tracesys_exit
 		j	ret_from_sys_call
 
@@ -50,8 +50,8 @@ FEXPORT(ret_from_sys_call)
 		xori	t0, t0, 1
 		mtc0	t0, CP0_STATUS
 
-		ld	v0, TASK_NEED_RESCHED($28)
-		lw	v1, TASK_SIGPENDING($28)
+#error		ld	v0, TASK_NEED_RESCHED($28)
+#error		lw	v1, TASK_SIGPENDING($28)
 		bnez	v0, reschedule
 		bnez	v1, signal_return
 

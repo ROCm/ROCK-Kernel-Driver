@@ -167,7 +167,7 @@ int __init fastlane_esp_detect(Scsi_Host_Template *tpnt)
 		esp->irq = IRQ_AMIGA_PORTS;
 		esp->slot = board+FASTLANE_ESP_ADDR;
 		if (request_irq(IRQ_AMIGA_PORTS, esp_intr, SA_SHIRQ,
-				"Fastlane SCSI", esp_intr)) {
+				"Fastlane SCSI", esp->ehost)) {
 			printk(KERN_WARNING "Fastlane: Could not get IRQ%d, aborting.\n", IRQ_AMIGA_PORTS);
 			goto err_unmap;
 		}			

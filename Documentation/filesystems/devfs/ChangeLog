@@ -1877,3 +1877,11 @@ Changes for patch v207
 - Tag VFS deletable in <devfs_mk_symlink> if handle ignored
 
 - Updated README from master HTML file
+===============================================================================
+Changes for patch v208
+
+- Added KERN_* to remaining messages
+
+- Cleaned up declaration of <stat_read>
+
+- Updated README from master HTML file

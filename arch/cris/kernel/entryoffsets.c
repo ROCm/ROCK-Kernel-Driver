@@ -33,9 +33,9 @@ void NAME ## _fun (void)			\
   VAL (NAME, offsetof (TYPE, MEMBER))
 
 /* task_struct offsets.  */
-OF (LTASK_SIGPENDING, struct task_struct, sigpending)
-OF (LTASK_NEEDRESCHED, struct task_struct, need_resched)
-OF (LTASK_PTRACE, struct task_struct, ptrace)
+#error OF (LTASK_SIGPENDING, struct task_struct, sigpending)
+#error OF (LTASK_NEEDRESCHED, struct task_struct, need_resched)
+#error OF (LTASK_PTRACE, struct task_struct, ptrace)
 OF (LTASK_PID, struct task_struct, pid)
 
 /* pt_regs offsets.  */

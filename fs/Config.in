@@ -141,22 +141,10 @@ else
    define_bool CONFIG_SMB_FS n
 fi
 
-#
-# Do we need the compression support?
-#
 if [ "$CONFIG_ZISOFS" = "y" ]; then
    define_tristate CONFIG_ZISOFS_FS $CONFIG_ISO9660_FS
 else
    define_tristate CONFIG_ZISOFS_FS n
-fi
-if [ "$CONFIG_CRAMFS" = "y" -o "$CONFIG_ZISOFS_FS" = "y" ]; then
-   define_tristate CONFIG_ZLIB_FS_INFLATE y
-else
-  if [ "$CONFIG_CRAMFS" = "m" -o "$CONFIG_ZISOFS_FS" = "m" ]; then
-     define_tristate CONFIG_ZLIB_FS_INFLATE m
-  else
-     define_tristate CONFIG_ZLIB_FS_INFLATE n
-  fi
 fi
 
 mainmenu_option next_comment

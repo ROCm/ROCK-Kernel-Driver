@@ -28,16 +28,18 @@ ssize_t generic_read_dir(struct file *filp, char *buf, size_t siz, loff_t *ppos)
 loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
+	struct inode *inode = file->f_dentry->d_inode->i_mapping->host;
 
+	down(&inode->i_sem);
 	switch (origin) {
 		case 2:
-			offset += file->f_dentry->d_inode->i_size;
+			offset += inode->i_size;
 			break;
 		case 1:
 			offset += file->f_pos;
 	}
 	retval = -EINVAL;
-	if (offset>=0 && offset<=file->f_dentry->d_inode->i_sb->s_maxbytes) {
+	if (offset>=0 && offset<=inode->i_sb->s_maxbytes) {
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
 			file->f_reada = 0;
@@ -45,6 +47,7 @@ loff_t generic_file_llseek(struct file *file, loff_t offset, int origin)
 		}
 		retval = offset;
 	}
+	up(&inode->i_sem);
 	return retval;
 }
 
@@ -57,6 +60,7 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 {
 	long long retval;
 
+	lock_kernel();
 	switch (origin) {
 		case 2:
 			offset += file->f_dentry->d_inode->i_size;
@@ -73,21 +77,18 @@ loff_t default_llseek(struct file *file, loff_t offset, int origin)
 		}
 		retval = offset;
 	}
+	unlock_kernel();
 	return retval;
 }
 
 static inline loff_t llseek(struct file *file, loff_t offset, int origin)
 {
 	loff_t (*fn)(struct file *, loff_t, int);
-	loff_t retval;
 
 	fn = default_llseek;
 	if (file->f_op && file->f_op->llseek)
 		fn = file->f_op->llseek;
-	lock_kernel();
-	retval = fn(file, offset, origin);
-	unlock_kernel();
-	return retval;
+	return fn(file, offset, origin);
 }
 
 asmlinkage off_t sys_lseek(unsigned int fd, off_t offset, unsigned int origin)

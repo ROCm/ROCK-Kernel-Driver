@@ -500,7 +500,11 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
     config.mscp_free = ~0;
 #endif
 
-    if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", NULL)) {
+    /*
+     * Brrr, &config.mscp[0].SCint->host) it is something magical....
+     * XXX and FIXME
+     */
+    if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", &config.mscp[0].SCint->host)) {
 	printk("Unable to allocate IRQ%u for UltraStor controller.\n",
 	       config.interrupt);
 	return FALSE;
@@ -570,12 +574,7 @@ static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
 	  printk("U24F: invalid IRQ\n");
 	  return FALSE;
 	}
-      if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", NULL))
-	{
-	  printk("Unable to allocate IRQ%u for UltraStor controller.\n",
-		 config.interrupt);
-	  return FALSE;
-	}
+
       /* BIOS addr set */
       /* base port set */
       config.port_address = addr;
@@ -605,6 +604,13 @@ static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
              free_irq(config.interrupt, do_ultrastor_interrupt);
              return FALSE;
       }
+      
+      if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", shpnt))
+	{
+	  printk("Unable to allocate IRQ%u for UltraStor controller.\n",
+		 config.interrupt);
+	  return FALSE;
+	}
 
       shpnt->irq = config.interrupt;
       shpnt->dma_channel = config.dma_channel;
@@ -1159,10 +1165,11 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void do_ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     unsigned long flags;
-
-    spin_lock_irqsave(&io_request_lock, flags);
+    struct Scsi_Host *dev = dev_id;
+    
+    spin_lock_irqsave(dev->host_lock, flags);
     ultrastor_interrupt(irq, dev_id, regs);
-    spin_unlock_irqrestore(&io_request_lock, flags);
+    spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 MODULE_LICENSE("GPL");

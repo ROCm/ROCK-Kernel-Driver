@@ -69,9 +69,9 @@ ret_from_sys_call:
 	ori	t0, t0, 1
 	mtc0	t0, CP0_STATUS
 
-	ld	t2, TASK_NEED_RESCHED($28)
+#error	ld	t2, TASK_NEED_RESCHED($28)
 	bnez	t2, reschedule
-	lw	v0, TASK_SIGPENDING($28)
+#error	lw	v0, TASK_SIGPENDING($28)
 	bnez	v0, signal_return
 
 restore_all:

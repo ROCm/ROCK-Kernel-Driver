@@ -370,10 +370,11 @@ irqerror:;
 static void do_Irq_Handler (int irq, void *dev_id, struct pt_regs *regs)
 	{
 	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
+	struct Scsi_Host *dev = dev_id;
+	
+	spin_lock_irqsave(dev->host_lock, flags);
 	Irq_Handler(irq, dev_id, regs);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 	}
 /****************************************************************
  *	Name:	Psi240i_QueueCommand
@@ -602,7 +603,7 @@ int Psi240i_Detect (Scsi_Host_Template *tpnt)
 
 		save_flags (flags);
 		cli ();
-		if ( request_irq (chipConfig.irq, do_Irq_Handler, 0, "psi240i", NULL) )
+		if ( request_irq (chipConfig.irq, do_Irq_Handler, 0, "psi240i", pshost) )
 			{
 			printk ("Unable to allocate IRQ for PSI-240I controller.\n");
 			restore_flags (flags);

@@ -5,4 +5,36 @@ mainmenu_option next_comment
 comment 'Library routines'
 
 tristate 'CRC32 functions' CONFIG_CRC32
+
+#
+# Do we need the compression support?
+#
+if [ "$CONFIG_CRAMFS" = "y" -o \
+     "$CONFIG_PPP_DEFLATE" = "y" -o \
+     "$CONFIG_JFFS2_FS" = "y" -o \
+     "$CONFIG_ZISOFS_FS" = "y" ]; then
+   define_tristate CONFIG_ZLIB_INFLATE y
+else
+  if [ "$CONFIG_CRAMFS" = "m" -o \
+       "$CONFIG_PPP_DEFLATE" = "m" -o \
+       "$CONFIG_JFFS2_FS" = "m" -o \
+       "$CONFIG_ZISOFS_FS" = "m" ]; then
+     define_tristate CONFIG_ZLIB_INFLATE m
+  else
+     define_tristate CONFIG_ZLIB_INFLATE n
+  fi
+fi
+
+if [ "$CONFIG_PPP_DEFLATE" = "y" -o \
+     "$CONFIG_JFFS2_FS" = "y" ]; then
+   define_tristate CONFIG_ZLIB_DEFLATE y
+else
+  if [ "$CONFIG_PPP_DEFLATE" = "m" -o \
+       "$CONFIG_JFFS2_FS" = "m" ]; then
+     define_tristate CONFIG_ZLIB_DEFLATE m
+  else
+     define_tristate CONFIG_ZLIB_DEFLATE n
+  fi
+fi
+
 endmenu

@@ -76,9 +76,9 @@ _TSS_FLAGS   = (_TSS_IEEE+4)
  */
 state        =  0
 flags        =  4
-sigpending   =  8
-need_resched = 24
-tsk_ptrace   = 28
+#error sigpending   =  8
+#error need_resched = 24
+#error tsk_ptrace   = 28
 processor    = 56
 
 /*
@@ -218,7 +218,7 @@ pgm_system_call:
         stosm   24(%r15),0x03     # reenable interrupts
         sll     %r8,2
         l       %r8,sys_call_table-entry_base(8,%r13) # get address of system call
-        tm      tsk_ptrace+3(%r9),0x02 # PT_TRACESYS
+#error        tm      tsk_ptrace+3(%r9),0x02 # PT_TRACESYS
         bnz     BASED(sysc_tracesys)
         basr    %r14,%r8          # call sys_xxxx
         st      %r2,SP_R2(%r15)   # store return value (change R2 on stack)
@@ -231,9 +231,9 @@ sysc_return:
 #
 # check, if reschedule is needed
 #
-        icm     %r0,15,need_resched(%r9) # get need_resched from task_struct
+#error        icm     %r0,15,need_resched(%r9) # get need_resched from task_struct
         bnz     BASED(sysc_reschedule)
-        icm     %r0,15,sigpending(%r9)   # get sigpending from task_struct
+#error        icm     %r0,15,sigpending(%r9)   # get sigpending from task_struct
         bnz     BASED(sysc_signal_return)
 sysc_leave:
 	tm      SP_PGM_OLD_ILC(%r15),0xff
@@ -744,9 +744,9 @@ io_return_bh:
 #
 # check, if reschedule is needed
 #
-        icm     %r0,15,need_resched(%r9) # get need_resched from task_struct
+#error        icm     %r0,15,need_resched(%r9) # get need_resched from task_struct
         bnz     BASED(io_reschedule)
-        icm     %r0,15,sigpending(%r9)   # get sigpending from task_struct
+#error        icm     %r0,15,sigpending(%r9)   # get sigpending from task_struct
         bnz     BASED(io_signal_return)
 io_leave:
         stnsm   24(%r15),0xfc            # disable I/O and ext. interrupts
@@ -874,7 +874,7 @@ restart_go:
  */
 .Ls390_mcck:   .long  s390_do_machine_check
 .Ldo_IRQ:      .long  do_IRQ
-.Ldo_signal:   .long  do_signal
+#error .Ldo_signal:   .long  do_signal
 .Ldo_softirq:  .long  do_softirq
 .Lentry_base:  .long  entry_base
 .Lext_hash:    .long  ext_int_hash
@@ -891,7 +891,7 @@ restart_go:
 .Lsigreturn:   .long  sys_sigreturn
 .Lsigsuspend:  .long  sys_sigsuspend
 .Lsigaltstack: .long  sys_sigaltstack
-.Ltrace:       .long  syscall_trace
+#error .Ltrace:       .long  syscall_trace
 .Lvfork:       .long  sys_vfork
 
 #ifdef CONFIG_SMP

@@ -1712,10 +1712,10 @@ static inline int do_reset(Scsi_Cmnd *SCarg) {
 
    HD(j)->in_reset = TRUE;
 
-   spin_unlock_irq(&sh[j]->host_lock);
+   spin_unlock_irq(sh[j]->host_lock);
    time = jiffies;
    while ((jiffies - time) < (10 * HZ) && limit++ < 200000) udelay(100L);
-   spin_lock_irq(&sh[j]->host_lock);
+   spin_lock_irq(sh[j]->host_lock);
 
    printk("%s: reset, interrupts disabled, loops %d.\n", BN(j), limit);
 
@@ -2171,9 +2171,9 @@ static void do_interrupt_handler(int irq, void *shap, struct pt_regs *regs) {
    /* Check if the interrupt must be processed by this handler */
    if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
 
-   spin_lock_irqsave(&sh[j]->host_lock, spin_flags);
+   spin_lock_irqsave(sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
-   spin_unlock_irqrestore(&sh[j]->host_lock, spin_flags);
+   spin_unlock_irqrestore(sh[j]->host_lock, spin_flags);
 }
 
 int eata2x_release(struct Scsi_Host *shpnt) {

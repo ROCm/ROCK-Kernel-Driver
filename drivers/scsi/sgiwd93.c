@@ -66,10 +66,11 @@ static inline unsigned long read_wd33c93_count(wd33c93_regs *regp)
 static void sgiwd93_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
-
-	spin_lock_irqsave(&io_request_lock, flags);
+	struct Scsi_Host *dev = dev_id;
+	
+	spin_lock_irqsave(dev->host_lock, flags);
 	wd33c93_intr((struct Scsi_Host *) dev_id);
-	spin_unlock_irqrestore(&io_request_lock, flags);
+	spin_unlock_irqrestore(dev->host_lock, flags);
 }
 
 #undef DEBUG_DMA

@@ -433,7 +433,7 @@ go_42:
 			/*
 			 *	Complete the command
 			 */
-			spin_lock_irqsave(&io_request_lock, flags);
+			spin_lock_irqsave(workrequ->host->host_lock, flags);
 			(*workrequ->scsi_done) (workrequ);
 
 			/*
@@ -441,7 +441,7 @@ go_42:
 			 */
 			dev->id[target_id].curr_req = 0;
 			dev->working--;
-			spin_unlock_irqrestore(&io_request_lock, flags);
+			spin_unlock_irqrestore(workrequ->host->host_lock, flags);
 			/*
 			 *	Take it back wide
 			 */
