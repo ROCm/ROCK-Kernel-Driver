@@ -95,12 +95,7 @@
 #include <asm/atomic.h>
 #include <linux/delay.h>	/* Experimental delay */
 
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
- #include <asm/uaccess.h>
-#else
- #include <asm/segment.h>
- #include <net/route.h>
-#endif
+#include <asm/uaccess.h>
 
 #include <linux/if.h>
 #include <linux/if_arp.h>
@@ -281,11 +276,7 @@ typedef struct x25_channel
 	int ch_idx;
 	unsigned char enable_IPX;
 	unsigned long network_number;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	struct net_device_stats ifstats;	/* interface statistics */
-#else
-	struct enet_statistics ifstats;
-#endif	
 	unsigned short transmit_length;
 	unsigned short tx_offset;
 	char transmit_buffer[X25_CHAN_MTU+sizeof(x25api_hdr_t)];
@@ -369,9 +360,7 @@ static int if_rebuild_hdr (struct sk_buff* skb);
 static int if_send (struct sk_buff* skb, netdevice_t* dev);
 static struct net_device_stats *if_stats (netdevice_t* dev);
 
-#ifdef LINUX_2_4
 static void if_tx_timeout (netdevice_t *dev);
-#endif
 
 /*=================================================  
  * 	Interrupt handlers 
@@ -792,9 +781,6 @@ int wpx_init (sdla_t* card, wandev_conf_t* conf)
 	
 	init_global_statistics(card);	
 
-#ifndef LINUX_2_4
-	card->u.x.x25_poll_task.next = NULL;
-#endif
 	card->u.x.x25_poll_task.sync=0;
 	card->u.x.x25_poll_task.routine = (void*)(void*)wpx_poll;
 	card->u.x.x25_poll_task.data = card;
@@ -1011,18 +997,8 @@ static int new_if (wan_device_t* wandev, netdevice_t* dev, wanif_conf_t* conf)
 		chan->network_number = 0xDEADBEEF;
 
 	/* prepare network device data space for registration */
-#ifdef LINUX_2_4
 	strcpy(dev->name,chan->name);
-#else
-	dev->name = (char *)kmalloc(strlen(chan->name) + 2, GFP_KERNEL); 
-	if(dev->name == NULL)
-	{
-		kfree(chan);
-		dev->priv = NULL;
-		return -ENOMEM;
-	}
-	sprintf(dev->name, "%s", chan->name);
-#endif
+
 	dev->init = &if_init;
 
 	init_x25_channel_struct(chan);
@@ -1124,9 +1100,6 @@ static int if_init (netdevice_t* dev)
 	x25_channel_t* chan = dev->priv;
 	sdla_t* card = chan->card;
 	wan_device_t* wandev = &card->wandev;
-#ifdef LINUX_2_0
-	int i;
-#endif
 
 	/* Initialize device driver entry points */
 	dev->open		= &if_open;
@@ -1135,19 +1108,11 @@ static int if_init (netdevice_t* dev)
 	dev->rebuild_header	= &if_rebuild_hdr;
 	dev->hard_start_xmit	= &if_send;
 	dev->get_stats		= &if_stats;
-
-#ifdef LINUX_2_4
 	dev->tx_timeout		= &if_tx_timeout;
 	dev->watchdog_timeo	= TX_TIMEOUT;
-#endif
 
 	/* Initialize media-specific parameters */
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	dev->type		= ARPHRD_PPP;		/* ARP h/w type */
-#else
-        dev->family             = AF_INET;      /* address family */
-        dev->type               = ARPHRD_PPP;   /* no x25 type */
-#endif
 	dev->flags		|= IFF_POINTOPOINT;
 	dev->flags		|= IFF_NOARP;
 
@@ -1174,11 +1139,6 @@ static int if_init (netdevice_t* dev)
         /* Set transmit buffer queue length */
         dev->tx_queue_len = 100;
 
-	/* Initialize socket buffers */
-#if !defined(LINUX_2_1) && !defined(LINUX_2_4)
-        for (i = 0; i < DEV_NUMBUFFS; ++i)
-                skb_queue_head_init(&dev->buffs[i]);
-#endif
 	/* FIXME Why are we doing this */
 	set_chan_state(dev, WAN_DISCONNECTED);
 	return 0;
@@ -1214,15 +1174,12 @@ static int if_open (netdevice_t* dev)
 	struct timeval tv;
 	unsigned long smp_flags;
 	
-	if (is_dev_running(dev))
+	if (netif_running(dev))
 		return -EBUSY;
 
 	chan->tq_working = 0;
 
 	/* Initialize the task queue */
-#ifndef LINUX_2_4
-	chan->common.wanpipe_task.next = NULL;
-#endif
 	chan->common.wanpipe_task.sync = 0;
 	chan->common.wanpipe_task.routine = (void *)(void *)x25api_bh;
 	chan->common.wanpipe_task.data = dev;
@@ -1276,13 +1233,8 @@ static int if_open (netdevice_t* dev)
 	do_gettimeofday( &tv );
 	chan->router_start_time = tv.tv_sec;
 
-#ifdef LINUX_2_4
 	netif_start_queue(dev);
-#else	
-	dev->interrupt = 0;
-	dev->tbusy = 0;
-	dev->start = 1;
-#endif
+
 	return 0;
 }
 
@@ -1314,10 +1266,7 @@ static int if_close (netdevice_t* dev)
 	sdla_t* card = chan->card;
 	unsigned long smp_flags;
 	
-	stop_net_queue(dev);
-#ifndef LINUX_2_4
-	dev->start=0;
-#endif
+	netif_stop_queue(dev);
 
 	if ((chan->common.state == WAN_CONNECTED) || 
 	    (chan->common.state == WAN_CONNECTING)){
@@ -1336,7 +1285,7 @@ static int if_close (netdevice_t* dev)
 		for (i=0; i<(MAX_BH_BUFF+1); i++){
 			skb = ((bh_data_t *)&chan->bh_head[i])->skb;
 			if (skb != NULL){
-                		wan_dev_kfree_skb(skb, FREE_READ);
+                		dev_kfree_skb_any(skb);
 			}
 		}
 		kfree(chan->bh_head);
@@ -1405,7 +1354,6 @@ static int if_rebuild_hdr (struct sk_buff* skb)
 }
 
 
-#ifdef LINUX_2_4
 /*============================================================================
  * Handle transmit timeout event from netif watchdog
  */
@@ -1425,7 +1373,6 @@ static void if_tx_timeout (netdevice_t *dev)
 			card->devname, dev->name);
 	netif_wake_queue (dev);
 }
-#endif
 
 
 /*=========================================================================
@@ -1457,32 +1404,10 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 
 	++chan->if_send_stat.if_send_entry;
 
-#ifdef LINUX_2_4
 	netif_stop_queue(dev);
-#endif
 
 	/* No need to check frame length, since socket code
          * will perform the check for us */
-
-#ifndef LINUX_2_4
-	if (dev->tbusy){
-		netdevice_t *dev2;
-		
-		++chan->if_send_stat.if_send_tbusy;
-		if ((jiffies - chan->tick_counter) < (5*HZ)){
-			return 1;
-		}
-		printk(KERN_INFO "%s: Transmit time out %s!\n",
-			card->devname, dev->name);
-		
-		for( dev2 = card->wandev.dev; dev2; 
-		     dev2 = *((netdevice_t**)dev2->priv)){
-
-	        	dev2->tbusy = 0;
-		}
-		++chan->if_send_stat.if_send_tbusy_timeout;
-	}
-#endif
 
 	chan->tick_counter = jiffies;
 	
@@ -1506,7 +1431,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
                                 chan->if_send_stat.if_send_PIPE_request++;
 			}
                	}
-		start_net_queue(dev);
+		netif_start_queue(dev);
 		clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
 		S508_S514_unlock(card, &smp_flags);
 		return 0;
@@ -1518,7 +1443,7 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 			chan->transmit_length=0;
 			atomic_set(&chan->common.driver_busy,0);
 		}else{
-			stop_net_queue(dev);
+			netif_stop_queue(dev);
 			++card->u.x.tx_interrupts_pending;
 		        status->imask |= INTR_ON_TX_FRAME;
 			clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
@@ -1589,9 +1514,9 @@ static int if_send (struct sk_buff* skb, netdevice_t* dev)
 
 if_send_crit_exit:
 	
-       	wan_dev_kfree_skb(skb, FREE_WRITE);
+       	dev_kfree_skb_any(skb);
 
-	start_net_queue(dev);
+	netif_start_queue(dev);
 	clear_bit(SEND_CRIT,(void*)&card->wandev.critical);
 	S508_S514_unlock(card, &smp_flags);
 	return 0;
@@ -1787,14 +1712,12 @@ static void rx_intr (sdla_t* card)
 			++chan->ifstats.rx_dropped;
 			++card->wandev.stats.rx_dropped;
 			++chan->rx_intr_stat.rx_intr_bfr_not_passed_to_stack;
-			wan_dev_kfree_skb(skb, FREE_READ);
+			dev_kfree_skb_any(skb);
 			return;
 		}		
 
 		++chan->ifstats.rx_packets;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 		chan->ifstats.rx_bytes += skb->len;
-#endif
 		
 
 		chan->rx_skb = NULL;
@@ -1814,7 +1737,7 @@ static void rx_intr (sdla_t* card)
 	/* Decapsulate packet, if necessary */
 	if (!skb->protocol && !wanrouter_type_trans(skb, dev)){
 		/* can't decapsulate packet */
-                wan_dev_kfree_skb(skb, FREE_READ);
+                dev_kfree_skb_any(skb);
 		++chan->ifstats.rx_errors;
 		++chan->ifstats.rx_dropped;
 		++card->wandev.stats.rx_dropped;
@@ -1829,7 +1752,7 @@ static void rx_intr (sdla_t* card)
 				if(chan_send(dev, skb->data, skb->len,0)){
 					chan->tx_skb = skb;
 				}else{
-                                        wan_dev_kfree_skb(skb, FREE_WRITE);
+                                        dev_kfree_skb_any(skb);
 					++chan->rx_intr_stat.rx_intr_bfr_not_passed_to_stack;
 				}
 			}else{
@@ -1839,9 +1762,7 @@ static void rx_intr (sdla_t* card)
 			}
 		}else{
 			skb->mac.raw = skb->data;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 			chan->ifstats.rx_bytes += skb->len;
-#endif
 			++chan->ifstats.rx_packets;
 			++chan->rx_intr_stat.rx_intr_bfr_passed_to_stack;
 			netif_rx(skb);
@@ -1898,7 +1819,7 @@ static int wanpipe_pull_data_in_skb (sdla_t *card, netdevice_t *dev, struct sk_b
 
 	if (skb_tailroom(new_skb) < len){
 		/* No room for the packet. Call off the whole thing! */
-                wan_dev_kfree_skb(new_skb, FREE_READ);
+                dev_kfree_skb_any(new_skb);
 		if (chan->common.usedby == WANPIPE){
 			chan->rx_skb = NULL;
 			if (qdm & 0x01){ 
@@ -1985,12 +1906,12 @@ static void tx_intr (sdla_t* card)
 				chan->transmit_length = 0;
 				atomic_set(&chan->common.driver_busy,0);
 				chan->tx_offset=0;
-				if (is_queue_stopped(dev)){
+				if (netif_queue_stopped(dev)){
 					if (chan->common.usedby == API){
-						start_net_queue(dev);
+						netif_start_queue(dev);
 						wakeup_sk_bh(dev);
 					}else{
-						wake_net_dev(dev);
+						netif_wake_queue(dev);
 					}
 				}
 				dev = move_dev_to_next(card,dev);
@@ -2092,12 +2013,12 @@ static int tx_intr_send(sdla_t *card, netdevice_t *dev)
 
 	/* If we are in API mode, wakeup the 
          * sock BH handler, not the NET_BH */
-	if (is_queue_stopped(dev)){
+	if (netif_queue_stopped(dev)){
 		if (chan->common.usedby == API){
-			start_net_queue(dev);
+			netif_start_queue(dev);
 			wakeup_sk_bh(dev);
 		}else{
-			wake_net_dev(dev);
+			netif_wake_queue(dev);
 		}
 	}
 	return 0;
@@ -2342,11 +2263,7 @@ wpx_poll_exit:
 
 static void trigger_x25_poll(sdla_t *card)
 {
-#ifdef LINUX_2_4
 	schedule_task(&card->u.x.x25_poll_task);
-#else
-	queue_task(&card->u.x.x25_poll_task, &tq_scheduler);
-#endif
 }
 
 /*====================================================================
@@ -3658,8 +3575,8 @@ static void set_chan_state (netdevice_t* dev, int state)
 					chan->transmit_length=0;
 					atomic_set(&chan->common.driver_busy,0);
 					chan->tx_offset=0;
-					if (is_queue_stopped(dev)){
-						wake_net_dev(dev);
+					if (netif_queue_stopped(dev)){
+						netif_wake_queue(dev);
 					}
 				}
 				atomic_set(&chan->common.command,0);
@@ -3766,9 +3683,7 @@ static int chan_send (netdevice_t* dev, void* buff, unsigned data_len, unsigned 
 		case 0x00:	/* success */
 			chan->i_timeout_sofar = jiffies;
 
-#ifdef LINUX_2_4
 			dev->trans_start=jiffies;
-#endif
 			
 			if ((qdm & M_BIT) && !card->u.x.LAPB_hdlc){
 				if (!tx_intr){
@@ -3780,9 +3695,7 @@ static int chan_send (netdevice_t* dev, void* buff, unsigned data_len, unsigned 
 					chan->tx_offset += len;
 
 					++chan->ifstats.tx_packets;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 					chan->ifstats.tx_bytes += len;
-#endif
 					
 					if (chan->tx_offset < orig_len){
 						setup_for_delayed_transmit (dev, buff, data_len);
@@ -3795,9 +3708,7 @@ static int chan_send (netdevice_t* dev, void* buff, unsigned data_len, unsigned 
                                          * be X number of times larger than max data size.
 					 */
 					++chan->ifstats.tx_packets;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 					chan->ifstats.tx_bytes += len;
-#endif
 					
 					++chan->if_send_stat.if_send_bfr_passed_to_adptr;
 					chan->tx_offset += len;
@@ -3817,9 +3728,7 @@ static int chan_send (netdevice_t* dev, void* buff, unsigned data_len, unsigned 
 				}
 			}else{
 				++chan->ifstats.tx_packets;
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 				chan->ifstats.tx_bytes += len;
-#endif
 				++chan->if_send_stat.if_send_bfr_passed_to_adptr;
 				res=0;
 			}
@@ -4288,7 +4197,7 @@ static void x25api_bh (netdevice_t * dev)
 			if (chan->common.sk == NULL || chan->common.func == NULL){
 				printk(KERN_INFO "%s: BH: Socket disconnected, dropping\n",
 						card->devname);
-				wan_dev_kfree_skb(skb, FREE_READ);
+				dev_kfree_skb_any(skb);
 				x25api_bh_cleanup(dev);
 				++chan->ifstats.rx_dropped;
 				++chan->rx_intr_stat.rx_intr_bfr_not_passed_to_stack;
@@ -4745,7 +4654,7 @@ static int api_incoming_call (sdla_t* card, TX25Mbox *mbox, int lcn)
 
 	if (card->func(skb,card->sk) < 0){
 		printk(KERN_INFO "%s: MAJOR ERROR: Failed to send up place call \n",card->devname);
-                wan_dev_kfree_skb(skb, FREE_READ);
+                dev_kfree_skb_any(skb);
 		return 1;
 	}
 
@@ -4912,7 +4821,7 @@ static void send_oob_msg (sdla_t *card, netdevice_t *dev, TX25Mbox *mbox)
 	if (chan->common.func(skb,dev,chan->common.sk) < 0){
 		if (bh_enqueue(dev,skb)){
 			printk(KERN_INFO "%s: Dropping OOB MSG\n",card->devname);
-                	wan_dev_kfree_skb(skb, FREE_READ);
+                	dev_kfree_skb_any(skb);
 		}
 	}
 
@@ -4940,7 +4849,7 @@ static int alloc_and_init_skb_buf (sdla_t *card, struct sk_buff **skb, int len)
 
 	if (skb_tailroom(new_skb) < len){
 		/* No room for the packet. Call off the whole thing! */
-                wan_dev_kfree_skb(new_skb, FREE_READ);
+                dev_kfree_skb_any(new_skb);
 		printk(KERN_INFO "%s: Listen: unexpectedly long packet sequence\n"
 			,card->devname);
 		*skb = NULL;
@@ -5448,9 +5357,9 @@ static int store_udp_mgmt_pkt(int udp_type, char udp_pkt_src, sdla_t* card,
 	}
 
         if(udp_pkt_src == UDP_PKT_FRM_STACK){
-                wan_dev_kfree_skb(skb, FREE_WRITE);
+                dev_kfree_skb_any(skb);
 	}else{
-                wan_dev_kfree_skb(skb, FREE_READ);
+                dev_kfree_skb_any(skb);
 	}
 
         return(udp_pkt_stored);

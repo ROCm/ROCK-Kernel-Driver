@@ -812,13 +812,8 @@ static int munich_probe(void)
 
 	printk("munich_probe: munich chip found, IRQ %d\n", pci->irq);
 
-#if (LINUX_VERSION_CODE < 0x02030d)
-	bar1 = ioremap_nocache(pci->base_address[0], 0x100);
-	lbi = ioremap_nocache(pci->base_address[1], 0x100);
-#else
 	bar1 = ioremap_nocache(pci->resource[0].start, 0x100);
 	lbi = ioremap_nocache(pci->resource[1].start, 0x100);
-#endif
 
 	if (bar1 && lbi)
 	{
