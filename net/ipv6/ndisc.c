@@ -709,7 +709,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	struct inet6_ifaddr *ifp;
 	struct inet6_dev *idev = NULL;
 	struct neighbour *neigh;
-	int addr_type = ipv6_addr_type(saddr);
+	int dad = ipv6_addr_any(saddr);
 	int inc;
 
 	if (ipv6_addr_is_multicast(&msg->target)) {
@@ -722,7 +722,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 	 * RFC2461 7.1.1:
 	 * DAD has to be destined for solicited node multicast address.
 	 */
-	if (addr_type == IPV6_ADDR_ANY &&
+	if (dad &&
 	    !(daddr->s6_addr32[0] == htonl(0xff020000) &&
 	      daddr->s6_addr32[1] == htonl(0x00000000) &&
 	      daddr->s6_addr32[2] == htonl(0x00000001) &&
@@ -752,7 +752,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		 *	there MUST NOT be source link-layer address option 
 		 *	in the message.
 		 */
-		if (addr_type == IPV6_ADDR_ANY) {
+		if (dad) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP6 NS: bad DAD packet (link-layer address option)\n");
 			return;
@@ -768,10 +768,8 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			   does DAD, otherwise we ignore solicitations
 			   until DAD timer expires.
 			 */
-			if (addr_type != IPV6_ADDR_ANY) {
-				in6_ifa_put(ifp);
-				return;
-			}
+			if (!dad)
+				goto out;
 			if (dev->type == ARPHRD_IEEE802_TR) {
 				unsigned char *sadr = skb->mac.raw;
 				if (((sadr[8] ^ dev->dev_addr[0]) & 0x7f) == 0 &&
@@ -781,8 +779,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 				    sadr[12] == dev->dev_addr[4] &&
 				    sadr[13] == dev->dev_addr[5]) {
 					/* looped-back to us */
-					in6_ifa_put(ifp);
-					return;
+					goto out;
 				}
 			}
 			addrconf_dad_failure(ifp); 
@@ -820,7 +817,7 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 			goto out;
 	}
 
-	if (addr_type == IPV6_ADDR_ANY) {
+	if (dad) {
 		struct in6_addr maddr;
 
 		ipv6_addr_all_nodes(&maddr);
