@@ -609,7 +609,7 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || K2
 	default y
 
 config FORCE
