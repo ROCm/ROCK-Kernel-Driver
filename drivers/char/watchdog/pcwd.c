@@ -61,6 +61,7 @@
 #include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
+#include <linux/notifier.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
 #include <linux/reboot.h>
@@ -68,15 +69,8 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-/*
- * These are the auto-probe addresses available.
- *
- * Revision A only uses ports 0x270 and 0x370.  Revision C introduced 0x350.
- * Revision A has an address range of 2 addresses, while Revision C has 3.
- */
-static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
-
-#define WD_VER                  "1.14 (03/26/2004)"
+#define WD_VER                  "1.15 (03/27/2004)"
+#define PFX			"pcwd: "
 
 /*
  * It should be noted that PCWD_REVISION_B was removed because A and B
@@ -87,23 +81,6 @@ static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
  */
 #define	PCWD_REVISION_A		1
 #define	PCWD_REVISION_C		2
-
-#define	WD_TIMEOUT		4	/* 2 seconds for a timeout */
-static int timeout_val = WD_TIMEOUT;
-static int timeout = 2;
-
-module_param(timeout, int, 0);
-MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default=2)");
-
-#ifdef CONFIG_WATCHDOG_NOWAYOUT
-static int nowayout = 1;
-#else
-static int nowayout = 0;
-#endif
-
-module_param(nowayout, int, 0);
-MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
-
 
 /*
  * These are the defines that describe the control status bits for the
@@ -123,82 +100,108 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #define WD_REVC_HRBT            0x02	/* Watchdog Heartbeat */
 #define WD_REVC_TTRP            0x04	/* Temperature Trip status */
 
+/* max. time we give an ISA watchdog card to process a command */
+/* 500ms for each 4 bit response (according to spec.) */
+#define ISA_COMMAND_TIMEOUT     1000
+
+/* Watchdog's internal commands */
+#define CMD_ISA_IDLE                    0x00
+#define CMD_ISA_VERSION_INTEGER         0x01
+#define CMD_ISA_VERSION_TENTH           0x02
+#define CMD_ISA_VERSION_HUNDRETH        0x03
+#define CMD_ISA_VERSION_MINOR           0x04
+#define CMD_ISA_SWITCH_SETTINGS         0x05
+#define CMD_ISA_DELAY_TIME_2SECS        0x0A
+#define CMD_ISA_DELAY_TIME_4SECS        0x0B
+#define CMD_ISA_DELAY_TIME_8SECS        0x0C
+
+/* We can only use 1 card due to the /dev/watchdog restriction */
+static int cards_found;
+
+/* internal variables */
 static int current_readport, revision, temp_panic;
 static atomic_t open_allowed = ATOMIC_INIT(1);
 static char expect_close;
-static int initial_status, supports_temp, mode_debug;
+static int supports_temp;		/* Wether or not the card has a temperature device */
+static int command_mode;		/* Wether or not the card is in command mode */
+static int initial_status;		/* The card's boot status */
 static spinlock_t io_lock;
+static int heartbeat;
+
+/* module parameters */
+#ifdef CONFIG_WATCHDOG_NOWAYOUT
+static int nowayout = 1;
+#else
+static int nowayout = 0;
+#endif
+
+module_param(nowayout, int, 0);
+MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
 
 /*
- * PCWD_CHECKCARD
- *
- * This routine checks the "current_readport" to see if the card lies there.
- * If it does, it returns accordingly.
+ *	Internal functions
  */
-static int __init pcwd_checkcard(void)
+
+static int send_isa_command(int cmd)
 {
-	int card_dat, prev_card_dat, found = 0, count = 0, done = 0;
+	int i;
+	int control_status;
+	int port0, last_port0;	/* Double read for stabilising */
 
-	card_dat = 0x00;
-	prev_card_dat = 0x00;
+	/* The WCMD bit must be 1 and the command is only 4 bits in size */
+	control_status = (cmd & 0x0F) | 0x80;
+	outb_p(control_status, current_readport + 2);
+	udelay(ISA_COMMAND_TIMEOUT);
 
-	prev_card_dat = inb(current_readport);
-	if (prev_card_dat == 0xFF)
-		return 0;
+	port0 = inb_p(current_readport);
+	for (i = 0; i < 25; ++i) {
+		last_port0 = port0;
+		port0 = inb_p(current_readport);
 
-	while(count < timeout_val) {
+		if (port0 == last_port0)
+			break;	/* Data is stable */
 
-	/* Read the raw card data from the port, and strip off the
-	   first 4 bits */
-
-		card_dat = inb_p(current_readport);
-		card_dat &= 0x000F;
-
-	/* Sleep 1/2 second (or 500000 microseconds :) */
-
-		mdelay(500);
-		done = 0;
-
-	/* If there's a heart beat in both instances, then this means we
-	   found our card.  This also means that either the card was
-	   previously reset, or the computer was power-cycled. */
-
-		if ((card_dat & WD_HRTBT) && (prev_card_dat & WD_HRTBT) &&
-			(!done)) {
-			found = 1;
-			done = 1;
-			break;
-		}
-
-	/* If the card data is exactly the same as the previous card data,
-	   it's safe to assume that we should check again.  The manual says
-	   that the heart beat will change every second (or the bit will
-	   toggle), and this can be used to see if the card is there.  If
-	   the card was powered up with a cold boot, then the card will
-	   not start blinking until 2.5 minutes after a reboot, so this
-	   bit will stay at 1. */
-
-		if ((card_dat == prev_card_dat) && (!done)) {
-			count++;
-			done = 1;
-		}
-
-	/* If the card data is toggling any bits, this means that the heart
-	   beat was detected, or something else about the card is set. */
-
-		if ((card_dat != prev_card_dat) && (!done)) {
-			done = 1;
-			found = 1;
-			break;
-		}
-
-	/* Otherwise something else strange happened. */
-
-		if (!done)
-			count++;
+		udelay (250);
 	}
 
-	return((found) ? 1 : 0);
+	return port0;
+}
+
+static int set_command_mode(void)
+{
+	int i, found=0, count=0;
+
+	/* Set the card into command mode */
+	spin_lock(&io_lock);
+	while ((!found) && (count < 3)) {
+		i = send_isa_command(CMD_ISA_IDLE);
+
+		if (i == 0x00)
+			found = 1;
+		else if (i == 0xF3) {
+			/* Card does not like what we've done to it */
+			outb_p(0x00, current_readport + 2);
+			udelay(1200);	/* Spec says wait 1ms */
+			outb_p(0x00, current_readport + 2);
+			udelay(ISA_COMMAND_TIMEOUT);
+		}
+		count++;
+	}
+	spin_unlock(&io_lock);
+	command_mode = found;
+
+	return(found);
+}
+
+static void unset_command_mode(void)
+{
+	/* Set the card into normal mode */
+	spin_lock(&io_lock);
+	outb_p(0x00, current_readport + 2);
+	udelay(ISA_COMMAND_TIMEOUT);
+	spin_unlock(&io_lock);
+
+	command_mode = 0;
 }
 
 static int pcwd_start(void)
@@ -213,7 +216,7 @@ static int pcwd_start(void)
 		spin_unlock(&io_lock);
 		if (stat_reg & 0x10)
 		{
-			printk(KERN_INFO "pcwd: Could not start watchdog.\n");
+			printk(KERN_INFO PFX "Could not start watchdog\n");
 			return -EIO;
 		}
 	}
@@ -233,7 +236,7 @@ static int pcwd_stop(void)
 		spin_unlock(&io_lock);
 		if ((stat_reg & 0x10) == 0)
 		{
-			printk(KERN_INFO "pcwd: Could not stop watchdog.\n");
+			printk(KERN_INFO PFX "Could not stop watchdog\n");
 			return -EIO;
 		}
 	}
@@ -283,7 +286,7 @@ static int pcwd_get_status(int *status)
 		if (card_status & WD_T110) {
 			*status |= WDIOF_OVERHEAT;
 			if (temp_panic) {
-				printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+				printk (KERN_INFO PFX "Temperature overheat trip!\n");
 				machine_power_off();
 			}
 		}
@@ -294,7 +297,7 @@ static int pcwd_get_status(int *status)
 		if (card_status & WD_REVC_TTRP) {
 			*status |= WDIOF_OVERHEAT;
 			if (temp_panic) {
-				printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+				printk (KERN_INFO PFX "Temperature overheat trip!\n");
 				machine_power_off();
 			}
 		}
@@ -316,7 +319,7 @@ static int pcwd_clear_status(void)
 static int pcwd_get_temperature(int *temperature)
 {
 	/* check that port 0 gives temperature info and no command results */
-	if (mode_debug)
+	if (command_mode)
 		return -1;
 
 	*temperature = 0;
@@ -348,6 +351,7 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	{
 		.options =		WDIOF_OVERHEAT |
 					WDIOF_CARDRESET |
+					WDIOF_KEEPALIVEPING |
 					WDIOF_MAGICCLOSE,
 		.firmware_version =	1,
 		.identity =		"PCWD",
@@ -401,6 +405,9 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 	case WDIOC_KEEPALIVE:
 		pcwd_send_heartbeat();
 		return 0;
+
+	case WDIOC_GETTIMEOUT:
+		return put_user(heartbeat, (int *)arg);
 	}
 
 	return 0;
@@ -455,7 +462,7 @@ static int pcwd_close(struct inode *inode, struct file *file)
 		pcwd_stop();
 		atomic_inc( &open_allowed );
 	} else {
-		printk(KERN_CRIT "pcwd: Unexpected close, not stopping watchdog!\n");
+		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		pcwd_send_heartbeat();
 	}
 	expect_close = 0;
@@ -471,7 +478,7 @@ static ssize_t pcwd_temp_read(struct file *file, char *buf, size_t count,
 {
 	int temperature;
 
-	/*  Can't seek (pread) on this device  */
+	/* Can't seek (pread) on this device */
 	if (ppos != &file->f_pos)
 		return -ESPIPE;
 
@@ -497,80 +504,23 @@ static int pcwd_temp_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static inline void get_support(void)
+/*
+ *	Notify system
+ */
+
+static int pcwd_notify_sys(struct notifier_block *this, unsigned long code, void *unused)
 {
-	if (inb(current_readport) != 0xF0)
-		supports_temp = 1;
-}
-
-static inline int get_revision(void)
-{
-	int r = PCWD_REVISION_C;
-
-	spin_lock(&io_lock);
-	if ((inb(current_readport + 2) == 0xFF) ||
-	    (inb(current_readport + 3) == 0xFF))
-		r=PCWD_REVISION_A;
-	spin_unlock(&io_lock);
-
-	return r;
-}
-
-static int __init send_command(int cmd)
-{
-	int i;
-
-	outb_p(cmd, current_readport + 2);
-	mdelay(1);
-
-	i = inb(current_readport);
-	i = inb(current_readport);
-
-	return(i);
-}
-
-static inline char *get_firmware(void)
-{
-	int i, found = 0, count = 0, one, ten, hund, minor;
-	char *ret;
-
-	ret = kmalloc(6, GFP_KERNEL);
-	if(ret == NULL)
-		return NULL;
-
-	while((count < 3) && (!found)) {
-		outb_p(0x80, current_readport + 2);
-		i = inb(current_readport);
-
-		if (i == 0x00)
-			found = 1;
-		else if (i == 0xF3)
-			outb_p(0x00, current_readport + 2);
-
-		udelay(400L);
-		count++;
+	if (code==SYS_DOWN || code==SYS_HALT) {
+		/* Turn the WDT off */
+		pcwd_stop();
 	}
 
-	if (found) {
-		mode_debug = 1;
-
-		one = send_command(0x81);
-		ten = send_command(0x82);
-		hund = send_command(0x83);
-		minor = send_command(0x84);
-		sprintf(ret, "%c.%c%c%c", one, ten, hund, minor);
-	}
-	else
-		sprintf(ret, "ERROR");
-
-	return(ret);
+	return NOTIFY_DONE;
 }
 
-static void debug_off(void)
-{
-	outb_p(0x00, current_readport + 2);
-	mode_debug = 0;
-}
+/*
+ *	Kernel Interfaces
+ */
 
 static struct file_operations pcwd_fops = {
 	.owner		= THIS_MODULE,
@@ -601,50 +551,107 @@ static struct miscdevice temp_miscdev = {
 	.fops =		&pcwd_temp_fops,
 };
 
-static void __init pcwd_validate_timeout(void)
+static struct notifier_block pcwd_notifier = {
+	.notifier_call =	pcwd_notify_sys,
+};
+
+/*
+ *	Init & exit routines
+ */
+
+static inline void get_support(void)
 {
-	timeout_val = timeout * 2;
+	if (inb(current_readport) != 0xF0)
+		supports_temp = 1;
 }
 
-static int __init pcwatchdog_init(void)
+static inline int get_revision(void)
 {
+	int r = PCWD_REVISION_C;
+
+	spin_lock(&io_lock);
+	/* REV A cards use only 2 io ports; test
+	 * presumes a floating bus reads as 0xff. */
+	if ((inb(current_readport + 2) == 0xFF) ||
+	    (inb(current_readport + 3) == 0xFF))
+		r=PCWD_REVISION_A;
+	spin_unlock(&io_lock);
+
+	return r;
+}
+
+static inline char *get_firmware(void)
+{
+	int one, ten, hund, minor;
+	char *ret;
+
+	ret = kmalloc(6, GFP_KERNEL);
+	if(ret == NULL)
+		return NULL;
+
+	if (set_command_mode()) {
+		one = send_isa_command(CMD_ISA_VERSION_INTEGER);
+		ten = send_isa_command(CMD_ISA_VERSION_TENTH);
+		hund = send_isa_command(CMD_ISA_VERSION_HUNDRETH);
+		minor = send_isa_command(CMD_ISA_VERSION_MINOR);
+		sprintf(ret, "%c.%c%c%c", one, ten, hund, minor);
+	}
+	else
+		sprintf(ret, "ERROR");
+
+	unset_command_mode();
+	return(ret);
+}
+
+static inline int get_option_switches(void)
+{
+	int rv=0;
+
+	if (set_command_mode()) {
+		/* Get switch settings */
+		rv = send_isa_command(CMD_ISA_SWITCH_SETTINGS);
+	}
+
+	unset_command_mode();
+	return(rv);
+}
+
+static int __devinit pcwatchdog_init(int base_addr)
+{
+	int ret;
 	char *firmware;
-	int i, found = 0;
-	pcwd_validate_timeout();
-	spin_lock_init(&io_lock);
+	int option_switches;
 
-	revision = PCWD_REVISION_A;
+	cards_found++;
+	if (cards_found == 1)
+		printk(KERN_INFO PFX "v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
 
-	printk(KERN_INFO "pcwd: v%s Ken Hollis (kenji@bitgate.com)\n", WD_VER);
+	if (cards_found > 1) {
+		printk(KERN_ERR PFX "This driver only supports 1 device\n");
+		return -ENODEV;
+	}
+
+	if (base_addr == 0x0000) {
+		printk(KERN_ERR PFX "No I/O-Address for card detected\n");
+		return -ENODEV;
+	}
+	current_readport = base_addr;
+
+	/* Check card's revision */
+	revision = get_revision();
+
+	if (!request_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4, "PCWD")) {
+		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
+			current_readport);
+		current_readport = 0x0000;
+		return -EIO;
+	}
 
 	/* Initial variables */
 	supports_temp = 0;
-	mode_debug = 0;
 	temp_panic = 0;
 	initial_status = 0x0000;
-
-#ifndef	PCWD_BLIND
-	for (i = 0; pcwd_ioports[i] != 0; i++) {
-		current_readport = pcwd_ioports[i];
-
-		if (pcwd_checkcard()) {
-			found = 1;
-			break;
-		}
-	}
-
-	if (!found) {
-		printk(KERN_INFO "pcwd: No card detected, or port not available.\n");
-		return(-EIO);
-	}
-#endif
-
-#ifdef	PCWD_BLIND
-	current_readport = PCWD_BLIND;
-#endif
-
-	get_support();
-	revision = get_revision();
+	heartbeat = 0;
 
 	/* get the boot_status */
 	pcwd_get_status(&initial_status);
@@ -652,86 +659,198 @@ static int __init pcwatchdog_init(void)
 	/* clear the "card caused reboot" flag */
 	pcwd_clear_status();
 
+	/*  Disable the board  */
+	pcwd_stop();
+
+	/*  Check whether or not the card supports the temperature device */
+	get_support();
+
+	/* Get some extra info from the hardware (in command/debug/diag mode) */
 	if (revision == PCWD_REVISION_A)
-		printk(KERN_INFO "pcwd: PC Watchdog (REV.A) detected at port 0x%03x\n", current_readport);
+		printk(KERN_INFO PFX "ISA-PC Watchdog (REV.A) detected at port 0x%04x\n", current_readport);
 	else if (revision == PCWD_REVISION_C) {
 		firmware = get_firmware();
-		printk(KERN_INFO "pcwd: PC Watchdog (REV.C) detected at port 0x%03x (Firmware version: %s)\n",
+		printk(KERN_INFO PFX "ISA-PC Watchdog (REV.C) detected at port 0x%04x (Firmware version: %s)\n",
 			current_readport, firmware);
 		kfree(firmware);
+		option_switches = get_option_switches();
+		switch (option_switches & 0x07) {
+			case 0: heartbeat = 20; break;
+			case 1: heartbeat = 40; break;
+			case 2: heartbeat = 60; break;
+			case 3: heartbeat = 300; break;
+			case 4: heartbeat = 600; break;
+			case 5: heartbeat = 1800; break;
+			case 6: heartbeat = 3600; break;
+			case 7: heartbeat = 7200; break;
+		}
+		printk(KERN_INFO PFX "Option switches (0x%02x): Temperature Reset Enable=%s, Power On Delay=%s\n",
+			option_switches,
+			((option_switches & 0x10) ? "ON" : "OFF"),
+			((option_switches & 0x08) ? "ON" : "OFF"));
 	} else {
 		/* Should NEVER happen, unless get_revision() fails. */
-		printk("pcwd: Unable to get revision.\n");
+		printk(KERN_INFO PFX "Unable to get revision\n");
+		release_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4);
+		current_readport = 0x0000;
 		return -1;
 	}
 
-	debug_off();
-
 	if (supports_temp)
-		printk(KERN_INFO "pcwd: Temperature Option Detected.\n");
+		printk(KERN_INFO PFX "Temperature Option Detected\n");
 
 	if (initial_status & WDIOF_CARDRESET)
-		printk(KERN_INFO "pcwd: Previous reboot was caused by the card.\n");
+		printk(KERN_INFO PFX "Previous reboot was caused by the card\n");
 
 	if (initial_status & WDIOF_OVERHEAT) {
-		printk(KERN_EMERG "pcwd: Card senses a CPU Overheat.  Panicking!\n");
-		printk(KERN_EMERG "pcwd: CPU Overheat.\n");
+		printk(KERN_EMERG PFX "Card senses a CPU Overheat. Panicking!\n");
+		printk(KERN_EMERG PFX "CPU Overheat\n");
 	}
 
 	if (initial_status == 0)
-		printk(KERN_INFO "pcwd: No previous trip detected - Cold boot or reset\n");
+		printk(KERN_INFO PFX "No previous trip detected - Cold boot or reset\n");
 
-	/*  Disable the board  */
-	if (revision == PCWD_REVISION_C) {
-		outb_p(0xA5, current_readport + 3);
-		outb_p(0xA5, current_readport + 3);
+	ret = register_reboot_notifier(&pcwd_notifier);
+	if (ret) {
+		printk(KERN_ERR PFX "cannot register reboot notifier (err=%d)\n",
+			ret);
+		release_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4);
+		current_readport = 0x0000;
+		return ret;
 	}
 
-	if (misc_register(&pcwd_miscdev))
-		return -ENODEV;
-
-	if (supports_temp)
-		if (misc_register(&temp_miscdev)) {
-			misc_deregister(&pcwd_miscdev);
-			return -ENODEV;
-		}
-
-
-	if (revision == PCWD_REVISION_A) {
-		if (!request_region(current_readport, 2, "PCWD Rev.A (Berkshire)")) {
-			misc_deregister(&pcwd_miscdev);
-			if (supports_temp)
-				misc_deregister(&pcwd_miscdev);
-			return -EIO;
+	if (supports_temp) {
+		ret = misc_register(&temp_miscdev);
+		if (ret) {
+			printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+				TEMP_MINOR, ret);
+			unregister_reboot_notifier(&pcwd_notifier);
+			release_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4);
+			current_readport = 0x0000;
+			return ret;
 		}
 	}
-	else
-		if (!request_region(current_readport, 4, "PCWD Rev.C (Berkshire)")) {
-			misc_deregister(&pcwd_miscdev);
-			if (supports_temp)
-				misc_deregister(&pcwd_miscdev);
-			return -EIO;
-		}
+
+	ret = misc_register(&pcwd_miscdev);
+	if (ret) {
+		printk(KERN_ERR PFX "cannot register miscdev on minor=%d (err=%d)\n",
+			WATCHDOG_MINOR, ret);
+		if (supports_temp)
+			misc_deregister(&temp_miscdev);
+		unregister_reboot_notifier(&pcwd_notifier);
+		release_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4);
+		current_readport = 0x0000;
+		return ret;
+	}
+
+	printk(KERN_INFO PFX "initialized. heartbeat=%d sec (nowayout=%d)\n",
+		heartbeat, nowayout);
 
 	return 0;
 }
 
-static void __exit pcwatchdog_exit(void)
+static void __devexit pcwatchdog_exit(void)
 {
-	misc_deregister(&pcwd_miscdev);
 	/*  Disable the board  */
-	if (revision == PCWD_REVISION_C) {
-		outb_p(0xA5, current_readport + 3);
-		outb_p(0xA5, current_readport + 3);
-	}
+	if (!nowayout)
+		pcwd_stop();
+
+	/* Deregister */
+	misc_deregister(&pcwd_miscdev);
 	if (supports_temp)
 		misc_deregister(&temp_miscdev);
-
+	unregister_reboot_notifier(&pcwd_notifier);
 	release_region(current_readport, (revision == PCWD_REVISION_A) ? 2 : 4);
+	current_readport = 0x0000;
 }
 
-module_init(pcwatchdog_init);
-module_exit(pcwatchdog_exit);
+/*
+ *  The ISA cards have a heartbeat bit in one of the registers, which
+ *  register is card dependent.  The heartbeat bit is monitored, and if
+ *  found, is considered proof that a Berkshire card has been found.
+ *  The initial rate is once per second at board start up, then twice
+ *  per second for normal operation.
+ */
+static int __init pcwd_checkcard(int base_addr)
+{
+	int port0, last_port0;	/* Reg 0, in case it's REV A */
+	int port1, last_port1;	/* Register 1 for REV C cards */
+	int i;
+	int retval;
+
+	if (!request_region (base_addr, 4, "PCWD")) {
+		printk (KERN_INFO PFX "Port 0x%04x unavailable\n", base_addr);
+		return 0;
+	}
+
+	retval = 0;
+
+	port0 = inb_p(base_addr);	/* For REV A boards */
+	port1 = inb_p(base_addr + 1);	/* For REV C boards */
+	if (port0 != 0xff || port1 != 0xff) {
+		/* Not an 'ff' from a floating bus, so must be a card! */
+		for (i = 0; i < 4; ++i) {
+
+			set_current_state(TASK_INTERRUPTIBLE);
+			schedule_timeout(HZ / 2);
+
+			last_port0 = port0;
+			last_port1 = port1;
+
+			port0 = inb_p(base_addr);
+			port1 = inb_p(base_addr + 1);
+
+			/* Has either hearbeat bit changed?  */
+			if ((port0 ^ last_port0) & WD_HRTBT ||
+			    (port1 ^ last_port1) & WD_REVC_HRBT) {
+				retval = 1;
+				break;
+			}
+		}
+	}
+	release_region (base_addr, 4);
+
+	return retval;
+}
+
+/*
+ * These are the auto-probe addresses available.
+ *
+ * Revision A only uses ports 0x270 and 0x370.  Revision C introduced 0x350.
+ * Revision A has an address range of 2 addresses, while Revision C has 4.
+ */
+static int pcwd_ioports[] = { 0x270, 0x350, 0x370, 0x000 };
+
+static int __init pcwd_init_module(void)
+{
+	int i, found = 0;
+
+	spin_lock_init(&io_lock);
+
+	for (i = 0; pcwd_ioports[i] != 0; i++) {
+		if (pcwd_checkcard(pcwd_ioports[i])) {
+			if (!(pcwatchdog_init(pcwd_ioports[i])))
+				found++;
+		}
+	}
+
+	if (!found) {
+		printk (KERN_INFO PFX "No card detected, or port not available\n");
+		return -ENODEV;
+	}
+
+	return 0;
+}
+
+static void __exit pcwd_cleanup_module(void)
+{
+	if (current_readport)
+		pcwatchdog_exit();
+	return;
+}
+
+module_init(pcwd_init_module);
+module_exit(pcwd_cleanup_module);
 
 MODULE_AUTHOR("Ken Hollis <kenji@bitgate.com>");
 MODULE_DESCRIPTION("Berkshire ISA-PC Watchdog driver");
