@@ -915,7 +915,9 @@ load_up_altivec:
 	/* enable use of AltiVec after return */
 	oris	r9,r9,MSR_VEC@h
 	mfspr	r5,SPRG3		/* current task's THREAD (phys) */
+	li	r4,1
 	li	r10,THREAD_VSCR
+	stw	r4,THREAD_USED_VR(r5)
 	lvx	vr0,r10,r5
 	mtvscr	vr0
 	REST_32VR(0,r10,r5)
