@@ -19,7 +19,7 @@
 #include "psmouse.h"
 #include "alps.h"
 
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
 #define dbg(format, arg...) printk(KERN_INFO "alps.c: " format "\n", ## arg)
 #else
