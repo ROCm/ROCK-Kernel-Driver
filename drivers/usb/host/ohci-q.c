@@ -265,6 +265,9 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_CLE;
 				writel (ohci->hc_control, &ohci->regs->control);
+				writel (0, &ohci->regs->ed_controlcurrent);
+				// post those pci writes
+				(void) readl (&ohci->regs->control);
 			}
 			writel (le32_to_cpup (&ed->hwNextED),
 				&ohci->regs->ed_controlhead);
@@ -286,6 +289,9 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			if (!ed->hwNextED) {
 				ohci->hc_control &= ~OHCI_CTRL_BLE;
 				writel (ohci->hc_control, &ohci->regs->control);
+				writel (0, &ohci->regs->ed_bulkcurrent);
+				// post those pci writes
+				(void) readl (&ohci->regs->control);
 			}
 			writel (le32_to_cpup (&ed->hwNextED),
 				&ohci->regs->ed_bulkhead);
@@ -315,8 +321,12 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 	 * involves not marking it ED_IDLE till INTR_SF; we always do that
 	 * if td_list isn't empty.  Otherwise the race is small; but ...
 	 */
-	if (ed->state == ED_OPER)
+	if (ed->state == ED_OPER) {
 		ed->state = ED_IDLE;
+		ed->hwINFO &= ~(ED_SKIP | ED_DEQUEUE);
+		ed->hwHeadP &= ~ED_H;
+		wmb ();
+	}
 }
 
 
@@ -767,6 +777,8 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 		next->next_dl_td = rev;	
 		rev = next;
 
+		if (ed->hwTailP == cpu_to_le32 (next->td_dma))
+			ed->hwTailP = next->hwNextTD;
 		ed->hwHeadP = next->hwNextTD | toggle;
 	}
 
@@ -881,8 +893,13 @@ rescan_this:
 				continue;
 			}
 
-			/* patch pointer hc uses */
-			savebits = *prev & cpu_to_le32 (TD_MASK);
+			/* patch pointers hc uses ... tail, if we're removing
+			 * an otherwise active td, and whatever td pointer
+			 * points to this td
+			 */
+			if (ed->hwTailP == cpu_to_le32 (td->td_dma))
+				ed->hwTailP = td->hwNextTD;
+			savebits = *prev & ~cpu_to_le32 (TD_MASK);
 			*prev = td->hwNextTD | savebits;
 
 			/* HC may have partly processed this TD */
