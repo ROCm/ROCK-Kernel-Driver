@@ -271,7 +271,6 @@ static void ibmveth_replenish_task(struct ibmveth_adapter *adapter)
 	adapter->rx_no_buffer = *(u64*)(((char*)adapter->buffer_list_addr) + 4096 - 8);
 
 	atomic_inc(&adapter->not_replenishing);
-	ibmveth_assert(atomic_read(&adapter->not_replenishing) == 1);
 }
 
 /* kick the replenish tasklet if we need replenishing and it isn't already running */
@@ -733,6 +732,8 @@ static int ibmveth_poll(struct net_device *netdev, int *budget)
 
 		if(ibmveth_rxq_pending_buffer(adapter)) {
 			struct sk_buff *skb;
+
+			rmb();
 
 			if(!ibmveth_rxq_buffer_valid(adapter)) {
 				wmb(); /* suggested by larson1 */
