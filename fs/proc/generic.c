@@ -286,7 +286,7 @@ static int xlate_proc_name(const char *name,
 }
 
 static DEFINE_IDR(proc_inum_idr);
-static spinlock_t proc_inum_lock = SPIN_LOCK_UNLOCKED; /* protects the above */
+static DEFINE_SPINLOCK(proc_inum_lock); /* protects the above */
 
 #define PROC_DYNAMIC_FIRST 0xF0000000UL
 

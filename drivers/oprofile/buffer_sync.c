@@ -35,7 +35,7 @@
 static LIST_HEAD(dying_tasks);
 static LIST_HEAD(dead_tasks);
 cpumask_t marked_cpus = CPU_MASK_NONE;
-static spinlock_t task_mortuary = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(task_mortuary);
 void process_task_mortuary(void);
 
 

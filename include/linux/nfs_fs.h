@@ -261,12 +261,6 @@ static inline int NFS_USE_READDIRPLUS(struct inode *inode)
 	return NFS_FLAGS(inode) & NFS_INO_ADVISE_RDPLUS;
 }
 
-static inline
-loff_t page_offset(struct page *page)
-{
-	return ((loff_t)page->index) << PAGE_CACHE_SHIFT;
-}
-
 /**
  * nfs_save_change_attribute - Returns the inode attribute change cookie
  * @inode - pointer to inode

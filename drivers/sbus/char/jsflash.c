@@ -539,7 +539,7 @@ static struct request_queue *jsf_queue;
 
 static int jsfd_init(void)
 {
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	struct jsflash *jsf;
 	struct jsfd_part *jdp;
 	int err;

@@ -254,7 +254,7 @@ static __u16 vic_irq_mask[NR_CPUS] __cacheline_aligned;
 static __u16 vic_irq_enable_mask[NR_CPUS] __cacheline_aligned = { 0 };
 
 /* Lock for enable/disable of VIC interrupts */
-static spinlock_t vic_irq_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+static  __cacheline_aligned DEFINE_SPINLOCK(vic_irq_lock);
 
 /* The boot processor is correctly set up in PC mode when it 
  * comes up, but the secondaries need their master/slave 8259
@@ -798,7 +798,7 @@ fastcall void
 smp_vic_cmn_interrupt(struct pt_regs *regs)
 {
 	static __u8 in_cmn_int = 0;
-	static spinlock_t cmn_int_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(cmn_int_lock);
 
 	/* common ints are broadcast, so make sure we only do this once */
 	_raw_spin_lock(&cmn_int_lock);
@@ -831,7 +831,7 @@ smp_reschedule_interrupt(void)
 
 static struct mm_struct * flush_mm;
 static unsigned long flush_va;
-static spinlock_t tlbstate_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tlbstate_lock);
 #define FLUSH_ALL	0xffffffff
 
 /*
@@ -1021,7 +1021,7 @@ smp_stop_cpu_function(void *dummy)
 	       __asm__("hlt");
 }
 
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 
 struct call_data_struct {
 	void (*func) (void *info);

@@ -66,7 +66,8 @@ print_tuple(struct seq_file *s, const struct ip_conntrack_tuple *tuple,
 
 #ifdef CONFIG_IP_NF_CT_ACCT
 static unsigned int
-seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
+seq_print_counters(struct seq_file *s,
+		   const struct ip_conntrack_counter *counter)
 {
 	return seq_printf(s, "packets=%llu bytes=%llu ",
 			  (unsigned long long)counter->packets,
@@ -99,7 +100,7 @@ static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
 static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 			    struct seq_file *s)
 {
-	struct ip_conntrack *conntrack = hash->ctrack;
+	const struct ip_conntrack *conntrack = tuplehash_to_ctrack(hash);
 	struct ip_conntrack_protocol *proto;
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
@@ -200,7 +201,6 @@ static void *exp_seq_start(struct seq_file *s, loff_t *pos)
 	/* strange seq_file api calls stop even if we fail,
 	 * thus we need to grab lock since stop unlocks */
 	READ_LOCK(&ip_conntrack_lock);
-	READ_LOCK(&ip_conntrack_expect_tuple_lock);
 
 	if (list_empty(e))
 		return NULL;
@@ -227,7 +227,6 @@ static void *exp_seq_next(struct seq_file *s, void *v, loff_t *pos)
 
 static void exp_seq_stop(struct seq_file *s, void *v)
 {
-	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
 	READ_UNLOCK(&ip_conntrack_lock);
 }
 
@@ -235,14 +234,13 @@ static int exp_seq_show(struct seq_file *s, void *v)
 {
 	struct ip_conntrack_expect *expect = v;
 
-	if (expect->expectant->helper->timeout)
+	if (expect->timeout.function)
 		seq_printf(s, "%lu ", timer_pending(&expect->timeout)
 			   ? (expect->timeout.expires - jiffies)/HZ : 0);
 	else
 		seq_printf(s, "- ");
 
-	seq_printf(s, "use=%u proto=%u ", atomic_read(&expect->use),
-		   expect->tuple.dst.protonum);
+	seq_printf(s, "proto=%u ", expect->tuple.dst.protonum);
 
 	print_tuple(s, &expect->tuple,
 		    ip_ct_find_proto(expect->tuple.dst.protonum));
@@ -364,8 +362,20 @@ static unsigned int ip_confirm(unsigned int hooknum,
 			       const struct net_device *out,
 			       int (*okfn)(struct sk_buff *))
 {
+	struct ip_conntrack *ct;
+	enum ip_conntrack_info ctinfo;
+
+	/* This is where we call the helper: as the packet goes out. */
+	ct = ip_conntrack_get(*pskb, &ctinfo);
+	if (ct && ct->helper) {
+		unsigned int ret;
+		ret = ct->helper->help(pskb, ct, ctinfo);
+		if (ret != NF_ACCEPT)
+			return ret;
+	}
+
 	/* We've seen it coming out the other side: confirm it */
-	return ip_conntrack_confirm(*pskb);
+	return ip_conntrack_confirm(pskb);
 }
 
 static unsigned int ip_conntrack_defrag(unsigned int hooknum,
@@ -896,17 +906,13 @@ EXPORT_SYMBOL(ip_ct_iterate_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh_acct);
 EXPORT_SYMBOL(ip_ct_protos);
 EXPORT_SYMBOL(ip_ct_find_proto);
-EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_alloc);
+EXPORT_SYMBOL(ip_conntrack_expect_free);
 EXPORT_SYMBOL(ip_conntrack_expect_related);
-EXPORT_SYMBOL(ip_conntrack_change_expect);
 EXPORT_SYMBOL(ip_conntrack_unexpect_related);
-EXPORT_SYMBOL_GPL(ip_conntrack_expect_find_get);
-EXPORT_SYMBOL_GPL(ip_conntrack_expect_put);
 EXPORT_SYMBOL(ip_conntrack_tuple_taken);
 EXPORT_SYMBOL(ip_ct_gather_frags);
 EXPORT_SYMBOL(ip_conntrack_htable_size);
-EXPORT_SYMBOL(ip_conntrack_expect_list);
 EXPORT_SYMBOL(ip_conntrack_lock);
 EXPORT_SYMBOL(ip_conntrack_hash);
 EXPORT_SYMBOL(ip_conntrack_untracked);

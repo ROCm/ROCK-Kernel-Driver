@@ -26,7 +26,7 @@
  *  controllers on the Freescale 8540/8560 integrated processors,
  *  as well as the Fast Ethernet Controller on the 8540.  
  *  
- *  The driver is initialized through OCP.  Structures which
+ *  The driver is initialized through platform_device.  Structures which
  *  define the configuration needed by the board are defined in a
  *  board structure in arch/ppc/platforms (though I do not
  *  discount the possibility that other architectures could one
@@ -85,6 +85,7 @@
 #include <linux/skbuff.h>
 #include <linux/spinlock.h>
 #include <linux/mm.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -130,8 +131,8 @@ static void gfar_phy_timer(unsigned long data);
 static void adjust_link(struct net_device *dev);
 static void init_registers(struct net_device *dev);
 static int init_phy(struct net_device *dev);
-static int gfar_probe(struct ocp_device *ocpdev);
-static void gfar_remove(struct ocp_device *ocpdev);
+static int gfar_probe(struct device *device);
+static int gfar_remove(struct device *device);
 void free_skb_resources(struct gfar_private *priv);
 static void gfar_set_multi(struct net_device *dev);
 static void gfar_set_hash_for_addr(struct net_device *dev, u8 *addr);
@@ -148,43 +149,25 @@ MODULE_AUTHOR("Freescale Semiconductor, Inc");
 MODULE_DESCRIPTION("Gianfar Ethernet Driver");
 MODULE_LICENSE("GPL");
 
-/* Called by the ocp code to initialize device data structures
- * required for bringing up the device
- * returns 0 on success */
-static int gfar_probe(struct ocp_device *ocpdev)
+static int gfar_probe(struct device *device)
 {
 	u32 tempval;
-	struct ocp_device *mdiodev;
 	struct net_device *dev = NULL;
 	struct gfar_private *priv = NULL;
-	struct ocp_gfar_data *einfo;
+	struct platform_device *pdev = to_platform_device(device);
+	struct gianfar_platform_data *einfo;
+	struct resource *r;
 	int idx;
 	int err = 0;
 	int dev_ethtool_ops = 0;
 
-	einfo = (struct ocp_gfar_data *) ocpdev->def->additions;
+	einfo = (struct gianfar_platform_data *) pdev->dev.platform_data;
 
 	if (einfo == NULL) {
 		printk(KERN_ERR "gfar %d: Missing additional data!\n",
-		       ocpdev->def->index);
+		       pdev->id);
 
 		return -ENODEV;
-	}
-
-	/* get a pointer to the register memory which can
-	 * configure the PHYs.  If it's different from this set,
-	 * get the device which has those regs */
-	if ((einfo->phyregidx >= 0) && 
-			(einfo->phyregidx != ocpdev->def->index)) {
-		mdiodev = ocp_find_device(OCP_ANY_ID,
-					  OCP_FUNC_GFAR, einfo->phyregidx);
-
-		/* If the device which holds the MDIO regs isn't
-		 * up, wait for it to come up */
-		if (mdiodev == NULL)
-			return -EAGAIN;
-	} else {
-		mdiodev = ocpdev;
 	}
 
 	/* Create an ethernet device instance */
@@ -198,9 +181,19 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	/* Set the info in the priv to the current info */
 	priv->einfo = einfo;
 
+	/* fill out IRQ fields */
+	if (einfo->device_flags & FSL_GIANFAR_DEV_HAS_MULTI_INTR) {
+		priv->interruptTransmit = platform_get_irq_byname(pdev, "tx");
+		priv->interruptReceive = platform_get_irq_byname(pdev, "rx");
+		priv->interruptError = platform_get_irq_byname(pdev, "error");
+	} else {
+		priv->interruptTransmit = platform_get_irq(pdev, 0);
+	}
+
 	/* get a pointer to the register memory */
+	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	priv->regs = (struct gfar *)
-		ioremap(ocpdev->def->paddr, sizeof (struct gfar));
+		ioremap(r->start, sizeof (struct gfar));
 
 	if (priv->regs == NULL) {
 		err = -ENOMEM;
@@ -209,7 +202,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 
 	/* Set the PHY base address */
 	priv->phyregs = (struct gfar *)
-	    ioremap(mdiodev->def->paddr, sizeof (struct gfar));
+	    ioremap(einfo->phy_reg_addr, sizeof (struct gfar));
 
 	if (priv->phyregs == NULL) {
 		err = -ENOMEM;
@@ -218,7 +211,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 
 	spin_lock_init(&priv->lock);
 
-	ocp_set_drvdata(ocpdev, dev);
+	dev_set_drvdata(device, dev);
 
 	/* Stop the DMA engine now, in case it was running before */
 	/* (The firmware could have used it, and left it running). */
@@ -255,7 +248,7 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	dev->base_addr = (unsigned long) (priv->regs);
 
 	SET_MODULE_OWNER(dev);
-	SET_NETDEV_DEV(dev, &ocpdev->dev);
+	SET_NETDEV_DEV(dev, device);
 
 	/* Fill in the dev structure */
 	dev->open = gfar_enet_open;
@@ -274,10 +267,10 @@ static int gfar_probe(struct ocp_device *ocpdev)
 
 	/* Index into the array of possible ethtool
 	 * ops to catch all 4 possibilities */
-	if((priv->einfo->flags & GFAR_HAS_RMON) == 0)
+	if((priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_RMON) == 0)
 		dev_ethtool_ops += 1;
 
-	if((priv->einfo->flags & GFAR_HAS_COALESCE) == 0)
+	if((priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_COALESCE) == 0)
 		dev_ethtool_ops += 2;
 
 	dev->ethtool_ops = gfar_op_array[dev_ethtool_ops];
@@ -332,17 +325,20 @@ regs_fail:
 	return -ENOMEM;
 }
 
-static void gfar_remove(struct ocp_device *ocpdev)
+static int gfar_remove(struct device *device)
 {
-	struct net_device *dev = ocp_get_drvdata(ocpdev);
+	struct net_device *dev = dev_get_drvdata(device);
 	struct gfar_private *priv = netdev_priv(dev);
 
-	ocp_set_drvdata(ocpdev, NULL);
+	dev_set_drvdata(device, NULL);
 
 	iounmap((void *) priv->regs);
 	iounmap((void *) priv->phyregs);
 	free_netdev(dev);
+
+	return 0;
 }
+
 
 /* Configure the PHY for dev.
  * returns 0 if success.  -1 if failure
@@ -470,7 +466,7 @@ static void init_registers(struct net_device *dev)
 	gfar_write(&priv->regs->rctrl, 0x00000000);
 
 	/* Zero out the rmon mib registers if it has them */
-	if (priv->einfo->flags & GFAR_HAS_RMON) {
+	if (priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_RMON) {
 		memset((void *) &(priv->regs->rmon), 0,
 		       sizeof (struct rmon_mib));
 
@@ -536,7 +532,7 @@ void stop_gfar(struct net_device *dev)
 	tempval &= ~(MACCFG1_RX_EN | MACCFG1_TX_EN);
 	gfar_write(&regs->maccfg1, tempval);
 
-	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
+	if (priv->einfo->board_flags & FSL_GIANFAR_BRD_HAS_PHY_INTR) {
 		/* Clear any pending interrupts */
 		mii_clear_phy_interrupt(priv->mii_info);
 
@@ -548,15 +544,15 @@ void stop_gfar(struct net_device *dev)
 	spin_unlock_irqrestore(&priv->lock, flags);
 
 	/* Free the IRQs */
-	if (priv->einfo->flags & GFAR_HAS_MULTI_INTR) {
-		free_irq(priv->einfo->interruptError, dev);
-		free_irq(priv->einfo->interruptTransmit, dev);
-		free_irq(priv->einfo->interruptReceive, dev);
+	if (priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_MULTI_INTR) {
+		free_irq(priv->interruptError, dev);
+		free_irq(priv->interruptTransmit, dev);
+		free_irq(priv->interruptReceive, dev);
 	} else {
-		free_irq(priv->einfo->interruptTransmit, dev);
+		free_irq(priv->interruptTransmit, dev);
 	}
 
-	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
+	if (priv->einfo->board_flags & FSL_GIANFAR_BRD_HAS_PHY_INTR) {
 		free_irq(priv->einfo->interruptPHY, dev);
 	} else {
 		del_timer_sync(&priv->phy_info_timer);
@@ -727,41 +723,41 @@ int startup_gfar(struct net_device *dev)
 
 	/* If the device has multiple interrupts, register for
 	 * them.  Otherwise, only register for the one */
-	if (priv->einfo->flags & GFAR_HAS_MULTI_INTR) {
+	if (priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_MULTI_INTR) {
 		/* Install our interrupt handlers for Error, 
 		 * Transmit, and Receive */
-		if (request_irq(priv->einfo->interruptError, gfar_error,
+		if (request_irq(priv->interruptError, gfar_error,
 				0, "enet_error", dev) < 0) {
 			printk(KERN_ERR "%s: Can't get IRQ %d\n",
-			       dev->name, priv->einfo->interruptError);
+			       dev->name, priv->interruptError);
 
 			err = -1;
 			goto err_irq_fail;
 		}
 
-		if (request_irq(priv->einfo->interruptTransmit, gfar_transmit,
+		if (request_irq(priv->interruptTransmit, gfar_transmit,
 				0, "enet_tx", dev) < 0) {
 			printk(KERN_ERR "%s: Can't get IRQ %d\n",
-			       dev->name, priv->einfo->interruptTransmit);
+			       dev->name, priv->interruptTransmit);
 
 			err = -1;
 
 			goto tx_irq_fail;
 		}
 
-		if (request_irq(priv->einfo->interruptReceive, gfar_receive,
+		if (request_irq(priv->interruptReceive, gfar_receive,
 				0, "enet_rx", dev) < 0) {
 			printk(KERN_ERR "%s: Can't get IRQ %d (receive0)\n",
-			       dev->name, priv->einfo->interruptReceive);
+			       dev->name, priv->interruptReceive);
 
 			err = -1;
 			goto rx_irq_fail;
 		}
 	} else {
-		if (request_irq(priv->einfo->interruptTransmit, gfar_interrupt,
+		if (request_irq(priv->interruptTransmit, gfar_interrupt,
 				0, "gfar_interrupt", dev) < 0) {
 			printk(KERN_ERR "%s: Can't get IRQ %d\n",
-			       dev->name, priv->einfo->interruptError);
+			       dev->name, priv->interruptError);
 
 			err = -1;
 			goto err_irq_fail;
@@ -815,9 +811,9 @@ int startup_gfar(struct net_device *dev)
 	return 0;
 
 rx_irq_fail:
-	free_irq(priv->einfo->interruptTransmit, dev);
+	free_irq(priv->interruptTransmit, dev);
 tx_irq_fail:
-	free_irq(priv->einfo->interruptError, dev);
+	free_irq(priv->interruptError, dev);
 err_irq_fail:
 rx_skb_fail:
 	free_skb_resources(priv);
@@ -1490,7 +1486,7 @@ static void gfar_phy_change(void *data)
 		adjust_link(dev);
 
 	/* Reenable interrupts, if needed */
-	if (priv->einfo->flags & GFAR_HAS_PHY_INTR)
+	if (priv->einfo->board_flags & FSL_GIANFAR_BRD_HAS_PHY_INTR)
 		mii_configure_phy_interrupt(priv->mii_info,
 				MII_INTERRUPT_ENABLED);
 }
@@ -1547,7 +1543,7 @@ static void gfar_phy_startup_timer(unsigned long data)
 	del_timer_sync(&priv->phy_info_timer);
 
 	/* Grab the PHY interrupt, if necessary/possible */
-	if (priv->einfo->flags & GFAR_HAS_PHY_INTR) {
+	if (priv->einfo->board_flags & FSL_GIANFAR_BRD_HAS_PHY_INTR) {
 		if (request_irq(priv->einfo->interruptPHY, 
 					phy_interrupt,
 					SA_SHIRQ, 
@@ -1758,7 +1754,7 @@ static irqreturn_t gfar_error(int irq, void *dev_id, struct pt_regs *regs)
 	/* Hmm... */
 #if defined (BRIEF_GFAR_ERRORS) || defined (VERBOSE_GFAR_ERRORS)
 	printk(KERN_DEBUG "%s: error interrupt (ievent=0x%08x imask=0x%08x)\n",
-	       dev->name, events, gfar_read(priv->regs->imask));
+	       dev->name, events, gfar_read(&priv->regs->imask));
 #endif
 
 	/* Update the error counters */
@@ -1829,36 +1825,23 @@ static irqreturn_t gfar_error(int irq, void *dev_id, struct pt_regs *regs)
 }
 
 /* Structure for a device driver */
-static struct ocp_device_id gfar_ids[] = {
-	{.vendor = OCP_ANY_ID,.function = OCP_FUNC_GFAR},
-	{.vendor = OCP_VENDOR_INVALID}
-};
-
-static struct ocp_driver gfar_driver = {
-	.name = "gianfar",
-	.id_table = gfar_ids,
-
+static struct device_driver gfar_driver = {
+	.name = "fsl-gianfar",
+	.bus = &platform_bus_type,
 	.probe = gfar_probe,
 	.remove = gfar_remove,
 };
 
 static int __init gfar_init(void)
 {
-	int rc;
-
-	rc = ocp_register_driver(&gfar_driver);
-	if (rc != 0) {
-		ocp_unregister_driver(&gfar_driver);
-		return -ENODEV;
-	}
-
-	return 0;
+	return driver_register(&gfar_driver);
 }
 
 static void __exit gfar_exit(void)
 {
-	ocp_unregister_driver(&gfar_driver);
+	driver_unregister(&gfar_driver);
 }
 
 module_init(gfar_init);
 module_exit(gfar_exit);
+

@@ -143,7 +143,7 @@ static struct mtd_partition h3xxx_partitions_bank2[] = {
 };
 #endif
 
-static spinlock_t ipaq_vpp_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ipaq_vpp_lock);
 
 static void h3xxx_set_vpp(struct map_info *map, int vpp)
 {

@@ -123,14 +123,14 @@ static struct tcf_ext_map rsvp_ext_map = {
 	.action = TCA_RSVP_ACT
 };
 
-#define RSVP_APPLY_RESULT()					\
-	do {							\
-		int r = tcf_exts_exec(skb, &f->exts, res);	\
-		if (r < 0)					\
-			continue;				\
-		else if (r > 0)					\
-			return r;				\
-	} while(0)
+#define RSVP_APPLY_RESULT()				\
+{							\
+	int r = tcf_exts_exec(skb, &f->exts, res);	\
+	if (r < 0)					\
+		continue;				\
+	else if (r > 0)					\
+		return r;				\
+}
 	
 static int rsvp_classify(struct sk_buff *skb, struct tcf_proto *tp,
 			 struct tcf_result *res)

@@ -109,7 +109,10 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	 * so early in setup that sucker gets confused into doing what
 	 * it shouldn't if we actually call it.
 	 */
-	for (p = q = ioremap(0xF0000, 0x10000); q < p + 0x10000; q += 16) {
+	p = ioremap(0xF0000, 0x10000);
+	if (p == NULL)
+		return -1;
+	for (q = p; q < p + 0x10000; q += 16) {
 		memcpy_fromio(buf, q, 15);
 		if(memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf))
 		{

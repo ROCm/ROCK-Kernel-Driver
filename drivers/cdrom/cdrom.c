@@ -303,7 +303,7 @@ module_param(lockdoor, bool, 0);
 module_param(check_media_type, bool, 0);
 module_param(mrw_format_restart, bool, 0);
 
-static spinlock_t cdrom_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cdrom_lock);
 
 static const char *mrw_format_status[] = {
 	"not mrw",

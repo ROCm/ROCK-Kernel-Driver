@@ -42,7 +42,7 @@
 
 int sis_apic_bug; /* not actually supported, dummy for compile */
 
-static spinlock_t ioapic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ioapic_lock);
 
 /*
  * # of IRQ routing registers

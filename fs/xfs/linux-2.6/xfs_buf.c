@@ -168,7 +168,7 @@ typedef struct a_list {
 
 STATIC a_list_t		*as_free_head;
 STATIC int		as_list_len;
-STATIC spinlock_t	as_lock = SPIN_LOCK_UNLOCKED;
+STATIC DEFINE_SPINLOCK(as_lock);
 
 /*
  * Try to batch vunmaps because they are costly.
@@ -1593,7 +1593,7 @@ error:
  */
 
 STATIC LIST_HEAD(pbd_delwrite_queue);
-STATIC spinlock_t pbd_delwrite_lock = SPIN_LOCK_UNLOCKED;
+STATIC DEFINE_SPINLOCK(pbd_delwrite_lock);
 
 STATIC void
 pagebuf_delwri_queue(

@@ -25,7 +25,7 @@ extern char memcons_output[], memcons_output_end;
 static unsigned long memcons_offs = 0;
 
 /* Spinlock protecting memcons_offs.  */
-static spinlock_t memcons_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(memcons_lock);
 
 
 static size_t write (const char *buf, size_t len)

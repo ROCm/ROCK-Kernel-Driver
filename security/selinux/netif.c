@@ -45,7 +45,7 @@ struct sel_netif
 
 static u32 sel_netif_total;
 static LIST_HEAD(sel_netif_list);
-static spinlock_t sel_netif_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sel_netif_lock);
 static struct list_head sel_netif_hash[SEL_NETIF_HASH_SIZE];
 
 static inline u32 sel_netif_hasfn(struct net_device *dev)

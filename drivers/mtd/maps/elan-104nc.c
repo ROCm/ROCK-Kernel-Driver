@@ -54,7 +54,7 @@ always fail.  So we don't do it.  I just hope it doesn't break anything.
 
 static volatile int page_in_window = -1; // Current page in window.
 static void __iomem *iomapadr;
-static spinlock_t elan_104nc_spin = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(elan_104nc_spin);
 
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the

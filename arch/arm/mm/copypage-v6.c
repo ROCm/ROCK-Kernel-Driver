@@ -28,7 +28,7 @@
 
 static pte_t *from_pte;
 static pte_t *to_pte;
-static spinlock_t v6_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(v6_lock);
 
 #define DCACHE_COLOUR(vaddr) ((vaddr & (SHMLBA - 1)) >> PAGE_SHIFT)
 

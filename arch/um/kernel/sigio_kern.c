@@ -39,7 +39,7 @@ int write_sigio_irq(int fd)
 	return(0);
 }
 
-static spinlock_t sigio_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sigio_spinlock);
 
 void sigio_lock(void)
 {

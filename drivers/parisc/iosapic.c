@@ -396,7 +396,7 @@ iosapic_init(void)
 	unsigned long cell = 0;
 
 	/* init global data */
-	iosapic_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&iosapic_lock);
         iosapic_list = (struct iosapic_info *) NULL;
 	iosapic_count = 0;
 

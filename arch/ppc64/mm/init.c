@@ -470,7 +470,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
-static spinlock_t mmu_context_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mmu_context_lock);
 static DEFINE_IDR(mmu_context_idr);
 
 int init_new_context(struct task_struct *tsk, struct mm_struct *mm)

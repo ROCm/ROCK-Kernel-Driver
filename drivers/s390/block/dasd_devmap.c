@@ -73,7 +73,7 @@ static char *dasd[256];
 /*
  * Single spinlock to protect devmap structures and lists.
  */
-static spinlock_t dasd_devmap_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dasd_devmap_lock);
 
 /*
  * Hash lists for devmap structures.

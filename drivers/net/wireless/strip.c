@@ -437,7 +437,7 @@ static const long LongTime = 0x7FFFFFFF;
 /* Global variables							*/
 
 static LIST_HEAD(strip_list);
-static spinlock_t strip_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(strip_lock);
 
 /************************************************************************/
 /* Macros								*/

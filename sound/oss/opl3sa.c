@@ -36,7 +36,7 @@
 static int sb_initialized;
 #endif
 
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 static unsigned char opl3sa_read(int addr)
 {

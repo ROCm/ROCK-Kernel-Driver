@@ -139,8 +139,6 @@ typedef struct {
 
 #define rwlock_init(x)  do { *(x) = RW_LOCK_UNLOCKED; } while(0)
 
-#define rwlock_is_locked(x) ((x)->lock)
-
 static inline void _raw_read_lock(rwlock_t *rw)
 {
 	unsigned int tmp;

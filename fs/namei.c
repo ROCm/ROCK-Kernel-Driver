@@ -169,21 +169,6 @@ int generic_permission(struct inode *inode, int mask,
 {
 	umode_t			mode = inode->i_mode;
 
-	if (mask & MAY_WRITE) {
-		/*
-		 * Nobody gets write access to a read-only fs.
-		 */
-		if (IS_RDONLY(inode) &&
-		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
-			return -EROFS;
-
-		/*
-		 * Nobody gets write access to an immutable file.
-		 */
-		if (IS_IMMUTABLE(inode))
-			return -EACCES;
-	}
-
 	if (current->fsuid == inode->i_uid)
 		mode >>= 6;
 	else {
@@ -225,14 +210,30 @@ int generic_permission(struct inode *inode, int mask,
 	return -EACCES;
 }
 
-int permission(struct inode * inode,int mask, struct nameidata *nd)
+int permission(struct inode *inode, int mask, struct nameidata *nd)
 {
-	int retval;
-	int submask;
+	int retval, submask;
+
+	if (mask & MAY_WRITE) {
+		umode_t mode = inode->i_mode;
+
+		/*
+		 * Nobody gets write access to a read-only fs.
+		 */
+		if (IS_RDONLY(inode) &&
+		    (S_ISREG(mode) || S_ISDIR(mode) || S_ISLNK(mode)))
+			return -EROFS;
+
+		/*
+		 * Nobody gets write access to an immutable file.
+		 */
+		if (IS_IMMUTABLE(inode))
+			return -EACCES;
+	}
+
 
 	/* Ordinary permission routines do not understand MAY_APPEND. */
 	submask = mask & ~MAY_APPEND;
-
 	if (inode->i_op && inode->i_op->permission)
 		retval = inode->i_op->permission(inode, submask, nd);
 	else
@@ -481,6 +482,24 @@ fail:
 	return PTR_ERR(link);
 }
 
+static inline int __do_follow_link(struct dentry *dentry, struct nameidata *nd)
+{
+	int error;
+
+	touch_atime(nd->mnt, dentry);
+	nd_set_link(nd, NULL);
+	error = dentry->d_inode->i_op->follow_link(dentry, nd);
+	if (!error) {
+		char *s = nd_get_link(nd);
+		if (s)
+			error = __vfs_follow_link(nd, s);
+		if (dentry->d_inode->i_op->put_link)
+			dentry->d_inode->i_op->put_link(dentry, nd);
+	}
+
+	return error;
+}
+
 /*
  * This limits recursive symlink follows to 8, while
  * limiting consecutive symlinks to 40.
@@ -503,16 +522,7 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 	current->link_count++;
 	current->total_link_count++;
 	nd->depth++;
-	touch_atime(nd->mnt, dentry);
-	nd_set_link(nd, NULL);
-	err = dentry->d_inode->i_op->follow_link(dentry, nd);
-	if (!err) {
-		char *s = nd_get_link(nd);
-		if (s)
-			err = __vfs_follow_link(nd, s);
-		if (dentry->d_inode->i_op->put_link)
-			dentry->d_inode->i_op->put_link(dentry, nd);
-	}
+	err = __do_follow_link(dentry, nd);
 	current->link_count--;
 	nd->depth--;
 	return err;
@@ -1469,16 +1479,7 @@ do_link:
 	error = security_inode_follow_link(dentry, nd);
 	if (error)
 		goto exit_dput;
-	touch_atime(nd->mnt, dentry);
-	nd_set_link(nd, NULL);
-	error = dentry->d_inode->i_op->follow_link(dentry, nd);
-	if (!error) {
-		char *s = nd_get_link(nd);
-		if (s)
-			error = __vfs_follow_link(nd, s);
-		if (dentry->d_inode->i_op->put_link)
-			dentry->d_inode->i_op->put_link(dentry, nd);
-	}
+	error = __do_follow_link(dentry, nd);
 	dput(dentry);
 	if (error)
 		return error;

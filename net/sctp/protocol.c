@@ -364,7 +364,7 @@ static int sctp_v4_is_any(const union sctp_addr *addr)
  * Return 0 - If the address is a non-unicast or an illegal address.
  * Return 1 - If the address is a unicast.
  */
-static int sctp_v4_addr_valid(union sctp_addr *addr, struct sctp_opt *sp)
+static int sctp_v4_addr_valid(union sctp_addr *addr, struct sctp_sock *sp)
 {
 	/* Is this a non-unicast address or a unusable SCTP address? */
 	if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
@@ -374,7 +374,7 @@ static int sctp_v4_addr_valid(union sctp_addr *addr, struct sctp_opt *sp)
 }
 
 /* Should this be available for binding?   */
-static int sctp_v4_available(union sctp_addr *addr, struct sctp_opt *sp)
+static int sctp_v4_available(union sctp_addr *addr, struct sctp_sock *sp)
 {
 	int ret = inet_addr_type(addr->v4.sin_addr.s_addr);
 
@@ -608,7 +608,7 @@ out:
 }
 
 /* Map address, empty for v4 family */
-static void sctp_v4_addr_v4map(struct sctp_opt *sp, union sctp_addr *addr)
+static void sctp_v4_addr_v4map(struct sctp_sock *sp, union sctp_addr *addr)
 {
 	/* Empty */
 }
@@ -745,7 +745,7 @@ static void sctp_inet_skb_msgname(struct sk_buff *skb, char *msgname, int *len)
 }
 
 /* Do we support this AF? */
-static int sctp_inet_af_supported(sa_family_t family, struct sctp_opt *sp)
+static int sctp_inet_af_supported(sa_family_t family, struct sctp_sock *sp)
 {
 	/* PF_INET only supports AF_INET addresses. */
 	return (AF_INET == family);
@@ -754,7 +754,7 @@ static int sctp_inet_af_supported(sa_family_t family, struct sctp_opt *sp)
 /* Address matching with wildcards allowed. */
 static int sctp_inet_cmp_addr(const union sctp_addr *addr1,
 			      const union sctp_addr *addr2,
-			      struct sctp_opt *opt)
+			      struct sctp_sock *opt)
 {
 	/* PF_INET only supports AF_INET addresses. */
 	if (addr1->sa.sa_family != addr2->sa.sa_family)
@@ -771,7 +771,7 @@ static int sctp_inet_cmp_addr(const union sctp_addr *addr1,
 /* Verify that provided sockaddr looks bindable.  Common verification has
  * already been taken care of.
  */
-static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
+static int sctp_inet_bind_verify(struct sctp_sock *opt, union sctp_addr *addr)
 {
 	return sctp_v4_available(addr, opt);
 }
@@ -779,7 +779,7 @@ static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 /* Verify that sockaddr looks sendable.  Common verification has already
  * been taken care of.
  */
-static int sctp_inet_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
+static int sctp_inet_send_verify(struct sctp_sock *opt, union sctp_addr *addr)
 {
 	return 1;
 }
@@ -787,7 +787,7 @@ static int sctp_inet_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
 /* Fill in Supported Address Type information for INIT and INIT-ACK
  * chunks.  Returns number of addresses supported.
  */
-static int sctp_inet_supported_addrs(const struct sctp_opt *opt,
+static int sctp_inet_supported_addrs(const struct sctp_sock *opt,
 				     __u16 *types)
 {
 	types[0] = SCTP_PARAM_IPV4_ADDRESS;

@@ -713,7 +713,7 @@ static struct vm86_irqs {
 	int sig;
 } vm86_irqs[16];
 
-static spinlock_t irqbits_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(irqbits_lock);
 static int irqbits;
 
 #define ALLOWED_SIGS ( 1 /* 0 = don't send a signal */ \

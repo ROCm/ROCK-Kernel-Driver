@@ -186,9 +186,11 @@ int gfar_gsettings(struct net_device *dev, struct ethtool_cmd *cmd)
 {
 	struct gfar_private *priv = netdev_priv(dev);
 	uint gigabit_support = 
-		priv->einfo->flags & GFAR_HAS_GIGABIT ? SUPPORTED_1000baseT_Full : 0;
+		priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_GIGABIT ?
+			SUPPORTED_1000baseT_Full : 0;
 	uint gigabit_advert = 
-		priv->einfo->flags & GFAR_HAS_GIGABIT ? ADVERTISED_1000baseT_Full: 0;
+		priv->einfo->device_flags & FSL_GIANFAR_DEV_HAS_GIGABIT ?
+			ADVERTISED_1000baseT_Full: 0;
 
 	cmd->supported = (SUPPORTED_10baseT_Half
 			  | SUPPORTED_100baseT_Half

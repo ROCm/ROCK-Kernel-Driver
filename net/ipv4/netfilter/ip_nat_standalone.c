@@ -55,15 +55,6 @@
 			         : ((hooknum) == NF_IP_LOCAL_IN ? "LOCAL_IN"  \
 				    : "*ERROR*")))
 
-static inline int call_expect(struct ip_conntrack *master,
-			      struct sk_buff **pskb,
-			      unsigned int hooknum,
-			      struct ip_conntrack *ct,
-			      struct ip_nat_info *info)
-{
-	return master->nat.info.helper->expect(pskb, hooknum, ct, info);
-}
-
 static unsigned int
 ip_nat_fn(unsigned int hooknum,
 	  struct sk_buff **pskb,
@@ -115,7 +106,7 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_RELATED:
 	case IP_CT_RELATED+IP_CT_IS_REPLY:
 		if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP) {
-			if (!icmp_reply_translation(pskb, ct, hooknum,
+			if (!icmp_reply_translation(pskb, ct, maniptype,
 						    CTINFO2DIR(ctinfo)))
 				return NF_DROP;
 			else
@@ -125,37 +116,26 @@ ip_nat_fn(unsigned int hooknum,
 	case IP_CT_NEW:
 		info = &ct->nat.info;
 
-		WRITE_LOCK(&ip_nat_lock);
 		/* Seen it before?  This can happen for loopback, retrans,
 		   or local packets.. */
-		if (!(info->initialized & (1 << maniptype))) {
+		if (!ip_nat_initialized(ct, maniptype)) {
 			unsigned int ret;
 
-			if (ct->master
-			    && master_ct(ct)->nat.info.helper
-			    && master_ct(ct)->nat.info.helper->expect) {
-				ret = call_expect(master_ct(ct), pskb, 
-						  hooknum, ct, info);
-			} else {
-				/* LOCAL_IN hook doesn't have a chain!  */
-				if (hooknum == NF_IP_LOCAL_IN)
-					ret = alloc_null_binding(ct, info,
-								 hooknum);
-				else
-					ret = ip_nat_rule_find(pskb, hooknum,
-					                       in, out, ct,
-					                       info);
-			}
+			/* LOCAL_IN hook doesn't have a chain!  */
+			if (hooknum == NF_IP_LOCAL_IN)
+				ret = alloc_null_binding(ct, info, hooknum);
+			else
+				ret = ip_nat_rule_find(pskb, hooknum,
+						       in, out, ct,
+						       info);
 
 			if (ret != NF_ACCEPT) {
-				WRITE_UNLOCK(&ip_nat_lock);
 				return ret;
 			}
 		} else
 			DEBUGP("Already setup manip %s for ct %p\n",
 			       maniptype == IP_NAT_MANIP_SRC ? "SRC" : "DST",
 			       ct);
-		WRITE_UNLOCK(&ip_nat_lock);
 		break;
 
 	default:
@@ -166,7 +146,7 @@ ip_nat_fn(unsigned int hooknum,
 	}
 
 	IP_NF_ASSERT(info);
-	return do_bindings(ct, ctinfo, info, hooknum, pskb);
+	return nat_packet(ct, ctinfo, hooknum, pskb);
 }
 
 static unsigned int
@@ -288,33 +268,6 @@ static struct nf_hook_ops ip_nat_local_in_ops = {
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
 
-/* Protocol registration. */
-int ip_nat_protocol_register(struct ip_nat_protocol *proto)
-{
-	int ret = 0;
-
-	WRITE_LOCK(&ip_nat_lock);
-	if (ip_nat_protos[proto->protonum] != &ip_nat_unknown_protocol) {
-		ret = -EBUSY;
-		goto out;
-	}
-	ip_nat_protos[proto->protonum] = proto;
- out:
-	WRITE_UNLOCK(&ip_nat_lock);
-	return ret;
-}
-
-/* Noone stores the protocol anywhere; simply delete it. */
-void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
-{
-	WRITE_LOCK(&ip_nat_lock);
-	ip_nat_protos[proto->protonum] = &ip_nat_unknown_protocol;
-	WRITE_UNLOCK(&ip_nat_lock);
-
-	/* Someone could be still looking at the proto in a bh. */
-	synchronize_net();
-}
-
 static int init_or_cleanup(int init)
 {
 	int ret = 0;
@@ -388,12 +341,9 @@ module_exit(fini);
 EXPORT_SYMBOL(ip_nat_setup_info);
 EXPORT_SYMBOL(ip_nat_protocol_register);
 EXPORT_SYMBOL(ip_nat_protocol_unregister);
-EXPORT_SYMBOL(ip_nat_helper_register);
-EXPORT_SYMBOL(ip_nat_helper_unregister);
 EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
 EXPORT_SYMBOL(ip_nat_used_tuple);
-EXPORT_SYMBOL(ip_nat_find_helper);
-EXPORT_SYMBOL(__ip_nat_find_helper);
+EXPORT_SYMBOL(ip_nat_follow_master);
 MODULE_LICENSE("GPL");

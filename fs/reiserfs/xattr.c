@@ -1152,7 +1152,7 @@ out:
 
 /* This is the implementation for the xattr plugin infrastructure */
 static struct list_head xattr_handlers = LIST_HEAD_INIT (xattr_handlers);
-static rwlock_t handler_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(handler_lock);
 
 static struct reiserfs_xattr_handler *
 find_xattr_handler_prefix (const char *prefix)

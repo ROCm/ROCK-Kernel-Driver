@@ -637,7 +637,7 @@ static int __init get_model_name(struct cpuinfo_x86 *c)
 {
 	unsigned int *v;
 
-	if (cpuid_eax(0x80000000) < 0x80000004)
+	if (c->x86_cpuid_level < 0x80000004)
 		return 0;
 
 	v = (unsigned int *) c->x86_model_id;
@@ -653,7 +653,7 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int n, dummy, eax, ebx, ecx, edx;
 
-	n = cpuid_eax(0x80000000);
+	n = c->x86_cpuid_level;
 
 	if (n >= 0x80000005) {
 		cpuid(0x80000005, &dummy, &ebx, &ecx, &edx);
@@ -713,7 +713,7 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 	} 
 	display_cacheinfo(c);
 
-	if (cpuid_eax(0x80000000) >= 0x80000008) {
+	if (c->x86_cpuid_level >= 0x80000008) {
 		c->x86_num_cores = (cpuid_ecx(0x80000008) & 0xff) + 1;
 		if (c->x86_num_cores & (c->x86_num_cores - 1))
 			c->x86_num_cores = 1;
@@ -727,6 +727,8 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 		cpu = c->x86_apicid;
 		if (acpi_numa <= 0 && c->x86_num_cores > 1) {
 			cpu_to_node[cpu] = cpu >> hweight32(c->x86_num_cores - 1);
+			if (!node_online(cpu_to_node[cpu]))
+				cpu_to_node[cpu] = first_node(node_online_map);
 		}
 		printk(KERN_INFO "CPU %d(%d) -> Node %d\n",
 				cpu, c->x86_num_cores, cpu_to_node[cpu]);
@@ -802,7 +804,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	unsigned n;
 
 	init_intel_cacheinfo(c);
-	n = cpuid_eax(0x80000000);
+	n = c->x86_cpuid_level;
 	if (n >= 0x80000008) {
 		unsigned eax = cpuid_eax(0x80000008);
 		c->x86_virt_bits = (eax >> 8) & 0xff;
@@ -848,6 +850,7 @@ void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	c->x86_cache_alignment = c->x86_clflush_size;
 	c->x86_num_cores = 1;
 	c->x86_apicid = c == &boot_cpu_data ? 0 : c - cpu_data;
+	c->x86_cpuid_level = 0;
 	memset(&c->x86_capability, 0, sizeof c->x86_capability);
 
 	/* Get vendor name */
@@ -894,6 +897,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* AMD-defined flags: level 0x80000001 */
 	xlvl = cpuid_eax(0x80000000);
+	c->x86_cpuid_level = xlvl;
 	if ((xlvl & 0xffff0000) == 0x80000000) {
 		if (xlvl >= 0x80000001) {
 			c->x86_capability[1] = cpuid_edx(0x80000001);
@@ -906,6 +910,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	/* Transmeta-defined flags: level 0x80860001 */
 	xlvl = cpuid_eax(0x80860000);
 	if ((xlvl & 0xffff0000) == 0x80860000) {
+		/* Don't set x86_cpuid_level here for now to not confuse. */
 		if (xlvl >= 0x80860001)
 			c->x86_capability[2] = cpuid_edx(0x80860001);
 	}

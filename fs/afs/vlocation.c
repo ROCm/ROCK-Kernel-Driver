@@ -57,7 +57,7 @@ static const struct afs_async_op_ops afs_vlocation_update_op_ops = {
 
 static LIST_HEAD(afs_vlocation_update_pendq);	/* queue of VLs awaiting update */
 static struct afs_vlocation *afs_vlocation_update;	/* VL currently being updated */
-static spinlock_t afs_vlocation_update_lock = SPIN_LOCK_UNLOCKED; /* lock guarding update queue */
+static DEFINE_SPINLOCK(afs_vlocation_update_lock); /* lock guarding update queue */
 
 #ifdef AFS_CACHING_SUPPORT
 static cachefs_match_val_t afs_vlocation_cache_match(void *target,

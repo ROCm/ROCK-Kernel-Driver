@@ -140,7 +140,7 @@ static int StartDiskType[] = {
 
 static int DriveType = TYPE_HD;
 
-static spinlock_t ataflop_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ataflop_lock);
 
 /* Array for translating minors into disk formats */
 static struct {

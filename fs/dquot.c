@@ -121,8 +121,8 @@
  * i_sem on quota files is special (it's below dqio_sem)
  */
 
-static spinlock_t dq_list_lock = SPIN_LOCK_UNLOCKED;
-spinlock_t dq_data_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dq_list_lock);
+DEFINE_SPINLOCK(dq_data_lock);
 
 static char *quotatypes[] = INITQFNAMES;
 static struct quota_format_type *quota_formats;	/* List of registered formats */

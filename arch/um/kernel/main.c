@@ -154,13 +154,21 @@ int main(int argc, char **argv, char **envp)
 	do_uml_initcalls();
 	ret = linux_main(argc, argv);
 
+	/* Disable SIGPROF - I have no idea why libc doesn't do this or turn
+	 * off the profiling time, but UML dies with a SIGPROF just before
+	 * exiting when profiling is active.
+	 */
+	change_sig(SIGPROF, 0);
+
 	/* Reboot */
 	if(ret){
 		int err;
 
 		printf("\n");
+
 		/* stop timers and set SIG*ALRM to be ignored */
 		disable_timer();
+
 		/* disable SIGIO for the fds and set SIGIO to be ignored */
 		err = deactivate_all_fds();
 		if(err)

@@ -167,7 +167,7 @@ DEB( static int debugging = DEBUG; )
    24 bits) */
 #define SET_DENS_AND_BLK 0x10001
 
-static rwlock_t st_dev_arr_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(st_dev_arr_lock);
 
 static int st_fixed_buffer_size = ST_FIXED_BUFFER_SIZE;
 static int st_max_sg_segs = ST_MAX_SG;

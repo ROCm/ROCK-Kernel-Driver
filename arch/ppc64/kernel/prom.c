@@ -95,7 +95,7 @@ static struct device_node *allnodes = NULL;
 /* use when traversing tree through the allnext, child, sibling,
  * or parent members of struct device_node.
  */
-static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(devtree_lock);
 
 /* export that to outside world */
 struct device_node *of_chosen;
@@ -1055,7 +1055,7 @@ void __init early_init_devtree(void *params)
 			rnd_mem_size <<= 1;
 
 		/* # pages / 2 */
-		pteg_count = (rnd_mem_size >> (12 + 1));
+		pteg_count = max(rnd_mem_size >> (12 + 1), 1UL << 11);
 
 		ppc64_pft_size = __ilog2(pteg_count << 7);
 	}

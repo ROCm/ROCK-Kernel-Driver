@@ -231,7 +231,7 @@ static unsigned long set_mtrr_state(u32 deftype_lo, u32 deftype_hi)
 
 static unsigned long cr4 = 0;
 static u32 deftype_lo, deftype_hi;
-static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(set_atomicity_lock);
 
 /*
  * Since we are disabling the cache don't allow any interrupts - they

@@ -141,7 +141,7 @@ static struct pccard_operations au1000_pcmcia_operations = {
 #endif
 };
 
-static spinlock_t pcmcia_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pcmcia_lock);
 
 static int __init au1000_pcmcia_driver_init(void)
 {

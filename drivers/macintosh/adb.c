@@ -120,7 +120,7 @@ static struct adb_handler {
  * called.
  */
 static DECLARE_MUTEX(adb_handler_sem);
-static rwlock_t adb_handler_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(adb_handler_lock);
 
 #if 0
 static void printADBreply(struct adb_request *req)

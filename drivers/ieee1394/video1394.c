@@ -699,8 +699,8 @@ static void initialize_dma_it_ctx(struct dma_iso_ctx *d, int sync_tag,
 	reg_write(ohci, OHCI1394_IsoXmitIntMaskSet, 1<<d->ctx);
 }
 
-static int video1394_ioctl(struct inode *inode, struct file *file,
-			   unsigned int cmd, unsigned long arg)
+static int __video1394_ioctl(struct file *file,
+			     unsigned int cmd, unsigned long arg)
 {
 	struct file_ctx *ctx = (struct file_ctx *)file->private_data;
 	struct ti_ohci *ohci = ctx->ohci;
@@ -1152,6 +1152,15 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
+static long video1394_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+{
+	int err;
+	lock_kernel();
+	err = __video1394_ioctl(file, cmd, arg);
+	unlock_kernel();
+	return err;
+}
+
 /*
  *	This maps the vmalloced and reserved buffer to user space.
  *
@@ -1233,11 +1242,18 @@ static int video1394_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+#ifdef CONFIG_COMPAT
+static long video1394_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg);
+#endif
+
 static struct cdev video1394_cdev;
 static struct file_operations video1394_fops=
 {
 	.owner =	THIS_MODULE,
-	.ioctl =	video1394_ioctl,
+	.unlocked_ioctl = video1394_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl = video1394_compat_ioctl,
+#endif
 	.mmap =		video1394_mmap,
 	.open =		video1394_open,
 	.release =	video1394_release
@@ -1333,17 +1349,13 @@ struct video1394_wait32 {
 	struct compat_timeval filltime;
 };
 
-static int video1394_wr_wait32(unsigned int fd, unsigned int cmd, unsigned long arg,
-			       struct file *file)
+static int video1394_wr_wait32(struct file *file, unsigned int cmd, unsigned long arg)
 {
         struct video1394_wait32 __user *argp = (void __user *)arg;
         struct video1394_wait32 wait32;
         struct video1394_wait wait;
         mm_segment_t old_fs;
         int ret;
-
-	if (file->f_op->ioctl != video1394_ioctl)
-		return -EFAULT;
 
         if (copy_from_user(&wait32, argp, sizeof(wait32)))
                 return -EFAULT;
@@ -1356,11 +1368,11 @@ static int video1394_wr_wait32(unsigned int fd, unsigned int cmd, unsigned long 
         old_fs = get_fs();
         set_fs(KERNEL_DS);
         if (cmd == VIDEO1394_IOC32_LISTEN_WAIT_BUFFER)
-		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+		ret = video1394_ioctl(file,
 				      VIDEO1394_IOC_LISTEN_WAIT_BUFFER,
 				      (unsigned long) &wait);
         else
-		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+		ret = video1394_ioctl(file,
 				      VIDEO1394_IOC_LISTEN_POLL_BUFFER,
 				      (unsigned long) &wait);
         set_fs(old_fs);
@@ -1378,16 +1390,12 @@ static int video1394_wr_wait32(unsigned int fd, unsigned int cmd, unsigned long 
         return ret;
 }
 
-static int video1394_w_wait32(unsigned int fd, unsigned int cmd, unsigned long arg,
-			      struct file *file)
+static int video1394_w_wait32(struct file *file, unsigned int cmd, unsigned long arg)
 {
         struct video1394_wait32 wait32;
         struct video1394_wait wait;
         mm_segment_t old_fs;
         int ret;
-
-	if (file->f_op->ioctl != video1394_ioctl)
-		return -EFAULT;
 
         if (copy_from_user(&wait32, (void __user *)arg, sizeof(wait32)))
                 return -EFAULT;
@@ -1400,11 +1408,11 @@ static int video1394_w_wait32(unsigned int fd, unsigned int cmd, unsigned long a
         old_fs = get_fs();
         set_fs(KERNEL_DS);
         if (cmd == VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER)
-		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+		ret = video1394_ioctl(file,
 				      VIDEO1394_IOC_LISTEN_QUEUE_BUFFER,
 				      (unsigned long) &wait);
         else
-		ret = video1394_ioctl(file->f_dentry->d_inode, file,
+		ret = video1394_ioctl(file,
 				      VIDEO1394_IOC_TALK_WAIT_BUFFER,
 				      (unsigned long) &wait);
         set_fs(old_fs);
@@ -1412,38 +1420,42 @@ static int video1394_w_wait32(unsigned int fd, unsigned int cmd, unsigned long a
         return ret;
 }
 
-static int video1394_queue_buf32(unsigned int fd, unsigned int cmd, unsigned long arg,
-				 struct file *file)
+static int video1394_queue_buf32(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	if (file->f_op->ioctl != video1394_ioctl)
-		return -EFAULT;
+        return -EFAULT;   /* ??? was there before. */
 
-        return -EFAULT;
-
-	return video1394_ioctl(file->f_dentry->d_inode, file,
+	return video1394_ioctl(file,
 				VIDEO1394_IOC_TALK_QUEUE_BUFFER, arg);
+}
+
+static long video1394_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case VIDEO1394_IOC_LISTEN_CHANNEL:
+	case VIDEO1394_IOC_UNLISTEN_CHANNEL:
+	case VIDEO1394_IOC_TALK_CHANNEL:
+	case VIDEO1394_IOC_UNTALK_CHANNEL:
+		return video1394_ioctl(f, cmd, arg);
+
+	case VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER:
+		return video1394_w_wait32(f, cmd, arg);
+	case VIDEO1394_IOC32_LISTEN_WAIT_BUFFER:
+		return video1394_wr_wait32(f, cmd, arg);
+	case VIDEO1394_IOC_TALK_QUEUE_BUFFER:
+		return video1394_queue_buf32(f, cmd, arg);
+	case VIDEO1394_IOC32_TALK_WAIT_BUFFER:
+		return video1394_w_wait32(f, cmd, arg);
+	case VIDEO1394_IOC32_LISTEN_POLL_BUFFER:
+		return video1394_wr_wait32(f, cmd, arg);
+	default:
+		return -ENOIOCTLCMD;
+	}
 }
 
 #endif /* CONFIG_COMPAT */
 
 static void __exit video1394_exit_module (void)
 {
-#ifdef CONFIG_COMPAT
-	int ret;
-
-	ret = unregister_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER);
-	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER);
-	if (ret)
-		PRINT_G(KERN_CRIT, "Error unregistering ioctl32 translations");
-#endif
-
 	hpsb_unregister_protocol(&video1394_driver);
 
 	hpsb_unregister_highlevel(&video1394_highlevel);
@@ -1479,30 +1491,6 @@ static int __init video1394_init_module (void)
 		cdev_del(&video1394_cdev);
 		return ret;
 	}
-
-#ifdef CONFIG_COMPAT
-	{
-		/* First the compatible ones */
-		ret = register_ioctl32_conversion(VIDEO1394_IOC_LISTEN_CHANNEL, NULL);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNLISTEN_CHANNEL, NULL);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_CHANNEL, NULL);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC_UNTALK_CHANNEL, NULL);
-
-		/* These need translation */
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_QUEUE_BUFFER,
-					    video1394_w_wait32);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_WAIT_BUFFER,
-					    video1394_wr_wait32);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC_TALK_QUEUE_BUFFER,
-					    video1394_queue_buf32);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER,
-					    video1394_w_wait32);
-		ret |= register_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER,
-					    video1394_wr_wait32);
-		if (ret)
-			PRINT_G(KERN_INFO, "Error registering ioctl32 translations");
-	}
-#endif
 
 	PRINT_G(KERN_INFO, "Installed " VIDEO1394_DRIVER_NAME " module");
 	return 0;

@@ -85,7 +85,7 @@ static inline int remap_area_pud(pud_t * pud, unsigned long address, unsigned lo
 			return -ENOMEM;
 		remap_area_pmd(pmd, address, end - address, address + phys_addr, flags);
 		address = (address + PUD_SIZE) & PUD_MASK;
-		pmd++;
+		pud++;
 	} while (address && (address < end));
 	return 0;
 }

@@ -150,7 +150,7 @@ static int osst_max_dev           = OSST_MAX_TAPES;
 static int osst_nr_dev;
 
 static struct osst_tape **os_scsi_tapes = NULL;
-static rwlock_t os_scsi_tapes_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(os_scsi_tapes_lock);
 
 static int modes_defined = FALSE;
 

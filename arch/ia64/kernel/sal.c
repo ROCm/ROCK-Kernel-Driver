@@ -18,7 +18,7 @@
 #include <asm/sal.h>
 #include <asm/pal.h>
 
-spinlock_t sal_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+ __cacheline_aligned DEFINE_SPINLOCK(sal_lock);
 unsigned long sal_platform_features;
 
 unsigned short sal_revision;

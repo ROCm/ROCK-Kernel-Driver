@@ -71,7 +71,7 @@ int map_page(unsigned long va, phys_addr_t pa, int flags);
  * This is the page table (2MB) covering uncached, DMA consistent allocations
  */
 static pte_t *consistent_pte;
-static spinlock_t consistent_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(consistent_lock);
 
 /*
  * VM region handling support.

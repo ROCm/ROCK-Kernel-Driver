@@ -53,7 +53,7 @@
 /*
  * For the future...
  */
-static rwlock_t adfs_map_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(adfs_map_lock);
 
 /*
  * This is fun.  We need to load up to 19 bits from the map at an

@@ -32,7 +32,7 @@
 static char led_state;
 static char hw_led_state;
 
-static spinlock_t leds_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(leds_lock);
 
 static void ebsa285_leds_event(led_event_t evt)
 {

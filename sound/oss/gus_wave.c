@@ -139,7 +139,7 @@ static int      pcm_current_block;
 static unsigned long pcm_current_buf;
 static int      pcm_current_count;
 static int      pcm_current_intrflag;
-spinlock_t gus_lock=SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(gus_lock);
 
 extern int     *gus_osp;
 

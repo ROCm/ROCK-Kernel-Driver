@@ -31,7 +31,7 @@
 #include "pci_impl.h"
 #include "machvec_impl.h"
 
-spinlock_t sable_lynx_irq_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(sable_lynx_irq_lock);
 
 typedef struct irq_swizzle_struct
 {

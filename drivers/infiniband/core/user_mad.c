@@ -449,7 +449,7 @@ out:
 	return ret;
 }
 
-static int ib_umad_ioctl(struct inode *inode, struct file *filp,
+static long ib_umad_ioctl(struct file *filp,
 			 unsigned int cmd, unsigned long arg)
 {
 	switch (cmd) {
@@ -506,7 +506,8 @@ static struct file_operations umad_fops = {
 	.read 	 = ib_umad_read,
 	.write 	 = ib_umad_write,
 	.poll 	 = ib_umad_poll,
-	.ioctl 	 = ib_umad_ioctl,
+	.unlocked_ioctl = ib_umad_ioctl,
+	.compat_ioctl = ib_umad_ioctl,
 	.open 	 = ib_umad_open,
 	.release = ib_umad_close
 };
@@ -702,17 +703,8 @@ static int __init ib_umad_init(void)
 		goto out_class;
 	}
 
-	/* Our ioctls are 32/64 clean */
-	ret  = register_ioctl32_conversion(IB_USER_MAD_REGISTER_AGENT,   NULL);
-	ret |= register_ioctl32_conversion(IB_USER_MAD_UNREGISTER_AGENT, NULL);
-	if (ret) {
-		printk(KERN_ERR "user_mad: couldn't register ioctl32 conversions\n");
-		goto out_client;
-	}
-
 	return 0;
 
-out_client:
 	ib_unregister_client(&umad_client);
 
 out_class:
@@ -727,8 +719,6 @@ out:
 
 static void __exit ib_umad_cleanup(void)
 {
-	unregister_ioctl32_conversion(IB_USER_MAD_REGISTER_AGENT);
-	unregister_ioctl32_conversion(IB_USER_MAD_UNREGISTER_AGENT);
 	ib_unregister_client(&umad_client);
 	class_unregister(&umad_class);
 	unregister_chrdev_region(base_dev, IB_UMAD_MAX_PORTS);

@@ -287,7 +287,7 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	int iif = 0;
 	int addr_type = 0;
 	int len;
-	int hlimit = -1;
+	int hlimit;
 	int err = 0;
 
 	if ((u8*)hdr < skb->head || (u8*)(hdr+1) > skb->tail)
@@ -375,14 +375,12 @@ void icmpv6_send(struct sk_buff *skb, int type, int code, __u32 info,
 	if ((err = xfrm_lookup(&dst, &fl, sk, 0)) < 0)
 		goto out_dst_release;
 
-	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(&fl.fl6_dst))
-			hlimit = np->mcast_hops;
-		else
-			hlimit = np->hop_limit;
-		if (hlimit < 0)
-			hlimit = dst_metric(dst, RTAX_HOPLIMIT);
-	}
+	if (ipv6_addr_is_multicast(&fl.fl6_dst))
+		hlimit = np->mcast_hops;
+	else
+		hlimit = np->hop_limit;
+	if (hlimit < 0)
+		hlimit = dst_metric(dst, RTAX_HOPLIMIT);
 
 	msg.skb = skb;
 	msg.offset = skb->nh.raw - skb->data;
@@ -433,7 +431,7 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	struct icmpv6_msg msg;
 	struct dst_entry *dst;
 	int err = 0;
-	int hlimit = -1;
+	int hlimit;
 
 	saddr = &skb->nh.ipv6h->daddr;
 
@@ -463,14 +461,12 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 	if ((err = xfrm_lookup(&dst, &fl, sk, 0)) < 0)
 		goto out_dst_release;
 
-	if (hlimit < 0) {
-		if (ipv6_addr_is_multicast(&fl.fl6_dst))
-			hlimit = np->mcast_hops;
-		else
-			hlimit = np->hop_limit;
-		if (hlimit < 0)
-			hlimit = dst_metric(dst, RTAX_HOPLIMIT);
-	}
+	if (ipv6_addr_is_multicast(&fl.fl6_dst))
+		hlimit = np->mcast_hops;
+	else
+		hlimit = np->hop_limit;
+	if (hlimit < 0)
+		hlimit = dst_metric(dst, RTAX_HOPLIMIT);
 
 	idev = in6_dev_get(skb->dev);
 

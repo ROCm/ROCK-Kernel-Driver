@@ -172,7 +172,7 @@ void pmd_ctor(void *pmd, kmem_cache_t *cache, unsigned long flags)
  * recommendations and having no core impact whatsoever.
  * -- wli
  */
-spinlock_t pgd_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pgd_lock);
 struct page *pgd_list;
 
 static inline void pgd_list_add(pgd_t *pgd)

@@ -54,10 +54,10 @@
 	.rlim		= INIT_RLIMITS,					\
 }
 
-#define INIT_SIGHAND(sighand) {	\
-	.count		= ATOMIC_INIT(1), 		\
-	.action		= { {{NULL,}}, },		\
-	.siglock	= SPIN_LOCK_UNLOCKED, 		\
+#define INIT_SIGHAND(sighand) {						\
+	.count		= ATOMIC_INIT(1), 				\
+	.action		= { { { .sa_handler = NULL, } }, },		\
+	.siglock	= SPIN_LOCK_UNLOCKED, 				\
 }
 
 extern struct group_info init_groups;

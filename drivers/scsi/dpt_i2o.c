@@ -145,7 +145,7 @@ struct adpt_i2o_post_wait_data
 
 static struct adpt_i2o_post_wait_data *adpt_post_wait_queue = NULL;
 static u32 adpt_post_wait_id = 0;
-static spinlock_t adpt_post_wait_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(adpt_post_wait_lock);
 
 
 /*============================================================================

@@ -99,7 +99,7 @@
 #define DBG(fmt...)
 #endif
 
-static spinlock_t iosapic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(iosapic_lock);
 
 /* These tables map IA-64 vectors to the IOSAPIC pin that generates this vector. */
 

@@ -41,7 +41,7 @@ EXPORT_SYMBOL(jiffies_64);
 extern unsigned long wall_jiffies;
 
 /* this needs a better home */
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
 /* change this if you have some constant time drift */
 #define USECS_PER_JIFFY	(1000000/HZ)

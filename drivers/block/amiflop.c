@@ -163,7 +163,7 @@ static int writepending;
 static int writefromint;
 static char *raw_buf;
 
-static spinlock_t amiflop_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(amiflop_lock);
 
 #define RAW_BUF_SIZE 30000  /* size of raw disk data */
 

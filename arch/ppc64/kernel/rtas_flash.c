@@ -105,7 +105,7 @@ struct rtas_validate_flash_t
 	unsigned int update_results;	/* Update results token */
 };
 
-static spinlock_t flash_file_open_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(flash_file_open_lock);
 static struct proc_dir_entry *firmware_flash_pde;
 static struct proc_dir_entry *firmware_update_pde;
 static struct proc_dir_entry *validate_pde;

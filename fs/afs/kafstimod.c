@@ -25,7 +25,7 @@ static DECLARE_WAIT_QUEUE_HEAD(kafstimod_sleepq);
 static int kafstimod_die;
 
 static LIST_HEAD(kafstimod_list);
-static spinlock_t kafstimod_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(kafstimod_lock);
 
 static int kafstimod(void *arg);
 

@@ -128,7 +128,7 @@ static struct ctl_table appldata_dir_table[] = {
 DEFINE_PER_CPU(struct vtimer_list, appldata_timer);
 static atomic_t appldata_expire_count = ATOMIC_INIT(0);
 
-static spinlock_t appldata_timer_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(appldata_timer_lock);
 static int appldata_interval = APPLDATA_CPU_INTERVAL;
 static int appldata_timer_active;
 
@@ -140,7 +140,7 @@ static struct tasklet_struct appldata_tasklet_struct;
 /*
  * Ops list
  */
-static spinlock_t appldata_ops_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(appldata_ops_lock);
 static LIST_HEAD(appldata_ops_list);
 
 

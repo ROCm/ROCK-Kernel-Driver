@@ -99,7 +99,7 @@ struct mb_cache {
 
 static LIST_HEAD(mb_cache_list);
 static LIST_HEAD(mb_cache_lru_list);
-static spinlock_t mb_cache_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mb_cache_spinlock);
 static struct shrinker *mb_shrinker;
 
 static inline int
@@ -554,8 +554,6 @@ static struct mb_cache_entry *
 __mb_cache_entry_find(struct list_head *l, struct list_head *head,
 		      int index, struct block_device *bdev, unsigned int key)
 {
-	DEFINE_WAIT(wait);
-
 	while (l != head) {
 		struct mb_cache_entry *ce =
 			list_entry(l, struct mb_cache_entry,

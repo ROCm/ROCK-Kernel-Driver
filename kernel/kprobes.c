@@ -76,18 +76,19 @@ struct kprobe *get_kprobe(void *addr)
 int register_kprobe(struct kprobe *p)
 {
 	int ret = 0;
-	unsigned long flags;
+	unsigned long flags = 0;
 
+	if ((ret = arch_prepare_kprobe(p)) != 0) {
+		goto out;
+	}
 	spin_lock_irqsave(&kprobe_lock, flags);
 	INIT_HLIST_NODE(&p->hlist);
 	if (get_kprobe(p->addr)) {
 		ret = -EEXIST;
 		goto out;
 	}
+	arch_copy_kprobe(p);
 
-	if ((ret = arch_prepare_kprobe(p)) != 0) {
-		goto out;
-	}
 	hlist_add_head(&p->hlist,
 		       &kprobe_table[hash_ptr(p->addr, KPROBE_HASH_BITS)]);
 
@@ -97,14 +98,16 @@ int register_kprobe(struct kprobe *p)
 			   (unsigned long) p->addr + sizeof(kprobe_opcode_t));
       out:
 	spin_unlock_irqrestore(&kprobe_lock, flags);
+	if (ret == -EEXIST)
+		arch_remove_kprobe(p);
 	return ret;
 }
 
 void unregister_kprobe(struct kprobe *p)
 {
 	unsigned long flags;
-	spin_lock_irqsave(&kprobe_lock, flags);
 	arch_remove_kprobe(p);
+	spin_lock_irqsave(&kprobe_lock, flags);
 	*p->addr = p->opcode;
 	hlist_del(&p->hlist);
 	flush_icache_range((unsigned long) p->addr,

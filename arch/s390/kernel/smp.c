@@ -76,7 +76,7 @@ static void smp_ext_bitcall_others(ec_bit_sig);
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
  */
-static spinlock_t call_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(call_lock);
 
 struct call_data_struct {
 	void (*func) (void *info);
@@ -566,7 +566,7 @@ static void __init smp_create_idle(unsigned int cpu)
 
 /* Reserving and releasing of CPUs */
 
-static spinlock_t smp_reserve_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(smp_reserve_lock);
 static int smp_cpu_reserved[NR_CPUS];
 
 int

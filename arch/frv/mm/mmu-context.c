@@ -17,7 +17,7 @@
 
 static unsigned long cxn_bitmap[NR_CXN / (sizeof(unsigned long) * 8)];
 static LIST_HEAD(cxn_owners_lru);
-static spinlock_t cxn_owners_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(cxn_owners_lock);
 
 int __nongpreldata cxn_pinned = -1;
 

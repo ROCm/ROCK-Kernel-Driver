@@ -44,7 +44,7 @@ void __up(struct semaphore *sem)
 	wake_up(&sem->wait);
 }
 
-static spinlock_t semaphore_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(semaphore_lock);
 
 void __sched __down(struct semaphore * sem)
 {

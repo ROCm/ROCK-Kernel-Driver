@@ -305,7 +305,7 @@ static int mcdx_setattentuator(struct s_drive_stuff *,
 
 static int mcdx_drive_map[][2] = MCDX_DRIVEMAP;
 static struct s_drive_stuff *mcdx_stuffp[MCDX_NDRIVES];
-static spinlock_t mcdx_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mcdx_lock);
 static struct request_queue *mcdx_queue;
 
 /* You can only set the first two pairs, from old MODULE_PARM code.  */

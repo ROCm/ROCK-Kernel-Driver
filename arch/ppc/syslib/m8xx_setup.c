@@ -238,7 +238,7 @@ m8xx_restart(char *cmd)
 {
 	__volatile__ unsigned char dummy;
 
-	cli();
+	local_irq_disable();
 	((immap_t *)IMAP_ADDR)->im_clkrst.car_plprcr |= 0x00000080;
 
 	/* Clear the ME bit in MSR to cause checkstop on machine check

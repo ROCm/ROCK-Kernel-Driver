@@ -41,7 +41,7 @@ EXPORT_SYMBOL(rtas);
 
 char rtas_err_buf[RTAS_ERROR_LOG_MAX];
 
-spinlock_t rtas_data_buf_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtas_data_buf_lock);
 char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
 unsigned long rtas_rmo_buf;
 

@@ -8,34 +8,33 @@
 
 #include <asm/sn/shub_mmr.h>
 
-#define ZEROVAL		0x3f		// "zero" value for outstanding PIO requests
-#define DEADLOCKBIT	SH_PIO_WRITE_STATUS_0_WRITE_DEADLOCK_SHFT
-#define WRITECOUNT	SH_PIO_WRITE_STATUS_0_PENDING_WRITE_COUNT_SHFT
-#define ALIAS_OFFSET	(SH_PIO_WRITE_STATUS_0_ALIAS-SH_PIO_WRITE_STATUS_0)
+#define DEADLOCKBIT	SH_PIO_WRITE_STATUS_WRITE_DEADLOCK_SHFT
+#define WRITECOUNTMASK	SH_PIO_WRITE_STATUS_PENDING_WRITE_COUNT_MASK
+#define ALIAS_OFFSET	(SH1_PIO_WRITE_STATUS_0_ALIAS-SH1_PIO_WRITE_STATUS_0)
 
 
 	.global	sn2_ptc_deadlock_recovery_core
 	.proc  	sn2_ptc_deadlock_recovery_core
 
 sn2_ptc_deadlock_recovery_core:
-	.regstk 5,0,0,0
+	.regstk 6,0,0,0
 
 	ptc0  	 = in0
 	data0 	 = in1
 	ptc1  	 = in2
 	data1 	 = in3
 	piowc 	 = in4
+	zeroval  = in5
 	piowcphy = r30
 	psrsave  = r2
-	zeroval  = r3
 	scr1	 = r16
 	scr2	 = r17
+	mask	 = r18
 
 
 	extr.u	piowcphy=piowc,0,61;;	// Convert piowc to uncached physical address
 	dep	piowcphy=-1,piowcphy,63,1
-
-	mov	zeroval=ZEROVAL		// "zero" value for PIO write count
+	movl	mask=WRITECOUNTMASK
 
 1:
 	add	scr2=ALIAS_OFFSET,piowc	// Address of WRITE_STATUS alias register 
@@ -43,7 +42,7 @@ sn2_ptc_deadlock_recovery_core:
 	st8.rel	[scr2]=scr1;;
 
 5:	ld8.acq	scr1=[piowc];;		// Wait for PIOs to complete.
-	extr.u	scr2=scr1,WRITECOUNT,7;;// PIO count
+	and	scr2=scr1,mask;;	// mask of writecount bits
 	cmp.ne	p6,p0=zeroval,scr2
 (p6)	br.cond.sptk 5b
 	
@@ -57,16 +56,17 @@ sn2_ptc_deadlock_recovery_core:
 	st8.rel [ptc0]=data0		// Write PTC0 & wait for completion.
 
 5:	ld8.acq	scr1=[piowcphy];;	// Wait for PIOs to complete.
-	extr.u	scr2=scr1,WRITECOUNT,7;;// PIO count
+	and	scr2=scr1,mask;;	// mask of writecount bits
 	cmp.ne	p6,p0=zeroval,scr2
 (p6)	br.cond.sptk 5b;;
 
 	tbit.nz	p8,p7=scr1,DEADLOCKBIT;;// Test for DEADLOCK
+(p7)	cmp.ne p7,p0=r0,ptc1;;		// Test for non-null ptc1
 	
 (p7)	st8.rel [ptc1]=data1;;		// Now write PTC1.
 
 5:	ld8.acq	scr1=[piowcphy];;	// Wait for PIOs to complete.
-	extr.u	scr2=scr1,WRITECOUNT,7;;// PIO count
+	and	scr2=scr1,mask;;	// mask of writecount bits
 	cmp.ne	p6,p0=zeroval,scr2
 (p6)	br.cond.sptk 5b
 	

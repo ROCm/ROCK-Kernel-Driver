@@ -70,7 +70,7 @@
 #include <asm/system.h>
 #include <asm/processor.h>	/* for boot_cpu_data */
 
-static spinlock_t pdc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pdc_lock);
 static unsigned long pdc_result[32] __attribute__ ((aligned (8)));
 static unsigned long pdc_result2[32] __attribute__ ((aligned (8)));
 

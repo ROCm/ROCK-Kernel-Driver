@@ -239,7 +239,7 @@ static void sym53c416_set_transfer_counter(int base, unsigned int len)
 	outb((len & 0xFF0000) >> 16, base + TC_HIGH);
 }
 
-static spinlock_t sym53c416_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sym53c416_lock);
 
 /* Returns the number of bytes read */
 static __inline__ unsigned int sym53c416_read(int base, unsigned char *buffer, unsigned int len)

@@ -34,7 +34,7 @@
 #include <asm/xmon.h>
 
 /* A lock to regulate grabbing the interrupt */
-spinlock_t perfmon_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(perfmon_lock);
 
 #ifdef CONFIG_FSL_BOOKE
 static void dummy_perf(struct pt_regs *regs)

@@ -81,7 +81,7 @@ __obsolete_setup("i8042_dumbkbd");
 
 #include "i8042.h"
 
-spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(i8042_lock);
 
 struct i8042_port {
 	struct serio *serio;

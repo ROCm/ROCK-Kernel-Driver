@@ -102,27 +102,9 @@ struct iSeries_Device_Node {
 };
 
 /************************************************************************/
-/* Location Data extracted from the VPD list and device info.           */
-/************************************************************************/
-
-struct LocationDataStruct { 	/* Location data structure for device  */
-	u16  Bus;               /* iSeries Bus Number              0x00*/
-	u16  Board;             /* iSeries Board                   0x02*/
-	u8   FrameId;           /* iSeries spcn Frame Id           0x04*/
-	u8   PhbId;             /* iSeries Phb Location            0x05*/
-	u8   AgentId;           /* iSeries AgentId                 0x06*/
-	u8   Card;
-	char CardLocation[4];      
-};
-
-typedef struct LocationDataStruct  LocationData;
-#define LOCATION_DATA_SIZE      48
-
-/************************************************************************/
 /* Functions                                                            */
 /************************************************************************/
 
-extern LocationData* iSeries_GetLocationData(struct pci_dev* PciDev);
 extern int           iSeries_Device_Information(struct pci_dev*,char*, int);
 extern void          iSeries_Get_Location_Code(struct iSeries_Device_Node*);
 extern int           iSeries_Device_ToggleReset(struct pci_dev* PciDev, int AssertTime, int DelayTime);

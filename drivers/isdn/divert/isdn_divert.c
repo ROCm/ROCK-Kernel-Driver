@@ -48,7 +48,7 @@ static struct deflect_struc *table_head = NULL;
 static struct deflect_struc *table_tail = NULL; 
 static unsigned char extern_wait_max = 4; /* maximum wait in s for external process */ 
 
-spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(divert_lock);
 
 /***************************/
 /* timer callback function */

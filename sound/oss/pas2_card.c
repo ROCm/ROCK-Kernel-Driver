@@ -40,7 +40,7 @@ int      	pas_translate_code = 0;
 static int      pas_intr_mask;
 static int      pas_irq;
 static int      pas_sb_base;
-spinlock_t	pas_lock=SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(pas_lock);
 #ifndef CONFIG_PAS_JOYSTICK
 static int	joystick;
 #else

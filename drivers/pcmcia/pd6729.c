@@ -67,7 +67,7 @@ MODULE_PARM_DESC(irq_mode,
 		"interrupt delivery mode. 0 = ISA, 1 = PCI. default is 1");
 MODULE_PARM_DESC(irq_list, "interrupts that can be used by PCMCIA cards");
 
-static spinlock_t port_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(port_lock);
 
 /* basic value read/write functions */
 

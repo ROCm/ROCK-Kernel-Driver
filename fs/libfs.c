@@ -418,7 +418,7 @@ out:
 	return -ENOMEM;
 }
 
-static spinlock_t pin_fs_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pin_fs_lock);
 
 int simple_pin_fs(char *name, struct vfsmount **mount, int *count)
 {
@@ -476,7 +476,7 @@ ssize_t simple_read_from_buffer(void __user *to, size_t count, loff_t *ppos,
 char *simple_transaction_get(struct file *file, const char __user *buf, size_t size)
 {
 	struct simple_transaction_argresp *ar;
-	static spinlock_t simple_transaction_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(simple_transaction_lock);
 
 	if (size > SIMPLE_TRANSACTION_LIMIT - 1)
 		return ERR_PTR(-EFBIG);

@@ -1030,6 +1030,7 @@ restart:
 				}
 				n->end = start;
 				sp_insert(sp, new2);
+				new2 = NULL;
 				break;
 			} else
 				n->end = start;

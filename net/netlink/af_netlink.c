@@ -629,7 +629,6 @@ int netlink_attachskb(struct sock *sk, struct sk_buff *skb, int nonblock, long t
 		}
 		return 1;
 	}
-	skb_orphan(skb);
 	skb_set_owner_r(skb, sk);
 	return 0;
 }
@@ -661,21 +660,28 @@ void netlink_detachskb(struct sock *sk, struct sk_buff *skb)
 	sock_put(sk);
 }
 
-static inline void netlink_trim(struct sk_buff *skb, int allocation)
+static inline struct sk_buff *netlink_trim(struct sk_buff *skb, int allocation)
 {
-	int delta = skb->end - skb->tail;
+	int delta;
 
-	/* If the packet is charged to a socket, the modification
-	 * of truesize below is illegal and will corrupt socket
-	 * buffer accounting state.
-	 */
-	BUG_ON(skb->list != NULL);
+	skb_orphan(skb);
 
+	delta = skb->end - skb->tail;
 	if (delta * 2 < skb->truesize)
-		return;
-	if (pskb_expand_head(skb, 0, -delta, allocation))
-		return;
-	skb->truesize -= delta;
+		return skb;
+
+	if (skb_shared(skb)) {
+		struct sk_buff *nskb = skb_clone(skb, allocation);
+		if (!nskb)
+			return skb;
+		kfree_skb(skb);
+		skb = nskb;
+	}
+
+	if (!pskb_expand_head(skb, 0, -delta, allocation))
+		skb->truesize -= delta;
+
+	return skb;
 }
 
 int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock)
@@ -684,7 +690,7 @@ int netlink_unicast(struct sock *ssk, struct sk_buff *skb, u32 pid, int nonblock
 	int err;
 	long timeo;
 
-	netlink_trim(skb, gfp_any());
+	skb = netlink_trim(skb, gfp_any());
 
 	timeo = sock_sndtimeo(ssk, nonblock);
 retry:
@@ -707,14 +713,12 @@ static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff 
 	struct netlink_opt *nlk = nlk_sk(sk);
 #ifdef NL_EMULATE_DEV
 	if (nlk->handler) {
-		skb_orphan(skb);
 		nlk->handler(sk->sk_protocol, skb);
 		return 0;
 	} else
 #endif
 	if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf &&
 	    !test_bit(0, &nlk->state)) {
-                skb_orphan(skb);
 		skb_set_owner_r(skb, sk);
 		skb_queue_tail(&sk->sk_receive_queue, skb);
 		sk->sk_data_ready(sk, skb->len);
@@ -784,6 +788,8 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	struct hlist_node *node;
 	struct sock *sk;
 
+	skb = netlink_trim(skb, allocation);
+
 	info.exclude_sk = ssk;
 	info.pid = pid;
 	info.group = group;
@@ -793,8 +799,6 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	info.allocation = allocation;
 	info.skb = skb;
 	info.skb2 = NULL;
-
-	netlink_trim(skb, allocation);
 
 	/* While we sleep in clone, do not allow to change socket list */
 

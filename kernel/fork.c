@@ -560,7 +560,7 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 {
 	struct files_struct *oldf, *newf;
 	struct file **old_fds, **new_fds;
-	int open_files, nfds, size, i, error = 0;
+	int open_files, size, i, error = 0, expand;
 
 	/*
 	 * A background process may not have any files ...
@@ -595,36 +595,32 @@ static int copy_files(unsigned long clone_flags, struct task_struct * tsk)
 	newf->open_fds	    = &newf->open_fds_init;
 	newf->fd	    = &newf->fd_array[0];
 
-	/* We don't yet have the oldf readlock, but even if the old
-           fdset gets grown now, we'll only copy up to "size" fds */
-	size = oldf->max_fdset;
-	if (size > __FD_SETSIZE) {
-		newf->max_fdset = 0;
-		spin_lock(&newf->file_lock);
-		error = expand_fdset(newf, size-1);
-		spin_unlock(&newf->file_lock);
-		if (error)
-			goto out_release;
-	}
 	spin_lock(&oldf->file_lock);
 
-	open_files = count_open_files(oldf, size);
+	open_files = count_open_files(oldf, oldf->max_fdset);
+	expand = 0;
 
 	/*
-	 * Check whether we need to allocate a larger fd array.
-	 * Note: we're not a clone task, so the open count won't
-	 * change.
+	 * Check whether we need to allocate a larger fd array or fd set.
+	 * Note: we're not a clone task, so the open count won't  change.
 	 */
-	nfds = NR_OPEN_DEFAULT;
-	if (open_files > nfds) {
-		spin_unlock(&oldf->file_lock);
+	if (open_files > newf->max_fdset) {
+		newf->max_fdset = 0;
+		expand = 1;
+	}
+	if (open_files > newf->max_fds) {
 		newf->max_fds = 0;
+		expand = 1;
+	}
+
+	/* if the old fdset gets grown now, we'll only copy up to "size" fds */
+	if (expand) {
+		spin_unlock(&oldf->file_lock);
 		spin_lock(&newf->file_lock);
-		error = expand_fd_array(newf, open_files-1);
+		error = expand_files(newf, open_files-1);
 		spin_unlock(&newf->file_lock);
-		if (error) 
+		if (error < 0)
 			goto out_release;
-		nfds = newf->max_fds;
 		spin_lock(&oldf->file_lock);
 	}
 
@@ -673,6 +669,7 @@ out:
 out_release:
 	free_fdset (newf->close_on_exec, newf->max_fdset);
 	free_fdset (newf->open_fds, newf->max_fdset);
+	free_fd_array(newf->fd, newf->max_fds);
 	kmem_cache_free(files_cachep, newf);
 	goto out;
 }

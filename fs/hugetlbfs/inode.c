@@ -737,7 +737,7 @@ static struct vfsmount *hugetlbfs_vfsmount;
  */
 static unsigned long hugetlbfs_counter(void)
 {
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(lock);
 	static unsigned long counter;
 	unsigned long ret;
 

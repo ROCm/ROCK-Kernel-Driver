@@ -45,6 +45,12 @@ Machines
     Handheld (IPAQ), available in several varieties
 
 
+  HP iPAQ rx3715
+
+    S3C2440 based IPAQ, with a number of variations depending on
+    features shipped.
+
+
 NAND
 ----
 
@@ -91,6 +97,8 @@ Port Contributors
   Roc Wu
   Klaus Fetscher
   Dimitry Andric
+  Shannon Holland
+
 
 Document Changes
 ----------------
@@ -99,8 +107,9 @@ Document Changes
   05 Sep 2004 - BJD - Added Klaus Fetscher to list of contributors
   25 Oct 2004 - BJD - Added Dimitry Andric to list of contributors
   25 Oct 2004 - BJD - Updated the MTD from the 2.6.9 merge
+  21 Jan 2005 - BJD - Added rx3715, added Shannon to contributors
 
 Document Author
 ---------------
 
-Ben Dooks, (c) 2004 Simtec Electronics
+Ben Dooks, (c) 2004-2005 Simtec Electronics

@@ -62,7 +62,7 @@ static u8 *ntfs_compression_buffer = NULL;
 /**
  * ntfs_cb_lock - spinlock which protects ntfs_compression_buffer
  */
-static spinlock_t ntfs_cb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ntfs_cb_lock);
 
 /**
  * allocate_compression_buffers - allocate the decompression buffers

@@ -365,20 +365,20 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		? current_thread_info()->exec_domain->signal_invmap[sig]
 		: sig;
 
-	err |= __put_user(usig, &frame->sig);
+	err = __put_user(usig, &frame->sig);
 	if (err)
 		goto give_sigsegv;
 
-	err |= setup_sigcontext(&frame->sc, &frame->fpstate, regs, set->sig[0]);
+	err = setup_sigcontext(&frame->sc, &frame->fpstate, regs, set->sig[0]);
 	if (err)
 		goto give_sigsegv;
 
 	if (_NSIG_WORDS > 1) {
-		err |= __copy_to_user(&frame->extramask, &set->sig[1],
+		err = __copy_to_user(&frame->extramask, &set->sig[1],
 				      sizeof(frame->extramask));
+		if (err)
+			goto give_sigsegv;
 	}
-	if (err)
-		goto give_sigsegv;
 
 	restorer = &__kernel_sigreturn;
 	if (ka->sa.sa_flags & SA_RESTORER)

@@ -2664,12 +2664,11 @@ __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 		}
 	}
 	
-	spin_lock_bh(&odev->xmit_lock);
+	spin_lock_irq(&odev->xmit_lock);
 	if (!netif_queue_stopped(odev)) {
 		u64 now;
 
 		atomic_inc(&(pkt_dev->skb->users));
-retry_now:
 		ret = odev->hard_start_xmit(pkt_dev->skb, odev);
 		if (likely(ret == NETDEV_TX_OK)) {
 			pkt_dev->last_ok = 1;    
@@ -2677,10 +2676,6 @@ retry_now:
 			pkt_dev->seq_num++;
 			pkt_dev->tx_bytes += pkt_dev->cur_pkt_size;
 			
-		} else if (ret == NETDEV_TX_LOCKED 
-			   && (odev->features & NETIF_F_LLTX)) {
-			cpu_relax();
-			goto retry_now;
 		} else {  /* Retry it next time */
 			
 			atomic_dec(&(pkt_dev->skb->users));
@@ -2716,7 +2711,7 @@ retry_now:
 		pkt_dev->next_tx_ns = 0;
         }
 
-	spin_unlock_bh(&odev->xmit_lock);
+	spin_unlock_irq(&odev->xmit_lock);
 	
 	/* If pkt_dev->count is zero, then run forever */
 	if ((pkt_dev->count != 0) && (pkt_dev->sofar >= pkt_dev->count)) {

@@ -38,15 +38,21 @@ MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 #define DEBUGP(format, args...)
 #endif
 
-static int tftp_help(struct sk_buff *skb,
+unsigned int (*ip_nat_tftp_hook)(struct sk_buff **pskb,
+				 enum ip_conntrack_info ctinfo,
+				 struct ip_conntrack_expect *exp);
+EXPORT_SYMBOL_GPL(ip_nat_tftp_hook);
+
+static int tftp_help(struct sk_buff **pskb,
 		     struct ip_conntrack *ct,
 		     enum ip_conntrack_info ctinfo)
 {
 	struct tftphdr _tftph, *tfh;
 	struct ip_conntrack_expect *exp;
+	unsigned int ret = NF_ACCEPT;
 
-	tfh = skb_header_pointer(skb,
-				 skb->nh.iph->ihl * 4 + sizeof(struct udphdr),
+	tfh = skb_header_pointer(*pskb,
+				 (*pskb)->nh.iph->ihl*4+sizeof(struct udphdr),
 				 sizeof(_tftph), &_tftph);
 	if (tfh == NULL)
 		return NF_ACCEPT;
@@ -61,19 +67,25 @@ static int tftp_help(struct sk_buff *skb,
 
 		exp = ip_conntrack_expect_alloc();
 		if (exp == NULL)
-			return NF_ACCEPT;
+			return NF_DROP;
 
 		exp->tuple = ct->tuplehash[IP_CT_DIR_REPLY].tuple;
 		exp->mask.src.ip = 0xffffffff;
 		exp->mask.dst.ip = 0xffffffff;
 		exp->mask.dst.u.udp.port = 0xffff;
-		exp->mask.dst.protonum = 0xffff;
+		exp->mask.dst.protonum = 0xff;
 		exp->expectfn = NULL;
+		exp->master = ct;
 
 		DEBUGP("expect: ");
 		DUMP_TUPLE(&exp->tuple);
 		DUMP_TUPLE(&exp->mask);
-		ip_conntrack_expect_related(exp, ct);
+		if (ip_nat_tftp_hook)
+			ret = ip_nat_tftp_hook(pskb, ctinfo, exp);
+		else if (ip_conntrack_expect_related(exp) != 0) {
+			ip_conntrack_expect_free(exp);
+			ret = NF_DROP;
+		}
 		break;
 	case TFTP_OPCODE_DATA:
 	case TFTP_OPCODE_ACK:
@@ -116,11 +128,10 @@ static int __init init(void)
 
 		tftp[i].tuple.dst.protonum = IPPROTO_UDP;
 		tftp[i].tuple.src.u.udp.port = htons(ports[i]);
-		tftp[i].mask.dst.protonum = 0xFFFF;
+		tftp[i].mask.dst.protonum = 0xFF;
 		tftp[i].mask.src.u.udp.port = 0xFFFF;
 		tftp[i].max_expected = 1;
-		tftp[i].timeout = 0;
-		tftp[i].flags = IP_CT_HELPER_F_REUSE_EXPECT;
+		tftp[i].timeout = 5 * 60; /* 5 minutes */
 		tftp[i].me = THIS_MODULE;
 		tftp[i].help = tftp_help;
 
@@ -143,8 +154,6 @@ static int __init init(void)
 	}
 	return(0);
 }
-
-PROVIDES_CONNTRACK(tftp);
 
 module_init(init);
 module_exit(fini);

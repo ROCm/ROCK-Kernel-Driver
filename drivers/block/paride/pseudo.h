@@ -43,7 +43,7 @@ static unsigned long ps_timeout;
 static int ps_tq_active = 0;
 static int ps_nice = 0;
 
-static spinlock_t ps_spinlock __attribute__((unused)) = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ps_spinlock __attribute__((unused)));
 
 static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
 

@@ -3136,14 +3136,11 @@ deinit_card(struct idt77252_dev *card)
 		}
 	}
 
-	if (card->soft_tst)
-		vfree(card->soft_tst);
+	vfree(card->soft_tst);
 
-	if (card->scd2vc)
-		vfree(card->scd2vc);
+	vfree(card->scd2vc);
 
-	if (card->vcs)
-		vfree(card->vcs);
+	vfree(card->vcs);
 
 	if (card->raw_cell_hnd) {
 		pci_free_consistent(card->pcidev, 2 * sizeof(u32),

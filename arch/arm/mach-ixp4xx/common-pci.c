@@ -53,7 +53,7 @@ unsigned long ixp4xx_pci_reg_base = 0;
  * these transactions are atomic or we will end up
  * with corrupt data on the bus or in a driver.
  */
-static spinlock_t ixp4xx_pci_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ixp4xx_pci_lock);
 
 /*
  * Read from PCI config space

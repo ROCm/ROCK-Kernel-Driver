@@ -20,24 +20,24 @@ enum ip_ct_ftp_type
 	IP_CT_FTP_EPSV,
 };
 
-/* This structure is per expected connection */
-struct ip_ct_ftp_expect
-{
-	/* We record seq number and length of ftp ip/port text here: all in
-	 * host order. */
-
- 	/* sequence number of IP address in packet is in ip_conntrack_expect */
-	u_int32_t len;			/* length of IP address */
-	enum ip_ct_ftp_type ftptype;	/* PORT or PASV ? */
-	u_int16_t port; 		/* TCP port that was to be used */
-};
-
+#define NUM_SEQ_TO_REMEMBER 2
 /* This structure exists only once per master */
 struct ip_ct_ftp_master {
-	/* Next valid seq position for cmd matching after newline */
-	u_int32_t seq_aft_nl[IP_CT_DIR_MAX];
+	/* Valid seq positions for cmd matching after newline */
+	u_int32_t seq_aft_nl[IP_CT_DIR_MAX][NUM_SEQ_TO_REMEMBER];
 	/* 0 means seq_match_aft_nl not set */
-	int seq_aft_nl_set[IP_CT_DIR_MAX];
+	int seq_aft_nl_num[IP_CT_DIR_MAX];
 };
 
+struct ip_conntrack_expect;
+
+/* For NAT to hook in when we find a packet which describes what other
+ * connection we should expect. */
+extern unsigned int (*ip_nat_ftp_hook)(struct sk_buff **pskb,
+				       enum ip_conntrack_info ctinfo,
+				       enum ip_ct_ftp_type type,
+				       unsigned int matchoff,
+				       unsigned int matchlen,
+				       struct ip_conntrack_expect *exp,
+				       u32 *seq);
 #endif /* _IP_CONNTRACK_FTP_H */

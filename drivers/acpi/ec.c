@@ -832,7 +832,7 @@ acpi_fake_ecdt_callback (
 	status = acpi_evaluate_integer(handle, "_GPE", NULL, &ec_ecdt->gpe_bit);
 	if (ACPI_FAILURE(status))
 		return status;
-	ec_ecdt->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ec_ecdt->lock);
 	ec_ecdt->global_lock = TRUE;
 	ec_ecdt->handle = handle;
 

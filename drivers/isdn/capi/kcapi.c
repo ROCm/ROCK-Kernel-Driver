@@ -63,9 +63,9 @@ static char capi_manufakturer[64] = "AVM Berlin";
 #define NCCI2CTRL(ncci)    (((ncci) >> 24) & 0x7f)
 
 LIST_HEAD(capi_drivers);
-rwlock_t capi_drivers_list_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(capi_drivers_list_lock);
 
-static rwlock_t application_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(application_lock);
 static DECLARE_MUTEX(controller_sem);
 
 struct capi20_appl *capi_applications[CAPI_MAXAPPL];

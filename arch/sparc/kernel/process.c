@@ -198,7 +198,7 @@ void machine_power_off(void)
 
 EXPORT_SYMBOL(machine_power_off);
 
-static spinlock_t sparc_backtrace_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sparc_backtrace_lock);
 
 void __show_backtrace(unsigned long fp)
 {

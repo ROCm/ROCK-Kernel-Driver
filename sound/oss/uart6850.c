@@ -72,7 +72,7 @@ static int uart6850_opened;
 static int uart6850_irq;
 static int uart6850_detected;
 static int my_dev;
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 static void (*midi_input_intr) (int dev, unsigned char data);
 static void poll_uart6850(unsigned long dummy);

@@ -1033,7 +1033,7 @@ static struct block_device_operations stram_fops = {
 
 static struct gendisk *stram_disk;
 static struct request_queue *stram_queue;
-static spinlock_t stram_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(stram_lock);
 
 int __init stram_device_init(void)
 {

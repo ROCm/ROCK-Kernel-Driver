@@ -102,7 +102,7 @@ struct raw3215_info {
 /* array of 3215 devices structures */
 static struct raw3215_info *raw3215[NR_3215];
 /* spinlock to protect the raw3215 array */
-static spinlock_t raw3215_device_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(raw3215_device_lock);
 /* list of free request structures */
 static struct raw3215_req *raw3215_freelist;
 /* spinlock to protect free list */

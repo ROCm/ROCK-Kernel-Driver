@@ -38,7 +38,7 @@
    the extra indirection from having one of the map->map_priv 
    fields pointing to yet another private struct.
 */
-static spinlock_t vmax301_spin = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(vmax301_spin);
 
 static void __vmax301_page(struct map_info *map, unsigned long page)
 {

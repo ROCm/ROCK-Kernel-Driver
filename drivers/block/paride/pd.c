@@ -155,7 +155,7 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_GEO, D_SBY, D_DLY, D_SLV};
 #include <linux/sched.h>
 #include <linux/workqueue.h>
 
-static spinlock_t pd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pd_lock);
 
 #ifndef MODULE
 

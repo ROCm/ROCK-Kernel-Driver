@@ -56,8 +56,8 @@ struct ext3_group_desc * ext3_get_group_desc(struct super_block * sb,
 	}
 	smp_rmb();
 
-	group_desc = block_group / EXT3_DESC_PER_BLOCK(sb);
-	desc = block_group % EXT3_DESC_PER_BLOCK(sb);
+	group_desc = block_group >> EXT3_DESC_PER_BLOCK_BITS(sb);
+	desc = block_group & (EXT3_DESC_PER_BLOCK(sb) - 1);
 	if (!EXT3_SB(sb)->s_group_desc[group_desc]) {
 		ext3_error (sb, "ext3_get_group_desc",
 			    "Group descriptor not loaded - "
@@ -1440,19 +1440,17 @@ static inline int block_in_use(unsigned long block,
 
 static inline int test_root(int a, int b)
 {
-	if (a == 0)
-		return 1;
-	while (1) {
-		if (a == 1)
-			return 1;
-		if (a % b)
-			return 0;
-		a = a / b;
-	}
+	int num = b;
+
+	while (a > num)
+		num *= b;
+	return num == a;
 }
 
 static int ext3_group_sparse(int group)
 {
+	if (group <= 1)
+		return 1;
 	return (test_root(group, 3) || test_root(group, 5) ||
 		test_root(group, 7));
 }

@@ -81,7 +81,7 @@ static struct wf_mpu_config *phys_dev = &devs[0];
 static struct wf_mpu_config *virt_dev = &devs[1];
 
 static void start_uart_mode (void);
-static spinlock_t lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lock);
 
 #define	OUTPUT_READY	0x40
 #define	INPUT_AVAIL	0x80

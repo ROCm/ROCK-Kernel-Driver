@@ -45,7 +45,7 @@ static ia64_mca_os_to_sal_state_t *os_to_sal_handoff_state;
 /* from mca_drv_asm.S */
 extern void *mca_handler_bhhook(void);
 
-static spinlock_t mca_bh_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mca_bh_lock);
 
 typedef enum {
 	MCA_IS_LOCAL  = 0,

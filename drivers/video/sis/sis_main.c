@@ -2192,10 +2192,21 @@ sisfb_ioctl(struct inode *inode, struct file *file,
 		break;
 
 	   default:
-		return -EINVAL;
+		return -ENOIOCTLCMD;
 	}
 	return 0;
 }
+
+#ifdef CONFIG_COMPAT
+static long sisfb_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg, struct fb_info *info)
+{
+	int ret;
+	lock_kernel();
+	ret = sisfb_ioctl(NULL, f, cmd, arg, info);
+	unlock_kernel();
+	return ret;
+}
+#endif
 
 static int
 sisfb_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
@@ -2258,7 +2269,10 @@ static struct fb_ops sisfb_ops = {
 	.fb_imageblit   = cfb_imageblit,
 	.fb_cursor      = soft_cursor,
 	.fb_sync        = fbcon_sis_sync,
-	.fb_ioctl       = sisfb_ioctl
+	.fb_ioctl       = sisfb_ioctl,
+#ifdef CONFIG_COMPAT
+	.fb_compat_ioctl = sisfb_compat_ioctl,
+#endif
 };
 #endif
 
@@ -4791,10 +4805,6 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	ivideo->pcifunc = PCI_FUNC(pdev->devfn);
 	ivideo->subsysvendor = pdev->subsystem_vendor;
 	ivideo->subsysdevice = pdev->subsystem_device;
-#ifdef SIS_CONFIG_COMPAT
-	ivideo->ioctl32registered = 0;
-	ivideo->ioctl32vblankregistered = 0;
-#endif
 
 #ifndef MODULE
 	if(sisfb_mode_idx == -1) {
@@ -5594,30 +5604,6 @@ int __devinit sisfb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		ivideo->next = card_list;
 		card_list = ivideo;
 
-#ifdef SIS_CONFIG_COMPAT
-		{
-		int ret;
-		/* Our ioctls are all "32/64bit compatible" */
-		if(register_ioctl32_conversion(FBIOGET_VBLANK, NULL)) {
-		   printk(KERN_ERR "sisfb: Error registering FBIOGET_VBLANK ioctl32 translation\n");
-		} else {
-		   ivideo->ioctl32vblankregistered = 1;
-		}
-		ret =  register_ioctl32_conversion(FBIO_ALLOC,             NULL);
-		ret |= register_ioctl32_conversion(FBIO_FREE,              NULL);
-		ret |= register_ioctl32_conversion(SISFB_GET_INFO_SIZE,    NULL);
-		ret |= register_ioctl32_conversion(SISFB_GET_INFO,         NULL);
-		ret |= register_ioctl32_conversion(SISFB_GET_TVPOSOFFSET,  NULL);
-		ret |= register_ioctl32_conversion(SISFB_SET_TVPOSOFFSET,  NULL);
-		ret |= register_ioctl32_conversion(SISFB_SET_LOCK,         NULL);
-		ret |= register_ioctl32_conversion(SISFB_GET_VBRSTATUS,    NULL);
-		ret |= register_ioctl32_conversion(SISFB_GET_AUTOMAXIMIZE, NULL);
-		ret |= register_ioctl32_conversion(SISFB_SET_AUTOMAXIMIZE, NULL);
-		if(ret)	printk(KERN_ERR "sisfb: Error registering ioctl32 translations\n");
-		else    ivideo->ioctl32registered = 1;
-		}
-#endif
-
 		printk(KERN_INFO "sisfb: 2D acceleration is %s, y-panning %s\n",
 		     ivideo->sisfb_accel ? "enabled" : "disabled",
 		     ivideo->sisfb_ypan  ?
@@ -5648,28 +5634,6 @@ static void __devexit sisfb_remove(struct pci_dev *pdev)
 	struct sis_video_info *ivideo = pci_get_drvdata(pdev);
 	struct fb_info        *sis_fb_info = ivideo->memyselfandi;
 	int                   registered = ivideo->registered;
-
-#ifdef SIS_CONFIG_COMPAT
-	if(ivideo->ioctl32vblankregistered) {
-		if(unregister_ioctl32_conversion(FBIOGET_VBLANK)) {
-			printk(KERN_ERR "sisfb: Error unregistering FBIOGET_VBLANK ioctl32 translation\n");
-		}
-	}
-	if(ivideo->ioctl32registered) {
-		int ret;
-		ret =  unregister_ioctl32_conversion(FBIO_ALLOC);
-		ret |= unregister_ioctl32_conversion(FBIO_FREE);
-		ret |= unregister_ioctl32_conversion(SISFB_GET_INFO_SIZE);
-		ret |= unregister_ioctl32_conversion(SISFB_GET_INFO);
-		ret |= unregister_ioctl32_conversion(SISFB_GET_TVPOSOFFSET);
-		ret |= unregister_ioctl32_conversion(SISFB_SET_TVPOSOFFSET);
-		ret |= unregister_ioctl32_conversion(SISFB_SET_LOCK);
-		ret |= unregister_ioctl32_conversion(SISFB_GET_VBRSTATUS);
-		ret |= unregister_ioctl32_conversion(SISFB_GET_AUTOMAXIMIZE);
-		ret |= unregister_ioctl32_conversion(SISFB_SET_AUTOMAXIMIZE);
-		if(ret)	printk(KERN_ERR "sisfb: Error unregistering ioctl32 translations\n");
-	}
-#endif
 
 	/* Unmap */
 	iounmap(ivideo->video_vbase);

@@ -1293,7 +1293,7 @@ static void sunzilog_put_char(struct zilog_channel __iomem *channel, unsigned ch
 
 #ifdef CONFIG_SERIO
 
-static spinlock_t sunzilog_serio_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sunzilog_serio_lock);
 
 static int sunzilog_serio_write(struct serio *serio, unsigned char ch)
 {

@@ -185,14 +185,6 @@ config SMP
 
 	  If you don't know what to do here, say Y.
 
-config IRQ_ALL_CPUS
-	bool "Distribute interrupts on all CPUs by default"
-	depends on SMP && PPC_MULTIPLATFORM
-	help
-	  This option gives the kernel permission to distribute IRQs across
-	  multiple CPUs.  Saying N here will route all IRQs to the first
-	  CPU.
-
 config NR_CPUS
 	int "Maximum number of CPUs (2-128)"
 	range 2 128

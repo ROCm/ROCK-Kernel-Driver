@@ -2,11 +2,10 @@
 #define _IP_CONNTRACK_AMANDA_H
 /* AMANDA tracking. */
 
-struct ip_ct_amanda_expect
-{
-	u_int16_t port;		/* port number of this expectation */
-	u_int16_t offset;	/* offset of port in ctrl packet */
-	u_int16_t len;		/* length of the port number string */
-};
-
+struct ip_conntrack_expect;
+extern unsigned int (*ip_nat_amanda_hook)(struct sk_buff **pskb,
+					  enum ip_conntrack_info ctinfo,
+					  unsigned int matchoff,
+					  unsigned int matchlen,
+					  struct ip_conntrack_expect *exp);
 #endif /* _IP_CONNTRACK_AMANDA_H */

@@ -108,7 +108,7 @@ static int intg_esdi = 0;       /* If integrated adapter */
 struct ps2esdi_i_struct {
 	unsigned int head, sect, cyl, wpcom, lzone, ctl;
 };
-static spinlock_t ps2esdi_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ps2esdi_lock);
 static struct request_queue *ps2esdi_queue;
 static struct request *current_req;
 

@@ -85,7 +85,7 @@ static struct scsi_driver sr_template = {
 };
 
 static unsigned long sr_index_bits[SR_DISKS / BITS_PER_LONG];
-static spinlock_t sr_index_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sr_index_lock);
 
 /* This semaphore is used to mediate the 0->1 reference get in the
  * face of object destruction (i.e. we can't allow a get on an

@@ -93,9 +93,9 @@ static void __dev_mc_upload(struct net_device *dev)
 
 void dev_mc_upload(struct net_device *dev)
 {
-	spin_lock_bh(&dev->xmit_lock);
+	spin_lock_irq(&dev->xmit_lock);
 	__dev_mc_upload(dev);
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 }
 
 /*
@@ -107,7 +107,7 @@ int dev_mc_delete(struct net_device *dev, void *addr, int alen, int glbl)
 	int err = 0;
 	struct dev_mc_list *dmi, **dmip;
 
-	spin_lock_bh(&dev->xmit_lock);
+	spin_lock_irq(&dev->xmit_lock);
 
 	for (dmip = &dev->mc_list; (dmi = *dmip) != NULL; dmip = &dmi->next) {
 		/*
@@ -139,13 +139,13 @@ int dev_mc_delete(struct net_device *dev, void *addr, int alen, int glbl)
 			 */
 			__dev_mc_upload(dev);
 			
-			spin_unlock_bh(&dev->xmit_lock);
+			spin_unlock_irq(&dev->xmit_lock);
 			return 0;
 		}
 	}
 	err = -ENOENT;
 done:
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 	return err;
 }
 
@@ -160,7 +160,7 @@ int dev_mc_add(struct net_device *dev, void *addr, int alen, int glbl)
 
 	dmi1 = (struct dev_mc_list *)kmalloc(sizeof(*dmi), GFP_ATOMIC);
 
-	spin_lock_bh(&dev->xmit_lock);
+	spin_lock_irq(&dev->xmit_lock);
 	for (dmi = dev->mc_list; dmi != NULL; dmi = dmi->next) {
 		if (memcmp(dmi->dmi_addr, addr, dmi->dmi_addrlen) == 0 &&
 		    dmi->dmi_addrlen == alen) {
@@ -176,7 +176,7 @@ int dev_mc_add(struct net_device *dev, void *addr, int alen, int glbl)
 	}
 
 	if ((dmi = dmi1) == NULL) {
-		spin_unlock_bh(&dev->xmit_lock);
+		spin_unlock_irq(&dev->xmit_lock);
 		return -ENOMEM;
 	}
 	memcpy(dmi->dmi_addr, addr, alen);
@@ -189,11 +189,11 @@ int dev_mc_add(struct net_device *dev, void *addr, int alen, int glbl)
 
 	__dev_mc_upload(dev);
 	
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 	return 0;
 
 done:
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 	if (dmi1)
 		kfree(dmi1);
 	return err;
@@ -205,7 +205,7 @@ done:
 
 void dev_mc_discard(struct net_device *dev)
 {
-	spin_lock_bh(&dev->xmit_lock);
+	spin_lock_irq(&dev->xmit_lock);
 	
 	while (dev->mc_list != NULL) {
 		struct dev_mc_list *tmp = dev->mc_list;
@@ -216,7 +216,7 @@ void dev_mc_discard(struct net_device *dev)
 	}
 	dev->mc_count = 0;
 
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 }
 
 #ifdef CONFIG_PROC_FS
@@ -251,7 +251,7 @@ static int dev_mc_seq_show(struct seq_file *seq, void *v)
 	struct dev_mc_list *m;
 	struct net_device *dev = v;
 
-	spin_lock_bh(&dev->xmit_lock);
+	spin_lock_irq(&dev->xmit_lock);
 	for (m = dev->mc_list; m; m = m->next) {
 		int i;
 
@@ -263,7 +263,7 @@ static int dev_mc_seq_show(struct seq_file *seq, void *v)
 
 		seq_putc(seq, '\n');
 	}
-	spin_unlock_bh(&dev->xmit_lock);
+	spin_unlock_irq(&dev->xmit_lock);
 	return 0;
 }
 

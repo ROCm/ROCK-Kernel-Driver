@@ -95,7 +95,7 @@ static debug_info_t *qdio_dbf_slsb_in;
 /* iQDIO stuff: */
 static volatile struct qdio_q *tiq_list=NULL; /* volatile as it could change
 						 during a while loop */
-static spinlock_t ttiq_list_lock=SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ttiq_list_lock);
 static int register_thinint_result;
 static void tiqdio_tl(unsigned long);
 static DECLARE_TASKLET(tiqdio_tasklet,tiqdio_tl,0);

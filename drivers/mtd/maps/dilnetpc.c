@@ -197,7 +197,7 @@ static void dnpc_unmap_flash(void)
 ************************************************************
 */
 
-static spinlock_t dnpc_spin   = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dnpc_spin);
 static int        vpp_counter = 0;
 /*
 ** This is what has to be done for the DNP board ..

@@ -50,7 +50,7 @@ void __init arc_init_irq(void);
 #define MAX_IRQ_CNT	100000
 
 static volatile unsigned long irq_err_count;
-static spinlock_t irq_controller_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(irq_controller_lock);
 
 struct irqdesc irq_desc[NR_IRQS];
 

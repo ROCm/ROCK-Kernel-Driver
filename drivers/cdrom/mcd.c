@@ -187,7 +187,7 @@ static int mcd_open(struct cdrom_device_info *cdi, int purpose);
 static void mcd_release(struct cdrom_device_info *cdi);
 static int mcd_media_changed(struct cdrom_device_info *cdi, int disc_nr);
 static int mcd_tray_move(struct cdrom_device_info *cdi, int position);
-static spinlock_t mcd_spinlock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mcd_spinlock);
 static int mcd_audio_ioctl(struct cdrom_device_info *cdi, unsigned int cmd,
 		    void *arg);
 static int mcd_drive_status(struct cdrom_device_info *cdi, int slot_nr);

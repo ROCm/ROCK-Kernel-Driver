@@ -18,7 +18,6 @@ static int iph5526_change_mtu(struct net_device *dev, int mtu);
 
 static void rx_net_packet(struct fc_info *fi, u_char *buff_addr, int payload_size);
 static void rx_net_mfs_packet(struct fc_info *fi, struct sk_buff *skb);
-unsigned short fc_type_trans(struct sk_buff *skb, struct net_device *dev); 
 static int tx_ip_packet(struct sk_buff *skb, unsigned long len, struct fc_info *fi);
 static int tx_arp_packet(char *data, unsigned long len, struct fc_info *fi);
 #endif

@@ -20,7 +20,6 @@
 
 #include <asm/mpc85xx.h>
 #include <asm/mmu.h>
-#include <asm/ocp.h>
 
 /* ************************************************************************ */
 /* Return the value of CCSRBAR for the current board */
@@ -29,18 +28,6 @@ phys_addr_t
 get_ccsrbar(void)
 {
         return BOARD_CCSRBAR;
-}
-
-/* ************************************************************************ */
-/* Update the 85xx OCP tables paddr field */
-void
-mpc85xx_update_paddr_ocp(struct ocp_device *dev, void *arg)
-{
-	phys_addr_t ccsrbar;
-	if (arg) {
-		ccsrbar = *(phys_addr_t *)arg;
-		dev->def->paddr += ccsrbar;
-	}
 }
 
 EXPORT_SYMBOL(get_ccsrbar);

@@ -34,7 +34,6 @@
 
 #include <linux/interrupt.h>
 #include <asm/sn/pda.h>
-#include "shub.h"
 #include <asm/sn/leds.h>
 
 extern void sn_lb_int_war_check(void);

@@ -39,7 +39,7 @@ static int kafsasyncd(void *arg);
 
 static LIST_HEAD(kafsasyncd_async_attnq);
 static LIST_HEAD(kafsasyncd_async_busyq);
-static spinlock_t kafsasyncd_async_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(kafsasyncd_async_lock);
 
 static void kafsasyncd_null_call_attn_func(struct rxrpc_call *call)
 {

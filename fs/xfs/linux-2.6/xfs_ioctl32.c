@@ -37,10 +37,14 @@
 #include <linux/ioctl32.h>
 #include <linux/syscalls.h>
 #include <linux/types.h>
+#include <linux/fs.h>
 #include <asm/uaccess.h>
 
+#include "xfs.h"
 #include "xfs_types.h"
 #include "xfs_fs.h"
+#include "xfs_vfs.h"
+#include "xfs_vnode.h"
 #include "xfs_dfrag.h"
 
 #if defined(CONFIG_IA64) || defined(CONFIG_X86_64)
@@ -54,12 +58,8 @@ typedef struct xfs_fsop_bulkreq32 {
 	__s32		ocount;		/* output count pointer		*/
 } xfs_fsop_bulkreq32_t;
 
-static int
-xfs_ioctl32_bulkstat(
-	unsigned int		fd,
-	unsigned int		cmd,
-	unsigned long		arg,
-	struct file *		file)
+static unsigned long
+xfs_ioctl32_bulkstat(unsigned long arg)
 {
 	xfs_fsop_bulkreq32_t	__user *p32 = (void __user *)arg;
 	xfs_fsop_bulkreq_t	__user *p = compat_alloc_user_space(sizeof(*p));
@@ -74,89 +74,90 @@ xfs_ioctl32_bulkstat(
 	    put_user(compat_ptr(addr), &p->ocount))
 		return -EFAULT;
 
-	return sys_ioctl(fd, cmd, (unsigned long)p);
+	return (unsigned long)p;
 }
 #endif
 
-struct ioctl_trans xfs_ioctl32_trans[] = {
-	{ XFS_IOC_DIOINFO, },
-	{ XFS_IOC_FSGEOMETRY_V1, },
-	{ XFS_IOC_FSGEOMETRY, },
-	{ XFS_IOC_GETVERSION, },
-	{ XFS_IOC_GETXFLAGS, },
-	{ XFS_IOC_SETXFLAGS, },
-	{ XFS_IOC_FSGETXATTR, },
-	{ XFS_IOC_FSSETXATTR, },
-	{ XFS_IOC_FSGETXATTRA, },
-	{ XFS_IOC_FSSETDM, },
-	{ XFS_IOC_GETBMAP, },
-	{ XFS_IOC_GETBMAPA, },
-	{ XFS_IOC_GETBMAPX, },
+static long
+__xfs_compat_ioctl(int mode, struct file *f, unsigned cmd, unsigned long arg)
+{
+	int		error;
+	struct inode *inode = f->f_dentry->d_inode;
+	vnode_t		*vp = LINVFS_GET_VP(inode);
+
+	switch (cmd) {
+	case XFS_IOC_DIOINFO:
+	case XFS_IOC_FSGEOMETRY_V1:
+	case XFS_IOC_FSGEOMETRY:
+	case XFS_IOC_GETVERSION:
+	case XFS_IOC_GETXFLAGS:
+	case XFS_IOC_SETXFLAGS:
+	case XFS_IOC_FSGETXATTR:
+	case XFS_IOC_FSSETXATTR:
+	case XFS_IOC_FSGETXATTRA:
+	case XFS_IOC_FSSETDM:
+	case XFS_IOC_GETBMAP:
+	case XFS_IOC_GETBMAPA:
+	case XFS_IOC_GETBMAPX:
 /* not handled
-	{ XFS_IOC_FD_TO_HANDLE, },
-	{ XFS_IOC_PATH_TO_HANDLE, },
-	{ XFS_IOC_PATH_TO_HANDLE, },
-	{ XFS_IOC_PATH_TO_FSHANDLE, },
-	{ XFS_IOC_OPEN_BY_HANDLE, },
-	{ XFS_IOC_FSSETDM_BY_HANDLE, },
-	{ XFS_IOC_READLINK_BY_HANDLE, },
-	{ XFS_IOC_ATTRLIST_BY_HANDLE, },
-	{ XFS_IOC_ATTRMULTI_BY_HANDLE, },
+	case XFS_IOC_FD_TO_HANDLE:
+	case XFS_IOC_PATH_TO_HANDLE:
+	case XFS_IOC_PATH_TO_HANDLE:
+	case XFS_IOC_PATH_TO_FSHANDLE:
+	case XFS_IOC_OPEN_BY_HANDLE:
+	case XFS_IOC_FSSETDM_BY_HANDLE:
+	case XFS_IOC_READLINK_BY_HANDLE:
+	case XFS_IOC_ATTRLIST_BY_HANDLE:
+	case XFS_IOC_ATTRMULTI_BY_HANDLE:
 */
-	{ XFS_IOC_FSCOUNTS, NULL, },
-	{ XFS_IOC_SET_RESBLKS, NULL, },
-	{ XFS_IOC_GET_RESBLKS, NULL, },
-	{ XFS_IOC_FSGROWFSDATA, NULL, },
-	{ XFS_IOC_FSGROWFSLOG, NULL, },
-	{ XFS_IOC_FSGROWFSRT, NULL, },
-	{ XFS_IOC_FREEZE, NULL, },
-	{ XFS_IOC_THAW, NULL, },
-	{ XFS_IOC_GOINGDOWN, NULL, },
-	{ XFS_IOC_ERROR_INJECTION, NULL, },
-	{ XFS_IOC_ERROR_CLEARALL, NULL, },
+	case XFS_IOC_FSCOUNTS:
+	case XFS_IOC_SET_RESBLKS:
+	case XFS_IOC_GET_RESBLKS:
+	case XFS_IOC_FSGROWFSDATA:
+	case XFS_IOC_FSGROWFSLOG:
+	case XFS_IOC_FSGROWFSRT:
+	case XFS_IOC_FREEZE:
+	case XFS_IOC_THAW:
+	case XFS_IOC_GOINGDOWN:
+	case XFS_IOC_ERROR_INJECTION:
+	case XFS_IOC_ERROR_CLEARALL:
+		break;
+
 #ifndef BROKEN_X86_ALIGNMENT
 	/* xfs_flock_t and xfs_bstat_t have wrong u32 vs u64 alignment */
-	{ XFS_IOC_ALLOCSP, },
-	{ XFS_IOC_FREESP, },
-	{ XFS_IOC_RESVSP, },
-	{ XFS_IOC_UNRESVSP, },
-	{ XFS_IOC_ALLOCSP64, },
-	{ XFS_IOC_FREESP64, },
-	{ XFS_IOC_RESVSP64, },
-	{ XFS_IOC_UNRESVSP64, },
-	{ XFS_IOC_SWAPEXT, },
-	{ XFS_IOC_FSBULKSTAT_SINGLE, xfs_ioctl32_bulkstat },
-	{ XFS_IOC_FSBULKSTAT, xfs_ioctl32_bulkstat},
-	{ XFS_IOC_FSINUMBERS, xfs_ioctl32_bulkstat},
+	case XFS_IOC_ALLOCSP:
+	case XFS_IOC_FREESP:
+	case XFS_IOC_RESVSP:
+	case XFS_IOC_UNRESVSP:
+	case XFS_IOC_ALLOCSP64:
+	case XFS_IOC_FREESP64:
+	case XFS_IOC_RESVSP64:
+	case XFS_IOC_UNRESVSP64:
+	case XFS_IOC_SWAPEXT:
+		break;
+
+	case XFS_IOC_FSBULKSTAT_SINGLE:
+	case XFS_IOC_FSBULKSTAT:
+	case XFS_IOC_FSINUMBERS:
+		arg = xfs_ioctl32_bulkstat(arg);
+		break;
 #endif
-	{ 0, },
-};
-
-int __init
-xfs_ioctl32_init(void)
-{
-	int error, i;
-
-	for (i = 0; xfs_ioctl32_trans[i].cmd != 0; i++) {
-		error = register_ioctl32_conversion(xfs_ioctl32_trans[i].cmd,
-				xfs_ioctl32_trans[i].handler);
-		if (error)
-			goto fail;
+	default:
+		return -ENOIOCTLCMD;
 	}
 
-	return 0;
+	VOP_IOCTL(vp, inode, f, mode, cmd, (void __user *)arg, error);
+	VMODIFY(vp);
 
- fail:
-	while (--i)
-		unregister_ioctl32_conversion(xfs_ioctl32_trans[i].cmd);
 	return error;
 }
 
-void
-xfs_ioctl32_exit(void)
+long xfs_compat_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 {
-	int i;
+	return __xfs_compat_ioctl(0, f, cmd, arg);
+}
 
-	for (i = 0; xfs_ioctl32_trans[i].cmd != 0; i++)
-		unregister_ioctl32_conversion(xfs_ioctl32_trans[i].cmd);
+long xfs_compat_invis_ioctl(struct file *f, unsigned cmd, unsigned long arg)
+{
+	return __xfs_compat_ioctl(IO_INVIS, f, cmd, arg);
 }

@@ -56,7 +56,7 @@
 #include "qlogicpti_asm.c"
 
 static struct qlogicpti *qptichain = NULL;
-static spinlock_t qptichain_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(qptichain_lock);
 static int qptis_running = 0;
 
 #define PACKB(a, b)			(((a)<<4)|(b))

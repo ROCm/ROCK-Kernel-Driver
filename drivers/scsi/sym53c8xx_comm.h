@@ -250,7 +250,7 @@ static void ___m_free(m_pool_s *mp, void *ptr, int size)
 	}
 }
 
-static spinlock_t ncr53c8xx_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ncr53c8xx_lock);
 
 static void *__m_calloc2(m_pool_s *mp, int size, char *name, int uflags)
 {

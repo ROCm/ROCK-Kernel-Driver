@@ -25,7 +25,7 @@
 
 #define HPTE_LOCK_BIT 3
 
-static spinlock_t native_tlbie_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(native_tlbie_lock);
 
 static inline void native_lock_hpte(HPTE *hptep)
 {

@@ -63,7 +63,7 @@ EXPORT_SYMBOL(phys_proc_id);
 /* Bitmask of currently online CPUs */
 cpumask_t cpu_online_map;
 
-static cpumask_t cpu_callin_map;
+cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
 static cpumask_t smp_commenced_mask;
 

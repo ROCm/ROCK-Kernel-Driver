@@ -101,7 +101,7 @@ struct irqaction *irq_action[NR_IRQS+1] = {
  * read things in the table.  IRQ handler processing orders
  * its' accesses such that no locking is needed.
  */
-static spinlock_t irq_action_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(irq_action_lock);
 
 static void register_irq_proc (unsigned int irq);
 

@@ -16,7 +16,7 @@
 ACPI_MODULE_NAME		("event")
 
 /* Global vars for handling event proc entry */
-static spinlock_t		acpi_system_event_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(acpi_system_event_lock);
 int				event_is_open = 0;
 extern struct list_head		acpi_bus_event_list;
 extern wait_queue_head_t	acpi_bus_event_queue;

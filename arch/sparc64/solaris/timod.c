@@ -29,7 +29,7 @@
 
 asmlinkage int solaris_ioctl(unsigned int fd, unsigned int cmd, u32 arg);
 
-static spinlock_t timod_pagelock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(timod_pagelock);
 static char * page = NULL ;
 
 #ifndef DEBUG_SOLARIS_KMALLOC

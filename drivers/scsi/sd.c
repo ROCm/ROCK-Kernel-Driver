@@ -105,7 +105,7 @@ struct scsi_disk {
 };
 
 static DEFINE_IDR(sd_index_idr);
-static spinlock_t sd_index_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(sd_index_lock);
 
 /* This semaphore is used to mediate the 0->1 reference get in the
  * face of object destruction (i.e. we can't allow a get on an
