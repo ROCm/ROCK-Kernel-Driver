@@ -26,7 +26,7 @@
  *
  * Authors:
  *    Jeff Hartmann <jhartmann@valinux.com>
- *    Keith Whitwell <keithw@valinux.com>
+ *    Keith Whitwell <keith@tungstengraphics.com>
  *
  * Rewritten by:
  *    Gareth Hughes <gareth@valinux.com>
@@ -239,6 +239,7 @@ typedef struct _drm_mga_sarea {
 #define DRM_IOCTL_MGA_INDICES		DRM_IOW( 0x46, drm_mga_indices_t)
 #define DRM_IOCTL_MGA_ILOAD		DRM_IOW( 0x47, drm_mga_iload_t)
 #define DRM_IOCTL_MGA_BLIT		DRM_IOW( 0x48, drm_mga_blit_t)
+#define DRM_IOCTL_MGA_GETPARAM		DRM_IOWR(0x49, drm_mga_getparam_t)
 
 typedef struct _drm_mga_warp_index {
    	int installed;
@@ -321,5 +322,15 @@ typedef struct _drm_mga_blit {
 	int height, ydir;		/* flip image vertically */
 	int source_pitch, dest_pitch;
 } drm_mga_blit_t;
+
+/* 3.1: An ioctl to get parameters that aren't available to the 3d
+ * client any other way.  
+ */
+#define MGA_PARAM_IRQ_NR            1
+
+typedef struct drm_mga_getparam {
+	int param;
+	int *value;
+} drm_mga_getparam_t;
 
 #endif
