@@ -1550,7 +1550,6 @@ wavelan_set_mac_address(struct net_device *	dev,
 /*
  * Frequency setting (for hardware able of it)
  * It's a bit complicated and you don't really want to look into it...
- * (called in wavelan_ioctl)
  */
 static inline int
 wv_set_frequency(u_long		base,	/* i/o port of the card */
@@ -2438,6 +2437,12 @@ static int wavelan_get_range(struct net_device *dev,
 	range->num_bitrates = 1;
 	range->bitrate[0] = 2000000;	/* 2 Mb/s */
 
+	/* Event capability (kernel + driver) */
+	range->event_capa[0] = (IW_EVENT_CAPA_MASK(0x8B02) |
+				IW_EVENT_CAPA_MASK(0x8B04) |
+				IW_EVENT_CAPA_MASK(0x8B06));
+	range->event_capa[1] = IW_EVENT_CAPA_K_1;
+
 	/* Disable interrupts and save flags. */
 	spin_lock_irqsave(&lp->spinlock, flags);
 	
@@ -2737,11 +2742,10 @@ static const struct iw_handler_def	wavelan_handler_def =
 	.num_standard	= sizeof(wavelan_handler)/sizeof(iw_handler),
 	.num_private	= sizeof(wavelan_private_handler)/sizeof(iw_handler),
 	.num_private_args = sizeof(wavelan_private_args)/sizeof(struct iw_priv_args),
-	.standard	= (iw_handler *) wavelan_handler,
-	.private	= (iw_handler *) wavelan_private_handler,
-	.private_args	= (struct iw_priv_args *) wavelan_private_args,
-	.spy_offset	= ((void *) (&((net_local *) NULL)->spy_data) -
-			   (void *) NULL),
+	.standard	= wavelan_handler,
+	.private	= wavelan_private_handler,
+	.private_args	= wavelan_private_args,
+	.get_wireless_stats = wavelan_get_wireless_stats,
 };
 
 /*------------------------------------------------------------------*/
@@ -4720,9 +4724,10 @@ wavelan_attach(void)
   dev->watchdog_timeo	= WATCHDOG_JIFFIES;
 
 #ifdef WIRELESS_EXT	/* If wireless extension exist in the kernel */
-  dev->wireless_handlers = (struct iw_handler_def *)&wavelan_handler_def;
-  dev->do_ioctl = wavelan_ioctl;	/* old wireless extensions */
-  dev->get_wireless_stats = wavelan_get_wireless_stats;
+  dev->wireless_handlers = &wavelan_handler_def;
+  dev->do_ioctl = wavelan_ioctl;	/* ethtool */
+  lp->wireless_data.spy_data = &lp->spy_data;
+  dev->wireless_data = &lp->wireless_data;
 #endif
 
   /* Other specific data */
