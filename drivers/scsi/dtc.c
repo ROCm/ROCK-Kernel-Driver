@@ -219,44 +219,58 @@ static int __init dtc_detect(Scsi_Host_Template * tpnt)
 {
 	static int current_override = 0, current_base = 0;
 	struct Scsi_Host *instance;
-	unsigned int base;
+	unsigned int addr;
+	void __iomem *base;
 	int sig, count;
 
 	tpnt->proc_name = "dtc3x80";
 	tpnt->proc_info = &dtc_proc_info;
 
 	for (count = 0; current_override < NO_OVERRIDES; ++current_override) {
-		base = 0;
+		addr = 0;
+		base = NULL;
 
-		if (overrides[current_override].address)
-			base = overrides[current_override].address;
-		else
-			for (; !base && (current_base < NO_BASES); ++current_base) {
+		if (overrides[current_override].address) {
+			addr = overrides[current_override].address;
+			base = ioremap(addr, 0x2000);
+			if (!base)
+				addr = 0;
+		} else
+			for (; !addr && (current_base < NO_BASES); ++current_base) {
 #if (DTCDEBUG & DTCDEBUG_INIT)
 				printk("scsi-dtc : probing address %08x\n", bases[current_base].address);
 #endif
-				for (sig = 0; sig < NO_SIGNATURES; ++sig)
-					if (!bases[current_base].noauto && isa_check_signature(bases[current_base].address + signatures[sig].offset, signatures[sig].string, strlen(signatures[sig].string))) {
-						base = bases[current_base].address;
+				if (bases[current_base].noauto)
+					continue;
+				base = ioremap(bases[current_base].address, 0x2000);
+				if (!base)
+					continue;
+				for (sig = 0; sig < NO_SIGNATURES; ++sig) {
+					if (check_signature(base + signatures[sig].offset, signatures[sig].string, strlen(signatures[sig].string))) {
+						addr = bases[current_base].address;
 #if (DTCDEBUG & DTCDEBUG_INIT)
 						printk("scsi-dtc : detected board.\n");
 #endif
-						break;
+						goto found;
 					}
+				}
+				iounmap(base);
 			}
 
 #if defined(DTCDEBUG) && (DTCDEBUG & DTCDEBUG_INIT)
-		printk("scsi-dtc : base = %08x\n", base);
+		printk("scsi-dtc : base = %08x\n", addr);
 #endif
 
-		if (!base)
+		if (!addr)
 			break;
 
+found:
 		instance = scsi_register(tpnt, sizeof(struct NCR5380_hostdata));
 		if (instance == NULL)
 			break;
 
-		instance->base = base;
+		instance->base = addr;
+		((struct NCR5380_hostdata *)(instance)->hostdata)->base = base;
 
 		NCR5380_init(instance, 0);
 
@@ -372,7 +386,7 @@ static inline int NCR5380_pread(struct Scsi_Host *instance, unsigned char *dst, 
 		while (NCR5380_read(DTC_CONTROL_REG) & CSR_HOST_BUF_NOT_RDY)
 			++i;
 		rtrc(3);
-		isa_memcpy_fromio(d, base + DTC_DATA_BUF, 128);
+		memcpy_fromio(d, base + DTC_DATA_BUF, 128);
 		d += 128;
 		len -= 128;
 		rtrc(7);
@@ -423,7 +437,7 @@ static inline int NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *src,
 		while (NCR5380_read(DTC_CONTROL_REG) & CSR_HOST_BUF_NOT_RDY)
 			++i;
 		rtrc(3);
-		isa_memcpy_toio(base + DTC_DATA_BUF, src, 128);
+		memcpy_toio(base + DTC_DATA_BUF, src, 128);
 		src += 128;
 		len -= 128;
 	}
@@ -449,12 +463,15 @@ MODULE_LICENSE("GPL");
 
 static int dtc_release(struct Scsi_Host *shost)
 {
+	NCR5380_local_declare();
+	NCR5380_setup(shost);
 	if (shost->irq)
 		free_irq(shost->irq, NULL);
 	NCR5380_exit(shost);
 	if (shost->io_port && shost->n_io_port)
 		release_region(shost->io_port, shost->n_io_port);
 	scsi_unregister(shost);
+	iounmap(base);
 	return 0;
 }
 

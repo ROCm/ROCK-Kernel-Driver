@@ -90,10 +90,10 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 	spin_lock(&card->lock);
 
 	/* get the message type */
-	ackupload = copy_from_pam_dword(card, (void *)TPAM_ACKUPLOAD_REGISTER);
+	ackupload = copy_from_pam_dword(card, TPAM_ACKUPLOAD_REGISTER);
 
 	/* acknowledge the interrupt */
-	copy_to_pam_dword(card, (void *)TPAM_INTERRUPTACK_REGISTER, 0);
+	copy_to_pam_dword(card, TPAM_INTERRUPTACK_REGISTER, 0);
 	readl(card->bar0 + TPAM_HINTACK_REGISTER);
 
 	if (!ackupload) {
@@ -104,10 +104,10 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 		/* get the upload pointer */
 		uploadptr = copy_from_pam_dword(card, 
-					    (void *)TPAM_UPLOADPTR_REGISTER);
+					    TPAM_UPLOADPTR_REGISTER);
 		
 		/* get the beginning of the message (pci_mpb part) */
-		copy_from_pam(card, &mpb, (void *)uploadptr, sizeof(pci_mpb));
+		copy_from_pam(card, &mpb, uploadptr, sizeof(pci_mpb));
 
 		/* allocate the sk_buff */
 		if (!(skb = alloc_skb(sizeof(skb_header) + sizeof(pci_mpb) + 
@@ -131,13 +131,13 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 		/* copy the TLV block into the sk_buff */
 		copy_from_pam(card, skb_put(skb, mpb.actualBlockTLVSize),
-			      (void *)uploadptr + sizeof(pci_mpb), 
+			      uploadptr + sizeof(pci_mpb), 
 			      mpb.actualBlockTLVSize);
 
 		/* if existent, copy the data block into the sk_buff */
 		if (mpb.actualDataSize)
 			copy_from_pam(card, skb_put(skb, mpb.actualDataSize),
-				(void *)uploadptr + sizeof(pci_mpb) + 4096, 
+				uploadptr + sizeof(pci_mpb) + 4096, 
 				mpb.actualDataSize);
 
 		/* wait for the board to become ready */
@@ -154,7 +154,7 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 		} while (hpic & 0x00000002);
 
 		/* acknowledge the message */
-        	copy_to_pam_dword(card, (void *)TPAM_ACKDOWNLOAD_REGISTER, 
+        	copy_to_pam_dword(card, TPAM_ACKDOWNLOAD_REGISTER, 
 				  0xffffffff);
         	readl(card->bar0 + TPAM_DSPINT_REGISTER);
 
@@ -362,15 +362,14 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 		card->id, skbh->size, skbh->data_size);
 
 	/* get the board's download pointer */
-       	downloadptr = copy_from_pam_dword(card, 
-					  (void *)TPAM_DOWNLOADPTR_REGISTER);
+       	downloadptr = copy_from_pam_dword(card, TPAM_DOWNLOADPTR_REGISTER);
 
 	/* copy the packet to the board at the downloadptr location */
-       	copy_to_pam(card, (void *)downloadptr, skb->data + sizeof(skb_header), 
+       	copy_to_pam(card, downloadptr, skb->data + sizeof(skb_header), 
 		    skbh->size);
 	if (skbh->data_size)
 		/* if there is some data in the packet, copy it too */
-		copy_to_pam(card, (void *)downloadptr + sizeof(pci_mpb) + 4096,
+		copy_to_pam(card, downloadptr + sizeof(pci_mpb) + 4096,
 			    skb->data + sizeof(skb_header) + skbh->size, 
 			    skbh->data_size);
 
@@ -378,7 +377,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 	card->busy = 1;
 
 	/* interrupt the board */
-	copy_to_pam_dword(card, (void *)TPAM_ACKDOWNLOAD_REGISTER, 0);
+	copy_to_pam_dword(card, TPAM_ACKDOWNLOAD_REGISTER, 0);
 	readl(card->bar0 + TPAM_DSPINT_REGISTER);
 
 	/* release the lock */
