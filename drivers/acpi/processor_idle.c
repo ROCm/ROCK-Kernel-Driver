@@ -778,6 +778,32 @@ int acpi_processor_get_power_info (
 	return_VALUE(0);
 }
 
+int acpi_processor_cst_has_changed (struct acpi_processor *pr)
+{
+ 	int			result = 0;
+
+	ACPI_FUNCTION_TRACE("acpi_processor_cst_has_changed");
+
+	if (!pr)
+ 		return_VALUE(-EINVAL);
+
+	if (errata.smp) {
+		return_VALUE(-ENODEV);
+	}
+
+	/* Fall back to the default idle loop */
+	pm_idle = pm_idle_save;
+	pm_idle_save = NULL;
+
+	pr->flags.power = 0;
+	result = acpi_processor_get_power_info(pr);
+	if (pr->flags.power == 1) {
+		pm_idle_save = pm_idle;
+		pm_idle = acpi_processor_idle;
+	}
+
+	return_VALUE(result);
+}
 
 /* proc interface */
 
@@ -859,3 +885,4 @@ struct file_operations acpi_processor_power_fops = {
 	.llseek		= seq_lseek,
 	.release	= single_release,
 };
+

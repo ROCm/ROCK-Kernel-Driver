@@ -215,6 +215,7 @@ void acpi_processor_idle (void);
 int acpi_processor_get_power_info (struct acpi_processor *pr);
 extern struct file_operations acpi_processor_power_fops;
 int no_c2c3(struct dmi_system_id *id);
+int acpi_processor_cst_has_changed (struct acpi_processor *pr);
 
 /* in processor_thermal.c */
 int acpi_processor_get_limit_info (struct acpi_processor *pr);

@@ -627,7 +627,7 @@ acpi_processor_notify (
 			pr->performance_platform_limit);
 		break;
 	case ACPI_PROCESSOR_NOTIFY_POWER:
-		/* TBD */
+		acpi_processor_cst_has_changed(pr);
 		acpi_bus_generate_event(device, event, 0);
 		break;
 	default:
