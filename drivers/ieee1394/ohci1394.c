@@ -134,7 +134,7 @@
 
 #ifdef OHCI1394_DEBUG
 #define DBGMSG(card, fmt, args...) \
-printk(KERN_INFO "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
+printk(KERN_INFO "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 #else
 #define DBGMSG(card, fmt, args...)
 #endif
@@ -158,10 +158,10 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 
 /* print card specific information */
 #define PRINT(level, card, fmt, args...) \
-printk(level "%s_%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
+printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1045 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1087 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -845,7 +845,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 		PRINT(KERN_ERR, ohci->id, 
 		      "Transmit packet size %Zd is too big",
 		      packet->data_size);
-		return 0;
+		return -EOVERFLOW;
 	}
 
 	/* Decide whether we have an iso, a request, or a response packet */
@@ -862,7 +862,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 			if (in_interrupt()) {
 				PRINT(KERN_ERR, ohci->id, 
 				      "legacy IT context cannot be initialized during interrupt");
-				return 0;
+				return -EINVAL;
 			}
 
 			if (alloc_dma_trm_ctx(ohci, &ohci->it_legacy_context,
@@ -870,7 +870,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 					      OHCI1394_IsoXmitContextBase) < 0) {
 				PRINT(KERN_ERR, ohci->id, 
 				      "error initializing legacy IT context");
-				return 0;
+				return -ENOMEM;
 			}
 
 			initialize_dma_trm_ctx(&ohci->it_legacy_context);
@@ -890,7 +890,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 
 	spin_unlock_irqrestore(&d->lock,flags);
 
-	return 1;
+	return 0;
 }
 
 static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
@@ -1113,8 +1113,8 @@ struct ohci_iso_recv {
 	struct ohci1394_iso_tasklet task;
 	int task_active;
 
-	enum { BUFFER_FILL_MODE,
-	       PACKET_PER_BUFFER_MODE } dma_mode;
+	enum { BUFFER_FILL_MODE = 0,
+	       PACKET_PER_BUFFER_MODE = 1 } dma_mode;
 
 	/* memory and PCI mapping for the DMA descriptors */
 	struct dma_prog_region prog;
@@ -1175,7 +1175,8 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 	/* use buffer-fill mode, unless irq_interval is 1
 	   (note: multichannel requires buffer-fill) */
 
-	if (iso->irq_interval == 1 && iso->channel != -1) {
+	if (((iso->irq_interval == 1 && iso->dma_mode == HPSB_ISO_DMA_OLD_ABI) ||
+	     iso->dma_mode == HPSB_ISO_DMA_PACKET_PER_BUFFER) && iso->channel != -1) {
 		recv->dma_mode = PACKET_PER_BUFFER_MODE;
 	} else {
 		recv->dma_mode = BUFFER_FILL_MODE;
@@ -1194,8 +1195,11 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 		}
 
 		/* iso->irq_interval is in packets - translate that to blocks */
-		/* (err, sort of... 1 is always the safest value) */
-		recv->block_irq_interval = iso->irq_interval / recv->nblocks;
+		if (iso->irq_interval == 1)
+			recv->block_irq_interval = 1;			
+		else
+			recv->block_irq_interval = iso->irq_interval *
+							((recv->nblocks+1)/iso->buf_packets);
 		if (recv->block_irq_interval*4 > recv->nblocks)
 			recv->block_irq_interval = recv->nblocks/4;
 		if (recv->block_irq_interval < 1)
@@ -1205,6 +1209,10 @@ static int ohci_iso_recv_init(struct hpsb_iso *iso)
 		int max_packet_size;
 
 		recv->nblocks = iso->buf_packets;
+		recv->block_irq_interval = iso->irq_interval;
+		if (recv->block_irq_interval * 4 > iso->buf_packets)
+			recv->block_irq_interval = iso->buf_packets / 4;
+		if (recv->block_irq_interval < 1)
 		recv->block_irq_interval = 1;
 
 		/* choose a buffer stride */
@@ -3271,7 +3279,6 @@ do {						\
 static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 					const struct pci_device_id *ent)
 {
-	static unsigned int card_id_counter = 0;
 	static int version_printed = 0;
 
 	struct hpsb_host *host;
@@ -3282,15 +3289,14 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 		PRINT_G(KERN_INFO, "%s", version);
 
         if (pci_enable_device(dev))
-		FAIL(-ENXIO, "Failed to enable OHCI hardware %d",
-		        card_id_counter++);
+		FAIL(-ENXIO, "Failed to enable OHCI hardware");
         pci_set_master(dev);
 
-	host = hpsb_alloc_host(&ohci1394_driver, sizeof(struct ti_ohci));
+	host = hpsb_alloc_host(&ohci1394_driver, sizeof(struct ti_ohci), &dev->dev);
 	if (!host) FAIL(-ENOMEM, "Failed to allocate host structure");
 
 	ohci = host->hostdata;
-	ohci->id = card_id_counter++;
+	ohci->id = host->id;
 	ohci->dev = dev;
 	ohci->host = host;
 	ohci->init_state = OHCI_INIT_ALLOC_HOST;
@@ -3462,10 +3468,13 @@ static int __devinit ohci1394_pci_probe(struct pci_dev *dev,
 static void ohci1394_pci_remove(struct pci_dev *pdev)
 {
 	struct ti_ohci *ohci;
+	struct device *dev;
 
 	ohci = pci_get_drvdata(pdev);
 	if (!ohci)
 		return;
+
+	dev = get_device(&ohci->host->device);
 
 	switch (ohci->init_state) {
 	case OHCI_INIT_DONE:
@@ -3489,7 +3498,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 
 		/* Disable IRM Contender */
 		set_phy_reg(ohci, 4, ~0xc0 & get_phy_reg(ohci, 4));
-		
+
 		/* Clear link control register */
 		reg_write(ohci, OHCI1394_LinkControlClear, 0xffffffff);
 
@@ -3521,7 +3530,7 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 				    ohci->selfid_buf_cpu,
 				    ohci->selfid_buf_bus);
 		OHCI_DMA_FREE("consistent selfid_buf");
-		
+
 	case OHCI_INIT_HAVE_CONFIG_ROM_BUFFER:
 		pci_free_consistent(ohci->dev, OHCI_CONFIG_ROM_LEN,
 				    ohci->csr_config_rom_cpu,
@@ -3555,8 +3564,10 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 
 	case OHCI_INIT_ALLOC_HOST:
 		pci_set_drvdata(ohci->dev, NULL);
-		hpsb_unref_host(ohci->host);
 	}
+
+	if (dev)
+		put_device(dev);
 }
 
 

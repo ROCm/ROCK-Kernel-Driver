@@ -159,7 +159,7 @@ static inline void __put_unaligned_8_be(const unsigned long long __v, register _
 		(void) 0;					\
 	})
 
-#define put_unaligned_be(val,ptr)					\
+#define __put_unaligned_be(val,ptr)					\
 	({							\
 		switch (sizeof(*(ptr))) {			\
 		case 1:						\

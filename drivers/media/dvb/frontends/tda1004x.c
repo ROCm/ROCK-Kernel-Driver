@@ -20,7 +20,7 @@
 
 /*
     This driver needs a copy of the DLL "ttlcdacc.dll" from the Haupauge or Technotrend
-    windows driver saved as '/etc/dvb/tda1004x.mc'.
+    windows driver saved as '/usr/lib/hotplug/firmware/tda1004x.mc'.
     You can also pass the complete file name with the module parameter 'tda1004x_firmware'.
 
     Currently the DLL from v2.15a of the technotrend driver is supported. Other versions can
@@ -45,7 +45,7 @@
 #include "dvb_functions.h"
 
 #ifndef DVB_TDA1004X_FIRMWARE_FILE
-#define DVB_TDA1004X_FIRMWARE_FILE "/etc/dvb/tda1004x.mc"
+#define DVB_TDA1004X_FIRMWARE_FILE "/usr/lib/hotplug/firmware/tda1004x.mc"
 #endif
 
 static int tda1004x_debug = 0;
@@ -108,7 +108,7 @@ static struct dvb_frontend_info tda10045h_info = {
 	.frequency_min = 51000000,
 	.frequency_max = 858000000,
 	.frequency_stepsize = 166667,
-	.caps = FE_CAN_INVERSION_AUTO |
+	.caps =
 	    FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	    FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 	    FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |

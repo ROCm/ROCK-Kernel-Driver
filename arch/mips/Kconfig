@@ -1261,8 +1261,8 @@ config SOUND
 	  You want to read the Sound-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>. General information about
 	  the modular sound system is contained in the files
-	  <file:Documentation/sound/Introduction>.  The file
-	  <file:Documentation/sound/README.OSS> contains some slightly
+	  <file:Documentation/sound/oss/Introduction>.  The file
+	  <file:Documentation/sound/oss/README.OSS> contains some slightly
 	  outdated but still useful information as well.
 
 	  If you have a PnP sound card and you want to configure it at boot
@@ -1270,7 +1270,7 @@ config SOUND
 	  <http://www.roestock.demon.co.uk/isapnptools/>), then you need to
 	  compile the sound card support as a module and load that module
 	  after the PnP configuration is finished. To do this, choose M here
-	  and read <file:Documentation/sound/README.modules>; the module
+	  and read <file:Documentation/sound/oss/README.modules>; the module
 	  will be called soundcore.
 
 	  I'm told that even without a sound card, you can make your computer

@@ -48,10 +48,6 @@
 MODULE_DESCRIPTION("IBM IIC driver v" DRIVER_VERSION);
 MODULE_LICENSE("GPL");
 
-static int iic_scan = 0;
-MODULE_PARM(iic_scan, "i");
-MODULE_PARM_DESC(iic_scan, "Scan for active chips on the bus");
-
 static int iic_force_poll = 0;
 MODULE_PARM(iic_force_poll, "i");
 MODULE_PARM_DESC(iic_force_poll, "Force polling mode");
@@ -518,32 +514,6 @@ static struct i2c_algorithm iic_algo = {
 };
 
 /*
- * Scan bus for valid 7-bit addresses (ie things that ACK on 1 byte read)
- * We only scan range [0x08 - 0x77], all other addresses are reserved anyway
- */
-static void __devinit iic_scan_bus(struct ibm_iic_private* dev)
-{
-	int found = 0;
-	char dummy;
-	struct i2c_msg msg = {
-		.buf   = &dummy,
-		.len   = sizeof(dummy),
-		.flags = I2C_M_RD
-	};
-	
-	printk(KERN_INFO "ibm-iic%d: scanning bus...\n" KERN_INFO, dev->idx);
-	
-	for (msg.addr = 8; msg.addr < 0x78; ++msg.addr)
-		if (iic_xfer(&dev->adap, &msg, 1) == 1){
-			++found;
-			printk(" 0x%02x", msg.addr);
-		}
-
-	printk("%sibm-iic%d: %d device(s) detected\n", 
-		found ? "\n" KERN_INFO : "", dev->idx, found);
-}
-
-/*
  * Calculates IICx_CLCKDIV value for a specific OPB clock frequency
  */
 static inline u8 iic_clckdiv(unsigned int opb)
@@ -648,10 +618,6 @@ static int __devinit iic_probe(struct ocp_device *ocp){
 	
 	printk(KERN_INFO "ibm-iic%d: using %s mode\n", dev->idx,
 		dev->fast_mode ? "fast (400 kHz)" : "standard (100 kHz)");
-
-	/* Scan bus if requested by user */
-	if (iic_scan)
-		iic_scan_bus(dev);
 
 	return 0;
 

@@ -30,7 +30,7 @@
 
 
 #if 0
-#define DEBUG(x,args...)	printk("%s: " x, __FUNCTION__, ##args)
+#define DEBUG(x,args...)	printk(KERN_DEBUG "%s: " x, __FUNCTION__, ##args)
 #else
 #define DEBUG(x,args...)
 #endif
@@ -779,7 +779,7 @@ static void yenta_get_socket_capabilities(struct yenta_socket *socket, u32 isa_i
 	socket->socket.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
 	socket->socket.cb_dev = socket->dev;
 
-	printk(KERN_INFO "Yenta: ISA IRQ list %04x, PCI irq%d\n",
+	printk(KERN_INFO "Yenta: ISA IRQ mask 0x%04x, PCI irq %d\n",
 	       socket->socket.irq_mask, socket->cb_irq);
 }
 
@@ -860,7 +860,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 		goto disable;
 
 	if (!pci_resource_start(dev, 0)) {
-		printk("No cardbus resource!\n");
+		printk(KERN_ERR "No cardbus resource!\n");
 		ret = -ENODEV;
 		goto release;
 	}
@@ -916,7 +916,7 @@ static int __devinit yenta_probe (struct pci_dev *dev, const struct pci_device_i
 
 	/* Figure out what the dang thing can do for the PCMCIA layer... */
 	yenta_get_socket_capabilities(socket, isa_interrupts);
-	printk("Socket status: %08x\n", cb_readl(socket, CB_SOCKET_STATE));
+	printk(KERN_INFO "Socket status: %08x\n", cb_readl(socket, CB_SOCKET_STATE));
 
 	/* Register it with the pcmcia layer.. */
 	ret = pcmcia_register_socket(&socket->socket);

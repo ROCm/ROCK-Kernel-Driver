@@ -20,6 +20,7 @@
 #define cpus_complement(map)	bitmap_complement((map).mask, NR_CPUS)
 #define cpus_equal(map1, map2)	bitmap_equal((map1).mask, (map2).mask, NR_CPUS)
 #define cpus_empty(map)		bitmap_empty(map.mask, NR_CPUS)
+#define cpus_addr(map)		((map).mask)
 #define cpus_weight(map)		bitmap_weight((map).mask, NR_CPUS)
 #define cpus_shift_right(d, s, n)	bitmap_shift_right((d).mask, (s).mask, n, NR_CPUS)
 #define cpus_shift_left(d, s, n)	bitmap_shift_left((d).mask, (s).mask, n, NR_CPUS)

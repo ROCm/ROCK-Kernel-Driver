@@ -21,6 +21,9 @@
 /* jds -- add private data to file to keep track of iso contexts associated
    with each open -- so release won't kill all iso transfers */
 
+/* Damien Douxchamps: Fix failure when the number of DMA pages per frame is
+   one */
+
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -398,32 +401,42 @@ static void initialize_dma_ir_prg(struct dma_iso_ctx *d, int n, int flags)
 	ir_prg[0].branchAddress = cpu_to_le32((dma_prog_region_offset_to_bus(ir_reg,
 					1 * sizeof(struct dma_cmd)) & 0xfffffff0) | 0x1);
 
-	/* the second descriptor will read PAGE_SIZE-4 bytes */
-	ir_prg[1].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
-		DMA_CTL_BRANCH | (PAGE_SIZE-4));
-	ir_prg[1].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma, (buf + 4) -
-					(unsigned long)d->dma.kvirt));
-	ir_prg[1].branchAddress = cpu_to_le32((dma_prog_region_offset_to_bus(ir_reg,
-					2 * sizeof(struct dma_cmd)) & 0xfffffff0) | 0x1);
-	
-	for (i=2;i<d->nb_cmd-1;i++) {
-		ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
-			DMA_CTL_BRANCH | PAGE_SIZE);
-		ir_prg[i].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma,
-					        (buf+(i-1)*PAGE_SIZE) -
+	/* If there is *not* only one DMA page per frame (hence, d->nb_cmd==2) */
+	if (d->nb_cmd > 2) {
+		/* The second descriptor will read PAGE_SIZE-4 bytes */
+		ir_prg[1].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE |
+						DMA_CTL_BRANCH | (PAGE_SIZE-4));
+		ir_prg[1].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma, (buf + 4) -
 						(unsigned long)d->dma.kvirt));
+		ir_prg[1].branchAddress = cpu_to_le32((dma_prog_region_offset_to_bus(ir_reg,
+						      2 * sizeof(struct dma_cmd)) & 0xfffffff0) | 0x1);
+	
+		for (i = 2; i < d->nb_cmd - 1; i++) {
+			ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+							DMA_CTL_BRANCH | PAGE_SIZE);
+			ir_prg[i].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma,
+							(buf+(i-1)*PAGE_SIZE) -
+							(unsigned long)d->dma.kvirt));
 
-		ir_prg[i].branchAddress =
-			cpu_to_le32((dma_prog_region_offset_to_bus(ir_reg,
-				(i + 1) * sizeof(struct dma_cmd)) & 0xfffffff0) | 0x1);
+			ir_prg[i].branchAddress =
+				cpu_to_le32((dma_prog_region_offset_to_bus(ir_reg,
+					    (i + 1) * sizeof(struct dma_cmd)) & 0xfffffff0) | 0x1);
+		}
+
+		/* The last descriptor will generate an interrupt */
+		ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+						DMA_CTL_IRQ | DMA_CTL_BRANCH | d->left_size);
+		ir_prg[i].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma,
+						(buf+(i-1)*PAGE_SIZE) -
+						(unsigned long)d->dma.kvirt));
+	} else { 
+		/* Only one DMA page is used. Read d->left_size immediately and */
+		/* generate an interrupt as this is also the last page. */
+		ir_prg[1].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
+						DMA_CTL_IRQ | DMA_CTL_BRANCH | (d->left_size-4));
+		ir_prg[1].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma,
+						(buf + 4) - (unsigned long)d->dma.kvirt));
 	}
-
-	/* the last descriptor will generate an interrupt */
-	ir_prg[i].control = cpu_to_le32(DMA_CTL_INPUT_MORE | DMA_CTL_UPDATE | 
-		DMA_CTL_IRQ | DMA_CTL_BRANCH | d->left_size);
-	ir_prg[i].address = cpu_to_le32(dma_region_offset_to_bus(&d->dma,
-					(buf+(i-1)*PAGE_SIZE) -
-					(unsigned long)d->dma.kvirt));
 }
 	
 static void initialize_dma_ir_ctx(struct dma_iso_ctx *d, int tag, int flags)

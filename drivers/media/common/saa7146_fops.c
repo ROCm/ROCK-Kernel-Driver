@@ -86,7 +86,7 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 		return;
 	}
 
-	DEB_EE(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
+	DEB_INT(("dev:%p, dmaq:%p, vbi:%d\n", dev, q, vbi));
 
 #if DEBUG_SPINLOCKS
 	BUG_ON(!spin_is_locked(&dev->slock));
@@ -98,10 +98,10 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 		if (!list_empty(&q->queue))
 			next = list_entry(q->queue.next,struct saa7146_buf, vb.queue);
 		q->curr = buf;
-		DEB_D(("next buffer: buf:%p, prev:%p, next:%p\n", buf, q->queue.prev,q->queue.next));
+		DEB_INT(("next buffer: buf:%p, prev:%p, next:%p\n", buf, q->queue.prev,q->queue.next));
 		buf->activate(dev,buf,next);
 	} else {
-		DEB_D(("no next buffer. stopping.\n"));
+		DEB_INT(("no next buffer. stopping.\n"));
 		if( 0 != vbi ) {
 			/* turn off video-dma3 */
 			saa7146_write(dev,MC1, MASK_20);
@@ -229,10 +229,10 @@ static int fops_open(struct inode *inode, struct file *file)
 
 	if( fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
 		DEB_S(("initializing vbi...\n"));
-		saa7146_vbi_uops.open(dev,fh);
+		saa7146_vbi_uops.open(dev,file);
 	} else {
 		DEB_S(("initializing video...\n"));
-		saa7146_video_uops.open(dev,fh);
+		saa7146_video_uops.open(dev,file);
 	}
 
 	result = 0;
@@ -255,9 +255,9 @@ static int fops_release(struct inode *inode, struct file *file)
 		return -ERESTARTSYS;
 
 	if( fh->type == V4L2_BUF_TYPE_VBI_CAPTURE) {
-		saa7146_vbi_uops.release(dev,fh,file);
+		saa7146_vbi_uops.release(dev,file);
 	} else {
-		saa7146_video_uops.release(dev,fh,file);
+		saa7146_video_uops.release(dev,file);
 	}
 
 	module_put(dev->ext->module);
@@ -372,7 +372,7 @@ void vv_callback(struct saa7146_dev *dev, unsigned long status)
 {
 	u32 isr = status;
 	
-	DEB_EE(("dev:%p, isr:0x%08x\n",dev,(u32)status));
+	DEB_INT(("dev:%p, isr:0x%08x\n",dev,(u32)status));
 
 	if (0 != (isr & (MASK_27))) {
 		DEB_INT(("irq: RPS0 (0x%08x).\n",isr));
@@ -410,6 +410,12 @@ int saa7146_vv_init(struct saa7146_dev* dev, struct saa7146_ext_vv *ext_vv)
 
 	DEB_EE(("dev:%p\n",dev));
 	
+	/* set default values for video parts of the saa7146 */
+	saa7146_write(dev, BCS_CTRL, 0x80400040);
+
+	/* enable video-port pins */
+	saa7146_write(dev, MC1, (MASK_10 | MASK_26));
+
 	/* save per-device extension data (one extension can
 	   handle different devices that might need different
 	   configuration data) */

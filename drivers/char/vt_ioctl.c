@@ -332,7 +332,7 @@ do_fontx_ioctl(int cmd, struct consolefontdesc *user_cfd, int perm, struct conso
 }
 
 static inline int 
-do_unimap_ioctl(int cmd, struct unimapdesc *user_ud,int perm)
+do_unimap_ioctl(int cmd, struct unimapdesc *user_ud, int perm, unsigned int console)
 {
 	struct unimapdesc tmp;
 	int i = 0; 
@@ -348,9 +348,11 @@ do_unimap_ioctl(int cmd, struct unimapdesc *user_ud,int perm)
 	case PIO_UNIMAP:
 		if (!perm)
 			return -EPERM;
-		return con_set_unimap(fg_console, tmp.entry_ct, tmp.entries);
+		return con_set_unimap(console, tmp.entry_ct, tmp.entries);
 	case GIO_UNIMAP:
-		return con_get_unimap(fg_console, tmp.entry_ct, &(user_ud->entry_ct), tmp.entries);
+		if (!perm && fg_console != console)
+			return -EPERM;
+		return con_get_unimap(console, tmp.entry_ct, &(user_ud->entry_ct), tmp.entries);
 	}
 	return 0;
 }
@@ -966,13 +968,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -EPERM;
 		i = copy_from_user(&ui, (void *)arg, sizeof(struct unimapinit));
 		if (i) return -EFAULT;
-		con_clear_unimap(fg_console, &ui);
+		con_clear_unimap(console, &ui);
 		return 0;
 	      }
 
 	case PIO_UNIMAP:
 	case GIO_UNIMAP:
-		return do_unimap_ioctl(cmd, (struct unimapdesc *)arg, perm);
+		return do_unimap_ioctl(cmd, (struct unimapdesc *)arg, perm, console);
 
 	case VT_LOCKSWITCH:
 		if (!capable(CAP_SYS_TTY_CONFIG))

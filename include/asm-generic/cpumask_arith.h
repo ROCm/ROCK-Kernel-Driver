@@ -17,6 +17,7 @@
 #define cpus_complement(map)		do { map = ~(map); } while (0)
 #define cpus_equal(map1, map2)		((map1) == (map2))
 #define cpus_empty(map)			((map) == 0)
+#define cpus_addr(map)			(&(map))
 
 #if BITS_PER_LONG == 32
 #define cpus_weight(map)		hweight32(map)

@@ -860,7 +860,7 @@ extern void xfrm_policy_flush(void);
 extern void xfrm_policy_kill(struct xfrm_policy *);
 extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);
 extern struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl);
-extern int xfrm_flush_bundles(struct xfrm_state *x);
+extern int xfrm_flush_bundles(void);
 
 extern wait_queue_head_t km_waitq;
 extern void km_state_expired(struct xfrm_state *x, int hard);

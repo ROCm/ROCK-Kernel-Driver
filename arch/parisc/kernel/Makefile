@@ -8,6 +8,7 @@ extra-y			:= init_task.o $(head-y) vmlinux.lds.s
 
 AFLAGS_entry.o	:= -traditional
 AFLAGS_pacache.o := -traditional
+CFLAGS_ioctl32.o := -Ifs/
 
 obj-y	     	:= cache.o pacache.o setup.o traps.o time.o irq.o \
 		   pa7300lc.o syscall.o entry.o sys_parisc.o firmware.o \

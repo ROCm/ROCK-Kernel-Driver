@@ -3001,7 +3001,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	return res;
 }
 
-static void __devinit es1371_remove(struct pci_dev *dev)
+static void __devexit es1371_remove(struct pci_dev *dev)
 {
 	struct es1371_state *s = pci_get_drvdata(dev);
 
@@ -3043,7 +3043,7 @@ static struct pci_driver es1371_driver = {
 	.name		= "es1371",
 	.id_table	= id_table,
 	.probe		= es1371_probe,
-	.remove		= es1371_remove,
+	.remove		= __devexit_p(es1371_remove),
 };
 
 static int __init init_es1371(void)

@@ -223,7 +223,7 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 
 		/* Put an arbritrary limit on the number of messages that can
 		 * be sent at once */
-		if (rdwr_arg.nmsgs > 42)
+		if (rdwr_arg.nmsgs > I2C_RDRW_IOCTL_MAX_MSGS)
 			return -EINVAL;
 		
 		rdwr_pa = (struct i2c_msg *)
@@ -447,7 +447,7 @@ static int i2cdev_attach_adapter(struct i2c_adapter *adap)
 
 	/* register this i2c device with the driver core */
 	i2c_dev->adap = adap;
-	if (adap->dev.parent == &legacy_bus)
+	if (adap->dev.parent == &platform_bus)
 		i2c_dev->class_dev.dev = &adap->dev;
 	else
 		i2c_dev->class_dev.dev = adap->dev.parent;

@@ -75,6 +75,9 @@
 #include <net/checksum.h>
 #include <linux/proc_fs.h>
 
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv6.h>
+
 static struct socket *ndisc_socket;
 
 static u32 ndisc_hash(const void *pkey, const struct net_device *dev);
@@ -207,9 +210,8 @@ static struct ndisc_options *ndisc_parse_options(u8 *opt, int opt_len,
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECT_HDR:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
-				ND_PRINTK2((KERN_WARNING
-					    "ndisc_parse_options(): duplicated ND6 option found: type=%d\n",
-					    nd_opt->nd_opt_type));
+				ND_PRINTK2("ndisc_parse_options(): duplicated ND6 option found: type=%d\n",
+					    nd_opt->nd_opt_type);
 			} else {
 				ndopts->nd_opt_array[nd_opt->nd_opt_type] = nd_opt;
 			}
@@ -498,10 +500,11 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
 
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(skb);
-
-	ICMP6_INC_STATS(idev, Icmp6OutNeighborAdvertisements);
-	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
+	if (!err) {
+		ICMP6_INC_STATS(idev, Icmp6OutNeighborAdvertisements);
+		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	}
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
@@ -577,10 +580,11 @@ void ndisc_send_ns(struct net_device *dev, struct neighbour *neigh,
 	/* send it! */
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(skb);
-
-	ICMP6_INC_STATS(idev, Icmp6OutNeighborSolicits);
-	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
+	if (!err) {
+		ICMP6_INC_STATS(idev, Icmp6OutNeighborSolicits);
+		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	}
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
@@ -619,6 +623,7 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 				  1, &err);
 	if (skb == NULL) {
 		ND_PRINTK1("send_ns: alloc skb failed\n");
+		dst_release(dst);
 		return;
 	}
 
@@ -644,10 +649,11 @@ void ndisc_send_rs(struct net_device *dev, struct in6_addr *saddr,
 	/* send it! */
 	skb->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(skb);
-
-	ICMP6_INC_STATS(idev, Icmp6OutRouterSolicits);
-	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, dst->dev, dst_output);
+	if (!err) {
+		ICMP6_INC_STATS(idev, Icmp6OutRouterSolicits);
+		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	}
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);
@@ -1166,9 +1172,7 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 				ND_PRINTK0("NDISC: router announcement with mtu = %d\n",
 					   mtu);
 			}
-		}
-
-		if (in6_dev->cnf.mtu6 != mtu) {
+		} else if (in6_dev->cnf.mtu6 != mtu) {
 			in6_dev->cnf.mtu6 = mtu;
 
 			if (rt)
@@ -1406,10 +1410,11 @@ void ndisc_send_redirect(struct sk_buff *skb, struct neighbour *neigh,
 
 	buff->dst = dst;
 	idev = in6_dev_get(dst->dev);
-	dst_output(buff);
-
-	ICMP6_INC_STATS(idev, Icmp6OutRedirects);
-	ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, buff, NULL, dst->dev, dst_output);
+	if (!err) {
+		ICMP6_INC_STATS(idev, Icmp6OutRedirects);
+		ICMP6_INC_STATS(idev, Icmp6OutMsgs);
+	}
 
 	if (likely(idev != NULL))
 		in6_dev_put(idev);

@@ -372,7 +372,7 @@ extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);
 
 extern struct bus_type platform_bus_type;
-extern struct device legacy_bus;
+extern struct device platform_bus;
 
 /* drivers/base/power.c */
 extern void device_shutdown(void);

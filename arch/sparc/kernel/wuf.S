@@ -8,7 +8,6 @@
 #include <asm/contregs.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
-#include <asm/asm_offsets.h>
 #include <asm/psr.h>
 #include <asm/smp.h>
 #include <asm/asi.h>
@@ -187,8 +186,7 @@ fwin_user_stack_is_bolixed:
 	mov	0x1, %g5
 	sll	%g5, %g3, %g5
 	st	%g5, [%curptr + TI_UWINMASK]		! one live user window still
-	ld	[%curptr + TI_TASK], %g5
-	st	%g0, [%g5 + AOFF_task_thread + AOFF_thread_w_saved]		! no windows in the buffer
+	st	%g0, [%curptr + TI_W_SAVED]		! no windows in the buffer
 
 	wr	%t_psr, PSR_ET, %psr			! enable traps
 	nop

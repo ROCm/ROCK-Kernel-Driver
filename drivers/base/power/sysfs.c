@@ -36,7 +36,7 @@ static ssize_t state_store(struct device * dev, const char * buf, size_t n)
 	int error = 0;
 
 	state = simple_strtoul(buf,&rest,10);
-	if (rest)
+	if (*rest)
 		return -EINVAL;
 	if (state)
 		error = dpm_runtime_suspend(dev,state);

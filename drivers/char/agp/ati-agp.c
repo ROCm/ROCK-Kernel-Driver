@@ -135,6 +135,15 @@ static int ati_create_gatt_pages(int nr_tables)
 	return retval;
 }
 
+static int is_r200(void)
+{
+	if ((agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS100) ||
+	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200) ||
+	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200_B) ||
+	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS250))
+		return 1;
+	return 0;
+}
 
 static int ati_fetch_size(void)
 {
@@ -142,13 +151,10 @@ static int ati_fetch_size(void)
 	u32 temp;
 	struct aper_size_info_lvl2 *values;
 
-	if ((agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS100) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS250)) {
+	if (is_r200)
 		pci_read_config_dword(agp_bridge->dev, ATI_RS100_APSIZE, &temp);
-	} else {
+	else
 		pci_read_config_dword(agp_bridge->dev, ATI_RS300_APSIZE, &temp);
-	}
 
 	temp = (temp & 0x0000000e);
 	values = A_SIZE_LVL2(agp_bridge->driver->aperture_sizes);
@@ -178,9 +184,7 @@ static void ati_cleanup(void)
 	previous_size = A_SIZE_LVL2(agp_bridge->previous_size);
 
 	/* Write back the previous size and disable gart translation */
-	if ((agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS100) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS250)) {
+	if (is_r200) {
 		pci_read_config_dword(agp_bridge->dev, ATI_RS100_APSIZE, &temp);
 		temp = ((temp & ~(0x0000000f)) | previous_size->size_value);
 		pci_write_config_dword(agp_bridge->dev, ATI_RS100_APSIZE, temp);
@@ -202,13 +206,10 @@ static int ati_configure(void)
 	temp = (temp & 0xfffff000);
 	ati_generic_private.registers = (volatile u8 *) ioremap(temp, 4096);
 
-	if ((agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS100) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS250)) {
-        	pci_write_config_dword(agp_bridge->dev, ATI_RS100_IG_AGPMODE, 0x20000);
-	} else {
+	if (is_r200)
+       	pci_write_config_dword(agp_bridge->dev, ATI_RS100_IG_AGPMODE, 0x20000);
+	else
 		pci_write_config_dword(agp_bridge->dev, ATI_RS300_IG_AGPMODE, 0x20000);
-	}
 
 	/* address to map too */
         /*
@@ -332,9 +333,7 @@ static int ati_create_gatt_table(void)
 	/* Write out the size register */
 	current_size = A_SIZE_LVL2(agp_bridge->current_size);
 
-	if ((agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS100) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS200) ||
-	    (agp_bridge->dev->device == PCI_DEVICE_ID_ATI_RS250)) {
+	if (is_r200) {
 		pci_read_config_dword(agp_bridge->dev, ATI_RS100_APSIZE, &temp);
 		temp = (((temp & ~(0x0000000e)) | current_size->size_value)
 			| 0x00000001);
@@ -412,6 +411,10 @@ static struct agp_device_ids ati_agp_device_ids[] __devinitdata =
 	{
 		.device_id	= PCI_DEVICE_ID_ATI_RS200,
 		.chipset_name	= "IGP330/340/345/350/M",
+	},
+	{
+		.device_id	= PCI_DEVICE_ID_ATI_RS200_B,
+		.chipset_name	= "IGP345M",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_ATI_RS250,

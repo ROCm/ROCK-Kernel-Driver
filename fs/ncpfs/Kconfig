@@ -65,6 +65,7 @@ config NCPFS_SMALLDOS
 config NCPFS_NLS
 	bool "Use Native Language Support"
 	depends on NCP_FS
+	select NLS
 	help
 	  Allows you to use codepages and I/O charsets for file name
 	  translation between the server file system and input/output. This

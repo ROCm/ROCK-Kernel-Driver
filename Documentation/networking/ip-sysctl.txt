@@ -678,4 +678,23 @@ IPv6 Update by:
 Pekka Savola <pekkas@netcore.fi>
 YOSHIFUJI Hideaki / USAGI Project <yoshfuji@linux-ipv6.org>
 
+
+/proc/sys/net/bridge/* Variables:
+
+bridge-nf-call-arptables - BOOLEAN
+	1 : pass bridged ARP traffic to arptables' FORWARD chain.
+	0 : disable this.
+	Default: 1
+
+bridge-nf-call-iptables - BOOLEAN
+	1 : pass bridged IPv4 traffic to iptables' chains.
+	0 : disable this.
+	Default: 1
+
+bridge-nf-filter-vlan-tagged - BOOLEAN
+	1 : pass bridged vlan-tagged ARP/IP traffic to arptables/iptables.
+	0 : disable this.
+	Default: 1
+
+
 $Id: ip-sysctl.txt,v 1.20 2001/12/13 09:00:18 davem Exp $

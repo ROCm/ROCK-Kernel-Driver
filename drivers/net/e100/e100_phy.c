@@ -132,7 +132,7 @@ e100_mdi_read(struct e100_private *bdp, u32 reg_addr, u32 phy_addr, u16 *data)
 	}
 }
 
-static unsigned char __devinit
+static unsigned char
 e100_phy_valid(struct e100_private *bdp, unsigned int phy_address)
 {
 	u16 ctrl_reg, stat_reg;
@@ -150,7 +150,7 @@ e100_phy_valid(struct e100_private *bdp, unsigned int phy_address)
 	return true;
 }
 
-static void __devinit
+static void
 e100_phy_address_detect(struct e100_private *bdp)
 {
 	unsigned int addr;
@@ -180,7 +180,7 @@ e100_phy_address_detect(struct e100_private *bdp)
 	}
 }
 
-static void __devinit
+static void
 e100_phy_id_detect(struct e100_private *bdp)
 {
 	u16 low_id_reg, high_id_reg;
@@ -204,7 +204,7 @@ e100_phy_id_detect(struct e100_private *bdp)
 		      ((unsigned int) high_id_reg << 16));
 }
 
-static void __devinit
+static void
 e100_phy_isolate(struct e100_private *bdp)
 {
 	unsigned int phy_address;
@@ -227,7 +227,7 @@ e100_phy_isolate(struct e100_private *bdp)
 	}
 }
 
-static unsigned char __devinit
+static unsigned char
 e100_phy_specific_setup(struct e100_private *bdp)
 {
 	u16 misc_reg;
@@ -380,7 +380,7 @@ e100_phy_fix_squelch(struct e100_private *bdp)
  * Returns:
  *	NOTHING
  */
-static void __devinit
+static void
 e100_fix_polarity(struct e100_private *bdp)
 {
 	u16 status;
@@ -916,7 +916,7 @@ e100_phy_reset(struct e100_private *bdp)
 	schedule_timeout(HZ / 2);
 }
 
-unsigned char __devinit
+unsigned char
 e100_phy_init(struct e100_private *bdp)
 {
 	e100_phy_reset(bdp);

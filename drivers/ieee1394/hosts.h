@@ -29,8 +29,6 @@ struct hpsb_host {
 
         atomic_t generation;
 
-	atomic_t refcount;
-
         struct list_head pending_packets;
         spinlock_t pending_pkt_lock;
 	struct timer_list timeout;
@@ -165,7 +163,7 @@ struct hpsb_host_driver {
          * packet->type == raw) and do byte-swapping as necessary or instruct
          * the hardware to do so.  It can return immediately after the packet
          * was queued for sending.  After sending, hpsb_sent_packet() has to be
-         * called.  Return 0 for failure.
+         * called.  Return 0 on success, negative errno on failure.
          * NOTE: The function must be callable in interrupt context.
          */
         int (*transmit_packet) (struct hpsb_host *host, 
@@ -195,22 +193,8 @@ struct hpsb_host_driver {
 };
 
 
-extern struct list_head hpsb_hosts;
-extern struct semaphore hpsb_hosts_lock;
-
-
-/*
- * In order to prevent hosts from unloading, use hpsb_ref_host().  This prevents
- * the host from going away (e.g. makes module unloading of the driver
- * impossible), but still can not guarantee it (e.g. PC-Card being pulled by the
- * user).  hpsb_ref_host() returns false if host could not be locked.  If it is
- * successful, host is valid as a pointer until hpsb_unref_host() (not just
- * until after remove_host).
- */
-int hpsb_ref_host(struct hpsb_host *host);
-void hpsb_unref_host(struct hpsb_host *host);
-
-struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra);
+struct hpsb_host *hpsb_alloc_host(struct hpsb_host_driver *drv, size_t extra,
+				  struct device *dev);
 void hpsb_add_host(struct hpsb_host *host);
 void hpsb_remove_host(struct hpsb_host *h);
 

@@ -1033,7 +1033,7 @@ static int __devinit rme96xx_probe(struct pci_dev *pcidev, const struct pci_devi
 }
 
 
-static void __devinit rme96xx_remove(struct pci_dev *dev)
+static void __devexit rme96xx_remove(struct pci_dev *dev)
 {
 	int i;
 	rme96xx_info *s = pci_get_drvdata(dev);
@@ -1087,7 +1087,7 @@ static struct pci_driver rme96xx_driver = {
 	.name	  =  "rme96xx",
 	.id_table = id_table,
 	.probe	  = rme96xx_probe,
-	.remove	  = rme96xx_remove,
+	.remove	  = __devexit_p(rme96xx_remove),
 };
 
 static int __init init_rme96xx(void)

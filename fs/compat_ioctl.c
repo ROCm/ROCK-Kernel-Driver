@@ -63,6 +63,8 @@
 #include <linux/ctype.h>
 #include <linux/ioctl32.h>
 #include <linux/ncp_fs.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
 
 #include <net/sock.h>          /* siocdevprivate_ioctl */
 #include <net/bluetooth/bluetooth.h>
@@ -128,7 +130,7 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 	set_fs (KERNEL_DS);
 	err = sys_ioctl(fd, cmd, (unsigned long)&val);
 	set_fs (old_fs);
-	if (!err && put_user(val, (u32 *)arg))
+	if (!err && put_user(val, (u32 *)compat_ptr(arg)))
 		return -EFAULT;
 	return err;
 }
@@ -136,15 +138,16 @@ static int w_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 static int rw_long(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	mm_segment_t old_fs = get_fs();
+	u32 *argptr = compat_ptr(arg);
 	int err;
 	unsigned long val;
 	
-	if(get_user(val, (u32 *)arg))
+	if(get_user(val, argptr))
 		return -EFAULT;
 	set_fs (KERNEL_DS);
 	err = sys_ioctl(fd, cmd, (unsigned long)&val);
 	set_fs (old_fs);
-	if (!err && put_user(val, (u32 *)arg))
+	if (!err && put_user(val, argptr))
 		return -EFAULT;
 	return err;
 }
@@ -1701,7 +1704,7 @@ static int do_smb_getmountuid(unsigned int fd, unsigned int cmd, unsigned long a
 	set_fs(old_fs);
 
 	if (err >= 0)
-		err = put_user(kuid, (compat_pid_t *)arg);
+		err = put_user(kuid, (compat_uid_t *)arg);
 
 	return err;
 }
@@ -2869,6 +2872,105 @@ static int do_usbdevfs_discsignal(unsigned int fd, unsigned int cmd, unsigned lo
 
         return err;
 }
+
+/*
+ * I2C layer ioctls
+ */
+
+struct i2c_msg32 {
+	u16 addr;
+	u16 flags;
+	u16 len;
+	compat_caddr_t buf;
+};
+
+struct i2c_rdwr_ioctl_data32 {
+	compat_caddr_t msgs; /* struct i2c_msg __user *msgs */
+	u32 nmsgs;
+};
+
+struct i2c_smbus_ioctl_data32 {
+	u8 read_write;
+	u8 command;
+	u32 size;
+	compat_caddr_t data; /* union i2c_smbus_data *data */
+};
+
+static int do_i2c_rdwr_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct i2c_rdwr_ioctl_data	*tdata;
+	struct i2c_rdwr_ioctl_data32	*udata;
+	struct i2c_msg			*tmsgs;
+	struct i2c_msg32		*umsgs;
+	compat_caddr_t			datap;
+	int				nmsgs, i;
+
+	tdata = compat_alloc_user_space(sizeof(*tdata));
+	if (tdata == NULL)
+		return -ENOMEM;
+	if (verify_area(VERIFY_WRITE, tdata, sizeof(*tdata)))
+		return -EFAULT;
+
+	udata = (struct i2c_rdwr_ioctl_data32 *)compat_ptr(arg);
+	if (verify_area(VERIFY_READ, udata, sizeof(*udata)))
+		return -EFAULT;
+	if (__get_user(nmsgs, &udata->nmsgs) || __put_user(nmsgs, &tdata->nmsgs))
+		return -EFAULT;
+	if (nmsgs > I2C_RDRW_IOCTL_MAX_MSGS)
+		return -EINVAL;
+	if (__get_user(datap, &udata->msgs))
+		return -EFAULT;
+	umsgs = (struct i2c_msg32 *)compat_ptr(datap);
+	if (verify_area(VERIFY_READ, umsgs, sizeof(struct i2c_msg) * nmsgs))
+		return -EFAULT;
+
+	tmsgs = compat_alloc_user_space(sizeof(struct i2c_msg) * nmsgs);
+	if (tmsgs == NULL)
+		return -ENOMEM;
+	if (verify_area(VERIFY_WRITE, tmsgs, sizeof(struct i2c_msg) * nmsgs))
+		return -EFAULT;
+	if (__put_user(tmsgs, &tdata->msgs))
+		return -ENOMEM;
+	for (i = 0; i < nmsgs; i++) {
+		if (__copy_in_user(&tmsgs[i].addr,
+				   &umsgs[i].addr,
+				   3 * sizeof(u16)))
+			return -EFAULT;
+		if (__get_user(datap, &umsgs[i].buf) ||
+		    __put_user(compat_ptr(datap), &tmsgs[i].buf))
+			return -EFAULT;
+	}
+	return sys_ioctl(fd, cmd, (unsigned long)tdata);
+}
+
+static int do_i2c_smbus_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct i2c_smbus_ioctl_data	*tdata;
+	struct i2c_smbus_ioctl_data32	*udata;
+	compat_caddr_t			datap;
+
+	tdata = compat_alloc_user_space(sizeof(*tdata));
+	if (tdata == NULL)
+		return -ENOMEM;
+	if (verify_area(VERIFY_WRITE, tdata, sizeof(*tdata)))
+		return -EFAULT;
+
+	udata = (struct i2c_smbus_ioctl_data32 *)compat_ptr(arg);
+	if (verify_area(VERIFY_READ, udata, sizeof(*udata)))
+		return -EFAULT;
+
+	if (__copy_in_user(&tdata->read_write, &udata->read_write, 2 * sizeof(u8)))
+		return -EFAULT;
+	if (__copy_in_user(&tdata->size, &udata->size, 2 * sizeof(u32)))
+		return -EFAULT;
+	if (__get_user(datap, &udata->data) ||
+	    __put_user(compat_ptr(datap), &tdata->data))
+		return -EFAULT;
+
+	return sys_ioctl(fd, cmd, (unsigned long)tdata);
+}
+
+
 #undef CODE
 #endif
 
@@ -2979,7 +3081,7 @@ HANDLE_IOCTL(VIDIOCSFBUF32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCGFREQ32, do_video_ioctl)
 HANDLE_IOCTL(VIDIOCSFREQ32, do_video_ioctl)
 /* One SMB ioctl needs translations. */
-#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, compat_pid_t)
+#define SMB_IOC_GETMOUNTUID_32 _IOR('u', 1, compat_uid_t)
 HANDLE_IOCTL(SMB_IOC_GETMOUNTUID_32, do_smb_getmountuid)
 HANDLE_IOCTL(ATM_GETLINKRATE32, do_atm_ioctl)
 HANDLE_IOCTL(ATM_GETNAMES32, do_atm_ioctl)
@@ -3027,5 +3129,10 @@ HANDLE_IOCTL(USBDEVFS_BULK32, do_usbdevfs_bulk)
 HANDLE_IOCTL(USBDEVFS_REAPURB32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_REAPURBNDELAY32, do_usbdevfs_reapurb)
 HANDLE_IOCTL(USBDEVFS_DISCSIGNAL32, do_usbdevfs_discsignal)
+/* i2c */
+HANDLE_IOCTL(I2C_FUNCS, w_long)
+HANDLE_IOCTL(I2C_RDWR, do_i2c_rdwr_ioctl)
+HANDLE_IOCTL(I2C_SMBUS, do_i2c_smbus_ioctl)
+
 #undef DECLARES
 #endif

@@ -282,7 +282,7 @@
  *      for common error messages rather than the maintainer.
  *
  * 0.4.7  11/28/2001
- *    - Fixed typo in Documentation/scanner.txt.  Thanks to
+ *    - Fixed typo in Documentation/usb/scanner.txt.  Thanks to
  *      Karel <karel.vervaeke@pandora.be> for pointing it out.
  *    - Added ID's for a Memorex 6136u. Thanks to Álvaro Gaspar de
  *      Valenzuela" <agaspard@utsi.edu>.
@@ -380,6 +380,10 @@
  *      Visioneer scanners.
  *    - Added test for USB_CLASS_CDC_DATA which is used by some fingerprint scanners.
  *
+ * 0.4.16  2003-11-04
+ *    - Added vendor/product ids for Epson, Genius, Microtek, Plustek, Reflecta, and
+ *      Visioneer scanners. Removed ids for HP PSC devices as these are supported by
+ *      the hpoj userspace driver.
  *
  * TODO
  *    - Performance

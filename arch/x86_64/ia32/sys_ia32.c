@@ -110,6 +110,21 @@ int cp_compat_stat(struct kstat *kbuf, struct compat_stat *ubuf)
 	return 0;
 }
 
+extern long sys_truncate(char *, loff_t);
+extern long sys_ftruncate(int, loff_t);
+
+asmlinkage long
+sys32_truncate64(char * filename, unsigned long offset_low, unsigned long offset_high)
+{
+       return sys_truncate(filename, ((loff_t) offset_high << 32) | offset_low);
+}
+
+asmlinkage long
+sys32_ftruncate64(unsigned int fd, unsigned long offset_low, unsigned long offset_high)
+{
+       return sys_ftruncate(fd, ((loff_t) offset_high << 32) | offset_low);
+}
+
 /* Another set for IA32/LFS -- x86_64 struct stat is different due to 
    support for 64bit inode numbers. */
 
@@ -1817,13 +1832,6 @@ long asmlinkage sys32_nfsservctl(int cmd, void *notused, void *notused2)
 }
 #endif
 
-long sys32_module_warning(void)
-{ 
-		printk(KERN_INFO "%s: 32bit 2.4.x modutils not supported on 64bit kernel\n",
-		       current->comm);
-	return -ENOSYS ;
-} 
-
 extern long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
 
 long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
@@ -1989,11 +1997,15 @@ long sys32_fadvise64_64(int fd, __u32 offset_low, __u32 offset_high,
 
 long sys32_vm86_warning(void)
 { 
+	struct task_struct *me = current;
+	static char lastcomm[8];
+	if (strcmp(lastcomm, me->comm)) {
 		printk(KERN_INFO "%s: vm86 mode not supported on 64 bit kernel\n",
-		       current->comm);
-	return -ENOSYS ;
+		       me->comm);
+		strcpy(lastcomm, me->comm); 
+	} 
+	return -ENOSYS;
 } 
-
 
 struct exec_domain ia32_exec_domain = { 
 	.name = "linux/x86",

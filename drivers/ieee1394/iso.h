@@ -51,6 +51,14 @@ struct hpsb_iso_packet_info {
 
 enum hpsb_iso_type { HPSB_ISO_RECV = 0, HPSB_ISO_XMIT = 1 };
 
+/* The mode of the dma when receiving iso data. Must be supported by chip */
+enum raw1394_iso_dma_recv_mode {
+	HPSB_ISO_DMA_DEFAULT = -1,
+	HPSB_ISO_DMA_OLD_ABI = 0,
+	HPSB_ISO_DMA_BUFFERFILL = 1,
+	HPSB_ISO_DMA_PACKET_PER_BUFFER = 2
+};
+
 struct hpsb_iso {
 	enum hpsb_iso_type type;
 
@@ -68,6 +76,8 @@ struct hpsb_iso {
 
 	int speed; /* IEEE1394_SPEED_100, 200, or 400 */
 	int channel; /* -1 if multichannel */
+	int dma_mode; /* dma receive mode */
+
 
 	/* greatest # of packets between interrupts - controls
 	   the maximum latency of the buffer */
@@ -139,6 +149,7 @@ struct hpsb_iso* hpsb_iso_recv_init(struct hpsb_host *host,
 				    unsigned int data_buf_size,
 				    unsigned int buf_packets,
 				    int channel,
+				    int dma_mode,
 				    int irq_interval,
 				    void (*callback)(struct hpsb_iso*));
 

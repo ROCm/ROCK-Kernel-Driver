@@ -532,7 +532,12 @@ static void __init system_map_inventory(void)
 	 * Otherwise the machine might crash during iommu setup.
 	 */
 	pdc_io_reset();
-	pdc_io_reset_devices();
+
+	/*
+	 * Unfortunately if we reset devices here, serial console
+	 * stops working :-(
+	 */
+	/* pdc_io_reset_devices(); */
 #endif
 
 	for (i = 0; status != PDC_BAD_PROC && status != PDC_NE_MOD; i++) {

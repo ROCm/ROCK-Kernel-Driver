@@ -3,7 +3,6 @@
  *	(c) Copyright 2001 Red Hat Inc.	<alan@redhat.com>
  *
  * based on the old aacraid driver that is..
-
  * Adaptec aacraid device driver for Linux.
  *
  * Copyright (c) 2000 Adaptec, Inc. (aacraid@adaptec.com)
@@ -28,10 +27,8 @@
  * Abstract: Contain all routines that are required for FSA host/adapter
  *    commuication.
  *
- *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -40,10 +37,8 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
-#include <asm/semaphore.h>
 #include <linux/blkdev.h>
-#include "scsi.h"
-#include "hosts.h"
+#include <asm/semaphore.h>
 
 #include "aacraid.h"
 

@@ -921,7 +921,7 @@ int is_hugepage_mem_enough(size_t size)
  * this far.
  */
 static struct page *hugetlb_nopage(struct vm_area_struct *vma,
-				unsigned long address, int unused)
+				unsigned long address, int *unused)
 {
 	BUG();
 	return NULL;

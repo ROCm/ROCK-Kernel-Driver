@@ -162,7 +162,7 @@ prio_destroy(struct Qdisc* sch)
 
 	while ((tp = q->filter_list) != NULL) {
 		q->filter_list = tp->next;
-		tp->ops->destroy(tp);
+		tcf_destroy(tp);
 	}
 
 	for (prio=0; prio<q->bands; prio++) {

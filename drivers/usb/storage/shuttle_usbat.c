@@ -40,7 +40,6 @@
  */
 
 #include "transport.h"
-#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -529,9 +528,8 @@ int usbat_handle_read10(struct us_data *us,
 	unsigned char *buffer;
 	unsigned int len;
 	unsigned int sector;
-	struct scatterlist *sg = NULL;
-	int sg_segment = 0;
-	int sg_offset = 0;
+	unsigned int sg_segment = 0;
+	unsigned int sg_offset = 0;
 
 	US_DEBUGP("handle_read10: transfersize %d\n",
 		srb->transfersize);
@@ -570,21 +568,29 @@ int usbat_handle_read10(struct us_data *us,
 			srb->transfersize);
 	}
 
+	// Since we only read in one block at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
+
 	len = (65535/srb->transfersize) * srb->transfersize;
 	US_DEBUGP("Max read is %d bytes\n", len);
-	buffer = kmalloc(len, GFP_NOIO);
-	if (buffer == NULL) // bloody hell!
-		return USB_STOR_TRANSPORT_FAILED;
+	len = min(len, srb->request_bufflen);
+	if (srb->use_sg) {
+		buffer = kmalloc(len, GFP_NOIO);
+		if (buffer == NULL) // bloody hell!
+			return USB_STOR_TRANSPORT_FAILED;
+	} else
+		buffer = srb->request_buffer;
 	sector = short_pack(data[7+3], data[7+2]);
 	sector <<= 16;
 	sector |= short_pack(data[7+5], data[7+4]);
 	transferred = 0;
 
-	if (srb->use_sg) {
-		sg = (struct scatterlist *)srb->request_buffer;
-		sg_segment = 0; // for keeping track of where we are in
-		sg_offset = 0;  // the scatter/gather list
-	}
+	sg_segment = 0; // for keeping track of where we are in
+	sg_offset = 0;  // the scatter/gather list
 
 	while (transferred != srb->request_bufflen) {
 
@@ -615,13 +621,12 @@ int usbat_handle_read10(struct us_data *us,
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
 
-		// Transfer the received data into the srb buffer
-
+		// Store the data (s-g) or update the pointer (!s-g)
 		if (srb->use_sg)
-			us_copy_to_sgbuf(buffer, len, sg,
-					 &sg_segment, &sg_offset, srb->use_sg);
+			usb_stor_access_xfer_buf(buffer, len, srb,
+					 &sg_segment, &sg_offset, TO_XFER_BUF);
 		else
-			memcpy(srb->request_buffer+transferred, buffer, len);
+			buffer += len;
 
 		// Update the amount transferred and the sector number
 
@@ -630,7 +635,8 @@ int usbat_handle_read10(struct us_data *us,
 
 	} // while transferred != srb->request_bufflen
 
-	kfree(buffer);
+	if (srb->use_sg)
+		kfree(buffer);
 	return result;
 }
 

@@ -49,6 +49,7 @@
 #include <asm/page.h>
 #include <asm/fixmap.h>
 #include <asm/errno.h>
+#include <asm/io.h>
 
 #define __vsyscall(nr) __attribute__ ((unused,__section__(".vsyscall_" #nr)))
 #define force_inline __attribute__((always_inline)) inline
@@ -88,11 +89,10 @@ static force_inline void do_vgettimeofday(struct timeval * tv)
 			if (t < __vxtime.last_tsc) t = __vxtime.last_tsc;
 			usec += ((t - __vxtime.last_tsc) *
 				 __vxtime.tsc_quot) >> 32;
+			/* See comment in x86_64 do_gettimeopfday. */ 
 		} else {
-#if 0
 			usec += ((readl(fix_to_virt(VSYSCALL_HPET) + 0xf0) -
 				  __vxtime.last) * __vxtime.quot) >> 32;
-#endif
 		}
 	} while (read_seqretry(&__xtime_lock, sequence));
 

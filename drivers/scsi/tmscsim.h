@@ -24,6 +24,8 @@
 
 #define END_SCAN		2
 
+#define pci_dma_lo32(a)			(a & 0xffffffff)
+
 typedef u8		UCHAR;	/*  8 bits */
 typedef u16		USHORT;	/* 16 bits */
 typedef u32		UINT;	/* 32 bits */
@@ -213,8 +215,7 @@ PSRB		pTmpSRB;
 
 /* 0x2c: */
 ULONG		QueryCnt;
-PSCSICMD	pQueryHead;
-PSCSICMD	pQueryTail;
+struct list_head	cmdq;
 
 /* 0x38: */
 UCHAR		msgin123[4];
@@ -400,6 +401,20 @@ typedef  struct  _ACB	 DC390_ACB, *PACB;
 
 /*;----SCSI MSG BYTE*/ /* see scsi/scsi.h */ /* One is missing ! */
 #define ABORT_TAG	0x0d
+
+/*
+ *	SISC query queue
+ */
+typedef struct {
+	struct list_head	list;
+	dma_addr_t		saved_dma_handle;
+} dc390_cmd_scp_t;
+
+struct scsi_cmnd_list
+{
+	char dummy[offsetof(struct scsi_cmnd, SCp)];
+	dc390_cmd_scp_t scp;
+};
 
 /*
 **  Inquiry Data format

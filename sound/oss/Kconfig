@@ -25,7 +25,7 @@ config SOUND_CMPCI
 	depends on SOUND_PRIME!=n && SOUND && PCI
 	help
 	  Say Y or M if you have a PCI sound card using the CMI8338
-	  or the CMI8378 chipset.  Data on these chips are available at
+	  or the CMI8738 chipset.  Data on these chips are available at
 	  <http://www.cmedia.com.tw/>.
 
 	  A userspace utility to control some internal registers of these
@@ -195,7 +195,7 @@ config SOUND_ES1371
 	  Ensoniq was bought by Creative Labs, Sound Blaster 64/PCI
 	  models are either ES1370 or ES1371 based. This driver differs
 	  slightly from OSS/Free, so PLEASE READ
-	  <file:Documentation/sound/es1371>.
+	  <file:Documentation/sound/oss/es1371>.
 
 config SOUND_ESSSOLO1
 	tristate "ESS Technology Solo1"

@@ -4,6 +4,7 @@
 
 EXTRA_CFLAGS = -Idrivers/media/dvb/dvb-core/
 
+obj-$(CONFIG_DVB_TWINHAN_DST) += dst.o
 obj-$(CONFIG_DVB_STV0299) += stv0299.o
 obj-$(CONFIG_DVB_ALPS_TDLB7) += alps_tdlb7.o
 obj-$(CONFIG_DVB_ALPS_TDMB7) += alps_tdmb7.o

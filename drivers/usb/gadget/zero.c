@@ -108,17 +108,13 @@ static const char loopback [] = "loop input to output";
  *
  * CHIP ... hardware identifier
  * DRIVER_VERSION_NUM ... alerts the host side driver to differences
- * EP0_MAXPACKET ... controls packetization of control requests
  * EP_*_NAME ... which endpoints do we use for which purpose?
  * EP_*_NUM ... numbers for them (often limited by hardware)
  * HIGHSPEED ... define if ep0 and descriptors need high speed support
  * MAX_USB_POWER ... define if we use other than 100 mA bus current
- * SELFPOWER ... unless we can run on bus power, USB_CONFIG_ATT_SELFPOWER
+ * SELFPOWER ... if we can run on bus power, zero
  * WAKEUP ... if hardware supports remote wakeup AND we will issue the
  * 	usb_gadget_wakeup() call to initiate it, USB_CONFIG_ATT_WAKEUP
- *
- * hw_optimize(gadget) ... for any hardware tweaks we want to kick in
- * 	before we enable our endpoints
  *
  * add other defines for other portability issues, like hardware that
  * for some reason doesn't handle full speed bulk maxpacket of 64.
@@ -138,25 +134,13 @@ static const char loopback [] = "loop input to output";
 #ifdef	CONFIG_USB_ZERO_NET2280
 #define CHIP			"net2280"
 #define DRIVER_VERSION_NUM	0x0101
-#define EP0_MAXPACKET		64
 static const char EP_OUT_NAME [] = "ep-a";
 #define EP_OUT_NUM	2
 static const char EP_IN_NAME [] = "ep-b";
 #define EP_IN_NUM	2
 #define HIGHSPEED
 /* specific hardware configs could be bus-powered */
-#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
 /* supports remote wakeup, but this driver doesn't */
-
-extern int net2280_set_fifo_mode (struct usb_gadget *gadget, int mode);
-
-static inline void hw_optimize (struct usb_gadget *gadget)
-{
-	/* we can have bigger ep-a/ep-b fifos (2KB each, 4 packets
-	 * for highspeed bulk) because we're not using ep-c/ep-d.
-	 */
-	net2280_set_fifo_mode (gadget, 1);
-}
 #endif
 
 /*
@@ -173,17 +157,12 @@ static inline void hw_optimize (struct usb_gadget *gadget)
 #ifdef	CONFIG_USB_ZERO_PXA2XX
 #define CHIP			"pxa2xx"
 #define DRIVER_VERSION_NUM	0x0103
-#define EP0_MAXPACKET		16
 static const char EP_OUT_NAME [] = "ep12out-bulk";
 #define EP_OUT_NUM	12
 static const char EP_IN_NAME [] = "ep11in-bulk";
 #define EP_IN_NUM	11
 /* doesn't support bus-powered operation */
-#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
 /* supports remote wakeup, but this driver doesn't */
-
-/* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0);
 #endif
 
 /*
@@ -200,22 +179,32 @@ static const char EP_IN_NAME [] = "ep11in-bulk";
 #ifdef	CONFIG_USB_ZERO_SA1100
 #define CHIP			"sa1100"
 #define DRIVER_VERSION_NUM	0x0105
-#define EP0_MAXPACKET		8
 static const char EP_OUT_NAME [] = "ep1out-bulk";
 #define EP_OUT_NUM	1
 static const char EP_IN_NAME [] = "ep2in-bulk";
 #define EP_IN_NUM	2
 /* doesn't support bus-powered operation */
-#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
 /* doesn't support remote wakeup? */
+#endif
 
-/* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0);
+/*
+ * Toshiba TC86C001 ("Goku-S") UDC
+ *
+ * This has three semi-configurable full speed bulk/interrupt endpoints.
+ */
+#ifdef	CONFIG_USB_ZERO_GOKU
+#define CHIP			"goku"
+#define DRIVER_VERSION_NUM	0x0106
+static const char EP_OUT_NAME [] = "ep1-bulk";
+#define EP_OUT_NUM	1
+static const char EP_IN_NAME [] = "ep2-bulk";
+#define EP_IN_NUM	2
+/* doesn't support remote wakeup */
 #endif
 
 /*-------------------------------------------------------------------------*/
 
-#ifndef EP0_MAXPACKET
+#ifndef EP_OUT_NUM
 #	error Configure some USB peripheral controller driver!
 #endif
 
@@ -224,10 +213,10 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
  */
 
 #ifndef	SELFPOWER
-/* default: say we rely on bus power */
-#define SELFPOWER	0
+/* default: say we're self-powered */
+#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
 /* else:
- * - SELFPOWER value must be USB_CONFIG_ATT_SELFPOWER
+ * - SELFPOWER value must be zero
  * - MAX_USB_POWER may be nonzero.
  */
 #endif
@@ -338,14 +327,13 @@ module_param (loopdefault, bool, S_IRUGO|S_IWUSR);
 #define	CONFIG_SOURCE_SINK	3
 #define	CONFIG_LOOPBACK		2
 
-static const struct usb_device_descriptor
+static struct usb_device_descriptor
 device_desc = {
 	.bLength =		sizeof device_desc,
 	.bDescriptorType =	USB_DT_DEVICE,
 
 	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
-	.bMaxPacketSize0 =	EP0_MAXPACKET,
 
 	.idVendor =		__constant_cpu_to_le16 (DRIVER_VENDOR_NUM),
 	.idProduct =		__constant_cpu_to_le16 (DRIVER_PRODUCT_NUM),
@@ -457,16 +445,13 @@ hs_sink_desc = {
 	.wMaxPacketSize =	__constant_cpu_to_le16 (512),
 };
 
-static const struct usb_qualifier_descriptor
+static struct usb_qualifier_descriptor
 dev_qualifier = {
 	.bLength =		sizeof dev_qualifier,
 	.bDescriptorType =	USB_DT_DEVICE_QUALIFIER,
 
 	.bcdUSB =		__constant_cpu_to_le16 (0x0200),
 	.bDeviceClass =		USB_CLASS_VENDOR_SPEC,
-
-	/* assumes ep0 uses the same value for both speeds ... */
-	.bMaxPacketSize0 =	EP0_MAXPACKET,
 
 	.bNumConfigurations =	2,
 };
@@ -959,7 +944,6 @@ zero_set_config (struct zero_dev *dev, unsigned number, int gfp_flags)
 	}
 #endif
 	zero_reset_config (dev);
-	hw_optimize (gadget);
 
 	switch (number) {
 	case CONFIG_SOURCE_SINK:
@@ -1028,7 +1012,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 
 	case USB_REQ_GET_DESCRIPTOR:
 		if (ctrl->bRequestType != USB_DIR_IN)
-			break;
+			goto unknown;
 		switch (ctrl->wValue >> 8) {
 
 		case USB_DT_DEVICE:
@@ -1068,14 +1052,14 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	/* currently two configs, two speeds */
 	case USB_REQ_SET_CONFIGURATION:
 		if (ctrl->bRequestType != 0)
-			break;
+			goto unknown;
 		spin_lock (&dev->lock);
 		value = zero_set_config (dev, ctrl->wValue, GFP_ATOMIC);
 		spin_unlock (&dev->lock);
 		break;
 	case USB_REQ_GET_CONFIGURATION:
 		if (ctrl->bRequestType != USB_DIR_IN)
-			break;
+			goto unknown;
 		*(u8 *)req->buf = dev->config;
 		value = min (ctrl->wLength, (u16) 1);
 		break;
@@ -1086,7 +1070,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	 */
 	case USB_REQ_SET_INTERFACE:
 		if (ctrl->bRequestType != USB_RECIP_INTERFACE)
-			break;
+			goto unknown;
 		spin_lock (&dev->lock);
 		if (dev->config && ctrl->wIndex == 0 && ctrl->wValue == 0) {
 			u8		config = dev->config;
@@ -1106,7 +1090,7 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		break;
 	case USB_REQ_GET_INTERFACE:
 		if (ctrl->bRequestType != (USB_DIR_IN|USB_RECIP_INTERFACE))
-			break;
+			goto unknown;
 		if (!dev->config)
 			break;
 		if (ctrl->wIndex != 0) {
@@ -1117,7 +1101,35 @@ zero_setup (struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 		value = min (ctrl->wLength, (u16) 1);
 		break;
 
+	/*
+	 * These are the same vendor-specific requests supported by
+	 * Intel's USB 2.0 compliance test devices.  We exceed that
+	 * device spec by allowing multiple-packet requests.
+	 */
+	case 0x5b:	/* control WRITE test -- fill the buffer */
+		if (ctrl->bRequestType != (USB_DIR_OUT|USB_TYPE_VENDOR))
+			goto unknown;
+		if (ctrl->wValue || ctrl->wIndex)
+			break;
+		/* just read that many bytes into the buffer */
+		if (ctrl->wLength > USB_BUFSIZ)
+			break;
+		value = ctrl->wLength;
+		break;
+	case 0x5c:	/* control READ test -- return the buffer */
+		if (ctrl->bRequestType != (USB_DIR_IN|USB_TYPE_VENDOR))
+			goto unknown;
+		if (ctrl->wValue || ctrl->wIndex)
+			break;
+		/* expect those bytes are still in the buffer; send back */
+		if (ctrl->wLength > USB_BUFSIZ
+				|| ctrl->wLength != req->length)
+			break;
+		value = ctrl->wLength;
+		break;
+
 	default:
+unknown:
 		VDEBUG (dev,
 			"unknown control req%02x.%02x v%04x i%04x l%d\n",
 			ctrl->bRequestType, ctrl->bRequest,
@@ -1198,6 +1210,12 @@ zero_bind (struct usb_gadget *gadget)
 		goto enomem;
 
 	dev->req->complete = zero_setup_complete;
+
+	device_desc.bMaxPacketSize0 = gadget->ep0->maxpacket;
+#ifdef HIGHSPEED
+	/* assume ep0 uses the same value for both speeds ... */
+	dev_qualifier.bMaxPacketSize0 = device_desc.bMaxPacketSize0;
+#endif
 
 	gadget->ep0->driver_data = dev;
 

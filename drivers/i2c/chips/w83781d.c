@@ -24,10 +24,11 @@
     Supports following chips:
 
     Chip	#vin	#fanin	#pwm	#temp	wchipid	vendid	i2c	ISA
-    as99127f	7	3	1?	3	0x30	0x12c3	yes	no
-    asb100 "bach" (type_name = as99127f)	0x30	0x0694	yes	no
-    w83781d	7	3	0	3	0x10	0x5ca3	yes	yes
-    w83627hf	9	3	2	3	0x20	0x5ca3	yes	yes(LPC)
+    as99127f	7	3	1?	3	0x31	0x12c3	yes	no
+    as99127f rev.2 (type_name = 1299127f)	0x31	0x5ca3	yes	no
+    asb100 "bach" (type_name = as99127f)	0x31	0x0694	yes	no
+    w83781d	7	3	0	3	0x10-1	0x5ca3	yes	yes
+    w83627hf	9	3	2	3	0x21	0x5ca3	yes	yes(LPC)
     w83627thf	9	3	2	3	0x90	0x5ca3	no	yes(LPC)
     w83782d	9	3	2-4	3	0x30	0x5ca3	yes	yes
     w83783s	5-6	3	2	1-2	0x40	0x5ca3	yes	no
@@ -207,72 +208,6 @@ DIV_TO_REG(long val, enum chips type)
 	return ((u8) i);
 }
 
-/* Initial limits */
-#define W83781D_INIT_IN_0		(vid == 3500 ? 280 : vid / 10)
-#define W83781D_INIT_IN_1		(vid == 3500 ? 280 : vid / 10)
-#define W83781D_INIT_IN_2		330
-#define W83781D_INIT_IN_3		(((500)   * 100) / 168)
-#define W83781D_INIT_IN_4		(((1200)  * 10) / 38)
-#define W83781D_INIT_IN_5		(((-1200) * -604) / 2100)
-#define W83781D_INIT_IN_6		(((-500)  * -604) / 909)
-#define W83781D_INIT_IN_7		(((500)   * 100) / 168)
-#define W83781D_INIT_IN_8		300
-/* Initial limits for 782d/783s negative voltages */
-/* Note level shift. Change min/max below if you change these. */
-#define W83782D_INIT_IN_5		((((-1200) + 1491) * 100)/514)
-#define W83782D_INIT_IN_6		((( (-500)  + 771) * 100)/314)
-
-#define W83781D_INIT_IN_PERCENTAGE	10
-#define W83781D_INIT_IN_MIN(val)	(val - val * W83781D_INIT_IN_PERCENTAGE / 100)
-#define W83781D_INIT_IN_MAX(val)	(val + val * W83781D_INIT_IN_PERCENTAGE / 100)
-
-#define W83781D_INIT_IN_MIN_0		W83781D_INIT_IN_MIN(W83781D_INIT_IN_0)
-#define W83781D_INIT_IN_MAX_0		W83781D_INIT_IN_MAX(W83781D_INIT_IN_0)
-#define W83781D_INIT_IN_MIN_1		W83781D_INIT_IN_MIN(W83781D_INIT_IN_1)
-#define W83781D_INIT_IN_MAX_1		W83781D_INIT_IN_MAX(W83781D_INIT_IN_1)
-#define W83781D_INIT_IN_MIN_2		W83781D_INIT_IN_MIN(W83781D_INIT_IN_2)
-#define W83781D_INIT_IN_MAX_2		W83781D_INIT_IN_MAX(W83781D_INIT_IN_2)
-#define W83781D_INIT_IN_MIN_3		W83781D_INIT_IN_MIN(W83781D_INIT_IN_3)
-#define W83781D_INIT_IN_MAX_3		W83781D_INIT_IN_MAX(W83781D_INIT_IN_3)
-#define W83781D_INIT_IN_MIN_4		W83781D_INIT_IN_MIN(W83781D_INIT_IN_4)
-#define W83781D_INIT_IN_MAX_4		W83781D_INIT_IN_MAX(W83781D_INIT_IN_4)
-#define W83781D_INIT_IN_MIN_5		W83781D_INIT_IN_MIN(W83781D_INIT_IN_5)
-#define W83781D_INIT_IN_MAX_5		W83781D_INIT_IN_MAX(W83781D_INIT_IN_5)
-#define W83781D_INIT_IN_MIN_6		W83781D_INIT_IN_MIN(W83781D_INIT_IN_6)
-#define W83781D_INIT_IN_MAX_6		W83781D_INIT_IN_MAX(W83781D_INIT_IN_6)
-#define W83781D_INIT_IN_MIN_7		W83781D_INIT_IN_MIN(W83781D_INIT_IN_7)
-#define W83781D_INIT_IN_MAX_7		W83781D_INIT_IN_MAX(W83781D_INIT_IN_7)
-#define W83781D_INIT_IN_MIN_8		W83781D_INIT_IN_MIN(W83781D_INIT_IN_8)
-#define W83781D_INIT_IN_MAX_8		W83781D_INIT_IN_MAX(W83781D_INIT_IN_8)
-
-/* Initial limits for 782d/783s negative voltages */
-/* These aren't direct multiples because of level shift */
-/* Beware going negative - check */
-#define W83782D_INIT_IN_MIN_5_TMP \
-	(((-1200 * (100 + W83781D_INIT_IN_PERCENTAGE)) + (1491 * 100))/514)
-#define W83782D_INIT_IN_MIN_5 \
-	((W83782D_INIT_IN_MIN_5_TMP > 0) ? W83782D_INIT_IN_MIN_5_TMP : 0)
-#define W83782D_INIT_IN_MAX_5 \
-	(((-1200 * (100 - W83781D_INIT_IN_PERCENTAGE)) + (1491 * 100))/514)
-#define W83782D_INIT_IN_MIN_6_TMP \
-	((( -500 * (100 + W83781D_INIT_IN_PERCENTAGE)) +  (771 * 100))/314)
-#define W83782D_INIT_IN_MIN_6 \
-	((W83782D_INIT_IN_MIN_6_TMP > 0) ? W83782D_INIT_IN_MIN_6_TMP : 0)
-#define W83782D_INIT_IN_MAX_6 \
-	((( -500 * (100 - W83781D_INIT_IN_PERCENTAGE)) +  (771 * 100))/314)
-
-#define W83781D_INIT_FAN_MIN_1		3000
-#define W83781D_INIT_FAN_MIN_2		3000
-#define W83781D_INIT_FAN_MIN_3		3000
-
-/* temp = value / 100 */
-#define W83781D_INIT_TEMP_OVER		6000
-#define W83781D_INIT_TEMP_HYST		12700	/* must be 127 for ALARM to work */
-#define W83781D_INIT_TEMP2_OVER		6000
-#define W83781D_INIT_TEMP2_HYST		5000
-#define W83781D_INIT_TEMP3_OVER		6000
-#define W83781D_INIT_TEMP3_HYST		5000
-
 /* There are some complications in a module like this. First off, W83781D chips
    may be both present on the SMBus and the ISA bus, and we have to handle
    those cases separately at some places. Second, there might be several
@@ -309,11 +244,11 @@ struct w83781d_data {
 	u8 fan[3];		/* Register value */
 	u8 fan_min[3];		/* Register value */
 	u8 temp;
-	u8 temp_min;		/* Register value */
 	u8 temp_max;		/* Register value */
+	u8 temp_hyst;		/* Register value */
 	u16 temp_add[2];	/* Register value */
 	u16 temp_max_add[2];	/* Register value */
-	u16 temp_min_add[2];	/* Register value */
+	u16 temp_hyst_add[2];	/* Register value */
 	u8 fan_div[3];		/* Register encoding, shifted right */
 	u8 vid;			/* Register encoding, combined */
 	u32 alarms;		/* Register encoding, combined */
@@ -510,8 +445,8 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 	} \
 }
 show_temp_reg(temp);
-show_temp_reg(temp_min);
 show_temp_reg(temp_max);
+show_temp_reg(temp_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
@@ -538,8 +473,8 @@ static ssize_t store_temp_##reg (struct device *dev, const char *buf, size_t cou
 	 \
 	return count; \
 }
-store_temp_reg(OVER, min);
-store_temp_reg(HYST, max);
+store_temp_reg(OVER, max);
+store_temp_reg(HYST, hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -562,8 +497,8 @@ static DEVICE_ATTR(temp_##reg##offset, S_IRUGO| S_IWUSR, show_regs_temp_##reg##o
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
-sysfs_temp_reg_offset(min, offset); \
-sysfs_temp_reg_offset(max, offset);
+sysfs_temp_reg_offset(max, offset); \
+sysfs_temp_reg_offset(hyst, offset);
 
 sysfs_temp_offsets(1);
 sysfs_temp_offsets(2);
@@ -573,7 +508,7 @@ sysfs_temp_offsets(3);
 do { \
 device_create_file(&client->dev, &dev_attr_temp_input##offset); \
 device_create_file(&client->dev, &dev_attr_temp_max##offset); \
-device_create_file(&client->dev, &dev_attr_temp_min##offset); \
+device_create_file(&client->dev, &dev_attr_temp_hyst##offset); \
 } while (0)
 
 static ssize_t
@@ -1264,7 +1199,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			goto ERROR2;
 		}
 		/* If Winbond SMBus, check address at 0x48.
-		   Asus doesn't support */
+		   Asus doesn't support, except for as99127f rev.2 */
 		if ((!is_isa) && (((!(val1 & 0x80)) && (val2 == 0xa3)) ||
 				  ((val1 & 0x80) && (val2 == 0x5c)))) {
 			if (w83781d_read_value
@@ -1295,18 +1230,17 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 			goto ERROR2;
 		}
 
-		/* mask off lower bit, not reliable */
-		val1 =
-		    w83781d_read_value(new_client, W83781D_REG_WCHIPID) & 0xfe;
-		if (val1 == 0x10 && vendid == winbond)
+		val1 = w83781d_read_value(new_client, W83781D_REG_WCHIPID);
+		if ((val1 == 0x10 || val1 == 0x11) && vendid == winbond)
 			kind = w83781d;
 		else if (val1 == 0x30 && vendid == winbond)
 			kind = w83782d;
-		else if (val1 == 0x40 && vendid == winbond && !is_isa)
+		else if (val1 == 0x40 && vendid == winbond && !is_isa
+				&& address == 0x2d)
 			kind = w83783s;
-		else if ((val1 == 0x20 || val1 == 0x90) && vendid == winbond)
+		else if ((val1 == 0x21 || val1 == 0x90) && vendid == winbond)
 			kind = w83627hf;
-		else if (val1 == 0x30 && vendid == asus && !is_isa)
+		else if (val1 == 0x31 && !is_isa && address >= 0x28)
 			kind = as99127f;
 		else if (val1 == 0x60 && vendid == winbond && is_isa)
 			kind = w83697hf;
@@ -1688,113 +1622,6 @@ w83781d_init_client(struct i2c_client *client)
 #endif				/* W83781D_RT */
 
 	if (init) {
-		w83781d_write_value(client, W83781D_REG_IN_MIN(0),
-				    IN_TO_REG(W83781D_INIT_IN_MIN_0));
-		w83781d_write_value(client, W83781D_REG_IN_MAX(0),
-				    IN_TO_REG(W83781D_INIT_IN_MAX_0));
-		if (type != w83783s && type != w83697hf) {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(1),
-					    IN_TO_REG(W83781D_INIT_IN_MIN_1));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(1),
-					    IN_TO_REG(W83781D_INIT_IN_MAX_1));
-		}
-
-		w83781d_write_value(client, W83781D_REG_IN_MIN(2),
-				    IN_TO_REG(W83781D_INIT_IN_MIN_2));
-		w83781d_write_value(client, W83781D_REG_IN_MAX(2),
-				    IN_TO_REG(W83781D_INIT_IN_MAX_2));
-		w83781d_write_value(client, W83781D_REG_IN_MIN(3),
-				    IN_TO_REG(W83781D_INIT_IN_MIN_3));
-		w83781d_write_value(client, W83781D_REG_IN_MAX(3),
-				    IN_TO_REG(W83781D_INIT_IN_MAX_3));
-		w83781d_write_value(client, W83781D_REG_IN_MIN(4),
-				    IN_TO_REG(W83781D_INIT_IN_MIN_4));
-		w83781d_write_value(client, W83781D_REG_IN_MAX(4),
-				    IN_TO_REG(W83781D_INIT_IN_MAX_4));
-		if (type == w83781d || type == as99127f) {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(5),
-					    IN_TO_REG(W83781D_INIT_IN_MIN_5));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(5),
-					    IN_TO_REG(W83781D_INIT_IN_MAX_5));
-		} else {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(5),
-					    IN_TO_REG(W83782D_INIT_IN_MIN_5));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(5),
-					    IN_TO_REG(W83782D_INIT_IN_MAX_5));
-		}
-		if (type == w83781d || type == as99127f) {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(6),
-					    IN_TO_REG(W83781D_INIT_IN_MIN_6));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(6),
-					    IN_TO_REG(W83781D_INIT_IN_MAX_6));
-		} else {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(6),
-					    IN_TO_REG(W83782D_INIT_IN_MIN_6));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(6),
-					    IN_TO_REG(W83782D_INIT_IN_MAX_6));
-		}
-		if ((type == w83782d) || (type == w83627hf) ||
-		    (type == w83697hf)) {
-			w83781d_write_value(client, W83781D_REG_IN_MIN(7),
-					    IN_TO_REG(W83781D_INIT_IN_MIN_7));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(7),
-					    IN_TO_REG(W83781D_INIT_IN_MAX_7));
-			w83781d_write_value(client, W83781D_REG_IN_MIN(8),
-					    IN_TO_REG(W83781D_INIT_IN_MIN_8));
-			w83781d_write_value(client, W83781D_REG_IN_MAX(8),
-					    IN_TO_REG(W83781D_INIT_IN_MAX_8));
-			w83781d_write_value(client, W83781D_REG_VBAT,
-					    (w83781d_read_value
-					     (client,
-					      W83781D_REG_VBAT) | 0x01));
-		}
-		w83781d_write_value(client, W83781D_REG_FAN_MIN(1),
-				    FAN_TO_REG(W83781D_INIT_FAN_MIN_1, 2));
-		w83781d_write_value(client, W83781D_REG_FAN_MIN(2),
-				    FAN_TO_REG(W83781D_INIT_FAN_MIN_2, 2));
-		if (type != w83697hf) {
-			w83781d_write_value(client, W83781D_REG_FAN_MIN(3),
-					    FAN_TO_REG(W83781D_INIT_FAN_MIN_3,
-						       2));
-		}
-
-		w83781d_write_value(client, W83781D_REG_TEMP_OVER(1),
-				    TEMP_TO_REG(W83781D_INIT_TEMP_OVER));
-		w83781d_write_value(client, W83781D_REG_TEMP_HYST(1),
-				    TEMP_TO_REG(W83781D_INIT_TEMP_HYST));
-
-		if (type == as99127f) {
-			w83781d_write_value(client, W83781D_REG_TEMP_OVER(2),
-					    AS99127_TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP2_OVER));
-			w83781d_write_value(client, W83781D_REG_TEMP_HYST(2),
-					    AS99127_TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP2_HYST));
-		} else {
-			w83781d_write_value(client, W83781D_REG_TEMP_OVER(2),
-					    TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP2_OVER));
-			w83781d_write_value(client, W83781D_REG_TEMP_HYST(2),
-					    TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP2_HYST));
-		}
-		w83781d_write_value(client, W83781D_REG_TEMP2_CONFIG, 0x00);
-
-		if (type == as99127f) {
-			w83781d_write_value(client, W83781D_REG_TEMP_OVER(3),
-					    AS99127_TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP3_OVER));
-			w83781d_write_value(client, W83781D_REG_TEMP_HYST(3),
-					    AS99127_TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP3_HYST));
-		} else if (type != w83783s && type != w83697hf) {
-			w83781d_write_value(client, W83781D_REG_TEMP_OVER(3),
-					    TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP3_OVER));
-			w83781d_write_value(client, W83781D_REG_TEMP_HYST(3),
-					    TEMP_ADD_TO_REG
-					    (W83781D_INIT_TEMP3_HYST));
-		}
 		if (type != w83783s && type != w83697hf) {
 			w83781d_write_value(client, W83781D_REG_TEMP3_CONFIG,
 					    0x00);
@@ -1865,15 +1692,15 @@ w83781d_update_client(struct i2c_client *client)
 		}
 
 		data->temp = w83781d_read_value(client, W83781D_REG_TEMP(1));
-		data->temp_min =
-		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
 		data->temp_max =
+		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(1));
+		data->temp_hyst =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(1));
 		data->temp_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP(2));
 		data->temp_max_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_OVER(2));
-		data->temp_min_add[0] =
+		data->temp_hyst_add[0] =
 		    w83781d_read_value(client, W83781D_REG_TEMP_HYST(2));
 		if (data->type != w83783s && data->type != w83697hf) {
 			data->temp_add[1] =
@@ -1881,7 +1708,7 @@ w83781d_update_client(struct i2c_client *client)
 			data->temp_max_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_OVER(3));
-			data->temp_min_add[1] =
+			data->temp_hyst_add[1] =
 			    w83781d_read_value(client,
 					       W83781D_REG_TEMP_HYST(3));
 		}

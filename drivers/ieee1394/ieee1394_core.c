@@ -109,7 +109,7 @@ void hpsb_set_packet_complete_task(struct hpsb_packet *packet,
 }
 
 /**
- * alloc_hpsb_packet - allocate new packet structure
+ * hpsb_alloc_packet - allocate new packet structure
  * @data_size: size of the data block to be allocated
  *
  * This function allocates, initializes and returns a new &struct hpsb_packet.
@@ -128,7 +128,7 @@ void hpsb_set_packet_complete_task(struct hpsb_packet *packet,
  * Return value: A pointer to a &struct hpsb_packet or NULL on allocation
  * failure.
  */
-struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
+struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
 {
         struct hpsb_packet *packet = NULL;
         void *data = NULL;
@@ -152,25 +152,23 @@ struct hpsb_packet *alloc_hpsb_packet(size_t data_size)
         }
 
         INIT_LIST_HEAD(&packet->list);
-        sema_init(&packet->state_change, 0);
 	packet->complete_routine = NULL;
 	packet->complete_data = NULL;
         packet->state = hpsb_unused;
         packet->generation = -1;
-        packet->data_be = 1;
 
         return packet;
 }
 
 
 /**
- * free_hpsb_packet - free packet and data associated with it
+ * hpsb_free_packet - free packet and data associated with it
  * @packet: packet to free (is NULL safe)
  *
  * This function will free packet->data, packet->header and finally the packet
  * itself.
  */
-void free_hpsb_packet(struct hpsb_packet *packet)
+void hpsb_free_packet(struct hpsb_packet *packet)
 {
         if (!packet) return;
 
@@ -420,14 +418,12 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
 
         if (packet->no_waiter) {
                 /* must not have a tlabel allocated */
-                free_hpsb_packet(packet);
+                hpsb_free_packet(packet);
                 return;
         }
 
         if (ackcode != ACK_PENDING || !packet->expect_response) {
                 packet->state = hpsb_complete;
-                up(&packet->state_change);
-                up(&packet->state_change);
                 run_packet_complete(packet);
                 return;
         }
@@ -439,7 +435,6 @@ void hpsb_packet_sent(struct hpsb_host *host, struct hpsb_packet *packet,
         list_add_tail(&packet->list, &host->pending_packets);
         spin_unlock_irqrestore(&host->pending_pkt_lock, flags);
 
-        up(&packet->state_change);
 	mod_timer(&host->timeout, jiffies + host->timeout_interval);
 }
 
@@ -465,7 +460,7 @@ int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt)
 		return -EINVAL;
 	}
 
-	packet = alloc_hpsb_packet(0);
+	packet = hpsb_alloc_packet(0);
 	if (!packet)
 		return -ENOMEM;
 
@@ -485,16 +480,8 @@ int hpsb_send_phy_config(struct hpsb_host *host, int rootid, int gapcnt)
 
 	packet->generation = get_hpsb_generation(host);
 
-	if (!hpsb_send_packet(packet)) {
-		retval = -EINVAL;
-		goto fail;
-	}
-
-	down(&packet->state_change);
-	down(&packet->state_change);
-
-fail:
-	free_hpsb_packet(packet);
+	retval = hpsb_send_packet_and_wait(packet);
+	hpsb_free_packet(packet);
 
 	return retval;
 }
@@ -504,23 +491,24 @@ fail:
  * @packet: packet to send
  *
  * The packet is sent through the host specified in the packet->host field.
- * Before sending, the packet's transmit speed is automatically determined using
- * the local speed map when it is an async, non-broadcast packet.
+ * Before sending, the packet's transmit speed is automatically determined
+ * using the local speed map when it is an async, non-broadcast packet.
  *
  * Possibilities for failure are that host is either not initialized, in bus
  * reset, the packet's generation number doesn't match the current generation
  * number or the host reports a transmit error.
  *
- * Return value: False (0) on failure, true (1) otherwise.
+ * Return value: 0 on success, negative errno on failure.
  */
 int hpsb_send_packet(struct hpsb_packet *packet)
 {
         struct hpsb_host *host = packet->host;
 
-        if (host->is_shutdown || host->in_bus_reset
-            || (packet->generation != get_hpsb_generation(host))) {
-                return 0;
-        }
+        if (host->is_shutdown)
+		return -EINVAL;
+	if (host->in_bus_reset ||
+	    (packet->generation != get_hpsb_generation(host)))
+                return -EAGAIN;
 
         packet->state = hpsb_queued;
 
@@ -532,23 +520,13 @@ int hpsb_send_packet(struct hpsb_packet *packet)
                 data = kmalloc(packet->header_size + packet->data_size, GFP_ATOMIC);
                 if (!data) {
                         HPSB_ERR("unable to allocate memory for concatenating header and data");
-                        return 0;
+                        return -ENOMEM;
                 }
 
                 memcpy(data, packet->header, packet->header_size);
 
                 if (packet->data_size)
-                {
-                        if (packet->data_be) {
-                                memcpy(((u8*)data)+packet->header_size, packet->data, packet->data_size);
-                        } else {
-                                int i;
-                                quadlet_t *my_data=(quadlet_t*) ((u8*) data + packet->data_size);
-                                for (i=0; i < packet->data_size/4; i++) {
-                                        my_data[i] = cpu_to_be32(packet->data[i]);
-                                }
-                        }
-                }
+			memcpy(((u8*)data)+packet->header_size, packet->data, packet->data_size);
 
                 dump_packet("send packet local:", packet->header,
                             packet->header_size);
@@ -558,7 +536,7 @@ int hpsb_send_packet(struct hpsb_packet *packet)
 
                 kfree(data);
 
-                return 1;
+                return 0;
         }
 
         if (packet->type == hpsb_async && packet->node_id != ALL_NODES) {
@@ -584,10 +562,33 @@ int hpsb_send_packet(struct hpsb_packet *packet)
         return host->driver->transmit_packet(host, packet);
 }
 
+/* We could just use complete() directly as the packet complete
+ * callback, but this is more typesafe, in the sense that we get a
+ * compiler error if the prototype for complete() changes. */
+
+static void complete_packet(void *data)
+{
+	complete((struct completion *) data);
+}
+
+int hpsb_send_packet_and_wait(struct hpsb_packet *packet)
+{
+	struct completion done;
+	int retval;
+
+	init_completion(&done);
+	hpsb_set_packet_complete_task(packet, complete_packet, &done);
+	retval = hpsb_send_packet(packet);
+	if (retval == 0)
+		wait_for_completion(&done);
+
+	return retval;
+}
+
 static void send_packet_nocare(struct hpsb_packet *packet)
 {
-        if (!hpsb_send_packet(packet)) {
-                free_hpsb_packet(packet);
+        if (hpsb_send_packet(packet) < 0) {
+                hpsb_free_packet(packet);
         }
 }
 
@@ -668,7 +669,6 @@ void handle_packet_response(struct hpsb_host *host, int tcode, quadlet_t *data,
         }
 
         packet->state = hpsb_complete;
-        up(&packet->state_change);
 	run_packet_complete(packet);
 }
 
@@ -680,7 +680,7 @@ static struct hpsb_packet *create_reply_packet(struct hpsb_host *host,
 
         dsize += (dsize % 4 ? 4 - (dsize % 4) : 0);
 
-        p = alloc_hpsb_packet(dsize);
+        p = hpsb_alloc_packet(dsize);
         if (p == NULL) {
                 /* FIXME - send data_error response */
                 return NULL;
@@ -820,6 +820,8 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                 if (rcode >= 0) {
                         fill_async_readblock_resp(packet, rcode, length);
                         send_packet_nocare(packet);
+                } else {
+                        hpsb_free_packet(packet);
                 }
                 break;
 
@@ -874,7 +876,7 @@ static void handle_incoming_packet(struct hpsb_host *host, int tcode,
                 if (rcode >= 0) {
                         send_packet_nocare(packet);
                 } else {
-                        free_hpsb_packet(packet);
+                        hpsb_free_packet(packet);
                 }
                 break;
         }
@@ -949,7 +951,6 @@ void abort_requests(struct hpsb_host *host)
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_ABORTED;
-                up(&packet->state_change);
 		run_packet_complete(packet);
         }
 }
@@ -987,7 +988,6 @@ void abort_timedouts(unsigned long __opaque)
                 list_del(&packet->list);
                 packet->state = hpsb_complete;
                 packet->ack_code = ACKX_TIMEOUT;
-                up(&packet->state_change);
 		run_packet_complete(packet);
         }
 }
@@ -1171,19 +1171,22 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 
 static int __init ieee1394_init(void)
 {
-	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
-					      0, 0, NULL, NULL);
-
 	devfs_mk_dir("ieee1394");
-
 	if (register_chrdev(IEEE1394_MAJOR, "ieee1394", &ieee1394_chardev_ops)) {
 		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);
-		devfs_remove("ieee1394");
 		return -ENODEV;
 	}
 
+	devfs_mk_dir("ieee1394");
+
+	hpsb_packet_cache = kmem_cache_create("hpsb_packet", sizeof(struct hpsb_packet),
+					      0, 0, NULL, NULL);
+
+	bus_register(&ieee1394_bus_type);
+
 	init_hpsb_highlevel();
 	init_csr();
+
 	if (!disable_nodemgr)
 		init_ieee1394_nodemgr();
 	else
@@ -1198,6 +1201,9 @@ static void __exit ieee1394_cleanup(void)
 		cleanup_ieee1394_nodemgr();
 
 	cleanup_csr();
+
+	bus_unregister(&ieee1394_bus_type);
+
 	kmem_cache_destroy(hpsb_packet_cache);
 
 	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
@@ -1213,16 +1219,15 @@ module_exit(ieee1394_cleanup);
 EXPORT_SYMBOL(hpsb_alloc_host);
 EXPORT_SYMBOL(hpsb_add_host);
 EXPORT_SYMBOL(hpsb_remove_host);
-EXPORT_SYMBOL(hpsb_ref_host);
-EXPORT_SYMBOL(hpsb_unref_host);
 
 /** ieee1394_core.c **/
 EXPORT_SYMBOL(hpsb_speedto_str);
 EXPORT_SYMBOL(hpsb_set_packet_complete_task);
-EXPORT_SYMBOL(alloc_hpsb_packet);
-EXPORT_SYMBOL(free_hpsb_packet);
+EXPORT_SYMBOL(hpsb_alloc_packet);
+EXPORT_SYMBOL(hpsb_free_packet);
 EXPORT_SYMBOL(hpsb_send_phy_config);
 EXPORT_SYMBOL(hpsb_send_packet);
+EXPORT_SYMBOL(hpsb_send_packet_and_wait);
 EXPORT_SYMBOL(hpsb_reset_bus);
 EXPORT_SYMBOL(hpsb_bus_reset);
 EXPORT_SYMBOL(hpsb_selfid_received);
@@ -1282,6 +1287,7 @@ EXPORT_SYMBOL(hpsb_node_lock);
 EXPORT_SYMBOL(hpsb_register_protocol);
 EXPORT_SYMBOL(hpsb_unregister_protocol);
 EXPORT_SYMBOL(ieee1394_bus_type);
+EXPORT_SYMBOL(nodemgr_for_each_host);
 
 /** csr.c **/
 EXPORT_SYMBOL(hpsb_update_config_rom);

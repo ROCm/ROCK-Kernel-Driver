@@ -30,10 +30,12 @@ char *syscall32_page;
 int map_syscall32(struct mm_struct *mm, unsigned long address) 
 { 
 	pte_t *pte;
+	pmd_t *pmd;
 	int err = 0;
+
 	down_read(&mm->mmap_sem);
 	spin_lock(&mm->page_table_lock); 
-	pmd_t *pmd = pmd_alloc(mm, pgd_offset(mm, address), address); 
+	pmd = pmd_alloc(mm, pgd_offset(mm, address), address); 
 	if (pmd && (pte = pte_alloc_map(mm, pmd, address)) != NULL) { 
 		if (pte_none(*pte)) { 
 			set_pte(pte, 

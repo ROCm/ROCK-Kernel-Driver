@@ -51,6 +51,7 @@ static int register_i2c_client (struct dvb_i2c_bus *i2c, struct dvb_i2c_device *
 
 	client->detach = dev->detach;
 	client->owner = dev->owner;
+	client->data = dev->data;
 
 	INIT_LIST_HEAD(&client->list_head);
 

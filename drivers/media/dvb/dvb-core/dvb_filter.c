@@ -564,14 +564,18 @@ void dvb_filter_pes2ts_init(struct dvb_filter_pes2ts *p2ts, unsigned short pid,
 	p2ts->priv=priv;
 }
 
-int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes, int len)
+int dvb_filter_pes2ts(struct dvb_filter_pes2ts *p2ts, unsigned char *pes,
+		      int len, int payload_start)
 {
 	unsigned char *buf=p2ts->buf;
 	int ret=0, rest;
 	
 	//len=6+((pes[4]<<8)|pes[5]);
 
+	if (payload_start)
 	buf[1]|=0x40;
+	else
+		buf[1]&=~0x40;
 	while (len>=184) {
 		buf[3]=0x10|((p2ts->cc++)&0x0f);
 		memcpy(buf+4, pes, 184);

@@ -248,7 +248,7 @@ static int cx24108_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
         cx24108_write(i2c,pll);
         cx24110_writereg(i2c,0x56,0x7f);
 
-	dvb_delay(HZ/10); /* wait a moment for the tuner pll to lock */
+	dvb_delay(10); /* wait a moment for the tuner pll to lock */
 
 	/* tuner pll lock can be monitored on GPIO pin 4 of cx24110 */
         while (!(cx24110_readreg(i2c,0x66)&0x20)&&i<1000)

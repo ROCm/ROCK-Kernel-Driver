@@ -57,6 +57,21 @@
 #define MCT_U232_SET_MODEM_CTRL_REQUEST	10 /* Set Modem Control Register (MCR) */
 #define MCT_U232_SET_MODEM_CTRL_SIZE    1
 
+/* This USB device request code is not well understood.  It is transmitted by
+   the MCT-supplied Windows driver whenever the baud rate changes. 
+*/
+#define MCT_U232_SET_UNKNOWN1_REQUEST   11  /* Unknown functionality */
+#define MCT_U232_SET_UNKNOWN1_SIZE       1
+
+/* This USB device request code is not well understood.  It is transmitted by
+   the MCT-supplied Windows driver whenever the baud rate changes. 
+   
+   Without this USB device request, the USB/RS-232 adapter will not write to
+   RS-232 devices which do not assert the 'CTS' signal.
+*/
+#define MCT_U232_SET_UNKNOWN2_REQUEST   12  /* Unknown functionality */
+#define MCT_U232_SET_UNKNOWN2_SIZE       1
+
 /*
  * Baud rate (divisor)
  */
@@ -137,22 +152,31 @@
  * Baud rate (divisor)
  * -------------------
  *
- *   BmRequestType:  0x4 (0100 0000B)
- *   bRequest:       0x5
- *   wValue:         0x0
- *   wIndex:         0x0
- *   wLength:        0x4
+ *   BmRequestType:  0x40 (0100 0000B)
+ *   bRequest:       0x05
+ *   wValue:         0x0000
+ *   wIndex:         0x0000
+ *   wLength:        0x0004
  *   Data:           divisor = 115200 / baud_rate
+ *
+ *   SniffUSB observations (Nov 2003): Contrary to the 'wLength' value of 4
+ *   shown above, observations with a Belkin F5U109 adapter, using the
+ *   MCT-supplied Windows98 driver (U2SPORT.VXD, "File version: 1.21P.0104 for
+ *   Win98/Me"), show this request has a length of 1 byte, presumably because
+ *   of the fact that the Belkin adapter and the 'Sitecom U232-P25' adapter
+ *   use a baud-rate code instead of a conventional RS-232 baud rate divisor.
+ *   The current source code for this driver does not reflect this fact, but
+ *   the driver works fine with this adapter/driver combination nonetheless.
  *
  *
  * Line Control Register (LCR)
  * ---------------------------
  *
- *  BmRequestType:  0x4 (0100 0000B)    0xc (1100 0000B)
- *  bRequest:       0x7                 0x6
- *  wValue:         0x0
- *  wIndex:         0x0
- *  wLength:        0x1
+ *  BmRequestType:  0x40 (0100 0000B)    0xc0 (1100 0000B)
+ *  bRequest:       0x07                 0x06
+ *  wValue:         0x0000
+ *  wIndex:         0x0000
+ *  wLength:        0x0001
  *  Data:           LCR (see below)
  *
  *  Bit 7: Divisor Latch Access Bit (DLAB). When set, access to the data
@@ -186,18 +210,18 @@
  *
  *  SniffUSB observations: Bit 7 seems not to be used. There seem to be two bugs
  *  in the Win98 driver: the break does not work (bit 6 is not asserted) and the
- *  sticky parity bit is not cleared when set once. The LCR can also be read
+ *  stick parity bit is not cleared when set once. The LCR can also be read
  *  back with USB request 6 but this has never been observed with SniffUSB.
  *
  *
  * Modem Control Register (MCR)
  * ----------------------------
  *
- *  BmRequestType:  0x4  (0100 0000B)
- *  bRequest:       0xa
- *  wValue:         0x0
- *  wIndex:         0x0
- *  wLength:        0x1
+ *  BmRequestType:  0x40  (0100 0000B)
+ *  bRequest:       0x0a
+ *  wValue:         0x0000
+ *  wIndex:         0x0000
+ *  wLength:        0x0001
  *  Data:           MCR (Bit 4..7, see below)
  *
  *  Bit 7: Reserved, always 0.
@@ -226,11 +250,11 @@
  * Modem Status Register (MSR)
  * ---------------------------
  *
- *  BmRequestType:  0xc  (1100 0000B)
- *  bRequest:       0x2
- *  wValue:         0x0
- *  wIndex:         0x0
- *  wLength:        0x1
+ *  BmRequestType:  0xc0  (1100 0000B)
+ *  bRequest:       0x02
+ *  wValue:         0x0000
+ *  wIndex:         0x0000
+ *  wLength:        0x0001
  *  Data:           MSR (see below)
  *
  *  Bit 7: Data Carrier Detect (CD). Reflects the state of the DCD line on the
@@ -285,6 +309,41 @@
  *  SniffUSB observations: the LSR is returned as second byte on the interrupt-in
  *  endpoint 0x83 to signal error conditions. Such errors have been seen with
  *  minicom/zmodem transfers (CRC errors).
+ *
+ *
+ * Unknown #1
+ * -------------------
+ *
+ *   BmRequestType:  0x40 (0100 0000B)
+ *   bRequest:       0x0b
+ *   wValue:         0x0000
+ *   wIndex:         0x0000
+ *   wLength:        0x0001
+ *   Data:           0x00
+ *
+ *   SniffUSB observations (Nov 2003): With the MCT-supplied Windows98 driver
+ *   (U2SPORT.VXD, "File version: 1.21P.0104 for Win98/Me"), this request
+ *   occurs immediately after a "Baud rate (divisor)" message.  It was not
+ *   observed at any other time.  It is unclear what purpose this message
+ *   serves.
+ *
+ *
+ * Unknown #2
+ * -------------------
+ *
+ *   BmRequestType:  0x40 (0100 0000B)
+ *   bRequest:       0x0c
+ *   wValue:         0x0000
+ *   wIndex:         0x0000
+ *   wLength:        0x0001
+ *   Data:           0x00
+ *
+ *   SniffUSB observations (Nov 2003): With the MCT-supplied Windows98 driver
+ *   (U2SPORT.VXD, "File version: 1.21P.0104 for Win98/Me"), this request
+ *   occurs immediately after the 'Unknown #1' message (see above).  It was
+ *   not observed at any other time.  It is unclear what other purpose (if
+ *   any) this message might serve, but without it, the USB/RS-232 adapter
+ *   will not write to RS-232 devices which do not assert the 'CTS' signal.
  *
  *
  * Flow control

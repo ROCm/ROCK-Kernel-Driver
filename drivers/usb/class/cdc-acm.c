@@ -1,5 +1,5 @@
 /*
- * acm.c  Version 0.22
+ * cdc-acm.c
  *
  * Copyright (c) 1999 Armin Fuerst	<fuerst@in.tum.de>
  * Copyright (c) 1999 Pavel Machek	<pavel@suse.cz>
@@ -26,6 +26,7 @@
  *	v0.21 - revert to probing on device for devices with multiple configs
  *	v0.22 - probe only the control interface. if usbcore doesn't choose the
  *		config we want, sysadmin changes bConfigurationValue in sysfs.
+ *	v0.23 - use softirq for rx processing, as needed by tty layer
  */
 
 /*
@@ -44,6 +45,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+#undef DEBUG
+
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -54,14 +57,13 @@
 #include <linux/module.h>
 #include <linux/smp_lock.h>
 #include <asm/uaccess.h>
-#undef DEBUG
 #include <linux/usb.h>
 #include <asm/byteorder.h>
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.21"
+#define DRIVER_VERSION "v0.23"
 #define DRIVER_AUTHOR "Armin Fuerst, Pavel Machek, Johannes Erdfelt, Vojtech Pavlik"
 #define DRIVER_DESC "USB Abstract Control Model driver for USB modems and ISDN adapters"
 
@@ -146,7 +148,8 @@ struct acm {
 	struct tty_struct *tty;				/* the corresponding tty */
 	struct urb *ctrlurb, *readurb, *writeurb;	/* urbs */
 	struct acm_line line;				/* line coding (bits, stop, parity) */
-	struct work_struct work;					/* work queue entry for line discipline waking up */
+	struct work_struct work;			/* work queue entry for line discipline waking up */
+	struct tasklet_struct bh;			/* rx processing */
 	unsigned int ctrlin;				/* input control lines (DCD, DSR, RI, break, overruns) */
 	unsigned int ctrlout;				/* output control lines (DTR, RTS) */
 	unsigned int writesize;				/* max packet size for the output bulk endpoint */
@@ -184,9 +187,10 @@ static int acm_ctrl_msg(struct acm *acm, int request, int value, void *buf, int 
 #define acm_send_break(acm, ms)		acm_ctrl_msg(acm, ACM_REQ_SEND_BREAK, ms, NULL, 0)
 
 /*
- * Interrupt handler for various ACM control events
+ * Interrupt handlers for various ACM device responses
  */
 
+/* control interface reports status changes with "interrupt" transfers */
 static void acm_ctrl_irq(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = urb->context;
@@ -251,20 +255,30 @@ exit:
 		     __FUNCTION__, status);
 }
 
+/* data interface returns incoming bytes, or we got unthrottled */
 static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = urb->context;
-	struct tty_struct *tty = acm->tty;
-	unsigned char *data = urb->transfer_buffer;
-	int i = 0;
 
 	if (!ACM_READY(acm))
 		return;
 
 	if (urb->status)
-		dbg("nonzero read bulk status received: %d", urb->status);
+		dev_dbg(&acm->data->dev, "bulk rx status %d\n", urb->status);
 
-	if (!urb->status && !acm->throttle)  {
+	/* calling tty_flip_buffer_push() in_irq() isn't allowed */
+	tasklet_schedule(&acm->bh);
+}
+
+static void acm_rx_tasklet(unsigned long _acm)
+{
+	struct acm *acm = (void *)_acm;
+	struct urb *urb = acm->readurb;
+	struct tty_struct *tty = acm->tty;
+	unsigned char *data = urb->transfer_buffer;
+	int i = 0;
+
+	if (urb->actual_length > 0 && !acm->throttle)  {
 		for (i = 0; i < urb->actual_length && !acm->throttle; i++) {
 			/* if we insert more than TTY_FLIPBUF_SIZE characters,
 			 * we drop them. */
@@ -285,10 +299,12 @@ static void acm_read_bulk(struct urb *urb, struct pt_regs *regs)
 	urb->actual_length = 0;
 	urb->dev = acm->dev;
 
-	if (usb_submit_urb(urb, GFP_ATOMIC))
-		dbg("failed resubmitting read urb");
+	i = usb_submit_urb(urb, GFP_ATOMIC);
+	if (i)
+		dev_dbg(&acm->data->dev, "bulk rx resubmit %d\n", i);
 }
 
+/* data interface wrote those outgoing bytes */
 static void acm_write_bulk(struct urb *urb, struct pt_regs *regs)
 {
 	struct acm *acm = (struct acm *)urb->context;
@@ -621,6 +637,8 @@ static int acm_probe (struct usb_interface *intf,
 			acm->minor = minor;
 			acm->dev = dev;
 
+			acm->bh.func = acm_rx_tasklet;
+			acm->bh.data = (unsigned long) acm;
 			INIT_WORK(&acm->work, acm_softint, acm);
 
 			if (!(buf = kmalloc(ctrlsize + readsize + acm->writesize, GFP_KERNEL))) {

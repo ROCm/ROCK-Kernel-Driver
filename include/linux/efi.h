@@ -16,6 +16,8 @@
 #include <linux/time.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
+#include <linux/rtc.h>
+#include <linux/ioport.h>
 
 #include <asm/page.h>
 #include <asm/system.h>
@@ -77,18 +79,23 @@ typedef	struct {
 #define EFI_MAX_MEMORY_TYPE		14
 
 /* Attribute values: */
-#define EFI_MEMORY_UC		0x0000000000000001	/* uncached */
-#define EFI_MEMORY_WC		0x0000000000000002	/* write-coalescing */
-#define EFI_MEMORY_WT		0x0000000000000004	/* write-through */
-#define EFI_MEMORY_WB		0x0000000000000008	/* write-back */
-#define EFI_MEMORY_WP		0x0000000000001000	/* write-protect */
-#define EFI_MEMORY_RP		0x0000000000002000	/* read-protect */
-#define EFI_MEMORY_XP		0x0000000000004000	/* execute-protect */
-#define EFI_MEMORY_RUNTIME	0x8000000000000000	/* range requires runtime mapping */
+#define EFI_MEMORY_UC		((u64)0x0000000000000001ULL)	/* uncached */
+#define EFI_MEMORY_WC		((u64)0x0000000000000002ULL)	/* write-coalescing */
+#define EFI_MEMORY_WT		((u64)0x0000000000000004ULL)	/* write-through */
+#define EFI_MEMORY_WB		((u64)0x0000000000000008ULL)	/* write-back */
+#define EFI_MEMORY_WP		((u64)0x0000000000001000ULL)	/* write-protect */
+#define EFI_MEMORY_RP		((u64)0x0000000000002000ULL)	/* read-protect */
+#define EFI_MEMORY_XP		((u64)0x0000000000004000ULL)	/* execute-protect */
+#define EFI_MEMORY_RUNTIME	((u64)0x8000000000000000ULL)	/* range requires runtime mapping */
 #define EFI_MEMORY_DESCRIPTOR_VERSION	1
 
 #define EFI_PAGE_SHIFT		12
 
+/*
+ * For current x86 implementations of EFI, there is
+ * additional padding in the mem descriptors.  This is not
+ * the case in ia64.  Need to have this fixed in the f/w.
+ */
 typedef struct {
 	u32 type;
 	u32 pad;
@@ -96,6 +103,9 @@ typedef struct {
 	u64 virt_addr;
 	u64 num_pages;
 	u64 attribute;
+#if defined (__i386__)
+	u64 pad1;
+#endif
 } efi_memory_desc_t;
 
 typedef int efi_freemem_callback_t (unsigned long start, unsigned long end, void *arg);
@@ -132,11 +142,12 @@ typedef struct {
  */
 #define EFI_RESET_COLD 0
 #define EFI_RESET_WARM 1
+#define EFI_RESET_SHUTDOWN 2
 
 /*
  * EFI Runtime Services table
  */
-#define EFI_RUNTIME_SERVICES_SIGNATURE 0x5652453544e5552
+#define EFI_RUNTIME_SERVICES_SIGNATURE ((u64)0x5652453544e5552ULL)
 #define EFI_RUNTIME_SERVICES_REVISION  0x00010000
 
 typedef struct {
@@ -169,6 +180,10 @@ typedef efi_status_t efi_set_variable_t (efi_char16_t *name, efi_guid_t *vendor,
 typedef efi_status_t efi_get_next_high_mono_count_t (u32 *count);
 typedef void efi_reset_system_t (int reset_type, efi_status_t status,
 				 unsigned long data_size, efi_char16_t *data);
+typedef efi_status_t efi_set_virtual_address_map_t (unsigned long memory_map_size,
+						unsigned long descriptor_size,
+						u32 descriptor_version,
+						efi_memory_desc_t *virtual_map);
 
 /*
  *  EFI Configuration Table and GUID definitions
@@ -194,12 +209,15 @@ typedef void efi_reset_system_t (int reset_type, efi_status_t status,
 #define HCDP_TABLE_GUID	\
     EFI_GUID(  0xf951938d, 0x620b, 0x42ef, 0x82, 0x79, 0xa8, 0x4b, 0x79, 0x61, 0x78, 0x98 )
 
+#define UGA_IO_PROTOCOL_GUID \
+    EFI_GUID(  0x61a4d49e, 0x6f68, 0x4f1b, 0xb9, 0x22, 0xa8, 0x6e, 0xed, 0xb, 0x7, 0xa2 )
+
 typedef struct {
 	efi_guid_t guid;
 	unsigned long table;
 } efi_config_table_t;
 
-#define EFI_SYSTEM_TABLE_SIGNATURE 0x5453595320494249
+#define EFI_SYSTEM_TABLE_SIGNATURE ((u64)0x5453595320494249ULL)
 #define EFI_SYSTEM_TABLE_REVISION  ((1 << 16) | 00)
 
 typedef struct {
@@ -218,6 +236,13 @@ typedef struct {
 	unsigned long tables;
 } efi_system_table_t;
 
+struct efi_memory_map {
+	efi_memory_desc_t *phys_map;
+	efi_memory_desc_t *map;
+	int nr_map;
+	unsigned long desc_version;
+};
+
 /*
  * All runtime access to EFI goes through this structure:
  */
@@ -230,6 +255,7 @@ extern struct efi {
 	void *sal_systab;		/* SAL system table */
 	void *boot_info;		/* boot info table */
 	void *hcdp;			/* HCDP table */
+	void *uga;			/* UGA table */
 	efi_get_time_t *get_time;
 	efi_set_time_t *set_time;
 	efi_get_wakeup_time_t *get_wakeup_time;
@@ -239,6 +265,7 @@ extern struct efi {
 	efi_set_variable_t *set_variable;
 	efi_get_next_high_mono_count_t *get_next_high_mono_count;
 	efi_reset_system_t *reset_system;
+	efi_set_virtual_address_map_t *set_virtual_address_map;
 } efi;
 
 static inline int
@@ -260,12 +287,25 @@ efi_guid_unparse(efi_guid_t *guid, char *out)
 
 extern void efi_init (void);
 extern void efi_map_pal_code (void);
+extern void efi_map_memmap(void);
 extern void efi_memmap_walk (efi_freemem_callback_t callback, void *arg);
 extern void efi_gettimeofday (struct timespec *ts);
 extern void efi_enter_virtual_mode (void);	/* switch EFI to virtual mode, if possible */
 extern u64 efi_get_iobase (void);
 extern u32 efi_mem_type (unsigned long phys_addr);
 extern u64 efi_mem_attributes (unsigned long phys_addr);
+extern void efi_initialize_iomem_resources(struct resource *code_resource,
+					struct resource *data_resource);
+extern efi_status_t phys_efi_get_time(efi_time_t *tm, efi_time_cap_t *tc);
+extern unsigned long inline __init efi_get_time(void);
+extern int inline __init efi_set_rtc_mmss(unsigned long nowtime);
+extern struct efi_memory_map memmap;
+
+#ifdef CONFIG_EFI
+extern int efi_enabled;
+#else
+#define efi_enabled 0
+#endif
 
 /*
  * Variable Attributes

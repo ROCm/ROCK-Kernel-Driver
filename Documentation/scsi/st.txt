@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai Mäkisara (email
 Kai.Makisara@kolumbus.fi)
 
-Last modified: Sat Apr 12 20:26:37 2003 by makisara
+Last modified: Sun Nov  9 22:36:02 2003 by makisara
 
 
 BASICS
@@ -93,6 +93,24 @@ seconds, open fails with the errno value EIO. With O_NONBLOCK the
 device can be opened for writing even if there is a write protected
 tape in the drive (commands trying to write something return error if
 attempted).
+
+
+MINOR NUMBERS
+
+The tape driver currently supports 128 drives by default. This number
+can be increased by editing st.h and recompiling the driver if
+necessary. The upper limit is 2^17 drives if 4 modes for each drive
+are used.
+
+The minor numbers consist of the following bit fields:
+
+dev_upper non-rew mode dev-lower
+  20 -  8     7    6 5  4      0
+The non-rewind bit is always bit 7 (the uppermost bit in the lowermost
+byte). The bits defining the mode are next to the non-rewind bits. The
+remaining bits define the tape device number. This numbering is
+backward compatible with the numbering used when the minor number was
+only 8 bits wide.
 
 
 BSD AND SYS V SEMANTICS
