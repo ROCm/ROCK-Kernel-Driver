@@ -134,7 +134,6 @@
 #include <linux/proc_fs.h>
 #include <asm/io.h>
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 #include <linux/slab.h>
 #include "ini9100u.h"
@@ -583,27 +582,28 @@ int i91u_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 /*
  * Return the "logical geometry"
  */
-int i91u_biosparam(Scsi_Disk * disk, struct block_device *dev, int *info_array)
+int i91u_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int *info_array)
 {
 	HCS *pHcb;		/* Point to Host adapter control block */
 	TCS *pTcb;
 
-	pHcb = (HCS *) disk->device->host->base;
-	pTcb = &pHcb->HCS_Tcs[disk->device->id];
+	pHcb = (HCS *) sdev->host->base;
+	pTcb = &pHcb->HCS_Tcs[sdev->id];
 
 	if (pTcb->TCS_DrvHead) {
 		info_array[0] = pTcb->TCS_DrvHead;
 		info_array[1] = pTcb->TCS_DrvSector;
-		info_array[2] = (unsigned long)disk->capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
+		info_array[2] = (unsigned long)capacity / pTcb->TCS_DrvHead / pTcb->TCS_DrvSector;
 	} else {
 		if (pTcb->TCS_DrvFlags & TCF_DRV_255_63) {
 			info_array[0] = 255;
 			info_array[1] = 63;
-			info_array[2] = (unsigned long)disk->capacity / 255 / 63;
+			info_array[2] = (unsigned long)capacity / 255 / 63;
 		} else {
 			info_array[0] = 64;
 			info_array[1] = 32;
-			info_array[2] = (unsigned long)disk->capacity >> 11;
+			info_array[2] = (unsigned long)capacity >> 11;
 		}
 	}
 

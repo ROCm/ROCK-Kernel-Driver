@@ -119,7 +119,6 @@
 #include <linux/stat.h>
 
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 
 #define IN2000_VERSION    "1.33"
@@ -832,7 +831,7 @@ int i;
 
 static void in2000_intr (int irqnum, void * dev_id, struct pt_regs *ptregs)
 {
-struct Scsi_Host *instance;
+struct Scsi_Host *instance = dev_id;
 struct IN2000_hostdata *hostdata;
 Scsi_Cmnd *patch, *cmd;
 uchar asr, sr, phs, id, lun, *ucp, msg;
@@ -842,14 +841,6 @@ unsigned short *sp;
 unsigned short f;
 unsigned long flags;
 
-   for (instance = instance_list; instance; instance = instance->next) {
-      if (instance->irq == irqnum)
-         break;
-      }
-   if (!instance) {
-      printk("*** Hmm... interrupts are screwed up! ***\n");
-      return;
-      }
    hostdata = (struct IN2000_hostdata *)instance->hostdata;
 
 /* Get the spin_lock and disable further ints, for SMP */
@@ -2046,7 +2037,7 @@ char buf[32];
       write1_io(0,IO_FIFO_READ);             /* start fifo out in read mode */
       write1_io(0,IO_INTR_MASK);    /* allow all ints */
       x = int_tab[(switches & (SW_INT0 | SW_INT1)) >> SW_INT_SHIFT];
-      if (request_irq(x, in2000_intr, SA_INTERRUPT, "in2000", NULL)) {
+      if (request_irq(x, in2000_intr, SA_INTERRUPT, "in2000", instance)) {
          printk("in2000_detect: Unable to allocate IRQ.\n");
          detect_count--;
          continue;
@@ -2163,17 +2154,28 @@ char buf[32];
    return detect_count;
 }
 
+static int in2000_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, shost);
+	if (shost->io_port && shost->n_io_port)
+		release_region(shost->io_port, shost->n_io_port);
+	return 0;
+}
+
 
 /* NOTE: I lifted this function straight out of the old driver,
  *       and have not tested it. Presumably it does what it's
  *       supposed to do...
  */
 
-static int in2000_biosparam(Disk *disk, struct block_device *dev, int *iinfo)
+static int in2000_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev,
+		sector_t capacity, int *iinfo)
 {
 int size;
 
-   size  = disk->capacity;
+   size  = capacity;
    iinfo[0] = 64;
    iinfo[1] = 32;
    iinfo[2] = size >> 11;
@@ -2185,17 +2187,17 @@ int size;
    if (iinfo[2] > 1024) {
       iinfo[0] = 64;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 128;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 255;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
     return 0;
 }
@@ -2215,10 +2217,7 @@ Scsi_Cmnd *cmd;
 int x,i;
 static int stop = 0;
 
-   for (instance=instance_list; instance; instance=instance->next) {
-      if (instance->host_no == hn)
-         break;
-      }
+   instance = scsi_host_hn_get(hn);  
    if (!instance) {
       printk("*** Hmm... Can't find host #%d!\n",hn);
       return (-ESRCH);

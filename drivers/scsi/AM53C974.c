@@ -17,7 +17,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "AM53C974.h"
-#include "sd.h"
 
 /* AM53/79C974 (PCscsi) driver release 0.5
 

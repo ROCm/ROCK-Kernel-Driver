@@ -24,6 +24,9 @@ dep_tristate 'Amiga FFS file system support (EXPERIMENTAL)' CONFIG_AFFS_FS $CONF
 
 dep_tristate 'Apple Macintosh file system support (EXPERIMENTAL)' CONFIG_HFS_FS $CONFIG_EXPERIMENTAL
 
+dep_tristate 'BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)' CONFIG_BEFS_FS $CONFIG_EXPERIMENTAL
+dep_mbool '  Debug BeFS' CONFIG_BEFS_DEBUG $CONFIG_BEFS_FS
+
 dep_tristate 'BFS file system support (EXPERIMENTAL)' CONFIG_BFS_FS $CONFIG_EXPERIMENTAL
 
 tristate 'Ext3 journalling file system support' CONFIG_EXT3_FS

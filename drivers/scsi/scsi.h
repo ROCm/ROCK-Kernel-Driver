@@ -446,20 +446,6 @@ struct scatterlist *scsi_alloc_sgtable(Scsi_Cmnd *SCpnt, int gfp_mask);
 void scsi_free_sgtable(struct scatterlist *sgl, int index);
 
 /*
- * Prototypes for functions in scsi_dma.c
- */
-void scsi_resize_dma_pool(void);
-int scsi_init_minimal_dma_pool(void);
-void *scsi_malloc(unsigned int);
-int scsi_free(void *, unsigned int);
-
-/*
- * Prototypes for functions in scsi_merge.c
- */
-extern void scsi_initialize_merge_fn(Scsi_Device *SDpnt);
-extern int scsi_init_io(Scsi_Cmnd *SCpnt);
-
-/*
  * Prototypes for functions in scsi_lib.c
  */
 extern int scsi_maybe_unblock_host(Scsi_Device * SDpnt);
@@ -494,6 +480,7 @@ extern void scsi_do_cmd(Scsi_Cmnd *, const void *cmnd,
 			void (*done) (struct scsi_cmnd *),
 			int timeout, int retries);
 extern int scsi_dev_init(void);
+extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 
 /*
  * Newer request-based interfaces.

@@ -1467,6 +1467,7 @@ static int do_md_run(mddev_t * mddev)
 
 static int restart_array(mddev_t *mddev)
 {
+	struct gendisk *disk = disks[mdidx(mddev)];
 	int err;
 
 	/*
@@ -1482,7 +1483,7 @@ static int restart_array(mddev_t *mddev)
 			goto out;
 
 		mddev->ro = 0;
-		set_device_ro(mddev_to_kdev(mddev), 0);
+		set_disk_ro(disk, 0);
 
 		printk(KERN_INFO
 			"md: md%d switched to read-write mode.\n", mdidx(mddev));
@@ -1509,7 +1510,7 @@ out:
 static int do_md_stop(mddev_t * mddev, int ro)
 {
 	int err = 0;
-	kdev_t dev = mddev_to_kdev(mddev);
+	struct gendisk *disk = disks[mdidx(mddev)];
 
 	if (atomic_read(&mddev->active)>1) {
 		printk(STILL_IN_USE, mdidx(mddev));
@@ -1525,7 +1526,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			mddev->sync_thread = NULL;
 		}
 
-		invalidate_device(dev, 1);
+		invalidate_device(mk_kdev(disk->major, disk->first_minor), 1);
 
 		if (ro) {
 			err  = -ENXIO;
@@ -1534,11 +1535,11 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			mddev->ro = 1;
 		} else {
 			if (mddev->ro)
-				set_device_ro(dev, 0);
+				set_disk_ro(disk, 0);
 			if (mddev->pers->stop(mddev)) {
 				err = -EBUSY;
 				if (mddev->ro)
-					set_device_ro(dev, 1);
+					set_disk_ro(disk, 1);
 				goto out;
 			}
 			if (mddev->ro)
@@ -1556,7 +1557,7 @@ static int do_md_stop(mddev_t * mddev, int ro)
 			md_update_sb(mddev);
 		}
 		if (ro)
-			set_device_ro(dev, 1);
+			set_disk_ro(disk, 1);
 	}
 	/*
 	 * Free resources if final stop
@@ -2767,7 +2768,7 @@ static int is_mddev_idle(mddev_t *mddev)
 	idle = 1;
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		struct gendisk *disk = rdev->bdev->bd_disk;
-		curr_events = disk->reads + disk->writes - disk->sync_io;
+		curr_events = disk->read_sectors + disk->write_sectors - disk->sync_io;
 		if ((curr_events - rdev->last_events) > 32) {
 			rdev->last_events = curr_events;
 			idle = 0;

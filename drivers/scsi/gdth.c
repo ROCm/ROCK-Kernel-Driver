@@ -337,7 +337,6 @@
 #endif
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "gdth.h"
 
@@ -4512,26 +4511,27 @@ int gdth_eh_host_reset(Scsi_Cmnd *scp)
 }
 #endif
 
-int gdth_bios_param(Disk *disk,struct block_device *bdev,int *ip)
+int gdth_bios_param(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *ip)
 {
     unchar b, t;
     int hanum;
     gdth_ha_str *ha;
 
-    hanum = NUMDATA(disk->device->host)->hanum;
-    b = virt_ctr ? NUMDATA(disk->device->host)->busnum : disk->device->channel;
-    t = disk->device->id;
+    hanum = NUMDATA(sdev->host)->hanum;
+    b = virt_ctr ? NUMDATA(sdev->host)->busnum : sdev->channel;
+    t = sdev->id;
     TRACE2(("gdth_bios_param() ha %d bus %d target %d\n", hanum, b, t)); 
     ha = HADATA(gdth_ctr_tab[hanum]);
 
     if (b != ha->virt_bus || ha->hdr[t].heads == 0) {
         /* raw device or host drive without mapping information */
         TRACE2(("Evaluate mapping\n"));
-        gdth_eval_mapping(disk->capacity,&ip[2],&ip[0],&ip[1]);
+        gdth_eval_mapping(capacity,&ip[2],&ip[0],&ip[1]);
     } else {
         ip[0] = ha->hdr[t].heads;
         ip[1] = ha->hdr[t].secs;
-        ip[2] = disk->capacity / ip[0] / ip[1];
+        ip[2] = capacity / ip[0] / ip[1];
     }
 
     TRACE2(("gdth_bios_param(): %d heads, %d secs, %d cyls\n",

@@ -44,25 +44,18 @@
 #endif
 
 #ifndef ASM
-int generic_NCR5380_abort(Scsi_Cmnd *);
-int generic_NCR5380_detect(Scsi_Host_Template *);
-int generic_NCR5380_release_resources(struct Scsi_Host *);
-int generic_NCR5380_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
-int generic_NCR5380_bus_reset(Scsi_Cmnd *);
-int generic_NCR5380_host_reset(Scsi_Cmnd *);
-int generic_NCR5380_device_reset(Scsi_Cmnd *);
-int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
+static int generic_NCR5380_abort(Scsi_Cmnd *);
+static int generic_NCR5380_detect(Scsi_Host_Template *);
+static int generic_NCR5380_release_resources(struct Scsi_Host *);
+static int generic_NCR5380_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+static int generic_NCR5380_bus_reset(Scsi_Cmnd *);
+static int generic_NCR5380_host_reset(Scsi_Cmnd *);
+static int generic_NCR5380_device_reset(Scsi_Cmnd *);
+static int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
                      int length, int hostno, int inout);
-const char* generic_NCR5380_info(struct Scsi_Host *);
-#ifdef BIOSPARAM
-int generic_NCR5380_biosparam(Disk *, struct block_device *, int *);
-#endif
-
-int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int length, int hostno, int inout);
-
-#ifndef NULL
-#define NULL 0
-#endif
+static const char* generic_NCR5380_info(struct Scsi_Host *);
+static int generic_NCR5380_biosparam(Disk *, struct block_device *, sector_t, int *);
+static int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int length, int hostno, int inout);
 
 #ifndef CMD_PER_LUN
 #define CMD_PER_LUN 2
@@ -95,18 +88,13 @@ int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int leng
 #define __STRVAL(x) #x
 #define STRVAL(x) __STRVAL(x)
 
-#ifdef CONFIG_SCSI_G_NCR5380_PORT
+#ifndef CONFIG_SCSI_G_NCR5380_MEM
 
 #define NCR5380_map_config port
-
 #define NCR5380_map_type int
-
 #define NCR5380_map_name port
-
 #define NCR5380_instance_name io_port
-
 #define NCR53C400_register_offset 0
-
 #define NCR53C400_address_adjust 8
 
 #ifdef NCR53C400
@@ -122,27 +110,17 @@ int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int leng
 /* therefore CONFIG_SCSI_G_NCR5380_MEM */
 
 #define NCR5380_map_config memory
-
 #define NCR5380_map_type unsigned long
-
 #define NCR5380_map_name base
-
 #define NCR5380_instance_name base
-
 #define NCR53C400_register_offset 0x108
-
 #define NCR53C400_address_adjust 0
-
 #define NCR53C400_mem_base 0x3880
-
 #define NCR53C400_host_buffer 0x3900
-
 #define NCR5380_region_size 0x3a00
-
 
 #define NCR5380_read(reg) isa_readb(NCR5380_map_name + NCR53C400_mem_base + (reg))
 #define NCR5380_write(reg, value) isa_writeb(NCR5380_map_name + NCR53C400_mem_base + (reg), value)
-
 #endif
 
 #define NCR5380_implementation_fields \
@@ -155,7 +133,6 @@ int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int leng
     NCR5380_map_name = (NCR5380_map_type)((instance)->NCR5380_instance_name)
 
 #define NCR5380_intr generic_NCR5380_intr
-#define do_NCR5380_intr do_generic_NCR5380_intr
 #define NCR5380_queue_command generic_NCR5380_queue_command
 #define NCR5380_abort generic_NCR5380_abort
 #define NCR5380_bus_reset generic_NCR5380_bus_reset

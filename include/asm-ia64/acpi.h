@@ -97,17 +97,18 @@
 	} while (0)
 
 const char *acpi_get_sysname (void);
-int acpi_boot_init (char *cdline);
 int acpi_request_vector (u32 int_type);
 int acpi_get_prt (struct pci_vector_struct **vectors, int *count);
 int acpi_get_interrupt_model (int *type);
 int acpi_irq_to_vector (u32 irq);
 
-#ifdef CONFIG_DISCONTIGMEM
-#define NODE_ARRAY_INDEX(x)	((x) / 8)	/* 8 bits/char */
-#define NODE_ARRAY_OFFSET(x)	((x) % 8)	/* 8 bits/char */
-#define MAX_PXM_DOMAINS		(256)
-#endif /* CONFIG_DISCONTIGMEM */
+#ifdef CONFIG_ACPI_NUMA
+#include <asm/numa.h>
+/* Proximity bitmap length; _PXM is at most 255 (8 bit)*/
+#define MAX_PXM_DOMAINS (256)
+extern int __initdata pxm_to_nid_map[MAX_PXM_DOMAINS];
+extern int __initdata nid_to_pxm_map[NR_NODES];
+#endif
 
 #endif /*__KERNEL__*/
 

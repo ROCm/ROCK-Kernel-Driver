@@ -82,7 +82,6 @@ int eata_pio_release(struct Scsi_Host *);
     queuecommand:      eata_pio_queue,				\
     abort:             eata_pio_abort,				\
     reset:             eata_pio_reset,				\
-    bios_param:        scsicam_bios_param,			\
     unchecked_isa_dma: 1,	    /* True if ISA  */		\
     use_clustering:    ENABLE_CLUSTERING }
 

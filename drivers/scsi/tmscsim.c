@@ -228,7 +228,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <scsi/scsicam.h>
 
@@ -1439,12 +1438,13 @@ static int partsize(unsigned char *buf, unsigned long capacity,
  * Note:
  *   In contrary to other externally callable funcs (DC390_), we don't lock
  ***********************************************************************/
-int DC390_bios_param (Disk *disk, struct block_device *bdev, int geom[])
+int DC390_bios_param (struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[])
 {
     int heads, sectors, cylinders;
-    PACB pACB = (PACB) disk->device->host->hostdata;
+    PACB pACB = (PACB) sdev->host->hostdata;
     int ret_code = -1;
-    int size = disk->capacity;
+    int size = capacity;
     unsigned char *buf;
 
     if ((buf = scsi_bios_ptable(bdev)))
@@ -1475,9 +1475,10 @@ int DC390_bios_param (Disk *disk, struct block_device *bdev, int geom[])
     return (0);
 }
 #else
-int DC390_bios_param (Disk *disk, struct block_device *bdev, int geom[])
+int DC390_bios_param (struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[])
 {
-    return scsicam_bios_param (disk, bdev, geom);
+    return scsicam_bios_param (bdev, capacity, geom);
 };
 #endif
 

@@ -2343,8 +2343,7 @@ static int __init stl_initports(stlbrd_t *brdp, stlpanel_t *panelp)
 		portp->closing_wait = 30 * HZ;
 		portp->normaltermios = stl_deftermios;
 		portp->callouttermios = stl_deftermios;
-		portp->tqueue.routine = stl_offintr;
-		portp->tqueue.data = portp;
+		INIT_WORK(&portp->tqueue, stl_offintr, portp);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		portp->stats.brd = portp->brdnr;
@@ -4128,7 +4127,7 @@ static void stl_cd1400txisr(stlpanel_t *panelp, int ioaddr)
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
 		MOD_INC_USE_COUNT;
-		if (schedule_task(&portp->tqueue) == 0)
+		if (schedule_work(&portp->tqueue) == 0)
 			MOD_DEC_USE_COUNT;
 	}
 

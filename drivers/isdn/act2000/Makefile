@@ -7,5 +7,3 @@ obj-$(CONFIG_ISDN_DRV_ACT2000)	+= act2000.o
 # Multipart objects.
 
 act2000-objs	:= module.o capi.o act2000_isa.o
-
-include $(TOPDIR)/Rules.make

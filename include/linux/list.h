@@ -1,7 +1,7 @@
 #ifndef _LINUX_LIST_H
 #define _LINUX_LIST_H
 
-#if defined(__KERNEL__) || defined(_LVM_H_INCLUDE)
+#ifdef __KERNEL__
 
 #include <linux/prefetch.h>
 #include <asm/system.h>
@@ -319,6 +319,7 @@ static inline void list_splice_init(struct list_head *list,
 	for (pos = (head)->next, n = pos->next; pos != (head); \
 		pos = n, ({ read_barrier_depends(); 0;}), n = pos->next)
 
-#endif /* __KERNEL__ || _LVM_H_INCLUDE */
-
+#else
+#warning "don't include kernel headers in userspace"
+#endif /* __KERNEL__ */
 #endif

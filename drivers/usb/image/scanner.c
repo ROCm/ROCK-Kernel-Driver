@@ -364,18 +364,33 @@ irq_scanner(struct urb *urb)
 
 	struct scn_usb_data *scn;
 	unsigned char *data;
+	int status;
+
 	scn = urb->context;
 
 	data = &scn->button;
 	data += 0;		/* Keep gcc from complaining about unused var */
 
-	if (urb->status) {
+	switch (urb->status) {
+	case 0:
+		/* success */
+		break;
+	case -ECONNRESET:
+	case -ENOENT:
+	case -ESHUTDOWN:
+		/* this urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d", __FUNCTION__, urb->status);
 		return;
+	default:
+		dbg("%s - nonzero urb status received: %d", __FUNCTION__, urb->status);
 	}
 
 	dbg("irq_scanner(%d): data:%x", scn->scn_minor, *data);
 
-	return;
+	status = usb_submit_urb (urb, GFP_ATOMIC);
+	if (status)
+		err ("%s - usb_submit_urb failed with result %d",
+		     __FUNCTION__, status);
 }
 
 static int

@@ -182,6 +182,7 @@ struct cops_local
 	int nodeid;			/* Set to 1 once have nodeid. */
         unsigned char node_acquire;	/* Node ID when acquired. */
         struct atalk_addr node_addr;	/* Full node address */
+	spinlock_t lock;		/* RX/TX lock */
 };
 
 /* Index to functions, as function prototypes. */
@@ -322,6 +323,7 @@ static int __init cops_probe1(struct net_device *dev, int ioaddr)
 
         lp = (struct cops_local *)dev->priv;
         memset(lp, 0, sizeof(struct cops_local));
+        spinlock_init(&lp->lock);
 
 	/* Copy local board variable to lp struct. */
 	lp->board               = board;
@@ -759,9 +761,8 @@ static void cops_rx(struct net_device *dev)
         unsigned long flags;
 
 
-	save_flags(flags);
-        cli();  /* Disable interrupts. */
-
+	spin_lock_irqsave(&lp->lock, flags);
+	
         if(lp->board==DAYNA)
         {
                 outb(0, ioaddr);                /* Send out Zero length. */
@@ -779,7 +780,7 @@ static void cops_rx(struct net_device *dev)
                 if(boguscount==1000000)
                 {
                         printk(KERN_WARNING "%s: DMA timed out.\n",dev->name);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&lp->lock, flags);
                         return;
                 }
         }
@@ -814,7 +815,7 @@ static void cops_rx(struct net_device *dev)
         if(lp->board==DAYNA)
                 outb(1, ioaddr+DAYNA_INT_CARD);         /* Interrupt the card */
 
-        restore_flags(flags);  /* Restore interrupts. */
+        spin_unlock_irqrestore(&lp->lock, flags);  /* Restore interrupts. */
 
         /* Check for bad response length */
         if(pkt_len < 0 || pkt_len > MAX_LLAP_SIZE)
@@ -890,12 +891,13 @@ static int cops_send_packet(struct sk_buff *skb, struct net_device *dev)
 	 
 	netif_stop_queue(dev);
 
-	save_flags(flags);	
-	cli();	/* Disable interrupts. */
+	spin_lock_irqsave(&lp->lock, flags);
 	if(lp->board == DAYNA)	 /* Wait for adapter transmit buffer. */
-		while((inb(ioaddr+DAYNA_CARD_STATUS)&DAYNA_TX_READY)==0);
+		while((inb(ioaddr+DAYNA_CARD_STATUS)&DAYNA_TX_READY)==0)
+			cpu_relax();
 	if(lp->board == TANGENT) /* Wait for adapter transmit buffer. */
-		while((inb(ioaddr+TANG_CARD_STATUS)&TANG_TX_READY)==0);
+		while((inb(ioaddr+TANG_CARD_STATUS)&TANG_TX_READY)==0)
+			cpu_relax();
 
 	/* Output IO length. */
 	outb(skb->len, ioaddr);
@@ -915,7 +917,7 @@ static int cops_send_packet(struct sk_buff *skb, struct net_device *dev)
 	if(lp->board==DAYNA)	/* Dayna requires you kick the card */
 		outb(1, ioaddr+DAYNA_INT_CARD);
 
-	restore_flags(flags);	/* Restore interrupts. */
+	spin_unlock_irqrestore(&lp->lock, flags);	/* Restore interrupts. */
 
 	/* Done sending packet, update counters and cleanup. */
 	lp->stats.tx_packets++;

@@ -39,6 +39,16 @@
 #define __IA32_NR_sigreturn            119
 #define __IA32_NR_rt_sigreturn         173
 
+register double f16 asm ("f16"); register double f17 asm ("f17");
+register double f18 asm ("f18"); register double f19 asm ("f19");
+register double f20 asm ("f20"); register double f21 asm ("f21");
+register double f22 asm ("f22"); register double f23 asm ("f23");
+
+register double f24 asm ("f24"); register double f25 asm ("f25");
+register double f26 asm ("f26"); register double f27 asm ("f27");
+register double f28 asm ("f28"); register double f29 asm ("f29");
+register double f30 asm ("f30"); register double f31 asm ("f31");
+
 struct sigframe_ia32
 {
        int pretcode;
@@ -143,6 +153,282 @@ copy_siginfo_to_user32 (siginfo_t32 *to, siginfo_t *from)
 	return err;
 }
 
+
+/*
+ *  SAVE and RESTORE of ia32 fpstate info, from ia64 current state
+ *  Used in exception handler to pass the fpstate to the user, and restore
+ *  the fpstate while returning from the exception handler.
+ *
+ *    fpstate info and their mapping to IA64 regs:
+ *    fpstate    REG(BITS)      Attribute    Comments
+ *    cw         ar.fcr(0:12)                with bits 7 and 6 not used
+ *    sw         ar.fsr(0:15)
+ *    tag        ar.fsr(16:31)               with odd numbered bits not used
+ *                                           (read returns 0, writes ignored)
+ *    ipoff      ar.fir(0:31)   RO
+ *    cssel      ar.fir(32:47)  RO
+ *    dataoff    ar.fdr(0:31)   RO
+ *    datasel    ar.fdr(32:47)  RO
+ *
+ *    _st[(0+TOS)%8]   f8
+ *    _st[(1+TOS)%8]   f9                    (f8, f9 from ptregs)
+ *      : :            :                     (f10..f15 from live reg)
+ *      : :            :
+ *    _st[(7+TOS)%8]   f15                   TOS=sw.top(bits11:13)
+ *
+ *    status     Same as sw     RO
+ *    magic      0                           as X86_FXSR_MAGIC in ia32
+ *    mxcsr      Bits(7:15)=ar.fcr(39:47)
+ *               Bits(0:5) =ar.fsr(32:37)    with bit 6 reserved
+ *    _xmm[0..7] f16..f31                    (live registers)
+ *                                           with _xmm[0]
+ *                                             Bit(64:127)=f17(0:63)
+ *                                             Bit(0:63)=f16(0:63)
+ *    All other fields unused...
+ */
+
+#define __ldfe(regnum, x)						\
+({									\
+ 	register double __f__ asm ("f"#regnum);				\
+	__asm__ __volatile__ ("ldfe %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
+})
+
+#define __ldf8(regnum, x)						\
+({									\
+ 	register double __f__ asm ("f"#regnum);				\
+	__asm__ __volatile__ ("ldf8 %0=[%1] ;;" :"=f"(__f__): "r"(x));	\
+})
+
+#define __stfe(x, regnum)							\
+({										\
+ 	register double __f__ asm ("f"#regnum);					\
+	__asm__ __volatile__ ("stfe [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
+})
+
+#define __stf8(x, regnum)							\
+({										\
+ 	register double __f__ asm ("f"#regnum);					\
+	__asm__ __volatile__ ("stf8 [%0]=%1" :: "r"(x), "f"(__f__) : "memory");	\
+})
+
+static int
+save_ia32_fpstate_live (struct _fpstate_ia32 *save)
+{
+	struct task_struct *tsk = current;
+	struct pt_regs *ptp;
+	struct _fpreg_ia32 *fpregp;
+	char buf[32];
+	unsigned long fsr, fcr, fir, fdr;
+	unsigned long new_fsr;
+	unsigned long num128[2];
+	unsigned long mxcsr=0;
+	int fp_tos, fr8_st_map;
+
+	if (!access_ok(VERIFY_WRITE, save, sizeof(*save)))
+		return -EFAULT;
+
+	/* Readin fsr, fcr, fir, fdr and copy onto fpstate */
+	asm volatile ( "mov %0=ar.fsr;" : "=r"(fsr));
+	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
+	asm volatile ( "mov %0=ar.fir;" : "=r"(fir));
+	asm volatile ( "mov %0=ar.fdr;" : "=r"(fdr));
+	/*
+	 * We need to clear the exception state before calling the signal handler. Clear
+	 * the bits 15, bits 0-7 in fp status word. Similar to the functionality of fnclex
+	 * instruction.
+	 */
+	new_fsr = fsr & ~0x80ff;
+	asm volatile ( "mov ar.fsr=%0;" :: "r"(new_fsr));
+
+	__put_user(fcr & 0xffff, &save->cw);
+	__put_user(fsr & 0xffff, &save->sw);
+	__put_user((fsr>>16) & 0xffff, &save->tag);
+	__put_user(fir, &save->ipoff);
+	__put_user((fir>>32) & 0xffff, &save->cssel);
+	__put_user(fdr, &save->dataoff);
+	__put_user((fdr>>32) & 0xffff, &save->datasel);
+	__put_user(fsr & 0xffff, &save->status);
+
+	mxcsr = ((fcr>>32) & 0xff80) | ((fsr>>32) & 0x3f);
+	__put_user(mxcsr & 0xffff, &save->mxcsr);
+	__put_user( 0, &save->magic); //#define X86_FXSR_MAGIC   0x0000
+
+	/*
+	 * save f8 and f9  from pt_regs
+	 * save f10..f15 from live register set
+	 */
+	/*
+	 *  Find the location where f8 has to go in fp reg stack.  This depends on
+	 *  TOP(11:13) field of sw. Other f reg continue sequentially from where f8 maps
+	 *  to.
+	 */
+	fp_tos = (fsr>>11)&0x7;
+	fr8_st_map = (8-fp_tos)&0x7;
+	ptp = ia64_task_regs(tsk);
+	fpregp = (struct _fpreg_ia32 *)(((unsigned long)buf + 15) & ~15);
+	ia64f2ia32f(fpregp, &ptp->f8);
+	copy_to_user(&save->_st[(0+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	ia64f2ia32f(fpregp, &ptp->f9);
+	copy_to_user(&save->_st[(1+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+
+	__stfe(fpregp, 10);
+	copy_to_user(&save->_st[(2+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	__stfe(fpregp, 11);
+	copy_to_user(&save->_st[(3+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	__stfe(fpregp, 12);
+	copy_to_user(&save->_st[(4+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	__stfe(fpregp, 13);
+	copy_to_user(&save->_st[(5+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	__stfe(fpregp, 14);
+	copy_to_user(&save->_st[(6+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+	__stfe(fpregp, 15);
+	copy_to_user(&save->_st[(7+fr8_st_map)&0x7], fpregp, sizeof(struct _fpreg_ia32));
+
+	__stf8(&num128[0], 16);
+	__stf8(&num128[1], 17);
+	copy_to_user(&save->_xmm[0], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 18);
+	__stf8(&num128[1], 19);
+	copy_to_user(&save->_xmm[1], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 20);
+	__stf8(&num128[1], 21);
+	copy_to_user(&save->_xmm[2], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 22);
+	__stf8(&num128[1], 23);
+	copy_to_user(&save->_xmm[3], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 24);
+	__stf8(&num128[1], 25);
+	copy_to_user(&save->_xmm[4], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 26);
+	__stf8(&num128[1], 27);
+	copy_to_user(&save->_xmm[5], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 28);
+	__stf8(&num128[1], 29);
+	copy_to_user(&save->_xmm[6], num128, sizeof(struct _xmmreg_ia32));
+
+	__stf8(&num128[0], 30);
+	__stf8(&num128[1], 31);
+	copy_to_user(&save->_xmm[7], num128, sizeof(struct _xmmreg_ia32));
+	return 0;
+}
+
+static int
+restore_ia32_fpstate_live (struct _fpstate_ia32 *save)
+{
+	struct task_struct *tsk = current;
+	struct pt_regs *ptp;
+	unsigned int lo, hi;
+	unsigned long num128[2];
+	unsigned long num64, mxcsr;
+	struct _fpreg_ia32 *fpregp;
+	char buf[32];
+	unsigned long fsr, fcr;
+	int fp_tos, fr8_st_map;
+
+	if (!access_ok(VERIFY_READ, save, sizeof(*save)))
+		return(-EFAULT);
+
+	/*
+	 * Updating fsr, fcr, fir, fdr.
+	 * Just a bit more complicated than save.
+	 * - Need to make sure that we dont write any value other than the
+	 *   specific fpstate info
+	 * - Need to make sure that the untouched part of frs, fdr, fir, fcr
+	 *   should remain same while writing.
+	 * So, we do a read, change specific fields and write.
+	 */
+	asm volatile ( "mov %0=ar.fsr;" : "=r"(fsr));
+	asm volatile ( "mov %0=ar.fcr;" : "=r"(fcr));
+
+	__get_user(mxcsr, (unsigned int *)&save->mxcsr);
+	/* setting bits 0..5 8..12 with cw and 39..47 from mxcsr */
+	__get_user(lo, (unsigned int *)&save->cw);
+	num64 = mxcsr & 0xff10;
+	num64 = (num64 << 32) | (lo & 0x1f3f);
+	fcr = (fcr & (~0xff1000001f3f)) | num64;
+
+	/* setting bits 0..31 with sw and tag and 32..37 from mxcsr */
+	__get_user(lo, (unsigned int *)&save->sw);
+	__get_user(hi, (unsigned int *)&save->tag);
+	num64 = mxcsr & 0x3f;
+	num64 = (num64 << 16) | (hi & 0xffff);
+	num64 = (num64 << 16) | (lo & 0xffff);
+	fsr = (fsr & (~0x3fffffffff)) | num64;
+
+	asm volatile ( "mov ar.fsr=%0;" :: "r"(fsr));
+	asm volatile ( "mov ar.fcr=%0;" :: "r"(fcr));
+	/*
+	 * restore f8, f9 onto pt_regs
+	 * restore f10..f15 onto live registers
+	 */
+	/*
+	 *  Find the location where f8 has to go in fp reg stack.  This depends on
+	 *  TOP(11:13) field of sw. Other f reg continue sequentially from where f8 maps
+	 *  to.
+	 */
+	fp_tos = (fsr>>11)&0x7;
+	fr8_st_map = (8-fp_tos)&0x7;
+	fpregp = (struct _fpreg_ia32 *)(((unsigned long)buf + 15) & ~15);
+
+	ptp = ia64_task_regs(tsk);
+	copy_from_user(fpregp, &save->_st[(0+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	ia32f2ia64f(&ptp->f8, fpregp);
+	copy_from_user(fpregp, &save->_st[(1+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	ia32f2ia64f(&ptp->f9, fpregp);
+
+	copy_from_user(fpregp, &save->_st[(2+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(10, fpregp);
+	copy_from_user(fpregp, &save->_st[(3+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(11, fpregp);
+	copy_from_user(fpregp, &save->_st[(4+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(12, fpregp);
+	copy_from_user(fpregp, &save->_st[(5+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(13, fpregp);
+	copy_from_user(fpregp, &save->_st[(6+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(14, fpregp);
+	copy_from_user(fpregp, &save->_st[(7+fr8_st_map)&0x7], sizeof(struct _fpreg_ia32));
+	__ldfe(15, fpregp);
+
+	copy_from_user(num128, &save->_xmm[0], sizeof(struct _xmmreg_ia32));
+	__ldf8(16, &num128[0]);
+	__ldf8(17, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[1], sizeof(struct _xmmreg_ia32));
+	__ldf8(18, &num128[0]);
+	__ldf8(19, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[2], sizeof(struct _xmmreg_ia32));
+	__ldf8(20, &num128[0]);
+	__ldf8(21, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[3], sizeof(struct _xmmreg_ia32));
+	__ldf8(22, &num128[0]);
+	__ldf8(23, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[4], sizeof(struct _xmmreg_ia32));
+	__ldf8(24, &num128[0]);
+	__ldf8(25, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[5], sizeof(struct _xmmreg_ia32));
+	__ldf8(26, &num128[0]);
+	__ldf8(27, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[6], sizeof(struct _xmmreg_ia32));
+	__ldf8(28, &num128[0]);
+	__ldf8(29, &num128[1]);
+
+	copy_from_user(num128, &save->_xmm[7], sizeof(struct _xmmreg_ia32));
+	__ldf8(30, &num128[0]);
+	__ldf8(31, &num128[1]);
+	return 0;
+}
+
 static inline void
 sigact_set_handler (struct k_sigaction *sa, unsigned int handler, unsigned int restorer)
 {
@@ -170,13 +456,13 @@ ia32_rt_sigsuspend (sigset32_t *uset, unsigned int sigsetsize, struct sigscratch
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	{
 		oldset = current->blocked;
 		current->blocked = set;
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	/*
 	 * The return below usually returns to the signal handler.  We need to pre-set the
@@ -371,6 +657,9 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	int  err = 0;
 	unsigned long flag;
 
+	if (!access_ok(VERIFY_WRITE, sc, sizeof(*sc)))
+		return -EFAULT;
+
 	err |= __put_user((regs->r16 >> 32) & 0xffff, (unsigned int *)&sc->fs);
 	err |= __put_user((regs->r16 >> 48) & 0xffff, (unsigned int *)&sc->gs);
 	err |= __put_user((regs->r16 >> 16) & 0xffff, (unsigned int *)&sc->es);
@@ -397,6 +686,11 @@ setup_sigcontext_ia32 (struct sigcontext_ia32 *sc, struct _fpstate_ia32 *fpstate
 	err |= __put_user(regs->r12, &sc->esp_at_signal);
 	err |= __put_user((regs->r17 >> 16) & 0xffff, (unsigned int *)&sc->ss);
 
+	if ( save_ia32_fpstate_live(fpstate) < 0 )
+		err = -EFAULT;
+	else
+		err |= __put_user((u32)(u64)fpstate, &sc->fpstate);
+
 #if 0
 	tmp = save_i387(fpstate);
 	if (tmp < 0)
@@ -417,6 +711,9 @@ static int
 restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *peax)
 {
 	unsigned int err = 0;
+
+	if (!access_ok(VERIFY_READ, sc, sizeof(*sc)))
+		return(-EFAULT);
 
 #define COPY(ia64x, ia32x)	err |= __get_user(regs->ia64x, &sc->ia32x)
 
@@ -475,6 +772,16 @@ restore_sigcontext_ia32 (struct pt_regs *regs, struct sigcontext_ia32 *sc, int *
 		asm volatile ("mov ar.eflag=%0 ;;" :: "r"(flag));
 
 		regs->r1 = -1;	/* disable syscall checks, r1 is orig_eax */
+	}
+
+	{
+		struct _fpstate_ia32 *buf = NULL;
+		u32    fpstate_ptr;
+		err |= get_user(fpstate_ptr, &(sc->fpstate));
+		buf = (struct _fpstate_ia32 *)(u64)fpstate_ptr;
+		if (buf) {
+			err |= restore_ia32_fpstate_live(buf);
+		}
 	}
 
 #if 0
@@ -686,10 +993,10 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked = (sigset_t) set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigcontext_ia32(regs, &frame->sc, &eax))
 		goto badframe;
@@ -717,10 +1024,10 @@ sys32_rt_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, 
 		goto badframe;
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	current->blocked =  set;
 	recalc_sigpending();
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigcontext_ia32(regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;

@@ -24,12 +24,6 @@
  * be sent.
  */
 
-/* This has to be defined before some of the #includes below */
-
-#define MAJOR_NR  FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&swim_queue)
-
 #include <linux/stddef.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
@@ -83,6 +77,11 @@ static int floppy_count;
 
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
+
+#define MAJOR_NR  FLOPPY_MAJOR
+#define DEVICE_NAME "floppy"
+#define QUEUE (&swim_queue)
+#define CURRENT elv_next_request(&swim_queue)
 
 static char *drive_names[7] = {
 	"not installed",	/* DRV_NONE    */
@@ -524,13 +523,11 @@ static void start_request(struct floppy_state *fs)
 		return;
 	}
 	while (!blk_queue_empty(QUEUE) && fs->state == idle) {
-		if (MAJOR(CURRENT->rq_dev) != MAJOR_NR)
-			panic(DEVICE_NAME ": request list destroyed");
 		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
 			panic(DEVICE_NAME ": block not locked");
 #if 0
-		printk("do_fd_req: dev=%x cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
-		       kdev_t_to_nr(CURRENT->rq_dev), CURRENT->cmd,
+		printk("do_fd_req: dev=%s cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
+		       CURRENT->rq_disk->disk_name, CURRENT->cmd,
 		       CURRENT->sector, CURRENT->nr_sectors, CURRENT->buffer);
 		printk("           rq_status=%d errors=%d current_nr_sectors=%ld\n",
 		       CURRENT->rq_status, CURRENT->errors, CURRENT->current_nr_sectors);

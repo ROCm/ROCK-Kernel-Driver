@@ -35,7 +35,6 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/completion.h>
-#include <linux/tqueue.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>

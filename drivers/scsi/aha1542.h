@@ -140,7 +140,8 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt);
 static int aha1542_old_abort(Scsi_Cmnd * SCpnt);
 static int aha1542_old_reset(Scsi_Cmnd *, unsigned int);
 #endif
-static int aha1542_biosparam(Disk *, struct block_device *, int*);
+static int aha1542_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 #define AHA1542_MAILBOXES 8
 #define AHA1542_SCATTER 16

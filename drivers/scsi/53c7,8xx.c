@@ -241,7 +241,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "53c7,8xx.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <linux/stddef.h>
 
@@ -1153,7 +1152,6 @@ NCR53c7x0_init (struct Scsi_Host *host) {
 /* 
  * Function : static int normal_init(Scsi_Host_Template *tpnt, int board, 
  *	int chip, u32 base, int io_port, int irq, int dma, int pcivalid,
- *	unsigned char pci_bus, unsigned char pci_device_fn,
  *      struct pci_dev *pci_dev, long long options);
  *
  * Purpose : initializes a NCR53c7,8x0 based on base addresses,
@@ -1161,7 +1159,7 @@ NCR53c7x0_init (struct Scsi_Host *host) {
  *	
  *	Useful where a new NCR chip is backwards compatible with
  *	a supported chip, but the DEVICE ID has changed so it 
- *	doesn't show up when the autoprobe does a pcibios_find_device.
+ *	doesn't show up when the autoprobe does a pci_find_device.
  *
  * Inputs : tpnt - Template for this SCSI adapter, board - board level
  *	product, chip - 810, 820, or 825, bus - PCI bus, device_fn -
@@ -1174,7 +1172,6 @@ NCR53c7x0_init (struct Scsi_Host *host) {
 static int  __init 
 normal_init (Scsi_Host_Template *tpnt, int board, int chip, 
     u32 base, int io_port, int irq, int dma, int pci_valid, 
-    unsigned char pci_bus, unsigned char pci_device_fn,
     struct pci_dev *pci_dev, long long options)
 {
     struct Scsi_Host *instance;
@@ -1275,8 +1272,7 @@ normal_init (Scsi_Host_Template *tpnt, int board, int chip,
     hostdata->board = board;
     hostdata->chip = chip;
     if ((hostdata->pci_valid = pci_valid)) {
-	hostdata->pci_bus = pci_bus;
-	hostdata->pci_device_fn = pci_device_fn;
+	hostdata->pci_dev = pci_dev;
     }
 
     /*
@@ -1377,7 +1373,7 @@ normal_init (Scsi_Host_Template *tpnt, int board, int chip,
  *	
  *	Useful where a new NCR chip is backwards compatible with
  *	a supported chip, but the DEVICE ID has changed so it 
- *	doesn't show up when the autoprobe does a pcibios_find_device.
+ *	doesn't show up when the autoprobe does a pci_find_device.
  *
  * Inputs : tpnt - Template for this SCSI adapter, board - board level
  *	product, chip - 810, 820, or 825, bus - PCI bus, device_fn -
@@ -1511,7 +1507,7 @@ ncr_pci_init (Scsi_Host_Template *tpnt, int board, int chip,
     }
 
     return normal_init (tpnt, board, chip, (int) base, io_port, 
-	(int) irq, DMA_NONE, 1, bus, device_fn, pdev, options);
+	(int) irq, DMA_NONE, 1, pdev, options);
 }
 
 
@@ -5085,8 +5081,7 @@ intr_bf (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
     if ((hostdata->chip / 100) == 8) {
 	save_flags (flags);
 	cli();
-	tmp = pcibios_read_config_word (hostdata->pci_bus, 
-	    hostdata->pci_device_fn, PCI_STATUS, &pci_status);
+	tmp = pci_read_config_word (hostdata->pcidev, PCI_STATUS, &pci_status);
 	restore_flags (flags);
 	if (tmp == PCIBIOS_SUCCESSFUL) {
 	    if (pci_status & PCI_STATUS_REC_TARGET_ABORT) {

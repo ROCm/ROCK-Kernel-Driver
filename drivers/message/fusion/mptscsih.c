@@ -78,7 +78,6 @@
 #include <linux/reboot.h>	/* notifier code */
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/sd.h"
 
 #include "mptbase.h"
 #include "mptscsih.h"
@@ -1295,10 +1294,6 @@ mptscsih_detect(Scsi_Host_Template *tpnt)
 #endif
 				sh->this_id = this->pfacts[portnum].PortSCSIID;
 
-				/* OS entry to allow host drivers to force
-				 * a queue depth on a per device basis.
-				 */
-				sh->select_queue_depths = mptscsih_select_queue_depths;
 				/* Required entry.
 				 */
 				sh->unique_id = this->id;
@@ -3643,15 +3638,18 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
  *	This is anyones guess quite frankly.
  */
 int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-mptscsih_bios_param(Disk * disk, struct block_device *dev, int *ip)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
+mptscsih_bios_param(struct scsi_device * sdev, struct block_device *bdev,
+		sector_t capacity, int *ip)
+{
 #else
 mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
-#endif
 {
+	sector_t capacity = disk->capacity;
+#endif
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;				/* heads			*/
 	ip[1] = 32;				/* sectors			*/
 	if ((ip[2] = size >> 11) > 1024) {	/* cylinders, test for big disk */
@@ -3668,37 +3666,19 @@ mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
  *	Called once per device the bus scan. Use it to force the queue_depth
  *	member to 1 if a device does not support Q tags.
  */
-void
-mptscsih_select_queue_depths(struct Scsi_Host *sh, Scsi_Device *sdList)
+int
+mptscsih_slave_attach(Scsi_Device *device)
 {
-	struct scsi_device	*device;
 	VirtDevice		*pTarget;
-	MPT_SCSI_HOST		*hd;
-	int			 ii, max;
-
-	for (device = sdList; device != NULL; device = device->next) {
-
-		if (device->host != sh)
-			continue;
-
-		hd = (MPT_SCSI_HOST *) sh->hostdata;
-		if (hd == NULL)
-			continue;
-
-		if (hd->Targets != NULL) {
-			if (hd->is_spi)
-				max = MPT_MAX_SCSI_DEVICES;
-			else
-				max = MPT_MAX_FC_DEVICES<256 ? MPT_MAX_FC_DEVICES : 255;
-
-			for (ii=0; ii < max; ii++) {
-				pTarget = hd->Targets[ii];
-				if (pTarget && !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
-					device->queue_depth = 1;
-				}
-			}
-		}
+	pTarget = device->hostdata;
+	if (!device->tagged_supported ||
+	    !(pTarget->tflags & MPT_TARGET_FLAGS_Q_YES)) {
+		scsi_adjust_queue_depth(device, 0, 1);
+	} else {
+		scsi_adjust_queue_depth(device, MSG_SIMPLE_TAG,
+					       device->host->can_queue >> 1);
 	}
+	return 0;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

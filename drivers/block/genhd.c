@@ -40,7 +40,7 @@ struct blk_probe {
 	unsigned long range;
 	struct module *owner;
 	struct gendisk *(*get)(dev_t dev, int *part, void *data);
-	void (*lock)(dev_t, void *);
+	int (*lock)(dev_t, void *);
 	void *data;
 } *probes[MAX_BLKDEV];
 
@@ -52,7 +52,7 @@ static inline int dev_to_index(dev_t dev)
 
 void blk_register_region(dev_t dev, unsigned long range, struct module *module,
 		    struct gendisk *(*probe)(dev_t, int *, void *),
-		    void (*lock)(dev_t, void *), void *data)
+		    int (*lock)(dev_t, void *), void *data)
 {
 	int index = dev_to_index(dev);
 	struct blk_probe *p = kmalloc(sizeof(struct blk_probe), GFP_KERNEL);
@@ -97,10 +97,12 @@ static struct gendisk *exact_match(dev_t dev, int *part, void *data)
 	return p;
 }
 
-static void exact_lock(dev_t dev, void *data)
+static int exact_lock(dev_t dev, void *data)
 {
 	struct gendisk *p = data;
-	get_disk(p);
+	if (!get_disk(p))
+		return -1;
+	return 0;
 }
 
 /**
@@ -167,8 +169,11 @@ retry:
 		probe = p->get;
 		best = p->range;
 		*part = dev - p->dev;
-		if (p->lock)
-			p->lock(dev, data);
+		if (p->lock && p->lock(dev, data) < 0) {
+			if (owner)
+				__MOD_DEC_USE_COUNT(owner);
+			continue;
+		}
 		read_unlock(&gendisk_lock);
 		disk = probe(dev, part, data);
 		/* Currently ->owner protects _only_ ->probe() itself. */
@@ -289,6 +294,7 @@ EXPORT_SYMBOL(disk_devclass);
 static void disk_release(struct device *dev)
 {
 	struct gendisk *disk = dev->driver_data;
+	kfree(disk->random);
 	kfree(disk->part);
 	kfree(disk);
 }
@@ -316,11 +322,18 @@ struct gendisk *alloc_disk(int minors)
 		disk->disk_dev.driver_data = disk;
 		device_initialize(&disk->disk_dev);
 	}
+	rand_initialize_disk(disk);
 	return disk;
 }
 
 struct gendisk *get_disk(struct gendisk *disk)
 {
+	struct module *owner;
+	if (!disk->fops)
+		return NULL;
+	owner = disk->fops->owner;
+	if (owner && !try_inc_mod_count(owner))
+		return NULL;
 	atomic_inc(&disk->disk_dev.refcount);
 	return disk;
 }
@@ -334,3 +347,40 @@ void put_disk(struct gendisk *disk)
 EXPORT_SYMBOL(alloc_disk);
 EXPORT_SYMBOL(get_disk);
 EXPORT_SYMBOL(put_disk);
+
+void set_device_ro(struct block_device *bdev, int flag)
+{
+	struct gendisk *disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		p->policy = flag;
+	} else
+		disk->policy = flag;
+}
+
+void set_disk_ro(struct gendisk *disk, int flag)
+{
+	int i;
+	disk->policy = flag;
+	for (i = 0; i < disk->minors; i++)
+		disk->part[i].policy = flag;
+}
+
+int bdev_read_only(struct block_device *bdev)
+{
+	struct gendisk *disk;
+	if (!bdev)
+		return 0;
+	disk = bdev->bd_disk;
+	if (bdev->bd_contains != bdev) {
+		int part = bdev->bd_dev - MKDEV(disk->major, disk->first_minor);
+		struct hd_struct *p = &disk->part[part-1];
+		return p->policy;
+	} else
+		return disk->policy;
+}
+
+EXPORT_SYMBOL(bdev_read_only);
+EXPORT_SYMBOL(set_device_ro);
+EXPORT_SYMBOL(set_disk_ro);

@@ -62,54 +62,6 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 	usb_hcd_giveback_urb (&ohci->hcd, urb);
 }
 
-static void td_submit_urb (struct ohci_hcd *ohci, struct urb *urb);
-
-/* Report interrupt transfer completion, maybe reissue */
-static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
-{
-	struct urb_priv	*urb_priv = urb->hcpriv;
-	unsigned long	flags;
-
-// FIXME going away along with the rest of interrrupt automagic...
-
-	/* FIXME: MP race.  If another CPU partially unlinks
-	 * this URB (urb->status was updated, hasn't yet told
-	 * us to dequeue) before we call complete() here, an
-	 * extra "unlinked" completion will be reported...
-	 */
-
-	spin_lock_irqsave (&urb->lock, flags);
-	if (likely (urb->status == -EINPROGRESS))
-		urb->status = 0;
-	spin_unlock_irqrestore (&urb->lock, flags);
-
-	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
-			&& usb_pipein (urb->pipe))
-		pci_dma_sync_single (hc->hcd.pdev, urb->transfer_dma,
-				urb->transfer_buffer_length,
-				PCI_DMA_FROMDEVICE);
-
-#ifdef OHCI_VERBOSE_DEBUG
-	urb_print (urb, "INTR", usb_pipeout (urb->pipe));
-#endif
-	urb->complete (urb);
-
-	/* always requeued, but ED_SKIP if complete() unlinks.
-	 * EDs are removed from periodic table only at SOF intr.
-	 */
-	urb->actual_length = 0;
-	spin_lock_irqsave (&urb->lock, flags);
-	if (urb_priv->state != URB_DEL)
-		urb->status = -EINPROGRESS;
-	spin_unlock (&urb->lock);
-
-	/* syncing with PCI_DMA_TODEVICE is evidently trouble... */
-
-	spin_lock (&hc->lock);
-	td_submit_urb (hc, urb);
-	spin_unlock_irqrestore (&hc->lock, flags);
-}
-
 
 /*-------------------------------------------------------------------------*
  * ED handling functions
@@ -1022,22 +974,10 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td)
    		td_done (urb, td);
   		urb_priv->td_cnt++;
 
-		/* If all this urb's TDs are done, call complete().
-		 * Interrupt transfers are the only special case:
-		 * they're reissued, until "deleted" by usb_unlink_urb
-		 * (real work done in a SOF intr, by finish_unlinks).
-		 */
+		/* If all this urb's TDs are done, call complete() */
   		if (urb_priv->td_cnt == urb_priv->length) {
-			int	resubmit;
-
-			resubmit = usb_pipeint (urb->pipe)
-					&& (urb_priv->state != URB_DEL);
-
      			spin_unlock_irqrestore (&ohci->lock, flags);
-			if (resubmit)
-  				intr_resub (ohci, urb);
-  			else
-  				finish_urb (ohci, urb);
+  			finish_urb (ohci, urb);
   			spin_lock_irqsave (&ohci->lock, flags);
   		}
 

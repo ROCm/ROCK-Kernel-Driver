@@ -28,7 +28,7 @@ static int device_check(int host_no);
 #include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"
 
 typedef struct {
@@ -199,6 +199,8 @@ int imm_detect(Scsi_Host_Template * host)
 	    continue;
 	}
 
+	INIT_WORK(&imm_hosts[i].imm_tq, imm_interrupt, &imm_hosts[i]);
+	
 	host->can_queue = IMM_CAN_QUEUE;
 	host->sg_tablesize = imm_sg;
 	hreg = scsi_register(host, 0);
@@ -1115,15 +1117,16 @@ int imm_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
  * be done in sd.c.  Even if it gets fixed there, this will still
  * work.
  */
-int imm_biosparam(Disk * disk, struct block_device *dev, int ip[])
+int imm_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int ip[])
 {
     ip[0] = 0x40;
     ip[1] = 0x20;
-    ip[2] = ((unsigned long)disk->capacity + 1) / (ip[0] * ip[1]);
+    ip[2] = ((unsigned long)capacity + 1) / (ip[0] * ip[1]);
     if (ip[2] > 1024) {
 	ip[0] = 0xff;
 	ip[1] = 0x3f;
-	ip[2] = ((unsigned long)disk->capacity + 1) / (ip[0] * ip[1]);
+	ip[2] = ((unsigned long)capacity + 1) / (ip[0] * ip[1]);
     }
     return 0;
 }

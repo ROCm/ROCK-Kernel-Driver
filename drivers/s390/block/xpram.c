@@ -276,17 +276,13 @@ static unsigned long __init xpram_highest_page_index(void)
  */
 static int xpram_make_request(request_queue_t *q, struct bio *bio)
 {
-	xpram_device_t *xdev;
+	xpram_device_t *xdev = bio->bi_bdev->bd_disk->private_data;
 	struct bio_vec *bvec;
 	unsigned long index;
 	unsigned long page_addr;
 	unsigned long bytes;
 	int i;
 
-	if (MINOR(bio->bi_bdev->bd_dev) > xpram_devs)
-		/* No such device. */
-		goto fail;
-	xdev = xpram_devices + MINOR(bio->bi_bdev->bd_dev);
 	if ((bio->bi_sector & 3) != 0 || (bio->bi_size & 4095) != 0)
 		/* Request is not page-aligned. */
 		goto fail;
@@ -348,8 +344,8 @@ static int xpram_ioctl (struct inode *inode, struct file *filp,
 
 static struct block_device_operations xpram_devops =
 {
-	owner:   THIS_MODULE,
-	ioctl:   xpram_ioctl,
+	.owner	= THIS_MODULE,
+	.ioctl	= xpram_ioctl,
 };
 
 /*
@@ -419,9 +415,10 @@ static int __init xpram_setup_sizes(unsigned long pages)
 	return 0;
 }
 
+static struct request_queue xpram_queue;
+
 static int __init xpram_setup_blkdev(void)
 {
-	request_queue_t *q;
 	unsigned long offset;
 	int i, rc = -ENOMEM;
 
@@ -451,9 +448,8 @@ static int __init xpram_setup_blkdev(void)
 	 * Assign the other needed values: make request function, sizes and
 	 * hardsect size. All the minor devices feature the same value.
 	 */
-	q = BLK_DEFAULT_QUEUE(XPRAM_MAJOR);
-	blk_queue_make_request(q,xpram_make_request);
-	blk_queue_hardsect_size(q, 4096);
+	blk_queue_make_request(&xpram_queue, xpram_make_request);
+	blk_queue_hardsect_size(&xpram_queue, 4096);
 
 	/*
 	 * Setup device structures.
@@ -467,6 +463,8 @@ static int __init xpram_setup_blkdev(void)
 		disk->major = XPRAM_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &xpram_devops;
+		disk->private_data = &xpram_devices[i];
+		disk->queue = &xpram_queue;
 		sprintf(disk->disk_name, "slram%d", i);
 		set_capacity(disk, xpram_sizes[i] << 1);
 		add_disk(disk);

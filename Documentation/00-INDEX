@@ -28,8 +28,6 @@ IO-mapping.txt
 	- how to access I/O mapped memory from within device drivers.
 IRQ-affinity.txt
 	- how to select which CPU(s) handle which interrupt events on SMP.
-LVM-HOWTO
-	- info on setting up logical volume management (virtual disks etc.)
 README.DAC960
 	- info on Mylex DAC960/DAC1100 PCI RAID Controller Driver for Linux
 README.moxa

@@ -80,6 +80,7 @@ static struct acpi_driver acpi_ec_driver = {
 
 struct acpi_ec {
 	acpi_handle		handle;
+	unsigned long		uid;
 	unsigned long		gpe_bit;
 	acpi_generic_address	status_addr;
 	acpi_generic_address	command_addr;
@@ -90,9 +91,6 @@ struct acpi_ec {
 
 /* If we find an EC via the ECDT, we need to keep a ptr to its context */
 static struct acpi_ec	*ec_ecdt;
-/* compare this against UIDs in properly enumerated ECs to determine if we
-   have a dupe */
-static unsigned long		ecdt_uid = 0xFFFFFFFF;
 
 /* --------------------------------------------------------------------------
                              Transaction Management
@@ -297,48 +295,21 @@ struct acpi_ec_query_data {
 	u8			data;
 };
 
-
 static void
 acpi_ec_gpe_query (
-	void			*data)
+	void			*ec_cxt)
 {
-	struct acpi_ec_query_data *query_data = NULL;
+	struct acpi_ec		*ec = (struct acpi_ec *) ec_cxt;
+	u32			value = 0;
+	unsigned long		flags = 0;
 	static char		object_name[5] = {'_','Q','0','0','\0'};
 	const char		hex[] = {'0','1','2','3','4','5','6','7',
 				         '8','9','A','B','C','D','E','F'};
 
 	ACPI_FUNCTION_TRACE("acpi_ec_gpe_query");
 
-	if (!data)
-		return;
-
-	query_data = (struct acpi_ec_query_data *) data;
-
-	object_name[2] = hex[((query_data->data >> 4) & 0x0F)];
-	object_name[3] = hex[(query_data->data & 0x0F)];
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Evaluating %s\n", object_name));
-
-	acpi_evaluate_object(query_data->handle, object_name, NULL, NULL);
-
-	kfree(query_data);
-
-	return;
-}
-
-
-static void
-acpi_ec_gpe_handler (
-	void			*data)
-{
-	acpi_status		status = AE_OK;
-	struct acpi_ec		*ec = (struct acpi_ec *) data;
-	u32			value = 0;
-	unsigned long		flags = 0;
-	struct acpi_ec_query_data *query_data = NULL;
-
-	if (!ec)
-		return;
+	if (!ec_cxt)
+		goto end;	
 
 	spin_lock_irqsave(&ec->lock, flags);
 	acpi_hw_low_level_read(8, &value, &ec->command_addr, 0);
@@ -346,30 +317,42 @@ acpi_ec_gpe_handler (
 
 	/* TBD: Implement asynch events!
 	 * NOTE: All we care about are EC-SCI's.  Other EC events are
-	 *       handled via polling (yuck!).  This is because some systems
-	 *       treat EC-SCIs as level (versus EDGE!) triggered, preventing
-	 *       a purely interrupt-driven approach (grumble, grumble).
+	 * handled via polling (yuck!).  This is because some systems
+	 * treat EC-SCIs as level (versus EDGE!) triggered, preventing
+	 *  a purely interrupt-driven approach (grumble, grumble).
 	 */
 	if (!(value & ACPI_EC_FLAG_SCI))
-		return;
+		goto end;
 
 	if (acpi_ec_query(ec, &value))
-		return;
+		goto end;
+	
+	object_name[2] = hex[((value >> 4) & 0x0F)];
+	object_name[3] = hex[(value & 0x0F)];
 
-	query_data = kmalloc(sizeof(struct acpi_ec_query_data), GFP_ATOMIC);
-	if (!query_data)
-		return;
-	query_data->handle = ec->handle;
-	query_data->data = value;
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Evaluating %s\n", object_name));
 
-	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
-		acpi_ec_gpe_query, query_data);
-	if (ACPI_FAILURE(status))
-		kfree(query_data);
+	acpi_evaluate_object(ec->handle, object_name, NULL, NULL);
 
-	return;
+end:
+	acpi_enable_event(ec->gpe_bit, ACPI_EVENT_GPE, 0);
 }
 
+static void
+acpi_ec_gpe_handler (
+	void			*data)
+{
+	acpi_status		status = AE_OK;
+	struct acpi_ec		*ec = (struct acpi_ec *) data;
+
+	if (!ec)
+		return;
+
+	acpi_disable_event(ec->gpe_bit, ACPI_EVENT_GPE, 0);
+
+	status = acpi_os_queue_for_execution(OSD_PRIORITY_GPE,
+		acpi_ec_gpe_query, ec);
+}
 
 /* --------------------------------------------------------------------------
                              Address Space Management
@@ -559,6 +542,7 @@ acpi_ec_add (
 	memset(ec, 0, sizeof(struct acpi_ec));
 
 	ec->handle = device->handle;
+	ec->uid = -1;
 	ec->lock = SPIN_LOCK_UNLOCKED;
 	sprintf(acpi_device_name(device), "%s", ACPI_EC_DEVICE_NAME);
 	sprintf(acpi_device_class(device), "%s", ACPI_EC_CLASS);
@@ -567,10 +551,10 @@ acpi_ec_add (
 	/* Use the global lock for all EC transactions? */
 	acpi_evaluate_integer(ec->handle, "_GLK", NULL, &ec->global_lock);
 
-	/* If our UID matches ecdt_uid, we already found this EC via the
-	   ECDT. Abort. */
+	/* If our UID matches the UID for the ECDT-enumerated EC,
+	   we already found this EC, so abort. */
 	acpi_evaluate_integer(ec->handle, "_UID", NULL, &uid);
-	if (ecdt_uid == uid) {
+	if (ec_ecdt && ec_ecdt->uid == uid) {
 		result = -ENODEV;
 		goto end;
 	}
@@ -758,7 +742,12 @@ acpi_ec_ecdt_probe (void)
 		ec_ecdt->lock = SPIN_LOCK_UNLOCKED;
 		/* use the GL just to be safe */
 		ec_ecdt->global_lock = TRUE;
-		ecdt_uid = ecdt_ptr->uid;
+		ec_ecdt->uid = ecdt_ptr->uid;
+
+		status = acpi_get_handle(NULL, ecdt_ptr->ec_id, &ec_ecdt->handle);
+		if (ACPI_FAILURE(status)) {
+			goto error;
+		}
 
 		/*
 		 * Install GPE handler
@@ -783,7 +772,9 @@ acpi_ec_ecdt_probe (void)
 	return 0;
 
 error:
+	printk(KERN_ERR PREFIX "Could not use ECDT\n");
 	kfree(ec_ecdt);
+	ec_ecdt = NULL;
 
 	return -ENODEV;
 }
@@ -835,3 +826,4 @@ acpi_ec_exit (void)
 
 	return_VOID;
 }
+

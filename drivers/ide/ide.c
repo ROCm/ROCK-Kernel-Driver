@@ -406,7 +406,7 @@ int ide_end_request (ide_drive_t *drive, int uptodate, int nr_sectors)
 	}
 
 	if (!end_that_request_first(rq, uptodate, nr_sectors)) {
-		add_blkdev_randomness(major(rq->rq_dev));
+		add_disk_randomness(rq->rq_disk);
 		if (!blk_rq_tagged(rq))
 			blkdev_dequeue_request(rq);
 		else
@@ -878,13 +878,12 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	unsigned long block;
-	ide_hwif_t *hwif = HWIF(drive);
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
 #ifdef DEBUG
 	printk("%s: start_request: current=0x%08lx\n",
-		hwif->name, (unsigned long) rq);
+		HWIF(drive)->name, (unsigned long) rq);
 #endif
 
 	/* bail early if we've exceeded max_failures */
@@ -910,7 +909,7 @@ ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		block = 1;  /* redirect MBR access to EZ-Drive partn table */
 
 #if (DISK_RECOVERY_TIME > 0)
-	while ((read_timer() - hwif->last_time) < DISK_RECOVERY_TIME);
+	while ((read_timer() - HWIF(drive)->last_time) < DISK_RECOVERY_TIME);
 #endif
 
 	SELECT_DRIVE(drive);
@@ -1128,9 +1127,15 @@ queue_next:
 			break;
 		}
 
+		/*
+		 * we know that the queue isn't empty, but this can happen
+		 * if the q->prep_rq_fn() decides to kill a request
+		 */
 		rq = elv_next_request(&drive->queue);
-		if (!rq)
+		if (!rq) {
+			hwgroup->busy = !!ata_pending_commands(drive);
 			break;
+		}
 
 		if (!rq->bio && ata_pending_commands(drive))
 			break;
@@ -1515,10 +1520,8 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
-	unsigned int major = HWIF(drive)->major;
-	request_queue_t *q = &drive->queue;
-	struct list_head *queue_head = &q->queue_head;
 	DECLARE_COMPLETION(wait);
+	int insert_end = 1, err;
 
 #ifdef CONFIG_BLK_DEV_PDC4030
 	if (HWIF(drive)->chipset == ide_pdc4030 && rq->buffer != NULL)
@@ -1527,68 +1530,40 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	rq->errors = 0;
 	rq->rq_status = RQ_ACTIVE;
 
+	rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
+	rq->rq_disk = drive->disk;
+
 	/*
-	 * Aiee. This is ugly, but it gets called before "drive->disk"
-	 * has been initialized. Al will fix it, I'm sure.
+	 * we need to hold an extra reference to request for safe inspection
+	 * after completion
 	 */
-	if (drive->disk)
-		rq->rq_dev = mk_kdev(drive->disk->major, drive->disk->first_minor);
-	else {
-		printk("IDE init is ugly:");
-		dump_stack();
-		rq->rq_dev = mk_kdev(HWIF(drive)->major, (drive->select.b.unit) << PARTN_BITS);
+	if (action == ide_wait) {
+		rq->ref_count++;
+		rq->waiting = &wait;
 	}
 
-	rq->rq_disk = drive->disk;
-	if (action == ide_wait)
-		rq->waiting = &wait;
 	spin_lock_irqsave(&ide_lock, flags);
-	if (blk_queue_empty(q) || action == ide_preempt) {
-		if (action == ide_preempt)
-			hwgroup->rq = NULL;
-	} else {
-		if (action == ide_wait || action == ide_end) {
-			queue_head = queue_head->prev;
-		} else
-			queue_head = queue_head->next;
+	if (action == ide_preempt) {
+		hwgroup->rq = NULL;
+		insert_end = 0;
 	}
-	q->elevator.elevator_add_req_fn(q, rq, queue_head);
+	__elv_add_request(&drive->queue, rq, insert_end, 0);
 	ide_do_request(hwgroup, 0);
 	spin_unlock_irqrestore(&ide_lock, flags);
-	if (action == ide_wait) {
-		/* wait for it to be serviced */
-		wait_for_completion(&wait);
-		/* return -EIO if errors */
-		return rq->errors ? -EIO : 0;
-	}
-	return 0;
 
+	err = 0;
+	if (action == ide_wait) {
+		wait_for_completion(&wait);
+		if (rq->errors)
+			err = -EIO;
+
+		blk_put_request(rq);
+	}
+
+	return err;
 }
 
 EXPORT_SYMBOL(ide_do_drive_cmd);
-
-void ide_revalidate_drive (ide_drive_t *drive)
-{
-	set_capacity(drive->disk, current_capacity(drive));
-}
-
-EXPORT_SYMBOL(ide_revalidate_drive);
-
-/*
- * This routine is called to flush all partitions and partition tables
- * for a changed disk, and then re-read the new partition table.
- * If we are revalidating a disk because of a media change, then we
- * enter with usage == 0.  If we are using an ioctl, we automatically have
- * usage == 1 (we need an open channel to use an ioctl :-), so this
- * is our limit.
- */
-static int ide_revalidate_disk(struct gendisk *disk)
-{
-	ide_drive_t *drive = disk->private_data;
-	if (DRIVER(drive)->revalidate)
-		DRIVER(drive)->revalidate(drive);
-	return  0;
-}
 
 void ide_probe_module (void)
 {
@@ -1605,21 +1580,7 @@ EXPORT_SYMBOL(ide_probe_module);
 
 static int ide_open (struct inode * inode, struct file * filp)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	drive->usage++;
-	return DRIVER(drive)->open(inode, filp, drive);
-}
-
-/*
- * Releasing a block device means we sync() it, so that it can safely
- * be forgotten about...
- */
-static int ide_release (struct inode * inode, struct file * file)
-{
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
-	DRIVER(drive)->release(inode, file, drive);
-	drive->usage--;
-	return 0;
+	return -ENXIO;
 }
 
 static LIST_HEAD(ata_unused);
@@ -1810,12 +1771,12 @@ void ide_unregister (unsigned int index)
 	 * Remove us from the kernel's knowledge
 	 */
 	blk_unregister_region(MKDEV(hwif->major, 0), MAX_DRIVES<<PARTN_BITS);
-	unregister_blkdev(hwif->major, hwif->name);
 	for (i = 0; i < MAX_DRIVES; i++) {
 		struct gendisk *disk = hwif->drives[i].disk;
 		hwif->drives[i].disk = NULL;
 		put_disk(disk);
 	}
+	unregister_blkdev(hwif->major, hwif->name);
 	old_hwif			= *hwif;
 	init_hwif_data(index);	/* restore hwif data to pristine status */
 	hwif->hwgroup			= old_hwif.hwgroup;
@@ -2402,10 +2363,10 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
-static int ide_ioctl (struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
+			unsigned long arg)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
 	ide_settings_t *setting;
 	int err = 0;
 
@@ -2414,7 +2375,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			err = ide_read_setting(drive, setting);
 			return err >= 0 ? put_user(err, (long *) arg) : err;
 		} else {
-			if (inode->i_bdev != inode->i_bdev->bd_contains)
+			if (bdev != bdev->bd_contains)
 				return -EINVAL;
 			return ide_write_setting(drive, setting, arg);
 		}
@@ -2429,7 +2390,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->bios_head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->bios_sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (u16 *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(inode->i_bdev),
+			if (put_user((unsigned)get_start_sect(bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -2441,14 +2402,14 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(inode->i_bdev),
+			if (put_user((unsigned)get_start_sect(bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
 
 		case HDIO_OBSOLETE_IDENTITY:
 		case HDIO_GET_IDENTITY:
-			if (inode->i_bdev != inode->i_bdev->bd_contains)
+			if (bdev != bdev->bd_contains)
 				return -EINVAL;
 			if (drive->id == NULL)
 				return -ENOMSG;
@@ -2470,12 +2431,12 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 				return -EACCES;
 			switch(drive->media) {
 				case ide_disk:
-					return ide_taskfile_ioctl(drive, inode, file, cmd, arg);
+					return ide_taskfile_ioctl(drive, cmd, arg);
 #ifdef CONFIG_PKT_TASK_IOCTL
 				case ide_cdrom:
 				case ide_tape:
 				case ide_floppy:
-					return pkt_taskfile_ioctl(drive, inode, file, cmd, arg);
+					return pkt_taskfile_ioctl(drive, cmd, arg);
 #endif /* CONFIG_PKT_TASK_IOCTL */
 				default:
 					return -ENOMSG;
@@ -2485,12 +2446,12 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case HDIO_DRIVE_CMD:
 			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 				return -EACCES;
-			return ide_cmd_ioctl(drive, inode, file, cmd, arg);
+			return ide_cmd_ioctl(drive, cmd, arg);
 
 		case HDIO_DRIVE_TASK:
 			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 				return -EACCES;
-			return ide_task_ioctl(drive, inode, file, cmd, arg);
+			return ide_task_ioctl(drive, cmd, arg);
 
 		case HDIO_SCAN_HWIF:
 		{
@@ -2547,15 +2508,14 @@ static int ide_ioctl (struct inode *inode, struct file *file,
  *				} 
  *				HWIF(drive)->multiproc(drive);
  */
-				return file->f_op->ioctl(inode, file,
-								BLKRRPART, 0);
+				return ioctl_by_bdev(bdev, BLKRRPART, 0);
 			}
 			return 0;
 		}
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+			return scsi_cmd_ioctl(bdev, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
@@ -2572,19 +2532,11 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			return 0;
 
 		default:
-			if (drive->driver != NULL)
-				return DRIVER(drive)->ioctl(drive, inode, file, cmd, arg);
-			return -EPERM;
+			return -EINVAL;
 	}
 }
 
-static int ide_check_media_change(struct gendisk *disk)
-{
-	ide_drive_t *drive = disk->private_data;
-	if (drive->driver != NULL)
-		return DRIVER(drive)->media_change(drive);
-	return 0;
-}
+EXPORT_SYMBOL(generic_ide_ioctl);
 
 /*
  * stridx() returns the offset of c within s,
@@ -3159,11 +3111,6 @@ void __init ide_init_builtin_drivers (void)
 #endif
 }
 
-static int default_cleanup (ide_drive_t *drive)
-{
-	return ide_unregister_subdriver(drive);
-}
-
 static int default_standby (ide_drive_t *drive)
 {
 	return 0;
@@ -3205,27 +3152,6 @@ static ide_startstop_t default_error (ide_drive_t *drive, const char *msg, u8 st
 	return ide_error(drive, msg, stat);
 }
 
-static int default_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file,
-			  unsigned int cmd, unsigned long arg)
-{
-	return -EINVAL;
-}
-
-static int default_open (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-	drive->usage--;
-	return -EIO;
-}
-
-static void default_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
-{
-}
-
-static int default_check_media_change (ide_drive_t *drive)
-{
-	return 1;
-}
-
 static void default_pre_reset (ide_drive_t *drive)
 {
 }
@@ -3256,7 +3182,6 @@ static void setup_driver_defaults (ide_drive_t *drive)
 {
 	ide_driver_t *d = drive->driver;
 
-	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->standby == NULL)		d->standby = default_standby;
 	if (d->suspend == NULL)		d->suspend = default_suspend;
 	if (d->resume == NULL)		d->resume = default_resume;
@@ -3265,10 +3190,6 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->end_request == NULL)	d->end_request = default_end_request;
 	if (d->sense == NULL)		d->sense = default_sense;
 	if (d->error == NULL)		d->error = default_error;
-	if (d->ioctl == NULL)		d->ioctl = default_ioctl;
-	if (d->open == NULL)		d->open = default_open;
-	if (d->release == NULL)		d->release = default_release;
-	if (d->media_change == NULL)	d->media_change = default_check_media_change;
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
@@ -3369,7 +3290,7 @@ int ide_register_driver(ide_driver_t *driver)
 		list_del_init(&drive->list);
 		ata_attach(drive);
 	}
-	driver->gen_driver.name = driver->name;
+	driver->gen_driver.name = (char *) driver->name;
 	driver->gen_driver.bus = &ide_bus_type;
 	driver->gen_driver.remove = ide_drive_remove;
 	return driver_register(&driver->gen_driver);
@@ -3406,10 +3327,6 @@ EXPORT_SYMBOL(ide_unregister_driver);
 struct block_device_operations ide_fops[] = {{
 	.owner		= THIS_MODULE,
 	.open		= ide_open,
-	.release	= ide_release,
-	.ioctl		= ide_ioctl,
-	.media_changed	= ide_check_media_change,
-	.revalidate_disk= ide_revalidate_disk
 }};
 
 EXPORT_SYMBOL(ide_fops);

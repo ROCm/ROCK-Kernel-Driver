@@ -483,6 +483,35 @@ static int get_device_flags(unsigned char *vendor, unsigned char *model)
 }
 
 /**
+ * scsi_initialize_merge_fn() -ƣinitialize merge function for a host
+ * @sd:		host descriptor
+ */
+static void scsi_initialize_merge_fn(struct scsi_device *sd)
+{
+	request_queue_t *q = &sd->request_queue;
+	struct Scsi_Host *sh = sd->host;
+	u64 bounce_limit;
+
+	if (sh->highmem_io) {
+		if (sh->pci_dev && PCI_DMA_BUS_IS_PHYS) {
+			bounce_limit = sh->pci_dev->dma_mask;
+		} else {
+			/*
+			 * Platforms with virtual-DMA translation
+ 			 * hardware have no practical limit.
+			 */
+			bounce_limit = BLK_BOUNCE_ANY;
+		}
+	} else if (sh->unchecked_isa_dma) {
+		bounce_limit = BLK_BOUNCE_ISA;
+	} else {
+		bounce_limit = BLK_BOUNCE_HIGH;
+	}
+
+	blk_queue_bounce_limit(q, bounce_limit);
+}
+
+/**
  * scsi_alloc_sdev - allocate and setup a Scsi_Device
  *
  * Description:
@@ -1995,29 +2024,28 @@ static void scsi_scan_selected_lun(struct Scsi_Host *shost, uint channel,
 	sdevscan->scsi_level = scsi_find_scsi_level(channel, id, shost);
 	res = scsi_probe_and_add_lun(sdevscan, &sdev, NULL);
 	scsi_free_sdev(sdevscan);
-	if (res == SCSI_SCAN_LUN_PRESENT) {
-		BUG_ON(sdev == NULL);
 
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->init && sdt->dev_noticed)
-				(*sdt->init) ();
+	if (res != SCSI_SCAN_LUN_PRESENT) 
+		return;
 
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->attach) {
-				(*sdt->attach) (sdev);
-				if (sdev->attached) {
-					scsi_build_commandblocks(sdev);
-					if (sdev->current_queue_depth == 0)
-						printk(ALLOC_FAILURE_MSG,
-						       __FUNCTION__);
-				}
-			}
+	BUG_ON(sdev == NULL);
 
-		for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
-			if (sdt->finish && sdt->nr_dev)
-				(*sdt->finish) ();
-
+	scsi_build_commandblocks(sdev);
+	if (sdev->current_queue_depth == 0) {
+		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
+		return;
 	}
+
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->init && sdt->dev_noticed)
+			(*sdt->init) ();
+
+	for (sdt = scsi_devicelist; sdt; sdt = sdt->next)
+		if (sdt->attach)
+			(*sdt->attach) (sdev);
+
+	if (!sdev->attached)
+		scsi_release_commandblocks(sdev);
 }
 
 /**

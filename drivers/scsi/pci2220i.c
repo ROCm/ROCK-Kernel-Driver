@@ -2887,8 +2887,6 @@ int Pci2220i_Release (struct Scsi_Host *pshost)
     return 0;
 	}
 
-#include "sd.h"
-
 /****************************************************************
  *	Name:	Pci2220i_BiosParam
  *
@@ -2902,13 +2900,14 @@ int Pci2220i_Release (struct Scsi_Host *pshost)
  *	Returns:		zero.
  *
  ****************************************************************/
-int Pci2220i_BiosParam (Scsi_Disk *disk, struct block_device *dev, int geom[])
+int Pci2220i_BiosParam (struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int geom[])
 	{
 	POUR_DEVICE	pdev;
 
-	if ( !(HOSTDATA(disk->device->host))->atapi )
+	if ( !(HOSTDATA(sdev->host))->atapi )
 		{
-		pdev = &(HOSTDATA(disk->device->host)->device[disk->device->id]);
+		pdev = &(HOSTDATA(sdev->host)->device[sdev->id]);
 
 		geom[0] = pdev->heads;
 		geom[1] = pdev->sectors;

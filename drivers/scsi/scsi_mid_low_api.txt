@@ -70,8 +70,9 @@ The interface functions are listed below in alphabetical order.
 
 /**
  *      bios_param - fetch head, sector, cylinder info for a disk
- *      @sdkp: pointer to disk structure (defined in sd.h)
+ *      @sdev: pointer to scsi device context (defined in scsi.h)
  *      @bdev: pointer to block device context (defined in fs.h)
+ *	@capacity:  device size
  *      @params: three element array to place output:
  *              params[0] number of heads
  *              params[1] number of sectors
@@ -88,7 +89,8 @@ The interface functions are listed below in alphabetical order.
  *      pre-initialized with made up values just in case this function 
  *      doesn't output anything.
  **/
-    int bios_param(Scsi_Disk * sdkp, struct block_device *bdev, int params[3]);
+    int bios_param(struct scsi_device * sdev, struct block_device *bdev,
+    			sector_t capacity, int params[3]);
 
 
 /**
@@ -459,13 +461,6 @@ driver. Each scsi device has a pool of Scsi_Cmnd instances whose size
 is determined by select_queue_depths (or Scsi_Host::cmd_per_lun). There
 will be at least one instance of Scsi_Cmnd for each scsi device.
 The structure is defined in scsi.h
-
-Scsi_Disk
----------
-It is a bit strange that this structure is exposed to a lower level
-driver in the bios_param() function. It is defined in sd.h and is only
-relevant to the sd upper level driver. The sd driver invokes bios_param()
-is response to the HD_GETGEO and HD_GETGEO_BIG ioctls.
 
 
 Flow of control during initialization

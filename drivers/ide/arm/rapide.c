@@ -1,11 +1,7 @@
 /*
  * linux/drivers/ide/rapide.c
  *
- * Copyright (c) 1996-1998 Russell King.
- *
- * Changelog:
- *  08-06-1996	RMK	Created
- *  13-04-1998	RMK	Added manufacturer and product IDs
+ * Copyright (c) 1996-2002 Russell King.
  */
 
 #include <linux/module.h>
@@ -17,20 +13,14 @@
 
 #include <asm/ecard.h>
 
-static card_ids __init rapide_cids[] = {
-	{ MANU_YELLOWSTONE, PROD_YELLOWSTONE_RAPIDE32 },
-	{ 0xffff, 0xffff }
-};
-
-static struct expansion_card *ec[MAX_ECARDS];
-static int result[MAX_ECARDS];
-
-static inline int rapide_register(struct expansion_card *ec)
+static int __devinit
+rapide_probe(struct expansion_card *ec, const struct ecard_id *id)
 {
 	unsigned long port = ecard_address (ec, ECARD_MEMC, 0);
 	hw_regs_t hw;
+	int i, ret;
 
-	int i;
+	ecard_claim(ec);
 
 	memset(&hw, 0, sizeof(hw));
 
@@ -41,54 +31,53 @@ static inline int rapide_register(struct expansion_card *ec)
 	hw.io_ports[IDE_CONTROL_OFFSET] = port + 0x206;
 	hw.irq = ec->irq;
 
-	return ide_register_hw(&hw, NULL);
+	ret = ide_register_hw(&hw, NULL);
+
+	if (ret)
+		ecard_release(ec);
+	/*
+	 * this locks the driver in-core - remove this
+	 * comment and the two lines below when we can
+	 * safely remove interfaces.
+	 */
+	else
+		MOD_INC_USE_COUNT;
+
+	return ret;
 }
 
-int __init rapide_init(void)
+static void __devexit rapide_remove(struct expansion_card *ec)
 {
-	int i;
-
-	for (i = 0; i < MAX_ECARDS; i++)
-		ec[i] = NULL;
-
-	ecard_startfind();
-
-	for (i = 0; ; i++) {
-		if ((ec[i] = ecard_find(0, rapide_cids)) == NULL)
-			break;
-
-		ecard_claim(ec[i]);
-		result[i] = rapide_register(ec[i]);
-	}
-	for (i = 0; i < MAX_ECARDS; i++)
-		if (ec[i] && result[i] < 0) {
-			ecard_release(ec[i]);
-			ec[i] = NULL;
-	}
-	return 0;
+	/* need to do more */
+	ecard_release(ec);
 }
 
-#ifdef MODULE
+static struct ecard_id rapide_ids[] = {
+	{ MANU_YELLOWSTONE, PROD_YELLOWSTONE_RAPIDE32 },
+	{ 0xffff, 0xffff }
+};
+
+static struct ecard_driver rapide_driver = {
+	.probe		= rapide_probe,
+	.remove		= __devexit_p(rapide_remove),
+	.id_table	= rapide_ids,
+	.drv = {
+		.name	= "rapide",
+	},
+};
+
+static int __init rapide_init(void)
+{
+	return ecard_register_driver(&rapide_driver);
+}
+
+static void __exit rapide_exit(void)
+{
+	ecard_remove_driver(&rapide_driver);
+}
+
 MODULE_LICENSE("GPL");
+MODULE_DESCRIPTION("Yellowstone RAPIDE driver");
 
-int init_module (void)
-{
-	return rapide_init();
-}
-
-void cleanup_module (void)
-{
-	int i;
-
-	for (i = 0; i < MAX_ECARDS; i++)
-		if (ec[i]) {
-			unsigned long port;
-			port = ecard_address(ec[i], ECARD_MEMC, 0);
-
-			ide_unregister_port(port, ec[i]->irq, 16);
-			ecard_release(ec[i]);
-			ec[i] = NULL;
-		}
-}
-#endif
-
+module_init(rapide_init);
+module_exit(rapide_exit);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbget - ACPI Table get* routines
- *              $Revision: 80 $
+ *              $Revision: 81 $
  *
  *****************************************************************************/
 
@@ -386,7 +386,6 @@ acpi_tb_get_this_table (
 	table_info->pointer     = full_table;
 	table_info->length      = (ACPI_SIZE) header->length;
 	table_info->allocation  = allocation;
-	table_info->base_pointer = full_table;
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_INFO,
 		"Found table [%4.4s] at %8.8X%8.8X, mapped/copied to %p\n",

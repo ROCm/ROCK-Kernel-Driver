@@ -23,7 +23,6 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/acct.h>
 #include <linux/blkdev.h>
 #include <linux/quotaops.h>
@@ -465,11 +464,8 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 {
 	struct inode *inode;
 	struct block_device *bdev;
-	struct block_device_operations *bdops;
-	devfs_handle_t de;
 	struct super_block * s;
 	struct nameidata nd;
-	kdev_t dev;
 	int error = 0;
 	mode_t mode = FMODE_READ; /* we always need it ;-) */
 
@@ -490,15 +486,10 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	if (error)
 		goto out;
 	bdev = inode->i_bdev;
-	de = devfs_get_handle_from_inode (inode);
-	bdops = devfs_get_ops (de);         /*  Increments module use count  */
-	if (bdops) bdev->bd_op = bdops;
 	/* Done with lookups, semaphore down */
-	dev = to_kdev_t(bdev->bd_dev);
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
 	error = blkdev_get(bdev, mode, 0, BDEV_FS);
-	devfs_put_ops (de);   /*  Decrement module use count now we're safe  */
 	if (error)
 		goto out;
 	error = -EACCES;

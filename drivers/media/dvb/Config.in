@@ -1,0 +1,17 @@
+#
+# Multimedia device configuration
+#
+mainmenu_option next_comment
+comment 'Digital Video Broadcasting Devices'
+
+bool 'DVB For Linux' CONFIG_DVB
+
+if [ "$CONFIG_DVB" != "n" ]; then
+  source drivers/media/dvb/dvb-core/Config.in
+  source drivers/media/dvb/frontends/Config.in
+
+  comment 'Supported DVB Adapters'
+  source drivers/media/dvb/av7110/Config.in
+fi
+
+endmenu

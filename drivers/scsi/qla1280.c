@@ -270,7 +270,6 @@
 #include <linux/pci_ids.h>
 #endif
 
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #define UNIQUE_FW_NAME
@@ -1697,17 +1696,18 @@ qla1280_reset(Scsi_Cmnd * cmd, unsigned int flags)
  *   Return the disk geometry for the given SCSI device.
  **************************************************************************/
 int
-qla1280_biosparam(Disk * disk, struct block_device *dev, int geom[])
+qla1280_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[])
 {
 	int heads, sectors, cylinders;
 
 	heads = 64;
 	sectors = 32;
-	cylinders = (unsigned long)disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)capacity / (heads * sectors);
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = (unsigned long)disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)capacity / (heads * sectors);
 		/* if (cylinders > 1023)
 		   cylinders = 1023; */
 	}

@@ -100,9 +100,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
-
-#define MAJOR_NR MITSUMI_CDROM_MAJOR
-#define QUEUE (&mcd_queue)
 #include <linux/blk.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
@@ -117,6 +114,10 @@ static int mcd1xhold;
 /* Is the drive connected properly and responding?? */
 static int mcdPresent;
 static struct request_queue mcd_queue;
+
+#define MAJOR_NR MITSUMI_CDROM_MAJOR
+#define QUEUE (&mcd_queue)
+#define CURRENT elv_next_request(&mcd_queue)
 
 #define QUICK_LOOP_DELAY udelay(45)	/* use udelay */
 #define QUICK_LOOP_COUNT 20

@@ -1031,7 +1031,7 @@ int gdth_reset(Scsi_Cmnd *);
 #endif
 const char *gdth_info(struct Scsi_Host *);
 
-int gdth_bios_param(Disk *,struct block_device *,int *);
+int gdth_bios_param(struct scsi_device *,struct block_device *,sector_t,int *);
 int gdth_proc_info(char *,char **,off_t,int,int,int);
 int gdth_eh_abort(Scsi_Cmnd *scp);
 int gdth_eh_device_reset(Scsi_Cmnd *scp);

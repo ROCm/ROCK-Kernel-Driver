@@ -14,7 +14,8 @@ int sim710_abort(Scsi_Cmnd * SCpnt);
 int sim710_bus_reset(Scsi_Cmnd * SCpnt);
 int sim710_dev_reset(Scsi_Cmnd * SCpnt);
 int sim710_host_reset(Scsi_Cmnd * SCpnt);
-int sim710_biosparam(Disk *, struct block_device *, int*);
+int sim710_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int*);
 #ifdef MODULE
 int sim710_release(struct Scsi_Host *);
 #else
@@ -32,7 +33,6 @@ int sim710_release(struct Scsi_Host *);
 		      eh_device_reset_handler:	sim710_dev_reset,	\
 		      eh_bus_reset_handler:	sim710_bus_reset,	\
 		      eh_host_reset_handler:	sim710_host_reset,	\
-		      bios_param:		scsicam_bios_param,	\
 		      can_queue:		8,		 	\
 		      this_id:			7, 			\
 		      sg_tablesize:		128,		 	\

@@ -1781,14 +1781,13 @@ fail:
 }
 #endif    /* end of big comment block around old_abort + old_reset */
 
-#include "sd.h"
-
-static int aha1542_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip)
+static int aha1542_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev, sector_t capacity, int *ip)
 {
 	int translation_algorithm;
-	int size = disk->capacity;
+	int size = capacity;
 
-	translation_algorithm = HOSTDATA(disk->device->host)->bios_translation;
+	translation_algorithm = HOSTDATA(sdev->host)->bios_translation;
 
 	if ((size >> 11) > 1024 && translation_algorithm == BIOS_TRANSLATION_25563) {
 		/* Please verify that this is the same as what DOS returns */

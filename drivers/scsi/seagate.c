@@ -104,7 +104,6 @@
 #include "seagate.h"
 #include <linux/stat.h>
 #include <asm/uaccess.h>
-#include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
 #ifdef DEBUG
@@ -1687,6 +1686,14 @@ static int seagate_st0x_host_reset(Scsi_Cmnd *SCpnt)
 static int seagate_st0x_device_reset(Scsi_Cmnd *SCpnt)
 {
 	return FAILED;
+}
+
+static int seagate_st0x_release(struct Scsi_Host *shost)
+{
+	if (shost->irq)
+		free_irq(shost->irq, shost);
+	release_region(shost->io_port, shost->n_io_port);
+	return 0;
 }
 
 /* Eventually this will go into an include file, but this will be later */

@@ -48,7 +48,6 @@
 	release:        	cciss_scsi_release,		\
 	proc_info:           	cciss_scsi_proc_info,		\
 	queuecommand:   	cciss_scsi_queue_command,	\
-	bios_param:     	scsicam_bios_param,		\
 	can_queue:      	SCSI_CCISS_CAN_QUEUE,		\
 	this_id:        	7,				\
 	sg_tablesize:   	MAXSGENTRIES, 			\

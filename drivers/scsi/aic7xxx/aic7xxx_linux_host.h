@@ -47,7 +47,8 @@ int		 ahc_linux_queue(Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 int		 ahc_linux_detect(Scsi_Host_Template *);
 int		 ahc_linux_release(struct Scsi_Host *);
 const char	*ahc_linux_info(struct Scsi_Host *);
-int		 ahc_linux_biosparam(Disk *, struct block_device *, int[]);
+int		 ahc_linux_biosparam(struct scsi_device *,
+			struct block_device *, sector_t, int[]);
 int		 ahc_linux_bus_reset(Scsi_Cmnd *);
 int		 ahc_linux_dev_reset(Scsi_Cmnd *);
 int		 ahc_linux_abort(Scsi_Cmnd *);
@@ -63,22 +64,14 @@ int		 ahc_linux_abort(Scsi_Cmnd *);
  * to do with card config are filled in after the card is detected.
  */
 #define AIC7XXX	{						\
-	module: NULL,						\
-	proc_dir: NULL,						\
 	proc_info: ahc_linux_proc_info,				\
-	name: NULL,						\
 	detect: ahc_linux_detect,				\
 	release: ahc_linux_release,				\
 	info: ahc_linux_info,					\
-	command: NULL,						\
 	queuecommand: ahc_linux_queue,				\
-	eh_strategy_handler: NULL,				\
 	eh_abort_handler: ahc_linux_abort,			\
 	eh_device_reset_handler: ahc_linux_dev_reset,		\
 	eh_bus_reset_handler: ahc_linux_bus_reset,		\
-	eh_host_reset_handler: NULL,				\
-	abort: NULL,						\
-	reset: NULL,						\
 	slave_attach: ahc_linux_slave_attach,			\
 	bios_param: AIC7XXX_BIOSPARAM,				\
 	can_queue: 253,		/* max simultaneous cmds      */\

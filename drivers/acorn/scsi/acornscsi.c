@@ -3132,7 +3132,6 @@ static Scsi_Host_Template acornscsi_template = {
 	.queuecommand		= acornscsi_queuecmd,
 	.abort			= acornscsi_abort,
 	.reset			= acornscsi_reset,
-	.bios_param		= scsicam_bios_param,
 	.can_queue		= 16,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,

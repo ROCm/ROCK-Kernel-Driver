@@ -3014,7 +3014,7 @@ static void DAC960_V1_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      complete(Command->Completion);
 	      Command->Completion = NULL;
 	    }
-	  add_blkdev_randomness(DAC960_MAJOR + Controller->ControllerNumber);
+	  add_disk_randomness(Controller->disks[Command->LogicalDriveNumber]);
 	}
       else if ((CommandStatus == DAC960_V1_IrrecoverableDataError ||
 		CommandStatus == DAC960_V1_BadDataEncountered) &&
@@ -4120,7 +4120,7 @@ static void DAC960_V2_ProcessCompletedCommand(DAC960_Command_T *Command)
 	      complete(Command->Completion);
 	      Command->Completion = NULL;
 	    }
-	  add_blkdev_randomness(DAC960_MAJOR + Controller->ControllerNumber);
+	  add_disk_randomness(Controller->disks[Command->LogicalDriveNumber]);
 	}
       else if (Command->V2.RequestSense.SenseKey
 	       == DAC960_SenseKey_MediumError &&

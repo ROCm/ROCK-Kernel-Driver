@@ -152,11 +152,6 @@
 #include <asm/uaccess.h>
 
 
-#define MAJOR_NR FLOPPY_MAJOR
-#define FLOPPY_DMA 0
-#define DEVICE_NAME "floppy"
-#define DEVICE_NR(device) ( (minor(device) & 3) | ((minor(device) & 0x80 ) >> 5 ))
-#define QUEUE (&floppy_queue)
 #include <linux/blk.h>
 
 /* Note: FD_MAX_UNITS could be redefined to 2 for the Atari (with
@@ -181,6 +176,12 @@
 #endif
 
 static struct request_queue floppy_queue;
+
+#define MAJOR_NR FLOPPY_MAJOR
+#define FLOPPY_DMA 0
+#define DEVICE_NAME "floppy"
+#define QUEUE (&floppy_queue)
+#define CURRENT elv_next_request(&floppy_queue)
 
 /* Disk types: DD */
 static struct archy_disk_type {
@@ -1208,8 +1209,8 @@ static void redo_fd_request(void)
 	int device, drive, type;
 	struct archy_floppy_struct *floppy;
 
-	DPRINT(("redo_fd_request: CURRENT=%08lx CURRENT->rq_dev=%04x CURRENT->sector=%ld\n",
-		(unsigned long) CURRENT, CURRENT ? CURRENT->rq_dev : 0,
+	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
+		CURRENT, CURRENT ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0));
 
 repeat:
@@ -1217,13 +1218,6 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	if (major(CURRENT->rq_dev) != MAJOR_NR)
-		panic(DEVICE_NAME ": request list destroyed");
-
-	if (CURRENT->bh) {
-		if (!buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
-	}
 	device = minor(CURRENT->rq_dev);
 	drive = device & 3;
 	type = device >> 2;

@@ -337,11 +337,6 @@ dasd_state_known_to_new(dasd_device_t * device)
 	/* Forget the discipline information. */
 	device->discipline = NULL;
 	device->state = DASD_STATE_NEW;
-
-	/* Forget the block device */
-	bdev = bdget(MKDEV(device->gdp->major, device->gdp->first_minor));
-	bdput(bdev);
-	bdput(bdev);
 }
 
 /*
@@ -428,17 +423,6 @@ dasd_state_accept_to_basic(dasd_device_t * device)
 }
 
 /*
- * get the kdev_t of a device 
- * FIXME: remove this when no longer needed
- */
-static inline kdev_t
-dasd_partition_to_kdev_t(dasd_device_t *device, unsigned int partition)
-{
-	return mk_kdev(device->gdp->major, device->gdp->first_minor+partition);
-}
-
-
-/*
  * Setup block device.
  */
 static inline int
@@ -449,8 +433,6 @@ dasd_state_accept_to_ready(dasd_device_t * device)
 
 	devmap = dasd_devmap_from_devno(device->devinfo.devno);
 	if (devmap->features & DASD_FEATURE_READONLY) {
-		for (i = 0; i < (1 << DASD_PARTN_BITS); i++)
-			set_device_ro(dasd_partition_to_kdev_t(device, i), 1);
 		device->ro_flag = 1;
 		DEV_MESSAGE (KERN_WARNING, device, "%s",
 			     "setting read-only mode ");
@@ -1496,7 +1478,7 @@ dasd_end_request(struct request *req, int uptodate)
 {
 	if (end_that_request_first(req, uptodate, req->hard_nr_sectors))
 		BUG();
-	add_blkdev_randomness(major(req->rq_dev));
+	add_disk_randomness(req->rq_disk);
 	end_that_request_last(req);
 	return;
 }
@@ -2178,10 +2160,10 @@ dasd_release(struct inode *inp, struct file *filp)
 
 struct
 block_device_operations dasd_device_operations = {
-	owner:THIS_MODULE,
-	open:dasd_open,
-	release:dasd_release,
-	ioctl:dasd_ioctl,
+	.owner		= THIS_MODULE,
+	.open		= dasd_open,
+	.release	= dasd_release,
+	.ioctl		= dasd_ioctl,
 };
 
 

@@ -316,7 +316,7 @@ static void hpt366_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 #endif
 
 	reg2 = pci_bus_clock_list(speed,
-		(struct chipset_bus_clock_list_entry *) dev->driver_data);
+		(struct chipset_bus_clock_list_entry *) pci_get_drvdata(dev));
 	/*
 	 * Disable on-chip PIO FIFO/buffer
 	 *  (to avoid problems handling I/O errors later)
@@ -369,7 +369,7 @@ static void hpt370_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 
 	list_conf = pci_bus_clock_list(speed, 
 				       (struct chipset_bus_clock_list_entry *)
-				       dev->driver_data);
+				       pci_get_drvdata(dev));
 
 	pci_read_config_dword(dev, drive_pci, &drive_conf);
 	list_conf = (list_conf & ~conf_mask) | (drive_conf & conf_mask);
@@ -401,7 +401,7 @@ static void hpt372_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 					
 	list_conf = pci_bus_clock_list(speed,
 			(struct chipset_bus_clock_list_entry *)
-					dev->driver_data);
+					pci_get_drvdata(dev));
 	pci_read_config_dword(dev, drive_pci, &drive_conf);
 	list_conf = (list_conf & ~conf_mask) | (drive_conf & conf_mask);
 	if (speed < XFER_MW_DMA_0)
@@ -841,7 +841,7 @@ static int __init init_hpt37x(struct pci_dev *dev)
 	 * don't like to use the PLL because it will cause glitches
 	 * on PRST/SRST when the HPT state engine gets reset.
 	 */
-	if (dev->driver_data) 
+	if (pci_get_drvdata(dev)) 
 		goto init_hpt37X_done;
 	
 	/*
@@ -923,7 +923,7 @@ static int __init init_hpt366 (struct pci_dev *dev)
 			break;
 	}
 
-	if (!dev->driver_data)
+	if (!pci_get_drvdata(dev))
 	{
 		printk(KERN_ERR "hpt366: unknown bus timing.\n");
 		return -EOPNOTSUPP;

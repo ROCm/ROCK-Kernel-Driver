@@ -318,27 +318,27 @@ static void bt3c_receive(bt3c_info_t *info)
 			if (info->rx_count == 0) {
 
 				int dlen;
-				hci_event_hdr *eh;
-				hci_acl_hdr *ah;
-				hci_sco_hdr *sh;
+				struct hci_event_hdr *eh;
+				struct hci_acl_hdr *ah;
+				struct hci_sco_hdr *sh;
 
 				switch (info->rx_state) {
 
 				case RECV_WAIT_EVENT_HEADER:
-					eh = (hci_event_hdr *)(info->rx_skb->data);
+					eh = (struct hci_event_hdr *)(info->rx_skb->data);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = eh->plen;
 					break;
 
 				case RECV_WAIT_ACL_HEADER:
-					ah = (hci_acl_hdr *)(info->rx_skb->data);
+					ah = (struct hci_acl_hdr *)(info->rx_skb->data);
 					dlen = __le16_to_cpu(ah->dlen);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = dlen;
 					break;
 
 				case RECV_WAIT_SCO_HEADER:
-					sh = (hci_sco_hdr *)(info->rx_skb->data);
+					sh = (struct hci_sco_hdr *)(info->rx_skb->data);
 					info->rx_state = RECV_WAIT_DATA;
 					info->rx_count = sh->dlen;
 					break;

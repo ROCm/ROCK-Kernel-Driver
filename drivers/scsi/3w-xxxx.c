@@ -186,7 +186,6 @@ MODULE_LICENSE("GPL");
 
 #define __3W_C			/* let 3w-xxxx.h know it is use */
 
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 
@@ -2092,22 +2091,23 @@ int tw_reset_sequence(TW_Device_Extension *tw_dev)
 } /* End tw_reset_sequence() */
 
 /* This funciton returns unit geometry in cylinders/heads/sectors */
-int tw_scsi_biosparam(Disk *disk, struct block_device *dev, int geom[]) 
+int tw_scsi_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[]) 
 {
 	int heads, sectors, cylinders;
 	TW_Device_Extension *tw_dev;
 	
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_biosparam()\n");
-	tw_dev = (TW_Device_Extension *)disk->device->host->hostdata;
+	tw_dev = (TW_Device_Extension *)sdev->host->hostdata;
 
 	heads = 64;
 	sectors = 32;
-	cylinders = (unsigned long)disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)capacity / (heads * sectors);
 
-	if (disk->capacity >= 0x200000) {
+	if (capacity >= 0x200000) {
 		heads = 255;
 		sectors = 63;
-		cylinders = (unsigned long)disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)capacity / (heads * sectors);
 	}
 
 	dprintk(KERN_NOTICE "3w-xxxx: tw_scsi_biosparam(): heads = %d, sectors = %d, cylinders = %d\n", heads, sectors, cylinders);

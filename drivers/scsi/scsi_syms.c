@@ -22,7 +22,6 @@
 #include <scsi/scsi_ioctl.h>
 #include "hosts.h"
 
-#include "sd.h"
 #include <scsi/scsicam.h>
 
 /*

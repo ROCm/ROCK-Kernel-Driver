@@ -18,7 +18,7 @@
  *	 - Alex Davis <letmein@erols.com> Fix problem where partition info
  *	   not being read in sd_open. Fix problem where removable media 
  *	   could be ejected after sd_open.
- *	 - Douglas Gilbert <dgilbert@interlog.com> cleanup for lk 2.5 series
+ *	 - Douglas Gilbert <dgilbert@interlog.com> cleanup for lk 2.5.x
  *
  *	Logging policy (needs CONFIG_SCSI_LOGGING defined):
  *	 - setting up transfer: SCSI_LOG_HLQUEUE levels 1 and 2
@@ -29,145 +29,121 @@
  *	than the level indicated above to trigger output.	
  */
 
+#define MAJOR_NR SCSI_DISK0_MAJOR
+
 #include <linux/config.h>
 #include <linux/module.h>
-
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/bio.h>
-#include <linux/string.h>
+#include <linux/genhd.h>
 #include <linux/hdreg.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/reboot.h>
 #include <linux/vmalloc.h>
-#include <linux/smp.h>
-
-#include <asm/uaccess.h>
-#include <asm/io.h>
-
-#define MAJOR_NR SCSI_DISK0_MAJOR
-#define LOCAL_END_REQUEST
 #include <linux/blk.h>
 #include <linux/blkpg.h>
+#include <asm/uaccess.h>
+
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <scsi/scsi_ioctl.h>
-#include <scsi/scsicam.h>	/* must follow "hosts.h" */
-
-#include <linux/genhd.h>
-
-/* static char sd_version_str[] = "Version: 2.0.3 (20020417)"; */
-
-#define SD_MAJOR(i) (!(i) ? SCSI_DISK0_MAJOR : SCSI_DISK1_MAJOR-1+(i))
-
-#define SCSI_DISKS_PER_MAJOR	16
-#define SD_MAJOR_NUMBER(i)	SD_MAJOR((i) >> 8)
-#define SD_MINOR_NUMBER(i)	((i) & 255)
-#define MKDEV_SD_PARTITION(i)	mk_kdev(SD_MAJOR_NUMBER(i), (i) & 255)
-#define MKDEV_SD(index)		MKDEV_SD_PARTITION((index) << 4)
-#define N_USED_SD_MAJORS	(1 + ((sd_template.dev_max - 1) >> 4))
-
-#define MAX_RETRIES 5
+#include <scsi/scsicam.h>
 
 /*
- *  Time out in seconds for disks and Magneto-opticals (which are slower).
+ * Remaining dev_t-handling stuff
  */
+#define SD_MAJORS	8
+#define SD_MAJOR(i)	((i) ? SCSI_DISK1_MAJOR+(i) : SCSI_DISK0_MAJOR)
 
-#define SD_TIMEOUT (30 * HZ)
-#define SD_MOD_TIMEOUT (75 * HZ)
+/*
+ * Time out in seconds for disks and Magneto-opticals (which are slower).
+ */
+#define SD_TIMEOUT		(30 * HZ)
+#define SD_MOD_TIMEOUT		(75 * HZ)
 
-#define SD_DSK_ARR_LUMP 6 /* amount to over allocate sd_dsk_arr by */
+/*
+ * Number of allowed retries
+ */
+#define SD_MAX_RETRIES		5
 
-static Scsi_Disk ** sd_dsk_arr;
-static rwlock_t sd_dsk_arr_lock = RW_LOCK_UNLOCKED;
+struct scsi_disk {
+	struct list_head list;		/* list of all scsi_disks */
+	struct scsi_device *device;
+	struct gendisk	*disk;
+	sector_t	capacity;	/* size in 512-byte sectors */
+	u8		media_present;
+	u8		write_prot;
+	unsigned	WCE : 1;	/* state of disk WCE bit */
+	unsigned	RCD : 1;	/* state of disk RCD bit */
+};
+
+static LIST_HEAD(sd_devlist);
+static spinlock_t sd_devlist_lock = SPIN_LOCK_UNLOCKED;
 
 static int check_scsidisk_media_change(struct gendisk *);
 static int sd_revalidate(struct gendisk *);
 
-static void sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk);
+static void sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk);
+static void sd_rw_intr(struct scsi_cmnd * SCpnt);
 
-static int sd_init(void);
-static void sd_finish(void);
-static int sd_attach(Scsi_Device *);
-static int sd_detect(Scsi_Device *);
-static void sd_detach(Scsi_Device *);
-static int sd_init_command(Scsi_Cmnd *);
-static int sd_synchronize_cache(int, int);
+static int sd_attach(struct scsi_device *);
+static int sd_detect(struct scsi_device *);
+static void sd_detach(struct scsi_device *);
+static int sd_init_command(struct scsi_cmnd *);
+static int sd_synchronize_cache(struct scsi_disk *, int);
 static int sd_notifier(struct notifier_block *, unsigned long, void *);
 
 static struct notifier_block sd_notifier_block = {sd_notifier, NULL, 0}; 
 
 static struct Scsi_Device_Template sd_template = {
-	module:THIS_MODULE,
-	name:"disk",
-	tag:"sd",
-	scsi_type:TYPE_DISK,
-	major:SCSI_DISK0_MAJOR,
-        /*
-         * Secondary range of majors that this driver handles.
-         */
-	min_major:SCSI_DISK1_MAJOR,
-	max_major:SCSI_DISK7_MAJOR,
-	blk:1,
-	detect:sd_detect,
-	init:sd_init,
-	finish:sd_finish,
-	attach:sd_attach,
-	detach:sd_detach,
-	init_command:sd_init_command,
+	.module		= THIS_MODULE,
+	.name		= "disk",
+	.tag		= "sd",
+	.scsi_type	= TYPE_DISK,
+	.major		= SCSI_DISK0_MAJOR,
+	.min_major	= SCSI_DISK1_MAJOR,
+	.max_major	= SCSI_DISK7_MAJOR,
+	.blk		= 1,
+	.detect		= sd_detect,
+	.attach		= sd_attach,
+	.detach		= sd_detach,
+	.init_command	= sd_init_command,
 };
 
-static void sd_rw_intr(Scsi_Cmnd * SCpnt);
-
-static Scsi_Disk * sd_get_sdisk(int index);
-
-#if defined(CONFIG_PPC32)
-/**
- *	sd_find_target - find kdev_t of first scsi disk that matches
- *	given host and scsi_id. 
- *	@host: Scsi_Host object pointer that owns scsi device of interest
- *	@scsi_id: scsi (target) id number of device of interest
- *
- *	Returns kdev_t of first scsi device that matches arguments or
- *	NODEV of no match.
- *
- *	Notes: Looks like a hack, should scan for <host,channel,id,lin>
- *	tuple.
- *	[Architectural dependency: ppc only.] Moved here from 
- *	arch/ppc/pmac_setup.c.
- **/
-kdev_t __init
-sd_find_target(void *hp, int scsi_id)
+static struct scsi_disk *sd_find_by_sdev(Scsi_Device *sd)
 {
-	Scsi_Disk *sdkp;
-	Scsi_Device *sdp;
-	struct Scsi_Host *shp = hp;
-	int dsk_nr;
-	kdev_t retval = NODEV;
-	unsigned long iflags;
+	struct scsi_disk *sdkp;
 
-	SCSI_LOG_HLQUEUE(3, printk("sd_find_target: host_nr=%d, "
-			    "scsi_id=%d\n", shp->host_no, scsi_id));
-	read_lock_irqsave(&sd_dsk_arr_lock, iflags);
-	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; ++dsk_nr) {
-		sdkp = sd_dsk_arr[dsk_nr];
-		if (sdkp == NULL)
-			continue;
-		sdp = sdkp->device;
-		if (sdp && (sdp->host == shp) && (sdp->id == scsi_id)) {
-			retval = MKDEV_SD(dsk_nr);
-			break;
+	spin_lock(&sd_devlist_lock);
+	list_for_each_entry(sdkp, &sd_devlist, list) {
+		if (sdkp->device == sd) {
+			spin_unlock(&sd_devlist_lock);
+			return sdkp;
 		}
 	}
-	read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-	return retval;
+
+	spin_unlock(&sd_devlist_lock);
+	return NULL;
 }
-#endif
+
+static inline void sd_devlist_insert(struct scsi_disk *sdkp)
+{
+	spin_lock(&sd_devlist_lock);
+	list_add(&sdkp->list, &sd_devlist);
+	spin_unlock(&sd_devlist_lock);
+}
+
+static inline void sd_devlist_remove(struct scsi_disk *sdkp)
+{
+	spin_lock(&sd_devlist_lock);
+	list_del(&sdkp->list);
+	spin_unlock(&sd_devlist_lock);
+}
 
 /**
  *	sd_ioctl - process an ioctl
@@ -186,9 +162,11 @@ sd_find_target(void *hp, int scsi_id)
 static int sd_ioctl(struct inode * inode, struct file * filp, 
 		    unsigned int cmd, unsigned long arg)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
-        Scsi_Disk *sdkp = disk->private_data;
-	Scsi_Device *sdp = sdkp->device;
+	struct block_device *bdev = inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
+	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_device *sdp = sdkp->device;
+	sector_t capacity = sdkp->capacity;
 	struct Scsi_Host *host;
 	int diskinfo[4];
 	int error;
@@ -204,19 +182,19 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	 * access to the device is prohibited.
 	 */
 
-	if( !scsi_block_when_processing_errors(sdp) )
+	if (!scsi_block_when_processing_errors(sdp))
 		return -ENODEV;
 
-	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+	error = scsi_cmd_ioctl(bdev, cmd, arg);
 	if (error != -ENOTTY)
 		return error;
 
-	switch (cmd) 
-	{
+	switch (cmd) {
 		case HDIO_GETGEO:   /* Return BIOS disk parameters */
 		{
-			struct hd_geometry *loc = (struct hd_geometry *) arg;
-			if(!loc)
+			struct hd_geometry *loc = (struct hd_geometry *)arg;
+
+			if (!loc)
 				return -EINVAL;
 
 			host = sdp->host;
@@ -230,43 +208,27 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 			/* override with calculated, extended default, 
 			   or driver values */
 	
-			if(host->hostt->bios_param != NULL)
-				host->hostt->bios_param(sdkp, inode->i_bdev,
-							&diskinfo[0]);
-			else
-				scsicam_bios_param(sdkp, inode->i_bdev, &diskinfo[0]);
-			if (put_user(diskinfo[0], &loc->heads) ||
-				put_user(diskinfo[1], &loc->sectors) ||
-				put_user(diskinfo[2], &loc->cylinders) ||
-				put_user((unsigned) 
-					     get_start_sect(inode->i_bdev),
-					 (unsigned long *) &loc->start))
+			if (host->hostt->bios_param) {
+				host->hostt->bios_param(sdp, bdev,
+							capacity, diskinfo);
+			} else
+				scsicam_bios_param(bdev, capacity, diskinfo);
+
+			if (put_user(diskinfo[0], &loc->heads))
+				return -EFAULT;
+			if (put_user(diskinfo[1], &loc->sectors))
+				return -EFAULT;
+			if (put_user(diskinfo[2], &loc->cylinders))
+				return -EFAULT;
+			if (put_user((unsigned)get_start_sect(bdev),
+				     (unsigned long *)&loc->start))
 				return -EFAULT;
 			return 0;
 		}
 		default:
-			return scsi_ioctl(sdp, cmd, (void *) arg);
+			return scsi_ioctl(sdp, cmd, (void *)arg);
 	}
 }
-
-static void sd_dskname(unsigned int dsk_nr, char *buffer)
-{
-	if (dsk_nr < 26)
-		sprintf(buffer, "sd%c", 'a' + dsk_nr);
-	else {
-		unsigned int min1;
-		unsigned int min2;
-		/*
-		 * For larger numbers of disks, we need to go to a new
-		 * naming scheme.
-		 */
-		min1 = dsk_nr / 26;
-		min2 = dsk_nr % 26;
-		sprintf(buffer, "sd%c%c", 'a' + min1 - 1, 'a' + min2);
-	}
-}
-
-static struct gendisk **sd_disks;
 
 /**
  *	sd_init_command - build a scsi (read or write) command from
@@ -276,12 +238,12 @@ static struct gendisk **sd_disks;
  *
  *	Returns 1 if successful and 0 if error (or cannot be done now).
  **/
-static int sd_init_command(Scsi_Cmnd * SCpnt)
+static int sd_init_command(struct scsi_cmnd * SCpnt)
 {
 	int this_count, timeout;
 	struct gendisk *disk;
 	sector_t block;
-	Scsi_Device *sdp = SCpnt->device;
+	struct scsi_device *sdp = SCpnt->device;
 
 	timeout = SD_TIMEOUT;
 	if (SCpnt->device->type != TYPE_DISK)
@@ -308,6 +270,8 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 		if (rq->timeout)
 			timeout = rq->timeout;
 
+		SCpnt->transfersize = rq->data_len;
+		SCpnt->underflow = rq->data_len;
 		goto queue;
 	}
 
@@ -431,11 +395,11 @@ static int sd_init_command(Scsi_Cmnd * SCpnt)
 	 * host adapter, it's safe to assume that we can at least transfer
 	 * this many bytes between each connect / disconnect.
 	 */
-queue:
 	SCpnt->transfersize = sdp->sector_size;
 	SCpnt->underflow = this_count << 9;
 
-	SCpnt->allowed = MAX_RETRIES;
+queue:
+	SCpnt->allowed = SD_MAX_RETRIES;
 	SCpnt->timeout_per_command = timeout;
 
 	/*
@@ -467,8 +431,8 @@ queue:
 static int sd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
-	Scsi_Disk *sdkp = disk->private_data;
-	Scsi_Device * sdp = sdkp->device;
+	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_device * sdp = sdkp->device;
 	int retval = -ENXIO;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_open: disk=%s\n", disk->disk_name));
@@ -552,8 +516,8 @@ error_out:
 static int sd_release(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
-	Scsi_Disk *sdkp = disk->private_data;
-	Scsi_Device *sdp = sdkp->device;
+	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_device *sdp = sdkp->device;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_release: disk=%s\n", disk->disk_name));
 	if (!sdp)
@@ -594,7 +558,7 @@ static struct block_device_operations sd_fops =
  *
  *	Note: potentially run from within an ISR. Must not block.
  **/
-static void sd_rw_intr(Scsi_Cmnd * SCpnt)
+static void sd_rw_intr(struct scsi_cmnd * SCpnt)
 {
 	int result = SCpnt->result;
 	int this_count = SCpnt->bufflen >> 9;
@@ -690,7 +654,7 @@ static void sd_rw_intr(Scsi_Cmnd * SCpnt)
 }
 
 static void
-sd_set_media_not_present(Scsi_Disk *sdkp) {
+sd_set_media_not_present(struct scsi_disk *sdkp) {
 	sdkp->media_present = 0;
 	sdkp->capacity = 0;
 	sdkp->device->changed = 1;
@@ -706,8 +670,8 @@ sd_set_media_not_present(Scsi_Disk *sdkp) {
  **/
 static int check_scsidisk_media_change(struct gendisk *disk)
 {
-	Scsi_Disk *sdkp = disk->private_data;
-	Scsi_Device *sdp = sdkp->device;
+	struct scsi_disk *sdkp = disk->private_data;
+	struct scsi_device *sdp = sdkp->device;
 	int retval;
 	int flag = 0;	/* <<<< what is this for?? */
 
@@ -755,7 +719,7 @@ static int check_scsidisk_media_change(struct gendisk *disk)
 	}
 	/*
 	 * For removable scsi disk we have to recognise the presence
-	 * of a disk in the drive. This is kept in the Scsi_Disk
+	 * of a disk in the drive. This is kept in the struct scsi_disk
 	 * struct and tested at open !  Daniel Roche ( dan@lectra.fr )
 	 */
 
@@ -768,7 +732,7 @@ static int check_scsidisk_media_change(struct gendisk *disk)
 }
 
 static int
-sd_media_not_present(Scsi_Disk *sdkp, Scsi_Request *SRpnt) {
+sd_media_not_present(struct scsi_disk *sdkp, struct scsi_request *SRpnt) {
 	int the_result = SRpnt->sr_result;
 
 	if (the_result != 0
@@ -786,10 +750,10 @@ sd_media_not_present(Scsi_Disk *sdkp, Scsi_Request *SRpnt) {
  * spinup disk - called only in sd_init_onedisk()
  */
 static void
-sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
-	       Scsi_Request *SRpnt, unsigned char *buffer) {
+sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
+	       struct scsi_request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
-	Scsi_Device *sdp = sdkp->device;
+	struct scsi_device *sdp = sdkp->device;
 	unsigned long spintime_value = 0;
 	int the_result, retries, spintime;
 
@@ -810,7 +774,7 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
 			SRpnt->sr_data_direction = SCSI_DATA_NONE;
 
 			scsi_wait_req (SRpnt, (void *) cmd, (void *) buffer,
-				       0/*512*/, SD_TIMEOUT, MAX_RETRIES);
+				       0/*512*/, SD_TIMEOUT, SD_MAX_RETRIES);
 
 			the_result = SRpnt->sr_result;
 			retries++;
@@ -846,7 +810,7 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
 				SRpnt->sr_data_direction = SCSI_DATA_READ;
 				scsi_wait_req(SRpnt, (void *)cmd, 
 					      (void *) buffer, 0/*512*/, 
-					      SD_TIMEOUT, MAX_RETRIES);
+					      SD_TIMEOUT, SD_MAX_RETRIES);
 				spintime_value = jiffies;
 			}
 			spintime = 1;
@@ -873,8 +837,8 @@ sd_spinup_disk(Scsi_Disk *sdkp, char *diskname,
  * sd_read_cache_type - called only from sd_init_onedisk()
  */
 static void
-sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
-		   Scsi_Request *SRpnt, unsigned char *buffer) {
+sd_read_cache_type(struct scsi_disk *sdkp, char *diskname,
+		   struct scsi_request *SRpnt, unsigned char *buffer) {
 
 	unsigned char cmd[10];
 	int the_result, retries;
@@ -896,7 +860,7 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
 
 		SRpnt->sr_data_direction = SCSI_DATA_READ;
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			    128, SD_TIMEOUT, MAX_RETRIES);
+			    128, SD_TIMEOUT, SD_MAX_RETRIES);
 
 		the_result = SRpnt->sr_result;
 		retries--;
@@ -947,10 +911,10 @@ sd_read_cache_type(Scsi_Disk *sdkp, char *diskname,
  * read disk capacity - called only in sd_init_onedisk()
  */
 static void
-sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
-		 Scsi_Request *SRpnt, unsigned char *buffer) {
+sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
+		 struct scsi_request *SRpnt, unsigned char *buffer) {
 	unsigned char cmd[10];
-	Scsi_Device *sdp = sdkp->device;
+	struct scsi_device *sdp = sdkp->device;
 	int the_result, retries;
 	int sector_size;
 
@@ -966,7 +930,7 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 		SRpnt->sr_data_direction = SCSI_DATA_READ;
 
 		scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-			      8, SD_TIMEOUT, MAX_RETRIES);
+			      8, SD_TIMEOUT, SD_MAX_RETRIES);
 
 		if (sd_media_not_present(sdkp, SRpnt))
 			return;
@@ -1071,7 +1035,7 @@ sd_read_capacity(Scsi_Disk *sdkp, char *diskname,
 }
 
 static int
-sd_do_mode_sense6(Scsi_Device *sdp, Scsi_Request *SRpnt,
+sd_do_mode_sense6(struct scsi_device *sdp, struct scsi_request *SRpnt,
 		  int modepage, unsigned char *buffer, int len) {
 	unsigned char cmd[8];
 
@@ -1086,7 +1050,7 @@ sd_do_mode_sense6(Scsi_Device *sdp, Scsi_Request *SRpnt,
 	SRpnt->sr_data_direction = SCSI_DATA_READ;
 
 	scsi_wait_req(SRpnt, (void *) cmd, (void *) buffer,
-		      len, SD_TIMEOUT, MAX_RETRIES);
+		      len, SD_TIMEOUT, SD_MAX_RETRIES);
 
 	return SRpnt->sr_result;
 }
@@ -1095,9 +1059,9 @@ sd_do_mode_sense6(Scsi_Device *sdp, Scsi_Request *SRpnt,
  * read write protect setting, if possible - called only in sd_init_onedisk()
  */
 static void
-sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
-			   Scsi_Request *SRpnt, unsigned char *buffer) {
-	Scsi_Device *sdp = sdkp->device;
+sd_read_write_protect_flag(struct scsi_disk *sdkp, char *diskname,
+		   struct scsi_request *SRpnt, unsigned char *buffer) {
+	struct scsi_device *sdp = sdkp->device;
 	int res;
 
 	/*
@@ -1136,18 +1100,18 @@ sd_read_write_protect_flag(Scsi_Disk *sdkp, char *diskname,
 /**
  *	sd_init_onedisk - called the first time a new disk is seen,
  *	performs disk spin up, read_capacity, etc.
- *	@sdkp: pointer to associated Scsi_Disk object
+ *	@sdkp: pointer to associated struct scsi_disk object
  *	@dsk_nr: disk number within this driver (e.g. 0->/dev/sda,
  *	1->/dev/sdb, etc)
  *
  *	Note: this function is local to this driver.
  **/
 static void
-sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk)
+sd_init_onedisk(struct scsi_disk * sdkp, struct gendisk *disk)
 {
 	unsigned char *buffer;
-	Scsi_Device *sdp;
-	Scsi_Request *SRpnt;
+	struct scsi_device *sdp;
+	struct scsi_request *SRpnt;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_init_onedisk: disk=%s\n", disk->disk_name));
 
@@ -1197,131 +1161,6 @@ sd_init_onedisk(Scsi_Disk * sdkp, struct gendisk *disk)
 	kfree(buffer);
 }
 
-/*
- * The sd_init() function looks at all SCSI drives present, determines
- * their size, and reads partition table entries for them.
- */
-
-static int sd_registered;
-
-/**
- *	sd_init- called during driver initialization (after
- *	sd_detect() is called for each scsi device present).
- *
- *	Returns 0 is successful (or already called); 1 if error
- *
- *	Note: this function is invoked from the scsi mid-level.
- **/
-static int sd_init()
-{
-	int k, maxparts;
-	Scsi_Disk * sdkp;
-
-	SCSI_LOG_HLQUEUE(3, printk("sd_init: dev_noticed=%d\n",
-			    sd_template.dev_noticed));
-	if (sd_template.dev_noticed == 0)
-		return 0;
-
-	if (NULL == sd_dsk_arr)
-		sd_template.dev_max = sd_template.dev_noticed + SD_EXTRA_DEVS;
-
-	if (sd_template.dev_max > N_SD_MAJORS * SCSI_DISKS_PER_MAJOR)
-		sd_template.dev_max = N_SD_MAJORS * SCSI_DISKS_PER_MAJOR;
-
-	/* At most 16 partitions on each scsi disk. */
-	maxparts = (sd_template.dev_max << 4);
-	if (maxparts == 0)
-		return 0;
-
-	if (!sd_registered) {
-		for (k = 0; k < N_USED_SD_MAJORS; k++) {
-			if (register_blkdev(SD_MAJOR(k), "sd", &sd_fops)) {
-				printk(KERN_NOTICE "Unable to get major %d "
-				       "for SCSI disk\n", SD_MAJOR(k));
-				return 1;
-			}
-		}
-		sd_registered++;
-	}
-	/* We do not support attaching loadable devices yet. */
-	if (sd_dsk_arr)
-		return 0;
-
-	/* allocate memory */
-#define init_mem_lth(x,n)	x = vmalloc((n) * sizeof(*x))
-#define zero_mem_lth(x,n)	memset(x, 0, (n) * sizeof(*x))
-
-	init_mem_lth(sd_dsk_arr, sd_template.dev_max);
-	if (sd_dsk_arr) {
-		zero_mem_lth(sd_dsk_arr, sd_template.dev_max);
-		for (k = 0; k < sd_template.dev_max; ++k) {
-			sdkp = vmalloc(sizeof(Scsi_Disk));
-			if (NULL == sdkp)
-				goto cleanup_mem;
-			memset(sdkp, 0, sizeof(Scsi_Disk));
-			sd_dsk_arr[k] = sdkp;
-		}
-	}
-	init_mem_lth(sd_disks, sd_template.dev_max);
-	if (sd_disks)
-		zero_mem_lth(sd_disks, sd_template.dev_max);
-
-	if (!sd_dsk_arr || !sd_disks)
-		goto cleanup_mem;
-
-	return 0;
-
-#undef init_mem_lth
-#undef zero_mem_lth
-
-cleanup_mem:
-	vfree(sd_disks);
-	sd_disks = NULL;
-	if (sd_dsk_arr) {
-                for (k = 0; k < sd_template.dev_max; ++k)
-			vfree(sd_dsk_arr[k]);
-		vfree(sd_dsk_arr);
-		sd_dsk_arr = NULL;
-	}
-	for (k = 0; k < N_USED_SD_MAJORS; k++) {
-		unregister_blkdev(SD_MAJOR(k), "sd");
-	}
-	sd_registered--;
-	return 1;
-}
-
-/**
- *	sd_finish - called during driver initialization, after all
- *	the sd_attach() calls are finished.
- *
- *	Note: this function is invoked from the scsi mid-level.
- *	This function is not called after driver initialization has completed.
- *	Specifically later device attachments invoke sd_attach() but not
- *	this function.
- **/
-static void sd_finish()
-{
-	int k;
-	Scsi_Disk * sdkp;
-
-	SCSI_LOG_HLQUEUE(3, printk("sd_finish: \n"));
-
-	for (k = 0; k < sd_template.dev_max; ++k) {
-		sdkp = sd_get_sdisk(k);
-		if (sdkp && (0 == sdkp->capacity) && sdkp->device) {
-			sd_init_onedisk(sdkp, sd_disks[k]);
-			if (sdkp->has_been_registered)
-				continue;
-			set_capacity(sd_disks[k], sdkp->capacity);
-			sd_disks[k]->private_data = sdkp;
-			sd_disks[k]->queue = &sdkp->device->request_queue;
-			add_disk(sd_disks[k]);
-			sdkp->has_been_registered = 1;
-		}
-	}
-	return;
-}
-
 /**
  *	sd_detect - called at the start of driver initialization, once 
  *	for each scsi device (not just disks) present.
@@ -1330,9 +1169,8 @@ static void sd_finish()
  *	1 if this device is of interest (e.g. a disk).
  *
  *	Note: this function is invoked from the scsi mid-level.
- *	This function is called before sd_init() so very little is available.
  **/
-static int sd_detect(Scsi_Device * sdp)
+static int sd_detect(struct scsi_device * sdp)
 {
 	SCSI_LOG_HLQUEUE(3, printk("sd_detect: type=%d\n", sdp->type));
 	if (sdp->type != TYPE_DISK && sdp->type != TYPE_MOD)
@@ -1355,53 +1193,45 @@ static int sd_detect(Scsi_Device * sdp)
  *	<host,channel,id,lun> (found in sdp) and new device name 
  *	(e.g. /dev/sda). More precisely it is the block device major 
  *	and minor number that is chosen here.
+ *
+ *	Assume sd_attach is not re-entrant (for time being)
+ *	Also think about sd_attach() and sd_detach() running coincidentally.
  **/
-static int sd_attach(Scsi_Device * sdp)
+static int sd_attach(struct scsi_device * sdp)
 {
-	Scsi_Disk *sdkp;
+	struct scsi_disk *sdkp = NULL;	/* shut up lame gcc warning */
 	int dsk_nr;
-	unsigned long iflags;
 	struct gendisk *gd;
 
-	if ((NULL == sdp) ||
-	    ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD)))
+	if ((sdp->type != TYPE_DISK) && (sdp->type != TYPE_MOD))
 		return 0;
-
-	gd = alloc_disk(16);
-	if (!gd)
-		return 1;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
 			 sdp->host->host_no, sdp->channel, sdp->id, sdp->lun));
-	if (sd_template.nr_dev >= sd_template.dev_max) {
-		sdp->attached--;
-		printk(KERN_ERR "sd_init: no more room for device\n");
-		put_disk(gd);
-		return 1;
-	}
 
-/* Assume sd_attach is not re-entrant (for time being) */
-/* Also think about sd_attach() and sd_detach() running coincidentally. */
-	write_lock_irqsave(&sd_dsk_arr_lock, iflags);
-	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
-		sdkp = sd_dsk_arr[dsk_nr];
-		if (!sdkp->device) {
-			memset(sdkp, 0, sizeof(Scsi_Disk));
-			sdkp->device = sdp;
-			break;
-		}
-	}
-	write_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
+	sdkp = kmalloc(sizeof(*sdkp), GFP_KERNEL);
+	if (!sdkp)
+		goto out;
 
-	if (dsk_nr >= sd_template.dev_max) {
-		/* panic("scsi_devices corrupt (sd)");  overkill */
-		printk(KERN_ERR "sd_init: sd_dsk_arr corrupted\n");
-		put_disk(gd);
-		return 1;
-	}
+	gd = alloc_disk(16);
+	if (!gd)
+		goto out_free;
 
-	sd_template.nr_dev++;
-        gd->de = sdp->de;
+	/*
+	 * XXX  This doesn't make us better than the previous code in the
+	 * XXX  end (not worse either, though..).
+	 * XXX  To properly support hotplugging we should have a bitmap and
+	 * XXX  use find_first_zero_bit on it.  This will happen at the
+	 * XXX  same time template->nr_* goes away.		--hch
+	 */
+	dsk_nr = sd_template.nr_dev++;
+
+	sdkp->device = sdp;
+	sdkp->disk = gd;
+
+	sd_init_onedisk(sdkp, gd);
+
+	gd->de = sdp->de;
 	gd->major = SD_MAJOR(dsk_nr>>4);
 	gd->first_minor = (dsk_nr & 15)<<4;
 	gd->fops = &sd_fops;
@@ -1409,19 +1239,34 @@ static int sd_attach(Scsi_Device * sdp)
 		sprintf(gd->disk_name, "sd%c%c",'a'+dsk_nr/26-1,'a'+dsk_nr%26);
 	else
 		sprintf(gd->disk_name, "sd%c",'a'+dsk_nr%26);
-        gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
-        gd->driverfs_dev = &sdp->sdev_driverfs_dev;
-        gd->flags |= GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
-	sd_disks[dsk_nr] = gd;
+	gd->driverfs_dev = &sdp->sdev_driverfs_dev;
+	gd->flags = GENHD_FL_DRIVERFS | GENHD_FL_DEVFS;
+	if (sdp->removable)
+		gd->flags |= GENHD_FL_REMOVABLE;
+	gd->private_data = sdkp;
+	gd->queue = &sdkp->device->request_queue;
+
+	sd_devlist_insert(sdkp);
+	set_capacity(gd, sdkp->capacity);
+	add_disk(gd);
+
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
 	       "id %d, lun %d\n", sdp->removable ? "removable " : "",
-	       gd->disk_name, sdp->host->host_no, sdp->channel, sdp->id, sdp->lun);
+	       gd->disk_name, sdp->host->host_no, sdp->channel,
+	       sdp->id, sdp->lun);
+
 	return 0;
+
+out_free:
+	kfree(sdkp);
+out:
+	sdp->attached--;
+	return 1;
 }
 
 static int sd_revalidate(struct gendisk *disk)
 {
-	Scsi_Disk *sdkp = disk->private_data;
+	struct scsi_disk *sdkp = disk->private_data;
 
 	if (!sdkp->device)
 		return -ENODEV;
@@ -1442,45 +1287,32 @@ static int sd_revalidate(struct gendisk *disk)
  *	that could be re-used by a subsequent sd_attach().
  *	This function is not called when the built-in sd driver is "exit-ed".
  **/
-static void sd_detach(Scsi_Device * sdp)
+static void sd_detach(struct scsi_device * sdp)
 {
-	Scsi_Disk *sdkp = NULL;
-	int dsk_nr;
-	unsigned long iflags;
+	struct scsi_disk *sdkp;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_detach: <%d,%d,%d,%d>\n", 
 			    sdp->host->host_no, sdp->channel, sdp->id, 
 			    sdp->lun));
-	write_lock_irqsave(&sd_dsk_arr_lock, iflags);
-	for (dsk_nr = 0; dsk_nr < sd_template.dev_max; dsk_nr++) {
-		sdkp = sd_dsk_arr[dsk_nr];
-		if (sdkp->device == sdp) {
-			break;
-		}
-	}
-	write_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-	if (dsk_nr >= sd_template.dev_max)
+
+	sdkp = sd_find_by_sdev(sdp);
+	if (!sdkp)
 		return;
 
 	/* check that we actually have a write back cache to synchronize */
-	if(sdkp->WCE) {
+	if (sdkp->WCE) {
 		printk(KERN_NOTICE "Synchronizing SCSI cache: ");
-		sd_synchronize_cache(dsk_nr, 1);
+		sd_synchronize_cache(sdkp, 1);
 		printk("\n");
 	}
-	sdkp->device = NULL;
-	sdkp->capacity = 0;
-	/* sdkp->detaching = 1; */
 
-	if (sdkp->has_been_registered) {
-		sdkp->has_been_registered = 0;
-		del_gendisk(sd_disks[dsk_nr]);
-	}
+	sd_devlist_remove(sdkp);
+	del_gendisk(sdkp->disk);
 	sdp->attached--;
 	sd_template.dev_noticed--;
 	sd_template.nr_dev--;
-	put_disk(sd_disks[dsk_nr]);
-	sd_disks[dsk_nr] = NULL;
+	put_disk(sdkp->disk);
+	kfree(sdkp);
 }
 
 /**
@@ -1491,16 +1323,26 @@ static void sd_detach(Scsi_Device * sdp)
  **/
 static int __init init_sd(void)
 {
-	int rc;
+	int majors = 0, rc = -ENODEV, i;
+
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
-	sd_template.module = THIS_MODULE;
-	rc = scsi_register_device(&sd_template);
-	if (!rc) {
-		sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
-		sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sd_template.scsi_driverfs_driver);
-		register_reboot_notifier(&sd_notifier_block);
+
+	for (i = 0; i < SD_MAJORS; i++) {
+		if (register_blkdev(SD_MAJOR(i), "sd", &sd_fops))
+			printk(KERN_NOTICE
+			       "Unable to get major %d for SCSI disk\n",
+			       SD_MAJOR(i));
+		else
+			majors++;
 	}
+
+	if (!majors)
+		return -ENODEV;
+
+	rc = scsi_register_device(&sd_template);
+	if (rc)
+		return rc;
+	register_reboot_notifier(&sd_notifier_block);
 	return rc;
 }
 
@@ -1511,48 +1353,38 @@ static int __init init_sd(void)
  **/
 static void __exit exit_sd(void)
 {
-	int k;
+	int i;
 
 	SCSI_LOG_HLQUEUE(3, printk("exit_sd: exiting sd driver\n"));
-	scsi_unregister_device(&sd_template);
-	for (k = 0; k < N_USED_SD_MAJORS; k++)
-		unregister_blkdev(SD_MAJOR(k), "sd");
-
-	sd_registered--;
-	if (sd_dsk_arr != NULL) {
-		for (k = 0; k < sd_template.dev_max; ++k)
-			vfree(sd_dsk_arr[k]);
-		vfree(sd_dsk_arr);
-	}
-	sd_template.dev_max = 0;
-	driver_unregister(&sd_template.scsi_driverfs_driver);
 
 	unregister_reboot_notifier(&sd_notifier_block);
+	scsi_unregister_device(&sd_template);
+	for (i = 0; i < SD_MAJORS; i++)
+		unregister_blkdev(SD_MAJOR(i), "sd");
+	driver_unregister(&sd_template.scsi_driverfs_driver);
 }
 
-static int sd_notifier(struct notifier_block *nbt, unsigned long event, void *buf)
+/*
+ * XXX: this function does not take sd_devlist_lock to synchronize
+ *	access to sd_devlist.  This should be safe as no other reboot
+ *	notifier can access it.
+ */
+static int sd_notifier(struct notifier_block *n, unsigned long event, void *p)
 {
-	int i;
-	char *msg = "Synchronizing SCSI caches: ";
-
-	if (!(event == SYS_RESTART || event == SYS_HALT 
-	      || event == SYS_POWER_OFF))
+	if (event != SYS_RESTART &&
+	    event != SYS_HALT &&
+	    event != SYS_POWER_OFF)
 		return NOTIFY_DONE;
-	for (i = 0; i < sd_template.dev_max; i++) {
-		Scsi_Disk *sdkp = sd_get_sdisk(i);
 
-		if (!sdkp || !sdkp->device)
-			continue;
-		if (sdkp->WCE) {
-			if(msg) {
-				printk(KERN_NOTICE "%s", msg);
-				msg = NULL;
-			}
-			sd_synchronize_cache(i, 1);
-		}
-	}
-	if(!msg)
+	if (!list_empty(&sd_devlist)) {
+		struct scsi_disk *sdkp;
+
+		printk(KERN_NOTICE "Synchronizing SCSI caches: ");
+		list_for_each_entry(sdkp, &sd_devlist, list)
+			if (sdkp->WCE)
+				sd_synchronize_cache(sdkp, 1);
 		printk("\n");
+	}
 
 	return NOTIFY_OK;
 }
@@ -1560,20 +1392,17 @@ static int sd_notifier(struct notifier_block *nbt, unsigned long event, void *bu
 /* send a SYNCHRONIZE CACHE instruction down to the device through the
  * normal SCSI command structure.  Wait for the command to complete (must
  * have user context) */
-static int sd_synchronize_cache(int index, int verbose)
+static int sd_synchronize_cache(struct scsi_disk *sdkp, int verbose)
 {
-	Scsi_Request *SRpnt;
-	Scsi_Disk *sdkp = sd_get_sdisk(index);
-	Scsi_Device *SDpnt = sdkp->device;
+	struct scsi_request *SRpnt;
+	struct scsi_device *SDpnt = sdkp->device;
 	int retries, the_result;
 
-	if(verbose) {
-		char buf[16];
+	if (!SDpnt->online)
+		return 0;
 
-		sd_dskname(index, buf);
-
-		printk("%s ", buf);
-	}
+	if (verbose)
+		printk("%s ", sdkp->disk->disk_name);
 
 	SRpnt = scsi_allocate_request(SDpnt);
 	if(!SRpnt) {
@@ -1590,7 +1419,7 @@ static int sd_synchronize_cache(int index, int verbose)
 		/* leave the rest of the command zero to indicate 
 		 * flush everything */
 		scsi_wait_req(SRpnt, (void *)cmd, NULL, 0,
-			      SD_TIMEOUT, MAX_RETRIES);
+			      SD_TIMEOUT, SD_MAX_RETRIES);
 
 		if(SRpnt->sr_result == 0)
 			break;
@@ -1611,18 +1440,6 @@ static int sd_synchronize_cache(int index, int verbose)
 	}
 	scsi_release_request(SRpnt);
 	return (the_result == 0);
-}
-
-static Scsi_Disk * sd_get_sdisk(int index)
-{
-	Scsi_Disk * sdkp = NULL;
-	unsigned long iflags;
-
-	read_lock_irqsave(&sd_dsk_arr_lock, iflags);
-	if (sd_dsk_arr && (index >= 0) && (index < sd_template.dev_max))
-		sdkp = sd_dsk_arr[index];
-	read_unlock_irqrestore(&sd_dsk_arr_lock, iflags);
-	return sdkp;
 }
 
 MODULE_LICENSE("GPL");

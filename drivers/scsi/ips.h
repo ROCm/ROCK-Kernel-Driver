@@ -59,7 +59,8 @@
    extern int ips_eh_abort(Scsi_Cmnd *);
    extern int ips_eh_reset(Scsi_Cmnd *);
    extern int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-   extern int ips_biosparam(Disk *, struct block_device *, int *);
+   extern int ips_biosparam(struct scsi_device *, struct block_device *,
+		   sector_t, int *);
    extern int ips_slave_attach(Scsi_Device *);
    extern const char * ips_info(struct Scsi_Host *);
    extern void do_ips(int, void *, struct pt_regs *);
@@ -464,23 +465,13 @@
 }
 #else
  #define IPS {                            \
-    module : NULL,                        \
-    proc_info : NULL,                     \
-    name : NULL,                          \
     detect : ips_detect,                  \
     release : ips_release,                \
     info : ips_info,                      \
-    command : NULL,                       \
     queuecommand : ips_queue,             \
-    eh_strategy_handler : NULL,           \
     eh_abort_handler : ips_eh_abort,      \
-    eh_device_reset_handler : NULL,       \
-    eh_bus_reset_handler : NULL,          \
     eh_host_reset_handler : ips_eh_reset, \
-    abort : NULL,                         \
-    reset : NULL,                         \
     slave_attach : ips_slave_attach,      \
-    slave_detach : NULL,                  \
     bios_param : ips_biosparam,           \
     can_queue : 0,                        \
     this_id: -1,                          \

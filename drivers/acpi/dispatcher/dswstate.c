@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: dswstate - Dispatcher parse tree walk management routines
- *              $Revision: 68 $
+ *              $Revision: 69 $
  *
  *****************************************************************************/
 
@@ -174,7 +174,7 @@ acpi_ds_result_pop (
 	acpi_operand_object     **object,
 	acpi_walk_state         *walk_state)
 {
-	u32                     index;
+	NATIVE_UINT             index;
 	acpi_generic_state      *state;
 
 
@@ -205,7 +205,7 @@ acpi_ds_result_pop (
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Obj=%p [%s] Index=%X State=%p Num=%X\n",
 				*object, (*object) ? acpi_ut_get_object_type_name (*object) : "NULL",
-				index -1, walk_state, state->results.num_results));
+				(u32) index -1, walk_state, state->results.num_results));
 
 			return (AE_OK);
 		}

@@ -522,8 +522,6 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include <scsi/scsicam.h>
@@ -4224,25 +4222,26 @@ static void mega_create_proc_entry (int index, struct proc_dir_entry *parent)
  *     geom[1] = sectors
  *     geom[2] = cylinders
  *-------------------------------------------------------------*/
-int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
+int megaraid_biosparam (struct scsi_device *sdev, struct block_device *bdev,
+				sector_t capacity, int *geom)
 {
 	int heads, sectors, cylinders;
 	mega_host_config *megaCfg;
 
 	/* Get pointer to host config structure */
-	megaCfg = (mega_host_config *) disk->device->host->hostdata;
+	megaCfg = (mega_host_config *) sdev->host->hostdata;
 
-	if( IS_RAID_CH(disk->device->channel)) {
+	if( IS_RAID_CH(sdev->channel)) {
 			/* Default heads (64) & sectors (32) */
 			heads = 64;
 			sectors = 32;
-			cylinders = (unsigned long)disk->capacity / (heads * sectors);
+			cylinders = (unsigned long)capacity / (heads * sectors);
 
 			/* Handle extended translation size for logical drives > 1Gb */
-			if (disk->capacity >= 0x200000) {
+			if (capacity >= 0x200000) {
 				heads = 255;
 				sectors = 63;
-				cylinders = (unsigned long)disk->capacity / (heads * sectors);
+				cylinders = (unsigned long)capacity / (heads * sectors);
 			}
 
 			/* return result */
@@ -4251,22 +4250,22 @@ int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
 			geom[2] = cylinders;
 	}
 	else {
-		if( mega_partsize(disk, bdev, geom) == 0 ) return 0;
+		if( mega_partsize(bdev, capacity, geom) == 0 ) return 0;
 
 		printk(KERN_WARNING
 				"megaraid: invalid partition on this disk on channel %d\n",
-				disk->device->channel);
+				sdev->channel);
 
 		/* Default heads (64) & sectors (32) */
 		heads = 64;
 		sectors = 32;
-		cylinders = disk->capacity >> 11;
+		cylinders = capacity >> 11;
 
 		/* Handle extended translation size for logical drives > 1Gb */
-		if (disk->capacity >= 0x200000) {
+		if (capacity >= 0x200000) {
 			heads = 255;
 			sectors = 63;
-			cylinders = (unsigned long)disk->capacity / (heads * sectors);
+			cylinders = (unsigned long)capacity / (heads * sectors);
 		}
 
 		/* return result */
@@ -4289,12 +4288,12 @@ int megaraid_biosparam (Disk * disk, struct block_device *bdev, int *geom)
  * Returns : -1 on failure, 0 on success.
  */
 static int
-mega_partsize(Disk * disk, struct block_device *bdev, int *geom)
+mega_partsize(struct block_device *bdev, sector_t capacity, int *geom)
 {
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
 	int heads, cyls, sectors;
-	int capacity = disk->capacity;
+	int capacity = capacity;
 	unsigned char *buf;
 
 	if (!(buf = scsi_bios_ptable(bdev)))

@@ -3371,8 +3371,7 @@ static inline int stli_initports(stlibrd_t *brdp)
 		portp->baud_base = STL_BAUDBASE;
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
-		portp->tqhangup.routine = stli_dohangup;
-		portp->tqhangup.data = portp;
+		INIT_WORK(&portp->tqhangup, stli_dohangup, portp);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
 		init_waitqueue_head(&portp->raw_wait);

@@ -1607,7 +1607,7 @@ sg_detach(Scsi_Device * scsidp)
 		sdp->de = NULL;
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_type);
 		device_remove_file(&sdp->sg_driverfs_dev, &dev_attr_kdev);
-		put_device(&sdp->sg_driverfs_dev);
+		device_unregister(&sdp->sg_driverfs_dev);
 		if (NULL == sdp->headfp)
 			vfree((char *) sdp);
 	}
@@ -1629,17 +1629,9 @@ MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 static int __init
 init_sg(void)
 {
-	int rc;
 	if (def_reserved_size >= 0)
 		sg_big_buff = def_reserved_size;
-	rc = scsi_register_device(&sg_template);
-	if (!rc) {
-		sg_template.scsi_driverfs_driver.name =
-		    (char *) sg_template.tag;
-		sg_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sg_template.scsi_driverfs_driver);
-	}
-	return rc;
+	return scsi_register_device(&sg_template);
 }
 
 static void __exit
@@ -1655,7 +1647,6 @@ exit_sg(void)
 		sg_dev_arr = NULL;
 	}
 	sg_template.dev_max = 0;
-	driver_unregister(&sg_template.scsi_driverfs_driver);
 }
 
 static int

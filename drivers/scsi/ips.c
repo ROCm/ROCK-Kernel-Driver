@@ -169,7 +169,6 @@
 
 #include <scsi/sg.h>
 
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include "ips.h"
@@ -248,8 +247,8 @@ struct proc_dir_entry proc_scsi_ips = {
 #else
     #define IPS_SG_ADDRESS(sg)      (page_address((sg)->page) ? \
                                      page_address((sg)->page)+(sg)->offset : 0)
-    #define IPS_LOCK_SAVE(lock,flags) spin_lock(lock)
-    #define IPS_UNLOCK_RESTORE(lock,flags) spin_unlock(lock)
+    #define IPS_LOCK_SAVE(lock,flags) do{spin_lock(lock);(void)flags;}while(0)
+    #define IPS_UNLOCK_RESTORE(lock,flags) do{spin_unlock(lock);(void)flags;}while(0)
 #endif
 
 #define IPS_DMA_DIR(scb) ((!scb->scsi_cmd || ips_is_passthru(scb->scsi_cmd) || \
@@ -432,7 +431,8 @@ int ips_release(struct Scsi_Host *);
 int ips_eh_abort(Scsi_Cmnd *);
 int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-int ips_biosparam(Disk *, struct block_device *, int *);
+int ips_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 int ips_slave_attach(Scsi_Device *);
 const char * ips_info(struct Scsi_Host *);
 void do_ipsintr(int, void *, struct pt_regs *);
@@ -1777,7 +1777,8 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 int
-ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
+ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[]) {
    ips_ha_t         *ha;
    int               heads;
    int               sectors;
@@ -1785,7 +1786,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
 
    METHOD_TRACE("ips_biosparam", 1);
 
-   ha = (ips_ha_t *) disk->device->host->hostdata;
+   ha = (ips_ha_t *) sdev->host->hostdata;
 
    if (!ha)
       /* ?!?! host adater info invalid */
@@ -1798,7 +1799,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
       /* ?!?! Enquiry command failed */
       return (0);
 
-   if ((disk->capacity > 0x400000) &&
+   if ((capacity > 0x400000) &&
        ((ha->enq->ucMiscFlag & 0x8) == 0)) {
       heads = IPS_NORM_HEADS;
       sectors = IPS_NORM_SECTORS;
@@ -1807,7 +1808,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
       sectors = IPS_COMP_SECTORS;
    }
 
-   cylinders = (unsigned long)disk->capacity / (heads * sectors);
+   cylinders = (unsigned long)capacity / (heads * sectors);
 
    DEBUG_VAR(2, "Geometry: heads: %d, sectors: %d, cylinders: %d",
              heads, sectors, cylinders);
@@ -1879,9 +1880,9 @@ ips_slave_attach(Scsi_Device *SDptr)
    int          min;
 
    ha = IPS_HA(SDptr->host);
-   if (SDptr->tagged_supported) {
+   if (SDptr->tagged_supported && SDptr->type == TYPE_DISK) {
       min = ha->max_cmds / 2;
-      if (min <= 16)
+      if (ha->enq->ucLogDriveCount <= 2)
          min = ha->max_cmds - 1;
       scsi_adjust_queue_depth(SDptr, MSG_ORDERED_TAG, min);
    }
@@ -4761,7 +4762,7 @@ ips_inquiry(ips_ha_t *ha, ips_scb_t *scb) {
    inquiry.ResponseDataFormat = IPS_SCSI_INQ_RD_REV2;
    inquiry.AdditionalLength = 31;
    inquiry.Flags[0] = IPS_SCSI_INQ_Address16;
-   inquiry.Flags[1] = IPS_SCSI_INQ_WBus16 | IPS_SCSI_INQ_Sync;
+   inquiry.Flags[1] = IPS_SCSI_INQ_WBus16 | IPS_SCSI_INQ_Sync | IPS_SCSI_INQ_CmdQue;
    strncpy(inquiry.VendorId, "IBM     ", 8);
    strncpy(inquiry.ProductId, "SERVERAID       ", 16);
    strncpy(inquiry.ProductRevisionLevel, "1.00", 4);

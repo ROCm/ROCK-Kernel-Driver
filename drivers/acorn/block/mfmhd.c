@@ -105,16 +105,12 @@
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
 #include <linux/genhd.h>
 #include <linux/major.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-
-#define MAJOR_NR	MFM_ACORN_MAJOR
-#define QUEUE (&mfm_queue)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -130,6 +126,10 @@
 static void (*do_mfm)(void) = NULL;
 static struct request_queue mfm_queue;
 static spinlock_t mfm_lock = SPIN_LOCK_UNLOCKED;
+
+#define MAJOR_NR	MFM_ACORN_MAJOR
+#define QUEUE (&mfm_queue)
+#define CURRENT elv_next_request(&mfm_queue)
 /*
  * This sort of stuff should be in a header file shared with ide.c, hd.c, xd.c etc
  */

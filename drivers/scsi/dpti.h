@@ -46,7 +46,8 @@ static int adpt_release(struct Scsi_Host *host);
 static int adpt_slave_attach(Scsi_Device *);
 
 static const char *adpt_info(struct Scsi_Host *pSHost);
-static int adpt_bios_param(Disk * disk, struct block_device *dev, int geom[]);
+static int adpt_bios_param(struct scsi_device * sdev, struct block_device *dev,
+		sector_t, int geom[]);
 
 static int adpt_bus_reset(Scsi_Cmnd* cmd);
 static int adpt_device_reset(Scsi_Cmnd* cmd);

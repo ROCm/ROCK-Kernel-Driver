@@ -28,11 +28,11 @@
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
 #include <linux/mca.h>
+#include <linux/string.h>
 #include <asm/system.h>
 #include <linux/spinlock.h>
 #include <asm/io.h>
 #include <linux/init.h>
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include "ibmmca.h"
@@ -504,15 +504,16 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    unsigned long flags;
    Scsi_Cmnd *cmd;
    int lastSCSI;
+   struct Scsi_Host *dev = dev_id;
 
-   IBMLOCK(dev_id)
+   IBMLOCK(dev)
    /* search for one adapter-response on shared interrupt */
    for (host_index=0;
 	hosts[host_index] && !(inb(IM_STAT_REG(host_index)) & IM_INTR_REQUEST);
 	host_index++);
    /* return if some other device on this IRQ caused the interrupt */
    if (!hosts[host_index]) {
-      IBMUNLOCK(dev_id)
+      IBMUNLOCK(dev)
       return;
    }
 
@@ -521,15 +522,16 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    if ((reset_status(host_index) == IM_RESET_NOT_IN_PROGRESS_NO_INT)||
        (reset_status(host_index) == IM_RESET_FINISHED_OK_NO_INT)) {
       reset_status(host_index) = IM_RESET_NOT_IN_PROGRESS;
-      IBMUNLOCK(dev_id)
+      IBMUNLOCK(dev)
       return;
    }
 
    /*must wait for attention reg not busy, then send EOI to subsystem */
    while (1) {
       if (!(inb (IM_STAT_REG(host_index)) & IM_BUSY)) break;
-      IBMUNLOCK(dev_id) /* cycle interrupt */
-      IBMLOCK(dev_id)
+      IBMUNLOCK(dev) /* cycle interrupt */
+      cpu_relax();
+      IBMLOCK(dev)
    }
    ihost_index=host_index;
    /*get command result and logical device */
@@ -539,7 +541,7 @@ static void interrupt_handler (int irq, void *dev_id, struct pt_regs *regs)
    /* get the last_scsi_command here */
    lastSCSI = last_scsi_command(ihost_index)[ldn];
    outb (IM_EOI | ldn, IM_ATTN_REG(ihost_index));
-   IBMUNLOCK(dev_id)
+   IBMUNLOCK(dev)
    /*these should never happen (hw fails, or a local programming bug) */
    if (!global_command_error_excuse) {
       switch (cmd_result) {
@@ -1435,12 +1437,13 @@ void internal_ibmmca_scsi_setup (char *str, int *ints)
    return;
 }
 
-static int ibmmca_getinfo (char *buf, int slot, void *dev)
+static int ibmmca_getinfo (char *buf, int slot, void *dev_id)
 {
    struct Scsi_Host *shpnt;
    int len, speciale, connectore, k;
    unsigned int pos[8];
    unsigned long flags;
+   struct Scsi_Host *dev = dev_id;
 
    IBMLOCK(dev)
    shpnt = dev; /* assign host-structure to local pointer */
@@ -2382,9 +2385,10 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
      return SCSI_RESET_SUCCESS;
 }
 
-int ibmmca_biosparam (Disk * disk, struct block_device *dev, int *info)
+int ibmmca_biosparam (struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *info)
 {
-   int size = disk->capacity;
+   int size = capacity;
    info[0] = 64;
    info[1] = 32;
    info[2] = size / (info[0] * info[1]);

@@ -210,6 +210,7 @@ static struct pci_device_id tulip_pci_tbl[] __devinitdata = {
 	{ 0x13D1, 0xAB08, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x104A, 0x0981, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x104A, 0x2774, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
+	{ 0x1259, 0xa120, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMET },
 	{ 0x11F6, 0x9881, PCI_ANY_ID, PCI_ANY_ID, 0, 0, COMPEX9881 },
 	{ 0x8086, 0x0039, PCI_ANY_ID, PCI_ANY_ID, 0, 0, I21145 },
 	{ 0x1282, 0x9100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, DM910X },
@@ -1409,7 +1410,6 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	tp->timer.function = tulip_tbl[tp->chip_id].media_timer;
 
 	dev->base_addr = ioaddr;
-	dev->irq = irq;
 
 #ifdef CONFIG_TULIP_MWI
 	if (!force_csr0 && (tp->flags & HAS_PCI_MWI))
@@ -1553,6 +1553,7 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 	for (i = 0; i < 6; i++)
 		last_phys_addr[i] = dev->dev_addr[i];
 	last_irq = irq;
+	dev->irq = irq;
 
 	/* The lower four bits are the media type. */
 	if (board_idx >= 0  &&  board_idx < MAX_UNITS) {

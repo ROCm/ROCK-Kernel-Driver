@@ -91,8 +91,8 @@ int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
  * @shost: 
  * 
  * Description:
- * 	This is the default case for the release function.  It should do
- * 	the right thing for most correctly written host adapters.
+ * 	This is the default case for the release function.  Its completely
+ *	useless for anything but old ISA adapters
  **/
 static void scsi_host_generic_release(struct Scsi_Host *shost)
 {
@@ -390,8 +390,9 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	 */
 	shost->max_cmd_len = 12;
 	shost->hostt = shost_tp;
-	shost->host_blocked = FALSE;
+	shost->host_blocked = 0;
 	shost->host_self_blocked = FALSE;
+	shost->max_host_blocked = shost_tp->max_host_blocked ? shost_tp->max_host_blocked : SCSI_DEFAULT_HOST_BLOCKED;
 
 #ifdef DEBUG
 	printk("%s: %x %x: %d\n", __FUNCTION_ (int)shost,
@@ -561,25 +562,18 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 			shost = list_entry(lh, struct Scsi_Host, sh_list);
 			for (sdev = shost->host_queue; sdev; sdev = sdev->next)
 				if (sdev->host->hostt == shost_tp) {
+					scsi_build_commandblocks(sdev);
+					if (sdev->current_queue_depth == 0)
+						goto out_of_space;
 					for (sdev_tp = scsi_devicelist;
 					     sdev_tp;
 					     sdev_tp = sdev_tp->next)
 						if (sdev_tp->attach)
 							(*sdev_tp->attach) (sdev);
-					if (sdev->attached) {
-						scsi_build_commandblocks(sdev);
-						if (sdev->current_queue_depth == 0)
-							goto out_of_space;
+					if (!sdev->attached) {
+                                                scsi_release_commandblocks(sdev);
 					}
 				}
-		}
-
-		/* This does any final handling that is required. */
-		for (sdev_tp = scsi_devicelist; sdev_tp;
-		     sdev_tp = sdev_tp->next) {
-			if (sdev_tp->finish && sdev_tp->nr_dev) {
-				(*sdev_tp->finish) ();
-			}
 		}
 	}
 

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 119 $
+ *              $Revision: 120 $
  *
  *****************************************************************************/
 
@@ -313,7 +313,7 @@ acpi_ex_prep_field_value (
 
 	/* Parameter validation */
 
-	if (info->field_type != INTERNAL_TYPE_INDEX_FIELD) {
+	if (info->field_type != ACPI_TYPE_LOCAL_INDEX_FIELD) {
 		if (!info->region_node) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null Region_node\n"));
 			return_ACPI_STATUS (AE_AML_NO_OPERAND);
@@ -349,7 +349,7 @@ acpi_ex_prep_field_value (
 	/* Initialize areas of the object that are specific to the field type */
 
 	switch (info->field_type) {
-	case INTERNAL_TYPE_REGION_FIELD:
+	case ACPI_TYPE_LOCAL_REGION_FIELD:
 
 		obj_desc->field.region_obj   = acpi_ns_get_attached_object (info->region_node);
 
@@ -364,7 +364,7 @@ acpi_ex_prep_field_value (
 		break;
 
 
-	case INTERNAL_TYPE_BANK_FIELD:
+	case ACPI_TYPE_LOCAL_BANK_FIELD:
 
 		obj_desc->bank_field.value   = info->bank_value;
 		obj_desc->bank_field.region_obj = acpi_ns_get_attached_object (info->region_node);
@@ -385,7 +385,7 @@ acpi_ex_prep_field_value (
 		break;
 
 
-	case INTERNAL_TYPE_INDEX_FIELD:
+	case ACPI_TYPE_LOCAL_INDEX_FIELD:
 
 		obj_desc->index_field.index_obj = acpi_ns_get_attached_object (info->register_node);
 		obj_desc->index_field.data_obj = acpi_ns_get_attached_object (info->data_register_node);

@@ -760,6 +760,7 @@ static void process_txdone_queue (struct fs_dev *dev, struct queue *q)
 		default:
 			/* Here we get the tx purge inhibit command ... */
 			/* Action, I believe, is "don't do anything". -- REW */
+			;
 		}
     
 		write_fs (dev, Q_RP(q->offset), Q_INCWRAP);

@@ -287,12 +287,6 @@ static void sg_complete (struct urb *urb)
  *
  * The request may be canceled with usb_sg_cancel(), either before or after
  * usb_sg_wait() is called.
- *
- * NOTE:
- *
- * At this writing, don't use the interrupt transfer mode, since the old old
- * "automagic resubmit" mode hasn't yet been removed.  It should be removed
- * by the time 2.5 finalizes.
  */
 int usb_sg_init (
 	struct usb_sg_request	*io,
@@ -686,8 +680,9 @@ void usb_set_maxpacket(struct usb_device *dev)
  * as reported by URB completion status.  Endpoints that are halted are
  * sometimes referred to as being "stalled".  Such endpoints are unable
  * to transmit or receive data until the halt status is cleared.  Any URBs
- * queued queued for such an endpoint should normally be unlinked before
- * clearing the halt condition.
+ * queued for such an endpoint should normally be unlinked by the driver
+ * before clearing the halt condition, as described in sections 5.7.5
+ * and 5.8.5 of the USB 2.0 spec.
  *
  * Note that control and isochronous endpoints don't halt, although control
  * endpoints report "protocol stall" (for unsupported requests) using the
@@ -701,48 +696,34 @@ void usb_set_maxpacket(struct usb_device *dev)
 int usb_clear_halt(struct usb_device *dev, int pipe)
 {
 	int result;
-	__u16 status;
-	unsigned char *buffer;
-	int endp=usb_pipeendpoint(pipe)|(usb_pipein(pipe)<<7);
+	int endp = usb_pipeendpoint(pipe);
+	
+	if (usb_pipein (pipe))
+		endp |= USB_DIR_IN;
 
-/*
-	if (!usb_endpoint_halted(dev, endp & 0x0f, usb_endpoint_out(endp)))
-		return 0;
-*/
-
+	/* we don't care if it wasn't halted first. in fact some devices
+	 * (like some ibmcam model 1 units) seem to expect hosts to make
+	 * this request for iso endpoints, which can't halt!
+	 */
 	result = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
 		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0, endp, NULL, 0,
 		HZ * USB_CTRL_SET_TIMEOUT);
 
-	/* don't clear if failed */
+	/* don't un-halt or force to DATA0 except on success */
 	if (result < 0)
 		return result;
 
-	buffer = kmalloc(sizeof(status), GFP_KERNEL);
-	if (!buffer) {
-		err("unable to allocate memory for configuration descriptors");
-		return -ENOMEM;
-	}
+	/* NOTE:  seems like Microsoft and Apple don't bother verifying
+	 * the clear "took", so some devices could lock up if you check...
+	 * such as the Hagiwara FlashGate DUAL.  So we won't bother.
+	 *
+	 * NOTE:  make sure the logic here doesn't diverge much from
+	 * the copy in usb-storage, for as long as we need two copies.
+	 */
 
-	result = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-		USB_REQ_GET_STATUS, USB_DIR_IN | USB_RECIP_ENDPOINT, 0, endp,
-		// FIXME USB_CTRL_GET_TIMEOUT, yes?  why not usb_get_status() ?
-		buffer, sizeof(status), HZ * USB_CTRL_SET_TIMEOUT);
-
-	memcpy(&status, buffer, sizeof(status));
-	kfree(buffer);
-
-	if (result < 0)
-		return result;
-
-	if (le16_to_cpu(status) & 1)
-		return -EPIPE;		/* still halted */
-
-	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
-
-	/* toggle is reset on clear */
-
+	/* toggle was reset by the clear, then ep was reactivated */
 	usb_settoggle(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe), 0);
+	usb_endpoint_running(dev, usb_pipeendpoint(pipe), usb_pipeout(pipe));
 
 	return 0;
 }

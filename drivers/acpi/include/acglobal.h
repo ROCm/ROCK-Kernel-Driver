@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acglobal.h - Declarations for global variables
- *       $Revision: 131 $
+ *       $Revision: 132 $
  *
  *****************************************************************************/
 
@@ -152,7 +152,7 @@ extern const NATIVE_CHAR               *acpi_gbl_region_types[ACPI_NUM_PREDEFINE
  *
  ****************************************************************************/
 
-#define NUM_NS_TYPES                    INTERNAL_TYPE_INVALID+1
+#define NUM_NS_TYPES                    ACPI_TYPE_INVALID+1
 
 #if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
 #define NUM_PREDEFINED_NAMES            10
@@ -279,8 +279,8 @@ ACPI_EXTERN acpi_namespace_node        *acpi_gbl_db_scope_node;
 /*
  * Statistic globals
  */
-ACPI_EXTERN u16                         acpi_gbl_obj_type_count[INTERNAL_TYPE_NODE_MAX+1];
-ACPI_EXTERN u16                         acpi_gbl_node_type_count[INTERNAL_TYPE_NODE_MAX+1];
+ACPI_EXTERN u16                         acpi_gbl_obj_type_count[ACPI_TYPE_NS_NODE_MAX+1];
+ACPI_EXTERN u16                         acpi_gbl_node_type_count[ACPI_TYPE_NS_NODE_MAX+1];
 ACPI_EXTERN u16                         acpi_gbl_obj_type_count_misc;
 ACPI_EXTERN u16                         acpi_gbl_node_type_count_misc;
 ACPI_EXTERN u32                         acpi_gbl_num_nodes;

@@ -193,7 +193,9 @@ int Pci2000_QueueCommand	(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *));
 int Pci2000_Abort			(Scsi_Cmnd *SCpnt);
 int Pci2000_Reset			(Scsi_Cmnd *SCpnt, unsigned int flags);
 int Pci2000_Release			(struct Scsi_Host *pshost);
-int Pci2000_BiosParam		(Disk *disk, struct block_device *dev, int geom[]);
+int Pci2000_BiosParam		(struct scsi_device *sdev,
+					struct block_device *bdev,
+					sector_t capacity, int geom[]);
 
 #ifndef NULL
 	#define NULL 0

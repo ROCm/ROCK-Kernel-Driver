@@ -421,9 +421,6 @@ struct vicam_camera {
 	u8 bulkEndpoint;
 	bool needsDummyRead;
 
-	u32 framebuf_size;	// # of valid bytes in framebuf
-	u32 framebuf_read_start;	// position in frame buf that a read is happening at.
-
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *proc_entry;
 #endif
@@ -924,6 +921,11 @@ read_frame(struct vicam_camera *cam, int framenum)
 	int n;
 	int actual_length;
 
+	if (cam->needsDummyRead) {
+		cam->needsDummyRead = 0;
+		read_frame(cam, framenum);
+	}
+
 	memset(request, 0, 16);
 	request[0] = cam->gain;	// 0 = 0% gain, FF = 100% gain
 
@@ -974,74 +976,37 @@ read_frame(struct vicam_camera *cam, int framenum)
 	vicam_decode_color(cam->raw_image,
 			 cam->framebuf +
 			 framenum * VICAM_MAX_FRAME_SIZE );
-
-	cam->framebuf_size =
-	    320 * 240 * VICAM_BYTES_PER_PIXEL;
-	cam->framebuf_read_start = 0;
-
-	return;
-
 }
 
 static int
 vicam_read( struct file *file, char *buf, size_t count, loff_t *ppos )
 {
 	struct vicam_camera *cam = file->private_data;
+
 	DBG("read %d bytes.\n", (int) count);
-
-	if (!buf)
-		return -EINVAL;
-
-	if (!count)
-		return -EINVAL;
-
-	// This is some code that will hopefully allow us to do shell copies from
-	// the /dev/videoX to a file and have it actually work.
-	if (cam->framebuf_size != 0) {
-		if (cam->framebuf_read_start == cam->framebuf_size) {
-			cam->framebuf_size = cam->framebuf_read_start = 0;
-			return 0;
-		} else {
-			if (cam->framebuf_read_start + count <=
-			    cam->framebuf_size) {
-				// count does not exceed available bytes
-				copy_to_user(buf,
-					     (cam->framebuf) +
-					     cam->framebuf_read_start, count);
-				cam->framebuf_read_start += count;
-				return count;
-			} else {
-				count =
-				    cam->framebuf_size -
-				    cam->framebuf_read_start;
-				copy_to_user(buf,
-					     (cam->framebuf) +
-					     cam->framebuf_read_start, count);
-				cam->framebuf_read_start = cam->framebuf_size;
-				return count;
-			}
-		}
-	}
 
 	down_interruptible(&cam->busy_lock);
 
-	if (cam->needsDummyRead) {
-		read_frame(cam, 0);
-		cam->needsDummyRead = 0;
+	if (*ppos >= VICAM_MAX_FRAME_SIZE) {
+		*ppos = 0;
+		return 0;
 	}
-	// read_frame twice because the camera doesn't seem to take the shutter speed for the first one.
 
-	read_frame(cam, 0);
+	if (*ppos == 0) {
+		read_frame(cam, 0);
+	}
 
-	if (count > cam->framebuf_size)
-		count = cam->framebuf_size;
+	count = min_t(size_t, count, VICAM_MAX_FRAME_SIZE - *ppos);
 
-	copy_to_user(buf, cam->framebuf, count);
+	if (copy_to_user(buf, &cam->framebuf[*ppos], count)) {
+		count = -EFAULT;
+	} else {
+		*ppos += count;
+	}
 
-	if (count != cam->framebuf_size)
-		cam->framebuf_read_start = count;
-	else
-		cam->framebuf_size = 0;
+	if (count == VICAM_MAX_FRAME_SIZE) {
+		*ppos = 0;
+	}
 
 	up(&cam->busy_lock);
 

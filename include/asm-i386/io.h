@@ -370,6 +370,6 @@ static inline void ins##bwl(int port, void *addr, unsigned long count) { \
 
 BUILDIO(b,b,char)
 BUILDIO(w,w,short)
-BUILDIO(l,,long)
+BUILDIO(l,,int)
 
 #endif
