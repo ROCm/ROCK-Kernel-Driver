@@ -87,14 +87,15 @@ nfs_proc_get_root(struct nfs_server *server, struct nfs_fh *fhandle,
  * One function for each procedure in the NFS protocol.
  */
 static int
-nfs_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
+nfs_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_fattr *fattr)
 {
 	int	status;
 
 	dprintk("NFS call  getattr\n");
 	fattr->valid = 0;
-	status = rpc_call(NFS_CLIENT(inode), NFSPROC_GETATTR,
-				NFS_FH(inode), fattr, 0);
+	status = rpc_call(server->client, NFSPROC_GETATTR,
+				fhandle, fattr, 0);
 	dprintk("NFS reply getattr\n");
 	return status;
 }

@@ -305,6 +305,11 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	if (status)
 		goto out_err;
 	update_changeattr(dir, &o_res.cinfo);
+	if (!(f_attr.valid & NFS_ATTR_FATTR)) {
+		status = server->rpc_ops->getattr(server, &o_res.fh, &f_attr);
+		if (status < 0)
+			goto out_err;
+	}
 
 	status = -ENOMEM;
 	inode = nfs_fhget(dir->i_sb, &o_res.fh, &f_attr);
@@ -734,11 +739,10 @@ out:
 	return status;
 }
 
-static int _nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
+static int _nfs4_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
-	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs4_getattr_arg args = {
-		.fh = NFS_FH(inode),
+		.fh = fhandle,
 		.bitmask = server->attr_bitmask,
 	};
 	struct nfs4_getattr_res res = {
@@ -752,16 +756,16 @@ static int _nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 	};
 	
 	fattr->valid = 0;
-	return rpc_call_sync(NFS_CLIENT(inode), &msg, 0);
+	return rpc_call_sync(server->client, &msg, 0);
 }
 
-static int nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
+static int nfs4_proc_getattr(struct nfs_server *server, struct nfs_fh *fhandle, struct nfs_fattr *fattr)
 {
 	struct nfs4_exception exception = { };
 	int err;
 	do {
-		err = nfs4_handle_exception(NFS_SERVER(inode),
-				_nfs4_proc_getattr(inode, fattr),
+		err = nfs4_handle_exception(server,
+				_nfs4_proc_getattr(server, fhandle, fattr),
 				&exception);
 	} while (exception.retry);
 	return err;

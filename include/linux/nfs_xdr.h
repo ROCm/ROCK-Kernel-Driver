@@ -669,7 +669,8 @@ struct nfs_rpc_ops {
 
 	int	(*getroot) (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
-	int	(*getattr) (struct inode *, struct nfs_fattr *);
+	int	(*getattr) (struct nfs_server *, struct nfs_fh *,
+			    struct nfs_fattr *);
 	int	(*setattr) (struct dentry *, struct nfs_fattr *,
 			    struct iattr *);
 	int	(*lookup)  (struct inode *, struct qstr *,

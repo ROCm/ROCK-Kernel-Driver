@@ -961,7 +961,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 
 	/* Protect against RPC races by saving the change attribute */
 	verifier = nfs_save_change_attribute(inode);
-	status = NFS_PROTO(inode)->getattr(inode, &fattr);
+	status = NFS_PROTO(inode)->getattr(server, NFS_FH(inode), &fattr);
 	if (status) {
 		dfprintk(PAGECACHE, "nfs_revalidate_inode: (%s/%Ld) getattr failed, error=%d\n",
 			 inode->i_sb->s_id,

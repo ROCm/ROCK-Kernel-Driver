@@ -982,10 +982,16 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 	/* We may have been initialized further down */
 	if (dentry->d_inode)
 		return 0;
-	if (fhandle->size == 0 || !(fattr->valid & NFS_ATTR_FATTR)) {
+	if (fhandle->size == 0) {
 		struct inode *dir = dentry->d_parent->d_inode;
 		error = NFS_PROTO(dir)->lookup(dir, &dentry->d_name, fhandle, fattr);
 		if (error)
+			goto out_err;
+	}
+	if (!(fattr->valid & NFS_ATTR_FATTR)) {
+		struct nfs_server *server = NFS_SB(dentry->d_sb);
+		error = server->rpc_ops->getattr(server, fhandle, fattr);
+		if (error < 0)
 			goto out_err;
 	}
 	inode = nfs_fhget(dentry->d_sb, fhandle, fattr);
