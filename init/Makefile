@@ -21,5 +21,5 @@ $(obj)/version.o: include/linux/compile.h
 # actual file if its content has changed.
 
 include/linux/compile.h: FORCE
-	@echo -n '  GEN     $@'
+	@echo '  CHK     $@'
 	@sh $(srctree)/scripts/mkcompile_h $@ "$(UTS_MACHINE)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
