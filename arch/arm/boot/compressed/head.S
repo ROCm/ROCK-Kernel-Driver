@@ -349,11 +349,13 @@ LC0:		.word	LC0			@ r1
 LC1:		.word	reloc_end - reloc_start
 		.size	LC0, . - LC0
 
+#ifdef CONFIG_ARCH_RPC
 		.globl	params
 params:		ldr	r0, =params_phys
 		mov	pc, lr
 		.ltorg
 		.align
+#endif
 
 /*
  * Turn on the cache.  We need to setup some page tables so that we
