@@ -924,8 +924,8 @@ static int st_open(struct inode *inode, struct file *filp)
 	int dev = TAPE_NR(inode->i_rdev);
 
 	write_lock(&st_dev_arr_lock);
-	STp = scsi_tapes[dev];
-	if (dev >= st_template.dev_max || STp == NULL) {
+	if (dev >= st_template.dev_max || scsi_tapes == NULL ||
+	    ((STp = scsi_tapes[dev]) == NULL)) {
 		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
 	}
