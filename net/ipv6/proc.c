@@ -201,33 +201,23 @@ static struct file_operations snmp6_seq_fops = {
 
 int snmp6_register_dev(struct inet6_dev *idev)
 {
-	int err = -ENOMEM;
 	struct proc_dir_entry *p;
 
 	if (!idev || !idev->dev)
 		return -EINVAL;
 
-	if (snmp6_mib_init((void **)idev->stats.icmpv6, sizeof(struct icmpv6_mib),
-			   __alignof__(struct icmpv6_mib)) < 0)
-		goto err_icmp;
+	if (!proc_net_devsnmp6)
+		return -ENOENT;
 
-	if (!proc_net_devsnmp6) {
-		err = -ENOENT;
-		goto err_proc;
-	}
 	p = create_proc_entry(idev->dev->name, S_IRUGO, proc_net_devsnmp6);
 	if (!p)
-		goto err_proc;
+		return -ENOMEM;
+
 	p->data = idev;
 	p->proc_fops = &snmp6_seq_fops;
 
 	idev->stats.proc_dir_entry = p;
 	return 0;
-
-err_proc:
-	snmp6_mib_free((void **)idev->stats.icmpv6);
-err_icmp:
-	return err;
 }
 
 int snmp6_unregister_dev(struct inet6_dev *idev)
@@ -238,8 +228,6 @@ int snmp6_unregister_dev(struct inet6_dev *idev)
 		return -EINVAL;
 	remove_proc_entry(idev->stats.proc_dir_entry->name,
 			  proc_net_devsnmp6);
-	snmp6_mib_free((void **)idev->stats.icmpv6);
-
 	return 0;
 }
 
@@ -280,6 +268,17 @@ void ipv6_misc_proc_exit(void)
 
 int snmp6_register_dev(struct inet6_dev *idev)
 {
+	return 0;
+}
+
+int snmp6_unregister_dev(struct inet6_dev *idev)
+{
+	return 0;
+}
+#endif	/* CONFIG_PROC_FS */
+
+int snmp6_alloc_dev(struct inet6_dev *idev)
+{
 	int err = -ENOMEM;
 
 	if (!idev || !idev->dev)
@@ -295,11 +294,10 @@ err_icmp:
 	return err;
 }
 
-int snmp6_unregister_dev(struct inet6_dev *idev)
+int snmp6_free_dev(struct inet6_dev *idev)
 {
 	snmp6_mib_free((void **)idev->stats.icmpv6);
 	return 0;
 }
 
-#endif
 

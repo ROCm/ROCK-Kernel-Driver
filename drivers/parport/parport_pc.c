@@ -2488,7 +2488,7 @@ static int __devinit sio_ite_8872_probe (struct pci_dev *pdev, int autoirq,
 
 /* VIA 8231 support by Pavel Fedin <sonic_amiga@rambler.ru>
    based on VIA 686a support code by Jeff Garzik <jgarzik@pobox.com> */
-static int __initdata parport_init_mode = 0;
+static int __devinitdata parport_init_mode = 0;
 
 /* Data for two known VIA chips */
 static struct parport_pc_via_data via_686a_data __devinitdata = {
