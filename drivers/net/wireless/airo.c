@@ -4622,7 +4622,7 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 		return -ENODEV;
 
 	pci_set_drvdata(pdev, dev);
-	clear_bit (FLAG_PCI, &((struct airo_info *)dev->priv)->flags);
+	set_bit (FLAG_PCI, &((struct airo_info *)dev->priv)->flags);
 	return 0;
 }
 
