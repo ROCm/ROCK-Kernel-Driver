@@ -3630,9 +3630,25 @@ static int tg3_chip_reset(struct tg3 *tp)
 	/* restore 5701 hardware bug workaround flag */
 	tp->tg3_flags = flags_save;
 
+	/* Unfortunately, we have to delay before the PCI read back.
+	 * Some 575X chips even will not respond to a PCI cfg access
+	 * when the reset command is given to the chip.
+	 *
+	 * How do these hardware designers expect things to work
+	 * properly if the PCI write is posted for a long period
+	 * of time?  It is always necessary to have some method by
+	 * which a register read back can occur to push the write
+	 * out which does the reset.
+	 *
+	 * For most tg3 variants the trick below was working.
+	 * Ho hum...
+	 */
+	udelay(120);
+
 	/* Flush PCI posted writes.  The normal MMIO registers
 	 * are inaccessible at this time so this is the only
-	 * way to make this reliably.  I tried to use indirect
+	 * way to make this reliably (actually, this is no longer
+	 * the case, see above).  I tried to use indirect
 	 * register read/write but this upset some 5701 variants.
 	 */
 	pci_read_config_dword(tp->pdev, PCI_COMMAND, &val);
