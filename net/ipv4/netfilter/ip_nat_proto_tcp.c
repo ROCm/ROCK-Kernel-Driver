@@ -7,6 +7,7 @@
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_rule.h>
 #include <linux/netfilter_ipv4/ip_nat_protocol.h>
+#include <linux/netfilter_ipv4/ip_nat_core.h>
 
 static int
 tcp_in_range(const struct ip_conntrack_tuple *tuple,
@@ -73,36 +74,49 @@ tcp_unique_tuple(struct ip_conntrack_tuple *tuple,
 	return 0;
 }
 
-static void
-tcp_manip_pkt(struct iphdr *iph, size_t len,
+static int
+tcp_manip_pkt(struct sk_buff **pskb,
+	      unsigned int hdroff,
 	      const struct ip_conntrack_manip *manip,
 	      enum ip_nat_manip_type maniptype)
 {
-	struct tcphdr *hdr = (struct tcphdr *)((u_int32_t *)iph + iph->ihl);
+	struct tcphdr *hdr;
 	u_int32_t oldip;
-	u_int16_t *portptr;
-
-	if (maniptype == IP_NAT_MANIP_SRC) {
-		/* Get rid of src ip and src pt */
-		oldip = iph->saddr;
-		portptr = &hdr->source;
-	} else {
-		/* Get rid of dst ip and dst pt */
-		oldip = iph->daddr;
-		portptr = &hdr->dest;
-	}
+	u_int16_t *portptr, oldport;
+	int hdrsize = 8; /* TCP connection tracking guarantees this much */
 
 	/* this could be a inner header returned in icmp packet; in such
 	   cases we cannot update the checksum field since it is outside of
 	   the 8 bytes of transport layer headers we are guaranteed */
-	if(((void *)&hdr->check + sizeof(hdr->check) - (void *)iph) <= len) {
-		hdr->check = ip_nat_cheat_check(~oldip, manip->ip,
-					ip_nat_cheat_check(*portptr ^ 0xFFFF,
-							   manip->u.tcp.port,
-							   hdr->check));
+	if ((*pskb)->len >= hdroff + sizeof(struct tcphdr))
+		hdrsize = sizeof(struct tcphdr);
+
+	if (!skb_ip_make_writable(pskb, hdroff + hdrsize))
+		return 0;
+
+	hdr = (void *)(*pskb)->data + hdroff;
+
+	if (maniptype == IP_NAT_MANIP_SRC) {
+		/* Get rid of src ip and src pt */
+		oldip = (*pskb)->nh.iph->saddr;
+		portptr = &hdr->source;
+	} else {
+		/* Get rid of dst ip and dst pt */
+		oldip = (*pskb)->nh.iph->daddr;
+		portptr = &hdr->dest;
 	}
 
+	oldport = *portptr;
 	*portptr = manip->u.tcp.port;
+
+	if (hdrsize < sizeof(*hdr))
+		return 1;
+
+	hdr->check = ip_nat_cheat_check(~oldip, manip->ip,
+					ip_nat_cheat_check(oldport ^ 0xFFFF,
+							   manip->u.tcp.port,
+							   hdr->check));
+	return 1;
 }
 
 static unsigned int

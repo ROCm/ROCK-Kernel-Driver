@@ -39,6 +39,7 @@
  *                                 no ref count on net devices.
  *              Steve Whitehouse : RCU for the route cache
  *              Steve Whitehouse : Preparations for the flow cache
+ *              Steve Whitehouse : Prepare for nonlinear skbs
  */
 
 /******************************************************************************
@@ -70,6 +71,7 @@
 #include <net/sock.h>
 #include <linux/mm.h>
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #include <linux/init.h>
 #include <linux/rtnetlink.h>
 #include <linux/string.h>
@@ -97,14 +99,17 @@ extern struct neigh_table dn_neigh_table;
 
 static unsigned char dn_hiord_addr[6] = {0xAA,0x00,0x04,0x00,0x00,0x00};
 
-int dn_rt_min_delay = 2*HZ;
-int dn_rt_max_delay = 10*HZ;
-static unsigned long dn_rt_deadline = 0;
+int dn_rt_min_delay = 2 * HZ;
+int dn_rt_max_delay = 10 * HZ;
+int dn_rt_mtu_expires = 10 * 60 * HZ;
+
+static unsigned long dn_rt_deadline;
 
 static int dn_dst_gc(void);
 static struct dst_entry *dn_dst_check(struct dst_entry *, __u32);
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *);
 static void dn_dst_link_failure(struct sk_buff *);
+static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu);
 static int dn_route_input(struct sk_buff *);
 static void dn_run_flush(unsigned long dummy);
 
@@ -124,6 +129,7 @@ static struct dst_ops dn_dst_ops = {
 	.check =		dn_dst_check,
 	.negative_advice =	dn_dst_negative_advice,
 	.link_failure =		dn_dst_link_failure,
+	.update_pmtu =		dn_dst_update_pmtu,
 	.entry_size =		sizeof(struct dn_route),
 	.entries =		ATOMIC_INIT(0),
 };
@@ -210,16 +216,49 @@ static int dn_dst_gc(void)
 	return 0;
 }
 
+/*
+ * The decnet standards don't impose a particular minimum mtu, what they
+ * do insist on is that the routing layer accepts a datagram of at least
+ * 230 bytes long. Here we have to subtract the routing header length from
+ * 230 to get the minimum acceptable mtu. If there is no neighbour, then we
+ * assume the worst and use a long header size.
+ *
+ * We update both the mtu and the advertised mss (i.e. the segment size we
+ * advertise to the other end).
+ */
+static void dn_dst_update_pmtu(struct dst_entry *dst, u32 mtu)
+{
+	u32 min_mtu = 230;
+	struct dn_dev *dn = dst->neighbour ?
+			    (struct dn_dev *)dst->neighbour->dev->dn_ptr : NULL;
+
+	if (dn && dn->use_long == 0)
+		min_mtu -= 6;
+	else
+		min_mtu -= 21;
+
+	if (dst->metrics[RTAX_MTU-1] > mtu && mtu >= min_mtu) {
+		if (!(dst_metric_locked(dst, RTAX_MTU))) {
+			dst->metrics[RTAX_MTU-1] = mtu;
+			dst_set_expires(dst, dn_rt_mtu_expires);
+		}
+		if (!(dst_metric_locked(dst, RTAX_ADVMSS))) {
+			u32 mss = mtu - DN_MAX_NSP_DATA_HEADER;
+			if (dst->metrics[RTAX_ADVMSS-1] > mss)
+				dst->metrics[RTAX_ADVMSS-1] = mss;
+		}
+	}
+}
+
+/* 
+ * When a route has been marked obsolete. (e.g. routing cache flush)
+ */
 static struct dst_entry *dn_dst_check(struct dst_entry *dst, __u32 cookie)
 {
 	dst_release(dst);
 	return NULL;
 }
 
-/*
- * This is called through sendmsg() when you specify MSG_TRYHARD
- * and there is already a route in cache.
- */
 static struct dst_entry *dn_dst_negative_advice(struct dst_entry *dst)
 {
 	dst_release(dst);
@@ -467,7 +506,7 @@ static int dn_route_rx_long(struct sk_buff *skb)
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned char *ptr = skb->data;
 
-	if (skb->len < 21) /* 20 for long header, 1 for shortest nsp */
+	if (!pskb_may_pull(skb, 21)) /* 20 for long header, 1 for shortest nsp */
 		goto drop_it;
 
 	skb_pull(skb, 20);
@@ -505,7 +544,7 @@ static int dn_route_rx_short(struct sk_buff *skb)
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	unsigned char *ptr = skb->data;
 
-	if (skb->len < 6) /* 5 for short header + 1 for shortest nsp */
+	if (!pskb_may_pull(skb, 6)) /* 5 for short header + 1 for shortest nsp */
 		goto drop_it;
 
 	skb_pull(skb, 5);
@@ -555,6 +594,9 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
 		goto out;
 
+	if (!pskb_may_pull(skb, 3))
+		goto dump_it;
+
 	skb_pull(skb, 2);
 
 	if (len > skb->len)
@@ -573,6 +615,8 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 	 */
 	if (flags & DN_RT_F_PF) {
 		padlen = flags & ~DN_RT_F_PF;
+		if (!pskb_may_pull(skb, padlen + 1))
+			goto dump_it;
 		skb_pull(skb, padlen);
 		flags = *skb->data;
 	}
@@ -594,6 +638,10 @@ int dn_route_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type
 			padlen);
 
         if (flags & DN_RT_PKT_CNTL) {
+		if (unlikely(skb_is_nonlinear(skb)) &&
+		    skb_linearize(skb, GFP_ATOMIC) != 0)
+			goto dump_it;
+
                 switch(flags & DN_RT_CNTL_MSK) {
         	        case DN_RT_PKT_INIT:
 				dn_dev_init_pkt(skb);
@@ -712,7 +760,7 @@ static int dn_forward(struct sk_buff *skb)
 	 * packets, so we don't need to test for them here.
 	 */
 	cb->rt_flags &= ~DN_RT_F_IE;
-	if (rt->rt_flags | RTCF_DOREDIRECT)
+	if (rt->rt_flags & RTCF_DOREDIRECT)
 		cb->rt_flags |= DN_RT_F_IE;
 
 	return NF_HOOK(PF_DECnet, NF_DN_FORWARD, skb, dev, skb->dev, neigh->output);
@@ -788,8 +836,10 @@ static inline int dn_match_addr(__u16 addr1, __u16 addr2)
 {
 	__u16 tmp = dn_ntohs(addr1) ^ dn_ntohs(addr2);
 	int match = 16;
-	while(tmp)
-		tmp >>= 1, match--;
+	while(tmp) {
+		tmp >>= 1;
+		match--;
+	}
 	return match;
 }
 
@@ -899,17 +949,19 @@ source_ok:
 	/* No destination? Assume its local */
 	if (!fl.fld_dst) {
 		fl.fld_dst = fl.fld_src;
-#if 0
-		if (!fl.fld_dst)
-			/* grab an address from loopback? */
-#endif
+
 		err = -EADDRNOTAVAIL;
 		if (dev_out)
 			dev_put(dev_out);
-		if (!fl.fld_dst)
-			goto out;
 		dev_out = &loopback_dev;
 		dev_hold(dev_out);
+		if (!fl.fld_dst) {
+			fl.fld_dst =
+			fl.fld_src = dnet_select_source(dev_out, 0,
+						       RT_SCOPE_HOST);
+			if (!fl.fld_dst)
+				goto out;
+		}
 		fl.oif = loopback_dev.ifindex;
 		res.type = RTN_LOCAL;
 		goto make_route;
@@ -1061,6 +1113,7 @@ make_route:
 	rt->rt_saddr      = fl.fld_src;
 	rt->rt_daddr      = fl.fld_dst;
 	rt->rt_gateway    = gateway ? gateway : fl.fld_dst;
+	rt->rt_local_src  = fl.fld_src;
 
 	rt->rt_dst_map    = fl.fld_dst;
 	rt->rt_src_map    = fl.fld_src;
@@ -1075,14 +1128,14 @@ make_route:
 	rt->u.dst.input   = dn_rt_bug;
 	rt->rt_flags      = flags;
 	if (flags & RTCF_LOCAL)
-		rt->u.dst.output = dn_nsp_rx;
+		rt->u.dst.input = dn_nsp_rx;
 
-	if (dn_rt_set_next_hop(rt, &res))
+	err = dn_rt_set_next_hop(rt, &res);
+	if (err)
 		goto e_neighbour;
 
 	hash = dn_hash(rt->fl.fld_src, rt->fl.fld_dst);
 	dn_insert_route(rt, hash, (struct dn_route **)pprt);
-	err = 0;
 
 done:
 	if (neigh)
@@ -1175,6 +1228,7 @@ static int dn_route_input_slow(struct sk_buff *skb)
 	unsigned hash;
 	int flags = 0;
 	__u16 gateway = 0;
+	__u16 local_src = 0;
 	struct flowi fl = { .nl_u = { .dn_u = 
 				     { .daddr = cb->dst,
 				       .saddr = cb->src,
@@ -1275,6 +1329,8 @@ static int dn_route_input_slow(struct sk_buff *skb)
 		if (out_dev == in_dev && !(flags & RTCF_NAT))
 			flags |= RTCF_DOREDIRECT;
 
+		local_src = DN_FIB_RES_PREFSRC(res);
+
 	case RTN_BLACKHOLE:
 	case RTN_UNREACHABLE:
 		break;
@@ -1319,6 +1375,8 @@ make_route:
 	rt->rt_gateway    = fl.fld_dst;
 	if (gateway)
 		rt->rt_gateway = gateway;
+	rt->rt_local_src  = local_src ? local_src : rt->rt_saddr;
+
 	rt->rt_dst_map    = fl.fld_dst;
 	rt->rt_src_map    = fl.fld_src;
 
@@ -1352,12 +1410,12 @@ make_route:
 	if (rt->u.dst.dev)
 		dev_hold(rt->u.dst.dev);
 
-	if (dn_rt_set_next_hop(rt, &res))
+	err = dn_rt_set_next_hop(rt, &res);
+	if (err)
 		goto e_neighbour;
 
 	hash = dn_hash(rt->fl.fld_src, rt->fl.fld_dst);
 	dn_insert_route(rt, hash, (struct dn_route **)&skb->dst);
-	err = 0;
 
 done:
 	if (neigh)
@@ -1449,7 +1507,7 @@ static int dn_rt_fill_info(struct sk_buff *skb, u32 pid, u32 seq, int event, int
 	 * they deal only with inputs and not with replies like they do
 	 * currently.
 	 */
-	RTA_PUT(skb, RTA_PREFSRC, 2, &rt->rt_saddr);
+	RTA_PUT(skb, RTA_PREFSRC, 2, &rt->rt_local_src);
 	if (rt->rt_daddr != rt->rt_gateway)
 		RTA_PUT(skb, RTA_GATEWAY, 2, &rt->rt_gateway);
 	if (rtnetlink_put_metrics(skb, rt->u.dst.metrics) < 0)
@@ -1490,6 +1548,7 @@ int dn_cache_getroute(struct sk_buff *in_skb, struct nlmsghdr *nlh, void *arg)
 	struct flowi fl;
 
 	memset(&fl, 0, sizeof(fl));
+	fl.proto = DNPROTO_NSP;
 
 	skb = alloc_skb(NLMSG_GOODSIZE, GFP_KERNEL);
 	if (skb == NULL)
@@ -1609,53 +1668,113 @@ done:
 }
 
 #ifdef CONFIG_PROC_FS
+struct dn_rt_cache_iter_state {
+	int bucket;
+};
 
-static int decnet_cache_get_info(char *buffer, char **start, off_t offset, int length)
+static struct dn_route *dn_rt_cache_get_first(struct seq_file *seq)
 {
-        int len = 0;
-        off_t pos = 0;
-        off_t begin = 0;
-	struct dn_route *rt;
-	int i;
+	struct dn_route *rt = NULL;
+	struct dn_rt_cache_iter_state *s = seq->private;
+
+	for(s->bucket = dn_rt_hash_mask; s->bucket >= 0; --s->bucket) {
+		rcu_read_lock();
+		rt = dn_rt_hash_table[s->bucket].chain;
+		if (rt)
+			break;
+		rcu_read_unlock();
+	}
+	return rt;
+}
+
+static struct dn_route *dn_rt_cache_get_next(struct seq_file *seq, struct dn_route *rt)
+{
+	struct dn_rt_cache_iter_state *s = seq->private;
+
+	smp_read_barrier_depends();
+	rt = rt->u.rt_next;
+	while(!rt) {
+		rcu_read_unlock();
+		if (--s->bucket < 0)
+			break;
+		rcu_read_lock();
+		rt = dn_rt_hash_table[s->bucket].chain;
+	}
+	return rt;
+}
+
+static void *dn_rt_cache_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct dn_route *rt = dn_rt_cache_get_first(seq);
+
+	if (rt) {
+		while(*pos && (rt = dn_rt_cache_get_next(seq, rt)))
+			--*pos;
+	}
+	return *pos ? NULL : rt;
+}
+
+static void *dn_rt_cache_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct dn_route *rt = dn_rt_cache_get_next(seq, v);
+	++*pos;
+	return rt;
+}
+
+static void dn_rt_cache_seq_stop(struct seq_file *seq, void *v)
+{
+	rcu_read_unlock();
+}
+
+static int dn_rt_cache_seq_show(struct seq_file *seq, void *v)
+{
+	struct dn_route *rt = v;
 	char buf1[DN_ASCBUF_LEN], buf2[DN_ASCBUF_LEN];
 
-	for(i = 0; i <= dn_rt_hash_mask; i++) {
-		rcu_read_lock();
-		rt = dn_rt_hash_table[i].chain;
-		for(; rt != NULL; rt = rt->u.rt_next) {
-			read_barrier_depends();
-			len += sprintf(buffer + len, "%-8s %-7s %-7s %04d %04d %04d\n",
-					rt->u.dst.dev ? rt->u.dst.dev->name : "*",
-					dn_addr2asc(dn_ntohs(rt->rt_daddr), buf1),
-					dn_addr2asc(dn_ntohs(rt->rt_saddr), buf2),
-					atomic_read(&rt->u.dst.__refcnt),
-					rt->u.dst.__use,
-					(int) dst_metric(&rt->u.dst, RTAX_RTT)
-					);
-
-
-
-	                pos = begin + len;
-	
-        	        if (pos < offset) {
-                	        len   = 0;
-                        	begin = pos;
-                	}
-              		if (pos > offset + length)
-                	        break;
-		}
-		rcu_read_unlock();
-		if (pos > offset + length)
-			break;
-	}
-
-        *start = buffer + (offset - begin);
-        len   -= (offset - begin);
-
-        if (len > length) len = length;
-
-        return(len);
+	seq_printf(seq, "%-8s %-7s %-7s %04d %04d %04d\n",
+			rt->u.dst.dev ? rt->u.dst.dev->name : "*",
+			dn_addr2asc(dn_ntohs(rt->rt_daddr), buf1),
+			dn_addr2asc(dn_ntohs(rt->rt_saddr), buf2),
+			atomic_read(&rt->u.dst.__refcnt),
+			rt->u.dst.__use,
+			(int) dst_metric(&rt->u.dst, RTAX_RTT));
+	return 0;
 } 
+
+static struct seq_operations dn_rt_cache_seq_ops = {
+	.start	= dn_rt_cache_seq_start,
+	.next	= dn_rt_cache_seq_next,
+	.stop	= dn_rt_cache_seq_stop,
+	.show	= dn_rt_cache_seq_show,
+};
+
+static int dn_rt_cache_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct dn_rt_cache_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+	rc = seq_open(file, &dn_rt_cache_seq_ops);
+	if (rc)
+		goto out_kfree;
+	seq		= file->private_data;
+	seq->private	= s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations dn_rt_cache_seq_fops = {
+	.open	 = dn_rt_cache_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release_private,
+};
 
 #endif /* CONFIG_PROC_FS */
 
@@ -1714,9 +1833,7 @@ void __init dn_route_init(void)
 
         dn_dst_ops.gc_thresh = (dn_rt_hash_mask + 1);
 
-#ifdef CONFIG_PROC_FS
-	proc_net_create("decnet_cache",0,decnet_cache_get_info);
-#endif /* CONFIG_PROC_FS */
+	proc_net_fops_create("decnet_cache", S_IRUGO, &dn_rt_cache_seq_fops);
 }
 
 void __exit dn_route_cleanup(void)

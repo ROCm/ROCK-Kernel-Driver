@@ -43,22 +43,23 @@ extern struct list_head helpers;
 
 extern int ip_nat_helper_register(struct ip_nat_helper *me);
 extern void ip_nat_helper_unregister(struct ip_nat_helper *me);
+
+/* These return true or false. */
 extern int ip_nat_mangle_tcp_packet(struct sk_buff **skb,
 				struct ip_conntrack *ct,
 				enum ip_conntrack_info ctinfo,
 				unsigned int match_offset,
 				unsigned int match_len,
-				char *rep_buffer,
+				const char *rep_buffer,
 				unsigned int rep_len);
 extern int ip_nat_mangle_udp_packet(struct sk_buff **skb,
 				struct ip_conntrack *ct,
 				enum ip_conntrack_info ctinfo,
 				unsigned int match_offset,
 				unsigned int match_len,
-				char *rep_buffer,
+				const char *rep_buffer,
 				unsigned int rep_len);
-extern int ip_nat_seq_adjust(struct sk_buff *skb,
-				struct ip_conntrack *ct,
-				enum ip_conntrack_info ctinfo);
-extern void ip_nat_delete_sack(struct sk_buff *skb);
+extern int ip_nat_seq_adjust(struct sk_buff **pskb, 
+			     struct ip_conntrack *ct, 
+			     enum ip_conntrack_info ctinfo);
 #endif

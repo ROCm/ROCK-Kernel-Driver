@@ -84,6 +84,16 @@ again:
 	return 0;
 }
 
+static int __init has_button_interrupt(struct linux_ebus_device *edev)
+{
+	if (edev->irqs[0] == PCI_IRQ_NONE)
+		return 0;
+	if (!prom_node_has_property(edev->prom_node, "button"))
+		return 0;
+
+	return 1;
+}
+
 void __init power_init(void)
 {
 	struct linux_ebus *ebus;
@@ -106,7 +116,7 @@ found:
 	power_reg = (unsigned long)ioremap(edev->resource[0].start, 0x4);
 	printk("power: Control reg at %016lx ... ", power_reg);
 	poweroff_method = machine_halt;  /* able to use the standard halt */
-	if (edev->irqs[0] != PCI_IRQ_NONE) {
+	if (has_button_interrupt(edev)) {
 		if (kernel_thread(powerd, 0, CLONE_FS) < 0) {
 			printk("Failed to start power daemon.\n");
 			return;

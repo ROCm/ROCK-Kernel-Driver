@@ -5,8 +5,7 @@
 #define IPX_NODE_LEN	6
 #define IPX_MTU		576
 
-struct sockaddr_ipx
-{
+struct sockaddr_ipx {
 	sa_family_t	sipx_family;
 	__u16		sipx_port;
 	__u32		sipx_network;
@@ -16,9 +15,8 @@ struct sockaddr_ipx
 };
 
 /*
- *	So we can fit the extra info for SIOCSIFADDR into the address nicely
+ * So we can fit the extra info for SIOCSIFADDR into the address nicely
  */
- 
 #define sipx_special	sipx_port
 #define sipx_action	sipx_zero
 #define IPX_DLTITF	0
@@ -56,14 +54,13 @@ struct ipx_config_data {
  * OLD Route Definition for backward compatibility.
  */
 
-struct ipx_route_def
-{
-	__u32         ipx_network;
-	__u32         ipx_router_network;
+struct ipx_route_def {
+	__u32		ipx_network;
+	__u32		ipx_router_network;
 #define IPX_ROUTE_NO_ROUTER	0
-	unsigned char ipx_router_node[IPX_NODE_LEN];
-	unsigned char ipx_device[16];
-	unsigned short ipx_flags;
+	unsigned char	ipx_router_node[IPX_NODE_LEN];
+	unsigned char	ipx_device[16];
+	unsigned short	ipx_flags;
 #define IPX_RT_SNAP		8
 #define IPX_RT_8022		4
 #define IPX_RT_BLUEBOOK		2
@@ -71,7 +68,7 @@ struct ipx_route_def
 };
 
 #define SIOCAIPXITFCRT		(SIOCPROTOPRIVATE)
-#define SIOCAIPXPRISLT		(SIOCPROTOPRIVATE+1)
-#define SIOCIPXCFGDATA		(SIOCPROTOPRIVATE+2)
-#define SIOCIPXNCPCONN		(SIOCPROTOPRIVATE+3)
-#endif /* def _IPX_H_ */
+#define SIOCAIPXPRISLT		(SIOCPROTOPRIVATE + 1)
+#define SIOCIPXCFGDATA		(SIOCPROTOPRIVATE + 2)
+#define SIOCIPXNCPCONN		(SIOCPROTOPRIVATE + 3)
+#endif /* _IPX_H_ */
