@@ -354,7 +354,7 @@ _GLOBAL(_nmask_and_or_msr)
  * Flush MMU TLB
  */
 _GLOBAL(_tlbia)
-#if defined(CONFIG_4xx) && defined(CONFIG_PIN_TLB)
+#if defined(CONFIG_40x) && defined(CONFIG_PIN_TLB)
 	/* This needs to be coordinated with other pinning functions since
 	 * we don't keep a memory location of number of entries to reduce
 	 * cache pollution during these operations.
@@ -401,14 +401,14 @@ _GLOBAL(_tlbia)
 	tlbia
 	sync
 #endif /* CONFIG_SMP */
-#endif /* CONFIG_4xx */
+#endif /* defined(CONFIG_40x) && defined(CONFIG_PIN_TLB) */
 	blr	
 
 /*
  * Flush MMU TLB for a particular address
  */
 _GLOBAL(_tlbie)
-#ifdef CONFIG_4xx
+#ifdef CONFIG_40x
 	tlbsx.	r3, 0, r3
 	bne	10f
 	sync
@@ -418,7 +418,7 @@ _GLOBAL(_tlbie)
 	tlbwe	r3, r3, TLB_TAG
 	isync
 10:
-#else
+#else /* ! CONFIG_40x */
 #if defined(CONFIG_SMP)
 	rlwinm	r8,r1,0,0,18
 	lwz	r8,TI_CPU(r8)
@@ -451,7 +451,7 @@ _GLOBAL(_tlbie)
 	tlbie	r3
 	sync
 #endif /* CONFIG_SMP */
-#endif /* CONFIG_4xx */
+#endif /* ! CONFIG_40x */
 	blr
 
 /*
@@ -463,7 +463,7 @@ _GLOBAL(flush_instruction_cache)
 	isync
 	lis	r5, IDC_INVALL@h
 	mtspr	IC_CST, r5
-#elif defined(CONFIG_4xx)
+#elif defined(CONFIG_40x)
 #ifdef CONFIG_403GCX
 	li      r3, 512
 	mtctr   r3

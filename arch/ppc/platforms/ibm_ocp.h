@@ -1,5 +1,5 @@
 /*
- * ibm_ips.h
+ * ibm_ocp.h
  *
  *	This was dirived from the ppc4xx.h and all 405GP specific definition and board
  *	inclusions where moved here.
@@ -36,8 +36,8 @@
  */
 
 #ifdef __KERNEL__
-#ifndef __ASM_IBM_IPS_H__
-#define __ASM_IBM_IPS_H__
+#ifndef __ASM_IBM_OCP_H__
+#define __ASM_IBM_OCP_H__
 
 #ifndef __ASSEMBLY__
 #include <linux/types.h>
@@ -188,5 +188,5 @@ typedef struct ide_regs {
 } ide_t;
 
 #endif				/* __ASSEMBLY__ */
-#endif				/* __ASM_IBM_IPS_H__ */
+#endif				/* __ASM_IBM_OCP_H__ */
 #endif				/* __KERNEL__ */

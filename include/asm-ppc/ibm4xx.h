@@ -16,7 +16,7 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_4xx
+#ifdef CONFIG_40x
 
 #if defined(CONFIG_ASH)
 #include <platforms/ash.h>
@@ -54,9 +54,7 @@
 #define PPC4xx_MACHINE_NAME	"Unidentified 4xx class"
 #endif
 
-#ifndef NR_BOARD_IRQS
-#define NR_BOARD_IRQS 0
-#endif
+
 
 /* IO_BASE is for PCI I/O.
  * ISA not supported, just here to resolve copilation.
@@ -95,6 +93,6 @@ extern unsigned char __res[];
 		asm volatile("mtdcr " stringify(rn) ",%0" : : "r" (v));}
 
 #endif /* __ASSEMBLY__ */
-#endif /* CONFIG_4xx */
+#endif /* CONFIG_40x */
 #endif /* __ASM_IBM4XX_H__ */
 #endif /* __KERNEL__ */

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.start.c 1.10 07/25/01 18:13:07 trini
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * Copyright (C) Paul Mackerras 1997.
@@ -14,7 +14,7 @@
 extern int strlen(const char *s);
 extern void boot(int a1, int a2, void *prom);
 
-int (*prom)();
+int (*prom)(void *);
 
 void *chosen_handle;
 void *stdin;
@@ -29,7 +29,7 @@ void printk(char *fmt, ...);
 void
 start(int a1, int a2, void *promptr)
 {
-    prom = (int (*)()) promptr;
+    prom = (int (*)(void *)) promptr;
     chosen_handle = finddevice("/chosen");
     if (chosen_handle == (void *) -1)
 	exit();

@@ -283,7 +283,7 @@ struct cpu_spec	cpu_specs[] = {
 	__setup_cpu_8xx	/* Empty */
     },
 #endif /* CONFIG_8xx */
-#ifdef CONFIG_4xx
+#ifdef CONFIG_40x
     {	/* 403GC */
     	0xffffff00, 0x00200200, "403GC",
     	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
@@ -333,7 +333,38 @@ struct cpu_spec	cpu_specs[] = {
 	16, 8,
 	0, /*__setup_cpu_405 */
     },
-#endif /* CONFIG_4xx */
+    {	/* NP4GS3 */
+    	0xffff0000, 0x40B10000, "NP4GS3",
+    	CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+    	PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+	16, 8,
+	0, /*__setup_cpu_405 */
+    },
+    {   /* NP405H */
+        0xffff0000, 0x41410000, "NP405H",
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU | PPC_FEATURE_HAS_4xxMAC,
+        16, 8,
+        0, /*__setup_cpu_405 */
+     },
+
+#endif /* CONFIG_40x */
+#ifdef CONFIG_440
+    { /* 440GP Rev. B */
+        0xf0000fff, 0x40000440, "440GP Rev. B",
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+        32, 32,
+        0, /*__setup_cpu_440 */
+    },
+    { /* 440GP Rev. C */
+        0xf0000fff, 0x40000481, "440GP Rev. C",
+        CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB,
+        PPC_FEATURE_32 | PPC_FEATURE_HAS_MMU,
+        32, 32,
+        0, /*__setup_cpu_440 */
+    },
+#endif /* CONFIG_440 */
 #if !CLASSIC_PPC
     {	/* default match */
     	0x00000000, 0x00000000, "(generic PPC)",

@@ -21,7 +21,7 @@ CFLAGS_btext.o		+= -mrelocatable-lib
 
 # Start off with 'head.o', change as needed.
 HEAD-y				:= head.o
-HEAD-$(CONFIG_4xx)		:= head_4xx.o
+HEAD-$(CONFIG_40x)		:= head_4xx.o
 HEAD-$(CONFIG_8xx)		:= head_8xx.o
 HEAD-$(CONFIG_PPC_ISERIES)	:= iSeries_head.o
 
@@ -54,19 +54,18 @@ obj-$(CONFIG_PM)		+= ppc4xx_pm.o
 endif
 obj-$(CONFIG_8xx)		+= m8xx_setup.o ppc8xx_pic.o
 ifeq ($(CONFIG_8xx),y)
-obj-$(CONFIG_PCI)		+= qspan_pci.o
-ifndef CONFIG_MATH_EMULATION
+obj-$(CONFIG_PCI)		+= qspan_pci.o i8259.o
+ifneq ($(CONFIG_MATH_EMULATION),n)
 obj-y				+= softemu8xx.o
 endif
 endif
-obj-$(CONFIG_MBX)		+= i8259.o
 obj-$(CONFIG_ALL_PPC)		+= prom_init.o prom.o open_pic.o \
 					indirect_pci.o i8259.o
 obj-$(CONFIG_ADIR)		+= i8259.o indirect_pci.o pci_auto.o \
 					todc_time.o
 obj-$(CONFIG_EV64260)		+= gt64260_common.o gt64260_pic.o \
 					indirect_pci.o todc_time.o pci_auto.o
-obj-$(CONFIG_GEMINI)		+= open_pic.o
+obj-$(CONFIG_GEMINI)		+= open_pic.o i8259.o
 obj-$(CONFIG_K2)		+= i8259.o indirect_pci.o todc_time.o \
 					pci_auto.o
 obj-$(CONFIG_LOPEC)		+= mpc10x_common.o indirect_pci.o pci_auto.o \

@@ -6,7 +6,7 @@
  * Author: Dan Cox
  *         danc@mvista.com (or, alternately, source@mvista.com)
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -14,18 +14,11 @@
  * option) any later version.
  */
 
-#include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/slab.h>
 
 #include <asm/machdep.h>
-#include <asm/byteorder.h>
-#include <asm/io.h>
-#include <asm/irq.h>
-#include <asm/uaccess.h>
 #include <asm/pci-bridge.h>
-#include <asm/open_pic.h>
 #include <asm/mpc10x.h>
 
 static inline int __init
