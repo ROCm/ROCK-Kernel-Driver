@@ -679,6 +679,8 @@ void __init eeh_init(void)
 		printk(KERN_WARNING "EEH: RTAS not found !\n");
 		return;
 	}
+
+	init_pci_config_tokens();
 	
 	ibm_set_eeh_option = rtas_token("ibm,set-eeh-option");
 	ibm_set_slot_reset = rtas_token("ibm,set-slot-reset");
@@ -707,7 +709,6 @@ void __init eeh_init(void)
 	}
 
 	/* Enable EEH for all adapters.  Note that eeh requires buid's */
-	init_pci_config_tokens();
 	for (phb = of_find_node_by_name(NULL, "pci"); phb;
 	     phb = of_find_node_by_name(phb, "pci")) {
 		unsigned long buid;
