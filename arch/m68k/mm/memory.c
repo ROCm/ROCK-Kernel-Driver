@@ -371,46 +371,51 @@ unsigned long mm_ptov (unsigned long paddr)
 #endif
 
 /* invalidate page in both caches */
-#define	clear040(paddr)					\
-	__asm__ __volatile__ ("nop\n\t"			\
-			      ".chip 68040\n\t"		\
-			      "cinvp %%bc,(%0)\n\t"	\
-			      ".chip 68k"		\
-			      : : "a" (paddr))
+static inline void clear040(unsigned long paddr)
+{
+	asm volatile (
+		"nop\n\t"
+		".chip 68040\n\t"
+		"cinvp %%bc,(%0)\n\t"
+		".chip 68k"
+		: : "a" (paddr));
+}
 
 /* invalidate page in i-cache */
-#define	cleari040(paddr)				\
-	__asm__ __volatile__ ("nop\n\t"			\
-			      ".chip 68040\n\t"		\
-			      "cinvp %%ic,(%0)\n\t"	\
-			      ".chip 68k"		\
-			      : : "a" (paddr))
+static inline void cleari040(unsigned long paddr)
+{
+	asm volatile (
+		"nop\n\t"
+		".chip 68040\n\t"
+		"cinvp %%ic,(%0)\n\t"
+		".chip 68k"
+		: : "a" (paddr));
+}
 
 /* push page in both caches */
-#define	push040(paddr)					\
-	__asm__ __volatile__ ("nop\n\t"			\
-			      ".chip 68040\n\t"		\
-			      "cpushp %%bc,(%0)\n\t"	\
-			      ".chip 68k"		\
-			      : : "a" (paddr))
+/* RZ: cpush %bc DOES invalidate %ic, regardless of DPI */
+static inline void push040(unsigned long paddr)
+{
+	asm volatile (
+		"nop\n\t"
+		".chip 68040\n\t"
+		"cpushp %%bc,(%0)\n\t"
+		".chip 68k"
+		: : "a" (paddr));
+}
 
 /* push and invalidate page in both caches, must disable ints
  * to avoid invalidating valid data */
-#define	pushcl040(paddr)			\
-	do { unsigned long flags;               \
-             save_flags(flags);                 \
-	     cli();                             \
-             push040(paddr);			\
-	     if (CPU_IS_060) clear040(paddr);	\
-	     restore_flags(flags);              \
-	} while(0)
+static inline void pushcl040(unsigned long paddr)
+{
+	unsigned long flags;
 
-/* push page in both caches, invalidate in i-cache */
-/* RZ: cpush %bc DOES invalidate %ic, regardless of DPI */
-#define	pushcli040(paddr)			\
-	do { push040(paddr);			\
-	} while(0)
-
+	local_irq_save(flags);
+	push040(paddr);
+	if (CPU_IS_060)
+		clear040(paddr);
+	local_irq_restore(flags);
+}
 
 /*
  * 040: Hit every page containing an address in the range paddr..paddr+len-1.
@@ -504,7 +509,7 @@ void cache_push (unsigned long paddr, int len)
 	paddr &= PAGE_MASK;
 
 	do {
-	    pushcli040(paddr);
+	    push040(paddr);
 	    paddr += tmp;
 	} while ((len -= tmp) > 0);
     }
@@ -529,12 +534,6 @@ void cache_push (unsigned long paddr, int len)
 #endif
 }
 
-
-#undef clear040
-#undef cleari040
-#undef push040
-#undef pushcl040
-#undef pushcli040
 
 #ifndef CONFIG_SINGLE_MEMORY_CHUNK
 int mm_end_of_chunk (unsigned long addr, int len)
