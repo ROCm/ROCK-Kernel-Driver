@@ -43,17 +43,17 @@ MODULE_LICENSE("GPL");
 
 static int gc[] __initdata = { -1, 0, 0, 0, 0, 0 };
 static int gc_nargs __initdata = 0;
-module_param_array_named(map, gc, int, gc_nargs, 0);
+module_param_array_named(map, gc, int, &gc_nargs, 0);
 MODULE_PARM_DESC(map, "Describers first set of devices (<parport#>,<pad1>,<pad2>,..<pad5>)");
 
 static int gc_2[] __initdata = { -1, 0, 0, 0, 0, 0 };
 static int gc_nargs_2 __initdata = 0;
-module_param_array_named(map2, gc_2, int, gc_nargs_2, 0);
+module_param_array_named(map2, gc_2, int, &gc_nargs_2, 0);
 MODULE_PARM_DESC(map2, "Describers second set of devices");
 
 static int gc_3[] __initdata = { -1, 0, 0, 0, 0, 0 };
 static int gc_nargs_3 __initdata = 0;
-module_param_array_named(map3, gc_3, int, gc_nargs_3, 0);
+module_param_array_named(map3, gc_3, int, &gc_nargs_3, 0);
 MODULE_PARM_DESC(map3, "Describers third set of devices");
 
 __obsolete_setup("gc=");

@@ -369,16 +369,16 @@ static struct {
 	};
 
 
-module_param_array(file, charp, mod_data.num_filenames, S_IRUGO);
+module_param_array(file, charp, &mod_data.num_filenames, S_IRUGO);
 MODULE_PARM_DESC(file, "names of backing files or devices");
 
-module_param_array(ro, bool, mod_data.num_ros, S_IRUGO);
+module_param_array(ro, bool, &mod_data.num_ros, S_IRUGO);
 MODULE_PARM_DESC(ro, "true to force read-only");
 
-module_param_named(luns, mod_data.nluns, uint, S_IRUGO);
+module_param_named(luns, &mod_data.nluns, uint, S_IRUGO);
 MODULE_PARM_DESC(luns, "number of LUNs");
 
-module_param_named(removable, mod_data.removable, bool, S_IRUGO);
+module_param_named(removable, &mod_data.removable, bool, S_IRUGO);
 MODULE_PARM_DESC(removable, "true to simulate removable media");
 
 

@@ -282,9 +282,8 @@ static u8	dc390_adapterCnt = 0;
 
 /* Startup values, to be overriden on the commandline */
 static int tmscsim[] = {-2, -2, -2, -2, -2, -2};
-static int tmscsim_paramnum = ARRAY_SIZE(tmscsim);
 
-module_param_array(tmscsim, int, tmscsim_paramnum, 0);
+module_param_array(tmscsim, int, NULL, 0);
 MODULE_PARM_DESC(tmscsim, "Host SCSI ID, Speed (0=10MHz), Device Flags, Adapter Flags, Max Tags (log2(tags)-1), DelayReset (s)");
 MODULE_AUTHOR("C.L. Huang / Kurt Garloff");
 MODULE_DESCRIPTION("SCSI host adapter driver for Tekram DC390 and other AMD53C974A based PCI SCSI adapters");

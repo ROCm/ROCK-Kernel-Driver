@@ -109,7 +109,7 @@ module_param(tcic_base, int, 0444);
 module_param(ignore, int, 0444);
 module_param(do_scan, int, 0444);
 module_param(irq_mask, int, 0444);
-module_param_array(irq_list, int, irq_list_count, 0444);
+module_param_array(irq_list, int, &irq_list_count, 0444);
 module_param(cs_irq, int, 0444);
 module_param(poll_interval, int, 0444);
 module_param(poll_quick, int, 0444);

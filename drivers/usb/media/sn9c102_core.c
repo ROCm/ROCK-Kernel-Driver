@@ -53,8 +53,7 @@ MODULE_VERSION(SN9C102_MODULE_VERSION);
 MODULE_LICENSE(SN9C102_MODULE_LICENSE);
 
 static short video_nr[] = {[0 ... SN9C102_MAX_DEVICES-1] = -1};
-static unsigned int nv;
-module_param_array(video_nr, short, nv, 0444);
+module_param_array(video_nr, short, NULL, 0444);
 MODULE_PARM_DESC(video_nr,
                  "\n<-1|n[,...]> Specify V4L2 minor mode number."
                  "\n -1 = use next available (default)"

@@ -1484,8 +1484,7 @@ static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 };
 
 static int __initdata addr[2];
-static int __initdata num;
-module_param_array(addr, int, num, 0444);
+module_param_array(addr, int, NULL, 0444);
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
 
 void __init dn_dev_init(void)
