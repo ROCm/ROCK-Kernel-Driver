@@ -678,7 +678,7 @@ static inline void __remove_assoc_queue(struct buffer_head *bh)
 
 int inode_has_buffers(struct inode *inode)
 {
-	return !list_empty(&inode->i_mapping->private_list);
+	return !list_empty(&inode->i_data.private_list);
 }
 
 /*
@@ -858,7 +858,7 @@ int fsync_buffers_list(spinlock_t *lock, struct list_head *list)
 void invalidate_inode_buffers(struct inode *inode)
 {
 	if (inode_has_buffers(inode)) {
-		struct address_space *mapping = inode->i_mapping;
+		struct address_space *mapping = &inode->i_data;
 		struct list_head *list = &mapping->private_list;
 		struct address_space *buffer_mapping = mapping->assoc_mapping;
 
@@ -867,6 +867,35 @@ void invalidate_inode_buffers(struct inode *inode)
 			__remove_assoc_queue(BH_ENTRY(list->next));
 		spin_unlock(&buffer_mapping->private_lock);
 	}
+}
+
+/*
+ * Remove any clean buffers from the inode's buffer list.  This is called
+ * when we're trying to free the inode itself.  Those buffers can pin it.
+ *
+ * Returns true if all buffers were removed.
+ */
+int remove_inode_buffers(struct inode *inode)
+{
+	int ret = 1;
+
+	if (inode_has_buffers(inode)) {
+		struct address_space *mapping = &inode->i_data;
+		struct list_head *list = &mapping->private_list;
+		struct address_space *buffer_mapping = mapping->assoc_mapping;
+
+		spin_lock(&buffer_mapping->private_lock);
+		while (!list_empty(list)) {
+			struct buffer_head *bh = BH_ENTRY(list->next);
+			if (buffer_dirty(bh)) {
+				ret = 0;
+				break;
+			}
+			__remove_assoc_queue(bh);
+		}
+		spin_unlock(&buffer_mapping->private_lock);
+	}
+	return ret;
 }
 
 /*
