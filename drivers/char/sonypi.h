@@ -258,7 +258,7 @@ struct sonypi_device {
 	while (--n && (command)) \
 		udelay(1); \
 	if (!n && (verbose || !quiet)) \
-		printk(KERN_WARNING "sonypi command failed at " __FILE__ " : " __FUNCTION__ "(line %d)\n", __LINE__); \
+		printk(KERN_WARNING "sonypi command failed at %s : %s(line %d)\n", __FILE__, __FUNCTION__, __LINE__); \
 }
 
 #endif /* __KERNEL__ */
