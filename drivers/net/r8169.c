@@ -495,6 +495,13 @@ static void rtl8169_irq_mask_and_ack(void __iomem *ioaddr)
 	RTL_W16(IntrStatus, 0xffff);
 }
 
+static void rtl8169_asic_down(void __iomem *ioaddr)
+{
+	RTL_W8(ChipCmd, 0x00);
+	rtl8169_irq_mask_and_ack(ioaddr);
+	RTL_R16(CPlusCmd);
+}
+
 static unsigned int rtl8169_tbi_reset_pending(void __iomem *ioaddr)
 {
 	return RTL_R32(TBICSR) & TBIReset;
@@ -2260,8 +2267,10 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		handled = 1;
 
-		if (unlikely(!netif_running(dev)))
-			goto out_asic_stop;
+		if (unlikely(!netif_running(dev))) {
+			rtl8169_asic_down(ioaddr);
+			goto out;
+		}
 
 		status &= tp->intr_mask;
 		RTL_W16(IntrStatus,
@@ -2310,12 +2319,6 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	}
 out:
 	return IRQ_RETVAL(handled);
-
-out_asic_stop:
-	RTL_W8(ChipCmd, 0x00);
-	rtl8169_irq_mask_and_ack(ioaddr);
-	RTL_R16(CPlusCmd);
-	goto out;
 }
 
 #ifdef CONFIG_R8169_NAPI
@@ -2363,11 +2366,7 @@ static void rtl8169_down(struct net_device *dev)
 core_down:
 	spin_lock_irq(&tp->lock);
 
-	/* Stop the chip's Tx and Rx DMA processes. */
-	RTL_W8(ChipCmd, 0x00);
-
-	/* Disable interrupts by clearing the interrupt mask. */
-	RTL_W16(IntrMask, 0x0000);
+	rtl8169_asic_down(ioaddr);
 
 	/* Update the error counts. */
 	tp->stats.rx_missed_errors += RTL_R32(RxMissed);
