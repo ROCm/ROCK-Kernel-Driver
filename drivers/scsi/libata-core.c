@@ -34,6 +34,7 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
+#include <linux/suspend.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include "hosts.h"
