@@ -1258,7 +1258,6 @@ asmlinkage void schedule(void)
 		}
 	}
 
-	check_highmem_ptes();
 need_resched:
 	preempt_disable();
 	prev = current;
