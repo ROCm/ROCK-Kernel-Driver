@@ -1,7 +1,7 @@
 /* linux/arch/arm/mach-bast/dma.c
  *
  * (c) 2003,2004 Simtec Electronics
- * Ben Dooks <ben@simtec.co.uk>
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * S3C2410 DMA core
  *
@@ -12,6 +12,7 @@
  * published by the Free Software Foundation.
  *
  * Changelog:
+ *  10-Nov-2004 BJD  Use sys_device and sysdev_class for power management
  *  08-Aug-2004 BJD  Apply rmk's suggestions
  *  21-Jul-2004 BJD  Ported to linux 2.6
  *  12-Jul-2004 BJD  Finished re-write and change of API
@@ -38,6 +39,7 @@
 #include <linux/sched.h>
 #include <linux/spinlock.h>
 #include <linux/interrupt.h>
+#include <linux/sysdev.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
 #include <linux/delay.h>
@@ -1042,12 +1044,55 @@ int s3c2410_dma_devconfig(int channel,
 	return -EINVAL;
 }
 
+/* system device class */
+
+#ifdef CONFIG_PM
+
+static int s3c2410_dma_suspend(struct sys_device *dev, u32 state)
+{
+	s3c2410_dma_chan_t *cp = container_of(dev, s3c2410_dma_chan_t, dev);
+
+	printk(KERN_DEBUG "suspending dma channel %d\n", cp->number);
+
+	if (dma_rdreg(cp, S3C2410_DMA_DMASKTRIG) & S3C2410_DMASKTRIG_ON) {
+		/* the dma channel is still working, which is probably
+		 * a bad thing to do over suspend/resume. We stop the
+		 * channel and assume that the client is either going to
+		 * retry after resume, or that it is broken.
+		 */
+
+		printk(KERN_INFO "dma: stopping channel %d due to suspend\n",
+		       cp->number);
+
+		s3c2410_dma_dostop(cp);
+	}
+
+	return 0;
+}
+
+static int s3c2410_dma_resume(struct sys_device *dev)
+{
+	return 0;
+}
+
+#else
+#define s3c2410_dma_suspend NULL
+#define s3c2410_dma_resume  NULL
+#endif /* CONFIG_PM */
+
+static struct sysdev_class dma_sysclass = {
+	set_kset_name("s3c24xx-dma"),
+	.suspend	= s3c2410_dma_suspend,
+	.resume		= s3c2410_dma_resume,
+};
+
 /* initialisation code */
 
 static int __init s3c2410_init_dma(void)
 {
-	int channel;
 	s3c2410_dma_chan_t *cp;
+	int channel;
+	int ret;
 
 	printk("S3C2410 DMA Driver, (c) 2003-2004 Simtec Electronics\n");
 
@@ -1055,6 +1100,12 @@ static int __init s3c2410_init_dma(void)
 	if (dma_base == NULL) {
 		printk(KERN_ERR "dma failed to remap register block\n");
 		return -ENOMEM;
+	}
+
+	ret = sysdev_class_register(&dma_sysclass);
+	if (ret != 0) {
+		printk(KERN_ERR "dma sysclass registration failed\n");
+		goto err;
 	}
 
 	for (channel = 0; channel < S3C2410_DMA_CHANNELS; channel++) {
@@ -1075,11 +1126,22 @@ static int __init s3c2410_init_dma(void)
 
 		cp->load_timeout = 1<<18;
 
+		/* register system device */
+
+		cp->dev.cls = &dma_sysclass;
+		cp->dev.id  = channel;
+		ret = sysdev_register(&cp->dev);
+
 		printk("DMA channel %d at %p, irq %d\n",
 		       cp->number, cp->regs, cp->irq);
 	}
 
 	return 0;
+
+ err:
+	iounmap(dma_base);
+	dma_base = NULL;
+	return ret;
 }
 
 __initcall(s3c2410_init_dma);

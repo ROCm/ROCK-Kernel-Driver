@@ -1,7 +1,7 @@
 /* linux/include/asm-arm/arch-bast/dma.h
  *
- * Copyright (C) 2003 Simtec Electronics
- *  Ben Dooks <ben@simtec.co.uk>
+ * Copyright (C) 2003,2004 Simtec Electronics
+ *	Ben Dooks <ben@simtec.co.uk>
  *
  * Samsung S3C2410X DMA support
  *
@@ -12,13 +12,14 @@
  * Changelog:
  *  ??-May-2003 BJD   Created file
  *  ??-Jun-2003 BJD   Added more dma functionality to go with arch
+ *  10-Nov-2004 BJD   Added sys_device support
 */
 
-
 #ifndef __ASM_ARCH_DMA_H
-#define __ASM_ARCH_DMA_H
+#define __ASM_ARCH_DMA_H __FILE__
 
 #include <linux/config.h>
+#include <linux/sysdev.h>
 #include "hardware.h"
 
 
@@ -215,6 +216,9 @@ struct s3c2410_dma_chan_s {
 	s3c2410_dma_buf_t      *curr;        /* current dma buffer */
 	s3c2410_dma_buf_t      *next;        /* next buffer to load */
 	s3c2410_dma_buf_t      *end;         /* end of queue */
+
+	/* system device */
+	struct sys_device	dev;
 };
 
 /* the currently allocated channel information */
