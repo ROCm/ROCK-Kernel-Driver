@@ -455,8 +455,12 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct sk_buff *buff;
-	int nsize = skb->len - len;
+	int nsize;
 	u16 flags;
+
+	nsize = skb_headlen(skb) - len;
+	if (nsize < 0)
+		nsize = 0;
 
 	if (skb_cloned(skb) &&
 	    skb_is_nonlinear(skb) &&

@@ -200,5 +200,16 @@ void gen_kill_estimator(struct gnet_stats_basic *bstats,
 	}
 }
 
+int
+gen_replace_estimator(struct gnet_stats_basic *bstats,
+	struct gnet_stats_rate_est *rate_est, spinlock_t *stats_lock,
+	struct rtattr *opt)
+{
+    gen_kill_estimator(bstats, rate_est);
+    return gen_new_estimator(bstats, rate_est, stats_lock, opt);
+}
+    
+
 EXPORT_SYMBOL(gen_kill_estimator);
 EXPORT_SYMBOL(gen_new_estimator);
+EXPORT_SYMBOL(gen_replace_estimator);

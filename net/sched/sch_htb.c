@@ -735,7 +735,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	}
     } else if (!cl) {
 	    if (NET_XMIT_DROP == ret) {
-		    sch->stats.drops++;
+		    sch->qstats.drops++;
 	    }
 	    return ret;
     }
@@ -747,13 +747,13 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	    q->direct_pkts++;
 	} else {
 	    kfree_skb (skb);
-	    sch->stats.drops++;
+	    sch->qstats.drops++;
 	    return NET_XMIT_DROP;
 	}
     }
 #endif
     else if (cl->un.leaf.q->enqueue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	cl->stats.drops++;
 	return NET_XMIT_DROP;
     } else {
@@ -762,7 +762,7 @@ static int htb_enqueue(struct sk_buff *skb, struct Qdisc *sch)
     }
 
     sch->q.qlen++;
-    sch->stats.packets++; sch->stats.bytes += skb->len;
+    sch->bstats.packets++; sch->bstats.bytes += skb->len;
     HTB_DBG(1,1,"htb_enq_ok cl=%X skb=%p\n",(cl && cl != HTB_DIRECT)?cl->classid:0,skb);
     return NET_XMIT_SUCCESS;
 }
@@ -783,11 +783,11 @@ static int htb_requeue(struct sk_buff *skb, struct Qdisc *sch)
             __skb_queue_head(&q->direct_queue, skb);
             tskb = __skb_dequeue_tail(&q->direct_queue);
             kfree_skb (tskb);
-            sch->stats.drops++;
+            sch->qstats.drops++;
             return NET_XMIT_CN;	
 	}
     } else if (cl->un.leaf.q->ops->requeue(skb, cl->un.leaf.q) != NET_XMIT_SUCCESS) {
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	cl->stats.drops++;
 	return NET_XMIT_DROP;
     } else 
@@ -1117,7 +1117,7 @@ static void htb_delay_by(struct Qdisc *sch,long delay)
 	/* why don't use jiffies here ? because expires can be in past */
 	mod_timer(&q->timer, q->jiffies + delay);
 	sch->flags |= TCQ_F_THROTTLED;
-	sch->stats.overlimits++;
+	sch->qstats.overlimits++;
 	HTB_DBG(3,1,"htb_deq t_delay=%ld\n",delay);
 }
 
@@ -1332,8 +1332,6 @@ static int htb_dump(struct Qdisc *sch, struct sk_buff *skb)
 	RTA_PUT(skb, TCA_OPTIONS, 0, NULL);
 	RTA_PUT(skb, TCA_HTB_INIT, sizeof(gopt), &gopt);
 	rta->rta_len = skb->tail - b;
-	sch->stats.qlen = sch->q.qlen;
-	RTA_PUT(skb, TCA_STATS, sizeof(sch->stats), &sch->stats);
 	HTB_QUNLOCK(sch);
 	return skb->len;
 rtattr_failure:

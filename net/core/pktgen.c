@@ -603,8 +603,10 @@ static void show_results(struct pktgen_info* info, int nr_frags)
 	do_div(idle, cpu_speed);
 
 	p += sprintf(p, "OK: %llu(c%llu+d%lu) usec, %llu (%dbyte,%dfrags)\n",
-		     total, total - idle, idle,
-		     info->sofar, size, nr_frags);
+		     (unsigned long long) total,
+		     (unsigned long long) (total - idle), idle,
+		     (unsigned long long) info->sofar,
+		     size, nr_frags);
 
 	pps = info->sofar * USEC_PER_SEC;
 	
@@ -620,7 +622,10 @@ static void show_results(struct pktgen_info* info, int nr_frags)
 	mbps = bps;
 	do_div(mbps, 1000000);
 	p += sprintf(p, "  %llupps %lluMb/sec (%llubps) errors: %llu",
-		     pps, mbps, bps, info->errors);
+		     (unsigned long long) pps,
+		     (unsigned long long) mbps,
+		     (unsigned long long) bps,
+		     (unsigned long long) info->errors);
 }
 
 static void inject(struct pktgen_info* info)

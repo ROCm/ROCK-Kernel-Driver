@@ -433,8 +433,8 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 #endif
 		if ((ret = cl->q->enqueue(skb, cl->q)) == NET_XMIT_SUCCESS) {
 			sch->q.qlen++;
-			sch->stats.packets++;
-			sch->stats.bytes+=len;
+			sch->bstats.packets++;
+			sch->bstats.bytes+=len;
 			cbq_mark_toplevel(q, cl);
 			if (!cl->next_alive)
 				cbq_activate_class(cl);
@@ -443,7 +443,7 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	}
 
 #ifndef CONFIG_NET_CLS_ACT
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	if (cl == NULL)
 		kfree_skb(skb);
 	else {
@@ -452,7 +452,7 @@ cbq_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	}
 #else
 	if ( NET_XMIT_DROP == ret) {
-		sch->stats.drops++;
+		sch->qstats.drops++;
 	}
 
 	if (cl != NULL) {
@@ -472,7 +472,7 @@ cbq_requeue(struct sk_buff *skb, struct Qdisc *sch)
 
 	if ((cl = q->tx_class) == NULL) {
 		kfree_skb(skb);
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return NET_XMIT_CN;
 	}
 	q->tx_class = NULL;
@@ -489,7 +489,7 @@ cbq_requeue(struct sk_buff *skb, struct Qdisc *sch)
 			cbq_activate_class(cl);
 		return 0;
 	}
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	cl->stats.drops++;
 	return ret;
 }
@@ -729,17 +729,17 @@ static int cbq_reshape_fail(struct sk_buff *skb, struct Qdisc *child)
 
 		if (cl->q->enqueue(skb, cl->q) == 0) {
 			sch->q.qlen++;
-			sch->stats.packets++;
-			sch->stats.bytes+=len;
+			sch->bstats.packets++;
+			sch->bstats.bytes+=len;
 			if (!cl->next_alive)
 				cbq_activate_class(cl);
 			return 0;
 		}
-		sch->stats.drops++;
+		sch->qstats.drops++;
 		return 0;
 	}
 
-	sch->stats.drops++;
+	sch->qstats.drops++;
 	return -1;
 }
 #endif
@@ -1090,7 +1090,7 @@ cbq_dequeue(struct Qdisc *sch)
 	   Sigh... start watchdog timer in the last case. */
 
 	if (sch->q.qlen) {
-		sch->stats.overlimits++;
+		sch->qstats.overlimits++;
 		if (q->wd_expires) {
 			long delay = PSCHED_US2JIFFIE(q->wd_expires);
 			if (delay <= 0)
@@ -1749,6 +1749,8 @@ static void cbq_destroy_class(struct Qdisc *sch, struct cbq_class *cl)
 {
 	struct cbq_sched_data *q = qdisc_priv(sch);
 
+	BUG_TRAP(!cl->filters);
+
 	cbq_destroy_filters(cl);
 	qdisc_destroy(cl->q);
 	qdisc_put_rtab(cl->R_tab);
@@ -1769,6 +1771,14 @@ cbq_destroy(struct Qdisc* sch)
 #ifdef CONFIG_NET_CLS_POLICE
 	q->rx_class = NULL;
 #endif
+	/*
+	 * Filters must be destroyed first because we don't destroy the
+	 * classes from root to leafs which means that filters can still
+	 * be bound to classes which have been destroyed already. --TGR '04
+	 */
+	for (h = 0; h < 16; h++)
+		for (cl = q->classes[h]; cl; cl = cl->next)
+			cbq_destroy_filters(cl);
 
 	for (h = 0; h < 16; h++) {
 		struct cbq_class *next;
