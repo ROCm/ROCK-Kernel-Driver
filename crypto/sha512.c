@@ -348,6 +348,8 @@ static struct crypto_alg sha384 = {
         }
 };
 
+MODULE_ALIAS("sha384");
+
 static int __init init(void)
 {
         int ret = 0;

@@ -23,16 +23,10 @@
 #include <linux/major.h>
 #include <linux/initrd.h>
 #include <linux/console.h>
-#include <linux/delay.h>
 #include <linux/irq.h>
 #include <linux/seq_file.h>
-#include <linux/ide.h>
 #include <linux/root_dev.h>
 
-#include <asm/system.h>
-#include <asm/pgtable.h>
-#include <asm/page.h>
-#include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/time.h>
@@ -40,13 +34,121 @@
 #include <asm/mpc10x.h>
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
+#include <asm/kgdb.h>
 
 #include "pcore.h"
 
-extern int pcore_find_bridges(void);
 extern unsigned long loops_per_jiffy;
 
 static int board_type;
+
+static inline int __init
+pcore_6750_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	static char pci_irq_table[][4] =
+	/*
+	 *      PCI IDSEL/INTPIN->INTLINE
+	 *      A       B       C       D
+	 */
+	{
+		{9,	10,	11,	12},	/* IDSEL 24 - DEC 21554 */
+		{10,	0,	0,	0},	/* IDSEL 25 - DEC 21143 */
+		{11,	12,	9,	10},	/* IDSEL 26 - PMC I */
+		{12,	9,	10,	11},	/* IDSEL 27 - PMC II */
+		{0,	0,	0,	0},	/* IDSEL 28 - unused */
+		{0,	0,	9,	0},	/* IDSEL 29 - unused */
+		{0,	0,	0,	0},	/* IDSEL 30 - Winbond */
+		};
+	const long min_idsel = 24, max_idsel = 30, irqs_per_slot = 4;
+	return PCI_IRQ_TABLE_LOOKUP;
+};
+
+static inline int __init
+pcore_680_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
+{
+	static char pci_irq_table[][4] =
+	/*
+	 *      PCI IDSEL/INTPIN->INTLINE
+	 *      A       B       C       D
+	 */
+	{
+		{9,	10,	11,	12},	/* IDSEL 24 - Sentinel */
+		{10,	0,	0,	0},	/* IDSEL 25 - i82559 #1 */
+		{11,	12,	9,	10},	/* IDSEL 26 - PMC I */
+		{12,	9,	10,	11},	/* IDSEL 27 - PMC II */
+		{9,	0,	0,	0},	/* IDSEL 28 - i82559 #2 */
+		{0,	0,	0,	0},	/* IDSEL 29 - unused */
+		{0,	0,	0,	0},	/* IDSEL 30 - Winbond */
+		};
+	const long min_idsel = 24, max_idsel = 30, irqs_per_slot = 4;
+	return PCI_IRQ_TABLE_LOOKUP;
+};
+
+void __init
+pcore_pcibios_fixup(void)
+{
+	struct pci_dev *dev;
+
+	if ((dev = pci_find_device(PCI_VENDOR_ID_WINBOND,
+				PCI_DEVICE_ID_WINBOND_83C553,
+				0)))
+	{
+		/* Reroute interrupts both IDE channels to 15 */
+		pci_write_config_byte(dev,
+				PCORE_WINBOND_IDE_INT,
+				0xff);
+
+		/* Route INTA-D to IRQ9-12, respectively */
+		pci_write_config_word(dev,
+				PCORE_WINBOND_PCI_INT,
+				0x9abc);
+
+		/*
+		 * Set up 8259 edge/level triggering
+		 */
+ 		outb(0x00, PCORE_WINBOND_PRI_EDG_LVL);
+		outb(0x1e, PCORE_WINBOND_SEC_EDG_LVL);
+	}
+}
+
+int __init
+pcore_find_bridges(void)
+{
+	struct pci_controller* hose;
+	int host_bridge, board_type;
+
+	hose = pcibios_alloc_controller();
+	if (!hose)
+		return 0;
+
+	mpc10x_bridge_init(hose,
+			MPC10X_MEM_MAP_B,
+			MPC10X_MEM_MAP_B,
+			MPC10X_MAPB_EUMB_BASE);
+
+	/* Determine board type */
+	early_read_config_dword(hose,
+			0,
+			PCI_DEVFN(0,0),
+			PCI_VENDOR_ID,
+			&host_bridge);
+	if (host_bridge == MPC10X_BRIDGE_106)
+		board_type = PCORE_TYPE_6750;
+	else /* MPC10X_BRIDGE_107 */
+		board_type = PCORE_TYPE_680;
+
+	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
+
+	ppc_md.pcibios_fixup = pcore_pcibios_fixup;
+	ppc_md.pci_swizzle = common_swizzle;
+
+	if (board_type == PCORE_TYPE_6750)
+		ppc_md.pci_map_irq = pcore_6750_map_irq;
+	else /* PCORE_TYPE_680 */
+		ppc_md.pci_map_irq = pcore_680_map_irq;
+
+	return board_type;
+}
 
 /* Dummy variable to satisfy mpc10x_common.o */
 void *OpenPIC_Addr;
@@ -130,7 +232,14 @@ pcore_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 
-		 printk("Force PCore port (C) 2001 MontaVista Software, Inc. (source@mvista.com)\n");
+ 	printk(KERN_INFO "Force PowerCore ");
+	if (board_type == PCORE_TYPE_6750)
+		printk("6750\n");
+	else
+		printk("680\n");
+	printk(KERN_INFO "Port by MontaVista Software, Inc. (source@mvista.com)\n");
+	_set_L2CR(L2CR_L2E | _get_L2CR());
+
 }
 
 static void
@@ -175,25 +284,16 @@ pcore_init_IRQ(void)
 static __inline__ void
 pcore_set_bat(void)
 {
-	unsigned long   bat3u, bat3l;
+	mb();
+	mtspr(DBAT3U, 0xf0001ffe);
+	mtspr(DBAT3L, 0xfe80002a);
+	mb();
 
-	__asm__ __volatile__(
-			" lis %0,0xf000\n \
-			ori %1,%0,0x002a\n \
-			ori %0,%0,0x1ffe\n \
-			mtspr 0x21e,%0\n \
-			mtspr 0x21f,%1\n \
-			isync\n \
-			sync "
-			: "=r" (bat3u), "=r" (bat3l));
 }
 
 static unsigned long __init
 pcore_find_end_of_memory(void)
 {
-	/* Cover I/O space with a BAT */
-	/* yuck, better hope your ram size is a power of 2  -- paulus */
-	pcore_set_bat();
 
 	return mpc10x_get_mem_size(MPC10X_MEM_MAP_B);
 }
@@ -211,6 +311,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 		unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
+
+	/* Cover I/O space with a BAT */
+	/* yuck, better hope your ram size is a power of 2  -- paulus */
+	pcore_set_bat();
 
 	isa_io_base = MPC10X_MAPB_ISA_IO_BASE;
 	isa_mem_base = MPC10X_MAPB_ISA_MEM_BASE;
@@ -241,4 +345,11 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.nvram_read_val	= todc_m48txx_read_val;
 	ppc_md.nvram_write_val	= todc_m48txx_write_val;
+
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
+	ppc_md.progress = gen550_progress;
+#endif
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
+#endif
 }

@@ -1,10 +1,12 @@
 /*
- * arch/ppc/platforms/mcpn765_setup.c
+ * arch/ppc/platforms/mcpn765.c
  *
  * Board setup routines for the Motorola MCG MCPN765 cPCI Board.
  *
  * Author: Mark A. Greer
  *         mgreer@mvista.com
+ *
+ * Modified by Randy Vinson (rvinson@mvista.com)
  *
  * 2001-2002 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
@@ -28,18 +30,22 @@
 #include <linux/console.h>
 #include <linux/delay.h>
 #include <linux/irq.h>
+#if 0
 #include <linux/ide.h>
+#endif
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 #include <linux/serial.h>
 #include <linux/tty.h>	/* for linux/serial_core.h */
 #include <linux/serial_core.h>
+#include <linux/slab.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/time.h>
 #include <asm/dma.h>
+#include <asm/byteorder.h>
 #include <asm/io.h>
 #include <asm/machdep.h>
 #include <asm/prom.h>
@@ -48,8 +54,10 @@
 #include <asm/i8259.h>
 #include <asm/todc.h>
 #include <asm/pci-bridge.h>
+#include <asm/irq.h>
+#include <asm/uaccess.h>
 #include <asm/bootinfo.h>
-#include <asm/pplus.h>
+#include <asm/hawk.h>
 #include <asm/kgdb.h>
 
 #include "mcpn765.h"
@@ -75,9 +83,13 @@ static u_char mcpn765_openpic_initsenses[] __initdata = {
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE),/* 31: RTC Alarm */
 };
 
+extern void mcpn765_set_VIA_IDE_native(void);
 
 extern u_int openpic_irq(void);
 extern char cmd_line[];
+
+extern void gen550_progress(char *, unsigned short);
+extern void gen550_init(int, struct uart_port *);
 
 int use_of_interrupt_tree = 0;
 
@@ -85,59 +97,215 @@ static void mcpn765_halt(void);
 
 TODC_ALLOC();
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-static void __init
-mcpn765_early_serial_map(void)
+/*
+ * Motorola MCG MCPN765 interrupt routing.
+ */
+static inline int
+mcpn765_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
-	struct uart_port serial_req;
+	static char pci_irq_table[][4] =
+	/*
+	 *	PCI IDSEL/INTPIN->INTLINE
+	 * 	   A   B   C   D
+	 */
+	{
+		{ 14,  0,  0,  0 },	/* IDSEL 11 - have to manually set */
+		{  0,  0,  0,  0 },	/* IDSEL 12 - unused */
+		{  0,  0,  0,  0 },	/* IDSEL 13 - unused */
+		{ 18,  0,  0,  0 },	/* IDSEL 14 - Enet 0 */
+		{  0,  0,  0,  0 },	/* IDSEL 15 - unused */
+		{ 25, 26, 27, 28 },	/* IDSEL 16 - PMC Slot 1 */
+		{ 28, 25, 26, 27 },	/* IDSEL 17 - PMC Slot 2 */
+		{  0,  0,  0,  0 },	/* IDSEL 18 - PMC 2B Connector XXXX */
+		{ 29,  0,  0,  0 },	/* IDSEL 19 - Enet 1 */
+		{ 20,  0,  0,  0 },	/* IDSEL 20 - 21554 cPCI bridge */
+	};
 
-	/* Setup serial port access */
-	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.uartclk = UART_CLK;
-	serial_req.irq = 17;
-	serial_req.flags = STD_COM_FLAGS;
-	serial_req.iotype = SERIAL_IO_MEM;
-	serial_req.membase = (u_char *)MCPN765_SERIAL_1;
-	serial_req.regshift = 4;
-
-	gen550_init(0, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 0 failed\n");
-
-	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 1;
-	serial_req.irq = 17;
-	serial_req.membase = (u_char *)MCPN765_SERIAL_2;
-
-	gen550_init(1, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 1 failed\n");
-
-	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 2;
-	serial_req.irq = 17;
-	serial_req.membase = (u_char *)MCPN765_SERIAL_3;
-
-	gen550_init(2, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 2 failed\n");
-
-	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 3;
-	serial_req.irq = 17;
-	serial_req.membase = (u_char *)MCPN765_SERIAL_4;
-
-	gen550_init(3, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 3 failed\n");
+	const long min_idsel = 11, max_idsel = 20, irqs_per_slot = 4;
+	return PCI_IRQ_TABLE_LOOKUP;
 }
-#endif
 
+void __init
+mcpn765_set_VIA_IDE_legacy(void)
+{
+	unsigned short vend, dev;
+
+	early_read_config_word(0, 0, PCI_DEVFN(0xb, 1), PCI_VENDOR_ID, &vend);
+	early_read_config_word(0, 0, PCI_DEVFN(0xb, 1), PCI_DEVICE_ID, &dev);
+
+	if ((vend == PCI_VENDOR_ID_VIA) &&
+	    (dev == PCI_DEVICE_ID_VIA_82C586_1)) {
+
+		unsigned char temp;
+
+		/* put back original "standard" port base addresses */
+		early_write_config_dword(0, 0, PCI_DEVFN(0xb, 1),
+				         PCI_BASE_ADDRESS_0, 0x1f1);
+		early_write_config_dword(0, 0, PCI_DEVFN(0xb, 1),
+				         PCI_BASE_ADDRESS_1, 0x3f5);
+		early_write_config_dword(0, 0, PCI_DEVFN(0xb, 1),
+				         PCI_BASE_ADDRESS_2, 0x171);
+		early_write_config_dword(0, 0, PCI_DEVFN(0xb, 1),
+				         PCI_BASE_ADDRESS_3, 0x375);
+		early_write_config_dword(0, 0, PCI_DEVFN(0xb, 1),
+				         PCI_BASE_ADDRESS_4, 0xcc01);
+
+		/* put into legacy mode */
+		early_read_config_byte(0, 0, PCI_DEVFN(0xb, 1), PCI_CLASS_PROG,
+				       &temp);
+		temp &= ~0x05;
+		early_write_config_byte(0, 0, PCI_DEVFN(0xb, 1), PCI_CLASS_PROG,
+					temp);
+	}
+}
+
+void
+mcpn765_set_VIA_IDE_native(void)
+{
+	unsigned short vend, dev;
+
+	early_read_config_word(0, 0, PCI_DEVFN(0xb, 1), PCI_VENDOR_ID, &vend);
+	early_read_config_word(0, 0, PCI_DEVFN(0xb, 1), PCI_DEVICE_ID, &dev);
+
+	if ((vend == PCI_VENDOR_ID_VIA) &&
+	    (dev == PCI_DEVICE_ID_VIA_82C586_1)) {
+
+		unsigned char temp;
+
+		/* put into native mode */
+		early_read_config_byte(0, 0, PCI_DEVFN(0xb, 1), PCI_CLASS_PROG,
+				       &temp);
+		temp |= 0x05;
+		early_write_config_byte(0, 0, PCI_DEVFN(0xb, 1), PCI_CLASS_PROG,
+					temp);
+	}
+}
+
+/*
+ * Initialize the VIA 82c586b.
+ */
+static void __init
+mcpn765_setup_via_82c586b(void)
+{
+	struct pci_dev	*dev;
+	u_char		c;
+
+	if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
+				   PCI_DEVICE_ID_VIA_82C586_0,
+				   NULL)) == NULL) {
+		printk("No VIA ISA bridge found\n");
+		mcpn765_halt();
+		/* NOTREACHED */
+	}
+
+	/*
+	 * If the firmware left the EISA 4d0/4d1 ports enabled, make sure
+	 * IRQ 14 is set for edge.
+	 */
+	pci_read_config_byte(dev, 0x47, &c);
+
+	if (c & (1<<5)) {
+		c = inb(0x4d1);
+		c &= ~(1<<6);
+		outb(c, 0x4d1);
+	}
+
+	/* Disable PNP IRQ routing since we use the Hawk's MPIC */
+	pci_write_config_dword(dev, 0x54, 0);
+	pci_write_config_byte(dev, 0x58, 0);
+
+
+	if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
+				   PCI_DEVICE_ID_VIA_82C586_1,
+				   NULL)) == NULL) {
+		printk("No VIA ISA bridge found\n");
+		mcpn765_halt();
+		/* NOTREACHED */
+	}
+
+	/*
+	 * PPCBug doesn't set the enable bits for the IDE device.
+	 * Turn them on now.
+	 */
+	pci_read_config_byte(dev, 0x40, &c);
+	c |= 0x03;
+	pci_write_config_byte(dev, 0x40, c);
+
+	return;
+}
+
+void __init
+mcpn765_pcibios_fixup(void)
+{
+	/* Do MCPN765 board specific initialization.  */
+	mcpn765_setup_via_82c586b();
+}
+
+void __init
+mcpn765_find_bridges(void)
+{
+	struct pci_controller	*hose;
+
+	hose = pcibios_alloc_controller();
+
+	if (!hose)
+		return;
+
+	hose->first_busno = 0;
+	hose->last_busno = 0xff;
+	hose->pci_mem_offset = MCPN765_PCI_PHY_MEM_OFFSET;
+
+	pci_init_resource(&hose->io_resource,
+			MCPN765_PCI_IO_START,
+			MCPN765_PCI_IO_END,
+			IORESOURCE_IO,
+			"PCI host bridge");
+
+	pci_init_resource(&hose->mem_resources[0],
+			MCPN765_PCI_MEM_START,
+			MCPN765_PCI_MEM_END,
+			IORESOURCE_MEM,
+			"PCI host bridge");
+
+	hose->io_space.start = MCPN765_PCI_IO_START;
+	hose->io_space.end = MCPN765_PCI_IO_END;
+	hose->mem_space.start = MCPN765_PCI_MEM_START;
+	hose->mem_space.end = MCPN765_PCI_MEM_END - HAWK_MPIC_SIZE;
+
+	if (hawk_init(hose,
+		       MCPN765_HAWK_PPC_REG_BASE,
+		       MCPN765_PROC_PCI_MEM_START,
+		       MCPN765_PROC_PCI_MEM_END - HAWK_MPIC_SIZE,
+		       MCPN765_PROC_PCI_IO_START,
+		       MCPN765_PROC_PCI_IO_END,
+		       MCPN765_PCI_MEM_END - HAWK_MPIC_SIZE + 1) != 0) {
+		printk("Could not initialize HAWK bridge\n");
+	}
+
+	/* VIA IDE BAR decoders are only 16-bits wide. PCI Auto Config
+	 * will reassign the bars outside of 16-bit I/O space, which will 
+	 * "break" things. To prevent this, we'll set the IDE chip into
+	 * legacy mode and seed the bars with their legacy addresses (in 16-bit
+	 * I/O space). The Auto Config code will skip the IDE contoller in 
+	 * legacy mode, so our bar values will stick.
+	 */
+	mcpn765_set_VIA_IDE_legacy();
+
+	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
+
+	/* Now that we've got 16-bit addresses in the bars, we can switch the
+	 * IDE controller back into native mode so we can do "modern" resource
+	 * and interrupt management.
+	 */
+	mcpn765_set_VIA_IDE_native();
+
+	ppc_md.pcibios_fixup = mcpn765_pcibios_fixup;
+	ppc_md.pcibios_fixup_bus = NULL;
+	ppc_md.pci_swizzle = common_swizzle;
+	ppc_md.pci_map_irq = mcpn765_map_irq;
+
+	return;
+}
 static void __init
 mcpn765_setup_arch(void)
 {
@@ -190,39 +358,9 @@ mcpn765_setup_arch(void)
 	return;
 }
 
-/*
- * Initialize the VIA 82c586b.
- */
-static void __init
-mcpn765_setup_via_82c586b(void)
-{
-	struct pci_dev	*dev;
-	u_char		c;
-
-	if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
-				   PCI_DEVICE_ID_VIA_82C586_1,
-				   NULL)) == NULL) {
-		printk("No VIA ISA bridge found\n");
-		mcpn765_halt();
-		/* NOTREACHED */
-	}
-
-	/*
-	 * PPCBug doesn't set the enable bits for the IDE device.
-	 * Turn them on now.
-	 */
-	pci_read_config_byte(dev, 0x40, &c);
-	c |= 0x03;
-	pci_write_config_byte(dev, 0x40, c);
-
-	return;
-}
-
 static void __init
 mcpn765_init2(void)
 {
-	/* Do MCPN765 board specific initialization.  */
-	mcpn765_setup_via_82c586b();
 
 	request_region(0x00,0x20,"dma1");
 	request_region(0x20,0x20,"pic1");
@@ -271,7 +409,7 @@ mcpn765_irq_canonicalize(u32 irq)
 static unsigned long __init
 mcpn765_find_end_of_memory(void)
 {
-	return pplus_get_mem_size(MCPN765_HAWK_SMC_BASE);
+	return hawk_get_mem_size(MCPN765_HAWK_SMC_BASE);
 }
 
 static void __init
@@ -284,6 +422,9 @@ static void
 mcpn765_reset_board(void)
 {
 	local_irq_disable();
+
+	/* set VIA IDE controller into native mode */
+	mcpn765_set_VIA_IDE_native();
 
 	/* Set exception prefix high - to the firmware */
 	_nmask_and_or_msr(0, MSR_IP);
@@ -327,92 +468,6 @@ mcpn765_show_cpuinfo(struct seq_file *m)
 
 	return 0;
 }
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-/*
- * IDE support.
- */
-static int		mcpn765_ide_ports_known = 0;
-static unsigned long	mcpn765_ide_regbase[MAX_HWIFS];
-static unsigned long	mcpn765_ide_ctl_regbase[MAX_HWIFS];
-static unsigned long	mcpn765_idedma_regbase;
-
-static void
-mcpn765_ide_probe(void)
-{
-	struct pci_dev *pdev = pci_find_device(PCI_VENDOR_ID_VIA,
-					       PCI_DEVICE_ID_VIA_82C586_1,
-					       NULL);
-
-        if(pdev) {
-                mcpn765_ide_regbase[0]=pdev->resource[0].start;
-                mcpn765_ide_regbase[1]=pdev->resource[2].start;
-                mcpn765_ide_ctl_regbase[0]=pdev->resource[1].start;
-                mcpn765_ide_ctl_regbase[1]=pdev->resource[3].start;
-                mcpn765_idedma_regbase=pdev->resource[4].start;
-        }
-
-        mcpn765_ide_ports_known = 1;
-	return;
-}
-
-static int
-mcpn765_ide_default_irq(unsigned long base)
-{
-        if (mcpn765_ide_ports_known == 0)
-	        mcpn765_ide_probe();
-
-	if (base == mcpn765_ide_regbase[0])
-		return 14;
-	else if (base == mcpn765_ide_regbase[1])
-		return 14;
-	else
-		return 0;
-}
-
-static unsigned long
-mcpn765_ide_default_io_base(int index)
-{
-        if (mcpn765_ide_ports_known == 0)
-	        mcpn765_ide_probe();
-
-	return mcpn765_ide_regbase[index];
-}
-
-static void __init
-mcpn765_ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
-			      unsigned long ctrl_port, int *irq)
-{
-	unsigned long reg = data_port;
-	uint	alt_status_base;
-	int	i;
-
-	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
-		hw->io_ports[i] = reg++;
-	}
-
-	if (data_port == mcpn765_ide_regbase[0]) {
-		alt_status_base = mcpn765_ide_ctl_regbase[0] + 2;
-		hw->irq = 14;
-	} else if (data_port == mcpn765_ide_regbase[1]) {
-		alt_status_base = mcpn765_ide_ctl_regbase[1] + 2;
-		hw->irq = 14;
-	} else {
-		alt_status_base = 0;
-		hw->irq = 0;
-	}
-
-	if (ctrl_port)
-		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-	else
-		hw->io_ports[IDE_CONTROL_OFFSET] = alt_status_base;
-
-	if (irq != NULL)
-		*irq = hw->irq;
-
-	return;
-}
-#endif
 
 /*
  * Set BAT 3 to map 0xf0000000 to end of physical memory space.
@@ -467,21 +522,11 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.heartbeat_reset = 0;
 	ppc_md.heartbeat_count = 0;
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-	mcpn765_early_serial_map();
-#ifdef CONFIG_KGDB
-	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
-#endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = gen550_progress;
 #endif
-#endif
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.default_irq = mcpn765_ide_default_irq;
-        ppc_ide_md.default_io_base = mcpn765_ide_default_io_base;
-        ppc_ide_md.ide_init_hwif = mcpn765_ide_init_hwif_ports;
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
 #endif
 
 	return;

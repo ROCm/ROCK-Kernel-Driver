@@ -43,6 +43,8 @@
 #include <linux/unistd.h>
 #include <linux/fcntl.h>
 #include <linux/errno.h>
+#include <linux/syscalls.h>
+
 #include "dvb_frontend.h"
 #include "dvb_functions.h"
 

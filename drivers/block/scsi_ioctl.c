@@ -111,6 +111,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	unsigned long start_time;
 	int reading, writing;
 	struct request *rq;
+	struct bio *bio;
 	char sense[SCSI_SENSE_BUFFERSIZE];
 
 	if (hdr->interface_id != 'S')
@@ -164,6 +165,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	rq->sense_len = 0;
 
 	rq->flags |= REQ_BLOCK_PC;
+	bio = rq->bio;
 
 	rq->timeout = (hdr->timeout * HZ) / 1000;
 	if (!rq->timeout)
@@ -199,7 +201,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 			hdr->sb_len_wr = len;
 	}
 
-	if (blk_rq_unmap_user(rq, hdr->dxferp, hdr->dxfer_len))
+	if (blk_rq_unmap_user(rq, hdr->dxferp, bio, hdr->dxfer_len))
 		return -EFAULT;
 
 	/* may not have succeeded, but output values written to control
