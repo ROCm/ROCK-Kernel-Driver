@@ -65,12 +65,9 @@ static int enable_slot		(struct hotplug_slot *slot);
 static int disable_slot		(struct hotplug_slot *slot);
 static int set_attention_status (struct hotplug_slot *slot, u8 value);
 static int get_power_status	(struct hotplug_slot *slot, u8 *value);
-static int get_attention_status	(struct hotplug_slot *slot, u8 *value);
 static int get_address		(struct hotplug_slot *slot, u32 *value);
 static int get_latch_status	(struct hotplug_slot *slot, u8 *value);
 static int get_adapter_status	(struct hotplug_slot *slot, u8 *value);
-static int get_max_bus_speed	(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
-static int get_cur_bus_speed	(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
 
 static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
 	.owner			= THIS_MODULE,
@@ -78,12 +75,9 @@ static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
 	.disable_slot		= disable_slot,
 	.set_attention_status	= set_attention_status,
 	.get_power_status	= get_power_status,
-	.get_attention_status	= get_attention_status,
 	.get_latch_status	= get_latch_status,
 	.get_adapter_status	= get_adapter_status,
 	.get_address		= get_address,
-	.get_max_bus_speed	= get_max_bus_speed,
-	.get_cur_bus_speed	= get_cur_bus_speed,
 };
 
 /**
@@ -170,24 +164,6 @@ static int get_power_status(struct hotplug_slot *hotplug_slot, u8 *value)
 	return 0;
 }
 
-
-/**
- * get_attention_status - get attention LED status
- *
- * TBD:
- * ACPI doesn't provide any formal means to access attention LED status.
- *
- */
-static int get_attention_status(struct hotplug_slot *hotplug_slot, u8 *value)
-{
-	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
-
-	*value = hotplug_slot->info->attention_status;
-
-	return 0;
-}
-
-
 /**
  * get_latch_status - get latch status of a slot
  * @hotplug_slot: slot to get status
@@ -246,25 +222,6 @@ static int get_address(struct hotplug_slot *hotplug_slot, u32 *value)
 
 	return 0;
 }
-
-
-/* return dummy value because ACPI doesn't provide any method... */
-static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
-{
-	*value = PCI_SPEED_UNKNOWN;
-
-	return 0;
-}
-
-
-/* return dummy value because ACPI doesn't provide any method... */
-static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
-{
-	*value = PCI_SPEED_UNKNOWN;
-
-	return 0;
-}
-
 
 static int __init init_acpi (void)
 {
@@ -353,6 +310,8 @@ static int __init init_slots(void)
 		slot->hotplug_slot->info->attention_status = acpiphp_get_attention_status(slot->acpi_slot);
 		slot->hotplug_slot->info->latch_status = acpiphp_get_latch_status(slot->acpi_slot);
 		slot->hotplug_slot->info->adapter_status = acpiphp_get_adapter_status(slot->acpi_slot);
+		slot->hotplug_slot->info->max_bus_speed = PCI_SPEED_UNKNOWN;
+		slot->hotplug_slot->info->cur_bus_speed = PCI_SPEED_UNKNOWN;
 
 		make_slot_name(slot);
 
