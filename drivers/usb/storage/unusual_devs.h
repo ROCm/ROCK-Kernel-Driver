@@ -106,9 +106,9 @@ UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
  * This entry is needed because the device reports Sub=ff 
  */
 UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
-               "Panasonic",
-               "LS-120 Camera",
-               US_SC_UFI, US_PR_CBI, NULL, 0),
+		"Panasonic",
+		"LS-120 Camera",
+		US_SC_UFI, US_PR_CBI, NULL, 0),
 
 /* Reported by Peter Wächtler <pwaechtler@loewe-komp.de> */
 UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
@@ -230,7 +230,7 @@ UNUSUAL_DEV(  0x054c, 0x002e, 0x0106, 0x0310,
 		US_FL_SINGLE_LUN | US_FL_START_STOP | US_FL_MODE_XLATE),
 
 UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
-                "Sony",
+		"Sony",
 		"Memorystick MSC-U01N",
 		US_SC_UFI, US_PR_CB, NULL,
 		US_FL_SINGLE_LUN | US_FL_START_STOP ),
@@ -261,34 +261,34 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x05ab, 0x0031, 0x0100, 0x0110,
-                "In-System",
-                "USB/IDE Bridge (ATA/ATAPI)",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"In-System",
+		"USB/IDE Bridge (ATA/ATAPI)",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 
 UNUSUAL_DEV(  0x05ab, 0x0301, 0x0100, 0x0110,
-                "In-System",
-                "Portable USB Harddrive V2",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"In-System",
+		"Portable USB Harddrive V2",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 
 UNUSUAL_DEV(  0x05ab, 0x0351, 0x0100, 0x0110,
-                "In-System",
-                "Portable USB Harddrive V2",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"In-System",
+		"Portable USB Harddrive V2",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 
 UNUSUAL_DEV(  0x05ab, 0x5701, 0x0100, 0x0110,
-                "In-System",
-                "USB Storage Adapter V2",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"In-System",
+		"USB Storage Adapter V2",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 
 UNUSUAL_DEV(  0x054c, 0x002b, 0x0100, 0x0110,
-                "Sony",
-                "Portable USB Harddrive V2",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"Sony",
+		"Portable USB Harddrive V2",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 #endif
 
 #ifdef CONFIG_USB_STORAGE_JUMPSHOT
@@ -342,18 +342,18 @@ UNUSUAL_DEV(  0x066b, 0x0105, 0x0100, 0x0100,
 /* Submitted by kedar@centillium
  * Needed for START_STOP flag, but that is unconfirmed */
 UNUSUAL_DEV( 0x0686, 0x4006, 0x0001, 0x0001,
-                "Minolta",
-                "Dimage S304",
-                US_SC_SCSI, US_PR_BULK, NULL,
-                US_FL_START_STOP ),
+		"Minolta",
+		"Dimage S304",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP ),
 
 /* Submitted by f.brugmans@hccnet.nl
  * Needed for START_STOP flag */
 UNUSUAL_DEV( 0x0686, 0x4007, 0x0001, 0x0001,
-                "Minolta",
-                "Dimage S304",
-                US_SC_SCSI, US_PR_BULK, NULL,
-                US_FL_START_STOP ),
+		"Minolta",
+		"Dimage S304",
+		US_SC_SCSI, US_PR_BULK, NULL,
+		US_FL_START_STOP ),
 
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
@@ -378,10 +378,10 @@ UNUSUAL_DEV(  0x0781, 0x0002, 0x0009, 0x0009,
 		US_FL_IGNORE_SER),
 
 UNUSUAL_DEV(  0x0781, 0x0100, 0x0100, 0x0100,
-                "Sandisk",
-                "ImageMate SDDR-12",
-                US_SC_SCSI, US_PR_CB, NULL,
-                US_FL_SINGLE_LUN ),
+		"Sandisk",
+		"ImageMate SDDR-12",
+		US_SC_SCSI, US_PR_CB, NULL,
+		US_FL_SINGLE_LUN ),
 
 #ifdef CONFIG_USB_STORAGE_SDDR09
 UNUSUAL_DEV(  0x0781, 0x0200, 0x0000, 0x9999, 
@@ -393,9 +393,9 @@ UNUSUAL_DEV(  0x0781, 0x0200, 0x0000, 0x9999,
 
 #ifdef CONFIG_USB_STORAGE_FREECOM
 UNUSUAL_DEV(  0x07ab, 0xfc01, 0x0000, 0x9999,
-                "Freecom",
-                "USB-IDE",
-                US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
+		"Freecom",
+		"USB-IDE",
+		US_SC_QIC, US_PR_FREECOM, freecom_init, 0),
 #endif
 
 UNUSUAL_DEV(  0x07af, 0x0004, 0x0100, 0x0133, 
@@ -473,7 +473,7 @@ UNUSUAL_DEV(  0x07c4, 0xa109, 0x0000, 0xffff,
 		US_SC_SCSI, US_PR_DATAFAB, NULL,
 		US_FL_MODE_XLATE ),
 #endif
-
+		
 #ifdef CONFIG_USB_STORAGE_SDDR55
 /* Contributed by Peter Waechtler */
 UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
@@ -491,10 +491,10 @@ UNUSUAL_DEV( 0x07c4, 0xa103, 0x0000, 0x9999,
  *   of the SCSI layer ourselves.
  */
 UNUSUAL_DEV( 0x07cf, 0x1001, 0x1000, 0x9009,
-                "Casio",
-                "QV DigitalCamera",
-                US_SC_8070, US_PR_CB, NULL,
-                US_FL_FIX_INQUIRY ),
+		"Casio",
+		"QV DigitalCamera",
+		US_SC_8070, US_PR_CB, NULL,
+		US_FL_FIX_INQUIRY ),
 
 UNUSUAL_DEV(  0x097a, 0x0001, 0x0000, 0x0001,
 		"Minds@Work",
@@ -510,10 +510,10 @@ UNUSUAL_DEV(  0x0a16, 0x8888, 0x0100, 0x0100,
 
 #ifdef CONFIG_USB_STORAGE_ISD200
 UNUSUAL_DEV(  0x0bf6, 0xa001, 0x0100, 0x0110,
-                "ATI",
-                "USB Cable 205",
-                US_SC_ISD200, US_PR_BULK, isd200_Initialization,
-                0 ),
+		"ATI",
+		"USB Cable 205",
+		US_SC_ISD200, US_PR_BULK, isd200_Initialization,
+		0 ),
 #endif
 
 /* EasyDisk support. Submitted by Stanislav Karchebny <berk@madfire.net> */
