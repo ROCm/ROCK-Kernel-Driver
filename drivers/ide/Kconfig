@@ -682,6 +682,27 @@ config BLK_DEV_OPTI621
 config BLK_DEV_PDC202XX_OLD
 	tristate "PROMISE PDC202{46|62|65|67} support"
 	depends on BLK_DEV_IDEDMA_PCI
+	help
+	  Promise Ultra33 or PDC20246
+	  Promise Ultra66 or PDC20262
+	  Promise Ultra100 or PDC20265/PDC20267/PDC20268
+
+	  This driver adds up to 4 more EIDE devices sharing a single
+	  interrupt. This add-on card is a bootable PCI UDMA controller. Since
+	  multiple cards can be installed and there are BIOS ROM problems that
+	  happen if the BIOS revisions of all installed cards (three-max) do
+	  not match, the driver attempts to do dynamic tuning of the chipset
+	  at boot-time for max-speed.  Ultra33 BIOS 1.25 or newer is required
+	  for more than one card. This card may require that you say Y to
+	  "Special UDMA Feature".
+
+	  If you say Y here, you need to say Y to "Use DMA by default when
+	  available" as well.
+
+	  Please read the comments at the top of
+	  <file:drivers/ide/pci/pdc202xx_old.c>.
+
+	  If unsure, say N.
 
 config PDC202XX_BURST
 	bool "Special UDMA Feature"
@@ -1109,32 +1130,6 @@ config DMA_NONPCI
 	bool
 	depends on BLK_DEV_TIVO
 	default y
-
-config BLK_DEV_PDC202XX
-	bool
-	depends on BLK_DEV_IDEDMA_PCI && (BLK_DEV_PDC202XX_OLD || BLK_DEV_PDC202XX_NEW)
-	default y
-	---help---
-	  Promise Ultra33 or PDC20246
-	  Promise Ultra66 or PDC20262
-	  Promise Ultra100 or PDC20265/PDC20267/PDC20268
-
-	  This driver adds up to 4 more EIDE devices sharing a single
-	  interrupt. This add-on card is a bootable PCI UDMA controller. Since
-	  multiple cards can be installed and there are BIOS ROM problems that
-	  happen if the BIOS revisions of all installed cards (three-max) do
-	  not match, the driver attempts to do dynamic tuning of the chipset
-	  at boot-time for max-speed.  Ultra33 BIOS 1.25 or newer is required
-	  for more than one card. This card may require that you say Y to
-	  "Special UDMA Feature".
-
-	  If you say Y here, you need to say Y to "Use DMA by default when
-	  available" as well.
-
-	  Please read the comments at the top of
-	  <file:drivers/ide/pdc202xx_old.c>.
-
-	  If unsure, say N.
 
 endmenu
 
