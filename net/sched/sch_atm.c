@@ -70,6 +70,7 @@ struct atm_flow_data {
 	u32			classid;	/* x:y type ID */
 	int			ref;		/* reference count */
 	struct tc_stats		stats;
+	spinlock_t		*stats_lock;
 	struct atm_flow_data	*next;
 	struct atm_flow_data	*excess;	/* flow for excess traffic;
 						   NULL to set CLP instead */

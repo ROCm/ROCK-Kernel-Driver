@@ -386,7 +386,7 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	sch->enqueue = ops->enqueue;
 	sch->dequeue = ops->dequeue;
 	sch->dev = dev;
-	sch->stats.lock = &dev->queue_lock;
+	sch->stats_lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
 	/* enqueue is accessed locklessly - make sure it's visible
 	 * before we set a netdevice's qdisc pointer to sch */

@@ -147,6 +147,7 @@ struct cbq_class
 	long			deficit;	/* Saved deficit for WRR */
 	unsigned long		penalized;
 	struct tc_stats		stats;
+	spinlock_t		*stats_lock;
 	struct tc_cbq_xstats	xstats;
 
 	struct tcf_proto	*filter_list;
@@ -1468,7 +1469,7 @@ static int cbq_init(struct Qdisc *sch, struct rtattr *opt)
 	q->link.ewma_log = TC_CBQ_DEF_EWMA;
 	q->link.avpkt = q->link.allot/2;
 	q->link.minidle = -0x7FFFFFFF;
-	q->link.stats.lock = &sch->dev->queue_lock;
+	q->link.stats_lock = &sch->dev->queue_lock;
 
 	init_timer(&q->wd_timer);
 	q->wd_timer.data = (unsigned long)sch;
@@ -1667,7 +1668,7 @@ cbq_dump_class(struct Qdisc *sch, unsigned long arg,
 		goto rtattr_failure;
 	rta->rta_len = skb->tail - b;
 	cl->stats.qlen = cl->q->q.qlen;
-	if (qdisc_copy_stats(skb, &cl->stats))
+	if (qdisc_copy_stats(skb, &cl->stats, cl->stats_lock))
 		goto rtattr_failure;
 	spin_lock_bh(&sch->dev->queue_lock);
 	cl->xstats.avgidle = cl->avgidle;
@@ -1897,7 +1898,8 @@ cbq_change_class(struct Qdisc *sch, u32 classid, u32 parentid, struct rtattr **t
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1]) {
 			qdisc_kill_estimator(&cl->stats);
-			qdisc_new_estimator(&cl->stats, tca[TCA_RATE-1]);
+			qdisc_new_estimator(&cl->stats, cl->stats_lock,
+					    tca[TCA_RATE-1]);
 		}
 #endif
 		return 0;
@@ -1958,7 +1960,7 @@ cbq_change_class(struct Qdisc *sch, u32 classid, u32 parentid, struct rtattr **t
 	cl->allot = parent->allot;
 	cl->quantum = cl->allot;
 	cl->weight = cl->R_tab->rate.rate;
-	cl->stats.lock = &sch->dev->queue_lock;
+	cl->stats_lock = &sch->dev->queue_lock;
 
 	sch_tree_lock(sch);
 	cbq_link_class(cl);
@@ -1988,7 +1990,8 @@ cbq_change_class(struct Qdisc *sch, u32 classid, u32 parentid, struct rtattr **t
 
 #ifdef CONFIG_NET_ESTIMATOR
 	if (tca[TCA_RATE-1])
-		qdisc_new_estimator(&cl->stats, tca[TCA_RATE-1]);
+		qdisc_new_estimator(&cl->stats, cl->stats_lock,
+				    tca[TCA_RATE-1]);
 #endif
 
 	*arg = (unsigned long)cl;

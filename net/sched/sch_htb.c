@@ -143,6 +143,7 @@ struct htb_class
     /* general class parameters */
     u32 classid;
     struct tc_stats	stats;	/* generic stats */
+    spinlock_t		*stats_lock;
     struct tc_htb_xstats xstats;/* our special stats */
     int refcnt;			/* usage count of this class */
 

@@ -207,7 +207,7 @@ int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,struct tc_actio
 	ret = 1;
 	p->refcnt = 1;
 	spin_lock_init(&p->lock);
-	p->stats.lock = &p->lock;
+	p->stats_lock = &p->lock;
 	if (bind)
 		p->bindcnt = 1;
 override:
@@ -245,7 +245,7 @@ override:
 	p->index = parm->index ? : tcf_police_new_index();
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
-		qdisc_new_estimator(&p->stats, est);
+		qdisc_new_estimator(&p->stats, p->stats_lock, est);
 #endif
 	h = tcf_police_hash(p->index);
 	write_lock_bh(&police_lock);
@@ -280,7 +280,7 @@ int tcf_act_police_stats(struct sk_buff *skb, struct tc_action *a)
 	struct tcf_police *p;
 	p = PRIV(a);
 	if (NULL != p) 
-		return qdisc_copy_stats(skb, &p->stats);
+		return qdisc_copy_stats(skb, &p->stats, p->stats_lock);
 
 	return 1;
 }
@@ -452,7 +452,7 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	memset(p, 0, sizeof(*p));
 	p->refcnt = 1;
 	spin_lock_init(&p->lock);
-	p->stats.lock = &p->lock;
+	p->stats_lock = &p->lock;
 	if (parm->rate.rate) {
 		if ((p->R_tab = qdisc_get_rtab(&parm->rate, tb[TCA_POLICE_RATE-1])) == NULL)
 			goto failure;
@@ -480,7 +480,7 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	p->action = parm->action;
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
-		qdisc_new_estimator(&p->stats, est);
+		qdisc_new_estimator(&p->stats, p->stats_lock, est);
 #endif
 	h = tcf_police_hash(p->index);
 	write_lock_bh(&police_lock);

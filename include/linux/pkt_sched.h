@@ -38,9 +38,6 @@ struct tc_stats
 	__u32	pps;			/* Current flow packet rate */
 	__u32	qlen;
 	__u32	backlog;
-#ifdef __KERNEL__
-	spinlock_t *lock;
-#endif
 };
 
 struct tc_estimator

@@ -122,6 +122,7 @@ struct hfsc_class
 	unsigned int	refcnt;		/* usage count */
 
 	struct tc_stats	stats;		/* generic statistics */
+	spinlock_t	*stats_lock;
 	unsigned int	level;		/* class level in hierarchy */
 	struct tcf_proto *filter_list;	/* filter list */
 	unsigned int	filter_cnt;	/* filter count */
@@ -1124,7 +1125,8 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 #ifdef CONFIG_NET_ESTIMATOR
 		if (tca[TCA_RATE-1]) {
 			qdisc_kill_estimator(&cl->stats);
-			qdisc_new_estimator(&cl->stats, tca[TCA_RATE-1]);
+			qdisc_new_estimator(&cl->stats, cl->stats_lock,
+					    tca[TCA_RATE-1]);
 		}
 #endif
 		return 0;
@@ -1167,7 +1169,7 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 	cl->qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
 	if (cl->qdisc == NULL)
 		cl->qdisc = &noop_qdisc;
-	cl->stats.lock = &sch->dev->queue_lock;
+	cl->stats_lock = &sch->dev->queue_lock;
 	INIT_LIST_HEAD(&cl->children);
 	INIT_LIST_HEAD(&cl->actlist);
 
@@ -1181,7 +1183,8 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 
 #ifdef CONFIG_NET_ESTIMATOR
 	if (tca[TCA_RATE-1])
-		qdisc_new_estimator(&cl->stats, tca[TCA_RATE-1]);
+		qdisc_new_estimator(&cl->stats, cl->stats_lock,
+				    tca[TCA_RATE-1]);
 #endif
 	*arg = (unsigned long)cl;
 	return 0;
@@ -1428,7 +1431,7 @@ static inline int
 hfsc_dump_stats(struct sk_buff *skb, struct hfsc_class *cl)
 {
 	cl->stats.qlen = cl->qdisc->q.qlen;
-	if (qdisc_copy_stats(skb, &cl->stats) < 0)
+	if (qdisc_copy_stats(skb, &cl->stats, cl->stats_lock) < 0)
 		goto rtattr_failure;
 
 	return skb->len;
@@ -1551,7 +1554,7 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 	qopt = RTA_DATA(opt);
 
 	memset(q, 0, sizeof(struct hfsc_sched));
-	sch->stats.lock = &sch->dev->queue_lock;
+	sch->stats_lock = &sch->dev->queue_lock;
 
 	q->defcls = qopt->defcls;
 	for (i = 0; i < HFSC_HSIZE; i++)
@@ -1566,7 +1569,7 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 	q->root.qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
 	if (q->root.qdisc == NULL)
 		q->root.qdisc = &noop_qdisc;
-	q->root.stats.lock = &sch->dev->queue_lock;
+	q->root.stats_lock = &sch->dev->queue_lock;
 	INIT_LIST_HEAD(&q->root.children);
 	INIT_LIST_HEAD(&q->root.actlist);
 
@@ -1671,7 +1674,7 @@ hfsc_dump_qdisc(struct Qdisc *sch, struct sk_buff *skb)
 	RTA_PUT(skb, TCA_OPTIONS, sizeof(qopt), &qopt);
 
 	sch->stats.qlen = sch->q.qlen;
-	if (qdisc_copy_stats(skb, &sch->stats) < 0)
+	if (qdisc_copy_stats(skb, &sch->stats, sch->stats_lock) < 0)
 		goto rtattr_failure;
 
 	return skb->len;

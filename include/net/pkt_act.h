@@ -258,7 +258,7 @@ tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int
 	p->tm.lastuse = jiffies;
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est) {
-		qdisc_new_estimator(&p->stats, est);
+		qdisc_new_estimator(&p->stats, p->stats_lock, est);
 	}
 #endif
 	h = tcf_hash(p->index);
