@@ -1313,6 +1313,16 @@ static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
+static inline int sctp_setsockopt_initmsg(struct sock *sk, char *optval,
+					  int optlen)
+{
+	if (optlen != sizeof(struct sctp_initmsg))
+		return -EINVAL;
+	if (copy_from_user(&sctp_sk(sk)->initmsg, optval, optlen))
+		return -EFAULT;
+	return 0;
+}
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1398,6 +1408,10 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_SET_PEER_ADDR_PARAMS:
 		retval = sctp_setsockopt_set_peer_addr_params(sk, optval,
 							      optlen);
+		break;
+
+	case SCTP_INITMSG:
+		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
 		break;
 
 	default:
@@ -1908,6 +1922,15 @@ static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
 	return 0;
 }
 
+static inline int sctp_getsockopt_initmsg(struct sock *sk, int len, char *optval, int *optlen)
+{
+	if (len != sizeof(struct sctp_initmsg))
+		return -EINVAL;
+	if (copy_to_user(optval, &sctp_sk(sk)->initmsg, len))
+		return -EFAULT;
+	return 0;
+}
+
 SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 				char *optval, int *optlen)
 {
@@ -1959,6 +1982,10 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_GET_PEER_ADDR_PARAMS:
 		retval = sctp_getsockopt_get_peer_addr_params(sk, len, optval,
 							      optlen);
+		break;
+
+	case SCTP_INITMSG:
+		retval = sctp_getsockopt_initmsg(sk, len, optval, optlen);
 		break;
 
 	default:
