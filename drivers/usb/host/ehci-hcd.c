@@ -347,9 +347,18 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 
 #ifdef	CONFIG_PCI
 	/* EHCI 0.96 and later may have "extended capabilities" */
-	if (hcd->self.controller->bus == &pci_bus_type)
+	if (hcd->self.controller->bus == &pci_bus_type) {
+		struct pci_dev	*pdev = to_pci_dev(ehci->hcd.self.controller);
+
+		/* AMD8111 EHCI doesn't work, according to AMD errata */
+		if ((pdev->vendor == PCI_VENDOR_ID_AMD)
+				&& (pdev->device == 0x7463)) {
+			ehci_info (ehci, "ignoring AMD8111 (errata)\n");
+			return -EIO;
+		}
+
 		temp = HCC_EXT_CAPS (readl (&ehci->caps->hcc_params));
-	else
+	} else
 		temp = 0;
 	while (temp && count--) {
 		u32		cap;
@@ -361,10 +370,6 @@ static int ehci_hc_reset (struct usb_hcd *hcd)
 		case 1:			/* BIOS/SMM/... handoff */
 			if (bios_handoff (ehci, temp, cap) != 0)
 				return -EOPNOTSUPP;
-			break;
-		case 0x0a:		/* appendix C */
-			ehci_dbg (ehci, "debug registers, BAR %d offset %d\n",
-				(cap >> 29) & 0x07, (cap >> 16) & 0x0fff);
 			break;
 		case 0:			/* illegal reserved capability */
 			ehci_warn (ehci, "illegal capability!\n");
