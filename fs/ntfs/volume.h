@@ -95,9 +95,6 @@ typedef struct {
 	struct inode *mftbmp_ino;	/* Attribute inode for $MFT/$BITMAP. */
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
-	unsigned long nr_mft_records;	/* Number of mft records == number of
-					   bits in mft bitmap. */
-
 #ifdef NTFS_RW
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	int mftmirr_size;		/* Size of mft mirror in mft records. */
