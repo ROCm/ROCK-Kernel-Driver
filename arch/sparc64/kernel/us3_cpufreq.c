@@ -169,7 +169,7 @@ static int __init us3_freq_cpu_init(struct cpufreq_policy *policy)
 	return cpufreq_frequency_table_cpuinfo(policy, table);
 }
 
-static int __exit us3_freq_cpu_exit(struct cpufreq_policy *policy)
+static int us3_freq_cpu_exit(struct cpufreq_policy *policy)
 {
 	if (cpufreq_us3_driver)
 		us3_set_cpu_divider_index(policy->cpu, 0);
