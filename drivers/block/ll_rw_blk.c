@@ -188,7 +188,7 @@ void blk_queue_merge_bvec(request_queue_t *q, merge_bvec_fn *mbfn)
  * Caveat:
  *    The driver that does this *must* be able to deal appropriately
  *    with buffers in "highmemory". This can be accomplished by either calling
- *    bio_kmap() to get a temporary kernel mapping, or by calling
+ *    __bio_kmap_atomic() to get a temporary kernel mapping, or by calling
  *    blk_queue_bounce() to create a buffer in normal memory.
  **/
 void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
