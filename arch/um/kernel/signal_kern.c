@@ -36,7 +36,7 @@ static void force_segv(int sig)
 	if(sig == SIGSEGV){
 		struct k_sigaction *ka;
 
-		ka = &current->sig->action[SIGSEGV - 1];
+		ka = &current->sighand->action[SIGSEGV - 1];
 		ka->sa.sa_handler = SIG_DFL;
 	}
 	force_sig(SIGSEGV, current);
@@ -60,10 +60,10 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 	int err, ret;
 
 	ret = 0;
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 	switch(error){
 	case -ERESTART_RESTARTBLOCK:
-		current_thread_info()->restart_block.fn = 
-			do_no_restart_syscall;
 	case -ERESTARTNOHAND:
 		ret = -EINTR;
 		break;
@@ -142,7 +142,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 		return(0);
 
 	/* Whee!  Actually deliver the signal.  */
-	ka = &current->sig->action[sig -1 ];
+	ka = &current->sighand->action[sig -1 ];
 	err = handle_signal(regs, sig, ka, &info, oldset, error);
 	if(!err) return(1);
 
@@ -201,7 +201,7 @@ int sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	}
 }
 
-int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
+int sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize)
 {
 	sigset_t saveset, newset;
 
@@ -227,20 +227,59 @@ int sys_rt_sigsuspend(sigset_t *unewset, size_t sigsetsize)
 	}
 }
 
+int sys_sigaction(int sig, const struct old_sigaction __user *act,
+			 struct old_sigaction __user *oact)
+{
+	struct k_sigaction new_ka, old_ka;
+	int ret;
+
+	if (act) {
+		old_sigset_t mask;
+		if (verify_area(VERIFY_READ, act, sizeof(*act)) ||
+		    __get_user(new_ka.sa.sa_handler, &act->sa_handler) ||
+		    __get_user(new_ka.sa.sa_restorer, &act->sa_restorer))
+			return -EFAULT;
+		__get_user(new_ka.sa.sa_flags, &act->sa_flags);
+		__get_user(mask, &act->sa_mask);
+		siginitset(&new_ka.sa.sa_mask, mask);
+	}
+
+	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
+
+	if (!ret && oact) {
+		if (verify_area(VERIFY_WRITE, oact, sizeof(*oact)) ||
+		    __put_user(old_ka.sa.sa_handler, &oact->sa_handler) ||
+		    __put_user(old_ka.sa.sa_restorer, &oact->sa_restorer))
+			return -EFAULT;
+		__put_user(old_ka.sa.sa_flags, &oact->sa_flags);
+		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);
+	}
+
+	return ret;
+}
+
+int sys_sigaltstack(const stack_t *uss, stack_t *uoss)
+{
+	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
+}
+
+extern int userspace_pid[];
+
 static int copy_sc_from_user(struct pt_regs *to, void *from, 
 			     struct arch_frame_data *arch)
 {
 	int ret;
 
 	ret = CHOOSE_MODE(copy_sc_from_user_tt(UPT_SC(&to->regs), from, arch),
-			  copy_sc_from_user_skas(&to->regs, from));
+			  copy_sc_from_user_skas(userspace_pid[0],
+						 &to->regs, from));
 	return(ret);
 }
 
 int sys_sigreturn(struct pt_regs regs)
 {
-	void *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
-	void *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
+	void __user *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
+	void __user *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
 	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
 
 	spin_lock_irq(&current->sighand->siglock);
@@ -257,8 +296,8 @@ int sys_sigreturn(struct pt_regs regs)
 
 int sys_rt_sigreturn(struct pt_regs regs)
 {
-	struct ucontext *uc = sp_to_uc(PT_REGS_SP(&current->thread.regs));
-	void *fp;
+	unsigned long sp = PT_REGS_SP(&current->thread.regs);
+	struct ucontext __user *uc = sp_to_uc(sp);
 	int sig_size = _NSIG_WORDS * sizeof(unsigned long);
 
 	spin_lock_irq(&current->sighand->siglock);
@@ -266,7 +305,6 @@ int sys_rt_sigreturn(struct pt_regs regs)
 	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
-	fp = (void *) (((unsigned long) uc) + sizeof(struct ucontext));
 	copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext,
 			  &signal_frame_si.common.arch);
 	return(PT_REGS_SYSCALL_RET(&current->thread.regs));

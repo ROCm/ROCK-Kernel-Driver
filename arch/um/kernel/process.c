@@ -9,12 +9,10 @@
 #include <sched.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <setjmp.h>
 #include <sys/time.h>
 #include <sys/ptrace.h>
-#include <sys/ioctl.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
 #include <asm/ptrace.h>
@@ -58,7 +56,11 @@ void init_new_thread_signals(int altstack)
 {
 	int flags = altstack ? SA_ONSTACK : 0;
 
-	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags,
+	/* NODEFER is set here because SEGV isn't turned back on when the
+	 * handler is ready to receive signals.  This causes any segfault
+	 * during a copy_user to kill the process because the fault is blocked.
+	 */
+	set_handler(SIGSEGV, (__sighandler_t) sig_handler, flags | SA_NODEFER,
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGTRAP, (__sighandler_t) sig_handler, flags, 
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
@@ -72,7 +74,6 @@ void init_new_thread_signals(int altstack)
 		    SIGUSR1, SIGIO, SIGWINCH, SIGALRM, SIGVTALRM, -1);
 	set_handler(SIGUSR2, (__sighandler_t) sig_handler, 
 		    SA_NOMASK | flags, -1);
-	(void) CHOOSE_MODE(signal(SIGCHLD, SIG_IGN), (void *) 0);
 	signal(SIGHUP, SIG_IGN);
 
 	init_irq_signals(altstack);
@@ -123,11 +124,12 @@ int start_fork_tramp(void *thread_arg, unsigned long temp_stack,
 	/* Start the process and wait for it to kill itself */
 	new_pid = clone(outer_tramp, (void *) sp, clone_flags, &arg);
 	if(new_pid < 0) return(-errno);
-	while((err = waitpid(new_pid, &status, 0) < 0) && (errno == EINTR)) ;
+	while(((err = waitpid(new_pid, &status, 0)) < 0) && (errno == EINTR)) ;
 	if(err < 0) panic("Waiting for outer trampoline failed - errno = %d", 
 			  errno);
 	if(!WIFSIGNALED(status) || (WTERMSIG(status) != SIGKILL))
-		panic("outer trampoline didn't exit with SIGKILL");
+		panic("outer trampoline didn't exit with SIGKILL, "
+		      "status = %d", status);
 
 	return(arg.pid);
 }
@@ -138,7 +140,7 @@ void suspend_new_thread(int fd)
 
 	os_stop_process(os_getpid());
 
-	if(read(fd, &c, sizeof(c)) != sizeof(c))
+	if(os_read_file(fd, &c, sizeof(c)) != sizeof(c))
 		panic("read failed in suspend_new_thread");
 }
 
@@ -233,7 +235,7 @@ int run_kernel_thread(int (*fn)(void *), void *arg, void **jmp_ptr)
 	int n;
 
 	*jmp_ptr = &buf;
-	n = setjmp(buf);
+	n = sigsetjmp(buf, 1);
 	if(n != 0)
 		return(n);
 	(*fn)(arg);
@@ -273,7 +275,7 @@ int can_do_skas(void)
 	stop_ptraced_child(pid, stack, 1);
 
 	printf("Checking for /proc/mm...");
-	if(access("/proc/mm", W_OK)){
+	if(os_access("/proc/mm", OS_ACC_W_OK) < 0){
 		printf("not found\n");
 		ret = 0;
 	}

@@ -39,10 +39,10 @@ static void write_debugregs(int pid, unsigned long *regs)
 	nregs = sizeof(dummy->u_debugreg)/sizeof(dummy->u_debugreg[0]);
 	for(i = 0; i < nregs; i++){
 		if((i == 4) || (i == 5)) continue;
-		if(ptrace(PTRACE_POKEUSR, pid, &dummy->u_debugreg[i],
+		if(ptrace(PTRACE_POKEUSER, pid, &dummy->u_debugreg[i],
 			  regs[i]) < 0)
-			printk("write_debugregs - ptrace failed, "
-			       "errno = %d\n", errno);
+			printk("write_debugregs - ptrace failed on "
+			       "register %d, errno = %d\n", errno);
 	}
 }
 
@@ -54,7 +54,7 @@ static void read_debugregs(int pid, unsigned long *regs)
 	dummy = NULL;
 	nregs = sizeof(dummy->u_debugreg)/sizeof(dummy->u_debugreg[0]);
 	for(i = 0; i < nregs; i++){
-		regs[i] = ptrace(PTRACE_PEEKUSR, pid, 
+		regs[i] = ptrace(PTRACE_PEEKUSER, pid,
 				 &dummy->u_debugreg[i], 0);
 	}
 }

@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2000, 2001 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000 - 2003 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -55,6 +55,93 @@ typedef elf_greg_t elf_gregset_t[ELF_NGREG];
 	pr_reg[15] = PT_REGS_SP(regs);		\
 	pr_reg[16] = PT_REGS_SS(regs);		\
 } while(0);
+
+#if 0 /* Turn this back on when UML has VSYSCALL working */
+#define VSYSCALL_BASE	(__fix_to_virt(FIX_VSYSCALL))
+#else
+#define VSYSCALL_BASE	0
+#endif
+
+#define VSYSCALL_EHDR	((const struct elfhdr *) VSYSCALL_BASE)
+#define VSYSCALL_ENTRY	((unsigned long) &__kernel_vsyscall)
+extern void *__kernel_vsyscall;
+
+/*
+ * Architecture-neutral AT_ values in 0-17, leave some room
+ * for more of them, start the x86-specific ones at 32.
+ */
+#define AT_SYSINFO		32
+#define AT_SYSINFO_EHDR		33
+
+#define ARCH_DLINFO						\
+do {								\
+		NEW_AUX_ENT(AT_SYSINFO,	VSYSCALL_ENTRY);	\
+		NEW_AUX_ENT(AT_SYSINFO_EHDR, VSYSCALL_BASE);	\
+} while (0)
+
+/*
+ * These macros parameterize elf_core_dump in fs/binfmt_elf.c to write out
+ * extra segments containing the vsyscall DSO contents.  Dumping its
+ * contents makes post-mortem fully interpretable later without matching up
+ * the same kernel and hardware config to see what PC values meant.
+ * Dumping its extra ELF program headers includes all the other information
+ * a debugger needs to easily find how the vsyscall DSO was being used.
+ */
+#if 0
+#define ELF_CORE_EXTRA_PHDRS		(VSYSCALL_EHDR->e_phnum)
+#endif
+
+#undef ELF_CORE_EXTRA_PHDRS
+
+#if 0
+#define ELF_CORE_WRITE_EXTRA_PHDRS					      \
+do {									      \
+	const struct elf_phdr *const vsyscall_phdrs =			      \
+		(const struct elf_phdr *) (VSYSCALL_BASE		      \
+					   + VSYSCALL_EHDR->e_phoff);	      \
+	int i;								      \
+	Elf32_Off ofs = 0;						      \
+	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
+		struct elf_phdr phdr = vsyscall_phdrs[i];		      \
+		if (phdr.p_type == PT_LOAD) {				      \
+			ofs = phdr.p_offset = offset;			      \
+			offset += phdr.p_filesz;			      \
+		}							      \
+		else							      \
+			phdr.p_offset += ofs;				      \
+		phdr.p_paddr = 0; /* match other core phdrs */		      \
+		DUMP_WRITE(&phdr, sizeof(phdr));			      \
+	}								      \
+} while (0)
+#define ELF_CORE_WRITE_EXTRA_DATA					      \
+do {									      \
+	const struct elf_phdr *const vsyscall_phdrs =			      \
+		(const struct elf_phdr *) (VSYSCALL_BASE		      \
+					   + VSYSCALL_EHDR->e_phoff);	      \
+	int i;								      \
+	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
+		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
+			DUMP_WRITE((void *) vsyscall_phdrs[i].p_vaddr,	      \
+				   vsyscall_phdrs[i].p_filesz);		      \
+	}								      \
+} while (0)
+#endif
+
+#undef ELF_CORE_WRITE_EXTRA_PHDRS
+#undef ELF_CORE_WRITE_EXTRA_DATA
+
+#define R_386_NONE	0
+#define R_386_32	1
+#define R_386_PC32	2
+#define R_386_GOT32	3
+#define R_386_PLT32	4
+#define R_386_COPY	5
+#define R_386_GLOB_DAT	6
+#define R_386_JMP_SLOT	7
+#define R_386_RELATIVE	8
+#define R_386_GOTOFF	9
+#define R_386_GOTPC	10
+#define R_386_NUM	11
 
 /********* Bits for asm-um/delay.h **********/
 

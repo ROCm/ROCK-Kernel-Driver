@@ -29,6 +29,20 @@ config BLK_DEV_UBD_SYNC
         wise choice too.  In all other cases (for example, if you're just
         playing around with User-Mode Linux) you can choose N.
 
+# Turn this back on when the driver actually works
+#
+#config BLK_DEV_COW
+#	tristate "COW block device"
+#	help
+#	This is a layered driver which sits above two other block devices.
+#	One is read-only, and the other is a read-write layer which stores
+#	all changes.  This provides the illusion that the read-only layer
+#	can be mounted read-write and changed.
+
+config BLK_DEV_COW_COMMON
+	bool
+	default BLK_DEV_COW || BLK_DEV_UBD
+
 config BLK_DEV_LOOP
 	tristate "Loopback device support"
 

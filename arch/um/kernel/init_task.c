@@ -8,7 +8,6 @@
 #include "linux/module.h"
 #include "linux/sched.h"
 #include "linux/init_task.h"
-#include "linux/version.h"
 #include "linux/mqueue.h"
 #include "asm/uaccess.h"
 #include "asm/pgtable.h"
@@ -19,7 +18,7 @@ static struct fs_struct init_fs = INIT_FS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS(init_signals);
-
+static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 EXPORT_SYMBOL(init_mm);
 
 /*
@@ -44,24 +43,10 @@ union thread_union init_thread_union
 __attribute__((__section__(".data.init_task"))) = 
 { INIT_THREAD_INFO(init_task) };
 
-struct task_struct *alloc_task_struct(void)
-{
-	return((struct task_struct *) 
-	       __get_free_pages(GFP_KERNEL, CONFIG_KERNEL_STACK_ORDER));
-}
-
 void unprotect_stack(unsigned long stack)
 {
 	protect_memory(stack, (1 << CONFIG_KERNEL_STACK_ORDER) * PAGE_SIZE, 
 		       1, 1, 0, 1);
-}
-
-void free_task_struct(struct task_struct *task)
-{
-	/* free_pages decrements the page counter and only actually frees
-	 * the pages if they are now not accessed by anything.
-	 */
-	free_pages((unsigned long) task, CONFIG_KERNEL_STACK_ORDER);
 }
 
 /*

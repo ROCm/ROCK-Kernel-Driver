@@ -22,7 +22,7 @@ void handle_syscall(union uml_pt_regs *regs)
 
 	index = record_syscall_start(UPT_SYSCALL_NR(regs));
 
-	syscall_trace();
+	syscall_trace(regs, 1);
 	result = execute_syscall(regs);
 
 	REGS_SET_SYSCALL_RETURN(regs->skas.regs, result);
@@ -30,7 +30,7 @@ void handle_syscall(union uml_pt_regs *regs)
 	   (result == -ERESTARTNOINTR))
 		do_signal(result);
 
-	syscall_trace();
+	syscall_trace(regs, 0);
 	record_syscall_end(index, result);
 }
 

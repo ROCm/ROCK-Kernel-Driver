@@ -4,9 +4,6 @@
  */
 
 #include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/ioctl.h>
-#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
 #include "hostaudio.h"
@@ -20,45 +17,31 @@
 ssize_t hostaudio_read_user(struct hostaudio_state *state, char *buffer, 
 			    size_t count, loff_t *ppos)
 {
-	ssize_t ret;
-
 #ifdef DEBUG
         printk("hostaudio: read_user called, count = %d\n", count);
 #endif
 
-        ret = read(state->fd, buffer, count);
-
-        if(ret < 0) return(-errno);
-        return(ret);
+	return(os_read_file(state->fd, buffer, count));
 }
 
 ssize_t hostaudio_write_user(struct hostaudio_state *state, const char *buffer,
 			     size_t count, loff_t *ppos)
 {
-	ssize_t ret;
-
 #ifdef DEBUG
         printk("hostaudio: write_user called, count = %d\n", count);
 #endif
 
-        ret = write(state->fd, buffer, count);
-
-        if(ret < 0) return(-errno);
-        return(ret);
+	return(os_write_file(state->fd, buffer, count));
 }
 
 int hostaudio_ioctl_user(struct hostaudio_state *state, unsigned int cmd, 
 			 unsigned long arg)
 {
-	int ret;
 #ifdef DEBUG
         printk("hostaudio: ioctl_user called, cmd = %u\n", cmd);
 #endif
 
-        ret = ioctl(state->fd, cmd, arg);
-	
-        if(ret < 0) return(-errno);
-        return(ret);
+	return(os_ioctl_generic(state->fd, cmd, arg));
 }
 
 int hostaudio_open_user(struct hostaudio_state *state, int r, int w, char *dsp)
@@ -67,14 +50,15 @@ int hostaudio_open_user(struct hostaudio_state *state, int r, int w, char *dsp)
         printk("hostaudio: open_user called\n");
 #endif
 
-        state->fd = os_open_file(dsp, of_set_rw(OPENFLAGS(), r, w), 0);
+	state->fd = os_open_file(dsp, of_set_rw(OPENFLAGS(), r, w), 0);
 
-        if(state->fd >= 0) return(0);
-
-        printk("hostaudio_open_user failed to open '%s', errno = %d\n",
-	       dsp, errno);
+	if(state->fd < 0) {
+		printk("hostaudio_open_user failed to open '%s', err = %d\n",
+		       dsp, -state->fd);
+		return(state->fd);
+	}
         
-        return(-errno); 
+	return(0);
 }
 
 int hostaudio_release_user(struct hostaudio_state *state)
@@ -82,10 +66,10 @@ int hostaudio_release_user(struct hostaudio_state *state)
 #ifdef DEBUG
         printk("hostaudio: release called\n");
 #endif
-        if(state->fd >= 0){
-		close(state->fd);
-		state->fd=-1;
-        }
+	if(state->fd >= 0){
+		os_close_file(state->fd);
+		state->fd = -1;
+	}
 
         return(0);
 }
@@ -95,15 +79,11 @@ int hostaudio_release_user(struct hostaudio_state *state)
 int hostmixer_ioctl_mixdev_user(struct hostmixer_state *state, 
 				unsigned int cmd, unsigned long arg)
 {
-	int ret;
 #ifdef DEBUG
         printk("hostmixer: ioctl_user called cmd = %u\n",cmd);
 #endif
 
-        ret = ioctl(state->fd, cmd, arg);
-	if(ret < 0) 
-		return(-errno);
-	return(ret);
+	return(os_ioctl_generic(state->fd, cmd, arg));
 }
 
 int hostmixer_open_mixdev_user(struct hostmixer_state *state, int r, int w,
@@ -115,12 +95,13 @@ int hostmixer_open_mixdev_user(struct hostmixer_state *state, int r, int w,
 
         state->fd = os_open_file(mixer, of_set_rw(OPENFLAGS(), r, w), 0);
 
-        if(state->fd >= 0) return(0);
-
-        printk("hostaudio_open_mixdev_user failed to open '%s', errno = %d\n",
-	       mixer, errno);
+	if(state->fd < 0) {
+	        printk("hostaudio_open_mixdev_user failed to open '%s', "
+		       "err = %d\n", mixer, state->fd);
+		return(state->fd);
+	}
         
-        return(-errno); 
+	return(0);
 }
 
 int hostmixer_release_mixdev_user(struct hostmixer_state *state)
@@ -130,7 +111,7 @@ int hostmixer_release_mixdev_user(struct hostmixer_state *state)
 #endif
 
         if(state->fd >= 0){
-		close(state->fd);
+		os_close_file(state->fd);
 		state->fd = -1;
         }
 

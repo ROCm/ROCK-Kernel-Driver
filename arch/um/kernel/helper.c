@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <sched.h>
 #include <sys/signal.h>
 #include <sys/wait.h>
@@ -33,6 +32,7 @@ static int helper_child(void *arg)
 {
 	struct helper_data *data = arg;
 	char **argv = data->argv;
+	int errval;
 
 	if(helper_pause){
 		signal(SIGHUP, helper_hup);
@@ -41,8 +41,9 @@ static int helper_child(void *arg)
 	if(data->pre_exec != NULL)
 		(*data->pre_exec)(data->pre_data);
 	execvp(argv[0], argv);
+	errval = errno;
 	printk("execvp of '%s' failed - errno = %d\n", argv[0], errno);
-	write(data->fd, &errno, sizeof(errno));
+	os_write_file(data->fd, &errval, sizeof(errval));
 	os_kill_process(os_getpid(), 0);
 	return(0);
 }
@@ -59,17 +60,20 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 	if((stack_out != NULL) && (*stack_out != 0))
 		stack = *stack_out;
 	else stack = alloc_stack(0, um_in_interrupt());
-	if(stack == 0) return(-ENOMEM);
+	if(stack == 0)
+		return(-ENOMEM);
 
 	err = os_pipe(fds, 1, 0);
-	if(err){
-		printk("run_helper : pipe failed, errno = %d\n", -err);
-		return(err);
+	if(err < 0){
+		printk("run_helper : pipe failed, err = %d\n", -err);
+		goto out_free;
 	}
-	if(fcntl(fds[1], F_SETFD, 1) != 0){
-		printk("run_helper : setting FD_CLOEXEC failed, errno = %d\n",
-		       errno);
-		return(-errno);
+
+	err = os_set_exec_close(fds[1], 1);
+	if(err < 0){
+		printk("run_helper : setting FD_CLOEXEC failed, err = %d\n",
+		       -err);
+		goto out_close;
 	}
 
 	sp = stack + page_size() - sizeof(void *);
@@ -80,23 +84,34 @@ int run_helper(void (*pre_exec)(void *), void *pre_data, char **argv,
 	pid = clone(helper_child, (void *) sp, CLONE_VM | SIGCHLD, &data);
 	if(pid < 0){
 		printk("run_helper : clone failed, errno = %d\n", errno);
-		return(-errno);
+		err = -errno;
+		goto out_close;
 	}
-	close(fds[1]);
-	n = read(fds[0], &err, sizeof(err));
+
+	os_close_file(fds[1]);
+	n = os_read_file(fds[0], &err, sizeof(err));
 	if(n < 0){
-		printk("run_helper : read on pipe failed, errno = %d\n", 
-		       errno);
-		return(-errno);
+		printk("run_helper : read on pipe failed, err = %d\n", -n);
+		err = n;
+		goto out_kill;
 	}
 	else if(n != 0){
 		waitpid(pid, NULL, 0);
-		pid = -err;
+		pid = -errno;
 	}
 
 	if(stack_out == NULL) free_stack(stack, 0);
         else *stack_out = stack;
 	return(pid);
+
+ out_kill:
+	os_kill_process(pid, 1);
+ out_close:
+	os_close_file(fds[0]);
+	os_close_file(fds[1]);
+ out_free:
+	free_stack(stack, 0);
+	return(err);
 }
 
 int run_helper_thread(int (*proc)(void *), void *arg, unsigned int flags, 
@@ -117,9 +132,11 @@ int run_helper_thread(int (*proc)(void *), void *arg, unsigned int flags,
 	}
 	if(stack_out == NULL){
 		pid = waitpid(pid, &status, 0);
-		if(pid < 0)
+		if(pid < 0){
 			printk("run_helper_thread - wait failed, errno = %d\n",
-			       pid);
+			       errno);
+			pid = -errno;
+		}
 		if(!WIFEXITED(status) || (WEXITSTATUS(status) != 0))
 			printk("run_helper_thread - thread returned status "
 			       "0x%x\n", status);

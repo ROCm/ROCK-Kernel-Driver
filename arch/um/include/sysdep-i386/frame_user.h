@@ -56,26 +56,26 @@ static inline void setup_arch_frame(struct arch_frame_data_raw *in,
  * it would have to be __builtin_frame_address(1).
  */
 
-static inline unsigned long frame_restorer(void)
-{
-	unsigned long *fp;
-
-	fp = __builtin_frame_address(0);
-	return((unsigned long) (fp + 1));
-}
+#define frame_restorer() \
+({ \
+	unsigned long *fp; \
+\
+	fp = __builtin_frame_address(0); \
+	((unsigned long) (fp + 1)); \
+})
 
 /* Similarly, this returns the value of sp when the handler was first
  * entered.  This is used to calculate the proper sp when delivering
  * signals.
  */
 
-static inline unsigned long frame_sp(void)
-{
-	unsigned long *fp;
-
-	fp = __builtin_frame_address(0);
-	return((unsigned long) (fp + 1));
-}
+#define frame_sp() \
+({ \
+	unsigned long *fp; \
+\
+	fp = __builtin_frame_address(0); \
+	((unsigned long) (fp + 1)); \
+})
 
 #endif
 

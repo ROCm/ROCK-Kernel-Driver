@@ -120,7 +120,10 @@ static int __init mmapper_init(void)
 	printk(KERN_INFO "Mapper v0.1\n");
 
 	v_buf = (char *) find_iomem("mmapper", &mmapper_size);
-	if(mmapper_size == 0) return(0);
+	if(mmapper_size == 0){
+		printk(KERN_ERR "mmapper_init - find_iomem failed\n");
+		return(0);
+	}
 
 	p_buf = __pa(v_buf);
 

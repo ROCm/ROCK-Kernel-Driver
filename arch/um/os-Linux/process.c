@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2002 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -7,32 +7,37 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <linux/unistd.h>
 #include <sys/mman.h>
 #include <sys/wait.h>
 #include "os.h"
 #include "user.h"
 
+#define ARBITRARY_ADDR -1
+#define FAILURE_PID    -1
+
 unsigned long os_process_pc(int pid)
 {
 	char proc_stat[sizeof("/proc/#####/stat\0")], buf[256];
 	unsigned long pc;
-	int fd;
+	int fd, err;
 
 	sprintf(proc_stat, "/proc/%d/stat", pid);
 	fd = os_open_file(proc_stat, of_read(OPENFLAGS()), 0);
 	if(fd < 0){
-		printk("os_process_pc - couldn't open '%s', errno = %d\n", 
-		       proc_stat, errno);
-		return(-1);
+		printk("os_process_pc - couldn't open '%s', err = %d\n",
+		       proc_stat, -fd);
+		return(ARBITRARY_ADDR);
 	}
-	if(read(fd, buf, sizeof(buf)) < 0){
-		printk("os_process_pc - couldn't read '%s', errno = %d\n", 
-		       proc_stat, errno);
-		close(fd);
-		return(-1);
+	err = os_read_file(fd, buf, sizeof(buf));
+	if(err < 0){
+		printk("os_process_pc - couldn't read '%s', err = %d\n",
+		       proc_stat, -err);
+		os_close_file(fd);
+		return(ARBITRARY_ADDR);
 	}
-	close(fd);
-	pc = -1;
+	os_close_file(fd);
+	pc = ARBITRARY_ADDR;
 	if(sscanf(buf, "%*d %*s %*c %*d %*d %*d %*d %*d %*d %*d %*d "
 		  "%*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d %*d "
 		  "%*d %*d %*d %*d %ld", &pc) != 1){
@@ -52,22 +57,23 @@ int os_process_parent(int pid)
 	snprintf(stat, sizeof(stat), "/proc/%d/stat", pid);
 	fd = os_open_file(stat, of_read(OPENFLAGS()), 0);
 	if(fd < 0){
-		printk("Couldn't open '%s', errno = %d\n", stat, -fd);
-		return(-1);
+		printk("Couldn't open '%s', err = %d\n", stat, -fd);
+		return(FAILURE_PID);
 	}
 
-	n = read(fd, data, sizeof(data));
-	close(fd);
+	n = os_read_file(fd, data, sizeof(data));
+	os_close_file(fd);
 
 	if(n < 0){
-		printk("Couldn't read '%s', errno = %d\n", stat);
-		return(-1);
+		printk("Couldn't read '%s', err = %d\n", stat, -n);
+		return(FAILURE_PID);
 	}
 
-	parent = -1;
+	parent = FAILURE_PID;
 	/* XXX This will break if there is a space in the command */
 	n = sscanf(data, "%*d %*s %*c %d", &parent);
-	if(n != 1) printk("Failed to scan '%s'\n", data);
+	if(n != 1)
+		printk("Failed to scan '%s'\n", data);
 
 	return(parent);
 }
@@ -87,7 +93,8 @@ void os_kill_process(int pid, int reap_child)
 
 void os_usr1_process(int pid)
 {
-	kill(pid, SIGUSR1);
+	syscall(__NR_tkill, pid, SIGUSR1);
+	/* kill(pid, SIGUSR1); */
 }
 
 int os_getpid(void)
@@ -95,7 +102,7 @@ int os_getpid(void)
 	return(getpid());
 }
 
-int os_map_memory(void *virt, int fd, unsigned long off, unsigned long len, 
+int os_map_memory(void *virt, int fd, unsigned long long off, unsigned long len,
 		  int r, int w, int x)
 {
 	void *loc;
@@ -104,8 +111,8 @@ int os_map_memory(void *virt, int fd, unsigned long off, unsigned long len,
 	prot = (r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
 		(x ? PROT_EXEC : 0);
 
-	loc = mmap((void *) virt, len, prot, MAP_SHARED | MAP_FIXED, 
-		   fd, off);
+	loc = mmap64((void *) virt, len, prot, MAP_SHARED | MAP_FIXED,
+		     fd, off);
 	if(loc == MAP_FAILED)
 		return(-errno);
 	return(0);
@@ -126,7 +133,8 @@ int os_unmap_memory(void *addr, int len)
         int err;
 
         err = munmap(addr, len);
-        if(err < 0) return(-errno);
+	if(err < 0)
+		return(-errno);
         return(0);
 }
 

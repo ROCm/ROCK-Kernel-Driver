@@ -8,6 +8,8 @@
 
 #include "sysdep/ptrace.h"
 
+enum { OP_NONE, OP_EXEC, OP_FORK, OP_TRACE_ON, OP_REBOOT, OP_HALT, OP_CB };
+
 extern int tracing_pid;
 
 extern int tracer(int (*init_proc)(void *), void *sp);

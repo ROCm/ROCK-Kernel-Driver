@@ -4,7 +4,6 @@
 #include <stddef.h>
 #include <sched.h>
 #include <string.h>
-#include <sys/fcntl.h>
 #include <sys/errno.h>
 #include <sys/wait.h>
 #include <sys/signal.h>
@@ -48,15 +47,15 @@ static int slirp_tramp(char **argv, int fd)
 
 	return(pid);
 }
- 
+
+/* XXX This is just a trivial wrapper around os_pipe */
 static int slirp_datachan(int *mfd, int *sfd)
 {
 	int fds[2], err;
 
 	err = os_pipe(fds, 1, 1);
-	if(err){
-		printk("slirp_datachan: Failed to open pipe, errno = %d\n",
-		       -err);
+	if(err < 0){
+		printk("slirp_datachan: Failed to open pipe, err = %d\n", -err);
 		return(err);
 	}
 
@@ -77,7 +76,7 @@ static int slirp_open(void *data)
 	pid = slirp_tramp(pri->argw.argv, sfd);
 
 	if(pid < 0){
-		printk("slirp_tramp failed - errno = %d\n", pid);
+		printk("slirp_tramp failed - errno = %d\n", -pid);
 		os_close_file(sfd);	
 		os_close_file(mfd);	
 		return(pid);
@@ -97,8 +96,8 @@ static void slirp_close(int fd, void *data)
 	struct slirp_data *pri = data;
 	int status,err;
 
-	close(fd);
-	close(pri->slave);
+	os_close_file(fd);
+	os_close_file(pri->slave);
 
 	pri->slave = -1;
 

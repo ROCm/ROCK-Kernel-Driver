@@ -17,6 +17,7 @@
 #include "mem_user.h"
 #include "os.h"
 #include "tlb.h"
+#include "mode.h"
 
 static int exec_tramp(void *sig_stack)
 {
@@ -47,17 +48,17 @@ void flush_thread_tt(void)
 		do_exit(SIGKILL);
 	}
 
-	if(current->thread_info->cpu == 0)
+	if(current_thread->cpu == 0)
 		forward_interrupts(new_pid);
 	current->thread.request.op = OP_EXEC;
 	current->thread.request.u.exec.pid = new_pid;
-	unprotect_stack((unsigned long) current->thread_info);
+	unprotect_stack((unsigned long) current_thread);
 	os_usr1_process(os_getpid());
 
 	enable_timer();
 	free_page(stack);
 	protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 1, 0, 1);
-	task_protections((unsigned long) current->thread_info);
+	task_protections((unsigned long) current_thread);
 	force_flush_all();
 	unblock_signals();
 }
