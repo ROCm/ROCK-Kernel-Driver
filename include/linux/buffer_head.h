@@ -44,7 +44,7 @@ struct buffer_head {
 	struct page *b_page;		/* the page this bh is mapped to */
 
 	sector_t b_blocknr;		/* block number */
-	unsigned short b_size;		/* block size */
+	u32 b_size;			/* block size */
 	char *b_data;			/* pointer to data block */
 
 	struct block_device *b_bdev;

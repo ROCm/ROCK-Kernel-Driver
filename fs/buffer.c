@@ -179,8 +179,8 @@ __clear_page_buffers(struct page *page)
 
 static void buffer_io_error(struct buffer_head *bh)
 {
-	printk(KERN_ERR "Buffer I/O error on device %s, logical block %ld\n",
-			bdevname(bh->b_bdev), bh->b_blocknr);
+	printk(KERN_ERR "Buffer I/O error on device %s, logical block %Ld\n",
+			bdevname(bh->b_bdev), (u64)bh->b_blocknr);
 }
 
 /*
@@ -189,12 +189,12 @@ static void buffer_io_error(struct buffer_head *bh)
  */
 void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 {
-	if (!uptodate)
-		buffer_io_error(bh);
-	if (uptodate)
+	if (uptodate) {
 		set_buffer_uptodate(bh);
-	else
+	} else {
+		buffer_io_error(bh);
 		clear_buffer_uptodate(bh);
+	}
 	unlock_buffer(bh);
 	put_bh(bh);
 }
@@ -519,14 +519,12 @@ static void end_buffer_async_read(struct buffer_head *bh, int uptodate)
 
 	BUG_ON(!buffer_async_read(bh));
 
-	if (!uptodate)
-		buffer_io_error(bh);
-
 	page = bh->b_page;
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
 		clear_buffer_uptodate(bh);
+		buffer_io_error(bh);
 		SetPageError(page);
 	}
 
@@ -579,13 +577,11 @@ static void end_buffer_async_write(struct buffer_head *bh, int uptodate)
 
 	BUG_ON(!buffer_async_write(bh));
 
-	if (!uptodate)
-		buffer_io_error(bh);
-
 	page = bh->b_page;
 	if (uptodate) {
 		set_buffer_uptodate(bh);
 	} else {
+		buffer_io_error(bh);
 		clear_buffer_uptodate(bh);
 		SetPageError(page);
 	}
@@ -907,6 +903,7 @@ try_again:
 
 		bh->b_bdev = NULL;
 		bh->b_this_page = head;
+		bh->b_blocknr = -1;
 		head = bh;
 
 		bh->b_state = 0;
@@ -2442,7 +2439,6 @@ static void init_buffer_head(void *data, kmem_cache_t *cachep, unsigned long fla
 		struct buffer_head * bh = (struct buffer_head *)data;
 
 		memset(bh, 0, sizeof(*bh));
-		bh->b_blocknr = -1;
 		INIT_LIST_HEAD(&bh->b_assoc_buffers);
 	}
 }
