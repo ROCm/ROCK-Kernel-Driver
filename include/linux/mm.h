@@ -255,22 +255,7 @@ static inline void get_page(struct page *page)
 	atomic_inc(&page->count);
 }
 
-static inline void put_page(struct page *page)
-{
-	if (unlikely(PageCompound(page))) {
-		page = (struct page *)page->private;
-		if (put_page_testzero(page)) {
-			if (page[1].mapping) {	/* destructor? */
-				(*(void (*)(struct page *))page[1].mapping)(page);
-			} else {
-				__page_cache_release(page);
-			}
-		}
-		return;
-	}
-	if (!PageReserved(page) && put_page_testzero(page))
-		__page_cache_release(page);
-}
+void put_page(struct page *page);
 
 #else		/* CONFIG_HUGETLB_PAGE */
 

@@ -34,6 +34,27 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
+#ifdef CONFIG_HUGETLB_PAGE
+
+void put_page(struct page *page)
+{
+	if (unlikely(PageCompound(page))) {
+		page = (struct page *)page->private;
+		if (put_page_testzero(page)) {
+			if (page[1].mapping) {	/* destructor? */
+				(*(void (*)(struct page *))page[1].mapping)(page);
+			} else {
+				__page_cache_release(page);
+			}
+		}
+		return;
+	}
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
+EXPORT_SYMBOL(put_page);
+#endif
+
 /*
  * Writeback is about to end against a page which has been marked for immediate
  * reclaim.  If it still appears to be reclaimable, move it to the tail of the
