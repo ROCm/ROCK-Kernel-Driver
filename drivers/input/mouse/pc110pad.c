@@ -38,6 +38,7 @@
 #include <linux/input.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/pci.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -107,8 +108,22 @@ static int pc110pad_open(struct input_dev *dev)
 	return 0;
 }
 
+/*
+ * We try to avoid enabling the hardware if it's not
+ * there, but we don't know how to test. But we do know
+ * that the PC110 is not a PCI system. So if we find any
+ * PCI devices in the machine, we don't have a PC110.
+ */
 static int __init pc110pad_init(void)
 {
+	struct pci_dev *dev;
+
+	dev = pci_get_device(PCI_ANY_ID, PCI_ANY_ID, NULL);
+	if (dev) {
+		pci_dev_put(dev);
+		return -ENOENT;
+	}
+
 	if (!request_region(pc110pad_io, 4, "pc110pad")) {
 		printk(KERN_ERR "pc110pad: I/O area %#x-%#x in use.\n",
 				pc110pad_io, pc110pad_io + 4);
