@@ -856,23 +856,11 @@ struct fb_cmap32 {
 	compat_caddr_t	transp;
 };
 
-static int do_cmap_ptr(__u16 **ptr64, __u32 *ptr32)
-{
-	__u32 data;
-	void *datap;
-
-	if (get_user(data, ptr32))
-		return -EFAULT;
-	datap = compat_ptr(data);
-	if (put_user(datap, ptr64))
-		return -EFAULT;
-	return 0;
-}
-
 static int fb_getput_cmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
-	struct fb_cmap *cmap;
-	struct fb_cmap32 *cmap32;
+	struct fb_cmap __user *cmap;
+	struct fb_cmap32 __user *cmap32;
+	__u32 data;
 	int err;
 
 	cmap = compat_alloc_user_space(sizeof(*cmap));
@@ -881,10 +869,14 @@ static int fb_getput_cmap(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (copy_in_user(&cmap->start, &cmap32->start, 2 * sizeof(__u32)))
 		return -EFAULT;
 
-	if (do_cmap_ptr(&cmap->red, &cmap32->red) ||
-	    do_cmap_ptr(&cmap->green, &cmap32->green) ||
-	    do_cmap_ptr(&cmap->blue, &cmap32->blue) ||
-	    do_cmap_ptr(&cmap->transp, &cmap32->transp))
+	if (get_user(data, &cmap32->red) ||
+	    put_user(compat_ptr(data), &cmap->red) ||
+	    get_user(data, &cmap32->green) ||
+	    put_user(compat_ptr(data), &cmap->green) ||
+	    get_user(data, &cmap32->blue) ||
+	    put_user(compat_ptr(data), &cmap->blue) ||
+	    get_user(data, &cmap32->transp) ||
+	    put_user(compat_ptr(data), &cmap->transp))
 		return -EFAULT;
 
 	err = sys_ioctl(fd, cmd, (unsigned long) cmap);
