@@ -353,9 +353,9 @@ void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 
 #if __REALLY_HAVE_AGP
 
-agp_memory *DRM(alloc_agp)(int pages, u32 type)
+DRM_AGP_MEM *DRM(alloc_agp)(int pages, u32 type)
 {
-	agp_memory *handle;
+	DRM_AGP_MEM *handle;
 
 	if (!pages) {
 		DRM_MEM_ERROR(DRM_MEM_TOTALAGP, "Allocating 0 pages\n");
@@ -376,7 +376,7 @@ agp_memory *DRM(alloc_agp)(int pages, u32 type)
 	return NULL;
 }
 
-int DRM(free_agp)(agp_memory *handle, int pages)
+int DRM(free_agp)(DRM_AGP_MEM *handle, int pages)
 {
 	int           alloc_count;
 	int           free_count;
@@ -405,7 +405,7 @@ int DRM(free_agp)(agp_memory *handle, int pages)
 	return retval;
 }
 
-int DRM(bind_agp)(agp_memory *handle, unsigned int start)
+int DRM(bind_agp)(DRM_AGP_MEM *handle, unsigned int start)
 {
 	int retcode = -EINVAL;
 
@@ -429,7 +429,7 @@ int DRM(bind_agp)(agp_memory *handle, unsigned int start)
 	return retcode;
 }
 
-int DRM(unbind_agp)(agp_memory *handle)
+int DRM(unbind_agp)(DRM_AGP_MEM *handle)
 {
 	int alloc_count;
 	int free_count;
