@@ -78,7 +78,7 @@
 #define SYMLINK_MAPS 2
 
 extern int xfs_ioctl(bhv_desc_t *, struct inode *, struct file *,
-			unsigned int, unsigned long);
+			int, unsigned int, unsigned long);
 
 
 /*
@@ -992,6 +992,7 @@ STATIC int
 xfs_readlink(
 	bhv_desc_t	*bdp,
 	uio_t		*uiop,
+	int		ioflags,
 	cred_t		*credp)
 {
 	xfs_inode_t     *ip;
@@ -1033,7 +1034,7 @@ xfs_readlink(
 		goto error_return;
 	}
 
-	if (!(uiop->uio_fmode & FINVIS)) {
+	if (!(ioflags & IO_INVIS)) {
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	}
 

@@ -149,6 +149,7 @@ xfs_read(
 	const struct iovec	*iovp,
 	unsigned int		segs,
 	loff_t			*offset,
+	int			ioflags,
 	cred_t			*credp)
 {
 	struct file		*file = iocb->ki_filp;
@@ -159,8 +160,6 @@ xfs_read(
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
 	unsigned long		seg;
-	int			direct = (file->f_flags & O_DIRECT);
-	int			invisible = (file->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -183,7 +182,7 @@ xfs_read(
 	}
 	/* END copy & waste from filemap.c */
 
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		pb_target_t	*target =
 			(ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
@@ -214,7 +213,8 @@ xfs_read(
 	 */
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
 
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    !(ioflags & IO_INVIS)) {
 		int error;
 		vrwlock_t locktype = VRWLOCK_READ;
 
@@ -226,14 +226,13 @@ xfs_read(
 		}
 	}
 
-	/* We need to deal with the iovec case seperately here */
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
 
-	if (!invisible)
+	if (likely(!(ioflags & IO_INVIS)))
 		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 
 	return ret;
@@ -244,6 +243,7 @@ xfs_sendfile(
 	bhv_desc_t		*bdp,
 	struct file		*filp,
 	loff_t			*offset,
+	int			ioflags,
 	size_t			count,
 	read_actor_t		actor,
 	void			*target,
@@ -254,7 +254,6 @@ xfs_sendfile(
 	xfs_inode_t		*ip;
 	xfs_mount_t		*mp;
 	vnode_t			*vp;
-	int			invisible = (filp->f_mode & FINVIS);
 
 	ip = XFS_BHVTOI(bdp);
 	vp = BHV_TO_VNODE(bdp);
@@ -274,7 +273,9 @@ xfs_sendfile(
 		return -EIO;
 
 	xfs_ilock(ip, XFS_IOLOCK_SHARED);
-	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) && !invisible) {
+
+	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_READ) &&
+	    (!(ioflags & IO_INVIS))) {
 		vrwlock_t locktype = VRWLOCK_READ;
 		int error;
 
@@ -289,8 +290,7 @@ xfs_sendfile(
 	xfs_iunlock(ip, XFS_IOLOCK_SHARED);
 
 	XFS_STATS_ADD(xs_read_bytes, ret);
-	if (!invisible)
-		xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
+	xfs_ichgtime(ip, XFS_ICHGTIME_ACC);
 	return ret;
 }
 
@@ -518,6 +518,7 @@ xfs_write(
 	const struct iovec	*iovp,
 	unsigned int		segs,
 	loff_t			*offset,
+	int			ioflags,
 	cred_t			*credp)
 {
 	struct file		*file = iocb->ki_filp;
@@ -532,8 +533,6 @@ xfs_write(
 	vnode_t			*vp;
 	unsigned long		seg;
 	int			iolock;
-	int			direct = (file->f_flags & O_DIRECT);
-	int			invisible = (file->f_mode & FINVIS);
 	int			eventsent = 0;
 	vrwlock_t		locktype;
 
@@ -569,7 +568,7 @@ xfs_write(
 		return -EIO;
 	}
 
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		pb_target_t	*target =
 			(xip->i_d.di_flags & XFS_DIFLAG_REALTIME) ?
 				mp->m_rtdev_targp : mp->m_ddev_targp;
@@ -586,6 +585,7 @@ xfs_write(
 	}
 
 	xfs_ilock(xip, XFS_ILOCK_EXCL|iolock);
+
 	isize = xip->i_d.di_size;
 	limit = XFS_MAXIOFFSET(mp);
 
@@ -608,7 +608,7 @@ start:
 	}
 
 	if ((DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_WRITE) &&
-	    !invisible && !eventsent)) {
+	    !(ioflags & IO_INVIS) && !eventsent)) {
 		loff_t		savedsize = *offset;
 
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
@@ -642,7 +642,7 @@ start:
 	 *
 	 * We must update xfs' times since revalidate will overcopy xfs.
 	 */
-	if (size && !invisible)
+	if (size && !(ioflags & IO_INVIS))
 		xfs_ichgtime(xip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 
 	/*
@@ -654,7 +654,7 @@ start:
 	 * to zero it out up to the new size.
 	 */
 
-	if (!direct && (*offset > isize && isize)) {
+	if (!(ioflags & IO_ISDIRECT) && (*offset > isize && isize)) {
 		error = xfs_zero_eof(BHV_TO_VNODE(bdp), io, *offset,
 			isize, *offset + size);
 		if (error) {
@@ -683,14 +683,15 @@ start:
 	}
 
 retry:
-	if (direct) {
+	if (ioflags & IO_ISDIRECT) {
 		xfs_inval_cached_pages(vp, &xip->i_iocore, *offset, 1, 1);
 	}
 
 	ret = generic_file_aio_write_nolock(iocb, iovp, segs, offset);
 
 	if ((ret == -ENOSPC) &&
-	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) && !invisible) {
+	    DM_EVENT_ENABLED(vp->v_vfsp, xip, DM_EVENT_NOSPACE) &&
+	    !(ioflags & IO_INVIS)) {
 
 		xfs_rwunlock(bdp, locktype);
 		error = XFS_SEND_NAMESP(xip->i_mount, DM_EVENT_NOSPACE, vp,

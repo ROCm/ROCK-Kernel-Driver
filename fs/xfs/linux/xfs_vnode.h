@@ -155,9 +155,17 @@ extern u_short		vttoif_tab[];
 #define VMODIFIED	       0x8	/* XFS inode state possibly differs */
 					/* to the Linux inode state.	*/
 
-typedef enum vrwlock	{ VRWLOCK_NONE, VRWLOCK_READ,
-			  VRWLOCK_WRITE, VRWLOCK_WRITE_DIRECT,
-			  VRWLOCK_TRY_READ, VRWLOCK_TRY_WRITE } vrwlock_t;
+/*
+ * Values for the VOP_RWLOCK and VOP_RWUNLOCK flags parameter.
+ */
+typedef enum vrwlock {
+	VRWLOCK_NONE,
+	VRWLOCK_READ,
+	VRWLOCK_WRITE,
+	VRWLOCK_WRITE_DIRECT,
+	VRWLOCK_TRY_READ,
+	VRWLOCK_TRY_WRITE
+} vrwlock_t;
 
 /*
  * Return values for VOP_INACTIVE.  A return value of
@@ -182,15 +190,15 @@ typedef enum vchange {
 typedef int	(*vop_open_t)(bhv_desc_t *, struct cred *);
 typedef ssize_t (*vop_read_t)(bhv_desc_t *, struct kiocb *,
 				const struct iovec *, unsigned int,
-				loff_t *, struct cred *);
+				loff_t *, int, struct cred *);
 typedef ssize_t (*vop_write_t)(bhv_desc_t *, struct kiocb *,
 				const struct iovec *, unsigned int,
-				loff_t *, struct cred *);
+				loff_t *, int, struct cred *);
 typedef ssize_t (*vop_sendfile_t)(bhv_desc_t *, struct file *,
-				loff_t *, size_t, read_actor_t,
+				loff_t *, int, size_t, read_actor_t,
 				void *, struct cred *);
 typedef int	(*vop_ioctl_t)(bhv_desc_t *, struct inode *, struct file *,
-				unsigned int, unsigned long);
+				int, unsigned int, unsigned long);
 typedef int	(*vop_getattr_t)(bhv_desc_t *, struct vattr *, int,
 				struct cred *);
 typedef int	(*vop_setattr_t)(bhv_desc_t *, struct vattr *, int,
@@ -212,7 +220,8 @@ typedef int	(*vop_readdir_t)(bhv_desc_t *, struct uio *, struct cred *,
 				int *);
 typedef int	(*vop_symlink_t)(bhv_desc_t *, vname_t *, struct vattr *,
 				char *, vnode_t **, struct cred *);
-typedef int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, struct cred *);
+typedef int	(*vop_readlink_t)(bhv_desc_t *, struct uio *, int,
+				struct cred *);
 typedef int	(*vop_fsync_t)(bhv_desc_t *, int, struct cred *,
 				xfs_off_t, xfs_off_t);
 typedef int	(*vop_inactive_t)(bhv_desc_t *, struct cred *);
@@ -284,12 +293,12 @@ typedef struct vnodeops {
  */
 #define _VOP_(op, vp)	(*((vnodeops_t *)(vp)->v_fops)->op)
 
-#define VOP_READ(vp,file,iov,segs,offset,cr,rv)			\
-	rv = _VOP_(vop_read, vp)((vp)->v_fbhv,file,iov,segs,offset,cr)
-#define VOP_WRITE(vp,file,iov,segs,offset,cr,rv)		\
-	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,iov,segs,offset,cr)
-#define VOP_SENDFILE(vp,f,off,cnt,act,targ,cr,rv)		\
-	rv = _VOP_(vop_sendfile, vp)((vp)->v_fbhv,f,off,cnt,act,targ,cr)
+#define VOP_READ(vp,file,iov,segs,offset,ioflags,cr,rv)			\
+	rv = _VOP_(vop_read, vp)((vp)->v_fbhv,file,iov,segs,offset,ioflags,cr)
+#define VOP_WRITE(vp,file,iov,segs,offset,ioflags,cr,rv)		\
+	rv = _VOP_(vop_write, vp)((vp)->v_fbhv,file,iov,segs,offset,ioflags,cr)
+#define VOP_SENDFILE(vp,f,off,ioflags,cnt,act,targ,cr,rv)		\
+	rv = _VOP_(vop_sendfile, vp)((vp)->v_fbhv,f,off,ioflags,cnt,act,targ,cr)
 #define VOP_BMAP(vp,of,sz,rw,b,n,rv)					\
 	rv = _VOP_(vop_bmap, vp)((vp)->v_fbhv,of,sz,rw,b,n)
 #define VOP_OPEN(vp, cr, rv)						\
@@ -318,8 +327,8 @@ typedef struct vnodeops {
 	rv = _VOP_(vop_readdir, vp)((vp)->v_fbhv,uiop,cr,eofp)
 #define	VOP_SYMLINK(dvp,d,vap,tnm,vpp,cr,rv)				\
 	rv = _VOP_(vop_symlink, dvp) ((dvp)->v_fbhv,d,vap,tnm,vpp,cr)
-#define	VOP_READLINK(vp,uiop,cr,rv)					\
-	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,cr)
+#define	VOP_READLINK(vp,uiop,fl,cr,rv)					\
+	rv = _VOP_(vop_readlink, vp)((vp)->v_fbhv,uiop,fl,cr)
 #define	VOP_FSYNC(vp,f,cr,b,e,rv)					\
 	rv = _VOP_(vop_fsync, vp)((vp)->v_fbhv,f,cr,b,e)
 #define VOP_INACTIVE(vp, cr, rv)					\
@@ -366,15 +375,20 @@ typedef struct vnodeops {
  */
 #define VOP_FLUSH_PAGES(vp, first, last, flags, fiopt, rv)		\
 	rv = _VOP_(vop_flush_pages, vp)((vp)->v_fbhv,first,last,flags,fiopt)
-#define VOP_IOCTL(vp, inode, filp, cmd, arg, rv)			\
-	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,cmd,arg)
+#define VOP_IOCTL(vp, inode, filp, fl, cmd, arg, rv)			\
+	rv = _VOP_(vop_ioctl, vp)((vp)->v_fbhv,inode,filp,fl,cmd,arg)
 #define VOP_IFLUSH(vp, flags, rv)					\
 	rv = _VOP_(vop_iflush, vp)((vp)->v_fbhv, flags)
 
 /*
+ * Flags for read/write calls - same values as IRIX
+ */
+#define IO_ISDIRECT	0x00004		/* bypass page cache */
+#define IO_INVIS	0x00020		/* don't update inode timestamps */
+
+/*
  * Flags for VOP_IFLUSH call
  */
-
 #define FLUSH_SYNC		1	/* wait for flush to complete	*/
 #define FLUSH_INODE		2	/* flush the inode itself	*/
 #define FLUSH_LOG		4	/* force the last log entry for

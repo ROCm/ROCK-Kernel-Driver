@@ -61,6 +61,7 @@ extern struct inode_operations linvfs_dir_inode_operations;
 extern struct inode_operations linvfs_symlink_inode_operations;
 
 extern struct file_operations linvfs_file_operations;
+extern struct file_operations linvfs_invis_file_operations;
 extern struct file_operations linvfs_dir_operations;
 
 extern struct address_space_operations linvfs_aops;

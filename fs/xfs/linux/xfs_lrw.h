@@ -56,12 +56,12 @@ extern int xfs_zero_eof(struct vnode *, struct xfs_iocore *, xfs_off_t,
 				xfs_fsize_t, xfs_fsize_t);
 extern ssize_t xfs_read(struct bhv_desc *, struct kiocb *,
 				const struct iovec *, unsigned int,
-				loff_t *, struct cred *);
+				loff_t *, int, struct cred *);
 extern ssize_t xfs_write(struct bhv_desc *, struct kiocb *,
 				const struct iovec *, unsigned int,
-				loff_t *, struct cred *);
+				loff_t *, int, struct cred *);
 extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
-				loff_t *, size_t, read_actor_t,
+				loff_t *, int, size_t, read_actor_t,
 				void *, struct cred *);
 
 extern int xfs_iomap(struct xfs_iocore *, xfs_off_t, ssize_t, int,
