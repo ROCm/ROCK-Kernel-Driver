@@ -33,6 +33,7 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
+#include <linux/completion.h>
 #include <linux/reboot.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
@@ -65,6 +66,7 @@ struct ecard_request {
 	unsigned int	length;
 	unsigned int	use_loader;
 	void		*buffer;
+	struct completion *complete;
 };
 
 struct expcard_blacklist {
@@ -219,12 +221,9 @@ static void ecard_do_request(struct ecard_request *req)
 	}
 }
 
-#include <linux/completion.h>
-
 static DECLARE_WAIT_QUEUE_HEAD(ecard_wait);
 static struct ecard_request *ecard_req;
 static DECLARE_MUTEX(ecard_sem);
-static DECLARE_COMPLETION(ecard_completion);
 
 /*
  * Set up the expansion card daemon's page tables.
@@ -298,9 +297,10 @@ ecard_task(void * unused)
 		wait_event_interruptible(ecard_wait, ecard_req != NULL);
 
 		req = xchg(&ecard_req, NULL);
-		if (req != NULL)
+		if (req != NULL) {
 			ecard_do_request(req);
-		complete(&ecard_completion);
+			complete(req->complete);
+		}
 	}
 }
 
@@ -310,14 +310,17 @@ ecard_task(void * unused)
  * FIXME: The test here is not sufficient to detect if the
  * kcardd is running.
  */
-static void
-ecard_call(struct ecard_request *req)
+static void ecard_call(struct ecard_request *req)
 {
+	DECLARE_COMPLETION(completion);
+
 	/*
 	 * Make sure we have a context that is able to sleep.
 	 */
 	if (current == &init_task || in_interrupt())
 		BUG();
+
+	req->complete = &completion;
 
 	down(&ecard_sem);
 	ecard_req = req;
@@ -326,7 +329,7 @@ ecard_call(struct ecard_request *req)
 	/*
 	 * Now wait for kecardd to run.
 	 */
-	wait_for_completion(&ecard_completion);
+	wait_for_completion(&completion);
 	up(&ecard_sem);
 }
 
