@@ -6,6 +6,8 @@
 #include <linux/sched.h>
 #endif
 
+#include "csr1212.h"
+
 #define CSR_REGISTER_BASE  0xfffff0000000ULL
 
 /* register offsets relative to CSR_REGISTER_BASE */
@@ -34,6 +36,27 @@
 #define CSR_SPEED_MAP             0x2000
 #define CSR_SPEED_MAP_END         0x3000
 
+/* IEEE 1394 bus specific Configuration ROM Key IDs */
+#define IEEE1394_KV_ID_POWER_REQUIREMENTS (0x30)
+
+/* IEEE 1394 Bus Inforamation Block specifics */
+#define CSR_BUS_INFO_SIZE (5 * sizeof(quadlet_t))
+
+#define CSR_IRMC_SHIFT 31
+#define CSR_CMC_SHIFT  30
+#define CSR_ISC_SHIFT  29
+#define CSR_BMC_SHIFT  28
+#define CSR_PMC_SHIFT  27
+#define CSR_CYC_CLK_ACC_SHIFT 16
+#define CSR_MAX_REC_SHIFT 12
+#define CSR_MAX_ROM_SHIFT 8
+#define CSR_GENERATION_SHIFT 4
+
+#define CSR_SET_BUS_INFO_GENERATION(csr, gen)				\
+	((csr)->bus_info_data[2] =					\
+		cpu_to_be32((be32_to_cpu((csr)->bus_info_data[2]) &	\
+			     ~(0xf << CSR_GENERATION_SHIFT)) |          \
+			    (gen) << CSR_GENERATION_SHIFT))
 
 struct csr_control {
         spinlock_t lock;
@@ -49,17 +72,25 @@ struct csr_control {
         quadlet_t channels_available_hi, channels_available_lo;
 	quadlet_t broadcast_channel;
 
-        quadlet_t *rom;
-        size_t rom_size;
-        unsigned char rom_version;
+	/* Bus Info */
+	quadlet_t guid_hi, guid_lo;
+	u8 cyc_clk_acc;
+	u8 max_rec;
+	u8 max_rom;
+	u8 generation;	/* Only use values between 0x2 and 0xf */
+	u8 lnk_spd;
 
+	unsigned long gen_timestamp[16];
+
+	struct csr1212_csr *rom;
 
         quadlet_t topology_map[256];
         quadlet_t speed_map[1024];
 };
 
+extern struct csr1212_bus_ops csr_bus_ops;
 
-void init_csr(void);
+int init_csr(void);
 void cleanup_csr(void);
 
 #endif /* _IEEE1394_CSR_H */
