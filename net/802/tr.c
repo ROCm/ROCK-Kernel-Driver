@@ -465,6 +465,7 @@ static int rif_get_info(char *buffer,char **start, off_t offset, int length)
 	off_t pos=0;
 	int size,i,j,rcf_len,segment,brdgnmb;
 	unsigned long now=jiffies;
+	unsigned long flags;
 
 	rif_cache entry;
 
@@ -473,7 +474,7 @@ static int rif_get_info(char *buffer,char **start, off_t offset, int length)
 	pos+=size;
 	len+=size;
 
-	spin_lock_bh(&rif_lock);
+	spin_lock_irqsave(&rif_lock,flags);
 	for(i=0;i < RIF_TABLE_SIZE;i++) 
 	{
 		for(entry=rif_table[i];entry;entry=entry->next) {
@@ -522,7 +523,7 @@ static int rif_get_info(char *buffer,char **start, off_t offset, int length)
 		if(pos>offset+length)
 			break;
 	}
-	spin_unlock_bh(&rif_lock);
+	spin_unlock_irqrestore(&rif_lock,flags);
 
 	*start=buffer+(offset-begin); /* Start of wanted data */
 	len-=(offset-begin);    /* Start slop */
