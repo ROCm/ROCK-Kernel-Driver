@@ -181,7 +181,7 @@ vmlinux: include/linux/version.h $(CONFIGURATION) init/main.o init/version.o ini
 linuxsubdirs: $(patsubst %, _dir_%, $(SUBDIRS))
 
 $(patsubst %, _dir_%, $(SUBDIRS)) : dummy include/linux/version.h include/config/MARKER
-	$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
+	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" AFLAGS="$(AFLAGS) $(AFLAGS_KERNEL)" -C $(patsubst _dir_%, %, $@)
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -190,11 +190,11 @@ oldconfig: symlinks
 	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
 
 xconfig: symlinks
-	$(MAKE) -C scripts kconfig.tk
+	@$(MAKE) -C scripts kconfig.tk
 	wish -f scripts/kconfig.tk
 
 menuconfig: include/linux/version.h symlinks
-	$(MAKE) -C scripts/lxdialog all
+	@$(MAKE) -C scripts/lxdialog all
 	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
 
 config: symlinks
@@ -274,7 +274,7 @@ modules: $(patsubst %, _mod_%, $(SUBDIRS))
 
 .PHONY: $(patsubst %, _mod_%, $(SUBDIRS))
 $(patsubst %, _mod_%, $(SUBDIRS)) : include/linux/version.h include/config/MARKER
-	$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
+	@$(MAKE) -C $(patsubst _mod_%, %, $@) CFLAGS="$(CFLAGS) $(MODFLAGS)" MAKING_MODULES=1 modules
 
 #	Install modules
 
@@ -304,7 +304,7 @@ _modinst_post:
 
 .PHONY: $(patsubst %, _modinst_%, $(SUBDIRS))
 $(patsubst %, _modinst_%, $(SUBDIRS)) :
-	$(MAKE) -C $(patsubst _modinst_%, %, $@) modules_install
+	@$(MAKE) -C $(patsubst _modinst_%, %, $@) modules_install
 
 else # CONFIG_MODULES
 
@@ -395,13 +395,13 @@ clean:	archclean
 		| grep -v lxdialog/ | xargs rm -f
 	rm -f $(CLEAN_FILES)
 	rm -rf $(CLEAN_DIRS)
-	$(MAKE) -C Documentation/DocBook clean
+	@$(MAKE) -C Documentation/DocBook clean
 
 mrproper: clean archmrproper
 	find . \( -size 0 -o -name .depend \) -type f -print | xargs rm -f
 	rm -f $(MRPROPER_FILES)
 	rm -rf $(MRPROPER_DIRS)
-	$(MAKE) -C Documentation/DocBook mrproper
+	@$(MAKE) -C Documentation/DocBook mrproper
 
 distclean: mrproper
 	rm -f core `find . \( -not -type d \) -and \
@@ -415,7 +415,7 @@ distclean: mrproper
 # Documentation targets
 
 sgmldocs psdocs pdfdocs htmldocs:
-	$(MAKE) -C Documentation/DocBook $@
+	@$(MAKE) -C Documentation/DocBook $@
 
 
 # RPM target

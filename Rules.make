@@ -175,7 +175,7 @@ endif
 
 ifdef _FASTDEP_ALL_SUB_DIRS
 $(patsubst %,_sfdep_%,$(_FASTDEP_ALL_SUB_DIRS)):
-	$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
+	@$(MAKE) -C $(patsubst _sfdep_%,%,$@) fastdep
 endif
 
 
@@ -187,7 +187,7 @@ sub_dirs: dummy $(subdir-list)
 
 ifdef SUB_DIRS
 $(subdir-list) : dummy
-	$(MAKE) -C $(patsubst _subdir_%,%,$@)
+	@$(MAKE) -C $(patsubst _subdir_%,%,$@)
 endif
 
 #
@@ -200,11 +200,11 @@ endif
 ifneq "$(strip $(MOD_SUB_DIRS))" ""
 .PHONY: $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS))
 $(patsubst %,_modsubdir_%,$(MOD_SUB_DIRS)) : dummy
-	$(MAKE) -C $(patsubst _modsubdir_%,%,$@) modules
+	@$(MAKE) -C $(patsubst _modsubdir_%,%,$@) modules
 
 .PHONY: $(patsubst %,_modinst_%,$(MOD_SUB_DIRS))
 $(patsubst %,_modinst_%,$(MOD_SUB_DIRS)) : dummy
-	$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
+	@$(MAKE) -C $(patsubst _modinst_%,%,$@) modules_install
 endif
 
 .PHONY: modules
