@@ -18,6 +18,7 @@
 #include <linux/completion.h>
 #include <linux/delay.h>
 #include <linux/pci.h>
+#include <linux/moduleparam.h>
 #include <asm/atomic.h>
 
 #include "ieee1394_types.h"
@@ -27,6 +28,10 @@
 #include "highlevel.h"
 #include "csr.h"
 #include "nodemgr.h"
+
+static int ignore_drivers = 0;
+module_param(ignore_drivers, int, 0444);
+MODULE_PARM_DESC(ignore_drivers, "Disable automatic probing for drivers.");
 
 struct nodemgr_csr_info {
 	struct hpsb_host *host;
@@ -370,9 +375,29 @@ static ssize_t fw_get_rescan(struct bus_type *bus, char *buf)
 }
 static BUS_ATTR(rescan, S_IWUSR | S_IRUGO, fw_get_rescan, fw_set_rescan);
 
+
+static ssize_t fw_set_ignore_drivers(struct bus_type *bus, const char *buf, size_t count)
+{
+	int state = simple_strtoul(buf, NULL, 10);
+
+	if (state == 1)
+		ignore_drivers = 1;
+	else if (!state)
+		ignore_drivers = 0;
+
+	return count;
+}
+static ssize_t fw_get_ignore_drivers(struct bus_type *bus, char *buf)
+{
+	return sprintf(buf, "%d\n", ignore_drivers);
+}
+static BUS_ATTR(ignore_drivers, S_IWUSR | S_IRUGO, fw_get_ignore_drivers, fw_set_ignore_drivers);
+
+
 struct bus_attribute *const fw_bus_attrs[] = {
 	&bus_attr_destroy_node,
 	&bus_attr_rescan,
+	&bus_attr_ignore_drivers,
 	NULL
 };
 
@@ -854,6 +879,7 @@ static struct unit_directory *nodemgr_process_unit_directory
 	memset (ud, 0, sizeof(struct unit_directory));
 
 	ud->ne = ne;
+	ud->ignore_driver = ignore_drivers;
 	ud->address = ud_kv->offset + CSR1212_CONFIG_ROM_SPACE_BASE;
 	ud->ud_kv = ud_kv;
 	ud->id = (*id)++;
