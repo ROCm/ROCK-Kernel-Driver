@@ -45,4 +45,5 @@ extern int llc_station_ac_report_status(struct llc_station *station,
 					struct sk_buff *skb);
 extern int llc_station_ac_report_status(struct llc_station *station,
 					struct sk_buff *skb);
+extern void llc_station_ack_tmr_cb(unsigned long timeout_data);
 #endif /* LLC_ACTN_H */
