@@ -30,6 +30,9 @@ ToDo/Notes:
 	- Rename init_runlist() to ntfs_init_runlist(), ntfs_vcn_to_lcn() to
 	  ntfs_rl_vcn_to_lcn(), decompress_mapping_pairs() to
 	  ntfs_mapping_pairs_decompress() and adapt all callers.
+	- Add fs/ntfs/runlist.[hc]::ntfs_get_nr_significant_bytes(),
+	  ntfs_get_size_for_mapping_pairs(), ntfs_write_significant_bytes(),
+	  and ntfs_mapping_pairs_build(), adapted from libntfs.
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 

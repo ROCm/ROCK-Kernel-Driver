@@ -45,4 +45,11 @@ extern runlist_element *ntfs_mapping_pairs_decompress(const ntfs_volume *vol,
 
 extern LCN ntfs_rl_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
+extern int ntfs_get_size_for_mapping_pairs(const ntfs_volume *vol,
+		const runlist_element *rl, const VCN start_vcn);
+
+extern int ntfs_mapping_pairs_build(const ntfs_volume *vol, s8 *dst,
+		const int dst_len, const runlist_element *rl,
+		const VCN start_vcn, VCN *const stop_vcn);
+
 #endif /* _LINUX_NTFS_RUNLIST_H */
