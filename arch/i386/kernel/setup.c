@@ -117,7 +117,7 @@
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
 #include <asm/arch_hooks.h>
-#include "setup_arch.h"
+#include "setup_arch_pre.h"
 
 static inline char * __init machine_specific_memory_setup(void);
 
@@ -2925,8 +2925,7 @@ int __init ppro_with_ram_bug(void)
 	return 0;
 }
 
-#define SETUP_POST
-#include "setup_arch.h"
+#include "setup_arch_post.h"
 	
 /*
  * Local Variables:

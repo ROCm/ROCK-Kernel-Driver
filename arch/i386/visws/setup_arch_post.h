@@ -1,6 +1,8 @@
-#ifndef SETUP_POST
-#define ARCH_SETUP
-#else
+/* Hook for machine specific memory setup.
+ *
+ * This is included late in kernel/setup.c so that it can make use of all of
+ * the static functions. */
+
 static inline char * __init machine_specific_memory_setup(void)
 {
 	char *who;
@@ -33,4 +35,3 @@ static inline char * __init machine_specific_memory_setup(void)
   	}
 	return who;
 }
-#endif
