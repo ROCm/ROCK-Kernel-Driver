@@ -204,7 +204,6 @@ static void mddev_put(mddev_t *mddev)
 	}
 	spin_unlock(&all_mddevs_lock);
 }
-EXPORT_SYMBOL(md_unplug_mddev);
 
 static mddev_t * mddev_find(dev_t unit)
 {
