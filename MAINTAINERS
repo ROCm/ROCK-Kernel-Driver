@@ -798,7 +798,7 @@ FRAMEBUFFER LAYER
 P:	James Simmons, Geert Uytterhoeven	
 M:	jsimmons@infradead.org, geert@linux-m68k.org	
 L:	linux-fbdev-devel@lists.sourceforge.net	
-W:	http://www.linux-fbdev.org
+W:	http://linux-fbdev.sourceforge.net/
 S:	Supported
 
 FILE LOCKING (flock() and fcntl()/lockf())
