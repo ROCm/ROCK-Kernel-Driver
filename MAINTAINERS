@@ -929,10 +929,9 @@ S:	Maintained
 KERNEL NFSD
 P:	Neil Brown
 M:	neilb@cse.unsw.edu.au
-L:	nfs-devel@linux.kernel.org (Linux NFS)
 L:	nfs@lists.sourceforge.net
 W:	http://nfs.sourceforge.net/
-W:	http://www.cse.unsw.edu.au/~neilb/oss/knfsd/
+W:	http://www.cse.unsw.edu.au/~neilb/patches/linux-devel/
 S:	Maintained
 
 LANMEDIA WAN CARD DRIVER
