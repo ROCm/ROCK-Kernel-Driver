@@ -563,8 +563,6 @@ static void __devinit smp_store_cpu_info(int id)
 
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
-	int i;
-
 	/* Fixup boot cpu */
 	smp_store_cpu_info(smp_processor_id());
 	cpu_callin_map[smp_processor_id()] = 1;
