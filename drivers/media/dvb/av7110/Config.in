@@ -1,6 +1,0 @@
-dep_tristate '  SAA7146 based AV7110 and Nova/budget cards' CONFIG_DVB_AV7110 $CONFIG_VIDEO_DEV $CONFIG_DVB_CORE
-
-if [ "$CONFIG_DVB_AV7110" != "n" ]; then
-  bool     '  AV7110 OSD support' CONFIG_DVB_AV7110_OSD
-fi
-
