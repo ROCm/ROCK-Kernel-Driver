@@ -1297,8 +1297,11 @@ fill_in_inode(struct inode *tmp_inode,
 	}
 
 	i_size_write(tmp_inode,pfindData->EndOfFile);
-	tmp_inode->i_blocks =
-		(tmp_inode->i_blksize - 1 + pfindData->AllocationSize) >> tmp_inode->i_blkbits;
+
+	/* 512 bytes (2**9) is the fake blocksize that must be used */
+	/* for this calculation, even though the reported blocksize is larger */
+	tmp_inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
+
 	if (pfindData->AllocationSize < pfindData->EndOfFile)
 		cFYI(1, ("Possible sparse file: allocation size less than end of file "));
 	cFYI(1,
@@ -1371,8 +1374,10 @@ unix_fill_in_inode(struct inode *tmp_inode,
 	pfindData->NumOfBytes = le64_to_cpu(pfindData->NumOfBytes);
 	pfindData->EndOfFile = le64_to_cpu(pfindData->EndOfFile);
 	i_size_write(tmp_inode,pfindData->EndOfFile);
-	tmp_inode->i_blocks =
-                (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
+
+	/* 512 bytes (2**9) is the fake blocksize that must be used */
+	/* for this calculation, not the real blocksize */
+	tmp_inode->i_blocks = (512 - 1 + pfindData->NumOfBytes) >> 9;
 
 	if (S_ISREG(tmp_inode->i_mode)) {
 		cFYI(1, ("File inode"));

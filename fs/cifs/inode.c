@@ -130,8 +130,18 @@ cifs_get_inode_info_unix(struct inode **pinode,
 	and blkbits set in superblock so 2**blkbits and blksize will match */
 /*		inode->i_blksize =
 		    (pTcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & 0xFFFFFE00;*/
-		inode->i_blocks = 
-	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;
+
+		/* This seems incredibly stupid but it turns out that
+		i_blocks is not related to (i_size / i_blksize), instead a
+		size of 512 is required to be used for calculating num blocks */
+		 
+
+/*		inode->i_blocks = 
+	                (inode->i_blksize - 1 + findData.NumOfBytes) >> inode->i_blkbits;*/
+
+		/* 512 bytes (2**9) is the fake blocksize that must be used */
+		/* for this calculation */
+		inode->i_blocks = (512 - 1 + findData.NumOfBytes) >> 9;
 
 		if (findData.NumOfBytes < findData.EndOfFile)
 			cFYI(1, ("Server inconsistency Error: it says allocation size less than end of file "));
@@ -275,8 +285,10 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 		}
 		i_size_write(inode,le64_to_cpu(pfindData->EndOfFile));
 		pfindData->AllocationSize = le64_to_cpu(pfindData->AllocationSize);
-		inode->i_blocks =
-			(inode->i_blksize - 1 + pfindData->AllocationSize) >> inode->i_blkbits;
+
+		/* 512 bytes (2**9) is the fake blocksize that must be used */
+		/* for this calculation */
+		inode->i_blocks = (512 - 1 + pfindData->AllocationSize) >> 9;
 
 		inode->i_nlink = le32_to_cpu(pfindData->NumberOfLinks);
 
