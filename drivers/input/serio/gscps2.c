@@ -385,6 +385,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 	serio->open		= gscps2_open;
 	serio->close		= gscps2_close;
 	serio->port_data	= ps2port;
+	serio->dev.parent	= &dev->dev;
 
 	list_add_tail(&ps2port->node, &ps2port_list);
 

@@ -141,6 +141,7 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 	strlcpy(io->name, dev->dev.bus_id, sizeof(io->name));
 	strlcpy(io->phys, dev->dev.bus_id, sizeof(io->phys));
 	io->port_data	= kmi;
+	io->dev.parent	= &dev->dev;
 
 	kmi->io 	= io;
 	kmi->base	= ioremap(dev->res.start, KMI_SIZE);

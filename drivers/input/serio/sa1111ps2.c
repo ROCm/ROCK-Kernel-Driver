@@ -252,6 +252,7 @@ static int ps2_probe(struct sa1111_dev *dev)
 	strlcpy(serio->name, dev->dev.bus_id, sizeof(serio->name));
 	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
 	serio->port_data	= ps2if;
+	serio->dev.parent	= &dev->dev;
 	ps2if->io		= serio;
 	ps2if->dev		= dev;
 	sa1111_set_drvdata(dev, ps2if);

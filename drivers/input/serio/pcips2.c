@@ -159,6 +159,7 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 	strlcpy(serio->name, pci_name(dev), sizeof(serio->name));
 	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
 	serio->port_data	= ps2if;
+	serio->dev.parent	= &dev->dev;
 	ps2if->io		= serio;
 	ps2if->dev		= dev;
 	ps2if->base		= pci_resource_start(dev, 0);
