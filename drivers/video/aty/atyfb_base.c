@@ -2033,7 +2033,7 @@ static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
 		state = 2;
 #endif /* CONFIG_PPC_PMAC */
 
-	if (state != 2 || state == pdev->dev.power_state)
+	if (state != 2 || state == pdev->dev.power.power_state)
 		return 0;
 
 	acquire_console_sem();
@@ -2062,7 +2062,7 @@ static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
 
 	release_console_sem();
 
-	pdev->dev.power_state = state;
+	pdev->dev.power.power_state = state;
 
 	return 0;
 }
@@ -2072,12 +2072,12 @@ static int atyfb_pci_resume(struct pci_dev *pdev)
 	struct fb_info *info = pci_get_drvdata(pdev);
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
-	if (pdev->dev.power_state == 0)
+	if (pdev->dev.power.power_state == 0)
 		return 0;
 
 	acquire_console_sem();
 
-	if (pdev->dev.power_state == 2)
+	if (pdev->dev.power.power_state == 2)
 		aty_power_mgmt(0, par);
 	par->asleep = 0;
 
@@ -2093,7 +2093,7 @@ static int atyfb_pci_resume(struct pci_dev *pdev)
 
 	release_console_sem();
 
-	pdev->dev.power_state = 0;
+	pdev->dev.power.power_state = 0;
 
 	return 0;
 }

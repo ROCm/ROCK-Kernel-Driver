@@ -42,6 +42,8 @@ static char *action_to_string(enum kobject_action action)
 		return "umount";
 	case KOBJ_OFFLINE:
 		return "offline";
+	case KOBJ_ONLINE:
+		return "online";
 	default:
 		return NULL;
 	}
@@ -287,10 +289,10 @@ void kobject_hotplug(struct kobject *kobj, enum kobject_action action)
 	spin_lock(&sequence_lock);
 	seq = ++hotplug_seqnum;
 	spin_unlock(&sequence_lock);
-	sprintf(seq_buff, "SEQNUM=%lld", (long long)seq);
+	sprintf(seq_buff, "SEQNUM=%llu", (unsigned long long)seq);
 
-	pr_debug ("%s: %s %s seq=%lld %s %s %s %s %s\n",
-		  __FUNCTION__, argv[0], argv[1], (long long)seq,
+	pr_debug ("%s: %s %s seq=%llu %s %s %s %s %s\n",
+		  __FUNCTION__, argv[0], argv[1], (unsigned long long)seq,
 		  envp[0], envp[1], envp[2], envp[3], envp[4]);
 
 	send_uevent(action_string, kobj_path, envp, GFP_KERNEL);

@@ -38,7 +38,7 @@ static struct sysfs_dirent * sysfs_new_dirent(struct sysfs_dirent * parent_sd,
 
 	sd = kmalloc(sizeof(*sd), GFP_KERNEL);
 	if (!sd)
-		return ERR_PTR(-ENOMEM);
+		return NULL;
 
 	memset(sd, 0, sizeof(*sd));
 	atomic_set(&sd->s_count, 1);
@@ -56,7 +56,7 @@ int sysfs_make_dirent(struct sysfs_dirent * parent_sd, struct dentry * dentry,
 
 	sd = sysfs_new_dirent(parent_sd, element);
 	if (!sd)
-		return 0;
+		return -ENOMEM;
 
 	sd->s_mode = mode;
 	sd->s_type = type;
@@ -111,7 +111,7 @@ static int create_dir(struct kobject * k, struct dentry * p,
 				d_rehash(*d);
 			}
 		}
-		if (error)
+		if (error && (error != -EEXIST))
 			d_drop(*d);
 		dput(*d);
 	} else
