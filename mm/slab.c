@@ -351,7 +351,7 @@ static cache_sizes_t cache_sizes[] = {
 	{     0,	NULL, NULL}
 };
 /* Must match cache_sizes above. Out of line to keep cache footprint low. */
-#define CN(x) { x, x " (DMA)" }
+#define CN(x) { x, x "(DMA)" }
 static struct { 
 	char *name; 
 	char *name_dma;
