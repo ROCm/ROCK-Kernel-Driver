@@ -33,7 +33,6 @@
 #include <asm/oplib.h>
 #include <asm/timer.h>
 #include <asm/smp.h>
-#include <asm/hardirq.h>
 #include <asm/starfire.h>
 #include <asm/uaccess.h>
 #include <asm/cache.h>

@@ -45,7 +45,6 @@
 #include <linux/proc_fs.h>
 
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <asm/io.h>
 
 #define DRIVER_NAME	"forte"

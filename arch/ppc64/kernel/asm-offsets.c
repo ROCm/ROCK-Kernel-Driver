@@ -22,11 +22,11 @@
 #include <linux/types.h>
 #include <linux/mman.h>
 #include <linux/mm.h>
+#include <linux/hardirq.h>
 #include <asm/io.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
-#include <asm/hardirq.h>
 
 #include <asm/naca.h>
 #include <asm/paca.h>

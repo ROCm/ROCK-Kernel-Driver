@@ -17,7 +17,6 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/kmod.h>
-#include <asm/hardirq.h>
 #include <asm/kmap_types.h>
 
 extern enum km_type crypto_km_types[];

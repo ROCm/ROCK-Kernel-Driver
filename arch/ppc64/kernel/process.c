@@ -34,6 +34,7 @@
 #include <linux/prctl.h>
 #include <linux/ptrace.h>
 #include <linux/kallsyms.h>
+#include <linux/interrupt.h>
 #include <linux/version.h>
 
 #include <asm/pgtable.h>
@@ -47,7 +48,6 @@
 #include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/iSeries/HvCallHpt.h>
-#include <asm/hardirq.h>
 #include <asm/cputable.h>
 #include <asm/sections.h>
 #include <asm/tlbflush.h>

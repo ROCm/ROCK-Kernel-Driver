@@ -101,7 +101,6 @@
 #include <linux/ac97_codec.h>
 #include <linux/bitops.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 
 #define DRIVER_VERSION "1.01"
 

@@ -14,9 +14,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/timer.h>
-#include <asm/hardirq.h>
+#include <linux/firmware.h>
 
-#include "linux/firmware.h"
 
 MODULE_AUTHOR("Manuel Estrada Sainz <ranty@debian.org>");
 MODULE_DESCRIPTION("Hackish sample for using firmware class directly");

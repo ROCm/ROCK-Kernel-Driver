@@ -15,7 +15,6 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
-#include <asm/hardirq.h>
 #include <asm/current.h>
 #include <asm/gpio.h>
 

@@ -38,11 +38,11 @@
 #include <linux/kernel_stat.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
+#include <linux/hardirq.h>
 
 #include <asm/mipsregs.h>
 #include <asm/ptrace.h>
 #include <asm/time.h>
-#include <asm/hardirq.h>
 #include <asm/div64.h>
 #include <asm/mach-au1x00/au1000.h>
 

@@ -2,9 +2,9 @@
 #include <linux/types.h>
 #include <linux/string.h>
 #include <linux/sched.h>
+#include <linux/hardirq.h>
 
 #include <asm/i387.h>
-#include <asm/hardirq.h> 
 
 
 /*

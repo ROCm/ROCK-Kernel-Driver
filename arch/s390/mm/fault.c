@@ -25,11 +25,11 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/module.h>
+#include <linux/hardirq.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/hardirq.h>
 
 #ifndef CONFIG_ARCH_S390X
 #define __FAIL_ADDR_MASK 0x7ffff000

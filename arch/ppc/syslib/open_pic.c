@@ -25,7 +25,6 @@
 #include <asm/sections.h>
 #include <asm/open_pic.h>
 #include <asm/i8259.h>
-#include <asm/hardirq.h>
 
 #include "open_pic_defs.h"
 

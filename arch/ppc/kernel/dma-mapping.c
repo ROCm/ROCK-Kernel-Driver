@@ -41,11 +41,11 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/dma-mapping.h>
+#include <linux/hardirq.h>
 
 #include <asm/pgalloc.h>
 #include <asm/prom.h>
 #include <asm/io.h>
-#include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
 #include <asm/mmu.h>

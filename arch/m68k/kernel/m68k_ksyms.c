@@ -16,7 +16,6 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>
 #include <asm/checksum.h>
-#include <asm/hardirq.h>
 
 asmlinkage long long __ashldi3 (long long, int);
 asmlinkage long long __ashrdi3 (long long, int);

@@ -12,9 +12,9 @@
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
 #include <linux/ptrace.h>
+#include <linux/hardirq.h>
 #include <asm/bootinfo.h>
 #include <asm/irq.h>
-#include <asm/hardirq.h>
 
 #define DEFINE(sym, val) \
         asm volatile("\n->" #sym " %0 " #val : : "i" (val))
