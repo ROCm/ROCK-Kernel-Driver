@@ -1425,27 +1425,6 @@ sys32_ipc(u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	return -EINVAL;
 }
 
-/*
- * sys_time() can be implemented in user-level using
- * sys_gettimeofday().  IA64 did this but i386 Linux did not
- * so we have to implement this system call here.
- */
-asmlinkage long
-sys32_time (int __user *tloc)
-{
-	int i;
-	struct timeval tv;
-
-	do_gettimeofday(&tv);
-	i = tv.tv_sec;
-
-	if (tloc) {
-		if (put_user(i, tloc))
-			i = -EFAULT;
-	}
-	return i;
-}
-
 asmlinkage long
 compat_sys_wait4 (compat_pid_t pid, compat_uint_t * stat_addr, int options,
 		 struct compat_rusage *ru);

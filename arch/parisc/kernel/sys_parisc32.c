@@ -206,21 +206,6 @@ static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 	return 0;
 }
 
-asmlinkage long sys32_time(compat_time_t *tloc)
-{
-	struct timeval tv;
-	compat_time_t now32;
-
-	do_gettimeofday(&tv);
-	now32 = tv.tv_sec;
-
-	if (tloc)
-		if (put_user(now32, tloc))
-			now32 = -EFAULT;
-
-	return now32;
-}
-
 asmlinkage int
 sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 {

@@ -64,7 +64,7 @@ sys32_chdir_wrapper:
 	.globl  sys32_time_wrapper 
 sys32_time_wrapper:
 	llgtr	%r2,%r2			# int *
-	jg	sys_time		# branch to system call
+	jg	compat_sys_time		# branch to system call
 
 	.globl  sys32_mknod_wrapper 
 sys32_mknod_wrapper:
@@ -1076,8 +1076,8 @@ sys32_lstat64_wrapper:
 
 	.globl	sys32_stime_wrapper
 sys32_stime_wrapper:
-	llgtr	%r2,%r2			# int *
-	jg	sys_stime		# branch to system call
+	llgtr	%r2,%r2			# long *
+	jg	compat_sys_stime	# branch to system call
 
 	.globl  sys32_sysctl_wrapper
 sys32_sysctl_wrapper:

@@ -52,12 +52,10 @@ EXPORT_SYMBOL(sys_tz);
  * sys_gettimeofday().  Is this for backwards compatibility?  If so,
  * why not move it into the appropriate arch directory (for those
  * architectures that need it).
- *
- * XXX This function is NOT 64-bit clean!
  */
-asmlinkage long sys_time(int __user * tloc)
+asmlinkage long sys_time(time_t __user * tloc)
 {
-	int i;
+	time_t i;
 	struct timeval tv;
 
 	do_gettimeofday(&tv);

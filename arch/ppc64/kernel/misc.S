@@ -700,7 +700,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_unlink      	/* 10 */
 	.llong .sys32_execve
 	.llong .sys_chdir
-	.llong .sys32_time
+	.llong .compat_sys_time
 	.llong .sys_mknod
 	.llong .sys_chmod		/* 15 */
 	.llong .sys_lchown
@@ -712,7 +712,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_oldumount
 	.llong .sys_setuid
 	.llong .sys_getuid
-	.llong .ppc64_sys32_stime       /* 25 */
+	.llong .compat_sys_stime	/* 25 */
 	.llong .sys32_ptrace
 	.llong .sys_alarm
 	.llong .sys_ni_syscall		/* old fstat syscall */
@@ -987,7 +987,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* old umount syscall */
 	.llong .sys_setuid
 	.llong .sys_getuid
-	.llong .ppc64_sys_stime		/* 25 */
+	.llong .sys_stime		/* 25 */
 	.llong .sys_ptrace
 	.llong .sys_alarm
 	.llong .sys_ni_syscall		/* old fstat syscall */

@@ -20,6 +20,7 @@
 #include <linux/futex.h>	/* for FUTEX_WAIT */
 #include <linux/syscalls.h>
 #include <linux/unistd.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -680,3 +681,42 @@ long compat_put_bitmap(compat_ulong_t __user *umask, unsigned long *mask,
 
 	return 0;
 }
+
+#ifdef __ARCH_WANT_COMPAT_SYS_TIME
+
+/* compat_time_t is a 32 bit "long" and needs to get converted. */
+
+asmlinkage long compat_sys_time(compat_time_t __user * tloc)
+{
+	compat_time_t i;
+	struct timeval tv;
+
+	do_gettimeofday(&tv);
+	i = tv.tv_sec;
+
+	if (tloc) {
+		if (put_user(i,tloc))
+			i = -EFAULT;
+	}
+	return i;
+}
+
+asmlinkage long compat_sys_stime(compat_time_t __user *tptr)
+{
+	struct timespec tv;
+	int err;
+
+	if (get_user(tv.tv_sec, tptr))
+		return -EFAULT;
+
+	tv.tv_nsec = 0;
+
+	err = security_settime(&tv, NULL);
+	if (err)
+		return err;
+
+	do_settimeofday(&tv);
+	return 0;
+}
+
+#endif /* __ARCH_WANT_COMPAT_SYS_TIME */

@@ -74,7 +74,7 @@
 	ENTRY_DIFF(execve_wrapper)
 	ENTRY_SAME(chdir)
 	/* See comments in kernel/time.c!!! Maybe we don't need this? */
-	ENTRY_DIFF(time)
+	ENTRY_COMP(time)
 	ENTRY_SAME(mknod)
 	ENTRY_SAME(chmod)		/* 15 */
 	ENTRY_SAME(lchown)
@@ -91,7 +91,7 @@
 	ENTRY_SAME(bind)
 	ENTRY_SAME(setuid)
 	ENTRY_SAME(getuid)
-	ENTRY_SAME(stime)		/* 25 */
+	ENTRY_COMP(stime)		/* 25 */
 	ENTRY_SAME(ptrace)
 	ENTRY_SAME(alarm)
 	/* see stat comment */
