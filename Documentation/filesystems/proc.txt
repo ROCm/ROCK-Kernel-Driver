@@ -201,7 +201,7 @@ Table 1-3: Kernel info in /proc
  devices     Available devices (block and character)           
  dma         Used DMS channels                                 
  filesystems Supported filesystems                             
- driver	     Various drivers grouped here, currently rtc	(2.4)
+ driver	     Various drivers grouped here, currently rtc (2.4) and hpet (2.6)
  execdomains Execdomains, related to security			(2.4)
  fb	     Frame Buffer devices				(2.4)
  fs	     File system parameters, currently nfs/exports	(2.4)

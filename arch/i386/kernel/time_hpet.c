@@ -21,6 +21,7 @@
 #include <linux/config.h>
 
 #include <asm/hpet.h>
+#include <linux/hpet.h>
 
 unsigned long hpet_period;	/* fsecs / HPET clock */
 unsigned long hpet_tick;	/* hpet clks count per tick */
@@ -135,6 +136,51 @@ int __init hpet_enable(void)
 	hpet_writel(cfg, HPET_CFG);
 
 	use_hpet = 1;
+
+#ifdef	CONFIG_HPET
+	{
+		struct hpet_data	hd;
+		unsigned int 		ntimer;
+
+		memset(&hd, 0, sizeof (hd));
+
+		ntimer = hpet_readl(HPET_ID);
+		ntimer = (ntimer & HPET_ID_NUMBER) >> HPET_ID_NUMBER_SHIFT;
+		ntimer++;
+
+		/*
+		 * Register with driver.
+		 * Timer0 and Timer1 is used by platform.
+		 */
+		hd.hd_address = hpet_virt_address;
+		hd.hd_nirqs = ntimer;
+		hd.hd_flags = HPET_DATA_PLATFORM;
+#ifndef	CONFIG_HPET_EMULATE_RTC
+		hd.hd_state = 0x1;
+#else
+		hd.hd_state = 0x3;
+#endif
+		hd.hd_irq[0] = HPET_LEGACY_8254;
+		hd.hd_irq[1] = HPET_LEGACY_RTC;
+		if (ntimer > 2) {
+			struct hpet		*hpet;
+			struct hpet_timer	*timer;
+			int			i;
+
+			hpet = (struct hpet *) hpet_virt_address;
+
+			for (i = 2, timer = &hpet->hpet_timers[2]; i < ntimer;
+				timer++, i++)
+				hd.hd_irq[i] = (timer->hpet_config &
+					Tn_INT_ROUTE_CNF_MASK) >>
+					Tn_INT_ROUTE_CNF_SHIFT;
+
+		}
+
+		hpet_alloc(&hd);
+	}
+#endif
+
 #ifdef CONFIG_X86_LOCAL_APIC
 	wait_timer_tick = wait_hpet_tick;
 #endif

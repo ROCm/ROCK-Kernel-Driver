@@ -957,6 +957,33 @@ config RAW_DRIVER
           kernels.  Applications should simply open the device (eg /dev/hda1)
           with the O_DIRECT flag.
 
+config HPET
+	bool "HPET - High Precision Event Timer" if (X86 || IA64)
+	default n
+	depends on ACPI
+	help
+	  If you say Y here, you will have a device named "/dev/hpet/XX" for
+	  each timer supported by the HPET.  The timers are
+	  non-periodioc and/or periodic.
+
+config HPET_RTC_IRQ
+	bool "HPET Control RTC IRQ" if !HPET_EMULATE_RTC
+	default n
+	depends on HPET
+	help
+	  If you say Y here, you will disable RTC_IRQ in drivers/char/rtc.c. It
+	  is assumed the platform called hpet_alloc with the RTC IRQ values for
+	  the HPET timers.
+
+config HPET_NOMMAP
+	bool "HPET - Control mmap capability."
+	default n
+	depends on HPET
+	help
+	  If you say Y here, then the mmap interface for the HPET driver returns ENOSYS.
+	  Some hardware implementations might not want all the memory in the page the
+	  HPET control registers reside to be exposed.
+
 config MAX_RAW_DEVS
 	int "Maximum number of RAW devices to support (1-8192)"
 	depends on RAW_DRIVER
