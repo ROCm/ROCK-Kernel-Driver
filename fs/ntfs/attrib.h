@@ -24,23 +24,11 @@
 #ifndef _LINUX_NTFS_ATTRIB_H
 #define _LINUX_NTFS_ATTRIB_H
 
-#include <linux/fs.h>
-
 #include "endian.h"
 #include "types.h"
 #include "layout.h"
-
-static inline void init_runlist(runlist *rl)
-{
-	rl->rl = NULL;
-	init_rwsem(&rl->lock);
-}
-
-typedef enum {
-	LCN_HOLE		= -1,	/* Keep this as highest value or die! */
-	LCN_RL_NOT_MAPPED	= -2,
-	LCN_ENOENT		= -3,
-} LCN_SPECIAL_VALUES;
+#include "inode.h"
+#include "runlist.h"
 
 /**
  * ntfs_attr_search_ctx - used in attribute search functions
@@ -71,12 +59,7 @@ typedef struct {
 	ATTR_RECORD *base_attr;
 } ntfs_attr_search_ctx;
 
-extern runlist_element *decompress_mapping_pairs(const ntfs_volume *vol,
-		const ATTR_RECORD *attr, runlist_element *old_rl);
-
 extern int ntfs_map_runlist(ntfs_inode *ni, VCN vcn);
-
-extern LCN ntfs_vcn_to_lcn(const runlist_element *rl, const VCN vcn);
 
 extern runlist_element *ntfs_find_vcn(ntfs_inode *ni, const VCN vcn,
 		const BOOL need_write);

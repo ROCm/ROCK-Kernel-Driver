@@ -25,6 +25,7 @@ ToDo/Notes:
 
 	- Implement extent mft record deallocation
 	  fs/ntfs/mft.c::ntfs_extent_mft_record_free().
+	- Splitt runlist related functions off from attrib.[hc] to runlist.[hc].
 
 2.1.19 - Many cleanups, improvements, and a minor bug fix.
 

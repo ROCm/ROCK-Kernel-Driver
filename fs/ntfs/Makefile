@@ -3,8 +3,8 @@
 obj-$(CONFIG_NTFS_FS) += ntfs.o
 
 ntfs-objs := aops.o attrib.o collate.o compress.o debug.o dir.o file.o \
-	     index.o inode.o mft.o mst.o namei.o super.o sysctl.o unistr.o \
-	     upcase.o
+	     index.o inode.o mft.o mst.o namei.o runlist.o super.o sysctl.o \
+	     unistr.o upcase.o
 
 EXTRA_CFLAGS = -DNTFS_VERSION=\"2.1.20-WIP\"
 
