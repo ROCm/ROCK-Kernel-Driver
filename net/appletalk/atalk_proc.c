@@ -275,6 +275,7 @@ int __init atalk_proc_init(void)
 	atalk_proc_dir = proc_mkdir("atalk", proc_net);
 	if (!atalk_proc_dir)
 		goto out;
+	atalk_proc_dir->owner = THIS_MODULE;
 
 	p = create_proc_entry("interface", S_IRUGO, atalk_proc_dir);
 	if (!p)
