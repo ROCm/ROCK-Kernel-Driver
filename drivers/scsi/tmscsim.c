@@ -168,6 +168,7 @@
  *	2.1a  03/11/29  GL, KG	Initial fixing for 2.6. Convert to	*
  *				use the current PCI-mapping API, update	*
  *				command-queuing.			*
+ *	2.1b  04/04/13  GL	Fix for 64-bit platforms		*
  ***********************************************************************/
 
 /* Uncomment SA_INTERRUPT, if the driver refuses to share its IRQ with other devices */
@@ -1022,7 +1023,7 @@ static int dc390_pci_map (PSRB pSRB)
 			pci_map_page(pdev, virt_to_page(pcmd->sense_buffer),
 				     (unsigned long)pcmd->sense_buffer & ~PAGE_MASK, sizeof(pcmd->sense_buffer),
 				     DMA_FROM_DEVICE);
-		pSRB->Segmentx.length = sizeof(pcmd->sense_buffer);
+		sg_dma_len(&pSRB->Segmentx) = sizeof(pcmd->sense_buffer);
 		pSRB->SGcount = 1;
 		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
 		DEBUG1(printk("%s(): Mapped sense buffer %p at %x\n", __FUNCTION__, pcmd->sense_buffer, cmdp->saved_dma_handle));
@@ -1043,7 +1044,7 @@ static int dc390_pci_map (PSRB pSRB)
 				     (unsigned long)pcmd->request_buffer & ~PAGE_MASK,
 				     pcmd->request_bufflen, scsi_to_pci_dma_dir(pcmd->sc_data_direction));
 		/* TODO: error handling */
-		pSRB->Segmentx.length = pcmd->request_bufflen;
+		sg_dma_len(&pSRB->Segmentx) = pcmd->request_bufflen;
 		pSRB->SGcount = 1;
 		pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
 		DEBUG1(printk("%s(): Mapped request buffer %p at %x\n", __FUNCTION__, pcmd->request_buffer, cmdp->saved_dma_handle));
@@ -1131,7 +1132,7 @@ static void dc390_Query_to_Waiting (PACB pACB)
 	if (!pcmd) { dc390_Free_insert (pACB, pSRB); return; } /* should not happen */
 	pDCB = dc390_findDCB (pACB, pcmd->device->id, pcmd->device->lun);
 	if (!pDCB) 
-	{ 
+	{
 		dc390_Free_insert (pACB, pSRB);
 		printk (KERN_ERR "DC390: Command in queue to non-existing device!\n");
 		pcmd->result = MK_RES(DRIVER_ERROR,DID_ERROR,0,0);
@@ -1180,7 +1181,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
     /* Assume BAD_TARGET; will be cleared later */
     cmd->result = DID_BAD_TARGET << 16;
    
-    /* TODO: Change the policy: Alway accept TEST_UNIT_READY or INQUIRY 
+    /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
      * commands and alloc a DCB for the device if not yet there. DCB will
      * be removed in dc390_SRBdone if SEL_TIMEOUT */
 
@@ -1767,7 +1768,7 @@ void dc390_initDCB( PACB pACB, PDCB *ppDCB, UCHAR id, UCHAR lun )
     PDCB pDCB, pDCB2;
 
     pDCB = kmalloc (sizeof(DC390_DCB), GFP_ATOMIC);
-    DCBDEBUG(printk (KERN_INFO "DC390: alloc mem for DCB (ID %i, LUN %i): %p\n"	\
+    DCBDEBUG(printk (KERN_INFO "DC390: alloc mem for DCB (ID %i, LUN %i): %p\n",	\
 		     id, lun, pDCB));
  
     *ppDCB = pDCB;
@@ -2229,10 +2230,13 @@ int __init DC390_detect (Scsi_Host_Template *psht)
     if ( PCI_PRESENT )
 	while (PCI_FIND_DEVICE (PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD53C974))
 	{
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,30)
 	    if (pci_enable_device (pdev))
 		continue;
-#endif
+
+	    if (pci_set_dma_mask(pdev, 0xffffffff)) {
+		    printk(KERN_ERR "DC390(%i): No suitable DMA available.\n", dc390_adapterCnt);
+		    continue;
+	    }
 	    PCI_GET_IO_AND_IRQ;
 	    DEBUG0(printk(KERN_INFO "DC390(%i): IO_PORT=%04x,IRQ=%x\n", dc390_adapterCnt, (UINT) io_port, irq));
 

@@ -521,7 +521,7 @@ din_1:
     {
 	    DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
 	    DC390_write8 (DMA_Cmd, READ_DIRECTION+DMA_IDLE_CMD); /* | DMA_INT */
-    }	    
+    }
 }
 
 static void
@@ -740,9 +740,9 @@ dc390_restore_ptr (PACB pACB, PSRB pSRB)
 	psgl = pSRB->pSegmentList;
 	//dc390_pci_sync(pSRB);
 
-	while (pSRB->TotalXferredLen + (ULONG) psgl->length < pSRB->Saved_Ptr)
+	while (pSRB->TotalXferredLen + (ULONG) sg_dma_len(psgl) < pSRB->Saved_Ptr)
 	{
-	    pSRB->TotalXferredLen += (ULONG) psgl->length;
+	    pSRB->TotalXferredLen += (ULONG) sg_dma_len(psgl);
 	    pSRB->SGIndex++;
 	    if( pSRB->SGIndex < pSRB->SGcount )
 	    {
@@ -762,7 +762,7 @@ dc390_restore_ptr (PACB pACB, PSRB pSRB)
     } else if(pcmd->request_buffer) {
 	//dc390_pci_sync(pSRB);
 
-	pSRB->Segmentx.length = pcmd->request_bufflen - pSRB->Saved_Ptr;
+	sg_dma_len(&pSRB->Segmentx) = pcmd->request_bufflen - pSRB->Saved_Ptr;
 	pSRB->SGcount = 1;
 	pSRB->pSegmentList = (PSGL) &pSRB->Segmentx;
     } else {
@@ -885,6 +885,8 @@ dc390_DataIO_Comm( PACB pACB, PSRB pSRB, UCHAR ioDir)
 	if (pDCB) printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (%02i-%i)\n",
 			  pDCB->TargetID, pDCB->TargetLUN);
 	else printk (KERN_ERR "DC390: pSRB == pTmpSRB! (TagQ Error?) (DCB 0!)\n");
+
+	pSRB->pSRBDCB = pDCB;
 	dc390_EnableMsgOut_Abort (pACB, pSRB);
 	if (pDCB) pDCB->DCBFlag |= ABORT_DEV;
 	return;
@@ -1466,7 +1468,7 @@ dc390_SRBdone( PACB pACB, PDCB pDCB, PSRB pSRB )
 		ptr2 = pSRB->pSegmentList;
 		for( i=pSRB->SGIndex; i < bval; i++)
 		{
-		    swlval += ptr2->length;
+		    swlval += sg_dma_len(ptr2);
 		    ptr2++;
 		}
 		REMOVABLEDEBUG(printk(KERN_INFO "XferredLen=%08x,NotXferLen=%08x\n",\
