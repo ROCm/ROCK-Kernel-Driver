@@ -1078,3 +1078,12 @@ acpi_leave_gpes_disabled_setup(char *str)
 
 __setup("acpi_leave_gpes_disabled", acpi_leave_gpes_disabled_setup);
 
+/*
+ * acpi_cstate_limit is defined in the base kernel so modules can
+ * change it w/o depending on the state of the processor module.
+ */
+unsigned int acpi_cstate_limit = ACPI_C_STATES_MAX;
+
+
+EXPORT_SYMBOL(acpi_cstate_limit);
+
