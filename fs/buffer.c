@@ -274,6 +274,8 @@ static void do_sync(unsigned long wait)
 	sync_inodes(wait);	/* Mappings, inodes and blockdevs, again. */
 	if (!wait)
 		printk("Emergency Sync complete\n");
+	if (unlikely(laptop_mode))
+		laptop_sync_completion();
 }
 
 asmlinkage long sys_sync(void)

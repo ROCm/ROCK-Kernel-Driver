@@ -75,6 +75,9 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 	if ((inode->i_state & flags) == flags)
 		return;
 
+	if (unlikely(block_dump))
+		printk("%s(%d): dirtied file\n", current->comm, current->pid);
+
 	spin_lock(&inode_lock);
 	if ((inode->i_state & flags) != flags) {
 		const int was_dirty = inode->i_state & I_DIRTY;

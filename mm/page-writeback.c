@@ -28,6 +28,7 @@
 #include <linux/smp.h>
 #include <linux/sysctl.h>
 #include <linux/cpu.h>
+#include <linux/syscalls.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate
@@ -80,6 +81,16 @@ int dirty_writeback_centisecs = 5 * 100;
  * The longest number of centiseconds for which data is allowed to remain dirty
  */
 int dirty_expire_centisecs = 30 * 100;
+
+/*
+ * Flag that makes the machine dump writes/reads and block dirtyings.
+ */
+int block_dump;
+
+/*
+ * Flag that puts the machine in "laptop mode".
+ */
+int laptop_mode;
 
 /* End of sysctl-exported parameters */
 
@@ -195,7 +206,19 @@ static void balance_dirty_pages(struct address_space *mapping)
 	if (nr_reclaimable + ps.nr_writeback <= dirty_thresh)
 		dirty_exceeded = 0;
 
-	if (!writeback_in_progress(bdi) && nr_reclaimable > background_thresh)
+	if (writeback_in_progress(bdi))
+		return;		/* pdflush is already working this queue */
+
+	/*
+	 * In laptop mode, we wait until hitting the higher threshold before
+	 * starting background writeout, and then write out all the way down
+	 * to the lower threshold.  So slow writers cause minimal disk activity.
+	 *
+	 * In normal mode, we start background writeout at the lower
+	 * background_thresh, to keep the amount of dirty memory low.
+	 */
+	if ((laptop_mode && pages_written) ||
+	     (!laptop_mode && (nr_reclaimable > background_thresh)))
 		pdflush_operation(background_writeout, 0);
 }
 
@@ -289,7 +312,13 @@ int wakeup_bdflush(long nr_pages)
 	return pdflush_operation(background_writeout, nr_pages);
 }
 
-static struct timer_list wb_timer;
+static void wb_timer_fn(unsigned long unused);
+static void laptop_timer_fn(unsigned long unused);
+
+static struct timer_list wb_timer =
+			TIMER_INITIALIZER(wb_timer_fn, 0, 0);
+static struct timer_list laptop_mode_wb_timer =
+			TIMER_INITIALIZER(laptop_timer_fn, 0, 0);
 
 /*
  * Periodic writeback of "old" data.
@@ -368,7 +397,36 @@ static void wb_timer_fn(unsigned long unused)
 {
 	if (pdflush_operation(wb_kupdate, 0) < 0)
 		mod_timer(&wb_timer, jiffies + HZ); /* delay 1 second */
+}
 
+static void laptop_flush(unsigned long unused)
+{
+	sys_sync();
+}
+
+static void laptop_timer_fn(unsigned long unused)
+{
+	pdflush_operation(laptop_flush, 0);
+}
+
+/*
+ * We've spun up the disk and we're in laptop mode: schedule writeback
+ * of all dirty data a few seconds from now.  If the flush is already scheduled
+ * then push it back - the user is still using the disk.
+ */
+void laptop_io_completion(void)
+{
+	mod_timer(&laptop_mode_wb_timer, jiffies + laptop_mode * HZ);
+}
+
+/*
+ * We're in laptop mode and we've just synced. The sync's writes will have
+ * caused another writeback to be scheduled by laptop_io_completion.
+ * Nothing needs to be written back anymore, so we unschedule the writeback.
+ */
+void laptop_sync_completion(void)
+{
+	del_timer(&laptop_mode_wb_timer);
 }
 
 /*
@@ -429,12 +487,7 @@ void __init page_writeback_init(void)
 		vm_dirty_ratio *= correction;
 		vm_dirty_ratio /= 100;
 	}
-
-	init_timer(&wb_timer);
-	wb_timer.expires = jiffies + (dirty_writeback_centisecs * HZ) / 100;
-	wb_timer.data = 0;
-	wb_timer.function = wb_timer_fn;
-	add_timer(&wb_timer);
+	mod_timer(&wb_timer, jiffies + (dirty_writeback_centisecs * HZ) / 100);
 	set_ratelimit();
 	register_cpu_notifier(&ratelimit_nb);
 }

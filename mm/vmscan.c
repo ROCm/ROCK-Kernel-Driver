@@ -246,7 +246,8 @@ static void handle_write_error(struct address_space *mapping,
  * shrink_list returns the number of reclaimed pages
  */
 static int
-shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
+shrink_list(struct list_head *page_list, unsigned int gfp_mask,
+		int *nr_scanned, int do_writepage)
 {
 	struct address_space *mapping;
 	LIST_HEAD(ret_pages);
@@ -353,6 +354,8 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 			if (!may_enter_fs)
 				goto keep_locked;
 			if (!may_write_to_queue(mapping->backing_dev_info))
+				goto keep_locked;
+			if (laptop_mode && !do_writepage)
 				goto keep_locked;
 			if (clear_page_dirty_for_io(page)) {
 				int res;
@@ -473,7 +476,7 @@ keep:
  */
 static int
 shrink_cache(struct zone *zone, unsigned int gfp_mask,
-		int max_scan, int *total_scanned)
+		int max_scan, int *total_scanned, int do_writepage)
 {
 	LIST_HEAD(page_list);
 	struct pagevec pvec;
@@ -521,7 +524,8 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 			mod_page_state_zone(zone, pgscan_kswapd, nr_scan);
 		else
 			mod_page_state_zone(zone, pgscan_direct, nr_scan);
-		nr_freed = shrink_list(&page_list, gfp_mask, total_scanned);
+		nr_freed = shrink_list(&page_list, gfp_mask,
+					total_scanned, do_writepage);
 		*total_scanned += nr_taken;
 		if (current_is_kswapd())
 			mod_page_state(kswapd_steal, nr_freed);
@@ -735,7 +739,7 @@ refill_inactive_zone(struct zone *zone, const int nr_pages_in,
  */
 static int
 shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
-		int *total_scanned, struct page_state *ps)
+		int *total_scanned, struct page_state *ps, int do_writepage)
 {
 	unsigned long ratio;
 	int count;
@@ -764,7 +768,8 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 	count = atomic_read(&zone->nr_scan_inactive);
 	if (count >= SWAP_CLUSTER_MAX) {
 		atomic_set(&zone->nr_scan_inactive, 0);
-		return shrink_cache(zone, gfp_mask, count, total_scanned);
+		return shrink_cache(zone, gfp_mask, count,
+					total_scanned, do_writepage);
 	}
 	return 0;
 }
@@ -787,7 +792,7 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
  */
 static int
 shrink_caches(struct zone **zones, int priority, int *total_scanned,
-		int gfp_mask, struct page_state *ps)
+		int gfp_mask, struct page_state *ps, int do_writepage)
 {
 	int ret = 0;
 	int i;
@@ -803,7 +808,8 @@ shrink_caches(struct zone **zones, int priority, int *total_scanned,
 			continue;	/* Let kswapd poll it */
 
 		max_scan = zone->nr_inactive >> priority;
-		ret += shrink_zone(zone, max_scan, gfp_mask, total_scanned, ps);
+		ret += shrink_zone(zone, max_scan, gfp_mask,
+					total_scanned, ps, do_writepage);
 	}
 	return ret;
 }
@@ -833,6 +839,8 @@ int try_to_free_pages(struct zone **zones,
 	int nr_reclaimed = 0;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	int i;
+	unsigned long total_scanned = 0;
+	int do_writepage = 0;
 
 	inc_page_state(allocstall);
 
@@ -840,13 +848,13 @@ int try_to_free_pages(struct zone **zones,
 		zones[i]->temp_priority = DEF_PRIORITY;
 
 	for (priority = DEF_PRIORITY; priority >= 0; priority--) {
-		int total_scanned = 0;
+		int scanned = 0;
 		struct page_state ps;
 
 		get_page_state(&ps);
-		nr_reclaimed += shrink_caches(zones, priority, &total_scanned,
-						gfp_mask, &ps);
-		shrink_slab(total_scanned, gfp_mask);
+		nr_reclaimed += shrink_caches(zones, priority, &scanned,
+						gfp_mask, &ps, do_writepage);
+		shrink_slab(scanned, gfp_mask);
 		if (reclaim_state) {
 			nr_reclaimed += reclaim_state->reclaimed_slab;
 			reclaim_state->reclaimed_slab = 0;
@@ -858,14 +866,20 @@ int try_to_free_pages(struct zone **zones,
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
-		 * Try to write back as many pages as we just scanned.  Not
-		 * sure if that makes sense, but it's an attempt to avoid
-		 * creating IO storms unnecessarily
+		 * Try to write back as many pages as we just scanned.  This
+		 * tends to cause slow streaming writers to write data to the
+		 * disk smoothly, at the dirtying rate, which is nice.   But
+		 * that's undesirable in laptop mode, where we *want* lumpy
+		 * writeout.  So in laptop mode, write out the whole world.
 		 */
-		wakeup_bdflush(total_scanned);
+		total_scanned += scanned;
+		if (total_scanned > SWAP_CLUSTER_MAX + SWAP_CLUSTER_MAX/2) {
+			wakeup_bdflush(laptop_mode ? 0 : total_scanned);
+			do_writepage = 1;
+		}
 
 		/* Take a nap, wait for some writeback to complete */
-		if (total_scanned && priority < DEF_PRIORITY - 2)
+		if (scanned && priority < DEF_PRIORITY - 2)
 			blk_congestion_wait(WRITE, HZ/10);
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
@@ -908,6 +922,8 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int i;
 	struct reclaim_state *reclaim_state = current->reclaim_state;
 	unsigned long total_scanned = 0;
+	unsigned long total_reclaimed = 0;
+	int do_writepage = 0;
 
 	inc_page_state(pageoutrun);
 
@@ -969,16 +985,25 @@ scan:
 			zone->temp_priority = priority;
 			max_scan = zone->nr_inactive >> priority;
 			reclaimed = shrink_zone(zone, max_scan, GFP_KERNEL,
-					&scanned, ps);
+					&scanned, ps, do_writepage);
 			total_scanned += scanned;
 			reclaim_state->reclaimed_slab = 0;
 			shrink_slab(scanned, GFP_KERNEL);
 			reclaimed += reclaim_state->reclaimed_slab;
+			total_reclaimed += reclaimed;
 			to_free -= reclaimed;
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)
 				zone->all_unreclaimable = 1;
+			/*
+			 * If we've done a decent amount of scanning and
+			 * the reclaim ratio is low, start doing writepage
+			 * even in laptop mode
+			 */
+			if (total_scanned > SWAP_CLUSTER_MAX * 2 &&
+			    total_scanned > total_reclaimed+total_reclaimed/2)
+				do_writepage = 1;
 		}
 		if (nr_pages && to_free > 0)
 			continue;	/* swsusp: need to do more work */
@@ -997,7 +1022,7 @@ out:
 
 		zone->prev_priority = zone->temp_priority;
 	}
-	return nr_pages - to_free;
+	return total_reclaimed;
 }
 
 /*

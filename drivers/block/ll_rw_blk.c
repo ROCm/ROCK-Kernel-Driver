@@ -27,6 +27,7 @@
 #include <linux/completion.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+#include <linux/writeback.h>
 
 /*
  * for max sense size
@@ -2471,6 +2472,16 @@ int submit_bio(int rw, struct bio *bio)
 		mod_page_state(pgpgout, count);
 	else
 		mod_page_state(pgpgin, count);
+
+	if (unlikely(block_dump)) {
+		char b[BDEVNAME_SIZE];
+		printk("%s(%d): %s block %Lu on %s\n",
+			current->comm, current->pid,
+			(rw & WRITE) ? "WRITE" : "READ",
+			(unsigned long long)bio->bi_sector,
+			bdevname(bio->bi_bdev,b));
+	}
+
 	generic_make_request(bio);
 	return 1;
 }
@@ -2753,6 +2764,9 @@ void end_that_request_last(struct request *req)
 {
 	struct gendisk *disk = req->rq_disk;
 	struct completion *waiting = req->waiting;
+
+	if (unlikely(laptop_mode))
+		laptop_io_completion();
 
 	if (disk && blk_fs_request(req)) {
 		unsigned long duration = jiffies - req->start_time;
