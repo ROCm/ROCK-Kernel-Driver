@@ -241,7 +241,7 @@ static struct usb_driver usb_bluetooth_driver = {
 	.id_table =	usb_bluetooth_ids,
 };
 
-static struct tty_driver	bluetooth_tty_driver;
+static struct tty_driver	*bluetooth_tty_driver;
 static struct usb_bluetooth	*bluetooth_table[BLUETOOTH_TTY_MINORS];
 
 
@@ -1195,7 +1195,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		     bluetooth, endpoint->bInterval);
 
 	/* initialize the devfs nodes for this device and let the user know what bluetooths we are bound to */
-	tty_register_device (&bluetooth_tty_driver, minor, &intf->dev);
+	tty_register_device (bluetooth_tty_driver, minor, &intf->dev);
 	info("Bluetooth converter now attached to ttyUB%d (or usb/ttub/%d for devfs)", minor, minor);
 
 	bluetooth_table[minor] = bluetooth;
@@ -1260,7 +1260,7 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 		if (bluetooth->interrupt_in_buffer)
 			kfree (bluetooth->interrupt_in_buffer);
 
-		tty_unregister_device (&bluetooth_tty_driver, bluetooth->minor);
+		tty_unregister_device (bluetooth_tty_driver, bluetooth->minor);
 
 		for (i = 0; i < NUM_BULK_URBS; ++i) {
 			if (bluetooth->write_urb_pool[i]) {
@@ -1290,19 +1290,7 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 	}
 }
 
-
-static struct tty_driver bluetooth_tty_driver = {
-	.magic =		TTY_DRIVER_MAGIC,
-	.owner =		THIS_MODULE,
-	.driver_name =		"usb-bluetooth",
-	.name =			"usb/ttub/",
-	.major =		BLUETOOTH_TTY_MAJOR,
-	.minor_start =		0,
-	.num =			BLUETOOTH_TTY_MINORS,
-	.type =			TTY_DRIVER_TYPE_SERIAL,
-	.subtype =		SERIAL_TYPE_NORMAL,
-	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
+static struct tty_operations bluetooth_ops = {
 	.open =			bluetooth_open,
 	.close =		bluetooth_close,
 	.write =		bluetooth_write,
@@ -1313,7 +1301,6 @@ static struct tty_driver bluetooth_tty_driver = {
 	.unthrottle =		bluetooth_unthrottle,
 	.chars_in_buffer =	bluetooth_chars_in_buffer,
 };
-
 
 int usb_bluetooth_init(void)
 {
@@ -1327,18 +1314,32 @@ int usb_bluetooth_init(void)
 
 	info ("USB Bluetooth support registered");
 
-	/* register the tty driver */
-	bluetooth_tty_driver.init_termios          = tty_std_termios;
-	bluetooth_tty_driver.init_termios.c_cflag  = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	if (tty_register_driver (&bluetooth_tty_driver)) {
+	bluetooth_tty_driver = alloc_tty_driver(BLUETOOTH_TTY_MINORS);
+	if (!bluetooth_tty_driver)
+		return -ENOMEM;
+
+	bluetooth_tty_driver->owner = THIS_MODULE;
+	bluetooth_tty_driver->driver_name = "usb-bluetooth";
+	bluetooth_tty_driver->name = "usb/ttub/";
+	bluetooth_tty_driver->major = BLUETOOTH_TTY_MAJOR;
+	bluetooth_tty_driver->minor_start = 0;
+	bluetooth_tty_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	bluetooth_tty_driver->subtype = SERIAL_TYPE_NORMAL;
+	bluetooth_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	bluetooth_tty_driver->init_termios = tty_std_termios;
+	bluetooth_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	tty_set_operations(bluetooth_tty_driver, &bluetooth_ops);
+	if (tty_register_driver (bluetooth_tty_driver)) {
 		err("%s - failed to register tty driver", __FUNCTION__);
+		put_tty_driver(bluetooth_tty_driver);
 		return -1;
 	}
 
 	/* register the USB driver */
 	result = usb_register(&usb_bluetooth_driver);
 	if (result < 0) {
-		tty_unregister_driver(&bluetooth_tty_driver);
+		tty_unregister_driver(bluetooth_tty_driver);
+		put_tty_driver(bluetooth_tty_driver);
 		err("usb_register failed for the USB bluetooth driver. Error number %d", result);
 		return -1;
 	}
@@ -1352,7 +1353,8 @@ int usb_bluetooth_init(void)
 void usb_bluetooth_exit(void)
 {
 	usb_deregister(&usb_bluetooth_driver);
-	tty_unregister_driver(&bluetooth_tty_driver);
+	tty_unregister_driver(bluetooth_tty_driver);
+	put_tty_driver(bluetooth_tty_driver);
 }
 
 
