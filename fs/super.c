@@ -355,6 +355,7 @@ static int grab_super(struct super_block *s)
 	}
 	up_write(&s->s_umount);
 	put_super(s);
+	yield();
 	return 0;
 }
  
@@ -724,8 +725,8 @@ restart:
 	return s;
 
 failed:
-	deactivate_super(s);
-	remove_super(s);
+	up_write(&s->s_umount);
+	kill_super(s);
 	goto out;
 out1:
 	blkdev_put(bdev, BDEV_FS);
@@ -748,8 +749,8 @@ struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 
 	error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error) {
-		deactivate_super(s);
-		remove_super(s);
+		up_write(&s->s_umount);
+		kill_super(s);
 		return ERR_PTR(error);
 	}
 	s->s_flags |= MS_ACTIVE;
@@ -774,8 +775,8 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 		s->s_flags = flags;
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 		if (error) {
-			deactivate_super(s);
-			remove_super(s);
+			up_write(&s->s_umount);
+			kill_super(s);
 			return ERR_PTR(error);
 		}
 		s->s_flags |= MS_ACTIVE;
@@ -826,32 +827,35 @@ void kill_super(struct super_block *sb)
 		return;
 
 	down_write(&sb->s_umount);
-	sb->s_root = NULL;
-	/* Need to clean after the sucker */
-	if (fs->fs_flags & FS_LITTER)
-		d_genocide(root);
-	shrink_dcache_parent(root);
-	dput(root);
-	fsync_super(sb);
-	lock_super(sb);
-	lock_kernel();
-	sb->s_flags &= ~MS_ACTIVE;
-	invalidate_inodes(sb);	/* bad name - it should be evict_inodes() */
-	if (sop) {
-		if (sop->write_super && sb->s_dirt)
-			sop->write_super(sb);
-		if (sop->put_super)
-			sop->put_super(sb);
-	}
+	if (sb->s_root) {
+		sb->s_root = NULL;
+		/* Need to clean after the sucker */
+		if (fs->fs_flags & FS_LITTER)
+			d_genocide(root);
+		shrink_dcache_parent(root);
+		dput(root);
+		fsync_super(sb);
+		lock_super(sb);
+		lock_kernel();
+		sb->s_flags &= ~MS_ACTIVE;
+		/* bad name - it should be evict_inodes() */
+		invalidate_inodes(sb);
+		if (sop) {
+			if (sop->write_super && sb->s_dirt)
+				sop->write_super(sb);
+			if (sop->put_super)
+				sop->put_super(sb);
+		}
 
-	/* Forget any remaining inodes */
-	if (invalidate_inodes(sb)) {
-		printk("VFS: Busy inodes after unmount. "
-			"Self-destruct in 5 seconds.  Have a nice day...\n");
-	}
+		/* Forget any remaining inodes */
+		if (invalidate_inodes(sb)) {
+			printk("VFS: Busy inodes after unmount. "
+			   "Self-destruct in 5 seconds.  Have a nice day...\n");
+		}
 
-	unlock_kernel();
-	unlock_super(sb);
+		unlock_kernel();
+		unlock_super(sb);
+	}
 	remove_super(sb);
 }
 
