@@ -1404,7 +1404,7 @@ char *idetape_command_key_verbose(u8 idetape_command_key)
  */
 static void idetape_onstream_mode_sense_tape_parameter_page(ide_drive_t *drive, int debug);
 static int idetape_chrdev_release (struct inode *inode, struct file *filp);
-static void idetape_write_release (struct inode *inode);
+static void idetape_write_release (ide_drive_t *drive, unsigned int minor);
 
 /*
  * Too bad. The drive wants to send us data which we are not ready to accept.
@@ -4292,18 +4292,6 @@ static void idetape_pre_reset (ide_drive_t *drive)
 		set_bit(IDETAPE_IGNORE_DSC, &tape->flags);
 }
 
-/*
- *	Character device interface functions
- */
-static ide_drive_t *get_drive_ptr (kdev_t i_rdev)
-{
-	unsigned int i = minor(i_rdev) & ~0xc0;
-
-	if (i >= MAX_HWIFS * MAX_DRIVES)
-		return NULL;
-	return (idetape_chrdevs[i].drive);
-}
-
 static int idetape_onstream_space_over_filemarks_backward (ide_drive_t *drive,short mt_op,int mt_count)
 {
 	idetape_tape_t *tape = drive->driver_data;
@@ -4591,7 +4579,7 @@ static ssize_t idetape_chrdev_read (struct file *file, char *buf,
 				    size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	ide_drive_t *drive = get_drive_ptr(inode->i_rdev);
+	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape = drive->driver_data;
 	ssize_t bytes_read,temp, actually_read = 0, rc;
 
@@ -4819,8 +4807,9 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 				     size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
-	ide_drive_t *drive = get_drive_ptr(inode->i_rdev);
+	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape = drive->driver_data;
+	unsigned int minor = minor(inode->i_rdev);
 	ssize_t retval, actually_written = 0;
 	int position;
 
@@ -4852,7 +4841,7 @@ static ssize_t idetape_chrdev_write (struct file *file, const char *buf,
 				"EOM early warning");
 #endif
 			if (tape->chrdev_direction == idetape_direction_write)
-				idetape_write_release(inode);
+				idetape_write_release(drive, minor);
 			return -ENOSPC;
 		}
 	}
@@ -5293,7 +5282,7 @@ static int idetape_mtioctop (ide_drive_t *drive,short mt_op,int mt_count)
  */
 static int idetape_chrdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	ide_drive_t *drive = get_drive_ptr(inode->i_rdev);
+	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape = drive->driver_data;
 	struct mtop mtop;
 	struct mtget mtget;
@@ -5465,17 +5454,18 @@ ok:
  */
 static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 {
+	unsigned int minor = minor(inode->i_rdev), i = minor & ~0xc0;
 	ide_drive_t *drive;
 	idetape_tape_t *tape;
 	idetape_pc_t pc;
-	unsigned int minor = minor(inode->i_rdev);
 			
 #if IDETAPE_DEBUG_LOG
 	printk(KERN_INFO "ide-tape: Reached idetape_chrdev_open\n");
 #endif /* IDETAPE_DEBUG_LOG */
 	
-	if ((drive = get_drive_ptr(inode->i_rdev)) == NULL)
+	if (i >= MAX_HWIFS * MAX_DRIVES)
 		return -ENXIO;
+	drive = idetape_chrdevs[i].drive;
 	tape = drive->driver_data;
 
 	if (test_and_set_bit(IDETAPE_BUSY, &tape->flags))
@@ -5519,11 +5509,9 @@ static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 	return 0;
 }
 
-static void idetape_write_release (struct inode *inode)
+static void idetape_write_release (ide_drive_t *drive, unsigned int minor)
 {
-	ide_drive_t *drive = get_drive_ptr(inode->i_rdev);
 	idetape_tape_t *tape = drive->driver_data;
-	unsigned int minor = minor(inode->i_rdev);
 
 	idetape_empty_write_pipeline(drive);
 	tape->merge_stage = __idetape_kmalloc_stage(tape, 1, 0);
@@ -5537,8 +5525,6 @@ static void idetape_write_release (struct inode *inode)
 	idetape_flush_tape_buffers(drive);
 	idetape_write_header(drive, minor >= 128);
 	idetape_flush_tape_buffers(drive);
-
-	return;
 }
 
 /*
@@ -5546,7 +5532,7 @@ static void idetape_write_release (struct inode *inode)
  */
 static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 {
-	ide_drive_t *drive = get_drive_ptr(inode->i_rdev);
+	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape;
 	idetape_pc_t pc;
 	unsigned int minor = minor(inode->i_rdev);
@@ -5558,9 +5544,8 @@ static int idetape_chrdev_release (struct inode *inode, struct file *filp)
 		printk(KERN_INFO "ide-tape: Reached idetape_chrdev_release\n");
 #endif /* IDETAPE_DEBUG_LOG */
 
-	if (tape->chrdev_direction == idetape_direction_write) {
-		idetape_write_release(inode);
-	}
+	if (tape->chrdev_direction == idetape_direction_write)
+		idetape_write_release(drive, minor);
 	if (tape->chrdev_direction == idetape_direction_read) {
 		if (minor < 128)
 			idetape_discard_read_pipeline(drive, 1);
@@ -6270,7 +6255,6 @@ static struct block_device_operations idetape_block_ops = {
 static int idetape_attach (ide_drive_t *drive)
 {
 	idetape_tape_t *tape;
-	char devfs_name[64];
 	int minor;
 
 	if (!strstr("ide-tape", drive->driver_req))
@@ -6306,17 +6290,14 @@ static int idetape_attach (ide_drive_t *drive)
 	idetape_setup(drive, tape, minor);
 	idetape_chrdevs[minor].drive = drive;
 
-	sprintf(devfs_name, "%s/mt", drive->devfs_name);
-	tape->de_r = devfs_register (NULL, devfs_name, 0,
-			HWIF(drive)->major, minor,
+	devfs_mk_cdev(MKDEV(HWIF(drive)->major, minor)
 			S_IFCHR | S_IRUGO | S_IWUGO,
-			&idetape_fops, NULL);
-
-	sprintf(devfs_name, "%s/mtn", drive->devfs_name);
-	tape->de_n = devfs_register (NULL, devfs_name, 0,
-			HWIF(drive)->major, minor + 128,
+			&idetape_fops, NULL,
+			"%s/mt", drive->devfs_name);
+	devfs_mk_cdev(MKDEV(HWIF(drive)->major, minor + 128),
 			S_IFCHR | S_IRUGO | S_IWUGO,
-			&idetape_fops, NULL);
+			&idetape_fops, NULL,
+			"%s/mtn", drive->devfs_name);
 
 	drive->disk->number = devfs_register_tape(drive->devfs_name);
 	drive->disk->fops = &idetape_block_ops;
