@@ -13,6 +13,8 @@ typedef struct kmem_cache_s kmem_cache_t;
 
 #include	<linux/gfp.h>
 #include	<linux/types.h>
+#include	<asm/page.h>
+#include	<asm/cache.h>
 
 /* flags for kmem_cache_alloc() */
 #define	SLAB_NOFS		GFP_NOFS
