@@ -204,7 +204,7 @@ static int set_bit_in_list_bitmap(struct super_block *p_s_sb, int block,
   if (!jb->bitmaps[bmap_nr]) {
     jb->bitmaps[bmap_nr] = get_bitmap_node(p_s_sb) ;
   }
-  set_bit(bit_nr, jb->bitmaps[bmap_nr]->data) ;
+  set_bit(bit_nr, (unsigned long *)jb->bitmaps[bmap_nr]->data) ;
   return 0 ;
 }
 
@@ -550,7 +550,7 @@ int reiserfs_in_journal(struct super_block *p_s_sb,
       PROC_INFO_INC( p_s_sb, journal.in_journal_bitmap );
       jb = SB_JOURNAL(p_s_sb)->j_list_bitmap + i ;
       if (jb->journal_list && jb->bitmaps[bmap_nr] &&
-          test_bit(bit_nr, jb->bitmaps[bmap_nr]->data)) {
+          test_bit(bit_nr, (unsigned long *)jb->bitmaps[bmap_nr]->data)) {
 	tmp_bit = find_next_zero_bit((unsigned long *)
 	                             (jb->bitmaps[bmap_nr]->data),
 	                             p_s_sb->s_blocksize << 3, bit_nr+1) ; 

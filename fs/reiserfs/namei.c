@@ -248,7 +248,7 @@ static int linear_search_in_dir_item (struct cpu_key * key, struct reiserfs_dir_
    
 	/* mark, that this generation number is used */
 	if (de->de_gen_number_bit_string)
-	    set_bit (GET_GENERATION_NUMBER (deh_offset (deh)), de->de_gen_number_bit_string);
+	    set_bit (GET_GENERATION_NUMBER (deh_offset (deh)), (unsigned long *)de->de_gen_number_bit_string);
 
 	// calculate pointer to name and namelen
 	de->de_entry_num = i;
@@ -504,7 +504,7 @@ static int reiserfs_add_entry (struct reiserfs_transaction_handle *th, struct in
 	return -EEXIST;
     }
 
-    gen_number = find_first_zero_bit (bit_string, MAX_GENERATION_NUMBER + 1);
+    gen_number = find_first_zero_bit ((unsigned long *)bit_string, MAX_GENERATION_NUMBER + 1);
     if (gen_number > MAX_GENERATION_NUMBER) {
       /* there is no free generation number */
       reiserfs_warning ("reiserfs_add_entry: Congratulations! we have got hash function screwed up\n");
