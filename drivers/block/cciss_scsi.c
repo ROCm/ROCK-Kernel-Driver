@@ -1046,7 +1046,7 @@ cciss_update_non_disk_devices(int cntl_num, int hostno)
 	}
 	else {
 		printk(KERN_ERR  "cciss: Report physical LUNs failed.\n");
-		return;
+		goto out;
 	}
 
 
@@ -1091,7 +1091,7 @@ cciss_update_non_disk_devices(int cntl_num, int hostno)
 	}
 
 	adjust_cciss_scsi_table(cntl_num, hostno, currentsd, ncurrent);
-
+out:
 	kfree(inq_buff);
 	kfree(ld_buff);
 	return;

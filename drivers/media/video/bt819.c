@@ -167,6 +167,7 @@ static int bt819_attach(struct i2c_adapter *adap, int addr , unsigned long flags
 	decoder = kmalloc(sizeof(struct bt819), GFP_KERNEL);
 	if (decoder == NULL) {
 		MOD_DEC_USE_COUNT;
+		kfree(client);
 		return -ENOMEM;
 	}
 

@@ -278,6 +278,7 @@ int dm_hash_rename(const char *old, const char *new)
 		DMWARN("asked to rename to an already existing name %s -> %s",
 		       old, new);
 		up_write(&_hash_lock);
+		kfree(new_name);
 		return -EBUSY;
 	}
 
@@ -289,6 +290,7 @@ int dm_hash_rename(const char *old, const char *new)
 		DMWARN("asked to rename a non existent device %s -> %s",
 		       old, new);
 		up_write(&_hash_lock);
+		kfree(new_name);
 		return -ENXIO;
 	}
 

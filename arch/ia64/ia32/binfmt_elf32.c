@@ -12,6 +12,7 @@
 #include <linux/config.h>
 
 #include <linux/types.h>
+#include <linux/mm.h>
 
 #include <asm/param.h>
 #include <asm/signal.h>
@@ -40,7 +41,6 @@
 #define CLOCKS_PER_SEC	IA32_CLOCKS_PER_SEC
 
 extern void ia64_elf32_init (struct pt_regs *regs);
-extern void put_dirty_page (struct task_struct * tsk, struct page *page, unsigned long address);
 
 static void elf32_set_personality (void);
 
@@ -200,7 +200,7 @@ ia32_setup_arg_pages (struct linux_binprm *bprm)
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			put_dirty_page(current, page, stack_base);
+			put_dirty_page(current, page, stack_base, PAGE_COPY);
 		}
 		stack_base += PAGE_SIZE;
 	}

@@ -522,7 +522,7 @@ static loff_t null_lseek(struct file * file, loff_t offset, int orig)
  */
 static loff_t memory_lseek(struct file * file, loff_t offset, int orig)
 {
-	int ret;
+	loff_t ret;
 
 	lock_kernel();
 	switch (orig) {

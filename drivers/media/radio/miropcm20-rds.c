@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
+#include <linux/fs.h>
 #include <linux/miscdevice.h>
 #include <asm/uaccess.h>
 #include "miropcm20-rds-core.h"

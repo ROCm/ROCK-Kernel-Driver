@@ -1080,7 +1080,7 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 	entry->p = p;
 	up(&info_mutex);
 
-	if (strncmp(name, "controlC", 8) == 0)	/* created in sound.c */
+	if (strncmp(name, "controlC", 8) != 0)	/* created in sound.c */
 		devfs_mk_cdev(MKDEV(_major, minor), mode, "snd/%s", name);
 	return entry;
 }
