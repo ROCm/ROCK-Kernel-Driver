@@ -1457,7 +1457,7 @@ int isdn_ppp_autodial_filter(struct sk_buff *skb, isdn_net_local *lp)
 	 * earlier.
 	 */
 	skb_pull(skb, IPPP_MAX_HEADER - 4);
-	skb->data[0] = 1;	/* indicate outbound */
+	*(u_int16_t *)skb->data = htons(4);	/* indicate outbound in DLT_LINUX_SLL */
 	*(u_int16_t *)(skb->data + 2) = htons(proto);
 	
 	drop |= is->pass_filter.filter
