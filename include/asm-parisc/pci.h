@@ -180,9 +180,6 @@ extern inline void pcibios_register_hba(struct pci_hba_data *x)
 /* Don't support DAC yet. */
 #define pci_dac_dma_supported(pci_dev, mask)   (0)
 
-/* Return the index of the PCI controller for device PDEV. */
-#define	pci_controller_num(PDEV)	(0)
-
 /* export the pci_ DMA API in terms of the dma_ one */
 #include <asm-generic/pci-dma-compat.h>
 

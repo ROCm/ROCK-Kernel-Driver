@@ -529,7 +529,8 @@ pci_scan_device(struct pci_bus *bus, int devfn)
 	pci_name_device(dev);
 
 	/* now put in global tree */
-	strcpy(dev->dev.bus_id,dev->slot_name);
+	sprintf(dev->dev.bus_id, "%04x:%s", pci_domain_nr(bus),
+			dev->slot_name);
 	dev->dev.dma_mask = &dev->dma_mask;
 
 	return dev;

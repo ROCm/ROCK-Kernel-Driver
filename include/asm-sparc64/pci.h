@@ -189,7 +189,7 @@ pci_dac_dma_sync_single(struct pci_dev *pdev, dma64_addr_t dma_addr, size_t len,
 
 /* Return the index of the PCI controller for device PDEV. */
 
-extern int pci_controller_num(struct pci_dev *pdev);
+extern int pci_domain_nr(struct pci_bus *bus);
 
 /* Platform support for /proc/bus/pci/X/Y mmap()s. */
 

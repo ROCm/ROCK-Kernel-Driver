@@ -773,6 +773,10 @@ config PCI
 	  your box.  If you say Y here, the kernel will include drivers and
 	  infrastructure code to support PCI bus devices.
 
+config PCI_DOMAINS
+	bool
+	default PCI
+
 config PC_KEYBOARD
 	bool "PC PS/2 style Keyboard"
 	depends on 4xx || 8260

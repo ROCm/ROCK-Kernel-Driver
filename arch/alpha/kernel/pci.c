@@ -484,11 +484,3 @@ sys_pciconfig_iobase(long which, unsigned long bus, unsigned long dfn)
 
 	return -EOPNOTSUPP;
 }
-
-/* Return the index of the PCI controller for device PDEV. */
-int
-pci_controller_num(struct pci_dev *pdev)
-{
-        struct pci_controller *hose = pdev->sysdata;
-	return (hose ? (int) hose->index : -ENXIO);
-}

@@ -210,7 +210,7 @@ static int proc_bus_pci_ioctl(struct inode *inode, struct file *file, unsigned i
 
 	switch (cmd) {
 	case PCIIOC_CONTROLLER:
-		ret = pci_controller_num(dev);
+		ret = pci_domain_nr(dev->bus);
 		break;
 
 #ifdef HAVE_PCI_MMAP

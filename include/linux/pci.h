@@ -805,5 +805,15 @@ extern int pci_pci_problems;
 #define PCIPCI_VSFX		16
 #define PCIPCI_ALIMAGIK		32
 
+/*
+ * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
+ * a PCI domain is defined to be a set of PCI busses which share
+ * configuration space.
+ */
+
+#ifndef CONFIG_PCI_DOMAINS
+#define pci_domain_nr(bus)	0
+#endif
+
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */
