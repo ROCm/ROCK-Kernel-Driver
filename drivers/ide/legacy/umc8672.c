@@ -137,7 +137,7 @@ int __init probe_umc8672 (void)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	if (check_region(0x108, 2)) {
+	if (!request_region(0x108, 2, "umc8672")) {
 		local_irq_restore(flags);
 		printk(KERN_ERR "umc8672: ports 0x108-0x109 already in use.\n");
 		return 1;
@@ -146,6 +146,7 @@ int __init probe_umc8672 (void)
 	if (in_umc (0xd5) != 0xa0) {
 		local_irq_restore(flags);
 		printk(KERN_ERR "umc8672: not found\n");
+		release_region(0x108, 2);
 		return 1;  
 	}
 	outb_p(0xa5,0x108); /* disable umc */
@@ -153,7 +154,6 @@ int __init probe_umc8672 (void)
 	umc_set_speeds (current_speeds);
 	local_irq_restore(flags);
 
-	request_region(0x108, 2, "umc8672");
 	ide_hwifs[0].chipset = ide_umc8672;
 	ide_hwifs[1].chipset = ide_umc8672;
 	ide_hwifs[0].tuneproc = &tune_umc;
