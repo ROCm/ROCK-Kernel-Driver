@@ -1,6 +1,6 @@
 CFLAGS	= -g -O2 -Wall $(CPPFLAGS)
 
-TARGET	= $(TOPDIR)/include/asm-ia64/offsets.h
+TARGET	= include/asm-ia64/offsets.h
 
 src = $(obj)
 

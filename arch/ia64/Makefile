@@ -52,7 +52,7 @@ drivers-$(CONFIG_IA64_SGI_SN)	+= arch/ia64/sn/fakeprom/
 makeboot =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ia64/boot $(1)
 maketool =$(Q)$(MAKE) -f scripts/Makefile.build obj=arch/ia64/tools $(1)
 
-.PHONY: compressed archclean archmrproper include/asm-ia64/offsets.h
+.PHONY: boot compressed archclean archmrproper include/asm-ia64/offsets.h
 
 all compressed: vmlinux.gz
 
@@ -67,6 +67,8 @@ CLEAN_FILES += include/asm-ia64/offsets.h vmlinux.gz bootloader
 
 prepare: include/asm-ia64/offsets.h
 
-include/asm-ia64/offsets.h: include/asm include/linux/version.h \
-			    include/config/MARKER
+boot:
+	$(call makeboot,$@)
+
+include/asm-ia64/offsets.h: include/asm include/linux/version.h include/config/MARKER
 	$(call maketool,$@)

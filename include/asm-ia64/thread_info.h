@@ -30,6 +30,7 @@ struct thread_info {
 	__u32 cpu;			/* current CPU */
 	mm_segment_t addr_limit;	/* user-level address space limit */
 	__s32 preempt_count;		/* 0=premptable, <0=BUG; will also serve as bh-counter */
+	struct restart_block restart_block;
 };
 
 #define INIT_THREAD_SIZE		/* tell sched.h not to declare the thread_union */

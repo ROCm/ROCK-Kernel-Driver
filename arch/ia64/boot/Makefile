@@ -21,6 +21,8 @@ vmlinux.gz: $(obj)/vmlinux.gz $(targets-y)
 	$(call cmd,cptotop)
 	@echo '  Kernel: $@ is ready'
 
+boot: bootloader
+
 bootloader: $(obj)/bootloader
 	$(call cmd,cptotop)
 
