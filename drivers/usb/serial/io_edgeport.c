@@ -1906,6 +1906,7 @@ static int edge_ioctl (struct usb_serial_port *port, struct file *file, unsigned
 
 		case TIOCGICOUNT:
 			cnow = edge_port->icount;
+			memset(&icount, 0, sizeof(icount));
 			icount.cts = cnow.cts;
 			icount.dsr = cnow.dsr;
 			icount.rng = cnow.rng;
