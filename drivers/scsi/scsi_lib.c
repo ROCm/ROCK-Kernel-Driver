@@ -1590,6 +1590,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 	case SDEV_QUIESCE:
 		switch (oldstate) {
 		case SDEV_RUNNING:
+		case SDEV_OFFLINE:
 			break;
 		default:
 			goto illegal;
@@ -1600,6 +1601,7 @@ scsi_device_set_state(struct scsi_device *sdev, enum scsi_device_state state)
 		switch (oldstate) {
 		case SDEV_CREATED:
 		case SDEV_RUNNING:
+		case SDEV_QUIESCE:
 			break;
 		default:
 			goto illegal;
