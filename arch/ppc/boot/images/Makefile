@@ -13,7 +13,7 @@ $(obj)/vmlinux.bin: vmlinux FORCE
 $(obj)/vmlinux.gz: $(obj)/vmlinux.bin FORCE
 	$(call if_changed,gzip)
 
-quite_cmd_uimage = UIMAGE $@
+quiet_cmd_uimage = UIMAGE  $@
       cmd_uimage = $(CONFIG_SHELL) $(MKIMAGE) -A ppc -O linux -T kernel \
                -C gzip -a 00000000 -e 00000000 -n 'Linux-$(KERNELRELEASE)' \
                -d $< $@
