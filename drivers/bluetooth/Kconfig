@@ -64,6 +64,19 @@ config BT_HCIUART_BCSP_TXCRC
 	  every BCSP (BlueCore Serial Protocol) packet sent to the Bluetooth chip.
 	  This increases reliability, but slightly reduces efficiency.
 
+config BT_HCIBFUSB
+	tristate "HCI BlueFRITZ! USB driver"
+	depends on USB && BT
+	enable FW_LOADER
+	help
+	  Bluetooth HCI BlueFRITZ! USB driver.
+	  This driver provides support for Bluetooth USB devices with AVM
+	  interface:
+	     AVM BlueFRITZ! USB
+
+	  Say Y here to compile support for HCI BFUSB devices into the
+	  kernel or say M to compile it as module (bfusb.o).
+
 config BT_HCIDTL1
 	tristate "HCI DTL1 (PC Card) driver"
 	depends on PCMCIA && BT
