@@ -3676,9 +3676,24 @@ static int tg3_chip_reset(struct tg3 *tp)
 	 */
 	pci_read_config_dword(tp->pdev, PCI_COMMAND, &val);
 
-	udelay(40);
-	udelay(40);
-	udelay(40);
+	udelay(120);
+
+	if (tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) {
+		if (tp->pci_chip_rev_id == CHIPREV_ID_5750_A0) {
+			int i;
+			u32 cfg_val;
+
+			/* Wait for link training to complete.  */
+			for (i = 0; i < 5000; i++)
+				udelay(100);
+
+			pci_read_config_dword(tp->pdev, 0xc4, &cfg_val);
+			pci_write_config_dword(tp->pdev, 0xc4,
+					       cfg_val | (1 << 15));
+		}
+		/* Set PCIE max payload size and clear error status.  */
+		pci_write_config_dword(tp->pdev, 0xd8, 0xf5000);
+	}
 
 	/* Re-enable indirect register accesses. */
 	pci_write_config_dword(tp->pdev, TG3PCI_MISC_HOST_CTRL,
@@ -3701,6 +3716,12 @@ static int tg3_chip_reset(struct tg3 *tp)
 	tw32(MEMARB_MODE, MEMARB_MODE_ENABLE);
 
 	tw32(GRC_MODE, tp->grc_mode);
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5705_A0) {
+		u32 val = tr32(0xc4);
+
+		tw32(0xc4, val | (1 << 15));
+	}
 
 	if ((tp->nic_sram_data_cfg & NIC_SRAM_DATA_CFG_MINI_PCI) != 0 &&
 	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
@@ -3730,6 +3751,13 @@ static int tg3_chip_reset(struct tg3 *tp)
 		       "firmware will not restart magic=%08x\n",
 		       tp->dev->name, val);
 		return -ENODEV;
+	}
+
+	if ((tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS) &&
+	    tp->pci_chip_rev_id != CHIPREV_ID_5750_A0) {
+		u32 val = tr32(0x7c00);
+
+		tw32(0x7c00, val | (1 << 25));
 	}
 
 	/* Reprobe ASF enable state.  */
