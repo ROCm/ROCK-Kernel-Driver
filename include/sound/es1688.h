@@ -55,6 +55,8 @@ struct _snd_es1688 {
 
 typedef struct _snd_es1688 es1688_t;
 
+#define chip_t es1688_t
+
 /* I/O ports */
 
 #define ES1688P(codec, x) ((codec)->port + e_s_s_ESS1688##x)
