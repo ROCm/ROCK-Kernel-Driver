@@ -226,7 +226,6 @@ static struct ata_port_operations k2_sata_ops = {
 	.check_status		= k2_stat_check_status,
 	.exec_command		= ata_exec_command_mmio,
 	.phy_reset		= sata_phy_reset,
-	.phy_config		= pata_phy_config,	/* not a typo */
 	.bmdma_start            = ata_bmdma_start_mmio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,

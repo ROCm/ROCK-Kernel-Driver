@@ -58,6 +58,7 @@ static void ata_host_set_pio(struct ata_port *ap);
 static void ata_host_set_udma(struct ata_port *ap);
 static void ata_dev_set_pio(struct ata_port *ap, unsigned int device);
 static void ata_dev_set_udma(struct ata_port *ap, unsigned int device);
+static void ata_set_mode(struct ata_port *ap);
 
 static unsigned int ata_unique_id = 1;
 
@@ -1031,7 +1032,7 @@ static void ata_port_reset(struct ata_port *ap)
 	if ((!found) || (ap->flags & ATA_FLAG_PORT_DISABLED))
 		goto err_out_disable;
 
-	ap->ops->phy_config(ap);
+	ata_set_mode(ap);
 	if (ap->flags & ATA_FLAG_PORT_DISABLED)
 		goto err_out_disable;
 
@@ -1120,13 +1121,13 @@ void ata_port_disable(struct ata_port *ap)
 }
 
 /**
- *	pata_phy_config -
- *	@ap:
+ *	ata_set_mode - Program timings and issue SET FEATURES - XFER
+ *	@ap: port on which timings will be programmed
  *
  *	LOCKING:
  *
  */
-void pata_phy_config(struct ata_port *ap)
+static void ata_set_mode(struct ata_port *ap)
 {
 	unsigned int force_pio;
 
@@ -3387,7 +3388,6 @@ EXPORT_SYMBOL_GPL(ata_bmdma_start_pio);
 EXPORT_SYMBOL_GPL(ata_bmdma_start_mmio);
 EXPORT_SYMBOL_GPL(ata_port_probe);
 EXPORT_SYMBOL_GPL(sata_phy_reset);
-EXPORT_SYMBOL_GPL(pata_phy_config);
 EXPORT_SYMBOL_GPL(ata_bus_reset);
 EXPORT_SYMBOL_GPL(ata_port_disable);
 EXPORT_SYMBOL_GPL(ata_pci_init_one);
