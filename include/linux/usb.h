@@ -140,6 +140,9 @@ static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
 	dev_set_drvdata(&intf->dev, data);
 }
 
+/* this maximum is arbitrary */
+#define USB_MAXINTERFACES	32
+
 /* USB_DT_CONFIG: Configuration descriptor information.
  *
  * USB_DT_OTHER_SPEED_CONFIG is the same descriptor, except that the
@@ -153,7 +156,7 @@ struct usb_host_config {
 	/* the interfaces associated with this configuration
 	 * these will be in numeric order, 0..desc.bNumInterfaces
 	 */
-	struct usb_interface *interface;
+	struct usb_interface *interface[USB_MAXINTERFACES];
 
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
