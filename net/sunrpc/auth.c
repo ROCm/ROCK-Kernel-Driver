@@ -69,7 +69,7 @@ rpcauth_destroy(struct rpc_auth *auth)
 	auth->au_ops->destroy(auth);
 }
 
-spinlock_t rpc_credcache_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t rpc_credcache_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Initialize RPC credential cache

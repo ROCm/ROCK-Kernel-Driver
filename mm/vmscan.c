@@ -52,10 +52,12 @@ static inline int try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* 
 	/* Don't look at this pte if it's been accessed recently. */
 	if (ptep_test_and_clear_young(page_table)) {
 		flush_tlb_page(vma, address);
-		activate_page(page);
+		mark_page_accessed(page);
 		return 0;
 	}
-	if ((PageInactive(page) || PageActive(page)) && PageReferenced(page))
+
+	/* Don't bother with it if the page is otherwise active */
+	if (PageActive(page))
 		return 0;
 
 	if (TryLockPage(page))
@@ -91,8 +93,6 @@ drop_pte:
 		UnlockPage(page);
 		{
 			int freeable = page_count(page) - !!page->buffers <= 2;
-			if (freeable)
-				deactivate_page(page);
 			page_cache_release(page);
 			return freeable & right_classzone;
 		}
@@ -355,31 +355,10 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 
 		this_max_scan--;
 
-		if (PageTestandClearReferenced(page)) {
-			if (!PageSwapCache(page)) {
-				if (PageInactive(page)) {
-					del_page_from_inactive_list(page);
-					add_page_to_active_list(page);
-				} else if (PageActive(page)) {
-					list_del(entry);
-					list_add(entry, &active_list);
-				} else
-					BUG();
-			} else {
-				list_del(entry);
-				list_add(entry, lru);
-			}
+		list_del(entry);
+		list_add(entry, lru);
+		if (PageTestandClearReferenced(page))
 			continue;
-		}
-
-		if (PageInactive(page)) {
-			/* just roll it over, no need to update any stat */
-			list_del(entry);
-			list_add(entry, &inactive_list);
-		} else {
-			del_page_from_active_list(page);
-			add_page_to_inactive_list(page);
-		}
 
 		if (unlikely(!memclass(page->zone, classzone)))
 			continue;
@@ -387,10 +366,8 @@ static int shrink_cache(struct list_head * lru, int * max_scan, int this_max_sca
 		__max_scan--;
 
 		/* Racy check to avoid trylocking when not worthwhile */
-		if (!page->buffers && page_count(page) != 1) {
-			activate_page_nolock(page);
+		if (!page->buffers && page_count(page) != 1)
 			continue;
-		}
 
 		/*
 		 * The page is locked. IO in progress?
@@ -547,10 +524,17 @@ static void balance_inactive(int nr_pages)
 
 		page = list_entry(entry, struct page, lru);
 		entry = entry->prev;
+		if (PageTestandClearReferenced(page))
+			continue;
 
 		del_page_from_active_list(page);
 		add_page_to_inactive_list(page);
 	}
+
+	/* move active list to between "entry" and "entry->next" */
+	__list_del(active_list.prev, active_list.next);
+	__list_add(&active_list, entry, entry->next);
+
 	spin_unlock(&pagemap_lru_lock);
 }
 
@@ -565,10 +549,6 @@ static int shrink_caches(int priority, zone_t * classzone, unsigned int gfp_mask
 
 	balance_inactive(nr_pages);
 	nr_pages = shrink_cache(&inactive_list, &max_scan, nr_inactive_pages, nr_pages, classzone, gfp_mask);
-	if (nr_pages <= 0)
-		return 0;
-
-	nr_pages = shrink_cache(&active_list, &max_scan, nr_active_pages / DEF_PRIORITY, nr_pages, classzone, gfp_mask);
 	if (nr_pages <= 0)
 		return 0;
 

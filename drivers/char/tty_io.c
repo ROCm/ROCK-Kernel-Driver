@@ -2021,7 +2021,7 @@ void tty_register_devfs (struct tty_driver *driver, unsigned int flags, unsigned
 			break;
 		default:
 			if (driver->major == PTY_MASTER_MAJOR)
-				flags |= DEVFS_FL_AUTO_OWNER;
+				mode |= S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH;
 			break;
 	}
 	if ( (minor <  driver->minor_start) || 

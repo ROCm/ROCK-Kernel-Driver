@@ -2253,11 +2253,9 @@ int __init mtrr_init(void)
 	proc_root_mtrr->proc_fops = &mtrr_fops;
     }
 #endif
-#ifdef CONFIG_DEVFS_FS
     devfs_handle = devfs_register (NULL, "cpu/mtrr", DEVFS_FL_DEFAULT, 0, 0,
 				   S_IFREG | S_IRUGO | S_IWUSR,
 				   &mtrr_fops, NULL);
-#endif
     init_table ();
     return 0;
 }   /*  End Function mtrr_init  */

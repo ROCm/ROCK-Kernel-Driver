@@ -1675,3 +1675,83 @@ Changes for patch v182
 - Fixed number leak for /dev/cdroms/cdrom%d
 
 - Fixed number leak for /dev/discs/disc%d
+===============================================================================
+Changes for patch v183
+
+- Fixed bug in <devfs_setup> which could hang boot process
+===============================================================================
+Changes for patch v184
+
+- Documentation typo fix for fs/devfs/util.c
+
+- Fixed drivers/char/stallion.c for devfs
+
+- Added DEVFSD_NOTIFY_DELETE event
+
+- Updated README from master HTML file
+
+- Removed #include <asm/segment.h> from fs/devfs/base.c
+===============================================================================
+Changes for patch v185
+
+- Made <block_semaphore> and <char_semaphore> in fs/devfs/util.c
+  private
+
+- Fixed inode table races by removing it and using inode->u.generic_ip
+  instead
+
+- Moved <devfs_read_inode> into <get_vfs_inode>
+
+- Moved <devfs_write_inode> into <devfs_notify_change>
+===============================================================================
+Changes for patch v186
+
+- Fixed race in <devfs_do_symlink> for uni-processor
+
+- Updated README from master HTML file
+===============================================================================
+Changes for patch v187
+
+- Fixed drivers/char/stallion.c for devfs
+
+- Fixed drivers/char/rocket.c for devfs
+
+- Fixed bug in <devfs_alloc_unique_number>: limited to 128 numbers
+===============================================================================
+Changes for patch v188
+
+- Updated major masks in fs/devfs/util.c up to Linus' "no new majors"
+  proclamation. Block: were 126 now 122 free, char: were 26 now 19 free
+
+- Updated README from master HTML file
+
+- Removed remnant of multi-mount support in <devfs_mknod>
+
+- Removed unused DEVFS_FL_SHOW_UNREG flag
+===============================================================================
+Changes for patch v189
+
+- Removed nlink field from struct devfs_inode
+
+- Removed auto-ownership for /dev/pty/* (BSD ptys) and used
+  DEVFS_FL_CURRENT_OWNER|DEVFS_FL_NO_PERSISTENCE for /dev/pty/s* (just
+  like Unix98 pty slaves) and made /dev/pty/m* rw-rw-rw- access
+===============================================================================
+Changes for patch v190
+
+- Updated README from master HTML file
+
+- Replaced BKL with global rwsem to protect symlink data (quick and
+  dirty hack)
+===============================================================================
+Changes for patch v191
+
+- Replaced global rwsem for symlink with per-link refcount
+===============================================================================
+Changes for patch v192
+
+- Removed unnecessary #ifdef CONFIG_DEVFS_FS from arch/i386/kernel/mtrr.c
+
+- Ported to kernel 2.4.10-pre11
+
+- Set inode->i_mapping->a_ops for block nodes in <get_vfs_inode>

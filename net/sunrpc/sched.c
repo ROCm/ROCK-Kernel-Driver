@@ -76,7 +76,7 @@ spinlock_t rpc_queue_lock = SPIN_LOCK_UNLOCKED;
 /*
  * Spinlock for other critical sections of code.
  */
-spinlock_t rpc_sched_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t rpc_sched_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This is the last-ditch buffer for NFS swap requests

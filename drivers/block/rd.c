@@ -100,7 +100,7 @@ static int rd_hardsec[NUM_RAMDISKS];		/* Size of real blocks in bytes */
 static int rd_blocksizes[NUM_RAMDISKS];		/* Size of 1024 byte blocks :)  */
 static int rd_kbsize[NUM_RAMDISKS];		/* Size in blocks of 1024 bytes */
 static devfs_handle_t devfs_handle;
-static struct inode *rd_inode[NUM_RAMDISKS];	/* Protected device inodes */
+static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
 
 /*
  * Parameters for the boot-loading of the RAM disk.  These are set by
@@ -186,17 +186,67 @@ __setup("ramdisk_blocksize=", ramdisk_blocksize);
 
 #endif
 
+/*
+ * Copyright (C) 2000 Linus Torvalds.
+ *               2000 Transmeta Corp.
+ * aops copied from ramfs.
+ */
+static int ramdisk_readpage(struct file *file, struct page * page)
+{
+	if (!Page_Uptodate(page)) {
+		memset(kmap(page), 0, PAGE_CACHE_SIZE);
+		kunmap(page);
+		flush_dcache_page(page);
+		SetPageUptodate(page);
+	}
+	UnlockPage(page);
+	return 0;
+}
+
+/*
+ * Writing: just make sure the page gets marked dirty, so that
+ * the page stealer won't grab it.
+ */
+static int ramdisk_writepage(struct page *page)
+{
+	SetPageDirty(page);
+	UnlockPage(page);
+	return 0;
+}
+
+static int ramdisk_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	if (!Page_Uptodate(page)) {
+		void *addr = page_address(page);
+		memset(addr, 0, PAGE_CACHE_SIZE);
+		flush_dcache_page(page);
+		SetPageUptodate(page);
+	}
+	SetPageDirty(page);
+	return 0;
+}
+
+static int ramdisk_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	return 0;
+}
+
+static struct address_space_operations ramdisk_aops = {
+	readpage: ramdisk_readpage,
+	writepage: ramdisk_writepage,
+	prepare_write: ramdisk_prepare_write,
+	commit_write: ramdisk_commit_write,
+};
+
 static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 {
-	struct address_space * mapping = rd_inode[minor]->i_mapping;
+	struct address_space * mapping;
 	unsigned long index;
-	int offset, size, err = 0;
+	int offset, size, err;
 
-	if (sbh->b_page->mapping == mapping) {
-		if (rw != READ)
-			SetPageDirty(sbh->b_page);
-		goto out;
-	}
+	err = -EIO;
+	err = 0;
+	mapping = rd_bdev[minor]->bd_inode->i_mapping;
 
 	index = sbh->b_rsector >> (PAGE_CACHE_SHIFT - 9);
 	offset = (sbh->b_rsector << 9) & ~PAGE_CACHE_MASK;
@@ -206,8 +256,7 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 		int count;
 		struct page ** hash;
 		struct page * page;
-		const char * src;
-		char * dst;
+		char * src, * dst;
 		int unlock = 0;
 
 		count = PAGE_CACHE_SIZE - offset;
@@ -217,20 +266,24 @@ static int rd_blkdev_pagecache_IO(int rw, struct buffer_head * sbh, int minor)
 
 		hash = page_hash(mapping, index);
 		page = __find_get_page(mapping, index, hash);
-		if (!page && rw != READ) {
+		if (!page) {
 			page = grab_cache_page(mapping, index);
 			err = -ENOMEM;
 			if (!page)
 				goto out;
 			err = 0;
+
+			if (!Page_Uptodate(page)) {
+				memset(kmap(page), 0, PAGE_CACHE_SIZE);
+				kunmap(page);
+				flush_dcache_page(page);
+				SetPageUptodate(page);
+			}
+
 			unlock = 1;
 		}
 
 		index++;
-		if (!page) {
-			offset = 0;
-			continue;
-		}
 
 		if (rw == READ) {
 			src = kmap(page);
@@ -303,10 +356,11 @@ static int rd_make_request(request_queue_t * q, int rw, struct buffer_head *sbh)
 
 static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
+	int error = -EINVAL;
 	unsigned int minor;
 
 	if (!inode || !inode->i_rdev) 	
-		return -EINVAL;
+		goto out;
 
 	minor = MINOR(inode->i_rdev);
 
@@ -317,40 +371,29 @@ static int rd_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			/* special: we want to release the ramdisk memory,
 			   it's not like with the other blockdevices where
 			   this ioctl only flushes away the buffer cache. */
-			{
-				struct block_device * bdev = inode->i_bdev;
-
-				down(&bdev->bd_sem);
-				if (bdev->bd_openers > 2) {
-					up(&bdev->bd_sem);
-					return -EBUSY;
-				}
-				bdev->bd_openers--;
-				bdev->bd_cache_openers--;
-				iput(rd_inode[minor]);
-				rd_inode[minor] = NULL;
-				rd_blocksizes[minor] = rd_blocksize;
-				up(&bdev->bd_sem);
+			error = -EBUSY;
+			down(&inode->i_bdev->bd_sem);
+			if (inode->i_bdev->bd_openers <= 2) {
+				truncate_inode_pages(inode->i_mapping, 0);
+				error = 0;
 			}
+			up(&inode->i_bdev->bd_sem);
 			break;
-
          	case BLKGETSIZE:   /* Return device size */
-			if (!arg)  return -EINVAL;
-			return put_user(rd_kbsize[minor] << 1, (long *) arg);
-
+			if (!arg)
+				break;
+			error = put_user(rd_kbsize[minor] << 1, (long *) arg);
+			break;
          	case BLKGETSIZE64:
-			return put_user((u64)rd_kbsize[minor] << 10, (u64*)arg);
-
+			error = put_user((u64)rd_kbsize[minor]<<10, (u64*)arg);
+			break;
 		case BLKROSET:
 		case BLKROGET:
 		case BLKSSZGET:
-			return blk_ioctl(inode->i_rdev, cmd, arg);
-
-		default:
-			return -EINVAL;
+			error = blk_ioctl(inode->i_rdev, cmd, arg);
 	};
-
-	return 0;
+out:
+	return error;
 }
 
 
@@ -377,6 +420,8 @@ static int initrd_release(struct inode *inode,struct file *file)
 	if (!--initrd_users) {
 		free_initrd_mem(initrd_start, initrd_end);
 		initrd_start = 0;
+		inode->i_bdev->bd_cache_openers--;
+		blkdev_put(inode->i_bdev, BDEV_FILE);
 	}
 	return 0;
 }
@@ -384,6 +429,7 @@ static int initrd_release(struct inode *inode,struct file *file)
 
 static struct file_operations initrd_fops = {
 	read:		initrd_read,
+	release:	initrd_release,
 };
 
 #endif
@@ -391,36 +437,28 @@ static struct file_operations initrd_fops = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
-	if (DEVICE_NR(inode->i_rdev) == INITRD_MINOR) {
-		static struct block_device_operations initrd_bd_op = {
-			open:		rd_open,
-			release:	initrd_release,
-		};
+	int unit = DEVICE_NR(inode->i_rdev);
 
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (unit == INITRD_MINOR) {
 		if (!initrd_start) return -ENODEV;
 		initrd_users++;
 		filp->f_op = &initrd_fops;
-		inode->i_bdev->bd_op = &initrd_bd_op;
 		return 0;
 	}
 #endif
 
-	if (DEVICE_NR(inode->i_rdev) >= NUM_RAMDISKS)
+	if (unit >= NUM_RAMDISKS)
 		return -ENXIO;
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
 	 */
-	if (rd_inode[DEVICE_NR(inode->i_rdev)] == NULL) {
-		if (!inode->i_bdev) return -ENXIO;
-		if ((rd_inode[DEVICE_NR(inode->i_rdev)] = igrab(inode)) != NULL) {
-			struct block_device *bdev = inode->i_bdev;
-
-			/* bdev->bd_sem is held by caller */
-			bdev->bd_openers++;
-			bdev->bd_cache_openers++;
-		}
+	if (rd_bdev[unit] == NULL) {
+		rd_bdev[unit] = bdget(kdev_t_to_nr(inode->i_rdev));
+		rd_bdev[unit]->bd_openers++;
+		rd_bdev[unit]->bd_cache_openers++;
+		rd_bdev[unit]->bd_inode->i_mapping->a_ops = &ramdisk_aops;
 	}
 
 	MOD_INC_USE_COUNT;
@@ -447,18 +485,13 @@ static void __exit rd_cleanup (void)
 	int i;
 
 	for (i = 0 ; i < NUM_RAMDISKS; i++) {
-		if (rd_inode[i]) {
-			/* withdraw invalidate_buffers() and prune_icache() immunity */
-			struct block_device *bdev = rd_inode[i]->i_bdev;
-
-			down(&bdev->bd_sem);
-			bdev->bd_openers--;
+		struct block_device *bdev = rd_bdev[i];
+		rd_bdev[i] = NULL;
+		if (bdev) {
 			bdev->bd_cache_openers--;
-			up(&bdev->bd_sem);
-
-			/* remove stale pointer to module address space */
-			rd_inode[i]->i_bdev->bd_op = NULL;
-			iput(rd_inode[i]);
+			truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
+			blkdev_put(bdev, BDEV_FILE);
+			bdput(bdev);
 		}
 		destroy_buffers(MKDEV(MAJOR_NR, i));
 	}
@@ -777,7 +810,7 @@ successful_load:
 	if (ROOT_DEVICE_NAME != NULL) strcpy (ROOT_DEVICE_NAME, "rd/0");
 
 done:
-	blkdev_close(inode, &infile);
+	infile.f_op->release(inode, &infile);
 noclose_input:
 	blkdev_close(out_inode, &outfile);
 	iput(inode);
@@ -786,7 +819,7 @@ noclose_input:
 	return;
 free_inodes: /* free inodes on error */ 
 	iput(out_inode);
-	blkdev_close(inode, &infile);
+	infile.f_op->release(inode, &infile);
 free_inode:
 	iput(inode);
 }

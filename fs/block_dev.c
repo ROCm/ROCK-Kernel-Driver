@@ -697,7 +697,6 @@ int blkdev_get(struct block_device *bdev, mode_t mode, unsigned flags, int kind)
 			ret = bdev->bd_op->open(bdev->bd_inode, &fake_file);
 		if (!ret) {
 			bdev->bd_openers++;
-			atomic_inc(&bdev->bd_count);
 		} else if (!bdev->bd_openers) {
 			struct inode *bd_inode = bdev->bd_inode;
 			bdev->bd_op = NULL;
@@ -778,7 +777,6 @@ int blkdev_put(struct block_device *bdev, int kind)
 	}
 	unlock_kernel();
 	up(&bdev->bd_sem);
-	bdput(bdev);
 	return ret;
 }
 

@@ -2186,7 +2186,11 @@ int __init rp_init(void)
 	 */
 	memset(&rocket_driver, 0, sizeof(struct tty_driver));
 	rocket_driver.magic = TTY_DRIVER_MAGIC;
+#ifdef CONFIG_DEVFS_FS
+	rocket_driver.name = "tts/R%d";
+#else
 	rocket_driver.name = "ttyR";
+#endif
 	rocket_driver.major = TTY_ROCKET_MAJOR;
 	rocket_driver.minor_start = 0;
 	rocket_driver.num = MAX_RP_PORTS;
@@ -2228,7 +2232,11 @@ int __init rp_init(void)
 	 * the minor number and the subtype code.
 	 */
 	callout_driver = rocket_driver;
+#ifdef CONFIG_DEVFS_FS
+	callout_driver.name = "cua/R%d";
+#else
 	callout_driver.name = "cur";
+#endif
 	callout_driver.major = CUA_ROCKET_MAJOR;
 	callout_driver.minor_start = 0;
 	callout_driver.subtype = SERIAL_TYPE_CALLOUT;

@@ -135,15 +135,13 @@ struct rpc_xprt {
 	struct rpc_wait_queue	sending;	/* requests waiting to send */
 	struct rpc_wait_queue	pending;	/* requests in flight */
 	struct rpc_wait_queue	backlog;	/* waiting for slot */
-	struct rpc_wait_queue	reconn;		/* waiting for reconnect */
 	struct rpc_rqst *	free;		/* free slots */
 	struct rpc_rqst		slot[RPC_MAXREQS];
 	unsigned long		sockstate;	/* Socket state */
 	unsigned char		shutdown   : 1,	/* being shut down */
 				nocong	   : 1,	/* no congestion control */
 				stream     : 1,	/* TCP */
-				tcp_more   : 1,	/* more record fragments */
-				connecting : 1;	/* being reconnected */
+				tcp_more   : 1;	/* more record fragments */
 
 	/*
 	 * State of TCP reply receive stuff
@@ -158,6 +156,8 @@ struct rpc_xprt {
 	/*
 	 * Send stuff
 	 */
+	spinlock_t		sock_lock;	/* lock socket info */
+	spinlock_t		xprt_lock;	/* lock xprt info */
 	struct rpc_task *	snd_task;	/* Task blocked in send */
 
 
@@ -185,9 +185,8 @@ int			xprt_adjust_timeout(struct rpc_timeout *);
 void			xprt_release(struct rpc_task *);
 void			xprt_reconnect(struct rpc_task *);
 int			xprt_clear_backlog(struct rpc_xprt *);
+int			xprt_tcp_pending(void);
 void			__rpciod_tcp_dispatcher(void);
-
-extern struct list_head	rpc_xprt_pending;
 
 #define XPRT_WSPACE	0
 #define XPRT_CONNECT	1
@@ -200,12 +199,6 @@ extern struct list_head	rpc_xprt_pending;
 #define xprt_set_connected(xp)		(set_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_test_and_set_connected(xp)	(test_and_set_bit(XPRT_CONNECT, &(xp)->sockstate))
 #define xprt_clear_connected(xp)	(clear_bit(XPRT_CONNECT, &(xp)->sockstate))
-
-static inline
-int xprt_tcp_pending(void)
-{
-	return !list_empty(&rpc_xprt_pending);
-}
 
 static inline
 void rpciod_tcp_dispatcher(void)

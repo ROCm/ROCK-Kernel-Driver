@@ -340,11 +340,15 @@ struct page * __alloc_pages(unsigned int gfp_mask, unsigned int order, zonelist_
 
 	zone = zonelist->zones;
 	for (;;) {
+		unsigned long min;
 		zone_t *z = *(zone++);
 		if (!z)
 			break;
 
-		if (zone_free_pages(z, order) > (gfp_mask & __GFP_HIGH ? z->pages_min / 2 : z->pages_min)) {
+		min = z->pages_min;
+		if (!(gfp_mask & __GFP_WAIT))
+			min >>= 2;
+		if (zone_free_pages(z, order) > min) {
 			page = rmqueue(z, order);
 			if (page)
 				return page;

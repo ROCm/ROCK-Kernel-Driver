@@ -86,19 +86,18 @@ lookup_exec_domain(u_long personality)
 			if (try_inc_mod_count(ep->module))
 				goto out;
 	}
-	read_unlock(&exec_domains_lock);
 
 #ifdef CONFIG_KMOD
+	read_unlock(&exec_domains_lock);
 	sprintf(buffer, "personality-%ld", pers);
 	request_module(buffer);
-
 	read_lock(&exec_domains_lock);
+
 	for (ep = exec_domains; ep; ep = ep->next) {
 		if (pers >= ep->pers_low && pers <= ep->pers_high)
 			if (try_inc_mod_count(ep->module))
 				goto out;
 	}
-	read_unlock(&exec_domains_lock);
 #endif
 
 	ep = &default_exec_domain;

@@ -170,6 +170,8 @@ extern unsigned long swap_cache_find_success;
 
 extern spinlock_t pagemap_lru_lock;
 
+extern void FASTCALL(mark_page_accessed(struct page *));
+
 /*
  * List add/del helper macros. These must be called
  * with the pagemap_lru_lock held!

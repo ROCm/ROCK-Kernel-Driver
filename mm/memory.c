@@ -82,8 +82,13 @@ void __free_pte(pte_t pte)
 	 * free_page() used to be able to clear swap cache
 	 * entries.  We may now have to do it manually.
 	 */
-	if (pte_dirty(pte) && page->mapping)
-		set_page_dirty(page);
+	if (page->mapping) {
+		if (pte_dirty(pte))
+			set_page_dirty(page);
+		if (pte_young(pte))
+			mark_page_accessed(page);
+	}
+		
 	free_page_and_swap_cache(page);
 }
 

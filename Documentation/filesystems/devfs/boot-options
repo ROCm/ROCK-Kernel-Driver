@@ -4,7 +4,7 @@
 
 		Richard Gooch <rgooch@atnf.csiro.au>
 
-			      30-APR-2000
+			      18-AUG-2001
 
 
 When CONFIG_DEVFS_DEBUG is enabled, you can pass several boot options
@@ -18,6 +18,8 @@ and so on. For example, if you wanted to turn on debugging for module
 load requests and device registration, you would do:
 
 devfs=dmod,dreg
+
+You may prefix "no" to any option. This will invert the option.
 
 
 Debugging Options
@@ -42,11 +44,11 @@ dchange		print device change requests to <devfs_set_flags>
 
 dilookup	print inode lookup requests
 
-diread		print inode reads
+diget		print VFS inode allocations
 
 diunlink	print inode unlinks
 
-diwrite		print inode writes
+dichange	print inode changes
 
 dimknod		print calls to mknod(2)
 
@@ -58,10 +60,6 @@ Other Options
 
 These control the default behaviour of devfs. The options are:
 
-show		show unregistered devices by default
-
 mount		mount devfs onto /dev at boot time
-
-nomount		do not mount devfs onto /dev at boot time
 
 only		disable non-devfs device nodes for devfs-capable drivers

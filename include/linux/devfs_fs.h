@@ -20,6 +20,7 @@
 #define DEVFSD_NOTIFY_LOOKUP        4
 #define DEVFSD_NOTIFY_CHANGE        5
 #define DEVFSD_NOTIFY_CREATE        6
+#define DEVFSD_NOTIFY_DELETE        7
 
 #define DEVFS_PATHLEN               1024  /*  Never change this otherwise the
 					      binary interface will change   */

@@ -55,6 +55,8 @@ static void	call_refresh(struct rpc_task *task);
 static void	call_refreshresult(struct rpc_task *task);
 static void	call_timeout(struct rpc_task *task);
 static void	call_reconnect(struct rpc_task *task);
+static void	child_reconnect(struct rpc_task *);
+static void	child_reconnect_status(struct rpc_task *);
 static u32 *	call_header(struct rpc_task *task);
 static u32 *	call_verify(struct rpc_task *task);
 
@@ -525,6 +527,7 @@ static void
 call_reconnect(struct rpc_task *task)
 {
 	struct rpc_clnt *clnt = task->tk_client;
+	struct rpc_task *child;
 
 	dprintk("RPC: %4d call_reconnect status %d\n",
 				task->tk_pid, task->tk_status);
@@ -532,8 +535,29 @@ call_reconnect(struct rpc_task *task)
 	task->tk_action = call_transmit;
 	if (task->tk_status < 0 || !clnt->cl_xprt->stream)
 		return;
-	clnt->cl_stats->netreconn++;
+
+	/* Run as a child to ensure it runs as an rpciod task */
+	child = rpc_new_child(clnt, task);
+	if (child) {
+		child->tk_action = child_reconnect;
+		rpc_run_child(task, child, NULL);
+	}
+}
+
+static void child_reconnect(struct rpc_task *task)
+{
+	task->tk_client->cl_stats->netreconn++;
+	task->tk_status = 0;
+	task->tk_action = child_reconnect_status;
 	xprt_reconnect(task);
+}
+
+static void child_reconnect_status(struct rpc_task *task)
+{
+	if (task->tk_status == -EAGAIN)
+		task->tk_action = child_reconnect;
+	else
+		task->tk_action = NULL;
 }
 
 /*

@@ -39,6 +39,15 @@
                Created <devfs_*alloc_major> and <devfs_*alloc_devnum>.
     20010710   Richard Gooch <rgooch@atnf.csiro.au>
                Created <devfs_*alloc_unique_number>.
+    20010730   Richard Gooch <rgooch@atnf.csiro.au>
+               Documentation typo fix.
+    20010806   Richard Gooch <rgooch@atnf.csiro.au>
+               Made <block_semaphore> and <char_semaphore> private.
+    20010813   Richard Gooch <rgooch@atnf.csiro.au>
+               Fixed bug in <devfs_alloc_unique_number>: limited to 128 numbers
+    20010818   Richard Gooch <rgooch@atnf.csiro.au>
+               Updated major masks up to Linus' "no new majors" proclamation.
+	       Block: were 126 now 122 free, char: were 26 now 19 free.
 */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -181,15 +190,15 @@ struct major_list
 };
 
 /*  Block majors already assigned:
-    0-3, 7-9, 11-12, 13-63, 65-93, 95-99, 101, 103-111, 120-127, 199, 201,
-    240-255
+    0-3, 7-9, 11-63, 65-99, 101-113, 120-127, 199, 201, 240-255
+    Total free: 122
 */
 static struct major_list block_major_list =
 {SPIN_LOCK_UNLOCKED,
     {0xfffffb8f,  /*  Majors 0   to 31   */
      0xffffffff,  /*  Majors 32  to 63   */
-     0xbffffffe,  /*  Majors 64  to 95   */
-     0xff00ffaf,  /*  Majors 96  to 127  */
+     0xfffffffe,  /*  Majors 64  to 95   */
+     0xff03ffef,  /*  Majors 96  to 127  */
      0x00000000,  /*  Majors 128 to 159  */
      0x00000000,  /*  Majors 160 to 191  */
      0x00000280,  /*  Majors 192 to 223  */
@@ -197,7 +206,8 @@ static struct major_list block_major_list =
 };
 
 /*  Char majors already assigned:
-    0-7, 9-151, 154-158, 160-195, 198-211, 216-221, 224-225, 240-255
+    0-7, 9-151, 154-158, 160-211, 216-221, 224-230, 240-255
+    Total free: 19
 */
 static struct major_list char_major_list =
 {SPIN_LOCK_UNLOCKED,
@@ -207,14 +217,14 @@ static struct major_list char_major_list =
      0xffffffff,  /*  Majors 96  to 127  */
      0x7cffffff,  /*  Majors 128 to 159  */
      0xffffffff,  /*  Majors 160 to 191  */
-     0x3f0fffcf,  /*  Majors 192 to 223  */
-     0xffff0003}  /*  Majors 224 to 255  */
+     0x3f0fffff,  /*  Majors 192 to 223  */
+     0xffff007f}  /*  Majors 224 to 255  */
 };
 
 
 /**
  *	devfs_alloc_major - Allocate a major number.
- *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLOCK)
+ *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK)
 
  *	Returns the allocated major, else -1 if none are available.
  *	This routine is thread safe and does not block.
@@ -238,7 +248,7 @@ EXPORT_SYMBOL(devfs_alloc_major);
 
 /**
  *	devfs_dealloc_major - Deallocate a major number.
- *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLOCK)
+ *	@type: The type of the major (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK)
  *	@major: The major number.
  *	This routine is thread safe and does not block.
  */
@@ -273,16 +283,16 @@ struct device_list
     int none_free;
 };
 
-DECLARE_MUTEX (block_semaphore);
+static DECLARE_MUTEX (block_semaphore);
 static struct device_list block_list;
 
-DECLARE_MUTEX (char_semaphore);
+static DECLARE_MUTEX (char_semaphore);
 static struct device_list char_list;
 
 
 /**
  *	devfs_alloc_devnum - Allocate a device number.
- *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLOCK).
+ *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK).
  *
  *	Returns the allocated device number, else NODEV if none are available.
  *	This routine is thread safe and may block.
@@ -347,7 +357,7 @@ EXPORT_SYMBOL(devfs_alloc_devnum);
 
 /**
  *	devfs_dealloc_devnum - Dellocate a device number.
- *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLOCK).
+ *	@type: The type (DEVFS_SPECIAL_CHR or DEVFS_SPECIAL_BLK).
  *	@devnum: The device number.
  *
  *	This routine is thread safe and does not block.
@@ -437,6 +447,7 @@ int devfs_alloc_unique_number (struct unique_numspace *space)
 	space->length = length;
     }
     number = find_first_zero_bit (space->bits, space->length << 3);
+    --space->num_free;
     __set_bit (number, space->bits);
     up (&space->semaphore);
     return number;

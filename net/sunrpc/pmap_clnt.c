@@ -31,7 +31,7 @@
 static struct rpc_clnt *	pmap_create(char *, struct sockaddr_in *, int);
 static void			pmap_getport_done(struct rpc_task *);
 extern struct rpc_program	pmap_program;
-spinlock_t			pmap_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t		pmap_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * Obtain the port for a given RPC service on a given host. This one can

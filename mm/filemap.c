@@ -420,8 +420,6 @@ inside:
 			break;
 	}
 
-	SetPageReferenced(page);
-
 not_found:
 	return page;
 }
@@ -1087,6 +1085,26 @@ static void generic_file_readahead(int reada_ok,
 }
 
 /*
+ * Mark a page as having seen activity.
+ *
+ * If it was already so marked, move it
+ * to the active queue and drop the referenced
+ * bit. Otherwise, just mark it for future
+ * action..
+ */
+void mark_page_accessed(struct page *page)
+{
+	if (!PageActive(page) && PageReferenced(page)) {
+		activate_page(page);
+		ClearPageReferenced(page);
+		return;
+	}
+
+	/* Mark the page referenced, AFTER checking for previous usage.. */
+	SetPageReferenced(page);
+}
+
+/*
  * This is a generic file read routine, and uses the
  * inode->i_op->readpage() function for the actual low-level
  * stuff.
@@ -1203,6 +1221,7 @@ page_ok:
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 
+		mark_page_accessed(page);
 		page_cache_release(page);
 		if (ret == nr && desc->count)
 			continue;
@@ -2534,6 +2553,7 @@ repeat:
 	}
 	if (cached_page)
 		page_cache_release(cached_page);
+	mark_page_accessed(page);
 	return page;
 }
 

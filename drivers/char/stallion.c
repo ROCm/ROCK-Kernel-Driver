@@ -139,8 +139,13 @@ static int	stl_nrbrds = sizeof(stl_brdconf) / sizeof(stlconf_t);
 static char	*stl_drvtitle = "Stallion Multiport Serial Driver";
 static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
+#ifdef CONFIG_DEVFS_FS
+static char	*stl_serialname = "tts/E%d";
+static char	*stl_calloutname = "cua/E%d";
+#else
 static char	*stl_serialname = "ttyE";
 static char	*stl_calloutname = "cue";
+#endif
 
 static struct tty_driver	stl_serial;
 static struct tty_driver	stl_callout;

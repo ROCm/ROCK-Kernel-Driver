@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-26-APR-2001
+23-AUG-2001
 
 -----------------------------------------------------------------------------
 
@@ -18,17 +18,14 @@ find out more about it at:
 
 http://www.atnf.csiro.au/~rgooch/linux/
 
-NEWSFLASH: The official 2.3.46 kernel has
-included the devfs patch. Future patches will be released which
-build on this. These patches are rolled into Linus' tree from time to
-time.
-
 A mailing list is available which you may subscribe to. Send
 email
 to majordomo@oss.sgi.com with the following line in the
 body of the message:
 subscribe devfs
-The list is archived at
+To unsubscribe, send the message body:
+unsubscribe devfs
+instead. The list is archived at
 
 http://oss.sgi.com/projects/devfs/archive/.
 
@@ -71,6 +68,8 @@ Alternatives to devfs
 
 Other resources
 
+Translations of this document
+
 
 -----------------------------------------------------------------------------
 
@@ -82,7 +81,7 @@ on your root filesystem. Kernel device drivers can register devices by
 name rather than major and minor numbers. These devices will appear in
 devfs automatically, with whatever default ownership and
 protection the driver specified. A daemon (devfsd) can be used to
-override these defaults.
+override these defaults. Devfs has been in the kernel since 2.3.46.
 
 NOTE that devfs is entirely optional. If you prefer the old
 disc-based device nodes, then simply leave CONFIG_DEVFS_FS=n (the
@@ -604,6 +603,20 @@ services. Unfortunately, it's also fragile, complex and undocumented
 has problems with symbolic links. Append the following lines to your
 /etc/securetty file:
 
+vc/1
+vc/2
+vc/3
+vc/4
+vc/5
+vc/6
+vc/7
+vc/8
+
+This will not weaken security. If you have a version of util-linux
+earlier than 2.10.h, please upgrade to 2.10.h or later. If you
+absolutely cannot upgrade, then also append the following lines to
+your /etc/securetty file:
+
 1
 2
 3
@@ -618,27 +631,13 @@ network (a password is still required, though). However, since there
 are problems with dealing with symlinks, I'm suspicious of the level
 of security offered in any case.
 
-A better solution is to install util-linux-2.10.h or later, which
-fixes a bug with ttyname handling in the login programme. Then append
-the following lines to your /etc/securetty file:
-
-vc/1
-vc/2
-vc/3
-vc/4
-vc/5
-vc/6
-vc/7
-vc/8
-
-This will not weaken security.
-
 XFree86
 While not essential, it's probably a good idea to upgrade to XFree86
 4.0, as patches went in to make it more devfs-friendly. If you don't,
 you'll probably need to apply the following patch to
 /etc/security/console.perms so that ordinary users can run
-startx.
+startx. Note that not all distributions have this file (e.g. Debian),
+so if it's not present, don't worry about it.
 
 --- /etc/security/console.perms.orig    Sat Apr 17 16:26:47 1999 
 +++ /etc/security/console.perms Fri Feb 25 23:53:55 2000 
@@ -691,9 +690,12 @@ Alternatively, use the same technique used for unsupported drivers
 described above.
 
 The Kernel
-Finally, you need to make sure devfs is compiled into your
-kernel. Set CONFIG_DEVFS_FS=y and CONFIG_DEVFS_MOUNT=y and recompile
-your kernel. At boot, devfs will be mounted onto /dev.
+Finally, you need to make sure devfs is compiled into your kernel. Set
+CONFIG_EXPERIMENTAL=y, CONFIG_DEVFS_FS=y and CONFIG_DEVFS_MOUNT=y by
+using favourite configuration tool (i.e. make config or
+make xconfig) and then make dep; make clean and then
+recompile your kernel and modules. At boot, devfs will be mounted onto
+/dev.
 
 If you encounter problems booting (for example if you forgot a
 configuration step), you can pass devfs=nomount at the kernel
@@ -805,8 +807,17 @@ mounted-over /dev. However, you can still use a regular
 directory to store the database. The sample /etc/devfsd.conf
 file above may still be used. You will need to create the
 /dev-state directory prior to installing devfsd. If you have
-old permissions in /dev, then just copy the device nodes over
-to the new directory.
+old permissions in /dev, then just copy (or move) the device
+nodes over to the new directory.
+
+Which method is better?
+
+The best method is to have the permissions database stored in the
+mounted-over /dev. This is because you will not need to copy
+device nodes over to /dev-state, and because it allows you to
+switch between devfs and non-devfs kernels, without requiring you to
+copy permissions between /dev-state (for devfs) and
+/dev (for non-devfs).
 
 
 Dealing with drivers without devfs support
@@ -1037,6 +1048,13 @@ have a directory of entries, making it easy to see what devices of
 that class are available. Often, the entries are symbolic links into a
 directory tree that reflects the topology of available devices. The
 topological tree is useful for finding how your devices are arranged.
+
+Below is a list of the naming schemes for the most common drivers. A
+list of reserved device names is
+available for reference. Please send email to
+rgooch@atnf.csiro.au to obtain an allocation. Please be
+patient (the maintainer is busy). An alternative name may be allocated
+instead of the requested name, at the discretion of the maintainer.
 
 Disc Devices
 
@@ -1486,6 +1504,47 @@ raised the possibilty of moving network devices into the device
 namespace, but have had no response.
 
 
+How can I test if I have devfs compiled into my kernel?
+
+All filesystems built-in or currently loaded are listed in
+/proc/filesystems. If you see a devfs entry, then
+you know that devfs was compiled into your kernel. If you have
+correctly configured and rebuilt your kernel, then devfs will be
+built-in. If you think you've configured it in, but
+/proc/filesystems doesn't show it, you've made a mistake.
+Common mistakes include:
+
+Using a 2.2.x kernel without applying the devfs patch (if you
+don't know how to patch your kernel, use 2.4.x instead, don't bother
+asking me how to patch)
+Forgetting to set CONFIG_EXPERIMENTAL=y
+Forgetting to set CONFIG_DEVFS_FS=y
+Forgetting to set CONFIG_DEVFS_MOUNT=y (if you want devfs
+to be automatically mounted at boot)
+Editing your .config manually, instead of using make
+config or make xconfig
+Forgetting to run make dep; make clean after changing the
+configuration and before compiling
+Forgetting to compile your kernel and modules
+Forgetting to install your kernel
+Forgetting to install your modules
+
+Please check twice that you've done all these steps before sending in
+a bug report.
+
+
+
+How can I test if devfs is mounted on /dev?
+
+The device filesystem will always create an entry called
+".devfsd", which is used to communicate with the daemon. Even
+if the daemon is not running, this entry will exist. Testing for the
+existence of this entry is the approved method of determining if devfs
+is mounted or not. Note that the type of entry (i.e. regular file,
+character device, named pipe, etc.) may change without notice. Only
+the existence of the entry should be relied upon.
+
+
 
 
 
@@ -1713,6 +1772,23 @@ at the
 
 2nd Annual Storage Management Workshop held in Miamia, Florida,
 U.S.A. in October 2000.
+
+
+
+
+-----------------------------------------------------------------------------
+
+
+Translations of this document
+
+This document has been translated into other languages.
+
+
+
+
+A Korean translation by viatoris@nownuri.net is available at
+
+http://home.nownuri.net/~viatoris/devfs/devfs.html 
 
 
 
