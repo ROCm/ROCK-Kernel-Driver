@@ -589,7 +589,9 @@ void isd200_invoke_transport( struct us_data *us,
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
 			srb->result = DID_ABORT << 16;
-		} else if (result == ISD200_GOOD) {
+			return;
+		}
+		if (result == ISD200_GOOD) {
 			isd200_build_sense(us, srb);
 			srb->result = CHECK_CONDITION << 1;
 
