@@ -37,8 +37,9 @@ struct pci_controller {
 	unsigned long config_space_base;
 
 	unsigned int index;
-	unsigned int first_busno;
-	unsigned int last_busno;
+	/* For compatibility with current (as of July 2003) pciutils
+	   and XFree86. Eventually will be removed. */
+	unsigned int need_domain_info;
 
 	struct pci_iommu_arena *sg_pci;
 	struct pci_iommu_arena *sg_isa;
@@ -194,15 +195,14 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 
 #define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
-/* Bus number == domain number until we get above 256 busses */
 static inline int pci_name_bus(char *name, struct pci_bus *bus)
 {
-	int domain = pci_domain_nr(bus);
+	struct pci_controller *hose = bus->sysdata;
 
-	if (domain < 256) {
-		sprintf(name, "%02x", domain);
+	if (likely(hose->need_domain_info == 0)) {
+		sprintf(name, "%02x", bus->number);
 	} else {
-		sprintf(name, "%04x:%02x", domain, bus->number);
+		sprintf(name, "%04x:%02x", hose->index, bus->number);
 	}
 	return 0;
 }

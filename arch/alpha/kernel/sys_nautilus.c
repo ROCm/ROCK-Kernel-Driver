@@ -200,7 +200,6 @@ nautilus_init_pci(void)
 	/* Scan our single hose.  */
 	bus = pci_scan_bus(0, alpha_mv.pci_ops, hose);
 	hose->bus = bus;
-	hose->last_busno = bus->subordinate;
 
 	irongate = pci_find_slot(0, 0);
 	bus->self = irongate;
