@@ -1286,15 +1286,15 @@ int reiserfs_delete_item (struct reiserfs_transaction_handle *th,
         **
         ** p_s_un_bh is from the page cache (all unformatted nodes are
         ** from the page cache) and might be a highmem page.  So, we
-        ** can't use p_s_un_bh->b_data.  But, the page has already been
-        ** kmapped, so we can use page_address()
+        ** can't use p_s_un_bh->b_data.
 	** -clm
 	*/
 
-        data = page_address(p_s_un_bh->b_page) ;
+        data = kmap_atomic(p_s_un_bh->b_page, KM_USER0);
 	off = ((le_ih_k_offset (&s_ih) - 1) & (PAGE_CACHE_SIZE - 1));
 	memcpy(data + off,
 	       B_I_PITEM(PATH_PLAST_BUFFER(p_s_path), &s_ih), n_ret_value);
+	kunmap_atomic(data, KM_USER0);
     }
 
     /* Perform balancing after all resources have been collected at once. */ 

@@ -2196,7 +2196,6 @@ typedef struct file File_T;
 typedef struct block_device_operations BlockDeviceOperations_T;
 typedef struct completion Completion_T;
 typedef struct hd_geometry DiskGeometry_T;
-typedef struct hd_struct DiskPartition_T;
 typedef struct inode Inode_T;
 typedef struct inode_operations InodeOperations_T;
 typedef kdev_t KernelDevice_T;
@@ -2472,7 +2471,6 @@ typedef struct DAC960_Controller
       boolean LogicalDriveFoundDuringScan[DAC960_MaxLogicalDrives];
     } V2;
   } FW;
-  DiskPartition_T DiskPartitions[DAC960_MinorCount];
   unsigned char ProgressBuffer[DAC960_ProgressBufferSize];
   unsigned char UserStatusBuffer[DAC960_UserMessageSize];
 }

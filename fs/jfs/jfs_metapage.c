@@ -403,7 +403,6 @@ static void __write_metapage(metapage_t * mp)
 	if (rc) {
 		jERROR(1, ("prepare_write return %d!\n", rc));
 		ClearPageUptodate(mp->page);
-		kunmap(mp->page);
 		unlock_page(mp->page);
 		clear_bit(META_dirty, &mp->flag);
 		return;

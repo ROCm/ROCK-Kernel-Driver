@@ -184,7 +184,7 @@ static struct Scsi_Device_Template st_template = {
 static int st_compression(Scsi_Tape *, int);
 
 static int find_partition(Scsi_Tape *);
-static int update_partition(Scsi_Tape *);
+static int switch_partition(Scsi_Tape *);
 
 static int st_int_ioctl(Scsi_Tape *, unsigned int, unsigned long);
 
@@ -1028,9 +1028,9 @@ static int st_flush(struct file *filp)
 	}
 
 	if (STp->can_partitions &&
-	    (result2 = update_partition(STp)) < 0) {
+	    (result2 = switch_partition(STp)) < 0) {
                 DEBC(printk(ST_DEB_MSG
-                               "st%d: update_partition at close failed.\n", dev));
+                               "st%d: switch_partition at close failed.\n", dev));
 		if (result == 0)
 			result = result2;
 		goto out;
@@ -1206,7 +1206,7 @@ static ssize_t rw_checks(Scsi_Tape *STp, struct file *filp, size_t count, loff_t
 	} ) /* end DEB */
 
 	if (STp->can_partitions &&
-	    (retval = update_partition(STp)) < 0)
+	    (retval = switch_partition(STp)) < 0)
 		goto out;
 
 	if (STp->block_size == 0 && STp->max_block > 0 &&
@@ -2904,7 +2904,7 @@ static int find_partition(Scsi_Tape *STp)
 
 
 /* Change the partition if necessary */
-static int update_partition(Scsi_Tape *STp)
+static int switch_partition(Scsi_Tape *STp)
 {
 	ST_partstat *STps;
 
@@ -3239,7 +3239,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		}
 
 		if (STp->can_partitions && STp->ready == ST_READY &&
-		    (i = update_partition(STp)) < 0) {
+		    (i = switch_partition(STp)) < 0) {
 			retval = i;
 			goto out;
 		}
@@ -3260,7 +3260,7 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 	if (STp->can_partitions &&
-	    (i = update_partition(STp)) < 0) {
+	    (i = switch_partition(STp)) < 0) {
 		retval = i;
 		goto out;
 	}

@@ -1342,17 +1342,10 @@ int isp2x00_queuecommand(Scsi_Cmnd * Cmnd, void (*done) (Scsi_Cmnd *))
 
 	num_free = QLOGICFC_REQ_QUEUE_LEN - REQ_QUEUE_DEPTH(in_ptr, out_ptr);
 	num_free = (num_free > 2) ? num_free - 2 : 0;
-	host->can_queue = hostdata->queued + num_free;
+       host->can_queue = host->host_busy + num_free;
 	if (host->can_queue > QLOGICFC_REQ_QUEUE_LEN)
 		host->can_queue = QLOGICFC_REQ_QUEUE_LEN;
 	host->sg_tablesize = QLOGICFC_MAX_SG(num_free);
-
-	/* this is really gross */
-	if (host->can_queue <= host->host_busy){
-	        if (host->can_queue+2 < host->host_busy) 
-			DEBUG(printk("qlogicfc%d.c crosses its fingers.\n", hostdata->host_id));
-		host->can_queue = host->host_busy + 1;
-	}
 
 	LEAVE("isp2x00_queuecommand");
 
@@ -1623,16 +1616,10 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 	num_free = QLOGICFC_REQ_QUEUE_LEN - REQ_QUEUE_DEPTH(in_ptr, out_ptr);
 	num_free = (num_free > 2) ? num_free - 2 : 0;
-	host->can_queue = hostdata->queued + num_free;
+       host->can_queue = host->host_busy + num_free;
 	if (host->can_queue > QLOGICFC_REQ_QUEUE_LEN)
 		host->can_queue = QLOGICFC_REQ_QUEUE_LEN;
 	host->sg_tablesize = QLOGICFC_MAX_SG(num_free);
-
-	if (host->can_queue <= host->host_busy){
-	        if (host->can_queue+2 < host->host_busy) 
-		        DEBUG(printk("qlogicfc%d : crosses its fingers.\n", hostdata->host_id));
-		host->can_queue = host->host_busy + 1;
-	}
 
 	outw(HCCR_CLEAR_RISC_INTR, host->io_port + HOST_HCCR);
 	LEAVE_INTR("isp2x00_intr_handler");

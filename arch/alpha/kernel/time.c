@@ -185,8 +185,8 @@ validate_cc_value(unsigned long cc)
 		unsigned int min, max;
 	} cpu_hz[] __initdata = {
 		[EV3_CPU]    = {   50000000,  200000000 },	/* guess */
-		[EV4_CPU]    = {  150000000,  300000000 },
-		[LCA4_CPU]   = {  150000000,  300000000 },	/* guess */
+		[EV4_CPU]    = {  100000000,  300000000 },
+		[LCA4_CPU]   = {  100000000,  300000000 },	/* guess */
 		[EV45_CPU]   = {  200000000,  300000000 },
 		[EV5_CPU]    = {  250000000,  433000000 },
 		[EV56_CPU]   = {  333000000,  667000000 },
@@ -257,12 +257,12 @@ calibrate_cc_with_pic(void)
 
 	cc = rpcc();
 	do {
-		count++;
+	  count+=100; /* by 1 takes too long to timeout from 0 */
 	} while ((inb(0x61) & 0x20) == 0 && count > 0);
 	cc = rpcc() - cc;
 
 	/* Error: ECTCNEVERSET or ECPUTOOFAST.  */
-	if (count <= 1)
+	if (count <= 100)
 		return 0;
 
 	/* Error: ECPUTOOSLOW.  */

@@ -210,8 +210,7 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			goto fail;
 		if (aops->prepare_write(file, page, offset, offset+size))
 			goto unlock;
-		kaddr = page_address(page);
-		flush_dcache_page(page);
+		kaddr = kmap(page);
 		transfer_result = lo_do_transfer(lo, WRITE, kaddr + offset, data, size, IV);
 		if (transfer_result) {
 			/*
@@ -221,6 +220,8 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			printk(KERN_ERR "loop: transfer error block %ld\n", index);
 			memset(kaddr + offset, 0, size);
 		}
+		flush_dcache_page(page);
+		kunmap(page);
 		if (aops->commit_write(file, page, offset, offset+size))
 			goto unlock;
 		if (transfer_result)

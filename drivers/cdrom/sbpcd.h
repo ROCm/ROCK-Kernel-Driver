@@ -242,12 +242,12 @@
 /*
  * disk states (bits of diskstate_flags):
  */
-#define upc_valid		(D_S[d].diskstate_flags&upc_bit)
-#define volume_valid		(D_S[d].diskstate_flags&volume_bit)
-#define toc_valid		(D_S[d].diskstate_flags&toc_bit)
-#define cd_size_valid		(D_S[d].diskstate_flags&cd_size_bit)
-#define subq_valid		(D_S[d].diskstate_flags&subq_bit)
-#define frame_size_valid	(D_S[d].diskstate_flags&frame_size_bit)
+#define upc_valid		(current_drive->diskstate_flags&upc_bit)
+#define volume_valid		(current_drive->diskstate_flags&volume_bit)
+#define toc_valid		(current_drive->diskstate_flags&toc_bit)
+#define cd_size_valid		(current_drive->diskstate_flags&cd_size_bit)
+#define subq_valid		(current_drive->diskstate_flags&subq_bit)
+#define frame_size_valid	(current_drive->diskstate_flags&frame_size_bit)
 
 /*
  * the status_bits variable
@@ -324,13 +324,13 @@
 /*
  * used drive states:
  */
-#define st_door_closed	(D_S[d].status_bits&p_door_closed)
-#define st_caddy_in	(D_S[d].status_bits&p_caddy_in)
-#define st_spinning	(D_S[d].status_bits&p_spinning)
-#define st_check	(D_S[d].status_bits&p_check)
-#define st_busy		(D_S[d].status_bits&p_busy_new)
-#define st_door_locked	(D_S[d].status_bits&p_door_locked)
-#define st_diskok	(D_S[d].status_bits&p_disk_ok)
+#define st_door_closed	(current_drive->status_bits&p_door_closed)
+#define st_caddy_in	(current_drive->status_bits&p_caddy_in)
+#define st_spinning	(current_drive->status_bits&p_spinning)
+#define st_check	(current_drive->status_bits&p_check)
+#define st_busy		(current_drive->status_bits&p_busy_new)
+#define st_door_locked	(current_drive->status_bits&p_door_locked)
+#define st_diskok	(current_drive->status_bits&p_disk_ok)
 
 /*
  * bits of the CDi_status register:
@@ -372,22 +372,22 @@
 #define drv_famV	0x2000		/* ECS-AT (vertos-100) family */
 #define drv_at		(drv_famV+0x01)	/* ECS-AT, firmware "1.00" */
 
-#define fam0_drive	(D_S[d].drv_type&drv_fam0)
-#define famL_drive	(D_S[d].drv_type&drv_famL)
-#define famV_drive	(D_S[d].drv_type&drv_famV)
-#define fam1_drive	(D_S[d].drv_type&drv_fam1)
-#define fam2_drive	(D_S[d].drv_type&drv_fam2)
-#define famT_drive	(D_S[d].drv_type&drv_famT)
-#define fam0L_drive	(D_S[d].drv_type&(drv_fam0|drv_famL))
-#define fam0V_drive	(D_S[d].drv_type&(drv_fam0|drv_famV))
-#define famLV_drive	(D_S[d].drv_type&(drv_famL|drv_famV))
-#define fam0LV_drive	(D_S[d].drv_type&(drv_fam0|drv_famL|drv_famV))
-#define fam1L_drive	(D_S[d].drv_type&(drv_fam1|drv_famL))
-#define fam1V_drive	(D_S[d].drv_type&(drv_fam1|drv_famV))
-#define fam1LV_drive	(D_S[d].drv_type&(drv_fam1|drv_famL|drv_famV))
-#define fam01_drive	(D_S[d].drv_type&(drv_fam0|drv_fam1))
-#define fam12_drive	(D_S[d].drv_type&(drv_fam1|drv_fam2))
-#define fam2T_drive	(D_S[d].drv_type&(drv_fam2|drv_famT))
+#define fam0_drive	(current_drive->drv_type&drv_fam0)
+#define famL_drive	(current_drive->drv_type&drv_famL)
+#define famV_drive	(current_drive->drv_type&drv_famV)
+#define fam1_drive	(current_drive->drv_type&drv_fam1)
+#define fam2_drive	(current_drive->drv_type&drv_fam2)
+#define famT_drive	(current_drive->drv_type&drv_famT)
+#define fam0L_drive	(current_drive->drv_type&(drv_fam0|drv_famL))
+#define fam0V_drive	(current_drive->drv_type&(drv_fam0|drv_famV))
+#define famLV_drive	(current_drive->drv_type&(drv_famL|drv_famV))
+#define fam0LV_drive	(current_drive->drv_type&(drv_fam0|drv_famL|drv_famV))
+#define fam1L_drive	(current_drive->drv_type&(drv_fam1|drv_famL))
+#define fam1V_drive	(current_drive->drv_type&(drv_fam1|drv_famV))
+#define fam1LV_drive	(current_drive->drv_type&(drv_fam1|drv_famL|drv_famV))
+#define fam01_drive	(current_drive->drv_type&(drv_fam0|drv_fam1))
+#define fam12_drive	(current_drive->drv_type&(drv_fam1|drv_fam2))
+#define fam2T_drive	(current_drive->drv_type&(drv_fam2|drv_famT))
 
 /*
  * audio states:
