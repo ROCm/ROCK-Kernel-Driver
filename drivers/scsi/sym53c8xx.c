@@ -1279,16 +1279,6 @@ static __inline__ int scsi_data_direction(Scsi_Cmnd *cmd)
 
 #endif	/* SCSI_DATA_UNKNOWN */
 
-/*
-**	Head of list of NCR boards
-**
-**	For kernel version < 1.3.70, host is retrieved by its irq level.
-**	For later kernels, the internal host control block address 
-**	(struct ncb) is used as device id parameter of the irq stuff.
-*/
-
-static struct Scsi_Host	*first_host = NULL;
-
 
 /*
 **	/proc directory entry and proc_info function
@@ -5880,11 +5870,6 @@ ncr_attach (Scsi_Host_Template *tpnt, int unit, ncr_device *device)
 
 	/*
 	**  Done.
-	*/
-        if (!first_host)
-        	first_host = instance;
-
-	/*
 	**	Fill Linux host instance structure
 	**	and return success.
 	*/
@@ -14228,36 +14213,30 @@ static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
 printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 #endif
 
-	for (host = first_host; host; host = host->next) {
-		if (host->hostt != first_host->hostt)
-			continue;
-		if (host->host_no == hostno) {
-			host_data = (struct host_data *) host->hostdata;
-			ncb = host_data->ncb;
-			break;
-		}
-	}
-
-	if (!ncb)
+	host = scsi_host_hn_get(hostno);
+	if (!host)
 		return -EINVAL;
+
+	host_data = (struct host_data *) host->hostdata;
+	ncb = host_data->ncb;
+	retv = -EINVAL;
+	if (!ncb)
+		goto out;
 
 	if (func) {
 #ifdef	SCSI_NCR_USER_COMMAND_SUPPORT
 		retv = ncr_user_command(ncb, buffer, length);
-#else
-		retv = -EINVAL;
 #endif
-	}
-	else {
+	} else {
 		if (start)
 			*start = buffer;
 #ifdef SCSI_NCR_USER_INFO_SUPPORT
 		retv = ncr_host_info(ncb, buffer, offset, length);
-#else
-		retv = -EINVAL;
 #endif
 	}
 
+out:
+	scsi_host_put(host);
 	return retv;
 }
 
