@@ -685,7 +685,7 @@ EXPORT_SYMBOL(ip_route_me_harder);
 
 EXPORT_SYMBOL(register_gifconf);
 
-EXPORT_SYMBOL(softnet_data);
+EXPORT_PER_CPU_SYMBOL(softnet_data);
 
 #ifdef CONFIG_NET_RADIO
 #include <net/iw_handler.h>		/* Wireless Extensions driver API */
