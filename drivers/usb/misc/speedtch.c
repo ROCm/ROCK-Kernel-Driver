@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 /*
- *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@wanadoo.fr)
+ *  Written by Johan Verrept, maintained by Duncan Sands (duncan.sands@free.fr)
  *
  *  1.6:	- No longer opens a connection if the firmware is not loaded
  *  		- Added support for the speedtouch 330
@@ -94,7 +94,7 @@ static int udsl_print_packet (const unsigned char *data, int len);
 #define vdbg(arg...)
 #endif
 
-#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@wanadoo.fr>"
+#define DRIVER_AUTHOR	"Johan Verrept, Duncan Sands <duncan.sands@free.fr>"
 #define DRIVER_DESC	"Alcatel SpeedTouch USB driver"
 #define DRIVER_VERSION	"1.6"
 
