@@ -1157,7 +1157,7 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	int pipe;
 
 	/* issue the command -- use usb_control_msg() because
-	 *  the state machine is not yet alive */
+	 * this is not a scsi queued-command */
 	pipe = usb_rcvctrlpipe(us->pusb_dev, 0);
 	result = usb_control_msg(us->pusb_dev, pipe,
 				 US_BULK_GET_MAX_LUN, 
@@ -1176,8 +1176,8 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 	if (result == -EPIPE) {
 		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
 
-		/* Use usb_clear_halt() because the state machine
-		 *  is not yet alive */
+		/* Use usb_clear_halt() because this is not a
+		 * scsi queued-command */
 		usb_clear_halt(us->pusb_dev, pipe);
 	}
 
@@ -1351,27 +1351,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
  * Reset routines
  ***********************************************************************/
 
-struct us_timeout {
-	struct us_data *us;
-	spinlock_t timer_lock;
-};
-
-/* The timeout event handler
- */
-static void usb_stor_timeout_handler(unsigned long to__)
-{
-	struct us_timeout *to = (struct us_timeout *) to__;
-	struct us_data *us = to->us;
-
-	US_DEBUGP("Timeout occurred\n");
-
-	/* abort the current request */
-	usb_stor_abort_transport(us);
-
-	/* let the reset routine know we have finished */
-	spin_unlock(&to->timer_lock);
-}
-
 /* This is the common part of the device reset code.
  *
  * It's handy that every transport mechanism uses the control endpoint for
@@ -1380,28 +1359,20 @@ static void usb_stor_timeout_handler(unsigned long to__)
  * Basically, we send a reset with a 20-second timeout, so we don't get
  * jammed attempting to do the reset.
  */
-void usb_stor_reset_common(struct us_data *us, u8 request, u8 requesttype,
+static int usb_stor_reset_common(struct us_data *us,
+		u8 request, u8 requesttype,
 		u16 value, u16 index, void *data, u16 size)
 {
 	int result;
-	struct us_timeout timeout_data = {us, SPIN_LOCK_UNLOCKED};
-	struct timer_list timeout_list;
-
-	/* prepare the timeout handler */
-	spin_lock(&timeout_data.timer_lock);
-	init_timer(&timeout_list);
 
 	/* A 20-second timeout may seem rather long, but a LaCie
 	 *  StudioDrive USB2 device takes 16+ seconds to get going
 	 *  following a powerup or USB attach event. */
 
-	timeout_list.expires = jiffies + 20 * HZ;
-	timeout_list.data = (unsigned long) &timeout_data;
-	timeout_list.function = usb_stor_timeout_handler;
-	add_timer(&timeout_list);
-
-	result = usb_stor_control_msg(us, usb_sndctrlpipe(us->pusb_dev,0),
-			 request, requesttype, value, index, data, size);
+	/* Use usb_control_msg() because this is not a queued-command */
+	result = usb_control_msg(us->pusb_dev, usb_sndctrlpipe(us->pusb_dev,0),
+			request, requesttype, value, index, data, size,
+			20*HZ);
 	if (result < 0)
 		goto Done;
 
@@ -1410,41 +1381,30 @@ void usb_stor_reset_common(struct us_data *us, u8 request, u8 requesttype,
 	schedule_timeout(HZ*6);
 	set_current_state(TASK_RUNNING);
 
+	/* Use usb_clear_halt() because this is not a queued-command */
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
-	result = usb_stor_clear_halt(us,
+	result = usb_clear_halt(us->pusb_dev,
 		usb_rcvbulkpipe(us->pusb_dev, us->ep_in));
 	if (result < 0)
 		goto Done;
 
 	US_DEBUGP("Soft reset: clearing bulk-out endpoint halt\n");
-	result = usb_stor_clear_halt(us,
+	result = usb_clear_halt(us->pusb_dev,
 		usb_sndbulkpipe(us->pusb_dev, us->ep_out));
 
 	Done:
 
-	/* prevent the timer from coming back to haunt us */
-	if (!del_timer(&timeout_list)) {
-		/* the handler has already started; wait for it to finish */
-		spin_lock(&timeout_data.timer_lock);
-		/* change the abort into a timeout */
-		if (result == -ENOENT)
-			result = -ETIMEDOUT;
-	}
-
 	/* return a result code based on the result of the control message */
-	if (result >= 0)
-		US_DEBUGP("Soft reset done\n");
-	else
+	if (result < 0) {
 		US_DEBUGP("Soft reset failed: %d\n", result);
-
-	if (result == -ETIMEDOUT)
-		us->srb->result = DID_TIME_OUT << 16;
-	else if (result == -ENOENT)
-		us->srb->result = DID_ABORT << 16;
-	else if (result < 0)
 		us->srb->result = DID_ERROR << 16;
-	else
+		result = FAILED;
+	} else {
+		US_DEBUGP("Soft reset done\n");
 		us->srb->result = GOOD << 1;
+		result = SUCCESS;
+	}
+	return result;
 }
 
 /* This issues a CB[I] Reset to the device in question
@@ -1458,10 +1418,9 @@ int usb_stor_CB_reset(struct us_data *us)
 	memset(cmd, 0xFF, sizeof(cmd));
 	cmd[0] = SEND_DIAGNOSTIC;
 	cmd[1] = 4;
-	usb_stor_reset_common(us, US_CBI_ADSC, 
+	return usb_stor_reset_common(us, US_CBI_ADSC, 
 				 USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 				 0, us->ifnum, cmd, sizeof(cmd));
-	return (us->srb->result == GOOD << 1 ? SUCCESS : FAILED);
 }
 
 /* This issues a Bulk-only Reset to the device in question, including
@@ -1471,8 +1430,7 @@ int usb_stor_Bulk_reset(struct us_data *us)
 {
 	US_DEBUGP("Bulk reset requested\n");
 
-	usb_stor_reset_common(us, US_BULK_RESET_REQUEST, 
+	return usb_stor_reset_common(us, US_BULK_RESET_REQUEST, 
 				 USB_TYPE_CLASS | USB_RECIP_INTERFACE,
 				 0, us->ifnum, NULL, 0);
-	return (us->srb->result == GOOD << 1 ? SUCCESS : FAILED);
 }
