@@ -1038,7 +1038,6 @@ int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 			if (jh->b_transaction != NULL) {
 				JBUFFER_TRACE(jh, "unfile from commit");
 				__journal_unfile_buffer(jh);
-				jh->b_transaction = NULL;
 			}
 			/* The buffer will be refiled below */
 
@@ -1053,7 +1052,6 @@ int journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 			JBUFFER_TRACE(jh, "not on correct data list: unfile");
 			J_ASSERT_JH(jh, jh->b_jlist != BJ_Shadow);
 			__journal_unfile_buffer(jh);
-			jh->b_transaction = NULL;
 			JBUFFER_TRACE(jh, "file as data");
 			__journal_file_buffer(jh, handle->h_transaction,
 						BJ_SyncData);
@@ -1228,7 +1226,6 @@ void journal_forget(handle_t *handle, struct buffer_head *bh)
 		J_ASSERT_JH(jh, !jh->b_committed_data);
 
 		__journal_unfile_buffer(jh);
-		jh->b_transaction = 0;
 
 		/* 
 		 * We are no longer going to journal this buffer.
@@ -1516,7 +1513,7 @@ void __journal_unfile_buffer(struct journal_head *jh)
 
 	switch (jh->b_jlist) {
 	case BJ_None:
-		return;
+		goto out;
 	case BJ_SyncData:
 		list = &transaction->t_sync_datalist;
 		break;
@@ -1549,6 +1546,8 @@ void __journal_unfile_buffer(struct journal_head *jh)
 	jh->b_jlist = BJ_None;
 	if (test_clear_buffer_jbddirty(bh))
 		mark_buffer_dirty(bh);	/* Expose it to the VM */
+out:
+	jh->b_transaction = NULL;
 }
 
 void journal_unfile_buffer(journal_t *journal, struct journal_head *jh)
@@ -1584,7 +1583,6 @@ __journal_try_to_free_buffer(journal_t *journal, struct buffer_head *bh)
 			/* A written-back ordered data buffer */
 			JBUFFER_TRACE(jh, "release data");
 			__journal_unfile_buffer(jh);
-			jh->b_transaction = 0;
 			journal_remove_journal_head(bh);
 			__brelse(bh);
 		}
@@ -1690,7 +1688,6 @@ static int __dispose_buffer(struct journal_head *jh, transaction_t *transaction)
 	struct buffer_head *bh = jh2bh(jh);
 
 	__journal_unfile_buffer(jh);
-	jh->b_transaction = 0;
 
 	if (jh->b_cp_transaction) {
 		JBUFFER_TRACE(jh, "on running+cp transaction");
@@ -1959,8 +1956,7 @@ void __journal_file_buffer(struct journal_head *jh,
 
 	if (jh->b_transaction)
 		__journal_unfile_buffer(jh);
-	else
-		jh->b_transaction = transaction;
+	jh->b_transaction = transaction;
 
 	switch (jlist) {
 	case BJ_None:
@@ -2033,7 +2029,6 @@ void __journal_refile_buffer(struct journal_head *jh)
 	/* If the buffer is now unused, just drop it. */
 	if (jh->b_next_transaction == NULL) {
 		__journal_unfile_buffer(jh);
-		jh->b_transaction = NULL;
 		return;
 	}
 
