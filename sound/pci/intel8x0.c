@@ -1817,6 +1817,12 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	},
 	{
 		.vendor = 0x8086,
+		.device = 0x4d56,
+		.name = "Intel ICH/AD1885",
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x8086,
 		.device = 0x6000,
 		.mask = 0xfff0,
 		.name = "Intel ICH5/AD1985",
