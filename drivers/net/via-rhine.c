@@ -368,6 +368,8 @@ enum chip_capability_flags {
 #else
 #define RHINE_IOTYPE (PCI_USES_IO  | PCI_USES_MASTER | PCI_ADDR0)
 #endif
+/* Beware of PCI posted writes */
+#define IOSYNC	do { readb(dev->base_addr + StationAddr); } while (0)
 
 /* directly indexed by enum via_rhine_chips, above */
 static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
@@ -530,11 +532,12 @@ static int  via_rhine_close(struct net_device *dev);
 static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 {
 	long ioaddr = dev->base_addr;
+	int boguscnt = 20;
 
-	udelay(5);
+	IOSYNC;
 
 	if (readw(ioaddr + ChipCmd) & CmdReset) {
-		printk(KERN_INFO "%s: Reset did not complete in 5 us. "
+		printk(KERN_INFO "%s: Reset not complete yet. "
 			"Trying harder.\n", name);
 
 		/* Rhine-II needs to be forced sometimes */
@@ -543,12 +546,14 @@ static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 
 		/* VT86C100A may need long delay after reset (dlink) */
 		/* Seen on Rhine-II as well (rl) */
-		udelay(100);
+		while ((readw(ioaddr + ChipCmd) & CmdReset) && --boguscnt);
+			udelay(5);
+
 	}
 
 	if (debug > 1)
 		printk(KERN_INFO "%s: Reset %s.\n", name,
-			(readw(ioaddr + ChipCmd) & CmdReset) ? "failed" : "succeeded");
+			boguscnt ? "succeeded" : "failed");
 }
 
 #ifdef USE_MEM
