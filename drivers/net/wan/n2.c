@@ -218,15 +218,9 @@ static int n2_open(struct net_device *dev)
 	u8 mcr = inb(io + N2_MCR) | (port->phy_node ? TX422_PORT1:TX422_PORT0);
 	int result;
 
-
-	if (!try_module_get(THIS_MODULE))
-		return -EFAULT;	/* rmmod in progress */
-
 	result = hdlc_open(hdlc);
-	if (result) {
+	if (result)
 		return result;
-		module_put(THIS_MODULE);
-	}
 
 	mcr &= port->phy_node ? ~DTR_PORT1 : ~DTR_PORT0; /* set DTR ON */
 	outb(mcr, io + N2_MCR);
@@ -251,7 +245,6 @@ static int n2_close(struct net_device *dev)
 	mcr |= port->phy_node ? DTR_PORT1 : DTR_PORT0; /* set DTR OFF */
 	outb(mcr, io + N2_MCR);
 	hdlc_close(hdlc);
-	module_put(THIS_MODULE);
 	return 0;
 }
 
@@ -451,6 +444,7 @@ static int __init n2_run(unsigned long io, unsigned long irq,
 			port->log_node = 1;
 
 		spin_lock_init(&port->lock);
+		SET_MODULE_OWNER(dev);
 		dev->irq = irq;
 		dev->mem_start = winbase;
 		dev->mem_end = winbase + USE_WINDOWSIZE-1;
