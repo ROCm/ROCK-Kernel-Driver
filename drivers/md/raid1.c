@@ -450,6 +450,32 @@ rb_out:
 	return new_disk;
 }
 
+static int raid1_issue_flush(request_queue_t *q, struct gendisk *disk,
+			     sector_t *error_sector)
+{
+	mddev_t *mddev = q->queuedata;
+	conf_t *conf = mddev_to_conf(mddev);
+	unsigned long flags;
+	int i, ret = 0;
+
+	spin_lock_irqsave(&conf->device_lock, flags);
+	for (i=0; i<mddev->raid_disks; i++) {
+		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
+		if (rdev && !rdev->faulty) {
+			struct block_device *bdev = rdev->bdev;
+			request_queue_t *r_queue = bdev_get_queue(bdev);
+
+			if (r_queue->issue_flush_fn) {
+				ret = r_queue->issue_flush_fn(r_queue, bdev->bd_disk, error_sector);
+				if (ret)
+					break;
+			}
+		}
+	}
+	spin_unlock_irqrestore(&conf->device_lock, flags);
+	return ret;
+}
+
 static void unplug_slaves(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
@@ -1140,7 +1166,7 @@ static int run(mddev_t *mddev)
 		goto out_free_conf;
 	}
 	mddev->queue->unplug_fn = raid1_unplug;
-
+	mddev->queue->issue_flush_fn = raid1_issue_flush;
 
 	ITERATE_RDEV(mddev, rdev, tmp) {
 		disk_idx = rdev->raid_disk;
