@@ -373,21 +373,21 @@ static struct db9 __init *db9_probe(int *config)
 }
 
 #ifndef MODULE
-int __init db9_setup(char *str)
+static int __init db9_setup(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 2; i++) db9[i] = ints[i + 1];
 	return 1;
 }
-int __init db9_setup_2(char *str)
+static int __init db9_setup_2(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 2; i++) db9_2[i] = ints[i + 1];
 	return 1;
 }
-int __init db9_setup_3(char *str)
+static int __init db9_setup_3(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);

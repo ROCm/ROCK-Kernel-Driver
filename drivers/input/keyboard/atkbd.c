@@ -520,14 +520,16 @@ static struct serio_dev atkbd_dev = {
 	disconnect:	atkbd_disconnect
 };
 
-/*
- * Module init and exit.
- */
-
-void __init atkbd_setup(char *str, int *ints)
+#ifndef MODULE
+static int __init atkbd_setup(char *str)
 {
-	if (!ints[0]) atkbd_set = ints[1];
+        int ints[4];
+        str = get_options(str, ARRAY_SIZE(ints), ints);
+        if (ints[0] > 0) atkbd_set = ints[1];
+        return 1;
 }
+__setup("atkbd_set=", atkbd_setup);
+#endif
 
 int __init atkbd_init(void)
 {

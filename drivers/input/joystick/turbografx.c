@@ -208,21 +208,21 @@ static struct tgfx __init *tgfx_probe(int *config)
 }
 
 #ifndef MODULE
-int __init tgfx_setup(char *str)
+static int __init tgfx_setup(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 8; i++) tgfx[i] = ints[i + 1];
 	return 1;
 }
-int __init tgfx_setup_2(char *str)
+static int __init tgfx_setup_2(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 8; i++) tgfx_2[i] = ints[i + 1];
 	return 1;
 }
-int __init tgfx_setup_3(char *str)
+static int __init tgfx_setup_3(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);
