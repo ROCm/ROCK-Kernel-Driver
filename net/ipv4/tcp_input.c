@@ -305,6 +305,8 @@ static void tcp_init_buffer_space(struct sock *sk)
 	if (!(sk->sk_userlocks & SOCK_SNDBUF_LOCK))
 		tcp_fixup_sndbuf(sk);
 
+	tp->rcvq_space.space = tp->rcv_wnd;
+
 	maxwin = tcp_full_space(sk);
 
 	if (tp->window_clamp >= maxwin) {
@@ -429,6 +431,53 @@ static inline void tcp_rcv_rtt_measure_ts(struct tcp_opt *tp, struct sk_buff *sk
 	    (TCP_SKB_CB(skb)->end_seq -
 	     TCP_SKB_CB(skb)->seq >= tp->ack.rcv_mss))
 		tcp_rcv_rtt_update(tp, tcp_time_stamp - tp->rcv_tsecr, 0);
+}
+
+/*
+ * This function should be called every time data is copied to user space.
+ * It calculates the appropriate TCP receive buffer space.
+ */
+void tcp_rcv_space_adjust(struct sock *sk)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	int time;
+	int space;
+	
+	if (tp->rcvq_space.time == 0)
+		goto new_measure;
+	
+	time = tcp_time_stamp - tp->rcvq_space.time;
+	if (time < (tp->rcv_rtt_est.rtt >> 3) ||
+	    tp->rcv_rtt_est.rtt == 0)
+		return;
+	
+	space = 2 * (tp->copied_seq - tp->rcvq_space.seq);
+
+	space = max(tp->rcvq_space.space, space);
+
+	if (tp->rcvq_space.space != space) {
+		int rcvmem;
+
+		tp->rcvq_space.space = space;
+
+		/* Receive space grows, normalize in order to
+		 * take into account packet headers and sk_buff
+		 * structure overhead.
+		 */
+		space /= tp->advmss;
+		if (!space)
+			space = 1;
+		rcvmem = (tp->advmss + MAX_TCP_HEADER +
+			  16 + sizeof(struct sk_buff));
+		space *= rcvmem;
+		space = min(space, sysctl_tcp_rmem[2]);
+		if (space > sk->sk_rcvbuf)
+			sk->sk_rcvbuf = space;
+	}
+	
+new_measure:
+	tp->rcvq_space.seq = tp->copied_seq;
+	tp->rcvq_space.time = tcp_time_stamp;
 }
 
 /* There is something which you must keep in mind when you analyze the
@@ -3387,6 +3436,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 				tp->ucopy.len -= chunk;
 				tp->copied_seq += chunk;
 				eaten = (chunk == skb->len && !th->fin);
+				tcp_rcv_space_adjust(sk);
 			}
 			local_bh_disable();
 		}
@@ -3987,6 +4037,7 @@ static int tcp_copy_to_iovec(struct sock *sk, struct sk_buff *skb, int hlen)
 	if (!err) {
 		tp->ucopy.len -= chunk;
 		tp->copied_seq += chunk;
+		tcp_rcv_space_adjust(sk);
 	}
 
 	local_bh_disable();
