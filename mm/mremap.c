@@ -229,8 +229,6 @@ static inline unsigned long move_vma(struct vm_area_struct * vma,
 	return -ENOMEM;
 }
 
-extern int sysctl_overcommit_memory;	/* FIXME!! */
-
 /*
  * Expand (or shrink) an existing mapping, potentially moving it at the
  * same time (controlled by the MREMAP_MAYMOVE flag and available VM space)
@@ -315,8 +313,6 @@ unsigned long do_mremap(unsigned long addr,
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		goto out;
 
-	if (sysctl_overcommit_memory > 1)
-		flags &= ~MAP_NORESERVE;
 	if (vma->vm_flags & VM_ACCOUNT) {
 		charged = (new_len - old_len) >> PAGE_SHIFT;
 		if (!vm_enough_memory(charged))
