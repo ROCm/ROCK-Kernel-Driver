@@ -627,6 +627,8 @@ EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
 
+EXPORT_SYMBOL(kset_register);
+EXPORT_SYMBOL(kset_unregister);
 EXPORT_SYMBOL(kset_find_obj);
 
 EXPORT_SYMBOL(subsystem_init);
