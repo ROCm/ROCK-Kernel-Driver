@@ -1682,7 +1682,14 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 	data = kmalloc(bufsize, GFP_KERNEL);
 	pfindData = (FILE_DIRECTORY_INFO *) data;
 
+	if(file->f_dentry == NULL) {
+		FreeXid(xid);
+		return -EIO;
+	}
+	down(&file->f_dentry->d_sb->s_vfs_rename_sem);
 	full_path = build_wildcard_path_from_dentry(file->f_dentry);
+	up(&file->f_dentry->d_sb->s_vfs_rename_sem);
+
 
 	cFYI(1, ("Full path: %s start at: %lld ", full_path, file->f_pos));
 
