@@ -96,7 +96,7 @@ extern struct net_device *cops_probe(int unit);
 extern struct net_device *ltpc_probe(void);
   
 /* Detachable devices ("pocket adaptors") */
-extern int de620_probe(struct net_device *);
+extern struct net_device *de620_probe(int unit);
 
 /* Fibre Channel adapters */
 extern int iph5526_probe(struct net_device *dev);
@@ -292,7 +292,7 @@ static struct devprobe isa_probes[] __initdata = {
 	{NULL, 0},
 };
 
-static struct devprobe parport_probes[] __initdata = {
+static struct devprobe2 parport_probes[] __initdata = {
 #ifdef CONFIG_DE620		/* D-Link DE-620 adapter */
 	{de620_probe, 0},
 #endif
@@ -383,8 +383,7 @@ static int __init ethif_probe(int unit)
 	    probe_list(dev, mips_probes) == 0 ||
 	    probe_list(dev, eisa_probes) == 0 ||
 	    probe_list(dev, mca_probes) == 0 ||
-	    probe_list(dev, isa_probes) == 0 ||
-	    probe_list(dev, parport_probes) == 0) 
+	    probe_list(dev, isa_probes) == 0)
 		err = register_netdev(dev);
 
 	if (err)
@@ -400,7 +399,7 @@ static void __init ethif_probe2(int unit)
 	if (base_addr == 1)
 		return;
 
-	return;	/* nothing yet */
+	probe_list2(unit, parport_probes, base_addr == 0);
 }
 
 #ifdef CONFIG_TR
