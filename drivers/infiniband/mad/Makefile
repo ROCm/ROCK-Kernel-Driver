@@ -1,3 +1,11 @@
+ifneq ($(KBUILD_MODULES),)
+$(shell lib=$(obj)/../core/ib_packet_lib.o \; \
+  while ! [ -e $$lib ] \; do \
+    echo "Waiting for $$lib" >&2 \; \
+    sleep 1 \; \
+  done)
+endif
+
 EXTRA_CFLAGS += \
     -Idrivers/infiniband/include \
     -Idrivers/infiniband/hw/mellanox-hca/include \
