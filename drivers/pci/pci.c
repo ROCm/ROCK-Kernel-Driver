@@ -306,6 +306,30 @@ pci_set_power_state(struct pci_dev *dev, pci_power_t state)
 }
 
 /**
+ * pci_choose_state - Choose the power state of a PCI device
+ * @dev: PCI device to be suspended
+ * @state: target sleep state for the whole system
+ *
+ * Returns PCI power state suitable for given device and given system
+ * message.
+ */
+
+pci_power_t pci_choose_state(struct pci_dev *dev, u32 state)
+{
+	if (!pci_find_capability(dev, PCI_CAP_ID_PM))
+		return PCI_D0;
+
+	switch (state) {
+	case 0:	return PCI_D0;
+	case 2: return PCI_D2;
+	case 3: return PCI_D3hot;
+	default: BUG();
+	}
+}
+
+EXPORT_SYMBOL(pci_choose_state);
+
+/**
  * pci_save_state - save the PCI configuration space of a device before suspending
  * @dev: - PCI device that we're dealing with
  * @buffer: - buffer to hold config space context
