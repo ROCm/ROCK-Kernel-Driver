@@ -50,6 +50,7 @@
 #include <linux/netlink.h>
 #include <linux/netdevice.h>
 #include <linux/mm.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_ULOG.h>
 #include <linux/netfilter_ipv4/lockhelp.h>
@@ -79,6 +80,10 @@ MODULE_PARM_DESC(nlbufsiz, "netlink buffer size");
 static unsigned int flushtimeout = 10 * HZ;
 MODULE_PARM(flushtimeout, "i");
 MODULE_PARM_DESC(flushtimeout, "buffer flush timeout");
+
+static unsigned int nflog = 1;
+MODULE_PARM(nflog, "i");
+MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
 
 /* global data structures */
 
@@ -157,17 +162,17 @@ struct sk_buff *ulog_alloc_skb(unsigned int size)
 	return skb;
 }
 
-static unsigned int ipt_ulog_target(struct sk_buff **pskb,
-				    const struct net_device *in,
-				    const struct net_device *out,
-				    unsigned int hooknum,
-				    const void *targinfo, void *userinfo)
+static void ipt_ulog_packet(unsigned int hooknum,
+			    const struct sk_buff *skb,
+			    const struct net_device *in,
+			    const struct net_device *out,
+			    const struct ipt_ulog_info *loginfo,
+			    const char *prefix)
 {
 	ulog_buff_t *ub;
 	ulog_packet_msg_t *pm;
 	size_t size, copy_len;
 	struct nlmsghdr *nlh;
-	struct ipt_ulog_info *loginfo = (struct ipt_ulog_info *) targinfo;
 
 	/* ffs == find first bit set, necessary because userspace
 	 * is already shifting groupnumber, but we need unshifted.
@@ -176,8 +181,8 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 
 	/* calculate the size of the skb needed */
 	if ((loginfo->copy_range == 0) ||
-	    (loginfo->copy_range > (*pskb)->len)) {
-		copy_len = (*pskb)->len;
+	    (loginfo->copy_range > skb->len)) {
+		copy_len = skb->len;
 	} else {
 		copy_len = loginfo->copy_range;
 	}
@@ -214,19 +219,21 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 
 	/* copy hook, prefix, timestamp, payload, etc. */
 	pm->data_len = copy_len;
-	pm->timestamp_sec = (*pskb)->stamp.tv_sec;
-	pm->timestamp_usec = (*pskb)->stamp.tv_usec;
-	pm->mark = (*pskb)->nfmark;
+	pm->timestamp_sec = skb->stamp.tv_sec;
+	pm->timestamp_usec = skb->stamp.tv_usec;
+	pm->mark = skb->nfmark;
 	pm->hook = hooknum;
-	if (loginfo->prefix[0] != '\0')
+	if (prefix != NULL)
+		strncpy(pm->prefix, prefix, sizeof(pm->prefix));
+	else if (loginfo->prefix[0] != '\0')
 		strncpy(pm->prefix, loginfo->prefix, sizeof(pm->prefix));
 	else
 		*(pm->prefix) = '\0';
 
 	if (in && in->hard_header_len > 0
-	    && (*pskb)->mac.raw != (void *) (*pskb)->nh.iph
+	    && skb->mac.raw != (void *) skb->nh.iph
 	    && in->hard_header_len <= ULOG_MAC_LEN) {
-		memcpy(pm->mac, (*pskb)->mac.raw, in->hard_header_len);
+		memcpy(pm->mac, skb->mac.raw, in->hard_header_len);
 		pm->mac_len = in->hard_header_len;
 	} else
 		pm->mac_len = 0;
@@ -241,8 +248,8 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 	else
 		pm->outdev_name[0] = '\0';
 
-	/* copy_len <= (*pskb)->len, so can't fail. */
-	if (skb_copy_bits(*pskb, 0, pm->payload, copy_len) < 0)
+	/* copy_len <= skb->len, so can't fail. */
+	if (skb_copy_bits(skb, 0, pm->payload, copy_len) < 0)
 		BUG();
 	
 	/* check if we are building multi-part messages */
@@ -266,8 +273,7 @@ static unsigned int ipt_ulog_target(struct sk_buff **pskb,
 
 	UNLOCK_BH(&ulog_lock);
 
-	return IPT_CONTINUE;
-
+	return;
 
 nlmsg_failure:
 	PRINTR("ipt_ULOG: error during NLMSG_PUT\n");
@@ -276,8 +282,35 @@ alloc_failure:
 	PRINTR("ipt_ULOG: Error building netlink message\n");
 
 	UNLOCK_BH(&ulog_lock);
+}
 
-	return IPT_CONTINUE;
+static unsigned int ipt_ulog_target(struct sk_buff **pskb,
+				    const struct net_device *in,
+				    const struct net_device *out,
+				    unsigned int hooknum,
+				    const void *targinfo, void *userinfo)
+{
+	struct ipt_ulog_info *loginfo = (struct ipt_ulog_info *) targinfo;
+
+	ipt_ulog_packet(hooknum, *pskb, in, out, loginfo, NULL);
+ 
+ 	return IPT_CONTINUE;
+}
+ 
+static void ipt_logfn(unsigned int hooknum,
+		      const struct sk_buff *skb,
+		      const struct net_device *in,
+		      const struct net_device *out,
+		      const char *prefix)
+{
+	struct ipt_ulog_info loginfo = { 
+		.nl_group = ULOG_DEFAULT_NLGROUP,
+		.copy_range = 0,
+		.qthreshold = ULOG_DEFAULT_QTHRESHOLD,
+		.prefix = ""
+	};
+
+	ipt_ulog_packet(hooknum, skb, in, out, &loginfo, prefix);
 }
 
 static int ipt_ulog_checkentry(const char *tablename,
@@ -341,7 +374,9 @@ static int __init init(void)
 		sock_release(nflognl->sk_socket);
 		return -EINVAL;
 	}
-
+	if (nflog)
+		nf_log_register(PF_INET, &ipt_logfn);
+	
 	return 0;
 }
 
@@ -352,6 +387,8 @@ static void __exit fini(void)
 
 	DEBUGP("ipt_ULOG: cleanup_module\n");
 
+	if (nflog)
+		nf_log_unregister(PF_INET, &ipt_logfn);
 	ipt_unregister_target(&ipt_ulog_reg);
 	sock_release(nflognl->sk_socket);
 

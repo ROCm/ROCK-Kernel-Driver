@@ -256,8 +256,8 @@ static int help(struct sk_buff *skb,
 	int dir = CTINFO2DIR(ctinfo);
 	unsigned int matchlen, matchoff;
 	struct ip_ct_ftp_master *ct_ftp_info = &ct->help.ct_ftp_info;
-	struct ip_conntrack_expect expect, *exp = &expect;
-	struct ip_ct_ftp_expect *exp_ftp_info = &exp->help.exp_ftp_info;
+	struct ip_conntrack_expect *exp;
+	struct ip_ct_ftp_expect *exp_ftp_info;
 
 	unsigned int i;
 	int found = 0;
@@ -346,8 +346,15 @@ static int help(struct sk_buff *skb,
 	DEBUGP("conntrack_ftp: match `%.*s' (%u bytes at %u)\n",
 	       (int)matchlen, data + matchoff,
 	       matchlen, ntohl(tcph.seq) + matchoff);
-	       
-	memset(&expect, 0, sizeof(expect));
+
+	/* Allocate expectation which will be inserted */
+	exp = ip_conntrack_expect_alloc();
+	if (exp == NULL) {
+		ret = NF_ACCEPT;
+		goto out;
+	}
+
+	exp_ftp_info = &exp->help.exp_ftp_info;
 
 	/* Update the ftp info */
 	if (htonl((array[0] << 24) | (array[1] << 16) | (array[2] << 8) | array[3])
@@ -389,7 +396,7 @@ static int help(struct sk_buff *skb,
 	exp->expectfn = NULL;
 
 	/* Ignore failure; should only happen with NAT */
-	ip_conntrack_expect_related(ct, &expect);
+	ip_conntrack_expect_related(exp, ct);
 	ret = NF_ACCEPT;
  out:
 	UNLOCK_BH(&ip_ftp_lock);

@@ -99,6 +99,24 @@ void nf_unregister_sockopt(struct nf_sockopt_ops *reg);
 
 extern struct list_head nf_hooks[NPROTO][NF_MAX_HOOKS];
 
+typedef void nf_logfn(unsigned int hooknum,
+		      const struct sk_buff *skb,
+		      const struct net_device *in,
+		      const struct net_device *out,
+		      const char *prefix);
+
+/* Function to register/unregister log function. */
+int nf_log_register(int pf, nf_logfn *logfn);
+void nf_log_unregister(int pf, nf_logfn *logfn);
+
+/* Calls the registered backend logging function */
+void nf_log_packet(int pf,
+		   unsigned int hooknum,
+		   const struct sk_buff *skb,
+		   const struct net_device *in,
+		   const struct net_device *out,
+		   const char *fmt, ...);
+                   
 /* Activate hook; either okfn or kfree_skb called, unless a hook
    returns NF_STOLEN (in which case, it's up to the hook to deal with
    the consequences).

@@ -178,6 +178,16 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &tcph, sizeof(tcph)) != 0)
 		return -1;
 
+	/* If only reply is a RST, we can consider ourselves not to
+	   have an established connection: this is a fairly common
+	   problem case, so we can delete the conntrack
+	   immediately.  --RR */
+	if (!test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status) && tcph.rst) {
+		if (del_timer(&conntrack->timeout))
+			conntrack->timeout.function((unsigned long)conntrack);
+		return NF_ACCEPT;
+	}
+
 	WRITE_LOCK(&tcp_lock);
 	oldtcpstate = conntrack->proto.tcp.state;
 	newconntrack
@@ -199,29 +209,21 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 	/* Poor man's window tracking: record SYN/ACK for handshake check */
 	if (oldtcpstate == TCP_CONNTRACK_SYN_SENT
 	    && CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY
-	    && tcph.syn && tcph.ack)
+	    && tcph.syn && tcph.ack) {
 		conntrack->proto.tcp.handshake_ack
 			= htonl(ntohl(tcph.seq) + 1);
-
-	/* If only reply is a RST, we can consider ourselves not to
-	   have an established connection: this is a fairly common
-	   problem case, so we can delete the conntrack
-	   immediately.  --RR */
-	if (!test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status) && tcph.rst) {
-		WRITE_UNLOCK(&tcp_lock);
-		if (del_timer(&conntrack->timeout))
-			conntrack->timeout.function((unsigned long)conntrack);
-	} else {
-		/* Set ASSURED if we see see valid ack in ESTABLISHED after SYN_RECV */
-		if (oldtcpstate == TCP_CONNTRACK_SYN_RECV
-		    && CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL
-		    && tcph.ack && !tcph.syn
-		    && tcph.ack_seq == conntrack->proto.tcp.handshake_ack)
-			set_bit(IPS_ASSURED_BIT, &conntrack->status);
-
-		WRITE_UNLOCK(&tcp_lock);
-		ip_ct_refresh(conntrack, *tcp_timeouts[newconntrack]);
+		goto out;
 	}
+
+	/* Set ASSURED if we see valid ack in ESTABLISHED after SYN_RECV */
+	if (oldtcpstate == TCP_CONNTRACK_SYN_RECV
+	    && CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL
+	    && tcph.ack && !tcph.syn
+	    && tcph.ack_seq == conntrack->proto.tcp.handshake_ack)
+		set_bit(IPS_ASSURED_BIT, &conntrack->status);
+
+out:	WRITE_UNLOCK(&tcp_lock);
+	ip_ct_refresh(conntrack, *tcp_timeouts[newconntrack]);
 
 	return NF_ACCEPT;
 }

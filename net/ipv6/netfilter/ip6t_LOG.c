@@ -18,12 +18,17 @@
 #include <net/udp.h>
 #include <net/tcp.h>
 #include <net/ipv6.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
 MODULE_AUTHOR("Jan Rekorajski <baggins@pld.org.pl>");
 MODULE_DESCRIPTION("IP6 tables LOG target module");
 MODULE_LICENSE("GPL");
 
+static unsigned int nflog = 1;
+MODULE_PARM(nflog, "i");
+MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
+ 
 struct in_device;
 #include <net/route.h>
 #include <linux/netfilter_ipv6/ip6t_LOG.h>
@@ -265,40 +270,38 @@ static void dump_packet(const struct ip6t_log_info *info,
 	}
 }
 
-static unsigned int
-ip6t_log_target(struct sk_buff **pskb,
-		unsigned int hooknum,
+static void
+ip6t_log_packet(unsigned int hooknum,
+		const struct sk_buff *skb,
 		const struct net_device *in,
 		const struct net_device *out,
-		const void *targinfo,
-		void *userinfo)
+		const struct ip6t_log_info *loginfo,
+		const char *level_string,
+		const char *prefix)
 {
-	struct ipv6hdr *ipv6h = (*pskb)->nh.ipv6h;
-	const struct ip6t_log_info *loginfo = targinfo;
-	char level_string[4] = "< >";
+	struct ipv6hdr *ipv6h = skb->nh.ipv6h;
 
-	level_string[1] = '0' + (loginfo->level % 8);
 	spin_lock_bh(&log_lock);
 	printk(level_string);
 	printk("%sIN=%s OUT=%s ",
-		loginfo->prefix,
+		prefix == NULL ? loginfo->prefix : prefix,
 		in ? in->name : "",
 		out ? out->name : "");
 	if (in && !out) {
 		/* MAC logging for input chain only. */
 		printk("MAC=");
-		if ((*pskb)->dev && (*pskb)->dev->hard_header_len && (*pskb)->mac.raw != (void*)ipv6h) {
-			if ((*pskb)->dev->type != ARPHRD_SIT){
+		if (skb->dev && skb->dev->hard_header_len && skb->mac.raw != (void*)ipv6h) {
+			if (skb->dev->type != ARPHRD_SIT){
 			  int i;
-			  unsigned char *p = (*pskb)->mac.raw;
-			  for (i = 0; i < (*pskb)->dev->hard_header_len; i++,p++)
+			  unsigned char *p = skb->mac.raw;
+			  for (i = 0; i < skb->dev->hard_header_len; i++,p++)
 				printk("%02x%c", *p,
-			       		i==(*pskb)->dev->hard_header_len - 1
+			       		i==skb->dev->hard_header_len - 1
 			       		? ' ':':');
 			} else {
 			  int i;
-			  unsigned char *p = (*pskb)->mac.raw;
-			  if ( p - (ETH_ALEN*2+2) > (*pskb)->head ){
+			  unsigned char *p = skb->mac.raw;
+			  if ( p - (ETH_ALEN*2+2) > skb->head ){
 			    p -= (ETH_ALEN+2);
 			    for (i = 0; i < (ETH_ALEN); i++,p++)
 				printk("%02x%s", *p,
@@ -309,10 +312,10 @@ ip6t_log_target(struct sk_buff **pskb,
 					i == ETH_ALEN-1 ? ' ' : ':');
 			  }
 			  
-			  if (((*pskb)->dev->addr_len == 4) &&
-			      (*pskb)->dev->hard_header_len > 20){
+			  if ((skb->dev->addr_len == 4) &&
+			      skb->dev->hard_header_len > 20){
 			    printk("TUNNEL=");
-			    p = (*pskb)->mac.raw + 12;
+			    p = skb->mac.raw + 12;
 			    for (i = 0; i < 4; i++,p++)
 				printk("%3d%s", *p,
 					i == 3 ? "->" : ".");
@@ -328,8 +331,39 @@ ip6t_log_target(struct sk_buff **pskb,
 	dump_packet(loginfo, ipv6h, 1);
 	printk("\n");
 	spin_unlock_bh(&log_lock);
+}
+
+static unsigned int
+ip6t_log_target(struct sk_buff **pskb,
+		unsigned int hooknum,
+		const struct net_device *in,
+		const struct net_device *out,
+		const void *targinfo,
+		void *userinfo)
+{
+	const struct ip6t_log_info *loginfo = targinfo;
+	char level_string[4] = "< >";
+
+	level_string[1] = '0' + (loginfo->level % 8);
+	ip6t_log_packet(hooknum, *pskb, in, out, loginfo, level_string, NULL);
 
 	return IP6T_CONTINUE;
+}
+
+static void
+ip6t_logfn(unsigned int hooknum,
+	   const struct sk_buff *skb,
+	   const struct net_device *in,
+	   const struct net_device *out,
+	   const char *prefix)
+{
+	struct ip6t_log_info loginfo = {
+		.level = 0,
+		.logflags = IP6T_LOG_MASK,
+		.prefix = ""
+	};
+
+	ip6t_log_packet(hooknum, skb, in, out, &loginfo, KERN_WARNING, prefix);
 }
 
 static int ip6t_log_checkentry(const char *tablename,
@@ -360,20 +394,27 @@ static int ip6t_log_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ip6t_target ip6t_log_reg
-= { { NULL, NULL }, "LOG", ip6t_log_target, ip6t_log_checkentry, NULL, 
-    THIS_MODULE };
+static struct ip6t_target ip6t_log_reg = {
+	.name 		= "LOG",
+	.target 	= ip6t_log_target, 
+	.checkentry	= ip6t_log_checkentry, 
+	.me 		= THIS_MODULE,
+};
 
 static int __init init(void)
 {
 	if (ip6t_register_target(&ip6t_log_reg))
 		return -EINVAL;
+	if (nflog)
+		nf_log_register(PF_INET6, &ip6t_logfn);
 
 	return 0;
 }
 
 static void __exit fini(void)
 {
+	if (nflog)
+		nf_log_unregister(PF_INET6, &ip6t_logfn);
 	ip6t_unregister_target(&ip6t_log_reg);
 }
 
