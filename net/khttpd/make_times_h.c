@@ -64,59 +64,52 @@ static int WeekGetDay(int D,int M,int Y)
 int main(void)
 {
 	int M,Y;
-	FILE *file;
-	
-	file=fopen("times.h","w");
-	
-	if (file==NULL) 
-		return 0; 
-	
-	fprintf(file,"static time_t TimeDays[10][13] = { \n");
-	
-	Y=1997;
-	while (Y<2007)
-	{
-		M=0;
-		fprintf(file," { ");
-		while (M<12)
-		{
-			fprintf(file,"%i",(int)GetDay(1,M,Y));
-     		  	fprintf(file,",\t");
-		
-			M++;
-		}
-		
-		fprintf(file,"%i } ",(int)GetDay(1,0,Y+1));
-		if (Y!=2006) fprintf(file,",");
-		fprintf(file,"\n");
-		Y++;
-	}
-	fprintf(file,"};\n");
 
-	fprintf(file,"static int WeekDays[10][13] = { \n");
+	printf("static time_t TimeDays[10][13] = { \n");
 	
 	Y=1997;
 	while (Y<2007)
 	{
 		M=0;
-		fprintf(file," { ");
+		printf(" { ");
 		while (M<12)
 		{
-			fprintf(file,"%i",(int)WeekGetDay(1,M,Y));
-     		  	fprintf(file,",\t");
+			printf("%i",(int)GetDay(1,M,Y));
+     		  	printf(",\t");
 		
 			M++;
 		}
 		
-		fprintf(file,"%i } ",(int)WeekGetDay(1,0,Y+1));
-		if (Y!=2006) fprintf(file,",");
-		fprintf(file,"\n");
+		printf("%i } ",(int)GetDay(1,0,Y+1));
+		if (Y!=2006) printf(",");
+		printf("\n");
 		Y++;
 	}
-	fprintf(file,"};\n");
-	fprintf(file,"#define KHTTPD_YEAROFFSET   1997\n");
-	fprintf(file,"#define KHTTPD_NUMYEARS     10\n");
-	(void)fclose(file);
+	printf("};\n");
+
+	printf("static int WeekDays[10][13] = { \n");
+	
+	Y=1997;
+	while (Y<2007)
+	{
+		M=0;
+		printf(" { ");
+		while (M<12)
+		{
+			printf("%i",(int)WeekGetDay(1,M,Y));
+     		  	printf(",\t");
+		
+			M++;
+		}
+		
+		printf("%i } ",(int)WeekGetDay(1,0,Y+1));
+		if (Y!=2006) printf(",");
+		printf("\n");
+		Y++;
+	}
+	printf("};\n");
+	printf("#define KHTTPD_YEAROFFSET   1997\n");
+	printf("#define KHTTPD_NUMYEARS     10\n");
 	
 	return 0;
 }

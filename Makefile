@@ -48,10 +48,34 @@ ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 1
 endif
 
-# 	Decide whether to build built-in, modular, or both
+# 	Decide whether to build built-in, modular, or both.
+#	Normally, just do built-in.
 
-KBUILD_MODULES := 1
+KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
+
+#	If we have only "make modules", don't compile built-in objects.
+
+ifeq ($(MAKECMDGOALS),modules)
+  KBUILD_BUILTIN :=
+endif
+
+#	If we have "make <whatever> modules", compile modules
+#	in addition to whatever we do anyway.
+
+ifneq ($(filter modules,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
+
+#	Just "make" or "make all" shall build modules as well
+
+ifeq ($(MAKECMDGOALS),)
+  KBUILD_MODULES := 1
+endif
+
+ifneq ($(filter all,$(MAKECMDGOALS)),)
+  KBUILD_MODULES := 1
+endif
 
 export KBUILD_MODULES KBUILD_BUILTIN
 
@@ -120,6 +144,8 @@ export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS
 export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE 
 export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
+SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
 		    clean mrproper distclean \
@@ -182,7 +208,7 @@ endif
 
 # Link components for vmlinux
 # ---------------------------------------------------------------------------
-SUBDIRS		:= init kernel mm fs ipc lib drivers sound net
+
 INIT		:= init/init.o
 CORE_FILES	:= kernel/kernel.o mm/mm.o fs/fs.o ipc/ipc.o
 LIBS		:= lib/lib.a
@@ -254,6 +280,7 @@ $(SUBDIRS): .hdepend prepare
 
 .PHONY: prepare
 prepare: include/linux/version.h include/asm include/config/MARKER
+	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
 
 # Single targets
 # ---------------------------------------------------------------------------
@@ -384,8 +411,7 @@ MODFLAGS += -include $(HPATH)/linux/modversions.h
 endif
 
 .PHONY: modules
-modules:
-	@$(MAKE) KBUILD_BUILTIN= $(SUBDIRS)
+modules: $(SUBDIRS)
 
 #	Install modules
 
@@ -549,6 +575,7 @@ CLEAN_FILES += \
 	drivers/char/consolemap_deftbl.c drivers/video/promcon_tbl.c \
 	drivers/char/conmakehash \
 	drivers/char/drm/*-mod.c \
+	drivers/char/defkeymap.c drivers/char/qtronixmap.c \
 	drivers/pci/devlist.h drivers/pci/classlist.h drivers/pci/gen-devlist \
 	drivers/zorro/devlist.h drivers/zorro/gen-devlist \
 	sound/oss/bin2hex sound/oss/hex2hex \
@@ -559,9 +586,12 @@ CLEAN_FILES += \
 	drivers/scsi/aic7xxx/aicasm/aicasm_scan.c \
 	drivers/scsi/aic7xxx/aicasm/y.tab.h \
 	drivers/scsi/aic7xxx/aicasm/aicasm \
-	drivers/scsi/53c700_d.h \
-	net/khttpd/make_times_h \
-	net/khttpd/times.h \
+	drivers/scsi/53c700_d.h drivers/scsi/sim710_d.h \
+	drivers/scsi/53c7xx_d.h drivers/scsi/53c7xx_u.h \
+	drivers/scsi/53c8xx_d.h drivers/scsi/53c8xx_u.h \
+	net/802/cl2llc.c net/802/transit/pdutr.h net/802/transit/timertr.h \
+	net/802/pseudo/pseudocode.h \
+	net/khttpd/make_times_h net/khttpd/times.h \
 	submenu*
 
 # 	files removed with 'make mrproper'

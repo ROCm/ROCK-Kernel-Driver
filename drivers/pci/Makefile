@@ -34,7 +34,13 @@ host-progs := gen-devlist
 
 include $(TOPDIR)/Rules.make
 
-names.o: devlist.h classlist.h
+# Dependencies on generated files need to be listed explicitly
 
-devlist.h classlist.h: pci.ids gen-devlist
-	./gen-devlist <pci.ids
+$(obj)/names.o: $(obj)/devlist.h $(obj)/classlist.h
+
+# And that's how to generate them
+
+$(obj)/devlist.h: $(src)/pci.ids $(obj)/gen-devlist
+	$(obj)/gen-devlist < $<
+
+$(obj)/classlist.h: $(obj)/devlist.h
