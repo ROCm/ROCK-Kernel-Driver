@@ -132,7 +132,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 	}
 
 	if (cpu_has_pse && (atomic_read(&kpte_page->count) == 1)) { 
-		list_add(&kpte_page->list, &df_list);
+		list_add(&kpte_page->lru, &df_list);
 		revert_page(kpte_page, address);
 	} 
 	return 0;
@@ -185,7 +185,7 @@ void global_flush_tlb(void)
 	flush_map();
 	n = l.next;
 	while (n != &l) {
-		struct page *pg = list_entry(n, struct page, list);
+		struct page *pg = list_entry(n, struct page, lru);
 		n = n->next;
 		__free_page(pg);
 	}
