@@ -1108,7 +1108,7 @@ static void rebalance_tick(runqueue_t *this_rq, int idle)
 #endif
 		if (!(j % IDLE_REBALANCE_TICK)) {
 			spin_lock(&this_rq->lock);
-			load_balance(this_rq, 0, cpu_to_node_mask(this_cpu));
+			load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
 			spin_unlock(&this_rq->lock);
 		}
 		return;

@@ -377,6 +377,15 @@ config ARM_THUMB
 
 	  If you don't know what this all is, saying Y is a safe choice.
 
+config CPU_BIG_ENDIAN
+	bool "Build big-endian kernel"
+	depends on ARCH_SUPPORTS_BIG_ENDIAN
+	help
+	  Say Y if you plan on running a kernel in big-endian mode.
+	  Note that your board must be properly built and your board
+	  port must properly enable and big-endian related features
+	  of your chipset/board/processor.
+
 config CPU_ICACHE_DISABLE
 	bool "Disable I-Cache"
 	depends on CPU_ARM920T || CPU_ARM922T || CPU_ARM926T || CPU_ARM1020

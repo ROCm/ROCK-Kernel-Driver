@@ -21,13 +21,6 @@
 
 #include <linux/config.h>
 
-typedef struct erase_busy_t {
-    eraseq_entry_t	*erase;
-    client_handle_t	client;
-    struct timer_list	timeout;
-    struct erase_busy_t	*prev, *next;
-} erase_busy_t;
-
 #define ERASEQ_MAGIC	0xFA67
 typedef struct eraseq_t {
     u_short		eraseq_magic;
@@ -39,7 +32,7 @@ typedef struct eraseq_t {
 #define CLIENT_MAGIC 	0x51E6
 typedef struct client_t {
     u_short		client_magic;
-    socket_t		Socket;
+    struct pcmcia_socket *Socket;
     u_char		Function;
     dev_info_t		dev_info;
     u_int		Attributes;
@@ -62,23 +55,6 @@ typedef struct client_t {
 #define CLIENT_STALE		0x0010
 #define CLIENT_WIN_REQ(i)	(0x20<<(i))
 #define CLIENT_CARDBUS		0x8000
-
-typedef struct io_window_t {
-    u_int		Attributes;
-    ioaddr_t		BasePort, NumPorts;
-    ioaddr_t		InUse, Config;
-} io_window_t;
-
-#define WINDOW_MAGIC	0xB35C
-typedef struct window_t {
-    u_short		magic;
-    u_short		index;
-    client_handle_t	handle;
-    struct socket_info_t *sock;
-    u_long		base;
-    u_long		size;
-    pccard_mem_map	ctl;
-} window_t;
 
 #define REGION_MAGIC	0xE3C9
 typedef struct region_t {
@@ -108,12 +84,6 @@ typedef struct config_t {
     } irq;
 } config_t;
 
-/* Maximum number of IO windows per socket */
-#define MAX_IO_WIN 2
-
-/* Maximum number of memory windows per socket */
-#define MAX_WIN 4
-
 struct cis_cache_entry {
 	struct list_head	node;
 	unsigned int		addr;
@@ -121,48 +91,6 @@ struct cis_cache_entry {
 	unsigned int		attr;
 	unsigned char		cache[0];
 };
-
-typedef struct socket_info_t {
-    spinlock_t			lock;
-    struct pccard_operations *	ss_entry;
-    u_int			sock;
-    socket_state_t		socket;
-    socket_cap_t		cap;
-    u_int			state;
-    u_short			functions;
-    u_short			lock_count;
-    client_handle_t		clients;
-    u_int			real_clients;
-    pccard_mem_map		cis_mem;
-    u_char			*cis_virt;
-    config_t			*config;
-#ifdef CONFIG_CARDBUS
-    struct resource *		cb_cis_res;
-    u_char			*cb_cis_virt;
-#endif
-    struct {
-	u_int			AssignedIRQ;
-	u_int			Config;
-    } irq;
-    io_window_t			io[MAX_IO_WIN];
-    window_t			win[MAX_WIN];
-    region_t			*c_region, *a_region;
-    erase_busy_t		erase_busy;
-    struct list_head		cis_cache;
-    u_int			fake_cis_len;
-    char			*fake_cis;
-#ifdef CONFIG_PROC_FS
-    struct proc_dir_entry	*proc;
-#endif
-
-    struct semaphore		skt_sem;	/* protects socket h/w state */
-
-    struct task_struct		*thread;
-    struct completion		thread_done;
-    wait_queue_head_t		thread_wait;
-    spinlock_t			thread_lock;	/* protects thread_events */
-    unsigned int		thread_events;
-} socket_info_t;
 
 /* Flags in config state */
 #define CONFIG_LOCKED		0x01
@@ -187,7 +115,7 @@ typedef struct socket_info_t {
 #define CHECK_SOCKET(s) \
     (((s) >= sockets) || (socket_table[s]->ss_entry == NULL))
 
-#define SOCKET(h) (socket_table[(h)->Socket])
+#define SOCKET(h) (h->Socket)
 #define CONFIG(h) (&SOCKET(h)->config[(h)->Function])
 
 #define CHECK_REGION(r) \
@@ -200,19 +128,19 @@ typedef struct socket_info_t {
     ((h)->event_handler((e), (p), &(h)->event_callback_args))
 
 /* In cardbus.c */
-int cb_alloc(socket_info_t *s);
-void cb_free(socket_info_t *s);
-int read_cb_mem(socket_info_t *s, int space, u_int addr, u_int len, void *ptr);
+int cb_alloc(struct pcmcia_socket *s);
+void cb_free(struct pcmcia_socket *s);
+int read_cb_mem(struct pcmcia_socket *s, int space, u_int addr, u_int len, void *ptr);
 
 /* In cistpl.c */
-int read_cis_mem(socket_info_t *s, int attr,
+int read_cis_mem(struct pcmcia_socket *s, int attr,
 		 u_int addr, u_int len, void *ptr);
-void write_cis_mem(socket_info_t *s, int attr,
+void write_cis_mem(struct pcmcia_socket *s, int attr,
 		   u_int addr, u_int len, void *ptr);
-void release_cis_mem(socket_info_t *s);
-void destroy_cis_cache(socket_info_t *s);
-int verify_cis_cache(socket_info_t *s);
-void preload_cis_cache(socket_info_t *s);
+void release_cis_mem(struct pcmcia_socket *s);
+void destroy_cis_cache(struct pcmcia_socket *s);
+int verify_cis_cache(struct pcmcia_socket *s);
+void preload_cis_cache(struct pcmcia_socket *s);
 int get_first_tuple(client_handle_t handle, tuple_t *tuple);
 int get_next_tuple(client_handle_t handle, tuple_t *tuple);
 int get_tuple_data(client_handle_t handle, tuple_t *tuple);
@@ -236,11 +164,11 @@ int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
 int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
-void validate_mem(socket_info_t *s);
+void validate_mem(struct pcmcia_socket *s);
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
-		   char *name, socket_info_t *s);
+		   char *name, struct pcmcia_socket *s);
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, socket_info_t *s);
+		    int force_low, char *name, struct pcmcia_socket *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);
@@ -250,9 +178,8 @@ int proc_read_io(char *buf, char **start, off_t pos,
 int proc_read_mem(char *buf, char **start, off_t pos,
 		  int count, int *eof, void *data);
 
-#define MAX_SOCK 8
-extern socket_t sockets;
-extern socket_info_t *socket_table[MAX_SOCK];
+extern struct rw_semaphore pcmcia_socket_list_rwsem;
+extern struct list_head pcmcia_socket_list;
 
 #ifdef CONFIG_PROC_FS
 extern struct proc_dir_entry *proc_pccard;

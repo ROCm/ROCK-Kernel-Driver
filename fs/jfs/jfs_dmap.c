@@ -3050,7 +3050,7 @@ int blkstol2(s64 nb)
  * RETURN VALUES:
  *      none
  */
-void fsDirty()
+void fsDirty(void)
 {
 	printk("fsDirty(): bye-bye\n");
 	assert(0);

@@ -59,17 +59,63 @@ static struct acpi_driver acpi_pci_root_driver = {
 			},
 };
 
- struct acpi_pci_root {
+struct acpi_pci_root {
 	struct list_head	node;
- 	acpi_handle		handle;
- 	struct acpi_pci_id	id;
- 	struct pci_bus		*bus;
+	acpi_handle		handle;
+	struct acpi_pci_id	id;
+	struct pci_bus		*bus;
 	u64			mem_tra;
 	u64			io_tra;
- };
+};
 
 struct list_head		acpi_pci_roots;
 
+static struct acpi_pci_driver *sub_driver;
+
+int acpi_pci_register_driver(struct acpi_pci_driver *driver)
+{
+	int n = 0;
+	struct list_head *entry;
+
+	struct acpi_pci_driver **pptr = &sub_driver;
+	while (*pptr)
+		pptr = &(*pptr)->next;
+	*pptr = driver;
+
+	if (!driver->add)
+		return 0;
+
+	list_for_each(entry, &acpi_pci_roots) {
+		struct acpi_pci_root *root;
+		root = list_entry(entry, struct acpi_pci_root, node);
+		driver->add(root->handle);
+		n++;
+	}
+
+	return n;
+}
+
+void acpi_pci_unregister_driver(struct acpi_pci_driver *driver)
+{
+	struct list_head *entry;
+
+	struct acpi_pci_driver **pptr = &sub_driver;
+	while (*pptr) {
+		if (*pptr != driver)
+			continue;
+		*pptr = (*pptr)->next;
+		break;
+	}
+
+	if (!driver->remove)
+		return;
+
+	list_for_each(entry, &acpi_pci_roots) {
+		struct acpi_pci_root *root;
+		root = list_entry(entry, struct acpi_pci_root, node);
+		driver->remove(root->handle);
+	}
+}
 
 void
 acpi_pci_get_translations (

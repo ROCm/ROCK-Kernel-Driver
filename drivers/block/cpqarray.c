@@ -1028,7 +1028,7 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 	int diskinfo[4];
 	struct hd_geometry *geo = (struct hd_geometry *)arg;
 	ida_ioctl_t *io = (ida_ioctl_t*)arg;
-	ida_ioctl_t my_io;
+	ida_ioctl_t *my_io;
 
 	switch(cmd) {
 	case HDIO_GETGEO:
@@ -1051,12 +1051,24 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 			return -EFAULT;
 		return 0;
 	case IDAPASSTHRU:
-		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
-		if (copy_from_user(&my_io, io, sizeof(my_io)))
-			return -EFAULT;
-		error = ida_ctlr_ioctl(host, drv - host->drv, &my_io);
-		if (error) return error;
-		return copy_to_user(io, &my_io, sizeof(my_io)) ? -EFAULT : 0;
+		if (!capable(CAP_SYS_RAWIO))
+			return -EPERM;
+		my_io = kmalloc(sizeof(ida_ioctl_t), GFP_KERNEL);
+		if (!my_io)
+			return -ENOMEM;
+		error = -EFAULT;
+		if (copy_from_user(my_io, io, sizeof(*my_io)))
+			goto out_passthru;
+		error = ida_ctlr_ioctl(host, drv - host->drv, my_io);
+		if (error)
+			goto out_passthru;
+		error = -EFAULT;
+		if (copy_to_user(io, &my_io, sizeof(*my_io)))
+			goto out_passthru;
+		error = 0;
+out_passthru:
+		kfree(my_io);
+		return error;
 	case IDAGETCTLRSIG:
 		if (!arg) return -EINVAL;
 		put_user(host->ctlr_sig, (int*)arg);

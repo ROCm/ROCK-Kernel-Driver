@@ -93,7 +93,7 @@ static int linear_run (mddev_t *mddev)
 			GFP_KERNEL);
 	if (!conf)
 		goto out;
-	memset(conf, 0, sizeof(*conf));
+	memset(conf, 0, sizeof(*conf) + mddev->raid_disks*sizeof(dev_info_t));
 	mddev->private = conf;
 
 	/*

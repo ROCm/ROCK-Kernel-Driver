@@ -20,7 +20,7 @@ static inline unsigned long xapic_phys_to_log_apicid(int phys_apic)
 
 static inline unsigned long target_cpus(void)
 {
-	return XAPIC_DEST_CPUS_MASK;
+	return (~0UL);
 } 
 #define TARGET_CPUS	(target_cpus())
 
@@ -141,7 +141,7 @@ static inline unsigned int cpu_mask_to_apicid (unsigned long cpumask)
 			if (apicid_cluster(apicid) != 
 					apicid_cluster(new_apicid)){
 				printk ("%s: Not a valid mask!\n",__FUNCTION__);
-				return TARGET_CPUS;
+				return 0xFF;
 			}
 			apicid = apicid | new_apicid;
 			cpus_found++;

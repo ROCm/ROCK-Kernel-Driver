@@ -4225,8 +4225,7 @@ int xtDisplayPage(struct inode *ip, s64 bn, xtpage_t * p)
  *      at the current entry at the current subtree root page
  *
  */
-int xtGather(t)
-btree_t *t;
+int xtGather(btree_t *t)
 {
 	int rc = 0;
 	xtpage_t *p;

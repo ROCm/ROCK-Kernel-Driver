@@ -6,7 +6,7 @@
 
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
 
-#define TARGET_CPUS (0xf)
+#define TARGET_CPUS (~0UL)
 
 #define NO_BALANCE_IRQ (1)
 #define esr_disable (1)

@@ -12,7 +12,7 @@
  * add themselves as children of the system bus.
  */
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/sysdev.h>
 #include <linux/err.h>
@@ -62,6 +62,19 @@ static struct kobj_type ktype_sysdev = {
 	.sysfs_ops	= &sysfs_ops,
 };
 
+
+int sysdev_create_file(struct sys_device * s, struct sysdev_attribute * a)
+{
+	return sysfs_create_file(&s->kobj,&a->attr);
+}
+
+
+void sysdev_remove_file(struct sys_device * s, struct sysdev_attribute * a)
+{
+	sysfs_remove_file(&s->kobj,&a->attr);
+}
+
+
 /* 
  * declare system_subsys 
  */
@@ -104,9 +117,16 @@ int sysdev_driver_register(struct sysdev_class * cls,
 			   struct sysdev_driver * drv)
 {
 	down_write(&system_subsys.rwsem);
-	if (cls && kset_get(&cls->kset))
+	if (cls && kset_get(&cls->kset)) {
 		list_add_tail(&drv->entry,&cls->drivers);
-	else
+
+		/* If devices of this class already exist, tell the driver */
+		if (drv->add) {
+			struct sys_device *dev;
+			list_for_each_entry(dev, &cls->kset.list, kobj.entry)
+				drv->add(dev);
+		}
+	} else
 		list_add_tail(&drv->entry,&global_drivers);
 	up_write(&system_subsys.rwsem);
 	return 0;
@@ -123,8 +143,14 @@ void sysdev_driver_unregister(struct sysdev_class * cls,
 {
 	down_write(&system_subsys.rwsem);
 	list_del_init(&drv->entry);
-	if (cls)
+	if (cls) {
+		if (drv->remove) {
+			struct sys_device *dev;
+			list_for_each_entry(dev, &cls->kset.list, kobj.entry)
+				drv->remove(dev);
+		}
 		kset_put(&cls->kset);
+	}
 	up_write(&system_subsys.rwsem);
 }
 
@@ -157,7 +183,7 @@ int sys_device_register(struct sys_device * sysdev)
 	if (!error) {
 		struct sysdev_driver * drv;
 
-		down_read(&system_subsys.rwsem);
+		down_write(&system_subsys.rwsem);
 		/* Generic notification is implicit, because it's that 
 		 * code that should have called us. 
 		 */
@@ -173,7 +199,7 @@ int sys_device_register(struct sys_device * sysdev)
 			if (drv->add)
 				drv->add(sysdev);
 		}
-		up_read(&system_subsys.rwsem);
+		up_write(&system_subsys.rwsem);
 	}
 	return error;
 }
@@ -182,7 +208,7 @@ void sys_device_unregister(struct sys_device * sysdev)
 {
 	struct sysdev_driver * drv;
 
-	down_read(&system_subsys.rwsem);
+	down_write(&system_subsys.rwsem);
 	list_for_each_entry(drv,&global_drivers,entry) {
 		if (drv->remove)
 			drv->remove(sysdev);
@@ -192,7 +218,10 @@ void sys_device_unregister(struct sys_device * sysdev)
 		if (drv->remove)
 			drv->remove(sysdev);
 	}
-	up_read(&system_subsys.rwsem);
+
+	list_del_init(&sysdev->entry);
+
+	up_write(&system_subsys.rwsem);
 
 	kobject_unregister(&sysdev->kobj);
 }

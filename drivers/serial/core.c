@@ -2189,11 +2189,11 @@ int uart_register_driver(struct uart_driver *drv)
 void uart_unregister_driver(struct uart_driver *drv)
 {
 	struct tty_driver *p = drv->tty_driver;
-	drv->tty_driver = NULL;
 	tty_unregister_driver(p);
 	kfree(drv->state);
-	kfree(drv->tty_driver->termios);
-	kfree(drv->tty_driver);
+	kfree(p->termios);
+	kfree(p);
+	drv->tty_driver = NULL;
 }
 
 struct tty_driver *uart_console_device(struct console *co, int *index)

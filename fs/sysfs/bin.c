@@ -22,7 +22,7 @@ fill_read(struct dentry *dentry, char *buffer, loff_t off, size_t count)
 }
 
 static ssize_t
-read(struct file * file, char * userbuf, size_t count, loff_t * off)
+read(struct file * file, char __user * userbuf, size_t count, loff_t * off)
 {
 	char *buffer = file->private_data;
 	struct dentry *dentry = file->f_dentry;
@@ -65,7 +65,7 @@ flush_write(struct dentry *dentry, char *buffer, loff_t offset, size_t count)
 	return attr->write(kobj, buffer, offset, count);
 }
 
-static ssize_t write(struct file * file, const char * userbuf,
+static ssize_t write(struct file * file, const char __user * userbuf,
 		     size_t count, loff_t * off)
 {
 	char *buffer = file->private_data;

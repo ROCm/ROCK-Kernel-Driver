@@ -252,14 +252,15 @@ int kobject_add(struct kobject * kobj)
 
 	if (kobj->kset) {
 		down_write(&kobj->kset->subsys->rwsem);
-		if (parent) 
-			list_add_tail(&kobj->entry,&parent->entry);
-		else {
-			list_add_tail(&kobj->entry,&kobj->kset->list);
-			kobj->parent = kobject_get(&kobj->kset->kobj);
-		}
+
+		if (!parent)
+			parent = kobject_get(&kobj->kset->kobj);
+
+		list_add_tail(&kobj->entry,&kobj->kset->list);
 		up_write(&kobj->kset->subsys->rwsem);
 	}
+	kobj->parent = parent;
+
 	error = create_dir(kobj);
 	if (error)
 		unlink(kobj);

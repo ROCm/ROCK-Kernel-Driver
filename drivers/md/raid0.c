@@ -90,6 +90,9 @@ static int create_strip_zones (mddev_t *mddev)
 
 	memset(conf->strip_zone, 0,sizeof(struct strip_zone)*
 				   conf->nr_strip_zones);
+	memset(conf->devlist, 0,
+	       sizeof(mdk_rdev_t*) * conf->nr_strip_zones * mddev->raid_disks);
+
 	/* The first zone must contain all devices, so here we check that
 	 * there is a proper alignment of slots to devices and find them all
 	 */
