@@ -170,7 +170,6 @@ struct nfs_inode {
 #define NFS_INO_REVALIDATING	0x0004		/* revalidating attrs */
 #define NFS_IS_SNAPSHOT		0x0010		/* a snapshot file */
 #define NFS_INO_FLUSH		0x0020		/* inode is due for flushing */
-#define NFS_INO_NEW		0x0040		/* hadn't been filled yet */
 
 static inline struct nfs_inode *NFS_I(struct inode *inode)
 {
@@ -208,7 +207,6 @@ do { \
 #define NFS_FLAGS(inode)		(NFS_I(inode)->flags)
 #define NFS_REVALIDATING(inode)		(NFS_FLAGS(inode) & NFS_INO_REVALIDATING)
 #define NFS_STALE(inode)		(NFS_FLAGS(inode) & NFS_INO_STALE)
-#define NFS_NEW(inode)			(NFS_FLAGS(inode) & NFS_INO_NEW)
 
 #define NFS_FILEID(inode)		(NFS_I(inode)->fileid)
 

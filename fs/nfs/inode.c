@@ -47,7 +47,6 @@ static void nfs_invalidate_inode(struct inode *);
 
 static struct inode *nfs_alloc_inode(struct super_block *sb);
 static void nfs_destroy_inode(struct inode *);
-static void nfs_read_inode(struct inode *);
 static void nfs_write_inode(struct inode *,int);
 static void nfs_delete_inode(struct inode *);
 static void nfs_put_super(struct super_block *);
@@ -59,7 +58,6 @@ static int  nfs_show_options(struct seq_file *, struct vfsmount *);
 static struct super_operations nfs_sops = { 
 	alloc_inode:	nfs_alloc_inode,
 	destroy_inode:	nfs_destroy_inode,
-	read_inode:	nfs_read_inode,
 	write_inode:	nfs_write_inode,
 	delete_inode:	nfs_delete_inode,
 	put_super:	nfs_put_super,
@@ -96,15 +94,6 @@ static inline unsigned long
 nfs_fattr_to_ino_t(struct nfs_fattr *fattr)
 {
 	return nfs_fileid_to_ino_t(fattr->fileid);
-}
-
-/*
- * The "read_inode" function doesn't actually do anything:
- * the real data is filled in later in nfs_fhget.
- */
-static void
-nfs_read_inode(struct inode * inode)
-{
 }
 
 static void
@@ -664,16 +653,15 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 
 	ino = nfs_fattr_to_ino_t(fattr);
 
-	if (!(inode = iget4(sb, ino, nfs_find_actor, nfs_init_locked, &desc)))
+	if (!(inode = iget5_locked(sb, ino, nfs_find_actor, nfs_init_locked, &desc)))
 		goto out_no_inode;
 
-	if (NFS_NEW(inode)) {
+	if (inode->i_state & I_NEW) {
 		__u64		new_size, new_mtime;
 		loff_t		new_isize;
 		time_t		new_atime;
 
 		/* We can't support UPDATE_ATIME(), since the server will reset it */
-		NFS_FLAGS(inode) &= ~NFS_INO_NEW;
 		inode->i_flags |= S_NOATIME;
 		inode->i_mode = fattr->mode;
 		/* Why so? Because we want revalidate for devices/FIFOs, and
@@ -721,6 +709,8 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
+
+		unlock_new_inode(inode);
 	} else
 		nfs_refresh_inode(inode, fattr);
 	dprintk("NFS: __nfs_fhget(%s/%Ld ct=%d)\n",
@@ -1241,7 +1231,7 @@ static struct inode *nfs_alloc_inode(struct super_block *sb)
 	nfsi = (struct nfs_inode *)kmem_cache_alloc(nfs_inode_cachep, SLAB_KERNEL);
 	if (!nfsi)
 		return NULL;
-	nfsi->flags = NFS_INO_NEW;
+	nfsi->flags = 0;
 	nfsi->mm_cred = NULL;
 	return &nfsi->vfs_inode;
 }

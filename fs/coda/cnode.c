@@ -72,12 +72,20 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 			 struct coda_vattr * attr)
 {
 	struct inode *inode;
+	struct coda_inode_info *cii;
+	struct coda_sb_info *sbi = coda_sbp(sb);
 	ino_t ino = coda_f2i(fid);
 
-	inode = iget4(sb, ino, coda_test_inode, coda_set_inode, fid);
+	inode = iget5_locked(sb, ino, coda_test_inode, coda_set_inode, fid);
 
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
+
+	if (inode->i_state & I_NEW) {
+		cii = ITOC(inode);
+		list_add(&cii->c_cilist, &sbi->sbi_cihead);
+		unlock_new_inode(inode);
+	}
 
 	/* always replace the attributes, type might have changed */
 	coda_fill_inode(inode, attr);
@@ -141,12 +149,13 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 	}
 
 	nr = coda_f2i(fid);
-	inode = iget4(sb, nr, coda_test_inode, coda_fail_inode, fid);
-	if ( !inode ) {
-		printk("coda_fid_to_inode: null from iget, sb %p, nr %ld.\n",
-		       sb, (long)nr);
+	inode = iget5_locked(sb, nr, coda_test_inode, coda_fail_inode, fid);
+	if ( !inode )
 		return NULL;
-	}
+
+	/* we should never see newly created inodes because we intentionally
+	 * fail in the initialization callback */
+	BUG_ON(inode->i_state & I_NEW);
 
 	return inode;
 }
@@ -156,8 +165,9 @@ int coda_cnode_makectl(struct inode **inode, struct super_block *sb)
 {
 	int error = -ENOMEM;
 
-	*inode = iget(sb, CTL_INO);
-	if ( *inode ) {
+	*inode = new_inode(sb);
+	if (*inode) {
+		(*inode)->i_ino = CTL_INO;
 		(*inode)->i_op = &coda_ioctl_inode_operations;
 		(*inode)->i_fop = &coda_ioctl_operations;
 		(*inode)->i_mode = 0444;
