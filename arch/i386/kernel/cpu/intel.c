@@ -232,15 +232,19 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	if (c->x86 == 6) {
 		switch (c->x86_model) {
 		case 5:
-			if (l2 == 0)
-				p = "Celeron (Covington)";
-			if (l2 == 256)
-				p = "Mobile Pentium II (Dixon)";
+			if (c->x86_mask == 0) {
+				if (l2 == 0)
+					p = "Celeron (Covington)";
+				else if (l2 == 256)
+					p = "Mobile Pentium II (Dixon)";
+			}
 			break;
 			
 		case 6:
 			if (l2 == 128)
 				p = "Celeron (Mendocino)";
+			else if (c->x86_mask == 0 || c->x86_mask == 5)
+				p = "Celeron-A";
 			break;
 			
 		case 8:
@@ -348,6 +352,26 @@ static struct cpu_dev intel_cpu_dev __initdata = {
 			  [4] "Pentium MMX",
 			  [7] "Mobile Pentium 75 - 200", 
 			  [8] "Mobile Pentium MMX"
+		  }
+		},
+		{ X86_VENDOR_INTEL,     6,
+		  { 
+			  [0] "Pentium Pro A-step",
+			  [1] "Pentium Pro", 
+			  [3] "Pentium II (Klamath)", 
+			  [4] "Pentium II (Deschutes)", 
+			  [5] "Pentium II (Deschutes)", 
+			  [6] "Mobile Pentium II",
+			  [7] "Pentium III (Katmai)", 
+			  [8] "Pentium III (Coppermine)", 
+			  [10] "Pentium III (Cascades)",
+			  [11] "Pentium III (Tualatin)",
+		  }
+		},
+		{ X86_VENDOR_INTEL,     15,
+		  {
+			  [1] "Pentium 4 (Unknown)",
+			  [5] "Pentium 4 (Foster)",
 		  }
 		},
 	},
