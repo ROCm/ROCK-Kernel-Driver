@@ -735,6 +735,7 @@ static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 
 	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
 	    SLAB_CTOR_CONSTRUCTOR) {
+		spin_lock_init(&ei->cache_lru_lock);
 		ei->nr_caches = 0;
 		INIT_LIST_HEAD(&ei->cache_lru);
 		INIT_HLIST_NODE(&ei->i_fat_hash);
@@ -820,7 +821,6 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	if (error)
 		goto out_fail;
 
-	spin_lock_init(&MSDOS_SB(sb)->cache_lock);
 	/* set up enough so that it can read an inode */
 	init_MUTEX(&sbi->fat_lock);
 

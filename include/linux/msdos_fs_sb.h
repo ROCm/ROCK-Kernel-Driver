@@ -48,8 +48,6 @@ struct msdos_sb_info {
 	void *dir_ops;		     /* Opaque; default directory operations */
 	int dir_per_block;	     /* dir entries per block */
 	int dir_per_block_bits;	     /* log2(dir_per_block) */
-
-	spinlock_t cache_lock;
 };
 
 #endif

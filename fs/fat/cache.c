@@ -85,11 +85,10 @@ static int fat_cache_lookup(struct inode *inode, int fclus,
 {
 	static struct fat_cache nohit = { .fcluster = 0, };
 
-	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	struct fat_cache *hit = &nohit, *p;
 	int offset = -1;
 
-	spin_lock(&sbi->cache_lock);
+	spin_lock(&MSDOS_I(inode)->cache_lru_lock);
 	debug_pr("FAT: %s, fclus %d", __FUNCTION__, fclus);
 	list_for_each_entry(p, &MSDOS_I(inode)->cache_lru, cache_list) {
 		if (p->fcluster <= fclus && hit->fcluster < p->fcluster) {
@@ -113,7 +112,7 @@ static int fat_cache_lookup(struct inode *inode, int fclus,
 		*cached_dclus = cache->dcluster + offset;
 	}
 	debug_pr("\n");
-	spin_unlock(&sbi->cache_lock);
+	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 
 	return offset;
 }
@@ -141,7 +140,6 @@ static struct fat_cache *fat_cache_merge(struct inode *inode,
 
 static void fat_cache_add(struct inode *inode, struct fat_cache *new)
 {
-	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	struct fat_cache *cache, *tmp;
 
 	debug_pr("FAT: %s: fclus %d, dclus %d, cont %d\n", __FUNCTION__,
@@ -150,15 +148,15 @@ static void fat_cache_add(struct inode *inode, struct fat_cache *new)
 	if (new->fcluster == -1) /* dummy cache */
 		return;
 
-	spin_lock(&sbi->cache_lock);
+	spin_lock(&MSDOS_I(inode)->cache_lru_lock);
 	cache = fat_cache_merge(inode, new);
 	if (cache == NULL) {
 		if (MSDOS_I(inode)->nr_caches < fat_max_cache(inode)) {
 			MSDOS_I(inode)->nr_caches++;
-			spin_unlock(&sbi->cache_lock);
+			spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 
 			tmp = fat_cache_alloc(inode);
-			spin_lock(&sbi->cache_lock);
+			spin_lock(&MSDOS_I(inode)->cache_lru_lock);
 			cache = fat_cache_merge(inode, new);
 			if (cache != NULL) {
 				MSDOS_I(inode)->nr_caches--;
@@ -183,7 +181,7 @@ out:
 		       cache->fcluster, cache->dcluster, cache->nr_contig);
 	}
 	debug_pr("\n");
-	spin_unlock(&sbi->cache_lock);
+	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 }
 
 /*
@@ -205,9 +203,9 @@ static void __fat_cache_inval_inode(struct inode *inode)
 
 void fat_cache_inval_inode(struct inode *inode)
 {
-	spin_lock(&MSDOS_SB(inode->i_sb)->cache_lock);
+	spin_lock(&MSDOS_I(inode)->cache_lru_lock);
 	__fat_cache_inval_inode(inode);
-	spin_unlock(&MSDOS_SB(inode->i_sb)->cache_lock);
+	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 }
 
 int __fat_access(struct super_block *sb, int nr, int new_value)

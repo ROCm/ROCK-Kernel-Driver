@@ -8,6 +8,7 @@
  */
 
 struct msdos_inode_info {
+	spinlock_t cache_lru_lock;
 	struct list_head cache_lru;
 	int nr_caches;
 
