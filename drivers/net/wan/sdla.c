@@ -1669,7 +1669,7 @@ static int __init init_sdla(void)
 
 	err = register_netdev(sdla);
 	if (err) 
-		kfree(sdla);
+		free_netdev(sdla);
 
 	return err;
 }
