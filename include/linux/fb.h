@@ -449,6 +449,7 @@ struct fb_info {
 
 extern int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info); 
 extern int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info); 
+extern int fb_blank(int blank, struct fb_info *info);
 extern int soft_cursor(struct fb_info *info, struct fb_cursor *cursor);
 extern void cfb_fillrect(struct fb_info *info, struct fb_fillrect *rect); 
 extern void cfb_copyarea(struct fb_info *info, struct fb_copyarea *area); 
