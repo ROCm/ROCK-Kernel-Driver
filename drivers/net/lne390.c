@@ -49,6 +49,8 @@ static const char *version =
 
 #include "8390.h"
 
+#define DRV_NAME "lne390"
+
 static int lne390_probe1(struct net_device *dev, int ioaddr);
 
 static int lne390_open(struct net_device *dev);
@@ -112,7 +114,7 @@ static int __init do_lne390_probe(struct net_device *dev)
 	SET_MODULE_OWNER(dev);
 
 	if (ioaddr > 0x1ff) {		/* Check a single specified location. */
-		if (!request_region(ioaddr, LNE390_IO_EXTENT, dev->name))
+		if (!request_region(ioaddr, LNE390_IO_EXTENT, DRV_NAME))
 			return -EBUSY;
 		ret = lne390_probe1(dev, ioaddr);
 		if (ret)
@@ -131,7 +133,7 @@ static int __init do_lne390_probe(struct net_device *dev)
 
 	/* EISA spec allows for up to 16 slots, but 8 is typical. */
 	for (ioaddr = 0x1000; ioaddr < 0x9000; ioaddr += 0x1000) {
-		if (!request_region(ioaddr, LNE390_IO_EXTENT, dev->name))
+		if (!request_region(ioaddr, LNE390_IO_EXTENT, DRV_NAME))
 			continue;
 		if (lne390_probe1(dev, ioaddr) == 0)
 			return 0;
@@ -230,7 +232,7 @@ static int __init lne390_probe1(struct net_device *dev, int ioaddr)
 	}
 	printk(" IRQ %d,", dev->irq);
 
-	if ((ret = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev))) {
+	if ((ret = request_irq(dev->irq, ei_interrupt, 0, DRV_NAME, dev))) {
 		printk (" unable to get IRQ %d.\n", dev->irq);
 		return ret;
 	}

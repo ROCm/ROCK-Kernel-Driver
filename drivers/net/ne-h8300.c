@@ -34,6 +34,8 @@ static const char version1[] =
 
 #include "8390.h"
 
+#define DRV_NAME "ne-h8300"
+
 /* Some defines that people can play with if so inclined. */
 
 /* Do we perform extra sanity checks on stuff ? */
@@ -202,7 +204,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 	struct ei_device *ei_local = (struct ei_device *) netdev_priv(dev);
 	unsigned char bus_width;
 
-	if (!request_region(ioaddr, NE_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, NE_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	reg0 = inb_p(ioaddr);

@@ -493,7 +493,7 @@ static int __init eth16i_probe1(struct net_device *dev, int ioaddr)
 	int retval;
 
 	/* Let's grab the region */
-	if (!request_region(ioaddr, ETH16I_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, ETH16I_IO_EXTENT, cardname))
 		return -EBUSY;
 
 	/*
@@ -540,9 +540,9 @@ static int __init eth16i_probe1(struct net_device *dev, int ioaddr)
 
 	/* Try to obtain interrupt vector */
 
-	if ((retval = request_irq(dev->irq, (void *)&eth16i_interrupt, 0, dev->name, dev))) {
-		printk(KERN_WARNING "%s: %s at %#3x, but is unusable due conflicting IRQ %d.\n", 
-		       dev->name, cardname, ioaddr, dev->irq);
+	if ((retval = request_irq(dev->irq, (void *)&eth16i_interrupt, 0, cardname, dev))) {
+		printk(KERN_WARNING "%s at %#3x, but is unusable due to conflicting IRQ %d.\n", 
+		       cardname, ioaddr, dev->irq);
 		goto out;
 	}
 

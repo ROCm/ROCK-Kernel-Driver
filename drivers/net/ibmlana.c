@@ -97,6 +97,8 @@ History:
 
 #undef DEBUG
 
+#define DRV_NAME "ibmlana"
+
 /* ------------------------------------------------------------------------
  * global static data - not more since we can handle multiple boards and
  * have to pack all state info into the device struct!
@@ -951,8 +953,8 @@ static int ibmlana_probe(struct net_device *dev)
 	printk(KERN_INFO "%s: IBM LAN Adapter/A found in slot %d\n", dev->name, slot + 1);
 
 	/* try to obtain I/O range */
-	if (!request_region(iobase, IBM_LANA_IORANGE, dev->name)) {
-		printk(KERN_ERR "%s: cannot allocate I/O range at %#x!\n", dev->name, iobase);
+	if (!request_region(iobase, IBM_LANA_IORANGE, DRV_NAME)) {
+		printk(KERN_ERR "%s: cannot allocate I/O range at %#x!\n", DRV_NAME, iobase);
 		startslot = slot + 1;
 		return -EBUSY;
 	}

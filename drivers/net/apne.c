@@ -49,6 +49,8 @@
 
 /* ---- No user-serviceable parts below ---- */
 
+#define DRV_NAME "apne"
+
 #define NE_BASE	 (dev->base_addr)
 #define NE_CMD	 		0x00
 #define NE_DATAPORT		0x10            /* NatSemi-defined port window offset. */
@@ -168,7 +170,7 @@ struct net_device * __init apne_probe(int unit)
 		return ERR_PTR(-ENODEV);
 	}
 
-	if (!request_region(IOBASE, 0x20, dev->name)) {
+	if (!request_region(IOBASE, 0x20, DRV_NAME)) {
 		free_netdev(dev);
 		return ERR_PTR(-EBUSY);
 	}
@@ -310,7 +312,7 @@ static int __init apne_probe1(struct net_device *dev, int ioaddr)
     dev->base_addr = ioaddr;
 
     /* Install the Interrupt handler */
-    i = request_irq(IRQ_AMIGA_PORTS, apne_interrupt, SA_SHIRQ, dev->name, dev);
+    i = request_irq(IRQ_AMIGA_PORTS, apne_interrupt, SA_SHIRQ, DRV_NAME, dev);
     if (i) return i;
 
     for(i = 0; i < ETHER_ADDR_LEN; i++) {

@@ -880,7 +880,7 @@ static int __devinit starfire_init_one(struct pci_dev *pdev,
 
 	irq = pdev->irq;
 
-	if (pci_request_regions (pdev, dev->name)) {
+	if (pci_request_regions (pdev, DRV_NAME)) {
 		printk(KERN_ERR DRV_NAME " %d: cannot reserve PCI resources, aborting\n", card_idx);
 		goto err_out_free_netdev;
 	}

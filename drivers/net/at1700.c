@@ -65,6 +65,8 @@
 static char version[] __initdata =
 	"at1700.c:v1.15 4/7/98  Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
+#define DRV_NAME "at1700"
+
 /* Tunable parameters. */
 
 /* When to switch from the 64-entry multicast filter to Rx-all-multicast. */
@@ -322,11 +324,11 @@ static int __init at1700_probe1(struct net_device *dev, int ioaddr)
 	struct net_local *lp = netdev_priv(dev);
 
 #ifndef CONFIG_X86_PC9800
-	if (!request_region(ioaddr, AT1700_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, AT1700_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 #else
 	for (i = 0; i < 0x2000; i += 0x0200) {
-		if (!request_region(ioaddr + i, 2, dev->name)) {
+		if (!request_region(ioaddr + i, 2, DRV_NAME)) {
 			while (i > 0) {
 				i -= 0x0200;
 				release_region(ioaddr + i, 2);
@@ -542,7 +544,7 @@ found:
 	lp->jumpered = is_fmv18x;
 	lp->mca_slot = slot;
 	/* Snarf the interrupt vector now. */
-	ret = request_irq(irq, &net_interrupt, 0, dev->name, dev);
+	ret = request_irq(irq, &net_interrupt, 0, DRV_NAME, dev);
 	if (ret) {
 		printk ("  AT1700 at %#3x is unusable due to a conflict on"
 				"IRQ %d.\n", ioaddr, irq);

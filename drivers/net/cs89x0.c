@@ -141,6 +141,8 @@
 static char version[] __initdata =
 "cs89x0.c: v2.4.3-pre1 Russell Nelson <nelson@crynwr.com>, Andrew Morton <andrewm@uow.edu.au>\n";
 
+#define DRV_NAME "cs89x0"
+
 /* First, a few definitions that the brave might change.
    A zero-terminated list of I/O addresses to be probed. Some special flags..
       Addr & 1 = Read back the address port, look for signature and reset
@@ -425,9 +427,9 @@ cs89x0_probe1(struct net_device *dev, int ioaddr, int modular)
 
 	/* Grab the region so we can find another board if autoIRQ fails. */
 	/* WTF is going on here? */
-	if (!request_region(ioaddr & ~3, NETCARD_IO_EXTENT, dev->name)) {
+	if (!request_region(ioaddr & ~3, NETCARD_IO_EXTENT, DRV_NAME)) {
 		printk(KERN_ERR "%s: request_region(0x%x, 0x%x) failed\n",
-				dev->name, ioaddr, NETCARD_IO_EXTENT);
+				DRV_NAME, ioaddr, NETCARD_IO_EXTENT);
 		retval = -EBUSY;
 		goto out1;
 	}

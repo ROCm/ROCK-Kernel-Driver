@@ -445,7 +445,7 @@ static int __init do_elmc_probe(struct net_device *dev)
 			slot = mca_find_adapter(ELMC_MCA_ID, slot + 1);
 			continue;
 		}
-		if (!request_region(dev->base_addr, ELMC_IO_EXTENT, dev->name)) {
+		if (!request_region(dev->base_addr, ELMC_IO_EXTENT, DRV_NAME)) {
 			slot = mca_find_adapter(ELMC_MCA_ID, slot + 1);
 			continue;
 		}

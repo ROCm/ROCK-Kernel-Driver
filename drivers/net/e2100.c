@@ -51,6 +51,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "e2100"
+
 static int e21_probe_list[] = {0x300, 0x280, 0x380, 0x220, 0};
 
 /* Offsets from the base_addr.
@@ -177,7 +179,7 @@ static int __init e21_probe1(struct net_device *dev, int ioaddr)
 	unsigned char *station_addr = dev->dev_addr;
 	static unsigned version_printed;
 
-	if (!request_region(ioaddr, E21_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, E21_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	/* First check the station address for the Ctron prefix. */

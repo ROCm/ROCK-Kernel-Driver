@@ -113,6 +113,8 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
+#define DRV_NAME "ns83820"
+
 /* Global parameters.  See MODULE_PARM near the bottom. */
 static int ihr = 2;
 static int reset_phy = 0;
@@ -1851,7 +1853,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 		0);
 
 	err = request_irq(pci_dev->irq, ns83820_irq, SA_SHIRQ,
-			  ndev->name, ndev);
+			  DRV_NAME, ndev);
 	if (err) {
 		printk(KERN_INFO "ns83820: unable to register irq %d\n",
 			pci_dev->irq);

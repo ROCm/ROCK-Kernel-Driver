@@ -37,6 +37,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "hp"
+
 /* A zero-terminated list of I/O addresses to be probed. */
 static unsigned int hppclan_portlist[] __initdata =
 { 0x300, 0x320, 0x340, 0x280, 0x2C0, 0x200, 0x240, 0};
@@ -139,7 +141,7 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 	const char *name;
 	static unsigned version_printed;
 
-	if (!request_region(ioaddr, HP_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, HP_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	/* Check for the HP physical address, 08 00 09 xx xx xx. */
@@ -184,7 +186,7 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 				outb_p(irqmap[irq] | HP_RUN, ioaddr + HP_CONFIGURE);
 				outb_p( 0x00 | HP_RUN, ioaddr + HP_CONFIGURE);
 				if (irq == probe_irq_off(cookie)		 /* It's a good IRQ line! */
-					&& request_irq (irq, ei_interrupt, 0, dev->name, dev) == 0) {
+					&& request_irq (irq, ei_interrupt, 0, DRV_NAME, dev) == 0) {
 					printk(" selecting IRQ %d.\n", irq);
 					dev->irq = *irqp;
 					break;
@@ -199,7 +201,7 @@ static int __init hp_probe1(struct net_device *dev, int ioaddr)
 	} else {
 		if (dev->irq == 2)
 			dev->irq = 9;
-		if ((retval = request_irq(dev->irq, ei_interrupt, 0, dev->name, dev))) {
+		if ((retval = request_irq(dev->irq, ei_interrupt, 0, DRV_NAME, dev))) {
 			printk (" unable to get IRQ %d.\n", dev->irq);
 			goto out;
 		}

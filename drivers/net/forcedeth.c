@@ -81,6 +81,7 @@
  * superfluous timer interrupts from the nic.
  */
 #define FORCEDETH_VERSION		"0.25"
+#define DRV_NAME			"forcedeth"
 
 #include <linux/module.h>
 #include <linux/types.h>
@@ -1424,7 +1425,7 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 
 	pci_set_master(pci_dev);
 
-	err = pci_request_regions(pci_dev, dev->name);
+	err = pci_request_regions(pci_dev, DRV_NAME);
 	if (err < 0)
 		goto out_disable;
 

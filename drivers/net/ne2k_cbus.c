@@ -37,6 +37,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "ne2k_cbus"
+
 /* Some defines that people can play with if so inclined. */
 
 /* Do we support clones that don't adhere to 14,15 of the SAprom ? */
@@ -265,7 +267,7 @@ static int __init ne_probe1(struct net_device *dev, int ioaddr)
 
 	for (rlist = hw->regionlist; rlist->range; rlist++)
 		if (!request_region(ioaddr + rlist->start,
-					rlist->range, dev->name)) {
+					rlist->range, DRV_NAME)) {
 			ret = -EBUSY;
 			goto err_out;
 		}

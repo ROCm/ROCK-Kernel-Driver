@@ -85,6 +85,8 @@
 #include <asm/uaccess.h>
 
 
+#define DRV_NAME "acenic"
+
 #undef INDEX_DEBUG
 
 #ifdef CONFIG_ACENIC_OMIT_TIGON_I
@@ -1454,10 +1456,10 @@ static int __init ace_init(struct net_device *dev)
 	}
 
 	ecode = request_irq(pdev->irq, ace_interrupt, SA_SHIRQ,
-			    dev->name, dev);
+			    DRV_NAME, dev);
 	if (ecode) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy\n",
-		       dev->name, pdev->irq);
+		       DRV_NAME, pdev->irq);
 		goto init_error;
 	} else
 		dev->irq = pdev->irq;

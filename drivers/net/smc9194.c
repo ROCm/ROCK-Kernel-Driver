@@ -78,6 +78,8 @@ static const char version[] =
 
 #include "smc9194.h"
 
+#define DRV_NAME "smc9194"
+
 /*------------------------------------------------------------------------
  .
  . Configuration options, for the experienced user to change.
@@ -843,7 +845,7 @@ static int __init smc_probe(struct net_device *dev, int ioaddr)
 	word memory_cfg_register;
 
 	/* Grab the region so that no one else tries to probe our ioports. */
-	if (!request_region(ioaddr, SMC_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, SMC_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	dev->irq = irq;
@@ -1001,9 +1003,9 @@ static int __init smc_probe(struct net_device *dev, int ioaddr)
 	memset(dev->priv, 0, sizeof(struct smc_local));
 
 	/* Grab the IRQ */
-      	retval = request_irq(dev->irq, &smc_interrupt, 0, dev->name, dev);
+      	retval = request_irq(dev->irq, &smc_interrupt, 0, DRV_NAME, dev);
       	if (retval) {
-		printk("%s: unable to get IRQ %d (irqval=%d).\n", dev->name,
+		printk("%s: unable to get IRQ %d (irqval=%d).\n", DRV_NAME,
 			dev->irq, retval);
   	  	goto err_out;
       	}

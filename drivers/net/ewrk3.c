@@ -1271,7 +1271,7 @@ static int __init isa_probe(struct net_device *dev, u_long ioaddr)
 	for (; (i < maxSlots) && (dev != NULL);
 	     iobase += EWRK3_IOP_INC, i++)
 	{
-		if (request_region(iobase, EWRK3_TOTAL_SIZE, dev->name)) {
+		if (request_region(iobase, EWRK3_TOTAL_SIZE, DRV_NAME)) {
 			if (DevicePresent(iobase) == 0) {
 				int irq = dev->irq;
 				ret = ewrk3_hw_init(dev, iobase);
@@ -1312,7 +1312,7 @@ static int __init eisa_probe(struct net_device *dev, u_long ioaddr)
 
 	for (i = 1; (i < maxSlots) && (dev != NULL); i++, iobase += EISA_SLOT_INC) {
 		if (EISA_signature(name, EISA_ID) == 0) {
-			if (request_region(iobase, EWRK3_TOTAL_SIZE, dev->name) &&
+			if (request_region(iobase, EWRK3_TOTAL_SIZE, DRV_NAME) &&
 			    DevicePresent(iobase) == 0) {
 				int irq = dev->irq;
 				ret = ewrk3_hw_init(dev, iobase);

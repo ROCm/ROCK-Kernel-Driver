@@ -72,6 +72,8 @@ static const char version[] =
 
 #include "8390.h"
 
+#define DRV_NAME "smc-ultra"
+
 /* A zero-terminated list of I/O addresses to be probed. */
 static unsigned int ultra_portlist[] __initdata =
 {0x200, 0x220, 0x240, 0x280, 0x300, 0x340, 0x380, 0};
@@ -217,7 +219,7 @@ static int __init ultra_probe1(struct net_device *dev, int ioaddr)
 	unsigned char idreg = inb(ioaddr + 7);
 	unsigned char reg4 = inb(ioaddr + 4) & 0x7f;
 
-	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name))
+	if (!request_region(ioaddr, ULTRA_IO_EXTENT, DRV_NAME))
 		return -EBUSY;
 
 	/* Check the ID nibble. */

@@ -151,6 +151,8 @@ static const char version[] =
 #include <asm/io.h>
 #include <asm/dma.h>
 
+#define DRV_NAME "eepro"
+
 #define compat_dev_kfree_skb( skb, mode ) dev_kfree_skb( (skb) )
 /* I had reports of looong delays with SLOW_DOWN defined as udelay(2) */
 #define SLOW_DOWN inb(0x80)
@@ -747,7 +749,7 @@ static int __init eepro_probe1(struct net_device *dev, int autoprobe)
 	int ioaddr = dev->base_addr;
 
 	/* Grab the region so we can find another board if autoIRQ fails. */
-	if (!request_region(ioaddr, EEPRO_IO_EXTENT, dev->name)) { 
+	if (!request_region(ioaddr, EEPRO_IO_EXTENT, DRV_NAME)) { 
 		if (!autoprobe)
 			printk(KERN_WARNING "EEPRO: io-port 0x%04x in use \n",
 				ioaddr);

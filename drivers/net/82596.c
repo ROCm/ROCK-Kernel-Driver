@@ -63,6 +63,8 @@
 static char version[] __initdata =
 	"82596.c $Revision: 1.5 $\n";
 
+#define DRV_NAME	"82596"
+
 /* DEBUG flags
  */
 
@@ -1191,7 +1193,7 @@ struct net_device * __init i82596_probe(int unit)
 		/* this is easy the ethernet interface can only be at 0x300 */
 		/* first check nothing is already registered here */
 
-		if (!request_region(ioaddr, I596_TOTAL_SIZE, dev->name)) {
+		if (!request_region(ioaddr, I596_TOTAL_SIZE, DRV_NAME)) {
 			printk(KERN_ERR "82596: IO address 0x%04x in use\n", ioaddr);
 			err = -EBUSY;
 			goto out;

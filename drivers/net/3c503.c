@@ -184,10 +184,10 @@ el2_probe1(struct net_device *dev, int ioaddr)
     static unsigned version_printed;
     unsigned long vendor_id;
 
-    if (!request_region(ioaddr, EL2_IO_EXTENT, dev->name))
+    if (!request_region(ioaddr, EL2_IO_EXTENT, DRV_NAME))
 	return -EBUSY;
 
-    if (!request_region(ioaddr + 0x400, 8, dev->name)) {
+    if (!request_region(ioaddr + 0x400, 8, DRV_NAME)) {
 	retval = -EBUSY;
 	goto out;
     }
