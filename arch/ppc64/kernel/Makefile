@@ -40,25 +40,3 @@ obj-y += prom.o lmb.o rtas.o rtas-proc.o chrp_setup.o i8259.o
 
 include $(TOPDIR)/Rules.make
 
-#
-# This is just to get the dependencies...
-#
-
-head.o: head.S ppc_defs.h
-misc.o: misc.S ppc_defs.h
-entry.o: entry.S ppc_defs.h
-hvCall.o: hvCall.S ppc_defs.h
-pSeries_hvCall.o: pSeries_hvCall.S ppc_defs.h
-sys32.o: sys32.S ppc_defs.h
-
-ppc_defs.h: mk_defs.c ppc_defs.head \
-		$(TOPDIR)/include/asm/mmu.h \
-		$(TOPDIR)/include/asm/processor.h \
-		$(TOPDIR)/include/asm/pgtable.h \
-		$(TOPDIR)/include/asm/ptrace.h
-	$(CC) $(CFLAGS) -S mk_defs.c
-	cp ppc_defs.head ppc_defs.h
-# for bk, this way we can write to the file even if it's not checked out
-	chmod u+w ppc_defs.h
-	grep '^#define' mk_defs.s >> ppc_defs.h
-	rm mk_defs.s

@@ -51,5 +51,7 @@ static __inline__ int irq_cannonicalize(int irq)
 	return irq;
 }
 
+#define NR_MASK_WORDS	((NR_IRQS + 63) / 64)
+
 #endif /* _ASM_IRQ_H */
 #endif /* __KERNEL__ */

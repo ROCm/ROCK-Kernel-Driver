@@ -20,6 +20,9 @@
 struct free_pte_ctx;
 static inline void tlb_flush(struct free_pte_ctx *tlb);
 
+/* Avoid pulling in another include just for this */
+#define check_pgt_cache()	do { } while (0)
+
 /* Get the generic bits... */
 #include <asm-generic/tlb.h>
 
@@ -51,16 +54,17 @@ static inline void __tlb_remove_tlb_entry(mmu_gather_t *tlb, pte_t *ptep,
 	if (pte_val(*ptep) & _PAGE_HASHPTE) {
 		pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
 		if (pte_val(pte) & _PAGE_HASHPTE) {
-			int local = 0;
-
-			if (tlb->mm->cpu_vm_mask == (1 << cpu))
-				local = 1;
 
 			batch->pte[i] = pte;
 			batch->addr[i] = address;
 			i++;
 
 			if (i == PPC64_TLB_BATCH_NR) {
+				int local = 0;
+
+				if (tlb->mm->cpu_vm_mask == (1 << cpu))
+					local = 1;
+
 				flush_hash_range(tlb->mm->context, i, local);
 				i = 0;
 			}

@@ -9,7 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <asm/processor.h>
-#include "../kernel/ppc_asm.h"
+#include <asm/ppc_asm.h>
 
 _GLOBAL(copy_page)
 	std	r31,-8(1)

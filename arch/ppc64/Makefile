@@ -62,7 +62,22 @@ endif
 	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
 
 archclean:
-	rm -f arch/ppc64/kernel/{ppc_defs.h,mk_defs.s,mk_defs_out.c,mk_defs_tpl}
 	@$(MAKEBOOT) clean
 
 archmrproper:
+
+
+prepare: include/asm-$(ARCH)/offsets.h
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
+
+CLEAN_FILES += include/asm-$(ARCH)/offsets.h.tmp \
+	       include/asm-$(ARCH)/offsets.h

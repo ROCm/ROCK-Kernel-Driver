@@ -25,12 +25,12 @@
 
 #define SECONDARY_PROCESSORS
 
-#include "ppc_asm.h"
-#include "ppc_defs.h"
+#include <linux/config.h>
 #include <asm/processor.h>
 #include <asm/page.h>
-#include <linux/config.h>
 #include <asm/mmu.h>
+#include <asm/ppc_asm.h>
+#include <asm/offsets.h>
 
 #ifdef CONFIG_PPC_ISERIES
 #define DO_SOFT_DISABLE

@@ -215,6 +215,7 @@ void *traverse_all_pci_devices(traverse_func pre)
 	return NULL;
 }
 
+
 /* Traversal func that looks for a <busno,devfcn> value.
  * If found, the device_node is returned (thus terminating the traversal).
  */
@@ -223,7 +224,6 @@ is_devfn_node(struct device_node *dn, void *data)
 {
 	int busno = ((unsigned long)data >> 8) & 0xff;
 	int devfn = ((unsigned long)data) & 0xff;
-
 	return (devfn == dn->devfn && busno == dn->busno) ? dn : NULL;
 }
 
@@ -249,8 +249,9 @@ create_eads_node(struct device_node *other_eads)
 	*eads = *other_eads;
 	eads->devfn &= ~7;	/* make it function zero */
 	eads->tce_table = NULL;
-	/* NOTE: share properties.  We could copy but for now this should suffice.
-	 * The full_name is also incorrect...but seems harmless.
+	/*
+	 * NOTE: share properties.  We could copy but for now this should
+	 * suffice.  The full_name is also incorrect...but seems harmless.
 	 */
 	eads->child = NULL;
 	eads->next = NULL;
@@ -285,21 +286,25 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev)
 		dev->sysdata = dn;
 		/* ToDo: call some device init hook here */
 	} else {
-		/* Now it is very possible that we can't find the device because it is
-		 * not the zero'th device of a mutifunction device and we don't have
-		 * permission to read the zero'th device.  If this is the case, Linux
-		 * would ordinarily skip all the other functions.
+		/* Now it is very possible that we can't find the device
+		 * because it is not the zero'th device of a mutifunction
+		 * device and we don't have permission to read the zero'th
+		 * device.  If this is the case, Linux would ordinarily skip
+		 * all the other functions.
 		 */
 		if ((searchval & 0x7) == 0) {
 			struct device_node *thisdevdn;
 			/* Ok, we are looking for fn == 0.  Let's check for other functions. */
 			thisdevdn = (struct device_node *)traverse_pci_devices(phb_dn, is_devfn_sub_node, NULL, (void *)searchval);
 			if (thisdevdn) {
-				/* Ah ha!  There does exist a sub function.  Now this isn't an exact
-				 * match for searchval, but in order to get Linux to believe the sub
-				 * functions exist we will need to manufacture a fake device_node
-				 * for this zero'th function.  To keept this simple for now we only
-				 * handle pci bridges and we just hand back the found node which
+				/* Ah ha!  There does exist a sub function.
+				 * Now this isn't an exact match for
+				 * searchval, but in order to get Linux to
+				 * believe the sub functions exist we will
+				 * need to manufacture a fake device_node for
+				 * this zero'th function.  To keept this
+				 * simple for now we only handle pci bridges
+				 * and we just hand back the found node which
 				 * isn't correct, but Linux won't care.
 				 */
 				char *device_type = (char *)get_property(thisdevdn, "device_type", 0);
@@ -367,7 +372,6 @@ pci_fixup_bus_sysdata_list(struct list_head *bus_list)
 		pci_fixup_bus_sysdata_list(&bus->children);
 	}
 }
-
 
 /******************************************************************
  * Fixup the bus->sysdata ptrs to point to the bus' device_node.
