@@ -244,9 +244,7 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 /*-------------------------------------------------------------------------*/
 
-static void ehci_tasklet (unsigned long param);
-
-static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs);
+static void ehci_work(struct ehci_hcd *ehci, struct pt_regs *regs);
 
 static void ehci_watchdog (unsigned long param)
 {
@@ -254,10 +252,25 @@ static void ehci_watchdog (unsigned long param)
 	unsigned long		flags;
 
 	spin_lock_irqsave (&ehci->lock, flags);
-	/* guard against lost IAA, which wedges everything */
-	ehci_irq (&ehci->hcd, NULL);
+
+	/* lost IAA irqs wedge things badly; seen with a vt8235 */
+	if (ehci->reclaim) {
+		u32		status = readl (&ehci->regs->status);
+
+		if (status & STS_IAA) {
+			ehci_vdbg (ehci, "lost IAA\n");
+			writel (STS_IAA, &ehci->regs->status);
+			ehci->reclaim_ready = 1;
+		}
+	}
+
+	ehci_work (ehci, NULL);
+	if (ehci->reclaim && !timer_pending (&ehci->watchdog))
+		mod_timer (&ehci->watchdog,
+				jiffies + EHCI_WATCHDOG_JIFFIES);
+
  	/* stop async processing after it's idled a while */
- 	if (ehci->async_idle) {
+	else if (ehci->async_idle) {
  		start_unlink_async (ehci, ehci->async);
  		ehci->async_idle = 0;
 	}
@@ -418,9 +431,6 @@ static int ehci_start (struct usb_hcd *hcd)
 
 	/* set async sleep time = 10 us ... ? */
 
-	ehci->tasklet.func = ehci_tasklet;
-	ehci->tasklet.data = (unsigned long) ehci;
-
 	init_timer (&ehci->watchdog);
 	ehci->watchdog.function = ehci_watchdog;
 	ehci->watchdog.data = (unsigned long) ehci;
@@ -499,8 +509,9 @@ static void ehci_stop (struct usb_hcd *hcd)
 	remove_debug_files (ehci);
 
 	/* root hub is shut down separately (first, when possible) */
-	tasklet_disable (&ehci->tasklet);
-	ehci_tasklet ((unsigned long) ehci);
+	spin_lock_irq (&ehci->lock);
+	ehci_work (ehci, NULL);
+	spin_unlock_irq (&ehci->lock);
 	ehci_mem_cleanup (ehci);
 
 #ifdef	EHCI_STATS
@@ -608,23 +619,16 @@ dbg ("%s: resume port %d", hcd_to_bus (hcd)->bus_name, i);
 /*-------------------------------------------------------------------------*/
 
 /*
- * tasklet scheduled by some interrupts and other events
- * calls driver completion functions ... but not in_irq()
+ * ehci_work is called from some interrupts, timers, and so on.
+ * it calls driver completion functions, after dropping ehci->lock.
  */
-static void ehci_tasklet (unsigned long param)
+static void ehci_work (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
-	struct ehci_hcd		*ehci = (struct ehci_hcd *) param;
-	struct pt_regs		*regs = NULL;
-
-	spin_lock_irq (&ehci->lock);
-
 	if (ehci->reclaim_ready)
 		end_unlink_async (ehci, regs);
 	scan_async (ehci, regs);
 	if (ehci->next_uframe != -1)
 		scan_periodic (ehci, regs);
-
-	spin_unlock_irq (&ehci->lock);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -644,6 +648,8 @@ static void ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 	status &= INTR_MASK;
 	if (!status)			/* irq sharing? */
 		return;
+
+	spin_lock (&ehci->lock);
 
 	/* clear (just) interrupts */
 	writel (status, &ehci->regs->status);
@@ -684,9 +690,9 @@ dead:
 		bh = 1;
 	}
 
-	/* most work doesn't need to be in_irq() */
-	if (likely (bh == 1))
-		tasklet_schedule (&ehci->tasklet);
+	if (bh)
+		ehci_work (ehci, regs);
+	spin_unlock (&ehci->lock);
 }
 
 /*-------------------------------------------------------------------------*/
@@ -882,7 +888,7 @@ static void ehci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
 					) {
 				spin_unlock_irqrestore (&ehci->lock, flags);
 				/* wait_ms() won't spin, we're a thread;
-				 * and we know IRQ+tasklet can progress
+				 * and we know IRQ/timer/... can progress
 				 */
 				wait_ms (1);
 				spin_lock_irqsave (&ehci->lock, flags);

@@ -190,7 +190,7 @@ static int enable_periodic (struct ehci_hcd *ehci)
 	/* posted write ... PSS happens later */
 	ehci->hcd.state = USB_STATE_RUNNING;
 
-	/* make sure tasklet scans these */
+	/* make sure ehci_work scans these */
 	ehci->next_uframe = readl (&ehci->regs->frame_index)
 				% (ehci->periodic_size << 3);
 	return 0;
