@@ -4269,6 +4269,7 @@ ahd_linux_run_device_queue(struct ahd_softc *ahd, struct ahd_linux_device *dev)
 		 */
 		hscb->control = 0;
 		hscb->scsiid = BUILD_SCSIID(ahd, cmd);
+		hscb->lun = cmd->device->lun;
 		scb->hscb->task_management = 0;
 		mask = SCB_GET_TARGET_MASK(ahd, scb);
 
