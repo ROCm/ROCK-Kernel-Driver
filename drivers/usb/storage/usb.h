@@ -52,33 +52,6 @@
 #include "scsi.h"
 #include "hosts.h"
 
-/* 
- * GUID definitions
- */
-
-#define GUID(x) __u32 x[3]
-#define GUID_EQUAL(x, y) (x[0] == y[0] && x[1] == y[1] && x[2] == y[2])
-#define GUID_CLEAR(x) x[0] = x[1] = x[2] = 0;
-#define GUID_NONE(x) (!x[0] && !x[1] && !x[2])
-#define GUID_FORMAT "%08x%08x%08x"
-#define GUID_ARGS(x) x[0], x[1], x[2]
-
-static inline void make_guid( __u32 *pg, __u16 vendor, __u16 product, char *serial)
-{
-	pg[0] = (vendor << 16) | product;
-	pg[1] = pg[2] = 0;
-	while (*serial) {
-		pg[1] <<= 4;
-		pg[1] |= pg[2] >> 28;
-		pg[2] <<= 4;
-		if (*serial >= 'a')
-			*serial -= 'a' - 'A';
-		pg[2] |= (*serial <= '9' && *serial >= '0') ? *serial - '0'
-			: *serial - 'A' + 10;
-		serial++;
-	}
-}
-
 struct us_data;
 
 /*
@@ -124,8 +97,6 @@ typedef void (*extra_data_destructor)(void *);	 /* extra data destructor   */
 
 /* we allocate one of these for every device that we remember */
 struct us_data {
-	struct us_data		*next;		 /* next device */
-
 	/* The device we're working with
 	 * It's important to note:
 	 *    (o) you must hold dev_semaphore to change pusb_dev
@@ -163,11 +134,7 @@ struct us_data {
 	proto_cmnd		proto_handler;	 /* protocol handler	   */
 
 	/* SCSI interfaces */
-	GUID(guid);				 /* unique dev id	*/
 	struct Scsi_Host	*host;		 /* our dummy host data */
-	Scsi_Host_Template	htmplt;		 /* own host template	*/
-	int			host_number;	 /* to find us		*/
-	int			host_no;	 /* allocated by scsi	*/
 	Scsi_Cmnd		*srb;		 /* current srb		*/
 
 	/* thread information */
@@ -191,10 +158,6 @@ struct us_data {
 	void			*extra;		 /* Any extra data          */
 	extra_data_destructor	extra_destructor;/* extra data destructor   */
 };
-
-/* The list of structures and the protective lock for them */
-extern struct us_data *us_list;
-extern struct semaphore us_list_semaphore;
 
 /* The structure which defines our driver */
 extern struct usb_driver usb_storage_driver;
