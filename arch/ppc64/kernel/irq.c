@@ -577,13 +577,13 @@ int do_IRQ(struct pt_regs *regs)
 	irq_enter();
 
 #ifdef CONFIG_DEBUG_STACKOVERFLOW
-	/* Debugging check for stack overflow: is there less than 8KB free? */
+	/* Debugging check for stack overflow: is there less than 4KB free? */
 	{
 		long sp;
 
 		sp = __get_SP() & (THREAD_SIZE-1);
 
-		if (unlikely(sp < (sizeof(struct thread_info) + 8192))) {
+		if (unlikely(sp < (sizeof(struct thread_info) + 4096))) {
 			printk("do_IRQ: stack overflow: %ld\n",
 				sp - sizeof(struct thread_info));
 			dump_stack();
