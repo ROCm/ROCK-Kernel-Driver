@@ -46,14 +46,14 @@ const unsigned char scsi_command_size[8] =
 #define SCSI_SENSE_BUFFERSIZE 64
 #endif
 
-static int blk_do_rq(request_queue_t *q, struct block_device *bdev, 
+static int blk_do_rq(request_queue_t *q, struct gendisk *bd_disk,
 		     struct request *rq)
 {
 	char sense[SCSI_SENSE_BUFFERSIZE];
 	DECLARE_COMPLETION(wait);
 	int err = 0;
 
-	rq->rq_disk = bdev->bd_disk;
+	rq->rq_disk = bd_disk;
 
 	/*
 	 * we need an extra reference to the request, so we can look at
@@ -142,7 +142,7 @@ static int sg_emulated_host(request_queue_t *q, int *p)
 	return put_user(1, p);
 }
 
-static int sg_io(request_queue_t *q, struct block_device *bdev,
+static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 		 struct sg_io_hdr *hdr)
 {
 	unsigned long start_time;
@@ -190,7 +190,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 		 * first try to map it into a bio. reading from device will
 		 * be a write to vm.
 		 */
-		bio = bio_map_user(bdev, (unsigned long) hdr->dxferp,
+		bio = bio_map_user(q, NULL, (unsigned long) hdr->dxferp,
 				   hdr->dxfer_len, reading);
 
 		/*
@@ -246,7 +246,7 @@ static int sg_io(request_queue_t *q, struct block_device *bdev,
 	 * (if he doesn't check that is his problem).
 	 * N.B. a non-zero SCSI status is _not_ necessarily an error.
 	 */
-	blk_do_rq(q, bdev, rq);
+	blk_do_rq(q, bd_disk, rq);
 
 	if (bio)
 		bio_unmap_user(bio, reading);
@@ -296,7 +296,7 @@ out_buffer:
 #define READ_DEFECT_DATA_TIMEOUT	(60 * HZ )
 #define OMAX_SB_LEN 16          /* For backward compatibility */
 
-static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
+static int sg_scsi_ioctl(request_queue_t *q, struct gendisk *bd_disk,
 			 Scsi_Ioctl_Command *sic)
 {
 	struct request *rq;
@@ -369,7 +369,7 @@ static int sg_scsi_ioctl(request_queue_t *q, struct block_device *bdev,
 	rq->data_len = bytes;
 	rq->flags |= REQ_BLOCK_PC;
 
-	blk_do_rq(q, bdev, rq);
+	blk_do_rq(q, bd_disk, rq);
 	err = rq->errors & 0xff;	/* only 8 bit SCSI status */
 	if (err) {
 		if (rq->sense_len && rq->sense) {
@@ -389,13 +389,13 @@ error:
 	return err;
 }
 
-int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
+int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 {
 	request_queue_t *q;
 	struct request *rq;
 	int close = 0, err;
 
-	q = bdev_get_queue(bdev);
+	q = bd_disk->queue;
 	if (!q)
 		return -ENXIO;
 
@@ -446,7 +446,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 
 			old_cdb = hdr.cmdp;
 			hdr.cmdp = cdb;
-			err = sg_io(q, bdev, &hdr);
+			err = sg_io(q, bd_disk, &hdr);
 
 			hdr.cmdp = old_cdb;
 			if (copy_to_user((struct sg_io_hdr *) arg, &hdr, sizeof(hdr)))
@@ -493,7 +493,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			hdr.timeout = cgc.timeout;
 			hdr.cmdp = cgc.cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
-			err = sg_io(q, bdev, &hdr);
+			err = sg_io(q, bd_disk, &hdr);
 
 			if (hdr.status)
 				err = -EIO;
@@ -514,7 +514,8 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			if (!arg)
 				break;
 
-			err = sg_scsi_ioctl(q, bdev, (Scsi_Ioctl_Command *)arg);
+			err = sg_scsi_ioctl(q, bd_disk,
+					    (Scsi_Ioctl_Command *)arg);
 			break;
 		case CDROMCLOSETRAY:
 			close = 1;
@@ -528,7 +529,7 @@ int scsi_cmd_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long ar
 			rq->cmd[0] = GPCMD_START_STOP_UNIT;
 			rq->cmd[4] = 0x02 + (close != 0);
 			rq->cmd_len = 6;
-			err = blk_do_rq(q, bdev, rq);
+			err = blk_do_rq(q, bd_disk, rq);
 			blk_put_request(rq);
 			break;
 		default:
