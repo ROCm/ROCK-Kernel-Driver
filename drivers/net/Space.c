@@ -42,7 +42,7 @@
 
 extern int ne2_probe(struct net_device *dev);
 extern int hp100_probe(struct net_device *dev);
-extern int ultra_probe(struct net_device *dev);
+extern struct net_device *ultra_probe(int unit);
 extern int ultra32_probe(struct net_device *dev);
 extern struct net_device *wd_probe(int unit);
 extern struct net_device *el2_probe(int unit);
@@ -204,13 +204,13 @@ static struct devprobe isa_probes[] __initdata = {
 #ifdef CONFIG_3C515
 	{tc515_probe, 0},
 #endif
-#ifdef CONFIG_ULTRA 
-	{ultra_probe, 0},
-#endif
 	{NULL, 0},
 };
 
 static struct devprobe2 isa_probes2[] __initdata = {
+#ifdef CONFIG_ULTRA 
+	{ultra_probe, 0},
+#endif
 #ifdef CONFIG_WD80x3 
 	{wd_probe, 0},
 #endif
