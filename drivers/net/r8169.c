@@ -203,7 +203,7 @@ enum RTL8169_register_content {
 	SWInt = 0x0100,
 	TxDescUnavail = 0x80,
 	RxFIFOOver = 0x40,
-	RxUnderrun = 0x20,
+	LinkChg = 0x20,
 	RxOverflow = 0x10,
 	TxErr = 0x08,
 	TxOK = 0x04,
@@ -359,9 +359,9 @@ static int rtl8169_poll(struct net_device *dev, int *budget);
 #endif
 
 static const u16 rtl8169_intr_mask =
-	RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
+	LinkChg | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 static const u16 rtl8169_napi_event =
-	RxOK | RxUnderrun | RxOverflow | RxFIFOOver | TxOK | TxErr;
+	RxOK | LinkChg | RxOverflow | RxFIFOOver | TxOK | TxErr;
 static const unsigned int rtl8169_rx_config =
     (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
 
@@ -1567,7 +1567,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 		handled = 1;
 /*
-		if (status & RxUnderrun)
+		if (status & LinkChg)
 			link_changed = RTL_R16 (CSCR) & CSCR_LinkChangeBit;
 */
 		status &= tp->intr_mask;
@@ -1590,7 +1590,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		break;
 #else
 		// Rx interrupt 
-		if (status & (RxOK | RxUnderrun | RxOverflow | RxFIFOOver)) {
+		if (status & (RxOK | LinkChg | RxOverflow | RxFIFOOver)) {
 			rtl8169_rx_interrupt(dev, tp, ioaddr);
 		}
 		// Tx interrupt
