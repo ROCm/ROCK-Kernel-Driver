@@ -1254,3 +1254,4 @@ __initcall(aio_setup);
 
 EXPORT_SYMBOL(aio_complete);
 EXPORT_SYMBOL(aio_put_req);
+EXPORT_SYMBOL(wait_on_sync_kiocb);
