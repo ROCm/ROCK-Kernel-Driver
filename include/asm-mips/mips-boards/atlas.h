@@ -27,7 +27,7 @@
 
 #include <asm/addrspace.h>
 
-/* 
+/*
  * Atlas RTC-device indirect register access.
  */
 #define ATLAS_RTC_ADR_REG       (KSEG1ADDR(0x1f000800))
@@ -43,7 +43,7 @@
  * Atlas UART register base.
  */
 #define ATLAS_UART_REGS_BASE    (0x1f000900)
-#define ATLAS_BASE_BAUD ( 3686400 / 16 ) 
+#define ATLAS_BASE_BAUD ( 3686400 / 16 )
 
 /*
  * Atlas PSU standby register.
@@ -54,7 +54,7 @@
 /*
  * We make a universal assumption about the way the bootloader (YAMON)
  * have located the Philips SAA9730 chip.
- * This is not ideal, but is needed for setting up remote debugging as 
+ * This is not ideal, but is needed for setting up remote debugging as
  * soon as possible.
  */
 #define ATLAS_SAA9730_REG  (KSEG1ADDR(0x08800000))

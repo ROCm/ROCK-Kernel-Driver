@@ -1,6 +1,6 @@
 /*
  * Carsten Langgaard, carstenl@mips.com
- * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2002 MIPS Technologies, Inc.  All rights reserved.
  *
  * ########################################################################
  *
@@ -18,30 +18,18 @@
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
  * ########################################################################
- * 
- * Display routines for display messages in MIPS boards ascii display.
+ *
+ * Defines for the SEAD interrupt controller.
  *
  */
+#ifndef _MIPS_SEADINT_H
+#define _MIPS_SEADINT_H
 
-#include <asm/mips-boards/generic.h>
+/* Number of IRQ supported */
+#define SEADINT_UART0     0
+#define SEADINT_UART1     1
+#define SEADINT_END       2
 
+extern void seadint_init(void);
 
-void mips_display_message(const char *str)
-{
-        volatile unsigned int *display = (void *)ASCII_DISPLAY_POS_BASE;
-	int i;
-
-	for (i = 0; i <= 14; i=i+2) {
-	         if (*str)
-		         display[i] = *str++;
-		 else
-		         display[i] = ' ';
-	}
-}
-
-void mips_display_word(unsigned int num)
-{
-        volatile unsigned int *display = (void *)ASCII_DISPLAY_WORD_BASE;
-	
-	*display = num;
-}
+#endif /* !(_MIPS_SEADINT_H) */

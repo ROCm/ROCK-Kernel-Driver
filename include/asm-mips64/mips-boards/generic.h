@@ -25,14 +25,20 @@
 #ifndef _MIPS_GENERIC_H
 #define _MIPS_GENERIC_H
 
+#include <linux/config.h>
 #include <asm/addrspace.h>
 #include <asm/byteorder.h>
+#include <asm/mips-boards/bonito64.h>
 
 /*
  * Display register base.
  */
+#if defined(CONFIG_MIPS_SEAD)
+#define ASCII_DISPLAY_POS_BASE     (KSEG1ADDR(0x1f0005c0))
+#else
 #define ASCII_DISPLAY_WORD_BASE    (KSEG1ADDR(0x1f000410))
 #define ASCII_DISPLAY_POS_BASE     (KSEG1ADDR(0x1f000418))
+#endif
 
 
 /*
@@ -44,8 +50,28 @@
 /*
  * Reset register.
  */
+#if defined(CONFIG_MIPS_SEAD)
+#define SOFTRES_REG       (KSEG1ADDR(0x1e800050))
+#define GORESET           0x4d
+#else
 #define SOFTRES_REG       (KSEG1ADDR(0x1f000500))
 #define GORESET           0x42
+#endif
+
+/*
+ * Revision register.
+ */
+#define MIPS_REVISION_REG                  (KSEG1ADDR(0x1fc00010))
+#define MIPS_REVISION_CORID_QED_RM5261     0
+#define MIPS_REVISION_CORID_CORE_LV        1
+#define MIPS_REVISION_CORID_BONITO64       2
+#define MIPS_REVISION_CORID_CORE_20K       3
+#define MIPS_REVISION_CORID_CORE_FPGA      4
+#define MIPS_REVISION_CORID_CORE_MSC       5
+
+#define MIPS_REVISION_CORID (((*(volatile u32 *)(MIPS_REVISION_REG)) >> 10) & 0x3f)
+
+extern unsigned int mips_revision_corid;
 
 
 /*
@@ -66,5 +92,20 @@
 	*(volatile u32 *)(MIPS_GT_BASE+ofs) = data
 #define GT_PCI_READ(ofs, data)   \
 	data = *(volatile u32 *)(MIPS_GT_BASE+ofs)
+
+/*
+ * Algorithmics Bonito64 system controller register base.
+ */
+static char * const _bonito = (char *)KSEG1ADDR(BONITO_REG_BASE);
+
+/*
+ * MIPS System controller PCI register base.
+ */
+#define MSC01_PCI_REG_BASE  (KSEG1ADDR(0x1bd00000))
+
+#define MSC_WRITE(reg, data)  \
+	*(volatile u32 *)(reg) = data
+#define MSC_READ(reg, data)   \
+	data = *(volatile u32 *)(reg)
 
 #endif  /* !(_MIPS_GENERIC_H) */

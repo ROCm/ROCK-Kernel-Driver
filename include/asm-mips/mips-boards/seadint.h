@@ -1,6 +1,6 @@
 /*
  * Carsten Langgaard, carstenl@mips.com
- * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2002 MIPS Technologies, Inc.  All rights reserved.
  *
  * ########################################################################
  *
@@ -19,32 +19,17 @@
  *
  * ########################################################################
  *
- * RTC routines for Malta style attached PIIX4 device, which contains a
- * Motorola MC146818A-compatible Real Time Clock.
+ * Defines for the SEAD interrupt controller.
  *
  */
-#include <asm/mc146818rtc.h>
-#include <asm/mips-boards/malta.h>
+#ifndef _MIPS_SEADINT_H
+#define _MIPS_SEADINT_H
 
-static unsigned char malta_rtc_read_data(unsigned long addr)
-{
-	outb(addr, MALTA_RTC_ADR_REG);
-	return inb(MALTA_RTC_DAT_REG);
-}
+/* Number of IRQ supported */
+#define SEADINT_UART0     0
+#define SEADINT_UART1     1
+#define SEADINT_END       2
 
-static void malta_rtc_write_data(unsigned char data, unsigned long addr)
-{
-	outb(addr, MALTA_RTC_ADR_REG);
-	outb(data, MALTA_RTC_DAT_REG);
-}
+extern void seadint_init(void);
 
-static int malta_rtc_bcd_mode(void)
-{
-	return 0;
-}
-
-struct rtc_ops malta_rtc_ops = {
-	&malta_rtc_read_data,
-	&malta_rtc_write_data,
-	&malta_rtc_bcd_mode
-};
+#endif /* !(_MIPS_SEADINT_H) */

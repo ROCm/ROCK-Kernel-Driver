@@ -1,6 +1,6 @@
 /*
  * Carsten Langgaard, carstenl@mips.com
- * Copyright (C) 1999 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2002 MIPS Technologies, Inc.  All rights reserved.
  *
  * ########################################################################
  *
@@ -19,33 +19,18 @@
  *
  * ########################################################################
  *
- * Defines for the Atlas interrupt controller.
+ * Defines of the SEAD board specific address-MAP, registers, etc.
  *
  */
-#ifndef _MIPS_ATLASINT_H
-#define _MIPS_ATLASINT_H
+#ifndef _MIPS_SEAD_H
+#define _MIPS_SEAD_H
 
-/* Number of IRQ supported on hw interrupt 0. */
-#define ATLASINT_UART      0
-#define ATLASINT_END      32
+#include <asm/addrspace.h>
 
 /*
- * Atlas registers are memory mapped on 64-bit aligned boundaries and
- * only word access are allowed.
+ * SEAD UART register base.
  */
-struct atlas_ictrl_regs {
-        volatile unsigned long intraw;
-        long dummy1;
-        volatile unsigned long intseten;
-        long dummy2;
-        volatile unsigned long intrsten;
-        long dummy3;
-        volatile unsigned long intenable;
-        long dummy4;
-        volatile unsigned long intstatus;
-        long dummy5;
-};
+#define SEAD_UART0_REGS_BASE    (0x1f000800)
+#define SEAD_BASE_BAUD ( 3686400 / 16 )
 
-extern void atlasint_init(void);
-
-#endif /* !(_MIPS_ATLASINT_H) */
+#endif /* !(_MIPS_SEAD_H) */

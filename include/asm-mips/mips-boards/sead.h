@@ -1,6 +1,6 @@
 /*
  * Carsten Langgaard, carstenl@mips.com
- * Copyright (C) 2000 MIPS Technologies, Inc.  All rights reserved.
+ * Copyright (C) 2002 MIPS Technologies, Inc.  All rights reserved.
  *
  * ########################################################################
  *
@@ -19,40 +19,18 @@
  *
  * ########################################################################
  *
- * RTC routines for Atlas style attached Dallas chip.
+ * Defines of the SEAD board specific address-MAP, registers, etc.
  *
  */
-#include <asm/mc146818rtc.h>
-#include <asm/mips-boards/atlas.h>
+#ifndef _MIPS_SEAD_H
+#define _MIPS_SEAD_H
 
+#include <asm/addrspace.h>
 
-static unsigned char atlas_rtc_read_data(unsigned long addr)
-{
-	volatile unsigned int *rtc_adr_reg = (void *)ATLAS_RTC_ADR_REG;
-	volatile unsigned int *rtc_dat_reg = (void *)ATLAS_RTC_DAT_REG;
+/*
+ * SEAD UART register base.
+ */
+#define SEAD_UART0_REGS_BASE    (0x1f000800)
+#define SEAD_BASE_BAUD ( 3686400 / 16 )
 
-	*rtc_adr_reg = addr;
-
-	return *rtc_dat_reg;
-}
-
-static void atlas_rtc_write_data(unsigned char data, unsigned long addr)
-{
-	volatile unsigned int *rtc_adr_reg = (void *)ATLAS_RTC_ADR_REG;
-	volatile unsigned int *rtc_dat_reg = (void *)ATLAS_RTC_DAT_REG;
-
-	*rtc_adr_reg = addr;
-	*rtc_dat_reg = data;
-}
-
-static int atlas_rtc_bcd_mode(void)
-{
-	return 0;
-}
-
-struct rtc_ops atlas_rtc_ops = {
-	&atlas_rtc_read_data,
-	&atlas_rtc_write_data,
-	&atlas_rtc_bcd_mode
-};
-
+#endif /* !(_MIPS_SEAD_H) */
