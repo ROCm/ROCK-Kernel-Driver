@@ -62,7 +62,6 @@ extern int eth16i_probe(struct net_device *);
 extern int depca_probe(struct net_device *);
 extern int i82596_probe(struct net_device *);
 extern int ewrk3_probe(struct net_device *);
-extern int de4x5_probe(struct net_device *);
 extern int el1_probe(struct net_device *);
 extern int wavelan_probe(struct net_device *);
 extern int arlan_probe(struct net_device *);
@@ -152,12 +151,9 @@ static int __init probe_list(struct net_device *dev, struct devprobe *plist)
  * This is a bit of an artificial separation as there are PCI drivers
  * that also probe for EISA cards (in the PCI group) and there are ISA
  * drivers that probe for EISA cards (in the ISA group).  These are the
- * EISA only driver probes, and also the legacy PCI probes
+ * legacy EISA only driver probes, and also the legacy PCI probes
  */
 static struct devprobe eisa_probes[] __initdata = {
-#ifdef CONFIG_DE4X5             /* DEC DE425, DE434, DE435 adapters */
-	{de4x5_probe, 0},
-#endif
 #ifdef CONFIG_ULTRA32 
 	{ultra32_probe, 0},	
 #endif
