@@ -440,6 +440,32 @@ CONFIG_ITANIUM_BSTEP_SPECIFIC
   with a B-step CPU.  You have a B-step CPU if the "revision" field in
   /proc/cpuinfo has a value in the range from 1 to 4.
 
+CONFIG_IA64_SGI_AUTOTEST
+  Build a kernel used for hardware validation. If you include the
+  keyword "autotest" on the boot command line, the kernel does NOT boot.
+  Instead, it starts all cpus and runs cache coherency tests instead.
+
+  If unsure, say N.
+
+CONFIG_IA64_SGI_SN_DEBUG
+  Turns on extra debugging code in the SGI SN (Scalable NUMA) platform
+  for IA64.  Unless you are debugging problems on an SGI SN IA64 box,
+  say N.
+
+CONFIG_IA64_SGI_SN_SIM
+  If you are compiling a kernel that will run under SGI's IA64
+  simulator (Medusa) then say Y, otherwise say N.
+
+CONFIG_SERIAL_SGI_L1_PROTOCOL
+  Uses protocol mode instead of raw mode for the level 1 console on the
+  SGI SN (Scalable NUMA) platform for IA64.  If you are compiling for
+  an SGI SN box then Y is the recommended value, otherwise say N.
+
+CONFIG_PCIBA
+  IRIX PCIBA-inspired user mode PCI interface for the SGI SN (Scalable
+  NUMA) platform for IA64.  Unless you are compiling a kernel for an
+  SGI SN IA64 box, say N.
+
 CONFIG_IA64_MCA
   Say Y here to enable machine check support for IA-64.  If you're
   unsure, answer Y.
