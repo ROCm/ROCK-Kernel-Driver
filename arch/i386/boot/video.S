@@ -133,9 +133,9 @@ vid1:
 #ifdef CONFIG_VIDEO_RETAIN
 	call	restore_screen			# Restore screen contents
 #endif /* CONFIG_VIDEO_RETAIN */
+	call	store_edid
 #endif /* CONFIG_VIDEO_SELECT */
 	call	mode_params			# Store mode parameters
-	call	store_edid
 	popw	%ds				# Restore original DS
 	ret
 
