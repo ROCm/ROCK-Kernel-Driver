@@ -130,8 +130,7 @@ nfs_direct_read_seg(struct inode *inode, struct nfs_open_context *ctx,
 		.cred		= ctx->cred,
 		.args		= {
 			.fh		= NFS_FH(inode),
-			.lockowner	= ctx->lockowner,
-			.state		= ctx->state,
+			.context	= ctx,
 		},
 		.res		= {
 			.fattr		= &rdata.fattr,
@@ -262,8 +261,7 @@ nfs_direct_write_seg(struct inode *inode, struct nfs_open_context *ctx,
 		.cred		= ctx->cred,
 		.args		= {
 			.fh		= NFS_FH(inode),
-			.lockowner	= ctx->lockowner,
-			.state		= ctx->state,
+			.context	= ctx,
 		},
 		.res		= {
 			.fattr		= &wdata.fattr,

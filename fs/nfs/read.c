@@ -109,8 +109,7 @@ static int nfs_readpage_sync(struct nfs_open_context *ctx, struct inode *inode,
 	rdata->inode = inode;
 	INIT_LIST_HEAD(&rdata->pages);
 	rdata->args.fh = NFS_FH(inode);
-	rdata->args.lockowner = ctx->lockowner;
-	rdata->args.state = ctx->state;
+	rdata->args.context = ctx;
 	rdata->args.pages = &page;
 	rdata->args.pgbase = 0UL;
 	rdata->args.count = rsize;
@@ -227,8 +226,7 @@ static void nfs_read_rpcsetup(struct nfs_page *req, struct nfs_read_data *data,
 	data->args.pgbase = req->wb_pgbase + offset;
 	data->args.pages  = data->pagevec;
 	data->args.count  = count;
-	data->args.lockowner = req->wb_context->lockowner;
-	data->args.state  = req->wb_context->state;
+	data->args.context = req->wb_context;
 
 	data->res.fattr   = &data->fattr;
 	data->res.count   = count;

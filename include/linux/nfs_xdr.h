@@ -235,8 +235,7 @@ struct nfs_lockres {
 
 struct nfs_readargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	unsigned int		pgbase;
@@ -259,8 +258,7 @@ struct nfs_readres {
 
 struct nfs_writeargs {
 	struct nfs_fh *		fh;
-	fl_owner_t		lockowner;
-	struct nfs4_state *	state;
+	struct nfs_open_context *context;
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;

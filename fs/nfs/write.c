@@ -191,8 +191,7 @@ static int nfs_writepage_sync(struct nfs_open_context *ctx, struct inode *inode,
 	wdata->cred = ctx->cred;
 	wdata->inode = inode;
 	wdata->args.fh = NFS_FH(inode);
-	wdata->args.lockowner = ctx->lockowner;
-	wdata->args.state = ctx->state;
+	wdata->args.context = ctx;
 	wdata->args.pages = &page;
 	wdata->args.stable = NFS_FILE_SYNC;
 	wdata->args.pgbase = offset;
@@ -874,8 +873,7 @@ static void nfs_write_rpcsetup(struct nfs_page *req,
 	data->args.pgbase = req->wb_pgbase + offset;
 	data->args.pages  = data->pagevec;
 	data->args.count  = count;
-	data->args.lockowner = req->wb_context->lockowner;
-	data->args.state  = req->wb_context->state;
+	data->args.context = req->wb_context;
 
 	data->res.fattr   = &data->fattr;
 	data->res.count   = count;
