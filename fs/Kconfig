@@ -575,6 +575,11 @@ config UDF_FS
 
 	  If unsure, say N.
 
+config UDF_NLS
+	bool
+	default y
+	depends on (UDF_FS=m && NLS) || (UDF_FS=y && NLS=y)
+
 endmenu
 
 menu "DOS/FAT/NT Filesystems"
