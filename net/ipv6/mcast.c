@@ -2110,6 +2110,11 @@ void ipv6_mc_destroy_dev(struct inet6_dev *idev)
 	 */
 	__ipv6_dev_mc_dec(idev->dev, idev, &maddr);
 
+	if (idev->cnf.forwarding) {
+		ipv6_addr_all_routers(&maddr);
+		__ipv6_dev_mc_dec(idev->dev, idev, &maddr);
+	}
+
 	write_lock_bh(&idev->lock);
 	while ((i = idev->mc_list) != NULL) {
 		idev->mc_list = i->next;
