@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#190 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#194 $
  *
  * $FreeBSD$
  */
@@ -4401,7 +4401,7 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 
 		sgptr = ahd_inb_scbram(ahd, SCB_RESIDUAL_SGPTR);
 		if ((sgptr & SG_LIST_NULL) != 0
-		 && ahd_inb(ahd, DATA_COUNT_ODD) == 1) {
+		 && (ahd_inb(ahd, SCB_TASK_ATTRIBUTE) & SCB_XFERLEN_ODD) != 0) {
 			/*
 			 * If the residual occurred on the last
 			 * transfer and the transfer request was
@@ -4414,29 +4414,20 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 			uint32_t sglen;
 
 			/* Pull in the rest of the sgptr */
-			sgptr |=
-			    (ahd_inb_scbram(ahd, SCB_RESIDUAL_SGPTR + 3) << 24)
-			  | (ahd_inb_scbram(ahd, SCB_RESIDUAL_SGPTR + 2) << 16)
-			  | (ahd_inb_scbram(ahd, SCB_RESIDUAL_SGPTR + 1) << 8);
-			sgptr &= SG_PTR_MASK;
-			data_cnt =
-			    (ahd_inb_scbram(ahd, SCB_RESIDUAL_DATACNT+3) << 24)
-			  | (ahd_inb_scbram(ahd, SCB_RESIDUAL_DATACNT+2) << 16)
-			  | (ahd_inb_scbram(ahd, SCB_RESIDUAL_DATACNT+1) << 8)
-			  | (ahd_inb_scbram(ahd, SCB_RESIDUAL_DATACNT));
-
-			data_addr = (((uint64_t)ahd_inb(ahd, SHADDR + 7)) << 56)
-				  | (((uint64_t)ahd_inb(ahd, SHADDR + 6)) << 48)
-				  | (((uint64_t)ahd_inb(ahd, SHADDR + 5)) << 40)
-				  | (((uint64_t)ahd_inb(ahd, SHADDR + 4)) << 32)
-				  | (ahd_inb(ahd, SHADDR + 3) << 24)
-				  | (ahd_inb(ahd, SHADDR + 2) << 16)
-				  | (ahd_inb(ahd, SHADDR + 1) << 8)
-				  | (ahd_inb(ahd, SHADDR));
-
+			sgptr = ahd_inl_scbram(ahd, SCB_RESIDUAL_SGPTR);
+			data_cnt = ahd_inl_scbram(ahd, SCB_RESIDUAL_DATACNT);
+			if ((sgptr & SG_LIST_NULL) != 0) {
+				/*
+				 * The residual data count is not updated
+				 * for the command run to completion case.
+				 * Explicitly zero the count.
+				 */
+				data_cnt &= ~AHD_SG_LEN_MASK;
+			}
+			data_addr = ahd_inq(ahd, SHADDR);
 			data_cnt += 1;
 			data_addr -= 1;
-
+			sgptr &= SG_PTR_MASK;
 			if ((ahd->flags & AHD_64BIT_ADDRESSING) != 0) {
 				struct ahd_dma64_seg *sg;
 
@@ -4504,16 +4495,17 @@ ahd_handle_ign_wide_residue(struct ahd_softc *ahd, struct ahd_devinfo *devinfo)
 								  sg);
 				}
 			}
-			ahd_outb(ahd, SCB_RESIDUAL_SGPTR + 3, sgptr >> 24);
-			ahd_outb(ahd, SCB_RESIDUAL_SGPTR + 2, sgptr >> 16);
-			ahd_outb(ahd, SCB_RESIDUAL_SGPTR + 1, sgptr >> 8);
-			ahd_outb(ahd, SCB_RESIDUAL_SGPTR, sgptr);
+			/*
+			 * Toggle the "oddness" of the transfer length
+			 * to handle this mid-transfer ignore wide
+			 * residue.  This ensures that the oddness is
+			 * correct for subsequent data transfers.
+			 */
+			ahd_outb(ahd, SCB_TASK_ATTRIBUTE,
+			    ahd_inb(ahd, SCB_TASK_ATTRIBUTE) ^ SCB_XFERLEN_ODD);
 
-			ahd_outb(ahd, SCB_RESIDUAL_DATACNT + 3, data_cnt >> 24);
-			ahd_outb(ahd, SCB_RESIDUAL_DATACNT + 2, data_cnt >> 16);
-			ahd_outb(ahd, SCB_RESIDUAL_DATACNT + 1, data_cnt >> 8);
-			ahd_outb(ahd, SCB_RESIDUAL_DATACNT, data_cnt);
-
+			ahd_outl(ahd, SCB_RESIDUAL_SGPTR, sgptr);
+			ahd_outl(ahd, SCB_RESIDUAL_DATACNT, data_cnt);
 			/*
 			 * The FIFO's pointers will be updated if/when the
 			 * sequencer re-enters a data phase.
@@ -4806,12 +4798,12 @@ ahd_alloc(void *platform_arg, char *name)
 		   | AHD_EXTENDED_TRANS_A|AHD_STPWLEVEL_A;
 	ahd_timer_init(&ahd->reset_timer);
 	ahd_timer_init(&ahd->stat_timer);
-	ahd->int_coalessing_timer = AHD_INT_COALESSING_TIMER_DEFAULT;
-	ahd->int_coalessing_maxcmds = AHD_INT_COALESSING_MAXCMDS_DEFAULT;
-	ahd->int_coalessing_mincmds = AHD_INT_COALESSING_MINCMDS_DEFAULT;
-	ahd->int_coalessing_threshold = AHD_INT_COALESSING_THRESHOLD_DEFAULT;
-	ahd->int_coalessing_stop_threshold =
-	    AHD_INT_COALESSING_STOP_THRESHOLD_DEFAULT;
+	ahd->int_coalescing_timer = AHD_INT_COALESCING_TIMER_DEFAULT;
+	ahd->int_coalescing_maxcmds = AHD_INT_COALESCING_MAXCMDS_DEFAULT;
+	ahd->int_coalescing_mincmds = AHD_INT_COALESCING_MINCMDS_DEFAULT;
+	ahd->int_coalescing_threshold = AHD_INT_COALESCING_THRESHOLD_DEFAULT;
+	ahd->int_coalescing_stop_threshold =
+	    AHD_INT_COALESCING_STOP_THRESHOLD_DEFAULT;
 
 	if (ahd_platform_alloc(ahd, platform_arg) != 0) {
 		ahd_free(ahd);
@@ -5722,6 +5714,7 @@ ahd_alloc_scbs(struct ahd_softc *ahd)
 		next_scb->sg_list = segs;
 		next_scb->sense_data = sense_data;
 		next_scb->sense_busaddr = sense_busaddr;
+		memset(hscb, 0, sizeof(*hscb));
 		next_scb->hscb = hscb;
 		hscb->hscb_busaddr = ahd_htole32(hscb_busaddr);
 
@@ -6341,14 +6334,14 @@ ahd_chip_init(struct ahd_softc *ahd)
 	ahd_outb(ahd, NEXT_QUEUED_SCB_ADDR + 3, (busaddr >> 24) & 0xFF);
 
 	/*
-	 * Default to coalessing disabled.
+	 * Default to coalescing disabled.
 	 */
-	ahd_outw(ahd, INT_COALESSING_CMDCOUNT, 0);
+	ahd_outw(ahd, INT_COALESCING_CMDCOUNT, 0);
 	ahd_outw(ahd, CMDS_PENDING, 0);
-	ahd_update_coalessing_values(ahd, ahd->int_coalessing_timer,
-				     ahd->int_coalessing_maxcmds,
-				     ahd->int_coalessing_mincmds);
-	ahd_enable_coalessing(ahd, FALSE);
+	ahd_update_coalescing_values(ahd, ahd->int_coalescing_timer,
+				     ahd->int_coalescing_maxcmds,
+				     ahd->int_coalescing_mincmds);
+	ahd_enable_coalescing(ahd, FALSE);
 
 	ahd_loadseq(ahd);
 	ahd_set_modes(ahd, AHD_MODE_SCSI, AHD_MODE_SCSI);
@@ -6601,30 +6594,30 @@ ahd_intr_enable(struct ahd_softc *ahd, int enable)
 }
 
 void
-ahd_update_coalessing_values(struct ahd_softc *ahd, u_int timer, u_int maxcmds,
+ahd_update_coalescing_values(struct ahd_softc *ahd, u_int timer, u_int maxcmds,
 			     u_int mincmds)
 {
 	if (timer > AHD_TIMER_MAX_US)
 		timer = AHD_TIMER_MAX_US;
-	ahd->int_coalessing_timer = timer;
+	ahd->int_coalescing_timer = timer;
 
-	if (maxcmds > AHD_INT_COALESSING_MAXCMDS_MAX)
-		maxcmds = AHD_INT_COALESSING_MAXCMDS_MAX;
-	if (mincmds > AHD_INT_COALESSING_MINCMDS_MAX)
-		mincmds = AHD_INT_COALESSING_MINCMDS_MAX;
-	ahd->int_coalessing_maxcmds = maxcmds;
-	ahd_outw(ahd, INT_COALESSING_TIMER, timer / AHD_TIMER_US_PER_TICK);
-	ahd_outb(ahd, INT_COALESSING_MAXCMDS, -maxcmds);
-	ahd_outb(ahd, INT_COALESSING_MINCMDS, -mincmds);
+	if (maxcmds > AHD_INT_COALESCING_MAXCMDS_MAX)
+		maxcmds = AHD_INT_COALESCING_MAXCMDS_MAX;
+	if (mincmds > AHD_INT_COALESCING_MINCMDS_MAX)
+		mincmds = AHD_INT_COALESCING_MINCMDS_MAX;
+	ahd->int_coalescing_maxcmds = maxcmds;
+	ahd_outw(ahd, INT_COALESCING_TIMER, timer / AHD_TIMER_US_PER_TICK);
+	ahd_outb(ahd, INT_COALESCING_MAXCMDS, -maxcmds);
+	ahd_outb(ahd, INT_COALESCING_MINCMDS, -mincmds);
 }
 
 void
-ahd_enable_coalessing(struct ahd_softc *ahd, int enable)
+ahd_enable_coalescing(struct ahd_softc *ahd, int enable)
 {
 
-	ahd->hs_mailbox &= ~ENINT_COALESS;
+	ahd->hs_mailbox &= ~ENINT_COALESCE;
 	if (enable)
-		ahd->hs_mailbox |= ENINT_COALESS;
+		ahd->hs_mailbox |= ENINT_COALESCE;
 	ahd_outb(ahd, HS_MAILBOX, ahd->hs_mailbox);
 	ahd_flush_device_writes(ahd);
 	ahd_run_qoutfifo(ahd);
@@ -7718,20 +7711,20 @@ ahd_stat_timer(void *arg)
 	}
 	ahd_lock(ahd, &s);
 
-	enint_coal = ahd->hs_mailbox & ENINT_COALESS;
-	if (ahd->cmdcmplt_total > ahd->int_coalessing_threshold)
-		enint_coal |= ENINT_COALESS;
-	else if (ahd->cmdcmplt_total < ahd->int_coalessing_stop_threshold)
-		enint_coal &= ~ENINT_COALESS;
+	enint_coal = ahd->hs_mailbox & ENINT_COALESCE;
+	if (ahd->cmdcmplt_total > ahd->int_coalescing_threshold)
+		enint_coal |= ENINT_COALESCE;
+	else if (ahd->cmdcmplt_total < ahd->int_coalescing_stop_threshold)
+		enint_coal &= ~ENINT_COALESCE;
 
-	if (enint_coal != (ahd->hs_mailbox & ENINT_COALESS)) {
-		ahd_enable_coalessing(ahd, enint_coal);
+	if (enint_coal != (ahd->hs_mailbox & ENINT_COALESCE)) {
+		ahd_enable_coalescing(ahd, enint_coal);
 #ifdef AHD_DEBUG
-		if ((ahd_debug & AHD_SHOW_INT_COALESSING) != 0)
-			printf("%s: Interrupt coalessing "
+		if ((ahd_debug & AHD_SHOW_INT_COALESCING) != 0)
+			printf("%s: Interrupt coalescing "
 			       "now %sabled. Cmds %d\n",
 			       ahd_name(ahd),
-			       (enint_coal & ENINT_COALESS) ? "en" : "dis",
+			       (enint_coal & ENINT_COALESCE) ? "en" : "dis",
 			       ahd->cmdcmplt_total);
 #endif
 	}
@@ -8279,8 +8272,6 @@ ahd_loadseq(struct ahd_softc *ahd)
 	download_consts[PKT_OVERRUN_BUFOFFSET] =
 		(ahd->overrun_buf - (uint8_t *)ahd->qoutfifo) / 256;
 	download_consts[SCB_TRANSFER_SIZE] = SCB_TRANSFER_SIZE_1BYTE_LUN;
-	if ((ahd->bugs & AHD_PKT_LUN_BUG) != 0)
-		download_consts[SCB_TRANSFER_SIZE] = SCB_TRANSFER_SIZE_FULL_LUN;
 	cur_patch = patches;
 	downloaded = 0;
 	skip_addr = 0;
@@ -8509,7 +8500,7 @@ sized:
 }
 
 void
-ahd_dump_all_cards_state()
+ahd_dump_all_cards_state(void)
 {
 	struct ahd_softc *list_ahd;
 
