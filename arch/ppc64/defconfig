@@ -636,7 +636,7 @@ CONFIG_XMON_DEFAULT=y
 #
 # Security options
 #
-CONFIG_SECURITY_CAPABILITIES=y
+# CONFIG_SECURITY is not set
 
 #
 # Cryptographic options

@@ -191,8 +191,10 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 #ifdef CONFIG_PPC_ISERIES
 		set_ti_thread_flag(p->thread_info, TIF_RUN_LIGHT);
 #endif
-	} else
+	} else {
+		childregs->gpr[1] = usp;
 		p->thread.regs = childregs;
+	}
 	childregs->gpr[3] = 0;  /* Result from fork() */
 	sp -= STACK_FRAME_OVERHEAD;
 
@@ -266,12 +268,16 @@ int get_fpexc_mode(struct task_struct *tsk, unsigned long adr)
 	return put_user(val, (unsigned int *) adr);
 }
 
-int sys_clone(unsigned long clone_flags, u32 p2, u32 p3, u32 p4, u32 p5,
-	      u32 p6, struct pt_regs *regs)
+int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
+	      unsigned long p4, unsigned long p5, unsigned long p6,
+	      struct pt_regs *regs)
 {
 	struct task_struct *p;
 	unsigned long parent_tidptr = 0;
 	unsigned long child_tidptr = 0;
+
+	if (p2 == 0)
+		p2 = regs->gpr[1];	/* stack pointer for child */
 
 	if (clone_flags & (CLONE_PARENT_SETTID | CLONE_CHILD_SETTID |
 			   CLONE_CHILD_CLEARTID)) {
@@ -286,12 +292,13 @@ int sys_clone(unsigned long clone_flags, u32 p2, u32 p3, u32 p4, u32 p5,
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
 
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, regs->gpr[1], regs, 0,
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
 		    (int *)parent_tidptr, (int *)child_tidptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
-int sys_fork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6,
+int sys_fork(unsigned long p1, unsigned long p2, unsigned long p3,
+	     unsigned long p4, unsigned long p5, unsigned long p6,
 	     struct pt_regs *regs)
 {
 	struct task_struct *p;
@@ -303,7 +310,8 @@ int sys_fork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6,
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
-int sys_vfork(u32 p1, u32 p2, u32 p3, u32 p4, u32 p5, u32 p6,
+int sys_vfork(unsigned long p1, unsigned long p2, unsigned long p3,
+	      unsigned long p4, unsigned long p5, unsigned long p6,
 	      struct pt_regs *regs)
 {
 	struct task_struct *p;

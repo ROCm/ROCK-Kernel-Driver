@@ -485,8 +485,10 @@ _GLOBAL(cvt_df)
 _GLOBAL(kernel_thread)
 	/* XXX fix this when we optimise syscall entry to not save volatiles */
 	mr	r6,r3		/* function */
+	mr	r7,r4		/* arg */
 	ori	r3,r5,CLONE_VM	/* flags */
 	oris	r3,r3,(CLONE_UNTRACED>>16)
+	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
 	cmpi	0,r3,0		/* parent or child? */
@@ -496,7 +498,7 @@ _GLOBAL(kernel_thread)
 	ld	r2,8(r6)
 	ld	r6,0(r6)
 	mtlr	r6              /* fn addr in lr */
-	mr	r3,r4	        /* load arg and call fn */
+	mr	r3,r7	        /* load arg and call fn */
 	blrl
 	li	r0,__NR_exit	/* exit after child exits */
         li	r3,0
