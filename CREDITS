@@ -156,6 +156,14 @@ S: University of Calgary
 S: Calgary, Alberta
 S: Canada
 
+N: Miles Bader
+E: miles@gnu.org
+D: v850 port (uClinux)
+S: NEC Corporation
+S: 1753 Shimonumabe, Nakahara-ku
+S: Kawasaki 211-8666
+S: Japan
+
 N: Ralf Baechle
 E: ralf@gnu.org
 P: 1024/AF7B30C1 CF 97 C2 CC 6D AE A7 FE  C8 BA 9C FC 88 DE 32 C3
