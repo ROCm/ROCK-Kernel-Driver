@@ -315,6 +315,7 @@ enum uhci_state {
 };
 
 #define hcd_to_uhci(hcd_ptr) container_of(hcd_ptr, struct uhci_hcd, hcd)
+#define uhci_dev(u)	((u)->hcd.self.controller)
 
 /*
  * This describes the full uhci information.
@@ -422,4 +423,3 @@ struct urb_priv {
  */
 
 #endif
-

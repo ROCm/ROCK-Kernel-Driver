@@ -1,7 +1,7 @@
 /*
  * Universal Host Controller Interface driver for USB.
  *
- * Maintainer: Johannes Erdfelt <johannes@erdfelt.com>
+ * Maintainer: Alan Stern <stern@rowland.harvard.edu>
  *
  * (C) Copyright 1999 Linus Torvalds
  * (C) Copyright 1999-2002 Johannes Erdfelt, johannes@erdfelt.com
@@ -9,6 +9,7 @@
  * (C) Copyright 1999 Georg Acher, acher@in.tum.de
  * (C) Copyright 1999 Deti Fliegl, deti@fliegl.de
  * (C) Copyright 1999 Thomas Sailer, sailer@ife.ee.ethz.ch
+ * (C) Copyright 2004 Alan Stern, stern@rowland.harvard.edu
  */
 
 static __u8 root_hub_hub_des[] =
@@ -122,9 +123,8 @@ static int uhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			wPortStatus |= 1 << USB_PORT_FEAT_LOWSPEED;
 
 		if (wPortChange)
-			dev_dbg (uhci->hcd.self.controller,
-				"port %d portsc %04x\n",
-				wIndex, status);
+			dev_dbg(uhci_dev(uhci), "port %d portsc %04x\n",
+					wIndex, status);
 
 		*(__u16 *)buf = cpu_to_le16(wPortStatus);
 		*(__u16 *)(buf + 2) = cpu_to_le16(wPortChange);
@@ -209,4 +209,3 @@ err:
 
 	return retval;
 }
-
