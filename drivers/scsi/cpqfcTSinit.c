@@ -938,9 +938,7 @@ int cpqfcTS_proc_info (char *buffer, char **start, off_t offset, int length,
   char buf[81];
 
   // Search the Scsi host list for our controller
-  for (host=scsi_hostlist; host; host=host->next)
-    if (host->host_no == hostno)
-      break;
+  host = scsi_host_hn_get(hostno);
 
   if (!host) return -ESRCH;
 
