@@ -605,6 +605,7 @@ struct nfs_read_data {
 };
 
 struct nfs_write_data {
+	int			flags;
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
@@ -635,10 +636,7 @@ struct nfs_rpc_ops {
 	int	(*access)  (struct inode *, struct rpc_cred *, int);
 	int	(*readlink)(struct inode *, struct page *);
 	int	(*read)    (struct nfs_read_data *);
-	int	(*write)   (struct inode *, struct rpc_cred *,
-			    struct nfs_fattr *,
-			    int, unsigned int, unsigned int,
-			    struct page *, struct nfs_writeverf *verfp);
+	int	(*write)   (struct nfs_write_data *);
 	int	(*commit)  (struct inode *, struct nfs_fattr *,
 			    unsigned long, unsigned int);
 	int	(*create)  (struct inode *, struct qstr *, struct iattr *,

@@ -174,45 +174,30 @@ nfs_proc_read(struct nfs_read_data *rdata)
 }
 
 static int
-nfs_proc_write(struct inode *inode, struct rpc_cred *cred,
-	       struct nfs_fattr *fattr, int how,
-	       unsigned int base, unsigned int count,
-	       struct page *page, struct nfs_writeverf *verf)
+nfs_proc_write(struct nfs_write_data *wdata)
 {
-	u64			offset = page_offset(page) + base;
-	struct nfs_writeargs	arg = {
-		.fh		= NFS_FH(inode),
-		.offset		= offset,
-		.count		= count,
-		.stable		= NFS_FILE_SYNC,
-		.pgbase		= base,
-		.pages		= &page
-	};
-	struct nfs_writeres     res = {
-		.fattr		= fattr,
-		.verf		= verf,
-		.count		= count
-	};
+	int			flags = wdata->flags;
+	struct inode *		inode = wdata->inode;
+	struct nfs_fattr *	fattr = wdata->res.fattr;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
-		.rpc_argp	= &arg,
-		.rpc_resp	= &res,
-		.rpc_cred	= cred
+		.rpc_argp	= &wdata->args,
+		.rpc_resp	= &wdata->res,
+		.rpc_cred	= wdata->cred
 	};
-	int			status, flags = 0;
+	int			status;
 
-	dprintk("NFS call  write %d @ %Ld\n", count, (long long)offset);
+	dprintk("NFS call  write %d @ %Ld\n", wdata->args.count,
+			(long long) wdata->args.offset);
 	fattr->valid = 0;
-	if (how & NFS_RW_SWAP)
-		flags |= NFS_RPC_SWAPFLAGS;
 	status = rpc_call_sync(NFS_CLIENT(inode), &msg, flags);
-
-	if (status >= 0)
+	if (status >= 0) {
 		nfs_write_refresh_inode(inode, fattr);
-
+		wdata->res.count = wdata->args.count;
+		wdata->verf.committed = NFS_FILE_SYNC;
+	}
 	dprintk("NFS reply write: %d\n", status);
-	verf->committed = NFS_FILE_SYNC;      /* NFSv2 always syncs data */
-	return status < 0? status : count;
+	return status < 0? status : wdata->res.count;
 }
 
 static int

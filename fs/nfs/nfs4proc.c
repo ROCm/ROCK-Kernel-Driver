@@ -1061,51 +1061,41 @@ nfs4_proc_read(struct nfs_read_data *rdata)
 }
 
 static int
-nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
-		struct nfs_fattr *fattr, int flags,
-		unsigned int base, unsigned int count,
-		struct page *page, struct nfs_writeverf *verf)
+nfs4_proc_write(struct nfs_write_data *wdata)
 {
+	int rpcflags = wdata->flags;
+	struct inode *inode = wdata->inode;
+	struct nfs_fattr *fattr = wdata->res.fattr;
+	nfs4_stateid *stateid = &wdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
-	struct nfs4_state_owner	*sp;
-	uint64_t offset = page_offset(page) + base;
-	struct nfs_writeargs arg = {
-		.fh		= NFS_FH(inode),
-		.offset		= offset,
-		.count		= count,
-		.stable		= (flags & NFS_RW_SYNC) ? NFS_FILE_SYNC : NFS_UNSTABLE,
-		.pgbase		= base,
-		.pages		= &page,
-	};
-	struct nfs_writeres res = {
-		.fattr		= fattr,
-		.count		= count,
-		.verf		= verf,
-	};
+	struct nfs4_state_owner *sp;
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
-		.rpc_argp	= &arg,
-		.rpc_resp	= &res,
-		.rpc_cred	= cred,
+		.rpc_argp	= &wdata->args,
+		.rpc_resp	= &wdata->res,
+		.rpc_cred	= wdata->cred,
 	};
-	int			rpcflags = (flags & NFS_RW_SWAP) ? NFS_RPC_SWAPFLAGS : 0;
+	int status;
 
-	dprintk("NFS call  write %d @ %Ld\n", count, (long long)offset);
+	dprintk("NFS call  write %d @ %Ld\n", wdata->args.count,
+			(long long) wdata->args.offset);
 
 	/*
-	* Try first to use O_WRONLY, then O_RDWR stateid.
-	*/
+	 * Try first to use O_WRONLY, then O_RDWR stateid.
+	 */
 	sp = nfs4_get_inode_share(inode, O_WRONLY);
 	if (!sp)
 		sp = nfs4_get_inode_share(inode, O_RDWR);
 
 	if (sp)
-		memcpy(arg.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+		memcpy(stateid, sp->so_stateid, sizeof(nfs4_stateid));
 	else
-		memcpy(arg.stateid, zero_stateid, sizeof(nfs4_stateid));
+		memcpy(stateid, zero_stateid, sizeof(nfs4_stateid));
 
 	fattr->valid = 0;
-	return rpc_call_sync(server->client, &msg, rpcflags);
+	status = rpc_call_sync(server->client, &msg, rpcflags);
+	dprintk("NFS reply write: %d\n", status);
+	return status;
 }
 
 /*
