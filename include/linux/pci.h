@@ -1005,8 +1005,10 @@ struct pci_fixup {
 	void (*hook)(struct pci_dev *dev);
 };
 
-#define PCI_FIXUP_HEADER	1		/* Called immediately after reading configuration header */
-#define PCI_FIXUP_FINAL		2		/* Final phase of device fixups */
+enum pci_fixup_pass {
+	pci_fixup_header,	/* Called immediately after reading configuration header */
+	pci_fixup_final,	/* Final phase of device fixups */
+};
 
 /* Anonymous variables would be nice... */
 #define DECLARE_PCI_FIXUP_HEADER(vendor, device, hook)					\
@@ -1019,8 +1021,7 @@ struct pci_fixup {
 	__attribute__((__section__(".pci_fixup_final"))) = {				\
 		vendor, device, hook };
 
-
-void pci_fixup_device(int pass, struct pci_dev *dev);
+void pci_fixup_device(enum pci_fixup_pass pass, struct pci_dev *dev);
 
 extern int pci_pci_problems;
 #define PCIPCI_FAIL		1
