@@ -2748,7 +2748,7 @@ static int transmit_802_3_packet(struct airo_info *ai, int len, char *pPacket)
 
 	len >>= 16;
 
-	if (len < ETH_ALEN * 2) {
+	if (len <= ETH_ALEN * 2) {
 		printk( KERN_WARNING "Short packet %d\n", len );
 		return ERROR;
 	}
