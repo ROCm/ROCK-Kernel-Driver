@@ -593,6 +593,8 @@ do_boot_cpu(__u8 cpu)
 	if(IS_ERR(idle))
 		panic("failed fork for CPU%d", cpu);
 
+	wake_up_forked_process(idle);
+
 	init_idle(idle, cpu);
 
 	idle->thread.eip = (unsigned long) start_secondary;
