@@ -34,6 +34,7 @@
 #include <asm/arch/pxa-regs.h>
 #include <asm/arch/mainstone.h>
 #include <asm/arch/pxafb.h>
+#include <asm/arch/mmc.h>
 
 #include "generic.h"
 
@@ -170,6 +171,61 @@ static struct pxafb_mach_info toshiba_ltm035a776c __initdata = {
 	.pxafb_backlight_power	= mainstone_backlight_power,
 };
 
+static int mainstone_mci_init(struct device *dev, irqreturn_t (*mstone_detect_int)(int, void *, struct pt_regs *), void *data)
+{
+	int err;
+
+	/*
+	 * setup GPIO for PXA27x MMC controller
+	 */
+	pxa_gpio_mode(GPIO32_MMCCLK_MD);
+	pxa_gpio_mode(GPIO112_MMCCMD_MD);
+	pxa_gpio_mode(GPIO92_MMCDAT0_MD);
+	pxa_gpio_mode(GPIO109_MMCDAT1_MD);
+	pxa_gpio_mode(GPIO110_MMCDAT2_MD);
+	pxa_gpio_mode(GPIO111_MMCDAT3_MD);
+
+	/* make sure SD/Memory Stick multiplexer's signals
+	 * are routed to MMC controller
+	 */
+	MST_MSCWR1 &= ~MST_MSCWR1_MS_SEL;
+
+	err = request_irq(MAINSTONE_MMC_IRQ, mstone_detect_int, SA_INTERRUPT,
+			     "MMC card detect", data);
+	if (err) {
+		printk(KERN_ERR "mainstone_mci_init: MMC/SD: can't request MMC card detect IRQ\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+static void mainstone_mci_setpower(struct device *dev, unsigned int vdd)
+{
+	struct pxamci_platform_data* p_d = dev->platform_data;
+
+	if (( 1 << vdd) & p_d->ocr_mask) {
+		printk(KERN_DEBUG "%s: on\n", __FUNCTION__);
+		MST_MSCWR1 |= MST_MSCWR1_MMC_ON;
+		MST_MSCWR1 &= ~MST_MSCWR1_MS_SEL;
+	} else {
+		printk(KERN_DEBUG "%s: off\n", __FUNCTION__);
+		MST_MSCWR1 &= ~MST_MSCWR1_MMC_ON;
+	}
+}
+
+static void mainstone_mci_exit(struct device *dev, void *data)
+{
+	free_irq(MAINSTONE_MMC_IRQ, data);
+}
+
+static struct pxamci_platform_data mainstone_mci_platform_data = {
+	.ocr_mask	= MMC_VDD_32_33|MMC_VDD_33_34,
+	.init 		= mainstone_mci_init,
+	.setpower 	= mainstone_mci_setpower,
+	.exit		= mainstone_mci_exit,
+};
+
 static void __init mainstone_init(void)
 {
 	platform_device_register(&smc91x_device);
@@ -180,6 +236,8 @@ static void __init mainstone_init(void)
 		set_pxa_fb_info(&toshiba_ltm04c380k);
 	else
 		set_pxa_fb_info(&toshiba_ltm035a776c);
+
+	pxa_set_mci_info(&mainstone_mci_platform_data);
 }
 
 
