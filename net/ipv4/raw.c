@@ -647,7 +647,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 
 		default:
 #ifdef CONFIG_IP_MROUTE
-			return ipmr_ioctl(sk, cmd, arg);
+			return ipmr_ioctl(sk, cmd, (void __user *)arg);
 #else
 			return -ENOIOCTLCMD;
 #endif
