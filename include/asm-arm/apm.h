@@ -15,7 +15,7 @@
 
 #include <linux/config.h>
 
-#ifdef CONFIG_APM
+#if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 
 
 #define APM_AC_OFFLINE 0
