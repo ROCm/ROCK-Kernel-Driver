@@ -41,6 +41,8 @@
 #include <asm/arch_hooks.h>
 #include "setup_arch_pre.h"
 
+int disable_pse __initdata = 0;
+
 static inline char * __init machine_specific_memory_setup(void);
 
 /*
@@ -523,6 +525,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (!memcmp(from+4, "nopentium", 9)) {
 				from += 9+4;
 				clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
+				disable_pse = 1;
 			} else if (!memcmp(from+4, "exactmap", 8)) {
 				from += 8+4;
 				e820.nr_map = 0;
