@@ -130,6 +130,7 @@ static void cleanup_card(struct net_device *dev)
 		iounmap((void *)dev->mem_start);
 }
 
+#ifndef MODULE
 struct net_device * __init ac3200_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -154,6 +155,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init ac_probe1(int ioaddr, struct net_device *dev)
 {

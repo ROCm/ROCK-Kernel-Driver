@@ -284,6 +284,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, NE_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init ne2_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -308,6 +309,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int ne2_procinfo(char *buf, int slot, struct net_device *dev)
 {

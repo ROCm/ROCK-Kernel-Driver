@@ -142,6 +142,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr - NIC_OFFSET, HP_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init hp_plus_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -166,6 +167,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /* Do the interesting part of the probe at a single address. */
 static int __init hpp_probe1(struct net_device *dev, int ioaddr)

@@ -147,6 +147,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, EL2_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init el2_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -171,6 +172,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /* Probe for the Etherlink II card at I/O port base IOADDR,
    returning non-zero on success.  If found, set the station

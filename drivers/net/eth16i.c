@@ -458,6 +458,7 @@ static int __init do_eth16i_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+#ifndef MODULE
 struct net_device * __init eth16i_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct eth16i_local));
@@ -483,6 +484,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init eth16i_probe1(struct net_device *dev, int ioaddr)
 {

@@ -432,6 +432,7 @@ static int __init do_lance_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+#ifndef MODULE
 struct net_device * __init lance_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(0);
@@ -456,6 +457,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init lance_probe1(struct net_device *dev, int ioaddr, int irq, int options)
 {

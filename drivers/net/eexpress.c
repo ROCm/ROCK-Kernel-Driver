@@ -423,6 +423,7 @@ static int __init do_express_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+#ifndef MODULE
 struct net_device * __init express_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct net_local));
@@ -443,6 +444,7 @@ struct net_device * __init express_probe(int unit)
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /*
  * open and initialize the adapter, ready for use

@@ -341,6 +341,7 @@ static int num_ewrks3s;
     mdelay(1);\
 }
 
+#ifndef MODULE
 struct net_device * __init ewrk3_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct ewrk3_private));
@@ -364,6 +365,7 @@ out:
 	return ERR_PTR(err);
 	
 }
+#endif
 
 static int __init ewrk3_probe1(struct net_device *dev, u_long iobase, int irq)
 {

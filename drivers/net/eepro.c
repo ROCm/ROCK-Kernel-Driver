@@ -577,6 +577,7 @@ static int __init do_eepro_probe(struct net_device *dev)
 	return -ENODEV;
 }
 
+#ifndef MODULE
 struct net_device * __init eepro_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct eepro_local));
@@ -603,6 +604,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static void __init printEEPROMInfo(short ioaddr, struct net_device *dev)
 {

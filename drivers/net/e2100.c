@@ -144,6 +144,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, E21_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init e2100_probe(int unit)
 {
 	struct net_device *dev = alloc_ei_netdev();
@@ -168,6 +169,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 static int __init e21_probe1(struct net_device *dev, int ioaddr)
 {

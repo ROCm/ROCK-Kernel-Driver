@@ -261,7 +261,6 @@ static int __init media_fn(char *str)
 }
 
 __setup("cs89x0_media=", media_fn);
-#endif
 
 
 /* Check for a network adaptor of this type, and return '0' iff one exists.
@@ -318,6 +317,7 @@ out:
 	printk(KERN_WARNING "cs89x0: no cs8900 or cs8920 detected.  Be sure to disable PnP with SETUP\n");
 	return ERR_PTR(err);
 }
+#endif
 
 static int
 readreg(struct net_device *dev, int portno)

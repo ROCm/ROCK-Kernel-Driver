@@ -585,6 +585,7 @@ static void cleanup_card(struct net_device *dev)
 	release_region(dev->base_addr, ELMC_IO_EXTENT);
 }
 
+#ifndef MODULE
 struct net_device * __init elmc_probe(int unit)
 {
 	struct net_device *dev = alloc_etherdev(sizeof(struct priv));
@@ -609,6 +610,7 @@ out:
 	free_netdev(dev);
 	return ERR_PTR(err);
 }
+#endif
 
 /**********************************************
  * init the chip (elmc-interrupt should be disabled?!)
