@@ -66,6 +66,8 @@ static __inline__ unsigned int full_name_hash(const unsigned char * name, unsign
 
 #define DNAME_INLINE_LEN 16
 
+struct dcookie_struct;
+ 
 struct dentry {
 	atomic_t d_count;
 	unsigned int d_flags;
@@ -84,6 +86,7 @@ struct dentry {
 	unsigned long d_vfs_flags;
 	void * d_fsdata;		/* fs-specific data */
 	unsigned char d_iname[DNAME_INLINE_LEN]; /* small names */
+	struct dcookie_struct * d_cookie; /* cookie, if any */
 };
 
 struct dentry_operations {

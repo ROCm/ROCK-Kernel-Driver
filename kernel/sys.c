@@ -20,6 +20,7 @@
 #include <linux/device.h>
 #include <linux/times.h>
 #include <linux/security.h>
+#include <linux/dcookies.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -202,6 +203,7 @@ asmlinkage long sys_ni_syscall(void)
 cond_syscall(sys_nfsservctl)
 cond_syscall(sys_quotactl)
 cond_syscall(sys_acct)
+cond_syscall(sys_lookup_dcookie)
 
 static int set_one_prio(struct task_struct *p, int niceval, int error)
 {
