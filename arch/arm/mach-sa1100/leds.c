@@ -17,6 +17,8 @@ sa1100_leds_init(void)
 {
 	if (machine_is_assabet())
 		leds_event = assabet_leds_event;
+ 	if (machine_is_consus())
+ 	        leds_event = consus_leds_event;
 	if (machine_is_brutus())
 		leds_event = brutus_leds_event;
 	if (machine_is_cerf())
