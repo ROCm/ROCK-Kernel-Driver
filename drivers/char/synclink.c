@@ -1873,7 +1873,7 @@ static void shutdown(struct mgsl_struct * info)
 
 	if (info->xmit_buf) {
 		free_page((unsigned long) info->xmit_buf);
-		info->xmit_buf = 0;
+		info->xmit_buf = NULL;
 	}
 
 	spin_lock_irqsave(&info->irq_spinlock,flags);
@@ -3260,7 +3260,7 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 	shutdown(info);
 	
 	tty->closing = 0;
-	info->tty = 0;
+	info->tty = NULL;
 	
 	if (info->blocked_open) {
 		if (info->close_delay) {
@@ -3381,7 +3381,7 @@ static void mgsl_hangup(struct tty_struct *tty)
 	
 	info->count = 0;	
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 
 	wake_up_interruptible(&info->open_wait);
 	
@@ -3592,7 +3592,7 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 cleanup:			
 	if (retval) {
 		if (tty->count == 1)
-			info->tty = 0; /* tty layer will release tty struct */
+			info->tty = NULL;/* tty layer will release tty struct */
 		if(info->count)
 			info->count--;
 	}
@@ -4341,11 +4341,11 @@ void mgsl_release_resources(struct mgsl_struct *info)
 	}
 	if (info->memory_base){
 		iounmap(info->memory_base);
-		info->memory_base = 0;
+		info->memory_base = NULL;
 	}
 	if (info->lcr_base){
 		iounmap(info->lcr_base - info->lcr_offset);
-		info->lcr_base = 0;
+		info->lcr_base = NULL;
 	}
 	
 	if ( debug_level >= DEBUG_LEVEL_INFO )

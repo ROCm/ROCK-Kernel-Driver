@@ -330,7 +330,7 @@ static void S24C16_write_ack(struct sym_device *np, u_char write_bit, u_char *gp
 			    u_char *gpcntl)
 {
 	OUTB (nc_gpcntl, *gpcntl & 0xfe);
-	S24C16_do_bit(np, 0, write_bit, gpreg);
+	S24C16_do_bit(np, NULL, write_bit, gpreg);
 	OUTB (nc_gpcntl, *gpcntl);
 }
 
@@ -356,7 +356,7 @@ static void S24C16_write_byte(struct sym_device *np, u_char *ack_data, u_char wr
 	int x;
 	
 	for (x = 0; x < 8; x++)
-		S24C16_do_bit(np, 0, (write_data >> (7 - x)) & 0x01, gpreg);
+		S24C16_do_bit(np, NULL, (write_data >> (7 - x)) & 0x01, gpreg);
 		
 	S24C16_read_ack(np, ack_data, gpreg, gpcntl);
 }

@@ -245,7 +245,7 @@ static struct tty_struct *pmz_receive_chars(struct uart_pmac_port *uap,
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
 				drop = 1;
 			if (ZS_IS_ASLEEP(uap))
-				return 0;
+				return NULL;
 			if (!ZS_IS_OPEN(uap))
 				goto retry;
 		}

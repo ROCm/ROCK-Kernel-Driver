@@ -121,10 +121,10 @@ asmlinkage u32 solaris_mmap64(struct pt_regs *regs, u32 len, u32 prot, u32 flags
 	u32 offlo;
 	
 	if (regs->u_regs[UREG_G1]) {
-		if (get_user (offlo, (u32 *)(long)((u32)regs->u_regs[UREG_I6] + 0x5c)))
+		if (get_user (offlo, (u32 __user *)(long)((u32)regs->u_regs[UREG_I6] + 0x5c)))
 			return -EFAULT;
 	} else {
-		if (get_user (offlo, (u32 *)(long)((u32)regs->u_regs[UREG_I6] + 0x60)))
+		if (get_user (offlo, (u32 __user *)(long)((u32)regs->u_regs[UREG_I6] + 0x60)))
 			return -EFAULT;
 	}
 	return do_solaris_mmap((u32)regs->u_regs[UREG_I0], len, prot, flags, fd, (((u64)offhi)<<32)|offlo);
@@ -148,7 +148,7 @@ asmlinkage int solaris_brk(u32 brk)
 		for (p=from,i=0; *p && *p != '.' && --len; p++,i++); 	\
 	else 								\
 		i = len - 1; 						\
-	if (__put_user('\0', (char *)(to+i)))				\
+	if (__put_user('\0', (char __user *)((to)+i)))			\
 		return -EFAULT;						\
 }
 
@@ -218,21 +218,17 @@ static char *serial(char *buffer)
 
 asmlinkage int solaris_utssys(u32 buf, u32 flags, int which, u32 buf2)
 {
+	struct sol_uname __user *v = A(buf);
 	switch (which) {
 	case 0:	/* old uname */
 		/* Let's cheat */
-		set_utsfield(((struct sol_uname *)A(buf))->sysname, 
-			"SunOS", 1, 0);
+		set_utsfield(v->sysname, "SunOS", 1, 0);
 		down_read(&uts_sem);
-		set_utsfield(((struct sol_uname *)A(buf))->nodename, 
-			system_utsname.nodename, 1, 1);
+		set_utsfield(v->nodename, system_utsname.nodename, 1, 1);
 		up_read(&uts_sem);
-		set_utsfield(((struct sol_uname *)A(buf))->release, 
-			"2.6", 0, 0);
-		set_utsfield(((struct sol_uname *)A(buf))->version, 
-			"Generic", 0, 0);
-		set_utsfield(((struct sol_uname *)A(buf))->machine, 
-			machine(), 0, 0);
+		set_utsfield(v->release, "2.6", 0, 0);
+		set_utsfield(v->version, "Generic", 0, 0);
+		set_utsfield(v->machine, machine(), 0, 0);
 		return 0;
 	case 2: /* ustat */
 		return -ENOSYS;
@@ -245,18 +241,14 @@ asmlinkage int solaris_utssys(u32 buf, u32 flags, int which, u32 buf2)
 
 asmlinkage int solaris_utsname(u32 buf)
 {
+	struct sol_utsname __user *v = A(buf);
 	/* Why should we not lie a bit? */
 	down_read(&uts_sem);
-	set_utsfield(((struct sol_utsname *)A(buf))->sysname, 
-			"SunOS", 0, 0);
-	set_utsfield(((struct sol_utsname *)A(buf))->nodename, 
-			system_utsname.nodename, 1, 1);
-	set_utsfield(((struct sol_utsname *)A(buf))->release, 
-			"5.6", 0, 0);
-	set_utsfield(((struct sol_utsname *)A(buf))->version, 
-			"Generic", 0, 0);
-	set_utsfield(((struct sol_utsname *)A(buf))->machine, 
-			machine(), 0, 0);
+	set_utsfield(v->sysname, "SunOS", 0, 0);
+	set_utsfield(v->nodename, system_utsname.nodename, 1, 1);
+	set_utsfield(v->release, "5.6", 0, 0);
+	set_utsfield(v->version, "Generic", 0, 0);
+	set_utsfield(v->machine, machine(), 0, 0);
 	up_read(&uts_sem);
 	return 0;
 }
@@ -302,11 +294,11 @@ asmlinkage int solaris_sysinfo(int cmd, u32 buf, s32 count)
 	}
 	len = strlen(r) + 1;
 	if (count < len) {
-		if (copy_to_user((char *)A(buf), r, count - 1) ||
-		    __put_user(0, (char *)A(buf) + count - 1))
+		if (copy_to_user(A(buf), r, count - 1) ||
+		    __put_user(0, (char __user *)A(buf) + count - 1))
 			return -EFAULT;
 	} else {
-		if (copy_to_user((char *)A(buf), r, len))
+		if (copy_to_user(A(buf), r, len))
 			return -EFAULT;
 	}
 	return len;
@@ -453,7 +445,7 @@ struct rlimit32 {
 	u32	rlim_max;
 };
 
-asmlinkage int solaris_getrlimit(unsigned int resource, struct rlimit32 *rlim)
+asmlinkage int solaris_getrlimit(unsigned int resource, struct rlimit32 __user *rlim)
 {
 	struct rlimit r;
 	int ret;
@@ -486,15 +478,15 @@ asmlinkage int solaris_getrlimit(unsigned int resource, struct rlimit32 *rlim)
 	return ret;
 }
 
-asmlinkage int solaris_setrlimit(unsigned int resource, struct rlimit32 *rlim)
+asmlinkage int solaris_setrlimit(unsigned int resource, struct rlimit32 __user *rlim)
 {
 	struct rlimit r, rold;
 	int ret;
 	mm_segment_t old_fs = get_fs ();
-	int (*sys_getrlimit)(unsigned int, struct rlimit *) =
-		(int (*)(unsigned int, struct rlimit *))SYS(getrlimit);
-	int (*sys_setrlimit)(unsigned int, struct rlimit *) =
-		(int (*)(unsigned int, struct rlimit *))SYS(setrlimit);
+	int (*sys_getrlimit)(unsigned int, struct rlimit __user *) =
+		(int (*)(unsigned int, struct rlimit __user *))SYS(getrlimit);
+	int (*sys_setrlimit)(unsigned int, struct rlimit __user *) =
+		(int (*)(unsigned int, struct rlimit __user *))SYS(setrlimit);
 
 	if (resource > RLIMIT_SOL_VMEM)
 		return -EINVAL;	
@@ -527,13 +519,13 @@ asmlinkage int solaris_setrlimit(unsigned int resource, struct rlimit32 *rlim)
 	return ret;
 }
 
-asmlinkage int solaris_getrlimit64(unsigned int resource, struct rlimit *rlim)
+asmlinkage int solaris_getrlimit64(unsigned int resource, struct rlimit __user *rlim)
 {
 	struct rlimit r;
 	int ret;
 	mm_segment_t old_fs = get_fs ();
-	int (*sys_getrlimit)(unsigned int, struct rlimit *) =
-		(int (*)(unsigned int, struct rlimit *))SYS(getrlimit);
+	int (*sys_getrlimit)(unsigned int, struct rlimit __user *) =
+		(int (*)(unsigned int, struct rlimit __user *))SYS(getrlimit);
 
 	if (resource > RLIMIT_SOL_VMEM)
 		return -EINVAL;	
@@ -556,15 +548,15 @@ asmlinkage int solaris_getrlimit64(unsigned int resource, struct rlimit *rlim)
 	return ret;
 }
 
-asmlinkage int solaris_setrlimit64(unsigned int resource, struct rlimit *rlim)
+asmlinkage int solaris_setrlimit64(unsigned int resource, struct rlimit __user *rlim)
 {
 	struct rlimit r, rold;
 	int ret;
 	mm_segment_t old_fs = get_fs ();
-	int (*sys_getrlimit)(unsigned int, struct rlimit *) =
-		(int (*)(unsigned int, struct rlimit *))SYS(getrlimit);
-	int (*sys_setrlimit)(unsigned int, struct rlimit *) =
-		(int (*)(unsigned int, struct rlimit *))SYS(setrlimit);
+	int (*sys_getrlimit)(unsigned int, struct rlimit __user *) =
+		(int (*)(unsigned int, struct rlimit __user *))SYS(getrlimit);
+	int (*sys_setrlimit)(unsigned int, struct rlimit __user *) =
+		(int (*)(unsigned int, struct rlimit __user *))SYS(setrlimit);
 
 	if (resource > RLIMIT_SOL_VMEM)
 		return -EINVAL;	
@@ -623,10 +615,10 @@ struct sol_timex {
 	s32 stbcnt;
 };
 
-asmlinkage int solaris_ntp_gettime(struct sol_ntptimeval *ntp)
+asmlinkage int solaris_ntp_gettime(struct sol_ntptimeval __user *ntp)
 {
-	int (*sys_adjtimex)(struct timex *) =
-		(int (*)(struct timex *))SYS(adjtimex);
+	int (*sys_adjtimex)(struct timex __user *) =
+		(int (*)(struct timex __user *))SYS(adjtimex);
 	struct timex t;
 	int ret;
 	mm_segment_t old_fs = get_fs();
@@ -644,10 +636,10 @@ asmlinkage int solaris_ntp_gettime(struct sol_ntptimeval *ntp)
 	return ret;	                        
 }
 
-asmlinkage int solaris_ntp_adjtime(struct sol_timex *txp)
+asmlinkage int solaris_ntp_adjtime(struct sol_timex __user *txp)
 {
-	int (*sys_adjtimex)(struct timex *) =
-		(int (*)(struct timex *))SYS(adjtimex);
+	int (*sys_adjtimex)(struct timex __user *) =
+		(int (*)(struct timex __user *))SYS(adjtimex);
 	struct timex t;
 	int ret, err;
 	mm_segment_t old_fs = get_fs();

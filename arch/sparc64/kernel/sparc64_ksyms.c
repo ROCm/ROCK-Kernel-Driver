@@ -142,8 +142,8 @@ EXPORT_SYMBOL(_raw_spin_lock_flags);
 EXPORT_SYMBOL(synchronize_irq);
 
 #if defined(CONFIG_MCOUNT)
-extern void mcount(void);
-EXPORT_SYMBOL_NOVERS(mcount);
+extern void _mcount(void);
+EXPORT_SYMBOL_NOVERS(_mcount);
 #endif
 
 /* CPU online map and active count.  */

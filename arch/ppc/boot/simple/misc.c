@@ -221,7 +221,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	puts("\n");
 
 	puts("Uncompressing Linux...");
-	gunzip(0, 0x400000, zimage_start, &zimage_size);
+	gunzip(NULL, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
 
 	/* get the bi_rec address */

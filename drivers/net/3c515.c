@@ -831,7 +831,7 @@ static int corkscrew_open(struct net_device *dev)
 		outb(PKT_BUF_SZ >> 8, ioaddr + TxFreeThreshold);	/* Room for a packet. */
 		/* Clear the Tx ring. */
 		for (i = 0; i < TX_RING_SIZE; i++)
-			vp->tx_skbuff[i] = 0;
+			vp->tx_skbuff[i] = NULL;
 		outl(0, ioaddr + DownListPtr);
 	}
 	/* Set receiver mode: presumably accept b-case and phys addr only. */
@@ -1174,7 +1174,7 @@ static irqreturn_t corkscrew_interrupt(int irq, void *dev_id,
 					break;	/* It still hasn't been processed. */
 				if (lp->tx_skbuff[entry]) {
 					dev_kfree_skb_irq(lp->tx_skbuff[entry]);
-					lp->tx_skbuff[entry] = 0;
+					lp->tx_skbuff[entry] = NULL;
 				}
 				dirty_tx++;
 			}
@@ -1458,7 +1458,7 @@ static int corkscrew_close(struct net_device *dev)
 		for (i = 0; i < RX_RING_SIZE; i++)
 			if (vp->rx_skbuff[i]) {
 				dev_kfree_skb(vp->rx_skbuff[i]);
-				vp->rx_skbuff[i] = 0;
+				vp->rx_skbuff[i] = NULL;
 			}
 	}
 	if (vp->full_bus_master_tx) {	/* Free Boomerang bus master Tx buffers. */
@@ -1466,7 +1466,7 @@ static int corkscrew_close(struct net_device *dev)
 		for (i = 0; i < TX_RING_SIZE; i++)
 			if (vp->tx_skbuff[i]) {
 				dev_kfree_skb(vp->tx_skbuff[i]);
-				vp->tx_skbuff[i] = 0;
+				vp->tx_skbuff[i] = NULL;
 			}
 	}
 

@@ -63,6 +63,7 @@
 #include <net/ipv6.h>
 #include <linux/hugetlb.h>
 #include <linux/major.h>
+#include <linux/personality.h>
 
 #include "avc.h"
 #include "objsec.h"

@@ -294,7 +294,7 @@ static void n_hdlc_tty_close(struct tty_struct *tty)
 #endif
 		tty->disc_data = NULL;
 		if (tty == n_hdlc->backup_tty)
-			n_hdlc->backup_tty = 0;
+			n_hdlc->backup_tty = NULL;
 		if (tty != n_hdlc->tty)
 			return;
 		if (n_hdlc->backup_tty) {
@@ -829,7 +829,7 @@ static struct n_hdlc *n_hdlc_alloc(void)
 	struct n_hdlc *n_hdlc = kmalloc(sizeof(*n_hdlc), GFP_KERNEL);
 
 	if (!n_hdlc)
-		return 0;
+		return NULL;
 
 	memset(n_hdlc, 0, sizeof(*n_hdlc));
 

@@ -195,7 +195,7 @@ static int ntfs_decompress(struct page *dest_pages[], int *dest_index,
 
 	ntfs_debug("Entering, cb_size = 0x%x.", cb_size);
 do_next_sb:
-	ntfs_debug("Beginning sub-block at offset = 0x%x in the cb.",
+	ntfs_debug("Beginning sub-block at offset = 0x%zx in the cb.",
 			cb - cb_start);
 	/*
 	 * Have we reached the end of the compression block or the end of the

@@ -980,7 +980,7 @@ static void alloc_rbufs(struct net_device *dev)
 		rp->rx_ring[i].desc_length = cpu_to_le32(rp->rx_buf_sz);
 		next += sizeof(struct rx_desc);
 		rp->rx_ring[i].next_desc = cpu_to_le32(next);
-		rp->rx_skbuff[i] = 0;
+		rp->rx_skbuff[i] = NULL;
 	}
 	/* Mark the last entry as wrapping the ring. */
 	rp->rx_ring[i-1].next_desc = cpu_to_le32(rp->rx_ring_dma);
@@ -1018,7 +1018,7 @@ static void free_rbufs(struct net_device* dev)
 					 rp->rx_buf_sz, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb(rp->rx_skbuff[i]);
 		}
-		rp->rx_skbuff[i] = 0;
+		rp->rx_skbuff[i] = NULL;
 	}
 }
 
@@ -1031,7 +1031,7 @@ static void alloc_tbufs(struct net_device* dev)
 	rp->dirty_tx = rp->cur_tx = 0;
 	next = rp->tx_ring_dma;
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		rp->tx_skbuff[i] = 0;
+		rp->tx_skbuff[i] = NULL;
 		rp->tx_ring[i].tx_status = 0;
 		rp->tx_ring[i].desc_length = cpu_to_le32(TXDESC);
 		next += sizeof(struct tx_desc);
@@ -1060,8 +1060,8 @@ static void free_tbufs(struct net_device* dev)
 			}
 			dev_kfree_skb(rp->tx_skbuff[i]);
 		}
-		rp->tx_skbuff[i] = 0;
-		rp->tx_buf[i] = 0;
+		rp->tx_skbuff[i] = NULL;
+		rp->tx_buf[i] = NULL;
 	}
 }
 

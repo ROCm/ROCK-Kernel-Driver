@@ -151,7 +151,7 @@ static __inline struct sym_quehead *sym_remque_head(struct sym_quehead *head)
 	if (elem != head)
 		__sym_que_del(head, elem->flink);
 	else
-		elem = 0;
+		elem = NULL;
 	return elem;
 }
 

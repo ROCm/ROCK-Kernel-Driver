@@ -1405,7 +1405,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		case PBOOK_SLEEP_REJECT:
 			if (par->save_framebuffer) {
 				vfree(par->save_framebuffer);
-				par->save_framebuffer = 0;
+				par->save_framebuffer = NULL;
 			}
 			break;
 		case PBOOK_SLEEP_NOW:
@@ -1435,7 +1435,7 @@ static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
 				memcpy_toio((void *) info->screen_base,
 					    par->save_framebuffer, nb);
 				vfree(par->save_framebuffer);
-				par->save_framebuffer = 0;
+				par->save_framebuffer = NULL;
 			}
 			/* Restore display */
 			atyfb_set_par(info);

@@ -584,7 +584,7 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 /* Protected by rt6_lock.  */
 static struct dst_entry *ndisc_dst_gc_list;
 static int ipv6_get_mtu(struct net_device *dev);
-static inline unsigned int ipv6_advmss(unsigned int mtu);
+static unsigned int ipv6_advmss(unsigned int mtu);
 
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,

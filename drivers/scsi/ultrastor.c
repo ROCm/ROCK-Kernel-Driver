@@ -948,9 +948,9 @@ static int ultrastor_abort(Scsi_Cmnd *SCpnt)
 	return SCSI_ABORT_NOT_RUNNING;
 
     if (config.mscp[mscp_index].SCint != SCpnt) panic("Bad abort");
-    config.mscp[mscp_index].SCint = 0;
+    config.mscp[mscp_index].SCint = NULL;
     done = config.mscp[mscp_index].done;
-    config.mscp[mscp_index].done = 0;
+    config.mscp[mscp_index].done = NULL;
     SCpnt->result = DID_ABORT << 16;
     
     /* Take the host lock to guard against scsi layer re-entry */
@@ -1000,9 +1000,9 @@ static int ultrastor_host_reset(Scsi_Cmnd * SCpnt)
 	  {
 	    config.mscp[i].SCint->result = DID_RESET << 16;
 	    config.mscp[i].done(config.mscp[i].SCint);
-	    config.mscp[i].done = 0;
+	    config.mscp[i].done = NULL;
 	  }
-	config.mscp[i].SCint = 0;
+	config.mscp[i].SCint = NULL;
       }
 #endif
 
@@ -1083,7 +1083,7 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (icm_status == 3) {
 	    void (*done)(Scsi_Cmnd *) = mscp->done;
 	    if (done) {
-		mscp->done = 0;
+		mscp->done = NULL;
 		mscp->SCint->result = DID_ABORT << 16;
 		done(mscp->SCint);
 	    }
@@ -1114,7 +1114,7 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
        once we call done, we may get another command queued before this
        interrupt service routine can return. */
     done = mscp->done;
-    mscp->done = 0;
+    mscp->done = NULL;
 
     /* Let the higher levels know that we're done */
     switch (mscp->adapter_status)
@@ -1138,7 +1138,7 @@ static void ultrastor_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
     SCtmp->result = status | mscp->target_status;
 
-    SCtmp->host_scribble = 0;
+    SCtmp->host_scribble = NULL;
 
     /* Free up mscp block for next command */
 #if ULTRASTOR_MAX_CMDS == 1

@@ -76,8 +76,8 @@ static long sig_handler(int sig, u32 arg, int one_shot)
 	struct sigaction sa, old;
 	int ret;
 	mm_segment_t old_fs = get_fs();
-	int (*sys_sigaction)(int,struct sigaction *,struct sigaction *) = 
-		(int (*)(int,struct sigaction *,struct sigaction *))SYS(sigaction);
+	int (*sys_sigaction)(int,struct sigaction __user *,struct sigaction __user *) = 
+		(int (*)(int,struct sigaction __user *,struct sigaction __user *))SYS(sigaction);
 	
 	sigemptyset(&sa.sa_mask);
 	sa.sa_restorer = NULL;
@@ -85,10 +85,10 @@ static long sig_handler(int sig, u32 arg, int one_shot)
 	sa.sa_flags = 0;
 	if (one_shot) sa.sa_flags = SA_ONESHOT | SA_NOMASK;
 	set_fs (KERNEL_DS);
-	ret = sys_sigaction(sig, &sa, &old);
+	ret = sys_sigaction(sig, (void __user *)&sa, (void __user *)&old);
 	set_fs (old_fs);
 	if (ret < 0) return ret;
-	return (u32)(long)old.sa_handler;
+	return (u32)(unsigned long)old.sa_handler;
 }
 
 static inline long solaris_signal(int sig, u32 arg)
@@ -129,7 +129,7 @@ static inline long solaris_sigrelse(int sig)
 
 static inline long solaris_sigignore(int sig)
 {
-	return sig_handler (sig, (u32)SIG_IGN, 0);
+	return sig_handler(sig, (u32)(unsigned long)SIG_IGN, 0);
 }
 
 static inline long solaris_sigpause(int sig)
@@ -207,21 +207,22 @@ asmlinkage int solaris_sigprocmask(int how, u32 in, u32 out)
 	sigset_t in_s, *ins, out_s, *outs;
 	mm_segment_t old_fs = get_fs();
 	int ret;
-	int (*sys_sigprocmask)(int,sigset_t *,sigset_t *) = 
-		(int (*)(int,sigset_t *,sigset_t *))SYS(sigprocmask);
+	int (*sys_sigprocmask)(int,sigset_t __user *,sigset_t __user *) = 
+		(int (*)(int,sigset_t __user *,sigset_t __user *))SYS(sigprocmask);
 	
 	ins = NULL; outs = NULL;
 	if (in) {
 		u32 tmp[2];
 		
-		if (copy_from_user (tmp, (sol_sigset_t *)A(in), 2*sizeof(u32)))
+		if (copy_from_user (tmp, (void __user *)A(in), 2*sizeof(u32)))
 			return -EFAULT;
 		ins = &in_s;
 		if (mapin (tmp, ins)) return -EINVAL;
 	}
 	if (out) outs = &out_s;
 	set_fs (KERNEL_DS);
-	ret = sys_sigprocmask((how == 3) ? SIG_SETMASK : how, ins, outs);
+	ret = sys_sigprocmask((how == 3) ? SIG_SETMASK : how,
+				(void __user *)ins, (void __user *)outs);
 	set_fs (old_fs);
 	if (ret) return ret;
 	if (out) {
@@ -229,7 +230,7 @@ asmlinkage int solaris_sigprocmask(int how, u32 in, u32 out)
 		
 		tmp[2] = 0; tmp[3] = 0;
 		if (mapout (outs, tmp)) return -EINVAL;
-		if (copy_to_user((sol_sigset_t *)A(out), tmp, 4*sizeof(u32)))
+		if (copy_to_user((void __user *)A(out), tmp, 4*sizeof(u32)))
 			return -EFAULT;
 	}
 	return 0;
@@ -240,7 +241,7 @@ asmlinkage long do_sol_sigsuspend(u32 mask)
 	sigset_t s;
 	u32 tmp[2];
 		
-	if (copy_from_user (tmp, (sol_sigset_t *)A(mask), 2*sizeof(u32)))
+	if (copy_from_user (tmp, (sol_sigset_t __user *)A(mask), 2*sizeof(u32)))
 		return -EFAULT;
 	if (mapin (tmp, &s)) return -EINVAL;
 	return (long)s.sig[0];
@@ -259,18 +260,19 @@ asmlinkage int solaris_sigaction(int sig, u32 act, u32 old)
 	struct sigaction s, s2;
 	int ret;
 	mm_segment_t old_fs = get_fs();
-	int (*sys_sigaction)(int,struct sigaction *,struct sigaction *) = 
-		(int (*)(int,struct sigaction *,struct sigaction *))SYS(sigaction);
+	struct sol_sigaction __user *p = (void __user *)A(old);
+	int (*sys_sigaction)(int,struct sigaction __user *,struct sigaction __user *) = 
+		(int (*)(int,struct sigaction __user *,struct sigaction __user *))SYS(sigaction);
 	
 	sig = mapsig(sig); 
 	if (sig < 0) {
 		/* We cheat a little bit for Solaris only signals */
-		if (old && clear_user((struct sol_sigaction *)A(old), sizeof(struct sol_sigaction)))
+		if (old && clear_user(p, sizeof(struct sol_sigaction)))
 			return -EFAULT;
 		return 0;
 	}
 	if (act) {
-		if (get_user (tmp, &((struct sol_sigaction *)A(act))->sa_flags))
+		if (get_user (tmp, &p->sa_flags))
 			return -EFAULT;
 		s.sa_flags = 0;
 		if (tmp & SOLARIS_SA_ONSTACK) s.sa_flags |= SA_STACK;
@@ -278,15 +280,16 @@ asmlinkage int solaris_sigaction(int sig, u32 act, u32 old)
 		if (tmp & SOLARIS_SA_NODEFER) s.sa_flags |= SA_NOMASK;
 		if (tmp & SOLARIS_SA_RESETHAND) s.sa_flags |= SA_ONESHOT;
 		if (tmp & SOLARIS_SA_NOCLDSTOP) s.sa_flags |= SA_NOCLDSTOP;
-		if (get_user (tmp, &((struct sol_sigaction *)A(act))->sa_handler) ||
-		    copy_from_user (tmp2, &((struct sol_sigaction *)A(act))->sa_mask, 2*sizeof(u32)))
+		if (get_user (tmp, &p->sa_handler) ||
+		    copy_from_user (tmp2, &p->sa_mask, 2*sizeof(u32)))
 			return -EFAULT;
 		s.sa_handler = (__sighandler_t)A(tmp);
 		if (mapin (tmp2, &s.sa_mask)) return -EINVAL;
-		s.sa_restorer = 0;
+		s.sa_restorer = NULL;
 	}
 	set_fs(KERNEL_DS);
-	ret = sys_sigaction(sig, act ? &s : NULL, old ? &s2 : NULL);
+	ret = sys_sigaction(sig, act ? (void __user *)&s : NULL,
+				 old ? (void __user *)&s2 : NULL);
 	set_fs(old_fs);
 	if (ret) return ret;
 	if (old) {
@@ -297,9 +300,9 @@ asmlinkage int solaris_sigaction(int sig, u32 act, u32 old)
 		if (s2.sa_flags & SA_NOMASK) tmp |= SOLARIS_SA_NODEFER;
 		if (s2.sa_flags & SA_ONESHOT) tmp |= SOLARIS_SA_RESETHAND;
 		if (s2.sa_flags & SA_NOCLDSTOP) tmp |= SOLARIS_SA_NOCLDSTOP;
-		if (put_user (tmp, &((struct sol_sigaction *)A(old))->sa_flags) ||
-		    __put_user ((u32)(long)s2.sa_handler, &((struct sol_sigaction *)A(old))->sa_handler) ||
-		    copy_to_user (&((struct sol_sigaction *)A(old))->sa_mask, tmp2, 4*sizeof(u32)))
+		if (put_user (tmp, &p->sa_flags) ||
+		    __put_user ((u32)(unsigned long)s2.sa_handler, &p->sa_handler) ||
+		    copy_to_user (&p->sa_mask, tmp2, 4*sizeof(u32)))
 			return -EFAULT;
 	}
 	return 0;
@@ -323,26 +326,27 @@ asmlinkage int solaris_sigpending(int which, u32 set)
 	}
 	if (mapout (&s, tmp)) return -EINVAL;
 	tmp[2] = 0; tmp[3] = 0;
-	if (copy_to_user ((u32 *)A(set), tmp, sizeof(tmp)))
+	if (copy_to_user ((u32 __user *)A(set), tmp, sizeof(tmp)))
 		return -EFAULT;
 	return 0;
 }
 
 asmlinkage int solaris_wait(u32 stat_loc)
 {
-	int (*sys_wait4)(pid_t,unsigned int *, int, struct rusage *) =
-		(int (*)(pid_t,unsigned int *, int, struct rusage *))SYS(wait4);
+	unsigned __user *p = (unsigned __user *)A(stat_loc);
+	int (*sys_wait4)(pid_t,unsigned __user *, int, struct rusage __user *) =
+		(int (*)(pid_t,unsigned __user *, int, struct rusage __user *))SYS(wait4);
 	int ret, status;
 	
-	ret = sys_wait4(-1, (unsigned int *)A(stat_loc), WUNTRACED, NULL);
+	ret = sys_wait4(-1, p, WUNTRACED, NULL);
 	if (ret >= 0 && stat_loc) {
-		if (get_user (status, (unsigned int *)A(stat_loc)))
+		if (get_user (status, p))
 			return -EFAULT;
 		if (((status - 1) & 0xffff) < 0xff)
 			status = linux_to_solaris_signals[status & 0x7f] & 0x7f;
 		else if ((status & 0xff) == 0x7f)
 			status = (linux_to_solaris_signals[(status >> 8) & 0xff] << 8) | 0x7f;
-		if (__put_user (status, (unsigned int *)A(stat_loc)))
+		if (__put_user (status, p))
 			return -EFAULT;
 	}
 	return ret;
@@ -350,8 +354,8 @@ asmlinkage int solaris_wait(u32 stat_loc)
 
 asmlinkage int solaris_waitid(int idtype, s32 pid, u32 info, int options)
 {
-	int (*sys_wait4)(pid_t,unsigned int *, int, struct rusage *) =
-		(int (*)(pid_t,unsigned int *, int, struct rusage *))SYS(wait4);
+	int (*sys_wait4)(pid_t,unsigned __user *, int, struct rusage __user *) =
+		(int (*)(pid_t,unsigned __user *, int, struct rusage __user *))SYS(wait4);
 	int opts, status, ret;
 	
 	switch (idtype) {
@@ -364,12 +368,12 @@ asmlinkage int solaris_waitid(int idtype, s32 pid, u32 info, int options)
 	if (options & SOLARIS_WUNTRACED) opts |= WUNTRACED;
 	if (options & SOLARIS_WNOHANG) opts |= WNOHANG;
 	current->state = TASK_RUNNING;
-	ret = sys_wait4(pid, (unsigned int *)A(info), opts, NULL);
+	ret = sys_wait4(pid, (unsigned int __user *)A(info), opts, NULL);
 	if (ret < 0) return ret;
 	if (info) {
-		struct sol_siginfo *s = (struct sol_siginfo *)A(info);
+		struct sol_siginfo __user *s = (void __user *)A(info);
 	
-		if (get_user (status, (unsigned int *)A(info)))
+		if (get_user (status, (unsigned int __user *)A(info)))
 			return -EFAULT;
 
 		if (__put_user (SOLARIS_SIGCLD, &s->si_signo) ||
