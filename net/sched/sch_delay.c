@@ -69,7 +69,7 @@ static int dly_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		sch->stats.bytes += skb->len;
 		sch->stats.packets++;
 	}
-	return 0;
+	return ret;
 }
 
 /* Requeue packets but don't change time stamp */
