@@ -1,5 +1,5 @@
-/* lists.c -- Buffer list handling routines -*- linux-c -*-
- * Created: Mon Apr 19 20:54:22 1999 by faith@precisioninsight.com
+/* drm_lists.h -- Buffer list handling routines -*- linux-c -*-
+ * Created: Mon Apr 19 20:54:22 1999 by faith@valinux.com
  *
  * Copyright 1999 Precision Insight, Inc., Cedar Park, Texas.
  * Copyright 2000 VA Linux Systems, Inc., Sunnyvale, California.
@@ -11,34 +11,39 @@
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice (including the next
  * paragraph) shall be included in all copies or substantial portions of the
  * Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.  IN NO EVENT SHALL
- * PRECISION INSIGHT AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ * VA LINUX SYSTEMS AND/OR ITS SUPPLIERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
  * OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
- * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- * 
+ * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ * OTHER DEALINGS IN THE SOFTWARE.
+ *
  * Authors:
  *    Rickard E. (Rik) Faith <faith@valinux.com>
- *
+ *    Gareth Hughes <gareth@valinux.com>
  */
 
 #define __NO_VERSION__
 #include "drmP.h"
 
-int drm_waitlist_create(drm_waitlist_t *bl, int count)
+#if __HAVE_DMA_WAITLIST
+
+int DRM(waitlist_create)(drm_waitlist_t *bl, int count)
 {
 	if (bl->count) return -EINVAL;
-	
+
+	bl->bufs       = DRM(alloc)((bl->count + 2) * sizeof(*bl->bufs),
+				    DRM_MEM_BUFLISTS);
+
+	if(!bl->bufs) return -ENOMEM;
+
 	bl->count      = count;
-	bl->bufs       = drm_alloc((bl->count + 2) * sizeof(*bl->bufs),
-				   DRM_MEM_BUFLISTS);
 	bl->rp	       = bl->bufs;
 	bl->wp	       = bl->bufs;
 	bl->end	       = &bl->bufs[bl->count+1];
@@ -47,12 +52,12 @@ int drm_waitlist_create(drm_waitlist_t *bl, int count)
 	return 0;
 }
 
-int drm_waitlist_destroy(drm_waitlist_t *bl)
+int DRM(waitlist_destroy)(drm_waitlist_t *bl)
 {
 	if (bl->rp != bl->wp) return -EINVAL;
-	if (bl->bufs) drm_free(bl->bufs,
-			       (bl->count + 2) * sizeof(*bl->bufs),
-			       DRM_MEM_BUFLISTS);
+	if (bl->bufs) DRM(free)(bl->bufs,
+				(bl->count + 2) * sizeof(*bl->bufs),
+				DRM_MEM_BUFLISTS);
 	bl->count = 0;
 	bl->bufs  = NULL;
 	bl->rp	  = NULL;
@@ -61,8 +66,8 @@ int drm_waitlist_destroy(drm_waitlist_t *bl)
 	return 0;
 }
 
-int drm_waitlist_put(drm_waitlist_t *bl, drm_buf_t *buf)
-{							
+int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
+{
 	int	      left;
 	unsigned long flags;
 
@@ -72,20 +77,20 @@ int drm_waitlist_put(drm_waitlist_t *bl, drm_buf_t *buf)
 			  buf->idx, buf->pid);
 		return -EINVAL;
 	}
-#if DRM_DMA_HISTOGRAM
+#if __HAVE_DMA_HISTOGRAM
 	buf->time_queued = get_cycles();
 #endif
 	buf->list	 = DRM_LIST_WAIT;
-	
+
 	spin_lock_irqsave(&bl->write_lock, flags);
 	*bl->wp = buf;
 	if (++bl->wp >= bl->end) bl->wp = bl->bufs;
 	spin_unlock_irqrestore(&bl->write_lock, flags);
-	
+
 	return 0;
 }
 
-drm_buf_t *drm_waitlist_get(drm_waitlist_t *bl)
+drm_buf_t *DRM(waitlist_get)(drm_waitlist_t *bl)
 {
 	drm_buf_t     *buf;
 	unsigned long flags;
@@ -95,14 +100,19 @@ drm_buf_t *drm_waitlist_get(drm_waitlist_t *bl)
 	if (bl->rp == bl->wp) {
 		spin_unlock_irqrestore(&bl->read_lock, flags);
 		return NULL;
-	}				     
+	}
 	if (++bl->rp >= bl->end) bl->rp = bl->bufs;
 	spin_unlock_irqrestore(&bl->read_lock, flags);
-	
+
 	return buf;
 }
 
-int drm_freelist_create(drm_freelist_t *bl, int count)
+#endif /* __HAVE_DMA_WAITLIST */
+
+
+#if __HAVE_DMA_FREELIST
+
+int DRM(freelist_create)(drm_freelist_t *bl, int count)
 {
 	atomic_set(&bl->count, 0);
 	bl->next      = NULL;
@@ -115,14 +125,14 @@ int drm_freelist_create(drm_freelist_t *bl, int count)
 	return 0;
 }
 
-int drm_freelist_destroy(drm_freelist_t *bl)
+int DRM(freelist_destroy)(drm_freelist_t *bl)
 {
 	atomic_set(&bl->count, 0);
 	bl->next = NULL;
 	return 0;
 }
 
-int drm_freelist_put(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
+int DRM(freelist_put)(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 {
 	drm_device_dma_t *dma  = dev->dma;
 
@@ -136,17 +146,17 @@ int drm_freelist_put(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 			  buf->idx, buf->waiting, buf->pending, buf->list);
 	}
 	if (!bl) return 1;
-#if DRM_DMA_HISTOGRAM
+#if __HAVE_DMA_HISTOGRAM
 	buf->time_freed = get_cycles();
-	drm_histogram_compute(dev, buf);
+	DRM(histogram_compute)(dev, buf);
 #endif
 	buf->list	= DRM_LIST_FREE;
-	
+
 	spin_lock(&bl->lock);
 	buf->next	= bl->next;
 	bl->next	= buf;
 	spin_unlock(&bl->lock);
-	
+
 	atomic_inc(&bl->count);
 	if (atomic_read(&bl->count) > dma->buf_count) {
 		DRM_ERROR("%d of %d buffers free after addition of %d\n",
@@ -161,12 +171,12 @@ int drm_freelist_put(drm_device_t *dev, drm_freelist_t *bl, drm_buf_t *buf)
 	return 0;
 }
 
-static drm_buf_t *drm_freelist_try(drm_freelist_t *bl)
+static drm_buf_t *DRM(freelist_try)(drm_freelist_t *bl)
 {
 	drm_buf_t	  *buf;
 
 	if (!bl) return NULL;
-	
+
 				/* Get buffer */
 	spin_lock(&bl->lock);
 	if (!bl->next) {
@@ -176,7 +186,7 @@ static drm_buf_t *drm_freelist_try(drm_freelist_t *bl)
 	buf	  = bl->next;
 	bl->next  = bl->next->next;
 	spin_unlock(&bl->lock);
-	
+
 	atomic_dec(&bl->count);
 	buf->next = NULL;
 	buf->list = DRM_LIST_NONE;
@@ -184,17 +194,17 @@ static drm_buf_t *drm_freelist_try(drm_freelist_t *bl)
 		DRM_ERROR("Free buffer %d: w%d, p%d, l%d\n",
 			  buf->idx, buf->waiting, buf->pending, buf->list);
 	}
-	
+
 	return buf;
 }
 
-drm_buf_t *drm_freelist_get(drm_freelist_t *bl, int block)
+drm_buf_t *DRM(freelist_get)(drm_freelist_t *bl, int block)
 {
 	drm_buf_t	  *buf	= NULL;
 	DECLARE_WAITQUEUE(entry, current);
 
 	if (!bl || !bl->initialized) return NULL;
-	
+
 				/* Check for low water mark */
 	if (atomic_read(&bl->count) <= bl->low_mark) /* Became low */
 		atomic_set(&bl->wfh, 1);
@@ -204,7 +214,7 @@ drm_buf_t *drm_freelist_get(drm_freelist_t *bl, int block)
 			for (;;) {
 				current->state = TASK_INTERRUPTIBLE;
 				if (!atomic_read(&bl->wfh)
-				    && (buf = drm_freelist_try(bl))) break;
+				    && (buf = DRM(freelist_try)(bl))) break;
 				schedule();
 				if (signal_pending(current)) break;
 			}
@@ -213,6 +223,8 @@ drm_buf_t *drm_freelist_get(drm_freelist_t *bl, int block)
 		}
 		return buf;
 	}
-		
-	return drm_freelist_try(bl);
+
+	return DRM(freelist_try)(bl);
 }
+
+#endif /* __HAVE_DMA_FREELIST */

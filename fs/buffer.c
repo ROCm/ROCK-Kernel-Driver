@@ -231,6 +231,7 @@ static int write_some_buffers(kdev_t dev)
 			return -EAGAIN;
 		}
 		unlock_buffer(bh);
+		__refile_buffer(bh);
 	}
 	spin_unlock(&lru_list_lock);
 
@@ -1116,15 +1117,17 @@ void balance_dirty(kdev_t dev)
 	/* If we're getting into imbalance, start write-out */
 	spin_lock(&lru_list_lock);
 	write_some_buffers(dev);
-	wakeup_bdflush();
 
 	/*
 	 * And if we're _really_ out of balance, wait for
-	 * some of the dirty/locked buffers ourselves.
+	 * some of the dirty/locked buffers ourselves and
+	 * start bdflush.
 	 * This will throttle heavy writers.
 	 */
-	if (state > 0)
+	if (state > 0) {
 		wait_for_some_buffers(dev);
+		wakeup_bdflush();
+	}
 }
 
 static __inline__ void __mark_dirty(struct buffer_head *bh)

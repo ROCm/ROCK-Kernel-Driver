@@ -585,25 +585,23 @@ unsigned int nr_inactive_clean_pages (void)
  */
 unsigned int nr_free_buffer_pages (void)
 {
-	unsigned int sum;
+	unsigned int sum = 0;
+	zonelist_t *zonelist;
+	zone_t **zonep, *zone;
 
-	sum = nr_free_pages();
-	sum += nr_inactive_clean_pages();
-	sum += nr_inactive_dirty_pages;
+	zonelist = contig_page_data.node_zonelists + (GFP_KERNEL & GFP_ZONEMASK);
+	zonep = zonelist->zones;
 
-	/*
-	 * Keep our write behind queue filled, even if
-	 * kswapd lags a bit right now.
-	 */
-	if (sum < freepages.high + inactive_target)
-		sum = freepages.high + inactive_target;
-	/*
-	 * We don't want dirty page writebehind to put too
-	 * much pressure on the working set, but we want it
-	 * to be possible to have some dirty pages in the
-	 * working set without upsetting the writebehind logic.
-	 */
-	sum += nr_active_pages >> 4;
+	for (zone = *zonep++; zone; zone = *zonep++) {
+		unsigned int pages = zone->free_pages +
+			zone->inactive_clean_pages +
+			zone->inactive_dirty_pages;
+
+		/* Allow the buffer cache to fill up at least "pages_high" pages */
+		if (pages < zone->pages_high)
+			pages = zone->pages_high;
+		sum += pages;
+	}
 
 	return sum;
 }
@@ -621,53 +619,6 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 #endif
-
-unsigned int zone_free_shortage(zone_t *zone)
-{
-	int sum = 0;
-
-	if (!zone->size)
-		goto ret;
-
-	if (zone->inactive_clean_pages + zone->free_pages
-			< zone->pages_high) {
-		sum += zone->pages_high;
-		sum -= zone->free_pages;
-		sum -= zone->inactive_clean_pages;
-	}
-ret:
-	return sum;
-}
-
-unsigned int zone_inactive_plenty(zone_t *zone)
-{
-	int inactive;
-
-	if (!zone->size)
-		return 0;
-		
-	inactive = zone->inactive_dirty_pages;
-	inactive += zone->inactive_clean_pages;
-	inactive += zone->free_pages;
-
-	return (inactive > (zone->size / 3));
-
-}
-unsigned int zone_inactive_shortage(zone_t *zone) 
-{
-	int sum = 0;
-
-	if (!zone->size)
-		goto ret;
-
-	sum = zone->pages_high;
-	sum -= zone->inactive_dirty_pages;
-	sum -= zone->inactive_clean_pages;
-	sum -= zone->free_pages;
-
-ret:
-     return (sum > 0 ? sum : 0);
-}
 
 /*
  * Show free area list (used inside shift_scroll-lock stuff)

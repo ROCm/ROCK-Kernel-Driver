@@ -26,7 +26,6 @@
  * Authors:
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *
  */
 
 #ifndef __RADEON_DRM_H__
@@ -74,7 +73,7 @@
 
 /* Vertex/indirect buffer size
  */
-#define RADEON_BUFFER_SIZE		16384
+#define RADEON_BUFFER_SIZE		65536
 
 /* Byte offsets for indirect buffer data
  */
@@ -237,7 +236,7 @@ typedef struct drm_radeon_init {
 		RADEON_INIT_CP    = 0x01,
 		RADEON_CLEANUP_CP = 0x02
 	} func;
-	int sarea_priv_offset;
+	unsigned long sarea_priv_offset;
 	int is_pci;
 	int cp_mode;
 	int agp_size;
@@ -250,12 +249,12 @@ typedef struct drm_radeon_init {
 	unsigned int depth_bpp;
 	unsigned int depth_offset, depth_pitch;
 
-	unsigned int fb_offset;
-	unsigned int mmio_offset;
-	unsigned int ring_offset;
-	unsigned int ring_rptr_offset;
-	unsigned int buffers_offset;
-	unsigned int agp_textures_offset;
+	unsigned long fb_offset;
+	unsigned long mmio_offset;
+	unsigned long ring_offset;
+	unsigned long ring_rptr_offset;
+	unsigned long buffers_offset;
+	unsigned long agp_textures_offset;
 } drm_radeon_init_t;
 
 typedef struct drm_radeon_cp_stop {
@@ -276,15 +275,18 @@ typedef struct drm_radeon_fullscreen {
 #define CLEAR_Y2	3
 #define CLEAR_DEPTH	4
 
+typedef union drm_radeon_clear_rect {
+	float f[5];
+	unsigned int ui[5];
+} drm_radeon_clear_rect_t;
+
 typedef struct drm_radeon_clear {
 	unsigned int flags;
-	int x, y, w, h;
 	unsigned int clear_color;
 	unsigned int clear_depth;
-	union {
-		float f[5];
-		unsigned int ui[5];
-	} rect;
+	unsigned int color_mask;
+	unsigned int depth_mask;
+	drm_radeon_clear_rect_t *depth_boxes;
 } drm_radeon_clear_t;
 
 typedef struct drm_radeon_vertex {
@@ -302,14 +304,20 @@ typedef struct drm_radeon_indices {
 	int discard;			/* Client finished with buffer? */
 } drm_radeon_indices_t;
 
-typedef struct drm_radeon_blit {
-	int idx;
-	int pitch;
+typedef struct drm_radeon_tex_image {
+	unsigned int x, y;		/* Blit coordinates */
+	unsigned int width, height;
+	const void *data;
+} drm_radeon_tex_image_t;
+
+typedef struct drm_radeon_texture {
 	int offset;
+	int pitch;
 	int format;
-	unsigned short x, y;
-	unsigned short width, height;
-} drm_radeon_blit_t;
+	int width;			/* Texture image coordinates */
+	int height;
+	drm_radeon_tex_image_t *image;
+} drm_radeon_texture_t;
 
 typedef struct drm_radeon_stipple {
 	unsigned int *mask;

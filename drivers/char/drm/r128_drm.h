@@ -25,13 +25,12 @@
  * DEALINGS IN THE SOFTWARE.
  *
  * Authors:
- *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
- *
+ *    Kevin E. Martin <martin@valinux.com>
  */
 
-#ifndef _R128_DRM_H_
-#define _R128_DRM_H_
+#ifndef __R128_DRM_H__
+#define __R128_DRM_H__
 
 /* WARNING: If you change any of these defines, make sure to change the
  * defines in the X server file (r128_sarea.h)
@@ -69,20 +68,12 @@
 
 /* Vertex/indirect buffer size
  */
-#if 1
 #define R128_BUFFER_SIZE		16384
-#else
-#define R128_BUFFER_SIZE		(128 * 1024)
-#endif
 
 /* Byte offsets for indirect buffer data
  */
 #define R128_INDEX_PRIM_OFFSET		20
 #define R128_HOSTDATA_BLIT_OFFSET	32
-
-/* 2048x2048 @ 32bpp texture requires this many indirect buffers
- */
-#define R128_MAX_BLIT_BUFFERS		((2048 * 2048 * 4) / R128_BUFFER_SIZE)
 
 /* Keep these small for testing.
  */
@@ -98,7 +89,9 @@
 #define R128_LOG_TEX_GRANULARITY	16
 
 #define R128_NR_CONTEXT_REGS		12
-#define R128_TEX_MAXLEVELS		11
+
+#define R128_MAX_TEXTURE_LEVELS		11
+#define R128_MAX_TEXTURE_UNITS		2
 
 #endif /* __R128_SAREA_DEFINES__ */
 
@@ -137,28 +130,23 @@ typedef struct {
 	unsigned int scale_3d_cntl;
 } drm_r128_context_regs_t;
 
-/* Setup registers for each texture unit */
+/* Setup registers for each texture unit
+ */
 typedef struct {
 	unsigned int tex_cntl;
 	unsigned int tex_combine_cntl;
 	unsigned int tex_size_pitch;
-	unsigned int tex_offset[R128_TEX_MAXLEVELS];
+	unsigned int tex_offset[R128_MAX_TEXTURE_LEVELS];
 	unsigned int tex_border_color;
 } drm_r128_texture_regs_t;
 
-
-typedef struct drm_tex_region {
-	unsigned char next, prev;
-	unsigned char in_use;
-	int age;
-} drm_tex_region_t;
 
 typedef struct drm_r128_sarea {
 	/* The channel for communication of state information to the kernel
 	 * on firing a vertex buffer.
 	 */
 	drm_r128_context_regs_t context_state;
-	drm_r128_texture_regs_t tex_state[R128_NR_TEX_HEAPS];
+	drm_r128_texture_regs_t tex_state[R128_MAX_TEXTURE_UNITS];
 	unsigned int dirty;
 	unsigned int vertsize;
 	unsigned int vc_format;
@@ -187,7 +175,11 @@ typedef struct drm_r128_init {
 		R128_INIT_CCE    = 0x01,
 		R128_CLEANUP_CCE = 0x02
 	} func;
+#if CONFIG_XFREE86_VERSION < XFREE86_VERSION(4,1,0,0)
 	int sarea_priv_offset;
+#else
+	unsigned long sarea_priv_offset;
+#endif
 	int is_pci;
 	int cce_mode;
 	int cce_secure;
@@ -201,12 +193,21 @@ typedef struct drm_r128_init {
 	unsigned int depth_offset, depth_pitch;
 	unsigned int span_offset;
 
+#if CONFIG_XFREE86_VERSION < XFREE86_VERSION(4,1,0,0)
 	unsigned int fb_offset;
 	unsigned int mmio_offset;
 	unsigned int ring_offset;
 	unsigned int ring_rptr_offset;
 	unsigned int buffers_offset;
 	unsigned int agp_textures_offset;
+#else
+	unsigned long fb_offset;
+	unsigned long mmio_offset;
+	unsigned long ring_offset;
+	unsigned long ring_rptr_offset;
+	unsigned long buffers_offset;
+	unsigned long agp_textures_offset;
+#endif
 } drm_r128_init_t;
 
 typedef struct drm_r128_cce_stop {
@@ -216,9 +217,15 @@ typedef struct drm_r128_cce_stop {
 
 typedef struct drm_r128_clear {
 	unsigned int flags;
+#if CONFIG_XFREE86_VERSION < XFREE86_VERSION(4,1,0,0)
 	int x, y, w, h;
+#endif
 	unsigned int clear_color;
 	unsigned int clear_depth;
+#if CONFIG_XFREE86_VERSION >= XFREE86_VERSION(4,1,0,0)
+	unsigned int color_mask;
+	unsigned int depth_mask;
+#endif
 } drm_r128_clear_t;
 
 typedef struct drm_r128_vertex {
@@ -263,10 +270,18 @@ typedef struct drm_r128_stipple {
 	unsigned int *mask;
 } drm_r128_stipple_t;
 
-typedef struct drm_r128_packet {
-	unsigned int *buffer;
-	int count;
-	int flags;
-} drm_r128_packet_t;
+typedef struct drm_r128_indirect {
+	int idx;
+	int start;
+	int end;
+	int discard;
+} drm_r128_indirect_t;
+
+typedef struct drm_r128_fullscreen {
+	enum {
+		R128_INIT_FULLSCREEN    = 0x01,
+		R128_CLEANUP_FULLSCREEN = 0x02
+	} func;
+} drm_r128_fullscreen_t;
 
 #endif

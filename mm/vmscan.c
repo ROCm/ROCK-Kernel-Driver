@@ -35,6 +35,58 @@
  * doesn't count as having freed a page.
  */
 
+/*
+ * Estimate whether a zone has enough inactive or free pages..
+ */
+static unsigned int zone_inactive_plenty(zone_t *zone)
+{
+	unsigned int inactive;
+
+	if (!zone->size)
+		return 0;
+		
+	inactive = zone->inactive_dirty_pages;
+	inactive += zone->inactive_clean_pages;
+	inactive += zone->free_pages;
+
+	return (inactive > (zone->size / 3));
+}
+
+static unsigned int zone_inactive_shortage(zone_t *zone) 
+{
+	unsigned int inactive;
+
+	if (!zone->size)
+		return 0;
+
+	inactive = zone->inactive_dirty_pages;
+	inactive += zone->inactive_clean_pages;
+	inactive += zone->free_pages;
+
+	return inactive < zone->pages_high;
+}
+
+static unsigned int zone_free_plenty(zone_t *zone)
+{
+	unsigned int free;
+
+	free = zone->free_pages;
+	free += zone->inactive_clean_pages;
+
+	return free > zone->pages_high*2;
+}
+
+static unsigned int zone_free_shortage(zone_t *zone)
+{
+	unsigned int free;
+
+	free = zone->free_pages;
+	free += zone->inactive_clean_pages;
+
+	return zone->size && free < zone->pages_low;
+}
+
+
 /* mm->page_table_lock is held. mmap_sem is not held */
 static void try_to_swap_out(struct mm_struct * mm, struct vm_area_struct* vma, unsigned long address, pte_t * page_table, struct page *page)
 {
@@ -434,7 +486,7 @@ out:
 #define MAX_LAUNDER 		(4 * (1 << page_cluster))
 #define CAN_DO_FS		(gfp_mask & __GFP_FS)
 #define CAN_DO_IO		(gfp_mask & __GFP_IO)
-int do_page_launder(zone_t *zone, int gfp_mask, int sync)
+int page_launder(int gfp_mask, int sync)
 {
 	int launder_loop, maxscan, cleaned_pages, maxlaunder;
 	struct list_head * page_lru;
@@ -470,11 +522,10 @@ dirty_page_rescan:
 		}
 
 		/* 
-		 * If we are doing zone-specific laundering, 
-		 * avoid touching pages from zones which do 
-		 * not have a free shortage.
+		 * If this zone has plenty of pages free,
+		 * don't spend time on cleaning it.
 		 */
-		if (zone && !zone_free_shortage(page->zone)) {
+		if (zone_free_plenty(page->zone)) {
 			list_del(page_lru);
 			list_add(page_lru, &inactive_dirty_list);
 			continue;
@@ -649,31 +700,6 @@ page_active:
 	return cleaned_pages;
 }
 
-int page_launder(int gfp_mask, int sync)
-{
-	int type = 0, ret = 0;
-	pg_data_t *pgdat = pgdat_list;
-	/*
-	 * First do a global scan if there is a 
-	 * global shortage.
-	 */
-	if (free_shortage())
-		ret += do_page_launder(NULL, gfp_mask, sync);
-
-	/*
-	 * Then check if there is any specific zone 
-	 * needs laundering.
-	 */
-	for (type = 0; type < MAX_NR_ZONES; type++) {
-		zone_t *zone = pgdat->node_zones + type;
-		
-		if (zone_free_shortage(zone)) 
-			ret += do_page_launder(zone, gfp_mask, sync);
-	} 
-
-	return ret;
-}
-
 static inline void age_page_up(struct page *page)
 {
 	unsigned age = page->age + PAGE_AGE_ADV;
@@ -807,12 +833,8 @@ int total_free_shortage(void)
 		int i;
 		for(i = 0; i < MAX_NR_ZONES; i++) {
 			zone_t *zone = pgdat->node_zones+ i;
-			if (zone->size && (zone->inactive_clean_pages +
-					zone->free_pages < zone->pages_min)) {
-				sum += zone->pages_min;
-				sum -= zone->free_pages;
-				sum -= zone->inactive_clean_pages;
-			}
+
+			sum += zone_free_shortage(zone);
 		}
 		pgdat = pgdat->node_next;
 	} while (pgdat);
