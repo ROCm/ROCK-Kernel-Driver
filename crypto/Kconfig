@@ -152,6 +152,20 @@ config CRYPTO_CAST6
 	  The CAST6 encryption algorithm (synonymous with CAST-256) is
 	  described in RFC2612.
 
+config CRYPTO_TEA
+	tristate "TEA and XTEA cipher algorithms"
+	depends on CRYPTO
+	help
+	  TEA cipher algorithm.
+
+	  Tiny Encryption Algorithm is a simple cipher that uses
+	  many rounds for security.  It is very fast and uses
+	  little memory.
+
+	  Xtendend Tiny Encryption Algorithm is a modifcation to
+	  the TEA algorithm to address a potential key weakness
+	  in the TEA algorithm.
+
 config CRYPTO_ARC4
 	tristate "ARC4 cipher algorithm"
 	depends on CRYPTO
