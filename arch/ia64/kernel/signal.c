@@ -143,9 +143,10 @@ copy_siginfo_to_user (siginfo_t *to, siginfo_t *from)
 {
 	if (!access_ok(VERIFY_WRITE, to, sizeof(siginfo_t)))
 		return -EFAULT;
-	if (from->si_code < 0)
-		return __copy_to_user(to, from, sizeof(siginfo_t));
-	else {
+	if (from->si_code < 0) {
+		if (__copy_to_user(to, from, sizeof(siginfo_t)))
+			return -EFAULT;
+	} else {
 		int err;
 
 		/*

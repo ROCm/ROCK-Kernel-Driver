@@ -38,7 +38,7 @@
  * the way of the program that it will "exec", and that there is
  * sufficient room for the brk.
  */
-#define ELF_ET_DYN_BASE		(TASK_UNMAPPED_BASE + 0x1000000)
+#define ELF_ET_DYN_BASE		(TASK_UNMAPPED_BASE + 0x800000000)
 
 
 /*

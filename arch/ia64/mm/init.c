@@ -251,7 +251,7 @@ put_gate_page (struct page *page, unsigned long address)
 void __init
 ia64_mmu_init (void *my_cpu_data)
 {
-	unsigned long flags, rid, pta, impl_va_bits;
+	unsigned long psr, rid, pta, impl_va_bits;
 	extern void __init tlb_init (void);
 #ifdef CONFIG_DISABLE_VHPT
 #	define VHPT_ENABLE_BIT	0
@@ -263,7 +263,7 @@ ia64_mmu_init (void *my_cpu_data)
 	 * Set up the kernel identity mapping for regions 6 and 5.  The mapping for region
 	 * 7 is setup up in _start().
 	 */
-	ia64_clear_ic(flags);
+	psr = ia64_clear_ic();
 
 	rid = ia64_rid(IA64_REGION_ID_KERNEL, __IA64_UNCACHED_OFFSET);
 	ia64_set_rr(__IA64_UNCACHED_OFFSET, (rid << 8) | (IA64_GRANULE_SHIFT << 2));
@@ -277,7 +277,7 @@ ia64_mmu_init (void *my_cpu_data)
 	ia64_itr(0x2, IA64_TR_PERCPU_DATA, PERCPU_ADDR,
 		 pte_val(pfn_pte(__pa(my_cpu_data) >> PAGE_SHIFT, PAGE_KERNEL)), PAGE_SHIFT);
 
-	__restore_flags(flags);
+	ia64_set_psr(psr);
 	ia64_srlz_i();
 
 	/*

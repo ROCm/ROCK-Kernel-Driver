@@ -400,7 +400,7 @@ CONFIG_ITANIUM
   Select your IA64 processor type.  The default is Intel Itanium.
 
 CONFIG_MCKINLEY
-  Select this to configure for a McKinley processor.
+  Select this to configure for an Itanium 2 (McKinley) processor.
 
 CONFIG_IA64_GENERIC
   This selects the system type of your hardware.  A "generic" kernel
