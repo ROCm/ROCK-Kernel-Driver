@@ -33,6 +33,9 @@
 
  History:
 
+ Version 0.40:
+  Markus: Updates for 2.6.x kernels, code layout changes, name sanitizing
+
  Version 0.30:
  	Markus: Updates for 2.5.x kernel and more ISO compliant source
 
@@ -75,12 +78,16 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.30"
+#define DRIVER_VERSION "v0.40"
 #define DRIVER_AUTHOR "Markus Demleitner <msdemlei@tucana.harvard.edu>"
 #define DRIVER_DESC "D-Link DSB-R100 USB FM radio driver"
 
 #define DSB100_VENDOR 0x04b4
 #define DSB100_PRODUCT 0x1002
+
+/* Commands the device appears to understand */
+#define DSB100_TUNE 1
+#define DSB100_ONOFF 2
 
 #define TB_LEN 16
 
@@ -102,15 +109,19 @@ static int usb_dsbr100_close(struct inode *inode, struct file *file);
 static int radio_nr = -1;
 MODULE_PARM(radio_nr, "i");
 
-typedef struct
-{
-	struct usb_device *dev;
+/* Data for one (physical) device */
+typedef struct {
+	struct usb_device *usbdev;
+	struct video_device *videodev;
 	unsigned char transfer_buffer[TB_LEN];
 	int curfreq;
 	int stereo;
-} usb_dsbr100;
+	int users;
+	int removed;
+} dsbr100_device;
 
 
+/* File system interface */
 static struct file_operations usb_dsbr100_fops = {
 	.owner =	THIS_MODULE,
 	.open =		usb_dsbr100_open,
@@ -118,65 +129,84 @@ static struct file_operations usb_dsbr100_fops = {
 	.ioctl =        usb_dsbr100_ioctl,
 	.llseek =       no_llseek,
 };
-static struct video_device usb_dsbr100_radio=
+
+/* V4L interface */
+static struct video_device dsbr100_videodev_template=
 {
 	.owner =	THIS_MODULE,
 	.name =		"D-Link DSB-R 100",
 	.type =		VID_TYPE_TUNER,
 	.hardware =	VID_HARDWARE_AZTECH,
 	.fops =         &usb_dsbr100_fops,
+	.release = video_device_release,
 };
 
-static int users = 0;
-
-static struct usb_device_id usb_dsbr100_table [] = {
+static struct usb_device_id usb_dsbr100_device_table [] = {
 	{ USB_DEVICE(DSB100_VENDOR, DSB100_PRODUCT) },
 	{ }						/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE (usb, usb_dsbr100_table);
+MODULE_DEVICE_TABLE (usb, usb_dsbr100_device_table);
 
+/* USB subsystem interface */
 static struct usb_driver usb_dsbr100_driver = {
 	.owner =	THIS_MODULE,
 	.name =		"dsbr100",
 	.probe =	usb_dsbr100_probe,
 	.disconnect =	usb_dsbr100_disconnect,
-	.id_table =	usb_dsbr100_table,
+	.id_table =	usb_dsbr100_device_table,
 };
 
+/* Low-level device interface begins here */
 
-static int dsbr100_start(usb_dsbr100 *radio)
+/* switch on radio */
+static int dsbr100_start(dsbr100_device *radio)
 {
-	if (usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x00, 0xC0, 0x00, 0xC7, radio->transfer_buffer, 8, 300)<0 ||
-	    usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x02, 0xC0, 0x01, 0x00, radio->transfer_buffer, 8, 300)<0)
+	if (usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			USB_REQ_GET_STATUS, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			0x00, 0xC7, radio->transfer_buffer, 8, 300)<0 ||
+	usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			DSB100_ONOFF, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			0x01, 0x00, radio->transfer_buffer, 8, 300)<0)
 		return -1;
 	return (radio->transfer_buffer)[0];
 }
 
 
-static int dsbr100_stop(usb_dsbr100 *radio)
+/* switch off radio */
+static int dsbr100_stop(dsbr100_device *radio)
 {
-	if (usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x00, 0xC0, 0x16, 0x1C, radio->transfer_buffer, 8, 300)<0 ||
-	    usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x02, 0xC0, 0x00, 0x00, radio->transfer_buffer, 8, 300)<0)
+	if (usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			USB_REQ_GET_STATUS, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			0x16, 0x1C, radio->transfer_buffer, 8, 300)<0 ||
+	usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			DSB100_ONOFF, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			0x00, 0x00, radio->transfer_buffer, 8, 300)<0)
 		return -1;
 	return (radio->transfer_buffer)[0];
 }
 
-
-static int dsbr100_setfreq(usb_dsbr100 *radio, int freq)
+/* set a frequency, freq is defined by v4l's TUNER_LOW, i.e. 1/16th kHz */
+static int dsbr100_setfreq(dsbr100_device *radio, int freq)
 {
 	freq = (freq/16*80)/1000+856;
-	if (usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x01, 0xC0, (freq>>8)&0x00ff, freq&0xff, 
-		radio->transfer_buffer, 8, 300)<0 ||
-	    usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x00, 0xC0, 0x96, 0xB7, radio->transfer_buffer, 8, 300)<0 ||
-	    usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x00, 0xC0, 0x00, 0x24, radio->transfer_buffer, 8, 300)<0) {
+	if (usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			DSB100_TUNE, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			(freq>>8)&0x00ff, freq&0xff, 
+			radio->transfer_buffer, 8, 300)<0 ||
+	   usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+		 	USB_REQ_GET_STATUS, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+			0x96, 0xB7, radio->transfer_buffer, 8, 300)<0 ||
+	usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+			USB_REQ_GET_STATUS, 
+			USB_TYPE_VENDOR | USB_RECIP_DEVICE |  USB_DIR_IN,
+			0x00, 0x24, radio->transfer_buffer, 8, 300)<0) {
 		radio->stereo = -1;
 		return -1;
 	}
@@ -184,61 +214,92 @@ static int dsbr100_setfreq(usb_dsbr100 *radio, int freq)
 	return (radio->transfer_buffer)[0];
 }
 
-static void dsbr100_getstat(usb_dsbr100 *radio)
+/* return the device status.  This is, in effect, just whether it
+sees a stereo signal or not.  Pity. */
+static void dsbr100_getstat(dsbr100_device *radio)
 {
-	if (usb_control_msg(radio->dev, usb_rcvctrlpipe(radio->dev, 0),
-		0x00, 0xC0, 0x00 , 0x24, radio->transfer_buffer, 8, 300)<0)
+	if (usb_control_msg(radio->usbdev, usb_rcvctrlpipe(radio->usbdev, 0),
+		USB_REQ_GET_STATUS, 
+		USB_TYPE_VENDOR | USB_RECIP_DEVICE | USB_DIR_IN,
+		0x00 , 0x24, radio->transfer_buffer, 8, 300)<0)
 		radio->stereo = -1;
 	else
 		radio->stereo = ! (radio->transfer_buffer[0]&0x01);
 }
 
 
+/* USB subsystem interface begins here */
+
+/* check if the device is present and register with v4l and
+usb if it is */
 static int usb_dsbr100_probe(struct usb_interface *intf, 
 			 const struct usb_device_id *id)
 {
-	usb_dsbr100 *radio;
+	dsbr100_device *radio;
+	struct video_device *videodev;
 
-	if (!(radio = kmalloc(sizeof(usb_dsbr100),GFP_KERNEL)))
+	if (!(radio = kmalloc(sizeof(dsbr100_device), GFP_KERNEL)))
 		return -ENOMEM;
-	usb_dsbr100_radio.priv = radio;
-	radio->dev = interface_to_usbdev (intf);
+	if (!(radio->videodev = video_device_alloc())) {
+		kfree(radio);
+		return -ENOMEM;
+	}
+	memcpy(radio->videodev, &dsbr100_videodev_template, 
+		sizeof(dsbr100_videodev_template));
+	radio->removed = 0;
+	radio->users = 0;
+	radio->usbdev = interface_to_usbdev(intf);
 	radio->curfreq = FREQ_MIN*FREQ_MUL;
-	usb_set_intfdata (intf, radio);
+	video_set_drvdata(radio->videodev, radio);
+	if (video_register_device(radio->videodev, VFL_TYPE_RADIO,
+		radio_nr)) {
+		warn("Could not register video device");
+		video_device_release(radio->videodev);
+		kfree(radio);
+		return -EIO;
+	}
+	usb_set_intfdata(intf, radio);
 	return 0;
 }
 
+/* handle unplugging of the device, release data structures
+if nothing keeps us from doing it.  If something is still
+keeping us busy, the release callback of v4l will take care
+of releasing it.  stv680.c does not relase its private
+data, so I don't do this here either.  Checking out the
+code I'd expect I better did that, but if there's a memory
+leak here it's tiny (~50 bytes per disconnect) */
 static void usb_dsbr100_disconnect(struct usb_interface *intf)
 {
-	usb_dsbr100 *radio = usb_get_intfdata (intf);
+	dsbr100_device *radio = usb_get_intfdata(intf);
 
 	usb_set_intfdata (intf, NULL);
-
 	if (radio) {
-		lock_kernel();
-		if (users) {
-			unlock_kernel();
-			return;
+		video_unregister_device(radio->videodev);
+		radio->videodev = NULL;
+		if (radio->users) {
+			kfree(radio);
+		} else {
+			radio->removed = 1;
 		}
-		kfree(radio);
-		usb_dsbr100_radio.priv = NULL;
-		unlock_kernel();
 	}
 }
+
+
+/* Video for Linux interface */
 
 static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 				unsigned int cmd, void *arg)
 {
-	struct video_device *dev = video_devdata(file);
-	usb_dsbr100 *radio=dev->priv;
+	dsbr100_device *radio=video_get_drvdata(video_devdata(file));
 
 	if (!radio)
-		return -EINVAL;
+		return -EIO;
 
-	switch(cmd)
-	{
+	switch(cmd) {
 		case VIDIOCGCAP: {
 			struct video_capability *v = arg;
+
 			memset(v, 0, sizeof(*v));
 			v->type = VID_TYPE_TUNER;
 			v->channels = 1;
@@ -248,6 +309,7 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 		}
 		case VIDIOCGTUNER: {
 			struct video_tuner *v = arg;
+
 			dsbr100_getstat(radio);
 			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
@@ -263,21 +325,21 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 		}
 		case VIDIOCSTUNER: {
 			struct video_tuner *v = arg;
+
 			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
-		case VIDIOCGFREQ:
-		{
+		case VIDIOCGFREQ: {
 			int *freq = arg;
+
 			if (radio->curfreq==-1)
 				return -EINVAL;
 			*freq = radio->curfreq;
 			return 0;
 		}
-		case VIDIOCSFREQ:
-		{
+		case VIDIOCSFREQ: {
 			int *freq = arg;
 
 			radio->curfreq = *freq;
@@ -287,6 +349,7 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 		}
 		case VIDIOCGAUDIO: {
 			struct video_audio *v = arg;
+
 			memset(v, 0, sizeof(*v));
 			v->flags |= VIDEO_AUDIO_MUTABLE;
 			v->mode = VIDEO_SOUND_STEREO;
@@ -297,9 +360,9 @@ static int usb_dsbr100_do_ioctl(struct inode *inode, struct file *file,
 		}
 		case VIDIOCSAUDIO: {
 			struct video_audio *v = arg;
+
 			if (v->audio) 
 				return -EINVAL;
-
 			if (v->flags&VIDEO_AUDIO_MUTE) {
 				if (dsbr100_stop(radio)==-1)
 					warn("Radio did not respond properly");
@@ -322,64 +385,40 @@ static int usb_dsbr100_ioctl(struct inode *inode, struct file *file,
 
 static int usb_dsbr100_open(struct inode *inode, struct file *file)
 {
-	struct video_device *dev = video_devdata(file);
-	usb_dsbr100 *radio=dev->priv;
+	dsbr100_device *radio=video_get_drvdata(video_devdata(file));
 
-	if (! radio) {
-		warn("Radio not initialised");
-		return -EAGAIN;
-	}
-	if(users)
-	{
-		warn("Radio in use");
-		return -EBUSY;
-	}
-	users++;
-	if (dsbr100_start(radio)<0)
+	radio->users = 1;
+	if (dsbr100_start(radio)<0) {
 		warn("Radio did not start up properly");
+		radio->users = 0;
+		return -EIO;
+	}
 	dsbr100_setfreq(radio, radio->curfreq);
 	return 0;
 }
 
 static int usb_dsbr100_close(struct inode *inode, struct file *file)
 {
-	struct video_device *dev = video_devdata(file);
-	usb_dsbr100 *radio=dev->priv;
+	dsbr100_device *radio=video_get_drvdata(video_devdata(file));
 
 	if (!radio)
 		return -ENODEV;
-	users--;
+	radio->users = 0;
+	if (radio->removed) {
+		kfree(radio);
+	}
 	return 0;
 }
 
 static int __init dsbr100_init(void)
 {
-	int retval;
-	usb_dsbr100_radio.priv = NULL;
-	retval = usb_register(&usb_dsbr100_driver);
-	if (retval)
-		goto failed_usb_register;
-	retval = video_register_device(&usb_dsbr100_radio, VFL_TYPE_RADIO,
-				       radio_nr);
-	if (retval) {	
-		warn("Couldn't register video device");
-		goto failed_video_register;
-	}
+	int retval = usb_register(&usb_dsbr100_driver);
 	info(DRIVER_VERSION ":" DRIVER_DESC);
-	return 0;
-failed_video_register:
-	usb_deregister(&usb_dsbr100_driver);
-failed_usb_register:
 	return retval;
 }
 
 static void __exit dsbr100_exit(void)
 {
-	usb_dsbr100 *radio=usb_dsbr100_radio.priv;
-
-	if (radio)
-		dsbr100_stop(radio);
-	video_unregister_device(&usb_dsbr100_radio);
 	usb_deregister(&usb_dsbr100_driver);
 }
 
