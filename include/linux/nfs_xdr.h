@@ -356,7 +356,6 @@ struct nfs3_getaclargs {
 	struct nfs_fh *		fh;
 	int			mask;
 	struct page **		pages;
-	unsigned int		page_len;
 };
 
 struct nfs3_setaclargs {
@@ -365,7 +364,6 @@ struct nfs3_setaclargs {
 	struct posix_acl *	acl_access;
 	struct posix_acl *	acl_default;
 	struct page **		pages;
-	unsigned int		page_len;
 };
 
 struct nfs_diropok {

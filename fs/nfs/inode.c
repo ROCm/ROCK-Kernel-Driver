@@ -492,7 +492,7 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		if (server->acl_client == NULL)
 			goto out_shutdown;
 		/* Initially assume the nfsacl program is supported */
-		server->flags |= (NFSACL_GETACL | NFSACL_SETACL);
+		server->flags |= NFSACL;
 	}
 #endif  /* CONFIG_NFS_ACL */
 	/* RFC 2623, sec 2.3.2 */

@@ -724,8 +724,7 @@ nfs3_proc_checkacls(struct inode *inode)
 	struct nfs3_getaclres res = { &fattr };
 	int status;
 
-	if (!(server->flags & NFSACL_GETACL) ||
-	    (server->flags & NFS_MOUNT_NOACL))
+	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
 		return -EOPNOTSUPP;
 
 	args.fh = NFS_FH(inode);
@@ -738,9 +737,8 @@ nfs3_proc_checkacls(struct inode *inode)
 
 	if (status) {
 		if (status == -ENOSYS) {
-			dprintk("NFS_ACL GETACL RPC not supported "
-				"(will not retry)\n");
-			server->flags &= ~NFSACL_GETACL;
+			dprintk("NFS_ACL extension not supported; disabling\n");
+			server->flags &= ~NFSACL;
 			status = -EOPNOTSUPP;
 		} else if (status == -ENOTSUPP)
 			status = -EOPNOTSUPP;
@@ -778,20 +776,18 @@ nfs3_proc_getacl(struct inode *inode, int type)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs_fattr fattr;
-	struct page *pages[NFSACL_MAXPAGES];
-	int count;
+	struct page *pages[NFSACL_MAXPAGES] = { };
 	struct nfs3_getaclargs args = {
+		/* The xdr layer may allocate pages here. */
 		.pages =	pages,
-		.page_len = NFSACL_MAXPAGES << PAGE_SHIFT,
 	};
 	struct nfs3_getaclres res = {
 		.fattr =	&fattr,
 	};
 	struct posix_acl *acl = NULL;
-	int status;
+	int status, count;
 
-	if (!(server->flags & NFSACL_GETACL) ||
-	    (server->flags & NFS_MOUNT_NOACL))
+	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
 		return ERR_PTR(-EOPNOTSUPP);
 
 	args.fh = NFS_FH(inode);
@@ -810,29 +806,19 @@ nfs3_proc_getacl(struct inode *inode, int type)
 			return ERR_PTR(-EINVAL);
 	}
 
-	for (count = 0; count < NFSACL_MAXPAGES; count++) {
-		pages[count] = alloc_page(GFP_KERNEL);
-		if (!args.pages[count]) {
-			while (count)
-				__free_page(args.pages[--count]);
-			return ERR_PTR(-ENOMEM);
-		}
-	}
-
 	dprintk("NFS call getacl\n");
 	status = rpc_call(server->acl_client, NFS3PROC_GETACL,
 			  &args, &res, 0);
 	dprintk("NFS reply getacl: %d\n", status);
 
-	while (count) {
-		__free_page(args.pages[--count]);
-	}
+	/* pages may have been allocated at the xdr layer. */
+	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
+		__free_page(args.pages[count]);
 
 	if (status) {
 		if (status == -ENOSYS) {
-			dprintk("NFS_ACL GETACL RPC not supported "
-				"(will not retry)\n");
-			server->flags &= ~NFSACL_GETACL;
+			dprintk("NFS_ACL extension not supported; disabling\n");
+			server->flags &= ~NFSACL;
 			status = -EOPNOTSUPP;
 		} else if (status == -ENOTSUPP)
 			status = -EOPNOTSUPP;
@@ -879,12 +865,13 @@ nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
 {
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs_fattr fattr;
-	struct page *pages[NFSACL_MAXPAGES];
-	struct nfs3_setaclargs args = { .pages = pages };
+	struct page *pages[NFSACL_MAXPAGES] = { };
+	struct nfs3_setaclargs args = {
+		.pages = pages,
+	};
 	int status, count;
 
-	if (!(server->flags & NFSACL_SETACL) ||
-	    (server->flags & NFS_MOUNT_NOACL))
+	if (!(server->flags & NFSACL) || (server->flags & NFS_MOUNT_NOACL))
 		return -EOPNOTSUPP;
 
 	/* We are doing this here, because XDR marshalling can only
@@ -939,29 +926,20 @@ nfs3_proc_setacl(struct inode *inode, int type, struct posix_acl *acl)
 	}
 	args.mask = NFS3_ACL | (args.acl_default ? NFS3_DFACL : 0);
 
-	args.page_len = nfsacl_size(
-		(args.mask & NFS3_ACL)   ? args.acl_access  : NULL,
-		(args.mask & NFS3_DFACL) ? args.acl_default : NULL);
-	for (count = 0; (count << PAGE_SHIFT) < args.page_len; count++) {
-		args.pages[count] = alloc_page(GFP_KERNEL);
-		if (!args.pages[count]) {
-			while (count)
-				__free_page(args.pages[--count]);
-			status = -ENOMEM;
-			goto cleanup;
-		}
-	}
-
 	dprintk("NFS call setacl\n");
 	status = rpc_call(server->acl_client, NFS3PROC_SETACL,
 			  &args, &fattr, 0);
 	dprintk("NFS reply setacl: %d\n", status);
 
+	/* pages may have been allocated at the xdr layer. */
+	for (count = 0; count < NFSACL_MAXPAGES && args.pages[count]; count++)
+		__free_page(args.pages[count]);
+
 	if (status) {
 		if (status == -ENOSYS) {
 			dprintk("NFS_ACL SETACL RPC not supported"
 				"(will not retry)\n");
-			server->flags &= ~NFSACL_SETACL;
+			server->flags &= ~NFSACL;
 			status = -EOPNOTSUPP;
 		} else if (status == -ENOTSUPP)
 			status = -EOPNOTSUPP;
