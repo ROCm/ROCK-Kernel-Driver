@@ -353,7 +353,6 @@ static ide_pci_device_t cs5530_chipset __devinitdata = {
 	.channels	= 2,
 	.autodma	= AUTODMA,
 	.bootable	= ON_BOARD,
-	.flags		= IDEPCI_FLAG_FORCE_MASTER,
 };
 
 static int __devinit cs5530_init_one(struct pci_dev *dev, const struct pci_device_id *id)
