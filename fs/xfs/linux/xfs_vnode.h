@@ -378,7 +378,6 @@ typedef struct vattr {
 	mode_t		va_mode;	/* file access mode */
 	uid_t		va_uid;		/* owner user id */
 	gid_t		va_gid;		/* owner group id */
-	xfs_dev_t	va_fsid;	/* file system id (dev for now) */
 	xfs_ino_t	va_nodeid;	/* node id */
 	nlink_t		va_nlink;	/* number of references to file */
 	xfs_off_t	va_size;	/* file size in bytes */

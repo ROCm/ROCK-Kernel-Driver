@@ -285,9 +285,9 @@ xfs_mount_validate_sb(
 #if !XFS_BIG_BLKNOS
 	if (unlikely(
 	    (sbp->sb_dblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> INT_MAX ||
+		> UINT_MAX ||
 	    (sbp->sb_rblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> INT_MAX)) {
+		> UINT_MAX)) {
 		cmn_err(CE_WARN,
 	"XFS: File system is too large to be mounted on this system.");
 		return XFS_ERROR(E2BIG);
@@ -949,7 +949,7 @@ xfs_mountfs(
 	 * log's mount-time initialization. Perform 1st part recovery if needed
 	 */
 	if (likely(sbp->sb_logblocks > 0)) {	/* check for volume case */
-		error = xfs_log_mount(mp, mp->m_logdev_targp->pbr_dev,
+		error = xfs_log_mount(mp, mp->m_logdev_targp,
 				      XFS_FSB_TO_DADDR(mp, sbp->sb_logstart),
 				      XFS_FSB_TO_BB(mp, sbp->sb_logblocks));
 		if (error) {
@@ -980,7 +980,7 @@ xfs_mountfs(
 	if (unlikely((rip->i_d.di_mode & IFMT) != IFDIR)) {
 		cmn_err(CE_WARN, "XFS: corrupted root inode");
 		prdev("Root inode %llu is not a directory",
-		      mp->m_dev, (unsigned long long)rip->i_ino);
+		      mp->m_ddev_targp, (unsigned long long)rip->i_ino);
 		xfs_iunlock(rip, XFS_ILOCK_EXCL);
 		XFS_ERROR_REPORT("xfs_mountfs_int(2)", XFS_ERRLEVEL_LOW,
 				 mp);

@@ -151,7 +151,6 @@ xfs_getattr(
 	}
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	vap->va_fsid = mp->m_dev;
 	vap->va_nodeid = ip->i_ino;
 #if XFS_BIG_INUMS
 	vap->va_nodeid += mp->m_inoadd;
@@ -1729,7 +1728,7 @@ xfs_inactive(
 
 	if (ip->i_d.di_nlink == 0 &&
 	    DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_DESTROY)) {
-		(void) XFS_SEND_DESTROY(mp, bdp, DM_RIGHT_NULL);
+		(void) XFS_SEND_DESTROY(mp, vp, DM_RIGHT_NULL);
 	}
 
 	error = 0;

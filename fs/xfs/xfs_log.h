@@ -153,10 +153,10 @@ xfs_lsn_t xfs_log_done(struct xfs_mount *mp,
 int	  xfs_log_force(struct xfs_mount *mp,
 			xfs_lsn_t	 lsn,
 			uint		 flags);
-int	  xfs_log_mount(struct xfs_mount *mp,
-			dev_t		 log_dev,
-			xfs_daddr_t		 start_block,
-			int		 num_bblocks);
+int	  xfs_log_mount(struct xfs_mount	*mp,
+			struct xfs_buftarg	*log_target,
+			xfs_daddr_t		start_block,
+			int		 	num_bblocks);
 int	  xfs_log_mount_finish(struct xfs_mount *mp, int);
 void	  xfs_log_move_tail(struct xfs_mount	*mp,
 			    xfs_lsn_t		tail_lsn);
