@@ -251,10 +251,17 @@ typedef struct {
 	u8 count;		/* 1: number of pxd/xad */
 				/* (8) */
 
-	void *xdlist;		/* 4: pxd/xad list */
-	s32 rsrvd;		/* 4: */
+	/*
+	 * We need xdlistlock_t to be 64 bits (8 bytes), regardless of
+	 * whether void * is 32 or 64 bits
+	 */
+	union {
+		void *_xdlist;	/* pxd/xad list */
+		s64 pad;	/* 8: Force 64-bit xdlist size */
+	} union64;
 } xdlistlock_t;			/* (16): */
 
+#define xdlist union64._xdlist
 
 /*
  *	commit
