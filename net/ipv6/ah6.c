@@ -154,11 +154,11 @@ static int ipv6_clear_mutable_options(struct ipv6hdr *iph, int len)
 	return 0;
 }
 
-int ah6_output(struct sk_buff **pskb)
+int ah6_output(struct sk_buff *skb)
 {
 	int err;
 	int extlen;
-	struct dst_entry *dst = (*pskb)->dst;
+	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct ipv6hdr *top_iph;
 	struct ip_auth_hdr *ah;
@@ -170,11 +170,11 @@ int ah6_output(struct sk_buff **pskb)
 		char hdrs[0];
 	} *tmp_ext;
 
-	top_iph = (struct ipv6hdr *)(*pskb)->data;
-	top_iph->payload_len = htons((*pskb)->len - sizeof(*top_iph));
+	top_iph = (struct ipv6hdr *)skb->data;
+	top_iph->payload_len = htons(skb->len - sizeof(*top_iph));
 
-	nexthdr = *(*pskb)->nh.raw;
-	*(*pskb)->nh.raw = IPPROTO_AH;
+	nexthdr = *skb->nh.raw;
+	*skb->nh.raw = IPPROTO_AH;
 
 	/* When there are no extension headers, we only need to save the first
 	 * 8 bytes of the base IP header.
@@ -182,7 +182,7 @@ int ah6_output(struct sk_buff **pskb)
 	memcpy(tmp_base, top_iph, sizeof(tmp_base));
 
 	tmp_ext = NULL;
-	extlen = (*pskb)->h.raw - (unsigned char *)(top_iph + 1);
+	extlen = skb->h.raw - (unsigned char *)(top_iph + 1);
 	if (extlen) {
 		extlen += sizeof(*tmp_ext);
 		tmp_ext = kmalloc(extlen, GFP_ATOMIC);
@@ -198,7 +198,7 @@ int ah6_output(struct sk_buff **pskb)
 			goto error_free_iph;
 	}
 
-	ah = (struct ip_auth_hdr *)(*pskb)->h.raw;
+	ah = (struct ip_auth_hdr *)skb->h.raw;
 	ah->nexthdr = nexthdr;
 
 	top_iph->priority    = 0;
@@ -214,7 +214,7 @@ int ah6_output(struct sk_buff **pskb)
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
-	ahp->icv(ahp, *pskb, ah->auth_data);
+	ahp->icv(ahp, skb, ah->auth_data);
 
 	err = 0;
 

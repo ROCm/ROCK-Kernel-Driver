@@ -114,10 +114,10 @@ error_out:
 	return err;
 }
 
-static int ipcomp6_output(struct sk_buff **pskb)
+static int ipcomp6_output(struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = (*pskb)->dst;
+	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct ipv6hdr *top_iph;
 	int hdr_len;
@@ -126,23 +126,23 @@ static int ipcomp6_output(struct sk_buff **pskb)
 	int plen, dlen;
 	u8 *start, *scratch = ipcd->scratch;
 
-	hdr_len = (*pskb)->h.raw - (*pskb)->data;
+	hdr_len = skb->h.raw - skb->data;
 
 	/* check whether datagram len is larger than threshold */
-	if (((*pskb)->len - hdr_len) < ipcd->threshold) {
+	if ((skb->len - hdr_len) < ipcd->threshold) {
 		goto out_ok;
 	}
 
-	if ((skb_is_nonlinear(*pskb) || skb_cloned(*pskb)) &&
-		skb_linearize(*pskb, GFP_ATOMIC) != 0) {
+	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
+		skb_linearize(skb, GFP_ATOMIC) != 0) {
 		err = -ENOMEM;
 		goto error;
 	}
 
 	/* compression */
-	plen = (*pskb)->len - hdr_len;
+	plen = skb->len - hdr_len;
 	dlen = IPCOMP_SCRATCH_SIZE;
-	start = (*pskb)->h.raw;
+	start = skb->h.raw;
 
 	err = crypto_comp_compress(ipcd->tfm, start, plen, scratch, &dlen);
 	if (err) {
@@ -152,18 +152,18 @@ static int ipcomp6_output(struct sk_buff **pskb)
 		goto out_ok;
 	}
 	memcpy(start + sizeof(struct ip_comp_hdr), scratch, dlen);
-	pskb_trim(*pskb, hdr_len + dlen + sizeof(struct ip_comp_hdr));
+	pskb_trim(skb, hdr_len + dlen + sizeof(struct ip_comp_hdr));
 
 	/* insert ipcomp header and replace datagram */
-	top_iph = (struct ipv6hdr *)(*pskb)->data;
+	top_iph = (struct ipv6hdr *)skb->data;
 
-	top_iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
+	top_iph->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 
 	ipch = (struct ipv6_comp_hdr *)start;
-	ipch->nexthdr = *(*pskb)->nh.raw;
+	ipch->nexthdr = *skb->nh.raw;
 	ipch->flags = 0;
 	ipch->cpi = htons((u16 )ntohl(x->id.spi));
-	*(*pskb)->nh.raw = IPPROTO_COMP;
+	*skb->nh.raw = IPPROTO_COMP;
 
 out_ok:
 	err = 0;

@@ -53,10 +53,10 @@ static int ip_clear_mutable_options(struct iphdr *iph, u32 *daddr)
 	return 0;
 }
 
-static int ah_output(struct sk_buff **pskb)
+static int ah_output(struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = (*pskb)->dst;
+	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x  = dst->xfrm;
 	struct iphdr *iph, *top_iph;
 	struct ip_auth_hdr *ah;
@@ -66,7 +66,7 @@ static int ah_output(struct sk_buff **pskb)
 		char 		buf[60];
 	} tmp_iph;
 
-	top_iph = (*pskb)->nh.iph;
+	top_iph = skb->nh.iph;
 	iph = &tmp_iph.iph;
 
 	iph->tos = top_iph->tos;
@@ -85,7 +85,7 @@ static int ah_output(struct sk_buff **pskb)
 	ah->nexthdr = top_iph->protocol;
 
 	top_iph->tos = 0;
-	top_iph->tot_len = htons((*pskb)->len);
+	top_iph->tot_len = htons(skb->len);
 	top_iph->frag_off = 0;
 	top_iph->ttl = 0;
 	top_iph->protocol = IPPROTO_AH;
@@ -98,7 +98,7 @@ static int ah_output(struct sk_buff **pskb)
 	ah->reserved = 0;
 	ah->spi = x->id.spi;
 	ah->seq_no = htonl(++x->replay.oseq);
-	ahp->icv(ahp, *pskb, ah->auth_data);
+	ahp->icv(ahp, skb, ah->auth_data);
 
 	top_iph->tos = iph->tos;
 	top_iph->ttl = iph->ttl;

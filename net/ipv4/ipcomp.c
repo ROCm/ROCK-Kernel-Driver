@@ -120,20 +120,20 @@ out:
 	return err;
 }
 
-static int ipcomp_output(struct sk_buff **pskb)
+static int ipcomp_output(struct sk_buff *skb)
 {
 	int err;
-	struct dst_entry *dst = (*pskb)->dst;
+	struct dst_entry *dst = skb->dst;
 	struct xfrm_state *x = dst->xfrm;
 	struct iphdr *iph;
 	struct ip_comp_hdr *ipch;
 	struct ipcomp_data *ipcd = x->data;
 	int hdr_len = 0;
 
-	iph = (*pskb)->nh.iph;
-	iph->tot_len = htons((*pskb)->len);
+	iph = skb->nh.iph;
+	iph->tot_len = htons(skb->len);
 	hdr_len = iph->ihl * 4;
-	if (((*pskb)->len - hdr_len) < ipcd->threshold) {
+	if ((skb->len - hdr_len) < ipcd->threshold) {
 		/* Don't bother compressing */
 		if (x->props.mode) {
 			ip_send_check(iph);
@@ -141,17 +141,17 @@ static int ipcomp_output(struct sk_buff **pskb)
 		goto out_ok;
 	}
 
-	if ((skb_is_nonlinear(*pskb) || skb_cloned(*pskb)) &&
-	    skb_linearize(*pskb, GFP_ATOMIC) != 0) {
+	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
+	    skb_linearize(skb, GFP_ATOMIC) != 0) {
 	    	err = -ENOMEM;
 	    	goto error;
 	}
 	
-	err = ipcomp_compress(x, *pskb);
+	err = ipcomp_compress(x, skb);
 	if (err) {
 		if (err == -EMSGSIZE) {
 			if (x->props.mode) {
-				iph = (*pskb)->nh.iph;
+				iph = skb->nh.iph;
 				ip_send_check(iph);
 			}
 			goto out_ok;
@@ -160,8 +160,8 @@ static int ipcomp_output(struct sk_buff **pskb)
 	}
 
 	/* Install ipcomp header, convert into ipcomp datagram. */
-	iph = (*pskb)->nh.iph;
-	iph->tot_len = htons((*pskb)->len);
+	iph = skb->nh.iph;
+	iph->tot_len = htons(skb->len);
 	ipch = (struct ip_comp_hdr *)((char *)iph + iph->ihl * 4);
 	ipch->nexthdr = iph->protocol;
 	ipch->flags = 0;

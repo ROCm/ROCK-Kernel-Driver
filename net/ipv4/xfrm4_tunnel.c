@@ -9,9 +9,8 @@
 #include <net/ip.h>
 #include <net/protocol.h>
 
-static int ipip_output(struct sk_buff **pskb)
+static int ipip_output(struct sk_buff *skb)
 {
-	struct sk_buff *skb = *pskb;
 	struct iphdr *iph;
 	
 	iph = skb->nh.iph;
