@@ -57,5 +57,5 @@ hisax-$(CONFIG_HISAX_W6692)		+= w6692.o
 hisax-$(CONFIG_HISAX_ENTERNOW_PCI)	+= enternow_pci.o amd7930_fn.o
 #hisax-$(CONFIG_HISAX_TESTEMU)		+= testemu.o
 
-CERT := $(shell cd $(src); md5sum -c md5sums.asc > /dev/null 2> /dev/null ;echo $$?)
-CFLAGS_cert.o := -DCERTIFICATION=$(CERT)
+CERT = $(shell cd $(src); md5sum -c md5sums.asc > /dev/null 2> /dev/null ;echo $$?)
+CFLAGS_cert.o = -DCERTIFICATION=$(CERT)

@@ -1991,6 +1991,10 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	int i;
 
 	sprintf(id, "capidrv-%d", contr);
+	if (!try_module_get(THIS_MODULE)) {
+		printk(KERN_WARNING "capidrv: (%s) Could not reserve module\n", id);
+		return -1;
+	}
 	if (!(card = (capidrv_contr *) kmalloc(sizeof(capidrv_contr), GFP_ATOMIC))) {
 		printk(KERN_WARNING
 		 "capidrv: (%s) Could not allocate contr-struct.\n", id);
@@ -1998,11 +2002,6 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	}
 	memset(card, 0, sizeof(capidrv_contr));
 	card->owner = THIS_MODULE;
-	if (!try_module_get(card->owner)) {
-		printk(KERN_WARNING "capidrv: (%s) Could not reserve module\n", id);
-		kfree(card);
-		return -1;
-	}
 	init_timer(&card->listentimer);
 	strcpy(card->name, id);
 	card->contrnr = contr;
@@ -2099,6 +2098,7 @@ static int capidrv_delcontr(u16 contr)
 		printk(KERN_ERR "capidrv: delcontr: no contr %u\n", contr);
 		return -1;
 	}
+	#warning FIXME: maybe a race condition the card should be removed here from global list /kkeil
 	spin_unlock_irqrestore(&global_lock, flags);
 
 	del_timer(&card->listentimer);

@@ -22,12 +22,12 @@
 
 #define I8K_BIOS_VERSION	_IOR ('i', 0x80, 4)
 #define I8K_MACHINE_ID		_IOR ('i', 0x81, 16)
-#define I8K_POWER_STATUS	_IOR ('i', 0x82, sizeof(int))
-#define I8K_FN_STATUS		_IOR ('i', 0x83, sizeof(int))
-#define I8K_GET_TEMP		_IOR ('i', 0x84, sizeof(int))
-#define I8K_GET_SPEED		_IOWR('i', 0x85, sizeof(int))
-#define I8K_GET_FAN		_IOWR('i', 0x86, sizeof(int))
-#define I8K_SET_FAN		_IOWR('i', 0x87, sizeof(int)*2)
+#define I8K_POWER_STATUS	_IOR ('i', 0x82, size_t)
+#define I8K_FN_STATUS		_IOR ('i', 0x83, size_t)
+#define I8K_GET_TEMP		_IOR ('i', 0x84, size_t)
+#define I8K_GET_SPEED		_IOWR('i', 0x85, size_t)
+#define I8K_GET_FAN		_IOWR('i', 0x86, size_t)
+#define I8K_SET_FAN		_IOWR('i', 0x87, size_t)
 
 #define I8K_FAN_LEFT		1
 #define I8K_FAN_RIGHT		0

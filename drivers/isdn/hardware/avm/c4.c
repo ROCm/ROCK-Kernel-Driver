@@ -37,8 +37,8 @@
 static int suppress_pollack;
 
 static struct pci_device_id c4_pci_tbl[] = {
-	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4, 4 },
-	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C2, 2 },
+	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C4, 0, 0, (unsigned long)4 },
+	{ PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21285, PCI_VENDOR_ID_AVM, PCI_DEVICE_ID_AVM_C2, 0, 0, (unsigned long)2 },
 	{ }			/* Terminating entry */
 };
 
@@ -145,6 +145,7 @@ static inline int wait_for_doorbell(avmcard *card, unsigned long t)
 	while (c4inmeml(card->mbase+DOORBELL) != 0xffffffff) {
 		if (!time_before(jiffies, stop))
 			return -1;
+		mb();
 	}
 	return 0;
 }
@@ -297,6 +298,7 @@ static void c4_reset(avmcard *card)
 		if (!time_before(jiffies, stop))
 			return;
 		c4outmeml(card->mbase+DOORBELL, DBELL_ADDR);
+		mb();
 	}
 
 	c4_poke(card, DC21285_ARMCSR_BASE + CHAN_1_CONTROL, 0);
@@ -320,6 +322,7 @@ static int c4_detect(avmcard *card)
 		if (!time_before(jiffies, stop))
 			return 2;
 		c4outmeml(card->mbase+DOORBELL, DBELL_ADDR);
+		mb();
 	}
 
 	c4_poke(card, DC21285_ARMCSR_BASE + CHAN_1_CONTROL, 0);
@@ -899,6 +902,9 @@ static void c4_remove(struct pci_dev *pdev)
 	avmctrl_info *cinfo;
 	u_int i;
 
+	if (!card)
+		return;
+
  	c4_reset(card);
 
         for (i=0; i < card->nr_controllers; i++) {
@@ -910,6 +916,7 @@ static void c4_remove(struct pci_dev *pdev)
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
         avmcard_dma_free(card->dma);
+        pci_set_drvdata(pdev, NULL);
 	b1_free_card(card);
 }
 
@@ -1141,7 +1148,7 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 
 	retval = c4_detect(card);
 	if (retval != 0) {
-		printk(KERN_NOTICE "c4: NO card at 0x%x (%d)\n",
+		printk(KERN_NOTICE "c4: NO card at 0x%x error(%d)\n",
 		       card->port, retval);
 		retval = -EIO;
 		goto err_unmap;
@@ -1185,7 +1192,7 @@ static int c4_add_card(struct capicardparams *p, struct pci_dev *dev,
 	printk(KERN_INFO "c4: AVM C%d at i/o %#x, irq %d, mem %#lx\n",
 	       nr_controllers, card->port, card->irq,
 	       card->membase);
-
+	pci_set_drvdata(dev, card);
 	return 0;
 
  err_free_irq:

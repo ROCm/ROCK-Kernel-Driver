@@ -58,12 +58,16 @@ MODULE_LICENSE("GPL");
 
 int capi_major = 68;		/* allocated */
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
+#define CAPINC_NR_PORTS	32
+#define CAPINC_MAX_PORTS	256
 int capi_ttymajor = 191;
+int capi_ttyminors = CAPINC_NR_PORTS;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 MODULE_PARM(capi_major, "i");
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 MODULE_PARM(capi_ttymajor, "i");
+MODULE_PARM(capi_ttyminors, "i");
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 /* -------- defines ------------------------------------------------- */
@@ -1262,7 +1266,6 @@ static int capinc_tty_read_proc(char *page, char **start, off_t off,
 	return 0;
 }
 
-#define CAPINC_NR_PORTS 256
 static struct tty_driver *capinc_tty_driver;
 
 static struct tty_operations capinc_ops = {
@@ -1289,8 +1292,14 @@ static struct tty_operations capinc_ops = {
 
 static int capinc_tty_init(void)
 {
-	struct tty_driver *drv = alloc_tty_driver(CAPINC_NR_PORTS);
+	struct tty_driver *drv;
+	
+	if (capi_ttyminors > CAPINC_MAX_PORTS)
+		capi_ttyminors = CAPINC_MAX_PORTS;
+	if (capi_ttyminors <= 0)
+		capi_ttyminors = CAPINC_NR_PORTS;
 
+	drv = alloc_tty_driver(capi_ttyminors);
 	if (!drv)
 		return -ENOMEM;
 
@@ -1454,7 +1463,6 @@ static int __init capi_init(void)
 	char *p;
 	char *compileinfo;
 
-
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strlcpy(rev, p + 2, sizeof(rev));
 		if ((p = strchr(rev, '$')) != 0 && p > rev)
@@ -1469,8 +1477,6 @@ static int __init capi_init(void)
 
 	devfs_mk_cdev(MKDEV(capi_major, 0), S_IFCHR | S_IRUSR | S_IWUSR,
 			"isdn/capi20");
-
-	printk(KERN_NOTICE "capi20: started up with major %d\n", capi_major);
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	if (capinc_tty_init() < 0) {

@@ -559,7 +559,7 @@ isdn_audio_eval_dtmf(modem_info * info)
 			ISDN_AUDIO_SKB_DLECOUNT(skb) = 0;
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 			isdn_tty_queue_tail(info, skb, 2);
-			if ((dev->modempoll) && (info->rcvsched))
+			if (((get_isdn_dev())->modempoll) && (info->rcvsched))
 				mod_timer(&info->read_timer, jiffies + 4);
 		} else
 			kfree_skb(skb);
@@ -670,7 +670,7 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	ISDN_AUDIO_SKB_LOCK(skb) = 0;
 	isdn_tty_queue_tail(info, skb, 2);
 	/* Schedule dequeuing */
-	if ((dev->modempoll) && (info->rcvsched))
+	if (((get_isdn_dev())->modempoll) && (info->rcvsched))
 		mod_timer(&info->read_timer, jiffies + 4);
 }
 

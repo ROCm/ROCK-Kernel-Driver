@@ -30,7 +30,9 @@ I'll register one for you.
 The second argument to _IO, _IOW, _IOR, or _IOWR is a sequence number
 to distinguish ioctls from each other.  The third argument to _IOW,
 _IOR, or _IOWR is the type of the data going into the kernel or coming
-out of the kernel (e.g.  'int' or 'struct foo').
+out of the kernel (e.g.  'int' or 'struct foo').  NOTE!  Do NOT use
+sizeof(arg) as the third argument as this results in your ioctl thinking
+it passes an argument of type size_t.
 
 Some devices use their major number as the identifier; this is OK, as
 long as it is unique.  Some devices are irregular and don't follow any

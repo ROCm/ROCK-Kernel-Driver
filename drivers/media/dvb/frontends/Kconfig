@@ -117,7 +117,7 @@ config DVB_VES1820
 
 config DVB_TDA1004X
 	tristate "Frontends with external TDA1004X demodulators (OFDM)"
-	depends on DVB_CORE
+	depends on DVB_CORE && !STANDALONE
 	help
 	  A DVB-T tuner module. Say Y when you want to support this frontend.
 
