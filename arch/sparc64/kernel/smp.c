@@ -18,6 +18,7 @@
 #include <linux/fs.h>
 #include <linux/seq_file.h>
 #include <linux/cache.h>
+#include <linux/jiffies.h>
 
 #include <asm/head.h>
 #include <asm/ptrace.h>
@@ -1086,7 +1087,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 		__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
 				     : /* no outputs */
 				     : "r" (pstate));
-	} while (tick >= compare);
+	} while (time_after_eq(tick, compare));
 }
 
 static void __init smp_setup_percpu_timer(void)

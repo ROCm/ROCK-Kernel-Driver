@@ -25,6 +25,7 @@
 #include <linux/delay.h>
 #include <linux/profile.h>
 #include <linux/bcd.h>
+#include <linux/jiffies.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -485,7 +486,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
 				     : /* no outputs */
 				     : "r" (pstate));
-	} while (ticks >= timer_tick_compare);
+	} while (time_after_eq(ticks, timer_tick_compare));
 
 	timer_check_rtc();
 
