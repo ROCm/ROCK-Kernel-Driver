@@ -68,6 +68,13 @@ extern spinlock_t sal_lock;
 	ia64_load_scratch_fpregs(__ia64_scn_fr);	\
 } while (0)
 
+# define SAL_CALL_REENTRANT(result,args...) do {	\
+	struct ia64_fpreg __ia64_scs_fr[6];		\
+	ia64_save_scratch_fpregs(__ia64_scs_fr);	\
+	__SAL_CALL(result, args);			\
+	ia64_load_scratch_fpregs(__ia64_scs_fr);	\
+} while (0)
+
 #define SAL_SET_VECTORS			0x01000000
 #define SAL_GET_STATE_INFO		0x01000001
 #define SAL_GET_STATE_INFO_SIZE		0x01000002
@@ -665,8 +672,8 @@ static inline s64
 ia64_sal_clear_state_info (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-    SAL_CALL(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, 0,
-             0, 0, 0, 0, 0);
+	SAL_CALL_REENTRANT(isrv, SAL_CLEAR_STATE_INFO, sal_info_type, 0,
+	              0, 0, 0, 0, 0);
 	return isrv.status;
 }
 
@@ -678,8 +685,8 @@ static inline u64
 ia64_sal_get_state_info (u64 sal_info_type, u64 *sal_info)
 {
 	struct ia64_sal_retval isrv;
-	SAL_CALL(isrv, SAL_GET_STATE_INFO, sal_info_type, 0,
-	         sal_info, 0, 0, 0, 0);
+	SAL_CALL_REENTRANT(isrv, SAL_GET_STATE_INFO, sal_info_type, 0,
+	              sal_info, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
 
@@ -694,8 +701,8 @@ static inline u64
 ia64_sal_get_state_info_size (u64 sal_info_type)
 {
 	struct ia64_sal_retval isrv;
-    SAL_CALL(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, 0,
-             0, 0, 0, 0, 0);
+	SAL_CALL_REENTRANT(isrv, SAL_GET_STATE_INFO_SIZE, sal_info_type, 0,
+	              0, 0, 0, 0, 0);
 	if (isrv.status)
 		return 0;
 	return isrv.v0;

@@ -280,7 +280,7 @@ sn_setup(char **cmdline_p)
 	else
 		sn_rtc_cycles_per_second = ticks_per_sec;
 
-	platform_intr_list[ACPI_INTERRUPT_CPEI] = IA64_PCE_VECTOR;
+	platform_intr_list[ACPI_INTERRUPT_CPEI] = IA64_CPE_VECTOR;
 
 
 	if ( IS_RUNNING_ON_SIMULATOR() )

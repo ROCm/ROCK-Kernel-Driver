@@ -127,8 +127,7 @@ typedef struct irqpda_s irqpda_t;
  * Check if given a compact node id the corresponding node has all the
  * cpus disabled. 
  */
-#define is_headless_node(cnode)		((cnode == CNODEID_NONE) ||			\
-					 (node_data(cnode)->active_cpu_count == 0))
+#define is_headless_node(cnode)		(!test_bit(cnode, &node_has_active_cpus))
 
 /*
  * Check if given a node vertex handle the corresponding node has all the

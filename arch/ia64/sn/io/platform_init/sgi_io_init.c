@@ -9,15 +9,13 @@
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/slab.h>
+#include <linux/smp.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/pda.h>
-#include <linux/smp.h>
-
-extern int init_hcl(void);
 
 /*
  * per_hub_init
@@ -79,31 +77,4 @@ per_hub_init(cnodeid_t cnode)
 
 	/* Initialize error interrupts for this hub. */
 	hub_error_init(cnode);
-}
-
-/*
- * This routine is responsible for the setup of all the IRIX hwgraph style
- * stuff that's been pulled into linux.  It's called by sn_pci_find_bios which
- * is called just before the generic Linux PCI layer does its probing (by 
- * platform_pci_fixup aka sn_pci_fixup).
- *
- * It is very IMPORTANT that this call is only made by the Master CPU!
- *
- */
-
-void
-sgi_master_io_infr_init(void)
-{
-	extern void irix_io_init(void);
-
-	init_hcl(); /* Sets up the hwgraph compatibility layer with devfs */
-	irix_io_init(); /* Do IRIX Compatibility IO Init */
-
-#ifdef	CONFIG_KDB
-	{
-		extern void kdba_io_init(void);
-		kdba_io_init();
-	}
-#endif
-
 }

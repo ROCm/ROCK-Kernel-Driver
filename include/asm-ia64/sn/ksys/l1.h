@@ -14,7 +14,6 @@
 #include <asm/sn/vector.h>
 #include <asm/sn/addrs.h>
 #include <asm/atomic.h>
-#include <asm/sn/sv.h>
 
 /* L1 Target Addresses */
 /*

@@ -40,14 +40,11 @@
 #include <linux/namei.h>
 #include <linux/string.h>
 #include <linux/slab.h>
+#include <linux/dcache.h>
 #include <asm/sn/hwgfs.h>
 
 
 extern struct vfsmount *hwgfs_vfsmount;
-
-/* TODO: Move this to some .h file or, more likely, use a slightly
-   different interface from lookup_create. */
-extern struct dentry *lookup_create(struct nameidata *nd, int is_dir);
 
 static int
 walk_parents_mkdir(
@@ -69,6 +66,7 @@ walk_parents_mkdir(
 			return error;
 
 		nd->dentry = lookup_create(nd, is_dir);
+		nd->flags |= LOOKUP_PARENT;
 		if (unlikely(IS_ERR(nd->dentry)))
 			return PTR_ERR(nd->dentry);
 

@@ -240,6 +240,18 @@ extern unsigned long __copy_user (void *to, const void *from, unsigned long coun
 	__cu_len;										\
 })
 
+#define __copy_in_user(to, from, size)          \
+        __copy_user((to), (from), (size))
+
+static inline unsigned long
+copy_in_user (void *to, const void *from, unsigned long n)
+{
+	if (likely(access_ok(VERIFY_READ, from, n) &&
+	    access_ok(VERIFY_WRITE, to, n)))
+		n = __copy_user(to, from, n);
+	return n;
+}
+
 extern unsigned long __do_clear_user (void *, unsigned long);
 
 #define __clear_user(to,n)			\
