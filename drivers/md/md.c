@@ -172,7 +172,7 @@ void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
 
 static int md_make_request (request_queue_t *q, struct bio *bio)
 {
-	mddev_t *mddev = kdev_to_mddev(to_kdev_t(bio->bi_bdev->bd_dev));
+	mddev_t *mddev = q->queuedata;
 
 	if (mddev && mddev->pers)
 		return mddev->pers->make_request(mddev, bio_rw(bio), bio);
@@ -180,6 +180,12 @@ static int md_make_request (request_queue_t *q, struct bio *bio)
 		bio_io_error(bio);
 		return 0;
 	}
+}
+
+static int md_fail_request (request_queue_t *q, struct bio *bio)
+{
+	bio_io_error(bio);
+	return 0;
 }
 
 static mddev_t * alloc_mddev(kdev_t dev)
@@ -1710,6 +1716,9 @@ static int do_md_run(mddev_t * mddev)
 #endif
 	}
 	mddev->pers = pers[pnum];
+
+	blk_queue_make_request(&mddev->queue, md_make_request);
+	mddev->queue.queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
 	if (err) {
@@ -3616,6 +3625,15 @@ static void md_geninit(void)
 #endif
 }
 
+request_queue_t * md_queue_proc(kdev_t dev)
+{
+	mddev_t *mddev = kdev_to_mddev(dev);
+	if (mddev == NULL)
+		return BLK_DEFAULT_QUEUE(MAJOR_NR);
+	else
+		return &mddev->queue;
+}
+
 int __init md_init(void)
 {
 	static char * name = "mdrecoveryd";
@@ -3640,8 +3658,9 @@ int __init md_init(void)
 			S_IFBLK | S_IRUSR | S_IWUSR, &md_fops, NULL);
 	}
 
-	/* forward all md request to md_make_request */
-	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), md_make_request);
+	/* all requests on an uninitialised device get failed... */
+	blk_queue_make_request(BLK_DEFAULT_QUEUE(MAJOR_NR), md_fail_request);
+	blk_dev[MAJOR_NR].queue = md_queue_proc;
 
 	add_gendisk(&md_gendisk);
 

@@ -1225,14 +1225,15 @@ static inline void raid5_activate_delayed(raid5_conf_t *conf)
 }
 static void raid5_unplug_device(void *data)
 {
-	raid5_conf_t *conf = (raid5_conf_t *)data;
+	request_queue_t *q = data;
+	mddev_t *mddev = q->queuedata;
+	raid5_conf_t *conf = mddev_to_conf(mddev);
 	unsigned long flags;
 
 	spin_lock_irqsave(&conf->device_lock, flags);
 
-	raid5_activate_delayed(conf);
-	
-	conf->plugged = 0;
+	if (blk_remove_plug(q))
+		raid5_activate_delayed(conf);
 	md_wakeup_thread(conf->thread);
 
 	spin_unlock_irqrestore(&conf->device_lock, flags);
@@ -1241,17 +1242,13 @@ static void raid5_unplug_device(void *data)
 static inline void raid5_plug_device(raid5_conf_t *conf)
 {
 	spin_lock_irq(&conf->device_lock);
-	if (list_empty(&conf->delayed_list))
-		if (!conf->plugged) {
-			conf->plugged = 1;
-			queue_task(&conf->plug_tq, &tq_disk);
-		}
+	blk_plug_device(&conf->mddev->queue);
 	spin_unlock_irq(&conf->device_lock);
 }
 
 static int make_request (mddev_t *mddev, int rw, struct bio * bi)
 {
-	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;
+	raid5_conf_t *conf = mddev_to_conf(mddev);
 	const unsigned int raid_disks = conf->raid_disks;
 	const unsigned int data_disks = raid_disks - 1;
 	unsigned int dd_idx, pd_idx;
@@ -1352,7 +1349,7 @@ static void raid5d (void *data)
 
 		if (list_empty(&conf->handle_list) &&
 		    atomic_read(&conf->preread_active_stripes) < IO_THRESHOLD &&
-		    !conf->plugged &&
+		    !blk_queue_plugged(&mddev->queue) &&
 		    !list_empty(&conf->delayed_list))
 			raid5_activate_delayed(conf);
 
@@ -1443,10 +1440,7 @@ static int run (mddev_t *mddev)
 	atomic_set(&conf->active_stripes, 0);
 	atomic_set(&conf->preread_active_stripes, 0);
 
-	conf->plugged = 0;
-	conf->plug_tq.sync = 0;
-	conf->plug_tq.routine = &raid5_unplug_device;
-	conf->plug_tq.data = conf;
+	mddev->queue.unplug_fn = raid5_unplug_device;
 
 	PRINTK("raid5: run(md%d) called.\n", mdidx(mddev));
 

@@ -214,6 +214,8 @@ struct mddev_s
 	atomic_t			recovery_active; /* blocks scheduled, but not written */
 	wait_queue_head_t		recovery_wait;
 
+	request_queue_t			queue;	/* for plugging ... */
+
 	struct list_head		all_mddevs;
 };
 

@@ -176,7 +176,7 @@ struct stripe_head {
  * is put on a "delayed" queue until there are no stripes currently
  * in a pre-read phase.  Further, if the "delayed" queue is empty when
  * a stripe is put on it then we "plug" the queue and do not process it
- * until an unplg call is made. (the tq_disk list is run).
+ * until an unplug call is made. (blk_run_queues is run).
  *
  * When preread is initiated on a stripe, we set PREREAD_ACTIVE and add
  * it to the count of prereading stripes.
@@ -228,9 +228,6 @@ struct raid5_private_data {
 							 * waiting for 25% to be free
 							 */        
 	spinlock_t		device_lock;
-
-	int			plugged;
-	struct tq_struct	plug_tq;
 };
 
 typedef struct raid5_private_data raid5_conf_t;
