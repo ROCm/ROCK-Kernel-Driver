@@ -186,15 +186,15 @@ struct compat_shmid64_ds {
  */
 typedef	u32		compat_uptr_t;
 
-static inline void *compat_ptr(compat_uptr_t uptr)
+static inline void __user *compat_ptr(compat_uptr_t uptr)
 {
-	return (void *)(unsigned long)uptr;
+	return (void __user *)(unsigned long)uptr;
 }
 
-static __inline__ void *compat_alloc_user_space(long len)
+static __inline__ void __user *compat_alloc_user_space(long len)
 {
 	struct pt_regs *regs = (void *)current->thread.rsp0 - sizeof(struct pt_regs); 
-	return (void *)regs->rsp - len; 
+	return (void __user *)regs->rsp - len; 
 }
 
 #endif /* _ASM_X86_64_COMPAT_H */
