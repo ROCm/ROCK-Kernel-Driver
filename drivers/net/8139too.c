@@ -152,7 +152,11 @@
 #ifdef RTL8139_NDEBUG
 #  define assert(expr) do {} while (0)
 #else
-#  define assert(expr) BUG_ON((expr) == 0)
+#  define assert(expr) \
+        if(unlikely(!(expr))) {				        \
+        printk(KERN_ERR "Assertion failed! %s,%s,%s,line=%d\n",	\
+        #expr,__FILE__,__FUNCTION__,__LINE__);		        \
+        }
 #endif
 
 
