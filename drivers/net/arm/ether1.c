@@ -687,7 +687,6 @@ static int
 ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 {
 	struct ether1_priv *priv = (struct ether1_priv *)dev->priv;
-	int len = (ETH_ZLEN < skb->len) ? skb->len : ETH_ZLEN;
 	int tmp, tst, nopaddr, txaddr, tbdaddr, dataddr;
 	unsigned long flags;
 	tx_t tx;
@@ -705,12 +704,18 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 			priv->restart = 0;
 	}
 
+	if (skb->len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			goto out;
+	}
+
 	/*
 	 * insert packet followed by a nop
 	 */
 	txaddr = ether1_txalloc (dev, TX_SIZE);
 	tbdaddr = ether1_txalloc (dev, TBD_SIZE);
-	dataddr = ether1_txalloc (dev, len);
+	dataddr = ether1_txalloc (dev, skb->len);
 	nopaddr = ether1_txalloc (dev, NOP_SIZE);
 
 	tx.tx_status = 0;
@@ -728,7 +733,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 	local_irq_save(flags);
 	ether1_writebuffer (dev, &tx, txaddr, TX_SIZE);
 	ether1_writebuffer (dev, &tbd, tbdaddr, TBD_SIZE);
-	ether1_writebuffer (dev, skb->data, dataddr, len);
+	ether1_writebuffer (dev, skb->data, dataddr, skb->len);
 	ether1_writebuffer (dev, &nop, nopaddr, NOP_SIZE);
 	tmp = priv->tx_link;
 	priv->tx_link = nopaddr;
@@ -750,6 +755,7 @@ ether1_sendpacket (struct sk_buff *skb, struct net_device *dev)
 	if (tst == -1)
 		netif_stop_queue(dev);
 
+ out:
 	return 0;
 }
 
