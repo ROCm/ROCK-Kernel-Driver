@@ -361,18 +361,21 @@ acpi_boot_init (
 		return result;
 	}
 
+#ifndef CONFIG_ACPI_HT_ONLY
 	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return result;
 	}
+#endif /*!CONFIG_ACPI_HT_ONLY*/
 
 	acpi_lapic = 1;
 
 #endif /*CONFIG_X86_LOCAL_APIC*/
 
 #ifdef CONFIG_X86_IO_APIC
+#ifndef CONFIG_ACPI_HT_ONLY
 
 	/* 
 	 * I/O APIC 
@@ -410,6 +413,7 @@ acpi_boot_init (
 
 	acpi_ioapic = 1;
 
+#endif /*!CONFIG_ACPI_HT_ONLY*/
 #endif /*CONFIG_X86_IO_APIC*/
 
 #ifdef CONFIG_X86_LOCAL_APIC
