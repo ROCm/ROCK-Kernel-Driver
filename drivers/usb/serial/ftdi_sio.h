@@ -190,6 +190,11 @@
 #define LINX_FUTURE_0_PID   0xF44A   /* Linx future device */
 #define LINX_FUTURE_1_PID   0xF44B   /* Linx future device */
 #define LINX_FUTURE_2_PID   0xF44C   /* Linx future device */
+#define FTDI_GUDEADS_889_PID    0xe889  /* USB RS323 OptoBridge */ 
+/* CCS Inc. ICDU/ICDU40 product ID - the FT232BM is used in an in-circuit-debugger */
+/* unit for PIC16's/PIC18's */
+#define FTDI_CCSICDU20_0_PID    0xF9D0     
+#define FTDI_CCSICDU40_1_PID    0xF9D1     
 
 /* Inside Accesso contactless reader (http://www.insidefr.com) */
 #define INSIDE_ACCESSO		0xFAD0

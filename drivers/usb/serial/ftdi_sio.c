@@ -17,6 +17,9 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (26/Mar/2004) Jan Capek
+ *      Added PID's for ICD-U20/ICD-U40 - incircuit PIC debuggers from CCS Inc.
+ *
  * (09/Feb/2004) Ian Abbott
  *      Changed full name of USB-UIRT device to avoid "/" character.
  *      Added FTDI's alternate PID (0x6006) for FT232/245 devices.
@@ -458,6 +461,10 @@ static struct usb_device_id id_table_FT232BM [] = {
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_0_PID, 0x400, 0xffff) },
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_1_PID, 0x400, 0xffff) },
  	{ USB_DEVICE_VER(FTDI_VID, LINX_FUTURE_2_PID, 0x400, 0xffff) },
+	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU20_0_PID) },
+ 	{ USB_DEVICE(FTDI_VID, FTDI_CCSICDU40_1_PID) },
 	{ }						/* Terminating entry */
 };
 
