@@ -54,6 +54,15 @@ void enable_timer(void)
 		       errno);
 }
 
+void disable_timer(void)
+{
+	struct itimerval disable = ((struct itimerval) { { 0, 0 }, { 0, 0 }});
+	if((setitimer(ITIMER_VIRTUAL, &disable, NULL) < 0) ||
+	   (setitimer(ITIMER_REAL, &disable, NULL) < 0))
+		printk("disnable_timer - setitimer failed, errno = %d\n",
+		       errno);
+}
+
 void switch_timers(int to_real)
 {
 	struct itimerval disable = ((struct itimerval) { { 0, 0 }, { 0, 0 }});

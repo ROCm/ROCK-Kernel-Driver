@@ -14,6 +14,7 @@ extern void free_irq_by_irq_and_dev(int irq, void *dev_id);
 extern void free_irq_by_fd(int fd);
 extern void reactivate_fd(int fd, int irqnum);
 extern void deactivate_fd(int fd, int irqnum);
+extern int deactivate_all_fds(void);
 extern void forward_interrupts(int pid);
 extern void init_irq_signals(int on_sigstack);
 extern void forward_ipi(int fd, int pid);
