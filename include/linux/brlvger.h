@@ -30,16 +30,8 @@
 #define BRLVGER_DISPLAY_OFF	3
 #define BRLVGER_BUZZ		4
 
-#ifdef CONFIG_USB_DYNAMIC_MINORS
-#define MAX_NR_BRLVGER_DEVS	256
-#define BRLVGER_MINOR		0
-#else
-/* Number of supported devices, and range of covered minors */
-#define MAX_NR_BRLVGER_DEVS	4
-
 /* Base minor for the char devices */
 #define BRLVGER_MINOR		128
-#endif
 
 /* Size of some fields */
 #define BRLVGER_HWVER_SIZE	2
