@@ -272,7 +272,7 @@ static int sk_alloc_security(struct sock *sk, int family, int priority)
 
 static void sk_free_security(struct sock *sk)
 {
-	struct task_security_struct *ssec = sk->sk_security;
+	struct sk_security_struct *ssec = sk->sk_security;
 
 	if (sk->sk_family != PF_UNIX || ssec->magic != SELINUX_MAGIC)
 		return;
