@@ -191,17 +191,18 @@ static int genmii_read_link(struct mii_phy *phy)
 	u16 lpa;
 
 	if (phy->autoneg) {
-		lpa = phy_read(phy, MII_LPA);
+		lpa = phy_read(phy, MII_LPA) & phy_read(phy, MII_ADVERTISE);
 
-		if (lpa & (LPA_10FULL | LPA_100FULL))
-			phy->duplex = DUPLEX_FULL;
-		else
-			phy->duplex = DUPLEX_HALF;
-		if (lpa & (LPA_100FULL | LPA_100HALF))
-			phy->speed = SPEED_100;
-		else
-			phy->speed = SPEED_10;
+		phy->speed = SPEED_10;
+		phy->duplex = DUPLEX_HALF;
 		phy->pause = 0;
+
+		if (lpa & (LPA_100FULL | LPA_100HALF)) {
+			phy->speed = SPEED_100;
+			if (lpa & LPA_100FULL)
+				phy->duplex = DUPLEX_FULL;
+		} else if (lpa & LPA_10FULL)
+			phy->duplex = DUPLEX_FULL;
 	}
 	/* On non-aneg, we assume what we put in BMCR is the speed,
 	 * though magic-aneg shouldn't prevent this case from occurring

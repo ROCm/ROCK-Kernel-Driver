@@ -33,21 +33,16 @@
 ** The Device and Vendor IDs for 10 Gigabit MACs
 **********************************************************************/
 
-#define INTEL_VENDOR_ID         0x8086
-#define INTEL_SUBVENDOR_ID      0x8086
+#define INTEL_VENDOR_ID             0x8086
+#define INTEL_SUBVENDOR_ID          0x8086
 
-#define IXGB_DEVICE_ID_82597EX      0x1048
-#define IXGB_DEVICE_ID_82597EX_SR   0x1A48
 
-#define IXGB_SUBDEVICE_ID_A11F  0xA11F
-#define IXGB_SUBDEVICE_ID_A01F  0xA01F
+#define IXGB_DEVICE_ID_82597EX      0x1048   
+#define IXGB_DEVICE_ID_82597EX_SR   0x1A48   
+#define IXGB_DEVICE_ID_82597EX_LR   0x1B48
+#define IXGB_SUBDEVICE_ID_A11F      0xA11F   
+#define IXGB_SUBDEVICE_ID_A01F      0xA01F   
 
-#define IXGB_SUBDEVICE_ID_A15F  0xA15F
-#define IXGB_SUBDEVICE_ID_A05F  0xA05F
-
-#define IXGB_SUBDEVICE_ID_A12F  0xA12F
-#define IXGB_SUBDEVICE_ID_A02F  0xA02F
-
-#endif				/* #ifndef _IXGB_IDS_H_ */
+#endif /* #ifndef _IXGB_IDS_H_ */
 
 /* End of File */
