@@ -677,9 +677,9 @@ static int alloc_pagedir(void)
 	calc_order();
 	pagedir_save = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC | __GFP_COLD,
 							     pagedir_order);
-	if(!pagedir_save)
+	if (!pagedir_save)
 		return -ENOMEM;
-	memset(pagedir_save,0,(1 << pagedir_order) * PAGE_SIZE);
+	memset(pagedir_save, 0, (1 << pagedir_order) * PAGE_SIZE);
 	pagedir_nosave = pagedir_save;
 	return 0;
 }
@@ -784,6 +784,7 @@ static int swsusp_alloc(void)
 int suspend_prepare_image(void)
 {
 	unsigned int nr_needed_pages = 0;
+	int error;
 
 	pr_debug("swsusp: critical section: \n");
 	if (save_highmem()) {
@@ -796,7 +797,9 @@ int suspend_prepare_image(void)
 	printk("swsusp: Need to copy %u pages\n",nr_copy_pages);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
 
-	swsusp_alloc();
+	error = swsusp_alloc();
+	if (error)
+		return error;
 	
 	/* During allocating of suspend pagedir, new cold pages may appear. 
 	 * Kill them.
