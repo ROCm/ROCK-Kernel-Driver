@@ -336,7 +336,6 @@ static void agp_x86_64_agp_enable(u32 mode)
 	struct pci_dev *device = NULL;
 	u32 command, scratch; 
 	u8 cap_ptr;
-	u8 agp_v3;
 	u8 v3_devs=0;
 
 	/* FIXME: If 'mode' is x1/x2/x4 should we call the AGPv2 routines directly ?
@@ -387,7 +386,6 @@ static void agp_x86_64_agp_enable(u32 mode)
 			printk (KERN_INFO "AGP: Setting up AGPv3 capable device at %d:%d:%d\n",
 					device->bus->number, PCI_FUNC(device->devfn), PCI_SLOT(device->devfn));
 			pci_read_config_dword(device, cap_ptr + 4, &scratch);
-			agp_v3 = (scratch & (1<<3) ) >>3;
 
 			/* adjust RQ depth */
 			command =
