@@ -470,15 +470,11 @@ static void reset_tx_descriptors(struct net_device *dev);
 
 static void stop_nic_rx(long ioaddr, long crvalue)
 {
-	writel(crvalue & (~CR_W_RXEN), ioaddr + TCRRCR);
-
-	/* wait for rx stop */
-	{
-		int i = 0, delay = 0x1000;
-
-		while ((!(readl(ioaddr + TCRRCR) & CR_R_RXSTOP)) && (i < delay)) {
-			++i;
-		}
+	int delay = 0x1000;
+	writel(crvalue & ~(CR_W_RXEN), ioaddr + TCRRCR);
+	while (--delay) {
+		if ( (readl(ioaddr + TCRRCR) & CR_R_RXSTOP) == CR_R_RXSTOP)
+			break;
 	}
 }
 
@@ -487,9 +483,9 @@ static void stop_nic_rxtx(long ioaddr, long crvalue)
 {
 	int delay = 0x1000;
 	writel(crvalue & ~(CR_W_RXEN+CR_W_TXEN), ioaddr + TCRRCR);
-	while(--delay) {
-		if( (readl(ioaddr + TCRRCR) & (CR_R_RXSTOP+CR_R_TXSTOP))
-		                           == (CR_R_RXSTOP+CR_R_TXSTOP) )
+	while (--delay) {
+		if ( (readl(ioaddr + TCRRCR) & (CR_R_RXSTOP+CR_R_TXSTOP))
+					    == (CR_R_RXSTOP+CR_R_TXSTOP) )
 			break;
 	}
 }
@@ -512,7 +508,7 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 #ifndef MODULE
 	static int printed_version;
 	if (!printed_version++)
-		printk (version);
+		printk(version);
 #endif
 	
 	card_idx++;
@@ -1186,7 +1182,7 @@ static void reset_and_disable_rxtx(struct net_device *dev)
 
 	/* Ueimor: wait for 50 PCI cycles (and flush posted writes btw). 
 	   We surely wait too long (address+data phase). Who cares? */
-	while(--delay) {
+	while (--delay) {
 		readl(ioaddr + BCR);
 		rmb();
 	}
@@ -1378,7 +1374,7 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 		np->cur_tx_copy->control |= (BPT << TBSShift);	/* buffer size */
 
 		/* for the last descriptor */
-		next = (struct fealnx *) np->cur_tx_copy.next_desc_logical;
+		next = np->cur_tx_copy->next_desc_logical;
 		next->skbuff = skb;
 		next->control = TXIC | TXLD | CRCEnable | PADEnable;
 		next->control |= (skb->len << PKTSShift);	/* pkt size */
@@ -1436,7 +1432,7 @@ static void reset_tx_descriptors(struct net_device *dev)
 
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		cur = &np->tx_ring[i];
-		if(cur->skbuff) {
+		if (cur->skbuff) {
 			pci_unmap_single(np->pci_dev, cur->buffer,
 				cur->skbuff->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb(cur->skbuff);
@@ -1447,12 +1443,12 @@ static void reset_tx_descriptors(struct net_device *dev)
 		cur->control = 0;	/* needed? */
 		/* probably not needed. We do it for purely paranoid reasons */
 		cur->next_desc = np->tx_ring_dma +
-			(i+1)*sizeof(struct fealnx_desc);
-		cur->next_desc_logical = &np->tx_ring[i+1];
+			(i + 1)*sizeof(struct fealnx_desc);
+		cur->next_desc_logical = &np->tx_ring[i + 1];
 	}
 	/* for the last tx descriptor */
-	np->tx_ring[TX_RING_SIZE-1].next_desc = np->tx_ring_dma;
-	np->tx_ring[TX_RING_SIZE-1].next_desc_logical = &np->tx_ring[0];
+	np->tx_ring[TX_RING_SIZE - 1].next_desc = np->tx_ring_dma;
+	np->tx_ring[TX_RING_SIZE - 1].next_desc_logical = &np->tx_ring[0];
 }
 
 
@@ -1614,7 +1610,7 @@ static irqreturn_t intr_handler(int irq, void *dev_instance, struct pt_regs *rgs
 		if (--boguscnt < 0) {
 			printk(KERN_WARNING "%s: Too much work at interrupt, "
 			       "status=0x%4.4x.\n", dev->name, intr_status);
-			if(!np->reset_timer_armed) {
+			if (!np->reset_timer_armed) {
 				np->reset_timer_armed = 1;
 				np->reset_timer.expires = RUN_AT(HZ/2);
 				add_timer(&np->reset_timer);
@@ -1857,13 +1853,13 @@ static void __set_rx_mode(struct net_device *dev)
 	writel(np->crvalue, ioaddr + TCRRCR);
 }
 
-static void netdev_get_drvinfo (struct net_device *dev, struct ethtool_drvinfo *info)
+static void netdev_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
 	struct netdev_private *np = dev->priv;
 
-	strcpy (info->driver, DRV_NAME);
-	strcpy (info->version, DRV_VERSION);
-	strcpy (info->bus_info, pci_name(np->pci_dev));
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+	strcpy(info->bus_info, pci_name(np->pci_dev));
 }
 
 static int netdev_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
@@ -2007,7 +2003,7 @@ static int __init fealnx_init(void)
 {
 /* when a module, this is printed whether or not devices are found in probe */
 #ifdef MODULE
-	printk (version);
+	printk(version);
 #endif
 
 	return pci_module_init(&fealnx_driver);
