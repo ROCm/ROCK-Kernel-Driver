@@ -1667,7 +1667,7 @@ static int journal_read(struct super_block *p_s_sb) {
 
   cur_dblock = SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) ;
   printk("reiserfs: checking transaction log (%s) for (%s)\n",
-	 __bdevname(SB_JOURNAL_DEV(p_s_sb)), p_s_sb->s_id) ;
+	 __bdevname(SB_JOURNAL_DEV(p_s_sb)), reiserfs_bdevname(p_s_sb));
   start = CURRENT_TIME ;
 
   /* step 1, read in the journal header block.  Check the transaction it says 
@@ -2052,15 +2052,11 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
      
      /* make sure that journal matches to the super block */
      if (is_reiserfs_jr(rs) && (jh->jh_journal.jp_journal_magic != sb_jp_journal_magic(rs))) {
-	 char jname[ 32 ];
-	 char fname[ 32 ];
 	 
-	 strcpy( jname, kdevname( SB_JOURNAL_DEV(p_s_sb) ) );
-	 strcpy( fname, p_s_sb->s_id);
 	 printk("sh-460: journal header magic %x (device %s) does not match "
 		"to magic found in super block %x (device %s)\n",
-		jh->jh_journal.jp_journal_magic, jname,
-		sb_jp_journal_magic(rs), fname);
+		jh->jh_journal.jp_journal_magic, kdevname( SB_JOURNAL_DEV(p_s_sb) ),
+		sb_jp_journal_magic(rs), reiserfs_bdevname (p_s_sb));
 	 brelse (bhjh);
 	 release_journal_dev(p_s_sb, journal);
 	 return 1 ;

@@ -103,7 +103,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th, unsign
   if (nr >= sb_bmap_nr (rs)) {
 	  reiserfs_warning ("vs-4075: reiserfs_free_block: "
 			    "block %lu is out of range on %s\n", 
-			    block, s->s_id);
+			    block, reiserfs_bdevname (s));
 	  return;
   }
 
@@ -113,7 +113,7 @@ static void _reiserfs_free_block (struct reiserfs_transaction_handle *th, unsign
   if (!reiserfs_test_and_clear_le_bit (offset, apbh[nr]->b_data)) {
       reiserfs_warning ("vs-4080: reiserfs_free_block: "
 			"free_block (%s:%lu)[dev:blocknr]: bit already cleared\n", 
-	    s->s_id, block);
+			reiserfs_bdevname (s), block);
   }
   journal_mark_dirty (th, s, apbh[nr]);
 

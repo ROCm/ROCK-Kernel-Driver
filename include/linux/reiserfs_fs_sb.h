@@ -456,4 +456,12 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
 #define SB_JOURNAL_DEV(s)            (SB_JOURNAL(s)->j_dev)
 
+/* A safe version of the "bdevname", which returns the "s_id" field of
+ * a superblock or else "Null superblock" if the super block is NULL.
+ */
+static inline char *reiserfs_bdevname(struct super_block *s)
+{
+        return (s == NULL) ? "Null superblock" : s -> s_id;
+}
+
 #endif	/* _LINUX_REISER_FS_SB */

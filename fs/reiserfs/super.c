@@ -735,7 +735,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (!bh) {
       printk ("sh-2006: read_super_block: "
               "bread failed (dev %s, block %lu, size %lu)\n",
-              s->s_id, offset / s->s_blocksize, s->s_blocksize);
+              reiserfs_bdevname (s), offset / s->s_blocksize, s->s_blocksize);
       return 1;
     }
  
@@ -755,7 +755,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (!bh) {
 	printk("sh-2007: read_super_block: "
                 "bread failed (dev %s, block %lu, size %lu)\n",
-                s->s_id, offset / s->s_blocksize, s->s_blocksize);
+                reiserfs_bdevname (s), offset / s->s_blocksize, s->s_blocksize);
 	return 1;
     }
     
@@ -763,7 +763,7 @@ static int read_super_block (struct super_block * s, int offset)
     if (sb_blocksize(rs) != s->s_blocksize) {
 	printk ("sh-2011: read_super_block: "
 		"can't find a reiserfs filesystem on (dev %s, block %lu, size %lu)\n",
-		s->s_id, bh->b_blocknr, s->s_blocksize);
+		reiserfs_bdevname (s), bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
 	return 1;
     }
@@ -772,7 +772,7 @@ static int read_super_block (struct super_block * s, int offset)
        brelse(bh) ;
        printk("dev %s: Unfinished reiserfsck --rebuild-tree run detected. Please run\n"
               "reiserfsck --rebuild-tree and wait for a completion. If that fails\n"
-              "get newer reiserfsprogs package\n", s->s_id);
+              "get newer reiserfsprogs package\n", reiserfs_bdevname (s));
        return 1;
     }
 
@@ -884,7 +884,7 @@ __u32 find_hash_out (struct super_block * s)
 	     ( (r5hash == yurahash) && (yurahash == GET_HASH_VALUE( deh_offset(&(de.de_deh[de.de_entry_num])))) ) ) {
 	    reiserfs_warning("reiserfs: Unable to automatically detect hash"
 		"function for device %s\n"
-		"please mount with -o hash={tea,rupasov,r5}\n", s->s_id);
+		"please mount with -o hash={tea,rupasov,r5}\n", reiserfs_bdevname (s));
 	    hash = UNSET_HASH;
 	    break;
 	}
@@ -896,7 +896,7 @@ __u32 find_hash_out (struct super_block * s)
 	    hash = R5_HASH;
 	else {
 	    reiserfs_warning("reiserfs: Unrecognised hash function for "
-			     "device %s\n", s->s_id);
+			     "device %s\n", reiserfs_bdevname (s));
 	    hash = UNSET_HASH;
 	}
     } while (0);
@@ -1031,7 +1031,7 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
       old_format = 1;
     /* try new format (64-th 1k block), which can contain reiserfs super block */
     else if (read_super_block (s, REISERFS_DISK_OFFSET_IN_BYTES)) {
-      printk("sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", s->s_id);
+      printk("sh-2021: reiserfs_fill_super: can not find reiserfs on %s\n", reiserfs_bdevname (s));
       goto error;    
     }
     sbi->s_mount_state = SB_REISERFS_STATE(s);

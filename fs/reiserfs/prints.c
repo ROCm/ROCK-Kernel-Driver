@@ -337,7 +337,7 @@ void reiserfs_panic (struct super_block * sb, const char * fmt, ...)
 
   /* this is not actually called, but makes reiserfs_panic() "noreturn" */
   panic ("REISERFS: panic (device %s): %s\n",
-	 sb ? sb->s_id : "sb == 0", error_buf);
+	 reiserfs_bdevname (sb), error_buf);
 }
 
 

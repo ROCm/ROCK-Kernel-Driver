@@ -918,7 +918,7 @@ static int reiserfs_unlink (struct inode * dir, struct dentry *dentry)
   
     if (!inode->i_nlink) {
 	printk("reiserfs_unlink: deleting nonexistent file (%s:%lu), %d\n",
-	       inode->i_sb->s_id, inode->i_ino, inode->i_nlink);
+	       reiserfs_bdevname (inode->i_sb), inode->i_ino, inode->i_nlink);
 	inode->i_nlink = 1;
     }
 

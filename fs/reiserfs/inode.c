@@ -1725,7 +1725,8 @@ static int grab_tail_page(struct inode *p_s_inode,
 	** call prepare_write
 	*/
 	reiserfs_warning("clm-6000: error reading block %lu on dev %s\n",
-	                  bh->b_blocknr, p_s_inode->i_sb->s_id) ;
+			 bh->b_blocknr,
+			 reiserfs_bdevname (p_s_inode->i_sb)) ;
 	error = -EIO ;
 	goto unlock ;
     }
@@ -1894,7 +1895,7 @@ research:
 	    goto research ;
 	}
     } else {
-        reiserfs_warning("clm-6003: bad item inode %lu, device %s\n", inode->i_ino, inode->i_sb->s_id) ;
+        reiserfs_warning("clm-6003: bad item inode %lu, device %s\n", inode->i_ino, reiserfs_bdevname (inode->i_sb)) ;
         retval = -EIO ;
 	goto out ;
     }
