@@ -57,7 +57,7 @@ static struct tty_struct *sclp_tty;
 static unsigned char sclp_tty_chars[SCLP_TTY_BUF_SIZE];
 static unsigned short int sclp_tty_chars_count;
 
-struct tty_driver sclp_tty_driver;
+struct tty_driver *sclp_tty_driver;
 
 extern struct termios  tty_std_termios;
 
@@ -708,28 +708,48 @@ static struct sclp_register sclp_input_event =
 	.receiver_fn = sclp_tty_receiver
 };
 
+static struct tty_operations sclp_ops = {
+	.open = sclp_tty_open,
+	.close = sclp_tty_close,
+	.write = sclp_tty_write,
+	.put_char = sclp_tty_put_char,
+	.flush_chars = sclp_tty_flush_chars,
+	.write_room = sclp_tty_write_room,
+	.chars_in_buffer = sclp_tty_chars_in_buffer,
+	.flush_buffer = sclp_tty_flush_buffer,
+	.ioctl = sclp_tty_ioctl,
+};
+
 int __init
 sclp_tty_init(void)
 {
+	struct tty_driver *driver;
 	void *page;
 	int i;
 	int rc;
 
 	if (!CONSOLE_IS_SCLP)
 		return 0;
+	driver = alloc_tty_driver(1);
+	if (!driver)
+		return -ENOMEM;
+
 	rc = sclp_rw_init();
 	if (rc) {
 		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
 		       "could not register tty - "
 		       "sclp_rw_init returned %d\n", rc);
+		put_tty_driver(driver);
 		return rc;
 	}
 	/* Allocate pages for output buffering */
 	INIT_LIST_HEAD(&sclp_tty_pages);
 	for (i = 0; i < MAX_KMEM_PAGES; i++) {
 		page = (void *) get_zeroed_page(GFP_KERNEL | GFP_DMA);
-		if (page == NULL)
+		if (page == NULL) {
+			put_tty_driver(driver);
 			return -ENOMEM;
+		}
 		list_add_tail((struct list_head *) page, &sclp_tty_pages);
 	}
 	INIT_LIST_HEAD(&sclp_tty_outqueue);
@@ -752,63 +772,33 @@ sclp_tty_init(void)
 	sclp_tty = NULL;
 
 	rc = sclp_register(&sclp_input_event);
-	if (rc)
+	if (rc) {
+		put_tty_driver(driver);
 		return rc;
+	}
 
-	memset (&sclp_tty_driver, 0, sizeof(struct tty_driver));
-	sclp_tty_driver.magic = TTY_DRIVER_MAGIC;
-	sclp_tty_driver.owner = THIS_MODULE;
-	sclp_tty_driver.driver_name = "sclp_line";
-	sclp_tty_driver.name = "ttyS";
-	sclp_tty_driver.major = TTY_MAJOR;
-	sclp_tty_driver.minor_start = 64;
-	sclp_tty_driver.num = 1;
-	sclp_tty_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	sclp_tty_driver.subtype = SYSTEM_TYPE_TTY;
-	sclp_tty_driver.init_termios = tty_std_termios;
-	sclp_tty_driver.init_termios.c_iflag = IGNBRK | IGNPAR;
-	sclp_tty_driver.init_termios.c_oflag = ONLCR | XTABS;
-	sclp_tty_driver.init_termios.c_lflag = ISIG | ECHO;
-	sclp_tty_driver.flags = TTY_DRIVER_REAL_RAW;
-	/* sclp_tty_driver.proc_entry ?	 */
-	sclp_tty_driver.open = sclp_tty_open;
-	sclp_tty_driver.close = sclp_tty_close;
-	sclp_tty_driver.write = sclp_tty_write;
-	sclp_tty_driver.put_char = sclp_tty_put_char;
-	sclp_tty_driver.flush_chars = sclp_tty_flush_chars;
-	sclp_tty_driver.write_room = sclp_tty_write_room;
-	sclp_tty_driver.chars_in_buffer = sclp_tty_chars_in_buffer;
-	sclp_tty_driver.flush_buffer = sclp_tty_flush_buffer;
-	sclp_tty_driver.ioctl = sclp_tty_ioctl;
-	/*
-	 * No need for these function because they would be only called when
-	 * the line discipline is close to full. That means that there must be
-	 * collected nearly 4kB of input data. I suppose it is very difficult
-	 * for the operator to enter lines quickly enough to let overrun the
-	 * line discipline. Besides the n_tty line discipline does not try to
-	 * call such functions if the pointers are set to NULL. Finally I have
-	 * no idea what to do within these function. I can not prevent the
-	 * operator and the SCLP to deliver input. Because of the reasons
-	 * above it seems not worth to implement a buffer mechanism.
-	 */
-	sclp_tty_driver.throttle = NULL;
-	sclp_tty_driver.unthrottle = NULL;
-	sclp_tty_driver.send_xchar = NULL;
-	sclp_tty_driver.set_termios = NULL;
-	sclp_tty_driver.set_ldisc = NULL;
-	sclp_tty_driver.stop = NULL;
-	sclp_tty_driver.start = NULL;
-	sclp_tty_driver.hangup = NULL;
-	sclp_tty_driver.break_ctl = NULL;
-	sclp_tty_driver.wait_until_sent = NULL;
-	sclp_tty_driver.read_proc = NULL;
-	sclp_tty_driver.write_proc = NULL;
-
-	rc = tty_register_driver(&sclp_tty_driver);
-	if (rc)
+	driver->owner = THIS_MODULE;
+	driver->driver_name = "sclp_line";
+	driver->name = "ttyS";
+	driver->major = TTY_MAJOR;
+	driver->minor_start = 64;
+	driver->type = TTY_DRIVER_TYPE_SYSTEM;
+	driver->subtype = SYSTEM_TYPE_TTY;
+	driver->init_termios = tty_std_termios;
+	driver->init_termios.c_iflag = IGNBRK | IGNPAR;
+	driver->init_termios.c_oflag = ONLCR | XTABS;
+	driver->init_termios.c_lflag = ISIG | ECHO;
+	driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(driver, &sclp_ops);
+	rc = tty_register_driver(driver);
+	if (rc) {
 		printk(KERN_ERR SCLP_TTY_PRINT_HEADER
 		       "could not register tty - "
 		       "tty_register_driver returned %d\n", rc);
-	return rc;
+		put_tty_driver(driver);
+		return rc;
+	}
+	sclp_tty_driver = driver;
+	return 0;
 }
 module_init(sclp_tty_init);

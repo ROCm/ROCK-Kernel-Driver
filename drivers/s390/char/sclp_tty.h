@@ -66,6 +66,6 @@ struct sclp_ioctls {
 /* get the number of buffers/pages got from kernel at startup */
 #define TIOCSCLPGKBUF	_IOR(SCLP_IOCTL_LETTER, 20, unsigned short)
 
-extern struct tty_driver sclp_tty_driver;
+extern struct tty_driver *sclp_tty_driver;
 
 #endif	/* __SCLP_TTY_H__ */

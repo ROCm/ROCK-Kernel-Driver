@@ -163,7 +163,7 @@ static struct tty_driver *
 sclp_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &sclp_tty_driver;
+	return sclp_tty_driver;
 }
 
 /*
