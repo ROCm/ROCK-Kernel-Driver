@@ -58,13 +58,11 @@ static struct page_list *alloc_pl(void)
 		return NULL;
 	}
 
-	SetPageLocked(pl->page);
 	return pl;
 }
 
 static void free_pl(struct page_list *pl)
 {
-	ClearPageLocked(pl->page);
 	__free_page(pl->page);
 	kfree(pl);
 }
