@@ -34,7 +34,7 @@ config LOG_BUF_SHIFT
 	int
 	default 14
 
-mmenu "Code maturity level options"
+menu "Code maturity level options"
 
 config EXPERIMENTAL
 	bool "Prompt for development and/or incomplete code/drivers"
