@@ -7,13 +7,14 @@
  */
 
 #include <asm/types.h>
+#include <asm/intrinsics.h>
 
 static __inline__ __const__ __u64
 __ia64_swab64 (__u64 x)
 {
 	__u64 result;
 
-	__asm__ ("mux1 %0=%1,@rev" : "=r" (result) : "r" (x));
+	result = ia64_mux1(x, ia64_mux1_rev);
 	return result;
 }
 

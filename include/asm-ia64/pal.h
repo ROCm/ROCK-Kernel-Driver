@@ -822,10 +822,10 @@ ia64_pal_cache_flush (u64 cache_type, u64 invalidate, u64 *progress, u64 *vector
 
 /* Initialize the processor controlled caches */
 static inline s64
-ia64_pal_cache_init (u64 level, u64 cache_type, u64 restrict)
+ia64_pal_cache_init (u64 level, u64 cache_type, u64 rest)
 {
 	struct ia64_pal_retval iprv;
-	PAL_CALL(iprv, PAL_CACHE_INIT, level, cache_type, restrict);
+	PAL_CALL(iprv, PAL_CACHE_INIT, level, cache_type, rest);
 	return iprv.status;
 }
 

@@ -18,6 +18,7 @@
 #include <asm/ptrace.h>
 #include <asm/kregs.h>
 #include <asm/ustack.h>
+#include <asm/intrinsics.h>
 
 #define IA64_NUM_DBG_REGS	8
 /*
@@ -356,38 +357,42 @@ extern unsigned long get_wchan (struct task_struct *p);
 /* Return stack pointer of blocked task TSK.  */
 #define KSTK_ESP(tsk)  ((tsk)->thread.ksp)
 
-static inline unsigned long
-ia64_get_kr (unsigned long regnum)
-{
-	unsigned long r = 0;
+extern void ia64_getreg_unknown_kr(void);
+extern void ia64_setreg_unknown_kr(void);
 
-	switch (regnum) {
-	      case 0: asm volatile ("mov %0=ar.k0" : "=r"(r)); break;
-	      case 1: asm volatile ("mov %0=ar.k1" : "=r"(r)); break;
-	      case 2: asm volatile ("mov %0=ar.k2" : "=r"(r)); break;
-	      case 3: asm volatile ("mov %0=ar.k3" : "=r"(r)); break;
-	      case 4: asm volatile ("mov %0=ar.k4" : "=r"(r)); break;
-	      case 5: asm volatile ("mov %0=ar.k5" : "=r"(r)); break;
-	      case 6: asm volatile ("mov %0=ar.k6" : "=r"(r)); break;
-	      case 7: asm volatile ("mov %0=ar.k7" : "=r"(r)); break;
-	}
-	return r;
-}
 
-static inline void
-ia64_set_kr (unsigned long regnum, unsigned long r)
-{
-	switch (regnum) {
-	      case 0: asm volatile ("mov ar.k0=%0" :: "r"(r)); break;
-	      case 1: asm volatile ("mov ar.k1=%0" :: "r"(r)); break;
-	      case 2: asm volatile ("mov ar.k2=%0" :: "r"(r)); break;
-	      case 3: asm volatile ("mov ar.k3=%0" :: "r"(r)); break;
-	      case 4: asm volatile ("mov ar.k4=%0" :: "r"(r)); break;
-	      case 5: asm volatile ("mov ar.k5=%0" :: "r"(r)); break;
-	      case 6: asm volatile ("mov ar.k6=%0" :: "r"(r)); break;
-	      case 7: asm volatile ("mov ar.k7=%0" :: "r"(r)); break;
-	}
-}
+#define ia64_get_kr(regnum)					\
+({								\
+	unsigned long r=0;					\
+								\
+	switch (regnum) {					\
+	    case 0: r = ia64_getreg(_IA64_REG_AR_KR0); break;	\
+	    case 1: r = ia64_getreg(_IA64_REG_AR_KR1); break;	\
+	    case 2: r = ia64_getreg(_IA64_REG_AR_KR2); break;	\
+	    case 3: r = ia64_getreg(_IA64_REG_AR_KR3); break;	\
+	    case 4: r = ia64_getreg(_IA64_REG_AR_KR4); break;	\
+	    case 5: r = ia64_getreg(_IA64_REG_AR_KR5); break;	\
+	    case 6: r = ia64_getreg(_IA64_REG_AR_KR6); break;	\
+	    case 7: r = ia64_getreg(_IA64_REG_AR_KR7); break;	\
+	    default: ia64_getreg_unknown_kr(); break;		\
+	}							\
+	r;							\
+})
+
+#define ia64_set_kr(regnum, r) 					\
+({								\
+	switch (regnum) {					\
+	    case 0: ia64_setreg(_IA64_REG_AR_KR0, r); break;	\
+	    case 1: ia64_setreg(_IA64_REG_AR_KR1, r); break;	\
+	    case 2: ia64_setreg(_IA64_REG_AR_KR2, r); break;	\
+	    case 3: ia64_setreg(_IA64_REG_AR_KR3, r); break;	\
+	    case 4: ia64_setreg(_IA64_REG_AR_KR4, r); break;	\
+	    case 5: ia64_setreg(_IA64_REG_AR_KR5, r); break;	\
+	    case 6: ia64_setreg(_IA64_REG_AR_KR6, r); break;	\
+	    case 7: ia64_setreg(_IA64_REG_AR_KR7, r); break;	\
+	    default: ia64_setreg_unknown_kr(); break;		\
+	}							\
+})
 
 /*
  * The following three macros can't be inline functions because we don't have struct
@@ -423,8 +428,8 @@ extern void ia32_save_state (struct task_struct *task);
 extern void ia32_load_state (struct task_struct *task);
 #endif
 
-#define ia64_fph_enable()	asm volatile (";; rsm psr.dfh;; srlz.d;;" ::: "memory");
-#define ia64_fph_disable()	asm volatile (";; ssm psr.dfh;; srlz.d;;" ::: "memory");
+#define ia64_fph_enable()	do { ia64_rsm(IA64_PSR_DFH); ia64_srlz_d(); } while (0)
+#define ia64_fph_disable()	do { ia64_ssm(IA64_PSR_DFH); ia64_srlz_d(); } while (0)
 
 /* load fp 0.0 into fph */
 static inline void
@@ -450,78 +455,14 @@ ia64_load_fpu (struct ia64_fpreg *fph) {
 	ia64_fph_disable();
 }
 
-static inline void
-ia64_fc (void *addr)
-{
-	asm volatile ("fc %0" :: "r"(addr) : "memory");
-}
-
-static inline void
-ia64_sync_i (void)
-{
-	asm volatile (";; sync.i" ::: "memory");
-}
-
-static inline void
-ia64_srlz_i (void)
-{
-	asm volatile (";; srlz.i ;;" ::: "memory");
-}
-
-static inline void
-ia64_srlz_d (void)
-{
-	asm volatile (";; srlz.d" ::: "memory");
-}
-
-static inline __u64
-ia64_get_rr (__u64 reg_bits)
-{
-	__u64 r;
-	asm volatile ("mov %0=rr[%1]" : "=r"(r) : "r"(reg_bits) : "memory");
-	return r;
-}
-
-static inline void
-ia64_set_rr (__u64 reg_bits, __u64 rr_val)
-{
-	asm volatile ("mov rr[%0]=%1" :: "r"(reg_bits), "r"(rr_val) : "memory");
-}
-
-static inline __u64
-ia64_get_dcr (void)
-{
-	__u64 r;
-	asm volatile ("mov %0=cr.dcr" : "=r"(r));
-	return r;
-}
-
-static inline void
-ia64_set_dcr (__u64 val)
-{
-	asm volatile ("mov cr.dcr=%0;;" :: "r"(val) : "memory");
-	ia64_srlz_d();
-}
-
-static inline __u64
-ia64_get_lid (void)
-{
-	__u64 r;
-	asm volatile ("mov %0=cr.lid" : "=r"(r));
-	return r;
-}
-
-static inline void
-ia64_invala (void)
-{
-	asm volatile ("invala" ::: "memory");
-}
-
 static inline __u64
 ia64_clear_ic (void)
 {
 	__u64 psr;
-	asm volatile ("mov %0=psr;; rsm psr.i | psr.ic;; srlz.i;;" : "=r"(psr) :: "memory");
+	psr = ia64_getreg(_IA64_REG_PSR);
+	ia64_stop();
+	ia64_rsm(IA64_PSR_I | IA64_PSR_IC);
+	ia64_srlz_i();
 	return psr;
 }
 
@@ -531,7 +472,9 @@ ia64_clear_ic (void)
 static inline void
 ia64_set_psr (__u64 psr)
 {
-	asm volatile (";; mov psr.l=%0;; srlz.d" :: "r" (psr) : "memory");
+	ia64_stop();
+	ia64_setreg(_IA64_REG_PSR_L, psr);
+	ia64_srlz_d();
 }
 
 /*
@@ -543,14 +486,13 @@ ia64_itr (__u64 target_mask, __u64 tr_num,
 	  __u64 vmaddr, __u64 pte,
 	  __u64 log_page_size)
 {
-	asm volatile ("mov cr.itir=%0" :: "r"(log_page_size << 2) : "memory");
-	asm volatile ("mov cr.ifa=%0;;" :: "r"(vmaddr) : "memory");
+	ia64_setreg(_IA64_REG_CR_ITIR, (log_page_size << 2));
+	ia64_setreg(_IA64_REG_CR_IFA, vmaddr);
+	ia64_stop();
 	if (target_mask & 0x1)
-		asm volatile ("itr.i itr[%0]=%1"
-				      :: "r"(tr_num), "r"(pte) : "memory");
+		ia64_itri(tr_num, pte);
 	if (target_mask & 0x2)
-		asm volatile (";;itr.d dtr[%0]=%1"
-				      :: "r"(tr_num), "r"(pte) : "memory");
+		ia64_itrd(tr_num, pte);
 }
 
 /*
@@ -561,13 +503,14 @@ static inline void
 ia64_itc (__u64 target_mask, __u64 vmaddr, __u64 pte,
 	  __u64 log_page_size)
 {
-	asm volatile ("mov cr.itir=%0" :: "r"(log_page_size << 2) : "memory");
-	asm volatile ("mov cr.ifa=%0;;" :: "r"(vmaddr) : "memory");
+	ia64_setreg(_IA64_REG_CR_ITIR, (log_page_size << 2));
+	ia64_setreg(_IA64_REG_CR_IFA, vmaddr);
+	ia64_stop();
 	/* as per EAS2.6, itc must be the last instruction in an instruction group */
 	if (target_mask & 0x1)
-		asm volatile ("itc.i %0;;" :: "r"(pte) : "memory");
+		ia64_itci(pte);
 	if (target_mask & 0x2)
-		asm volatile (";;itc.d %0;;" :: "r"(pte) : "memory");
+		ia64_itcd(pte);
 }
 
 /*
@@ -578,16 +521,17 @@ static inline void
 ia64_ptr (__u64 target_mask, __u64 vmaddr, __u64 log_size)
 {
 	if (target_mask & 0x1)
-		asm volatile ("ptr.i %0,%1" :: "r"(vmaddr), "r"(log_size << 2));
+		ia64_ptri(vmaddr, (log_size << 2));
 	if (target_mask & 0x2)
-		asm volatile ("ptr.d %0,%1" :: "r"(vmaddr), "r"(log_size << 2));
+		ia64_ptrd(vmaddr, (log_size << 2));
 }
 
 /* Set the interrupt vector address.  The address must be suitably aligned (32KB).  */
 static inline void
 ia64_set_iva (void *ivt_addr)
 {
-	asm volatile ("mov cr.iva=%0;; srlz.i;;" :: "r"(ivt_addr) : "memory");
+	ia64_setreg(_IA64_REG_CR_IVA, (__u64) ivt_addr);
+	ia64_srlz_i();
 }
 
 /* Set the page table address and control bits.  */
@@ -595,79 +539,33 @@ static inline void
 ia64_set_pta (__u64 pta)
 {
 	/* Note: srlz.i implies srlz.d */
-	asm volatile ("mov cr.pta=%0;; srlz.i;;" :: "r"(pta) : "memory");
-}
-
-static inline __u64
-ia64_get_cpuid (__u64 regnum)
-{
-	__u64 r;
-
-	asm ("mov %0=cpuid[%r1]" : "=r"(r) : "rO"(regnum));
-	return r;
+	ia64_setreg(_IA64_REG_CR_PTA, pta);
+	ia64_srlz_i();
 }
 
 static inline void
 ia64_eoi (void)
 {
-	asm ("mov cr.eoi=r0;; srlz.d;;" ::: "memory");
+	ia64_setreg(_IA64_REG_CR_EOI, 0);
+	ia64_srlz_d();
 }
+
+#define cpu_relax()	ia64_hint(ia64_hint_pause)
 
 static inline void
 ia64_set_lrr0 (unsigned long val)
 {
-	asm volatile ("mov cr.lrr0=%0;; srlz.d" :: "r"(val) : "memory");
+	ia64_setreg(_IA64_REG_CR_LRR0, val);
+	ia64_srlz_d();
 }
-
-static inline void
-ia64_hint_pause (void)
-{
-	asm volatile ("hint @pause" ::: "memory");
-}
-
-#define cpu_relax()	ia64_hint_pause()
 
 static inline void
 ia64_set_lrr1 (unsigned long val)
 {
-	asm volatile ("mov cr.lrr1=%0;; srlz.d" :: "r"(val) : "memory");
+	ia64_setreg(_IA64_REG_CR_LRR1, val);
+	ia64_srlz_d();
 }
 
-static inline void
-ia64_set_pmv (__u64 val)
-{
-	asm volatile ("mov cr.pmv=%0" :: "r"(val) : "memory");
-}
-
-static inline __u64
-ia64_get_pmc (__u64 regnum)
-{
-	__u64 retval;
-
-	asm volatile ("mov %0=pmc[%1]" : "=r"(retval) : "r"(regnum));
-	return retval;
-}
-
-static inline void
-ia64_set_pmc (__u64 regnum, __u64 value)
-{
-	asm volatile ("mov pmc[%0]=%1" :: "r"(regnum), "r"(value));
-}
-
-static inline __u64
-ia64_get_pmd (__u64 regnum)
-{
-	__u64 retval;
-
-	asm volatile ("mov %0=pmd[%1]" : "=r"(retval) : "r"(regnum));
-	return retval;
-}
-
-static inline void
-ia64_set_pmd (__u64 regnum, __u64 value)
-{
-	asm volatile ("mov pmd[%0]=%1" :: "r"(regnum), "r"(value));
-}
 
 /*
  * Given the address to which a spill occurred, return the unat bit
@@ -713,150 +611,25 @@ thread_saved_pc (struct task_struct *t)
  * Get the current instruction/program counter value.
  */
 #define current_text_addr() \
-	({ void *_pc; asm volatile ("mov %0=ip" : "=r" (_pc)); _pc; })
-
-/*
- * Set the correctable machine check vector register
- */
-static inline void
-ia64_set_cmcv (__u64 val)
-{
-	asm volatile ("mov cr.cmcv=%0" :: "r"(val) : "memory");
-}
-
-/*
- * Read the correctable machine check vector register
- */
-static inline __u64
-ia64_get_cmcv (void)
-{
-	__u64 val;
-
-	asm volatile ("mov %0=cr.cmcv" : "=r"(val) :: "memory");
-	return val;
-}
+	({ void *_pc; _pc = (void *)ia64_getreg(_IA64_REG_IP); _pc; })
 
 static inline __u64
 ia64_get_ivr (void)
 {
 	__u64 r;
-	asm volatile ("srlz.d;; mov %0=cr.ivr;; srlz.d;;" : "=r"(r));
+	ia64_srlz_d();
+	r = ia64_getreg(_IA64_REG_CR_IVR);
+	ia64_srlz_d();
 	return r;
-}
-
-static inline void
-ia64_set_tpr (__u64 val)
-{
-	asm volatile ("mov cr.tpr=%0" :: "r"(val));
-}
-
-static inline __u64
-ia64_get_tpr (void)
-{
-	__u64 r;
-	asm volatile ("mov %0=cr.tpr" : "=r"(r));
-	return r;
-}
-
-static inline void
-ia64_set_irr0 (__u64 val)
-{
-	asm volatile("mov cr.irr0=%0;;" :: "r"(val) : "memory");
-	ia64_srlz_d();
-}
-
-static inline __u64
-ia64_get_irr0 (void)
-{
-	__u64 val;
-
-	/* this is volatile because irr may change unbeknownst to gcc... */
-	asm volatile("mov %0=cr.irr0" : "=r"(val));
-	return val;
-}
-
-static inline void
-ia64_set_irr1 (__u64 val)
-{
-	asm volatile("mov cr.irr1=%0;;" :: "r"(val) : "memory");
-	ia64_srlz_d();
-}
-
-static inline __u64
-ia64_get_irr1 (void)
-{
-	__u64 val;
-
-	/* this is volatile because irr may change unbeknownst to gcc... */
-	asm volatile("mov %0=cr.irr1" : "=r"(val));
-	return val;
-}
-
-static inline void
-ia64_set_irr2 (__u64 val)
-{
-	asm volatile("mov cr.irr2=%0;;" :: "r"(val) : "memory");
-	ia64_srlz_d();
-}
-
-static inline __u64
-ia64_get_irr2 (void)
-{
-	__u64 val;
-
-	/* this is volatile because irr may change unbeknownst to gcc... */
-	asm volatile("mov %0=cr.irr2" : "=r"(val));
-	return val;
-}
-
-static inline void
-ia64_set_irr3 (__u64 val)
-{
-	asm volatile("mov cr.irr3=%0;;" :: "r"(val) : "memory");
-	ia64_srlz_d();
-}
-
-static inline __u64
-ia64_get_irr3 (void)
-{
-	__u64 val;
-
-	/* this is volatile because irr may change unbeknownst to gcc... */
-	asm volatile ("mov %0=cr.irr3" : "=r"(val));
-	return val;
-}
-
-static inline __u64
-ia64_get_gp(void)
-{
-	__u64 val;
-
-	asm ("mov %0=gp" : "=r"(val));
-	return val;
-}
-
-static inline void
-ia64_set_ibr (__u64 regnum, __u64 value)
-{
-	asm volatile ("mov ibr[%0]=%1" :: "r"(regnum), "r"(value));
 }
 
 static inline void
 ia64_set_dbr (__u64 regnum, __u64 value)
 {
-	asm volatile ("mov dbr[%0]=%1" :: "r"(regnum), "r"(value));
+	__ia64_set_dbr(regnum, value);
 #ifdef CONFIG_ITANIUM
-	asm volatile (";; srlz.d");
+	ia64_srlz_d();
 #endif
-}
-
-static inline __u64
-ia64_get_ibr (__u64 regnum)
-{
-	__u64 retval;
-
-	asm volatile ("mov %0=ibr[%1]" : "=r"(retval) : "r"(regnum));
-	return retval;
 }
 
 static inline __u64
@@ -864,9 +637,9 @@ ia64_get_dbr (__u64 regnum)
 {
 	__u64 retval;
 
-	asm volatile ("mov %0=dbr[%1]" : "=r"(retval) : "r"(regnum));
+	retval = __ia64_get_dbr(regnum);
 #ifdef CONFIG_ITANIUM
-	asm volatile (";; srlz.d");
+	ia64_srlz_d();
 #endif
 	return retval;
 }
@@ -883,28 +656,12 @@ ia64_get_dbr (__u64 regnum)
 # define ia64_rotr(w,n)							\
   ({									\
 	__u64 result;							\
-	asm ("shrp %0=%1,%1,%2" : "=r"(result) : "r"(w), "i"(n));	\
+	result = ia64_shrp((w), (w), (n));				\
 	result;								\
   })
 #endif
 
 #define ia64_rotl(w,n)	ia64_rotr((w),(64)-(n))
-
-static inline __u64
-ia64_thash (__u64 addr)
-{
-	__u64 result;
-	asm ("thash %0=%1" : "=r"(result) : "r" (addr));
-	return result;
-}
-
-static inline __u64
-ia64_tpa (__u64 addr)
-{
-	__u64 result;
-	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
-	return result;
-}
 
 /*
  * Take a mapped kernel address and return the equivalent address
@@ -914,7 +671,7 @@ static inline void *
 ia64_imva (void *addr)
 {
 	void *result;
-	asm ("tpa %0=%1" : "=r"(result) : "r"(addr));
+	result = (void *) ia64_tpa(addr);
 	return __va(result);
 }
 
@@ -926,13 +683,13 @@ ia64_imva (void *addr)
 static inline void
 prefetch (const void *x)
 {
-         __asm__ __volatile__ ("lfetch [%0]" : : "r"(x));
+	 ia64_lfetch(ia64_lfhint_none, x);
 }
 
 static inline void
 prefetchw (const void *x)
 {
-	__asm__ __volatile__ ("lfetch.excl [%0]" : : "r"(x));
+	ia64_lfetch_excl(ia64_lfhint_none, x);
 }
 
 #define spin_lock_prefetch(x)	prefetchw(x)

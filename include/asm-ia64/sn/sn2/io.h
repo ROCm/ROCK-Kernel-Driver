@@ -11,10 +11,22 @@
 
 extern void * sn_io_addr(unsigned long port); /* Forward definition */
 extern void sn_mmiob(void); /* Forward definition */
+#include <asm/intrinsics.h>
 
-#define __sn_mf_a()   __asm__ __volatile__ ("mf.a" ::: "memory")
+#define __sn_mf_a()   ia64_mfa()
 
 extern void sn_dma_flush(unsigned long);
+
+#define __sn_inb ___sn_inb
+#define __sn_inw ___sn_inw
+#define __sn_inl ___sn_inl
+#define __sn_outb ___sn_outb
+#define __sn_outw ___sn_outw
+#define __sn_outl ___sn_outl
+#define __sn_readb ___sn_readb
+#define __sn_readw ___sn_readw
+#define __sn_readl ___sn_readl
+#define __sn_readq ___sn_readq
 
 /*
  * The following routines are SN Platform specific, called when
@@ -26,7 +38,7 @@ extern void sn_dma_flush(unsigned long);
  */
 
 static inline unsigned int
-__sn_inb (unsigned long port)
+___sn_inb (unsigned long port)
 {
 	volatile unsigned char *addr;
 	unsigned char ret = -1;
@@ -40,7 +52,7 @@ __sn_inb (unsigned long port)
 }
 
 static inline unsigned int
-__sn_inw (unsigned long port)
+___sn_inw (unsigned long port)
 {
 	volatile unsigned short *addr;
 	unsigned short ret = -1;
@@ -54,7 +66,7 @@ __sn_inw (unsigned long port)
 }
 
 static inline unsigned int
-__sn_inl (unsigned long port)
+___sn_inl (unsigned long port)
 {
 	volatile unsigned int *addr;
 	unsigned int ret = -1;
@@ -68,7 +80,7 @@ __sn_inl (unsigned long port)
 }
 
 static inline void
-__sn_outb (unsigned char val, unsigned long port)
+___sn_outb (unsigned char val, unsigned long port)
 {
 	volatile unsigned char *addr;
 
@@ -79,7 +91,7 @@ __sn_outb (unsigned char val, unsigned long port)
 }
 
 static inline void
-__sn_outw (unsigned short val, unsigned long port)
+___sn_outw (unsigned short val, unsigned long port)
 {
 	volatile unsigned short *addr;
 
@@ -90,7 +102,7 @@ __sn_outw (unsigned short val, unsigned long port)
 }
 
 static inline void
-__sn_outl (unsigned int val, unsigned long port)
+___sn_outl (unsigned int val, unsigned long port)
 {
 	volatile unsigned int *addr;
 
@@ -110,7 +122,7 @@ __sn_outl (unsigned int val, unsigned long port)
  */
 
 static inline unsigned char
-__sn_readb (void *addr)
+___sn_readb (void *addr)
 {
 	unsigned char val;
 
@@ -121,7 +133,7 @@ __sn_readb (void *addr)
 }
 
 static inline unsigned short
-__sn_readw (void *addr)
+___sn_readw (void *addr)
 {
 	unsigned short val;
 
@@ -132,7 +144,7 @@ __sn_readw (void *addr)
 }
 
 static inline unsigned int
-__sn_readl (void *addr)
+___sn_readl (void *addr)
 {
 	unsigned int val;
 
@@ -143,7 +155,7 @@ __sn_readl (void *addr)
 }
 
 static inline unsigned long
-__sn_readq (void *addr)
+___sn_readq (void *addr)
 {
 	unsigned long val;
 

@@ -155,7 +155,7 @@ struct ia64_machine_vector {
 	ia64_mv_readw_t *readw;
 	ia64_mv_readl_t *readl;
 	ia64_mv_readq_t *readq;
-};
+} __attribute__((__aligned__(16))); /* align attrib? see above comment */
 
 #define MACHVEC_INIT(name)			\
 {						\

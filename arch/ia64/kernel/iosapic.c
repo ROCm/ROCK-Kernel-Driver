@@ -497,7 +497,7 @@ iosapic_register_intr (unsigned int gsi,
 		       unsigned long polarity, unsigned long trigger)
 {
 	int vector;
-	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
+	unsigned int dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 
 	vector = gsi_to_vector(gsi);
 	if (vector < 0)
@@ -574,7 +574,7 @@ iosapic_override_isa_irq (unsigned int isa_irq, unsigned int gsi,
 			  unsigned long trigger)
 {
 	int vector;
-	unsigned int dest = (ia64_get_lid() >> 16) & 0xffff;
+	unsigned int dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 
 	vector = isa_irq_to_vector(isa_irq);
 
@@ -668,11 +668,11 @@ iosapic_enable_intr (unsigned int vector)
 		 * Direct the interrupt vector to the current cpu, platform redirection
 		 * will distribute them.
 		 */
-		dest = (ia64_get_lid() >> 16) & 0xffff;
+		dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 	}
 #else
 	/* direct the interrupt vector to the running cpu id */
-	dest = (ia64_get_lid() >> 16) & 0xffff;
+	dest = (ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff;
 #endif
 	set_rte(vector, dest);
 

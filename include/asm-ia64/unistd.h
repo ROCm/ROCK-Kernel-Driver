@@ -334,73 +334,18 @@ waitpid (int pid, int * wait_stat, int flags)
 }
 
 
-static inline int
-execve (const char *filename, char *const av[], char *const ep[])
-{
-	register long r8 asm("r8");
-	register long r10 asm("r10");
-	register long r15 asm("r15") = __NR_execve;
-	register long out0 asm("out0") = (long)filename;
-	register long out1 asm("out1") = (long)av;
-	register long out2 asm("out2") = (long)ep;
-
-	asm volatile ("break " __stringify(__BREAK_SYSCALL) ";;\n\t"
-		      : "=r" (r8), "=r" (r10), "=r" (r15), "=r" (out0), "=r" (out1), "=r" (out2)
-		      : "2" (r15), "3" (out0), "4" (out1), "5" (out2)
-		      : "memory", "out3", "out4", "out5", "out6", "out7",
-		      /* Non-stacked integer registers, minus r8, r10, r15, r13  */
-		      "r2", "r3", "r9", "r11", "r12", "r14", "r16", "r17", "r18",
-		      "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27",
-		      "r28", "r29", "r30", "r31",
-		      /* Predicate registers.  */
-		      "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15",
-		      /* Non-rotating fp registers.  */
-		      "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15",
-		      /* Branch registers.  */
-		      "b6", "b7" );
-	return r8;
-}
-
-static inline pid_t
-clone (unsigned long flags, void *sp)
-{
-	register long r8 asm("r8");
-	register long r10 asm("r10");
-	register long r15 asm("r15") = __NR_clone;
-	register long out0 asm("out0") = (long)flags;
-	register long out1 asm("out1") = (long)sp;
-	long retval;
-
-	/* clone clobbers current, hence the "r13" in the clobbers list */
-	asm volatile ( "break " __stringify(__BREAK_SYSCALL) ";;\n\t"
-		       : "=r" (r8), "=r" (r10), "=r" (r15), "=r" (out0), "=r" (out1)
-		       : "2" (r15), "3" (out0), "4" (out1)
-		       : "memory", "out2", "out3", "out4", "out5", "out6", "out7", "r13",
-		       /* Non-stacked integer registers, minus r8, r10, r15, r13  */
-		       "r2", "r3", "r9", "r11", "r12", "r14", "r16", "r17", "r18",
-		       "r19", "r20", "r21", "r22", "r23", "r24", "r25", "r26", "r27",
-		       "r28", "r29", "r30", "r31",
-		       /* Predicate registers.  */
-		       "p6", "p7", "p8", "p9", "p10", "p11", "p12", "p13", "p14", "p15",
-		       /* Non-rotating fp registers.  */
-		       "f6", "f7", "f8", "f9", "f10", "f11", "f12", "f13", "f14", "f15",
-		       /* Branch registers.  */
-		       "b6", "b7" );
-	retval = r8;
-	return retval;;
-
-}
+extern int execve (const char *filename, char *const av[], char *const ep[]);
+extern pid_t clone (unsigned long flags, void *sp);
 
 #endif /* __KERNEL_SYSCALLS__ */
 
 /*
  * "Conditional" syscalls
  *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))), but it doesn't work on
- * all toolchains, so we just do it by hand.  Note, this macro can only be used in the
+ * Note, this macro can only be used in the
  * file which defines sys_ni_syscall, i.e., in kernel/sys.c.
  */
-#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#define cond_syscall(x) asmlinkage long x() __attribute__((weak,alias("sys_ni_syscall")));
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __KERNEL__ */

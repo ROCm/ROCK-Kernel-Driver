@@ -21,6 +21,7 @@ struct task_struct;	/* forward declaration for elf.h */
 #include <asm/pgtable.h>
 #include <asm/sal.h>
 #include <asm/system.h>
+#include <asm/intrinsics.h>
 
 /* Simulator system calls: */
 
@@ -54,9 +55,9 @@ struct disk_stat {
 };
 
 #include "../kernel/fw-emu.c"
+extern void jmp_to_kernel(ulong sp, ulong bp, ulong e_entry);
+extern void __bsw1(void);
 
-/* This needs to be defined because lib/string.c:strlcat() calls it in case of error... */
-asm (".global printk; printk = 0");
 
 /*
  * Set a break point on this function so that symbols are available to set breakpoints in
@@ -98,9 +99,12 @@ _start (void)
 	char *kpath, *args;
 	long arglen = 0;
 
-	asm volatile ("movl gp=__gp;;" ::: "memory");
-	asm volatile ("mov sp=%0" :: "r"(stack) : "memory");
-	asm volatile ("bsw.1;;");
+	extern __u64 __gp;
+	register unsigned long tmp = (unsigned long) &stack[0];
+
+	ia64_setreg(_IA64_REG_GP, __gp);
+	ia64_setreg(_IA64_REG_SP, tmp);
+	__bsw1();
 
 	ssc(0, 0, 0, 0, SSC_CONSOLE_INIT);
 
@@ -195,15 +199,15 @@ _start (void)
 	cons_write("starting kernel...\n");
 
 	/* fake an I/O base address: */
-	asm volatile ("mov ar.k0=%0" :: "r"(0xffffc000000UL));
+	ia64_setreg(_IA64_REG_AR_KR0, 0xffffc000000UL);
 
 	bp = sys_fw_init(args, arglen);
 
 	ssc(0, (long) kpath, 0, 0, SSC_LOAD_SYMBOLS);
 
 	debug_break();
-	asm volatile ("mov sp=%2; mov r28=%1; br.sptk.few %0"
-		      :: "b"(e_entry), "r"(bp), "r"(__pa(&stack)));
+	tmp = __pa(&stack);
+	jmp_to_kernel(tmp, (unsigned long) bp, e_entry);
 
 	cons_write("kernel returned!\n");
 	ssc(-1, 0, 0, 0, SSC_EXIT);

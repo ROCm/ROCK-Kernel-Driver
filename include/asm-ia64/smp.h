@@ -120,7 +120,7 @@ hard_smp_processor_id (void)
 		unsigned long bits;
 	} lid;
 
-	lid.bits = ia64_get_lid();
+	lid.bits = ia64_getreg(_IA64_REG_CR_LID); 
 	return lid.f.id << 8 | lid.f.eid;
 }
 

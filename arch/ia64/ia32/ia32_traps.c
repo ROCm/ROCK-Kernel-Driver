@@ -15,6 +15,7 @@
 #include "ia32priv.h"
 
 #include <asm/ptrace.h>
+#include <asm/intrinsics.h>
 
 int
 ia32_intercept (struct pt_regs *regs, unsigned long isr)
@@ -93,9 +94,8 @@ ia32_exception (struct pt_regs *regs, unsigned long isr)
 		{
 			unsigned long fsr, fcr;
 
-			asm ("mov %0=ar.fsr;"
-			     "mov %1=ar.fcr;"
-			     : "=r"(fsr), "=r"(fcr));
+			fsr = ia64_getreg(_IA64_REG_AR_FSR);
+			fcr = ia64_getreg(_IA64_REG_AR_FCR);
 
 			siginfo.si_signo = SIGFPE;
 			/*

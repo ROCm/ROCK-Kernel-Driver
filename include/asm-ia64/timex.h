@@ -11,6 +11,7 @@
  */
 
 #include <asm/processor.h>
+#include <asm/intrinsics.h>
 
 typedef unsigned long cycles_t;
 
@@ -32,7 +33,7 @@ get_cycles (void)
 {
 	cycles_t ret;
 
-	__asm__ __volatile__ ("mov %0=ar.itc" : "=r"(ret));
+	ret = ia64_getreg(_IA64_REG_AR_ITC);
 	return ret;
 }
 

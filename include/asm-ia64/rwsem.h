@@ -22,6 +22,7 @@
 
 #include <linux/list.h>
 #include <linux/spinlock.h>
+#include <asm/intrinsics.h>
 
 /*
  * the semaphore definition
@@ -82,8 +83,9 @@ static inline void
 __down_read (struct rw_semaphore *sem)
 {
 	int result;
-	__asm__ __volatile__ ("fetchadd4.acq %0=[%1],1" :
-			      "=r"(result) : "r"(&sem->count) : "memory");
+
+	result = ia64_fetchadd4_acq((unsigned int *)&sem->count, 1);
+
 	if (result < 0)
 		rwsem_down_read_failed(sem);
 }
@@ -112,8 +114,9 @@ static inline void
 __up_read (struct rw_semaphore *sem)
 {
 	int result;
-	__asm__ __volatile__ ("fetchadd4.rel %0=[%1],-1" :
-			      "=r"(result) : "r"(&sem->count) : "memory");
+
+	result = ia64_fetchadd4_rel((unsigned int *)&sem->count, -1);
+
 	if (result < 0 && (--result & RWSEM_ACTIVE_MASK) == 0)
 		rwsem_wake(sem);
 }

@@ -505,14 +505,14 @@ ia64_mca_cmc_vector_setup (void)
 	cmcv.cmcv_regval	= 0;
 	cmcv.cmcv_mask		= 0;        /* Unmask/enable interrupt */
 	cmcv.cmcv_vector	= IA64_CMC_VECTOR;
-	ia64_set_cmcv(cmcv.cmcv_regval);
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval);
 
 	IA64_MCA_DEBUG("ia64_mca_platform_init: CPU %d corrected "
 		       "machine check vector %#x setup and enabled.\n",
 		       smp_processor_id(), IA64_CMC_VECTOR);
 
 	IA64_MCA_DEBUG("ia64_mca_platform_init: CPU %d CMCV = %#016lx\n",
-		       smp_processor_id(), ia64_get_cmcv());
+		       smp_processor_id(), ia64_getreg(_IA64_REG_CR_CMCV));
 }
 
 /*
@@ -532,10 +532,10 @@ ia64_mca_cmc_vector_disable (void *dummy)
 {
 	cmcv_reg_t	cmcv;
 	
-	cmcv = (cmcv_reg_t)ia64_get_cmcv();
+	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 1; /* Mask/disable interrupt */
-	ia64_set_cmcv(cmcv.cmcv_regval);
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
 
 	IA64_MCA_DEBUG("ia64_mca_cmc_vector_disable: CPU %d corrected "
 		       "machine check vector %#x disabled.\n",
@@ -559,10 +559,10 @@ ia64_mca_cmc_vector_enable (void *dummy)
 {
 	cmcv_reg_t	cmcv;
 	
-	cmcv = (cmcv_reg_t)ia64_get_cmcv();
+	cmcv = (cmcv_reg_t)ia64_getreg(_IA64_REG_CR_CMCV);
 
 	cmcv.cmcv_mask = 0; /* Unmask/enable interrupt */
-	ia64_set_cmcv(cmcv.cmcv_regval);
+	ia64_setreg(_IA64_REG_CR_CMCV, cmcv.cmcv_regval)
 
 	IA64_MCA_DEBUG("ia64_mca_cmc_vector_enable: CPU %d corrected "
 		       "machine check vector %#x enabled.\n",
@@ -727,10 +727,10 @@ ia64_mca_init(void)
 	/* Register the os init handler with SAL */
 	if ((rc = ia64_sal_set_vectors(SAL_VECTOR_OS_INIT,
 				       ia64_mc_info.imi_monarch_init_handler,
-				       ia64_tpa(ia64_get_gp()),
+				       ia64_tpa(ia64_getreg(_IA64_REG_GP)),
 				       ia64_mc_info.imi_monarch_init_handler_size,
 				       ia64_mc_info.imi_slave_init_handler,
-				       ia64_tpa(ia64_get_gp()),
+				       ia64_tpa(ia64_getreg(_IA64_REG_GP)),
 				       ia64_mc_info.imi_slave_init_handler_size)))
 	{
 		printk(KERN_ERR "ia64_mca_init: Failed to register m/s init handlers with SAL. "
@@ -816,16 +816,16 @@ ia64_mca_wakeup_ipi_wait(void)
 	do {
 		switch(irr_num) {
 		      case 0:
-			irr = ia64_get_irr0();
+			irr = ia64_getreg(_IA64_REG_CR_IRR0);
 			break;
 		      case 1:
-			irr = ia64_get_irr1();
+			irr = ia64_getreg(_IA64_REG_CR_IRR1);
 			break;
 		      case 2:
-			irr = ia64_get_irr2();
+			irr = ia64_getreg(_IA64_REG_CR_IRR2);
 			break;
 		      case 3:
-			irr = ia64_get_irr3();
+			irr = ia64_getreg(_IA64_REG_CR_IRR3);
 			break;
 		}
 	} while (!(irr & (1 << irr_bit))) ;

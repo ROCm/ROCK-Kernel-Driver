@@ -46,17 +46,7 @@ static char fw_mem[(  sizeof(struct ia64_boot_param)
 /*
  * Simulator system call.
  */
-static long
-ssc (long arg0, long arg1, long arg2, long arg3, int nr)
-{
-	register long r8 asm ("r8");
-
-	asm volatile ("mov r15=%1\n\t"
-		      "break 0x80001"
-		      : "=r"(r8)
-		      : "r"(nr), "r"(arg0), "r"(arg1), "r"(arg2), "r"(arg3));
-	return r8;
-}
+extern long ssc (long arg0, long arg1, long arg2, long arg3, int nr);
 
 #define SECS_PER_HOUR   (60 * 60)
 #define SECS_PER_DAY    (SECS_PER_HOUR * 24)
@@ -127,101 +117,6 @@ offtime (unsigned long t, efi_time_t *tp)
  */
 extern void pal_emulator_static (void);
 
-asm (
-"	.proc pal_emulator_static\n"
-"pal_emulator_static:"
-"	mov r8=-1\n"
-"	mov r9=256\n"
-"	;;\n"
-"	cmp.gtu p6,p7=r9,r28		/* r28 <= 255? */\n"
-"(p6)	br.cond.sptk.few static\n"
-"	;;\n"
-"	mov r9=512\n"
-"	;;\n"
-"	cmp.gtu p6,p7=r9,r28\n"
-"(p6)	br.cond.sptk.few stacked\n"
-"	;;\n"
-"static:	cmp.eq p6,p7=6,r28		/* PAL_PTCE_INFO */\n"
-"(p7)	br.cond.sptk.few 1f\n"
-"	;;\n"
-"	mov r8=0			/* status = 0 */\n"
-"	movl r9=0x100000000		/* tc.base */\n"
-"	movl r10=0x0000000200000003	/* count[0], count[1] */\n"
-"	movl r11=0x1000000000002000	/* stride[0], stride[1] */\n"
-"	br.cond.sptk.few rp\n"
-"1:	cmp.eq p6,p7=14,r28		/* PAL_FREQ_RATIOS */\n"
-"(p7)	br.cond.sptk.few 1f\n"
-"	mov r8=0			/* status = 0 */\n"
-"	movl r9 =0x100000064		/* proc_ratio (1/100) */\n"
-"	movl r10=0x100000100		/* bus_ratio<<32 (1/256) */\n"
-"	movl r11=0x100000064		/* itc_ratio<<32 (1/100) */\n"
-"	;;\n"
-"1:	cmp.eq p6,p7=19,r28		/* PAL_RSE_INFO */\n"
-"(p7)	br.cond.sptk.few 1f\n"
-"	mov r8=0			/* status = 0 */\n"
-"	mov r9=96			/* num phys stacked */\n"
-"	mov r10=0			/* hints */\n"
-"	mov r11=0\n"
-"	br.cond.sptk.few rp\n"
-"1:	cmp.eq p6,p7=1,r28		/* PAL_CACHE_FLUSH */\n"
-"(p7)	br.cond.sptk.few 1f\n"
-"	mov r9=ar.lc\n"
-"	movl r8=524288			/* flush 512k million cache lines (16MB) */\n"
-"	;;\n"
-"	mov ar.lc=r8\n"
-"	movl r8=0xe000000000000000\n"
-"	;;\n"
-".loop:	fc r8\n"
-"	add r8=32,r8\n"
-"	br.cloop.sptk.few .loop\n"
-"	sync.i\n"
-"	;;\n"
-"	srlz.i\n"
-"	;;\n"
-"	mov ar.lc=r9\n"
-"	mov r8=r0\n"
-"	;;\n"
-"1:	cmp.eq p6,p7=15,r28		/* PAL_PERF_MON_INFO */\n"
-"(p7)	br.cond.sptk.few 1f\n"
-"	mov r8=0			/* status = 0 */\n"
-"	movl r9 =0x12082004		/* generic=4 width=32 retired=8 cycles=18 */\n"
-"	mov r10=0			/* reserved */\n"
-"	mov r11=0			/* reserved */\n"
-"	mov r16=0xffff			/* implemented PMC */\n"
-"	mov r17=0xffff			/* implemented PMD */\n"
-"	add r18=8,r29			/* second index */\n"
-"	;;\n"
-"	st8 [r29]=r16,16		/* store implemented PMC */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"	st8 [r29]=r0,16			/* store implemented PMC */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"	st8 [r29]=r17,16		/* store implemented PMD */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	mov r16=0xf0			/* cycles count capable PMC */\n"
-"	;;\n"
-"	st8 [r29]=r0,16			/* store implemented PMC */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	mov r17=0x10			/* retired bundles capable PMC */\n"
-"	;;\n"
-"	st8 [r29]=r16,16		/* store cycles capable */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"	st8 [r29]=r0,16			/* store implemented PMC */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"	st8 [r29]=r17,16		/* store retired bundle capable */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"	st8 [r29]=r0,16			/* store implemented PMC */\n"
-"	st8 [r18]=r0,16			/* clear remaining bits  */\n"
-"	;;\n"
-"1:	br.cond.sptk.few rp\n"
-"stacked:\n"
-"	br.ret.sptk.few rp\n"
-"	.endp pal_emulator_static\n");
-
 /* Macro to emulate SAL call using legacy IN and OUT calls to CF8, CFC etc.. */
 
 #define BUILD_CMD(addr)		((0x80000000 | (addr)) & ~3)
@@ -268,14 +163,14 @@ efi_unimplemented (void)
 	return EFI_UNSUPPORTED;
 }
 
-static long
+static struct sal_ret_values
 sal_emulator (long index, unsigned long in1, unsigned long in2,
 	      unsigned long in3, unsigned long in4, unsigned long in5,
 	      unsigned long in6, unsigned long in7)
 {
-	register long r9 asm ("r9") = 0;
-	register long r10 asm ("r10") = 0;
-	register long r11 asm ("r11") = 0;
+	long r9  = 0;
+	long r10 = 0;
+	long r11 = 0;
 	long status;
 
 	/*
@@ -357,8 +252,7 @@ sal_emulator (long index, unsigned long in1, unsigned long in2,
 	} else {
 		status = -1;
 	}
-	asm volatile ("" :: "r"(r9), "r"(r10), "r"(r11));
-	return status;
+	return ((struct sal_ret_values) {status, r9, r10, r11});
 }
 
 

@@ -10,10 +10,12 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/compiler.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/atomic.h>
+#include <asm/intrinsics.h>
 
 typedef struct {
 	volatile unsigned int lock;
@@ -102,8 +104,8 @@ typedef struct {
 do {											\
 	rwlock_t *__read_lock_ptr = (rw);						\
 											\
-	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, "acq") < 0)) {	\
-		ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");			\
+	while (unlikely(ia64_fetchadd(1, (int *) __read_lock_ptr, acq) < 0)) {		\
+		ia64_fetchadd(-1, (int *) __read_lock_ptr, rel);			\
 		while (*(volatile int *)__read_lock_ptr < 0)				\
 			cpu_relax();							\
 	}										\
@@ -112,7 +114,7 @@ do {											\
 #define _raw_read_unlock(rw)					\
 do {								\
 	rwlock_t *__read_lock_ptr = (rw);			\
-	ia64_fetchadd(-1, (int *) __read_lock_ptr, "rel");	\
+	ia64_fetchadd(-1, (int *) __read_lock_ptr, rel);	\
 } while (0)
 
 #define _raw_write_lock(rw)							\
