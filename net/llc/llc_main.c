@@ -71,7 +71,6 @@ struct llc_sap *llc_sap_alloc(void)
 		sap->state = LLC_SAP_STATE_ACTIVE;
 		memcpy(sap->laddr.mac, llc_main_station.mac_sa, ETH_ALEN);
 		spin_lock_init(&sap->sk_list.lock);
-		skb_queue_head_init(&sap->mac_pdu_q);
 	}
 	return sap;
 }

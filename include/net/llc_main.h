@@ -52,7 +52,6 @@ struct llc_station {
 	} ev_q;
 	struct sk_buff_head	    mac_pdu_q;
 };
-struct llc_station_state_ev;
 
 extern struct llc_sap *llc_sap_alloc(void);
 extern void llc_sap_save(struct llc_sap *sap);

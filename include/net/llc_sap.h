@@ -23,7 +23,6 @@
  * @laddr - SAP value in this 'lsap'
  * @node - entry in station sap_list
  * @sk_list - LLC sockets this one manages
- * @mac_pdu_q - PDUs ready to send to MAC
  */
 struct llc_sap {
 	struct llc_station *station;
@@ -39,9 +38,7 @@ struct llc_sap {
 		rwlock_t    lock;
 		struct sock *list;
 	} sk_list;
-	struct sk_buff_head mac_pdu_q;
 };
-struct llc_sap_state_ev;
 
 extern void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk);
