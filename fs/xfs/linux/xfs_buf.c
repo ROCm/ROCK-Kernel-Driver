@@ -165,8 +165,6 @@ _bhash(
  * Mapping of multi-page buffers into contiguous virtual space
  */
 
-STATIC void *pagebuf_mapout_locked(xfs_buf_t *);
-
 typedef struct a_list {
 	void		*vm_addr;
 	struct a_list	*next;
@@ -288,67 +286,53 @@ _pagebuf_get_pages(
 }
 
 /*
- * Walk a pagebuf releasing all the pages contained within it.
+ *	Frees pb_pages if it was malloced.
  */
-STATIC inline void
-_pagebuf_freepages(
-	xfs_buf_t		*pb)
+STATIC void
+_pagebuf_free_pages(
+	xfs_buf_t	*bp)
 {
-	int			buf_index;
-
-	for (buf_index = 0; buf_index < pb->pb_page_count; buf_index++) {
-		struct page	*page = pb->pb_pages[buf_index];
-
-		if (page) {
-			pb->pb_pages[buf_index] = NULL;
-			page_cache_release(page);
-		}
+	if (bp->pb_pages != bp->pb_page_array) {
+		kmem_free(bp->pb_pages,
+			  bp->pb_page_count * sizeof(struct page *));
 	}
 }
 
 /*
- *	pagebuf_free
+ *	Releases the specified buffer.
  *
- *	pagebuf_free releases the specified buffer.  The modification
- *	state of any associated pages is left unchanged.
+ * 	The modification state of any associated pages is left unchanged.
+ * 	The buffer most not be on any hash - use pagebuf_rele instead for
+ * 	hashed and refcounted buffers
  */
 void
 pagebuf_free(
-	xfs_buf_t		*pb)
+	xfs_buf_t		*bp)
 {
-	PB_TRACE(pb, "free", 0);
-	
-	ASSERT(list_empty(&pb->pb_hash_list));
+	PB_TRACE(bp, "free", 0);
 
-	/* release any virtual mapping */ ;
-	if (pb->pb_flags & _PBF_ADDR_ALLOCATED) {
-		void *vaddr = pagebuf_mapout_locked(pb);
-		if (vaddr) {
-			free_address(vaddr);
-		}
+	ASSERT(list_empty(&bp->pb_hash_list));
+
+	if (bp->pb_flags & _PBF_PAGE_CACHE) {
+		uint		i;
+
+		if ((bp->pb_flags & PBF_MAPPED) && (bp->pb_page_count > 1))
+			free_address(bp->pb_addr - bp->pb_offset);
+
+		for (i = 0; i < bp->pb_page_count; i++)
+			page_cache_release(bp->pb_pages[i]);
+		_pagebuf_free_pages(bp);
+	} else if (bp->pb_flags & _PBF_KMEM_ALLOC) {
+		 /*
+		  * XXX(hch): bp->pb_count_desired might be incorrect (see
+		  * pagebuf_associate_memory for details), but fortunately
+		  * the Linux version of kmem_free ignores the len argument..
+		  */
+		kmem_free(bp->pb_addr, bp->pb_count_desired);
+		_pagebuf_free_pages(bp);
 	}
 
-	if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
-		if (pb->pb_pages) {
-			if (pb->pb_flags & _PBF_MEM_SLAB) {
-				 /*
-				  * XXX: bp->pb_count_desired might be incorrect
-				  * (see pagebuf_associate_memory for details),
-				  * but fortunately the Linux version of
-				  * kmem_free ignores the len argument..
-				  */
-				kmem_free(pb->pb_addr, pb->pb_count_desired);
-			} else {
-				_pagebuf_freepages(pb);
-			}
-			if (pb->pb_pages != pb->pb_page_array)
-				kfree(pb->pb_pages);
-			pb->pb_pages = NULL;
-		}
-		pb->pb_flags &= ~(_PBF_MEM_ALLOCATED|_PBF_MEM_SLAB);
-	}
-
-	pagebuf_deallocate(pb);
+	pagebuf_deallocate(bp);
 }
 
 /*
@@ -443,7 +427,7 @@ _pagebuf_lookup_pages(
 			unlock_page(bp->pb_pages[i]);
 	}
 
-	bp->pb_flags |= (_PBF_PAGECACHE|_PBF_MEM_ALLOCATED);
+	bp->pb_flags |= _PBF_PAGE_CACHE;
 
 	if (page_count) {
 		/* if we have any uptodate pages, mark that in the buffer */
@@ -478,7 +462,7 @@ _pagebuf_map_pages(
 		if (unlikely(bp->pb_addr == NULL))
 			return -ENOMEM;
 		bp->pb_addr += bp->pb_offset;
-		bp->pb_flags |= PBF_MAPPED | _PBF_ADDR_ALLOCATED;
+		bp->pb_flags |= PBF_MAPPED;
 	}
 
 	return 0;
@@ -584,10 +568,7 @@ found:
 	}
 
 	if (pb->pb_flags & PBF_STALE)
-		pb->pb_flags &= PBF_MAPPED | \
-				_PBF_ADDR_ALLOCATED | \
-				_PBF_MEM_ALLOCATED | \
-				_PBF_MEM_SLAB;
+		pb->pb_flags &= PBF_MAPPED;
 	PB_TRACE(pb, "got_lock", 0);
 	XFS_STATS_INC(pb_get_locked);
 	return (pb);
@@ -789,9 +770,9 @@ pagebuf_associate_memory(
 		page_count++;
 
 	/* Free any previous set of page pointers */
-	if (pb->pb_pages && (pb->pb_pages != pb->pb_page_array)) {
-		kfree(pb->pb_pages);
-	}
+	if (pb->pb_pages)
+		_pagebuf_free_pages(pb);
+
 	pb->pb_pages = NULL;
 	pb->pb_addr = mem;
 
@@ -856,7 +837,7 @@ pagebuf_get_no_daddr(
 	error = pagebuf_associate_memory(bp, data, len);
 	if (error)
 		goto fail_free_mem;
-	bp->pb_flags |= (_PBF_MEM_ALLOCATED | _PBF_MEM_SLAB);
+	bp->pb_flags |= _PBF_KMEM_ALLOC;
 
 	pagebuf_unlock(bp);
 
@@ -1189,9 +1170,9 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 	}
 
 	pb->pb_flags &= ~(PBF_READ | PBF_WRITE | PBF_ASYNC | PBF_DELWRI | \
-			PBF_READ_AHEAD | PBF_RUN_QUEUES);
+			PBF_READ_AHEAD | _PBF_RUN_QUEUES);
 	pb->pb_flags |= flags & (PBF_READ | PBF_WRITE | PBF_ASYNC | \
-			PBF_READ_AHEAD | PBF_RUN_QUEUES);
+			PBF_READ_AHEAD | _PBF_RUN_QUEUES);
 
 	BUG_ON(pb->pb_bn == XFS_BUF_DADDR_NULL);
 
@@ -1378,8 +1359,8 @@ submit_io:
 		pagebuf_ioerror(pb, EIO);
 	}
 
-	if (pb->pb_flags & PBF_RUN_QUEUES) {
-		pb->pb_flags &= ~PBF_RUN_QUEUES;
+	if (pb->pb_flags & _PBF_RUN_QUEUES) {
+		pb->pb_flags &= ~_PBF_RUN_QUEUES;
 		if (atomic_read(&pb->pb_io_remaining) > 1)
 			blk_run_address_space(pb->pb_target->pbr_mapping);
 	}
@@ -1434,25 +1415,6 @@ pagebuf_iowait(
 	down(&pb->pb_iodonesema);
 	PB_TRACE(pb, "iowaited", (long)pb->pb_error);
 	return pb->pb_error;
-}
-
-STATIC void *
-pagebuf_mapout_locked(
-	xfs_buf_t		*pb)
-{
-	void			*old_addr = NULL;
-
-	if (pb->pb_flags & PBF_MAPPED) {
-		if (pb->pb_flags & _PBF_ADDR_ALLOCATED)
-			old_addr = pb->pb_addr - pb->pb_offset;
-		pb->pb_addr = NULL;
-		pb->pb_flags &= ~(PBF_MAPPED | _PBF_ADDR_ALLOCATED);
-	}
-
-	return old_addr;	/* Caller must free the address space,
-				 * we are under a spin lock, probably
-				 * not safe to do vfree here
-				 */
 }
 
 caddr_t

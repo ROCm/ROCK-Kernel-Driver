@@ -73,26 +73,22 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_ASYNC = (1 << 4),   /* initiator will not wait for completion  */
 	PBF_NONE = (1 << 5),    /* buffer not read at all                  */
 	PBF_DELWRI = (1 << 6),  /* buffer has dirty pages                  */
-	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
-	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
-	PBF_FS_DATAIOD = (1 << 12), /* schedule IO completion on fs datad  */
+	PBF_STALE = (1 << 7),	/* buffer has been staled, do not find it  */
+	PBF_FS_MANAGED = (1 << 8),  /* filesystem controls freeing memory  */
+	PBF_FS_DATAIOD = (1 << 9),  /* schedule IO completion on fs datad  */
+	PBF_FORCEIO = (1 << 10),    /* ignore any cache state		   */
+	PBF_FLUSH = (1 << 11),	    /* flush disk write cache		   */
+	PBF_READ_AHEAD = (1 << 12), /* asynchronous read-ahead		   */
 
 	/* flags used only as arguments to access routines */
-	PBF_LOCK = (1 << 13),	/* lock requested			   */
-	PBF_TRYLOCK = (1 << 14), /* lock requested, but do not wait	   */
-	PBF_DONT_BLOCK = (1 << 15), /* do not block in current thread	   */
+	PBF_LOCK = (1 << 14),       /* lock requested			   */
+	PBF_TRYLOCK = (1 << 15),    /* lock requested, but do not wait	   */
+	PBF_DONT_BLOCK = (1 << 16), /* do not block in current thread	   */
 
 	/* flags used only internally */
-	_PBF_PAGECACHE = (1 << 16),	/* backed by pagecache		   */
-	_PBF_ADDR_ALLOCATED = (1 << 19), /* pb_addr space was allocated	   */
-	_PBF_MEM_ALLOCATED = (1 << 20), /* underlying pages are allocated  */
-	_PBF_MEM_SLAB = (1 << 21), /* underlying pages are slab allocated  */
-
-	PBF_FORCEIO = (1 << 22), /* ignore any cache state		   */
-	PBF_FLUSH = (1 << 23),	/* flush disk write cache		   */
-	PBF_READ_AHEAD = (1 << 24), /* asynchronous read-ahead		   */
-	PBF_RUN_QUEUES = (1 << 25), /* run block device task queue	   */
-
+	_PBF_PAGE_CACHE = (1 << 17),/* backed by pagecache		   */
+	_PBF_KMEM_ALLOC = (1 << 18),/* backed by kmem_alloc()		   */
+	_PBF_RUN_QUEUES = (1 << 19),/* run block device task queue	   */
 } page_buf_flags_t;
 
 #define PBF_UPDATE (PBF_READ | PBF_WRITE)
@@ -508,7 +504,7 @@ static inline int	xfs_bawrite(void *mp, xfs_buf_t *bp)
 	bp->pb_fspriv3 = mp;
 	bp->pb_strat = xfs_bdstrat_cb;
 	xfs_buf_undelay(bp);
-	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | PBF_RUN_QUEUES);
+	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | _PBF_RUN_QUEUES);
 }
 
 static inline void	xfs_buf_relse(xfs_buf_t *bp)
@@ -545,7 +541,7 @@ static inline int	XFS_bwrite(xfs_buf_t *pb)
 	int	error = 0;
 
 	if (!iowait)
-		pb->pb_flags |= PBF_RUN_QUEUES;
+		pb->pb_flags |= _PBF_RUN_QUEUES;
 
 	xfs_buf_undelay(pb);
 	pagebuf_iostrategy(pb);
