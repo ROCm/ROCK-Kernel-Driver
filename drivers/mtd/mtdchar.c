@@ -497,7 +497,7 @@ static int __init init_mtdchar(void)
 	}
 
 #ifdef CONFIG_DEVFS_FS
-	devfs_mk_dir(NULL, "mtd", NULL);
+	devfs_mk_dir("mtd");
 
 	register_mtd_user(&notifier);
 #endif

@@ -1495,7 +1495,7 @@ static int __init init_scsi(void)
 		INIT_LIST_HEAD(&done_q[i]);
 
 	scsi_host_init();
-	devfs_mk_dir(NULL, "scsi", NULL);
+	devfs_mk_dir("scsi");
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;

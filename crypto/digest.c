@@ -13,6 +13,7 @@
  */
 #include <linux/crypto.h>
 #include <linux/mm.h>
+#include <linux/errno.h>
 #include <linux/highmem.h>
 #include <asm/scatterlist.h>
 #include "internal.h"

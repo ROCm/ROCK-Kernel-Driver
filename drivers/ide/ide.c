@@ -2392,6 +2392,8 @@ static int ide_drive_remove(struct device * dev)
 int ide_register_driver(ide_driver_t *driver)
 {
 	struct list_head list;
+	struct list_head *list_loop;
+	struct list_head *tmp_storage;
 
 	spin_lock(&drivers_lock);
 	list_add(&driver->drivers, &drivers);
@@ -2402,8 +2404,8 @@ int ide_register_driver(ide_driver_t *driver)
 	list_splice_init(&ata_unused, &list);
 	spin_unlock(&drives_lock);
 
-	while (!list_empty(&list)) {
-		ide_drive_t *drive = list_entry(list.next, ide_drive_t, list);
+	list_for_each_safe(list_loop, tmp_storage, &list) {
+		ide_drive_t *drive = container_of(list_loop, ide_drive_t, list);
 		list_del_init(&drive->list);
 		if (drive->present)
 			ata_attach(drive);
@@ -2470,7 +2472,7 @@ int __init ide_init (void)
 	static char banner_printed;
 	if (!banner_printed) {
 		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		devfs_mk_dir(NULL, "ide", NULL);
+		devfs_mk_dir("ide");
 		system_bus_speed = ide_system_bus_speed();
 		banner_printed = 1;
 	}

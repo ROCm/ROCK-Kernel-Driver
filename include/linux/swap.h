@@ -144,6 +144,9 @@ struct swap_list_t {
 /* linux/mm/oom_kill.c */
 extern void out_of_memory(void);
 
+/* linux/mm/memory.c */
+extern void swapin_readahead(swp_entry_t);
+
 /* linux/mm/page_alloc.c */
 extern unsigned long totalram_pages;
 extern unsigned long totalhigh_pages;

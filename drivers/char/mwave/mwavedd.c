@@ -502,7 +502,8 @@ static struct device_attribute * const mwave_dev_attrs[] = {
 	&dev_attr_uart_irq,
 	&dev_attr_uart_io,
 };
-
+static int nr_registered_attrs;
+static int device_registered;
 
 /*
 * mwave_init is called on module load
@@ -517,10 +518,14 @@ static void mwave_exit(void)
 
 	PRINTK_1(TRACE_MWAVE, "mwavedd::mwave_exit entry\n");
 
-	for (i = 0; i < ARRAY_SIZE(mwave_dev_attrs); i++) {
+	for (i = 0; i < nr_registered_attrs; i++)
 		device_remove_file(&mwave_device, mwave_dev_attrs[i]);
+	nr_registered_attrs = 0;
+
+	if (device_registered) {
+		device_unregister(&mwave_device);
+		device_registered = 0;
 	}
-	device_unregister(&mwave_device);
 
 	if ( pDrvData->sLine >= 0 ) {
 		unregister_serial(pDrvData->sLine);
@@ -643,7 +648,9 @@ static int __init mwave_init(void)
 	snprintf(mwave_device.name, DEVICE_NAME_SIZE, "mwave");
 	snprintf(mwave_device.bus_id, BUS_ID_SIZE, "mwave");
 
-	device_register(&mwave_device);
+	if (device_register(&mwave_device))
+		goto cleanup_error;
+	device_registered = 1;
 	for (i = 0; i < ARRAY_SIZE(mwave_dev_attrs); i++) {
 		if(device_create_file(&mwave_device, mwave_dev_attrs[i])) {
 			PRINTK_ERROR(KERN_ERR_MWAVE
@@ -652,12 +659,13 @@ static int __init mwave_init(void)
 					mwave_dev_attrs[i]->attr.name);
 			goto cleanup_error;
 		}
+		nr_registered_attrs++;
 	}
 
 	/* SUCCESS! */
 	return 0;
 
-	cleanup_error:
+cleanup_error:
 	PRINTK_ERROR(KERN_ERR_MWAVE
 			"mwavedd::mwave_init: Error:"
 			" Failed to initialize\n");

@@ -1020,7 +1020,7 @@ int __init loop_init(void)
 	if (register_blkdev(LOOP_MAJOR, "loop"))
 		return -EIO;
 
-	devfs_mk_dir(NULL, "loop", NULL);
+	devfs_mk_dir("loop");
 
 	loop_dev = kmalloc(max_loop * sizeof(struct loop_device), GFP_KERNEL);
 	if (!loop_dev)

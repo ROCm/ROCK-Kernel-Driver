@@ -281,7 +281,8 @@ skip_copy_pte_range:
 					goto cont_copy_pte_range_noset;
 				/* pte contains position in swap, so copy. */
 				if (!pte_present(pte)) {
-					swap_duplicate(pte_to_swp_entry(pte));
+					if (!pte_file(pte))
+						swap_duplicate(pte_to_swp_entry(pte));
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}
@@ -415,7 +416,8 @@ zap_pte_range(struct mmu_gather *tlb, pmd_t * pmd,
 				}
 			}
 		} else {
-			free_swap_and_cache(pte_to_swp_entry(pte));
+			if (!pte_file(pte))
+				free_swap_and_cache(pte_to_swp_entry(pte));
 			pte_clear(ptep);
 		}
 	}
@@ -1393,6 +1395,41 @@ out:
 }
 
 /*
+ * Fault of a previously existing named mapping. Repopulate the pte
+ * from the encoded file_pte if possible. This enables swappable
+ * nonlinear vmas.
+ */
+static int do_file_page(struct mm_struct * mm, struct vm_area_struct * vma,
+	unsigned long address, int write_access, pte_t *pte, pmd_t *pmd)
+{
+	unsigned long pgoff;
+	int err;
+
+	BUG_ON(!vma->vm_ops || !vma->vm_ops->nopage);
+	/*
+	 * Fall back to the linear mapping if the fs does not support
+	 * ->populate:
+	 */
+	if (!vma->vm_ops || !vma->vm_ops->populate || 
+			(write_access && !(vma->vm_flags & VM_SHARED))) {
+		pte_clear(pte);
+		return do_no_page(mm, vma, address, write_access, pte, pmd);
+	}
+
+	pgoff = pte_to_pgoff(*pte);
+
+	pte_unmap(pte);
+	spin_unlock(&mm->page_table_lock);
+
+	err = vma->vm_ops->populate(vma, address & PAGE_MASK, PAGE_SIZE, vma->vm_page_prot, pgoff, 0);
+	if (err == -ENOMEM)
+		return VM_FAULT_OOM;
+	if (err)
+		return VM_FAULT_SIGBUS;
+	return VM_FAULT_MAJOR;
+}
+
+/*
  * These routines also need to handle stuff like marking pages dirty
  * and/or accessed for architectures that don't do it in hardware (most
  * RISC architectures).  The early dirtying is also good on the i386.
@@ -1428,6 +1465,8 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		 */
 		if (pte_none(entry))
 			return do_no_page(mm, vma, address, write_access, pte, pmd);
+		if (pte_file(entry))
+			return do_file_page(mm, vma, address, write_access, pte, pmd);
 		return do_swap_page(mm, vma, address, pte, pmd, entry, write_access);
 	}
 

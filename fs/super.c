@@ -303,11 +303,25 @@ restart:
 /*
  * Call the ->sync_fs super_op against all filesytems which are r/w and
  * which implement it.
+ *
+ * This operation is careful to avoid the livelock which could easily happen
+ * if two or more filesystems are being continuously dirtied.  s_need_sync_fs
+ * is used only here.  We set it against all filesystems and then clear it as
+ * we sync them.  So redirtied filesystems are skipped.
+ *
+ * But if process A is currently running sync_filesytems and then process B
+ * calls sync_filesystems as well, process B will set all the s_need_sync_fs
+ * flags again, which will cause process A to resync everything.  Fix that with
+ * a local mutex.
+ *
+ * FIXME: If wait==0, we only really need to call ->sync_fs if s_dirt is true.
  */
 void sync_filesystems(int wait)
 {
-	struct super_block * sb;
+	struct super_block *sb;
+	static DECLARE_MUTEX(mutex);
 
+	down(&mutex);		/* Could be down_interruptible */
 	spin_lock(&sb_lock);
 	for (sb = sb_entry(super_blocks.next); sb != sb_entry(&super_blocks);
 			sb = sb_entry(sb->s_list.next)) {
@@ -337,6 +351,7 @@ restart:
 		goto restart;
 	}
 	spin_unlock(&sb_lock);
+	up(&mutex);
 }
 
 /**
@@ -526,8 +541,10 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 		}
 		goto out;
 	} else {
+		char b[BDEVNAME_SIZE];
+
 		s->s_flags = flags;
-		strncpy(s->s_id, bdevname(bdev), sizeof(s->s_id));
+		strncpy(s->s_id, bdevname(bdev, b), sizeof(s->s_id));
 		s->s_old_blocksize = block_size(bdev);
 		sb_set_blocksize(s, s->s_old_blocksize);
 		error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);

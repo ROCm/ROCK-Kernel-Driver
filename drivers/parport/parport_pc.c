@@ -147,7 +147,7 @@ static int change_mode(struct parport *p, int m)
 	if (mode >= 2 && !(priv->ctr & 0x20)) {
 		/* This mode resets the FIFO, so we may
 		 * have to wait for it to drain first. */
-		long expire = jiffies + p->physport->cad->timeout;
+		unsigned long expire = jiffies + p->physport->cad->timeout;
 		int counter;
 		switch (mode) {
 		case ECR_PPF: /* Parallel Port FIFO mode */
@@ -596,7 +596,7 @@ static size_t parport_pc_fifo_write_block_pio (struct parport *port,
 	int ret = 0;
 	const unsigned char *bufp = buf;
 	size_t left = length;
-	long expire = jiffies + port->physport->cad->timeout;
+	unsigned long expire = jiffies + port->physport->cad->timeout;
 	const int fifo = FIFO (port);
 	int poll_for = 8; /* 80 usecs */
 	const struct parport_pc_private *priv = port->physport->private_data;
@@ -724,7 +724,7 @@ dump_parport_state ("enter fifo_write_block_dma", port);
 	parport_pc_data_forward (port); /* Must be in PS2 mode */
 
 	while (left) {
-		long expire = jiffies + port->physport->cad->timeout;
+		unsigned long expire = jiffies + port->physport->cad->timeout;
 
 		size_t count = left;
 
@@ -816,7 +816,7 @@ size_t parport_pc_compat_write_block_pio (struct parport *port,
 {
 	size_t written;
 	int r;
-	long int expire;
+	unsigned long expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
 	/* Special case: a timeout of zero means we cannot call schedule().
@@ -893,7 +893,7 @@ size_t parport_pc_ecp_write_block_pio (struct parport *port,
 {
 	size_t written;
 	int r;
-	long int expire;
+	unsigned long expire;
 	const struct parport_pc_private *priv = port->physport->private_data;
 
 	/* Special case: a timeout of zero means we cannot call schedule().
@@ -1111,7 +1111,7 @@ dump_parport_state ("rev idle", port);
 	/* Do the transfer. */
 	while (left > fifofull) {
 		int ret;
-		long int expire = jiffies + port->cad->timeout;
+		unsigned long expire = jiffies + port->cad->timeout;
 		unsigned char ecrval = inb (ECONTROL (port));
 
 		if (need_resched() && time_before (jiffies, expire))

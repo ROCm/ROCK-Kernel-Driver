@@ -60,9 +60,11 @@ int journal_no_write[2];
 
 static void make_rdonly(struct block_device *bdev, int *no_write)
 {
+	char b[BDEVNAME_SIZE];
+
 	if (bdev) {
 		printk(KERN_WARNING "Turning device %s read-only\n", 
-		       bdevname(bdev));
+		       bdevname(bdev, b));
 		*no_write = 0xdead0000 + bdev->bd_dev;
 	}
 }
@@ -106,6 +108,72 @@ static void clear_ro_after(struct super_block *sb)
 #define clear_ro_after(sb)	do {} while (0)
 #endif
 
+/* 
+ * Wrappers for journal_start/end.
+ *
+ * The only special thing we need to do here is to make sure that all
+ * journal_end calls result in the superblock being marked dirty, so
+ * that sync() will call the filesystem's write_super callback if
+ * appropriate. 
+ */
+handle_t *ext3_journal_start(struct inode *inode, int nblocks)
+{
+	journal_t *journal;
+	
+	if (inode->i_sb->s_flags & MS_RDONLY)
+		return ERR_PTR(-EROFS);
+
+	/* Special case here: if the journal has aborted behind our
+	 * backs (eg. EIO in the commit thread), then we still need to
+	 * take the FS itself readonly cleanly. */
+	journal = EXT3_JOURNAL(inode);
+	if (is_journal_aborted(journal)) {
+		ext3_abort(inode->i_sb, __FUNCTION__,
+			   "Detected aborted journal");
+		return ERR_PTR(-EROFS);
+	}
+	
+	return journal_start(journal, nblocks);
+}
+
+/* 
+ * The only special thing we need to do here is to make sure that all
+ * journal_stop calls result in the superblock being marked dirty, so
+ * that sync() will call the filesystem's write_super callback if
+ * appropriate. 
+ */
+int __ext3_journal_stop(const char *where, handle_t *handle)
+{
+	struct super_block *sb;
+	int err;
+	int rc;
+
+	sb = handle->h_transaction->t_journal->j_private;
+	err = handle->h_err;
+	rc = journal_stop(handle);
+
+	if (!err)
+		err = rc;
+	if (err)
+		__ext3_std_error(sb, where, err);
+	return err;
+}
+
+void ext3_journal_abort_handle(const char *caller, const char *err_fn,
+		struct buffer_head *bh, handle_t *handle, int err)
+{
+	char nbuf[16];
+	const char *errstr = ext3_decode_error(NULL, err, nbuf);
+	
+	printk(KERN_ERR "%s: aborting transaction: %s in %s", 
+	       caller, errstr, err_fn);
+
+	if (bh)
+		BUFFER_TRACE(bh, "abort");
+	journal_abort_handle(handle);
+	if (!handle->h_err)
+		handle->h_err = err;
+}
 
 static char error_buf[1024];
 
@@ -317,6 +385,7 @@ static struct block_device *ext3_blkdev_get(dev_t dev)
 {
 	struct block_device *bdev;
 	int err = -ENODEV;
+	char b[BDEVNAME_SIZE];
 
 	bdev = bdget(dev);
 	if (bdev == NULL)
@@ -328,7 +397,7 @@ static struct block_device *ext3_blkdev_get(dev_t dev)
 
 fail:
 	printk(KERN_ERR "EXT3: failed to open journal device %s: %d\n",
-			__bdevname(dev), err);
+			__bdevname(dev, b), err);
 	return NULL;
 }
 
@@ -812,8 +881,10 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 	printk(KERN_INFO "EXT3 FS " EXT3FS_VERSION ", " EXT3FS_DATE " on %s, ",
 				sb->s_id);
 	if (EXT3_SB(sb)->s_journal->j_inode == NULL) {
+		char b[BDEVNAME_SIZE];
+
 		printk("external journal on %s\n",
-		    bdevname(EXT3_SB(sb)->s_journal->j_dev));
+			bdevname(EXT3_SB(sb)->s_journal->j_dev, b));
 	} else {
 		printk("internal journal\n");
 	}
@@ -1097,6 +1168,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	if (!parse_options ((char *) data, sbi, &journal_inum, 0))
 		goto failed_mount;
 
+	sb->s_flags |= MS_ONE_SECOND;
 	sb->s_flags = (sb->s_flags & ~MS_POSIXACL) |
 		((sbi->s_mount_opt & EXT3_MOUNT_POSIX_ACL) ? MS_POSIXACL : 0);
 
@@ -1425,6 +1497,7 @@ static journal_t *ext3_get_journal(struct super_block *sb, int journal_inum)
 		printk(KERN_ERR "EXT3-fs: Could not load journal inode\n");
 		iput(journal_inode);
 	}
+	journal->j_private = sb;
 	ext3_init_journal_params(EXT3_SB(sb), journal);
 	return journal;
 }
@@ -1489,6 +1562,7 @@ static journal_t *ext3_get_dev_journal(struct super_block *sb,
 		printk(KERN_ERR "EXT3-fs: failed to create device journal\n");
 		goto out_bdev;
 	}
+	journal->j_private = sb;
 	ll_rw_block(READ, 1, &journal->j_sb_buffer);
 	wait_on_buffer(journal->j_sb_buffer);
 	if (!buffer_uptodate(journal->j_sb_buffer)) {
@@ -1555,7 +1629,6 @@ static int ext3_load_journal(struct super_block * sb,
 		if (!(journal = ext3_get_dev_journal(sb, journal_dev)))
 			return -EINVAL;
 	}
-	
 
 	if (!really_read_only && test_opt(sb, UPDATE_JOURNAL)) {
 		err = journal_update_format(journal);

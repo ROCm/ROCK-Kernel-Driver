@@ -420,7 +420,7 @@ ext3_acl_chmod(struct inode *inode)
 			return PTR_ERR(handle);
 		}
 		error = ext3_set_acl(handle, inode, ACL_TYPE_ACCESS, clone);
-		ext3_journal_stop(handle, inode);
+		ext3_journal_stop(handle);
 	}
 	posix_acl_release(clone);
 	return error;
@@ -522,7 +522,7 @@ ext3_xattr_set_acl(struct inode *inode, int type, const void *value,
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 	error = ext3_set_acl(handle, inode, type, acl);
-	ext3_journal_stop(handle, inode);
+	ext3_journal_stop(handle);
 
 release_and_out:
 	posix_acl_release(acl);

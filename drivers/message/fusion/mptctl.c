@@ -2743,7 +2743,8 @@ extern int register_ioctl32_conversion(unsigned int cmd,
 						      unsigned long,
 						      struct file *));
 int unregister_ioctl32_conversion(unsigned int cmd);
-extern asmlinkage int sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg);
+extern asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd,
+				 unsigned long arg);
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /* sparc32_XXX functions are used to provide a conversion between

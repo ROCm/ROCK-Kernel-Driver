@@ -425,7 +425,7 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 		input_open_device(&mousedev->handle);
 
 	mousedev_table[minor] = mousedev;
-	mousedev->devfs = input_register_minor("mouse%d", minor, MOUSEDEV_MINOR_BASE);
+	mousedev->devfs = input_register_minor("input/mouse%d", minor, MOUSEDEV_MINOR_BASE);
 
 	return &mousedev->handle;
 }
@@ -507,7 +507,7 @@ static int __init mousedev_init(void)
 	mousedev_table[MOUSEDEV_MIX] = &mousedev_mix;
 	mousedev_mix.exist = 1;
 	mousedev_mix.minor = MOUSEDEV_MIX;
-	mousedev_mix.devfs = input_register_minor("mice", MOUSEDEV_MIX, MOUSEDEV_MINOR_BASE);
+	mousedev_mix.devfs = input_register_minor("input/mice", MOUSEDEV_MIX, MOUSEDEV_MINOR_BASE);
 
 #ifdef CONFIG_INPUT_MOUSEDEV_PSAUX
 	if (!(mousedev_mix.misc = !misc_register(&psaux_mouse)))

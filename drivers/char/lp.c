@@ -906,7 +906,7 @@ int __init lp_init (void)
 		return -EIO;
 	}
 
-	devfs_mk_dir (NULL, "printers", NULL);
+	devfs_mk_dir("printers");
 
 	if (parport_register_driver (&lp_driver)) {
 		printk (KERN_ERR "lp: unable to register with parport\n");

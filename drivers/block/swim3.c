@@ -979,7 +979,7 @@ int swim3_init(void)
 	int err = -ENOMEM;
 	int i;
 
-	floppy_devfs_handle = devfs_mk_dir(NULL, "floppy", NULL);
+	floppy_devfs_handle = devfs_mk_dir("floppy");
 
 	swim = find_devices("floppy");
 	while (swim && (floppy_count < MAX_FLOPPIES))
@@ -1095,9 +1095,9 @@ static int swim3_add_device(struct device_node *swim)
 
 	printk(KERN_INFO "fd%d: SWIM3 floppy controller %s\n", floppy_count,
 		mediabay ? "in media bay" : "");
-	sprintf(floppy_name, "%s%d", floppy_devfs_handle ? "" : "floppy",
-			floppy_count);
-	floppy_handle = devfs_register(floppy_devfs_handle, floppy_name, 
+
+	sprintf(floppy_name, "floppy/%d", floppy_count);
+	floppy_handle = devfs_register(NULL, floppy_name, 
 			DEVFS_FL_DEFAULT, FLOPPY_MAJOR, floppy_count, 
 			S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP |S_IWGRP, 
 			&floppy_fops, NULL);

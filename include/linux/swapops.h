@@ -51,6 +51,7 @@ static inline swp_entry_t pte_to_swp_entry(pte_t pte)
 {
 	swp_entry_t arch_entry;
 
+	BUG_ON(pte_file(pte));
 	arch_entry = __pte_to_swp_entry(pte);
 	return swp_entry(__swp_type(arch_entry), __swp_offset(arch_entry));
 }
@@ -64,5 +65,6 @@ static inline pte_t swp_entry_to_pte(swp_entry_t entry)
 	swp_entry_t arch_entry;
 
 	arch_entry = __swp_entry(swp_type(entry), swp_offset(entry));
+	BUG_ON(pte_file(__swp_entry_to_pte(arch_entry)));
 	return __swp_entry_to_pte(arch_entry);
 }

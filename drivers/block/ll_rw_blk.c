@@ -26,6 +26,7 @@
 #include <linux/bootmem.h>	/* for max_pfn/max_low_pfn */
 #include <linux/completion.h>
 #include <linux/slab.h>
+#include <linux/swap.h>
 
 static void blk_unplug_work(void *data);
 static void blk_unplug_timeout(unsigned long data);
@@ -200,6 +201,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	q->make_request_fn = mfn;
 	q->backing_dev_info.ra_pages = (VM_MAX_READAHEAD * 1024) / PAGE_CACHE_SIZE;
 	q->backing_dev_info.state = 0;
+	q->backing_dev_info.memory_backed = 0;
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 	blk_queue_dma_alignment(q, 511);
@@ -1892,13 +1894,14 @@ void generic_make_request(struct bio *bio)
 
 		if (maxsector < nr_sectors ||
 		    maxsector - nr_sectors < sector) {
+			char b[BDEVNAME_SIZE];
 			/* This may well happen - the kernel calls
 			 * bread() without checking the size of the
 			 * device, e.g., when mounting a device. */
 			printk(KERN_INFO
 			       "attempt to access beyond end of device\n");
 			printk(KERN_INFO "%s: rw=%ld, want=%Lu, limit=%Lu\n",
-			       bdevname(bio->bi_bdev),
+			       bdevname(bio->bi_bdev, b),
 			       bio->bi_rw,
 			       (unsigned long long) sector + nr_sectors,
 			       (long long) maxsector);
@@ -1917,12 +1920,15 @@ void generic_make_request(struct bio *bio)
 	 * Stacking drivers are expected to know what they are doing.
 	 */
 	do {
+		char b[BDEVNAME_SIZE];
+
 		q = bdev_get_queue(bio->bi_bdev);
 		if (!q) {
 			printk(KERN_ERR
-			       "generic_make_request: Trying to access nonexistent block-device %s (%Lu)\n",
-			       bdevname(bio->bi_bdev),
-			       (long long) bio->bi_sector);
+			       "generic_make_request: Trying to access "
+				"nonexistent block-device %s (%Lu)\n",
+				bdevname(bio->bi_bdev, b),
+				(long long) bio->bi_sector);
 end_io:
 			bio_endio(bio, bio->bi_size, -EIO);
 			break;
@@ -1930,9 +1936,9 @@ end_io:
 
 		if (unlikely(bio_sectors(bio) > q->max_sectors)) {
 			printk("bio too big device %s (%u > %u)\n", 
-			       bdevname(bio->bi_bdev),
-			       bio_sectors(bio),
-			       q->max_sectors);
+				bdevname(bio->bi_bdev, b),
+				bio_sectors(bio),
+				q->max_sectors);
 			goto end_io;
 		}
 

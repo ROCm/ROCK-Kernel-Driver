@@ -438,7 +438,7 @@ void line_register_devfs(struct lines *set, struct line_driver *line_driver,
 
 	from = line_driver->symlink_from;
 	to = line_driver->symlink_to;
-	err = devfs_mk_symlink(NULL, from, 0, to, NULL, NULL);
+	err = devfs_mk_symlink(from, to);
 	if(err) printk("Symlink creation from /dev/%s to /dev/%s "
 		       "returned %d\n", from, to, err);
 

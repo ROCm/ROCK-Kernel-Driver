@@ -89,7 +89,7 @@
 #endif	/* CONFIG_NET_RADIO */
 
 #include <asm/uaccess.h>
-#include <net/compat_socket.h>
+#include <net/compat.h>
 
 #include <net/sock.h>
 #include <linux/netfilter.h>
@@ -1558,7 +1558,7 @@ asmlinkage long sys_sendmsg(int fd, struct msghdr *msg, unsigned flags)
 	
 	err = -EFAULT;
 	if (MSG_CMSG_COMPAT & flags) {
-		if (msghdr_from_user_compat_to_kern(&msg_sys, msg_compat))
+		if (get_compat_msghdr(&msg_sys, msg_compat))
 			return -EFAULT;
 	} else if (copy_from_user(&msg_sys, msg, sizeof(struct msghdr)))
 		return -EFAULT;
@@ -1652,7 +1652,7 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	int *uaddr_len;
 	
 	if (MSG_CMSG_COMPAT & flags) {
-		if (msghdr_from_user_compat_to_kern(&msg_sys, msg_compat))
+		if (get_compat_msghdr(&msg_sys, msg_compat))
 			return -EFAULT;
 	} else
 		if (copy_from_user(&msg_sys,msg,sizeof(struct msghdr)))
@@ -1708,15 +1708,9 @@ asmlinkage long sys_recvmsg(int fd, struct msghdr *msg, unsigned int flags)
 	err = __put_user(msg_sys.msg_flags, COMPAT_FLAGS(msg));
 	if (err)
 		goto out_freeiov;
-	if (MSG_CMSG_COMPAT & flags) {
-		unsigned long ucmsg_ptr;
-		compat_size_t uclen;
-		if((unsigned long) msg_sys.msg_control != cmsg_ptr)
-			cmsg_compat_recvmsg_fixup(&msg_sys, cmsg_ptr);
-		ucmsg_ptr = ((unsigned long)msg_sys.msg_control);
-		uclen = (compat_size_t) (ucmsg_ptr - cmsg_ptr);
-		err = __put_user(uclen, &msg_compat->msg_controllen);
-	} else
+	if (MSG_CMSG_COMPAT & flags)
+		err = put_compat_msg_controllen(&msg_sys, msg_compat, cmsg_ptr);
+	else
 		err = __put_user((unsigned long)msg_sys.msg_control-cmsg_ptr, 
 				 &msg->msg_controllen);
 	if (err)

@@ -2254,7 +2254,7 @@ sys_signal(int sig, __sighandler_t handler)
 
 #ifndef HAVE_ARCH_SYS_PAUSE
 
-asmlinkage int
+asmlinkage long
 sys_pause(void)
 {
 	current->state = TASK_INTERRUPTIBLE;

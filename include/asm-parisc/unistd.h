@@ -842,19 +842,19 @@ type name(type1 arg1, type2 arg2, type3 arg3, type4 arg4, type5 arg5, type6 arg6
 
 static inline pid_t setsid(void)
 {
-	extern int sys_setsid(void);
+	extern long sys_setsid(void);
 	return sys_setsid();
 }
 
 static inline int write(int fd, const char *buf, off_t count)
 {
-	extern int sys_write(int, const char *, int);
+	extern long sys_write(int, const char *, int);
 	return sys_write(fd, buf, count);
 }
 
 static inline int read(int fd, char *buf, off_t count)
 {
-	extern int sys_read(int, char *, int);
+	extern long sys_read(int, char *, int);
 	return sys_read(fd, buf, count);
 }
 
@@ -866,7 +866,7 @@ static inline off_t lseek(int fd, off_t offset, int count)
 
 static inline int dup(int fd)
 {
-	extern int sys_dup(int);
+	extern long sys_dup(int);
 	return sys_dup(fd);
 }
 
@@ -891,7 +891,7 @@ static inline int close(int fd)
 
 static inline int _exit(int exitcode)
 {
-	extern int sys_exit(int) __attribute__((noreturn));
+	extern long sys_exit(int) __attribute__((noreturn));
 	return sys_exit(exitcode);
 }
 

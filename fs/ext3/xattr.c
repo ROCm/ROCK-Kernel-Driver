@@ -78,8 +78,9 @@
 		printk("\n"); \
 	} while (0)
 # define ea_bdebug(bh, f...) do { \
+		char b[BDEVNAME_SIZE]; \
 		printk(KERN_DEBUG "block %s:%ld: ", \
-			bdevname(bh->b_bdev), bh->b_blocknr); \
+			bdevname(bh->b_bdev, b), bh->b_blocknr); \
 		printk(f); \
 		printk("\n"); \
 	} while (0)
@@ -854,7 +855,7 @@ ext3_xattr_set(struct inode *inode, int name_index, const char *name,
 	else
 		error = ext3_xattr_set_handle(handle, inode, name_index, name,
 					      value, value_len, flags);
-	error2 = ext3_journal_stop(handle, inode);
+	error2 = ext3_journal_stop(handle);
 	unlock_kernel();
 
 	return error ? error : error2;

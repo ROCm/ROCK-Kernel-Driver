@@ -17,6 +17,7 @@
 #include <linux/aio.h>
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/mman.h>
 #include <linux/pagemap.h>
 #include <linux/file.h>
@@ -88,7 +89,7 @@ void __remove_from_page_cache(struct page *page)
 	page->mapping = NULL;
 
 	mapping->nrpages--;
-	dec_page_state(nr_pagecache);
+	pagecache_acct(-1);
 }
 
 void remove_from_page_cache(struct page *page)
@@ -1195,7 +1196,7 @@ err:
 static int filemap_populate(struct vm_area_struct *vma,
 			unsigned long addr,
 			unsigned long len,
-			unsigned long prot,
+			pgprot_t prot,
 			unsigned long pgoff,
 			int nonblock)
 {
@@ -1206,6 +1207,10 @@ static int filemap_populate(struct vm_area_struct *vma,
 	struct mm_struct *mm = vma->vm_mm;
 	struct page *page;
 	int err;
+
+	if (!nonblock)
+		do_page_cache_readahead(mapping, vma->vm_file,
+					pgoff, len >> PAGE_CACHE_SHIFT);
 
 repeat:
 	size = (inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;

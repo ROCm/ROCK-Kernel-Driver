@@ -235,7 +235,7 @@ void ext3_delete_inode (struct inode * inode)
 		clear_inode(inode);
 	else
 		ext3_free_inode(handle, inode);
-	ext3_journal_stop(handle, inode);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 	return;
 no_delete:
@@ -1107,7 +1107,7 @@ static int ext3_prepare_write(struct file *file, struct page *page,
 	}
 prepare_write_failed:
 	if (ret)
-		ext3_journal_stop(handle, inode);
+		ext3_journal_stop(handle);
 out:
 	unlock_kernel();
 	return ret;
@@ -1176,7 +1176,7 @@ static int ext3_commit_write(struct file *file, struct page *page,
 		if (!ret) 
 			ret = ret2;
 	}
-	ret2 = ext3_journal_stop(handle, inode);
+	ret2 = ext3_journal_stop(handle);
 	unlock_kernel();
 	if (!ret)
 		ret = ret2;
@@ -1374,7 +1374,7 @@ static int ext3_writepage(struct page *page, struct writeback_control *wbc)
 				PAGE_CACHE_SIZE, NULL, bput_one);
 	}
 
-	err = ext3_journal_stop(handle, inode);
+	err = ext3_journal_stop(handle);
 	if (!ret)
 		ret = err;
 	unlock_kernel();
@@ -1479,7 +1479,7 @@ out_stop:
 					ret = err;
 			}
 		}
-		err = ext3_journal_stop(handle, inode);
+		err = ext3_journal_stop(handle);
 		if (ret == 0)
 			ret = err;
 		unlock_kernel();
@@ -2140,7 +2140,7 @@ out_stop:
 	if (inode->i_nlink)
 		ext3_orphan_del(handle, inode);
 
-	ext3_journal_stop(handle, inode);
+	ext3_journal_stop(handle);
 	unlock_kernel();
 }
 
@@ -2560,7 +2560,7 @@ int ext3_setattr(struct dentry *dentry, struct iattr *attr)
 		rc = ext3_mark_inode_dirty(handle, inode);
 		if (!error)
 			error = rc;
-		ext3_journal_stop(handle, inode);
+		ext3_journal_stop(handle);
 	}
 	
 	rc = inode_setattr(inode, attr);
@@ -2737,7 +2737,7 @@ void ext3_dirty_inode(struct inode *inode)
 				current_handle);
 		ext3_mark_inode_dirty(handle, inode);
 	}
-	ext3_journal_stop(handle, inode);
+	ext3_journal_stop(handle);
 out:
 	unlock_kernel();
 }
@@ -2818,7 +2818,7 @@ int ext3_change_inode_journal_flag(struct inode *inode, int val)
 
 	err = ext3_mark_inode_dirty(handle, inode);
 	handle->h_sync = 1;
-	ext3_journal_stop(handle, inode);
+	ext3_journal_stop(handle);
 	ext3_std_error(inode->i_sb, err);
 	
 	return err;

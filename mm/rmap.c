@@ -22,6 +22,7 @@
  */
 #include <linux/mm.h>
 #include <linux/pagemap.h>
+#include <linux/swap.h>
 #include <linux/swapops.h>
 #include <linux/slab.h>
 #include <linux/init.h>
@@ -365,11 +366,28 @@ static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 	pte = ptep_get_and_clear(ptep);
 	flush_tlb_page(vma, address);
 
-	/* Store the swap location in the pte. See handle_pte_fault() ... */
 	if (PageSwapCache(page)) {
+		/*
+		 * Store the swap location in the pte.
+		 * See handle_pte_fault() ...
+		 */
 		swp_entry_t entry = { .val = page->index };
 		swap_duplicate(entry);
 		set_pte(ptep, swp_entry_to_pte(entry));
+		BUG_ON(pte_file(*ptep));
+	} else {
+		unsigned long pgidx;
+		/*
+		 * If a nonlinear mapping then store the file page offset
+		 * in the pte.
+		 */
+		pgidx = (address - vma->vm_start) >> PAGE_SHIFT;
+		pgidx += vma->vm_pgoff;
+		pgidx >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
+		if (page->index != pgidx) {
+			set_pte(ptep, pgoff_to_pte(page->index));
+			BUG_ON(!pte_file(*ptep));
+		}
 	}
 
 	/* Move the dirty bit to the physical page now the pte is gone. */

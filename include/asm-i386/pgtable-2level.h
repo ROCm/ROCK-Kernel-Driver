@@ -63,4 +63,16 @@ static inline pmd_t * pmd_offset(pgd_t * dir, unsigned long address)
 #define pfn_pte(pfn, prot)	__pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
+/*
+ * Bits 0, 6 and 7 are taken, split up the 29 bits of offset
+ * into this range:
+ */
+#define PTE_FILE_MAX_BITS	29
+
+#define pte_to_pgoff(pte) \
+	((((pte).pte_low >> 1) & 0x1f ) + (((pte).pte_low >> 8) << 5 ))
+
+#define pgoff_to_pte(off) \
+	((pte_t) { (((off) & 0x1f) << 1) + (((off) >> 5) << 8) + _PAGE_FILE })
+
 #endif /* _I386_PGTABLE_2LEVEL_H */

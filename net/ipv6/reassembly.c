@@ -23,6 +23,7 @@
  *      Horst von Brand Add missing #include <linux/string.h>
  *	Alexey Kuznetsov	SMP races, threading, cleanup.
  *	Patrick McHardy		LRU queue of frag heads for evictor.
+ *	Mitsuru KANDA @USAGI	Register inet6_protocol{}.
  */
 #include <linux/config.h>
 #include <linux/errno.h>
@@ -525,6 +526,7 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	int    remove_fraghdr = 0;
 	int    payload_len;
 	int    nhoff;
+	u8     nexthdr = 0;
 
 	fq_kill(fq);
 
@@ -534,6 +536,8 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	/* Unfragmented part is taken from the first segment. */
 	payload_len = (head->data - head->nh.raw) - sizeof(struct ipv6hdr) + fq->len;
 	nhoff = head->h.raw - head->nh.raw;
+
+	nexthdr = ((struct frag_hdr*)head->h.raw)->nexthdr;
 
 	if (payload_len > 65535) {
 		payload_len -= 8;
@@ -609,9 +613,12 @@ static int ip6_frag_reasm(struct frag_queue *fq, struct sk_buff **skb_in,
 	if (head->ip_summed == CHECKSUM_HW)
 		head->csum = csum_partial(head->nh.raw, head->h.raw-head->nh.raw, head->csum);
 
+	if (!pskb_pull(head, head->h.raw - head->data))
+		goto out_fail;
+
 	IP6_INC_STATS_BH(Ip6ReasmOKs);
 	fq->fragments = NULL;
-	return nhoff;
+	return nexthdr;
 
 out_oversize:
 	if (net_ratelimit())
@@ -622,16 +629,18 @@ out_oom:
 		printk(KERN_DEBUG "ip6_frag_reasm: no memory for reassembly\n");
 out_fail:
 	IP6_INC_STATS_BH(Ip6ReasmFails);
-	return -1;
+	return 0;
 }
 
-int ipv6_reassembly(struct sk_buff **skbp, int nhoff)
+static int ipv6_frag_rcv(struct sk_buff **skbp)
 {
 	struct sk_buff *skb = *skbp; 
 	struct net_device *dev = skb->dev;
 	struct frag_hdr *fhdr;
 	struct frag_queue *fq;
 	struct ipv6hdr *hdr;
+	int nhoff = skb->h.raw - skb->nh.raw;
+	u8 nexthdr = 0;
 
 	hdr = skb->nh.ipv6h;
 
@@ -640,15 +649,16 @@ int ipv6_reassembly(struct sk_buff **skbp, int nhoff)
 	/* Jumbo payload inhibits frag. header */
 	if (hdr->payload_len==0) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
-		return -1;
+		goto discard;
 	}
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+sizeof(struct frag_hdr))) {
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, skb->h.raw-skb->nh.raw);
-		return -1;
+		goto discard;
 	}
 
 	hdr = skb->nh.ipv6h;
 	fhdr = (struct frag_hdr *)skb->h.raw;
+	nexthdr = fhdr->nexthdr;
 
 	if (!(fhdr->frag_off & htons(0xFFF9))) {
 		/* It is not a fragmented frame */
@@ -674,10 +684,22 @@ int ipv6_reassembly(struct sk_buff **skbp, int nhoff)
 
 		spin_unlock(&fq->lock);
 		fq_put(fq);
-		return ret;
+		return -ret;
 	}
 
+discard:
 	IP6_INC_STATS_BH(Ip6ReasmFails);
 	kfree_skb(skb);
-	return -1;
+	return 0;
+}
+
+static struct inet6_protocol frag_protocol =
+{
+	.handler	=	ipv6_frag_rcv,
+};
+
+void __init ipv6_frag_init(void)
+{
+	if (inet6_add_protocol(&frag_protocol, IPPROTO_FRAGMENT) < 0)
+		printk(KERN_ERR "ipv6_frag_init: Could not register protocol\n");
 }

@@ -1878,7 +1878,7 @@ restore_via_state(void)
 	out_8(&via[IER], IER_SET | SR_INT | CB1_INT);
 }
 
-extern int sys_sync(void);
+extern long sys_sync(void);
 
 #define	GRACKLE_PM	(1<<7)
 #define GRACKLE_DOZE	(1<<5)

@@ -967,7 +967,7 @@ static void tcp_v6_send_check(struct sock *sk, struct tcphdr *th, int len,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 
 	if (skb->ip_summed == CHECKSUM_HW) {
-		th->check = csum_ipv6_magic(&np->saddr, &np->daddr, len, IPPROTO_TCP,  0);
+		th->check = ~csum_ipv6_magic(&np->saddr, &np->daddr, len, IPPROTO_TCP,  0);
 		skb->csum = offsetof(struct tcphdr, check);
 	} else {
 		th->check = csum_ipv6_magic(&np->saddr, &np->daddr, len, IPPROTO_TCP, 
@@ -1591,8 +1591,9 @@ ipv6_pktoptions:
 	return 0;
 }
 
-static int tcp_v6_rcv(struct sk_buff *skb)
+static int tcp_v6_rcv(struct sk_buff **pskb)
 {
+	struct sk_buff *skb = *pskb;
 	struct tcphdr *th;	
 	struct sock *sk;
 	int ret;
@@ -1642,7 +1643,7 @@ process:
 		goto discard_and_relse;
 
 	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
-		goto discard_it;
+		goto discard_and_relse;
 
 	skb->dev = NULL;
 

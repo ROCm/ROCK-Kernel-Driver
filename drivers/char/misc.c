@@ -196,7 +196,7 @@ int misc_register(struct miscdevice * misc)
 	if (misc->minor < DYNAMIC_MINORS)
 		misc_minors[misc->minor >> 3] |= 1 << (misc->minor & 7);
 	if (!devfs_handle)
-		devfs_handle = devfs_mk_dir (NULL, "misc", NULL);
+		devfs_handle = devfs_mk_dir("misc");
 	dir = strchr (misc->name, '/') ? NULL : devfs_handle;
 	misc->devfs_handle =
 		devfs_register (dir, misc->name, DEVFS_FL_NONE,

@@ -323,6 +323,7 @@ xfs_showargs(
 	};
 	struct proc_xfs_info	*xfs_infop;
 	struct xfs_mount	*mp = XFS_BHVTOM(vfsp->vfs_fbhv);
+	char b[BDEVNAME_SIZE];
 
 	for (xfs_infop = xfs_info; xfs_infop->flag; xfs_infop++) {
 		if (mp->m_flags & xfs_infop->flag)
@@ -352,12 +353,12 @@ xfs_showargs(
 
 	if (mp->m_ddev_targp->pbr_dev != mp->m_logdev_targp->pbr_dev)
 		seq_printf(m, "," MNTOPT_LOGDEV "=%s",
-				bdevname(mp->m_logdev_targp->pbr_bdev));
+				bdevname(mp->m_logdev_targp->pbr_bdev, b));
 
 	if (mp->m_rtdev_targp &&
 	    mp->m_ddev_targp->pbr_dev != mp->m_rtdev_targp->pbr_dev)
 		seq_printf(m, "," MNTOPT_RTDEV "=%s",
-				bdevname(mp->m_rtdev_targp->pbr_bdev));
+				bdevname(mp->m_rtdev_targp->pbr_bdev, b));
 
 	if (mp->m_dalign > 0)
 		seq_printf(m, "," MNTOPT_SUNIT "=%d",

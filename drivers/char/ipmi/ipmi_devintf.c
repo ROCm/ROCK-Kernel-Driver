@@ -444,15 +444,14 @@ static devfs_handle_t handles[MAX_DEVICES];
 
 static void ipmi_new_smi(int if_num)
 {
-	char name[2];
+	char name[10];
 
 	if (if_num > MAX_DEVICES)
 		return;
 
-	name[0] = if_num + '0';
-	name[1] = '\0';
+	snprinf(name, sizeof(name), "ipmidev/%d", if_num);
 
-	handles[if_num] = devfs_register(devfs_handle, name, DEVFS_FL_NONE,
+	handles[if_num] = devfs_register(NULL, name, DEVFS_FL_NONE,
 					 ipmi_major, if_num,
 					 S_IFCHR | S_IRUSR | S_IWUSR,
 					 &ipmi_fops, NULL);
@@ -489,7 +488,7 @@ static __init int init_ipmi_devintf(void)
 		ipmi_major = rv;
 	}
 
-	devfs_handle = devfs_mk_dir(NULL, DEVICE_NAME, NULL);
+	devfs_handle = devfs_mk_dir(DEVICE_NAME);
 
 	rv = ipmi_smi_watcher_register(&smi_watcher);
 	if (rv) {

@@ -191,7 +191,7 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 	case F_GETLK:
 	case F_SETLK:
 	case F_SETLKW:
-		ret = get_compat_flock(&f, (struct compat_flock *)arg);
+		ret = get_compat_flock(&f, compat_ptr(arg));
 		if (ret != 0)
 			break;
 		old_fs = get_fs();
@@ -203,15 +203,14 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 			    ((f.l_start + f.l_len) >= COMPAT_OFF_T_MAX))
 				ret = -EOVERFLOW;
 			if (ret == 0)
-				ret = put_compat_flock(&f,
-						(struct compat_flock *)arg);
+				ret = put_compat_flock(&f, compat_ptr(arg));
 		}
 		break;
 
 	case F_GETLK64:
 	case F_SETLK64:
 	case F_SETLKW64:
-		ret = get_compat_flock64(&f, (struct compat_flock64 *)arg);
+		ret = get_compat_flock64(&f, compat_ptr(arg));
 		if (ret != 0)
 			break;
 		old_fs = get_fs();
@@ -226,8 +225,7 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 			    ((f.l_start + f.l_len) >= COMPAT_LOFF_T_MAX))
 				ret = -EOVERFLOW;
 			if (ret == 0)
-				ret = put_compat_flock64(&f,
-						(struct compat_flock64 *)arg);
+				ret = put_compat_flock64(&f, compat_ptr(arg));
 		}
 		break;
 

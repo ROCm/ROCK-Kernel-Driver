@@ -1710,7 +1710,11 @@ static int wd7000_host_reset(Scsi_Cmnd * SCpnt)
 static int wd7000_biosparam(struct scsi_device *sdev,
 		struct block_device *bdev, sector_t capacity, int *ip)
 {
-	dprintk("wd7000_biosparam: dev=%s, size=%d, ", bdevname(bdev), capacity);
+	char b[BDEVNAME_SIZE];
+
+	dprintk("wd7000_biosparam: dev=%s, size=%d, ",
+		bdevname(bdev, b), capacity);
+	(void)b;	/* unused var warning? */
 
 	/*
 	 * try default translation

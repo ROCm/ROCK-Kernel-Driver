@@ -1807,23 +1807,6 @@ struct nfsctl_export32 {
 	compat_gid_t	ex32_anon_gid;
 };
 
-struct nfsctl_uidmap32 {
-	u32			ug32_ident;   /* char * */
-	compat_pid_t	ug32_uidbase;
-	s32			ug32_uidlen;
-	u32			ug32_udimap;  /* uid_t * */
-	compat_pid_t	ug32_gidbase;
-	s32			ug32_gidlen;
-	u32			ug32_gdimap;  /* gid_t * */
-};
-
-struct nfsctl_fhparm32 {
-	struct sockaddr		gf32_addr;
-	compat_dev_t	gf32_dev;
-	compat_ino_t	gf32_ino;
-	s32			gf32_version;
-};
-
 struct nfsctl_fdparm32 {
 	struct sockaddr		gd32_addr;
 	s8			gd32_path[NFS_MAXPATHLEN+1];
@@ -1842,16 +1825,12 @@ struct nfsctl_arg32 {
 		struct nfsctl_svc32	u32_svc;
 		struct nfsctl_client32	u32_client;
 		struct nfsctl_export32	u32_export;
-		struct nfsctl_uidmap32	u32_umap;
-		struct nfsctl_fhparm32	u32_getfh;
 		struct nfsctl_fdparm32	u32_getfd;
 		struct nfsctl_fsparm32	u32_getfs;
 	} u;
 #define ca32_svc	u.u32_svc
 #define ca32_client	u.u32_client
 #define ca32_export	u.u32_export
-#define ca32_umap	u.u32_umap
-#define ca32_getfh	u.u32_getfh
 #define ca32_getfd	u.u32_getfd
 #define ca32_getfs	u.u32_getfs
 #define ca32_authd	u.u32_authd
@@ -1920,22 +1899,6 @@ static int nfs_exp32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 	return err;
 }
 
-static int nfs_getfh32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
-{
-	int err;
-	
-	err = get_user(karg->ca_version, &arg32->ca32_version);
-	err |= copy_from_user(&karg->ca_getfh.gf_addr,
-			  &arg32->ca32_getfh.gf32_addr,
-			  (sizeof(struct sockaddr)));
-	err |= __get_user(karg->ca_getfh.gf_dev,
-		      &arg32->ca32_getfh.gf32_dev);
-	err |= __get_user(karg->ca_getfh.gf_ino,
-		      &arg32->ca32_getfh.gf32_ino);
-	err |= __get_user(karg->ca_getfh.gf_version,
-		      &arg32->ca32_getfh.gf32_version);
-	return err;
-}
 
 static int nfs_getfd32_trans(struct nfsctl_arg *karg, struct nfsctl_arg32 *arg32)
 {
@@ -2008,9 +1971,6 @@ long asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsc
 	case NFSCTL_UNEXPORT:
 		err = nfs_exp32_trans(karg, arg32);
 		break;
-	case NFSCTL_GETFH:
-		err = nfs_getfh32_trans(karg, arg32);
-		break;
 	case NFSCTL_GETFD:
 		err = nfs_getfd32_trans(karg, arg32);
 		break;
@@ -2031,23 +1991,13 @@ long asmlinkage sys32_nfsservctl(int cmd, struct nfsctl_arg32 *arg32, union nfsc
 	if (err)
 		goto done;
 
-	if((cmd == NFSCTL_GETFH) ||
-	   (cmd == NFSCTL_GETFD) ||
+	if((cmd == NFSCTL_GETFD) ||
 	   (cmd == NFSCTL_GETFS))
 		err = nfs_getfh32_res_trans(kres, res32);
 
 done:
-	if(karg) {
-		if(cmd == NFSCTL_UGIDUPDATE) {
-			if(karg->ca_umap.ug_ident)
-				kfree(karg->ca_umap.ug_ident);
-			if(karg->ca_umap.ug_udimap)
-				kfree(karg->ca_umap.ug_udimap);
-			if(karg->ca_umap.ug_gdimap)
-				kfree(karg->ca_umap.ug_gdimap);
-		}
+	if(karg)
 		kfree(karg);
-	}
 	if(kres)
 		kfree(kres);
 	return err;
@@ -2071,8 +2021,8 @@ long sys32_module_warning(void)
 	return -ENOSYS ;
 } 
 
-int sys_sched_getaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
-int sys_sched_setaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
+long sys_sched_getaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
+long sys_sched_setaffinity(pid_t pid, unsigned int len, unsigned long *new_mask_ptr); 
 
 /* only works on LE */
 long sys32_sched_setaffinity(pid_t pid, unsigned int len,

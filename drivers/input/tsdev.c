@@ -326,7 +326,7 @@ static struct input_handle *tsdev_connect(struct input_handler *handler,
 
 	tsdev_table[minor] = tsdev;
 	tsdev->devfs =
-	    input_register_minor("ts%d", minor, TSDEV_MINOR_BASE);
+	    input_register_minor("input/ts%d", minor, TSDEV_MINOR_BASE);
 
 
 	return &tsdev->handle;

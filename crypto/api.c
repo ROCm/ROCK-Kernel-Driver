@@ -15,6 +15,7 @@
  */
 #include <linux/init.h>
 #include <linux/crypto.h>
+#include <linux/errno.h>
 #include <linux/rwsem.h>
 #include <linux/slab.h>
 #include "internal.h"
@@ -151,10 +152,7 @@ out:
 
 void crypto_free_tfm(struct crypto_tfm *tfm)
 {
-	if (crypto_tfm_alg_type(tfm) == CRYPTO_ALG_TYPE_CIPHER)
-		if (tfm->crt_cipher.cit_iv)
-			kfree(tfm->crt_cipher.cit_iv);
-	
+	crypto_exit_ops(tfm);
 	crypto_alg_put(tfm->__crt_alg);
 	kfree(tfm);
 }

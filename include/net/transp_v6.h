@@ -15,6 +15,14 @@ extern struct proto tcpv6_prot;
 
 struct flowi;
 
+/* extention headers */
+extern void				ipv6_hopopts_init(void);
+extern void				ipv6_rthdr_init(void);
+extern void				ipv6_frag_init(void);
+extern void				ipv6_nodata_init(void);
+extern void				ipv6_destopt_init(void);
+
+/* transport protocols */
 extern void				rawv6_init(void);
 extern void				udpv6_init(void);
 extern void				tcpv6_init(void);

@@ -95,6 +95,7 @@ obj-$(CONFIG_SND_TRIDENT) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-ra
 obj-$(CONFIG_SND_YMFPCI) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_POWERMAC) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_SA11XX_UDA1341) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
+obj-$(CONFIG_SND_PC98_CS4232) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 ifeq ($(CONFIG_SND_SB16_CSP),y)
   obj-$(CONFIG_SND_SB16) += snd-hwdep.o
   obj-$(CONFIG_SND_SBAWE) += snd-hwdep.o

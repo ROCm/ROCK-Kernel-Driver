@@ -1607,8 +1607,7 @@ void devfs_unregister (devfs_handle_t de)
 }   /*  End Function devfs_unregister  */
 
 static int devfs_do_symlink (devfs_handle_t dir, const char *name,
-			     unsigned int flags, const char *link,
-			     devfs_handle_t *handle, void *info)
+			     const char *link, devfs_handle_t *handle)
 {
     int err;
     unsigned int linklength;
@@ -1638,7 +1637,7 @@ static int devfs_do_symlink (devfs_handle_t dir, const char *name,
 	kfree (newlink);
 	return -ENOTDIR;
     }
-    de->info = info;
+    de->info = NULL;
     de->u.symlink.linkname = newlink;
     de->u.symlink.length = linklength;
     if ( ( err = _devfs_append_entry (dir, de, NULL) ) != 0 )
@@ -1660,40 +1659,31 @@ static int devfs_do_symlink (devfs_handle_t dir, const char *name,
 
 /**
  *	devfs_mk_symlink Create a symbolic link in the devfs namespace.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
- *		new name is relative to the root of the devfs.
- *	@name: The name of the entry.
- *	@flags: A set of bitwise-ORed flags (DEVFS_FL_*).
- *	@link: The destination name.
- *	@handle: The handle to the symlink entry is written here. This may be %NULL.
- *	@info: An arbitrary pointer which will be associated with the entry.
+ *	@from: The name of the entry.
+ *	@to: Name of the destination
  *
  *	Returns 0 on success, else a negative error code is returned.
  */
 
-int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
-		      const char *link, devfs_handle_t *handle, void *info)
+int devfs_mk_symlink(const char *from, const char *to)
 {
-    int err;
-    devfs_handle_t de;
+	devfs_handle_t de;
+	int err;
 
-    if (handle != NULL) *handle = NULL;
-    DPRINTK (DEBUG_REGISTER, "(%s)\n", name);
-    err = devfs_do_symlink (dir, name, flags, link, &de, info);
-    if (err) return err;
-    if (handle == NULL) de->vfs_deletable = TRUE;
-    else *handle = de;
-    devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED, flags & DEVFS_FL_WAIT);
-    return 0;
-}   /*  End Function devfs_mk_symlink  */
+	err = devfs_do_symlink(NULL, from, to, &de);
+	if (!err) {
+		de->vfs_deletable = TRUE;
+		devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED, 0);
+	}
+
+	return err;
+}
 
 
 /**
  *	devfs_mk_dir - Create a directory in the devfs namespace.
- *	@dir: The handle to the parent devfs directory entry. If this is %NULL the
  *		new name is relative to the root of the devfs.
- *	@name: The name of the entry.
- *	@info: An arbitrary pointer which will be associated with the entry.
+ *	@fmt: The name of the entry.
  *
  *	Use of this function is optional. The devfs_register() function
  *	will automatically create intermediate directories as needed. This function
@@ -1702,36 +1692,42 @@ int devfs_mk_symlink (devfs_handle_t dir, const char *name, unsigned int flags,
  *	On failure %NULL is returned.
  */
 
-devfs_handle_t devfs_mk_dir (devfs_handle_t dir, const char *name, void *info)
+devfs_handle_t devfs_mk_dir(const char *fmt, ...)
 {
-    int err;
-    struct devfs_entry *de, *old;
+	struct devfs_entry *dir = NULL, *de = NULL, *old;
+	char buf[64];
+	va_list args;
+	int n;
 
-    if (name == NULL)
-    {
-	PRINTK ("(): NULL name pointer\n");
-	return NULL;
-    }
-    if ( ( de = _devfs_prepare_leaf (&dir, name, MODE_DIR) ) == NULL )
-    {
-	PRINTK ("(%s): could not prepare leaf\n", name);
-	return NULL;
-    }
-    de->info = info;
-    if ( ( err = _devfs_append_entry (dir, de, &old) ) != 0 )
-    {
-	PRINTK ("(%s): could not append to dir: %p \"%s\", err: %d\n",
-		name, dir, dir->name, err);
-	devfs_put (old);
-	devfs_put (dir);
-	return NULL;
-    }
-    DPRINTK (DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
-	     name, de, dir, dir->name);
-    devfsd_notify (de, DEVFSD_NOTIFY_REGISTERED, 0);
-    devfs_put (dir);
-    return de;
-}   /*  End Function devfs_mk_dir  */
+	va_start(args, fmt);
+	n = vsnprintf(buf, 64, fmt, args);
+	if (n >= 64 || !buf[0]) {
+		printk(KERN_WARNING "%s: invalid argument.", __FUNCTION__);
+		return NULL;
+	}
+
+	de = _devfs_prepare_leaf(&dir, buf, MODE_DIR);
+	if (!de) {
+		PRINTK("(%s): could not prepare leaf\n", buf);
+		return NULL;
+	}
+
+	de->info = NULL;
+	if (_devfs_append_entry(dir, de, &old)) {
+		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
+				buf, dir, dir->name);
+		devfs_put(old);
+		goto out_put;
+	}
+	
+	DPRINTK(DEBUG_REGISTER, "(%s): de: %p dir: %p \"%s\"\n",
+			buf, de, dir, dir->name);
+	devfsd_notify(de, DEVFSD_NOTIFY_REGISTERED, 0);
+
+ out_put:
+	devfs_put(dir);
+	return de;
+}
 
 
 void devfs_remove(const char *fmt, ...)
@@ -2016,7 +2012,6 @@ static struct inode *_devfs_get_vfs_inode (struct super_block *sb,
     if ( S_ISCHR (de->mode) )
     {
 	inode->i_rdev = to_kdev_t(de->u.cdev.dev);
-	inode->i_cdev = cdget(de->u.cdev.dev);
     }
     else if ( S_ISBLK (de->mode) )
     {
@@ -2398,8 +2393,7 @@ static int devfs_symlink (struct inode *dir, struct dentry *dentry,
     /*  First try to get the devfs entry for this directory  */
     parent = get_devfs_entry_from_vfs_inode (dir);
     if (parent == NULL) return -ENOENT;
-    err = devfs_do_symlink (parent, dentry->d_name.name, DEVFS_FL_NONE,
-			    symname, &de, NULL);
+    err = devfs_do_symlink (parent, dentry->d_name.name, symname, &de);
     DPRINTK (DEBUG_DISABLED, "(%s): errcode from <devfs_do_symlink>: %d\n",
 	     dentry->d_name.name, err);
     if (err < 0) return err;

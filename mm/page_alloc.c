@@ -804,6 +804,11 @@ static void show_node(struct zone *zone)
 DEFINE_PER_CPU(struct page_state, page_states) = {0};
 EXPORT_PER_CPU_SYMBOL(page_states);
 
+atomic_t nr_pagecache = ATOMIC_INIT(0);
+#ifdef CONFIG_SMP
+DEFINE_PER_CPU(long, nr_pagecache_local) = 0;
+#endif
+
 void __get_page_state(struct page_state *ret, int nr)
 {
 	int cpu = 0;
@@ -855,14 +860,6 @@ void get_zone_counts(unsigned long *active,
 		*inactive += zone->nr_inactive;
 		*free += zone->free_pages;
 	}
-}
-
-unsigned long get_page_cache_size(void)
-{
-	struct page_state ps;
-
-	get_page_state(&ps);
-	return ps.nr_pagecache;
 }
 
 void si_meminfo(struct sysinfo *val)
@@ -1434,7 +1431,6 @@ struct seq_operations fragmentation_op = {
 static char *vmstat_text[] = {
 	"nr_dirty",
 	"nr_writeback",
-	"nr_pagecache",
 	"nr_page_table_pages",
 	"nr_reverse_maps",
 	"nr_mapped",
