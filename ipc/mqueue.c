@@ -836,11 +836,11 @@ asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *u_msg_ptr,
 		goto out;
 
 	inode = filp->f_dentry->d_inode;
-	if (unlikely(inode->i_sb != mqueue_mnt->mnt_sb))
+	if (unlikely(filp->f_op != &mqueue_file_operations))
 		goto out_fput;
 	info = MQUEUE_I(inode);
 
-	if (unlikely((filp->f_flags & O_ACCMODE) == O_RDONLY))
+	if (unlikely(!(filp->f_mode & FMODE_WRITE)))
 		goto out_fput;
 
 	if (unlikely(msg_len > info->attr.mq_msgsize)) {
@@ -915,11 +915,11 @@ asmlinkage ssize_t sys_mq_timedreceive(mqd_t mqdes, char __user *u_msg_ptr,
 		goto out;
 
 	inode = filp->f_dentry->d_inode;
-	if (unlikely(inode->i_sb != mqueue_mnt->mnt_sb))
+	if (unlikely(filp->f_op != &mqueue_file_operations))
 		goto out_fput;
 	info = MQUEUE_I(inode);
 
-	if (unlikely((filp->f_flags & O_ACCMODE) == O_WRONLY))
+	if (unlikely(!(filp->f_mode & FMODE_READ)))
 		goto out_fput;
 
 	/* checks if buffer is big enough */
@@ -1008,7 +1008,7 @@ asmlinkage long sys_mq_notify(mqd_t mqdes,
 		goto out;
 
 	inode = filp->f_dentry->d_inode;
-	if (unlikely(inode->i_sb != mqueue_mnt->mnt_sb))
+	if (unlikely(filp->f_op != &mqueue_file_operations))
 		goto out_fput;
 	info = MQUEUE_I(inode);
 
@@ -1028,6 +1028,7 @@ asmlinkage long sys_mq_notify(mqd_t mqdes,
 		nfilp->f_vfsmnt = mntget(mqueue_mnt);
 		nfilp->f_dentry = dget(filp->f_dentry);
 		nfilp->f_mapping = filp->f_dentry->d_inode->i_mapping;
+		nfilp->f_flags = O_RDONLY;
 		nfilp->f_mode = FMODE_READ;
 	} else {
 		nfilp = NULL;
@@ -1092,7 +1093,7 @@ asmlinkage long sys_mq_getsetattr(mqd_t mqdes,
 		goto out;
 
 	inode = filp->f_dentry->d_inode;
-	if (unlikely(inode->i_sb != mqueue_mnt->mnt_sb))
+	if (unlikely(filp->f_op != &mqueue_file_operations))
 		goto out_fput;
 	info = MQUEUE_I(inode);
 
