@@ -249,17 +249,70 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
                       struct ethtool_eeprom *eeprom, uint16_t *eeprom_buff)
 {
 	struct e1000_hw *hw = &adapter->hw;
-	int i, max_len;
+	int i, max_len, first_word, last_word;
+
+	if(eeprom->len == 0) return;
 
 	eeprom->magic = hw->vendor_id | (hw->device_id << 16);
 
 	max_len = e1000_eeprom_size(hw);
 
-	if ((eeprom->offset + eeprom->len) > max_len)
+	if((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
-	for(i = 0; i < (max_len >> 1); i++)
-		e1000_read_eeprom(&adapter->hw, i, &eeprom_buff[i]);
+	first_word = eeprom->offset >> 1;
+	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
+
+	for(i = 0; i <= (last_word - first_word); i++)
+		e1000_read_eeprom(hw, first_word + i, &eeprom_buff[i]);
+}
+
+static int 
+e1000_ethtool_seeprom(struct e1000_adapter *adapter,
+                      struct ethtool_eeprom *eeprom, void *user_data)
+{
+	struct e1000_hw *hw = &adapter->hw;
+	uint16_t eeprom_buff[256];
+	int i, max_len, first_word, last_word;
+	void *ptr;
+
+	if(eeprom->magic != (hw->vendor_id | (hw->device_id << 16)))
+		return -EFAULT;
+
+	if(eeprom->len == 0) return 0;
+
+	max_len = e1000_eeprom_size(hw);
+
+	if((eeprom->offset + eeprom->len) > max_len)
+		eeprom->len = (max_len - eeprom->offset);
+
+	first_word = eeprom->offset >> 1;
+	last_word = (eeprom->offset + eeprom->len - 1) >> 1;
+	ptr = (void *)eeprom_buff;
+
+	if(eeprom->offset & 1) {
+		/* need read/modify/write of first changed EEPROM word */
+		/* only the second byte of the word is being modified */
+		e1000_read_eeprom(hw, first_word, &eeprom_buff[0]);
+		ptr++;
+	}
+	if((eeprom->offset + eeprom->len) & 1) {
+		/* need read/modify/write of last changed EEPROM word */
+		/* only the first byte of the word is being modified */
+		e1000_read_eeprom(hw, last_word,
+		                  &eeprom_buff[last_word - first_word]);
+	}
+	if(copy_from_user(ptr, user_data, eeprom->len))
+		return -EFAULT;
+
+	for(i = 0; i <= (last_word - first_word); i++)
+		e1000_write_eeprom(hw, first_word + i, eeprom_buff[i]);
+
+	/* Update the checksum over the first part of the EEPROM if needed */
+	if(first_word <= EEPROM_CHECKSUM_REG)
+		e1000_update_eeprom_checksum(hw);
+
+	return 0;
 }
 
 static void
@@ -339,7 +392,7 @@ e1000_ethtool_swol(struct e1000_adapter *adapter, struct ethtool_wolinfo *wol)
 	case E1000_DEV_ID_82545EM_COPPER:
 	case E1000_DEV_ID_82545EM_FIBER:
 	case E1000_DEV_ID_82546EB_COPPER:
-		if(wol->wolopts & WAKE_ARP)
+		if(wol->wolopts & (WAKE_ARP | WAKE_MAGICSECURE))
 			return -EOPNOTSUPP;
 
 		adapter->wol = 0;
@@ -496,6 +549,7 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 	case ETHTOOL_GEEPROM: {
 		struct ethtool_eeprom eeprom = {ETHTOOL_GEEPROM};
 		uint16_t eeprom_buff[256];
+		void *ptr;
 
 		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
 			return -EFAULT;
@@ -506,10 +560,23 @@ e1000_ethtool_ioctl(struct net_device *netdev, struct ifreq *ifr)
 			return -EFAULT;
 
 		addr += offsetof(struct ethtool_eeprom, data);
+		ptr = ((void *)eeprom_buff) + (eeprom.offset & 1);
 
-		if(copy_to_user(addr, eeprom_buff + eeprom.offset, eeprom.len))
+		if(copy_to_user(addr, ptr, eeprom.len))
 			return -EFAULT;
 		return 0;
+	}
+	case ETHTOOL_SEEPROM: {
+		struct ethtool_eeprom eeprom;
+
+		if(!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if(copy_from_user(&eeprom, addr, sizeof(eeprom)))
+			return -EFAULT;
+
+		addr += offsetof(struct ethtool_eeprom, data);
+		return e1000_ethtool_seeprom(adapter, &eeprom, addr);
 	}
 	default:
 		return -EOPNOTSUPP;

@@ -70,13 +70,35 @@
   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 *******************************************************************************/
-
 #define __E1000_MAIN__
 #include "e1000.h"
 
+/* Change Log
+ *
+ * 4.3.2       7/5/02
+ *   o Bug fix: perform controller reset using I/O rather than mmio because
+ *     some chipsets try to perform a 64-bit write, but the controller ignores
+ *     the upper 32-bit write once the reset is intiated by the lower 32-bit
+ *     write, causing a master abort.
+ *   o Bug fix: fixed jumbo frames sized from 1514 to 2048.
+ *   o ASF support: disable ARP when driver is loaded or resumed; enable when 
+ *     driver is removed or suspended.
+ *   o Bug fix: changed default setting for RxIntDelay to 0 for 82542/3/4
+ *     controllers to workaround h/w errata where controller will hang when
+ *     RxIntDelay <> 0 under certian network conditions.
+ *   o Clean up: removed unused and undocumented user-settable settings for
+ *     PHY.
+ *   o Bug fix: ethtool GEEPROM was using byte address rather than word
+ *     addressing.
+ *   o Feature: added support for ethtool SEEPROM.
+ *   o Feature: added support for entropy pool.
+ *
+ * 4.2.17      5/30/02
+ */
+
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.2.17-k1";
+char e1000_driver_version[] = "4.3.2-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -156,7 +178,6 @@ static void e1000_set_multi(struct net_device *netdev);
 static void e1000_update_phy_info(unsigned long data);
 static void e1000_watchdog(unsigned long data);
 static int e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev);
-static void e1000_tx_timeout(struct net_device *dev);
 static struct net_device_stats * e1000_get_stats(struct net_device *netdev);
 static int e1000_change_mtu(struct net_device *netdev, int new_mtu);
 static int e1000_set_mac(struct net_device *netdev, void *p);
@@ -173,6 +194,8 @@ static void e1000_leave_82542_rst(struct e1000_adapter *adapter);
 static inline void e1000_rx_checksum(struct e1000_adapter *adapter,
                                      struct e1000_rx_desc *rx_desc,
                                      struct sk_buff *skb);
+static void e1000_tx_timeout(struct net_device *dev);
+
 #ifdef NETIF_F_HW_VLAN_TX
 static void e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp);
 static void e1000_vlan_rx_add_vid(struct net_device *netdev, uint16_t vid);
@@ -260,7 +283,7 @@ e1000_up(struct e1000_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 
-	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ,
+	if(request_irq(netdev->irq, &e1000_intr, SA_SHIRQ | SA_SAMPLE_RANDOM,
 	               netdev->name, netdev))
 		return -1;
 
@@ -380,6 +403,15 @@ e1000_probe(struct pci_dev *pdev,
 	if(!adapter->hw.hw_addr)
 		goto err_ioremap;
 
+	for(i = BAR_1; i <= BAR_5; i++) {
+		if(pci_resource_len(pdev, i) == 0)
+			continue;
+		if(pci_resource_flags(pdev, i) & IORESOURCE_IO) {
+			adapter->hw.io_base = pci_resource_start(pdev, i);
+			break;
+		}
+	}
+
 	netdev->open = &e1000_open;
 	netdev->stop = &e1000_close;
 	netdev->hard_start_xmit = &e1000_xmit_frame;
@@ -397,7 +429,8 @@ e1000_probe(struct pci_dev *pdev,
 #endif
 
 	netdev->irq = pdev->irq;
-	netdev->base_addr = mmio_start;
+	netdev->mem_start = mmio_start;
+	netdev->base_addr = adapter->hw.io_base;
 
 	adapter->bd_number = cards_found;
 	adapter->id_string = e1000_strings[ent->driver_data];
@@ -509,7 +542,16 @@ e1000_remove(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-
+	uint32_t manc;
+	
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		if(manc & E1000_MANC_SMBUS_EN) {
+			manc |= E1000_MANC_ARP_EN;
+			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+		}
+	}
+		
 	unregister_netdev(netdev);
 
 	e1000_phy_hw_reset(&adapter->hw);
@@ -629,6 +671,13 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	hw->wait_autoneg_complete = FALSE;
 	hw->tbi_compatibility_en = TRUE;
 	hw->adaptive_ifs = TRUE;
+
+	/* Copper options */
+	
+	if(hw->media_type == e1000_media_type_copper) {
+		hw->mdix = AUTO_ALL_MODES;
+		hw->disable_polarity_correction = FALSE;
+	}
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->stats_lock);
@@ -1525,7 +1574,7 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 		return -EINVAL;
 	}
 
-	if(max_frame <= E1000_RXBUFFER_2048) {
+	if(max_frame <= MAXIMUM_ETHERNET_FRAME_SIZE) {
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(adapter->hw.mac_type < e1000_82543) {
@@ -2033,6 +2082,18 @@ e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 	pci_write_config_word(adapter->pdev, reg, *value);
 }
 
+uint32_t
+e1000_io_read(struct e1000_hw *hw, uint32_t port)
+{
+	return inl(port);
+}
+
+void
+e1000_io_write(struct e1000_hw *hw, uint32_t port, uint32_t value)
+{
+	outl(value, port);
+}
+
 #ifdef NETIF_F_HW_VLAN_TX
 static void
 e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
@@ -2133,7 +2194,7 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
-	uint32_t ctrl, ctrl_ext, rctl;
+	uint32_t ctrl, ctrl_ext, rctl, manc;
 
 	netif_device_detach(netdev);
 
@@ -2171,7 +2232,15 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 	}
 
 	pci_save_state(pdev, adapter->pci_state);
-	pci_set_power_state(pdev, 3);
+
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		if(manc & E1000_MANC_SMBUS_EN) {
+			manc |= E1000_MANC_ARP_EN;
+			E1000_WRITE_REG(&adapter->hw, MANC, manc);
+		}
+	} else
+		pci_set_power_state(pdev, 3);
 
 	return 0;
 }
@@ -2182,6 +2251,7 @@ e1000_resume(struct pci_dev *pdev)
 {
 	struct net_device *netdev = pci_get_drvdata(pdev);
 	struct e1000_adapter *adapter = netdev->priv;
+	uint32_t manc;
 
 	pci_set_power_state(pdev, 0);
 	pci_restore_state(pdev, adapter->pci_state);
@@ -2195,6 +2265,12 @@ e1000_resume(struct pci_dev *pdev)
 		e1000_up(adapter);
 
 	netif_device_attach(netdev);
+
+	if(adapter->hw.mac_type >= e1000_82540) {
+		manc = E1000_READ_REG(&adapter->hw, MANC);
+		manc &= ~(E1000_MANC_ARP_EN);
+		E1000_WRITE_REG(&adapter->hw, MANC, manc);
+	}
 
 	return 0;
 }
