@@ -23,6 +23,7 @@
 #undef  ISDN_DEBUG_NET_DUMP
 #undef  ISDN_DEBUG_NET_DIAL
 #undef  ISDN_DEBUG_NET_ICALL
+#undef  ISDN_DEBUG_STATCALLB
 
 #ifdef ISDN_DEBUG_NET_DIAL
 #define dbg_net_dial(arg...) printk(KERN_DEBUG arg)
@@ -34,6 +35,12 @@
 #define dbg_net_icall(arg...) printk(KERN_DEBUG arg)
 #else
 #define dbg_net_icall(arg...) do {} while (0)
+#endif
+
+#ifdef ISDN_DEBUG_STATCALLB
+#define dbg_statcallb(arg...) printk(KERN_DEBUG arg)
+#else
+#define dbg_statcallb(arg...) do {} while (0)
 #endif
 
 #define isdn_BUG() \

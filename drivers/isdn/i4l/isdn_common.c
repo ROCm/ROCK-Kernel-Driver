@@ -27,17 +27,9 @@
 #ifdef CONFIG_ISDN_AUDIO
 #include "isdn_audio.h"
 #endif
-#ifdef CONFIG_ISDN_DIVERSION_MODULE
-#define CONFIG_ISDN_DIVERSION
-#endif
-#ifdef CONFIG_ISDN_DIVERSION
 #include <linux/isdn_divertif.h>
-#endif /* CONFIG_ISDN_DIVERSION */
 #include "isdn_v110.h"
 #include <linux/devfs_fs_kernel.h>
-
-/* Debugflags */
-#undef ISDN_DEBUG_STATCALLB
 
 MODULE_DESCRIPTION("ISDN4Linux: link layer");
 MODULE_AUTHOR("Fritz Elfert");
@@ -76,9 +68,11 @@ static char *isdn_audio_revision = ": none $";
 #endif
 extern char *isdn_v110_revision;
 
-#ifdef CONFIG_ISDN_DIVERSION
+#if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 static isdn_divert_if *divert_if; /* = NULL */
-#endif /* CONFIG_ISDN_DIVERSION */
+#else
+#define divert_if (0)
+#endif
 
 
 static void set_global_features(void);
@@ -464,9 +458,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_ICALL:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "ICALL (net): %d %ld %s\n", di, c->arg, c->parm.num);
-#endif
+			dbg_statcallb("ICALL: %d %ld %s\n", di, c->arg, c->parm.num);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED) {
 				cmd.driver = di;
 				cmd.arg = c->arg;
@@ -484,12 +476,10 @@ isdn_status_callback(isdn_ctrl * c)
 					 * 3 on eventually match, if CID is longer.
 					 */
                                         if (c->command == ISDN_STAT_ICALL)
-					  if ((retval = isdn_tty_find_icall(di, c->arg, &c->parm.setup))) return(retval);
-#ifdef CONFIG_ISDN_DIVERSION 
+						if ((retval = isdn_tty_find_icall(di, c->arg, &c->parm.setup))) return(retval);
                                          if (divert_if)
-                 	                  if ((retval = divert_if->stat_callback(c))) 
-					    return(retval); /* processed */
-#endif /* CONFIG_ISDN_DIVERSION */                       
+						 if ((retval = divert_if->stat_callback(c))) 
+							 return(retval); /* processed */
 					if ((!retval) && (dev->drv[di]->flags & DRV_FLAG_REJBUS)) {
 						/* No tty responding */
 						cmd.driver = di;
@@ -533,17 +523,13 @@ isdn_status_callback(isdn_ctrl * c)
 					retval = 3;
 					break;
 			}
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "ICALL: ret=%d\n", retval);
-#endif
+			dbg_statcallb("ICALL: ret=%d\n", retval);
 			return retval;
 			break;
 		case ISDN_STAT_CINF:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "CINF: %ld %s\n", c->arg, c->parm.num);
-#endif
+			dbg_statcallb("CINF: %ld %s\n", c->arg, c->parm.num);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			if (strcmp(c->parm.num, "0"))
@@ -551,33 +537,23 @@ isdn_status_callback(isdn_ctrl * c)
 			isdn_tty_stat_callback(i, c);
 			break;
 		case ISDN_STAT_CAUSE:
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "CAUSE: %ld %s\n", c->arg, c->parm.num);
-#endif
+			dbg_statcallb("CAUSE: %ld %s\n", c->arg, c->parm.num);
 			printk(KERN_INFO "isdn: %s,ch%ld cause: %s\n",
 			       dev->drvid[di], c->arg, c->parm.num);
 			isdn_tty_stat_callback(i, c);
-#ifdef CONFIG_ISDN_DIVERSION
                         if (divert_if)
-                         divert_if->stat_callback(c); 
-#endif /* CONFIG_ISDN_DIVERSION */
+				divert_if->stat_callback(c); 
 			break;
 		case ISDN_STAT_DISPLAY:
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "DISPLAY: %ld %s\n", c->arg, c->parm.display);
-#endif
+			dbg_statcallb("DISPLAY: %ld %s\n", c->arg, c->parm.display);
 			isdn_tty_stat_callback(i, c);
-#ifdef CONFIG_ISDN_DIVERSION
                         if (divert_if)
-                         divert_if->stat_callback(c); 
-#endif /* CONFIG_ISDN_DIVERSION */
+				divert_if->stat_callback(c); 
 			break;
 		case ISDN_STAT_DCONN:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "DCONN: %ld\n", c->arg);
-#endif
+			dbg_statcallb("DCONN: %ld\n", c->arg);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			/* Find any net-device, waiting for D-channel setup */
@@ -596,9 +572,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_DHUP:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "DHUP: %ld\n", c->arg);
-#endif
+			dbg_statcallb("DHUP: %ld\n", c->arg);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
@@ -609,18 +583,13 @@ isdn_status_callback(isdn_ctrl * c)
 			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;
-#ifdef CONFIG_ISDN_DIVERSION
                         if (divert_if)
-                         divert_if->stat_callback(c); 
-#endif /* CONFIG_ISDN_DIVERSION */
-			break;
+				divert_if->stat_callback(c); 
 			break;
 		case ISDN_STAT_BCONN:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "BCONN: %ld\n", c->arg);
-#endif
+			dbg_statcallb("BCONN: %ld\n", c->arg);
 			/* Signal B-channel-connect to network-devices */
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
@@ -635,9 +604,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_BHUP:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "BHUP: %ld\n", c->arg);
-#endif
+			dbg_statcallb("BHUP: %ld\n", c->arg);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			dev->drv[di]->online &= ~(1 << (c->arg));
@@ -654,9 +621,7 @@ isdn_status_callback(isdn_ctrl * c)
 		case ISDN_STAT_NODCH:
 			if (i < 0)
 				return -1;
-#ifdef ISDN_DEBUG_STATCALLB
-			printk(KERN_DEBUG "NODCH: %ld\n", c->arg);
-#endif
+			dbg_statcallb("NODCH: %ld\n", c->arg);
 			if (dev->global_flags & ISDN_GLOBAL_STOPPED)
 				return 0;
 			if (isdn_net_stat_callback(i, c))
@@ -733,12 +698,10 @@ isdn_status_callback(isdn_ctrl * c)
 			isdn_tty_stat_callback(i, c);
 			break;
 #endif
-#ifdef CONFIG_ISDN_DIVERSION
 	        case ISDN_STAT_PROT:
 	        case ISDN_STAT_REDIR:
                         if (divert_if)
-                          return(divert_if->stat_callback(c));
-#endif /* CONFIG_ISDN_DIVERSION */
+				return(divert_if->stat_callback(c));
 		default:
 			return -1;
 	}
@@ -1987,7 +1950,7 @@ set_global_features(void)
 	}
 }
 
-#ifdef CONFIG_ISDN_DIVERSION
+#if defined(CONFIG_ISDN_DIVERSION) || defined(CONFIG_ISDN_DIVERSION_MODULE)
 
 static char *map_drvname(int di)
 {
@@ -2036,7 +1999,7 @@ int DIVERT_REG_NAME(isdn_divert_if *i_div)
 
 EXPORT_SYMBOL(DIVERT_REG_NAME);
 
-#endif /* CONFIG_ISDN_DIVERSION */
+#endif
 
 
 EXPORT_SYMBOL(register_isdn);
