@@ -945,6 +945,18 @@ static int scsi_prep_fn(struct request_queue *q, struct request *req)
 			cmd = req->special;
 	} else if (req->flags & (REQ_CMD | REQ_BLOCK_PC)) {
 		/*
+		 * Just check to see if the device is online.  If
+		 * it isn't, we refuse to process ordinary commands
+		 * (we will allow specials just in case someone needs
+		 * to send a command to an offline device without bringing
+		 * it back online)
+		 */
+		if(!sdev->online) {
+			printk(KERN_ERR "scsi%d (%d:%d): rejecting I/O to offline device\n",
+			       sdev->host->host_no, sdev->id, sdev->lun);
+			return BLKPREP_KILL;
+		}
+		/*
 		 * Now try and find a command block that we can use.
 		 */
 		if (!req->special) {
