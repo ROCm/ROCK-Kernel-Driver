@@ -77,7 +77,6 @@
 #include <linux/spinlock.h>
 
 #include <video/tdfx.h>
-#include <video/fbcon.h>
 
 #undef TDFXFB_DEBUG 
 #ifdef TDFXFB_DEBUG
@@ -143,10 +142,10 @@ static struct pci_device_id tdfxfb_id_table[] __devinitdata = {
 };
 
 static struct pci_driver tdfxfb_driver = {
-	.name =		"tdfxfb",
-	.id_table =	tdfxfb_id_table,
-	.probe =	tdfxfb_probe,
-	.remove =	__devexit_p(tdfxfb_remove),
+	.name		= "tdfxfb",
+	.id_table 	= tdfxfb_id_table,
+	.probe 		= tdfxfb_probe,
+	.remove 	= __devexit_p(tdfxfb_remove),
 };
 
 MODULE_DEVICE_TABLE(pci, tdfxfb_id_table);
@@ -162,16 +161,13 @@ static int tdfxfb_set_par(struct fb_info *info);
 static int tdfxfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue, 
 			    u_int transp, struct fb_info *info); 
 static int tdfxfb_blank(int blank, struct fb_info *info); 
-static int tdfxfb_pan_display(struct fb_var_screeninfo *var, int con, struct fb_info *info);
+static int tdfxfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
 static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect);
 static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area);  
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *image); 
 
 static struct fb_ops tdfxfb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_check_var	= tdfxfb_check_var,
 	.fb_set_par	= tdfxfb_set_par,
 	.fb_setcolreg	= tdfxfb_setcolreg,
@@ -180,20 +176,19 @@ static struct fb_ops tdfxfb_ops = {
 	.fb_fillrect	= tdfxfb_fillrect,
 	.fb_copyarea	= tdfxfb_copyarea,
 	.fb_imageblit	= tdfxfb_imageblit,
+	.fb_cursor	= soft_cursor,
 };
 
 /*
  * do_xxx: Hardware-specific functions
  */
 static u32 do_calc_pll(int freq, int *freq_out);
-static void  do_write_regs(struct banshee_reg *reg);
-static unsigned long do_lfb_size(unsigned short);
+static void  do_write_regs(struct tdfx_par *par, struct banshee_reg *reg);
+static unsigned long do_lfb_size(struct tdfx_par *par, unsigned short);
 
 /*
  * Driver data 
  */
-static struct tdfx_par default_par;
-
 static int  nopan   = 0;
 static int  nowrap  = 1;      // not implemented (yet)
 static int  inverse = 0;
@@ -204,132 +199,132 @@ static char *mode_option __initdata = NULL;
  * ------------------------------------------------------------------------- */
 
 #ifdef VGA_REG_IO 
-static inline  u8 vga_inb(u32 reg) { return inb(reg); }
-static inline u16 vga_inw(u32 reg) { return inw(reg); }
-static inline u16 vga_inl(u32 reg) { return inl(reg); }
+static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { return inb(reg); }
+static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { return inw(reg); }
+static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { return inl(reg); }
 
-static inline void vga_outb(u32 reg,  u8 val) { outb(val, reg); }
-static inline void vga_outw(u32 reg, u16 val) { outw(val, reg); }
-static inline void vga_outl(u32 reg, u32 val) { outl(val, reg); }
+static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { outb(val, reg); }
+static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { outw(val, reg); }
+static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { outl(val, reg); }
 #else
-static inline  u8 vga_inb(u32 reg) { 
-	return inb(default_par.iobase + reg - 0x300); 
+static inline  u8 vga_inb(struct tdfx_par *par, u32 reg) { 
+	return inb(par->iobase + reg - 0x300); 
 }
-static inline u16 vga_inw(u32 reg) { 
-	return inw(default_par.iobase + reg - 0x300); 
+static inline u16 vga_inw(struct tdfx_par *par, u32 reg) { 
+	return inw(par->iobase + reg - 0x300); 
 }
-static inline u16 vga_inl(u32 reg) { 
-	return inl(default_par.iobase + reg - 0x300); 
+static inline u16 vga_inl(struct tdfx_par *par, u32 reg) { 
+	return inl(par->iobase + reg - 0x300); 
 }
-static inline void vga_outb(u32 reg,  u8 val) { 
-	outb(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outb(struct tdfx_par *par, u32 reg,  u8 val) { 
+	outb(val, par->iobase + reg - 0x300); 
 }
-static inline void vga_outw(u32 reg, u16 val) { 
-	outw(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outw(struct tdfx_par *par, u32 reg, u16 val) { 
+	outw(val, par->iobase + reg - 0x300); 
 }
-static inline void vga_outl(u32 reg, u32 val) { 
-	outl(val, default_par.iobase + reg - 0x300); 
+static inline void vga_outl(struct tdfx_par *par, u32 reg, u32 val) { 
+	outl(val, par->iobase + reg - 0x300); 
 }
 #endif
 
-static inline void gra_outb(u32 idx, u8 val) {
-	vga_outb(GRA_I, idx); vga_outb(GRA_D, val);
+static inline void gra_outb(struct tdfx_par *par, u32 idx, u8 val) {
+	vga_outb(par, GRA_I, idx); vga_outb(par, GRA_D, val);
 }
 
-static inline u8 gra_inb(u32 idx) {
-	vga_outb(GRA_I, idx); return vga_inb(GRA_D);
+static inline u8 gra_inb(struct tdfx_par *par, u32 idx) {
+	vga_outb(par, GRA_I, idx); return vga_inb(par, GRA_D);
 }
 
-static inline void seq_outb(u32 idx, u8 val) {
-	vga_outb(SEQ_I, idx); vga_outb(SEQ_D, val);
+static inline void seq_outb(struct tdfx_par *par, u32 idx, u8 val) {
+	vga_outb(par, SEQ_I, idx); vga_outb(par, SEQ_D, val);
 }
 
-static inline u8 seq_inb(u32 idx) {
-	vga_outb(SEQ_I, idx); return vga_inb(SEQ_D);
+static inline u8 seq_inb(struct tdfx_par *par, u32 idx) {
+	vga_outb(par, SEQ_I, idx); return vga_inb(par, SEQ_D);
 }
 
-static inline void crt_outb(u32 idx, u8 val) {
-	vga_outb(CRT_I, idx); vga_outb(CRT_D, val);
+static inline void crt_outb(struct tdfx_par *par, u32 idx, u8 val) {
+	vga_outb(par, CRT_I, idx); vga_outb(par, CRT_D, val);
 }
 
-static inline u8 crt_inb(u32 idx) {
-	vga_outb(CRT_I, idx); return vga_inb(CRT_D);
+static inline u8 crt_inb(struct tdfx_par *par, u32 idx) {
+	vga_outb(par, CRT_I, idx); return vga_inb(par, CRT_D);
 }
 
-static inline void att_outb(u32 idx, u8 val) 
+static inline void att_outb(struct tdfx_par *par, u32 idx, u8 val) 
 {
 	unsigned char tmp;
 	
-	tmp = vga_inb(IS1_R);
-	vga_outb(ATT_IW, idx);
-	vga_outb(ATT_IW, val);
+	tmp = vga_inb(par, IS1_R);
+	vga_outb(par, ATT_IW, idx);
+	vga_outb(par, ATT_IW, val);
 }
 
-static inline u8 att_inb(u32 idx) 
+static inline u8 att_inb(struct tdfx_par *par, u32 idx) 
 {
 	unsigned char tmp;
 
-	tmp = vga_inb(IS1_R);
-	vga_outb(ATT_IW, idx);
-	return vga_inb(ATT_IW);
+	tmp = vga_inb(par, IS1_R);
+	vga_outb(par, ATT_IW, idx);
+	return vga_inb(par, ATT_IW);
 }
 
-static inline void vga_disable_video(void)
+static inline void vga_disable_video(struct tdfx_par *par)
 {
 	unsigned char s;
 
-	s = seq_inb(0x01) | 0x20;
-	seq_outb(0x00, 0x01);
-	seq_outb(0x01, s);
-	seq_outb(0x00, 0x03);
+	s = seq_inb(par, 0x01) | 0x20;
+	seq_outb(par, 0x00, 0x01);
+	seq_outb(par, 0x01, s);
+	seq_outb(par, 0x00, 0x03);
 }
 
-static inline void vga_enable_video(void)
+static inline void vga_enable_video(struct tdfx_par *par)
 {
 	unsigned char s;
 
-	s = seq_inb(0x01) & 0xdf;
-	seq_outb(0x00, 0x01);
-	seq_outb(0x01, s);
-	seq_outb(0x00, 0x03);
+	s = seq_inb(par, 0x01) & 0xdf;
+	seq_outb(par, 0x00, 0x01);
+	seq_outb(par, 0x01, s);
+	seq_outb(par, 0x00, 0x03);
 }
 
-static inline void vga_disable_palette(void)
+static inline void vga_disable_palette(struct tdfx_par *par)
 {
-	vga_inb(IS1_R);
-	vga_outb(ATT_IW, 0x00);
+	vga_inb(par, IS1_R);
+	vga_outb(par, ATT_IW, 0x00);
 }
 
-static inline void vga_enable_palette(void)
+static inline void vga_enable_palette(struct tdfx_par *par)
 {
-	vga_inb(IS1_R);
-	vga_outb(ATT_IW, 0x20);
+	vga_inb(par, IS1_R);
+	vga_outb(par, ATT_IW, 0x20);
 }
 
-static inline u32 tdfx_inl(unsigned int reg) 
+static inline u32 tdfx_inl(struct tdfx_par *par, unsigned int reg) 
 {
-	return readl(default_par.regbase_virt + reg);
+	return readl(par->regbase_virt + reg);
 }
 
-static inline void tdfx_outl(unsigned int reg, u32 val)
+static inline void tdfx_outl(struct tdfx_par *par, unsigned int reg, u32 val)
 {
-	writel(val, default_par.regbase_virt + reg);
+	writel(val, par->regbase_virt + reg);
 }
 
-static inline void banshee_make_room(int size)
+static inline void banshee_make_room(struct tdfx_par *par, int size)
 {
-	while((tdfx_inl(STATUS) & 0x1f) < size);
+	while((tdfx_inl(par, STATUS) & 0x1f) < size);
 }
  
-static inline void banshee_wait_idle(void)
+static inline void banshee_wait_idle(struct tdfx_par *par)
 {
 	int i = 0;
 
-	banshee_make_room(1);
-	tdfx_outl(COMMAND_3D, COMMAND_3D_NOP);
+	banshee_make_room(par, 1);
+	tdfx_outl(par, COMMAND_3D, COMMAND_3D_NOP);
 
 	while(1) {
-		i = (tdfx_inl(STATUS) & STATUS_BUSY) ? 0 : i + 1;
+		i = (tdfx_inl(par, STATUS) & STATUS_BUSY) ? 0 : i + 1;
 		if(i == 3) break;
 	}
 }
@@ -337,11 +332,11 @@ static inline void banshee_wait_idle(void)
 /*
  * Set the color of a palette entry in 8bpp mode 
  */
-static inline void do_setpalentry(unsigned regno, u32 c)
+static inline void do_setpalentry(struct tdfx_par *par, unsigned regno, u32 c)
 {  
-	banshee_make_room(2);
-	tdfx_outl(DACADDR, regno);
-	tdfx_outl(DACDATA, c);
+	banshee_make_room(par, 2);
+	tdfx_outl(par, DACADDR, regno);
+	tdfx_outl(par, DACDATA, c);
 }
 
 static u32 do_calc_pll(int freq, int* freq_out) 
@@ -373,71 +368,71 @@ static u32 do_calc_pll(int freq, int* freq_out)
 	return (n << 8) | (m << 2) | k;
 }
 
-static void do_write_regs(struct banshee_reg* reg) 
+static void do_write_regs(struct tdfx_par *par, struct banshee_reg* reg) 
 {
 	int i;
 
-	banshee_wait_idle();
+	banshee_wait_idle(par);
 
-	tdfx_outl(MISCINIT1, tdfx_inl(MISCINIT1) | 0x01);
+	tdfx_outl(par, MISCINIT1, tdfx_inl(par, MISCINIT1) | 0x01);
 
-	crt_outb(0x11, crt_inb(0x11) & 0x7f); /* CRT unprotect */
+	crt_outb(par, 0x11, crt_inb(par, 0x11) & 0x7f); /* CRT unprotect */
 
-	banshee_make_room(3);
-	tdfx_outl(VGAINIT1,	reg->vgainit1 &  0x001FFFFF);
-	tdfx_outl(VIDPROCCFG,	reg->vidcfg   & ~0x00000001);
+	banshee_make_room(par, 3);
+	tdfx_outl(par, VGAINIT1,	reg->vgainit1 &  0x001FFFFF);
+	tdfx_outl(par, VIDPROCCFG,	reg->vidcfg   & ~0x00000001);
 #if 0
-	tdfx_outl(PLLCTRL1, reg->mempll);
-	tdfx_outl(PLLCTRL2, reg->gfxpll);
+	tdfx_outl(par, PLLCTRL1, reg->mempll);
+	tdfx_outl(par, PLLCTRL2, reg->gfxpll);
 #endif
-	tdfx_outl(PLLCTRL0,	reg->vidpll);
+	tdfx_outl(par, PLLCTRL0,	reg->vidpll);
 
-	vga_outb(MISC_W, reg->misc[0x00] | 0x01);
+	vga_outb(par, MISC_W, reg->misc[0x00] | 0x01);
 
 	for (i = 0; i < 5; i++)
-		seq_outb(i, reg->seq[i]);
+		seq_outb(par, i, reg->seq[i]);
 
 	for (i = 0; i < 25; i++)
-		crt_outb(i, reg->crt[i]);
+		crt_outb(par, i, reg->crt[i]);
 
 	for (i = 0; i < 9; i++)
-		gra_outb(i, reg->gra[i]);
+		gra_outb(par, i, reg->gra[i]);
 
 	for (i = 0; i < 21; i++)
-		att_outb(i, reg->att[i]);
+		att_outb(par, i, reg->att[i]);
 
-	crt_outb(0x1a, reg->ext[0]);
-	crt_outb(0x1b, reg->ext[1]);
+	crt_outb(par, 0x1a, reg->ext[0]);
+	crt_outb(par, 0x1b, reg->ext[1]);
 
-	vga_enable_palette();
-	vga_enable_video();
+	vga_enable_palette(par);
+	vga_enable_video(par);
 
-	banshee_make_room(11);
-	tdfx_outl(VGAINIT0,      reg->vgainit0);
-	tdfx_outl(DACMODE,       reg->dacmode);
-	tdfx_outl(VIDDESKSTRIDE, reg->stride);
-	tdfx_outl(HWCURPATADDR,  0);
+	banshee_make_room(par, 11);
+	tdfx_outl(par, 	VGAINIT0,      reg->vgainit0);
+	tdfx_outl(par,	DACMODE,       reg->dacmode);
+	tdfx_outl(par,	VIDDESKSTRIDE, reg->stride);
+	tdfx_outl(par,	HWCURPATADDR,  0);
    
-	tdfx_outl(VIDSCREENSIZE,reg->screensize);
-	tdfx_outl(VIDDESKSTART,	reg->startaddr);
-	tdfx_outl(VIDPROCCFG,	reg->vidcfg);
-	tdfx_outl(VGAINIT1,	reg->vgainit1);  
-	tdfx_outl(MISCINIT0,	reg->miscinit0);	
+	tdfx_outl(par,	VIDSCREENSIZE,reg->screensize);
+	tdfx_outl(par,	VIDDESKSTART,	reg->startaddr);
+	tdfx_outl(par,	VIDPROCCFG,	reg->vidcfg);
+	tdfx_outl(par,	VGAINIT1,	reg->vgainit1);  
+	tdfx_outl(par,	MISCINIT0,	reg->miscinit0);	
 
-	banshee_make_room(8);
-	tdfx_outl(SRCBASE,         reg->srcbase);
-	tdfx_outl(DSTBASE,         reg->dstbase);
-	tdfx_outl(COMMANDEXTRA_2D, 0);
-	tdfx_outl(CLIP0MIN,        0);
-	tdfx_outl(CLIP0MAX,        0x0fff0fff);
-	tdfx_outl(CLIP1MIN,        0);
-	tdfx_outl(CLIP1MAX,        0x0fff0fff);
-	tdfx_outl(SRCXY,	   0);
+	banshee_make_room(par,	8);
+	tdfx_outl(par,	SRCBASE,         reg->srcbase);
+	tdfx_outl(par,	DSTBASE,         reg->dstbase);
+	tdfx_outl(par,	COMMANDEXTRA_2D, 0);
+	tdfx_outl(par,	CLIP0MIN,        0);
+	tdfx_outl(par,	CLIP0MAX,        0x0fff0fff);
+	tdfx_outl(par,	CLIP1MIN,        0);
+	tdfx_outl(par,	CLIP1MAX,        0x0fff0fff);
+	tdfx_outl(par,	SRCXY,	   0);
 
-	banshee_wait_idle();
+	banshee_wait_idle(par);
 }
 
-static unsigned long do_lfb_size(unsigned short dev_id) 
+static unsigned long do_lfb_size(struct tdfx_par *par, unsigned short dev_id) 
 {
 	u32 draminit0 = 0;
 	u32 draminit1 = 0;
@@ -445,8 +440,8 @@ static unsigned long do_lfb_size(unsigned short dev_id)
 	u32 lfbsize   = 0;
 	int sgram_p   = 0;
 
-	draminit0 = tdfx_inl(DRAMINIT0);  
-	draminit1 = tdfx_inl(DRAMINIT1);
+	draminit0 = tdfx_inl(par, DRAMINIT0);  
+	draminit1 = tdfx_inl(par, DRAMINIT1);
  
 	if ((dev_id == PCI_DEVICE_ID_3DFX_BANSHEE) ||
 	    (dev_id == PCI_DEVICE_ID_3DFX_VOODOO3)) {             	 
@@ -467,12 +462,12 @@ static unsigned long do_lfb_size(unsigned short dev_id)
 		lfbsize <<= 20;
 	}                 
 	/* disable block writes for SDRAM (why?) */
-	miscinit1 = tdfx_inl(MISCINIT1);
+	miscinit1 = tdfx_inl(par, MISCINIT1);
 	miscinit1 |= sgram_p ? 0 : MISCINIT1_2DBLOCK_DIS;
 	miscinit1 |= MISCINIT1_CLUT_INV;
 
-	banshee_make_room(1); 
-	tdfx_outl(MISCINIT1, miscinit1);
+	banshee_make_room(par, 1); 
+	tdfx_outl(par, MISCINIT1, miscinit1);
 	return lfbsize;
 }
 
@@ -710,7 +705,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 			VGAINIT0_WAKEUP_3C3   |
 			VGAINIT0_ALT_READBACK |
 			VGAINIT0_EXTSHIFTOUT;
-	reg.vgainit1 = tdfx_inl(VGAINIT1) & 0x1fffff;
+	reg.vgainit1 = tdfx_inl(par, VGAINIT1) & 0x1fffff;
 
 	reg.cursloc   = 0;
    
@@ -740,7 +735,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 
 	reg.screensize = info->var.xres | (info->var.yres << 12);
 	reg.vidcfg &= ~VIDCFG_HALF_MODE;
-	reg.miscinit0 = tdfx_inl(MISCINIT0);
+	reg.miscinit0 = tdfx_inl(par, MISCINIT0);
 
 #if defined(__BIG_ENDIAN)
 	switch (info->var.bits_per_pixel) {
@@ -759,7 +754,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 			break;
 	}
 #endif             
-	do_write_regs(&reg);
+	do_write_regs(par, &reg);
 
 	/* Now change fb_fix_screeninfo according to changes in par */
 	info->fix.line_length = info->var.xres * ((info->var.bits_per_pixel + 7)>>3);
@@ -773,6 +768,7 @@ static int tdfxfb_set_par(struct fb_info *info)
 static int tdfxfb_setcolreg(unsigned regno, unsigned red, unsigned green,  
 			    unsigned blue,unsigned transp,struct fb_info *info) 
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 rgbcol;
    
 	if (regno >= info->cmap.len) return 1;
@@ -782,7 +778,7 @@ static int tdfxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 			rgbcol =(((u32)red   & 0xff00) << 8) |
 				(((u32)green & 0xff00) << 0) |
 				(((u32)blue  & 0xff00) >> 8);
-			do_setpalentry(regno, rgbcol);
+			do_setpalentry(par, regno, rgbcol);
 			break;
 		/* Truecolor has no hardware color palettes. */
 		case FB_VISUAL_TRUECOLOR:
@@ -805,9 +801,10 @@ static int tdfxfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 /* 0 unblank, 1 blank, 2 no vsync, 3 no hsync, 4 off */
 static int tdfxfb_blank(int blank, struct fb_info *info)
 { 
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 dacmode, state = 0, vgablank = 0;
 
-	dacmode = tdfx_inl(DACMODE);
+	dacmode = tdfx_inl(par, DACMODE);
 
 	switch (blank) {
 		case 0: /* Screen: On; HSync: On, VSync: On */    
@@ -834,21 +831,22 @@ static int tdfxfb_blank(int blank, struct fb_info *info)
 
 	dacmode &= ~(BIT(1) | BIT(3));
 	dacmode |= state;
-	banshee_make_room(1); 
-	tdfx_outl(DACMODE, dacmode);
+	banshee_make_room(par, 1); 
+	tdfx_outl(par, DACMODE, dacmode);
 	if (vgablank) 
-		vga_disable_video();
+		vga_disable_video(par);
 	else
-		vga_enable_video();
+		vga_enable_video(par);
 	return 0;
 }
 
 /*   
  * Set the starting position of the visible screen to var->yoffset
  */   
-static int tdfxfb_pan_display(struct fb_var_screeninfo *var, int con,
+static int tdfxfb_pan_display(struct fb_var_screeninfo *var,
 			      struct fb_info *info) 
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 addr;  	
 
 	if (nopan || var->xoffset || (var->yoffset > var->yres_virtual))
@@ -857,8 +855,8 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo *var, int con,
 		return -EINVAL;
 
 	addr = var->yoffset * info->fix.line_length;
-	banshee_make_room(1);
-	tdfx_outl(VIDDESKSTART, addr);
+	banshee_make_room(par, 1);
+	tdfx_outl(par, VIDDESKSTART, addr);
    
 	info->var.xoffset = var->xoffset;
 	info->var.yoffset = var->yoffset; 
@@ -870,6 +868,7 @@ static int tdfxfb_pan_display(struct fb_var_screeninfo *var, int con,
  */
 static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect) 
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 bpp = info->var.bits_per_pixel;
 	u32 stride = info->fix.line_length;
 	u32 fmt= stride | ((bpp+((bpp==8) ? 0 : 8)) << 13); 
@@ -880,13 +879,13 @@ static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	else 			 
 		tdfx_rop = TDFX_ROP_XOR;
 
-	banshee_make_room(5);
-	tdfx_outl(DSTFORMAT, fmt);
-	tdfx_outl(COLORFORE, rect->color);
-	tdfx_outl(COMMAND_2D, COMMAND_2D_FILLRECT | (tdfx_rop << 24));
-	tdfx_outl(DSTSIZE,    rect->width | (rect->height << 16));
-	tdfx_outl(LAUNCH_2D,  rect->dx | (rect->dy << 16));
-	banshee_wait_idle();
+	banshee_make_room(par, 5);
+	tdfx_outl(par,	DSTFORMAT, fmt);
+	tdfx_outl(par,	COLORFORE, rect->color);
+	tdfx_outl(par,	COMMAND_2D, COMMAND_2D_FILLRECT | (tdfx_rop << 24));
+	tdfx_outl(par,	DSTSIZE,    rect->width | (rect->height << 16));
+	tdfx_outl(par,	LAUNCH_2D,  rect->dx | (rect->dy << 16));
+	banshee_wait_idle(par);
 }
 
 /*
@@ -894,6 +893,7 @@ static void tdfxfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
  */
 static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area)  
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	u32 bpp = info->var.bits_per_pixel;
 	u32 stride = info->fix.line_length;
 	u32 blitcmd = COMMAND_2D_S2S_BITBLT | (TDFX_ROP_COPY << 24);
@@ -912,19 +912,20 @@ static void tdfxfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 		area->dy += area->height - 1;
 	}
    
-	banshee_make_room(6);
+	banshee_make_room(par, 6);
 
-	tdfx_outl(SRCFORMAT, fmt);
-	tdfx_outl(DSTFORMAT, fmt);
-	tdfx_outl(COMMAND_2D, blitcmd); 
-	tdfx_outl(DSTSIZE,   area->width | (area->height << 16));
-	tdfx_outl(DSTXY,     area->dx | (area->dy << 16));
-	tdfx_outl(LAUNCH_2D, area->sx | (area->sy << 16)); 
-	banshee_wait_idle();
+	tdfx_outl(par,	SRCFORMAT, fmt);
+	tdfx_outl(par,	DSTFORMAT, fmt);
+	tdfx_outl(par,	COMMAND_2D, blitcmd); 
+	tdfx_outl(par,	DSTSIZE,   area->width | (area->height << 16));
+	tdfx_outl(par,	DSTXY,     area->dx | (area->dy << 16));
+	tdfx_outl(par,	LAUNCH_2D, area->sx | (area->sy << 16)); 
+	banshee_wait_idle(par);
 }
 
 static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap) 
 {
+	struct tdfx_par *par = (struct tdfx_par *) info->par;
 	int size = pixmap->height*((pixmap->width*pixmap->depth + 7)>>3);
 	int i, stride = info->fix.line_length;
 	u32 bpp = info->var.bits_per_pixel;
@@ -933,25 +934,25 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 	u32 srcfmt;
 
 	if (pixmap->depth == 1) {
-		banshee_make_room(8 + ((size + 3) >> 2));
-		tdfx_outl(COLORFORE, pixmap->fg_color);
-		tdfx_outl(COLORBACK, pixmap->bg_color);
+		banshee_make_room(par, 8 + ((size + 3) >> 2));
+		tdfx_outl(par, COLORFORE, pixmap->fg_color);
+		tdfx_outl(par, COLORBACK, pixmap->bg_color);
 		srcfmt = 0x400000;
 	} else {
-		banshee_make_room(6 + ((size + 3) >> 2));
+		banshee_make_room(par, 6 + ((size + 3) >> 2));
 		srcfmt = stride | ((bpp+((bpp==8) ? 0 : 8)) << 13) | 0x400000;
 	}	
 
-	tdfx_outl(SRCXY,     0);
-	tdfx_outl(DSTXY,     pixmap->dx | (pixmap->dy << 16));
-	tdfx_outl(COMMAND_2D, COMMAND_2D_H2S_BITBLT | (TDFX_ROP_COPY << 24));
-	tdfx_outl(SRCFORMAT, srcfmt);
-	tdfx_outl(DSTFORMAT, dstfmt);
-	tdfx_outl(DSTSIZE,   pixmap->width | (pixmap->height << 16));
+	tdfx_outl(par,	SRCXY,     0);
+	tdfx_outl(par,	DSTXY,     pixmap->dx | (pixmap->dy << 16));
+	tdfx_outl(par,	COMMAND_2D, COMMAND_2D_H2S_BITBLT | (TDFX_ROP_COPY << 24));
+	tdfx_outl(par,	SRCFORMAT, srcfmt);
+	tdfx_outl(par,	DSTFORMAT, dstfmt);
+	tdfx_outl(par,	DSTSIZE,   pixmap->width | (pixmap->height << 16));
 
 	/* Send four bytes at a time of data */	
 	for (i = (size >> 2) ; i > 0; i--) { 
-		tdfx_outl(LAUNCH_2D,*(u32*)chardata);
+		tdfx_outl(par,	LAUNCH_2D,*(u32*)chardata);
 		chardata += 4; 
 	}	
 
@@ -959,11 +960,11 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 	i = size%4;	
 	switch (i) {
 		case 0: break;
-		case 1:  tdfx_outl(LAUNCH_2D,*chardata); break;
-		case 2:  tdfx_outl(LAUNCH_2D,*(u16*)chardata); break;
-		case 3:  tdfx_outl(LAUNCH_2D,*(u16*)chardata | ((chardata[3]) << 24)); break;
+		case 1:  tdfx_outl(par,	LAUNCH_2D,*chardata); break;
+		case 2:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata); break;
+		case 3:  tdfx_outl(par,	LAUNCH_2D,*(u16*)chardata | ((chardata[3]) << 24)); break;
 	}
-	banshee_wait_idle();
+	banshee_wait_idle(par);
 }
 
 /**
@@ -978,6 +979,7 @@ static void tdfxfb_imageblit(struct fb_info *info, struct fb_image *pixmap)
 static int __devinit tdfxfb_probe(struct pci_dev *pdev,
                                   const struct pci_device_id *id)
 {
+	struct tdfx_par *default_par;
 	struct fb_info *info;
 	int size, err;
 
@@ -992,27 +994,29 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	if (!info)	return -ENOMEM;
 		
 	memset(info, 0, sizeof(info) + sizeof(struct display) + sizeof(u32) * 16);
-     
+    
+	default_par = kmalloc(sizeof(struct tdfx_par), GFP_KERNEL);
+ 
 	/* Configure the default fb_fix_screeninfo first */
 	switch (pdev->device) {
 		case PCI_DEVICE_ID_3DFX_BANSHEE:	
 			strcat(tdfx_fix.id, " Banshee");
-			default_par.max_pixclock = BANSHEE_MAX_PIXCLOCK;
+			default_par->max_pixclock = BANSHEE_MAX_PIXCLOCK;
 			break;
 		case PCI_DEVICE_ID_3DFX_VOODOO3:
 			strcat(tdfx_fix.id, " Voodoo3");
-			default_par.max_pixclock = VOODOO3_MAX_PIXCLOCK;
+			default_par->max_pixclock = VOODOO3_MAX_PIXCLOCK;
 			break;
 		case PCI_DEVICE_ID_3DFX_VOODOO5:
 			strcat(tdfx_fix.id, " Voodoo5");
-			default_par.max_pixclock = VOODOO5_MAX_PIXCLOCK;
+			default_par->max_pixclock = VOODOO5_MAX_PIXCLOCK;
 			break;
 	}
 
 	tdfx_fix.mmio_start = pci_resource_start(pdev, 0);
 	tdfx_fix.mmio_len = pci_resource_len(pdev, 0);
-	default_par.regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, tdfx_fix.mmio_len);
-	if (!default_par.regbase_virt) {
+	default_par->regbase_virt = ioremap_nocache(tdfx_fix.mmio_start, tdfx_fix.mmio_len);
+	if (!default_par->regbase_virt) {
 		printk("fb: Can't remap %s register area.\n", tdfx_fix.id);
 		goto out_err;
 	}
@@ -1024,7 +1028,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	} 
 
 	tdfx_fix.smem_start = pci_resource_start(pdev, 1);
-	if (!(tdfx_fix.smem_len = do_lfb_size(pdev->device))) {
+	if (!(tdfx_fix.smem_len = do_lfb_size(default_par, pdev->device))) {
 		printk("fb: Can't count %s memory.\n", tdfx_fix.id);
 		release_mem_region(pci_resource_start(pdev, 0),
 				   pci_resource_len(pdev, 0));
@@ -1050,7 +1054,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 		goto out_err;
 	}
 
-	default_par.iobase = pci_resource_start(pdev, 2);
+	default_par->iobase = pci_resource_start(pdev, 2);
     
 	if (!request_region(pci_resource_start(pdev, 2),
 	    pci_resource_len(pdev, 2), "tdfx iobase")) {
@@ -1073,16 +1077,9 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->node		= NODEV;
 	info->fbops		= &tdfxfb_ops;
 	info->fix		= tdfx_fix; 	
-	info->par		= &default_par;
-	info->disp		= (struct display *)(info + 1);	
-	info->pseudo_palette	= (void *)(info->disp + 1); 
+	info->par		= default_par;
+	info->pseudo_palette	= (void *)(info + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
-
-	/* The below feilds will go away !!!! */
-	strcpy(info->modename, info->fix.id);
-	info->currcon		= -1;
-	info->switch_con	= gen_switch;			 
-	info->updatevar		= gen_update_var;
 
 	if (!mode_option)
 		mode_option = "640x480@60";
@@ -1093,8 +1090,6 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 
 	size = (info->var.bits_per_pixel == 8) ? 256 : 16;
 	fb_alloc_cmap(&info->cmap, size, 0);  
-
-	gen_set_var(&info->var, -1, info);
 
 	if (register_framebuffer(info) < 0) {
 		printk("tdfxfb: can't register framebuffer\n");
@@ -1110,8 +1105,8 @@ out_err:
 	/*
 	 * Cleanup after anything that was remapped/allocated.
 	 */
-	if (default_par.regbase_virt)
-		iounmap(default_par.regbase_virt);
+	if (default_par->regbase_virt)
+		iounmap(default_par->regbase_virt);
 	if (info->screen_base)
 		iounmap(info->screen_base);
 	kfree(info);
@@ -1160,8 +1155,6 @@ static void __exit tdfxfb_exit(void)
 MODULE_AUTHOR("Hannu Mallat <hmallat@cc.hut.fi>");
 MODULE_DESCRIPTION("3Dfx framebuffer device driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(noaccel, "i");
-MODULE_PARM_DESC(noaccel, "Disable hardware acceleration (1 = disabled), enabled by default.");
  
 #ifdef MODULE
 module_init(tdfxfb_init);

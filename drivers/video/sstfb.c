@@ -1906,7 +1906,7 @@ static int __devinit sstfb_probe(struct pci_dev *pdev, const struct pci_device_i
 		goto fail;
 	}
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(sst_info->info.node),sst_info->info.modename);
+	       minor(sst_info->info.node),sst_info->info.modename);
 	return 0;
 
 fail:
