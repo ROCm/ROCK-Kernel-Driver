@@ -1873,7 +1873,7 @@ static int __init init_per_zone_pages_min(void)
 
 	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
 
-	min_free_kbytes = int_sqrt(lowmem_kbytes);
+	min_free_kbytes = int_sqrt(lowmem_kbytes) * 2;
 	if (min_free_kbytes < 128)
 		min_free_kbytes = 128;
 	if (min_free_kbytes > 16384)

@@ -492,9 +492,17 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 	LIST_HEAD(page_list);
 	struct pagevec pvec;
 	int ret = 0;
+	int orig_max_scan;
+	int can_writepage = 0;
 
 	pagevec_init(&pvec, 1);
-
+	/* we do two scans, one where we search for clean pages only, and 
+	 * one where we're allowed to write dirty pages.  So, cut max_scan
+	 * in half
+	 */
+	max_scan /= 2;
+	orig_max_scan = max_scan;
+retry:
 	lru_add_drain();
 	spin_lock_irq(&zone->lru_lock);
 	while (max_scan > 0) {
@@ -502,6 +510,7 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 		int nr_taken = 0;
 		int nr_scan = 0;
 		int nr_freed;
+		int write_deferred = 0;
 
 		while (nr_scan++ < SWAP_CLUSTER_MAX &&
 				!list_empty(&zone->inactive_list)) {
@@ -513,6 +522,16 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 			if (!TestClearPageLRU(page))
 				BUG();
 			list_del(&page->lru);
+			/* this could be done better, but I don't want
+			 * to take the page off its list without clearing
+			 * the PageLRU
+			 */
+			if (!can_writepage && PageDirty(page)) {
+				SetPageLRU(page);
+				list_add(&page->lru, &zone->inactive_list);
+				write_deferred++;
+				continue;
+			}
 			if (get_page_testzero(page)) {
 				/*
 				 * It is being freed elsewhere
@@ -529,10 +548,16 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 		zone->pages_scanned += nr_taken;
 		spin_unlock_irq(&zone->lru_lock);
 
-		if (nr_taken == 0)
-			goto done;
-
 		max_scan -= nr_scan;
+
+		if (nr_taken == 0) {
+			cond_resched();
+			if (write_deferred && !can_writepage) {
+				spin_lock_irq(&zone->lru_lock);
+				continue;
+			}
+			goto done;
+		}
 		if (current_is_kswapd())
 			mod_page_state_zone(zone, pgscan_kswapd, nr_scan);
 		else
@@ -547,6 +572,7 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
 		if (nr_freed <= 0 && list_empty(&page_list))
 			goto done;
 
+		cond_resched();
 		spin_lock_irq(&zone->lru_lock);
 		/*
 		 * Put back any unfreeable pages.
@@ -569,6 +595,11 @@ shrink_cache(struct zone *zone, unsigned int gfp_mask,
   	}
 	spin_unlock_irq(&zone->lru_lock);
 done:
+	if (!can_writepage) {
+		can_writepage = 1;
+		max_scan = orig_max_scan;
+		goto retry;
+	}
 	pagevec_release(&pvec);
 	return ret;
 }

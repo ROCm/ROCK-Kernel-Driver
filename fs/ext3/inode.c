@@ -1359,6 +1359,12 @@ static int ext3_ordered_writepage(struct page *page,
 
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
+		/* an ENOMEM failure isn't horribly surprising, we're
+		 * doing GFP_NOFS allocations here.  Just redirty the
+		 * page and try again later
+		 */
+		if (ret == -ENOMEM)
+			ret = 0;
 		goto out_fail;
 	}
 
@@ -1419,6 +1425,12 @@ static int ext3_writeback_writepage(struct page *page,
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
+		/* an ENOMEM failure isn't horribly surprising, we're
+		 * doing GFP_NOFS allocations here.  Just redirty the
+		 * page and try again later
+		 */
+		if (ret == -ENOMEM)
+			ret = 0;
 		goto out_fail;
 	}
 
@@ -1448,6 +1460,12 @@ static int ext3_journalled_writepage(struct page *page,
 	handle = ext3_journal_start(inode, ext3_writepage_trans_blocks(inode));
 	if (IS_ERR(handle)) {
 		ret = PTR_ERR(handle);
+		/* an ENOMEM failure isn't horribly surprising, we're
+		 * doing GFP_NOFS allocations here.  Just redirty the
+		 * page and try again later
+		 */
+		if (ret == -ENOMEM)
+			ret = 0;
 		goto no_write;
 	}
 
