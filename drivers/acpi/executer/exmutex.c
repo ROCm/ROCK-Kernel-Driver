@@ -176,15 +176,18 @@ acpi_ex_acquire_mutex (
 	/*
 	 * Support for multiple acquires by the owning thread
 	 */
+	if (obj_desc->mutex.owner_thread) {
+		/* Special case for Global Lock, allow all threads */
 
-	if ((obj_desc->mutex.owner_thread) &&
-		(obj_desc->mutex.owner_thread->thread_id == walk_state->thread->thread_id)) {
-		/*
-		 * The mutex is already owned by this thread,
-		 * just increment the acquisition depth
-		 */
-		obj_desc->mutex.acquisition_depth++;
-		return_ACPI_STATUS (AE_OK);
+		if ((obj_desc->mutex.owner_thread->thread_id == walk_state->thread->thread_id) ||
+			(obj_desc->mutex.semaphore == acpi_gbl_global_lock_semaphore)) {
+			/*
+			 * The mutex is already owned by this thread,
+			 * just increment the acquisition depth
+			 */
+			obj_desc->mutex.acquisition_depth++;
+			return_ACPI_STATUS (AE_OK);
+		}
 	}
 
 	/* Acquire the mutex, wait if necessary */
@@ -254,9 +257,12 @@ acpi_ex_release_mutex (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	/* The Mutex is owned, but this thread must be the owner */
-
-	if (obj_desc->mutex.owner_thread->thread_id != walk_state->thread->thread_id) {
+	/*
+	 * The Mutex is owned, but this thread must be the owner.
+	 * Special case for Global Lock, any thread can release
+	 */
+	if ((obj_desc->mutex.owner_thread->thread_id != walk_state->thread->thread_id) &&
+		(obj_desc->mutex.semaphore != acpi_gbl_global_lock_semaphore)) {
 		ACPI_REPORT_ERROR ((
 			"Thread %X cannot release Mutex [%4.4s] acquired by thread %X\n",
 			walk_state->thread->thread_id,
