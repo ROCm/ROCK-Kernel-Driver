@@ -2491,7 +2491,9 @@ asmlinkage void __sched schedule(void)
 	 */
 	if (likely(!(current->state & (TASK_DEAD | TASK_ZOMBIE)))) {
 		if (unlikely(in_atomic())) {
-			printk(KERN_ERR "bad: scheduling while atomic!\n");
+			printk(KERN_ERR "scheduling while atomic: "
+				"%s/0x%08x/%d\n",
+				current->comm, preempt_count(), current->pid);
 			dump_stack();
 		}
 	}
