@@ -35,7 +35,7 @@ DOCUMENTATION:
 
  - There are various README files in the Documentation/ subdirectory:
    these typically contain kernel-specific installation notes for some 
-   drivers for example. See ./Documentation/00-INDEX for a list of what
+   drivers for example. See Documentation/00-INDEX for a list of what
    is contained in each file.  Please read the Changes file, as it
    contains information about the problems, which may result by upgrading
    your kernel.
@@ -98,7 +98,7 @@ SOFTWARE REQUIREMENTS
 
    Compiling and running the 2.6.xx kernels requires up-to-date
    versions of various software packages.  Consult
-   ./Documentation/Changes for the minimum version numbers required
+   Documentation/Changes for the minimum version numbers required
    and how to get updates for these packages.  Beware that using
    excessively old versions of these packages can cause indirect
    errors that are very difficult to track down, so don't assume that
@@ -168,7 +168,7 @@ COMPILING the kernel:
    gcc 2.91.66 (egcs-1.1.2), and gcc 2.7.2.3 are known to miscompile
    some parts of the kernel, and are *no longer supported*.
    Also remember to upgrade your binutils package (for as/ld/nm and company)
-   if necessary. For more information, refer to ./Documentation/Changes.
+   if necessary. For more information, refer to Documentation/Changes.
 
    Please note that you can still run a.out user programs with this kernel.
 

@@ -118,13 +118,6 @@ config PMAC_BACKLIGHT
 	  events; also, the PowerBook button device will be enabled so you can
 	  change the screen brightness.
 
-config MAC_FLOPPY
-	bool "Support for PowerMac floppy"
-	depends on PPC_PMAC && !PPC_PMAC64
-	help
-	  If you have a SWIM-3 (Super Woz Integrated Machine 3; from Apple)
-	  floppy controller, say Y here. Most commonly found in PowerMacs.
-
 config MAC_SERIAL
 	tristate "Support for PowerMac serial ports (OBSOLETE DRIVER)"
 	depends on PPC_PMAC && BROKEN
@@ -191,7 +184,7 @@ config THERM_PM72
 	  G5 machines. 
 
 config ANSLCD
-	bool "Support for ANS LCD display"
+	tristate "Support for ANS LCD display"
 	depends on ADB_CUDA && PPC_PMAC
 
 endmenu

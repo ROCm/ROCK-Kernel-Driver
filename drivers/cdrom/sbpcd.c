@@ -5715,7 +5715,7 @@ int __init sbpcd_init(void)
 	
 	if (port_index>0)
           {
-            msg(DBG_INF, "You should read linux/Documentation/cdrom/sbpcd\n");
+            msg(DBG_INF, "You should read Documentation/cdrom/sbpcd\n");
             msg(DBG_INF, "and then configure sbpcd.h for your hardware.\n");
           }
 	check_datarate();

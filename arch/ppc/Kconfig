@@ -191,7 +191,7 @@ config CPU_FREQ
 	  fly. This is a nice method to save battery power on notebooks,
 	  because the lower the clock speed, the less power the CPU consumes.
 
-	  For more information, take a look at linux/Documentation/cpu-freq or
+	  For more information, take a look at <file:Documentation/cpu-freq> or
 	  at <http://www.brodo.de/cpufreq/>
 
 	  If in doubt, say N.
@@ -650,7 +650,7 @@ config 8272
 
 config CPM2
 	bool
-	depends on 8260
+	depends on 8260 || MPC8560
 	default y
 	help
 	  The CPM2 (Communications Processor Module) is a coprocessor on

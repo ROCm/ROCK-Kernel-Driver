@@ -200,6 +200,7 @@ exception_marker:
 #define EX_R13		32
 #define EX_SRR0		40
 #define EX_DAR		48
+#define EX_LR		48	/* SLB miss saves LR, but not DAR */
 #define EX_DSISR	56
 #define EX_CCR		60
 
@@ -433,18 +434,52 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	.globl DataAccessSLB_Pseries
 DataAccessSLB_Pseries:
 	mtspr	SPRG1,r13
-	mtspr	SPRG2,r12
-	mfspr	r13,DAR
-	mfcr	r12
-	srdi	r13,r13,60
-	cmpdi	r13,0xc
-	beq	.do_slb_bolted_Pseries
-	mtcrf	0x80,r12
-	mfspr	r12,SPRG2
-	EXCEPTION_PROLOG_PSERIES(PACA_EXGEN, DataAccessSLB_common)
+	mfspr	r13,SPRG3		/* get paca address into r13 */
+	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
+	std	r10,PACA_EXSLB+EX_R10(r13)
+	std	r11,PACA_EXSLB+EX_R11(r13)
+	std	r12,PACA_EXSLB+EX_R12(r13)
+	std	r3,PACASLBR3(r13)
+	mfspr	r9,SPRG1
+	std	r9,PACA_EXSLB+EX_R13(r13)
+	mfcr	r9
+	clrrdi	r12,r13,32		/* get high part of &label */
+	mfmsr	r10
+	mfspr	r11,SRR0		/* save SRR0 */
+	ori	r12,r12,(.do_slb_miss)@l
+	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
+	mtspr	SRR0,r12
+	mfspr	r12,SRR1		/* and SRR1 */
+	mtspr	SRR1,r10
+	mfspr	r3,DAR
+	rfid
 
 	STD_EXCEPTION_PSERIES(0x400, InstructionAccess)
-	STD_EXCEPTION_PSERIES(0x480, InstructionAccessSLB)
+
+	. = 0x480
+	.globl InstructionAccessSLB_Pseries
+InstructionAccessSLB_Pseries:
+	mtspr	SPRG1,r13
+	mfspr	r13,SPRG3		/* get paca address into r13 */
+	std	r9,PACA_EXSLB+EX_R9(r13)	/* save r9 - r12 */
+	std	r10,PACA_EXSLB+EX_R10(r13)
+	std	r11,PACA_EXSLB+EX_R11(r13)
+	std	r12,PACA_EXSLB+EX_R12(r13)
+	std	r3,PACASLBR3(r13)
+	mfspr	r9,SPRG1
+	std	r9,PACA_EXSLB+EX_R13(r13)
+	mfcr	r9
+	clrrdi	r12,r13,32		/* get high part of &label */
+	mfmsr	r10
+	mfspr	r11,SRR0		/* save SRR0 */
+	ori	r12,r12,(.do_slb_miss)@l
+	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
+	mtspr	SRR0,r12
+	mfspr	r12,SRR1		/* and SRR1 */
+	mtspr	SRR1,r10
+	mr	r3,r11			/* SRR0 is faulting address */
+	rfid
+
 	STD_EXCEPTION_PSERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_PSERIES(0x600, Alignment)
 	STD_EXCEPTION_PSERIES(0x700, ProgramCheck)
@@ -493,11 +528,6 @@ _GLOBAL(do_stab_bolted_Pseries)
 	mtcrf	0x80,r12
 	mfspr	r12,SPRG2
 	EXCEPTION_PROLOG_PSERIES(PACA_EXSLB, .do_stab_bolted)
-
-_GLOBAL(do_slb_bolted_Pseries)
-	mtcrf	0x80,r12
-	mfspr	r12,SPRG2
-	EXCEPTION_PROLOG_PSERIES(PACA_EXSLB, .do_slb_bolted)
 
 	
 	/* Space for the naca.  Architected to be located at real address
@@ -587,27 +617,25 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	.globl	DataAccessSLB_Iseries
 DataAccessSLB_Iseries:
 	mtspr	SPRG1,r13		/* save r13 */
-	mtspr	SPRG2,r12
-	mfspr	r13,DAR
-	mfcr	r12
-	srdi	r13,r13,60
-	cmpdi	r13,0xc
-	beq	.do_slb_bolted_Iseries
-	mtcrf	0x80,r12
-	mfspr	r12,SPRG2
-	EXCEPTION_PROLOG_ISERIES_1(PACA_EXGEN)
-	EXCEPTION_PROLOG_ISERIES_2
-	b	DataAccessSLB_common
-
-.do_slb_bolted_Iseries:
-	mtcrf	0x80,r12
-	mfspr	r12,SPRG2
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
-	EXCEPTION_PROLOG_ISERIES_2
-	b	.do_slb_bolted
+	std	r3,PACASLBR3(r13)
+	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	ld	r12,PACALPPACA+LPPACASRR1(r13)
+	mfspr	r3,DAR
+	b	.do_slb_miss
 
 	STD_EXCEPTION_ISERIES(0x400, InstructionAccess, PACA_EXGEN)
-	STD_EXCEPTION_ISERIES(0x480, InstructionAccessSLB, PACA_EXGEN)
+
+	.globl	InstructionAccessSLB_Iseries
+InstructionAccessSLB_Iseries:
+	mtspr	SPRG1,r13		/* save r13 */
+	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
+	std	r3,PACASLBR3(r13)
+	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	ld	r12,PACALPPACA+LPPACASRR1(r13)
+	mr	r3,r11
+	b	.do_slb_miss
+
 	MASKABLE_EXCEPTION_ISERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_ISERIES(0x600, Alignment, PACA_EXGEN)
 	STD_EXCEPTION_ISERIES(0x700, ProgramCheck, PACA_EXGEN)
@@ -865,21 +893,6 @@ DataAccess_common:
 	b	.do_hash_page	 	/* Try to handle as hpte fault */
 
 	.align	7
-	.globl DataAccessSLB_common
-DataAccessSLB_common:
-	mfspr	r10,DAR
-	std	r10,PACA_EXGEN+EX_DAR(r13)
-	EXCEPTION_PROLOG_COMMON(0x380, PACA_EXGEN)
-	ld	r3,PACA_EXGEN+EX_DAR(r13)
-	std	r3,_DAR(r1)
-	bl	.slb_allocate
-	cmpdi	r3,0			/* Check return code */
-	beq	fast_exception_return	/* Return if we succeeded */
-	li	r5,0
-	std	r5,_DSISR(r1)
-	b	.handle_page_fault
-
-	.align	7
 	.globl InstructionAccess_common
 InstructionAccess_common:
 	EXCEPTION_PROLOG_COMMON(0x400, PACA_EXGEN)
@@ -887,21 +900,6 @@ InstructionAccess_common:
 	andis.	r4,r12,0x5820
 	li	r5,0x400
 	b	.do_hash_page		/* Try to handle as hpte fault */
-
-	.align	7
-	.globl InstructionAccessSLB_common
-InstructionAccessSLB_common:
-	EXCEPTION_PROLOG_COMMON(0x480, PACA_EXGEN)
-	ld	r3,_NIP(r1)		/* SRR0 = NIA	*/
-	bl	.slb_allocate
-	or.	r3,r3,r3		/* Check return code */
-	beq+	fast_exception_return	/* Return if we succeeded */
-
-	ld	r4,_NIP(r1)
-	li	r5,0
-	std	r4,_DAR(r1)
-	std	r5,_DSISR(r1)
-	b      .handle_page_fault
 
 	.align	7
 	.globl HardwareInterrupt_common
@@ -1152,130 +1150,37 @@ _GLOBAL(do_stab_bolted)
 /*
  * r13 points to the PACA, r9 contains the saved CR,
  * r11 and r12 contain the saved SRR0 and SRR1.
+ * r3 has the faulting address
  * r9 - r13 are saved in paca->exslb.
+ * r3 is saved in paca->slb_r3
  * We assume we aren't going to take any exceptions during this procedure.
  */
-/* XXX note fix masking in get_kernel_vsid to match */
-_GLOBAL(do_slb_bolted)
+_GLOBAL(do_slb_miss)
+	mflr	r10
+
 	stw	r9,PACA_EXSLB+EX_CCR(r13)	/* save CR in exc. frame */
 	std	r11,PACA_EXSLB+EX_SRR0(r13)	/* save SRR0 in exc. frame */
+	std	r10,PACA_EXSLB+EX_LR(r13)	/* save LR */
 
-	/*
-	 * We take the next entry, round robin. Previously we tried
-	 * to find a free slot first but that took too long. Unfortunately
-	 * we dont have any LRU information to help us choose a slot.
-	 */
-
-	/* r13 = paca */
-1:	ld	r10,PACASTABRR(r13)
-	addi	r9,r10,1
-	cmpdi	r9,SLB_NUM_ENTRIES
-	blt+	2f
-	li	r9,2			/* dont touch slot 0 or 1 */
-2:	std	r9,PACASTABRR(r13)
-
-	/* r13 = paca, r10 = entry */
-
-	/* 
-	 * Never cast out the segment for our kernel stack. Since we
-	 * dont invalidate the ERAT we could have a valid translation
-	 * for the kernel stack during the first part of exception exit 
-	 * which gets invalidated due to a tlbie from another cpu at a
-	 * non recoverable point (after setting srr0/1) - Anton
-	 */
-	slbmfee	r9,r10
-	srdi	r9,r9,27
-	/*
-	 * Use paca->ksave as the value of the kernel stack pointer,
-	 * because this is valid at all times.
-	 * The >> 27 (rather than >> 28) is so that the LSB is the
-	 * valid bit - this way we check valid and ESID in one compare.
-	 * In order to completely close the tiny race in the context
-	 * switch (between updating r1 and updating paca->ksave),
-	 * we check against both r1 and paca->ksave.
-	 */
-	srdi	r11,r1,27
-	ori	r11,r11,1
-	cmpd	r11,r9
-	beq-	1b
-	ld	r11,PACAKSAVE(r13)
-	srdi	r11,r11,27
- 	ori	r11,r11,1
- 	cmpd	r11,r9
- 	beq-	1b
-
-	/* r13 = paca, r10 = entry */
-
-	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
-	mfspr	r9,DAR
-	rldicl	r11,r9,36,51
-	sldi	r11,r11,15
-	srdi	r9,r9,60
-	or	r11,r11,r9
-
-	/* VSID_RANDOMIZER */
-	li	r9,9
-	sldi	r9,r9,32
-	oris	r9,r9,58231
-	ori	r9,r9,39831
-
-	/* vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK */
-	mulld	r11,r11,r9
-	clrldi	r11,r11,28
-
-	/* r13 = paca, r10 = entry, r11 = vsid */
-
-	/* Put together slb word1 */
-	sldi	r11,r11,12
-
-BEGIN_FTR_SECTION
-	/* set kp and c bits */
-	ori	r11,r11,0x480
-END_FTR_SECTION_IFCLR(CPU_FTR_16M_PAGE)
-BEGIN_FTR_SECTION
-	/* set kp, l and c bits */
-	ori	r11,r11,0x580
-END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
-
-	/* r13 = paca, r10 = entry, r11 = slb word1 */
-
-	/* Put together slb word0 */
-	mfspr	r9,DAR
-	clrrdi	r9,r9,28	/* get the new esid */
-	oris	r9,r9,0x800	/* set valid bit */
-	rldimi	r9,r10,0,52	/* insert entry */
-
-	/* r13 = paca, r9 = slb word0, r11 = slb word1 */
-
-	/* 
-	 * No need for an isync before or after this slbmte. The exception
-	 * we enter with and the rfid we exit with are context synchronizing .
-	 */
-	slbmte	r11,r9
+	bl	.slb_allocate			/* handle it */
 
 	/* All done -- return from exception. */
+
+	ld	r10,PACA_EXSLB+EX_LR(r13)
+	ld	r3,PACASLBR3(r13)
 	lwz	r9,PACA_EXSLB+EX_CCR(r13)	/* get saved CR */
 	ld	r11,PACA_EXSLB+EX_SRR0(r13)	/* get saved SRR0 */
+
+	mtlr	r10
 
 	andi.	r10,r12,MSR_RI	/* check for unrecoverable exception */
 	beq-	unrecov_slb
 
-	/*
-	 * Until everyone updates binutils hardwire the POWER4 optimised
-	 * single field mtcrf
-	 */
-#if 0
-	.machine	push
-	.machine	"power4"
+.machine	push
+.machine	"power4"
 	mtcrf	0x80,r9
-	.machine	pop
-#else
-	.long 0x7d380120
-#endif
-
-	mfmsr	r10
-	clrrdi	r10,r10,2
-	mtmsrd	r10,1
+	mtcrf	0x01,r9		/* slb_allocate uses cr0 and cr7 */
+.machine	pop
 
 	mtspr	SRR0,r11
 	mtspr	SRR1,r12

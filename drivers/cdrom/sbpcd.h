@@ -5,7 +5,7 @@
 /*
  * Attention! This file contains user-serviceable parts!
  * I recommend to make use of it...
- * If you feel helpless, look into linux/Documentation/cdrom/sbpcd
+ * If you feel helpless, look into Documentation/cdrom/sbpcd
  * (good idea anyway, at least before mailing me).
  *
  * The definitions for the first controller can get overridden by

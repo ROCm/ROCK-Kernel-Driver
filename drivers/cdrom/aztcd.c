@@ -129,7 +129,7 @@
                 Werner Zimmermann, August 8, 1995
         V1.70   Multisession support now is completed, but there is still not 
                 enough testing done. If you can test it, please contact me. For
-                details please read /usr/src/linux/Documentation/cdrom/aztcd
+                details please read Documentation/cdrom/aztcd
                 Werner Zimmermann, August 19, 1995
         V1.80   Modification to suit the new kernel boot procedure introduced
                 with kernel 1.3.33. Will definitely not work with older kernels.

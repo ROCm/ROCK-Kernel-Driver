@@ -71,7 +71,7 @@ print_item (WINDOW * win, const char *item, int choice, int selected, int hotkey
 
     strncpy(menu_item, item, menu_width);
     menu_item[menu_width] = 0;
-    j = first_alpha(menu_item, "YyNnMm");
+    j = first_alpha(menu_item, "YyNnMmHh");
 
     /* Clear 'residue' of last item */
     wattrset (win, menubox_attr);
@@ -279,17 +279,17 @@ dialog_menu (const char *title, const char *prompt, int height, int width,
 
 	if (key < 256 && isalpha(key)) key = tolower(key);
 
-	if (strchr("ynm", key))
+	if (strchr("ynmh", key))
 		i = max_choice;
 	else {
         for (i = choice+1; i < max_choice; i++) {
-		j = first_alpha(items[(scroll+i)*2+1], "YyNnMm");
+		j = first_alpha(items[(scroll+i)*2+1], "YyNnMmHh");
 		if (key == tolower(items[(scroll+i)*2+1][j]))
                 	break;
 	}
 	if (i == max_choice)
        		for (i = 0; i < max_choice; i++) {
-			j = first_alpha(items[(scroll+i)*2+1], "YyNnMm");
+			j = first_alpha(items[(scroll+i)*2+1], "YyNnMmHh");
 			if (key == tolower(items[(scroll+i)*2+1][j]))
                 		break;
 		}
