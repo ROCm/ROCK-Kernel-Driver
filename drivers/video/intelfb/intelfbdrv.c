@@ -1108,7 +1108,6 @@ intelfb_set_fbinfo(struct intelfb_info *dinfo)
 
 	DBG_MSG("intelfb_set_fbinfo\n");
 
-	//info->currcon = -1;
 	info->flags = FBINFO_FLAG_DEFAULT;
 	info->fbops = &intel_fb_ops;
 	info->pseudo_palette = dinfo->pseudo_palette;

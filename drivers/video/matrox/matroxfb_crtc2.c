@@ -605,7 +605,6 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	m2info->fbcon.flags = FBINFO_FLAG_DEFAULT;
 	m2info->fbcon.flags |= FBINFO_HWACCEL_XPAN |
 			       FBINFO_HWACCEL_YPAN;
-	m2info->fbcon.currcon = -1;
 	m2info->fbcon.pseudo_palette = m2info->cmap;
 	fb_alloc_cmap(&m2info->fbcon.cmap, 256, 1);
 
@@ -634,9 +633,7 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 	if (register_framebuffer(&m2info->fbcon)) {
 		return -ENXIO;
 	}
-	if (m2info->fbcon.currcon < 0) {
-		fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
-	}
+	fb_set_var(&m2info->fbcon, &matroxfb_dh_defined);
 	down_write(&ACCESS_FBINFO(crtc2.lock));
 	oldcrtc2 = ACCESS_FBINFO(crtc2.info);
 	ACCESS_FBINFO(crtc2.info) = m2info;

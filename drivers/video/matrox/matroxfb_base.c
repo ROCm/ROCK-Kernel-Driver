@@ -1712,7 +1712,6 @@ static int initMatrox2(WPMINFO struct board* b){
 	}
 	ACCESS_FBINFO(devflags.ydstorg) = 0;
 
-	ACCESS_FBINFO(fbcon.currcon) = -1;
 	ACCESS_FBINFO(video.base) = video_base_phys;
 	ACCESS_FBINFO(video.len_usable) = ACCESS_FBINFO(video.len);
 	if (ACCESS_FBINFO(video.len_usable) > b->base->maxdisplayable)
@@ -1877,16 +1876,21 @@ static int initMatrox2(WPMINFO struct board* b){
 	}
 	printk("fb%d: %s frame buffer device\n",
 	       ACCESS_FBINFO(fbcon.node), ACCESS_FBINFO(fbcon.fix.id));
-	if (ACCESS_FBINFO(fbcon.currcon) < 0) {
-		/* there is no console on this fb... but we have to initialize hardware
-		 * until someone tells me what is proper thing to do */
-		printk(KERN_INFO "fb%d: initializing hardware\n",
-			ACCESS_FBINFO(fbcon.node));
-		/* We have to use FB_ACTIVATE_FORCE, as we had to put vesafb_defined to the fbcon.var
-		 * already before, so register_framebuffer works correctly. */
-		vesafb_defined.activate |= FB_ACTIVATE_FORCE;
-		fb_set_var(&ACCESS_FBINFO(fbcon), &vesafb_defined);
-	}
+	/*
+	 * Tony: If this driver is to be mapped to the console, then
+	 *       fbcon will automatically do a set_par for us.  The code below
+	 *       may not be needed.
+	 */
+
+	/* there is no console on this fb... but we have to initialize hardware
+	 * until someone tells me what is proper thing to do */
+	printk(KERN_INFO "fb%d: initializing hardware\n",
+	       ACCESS_FBINFO(fbcon.node));
+	/* We have to use FB_ACTIVATE_FORCE, as we had to put vesafb_defined to the fbcon.var
+	 * already before, so register_framebuffer works correctly. */
+	vesafb_defined.activate |= FB_ACTIVATE_FORCE;
+	fb_set_var(&ACCESS_FBINFO(fbcon), &vesafb_defined);
+
 	return 0;
 failVideoIO:;
 	matroxfb_g450_shutdown(PMINFO2);
