@@ -116,7 +116,7 @@ void __pagevec_release(struct pagevec *pvec)
 	for (i = 0; i < pagevec_count(pvec); i++) {
 		struct page *page = pvec->pages[i];
 
-		if (!put_page_testzero(page))
+		if (PageReserved(page) || !put_page_testzero(page))
 			continue;
 
 		if (!lock_held) {
