@@ -1,5 +1,5 @@
 /*
- * AGPGART module
+ * AGPGART
  * Copyright (C) 2002 Dave Jones
  * Copyright (C) 1999 Jeff Hartmann
  * Copyright (C) 1999 Precision Insight, Inc.
@@ -358,25 +358,11 @@ struct agp_device_ids {
 	int (*chipset_setup) (struct pci_dev *pdev);	/* used to override generic */
 };
 
-struct agp_bridge_info {
-	unsigned short vendor_id;
-	const char *vendor_name;
-	int (*chipset_setup) (struct pci_dev *pdev);
-	struct agp_device_ids *ids;
-};
-
 struct agp_driver {
 	struct module *owner;
 	struct pci_dev *dev;
 };
 
-extern struct agp_bridge_info ali_agp_bridge_info;
-extern struct agp_bridge_info amd_k8_agp_bridge_info;
-extern struct agp_bridge_info amd_agp_bridge_info;
-extern struct agp_bridge_info intel_agp_bridge_info;
-extern struct agp_bridge_info sis_agp_bridge_info;
-extern struct agp_bridge_info via_agp_bridge_info;
-extern struct agp_bridge_info hp_agp_bridge_info;
 
 /* Generic routines. */
 void agp_generic_agp_enable(u32 mode);
