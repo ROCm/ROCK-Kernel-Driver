@@ -228,7 +228,7 @@ struct dscc4_dev_priv {
 
 	unsigned short encoding;
 	unsigned short parity;
-	hdlc_device hdlc;
+	struct net_device *dev;
 	sync_serial_settings settings;
 	u32 __pad __attribute__ ((aligned (4)));
 };
@@ -373,12 +373,12 @@ static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
 
 static inline struct dscc4_dev_priv *dscc4_priv(struct net_device *dev)
 {
-	return list_entry(dev, struct dscc4_dev_priv, hdlc.netdev);
+	return dev_to_hdlc(dev)->priv;
 }
 
 static inline struct net_device *dscc4_to_dev(struct dscc4_dev_priv *p)
 {
-	return hdlc_to_dev(&p->hdlc);
+	return p->dev;
 }
 
 static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
@@ -698,6 +698,8 @@ static void dscc4_free1(struct pci_dev *pdev)
 
 	pci_set_drvdata(pdev, NULL);
 
+	for (i = 0; i < dev_per_card; i++)
+		free_hdlcdev(root[i].dev);
 	kfree(root);
 	kfree(ppriv);
 }
@@ -879,12 +881,26 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	}
 	memset(root, 0, dev_per_card*sizeof(*root));
 
+	for (i = 0; i < dev_per_card; i++) {
+		root[i].dev = alloc_hdlcdev(root + i);
+		if (!root[i].dev) {
+			while (i--)
+				free_hdlcdev(root[i].dev);
+			goto err_free_dev;
+		}
+	}
+
 	ppriv = (struct dscc4_pci_priv *) kmalloc(sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
 		printk(KERN_ERR "%s: can't allocate private data\n", DRV_NAME);
-		goto err_free_dev;
+		goto err_free_dev2;
 	}
 	memset(ppriv, 0, sizeof(struct dscc4_pci_priv));
+	ret = dscc4_set_quartz(root, quartz);
+	if (ret < 0)
+		goto err_free_priv;
+	ppriv->root = root;
+	spin_lock_init(&ppriv->lock);
 
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
@@ -910,27 +926,21 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
 
-		ret = register_hdlc_device(d);
-		if (ret < 0) {
-			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
-			goto err_unregister;
-	        }
-
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
-
+	
 		ret = dscc4_init_ring(d);
-		if (ret < 0) {
-			unregister_hdlc_device(d);
+		if (ret < 0)
 			goto err_unregister;
-		}
+
+		ret = register_hdlc_device(d);
+		if (ret < 0) {
+			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
+			dscc4_release_ring(dpriv);
+			goto err_unregister;
+	        }
 	}
-	ret = dscc4_set_quartz(root, quartz);
-	if (ret < 0)
-		goto err_unregister;
-	ppriv->root = root;
-	spin_lock_init(&ppriv->lock);
 	pci_set_drvdata(pdev, ppriv);
 	return ret;
 
@@ -939,7 +949,11 @@ err_unregister:
 		dscc4_release_ring(root + i);
 		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 	}
+err_free_priv:
 	kfree(ppriv);
+err_free_dev2:
+	for (i = 0; i < dev_per_card; i++)
+		free_hdlcdev(root[i].dev);
 err_free_dev:
 	kfree(root);
 err_out:
