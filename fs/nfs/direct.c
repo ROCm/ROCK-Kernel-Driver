@@ -679,6 +679,8 @@ nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t 
 	if (mapping->nrpages) {
 		retval = filemap_fdatawrite(mapping);
 		if (retval == 0)
+			retval = nfs_wb_all(inode);
+		if (retval == 0)
 			retval = filemap_fdatawait(mapping);
 		if (retval)
 			goto out;
@@ -767,6 +769,8 @@ nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, 
 
 	if (mapping->nrpages) {
 		retval = filemap_fdatawrite(mapping);
+		if (retval == 0)
+			retval = nfs_wb_all(inode);
 		if (retval == 0)
 			retval = filemap_fdatawait(mapping);
 		if (retval)
