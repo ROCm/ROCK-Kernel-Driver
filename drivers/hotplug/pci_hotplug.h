@@ -46,8 +46,11 @@ enum pci_bus_speed {
 };
 
 struct hotplug_slot;
-struct hotplug_slot_core;
-
+struct hotplug_slot_attribute {
+	struct attribute attr;
+	ssize_t (*show)(struct hotplug_slot *, char *);
+	ssize_t (*store)(struct hotplug_slot *, const char *, size_t);
+};
 /**
  * struct hotplug_slot_ops -the callbacks that the hotplug pci core can use
  * @owner: The module owner of this structure
@@ -131,7 +134,7 @@ struct hotplug_slot {
 
 	/* Variables below this are for use only by the hotplug pci core. */
 	struct list_head		slot_list;
-	struct hotplug_slot_core	*core_priv;
+	struct kobject			kobj;
 };
 
 extern int pci_hp_register		(struct hotplug_slot *slot);
