@@ -2709,6 +2709,7 @@ enum parport_pc_pci_cards {
 	oxsemi_954,
 	oxsemi_840,
 	aks_0100,
+	mobility_pp,
 };
 
 
@@ -2792,6 +2793,7 @@ static struct parport_pc_pci {
 	/* oxsemi_954 */		{ 1, { { 0, -1 }, } },
 	/* oxsemi_840 */		{ 1, { { 0, -1 }, } },
 	/* aks_0100 */			{ 1, { { 0, 1 }, } },
+	/* mobility_pp */		{ 1, { { 0, 1 }, } },
 };
 
 static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
@@ -2873,6 +2875,7 @@ static struct pci_device_id parport_pc_pci_tbl[] __devinitdata = {
 	{ 0x1409, 0x7268, 0x1409, 0x0103, 0, 0, timedia_4008a },
 	{ 0x1409, 0x7268, 0x1409, 0x0104, 0, 0, timedia_4018 },
 	{ 0x1409, 0x7268, 0x1409, 0x9018, 0, 0, timedia_9018a },
+	{ 0x14f2, 0x0121, PCI_ANY_ID, PCI_ANY_ID, 0, 0, mobility_pp },
 	{ PCI_VENDOR_ID_SYBA, PCI_DEVICE_ID_SYBA_2P_EPP,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, syba_2p_epp },
 	{ PCI_VENDOR_ID_SYBA, PCI_DEVICE_ID_SYBA_1P_ECP,

@@ -2760,7 +2760,7 @@ static int ess_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		if (s->dma_adc.mapped)
 			s->dma_adc.count &= s->dma_adc.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 
@@ -2777,7 +2777,7 @@ static int ess_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		if (s->dma_dac.mapped)
 			s->dma_dac.count &= s->dma_dac.fragsize-1;
 		spin_unlock_irqrestore(&s->lock, flags);
-                if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+		if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
 			return -EFAULT;
 		return 0;
 

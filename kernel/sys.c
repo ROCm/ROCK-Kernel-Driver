@@ -390,6 +390,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 		device_shutdown();
 		printk(KERN_EMERG "System halted.\n");
 		machine_halt();
+		unlock_kernel();
 		do_exit(0);
 		break;
 
@@ -399,6 +400,7 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void * arg)
 		device_shutdown();
 		printk(KERN_EMERG "Power down.\n");
 		machine_power_off();
+		unlock_kernel();
 		do_exit(0);
 		break;
 

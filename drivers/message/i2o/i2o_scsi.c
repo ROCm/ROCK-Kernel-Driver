@@ -335,15 +335,10 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	return;
 }
 
-struct i2o_handler i2o_scsi_handler=
-{
-	i2o_scsi_reply,
-	NULL,
-	NULL,
-	NULL,
-	"I2O SCSI OSM",
-	0,
-	I2O_CLASS_SCSI_PERIPHERAL
+struct i2o_handler i2o_scsi_handler = {
+	.reply	= i2o_scsi_reply,
+	.name	= "I2O SCSI OSM",
+	.class	= I2O_CLASS_SCSI_PERIPHERAL,
 };
 
 /**

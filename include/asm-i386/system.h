@@ -150,6 +150,11 @@ struct __xchg_dummy { unsigned long a[100]; };
  * to do an SIMD/3DNOW!/MMX/FPU 64-bit store here, but that
  * might have an implicit FPU-save as a cost, so it's not
  * clear which path to go.)
+ *
+ * cmpxchg8b must be used with the lock prefix here to allow
+ * the instruction to be executed atomically, see page 3-102
+ * of the instruction set reference 24319102.pdf. We need
+ * the reader side to see the coherent 64bit value.
  */
 static inline void __set_64bit (unsigned long long * ptr,
 		unsigned int low, unsigned int high)
@@ -158,7 +163,7 @@ static inline void __set_64bit (unsigned long long * ptr,
 		"\n1:\t"
 		"movl (%0), %%eax\n\t"
 		"movl 4(%0), %%edx\n\t"
-		"cmpxchg8b (%0)\n\t"
+		"lock cmpxchg8b (%0)\n\t"
 		"jnz 1b"
 		: /* no outputs */
 		:	"D"(ptr),

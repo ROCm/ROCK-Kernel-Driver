@@ -242,6 +242,11 @@ static dev_link_t *airo_attach(void)
 	
 	/* Allocate space for private device-specific data */
 	local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
+	if (!local) {
+		printk(KERN_ERR "airo_cs: no memory for new device\n");
+		kfree (link);
+		return NULL;
+	}
 	memset(local, 0, sizeof(local_info_t));
 	link->priv = local;
 	

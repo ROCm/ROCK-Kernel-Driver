@@ -1085,6 +1085,7 @@ static int __init myri_ether_init(struct net_device *dev, struct sbus_dev *sdev,
 #endif
 	return 0;
 err:	unregister_netdev(dev);
+	kfree(dev->priv);
 	kfree(dev);
 	return -ENODEV;
 }
@@ -1142,6 +1143,7 @@ static void __exit myri_sbus_cleanup(void)
 
 		unregister_netdev(root_myri_dev->dev);
 		kfree(root_myri_dev->dev);
+		kfree(root_myri_dev);
 		root_myri_dev = next;
 	}
 #endif /* MODULE */

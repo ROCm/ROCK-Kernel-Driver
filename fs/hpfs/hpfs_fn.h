@@ -75,7 +75,7 @@ struct quad_buffer_head {
 
 /* The b-tree down pointer from a dir entry */
 
-extern inline dnode_secno de_down_pointer (struct hpfs_dirent *de)
+static inline dnode_secno de_down_pointer (struct hpfs_dirent *de)
 {
   CHKCOND(de->down,("HPFS: de_down_pointer: !de->down\n"));
   return *(dnode_secno *) ((void *) de + de->length - 4);
@@ -83,14 +83,14 @@ extern inline dnode_secno de_down_pointer (struct hpfs_dirent *de)
 
 /* The first dir entry in a dnode */
 
-extern inline struct hpfs_dirent *dnode_first_de (struct dnode *dnode)
+static inline struct hpfs_dirent *dnode_first_de (struct dnode *dnode)
 {
   return (void *) dnode->dirent;
 }
 
 /* The end+1 of the dir entries */
 
-extern inline struct hpfs_dirent *dnode_end_de (struct dnode *dnode)
+static inline struct hpfs_dirent *dnode_end_de (struct dnode *dnode)
 {
   CHKCOND(dnode->first_free>=0x14 && dnode->first_free<=0xa00,("HPFS: dnode_end_de: dnode->first_free = %d\n",(int)dnode->first_free));
   return (void *) dnode + dnode->first_free;
@@ -98,58 +98,60 @@ extern inline struct hpfs_dirent *dnode_end_de (struct dnode *dnode)
 
 /* The dir entry after dir entry de */
 
-extern inline struct hpfs_dirent *de_next_de (struct hpfs_dirent *de)
+static inline struct hpfs_dirent *de_next_de (struct hpfs_dirent *de)
 {
   CHKCOND(de->length>=0x20 && de->length<0x800,("HPFS: de_next_de: de->length = %d\n",(int)de->length));
   return (void *) de + de->length;
 }
 
-extern inline struct extended_attribute *fnode_ea(struct fnode *fnode)
+static inline struct extended_attribute *fnode_ea(struct fnode *fnode)
 {
 	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs);
 }
 
-extern inline struct extended_attribute *fnode_end_ea(struct fnode *fnode)
+static inline struct extended_attribute *fnode_end_ea(struct fnode *fnode)
 {
 	return (struct extended_attribute *)((char *)fnode + fnode->ea_offs + fnode->ea_size_s);
 }
 
-extern inline struct extended_attribute *next_ea(struct extended_attribute *ea)
+static inline struct extended_attribute *next_ea(struct extended_attribute *ea)
 {
 	return (struct extended_attribute *)((char *)ea + 5 + ea->namelen + ea->valuelen);
 }
 
-extern inline secno ea_sec(struct extended_attribute *ea)
+static inline secno ea_sec(struct extended_attribute *ea)
 {
 	return *(secno *)((char *)ea + 9 + ea->namelen);
 }
 
-extern inline secno ea_len(struct extended_attribute *ea)
+static inline secno ea_len(struct extended_attribute *ea)
 {
 	return *(secno *)((char *)ea + 5 + ea->namelen);
 }
 
-extern inline char *ea_data(struct extended_attribute *ea)
+static inline char *ea_data(struct extended_attribute *ea)
 {
 	return (char *)((char *)ea + 5 + ea->namelen);
 }
 
-extern inline unsigned de_size(int namelen, secno down_ptr)
+static inline unsigned de_size(int namelen, secno down_ptr)
 {
 	return ((0x1f + namelen + 3) & ~3) + (down_ptr ? 4 : 0);
 }
 
-extern inline void copy_de(struct hpfs_dirent *dst, struct hpfs_dirent *src)
+static inline void copy_de(struct hpfs_dirent *dst, struct hpfs_dirent *src)
 {
-	int a = dst->down;
-	int n = dst->not_8x3;
+	int a;
+	int n;
 	if (!dst || !src) return;
+	a = dst->down;
+	n = dst->not_8x3;
 	memcpy((char *)dst + 2, (char *)src + 2, 28);
 	dst->down = a;
 	dst->not_8x3 = n;
 }
 
-extern inline unsigned tstbits(unsigned *bmp, unsigned b, unsigned n)
+static inline unsigned tstbits(unsigned *bmp, unsigned b, unsigned n)
 {
 	int i;
 	if ((b >= 0x4000) || (b + n - 1 >= 0x4000)) return n;
@@ -314,13 +316,13 @@ extern struct address_space_operations hpfs_aops;
  * local time (HPFS) to GMT (Unix)
  */
 
-extern inline time_t local_to_gmt(struct super_block *s, time_t t)
+static inline time_t local_to_gmt(struct super_block *s, time_t t)
 {
 	extern struct timezone sys_tz;
 	return t + sys_tz.tz_minuteswest * 60 + hpfs_sb(s)->sb_timeshift;
 }
 
-extern inline time_t gmt_to_local(struct super_block *s, time_t t)
+static inline time_t gmt_to_local(struct super_block *s, time_t t)
 {
 	extern struct timezone sys_tz;
 	return t - sys_tz.tz_minuteswest * 60 - hpfs_sb(s)->sb_timeshift;

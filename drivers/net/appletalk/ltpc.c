@@ -1059,26 +1059,39 @@ int __init ltpc_probe(struct net_device *dev)
 	int autoirq;
 	unsigned long flags;
 	unsigned long f;
+	int portfound=0;
 
 	SET_MODULE_OWNER(dev);
 
 	save_flags(flags);
 
 	/* probe for the I/O port address */
-	if (io != 0x240 && !check_region(0x220,8)) {
+	if (io != 0x240 && request_region(0x220,8,"ltpc")) {
 		x = inb_p(0x220+6);
-		if ( (x!=0xff) && (x>=0xf0) ) io = 0x220;
+		if ( (x!=0xff) && (x>=0xf0) ) {
+			io = 0x220;
+			portfound=1;
+		}
+		else {
+			release_region(0x220,8);
+		}
 	}
 	
-	if (io != 0x220 && !check_region(0x240,8)) {
+	if (io != 0x220 && request_region(0x240,8,"ltpc")) {
 		y = inb_p(0x240+6);
-		if ( (y!=0xff) && (y>=0xf0) ) io = 0x240;
+		if ( (y!=0xff) && (y>=0xf0) ){ 
+			io = 0x240;
+			portfound=1;
+		}
+		else {
+			release_region(0x240,8);
+		}
 	} 
 
-	if(io) {
-		/* found it, now grab it */
-		request_region(io,8,"ltpc");
-	} else {
+	if(io && !portfound && request_region(io,8,"ltpc")){
+		portfound = 1;
+	}
+	if(!portfound) {
 		/* give up in despair */
 		printk ("LocalTalk card not found; 220 = %02x, 240 = %02x.\n",
 			x,y);

@@ -366,7 +366,11 @@ int inia100_detect(Scsi_Host_Template * tpnt)
 			printk("inia100: initial orchid fail!!\n");
 			goto out_unalloc;
 		}
-		request_region(pHCB->HCS_Base, 256, "inia100");	/* Register */
+		if (!request_region(pHCB->HCS_Base, 256, "inia100")) {
+			printk(KERN_WARNING "inia100: io port 0x%x, is busy.\n", 
+			       pHCB->HCS_Base);
+			return (0);
+		}
 
 		hreg->io_port = pHCB->HCS_Base;
 		hreg->n_io_port = 0xff;

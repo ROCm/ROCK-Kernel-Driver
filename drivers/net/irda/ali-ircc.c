@@ -281,15 +281,13 @@ static int ali_ircc_open(int i, chipio_t *info)
         self->io.fifo_size = 16;		/* SIR: 16, FIR: 32 Benjamin 2000/11/1 */
 	
 	/* Reserve the ioports that we need */
-	ret = check_region(self->io.fir_base, self->io.fir_ext);
-	if (ret < 0) { 
+	if (!request_region(self->io.fir_base, self->io.fir_ext, driver_name)) {
 		WARNING("%s(), can't get iobase of 0x%03x\n", __FUNCTION__,
 			self->io.fir_base);
 		dev_self[i] = NULL;
 		kfree(self);
 		return -ENODEV;
 	}
-	request_region(self->io.fir_base, self->io.fir_ext, driver_name);
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);

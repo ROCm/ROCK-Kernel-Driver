@@ -310,15 +310,16 @@ static void __exit sbc60xxwdt_unload(void)
 
 	unregister_reboot_notifier(&wdt_notifier);
 	release_region(WDT_START,1);
-	release_region(WDT_STOP,1);
+//	release_region(WDT_STOP,1);
 }
 
 static int __init sbc60xxwdt_init(void)
 {
 	int rc = -EBUSY;
 
-	if (!request_region(WDT_STOP, 1, "SBC 60XX WDT"))
-		goto err_out;
+//	We cannot reserve 0x45 - the kernel already has!
+//	if (!request_region(WDT_STOP, 1, "SBC 60XX WDT"))
+//		goto err_out;
 	if (!request_region(WDT_START, 1, "SBC 60XX WDT"))
 		goto err_out_region1;
 

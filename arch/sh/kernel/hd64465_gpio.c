@@ -165,12 +165,19 @@ void hd64465_gpio_unregister_irq(int portpin)
 
 static int __init hd64465_gpio_init(void)
 {
-    	/* TODO: check return values */
-    	request_region(HD64465_REG_GPACR, 0x1000, MODNAME);
-	request_irq(HD64465_IRQ_GPIO, hd64465_gpio_interrupt,
-	    SA_INTERRUPT, MODNAME, 0);
+	int err;
+	
+	if (!request_region(HD64465_REG_GPACR, 0x1000, MODNAME))
+		return -EIO;
+	err = request_irq (HD64465_IRQ_GPIO, hd64465_gpio_interrupt,
+					SA_INTERRUPT, MODNAME, 0);
+	if (err) {
+		printk(KERN_ERR"HD64465: Unable to get irq %d.\n", HD64465_IRQ_GPIO);
+		release_region(HD64465_REG_GPACR, 0x1000);
+		return err;
+	}
 
-    	printk("HD64465 GPIO layer on irq %d\n", HD64465_IRQ_GPIO);
+	printk("HD64465 GPIO layer on irq %d\n", HD64465_IRQ_GPIO);
 	return 0;
 }
 

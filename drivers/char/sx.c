@@ -353,9 +353,11 @@ static int sx_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000,
                               0xc8000, 0xd8000, 0xe8000};
 static int si_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000, 
                               0xc8000, 0xd8000, 0xe8000, 0xa0000};
+static int si1_probe_addrs[]= { 0xd0000};
 
 #define NR_SX_ADDRS (sizeof(sx_probe_addrs)/sizeof (int))
 #define NR_SI_ADDRS (sizeof(si_probe_addrs)/sizeof (int))
+#define NR_SI1_ADDRS (sizeof(si1_probe_addrs)/sizeof (int))
 
 
 /* Set the mask to all-ones. This alas, only supports 32 interrupts. 
@@ -582,6 +584,8 @@ static int sx_reset (struct sx_board *board)
 		}
 	} else if (IS_EISA_BOARD(board)) {
 		outb(board->irq<<4, board->eisa_base+0xc02);
+	} else if (IS_SI1_BOARD(board)) {
+	        write_sx_byte (board, SI1_ISA_RESET,   0); // value does not matter
 	} else {
 		/* Gory details of the SI/ISA board */
 		write_sx_byte (board, SI2_ISA_RESET,    SI2_ISA_RESET_SET);
@@ -656,6 +660,9 @@ static int sx_start_board (struct sx_board *board)
 	} else if (IS_EISA_BOARD(board)) {
 		write_sx_byte(board, SI2_EISA_OFF, SI2_EISA_VAL);
 		outb((board->irq<<4)|4, board->eisa_base+0xc02);
+	} else if (IS_SI1_BOARD(board)) {
+		write_sx_byte (board, SI1_ISA_RESET_CLEAR, 0);
+		write_sx_byte (board, SI1_ISA_INTCL, 0);
 	} else {
 		/* Don't bug me about the clear_set. 
 		   I haven't the foggiest idea what it's about -- REW */
@@ -681,6 +688,9 @@ static int sx_start_interrupts (struct sx_board *board)
 		                                 SX_CONF_HOSTIRQ);
 	} else if (IS_EISA_BOARD(board)) {
 		inb(board->eisa_base+0xc03);  
+	} else if (IS_SI1_BOARD(board)) {
+	       write_sx_byte (board, SI1_ISA_INTCL,0);
+	       write_sx_byte (board, SI1_ISA_INTCL_CLEAR,0);
 	} else {
 		switch (board->irq) {
 		case 11:write_sx_byte (board, SI2_ISA_IRQ11, SI2_ISA_IRQ11_SET);break;
@@ -1690,6 +1700,7 @@ static int sx_fw_ioctl (struct inode *inode, struct file *filp,
 		if (IS_SX_BOARD (board)) rc = SX_TYPE_SX;
 		if (IS_CF_BOARD (board)) rc = SX_TYPE_CF;
 		if (IS_SI_BOARD (board)) rc = SX_TYPE_SI;
+		if (IS_SI1_BOARD (board)) rc = SX_TYPE_SI;
 		if (IS_EISA_BOARD (board)) rc = SX_TYPE_SI;
 		sx_dprintk (SX_DEBUG_FIRMWARE, "returning type= %d\n", rc);
 		break;
@@ -2184,13 +2195,20 @@ static int probe_si (struct sx_board *board)
 	int i;
 
 	func_enter();
-	sx_dprintk (SX_DEBUG_PROBE, "Going to verify SI signature %lx.\n", 
+	sx_dprintk (SX_DEBUG_PROBE, "Going to verify SI signature hw %lx at %lx.\n", board->hw_base,
 	            board->base + SI2_ISA_ID_BASE);
 
 	if (sx_debug & SX_DEBUG_PROBE)
 		my_hd ((char *)(board->base + SI2_ISA_ID_BASE), 0x8);
 
 	if (!IS_EISA_BOARD(board)) {
+	  if( IS_SI1_BOARD(board) ) 
+	    {
+		for (i=0;i<8;i++) {
+		  write_sx_byte (board, SI2_ISA_ID_BASE+7-i,i); 
+
+		}
+	    }
 		for (i=0;i<8;i++) {
 			if ((read_sx_byte (board, SI2_ISA_ID_BASE+7-i) & 7) != i) {
 				return 0;
@@ -2571,6 +2589,21 @@ static int __init sx_init(void)
 		board->base = (ulong) ioremap(board->hw_base, SI2_ISA_WINDOW_LEN);
 		board->flags &= ~SX_BOARD_TYPE;
 		board->flags |=  SI_ISA_BOARD;
+		board->irq = sx_irqmask ?-1:0;
+
+		if (probe_si (board)) {
+			found++;
+		} else {
+			my_iounmap (board->hw_base, board->base);
+		}
+	}
+	for (i=0;i<NR_SI1_ADDRS;i++) {
+		board = &boards[found];
+		board->hw_base = si1_probe_addrs[i];
+		board->base2 =
+		board->base = (ulong) ioremap(board->hw_base, SI1_ISA_WINDOW_LEN);
+		board->flags &= ~SX_BOARD_TYPE;
+		board->flags |=  SI1_ISA_BOARD;
 		board->irq = sx_irqmask ?-1:0;
 
 		if (probe_si (board)) {

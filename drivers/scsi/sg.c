@@ -474,9 +474,7 @@ sg_new_read(Sg_fd * sfp, char *buf, size_t count, Sg_request * srp)
 			sb_len = (hp->mx_sb_len > sb_len) ? sb_len : hp->mx_sb_len;
 			len = 8 + (int) srp->sense_b[7];	/* Additional sense length field */
 			len = (len > sb_len) ? sb_len : len;
-			if ((err = verify_area(VERIFY_WRITE, hp->sbp, len)))
-				goto err_out;
-			if (__copy_to_user(hp->sbp, srp->sense_b, len)) {
+			if (copy_to_user(hp->sbp, srp->sense_b, len)) {
 				err = -EFAULT;
 				goto err_out;
 			}

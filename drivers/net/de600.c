@@ -444,7 +444,10 @@ int __init de600_probe(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	request_region(DE600_IO, 3, "de600");
+	if (!request_region(DE600_IO, 3, "de600")) {
+		printk(KERN_WARNING "DE600: port 0x%x busy\n", DE600_IO);
+		return -EBUSY;
+	}
 
 	printk(", Ethernet Address: %02X", dev->dev_addr[0]);
 	for (i = 1; i < ETH_ALEN; i++)

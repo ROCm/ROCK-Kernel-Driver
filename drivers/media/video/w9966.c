@@ -568,7 +568,7 @@ static inline int w9966_i2c_setscl(struct w9966_dev* cam, int state)
 	if (state) {
 		timeout = jiffies + 100;
 		while (!w9966_i2c_getscl(cam)) {
-			if (jiffies > timeout)
+			if (time_after(jiffies, timeout))
 				return -1;
 		}
 	}

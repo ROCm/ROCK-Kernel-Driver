@@ -2253,7 +2253,7 @@ void __init sched_init(void)
 	enter_lazy_tlb(&init_mm, current, smp_processor_id());
 }
 
-#ifdef CONFIG_DEBUG_KERNEL
+#ifdef CONFIG_DEBUG_SPINLOCK_SLEEP
 void __might_sleep(char *file, int line)
 {
 #if defined(in_atomic)
