@@ -327,8 +327,10 @@ check_board_dma(struct net_device *dev0)
 	 */
 	priv0->vplxdma[PLX_DMA0_MODE/4] = 0xFFFFFFFF;
 	x = priv0->vplxdma[PLX_DMA0_MODE/4];
-	if (x != 0x00001FFF)
+	if (x != 0x00001FFF) {
+		iounmap((void *)priv0->vplxdma);
 		return (0);
+	}
 
 	return (1);
 }
@@ -1020,6 +1022,8 @@ dgrs_download(struct net_device *dev0)
 		if (!is)
 		{
 			printk("%s: Illegal IRQ %d\n", dev0->name, dev0->irq);
+			iounmap(priv0->vmem);
+			priv0->vmem = NULL;
 			return -ENXIO;
 		}
 		OUTB(dev0->base_addr + ES4H_AS_31_24,
@@ -1101,6 +1105,8 @@ dgrs_download(struct net_device *dev0)
 	if (priv0->bcomm->bc_status < BC_RUN)
 	{
 		printk("%s: board not operating\n", dev0->name);
+		iounmap(priv0->vmem);
+		priv0->vmem = NULL;
 		return -ENXIO;
 	}
 
