@@ -61,8 +61,6 @@ typedef struct ia64_mc_info_s {
 
 } ia64_mc_info_t;
 
-#define PERCPU_MCA_SIZE sizeof(struct ia64_mc_info_s)
-
 typedef struct ia64_mca_sal_to_os_state_s {
 	u64		imsto_os_gp;		/* GP of the os registered with the SAL */
 	u64		imsto_pal_proc;		/* PAL_PROC entry point - physical addr */
@@ -110,11 +108,13 @@ typedef struct ia64_mca_os_to_sal_state_s {
 
 typedef struct ia64_mca_cpu_s {
 	u64	ia64_mca_stack[IA64_MCA_STACK_SIZE] 		__attribute__((aligned(16)));
-	u64	ia64_mca_proc_state_dump[512] 			__attribute__((aligned(16)));
+	u64	ia64_mca_proc_state_dump[512]			__attribute__((aligned(16)));
 	u64	ia64_mca_stackframe[32]				__attribute__((aligned(16)));
-	u64	ia64_mca_bspstore[IA64_MCA_BSPSTORE_SIZE] 	__attribute__((aligned(16)));
-	u64	ia64_init_stack[KERNEL_STACK_SIZE] 		__attribute__((aligned(16)));
+	u64	ia64_mca_bspstore[IA64_MCA_BSPSTORE_SIZE]	__attribute__((aligned(16)));
+	u64	ia64_init_stack[KERNEL_STACK_SIZE/8] 		__attribute__((aligned(16)));
 } ia64_mca_cpu_t;
+
+#define PERCPU_MCA_SIZE sizeof(ia64_mca_cpu_t)
 
 extern void ia64_mca_init(void);
 extern void ia64_os_mca_dispatch(void);
