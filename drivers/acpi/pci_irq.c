@@ -71,6 +71,9 @@ acpi_pci_irq_find_prt_entry (
 
 	ACPI_FUNCTION_TRACE("acpi_pci_irq_find_prt_entry");
 
+	if (!acpi_prt.count)
+		return_PTR(NULL);
+
 	/*
 	 * Parse through all PRT entries looking for a match on the specified
 	 * PCI device's segment, bus, device, and pin (don't care about func).
