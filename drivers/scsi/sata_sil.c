@@ -6,7 +6,7 @@
  *		    on emails.
  *
  *  Copyright 2003 Red Hat, Inc.
- *  Copyright 2003 Benjamin Herrenschmidt <benh@kernel.crashing.org>
+ *  Copyright 2003 Benjamin Herrenschmidt
  *
  *  The contents of this file are subject to the Open
  *  Software License version 1.1 that can be found at

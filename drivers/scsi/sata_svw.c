@@ -389,6 +389,7 @@ static int __init k2_sata_init(void)
 	return pci_module_init(&k2_sata_pci_driver);
 }
 
+
 static void __exit k2_sata_exit(void)
 {
 	pci_unregister_driver(&k2_sata_pci_driver);
