@@ -270,7 +270,7 @@ int __init llc_proc_init(void)
 	return 0;
 }
 
-void __exit llc_proc_exit(void)
+void llc_proc_exit(void)
 {
 }
 #endif /* CONFIG_PROC_FS */
