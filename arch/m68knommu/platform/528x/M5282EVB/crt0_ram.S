@@ -1,7 +1,7 @@
 /*****************************************************************************/
 
 /*
- *	crt0_ram.S -- startup code for MCF5282 ColdFire based MOTOROLA boards.
+ *	crt0_ram.S -- startup code for M5282EVB ColdFire based MOTOROLA boards.
  *
  *	(C) Copyright 2003, Greg Ungerer (gerg@snapgear.com).
  */
@@ -18,7 +18,7 @@
 /*****************************************************************************/
 
 /*
- *	Motorola M5282C3 ColdFire eval board, chip select and memory setup.
+ *	Motorola M5282EVB ColdFire eval board, chip select and memory setup.
  */
 
 #define	MEM_BASE	0x00000000	/* Memory base at address 0 */
