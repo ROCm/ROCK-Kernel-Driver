@@ -313,8 +313,8 @@ config SCSI_AHA1740
 	  module will be called aha1740.
 
 config SCSI_AACRAID
-	tristate "Adaptec AACRAID support (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && SCSI && PCI
+	tristate "Adaptec AACRAID support"
+	depends on SCSI && PCI
 
 source "drivers/scsi/aic7xxx/Kconfig.aic7xxx"
 
