@@ -718,6 +718,39 @@ linvfs_get_dentry(
 	return result;
 }
 
+STATIC struct dentry *
+linvfs_decode_fh(
+	struct super_block	*sb,
+	__u32			*fh,
+	int			fh_len,
+	int			fileid_type,
+	int (*acceptable)(
+		void		*context,
+		struct dentry	*de),
+	void			*context)
+{
+	__u32 parent[2];
+	parent[0] = parent[1] = 0;
+	
+	if (fh_len < 2 || fileid_type > 2)
+		return NULL;
+	
+	if (fileid_type == 2 && fh_len > 2) {
+		if (fh_len == 3) {
+			printk(KERN_WARNING
+			       "XFS: detected filehandle without "
+			       "parent inode generation information.");
+			return ERR_PTR(-ESTALE);
+		}
+			
+		parent[0] = fh[2];
+		parent[1] = fh[3];
+	}
+	
+	return find_exported_dentry(sb, fh, parent, acceptable, context);
+
+}
+
 STATIC int
 linvfs_show_options(
 	struct seq_file		*m,
@@ -881,6 +914,7 @@ linvfs_get_sb(
 
 
 STATIC struct export_operations linvfs_export_ops = {
+	.decode_fh		= linvfs_decode_fh,
 	.get_parent		= linvfs_get_parent,
 	.get_dentry		= linvfs_get_dentry,
 };
