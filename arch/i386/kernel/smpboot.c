@@ -395,7 +395,7 @@ void __init smp_callin(void)
 	Dprintk("CALLIN, before setup_local_APIC().\n");
 	/*
 	 * Because we use NMIs rather than the INIT-STARTUP sequence to
-	 * bootstrap the CPUs, the APIC may be in a wierd state. Kick it.
+	 * bootstrap the CPUs, the APIC may be in a weird state. Kick it.
 	 */
 	if (clustered_apic_mode)
 		clear_local_APIC();
