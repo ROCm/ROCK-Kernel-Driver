@@ -63,7 +63,6 @@ static int get_power_status(struct hotplug_slot *slot, u8 * value);
 static int get_attention_status(struct hotplug_slot *slot, u8 * value);
 static int get_adapter_status(struct hotplug_slot *slot, u8 * value);
 static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
-static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value);
 
 struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.owner = THIS_MODULE,
@@ -74,7 +73,6 @@ struct hotplug_slot_ops rpaphp_hotplug_slot_ops = {
 	.get_attention_status = get_attention_status,
 	.get_adapter_status = get_adapter_status,
 	.get_max_bus_speed = get_max_bus_speed,
-	.get_cur_bus_speed = get_cur_bus_speed,
 };
 
 static int rpaphp_get_attention_status(struct slot *slot)
@@ -205,18 +203,6 @@ static int get_max_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_spe
 
 	}
 	up(&rpaphp_sem);
-	return 0;
-}
-
-/* return dummy value because not sure if PRA provides any method... */
-static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
-{
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
-	if (slot == NULL)
-		return -ENODEV;
-
-	*value = PCI_SPEED_UNKNOWN;
 	return 0;
 }
 
