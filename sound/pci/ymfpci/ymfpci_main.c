@@ -2054,10 +2054,11 @@ void snd_ymfpci_resume(ymfpci_t *chip)
 
 	/* start hw again */
 	if (chip->start_count > 0) {
-		spin_lock(&chip->reg_lock);
+		unsigned long flags;
+		spin_lock_irqsave(&chip->reg_lock, flags);
 		snd_ymfpci_writel(chip, YDSXGR_MODE, chip->saved_ydsxgr_mode);
 		chip->active_bank = snd_ymfpci_readl(chip, YDSXGR_CTRLSELECT);
-		spin_unlock(&chip->reg_lock);
+		spin_unlock_irqrestore(&chip->reg_lock, flags);
 	}
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
 }
