@@ -1291,19 +1291,11 @@ struct sctp_association {
 		 * used in the bulk of the text.  This value is hidden
 		 * in tsn_map--we get it by calling sctp_tsnmap_get_ctsn().
 		 */
-		sctp_tsnmap_t tsn_map;
+		struct sctp_tsnmap tsn_map;
 		__u8 _map[sctp_tsnmap_storage_size(SCTP_TSN_MAP_SIZE)];
 
-		/* We record duplicate TSNs here.  We clear this after
-		 * every SACK.
-		 * FIXME: We should move this into the tsnmap? --jgrimm
-		 */
-		sctp_dup_tsn_t dup_tsns[SCTP_MAX_DUP_TSNS];
-		int next_dup_tsn;
-
 		/* Do we need to sack the peer? */
-		uint8_t sack_needed;
-
+		__u8    sack_needed;
 		/* These are capabilities which our peer advertised.  */
 		__u8	ecn_capable;     /* Can peer do ECN? */
 		__u8	ipv4_address;    /* Peer understands IPv4 addresses? */

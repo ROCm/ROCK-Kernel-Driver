@@ -527,10 +527,8 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			break;
 
 		case SCTP_CMD_REPORT_DUP:
-			if (asoc->peer.next_dup_tsn < SCTP_MAX_DUP_TSNS) {
-				asoc->peer.dup_tsns[asoc->peer.next_dup_tsn++] =
-					ntohl(command->obj.u32);
-			}
+			sctp_tsnmap_mark_dup(&asoc->peer.tsn_map,
+					     ntohl(command->obj.u32));
 			break;
 
 		case SCTP_CMD_REPORT_BIGGAP:
@@ -744,7 +742,6 @@ int sctp_gen_sack(sctp_association_t *asoc, int force, sctp_cmd_seq_t *commands)
 		asoc->a_rwnd = asoc->rwnd;
 
 		asoc->peer.sack_needed = 0;
-		asoc->peer.next_dup_tsn = 0;
 
 		error = sctp_outq_tail(&asoc->outqueue, sack);
 
