@@ -18,16 +18,16 @@
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
-long    htlbpagemem = 0;
+static long    htlbpagemem;
 int     htlbpage_max;
-long    htlbzone_pages;
+static long    htlbzone_pages;
 
 struct vm_operations_struct hugetlb_vm_ops;
 static LIST_HEAD(htlbpage_freelist);
 static spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 
 #define MAX_ID 	32
-struct htlbpagekey {
+static struct htlbpagekey {
 	struct inode *in;
 	int key;
 } htlbpagek[MAX_ID];
@@ -109,7 +109,7 @@ static int anon_get_hugetlb_page(struct mm_struct *mm, struct vm_area_struct *vm
 	return page ? 1 : -1;
 }
 
-int make_hugetlb_pages_present(unsigned long addr, unsigned long end, int flags)
+static int make_hugetlb_pages_present(unsigned long addr, unsigned long end, int flags)
 {
 	int write;
 	struct mm_struct *mm = current->mm;
