@@ -2,8 +2,8 @@
 /*                                                                        */
 /* IBM eServer i/pSeries Virtual Ethernet Device Driver                   */
 /* Copyright (C) 2003 IBM Corp.                                           */
-/*  Dave Larson (larson1@us.ibm.com)                                      */
-/*  Santiago Leon (santil@us.ibm.com)                                     */
+/*  Originally written by Dave Larson (larson1@us.ibm.com)                */
+/*  Maintained by Santiago Leon (santil@us.ibm.com)                       */
 /*                                                                        */
 /*  This program is free software; you can redistribute it and/or modify  */
 /*  it under the terms of the GNU General Public License as published by  */
@@ -104,11 +104,12 @@ static struct proc_dir_entry *ibmveth_proc_dir;
 
 static const char ibmveth_driver_name[] = "ibmveth";
 static const char ibmveth_driver_string[] = "IBM i/pSeries Virtual Ethernet Driver";
-static const char ibmveth_driver_version[] = "1.0";
+#define ibmveth_driver_version "1.02"
 
-MODULE_AUTHOR("Dave Larson <larson1@us.ibm.com>");
+MODULE_AUTHOR("Santiago Leon <santil@us.ibm.com>");
 MODULE_DESCRIPTION("IBM i/pSeries Virtual Ethernet Driver");
 MODULE_LICENSE("GPL");
+MODULE_VERSION(ibmveth_driver_version);
 
 /* simple methods of getting data from the current rxq entry */
 static inline int ibmveth_rxq_pending_buffer(struct ibmveth_adapter *adapter)
