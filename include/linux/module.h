@@ -328,7 +328,7 @@ search_module_extables(unsigned long addr)
 }
 
 /* Is this address in a module? */
-static int module_text_address(unsigned long addr)
+static inline int module_text_address(unsigned long addr)
 {
 	return 0;
 }
