@@ -467,7 +467,7 @@ ia64_mca_init(void)
 					 SAL_MC_PARAM_MECHANISM_INT,
 					 IA64_MCA_RENDEZ_VECTOR,
 					 IA64_MCA_RENDEZ_TIMEOUT,
-					 0)))
+					 SAL_MC_PARAM_RZ_ALWAYS)))
 	{
 		printk(KERN_ERR "ia64_mca_init: Failed to register rendezvous interrupt "
 		       "with SAL.  rc = %ld\n", rc);
