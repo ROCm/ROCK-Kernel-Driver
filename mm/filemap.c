@@ -1933,7 +1933,16 @@ generic_file_buffered_write(struct kiocb *iocb, const struct iovec *iov,
 
 	pagevec_init(&lru_pvec, 0);
 
-	buf = iov->iov_base + written;	/* handle partial DIO write */
+	/*
+	 * handle partial DIO write.  Adjust cur_iov if needed.
+	 */
+	if (likely(nr_segs == 1))
+		buf = iov->iov_base + written;
+	else {
+		filemap_set_next_iovec(&cur_iov, &iov_base, written);
+		buf = iov->iov_base + iov_base;
+	}
+
 	do {
 		unsigned long index;
 		unsigned long offset;
