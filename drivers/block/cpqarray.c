@@ -1485,9 +1485,10 @@ static int revalidate_allvol(kdev_t dev)
 	int ctlr, i;
 	unsigned long flags;
 
-	ctlr = major(dev) - MAJOR_NR;
 	if (minor(dev) != 0)
 		return -ENXIO;
+
+	ctlr = major(dev) - MAJOR_NR;
 
 	spin_lock_irqsave(IDA_LOCK(ctlr), flags);
 	if (hba[ctlr]->usage_count > 1) {
