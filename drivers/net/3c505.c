@@ -298,17 +298,13 @@ inline static void adapter_reset(struct net_device *dev)
 		set_hsf(dev, HSF_PCB_NAK);
 	}
 	outb_control(adapter->hcr_val | ATTN | DIR, dev);
-	timeout = jiffies + 1*HZ/100;
-	while (time_before_eq(jiffies, timeout));
+	mdelay(10);
 	outb_control(adapter->hcr_val & ~ATTN, dev);
-	timeout = jiffies + 1*HZ/100;
-	while (time_before_eq(jiffies, timeout));
+	mdelay(10);
 	outb_control(adapter->hcr_val | FLSH, dev);
-	timeout = jiffies + 1*HZ/100;
-	while (time_before_eq(jiffies, timeout));
+	mdelay(10);
 	outb_control(adapter->hcr_val & ~FLSH, dev);
-	timeout = jiffies + 1*HZ/100;
-	while (time_before_eq(jiffies, timeout));
+	mdelay(10);
 
 	outb_control(orig_hcr, dev);
 	if (!start_receive(dev, &adapter->tx_pcb))

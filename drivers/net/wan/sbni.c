@@ -53,6 +53,7 @@
 #include <linux/skbuff.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <net/arp.h>
 
@@ -337,13 +338,12 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	outb( 0, ioaddr + CSR0 );
 
 	if( irq < 2 ) {
-		unsigned long irq_mask, delay;
+		unsigned long irq_mask;
 
 		irq_mask = probe_irq_on();
 		outb( EN_INT | TR_REQ, ioaddr + CSR0 );
 		outb( PR_RES, ioaddr + CSR1 );
-		delay = jiffies + HZ/20;
-		while (time_before(jiffies, delay)) ;
+		mdelay(50);
 		irq = probe_irq_off(irq_mask);
 		outb( 0, ioaddr + CSR0 );
 
