@@ -101,7 +101,8 @@ struct as_data {
 	struct list_head *hash;		/* request hash */
 	unsigned long current_batch_expires;
 	unsigned long last_check_fifo[2];
-	int changed_batch;
+	int changed_batch;		/* 1: waiting for old batch to end */
+	int new_batch;			/* 1: waiting on first read complete */
 	int batch_data_dir;		/* current batch REQ_SYNC / REQ_ASYNC */
 	int write_batch_count;		/* max # of reqs in a write batch */
 	int current_write_count;	/* how many requests left this batch */
@@ -910,8 +911,13 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 		return;
 
 	if (ad->changed_batch && ad->nr_dispatched == 1) {
+		WARN_ON(ad->batch_data_dir == arq->is_sync);
+
 		kblockd_schedule_work(&ad->antic_work);
-		ad->changed_batch = 2;
+		ad->changed_batch = 0;
+
+		if (ad->batch_data_dir == REQ_SYNC)
+			ad->new_batch = 1;
 	}
 	ad->nr_dispatched--;
 
@@ -920,12 +926,12 @@ static void as_completed_request(request_queue_t *q, struct request *rq)
 	 * actually serviced. This should help devices with big TCQ windows
 	 * and writeback caches
 	 */
-	if (ad->batch_data_dir == REQ_SYNC && ad->changed_batch
-			&& ad->batch_data_dir == arq->is_sync) {
+	if (ad->new_batch && ad->batch_data_dir == arq->is_sync) {
+		WARN_ON(ad->batch_data_dir != REQ_SYNC);
 		update_write_batch(ad);
 		ad->current_batch_expires = jiffies +
 				ad->batch_expire[REQ_SYNC];
-		ad->changed_batch = 0;
+		ad->new_batch = 0;
 	}
 
 	if (!arq->io_context)
@@ -1070,7 +1076,7 @@ static int as_fifo_expired(struct as_data *ad, int adir)
  */
 static inline int as_batch_expired(struct as_data *ad)
 {
-	if (ad->changed_batch)
+	if (ad->changed_batch || ad->new_batch)
 		return 0;
 
 	if (ad->batch_data_dir == REQ_SYNC)
@@ -1150,7 +1156,7 @@ static int as_dispatch_request(struct as_data *ad)
 	if (!(reads || writes)
 		|| ad->antic_status == ANTIC_WAIT_REQ
 		|| ad->antic_status == ANTIC_WAIT_NEXT
-		|| ad->changed_batch == 1)
+		|| ad->changed_batch)
 		return 0;
 
 	if (!(reads && writes && as_batch_expired(ad)) ) {
@@ -1192,8 +1198,10 @@ static int as_dispatch_request(struct as_data *ad)
 			 */
 			goto dispatch_writes;
 
- 		if (ad->batch_data_dir == REQ_ASYNC)
+ 		if (ad->batch_data_dir == REQ_ASYNC) {
+			WARN_ON(ad->new_batch);
  			ad->changed_batch = 1;
+		}
 		ad->batch_data_dir = REQ_SYNC;
 		arq = list_entry_fifo(ad->fifo_list[ad->batch_data_dir].next);
 		ad->last_check_fifo[ad->batch_data_dir] = jiffies;
@@ -1208,8 +1216,16 @@ static int as_dispatch_request(struct as_data *ad)
 dispatch_writes:
 		BUG_ON(RB_EMPTY(&ad->sort_list[REQ_ASYNC]));
 
- 		if (ad->batch_data_dir == REQ_SYNC)
+ 		if (ad->batch_data_dir == REQ_SYNC) {
  			ad->changed_batch = 1;
+
+			/*
+			 * new_batch might be 1 when the queue runs out of
+			 * reads. A subsequent submission of a write might
+			 * cause a change of batch before the read is finished.
+			 */
+			ad->new_batch = 0;
+		}
 		ad->batch_data_dir = REQ_ASYNC;
 		ad->current_write_count = ad->write_batch_count;
 		ad->write_batch_idled = 0;
@@ -1232,14 +1248,19 @@ fifo_expired:
 	}
 
 	if (ad->changed_batch) {
-		if (ad->changed_batch == 1 && ad->nr_dispatched)
+		WARN_ON(ad->new_batch);
+
+		if (ad->nr_dispatched)
 			return 0;
-		if (ad->batch_data_dir == REQ_ASYNC) {
+
+		if (ad->batch_data_dir == REQ_ASYNC)
 			ad->current_batch_expires = jiffies +
 					ad->batch_expire[REQ_ASYNC];
-			ad->changed_batch = 0;
-		} else
-			ad->changed_batch = 2;
+		else
+			ad->new_batch = 1;
+
+		ad->changed_batch = 0;
+
 		arq->request->flags |= REQ_SOFTBARRIER;
 	}
 
