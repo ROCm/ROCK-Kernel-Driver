@@ -679,6 +679,8 @@ svc_tcp_accept(struct svc_sock *svsk)
 		goto failed;		/* aborted connection or whatever */
 	}
 	set_bit(SK_CONN, &svsk->sk_flags);
+	svc_sock_enqueue(svsk);
+
 	slen = sizeof(sin);
 	err = ops->getname(newsock, (struct sockaddr *) &sin, &slen, 1);
 	if (err < 0) {
@@ -1220,7 +1222,7 @@ svc_create_socket(struct svc_serv *serv, int protocol, struct sockaddr_in *sin)
 	}
 
 	if (protocol == IPPROTO_TCP) {
-		if ((error = sock->ops->listen(sock, 5)) < 0)
+		if ((error = sock->ops->listen(sock, 64)) < 0)
 			goto bummer;
 	}
 
