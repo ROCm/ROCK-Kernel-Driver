@@ -77,7 +77,6 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_NONE = (1 << 5),    /* buffer not read at all                  */
 	PBF_DELWRI = (1 << 6),  /* buffer has dirty pages                  */
 	PBF_SYNC = (1 << 8),    /* force updates to disk                   */
-	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages          */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
 	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
 	PBF_FS_DATAIOD = (1 << 12), /* schedule IO completion on fs datad  */
@@ -508,17 +507,15 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 
 #define xfs_buf_read(target, blkno, len, flags) \
 		pagebuf_get((target), (blkno), (len), \
-			PBF_LOCK | PBF_READ | PBF_MAPPED | PBF_MAPPABLE)
+			PBF_LOCK | PBF_READ | PBF_MAPPED)
 #define xfs_buf_get(target, blkno, len, flags) \
 		pagebuf_get((target), (blkno), (len), \
-			PBF_LOCK | PBF_MAPPED | PBF_MAPPABLE)
+			PBF_LOCK | PBF_MAPPED)
 
 #define xfs_buf_read_flags(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), \
-			PBF_READ | PBF_MAPPABLE | flags)
+		pagebuf_get((target), (blkno), (len), PBF_READ | (flags))
 #define xfs_buf_get_flags(target, blkno, len, flags) \
-		pagebuf_get((target), (blkno), (len), \
-			PBF_MAPPABLE | flags)
+		pagebuf_get((target), (blkno), (len), (flags))
 
 static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 {

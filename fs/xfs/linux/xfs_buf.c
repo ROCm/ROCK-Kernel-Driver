@@ -470,10 +470,8 @@ _pagebuf_lookup_pages(
 		retry_count = 0;
 	} else if (flags & PBF_DONT_BLOCK) {
 		gfp_mask = GFP_NOFS;
-	} else if (flags & PBF_MAPPABLE) {
-		gfp_mask = GFP_KERNEL;
 	} else {
-		gfp_mask = GFP_HIGHUSER;
+		gfp_mask = GFP_KERNEL;
 	}
 
 	next_buffer_offset = pb->pb_file_offset + pb->pb_buffer_length;
@@ -708,8 +706,7 @@ found:
 	}
 
 	if (pb->pb_flags & PBF_STALE)
-		pb->pb_flags &= PBF_MAPPABLE | \
-				PBF_MAPPED | \
+		pb->pb_flags &= PBF_MAPPED | \
 				_PBF_ALL_PAGES_MAPPED | \
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED | \
@@ -856,7 +853,7 @@ pagebuf_readahead(
 	if (bdi_write_congested(bdi))
 		return;
 
-	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_MAPPABLE|PBF_READ_AHEAD);
+	flags |= (PBF_TRYLOCK|PBF_READ|PBF_ASYNC|PBF_READ_AHEAD);
 	pagebuf_get(target, ioff, isize, flags);
 }
 
