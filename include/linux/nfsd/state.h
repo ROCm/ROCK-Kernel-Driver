@@ -231,8 +231,9 @@ struct nfs4_stateid {
 #define CONFIRM                 0x00000002
 #define OPEN_STATE              0x00000004
 #define LOCK_STATE              0x00000008
-#define RDWR_STATE              0x00000010
-#define CLOSE_STATE             0x00000020
+#define RD_STATE	        0x00000010
+#define WR_STATE	        0x00000020
+#define CLOSE_STATE             0x00000040
 
 #define seqid_mutating_err(err)                       \
 	(((err) != nfserr_stale_clientid) &&    \
@@ -243,7 +244,7 @@ struct nfs4_stateid {
 extern time_t nfs4_laundromat(void);
 extern int nfsd4_renew(clientid_t *clid);
 extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh, 
-		stateid_t *stateid, int flags, struct nfs4_stateid **stpp);
+		stateid_t *stateid, int flags);
 extern int nfs4_share_conflict(struct svc_fh *current_fh, 
 		unsigned int deny_type);
 extern void nfs4_lock_state(void);
