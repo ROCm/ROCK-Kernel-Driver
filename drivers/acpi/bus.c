@@ -596,6 +596,9 @@ acpi_early_init (void)
 	acpi_status		status = AE_OK;
 	struct acpi_buffer	buffer = {sizeof(acpi_fadt), &acpi_fadt};
 
+	if (acpi_disabled)
+		return;
+
 	ACPI_FUNCTION_TRACE("acpi_bus_init");
 
 	status = acpi_initialize_subsystem();
