@@ -102,6 +102,7 @@ extern const char *print_tainted(void);
 #define TAINT_PROPRIETORY_MODULE	(1<<0)
 #define TAINT_FORCED_MODULE		(1<<1)
 #define TAINT_UNSAFE_SMP		(1<<2)
+#define TAINT_FORCED_RMMOD		(1<<3)
 
 extern void dump_stack(void);
 

@@ -348,12 +348,24 @@ static unsigned int module_refcount(struct module *mod)
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
 
+#ifdef CONFIG_MODULE_FORCE_UNLOAD
+static inline int try_force(unsigned int flags)
+{
+	return (flags & O_TRUNC);
+}
+#else
+static inline int try_force(unsigned int flags)
+{
+	return 0;
+}
+#endif /* CONFIG_MODULE_FORCE_UNLOAD */
+
 asmlinkage long
 sys_delete_module(const char *name_user, unsigned int flags)
 {
 	struct module *mod;
 	char name[MODULE_NAME_LEN];
-	int ret;
+	int ret, forced = 0;
 
 	if (!capable(CAP_SYS_MODULE))
 		return -EPERM;
@@ -371,24 +383,29 @@ sys_delete_module(const char *name_user, unsigned int flags)
 		goto out;
 	}
 
-	/* Already dying? */
-	if (!mod->live) {
-		DEBUGP("%s already dying\n", mod->name);
-		ret = -EBUSY;
-		goto out;
-	}
-
-	if (!mod->exit || mod->unsafe) {
-		/* This module can't be removed */
-		ret = -EBUSY;
-		goto out;
-	}
 	if (!list_empty(&mod->modules_which_use_me)) {
 		/* Other modules depend on us: get rid of them first. */
 		ret = -EWOULDBLOCK;
 		goto out;
 	}
 
+	/* Already dying? */
+	if (!mod->live) {
+		/* FIXME: if (force), slam module count and wake up
+                   waiter --RR */
+		DEBUGP("%s already dying\n", mod->name);
+		ret = -EBUSY;
+		goto out;
+	}
+
+	if (!mod->exit || mod->unsafe) {
+		forced = try_force(flags);
+		if (!forced) {
+			/* This module can't be removed */
+			ret = -EBUSY;
+			goto out;
+		}
+	}
 	/* Stop the machine so refcounts can't move: irqs disabled. */
 	DEBUGP("Stopping refcounts...\n");
 	ret = stop_refcounts();
@@ -396,9 +413,11 @@ sys_delete_module(const char *name_user, unsigned int flags)
 		goto out;
 
 	/* If it's not unused, quit unless we are told to block. */
-	if ((flags & O_NONBLOCK) && module_refcount(mod) != 0)
-		ret = -EWOULDBLOCK;
-	else {
+	if ((flags & O_NONBLOCK) && module_refcount(mod) != 0) {
+		forced = try_force(flags);
+		if (!forced)
+			ret = -EWOULDBLOCK;
+	} else {
 		mod->waiter = current;
 		mod->live = 0;
 	}
@@ -406,6 +425,9 @@ sys_delete_module(const char *name_user, unsigned int flags)
 
 	if (ret != 0)
 		goto out;
+
+	if (forced)
+		goto destroy;
 
 	/* Since we might sleep for some time, drop the semaphore first */
 	up(&module_mutex);
@@ -421,10 +443,11 @@ sys_delete_module(const char *name_user, unsigned int flags)
 	DEBUGP("Regrabbing mutex...\n");
 	down(&module_mutex);
 
+ destroy:
 	/* Final destruction now noone is using it. */
-	mod->exit();
+	if (mod->exit)
+		mod->exit();
 	free_module(mod);
-	ret = 0;
 
  out:
 	up(&module_mutex);
