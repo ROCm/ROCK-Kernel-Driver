@@ -50,15 +50,14 @@ void unlock_fat(struct super_block *sb)
 /* XXX: Need to write one per FSINFO block.  Currently only writes 1 */
 void fat_clusters_flush(struct super_block *sb)
 {
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	struct buffer_head *bh;
 	struct fat_boot_fsinfo *fsinfo;
 
-	if (MSDOS_SB(sb)->fat_bits != 32)
-		return;
-	if (MSDOS_SB(sb)->free_clusters == -1)
+	if (sbi->fat_bits != 32)
 		return;
 
-	bh = sb_bread(sb, MSDOS_SB(sb)->fsinfo_sector);
+	bh = sb_bread(sb, sbi->fsinfo_sector);
 	if (bh == NULL) {
 		printk(KERN_ERR "FAT bread failed in fat_clusters_flush\n");
 		return;
@@ -71,10 +70,12 @@ void fat_clusters_flush(struct super_block *sb)
 		       "     Found signature1 0x%08x signature2 0x%08x"
 		       " (sector = %lu)\n",
 		       CF_LE_L(fsinfo->signature1), CF_LE_L(fsinfo->signature2),
-		       MSDOS_SB(sb)->fsinfo_sector);
+		       sbi->fsinfo_sector);
 	} else {
-		fsinfo->free_clusters = CF_LE_L(MSDOS_SB(sb)->free_clusters);
-		fsinfo->next_cluster = CF_LE_L(MSDOS_SB(sb)->prev_free);
+		if (sbi->free_clusters != -1)
+			fsinfo->free_clusters = CF_LE_L(sbi->free_clusters);
+		if (sbi->prev_free)
+			fsinfo->next_cluster = CF_LE_L(sbi->prev_free);
 		mark_buffer_dirty(bh);
 	}
 	brelse(bh);

@@ -159,7 +159,9 @@ void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
-	fat_clusters_flush(sb);
+	if (!(sb->s_flags & MS_RDONLY))
+		fat_clusters_flush(sb);
+
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
 		sbi->nls_disk = NULL;
