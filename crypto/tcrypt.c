@@ -684,7 +684,14 @@ init(void)
 	return 0;
 }
 
+/*
+ * If an init function is provided, an exit function must also be provided
+ * to allow module unload.
+ */
+static void __exit fini(void) { }
+
 module_init(init);
+module_exit(fini);
 
 MODULE_PARM(mode, "i");
 
