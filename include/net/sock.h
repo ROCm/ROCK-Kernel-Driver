@@ -51,7 +51,7 @@
 
 #include <asm/atomic.h>
 #include <net/dst.h>
-#include <net/scm.h>	/* for sock_iocb */
+#include <net/scm.h>
 
 /*
  * This structure really needs to be cleaned up.
