@@ -1917,9 +1917,9 @@ static int idetape_end_request(struct ata_device *drive, struct request *rq, int
 			idetape_active_next_stage (drive);
 
 			/*
-			 *	Insert the next request into the request queue.
+			 * Insert the next request into the request queue.
 			 */
-			(void) ide_do_drive_cmd (drive, tape->active_data_request, ide_end);
+			ide_do_drive_cmd(drive, tape->active_data_request, ide_end);
 		} else if (!error) {
 			if (!tape->onstream)
 				idetape_increase_max_pipeline_stages (drive);
@@ -1986,7 +1986,7 @@ static void idetape_queue_pc_head (ide_drive_t *drive,idetape_pc_t *pc,struct re
 	ide_init_drive_cmd (rq);
 	rq->buffer = (char *) pc;
 	rq->flags = IDETAPE_PC_RQ1;
-	(void) ide_do_drive_cmd (drive, rq, ide_preempt);
+	ide_do_drive_cmd(drive, rq, ide_preempt);
 }
 
 /*
@@ -3197,7 +3197,7 @@ static int __idetape_queue_pc_tail (ide_drive_t *drive, idetape_pc_t *pc)
 	ide_init_drive_cmd (&rq);
 	rq.buffer = (char *) pc;
 	rq.flags = IDETAPE_PC_RQ1;
-	return ide_do_drive_cmd (drive, &rq, ide_wait);
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
 static void idetape_create_load_unload_cmd (ide_drive_t *drive, idetape_pc_t *pc,int cmd)

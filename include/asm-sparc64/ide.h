@@ -72,9 +72,6 @@ static __inline__ void ide_init_default_hwifs(void)
 #undef  SUPPORT_SLOW_DATA_PORTS
 #define SUPPORT_SLOW_DATA_PORTS 0
 
-#undef  SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC 0
-
 #undef  HD_DATA
 #define HD_DATA ((ide_ioreg_t)0)
 
@@ -180,10 +177,6 @@ static __inline__ void ide_outsw(unsigned long port,
 	__flush_dcache_range((unsigned long)src, end);
 #endif
 }
-
-#define ide_ack_intr(hwif)		(1)
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
 #endif /* __KERNEL__ */
 

@@ -10,10 +10,6 @@
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
- * Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*
@@ -71,9 +67,6 @@ extern int init_cs5530(void);
 #endif
 #ifdef CONFIG_BLK_DEV_AMD74XX
 extern int init_amd74xx(void);
-#endif
-#ifdef CONFIG_BLK_DEV_PDC_ADMA
-extern int init_pdcadma(void);
 #endif
 #ifdef CONFIG_BLK_DEV_SVWKS
 extern int init_svwks(void);

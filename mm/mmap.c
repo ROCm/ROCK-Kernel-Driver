@@ -732,97 +732,6 @@ struct vm_area_struct * find_extend_vma(struct mm_struct * mm, unsigned long add
 	return vma;
 }
 
-/* Normal function to fix up a mapping
- * This function is the default for when an area has no specific
- * function.  This may be used as part of a more specific routine.
- * This function works out what part of an area is affected and
- * adjusts the mapping information.  Since the actual page
- * manipulation is done in do_mmap(), none need be done here,
- * though it would probably be more appropriate.
- *
- * By the time this function is called, the area struct has been
- * removed from the process mapping list, so it needs to be
- * reinserted if necessary.
- *
- * The 4 main cases are:
- *    Unmapping the whole area
- *    Unmapping from the start of the segment to a point in it
- *    Unmapping from an intermediate point to the end
- *    Unmapping between to intermediate points, making a hole.
- *
- * Case 4 involves the creation of 2 new areas, for each side of
- * the hole.  If possible, we reuse the existing area rather than
- * allocate a new one, and the return indicates whether the old
- * area was reused.
- */
-static struct vm_area_struct * unmap_fixup(struct mm_struct *mm, 
-	struct vm_area_struct *area, unsigned long addr, size_t len, 
-	struct vm_area_struct *extra)
-{
-	struct vm_area_struct *mpnt;
-	unsigned long end = addr + len;
-
-	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
-	if (area->vm_flags & VM_LOCKED)
-		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
-
-	/* Unmapping the whole area. */
-	if (addr == area->vm_start && end == area->vm_end) {
-		if (area->vm_ops && area->vm_ops->close)
-			area->vm_ops->close(area);
-		if (area->vm_file)
-			fput(area->vm_file);
-		kmem_cache_free(vm_area_cachep, area);
-		return extra;
-	}
-
-	/* Work out to one of the ends. */
-	if (end == area->vm_end) {
-		/*
-		 * here area isn't visible to the semaphore-less readers
-		 * so we don't need to update it under the spinlock.
-		 */
-		area->vm_end = addr;
-		lock_vma_mappings(area);
-	} else if (addr == area->vm_start) {
-		area->vm_pgoff += (end - area->vm_start) >> PAGE_SHIFT;
-		/* same locking considerations of the above case */
-		area->vm_start = end;
-		lock_vma_mappings(area);
-	} else {
-	/* Unmapping a hole: area->vm_start < addr <= end < area->vm_end */
-		/* Add end mapping -- leave beginning for below */
-		mpnt = extra;
-		extra = NULL;
-
-		mpnt->vm_mm = area->vm_mm;
-		mpnt->vm_start = end;
-		mpnt->vm_end = area->vm_end;
-		mpnt->vm_page_prot = area->vm_page_prot;
-		mpnt->vm_flags = area->vm_flags;
-		mpnt->vm_raend = 0;
-		mpnt->vm_ops = area->vm_ops;
-		mpnt->vm_pgoff = area->vm_pgoff + ((end - area->vm_start) >> PAGE_SHIFT);
-		mpnt->vm_file = area->vm_file;
-		mpnt->vm_private_data = area->vm_private_data;
-		if (mpnt->vm_file)
-			get_file(mpnt->vm_file);
-		if (mpnt->vm_ops && mpnt->vm_ops->open)
-			mpnt->vm_ops->open(mpnt);
-		area->vm_end = addr;	/* Truncate area */
-
-		/* Because mpnt->vm_file == area->vm_file this locks
-		 * things correctly.
-		 */
-		lock_vma_mappings(area);
-		__insert_vm_struct(mm, mpnt);
-	}
-
-	__insert_vm_struct(mm, area);
-	unlock_vma_mappings(area);
-	return extra;
-}
-
 /*
  * Try to free as many page directory entries as we can,
  * without having to work very hard at actually scanning
@@ -882,103 +791,200 @@ no_mmaps:
 	}
 }
 
+/* Normal function to fix up a mapping
+ * This function is the default for when an area has no specific
+ * function.  This may be used as part of a more specific routine.
+ *
+ * By the time this function is called, the area struct has been
+ * removed from the process mapping list.
+ */
+static void unmap_vma(struct mm_struct *mm, struct vm_area_struct *area)
+{
+	size_t len = area->vm_end - area->vm_start;
+
+	area->vm_mm->total_vm -= len >> PAGE_SHIFT;
+	if (area->vm_flags & VM_LOCKED)
+		area->vm_mm->locked_vm -= len >> PAGE_SHIFT;
+
+	remove_shared_vm_struct(area);
+
+	if (area->vm_ops && area->vm_ops->close)
+		area->vm_ops->close(area);
+	if (area->vm_file)
+		fput(area->vm_file);
+	kmem_cache_free(vm_area_cachep, area);
+}
+
+
+/*
+ * Update the VMA and inode share lists.
+ *
+ * Ok - we have the memory areas we should free on the 'free' list,
+ * so release them, and do the vma updates.
+ */
+static void unmap_vma_list(struct mm_struct *mm,
+	struct vm_area_struct *mpnt)
+{
+	do {
+		struct vm_area_struct *next = mpnt->vm_next;
+		unmap_vma(mm, mpnt);
+		mpnt = next;
+	} while (mpnt != NULL);
+	validate_mm(mm);
+}
+
+/*
+ * Get rid of page table information in the indicated region.
+ *
+ * Called with the page table lock held.
+ */
+static void unmap_region(struct mm_struct *mm,
+	struct vm_area_struct *mpnt,
+	struct vm_area_struct *prev,
+	unsigned long start,
+	unsigned long end)
+{
+	mmu_gather_t *tlb;
+
+	tlb = tlb_gather_mmu(mm);
+
+	do {
+		unsigned long from, to;
+
+		from = start < mpnt->vm_start ? mpnt->vm_start : start;
+		to = end > mpnt->vm_end ? mpnt->vm_end : end;
+
+		unmap_page_range(tlb, mpnt, from, to);
+	} while ((mpnt = mpnt->vm_next) != NULL);
+
+	free_pgtables(tlb, prev, start, end);
+	tlb_finish_mmu(tlb, start, end);
+}
+
+/*
+ * Create a list of vma's touched by the unmap,
+ * removing them from the VM lists as we go..
+ *
+ * Called with the page_table_lock held.
+ */
+static struct vm_area_struct *touched_by_munmap(struct mm_struct *mm,
+	struct vm_area_struct *mpnt,
+	struct vm_area_struct *prev,
+	unsigned long end)
+{
+	struct vm_area_struct **npp, *touched;
+
+	npp = (prev ? &prev->vm_next : &mm->mmap);
+
+	touched = NULL;
+	do {
+		struct vm_area_struct *next = mpnt->vm_next;
+		mpnt->vm_next = touched;
+		touched = mpnt;
+		mm->map_count--;
+		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
+		mpnt = next;
+	} while (mpnt && mpnt->vm_start < end);
+	*npp = mpnt;
+	mm->mmap_cache = NULL;	/* Kill the cache. */
+	return touched;
+}
+
+/*
+ * Split a vma into two pieces at address 'addr', the original vma
+ * will contain the first part, a new vma is allocated for the tail.
+ */
+static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned long addr)
+{
+	struct vm_area_struct *new;
+
+	if (mm->map_count >= MAX_MAP_COUNT)
+		return -ENOMEM;
+
+	new = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
+	if (!new)
+		return -ENOMEM;
+
+	/* most fields are the same, copy all, and then fixup */
+	*new = *mpnt;
+
+	new->vm_start = addr;
+	new->vm_pgoff = mpnt->vm_pgoff + ((addr - mpnt->vm_start) >> PAGE_SHIFT);
+	new->vm_raend = 0;
+	if (mpnt->vm_file) {
+		struct file *file = mpnt->vm_file;
+		get_file(file);
+		if (mpnt->vm_flags & VM_DENYWRITE)
+			atomic_dec(&file->f_dentry->d_inode->i_writecount);
+	}
+
+	if (mpnt->vm_ops && mpnt->vm_ops->open)
+		mpnt->vm_ops->open(mpnt);
+	mpnt->vm_end = addr;	/* Truncate area */
+
+	spin_lock(&mm->page_table_lock);
+	lock_vma_mappings(mpnt);
+	__insert_vm_struct(mm, new);
+	unlock_vma_mappings(mpnt);
+	spin_unlock(&mm->page_table_lock);
+
+	return 0;
+}
+
 /* Munmap is split into 2 main parts -- this part which finds
  * what needs doing, and the areas themselves, which do the
  * work.  This now handles partial unmappings.
  * Jeremy Fitzhardine <jeremy@sw.oz.au>
  */
-int do_munmap(struct mm_struct *mm, unsigned long addr, size_t len)
+int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
-	mmu_gather_t *tlb;
-	struct vm_area_struct *mpnt, *prev, **npp, *free, *extra;
+	unsigned long end;
+	struct vm_area_struct *mpnt, *prev, *last;
 
-	if ((addr & ~PAGE_MASK) || addr > TASK_SIZE || len > TASK_SIZE-addr)
+	if ((start & ~PAGE_MASK) || start > TASK_SIZE || len > TASK_SIZE-start)
 		return -EINVAL;
 
 	if ((len = PAGE_ALIGN(len)) == 0)
 		return -EINVAL;
 
-	/* Check if this memory area is ok - put it on the temporary
-	 * list if so..  The checks here are pretty simple --
-	 * every area affected in some way (by any overlap) is put
-	 * on the list.  If nothing is put on, nothing is affected.
-	 */
-	mpnt = find_vma_prev(mm, addr, &prev);
+	/* Find the first overlapping VMA */
+	mpnt = find_vma_prev(mm, start, &prev);
 	if (!mpnt)
 		return 0;
-	/* we have  addr < mpnt->vm_end  */
+	/* we have  start < mpnt->vm_end  */
 
-	if (mpnt->vm_start >= addr+len)
+	/* if it doesn't overlap, we have nothing.. */
+	end = start + len;
+	if (mpnt->vm_start >= end)
 		return 0;
 
-	/* If we'll make "hole", check the vm areas limit */
-	if ((mpnt->vm_start < addr && mpnt->vm_end > addr+len)
-	    && mm->map_count >= MAX_MAP_COUNT)
-		return -ENOMEM;
+	/*
+	 * If we need to split any vma, do it now to save pain later.
+	 */
+	if (start > mpnt->vm_start) {
+		if (splitvma(mm, mpnt, start))
+			return -ENOMEM;
+		prev = mpnt;
+		mpnt = mpnt->vm_next;
+	}
+
+	/* Does it split the last one? */
+	last = find_vma(mm, end);
+	if (last && end > last->vm_start) {
+		if (splitvma(mm, last, end))
+			return -ENOMEM;
+	}
 
 	/*
-	 * We may need one additional vma to fix up the mappings ... 
-	 * and this is the last chance for an easy error exit.
+	 * Remove the vma's, and unmap the actual pages
 	 */
-	extra = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	if (!extra)
-		return -ENOMEM;
-
-	npp = (prev ? &prev->vm_next : &mm->mmap);
-	free = NULL;
 	spin_lock(&mm->page_table_lock);
-	for ( ; mpnt && mpnt->vm_start < addr+len; mpnt = *npp) {
-		*npp = mpnt->vm_next;
-		mpnt->vm_next = free;
-		free = mpnt;
-		rb_erase(&mpnt->vm_rb, &mm->mm_rb);
-	}
-	mm->mmap_cache = NULL;	/* Kill the cache. */
-
-	tlb = tlb_gather_mmu(mm);
-
-	/* Ok - we have the memory areas we should free on the 'free' list,
-	 * so release them, and unmap the page range..
-	 * If the one of the segments is only being partially unmapped,
-	 * it will put new vm_area_struct(s) into the address space.
-	 * In that case we have to be careful with VM_DENYWRITE.
-	 */
-	while ((mpnt = free) != NULL) {
-		unsigned long st, end;
-		struct file *file = NULL;
-
-		free = free->vm_next;
-
-		st = addr < mpnt->vm_start ? mpnt->vm_start : addr;
-		end = addr+len;
-		end = end > mpnt->vm_end ? mpnt->vm_end : end;
-
-		if (mpnt->vm_flags & VM_DENYWRITE &&
-		    (st != mpnt->vm_start || end != mpnt->vm_end) &&
-		    (file = mpnt->vm_file) != NULL) {
-			atomic_dec(&file->f_dentry->d_inode->i_writecount);
-		}
-		remove_shared_vm_struct(mpnt);
-		mm->map_count--;
-
-		unmap_page_range(tlb, mpnt, st, end);
-
-		/*
-		 * Fix the mapping, and free the old area if it wasn't reused.
-		 */
-		extra = unmap_fixup(mm, mpnt, st, end-st, extra);
-		if (file)
-			atomic_inc(&file->f_dentry->d_inode->i_writecount);
-	}
-	validate_mm(mm);
-
-	/* Release the extra vma struct if it wasn't used */
-	if (extra)
-		kmem_cache_free(vm_area_cachep, extra);
-
-	free_pgtables(tlb, prev, addr, addr+len);
-	tlb_finish_mmu(tlb, addr, addr+len);
+	mpnt = touched_by_munmap(mm, mpnt, prev, end);
+	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
+
+	/* Fix up all other VM information */
+	unmap_vma_list(mm, mpnt);
 
 	return 0;
 }

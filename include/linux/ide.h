@@ -40,9 +40,6 @@
 
 /* Right now this is only needed by a promise controlled.
  */
-#ifndef SUPPORT_VLB_SYNC		/* 1 to support weird 32-bit chips */
-# define SUPPORT_VLB_SYNC	1	/* 0 to reduce kernel size */
-#endif
 #ifndef DISK_RECOVERY_TIME		/* off=0; on=access_delay_time */
 # define DISK_RECOVERY_TIME	0	/*  for hardware that needs it */
 #endif
@@ -73,8 +70,6 @@ typedef unsigned char	byte;	/* used everywhere */
  * state flags
  */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
-
-#define HWGROUP(drive)		(drive->channel->hwgroup)
 
 /*
  * Definitions for accessing IDE controller registers
@@ -239,6 +234,19 @@ void ide_setup_ports(hw_regs_t *hw,
 
 #include <asm/ide.h>
 
+/* Currently only m68k, apus and m8xx need it */
+#ifdef ATA_ARCH_ACK_INTR
+# define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
+#else
+# define ide_ack_intr(hwif) (1)
+#endif
+
+/* Currently only Atari needs it */
+#ifndef ATA_ARCH_LOCK
+# define ide_release_lock(lock)		do {} while (0)
+# define ide_get_lock(lock, hdlr, data)	do {} while (0)
+#endif
+
 /*
  * If the arch-dependant ide.h did not declare/define any OUT_BYTE or IN_BYTE
  * functions, we make some defaults here. The only architecture currently
@@ -324,14 +332,16 @@ struct ata_device {
 	 * magically just go away.
 	 */
 	request_queue_t	queue;	/* per device request queue */
+	struct request *rq;		/* current request */
 
 	unsigned long sleep;	/* sleep until this time */
 
-	byte     using_dma;		/* disk is using dma for read/write */
-	byte	 using_tcq;		/* disk is using queueing */
 	byte	 retry_pio;		/* retrying dma capable host in pio */
 	byte	 state;			/* retry state */
-	byte     dsc_overlap;		/* flag: DSC overlap */
+
+	unsigned using_dma	: 1;	/* disk is using dma for read/write */
+	unsigned using_tcq	: 1;	/* disk is using queueing */
+	unsigned dsc_overlap	: 1;	/* flag: DSC overlap */
 
 	unsigned waiting_for_dma: 1;	/* dma currently in progress */
 	unsigned busy		: 1;	/* currently doing revalidate_disk() */
@@ -403,27 +413,56 @@ struct ata_device {
 	int		max_depth;
 } ide_drive_t;
 
+/*
+ * Status returned by various functions.
+ */
+typedef enum {
+	ide_stopped,	/* no drive operation was started */
+	ide_started,	/* a drive operation was started, and a handler was set */
+	ide_released	/* started and released bus */
+} ide_startstop_t;
+
+/*
+ *  Interrupt and timeout handler type.
+ */
+typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
+typedef int (ata_expiry_t)(struct ata_device *, struct request *);
+
 enum {
 	ATA_PRIMARY	= 0,
 	ATA_SECONDARY	= 1
+};
+
+enum {
+	IDE_BUSY,	/* awaiting an interrupt */
+	IDE_SLEEP,
+	IDE_DMA		/* DMA in progress */
 };
 
 struct ata_channel {
 	struct device	dev;		/* device handle */
 	int		unit;		/* channel number */
 
-	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
-	struct timer_list timer;	/* failsafe timer */
-	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
-	struct ata_device *drive;	/* last serviced drive */
+	/* This lock is used to serialize requests on the same device queue or
+	 * between differen queues sharing the same irq line.
+	 */
+	spinlock_t *lock;
 
-	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
-	hw_regs_t	hw;		/* Hardware info */
+	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
+	struct timer_list timer;				/* failsafe timer */
+	int (*expiry)(struct ata_device *, struct request *);	/* irq handler, if active */
+	unsigned long poll_timeout;				/* timeout value during polled operations */
+	struct ata_device *drive;				/* last serviced drive */
+
+	unsigned long active;		/* active processing request */
+
+	ide_ioreg_t io_ports[IDE_NR_PORTS];	/* task file registers */
+	hw_regs_t hw;				/* hardware info */
 #ifdef CONFIG_PCI
-	struct pci_dev	*pci_dev;	/* for pci chipsets */
+	struct pci_dev *pci_dev;		/* for pci chipsets */
 #endif
 	struct ata_device drives[MAX_DRIVES];	/* drive info */
-	struct gendisk	*gd;		/* gendisk structure */
+	struct gendisk *gd;			/* gendisk structure */
 
 	/*
 	 * Routines to tune PIO and DMA mode for drives.
@@ -431,7 +470,11 @@ struct ata_channel {
 	 * A value of 255 indicates that the function should choose the optimal
 	 * mode itself.
 	 */
+
+	/* setup disk on a channel for a particular transfer mode */
 	void (*tuneproc) (struct ata_device *, byte pio);
+
+	/* setup the chipset timing for a particular transfer mode */
 	int (*speedproc) (struct ata_device *, byte pio);
 
 	/* tweaks hardware to select drive */
@@ -448,6 +491,9 @@ struct ata_channel {
 
 	/* check host's drive quirk list */
 	int (*quirkproc) (struct ata_device *);
+
+	/* driver soft-power interface */
+	int (*busproc)(struct ata_device *, int);
 
 	/* CPU-polled transfer routines */
 	void (*ata_read)(struct ata_device *, void *, unsigned int);
@@ -497,18 +543,14 @@ struct ata_channel {
 	unsigned no_io_32bit	: 1;	/* disallow enabling 32bit I/O */
 	unsigned no_unmask	: 1;	/* disallow setting unmask bit */
 	unsigned auto_poll	: 1;	/* supports nop auto-poll */
-	byte		io_32bit;	/* 0=16-bit, 1=32-bit, 2/3=32bit+sync */
-	byte		unmask;		/* flag: okay to unmask other irqs */
-	byte		slow;		/* flag: slow data port */
+	unsigned unmask		: 1;	/* flag: okay to unmask other irqs */
+	unsigned slow		: 1;	/* flag: slow data port */
+	unsigned io_32bit	: 1;	/* 0=16-bit, 1=32-bit */
+	unsigned char bus_state;	/* power state of the IDE bus */
 
 #if (DISK_RECOVERY_TIME > 0)
-	unsigned long	last_time;	/* time when previous rq was done */
+	unsigned long last_time;	/* time when previous rq was done */
 #endif
-	/* driver soft-power interface */
-	int (*busproc)(struct ata_device *, int);
-	byte		bus_state;	/* power state of the IDE bus */
-
-	unsigned long poll_timeout; /* timeout value during polled operations */
 };
 
 /*
@@ -517,26 +559,7 @@ struct ata_channel {
 extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
 extern void ide_unregister(struct ata_channel *hwif);
 
-/*
- * Status returned by various functions.
- */
-typedef enum {
-	ide_stopped,	/* no drive operation was started */
-	ide_started,	/* a drive operation was started, and a handler was set */
-	ide_released	/* started and released bus */
-} ide_startstop_t;
-
-/*
- *  Interrupt and timeout handler type.
- */
-typedef ide_startstop_t (ata_handler_t)(struct ata_device *, struct request *);
-typedef int (ata_expiry_t)(struct ata_device *, struct request *);
-
 struct ata_taskfile;
-
-#define IDE_BUSY	0	/* awaiting an interrupt */
-#define IDE_SLEEP	1
-#define IDE_DMA		2	/* DMA in progress */
 
 #define IDE_MAX_TAG	32
 
@@ -560,15 +583,6 @@ static inline int ata_can_queue(struct ata_device *drive)
 # define ata_pending_commands(drive)	(0)
 # define ata_can_queue(drive)		(1)
 #endif
-
-typedef struct hwgroup_s {
-	/* FIXME: We should look for busy request queues instead of looking at
-	 * the !NULL state of this field.
-	 */
-	ide_startstop_t (*handler)(struct ata_device *, struct request *);	/* irq handler, if active */
-	unsigned long flags;		/* BUSY, SLEEPING */
-	struct request *rq;		/* current request */
-} ide_hwgroup_t;
 
 /* FIXME: kill this as soon as possible */
 #define PROC_IDE_READ_RETURN(page,start,off,count,eof,len) return 0;
@@ -647,12 +661,6 @@ extern ide_startstop_t ide_error(struct ata_device *, struct request *rq,
 		const char *, byte);
 
 /*
- * Issue a simple drive command
- * The drive must be selected beforehand.
- */
-void ide_cmd(struct ata_device *, byte, byte, ata_handler_t);
-
-/*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
  * removing leading/trailing blanks and compressing internal blanks.
  * It is primarily used to tidy up the model name/number fields as
@@ -701,7 +709,6 @@ extern void ide_init_drive_cmd(struct request *rq);
  */
 typedef enum {
 	ide_wait,	/* insert rq at end of list, and wait for it */
-	ide_next,	/* insert rq immediately after current request */
 	ide_preempt,	/* insert rq in front of current request */
 	ide_end		/* insert rq at end of list, but don't wait for it */
 } ide_action_t;
@@ -751,21 +758,14 @@ extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 
 void ide_delay_50ms(void);
 
-extern byte ide_auto_reduce_xfer(struct ata_device *);
 extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_driveid_update(struct ata_device *);
-extern int ide_ata66_check(struct ata_device *, struct ata_taskfile *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
 extern byte eighty_ninty_three(struct ata_device *);
-extern int set_transfer(struct ata_device *, struct ata_taskfile *);
 
 extern int system_bus_speed;
 
-/*
- * ide_stall_queue() can be used by a drive to give excess bandwidth back
- * to the hwgroup by sleeping for timeout jiffies.
- */
-void ide_stall_queue(struct ata_device *, unsigned long);
+extern void ide_stall_queue(struct ata_device *, unsigned long);
 
 /*
  * CompactFlash cards and their brethern pretend to be removable hard disks,
@@ -820,22 +820,55 @@ extern int ide_unregister_subdriver(struct ata_device *drive);
 
 void __init ide_scan_pcibus(int scan_direction);
 #endif
+
+static inline void udma_enable(struct ata_device *drive, int on, int verbose)
+{
+	drive->channel->udma_enable(drive, on, verbose);
+}
+
+static inline int udma_start(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_start(drive, rq);
+}
+
+static inline int udma_stop(struct ata_device *drive)
+{
+	return drive->channel->udma_stop(drive);
+}
+
+static inline int udma_read(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_read(drive, rq);
+}
+
+static inline int udma_write(struct ata_device *drive, struct request *rq)
+{
+	return drive->channel->udma_write(drive, rq);
+}
+
+static inline int udma_irq_status(struct ata_device *drive)
+{
+	return drive->channel->udma_irq_status(drive);
+}
+
+static inline void udma_timeout(struct ata_device *drive)
+{
+	return drive->channel->udma_timeout(drive);
+}
+
+static inline void udma_irq_lost(struct ata_device *drive)
+{
+	return drive->channel->udma_irq_lost(drive);
+}
+
 #ifdef CONFIG_BLK_DEV_IDEDMA
 
 extern int udma_new_table(struct ata_channel *, struct request *);
 extern void udma_destroy_table(struct ata_channel *);
 extern void udma_print(struct ata_device *);
 
-extern void udma_enable(struct ata_device *, int, int);
 extern int udma_black_list(struct ata_device *);
 extern int udma_white_list(struct ata_device *);
-extern void udma_timeout(struct ata_device *);
-extern void udma_irq_lost(struct ata_device *);
-extern int udma_start(struct ata_device *, struct request *rq);
-extern int udma_stop(struct ata_device *);
-extern int udma_read(struct ata_device *, struct request *rq);
-extern int udma_write(struct ata_device *, struct request *rq);
-extern int udma_irq_status(struct ata_device *);
 
 extern int ata_do_udma(unsigned int reading, struct ata_device *drive, struct request *rq);
 

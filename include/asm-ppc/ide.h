@@ -43,8 +43,6 @@ extern struct ide_machdep_calls ppc_ide_md;
 
 #undef	SUPPORT_SLOW_DATA_PORTS
 #define	SUPPORT_SLOW_DATA_PORTS	0
-#undef	SUPPORT_VLB_SYNC
-#define SUPPORT_VLB_SYNC	0
 
 #define ide__sti()	__sti()
 
@@ -108,12 +106,8 @@ static __inline__ void ide_init_default_hwifs(void)
 }
 
 #if (defined CONFIG_APUS || defined CONFIG_BLK_DEV_MPC8xx_IDE )
-#define ide_ack_intr(hwif) (hwif->hw.ack_intr ? hwif->hw.ack_intr(hwif) : 1)
-#else
-#define ide_ack_intr(hwif)		(1)
+#define ATA_ARCH_ACK_INTR
 #endif
-#define ide_release_lock(lock)		do {} while (0)
-#define ide_get_lock(lock, hdlr, data)	do {} while (0)
 
 #endif /* __KERNEL__ */
 

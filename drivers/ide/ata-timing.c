@@ -70,7 +70,7 @@ struct ata_timing ata_timing[] = {
  * then to be matched agains in esp. other drives no the same channel or even
  * the whole particular host chip.
  */
-short ata_timing_mode(ide_drive_t *drive, int map)
+short ata_timing_mode(struct ata_device *drive, int map)
 {
 	struct hd_driveid *id = drive->id;
 	short best = 0;
@@ -192,7 +192,7 @@ struct ata_timing* ata_timing_data(short speed)
 	return t;
 }
 
-int ata_timing_compute(ide_drive_t *drive, short speed, struct ata_timing *t,
+int ata_timing_compute(struct ata_device *drive, short speed, struct ata_timing *t,
 		int T, int UT)
 {
 	struct hd_driveid *id = drive->id;

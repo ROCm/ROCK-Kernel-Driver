@@ -363,22 +363,6 @@ struct usb_bus {
 extern int usb_root_hub_string(int id, int serial,
 		char *type, __u8 *data, int len);
 
-/*
- * As of USB 2.0, full/low speed devices are segregated into trees.
- * One type grows from USB 1.1 host controllers (OHCI, UHCI etc).
- * The other type grows from high speed hubs when they connect to
- * full/low speed devices using "Transaction Translators" (TTs).
- *
- * TTs should only be known to the hub driver, and high speed bus
- * drivers (only EHCI for now).  They affect periodic scheduling and
- * sometimes control/bulk error recovery.
- */
-struct usb_tt {
-	struct usb_device	*hub;	/* upstream highspeed hub */
-	int			multi;	/* true means one TT per port */
-};
-
-
 /* -------------------------------------------------------------------------- */
 
 /* This is arbitrary.
@@ -386,6 +370,8 @@ struct usb_tt {
  * have up to 255 ports. The most yet reported is 10.
  */
 #define USB_MAXCHILDREN		(16)
+
+struct usb_tt;
 
 struct usb_device {
 	int		devnum;		/* Address on USB bus */
@@ -440,6 +426,11 @@ struct usb_device {
 	struct usb_device *children[USB_MAXCHILDREN];
 };
 
+extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
+extern struct usb_device *usb_get_dev(struct usb_device *dev);
+extern void usb_free_dev(struct usb_device *);
+#define usb_put_dev usb_free_dev
+
 /* for when layers above USB add new non-USB drivers */
 extern void usb_scan_devices(void);
 
@@ -448,50 +439,6 @@ extern int usb_reset_device(struct usb_device *dev);
 
 /* for drivers using iso endpoints */
 extern int usb_get_current_frame_number (struct usb_device *usb_dev);
-
-/**
- * usb_inc_dev_use - record another reference to a device
- * @dev: the device being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally record such references in
- * their probe() methods, when they bind to an interface, and release
- * them usb_dec_dev_use(), in their disconnect() methods.
- */
-static inline void usb_inc_dev_use (struct usb_device *dev)
-{
-	atomic_inc (&dev->refcnt);
-}
-
-/**
- * usb_dec_dev_use - drop a reference to a device
- * @dev: the device no longer being referenced
- *
- * Each live reference to a device should be refcounted.
- *
- * Drivers for USB interfaces should normally release such references in
- * their disconnect() methods, and record them in probe().
- *
- * Note that driver disconnect() methods must guarantee that when they
- * return, all of their outstanding references to the device (and its
- * interfaces) are cleaned up.  That means that all pending URBs from
- * this driver must have completed, and that no more copies of the device
- * handle are saved in driver records (including other kernel threads).
- */
-static inline void usb_dec_dev_use (struct usb_device *dev)
-{
-	if (atomic_dec_and_test (&dev->refcnt)) {
-		/* May only go to zero when usbcore finishes
-		 * usb_disconnect() processing:  khubd or HCDs.
-		 *
-		 * If you hit this BUG() it's likely a problem
-		 * with some driver's disconnect() routine.
-		 */
-		BUG ();
-	}
-}
-
 
 /* used these for multi-interface device registration */
 extern int usb_find_interface_driver_for_ifnum(struct usb_device *dev, unsigned int ifnum);
@@ -1176,6 +1123,7 @@ extern int usb_set_interface(struct usb_device *dev, int ifnum, int alternate);
  * appropriately.
  */
 
+/* NOTE:  these are not the standard USB_ENDPOINT_XFER_* values!! */
 #define PIPE_ISOCHRONOUS		0
 #define PIPE_INTERRUPT			1
 #define PIPE_CONTROL			2

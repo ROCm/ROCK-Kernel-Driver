@@ -10,7 +10,7 @@
 
 O_TARGET := idedriver.o
 
-export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o ide-dma.o ataraid.o
+export-objs	:= ide-taskfile.o ide.o ide-features.o ide-probe.o quirks.o pcidma.o ataraid.o
 
 obj-y		:=
 obj-m		:=
@@ -43,7 +43,8 @@ ide-obj-$(CONFIG_BLK_DEV_HPT34X)	+= hpt34x.o
 ide-obj-$(CONFIG_BLK_DEV_HPT366)	+= hpt366.o
 ide-obj-$(CONFIG_BLK_DEV_HT6560B)	+= ht6560b.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_ICSIDE)	+= icside.o
-ide-obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
+ide-obj-$(CONFIG_BLK_DEV_IDEDMA)	+= quirks.o
+ide-obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= pcidma.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_TCQ)	+= tcq.o
 ide-obj-$(CONFIG_PCI)			+= ide-pci.o
 ide-obj-$(CONFIG_BLK_DEV_ISAPNP)	+= ide-pnp.o
@@ -54,7 +55,6 @@ ide-obj-$(CONFIG_BLK_DEV_OPTI621)	+= opti621.o
 ide-obj-$(CONFIG_BLK_DEV_SVWKS)		+= serverworks.o
 ide-obj-$(CONFIG_BLK_DEV_PDC202XX)	+= pdc202xx.o
 ide-obj-$(CONFIG_BLK_DEV_PDC4030)	+= pdc4030.o
-ide-obj-$(CONFIG_BLK_DEV_PDC_ADMA)	+= pdcadma.o
 ide-obj-$(CONFIG_BLK_DEV_PIIX)		+= piix.o
 ide-obj-$(CONFIG_BLK_DEV_QD65XX)	+= qd65xx.o
 ide-obj-$(CONFIG_BLK_DEV_IDE_RAPIDE)	+= rapide.o
@@ -72,6 +72,6 @@ obj-$(CONFIG_BLK_DEV_ATARAID)		+= ataraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_PDC)	+= pdcraid.o
 obj-$(CONFIG_BLK_DEV_ATARAID_HPT)	+= hptraid.o
 
-ide-mod-objs		:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
+ide-mod-objs	:= ide-taskfile.o ide.o ide-probe.o ide-geometry.o ide-features.o ata-timing.o $(ide-obj-y)
 
 include $(TOPDIR)/Rules.make

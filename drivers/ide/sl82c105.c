@@ -76,7 +76,7 @@ static void config_for_pio(ide_drive_t *drive, int pio, int report)
 	if (ide_config_drive_speed(drive, xfer_mode) == 0)
 		drv_ctrl = get_timing_sl82c105(t);
 
-	if (drive->using_dma == 0) {
+	if (!drive->using_dma) {
 		/*
 		 * If we are actually using MW DMA, then we can not
 		 * reprogram the interface drive control register.

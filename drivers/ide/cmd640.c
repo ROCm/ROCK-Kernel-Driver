@@ -155,7 +155,7 @@ int cmd640_vlb = 0;
 #define	CMDTIM		0x52
 #define	ARTTIM0		0x53
 #define	DRWTIM0		0x54
-#define ARTTIM1 	0x55
+#define ARTTIM1		0x55
 #define DRWTIM1		0x56
 #define ARTTIM23	0x57
 #define   ARTTIM23_DIS_RA2	0x04
@@ -166,36 +166,42 @@ int cmd640_vlb = 0;
 /*
  * Registers and masks for easy access by drive index:
  */
-static byte prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
-static byte prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
+static u8 prefetch_regs[4]  = {CNTRL, CNTRL, ARTTIM23, ARTTIM23};
+static u8 prefetch_masks[4] = {CNTRL_DIS_RA0, CNTRL_DIS_RA1, ARTTIM23_DIS_RA2, ARTTIM23_DIS_RA3};
 
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 
-static byte arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
-static byte drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
+/*
+ * Protects register file access from overlapping on primary and secondary
+ * channel, since those share hardware resources.
+ */
+static spinlock_t cmd640_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
+
+static u8 arttim_regs[4] = {ARTTIM0, ARTTIM1, ARTTIM23, ARTTIM23};
+static u8 drwtim_regs[4] = {DRWTIM0, DRWTIM1, DRWTIM23, DRWTIM23};
 
 /*
  * Current cmd640 timing values for each drive.
  * The defaults for each are the slowest possible timings.
  */
-static byte setup_counts[4]    = {4, 4, 4, 4};     /* Address setup count (in clocks) */
-static byte active_counts[4]   = {16, 16, 16, 16}; /* Active count   (encoded) */
-static byte recovery_counts[4] = {16, 16, 16, 16}; /* Recovery count (encoded) */
+static u8 setup_counts[4]    = {4, 4, 4, 4};     /* Address setup count (in clocks) */
+static u8 active_counts[4]   = {16, 16, 16, 16}; /* Active count   (encoded) */
+static u8 recovery_counts[4] = {16, 16, 16, 16}; /* Recovery count (encoded) */
 
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 
 /*
  * These are initialized to point at the devices we control
  */
 static struct ata_channel *cmd_hwif0, *cmd_hwif1;
-static ide_drive_t *cmd_drives[4];
+static struct ata_device *cmd_drives[4];
 
 /*
  * Interface to access cmd640x registers
  */
 static unsigned int cmd640_key;
 static void (*put_cmd640_reg)(unsigned short reg, byte val);
-static byte (*get_cmd640_reg)(unsigned short reg);
+static u8 (*get_cmd640_reg)(unsigned short reg);
 
 /*
  * This is read from the CFR reg, and is used in several places.
@@ -221,9 +227,9 @@ static void put_cmd640_reg_pci1 (unsigned short reg, byte val)
 	restore_flags(flags);
 }
 
-static byte get_cmd640_reg_pci1 (unsigned short reg)
+static u8 get_cmd640_reg_pci1 (unsigned short reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	save_flags(flags);
@@ -236,7 +242,7 @@ static byte get_cmd640_reg_pci1 (unsigned short reg)
 
 /* PCI method 2 access (from CMD datasheet) */
 
-static void put_cmd640_reg_pci2 (unsigned short reg, byte val)
+static void put_cmd640_reg_pci2 (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
@@ -248,9 +254,9 @@ static void put_cmd640_reg_pci2 (unsigned short reg, byte val)
 	restore_flags(flags);
 }
 
-static byte get_cmd640_reg_pci2 (unsigned short reg)
+static u8 get_cmd640_reg_pci2 (unsigned short reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	save_flags(flags);
@@ -264,7 +270,7 @@ static byte get_cmd640_reg_pci2 (unsigned short reg)
 
 /* VLB access */
 
-static void put_cmd640_reg_vlb (unsigned short reg, byte val)
+static void put_cmd640_reg_vlb (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
@@ -275,9 +281,9 @@ static void put_cmd640_reg_vlb (unsigned short reg, byte val)
 	restore_flags(flags);
 }
 
-static byte get_cmd640_reg_vlb (unsigned short reg)
+static u8 get_cmd640_reg_vlb (unsigned short reg)
 {
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	save_flags(flags);
@@ -290,7 +296,7 @@ static byte get_cmd640_reg_vlb (unsigned short reg)
 
 static int __init match_pci_cmd640_device (void)
 {
-	const byte ven_dev[4] = {0x95, 0x10, 0x40, 0x06};
+	const u8 ven_dev[4] = {0x95, 0x10, 0x40, 0x06};
 	unsigned int i;
 	for (i = 0; i < 4; i++) {
 		if (get_cmd640_reg(i) != ven_dev[i])
@@ -338,7 +344,7 @@ static int __init probe_for_cmd640_pci2 (void)
  */
 static int __init probe_for_cmd640_vlb (void)
 {
-	byte b;
+	u8 b;
 
 	get_cmd640_reg = get_cmd640_reg_vlb;
 	put_cmd640_reg = put_cmd640_reg_vlb;
@@ -404,7 +410,7 @@ void cmd640_dump_regs (void)
 static void __init check_prefetch (unsigned int index)
 {
 	struct ata_device *drive = cmd_drives[index];
-	byte b = get_cmd640_reg(prefetch_regs[index]);
+	u8 b = get_cmd640_reg(prefetch_regs[index]);
 
 	if (b & prefetch_masks[index]) {	/* is prefetch off? */
 		drive->channel->no_unmask = 0;
@@ -450,19 +456,19 @@ static void __init setup_device_ptrs (void)
  */
 static void set_prefetch_mode (unsigned int index, int mode)
 {
-	ide_drive_t *drive = cmd_drives[index];
+	struct ata_device *drive = cmd_drives[index];
 	int reg = prefetch_regs[index];
-	byte b;
+	u8 b;
 	unsigned long flags;
 
 	save_flags(flags);
 	cli();
 	b = get_cmd640_reg(reg);
 	if (mode) {	/* want prefetch on? */
-#if CMD640_PREFETCH_MASKS
+# if CMD640_PREFETCH_MASKS
 		drive->channel->no_unmask = 1;
 		drive->channel->unmask = 0;
-#endif
+# endif
 		drive->channel->no_io_32bit = 0;
 		b &= ~prefetch_masks[index];	/* enable prefetch */
 	} else {
@@ -480,7 +486,7 @@ static void set_prefetch_mode (unsigned int index, int mode)
  */
 static void display_clocks (unsigned int index)
 {
-	byte active_count, recovery_count;
+	u8 active_count, recovery_count;
 
 	active_count = active_counts[index];
 	if (active_count == 1)
@@ -497,7 +503,7 @@ static void display_clocks (unsigned int index)
  * Pack active and recovery counts into single byte representation
  * used by controller
  */
-inline static byte pack_nibbles (byte upper, byte lower)
+static inline u8 pack_nibbles (u8 upper, u8 lower)
 {
 	return ((upper & 0x0f) << 4) | (lower & 0x0f);
 }
@@ -507,7 +513,7 @@ inline static byte pack_nibbles (byte upper, byte lower)
  */
 static void __init retrieve_drive_counts (unsigned int index)
 {
-	byte b;
+	u8 b;
 
 	/*
 	 * Get the internal setup timing, and convert to clock count
@@ -537,9 +543,9 @@ static void __init retrieve_drive_counts (unsigned int index)
 static void program_drive_counts (unsigned int index)
 {
 	unsigned long flags;
-	byte setup_count    = setup_counts[index];
-	byte active_count   = active_counts[index];
-	byte recovery_count = recovery_counts[index];
+	u8 setup_count    = setup_counts[index];
+	u8 active_count   = active_counts[index];
+	u8 recovery_count = recovery_counts[index];
 
 	/*
 	 * Set up address setup count and drive read/write timing registers.
@@ -589,10 +595,12 @@ static void program_drive_counts (unsigned int index)
 /*
  * Set a specific pio_mode for a drive
  */
-static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cycle_time, unsigned int active_time, unsigned int setup_time)
+static void cmd640_set_mode (unsigned int index, u8 pio_mode, unsigned int cycle_time, unsigned int active_time, unsigned int setup_time)
 {
 	int recovery_time, clock_time;
-	byte setup_count, active_count, recovery_count, recovery_count2, cycle_count;
+	u8 setup_count, active_count;
+	u8 recovery_count, recovery_count2;
+	u8 cycle_count;
 
 	recovery_time = cycle_time - (setup_time + active_time);
 	clock_time = 1000 / system_bus_speed;
@@ -639,16 +647,19 @@ static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cyc
 /*
  * Drive PIO mode selection:
  */
-static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
+static void cmd640_tune_drive(struct ata_device *drive, byte mode_wanted)
 {
-	byte b;
+	u8 b;
 	struct ata_timing *t;
 	unsigned int index = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cmd640_lock, flags);
 
 	while (drive != cmd_drives[index]) {
 		if (++index > 3) {
-			printk("%s: bad news in cmd640_tune_drive\n", drive->name);
-			return;
+			printk(KERN_ERR "%s: bad news in cmd640_tune_drive\n", drive->name);
+			goto out_lock;
 		}
 	}
 	switch (mode_wanted) {
@@ -659,21 +670,21 @@ static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
 			if (mode_wanted)
 				b |= 0x27;
 			put_cmd640_reg(CNTRL, b);
-			printk("%s: %sabled cmd640 fast host timing (devsel)\n", drive->name, mode_wanted ? "en" : "dis");
-			return;
+			printk(KERN_INFO "%s: %sabled cmd640 fast host timing (devsel)\n", drive->name, mode_wanted ? "en" : "dis");
+			goto out_lock;
 
 		case 8: /* set prefetch off */
 		case 9: /* set prefetch on */
 			mode_wanted &= 1;
 			set_prefetch_mode(index, mode_wanted);
 			printk("%s: %sabled cmd640 prefetch\n", drive->name, mode_wanted ? "en" : "dis");
-			return;
+			goto out_lock;
 	}
 
 	if (mode_wanted == 255)
 		t = ata_timing_data(ata_timing_mode(drive, XFER_PIO | XFER_EPIO));
 	else
-		t = ata_timing_data(XFER_PIO_0 + min_t(byte, mode_wanted, 4));
+		t = ata_timing_data(XFER_PIO_0 + min_t(u8, mode_wanted, 4));
 
 	cmd640_set_mode(index, t->mode - XFER_PIO_0, t->cycle, t->active, t->setup);
 
@@ -681,10 +692,14 @@ static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
 		drive->name, t->mode, t->cycle);
 
 	display_clocks(index);
+
+out_lock:
+	spin_unlock_irqrestore(&cmd640_lock, flags);
+
 	return;
 }
 
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 
 /*
  * Probe for a cmd640 chipset, and initialize it if found.  Called from ide.c
@@ -697,7 +712,7 @@ int __init ide_probe_for_cmd640x(void)
 	int second_port_cmd640 = 0;
 	const char *bus_type, *port2;
 	unsigned int index;
-	byte b, cfr;
+	u8 b, cfr;
 
 	if (cmd640_vlb && probe_for_cmd640_vlb()) {
 		bus_type = "VLB";
@@ -743,7 +758,7 @@ int __init ide_probe_for_cmd640x(void)
 	cmd_hwif0->chipset = ide_cmd640;
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 	cmd_hwif0->tuneproc = &cmd640_tune_drive;
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 
 	/*
 	 * Ensure compatibility by always using the slowest timings
@@ -777,7 +792,7 @@ int __init ide_probe_for_cmd640x(void)
 				second_port_cmd640 = 1;
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 				second_port_toggled = 1;
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 				port2 = "enabled";
 			} else {
 				put_cmd640_reg(CNTRL, b); /* restore original setting */
@@ -796,7 +811,7 @@ int __init ide_probe_for_cmd640x(void)
 		cmd_hwif1->unit = ATA_SECONDARY;
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 		cmd_hwif1->tuneproc = &cmd640_tune_drive;
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 	}
 	printk("%s: %sserialized, secondary interface %s\n", cmd_hwif1->name,
 		cmd_hwif0->serialized ? "" : "not ", port2);
@@ -806,7 +821,7 @@ int __init ide_probe_for_cmd640x(void)
 	 * Do not unnecessarily disturb any prior BIOS setup of these.
 	 */
 	for (index = 0; index < (2 + (second_port_cmd640 << 1)); index++) {
-		ide_drive_t *drive = cmd_drives[index];
+		struct ata_device *drive = cmd_drives[index];
 #ifdef CONFIG_BLK_DEV_CMD640_ENHANCED
 		if (drive->autotune || ((index > 1) && second_port_toggled)) {
 			/*
@@ -837,7 +852,7 @@ int __init ide_probe_for_cmd640x(void)
 		check_prefetch (index);
 		printk("cmd640: drive%d timings/prefetch(%s) preserved\n",
 			index, drive->channel->no_io_32bit ? "off" : "on");
-#endif /* CONFIG_BLK_DEV_CMD640_ENHANCED */
+#endif
 	}
 
 #ifdef CMD640_DUMP_REGS

@@ -316,7 +316,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		unsigned long flags;
 		int ret;
 
-		spin_lock_irqsave(&ide_lock, flags);
+		spin_lock_irqsave(drive->channel->lock, flags);
 
 		ret = blk_queue_start_tag(&drive->queue, rq);
 
@@ -325,7 +325,7 @@ static ide_startstop_t idedisk_do_request(struct ata_device *drive, struct reque
 		if (ata_pending_commands(drive) > drive->max_last_depth)
 			drive->max_last_depth = ata_pending_commands(drive);
 
-		spin_unlock_irqrestore(&ide_lock, flags);
+		spin_unlock_irqrestore(drive->channel->lock, flags);
 
 		if (ret) {
 			BUG_ON(!ata_pending_commands(drive));
@@ -438,13 +438,6 @@ static int set_multcount(struct ata_device *drive, int arg)
 	if (!drive->id)
 		return -EIO;
 
-	/* FIXME: Hmm... just bailing out my be problematic, since there *is*
-	 * activity during boot. For now the same problem persists in
-	 * set_pio_mode() we will have to do something about it soon.
-	 */
-	if (HWGROUP(drive)->handler)
-		return -EBUSY;
-
 	if (arg > drive->id->max_multsect)
 		arg = drive->id->max_multsect;
 
@@ -466,9 +459,6 @@ static int set_multcount(struct ata_device *drive, int arg)
 
 static int set_nowerr(struct ata_device *drive, int arg)
 {
-	if (HWGROUP(drive)->handler)
-		return -EBUSY;
-
 	drive->nowerr = arg;
 	drive->bad_wstat = arg ? BAD_R_STAT : BAD_W_STAT;
 
@@ -576,8 +566,8 @@ static int idedisk_suspend(struct device *dev, u32 state, u32 level)
 		return 0;
 
 	/* wait until all commands are finished */
-	printk("ide_disk_suspend()\n");
-	while (HWGROUP(drive)->handler)
+	/* FIXME: waiting for spinlocks should be done instead. */
+	while (drive->channel->handler)
 		yield();
 
 	/* set the drive to standby */
@@ -1022,7 +1012,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = set_lba_addressing(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
@@ -1048,7 +1038,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = set_multcount(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
@@ -1058,6 +1048,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1071,7 +1062,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = set_nowerr(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
@@ -1081,6 +1072,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (unsigned long *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1094,13 +1086,13 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = write_cache(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
 
 		case HDIO_GET_ACOUSTIC: {
-			u8 val = drive->acoustic;
+			unsigned long val = drive->acoustic;
 
 			if (put_user(val, (u8 *) arg))
 				return -EFAULT;
@@ -1117,7 +1109,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = set_acoustic(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
@@ -1128,6 +1120,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 			if (put_user(val, (u8 *) arg))
 				return -EFAULT;
+
 			return 0;
 		}
 
@@ -1141,7 +1134,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 				return -EBUSY;
 
 			val = set_using_tcq(drive, arg);
-			spin_unlock_irq(&ide_lock);
+			spin_unlock_irq(drive->channel->lock);
 
 			return val;
 		}
@@ -1153,7 +1146,7 @@ static int idedisk_ioctl(struct ata_device *drive, struct inode *inode, struct f
 
 
 /*
- *      IDE subdriver functions, registered with ide.c
+ * Subdriver functions.
  */
 static struct ata_operations idedisk_driver = {
 	owner:			THIS_MODULE,
@@ -1178,11 +1171,9 @@ static void __exit idedisk_exit (void)
 
 	while ((drive = ide_scan_devices(ATA_DISK, "ide-disk", &idedisk_driver, failed)) != NULL) {
 		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
+			printk(KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
+			++failed;
 		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
 	}
 }
 
@@ -1203,10 +1194,11 @@ int idedisk_init(void)
 			idedisk_cleanup(drive);
 			continue;
 		}
-		failed--;
+		--failed;
 	}
 	revalidate_drives();
 	MOD_DEC_USE_COUNT;
+
 	return 0;
 }
 

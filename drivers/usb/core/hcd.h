@@ -182,9 +182,6 @@ extern int usb_hcd_pci_resume (struct pci_dev *dev);
 /* -------------------------------------------------------------------------- */
 
 /* Enumeration is only for the hub driver, or HCD virtual root hubs */
-extern struct usb_device *usb_alloc_dev(struct usb_device *parent,
-	struct usb_bus *);
-extern void usb_free_dev(struct usb_device *);
 extern int usb_new_device(struct usb_device *dev);
 extern void usb_connect(struct usb_device *dev);
 extern void usb_disconnect(struct usb_device **);
