@@ -1354,10 +1354,10 @@ int journal_stop(handle_t *handle)
 	 * by 30x or more...
 	 */
 	if (handle->h_sync) {
-		set_current_state(TASK_RUNNING);
 		do {
 			old_handle_count = transaction->t_handle_count;
-			schedule();
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(1);
 		} while (old_handle_count != transaction->t_handle_count);
 	}
 
