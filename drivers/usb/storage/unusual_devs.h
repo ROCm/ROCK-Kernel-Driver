@@ -632,6 +632,14 @@ UNUSUAL_DEV( 0x08ca, 0x2011, 0x0001, 0x0001,
 		"3MegaCam",
 		US_SC_DEVICE, US_PR_BULK, NULL,
 		US_FL_MODE_XLATE ),
+
+/* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
+UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,
+		"Trumpion",
+		"MP3 player",
+		US_SC_RBC, US_PR_BULK, NULL,
+		US_FL_MODE_XLATE),
+
 /* aeb */
 UNUSUAL_DEV( 0x090c, 0x1132, 0x0000, 0xffff,
 		"Feiya",
