@@ -486,7 +486,7 @@ static int cpia_probe(struct usb_interface *intf,
 		      const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_cpia *ucpia;
 	struct cam_data *cam;
 	int ret;
@@ -508,7 +508,7 @@ static int cpia_probe(struct usb_interface *intf,
 	memset(ucpia, 0, sizeof(*ucpia));
 
 	ucpia->dev = udev;
-	ucpia->iface = interface->bInterfaceNumber;
+	ucpia->iface = interface->desc.bInterfaceNumber;
 	init_waitqueue_head(&ucpia->wq_stream);
 
 	ucpia->buffers[0] = vmalloc(sizeof(*ucpia->buffers[0]));
