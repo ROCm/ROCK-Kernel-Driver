@@ -1914,27 +1914,24 @@ static int atalk_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 }
 
 static struct net_proto_family atalk_family_ops = {
-	.family =PF_APPLETALK,
-	.create =atalk_create,
-};
-
-	.family =	PF_APPLETALK,
-	.release =	atalk_release,
-	.bind =		atalk_bind,
-	.connect =	atalk_connect,
-	.socketpair =	sock_no_socketpair,
-	.accept =	sock_no_accept,
-	.getname =	atalk_getname,
-	.poll =		datagram_poll,
-	.ioctl =	atalk_ioctl,
-	.listen =	sock_no_listen,
-	.shutdown =	sock_no_shutdown,
-	.setsockopt =	sock_no_setsockopt,
-	.getsockopt =	sock_no_getsockopt,
-	.sendmsg =	atalk_sendmsg,
-	.recvmsg =	atalk_recvmsg,
-	.mmap =		sock_no_mmap,
-	.sendpage =	sock_no_sendpage,
+	.family		= PF_APPLETALK,
+	.create		= atalk_create,
+	.release	= atalk_release,
+	.bind		= atalk_bind,
+	.connect	= atalk_connect,
+	.socketpair	= sock_no_socketpair,
+	.accept		= sock_no_accept,
+	.getname	= atalk_getname,
+	.poll		= datagram_poll,
+	.ioctl		= atalk_ioctl,
+	.listen		= sock_no_listen,
+	.shutdown	= sock_no_shutdown,
+	.setsockopt	= sock_no_setsockopt,
+	.getsockopt	= sock_no_getsockopt,
+	.sendmsg	= atalk_sendmsg,
+	.recvmsg	= atalk_recvmsg,
+	.mmap		= sock_no_mmap,
+	.sendpage	= sock_no_sendpage,
 };
 
 #include <linux/smp_lock.h>
