@@ -34,6 +34,7 @@
 #define SGI_STREAMS_KEYBOARD 150
 /* drivers/sgi/char/usema.c */
 #define SGI_USEMACLONE	     151
+#define SGI_MMTIMER	     153
 
 #define TUN_MINOR	     200
 

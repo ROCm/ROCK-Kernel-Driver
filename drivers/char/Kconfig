@@ -1008,6 +1008,14 @@ config HANGCHECK_TIMER
 	  out to lunch past a certain margin.  It can reboot the system
 	  or merely print a warning.
 
+config MMTIMER
+	tristate "Memory mapped RTC"
+	depends on IA64_GENERIC || IA64_SGI_SN2
+	default y
+	help
+	  The mmtimer device memory gives userspace access to the
+	  Altix realtime clock.
+
 endmenu
 
 source "drivers/char/lirc/Kconfig"
