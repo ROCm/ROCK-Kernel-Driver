@@ -215,17 +215,11 @@ extern inline char *bio_kmap_irq(struct bio *bio, unsigned long *flags)
 {
 	unsigned long addr;
 
+	/*
+	 * might not be a highmem page, but the preempt/irq count
+	 * balancing is a lot nicer this way
+	 */
 	local_save_flags(*flags);
-
-	/*
-	 * could be low
-	 */
-	if (!PageHighMem(bio_page(bio)))
-		return bio_data(bio);
-
-	/*
-	 * it's a highmem page
-	 */
 	local_irq_disable();
 	addr = (unsigned long) kmap_atomic(bio_page(bio), KM_BIO_SRC_IRQ);
 

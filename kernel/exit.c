@@ -29,10 +29,9 @@ extern struct task_struct *child_reaper;
 
 int getrusage(struct task_struct *, int, struct rusage *);
 
-static inline void __unhash_process(struct task_struct *p)
+static struct dentry * __unhash_process(struct task_struct *p)
 {
 	struct dentry *proc_dentry;
-	write_lock_irq(&tasklist_lock);
 	nr_threads--;
 	unhash_pid(p);
 	REMOVE_LINKS(p);
@@ -47,15 +46,13 @@ static inline void __unhash_process(struct task_struct *p)
 			proc_dentry = NULL;
 		spin_unlock(&dcache_lock);
 	}
-	write_unlock_irq(&tasklist_lock);
-	if (unlikely(proc_dentry != NULL)) {
-		shrink_dcache_parent(proc_dentry);
-		dput(proc_dentry);
-	}
+	return proc_dentry;
 }
 
 static void release_task(struct task_struct * p)
 {
+	struct dentry *proc_dentry;
+
 	if (p->state != TASK_ZOMBIE)
 		BUG();
 #ifdef CONFIG_SMP
@@ -71,8 +68,14 @@ static void release_task(struct task_struct * p)
 		write_unlock_irq(&tasklist_lock);
 	}
 	BUG_ON(!list_empty(&p->ptrace_list) || !list_empty(&p->ptrace_children));
-	unhash_process(p);
-	exit_sighand(p);
+	write_lock_irq(&tasklist_lock);
+	__exit_sighand(p);
+	proc_dentry = __unhash_process(p);
+	write_unlock_irq(&tasklist_lock);
+	if (unlikely(proc_dentry != NULL)) {
+		shrink_dcache_parent(proc_dentry);
+		dput(proc_dentry);
+	}
 
 	release_thread(p);
 	if (p != current) {
@@ -88,7 +91,16 @@ static void release_task(struct task_struct * p)
 
 void unhash_process(struct task_struct *p)
 {
-	return __unhash_process(p);
+	struct dentry *proc_dentry;
+
+	write_lock_irq(&tasklist_lock);
+	proc_dentry = __unhash_process(p);
+	write_unlock_irq(&tasklist_lock);
+
+	if (unlikely(proc_dentry != NULL)) {
+		shrink_dcache_parent(proc_dentry);
+		dput(proc_dentry);
+	}
 }
 
 /*
@@ -567,7 +579,6 @@ static void exit_notify(void)
 	if (current->exit_signal != -1)
 		do_notify_parent(current, current->exit_signal);
 
-zap_again:
 	while (!list_empty(&current->children))
 		zap_thread(list_entry(current->children.next,struct task_struct,sibling), current, 0);
 	while (!list_empty(&current->ptrace_children))
@@ -652,6 +663,30 @@ NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 asmlinkage long sys_exit(int error_code)
 {
 	do_exit((error_code&0xff)<<8);
+}
+
+/*
+ * this kills every thread in the thread group. Note that any externally
+ * wait4()-ing process will get the correct exit code - even if this 
+ * thread is not the thread group leader.
+ */
+asmlinkage long sys_exit_group(int error_code)
+{
+	struct signal_struct *sig = current->sig;
+
+	spin_lock_irq(&sig->siglock);
+	if (sig->group_exit) {
+		spin_unlock_irq(&sig->siglock);
+
+		/* another thread was faster: */
+		do_exit(sig->group_exit_code);
+	}
+	sig->group_exit = 1;
+	sig->group_exit_code = (error_code & 0xff) << 8;
+	__broadcast_thread_group(current, SIGKILL);
+	spin_unlock_irq(&sig->siglock);
+
+	do_exit(sig->group_exit_code);
 }
 
 static inline int eligible_child(pid_t pid, int options, task_t *p)
