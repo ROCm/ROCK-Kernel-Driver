@@ -145,6 +145,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 			if (!add_to_swap(page))
 				goto activate_locked;
 			pte_chain_lock(page);
+			mapping = page->mapping;
 		}
 
 		/*
