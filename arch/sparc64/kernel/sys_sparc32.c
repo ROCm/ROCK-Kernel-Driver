@@ -3977,7 +3977,7 @@ asmlinkage int sys32_sendfile64(int out_fd, int in_fd, __kernel_loff_t32 *offset
 		return -EFAULT;
 		
 	set_fs(KERNEL_DS);
-	ret = sys_sendfile(out_fd, in_fd, offset ? &lof : NULL, count);
+	ret = sys_sendfile64(out_fd, in_fd, offset ? &lof : NULL, count);
 	set_fs(old_fs);
 	
 	if (offset && put_user(lof, offset))
