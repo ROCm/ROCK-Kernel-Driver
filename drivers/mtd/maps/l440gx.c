@@ -1,5 +1,5 @@
 /*
- * $Id: l440gx.c,v 1.14 2004/09/16 23:27:13 gleixner Exp $
+ * $Id: l440gx.c,v 1.15 2004/11/04 13:24:15 gleixner Exp $
  *
  * BIOS Flash chip on Intel 440GX board.
  *
@@ -73,7 +73,7 @@ static int __init init_l440gx(void)
 		return -ENODEV;
 	}
 
-	l440gx_map.virt = (void __iomem *)ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
+	l440gx_map.virt = ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 
 	if (!l440gx_map.virt) {
 		printk(KERN_WARNING "Failed to ioremap L440GX flash region\n");

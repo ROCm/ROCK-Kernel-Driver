@@ -1,7 +1,7 @@
 /*
  * Flash memory access on Alchemy Db1xxx boards
  * 
- * $Id: db1x00-flash.c,v 1.5 2004/09/18 23:22:35 ppopov Exp $
+ * $Id: db1x00-flash.c,v 1.6 2004/11/04 13:24:14 gleixner Exp $
  *
  * (C) 2003 Pete Popov <ppopov@embeddedalley.com>
  * 
@@ -199,7 +199,7 @@ int __init db1x00_mtd_init(void)
 	 */
 	printk(KERN_NOTICE "Db1xxx flash: probing %d-bit flash bus\n", 
 			db1xxx_mtd_map.bankwidth*8);
-	db1xxx_mtd_map.virt = (void __iomem *)ioremap(window_addr, window_size);
+	db1xxx_mtd_map.virt = ioremap(window_addr, window_size);
 	db1xxx_mtd = do_map_probe("cfi_probe", &db1xxx_mtd_map);
 	if (!db1xxx_mtd) return -ENXIO;
 	db1xxx_mtd->owner = THIS_MODULE;

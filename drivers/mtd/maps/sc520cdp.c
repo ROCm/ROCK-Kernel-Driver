@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: sc520cdp.c,v 1.17 2004/09/16 23:27:14 gleixner Exp $
+ * $Id: sc520cdp.c,v 1.18 2004/11/04 13:24:15 gleixner Exp $
  *
  *
  * The SC520CDP is an evaluation board for the Elan SC520 processor available
@@ -241,7 +241,7 @@ static int __init init_sc520cdp(void)
 		printk(KERN_NOTICE "SC520 CDP flash device: 0x%lx at 0x%lx\n",
 		       sc520cdp_map[i].size, sc520cdp_map[i].phys);
 
-		sc520cdp_map[i].virt = (void __iomem *)ioremap_nocache(sc520cdp_map[i].phys, sc520cdp_map[i].size);
+		sc520cdp_map[i].virt = ioremap_nocache(sc520cdp_map[i].phys, sc520cdp_map[i].size);
 
 		if (!sc520cdp_map[i].virt) {
 			printk("Failed to ioremap_nocache\n");

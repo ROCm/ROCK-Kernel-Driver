@@ -17,7 +17,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: sbc_gxx.c,v 1.30 2004/09/16 23:27:14 gleixner Exp $
+   $Id: sbc_gxx.c,v 1.31 2004/11/04 13:24:15 gleixner Exp $
 
 The SBC-MediaGX / SBC-GXx has up to 16 MiB of 
 Intel StrataFlash (28F320/28F640) in x8 mode.  
@@ -195,7 +195,7 @@ static void cleanup_sbc_gxx(void)
 
 int __init init_sbc_gxx(void)
 {
-  	iomapadr = (void __iomem *)ioremap(WINDOW_START, WINDOW_LENGTH);
+  	iomapadr = ioremap(WINDOW_START, WINDOW_LENGTH);
 	if (!iomapadr) {
 		printk( KERN_ERR"%s: failed to ioremap memory region\n",
 			sbc_gxx_map.name );

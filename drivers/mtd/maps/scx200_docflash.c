@@ -2,7 +2,7 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
-   $Id: scx200_docflash.c,v 1.7 2004/09/16 23:27:14 gleixner Exp $ 
+   $Id: scx200_docflash.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $ 
 
    National Semiconductor SCx200 flash mapped with DOCCS
 */
@@ -180,7 +180,7 @@ int __init init_scx200_docflash(void)
 	simple_map_init(&scx200_docflash_map);
 
 	scx200_docflash_map.phys = docmem.start;
-	scx200_docflash_map.virt = (void __iomem *)ioremap(docmem.start, scx200_docflash_map.size);
+	scx200_docflash_map.virt = ioremap(docmem.start, scx200_docflash_map.size);
 	if (!scx200_docflash_map.virt) {
 		printk(KERN_ERR NAME ": failed to ioremap the flash\n");
 		release_resource(&docmem);
