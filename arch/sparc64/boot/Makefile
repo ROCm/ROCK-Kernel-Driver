@@ -14,13 +14,21 @@ quiet_cmd_elftoaout = ELT2AOUT $@
       cmd_elftoaout = $(ELFTOAOUT) vmlinux -o $@
 quiet_cmd_piggy     = PIGGY    $@
       cmd_piggy     = $(obj)/piggyback $@ System.map $(ROOT_IMG)
+quiet_cmd_strip     = STRIP $@
+      cmd_strip     = $(STRIP) -R .comment -R .note vmlinux -o $@
 
-$(obj)/tftpboot.img: $(obj)/piggyback System.map vmlinux $(ROOT_IMG) FORCE
+
+# Actual linking
+$(obj)/image: FORCE
+	$(call if_changed,strip)
+	@echo '  kernel: $@ is ready'
+
+$(obj)/tftpboot.img: $(obj)/piggyback System.map $(ROOT_IMG) FORCE
 	$(call if_changed,elftoaout)
 	$(call if_changed,piggy)
 	@echo '  kernel: $@ is ready'
 
-$(obj)/vmlinux.aout: vmlinux FORCE
+$(obj)/vmlinux.aout: FORCE
 	$(call if_changed,elftoaout)
 	@echo '  kernel: $@ is ready'
 

@@ -37,7 +37,7 @@ struct vc_data {
 	unsigned short	vc_s_complement_mask;	/* Saved mouse pointer mask */
 	unsigned int	vc_x, vc_y;		/* Cursor position */
 	unsigned int	vc_saved_x, vc_saved_y;
-	unsigned int	vc_pos;			/* Cursor address */
+	unsigned long	vc_pos;			/* Cursor address */
 	/* fonts */	
 	unsigned short	vc_hi_font_mask;	/* [#] Attribute set for upper 256 chars of font or 0 if not supported */
 	struct console_font_op vc_font;		/* Current VC font set */
