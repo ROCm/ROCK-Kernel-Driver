@@ -2,7 +2,8 @@ Version 1.10
 ------------
 Fix reconnection (and certain failed mounts) to properly wake up the
 blocked users thread so it does not seem hung (in some cases was blocked
-until the cifs receive timeout expired).
+until the cifs receive timeout expired). Fix spurious error logging
+to kernel log when application with open network files killed. 
 
 Version 1.09
 ------------

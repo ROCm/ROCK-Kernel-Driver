@@ -151,6 +151,7 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	set_fs(get_ds());
 	rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
 	while((rc == -ENOSPC) || (rc == -EAGAIN)) {
+		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/2);
 		rc = sock_sendmsg(ssocket, &smb_msg, smb_buf_length + 4);
 	}
@@ -233,16 +234,23 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		timeout = 15 * HZ;
 	/* wait for 15 seconds or until woken up due to response arriving or 
 	   due to last connection to this server being unmounted */
-
-	timeout = wait_event_interruptible_timeout(ses->server->response_q,
-				(midQ->midState & MID_RESPONSE_RECEIVED) || 
-				((ses->server->tcpStatus != CifsGood) &&
-				 (ses->server->tcpStatus != CifsNew)),
-				timeout);
 	if (signal_pending(current)) {
-		cFYI(1, ("CIFS: caught signal"));
+		/* if signal pending do not hold up user for full smb timeout
+		but we still give response a change to complete */
+		if(midQ->midState & MID_REQUEST_SUBMITTED) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			timeout = schedule_timeout(HZ);
+		}
+	} else { /* use normal timeout */
+		timeout = wait_event_interruptible_timeout(ses->server->response_q,
+			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			((ses->server->tcpStatus != CifsGood) &&
+			 (ses->server->tcpStatus != CifsNew)),
+			timeout);
+	}
+	if (signal_pending(current)) {
 		DeleteMidQEntry(midQ);
-		return -EINTR;
+		return -EINTR; /* BB are we supposed to return -ERESTARTSYS ? */
 	} else {  /* BB spinlock protect this against races with demux thread */
 		spin_lock(&GlobalMid_Lock);
 		if (midQ->resp_buf) {

@@ -223,6 +223,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			csocket = server->ssocket;
 			continue;
 		} else if ((length == -ERESTARTSYS) || (length == -EAGAIN)) {
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
@@ -277,6 +278,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				} else {
 					/* give server a second to
 					clean up before reconnect attempt */
+					set_current_state(TASK_INTERRUPTIBLE);
 					schedule_timeout(HZ);
 					/* always try 445 first on reconnect
 					since we get NACK on some if we ever
