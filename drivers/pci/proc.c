@@ -472,6 +472,7 @@ int pci_proc_detach_bus(struct pci_bus* bus)
 	return 0;
 }
 
+#ifdef CONFIG_PCI_LEGACY_PROC
 
 /*
  *  Backward compatible /proc/pci interface.
@@ -573,22 +574,39 @@ static struct seq_operations proc_pci_op = {
 	.show	= show_dev_config
 };
 
-static int proc_bus_pci_dev_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &proc_bus_pci_devices_op);
-}
-static struct file_operations proc_bus_pci_dev_operations = {
-	.open		= proc_bus_pci_dev_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
 static int proc_pci_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &proc_pci_op);
 }
 static struct file_operations proc_pci_operations = {
 	.open		= proc_pci_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
+};
+
+static void legacy_proc_init(void)
+{
+	struct proc_dir_entry * entry = create_proc_entry("pci", 0, NULL);
+	if (entry)
+		entry->proc_fops = &proc_pci_operations;
+}
+
+#else
+
+static void legacy_proc_init(void)
+{
+
+}
+
+#endif /* CONFIG_PCI_LEGACY_PROC */
+
+static int proc_bus_pci_dev_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &proc_bus_pci_devices_op);
+}
+static struct file_operations proc_bus_pci_dev_operations = {
+	.open		= proc_bus_pci_dev_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,
 	.release	= seq_release,
@@ -607,9 +625,7 @@ static int __init pci_proc_init(void)
 		pci_for_each_dev(dev) {
 			pci_proc_attach_device(dev);
 		}
-		entry = create_proc_entry("pci", 0, NULL);
-		if (entry)
-			entry->proc_fops = &proc_pci_operations;
+		legacy_proc_init();
 	}
 	return 0;
 }
