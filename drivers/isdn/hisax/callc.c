@@ -21,9 +21,6 @@
 #include "hisax.h"
 #include <linux/isdn/capicmd.h>
 
-#ifdef MODULE
-#define MOD_USE_COUNT ( GET_USE_COUNT (&__this_module))
-#endif	/* MODULE */
 
 const char *lli_revision = "$Revision: 2.51.6.6 $";
 

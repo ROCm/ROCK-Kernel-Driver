@@ -23,7 +23,6 @@
     This driver puts entries in /proc/sys/dev/sensors for each I2C device
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -31,14 +30,10 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
-#include <asm/uaccess.h>
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
 #include <linux/init.h>
-
-#ifndef THIS_MODULE
-#define THIS_MODULE NULL
-#endif
+#include <asm/uaccess.h>
 
 static int i2c_create_name(char **name, const char *prefix,
 			       struct i2c_adapter *adapter, int addr);
@@ -56,7 +51,6 @@ static int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
 
 #define SENSORS_ENTRY_MAX 20
 static struct ctl_table_header *i2c_entries[SENSORS_ENTRY_MAX];
-static unsigned short i2c_inodes[SENSORS_ENTRY_MAX];
 
 static struct i2c_client *i2c_clients[SENSORS_ENTRY_MAX];
 
@@ -97,10 +91,21 @@ int i2c_create_name(char **name, const char *prefix,
 			struct i2c_adapter *adapter, int addr)
 {
 	char name_buffer[50];
-	int id;
+	int id, i, end;
 	if (i2c_is_isa_adapter(adapter))
 		sprintf(name_buffer, "%s-isa-%04x", prefix, addr);
-	else {
+	else if (!adapter->algo->smbus_xfer && !adapter->algo->master_xfer) {
+		/* dummy adapter, generate prefix */
+		sprintf(name_buffer, "%s-", prefix);
+		end = strlen(name_buffer);
+		for(i = 0; i < 32; i++) {
+			if(adapter->algo->name[i] == ' ')
+				break;
+			name_buffer[end++] = tolower(adapter->algo->name[i]);
+		}
+		name_buffer[end] = 0;
+		sprintf(name_buffer + end, "-%04x", addr);
+	} else {
 		if ((id = i2c_adapter_id(adapter)) < 0)
 			return -ENOENT;
 		sprintf(name_buffer, "%s-i2c-%d-%02x", prefix, id, addr);
@@ -186,8 +191,6 @@ int i2c_register_entry(struct i2c_client *client, const char *prefix,
 		return id;
 	}
 #endif				/* DEBUG */
-	i2c_inodes[id - 256] =
-	    new_header->ctl_table->child->child->de->low_ino;
 	new_header->ctl_table->child->child->de->owner = controlling_mod;
 
 	return id;
@@ -208,49 +211,6 @@ void i2c_deregister_entry(int id)
 		i2c_entries[id] = NULL;
 		i2c_clients[id] = NULL;
 	}
-}
-
-/* Monitor access for /proc/sys/dev/sensors; make unloading i2c-proc.o 
-   impossible if some process still uses it or some file in it */
-void i2c_fill_inode(struct inode *inode, int fill)
-{
-	if (fill)
-		MOD_INC_USE_COUNT;
-	else
-		MOD_DEC_USE_COUNT;
-}
-
-/* Monitor access for /proc/sys/dev/sensors/ directories; make unloading
-   the corresponding module impossible if some process still uses it or
-   some file in it */
-void i2c_dir_fill_inode(struct inode *inode, int fill)
-{
-	int i;
-	struct i2c_client *client;
-
-#ifdef DEBUG
-	if (!inode) {
-		printk(KERN_ERR "i2c-proc.o: Warning: inode NULL in fill_inode()\n");
-		return;
-	}
-#endif				/* def DEBUG */
-
-	for (i = 0; i < SENSORS_ENTRY_MAX; i++)
-		if (i2c_clients[i]
-		    && (i2c_inodes[i] == inode->i_ino)) break;
-#ifdef DEBUG
-	if (i == SENSORS_ENTRY_MAX) {
-		printk
-		    (KERN_ERR "i2c-proc.o: Warning: inode (%ld) not found in fill_inode()\n",
-		     inode->i_ino);
-		return;
-	}
-#endif				/* def DEBUG */
-	client = i2c_clients[i];
-	if (fill)
-		client->driver->inc_use(client);
-	else
-		client->driver->dec_use(client);
 }
 
 int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,

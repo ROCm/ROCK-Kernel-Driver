@@ -82,11 +82,11 @@ of error messages about running out of file handles, you might
 want to increase this limit.
 
 The three values in file-nr denote the number of allocated
-file handles, the number of used file handles and the maximum
+file handles, the number of unused file handles and the maximum
 number of file handles. When the allocated file handles come
-close to the maximum, but the number of actually used ones is
-far behind, you've encountered a peak in your usage of file
-handles and you don't need to increase the maximum.
+close to the maximum, but the number of unused file handles is
+significantly greater than 0, you've encountered a peak in your 
+usage of file handles and you don't need to increase the maximum.
 
 ==============================================================
 

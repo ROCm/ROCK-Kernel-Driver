@@ -66,26 +66,6 @@ static int scx200_i2c_getsda(void *data)
 	return scx200_gpio_get(sda);
 }
 
-static int scx200_i2c_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int scx200_i2c_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void scx200_i2c_inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void scx200_i2c_dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
  * This is only done when more than one hardware adapter is supported.
@@ -101,13 +81,10 @@ static struct i2c_algo_bit_data scx200_i2c_data = {
 };
 
 static struct i2c_adapter scx200_i2c_ops = {
+	.owner		   = THIS_MODULE,
 	.name              = "NatSemi SCx200 I2C",
 	.id		   = I2C_HW_B_VELLE,
 	.algo_data	   = &scx200_i2c_data,
-	.inc_use	   = scx200_i2c_inc_use,
-	.dec_use	   = scx200_i2c_dec_use,
-	.client_register   = scx200_i2c_reg,
-	.client_unregister = scx200_i2c_unreg,
 };
 
 int scx200_i2c_init(void)

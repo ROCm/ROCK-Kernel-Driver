@@ -466,13 +466,9 @@ static int sirdev_open(struct net_device *ndev)
 	if (!drv)
 		return -ENODEV;
 
-	lock_kernel();		/* serialize with rmmod */
 	/* increase the reference count of the driver module before doing serious stuff */
-	if (drv->owner  &&  !try_inc_mod_count(drv->owner)) {
-		unlock_kernel();
+	if (!try_module_get(drv->owner))
 		return -ESTALE;
-	}
-	unlock_kernel();
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 

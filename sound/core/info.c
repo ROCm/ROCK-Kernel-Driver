@@ -296,7 +296,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 #ifdef LINUX_2_2
 	MOD_INC_USE_COUNT;
 #endif
-	if (entry->module && !try_inc_mod_count(entry->module)) {
+	if (!try_module_get(entry->module)) {
 		err = -EFAULT;
 		goto __error1;
 	}

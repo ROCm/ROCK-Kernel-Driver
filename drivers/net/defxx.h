@@ -1669,13 +1669,6 @@ typedef union
 #define XMT_BUFF_K_SA		7				/* six byte source address */
 #define XMT_BUFF_K_DATA		13				/* offset to start of packet data */
 
-/*
- * Macro evaluates to "value" aligned to "size" bytes.  Make sure that
- * "size" is greater than 0 bytes.
- */
-
-#define ALIGN(value,size) ((value + (size - 1)) & ~(size - 1))
-
 /* Macro for checking a "value" is within a specific range */
 
 #define IN_RANGE(value,low,high) ((value >= low) && (value <= high))

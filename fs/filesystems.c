@@ -20,7 +20,7 @@
  *	We can access the fields of list element if:
  *		1) spinlock is held or
  *		2) we hold the reference to the module.
- *	The latter can be guaranteed by call of try_inc_mod_count(); if it
+ *	The latter can be guaranteed by call of try_module_get(); if it
  *	returned 0 we must skip the element, otherwise we got the reference.
  *	Once the reference is obtained we can drop the spinlock.
  */
@@ -153,8 +153,8 @@ static int fs_name(unsigned int index, char * buf)
 
 	read_lock(&file_systems_lock);
 	for (tmp = file_systems; tmp; tmp = tmp->next, index--)
-		if (index <= 0 && try_inc_mod_count(tmp->owner))
-				break;
+		if (index <= 0 && try_module_get(tmp->owner))
+			break;
 	read_unlock(&file_systems_lock);
 	if (!tmp)
 		return -EINVAL;
@@ -224,13 +224,13 @@ struct file_system_type *get_fs_type(const char *name)
 
 	read_lock(&file_systems_lock);
 	fs = *(find_filesystem(name));
-	if (fs && !try_inc_mod_count(fs->owner))
+	if (fs && !try_module_get(fs->owner))
 		fs = NULL;
 	read_unlock(&file_systems_lock);
 	if (!fs && (request_module(name) == 0)) {
 		read_lock(&file_systems_lock);
 		fs = *(find_filesystem(name));
-		if (fs && !try_inc_mod_count(fs->owner))
+		if (fs && !try_module_get(fs->owner))
 			fs = NULL;
 		read_unlock(&file_systems_lock);
 	}

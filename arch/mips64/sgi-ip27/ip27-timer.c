@@ -11,6 +11,7 @@
 #include <linux/param.h>
 #include <linux/timex.h>
 #include <linux/mm.h>		
+#include <linux/bcd.h>		
 
 #include <asm/pgtable.h>
 #include <asm/sgialib.h>

@@ -1,6 +1,6 @@
 #
 # AIC7XXX and AIC79XX 2.5.X Kernel configuration File.
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic7xxx#4 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Kconfig.aic7xxx#5 $
 #
 config SCSI_AIC7XXX
 	tristate "Adaptec AIC7xxx Fast -> U160 support (New Driver)"
@@ -92,7 +92,7 @@ config AIC7XXX_DEBUG_MASK
 
 config AIC7XXX_REG_PRETTY_PRINT
         bool "Decode registers during diagnostics"
-        depends on SCSI_AIC7XXX && SCSI_AIC7XXX_BUILD_FIRMWARE
+        depends on SCSI_AIC7XXX
 	default y
         help
 	Compile in register value tables for the output of expanded register

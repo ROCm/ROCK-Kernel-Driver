@@ -154,7 +154,7 @@ static void speedstep_set_state (unsigned int state, int notify)
 
 	freqs.old = (oldstate == SPEEDSTEP_HIGH) ? speedstep_high_freq : speedstep_low_freq;
 	freqs.new = (state == SPEEDSTEP_HIGH) ? speedstep_high_freq : speedstep_low_freq;
-	freqs.cpu = CPUFREQ_ALL_CPUS; /* speedstep.c is UP only driver */
+	freqs.cpu = 0; /* speedstep.c is UP only driver */
 	
 	if (notify)
 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);

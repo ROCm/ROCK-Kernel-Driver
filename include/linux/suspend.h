@@ -46,6 +46,9 @@ struct suspend_header {
 /* mm/vmscan.c */
 extern int shrink_mem(void);
 
+/* mm/page_alloc.c */
+extern void drain_local_pages(void);
+
 /* kernel/suspend.c */
 extern void software_suspend(void);
 extern void software_resume(void);

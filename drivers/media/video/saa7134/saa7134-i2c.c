@@ -318,16 +318,6 @@ static u32 functionality(struct i2c_adapter *adap)
 	return I2C_FUNC_SMBUS_EMUL;
 }
 
-static void inc_use(struct i2c_adapter *adap)
-{
-	MOD_INC_USE_COUNT;
-}
-
-static void dec_use(struct i2c_adapter *adap)
-{
-	MOD_DEC_USE_COUNT;
-}
-
 static int attach_inform(struct i2c_client *client)
 {
         struct saa7134_dev *dev = client->adapter->algo_data;
@@ -346,11 +336,10 @@ static struct i2c_algorithm saa7134_algo = {
 };
 
 static struct i2c_adapter saa7134_adap_template = {
+	.owner         = THIS_MODULE,
 	.name	       = "saa7134",
 	.id            = I2C_ALGO_SAA7134,
 	.algo          = &saa7134_algo,
-	.inc_use       = inc_use,
-	.dec_use       = dec_use,
 	.client_register = attach_inform,
 };
 

@@ -115,30 +115,6 @@ fail:
 	return -ENODEV;
 }
 
-static int bit_elv_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int bit_elv_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void bit_elv_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void bit_elv_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 /* ------------------------------------------------------------------------
  * Encapsulate the above functions in the correct operations structure.
  * This is only done when more than one hardware adapter is supported.
@@ -153,14 +129,10 @@ static struct i2c_algo_bit_data bit_elv_data = {
 };
 
 static struct i2c_adapter bit_elv_ops = {
-	"ELV Parallel port adaptor",
-	I2C_HW_B_ELV,
-	NULL,
-	&bit_elv_data,
-	bit_elv_inc_use,
-	bit_elv_dec_use,
-	bit_elv_reg,
-	bit_elv_unreg,	
+	.owner		= THIS_MODULE,
+	.name		= "ELV Parallel port adaptor",
+	.id		= I2C_HW_B_ELV,
+	.algo_data	= &bit_elv_data,
 };
 
 static int __init i2c_bitelv_init(void)

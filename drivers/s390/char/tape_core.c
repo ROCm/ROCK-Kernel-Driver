@@ -837,7 +837,7 @@ tape_open(struct tape_device *device)
 		DBF_EVENT(6, "TAPE:dbusy\n");
 		rc = -EBUSY;
 	} else if (device->discipline != NULL &&
-		   !try_inc_mod_count(device->discipline->owner)) {
+		   !try_module_get(device->discipline->owner)) {
 		DBF_EVENT(6, "TAPE:nodisc\n");
 		rc = -ENODEV;
 	} else {

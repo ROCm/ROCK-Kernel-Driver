@@ -945,14 +945,6 @@ static unsigned short normal_i2c[] = { MAVEN_I2CID, I2C_CLIENT_END };
 static unsigned short normal_i2c_range[] = { MAVEN_I2CID, MAVEN_I2CID, I2C_CLIENT_END };
 I2C_CLIENT_INSMOD;
 
-static void maven_inc_use(struct i2c_client* clnt) {
-	MOD_INC_USE_COUNT;
-}
-
-static void maven_dec_use(struct i2c_client* clnt) {
-	MOD_DEC_USE_COUNT;
-}
-
 static struct i2c_driver maven_driver;
 
 static int maven_detect_client(struct i2c_adapter* adapter, int address, unsigned short flags,
@@ -1016,17 +1008,13 @@ static int maven_command(struct i2c_client* client, unsigned int cmd, void* arg)
 	return -ENOIOCTLCMD;	/* or -EINVAL, depends on who will call this */
 }
 
-static int maven_driver_registered = 0;
-
 static struct i2c_driver maven_driver={
-	"maven",
-	I2C_DRIVERID_MGATVO,
-	I2C_DF_NOTIFY,
-	maven_attach_adapter,
-	maven_detach_client,
-	maven_command,
-	maven_inc_use,
-	maven_dec_use
+	.owner		= THIS_MODULE,
+	.name		= "maven",
+	.id		= I2C_DRIVERID_MGATVO,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= maven_attach_adapter,
+	.detach_client	= maven_detach_client,
 };
 
 /* ************************** */
@@ -1039,13 +1027,11 @@ static int matroxfb_maven_init(void) {
 		printk(KERN_ERR "maven: Maven driver failed to register (%d).\n", err);
 		return err;
 	}
-	maven_driver_registered = 1;
 	return 0;
 }
 
 static void matroxfb_maven_exit(void) {
-	if (maven_driver_registered)
-		i2c_del_driver(&maven_driver);
+	i2c_del_driver(&maven_driver);
 }
 
 MODULE_AUTHOR("(c) 1999-2002 Petr Vandrovec <vandrove@vc.cvut.cz>");

@@ -285,7 +285,9 @@ static inline const char *module_address_lookup(unsigned long addr,
 }
 #endif /* CONFIG_MODULES */
 
-#if defined(MODULE) && defined(KBUILD_MODNAME)
+#ifdef MODULE
+extern struct module __this_module;
+#ifdef KBUILD_MODNAME
 /* We make the linker do some of the work. */
 struct module __this_module
 __attribute__((section(".gnu.linkonce.this_module"))) = {
@@ -296,7 +298,8 @@ __attribute__((section(".gnu.linkonce.this_module"))) = {
 	.exit = cleanup_module,
 #endif
 };
-#endif /* MODULE && KBUILD_MODNAME */
+#endif /* KBUILD_MODNAME */
+#endif /* MODULE */
 
 /* For archs to search exception tables */
 extern struct list_head extables;
@@ -354,7 +357,6 @@ static inline void __deprecated _MOD_INC_USE_COUNT(struct module *module)
 	_MOD_INC_USE_COUNT(THIS_MODULE)
 #define MOD_DEC_USE_COUNT \
 	__MOD_DEC_USE_COUNT(THIS_MODULE)
-#define try_inc_mod_count(mod) try_module_get(mod)
 #define EXPORT_NO_SYMBOLS
 extern int module_dummy_usage;
 #define GET_USE_COUNT(module) (module_dummy_usage)

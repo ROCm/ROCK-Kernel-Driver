@@ -1604,7 +1604,7 @@ snd_wavefront_synth_open (snd_hwdep_t *hw, struct file *file)
 
 {
 	MOD_INC_USE_COUNT;
-	if (!try_inc_mod_count(hw->card->module)) {
+	if (!try_module_get(hw->card->module)) {
 		MOD_DEC_USE_COUNT;
 		return -EFAULT;
 	}

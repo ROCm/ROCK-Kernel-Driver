@@ -115,13 +115,9 @@ typedef s390_regs32 elf_gregset_t;
 #include <linux/config.h>
 #include <linux/elfcore.h>
 #include <linux/binfmts.h>
+#include <linux/compat.h>
 
 int setup_arg_pages32(struct linux_binprm *bprm);
-
-struct timeval32
-{
-    int tv_sec, tv_usec;
-};
 
 #define elf_prstatus elf_prstatus32
 struct elf_prstatus32
@@ -134,10 +130,10 @@ struct elf_prstatus32
 	pid_t	pr_ppid;
 	pid_t	pr_pgrp;
 	pid_t	pr_sid;
-	struct timeval32 pr_utime;	/* User time */
-	struct timeval32 pr_stime;	/* System time */
-	struct timeval32 pr_cutime;	/* Cumulative user time */
-	struct timeval32 pr_cstime;	/* Cumulative system time */
+	struct compat_timeval pr_utime;	/* User time */
+	struct compat_timeval pr_stime;	/* System time */
+	struct compat_timeval pr_cutime;	/* Cumulative user time */
+	struct compat_timeval pr_cstime;	/* Cumulative system time */
 	elf_gregset_t pr_reg;	/* GP registers */
 	int pr_fpvalid;		/* True if math co-processor being used.  */
 };

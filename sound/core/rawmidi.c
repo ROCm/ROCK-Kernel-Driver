@@ -189,7 +189,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 		err = -ENODEV;
 		goto __error1;
 	}
-	if (!try_inc_mod_count(rmidi->card->module)) {
+	if (!try_module_get(rmidi->card->module)) {
 		err = -EFAULT;
 		goto __error1;
 	}

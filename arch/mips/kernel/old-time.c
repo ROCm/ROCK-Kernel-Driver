@@ -16,6 +16,7 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/kernel_stat.h>
+#include <linux/bcd.h>
 
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>

@@ -1246,6 +1246,12 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
 	smp_store_cpu_info(boot_cpu_id);
 }
 
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &phys_cpu_present_map);
+}
+
 int __devinit __cpu_up(unsigned int cpu)
 {
 	int ret = smp_boot_one_cpu(cpu);
