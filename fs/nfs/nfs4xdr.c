@@ -90,12 +90,6 @@ static int nfs_stat_to_errno(int);
 #define decode_savefh_maxsz     (op_decode_hdr_maxsz)
 #define encode_restorefh_maxsz  (op_encode_hdr_maxsz)
 #define decode_restorefh_maxsz  (op_decode_hdr_maxsz)
-#define encode_read_getattr_maxsz	(op_encode_hdr_maxsz + 2)
-#define decode_read_getattr_maxsz	(op_decode_hdr_maxsz + 8)
-#define encode_pre_write_getattr_maxsz	(op_encode_hdr_maxsz + 2)
-#define decode_pre_write_getattr_maxsz	(op_decode_hdr_maxsz + 5)
-#define encode_post_write_getattr_maxsz	(op_encode_hdr_maxsz + 2)
-#define decode_post_write_getattr_maxsz	(op_decode_hdr_maxsz + 13)
 #define encode_fsinfo_maxsz	(op_encode_hdr_maxsz + 2)
 #define decode_fsinfo_maxsz	(op_decode_hdr_maxsz + 11)
 #define encode_renew_maxsz	(op_encode_hdr_maxsz + 3)
@@ -120,32 +114,22 @@ static int nfs_stat_to_errno(int);
 #define NFS4_dec_compound_sz	(1024)  /* XXX: large enough? */
 #define NFS4_enc_read_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
-				encode_read_getattr_maxsz + \
 				op_encode_hdr_maxsz + 7)
 #define NFS4_dec_read_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
-				decode_read_getattr_maxsz + \
 				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_write_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
-				encode_pre_write_getattr_maxsz + \
-				op_encode_hdr_maxsz + 8 + \
-				encode_post_write_getattr_maxsz)
+				op_encode_hdr_maxsz + 8)
 #define NFS4_dec_write_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
-				decode_pre_write_getattr_maxsz + \
-				op_decode_hdr_maxsz + 4 + \
-				decode_post_write_getattr_maxsz)
+				op_decode_hdr_maxsz + 4)
 #define NFS4_enc_commit_sz	(compound_encode_hdr_maxsz + \
 				encode_putfh_maxsz + \
-				encode_pre_write_getattr_maxsz + \
-				op_encode_hdr_maxsz + 3 + \
-				encode_post_write_getattr_maxsz)
+				op_encode_hdr_maxsz + 3)
 #define NFS4_dec_commit_sz	(compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
-				decode_pre_write_getattr_maxsz + \
-				op_decode_hdr_maxsz + 2 + \
-				decode_post_write_getattr_maxsz)
+				op_decode_hdr_maxsz + 2)
 #define NFS4_enc_open_sz        (compound_encode_hdr_maxsz + \
                                 encode_putfh_maxsz + \
                                 encode_savefh_maxsz + \
@@ -572,38 +556,6 @@ encode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr)
 {
 	return encode_getattr_two(xdr, getattr->gt_bmval[0],
 					getattr->gt_bmval[1]);
-}
-
-/*
- * Request the change attribute in order to check attribute+cache consistency
- */
-static inline int
-encode_read_getattr(struct xdr_stream *xdr)
-{
-	return encode_getattr_two(xdr, FATTR4_WORD0_CHANGE,
-			FATTR4_WORD1_TIME_ACCESS);
-}
-
-/*
- * Request the change attribute prior to doing a write operation
- */
-static inline int
-encode_pre_write_getattr(struct xdr_stream *xdr)
-{
-	/* Request the change attribute */
-	return encode_getattr_one(xdr, FATTR4_WORD0_CHANGE);
-}
-
-/*
- * Request the change attribute, size, and [cm]time after a write operation
- */
-static inline int
-encode_post_write_getattr(struct xdr_stream *xdr)
-{
-	return encode_getattr_two(xdr, FATTR4_WORD0_CHANGE|FATTR4_WORD0_SIZE,
-			FATTR4_WORD1_SPACE_USED |
-			FATTR4_WORD1_TIME_METADATA |
-			FATTR4_WORD1_TIME_MODIFY);
 }
 
 static int
@@ -1421,7 +1373,7 @@ nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_readargs *args)
 	struct rpc_auth	*auth = req->rq_task->tk_auth;
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops	= 3,
+		.nops = 2,
 	};
 	int replen, status;
 
@@ -1433,14 +1385,12 @@ nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_readargs *args)
 	status = encode_read(&xdr, args);
 	if (status)
 		goto out;
-	status = encode_read_getattr(&xdr);
 
 	/* set up reply iovec
 	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
 	 *       + OP_READ + status + eof + datalen = 9
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack +
-			NFS4_dec_read_sz - decode_read_getattr_maxsz) << 2;
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + NFS4_dec_read_sz) << 2;
 	xdr_inline_pages(&req->rq_rcv_buf, replen,
 			 args->pages, args->pgbase, args->count);
 out:
@@ -1481,7 +1431,7 @@ nfs4_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops   = 4,
+		.nops = 2,
 	};
 	int status;
 
@@ -1490,13 +1440,7 @@ nfs4_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args
 	status = encode_putfh(&xdr, args->fh);
 	if (status)
 		goto out;
-	status = encode_pre_write_getattr(&xdr);
-	if (status)
-		goto out;
 	status = encode_write(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_post_write_getattr(&xdr);
 out:
 	return status;
 }
@@ -1509,7 +1453,7 @@ nfs4_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *arg
 {
 	struct xdr_stream xdr;
 	struct compound_hdr hdr = {
-		.nops   = 4,
+		.nops = 2,
 	};
 	int status;
 
@@ -1518,13 +1462,7 @@ nfs4_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *arg
 	status = encode_putfh(&xdr, args->fh);
 	if (status)
 		goto out;
-	status = encode_pre_write_getattr(&xdr);
-	if (status)
-		goto out;
 	status = encode_commit(&xdr, args);
-	if (status)
-		goto out;
-	status = encode_post_write_getattr(&xdr);
 out:
 	return status;
 }
@@ -2305,138 +2243,6 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
                 goto xdr_error;
 	
         DECODE_TAIL;
-}
-
-static int
-decode_change_attr(struct xdr_stream *xdr, uint64_t *change_attr)
-{
-	uint32_t *p;
-	uint32_t attrlen, bmlen, bmval = 0;
-	int status;
-
-	status = decode_op_hdr(xdr, OP_GETATTR);
-	if (status)
-		return status;
-	READ_BUF(4);
-	READ32(bmlen);
-	if (bmlen < 1)
-		return -EIO;
-	READ_BUF(bmlen << 2);
-	READ32(bmval);
-	if (bmval != FATTR4_WORD0_CHANGE) {
-		printk(KERN_NOTICE "decode_change_attr: server returned bad attribute bitmap 0x%x\n",
-			(unsigned int)bmval);
-		return -EIO;
-	}
-	READ_BUF(4);
-	READ32(attrlen);
-	READ_BUF(attrlen);
-	if (attrlen < 8) {
-		printk(KERN_NOTICE "decode_change_attr: server returned bad attribute length %u\n",
-				(unsigned int)attrlen);
-		return -EIO;
-	}
-	READ64(*change_attr);
-	return 0;
-}
-
-static int
-decode_read_getattr(struct xdr_stream *xdr, struct nfs_fattr *fattr)
-{
-	uint32_t *p;
-	uint32_t attrlen, bmlen, bmval0 = 0, bmval1 = 0;
-	int status;
-
-	status = decode_op_hdr(xdr, OP_GETATTR);
-	if (status)
-		return status;
-	READ_BUF(4);
-	READ32(bmlen);
-	if (bmlen < 1)
-		return -EIO;
-	READ_BUF(bmlen << 2);
-	READ32(bmval0);
-	if (bmval0 != FATTR4_WORD0_CHANGE)
-		goto out_bad_bitmap;
-	if (bmlen > 1) {
-		READ32(bmval1);
-		if (bmval1 & ~(FATTR4_WORD1_TIME_ACCESS))
-			goto out_bad_bitmap;
-	}
-	READ_BUF(4);
-	READ32(attrlen);
-	READ_BUF(attrlen);
-	if (attrlen < 16) {
-		printk(KERN_NOTICE "decode_post_write_getattr: server returned bad attribute length %u\n",
-				(unsigned int)attrlen);
-		return -EIO;
-	}
-	READ64(fattr->change_attr);
-	if (bmval1 & FATTR4_WORD1_TIME_ACCESS)
-		READTIME(fattr->atime);
-	fattr->bitmap[0] = bmval0;
-	fattr->bitmap[1] = bmval1;
-	return 0;
-out_bad_bitmap:
-	printk(KERN_NOTICE "decode_read_getattr: server returned bad attribute bitmap 0x%x/0x%x\n",
-			(unsigned int)bmval0, (unsigned int)bmval1);
-	return -EIO;
-}
-
-static int
-decode_pre_write_getattr(struct xdr_stream *xdr, struct nfs_fattr *fattr)
-{
-	return decode_change_attr(xdr, &fattr->pre_change_attr);
-}
-
-static int
-decode_post_write_getattr(struct xdr_stream *xdr, struct nfs_fattr *fattr)
-{
-	uint32_t *p;
-	uint32_t attrlen, bmlen, bmval0 = 0, bmval1 = 0;
-	int status;
-
-	status = decode_op_hdr(xdr, OP_GETATTR);
-	if (status)
-		return status;
-	READ_BUF(4);
-	READ32(bmlen);
-	if (bmlen < 1)
-		return -EIO;
-	READ_BUF(bmlen << 2);
-	READ32(bmval0);
-	if (bmval0 != (FATTR4_WORD0_CHANGE|FATTR4_WORD0_SIZE))
-		goto out_bad_bitmap;
-	if (bmlen > 1) {
-		READ32(bmval1);
-		if (bmval1 & ~(FATTR4_WORD1_SPACE_USED |
-					FATTR4_WORD1_TIME_METADATA |
-					FATTR4_WORD1_TIME_MODIFY))
-			goto out_bad_bitmap;
-	}
-	READ_BUF(4);
-	READ32(attrlen);
-	READ_BUF(attrlen);
-	if (attrlen < 16) {
-		printk(KERN_NOTICE "decode_post_write_getattr: server returned bad attribute length %u\n",
-				(unsigned int)attrlen);
-		return -EIO;
-	}
-	READ64(fattr->change_attr);
-	READ64(fattr->size);
-	if (bmval1 & FATTR4_WORD1_SPACE_USED)
-		READ64(fattr->du.nfs3.used);
-	if (bmval1 & FATTR4_WORD1_TIME_METADATA)
-		READTIME(fattr->ctime);
-	if (bmval1 & FATTR4_WORD1_TIME_MODIFY)
-		READTIME(fattr->mtime);
-	fattr->bitmap[0] = bmval0;
-	fattr->bitmap[1] = bmval1;
-	return 0;
-out_bad_bitmap:
-	printk(KERN_NOTICE "decode_post_write_getattr: server returned bad attribute bitmap 0x%x/0x%x\n",
-			(unsigned int)bmval0, (unsigned int)bmval1);
-	return -EIO;
 }
 
 static int decode_getfattr(struct xdr_stream *xdr, struct nfs_fattr *fattr, const struct nfs_server *server)
@@ -3410,11 +3216,6 @@ nfs4_xdr_dec_read(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_readres *res)
 	if (status)
 		goto out;
 	status = decode_read(&xdr, rqstp, res);
-	if (status)
-		goto out;
-	status = decode_read_getattr(&xdr, res->fattr);
-	if (!status)
-		status = -nfs_stat_to_errno(hdr.status);
 	if (!status)
 		status = res->count;
 out:
@@ -3438,15 +3239,7 @@ nfs4_xdr_dec_write(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res
 	status = decode_putfh(&xdr);
 	if (status)
 		goto out;
-	status = decode_pre_write_getattr(&xdr, res->fattr);
-	if (status)
-		goto out;
 	status = decode_write(&xdr, res);
-	if (status)
-		goto out;
-	status = decode_post_write_getattr(&xdr, res->fattr);
-	if (!status)
-		status = -nfs_stat_to_errno(hdr.status);
 	if (!status)
 		status = res->count;
 out:
@@ -3470,15 +3263,7 @@ nfs4_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *re
 	status = decode_putfh(&xdr);
 	if (status)
 		goto out;
-	status = decode_pre_write_getattr(&xdr, res->fattr);
-	if (status)
-		goto out;
 	status = decode_commit(&xdr, res);
-	if (status)
-		goto out;
-	status = decode_post_write_getattr(&xdr, res->fattr);
-	if (!status)
-		status = -nfs_stat_to_errno(hdr.status);
 out:
 	return status;
 }
