@@ -86,7 +86,9 @@ enum rq_flag_bits {
 	__REQ_SENSE,	/* sense retrival */
 
 	__REQ_SPECIAL,	/* driver suplied command */
-
+	__REQ_DRIVE_CMD,
+	__REQ_DRIVE_TASK,
+	__REQ_DRIVE_TASKFILE,
 	__REQ_NR_BITS,	/* stops here */
 };
 
@@ -102,6 +104,9 @@ enum rq_flag_bits {
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
 #define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_SPECIAL	(1 << __REQ_SPECIAL)
+#define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
+#define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
+#define REQ_DRIVE_TASKFILE	(1 << __REQ_DRIVE_TASKFILE)
 
 #include <linux/elevator.h>
 
