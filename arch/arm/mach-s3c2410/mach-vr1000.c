@@ -11,6 +11,7 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     04-Sep-2004 BJD  Added new uart init, and io init
  *     21-Aug-2004 BJD  Added struct s3c2410_board
  *     06-Aug-2004 BJD  Fixed call to time initialisation
  *     05-Apr-2004 BJD  Copied to make mach-vr1000.c
@@ -40,6 +41,7 @@
 
 #include "s3c2410.h"
 #include "devs.h"
+#include "cpu.h"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -155,18 +157,14 @@ static struct s3c2410_board vr1000_board __initdata = {
 
 void __init vr1000_map_io(void)
 {
-	s3c2410_map_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
-	s3c2410_uartcfgs = vr1000_uartcfgs;
-
+	s3c24xx_init_io(vr1000_iodesc, ARRAY_SIZE(vr1000_iodesc));
+	s3c2410_init_uarts(vr1000_uartcfgs, ARRAY_SIZE(vr1000_uartcfgs));
 	s3c2410_set_board(&vr1000_board);
 }
 
 void __init vr1000_init_irq(void)
 {
-	//llprintk("vr1000init_irq:\n");
-
 	s3c2410_init_irq();
-
 }
 
 void __init vr1000_init_time(void)
