@@ -869,7 +869,7 @@ mrproper: clean archmrproper $(mrproper-dirs)
 .PHONY: distclean
 
 distclean: mrproper
-	@find . $(RCS_FIND_IGNORE) \
+	@find $(srctree) $(RCS_FIND_IGNORE) \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
 	 	-o -name '.*.rej' -o -size 0 \
