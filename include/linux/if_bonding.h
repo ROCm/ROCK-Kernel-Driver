@@ -42,7 +42,7 @@
 #include <linux/if_ether.h>
 
 /* userland - kernel ABI version (2003/05/08) */
-#define BOND_ABI_VERSION 1
+#define BOND_ABI_VERSION 2
 
 /*
  * We can remove these ioctl definitions in 2.5.  People should use the

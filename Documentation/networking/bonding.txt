@@ -973,13 +973,12 @@ Donald Becker's Ethernet Drivers and diag programs may be found at :
 You will also find a lot of information regarding Ethernet, NWay, MII, etc. at
 www.scyld.com.
 
-For new versions of the driver, patches for older kernels and the updated
-userspace tools, take a look at Willy Tarreau's site :
+Patches for 2.2 kernels are at Willy Tarreau's site :
  - http://wtarreau.free.fr/pub/bonding/
- - http://www-miaif.lip6.fr/willy/pub/bonding/
+ - http://www-miaif.lip6.fr/~tarreau/pub/bonding/
 
 To get latest informations about Linux Kernel development, please consult
 the Linux Kernel Mailing List Archives at :
-   http://boudicca.tux.org/hypermail/linux-kernel/latest/
+   http://www.ussg.iu.edu/hypermail/linux/kernel/
 
 -- END --
