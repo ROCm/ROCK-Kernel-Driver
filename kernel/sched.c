@@ -132,12 +132,14 @@
 	(NS_TO_JIFFIES((p)->sleep_avg) * MAX_BONUS / \
 		MAX_SLEEP_AVG)
 
+#define GRANULARITY	(10 * HZ / 1000 ? : 1)
+
 #ifdef CONFIG_SMP
-#define TIMESLICE_GRANULARITY(p)	(MIN_TIMESLICE * \
+#define TIMESLICE_GRANULARITY(p)	(GRANULARITY * \
 		(1 << (((MAX_BONUS - CURRENT_BONUS(p)) ? : 1) - 1)) * \
 			num_online_cpus())
 #else
-#define TIMESLICE_GRANULARITY(p)	(MIN_TIMESLICE * \
+#define TIMESLICE_GRANULARITY(p)	(GRANULARITY * \
 		(1 << (((MAX_BONUS - CURRENT_BONUS(p)) ? : 1) - 1)))
 #endif
 
