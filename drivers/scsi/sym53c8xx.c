@@ -4901,6 +4901,11 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	u_long	period;
 	int i;
 
+#ifdef CONFIG_PARISC
+	char scsi_mode = -1;
+	struct hardware_path hwpath;
+#endif
+
 	/*
 	**	Wide ?
 	*/
@@ -4972,6 +4977,31 @@ static int __init ncr_prepare_setting(ncb_p np, ncr_nvram *nvram)
 	 */
 
 	period = (4 * div_10M[0] + np->clock_khz - 1) / np->clock_khz;
+
+#ifdef CONFIG_PARISC
+	/* Host firmware (PDC) keeps a table for crippling SCSI capabilities.
+	 * Many newer machines export one channel of 53c896 chip
+	 * as SE, 50-pin HD.  Also used for Multi-initiator SCSI clusters
+	 * to set the SCSI Initiator ID.
+	 */
+	get_pci_node_path(np->pdev, &hwpath);
+	if (pdc_get_initiator(&hwpath, &np->myaddr, &period, &np->maxwide, &scsi_mode))
+	{
+		if (np->maxwide) 
+			np->features |= FE_WIDE;
+		if (scsi_mode >= 0) {
+			/* C3000 PDC reports period/mode */
+			driver_setup.diff_support = 0;
+			switch(scsi_mode) {
+			case 0:	np->scsi_mode = SMODE_SE; break;
+			case 1:	np->scsi_mode = SMODE_HVD; break;
+			case 2:	np->scsi_mode = SMODE_LVD; break;
+			default:	break;
+			}
+		}
+	}
+#endif
+
 	if	(period <= 250)		np->minsync = 10;
 	else if	(period <= 303)		np->minsync = 11;
 	else if	(period <= 500)		np->minsync = 12;

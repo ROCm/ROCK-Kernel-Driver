@@ -162,8 +162,8 @@ read_wd33c93(const wd33c93_regs regs, uchar reg_num)
 {
 	uchar data;
 
-	outb(reg_num, *regs.SASR);
-	data = inb(*regs.SCMD);
+	outb(reg_num, regs.SASR);
+	data = inb(regs.SCMD);
 	return data;
 }
 
@@ -172,33 +172,33 @@ read_wd33c93_count(const wd33c93_regs regs)
 {
 	unsigned long value;
 
-	outb(WD_TRANSFER_COUNT_MSB, *regs.SASR);
-	value = inb(*regs.SCMD) << 16;
-	value |= inb(*regs.SCMD) << 8;
-	value |= inb(*regs.SCMD);
+	outb(WD_TRANSFER_COUNT_MSB, regs.SASR);
+	value = inb(regs.SCMD) << 16;
+	value |= inb(regs.SCMD) << 8;
+	value |= inb(regs.SCMD);
 	return value;
 }
 
 static inline uchar
 read_aux_stat(const wd33c93_regs regs)
 {
-	return inb(*regs.SASR);
+	return inb(regs.SASR);
 }
 
 static inline void
 write_wd33c93(const wd33c93_regs regs, uchar reg_num, uchar value)
 {
-      outb(reg_num, *regs.SASR);
-      outb(value, *regs.SCMD);
+      outb(reg_num, regs.SASR);
+      outb(value, regs.SCMD);
 }
 
 static inline void
 write_wd33c93_count(const wd33c93_regs regs, unsigned long value)
 {
-	outb(WD_TRANSFER_COUNT_MSB, *regs.SASR);
-	outb((value >> 16) & 0xff, *regs.SCMD);
-	outb((value >> 8) & 0xff, *regs.SCMD);
-	outb( value & 0xff, *regs.SCMD);
+	outb(WD_TRANSFER_COUNT_MSB, regs.SASR);
+	outb((value >> 16) & 0xff, regs.SCMD);
+	outb((value >> 8) & 0xff, regs.SCMD);
+	outb( value & 0xff, regs.SCMD);
 }
 
 #define write_wd33c93_cmd(regs, cmd) \
@@ -209,9 +209,9 @@ write_wd33c93_cdb(const wd33c93_regs regs, uint len, uchar cmnd[])
 {
 	int i;
 
-	outb(WD_CDB_1, *regs.SASR);
+	outb(WD_CDB_1, regs.SASR);
 	for (i=0; i<len; i++)
-		outb(cmnd[i], *regs.SCMD);
+		outb(cmnd[i], regs.SCMD);
 }
 
 #else /* CONFIG_WD33C93_PIO */
@@ -1522,7 +1522,7 @@ reset_wd33c93(struct Scsi_Host *instance)
 }
 
 int
-wd33c93_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
+wd33c93_host_reset(Scsi_Cmnd * SCpnt)
 {
 	struct Scsi_Host *instance;
 	struct WD33C93_hostdata *hostdata;
@@ -1553,7 +1553,7 @@ wd33c93_reset(Scsi_Cmnd * SCpnt, unsigned int reset_flags)
 	reset_wd33c93(instance);
 	SCpnt->result = DID_RESET << 16;
 	enable_irq(instance->irq);
-	return 0;
+	return SUCCESS;
 }
 
 int
@@ -1591,7 +1591,7 @@ wd33c93_abort(Scsi_Cmnd * cmd)
 			     instance->host_no, cmd->pid);
 			enable_irq(cmd->device->host->irq);
 			cmd->scsi_done(cmd);
-			return SCSI_ABORT_SUCCESS;
+			return SUCCESS;
 		}
 		prev = tmp;
 		tmp = (Scsi_Cmnd *) tmp->host_scribble;
@@ -1666,7 +1666,7 @@ wd33c93_abort(Scsi_Cmnd * cmd)
 
 		enable_irq(cmd->device->host->irq);
 		cmd->scsi_done(cmd);
-		return SCSI_ABORT_SUCCESS;
+		return SUCCESS;
 	}
 
 /*
@@ -1681,9 +1681,9 @@ wd33c93_abort(Scsi_Cmnd * cmd)
 			printk
 			    ("scsi%d: Abort - command %ld found on disconnected_Q - ",
 			     instance->host_no, cmd->pid);
-			printk("returning ABORT_SNOOZE. ");
+			printk("Abort SNOOZE. ");
 			enable_irq(cmd->device->host->irq);
-			return SCSI_ABORT_SNOOZE;
+			return FAILED;
 		}
 		tmp = (Scsi_Cmnd *) tmp->host_scribble;
 	}
@@ -1704,7 +1704,7 @@ wd33c93_abort(Scsi_Cmnd * cmd)
 	enable_irq(cmd->device->host->irq);
 	printk("scsi%d: warning : SCSI command probably completed successfully"
 	       "         before abortion. ", instance->host_no);
-	return SCSI_ABORT_NOT_RUNNING;
+	return FAILED;
 }
 
 #define MAX_WD33C93_HOSTS 4
@@ -1755,7 +1755,7 @@ wd33c93_setup(char *str)
 
 	return 1;
 }
-__setup("wd33c9=", wd33c93_setup);
+__setup("wd33c93=", wd33c93_setup);
 
 /* check_setup_args() returns index if key found, 0 if not
  */
@@ -2080,7 +2080,7 @@ wd33c93_release(void)
 {
 }
 
-EXPORT_SYMBOL(wd33c93_reset);
+EXPORT_SYMBOL(wd33c93_host_reset);
 EXPORT_SYMBOL(wd33c93_init);
 EXPORT_SYMBOL(wd33c93_release);
 EXPORT_SYMBOL(wd33c93_abort);
