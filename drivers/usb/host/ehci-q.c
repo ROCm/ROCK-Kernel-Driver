@@ -918,11 +918,11 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 	qh->qh_state = QH_STATE_IDLE;
 	qh->qh_next.qh = 0;
 	qh_put (ehci, qh);			// refcount from reclaim 
-	ehci->reclaim = 0;
-	ehci->reclaim_ready = 0;
 
 	/* other unlink(s) may be pending (in QH_STATE_UNLINK_WAIT) */
 	next = qh->reclaim;
+	ehci->reclaim = next;
+	ehci->reclaim_ready = 0;
 	qh->reclaim = 0;
 
 	qh_completions (ehci, qh, regs);
@@ -941,8 +941,10 @@ static void end_unlink_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 			timer_action (ehci, TIMER_ASYNC_OFF);
 	}
 
-	if (next)
+	if (next) {
+		ehci->reclaim = 0;
 		start_unlink_async (ehci, next);
+	}
 }
 
 /* makes sure the async qh will become idle */
@@ -1046,7 +1048,8 @@ rescan:
 			if (list_empty (&qh->qtd_list)) {
 				if (qh->stamp == ehci->stamp)
 					action = TIMER_ASYNC_SHRINK;
-				else if (!ehci->reclaim)
+				else if (!ehci->reclaim
+					    && qh->qh_state == QH_STATE_LINKED)
 					start_unlink_async (ehci, qh);
 			}
 
