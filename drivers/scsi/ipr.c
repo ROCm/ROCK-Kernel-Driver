@@ -1533,6 +1533,32 @@ static void ipr_init_dump_entry_hdr(struct ipr_dump_entry_header *hdr)
 }
 
 /**
+ * ipr_dump_ioa_type_data - Fill in the adapter type in the dump.
+ * @ioa_cfg:	ioa config struct
+ * @driver_dump:	driver dump struct
+ *
+ * Return value:
+ * 	nothing
+ **/
+static void ipr_dump_ioa_type_data(struct ipr_ioa_cfg *ioa_cfg,
+				   struct ipr_driver_dump *driver_dump)
+{
+	struct ipr_inquiry_page3 *ucode_vpd = &ioa_cfg->vpd_cbs->page3_data;
+
+	ipr_init_dump_entry_hdr(&driver_dump->ioa_type_entry.hdr);
+	driver_dump->ioa_type_entry.hdr.len =
+		sizeof(struct ipr_dump_ioa_type_entry) -
+		sizeof(struct ipr_dump_entry_header);
+	driver_dump->ioa_type_entry.hdr.data_type = IPR_DUMP_DATA_TYPE_BINARY;
+	driver_dump->ioa_type_entry.hdr.id = IPR_DUMP_DRIVER_TYPE_ID;
+	driver_dump->ioa_type_entry.type = ioa_cfg->type;
+	driver_dump->ioa_type_entry.fw_version = (ucode_vpd->major_release << 24) |
+		(ucode_vpd->card_type << 16) | (ucode_vpd->minor_release[0] << 8) |
+		ucode_vpd->minor_release[1];
+	driver_dump->hdr.num_entries++;
+}
+
+/**
  * ipr_dump_version_data - Fill in the driver version in the dump.
  * @ioa_cfg:	ioa config struct
  * @driver_dump:	driver dump struct
@@ -1646,6 +1672,7 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 
 	ipr_dump_version_data(ioa_cfg, driver_dump);
 	ipr_dump_location_data(ioa_cfg, driver_dump);
+	ipr_dump_ioa_type_data(ioa_cfg, driver_dump);
 	ipr_dump_trace_data(ioa_cfg, driver_dump);
 
 	/* Update dump_header */

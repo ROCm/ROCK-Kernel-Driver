@@ -36,8 +36,8 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.4"
-#define IPR_DRIVER_DATE "(April 20, 2004)"
+#define IPR_DRIVER_VERSION "2.0.5"
+#define IPR_DRIVER_DATE "(April 28, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -980,6 +980,7 @@ struct ipr_dump_entry_header {
 #define IPR_DUMP_LOCATION_ID		0x4C4F4341
 #define IPR_DUMP_TRACE_ID		0x54524143
 #define IPR_DUMP_DRIVER_VERSION_ID	0x44525652
+#define IPR_DUMP_DRIVER_TYPE_ID	0x54595045
 #define IPR_DUMP_IOA_CTRL_BLK		0x494F4342
 #define IPR_DUMP_PEND_OPS		0x414F5053
 	u32 status;
@@ -1000,23 +1001,30 @@ struct ipr_dump_version_entry {
 	u8 version[sizeof(IPR_DRIVER_VERSION)];
 };
 
+struct ipr_dump_ioa_type_entry {
+	struct ipr_dump_entry_header hdr;
+	u32 type;
+	u32 fw_version;
+};
+
 struct ipr_driver_dump {
 	struct ipr_dump_header hdr;
 	struct ipr_dump_version_entry version_entry;
 	struct ipr_dump_location_entry location_entry;
+	struct ipr_dump_ioa_type_entry ioa_type_entry;
 	struct ipr_dump_trace_entry trace_entry;
 }__attribute__((packed));
 
 struct ipr_ioa_dump {
 	struct ipr_dump_entry_header hdr;
+	struct ipr_sdt sdt;
+	u32 *ioa_data[IPR_MAX_NUM_DUMP_PAGES];
+	u32 reserved;
 	u32 next_page_index;
 	u32 page_offset;
 	u32 format;
 #define IPR_SDT_FMT2		2
 #define IPR_SDT_UNKNOWN		3
-	u32 reserved;
-	struct ipr_sdt sdt;
-	u32 *ioa_data[IPR_MAX_NUM_DUMP_PAGES];
 }__attribute__((packed, aligned (4)));
 
 struct ipr_dump {
