@@ -513,7 +513,7 @@ static int __init etherh_addr(char *addr, struct expansion_card *ec)
 		if (i == 6)
 			return 0;
 	}
-	return ENODEV;
+	return -ENODEV;
 }
 
 /*
@@ -524,7 +524,7 @@ static int __init etherm_addr(char *addr)
 	unsigned int serial;
 
 	if (system_serial_low == 0 && system_serial_high == 0)
-		return ENODEV;
+		return -ENODEV;
 
 	serial = system_serial_low | system_serial_high;
 
