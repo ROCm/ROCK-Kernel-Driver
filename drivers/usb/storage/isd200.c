@@ -434,18 +434,18 @@ static int isd200_transfer_partial( struct us_data *us,
                 return ISD200_TRANSPORT_GOOD;
         }
 
+	/* did we abort this command? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+                US_DEBUGP("isd200_transfer_partial(): transfer aborted\n");
+		return ISD200_TRANSFER_ABORTED;
+	}
+
         /* uh oh... we have an error code, so something went wrong. */
         if (result) {
                 /* NAK - that means we've retried a few times already */
                 if (result == -ETIMEDOUT) {
                         US_DEBUGP("isd200_transfer_partial(): device NAKed\n");
                         return ISD200_TRANSPORT_FAILED;
-                }
-
-                /* -ENOENT -- we canceled this transfer */
-                if (result == -ENOENT) {
-                        US_DEBUGP("isd200_transfer_partial(): transfer aborted\n");
-                        return ISD200_TRANSPORT_ABORTED;
                 }
 
                 /* the catch-all case */
@@ -581,8 +581,11 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
 				   &partial);
         US_DEBUGP("Bulk command transfer result=%d\n", result);
     
-	if (result == -ENOENT)
-		return ISD200_TRANSPORT_ABORTED;
+	/* did we abort this command? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		return ISD200_TRANSFER_ABORTED;
+	}
+
 	else if (result == -EPIPE) {
 		/* if we stall, we need to clear it before we go on */
                 US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
@@ -610,8 +613,10 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
         US_DEBUGP("Attempting to get CSW...\n");
         result = usb_stor_bulk_msg(us, &bcs, pipe, US_BULK_CS_WRAP_LEN, 
 				   &partial);
-        if (result == -ENOENT)
-                return ISD200_TRANSPORT_ABORTED;
+	/* did we abort this command? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		return ISD200_TRANSFER_ABORTED;
+	}
 
         /* did the attempt to read the CSW fail? */
         if (result == -EPIPE) {
@@ -624,8 +629,9 @@ int isd200_Bulk_transport( struct us_data *us, Scsi_Cmnd *srb,
                                            US_BULK_CS_WRAP_LEN, &partial);
 
                 /* if the command was aborted, indicate that */
-                if (result == -ENOENT)
-                        return ISD200_TRANSPORT_ABORTED;
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+			return ISD200_TRANSFER_ABORTED;
+		}
         
                 /* if it fails again, we need a reset and return an error*/
                 if (result == -EPIPE) {

@@ -3,7 +3,7 @@
  * Unrelated to CF/SM - just USB stuff.
  *
  * This is mostly a thin layer on top of transport.c.
- * It converts routines that return values like -ENOENT and -EPIPE
+ * It converts routines that return values like -EPIPE
  * into routines that return USB_STOR_TRANSPORT_ABORTED etc.
  *
  * There is also some debug printing here.
@@ -58,13 +58,14 @@ usb_storage_send_control(struct us_data *us,
 			request, requesttype, value, index,
 			xfer_data, xfer_len);
 
+	/* did we abort this command? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		US_DEBUGP("usb_stor_send_control(): transfer aborted\n");
+		return US_BULK_TRANSFER_ABORTED;
+	}
 
 	// Check the return code for the command.
-
 	if (result < 0) {
-		/* if the command was aborted, indicate that */
-		if (result == -ENOENT)
-			return USB_STOR_TRANSPORT_ABORTED;
 
 		/* a stall is a fatal condition from the device */
 		if (result == -EPIPE) {
@@ -105,13 +106,13 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 		/* return US_BULK_TRANSFER_SHORT; */
 	}
 
-	if (result) {
-		/* -ENOENT -- we canceled this transfer */
-		if (result == -ENOENT) {
-			US_DEBUGP("raw_bulk(): transfer aborted\n");
-			return US_BULK_TRANSFER_ABORTED;
-		}
+	/* did we abort this command? */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		US_DEBUGP("usb_storage_raw_bulk(): transfer aborted\n");
+		return US_BULK_TRANSFER_ABORTED;
+	}
 
+	if (result) {
 		/* NAK - that means we've retried a few times already */
        		if (result == -ETIMEDOUT)
 			US_DEBUGP("raw_bulk(): device NAKed\n");
