@@ -64,7 +64,6 @@ static int max_interrupt_work = 20;
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/ioport.h>

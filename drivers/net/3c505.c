@@ -102,7 +102,6 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/in.h>
 #include <linux/slab.h>

@@ -29,7 +29,6 @@ static char *version = "sun3lance.c: v1.2 1/12/2001  Sam Creasey (sammy@sammy.ne
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/string.h>
-#include <linux/ptrace.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
