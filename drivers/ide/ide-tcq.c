@@ -396,10 +396,8 @@ ide_startstop_t ide_dmaq_intr(ide_drive_t *drive)
  */
 static int ide_tcq_configure(ide_drive_t *drive)
 {
-	struct hd_drive_task_hdr taskfile;
+	struct ata_taskfile args;
 	int tcq_supp = 1 << 1 | 1 << 14;
-
-	memset(&taskfile, 0, sizeof(taskfile));
 
 	/*
 	 * bit 14 and 1 must be set in word 83 of the device id to indicate
@@ -410,9 +408,12 @@ static int ide_tcq_configure(ide_drive_t *drive)
 		return 1;
 	}
 
-	taskfile.feature = SETFEATURES_EN_WCACHE;
-	taskfile.command = WIN_SETFEATURES;
-	if (ide_wait_taskfile(drive, &taskfile, NULL, NULL)) {
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SETFEATURES_EN_WCACHE;
+	args.taskfile.command = WIN_SETFEATURES;
+	ide_cmd_type_parser(&args);
+
+	if (ide_raw_taskfile(drive, &args, NULL)) {
 		printk("%s: failed to enable write cache\n", drive->name);
 		return 1;
 	}
@@ -421,9 +422,12 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	 * disable RELease interrupt, it's quicker to poll this after
 	 * having sent the command opcode
 	 */
-	taskfile.feature = SETFEATURES_DIS_RI;
-	taskfile.command = WIN_SETFEATURES;
-	if (ide_wait_taskfile(drive, &taskfile, NULL, NULL)) {
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SETFEATURES_DIS_RI;
+	args.taskfile.command = WIN_SETFEATURES;
+	ide_cmd_type_parser(&args);
+
+	if (ide_raw_taskfile(drive, &args, NULL)) {
 		printk("%s: disabling release interrupt fail\n", drive->name);
 		return 1;
 	}
@@ -432,9 +436,12 @@ static int ide_tcq_configure(ide_drive_t *drive)
 	/*
 	 * enable SERVICE interrupt
 	 */
-	taskfile.feature = SETFEATURES_EN_SI;
-	taskfile.command = WIN_SETFEATURES;
-	if (ide_wait_taskfile(drive, &taskfile, NULL, NULL)) {
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SETFEATURES_EN_SI;
+	args.taskfile.command = WIN_SETFEATURES;
+	ide_cmd_type_parser(&args);
+
+	if (ide_raw_taskfile(drive, &args, NULL)) {
 		printk("%s: enabling service interrupt fail\n", drive->name);
 		return 1;
 	}

@@ -891,39 +891,6 @@ void init_taskfile_request(struct request *rq)
 	rq->flags = REQ_DRIVE_TASKFILE;
 }
 
-/*
- * This is kept for internal use only !!!
- * This is an internal call and nobody in user-space has a
- * reason to call this taskfile.
- *
- * ide_raw_taskfile is the one that user-space executes.
- */
-
-int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf)
-{
-	struct request rq;
-	struct ata_request ar;
-	struct ata_taskfile *args = &ar.ar_task;
-
-	ata_ar_init(drive, &ar);
-
-	memcpy(&args->taskfile, taskfile, sizeof(*taskfile));
-	if (hobfile)
-		memcpy(&args->hobfile, hobfile, sizeof(*hobfile));
-
-	init_taskfile_request(&rq);
-
-	/* This is kept for internal use only !!! */
-	ide_cmd_type_parser(args);
-	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
-		rq.current_nr_sectors = rq.nr_sectors = (hobfile->sector_count << 8) | taskfile->sector_count;
-
-	rq.buffer = buf;
-	rq.special = &ar;
-
-	return ide_do_drive_cmd(drive, &rq, ide_wait);
-}
-
 int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
@@ -932,6 +899,7 @@ int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 	ata_ar_init(drive, &ar);
 	init_taskfile_request(&rq);
 	rq.buffer = buf;
+
 	memcpy(&ar.ar_task, args, sizeof(*args));
 
 	if (args->command_type != IDE_DRIVE_TASK_NO_DATA)
@@ -1022,7 +990,7 @@ abort:
 	return err;
 }
 
-int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_task_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
 	u8 args[7];
@@ -1051,15 +1019,14 @@ EXPORT_SYMBOL(atapi_input_bytes);
 EXPORT_SYMBOL(atapi_output_bytes);
 EXPORT_SYMBOL(taskfile_input_data);
 EXPORT_SYMBOL(taskfile_output_data);
-EXPORT_SYMBOL(ata_taskfile);
 
+EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(recal_intr);
 EXPORT_SYMBOL(set_geometry_intr);
 EXPORT_SYMBOL(set_multmode_intr);
 EXPORT_SYMBOL(task_no_data_intr);
-
-EXPORT_SYMBOL(ide_wait_taskfile);
 EXPORT_SYMBOL(ide_raw_taskfile);
 EXPORT_SYMBOL(ide_cmd_type_parser);
+
 EXPORT_SYMBOL(ide_cmd_ioctl);
 EXPORT_SYMBOL(ide_task_ioctl);

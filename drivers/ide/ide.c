@@ -494,8 +494,11 @@ unsigned long ata_capacity(ide_drive_t *drive)
 	if (ata_ops(drive) && ata_ops(drive)->capacity)
 		return ata_ops(drive)->capacity(drive);
 
-	/* FIXME: This magic number seems to be bogous. */
-	return 0x7fffffff;
+	/* This used to be 0x7fffffff, but since now we use the maximal drive
+	 * capacity value used by other kernel subsystems as well.
+	 */
+
+	return ~0UL;
 }
 
 /*
@@ -556,13 +559,12 @@ void ide_geninit(struct ata_channel *hwif)
 	}
 }
 
-static ide_startstop_t do_reset1 (ide_drive_t *, int);		/* needed below */
+static ide_startstop_t do_reset1(ide_drive_t *, int);		/* needed below */
 
 /*
- * ATAPI_reset_pollfunc() gets invoked to poll the interface for completion every 50ms
- * during an ATAPI drive reset operation. If the drive has not yet responded,
- * and we have not yet hit our maximum waiting time, then the timer is restarted
- * for another 50ms.
+ * Poll the interface for completion every 50ms during an ATAPI drive reset
+ * operation. If the drive has not yet responded, and we have not yet hit our
+ * maximum waiting time, then the timer is restarted for another 50ms.
  */
 static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 {
@@ -589,10 +591,9 @@ static ide_startstop_t atapi_reset_pollfunc (ide_drive_t *drive)
 }
 
 /*
- * reset_pollfunc() gets invoked to poll the interface for completion every 50ms
- * during an ide reset operation. If the drives have not yet responded,
- * and we have not yet hit our maximum waiting time, then the timer is restarted
- * for another 50ms.
+ * Poll the interface for completion every 50ms during an ata reset operation.
+ * If the drives have not yet responded, and we have not yet hit our maximum
+ * waiting time, then the timer is restarted for another 50ms.
  */
 static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 {
@@ -905,9 +906,9 @@ static void try_to_flush_leftover_data (ide_drive_t *drive)
 }
 
 /*
- * ide_error() takes action based on the error returned by the drive.
+ * Take action based on the error returned by the drive.
  */
-ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
+ide_startstop_t ide_error(ide_drive_t *drive, const char *msg, byte stat)
 {
 	struct request *rq;
 	byte err;
@@ -968,10 +969,9 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat)
 }
 
 /*
- * Issue a simple drive command
- * The drive must be selected beforehand.
+ * Issue a simple drive command.  The drive must be selected beforehand.
  */
-void ide_cmd (ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
+void ide_cmd(ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 {
 	BUG_ON(HWGROUP(drive)->handler);
 	ide_set_handler (drive, handler, WAIT_CMD, NULL);
@@ -983,7 +983,7 @@ void ide_cmd (ide_drive_t *drive, byte cmd, byte nsect, ide_handler_t *handler)
 }
 
 /*
- * drive_cmd_intr() is invoked on completion of a special DRIVE_CMD.
+ * Invoked on completion of a special DRIVE_CMD.
  */
 static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 {
@@ -1009,15 +1009,15 @@ static ide_startstop_t drive_cmd_intr (ide_drive_t *drive)
 }
 
 /*
- * This routine busy-waits for the drive status to be not "busy".
- * It then checks the status for all of the "good" bits and none
- * of the "bad" bits, and if all is okay it returns 0.  All other
- * cases return 1 after invoking ide_error() -- caller should just return.
+ * Busy-wait for the drive status to be not "busy".  Check then the status for
+ * all of the "good" bits and none of the "bad" bits, and if all is okay it
+ * returns 0.  All other cases return 1 after invoking ide_error() -- caller
+ * should just return.
  *
  * This routine should get fixed to not hog the cpu during extra long waits..
  * That could be done by busy-waiting for the first jiffy or two, and then
- * setting a timer to wake up at half second intervals thereafter,
- * until timeout is achieved, before timing out.
+ * setting a timer to wake up at half second intervals thereafter, until
+ * timeout is achieved, before timing out.
  */
 int ide_wait_stat(ide_startstop_t *startstop, ide_drive_t *drive, byte good, byte bad, unsigned long timeout) {
 	byte stat;
@@ -1243,8 +1243,8 @@ ide_startstop_t restart_request(ide_drive_t *drive)
 }
 
 /*
- * ide_stall_queue() can be used by a drive to give excess bandwidth back
- * to the hwgroup by sleeping for timeout jiffies.
+ * This is used by a drive to give excess bandwidth back to the hwgroup by
+ * sleeping for timeout jiffies.
  */
 void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 {
@@ -1254,7 +1254,7 @@ void ide_stall_queue(ide_drive_t *drive, unsigned long timeout)
 }
 
 /*
- * choose_drive() selects the next drive which will be serviced.
+ * Select the next drive which will be serviced.
  */
 static inline ide_drive_t *choose_drive(ide_hwgroup_t *hwgroup)
 {
@@ -1482,7 +1482,7 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
 	hwif->dmaproc(ide_dma_timeout, drive);
 
 	/*
-	 * disable dma for now, but remember that we did so because of
+	 * Disable dma for now, but remember that we did so because of
 	 * a timeout -- we'll reenable after we finish this next request
 	 * (or rather the first chunk of it) in pio.
 	 */
@@ -1631,7 +1631,7 @@ void ide_timer_expiry(unsigned long data)
  */
 static void unexpected_intr(int irq, ide_hwgroup_t *hwgroup)
 {
-	byte stat;
+	u8 stat;
 	struct ata_channel *hwif = hwgroup->hwif;
 
 	/*
@@ -2167,7 +2167,7 @@ void ide_unregister(struct ata_channel *channel)
 #endif
 
 	/*
-	 * Remove us from the kernel's knowledge
+	 * Remove us from the kernel's knowledge.
 	 */
 	unregister_blkdev(channel->major, channel->name);
 	kfree(blksize_size[channel->major]);
@@ -2249,7 +2249,7 @@ void ide_setup_ports (	hw_regs_t *hw,
 				case IDE_IRQ_OFFSET:
 					hw->io_ports[i] = intr;
 					break;
-#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+#endif
 				default:
 					hw->io_ports[i] = 0;
 					break;
@@ -2316,7 +2316,7 @@ found:
 }
 
 /*
- * Compatability function with existing drivers.  If you want
+ * Compatability function for existing drivers.  If you want
  * something different, use the function above.
  */
 int ide_register(int arg1, int arg2, int irq)
@@ -2327,7 +2327,7 @@ int ide_register(int arg1, int arg2, int irq)
 	return ide_register_hw(&hw, NULL);
 }
 
-void ide_add_setting (ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set)
+void ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set)
 {
 	ide_settings_t **p = &drive->settings;
 	ide_settings_t *setting = NULL;
@@ -2506,9 +2506,7 @@ static int set_pio_mode (ide_drive_t *drive, int arg)
 
 void ide_add_generic_settings (ide_drive_t *drive)
 {
-/*
- *			drive	setting name		read/write access				read ioctl		write ioctl		data type	min	max				mul_factor	div_factor	data pointer			set function
- */
+/*			drive	setting name		read/write access				read ioctl		write ioctl		data type	min	max				mul_factor	div_factor	data pointer			set function */
 	ide_add_setting(drive,	"io_32bit",		drive->no_io_32bit ? SETTING_READ : SETTING_RW,	HDIO_GET_32BIT,		HDIO_SET_32BIT,		TYPE_BYTE,	0,	1 + (SUPPORT_VLB_SYNC << 1),	1,		1,		&drive->io_32bit,		set_io_32bit);
 	ide_add_setting(drive,	"keepsettings",		SETTING_RW,					HDIO_GET_KEEPSETTINGS,	HDIO_SET_KEEPSETTINGS,	TYPE_BYTE,	0,	1,				1,		1,		&drive->keep_settings,		NULL);
 	ide_add_setting(drive,	"pio_mode",		SETTING_WRITE,					-1,			HDIO_SET_PIO_MODE,	TYPE_BYTE,	0,	255,				1,		1,		NULL,				set_pio_mode);
@@ -2757,8 +2755,6 @@ int ide_build_commandlist(ide_drive_t *drive)
 			break;
 		}
 
-		
-
 		/*
 		 * pheew, all done, add to list
 		 */
@@ -2787,18 +2783,21 @@ int ide_build_commandlist(ide_drive_t *drive)
 static int ide_check_media_change (kdev_t i_rdev)
 {
 	ide_drive_t *drive;
+	int res = 0; /* not changed */
 
-	if ((drive = get_info_ptr(i_rdev)) == NULL)
+	drive = get_info_ptr(i_rdev);
+	if (!drive)
 		return -ENODEV;
+
 	if (ata_ops(drive)) {
 		ata_get(ata_ops(drive));
 		if (ata_ops(drive)->check_media_change)
-			return ata_ops(drive)->check_media_change(drive);
+			res = ata_ops(drive)->check_media_change(drive);
 		else
-			return 1; /* assume it was changed */
+			res = 1; /* assume it was changed */
 		ata_put(ata_ops(drive));
 	}
-	return 0;
+	return res;
 }
 
 void ide_fixstring (byte *s, const int bytecount, const int byteswap)
@@ -2828,6 +2827,10 @@ void ide_fixstring (byte *s, const int bytecount, const int byteswap)
 		*p++ = '\0';
 }
 
+/****************************************************************************
+ * FIXME: rewrite the following crap:
+ */
+
 /*
  * stridx() returns the offset of c within s,
  * or -1 if c is '\0' or not found within s.
@@ -2835,11 +2838,12 @@ void ide_fixstring (byte *s, const int bytecount, const int byteswap)
 static int __init stridx (const char *s, char c)
 {
 	char *i = strchr(s, c);
+
 	return (i && c) ? i - s : -1;
 }
 
 /*
- * match_parm() does parsing for ide_setup():
+ * Parsing for ide_setup():
  *
  * 1. the first char of s must be '='.
  * 2. if the remainder matches one of the supplied keywords,
@@ -3000,6 +3004,7 @@ int __init ide_setup (char *s)
 
 		printk(" : Enabled support for IDE doublers\n");
 		ide_doubler = 1;
+
 		return 1;
 	}
 #endif
@@ -3007,6 +3012,7 @@ int __init ide_setup (char *s)
 	if (!strcmp(s, "ide=nodma")) {
 		printk("IDE: Prevented DMA\n");
 		noautodma = 1;
+
 		return 1;
 	}
 
@@ -3014,14 +3020,15 @@ int __init ide_setup (char *s)
 	if (!strcmp(s, "ide=reverse")) {
 		ide_scan_direction = 1;
 		printk(" : Enabled support for IDE inverse scan order.\n");
+
 		return 1;
 	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 
 	/*
 	 * Look for drive options:  "hdx="
 	 */
-	if (s[0] == 'h' && s[1] == 'd' && s[2] >= 'a' && s[2] <= max_drive) {
+	if (!strncmp(s, "hd", 2) && s[2] >= 'a' && s[2] <= max_drive) {
 		const char *hd_words[] = {"none", "noprobe", "nowerr", "cdrom",
 				"serialize", "autotune", "noautotune",
 				"slow", "swapdata", "bswap", "flash",
@@ -3038,7 +3045,7 @@ int __init ide_setup (char *s)
 		/*
 		 * Look for last lun option:  "hdxlun="
 		 */
-		if (s[3] == 'l' && s[4] == 'u' && s[5] == 'n') {
+		if (!strncmp(&s[3], "lun", 3)) {
 			if (match_parm(&s[6], NULL, vals, 1) != 1)
 				goto bad_option;
 			if (vals[0] >= 0 && vals[0] <= 7) {
@@ -3095,7 +3102,7 @@ int __init ide_setup (char *s)
 #else
 				drive->scsi = 0;
 				goto bad_option;
-#endif /* defined(CONFIG_BLK_DEV_IDESCSI) && defined(CONFIG_SCSI) */
+#endif
 			case 3: /* cyl,head,sect */
 				drive->type	= ATA_DISK;
 				drive->cyl	= drive->bios_cyl  = vals[0];
@@ -3110,12 +3117,10 @@ int __init ide_setup (char *s)
 		}
 	}
 
-	if (s[0] != 'i' || s[1] != 'd' || s[2] != 'e')
-		goto bad_option;
 	/*
 	 * Look for bus speed option:  "idebus="
 	 */
-	if (s[3] == 'b' && s[4] == 'u' && s[5] == 's') {
+	if (strncmp(s, "idebus", 6)) {
 		if (match_parm(&s[6], NULL, vals, 1) != 1)
 			goto bad_option;
 		if (vals[0] >= 20 && vals[0] <= 66) {
@@ -3124,13 +3129,14 @@ int __init ide_setup (char *s)
 			printk(" -- BAD BUS SPEED! Expected value from 20 to 66");
 		goto done;
 	}
+
 	/*
 	 * Look for interface options:  "idex="
 	 */
-	if (s[3] >= '0' && s[3] <= max_hwif) {
+	if (!strncmp(s, "ide", 3) && s[3] >= '0' && s[3] <= max_hwif) {
 		/*
 		 * Be VERY CAREFUL changing this: note hardcoded indexes below
-		 * -8,-9,-10 : are reserved for future idex calls to ease the hardcoding.
+		 * -8,-9,-10. -11 : are reserved for future idex calls to ease the hardcoding.
 		 */
 		const char *ide_words[] = {
 			"noprobe", "serialize", "autotune", "noautotune", "reset", "dma", "ata66",
@@ -3138,6 +3144,7 @@ int __init ide_setup (char *s)
 			"qd65xx", "ht6560b", "cmd640_vlb", "dtc2278", "umc8672", "ali14xx", "dc4030", NULL };
 		hw = s[3] - '0';
 		hwif = &ide_hwifs[hw];
+
 		i = match_parm(&s[4], ide_words, vals, 3);
 
 		/*
@@ -3169,7 +3176,7 @@ int __init ide_setup (char *s)
 				init_ali14xx();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_ALI14XX */
+#endif
 #ifdef CONFIG_BLK_DEV_UMC8672
 			case -16: /* "umc8672" */
 			{
@@ -3177,7 +3184,7 @@ int __init ide_setup (char *s)
 				init_umc8672();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_UMC8672 */
+#endif
 #ifdef CONFIG_BLK_DEV_DTC2278
 			case -15: /* "dtc2278" */
 			{
@@ -3185,7 +3192,7 @@ int __init ide_setup (char *s)
 				init_dtc2278();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_DTC2278 */
+#endif
 #ifdef CONFIG_BLK_DEV_CMD640
 			case -14: /* "cmd640_vlb" */
 			{
@@ -3193,7 +3200,7 @@ int __init ide_setup (char *s)
 				cmd640_vlb = 1;
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_CMD640 */
+#endif
 #ifdef CONFIG_BLK_DEV_HT6560B
 			case -13: /* "ht6560b" */
 			{
@@ -3201,7 +3208,7 @@ int __init ide_setup (char *s)
 				init_ht6560b();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_HT6560B */
+#endif
 #if CONFIG_BLK_DEV_QD65XX
 			case -12: /* "qd65xx" */
 			{
@@ -3209,7 +3216,7 @@ int __init ide_setup (char *s)
 				init_qd65xx();
 				goto done;
 			}
-#endif /* CONFIG_BLK_DEV_QD65XX */
+#endif
 			case -11: /* minus11 */
 			case -10: /* minus10 */
 			case -9: /* minus9 */
@@ -3219,10 +3226,10 @@ int __init ide_setup (char *s)
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
 				goto done;
-#else /* !CONFIG_BLK_DEV_IDEPCI */
+#else
 				hwif->udma_four = 0;
 				goto bad_hwif;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 			case -6: /* dma */
 				hwif->autodma = 1;
 				goto done;
@@ -3271,15 +3278,21 @@ int __init ide_setup (char *s)
 				return 1;
 		}
 	}
+
 bad_option:
 	printk(" -- BAD OPTION\n");
 	return 1;
+
 bad_hwif:
 	printk("-- NOT SUPPORTED ON ide%d", hw);
+
 done:
 	printk("\n");
+
 	return 1;
 }
+
+/****************************************************************************/
 
 /* This is the default end request function as well */
 int ide_end_request(ide_drive_t *drive, int uptodate)

@@ -858,16 +858,14 @@ extern ide_startstop_t set_geometry_intr(ide_drive_t *drive);
 extern ide_startstop_t set_multmode_intr(ide_drive_t *drive);
 extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
 
-int ide_wait_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf);
-
-int ide_raw_taskfile (ide_drive_t *drive, struct ata_taskfile *cmd, byte *buf);
 
 /* This is setting up all fields in args, which depend upon the command type.
  */
 extern void ide_cmd_type_parser(struct ata_taskfile *args);
+extern int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *cmd, byte *buf);
 
-int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
-int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+extern int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
+extern int ide_task_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 
 void ide_delay_50ms (void);
 

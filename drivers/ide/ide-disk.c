@@ -386,23 +386,22 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 {
 	MOD_INC_USE_COUNT;
 	if (drive->removable && drive->usage == 1) {
-		struct hd_drive_task_hdr taskfile;
-		struct hd_drive_hob_hdr hobfile;
-
-		memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+		struct ata_taskfile args;
 
 		check_disk_change(inode->i_rdev);
 
-		taskfile.command = WIN_DOORLOCK;
+		memset(&args, 0, sizeof(args));
+
+		args.taskfile.command = WIN_DOORLOCK;
+		ide_cmd_type_parser(&args);
 
 		/*
-		 * Ignore the return code from door_lock,
-		 * since the open() has already succeeded,
-		 * and the door_lock is irrelevant at this point.
+		 * Ignore the return code from door_lock, since the open() has
+		 * already succeeded, and the door_lock is irrelevant at this
+		 * point.
 		 */
-		if (drive->doorlocking &&
-		    ide_wait_taskfile(drive, &taskfile, &hobfile, NULL))
+
+		if (drive->doorlocking && ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
 	}
 	return 0;
@@ -410,33 +409,33 @@ static int idedisk_open (struct inode *inode, struct file *filp, ide_drive_t *dr
 
 static int idedisk_flushcache(ide_drive_t *drive)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
+	struct ata_taskfile args;
 
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	memset(&args, 0, sizeof(args));
+
 	if (drive->id->cfs_enable_2 & 0x2400)
-		taskfile.command = WIN_FLUSH_CACHE_EXT;
+		args.taskfile.command = WIN_FLUSH_CACHE_EXT;
 	else
-		taskfile.command = WIN_FLUSH_CACHE;
+		args.taskfile.command = WIN_FLUSH_CACHE;
 
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	ide_cmd_type_parser(&args);
+
+	return ide_raw_taskfile(drive, &args, NULL);
 }
 
 static void idedisk_release (struct inode *inode, struct file *filp, ide_drive_t *drive)
 {
 	if (drive->removable && !drive->usage) {
-		struct hd_drive_task_hdr taskfile;
-		struct hd_drive_hob_hdr hobfile;
-
-		memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+		struct ata_taskfile args;
 
 		invalidate_bdev(inode->i_bdev, 0);
 
-		taskfile.command = WIN_DOORUNLOCK;
+		memset(&args, 0, sizeof(args));
+		args.taskfile.command = WIN_DOORUNLOCK;
+		ide_cmd_type_parser(&args);
+
 		if (drive->doorlocking &&
-		    ide_wait_taskfile(drive, &taskfile, &hobfile, NULL))
+		    ide_raw_taskfile(drive, &args, NULL))
 			drive->doorlocking = 0;
 	}
 	if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
@@ -601,7 +600,7 @@ static inline int idedisk_supports_host_protected_area(ide_drive_t *drive)
 	return flag;
 }
 
-#endif /* CONFIG_IDEDISK_STROKE */
+#endif
 
 /*
  * Compute drive->capacity, the full capacity of the drive
@@ -767,45 +766,50 @@ static void idedisk_pre_reset (ide_drive_t *drive)
 
 static int smart_enable(ide_drive_t *drive)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.feature	= SMART_ENABLE;
-	taskfile.low_cylinder	= SMART_LCYL_PASS;
-	taskfile.high_cylinder	= SMART_HCYL_PASS;
-	taskfile.command	= WIN_SMART;
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	struct ata_taskfile args;
+
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SMART_ENABLE;
+	args.taskfile.low_cylinder = SMART_LCYL_PASS;
+	args.taskfile.high_cylinder = SMART_HCYL_PASS;
+	args.taskfile.command = WIN_SMART;
+	ide_cmd_type_parser(&args);
+
+	return ide_raw_taskfile(drive, &args, NULL);
 }
 
-static int get_smart_values(ide_drive_t *drive, byte *buf)
+static int get_smart_values(ide_drive_t *drive, u8 *buf)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.feature	= SMART_READ_VALUES;
-	taskfile.sector_count	= 0x01;
-	taskfile.low_cylinder	= SMART_LCYL_PASS;
-	taskfile.high_cylinder	= SMART_HCYL_PASS;
-	taskfile.command	= WIN_SMART;
+	struct ata_taskfile args;
+
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SMART_READ_VALUES;
+	args.taskfile.sector_count = 0x01;
+	args.taskfile.low_cylinder = SMART_LCYL_PASS;
+	args.taskfile.high_cylinder = SMART_HCYL_PASS;
+	args.taskfile.command = WIN_SMART;
+	ide_cmd_type_parser(&args);
+
 	smart_enable(drive);
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
+
+	return ide_raw_taskfile(drive, &args, buf);
 }
 
-static int get_smart_thresholds(ide_drive_t *drive, byte *buf)
+static int get_smart_thresholds(ide_drive_t *drive, u8 *buf)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.feature	= SMART_READ_THRESHOLDS;
-	taskfile.sector_count	= 0x01;
-	taskfile.low_cylinder	= SMART_LCYL_PASS;
-	taskfile.high_cylinder	= SMART_HCYL_PASS;
-	taskfile.command	= WIN_SMART;
+	struct ata_taskfile args;
+
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = SMART_READ_THRESHOLDS;
+	args.taskfile.sector_count = 0x01;
+	args.taskfile.low_cylinder = SMART_LCYL_PASS;
+	args.taskfile.high_cylinder = SMART_HCYL_PASS;
+	args.taskfile.command = WIN_SMART;
+	ide_cmd_type_parser(&args);
+
 	smart_enable(drive);
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
+
+	return ide_raw_taskfile(drive, &args, buf);
 }
 
 static int proc_idedisk_read_cache
@@ -947,7 +951,7 @@ static int set_multcount(ide_drive_t *drive, int arg)
 	ide_init_drive_cmd (&rq);
 	drive->mult_req = arg;
 	drive->special.b.set_multmode = 1;
-	(void) ide_do_drive_cmd (drive, &rq, ide_wait);
+	ide_do_drive_cmd (drive, &rq, ide_wait);
 	return (drive->mult_count == arg) ? 0 : -EIO;
 }
 
@@ -963,44 +967,46 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 
 static int write_cache(ide_drive_t *drive, int arg)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
-	taskfile.command	= WIN_SETFEATURES;
+	struct ata_taskfile args;
 
 	if (!(drive->id->cfs_enable_2 & 0x3000))
 		return 1;
 
-	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature	= (arg) ? SETFEATURES_EN_WCACHE : SETFEATURES_DIS_WCACHE;
+	args.taskfile.command	= WIN_SETFEATURES;
+	ide_cmd_type_parser(&args);
+	ide_raw_taskfile(drive, &args, NULL);
+
 	drive->wcache = arg;
+
 	return 0;
 }
 
 static int idedisk_standby(ide_drive_t *drive)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-	taskfile.command	= WIN_STANDBYNOW1;
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
+	struct ata_taskfile args;
+
+	memset(&args, 0, sizeof(args));
+	args.taskfile.command = WIN_STANDBYNOW1;
+	ide_cmd_type_parser(&args);
+
+	return ide_raw_taskfile(drive, &args, NULL);
 }
 
 static int set_acoustic(ide_drive_t *drive, int arg)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	struct ata_taskfile args;
 
-	taskfile.feature	= (arg)?SETFEATURES_EN_AAM:SETFEATURES_DIS_AAM;
-	taskfile.sector_count	= arg;
+	memset(&args, 0, sizeof(args));
+	args.taskfile.feature = (arg)?SETFEATURES_EN_AAM:SETFEATURES_DIS_AAM;
+	args.taskfile.sector_count = arg;
+	args.taskfile.command = WIN_SETFEATURES;
+	ide_cmd_type_parser(&args);
+	ide_raw_taskfile(drive, &args, NULL);
 
-	taskfile.command	= WIN_SETFEATURES;
-	ide_wait_taskfile(drive, &taskfile, &hobfile, NULL);
 	drive->acoustic = arg;
+
 	return 0;
 }
 

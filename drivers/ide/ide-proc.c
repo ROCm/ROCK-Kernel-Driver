@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/ide-proc.c	Version 1.03	January  2, 1998
- *
  *  Copyright (C) 1997-1998	Mark Lord
- */
-
-/*
+ *
  * This is the /proc/ide/ filesystem implementation.
  *
  * The major reason this exists is to provide sufficient access
@@ -176,26 +172,26 @@ static int proc_ide_read_channel
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
 
-static int proc_ide_get_identify(ide_drive_t *drive, byte *buf)
+static int get_identify(ide_drive_t *drive, u8 *buf)
 {
-	struct hd_drive_task_hdr taskfile;
-	struct hd_drive_hob_hdr hobfile;
-	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-	memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+	struct ata_taskfile args;
 
-	taskfile.sector_count = 0x01;
-	taskfile.command = (drive->type == ATA_DISK) ? WIN_IDENTIFY : WIN_PIDENTIFY ;
+	memset(&args, 0, sizeof(args));
+	args.taskfile.sector_count = 0x01;
+	args.taskfile.command = (drive->type == ATA_DISK) ? WIN_IDENTIFY : WIN_PIDENTIFY ;
+	ide_cmd_type_parser(&args);
 
-	return ide_wait_taskfile(drive, &taskfile, &hobfile, buf);
+	return ide_raw_taskfile(drive, &args, buf);
 }
 
 static int proc_ide_read_identify
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
 {
-	ide_drive_t	*drive = data;
-	int		len = 0, i = 0;
+	ide_drive_t *drive = data;
+	int len = 0;
+	int i = 0;
 
-	if (drive && !proc_ide_get_identify(drive, page)) {
+	if (drive && !get_identify(drive, page)) {
 		unsigned short *val = (unsigned short *) page;
 		char *out = ((char *)val) + (SECTOR_WORDS * 4);
 		page = out;
@@ -204,8 +200,7 @@ static int proc_ide_read_identify
 			val += 1;
 		} while (i < (SECTOR_WORDS * 2));
 		len = out - page;
-	}
-	else
+	} else
 		len = sprintf(page, "\n");
 	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
 }
@@ -422,6 +417,8 @@ void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p)
 	}
 }
 
+/* FIXME: we should iterate over the hwifs here as everywhere else.
+ */
 static void create_proc_ide_drives(struct ata_channel *hwif)
 {
 	int	d;
@@ -447,8 +444,6 @@ static void create_proc_ide_drives(struct ata_channel *hwif)
 			}
 		}
 		sprintf(name,"ide%d/%s", (drive->name[2]-'a')/2, drive->name);
-		ent = proc_symlink(drive->name, proc_ide_root, name);
-		if (!ent) return;
 	}
 }
 
