@@ -48,6 +48,14 @@ struct agp_bridge_data agp_bridge_dummy = { .type = NOT_SUPPORTED };
 struct agp_bridge_data *agp_bridge = &agp_bridge_dummy;
 EXPORT_SYMBOL(agp_bridge);
 
+/*
+ * agp_backend_acquire :
+ * 
+ * This Function attempts to acquire the agp backend.
+ * 
+ * returns -EBUSY if agp is in use,
+ * returns 0 if the caller owns the agp backend
+ */
 int agp_backend_acquire(void)
 {
 	if (agp_bridge->type == NOT_SUPPORTED)
@@ -60,6 +68,14 @@ int agp_backend_acquire(void)
 	return 0;
 }
 
+/*
+ * agp_backend_release :
+ * 
+ * This Function releases the lock on the agp backend.
+ * 
+ * The caller must insure that the graphics aperture translation table is read for use
+ * by another entity.  (Ensure that all memory it bound is unbound.)
+ */
 void agp_backend_release(void)
 {
 	if (agp_bridge->type == NOT_SUPPORTED)
