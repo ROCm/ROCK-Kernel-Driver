@@ -79,6 +79,8 @@ typedef unsigned  long u64;
 
 typedef u32 dma_addr_t;
 
+typedef unsigned int kmem_bufctl_t;
+
 #ifndef __s390x__
 typedef union {
 	unsigned long long pair;
@@ -92,8 +94,6 @@ typedef union {
 typedef u64 sector_t;
 #define HAVE_SECTOR_T
 #endif
-
-typedef unsigned int kmem_bufctl_t;
 
 #endif /* ! __s390x__   */
 #endif /* __ASSEMBLY__  */
