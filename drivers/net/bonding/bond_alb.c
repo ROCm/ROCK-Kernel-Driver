@@ -1193,6 +1193,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	int do_tx_balance = 1;
 	u32 hash_index = 0;
 	u8 *hash_start = NULL;
+	int res = 1;
 
 	/* make sure that the curr_active_slave and the slaves list do
 	 * not change during tx
@@ -1201,7 +1202,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	read_lock(&bond->curr_slave_lock);
 
 	if (!BOND_IS_OK(bond)) {
-		goto free_out;
+		goto out;
 	}
 
 	switch (ntohs(skb->protocol)) {
@@ -1266,29 +1267,27 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	}
 
 	if (tx_slave && SLAVE_IS_OK(tx_slave)) {
-		skb->dev = tx_slave->dev;
 		if (tx_slave != bond->curr_active_slave) {
 			memcpy(eth_data->h_source,
 			       tx_slave->dev->dev_addr,
 			       ETH_ALEN);
 		}
-		dev_queue_xmit(skb);
+
+		res = bond_dev_queue_xmit(bond, skb, tx_slave->dev);
 	} else {
-		/* no suitable interface, frame not sent */
 		if (tx_slave) {
 			tlb_clear_slave(bond, tx_slave, 0);
 		}
-		goto free_out;
 	}
 
 out:
+	if (res) {
+		/* no suitable interface, frame not sent */
+		dev_kfree_skb(skb);
+	}
 	read_unlock(&bond->curr_slave_lock);
 	read_unlock(&bond->lock);
 	return 0;
-
-free_out:
-	dev_kfree_skb(skb);
-	goto out;
 }
 
 void bond_alb_monitor(struct bonding *bond)
