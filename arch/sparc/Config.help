@@ -34,6 +34,11 @@ CONFIG_SPARC32
   maintains both the SPARC32 and SPARC64 ports; its web page is
   available at <http://www.ultralinux.org/>.
 
+SPARC power management support
+CONFIG_SUN_PM
+  Enable power management and CPU standby features on supported 
+  SPARC platforms. 
+
 CONFIG_BLK_DEV_FD
   If you want to use the floppy disk drive(s) of your PC under Linux,
   say Y. Information about this driver, especially important for IBM
