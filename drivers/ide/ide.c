@@ -187,7 +187,7 @@ int noautodma = 0;
 int noautodma = 1;
 #endif
 
-static int noraid;
+int noraid = 0;
 
 EXPORT_SYMBOL(noautodma);
 
