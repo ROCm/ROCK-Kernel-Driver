@@ -198,7 +198,7 @@ restore_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 		regs->psr &= ~PSR_EF;
 #else
 	if (current == last_task_used_math) {
-		last_task_used_math = 0;
+		last_task_used_math = NULL;
 		regs->psr &= ~PSR_EF;
 	}
 #endif
@@ -570,7 +570,7 @@ save_fpu_state(struct pt_regs *regs, __siginfo_fpu_t __user *fpu)
 		put_psr(get_psr() | PSR_EF);
 		fpsave(&current->thread.float_regs[0], &current->thread.fsr,
 		       &current->thread.fpqueue[0], &current->thread.fpqdepth);
-		last_task_used_math = 0;
+		last_task_used_math = NULL;
 		regs->psr &= ~(PSR_EF);
 	}
 #endif

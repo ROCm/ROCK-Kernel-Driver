@@ -725,7 +725,7 @@ _sparc_find_resource(struct resource *root, unsigned long hit)
 void register_proc_sparc_ioport(void)
 {
 #ifdef CONFIG_PROC_FS
-	create_proc_read_entry("io_map",0,0,_sparc_io_get_info,&sparc_iomap);
-	create_proc_read_entry("dvma_map",0,0,_sparc_io_get_info,&_sparc_dvma);
+	create_proc_read_entry("io_map",0,NULL,_sparc_io_get_info,&sparc_iomap);
+	create_proc_read_entry("dvma_map",0,NULL,_sparc_io_get_info,&_sparc_dvma);
 #endif
 }

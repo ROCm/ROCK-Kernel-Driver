@@ -216,7 +216,7 @@ void sun4d_handler_irq(int irq, struct pt_regs * regs)
 	if (!sbusl) {
 		action = *(irq + irq_action);
 		if (!action)
-			unexpected_irq(irq, 0, regs);
+			unexpected_irq(irq, NULL, regs);
 		do {
 			action->handler(irq, action->dev_id, regs);
 			action = action->next;
@@ -243,7 +243,7 @@ void sun4d_handler_irq(int irq, struct pt_regs * regs)
 						action = actionp->action;
 						
 						if (!action)
-							unexpected_irq(irq, 0, regs);
+							unexpected_irq(irq, NULL, regs);
 						do {
 							action->handler(irq, action->dev_id, regs);
 							action = action->next;

@@ -378,7 +378,7 @@ sun4u_get_pte (unsigned long addr)
 	if (addr >= PAGE_OFFSET)
 		return addr & _PAGE_PADDR;
 	if ((addr >= LOW_OBP_ADDRESS) && (addr < HI_OBP_ADDRESS))
-		return prom_virt_to_phys(addr, 0);
+		return prom_virt_to_phys(addr, NULL);
 	pgdp = pgd_offset_k(addr);
 	pmdp = pmd_offset(pgdp, addr);
 	ptep = pte_offset_kernel(pmdp, addr);

@@ -115,7 +115,7 @@ unsigned long *in_exception_stack(int cpu, unsigned long stack)
 		if (stack >= init_tss[cpu].ist[k]  && stack <= end) 
 			return (unsigned long *)end;
 	}
-	return 0;
+	return NULL;
 } 
 
 /*

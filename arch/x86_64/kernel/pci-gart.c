@@ -255,7 +255,7 @@ void pci_free_consistent(struct pci_dev *hwdev, size_t size,
 #define SET_LEAK(x) if (iommu_leak_tab) \
 			iommu_leak_tab[x] = __builtin_return_address(0);
 #define CLEAR_LEAK(x) if (iommu_leak_tab) \
-			iommu_leak_tab[x] = 0;
+			iommu_leak_tab[x] = NULL;
 
 /* Debugging aid for drivers that don't free their IOMMU tables */
 static void **iommu_leak_tab; 
