@@ -67,9 +67,7 @@ struct apm_user {
 	int			suspend_result;
 
 	int			suspends_pending;
-	int			standbys_pending;
 	unsigned int		suspends_read;
-	unsigned int		standbys_read;
 
 	struct apm_queue	queue;
 };
@@ -78,7 +76,6 @@ struct apm_user {
  * Local variables
  */
 static int suspends_pending;
-static int standbys_pending;
 static int apm_disabled;
 
 static DECLARE_WAIT_QUEUE_HEAD(apm_waitqueue);
@@ -155,12 +152,6 @@ static void queue_event_one_user(struct apm_user *as, apm_event_t event)
 		as->suspends_pending++;
 		suspends_pending++;
 		break;
-
-	case APM_SYS_STANDBY:
-	case APM_USER_STANDBY:
-		as->standbys_pending++;
-		standbys_pending++;
-		break;
 	}
 }
 
@@ -223,17 +214,8 @@ static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t 
 		if (copy_to_user(buf, &event, sizeof(event)))
 			break;
 
-		switch (event) {
-		case APM_SYS_SUSPEND:
-		case APM_USER_SUSPEND:
+		if (event == APM_SYS_SUSPEND || event == APM_USER_SUSPEND)
 			as->suspends_read++;
-			break;
-
-		case APM_SYS_STANDBY:
-		case APM_USER_STANDBY:
-			as->standbys_read++;
-			break;
-		}
 
 		buf += sizeof(event);
 		i -= sizeof(event);
@@ -273,9 +255,6 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 		return -EPERM;
 
 	switch (cmd) {
-	case APM_IOC_STANDBY:
-		break;
-
 	case APM_IOC_SUSPEND:
 		/*
 		 * If we read a suspend command from /dev/apm_bios,
@@ -322,14 +301,9 @@ static int apm_release(struct inode * inode, struct file * filp)
 	/*
 	 * We are now unhooked from the chain.  As far as new
 	 * events are concerned, we no longer exist.  However, we
-	 * need to balance standbys_pending and suspends_pending,
-	 * which means the possibility of sleeping.
+	 * need to balance suspends_pending, which means the
+	 * possibility of sleeping.
 	 */
-	if (as->standbys_pending > 0) {
-		standbys_pending -= as->standbys_pending;
-//		if (standbys_pending <= 0)
-//			standby();
-	}
 	if (as->suspends_pending > 0) {
 		suspends_pending -= as->suspends_pending;
 		if (suspends_pending <= 0)
