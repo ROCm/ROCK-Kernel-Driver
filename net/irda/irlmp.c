@@ -1812,6 +1812,7 @@ static void *irlmp_seq_start(struct seq_file *seq, loff_t *pos)
 	void *v;
 	loff_t off = *pos;
 
+	iter->hashbin = NULL;
 	if (off-- == 0)
 		return LSAP_START_TOKEN;
 
@@ -1950,7 +1951,6 @@ static int irlmp_seq_open(struct inode *inode, struct file *file)
 
 	seq	     = file->private_data;
 	seq->private = s;
-	memset(s, 0, sizeof(*s));
 out:
 	return rc;
 out_kfree:

@@ -421,7 +421,8 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 			*tuple = ((struct ip_conntrack_tuple)
 				  { *manip, orig_tuple->dst });
 			DEBUGP("get_unique_tuple: Found current src map\n");
-			return 1;
+			if (!ip_nat_used_tuple(tuple, conntrack))
+				return 1;
 		}
 	}
 

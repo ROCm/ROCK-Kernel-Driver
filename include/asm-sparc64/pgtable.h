@@ -156,7 +156,7 @@
 #define __ACCESS_BITS	(_PAGE_ACCESSED | _PAGE_READ | _PAGE_R)
 #define __PRIV_BITS	_PAGE_P
 
-#define PAGE_NONE	__pgprot (_PAGE_PRESENT | _PAGE_ACCESSED)
+#define PAGE_NONE	__pgprot (_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_CACHE)
 
 /* Don't set the TTE _PAGE_W bit here, else the dirty bit never gets set. */
 #define PAGE_SHARED	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
@@ -171,11 +171,7 @@
 #define PAGE_KERNEL	__pgprot (_PAGE_PRESENT | _PAGE_VALID | _PAGE_CACHE | \
 				  __PRIV_BITS | __ACCESS_BITS | __DIRTY_BITS)
 
-#define PAGE_INVALID	__pgprot (0)
-
 #define _PFN_MASK	_PAGE_PADDR
-
-#define _PAGE_CHG_MASK	(_PFN_MASK | _PAGE_MODIFIED | _PAGE_ACCESSED | _PAGE_PRESENT | _PAGE_SZBITS)
 
 #define pg_iobits (_PAGE_VALID | _PAGE_PRESENT | __DIRTY_BITS | __ACCESS_BITS | _PAGE_E)
 
@@ -224,9 +220,13 @@ extern struct page *mem_map_zero;
 static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 {
 	pte_t __pte;
+	const unsigned long preserve_mask = (_PFN_MASK |
+					     _PAGE_MODIFIED | _PAGE_ACCESSED |
+					     _PAGE_CACHE | _PAGE_E |
+					     _PAGE_PRESENT | _PAGE_SZBITS);
 
-	pte_val(__pte) = (pte_val(orig_pte) & _PAGE_CHG_MASK) |
-		pgprot_val(new_prot);
+	pte_val(__pte) = (pte_val(orig_pte) & preserve_mask) |
+		(pgprot_val(new_prot) & ~preserve_mask);
 
 	return __pte;
 }
