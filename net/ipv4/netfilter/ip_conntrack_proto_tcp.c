@@ -268,7 +268,15 @@ static int tcp_exp_matches_pkt(struct ip_conntrack_expect *exp,
 	return between(exp->seq, ntohl(tcph.seq), ntohl(tcph.seq) + datalen);
 }
 
-struct ip_conntrack_protocol ip_conntrack_protocol_tcp
-= { { NULL, NULL }, IPPROTO_TCP, "tcp",
-    tcp_pkt_to_tuple, tcp_invert_tuple, tcp_print_tuple, tcp_print_conntrack,
-    tcp_packet, tcp_new, NULL, tcp_exp_matches_pkt, NULL };
+struct ip_conntrack_protocol ip_conntrack_protocol_tcp =
+{
+	.proto 			= IPPROTO_TCP,
+	.name 			= "tcp",
+	.pkt_to_tuple 		= tcp_pkt_to_tuple,
+	.invert_tuple 		= tcp_invert_tuple,
+	.print_tuple 		= tcp_print_tuple,
+	.print_conntrack 	= tcp_print_conntrack,
+	.packet 		= tcp_packet,
+	.new 			= tcp_new,
+	.exp_matches_pkt	= tcp_exp_matches_pkt,
+};

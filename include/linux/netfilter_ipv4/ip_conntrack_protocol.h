@@ -55,6 +55,9 @@ struct ip_conntrack_protocol
 	int (*exp_matches_pkt)(struct ip_conntrack_expect *exp,
 			       const struct sk_buff *skb);
 
+	int (*error)(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
+		     unsigned int hooknum);
+
 	/* Module (if any) which this is connected to. */
 	struct module *me;
 };
@@ -68,4 +71,17 @@ extern struct ip_conntrack_protocol ip_conntrack_protocol_tcp;
 extern struct ip_conntrack_protocol ip_conntrack_protocol_udp;
 extern struct ip_conntrack_protocol ip_conntrack_protocol_icmp;
 extern int ip_conntrack_protocol_tcp_init(void);
+
+/* Log invalid packets */
+extern unsigned int ip_ct_log_invalid;
+
+#ifdef DEBUG_INVALID_PACKETS
+#define LOG_INVALID(proto) \
+	(ip_ct_log_invalid == (proto) || ip_ct_log_invalid == IPPROTO_RAW)
+#else
+#define LOG_INVALID(proto) \
+	((ip_ct_log_invalid == (proto) || ip_ct_log_invalid == IPPROTO_RAW) \
+	 && net_ratelimit())
+#endif
+
 #endif /*_IP_CONNTRACK_PROTOCOL_H*/

@@ -128,11 +128,11 @@ hash_conntrack(const struct ip_conntrack_tuple *tuple)
 }
 
 int
-get_tuple(const struct iphdr *iph,
-	  const struct sk_buff *skb,
-	  unsigned int dataoff,
-	  struct ip_conntrack_tuple *tuple,
-	  const struct ip_conntrack_protocol *protocol)
+ip_ct_get_tuple(const struct iphdr *iph,
+		const struct sk_buff *skb,
+		unsigned int dataoff,
+		struct ip_conntrack_tuple *tuple,
+		const struct ip_conntrack_protocol *protocol)
 {
 	/* Never happen */
 	if (iph->frag_off & htons(IP_OFFSET)) {
@@ -148,10 +148,10 @@ get_tuple(const struct iphdr *iph,
 	return protocol->pkt_to_tuple(skb, dataoff, tuple);
 }
 
-static int
-invert_tuple(struct ip_conntrack_tuple *inverse,
-	     const struct ip_conntrack_tuple *orig,
-	     const struct ip_conntrack_protocol *protocol)
+int
+ip_ct_invert_tuple(struct ip_conntrack_tuple *inverse,
+		   const struct ip_conntrack_tuple *orig,
+		   const struct ip_conntrack_protocol *protocol)
 {
 	inverse->src.ip = orig->dst.ip;
 	inverse->dst.ip = orig->src.ip;
@@ -497,83 +497,6 @@ ip_conntrack_tuple_taken(const struct ip_conntrack_tuple *tuple,
 	return h != NULL;
 }
 
-/* Returns conntrack if it dealt with ICMP, and filled in skb fields */
-struct ip_conntrack *
-icmp_error_track(struct sk_buff *skb,
-		 enum ip_conntrack_info *ctinfo,
-		 unsigned int hooknum)
-{
-	struct ip_conntrack_tuple innertuple, origtuple;
-	struct {
-		struct icmphdr icmp;
-		struct iphdr ip;
-	} inside;
-	struct ip_conntrack_protocol *innerproto;
-	struct ip_conntrack_tuple_hash *h;
-	int dataoff;
-
-	IP_NF_ASSERT(skb->nfct == NULL);
-
-	/* Not enough header? */
-	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &inside, sizeof(inside))!=0)
-		return NULL;
-
-	if (inside.icmp.type != ICMP_DEST_UNREACH
-	    && inside.icmp.type != ICMP_SOURCE_QUENCH
-	    && inside.icmp.type != ICMP_TIME_EXCEEDED
-	    && inside.icmp.type != ICMP_PARAMETERPROB
-	    && inside.icmp.type != ICMP_REDIRECT)
-		return NULL;
-
-	/* Ignore ICMP's containing fragments (shouldn't happen) */
-	if (inside.ip.frag_off & htons(IP_OFFSET)) {
-		DEBUGP("icmp_error_track: fragment of proto %u\n",
-		       inside.ip.protocol);
-		return NULL;
-	}
-
-	innerproto = ip_ct_find_proto(inside.ip.protocol);
-	dataoff = skb->nh.iph->ihl*4 + sizeof(inside.icmp) + inside.ip.ihl*4;
-	/* Are they talking about one of our connections? */
-	if (!get_tuple(&inside.ip, skb, dataoff, &origtuple, innerproto)) {
-		DEBUGP("icmp_error: ! get_tuple p=%u", inside.ip.protocol);
-		return NULL;
-	}
-
-	/* Ordinarily, we'd expect the inverted tupleproto, but it's
-	   been preserved inside the ICMP. */
-	if (!invert_tuple(&innertuple, &origtuple, innerproto)) {
-		DEBUGP("icmp_error_track: Can't invert tuple\n");
-		return NULL;
-	}
-
-	*ctinfo = IP_CT_RELATED;
-
-	h = ip_conntrack_find_get(&innertuple, NULL);
-	if (!h) {
-		/* Locally generated ICMPs will match inverted if they
-		   haven't been SNAT'ed yet */
-		/* FIXME: NAT code has to handle half-done double NAT --RR */
-		if (hooknum == NF_IP_LOCAL_OUT)
-			h = ip_conntrack_find_get(&origtuple, NULL);
-
-		if (!h) {
-			DEBUGP("icmp_error_track: no match\n");
-			return NULL;
-		}
-		/* Reverse direction from that found */
-		if (DIRECTION(h) != IP_CT_DIR_REPLY)
-			*ctinfo += IP_CT_IS_REPLY;
-	} else {
-		if (DIRECTION(h) == IP_CT_DIR_REPLY)
-			*ctinfo += IP_CT_IS_REPLY;
-	}
-
-	/* Update skb to refer to this connection */
-	skb->nfct = &h->ctrack->infos[*ctinfo];
-	return h->ctrack;
-}
-
 /* There's a small race here where we may free a just-assured
    connection.  Too bad: we're in trouble anyway. */
 static inline int unreplied(const struct ip_conntrack_tuple_hash *i)
@@ -655,7 +578,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 		}
 	}
 
-	if (!invert_tuple(&repl_tuple, tuple, protocol)) {
+	if (!ip_ct_invert_tuple(&repl_tuple, tuple, protocol)) {
 		DEBUGP("Can't invert tuple.\n");
 		return NULL;
 	}
@@ -751,7 +674,8 @@ resolve_normal_ct(struct sk_buff *skb,
 
 	IP_NF_ASSERT((skb->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
-	if (!get_tuple(skb->nh.iph, skb, skb->nh.iph->ihl*4, &tuple, proto))
+	if (!ip_ct_get_tuple(skb->nh.iph, skb, skb->nh.iph->ihl*4, 
+				&tuple,proto))
 		return NULL;
 
 	/* look for tuple match */
@@ -836,10 +760,12 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 
 	proto = ip_ct_find_proto((*pskb)->nh.iph->protocol);
 
-	/* It may be an icmp error... */
-	if ((*pskb)->nh.iph->protocol == IPPROTO_ICMP 
-	    && icmp_error_track(*pskb, &ctinfo, hooknum))
-		return NF_ACCEPT;
+	/* It may be an special packet, error, unclean...
+	 * inverse of the return code tells to the netfilter
+	 * core what to do with the packet. */
+	if (proto->error != NULL 
+	    && (ret = proto->error(*pskb, &ctinfo, hooknum)) <= 0)
+		return -ret;
 
 	if (!(ct = resolve_normal_ct(*pskb, proto,&set_reply,hooknum,&ctinfo)))
 		/* Not valid part of a connection */
@@ -877,7 +803,8 @@ unsigned int ip_conntrack_in(unsigned int hooknum,
 int invert_tuplepr(struct ip_conntrack_tuple *inverse,
 		   const struct ip_conntrack_tuple *orig)
 {
-	return invert_tuple(inverse, orig, ip_ct_find_proto(orig->dst.protonum));
+	return ip_ct_invert_tuple(inverse, orig, 
+				  ip_ct_find_proto(orig->dst.protonum));
 }
 
 static inline int resent_expect(const struct ip_conntrack_expect *i,

@@ -12,6 +12,8 @@
 #include <linux/netfilter.h>
 #include <linux/in.h>
 #include <linux/udp.h>
+#include <net/checksum.h>
+#include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_conntrack_protocol.h>
 
 unsigned long ip_ct_udp_timeout = 30*HZ;
@@ -81,7 +83,60 @@ static int udp_new(struct ip_conntrack *conntrack, const struct sk_buff *skb)
 	return 1;
 }
 
-struct ip_conntrack_protocol ip_conntrack_protocol_udp
-= { { NULL, NULL }, IPPROTO_UDP, "udp",
-    udp_pkt_to_tuple, udp_invert_tuple, udp_print_tuple, udp_print_conntrack,
-    udp_packet, udp_new, NULL, NULL, NULL };
+static int udp_error(struct sk_buff *skb, enum ip_conntrack_info *ctinfo,
+		     unsigned int hooknum)
+{
+	struct iphdr *iph = skb->nh.iph;
+	unsigned int udplen = skb->len - iph->ihl * 4;
+	struct udphdr hdr;
+
+	/* Header is too small? */
+	if (skb_copy_bits(skb, iph->ihl*4, &hdr, sizeof(hdr)) != 0) {
+		if (LOG_INVALID(IPPROTO_UDP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
+				  "ip_ct_udp: short packet ");
+		return -NF_ACCEPT;
+	}
+	
+	/* Truncated/malformed packets */
+	if (ntohs(hdr.len) > udplen || ntohs(hdr.len) < sizeof(hdr)) {
+		if (LOG_INVALID(IPPROTO_UDP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
+				  "ip_ct_udp: truncated/malformed packet ");
+		return -NF_ACCEPT;
+	}
+	
+	/* Packet with no checksum */
+	if (!hdr.check)
+		return NF_ACCEPT;
+
+	/* Checksum invalid? Ignore.
+	 * We skip checking packets on the outgoing path
+	 * because the semantic of CHECKSUM_HW is different there 
+	 * and moreover root might send raw packets.
+	 * FIXME: Source route IP option packets --RR */
+	if (hooknum == NF_IP_PRE_ROUTING
+	    && csum_tcpudp_magic(iph->saddr, iph->daddr, udplen, IPPROTO_UDP,
+			         skb->ip_summed == CHECKSUM_HW ? skb->csum
+			      	 : skb_checksum(skb, iph->ihl*4, udplen, 0))) {
+		if (LOG_INVALID(IPPROTO_UDP))
+			nf_log_packet(PF_INET, 0, skb, NULL, NULL, 
+				  "ip_ct_udp: bad UDP checksum ");
+		return -NF_ACCEPT;
+	}
+	
+	return NF_ACCEPT;
+}
+
+struct ip_conntrack_protocol ip_conntrack_protocol_udp =
+{
+	.proto 			= IPPROTO_UDP,
+	.name			= "udp",
+	.pkt_to_tuple		= udp_pkt_to_tuple,
+	.invert_tuple		= udp_invert_tuple,
+	.print_tuple		= udp_print_tuple,
+	.print_conntrack	= udp_print_conntrack,
+	.packet			= udp_packet,
+	.new			= udp_new,
+	.error			= udp_error,
+};

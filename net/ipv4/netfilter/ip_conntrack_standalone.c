@@ -432,6 +432,11 @@ extern unsigned long ip_ct_icmp_timeout;
 /* From ip_conntrack_proto_icmp.c */
 extern unsigned long ip_ct_generic_timeout;
 
+/* Log invalid packets of a given protocol */
+unsigned int ip_ct_log_invalid = 0;
+static int log_invalid_proto_min = 0;
+static int log_invalid_proto_max = 255;
+
 static struct ctl_table_header *ip_ct_sysctl_header;
 
 static ctl_table ip_ct_sysctl_table[] = {
@@ -546,6 +551,17 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.maxlen		= sizeof(unsigned int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
+	},
+	{
+		.ctl_name	= NET_IPV4_NF_CONNTRACK_LOG_INVALID,
+		.procname	= "ip_conntrack_log_invalid",
+		.data		= &ip_ct_log_invalid,
+		.maxlen		= sizeof(unsigned int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &log_invalid_proto_min,
+		.extra2		= &log_invalid_proto_max,
 	},
 	{ .ctl_name = 0 }
 };
