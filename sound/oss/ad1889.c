@@ -918,7 +918,7 @@ static int ad1889_aclink_reset(struct pci_dev * pcidev)
 
 /************************* PCI interfaces ****************************** */
 /* PCI device table */
-static struct pci_device_id ad1889_id_tbl[] __devinitdata = {
+static struct pci_device_id ad1889_id_tbl[] = {
 	{ PCI_VENDOR_ID_ANALOG_DEVICES, PCI_DEVICE_ID_AD1889JS, PCI_ANY_ID, 
 	  PCI_ANY_ID, 0, 0, (unsigned long)DEVNAME },
 	{ },

@@ -316,7 +316,7 @@ static struct {
 	/*@FIXME to be verified*/	{  3, 0x0001 }, /* AMD8111 */
 };
 
-static struct pci_device_id i810_pci_tbl [] __initdata = {
+static struct pci_device_id i810_pci_tbl [] = {
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, ICH82801AA},
 	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82901,

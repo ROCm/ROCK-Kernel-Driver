@@ -759,7 +759,7 @@ e100_remove1(struct pci_dev *pcid)
 	--e100nics;
 }
 
-static struct pci_device_id e100_id_table[] __devinitdata = {
+static struct pci_device_id e100_id_table[] = {
 	{0x8086, 0x1229, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{0x8086, 0x2449, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{0x8086, 0x1059, PCI_ANY_ID, PCI_ANY_ID, 0, 0, },

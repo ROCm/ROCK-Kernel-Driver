@@ -5705,7 +5705,7 @@ enum {
 	CS46XX_4615,  	/* same as 4624 */
 };
 
-static struct pci_device_id cs46xx_pci_tbl[] __devinitdata = {
+static struct pci_device_id cs46xx_pci_tbl[] = {
 	{
 		.vendor	     = PCI_VENDOR_ID_CIRRUS,
 		.device	     = PCI_DEVICE_ID_CIRRUS_4610,

@@ -322,7 +322,7 @@ static struct i2c_adapter amd756_adapter = {
 
 enum chiptype { AMD756, AMD766, AMD768, NFORCE };
 
-static struct pci_device_id amd756_ids[] __devinitdata = {
+static struct pci_device_id amd756_ids[] = {
 	{PCI_VENDOR_ID_AMD, 0x740B, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD756 },
 	{PCI_VENDOR_ID_AMD, 0x7413, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD766 },
 	{PCI_VENDOR_ID_AMD, 0x7443, PCI_ANY_ID, PCI_ANY_ID, 0, 0, AMD768 },

@@ -446,7 +446,7 @@ static void __devexit chipsfb_remove(struct pci_dev *dp)
 #endif /* CONFIG_PMAC_PBOOK */
 }
 
-static struct pci_device_id chipsfb_pci_tbl[] __devinitdata = {
+static struct pci_device_id chipsfb_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CT, PCI_DEVICE_ID_CT_65550, PCI_ANY_ID, PCI_ANY_ID },
 	{ 0 }
 };

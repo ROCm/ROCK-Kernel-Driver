@@ -5917,7 +5917,7 @@ static void __devexit dc395x_remove_one(struct pci_dev *dev)
  * Table which identifies the PCI devices which
  * are handled by this device driver.
  */
-static struct pci_device_id dc395x_pci_table[] __devinitdata = {
+static struct pci_device_id dc395x_pci_table[] = {
 	{
 		.vendor		= PCI_VENDOR_ID_TEKRAM,
 		.device		= PCI_DEVICE_ID_TEKRAM_TRMS1040,

@@ -2065,7 +2065,7 @@ static void __devexit neofb_remove(struct pci_dev *dev)
 	}
 }
 
-static struct pci_device_id neofb_devices[] __devinitdata = {
+static struct pci_device_id neofb_devices[] = {
 	{PCI_VENDOR_ID_NEOMAGIC, PCI_CHIP_NM2070,
 	 PCI_ANY_ID, PCI_ANY_ID, 0, 0, FB_ACCEL_NEOMAGIC_NM2070},
 

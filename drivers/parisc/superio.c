@@ -517,7 +517,7 @@ static int __devinit superio_probe(struct pci_dev *dev, const struct pci_device_
 	}
 }
 
-static struct pci_device_id superio_tbl[] __devinitdata = {
+static struct pci_device_id superio_tbl[] = {
 	{ PCI_VENDOR_ID_NS, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
 };

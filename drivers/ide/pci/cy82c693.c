@@ -439,7 +439,7 @@ static int __devinit cy82c693_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-static struct pci_device_id cy82c693_pci_tbl[] __devinitdata = {
+static struct pci_device_id cy82c693_pci_tbl[] = {
 	{ PCI_VENDOR_ID_CONTAQ, PCI_DEVICE_ID_CONTAQ_82C693, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
 };

@@ -331,7 +331,7 @@ static struct i2c_algorithm smbus_algorithm = {
 };
 
 
-static struct pci_device_id amd8111_ids[] __devinitdata = {
+static struct pci_device_id amd8111_ids[] = {
 	{ 0x1022, 0x746a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0, }
 };

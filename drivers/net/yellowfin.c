@@ -295,7 +295,7 @@ static struct pci_id_info pci_id_tbl[] = {
 	{0,},
 };
 
-static struct pci_device_id yellowfin_pci_tbl[] __devinitdata = {
+static struct pci_device_id yellowfin_pci_tbl[] = {
 	{ 0x1000, 0x0702, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
 	{ 0x1000, 0x0701, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1 },
 	{ 0, }

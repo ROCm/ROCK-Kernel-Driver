@@ -1554,7 +1554,7 @@ static void __devexit sstfb_remove(struct pci_dev *pdev)
 }
 
 
-static struct pci_device_id sstfb_id_tbl[] __devinitdata = {
+static struct pci_device_id sstfb_id_tbl[] = {
 	{ PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_VOODOO,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, ID_VOODOO1 },
 	{ PCI_VENDOR_ID_3DFX, PCI_DEVICE_ID_3DFX_VOODOO2,

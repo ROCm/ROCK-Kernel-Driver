@@ -68,7 +68,7 @@ enum {
 	VX_PCI_VX222_NEW
 };
 
-static struct pci_device_id snd_vx222_ids[] __devinitdata = {
+static struct pci_device_id snd_vx222_ids[] = {
 	{ 0x10b5, 0x9050, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_OLD, },   /* PLX */
 	{ 0x10b5, 0x9030, PCI_ANY_ID, PCI_ANY_ID, 0, 0, VX_PCI_VX222_NEW, },   /* PLX */
 	{ 0, }

@@ -440,7 +440,7 @@ static int __devinit amd74xx_probe(struct pci_dev *dev, const struct pci_device_
 	return 0;
 }
 
-static struct pci_device_id amd74xx_pci_tbl[] __devinitdata = {
+static struct pci_device_id amd74xx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7409,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7411,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 2},

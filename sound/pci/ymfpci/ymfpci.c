@@ -67,7 +67,7 @@ MODULE_PARM(rear_switch, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(rear_switch, "Enable shared rear/line-in switch");
 MODULE_PARM_SYNTAX(rear_switch, SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
-static struct pci_device_id snd_ymfpci_ids[] __devinitdata = {
+static struct pci_device_id snd_ymfpci_ids[] = {
         { 0x1073, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724 */
         { 0x1073, 0x000d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724F */
         { 0x1073, 0x000a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF740 */

@@ -3612,7 +3612,7 @@ static void maestro_remove(struct pci_dev *pcidev) {
 	pci_set_drvdata(pcidev,NULL);
 }
 
-static struct pci_device_id maestro_pci_tbl[] __devinitdata = {
+static struct pci_device_id maestro_pci_tbl[] = {
 	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1968, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2},
 	{PCI_VENDOR_ESS, PCI_DEVICE_ID_ESS_ESS1978, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO2E},
 	{PCI_VENDOR_ESS_OLD, PCI_DEVICE_ID_ESS_ESS0100, PCI_ANY_ID, PCI_ANY_ID, 0, 0, TYPE_MAESTRO},

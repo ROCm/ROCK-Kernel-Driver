@@ -344,8 +344,7 @@ static void snd_hammerfall_free_buffer(struct pci_dev *pci, size_t size, void *p
 }
 #endif
 
-
-static struct pci_device_id snd_rme9652_ids[] __devinitdata = {
+static struct pci_device_id snd_rme9652_ids[] = {
 	{
 		.vendor	   = 0x10ee,
 		.device	   = 0x3fc4,

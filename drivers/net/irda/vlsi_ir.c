@@ -57,7 +57,7 @@ static /* const */ char drivername[] = DRIVER_NAME;
 
 #define PCI_CLASS_WIRELESS_IRDA 0x0d00
 
-static struct pci_device_id vlsi_irda_table [] __devinitdata = { {
+static struct pci_device_id vlsi_irda_table [] = { {
 
 	.class =        PCI_CLASS_WIRELESS_IRDA << 8,
 	.vendor =       PCI_VENDOR_ID_VLSI,
