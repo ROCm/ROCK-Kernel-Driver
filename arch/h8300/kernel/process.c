@@ -44,12 +44,12 @@
 #include <asm/setup.h>
 #include <asm/pgtable.h>
 
-asmlinkage void ret_from_exception(void);
+asmlinkage void ret_from_fork(void);
 
 /*
  * The idle loop on an H8/300..
  */
-#if !defined(CONFIG_H8300H_SIM)
+#if !defined(CONFIG_H8300H_SIM) && !defined(CONFIG_H8S_SIM)
 void default_idle(void)
 {
 	while(1) {
@@ -85,20 +85,20 @@ void cpu_idle(void)
 
 void machine_restart(char * __unused)
 {
-	cli();
+	local_irq_disable();
 	__asm__("jmp @@0"); 
 }
 
 void machine_halt(void)
 {
-	cli();
+	local_irq_disable();
 	__asm__("sleep");
 	for (;;);
 }
 
 void machine_power_off(void)
 {
-	cli();
+	local_irq_disable();
 	__asm__("sleep");
 	for (;;);
 }
@@ -110,10 +110,13 @@ void show_regs(struct pt_regs * regs)
 	       regs->pc, regs->ccr);
 	printk("ORIG_ER0: %08lx ER0: %08lx ER1: %08lx\n",
 	       regs->orig_er0, regs->er0, regs->er1);
-	printk("ER2: %08lx ER3: %08lx\n",
-	       regs->er2, regs->er3);
-	if (!(regs->ccr & 0x10))
+	printk("ER2: %08lx ER3: %08lx ER4: %08lx ER5: %08lx\n",
+	       regs->er2, regs->er3, regs->er4, regs->er5);
+	printk("ER6' %08lx ",regs->er6);
+	if (user_mode(regs))
 		printk("USP: %08lx\n", rdusp());
+	else
+		printk("\n");
 }
 
 /*
@@ -122,34 +125,29 @@ void show_regs(struct pt_regs * regs)
 int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {
 	long retval;
-	register long clone_arg asm("er1");
+	long clone_arg;
 	mm_segment_t fs;
 
 	fs = get_fs();
 	set_fs (KERNEL_DS);
 	clone_arg = flags | CLONE_VM;
-
-	__asm__ __volatile__ (
-			"mov.l	sp, er2\n\t"
-			"mov.l  %1,er0\n\t"
-			"mov.l  %5,er1\n\t"
-			"trapa	#0\n\t"
-			"cmp.l	sp, er2\n\t"
-			"beq	1f\n\t"
-			"mov.l	%3, er0\n\t"
-			"jsr	@%4\n\t"
-			"mov.l	%2, er0\n\t"
-			"trapa	#0\n"
-			"1:\n\t"
-			"mov.l er0,%0"
-		: "=r" (retval)
-		: "i" (__NR_clone),
-		  "i" (__NR_exit),
-		  "r" (arg),
-		  "r" (fn),
-		  "r" (clone_arg)
-		: "cc", "er0", "er1", "er2", "er3");
-
+	__asm__("mov.l sp,er3\n\t"
+		"sub.l er2,er2\n\t"
+		"mov.l %2,er1\n\t"
+		"mov.l %1,er0\n\t"
+		"trapa #0\n\t"
+		"cmp.l sp,er3\n\t"
+		"beq 1f\n\t"
+		"mov.l %4,er0\n\t"
+		"mov.l %3,er1\n\t"
+		"jsr @er1\n\t"
+		"mov.l %5,er0\n\t"
+		"trapa #0\n"
+		"1:\n\t"
+		"mov.l er0,%0"
+		:"=r"(retval)
+		:"i"(__NR_clone),"g"(clone_arg),"g"(fn),"g"(arg),"i"(__NR_exit)
+		:"er0","er1","er2","er3");
 	set_fs (fs);
 	return retval;
 }
@@ -172,24 +170,20 @@ asmlinkage int h8300_fork(struct pt_regs *regs)
 
 asmlinkage int h8300_vfork(struct pt_regs *regs)
 {
-	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL, NULL);
 }
 
 asmlinkage int h8300_clone(struct pt_regs *regs)
 {
 	unsigned long clone_flags;
 	unsigned long newsp;
-	struct task_struct *p;
 
 	/* syscall2 puts clone_flags in er1 and usp in er2 */
 	clone_flags = regs->er1;
 	newsp = regs->er2;
 	if (!newsp)
 		newsp  = rdusp();
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
 
 }
 
@@ -198,25 +192,15 @@ int copy_thread(int nr, unsigned long clone_flags,
 		 struct task_struct * p, struct pt_regs * regs)
 {
 	struct pt_regs * childregs;
-	struct switch_stack * childstack, *stack;
-	unsigned long stack_offset, *retp;
 
-	stack_offset = KTHREAD_SIZE - sizeof(struct pt_regs);
 	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 
 	*childregs = *regs;
-
-	retp = (unsigned long *) regs-2;
-	stack = ((struct switch_stack *) retp) - 1;
-
-	childstack = ((struct switch_stack *) childregs) - 1;
-	*childstack = *stack;
+	childregs->retpc = (unsigned long) ret_from_fork;
 	childregs->er0 = 0;
-	childstack->retpc = (unsigned long) ret_from_exception;
 
 	p->thread.usp = usp;
-	p->thread.ksp = (unsigned long)childstack;
-	p->thread.vfork_ret = 0;
+	p->thread.ksp = (unsigned long)childregs;
 
 	return 0;
 }
@@ -226,8 +210,6 @@ int copy_thread(int nr, unsigned long clone_flags,
  */
 void dump_thread(struct pt_regs * regs, struct user * dump)
 {
-	struct switch_stack *sw;
-
 /* changed the size calculations - should hopefully work better. lbt */
 	dump->magic = CMAGIC;
 	dump->start_code = 0;
@@ -239,14 +221,13 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->u_ssize = 0;
 
 	dump->u_ar0 = (struct user_regs_struct *)(((int)(&dump->regs)) -((int)(dump)));
-	sw = ((struct switch_stack *)regs) - 1;
 	dump->regs.er0 = regs->er0;
 	dump->regs.er1 = regs->er1;
 	dump->regs.er2 = regs->er2;
 	dump->regs.er3 = regs->er3;
-	dump->regs.er4 = sw->er4;
-	dump->regs.er5 = sw->er5;
-	dump->regs.er6 = sw->er6;
+	dump->regs.er4 = regs->er4;
+	dump->regs.er5 = regs->er5;
+	dump->regs.er6 = regs->er6;
 	dump->regs.orig_er0 = regs->orig_er0;
 	dump->regs.ccr = regs->ccr;
 	dump->regs.pc  = regs->pc;
@@ -259,7 +240,7 @@ asmlinkage int sys_execve(char *name, char **argv, char **envp,int dummy,...)
 {
 	int error;
 	char * filename;
-	struct pt_regs *regs = (struct pt_regs *) ((unsigned char *)&dummy+4);
+	struct pt_regs *regs = (struct pt_regs *) ((unsigned char *)&dummy-4);
 
 	lock_kernel();
 	filename = getname(name);
@@ -283,14 +264,7 @@ extern void scheduling_functions_end_here(void);
 
 unsigned long thread_saved_pc(struct task_struct *tsk)
 {
-	struct switch_stack *sw = (struct switch_stack *)(tsk->thread.ksp);
-
-	/* Check whether the thread is blocked in resume() */
-	if (sw->retpc > (unsigned long)scheduling_functions_start_here &&
-	    sw->retpc < (unsigned long)scheduling_functions_end_here)
-		return ((unsigned long *)sw->er6)[1];
-	else
-		return sw->retpc;
+	return ((struct pt_regs *)tsk->thread.esp0)->pc;
 }
 
 unsigned long get_wchan(struct task_struct *p)
@@ -302,7 +276,7 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 
 	stack_page = (unsigned long)p;
-	fp = ((struct switch_stack *)p->thread.ksp)->er6;
+	fp = ((struct pt_regs *)p->thread.ksp)->er6;
 	do {
 		if (fp < stack_page+sizeof(struct task_struct) ||
 		    fp >= 8184+stack_page)

@@ -46,14 +46,12 @@
 
 /* Find the stack offset for a register, relative to thread.esp0. */
 #define PT_REG(reg)	((long)&((struct pt_regs *)0)->reg)
-#define SW_REG(reg)	((long)&((struct switch_stack *)0)->reg \
-			 - sizeof(struct switch_stack))
 /* Mapping from PT_xxx to the stack offset at which the register is
    saved.  Notice that usp has no stack-slot and needs to be treated
    specially (see get_reg/put_reg below). */
 static const int regoff[] = {
-	PT_REG(er1), PT_REG(er2), PT_REG(er3), SW_REG(er4),
-	SW_REG(er5), SW_REG(er6), PT_REG(er0), PT_REG(orig_er0),
+	PT_REG(er1), PT_REG(er2), PT_REG(er3), PT_REG(er4),
+	PT_REG(er5), PT_REG(er6), PT_REG(er0), PT_REG(orig_er0),
 	PT_REG(ccr), PT_REG(pc)
 };
 
