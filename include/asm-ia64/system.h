@@ -171,7 +171,7 @@ do {								\
 # define local_irq_restore(x)	__local_irq_restore(x)
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
-#define local_irq_enable()	({ ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
+#define local_irq_enable()	({ ia64_stop(); ia64_ssm(IA64_PSR_I); ia64_srlz_d(); })
 #define local_save_flags(flags)	({ ia64_stop(); (flags) = ia64_getreg(_IA64_REG_PSR); })
 
 #define irqs_disabled()				\

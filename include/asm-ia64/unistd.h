@@ -266,6 +266,8 @@
 
 #define NR_syscalls			256 /* length of syscall table */
 
+#define __ARCH_WANT_SYS_RT_SIGACTION
+
 #ifdef CONFIG_IA32_SUPPORT
 # define __ARCH_WANT_SYS_FADVISE64
 # define __ARCH_WANT_SYS_GETPGRP
@@ -275,7 +277,6 @@
 # define __ARCH_WANT_SYS_OLDUMOUNT
 # define __ARCH_WANT_SYS_SIGPENDING
 # define __ARCH_WANT_SYS_SIGPROCMASK
-# define __ARCH_WANT_SYS_RT_SIGACTION
 #endif
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)

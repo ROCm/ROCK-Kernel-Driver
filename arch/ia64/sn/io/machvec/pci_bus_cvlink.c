@@ -741,7 +741,7 @@ pci_bus_to_hcl_cvlink(void)
 			/* Is this PCI bus associated with this moduleid? */
 			moduleid = NODE_MODULEID(
 				nasid_to_cnodeid(pcibr_soft->bs_nasid));
-			if (modules[i]->id == moduleid) {
+			if (sn_modules[i]->id == moduleid) {
 				struct pcibr_list_s *new_element;
 
 				new_element = kmalloc(sizeof (struct pcibr_soft_s), GFP_KERNEL);
@@ -781,7 +781,7 @@ pci_bus_to_hcl_cvlink(void)
 				
 		/*
 		 * We now have a list of all the pci bridges associated with
-		 * the module_id, modules[i].  Call pci_bus_map_create() for
+		 * the module_id, sn_modules[i].  Call pci_bus_map_create() for
 		 * each pci bridge
 		 */
 		softlistp = first_in_list;

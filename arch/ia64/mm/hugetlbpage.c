@@ -297,7 +297,7 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 				unlock_page(page);
 			} else {
 				hugetlb_put_quota(mapping);
-				free_huge_page(page);
+				page_cache_release(page);
 				goto out;
 			}
 		}
