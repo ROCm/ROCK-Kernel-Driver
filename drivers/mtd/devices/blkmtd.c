@@ -217,7 +217,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
   DEBUG(3, "blkmtd: readpage: getting kiovec\n");
   err = alloc_kiovec(1, &iobuf);
   if (err) {
-    printk("blkmtd: cant allocate kiobuf\n");
+    printk("blkmtd: can't allocate kiobuf\n");
     SetPageError(page);
     return err;
   }
@@ -226,7 +226,7 @@ static int blkmtd_readpage(mtd_raw_dev_data_t *rawdevice, struct page *page)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
   blocks = kmalloc(KIO_MAX_SECTORS * sizeof(*blocks));
   if(blocks == NULL) {
-    printk("blkmtd: cant allocate iobuf blocks\n");
+    printk("blkmtd: can't allocate iobuf blocks\n");
     free_kiovec(1, &iobuf);
     SetPageError(page);
     return -ENOMEM;
@@ -306,7 +306,7 @@ static int write_queue_task(void *data)
   daemonize("blkmtdd");
 
   if(alloc_kiovec(1, &iobuf)) {
-    printk("blkmtd: write_queue_task cant allocate kiobuf\n");
+    printk("blkmtd: write_queue_task can't allocate kiobuf\n");
     return 0;
   }
 
@@ -314,7 +314,7 @@ static int write_queue_task(void *data)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,4)
   blocks = kmalloc(KIO_MAX_SECTORS * sizeof(unsigned long));
   if(blocks == NULL) {
-    printk("blkmtd: write_queue_task cant allocate iobuf blocks\n");
+    printk("blkmtd: write_queue_task can't allocate iobuf blocks\n");
     free_kiovec(1, &iobuf);
     return 0;
   }
@@ -794,7 +794,7 @@ static int blkmtd_write(struct mtd_info *mtd, loff_t to, size_t len,
       page = grab_cache_page(&rawdevice->as, pagenr);
       DEBUG(3, "blkmtd: write: got page %d from page cache\n", pagenr);
       if(!page) {
-	printk("blkmtd: write: cant grab cache page %d\n", pagenr);
+	printk("blkmtd: write: can't grab cache page %d\n", pagenr);
 	err = -EIO;
 	goto write_err;
       }
@@ -1090,7 +1090,7 @@ static int __init init_blkmtd(void)
 
   file = filp_open(device, mode, 0);
   if(IS_ERR(file)) {
-    printk("blkmtd: error, cant open device %s\n", device);
+    printk("blkmtd: error, can't open device %s\n", device);
     DEBUG(2, "blkmtd: filp_open returned %ld\n", PTR_ERR(file));
     return 1;
   }
@@ -1144,7 +1144,7 @@ static int __init init_blkmtd(void)
   DEBUG(1, "blkmtd: size = %ld\n", (long int)size);
 
   if(size == 0) {
-    printk("blkmtd: cant determine size\n");
+    printk("blkmtd: can't determine size\n");
     blkdev_put(bdev, BDEV_RAW);
     return 1;
   }

@@ -8103,7 +8103,7 @@ void mgsl_sppp_rx_done(struct mgsl_struct *info, char *buf, int size)
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("mgsl_sppp_rx_done(%s)\n",info->netname);	
 	if (skb == NULL) {
-		printk(KERN_NOTICE "%s: cant alloc skb, dropping packet\n",
+		printk(KERN_NOTICE "%s: can't alloc skb, dropping packet\n",
 			info->netname);
 		info->netstats.rx_dropped++;
 		return;

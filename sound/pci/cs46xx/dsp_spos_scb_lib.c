@@ -181,7 +181,7 @@ void cs46xx_dsp_remove_scb (cs46xx_t *chip, dsp_scb_descriptor_t * scb)
 		      (ins->scbs + scb->index) == scb), return );
 
 #if 0
-	/* cant remove a SCB with childs before 
+	/* can't remove a SCB with childs before 
 	   removing childs first  */
 	snd_assert ( (scb->sub_list_ptr == ins->the_null_scb &&
 		      scb->next_scb_ptr == ins->the_null_scb),

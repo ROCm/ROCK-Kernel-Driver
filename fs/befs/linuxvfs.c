@@ -541,7 +541,7 @@ befs_utf2nls(struct super_block *sb, const char *in,
 	wchar_t uni;
 	int unilen, utflen;
 	char *result;
-	int maxlen = in_len; /* The utf8->nls conversion cant make more chars */
+	int maxlen = in_len; /* The utf8->nls conversion can't make more chars */
 
 	befs_debug(sb, "---> utf2nls()");
 

@@ -804,7 +804,7 @@ ac97_recmask_io(struct ess_card *card, int read, int mask)
 
 	if (read) return val;
 
-	/* oss can have many inputs, maestro cant.  try
+	/* oss can have many inputs, maestro can't.  try
 		to pick the 'new' one */
 
 	if (mask != val) mask &= ~val;

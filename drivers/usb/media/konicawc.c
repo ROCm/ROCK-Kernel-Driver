@@ -806,7 +806,7 @@ static int konicawc_probe(struct usb_interface *intf, const struct usb_device_id
 				while(i--) {
 					usb_free_urb(cam->sts_urb[i]);
 				}
-				err("cant allocate urbs");
+				err("can't allocate urbs");
 				return -ENOMEM;
 			}
 		}
