@@ -105,5 +105,6 @@ extern int hwgraph_info_remove_LBL(vertex_hdl_t, char *, arbitrary_info_t *);
 extern char * vertex_to_name(vertex_hdl_t, char *, uint);
 extern graph_error_t hwgraph_vertex_unref(vertex_hdl_t);
 
+extern int init_hcl(void);
 
 #endif /* _ASM_IA64_SN_HCL_H */

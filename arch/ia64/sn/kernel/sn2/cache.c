@@ -26,6 +26,12 @@ void
 sn_flush_all_caches(long flush_addr, long bytes)
 {
 	flush_icache_range(flush_addr, flush_addr+bytes);
+	/*
+	 * The last call may have returned before the caches
+	 * were actually flushed, so we call it again to make
+	 * sure.
+	 */
+	flush_icache_range(flush_addr, flush_addr+bytes);
 	mb();
 }
 EXPORT_SYMBOL(sn_flush_all_caches);
