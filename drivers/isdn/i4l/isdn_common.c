@@ -35,9 +35,9 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
-static int isdn_command(isdn_ctrl *cmd);
 static void isdn_register_devfs(int);
 static void isdn_unregister_devfs(int);
+static int  isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
 
 /* ====================================================================== */
 
@@ -209,10 +209,11 @@ slot_dial(struct fsm_inst *fi, int pr, void *arg)
 static int
 slot_acceptd(struct fsm_inst *fi, int pr, void *arg)
 {
+	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl *ctrl = arg;
 	int retval;
 
-	retval = isdn_command(ctrl);
+	retval = __slot_command(slot, ctrl);
 	if (retval >= 0)
 		fsm_change_state(fi, ST_SLOT_WAIT_DCONN);
 
@@ -222,10 +223,11 @@ slot_acceptd(struct fsm_inst *fi, int pr, void *arg)
 static int
 slot_acceptb(struct fsm_inst *fi, int pr, void *arg)
 {
+	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl *ctrl = arg;
 	int retval;
 
-	retval = isdn_command(ctrl);
+	retval = __slot_command(slot, ctrl);
 	if (retval >= 0)
 		fsm_change_state(fi, ST_SLOT_WAIT_BCONN);
 
@@ -235,10 +237,11 @@ slot_acceptb(struct fsm_inst *fi, int pr, void *arg)
 static int
 slot_actv_hangup(struct fsm_inst *fi, int pr, void *arg)
 {
+	struct isdn_slot *slot = fi->userdata;
 	isdn_ctrl *ctrl = arg;
 	int retval;
 
-	retval = isdn_command(ctrl);
+	retval = __slot_command(slot, ctrl);
 	if (retval >= 0)
 		fsm_change_state(fi, ST_SLOT_WAIT_BHUP);
 
@@ -384,7 +387,6 @@ static int
 slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 {
 	struct isdn_slot *slot = fi->userdata;
-	int sl = slot - slots;
 
 	strcpy(slot->num, "???");
 	slot->ibytes = 0;
@@ -395,7 +397,8 @@ slot_unbind(struct fsm_inst *fi, int pr, void *arg)
 	isdn_v110_close(slot->iv110.v110);
 	slot->iv110.v110 = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
-	isdn_slot_set_usage(sl, ISDN_USAGE_NONE);
+	slot->usage = ISDN_USAGE_NONE;
+	isdn_info_update();
 	return 0;
 }
 
@@ -491,22 +494,16 @@ struct isdn_driver {
 	int                 maxbufsize;       /* Maximum Buffersize supported*/
 	int                 stavail;          /* Chars avail on Status-device*/
 	isdn_if            *interface;        /* Interface to driver         */
-	char               msn2eaz[10][ISDN_MSNLEN];  /*  MSN->EAZ           */
-	struct fsm_inst    fi;
+	char                msn2eaz[10][ISDN_MSNLEN];  /*  MSN->EAZ          */
+	struct fsm_inst     fi;
 } driver;
+
+static int __drv_command(struct isdn_driver *drv, isdn_ctrl *cmd);
 
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 static struct isdn_driver *drivers[ISDN_MAX_DRIVERS];
 
-int
-isdn_drv_maxbufsize(int di)
-{
-	BUG_ON(di < 0);
-
-	return drivers[di]->maxbufsize;
-}
-
-int
+static int
 isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb)
 {
 	struct sk_buff *skb2;
@@ -514,7 +511,7 @@ isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb)
 	int hl = drv->interface->hl_hdrlen;
 	int retval;
 
-	if( skb_headroom(skb) >= hl )
+	if (skb_headroom(skb) >= hl)
 		return drivers[di]->interface->writebuf_skb(di, ch, 1, skb);
 
 	skb2 = skb_realloc_headroom(skb, hl);
@@ -528,12 +525,6 @@ isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb)
 		kfree_skb(skb);
 
 	return retval;
-}
-
-int
-isdn_drv_hdrlen(int di)
-{
-	return drivers[di]->interface->hl_hdrlen;
 }
 
 int
@@ -638,7 +629,6 @@ set_global_features(void)
 static int  isdn_add_channels(struct isdn_driver *, int, int, int);
 static void isdn_receive_skb_callback(int di, int ch, struct sk_buff *skb);
 static int  isdn_status_callback(isdn_ctrl * c);
-static void set_global_features(void);
 
 static int
 drv_register(struct fsm_inst *fi, int pr, void *arg)
@@ -688,10 +678,9 @@ drv_stat_unload(struct fsm_inst *fi, int pr, void *arg)
 		cmd.driver = drv->di;
 		cmd.arg = 0;
 		cmd.command = ISDN_CMD_UNLOCK;
-		isdn_command(&cmd);
+		__drv_command(drv, &cmd);
 		drv->locks--;
 	}
-//			isdn_tty_stat_callback(i, c); FIXME?
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		if (slots[i].di == drv->di) {
  			slots[i].di = -1;
@@ -958,9 +947,9 @@ isdn_status_callback(isdn_ctrl *c)
 				if ((slots[i].di == di) &&
 				    (slots[i].ch == c->arg)) {
 					if (c->parm.num[0])
-						isdn_slot_set_usage(i, isdn_slot_usage(i) & ~ISDN_USAGE_DISABLED);
+						slots[i].usage &= ~ISDN_USAGE_DISABLED;
 					else if (USG_NONE(isdn_slot_usage(i)))
-						isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_DISABLED);
+						slots[i].usage |= ISDN_USAGE_DISABLED;
 					else 
 						retval = -1;
 					break;
@@ -1064,7 +1053,7 @@ isdn_lock_drivers(void)
 		cmd.driver = i;
 		cmd.arg = 0;
 		cmd.command = ISDN_CMD_LOCK;
-		isdn_command(&cmd);
+		__drv_command(drivers[i], &cmd);
 		drivers[i]->locks++;
 	}
 	spin_unlock_irqrestore(&drivers_lock, flags);
@@ -1093,7 +1082,7 @@ isdn_unlock_drivers(void)
 			cmd.driver = i;
 			cmd.arg = 0;
 			cmd.command = ISDN_CMD_UNLOCK;
-			isdn_command(&cmd);
+			__drv_command(drivers[i], &cmd);
 			drivers[i]->locks--;
 		}
 	}
@@ -1354,41 +1343,6 @@ __slot_command(struct isdn_slot *slot, isdn_ctrl *cmd)
 	return __drv_command(drv, cmd);
 }
 
-static int
-isdn_command(isdn_ctrl *cmd)
-{
-	int idx = isdn_dc2minor(cmd->driver, cmd->arg & 255);
-
-	if (cmd->driver == -1) {
-		isdn_BUG();
-		return 1;
-	}
-	if (cmd->command == ISDN_CMD_SETL2) {
-		unsigned long l2prot = (cmd->arg >> 8) & 255;
-		unsigned long features = (drivers[cmd->driver]->interface->features
-						>> ISDN_FEATURE_L2_SHIFT) &
-						ISDN_FEATURE_L2_MASK;
-		unsigned long l2_feature = (1 << l2prot);
-
-		switch (l2prot) {
-			case ISDN_PROTO_L2_V11096:
-			case ISDN_PROTO_L2_V11019:
-			case ISDN_PROTO_L2_V11038:
-			/* If V.110 requested, but not supported by
-			 * HL-driver, set emulator-flag and change
-			 * Layer-2 to transparent
-			 */
-				if (!(features & l2_feature)) {
-					slots[idx].iv110.v110emu = l2prot;
-					cmd->arg = (cmd->arg & 255) |
-						(ISDN_PROTO_L2_TRANS << 8);
-				} else
-					slots[idx].iv110.v110emu = 0;
-		}
-	}
-	return __drv_command(drivers[cmd->driver], cmd);
-}
-
 /*
  * Begin of a CAPI like LL<->HL interface, currently used only for 
  * supplementary service (CAPI 2.0 part III)
@@ -1424,8 +1378,6 @@ isdn_getnum(char **p)
 		v = ((v < 0) ? 0 : (v * 10)) + (int) ((*p[0]++) - '0');
 	return v;
 }
-
-#define DLE 0x10
 
 static __inline int
 isdn_minor2drv(int minor)
@@ -1484,7 +1436,7 @@ isdn_statstr(void)
 	sprintf(p, "\nphone:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%s ", isdn_slot_num(i));
+		sprintf(p, "%s ", slots[i].num);
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\n");
@@ -2015,7 +1967,7 @@ isdn_ctrl_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 			c.command = ISDN_CMD_IOCTL;
 			c.arg = cmd;
 			memcpy(c.parm.num, (char *) &iocts.arg, sizeof(ulong));
-			ret = isdn_command(&c);
+			ret = __drv_command(drivers[drvidx], &c);
 			memcpy((char *) &iocts.arg, c.parm.num, sizeof(ulong));
 			if (copy_to_user((char *) arg, &iocts, sizeof(isdn_ioctl_struct)))
 				return -EFAULT;
@@ -2111,6 +2063,7 @@ int
 isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 		   int pre_dev, int pre_chan, char *msn)
 {
+	struct isdn_slot *slot;
 	int i;
 	ulong flags;
 	ulong features;
@@ -2126,28 +2079,36 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 	 * because we can emulate this in linklevel.
 	 */
 
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if (USG_NONE(slots[i].usage) &&
-		    (slots[i].di != -1)) {
-			int d = slots[i].di;
-			if (!strcmp(isdn_map_eaz2msn(msn, d), "-"))
-				continue;
-			if (slots[i].usage & ISDN_USAGE_DISABLED)
-			        continue; /* usage not allowed */
-			if (drivers[d]->fi.state != ST_DRV_RUNNING)
-				continue;
+	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
+		slot = &slots[i];
 
-			if (((drivers[d]->interface->features & features) == features) ||
-			    (((drivers[d]->interface->features & vfeatures) == vfeatures) &&
-			     (drivers[d]->interface->features & ISDN_FEATURE_L2_TRANS))) {
-				if (pre_dev < 0 || pre_chan < 0 ||
-				    (pre_dev == d && pre_chan == slots[i].ch)) {
-					isdn_slot_set_usage(i, usage);
-					fsm_event(&slots[i].fi, EV_SLOT_BIND, NULL);
-					return i;
-				}
+		if (drivers[slot->di]->fi.state != ST_DRV_RUNNING)
+			continue;
+		
+		if (!USG_NONE(slots[i].usage))
+			continue;
+		
+		if (slots[i].usage & ISDN_USAGE_DISABLED)
+			continue;
+
+		if (slots[i].di == -1)
+			continue;
+
+		if (strcmp(isdn_map_eaz2msn(msn, slot->di), "-") == 0)
+			continue;
+
+		if (((drivers[slot->di]->interface->features & features) == features) ||
+		    (((drivers[slot->di]->interface->features & vfeatures) == vfeatures) &&
+			     (drivers[slot->di]->interface->features & ISDN_FEATURE_L2_TRANS))) {
+			if (pre_dev < 0 || pre_chan < 0 ||
+			    (pre_dev == slot->di && pre_chan == slot->ch)) {
+				slot->usage = usage;
+				isdn_info_update();
+				fsm_event(&slot->fi, EV_SLOT_BIND, NULL);
+				return i;
 			}
 		}
+	}
 	restore_flags(flags);
 	return -1;
 }
@@ -2341,48 +2302,46 @@ EXPORT_SYMBOL(isdn_ppp_unregister_compressor);
 #endif
 
 int
-isdn_slot_driver(int sl)
+isdn_slot_maxbufsize(int sl)
 {
 	BUG_ON(sl < 0);
 
-	return slots[sl].di;
-}
-
-int
-isdn_slot_channel(int sl)
-{
-	BUG_ON(sl < 0);
-
-	return slots[sl].ch;
+	return slots[sl].drv->maxbufsize;
 }
 
 int
 isdn_slot_hdrlen(int sl)
 {
-	int di = isdn_slot_driver(sl);
+	struct isdn_slot *slot = &slots[sl];
 	
-	return drivers[di]->interface->hl_hdrlen;
+	BUG_ON(sl < 0);
+	
+	return slot->drv->interface->hl_hdrlen;
 }
 
 char *
 isdn_slot_map_eaz2msn(int sl, char *msn)
 {
-	int di = isdn_slot_driver(sl);
-
-	return isdn_map_eaz2msn(msn, di);
+	struct isdn_slot *slot = &slots[sl];
+	
+	BUG_ON(sl < 0);
+	
+	return isdn_map_eaz2msn(msn, slot->di);
 }
 
 int
 isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 {
+	struct isdn_slot *slot = &slots[sl];
+
 	ctrl->command = cmd;
-	ctrl->driver = isdn_slot_driver(sl);
+	ctrl->driver = slot->di;
 
 	switch (cmd) {
 	case ISDN_CMD_SETL2:
 	case ISDN_CMD_SETL3:
 	case ISDN_CMD_PROT_IO:
-		ctrl->arg &= ~0xff; ctrl->arg |= isdn_slot_channel(sl);
+		ctrl->arg &= ~0xff; ctrl->arg |= slot->ch;
 		break;
 	case ISDN_CMD_DIAL:
 		if (dev->global_flags & ISDN_GLOBAL_STOPPED)
@@ -2390,26 +2349,26 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 
 		/* fall through */
 	default:
-		ctrl->arg = isdn_slot_channel(sl);
+		ctrl->arg = slot->ch;
 		break;
 	}
 	switch (cmd) {
 	case ISDN_CMD_CLREAZ:
-		return fsm_event(&slots[sl].fi, EV_CMD_CLREAZ, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_CLREAZ, ctrl);
 	case ISDN_CMD_SETEAZ:
-		return fsm_event(&slots[sl].fi, EV_CMD_SETEAZ, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_SETEAZ, ctrl);
 	case ISDN_CMD_SETL2:
-		return fsm_event(&slots[sl].fi, EV_CMD_SETL2, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_SETL2, ctrl);
 	case ISDN_CMD_SETL3:
-		return fsm_event(&slots[sl].fi, EV_CMD_SETL3, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_SETL3, ctrl);
 	case ISDN_CMD_DIAL:
-		return fsm_event(&slots[sl].fi, EV_CMD_DIAL, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_DIAL, ctrl);
 	case ISDN_CMD_ACCEPTD:
-		return fsm_event(&slots[sl].fi, EV_CMD_ACCEPTD, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_ACCEPTD, ctrl);
 	case ISDN_CMD_ACCEPTB:
-		return fsm_event(&slots[sl].fi, EV_CMD_ACCEPTB, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_ACCEPTB, ctrl);
 	case ISDN_CMD_HANGUP:
-		return fsm_event(&slots[sl].fi, EV_CMD_HANGUP, ctrl);
+		return fsm_event(&slot->fi, EV_CMD_HANGUP, ctrl);
 	}
 	HERE;
 	return -1;
@@ -2418,9 +2377,12 @@ isdn_slot_command(int sl, int cmd, isdn_ctrl *ctrl)
 int
 isdn_slot_dial(int sl, struct dial_info *dial)
 {
+	struct isdn_slot *slot = &slots[sl];
 	isdn_ctrl cmd;
 	int retval;
 	char *msn = isdn_slot_map_eaz2msn(sl, dial->msn);
+
+	BUG_ON(sl < 0);
 
 	/* check for DOV */
 	if (dial->si1 == 7 && tolower(dial->phone[0]) == 'v') { /* DOV call */
@@ -2428,8 +2390,9 @@ isdn_slot_dial(int sl, struct dial_info *dial)
 		dial->phone++; /* skip v/V */
 	}
 
-	strcpy(isdn_slot_num(sl), dial->phone);
-	isdn_slot_set_usage(sl, isdn_slot_usage(sl) | ISDN_USAGE_OUTGOING);
+	strcpy(slot->num, dial->phone);
+	slot->usage |= ISDN_USAGE_OUTGOING;
+	isdn_info_update();
 
 	retval = isdn_slot_command(sl, ISDN_CMD_CLREAZ, &cmd);
 	if (retval)
@@ -2477,15 +2440,6 @@ isdn_slot_usage(int sl)
 	BUG_ON(sl < 0);
 
 	return slots[sl].usage;
-}
-
-void
-isdn_slot_set_usage(int sl, int usage)
-{
-	BUG_ON(sl < 0);
-
-	slots[sl].usage = usage;
-	isdn_info_update();
 }
 
 int
@@ -2665,7 +2619,7 @@ static int __init isdn_init(void)
 		slots[i].di = -1;
 		slots[i].ch = -1;
 		slots[i].m_idx = -1;
-		strcpy(isdn_slot_num(i), "???");
+		strcpy(slots[i].num, "???");
 		init_waitqueue_head(&isdn_mdm.info[i].open_wait);
 		init_waitqueue_head(&isdn_mdm.info[i].close_wait);
 		slots[i].fi.fsm = &slot_fsm;
@@ -2718,23 +2672,15 @@ static int __init isdn_init(void)
  */
 static void __exit isdn_exit(void)
 {
-	unsigned long flags;
-
 #ifdef CONFIG_ISDN_PPP
 	isdn_ppp_cleanup();
 #endif
-	save_flags(flags);
-	cli();
 	isdn_net_lib_exit();
 
 	isdn_tty_exit();
-	if (unregister_chrdev(ISDN_MAJOR, "isdn"))
-		BUG();
-
+	unregister_chrdev(ISDN_MAJOR, "isdn");
 	isdn_cleanup_devfs();
-	del_timer(&dev->timer);
-	restore_flags(flags);
-	/* call vfree with interrupts enabled, else it will hang */
+	del_timer_sync(&dev->timer);
 	vfree(dev);
 	fsm_free(&drv_fsm);
 	fsm_free(&slot_fsm);

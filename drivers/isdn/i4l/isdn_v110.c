@@ -511,7 +511,7 @@ buffer_full:
 }
 
 int
-isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
+isdn_v110_stat_callback(int sl, struct isdn_v110 *iv110, isdn_ctrl *c)
 {
 	isdn_v110_stream *v = NULL;
 	int i;
@@ -543,7 +543,7 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 				else
 					skb = isdn_v110_idle(v);
 				if (skb) {
-					if (isdn_drv_writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+					if (isdn_slot_write(sl, skb) <= 0) {
 						dev_kfree_skb(skb);
 						break;
 					} else {
@@ -570,8 +570,8 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 			break;
 		case ISDN_STAT_BCONN:
 			if (iv110->v110emu && (iv110->v110 == NULL)) {
-				int hdrlen = isdn_drv_hdrlen(c->driver);
-				int maxsize = isdn_drv_maxbufsize(c->driver);
+				int hdrlen = isdn_slot_hdrlen(sl);
+				int maxsize = isdn_slot_maxbufsize(sl);
 				atomic_inc(&iv110->v110use);
 				switch (iv110->v110emu) {
 					case ISDN_PROTO_L2_V11096:
@@ -588,7 +588,7 @@ isdn_v110_stat_callback(struct isdn_v110 *iv110, isdn_ctrl *c)
 				if ((v = iv110->v110)) {
 					while (v->SyncInit) {
 						struct sk_buff *skb = isdn_v110_sync(v);
-						if (isdn_drv_writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+						if (isdn_slot_write(sl, skb) <= 0) {
 							dev_kfree_skb(skb);
 							/* Unable to send, try later */
 							break;

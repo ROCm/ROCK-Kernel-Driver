@@ -517,8 +517,6 @@ isdn_audio_eval_dtmf(modem_info * info)
 	dtmf_state *s;
 	int silence;
 	int i;
-	int di;
-	int ch;
 	unsigned long flags;
 	int grp[2];
 	char what;
@@ -563,8 +561,6 @@ isdn_audio_eval_dtmf(modem_info * info)
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 			save_flags(flags);
 			cli();
-			di = isdn_slot_driver(info->isdn_slot);
-			ch = isdn_slot_channel(info->isdn_slot);
 			isdn_tty_queue_tail(info, skb, 2);
 			restore_flags(flags);
 			/* Schedule dequeuing */
@@ -658,8 +654,6 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
-	int di;
-	int ch;
 	char *p;
 
 	skb = dev_alloc_skb(2);
@@ -682,8 +676,6 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	ISDN_AUDIO_SKB_LOCK(skb) = 0;
 	save_flags(flags);
 	cli();
-	di = isdn_slot_driver(info->isdn_slot);
-	ch = isdn_slot_channel(info->isdn_slot);
 	isdn_tty_queue_tail(info, skb, 2);
 	restore_flags(flags);
 	/* Schedule dequeuing */

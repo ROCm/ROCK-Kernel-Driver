@@ -873,7 +873,6 @@ isdn_tty_suspend(char *id, modem_info * info, atemu * m)
 		cmd.parm.cmsg.Length = l+18;
 		cmd.parm.cmsg.Command = CAPI_FACILITY;
 		cmd.parm.cmsg.Subcommand = CAPI_REQ;
-		cmd.parm.cmsg.adr.Controller = isdn_slot_driver(info->isdn_slot) + 1;
 		cmd.parm.cmsg.para[0] = 3; /* 16 bit 0x0003 suplementary service */
 		cmd.parm.cmsg.para[1] = 0;
 		cmd.parm.cmsg.para[2] = l + 3;
@@ -933,7 +932,6 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
 		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
-		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
 		restore_flags(flags);
@@ -945,7 +943,6 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 		cmd.parm.cmsg.Length = l+18;
 		cmd.parm.cmsg.Command = CAPI_FACILITY;
 		cmd.parm.cmsg.Subcommand = CAPI_REQ;
-		cmd.parm.cmsg.adr.Controller = isdn_slot_driver(info->isdn_slot) + 1;
 		cmd.parm.cmsg.para[0] = 3; /* 16 bit 0x0003 suplementary service */
 		cmd.parm.cmsg.para[1] = 0;
 		cmd.parm.cmsg.para[2] = l+3;
@@ -1010,7 +1007,6 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 		info->isdn_slot = i;
 		isdn_slot_set_m_idx(i, info->line);
 		isdn_slot_set_priv(i, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
-		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 		restore_flags(flags);
 		info->last_l2 = l2;
@@ -1021,7 +1017,6 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 		cmd.parm.cmsg.Length = l+14;
 		cmd.parm.cmsg.Command = CAPI_MANUFACTURER;
 		cmd.parm.cmsg.Subcommand = CAPI_REQ;
-		cmd.parm.cmsg.adr.Controller = isdn_slot_driver(info->isdn_slot) + 1;
 		cmd.parm.cmsg.para[0] = l+1;
 		strncpy(&cmd.parm.cmsg.para[1], msg, l);
 		cmd.parm.cmsg.para[l+1] = 0xd;
@@ -1193,7 +1188,6 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 {
 	int c;
 	int total = 0;
-	int di;
 	modem_info *info = (modem_info *) tty->driver_data;
 	atemu *m = &info->emu;
 
@@ -1207,12 +1201,8 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		c = count;
 		if (c > info->xmit_size - info->xmit_count)
 			c = info->xmit_size - info->xmit_count;
-		if (info->isdn_slot >= 0)
-			di = isdn_slot_driver(info->isdn_slot);
-		else
-			di = -1;
-		if (di >= 0 && c > isdn_drv_maxbufsize(di))
-			c = isdn_drv_maxbufsize(di);
+		if (info->isdn_slot >= 0 && c > isdn_slot_maxbufsize(info->isdn_slot))
+			c = isdn_slot_maxbufsize(info->isdn_slot);
 		if (c <= 0)
 			break;
 		if ((info->online > 1)
@@ -2295,13 +2285,12 @@ isdn_tty_find_icall(int di, int ch, int sl, setup_parm *setup)
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = idx;
 					isdn_slot_set_m_idx(idx, info->line);
-					isdn_slot_set_priv(idx, ISDN_USAGE_MODEM, info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
+					isdn_slot_set_priv(idx, isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]), info, isdn_tty_stat_callback, isdn_tty_rcv_skb);
 					strcpy(isdn_slot_num(idx), nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];
 					info->emu.mdmreg[REG_PLAN] = setup->plan;
 					info->emu.mdmreg[REG_SCREEN] = setup->screen;
-					isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | isdn_calc_usage(si1, info->emu.mdmreg[REG_L2PROT]));
 					restore_flags(flags);
 					printk(KERN_INFO "isdn_tty: call from %s, -> RING on ttyI%d\n", nr,
 					       info->line);
@@ -2450,18 +2439,6 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 					return 1;
 				}
 				break;
-			case ISDN_STAT_UNLOAD:
-#ifdef ISDN_TTY_STAT_DEBUG
-				printk(KERN_DEBUG "tty_STAT_UNLOAD ttyI%d\n", info->line);
-#endif
-				for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-					info = &isdn_mdm.info[i];
-					if (isdn_slot_driver(info->isdn_slot) == c->driver) {
-						if (info->online)
-							isdn_tty_modem_hup(info, 1);
-					}
-				}
-				return 1;
 #ifdef CONFIG_ISDN_TTY_FAX
 			case ISDN_STAT_FAXIND:
 				if (TTY_IS_ACTIVE(info)) {
@@ -2508,7 +2485,6 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 	ulong flags;
 	struct sk_buff *skb = 0;
 	char *sp = 0;
-	int di,ch;
 
 	if (!msg) {
 		printk(KERN_WARNING "isdn_tty: Null-Message in isdn_tty_at_cout\n");
@@ -2524,11 +2500,6 @@ isdn_tty_at_cout(char *msg, modem_info * info)
 
 	/* use queue instead of direct flip, if online and */
 	/* data is in queue or flip buffer is full */
-	if (info->isdn_slot >= 0) {
-		di = isdn_slot_driver(info->isdn_slot); ch = isdn_slot_channel(info->isdn_slot);
-	} else {
-		di = -1; ch = -1;
-	}
 	if ((info->online) && (((tty->flip.count + strlen(msg)) >= TTY_FLIPBUF_SIZE) ||
 	    (!skb_queue_empty(&info->rpqueue)))) {
 		skb = alloc_skb(strlen(msg)

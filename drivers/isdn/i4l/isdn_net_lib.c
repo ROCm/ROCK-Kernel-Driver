@@ -1431,9 +1431,6 @@ isdn_net_dev_icall(isdn_net_dev *idev, int di, int ch, int si1,
 		if (*my_eaz == 'b' || *my_eaz == 'B')
 			my_eaz++; /* skip to allow a match */
 	}
-	if (!USG_NONE(isdn_slot_usage(slot)))  // FIXME?
-		return 0;
-
 	/* check called number */
 	switch (isdn_msncmp(eaz, my_eaz)) {
 	case 1: /* no match */

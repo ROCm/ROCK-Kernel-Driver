@@ -86,12 +86,9 @@ extern int   isdn_slot_command(int slot, int cmd, isdn_ctrl *);
 extern int   isdn_slot_dial(int slot, struct dial_info *dial);
 extern char *isdn_slot_map_eaz2msn(int slot, char *msn);
 extern int   isdn_slot_write(int slot, struct sk_buff *);
-extern int   isdn_slot_readbchan(int slot, u_char *, u_char *, int);
 extern int   isdn_slot_hdrlen(int slot);
-extern int   isdn_slot_driver(int slot);
-extern int   isdn_slot_channel(int slot);
+extern int   isdn_slot_maxbufsize(int slot);
 extern int   isdn_slot_usage(int slot);
-extern void  isdn_slot_set_usage(int slot, int usage);
 extern char *isdn_slot_num(int slot);
 extern int   isdn_slot_m_idx(int slot);
 extern void  isdn_slot_set_m_idx(int slot, int midx);
@@ -99,8 +96,5 @@ extern void  isdn_slot_set_priv(int sl, int usage, void *priv, int (*stat_cb)(in
 extern void *isdn_slot_priv(int sl);
 extern int   isdn_hard_header_len(void);
 
-int   isdn_drv_maxbufsize(int di);
-int   isdn_drv_writebuf_skb(int di, int ch, int x, struct sk_buff *skb);
-int   isdn_drv_hdrlen(int di);
 int   isdn_drv_lookup(char *drvid);
 char *isdn_drv_drvid(int di);
