@@ -76,14 +76,10 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 	if (!clp)
 		return NULL;
 
-	exp = clp->cl_export[EXPORT_HASH(dev)];
-	if (exp)
-		do {
-			if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
-				goto out;
-		} while (NULL != (exp = exp->ex_next));
-	exp = NULL;
-out:
+	for (exp = clp->cl_export[EXPORT_HASH(dev)]; exp; exp = exp->ex_next) {
+		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
+			break;
+	}
 	return exp;
 }
 
