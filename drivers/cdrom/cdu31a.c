@@ -386,8 +386,7 @@ static inline void sony_sleep(void)
 	unsigned long flags;
 
 	if (cdu31a_irq <= 0) {
-		current->state = TASK_INTERRUPTIBLE;
-		schedule_timeout(0);
+		yield();
 	} else {		/* Interrupt driven */
 
 		save_flags(flags);
