@@ -557,7 +557,7 @@ static void load_balance(runqueue_t *this_rq, int idle)
 	 * Make sure nothing changed since we checked the
 	 * runqueue length.
 	 */
-	if (busiest->nr_running <= this_rq->nr_running + 1)
+	if (busiest->nr_running <= nr_running + 1)
 		goto out_unlock;
 
 	/*
