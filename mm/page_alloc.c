@@ -38,7 +38,7 @@ unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
 int numnodes = 1;
-
+int sysctl_lower_zone_protection = 0;
 
 /*
  * Used by page_zone() to look up the address of the struct zone whose
@@ -470,6 +470,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 			if (page)
 				return page;
 		}
+		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/* we're somewhat low on memory, failed to find what we needed */
@@ -492,6 +493,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 			if (page)
 				return page;
 		}
+		min += local_min * sysctl_lower_zone_protection;
 	}
 
 	/* here we're in the low on memory slow path */
@@ -529,6 +531,7 @@ rebalance:
 			if (page)
 				return page;
 		}
+		min += z->pages_low * sysctl_lower_zone_protection;
 	}
 
 	/*
