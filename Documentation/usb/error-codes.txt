@@ -1,8 +1,11 @@
-Revised: 2001-Dec-06.
+Revised: 2002-Feb-09.
 
 This is the documentation of (hopefully) all possible error codes (and
-their interpretation) that can be returned from the host controller drivers 
-and from usbcore.
+their interpretation) that can be returned from usbcore.
+
+Some of them are returned by the Host Controller Drivers (HCDs), which
+device drivers only see through usbcore.  As a rule, all the HCDs should
+behave the same except for transfer speed dependent behaviors.
 
 
 **************************************************************************
@@ -19,9 +22,9 @@ USB-specific:
 
 -ENODEV		specified USB-device or bus doesn't exist
 
--ENXIO		a control or interrupt URB is already queued to this endpoint; or
-		  a bulk URB is already queued to this endpoint and
-		  USB_QUEUE_BULK wasn't used (UHCI HCDs only)
+-ENXIO		a control or interrupt URB is already queued to this endpoint;
+		or (UHCI only) a bulk URB is already queued to this endpoint
+		and USB_QUEUE_BULK wasn't used
 
 -EINVAL		a) Invalid transfer type specified (or not supported)
 		b) Invalid interrupt interval (0<=n<256)
@@ -34,7 +37,8 @@ USB-specific:
 
 -EFBIG		too much ISO frames requested (currently uhci>900)
 
--EPIPE		specified pipe-handle is already stalled
+-EPIPE		Specified endpoint is stalled.  For non-control endpoints,
+		reset this status with usb_clear_halt().
 
 -EMSGSIZE	endpoint message size is zero, do interface/alternate setting
 
@@ -50,19 +54,29 @@ USB-specific:
 *                   or in iso_frame_desc[n].status (for ISO)             *
 **************************************************************************
 
+USB device drivers may only test urb status values in completion handlers.
+This is because otherwise there would be a race between HCDs updating
+these values on one CPU, and device drivers testing them on another CPU.
+
+A transfer's actual_length may be positive even when an error has been
+reported.  That's because transfers often involve several packets, so that
+one or more packets could finish before an error stops further endpoint I/O.
+
+
 0			Transfer completed successfully
 
--ENOENT			URB was canceled by usb_unlink_urb
+-ENOENT			URB was synchronously unlinked by usb_unlink_urb
 
 -EINPROGRESS		URB still pending, no results yet
-			(actually no error until now;-)
+			(That is, if drivers see this it's a bug.)
 
--EPROTO			a) bitstuff error
+-EPROTO (*)		a) bitstuff error
 			b) unknown USB error 
 
--EILSEQ			CRC mismatch
+-EILSEQ (*)		CRC mismatch
 
--EPIPE			endpoint stalled
+-EPIPE			Endpoint stalled.  For non-control endpoints,
+			reset this status with usb_clear_halt().
 
 -ECOMM			During an IN transfer, the host controller
 			received data from an endpoint faster than it
@@ -72,24 +86,35 @@ USB-specific:
 			could not retrieve data from system memory fast
 			enough to keep up with the USB data rate
 
--EOVERFLOW		The amount of data returned by the endpoint was
+-EOVERFLOW (*)		The amount of data returned by the endpoint was
 			greater than either the max packet size of the
 			endpoint or the remaining buffer size.  "Babble".
 
 -EREMOTEIO		The endpoint returned less than max packet size
 			and that amount did not fill the specified buffer
+			(and USB_DISBLE_SPD was not set in transfer_flags)
+
 -ETIMEDOUT		transfer timed out, NAK
 
--ENODEV			device was removed
-
--EREMOTEIO		short packet detected
+-ENODEV			Device was removed.  Often preceded by a burst of
+			other errors, since the hub driver does't detect
+			device removal events immediately.
 
 -EXDEV			ISO transfer only partially completed
 			look at individual frame status for details
 
 -EINVAL			ISO madness, if this happens: Log off and go home
 
--ECONNRESET		the URB is being unlinked asynchronously
+-ECONNRESET		URB was asynchronously unlinked by usb_unlink_urb
+
+-ESHUTDOWN		The host controller has been disabled due to some
+			problem that could not be worked around.
+
+
+(*) Error codes like -EPROTO, -EILSEQ and -EOVERFLOW normally indicate
+hardware problems such as bad devices (including firmware) or cables.
+
+
 
 **************************************************************************
 *              Error codes returned by usbcore-functions                 *
@@ -100,4 +125,6 @@ usb_register():
 -EINVAL			error during registering new driver
 
 usb_get_*/usb_set_*():
+usb_control_msg():
+usb_bulk_msg():
 			All USB errors (submit/status) can occur
