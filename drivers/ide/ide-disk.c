@@ -1339,6 +1339,9 @@ static int idedisk_issue_flush(request_queue_t *q, struct gendisk *disk,
 	char *buf = rq->cmd;
 	int ret;
 
+	if (!drive->wcache || !(drive->id->cfs_enable_2 & 0x3000))
+		return 0;
+
 	memset(buf, 0, sizeof(rq->cmd));
 
 	if (drive->id->cfs_enable_2 & 0x2400)
@@ -1806,10 +1809,10 @@ static int idedisk_open(struct inode *inode, struct file *filp)
 
 static int ide_cacheflush_p(ide_drive_t *drive)
 {
-	if(drive->wcache)
-	{
-		if (do_idedisk_flushcache(drive))
-		{
+	if (!(drive->id->cfs_enable_2 & 0x3000))
+		return 0;
+	if (drive->wcache) {
+		if (do_idedisk_flushcache(drive)) {
 			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 				drive->name);
 			return -EIO;
@@ -1895,9 +1898,8 @@ static int idedisk_attach(ide_drive_t *drive)
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
 			drive->name, drive->head);
-		if ((drive->id->cfs_enable_2 & 0x3000) && drive->wcache)
-			if (do_idedisk_flushcache(drive))
-				printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
+		if (do_idedisk_flushcache(drive) < 0)
+			printk (KERN_INFO "%s: Write Cache FAILED Flushing!\n",
 					drive->name);
 		ide_unregister_subdriver(drive);
 		DRIVER(drive)->busy--;
