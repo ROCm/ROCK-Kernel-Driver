@@ -1153,9 +1153,6 @@ static void idedisk_setup (ide_drive_t *drive)
 			barrier = 0;
 	}
 
-	if (!strncmp(drive->name, "hdc", 3))
-		barrier = 1;
-
 	printk(KERN_INFO "%s: cache flushes %ssupported\n",
 		drive->name, barrier ? "" : "not ");
 	if (barrier) {
