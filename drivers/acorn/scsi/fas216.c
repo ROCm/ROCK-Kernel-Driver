@@ -603,7 +603,7 @@ fas216_updateptrs(FAS216_Info *info, int bytes_transferred)
 		 * next buffer.
 		 */
 		bytes_transferred -= SCp->this_residual;
-		if (!next_SCp(&info->scsi.SCp)) {
+		if (!next_SCp(&info->scsi.SCp) && bytes_transferred) {
 			printk(KERN_WARNING "scsi%d.%c: out of buffers\n",
 				info->host->host_no, '0' + info->SCpnt->target);
 			return;
