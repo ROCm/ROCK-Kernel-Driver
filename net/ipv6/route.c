@@ -269,9 +269,8 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 
 	if (match) {
 		if (rt6_dflt_pointer != match)
-			RT6_TRACE1(KERN_INFO 
-					"changed default router: %p->%p\n",
-					rt6_dflt_pointer, match);
+			RT6_TRACE("changed default router: %p->%p\n",
+				  rt6_dflt_pointer, match);
 		rt6_dflt_pointer = match;
 	}
 	spin_unlock(&rt6_dflt_lock);
