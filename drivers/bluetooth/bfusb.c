@@ -98,14 +98,6 @@ struct bfusb_scb {
 static void bfusb_tx_complete(struct urb *urb, struct pt_regs *regs);
 static void bfusb_rx_complete(struct urb *urb, struct pt_regs *regs);
 
-static inline void bfusb_wait_for_urb(struct urb *urb)
-{
-	while (atomic_read(&urb->count) > 1) {
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((5 * HZ + 999) / 1000);
-	}
-}
-
 static struct urb *bfusb_get_completed(struct bfusb *bfusb)
 {
 	struct sk_buff *skb;
@@ -132,7 +124,6 @@ static void bfusb_unlink_urbs(struct bfusb *bfusb)
 	while ((skb = skb_dequeue(&bfusb->pending_q))) {
 		urb = ((struct bfusb_scb *) skb->cb)->urb;
 		usb_unlink_urb(urb);
-		bfusb_wait_for_urb(urb);
 		skb_queue_tail(&bfusb->completed_q, skb);
 	}
 
