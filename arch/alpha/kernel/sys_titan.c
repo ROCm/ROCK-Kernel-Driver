@@ -145,12 +145,12 @@ titan_end_irq(unsigned int irq)
 }
 
 static void
-titan_cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
+titan_cpu_set_irq_affinity(unsigned int irq, cpumask_t affinity)
 {
 	int cpu;
 
 	for (cpu = 0; cpu < 4; cpu++) {
-		if (affinity & (1UL << cpu))
+		if (cpu_isset(cpu, affinity))
 			titan_cpu_irq_affinity[cpu] |= 1UL << irq;
 		else
 			titan_cpu_irq_affinity[cpu] &= ~(1UL << irq);
@@ -159,7 +159,7 @@ titan_cpu_set_irq_affinity(unsigned int irq, unsigned long affinity)
 }
 
 static void
-titan_set_irq_affinity(unsigned int irq, unsigned long affinity)
+titan_set_irq_affinity(unsigned int irq, cpumask_t affinity)
 { 
 	spin_lock(&titan_irq_lock);
 	titan_cpu_set_irq_affinity(irq - 16, affinity);
