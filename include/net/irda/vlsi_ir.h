@@ -27,18 +27,71 @@
 #ifndef IRDA_VLSI_FIR_H
 #define IRDA_VLSI_FIR_H
 
-/*
- * #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,xx)
- *
- * missing pci-dma api call to give streaming dma buffer back to hw
- * patch floating on lkml - probably present in 2.5.26 or later
- * otherwise defining it as noop is ok, since the vlsi-ir is only
+/* ================================================================
+ * compatibility stuff
+ */
+
+/* definitions not present in pci_ids.h */
+
+#ifndef PCI_CLASS_WIRELESS_IRDA
+#define PCI_CLASS_WIRELESS_IRDA		0x0d00
+#endif
+
+#ifndef PCI_CLASS_SUBCLASS_MASK
+#define PCI_CLASS_SUBCLASS_MASK		0xffff
+#endif
+
+/* missing pci-dma api call to give streaming dma buffer back to hw
+ * patch was floating on lkml around 2.5.2x and might be present later.
+ * Defining it this way is ok, since the vlsi-ir is only
  * used on two oldish x86-based notebooks which are cache-coherent
+ * (and flush_write_buffers also handles PPro errata and C3 OOstore)
  */
-#define pci_dma_prep_single(dev, addr, size, direction)	/* nothing */
-/*
- * #endif
+#ifdef CONFIG_X86
+#include <asm-i386/io.h>
+#define pci_dma_prep_single(dev, addr, size, direction)	flush_write_buffers()
+#else
+#error missing pci dma api call
+#endif
+
+/* in recent 2.5 interrupt handlers have non-void return value */
+#ifndef IRQ_RETVAL
+typedef void irqreturn_t;
+#define IRQ_NONE
+#define IRQ_HANDLED
+#define IRQ_RETVAL(x)
+#endif
+
+/* some stuff need to check kernelversion. Not all 2.5 stuff was present
+ * in early 2.5.x - the test is merely to separate 2.4 from 2.5
  */
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+
+/* PDE() introduced in 2.5.4 */
+#ifdef CONFIG_PROC_FS
+#define PDE(inode) ((inode)->u.generic_ip)
+#endif
+
+/* irda crc16 calculation exported in 2.5.42 */
+#define irda_calc_crc16(fcs,buf,len)	(GOOD_FCS)
+
+/* we use this for unified pci device name access */
+#define PCIDEV_NAME(pdev)	((pdev)->name)
+
+#else /* 2.5 or later */
+
+/* recent 2.5/2.6 stores pci device names at varying places ;-) */
+#ifdef CONFIG_PCI_NAMES
+/* human readable name */
+#define PCIDEV_NAME(pdev)	((pdev)->pretty_name)
+#else
+/* whatever we get from the associated struct device - bus:slot:dev.fn id */
+#define PCIDEV_NAME(pdev)	(pci_name(pdev))
+#endif
+
+#endif
 
 /* ================================================================ */
 
