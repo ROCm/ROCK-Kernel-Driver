@@ -242,6 +242,9 @@ e100_diag_config_loopback(struct e100_private* bdp,
 		 *dynamic_tbd = e100_config_dynamic_tbd(bdp,*dynamic_tbd);
 
 	if (set_loopback) {
+		/* ICH PHY loopback is broken */
+		if (bdp->flags & IS_ICH && loopback_mode == PHY_LOOPBACK)
+			loopback_mode = MAC_LOOPBACK;
 		/* Configure loopback on MAC */
 		e100_config_loopback_mode(bdp,loopback_mode);
 	} else {

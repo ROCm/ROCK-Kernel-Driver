@@ -615,7 +615,9 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	}
 
 	if (((bdp->pdev->device > 0x1030)
-	     && (bdp->pdev->device < 0x103F))
+	       && (bdp->pdev->device < 0x103F))
+	    || ((bdp->pdev->device >= 0x1050)
+	       && (bdp->pdev->device <= 0x1057))
 	    || (bdp->pdev->device == 0x2449)
 	    || (bdp->pdev->device == 0x2459)
 	    || (bdp->pdev->device == 0x245D)) {
