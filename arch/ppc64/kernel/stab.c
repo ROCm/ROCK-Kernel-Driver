@@ -32,9 +32,13 @@ static void make_slbe(unsigned long esid, unsigned long vsid, int large,
 void stab_initialize(unsigned long stab)
 {
 	unsigned long esid, vsid; 
+	int seg0_largepages = 0;
 
 	esid = GET_ESID(KERNELBASE);
 	vsid = get_kernel_vsid(esid << SID_SHIFT); 
+
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		seg0_largepages = 1;
 
 	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
 		/* Invalidate the entire SLB & all the ERATS */
@@ -44,7 +48,7 @@ void stab_initialize(unsigned long stab)
 		asm volatile("isync":::"memory");
 		asm volatile("slbmte  %0,%0"::"r" (0) : "memory");
 		asm volatile("isync; slbia; isync":::"memory");
-		make_slbe(esid, vsid, 0, 1);
+		make_slbe(esid, vsid, seg0_largepages, 1);
 		asm volatile("isync":::"memory");
 #endif
 	} else {

@@ -269,11 +269,13 @@ lmb_phys_mem_size(void)
 	return _lmb->memory.size;
 #else
 	struct lmb_region *_mem = &(_lmb->memory);
-	unsigned long idx = _mem->cnt-1;
-	unsigned long lastbase = _mem->region[idx].physbase;
-	unsigned long lastsize = _mem->region[idx].size;
-	
-	return (lastbase + lastsize);
+	unsigned long total = 0;
+	int i;
+
+	/* add all physical memory to the bootmem map */
+	for (i=0; i < _mem->cnt; i++)
+		total += _mem->region[i].size;
+	return total;
 #endif /* CONFIG_MSCHUNKS */
 }
 
@@ -283,15 +285,13 @@ lmb_end_of_DRAM(void)
 	unsigned long offset = reloc_offset();
 	struct lmb *_lmb = PTRRELOC(&lmb);
 	struct lmb_region *_mem = &(_lmb->memory);
-	unsigned long idx;
+	int idx = _mem->cnt - 1;
 
-	for(idx=_mem->cnt-1; idx >= 0; idx--) {
 #ifdef CONFIG_MSCHUNKS
-		return (_mem->region[idx].physbase + _mem->region[idx].size);
+	return (_mem->region[idx].physbase + _mem->region[idx].size);
 #else
-		return (_mem->region[idx].base + _mem->region[idx].size);
+	return (_mem->region[idx].base + _mem->region[idx].size);
 #endif /* CONFIG_MSCHUNKS */
-	}
 
 	return 0;
 }

@@ -123,6 +123,7 @@ void __init htab_initialize(void)
 	unsigned long table, htab_size_bytes;
 	unsigned long pteg_count;
 	unsigned long mode_rw;
+	int i, use_largepages = 0;
 
 	/*
 	 * Calculate the required size of the htab.  We want the number of
@@ -165,18 +166,21 @@ void __init htab_initialize(void)
 
 	mode_rw = _PAGE_ACCESSED | _PAGE_COHERENT | PP_RWXX;
 
-	/* XXX we currently map kernel text rw, should fix this */
-	if ((cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
-	    && systemcfg->physicalMemorySize > 256*MB) {
-		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE + 256*MB, mode_rw, 0);
-		create_pte_mapping((unsigned long)KERNELBASE + 256*MB, 
-				   KERNELBASE + (systemcfg->physicalMemorySize), 
-				   mode_rw, 1);
-	} else {
-		create_pte_mapping((unsigned long)KERNELBASE, 
-				   KERNELBASE+(systemcfg->physicalMemorySize), 
-				   mode_rw, 0);
+	/* On U3 based machines, we need to reserve the DART area and
+	 * _NOT_ map it to avoid cache paradoxes as it's remapped non
+	 * cacheable later on
+	 */
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE)
+		use_largepages = 1;
+
+	/* add all physical memory to the bootmem map */
+	for (i=0; i < lmb.memory.cnt; i++) {
+		unsigned long base, size;
+
+		base = lmb.memory.region[i].physbase + KERNELBASE;
+		size = lmb.memory.region[i].size;
+
+		create_pte_mapping(base, base + size, mode_rw, use_largepages);
 	}
 }
 #undef KB

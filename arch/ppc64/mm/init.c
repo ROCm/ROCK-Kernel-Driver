@@ -91,6 +91,11 @@ unsigned long _ASR=0;
 /* max amount of RAM to use */
 unsigned long __max_memory;
 
+/* info on what we think the IO hole is */
+unsigned long 	io_hole_start;
+unsigned long	io_hole_size;
+unsigned long	top_of_ram;
+
 /* This is declared as we are using the more or less generic 
  * include/asm-ppc64/tlb.h file -- tgall
  */
@@ -647,8 +652,7 @@ void free_initrd_mem(unsigned long start, unsigned long end)
  */
 void __init mm_init_ppc64(void)
 {
-	struct paca_struct *lpaca;
-	unsigned long guard_page, index;
+	unsigned long i;
 
 	ppc64_boot_msg(0x100, "MM Init");
 
@@ -660,19 +664,62 @@ void __init mm_init_ppc64(void)
 	mmu_context_queue.head = 0;
 	mmu_context_queue.tail = NUM_USER_CONTEXT-1;
 	mmu_context_queue.size = NUM_USER_CONTEXT;
-	for(index=0; index < NUM_USER_CONTEXT ;index++) {
-		mmu_context_queue.elements[index] = index+FIRST_USER_CONTEXT;
-	}
+	for (i = 0; i < NUM_USER_CONTEXT; i++)
+		mmu_context_queue.elements[i] = i + FIRST_USER_CONTEXT;
 
-	/* Setup guard pages for the Paca's */
-	for (index = 0; index < NR_CPUS; index++) {
-		lpaca = &paca[index];
-		guard_page = ((unsigned long)lpaca) + 0x1000;
-		ppc_md.hpte_updateboltedpp(PP_RXRX, guard_page);
+	/* This is the story of the IO hole... please, keep seated,
+	 * unfortunately, we are out of oxygen masks at the moment.
+	 * So we need some rough way to tell where your big IO hole
+	 * is. On pmac, it's between 2G and 4G, on POWER3, it's around
+	 * that area as well, on POWER4 we don't have one, etc...
+	 * We need that to implement something approx. decent for
+	 * page_is_ram() so that /dev/mem doesn't map cacheable IO space
+	 * when XFree resquest some IO regions witout using O_SYNC, we
+	 * also need that as a "hint" when sizing the TCE table on POWER3
+	 * So far, the simplest way that seem work well enough for us it
+	 * to just assume that the first discontinuity in our physical
+	 * RAM layout is the IO hole. That may not be correct in the future
+	 * (and isn't on iSeries but then we don't care ;)
+	 */
+	top_of_ram = lmb_end_of_DRAM();
+
+#ifndef CONFIG_PPC_ISERIES
+	for (i = 1; i < lmb.memory.cnt; i++) {
+		unsigned long base, prevbase, prevsize;
+
+		prevbase = lmb.memory.region[i-1].physbase;
+		prevsize = lmb.memory.region[i-1].size;
+		base = lmb.memory.region[i].physbase;
+		if (base > (prevbase + prevsize)) {
+			io_hole_start = prevbase + prevsize;
+			io_hole_size = base  - (prevbase + prevsize);
+			break;
+		}
 	}
+#endif /* CONFIG_PPC_ISERIES */
+	if (io_hole_start)
+		printk("IO Hole assumed to be %lx -> %lx\n",
+		       io_hole_start, io_hole_start + io_hole_size - 1);
 
 	ppc64_boot_msg(0x100, "MM Init Done");
 }
+
+
+/*
+ * This is called by /dev/mem to know if a given address has to
+ * be mapped non-cacheable or not
+ */
+int page_is_ram(unsigned long physaddr)
+{
+#ifdef CONFIG_PPC_ISERIES
+	return 1;
+#endif
+	if (physaddr >= top_of_ram)
+		return 0;
+	return io_hole_start == 0 ||  physaddr < io_hole_start ||
+		physaddr >= (io_hole_start + io_hole_size);
+}
+
 
 /*
  * Initialize the bootmem system and give it all the memory we
@@ -698,7 +745,7 @@ void __init do_init_bootmem(void)
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 
-	/* add all physical memory to the bootmem map */
+	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
 
@@ -721,17 +768,28 @@ void __init do_init_bootmem(void)
  */
 void __init paging_init(void)
 {
-	unsigned long zones_size[MAX_NR_ZONES], i;
+	unsigned long zones_size[MAX_NR_ZONES];
+	unsigned long zholes_size[MAX_NR_ZONES];
+	unsigned long total_ram = lmb_phys_mem_size();
 
+	printk(KERN_INFO "Top of RAM: 0x%lx, Total RAM: 0x%lx\n",
+	       top_of_ram, total_ram);
+	printk(KERN_INFO "Memory hole size: %ldMB\n",
+	       (top_of_ram - total_ram) >> 20);
 	/*
 	 * All pages are DMA-able so we put them all in the DMA zone.
 	 */
-	zones_size[ZONE_DMA] = lmb_end_of_DRAM() >> PAGE_SHIFT;
-	for (i = 1; i < MAX_NR_ZONES; i++)
-		zones_size[i] = 0;
-	free_area_init(zones_size);
+	memset(zones_size, 0, sizeof(zones_size));
+	memset(zholes_size, 0, sizeof(zholes_size));
+
+	zones_size[ZONE_DMA] = top_of_ram >> PAGE_SHIFT;
+	zholes_size[ZONE_DMA] = (top_of_ram - total_ram) >> PAGE_SHIFT;
+
+	free_area_init_node(0, &contig_page_data, NULL, zones_size,
+			    __pa(PAGE_OFFSET) >> PAGE_SHIFT, zholes_size);
+	mem_map = contig_page_data.node_mem_map;
 }
-#endif
+#endif /* CONFIG_DISCONTIGMEM */
 
 static struct kcore_list kcore_vmem;
 
