@@ -8,24 +8,15 @@
  * published by the Free Software Foundation.
  */
 #include <linux/config.h>
-#include <linux/signal.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
-#include <linux/string.h>
-#include <linux/types.h>
 #include <linux/ptrace.h>
-#include <linux/mman.h>
-#include <linux/mm.h>
 #include <linux/swap.h>
-#include <linux/smp.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
 #include <linux/initrd.h>
 
-#include <asm/segment.h>
 #include <asm/mach-types.h>
-#include <asm/pgalloc.h>
-#include <asm/dma.h>
 #include <asm/hardware.h>
 #include <asm/setup.h>
 #include <asm/tlb.h>

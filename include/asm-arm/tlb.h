@@ -17,8 +17,9 @@
 #ifndef __ASMARM_TLB_H
 #define __ASMARM_TLB_H
 
-#include <asm/tlbflush.h>
 #include <asm/cacheflush.h>
+#include <asm/tlbflush.h>
+#include <asm/pgalloc.h>
 
 /*
  * TLB handling.  This allows us to remove pages from the page

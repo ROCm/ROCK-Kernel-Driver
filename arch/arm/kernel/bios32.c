@@ -12,9 +12,7 @@
 #include <linux/slab.h>
 #include <linux/init.h>
 
-#include <asm/bug.h>
 #include <asm/io.h>
-#include <asm/irq.h>
 #include <asm/mach-types.h>
 #include <asm/mach/pci.h>
 
