@@ -1,7 +1,7 @@
 /*
  *   fs/cifs/cifsencrypt.c
  *
- *   Copyright (c) International Business Machines  Corp., 2003
+ *   Copyright (C) International Business Machines  Corp., 2003
  *   Author(s): Steve French (sfrench@us.ibm.com)
  *
  *   This library is free software; you can redistribute it and/or modify
@@ -64,13 +64,13 @@ int cifs_sign_smb(struct smb_hdr * cifs_pdu, struct cifsSesInfo * ses,
 	if((le32_to_cpu(cifs_pdu->Flags2) & SMBFLG2_SECURITY_SIGNATURE) == 0) 
 		return rc;
 
-	write_lock(&GlobalMid_Lock);
+	spin_lock(&GlobalMid_Lock);
 	cifs_pdu->Signature.Sequence.SequenceNumber = cpu_to_le32(ses->sequence_number);
 	cifs_pdu->Signature.Sequence.Reserved = 0;
 	
 	*pexpected_response_sequence_number = ses->sequence_number++;
 	ses->sequence_number++;
-	write_unlock(&GlobalMid_Lock);
+	spin_unlock(&GlobalMid_Lock);
 
 	rc = cifs_calculate_signature(cifs_pdu, ses->mac_signing_key,smb_signature);
 	if(rc)
