@@ -45,23 +45,23 @@ static struct fb_info fb_info;
 static struct display disp;
 
 static struct fb_var_screeninfo maxinefb_defined = {
-	xres:		1024,
-	yres:		768,
-	xres_virtual:	1024,
-	yres_virtual:	768,
-	bits_per_pixel:	8,
-	activate:	FB_ACTIVATE_NOW,
-	height:		-1,
-	width:		-1,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.xres =		1024,
+	.yres =		768,
+	.xres_virtual =	1024,
+	.yres_virtual =	768,
+	.bits_per_pixel =8,
+	.activate =	FB_ACTIVATE_NOW,
+	.height =	-1,
+	.width =	-1,
+	.vmode =	FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo maxinefb_fix = {
-	id:		"Maxine onboard graphics 1024x768x8",
-	smem_len:	(1024*768),
-	type:		FB_TYPE_PACKED_PIXELS,
-	visual:		FB_VISUAL_PSEUDOCOLOR,
-	line_length:	1024,
+	.id =		"Maxine onboard graphics 1024x768x8",
+	.smem_len =	(1024*768),
+	.type =		FB_TYPE_PACKED_PIXELS,
+	.visual =	FB_VISUAL_PSEUDOCOLOR,
+	.line_length =	1024,
 }
 
 /* Reference to machine type set in arch/mips/dec/prom/identify.c, KM */
@@ -111,16 +111,14 @@ static int maxinefb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 static struct fb_ops maxinefb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	maxinefb_setcolreg,	
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,		
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= maxinefb_setcolreg,	
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,		
 };
 
 int __init maxinefb_init(void)

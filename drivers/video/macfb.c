@@ -148,21 +148,21 @@ struct jet_cmap_regs {
 static int  video_slot = 0;
 
 static struct fb_var_screeninfo macfb_defined = {
-	bits_per_pixel:	8,	
-	activae:	FB_ACTIVATE_NOW,
-	width:		-1,
-	height:		-1,
-	right_margin:	32,
-	upper_margin:	16,
-	lower_margin:	4,
-	vsync_len:	4,
-	vmode:		FB_VMODE_NONINTERLACED,
+	.bits_per_pixel	= 8,	
+	.activae	= FB_ACTIVATE_NOW,
+	.width		= -1,
+	.height		= -1,
+	.right_margin	= 32,
+	.upper_margin	= 16,
+	.lower_margin	= 4,
+	.vsync_len	= 4,
+	.vmode		= FB_VMODE_NONINTERLACED,
 };
 
 static struct fb_fix_screeninfo vesafb_fix = {
-	id:	"Macintosh ",
-	type:	FB_TYPE_PACKED_PIXELS,
-	accel:	FB_ACCEL_NONE,
+	.id	= "Macintosh ",
+	.type	= FB_TYPE_PACKED_PIXELS,
+	.accel	= FB_ACCEL_NONE,
 };
 
 static struct display disp;
@@ -591,16 +591,14 @@ static int macfb_setcolreg(unsigned regno, unsigned red, unsigned green,
 }
 
 static struct fb_ops macfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	gen_set_var,
-	fb_get_cmap:	gen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	macfb_setcolreg,
-	fb_fillrect:	cfb_fillrect,
-	fb_copyarea:	cfb_copyarea,
-	fb_imageblit:	cfb_imageblit,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= gen_set_var,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= macfb_setcolreg,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
 void __init macfb_setup(char *options, int *ints)

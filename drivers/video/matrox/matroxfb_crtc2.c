@@ -619,18 +619,18 @@ static int matroxfb_dh_blank(int blank, struct fb_info* info) {
 }
 
 static struct fb_ops matroxfb_dh_ops = {
-	owner:		THIS_MODULE,
-	fb_open:	matroxfb_dh_open,
-	fb_release:	matroxfb_dh_release,
-	fb_get_fix:	matroxfb_dh_get_fix,
-	fb_get_var:	matroxfb_dh_get_var,
-	fb_set_var:	matroxfb_dh_set_var,
-	fb_get_cmap:	matroxfb_dh_get_cmap,
-	fb_set_cmap:	matroxfb_dh_set_cmap,
-	fb_setcolreg:	matroxfb_dh_setcolreg,
-	fb_pan_display:	matroxfb_dh_pan_display,
-	fb_blank:	matroxfb_dh_blank,
-	fb_ioctl:	matroxfb_dh_ioctl,
+	.owner =	THIS_MODULE,
+	.fb_open =	matroxfb_dh_open,
+	.fb_release =	matroxfb_dh_release,
+	.fb_get_fix =	matroxfb_dh_get_fix,
+	.fb_get_var =	matroxfb_dh_get_var,
+	.fb_set_var =	matroxfb_dh_set_var,
+	.fb_get_cmap =	matroxfb_dh_get_cmap,
+	.fb_set_cmap =	matroxfb_dh_set_cmap,
+	.fb_setcolreg =	matroxfb_dh_setcolreg,
+	.fb_pan_display =matroxfb_dh_pan_display,
+	.fb_blank =	matroxfb_dh_blank,
+	.fb_ioctl =	matroxfb_dh_ioctl,
 };
 
 static int matroxfb_dh_switch(int con, struct fb_info* info) {
@@ -826,9 +826,9 @@ static void matroxfb_crtc2_remove(struct matrox_fb_info* minfo, void* crtc2) {
 }
 
 static struct matroxfb_driver crtc2 = {
-		name:	"Matrox G400 CRTC2",
-		probe:	matroxfb_crtc2_probe,
-		remove:	matroxfb_crtc2_remove };
+		.name =		"Matrox G400 CRTC2",
+		.probe =	matroxfb_crtc2_probe,
+		.remove =	matroxfb_crtc2_remove };
 
 static int matroxfb_crtc2_init(void) {
 	matroxfb_register_driver(&crtc2);

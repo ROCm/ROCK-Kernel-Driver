@@ -182,9 +182,9 @@ static struct sti_conf_flags default_conf_flags = {
 static void sti_inq_conf(struct sti_struct *sti)
 {
 	struct sti_conf_inptr inptr = { NULL };
-	struct sti_conf_outptr_ext outptr_ext = { future_ptr: NULL };
+	struct sti_conf_outptr_ext outptr_ext = { .future_ptr = NULL };
 	struct sti_conf_outptr outptr = {
-		ext_ptr: STI_PTR(&outptr_ext)
+		.ext_ptr = STI_PTR(&outptr_ext)
 	};
 	unsigned long flags;
 	s32 ret;
@@ -415,22 +415,22 @@ static u8 sticon_build_attr(struct vc_data *conp, u8 color, u8 intens, u8 blink,
 }
 
 static struct consw sti_con = {
-	con_startup: 		sticon_startup, 
-	con_init: 		sticon_init,
-	con_deinit: 		sticon_deinit,
-	con_clear: 		sticon_clear,
-	con_putc: 		sticon_putc,
-	con_putcs: 		sticon_putcs,
-	con_cursor: 		sticon_cursor,
-	con_scroll: 		sticon_scroll,
-	con_bmove: 		sticon_bmove,
-	con_switch: 		sticon_switch,
-	con_blank: 		sticon_blank,
-	con_font_op:		sticon_font_op,
-	con_set_palette:	sticon_set_palette,
-	con_scrolldelta:	sticon_scrolldelta,
-	con_set_origin: 	sticon_set_origin,
-	con_build_attr:		sticon_build_attr,
+	.con_startup = 		sticon_startup, 
+	.con_init = 		sticon_init,
+	.con_deinit = 		sticon_deinit,
+	.con_clear = 		sticon_clear,
+	.con_putc = 		sticon_putc,
+	.con_putcs = 		sticon_putcs,
+	.con_cursor = 		sticon_cursor,
+	.con_scroll = 		sticon_scroll,
+	.con_bmove = 		sticon_bmove,
+	.con_switch = 		sticon_switch,
+	.con_blank = 		sticon_blank,
+	.con_font_op =		sticon_font_op,
+	.con_set_palette =	sticon_set_palette,
+	.con_scrolldelta =	sticon_scrolldelta,
+	.con_set_origin = 	sticon_set_origin,
+	.con_build_attr =	sticon_build_attr,
 };
 
 #include <asm/pgalloc.h>	/* need cache flush routines */
