@@ -2049,6 +2049,7 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 		   SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb));
      if (!bhjh) {
 	 printk("sh-459: unable to read  journal header\n") ;
+	 release_journal_dev(p_s_sb, journal);
 	 return 1 ;
      }
      jh = (struct reiserfs_journal_header *)(bhjh->b_data);
@@ -2065,7 +2066,8 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
 		jh->jh_journal.jp_journal_magic, jname,
 		sb_jp_journal_magic(rs), fname);
 	 brelse (bhjh);
-    return 1 ;
+	 release_journal_dev(p_s_sb, journal);
+	 return 1 ;
   }
      
   SB_JOURNAL_TRANS_MAX(p_s_sb)      = le32_to_cpu (jh->jh_journal.jp_journal_trans_max);
@@ -2165,11 +2167,13 @@ int journal_init(struct super_block *p_s_sb, const char * j_dev_name, int old_fo
   SB_JOURNAL_LIST(p_s_sb)[0].j_list_bitmap = get_list_bitmap(p_s_sb, SB_JOURNAL_LIST(p_s_sb)) ;
   if (!(SB_JOURNAL_LIST(p_s_sb)[0].j_list_bitmap)) {
     reiserfs_warning("journal-2005, get_list_bitmap failed for journal list 0\n") ;
+    release_journal_dev(p_s_sb, journal);
     return 1 ;
   }
   if (journal_read(p_s_sb) < 0) {
     reiserfs_warning("Replay Failure, unable to mount\n") ;
     free_journal_ram(p_s_sb) ;
+    release_journal_dev(p_s_sb, journal);
     return 1 ;
   }
   SB_JOURNAL_LIST_INDEX(p_s_sb) = 0 ; /* once the read is done, we can set this
