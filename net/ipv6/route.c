@@ -131,14 +131,9 @@ rwlock_t rt6_lock = RW_LOCK_UNLOCKED;
 
 
 /* allocate dst with ip6_dst_ops */
-static __inline__ struct rt6_info *__ip6_dst_alloc(void)
+static __inline__ struct rt6_info *ip6_dst_alloc(void)
 {
 	return dst_alloc(&ip6_dst_ops);
-}
-
-struct rt6_info *ip6_dst_alloc(void)
-{
-	return __ip6_dst_alloc();
 }
 
 /*
@@ -560,6 +555,60 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 	}
 }
 
+/* Protected by rt6_lock.  */
+static struct dst_entry *ndisc_dst_gc_list;
+
+struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
+				  struct neighbour *neigh,
+				  int (*output)(struct sk_buff *))
+{
+	struct rt6_info *rt = ip6_dst_alloc();
+
+	if (unlikely(rt == NULL))
+		goto out;
+
+	rt->rt6i_dev	  = dev;
+	rt->rt6i_nexthop  = neigh;
+	rt->rt6i_expires  = 0;
+	rt->rt6i_flags    = RTF_LOCAL;
+	rt->rt6i_metric   = 0;
+	atomic_set(&rt->u.dst.__refcnt, 1);
+	rt->u.dst.metrics[RTAX_HOPLIMIT-1] = 255;
+	rt->u.dst.output  = output;
+
+	write_lock_bh(&rt6_lock);
+	rt->u.dst.next = ndisc_dst_gc_list;
+	ndisc_dst_gc_list = &rt->u.dst;
+	write_unlock_bh(&rt6_lock);
+
+	fib6_force_start_gc();
+
+out:
+	return (struct dst_entry *)rt;
+}
+
+int ndisc_dst_gc(int *more)
+{
+	struct dst_entry *dst, *next, **pprev;
+	int freed;
+
+	next = NULL;
+	pprev = &ndisc_dst_gc_list;
+	freed = 0;
+	while ((dst = *pprev) != NULL) {
+		if (!atomic_read(&dst->__refcnt)) {
+			*pprev = dst->next;
+			dst_free(dst);
+			freed++;
+		} else {
+			pprev = &dst->next;
+			(*more)++;
+		}
+	}
+
+	return freed;
+}
+
 static int ip6_dst_gc(void)
 {
 	static unsigned expire = 30*HZ;
@@ -655,7 +704,7 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	if (rtmsg->rtmsg_metric == 0)
 		rtmsg->rtmsg_metric = IP6_RT_PRIO_USER;
 
-	rt = __ip6_dst_alloc();
+	rt = ip6_dst_alloc();
 
 	if (rt == NULL)
 		return -ENOMEM;
@@ -1066,7 +1115,7 @@ out:
 
 static struct rt6_info * ip6_rt_copy(struct rt6_info *ort)
 {
-	struct rt6_info *rt = __ip6_dst_alloc();
+	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt) {
 		rt->u.dst.input = ort->u.dst.input;
@@ -1209,7 +1258,7 @@ int ip6_pkt_discard(struct sk_buff *skb)
 
 int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 {
-	struct rt6_info *rt = __ip6_dst_alloc();
+	struct rt6_info *rt = ip6_dst_alloc();
 
 	if (rt == NULL)
 		return -ENOMEM;
