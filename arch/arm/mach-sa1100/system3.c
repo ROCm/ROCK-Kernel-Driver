@@ -373,6 +373,36 @@ static void system3_backlight_power(int on)
 	}
 }
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= PT_SA1111_BASE,
+		.end		= PT_SA1111_BASE + 0x00001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= IRQ_SYSTEM3_SA1111,
+		.end		= IRQ_SYSTEM3_SA1111,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask,
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 static int __init system3_init(void)
 {
 	int ret = 0;
@@ -405,7 +435,7 @@ static int __init system3_init(void)
 	/*
 	 * Probe for a SA1111.
 	 */
-	ret = sa1111_init(PT_SA1111_BASE, IRQ_SYSTEM3_SA1111);
+	ret = platform_add_devices(devices, ARRAY_SIZE(devices));
 	if (ret < 0) {
 		printk( KERN_WARNING"PT Digital Board: no SA1111 found!\n" );
 		goto DONE;

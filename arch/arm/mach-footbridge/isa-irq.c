@@ -84,10 +84,6 @@ static struct irqchip isa_hi_chip = {
 	.unmask = isa_unmask_pic_hi_irq,
 };
 
-static void no_action(int irq, void *dev_id, struct pt_regs *regs)
-{
-}
-
 static void
 isa_irq_handler(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 {
