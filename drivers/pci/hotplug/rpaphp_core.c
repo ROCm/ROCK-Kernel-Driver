@@ -231,24 +231,24 @@ static int is_php_dn(struct device_node *dn, int **indexes, int **names, int **t
 {
 	*indexes = (int *) get_property(dn, "ibm,drc-indexes", NULL);
 	if (!*indexes)
-		return (0);
+		return 0;
 	/* &names[1] contains NULL terminated slot names */
 	*names = (int *) get_property(dn, "ibm,drc-names", NULL);
 	if (!*names)
-		return (0);
+		return 0;
 	/* &types[1] contains NULL terminated slot types */
 	*types = (int *) get_property(dn, "ibm,drc-types", NULL);
 	if (!*types)
-		return (0);
+		return 0;
 	/* power_domains[1...n] are the slot power domains */
 	*power_domains = (int *) get_property(dn,
 					      "ibm,drc-power-domains", NULL);
 	if (!*power_domains)
-		return (0);
+		return 0;
 	if (strcmp(dn->name, "pci") == 0 &&
-	    !get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL))
-		return (0);
-	return (1);
+			!get_property(dn, "ibm,fw-pci-hot-plug-ctrl", NULL))
+		return 0;
+	return 1;
 }
 
 static inline int is_vdevice_root(struct device_node *dn)
@@ -256,10 +256,10 @@ static inline int is_vdevice_root(struct device_node *dn)
 	return !strcmp(dn->name, "vdevice");
 }
 
-/*************************************
- * Add  Hot Plug slot(s) to sysfs
+/**
+ * rpaphp_add_slot: Add  Hot Plug slot(s) to sysfs
  *
- ************************************/
+ */
 int rpaphp_add_slot(struct device_node *dn)
 {
 	struct slot *slot;
@@ -283,8 +283,9 @@ int rpaphp_add_slot(struct device_node *dn)
 		name = (char *) &names[1];
 		type = (char *) &types[1];
 		for (i = 0; i < indexes[0];
-		     i++,
-		     name += (strlen(name) + 1), type += (strlen(type) + 1)) {
+					i++,
+					name += (strlen(name) + 1),
+					type += (strlen(type) + 1)) {
 			if (!(slot = alloc_slot_struct(dn, indexes[i + 1], name,
 						       power_domains[i + 1]))) {
 				retval = -ENOMEM;
@@ -297,7 +298,7 @@ int rpaphp_add_slot(struct device_node *dn)
 
 		}		/* for indexes */
 	}			/* end of PCI device_node */
-      exit:
+exit:
 	dbg("%s - Exit: num_slots=%d rc[%d]\n",
 	    __FUNCTION__, num_slots, retval);
 	return retval;
