@@ -188,7 +188,72 @@ MODULE_PARM(drive2, "1-8i");
 MODULE_PARM(drive3, "1-8i");
 
 #include "paride.h"
-#include "pseudo.h"
+
+#include <linux/sched.h>
+#include <linux/workqueue.h>
+
+static void ps_tq_int( void *data);
+
+static void (* ps_continuation)(void);
+static int (* ps_ready)(void);
+static unsigned long ps_timeout;
+static int ps_tq_active = 0;
+static int ps_nice = 0;
+
+static spinlock_t ps_spinlock __attribute__((unused)) = SPIN_LOCK_UNLOCKED;
+
+static DECLARE_WORK(ps_tq, ps_tq_int, NULL);
+
+static void ps_set_intr(void (*continuation)(void), 
+			int (*ready)(void),
+			int timeout, int nice)
+{
+	unsigned long	flags;
+
+	spin_lock_irqsave(&ps_spinlock,flags);
+
+	ps_continuation = continuation;
+	ps_ready = ready;
+	ps_timeout = jiffies + timeout;
+	ps_nice = nice;
+
+	if (!ps_tq_active) {
+		ps_tq_active = 1;
+		if (!ps_nice)
+			schedule_work(&ps_tq);
+		else
+			schedule_delayed_work(&ps_tq, ps_nice-1);
+	}
+	spin_unlock_irqrestore(&ps_spinlock,flags);
+}
+
+static void ps_tq_int(void *data)
+{
+	void (*con)(void);
+	unsigned long flags;
+
+	spin_lock_irqsave(&ps_spinlock,flags);
+
+	con = ps_continuation;
+	ps_tq_active = 0;
+
+	if (!con) {
+		spin_unlock_irqrestore(&ps_spinlock,flags);
+		return;
+	}
+	if (!ps_ready || ps_ready() || time_after_eq(jiffies, ps_timeout)) {
+		ps_continuation = NULL;
+		spin_unlock_irqrestore(&ps_spinlock,flags);
+		con();
+		return;
+	}
+	ps_tq_active = 1;
+	if (!ps_nice)
+		schedule_work(&ps_tq);
+	else
+		schedule_delayed_work(&ps_tq, ps_nice-1);
+	spin_unlock_irqrestore(&ps_spinlock,flags);
+}
 
 #define PD_BITS    4
 
@@ -721,10 +786,8 @@ static int pd_ready(void)
 	return !(status_reg(pd_current) & STAT_BUSY);
 }
 
-static void do_pd_request(request_queue_t * q)
+static void do_pd_request1(request_queue_t * q)
 {
-	if (pd_busy)
-		return;
 repeat:
 	pd_req = elv_next_request(q);
 	if (!pd_req)
@@ -755,6 +818,13 @@ repeat:
 	}
 }
 
+static void do_pd_request(request_queue_t * q)
+{
+	if (pd_busy)
+		return;
+	do_pd_request1(q);
+}
+
 static int pd_next_buf(void)
 {
 	unsigned long saved_flags;
@@ -782,7 +852,7 @@ static inline void next_request(int success)
 	spin_lock_irqsave(&pd_lock, saved_flags);
 	end_request(pd_req, success);
 	pd_busy = 0;
-	do_pd_request(pd_queue);
+	do_pd_request1(pd_queue);
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 }
 
