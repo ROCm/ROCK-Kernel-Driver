@@ -572,8 +572,8 @@ static void free_entropy_store(struct entropy_store *r)
  * it's cheap to do so and helps slightly in the expected case where
  * the entropy is concentrated in the low-order bits.
  */
-static void add_entropy_words(struct entropy_store *r, const __u32 *in,
-			      int nwords)
+static void __add_entropy_words(struct entropy_store *r, const __u32 *in,
+				int nwords, __u32 out[16])
 {
 	static __u32 const twist_table[8] = {
 		         0, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
@@ -626,8 +626,22 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 	r->input_rotate = input_rotate;
 	r->add_ptr = add_ptr;
 
+	if (out) {
+		for (i = 0; i < 16; i++) {
+			out[i] = r->pool[add_ptr];
+			add_ptr = (add_ptr - 1) & wordmask;
+		}
+	}
+
 	spin_unlock_irqrestore(&r->lock, flags);
 }
+
+static inline void add_entropy_words(struct entropy_store *r, const __u32 *in,
+				     int nwords)
+{
+	__add_entropy_words(r, in, nwords, NULL);
+}
+
 
 /*
  * Credit (or debit) the entropy store with n bits of entropy
@@ -1342,7 +1356,7 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 			       size_t nbytes, int flags)
 {
 	ssize_t ret, i;
-	__u32 tmp[TMP_BUF_SIZE];
+	__u32 tmp[TMP_BUF_SIZE], data[16];
 	__u32 x;
 	unsigned long cpuflags;
 
@@ -1422,7 +1436,15 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
 			HASH_TRANSFORM(tmp, r->pool+i);
 			add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1);
 		}
-		
+
+		/*
+		 * To avoid duplicates, we atomically extract a
+		 * portion of the pool while mixing, and hash one
+		 * final time.
+		 */
+		__add_entropy_words(r, &tmp[x%HASH_BUFFER_SIZE], 1, data);
+		HASH_TRANSFORM(tmp, data);
+
 		/*
 		 * In case the hash function has some recognizable
 		 * output pattern, we fold it in half.
