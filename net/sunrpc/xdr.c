@@ -303,7 +303,7 @@ void xdr_kunmap(struct xdr_buf *xdr, size_t base)
 	}
 }
 
-void
+int
 xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 			  skb_reader_t *desc,
 			  skb_read_actor_t copy_actor)
@@ -317,7 +317,7 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 		len -= base;
 		ret = copy_actor(desc, (char *)xdr->head[0].iov_base + base, len);
 		if (ret != len || !desc->count)
-			return;
+			return 0;
 		base = 0;
 	} else
 		base -= len;
@@ -337,6 +337,13 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 	do {
 		char *kaddr;
 
+		/* ACL likes to be lazy in allocating pages - ACLs
+		 * are small by default but can get huge. */
+		if (unlikely(*ppage == NULL)) {
+			if (!(*ppage = alloc_page(GFP_ATOMIC)))
+				return -ENOMEM;
+		}
+
 		len = PAGE_CACHE_SIZE;
 		kaddr = kmap_atomic(*ppage, KM_SKB_SUNRPC_DATA);
 		if (base) {
@@ -353,13 +360,15 @@ xdr_partial_copy_from_skb(struct xdr_buf *xdr, unsigned int base,
 		flush_dcache_page(*ppage);
 		kunmap_atomic(kaddr, KM_SKB_SUNRPC_DATA);
 		if (ret != len || !desc->count)
-			return;
+			return 0;
 		ppage++;
 	} while ((pglen -= len) != 0);
 copy_tail:
 	len = xdr->tail[0].iov_len;
 	if (base < len)
 		copy_actor(desc, (char *)xdr->tail[0].iov_base + base, len - base);
+
+	return 0;
 }
 
 
@@ -1037,4 +1046,245 @@ xdr_buf_read_netobj(struct xdr_buf *buf, struct xdr_netobj *obj, int offset)
 	return 0;
 out:
 	return -1;
+}
+
+int
+xdr_encode_word(struct xdr_buf *buf, unsigned int base, u32 w)
+{
+	if (base < buf->head->iov_len) {
+		((u32 *) buf->head->iov_base)[base >> 2] = htonl(w);
+		return 0;
+	}
+	base -= buf->head->iov_len;
+	if (base < buf->page_len) {
+		base += buf->page_base;
+		struct page **ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
+		u32 *p = (u32 *) kmap(*ppages) +
+			 ((base & ~PAGE_CACHE_MASK) >> 2);
+		*p = htonl(w);
+		kunmap(*ppages);
+		return 0;
+	}
+	base -= buf->page_len;
+	if (base < buf->tail->iov_len) {
+		((u32 *) buf->tail->iov_base)[base >> 2] = htonl(w);
+		return 0;
+	}
+	return -EINVAL;
+}
+
+int
+xdr_decode_word(struct xdr_buf *buf, unsigned int base, u32 *w)
+{
+	if (base < buf->head->iov_len) {
+		*w = ntohl(((u32 *) buf->head->iov_base)[base >> 2]);
+		return 0;
+	}
+	base -= buf->head->iov_len;
+	if (base < buf->page_len) {
+		base += buf->page_base;
+		struct page **ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
+		u32 *p = (u32 *) kmap(*ppages) +
+			 ((base & ~PAGE_CACHE_MASK) >> 2);
+		*w = ntohl(*p);
+		kunmap(*ppages);
+		return 0;
+	}
+	base -= buf->page_len;
+	if (base < buf->tail->iov_len) {
+		*w = ntohl(((u32 *) buf->tail->iov_base)[base >> 2]);
+		return 0;
+	}
+	return -EINVAL;
+}
+
+/* Returns 0 on success, or else a negative error code. */
+static int
+xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
+		 struct xdr_array2_desc *desc, int encode)
+{
+	char elem[desc->elem_size], *c;
+	unsigned int copied = 0, todo, avail_here;
+	struct page **ppages = NULL;
+	int err = 0;
+
+	if (encode) {
+		if (xdr_encode_word(buf, base, desc->array_len) != 0)
+			return -EINVAL;
+	} else {
+		if (xdr_decode_word(buf, base, &desc->array_len) != 0 ||
+		    (unsigned long) base + 4 + desc->array_len *
+				    desc->elem_size > buf->len)
+			return -EINVAL;
+	}
+	base += 4;
+
+	if (!desc->xcode)
+		return 0;
+
+	todo = desc->array_len * desc->elem_size;
+	
+	/* process head */
+	if (todo && base < buf->head->iov_len) {
+		c = buf->head->iov_base + base;
+		avail_here = min_t(unsigned int, todo,
+				   buf->head->iov_len - base);
+		todo -= avail_here;
+
+		while (avail_here >= desc->elem_size) {
+			err = desc->xcode(desc, c);
+			if (err)
+				goto out;
+			c += desc->elem_size;
+			avail_here -= desc->elem_size;
+		}
+		if (avail_here) {
+			if (encode) {
+				err = desc->xcode(desc, elem);
+				if (err)
+					goto out;
+				memcpy(c, elem, avail_here);
+			} else
+				memcpy(elem, c, avail_here);
+			copied = avail_here;
+		}
+		base = buf->head->iov_len;  /* align to start of pages */
+	}
+
+	/* process pages array */
+	base -= buf->head->iov_len;
+	if (todo && base < buf->page_len) {
+		avail_here = min(todo, buf->page_len - base);
+		todo -= avail_here;
+
+		base += buf->page_base;
+		ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
+		base &= ~PAGE_CACHE_MASK;
+		unsigned int avail_page = min_t(unsigned int,
+			PAGE_CACHE_SIZE - base, avail_here);
+		c = kmap(*ppages) + base;
+
+		while (avail_here) {
+			avail_here -= avail_page;
+			if (copied || avail_page < desc->elem_size) {
+				unsigned int l = min(avail_page,
+					desc->elem_size - copied);
+				if (encode) {
+					if (!copied) {
+						err = desc->xcode(desc, elem);
+						if (err)
+							goto out;
+					}
+					memcpy(c, elem + copied, l);
+					copied += l;
+					if (copied == desc->elem_size)
+						copied = 0;
+				} else {
+					memcpy(elem + copied, c, l);
+					copied += l;
+					if (copied == desc->elem_size) {
+						err = desc->xcode(desc, elem);
+						if (err)
+							goto out;
+						copied = 0;
+					}
+				}
+				avail_page -= l;
+				c += l;
+			}
+			while (avail_page >= desc->elem_size) {
+				err = desc->xcode(desc, c);
+				if (err)
+					goto out;
+				c += desc->elem_size;
+				avail_page -= desc->elem_size;
+			}
+			if (avail_page) {
+				unsigned int l = min(avail_page,
+					    desc->elem_size - copied);
+				if (encode) {
+					if (!copied) {
+						err = desc->xcode(desc, elem);
+						if (err)
+							goto out;
+					}
+					memcpy(c, elem + copied, l);
+					copied += l;
+					if (copied == desc->elem_size)
+						copied = 0;
+				} else {
+					memcpy(elem + copied, c, l);
+					copied += l;
+					if (copied == desc->elem_size) {
+						err = desc->xcode(desc, elem);
+						if (err)
+							goto out;
+						copied = 0;
+					}
+				}
+			}
+			if (avail_here) {
+				kunmap(*ppages);
+				ppages++;
+				c = kmap(*ppages);
+			}
+
+			avail_page = min(avail_here,
+				 (unsigned int) PAGE_CACHE_SIZE);
+		}
+		base = buf->page_len;  /* align to start of tail */
+	}
+
+	/* process tail */
+	base -= buf->page_len;
+	if (todo) {
+		c = buf->tail->iov_base + base;
+		if (copied) {
+			unsigned int l = desc->elem_size - copied;
+
+			if (encode)
+				memcpy(c, elem + copied, l);
+			else {
+				memcpy(elem + copied, c, l);
+				err = desc->xcode(desc, elem);
+				if (err)
+					goto out;
+			}
+			todo -= l;
+			c += l;
+		}
+		while (todo) {
+			err = desc->xcode(desc, c);
+			if (err)
+				goto out;
+			c += desc->elem_size;
+			todo -= desc->elem_size;
+		}
+	}
+	
+out:
+	if (ppages)
+		kunmap(*ppages);
+	return err;
+}
+
+int
+xdr_decode_array2(struct xdr_buf *buf, unsigned int base,
+		  struct xdr_array2_desc *desc)
+{
+	if (base >= buf->len)
+		return -EINVAL;
+
+	return xdr_xcode_array2(buf, base, desc, 0);
+}
+
+int
+xdr_encode_array2(struct xdr_buf *buf, unsigned int base,
+		  struct xdr_array2_desc *desc)
+{
+	if ((unsigned long) base + 4 + desc->array_len * desc->elem_size >
+	    buf->head->iov_len + buf->page_len + buf->tail->iov_len)
+		return -EINVAL;
+
+	return xdr_xcode_array2(buf, base, desc, 1);
 }

@@ -21,6 +21,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs3.h>
 #include <linux/nfs_fs.h>
+#include <linux/nfsacl.h>
 
 #define NFSDBG_FACILITY		NFSDBG_XDR
 
@@ -62,6 +63,8 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_linkargs_sz		(NFS3_fh_sz+NFS3_diropargs_sz)
 #define NFS3_readdirargs_sz	(NFS3_fh_sz+2)
 #define NFS3_commitargs_sz	(NFS3_fh_sz+3)
+#define NFS3_getaclargs_sz	(NFS3_fh_sz+1)
+#define NFS3_setaclargs_sz	(NFS3_fh_sz+1+2*(2+5*3))
 
 #define NFS3_attrstat_sz	(1+NFS3_fattr_sz)
 #define NFS3_wccstat_sz		(1+NFS3_wcc_data_sz)
@@ -78,6 +81,8 @@ extern int			nfs_stat_to_errno(int);
 #define NFS3_fsinfores_sz	(1+NFS3_post_op_attr_sz+12)
 #define NFS3_pathconfres_sz	(1+NFS3_post_op_attr_sz+6)
 #define NFS3_commitres_sz	(1+NFS3_wcc_data_sz+2)
+#define NFS3_getaclres_sz	(1+NFS3_post_op_attr_sz+1+2*(2+5*3))
+#define NFS3_setaclres_sz	(1+NFS3_post_op_attr_sz)
 
 /*
  * Map file type to S_IFMT bits
@@ -631,6 +636,76 @@ nfs3_xdr_commitargs(struct rpc_rqst *req, u32 *p, struct nfs_writeargs *args)
 	return 0;
 }
 
+#ifdef CONFIG_NFS_ACL
+/*
+ * Encode GETACL arguments
+ */
+static int
+nfs3_xdr_getaclargs(struct rpc_rqst *req, u32 *p,
+		    struct nfs3_getaclargs *args)
+{
+	struct rpc_auth *auth = req->rq_task->tk_auth;
+	unsigned int replen;
+
+	p = xdr_encode_fhandle(p, args->fh);
+	*p++ = htonl(args->mask);
+	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
+
+	if (args->mask & (NFS3_ACL | NFS3_DFACL)) {
+		/* Inline the page array */
+		replen = (RPC_REPHDRSIZE + auth->au_rslack +
+			  NFS3_getaclres_sz) << 2;
+		xdr_inline_pages(&req->rq_rcv_buf, replen, args->pages, 0,
+				 NFSACL_MAXPAGES << PAGE_SHIFT);
+	}
+	return 0;
+}
+#endif  /* CONFIG_NFS_ACL */
+
+#ifdef CONFIG_NFS_ACL
+/*
+ * Encode SETACL arguments
+ */
+static int
+nfs3_xdr_setaclargs(struct rpc_rqst *req, u32 *p,
+                   struct nfs3_setaclargs *args)
+{
+	struct xdr_buf *buf = &req->rq_snd_buf;
+	unsigned int base, len_in_head, len = nfsacl_size(
+		(args->mask & NFS3_ACL)   ? args->acl_access  : NULL,
+		(args->mask & NFS3_DFACL) ? args->acl_default : NULL);
+	int count, err;
+
+	p = xdr_encode_fhandle(p, NFS_FH(args->inode));
+	*p++ = htonl(args->mask);
+	base = (char *)p - (char *)buf->head->iov_base;
+	/* put as much of the acls into head as possible. */
+	len_in_head = min_t(unsigned int, buf->head->iov_len - base, len);
+	len -= len_in_head;
+	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p + len_in_head);
+
+	for (count = 0; (count << PAGE_SHIFT) < len; count++) {
+		args->pages[count] = alloc_page(GFP_KERNEL);
+		if (!args->pages[count]) {
+			while (count)
+				__free_page(args->pages[--count]);
+			return -ENOMEM;
+		}
+	}
+	xdr_encode_pages(buf, args->pages, 0, len);
+
+	err = nfsacl_encode(buf, base, args->inode,
+			    (args->mask & NFS3_ACL) ?
+			    args->acl_access : NULL, 1, 0);
+	if (err > 0)
+		err = nfsacl_encode(buf, base + err, args->inode,
+				    (args->mask & NFS3_DFACL) ?
+				    args->acl_default : NULL, 1,
+				    NFS3_ACL_DEFAULT);
+	return (err > 0) ? 0 : err;
+}
+#endif  /* CONFIG_NFS_ACL */
+
 /*
  * NFS XDR decode functions
  */
@@ -976,6 +1051,56 @@ nfs3_xdr_commitres(struct rpc_rqst *req, u32 *p, struct nfs_writeres *res)
 	return 0;
 }
 
+#ifdef CONFIG_NFS_ACL
+/*
+ * Decode GETACL reply
+ */
+static int
+nfs3_xdr_getaclres(struct rpc_rqst *req, u32 *p,
+		   struct nfs3_getaclres *res)
+{
+	struct xdr_buf *buf = &req->rq_rcv_buf;
+	int status = ntohl(*p++);
+	struct posix_acl **acl;
+	unsigned int *aclcnt;
+	int err, base;
+	
+	if (status != 0)
+		return -nfs_stat_to_errno(status);
+	p = xdr_decode_post_op_attr(p, res->fattr);
+	res->mask = ntohl(*p++);
+	if (res->mask & ~(NFS3_ACL|NFS3_ACLCNT|NFS3_DFACL|NFS3_DFACLCNT))
+		return -EINVAL;
+	base = (char *)p - (char *)req->rq_rcv_buf.head->iov_base;
+	
+	acl = (res->mask & NFS3_ACL) ? &res->acl_access : NULL;
+	aclcnt = (res->mask & NFS3_ACLCNT) ? &res->acl_access_count : NULL;
+	err = nfsacl_decode(buf, base, aclcnt, acl);
+
+	acl = (res->mask & NFS3_DFACL) ? &res->acl_default : NULL;
+	aclcnt = (res->mask & NFS3_DFACLCNT) ? &res->acl_default_count : NULL;
+	if (err > 0)
+		err = nfsacl_decode(buf, base + err, aclcnt, acl);
+	return (err > 0) ? 0 : err;
+}
+#endif  /* CONFIG_NFS_ACL */
+
+#ifdef CONFIG_NFS_ACL
+/*
+ * Decode setacl reply.
+ */
+static int
+nfs3_xdr_setaclres(struct rpc_rqst *req, u32 *p, struct nfs_fattr *fattr)
+{
+	int status = ntohl(*p++);
+
+	if (status)
+		return -nfs_stat_to_errno(status);
+	xdr_decode_post_op_attr(p, fattr);
+	return 0;
+}
+#endif  /* CONFIG_NFS_ACL */
+
 #ifndef MAX
 # define MAX(a, b)	(((a) > (b))? (a) : (b))
 #endif
@@ -1019,3 +1144,16 @@ struct rpc_version		nfs_version3 = {
 	.procs			= nfs3_procedures
 };
 
+#ifdef CONFIG_NFS_ACL
+static struct rpc_procinfo	nfs3_acl_procedures[] = {
+  PROC(GETACL,		getaclargs,	getaclres, 1),
+  PROC(SETACL,		setaclargs,	setaclres, 0),
+};
+
+struct rpc_version		nfsacl_version3 = {
+	.number			= 3,
+	.nrprocs		= sizeof(nfs3_acl_procedures)/
+				  sizeof(nfs3_acl_procedures[0]),
+	.procs			= nfs3_acl_procedures,
+};
+#endif  /* CONFIG_NFS_ACL */

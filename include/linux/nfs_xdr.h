@@ -2,6 +2,7 @@
 #define _LINUX_NFS_XDR_H
 
 #include <linux/sunrpc/xprt.h>
+#include <linux/nfsacl.h>
 
 struct nfs4_fsid {
 	__u64 major;
@@ -359,6 +360,20 @@ struct nfs_readdirargs {
 	struct page **		pages;
 };
 
+struct nfs3_getaclargs {
+	struct nfs_fh *		fh;
+	int			mask;
+	struct page **		pages;
+};
+
+struct nfs3_setaclargs {
+	struct inode *		inode;
+	int			mask;
+	struct posix_acl *	acl_access;
+	struct posix_acl *	acl_default;
+	struct page **		pages;
+};
+
 struct nfs_diropok {
 	struct nfs_fh *		fh;
 	struct nfs_fattr *	fattr;
@@ -478,6 +493,15 @@ struct nfs3_readdirres {
 	struct nfs_fattr *	dir_attr;
 	__u32 *			verf;
 	int			plus;
+};
+
+struct nfs3_getaclres {
+	struct nfs_fattr *	fattr;
+	int			mask;
+	unsigned int		acl_access_count;
+	unsigned int		acl_default_count;
+	struct posix_acl *	acl_access;
+	struct posix_acl *	acl_default;
 };
 
 #ifdef CONFIG_NFS_V4
@@ -711,6 +735,11 @@ struct nfs_rpc_ops {
 	void	(*request_init)(struct nfs_page *, struct file *);
 	int	(*request_compatible)(struct nfs_page *, struct file *, struct page *);
 	int	(*lock)(struct file *, int, struct file_lock *);
+#ifdef CONFIG_NFS_ACL
+	struct posix_acl * (*getacl)(struct inode *, int);
+	int	(*setacl)(struct inode *, int, struct posix_acl *);
+	int	(*checkacls)(struct inode *inode);
+#endif  /* CONFIG_NFS_ACL */
 };
 
 /*
@@ -731,5 +760,8 @@ extern struct rpc_version	nfs_version3;
 extern struct rpc_version	nfs_version4;
 extern struct rpc_program	nfs_program;
 extern struct rpc_stat		nfs_rpcstat;
+
+extern struct rpc_version	nfsacl_version3;
+extern struct rpc_program	nfsacl_program;
 
 #endif
