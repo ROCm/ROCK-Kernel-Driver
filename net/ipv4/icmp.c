@@ -592,7 +592,7 @@ static void icmp_unreach(struct sk_buff *skb)
 	struct iphdr *iph;
 	struct icmphdr *icmph;
 	int hash, protocol;
-	struct inet_protocol *ipprot;
+	struct net_protocol *ipprot;
 	struct sock *raw_sk;
 	u32 info = 0;
 

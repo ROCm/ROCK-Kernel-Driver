@@ -129,8 +129,6 @@ struct inet_opt {
 	int			mc_index;	/* Multicast device index */
 	__u32			mc_addr;
 	struct ip_mc_socklist	*mc_list;	/* Group array */
-	struct page		*sndmsg_page;	/* Cached page for sendmsg */
-	u32			sndmsg_off;	/* Cached offset for sendmsg */
 	/*
 	 * Following members are used to retain the infomation to build
 	 * an ip header on each ip fragmentation while the socket is corked.

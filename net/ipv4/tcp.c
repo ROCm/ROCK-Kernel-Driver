@@ -278,85 +278,11 @@ atomic_t tcp_orphan_count = ATOMIC_INIT(0);
 
 int sysctl_tcp_default_win_scale = 7;
 
-int sysctl_tcp_mem[3];
-int sysctl_tcp_wmem[3] = { 4 * 1024, 16 * 1024, 128 * 1024 };
-int sysctl_tcp_rmem[3] = { 4 * 1024, 87380, 87380 * 2 };
-
-atomic_t tcp_memory_allocated;	/* Current allocated memory. */
-atomic_t tcp_sockets_allocated;	/* Current number of TCP sockets. */
-
-/* Pressure flag: try to collapse.
- * Technical note: it is used by multiple contexts non atomically.
- * All the tcp_mem_schedule() is of this nature: accounting
- * is strict, actions are advisory and have some latency. */
-int tcp_memory_pressure;
-
-#define TCP_PAGES(amt) (((amt) + TCP_MEM_QUANTUM - 1) / TCP_MEM_QUANTUM)
-
-int tcp_mem_schedule(struct sock *sk, int size, int kind)
+void tcp_enter_memory_pressure(void)
 {
-	int amt = TCP_PAGES(size);
-
-	sk->sk_forward_alloc += amt * TCP_MEM_QUANTUM;
-	atomic_add(amt, &tcp_memory_allocated);
-
-	/* Under limit. */
-	if (atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0]) {
-		if (tcp_memory_pressure)
-			tcp_memory_pressure = 0;
-		return 1;
-	}
-
-	/* Over hard limit. */
-	if (atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[2]) {
-		tcp_enter_memory_pressure();
-		goto suppress_allocation;
-	}
-
-	/* Under pressure. */
-	if (atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[1])
-		tcp_enter_memory_pressure();
-
-	if (kind) {
-		if (atomic_read(&sk->sk_rmem_alloc) < sysctl_tcp_rmem[0])
-			return 1;
-	} else if (sk->sk_wmem_queued < sysctl_tcp_wmem[0])
-		return 1;
-
-	if (!tcp_memory_pressure ||
-	    sysctl_tcp_mem[2] > atomic_read(&tcp_sockets_allocated) *
-				TCP_PAGES(sk->sk_wmem_queued +
-					  atomic_read(&sk->sk_rmem_alloc) +
-					  sk->sk_forward_alloc))
-		return 1;
-
-suppress_allocation:
-
-	if (!kind) {
-		sk_stream_moderate_sndbuf(sk);
-
-		/* Fail only if socket is _under_ its sndbuf.
-		 * In this case we cannot block, so that we have to fail.
-		 */
-		if (sk->sk_wmem_queued + size >= sk->sk_sndbuf)
-			return 1;
-	}
-
-	/* Alas. Undo changes. */
-	sk->sk_forward_alloc -= amt * TCP_MEM_QUANTUM;
-	atomic_sub(amt, &tcp_memory_allocated);
-	return 0;
-}
-
-void __tcp_mem_reclaim(struct sock *sk)
-{
-	if (sk->sk_forward_alloc >= TCP_MEM_QUANTUM) {
-		atomic_sub(sk->sk_forward_alloc / TCP_MEM_QUANTUM,
-			   &tcp_memory_allocated);
-		sk->sk_forward_alloc &= TCP_MEM_QUANTUM - 1;
-		if (tcp_memory_pressure &&
-		    atomic_read(&tcp_memory_allocated) < sysctl_tcp_mem[0])
-			tcp_memory_pressure = 0;
+	if (!tcp_prot.memory_pressure) {
+		NET_INC_STATS(TCPMemoryPressures);
+		tcp_prot.memory_pressure = 1;
 	}
 }
 
@@ -628,16 +554,6 @@ static void tcp_listen_stop (struct sock *sk)
 	BUG_TRAP(!sk->sk_ack_backlog);
 }
 
-static inline void fill_page_desc(struct sk_buff *skb, int i,
-				  struct page *page, int off, int size)
-{
-	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-	frag->page = page;
-	frag->page_offset = off;
-	frag->size = size;
-	skb_shinfo(skb)->nr_frags = i + 1;
-}
-
 static inline void tcp_mark_push(struct tcp_opt *tp, struct sk_buff *skb)
 {
 	TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
@@ -740,7 +656,7 @@ new_segment:
 			skb_shinfo(skb)->frags[i - 1].size += copy;
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
-			fill_page_desc(skb, i, page, offset, copy);
+			skb_fill_page_desc(skb, i, page, offset, copy);
 		} else {
 			tcp_mark_push(tp, skb);
 			goto new_segment;
@@ -816,8 +732,8 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 	return res;
 }
 
-#define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
-#define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
+#define TCP_PAGE(sk)	(sk->sk_sndmsg_page)
+#define TCP_OFF(sk)	(sk->sk_sndmsg_off)
 
 static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 {
@@ -980,7 +896,7 @@ new_segment:
 					skb_shinfo(skb)->frags[i - 1].size +=
 									copy;
 				} else {
-					fill_page_desc(skb, i, page, off, copy);
+					skb_fill_page_desc(skb, i, page, off, copy);
 					if (TCP_PAGE(sk)) {
 						get_page(page);
 					} else if (off + copy < PAGE_SIZE) {
@@ -1634,29 +1550,6 @@ void tcp_shutdown(struct sock *sk, int how)
 	}
 }
 
-static __inline__ void tcp_kill_sk_queues(struct sock *sk)
-{
-	/* First the read buffer. */
-	__skb_queue_purge(&sk->sk_receive_queue);
-
-	/* Next, the error queue. */
-	__skb_queue_purge(&sk->sk_error_queue);
-
-	/* Next, the write queue. */
-	BUG_TRAP(skb_queue_empty(&sk->sk_write_queue));
-
-	/* Account for returned memory. */
-	tcp_mem_reclaim(sk);
-
-	BUG_TRAP(!sk->sk_wmem_queued);
-	BUG_TRAP(!sk->sk_forward_alloc);
-
-	/* It is _impossible_ for the backlog to contain anything
-	 * when we get here.  All user references to this socket
-	 * have gone away, only the net layer knows can touch it.
-	 */
-}
-
 /*
  * At this point, there should be no process reference to this
  * socket, and thus no user references at all.  Therefore we
@@ -1684,7 +1577,7 @@ void tcp_destroy_sock(struct sock *sk)
 
 	sk->sk_prot->destroy(sk);
 
-	tcp_kill_sk_queues(sk);
+	sk_stream_kill_queues(sk);
 
 	xfrm_sk_free_policy(sk);
 
@@ -1727,7 +1620,7 @@ void tcp_close(struct sock *sk, long timeout)
 		__kfree_skb(skb);
 	}
 
-	tcp_mem_reclaim(sk);
+	sk_stream_mem_reclaim(sk);
 
 	/* As outlined in draft-ietf-tcpimpl-prob-03.txt, section
 	 * 3.10, we send a RST here because data was lost.  To
@@ -1826,10 +1719,10 @@ adjudge_to_death:
 		}
 	}
 	if (sk->sk_state != TCP_CLOSE) {
-		tcp_mem_reclaim(sk);
+		sk_stream_mem_reclaim(sk);
 		if (atomic_read(&tcp_orphan_count) > sysctl_tcp_max_orphans ||
 		    (sk->sk_wmem_queued > SOCK_MIN_SNDBUF &&
-		     atomic_read(&tcp_memory_allocated) > sysctl_tcp_mem[2])) {
+		     atomic_read(&tcp_prot.memory_allocated) > tcp_prot.sysctl_mem[2])) {
 			if (net_ratelimit())
 				printk(KERN_INFO "TCP: too many of orphaned "
 				       "sockets\n");
@@ -2376,15 +2269,15 @@ void __init tcp_init(void)
 	}
 	tcp_port_rover = sysctl_local_port_range[0] - 1;
 
-	sysctl_tcp_mem[0] =  768 << order;
-	sysctl_tcp_mem[1] = 1024 << order;
-	sysctl_tcp_mem[2] = 1536 << order;
+	tcp_prot.sysctl_mem[0] =  768 << order;
+	tcp_prot.sysctl_mem[1] = 1024 << order;
+	tcp_prot.sysctl_mem[2] = 1536 << order;
 
 	if (order < 3) {
-		sysctl_tcp_wmem[2] = 64 * 1024;
-		sysctl_tcp_rmem[0] = PAGE_SIZE;
-		sysctl_tcp_rmem[1] = 43689;
-		sysctl_tcp_rmem[2] = 2 * 43689;
+		tcp_prot.sysctl_wmem[2] = 64 * 1024;
+		tcp_prot.sysctl_rmem[0] = PAGE_SIZE;
+		tcp_prot.sysctl_rmem[1] = 43689;
+		tcp_prot.sysctl_rmem[2] = 2 * 43689;
 	}
 
 	printk(KERN_INFO "TCP: Hash tables configured "
@@ -2394,9 +2287,6 @@ void __init tcp_init(void)
 	tcpdiag_init();
 }
 
-EXPORT_SYMBOL(__tcp_mem_reclaim);
-EXPORT_SYMBOL(sysctl_tcp_rmem);
-EXPORT_SYMBOL(sysctl_tcp_wmem);
 EXPORT_SYMBOL(tcp_accept);
 EXPORT_SYMBOL(tcp_close);
 EXPORT_SYMBOL(tcp_close_state);
@@ -2412,6 +2302,5 @@ EXPORT_SYMBOL(tcp_sendmsg);
 EXPORT_SYMBOL(tcp_sendpage);
 EXPORT_SYMBOL(tcp_setsockopt);
 EXPORT_SYMBOL(tcp_shutdown);
-EXPORT_SYMBOL(tcp_sockets_allocated);
 EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_timewait_cachep);

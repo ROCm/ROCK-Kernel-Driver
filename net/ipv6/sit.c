@@ -788,7 +788,7 @@ int __init ipip6_fb_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-static struct inet_protocol sit_protocol = {
+static struct net_protocol sit_protocol = {
 	.handler	=	ipip6_rcv,
 	.err_handler	=	ipip6_err,
 };
