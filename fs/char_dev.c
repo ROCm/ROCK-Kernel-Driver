@@ -457,11 +457,9 @@ static struct kobject *base_probe(dev_t dev, int *part, void *data)
 	return NULL;
 }
 
-static int __init chrdev_init(void)
+void __init chrdev_init(void)
 {
 	subsystem_register(&cdev_subsys);
 	kset_register(&kset_dynamic);
 	cdev_map = kobj_map_init(base_probe, &cdev_subsys);
-	return 0;
 }
-subsys_initcall(chrdev_init);

@@ -1606,6 +1606,7 @@ kmem_cache_t *filp_cachep;
 EXPORT_SYMBOL(d_genocide);
 
 extern void bdev_cache_init(void);
+extern void chrdev_init(void);
 
 void __init vfs_caches_init(unsigned long mempages)
 {
@@ -1626,4 +1627,5 @@ void __init vfs_caches_init(unsigned long mempages)
 	files_init(mempages); 
 	mnt_init(mempages);
 	bdev_cache_init();
+	chrdev_init();
 }
