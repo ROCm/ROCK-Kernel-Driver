@@ -31,6 +31,16 @@ u32 ethtool_op_get_tx_csum(struct net_device *dev)
 	return (dev->features & NETIF_F_IP_CSUM) != 0;
 }
 
+int ethtool_op_set_tx_csum(struct net_device *dev, u32 data)
+{
+	if (data)
+		dev->features |= NETIF_F_IP_CSUM;
+	else
+		dev->features &= ~NETIF_F_IP_CSUM;
+
+	return 0;
+}
+
 u32 ethtool_op_get_sg(struct net_device *dev)
 {
 	return (dev->features & NETIF_F_SG) != 0;
