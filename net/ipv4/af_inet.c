@@ -99,6 +99,7 @@
 #include <net/protocol.h>
 #include <net/arp.h>
 #include <net/route.h>
+#include <net/ip_fib.h>
 #include <net/tcp.h>
 #include <net/udp.h>
 #include <linux/skbuff.h>
