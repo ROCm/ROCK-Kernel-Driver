@@ -321,4 +321,16 @@ extern void pagebuf_delwri_dequeue(
 extern int pagebuf_init(void);
 extern void pagebuf_terminate(void);
 
+
+#ifdef PAGEBUF_TRACE
+extern ktrace_t *pagebuf_trace_buf;
+extern void pagebuf_trace(
+		page_buf_t *,		/* buffer being traced		*/
+		char *,			/* description of operation	*/
+		void *,			/* arbitrary diagnostic value	*/
+		void *);		/* return address		*/
+#else
+# define pagebuf_trace(pb, id, ptr, ra)	do { } while (0)
+#endif
+
 #endif /* __PAGE_BUF_H__ */

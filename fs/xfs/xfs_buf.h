@@ -231,18 +231,11 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 	pagebuf_rele(bp);
 }
 
-
 #define xfs_bpin(bp)		pagebuf_pin(bp)
 #define xfs_bunpin(bp)		pagebuf_unpin(bp)
 
-#ifdef PAGEBUF_TRACE
-# define PB_DEFINE_TRACES
-# include <pagebuf/page_buf_trace.h>
-# define xfs_buftrace(id, bp)	PB_TRACE(bp, PB_TRACE_REC(external), (void *)id)
-#else
-# define xfs_buftrace(id, bp)	do { } while (0)
-#endif
-
+#define xfs_buftrace(id, bp)	\
+	    pagebuf_trace(bp, id, NULL, (void *)__builtin_return_address(0))
 
 #define xfs_biodone(pb)		    \
 	    pagebuf_iodone(pb, (pb->pb_flags & PBF_FS_DATAIOD), 0)

@@ -69,10 +69,6 @@
 
 #include <pagebuf/page_buf.h>
 
-#ifndef STATIC
-#define STATIC static
-#endif
-
 /*
  * State flag for unwritten extent buffers.
  *

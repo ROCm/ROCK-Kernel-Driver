@@ -179,6 +179,7 @@ ktrace_enter(
 	void            *val15)
 {
 	static lock_t   wrap_lock = SPIN_LOCK_UNLOCKED;
+	unsigned long	flags;
 	int             index;
 	ktrace_entry_t  *ktep;
 
@@ -187,11 +188,11 @@ ktrace_enter(
 	/*
 	 * Grab an entry by pushing the index up to the next one.
 	 */
-	spin_lock(&wrap_lock);
+	spin_lock_irqsave(&wrap_lock, flags);
 	index = ktp->kt_index;
 	if (++ktp->kt_index == ktp->kt_nentries)
 		ktp->kt_index = 0;
-	spin_unlock(&wrap_lock);
+	spin_unlock_irqrestore(&wrap_lock, flags);
 
 	if (!ktp->kt_rollover && index == ktp->kt_nentries - 1)
 		ktp->kt_rollover = 1;
