@@ -200,7 +200,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			continue;
 		}
 		pdu_length = 4 + ntohl(smb_buffer->smb_buf_length);
-		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));	/* BB */
+		cFYI(1, ("Peek length rcvd: %d with smb length: %d", length, pdu_length));
 
 		temp = (char *) smb_buffer;
 		if (length > 3) {
@@ -332,8 +332,9 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		kfree(server);
 	} else	/* BB need to more gracefully handle the rare negative session 
 			   response case because response will be still outstanding */
-		cERROR(1, ("There are still active MIDs in queue and we are exiting but we can not delete mid_q_entries or TCP_Server_Info structure due to pending requests MEMORY LEAK!!"));	/* BB wake up waitors, and/or wait and/or free stale mids and try again? BB */
-/* BB Need to fix bug in error path above - perhaps wait until smb requests
+		cERROR(1, ("Active MIDs in queue while exiting - can not delete mid_q_entries or TCP_Server_Info structure due to pending requests MEMORY LEAK!!"));
+	/* BB wake up waitors, and/or wait and/or free stale mids and try again? BB */
+	/* BB Need to fix bug in error path above - perhaps wait until smb requests
    time out and then free the tcp per server struct BB */
 	read_unlock(&GlobalSMBSeslock);
 
@@ -672,6 +673,8 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 					SMBNTencrypt(pSesInfo->password_with_pad,
 						pSesInfo->server->cryptKey,ntlm_session_key);
 
+				/* BB add call to save MAC key here BB */
+
 				/* for better security the weaker lanman hash not sent 
 				   in AuthSessSetup so why bother calculating it */
 				/* toUpper(nls_info,
@@ -690,6 +693,8 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 			SMBNTencrypt(pSesInfo->password_with_pad,
 				pSesInfo->server->cryptKey,
 				ntlm_session_key);
+
+			cifs_calculate_mac_key(pSesInfo->mac_signing_key, ntlm_session_key, pSesInfo->password_with_pad);
 			rc = CIFSSessSetup(xid, pSesInfo,
 				ntlm_session_key, nls_info);
 		}

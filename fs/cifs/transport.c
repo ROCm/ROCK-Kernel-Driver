@@ -250,12 +250,17 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			       receive_len +
 			       4 /* include 4 byte RFC1001 header */ );
 
-rc = cifs_verify_signature(out_buf, ses->mac_signing_key,midQ->sequence_number); /* BB fix BB */
-
 			dump_smb(out_buf, 92);
 			/* convert the length into a more usable form */
 			out_buf->smb_buf_length =
 			    be32_to_cpu(out_buf->smb_buf_length);
+			if((out_buf->smb_buf_length > 24) &&
+			   (ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))) {
+				rc = cifs_verify_signature(out_buf, ses->mac_signing_key,midQ->sequence_number); /* BB fix BB */
+				if(rc)
+					cFYI(1,("Unexpected signature received from server"));
+			}
+
 			if (out_buf->smb_buf_length > 12)
 				out_buf->Flags2 = le16_to_cpu(out_buf->Flags2);
 			if (out_buf->smb_buf_length > 28)

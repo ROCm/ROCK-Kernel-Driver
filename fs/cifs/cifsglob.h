@@ -151,7 +151,7 @@ struct cifsSesInfo {
 	enum statusEnum status;
 	__u32 sequence_number;  /* needed for CIFS PDU signature */
 	__u16 ipc_tid;		/* special tid for connection to IPC share */
-	char mac_signing_key[CIFS_SESSION_KEY_SIZE];	
+	char mac_signing_key[CIFS_SESSION_KEY_SIZE + 16];	
 	char *serverOS;		/* name of operating system underlying the server */
 	char *serverNOS;	/* name of network operating system that the server is running */
 	char *serverDomain;	/* security realm of server */
