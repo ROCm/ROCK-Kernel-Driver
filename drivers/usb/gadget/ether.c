@@ -1345,14 +1345,11 @@ static void eth_setup_complete (struct usb_ep *ep, struct usb_request *req)
 
 static void rndis_response_complete (struct usb_ep *ep, struct usb_request *req)
 {
-	struct eth_dev          *dev = ep->driver_data;
-	
 	if (req->status || req->actual != req->length)
 		DEBUG (dev, "rndis response complete --> %d, %d/%d\n",
 		       req->status, req->actual, req->length);
 
 	/* done sending after CDC_GET_ENCAPSULATED_RESPONSE */
-	rndis_free_response (dev->rndis_config, req->buf);
 }
 
 static void rndis_command_complete (struct usb_ep *ep, struct usb_request *req)
@@ -1580,6 +1577,7 @@ done_set_intf:
 			if (buf) {
 				memcpy (req->buf, buf, value);
 				req->complete = rndis_response_complete;
+				rndis_free_response(dev->rndis_config, buf);
 			}
 			/* else stalls ... spec says to avoid that */
 		}
@@ -2064,6 +2062,16 @@ static void rndis_send_media_state (struct eth_dev *dev, int connect)
 	}
 }
 
+static void rndis_control_ack_complete (struct usb_ep *ep, struct usb_request *req)
+{
+	if (req->status || req->actual != req->length)
+		DEBUG (dev, "rndis control ack complete --> %d, %d/%d\n",
+		       req->status, req->actual, req->length);
+
+	usb_ep_free_buffer(ep, req->buf, req->dma, 8);
+	usb_ep_free_request(ep, req);
+}
+
 static int rndis_control_ack (struct net_device *net)
 {
 	struct eth_dev          *dev = (struct eth_dev *) net->priv;
@@ -2095,7 +2103,7 @@ static int rndis_control_ack (struct net_device *net)
 	 * CDC_NOTIFY_RESPONSE_AVAILABLE should work too
 	 */
 	resp->length = 8;
-	resp->complete = rndis_response_complete;
+	resp->complete = rndis_control_ack_complete;
 	
 	*((u32 *) resp->buf) = __constant_cpu_to_le32 (1);
 	*((u32 *) resp->buf + 1) = __constant_cpu_to_le32 (0);
@@ -2103,7 +2111,7 @@ static int rndis_control_ack (struct net_device *net)
 	length = usb_ep_queue (dev->status_ep, resp, GFP_ATOMIC);
 	if (length < 0) {
 		resp->status = 0;
-		rndis_response_complete (dev->status_ep, resp);
+		rndis_control_ack_complete (dev->status_ep, resp);
 	}
 	
 	return 0;
