@@ -837,7 +837,7 @@ static void aiptek_close(struct input_dev *inputdev)
 	struct aiptek *aiptek = inputdev->private;
 
 	if (--aiptek->openCount == 0) {
-		usb_unlink_urb(aiptek->urb);
+		usb_kill_urb(aiptek->urb);
 	}
 }
 
@@ -2258,7 +2258,7 @@ static void aiptek_disconnect(struct usb_interface *intf)
 	if (aiptek != NULL) {
 		/* Free & unhook everything from the system.
 		 */
-		usb_unlink_urb(aiptek->urb);
+		usb_kill_urb(aiptek->urb);
 		input_unregister_device(&aiptek->inputdev);
 		aiptek_delete_files(&intf->dev);
 		usb_free_urb(aiptek->urb);
