@@ -20,7 +20,7 @@
  *  (mailto:netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptscsih.h,v 1.18 2002/06/06 15:32:52 pdelaney Exp $
+ *  $Id: mptscsih.h,v 1.19 2002/10/03 13:10:15 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -77,7 +77,22 @@
 #define MPT_SCSI_CAN_QUEUE	MPT_FC_CAN_QUEUE
 #define MPT_SCSI_CMD_PER_LUN	 7
 
+#define MPT_SCSI_MAX_SECTORS    8192
+
+/*
+ * Set the MAX_SGE value based on user input.
+ */
+#ifdef  CONFIG_FUSION_MAX_SGE
+#if     CONFIG_FUSION_MAX_SGE  < 16
+#define MPT_SCSI_SG_DEPTH	16
+#elif   CONFIG_FUSION_MAX_SGE  > 128
+#define MPT_SCSI_SG_DEPTH	128
+#else
+#define MPT_SCSI_SG_DEPTH	CONFIG_FUSION_MAX_SGE
+#endif
+#else
 #define MPT_SCSI_SG_DEPTH	40
+#endif
 
 /* To disable domain validation, uncomment the
  * following line. No effect for FC devices.
@@ -146,24 +161,38 @@ struct mptscsih_driver_setup
 /*
  *	tq_scheduler disappeared @ lk-2.4.0-test12
  *	(right when <linux/sched.h> newly defined TQ_ACTIVE)
+ *	tq_struct reworked in 2.5.41. Include workqueue.h.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,41)
+#	include <linux/sched.h>
+#	include <linux/workqueue.h>
+#define SCHEDULE_TASK(x)		\
+	if (schedule_work(x) == 0) {	\
+		/*MOD_DEC_USE_COUNT*/;	\
+	}
+#else
 #define HAVE_TQ_SCHED	1
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 #	include <linux/sched.h>
 #	ifdef TQ_ACTIVE
 #		undef HAVE_TQ_SCHED
 #	endif
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,40)
+#		undef HAVE_TQ_SCHED
+#endif
 #endif
 #ifdef HAVE_TQ_SCHED
 #define SCHEDULE_TASK(x)		\
 	/*MOD_INC_USE_COUNT*/;		\
-	schedule_work(x)
+	(x)->next = NULL;		\
+	queue_task(x, &tq_scheduler)
 #else
 #define SCHEDULE_TASK(x)		\
 	/*MOD_INC_USE_COUNT*/;		\
-	if (schedule_work(x) == 0) {	\
+	if (schedule_task(x) == 0) {	\
 		/*MOD_DEC_USE_COUNT*/;	\
 	}
+#endif
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -236,6 +265,7 @@ extern	void		 x_scsi_taskmgmt_bh(void *);
 	can_queue:			MPT_SCSI_CAN_QUEUE,	\
 	this_id:			-1,			\
 	sg_tablesize:			MPT_SCSI_SG_DEPTH,	\
+	max_sectors:			MPT_SCSI_MAX_SECTORS,   \
 	cmd_per_lun:			MPT_SCSI_CMD_PER_LUN,	\
 	unchecked_isa_dma:		0,			\
 	use_clustering:			ENABLE_CLUSTERING,	\

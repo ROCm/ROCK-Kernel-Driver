@@ -49,7 +49,7 @@
  *  (mailto:sjralston1@netscape.net)
  *  (mailto:Pam.Delaney@lsil.com)
  *
- *  $Id: mptbase.c,v 1.121 2002/07/23 18:56:59 pdelaney Exp $
+ *  $Id: mptbase.c,v 1.122 2002/10/03 13:10:11 pdelaney Exp $
  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -1416,10 +1416,30 @@ mpt_adapter_install(struct pci_dev *pdev)
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC929X) {
 		ioc->chip_type = FC929X;
 		ioc->prod_name = "LSIFC929X";
+		{
+			/* 929X Chip Fix. Set Split transactions level
+			 * for PCIX. Set bits 5 - 6 to zero, turn on bit 4.
+			 */
+			u16 pcixcmd = 0;
+			pci_read_config_word(pdev, 0x6a, &pcixcmd);
+			pcixcmd &= 0xFF9F;
+			pcixcmd |= 0x0010;
+			pci_write_config_word(pdev, 0x6a, pcixcmd);
+		}
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVICEID_FC919X) {
 		ioc->chip_type = FC919X;
 		ioc->prod_name = "LSIFC919X";
+		{
+			/* 919X Chip Fix. Set Split transactions level
+			 * for PCIX. Set bits 5 - 6 to zero, turn on bit 4.
+			 */
+			u16 pcixcmd = 0;
+			pci_read_config_word(pdev, 0x6a, &pcixcmd);
+			pcixcmd &= 0xFF9F;
+			pcixcmd |= 0x0010;
+			pci_write_config_word(pdev, 0x6a, pcixcmd);
+		}
 	}
 	else if (pdev->device == MPI_MANUFACTPAGE_DEVID_53C1030) {
 		ioc->chip_type = C1030;
