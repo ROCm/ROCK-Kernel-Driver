@@ -1837,9 +1837,11 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 			snd_iprintf(buffer, "%d ", subs->dataurb[i].packets);
 		snd_iprintf(buffer, "]\n");
 		snd_iprintf(buffer, "    Packet Size = %d\n", subs->curpacksize);
-		snd_iprintf(buffer, "    Momentary freq = %d,%03d Hz\n",
-			    subs->freqm >> 14,
-			    ((subs->freqm & ((1 << 14) - 1)) * 1000) / ((1 << 14) - 1));
+		snd_iprintf(buffer, "    Momentary freq = %d.%d Hz\n",
+			    (subs->freqm * 125) >> 11,
+			    (subs->freqm >> 10) * 625
+			    + (((subs->freqm & ((1 << 10) - 1)) * 625) >> 10)
+			    - 10 * ((subs->freqm * 125) >> 11));
 	} else {
 		snd_iprintf(buffer, "  Status: Stop\n");
 	}
