@@ -23,8 +23,8 @@ int sim710_release(struct Scsi_Host *);
 
 #include <scsi/scsicam.h>
 
-#define SIM710_SCSI { proc_name:		"sim710",	\
-		      name:			"Simple 53c710", 	\
+#define SIM710_SCSI { proc_name:		"sim710",		\
+		      name:			"53c710",	 	\
 		      detect:			sim710_detect,		\
 		      release:			sim710_release,		\
 		      queuecommand:		sim710_queuecommand,	\
@@ -413,7 +413,7 @@ int sim710_release(struct Scsi_Host *);
 #define CTEST3_800_FM		0x02	/* Fetch mode pin */
 /* bit 0 is reserved on 800 series chips */
 
-#define CTEST4_REG_400		(0x18^bE)	/* Chip test 4 rw */
+#define CTEST4_REG_700		(0x18^bE)	/* Chip test 4 rw */
 #define CTEST4_REG_800		(0x21^bE)	/* Chip test 4 rw */
 /* 0x80 is reserved on 700 series chips */
 #define CTEST4_800_BDIS		0x80	/* Burst mode disable */
@@ -791,6 +791,20 @@ int sim710_release(struct Scsi_Host *);
 
 #define ISTAT_REG	ISTAT_REG_700
 #define SCRATCH_REG	SCRATCHB_REG_10
+#define ADDER_REG	ADDER_REG_10
+#define SIEN_REG	SIEN_REG_700
+#define SDID_REG	SDID_REG_700
+#define CTEST0_REG	CTEST0_REG_700
+#define CTEST1_REG	CTEST1_REG_700
+#define CTEST2_REG	CTEST2_REG_700
+#define CTEST3_REG	CTEST3_REG_700
+#define CTEST4_REG	CTEST4_REG_700
+#define CTEST5_REG	CTEST5_REG_700
+#define CTEST6_REG	CTEST6_REG_700
+#define SODL_REG	SODL_REG_700
+#define SBDL_REG	SBDL_REG_700
+#define SIDL_REG	SIDL_REG_700
+#define LCRC_REG	LCRC_REG_10
 
 #ifdef MEM_MAPPED
 #define NCR_read8(address) 					\

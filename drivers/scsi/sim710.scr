@@ -15,15 +15,12 @@ ABSOLUTE dsa_size     = 2088
 
 ABSOLUTE reselected_identify = 0
 ABSOLUTE msgin_buf = 0
+ABSOLUTE msg_reject = 0
+ABSOLUTE test1_src = 0
+ABSOLUTE test1_dst = 0
 
 /* Interrupt values passed back to driver */
 
-ABSOLUTE int_bad_extmsg1a	= 0xab930000
-ABSOLUTE int_bad_extmsg1b	= 0xab930001
-ABSOLUTE int_bad_extmsg2a	= 0xab930002
-ABSOLUTE int_bad_extmsg2b	= 0xab930003
-ABSOLUTE int_bad_extmsg3a	= 0xab930004
-ABSOLUTE int_bad_extmsg3b	= 0xab930005
 ABSOLUTE int_bad_msg1		= 0xab930006
 ABSOLUTE int_bad_msg2		= 0xab930007
 ABSOLUTE int_bad_msg3		= 0xab930008
@@ -47,9 +44,9 @@ ABSOLUTE int_disc1		= 0xab930019
 ABSOLUTE int_disc2		= 0xab93001a
 ABSOLUTE int_disc3		= 0xab93001b
 ABSOLUTE int_not_rej		= 0xab93001c
+ABSOLUTE int_test1		= 0xab93001d
 
-
-/* Bit field settings used to record status in SCRATCH */
+/* Bit field settings used to record status in SCRATCH0 */
 
 ABSOLUTE had_select	= 0x01
 ABSOLUTE had_msgout	= 0x02
@@ -60,6 +57,9 @@ ABSOLUTE had_status	= 0x20
 ABSOLUTE had_msgin	= 0x40
 ABSOLUTE had_extmsg	= 0x80
 
+/* Bit field settings used to record status in SCRATCH1 */
+
+ABSOLUTE did_reject	= 0x01
 
 /* These scripts are heavily based on the examples in the NCR 53C710
  * Programmer's Guide (Preliminary).
@@ -68,7 +68,6 @@ ABSOLUTE had_extmsg	= 0x80
 ENTRY do_select
 do_select:
 	CLEAR TARGET
-	MOVE SCRATCH0 & 0 TO SCRATCH0
 	; Enable selection timer
 	MOVE CTEST7 & 0xef TO CTEST7
 	SELECT ATN FROM dsa_select, reselect
@@ -401,17 +400,23 @@ ext_msg1:
 	MOVE SCRATCH0 | had_extmsg TO SCRATCH0
 	CLEAR ACK
 	MOVE 1, msgin_buf + 1, WHEN MSG_IN
-	JUMP ext_msg1a, IF 0x03
-	INT int_bad_extmsg1a
-ext_msg1a:
+	JUMP reject_msg1, IF NOT 0x03	; Only handle SDTR
 	CLEAR ACK
 	MOVE 1, msgin_buf + 2, WHEN MSG_IN
-	JUMP ext_msg1b, IF 0x01		; Must be SDTR
-	INT int_bad_extmsg1b
-ext_msg1b:
+	JUMP reject_msg1, IF NOT 0x01	; Only handle SDTR
 	CLEAR ACK
 	MOVE 2, msgin_buf + 3, WHEN MSG_IN
 	INT int_msg_sdtr1
+reject_msg1:
+	MOVE SCRATCH1 | did_reject TO SCRATCH1
+	SET ATN
+	CLEAR ACK
+	JUMP reject_msg1a, WHEN NOT MSG_IN
+	MOVE 1, msgin_buf + 7, WHEN MSG_IN
+	JUMP reject_msg1
+reject_msg1a:
+	MOVE 1, msg_reject, WHEN MSG_OUT
+	JUMP redo_msgin1
 disc1:
 	CLEAR ACK
 ENTRY wait_disc1
@@ -446,17 +451,23 @@ ext_msg2:
 	MOVE SCRATCH0 | had_extmsg TO SCRATCH0
 	CLEAR ACK
 	MOVE 1, msgin_buf + 1, WHEN MSG_IN
-	JUMP ext_msg2a, IF 0x03
-	INT int_bad_extmsg2a
-ext_msg2a:
+	JUMP reject_msg2, IF NOT 0x03	; Only handle SDTR
 	CLEAR ACK
 	MOVE 1, msgin_buf + 2, WHEN MSG_IN
-	JUMP ext_msg2b, IF 0x01		; Must be SDTR
-	INT int_bad_extmsg2b
-ext_msg2b:
+	JUMP reject_msg2, IF NOT 0x01	; Only handle SDTR
 	CLEAR ACK
 	MOVE 2, msgin_buf + 3, WHEN MSG_IN
 	INT int_msg_sdtr2
+reject_msg2:
+	MOVE SCRATCH1 | did_reject TO SCRATCH1
+	SET ATN
+	CLEAR ACK
+	JUMP reject_msg2a, WHEN NOT MSG_IN
+	MOVE 1, msgin_buf + 7, WHEN MSG_IN
+	JUMP reject_msg2
+reject_msg2a:
+	MOVE 1, msg_reject, WHEN MSG_OUT
+	JUMP redo_msgin2
 disc2:
 	CLEAR ACK
 ENTRY wait_disc2
@@ -491,17 +502,23 @@ ext_msg3:
 	MOVE SCRATCH0 | had_extmsg TO SCRATCH0
 	CLEAR ACK
 	MOVE 1, msgin_buf + 1, WHEN MSG_IN
-	JUMP ext_msg3a, IF 0x03
-	INT int_bad_extmsg3a
-ext_msg3a:
+	JUMP reject_msg3, IF NOT 0x03	; Only handle SDTR
 	CLEAR ACK
 	MOVE 1, msgin_buf + 2, WHEN MSG_IN
-	JUMP ext_msg3b, IF 0x01		; Must be SDTR
-	INT int_bad_extmsg3b
-ext_msg3b:
+	JUMP reject_msg3, IF NOT 0x01	; Only handle  SDTR
 	CLEAR ACK
 	MOVE 2, msgin_buf + 3, WHEN MSG_IN
 	INT int_msg_sdtr3
+reject_msg3:
+	MOVE SCRATCH1 | did_reject TO SCRATCH1
+	SET ATN
+	CLEAR ACK
+	JUMP reject_msg3a, WHEN NOT MSG_IN
+	MOVE 1, msgin_buf + 7, WHEN MSG_IN
+	JUMP reject_msg3
+reject_msg3a:
+	MOVE 1, msg_reject, WHEN MSG_OUT
+	JUMP redo_msgin3
 disc3:
 	CLEAR ACK
 ENTRY wait_disc3
@@ -551,4 +568,9 @@ patch_new_dsa:
 
 selected:
 	INT int_selected
+
+ENTRY test1
+test1:
+	MOVE MEMORY 4, test1_src, test1_dst
+	INT int_test1
 

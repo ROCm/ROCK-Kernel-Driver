@@ -18,6 +18,9 @@
  *----------------------------------------------------------------------------
  *
  * MCA card detection code by Trent McNair.
+ * Fixes to not explicitly nul bss data from Xavier Bestel.
+ * Some multiboard fixes from Rolf Eike Beer.
+ * Auto probing of EISA config space from Trevor Hemsley.
  *
  * Various bits of code in this driver have been copied from 53c7,8xx,c,
  * which is coyright Drew Eckhardt.  The scripts for the SCSI chip are
@@ -41,6 +44,16 @@
  * and insmod parameters similar to
  *	sim710="addr:0x9000 irq:15"
  *
+ * Multiple controllers can also be set up by command line, provided the
+ * addr: parameter is specified first for each controller.  e.g.
+ *      sim710="addr:0x9000 irq:15 addr:0x8000 irq:14"
+ *
+ * To seperate the different options, ' ', '+', and ',' can be used, except
+ * that ',' can not be used in module parameters.  ' ' can be a pain, because
+ * it needs to be quoted, which causes problems with some installers.
+ * The command line above is completely equivalent to
+ *      sim710="addr:0x9000+irq:15+addr:0x8000+irq:14"
+ *
  * The complete list of options are:
  *
  * addr:0x9000		Specifies the base I/O port (or address) of the 53C710.
@@ -49,12 +62,18 @@
  * ignore:0x0a		Makes the driver ignore SCSI IDs 0 and 2.
  * nodisc:0x70		Prevents disconnects from IDs 6, 5 and 4.
  * noneg:0x10		Prevents SDTR negotiation on ID 4.
+ * disabled:1		Completely disables the driver. When present, overrides
+ *			all other options.
+ *
+ * The driver will auto-probe chip addresses and IRQs now, so typically no
+ * parameters are needed.  Auto-probing of addresses is disabled if any addr:
+ * parameters are specified.
  *
  * Current limitations:
  *
  * o  Async only
  * o  Severely lacking in error recovery
- * o  Auto detection of IRQs and chip addresses only on MCA architectures
+ * o  'debug:' should be per host really.
  *
  */
 
@@ -71,26 +90,19 @@
 #include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/mca.h>
+#include <linux/interrupt.h>
 #include <asm/dma.h>
 #include <asm/system.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,17)
 #include <linux/spinlock.h>
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,93)
-#include <asm/spinlock.h>
-#endif
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/byteorder.h>
 #include <linux/blk.h>
 
-#ifdef CONFIG_TP34V_SCSI
-
-#include <asm/tp34vhw.h>
-#define MEM_MAPPED
-
-#elif defined(CONFIG_MCA)
-
+/* All targets are I/O mapped at the moment */
 #define IO_MAPPED
+
+#if defined(CONFIG_MCA)
 
 /*
  * For each known microchannel card using the 53c710 we need a list
@@ -115,12 +127,6 @@
 #define MCA_004F_IO_PORTS { 0x0000, 0x0200, 0x0300, 0x0400, 0x0500,  0x0600 }
 
 #define MCA_004F_IRQS { 5, 9, 14 }
-
-#else
-
-/* Assume an Intel platform */
-
-#define IO_MAPPED
 
 #endif
 
@@ -151,7 +157,7 @@
 
 #ifdef DEBUG
 #define DEB(m,x) if (sim710_debug & m) x
-int sim710_debug = 0;
+int sim710_debug;
 #else
 #define DEB(m,x)
 #endif
@@ -178,7 +184,7 @@ int sim710_debug = 0;
 #define STATE_BUSY		3
 #define STATE_DISABLED		4
 
-#define MAXBOARDS 2	/* Increase this and the sizes of the
+#define MAXBOARDS 4	/* Increase this and the sizes of the
 			   arrays below, if you need more.. */
 
 #ifdef MODULE
@@ -193,44 +199,15 @@ MODULE_PARM(sim710, "s");
 
 #endif
 
-static int sim710_errors = 0;	/* Count of error interrupts */
-static int sim710_intrs = 0;	/* Count of all interrupts */
-static int ignore_ids = 0;	/* Accept all SCSI IDs */
-static int opt_nodisc = 0;	/* Allow disconnect on all IDs */
-static int opt_noneg = 0;	/* Allow SDTR negotiation on all IDs */
-
-#ifdef CONFIG_TP34V_SCSI
-
-/* Special hardwired case for Tadpole TP34V at the moment, otherwise
- * boot parameters 'sim710=addr:0x8000,irq:15' (for example) must be given.
- */
-
-static int no_of_boards = 2;
-
-static unsigned int bases[MAXBOARDS] = {
-	TP34V_SCSI0_BASE, TP34V_SCSI1_BASE
-};
-static unsigned int irq_vectors[MAXBOARDS] = {
-	TP34V_SCSI0_VECTOR, TP34V_SCSI1_VECTOR
-};
-static unsigned int irq_index[MAXBOARDS] = {
-	TP34V_SCSI0_IRQ_INDEX, TP34V_SCSI1_IRQ_INDEX
-};
-
-#else
-
-/* All other cases use boot/module params, or auto-detect */
-
-static int no_of_boards = 0;
-
-static unsigned int bases[MAXBOARDS] = {
-	0
-};
-static unsigned int irq_vectors[MAXBOARDS] = {
-	0
-};
-
-#endif
+static int sim710_errors;		/* Count of error interrupts */
+static int sim710_intrs;		/* Count of all interrupts */
+static int ignore_ids[MAXBOARDS];	/* Accept all SCSI IDs */
+static int opt_nodisc[MAXBOARDS];	/* Allow disconnect on all IDs */
+static int opt_noneg[MAXBOARDS];	/* Allow SDTR negotiation on all IDs */
+static int hostdata_order;		/* Encoded size of hostdata for free_pages() */
+static int no_of_boards;		/* Actual number of boards/chips */
+static unsigned int bases[MAXBOARDS];	/* Base addresses of chips */
+static unsigned int irq_vectors[MAXBOARDS]; /* IRQ vectors used by chips */
 
 /* The SCSI Script!!! */
 
@@ -249,7 +226,6 @@ static unsigned int irq_vectors[MAXBOARDS] = {
 
 #define MAX_SG		128	/* Scatter/Gather elements */
 
-
 #define MAX_MSGOUT	8
 #define MAX_MSGIN	8
 #define MAX_CMND	12
@@ -263,6 +239,9 @@ struct sim710_hostdata{
     u8 negotiate;
     u8 reselected_identify;
     u8 msgin_buf[MAX_MSGIN];
+    u8 msg_reject;
+    u32 test1_src __attribute__ ((aligned (4)));
+    u32 test1_dst;
 
     struct sim710_target {
 	Scsi_Cmnd *cur_cmd;
@@ -294,81 +273,126 @@ static int full_reset(struct Scsi_Host * host);
 
 
 /*
+ * Function : static void ncr_dump (struct Scsi_Host *host)
+ *
+ * Purpose :  Dump (possibly) useful info
+ *
+ * Inputs : host - pointer to this host adapter's structure
+ */
+
+static void
+ncr_dump (struct Scsi_Host *host)
+{
+    unsigned long flags;
+    struct sim710_hostdata *hostdata = (struct sim710_hostdata *)
+       host->hostdata[0];
+
+    save_flags(flags);
+    cli();
+    printk("scsi%d: Chip register contents:\n", host->host_no);
+    printk(" (script at virt %p, bus %lx)\n",
+           hostdata->script, virt_to_bus(hostdata->script));
+    printk(" 00  sien:  %02x  sdid:  %02x  scntl1:%02x  scntl0:%02x\n"
+	   " 04  socl:  %02x  sodl:  %02x  sxfer: %02x  scid:  %02x\n"
+	   " 08  sbcl:  %02x  sbdl:  %02x  sidl:  %02x  sfbr:  %02x\n"
+	   " 0C  sstat2:%02x  sstat1:%02x  sstat0:%02x  dstat: %02x\n"
+	   " 10  dsa:   %08x\n"
+	   " 14  ctest3:%02x  ctest2:%02x  ctest1:%02x  ctest0:%02x\n"
+	   " 18  ctest7:%02x  ctest6:%02x  ctest5:%02x  ctest4:%02x\n"
+	   " 1C  temp:  %08x\n"
+	   " 20  lcrc:  %02x  ctest8:%02x  istat: %02x  dfifo: %02x\n"
+	   " 24  dbc:   %08x  dnad:  %08x  dsp:   %08x\n"
+	   " 30  dsps:  %08x  scratch:%08x\n"
+	   " 38  dcntl: %02x  dwt:   %02x  dien:  %02x  dmode: %02x\n"
+	   " 3C  adder: %08x\n",
+	  NCR_read8(SIEN_REG), NCR_read8(SDID_REG), NCR_read8(SCNTL1_REG),
+	  NCR_read8(SCNTL0_REG), NCR_read8(SOCL_REG), NCR_read8(SODL_REG),
+	  NCR_read8(SXFER_REG), NCR_read8(SCID_REG), NCR_read8(SBCL_REG),
+	  NCR_read8(SBDL_REG), NCR_read8(SIDL_REG), NCR_read8(SFBR_REG),
+	  NCR_read8(SSTAT2_REG), NCR_read8(SSTAT1_REG), NCR_read8(SSTAT0_REG),
+	  NCR_read8(DSTAT_REG), NCR_read32(DSA_REG), NCR_read8(CTEST3_REG),
+	  NCR_read8(CTEST2_REG), NCR_read8(CTEST1_REG), NCR_read8(CTEST0_REG),
+	  NCR_read8(CTEST7_REG), NCR_read8(CTEST6_REG), NCR_read8(CTEST5_REG),
+	  NCR_read8(CTEST4_REG), NCR_read8(TEMP_REG), NCR_read8(LCRC_REG),
+	  NCR_read8(CTEST8_REG), NCR_read8(ISTAT_REG), NCR_read8(DFIFO_REG),
+	  NCR_read32(DBC_REG), NCR_read32(DNAD_REG), NCR_read32(DSP_REG),
+	  NCR_read32(DSPS_REG), NCR_read32(SCRATCH_REG), NCR_read8(DCNTL_REG),
+	  NCR_read8(DWT_REG), NCR_read8(DIEN_REG), NCR_read8(DMODE_REG),
+	  NCR_read32(ADDER_REG));
+
+    restore_flags(flags);
+}
+
+
+/*
  * Function: int param_setup(char *str)
  */
 
-#ifdef MODULE
-#define ARG_SEP ' '
-#else
-#define ARG_SEP ','
-#endif
-
-static int
+__init int
 param_setup(char *str)
 {
     char *cur = str;
-    char *pc, *pv;
+    char *p, *pc, *pv;
     int val;
-    int base;
     int c;
 
     no_of_boards = 0;
-    while (cur != NULL && (pc = strchr(cur, ':')) != NULL) {
+    while (no_of_boards < MAXBOARDS && cur != NULL &&
+		(pc = strchr(cur, ':')) != NULL) {
 	char *pe;
 
 	val = 0;
 	pv = pc;
 	c = *++pv;
 
-	if (c == 'n')
-	    val = 0;
-	else if	(c == 'y')
-	    val = 1;
-	else {
-	    base = 0;
-	    val = (int) simple_strtoul(pv, &pe, base);
-	}
+	val = (int) simple_strtoul(pv, &pe, 0);
+
 	if (!strncmp(cur, "addr:", 5)) {
-	    bases[0] = val;
-	    no_of_boards = 1;
-	}
-	else if	(!strncmp(cur, "irq:", 4))
-	    irq_vectors[0] = val;
-	else if	(!strncmp(cur, "ignore:", 7))
-	    ignore_ids = val;
-	else if	(!strncmp(cur, "nodisc:", 7))
-	    opt_nodisc = val;
-	else if	(!strncmp(cur, "noneg:", 6))
-	    opt_noneg = val;
-	else if	(!strncmp(cur, "disabled:", 5)) {
-	    no_of_boards = -1;
-	    return 1;
+	    bases[no_of_boards++] = val;
 	}
 #ifdef DEBUG
 	else if (!strncmp(cur, "debug:", 6)) {
 	    sim710_debug = val;
 	}
 #endif
-	else
-	    printk("sim710: unexpected boot option '%.*s' ignored\n", (int)(pc-cur+1), cur);
+	else if (no_of_boards == 0) {
+	    printk("sim710: Invalid parameters, addr: must come first\n");
+	    no_of_boards = -1;
+	    return 1;
+	}
+	else if	(!strncmp(cur, "irq:", 4))
+	    irq_vectors[no_of_boards-1] = val;
+	else if	(!strncmp(cur, "ignore:", 7))
+	    ignore_ids[no_of_boards-1] = val;
+	else if	(!strncmp(cur, "nodisc:", 7))
+	    opt_nodisc[no_of_boards-1] = val;
+	else if	(!strncmp(cur, "noneg:", 6))
+	    opt_noneg[no_of_boards-1] = val;
+	else if	(!strncmp(cur, "disabled:", 9)) {
+	    no_of_boards = -1;
+	    return 1;
+	}
+	else {
+	    printk("sim710: unexpected boot option '%.*s'\n", (int)(pc-cur+1), cur);
+	    no_of_boards = -1;
+	    return 1;
+	}
 
-	if ((cur = strchr(cur, ARG_SEP)) != NULL)
-	    ++cur;
+	/* Allow ',', ' ', or '+' seperators.  Used to be ',' at boot and
+	 * ' ' for module load, some installers crap out on the space and
+	 * insmod doesn't like the comma.
+	 */
+       if ((p = strchr(cur, ',')) || (p = strchr(cur, ' ')) ||
+               (p = strchr(cur, '+')))
+           cur = p + 1;
+        else
+           break;
     }
     return 1;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 #ifndef MODULE
 __setup("sim710=", param_setup);
-#endif
-#else
-/* Old boot param syntax support */
-void
-sim710_setup(char *str, int *ints)
-{
-    param_setup(str);
-}
 #endif
 
 
@@ -398,22 +422,6 @@ sbcl_to_phase (int sbcl) {
 
 
 /*
- * Function: static void disable (struct Scsi_Host *host)
- */
-
-static void
-disable (struct Scsi_Host *host)
-{
-    struct sim710_hostdata *hostdata = (struct sim710_hostdata *)
-	host->hostdata[0];
-
-    hostdata->state = STATE_DISABLED;
-    printk (KERN_ALERT "scsi%d : disabled.  Unload and reload\n",
-		            host->host_no);
-}
-
-
-/*
  * Function : static int ncr_halt (struct Scsi_Host *host)
  *
  * Purpose : halts the SCSI SCRIPTS(tm) processor on the NCR chip
@@ -431,6 +439,8 @@ ncr_halt (struct Scsi_Host *host)
     struct sim710_hostdata *hostdata = (struct sim710_hostdata *)
 	host->hostdata[0];
     int stage;
+    int timeout;
+    int res = 0;
 
     save_flags(flags);
     cli();
@@ -438,8 +448,10 @@ ncr_halt (struct Scsi_Host *host)
        Stage 1 : set ABORT
        Stage 2 : eat all but abort interrupts
        Stage 3 : eat all interrupts
+       We loop for 50000 times with a delay of 10us which should give us
+       about half a second.
      */
-    for (stage = 0;;) {
+    for (stage = 0, timeout = 50000; timeout; timeout--) {
 	if (stage == 1) {
 	    DEB(DEB_HALT, printk("ncr_halt: writing ISTAT_ABRT\n"));
 	    NCR_write8(ISTAT_REG, ISTAT_ABRT);
@@ -460,9 +472,8 @@ ncr_halt (struct Scsi_Host *host)
 		    NCR_write8(ISTAT_REG, 0);
 		    ++stage;
 		} else {
-		    printk(KERN_ALERT "scsi%d : could not halt NCR chip\n",
-			host->host_no);
-		    disable (host);
+		    res = 1;
+		    break;
 	    	}
     	    }
 	}
@@ -472,10 +483,18 @@ ncr_halt (struct Scsi_Host *host)
 	    else if (stage == 3)
 		break;
 	}
+	udelay(10);
     }
-    hostdata->state = STATE_HALTED;
     restore_flags(flags);
-    return 0;
+
+    if (timeout == 0 || res) {
+	printk(KERN_ALERT "scsi%d: could not halt NCR chip\n", host->host_no);
+	return 1;
+    }
+    else {
+	hostdata->state = STATE_HALTED;
+	return 0;
+    }
 }
 
 /*
@@ -494,16 +513,9 @@ static void
 sim710_soft_reset (struct Scsi_Host *host)
 {
     unsigned long flags;
-#ifdef CONFIG_TP34V_SCSI
-    struct sim710_hostdata *hostdata = (struct sim710_hostdata *)
-	host->hostdata[0];
-#endif
 
     save_flags(flags);
     cli();
-#ifdef CONFIG_TP34V_SCSI
-    tpvic.loc_icr[irq_index[hostdata->chip]].icr = 0x80;
-#endif
     /*
      * Do a soft reset of the chip so that everything is
      * reinitialized to the power-on state.
@@ -528,6 +540,7 @@ sim710_soft_reset (struct Scsi_Host *host)
 
     mdelay(1000);				/* Let devices recover */
 
+    NCR_write32(SCRATCH_REG, 0);
     NCR_write8(DCNTL_REG, DCNTL_10_COM | DCNTL_700_CF_3);
     NCR_write8(CTEST7_REG, CTEST7_10_CDIS|CTEST7_STD);
     NCR_write8(DMODE_REG, DMODE_10_BL_8 | DMODE_10_FC2);
@@ -543,11 +556,6 @@ sim710_soft_reset (struct Scsi_Host *host)
 
     NCR_write8(SIEN_REG_700,
 	    SIEN_PAR | SIEN_700_STO | SIEN_RST | SIEN_UDC | SIEN_SGE | SIEN_MA);
-
-
-#ifdef CONFIG_TP34V_SCSI
-    tpvic.loc_icr[irq_index[hostdata->chip]].icr = 0x30 | TP34V_SCSI0n1_IPL;
-#endif
 
     restore_flags(flags);
 }
@@ -577,6 +585,12 @@ sim710_driver_init (struct Scsi_Host *host)
     	isa_virt_to_bus((void *)&(hostdata->reselected_identify)));
     patch_abs_32 (hostdata->script, 0, msgin_buf, 
     	isa_virt_to_bus((void *)&(hostdata->msgin_buf[0])));
+    patch_abs_32 (hostdata->script, 0, msg_reject,
+	isa_virt_to_bus((void *)&(hostdata->msg_reject)));
+    patch_abs_32 (hostdata->script, 0, test1_src,
+	isa_virt_to_bus((void *)&(hostdata->test1_src)));
+    patch_abs_32 (hostdata->script, 0, test1_dst,
+	isa_virt_to_bus((void *)&(hostdata->test1_dst)));
     hostdata->state = STATE_INITIALISED;
     hostdata->negotiate = 0xff;
 }
@@ -587,7 +601,7 @@ sim710_driver_init (struct Scsi_Host *host)
  * spurious request from the target.  Don't really expect target initiated
  * SDTRs, because we always negotiate on the first command.  Could still
  * get them though..
- * The chip is currently paused with ACK asserted o the last byte of the
+ * The chip is currently paused with ACK asserted on the last byte of the
  * SDTR.
  * resa is the resume address if the message is in response to our outgoing
  * SDTR.  Only possible on initial identify.
@@ -739,6 +753,12 @@ handle_phase_mismatch (struct Scsi_Host * host, Scsi_Cmnd * cmd)
 		host->host_no);
 	    resume_offset = Ent_resume_cmd;
 	}
+	else if (sbcl == SBCL_PHASE_STATIN) {
+	    /* Some devices do this on parity error, at least */
+	    printk("scsi%d: Unexpected switch to STATUSIN on initial message out\n",
+		host->host_no);
+	    resume_offset = Ent_end_data_trans;
+	}
 	else {
 	    printk("scsi%d: Unexpected phase change to %s on initial msgout\n",
 		host->host_no, sbcl_to_phase(sbcl));
@@ -800,6 +820,14 @@ handle_phase_mismatch (struct Scsi_Host * host, Scsi_Cmnd * cmd)
 	    targdata->dsa[DSA_DATAOUT + sg_id * 2 + 1] = naddr;
 	    resume_offset = Ent_resume_pmm;
 	}
+    }
+    else if (sbcl == SBCL_PHASE_STATIN) {
+	/* Change to Status In at some random point; probably wants to report a
+	 * parity error or similar.
+	 */
+	printk("scsi%d: Unexpected phase change to STATUSIN at index 0x%x\n",
+		host->host_no, index);
+	resume_offset = Ent_end_data_trans;
     }
     else {
 	printk("scsi%d: Unexpected phase change to %s at index 0x%x\n",
@@ -868,12 +896,6 @@ handle_script_int(struct Scsi_Host * host, Scsi_Cmnd * cmd)
 	printk("scsi%d: int_data_bad_phase, phase %s (%x)\n",
 		host->host_no, sbcl_to_phase(sbcl), sbcl);
 	break;
-    case A_int_bad_extmsg1a:
-    case A_int_bad_extmsg1b:
-    case A_int_bad_extmsg2a:
-    case A_int_bad_extmsg2b:
-    case A_int_bad_extmsg3a:
-    case A_int_bad_extmsg3b:
     case A_int_bad_msg1:
     case A_int_bad_msg2:
     case A_int_bad_msg3:
@@ -918,21 +940,22 @@ do_sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 static void
 sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 {
-    unsigned int flags;
     struct Scsi_Host * host = (struct Scsi_Host *)dev_id;
     struct sim710_hostdata *hostdata = (struct sim710_hostdata *)host->hostdata[0];
     Scsi_Cmnd * cmd;
     unsigned char istat, dstat;
     unsigned char sstat0;
-    u32 dsps, resume_offset = 0;
+    u32 scratch, dsps, resume_offset = 0;
 
-    save_flags(flags);
-    cli();
-    sim710_intrs++;
-    while ((istat = NCR_read8(ISTAT_REG)) & (ISTAT_SIP|ISTAT_DIP)) {
+    istat = NCR_read8(ISTAT_REG);
+    if (!(istat & (ISTAT_SIP|ISTAT_DIP)))
+	return;
+    else {
+	sim710_intrs++;
 	dsps = NCR_read32(DSPS_REG);
 	hostdata->state = STATE_HALTED;
 	sstat0 = dstat = 0;
+	scratch = NCR_read32(SCRATCH_REG);
 	if (istat & ISTAT_SIP) {
 	    sstat0 = NCR_read8(SSTAT0_REG);
 	}
@@ -945,7 +968,13 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 		"dstat %02x, dsp [%04x], scratch %02x\n",
 	    host->host_no, sim710_intrs, istat, sstat0, dstat,
 	    (u32 *)(isa_bus_to_virt(NCR_read32(DSP_REG))) - hostdata->script,
-	    NCR_read32(SCRATCH_REG)));
+	    scratch));
+	if (scratch & 0x100) {
+	    u8 *p = hostdata->msgin_buf;
+	    
+	    DEB(DEB_INTS, printk("  msgin_buf: %02x %02x %02x %02x\n",
+			p[0], p[1], p[2], p[3]));
+	}
 	if ((dstat & DSTAT_SIR) && dsps == A_int_reselected) {
 	    /* Reselected.  Identify the target from LCRC_REG, and
 	     * update current command.  If we were trying to select
@@ -1002,12 +1031,7 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	    hostdata->target[cmd->target].cur_cmd = NULL;
 	    resume_offset = Ent_reselect;
 	}
-	else if (dstat & DSTAT_SIR)
-	    resume_offset = handle_script_int(host, cmd);
-	else if (sstat0 & SSTAT0_MA) {
-	    resume_offset = handle_phase_mismatch(host, cmd);
-	}
-	else if (sstat0 & (SSTAT0_MA|SSTAT0_SGE|SSTAT0_UDC|SSTAT0_RST|SSTAT0_PAR)) {
+	else if (sstat0 & (SSTAT0_SGE|SSTAT0_UDC|SSTAT0_RST|SSTAT0_PAR)) {
 	    printk("scsi%d: Serious error, sstat0 = %02x\n", host->host_no,
 			    sstat0);
 	    sim710_errors++;
@@ -1019,6 +1043,10 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 	    sim710_errors++;
 	    /* resume_offset is zero, which will cause a host reset */
 	}
+	else if (dstat & DSTAT_SIR)
+	    resume_offset = handle_script_int(host, cmd);
+	else if (sstat0 & SSTAT0_MA)
+	    resume_offset = handle_phase_mismatch(host, cmd);
 	else if (dstat & DSTAT_IID) {
 	    /* This can be due to a quick reselect while doing a WAIT
 	     * DISCONNECT.
@@ -1044,18 +1072,21 @@ sim710_intr_handle(int irq, void *dev_id, struct pt_regs *regs)
 #ifdef DEBUG_LIMIT_INTS
 	if (sim710_intrs < DEBUG_LIMIT_INTS)
 #endif
-	NCR_write32(DSP_REG, isa_virt_to_bus(hostdata->script+resume_offset/4));
+	{
+	    NCR_write32(SCRATCH_REG, 0);
+	    NCR_write32(DSP_REG,
+		    isa_virt_to_bus(hostdata->script+resume_offset/4));
+	}
 	if (resume_offset == Ent_reselect)
 	    run_process_issue_queue(hostdata);
     }
     else {
 	printk("scsi%d: Failed to handle interrupt.  Failing commands "
 		"and resetting SCSI bus and chip\n", host->host_no);
-	mdelay(4000);		/* Give chance to read screen!! */
+	mdelay(1000);		/* Give chance to read screen!! */
 	full_reset(host);
     }
 
-    restore_flags(flags);
 }
 
 
@@ -1101,9 +1132,9 @@ run_command (struct sim710_hostdata *hostdata, Scsi_Cmnd *cmd)
     memcpy(targdata->dsa_cdb, cmd->cmnd, MAX_CMND);
 
     targdata->dsa_msgout[0] =
-		IDENTIFY((opt_nodisc & (1<<cmd->target)) ? 0 : 1 ,0);
+		IDENTIFY((opt_nodisc[hostdata->chip] & (1<<cmd->target)) ? 0 : 1 ,0);
     if (hostdata->negotiate & (1 << cmd->target)) {
-	if (opt_noneg & (1 << cmd->target)) {
+	if (opt_noneg[hostdata->chip] & (1 << cmd->target)) {
 	    hostdata->negotiate ^= (1 << cmd->target);
 	    targdata->dsa[DSA_MSGOUT] = 1;
 	}
@@ -1143,16 +1174,10 @@ run_command (struct sim710_hostdata *hostdata, Scsi_Cmnd *cmd)
 	u32 cnt = cmd->use_sg ? sgl->length : cmd->request_bufflen;
 
 	if (datain) {
-#ifdef CONFIG_TP34V_SCSI
-	    cache_clear(virt_to_phys(vbuf, cnt);
-#endif
 	    *dip++	= cnt;
 	    *dip++	= bbuf;
 	}
 	if (dataout) {
-#ifdef CONFIG_TP34V_SCSI
-	    cache_push(virt_to_phys(vbuf, cnt);
-#endif
 	    *dop++	= cnt;
 	    *dop++	= bbuf;
 	}
@@ -1288,7 +1313,7 @@ sim710_queuecommand(Scsi_Cmnd * cmd, void (*done)(Scsi_Cmnd *))
     save_flags(flags);
     cli();
 
-    if (ignore_ids & (1 << cmd->target)) {
+    if (ignore_ids[hostdata->chip] & (1 << cmd->target)) {
 	printk("scsi%d: ignoring target %d\n", host->host_no, cmd->target);
 	cmd->result = (DID_BAD_TARGET << 16);
 	done(cmd);
@@ -1320,18 +1345,25 @@ sim710_queuecommand(Scsi_Cmnd * cmd, void (*done)(Scsi_Cmnd *))
 }
 
 
-int
+__init int
 sim710_detect(Scsi_Host_Template * tpnt)
 {
-    unsigned char irq_vector;
     unsigned char scsi_id;
     unsigned int base_addr;
     struct Scsi_Host * host = NULL;
     struct sim710_hostdata *hostdata;
+    unsigned long timeout;
+    unsigned long irq_mask;
+    int requested_irq;
+    int probed_irq;
+    u32 dsps;
     int chips = 0;
+    int limit;
     int indx;
     int revision;
-    int order, size;
+    int size;
+    volatile u8 tmp;
+    struct Scsi_Host *our_hosts[MAXBOARDS+1];
 
 #ifdef MODULE
     if (sim710)
@@ -1433,83 +1465,191 @@ sim710_detect(Scsi_Host_Template * tpnt)
     }
 #endif
 
+#ifdef CONFIG_EISA
+    /* Auto probe, if no boards specified in boot parameters */
+    if (no_of_boards == 0) {
+	int io_addr;
+	/* reverse probe, so my on-board controller at 0x9000 is always scsi0 */
+	for (io_addr = 0x9000; no_of_boards < MAXBOARDS && io_addr >= 0x1000; io_addr -= 0x1000) {
+	    if (request_region(io_addr, 0x40, "sim710") != NULL) {
+		int id0 = inw(io_addr + 0xc80);
+		int id1 = inw(io_addr + 0xc82);
+		/* The on-board controller on my Proliant 2000 is 0x1044,
+		 * my EISA card is 0x1144.
+		 */
+		if (id0 == 0x110e && (id1 == 0x1044 || id1 == 0x1144)) {
+		    bases[no_of_boards] = io_addr;
+#if 0
+		    /* This should detect the IRQ, but I havn't proved it for
+		     * myself.  Leave the old probe code active for now, as
+		     * no-one has reported problems with it.
+		     */
+		    switch (inb(io_addr + 0xc88)) {
+			case (0x00):
+			    irq_vectors[no_of_boards] = 11;
+			    break;
+			case (0x01):
+			    irq_vectors[no_of_boards] = 14;
+			    break;
+			case (0x02):
+			    irq_vectors[no_of_boards] = 15;
+			    break;
+			case (0x03):
+			    irq_vectors[no_of_boards] = 10;
+			    break;
+			case (0x04):
+			    irq_vectors[no_of_boards] = 9;
+			    break;
+			default:
+			    printk("sim710.c: irq nasty\n");
+		    }
+#endif
+		    no_of_boards++;
+		}
+		release_region(io_addr, 64);
+	    }
+	}
+    }
+#endif
+      
     if (!no_of_boards) {
-       printk("sim710: No NCR53C710 adapter found.\n");
-       return 0;
+	printk("sim710: No NCR53C710 adapter found.\n");
+	return 0;
     }
 
     size = sizeof(struct sim710_hostdata);
-    order = 0;
-    while (size > (PAGE_SIZE << order))
-	order++;
-    size = PAGE_SIZE << order;
+    hostdata_order = 0;
+    while (size > (PAGE_SIZE << hostdata_order))
+	hostdata_order++;
+    size = PAGE_SIZE << hostdata_order;
 
     DEB(DEB_ANY, printk("sim710: hostdata %d bytes, size %d, order %d\n",
-	sizeof(struct sim710_hostdata), size, order));
+	sizeof(struct sim710_hostdata), size, hostdata_order));
 
     tpnt->proc_name = "sim710";
 
-    for(indx = 0; indx < no_of_boards; indx++) {
-        unsigned long page = __get_free_pages(GFP_ATOMIC, order);
+    memset(our_hosts, 0, sizeof(our_hosts));
+    for (indx = 0; indx < no_of_boards; indx++) {
+        unsigned long page = __get_free_pages(GFP_ATOMIC, hostdata_order);
         if(page == 0UL)
         {
-        	printk(KERN_WARNING "sim710: out of memory registering board %d.\n", indx);
-        	break;
+		printk(KERN_WARNING "sim710: out of memory registering board %d.\n", indx);
+		break;
         }
 	host = scsi_register(tpnt, 4);
-	if(host == NULL)
-		break;
+	if(host == NULL) {
+	    free_pages(host->hostdata[0], hostdata_order);
+	    break;
+	}
+	our_hosts[chips] = host;
 	host->hostdata[0] = page;
 	hostdata = (struct sim710_hostdata *)host->hostdata[0];
 	memset(hostdata, 0, size);
-#ifdef CONFIG_TP34V_SCSI
-	cache_push(virt_to_phys(hostdata), size);
-	cache_clear(virt_to_phys(hostdata), size);
-	kernel_set_cachemode((void *)hostdata,size,IOMAP_NOCACHE_SER);
-#endif
 	scsi_id = 7;
 	base_addr = bases[indx];
-	irq_vector = irq_vectors[indx];
-	printk("sim710: Configuring Sim710 (SCSI-ID %d) at %x, IRQ %d\n",
-	    		scsi_id, base_addr, irq_vector);
+	requested_irq = irq_vectors[indx];
+	printk("scsi%d: Configuring Sim710 (SCSI-ID %d) at %x, IRQ %d\n",
+			host->host_no, scsi_id, base_addr, requested_irq);
 	DEB(DEB_ANY, printk("sim710: hostdata = %p (%d bytes), dsa0 = %p\n",
 			hostdata, sizeof(struct sim710_hostdata),
 			 hostdata->target[0].dsa));
 	hostdata->chip = indx;
-	host->irq = irq_vector;
+	host->irq = requested_irq;
 	host->this_id = scsi_id;
 	host->unique_id = base_addr;
 	host->base = base_addr;
+	hostdata->msg_reject = MESSAGE_REJECT;
 
-	ncr_halt(host);
-
+	if (ncr_halt(host)) {
+	    free_pages(host->hostdata[0], hostdata_order);
+	    scsi_unregister (host);
+	    printk("scsi%d: Failed to initialise 53c710 at address %x\n",
+			host->host_no, base_addr);
+	    continue;
+	}
+	DEB(DEB_ANY,ncr_dump(host));
 	revision = (NCR_read8(CTEST8_REG) & 0xF0) >> 4;
 	printk("scsi%d: Revision 0x%x\n",host->host_no,revision);
-
 	sim710_soft_reset(host);
 
 	sim710_driver_init(host);
 
-#ifdef CONFIG_TP34V_SCSI
-	if (request_irq(irq_vector,do_sim710_intr_handle, 0, "sim710", host))
-#else
-	if (request_irq(irq_vector,do_sim710_intr_handle, SA_INTERRUPT, "sim710", host))
-#endif
+	request_region((u32)host->base, 64, "sim710");
+	/* Now run test1 */
+	hostdata->test1_src = 0x53c710aa;
+	hostdata->test1_dst = 0x76543210;
+	NCR_write32(DSPS_REG, 0x89abcdef);
+	irq_mask = probe_irq_on();
+	NCR_write32(DSP_REG, virt_to_bus(hostdata->script+Ent_test1/4));
+	timeout = 5;
+	while (hostdata->test1_dst != hostdata->test1_src && timeout--)
+	    mdelay(100);
+	tmp = NCR_read8(ISTAT_REG);
+	tmp = NCR_read8(SSTAT0_REG);
+	udelay(10);
+	tmp = NCR_read8(DSTAT_REG);
+	probed_irq = probe_irq_off(irq_mask);
+	if (requested_irq == 0) {
+	    if (probed_irq > 0) {
+		printk("scsi%d: Chip is using IRQ %d\n", host->host_no,
+			probed_irq);
+		requested_irq = host->irq = probed_irq;
+	    }
+	    else {
+		printk("scsi%d: Failed to probe for IRQ (returned %d)\n",
+			host->host_no, probed_irq);
+		ncr_halt(host);
+		free_pages(host->hostdata[0], hostdata_order);
+		scsi_unregister (host);
+		release_region((u32)host->base, 64);
+		continue;
+	    }
+	}
+	else if (probed_irq > 0 && probed_irq != requested_irq)
+	    printk("scsi%d: WARNING requested IRQ %d, but probed as %d\n",
+			host->host_no, requested_irq, probed_irq);
+	else if (probed_irq <= 0)
+	    printk("scsi%d: WARNING IRQ probe failed, (returned %d)\n",
+			host->host_no, probed_irq);
+	
+	dsps = NCR_read32(DSPS_REG);
+	if (hostdata->test1_dst != 0x53c710aa || dsps != A_int_test1) {
+	    if (hostdata->test1_dst != 0x53c710aa)
+		printk("scsi%d: test 1 FAILED: data: exp 0x53c710aa, got 0x%08x\n",
+			host->host_no, hostdata->test1_dst);
+	    if (dsps != A_int_test1)
+		printk("scsi%d: test 1 FAILED: dsps: exp 0x%08x, got 0x%08x\n",
+			host->host_no, A_int_test1, dsps);
+	    ncr_dump(host);
+	    ncr_halt(host);
+	    free_pages(host->hostdata[0], hostdata_order);
+	    scsi_unregister (host);
+	    release_region((u32)host->base, 64);
+	    continue;
+	}
+	printk("scsi%d: test 1 completed ok.\n", host->host_no);
+
+	NCR_write32(DSP_REG, virt_to_bus(hostdata->script+Ent_reselect/4));
+	hostdata->state = STATE_IDLE;
+	chips++;
+    }
+    /* OK, now run down our_hosts[] calling request_irq(... SA_SHIRQ ...).
+     * Couldn't call request_irq earlier, as probing would have failed.
+     */
+    for (indx = 0, limit = chips; indx < limit; indx++) {
+	host = our_hosts[indx];
+	if (request_irq(host->irq, do_sim710_intr_handle,
+                       SA_INTERRUPT | SA_SHIRQ, "sim710", host))
 	{
 	    printk("scsi%d : IRQ%d not free, detaching\n",
-	    		host->host_no, host->irq);
-
+			host->host_no, host->irq);
+	    ncr_halt(host);
+	    free_pages(host->hostdata[0], hostdata_order);
 	    scsi_unregister (host);
+	    chips--;
 	}
-	else {
-#ifdef IO_MAPPED
-	    request_region((u32)host->base, 64, "sim710");
-#endif
-	    chips++;
-	}
-	NCR_write32(DSP_REG, isa_virt_to_bus(hostdata->script+Ent_reselect/4));
-	hostdata->state = STATE_IDLE;
     }
+
     return chips;
 }
 
@@ -1558,11 +1698,34 @@ full_reset(struct Scsi_Host * host)
     int target;
     Scsi_Cmnd *cmd;
 
-    ncr_halt(host);
-    printk("scsi%d: dsp = %08x (script[0x%04x]), scratch = %08x\n",
-	host->host_no, NCR_read32(DSP_REG),
-	((u32)isa_bus_to_virt(NCR_read32(DSP_REG)) - (u32)hostdata->script)/4,
-	NCR_read32(SCRATCH_REG));
+    u32 istat, dstat = 0, sstat0 = 0, sstat1 = 0, dsp, dsps, scratch;
+    unsigned long flags;
+
+    save_flags(flags);
+    cli();
+
+    istat = NCR_read8(ISTAT_REG);
+    if (istat & ISTAT_SIP) {
+	sstat0 = NCR_read8(SSTAT0_REG);
+	sstat1 = NCR_read8(SSTAT1_REG);
+	udelay(10);
+    }
+    if (istat & ISTAT_DIP)
+	dstat = NCR_read8(DSTAT_REG);
+
+    if (ncr_halt(host)) {
+	restore_flags(flags);
+	return FAILED;
+    }
+    restore_flags(flags);
+    dsp = NCR_read32(DSP_REG);
+    dsps = NCR_read32(DSPS_REG);
+    scratch = NCR_read32(SCRATCH_REG);
+    printk("scsi%d: istat = %02x, sstat0 = %02x, sstat1 = %02x, dstat = %02x\n",
+		host->host_no, istat, sstat0, sstat1, dstat);
+    printk("scsi%d: dsp = %08x (script[0x%04x]), dsps = %08x, scratch = %08x\n",
+		host->host_no, dsp,
+		((u32)bus_to_virt(dsp) - (u32)hostdata->script)/4, dsps, scratch);
 
     for (target = 0; target < 7; target++) {
 	if ((cmd = hostdata->target[target].cur_cmd)) {
@@ -1604,10 +1767,10 @@ sim710_host_reset(Scsi_Cmnd * SCpnt)
 int
 sim710_release(struct Scsi_Host *host)
 {
+    ncr_halt(host);
+    free_pages(host->hostdata[0], hostdata_order);
     free_irq(host->irq, host);
-#ifdef IO_MAPPED
     release_region((u32)host->base, 64);
-#endif
     return 1;
 }
 
