@@ -310,6 +310,78 @@ void pcmcia_unregister_socket(struct class_device *dev);
 
 #define to_class_data(dev) dev->class_data
 
+static int pcmcia_add_socket(struct pcmcia_socket *socket)
+{
+	int ret = 0;
+
+	/* base address = 0, map = 0 */
+	socket->cis_mem.flags = 0;
+	socket->cis_mem.speed = cis_speed;
+	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
+	INIT_LIST_HEAD(&socket->cis_cache);
+	spin_lock_init(&socket->lock);
+
+	init_socket(socket);
+	socket->ss_entry->inquire_socket(socket->sock, &socket->cap);
+
+	init_completion(&socket->thread_done);
+	init_waitqueue_head(&socket->thread_wait);
+	init_MUTEX(&socket->skt_sem);
+	spin_lock_init(&socket->thread_lock);
+	ret = kernel_thread(pccardd, socket, CLONE_KERNEL);
+	if (ret < 0)
+		return ret;
+
+	wait_for_completion(&socket->thread_done);
+	BUG_ON(!socket->thread);
+
+#ifdef CONFIG_PROC_FS
+	if (proc_pccard) {
+		char name[3];
+		sprintf(name, "%02d", socket->sock);
+		socket->proc = proc_mkdir(name, proc_pccard);
+		if (socket->proc)
+			socket->ss_entry->proc_setup(socket->sock, socket->proc);
+#ifdef PCMCIA_DEBUG
+		if (socket->proc)
+			create_proc_read_entry("clients", 0, socket->proc,
+					       proc_read_clients, socket);
+#endif
+	}
+#endif
+	return 0;
+}
+
+static void pcmcia_remove_socket(struct pcmcia_socket *socket)
+{
+	client_t *client;
+
+#ifdef CONFIG_PROC_FS
+	if (proc_pccard) {
+		char name[3];
+		sprintf(name, "%02d", socket->sock);
+#ifdef PCMCIA_DEBUG
+		remove_proc_entry("clients", socket->proc);
+#endif
+		remove_proc_entry(name, proc_pccard);
+	}
+#endif
+	if (socket->thread) {
+		init_completion(&socket->thread_done);
+		socket->thread = NULL;
+		wake_up(&socket->thread_wait);
+		wait_for_completion(&socket->thread_done);
+	}
+	release_cis_mem(socket);
+	while (socket->clients) {
+		client = socket->clients;
+		socket->clients = socket->clients->next;
+		kfree(client);
+	}
+	socket->ss_entry = NULL;
+}
+
+
 /**
  * pcmcia_register_socket - add a new pcmcia socket device
  */
@@ -334,53 +406,15 @@ int pcmcia_register_socket(struct class_device *class_dev)
 
 	/* socket initialization */
 	for (i = 0; i < cls_d->nsock; i++) {
-		socket_info_t *s = &s_info[i];
+		struct pcmcia_socket *socket = &s_info[i];
 
-		s->ss_entry = cls_d->ops;
-		s->sock = i + cls_d->sock_offset;
+		socket->sock = i + cls_d->sock_offset;
 
-		/* base address = 0, map = 0 */
-		s->cis_mem.flags = 0;
-		s->cis_mem.speed = cis_speed;
-		s->erase_busy.next = s->erase_busy.prev = &s->erase_busy;
-		INIT_LIST_HEAD(&s->cis_cache);
-		spin_lock_init(&s->lock);
-
-		/* TBD: remove usage of socket_table, use class_for_each_dev instead */
 		down_write(&pcmcia_socket_list_rwsem);
-		list_add(&s->socket_list, &pcmcia_socket_list);
+		list_add(&socket->socket_list, &pcmcia_socket_list);
 		up_write(&pcmcia_socket_list_rwsem);
 
-		init_socket(s);
-		s->ss_entry->inquire_socket(s->sock, &s->cap);
-
-		init_completion(&s->thread_done);
-		init_waitqueue_head(&s->thread_wait);
-		init_MUTEX(&s->skt_sem);
-		spin_lock_init(&s->thread_lock);
-		ret = kernel_thread(pccardd, s, CLONE_KERNEL);
-		if (ret < 0) {
-			pcmcia_unregister_socket(class_dev);
-			break;
-		}
-
-		wait_for_completion(&s->thread_done);
-		BUG_ON(!s->thread);
-
-#ifdef CONFIG_PROC_FS
-		if (proc_pccard) {
-			char name[3];
-			sprintf(name, "%02d", s->sock);
-			s->proc = proc_mkdir(name, proc_pccard);
-			if (s->proc)
-				s->ss_entry->proc_setup(i, s->proc);
-#ifdef PCMCIA_DEBUG
-			if (s->proc)
-				create_proc_read_entry("clients", 0, s->proc,
-				       proc_read_clients, s);
-#endif
-		}
-#endif
+		pcmcia_add_socket(socket);
 	}
 	return ret;
 } /* pcmcia_register_socket */
@@ -393,46 +427,21 @@ void pcmcia_unregister_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket_class_data *cls_d = class_get_devdata(class_dev);
 	unsigned int i;
-	client_t *client;
-	socket_info_t *s;
+	struct pcmcia_socket *socket;
 
 	if (!cls_d)
 		return;
 
-	s = (socket_info_t *) cls_d->s_info;
+	socket = cls_d->s_info;
 
 	for (i = 0; i < cls_d->nsock; i++) {
-		
-#ifdef CONFIG_PROC_FS
-		if (proc_pccard) {
-			char name[3];
-			sprintf(name, "%02d", s->sock);
-#ifdef PCMCIA_DEBUG
-			remove_proc_entry("clients", s->proc);
-#endif
-			remove_proc_entry(name, proc_pccard);
-		}
-#endif
-		if (s->thread) {
-			init_completion(&s->thread_done);
-			s->thread = NULL;
-			wake_up(&s->thread_wait);
-			wait_for_completion(&s->thread_done);
-		}
-		release_cis_mem(s);
-		while (s->clients) {
-			client = s->clients;
-			s->clients = s->clients->next;
-			kfree(client);
-		}
+		pcmcia_remove_socket(socket);
 
-		down_write(&pcmcia_socket_list_rwsem);
-		list_del(&s->socket_list);
-		up_write(&pcmcia_socket_list_rwsem);
+ 		down_write(&pcmcia_socket_list_rwsem);
+ 		list_del(&socket->socket_list);
+ 		up_write(&pcmcia_socket_list_rwsem);
 
-		s->ss_entry = NULL;
-
-		s++;
+		socket++;
 	}
 	kfree(cls_d->s_info);
 } /* pcmcia_unregister_socket */
