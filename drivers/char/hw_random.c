@@ -47,7 +47,7 @@
 /*
  * core module and version information
  */
-#define RNG_VERSION "0.9.0"
+#define RNG_VERSION "1.0.0"
 #define RNG_MODULE_NAME "hw_random"
 #define RNG_DRIVER_NAME   RNG_MODULE_NAME " hardware driver " RNG_VERSION
 #define PFX RNG_MODULE_NAME ": "
@@ -499,7 +499,7 @@ static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
 
 		spin_unlock (&rng_lock);
 
-		while (have_data > 0) {
+		while (have_data && size) {
 			if (put_user((u8)data, buf++)) {
 				ret = ret ? : -EFAULT;
 				break;
