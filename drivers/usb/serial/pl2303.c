@@ -404,6 +404,9 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 		
 	dbg("%s -  port %d", __FUNCTION__, port->number);
 
+	usb_clear_halt(serial->dev, port->write_urb->pipe);
+	usb_clear_halt(serial->dev, port->read_urb->pipe);
+
 #define FISH(a,b,c,d)								\
 	result=usb_control_msg(serial->dev, usb_rcvctrlpipe(serial->dev,0),	\
 			       b, a, c, d, buf, 1, 100);			\
