@@ -13,6 +13,7 @@ obj-$(CONFIG_HISAX_AVM_A1_CS)		+= avma1_cs.o
 obj-$(CONFIG_HISAX_TELES_CS)		+= teles_cs.o
 obj-$(CONFIG_HISAX_ST5481)		+= hisax_st5481.o
 obj-$(CONFIG_HISAX_HFCUSB)		+= hfc_usb.o
+obj-$(CONFIG_HISAX_HFC4S8S)		+= hfc4s8s_l1.o
 obj-$(CONFIG_HISAX_FRITZ_PCIPNP)        += hisax_isac.o hisax_fcpcipnp.o
 
 ifdef CONFIG_HISAX_HDLC

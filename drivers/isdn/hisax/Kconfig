@@ -411,6 +411,12 @@ config HISAX_HFCUSB
 	help
 	  This enables the driver for HFC USB based ISDN modems.
 
+config HISAX_HFC4S8S
+	tristate "HFC-4S/8S based ISDN cards (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	help
+	  This enables the driver for HFC-4S/8S based ISDN cards.
+
 config HISAX_FRITZ_PCIPNP
 	tristate "AVM Fritz!Card PCI/PCIv2/PnP support (EXPERIMENTAL)"
 	depends on PCI && EXPERIMENTAL
