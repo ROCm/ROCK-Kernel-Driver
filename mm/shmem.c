@@ -1136,19 +1136,18 @@ fail_write:
 	goto release;
 }
 
-static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_t *desc)
+static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_t *desc, read_actor_t actor)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	struct address_space *mapping = inode->i_mapping;
 	unsigned long index, offset;
-	int nr = 1;
 
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
-	while (nr && desc->count) {
+	for (;;) {
 		struct page *page;
-		unsigned long end_index, nr;
+		unsigned long end_index, nr, ret;
 
 		end_index = inode->i_size >> PAGE_CACHE_SHIFT;
 		if (index > end_index)
@@ -1181,6 +1180,10 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		}
 		nr -= offset;
 
+		/* If users can be writing to this page using arbitrary
+		 * virtual addresses, take care about potential aliasing
+		 * before reading the page on the kernel side.
+		 */
 		if (!list_empty(&mapping->i_mmap_shared) &&
 		    page != ZERO_PAGE(0))
 			flush_dcache_page(page);
@@ -1195,12 +1198,14 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		 * "pos" here (the actor routine has to update the user buffer
 		 * pointers and the remaining count).
 		 */
-		nr = file_read_actor(desc, page, offset, nr);
-		offset += nr;
+		ret = actor(desc, page, offset, nr);
+		offset += ret;
 		index += offset >> PAGE_CACHE_SHIFT;
 		offset &= ~PAGE_CACHE_MASK;
 
 		page_cache_release(page);
+		if (ret != nr || !desc->count)
+			break;
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
@@ -1209,27 +1214,43 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 
 static ssize_t shmem_file_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 {
-	ssize_t retval;
+	read_descriptor_t desc;
 
-	retval = -EFAULT;
-	if (access_ok(VERIFY_WRITE, buf, count)) {
-		retval = 0;
+	if ((ssize_t) count < 0)
+		return -EINVAL;
+	if (!access_ok(VERIFY_WRITE, buf, count))
+		return -EFAULT;
+	if (!count)
+		return 0;
 
-		if (count) {
-			read_descriptor_t desc;
+	desc.written = 0;
+	desc.count = count;
+	desc.buf = buf;
+	desc.error = 0;
 
-			desc.written = 0;
-			desc.count = count;
-			desc.buf = buf;
-			desc.error = 0;
-			do_shmem_file_read(filp, ppos, &desc);
+	do_shmem_file_read(filp, ppos, &desc, file_read_actor);
+	if (desc.written)
+		return desc.written;
+	return desc.error;
+}
 
-			retval = desc.written;
-			if (!retval)
-				retval = desc.error;
-		}
-	}
-	return retval;
+static ssize_t shmem_file_sendfile(struct file *out_file,
+	struct file *in_file, loff_t *ppos, size_t count)
+{
+	read_descriptor_t desc;
+
+	if (!count)
+		return 0;
+
+	desc.written = 0;
+	desc.count = count;
+	desc.buf = (char *)out_file;
+	desc.error = 0;
+
+	do_shmem_file_read(in_file, ppos, &desc, file_send_actor);
+	if (desc.written)
+		return desc.written;
+	return desc.error;
 }
 
 static int shmem_statfs(struct super_block *sb, struct statfs *buf)
@@ -1649,6 +1670,7 @@ static struct file_operations shmem_file_operations = {
 	.read		= shmem_file_read,
 	.write		= shmem_file_write,
 	.fsync		= simple_sync_file,
+	.sendfile	= shmem_file_sendfile,
 #endif
 };
 
