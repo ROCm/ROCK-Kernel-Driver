@@ -140,6 +140,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define S_NOQUOTA	64	/* Inode is not counted to quota */
 #define S_DIRSYNC	128	/* Directory modifications are synchronous */
 #define S_NOCMTIME	256	/* Do not update file c/mtime */
+#define S_SWAPFILE	512	/* Do not truncate: swapon got its bmaps */
 
 /*
  * Note that nosuid etc flags are inode-specific: setting some file-system
@@ -174,6 +175,7 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 
 #define IS_DEADDIR(inode)	((inode)->i_flags & S_DEAD)
 #define IS_NOCMTIME(inode)	((inode)->i_flags & S_NOCMTIME)
+#define IS_SWAPFILE(inode)	((inode)->i_flags & S_SWAPFILE)
 
 /* the read-only stuff doesn't really belong here, but any other place is
    probably as bad and I don't want to create yet another include file. */

@@ -1,6 +1,10 @@
 /*
  * This code largely moved from arch/i386/kernel/time.c.
  * See comments there for proper credits.
+ *
+ * 2004-06-25    Jesper Juhl
+ *      moved mark_offset_tsc below cpufreq_delayed_get to avoid gcc 3.4
+ *      failing to inline.
  */
 
 #include <linux/spinlock.h>
@@ -69,7 +73,6 @@ static inline unsigned long long cycles_2_ns(unsigned long long cyc)
 {
 	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
 }
-
 
 static int count2; /* counter for mark_offset_tsc() */
 
@@ -150,119 +153,6 @@ unsigned long long sched_clock(void)
 
 	/* return the value in ns */
 	return cycles_2_ns(this_offset);
-}
-
-
-static void mark_offset_tsc(void)
-{
-	unsigned long lost,delay;
-	unsigned long delta = last_tsc_low;
-	int count;
-	int countmp;
-	static int count1 = 0;
-	unsigned long long this_offset, last_offset;
-	static int lost_count = 0;
-	
-	write_seqlock(&monotonic_lock);
-	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
-	/*
-	 * It is important that these two operations happen almost at
-	 * the same time. We do the RDTSC stuff first, since it's
-	 * faster. To avoid any inconsistencies, we need interrupts
-	 * disabled locally.
-	 */
-
-	/*
-	 * Interrupts are just disabled locally since the timer irq
-	 * has the SA_INTERRUPT flag set. -arca
-	 */
-	
-	/* read Pentium cycle counter */
-
-	rdtsc(last_tsc_low, last_tsc_high);
-
-	spin_lock(&i8253_lock);
-	outb_p(0x00, PIT_MODE);     /* latch the count ASAP */
-
-	count = inb_p(PIT_CH0);    /* read the latched count */
-	count |= inb(PIT_CH0) << 8;
-
-	/*
-	 * VIA686a test code... reset the latch if count > max + 1
-	 * from timer_pit.c - cjb
-	 */
-	if (count > LATCH) {
-		outb_p(0x34, PIT_MODE);
-		outb_p(LATCH & 0xff, PIT_CH0);
-		outb(LATCH >> 8, PIT_CH0);
-		count = LATCH - 1;
-	}
-
-	spin_unlock(&i8253_lock);
-
-	if (pit_latch_buggy) {
-		/* get center value of last 3 time lutch */
-		if ((count2 >= count && count >= count1)
-		    || (count1 >= count && count >= count2)) {
-			count2 = count1; count1 = count;
-		} else if ((count1 >= count2 && count2 >= count)
-			   || (count >= count2 && count2 >= count1)) {
-			countmp = count;count = count2;
-			count2 = count1;count1 = countmp;
-		} else {
-			count2 = count1; count1 = count; count = count1;
-		}
-	}
-
-	/* lost tick compensation */
-	delta = last_tsc_low - delta;
-	{
-		register unsigned long eax, edx;
-		eax = delta;
-		__asm__("mull %2"
-		:"=a" (eax), "=d" (edx)
-		:"rm" (fast_gettimeoffset_quotient),
-		 "0" (eax));
-		delta = edx;
-	}
-	delta += delay_at_last_interrupt;
-	lost = delta/(1000000/HZ);
-	delay = delta%(1000000/HZ);
-	if (lost >= 2) {
-		jiffies_64 += lost-1;
-
-		/* sanity check to ensure we're not always losing ticks */
-		if (lost_count++ > 100) {
-			printk(KERN_WARNING "Losing too many ticks!\n");
-			printk(KERN_WARNING "TSC cannot be used as a timesource.  \n");
-			printk(KERN_WARNING "Possible reasons for this are:\n");
-			printk(KERN_WARNING "  You're running with Speedstep,\n");
-			printk(KERN_WARNING "  You don't have DMA enabled for your hard disk (see hdparm),\n");
-			printk(KERN_WARNING "  Incorrect TSC synchronization on an SMP system (see dmesg).\n");
-			printk(KERN_WARNING "Falling back to a sane timesource now.\n");
-
-			clock_fallback();
-		}
-		/* ... but give the TSC a fair chance */
-		if (lost_count > 25)
-			cpufreq_delayed_get();
-	} else
-		lost_count = 0;
-	/* update the monotonic base value */
-	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
-	monotonic_base += cycles_2_ns(this_offset - last_offset);
-	write_sequnlock(&monotonic_lock);
-
-	/* calculate delay_at_last_interrupt */
-	count = ((LATCH-1) - count) * TICK_SIZE;
-	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
-
-	/* catch corner case where tick rollover occured 
-	 * between tsc and pit reads (as noted when 
-	 * usec delta is > 90% # of usecs/tick)
-	 */
-	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
-		jiffies_64++;
 }
 
 static void delay_tsc(unsigned long loops)
@@ -415,7 +305,8 @@ static int __init cpufreq_tsc(void)
 {
 	int ret;
 	INIT_WORK(&cpufreq_delayed_get_work, handle_cpufreq_delayed_get, NULL);
-	ret = cpufreq_register_notifier(&time_cpufreq_notifier_block, CPUFREQ_TRANSITION_NOTIFIER);
+	ret = cpufreq_register_notifier(&time_cpufreq_notifier_block,
+					CPUFREQ_TRANSITION_NOTIFIER);
 	if (!ret)
 		cpufreq_init = 1;
 	return ret;
@@ -426,6 +317,117 @@ core_initcall(cpufreq_tsc);
 static inline void cpufreq_delayed_get(void) { return; }
 #endif 
 
+static void mark_offset_tsc(void)
+{
+	unsigned long lost,delay;
+	unsigned long delta = last_tsc_low;
+	int count;
+	int countmp;
+	static int count1 = 0;
+	unsigned long long this_offset, last_offset;
+	static int lost_count = 0;
+
+	write_seqlock(&monotonic_lock);
+	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
+	/*
+	 * It is important that these two operations happen almost at
+	 * the same time. We do the RDTSC stuff first, since it's
+	 * faster. To avoid any inconsistencies, we need interrupts
+	 * disabled locally.
+	 */
+
+	/*
+	 * Interrupts are just disabled locally since the timer irq
+	 * has the SA_INTERRUPT flag set. -arca
+	 */
+
+	/* read Pentium cycle counter */
+
+	rdtsc(last_tsc_low, last_tsc_high);
+
+	spin_lock(&i8253_lock);
+	outb_p(0x00, PIT_MODE);     /* latch the count ASAP */
+
+	count = inb_p(PIT_CH0);    /* read the latched count */
+	count |= inb(PIT_CH0) << 8;
+
+	/*
+	 * VIA686a test code... reset the latch if count > max + 1
+	 * from timer_pit.c - cjb
+	 */
+	if (count > LATCH) {
+		outb_p(0x34, PIT_MODE);
+		outb_p(LATCH & 0xff, PIT_CH0);
+		outb(LATCH >> 8, PIT_CH0);
+		count = LATCH - 1;
+	}
+
+	spin_unlock(&i8253_lock);
+
+	if (pit_latch_buggy) {
+		/* get center value of last 3 time lutch */
+		if ((count2 >= count && count >= count1)
+		    || (count1 >= count && count >= count2)) {
+			count2 = count1; count1 = count;
+		} else if ((count1 >= count2 && count2 >= count)
+			   || (count >= count2 && count2 >= count1)) {
+			countmp = count;count = count2;
+			count2 = count1;count1 = countmp;
+		} else {
+			count2 = count1; count1 = count; count = count1;
+		}
+	}
+
+	/* lost tick compensation */
+	delta = last_tsc_low - delta;
+	{
+		register unsigned long eax, edx;
+		eax = delta;
+		__asm__("mull %2"
+		:"=a" (eax), "=d" (edx)
+		:"rm" (fast_gettimeoffset_quotient),
+		 "0" (eax));
+		delta = edx;
+	}
+	delta += delay_at_last_interrupt;
+	lost = delta/(1000000/HZ);
+	delay = delta%(1000000/HZ);
+	if (lost >= 2) {
+		jiffies_64 += lost-1;
+
+		/* sanity check to ensure we're not always losing ticks */
+		if (lost_count++ > 100) {
+			printk(KERN_WARNING "Losing too many ticks!\n");
+			printk(KERN_WARNING "TSC cannot be used as a timesource.  \n");
+			printk(KERN_WARNING "Possible reasons for this are:\n");
+			printk(KERN_WARNING "  You're running with Speedstep,\n");
+			printk(KERN_WARNING "  You don't have DMA enabled for your hard disk (see hdparm),\n");
+			printk(KERN_WARNING "  Incorrect TSC synchronization on an SMP system (see dmesg).\n");
+			printk(KERN_WARNING "Falling back to a sane timesource now.\n");
+
+			clock_fallback();
+		}
+		/* ... but give the TSC a fair chance */
+		if (lost_count > 25)
+			cpufreq_delayed_get();
+	} else
+		lost_count = 0;
+	/* update the monotonic base value */
+	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
+	monotonic_base += cycles_2_ns(this_offset - last_offset);
+	write_sequnlock(&monotonic_lock);
+
+	/* calculate delay_at_last_interrupt */
+	count = ((LATCH-1) - count) * TICK_SIZE;
+	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
+
+	/* catch corner case where tick rollover occured
+	 * between tsc and pit reads (as noted when
+	 * usec delta is > 90% # of usecs/tick)
+	 */
+	if (lost && abs(delay - delay_at_last_interrupt) > (900000/HZ))
+		jiffies_64++;
+}
 
 static int __init init_tsc(char* override)
 {

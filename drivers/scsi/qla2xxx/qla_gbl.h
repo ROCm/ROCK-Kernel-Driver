@@ -23,6 +23,8 @@
 #ifndef __QLA_GBL_H
 #define	__QLA_GBL_H
 
+#include <linux/interrupt.h>
+
 extern void qla2x00_remove_one(struct pci_dev *);
 extern int qla2x00_probe_one(struct pci_dev *, struct qla_board_info *);
 
@@ -64,6 +66,7 @@ extern int qlport_down_retry;
 extern int ql2xmaxqdepth;
 extern int displayConfig;
 extern int ql2xplogiabsentdevice;
+extern int ql2xenablezio;
 extern int ql2xintrdelaytimer;
 extern int ql2xloginretrycount;
 
@@ -74,8 +77,6 @@ extern int ql2xsuspendcount;
 #if defined(MODULE)
 extern char *ql2xopts;
 #endif
-extern struct list_head qla_hostlist;
-extern rwlock_t qla_hostlist_lock;
 
 extern char *qla2x00_get_fw_version_str(struct scsi_qla_host *, char *);
 
@@ -140,7 +141,7 @@ qla2x00_execute_fw(scsi_qla_host_t *);
 
 extern void
 qla2x00_get_fw_version(scsi_qla_host_t *, uint16_t *,
-    uint16_t *, uint16_t *, uint16_t *);
+    uint16_t *, uint16_t *, uint16_t *, uint32_t *);
 
 extern int
 qla2x00_get_fw_options(scsi_qla_host_t *, uint16_t *);

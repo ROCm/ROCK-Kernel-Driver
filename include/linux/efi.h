@@ -305,6 +305,10 @@ extern unsigned long __init efi_get_time(void);
 extern int __init efi_set_rtc_mmss(unsigned long nowtime);
 extern struct efi_memory_map memmap;
 
+#ifdef CONFIG_EFI_PCDP
+extern void __init efi_setup_pcdp_console(char *);
+#endif
+
 /*
  * We play games with efi_enabled so that the compiler will, if possible, remove
  * EFI-related code altogether.

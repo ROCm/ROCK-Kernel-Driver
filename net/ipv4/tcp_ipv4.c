@@ -2094,7 +2094,7 @@ static int tcp_v4_init_sock(struct sock *sk)
 	return 0;
 }
 
-static int tcp_v4_destroy_sock(struct sock *sk)
+int tcp_v4_destroy_sock(struct sock *sk)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 
@@ -2117,6 +2117,8 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 
 	return 0;
 }
+
+EXPORT_SYMBOL(tcp_v4_destroy_sock);
 
 #ifdef CONFIG_PROC_FS
 /* Proc filesystem TCP sock list dumping. */

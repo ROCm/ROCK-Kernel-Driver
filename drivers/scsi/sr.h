@@ -17,18 +17,20 @@
 #ifndef _SR_H
 #define _SR_H
 
-#include "scsi.h"
 #include <linux/genhd.h>
 #include <linux/kref.h>
+
+struct scsi_device;
 
 /* The CDROM is fairly slow, so we need a little extra time */
 /* In fact, it is very slow if it has to spin up first */
 #define IOCTL_TIMEOUT 30*HZ
 
+
 typedef struct scsi_cd {
 	struct scsi_driver *driver;
 	unsigned capacity;	/* size in blocks                       */
-	Scsi_Device *device;
+	struct scsi_device *device;
 	unsigned int vendor;	/* vendor code, see sr_vendor.c         */
 	unsigned long ms_offset;	/* for reading multisession-CD's        */
 	unsigned needs_sector_size:1;	/* needs to get sector size */

@@ -57,11 +57,9 @@ struct smb_sb_info {
 	unsigned int generation;
 	pid_t conn_pid;
 	struct smb_conn_opt opt;
-
+	wait_queue_head_t conn_wq;
+	int conn_complete;
 	struct semaphore sem;
-
-        unsigned short     rcls; /* The error codes we received */
-        unsigned short     err;
 
 	unsigned char      header[SMB_HEADER_LEN + 20*2 + 2];
 	u32                header_len;

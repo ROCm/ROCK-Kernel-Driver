@@ -30,6 +30,8 @@
 #include <asm/ocp.h>
 #include <asm/kgdb.h>
 
+#include <syslib/ppc85xx_setup.h>
+
 /* Return the amount of memory */
 unsigned long __init
 mpc85xx_find_end_of_memory(void)

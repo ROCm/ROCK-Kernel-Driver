@@ -610,6 +610,7 @@ int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 	unsigned char *b;
 	struct nlmsghdr *nlh;
 	struct tcamsg *t;
+	struct netlink_callback dcb;
 	struct rtattr *x;
 	struct rtattr *tb[TCA_ACT_MAX+1];
 	struct rtattr *kind = NULL;
@@ -646,7 +647,7 @@ int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 	x = (struct rtattr *) skb->tail;
 	RTA_PUT(skb, TCA_ACT_TAB, 0, NULL);
 
-	err = a->ops->walk(skb, NULL, RTM_DELACTION, a);
+	err = a->ops->walk(skb, &dcb, RTM_DELACTION, a);
 	if (0 > err ) {
 		goto rtattr_failure;
 	}

@@ -954,7 +954,8 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 	}
 
 	/* do not  need local check to inode_check_ok since the server does that */
-	inode_setattr(direntry->d_inode, attrs);
+	if (!rc)
+		rc = inode_setattr(direntry->d_inode, attrs);
 	if (full_path)
 		kfree(full_path);
 	FreeXid(xid);

@@ -153,6 +153,32 @@ ENTRY(startup_32_smp)
 	orl %edx,%eax
 	movl %eax,%cr4
 
+	btl $5, %eax		# check if PAE is enabled
+	jnc 6f
+
+	/* Check if extended functions are implemented */
+	movl $0x80000000, %eax
+	cpuid
+	cmpl $0x80000000, %eax
+	jbe 6f
+	mov $0x80000001, %eax
+	cpuid
+	/* Execute Disable bit supported? */
+	btl $20, %edx
+	jnc 6f
+
+	/* Setup EFER (Extended Feature Enable Register) */
+	movl $0xc0000080, %ecx
+	rdmsr
+
+	btsl $11, %eax
+	/* Make changes effective */
+	wrmsr
+
+6:
+	/* cpuid clobbered ebx, set it up again: */
+	xorl %ebx,%ebx
+	incl %ebx
 3:
 #endif /* CONFIG_SMP */
 

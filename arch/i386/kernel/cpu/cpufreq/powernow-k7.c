@@ -22,6 +22,7 @@
 #include <linux/cpufreq.h>
 #include <linux/slab.h>
 #include <linux/string.h>
+#include <linux/dmi.h>
 
 #include <asm/msr.h>
 #include <asm/timex.h>
@@ -554,6 +555,31 @@ static unsigned int powernow_get(unsigned int cpu)
 }
 
 
+static int __init acer_cpufreq_pst(struct dmi_system_id *d)
+{
+	printk(KERN_WARNING "%s laptop with broken PST tables in BIOS detected.\n", d->ident);
+	printk(KERN_WARNING "You need to downgrade to 3A21 (09/09/2002), or try a newer BIOS than 3A71 (01/20/2003)\n");
+	printk(KERN_WARNING "cpufreq scaling has been disabled as a result of this.\n");
+	return 0;
+}
+
+/*
+ * Some Athlon laptops have really fucked PST tables.
+ * A BIOS update is all that can save them.
+ * Mention this, and disable cpufreq.
+ */
+static struct dmi_system_id __initdata powernow_dmi_table[] = {
+	{
+		.callback = acer_cpufreq_pst,
+		.ident = "Acer Aspire",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Insyde Software"),
+			DMI_MATCH(DMI_BIOS_VERSION, "3A71"),
+		},
+	},
+	{ }
+};
+
 static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 {
 	union msr_fidvidstatus fidvidstatus;
@@ -572,7 +598,7 @@ static int __init powernow_cpu_init (struct cpufreq_policy *policy)
 	}
 	dprintk(KERN_INFO PFX "FSB: %3d.%03d MHz\n", fsb/1000, fsb%1000);
 
-	if ((dmi_broken & BROKEN_CPUFREQ) || acpi_force) {
+ 	if (dmi_check_system(powernow_dmi_table) || acpi_force) {
 		printk (KERN_INFO PFX "PSB/PST known to be broken.  Trying ACPI instead\n");
 		result = powernow_acpi_init();
 	} else {

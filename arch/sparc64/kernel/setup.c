@@ -47,6 +47,7 @@
 #include <asm/mmu_context.h>
 #include <asm/timer.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
 
 #ifdef CONFIG_IP_PNP
 #include <net/ipconfig.h>

@@ -360,6 +360,8 @@ EXPORT_SYMBOL(__bzero_noasi);
 EXPORT_SYMBOL(phys_base);
 EXPORT_SYMBOL(pfn_base);
 EXPORT_SYMBOL(sparc64_valid_addr_bitmap);
+EXPORT_SYMBOL(page_to_pfn);
+EXPORT_SYMBOL(pfn_to_page);
 
 /* No version information on this, heavily used in inline asm,
  * and will always be 'void __ret_efault(void)'.

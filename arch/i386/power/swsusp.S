@@ -18,7 +18,7 @@
 ENTRY(do_magic)
 	pushl %ebx
 	cmpl $0,8(%esp)
-	jne .L1450
+	jne resume
 	call do_magic_suspend_1
 	call save_processor_state
 
@@ -33,21 +33,21 @@ ENTRY(do_magic)
 	pushfl ; popl saved_context_eflags
 
 	call do_magic_suspend_2
-	jmp .L1449
-	.p2align 4,,7
-.L1450:
+	popl %ebx
+	ret
+
+resume:
 	movl $swsusp_pg_dir-__PAGE_OFFSET,%ecx
 	movl %ecx,%cr3
 
 	call do_magic_resume_1
 	movl $0,loop
 	cmpl $0,nr_copy_pages
-	je .L1453
-	.p2align 4,,7
-.L1455:
+	je copy_done
+copy_loop:
 	movl $0,loop2
 	.p2align 4,,7
-.L1459:
+copy_one_page:
 	movl pagedir_nosave,%ecx
 	movl loop,%eax
 	movl loop2,%edx
@@ -56,23 +56,21 @@ ENTRY(do_magic)
 	movl (%ecx,%eax),%eax
 	movb (%edx,%eax),%al
 	movb %al,(%edx,%ebx)
-	movl %cr3, %eax;              
-	movl %eax, %cr3;  # flush TLB 
 
 	movl loop2,%eax
 	leal 1(%eax),%edx
 	movl %edx,loop2
 	movl %edx,%eax
 	cmpl $4095,%eax
-	jbe .L1459
+	jbe copy_one_page
 	movl loop,%eax
 	leal 1(%eax),%edx
 	movl %edx,loop
 	movl %edx,%eax
 	cmpl nr_copy_pages,%eax
-	jb .L1455
-	.p2align 4,,7
-.L1453:
+	jb copy_loop
+
+copy_done:
 	movl $__USER_DS,%eax
 
 	movw %ax, %ds
@@ -88,7 +86,6 @@ ENTRY(do_magic)
 	call restore_processor_state
 	pushl saved_context_eflags ; popfl
 	call do_magic_resume_2
-.L1449:
 	popl %ebx
 	ret
 

@@ -18,6 +18,8 @@
 #include <linux/seq_file.h>
 #include <linux/tty.h>
 
+#include <asm/setup.h>
+
 /*
  * Setup options
  */

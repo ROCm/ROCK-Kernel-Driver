@@ -567,7 +567,7 @@ lec_atm_close(struct atm_vcc *vcc)
         if (skb_peek(&vcc->sk->sk_receive_queue))
 		printk("%s lec_atm_close: closing with messages pending\n",
                        dev->name);
-        while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue))) {
+        while ((skb = skb_dequeue(&vcc->sk->sk_receive_queue)) != NULL) {
                 atm_return(vcc, skb->truesize);
 		dev_kfree_skb(skb);
         }
@@ -1940,7 +1940,7 @@ lec_arp_check_expire(unsigned long data)
                                            priv->path_switching_delay)) {
 			                        struct sk_buff *skb;
 
- 				                while ((skb = skb_dequeue(&entry->tx_wait)))
+ 				                while ((skb = skb_dequeue(&entry->tx_wait)) != NULL)
 					                lec_send(entry->vcc, skb, entry->priv);
                                                 entry->last_used = jiffies;
                                                 entry->status = 
@@ -2337,7 +2337,7 @@ lec_flush_complete(struct lec_priv *priv, unsigned long tran_id)
                             entry->status == ESI_FLUSH_PENDING) {
 			        struct sk_buff *skb;
 
- 				while ((skb = skb_dequeue(&entry->tx_wait)))
+ 				while ((skb = skb_dequeue(&entry->tx_wait)) != NULL)
 					lec_send(entry->vcc, skb, entry->priv);
                                 entry->status = ESI_FORWARD_DIRECT;
                                 DPRINTK("LEC_ARP: Flushed\n");

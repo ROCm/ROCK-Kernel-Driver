@@ -329,7 +329,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	generic_identify(c);
 
-	printk(KERN_DEBUG "CPU:     After generic identify, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After generic identify, caps: %08lx %08lx %08lx %08lx\n",
 		c->x86_capability[0],
 		c->x86_capability[1],
 		c->x86_capability[2],
@@ -338,7 +338,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 	if (this_cpu->c_identify) {
 		this_cpu->c_identify(c);
 
-	printk(KERN_DEBUG "CPU:     After vendor identify, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After vendor identify, caps:  %08lx %08lx %08lx %08lx\n",
 		c->x86_capability[0],
 		c->x86_capability[1],
 		c->x86_capability[2],
@@ -393,7 +393,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk(KERN_DEBUG "CPU:     After all inits, caps: %08lx %08lx %08lx %08lx\n",
+	printk(KERN_DEBUG "CPU: After all inits, caps:        %08lx %08lx %08lx %08lx\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],

@@ -24,7 +24,7 @@
 #define PIRQ_VERSION 0x0100
 
 static int broken_hp_bios_irq9;
-int acer_tm360_irqrouting;
+static int acer_tm360_irqrouting;
 
 static struct irq_routing_table *pirq_table;
 
@@ -916,6 +916,19 @@ static int __init fix_broken_hp_bios_irq9(struct dmi_system_id *d)
 	return 0;
 }
 
+/*
+ * Work around broken Acer TravelMate 360 Notebooks which assign
+ * Cardbus to IRQ 11 even though it is actually wired to IRQ 10
+ */
+static int __init fix_acer_tm360_irqrouting(struct dmi_system_id *d)
+{
+	if (!acer_tm360_irqrouting) {
+		acer_tm360_irqrouting = 1;
+		printk(KERN_INFO "%s detected - fixing broken IRQ routing\n", d->ident);
+	}
+	return 0;
+}
+
 static struct dmi_system_id __initdata pciirq_dmi_table[] = {
 	{
 		.callback = fix_broken_hp_bios_irq9,
@@ -925,6 +938,14 @@ static struct dmi_system_id __initdata pciirq_dmi_table[] = {
 			DMI_MATCH(DMI_BIOS_VERSION, "GE.M1.03"),
 			DMI_MATCH(DMI_PRODUCT_VERSION, "HP Pavilion Notebook Model GE"),
 			DMI_MATCH(DMI_BOARD_VERSION, "OmniBook N32N-736"),
+		},
+	},
+	{
+		.callback = fix_acer_tm360_irqrouting,
+		.ident = "Acer TravelMate 36x Laptop",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Acer"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 360"),
 		},
 	},
 	{ }

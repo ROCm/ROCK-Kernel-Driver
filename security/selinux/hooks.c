@@ -3434,28 +3434,6 @@ out:
 	return err;
 }
 
-static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
-{
-	int err = 0;
-	
-	if (capable(CAP_NET_ADMIN))
-		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
-	else
-		NETLINK_CB(skb).eff_cap = 0;
-	
-	if (policydb_loaded_version >= POLICYDB_VERSION_NLCLASS)
-		err = selinux_nlmsg_perm(sk, skb);
-	
-	return err;
-}
-
-static int selinux_netlink_recv(struct sk_buff *skb)
-{
-	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
-		return -EPERM;
-	return 0;
-}
-
 #ifdef CONFIG_NETFILTER
 
 static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
@@ -3591,7 +3569,36 @@ static unsigned int selinux_ipv6_postroute_last(unsigned int hooknum,
 
 #endif	/* CONFIG_NETFILTER */
 
+#else
+
+static inline int selinux_nlmsg_perm(struct sock *sk, struct sk_buff *skb)
+{
+	return 0;
+}
+
 #endif	/* CONFIG_SECURITY_NETWORK */
+
+static int selinux_netlink_send(struct sock *sk, struct sk_buff *skb)
+{
+	int err = 0;
+
+	if (capable(CAP_NET_ADMIN))
+		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);
+	else
+		NETLINK_CB(skb).eff_cap = 0;
+
+	if (policydb_loaded_version >= POLICYDB_VERSION_NLCLASS)
+		err = selinux_nlmsg_perm(sk, skb);
+
+	return err;
+}
+
+static int selinux_netlink_recv(struct sk_buff *skb)
+{
+	if (!cap_raised(NETLINK_CB(skb).eff_cap, CAP_NET_ADMIN))
+		return -EPERM;
+	return 0;
+}
 
 static int ipc_alloc_security(struct task_struct *task,
 			      struct kern_ipc_perm *perm,

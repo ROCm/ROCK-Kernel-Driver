@@ -1075,6 +1075,15 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		n_type = ext_hdrs[SADB_X_EXT_NAT_T_TYPE-1];
 		natt->encap_type = n_type->sadb_x_nat_t_type_type;
 
+		switch (natt->encap_type) {
+		case UDP_ENCAP_ESPINUDP:
+		case UDP_ENCAP_ESPINUDP_NON_IKE:
+			break;
+		default:
+			err = -ENOPROTOOPT;
+			goto out;
+		}
+
 		if (ext_hdrs[SADB_X_EXT_NAT_T_SPORT-1]) {
 			struct sadb_x_nat_t_port* n_port =
 				ext_hdrs[SADB_X_EXT_NAT_T_SPORT-1];

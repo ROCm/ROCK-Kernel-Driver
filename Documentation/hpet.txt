@@ -103,7 +103,7 @@ hpet_open_close(int argc, const char **argv)
 		return;
 	}
 
-	fd = open(argv[0], O_RDWR);
+	fd = open(argv[0], O_RDONLY);
 	if (fd < 0)
 		fprintf(stderr, "hpet_open_close: open failed\n");
 	else
@@ -136,7 +136,7 @@ hpet_poll(int argc, const char **argv)
 	freq = atoi(argv[1]);
 	iterations = atoi(argv[2]);
 
-	fd = open(argv[0], O_RDWR);
+	fd = open(argv[0], O_RDONLY);
 
 	if (fd < 0) {
 		fprintf(stderr, "hpet_poll: open of %s failed\n", argv[0]);
@@ -230,7 +230,7 @@ hpet_fasync(int argc, const char **argv)
 		goto out;
 	}
 
-	fd = open(argv[0], O_RDWR);
+	fd = open(argv[0], O_RDONLY);
 
 	if (fd < 0) {
 		fprintf(stderr, "hpet_fasync: failed to open %s\n", argv[0]);

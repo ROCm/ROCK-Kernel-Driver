@@ -3,7 +3,8 @@
  */
 #include <linux/types.h>
 #include <asm/mpc8260.h>
-#include <asm/cpm_8260.h>
+#include <asm/cpm2.h>
+#include <asm/immap_cpm2.h>
 
 uint	no_print;
 extern char	*params[];
@@ -29,12 +30,12 @@ serial_init(int ignored, bd_t *bd)
 	volatile scc_uart_t	*sup;
 #endif
 	volatile cbd_t	*tbdf, *rbdf;
-	volatile immap_t	*ip;
-	volatile iop8260_t	*io;
-	volatile cpm8260_t	*cp;
+	volatile cpm2_map_t	*ip;
+	volatile iop_cpm2_t	*io;
+	volatile cpm_cpm2_t	*cp;
 	uint	dpaddr, memaddr;
 
-	ip = (immap_t *)IMAP_ADDR;
+	ip = (cpm2_map_t *)CPM_MAP_ADDR;
 	cp = &ip->im_cpm;
 	io = &ip->im_ioport;
 
@@ -223,10 +224,10 @@ serial_readbuf(u_char *cbuf)
 	volatile char		*buf;
 	volatile smc_uart_t	*up;
 	volatile scc_uart_t	*sup;
-	volatile immap_t	*ip;
+	volatile cpm2_map_t	*ip;
 	int	i, nc;
 
-	ip = (immap_t *)IMAP_ADDR;
+	ip = (cpm2_map_t *)CPM_MAP_ADDR;
 
 #ifdef SCC_CONSOLE
 	sup = (scc_uart_t *)&ip->im_dprambase[PROFF_SCC1 + ((SCC_CONSOLE-1) << 8)];
@@ -255,10 +256,10 @@ serial_putc(void *ignored, const char c)
 	volatile char		*buf;
 	volatile smc_uart_t	*up;
 	volatile scc_uart_t	*sup;
-	volatile immap_t	*ip;
+	volatile cpm2_map_t	*ip;
 	extern bd_t		*board_info;
 
-	ip = (immap_t *)IMAP_ADDR;
+	ip = (cpm2_map_t *)CPM_MAP_ADDR;
 #ifdef SCC_CONSOLE
 	sup = (scc_uart_t *)&ip->im_dprambase[PROFF_SCC1 + ((SCC_CONSOLE-1) << 8)];
 	tbdf = (cbd_t *)&ip->im_dprambase[sup->scc_genscc.scc_tbase];
@@ -298,9 +299,9 @@ serial_tstc(void *ignored)
 	volatile cbd_t		*rbdf;
 	volatile smc_uart_t	*up;
 	volatile scc_uart_t	*sup;
-	volatile immap_t	*ip;
+	volatile cpm2_map_t	*ip;
 
-	ip = (immap_t *)IMAP_ADDR;
+	ip = (cpm2_map_t *)CPM_MAP_ADDR;
 #ifdef SCC_CONSOLE
 	sup = (scc_uart_t *)&ip->im_dprambase[PROFF_SCC1 + ((SCC_CONSOLE-1) << 8)];
 	rbdf = (cbd_t *)&ip->im_dprambase[sup->scc_genscc.scc_rbase];

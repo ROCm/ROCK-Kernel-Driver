@@ -33,7 +33,7 @@ void radeonfb_fillrect(struct fb_info *info, const struct fb_fillrect *region)
   
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
-	if (radeon_accel_disabled()) {
+	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_fillrect(info, region);
 		return;
 	}
@@ -99,7 +99,7 @@ void radeonfb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
   
 	if (info->state != FBINFO_STATE_RUNNING)
 		return;
-	if (radeon_accel_disabled()) {
+	if (info->flags & FBINFO_HWACCEL_DISABLED) {
 		cfb_copyarea(info, area);
 		return;
 	}

@@ -17,7 +17,7 @@
 #include <linux/config.h>
 #include <linux/seq_file.h>
 
-#include <asm/immap_8260.h>
+#include <asm/immap_cpm2.h>
 #include <asm/mpc8260.h>
 #include <asm/machdep.h>
 
@@ -44,8 +44,8 @@ tqm8260_show_cpuinfo(struct seq_file *m)
 static int
 tqm8260_set_rtc_time(unsigned long time)
 {
-	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt = time;
-	((immap_t *)IMAP_ADDR)->im_sit.sit_tmcntsc = 0x3;
+	((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcnt = time;
+	((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcntsc = 0x3;
 
 	return(0);
 }
@@ -53,7 +53,7 @@ tqm8260_set_rtc_time(unsigned long time)
 static unsigned long
 tqm8260_get_rtc_time(void)
 {
-	return ((immap_t *)IMAP_ADDR)->im_sit.sit_tmcnt;
+	return ((cpm2_map_t *)CPM_MAP_ADDR)->im_sit.sit_tmcnt;
 }
 
 static void __init

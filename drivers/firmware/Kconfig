@@ -34,4 +34,23 @@ config EFI_VARS
 	  Subsequent efibootmgr releases may be found at:
 	  http://linux.dell.com/efibootmgr
 
+config EFI_PCDP
+	bool "Console device selection via EFI PCDP or HCDP table"
+	depends on ACPI && EFI && IA64
+	default y if IA64
+	help
+	  If your firmware supplies the PCDP table, and you want to
+	  automatically use the primary console device it describes
+	  as the Linux console, say Y here.
+
+	  If your firmware supplies the HCDP table, and you want to
+	  use the first serial port it describes as the Linux console,
+	  say Y here.  If your EFI ConOut path contains only a UART
+	  device, it will become the console automatically.  Otherwise,
+	  you must specify the "console=ttyS0" kernel boot argument.
+
+	  You must also enable the appropriate drivers (serial, VGA, etc.)
+
+	  See <http://www.dig64.org/specifications/DIG64_HCDPv20_042804.pdf>
+
 endmenu

@@ -1072,6 +1072,7 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	unsigned short *swap_map;
 	struct file *swap_file, *victim;
 	struct address_space *mapping;
+	struct inode *inode;
 	char * pathname;
 	int i, type, prev;
 	int err;
@@ -1165,12 +1166,15 @@ asmlinkage long sys_swapoff(const char __user * specialfile)
 	swap_list_unlock();
 	up(&swapon_sem);
 	vfree(swap_map);
-	if (S_ISBLK(mapping->host->i_mode)) {
-		struct block_device *bdev = I_BDEV(mapping->host);
+	inode = mapping->host;
+	if (S_ISBLK(inode->i_mode)) {
+		struct block_device *bdev = I_BDEV(inode);
 		set_blocksize(bdev, p->old_block_size);
 		bd_release(bdev);
 	} else {
-		up(&mapping->host->i_sem);
+		down(&inode->i_sem);
+		inode->i_flags &= ~S_SWAPFILE;
+		up(&inode->i_sem);
 	}
 	filp_close(swap_file, NULL);
 	err = 0;
@@ -1388,6 +1392,10 @@ asmlinkage long sys_swapon(const char __user * specialfile, int swap_flags)
 		p->bdev = inode->i_sb->s_bdev;
 		down(&inode->i_sem);
 		did_down = 1;
+		if (IS_SWAPFILE(inode)) {
+			error = -EBUSY;
+			goto bad_swap;
+		}
 	} else {
 		goto bad_swap;
 	}
@@ -1560,8 +1568,11 @@ out:
 	}
 	if (name)
 		putname(name);
-	if (error && did_down)
+	if (did_down) {
+		if (!error)
+			inode->i_flags |= S_SWAPFILE;
 		up(&inode->i_sem);
+	}
 	return error;
 }
 

@@ -827,6 +827,7 @@ The interface functions are listed below in alphabetical order.
 Summary:
    bios_param - fetch head, sector, cylinder info for a disk
    detect - detects HBAs this driver wants to control
+   eh_timed_out - notify the host that a command timer expired
    eh_abort_handler - abort given command
    eh_bus_reset_handler - issue SCSI bus reset
    eh_device_reset_handler - issue SCSI device reset
@@ -892,6 +893,32 @@ Details:
  *                       not invoked in "hotplug initialization mode")
  **/
     int detect(struct scsi_host_template * shtp)
+
+
+/**
+ *      eh_timed_out - The timer for the command has just fired
+ *      @scp: identifies command timing out
+ *
+ *      Returns:
+ *
+ *	EH_HANDLED:		I fixed the error, please complete the command
+ *	EH_RESET_TIMER:		I need more time, reset the timer and
+ *				begin counting again
+ *	EH_NOT_HANDLED		Begin normal error recovery
+
+ *
+ *      Locks: None held
+ *
+ *      Calling context: interrupt
+ *
+ *	Notes: This is to give the LLD an opportunity to do local recovery.
+ *	This recovery is limited to determining if the outstanding command
+ *	will ever complete.  You may not abort and restart the command from
+ *	this callback.
+ *
+ *      Optionally defined in: LLD
+ **/
+     int eh_timed_out(struct scsi_cmnd * scp)
 
 
 /**

@@ -40,6 +40,7 @@
 #include <linux/i2c.h>
 #include <linux/init.h>
 #include <linux/apm_bios.h>
+#include <linux/dmi.h>
 #include <asm/io.h>
 
 
@@ -114,18 +115,13 @@ static int piix4_transaction(void);
 static unsigned short piix4_smba = 0;
 static struct i2c_adapter piix4_adapter;
 
-/*
- * Get DMI information.
- */
-static int __devinit ibm_dmi_probe(void)
-{
-#ifdef CONFIG_X86
-	extern int is_unsafe_smbus;
-	return is_unsafe_smbus;
-#else
-	return 0;
-#endif
-}
+static struct dmi_system_id __devinitdata piix4_dmi_table[] = {
+	{
+		.ident = "IBM",
+		.matches = { DMI_MATCH(DMI_SYS_VENDOR, "IBM"), },
+	},
+	{ },
+};
 
 static int __devinit piix4_setup(struct pci_dev *PIIX4_dev,
 				const struct pci_device_id *id)
@@ -138,7 +134,9 @@ static int __devinit piix4_setup(struct pci_dev *PIIX4_dev,
 
 	dev_info(&PIIX4_dev->dev, "Found %s device\n", pci_name(PIIX4_dev));
 
-	if(ibm_dmi_probe() && PIIX4_dev->vendor == PCI_VENDOR_ID_INTEL) {
+	/* Don't access SMBus on IBM systems which get corrupted eeproms */
+	if (dmi_check_system(piix4_dmi_table) &&
+			PIIX4_dev->vendor == PCI_VENDOR_ID_INTEL) {
 		dev_err(&PIIX4_dev->dev, "IBM Laptop detected; this module "
 			"may corrupt your serial eeprom! Refusing to load "
 			"module!\n");

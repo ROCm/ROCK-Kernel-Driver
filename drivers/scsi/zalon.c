@@ -4,27 +4,13 @@
  */
 
 #include <linux/init.h>
-#include <linux/types.h>
-#include <linux/stat.h>
-#include <linux/mm.h>
-#include <linux/blkdev.h>
-#include <linux/sched.h>
-#include <linux/version.h>
-#include <linux/config.h>
+#include <linux/interrupt.h>
 #include <linux/module.h>
-
-#include <scsi/scsicam.h>
-
-#include <asm/page.h>
-#include <asm/pgtable.h>
-#include <asm/irq.h>
+#include <linux/types.h>
 #include <asm/hardware.h>
-#include <asm/delay.h>
 #include <asm/io.h>
 
 #include "../parisc/gsc.h"
-#include "scsi.h"
-#include <scsi/scsi_host.h>
 
 #include "ncr53c8xx.h"
 
@@ -40,20 +26,18 @@ MODULE_LICENSE("GPL");
 #define IO_MODULE_IO_COMMAND	(12*4)
 #define IO_MODULE_IO_STATUS	(13*4)
 
-#define IOSTATUS_RY             0x40
-#define IOSTATUS_FE             0x80
-#define IOIIDATA_SMINT5L        0x40000000
-#define IOIIDATA_MINT5EN        0x20000000
-#define IOIIDATA_PACKEN         0x10000000
-#define IOIIDATA_PREFETCHEN     0x08000000
-#define IOIIDATA_IOII           0x00000020
+#define IOSTATUS_RY		0x40
+#define IOSTATUS_FE		0x80
+#define IOIIDATA_SMINT5L	0x40000000
+#define IOIIDATA_MINT5EN	0x20000000
+#define IOIIDATA_PACKEN		0x10000000
+#define IOIIDATA_PREFETCHEN	0x08000000
+#define IOIIDATA_IOII		0x00000020
 
 #define CMD_RESET		5
 
-static ncr_chip zalon720_chip __initdata = {
-	.device_id =	PSEUDO_720_ID,
+static struct ncr_chip zalon720_chip __initdata = {
 	.revision_id =	0x0f,
-	.name =		"720",
 	.burst_max =	3,
 	.offset_max =	8,
 	.nr_divisor =	4,
@@ -93,7 +77,7 @@ lasi_scsi_clock(void * hpa, int defaultclock)
 }
 #endif
 
-static Scsi_Host_Template zalon7xx_template = {
+static struct scsi_host_template zalon7xx_template = {
 	.module		= THIS_MODULE,
 	.proc_name	= "zalon7xx",
 };
@@ -123,7 +107,7 @@ zalon_probe(struct parisc_device *dev)
 	/* Setup the interrupts first.
 	** Later on request_irq() will register the handler.
 	*/
-        irq = gsc_alloc_irq(&gsc_irq);
+	irq = gsc_alloc_irq(&gsc_irq);
 
 	printk("%s: Zalon vers field is 0x%x, IRQ %d\n", __FUNCTION__,
 		zalon_vers, irq);
@@ -155,7 +139,7 @@ zalon_probe(struct parisc_device *dev)
 
 	if (request_irq(irq, ncr53c8xx_intr, SA_SHIRQ, dev->dev.bus_id, host)) {
 		printk(KERN_ERR "%s: irq problem with %d, detaching\n ",
-		       dev->dev.bus_id, irq);
+			dev->dev.bus_id, irq);
 		goto fail;
 	}
 

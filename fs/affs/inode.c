@@ -249,7 +249,7 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 		goto out;
 	}
 
-	inode_setattr(inode, attr);
+	error = inode_setattr(inode, attr);
 	if (!error && (attr->ia_valid & ATTR_MODE))
 		mode_to_prot(inode);
 out:

@@ -38,6 +38,7 @@
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
 #include <asm/system.h>
 
 struct cpuinfo_mips cpu_data[NR_CPUS];
@@ -489,7 +490,7 @@ void __init setup_arch(char **cmdline_p)
 	do_earlyinitcalls();
 
 	strlcpy(command_line, arcs_cmdline, sizeof(command_line));
-	strlcpy(saved_command_line, command_line, sizeof(saved_command_line));
+	strlcpy(saved_command_line, command_line, COMMAND_LINE_SIZE);
 
 	*cmdline_p = command_line;
 

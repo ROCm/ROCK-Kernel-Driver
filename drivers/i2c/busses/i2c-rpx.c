@@ -50,7 +50,8 @@ rpx_iic_init(struct i2c_algo_8xx_data *data)
 	/* Allocate space for two transmit and two receive buffer
 	 * descriptors in the DP ram.
 	 */
-	data->dp_addr = m8xx_cpm_dpalloc(sizeof(cbd_t) * 4);
+	data->dp_addr = m8xx_cpm_dpram_offset(m8xx_cpm_dpalloc(sizeof(cbd_t)
+				* 4));
 
 	/* ptr to i2c area */
 	data->i2c = (i2c8xx_t *)&(((immap_t *)IMAP_ADDR)->im_i2c);

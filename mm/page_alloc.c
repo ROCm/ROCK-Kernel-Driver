@@ -179,20 +179,20 @@ static void destroy_compound_page(struct page *page, unsigned long order)
  */
 
 static inline void __free_pages_bulk (struct page *page, struct page *base,
-		struct zone *zone, struct free_area *area, unsigned long mask,
-		unsigned int order)
+		struct zone *zone, struct free_area *area, unsigned int order)
 {
-	unsigned long page_idx, index;
+	unsigned long page_idx, index, mask;
 
 	if (order)
 		destroy_compound_page(page, order);
+	mask = (~0UL) << order;
 	page_idx = page - base;
 	if (page_idx & ~mask)
 		BUG();
 	index = page_idx >> (1 + order);
 
-	zone->free_pages -= mask;
-	while (mask + (1 << (MAX_ORDER-1))) {
+	zone->free_pages += 1 << order;
+	while (order < MAX_ORDER-1) {
 		struct page *buddy1, *buddy2;
 
 		BUG_ON(area >= zone->free_area + MAX_ORDER);
@@ -201,17 +201,15 @@ static inline void __free_pages_bulk (struct page *page, struct page *base,
 			 * the buddy page is still allocated.
 			 */
 			break;
-		/*
-		 * Move the buddy up one level.
-		 * This code is taking advantage of the identity:
-		 * 	-mask = 1+~mask
-		 */
-		buddy1 = base + (page_idx ^ -mask);
+
+		/* Move the buddy up one level. */
+		buddy1 = base + (page_idx ^ (1 << order));
 		buddy2 = base + page_idx;
 		BUG_ON(bad_range(zone, buddy1));
 		BUG_ON(bad_range(zone, buddy2));
 		list_del(&buddy1->lru);
 		mask <<= 1;
+		order++;
 		area++;
 		index >>= 1;
 		page_idx &= mask;
@@ -255,12 +253,11 @@ static int
 free_pages_bulk(struct zone *zone, int count,
 		struct list_head *list, unsigned int order)
 {
-	unsigned long mask, flags;
+	unsigned long flags;
 	struct free_area *area;
 	struct page *base, *page = NULL;
 	int ret = 0;
 
-	mask = (~0UL) << order;
 	base = zone->zone_mem_map;
 	area = zone->free_area + order;
 	spin_lock_irqsave(&zone->lock, flags);
@@ -270,7 +267,7 @@ free_pages_bulk(struct zone *zone, int count,
 		page = list_entry(list->prev, struct page, lru);
 		/* have to delete it as __free_pages_bulk list manipulates */
 		list_del(&page->lru);
-		__free_pages_bulk(page, base, zone, area, mask, order);
+		__free_pages_bulk(page, base, zone, area, order);
 		ret++;
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
@@ -1238,7 +1235,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	DECLARE_BITMAP(used_mask, MAX_NUMNODES);
 
 	/* initialize zonelists */
-	for (i = 0; i < MAX_NR_ZONES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {
 		zonelist = pgdat->node_zonelists + i;
 		memset(zonelist, 0, sizeof(*zonelist));
 		zonelist->zones[0] = NULL;
@@ -1260,7 +1257,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 			node_load[node] += load;
 		prev_node = node;
 		load--;
-		for (i = 0; i < MAX_NR_ZONES; i++) {
+		for (i = 0; i < GFP_ZONETYPES; i++) {
 			zonelist = pgdat->node_zonelists + i;
 			for (j = 0; zonelist->zones[j] != NULL; j++);
 
@@ -1283,7 +1280,7 @@ static void __init build_zonelists(pg_data_t *pgdat)
 	int i, j, k, node, local_node;
 
 	local_node = pgdat->node_id;
-	for (i = 0; i < MAX_NR_ZONES; i++) {
+	for (i = 0; i < GFP_ZONETYPES; i++) {
 		struct zonelist *zonelist;
 
 		zonelist = pgdat->node_zonelists + i;
@@ -1843,7 +1840,7 @@ static void setup_per_zone_protection(void)
 		 * For each of the different allocation types:
 		 * GFP_DMA -> GFP_KERNEL -> GFP_HIGHMEM
 		 */
-		for (i = 0; i < MAX_NR_ZONES; i++) {
+		for (i = 0; i < GFP_ZONETYPES; i++) {
 			/*
 			 * For each of the zones:
 			 * ZONE_HIGHMEM -> ZONE_NORMAL -> ZONE_DMA
