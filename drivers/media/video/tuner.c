@@ -982,7 +982,7 @@ static struct i2c_driver driver = {
 	.detach_client	= tuner_detach,
 	.command	= tuner_command,
 };
-static structi2c_clientclient_template = 
+static struct i2c_client client_template = 
 {
 	.name	= "(tunerunset)",
 	.flags	= I2C_CLIENT_ALLOW_USE,
