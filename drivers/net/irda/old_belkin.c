@@ -82,12 +82,12 @@ static struct dongle_reg dongle = {
 	.owner = THIS_MODULE,
 };
 
-int __init old_belkin_init(void)
+static int __init old_belkin_init(void)
 {
 	return irda_device_register_dongle(&dongle);
 }
 
-void __exit old_belkin_cleanup(void)
+static void __exit old_belkin_cleanup(void)
 {
 	irda_device_unregister_dongle(&dongle);
 }

@@ -155,7 +155,7 @@ static int nsc_ircc_pmproc(struct pm_dev *dev, pm_request_t rqst, void *data);
  *    Initialize chip. Just try to find out how many chips we are dealing with
  *    and where they are
  */
-int __init nsc_ircc_init(void)
+static int __init nsc_ircc_init(void)
 {
 	chipio_t info;
 	nsc_chip_t *chip;
