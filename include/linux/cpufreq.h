@@ -206,41 +206,41 @@ enum {
 };
 
 #define CTL_CPU_VARS_SPEED_MAX { \
-                ctl_name: CPU_NR_FREQ_MAX, \
-                data: &cpu_max_freq, \
-                procname: "speed-max", \
-                maxlen:	sizeof(cpu_max_freq),\
-                mode: 0444, \
-                proc_handler: proc_dointvec, }
+                .ctl_name	= CPU_NR_FREQ_MAX, \
+                .data		= &cpu_max_freq, \
+                .procname	= "speed-max", \
+                .maxlen		= sizeof(cpu_max_freq),\
+                .mode		= 0444, \
+                .proc_handler	= proc_dointvec, }
 
 #define CTL_CPU_VARS_SPEED_MIN { \
-                ctl_name: CPU_NR_FREQ_MIN, \
-                data: &cpu_min_freq, \
-                procname: "speed-min", \
-                maxlen:	sizeof(cpu_min_freq),\
-                mode: 0444, \
-                proc_handler: proc_dointvec, }
+                .ctl_name	= CPU_NR_FREQ_MIN, \
+                .data		= &cpu_min_freq, \
+                .procname	= "speed-min", \
+                .maxlen		= sizeof(cpu_min_freq),\
+                .mode		= 0444, \
+                .proc_handler	= proc_dointvec, }
 
 #define CTL_CPU_VARS_SPEED(cpunr) { \
-                ctl_name: CPU_NR_FREQ, \
-                procname: "speed", \
-                mode: 0644, \
-                proc_handler: cpufreq_procctl, \
-                strategy: cpufreq_sysctl, \
-                extra1: (void*) (cpunr), }
+                .ctl_name	= CPU_NR_FREQ, \
+                .procname	= "speed", \
+                .mode		= 0644, \
+                .proc_handler	= cpufreq_procctl, \
+                .strategy	= cpufreq_sysctl, \
+                .extra1		= (void*) (cpunr), }
 
 #define CTL_TABLE_CPU_VARS(cpunr) static ctl_table ctl_cpu_vars_##cpunr[] = {\
                 CTL_CPU_VARS_SPEED_MAX, \
                 CTL_CPU_VARS_SPEED_MIN, \
                 CTL_CPU_VARS_SPEED(cpunr),  \
-                { ctl_name: 0, }, }
+                { .ctl_name = 0, }, }
 
 /* the ctl_table entry for each CPU */
 #define CPU_ENUM(s) { \
-                ctl_name: (CPU_NR + s), \
-                procname: #s, \
-                mode: 0555, \
-                child: ctl_cpu_vars_##s }
+                .ctl_name	= (CPU_NR + s), \
+                .procname	= #s, \
+                .mode		= 0555, \
+                .child		= ctl_cpu_vars_##s }
 
 #endif /* CONFIG_CPU_FREQ_24_API */
 
