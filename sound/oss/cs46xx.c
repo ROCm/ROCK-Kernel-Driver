@@ -2965,7 +2965,9 @@ static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			cinfo.blocks = dmabuf->count/dmabuf->divisor >> dmabuf->fragshift;
 			cinfo.ptr = dmabuf->hwptr/dmabuf->divisor;
 			spin_unlock_irqrestore(&state->card->lock, flags);
-			return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+			if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+				return -EFAULT;
+			return 0;
 		}
 		return -ENODEV;
 
@@ -2998,7 +3000,9 @@ static int cs_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			    "cs46xx: GETOPTR bytes=%d blocks=%d ptr=%d\n",
 				cinfo.bytes,cinfo.blocks,cinfo.ptr) );
 			spin_unlock_irqrestore(&state->card->lock, flags);
-			return copy_to_user((void *)arg, &cinfo, sizeof(cinfo));
+			if (copy_to_user((void *)arg, &cinfo, sizeof(cinfo)))
+				return -EFAULT;
+			return 0;
 		}
 		return -ENODEV;
 

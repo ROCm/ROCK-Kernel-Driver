@@ -1719,7 +1719,9 @@ static int guswave_load_patch(int dev, int format, const char *addr,
 	 * been transferred already.
 	 */
 
-	copy_from_user(&((char *) &patch)[offs], &(addr)[offs], sizeof_patch - offs);
+	if (copy_from_user(&((char *) &patch)[offs], &(addr)[offs],
+			   sizeof_patch - offs))
+		return -EFAULT;
 
 	if (patch.mode & WAVE_ROM)
 		return -EINVAL;
@@ -1864,7 +1866,10 @@ static int guswave_load_patch(int dev, int format, const char *addr,
 			 * OK, move now. First in and then out.
 			 */
 
-			copy_from_user(audio_devs[gus_devnum]->dmap_out->raw_buf, &(addr)[sizeof_patch + src_offs], blk_sz);
+			if (copy_from_user(audio_devs[gus_devnum]->dmap_out->raw_buf,
+					   &(addr)[sizeof_patch + src_offs],
+					   blk_sz))
+				return -EFAULT;
 
 			save_flags(flags);
 			cli();

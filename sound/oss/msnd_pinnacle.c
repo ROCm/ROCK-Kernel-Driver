@@ -564,11 +564,15 @@ static int mixer_ioctl(unsigned int cmd, unsigned long arg)
 		mixer_info info;
 		set_mixer_info();
 		info.modify_counter = dev.mixer_mod_count;
-		return copy_to_user((void *)arg, &info, sizeof(info));
+		if (copy_to_user((void *)arg, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
 	} else if (cmd == SOUND_OLD_MIXER_INFO) {
 		_old_mixer_info info;
 		set_mixer_info();
-		return copy_to_user((void *)arg, &info, sizeof(info));
+		if (copy_to_user((void *)arg, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
 	} else if (cmd == SOUND_MIXER_PRIVATE1) {
 		dev.nresets = 0;
 		dsp_full_reset();

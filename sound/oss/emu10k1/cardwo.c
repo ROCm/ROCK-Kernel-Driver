@@ -483,14 +483,17 @@ static void copy_block(void **dst, u32 str, u8 *src, u32 len)
 
 	if (len > PAGE_SIZE - pgoff) {
 		k = PAGE_SIZE - pgoff;
-		__copy_from_user((u8 *)dst[pg] + pgoff, src, k);
+		if (__copy_from_user((u8 *)dst[pg] + pgoff, src, k))
+			return;
 		len -= k;
 		while (len > PAGE_SIZE) {
-			__copy_from_user(dst[++pg], src + k, PAGE_SIZE);
+			if (__copy_from_user(dst[++pg], src + k, PAGE_SIZE))
+				return;
 			k += PAGE_SIZE;
 			len -= PAGE_SIZE;
 		}
-		__copy_from_user(dst[++pg], src + k, len);
+		if (__copy_from_user(dst[++pg], src + k, len))
+			return;
 
 	} else
 		__copy_from_user((u8 *)dst[pg] + pgoff, src, len);
@@ -515,7 +518,8 @@ static void copy_ilv_block(struct woinst *woinst, u32 str, u8 *src, u32 len)
 
 	while (len) { 
 		for (voice_num = 0; voice_num < woinst->num_voices; voice_num++) {
-			__copy_from_user((u8 *)(mem[voice_num].addr[pg]) + pgoff, src, woinst->format.bytespervoicesample);
+			if (__copy_from_user((u8 *)(mem[voice_num].addr[pg]) + pgoff, src, woinst->format.bytespervoicesample))
+				return;
 			src += woinst->format.bytespervoicesample;
 		}
 
