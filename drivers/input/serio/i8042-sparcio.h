@@ -74,7 +74,7 @@ static int i8042_platform_init(void)
 			    !strcmp(child->prom_name, OBP_PS2KBD_NAME2)) {
 				i8042_kbd_irq = child->irqs[0];
 				kbd_iobase = (unsigned long)
-					ioremap(child->resource[0].start);
+					ioremap(child->resource[0].start, 8);
 			}
 			if (!strcmp(child->prom_name, OBP_PS2MS_NAME1) ||
 			    !strcmp(child->prom_name, OBP_PS2MS_NAME2))
