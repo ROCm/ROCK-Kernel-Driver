@@ -286,7 +286,7 @@ void flow_cache_flush(void)
 
 	/* Don't want cpus going down or up during this, also protects
 	 * against multiple callers. */
-	down(&cpucontrol);
+	lock_cpu_hotplug();
 	atomic_set(&info.cpuleft, num_online_cpus());
 	init_completion(&info.completion);
 
@@ -296,7 +296,7 @@ void flow_cache_flush(void)
 	local_bh_enable();
 
 	wait_for_completion(&info.completion);
-	up(&cpucontrol);
+	unlock_cpu_hotplug();
 }
 
 static void __devinit flow_cache_cpu_prepare(int cpu)
