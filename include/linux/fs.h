@@ -290,6 +290,9 @@ struct address_space_operations {
 	/* Set a page dirty */
 	int (*set_page_dirty)(struct page *page);
 
+	int (*readpages)(struct address_space *mapping,
+			struct list_head *pages, unsigned nr_pages);
+
 	/*
 	 * ext3 requires that a successful prepare_write() call be followed
 	 * by a commit_write() call - they must be balanced

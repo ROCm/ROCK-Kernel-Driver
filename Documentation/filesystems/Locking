@@ -148,6 +148,7 @@ locking rules:
 			BKL	PageLocked(page)
 writepage:		no	yes, unlocks
 readpage:		no	yes, unlocks
+readpages:		no
 sync_page:		no	maybe
 writeback_mapping:	no
 vm_writeback:		no	yes
@@ -163,6 +164,8 @@ may be called from the request handler (/dev/loop).
 
 	->readpage() unlocks the page, either synchronously or via I/O
 completion.
+
+	->readpages() populates the pagecache with the passed pages and starts I/O against them.  They come unlocked upon I/O completion.
 
 	->writepage() unlocks the page synchronously, before returning to
 the caller.  If the page has write I/O underway against it, writepage()

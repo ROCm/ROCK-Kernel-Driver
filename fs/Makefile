@@ -7,7 +7,8 @@
 
 O_TARGET := fs.o
 
-export-objs :=	filesystems.o open.o dcache.o buffer.o bio.o inode.o dquot.o
+export-objs :=	filesystems.o open.o dcache.o buffer.o bio.o inode.o dquot.o \
+		mpage.o
 mod-subdirs :=	nls
 
 obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
@@ -15,7 +16,7 @@ obj-y :=	open.o read_write.o devices.o file_table.o buffer.o \
 		namei.o fcntl.o ioctl.o readdir.o select.o fifo.o locks.o \
 		dcache.o inode.o attr.o bad_inode.o file.o iobuf.o dnotify.o \
 		filesystems.o namespace.o seq_file.o xattr.o libfs.o \
-		fs-writeback.o quota.o
+		fs-writeback.o quota.o mpage.o
 
 ifneq ($(CONFIG_NFSD),n)
 ifneq ($(CONFIG_NFSD),)

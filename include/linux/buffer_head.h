@@ -24,6 +24,7 @@ enum bh_state_bits {
 	BH_Async_Write,	/* Is under end_buffer_async_write I/O */
 
 	BH_JBD,		/* Has an attached ext3 journal_head */
+	BH_Boundary,	/* Block is followed by a discontiguity */
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities
 			 */
@@ -106,6 +107,7 @@ BUFFER_FNS(Mapped, mapped)
 BUFFER_FNS(New, new)
 BUFFER_FNS(Async_Read, async_read)
 BUFFER_FNS(Async_Write, async_write)
+BUFFER_FNS(Boundary, boundary)
 
 /*
  * FIXME: this is used only by bh_kmap, which is used only by RAID5.

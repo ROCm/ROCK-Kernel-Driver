@@ -30,6 +30,7 @@
 #include <linux/quotaops.h>
 #include <linux/module.h>
 #include <linux/buffer_head.h>
+#include <linux/mpage.h>
 
 MODULE_AUTHOR("Remy Card and others");
 MODULE_DESCRIPTION("Second Extended Filesystem");
@@ -148,7 +149,8 @@ static inline int verify_chain(Indirect *from, Indirect *to)
  *	@inode: inode in question (we are only interested in its superblock)
  *	@i_block: block number to be parsed
  *	@offsets: array to store the offsets in
- *
+ *      @boundary: set this non-zero if the referred-to block is likely to be
+ *             followed (on disk) by an indirect block.
  *	To store the locations of file's data ext2 uses a data structure common
  *	for UNIX filesystems - tree of pointers anchored in the inode, with
  *	data blocks at leaves and indirect blocks in intermediate nodes.
@@ -172,7 +174,8 @@ static inline int verify_chain(Indirect *from, Indirect *to)
  * get there at all.
  */
 
-static int ext2_block_to_path(struct inode *inode, long i_block, int offsets[4])
+static int ext2_block_to_path(struct inode *inode,
+			long i_block, int offsets[4], int *boundary)
 {
 	int ptrs = EXT2_ADDR_PER_BLOCK(inode->i_sb);
 	int ptrs_bits = EXT2_ADDR_PER_BLOCK_BITS(inode->i_sb);
@@ -180,26 +183,33 @@ static int ext2_block_to_path(struct inode *inode, long i_block, int offsets[4])
 		indirect_blocks = ptrs,
 		double_blocks = (1 << (ptrs_bits * 2));
 	int n = 0;
+	int final = 0;
 
 	if (i_block < 0) {
 		ext2_warning (inode->i_sb, "ext2_block_to_path", "block < 0");
 	} else if (i_block < direct_blocks) {
 		offsets[n++] = i_block;
+		final = direct_blocks;
 	} else if ( (i_block -= direct_blocks) < indirect_blocks) {
 		offsets[n++] = EXT2_IND_BLOCK;
 		offsets[n++] = i_block;
+		final = ptrs;
 	} else if ((i_block -= indirect_blocks) < double_blocks) {
 		offsets[n++] = EXT2_DIND_BLOCK;
 		offsets[n++] = i_block >> ptrs_bits;
 		offsets[n++] = i_block & (ptrs - 1);
+		final = ptrs;
 	} else if (((i_block -= double_blocks) >> (ptrs_bits * 2)) < ptrs) {
 		offsets[n++] = EXT2_TIND_BLOCK;
 		offsets[n++] = i_block >> (ptrs_bits * 2);
 		offsets[n++] = (i_block >> ptrs_bits) & (ptrs - 1);
 		offsets[n++] = i_block & (ptrs - 1);
+		final = ptrs;
 	} else {
 		ext2_warning (inode->i_sb, "ext2_block_to_path", "block > big");
 	}
+	if (boundary)
+		*boundary = (i_block & (ptrs - 1)) == (final - 1);
 	return n;
 }
 
@@ -506,7 +516,8 @@ static int ext2_get_block(struct inode *inode, sector_t iblock, struct buffer_he
 	Indirect *partial;
 	unsigned long goal;
 	int left;
-	int depth = ext2_block_to_path(inode, iblock, offsets);
+	int boundary = 0;
+	int depth = ext2_block_to_path(inode, iblock, offsets, &boundary);
 
 	if (depth == 0)
 		goto out;
@@ -518,6 +529,8 @@ reread:
 	if (!partial) {
 got_it:
 		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
+		if (boundary)
+			set_buffer_boundary(bh_result);
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
@@ -569,21 +582,37 @@ static int ext2_writepage(struct page *page)
 {
 	return block_write_full_page(page,ext2_get_block);
 }
+
 static int ext2_readpage(struct file *file, struct page *page)
 {
-	return block_read_full_page(page,ext2_get_block);
+	return mpage_readpage(page, ext2_get_block);
 }
-static int ext2_prepare_write(struct file *file, struct page *page, unsigned from, unsigned to)
+
+static int
+ext2_readpages(struct address_space *mapping,
+		struct list_head *pages, unsigned nr_pages)
+{
+	return mpage_readpages(mapping, pages, nr_pages, ext2_get_block);
+}
+
+static int
+ext2_prepare_write(struct file *file, struct page *page,
+			unsigned from, unsigned to)
 {
 	return block_prepare_write(page,from,to,ext2_get_block);
 }
+
 static int ext2_bmap(struct address_space *mapping, long block)
 {
 	return generic_block_bmap(mapping,block,ext2_get_block);
 }
-static int ext2_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsigned long blocknr, int blocksize)
+
+static int
+ext2_direct_IO(int rw, struct inode *inode, struct kiobuf *iobuf,
+			unsigned long blocknr, int blocksize)
 {
-	return generic_direct_IO(rw, inode, iobuf, blocknr, blocksize, ext2_get_block);
+	return generic_direct_IO(rw, inode, iobuf, blocknr,
+				blocksize, ext2_get_block);
 }
 
 static int
@@ -600,15 +629,16 @@ ext2_writeback_mapping(struct address_space *mapping, int *nr_to_write)
 }
 
 struct address_space_operations ext2_aops = {
-	readpage: ext2_readpage,
-	writepage: ext2_writepage,
-	sync_page: block_sync_page,
-	prepare_write: ext2_prepare_write,
-	commit_write: generic_commit_write,
-	bmap: ext2_bmap,
-	direct_IO: ext2_direct_IO,
-	writeback_mapping: ext2_writeback_mapping,
-	vm_writeback: generic_vm_writeback,
+	readpage:		ext2_readpage,
+	readpages:		ext2_readpages,
+	writepage:		ext2_writepage,
+	sync_page:		block_sync_page,
+	prepare_write:		ext2_prepare_write,
+	commit_write:		generic_commit_write,
+	bmap:			ext2_bmap,
+	direct_IO:		ext2_direct_IO,
+	writeback_mapping:	ext2_writeback_mapping,
+	vm_writeback:		generic_vm_writeback,
 };
 
 /*
@@ -818,7 +848,7 @@ void ext2_truncate (struct inode * inode)
 
 	block_truncate_page(inode->i_mapping, inode->i_size, ext2_get_block);
 
-	n = ext2_block_to_path(inode, iblock, offsets);
+	n = ext2_block_to_path(inode, iblock, offsets, NULL);
 	if (n == 0)
 		return;
 
