@@ -9,6 +9,7 @@
 
 #include <linux/pci.h>
 #include <linux/module.h>
+#include <linux/interrupt.h>
 
 spinlock_t pci_bus_lock = SPIN_LOCK_UNLOCKED;
 
@@ -66,7 +67,7 @@ pci_find_next_bus(const struct pci_bus *from)
 	struct list_head *n;
 	struct pci_bus *b = NULL;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->node.next : pci_root_buses.next;
 	if (n != &pci_root_buses)
@@ -125,7 +126,7 @@ pci_find_subsys(unsigned int vendor, unsigned int device,
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -190,7 +191,7 @@ pci_get_subsys(unsigned int vendor, unsigned int device,
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -256,7 +257,7 @@ pci_find_device_reverse(unsigned int vendor, unsigned int device, const struct p
 	struct list_head *n;
 	struct pci_dev *dev;
 
-	WARN_ON(irqs_disabled());
+	WARN_ON(in_interrupt());
 	spin_lock(&pci_bus_lock);
 	n = from ? from->global_list.prev : pci_devices.prev;
 
