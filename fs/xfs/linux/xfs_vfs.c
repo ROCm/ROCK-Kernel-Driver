@@ -321,9 +321,14 @@ bhv_insert_all_vfsops(
 	struct vfs		*vfsp)
 {
 	struct xfs_mount	*mp;
+	struct bhv_vfsops	*op;
 
 	mp = xfs_mount_init();
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
-	vfs_insertdmapi(vfsp);
-	vfs_insertquota(vfsp);
+	op = (struct bhv_vfsops *) bhv_lookup_module(XFS_DMOPS, XFS_DM_MODULE);
+	if (op)
+		vfs_insertops(vfsp, op);
+	op = (struct bhv_vfsops *) bhv_lookup_module(XFS_QMOPS, XFS_QM_MODULE);
+	if (op)
+		vfs_insertops(vfsp, op);
 }
