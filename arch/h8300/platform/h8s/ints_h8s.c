@@ -9,6 +9,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/errno.h>
+#include <linux/kernel.h>
 
 #include <asm/ptrace.h>
 #include <asm/traps.h>
@@ -80,12 +81,13 @@ int h8300_enable_irq_pin(unsigned int irq)
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ15) {
 		unsigned short ptn = 1 << (irq - EXT_IRQ0);
 		unsigned int port_no,bit_no;
-		IRQ_GPIO_MAP(ptn,irq,port_no,bit_no);
+		IRQ_GPIO_MAP(ptn, irq, port_no, bit_no);
 		if (H8300_GPIO_RESERVE(port_no, bit_no) == 0)
 			return -EBUSY;                   /* pin already use */
 		H8300_GPIO_DDR(port_no, bit_no, H8300_GPIO_INPUT);
 		*(volatile unsigned short *)ISR &= ~ptn; /* ISR clear */
-	}		
+	}
+
 	return 0;
 }
 
@@ -97,7 +99,7 @@ void h8300_disable_irq_pin(unsigned int irq)
 		unsigned short port_no,bit_no;
 		*(volatile unsigned short *)ISR &= ~ptn;
 		*(volatile unsigned short *)IER &= ~ptn;
-		IRQ_GPIO_MAP(ptn,port_no,bit_no);
+		IRQ_GPIO_MAP(ptn, irq, port_no, bit_no);
 		H8300_GPIO_FREE(port_no, bit_no);
 	}
 }

@@ -166,7 +166,7 @@ SYMBOL_NAME_LABEL(interrupt_entry)
 	mov.l	sp,er1
 	subs	#4,er1				/* adjust ret_pc */
 	jsr	@SYMBOL_NAME(process_int)
-	mov.l	@SYMBOL_NAME(irq_stat)+CPU_SOFTIRQ_PENDING,er0
+	mov.l	@SYMBOL_NAME(irq_stat)+CPUSTAT_SOFTIRQ_PENDING,er0
 	beq	1f
 	jsr	@SYMBOL_NAME(do_softirq)
 1:

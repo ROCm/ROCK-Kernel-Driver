@@ -9,7 +9,7 @@
 #if defined(CONFIG_H83007) || defined(CONFIG_H83068)
 #include <asm/regs306x.h>
 #elif defined(CONFIG_H8S2678)
-#include <asm/regs2678.h>
+#include <asm/regs267x.h>
 #else
 #error UNKNOWN CPU TYPE
 #endif
@@ -73,7 +73,7 @@ static inline unsigned int _swapl(volatile unsigned long v)
 
 static inline int h8300_buswidth(unsigned int addr)
 {
-	return (*(volatile unsigned char *)ABWCR & (1 << (addr >> 21) & 7)) == 0;
+	return (*(volatile unsigned char *)ABWCR & (1 << ((addr >> 21) & 7))) == 0;
 }
 
 static inline void io_outsb(unsigned int addr, void *buf, int len)
@@ -145,10 +145,10 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 #define memcpy_fromio(a,b,c)	memcpy((a),(void *)(b),(c))
 #define memcpy_toio(a,b,c)	memcpy((void *)(a),(b),(c))
 
-#define inb(addr)    ((h8300_buswidth(addr))?readb(addr ^ 1) & 0xff:readb(addr))
+#define inb(addr)    ((h8300_buswidth(addr))?readb((addr) ^ 1) & 0xff:readb(addr))
 #define inw(addr)    _swapw(readw(addr))
 #define inl(addr)    _swapl(readl(addr))
-#define outb(x,addr) ((void)((h8300_buswidth(addr) && (addr & 1))?writew(x,addr):writeb(x,addr)))
+#define outb(x,addr) ((void)((h8300_buswidth(addr) && ((addr) & 1))?writew(x,addr):writeb(x,addr)))
 #define outw(x,addr) ((void) writew(_swapw(x),addr))
 #define outl(x,addr) ((void) writel(_swapl(x),addr))
 

@@ -297,10 +297,10 @@ static void kgdb_break_interrupt(int irq, void *ptr, struct pt_regs *regs)
 #if defined(__H8300S__)
 enum { sci_disable, sci_enable };
 
-static void h8300_sci_enable(struct sci_port* port, unsigned int ctrl)
+static void h8300_sci_enable(struct uart_port* port, unsigned int ctrl)
 {
 	volatile unsigned char *mstpcrl=(volatile unsigned char *)MSTPCRL;
-	int ch = (port->base  - SMR0) >> 3;
+	int ch = (port->mapbase  - SMR0) >> 3;
 	unsigned char mask = 1 << (ch+1);
 
 	if (ctrl == sci_disable) {
@@ -1276,7 +1276,7 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 			.line		= 1,
 		},
 		.type		= PORT_SCI,
-		.irqs		= H8S_IRQS1,
+		.irqs		= H8S_SCI_IRQS1,
 		.init_pins	= sci_init_pins_sci,
 	},
 	{
@@ -1290,7 +1290,7 @@ static struct sci_port sci_ports[SCI_NPORTS] = {
 			.line		= 2,
 		},
 		.type		= PORT_SCI,
-		.irqs		= H8S_IRQS2,
+		.irqs		= H8S_SCI_IRQS2,
 		.init_pins	= sci_init_pins_sci,
 	},
 #else
