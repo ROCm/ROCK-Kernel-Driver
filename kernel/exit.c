@@ -71,19 +71,19 @@ static void release_task(struct task_struct * p)
 	write_lock_irq(&tasklist_lock);
 	__exit_sighand(p);
 	proc_dentry = __unhash_process(p);
+	p->parent->cutime += p->utime + p->cutime;
+	p->parent->cstime += p->stime + p->cstime;
+	p->parent->cmin_flt += p->min_flt + p->cmin_flt;
+	p->parent->cmaj_flt += p->maj_flt + p->cmaj_flt;
+	p->parent->cnswap += p->nswap + p->cnswap;
+	sched_exit(p);
 	write_unlock_irq(&tasklist_lock);
+
 	if (unlikely(proc_dentry != NULL)) {
 		shrink_dcache_parent(proc_dentry);
 		dput(proc_dentry);
 	}
-
 	release_thread(p);
-	if (p != current) {
-		current->cmin_flt += p->min_flt + p->cmin_flt;
-		current->cmaj_flt += p->maj_flt + p->cmaj_flt;
-		current->cnswap += p->nswap + p->cnswap;
-		sched_exit(p);
-	}
 	put_task_struct(p);
 }
 
@@ -794,8 +794,6 @@ repeat:
 				}
 				goto end_wait4;
 			case TASK_ZOMBIE:
-				current->cutime += p->utime + p->cutime;
-				current->cstime += p->stime + p->cstime;
 				read_unlock(&tasklist_lock);
 				retval = ru ? getrusage(p, RUSAGE_BOTH, ru) : 0;
 				if (!retval && stat_addr) {
