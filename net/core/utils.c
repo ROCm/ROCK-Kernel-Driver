@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/random.h>
 #include <linux/percpu.h>
+#include <linux/init.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -77,10 +78,8 @@ static u32 __net_random(struct nrnd_state *state)
 	return (state->s1 ^ state->s2 ^ state->s3);
 }
 
-static void __net_srandom(struct nrnd_state *state, unsigned long entropy)
+static void __net_srandom(struct nrnd_state *state, unsigned long s)
 {
-	u32 s = state->s1 ^ entropy;
-
 	if (s == 0)
 		s = 1;      /* default seed is 1 */
 
@@ -112,24 +111,33 @@ unsigned long net_random(void)
 void net_srandom(unsigned long entropy)
 {
 	struct nrnd_state *state = &get_cpu_var(net_rand_state);
-	__net_srandom(state, entropy);
+	__net_srandom(state, state->s1^entropy);
 	put_cpu_var(state);
 }
 
 void __init net_random_init(void)
 {
 	int i;
-	unsigned long seed[NR_CPUS];
-
-	get_random_bytes(seed, sizeof(seed));
 
 	for (i = 0; i < NR_CPUS; i++) {
 		struct nrnd_state *state = &per_cpu(net_rand_state,i);
-
-		memset(state, 0, sizeof(*state));
-		__net_srandom(state, seed[i]);
+		__net_srandom(state, i+jiffies);
 	}
 }
+
+static int net_random_reseed(void)
+{
+	int i;
+	unsigned long seed[NR_CPUS];
+
+	get_random_bytes(seed, sizeof(seed));
+	for (i = 0; i < NR_CPUS; i++) {
+		struct nrnd_state *state = &per_cpu(net_rand_state,i);
+		__net_srandom(state, seed[i]);
+	}
+	return 0;
+}
+late_initcall(net_random_reseed);
 
 int net_msg_cost = 5*HZ;
 int net_msg_burst = 10;
