@@ -38,7 +38,7 @@ endif
 GCCFLAGS	:= -G 0 -mno-abicalls -fno-pic
 LDFLAGS_vmlinux	+= -static
 MODFLAGS	+= -mlong-calls
-LD		:= $(LD) -G 0
+LDFLAGS		:= -G 0
 
 ifdef CONFIG_REMOTE_DEBUG
 CFLAGS		:= $(CFLAGS) -g

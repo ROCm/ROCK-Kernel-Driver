@@ -333,7 +333,7 @@ ifdef O_TARGET
 quiet_cmd_link_o_target = LD     $(echo_target)
 # If the list of objects to link is empty, just create an empty O_TARGET
 cmd_link_o_target = $(if $(strip $(obj-y)),\
-		      $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
+		      $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $(obj-y), $^),\
 		      rm -f $@; $(AR) rcs $@)
 
 $(O_TARGET): $(obj-y) FORCE
@@ -360,7 +360,7 @@ endif
 #
 
 quiet_cmd_link_multi = LD     $(echo_target)
-cmd_link_multi = $(LD) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
+cmd_link_multi = $(LD) $(LDFLAGS) $(EXTRA_LDFLAGS) -r -o $@ $(filter $($(basename $@)-objs),$^)
 
 # We would rather have a list of rules like
 # 	foo.o: $(foo-objs)

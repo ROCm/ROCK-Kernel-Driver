@@ -13,7 +13,7 @@
 # Copyright (C) 1994 by Linus Torvalds
 #
 
-LD=$(CROSS_COMPILE)ld -m elf64_s390
+LDFLAGS		:= -m elf64_s390
 CPP=$(CC) -E
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 ifeq ($(CONFIG_SHARED_KERNEL),y)

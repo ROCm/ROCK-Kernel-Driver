@@ -9,7 +9,7 @@ EXTRA_AFLAGS := -traditional
 include $(TOPDIR)/Rules.make
 
 %.lnk: %.o
-	$(LD) -Ttext 0x0 -o $@ $<
+	$(LD) $(LDFLAGS) -Ttext 0x0 -o $@ $<
 
 %.boot: %.lnk
 	$(OBJCOPY) -O binary $< $@

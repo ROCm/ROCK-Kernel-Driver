@@ -24,7 +24,6 @@ AFLAGS		+= -mb
 LDFLAGS		:= -EB
 endif
 
-LD	=$(CROSS_COMPILE)ld $(LDFLAGS)
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -R .stab -R .stabstr -S
 
 MODFLAGS	+=

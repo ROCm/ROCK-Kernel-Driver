@@ -16,7 +16,7 @@
 #           Added '-march' and '-mpreferred-stack-boundary' support
 #
 
-LD=$(CROSS_COMPILE)ld -m elf_i386
+LDFLAGS		:= -m elf_i386
 OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux :=-T arch/i386/vmlinux.lds -e stext
 

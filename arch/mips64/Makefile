@@ -128,7 +128,7 @@ ifdef CONFIG_BOOT_ELF64
 CFLAGS += -Wa,-32
 LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf32
 #AS += -64
-#LD += -m elf64bmip
+#LDFLAGS += -m elf64bmip
 #LDFLAGS_vmlinux += -T arch/mips64/ld.script.elf64
 endif
 

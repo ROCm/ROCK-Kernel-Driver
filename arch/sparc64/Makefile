@@ -28,7 +28,7 @@ AR		= sparc64-linux-ar
 RANLIB		= sparc64-linux-ranlib
 else
 AS		:= $(AS) -64
-LD		:= $(LD) -m elf64_sparc
+LDFLAGS		:= -m elf64_sparc
 endif
 ELFTOAOUT	= elftoaout
 ifneq ($(UNDECLARED_REGS),y)
