@@ -50,7 +50,7 @@ match(const struct sk_buff *skb,
 	 eui64[0] |= 0x02;
 
 	 i=0;
-	 while ((skb->nh.ipv6h->saddr.in6_u.u6_addr8[8+i] ==
+	 while ((skb->nh.ipv6h->saddr.s6_addr[8+i] ==
 			 eui64[i]) && (i<8)) i++;
 
 	 if ( i == 8 )
