@@ -893,12 +893,12 @@ static int ibm_unconfigure_visit_pci_dev_phase1 (struct pci_dev_wrapped *wrapped
 }
 
 static struct pci_visit ibm_unconfigure_functions_phase1 = {
-	post_visit_pci_dev:	ibm_unconfigure_visit_pci_dev_phase1,
+	.post_visit_pci_dev =	ibm_unconfigure_visit_pci_dev_phase1,
 };
 
 static struct pci_visit ibm_unconfigure_functions_phase2 = {
-	post_visit_pci_bus:	ibm_unconfigure_visit_pci_bus_phase2,
-	post_visit_pci_dev:	ibm_unconfigure_visit_pci_dev_phase2,
+	.post_visit_pci_bus =	ibm_unconfigure_visit_pci_bus_phase2,
+	.post_visit_pci_dev =	ibm_unconfigure_visit_pci_dev_phase2,
 };
 
 static int ibm_unconfigure_device (struct pci_func *func)
@@ -962,7 +962,7 @@ static int configure_visit_pci_dev (struct pci_dev_wrapped *wrapped_dev, struct 
 }
 
 static struct pci_visit configure_functions = {
-	visit_pci_dev:	configure_visit_pci_dev,
+	.visit_pci_dev =configure_visit_pci_dev,
 };
 
 static int ibm_configure_device (struct pci_func *func)
@@ -1494,19 +1494,19 @@ int ibmphp_disable_slot (struct hotplug_slot *hotplug_slot)
 }
 
 struct hotplug_slot_ops ibmphp_hotplug_slot_ops = {
-	owner:				THIS_MODULE,
-	set_attention_status:		set_attention_status,
-	enable_slot:			enable_slot,
-	disable_slot:			ibmphp_disable_slot,
-	hardware_test:			NULL,
-	get_power_status:		get_power_status,
-	get_attention_status:		get_attention_status,
-	get_latch_status:		get_latch_status,
-	get_adapter_status:		get_adapter_present,
+	.owner =			THIS_MODULE,
+	.set_attention_status =		set_attention_status,
+	.enable_slot =			enable_slot,
+	.disable_slot =			ibmphp_disable_slot,
+	.hardware_test =		NULL,
+	.get_power_status =		get_power_status,
+	.get_attention_status =		get_attention_status,
+	.get_latch_status =		get_latch_status,
+	.get_adapter_status =		get_adapter_present,
 /*	get_max_bus_speed_status:	get_max_bus_speed,
-	get_max_adapter_speed_status:	get_max_adapter_speed,
-	get_cur_bus_speed_status:	get_cur_bus_speed,
-	get_card_bus_names_status:	get_card_bus_names,
+	.get_max_adapter_speed_status =	get_max_adapter_speed,
+	.get_cur_bus_speed_status =	get_cur_bus_speed,
+	.get_card_bus_names_status =	get_card_bus_names,
 */
 };
 
