@@ -80,7 +80,7 @@ int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * nam
 	char * s;
 
 	depth = object_depth(kobj);
-	size = object_path_length(target) + depth * 3 + 1;
+	size = object_path_length(target) + depth * 3 - 1;
 	if (size > PATH_MAX)
 		return -ENAMETOOLONG;
 	pr_debug("%s: depth = %d, size = %d\n",__FUNCTION__,depth,size);
