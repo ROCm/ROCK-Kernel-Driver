@@ -303,9 +303,11 @@ void
 acpi_ps_free_op (
 	union acpi_parse_object         *op);
 
+#ifdef ACPI_ENABLE_OBJECT_CACHE
 void
 acpi_ps_delete_parse_cache (
 	void);
+#endif
 
 u8
 acpi_ps_is_leading_char (

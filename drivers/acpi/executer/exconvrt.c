@@ -136,6 +136,12 @@ acpi_ex_convert_to_integer (
 
 	case ACPI_TYPE_BUFFER:
 
+		/* Check for zero-length buffer */
+
+		if (!count) {
+			return_ACPI_STATUS (AE_AML_BUFFER_LIMIT);
+		}
+
 		/* Transfer no more than an integer's worth of data */
 
 		if (count > acpi_gbl_integer_byte_width) {
