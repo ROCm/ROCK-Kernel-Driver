@@ -29,16 +29,50 @@ int rxrpc_knet;
 static struct ctl_table_header *rxrpc_sysctl = NULL;
 
 static ctl_table rxrpc_sysctl_table[] = {
-        { 1, "kdebug", &rxrpc_kdebug, sizeof(int), 0644, NULL, &proc_dointvec },
-        { 2, "ktrace", &rxrpc_ktrace, sizeof(int), 0644, NULL, &proc_dointvec },
-        { 3, "kproto", &rxrpc_kproto, sizeof(int), 0644, NULL, &proc_dointvec },
-        { 4, "knet",   &rxrpc_knet,   sizeof(int), 0644, NULL, &proc_dointvec },
-	{ 0 }
+        {
+		.ctl_name	= 1,
+		.procname	= "kdebug",
+		.data		= &rxrpc_kdebug,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+        {
+		.ctl_name	= 2,
+		.procname	= "ktrace",
+		.data		= &rxrpc_ktrace,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+        {
+		.ctl_name	= 3,
+		.procname	= "kproto",
+		.data		= &rxrpc_kproto,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+        {
+		.ctl_name	= 4,
+		.procname	= "knet",
+		.data		= &rxrpc_knet,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+	},
+	{ .ctl_name = 0 }
 };
 
 static ctl_table rxrpc_dir_sysctl_table[] = {
-	{ 1, "rxrpc", NULL, 0, 0555, rxrpc_sysctl_table },
-	{ 0 }
+	{
+		.ctl_name	= 1,
+		.procname	= "rxrpc",
+		.maxlen		= 0,
+		.mode		= 0555,
+		.child		= rxrpc_sysctl_table
+	},
+	{ .ctl_name = 0 }
 };
 #endif /* CONFIG_SYSCTL */
 
