@@ -86,7 +86,7 @@ typedef struct {
 } befs_btree_node;
 
 /* local constants */
-static const befs_off_t befs_bt_inval = 0xffffffffffffffff;
+static const befs_off_t befs_bt_inval = 0xffffffffffffffffULL;
 
 /* local functions */
 static int befs_btree_seekleaf(struct super_block *sb, befs_data_stream * ds,

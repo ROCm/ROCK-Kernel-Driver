@@ -938,6 +938,9 @@ static void udp_close(struct sock *sk, long timeout)
  */
 static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 {
+#ifndef CONFIG_XFRM
+	return 1; 
+#else
 	struct udp_opt *up = udp_sk(sk);
   	struct udphdr *uh = skb->h.uh;
 	struct iphdr *iph;
@@ -997,10 +1000,12 @@ static int udp_encap_rcv(struct sock * sk, struct sk_buff *skb)
 		return -1;
 
 	default:
-		printk(KERN_INFO "udp_encap_rcv(): Unhandled UDP encap type: %u\n",
-		       encap_type);
+		if (net_ratelimit())
+			printk(KERN_INFO "udp_encap_rcv(): Unhandled UDP encap type: %u\n",
+			       encap_type);
 		return 1;
 	}
+#endif
 }
 
 /* returns:

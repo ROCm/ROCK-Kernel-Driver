@@ -1636,13 +1636,13 @@ S:	Maintained
 
 SCSI SUBSYSTEM
 P:	James E.J. Bottomley
-M:	James.Bottomley@HansenPartnership.com
+M:	James.Bottomley@SteelEye.com
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
 SCSI TAPE DRIVER
 P:	Kai Mäkisara
-M:	Kai.Makisara@metla.fi
+M:	Kai.Makisara@kolumbus.fi
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 

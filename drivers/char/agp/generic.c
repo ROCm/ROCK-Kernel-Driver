@@ -459,9 +459,9 @@ static void agp_v3_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 
 	/* Clear out unwanted bits. */
 	if (*cmd & AGPSTAT3_8X)
-		*cmd = ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
+		*cmd &= ~(AGPSTAT3_4X | AGPSTAT3_RSVD);
 	if (*cmd & AGPSTAT3_4X)
-		*cmd = ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
+		*cmd &= ~(AGPSTAT3_8X | AGPSTAT3_RSVD);
 }
 
 //FIXME: This doesn't smell right.
@@ -545,7 +545,7 @@ EXPORT_SYMBOL(get_agp_version);
 
 void agp_generic_enable(u32 mode)
 {
-	u32 command;
+	u32 command, temp;
 	u32 agp3;
 
 	get_agp_version(agp_bridge);
@@ -577,7 +577,13 @@ void agp_generic_enable(u32 mode)
 			agp_device_command(command, TRUE);
 			return;
 		} else {
-			printk (KERN_INFO PFX "Device is in legacy mode,"
+		    /* Disable calibration cycle in RX91<1> when not in AGP3.0 mode of operation.*/            
+		    command &= ~(7<<10) ;
+		    pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+AGPCTRL, &temp);
+		    temp |= (1<<9);
+		    pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+AGPCTRL, temp);
+		    
+		    printk (KERN_INFO PFX "Device is in legacy mode,"
 				" falling back to 2.x\n");
 		}
 	}

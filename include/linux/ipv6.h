@@ -71,7 +71,7 @@ struct rt0_hdr {
 	__u32			bitmap;		/* strict/loose bit map */
 	struct in6_addr		addr[0];
 
-#define rt0_type		rt_hdr.type;
+#define rt0_type		rt_hdr.type
 };
 
 struct ipv6_auth_hdr {

@@ -1988,7 +1988,9 @@ void __init ip6_route_init(void)
 	if (p)
 		p->proc_fops = &rt6_stats_seq_fops;
 #endif
+#ifdef CONFIG_XFRM
 	xfrm6_init();
+#endif
 }
 
 #ifdef MODULE

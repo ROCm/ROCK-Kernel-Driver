@@ -663,7 +663,7 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 	}
 
-	dst = ip6_route_output(sk, &fl);
+	dst = ip6_dst_lookup(sk, &fl);
 
 	if ((err = dst->error) != 0) {
 		dst_release(dst);
@@ -691,6 +691,8 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	tp->ext_header_len = 0;
 	if (np->opt)
 		tp->ext_header_len = np->opt->opt_flen + np->opt->opt_nflen;
+	tp->ext2_header_len = dst->header_len;
+
 	tp->mss_clamp = IPV6_MIN_MTU - sizeof(struct tcphdr) - sizeof(struct ipv6hdr);
 
 	inet->dport = usin->sin6_port;
@@ -788,7 +790,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			fl.fl_ip_dport = inet->dport;
 			fl.fl_ip_sport = inet->sport;
 
-			dst = ip6_route_output(sk, &fl);
+			dst = ip6_dst_lookup(sk, &fl);
 		} else
 			dst_hold(dst);
 
@@ -889,7 +891,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
-		dst = ip6_route_output(sk, &fl);
+		dst = ip6_dst_lookup(sk, &fl);
 		if (dst->error)
 			goto done;
 	}
@@ -1018,7 +1020,7 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 	fl.fl_ip_sport = t1->source;
 
 	/* sk = NULL, but it is safe for now. RST socket required. */
-	buff->dst = ip6_route_output(NULL, &fl);
+	buff->dst = ip6_dst_lookup(NULL, &fl);
 
 	if (buff->dst->error == 0) {
 		ip6_xmit(NULL, buff, &fl, NULL, 0);
@@ -1081,7 +1083,7 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 	fl.fl_ip_dport = t1->dest;
 	fl.fl_ip_sport = t1->source;
 
-	buff->dst = ip6_route_output(NULL, &fl);
+	buff->dst = ip6_dst_lookup(NULL, &fl);
 
 	if (buff->dst->error == 0) {
 		ip6_xmit(NULL, buff, &fl, NULL, 0);
@@ -1329,7 +1331,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 		fl.fl_ip_dport = req->rmt_port;
 		fl.fl_ip_sport = inet_sk(sk)->sport;
 
-		dst = ip6_route_output(sk, &fl);
+		dst = ip6_dst_lookup(sk, &fl);
 	}
 
 	if (dst->error)
@@ -1401,6 +1403,7 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 	if (newnp->opt)
 		newtp->ext_header_len = newnp->opt->opt_nflen +
 					newnp->opt->opt_flen;
+	newtp->ext2_header_len = dst->header_len;
 
 	tcp_sync_mss(newsk, dst_pmtu(dst));
 	newtp->advmss = dst_metric(dst, RTAX_ADVMSS);
@@ -1727,7 +1730,7 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 			ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
 		}
 
-		dst = ip6_route_output(sk, &fl);
+		dst = ip6_dst_lookup(sk, &fl);
 
 		if (dst->error) {
 			err = dst->error;
@@ -1770,7 +1773,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	dst = __sk_dst_check(sk, np->dst_cookie);
 
 	if (dst == NULL) {
-		dst = ip6_route_output(sk, &fl);
+		dst = ip6_dst_lookup(sk, &fl);
 
 		if (dst->error) {
 			sk->sk_err_soft = -dst->error;

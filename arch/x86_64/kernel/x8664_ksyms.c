@@ -121,6 +121,7 @@ EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
+EXPORT_SYMBOL(cpu_callout_map);
 #endif
 
 #ifdef CONFIG_VT

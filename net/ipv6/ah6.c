@@ -265,13 +265,12 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	 * There is offset of AH before IPv6 header after the process.
 	 */
 
-	struct ipv6hdr *iph = skb->nh.ipv6h;
 	struct ipv6_auth_hdr *ah;
 	struct ah_data *ahp;
 	unsigned char *tmp_hdr = NULL;
-	u16 hdr_len = skb->data - skb->nh.raw;
+	u16 hdr_len;
 	u16 ah_hlen;
-	u16 cleared_hlen = hdr_len;
+	u16 cleared_hlen;
 	u16 nh_offset = 0;
 	u8 nexthdr = 0;
 	u8 *prevhdr;
@@ -279,6 +278,14 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	if (!pskb_may_pull(skb, sizeof(struct ip_auth_hdr)))
 		goto out;
 
+	/* We are going to _remove_ AH header to keep sockets happy,
+	 * so... Later this can change. */
+	if (skb_cloned(skb) &&
+	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
+		goto out;
+
+	hdr_len = skb->data - skb->nh.raw;
+	cleared_hlen = hdr_len;
 	ah = (struct ipv6_auth_hdr*)skb->data;
 	ahp = x->data;
 	nexthdr = ah->nexthdr;
@@ -297,27 +304,22 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	if (!pskb_may_pull(skb, ah_hlen))
 		goto out;
 
-	/* We are going to _remove_ AH header to keep sockets happy,
-	 * so... Later this can change. */
-	if (skb_cloned(skb) &&
-	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
-		goto out;
-
 	tmp_hdr = kmalloc(cleared_hlen, GFP_ATOMIC);
 	if (!tmp_hdr)
 		goto out;
 	memcpy(tmp_hdr, skb->nh.raw, cleared_hlen);
 	ipv6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_IN);
-	iph->priority    = 0;
-	iph->flow_lbl[0] = 0;
-	iph->flow_lbl[1] = 0;
-	iph->flow_lbl[2] = 0;
-	iph->hop_limit   = 0;
+	skb->nh.ipv6h->priority    = 0;
+	skb->nh.ipv6h->flow_lbl[0] = 0;
+	skb->nh.ipv6h->flow_lbl[1] = 0;
+	skb->nh.ipv6h->flow_lbl[2] = 0;
+	skb->nh.ipv6h->hop_limit   = 0;
 
         {
 		u8 auth_data[ahp->icv_trunc_len];
 
 		memcpy(auth_data, ah->auth_data, ahp->icv_trunc_len);
+		memset(ah->auth_data, 0, ahp->icv_trunc_len);
 		skb_push(skb, skb->data - skb->nh.raw);
 		ahp->icv(ahp, skb, ah->auth_data);
 		if (memcmp(ah->auth_data, auth_data, ahp->icv_trunc_len)) {

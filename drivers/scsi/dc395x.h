@@ -28,7 +28,6 @@
 #define DC395x_MAX_CMD_QUEUE		32
 /* #define DC395x_MAX_QTAGS		32 */
 #define DC395x_MAX_QTAGS		16
-#define DC395x_MAX_ADAPTER_NUM		4
 #define DC395x_MAX_SCSI_ID		16
 #define DC395x_MAX_CMD_PER_LUN		DC395x_MAX_QTAGS
 #define DC395x_MAX_SG_TABLESIZE		64	/* HW limitation			*/

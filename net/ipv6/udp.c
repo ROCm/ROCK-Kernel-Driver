@@ -811,8 +811,10 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 		 * The socket lock must be held while it's corked.
 		 */
 		lock_sock(sk);
-		if (likely(up->pending))
+		if (likely(up->pending)) {
+			dst = NULL;
 			goto do_append_data;
+		}
 		release_sock(sk);
 	}
 	ulen += sizeof(struct udphdr);
@@ -928,8 +930,8 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
 		fl.oif = np->mcast_oif;
 
-	err = ip6_dst_lookup(sk, &dst, &fl);
-	if (err)
+	dst = ip6_dst_lookup(sk, &fl);
+	if ((err = dst->error))
 		goto out;
 
 	if (hlimit < 0) {
@@ -968,9 +970,10 @@ do_append_data:
 	else if (!corkreq)
 		err = udp_v6_push_pending_frames(sk, up);
 
-	ip6_dst_store(sk, dst,
-		      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
-		      &np->daddr : NULL);
+	if (dst)
+		ip6_dst_store(sk, dst,
+			      !ipv6_addr_cmp(&fl.fl6_dst, &np->daddr) ?
+			      &np->daddr : NULL);
 	if (err > 0)
 		err = np->recverr ? net_xmit_errno(err) : 0;
 	release_sock(sk);

@@ -8,8 +8,6 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
-static int agp_try_unsupported __initdata = 0;
-
 static int sis_fetch_size(void)
 {
 	u8 temp_size;
@@ -187,16 +185,9 @@ static int __init agp_sis_probe(struct pci_dev *pdev,
 		}
 	}
 
-	if (!agp_try_unsupported) {
-		printk(KERN_ERR PFX
-		    "Unsupported SiS chipset (device id: %04x),"
-		    " you might want to try agp_try_unsupported=1.\n",
+	printk(KERN_ERR PFX "Unsupported SiS chipset (device id: %04x)\n",
 		    pdev->device);
-		return -ENODEV;
-	}
-
-	printk(KERN_WARNING PFX "Trying generic SiS routines"
-	       " for device id: %04x\n", pdev->device);
+	return -ENODEV;
 
 found:
 	bridge = agp_alloc_bridge();
@@ -258,5 +249,4 @@ static void __exit agp_sis_cleanup(void)
 module_init(agp_sis_init);
 module_exit(agp_sis_cleanup);
 
-MODULE_PARM(agp_try_unsupported, "1i");
 MODULE_LICENSE("GPL and additional rights");

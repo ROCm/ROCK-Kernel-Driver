@@ -61,6 +61,8 @@ static DEFINE_PER_CPU(int, prof_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_old_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_counter) = 1;
 
+static int enabled_via_apicbase;
+
 void enable_NMI_through_LVT0 (void * dummy)
 {
 	unsigned int v, ver;
@@ -190,6 +192,13 @@ void disable_local_APIC(void)
 	value = apic_read(APIC_SPIV);
 	value &= ~APIC_SPIV_APIC_ENABLED;
 	apic_write_around(APIC_SPIV, value);
+
+	if (enabled_via_apicbase) {
+		unsigned int l, h;
+		rdmsr(MSR_IA32_APICBASE, l, h);
+		l &= ~MSR_IA32_APICBASE_ENABLE;
+		wrmsr(MSR_IA32_APICBASE, l, h);
+	}
 }
 
 /*
@@ -485,7 +494,6 @@ static struct {
 
 static int lapic_suspend(struct sys_device *dev, u32 state)
 {
-	unsigned int l, h;
 	unsigned long flags;
 
 	if (!apic_pm_state.active)
@@ -507,9 +515,6 @@ static int lapic_suspend(struct sys_device *dev, u32 state)
 	
 	local_irq_save(flags);
 	disable_local_APIC();
-	rdmsr(MSR_IA32_APICBASE, l, h);
-	l &= ~MSR_IA32_APICBASE_ENABLE;
-	wrmsr(MSR_IA32_APICBASE, l, h);
 	local_irq_restore(flags);
 	return 0;
 }
@@ -636,6 +641,7 @@ static int __init detect_init_APIC (void)
 			l &= ~MSR_IA32_APICBASE_BASE;
 			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 			wrmsr(MSR_IA32_APICBASE, l, h);
+			enabled_via_apicbase = 1;
 		}
 	}
 	/*

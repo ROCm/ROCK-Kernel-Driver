@@ -264,6 +264,44 @@ struct SGentry {
 };
 
 
+/*
+ * The SEEPROM structure for TRM_S1040 
+ */
+struct NVRamTarget {
+	u8 cfg0;		/* Target configuration byte 0  */
+	u8 period;		/* Target period                */
+	u8 cfg2;		/* Target configuration byte 2  */
+	u8 cfg3;		/* Target configuration byte 3  */
+};
+
+
+struct NvRamType {
+	u8 sub_vendor_id[2];	/* 0,1  Sub Vendor ID   */
+	u8 sub_sys_id[2];	/* 2,3  Sub System ID   */
+	u8 sub_class;		/* 4    Sub Class       */
+	u8 vendor_id[2];	/* 5,6  Vendor ID       */
+	u8 device_id[2];	/* 7,8  Device ID       */
+	u8 reserved;		/* 9    Reserved        */
+	struct NVRamTarget target[DC395x_MAX_SCSI_ID];
+						/** 10,11,12,13
+						 ** 14,15,16,17
+						 ** ....
+						 ** ....
+						 ** 70,71,72,73
+						 */
+	u8 scsi_id;		/* 74 Host Adapter SCSI ID      */
+	u8 channel_cfg;		/* 75 Channel configuration     */
+	u8 delay_time;		/* 76 Power on delay time       */
+	u8 max_tag;		/* 77 Maximum tags              */
+	u8 reserved0;		/* 78  */
+	u8 boot_target;		/* 79  */
+	u8 boot_lun;		/* 80  */
+	u8 reserved1;		/* 81  */
+	u16 reserved2[22];	/* 82,..125 */
+	u16 cksum;		/* 126,127 */
+};
+
+
 /*-----------------------------------------------------------------------
   SCSI Request Block
   -----------------------------------------------------------------------*/
@@ -349,7 +387,6 @@ struct DeviceCtlBlk {
   -----------------------------------------------------------------------*/
 struct AdapterCtlBlk {
 	struct Scsi_Host *scsi_host;
-	struct AdapterCtlBlk *next_acb;
 
 	u16 IOPortBase;
 
@@ -365,7 +402,6 @@ struct AdapterCtlBlk {
 	struct timer_list selto_timer;
 
 	u16 srb_count;
-	u16 adapter_index;	/* nth Adapter this driver */
 
 	u8 dcb_count;
 	u8 sel_timeout;
@@ -389,45 +425,11 @@ struct AdapterCtlBlk {
 
 	struct ScsiReqBlk srb_array[DC395x_MAX_SRB_CNT];
 	struct ScsiReqBlk srb;
+
+	struct NvRamType eeprom;	/* eeprom settings for this adapter */
 };
 
 
-/*
- * The SEEPROM structure for TRM_S1040 
- */
-struct NVRamTarget {
-	u8 cfg0;		/* Target configuration byte 0  */
-	u8 period;		/* Target period                */
-	u8 cfg2;		/* Target configuration byte 2  */
-	u8 cfg3;		/* Target configuration byte 3  */
-};
-
-
-struct NvRamType {
-	u8 sub_vendor_id[2];	/* 0,1  Sub Vendor ID   */
-	u8 sub_sys_id[2];	/* 2,3  Sub System ID   */
-	u8 sub_class;		/* 4    Sub Class       */
-	u8 vendor_id[2];	/* 5,6  Vendor ID       */
-	u8 device_id[2];	/* 7,8  Device ID       */
-	u8 reserved;		/* 9    Reserved        */
-	struct NVRamTarget target[DC395x_MAX_SCSI_ID];
-						/** 10,11,12,13
-						 ** 14,15,16,17
-						 ** ....
-						 ** ....
-						 ** 70,71,72,73
-						 */
-	u8 scsi_id;		/* 74 Host Adapter SCSI ID      */
-	u8 channel_cfg;		/* 75 Channel configuration     */
-	u8 delay_time;		/* 76 Power on delay time       */
-	u8 max_tag;		/* 77 Maximum tags              */
-	u8 reserved0;		/* 78  */
-	u8 boot_target;		/* 79  */
-	u8 boot_lun;		/* 80  */
-	u8 reserved1;		/* 81  */
-	u16 reserved2[22];	/* 82,..125 */
-	u16 cksum;		/* 126,127 */
-};
 
 
 /*---------------------------------------------------------------------------
@@ -512,9 +514,6 @@ static void waiting_timeout(unsigned long ptr);
 /*---------------------------------------------------------------------------
                                  Static Data
  ---------------------------------------------------------------------------*/
-static struct AdapterCtlBlk *acb_list_head = NULL;
-static struct AdapterCtlBlk *acb_list_tail = NULL;
-static u16 adapter_count = 0;
 static u16 current_sync_offset = 0;
 static char monitor_next_irq = 0;
 
@@ -546,7 +545,6 @@ static void *dc395x_scsi_phase1[] = {
 	msgin_phase1,	/* phase:7 */
 };
 
-struct NvRamType eeprom_buf[DC395x_MAX_ADAPTER_NUM];
 /*
  *Fast20:	000	 50ns, 20.0 MHz
  *		001	 75ns, 13.3 MHz
@@ -1611,14 +1609,12 @@ static inline void clear_fifo(struct AdapterCtlBlk *acb, char *txt)
  */
 static void reset_dev_param(struct AdapterCtlBlk *acb)
 {
-	struct DeviceCtlBlk *dcb;
+	struct DeviceCtlBlk *dcb = acb->link_dcb;
 	struct DeviceCtlBlk *dcb_temp;
-	struct NvRamType *eeprom;
+	struct NvRamType *eeprom = &acb->eeprom;
 	u8 period_index;
-	u16 index;
 
 	dprintkdbg(DBG_0, "reset_dev_param..............\n");
-	dcb = acb->link_dcb;
 	if (dcb == NULL)
 		return;
 
@@ -1627,8 +1623,6 @@ static void reset_dev_param(struct AdapterCtlBlk *acb)
 		dcb->sync_mode &= ~(SYNC_NEGO_DONE + WIDE_NEGO_DONE);
 		dcb->sync_period = 0;
 		dcb->sync_offset = 0;
-		index = acb->adapter_index;
-		eeprom = &eeprom_buf[index];
 
 		dcb->dev_mode = eeprom->target[dcb->target_id].cfg0;
 		/*dcb->AdpMode = eeprom->channel_cfg; */
@@ -1679,7 +1673,7 @@ static int dc395x_eh_bus_reset(Scsi_Cmnd * cmd)
 	/* We may be in serious trouble. Wait some seconds */
 	acb->scsi_host->last_reset =
 	    jiffies + 3 * HZ / 2 +
-	    HZ * eeprom_buf[acb->adapter_index].delay_time;
+	    HZ * acb->eeprom.delay_time;
 
 	/*
 	 * re-enable interrupt      
@@ -3832,9 +3826,7 @@ static void disconnect(struct AdapterCtlBlk *acb)
 		/* Suspend queue for a while */
 		acb->scsi_host->last_reset =
 		    jiffies + HZ / 2 +
-		    HZ *
-		    eeprom_buf[acb->adapter_index].
-		    delay_time;
+		    HZ * acb->eeprom.delay_time;
 		clear_fifo(acb, "DiscEx");
 		DC395x_write16(acb, TRM_S1040_SCSI_CONTROL, DO_HWRESELECT);
 		return;
@@ -4640,7 +4632,7 @@ static void scsi_reset_detect(struct AdapterCtlBlk *acb)
 	/* Maybe we locked up the bus? Then lets wait even longer ... */
 	acb->scsi_host->last_reset =
 	    jiffies + 5 * HZ / 2 +
-	    HZ * eeprom_buf[acb->adapter_index].delay_time;
+	    HZ * acb->eeprom.delay_time;
 
 	clear_fifo(acb, "RstDet");
 	set_basic_config(acb);
@@ -4731,9 +4723,8 @@ static
 void init_dcb(struct AdapterCtlBlk *acb, struct DeviceCtlBlk **pdcb,
 	      u8 target, u8 lun)
 {
-	struct NvRamType *eeprom;
+	struct NvRamType *eeprom = &acb->eeprom;
 	u8 period_index;
-	u16 index;
 	struct DeviceCtlBlk *dcb;
 	struct DeviceCtlBlk *dcb2;
 
@@ -4771,8 +4762,6 @@ void init_dcb(struct AdapterCtlBlk *acb, struct DeviceCtlBlk **pdcb,
 	dcb->flag = 0;
 	dcb->max_command = 1;
 	/* $$$$$$$ */
-	index = acb->adapter_index;
-	eeprom = &eeprom_buf[index];
 	dcb->dev_mode = eeprom->target[target].cfg0;
 	/*dcb->AdpMode = eeprom->channel_cfg; */
 	dcb->inquiry7 = 0;
@@ -4951,13 +4940,12 @@ static void __init link_srb(struct AdapterCtlBlk *acb)
  ***********************************************************************
  */
 static
-int __init init_acb(struct Scsi_Host *host, u32 io_port, u8 irq, u16 index)
+int __init init_acb(struct Scsi_Host *host, u32 io_port, u8 irq)
 {
-	struct NvRamType *eeprom;
-	struct AdapterCtlBlk *acb;
+	struct AdapterCtlBlk *acb = (struct AdapterCtlBlk *)host->hostdata;
+	struct NvRamType *eeprom = &acb->eeprom;
 	u16 i;
 
-	eeprom = &eeprom_buf[index];
 	host->max_cmd_len = 24;
 	host->can_queue = DC395x_MAX_CMD_QUEUE;
 	host->cmd_per_lun = DC395x_MAX_CMD_PER_LUN;
@@ -4969,7 +4957,6 @@ int __init init_acb(struct Scsi_Host *host, u32 io_port, u8 irq, u16 index)
 	host->irq = irq;
 	host->last_reset = jiffies;
 
-	acb = (struct AdapterCtlBlk *) host->hostdata;
 
 	host->max_id = 16;
 	if (host->max_id - 1 == eeprom->scsi_id)
@@ -4991,7 +4978,6 @@ int __init init_acb(struct Scsi_Host *host, u32 io_port, u8 irq, u16 index)
 	acb->dcb_run_robin = NULL;
 	acb->active_dcb = NULL;
 	acb->srb_count = DC395x_MAX_SRB_CNT;
-	acb->adapter_index = index;
 	acb->scsi_host->this_id = eeprom->scsi_id;
 	acb->hostid_bit = (1 << acb->scsi_host->this_id);
 	/*acb->scsi_host->this_lun = 0; */
@@ -5050,16 +5036,14 @@ int __init init_acb(struct Scsi_Host *host, u32 io_port, u8 irq, u16 index)
  * @host:	This hosts adapter strcuture
  * @io_port:	The base I/O port
  * @irq:	IRQ
- * @index:	Card instance number
  *
  * Returns 0 if the initialization succeeds, any other value on failure.
  **/
 static
-int __init init_adapter(struct Scsi_Host *host, u32 io_port,
-			u8 irq, u16 index)
+int __init init_adapter(struct Scsi_Host *host, u32 io_port, u8 irq)
 {
-	struct NvRamType *eeprom = &eeprom_buf[index];
 	struct AdapterCtlBlk *acb = (struct AdapterCtlBlk *)host->hostdata;
+	struct NvRamType *eeprom = &acb->eeprom;
 
 	if (!request_region(io_port, host->n_io_port, DC395X_NAME)) {
 		dprintkl(KERN_ERR, "Failed to reserve IO region 0x%x\n", io_port);
@@ -5106,9 +5090,7 @@ int __init init_adapter(struct Scsi_Host *host, u32 io_port,
 
 		acb->scsi_host->last_reset =
 		    jiffies + HZ / 2 +
-		    HZ *
-		    eeprom_buf[acb->adapter_index].
-		    delay_time;
+		    HZ * acb->eeprom.delay_time;
 
 		/*spin_lock_irq (&io_request_lock); */
 	}
@@ -5465,22 +5447,22 @@ void __init print_config(struct AdapterCtlBlk *acb)
  * print_eeprom_settings - output the eeprom settings
  * to the kernel log so people can see what they were.
  *
- * @index: Adapter number
+ * @eeprom: The eeprom data strucutre to show details for.
  **/
 static
-void __init print_eeprom_settings(u16 index)
+void __init print_eeprom_settings(struct NvRamType *eeprom)
 {
 	dprintkl(KERN_INFO, "Used settings: AdapterID=%02i, Speed=%i(%02i.%01iMHz), dev_mode=0x%02x\n",
-	       eeprom_buf[index].scsi_id,
-	       eeprom_buf[index].target[0].period,
-	       clock_speed[eeprom_buf[index].target[0].period] / 10,
-	       clock_speed[eeprom_buf[index].target[0].period] % 10,
-	       eeprom_buf[index].target[0].cfg0);
+	       eeprom->scsi_id,
+	       eeprom->target[0].period,
+	       clock_speed[eeprom->target[0].period] / 10,
+	       clock_speed[eeprom->target[0].period] % 10,
+	       eeprom->target[0].cfg0);
 	dprintkl(KERN_INFO, "               AdaptMode=0x%02x, Tags=%i(%02i), DelayReset=%is\n",
-	       eeprom_buf[index].channel_cfg,
-	       eeprom_buf[index].max_tag,
-	       1 << eeprom_buf[index].max_tag,
-	       eeprom_buf[index].delay_time);
+	       eeprom->channel_cfg,
+	       eeprom->max_tag,
+	       1 << eeprom->max_tag,
+	       eeprom->delay_time);
 }
 
 
@@ -5497,52 +5479,37 @@ void __init print_eeprom_settings(u16 index)
  */
 static
 struct Scsi_Host *__init host_init(Scsi_Host_Template * host_template,
-				   u32 io_port, u8 irq,
-				   u16 index)
+				   u32 io_port, u8 irq)
 {
 	struct Scsi_Host *host;
 	struct AdapterCtlBlk *acb;
 
-	/*
-	 * Read the eeprom contents info the buffer we supply. Use
-	 * defaults is eeprom checksum is wrong.
-	 */
-	check_eeprom(&eeprom_buf[index], (u16) io_port);
-
-	/*
-	 *$$$$$$$$$$$  MEMORY ALLOCATE FOR ADAPTER CONTROL BLOCK $$$$$$$$$$$$
-	 */
 	host = scsi_host_alloc(host_template, sizeof(struct AdapterCtlBlk));
 	if (!host) {
-		dprintkl(KERN_INFO, "pSH scsi_host_alloc ERROR\n");
-		return 0;
+		dprintkl(KERN_INFO, "scsi_host_alloc failed\n");
+		goto failed;
 	}
- 	print_eeprom_settings(index);
+ 	acb = (struct AdapterCtlBlk *)host->hostdata;
 
- 	acb = (struct AdapterCtlBlk *) host->hostdata;
- 	if (init_acb(host, io_port, irq, index)) {
-		scsi_host_put(host);
-		return 0;
+	check_eeprom(&acb->eeprom, (u16)io_port);
+ 	print_eeprom_settings(&acb->eeprom);
+
+ 	if (init_acb(host, io_port, irq)) {
+		goto failed;
 	}
  	print_config(acb);
 
-       /*
-        *$$$$$$$$$$$$$$$$$ INITIAL ADAPTER $$$$$$$$$$$$$$$$$
-        */
- 	if (!init_adapter(host, io_port, irq, index)) {
- 		if (!acb_list_head) {
- 			acb_list_head = acb;
-  		} else {
- 			acb_list_tail->next_acb = acb;
-  		}
- 		acb_list_tail = acb;
- 		acb->next_acb = NULL;
-	} else {
+ 	if (init_adapter(host, io_port, irq)) {
 		dprintkl(KERN_INFO, "DC395x_initAdapter initial ERROR\n");
-		scsi_host_put(host);
-		host = NULL;
+		goto failed;
 	}
+
 	return host;
+
+failed:
+	if (host)
+		scsi_host_put(host);
+	return NULL;
 }
 
 #undef SEARCH
@@ -5579,24 +5546,14 @@ struct Scsi_Host *__init host_init(Scsi_Host_Template * host_template,
  else SPRINTF(" No  ")
 
 static
-int dc395x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset, int length,
+int dc395x_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset, int length,
 		     int inout)
 {
+	struct AdapterCtlBlk *acb = (struct AdapterCtlBlk *)host->hostdata;
 	int dev, spd, spd1;
 	char *pos = buffer;
-	struct AdapterCtlBlk *acb;
 	struct DeviceCtlBlk *dcb;
 	unsigned long flags;
-
-	acb = acb_list_head;
-
-	while (acb) {
-  		if (acb->scsi_host == shpnt)
-  			break;
-		acb = acb->next_acb;
-  	}
-	if (!acb)
-		return -ESRCH;
 
 	if (inout)		/* Has data been written to the file ? */
 		return -EPERM;
@@ -5606,23 +5563,21 @@ int dc395x_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t 
 
 	DC395x_LOCK_IO(acb->scsi_host, flags);
 
-	SPRINTF("SCSI Host Nr %i, ", shpnt->host_no);
-	SPRINTF("DC395U/UW/F DC315/U %s Adapter Nr %i\n",
-		(acb->config & HCC_WIDE_CARD) ? "Wide" : "",
-		acb->adapter_index);
+	SPRINTF("SCSI Host Nr %i, ", host->host_no);
+	SPRINTF("DC395U/UW/F DC315/U %s\n",
+		(acb->config & HCC_WIDE_CARD) ? "Wide" : "");
 	SPRINTF("IOPortBase 0x%04x, ", acb->IOPortBase);
 	SPRINTF("irq_level 0x%02x, ", acb->irq_level);
 	SPRINTF(" SelTimeout %ims\n", (1638 * acb->sel_timeout) / 1000);
 
-	SPRINTF("MaxID %i, MaxLUN %i, ", shpnt->max_id, shpnt->max_lun);
-	SPRINTF("AdapterID %i\n", shpnt->this_id);
+	SPRINTF("MaxID %i, MaxLUN %i, ", host->max_id, host->max_lun);
+	SPRINTF("AdapterID %i\n", host->this_id);
 
 	SPRINTF("tag_max_num %i", acb->tag_max_num);
 	/*SPRINTF(", DMA_Status %i\n", DC395x_read8(acb, TRM_S1040_DMA_STATUS)); */
 	SPRINTF(", FilterCfg 0x%02x",
 		DC395x_read8(acb, TRM_S1040_SCSI_CONFIG1));
-	SPRINTF(", DelayReset %is\n",
-		eeprom_buf[acb->adapter_index].delay_time);
+	SPRINTF(", DelayReset %is\n", acb->eeprom.delay_time);
 	/*SPRINTF("\n"); */
 
 	SPRINTF("Nr of DCBs: %i\n", acb->dcb_count);
@@ -5852,6 +5807,7 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 	u8 irq;
 	struct Scsi_Host *scsi_host;
 	static int banner_done = 0;
+	int error = 0;
 
 	dprintkdbg(DBG_0, "Init one instance of the dc395x\n");
 	if (!banner_done)
@@ -5871,29 +5827,27 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 	irq = dev->irq;
 	dprintkdbg(DBG_0, "IO_PORT=%04x,IRQ=%x\n", (unsigned int) io_port, irq);
 
-	scsi_host = host_init(&dc395x_driver_template, io_port, irq, adapter_count);
+	scsi_host = host_init(&dc395x_driver_template, io_port, irq);
 	if (!scsi_host)
 	{
 		dprintkdbg(DBG_0, "host_init failed\n");
 		return -ENOMEM;
 	}
-
-	pci_set_master(dev);
-
-	/* store pci devices in out host data object. */
 	((struct AdapterCtlBlk *)(scsi_host->hostdata))->dev = dev;
-
-	/* increment adaptor count */
-	adapter_count++;
-
-	/* store ptr to scsi host in the PCI device structure */
+	pci_set_master(dev);
 	pci_set_drvdata(dev, scsi_host);
 
 	/* get the scsi mid level to scan for new devices on the bus */
-	scsi_add_host(scsi_host, &dev->dev);	/* XXX handle failure */
-	scsi_scan_host(scsi_host);
-
-	return 0;
+	error = scsi_add_host(scsi_host, &dev->dev);
+	if (error) {
+		dprintkl(KERN_ERR, "scsi_add_host failed\n");
+                error = -ENODEV;
+                host_release(scsi_host);
+                scsi_host_put(scsi_host);
+	} else
+        	scsi_scan_host(scsi_host);
+        	
+	return error;
 }
 
 
@@ -5906,9 +5860,18 @@ int __devinit dc395x_init_one(struct pci_dev *dev,
 static void __devexit dc395x_remove_one(struct pci_dev *dev)
 {
 	struct Scsi_Host *host = pci_get_drvdata(dev);
+
 	dprintkdbg(DBG_0, "Removing instance\n");
-	scsi_remove_host(host);
+	if (!host) {
+		dprintkl(KERN_ERR, "no host allocated\n");
+		return;
+	}
+	if (scsi_remove_host(host)) {
+		dprintkl(KERN_ERR, "scsi_remove_host failed\n");
+		return;
+	}
 	host_release(host);
+	scsi_host_put(host);
 	pci_set_drvdata(dev, NULL);
 }
 

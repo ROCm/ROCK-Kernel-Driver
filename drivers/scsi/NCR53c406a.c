@@ -450,6 +450,7 @@ static __inline__ int NCR53c406a_pio_write(unsigned char *request, unsigned int 
 
 static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 {
+	int present = 0;
 	struct Scsi_Host *shpnt = NULL;
 #ifndef PORT_BASE
 	int i;
@@ -522,7 +523,7 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 
 	DEB(printk("NCR53c406a: using port_base 0x%x\n", port_base));
 
-	tpnt->present = 1;
+	present = 1;
 	tpnt->proc_name = "NCR53c406a";
 
 	shpnt = scsi_register(tpnt, 0);
@@ -576,7 +577,7 @@ static int __init NCR53c406a_detect(Scsi_Host_Template * tpnt)
 	sprintf(info_msg, "NCR53c406a at 0x%x, IRQ %d, %s PIO mode.", port_base, irq_level, fast_pio ? "fast" : "slow");
 #endif
 
-	return (tpnt->present);
+	return (present);
 
 #if USE_DMA
       err_free_irq:

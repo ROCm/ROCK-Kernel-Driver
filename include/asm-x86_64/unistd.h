@@ -461,7 +461,7 @@ __SYSCALL(__NR_fremovexattr, sys_fremovexattr)
 #define __NR_tkill	200
 __SYSCALL(__NR_tkill, sys_tkill) 
 #define __NR_time      201
-__SYSCALL(__NR_time, sys_time)
+__SYSCALL(__NR_time, sys_time64)
 #define __NR_futex     202
 __SYSCALL(__NR_futex, sys_futex)
 #define __NR_sched_setaffinity    203

@@ -2623,7 +2623,8 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 					       sizeof(struct net_device_stats));
 					if (card->hw.type == PC300_TE)
 						memcpy(&pc300stats.te_stats,&chan->falc,sizeof(falc_t));
-				    copy_to_user(arg, &pc300stats, sizeof(pc300stats_t));
+				    	if (copy_to_user(arg, &pc300stats, sizeof(pc300stats_t)))
+						return -EFAULT;
 				}
 				return 0;
 			}

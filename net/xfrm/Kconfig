@@ -1,9 +1,13 @@
 #
 # XFRM configuration
 #
+config XFRM
+       bool
+       depends on NET
+
 config XFRM_USER
 	tristate "IPsec user configuration interface"
-	depends on INET
+	depends on INET && XFRM
 	---help---
 	  Support for IPsec user configuration interface used
 	  by native Linux tools.

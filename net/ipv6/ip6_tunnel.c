@@ -621,6 +621,14 @@ merge_options(struct sock *sk, __u8 encap_limit,
 	return opt;
 }
 
+static int 
+ip6ip6_getfrag(void *from, char *to, int offset, int len, int odd, 
+		struct sk_buff *skb)
+{
+	memcpy(to, (char *) from + offset, len);
+	return 0;
+}
+
 /**
  * ip6ip6_tnl_addr_conflict - compare packet addresses to tunnel's own
  *   @t: the outgoing tunnel device
@@ -755,9 +763,9 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 	if (skb->len > mtu) {
 		icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, dev);
-		goto tx_err_opt_release;
+		goto tx_err_dst_release;
 	}
-	err = ip6_append_data(sk, ip_generic_getfrag, skb->nh.raw, skb->len, 0,
+	err = ip6_append_data(sk, ip6ip6_getfrag, skb->nh.raw, skb->len, 0,
 			      t->parms.hop_limit, opt, &fl, 
 			      (struct rt6_info *)dst, MSG_DONTWAIT);
 
@@ -785,7 +793,6 @@ int ip6ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 tx_err_dst_release:
 	dst_release(dst);
-tx_err_opt_release:
 	if (opt && opt != orig_opt)
 		sock_kfree_s(sk, opt, opt->tot_len);
 tx_err_free_fl_lbl:

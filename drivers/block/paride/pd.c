@@ -654,7 +654,7 @@ static int pd_probe_drive(struct pd_unit *disk)
 	return pd_identify(disk);
 }
 
-static struct request_queue pd_queue;
+static struct request_queue *pd_queue;
 
 static int pd_detect(void)
 {
@@ -704,7 +704,7 @@ static int pd_detect(void)
 			set_capacity(p, disk->capacity);
 			disk->gd = p;
 			p->private_data = disk;
-			p->queue = &pd_queue;
+			p->queue = pd_queue;
 			add_disk(p);
 		}
 	}
@@ -782,7 +782,7 @@ static inline void next_request(int success)
 	spin_lock_irqsave(&pd_lock, saved_flags);
 	end_request(pd_req, success);
 	pd_busy = 0;
-	do_pd_request(&pd_queue);
+	do_pd_request(pd_queue);
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 }
 
@@ -890,20 +890,30 @@ static int __init pd_init(void)
 {
 	if (disable)
 		return -1;
-	if (register_blkdev(major, name))
-		return -1;
 
-	blk_init_queue(&pd_queue, do_pd_request, &pd_lock);
-	blk_queue_max_sectors(&pd_queue, cluster);
+	pd_queue = blk_init_queue(do_pd_request, &pd_lock);
+	if (!pd_queue)
+		goto out1;
+
+	blk_queue_max_sectors(pd_queue, cluster);
+
+	if (register_blkdev(major, name))
+		goto out2;
 
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 	       name, name, PD_VERSION, major, cluster, nice);
 	pd_init_units();
-	if (!pd_detect()) {
-		unregister_blkdev(major, name);
-		return -1;
-	}
+	if (!pd_detect())
+		goto out3;
+
 	return 0;
+
+out3:
+	unregister_blkdev(major, name);
+out2:
+	blk_cleanup_queue(pd_queue);
+out1:
+	return -1;
 }
 
 static void __exit pd_exit(void)
@@ -920,7 +930,7 @@ static void __exit pd_exit(void)
 			pi_release(disk->pi);
 		}
 	}
-	blk_cleanup_queue(&pd_queue);
+	blk_cleanup_queue(pd_queue);
 }
 
 MODULE_LICENSE("GPL");

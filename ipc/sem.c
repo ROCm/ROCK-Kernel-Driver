@@ -425,7 +425,7 @@ static void freeary (struct sem_array *sma, int id)
 	ipc_rcu_free(sma, size);
 }
 
-static unsigned long copy_semid_to_user(void *buf, struct semid64_ds *in, int version)
+static unsigned long copy_semid_to_user(void __user *buf, struct semid64_ds *in, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -686,7 +686,7 @@ struct sem_setbuf {
 	mode_t	mode;
 };
 
-static inline unsigned long copy_semid_from_user(struct sem_setbuf *out, void *buf, int version)
+static inline unsigned long copy_semid_from_user(struct sem_setbuf *out, void __user *buf, int version)
 {
 	switch(version) {
 	case IPC_64:
@@ -960,13 +960,13 @@ out:
 	return un;
 }
 
-asmlinkage long sys_semop (int semid, struct sembuf *tsops, unsigned nsops)
+asmlinkage long sys_semop (int semid, struct sembuf __user *tsops, unsigned nsops)
 {
 	return sys_semtimedop(semid, tsops, nsops, NULL);
 }
 
-asmlinkage long sys_semtimedop(int semid, struct sembuf *tsops,
-			unsigned nsops, const struct timespec *timeout)
+asmlinkage long sys_semtimedop(int semid, struct sembuf __user *tsops,
+			unsigned nsops, const struct timespec __user *timeout)
 {
 	int error = -EINVAL;
 	struct sem_array *sma;

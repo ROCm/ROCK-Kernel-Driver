@@ -14720,6 +14720,5 @@ static Scsi_Host_Template driver_template = {
 	.cmd_per_lun    = SCSI_NCR_CMD_PER_LUN,
 	.max_sectors	= MAX_HW_SEGMENTS*8,
 	.use_clustering = DISABLE_CLUSTERING,
-	.highmem_io	= 1
 };
 #include "scsi_module.c"

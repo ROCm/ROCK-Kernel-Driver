@@ -279,6 +279,7 @@ static struct xfrm_state *ipcomp_tunnel_create(struct xfrm_state *x)
 	t->props.family = AF_INET;
 	t->props.mode = 1;
 	t->props.saddr.a4 = x->props.saddr.a4;
+	t->props.flags = x->props.flags;
 	
 	t->type = xfrm_get_type(IPPROTO_IPIP, t->props.family);
 	if (t->type == NULL)
