@@ -63,7 +63,7 @@ get_fpu_long(struct task_struct *task, unsigned long addr)
 	struct pt_regs *regs;
 	regs = (struct pt_regs*)((unsigned char *)task + THREAD_SIZE) - 1;
 
-	if (!task->used_math) {
+	if (!tsk_used_math(task)) {
 		if (addr == offsetof(struct user_fpu_struct, fpscr)) {
 			tmp = FPSCR_INIT;
 		} else {
@@ -105,9 +105,9 @@ put_fpu_long(struct task_struct *task, unsigned long addr, unsigned long data)
 
 	regs = (struct pt_regs*)((unsigned char *)task + THREAD_SIZE) - 1;
 
-	if (!task->used_math) {
+	if (!tsk_used_math(task)) {
 		fpinit(&task->thread.fpu.hard);
-		task->used_math = 1;
+		set_stopped_child_used_math(task);
 	} else if (last_task_used_math == task) {
 		grab_fpu();
 		fpsave(&task->thread.fpu.hard);
@@ -187,7 +187,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 			 (addr <  offsetof(struct user, u_fpvalid))) {
 			tmp = get_fpu_long(child, addr - offsetof(struct user, fpu));
 		} else if (addr == offsetof(struct user, u_fpvalid)) {
-			tmp = child->used_math;
+			tmp = !!tsk_used_math(child);
 		} else {
 			break;
 		}

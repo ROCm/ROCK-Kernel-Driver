@@ -158,12 +158,12 @@ do_fpu_state_restore(unsigned long ex, struct pt_regs *regs)
 		fpsave(&last_task_used_math->thread.fpu.hard);
         }
         last_task_used_math = current;
-        if (current->used_math) {
+        if (used_math()) {
                 fpload(&current->thread.fpu.hard);
         } else {
 		/* First time FPU user.  */
 		fpload(&init_fpuregs.hard);
-                current->used_math = 1;
+                set_used_math();
         }
 	release_fpu();
 }

@@ -323,13 +323,13 @@ do_fpu_state_restore(unsigned long r4, unsigned long r5, unsigned long r6,
 		return;
 	}
 
-	if (tsk->used_math) {
+	if (used_math()) {
 		/* Using the FPU again.  */
 		restore_fpu(tsk);
 	} else	{
 		/* First time FPU user.  */
 		fpu_init();
-		tsk->used_math = 1;
+		set_used_math();
 	}
 	set_tsk_thread_flag(tsk, TIF_USEDFPU);
 }

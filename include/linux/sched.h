@@ -614,19 +614,7 @@ struct task_struct {
 	struct key *process_keyring;	/* keyring private to this process (CLONE_THREAD) */
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
-/*
- * Must be changed atomically so it shouldn't be
- * be a shareable bitflag.
- */
-	unsigned char used_math;
-/*
- * OOM kill score adjustment (bit shift).
- * Cannot live together with used_math since
- * used_math and oomkilladj can be changed at the
- * same time, so they would race if they're in the
- * same atomic block.
- */
-	short oomkilladj;
+	int oomkilladj; /* OOM kill score adjustment (bit shift). */
 	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
@@ -695,7 +683,7 @@ struct task_struct {
 #endif
 #ifdef CONFIG_NUMA
   	struct mempolicy *mempolicy;
-  	short il_next;		/* could be shared with used_math */
+	short il_next;
 #endif
 };
 
@@ -737,7 +725,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_SIGNALED	0x00000400	/* killed by a signal */
 #define PF_MEMALLOC	0x00000800	/* Allocating memory */
 #define PF_FLUSHER	0x00001000	/* responsible for disk writeback */
-
+#define PF_USED_MATH	0x00002000	/* if unset the fpu must be initialized before use */
 #define PF_FREEZE	0x00004000	/* this task is being frozen for suspend now */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
 #define PF_FROZEN	0x00010000	/* frozen for system suspend */
@@ -747,6 +735,31 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_LESS_THROTTLE 0x00100000	/* Throttle me less: I clean memory */
 #define PF_SYNCWRITE	0x00200000	/* I am doing a sync write */
 #define PF_BORROWED_MM	0x00400000	/* I am a kthread doing use_mm */
+
+/*
+ * Only the _current_ task can read/write to tsk->flags, but other
+ * tasks can access tsk->flags in readonly mode for example
+ * with tsk_used_math (like during threaded core dumping).
+ * There is however an exception to this rule during ptrace
+ * or during fork: the ptracer task is allowed to write to the
+ * child->flags of its traced child (same goes for fork, the parent
+ * can write to the child->flags), because we're guaranteed the
+ * child is not running and in turn not changing child->flags
+ * at the same time the parent does it.
+ */
+#define clear_stopped_child_used_math(child) do { (child)->flags &= ~PF_USED_MATH; } while (0)
+#define set_stopped_child_used_math(child) do { (child)->flags |= PF_USED_MATH; } while (0)
+#define clear_used_math() clear_stopped_child_used_math(current)
+#define set_used_math() set_stopped_child_used_math(current)
+#define conditional_stopped_child_used_math(condition, child) \
+	do { (child)->flags &= ~PF_USED_MATH, (child)->flags |= (condition) ? PF_USED_MATH : 0; } while (0)
+#define conditional_used_math(condition) \
+	conditional_stopped_child_used_math(condition, current)
+#define copy_to_stopped_child_used_math(child) \
+	do { (child)->flags &= ~PF_USED_MATH, (child)->flags |= current->flags & PF_USED_MATH; } while (0)
+/* NOTE: this will return 0 or PF_USED_MATH, it will never return 1 */
+#define tsk_used_math(p) ((p)->flags & PF_USED_MATH)
+#define used_math() tsk_used_math(current)
 
 #ifdef CONFIG_SMP
 extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
