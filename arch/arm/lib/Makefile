@@ -12,12 +12,12 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
 		   testclearbit.o testsetbit.o uaccess.o getuser.o    \
 		   putuser.o ashldi3.o ashrdi3.o lshrdi3.o muldi3.o   \
 		   ucmpdi2.o udivdi3.o lib1funcs.o div64.o	      \
-		   io-readsb.o io-writesb.o io-writesl.o
+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
 
 ifeq ($(CONFIG_CPU_32v3),y)
-  lib-y	+= io-readsw-armv3.o io-writesw-armv3.o io-readsl-armv3.o
+  lib-y	+= io-readsw-armv3.o io-writesw-armv3.o
 else
-  lib-y	+= io-readsw-armv4.o io-writesw-armv4.o io-readsl-armv4.o
+  lib-y	+= io-readsw-armv4.o io-writesw-armv4.o
 endif
 
 lib-$(CONFIG_ARCH_RPC)		+= ecard.o io-acorn.o floppydma.o

@@ -1,6 +1,6 @@
-/* linux/include/asm-arm/arch-omap/omap1610.h
+/* linux/include/asm-arm/arch-omap/omap16xx.h
  *
- * Hardware definitions for TI OMAP1610 processor.
+ * Hardware definitions for TI OMAP1610/5912/1710 processors.
  *
  * Cleanup for Linux-2.6 by Dirk Behme <dirk.behme@de.bosch.com>
  *
@@ -25,8 +25,8 @@
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef __ASM_ARCH_OMAP1610_H
-#define __ASM_ARCH_OMAP1610_H
+#ifndef __ASM_ARCH_OMAP16XX_H
+#define __ASM_ARCH_OMAP16XX_H
 
 /*
  * ----------------------------------------------------------------------------
@@ -36,17 +36,18 @@
 
 /* Syntax: XX_BASE = Virtual base address, XX_START = Physical base address */
 
-#define OMAP1610_SRAM_BASE	0xD0000000
+#define OMAP16XX_SRAM_BASE	0xD0000000
 #define OMAP1610_SRAM_SIZE	(SZ_16K)
-#define OMAP1610_SRAM_START	0x20000000
+#define OMAP5912_SRAM_SIZE	0x3E800
+#define OMAP16XX_SRAM_START	0x20000000
 
-#define OMAP1610_DSP_BASE	0xE0000000
-#define OMAP1610_DSP_SIZE	0x28000
-#define OMAP1610_DSP_START	0xE0000000
+#define OMAP16XX_DSP_BASE	0xE0000000
+#define OMAP16XX_DSP_SIZE	0x28000
+#define OMAP16XX_DSP_START	0xE0000000
 
-#define OMAP1610_DSPREG_BASE	0xE1000000
-#define OMAP1610_DSPREG_SIZE	SZ_128K
-#define OMAP1610_DSPREG_START	0xE1000000
+#define OMAP16XX_DSPREG_BASE	0xE1000000
+#define OMAP16XX_DSPREG_SIZE	SZ_128K
+#define OMAP16XX_DSPREG_START	0xE1000000
 
 /*
  * ----------------------------------------------------------------------------
@@ -54,7 +55,8 @@
  * ----------------------------------------------------------------------------
  */
 
-#define OMAP1610_SRAM_IDLE_SUSPEND	(OMAP1610_SRAM_BASE + OMAP1610_SRAM_SIZE - 0x200)
+#define OMAP1610_SRAM_IDLE_SUSPEND	(OMAP16XX_SRAM_BASE + OMAP1610_SRAM_SIZE - 0x200)
+#define OMAP5912_SRAM_IDLE_SUSPEND	(OMAP16XX_SRAM_BASE + OMAP5912_SRAM_SIZE - 0x200)
 #define OMAP1610_SRAM_API_SUSPEND	(OMAP1610_SRAM_IDLE_SUSPEND + 0x100)
 
 /*
@@ -104,18 +106,18 @@
  * Clocks
  * ----------------------------------------------------------------------------
  */
-#define OMAP1610_ARM_IDLECT3	(CLKGEN_REG_BASE + 0x24)
+#define OMAP16XX_ARM_IDLECT3	(CLKGEN_REG_BASE + 0x24)
 
 /*
  * ----------------------------------------------------------------------------
  * Pin configuration registers
  * ----------------------------------------------------------------------------
  */
-#define OMAP1610_CONF_VOLTAGE_VDDSHV6	(1 << 8)
-#define OMAP1610_CONF_VOLTAGE_VDDSHV7	(1 << 9)
-#define OMAP1610_CONF_VOLTAGE_VDDSHV8	(1 << 10)
-#define OMAP1610_CONF_VOLTAGE_VDDSHV9	(1 << 11)
-#define OMAP1610_SUBLVDS_CONF_VALID	(1 << 13)
+#define OMAP16XX_CONF_VOLTAGE_VDDSHV6	(1 << 8)
+#define OMAP16XX_CONF_VOLTAGE_VDDSHV7	(1 << 9)
+#define OMAP16XX_CONF_VOLTAGE_VDDSHV8	(1 << 10)
+#define OMAP16XX_CONF_VOLTAGE_VDDSHV9	(1 << 11)
+#define OMAP16XX_SUBLVDS_CONF_VALID	(1 << 13)
 
 /*
  * ---------------------------------------------------------------------------
@@ -123,7 +125,55 @@
  * ---------------------------------------------------------------------------
  */
 #define TIPB_SWITCH_BASE		 (0xfffbc800)
-#define OMAP1610_MMCSD2_SSW_MPU_CONF	(TIPB_SWITCH_BASE + 0x160)
+#define OMAP16XX_MMCSD2_SSW_MPU_CONF	(TIPB_SWITCH_BASE + 0x160)
 
-#endif /*  __ASM_ARCH_OMAP1610_H */
+/* UART3 Registers Maping through MPU bus */
+#define UART3_RHR               (OMAP_UART3_BASE + 0)
+#define UART3_THR               (OMAP_UART3_BASE + 0)
+#define UART3_DLL               (OMAP_UART3_BASE + 0)
+#define UART3_IER               (OMAP_UART3_BASE + 4)
+#define UART3_DLH               (OMAP_UART3_BASE + 4)
+#define UART3_IIR               (OMAP_UART3_BASE + 8)
+#define UART3_FCR               (OMAP_UART3_BASE + 8)
+#define UART3_EFR               (OMAP_UART3_BASE + 8)
+#define UART3_LCR               (OMAP_UART3_BASE + 0x0C)
+#define UART3_MCR               (OMAP_UART3_BASE + 0x10)
+#define UART3_XON1_ADDR1        (OMAP_UART3_BASE + 0x10)
+#define UART3_XON2_ADDR2        (OMAP_UART3_BASE + 0x14)
+#define UART3_LSR               (OMAP_UART3_BASE + 0x14)
+#define UART3_TCR               (OMAP_UART3_BASE + 0x18)
+#define UART3_MSR               (OMAP_UART3_BASE + 0x18)
+#define UART3_XOFF1             (OMAP_UART3_BASE + 0x18)
+#define UART3_XOFF2             (OMAP_UART3_BASE + 0x1C)
+#define UART3_SPR               (OMAP_UART3_BASE + 0x1C)
+#define UART3_TLR               (OMAP_UART3_BASE + 0x1C)
+#define UART3_MDR1              (OMAP_UART3_BASE + 0x20)
+#define UART3_MDR2              (OMAP_UART3_BASE + 0x24)
+#define UART3_SFLSR             (OMAP_UART3_BASE + 0x28)
+#define UART3_TXFLL             (OMAP_UART3_BASE + 0x28)
+#define UART3_RESUME            (OMAP_UART3_BASE + 0x2C)
+#define UART3_TXFLH             (OMAP_UART3_BASE + 0x2C)
+#define UART3_SFREGL            (OMAP_UART3_BASE + 0x30)
+#define UART3_RXFLL             (OMAP_UART3_BASE + 0x30)
+#define UART3_SFREGH            (OMAP_UART3_BASE + 0x34)
+#define UART3_RXFLH             (OMAP_UART3_BASE + 0x34)
+#define UART3_BLR               (OMAP_UART3_BASE + 0x38)
+#define UART3_ACREG             (OMAP_UART3_BASE + 0x3C)
+#define UART3_DIV16             (OMAP_UART3_BASE + 0x3C)
+#define UART3_SCR               (OMAP_UART3_BASE + 0x40)
+#define UART3_SSR               (OMAP_UART3_BASE + 0x44)
+#define UART3_EBLR              (OMAP_UART3_BASE + 0x48)
+#define UART3_OSC_12M_SEL       (OMAP_UART3_BASE + 0x4C)
+#define UART3_MVR               (OMAP_UART3_BASE + 0x50)
+
+/*
+ * ----------------------------------------------------------------------------
+ * Pulse-Width Light
+ * ----------------------------------------------------------------------------
+ */
+#define OMAP16XX_PWL_BASE	(0xfffb5800)
+#define OMAP16XX_PWL_ENABLE	(OMAP16XX_PWL_BASE + 0x00)
+#define OMAP16XX_PWL_CLK_ENABLE	(OMAP16XX_PWL_BASE + 0x04)
+
+#endif /*  __ASM_ARCH_OMAP16XX_H */
 

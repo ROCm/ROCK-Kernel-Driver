@@ -15,6 +15,10 @@ obj-			:=
 obj-$(CONFIG_CPU_S3C2410)  += s3c2410.o
 obj-$(CONFIG_S3C2410_DMA)  += dma.o
 
+# Power Management support
+
+obj-$(CONFIG_PM)	   += pm.o sleep.o
+
 # S3C2440 support
 
 obj-$(CONFIG_CPU_S3C2440)  += s3c2440.o s3c2440-dsc.o

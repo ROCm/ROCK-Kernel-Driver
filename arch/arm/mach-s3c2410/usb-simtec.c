@@ -13,6 +13,7 @@
  *
  * Modifications:
  *	14-Sep-2004 BJD  Created
+ *	18-Oct-2004 BJD  Cleanups, and added code to report OC cleared
 */
 
 #define DEBUG
@@ -51,10 +52,8 @@ usb_simtec_powercontrol(int port, int to)
 {
 	pr_debug("usb_simtec_powercontrol(%d,%d)\n", port, to);
 
-	if (port == 1) {
+	if (port == 1)
 		s3c2410_gpio_setpin(S3C2410_GPB4, to ? 0:1);
-		pr_debug("GPBDAT now %08x\n", __raw_readl(S3C2410_GPBDAT));
-	}
 }
 
 static irqreturn_t
@@ -67,6 +66,7 @@ usb_simtec_ocirq(int irq, void *pw, struct pt_regs *regs)
 		s3c2410_report_oc(info, 3);
 	} else {
 		pr_debug("usb_simtec: over-current irq (oc cleared)\n");
+		s3c2410_report_oc(info, 0);
 	}
 
 	return IRQ_HANDLED;
@@ -77,16 +77,15 @@ static void usb_simtec_enableoc(struct s3c2410_hcd_info *info, int on)
 	int ret;
 
 	if (on) {
-		pr_debug("claiming usb overccurent\n");
 		ret = request_irq(IRQ_USBOC, usb_simtec_ocirq, SA_INTERRUPT,
-				  "usb-oc", info);
+				  "USB Over-current", info);
 		if (ret != 0) {
 			printk(KERN_ERR "failed to request usb oc irq\n");
 		}
 
 		set_irq_type(IRQ_USBOC, IRQT_BOTHEDGE);
 	} else {
-		free_irq(IRQ_USBOC, NULL);
+		free_irq(IRQ_USBOC, info);
 	}
 }
 
@@ -110,14 +109,5 @@ int usb_simtec_init(void)
 
 	s3c2410_gpio_cfgpin(S3C2410_GPB4, S3C2410_GPB4_OUTP);
 	s3c2410_gpio_setpin(S3C2410_GPB4, 1);
-
-	pr_debug("GPB: CON=%08x, DAT=%08x\n",
-		 __raw_readl(S3C2410_GPBCON), __raw_readl(S3C2410_GPBDAT));
-
-	if (0) {
-		s3c2410_modify_misccr(S3C2410_MISCCR_USBHOST,
-				      S3C2410_MISCCR_USBDEV);
-	}
-
 	return 0;
 }
