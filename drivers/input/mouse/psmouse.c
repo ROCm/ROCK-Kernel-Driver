@@ -102,7 +102,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 			case 1: /* Mouse extra info */
 
 				input_report_rel(dev, packet[2] & 0x80 ? REL_HWHEEL : REL_WHEEL,
-					(int) (packet[2] & 7) - (int) (packet[2] & 8));
+					(int) (packet[2] & 8) - (int) (packet[2] & 7));
 				input_report_key(dev, BTN_SIDE, (packet[2] >> 4) & 1);
 				input_report_key(dev, BTN_EXTRA, (packet[2] >> 5) & 1);
 					
@@ -111,7 +111,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 			case 3: /* TouchPad extra info */
 
 				input_report_rel(dev, packet[2] & 0x08 ? REL_HWHEEL : REL_WHEEL,
-					(int) ((packet[2] >> 4) & 7) - (int) ((packet[2] >> 4) & 8));
+					(int) ((packet[2] >> 4) & 8) - (int) ((packet[2] >> 4) & 7));
 				packet[0] = packet[2] | 0x08;
 
 				break;
@@ -135,14 +135,14 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  */
 
 	if (psmouse->type == PSMOUSE_IMPS || psmouse->type == PSMOUSE_GENPS)
-		input_report_rel(dev, REL_WHEEL, (signed char) packet[3]);
+		input_report_rel(dev, REL_WHEEL, -(signed char) packet[3]);
 
 /*
  * Scroll wheel and buttons on IntelliMouse Explorer
  */
 
 	if (psmouse->type == PSMOUSE_IMEX) {
-		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[3] & 8));
+		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 8) - (int) (packet[3] & 7));
 		input_report_key(dev, BTN_SIDE, (packet[3] >> 4) & 1);
 		input_report_key(dev, BTN_EXTRA, (packet[3] >> 5) & 1);
 	}
