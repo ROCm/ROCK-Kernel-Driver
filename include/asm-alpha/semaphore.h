@@ -16,10 +16,7 @@
 #include <linux/rwsem.h>
 
 struct semaphore {
-	/* Careful, inline assembly knows about the position of these two.  */
-	atomic_t count __attribute__((aligned(8)));
-	atomic_t waking;		/* biased by -1 */
-
+	atomic_t count;
 	wait_queue_head_t wait;
 #if WAITQUEUE_DEBUG
 	long __magic;
@@ -33,18 +30,18 @@ struct semaphore {
 #endif
 
 #define __SEMAPHORE_INITIALIZER(name,count)		\
-	{ ATOMIC_INIT(count), ATOMIC_INIT(-1),		\
+	{ ATOMIC_INIT(count),				\
 	  __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 	  __SEM_DEBUG_INIT(name) }
 
-#define __MUTEX_INITIALIZER(name) \
+#define __MUTEX_INITIALIZER(name)			\
 	__SEMAPHORE_INITIALIZER(name,1)
 
-#define __DECLARE_SEMAPHORE_GENERIC(name,count) \
+#define __DECLARE_SEMAPHORE_GENERIC(name,count)		\
 	struct semaphore name = __SEMAPHORE_INITIALIZER(name,count)
 
-#define DECLARE_MUTEX(name) __DECLARE_SEMAPHORE_GENERIC(name,1)
-#define DECLARE_MUTEX_LOCKED(name) __DECLARE_SEMAPHORE_GENERIC(name,0)
+#define DECLARE_MUTEX(name)		__DECLARE_SEMAPHORE_GENERIC(name,1)
+#define DECLARE_MUTEX_LOCKED(name)	__DECLARE_SEMAPHORE_GENERIC(name,0)
 
 static inline void sema_init(struct semaphore *sem, int val)
 {
@@ -55,7 +52,6 @@ static inline void sema_init(struct semaphore *sem, int val)
 	 */
 
 	atomic_set(&sem->count, val);
-	atomic_set(&sem->waking, -1);
 	init_waitqueue_head(&sem->wait);
 #if WAITQUEUE_DEBUG
 	sem->__magic = (long)&sem->__magic;
@@ -107,102 +103,42 @@ static inline int __down_interruptible(struct semaphore *sem)
 
 /*
  * down_trylock returns 0 on success, 1 if we failed to get the lock.
- *
- * We must manipulate count and waking simultaneously and atomically.
- * Do this by using ll/sc on the pair of 32-bit words.
  */
 
-static inline int __down_trylock(struct semaphore * sem)
+static inline int __down_trylock(struct semaphore *sem)
 {
-	long ret, tmp, tmp2, sub;
+	long ret;
 
-	/* "Equivalent" C.  Note that we have to do this all without
-	   (taken) branches in order to be a valid ll/sc sequence.
+	/* "Equivalent" C:
 
 	   do {
-		tmp = ldq_l;
-		sub = 0x0000000100000000;	
-		ret = ((int)tmp <= 0);		// count <= 0 ?
-		// Note that if count=0, the decrement overflows into
-		// waking, so cancel the 1 loaded above.  Also cancel
-		// it if the lock was already free.
-		if ((int)tmp >= 0) sub = 0;	// count >= 0 ?
-		ret &= ((long)tmp < 0);		// waking < 0 ?
-		sub += 1;
-		if (ret) break;	
-		tmp -= sub;
-		tmp = stq_c = tmp;
-	   } while (tmp == 0);
+		ret = ldl_l;
+		--ret;
+		if (ret < 0)
+			break;
+		ret = stl_c = ret;
+	   } while (ret == 0);
 	*/
-
 	__asm__ __volatile__(
-		"1:	ldq_l	%1,%4\n"
-		"	lda	%3,1\n"
-		"	addl	%1,0,%2\n"
-		"	sll	%3,32,%3\n"
-		"	cmple	%2,0,%0\n"
-		"	cmovge	%2,0,%3\n"
-		"	cmplt	%1,0,%2\n"
-		"	addq	%3,1,%3\n"
-		"	and	%0,%2,%0\n"
-		"	bne	%0,2f\n"
-		"	subq	%1,%3,%1\n"
-		"	stq_c	%1,%4\n"
-		"	beq	%1,3f\n"
-		"2:	mb\n"
-		".subsection 2\n"
-		"3:	br	1b\n"
-		".previous"
-		: "=&r"(ret), "=&r"(tmp), "=&r"(tmp2), "=&r"(sub)
-		: "m"(*sem)
-		: "memory");
-
-	return ret;
-}
-
-static inline void __up(struct semaphore *sem)
-{
-	long ret, tmp, tmp2, tmp3;
-
-	/* We must manipulate count and waking simultaneously and atomically.
-	   Otherwise we have races between up and __down_failed_interruptible
-	   waking up on a signal.
-
-	   "Equivalent" C.  Note that we have to do this all without
-	   (taken) branches in order to be a valid ll/sc sequence.
-
-	   do {
-		tmp = ldq_l;
-		ret = (int)tmp + 1;			// count += 1;
-		tmp2 = tmp & 0xffffffff00000000;	// extract waking
-		if (ret <= 0)				// still sleepers?
-			tmp2 += 0x0000000100000000;	// waking += 1;
-		tmp = ret & 0x00000000ffffffff;		// insert count
-		tmp |= tmp2;				// insert waking;
-	       tmp = stq_c = tmp;
-	   } while (tmp == 0);
-	*/
-
-	__asm__ __volatile__(
+		"1:	ldl_l	%0,%1\n"
+		"	subl	%0,1,%0\n"
+		"	blt	%0,2f\n"
+		"	stl_c	%0,%1\n"
+		"	beq	%0,3f\n"
 		"	mb\n"
-		"1:	ldq_l	%1,%4\n"
-		"	addl	%1,1,%0\n"
-		"	zapnot	%1,0xf0,%2\n"
-		"	addq	%2,%5,%3\n"
-		"	cmovle	%0,%3,%2\n"
-		"	zapnot	%0,0x0f,%1\n"
-		"	bis	%1,%2,%1\n"
-		"	stq_c	%1,%4\n"
-		"	beq	%1,3f\n"
 		"2:\n"
 		".subsection 2\n"
 		"3:	br	1b\n"
 		".previous"
-		: "=&r"(ret), "=&r"(tmp), "=&r"(tmp2), "=&r"(tmp3)
-		: "m"(*sem), "r"(0x0000000100000000)
-		: "memory");
+		: "=&r" (ret), "=m" (sem->count)
+		: "m" (sem->count));
 
-	if (unlikely(ret <= 0))
+	return ret < 0;
+}
+
+static inline void __up(struct semaphore *sem)
+{
+	if (unlikely(atomic_inc_return(&sem->count) <= 0))
 		__up_wakeup(sem);
 }
 
