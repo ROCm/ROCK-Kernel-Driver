@@ -124,7 +124,7 @@ int shift_state = 0;
  */
 
 static struct input_handler kbd_handler;
-static unsigned long key_down[256/BITS_PER_LONG];	/* keyboard key bitmap */
+static unsigned long key_down[NBITS(KEY_MAX)];		/* keyboard key bitmap */
 static unsigned char shift_down[NR_SHIFT];		/* shift state counters.. */
 static int dead_key_next;
 static int npadch = -1;					/* -1 or number assembled on pad */
@@ -143,7 +143,7 @@ static struct ledptr {
 /* Simple translation table for the SysRq keys */
 
 #ifdef CONFIG_MAGIC_SYSRQ
-unsigned char kbd_sysrq_xlate[128] =
+unsigned char kbd_sysrq_xlate[KEY_MAX] =
         "\000\0331234567890-=\177\t"                    /* 0x00 - 0x0f */
         "qwertyuiop[]\r\000as"                          /* 0x10 - 0x1f */
         "dfghjkl;'`\000\\zxcv"                          /* 0x20 - 0x2f */
@@ -1132,6 +1132,9 @@ void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *reg
 		kbd->slockstate = 0;
 		return;
 	}
+
+	if (keycode > NR_KEYS)
+		return;
 
 	keysym = key_map[keycode];
 	type = KTYP(keysym);
