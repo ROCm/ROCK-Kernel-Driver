@@ -173,14 +173,6 @@ prism54_mib_init(islpci_private *priv)
 	prism54_mib_mode_helper(priv, init_mode);
 }
 
-void
-prism54_mib_init_work(islpci_private *priv)
-{
-	down_write(&priv->mib_sem);
-	mgt_commit(priv);
-	up_write(&priv->mib_sem);
-}
-
 /* this will be executed outside of atomic context thanks to
  * schedule_work(), thus we can as well use sleeping semaphore
  * locking */
@@ -194,13 +186,6 @@ prism54_update_stats(islpci_private *priv)
 
 	if (down_interruptible(&priv->stats_sem))
 		return;
-
-/* missing stats are :
- *  iwstatistics.qual.updated
- *  iwstatistics.discard.nwid	    
- *  iwstatistics.discard.fragment	    
- *  iwstatistics.discard.misc
- *  iwstatistics.miss.beacon */
 
 /* Noise floor.
  * I'm not sure if the unit is dBm.
@@ -425,7 +410,6 @@ prism54_set_sens(struct net_device *ndev, struct iw_request_info *info,
 	/* by default  the card sets this to 20. */
 	sens = vwrq->disabled ? 20 : vwrq->value;
 
-	/* set the ed threshold. */
 	return mgt_set_request(priv, DOT11_OID_EDTHRESHOLD, 0, &sens);
 }
 
@@ -712,7 +696,7 @@ prism54_get_scan(struct net_device *ndev, struct iw_request_info *info,
 
 	/* Ask the device for a list of known bss. We can report at most
 	 * IW_MAX_AP=64 to the range struct. But the device won't repport anything
-	 * if you change the value of MAXBSS=24. Anyway 24 AP It is probably enough.
+	 * if you change the value of IWMAX_BSS=24.
 	 */
 	rvalue |= mgt_get_request(priv, DOT11_OID_BSSLIST, 0, NULL, &r);
 	bsslist = r.ptr;
@@ -969,8 +953,6 @@ prism54_get_frag(struct net_device *ndev, struct iw_request_info *info,
  * small frame <=>  smaller than the rts threshold
  * This is not really the behavior expected by the wireless tool but it seems
  * to be a common behavior in other drivers.
- * 
- * It seems that playing with this tends to hang the card -> DISABLED
  */
 
 static int
@@ -1002,14 +984,13 @@ prism54_set_retry(struct net_device *ndev, struct iw_request_info *info,
 		lifetime = vwrq->value / 1024;
 
 	/* now set what is requested */
-
-	if (slimit != 0)
+	if (slimit)
 		rvalue =
 		    mgt_set_request(priv, DOT11_OID_SHORTRETRIES, 0, &slimit);
-	if (llimit != 0)
+	if (llimit)
 		rvalue |=
 		    mgt_set_request(priv, DOT11_OID_LONGRETRIES, 0, &llimit);
-	if (lifetime != 0)
+	if (lifetime)
 		rvalue |=
 		    mgt_set_request(priv, DOT11_OID_MAXTXLIFETIME, 0,
 				    &lifetime);
@@ -1261,11 +1242,6 @@ static int
 prism54_set_u32(struct net_device *ndev, struct iw_request_info *info,
 		   __u32 * uwrq, char *extra)
 {
-	/*
-	   u32 *i = (int *) extra;
-	   int param = *i;
-	   int u = *(i + 1);
-	 */
 	u32 oid = uwrq[0], u = uwrq[1];
 
 	return mgt_set_request((islpci_private *) ndev->priv, oid, 0, &u);
@@ -1836,9 +1812,7 @@ prism54_process_trap_helper(islpci_private *priv, enum oid_num_t oid,
 				     0);
 		break;
 
-		/* Note : the following should never happen since we don't run the card in
-		 * extended mode.
-		 * Note : "mlme" is actually a "struct obj_mlmeex *" here, but this
+		/* Note : "mlme" is actually a "struct obj_mlmeex *" here, but this
 		 * is backward compatible layout-wise with "struct obj_mlme".
 		 */
 

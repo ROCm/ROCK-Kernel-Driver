@@ -504,7 +504,9 @@ islpci_reset_if(islpci_private *priv)
 	 * the IRQ line until we know for sure the reset went through */
 	isl38xx_enable_common_interrupts(priv->device_base);
 
-	prism54_mib_init_work(priv);
+	down_write(&priv->mib_sem);
+	mgt_commit(priv);
+	up_write(&priv->mib_sem);
 
 	islpci_set_state(priv, PRV_STATE_READY);
 

@@ -446,7 +446,7 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 	if (cache)
 		down_write(&priv->mib_sem);
 
-	if (islpci_get_state(priv) >= PRV_STATE_INIT) {
+	if (islpci_get_state(priv) >= PRV_STATE_READY) {
 		ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET, oid,
 					     _data, dlen, &response);
 		if (!ret) {
@@ -500,7 +500,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 	if (cache)
 		down_read(&priv->mib_sem);
 
-	if (islpci_get_state(priv) >= PRV_STATE_INIT) {
+	if (islpci_get_state(priv) >= PRV_STATE_READY) {
 		ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,
 					     oid, data, dlen, &response);
 		if (ret || !response ||
@@ -539,7 +539,7 @@ mgt_get_request(islpci_private *priv, enum oid_num_t n, int extra, void *data,
 	if (reslen > isl_oid[n].size)
 		printk(KERN_DEBUG
 		       "mgt_get_request(0x%x): received data length was bigger "
-		       "than expected (%d > %d). Memory is probably corrupted... ",
+		       "than expected (%d > %d). Memory is probably corrupted...",
 		       oid, reslen, isl_oid[n].size);
 	
 	return ret;
@@ -622,12 +622,32 @@ static enum oid_num_t commit_part2[] = {
 	OID_INL_OUTPUTPOWER,
 };
 
+/* update the MAC addr. */
+static int
+mgt_update_addr(islpci_private *priv)
+{
+	struct islpci_mgmtframe *res;
+	int ret;
+
+	ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_GET,
+				     isl_oid[GEN_OID_MACADDRESS].oid, NULL,
+				     isl_oid[GEN_OID_MACADDRESS].size, &res);
+
+	if ((ret == 0) && res && (res->header->operation != PIMFOR_OP_ERROR))
+		memcpy(priv->ndev->dev_addr, res->data, 6);
+	else
+		ret = -EIO;
+	if (res)
+		islpci_mgt_release(res);
+
+	return ret;
+}
+
 void
 mgt_commit(islpci_private *priv)
 {
 	int rvalue;
 	u32 u;
-	union oid_res_t r;
 
 	if (islpci_get_state(priv) < PRV_STATE_INIT)
 		return;
@@ -643,6 +663,7 @@ mgt_commit(islpci_private *priv)
 
 	u = OID_INL_MODE;
 	rvalue |= mgt_commit_list(priv, &u, 1);
+	rvalue |= mgt_update_addr(priv);
 
 	if (rvalue) {
 		/* some request have failed. The device might be in an
@@ -650,14 +671,6 @@ mgt_commit(islpci_private *priv)
 		printk(KERN_DEBUG "%s: mgt_commit has failed. Restart the "
                 "device \n", priv->ndev->name);
 	}
-
-	/* update the MAC addr. As it's not cached, no lock will be acquired by
-	 * the mgt_get_request
-	 */
-	mgt_get_request(priv, GEN_OID_MACADDRESS, 0, NULL, &r);
-	memcpy(priv->ndev->dev_addr, r.ptr, 6);
-	kfree(r.ptr);
-
 }
 
 /* This will tell you if you are allowed to answer a mlme(ex) request .*/
@@ -710,8 +723,11 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 	case OID_TYPE_BSS:{
 			struct obj_bss *bss = r->ptr;
 			return snprintf(str, PRIV_STR_SIZE,
-					"age=%u\nchannel=%u\n\
-				        capinfo=0x%X\nrates=0x%X\nbasic_rates=0x%X\n", bss->age, bss->channel, bss->capinfo, bss->rates, bss->basic_rates);
+					"age=%u\nchannel=%u\n"
+					"capinfo=0x%X\nrates=0x%X\n"
+					"basic_rates=0x%X\n", bss->age,
+					bss->channel, bss->capinfo,
+					bss->rates, bss->basic_rates);
 		}
 		break;
 	case OID_TYPE_BSSLIST:{
@@ -720,7 +736,9 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 			k = snprintf(str, PRIV_STR_SIZE, "nr=%u\n", list->nr);
 			for (i = 0; i < list->nr; i++)
 				k += snprintf(str + k, PRIV_STR_SIZE - k,
-					      "bss[%u] : \nage=%u\nchannel=%u\ncapinfo=0x%X\nrates=0x%X\nbasic_rates=0x%X\n",
+					      "bss[%u] : \nage=%u\nchannel=%u\n"
+					      "capinfo=0x%X\nrates=0x%X\n"
+					      "basic_rates=0x%X\n",
 					      i, list->bsslist[i].age,
 					      list->bsslist[i].channel,
 					      list->bsslist[i].capinfo,
@@ -742,16 +760,17 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 		break;
 	case OID_TYPE_MLME:{
 			struct obj_mlme *mlme = r->ptr;
-			return snprintf(str, PRIV_STR_SIZE, "id=0x%X\nstate=0x%X\n\
-			         code=0x%X\n", mlme->id, mlme->state,
-					mlme->code);
+			return snprintf(str, PRIV_STR_SIZE,
+					"id=0x%X\nstate=0x%X\ncode=0x%X\n",
+					mlme->id, mlme->state, mlme->code);
 		}
 		break;
 	case OID_TYPE_MLMEEX:{
 			struct obj_mlmeex *mlme = r->ptr;
-			return snprintf(str, PRIV_STR_SIZE, "id=0x%X\nstate=0x%X\n\
-			         code=0x%X\nsize=0x%X\n", mlme->id, mlme->state,
-					mlme->code, mlme->size);
+			return snprintf(str, PRIV_STR_SIZE,
+					"id=0x%X\nstate=0x%X\n"
+					"code=0x%X\nsize=0x%X\n", mlme->id,
+					mlme->state, mlme->code, mlme->size);
 		}
 		break;
 	case OID_TYPE_SSID:{

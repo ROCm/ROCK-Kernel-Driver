@@ -312,8 +312,9 @@ islpci_mgt_receive(struct net_device *ndev)
                  * size of a receive buffer.  Thus, if this check
                  * triggers, we likely have kernel heap corruption. */
                 if (frag_len > MGMT_FRAME_SIZE) {
-                        printk(KERN_WARNING "%s: Bogus packet size of %d (%#x).\
-n", ndev->name, frag_len, frag_len);
+			printk(KERN_WARNING
+				"%s: Bogus packet size of %d (%#x).\n",
+				ndev->name, frag_len, frag_len);
                         frag_len = MGMT_FRAME_SIZE;
                 }
 
@@ -488,7 +489,8 @@ islpci_mgt_transaction(struct net_device *ndev,
 		}
 		if (timeleft == 0) {
 			printk(KERN_DEBUG
-			       "%s: timeout waiting for mgmt response %lu, trigging device\n",
+				"%s: timeout waiting for mgmt response %lu, "
+				"triggering device\n",
 			       ndev->name, timeout_left);
 			islpci_trigger(priv);
 		}
