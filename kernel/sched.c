@@ -797,8 +797,8 @@ asmlinkage void schedule(void)
 	list_t *queue;
 	int idx;
 
-	if (unlikely(in_interrupt()))
-		BUG();
+	BUG_ON(in_interrupt());
+
 #if CONFIG_DEBUG_HIGHMEM
 	check_highmem_ptes();
 #endif
@@ -1200,7 +1200,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
-	 * 1..MAX_USER_RT_PRIO, valid priority for SCHED_OTHER is 0.
+	 * 1..MAX_USER_RT_PRIO-1, valid priority for SCHED_OTHER is 0.
 	 */
 	retval = -EINVAL;
 	if (lp.sched_priority < 0 || lp.sched_priority > MAX_USER_RT_PRIO-1)
@@ -1767,15 +1767,15 @@ static int migration_thread(void * bind_cpu)
 	sigfillset(&current->blocked);
 	set_fs(KERNEL_DS);
 	/*
-	 * The first migration thread is started on CPU #0. This one can migrate
-	 * the other migration threads to their destination CPUs.
+	 * The first migration thread is started on CPU #0. This one can
+	 * migrate the other migration threads to their destination CPUs.
 	 */
 	if (cpu != 0) {
 		while (!cpu_rq(cpu_logical_map(0))->migration_thread)
 			yield();
 		set_cpus_allowed(current, 1UL << cpu);
 	}
-	printk("migration_task %d on cpu=%d\n",cpu,smp_processor_id());
+	printk("migration_task %d on cpu=%d\n", cpu, smp_processor_id());
 	ret = setscheduler(0, SCHED_FIFO, &param);
 
 	rq = this_rq();
@@ -1847,4 +1847,4 @@ void __init migration_init(void)
 		while (!cpu_rq(cpu_logical_map(cpu))->migration_thread)
 			schedule_timeout(2);
 }
-#endif
+#endif /* CONFIG_SMP */
