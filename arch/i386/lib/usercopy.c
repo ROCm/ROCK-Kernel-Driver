@@ -9,21 +9,14 @@
 #include <asm/uaccess.h>
 #include <asm/mmx.h>
 
-#ifdef INTEL_MOVSL
 static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
 {
-	if (n < 64)
-		return 1;
-	if ((((const long)a1 ^ (const long)a2) & movsl_mask.mask) == 0)
-		return 1;
-	return 0;
-}
-#else
-static inline int movsl_is_ok(const void *a1, const void *a2, unsigned long n)
-{
+#ifdef CONFIG_X86_INTEL_USERCOPY
+	if (n >= 64 && (((const long)a1 ^ (const long)a2) & movsl_mask.mask))
+		return 0;
+#endif
 	return 1;
 }
-#endif
 
 /*
  * Copy a null terminated string from userspace.
@@ -151,8 +144,7 @@ long strnlen_user(const char *s, long n)
 	return res & mask;
 }
 
-#ifdef INTEL_MOVSL
-
+#ifdef CONFIG_X86_INTEL_USERCOPY
 static unsigned long
 __copy_user_intel(void *to, const void *from,unsigned long size)
 {
@@ -334,8 +326,7 @@ __copy_user_zeroing_intel(void *to, const void *from, unsigned long size)
 		       : "eax", "edx", "memory");
 	return size;
 }
-#else	/* INTEL_MOVSL */
-
+#else
 /*
  * Leave these declared but undefined.  They should not be any references to
  * them
@@ -344,8 +335,7 @@ unsigned long
 __copy_user_zeroing_intel(void *to, const void *from, unsigned long size);
 unsigned long
 __copy_user_intel(void *to, const void *from,unsigned long size);
-
-#endif	/* INTEL_MOVSL */
+#endif /* CONFIG_X86_INTEL_USERCOPY */
 
 /* Generic arbitrary sized copy.  */
 #define __copy_user(to,from,size)					\

@@ -8,16 +8,15 @@
 
 #include <linux/time.h>
 #include <linux/msdos_fs.h>
-#include <linux/fat_cvf.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 
-#define PRINTK(x)
-#define Printk(x) printk x
+static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
+			      loff_t *ppos);
 
 struct file_operations fat_file_operations = {
 	llseek:		generic_file_llseek,
-	read:		fat_file_read,
+	read:		generic_file_read,
 	write:		fat_file_write,
 	mmap:		generic_file_mmap,
 	fsync:		file_fsync,
@@ -29,19 +28,8 @@ struct inode_operations fat_file_inode_operations = {
 	setattr:	fat_notify_change,
 };
 
-ssize_t fat_file_read(
-	struct file *filp,
-	char *buf,
-	size_t count,
-	loff_t *ppos)
-{
-	struct inode *inode = filp->f_dentry->d_inode;
-	return MSDOS_SB(inode->i_sb)->cvf_format
-			->cvf_file_read(filp,buf,count,ppos);
-}
-
-
-int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_result, int create)
+int fat_get_block(struct inode *inode, sector_t iblock,
+		  struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
 	unsigned long phys;
@@ -77,23 +65,8 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 	return 0;
 }
 
-ssize_t fat_file_write(
-	struct file *filp,
-	const char *buf,
-	size_t count,
-	loff_t *ppos)
-{
-	struct inode *inode = filp->f_dentry->d_inode;
-	struct super_block *sb = inode->i_sb;
-	return MSDOS_SB(sb)->cvf_format
-			->cvf_file_write(filp,buf,count,ppos);
-}
-
-ssize_t default_fat_file_write(
-	struct file *filp,
-	const char *buf,
-	size_t count,
-	loff_t *ppos)
+static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
+			      loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	int retval;

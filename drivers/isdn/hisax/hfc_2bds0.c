@@ -202,7 +202,7 @@ static void
 hfc_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 }
 
 static struct sk_buff
@@ -608,8 +608,9 @@ setstack_2b(struct PStack *st, struct BCState *bcs)
 }
 
 static void
-hfcd_bh(struct IsdnCardState *cs)
+hfcd_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 /*	struct PStack *stptr;
 */
 	if (!cs)
@@ -645,7 +646,7 @@ void
 sched_event_D(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 static
@@ -1127,7 +1128,7 @@ init2bds0(struct IsdnCardState *cs)
 	cs->dbusytimer.function = (void *) hfc_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
-	INIT_WORK(&cs->tqueue, (void *) (void *) hfcd_bh, NULL);
+	INIT_WORK(&cs->work, hfcd_bh, cs);
 	if (!cs->hw.hfcD.send)
 		cs->hw.hfcD.send = init_send_hfcd(16);
 	if (!cs->bcs[0].hw.hfc.send)

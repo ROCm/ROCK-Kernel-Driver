@@ -14,9 +14,11 @@ static int disable_x86_serial_nr __initdata = 1;
 static int disable_P4_HT __initdata = 0;
 extern int trap_init_f00f_bug(void);
 
-#ifdef INTEL_MOVSL
-struct movsl_mask movsl_mask;	/* alignment at which movsl is preferred for
-			   	   bulk memory copies */
+#ifdef CONFIG_X86_INTEL_USERCOPY
+/*
+ * Alignment at which movsl is preferred for bulk memory copies.
+ */
+struct movsl_mask movsl_mask;
 #endif
 
 /*
@@ -355,7 +357,7 @@ too_many_siblings:
 	/* Work around errata */
 	Intel_errata_workarounds(c);
 
-#ifdef INTEL_MOVSL
+#ifdef CONFIG_X86_INTEL_USERCOPY
 	/*
 	 * Set up the preferred alignment for movsl bulk memory moves
 	 */
@@ -372,7 +374,6 @@ too_many_siblings:
 		break;
 	}
 #endif
-
 }
 
 

@@ -18,13 +18,13 @@
 
 extern const char *CardType[];
 const char *s0box_revision = "$Revision: 2.4.6.2 $";
+static spinlock_t s0box_lock = SPIN_LOCK_UNLOCKED;
 
 static inline void
 writereg(unsigned int padr, signed int addr, u_char off, u_char val) {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&s0box_lock, flags);
 	outb_p(0x1c,padr+2);
 	outb_p(0x14,padr+2);
 	outb_p((addr+off)&0x7f,padr);
@@ -33,7 +33,7 @@ writereg(unsigned int padr, signed int addr, u_char off, u_char val) {
 	outb_p(0x17,padr+2);
 	outb_p(0x14,padr+2);
 	outb_p(0x1c,padr+2);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&s0box_lock, flags);
 }
 
 static u_char nibtab[] = { 1, 9, 5, 0xd, 3, 0xb, 7, 0xf,
@@ -45,8 +45,7 @@ readreg(unsigned int padr, signed int addr, u_char off) {
 	register u_char n1, n2;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&s0box_lock, flags);
 	outb_p(0x1c,padr+2);
 	outb_p(0x14,padr+2);
 	outb_p((addr+off)|0x80,padr);
@@ -57,7 +56,7 @@ readreg(unsigned int padr, signed int addr, u_char off) {
 	n2 = (inb_p(padr+1) >> 3) & 0x17;
 	outb_p(0x14,padr+2);
 	outb_p(0x1c,padr+2);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&s0box_lock, flags);
 	return nibtab[n1] | (nibtab[n2] << 4);
 }
 

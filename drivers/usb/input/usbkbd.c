@@ -228,7 +228,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 			 const struct usb_device_id *id)
 {
 	struct usb_device * dev = interface_to_usbdev(iface);
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_kbd *kbd;
 	int i, pipe, maxp;
@@ -237,10 +237,10 @@ static int usb_kbd_probe(struct usb_interface *iface,
 
 	interface = &iface->altsetting[iface->act_altsetting];
 
-	if (interface->bNumEndpoints != 1)
+	if (interface->desc.bNumEndpoints != 1)
 		return -ENODEV;
 
-	endpoint = interface->endpoint + 0;
+	endpoint = &interface->endpoint[0].desc;
 	if (!(endpoint->bEndpointAddress & 0x80))
 		return -ENODEV;
 	if ((endpoint->bmAttributes & 3) != 3)
@@ -282,7 +282,7 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->cr->bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
 	kbd->cr->bRequest = 0x09;
 	kbd->cr->wValue = cpu_to_le16(0x200);
-	kbd->cr->wIndex = cpu_to_le16(interface->bInterfaceNumber);
+	kbd->cr->wIndex = cpu_to_le16(interface->desc.bInterfaceNumber);
 	kbd->cr->wLength = cpu_to_le16(1);
 
 	usb_make_path(dev, path, 64);

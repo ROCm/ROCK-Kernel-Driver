@@ -68,6 +68,14 @@ struct auth_domain *unix_domain_find(char *name)
 	return rv;
 }
 
+static void svcauth_unix_domain_release(struct auth_domain *dom)
+{
+	struct unix_domain *ud = container_of(dom, struct unix_domain, h);
+
+	kfree(dom->name);
+	kfree(ud);
+}
+
 
 /**************************************************
  * cache for IP address to unix_domain
@@ -462,5 +470,6 @@ struct auth_ops svcauth_unix = {
 	.flavour	= RPC_AUTH_UNIX,
 	.accept 	= svcauth_unix_accept,
 	.release	= svcauth_unix_release,
+	.domain_release	= svcauth_unix_domain_release,
 };
 

@@ -1528,6 +1528,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	int drive = *part & 3;
 	if ((*part >> 2) > NUM_DISK_TYPES || drive >= FD_MAX_UNITS)
 		return NULL;
+	*part = 0;
 	return get_disk(disks[drive]);
 }
 

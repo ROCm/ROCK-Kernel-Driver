@@ -549,8 +549,8 @@ static int uss720_probe(struct usb_interface *intf,
 			const struct usb_device_id *id)
 {
 	struct usb_device *usbdev = interface_to_usbdev(intf);
-	struct usb_interface_descriptor *interface;
-	struct usb_endpoint_descriptor *endpoint;
+	struct usb_host_interface *interface;
+	struct usb_host_endpoint *endpoint;
 	struct parport_uss720_private *priv;
 	struct parport *pp;
 	int i;
@@ -562,7 +562,7 @@ static int uss720_probe(struct usb_interface *intf,
 	if (intf->num_altsetting != 3)
 		return -ENODEV;
 
-	i = usb_set_interface(usbdev, intf->altsetting->bInterfaceNumber, 2);
+	i = usb_set_interface(usbdev, intf->altsetting->desc.bInterfaceNumber, 2);
 	printk(KERN_DEBUG "uss720: set inteface result %d\n", i);
 
 	interface = &intf->altsetting[2];
@@ -593,7 +593,7 @@ static int uss720_probe(struct usb_interface *intf,
 	       priv->reg[0], priv->reg[1], priv->reg[2], priv->reg[3], priv->reg[4], priv->reg[5], priv->reg[6]);
 
 	endpoint = &interface->endpoint[2];
-	printk(KERN_DEBUG "uss720: epaddr %d interval %d\n", endpoint->bEndpointAddress, endpoint->bInterval);
+	printk(KERN_DEBUG "uss720: epaddr %d interval %d\n", endpoint->desc.bEndpointAddress, endpoint->desc.bInterval);
 #if 0
 	priv->irqpipe = usb_rcvctrlpipe(usbdev, endpoint->bEndpointAddress);
 	i = usb_request_irq(usbdev, priv->irqpipe,

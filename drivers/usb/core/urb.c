@@ -272,23 +272,23 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 	unsigned int	allowed;
 
 	/* enforce simple/standard policy */
-	allowed = USB_ASYNC_UNLINK;	// affects later unlinks
+	allowed = URB_ASYNC_UNLINK;	// affects later unlinks
 	allowed |= URB_NO_DMA_MAP;
 	allowed |= URB_NO_INTERRUPT;
 	switch (temp) {
 	case PIPE_BULK:
 		if (is_out)
-			allowed |= USB_ZERO_PACKET;
+			allowed |= URB_ZERO_PACKET;
 		/* FALLTHROUGH */
 	case PIPE_CONTROL:
-		allowed |= USB_NO_FSBR;	/* only affects UHCI */
+		allowed |= URB_NO_FSBR;	/* only affects UHCI */
 		/* FALLTHROUGH */
 	default:			/* all non-iso endpoints */
 		if (!is_out)
 			allowed |= URB_SHORT_NOT_OK;
 		break;
 	case PIPE_ISOCHRONOUS:
-		allowed |= USB_ISO_ASAP;
+		allowed |= URB_ISO_ASAP;
 		break;
 	}
 	urb->transfer_flags &= allowed;
@@ -360,7 +360,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  * that the request has been canceled, and that control of the URB
  * has been returned to that device driver.
  *
- * When the USB_ASYNC_UNLINK transfer flag for the URB is clear, this
+ * When the URB_ASYNC_UNLINK transfer flag for the URB is clear, this
  * request is synchronous.  Success is indicated by returning zero,
  * at which time the urb will have been unlinked,
  * and the completion function will see status -ENOENT.  Failure is
@@ -368,7 +368,7 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  * when unlinking an urb from an interrupt context, such as a bottom
  * half or a completion handler,
  *
- * When the USB_ASYNC_UNLINK transfer flag for the URB is set, this
+ * When the URB_ASYNC_UNLINK transfer flag for the URB is set, this
  * request is asynchronous.  Success is indicated by returning -EINPROGRESS,
  * at which time the urb will normally not have been unlinked,
  * and the completion function will see status -ECONNRESET.  Failure is

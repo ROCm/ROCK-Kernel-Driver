@@ -1,17 +1,16 @@
-/* $Id: isdn_x25iface.h,v 1.3.6.1 2001/09/23 22:24:32 kai Exp $
- *
- * header for Linux ISDN subsystem, x.25 related functions
+/* Linux ISDN subsystem, x.25 related functions
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #ifndef _LINUX_ISDN_X25IFACE_H
 #define _LINUX_ISDN_X25IFACE_H
 
 #define ISDN_X25IFACE_MAGIC 0x1e75a2b9
-/* #define DEBUG_ISDN_X25 if you want isdn_x25 debugging messages */
+
+#undef DEBUG_ISDN_X25
+
 #ifdef DEBUG_ISDN_X25
 #   define IX25DEBUG(fmt,args...) printk(KERN_DEBUG fmt , ## args)
 #else
@@ -25,8 +24,6 @@
 
 extern struct concap_proto_ops * isdn_x25iface_concap_proto_ops_pt;
 extern struct concap_proto     * isdn_x25iface_proto_new(void);
-
-
 
 #endif
 

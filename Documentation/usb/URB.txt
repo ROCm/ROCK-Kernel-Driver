@@ -109,7 +109,7 @@ Take a look at the some existing drivers to see how they're used.
 
 Flags:
 For ISO there are two startup behaviors: Specified start_frame or ASAP.
-For ASAP set USB_ISO_ASAP in transfer_flags.
+For ASAP set URB_ISO_ASAP in transfer_flags.
 
 If short packets should NOT be tolerated, set URB_SHORT_NOT_OK in 
 transfer_flags.
@@ -156,7 +156,7 @@ usb_unlink_urb() returns with that status code, you can free the URB
 with usb_free_urb().
 
 There is also an asynchronous unlink mode.  To use this, set the
-the USB_ASYNC_UNLINK flag in urb->transfer flags before calling
+the URB_ASYNC_UNLINK flag in urb->transfer flags before calling
 usb_unlink_urb().  When using async unlinking, the URB will not
 normally be unlinked when usb_unlink_urb() returns.  Instead, wait
 for the completion handler to be called.

@@ -22,8 +22,6 @@
 
 #include <asm/uaccess.h>
 
-#define PRINTK(X)
-
 struct file_operations fat_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	fat_readdir,
@@ -219,7 +217,7 @@ parse_record:
 				unicode = (wchar_t *)
 					__get_free_page(GFP_KERNEL);
 				if (!unicode) {
-					fat_brelse(sb, bh);
+					brelse(bh);
 					return -ENOMEM;
 				}
 			}
@@ -335,7 +333,7 @@ Found:
 	*spos = cpos - sizeof(struct msdos_dir_entry);
 	*lpos = cpos - res*sizeof(struct msdos_dir_entry);
 EODir:
-	fat_brelse(sb, bh);
+	brelse(bh);
 	if (unicode) {
 		free_page((unsigned long) unicode);
 	}
@@ -417,7 +415,7 @@ GetNew:
 				__get_free_page(GFP_KERNEL);
 			if (!unicode) {
 				filp->f_pos = cpos;
-				fat_brelse(sb, bh);
+				brelse(bh);
 				ret = -ENOMEM;
 				goto out;
 			}
@@ -578,7 +576,7 @@ EODir:
 	filp->f_pos = cpos;
 FillFailed:
 	if (bh)
-		fat_brelse(sb, bh);
+		brelse(bh);
 	if (unicode) {
 		free_page((unsigned long) unicode);
 	}
@@ -636,8 +634,6 @@ static int vfat_ioctl_fill(
 		put_user(0, d1->d_name+len);
 		put_user(len, &d1->d_reclen);
 	}
-	PRINTK(("FAT d1=%p d2=%p len=%d, name_len=%d\n",
-		d1, d2, len, name_len));
 
 	return 0;
 }
@@ -672,11 +668,6 @@ int fat_dir_ioctl(struct inode * inode, struct file * filp,
 				    vfat_ioctl_fill, 1, 1);
 	}
 	default:
-		/* forward ioctl to CVF extension */
-	       if (MSDOS_SB(inode->i_sb)->cvf_format &&
-		   MSDOS_SB(inode->i_sb)->cvf_format->cvf_dir_ioctl)
-		       return MSDOS_SB(inode->i_sb)->cvf_format
-			       ->cvf_dir_ioctl(inode,filp,cmd,arg);
 		return -EINVAL;
 	}
 
@@ -704,9 +695,8 @@ int fat_dir_empty(struct inode *dir)
 			break;
 		}
 	}
-	if (bh)
-		fat_brelse(dir->i_sb, bh);
 
+	brelse(bh);
 	return result;
 }
 
@@ -726,7 +716,7 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	while (fat_get_entry(dir, &curr, bh, de, ino) > -1) {
 		/* check the maximum size of directory */
 		if (curr >= FAT_MAX_DIR_SIZE) {
-			fat_brelse(sb, *bh);
+			brelse(*bh);
 			return -ENOSPC;
 		}
 
@@ -743,7 +733,7 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	new_bh = fat_extend_dir(dir);
 	if (IS_ERR(new_bh))
 		return PTR_ERR(new_bh);
-	fat_brelse(sb, new_bh);
+	brelse(new_bh);
 	do {
 		fat_get_entry(dir, &curr, bh, de, ino);
 	} while (++row < slots);
@@ -753,7 +743,6 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 
 int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 {
-	struct super_block *sb = dir->i_sb;
 	struct buffer_head *bh;
 	struct msdos_dir_entry *de;
 	__u16 date, time;
@@ -779,8 +768,8 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	de[0].starthi = CT_LE_W(MSDOS_I(dir)->i_logstart>>16);
 	de[1].start = CT_LE_W(MSDOS_I(parent)->i_logstart);
 	de[1].starthi = CT_LE_W(MSDOS_I(parent)->i_logstart>>16);
-	fat_mark_buffer_dirty(sb, bh);
-	fat_brelse(sb, bh);
+	mark_buffer_dirty(bh);
+	brelse(bh);
 	dir->i_atime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(dir);
 

@@ -95,17 +95,16 @@ static int athlon_check_ctrs(unsigned int const cpu,
 			      struct pt_regs * const regs)
 {
 	unsigned int low, high;
-	int handled = 0;
 	int i;
 	for (i = 0 ; i < NUM_COUNTERS; ++i) {
 		CTR_READ(low, high, msrs, i);
 		if (CTR_OVERFLOWED(low)) {
 			oprofile_add_sample(regs->eip, i, cpu);
 			CTR_WRITE(reset_value[i], msrs, i);
-			handled = 1;
+			return 1;
 		}
 	}
-	return handled;
+	return 0;
 }
 
  

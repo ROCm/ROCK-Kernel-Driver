@@ -27,7 +27,7 @@
  * Here we define all the compile-time 'special' virtual
  * addresses. The point is to have a constant address at
  * compile time, but to set the physical address only
- * in the boot process. We allocate these special  addresses
+ * in the boot process. We allocate these special addresses
  * from the end of virtual memory (0xfffff000) backwards.
  * Also this lets us do fail-safe vmalloc(), we
  * can guarantee that these special addresses and
@@ -40,13 +40,6 @@
  *
  * TLB entries of such buffers will not be flushed across
  * task switches.
- */
-
-/*
- * on UP currently we will have no trace of the fixmap mechanizm,
- * no page table allocations, etc. This might change in the
- * future, say framebuffers for the console driver(s) could be
- * fix-mapped?
  */
 enum fixed_addresses {
 #ifdef CONFIG_X86_LOCAL_APIC
@@ -81,6 +74,7 @@ enum fixed_addresses {
 #define NR_FIX_BTMAPS	16
 	FIX_BTMAP_END = __end_of_permanent_fixed_addresses,
 	FIX_BTMAP_BEGIN = FIX_BTMAP_END + NR_FIX_BTMAPS - 1,
+	FIX_WP_TEST,
 	__end_of_fixed_addresses
 };
 
@@ -94,6 +88,10 @@ extern void __set_fixmap (enum fixed_addresses idx,
  */
 #define set_fixmap_nocache(idx, phys) \
 		__set_fixmap(idx, phys, PAGE_KERNEL_NOCACHE)
+
+#define clear_fixmap(idx) \
+		__set_fixmap(idx, 0, __pgprot(0))
+
 /*
  * used by vmalloc.c.
  *

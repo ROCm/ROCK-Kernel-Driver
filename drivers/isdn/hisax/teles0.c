@@ -196,10 +196,7 @@ static int
 reset_teles0(struct IsdnCardState *cs)
 {
 	u_char cfval;
-	long flags;
 
-	save_flags(flags);
-	sti();
 	if (cs->hw.teles0.cfg_reg) {
 		switch (cs->irq) {
 			case 2:
@@ -240,7 +237,6 @@ reset_teles0(struct IsdnCardState *cs)
 	HZDELAY(HZ / 5 + 1);
 	writeb(1, cs->hw.teles0.membase + 0x80); mb();
 	HZDELAY(HZ / 5 + 1);
-	restore_flags(flags);
 	return(0);
 }
 

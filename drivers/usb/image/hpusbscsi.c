@@ -35,14 +35,14 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 {
 	struct hpusbscsi *new;
 	struct usb_device *dev = interface_to_usbdev (intf);
-	struct usb_interface_descriptor *altsetting =
+	struct usb_host_interface *altsetting =
 		&(intf->altsetting[0]);
 
 	int i, result;
 
 	/* basic check */
 
-	if (altsetting->bNumEndpoints != 3) {
+	if (altsetting->desc.bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
 		return -ENODEV;
 	}
@@ -76,34 +76,34 @@ hpusbscsi_usb_probe (struct usb_interface *intf,
 
 	/* finding endpoints */
 
-	for (i = 0; i < altsetting->bNumEndpoints; i++) {
+	for (i = 0; i < altsetting->desc.bNumEndpoints; i++) {
 		if (
-		    (altsetting->endpoint[i].
+		    (altsetting->endpoint[i].desc.
 		     bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
 		    USB_ENDPOINT_XFER_BULK) {
-			if (altsetting->endpoint[i].
+			if (altsetting->endpoint[i].desc.
 			    bEndpointAddress & USB_DIR_IN) {
 				new->ep_in =
-					altsetting->endpoint[i].
+					altsetting->endpoint[i].desc.
 					bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			} else {
 				new->ep_out =
-					altsetting->endpoint[i].
+					altsetting->endpoint[i].desc.
 					bEndpointAddress &
 					USB_ENDPOINT_NUMBER_MASK;
 			}
 		} else {
 			new->ep_int =
-				altsetting->endpoint[i].
+				altsetting->endpoint[i].desc.
 				bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-			new->interrupt_interval= altsetting->endpoint[i].bInterval;
+			new->interrupt_interval= altsetting->endpoint[i].desc.bInterval;
 		}
 	}
 
 	/* USB initialisation magic for the simple case */
 
-	result = usb_set_interface (dev, altsetting->bInterfaceNumber, 0);
+	result = usb_set_interface (dev, altsetting->desc.bInterfaceNumber, 0);
 
 	switch (result) {
 	case 0:		/* no error */
@@ -244,7 +244,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 	sht->proc_dir = NULL;
 
 	/* build and submit an interrupt URB for status byte handling */
- 	FILL_INT_URB(desc->controlurb,
+ 	usb_fill_int_urb(desc->controlurb,
 			desc->dev,
 			usb_rcvintpipe(desc->dev,desc->ep_int),
 			&desc->scsi_state_byte,
@@ -321,7 +321,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	TRACE_STATE;
 
 	/* We prepare the urb for writing out the scsi command */
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		hpusbscsi->dataurb,
 		hpusbscsi->dev,
 		usb_sndbulkpipe(hpusbscsi->dev,hpusbscsi->ep_out),
@@ -477,7 +477,7 @@ static void scatter_gather_callback(struct urb *u)
 		hpusbscsi->state = HP_STATE_WORKING;
 	TRACE_STATE;
 
-        FILL_BULK_URB(
+        usb_fill_bulk_urb(
                 u,
                 hpusbscsi->dev,
                 hpusbscsi->current_data_pipe,
@@ -531,7 +531,7 @@ static void simple_payload_callback (struct urb *u)
 		return;
         }
 
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		u,
 		hpusbscsi->dev,
 		hpusbscsi->current_data_pipe,
@@ -562,7 +562,7 @@ static void request_sense_callback (struct urb *u)
 		return;
         }
 
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		u,
 		hpusbscsi->dev,
 		hpusbscsi->current_data_pipe,
@@ -582,7 +582,7 @@ static void request_sense_callback (struct urb *u)
 
 static void issue_request_sense (struct hpusbscsi *hpusbscsi)
 {
-	FILL_BULK_URB(
+	usb_fill_bulk_urb(
 		hpusbscsi->dataurb,
 		hpusbscsi->dev,
 		usb_sndbulkpipe(hpusbscsi->dev, hpusbscsi->ep_out),

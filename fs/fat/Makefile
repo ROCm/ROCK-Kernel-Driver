@@ -6,6 +6,6 @@ export-objs := fatfs_syms.o
 
 obj-$(CONFIG_FAT_FS) += fat.o
 
-fat-objs := buffer.o cache.o dir.o file.o inode.o misc.o cvf.o fatfs_syms.o
+fat-objs := cache.o dir.o file.o inode.o misc.o fatfs_syms.o
 
 include $(TOPDIR)/Rules.make

@@ -381,7 +381,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
  * before the submission or before setting the CAN_CANCEL bit.  If so, it's
  * essential to abort the URB if it hasn't been cancelled already (i.e.,
  * if the CAN_CANCEL bit is still set).  Either way, the function must then
- * wait for the URB to finish.  Note that because the USB_ASYNC_UNLINK flag
+ * wait for the URB to finish.  Note that because the URB_ASYNC_UNLINK flag
  * is set, the URB can still be in progress even after a call to
  * usb_unlink_urb() returns.
  *
@@ -426,7 +426,7 @@ static int usb_stor_msg_common(struct us_data *us)
 	us->current_urb->context = &urb_done;
 	us->current_urb->actual_length = 0;
 	us->current_urb->error_count = 0;
-	us->current_urb->transfer_flags = USB_ASYNC_UNLINK;
+	us->current_urb->transfer_flags = URB_ASYNC_UNLINK;
 
 	/* submit the URB */
 	status = usb_submit_urb(us->current_urb, GFP_NOIO);
@@ -474,7 +474,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 	us->dr->wLength = cpu_to_le16(size);
 
 	/* fill and submit the URB */
-	FILL_CONTROL_URB(us->current_urb, us->pusb_dev, pipe, 
+	usb_fill_control_urb(us->current_urb, us->pusb_dev, pipe, 
 			 (unsigned char*) us->dr, data, size, 
 			 usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us);
@@ -494,7 +494,7 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
 	int status;
 
 	/* fill and submit the URB */
-	FILL_BULK_URB(us->current_urb, us->pusb_dev, pipe, data, len,
+	usb_fill_bulk_urb(us->current_urb, us->pusb_dev, pipe, data, len,
 		      usb_stor_blocking_completion, NULL);
 	status = usb_stor_msg_common(us);
 

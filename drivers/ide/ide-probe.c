@@ -982,7 +982,7 @@ static int ata_lock(dev_t dev, void *data)
 struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 {
 	ide_hwif_t *hwif = data;
-	int unit = MINOR(dev) >> PARTN_BITS;
+	int unit = *part >> PARTN_BITS;
 	ide_drive_t *drive = &hwif->drives[unit];
 	if (!drive->present)
 		return NULL;
@@ -1000,6 +1000,7 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 	}
 	if (!drive->driver)
 		return NULL;
+	*part &= (1 << PARTN_BITS) - 1;
 	return get_disk(drive->disk);
 }
 

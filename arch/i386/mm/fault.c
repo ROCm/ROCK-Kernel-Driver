@@ -30,17 +30,20 @@ extern void die(const char *,struct pt_regs *,long);
 
 extern int console_loglevel;
 
+#ifndef CONFIG_X86_WP_WORKS_OK
 /*
  * Ugly, ugly, but the goto's result in better assembly..
  */
 int __verify_write(const void * addr, unsigned long size)
 {
+	struct mm_struct *mm = current->mm;
 	struct vm_area_struct * vma;
 	unsigned long start = (unsigned long) addr;
 
-	if (!size)
+	if (!size || segment_eq(get_fs(),KERNEL_DS))
 		return 1;
 
+	down_read(&mm->mmap_sem);
 	vma = find_vma(current->mm, start);
 	if (!vma)
 		goto bad_area;
@@ -80,6 +83,13 @@ good_area:
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;;
 	}
+	/*
+	 * We really need to hold mmap_sem over the whole access to
+	 * userspace, else another thread could change permissions.
+	 * This is unfixable, so don't use i386-class machines for
+	 * critical servers.
+	 */
+	up_read(&mm->mmap_sem);
 	return 1;
 
 check_stack:
@@ -89,6 +99,7 @@ check_stack:
 		goto good_area;
 
 bad_area:
+	up_read(&mm->mmap_sem);
 	return 0;
 
 out_of_memory:
@@ -98,6 +109,7 @@ out_of_memory:
 	}
 	goto bad_area;
 }
+#endif
 
 /*
  * Unlock any spinlocks which will prevent us from getting the

@@ -4210,6 +4210,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	    !(allowed_drive_mask & (1 << drive)) ||
 	    fdc_state[FDC(drive)].version == FDC_NONE)
 		return NULL;
+	*part = 0;
 	return get_disk(disks[drive]);
 }
 

@@ -92,9 +92,7 @@ EXPORT_SYMBOL(blk_unregister_region);
 
 static struct gendisk *exact_match(dev_t dev, int *part, void *data)
 {
-	struct gendisk *p = data;
-	*part = MINOR(dev) - p->first_minor;
-	return p;
+	return data;
 }
 
 static int exact_lock(dev_t dev, void *data)
@@ -363,7 +361,7 @@ void set_disk_ro(struct gendisk *disk, int flag)
 {
 	int i;
 	disk->policy = flag;
-	for (i = 0; i < disk->minors; i++)
+	for (i = 0; i < disk->minors - 1; i++)
 		disk->part[i].policy = flag;
 }
 

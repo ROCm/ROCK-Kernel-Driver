@@ -1165,7 +1165,7 @@ static void *s_start(struct seq_file *m, loff_t *pos)
 	if (!p)
 		return ERR_PTR(-ENOMEM);
 	lock_kernel();
-	for (v = module_list, n = *pos; v; n -= v->nsyms, v = v->next) {
+	for (v = module_list; v; n -= v->nsyms, v = v->next) {
 		if (n < v->nsyms) {
 			p->mod = v;
 			p->index = n;

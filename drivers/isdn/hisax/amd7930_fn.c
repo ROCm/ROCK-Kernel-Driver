@@ -232,9 +232,9 @@ Amd7930_new_ph(struct IsdnCardState *cs)
 
 
 static void
-Amd7930_bh(struct IsdnCardState *cs)
+Amd7930_bh(void *data)
 {
-
+	struct IsdnCardState *cs = data;
         struct PStack *stptr;
 
 	if (!cs)
@@ -277,7 +277,7 @@ Amd7930_sched_event(struct IsdnCardState *cs, int event) // ok
         }
 
         test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 static void
@@ -790,7 +790,7 @@ Amd7930_init(struct IsdnCardState *cs)
         cs->dc.amd7930.old_state = 0;
         cs->dc.amd7930.lmr1 = 0x40;
         cs->dc.amd7930.ph_command = Amd7930_ph_command;
-	INIT_WORK(&cs->tqueue, (void *) (void *) Amd7930_bh, NULL);
+	INIT_WORK(&cs->work, Amd7930_bh, cs);
 	cs->setstack_d = setstack_Amd7930;
 	cs->DC_Close = DC_Close_Amd7930;
 	cs->dbusytimer.function = (void *) dbusy_timer_handler;

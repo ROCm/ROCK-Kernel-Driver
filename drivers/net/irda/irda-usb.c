@@ -41,7 +41,7 @@
  * This driver has NOT been tested with the following drivers :
  *	o ehci-hcd	(USB 2.0 controllers)
  *
- * Note that all HCD drivers do USB_ZERO_PACKET and timeout properly,
+ * Note that all HCD drivers do URB_ZERO_PACKET and timeout properly,
  * so we don't have to worry about that anymore.
  * One common problem is the failure to set the address on the dongle,
  * but this happens before the driver gets loaded...
@@ -265,12 +265,12 @@ static void irda_usb_change_speed_xbofs(struct irda_usb_cb *self)
 	irda_usb_build_header(self, frame, 1);
 
 	/* Submit the 0 length IrDA frame to trigger new speed settings */
-        FILL_BULK_URB(urb, self->usbdev,
+        usb_fill_bulk_urb(urb, self->usbdev,
 		      usb_sndbulkpipe(self->usbdev, self->bulk_out_ep),
                       frame, IRDA_USB_SPEED_MTU,
                       speed_bulk_callback, self);
 	urb->transfer_buffer_length = USB_IRDA_HEADER;
-	urb->transfer_flags = USB_ASYNC_UNLINK;
+	urb->transfer_flags = URB_ASYNC_UNLINK;
 	urb->timeout = MSECS_TO_JIFFIES(100);
 
 	/* Irq disabled -> GFP_ATOMIC */
@@ -400,20 +400,20 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 	/* FIXME: Make macro out of this one */
 	((struct irda_skb_cb *)skb->cb)->context = self;
 
-        FILL_BULK_URB(urb, self->usbdev, 
+        usb_fill_bulk_urb(urb, self->usbdev, 
 		      usb_sndbulkpipe(self->usbdev, self->bulk_out_ep),
                       skb->data, IRDA_USB_MAX_MTU,
                       write_bulk_callback, skb);
 	urb->transfer_buffer_length = skb->len;
 	/* Note : unlink *must* be Asynchronous because of the code in 
 	 * irda_usb_net_timeout() -> call in irq - Jean II */
-	urb->transfer_flags = USB_ASYNC_UNLINK;
-	/* This flag (USB_ZERO_PACKET) indicates that what we send is not
+	urb->transfer_flags = URB_ASYNC_UNLINK;
+	/* This flag (URB_ZERO_PACKET) indicates that what we send is not
 	 * a continuous stream of data but separate packets.
 	 * In this case, the USB layer will insert an empty USB frame (TD)
 	 * after each of our packets that is exact multiple of the frame size.
 	 * This is how the dongle will detect the end of packet - Jean II */
-	urb->transfer_flags |= USB_ZERO_PACKET;
+	urb->transfer_flags |= URB_ZERO_PACKET;
 	/* Timeout need to be shorter than NET watchdog timer */
 	urb->timeout = MSECS_TO_JIFFIES(200);
 
@@ -634,7 +634,7 @@ static void irda_usb_net_timeout(struct net_device *netdev)
 			 * be -ENOENT. We will fix that at the next watchdog,
 			 * leaving more time to USB to recover...
 			 * Also, we are in interrupt, so we need to have
-			 * USB_ASYNC_UNLINK to work properly...
+			 * URB_ASYNC_UNLINK to work properly...
 			 * Jean II */
 			done = 1;
 			break;
@@ -729,7 +729,7 @@ static void irda_usb_submit(struct irda_usb_cb *self, struct sk_buff *skb, struc
 	cb->context = self;
 
 	/* Reinitialize URB */
-	FILL_BULK_URB(urb, self->usbdev, 
+	usb_fill_bulk_urb(urb, self->usbdev, 
 		      usb_rcvbulkpipe(self->usbdev, self->bulk_in_ep), 
 		      skb->data, skb->truesize,
                       irda_usb_receive, skb);
@@ -1016,9 +1016,9 @@ static int irda_usb_net_close(struct net_device *netdev)
 		}
 	}
 	/* Cancel Tx and speed URB - need to be synchronous to avoid races */
-	self->tx_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+	self->tx_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 	usb_unlink_urb(self->tx_urb);
-	self->speed_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+	self->speed_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 	usb_unlink_urb(self->speed_urb);
 
 	/* Stop and remove instance of IrLAP */
@@ -1258,7 +1258,7 @@ static inline int irda_usb_close(struct irda_usb_cb *self)
  * Most dongle have also an interrupt endpoint, that will be probably
  * documented in the next spec...
  */
-static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_endpoint_descriptor *endpoint, int ennum)
+static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_host_endpoint *endpoint, int ennum)
 {
 	int i;		/* Endpoint index in table */
 		
@@ -1277,10 +1277,10 @@ static inline int irda_usb_parse_endpoints(struct irda_usb_cb *self, struct usb_
 		__u16 psize;	/* Endpoint max packet size in bytes */
 
 		/* Get endpoint address, direction and attribute */
-		ep = endpoint[i].bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
-		dir = endpoint[i].bEndpointAddress & USB_ENDPOINT_DIR_MASK;
-		attr = endpoint[i].bmAttributes;
-		psize = endpoint[i].wMaxPacketSize;
+		ep = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_NUMBER_MASK;
+		dir = endpoint[i].desc.bEndpointAddress & USB_ENDPOINT_DIR_MASK;
+		attr = endpoint[i].desc.bmAttributes;
+		psize = endpoint[i].desc.wMaxPacketSize;
 
 		/* Is it a bulk endpoint ??? */
 		if(attr == USB_ENDPOINT_XFER_BULK) {
@@ -1366,7 +1366,7 @@ static inline struct irda_class_desc *irda_usb_find_class_desc(struct usb_interf
 	ret = usb_control_msg(dev, usb_rcvctrlpipe(dev,0),
 		IU_REQ_GET_CLASS_DESC,
 		USB_DIR_IN | USB_TYPE_CLASS | USB_RECIP_INTERFACE,
-		0, intf->altsetting->bInterfaceNumber, desc,
+		0, intf->altsetting->desc.bInterfaceNumber, desc,
 		sizeof(*desc), MSECS_TO_JIFFIES(500));
 	
 	IRDA_DEBUG(1, "%s(), ret=%d\n", __FUNCTION__, ret);
@@ -1407,7 +1407,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct irda_usb_cb *self = NULL;
-	struct usb_interface_descriptor *interface;
+	struct usb_host_interface *interface;
 	struct irda_class_desc *irda_desc;
 	int ret;
 	int i;
@@ -1477,7 +1477,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	}
 
 	/* Is this really necessary? */
-	if (usb_set_configuration (dev, dev->config[0].bConfigurationValue) < 0) {
+	if (usb_set_configuration (dev, dev->config[0].desc.bConfigurationValue) < 0) {
 		err("set_configuration failed");
 		return -EIO;
 	}
@@ -1486,7 +1486,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	/* Note : some driver do hardcode the interface number, some others
 	 * specify an alternate, but very few driver do like this.
 	 * Jean II */
-	ret = usb_set_interface(dev, intf->altsetting->bInterfaceNumber, 0);
+	ret = usb_set_interface(dev, intf->altsetting->desc.bInterfaceNumber, 0);
 	IRDA_DEBUG(1, "usb-irda: set interface %d result %d\n", intf->altsetting->bInterfaceNumber, ret);
 	switch (ret) {
 		case 0:
@@ -1504,7 +1504,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	/* Find our endpoints */
 	interface = &intf->altsetting[0];
 	if(!irda_usb_parse_endpoints(self, interface->endpoint,
-				     interface->bNumEndpoints)) {
+				     interface->desc.bNumEndpoints)) {
 		ERROR("%s(), Bogus endpoints...\n", __FUNCTION__);
 		return -EIO;
 	}
@@ -1573,9 +1573,9 @@ static void irda_usb_disconnect(struct usb_interface *intf)
 			usb_unlink_urb(self->rx_urb[i]);
 		/* Cancel Tx and speed URB.
 		 * Toggle flags to make sure it's synchronous. */
-		self->tx_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+		self->tx_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 		usb_unlink_urb(self->tx_urb);
-		self->speed_urb->transfer_flags &= ~USB_ASYNC_UNLINK;
+		self->speed_urb->transfer_flags &= ~URB_ASYNC_UNLINK;
 		usb_unlink_urb(self->speed_urb);
 	}
 

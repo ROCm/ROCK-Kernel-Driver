@@ -1919,6 +1919,7 @@ static struct gendisk *floppy_find(dev_t dev, int *part, void *data)
 	int type  = *part >> 2;
 	if (drive >= FD_MAX_UNITS || type > NUM_DISK_MINORS)
 		return NULL;
+	*part = 0;
 	return get_disk(unit[drive].disk);
 }
 

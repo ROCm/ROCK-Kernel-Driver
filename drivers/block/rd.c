@@ -432,7 +432,7 @@ static int __init rd_init (void)
 		disk->first_minor = i;
 		disk->fops = &rd_bd_op;
 		disk->queue = &rd_queue;
-		sprintf(disk->disk_name, "rd%d", i);
+		sprintf(disk->disk_name, "ram%d", i);
 		set_capacity(disk, rd_size * 2);
 	}
 	devfs_handle = devfs_mk_dir (NULL, "rd", NULL);

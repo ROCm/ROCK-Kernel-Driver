@@ -378,15 +378,10 @@ void __init paging_init(void)
  * This function cannot be __init, since exceptions don't work in that
  * section.
  */
-static int do_test_wp_bit(unsigned long vaddr);
+static int do_test_wp_bit(void);
 
 void __init test_wp_bit(void)
 {
-	const unsigned long vaddr = PAGE_OFFSET;
-	pgd_t *pgd;
-	pmd_t *pmd;
-	pte_t *pte, old_pte;
-
 	if (cpu_has_pse) {
 		/* Ok, all PSE-capable CPUs are definitely handling the WP bit right. */
 		boot_cpu_data.wp_works_ok = 1;
@@ -395,17 +390,10 @@ void __init test_wp_bit(void)
 
 	printk("Checking if this processor honours the WP bit even in supervisor mode... ");
 
-	pgd = swapper_pg_dir + __pgd_offset(vaddr);
-	pmd = pmd_offset(pgd, vaddr);
-	pte = pte_offset_kernel(pmd, vaddr);
-	old_pte = *pte;
-	*pte = pfn_pte(0, PAGE_READONLY);
-	local_flush_tlb();
-
-	boot_cpu_data.wp_works_ok = do_test_wp_bit(vaddr);
-
-	*pte = old_pte;
-	local_flush_tlb();
+	/* Any page-aligned address will do, the test is non-destructive */
+	__set_fixmap(FIX_WP_TEST, __pa(&swapper_pg_dir), PAGE_READONLY);
+	boot_cpu_data.wp_works_ok = do_test_wp_bit();
+	clear_fixmap(FIX_WP_TEST);
 
 	if (!boot_cpu_data.wp_works_ok) {
 		printk("No.\n");
@@ -550,7 +538,7 @@ void __init pgtable_cache_init(void)
 #endif
 
 /* Put this after the callers, so that it cannot be inlined */
-static int do_test_wp_bit(unsigned long vaddr)
+static int do_test_wp_bit(void)
 {
 	char tmp_reg;
 	int flag;
@@ -564,7 +552,7 @@ static int do_test_wp_bit(unsigned long vaddr)
 		"	.align 4	\n"
 		"	.long 1b,2b	\n"
 		".previous		\n"
-		:"=m" (*(char *) vaddr),
+		:"=m" (*(char *)fix_to_virt(FIX_WP_TEST)),
 		 "=q" (tmp_reg),
 		 "=r" (flag)
 		:"2" (1)
