@@ -3299,7 +3299,7 @@ static int raw_cmd_ioctl(int cmd, void *param)
 static int invalidate_drive(struct block_device *bdev)
 {
 	/* invalidate the buffer track to force a reread */
-	set_bit(DRIVE(to_kdev_t(bdev->bd_dev)), &fake_change);
+	set_bit((int)bdev->bd_disk->private_data, &fake_change);
 	process_fd_request();
 	check_disk_change(bdev);
 	return 0;
