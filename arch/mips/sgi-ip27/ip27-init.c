@@ -10,7 +10,6 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/sched.h>
-#include <linux/mmzone.h>	/* for numnodes */
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/cpumask.h>
