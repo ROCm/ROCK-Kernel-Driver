@@ -35,7 +35,6 @@
 #include <linux/smp_lock.h>
 #include <linux/sem.h>
 #include <linux/msg.h>
-#include <linux/binfmts.h>
 #include <linux/mm.h>
 #include <linux/shm.h>
 #include <linux/slab.h>
@@ -56,6 +55,7 @@
 #include <linux/stat.h>
 #include <linux/ipc.h>
 #include <linux/rwsem.h>
+#include <linux/binfmts.h>
 #include <linux/init.h>
 #include <linux/aio_abi.h>
 #include <asm/mman.h>
@@ -264,8 +264,11 @@ sys32_mmap(struct mmap_arg_struct *arg)
 		if (!file)
 			return -EBADF;
 	}
+	
+#if 0 /* reenable when noexec works */
 	if (a.prot & PROT_READ) 
 		a.prot |= PROT_EXEC; 
+#endif
 
 	a.flags |= MAP_32BIT;
 
@@ -275,8 +278,8 @@ sys32_mmap(struct mmap_arg_struct *arg)
 	if (file)
 		fput(file);
 
-	/* Should not happen */
-	if (retval >= 0xFFFFFFFF && (long)retval > 0) { 
+	/* Cannot wrap */
+	if (retval+a.len >= 0xFFFFFFFF && (long)retval > 0) { 
 		do_munmap(mm, retval, a.len); 
 		retval = -ENOMEM; 
 	} 
@@ -964,22 +967,24 @@ sys32_nanosleep(struct timespec32 *rqtp, struct timespec32 *rmtp)
 asmlinkage ssize_t sys_readv(unsigned long,const struct iovec *,unsigned long);
 asmlinkage ssize_t sys_writev(unsigned long,const struct iovec *,unsigned long);
 
-struct iovec *
-get_iovec32(struct iovec32 *iov32, struct iovec *iov_buf, u32 count, int type)
+static struct iovec *
+get_iovec32(struct iovec32 *iov32, struct iovec *iov_buf, u32 count, int type, int *errp)
 {
 	int i;
 	u32 buf, len;
 	struct iovec *ivp, *iov;
+	unsigned long totlen; 
 
 	/* Get the "struct iovec" from user memory */
 
 	if (!count)
 		return 0;
-	if(verify_area(VERIFY_READ, iov32, sizeof(struct iovec32)*count))
-		return(struct iovec *)0;
 	if (count > UIO_MAXIOV)
 		return(struct iovec *)0;
+	if(verify_area(VERIFY_READ, iov32, sizeof(struct iovec32)*count))
+		return(struct iovec *)0;
 	if (count > UIO_FASTIOV) {
+		*errp = -ENOMEM; 
 		iov = kmalloc(count*sizeof(struct iovec), GFP_KERNEL);
 		if (!iov)
 			return((struct iovec *)0);
@@ -987,24 +992,33 @@ get_iovec32(struct iovec32 *iov32, struct iovec *iov_buf, u32 count, int type)
 		iov = iov_buf;
 
 	ivp = iov;
+	totlen = 0;
 	for (i = 0; i < count; i++) {
-		if (__get_user(len, &iov32->iov_len) ||
-		    __get_user(buf, &iov32->iov_base)) {
-			if (iov != iov_buf)
-				kfree(iov);
-			return((struct iovec *)0);
-		}
-		if (verify_area(type, (void *)A(buf), len)) {
-			if (iov != iov_buf)
-				kfree(iov);
-			return((struct iovec *)0);
-		}
+		*errp = __get_user(len, &iov32->iov_len) |
+		  	__get_user(buf, &iov32->iov_base);	
+		if (*errp)
+			goto error;
+		*errp = verify_area(type, (void *)A(buf), len);
+		if (*errp) 
+			goto error;
+		/* SuS checks: */
+		*errp = -EINVAL; 
+		if ((int)len < 0)
+			goto error;
+		if ((totlen += len) >= 0x7fffffff)
+			goto error;			
 		ivp->iov_base = (void *)A(buf);
 		ivp->iov_len = (__kernel_size_t)len;
 		iov32++;
 		ivp++;
 	}
+	*errp = 0;
 	return(iov);
+
+error:
+	if (iov != iov_buf)
+		kfree(iov);
+	return NULL;
 }
 
 asmlinkage long
@@ -1015,8 +1029,8 @@ sys32_readv(int fd, struct iovec32 *vector, u32 count)
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_WRITE)) == (struct iovec *)0)
-		return -EFAULT;
+	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_WRITE, &ret)) == NULL)
+		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_readv(fd, iov, count);
 	set_fs(old_fs);
@@ -1033,8 +1047,8 @@ sys32_writev(int fd, struct iovec32 *vector, u32 count)
 	int ret;
 	mm_segment_t old_fs = get_fs();
 
-	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_READ)) == (struct iovec *)0)
-		return -EFAULT;
+	if ((iov = get_iovec32(vector, iovstack, count, VERIFY_READ, &ret)) == NULL)
+		return ret;
 	set_fs(KERNEL_DS);
 	ret = sys_writev(fd, iov, count);
 	set_fs(old_fs);
@@ -1121,7 +1135,7 @@ sys32_setrlimit(unsigned int resource, struct rlimit32 *rlim)
 
 /*
  * sys_time() can be implemented in user-level using
- * sys_gettimeofday().  IA64 did this but i386 Linux did not
+ * sys_gettimeofday().  x86-64 did this but i386 Linux did not
  * so we have to implement this system call here.
  */
 asmlinkage long sys32_time(int * tloc)
@@ -1288,6 +1302,39 @@ static inline int put_flock(struct flock *kfl, struct flock32 *ufl)
 }
 
 extern asmlinkage long sys_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg);
+asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg);
+
+
+asmlinkage long sys32_fcntl(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		{
+			struct flock f;
+			mm_segment_t old_fs;
+			long ret;
+			
+			if (get_flock(&f, (struct flock32 *)arg))
+				return -EFAULT;
+			old_fs = get_fs(); set_fs (KERNEL_DS);
+			ret = sys_fcntl(fd, cmd, (unsigned long)&f);
+			set_fs (old_fs);
+			if (ret) return ret;
+			if (put_flock(&f, (struct flock32 *)arg))
+				return -EFAULT;
+			return 0;
+		}
+	case F_GETLK64: 
+	case F_SETLK64: 
+	case F_SETLKW64: 
+		return sys32_fcntl64(fd,cmd,arg); 
+
+	default:
+		return sys_fcntl(fd, cmd, (unsigned long)arg);
+	}
+}
 
 static inline int get_flock64(struct ia32_flock64 *fl32, struct flock *fl64)
 {
@@ -1319,40 +1366,34 @@ asmlinkage long sys32_fcntl64(unsigned int fd, unsigned int cmd, unsigned long a
 {
 	struct flock fl64;  
 	mm_segment_t oldfs = get_fs(); 
-	int ret = 0, origcmd; 
-	unsigned long origarg;
+	int ret = 0; 
+	int oldcmd = cmd;
+	unsigned long oldarg = arg;
 
-	origcmd = cmd; 
-	origarg = arg;
 	switch (cmd) {
-	case F_GETLK: 
-	case F_SETLK:
-	case F_SETLKW:
-		ret = get_flock(&fl64, (struct flock32 *)arg); 
-		arg = (unsigned long) &fl64; 
-		set_fs(KERNEL_DS); 
-		break;
 	case F_GETLK64: 
 		cmd = F_GETLK; 
-		goto cnv64;
+		goto cnv;
 	case F_SETLK64: 
 		cmd = F_SETLK; 
-		goto cnv64; 
+		goto cnv; 
 	case F_SETLKW64:
 		cmd = F_SETLKW; 
-	cnv64:
+	cnv:
 		ret = get_flock64((struct ia32_flock64 *)arg, &fl64); 
 		arg = (unsigned long)&fl64; 
 		set_fs(KERNEL_DS); 
 		break; 
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		return sys32_fcntl(fd,cmd,arg); 
 	}
 	if (!ret)
 		ret = sys_fcntl(fd, cmd, arg);
 	set_fs(oldfs); 
-	if (origcmd == F_GETLK && !ret)
-		ret = put_flock(&fl64, (struct flock32 *)origarg); 
-	else if (cmd == F_GETLK && !ret)
-		ret = put_flock64((struct ia32_flock64 *)origarg, &fl64); 
+	if (oldcmd == F_GETLK64 && !ret)
+		ret = put_flock64((struct ia32_flock64 *)oldarg, &fl64); 
 	return ret; 
 }
 
@@ -1804,19 +1845,6 @@ sys32_sysctl(struct sysctl_ia32 *args32)
 #endif
 }
 
-extern asmlinkage long sys_newuname(struct new_utsname * name);
-
-asmlinkage long
-sys32_newuname(struct new_utsname * name)
-{
-	int ret = sys_newuname(name);
-	
-	if (current->personality == PER_LINUX32 && !ret) {
-		ret = copy_to_user(name->machine, "i686\0\0", 6);
-	}
-	return ret;
-}
-
 extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
 				    size_t count, loff_t pos);
 
@@ -1825,7 +1853,8 @@ extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
 
 typedef __kernel_ssize_t32 ssize_t32;
 
-/* warning. next two assume LE */
+
+/* warning: next two assume little endian */ 
 asmlinkage ssize_t32
 sys32_pread(unsigned int fd, char *ubuf, __kernel_size_t32 count,
 	    u32 poslo, u32 poshi)
@@ -1849,7 +1878,8 @@ asmlinkage long
 sys32_personality(unsigned long personality)
 {
 	int ret;
-	if (current->personality == PER_LINUX32 && personality == PER_LINUX)
+	if (personality(current->personality) == PER_LINUX32 && 
+		personality == PER_LINUX)
 		personality = PER_LINUX32;
 	ret = sys_personality(personality);
 	if (ret == PER_LINUX32)
@@ -1956,42 +1986,39 @@ sys32_adjtimex(struct timex32 *utp)
 	return ret;
 }
 
-
-/* common code for old and new mmaps */
-static inline long do_mmap2(
-	unsigned long addr, unsigned long len,
+asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags,
 	unsigned long fd, unsigned long pgoff)
 {
-	int error = -EBADF;
+	struct mm_struct *mm = current->mm;
+	unsigned long error;
 	struct file * file = NULL;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	if (!(flags & MAP_ANONYMOUS)) {
 		file = fget(fd);
 		if (!file)
-			goto out;
+			return -EBADF;
 	}
 
-	down_write(&current->mm->mmap_sem);
-	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
-	up_write(&current->mm->mmap_sem);
+	/* later add PROT_EXEC for PROT_READ here */
+
+	down_write(&mm->mmap_sem);
+	error = do_mmap_pgoff(file, addr, len, prot, flags|MAP_32BIT, pgoff);
+	up_write(&mm->mmap_sem);
+
+	/* cannot wrap */
+	if (error+len >= 0xFFFFFFFF && (long)error >= 0) { 
+		do_munmap(mm, error, len); 
+		error = -ENOMEM; 
+	} 
 
 	if (file)
 		fput(file);
-out:
 	return error;
 }
 
-asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
-	unsigned long prot, unsigned long flags,
-	unsigned long fd, unsigned long pgoff)
-{
-	return do_mmap2(addr, len, prot, flags, fd, pgoff);
-}
-
-
-asmlinkage int sys32_olduname(struct oldold_utsname * name)
+asmlinkage long sys32_olduname(struct oldold_utsname * name)
 {
 	int error;
 
@@ -2580,6 +2607,19 @@ long sys32_io_setup(unsigned nr_reqs, u32 *ctx32p)
 		ret = put_user((u32)ctx64, ctx32p);
 	return ret;
 } 
+
+
+int sys32_vm86_warning(void)
+{ 
+	static long warn_time = -(60*HZ); 
+	if (time_before(warn_time + 60*HZ,jiffies)) { 
+		printk(KERN_INFO "%s: vm86 mode not supported on 64 bit kernel\n",
+		       current->comm);
+		warn_time = jiffies;
+	} 
+	return -ENOSYS ;
+} 
+
 
 struct exec_domain ia32_exec_domain = { 
 	.name = "linux/x86",

@@ -21,6 +21,7 @@ define_bool CONFIG_RWSEM_XCHGADD_ALGORITHM n
 define_bool CONFIG_X86_CMPXCHG y
 
 define_bool CONFIG_EARLY_PRINTK y
+define_bool CONFIG_GENERIC_ISA_DMA y
 
 source init/Config.in
 
@@ -54,11 +55,17 @@ if [ "$CONFIG_SMP" = "n" ]; then
 fi
 if [ "$CONFIG_SMP" = "y" ]; then
     define_bool CONFIG_HAVE_DEC_LOCK y
+    # actually 64 maximum, but you need to fix the APIC code first
+    # to use clustered mode or whatever your big iron needs
     int  'Maximum number of CPUs (2-8)' CONFIG_NR_CPUS 8
 fi
 
+bool 'IOMMU support' CONFIG_GART_IOMMU
+if [ "$CONFIG_GART_IOMMU" != "y" ]; then
+   define_bool CONFIG_DUMMY_IOMMU y
+fi
+
 define_bool CONFIG_X86_MCE y
-bool 'Check for non-fatal machine check errors' CONFIG_X86_MCE_NONFATAL $CONFIG_X86_MCE
 
 endmenu
 
@@ -108,22 +115,20 @@ tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 
 bool 'IA32 Emulation' CONFIG_IA32_EMULATION
 
+
+
 endmenu
 
 source drivers/mtd/Config.in
 
 source drivers/parport/Config.in
 
-#source drivers/pnp/Config.in
-
 source drivers/block/Config.in
-
-source drivers/md/Config.in
 
 mainmenu_option next_comment
 comment 'ATA/ATAPI/MFM/RLL support'
 
-tristate 'ATA/ATAPI/MFM/RLL support' CONFIG_IDE
+tristate 'ATA/ATAPI/MFM/RLL device support' CONFIG_IDE
 
 if [ "$CONFIG_IDE" != "n" ]; then
   source drivers/ide/Config.in
@@ -133,14 +138,18 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'SCSI support'
+comment 'SCSI device support'
 
-tristate 'SCSI support' CONFIG_SCSI
+tristate 'SCSI device support' CONFIG_SCSI
 
 if [ "$CONFIG_SCSI" != "n" ]; then
    source drivers/scsi/Config.in
 fi
 endmenu
+
+source drivers/md/Config.in
+
+source drivers/telephony/Config.in
 
 source drivers/message/fusion/Config.in
 
@@ -171,8 +180,6 @@ source net/ax25/Config.in
 source net/irda/Config.in
 
 source drivers/isdn/Config.in
-
-source drivers/telephony/Config.in
 
 # no support for non IDE/SCSI cdroms as they were all ISA only
 
@@ -224,6 +231,8 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
    bool '  Additional run-time checks' CONFIG_CHECKING
    bool '  Debug __init statements' CONFIG_INIT_DEBUG
+   bool '  Spinlock debugging' CONFIG_DEBUG_SPINLOCK
+   bool '  Load all symbols for debugging/kksymoops' CONFIG_KALLSYMS
 fi
 endmenu
 

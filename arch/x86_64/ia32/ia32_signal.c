@@ -7,7 +7,7 @@
  *  2000-06-20  Pentium III FXSR, SSE support by Gareth Hughes
  *  2000-12-*   x86-64 compatibility mode signal handling by Andi Kleen
  * 
- *  $Id: ia32_signal.c,v 1.17 2002/03/21 14:16:32 ak Exp $
+ *  $Id: ia32_signal.c,v 1.22 2002/07/29 10:34:03 ak Exp $
  */
 
 #include <linux/sched.h>
@@ -39,6 +39,7 @@
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
 asmlinkage int do_signal(struct pt_regs *regs, sigset_t *oldset);
+void signal_fault(struct pt_regs *regs, void *frame, char *where);
 
 static int ia32_copy_siginfo_to_user(siginfo_t32 *to, siginfo_t *from)
 {
@@ -163,32 +164,38 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 *sc, unsign
 	regs->r ## x = reg;			\
 }
 
-#define RELOAD_SEG(seg)							\
+#define RELOAD_SEG(seg,mask)						\
 	{ unsigned int cur; 				\
 	  unsigned short pre;				\
 	  err |= __get_user(pre, &sc->seg);				\
     	  asm volatile("movl %%" #seg ",%0" : "=r" (cur));		\
+	  pre |= mask; 							\
 	  if (pre != cur) loadsegment(seg,pre); }
 
-	/* Reload fs and gs if they have changed in the signal handler. */
+	/* Reload fs and gs if they have changed in the signal handler.
+	   This does not handle long fs/gs base changes in the handler, but 
+	   does not clobber them at least in the normal case. */ 
 	
 	{
-		unsigned short gs; 
+		unsigned gs, oldgs; 
 		err |= __get_user(gs, &sc->gs);
+		gs |= 3; 
+		asm("movl %%gs,%0" : "=r" (oldgs));
+		if (gs != oldgs)
 		load_gs_index(gs); 
 	} 
-	RELOAD_SEG(fs);
-	RELOAD_SEG(ds);
-	RELOAD_SEG(es);
+	RELOAD_SEG(fs,3);
+	RELOAD_SEG(ds,3);
+	RELOAD_SEG(es,3);
 
 	COPY(di); COPY(si); COPY(bp); COPY(sp); COPY(bx);
 	COPY(dx); COPY(cx); COPY(ip);
 	/* Don't touch extended registers */ 
 	
 	err |= __get_user(regs->cs, &sc->cs); 
-	regs->cs |= 2;  
+	regs->cs |= 3;  
 	err |= __get_user(regs->ss, &sc->ss); 
-	regs->ss |= 2; 
+	regs->ss |= 3; 
 
 	{
 		unsigned int tmpflags;
@@ -284,7 +291,7 @@ asmlinkage int sys32_rt_sigreturn(struct pt_regs regs)
 	return eax;
 
 badframe:
-	signal_fault(&regs, frame, "32bit rt sigreturn"); 
+	signal_fault(&regs,frame,"32bit rt sigreturn");
 	return 0;
 }	
 
@@ -377,8 +384,9 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 
 	{
 		struct exec_domain *ed = current_thread_info()->exec_domain;
-		
-		err |= __put_user((ed && ed->signal_invmap && sig < 32
+	err |= __put_user((ed
+		           && ed->signal_invmap
+		           && sig < 32
 		           ? ed->signal_invmap[sig]
 		           : sig),
 		          &frame->sig);
@@ -435,7 +443,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 give_sigsegv:
 	if (sig == SIGSEGV)
 		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs,frame,"32bit signal setup"); 
+	signal_fault(regs,frame,"32bit signal deliver");
 }
 
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
@@ -449,9 +457,12 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		goto give_sigsegv;
 
+
 	{
 		struct exec_domain *ed = current_thread_info()->exec_domain;
-		err |= __put_user((ed && ed->signal_invmap && sig < 32
+	err |= __put_user((ed
+		    	   && ed->signal_invmap
+		    	   && sig < 32
 		    	   ? ed->signal_invmap[sig]
 			   : sig),
 			  &frame->sig);

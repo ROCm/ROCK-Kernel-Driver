@@ -32,18 +32,14 @@
 
 extern void die(const char *,struct pt_regs *,long);
 
-extern spinlock_t console_lock, timerlist_lock;
+extern spinlock_t console_lock;
 
 void bust_spinlocks(int yes)
 {
- 	spin_lock_init(&timerlist_lock);
+	int loglevel_save = console_loglevel;
 	if (yes) {
 		oops_in_progress = 1;
-#ifdef CONFIG_SMP
-		global_irq_lock = 0;	/* Many serial drivers do __global_cli() */
-#endif
 	} else {
-	int loglevel_save = console_loglevel;
 #ifdef CONFIG_VT
 		unblank_screen();
 #endif
@@ -108,6 +104,18 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	int write;
 	siginfo_t info;
 
+#ifdef CONFIG_CHECKING
+	{ 
+		unsigned long gs; 
+		struct x8664_pda *pda = cpu_pda + stack_smp_processor_id(); 
+		rdmsrl(MSR_GS_BASE, gs); 
+		if (gs != (unsigned long)pda) { 
+			wrmsrl(MSR_GS_BASE, pda); 
+			printk("page_fault: wrong gs %lx expected %p\n", gs, pda);
+		}
+	}
+#endif
+
 	/* get the address */
 	__asm__("movq %%cr2,%0":"=r" (address));
 
@@ -129,7 +137,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * If we're in an interrupt or have no user
 	 * context, we must not take the fault..
 	 */
-	if (in_interrupt() || !mm)
+	if (in_atomic() || !mm)
 		goto no_context;
 
  again:
@@ -223,7 +231,7 @@ no_context:
 	/* Are we prepared to handle this kernel fault?  */
 	if ((fixup = search_exception_table(regs->rip)) != 0) {
 		regs->rip = fixup;
-		if (exception_trace) 
+		if (0 && exception_trace) 
 		printk(KERN_ERR 
 		       "%s: fixed kernel exception at %lx address %lx err:%ld\n", 
 		       current->comm, regs->rip, address, error_code);
