@@ -156,7 +156,6 @@ extern struct bus_type i2c_bus_type;
  * function is mainly used for lookup & other admin. functions.
  */
 struct i2c_client {
-	char name[32];
 	int id;
 	unsigned int flags;		/* div., see below		*/
 	unsigned int addr;		/* chip address - NOTE: 7bit 	*/

@@ -291,9 +291,9 @@ int i2c_del_driver(struct i2c_driver *driver)
 				    client->driver == driver) {
 					DEB2(printk(KERN_DEBUG "i2c-core.o: "
 						    "detaching client %s:\n",
-					            client->name));
+					            client->dev.name));
 					if ((res = driver->detach_client(client))) {
- 						dev_err(&adap->dev, "while "
+						dev_err(&adap->dev, "while "
 						       "unregistering driver "
 						       "`%s', the client at "
 						       "address %02x of "
@@ -355,7 +355,7 @@ int i2c_attach_client(struct i2c_client *client)
 
 	printk(KERN_WARNING 
 	       " i2c-core.o: attach_client(%s) - enlarge I2C_CLIENT_MAX.\n",
-	       client->name);
+	       client->dev.name);
 
  out_unlock_list:
 	up(&adapter->list);
@@ -374,7 +374,7 @@ int i2c_attach_client(struct i2c_client *client)
 	}
 
 	DEB(dev_dbg(&adapter->dev, "client [%s] registered to adapter "
-			"(pos. %d).\n", client->name, i));
+			"(pos. %d).\n", client->dev.name, i));
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE)
 		client->usage_count = 0;
@@ -395,7 +395,7 @@ int i2c_detach_client(struct i2c_client *client)
 		if (res) {
 			printk(KERN_ERR
 			       "i2c-core.o: client_unregister [%s] failed, "
-			       "client not detached", client->name);
+			       "client not detached", client->dev.name);
 			goto out;
 		}
 	}
@@ -410,7 +410,7 @@ int i2c_detach_client(struct i2c_client *client)
 
 	printk(KERN_WARNING
 	       " i2c-core.o: unregister_client [%s] not found\n",
-	       client->name);
+	       client->dev.name);
 	res = -ENODEV;
 
  out_unlock:
@@ -522,7 +522,7 @@ static ssize_t i2cproc_bus_read(struct file *file, char *buf,
 				client = adapters[i]->clients[order[j]];
 				len += sprintf(kbuf+len,"%02x\t%-32s\t%-32s\n",
 				              client->addr,
-				              client->name,
+				              client->dev.name,
 				              client->driver->name);
 			}
 			len = len - file->f_pos;
