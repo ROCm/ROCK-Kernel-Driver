@@ -46,6 +46,7 @@ static struct page *alloc_hugetlb_page(void)
 	htlbpagemem--;
 	spin_unlock(&htlbpage_lock);
 	set_page_count(page, 1);
+	page->lru.prev = (void *)huge_page_release;
 	for (i = 0; i < (HPAGE_SIZE/PAGE_SIZE); ++i)
 		clear_highpage(&page[i]);
 	return page;
@@ -134,6 +135,7 @@ back1:
 		page = pte_page(pte);
 		if (pages) {
 			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
+			get_page(page);
 			pages[i] = page;
 		}
 		if (vmas)
@@ -218,8 +220,10 @@ follow_huge_pmd(struct mm_struct *mm, unsigned long address,
 	struct page *page;
 
 	page = pte_page(*(pte_t *)pmd);
-	if (page)
+	if (page) {
 		page += ((address & ~HPAGE_MASK) >> PAGE_SHIFT);
+		get_page(page);
+	}
 	return page;
 }
 #endif
@@ -372,8 +376,8 @@ int try_to_free_low(int count)
 
 int set_hugetlb_mem_size(int count)
 {
-	int j, lcount;
-	struct page *page, *map;
+	int lcount;
+	struct page *page;
 	extern long htlbzone_pages;
 	extern struct list_head htlbpage_freelist;
 
@@ -389,11 +393,6 @@ int set_hugetlb_mem_size(int count)
 			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
-			map = page;
-			for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-				SetPageReserved(map);
-				map++;
-			}
 			spin_lock(&htlbpage_lock);
 			list_add(&page->list, &htlbpage_freelist);
 			htlbpagemem++;
@@ -415,7 +414,8 @@ int set_hugetlb_mem_size(int count)
 	return (int) htlbzone_pages;
 }
 
-int hugetlb_sysctl_handler(ctl_table *table, int write, struct file *file, void *buffer, size_t *length)
+int hugetlb_sysctl_handler(ctl_table *table, int write,
+		struct file *file, void *buffer, size_t *length)
 {
 	proc_dointvec(table, write, file, buffer, length);
 	htlbpage_max = set_hugetlb_mem_size(htlbpage_max);
@@ -432,15 +432,13 @@ __setup("hugepages=", hugetlb_setup);
 
 static int __init hugetlb_init(void)
 {
-	int i, j;
+	int i;
 	struct page *page;
 
 	for (i = 0; i < htlbpage_max; ++i) {
 		page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 		if (!page)
 			break;
-		for (j = 0; j < HPAGE_SIZE/PAGE_SIZE; ++j)
-			SetPageReserved(&page[j]);
 		spin_lock(&htlbpage_lock);
 		list_add(&page->list, &htlbpage_freelist);
 		spin_unlock(&htlbpage_lock);

@@ -288,6 +288,7 @@ back1:
 		page = pte_page(pte);
 		if (pages) {
 			page += ((start & ~HPAGE_MASK) >> PAGE_SHIFT);
+			get_page(page);
 			pages[i] = page;
 		}
 		if (vmas)
@@ -584,11 +585,6 @@ int set_hugetlb_mem_size(int count)
 			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
-			map = page;
-			for (j = 0; j < (HPAGE_SIZE / PAGE_SIZE); j++) {
-				SetPageReserved(map);
-				map++;
-			}
 			spin_lock(&htlbpage_lock);
 			list_add(&page->list, &htlbpage_freelist);
 			htlbpagemem++;
@@ -613,7 +609,6 @@ int set_hugetlb_mem_size(int count)
 			map->flags &= ~(1UL << PG_locked | 1UL << PG_error |
 					1UL << PG_referenced |
 					1UL << PG_dirty | 1UL << PG_active |
-					1UL << PG_reserved |
 					1UL << PG_private | 1UL << PG_writeback);
 			set_page_count(page, 0);
 			map++;
