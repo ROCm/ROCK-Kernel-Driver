@@ -724,25 +724,6 @@ static struct pci_func *ibm_slot_find (u8 busno, u8 device, u8 function)
 	return NULL;
 }
 
-/* This routine is to find the pci_bus from kernel structures.
- * Parameters: bus number
- * Returns : pci_bus *  or NULL if not found
- */
-static struct pci_bus *ibmphp_find_bus (u8 busno)
-{
-	const struct list_head *tmp;
-	struct pci_bus *bus;
-	debug ("inside %s, busno = %x \n", __FUNCTION__, busno);
-
-	list_for_each (tmp, &pci_root_buses) {
-		bus = (struct pci_bus *) pci_bus_b (tmp);
-		if (bus)
-			if (bus->number == busno)
-				return bus;
-	}
-	return NULL;
-}
-
 /*************************************************************
  * This routine frees up memory used by struct slot, including
  * the pointers to pci_func, bus, hotplug_slot, controller,
@@ -810,7 +791,7 @@ static u8 bus_structure_fixup (u8 busno)
 	struct pci_dev *dev;
 	u16 l;
 
-	if (ibmphp_find_bus (busno) || !(ibmphp_find_same_bus_num (busno)))
+	if (pci_find_bus(busno) || !(ibmphp_find_same_bus_num (busno)))
 		return 1;
 
 	bus = kmalloc (sizeof (*bus), GFP_KERNEL);
@@ -855,7 +836,7 @@ static int ibm_configure_device (struct pci_func *func)
 		func->dev = pci_find_slot (func->busno, PCI_DEVFN(func->device, func->function));
 
 	if (func->dev == NULL) {
-		struct pci_bus *bus = ibmphp_find_bus (func->busno);
+		struct pci_bus *bus = pci_find_bus(func->busno);
 		if (!bus)
 			return 0;
 
@@ -1377,7 +1358,7 @@ static int __init ibmphp_init (void)
 		goto exit;
 	}
 
-	bus = ibmphp_find_bus (0);
+	bus = pci_find_bus(0);
 	if (!bus) {
 		err ("Can't find the root pci bus, can not continue\n");
 		rc = -ENODEV;
