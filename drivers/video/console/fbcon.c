@@ -503,6 +503,115 @@ static void set_blitting_type(struct vc_data *vc, struct fb_info *info,
 }
 #endif /* CONFIG_MISC_TILEBLITTING */
 
+
+static int con2fb_acquire_newinfo(struct vc_data *vc, struct fb_info *info,
+				  int unit, int oldidx)
+{
+	struct fbcon_ops *ops = NULL;
+	int err = 0;
+
+	if (!try_module_get(info->fbops->owner))
+		err = -ENODEV;
+
+	if (!err && info->fbops->fb_open &&
+	    info->fbops->fb_open(info, 0))
+		err = -ENODEV;
+
+	if (!err) {
+		ops = kmalloc(sizeof(struct fbcon_ops), GFP_KERNEL);
+		if (!ops)
+			err = -ENOMEM;
+	}
+
+	if (!err) {
+		memset(ops, 0, sizeof(struct fbcon_ops));
+		info->fbcon_par = ops;
+		set_blitting_type(vc, info, NULL);
+	}
+
+	if (err) {
+		con2fb_map[unit] = oldidx;
+		module_put(info->fbops->owner);
+	}
+
+	return err;
+}
+
+static int con2fb_release_oldinfo(struct vc_data *vc, struct fb_info *oldinfo,
+				  struct fb_info *newinfo, int unit,
+				  int oldidx, int found)
+{
+	struct fbcon_ops *ops = oldinfo->fbcon_par;
+	int err = 0;
+
+	if (oldinfo->fbops->fb_release &&
+	    oldinfo->fbops->fb_release(oldinfo, 0)) {
+		con2fb_map[unit] = oldidx;
+		if (!found && newinfo->fbops->fb_release)
+			newinfo->fbops->fb_release(newinfo, 0);
+		if (!found)
+			module_put(newinfo->fbops->owner);
+		err = -ENODEV;
+	}
+
+	if (!err) {
+		if (oldinfo->queue.func == fb_flashcursor)
+			del_timer_sync(&ops->cursor_timer);
+
+		kfree(ops->cursor_state.mask);
+		kfree(ops->cursor_data);
+		kfree(oldinfo->fbcon_par);
+		oldinfo->fbcon_par = NULL;
+		module_put(oldinfo->fbops->owner);
+	}
+
+	return err;
+}
+
+static void con2fb_init_newinfo(struct fb_info *info)
+{
+	if (!info->queue.func || info->queue.func == fb_flashcursor) {
+		struct fbcon_ops *ops = info->fbcon_par;
+
+		if (!info->queue.func)
+			INIT_WORK(&info->queue, fb_flashcursor, info);
+
+		init_timer(&ops->cursor_timer);
+		ops->cursor_timer.function = cursor_timer_handler;
+		ops->cursor_timer.expires = jiffies + HZ / 5;
+		ops->cursor_timer.data = (unsigned long ) info;
+		add_timer(&ops->cursor_timer);
+	}
+}
+
+static void con2fb_init_display(struct vc_data *vc, struct fb_info *info,
+				int unit, int show_logo)
+{
+	struct fbcon_ops *ops = info->fbcon_par;
+
+	ops->currcon = fg_console;
+
+	if (info->fbops->fb_set_par)
+		info->fbops->fb_set_par(info);
+
+	if (vc)
+		fbcon_set_disp(info, vc);
+	else
+		fbcon_preset_disp(info, unit);
+
+	if (show_logo) {
+		struct vc_data *fg_vc = vc_cons[fg_console].d;
+		struct fb_info *fg_info =
+			registered_fb[con2fb_map[fg_console]];
+
+		fbcon_prepare_logo(fg_vc, fg_info, fg_vc->vc_cols,
+				   fg_vc->vc_rows, fg_vc->vc_cols,
+				   fg_vc->vc_rows);
+	}
+
+	switch_screen(fg_console);
+}
+
 /**
  *	set_con2fb_map - map console to frame buffer device
  *	@unit: virtual console number to map
@@ -518,16 +627,15 @@ static int set_con2fb_map(int unit, int newidx, int user)
 	int oldidx = con2fb_map[unit];
 	struct fb_info *info = registered_fb[newidx];
 	struct fb_info *oldinfo = NULL;
-	struct fbcon_ops *ops;
-	int found;
+ 	int found, err = 0;
 
 	if (oldidx == newidx)
 		return 0;
 
 	if (!info)
-		return -EINVAL;
+ 		err =  -EINVAL;
 
-	if (!search_for_mapped_con()) {
+ 	if (!err && !search_for_mapped_con()) {
 		info_idx = newidx;
 		return fbcon_takeover(0);
 	}
@@ -539,109 +647,30 @@ static int set_con2fb_map(int unit, int newidx, int user)
 
 	acquire_console_sem();
 	con2fb_map[unit] = newidx;
+	if (!err && !found)
+ 		err = con2fb_acquire_newinfo(vc, info, unit, oldidx);
 
-	if (!found) {
-		int err = 0;
-
-		ops = NULL;
-
-		if (!try_module_get(info->fbops->owner)) {
-			err = -ENODEV;
-		}
-
-		if (!err && info->fbops->fb_open &&
-		    info->fbops->fb_open(info, 0)) {
-			err = -ENODEV;
-		}
-
-		if (!err) {
-			ops = kmalloc(sizeof(struct fbcon_ops), GFP_KERNEL);
-			if (!ops)
-				err = -ENOMEM;
-		}
-
-		if (!err) {
-			memset(ops, 0, sizeof(struct fbcon_ops));
-			info->fbcon_par = ops;
-			set_blitting_type(vc, info, NULL);
-		}
-
-		if (err) {
-			con2fb_map[unit] = oldidx;
-			module_put(info->fbops->owner);
-			release_console_sem();
-			return err;
-		}
-	}
 
 	/*
 	 * If old fb is not mapped to any of the consoles,
 	 * fbcon should release it.
 	 */
-	if (oldinfo && !search_fb_in_map(oldidx)) {
+ 	if (!err && oldinfo && !search_fb_in_map(oldidx))
+ 		err = con2fb_release_oldinfo(vc, oldinfo, info, unit, oldidx,
+ 					     found);
 
-		ops = oldinfo->fbcon_par;
+ 	if (!err) {
+ 		int show_logo = (fg_console == 0 && !user &&
+ 				 logo_shown != FBCON_LOGO_DONTSHOW);
 
-		if (oldinfo->fbops->fb_release &&
-		    oldinfo->fbops->fb_release(oldinfo, 0)) {
-			con2fb_map[unit] = oldidx;
-			if (!found && info->fbops->fb_release)
-				info->fbops->fb_release(info, 0);
-			if (!found)
-				module_put(info->fbops->owner);
-			release_console_sem();
-			return -ENODEV;
-		}
-
-		if (oldinfo->queue.func == fb_flashcursor)
-			del_timer_sync(&ops->cursor_timer);
-
-		kfree(ops->cursor_state.mask);
-		kfree(ops->cursor_data);
-		kfree(oldinfo->fbcon_par);
-		oldinfo->fbcon_par = NULL;
-		module_put(oldinfo->fbops->owner);
+ 		if (!found)
+ 			con2fb_init_newinfo(info);
+ 		con2fb_map_boot[unit] = newidx;
+ 		con2fb_init_display(vc, info, unit, show_logo);
 	}
 
-	if (!found) {
-		if (!info->queue.func || info->queue.func == fb_flashcursor) {
-
-			ops = info->fbcon_par;
-
-			if (!info->queue.func)
-				INIT_WORK(&info->queue, fb_flashcursor, info);
-
-			init_timer(&ops->cursor_timer);
-			ops->cursor_timer.function = cursor_timer_handler;
-			ops->cursor_timer.expires = jiffies + HZ / 5;
-			ops->cursor_timer.data = (unsigned long ) info;
-			add_timer(&ops->cursor_timer);
-		}
-	}
-
-	ops = info->fbcon_par;
-	ops->currcon = fg_console;
-	con2fb_map_boot[unit] = newidx;
-
-	if (info->fbops->fb_set_par)
-		info->fbops->fb_set_par(info);
-
-	if (vc)
-		fbcon_set_disp(info, vc);
-	else
-		fbcon_preset_disp(info, unit);
-
-	if (fg_console == 0 && !user && logo_shown != FBCON_LOGO_DONTSHOW) {
-		struct vc_data *vc = vc_cons[fg_console].d;
-		struct fb_info *fg_info = registered_fb[con2fb_map[fg_console]];
-
-		fbcon_prepare_logo(vc, fg_info, vc->vc_cols, vc->vc_rows,
-				   vc->vc_cols, vc->vc_rows);
-	}
-
-	switch_screen(fg_console);
 	release_console_sem();
-	return 0;
+ 	return err;
 }
 
 /*
