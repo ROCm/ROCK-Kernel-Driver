@@ -146,8 +146,6 @@ struct dummy {
 	u8				fifo_buf [FIFO_SIZE];
 	u16				devstatus;
 
-	struct hcd_dev			*hdev;
-
 	/*
 	 * MASTER/HOST side support
 	 */
@@ -159,6 +157,8 @@ struct dummy {
 	struct completion		released;
 	unsigned			resuming:1;
 	unsigned long			re_timeout;
+
+	struct usb_device		*udev;
 };
 
 static struct dummy	*the_controller;
@@ -822,7 +822,12 @@ static int dummy_urb_enqueue (
 	dum = container_of (hcd, struct dummy, hcd);
 	spin_lock_irqsave (&dum->lock, flags);
 
-	dum->hdev = urb->dev->hcpriv;
+	if (!dum->udev) {
+		dum->udev = urb->dev;
+		usb_get_dev (dum->udev);
+	} else if (unlikely (dum->udev != urb->dev))
+		dev_err (hardware, "usb_device address has changed!\n");
+
 	urb->hcpriv = dum;
 	if (usb_pipetype (urb->pipe) == PIPE_CONTROL)
 		urb->error_count = 1;		/* mark as a new urb */
@@ -1029,16 +1034,11 @@ static struct dummy_ep *find_endpoint (struct dummy *dum, u8 address)
 static void dummy_timer (unsigned long _dum)
 {
 	struct dummy		*dum = (struct dummy *) _dum;
-	struct hcd_dev		*hdev = dum->hdev;
+	struct hcd_dev		*hdev;
 	struct list_head	*entry, *tmp;
 	unsigned long		flags;
 	int			limit, total;
 	int			i;
-
-	if (!hdev) {
-		dev_err (hardware, "timer fired with device gone?\n");
-		return;
-	}
 
 	/* simplistic model for one frame's bandwidth */
 	switch (dum->gadget.speed) {
@@ -1060,6 +1060,14 @@ static void dummy_timer (unsigned long _dum)
 
 	/* look at each urb queued by the host side driver */
 	spin_lock_irqsave (&dum->lock, flags);
+
+	if (!dum->udev) {
+		dev_err (hardware, "timer fired with no URBs pending?\n");
+		spin_unlock_irqrestore (&dum->lock, flags);
+		return;
+	}
+	hdev = dum->udev->hcpriv;
+
 	for (i = 0; i < DUMMY_ENDPOINTS; i++) {
 		if (!ep_name [i])
 			break;
@@ -1331,7 +1339,11 @@ return_urb:
 
 	/* want a 1 msec delay here */
 	if (!list_empty (&hdev->urb_list))
-		mod_timer (&dum->timer, jiffies + 1);
+		mod_timer (&dum->timer, jiffies + msecs_to_jiffies(1));
+	else {
+		usb_put_dev (dum->udev);
+		dum->udev = NULL;
+	}
 
 	spin_unlock_irqrestore (&dum->lock, flags);
 }
@@ -1568,10 +1580,12 @@ show_urbs (struct device *dev, char *buf)
 	struct urb		*urb;
 	size_t			size = 0;
 	unsigned long		flags;
+	struct hcd_dev		*hdev;
 
 	spin_lock_irqsave (&dum->lock, flags);
-	if (dum->hdev) {
-		list_for_each_entry (urb, &dum->hdev->urb_list, urb_list) {
+	if (dum->udev) {
+		hdev = dum->udev->hcpriv;
+		list_for_each_entry (urb, &hdev->urb_list, urb_list) {
 			size_t		temp;
 
 			temp = show_urb (buf, PAGE_SIZE - size, urb);
