@@ -1358,9 +1358,8 @@ static int make_request (request_queue_t *q, struct bio * bi)
 		disk_stat_add(mddev->gendisk, read_sectors, bio_sectors(bi));
 	}
 
-	logical_sector = bi->bi_sector & ~(STRIPE_SECTORS-1);
+	logical_sector = bi->bi_sector & ~((sector_t)STRIPE_SECTORS-1);
 	last_sector = bi->bi_sector + (bi->bi_size>>9);
-
 	bi->bi_next = NULL;
 	bi->bi_phys_segments = 1;	/* over-loaded to count active stripes */
 	if ( bio_data_dir(bi) == WRITE )
