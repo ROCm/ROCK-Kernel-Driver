@@ -50,11 +50,11 @@
 #include <asm/tlbflush.h>
 #include <asm/smpboot.h>
 
-/* Set if we find a B stepping CPU			*/
-static int smp_b_stepping;
+/* Set if we find a B stepping CPU */
+static int __initdata smp_b_stepping;
 
 /* Setup configured maximum number of CPUs to activate */
-static int max_cpus = -1;
+static int __initdata max_cpus = NR_CPUS;
 
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
@@ -1146,7 +1146,7 @@ void __init smp_boot_cpus(void)
 
 		if (!(phys_cpu_present_map & (1 << bit)))
 			continue;
-		if ((max_cpus >= 0) && (max_cpus <= cpucount+1))
+		if (max_cpus <= cpucount+1)
 			continue;
 
 		do_boot_cpu(apicid);
