@@ -58,15 +58,13 @@ delayed_tlb_flush (void)
 
 	if (unlikely(ia64_need_tlb_flush)) {
 		__flush_tlb_all();
-		__ia64_need_tlb_flush = 0;
+		ia64_need_tlb_flush = 0;
 	}
 }
 
 static inline void
 get_new_mmu_context (struct mm_struct *mm)
 {
-	delayed_tlb_flush();
-
 	spin_lock(&ia64_ctx.lock);
 	{
 		if (ia64_ctx.next >= ia64_ctx.limit)
@@ -128,6 +126,8 @@ reload_context (struct mm_struct *mm)
 static inline void
 activate_mm (struct mm_struct *prev, struct mm_struct *next)
 {
+	delayed_tlb_flush();
+
 	/*
 	 * We may get interrupts here, but that's OK because interrupt
 	 * handlers cannot touch user-space.

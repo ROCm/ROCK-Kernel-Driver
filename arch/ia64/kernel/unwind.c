@@ -634,8 +634,8 @@ alloc_spill_area (unsigned long *offp, unsigned long regsize,
 	for (reg = hi; reg >= lo; --reg) {
 		if (reg->where == UNW_WHERE_SPILL_HOME) {
 			reg->where = UNW_WHERE_PSPREL;
-			reg->val = 0x10 - *offp;
-			*offp += regsize;
+			*offp -= regsize;
+			reg->val = *offp;
 		}
 	}
 }
@@ -814,7 +814,8 @@ desc_frgr_mem (unsigned char grmask, unw_word frmask, struct unw_state_record *s
 	}
 	for (i = 0; i < 20; ++i) {
 		if ((frmask & 1) != 0) {
-			set_reg(sr->curr.reg + UNW_REG_F2 + i, UNW_WHERE_SPILL_HOME,
+			int base = (i < 4) ? UNW_REG_F2 : UNW_REG_F16 - 4;
+			set_reg(sr->curr.reg + base + i, UNW_WHERE_SPILL_HOME,
 				sr->region_start + sr->region_len - 1, 0);
 			sr->any_spills = 1;
 		}

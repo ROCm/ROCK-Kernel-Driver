@@ -679,11 +679,10 @@ iosapic_init_pci_irq (void)
 		       pci_irq.route[i].bus, pci_irq.route[i].pci_id>>16, pci_irq.route[i].pin,
 		       iosapic_irq[vector].base_irq + iosapic_irq[vector].pin, vector);
 #endif
-
 		/*
-		 * Forget not to program the IOSAPIC RTE per ACPI _PRT
+		 * NOTE: The IOSAPIC RTE will be programmed in iosapic_pci_fixup().  It
+		 * needs to be done there to ensure PCI hotplug works right.
 		 */
-		set_rte(vector, (ia64_get_lid() >> 16) & 0xffff);
 	}
 }
 

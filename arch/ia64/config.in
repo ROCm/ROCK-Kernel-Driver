@@ -107,6 +107,7 @@ source drivers/pci/Config.in
 
 bool 'Support for hot-pluggable devices' CONFIG_HOTPLUG
 if [ "$CONFIG_HOTPLUG" = "y" ]; then
+   source drivers/hotplug/Config.in
    source drivers/pcmcia/Config.in
 else
    define_bool CONFIG_PCMCIA n
