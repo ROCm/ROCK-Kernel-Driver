@@ -213,6 +213,7 @@ static struct pd_unit *pd_current; /* current request's drive */
 static PIA *pi_current; /* current request's PIA */
 static struct request *pd_req;	/* current request */
 static enum action do_pd_io_start(void);
+static int pd_claimed;
 static struct request_queue *pd_queue;
 
 static void run_fsm(void)
@@ -226,6 +227,10 @@ static void run_fsm(void)
 			pd_current = pd_req->rq_disk->private_data;
 			pi_current = pd_current->pi;
 			phase = do_pd_io_start;
+		}
+
+		if (!pd_claimed) {
+			pd_claimed = 1;
 			if (!pi_schedule_claimed(pi_current, run_fsm))
 				return;
 		}
@@ -233,6 +238,7 @@ static void run_fsm(void)
 		switch(res = phase()) {
 			case Ok: case Fail:
 				pi_unclaim(pi_current);
+				pd_claimed = 0;
 				phase = NULL;
 				spin_lock_irqsave(&pd_lock, saved_flags);
 				end_request(pd_req, res);
@@ -247,9 +253,7 @@ static void run_fsm(void)
 				return;
 			case Wait:
 				pi_unclaim(pi_current);
-				if (!pi_schedule_claimed(pi_current, run_fsm))
-					return;
-				break;
+				pd_claimed = 0;
 		}
 	}
 }
