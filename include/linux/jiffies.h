@@ -1,6 +1,8 @@
 #ifndef _LINUX_JIFFIES_H
 #define _LINUX_JIFFIES_H
 
+#include <linux/types.h>
+
 /*
  * The 64-bit value is not volatile - you MUST NOT read it
  * without holding read_lock_irq(&xtime_lock)
