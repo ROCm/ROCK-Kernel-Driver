@@ -37,7 +37,8 @@
 #define PORT_16654	11
 #define PORT_16850	12
 #define PORT_RSA	13
-#define PORT_MAX_8250	13	/* max port ID */
+#define PORT_NS16550A	14
+#define PORT_MAX_8250	14	/* max port ID */
 
 /*
  * ARM specific type numbers.  These are not currently guaranteed
@@ -172,6 +173,7 @@ struct uart_port {
 #define UPF_LOW_LATENCY		(1 << 13)
 #define UPF_BUGGY_UART		(1 << 14)
 #define UPF_AUTOPROBE		(1 << 15)
+#define UPF_MAGIC_MULTIPLIER	(1 << 16)
 #define UPF_BOOT_ONLYMCA	(1 << 22)
 #define UPF_CONS_FLOW		(1 << 23)
 #define UPF_SHARE_IRQ		(1 << 24)
@@ -179,7 +181,7 @@ struct uart_port {
 #define UPF_RESOURCES		(1 << 30)
 #define UPF_IOREMAP		(1 << 31)
 
-#define UPF_CHANGE_MASK		(0x7fff)
+#define UPF_CHANGE_MASK		(0x17fff)
 #define UPF_USR_MASK		(UPF_SPD_MASK|UPF_LOW_LATENCY)
 
 	unsigned int		mctrl;			/* current modem ctrl settings */
