@@ -227,7 +227,9 @@ EXPORT_SYMBOL_GPL(ide_build_sglist);
  *	the PRD table that the IDE layer wants to be fed. The code
  *	knows about the 64K wrap bug in the CS5530.
  *
- *	Returns 0 if all went okay, returns 1 otherwise.
+ *	Returns the number of built PRD entries if all went okay,
+ *	returns 0 otherwise.
+ *
  *	May also be invoked from trm290.c
  */
  

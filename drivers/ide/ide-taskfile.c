@@ -851,8 +851,8 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 		hwif->OUTB(taskfile->high_cylinder, IDE_HCYL_REG);
 
         /*
-	 * (ks) In the flagged taskfile approch, we will used all specified
-	 * registers and the register value will not be changed. Except the
+	 * (ks) In the flagged taskfile approch, we will use all specified
+	 * registers and the register value will not be changed, except the
 	 * select bit (master/slave) in the drive_head register. We must make
 	 * sure that the desired drive is selected.
 	 */
