@@ -1161,12 +1161,14 @@ void ip_mc_down(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
+#ifdef CONFIG_IP_MULTICAST
 	in_dev->mr_ifc_count = 0;
 	if (del_timer(&in_dev->mr_ifc_timer))
 		atomic_dec(&in_dev->refcnt);
 	in_dev->mr_gq_running = 0;
 	if (del_timer(&in_dev->mr_gq_timer))
 		atomic_dec(&in_dev->refcnt);
+#endif
 
 	for (i=in_dev->mc_list; i; i=i->next)
 		igmp_group_dropped(i);
