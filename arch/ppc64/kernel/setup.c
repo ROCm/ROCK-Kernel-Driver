@@ -164,7 +164,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
 #if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
-	unsigned int ret, i;
+	int ret, i;
 #endif
 
 #ifdef CONFIG_XMON_DEFAULT
@@ -232,12 +232,11 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_SMP
 		/* Start secondary threads on SMT systems */
 		for (i = 0; i < NR_CPUS; i++) {
-			if(cpu_available(i)  && !cpu_possible(i)) {
+			if (cpu_available(i) && !cpu_possible(i)) {
 				printk("%16.16x : starting thread\n", i);
-				rtas_call(rtas_token("start-cpu"), 3, 1, 
-					  (void *)&ret,
+				rtas_call(rtas_token("start-cpu"), 3, 1, &ret,
 					  get_hard_smp_processor_id(i), 
-					  *((unsigned long *)pseries_secondary_smp_init),
+					  (u32)*((unsigned long *)pseries_secondary_smp_init),
 					  i);
 				cpu_set(i, cpu_possible_map);
 				systemcfg->processorCount++;

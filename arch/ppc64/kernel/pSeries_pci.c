@@ -62,7 +62,7 @@ extern unsigned long pci_probe_only;
 
 static int rtas_read_config(struct device_node *dn, int where, int size, u32 *val)
 {
-	unsigned long returnval = ~0L;
+	int returnval = -1;
 	unsigned long buid, addr;
 	int ret;
 
@@ -72,7 +72,8 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 	addr = (dn->busno << 16) | (dn->devfn << 8) | where;
 	buid = dn->phb->buid;
 	if (buid) {
-		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval, addr, buid >> 32, buid & 0xffffffff, size);
+		ret = rtas_call(ibm_read_pci_config, 4, 2, &returnval,
+				addr, buid >> 32, buid & 0xffffffff, size);
 	} else {
 		ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, size);
 	}
