@@ -54,7 +54,7 @@ int tcp_tw_count;
 
 
 /* Must be called with locally disabled BHs. */
-void tcp_timewait_kill(struct tcp_tw_bucket *tw)
+static void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 {
 	struct tcp_ehash_bucket *ehead;
 	struct tcp_bind_hashbucket *bhead;
@@ -166,7 +166,6 @@ tcp_timewait_state_process(struct tcp_tw_bucket *tw, struct sk_buff *skb,
 		if (!th->fin || TCP_SKB_CB(skb)->end_seq != tw->rcv_nxt+1) {
 kill_with_rst:
 			tcp_tw_deschedule(tw);
-			tcp_timewait_kill(tw);
 			tcp_tw_put(tw);
 			return TCP_TW_RST;
 		}
@@ -223,7 +222,6 @@ kill_with_rst:
 			if (sysctl_tcp_rfc1337 == 0) {
 kill:
 				tcp_tw_deschedule(tw);
-				tcp_timewait_kill(tw);
 				tcp_tw_put(tw);
 				return TCP_TW_SUCCESS;
 			}
@@ -484,6 +482,7 @@ void tcp_tw_deschedule(struct tcp_tw_bucket *tw)
 			del_timer(&tcp_tw_timer);
 	}
 	spin_unlock(&tw_death_lock);
+	tcp_timewait_kill(tw);
 }
 
 /* Short-time timewait calendar */

@@ -633,7 +633,6 @@ unique:
 	} else if (tw) {
 		/* Silly. Should hash-dance instead... */
 		tcp_tw_deschedule(tw);
-		tcp_timewait_kill(tw);
 		NET_INC_STATS_BH(TimeWaitRecycled);
 
 		tcp_tw_put(tw);
@@ -737,7 +736,6 @@ ok:
 
  		if (tw) {
  			tcp_tw_deschedule(tw);
- 			tcp_timewait_kill(tw);
  			tcp_tw_put(tw);
  		}
 
@@ -1853,7 +1851,6 @@ do_time_wait:
 							  tcp_v4_iif(skb));
 		if (sk2) {
 			tcp_tw_deschedule((struct tcp_tw_bucket *)sk);
-			tcp_timewait_kill((struct tcp_tw_bucket *)sk);
 			tcp_tw_put((struct tcp_tw_bucket *)sk);
 			sk = sk2;
 			goto process;

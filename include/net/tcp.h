@@ -222,7 +222,6 @@ static inline void tcp_tw_put(struct tcp_tw_bucket *tw)
 extern atomic_t tcp_orphan_count;
 extern int tcp_tw_count;
 extern void tcp_time_wait(struct sock *sk, int state, int timeo);
-extern void tcp_timewait_kill(struct tcp_tw_bucket *tw);
 extern void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo);
 extern void tcp_tw_deschedule(struct tcp_tw_bucket *tw);
 

@@ -420,7 +420,6 @@ EXPORT_SYMBOL(tcp_statistics);
 EXPORT_SYMBOL(tcp_rcv_state_process);
 EXPORT_SYMBOL(tcp_timewait_state_process);
 EXPORT_SYMBOL(tcp_timewait_cachep);
-EXPORT_SYMBOL(tcp_timewait_kill);
 EXPORT_SYMBOL(tcp_sendmsg);
 EXPORT_SYMBOL(tcp_v4_rebuild_header);
 EXPORT_SYMBOL(tcp_v4_send_check);
