@@ -35,11 +35,21 @@
 #include <asm/irq.h>
 #include <asm/mpspec.h>
 
-#ifdef CONFIG_X86_LOCAL_APIC
+#ifdef	CONFIG_X86_64
+
+static inline void  acpi_madt_oem_check(char *oem_id, char *oem_table_id) { }
+static inline void clustered_apic_check(void) { }
+static inline int ioapic_setup_disabled(void) { return 0; }
+#include <asm/proto.h>
+
+#else	/* X86 */
+
+#ifdef	CONFIG_X86_LOCAL_APIC
 #include <mach_apic.h>
 #include <mach_mpparse.h>
-#include <asm/io_apic.h>
-#endif
+#endif	/* CONFIG_X86_LOCAL_APIC */
+
+#endif	/* X86 */
 
 #define PREFIX			"ACPI: "
 
@@ -66,6 +76,22 @@ static u64 acpi_lapic_addr __initdata = APIC_DEFAULT_PHYS_BASE;
  * overriden if IOAPICs are enumerated (below).
  */
 enum acpi_irq_model_id		acpi_irq_model = ACPI_IRQ_MODEL_PIC;
+
+#ifdef	CONFIG_X86_64
+
+/* rely on all ACPI tables being in the direct mapping */
+char *__acpi_map_table(unsigned long phys_addr, unsigned long size)
+{
+	if (!phys_addr || !size)
+	return NULL;
+
+	if (phys_addr < (end_pfn_map << PAGE_SHIFT))
+		return __va(phys_addr);
+
+	return NULL;
+}
+
+#else
 
 /*
  * Temporarily use the virtual area starting from FIX_IO_APIC_BASE_END,
@@ -106,7 +132,7 @@ char *__acpi_map_table(unsigned long phys, unsigned long size)
 
 	return ((unsigned char *) base + offset);
 }
-
+#endif
 
 #ifdef CONFIG_PCI_MMCONFIG
 static int __init acpi_parse_mcfg(unsigned long phys_addr, unsigned long size)
@@ -432,7 +458,6 @@ static int __init acpi_parse_sbf(unsigned long phys_addr, unsigned long size)
 
 
 #ifdef CONFIG_HPET_TIMER
-extern unsigned long hpet_address;
 
 static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 {
@@ -453,16 +478,31 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 		return -1;
 	}
 
-	hpet_address = hpet_tbl->addr.addrl;
-	printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n", hpet_tbl->id,
-	       hpet_address);
+#ifdef	CONFIG_X86_64
+        vxtime.hpet_address = hpet_tbl->addr.addrl |
+                ((long) hpet_tbl->addr.addrh << 32);
+
+        printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
+               hpet_tbl->id, vxtime.hpet_address);
+#else	/* X86 */
+	{
+		extern unsigned long hpet_address;
+
+		hpet_address = hpet_tbl->addr.addrl;
+		printk(KERN_INFO PREFIX "HPET id: %#x base: %#lx\n",
+			hpet_tbl->id, hpet_address);
+	}
+#endif	/* X86 */
+
 	return 0;
 }
 #else
 #define	acpi_parse_hpet	NULL
 #endif
 
+#ifdef CONFIG_X86_PM_TIMER
 extern u32 pmtmr_ioport;
+#endif
 
 static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
 {
@@ -589,7 +629,7 @@ acpi_parse_madt_ioapic_entries(void)
 	/*
  	 * if "noapic" boot option, don't look for IO-APICs
 	 */
-	if (ioapic_setup_disabled()) {
+	if (skip_ioapic_setup) {
 		printk(KERN_INFO PREFIX "Skipping IOAPIC probe "
 			"due to 'noapic' option.\n");
 		return -ENODEV;
