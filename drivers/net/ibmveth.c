@@ -885,13 +885,16 @@ static int __devinit ibmveth_probe(struct vio_dev *dev, const struct vio_device_
 
 	mac_addr_p = (unsigned char *) vio_get_attribute(dev, VETH_MAC_ADDR, 0);
 	if(!mac_addr_p) {
-		ibmveth_error_printk("Can't find VETH_MAC_ADDR attribute\n");
+		printk(KERN_ERR "(%s:%3.3d) ERROR: Can't find VETH_MAC_ADDR "
+				"attribute\n", __FILE__, __LINE__);
 		return 0;
 	}
 	
 	mcastFilterSize_p= (unsigned int *) vio_get_attribute(dev, VETH_MCAST_FILTER_SIZE, 0);
 	if(!mcastFilterSize_p) {
-		ibmveth_error_printk("Can't find VETH_MCAST_FILTER_SIZE attribute\n");
+		printk(KERN_ERR "(%s:%3.3d) ERROR: Can't find "
+				"VETH_MCAST_FILTER_SIZE attribute\n",
+				__FILE__, __LINE__);
 		return 0;
 	}
 	

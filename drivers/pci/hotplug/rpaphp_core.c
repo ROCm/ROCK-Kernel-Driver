@@ -449,7 +449,7 @@ static int rpaphp_disable_slot(struct pci_dev *dev)
 
 static int disable_slot(struct hotplug_slot *hotplug_slot)
 {
-	int retval;
+	int retval = -EINVAL;
 	struct slot *slot = (struct slot *)hotplug_slot->private;
 
 	dbg("%s - Entry: slot[%s]\n", __FUNCTION__, slot->name);

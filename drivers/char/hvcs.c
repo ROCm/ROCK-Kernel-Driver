@@ -427,7 +427,7 @@ static int hvcs_io(struct hvcs_struct *hvcsd)
 	struct tty_struct *tty;
 	char buf[HVCS_BUFF_LEN] __ALIGNED__;
 	unsigned long flags;
-	int got;
+	int got = 0;
 	int i;
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
@@ -945,7 +945,7 @@ static int hvcs_enable_device(struct hvcs_struct *hvcsd, uint32_t unit_address,
  */
 struct hvcs_struct *hvcs_get_by_index(int index)
 {
-	struct hvcs_struct *hvcsd;
+	struct hvcs_struct *hvcsd = NULL;
 	unsigned long flags;
 
 	spin_lock(&hvcs_structs_lock);
@@ -1433,7 +1433,7 @@ static int __init hvcs_module_init(void)
 			" as a tty driver failed.\n");
 		hvcs_free_index_list();
 		put_tty_driver(hvcs_tty_driver);
-		return rc;
+		return -EIO;
 	}
 
 	hvcs_pi_buff = kmalloc(PAGE_SIZE, GFP_KERNEL);
