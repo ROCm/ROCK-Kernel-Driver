@@ -268,10 +268,8 @@ static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 		struct mmc_data *data;
 
 		status = readl(host->base + MMCISTATUS);
+		status &= readl(host->base + MMCIMASK0);
 		writel(status, host->base + MMCICLEAR);
-
-		if (!(status & MCI_IRQMASK))
-			break;
 
 		DBG(host, "irq0 %08x\n", status);
 
