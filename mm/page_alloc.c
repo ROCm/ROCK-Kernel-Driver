@@ -996,7 +996,7 @@ static inline unsigned long wait_table_size(unsigned long pages)
 	 */
 	size = min(size, 4096UL);
 
-	return size;
+	return max(size, 4UL);
 }
 
 /*
