@@ -199,7 +199,7 @@ static int handle_send_req(ipmi_user_t     user,
 			goto out;
 		}
 
-		if (copy_from_user(&msgdata,
+		if (copy_from_user(msgdata,
 				   req->msg.data,
 				   req->msg.data_len))
 		{
