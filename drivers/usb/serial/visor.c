@@ -177,7 +177,7 @@ static void visor_read_bulk_callback	(struct urb *urb);
 static int  clie_3_5_startup	(struct usb_serial *serial);
 
 
-static __devinitdata struct usb_device_id combined_id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M515_ID) },
@@ -191,12 +191,12 @@ static __devinitdata struct usb_device_id combined_id_table [] = {
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id clie_id_3_5_table [] = {
+static struct usb_device_id clie_id_3_5_table [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ }					/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table [] = {
+static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M500_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M505_ID) },
@@ -211,7 +211,7 @@ static __devinitdata struct usb_device_id id_table [] = {
 	{ }					/* Terminating entry */
 };
 
-MODULE_DEVICE_TABLE (usb, id_table);
+MODULE_DEVICE_TABLE (usb, id_table_combined);
 
 
 
@@ -219,7 +219,7 @@ MODULE_DEVICE_TABLE (usb, id_table);
 static struct usb_serial_device_type handspring_device = {
 	owner:			THIS_MODULE,
 	name:			"Handspring Visor / Palm 4.0 / Clié 4.x",
-	id_table:		combined_id_table,
+	id_table:		id_table,
 	num_interrupt_in:	0,
 	num_bulk_in:		2,
 	num_bulk_out:		2,

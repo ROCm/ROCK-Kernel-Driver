@@ -119,7 +119,7 @@ static u8 ir_baud = 0;
 static u8 ir_xbof = 0;
 static u8 ir_add_bof = 0;
 
-static __devinitdata struct usb_device_id id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(0x050f, 0x0180) },		/* KC Technology, KC-180 */
 	{ USB_DEVICE(0x08e9, 0x0100) },		/* XTNDAccess */
 	{ USB_DEVICE(0x09c4, 0x0011) },		/* ACTiSys ACT-IR2000U */

@@ -435,7 +435,7 @@ static __devinitdata struct usb_device_id keyspan_ids_combined[] = {
 MODULE_DEVICE_TABLE(usb, keyspan_ids_combined);
 
 /* usb_device_id table for the pre-firmware download keyspan devices */
-static __devinitdata struct usb_device_id keyspan_pre_ids[] = {
+static struct usb_device_id keyspan_pre_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_pre_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19qi_pre_product_id) },
@@ -449,7 +449,7 @@ static __devinitdata struct usb_device_id keyspan_pre_ids[] = {
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_1port_ids[] = {
+static struct usb_device_id keyspan_1port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa18x_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa19qi_product_id) },
@@ -458,14 +458,14 @@ static __devinitdata struct usb_device_id keyspan_1port_ids[] = {
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_2port_ids[] = {
+static struct usb_device_id keyspan_2port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28x_product_id) },
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa28xa_product_id) },
 	{ } /* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id keyspan_4port_ids[] = {
+static struct usb_device_id keyspan_4port_ids[] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, keyspan_usa49w_product_id) },
 	{ } /* Terminating entry */
 };

@@ -109,7 +109,7 @@ static void klsi_105_break_ctl	         (struct usb_serial_port *port,
 /*
  * All of the device info needed for the KLSI converters.
  */
-static __devinitdata struct usb_device_id id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALMCONNECT_VID, PALMCONNECT_PID) },
 	{ USB_DEVICE(KLSI_VID, KLSI_KL5KUSB105D_PID) },
 	{ }		/* Terminating entry */

@@ -787,7 +787,7 @@ error:
 	return 1;
 }
 
-static void * __devinit vicam_probe(struct usb_device *udev, unsigned int ifnum,
+static void *vicam_probe(struct usb_device *udev, unsigned int ifnum,
 	const struct usb_device_id *id)
 {
 	struct usb_vicam *vicam;

@@ -154,20 +154,20 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
-static __devinitdata struct usb_device_id id_table_std [] = {
+static struct usb_device_id id_table_std [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_ID) },
 	{ }						/* Terminating entry */
 };
 
 #ifdef KEYSPAN
-static __devinitdata struct usb_device_id id_table_fake [] = {
+static struct usb_device_id id_table_fake [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_FAKE_ID) },
 	{ }						/* Terminating entry */
 };
 #endif
 
 #ifdef XIRCOM
-static __devinitdata struct usb_device_id id_table_fake_xircom [] = {
+static struct usb_device_id id_table_fake_xircom [] = {
         { USB_DEVICE(XIRCOM_VENDOR_ID, XIRCOM_FAKE_ID) },
         { USB_DEVICE(ENTREGRA_VENDOR_ID, ENTREGRA_FAKE_ID) },
         { }                                             
