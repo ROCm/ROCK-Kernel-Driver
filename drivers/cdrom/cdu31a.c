@@ -1375,9 +1375,9 @@ read_data_block(char *buffer,
 			       readahead_buffer + (2048 -
 						   readahead_dataleft),
 			       readahead_dataleft);
-			readahead_dataleft = 0;
 			bytesleft -= readahead_dataleft;
 			offset += readahead_dataleft;
+			readahead_dataleft = 0;
 		} else {
 			/* The readahead will fill the whole buffer, get the data
 			   and return. */
