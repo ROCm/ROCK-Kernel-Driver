@@ -59,7 +59,7 @@
 struct proc_dir_entry *proc_bt;
 
 /* Bluetooth sockets */
-#define BT_MAX_PROTO	5
+#define BT_MAX_PROTO	6
 static struct net_proto_family *bt_proto[BT_MAX_PROTO];
 
 static kmem_cache_t *bt_sock_cache;
