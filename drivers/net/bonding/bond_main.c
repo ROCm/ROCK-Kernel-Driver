@@ -934,6 +934,8 @@ static int bond_open(struct net_device *dev)
 	struct timer_list *timer = &bond->mii_timer;
 	struct timer_list *arp_timer = &bond->arp_timer;
 
+	bond->kill_timers = 0;
+
 	if ((bond_mode == BOND_MODE_TLB) ||
 	    (bond_mode == BOND_MODE_ALB)) {
 		struct timer_list *alb_timer = &(BOND_ALB_INFO(bond).alb_timer);
@@ -955,7 +957,7 @@ static int bond_open(struct net_device *dev)
 
 	if (miimon > 0) {  /* link check interval, in milliseconds. */
 		init_timer(timer);
-		timer->expires  = jiffies + (miimon * HZ / 1000);
+		timer->expires  = jiffies + 1;
 		timer->data     = (unsigned long)dev;
 		timer->function = (void *)&bond_mii_monitor;
 		add_timer(timer);
@@ -963,7 +965,7 @@ static int bond_open(struct net_device *dev)
 
 	if (arp_interval> 0) {  /* arp interval, in milliseconds. */
 		init_timer(arp_timer);
-		arp_timer->expires  = jiffies + (arp_interval * HZ / 1000);
+		arp_timer->expires  = jiffies + 1;
 		arp_timer->data     = (unsigned long)dev;
 		if (bond_mode == BOND_MODE_ACTIVEBACKUP) {
 			arp_timer->function = (void *)&activebackup_arp_monitor;
@@ -976,7 +978,7 @@ static int bond_open(struct net_device *dev)
 	if (bond_mode == BOND_MODE_8023AD) {
 		struct timer_list *ad_timer = &(BOND_AD_INFO(bond).ad_timer);
 		init_timer(ad_timer);
-		ad_timer->expires  = jiffies + (AD_TIMER_INTERVAL * HZ / 1000);
+		ad_timer->expires  = jiffies + 1;
 		ad_timer->data     = (unsigned long)bond;
 		ad_timer->function = (void *)&bond_3ad_state_machine_handler;
 		add_timer(ad_timer);
@@ -994,31 +996,50 @@ static int bond_close(struct net_device *master)
 
 	write_lock_bh(&bond->lock);
 
-	if (miimon > 0) {  /* link check interval, in milliseconds. */
-		del_timer(&bond->mii_timer);
-	}
-	if (arp_interval> 0) {  /* arp interval, in milliseconds. */
-		del_timer(&bond->arp_timer);
-	}
+	bond_mc_list_destroy (bond);
 
 	if (bond_mode == BOND_MODE_8023AD) {
-		del_timer_sync(&(BOND_AD_INFO(bond).ad_timer));
-
 		/* Unregister the receive of LACPDUs */
 		bond_unregister_lacpdu(bond);
 	}
 
-	bond_mc_list_destroy (bond);
+	/* signal timers not to re-arm */
+	bond->kill_timers = 1;
 
 	write_unlock_bh(&bond->lock);
+
+	/* del_timer_sync must run without holding the bond->lock
+	 * because a running timer might be trying to hold it too
+	 */
+
+	if (miimon > 0) {  /* link check interval, in milliseconds. */
+		del_timer_sync(&bond->mii_timer);
+	}
+
+	if (arp_interval> 0) {  /* arp interval, in milliseconds. */
+		del_timer_sync(&bond->arp_timer);
+	}
+
+	switch (bond_mode) {
+	case BOND_MODE_8023AD:
+		del_timer_sync(&(BOND_AD_INFO(bond).ad_timer));
+		break;
+	case BOND_MODE_TLB:
+	case BOND_MODE_ALB:
+		del_timer_sync(&(BOND_ALB_INFO(bond).alb_timer));
+		break;
+	default:
+		break;
+	}
 
 	/* Release the bonded slaves */
 	bond_release_all(master);
 
 	if ((bond_mode == BOND_MODE_TLB) ||
 	    (bond_mode == BOND_MODE_ALB)) {
-		del_timer_sync(&(BOND_ALB_INFO(bond).alb_timer));
-
+		/* Must be called only after all
+		 * slaves have been released
+		 */
 		bond_alb_deinitialize(bond);
 	}
 
@@ -2150,8 +2171,17 @@ static void bond_mii_monitor(struct net_device *master)
 	struct slave *slave, *oldcurrent;
 	int slave_died = 0;
 	int do_failover = 0;
+	int delta_in_ticks = miimon * HZ / 1000;
 
 	read_lock(&bond->lock);
+
+	if (bond->kill_timers) {
+		goto out;
+	}
+
+	if (bond->slave_cnt == 0) {
+		goto re_arm;
+	}
 
 	/* we will try to read the link status of each of our slaves, and
 	 * set their IFF_RUNNING flag appropriately. For each slave not
@@ -2361,9 +2391,10 @@ static void bond_mii_monitor(struct net_device *master)
 		write_unlock(&bond->ptrlock);
 	}
 
+re_arm:
+	mod_timer(&bond->mii_timer, jiffies + delta_in_ticks);
+out:
 	read_unlock(&bond->lock);
-	/* re-arm the timer */
-	mod_timer(&bond->mii_timer, jiffies + (miimon * HZ / 1000));
 }
 
 /* 
@@ -2375,33 +2406,20 @@ static void bond_mii_monitor(struct net_device *master)
  */
 static void loadbalance_arp_monitor(struct net_device *master)
 {
-	struct bonding *bond;
+	struct bonding *bond = (struct bonding *)master->priv;
 	struct slave *slave, *oldcurrent;
-	int the_delta_in_ticks =  arp_interval * HZ / 1000;
-	int next_timer = jiffies + (arp_interval * HZ / 1000);
 	int do_failover = 0;
-
-	bond = (struct bonding *)master->priv; 
-	if (master->priv == NULL) {
-		mod_timer(&bond->arp_timer, next_timer);
-		return;
-	}
-
-	/* TODO: investigate why rtnl_shlock_nowait and rtnl_exlock_nowait
-	 * are called below and add comment why they are required... 
-	 */
-	if ((!IS_UP(master)) || rtnl_shlock_nowait()) {
-		mod_timer(&bond->arp_timer, next_timer);
-		return;
-	}
-
-	if (rtnl_exlock_nowait()) {
-		rtnl_shunlock();
-		mod_timer(&bond->arp_timer, next_timer);
-		return;
-	}
+	int the_delta_in_ticks =  arp_interval * HZ / 1000;
 
 	read_lock(&bond->lock);
+
+	if (bond->kill_timers) {
+		goto out;
+	}
+
+	if (bond->slave_cnt == 0) {
+		goto re_arm;
+	}
 
 	read_lock(&bond->ptrlock);
 	oldcurrent = bond->current_slave;
@@ -2500,12 +2518,10 @@ static void loadbalance_arp_monitor(struct net_device *master)
 		write_unlock(&bond->ptrlock);
 	}
 
+re_arm:
+	mod_timer(&bond->arp_timer, jiffies + the_delta_in_ticks);
+out:
 	read_unlock(&bond->lock);
-	rtnl_exunlock();
-	rtnl_shunlock();
-
-	/* re-arm the timer */
-	mod_timer(&bond->arp_timer, next_timer);
 }
 
 /* 
@@ -2525,23 +2541,19 @@ static void loadbalance_arp_monitor(struct net_device *master)
  */
 static void activebackup_arp_monitor(struct net_device *master)
 {
-	struct bonding *bond;
+	struct bonding *bond = (struct bonding *)master->priv;
 	struct slave *slave;
 	int the_delta_in_ticks =  arp_interval * HZ / 1000;
-	int next_timer = jiffies + (arp_interval * HZ / 1000);
-
-	bond = (struct bonding *)master->priv; 
-	if (master->priv == NULL) {
-		mod_timer(&bond->arp_timer, next_timer);
-		return;
-	}
-
-	if (!IS_UP(master)) {
-		mod_timer(&bond->arp_timer, next_timer);
-		return;
-	}
 
 	read_lock(&bond->lock);
+
+	if (bond->kill_timers) {
+		goto out;
+	}
+
+	if (bond->slave_cnt == 0) {
+		goto re_arm;
+	}
 
 	/* determine if any slave has come up or any backup slave has 
 	 * gone down 
@@ -2740,8 +2752,10 @@ static void activebackup_arp_monitor(struct net_device *master)
 		}
 	}
 
+re_arm:
+	mod_timer(&bond->arp_timer, jiffies + the_delta_in_ticks);
+out:
 	read_unlock(&bond->lock);
-	mod_timer(&bond->arp_timer, next_timer);
 }
 
 static int bond_sethwaddr(struct net_device *master, struct net_device *slave)

@@ -1322,13 +1322,18 @@ bond_alb_monitor(struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *slave = NULL;
+	int delta_in_ticks = HZ / ALB_TIMER_TICKS_PER_SEC;
 
 	read_lock(&bond->lock);
 
-	if ((bond->slave_cnt == 0) || !(bond->device->flags & IFF_UP)) {
+	if (bond->kill_timers) {
+		goto out;
+	}
+
+	if (bond->slave_cnt == 0) {
 		bond_info->tx_rebalance_counter = 0;
 		bond_info->lp_counter = 0;
-		goto out;
+		goto re_arm;
 	}
 
 	bond_info->tx_rebalance_counter++;
@@ -1413,14 +1418,10 @@ bond_alb_monitor(struct bonding *bond)
 		}
 	}
 
+re_arm:
+	mod_timer(&(bond_info->alb_timer), jiffies + delta_in_ticks);
 out:
 	read_unlock(&bond->lock);
-
-	if (bond->device->flags & IFF_UP) {
-		/* re-arm the timer */
-		mod_timer(&(bond_info->alb_timer),
-			jiffies + (HZ/ALB_TIMER_TICKS_PER_SEC));
-	}
 }
 
 /* assumption: called before the slave is attched to the bond

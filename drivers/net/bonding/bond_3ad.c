@@ -2122,16 +2122,17 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 {
 	struct port *port;
 	struct aggregator *aggregator;
+	int delta_in_ticks = AD_TIMER_INTERVAL * HZ / 1000;
 
 	read_lock(&bond->lock);
 
-	//check if there are any slaves
-	if (bond->next == (struct slave *)bond) {
-		goto end;
+	if (bond->kill_timers) {
+		goto out;
 	}
 
-	if ((bond->device->flags & IFF_UP) != IFF_UP) {
-		goto end;
+	//check if there are any slaves
+	if (bond->next == (struct slave *)bond) {
+		goto re_arm;
 	}
 
 	// check if agg_select_timer timer after initialize is timed out
@@ -2140,7 +2141,7 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 		if ((port = __get_first_port(bond))) {
 			if (!port->slave) {
 				printk(KERN_WARNING DRV_NAME ": Warning: bond's first port is uninitialized\n");
-				goto end;
+				goto re_arm;
 			}
 
 			aggregator = __get_first_agg(port);
@@ -2152,7 +2153,7 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 	for (port = __get_first_port(bond); port; port = __get_next_port(port)) {
 		if (!port->slave) {
 			printk(KERN_WARNING DRV_NAME ": Warning: Found an uninitialized port\n");
-			goto end;
+			goto re_arm;
 		}
 
 		ad_rx_machine(NULL, port);
@@ -2167,14 +2168,10 @@ void bond_3ad_state_machine_handler(struct bonding *bond)
 		}
 	}
 
-end:
+re_arm:
+	mod_timer(&(BOND_AD_INFO(bond).ad_timer), jiffies + delta_in_ticks);
+out:
 	read_unlock(&bond->lock);
-
-
-	if ((bond->device->flags & IFF_UP) == IFF_UP) {
-		/* re-arm the timer */
-		mod_timer(&(BOND_AD_INFO(bond).ad_timer), jiffies + (AD_TIMER_INTERVAL * HZ / 1000));
-	}
 }
 
 /**
