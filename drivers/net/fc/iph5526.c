@@ -4534,14 +4534,14 @@ int init_module(void)
 {
 int i = 0;
 
-	driver_template.module = &__this_module;
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
+	driver_template.module = THIS_MODULE;
+	scsi_register_host(&driver_template);
 	if (driver_template.present)
 		scsi_registered = TRUE; 
 	else {
 		printk("iph5526: SCSI registeration failed!!!\n");
 		scsi_registered = FALSE;
-		scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+		scsi_unregister_host(&driver_template);
 	}
 
 	while(fc[i] != NULL) {
@@ -4590,7 +4590,7 @@ int i = 0;
 		i++;
 	}
 	if (scsi_registered == TRUE)
-		scsi_unregister_module(MODULE_SCSI_HA, &driver_template); 
+		scsi_unregister_host(&driver_template); 
 }
 #endif /* MODULE */
 

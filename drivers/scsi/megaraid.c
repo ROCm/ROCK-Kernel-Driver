@@ -4290,26 +4290,18 @@ int megaraid_biosparam (Disk * disk, kdev_t dev, int *geom)
 static int
 mega_partsize(Disk * disk, kdev_t dev, int *geom)
 {
-	struct buffer_head *bh;
 	struct partition *p, *largest = NULL;
 	int i, largest_cyl;
 	int heads, cyls, sectors;
 	int capacity = disk->capacity;
+	unsigned char *buf;
 
-	int ma = MAJOR(dev);
-	int mi = (MINOR(dev) & ~0xf);
-
-	int block = 1024; 
-
-	if(blksize_size[ma])
-		block = blksize_size[ma][mi];
-		
-	if(!(bh = bread(MKDEV(ma,mi), 0, block)))
+	if (!(buf = scsi_bios_ptable(dev)))
 		return -1;
 
-	if( *(unsigned short *)(bh->b_data + 510) == 0xAA55 ) {
+	if( *(unsigned short *)(buf + 64) == 0xAA55 ) {
 
-		for( largest_cyl = -1, p = (struct partition *)(0x1BE + bh->b_data),
+		for( largest_cyl = -1, p = (struct partition *)buf,
 				i = 0; i < 4; ++i, ++p) {
 
 			if (!p->sys_ind) continue;
@@ -4328,7 +4320,7 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 		sectors = largest->end_sector & 0x3f;
 
 		if (heads == 0 || sectors == 0) {
-			brelse(bh);
+			kfree(buf);
 			return -1;
 		}
 
@@ -4338,11 +4330,11 @@ mega_partsize(Disk * disk, kdev_t dev, int *geom)
 		geom[1] = sectors;
 		geom[2] = cyls;
 
-		brelse(bh);
+		kfree(buf);
 		return 0;
 	}
 
-	brelse(bh);
+	kfree(buf);
 	return -1;
 }
 

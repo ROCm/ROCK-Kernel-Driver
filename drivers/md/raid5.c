@@ -1226,23 +1226,6 @@ static int raid5_make_request (mddev_t *mddev, int rw, struct buffer_head * bh)
 	return 0;
 }
 
-/*
- * Determine correct block size for this device.
- */
-unsigned int device_bsize (kdev_t dev)
-{
-	unsigned int i, correct_size;
-
-	correct_size = BLOCK_SIZE;
-	if (blksize_size[MAJOR(dev)]) {
-		i = blksize_size[MAJOR(dev)][MINOR(dev)];
-		if (i)
-			correct_size = i;
-	}
-
-	return correct_size;
-}
-
 static int raid5_sync_request (mddev_t *mddev, unsigned long sector_nr)
 {
 	raid5_conf_t *conf = (raid5_conf_t *) mddev->private;

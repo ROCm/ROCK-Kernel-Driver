@@ -1371,7 +1371,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
 #include <asm/unaligned.h>
 
 /*
- * Function : static int partsize(struct buffer_head *bh, unsigned long 
+ * Function : static int partsize(unsigned char *buf, unsigned long 
  *     capacity,unsigned int *cyls, unsigned int *hds, unsigned int *secs);
  *
  * Purpose : to determine the BIOS mapping used to create the partition
@@ -1381,7 +1381,7 @@ int DC390_queue_command (Scsi_Cmnd *cmd, void (* done)(Scsi_Cmnd *))
  *
  */
 
-static int partsize(struct buffer_head *bh, unsigned long capacity,
+static int partsize(unsigned char *buf, unsigned long capacity,
     unsigned int  *cyls, unsigned int *hds, unsigned int *secs) {
     struct partition *p, *largest = NULL;
     int i, largest_cyl;
@@ -1389,9 +1389,9 @@ static int partsize(struct buffer_head *bh, unsigned long capacity,
     unsigned int logical_end, physical_end, ext_physical_end;
     
 
-    if (*(unsigned short *) (bh->b_data+510) == 0xAA55) {
-	for (largest_cyl = -1, p = (struct partition *) 
-    	    (0x1BE + bh->b_data), i = 0; i < 4; ++i, ++p) {
+    if (*(unsigned short *) (buf+64) == 0xAA55) {
+	for (largest_cyl = -1, p = (struct partition *) buf, 
+    	    i = 0; i < 4; ++i, ++p) {
     	    if (!p->sys_ind)
     	    	continue;
     	    cyl = p->cyl + ((p->sector & 0xc0) << 2);
@@ -1446,16 +1446,16 @@ int DC390_bios_param (Disk *disk, kdev_t devno, int geom[])
 {
     int heads, sectors, cylinders;
     PACB pACB = (PACB) disk->device->host->hostdata;
-    struct buffer_head *bh;
     int ret_code = -1;
     int size = disk->capacity;
+    unsigned char *buf;
 
-    if ((bh = bread(MKDEV(MAJOR(devno), MINOR(devno)&~0xf), 0, 1024)))
+    if ((buf = scsi_bios_ptable(devno)))
     {
 	/* try to infer mapping from partition table */
-	ret_code = partsize (bh, (unsigned long) size, (unsigned int *) geom + 2,
+	ret_code = partsize (buf, (unsigned long) size, (unsigned int *) geom + 2,
 			     (unsigned int *) geom + 0, (unsigned int *) geom + 1);
-	brelse (bh);
+	kfree (buf);
     }
     if (ret_code == -1)
     {

@@ -1002,7 +1002,7 @@ static void * storage_probe(struct usb_device *dev, unsigned int ifnum,
 
 		/* now register	 - our detect function will be called */
 		ss->htmplt.module = THIS_MODULE;
-		scsi_register_module(MODULE_SCSI_HA, &(ss->htmplt));
+		scsi_register_host(&ss->htmplt);
 
 		/* lock access to the data structures */
 		down(&us_list_semaphore);
@@ -1107,8 +1107,8 @@ void __exit usb_stor_exit(void)
 	 * interface
 	 */
 	for (next = us_list; next; next = next->next) {
-		US_DEBUGP("-- calling scsi_unregister_module()\n");
-		scsi_unregister_module(MODULE_SCSI_HA, &(next->htmplt));
+		US_DEBUGP("-- calling scsi_unregister_host()\n");
+		scsi_unregister_host(&next->htmplt);
 	}
 
 	/* While there are still structures, free them.  Note that we are

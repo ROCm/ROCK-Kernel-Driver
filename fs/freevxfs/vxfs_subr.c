@@ -142,10 +142,7 @@ vxfs_getblk(struct inode *ip, sector_t iblock,
 
 	pblock = vxfs_bmap1(ip, iblock);
 	if (pblock != 0) {
-		bp->b_dev = ip->i_dev;
-		bp->b_blocknr = pblock;
-		bp->b_state |= (1UL << BH_Mapped);
-
+		map_bh(bp, ip->i_sb, pblock);
 		return 0;
 	}
 

@@ -270,15 +270,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
     return retval;
 }
 
-int
-scsi_register_device(struct Scsi_Device_Template * sdpnt)
-{
-    if(sdpnt->next) panic("Device already registered");
-    sdpnt->next = scsi_devicelist;
-    scsi_devicelist = sdpnt;
-    return 0;
-}
-
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

@@ -206,20 +206,6 @@ static inline int lvm_snapshot_prepare_blocks(unsigned long *blocks,
 	return 1;
 }
 
-inline int lvm_get_blksize(kdev_t dev)
-{
-	int correct_size = BLOCK_SIZE, i, major;
-
-	major = MAJOR(dev);
-	if (blksize_size[major])
-	{
-		i = blksize_size[major][MINOR(dev)];
-		if (i)
-			correct_size = i;
-	}
-	return correct_size;
-}
-
 #ifdef DEBUG_SNAPSHOT
 static inline void invalidate_snap_cache(unsigned long start, unsigned long nr,
 					 kdev_t dev)
@@ -256,7 +242,7 @@ int lvm_snapshot_fill_COW_page(vg_t * vg, lv_t * lv_snap)
 
 	is--;
         blksize_snap =
-               lvm_get_blksize(lv_snap->lv_block_exception[is].rdev_new);
+               block_size(lv_snap->lv_block_exception[is].rdev_new);
         is -= is % (blksize_snap / sizeof(lv_COW_table_disk_t));
 
 	memset(lv_COW_table, 0, blksize_snap);
@@ -347,8 +333,8 @@ int lvm_snapshot_COW(kdev_t org_phys_dev,
 
 	iobuf = lv_snap->lv_iobuf;
 
-	blksize_org = lvm_get_blksize(org_phys_dev);
-	blksize_snap = lvm_get_blksize(snap_phys_dev);
+	blksize_org = block_size(org_phys_dev);
+	blksize_snap = block_size(snap_phys_dev);
 	max_blksize = max(blksize_org, blksize_snap);
 	min_blksize = min(blksize_org, blksize_snap);
 	max_sectors = LVM_MAX_SECTORS * (min_blksize>>9);
@@ -592,7 +578,7 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 	snap_phys_dev = lv_snap->lv_block_exception[idx].rdev_new;
 	snap_pe_start = lv_snap->lv_block_exception[idx - (idx % COW_entries_per_pe)].rsector_new - lv_snap->lv_chunk_size;
 
-	blksize_snap = lvm_get_blksize(snap_phys_dev);
+	blksize_snap = block_size(snap_phys_dev);
 
         COW_entries_per_block = blksize_snap / sizeof(lv_COW_table_disk_t);
         idx_COW_table = idx % COW_entries_per_pe % COW_entries_per_block;
@@ -640,7 +626,7 @@ static int _write_COW_table_block(vg_t *vg, lv_t *lv_snap,
 			idx++;
 			snap_phys_dev = lv_snap->lv_block_exception[idx].rdev_new;
 			snap_pe_start = lv_snap->lv_block_exception[idx - (idx % COW_entries_per_pe)].rsector_new - lv_snap->lv_chunk_size;
-			blksize_snap = lvm_get_blksize(snap_phys_dev);
+			blksize_snap = block_size(snap_phys_dev);
 			blocks[0] = snap_pe_start >> (blksize_snap >> 10);
 		} else blocks[0]++;
 

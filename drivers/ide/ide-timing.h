@@ -2,11 +2,9 @@
 #define _IDE_TIMING_H
 
 /*
- * $Id: ide-timing.h,v 1.5 2001/01/15 21:48:56 vojtech Exp $
+ * $Id: ide-timing.h,v 1.6 2001/12/23 22:47:56 vojtech Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
- *
- *  Sponsored by SuSE
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  */
 
 /*
@@ -25,16 +23,14 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/hdreg.h>
 
-#ifndef XFER_PIO_5
 #define XFER_PIO_5		0x0d
 #define XFER_UDMA_SLOW		0x4f
-#endif
 
 struct ide_timing {
 	short mode;
@@ -49,13 +45,15 @@ struct ide_timing {
 };
 
 /*
- * PIO 0-5, MWDMA 0-2 and UDMA 0-5 timings (in nanoseconds).
+ * PIO 0-5, MWDMA 0-2 and UDMA 0-6 timings (in nanoseconds).
  * These were taken from ATA/ATAPI-6 standard, rev 0a, except
- * for PIO 5, which is a nonstandard extension.
+ * for PIO 5, which is a nonstandard extension and UDMA6, which
+ * is currently supported only by Maxtor drives. 
  */
 
 static struct ide_timing ide_timing[] = {
 
+	{ XFER_UDMA_6,     0,   0,   0,   0,   0,   0,   0,  15 },
 	{ XFER_UDMA_5,     0,   0,   0,   0,   0,   0,   0,  20 },
 	{ XFER_UDMA_4,     0,   0,   0,   0,   0,   0,   0,  30 },
 	{ XFER_UDMA_3,     0,   0,   0,   0,   0,   0,   0,  45 },
@@ -105,6 +103,7 @@ static struct ide_timing ide_timing[] = {
 #define EZ(v,unit)	((v)?ENOUGH(v,unit):0)
 
 #define XFER_MODE	0xf0
+#define XFER_UDMA_133	0x48
 #define XFER_UDMA_100	0x44
 #define XFER_UDMA_66	0x42
 #define XFER_UDMA	0x40
@@ -122,6 +121,9 @@ static short ide_find_best_mode(ide_drive_t *drive, int map)
 		return XFER_PIO_SLOW;
 
 	if ((map & XFER_UDMA) && (id->field_valid & 4)) {	/* Want UDMA and UDMA bitmap valid */
+
+		if ((map & XFER_UDMA_133) == XFER_UDMA_133)
+			if ((best = (id->dma_ultra & 0x0040) ? XFER_UDMA_6 : 0)) return best;
 
 		if ((map & XFER_UDMA_100) == XFER_UDMA_100)
 			if ((best = (id->dma_ultra & 0x0020) ? XFER_UDMA_5 : 0)) return best;
@@ -174,14 +176,14 @@ static short ide_find_best_mode(ide_drive_t *drive, int map)
 
 static void ide_timing_quantize(struct ide_timing *t, struct ide_timing *q, int T, int UT)
 {
-	q->setup   = EZ(t->setup,   T);
-	q->act8b   = EZ(t->act8b,   T);
-	q->rec8b   = EZ(t->rec8b,   T);
-	q->cyc8b   = EZ(t->cyc8b,   T);
-	q->active  = EZ(t->active,  T);
-	q->recover = EZ(t->recover, T);
-	q->cycle   = EZ(t->cycle,   T);
-	q->udma    = EZ(t->udma,   UT);
+	q->setup   = EZ(t->setup   * 1000,  T);
+	q->act8b   = EZ(t->act8b   * 1000,  T);
+	q->rec8b   = EZ(t->rec8b   * 1000,  T);
+	q->cyc8b   = EZ(t->cyc8b   * 1000,  T);
+	q->active  = EZ(t->active  * 1000,  T);
+	q->recover = EZ(t->recover * 1000,  T);
+	q->cycle   = EZ(t->cycle   * 1000,  T);
+	q->udma    = EZ(t->udma    * 1000, UT);
 }
 
 static void ide_timing_merge(struct ide_timing *a, struct ide_timing *b, struct ide_timing *m, unsigned int what)

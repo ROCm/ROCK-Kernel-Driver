@@ -25,7 +25,9 @@ static mempool_t *page_pool, *isa_page_pool;
 
 static void *page_pool_alloc(int gfp_mask, void *data)
 {
-	return alloc_page(gfp_mask);
+	int gfp = gfp_mask | (int) data;
+
+	return alloc_page(gfp);
 }
 
 static void page_pool_free(void *page, void *data)
@@ -252,7 +254,7 @@ int init_emergency_isa_pool(void)
 	if (isa_page_pool)
 		return 0;
 
-	isa_page_pool = mempool_create(ISA_POOL_SIZE, page_pool_alloc, page_pool_free, NULL);
+	isa_page_pool = mempool_create(ISA_POOL_SIZE, page_pool_alloc, page_pool_free, (void *) __GFP_DMA);
 	if (!isa_page_pool)
 		BUG();
 
@@ -272,7 +274,7 @@ static inline void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 	int i;
 
 	__bio_for_each_segment(tovec, to, i, 0) {
-		fromvec = &from->bi_io_vec[i];
+		fromvec = from->bi_io_vec + i;
 
 		/*
 		 * not bounced
@@ -301,7 +303,7 @@ static inline int bounce_end_io (struct bio *bio, int nr_sectors, mempool_t *poo
 	 * free up bounce indirect pages used
 	 */
 	__bio_for_each_segment(bvec, bio, i, 0) {
-		org_vec = &bio_orig->bi_io_vec[i];
+		org_vec = bio_orig->bi_io_vec + i;
 		if (bvec->bv_page == org_vec->bv_page)
 			continue;
 
@@ -394,7 +396,7 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 		if (!bio)
 			bio = bio_alloc(bio_gfp, (*bio_orig)->bi_vcnt);
 
-		to = &bio->bi_io_vec[i];
+		to = bio->bi_io_vec + i;
 
 		to->bv_page = mempool_alloc(pool, gfp);
 		to->bv_len = from->bv_len;

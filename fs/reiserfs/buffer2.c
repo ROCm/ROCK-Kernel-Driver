@@ -47,7 +47,7 @@ void wait_buffer_until_released (const struct buffer_head * bh)
     }
     run_task_queue(&tq_disk);
     current->policy |= SCHED_YIELD;
-    /*current->counter = 0;*/
+	/* current->dyn_prio = 0; */
     schedule();
   }
   if (repeat_counter > 30000000) {
@@ -64,12 +64,12 @@ void wait_buffer_until_released (const struct buffer_head * bh)
    block. */
 /* The function is NOT SCHEDULE-SAFE! */
 
-struct buffer_head  * reiserfs_bread (struct super_block *super, int n_block, int n_size) 
+struct buffer_head  * reiserfs_bread (struct super_block *super, int n_block) 
 {
     struct buffer_head  *result;
     PROC_EXP( unsigned int ctx_switches = kstat.context_swtch );
 
-    result = bread (super -> s_dev, n_block, n_size);
+    result = sb_bread(super, n_block);
     PROC_INFO_INC( super, breads );
     PROC_EXP( if( kstat.context_swtch != ctx_switches ) 
 	      PROC_INFO_INC( super, bread_miss ) );
@@ -84,9 +84,9 @@ struct buffer_head  * reiserfs_bread (struct super_block *super, int n_block, in
    actually get the block off of the disk. */
 /* The function is NOT SCHEDULE-SAFE! */
 
-struct buffer_head  * reiserfs_getblk (kdev_t n_dev, int n_block, int n_size)
+struct buffer_head  * reiserfs_getblk(struct super_block *sb, int n_block)
 {
-    return getblk (n_dev, n_block, n_size);
+    return sb_getblk(sb, n_block);
 }
 
 #ifdef NEW_GET_NEW_BUFFER
@@ -114,7 +114,7 @@ static int get_new_buffer_near_blocknr(
                                              blocknr, 1)) == NO_DISK_SPACE )
     return NO_DISK_SPACE;
   
-  *pp_s_new_bh = reiserfs_getblk(p_s_sb->s_dev, n_new_blocknumber, p_s_sb->s_blocksize);
+  *pp_s_new_bh = reiserfs_getblk(p_s_sb, n_new_blocknumber);
   if ( buffer_uptodate(*pp_s_new_bh) ) {
 
     RFALSE( buffer_dirty(*pp_s_new_bh) || (*pp_s_new_bh)->b_dev == NODEV,
@@ -149,7 +149,7 @@ static int get_new_buffer_near_blocknr(
 	printk("get_new_buffer(%u): counter(%d) too big", current->pid, repeat_counter);
 #endif
 
-      current->counter = 0;
+      current->time_slice = 0;
       schedule();
     }
 
@@ -291,7 +291,7 @@ int get_new_buffer(
   if ( (n_repeat = reiserfs_new_unf_blocknrs (th, &n_new_blocknumber, p_s_bh->b_blocknr)) == NO_DISK_SPACE )
     return NO_DISK_SPACE;
   
-  *pp_s_new_bh = reiserfs_getblk(p_s_sb->s_dev, n_new_blocknumber, p_s_sb->s_blocksize);
+  *pp_s_new_bh = reiserfs_getblk(p_s_sb, n_new_blocknumber);
   if (atomic_read (&(*pp_s_new_bh)->b_count) > 1) {
     /* Free path buffers to prevent deadlock which can occur in the
        situation like : this process holds p_s_path; Block

@@ -37,11 +37,8 @@ adfs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh, int 
 			goto abort_toobig;
 
 		block = __adfs_block_map(inode->i_sb, inode->i_ino, block);
-		if (block) {
-			bh->b_dev = inode->i_dev;
-			bh->b_blocknr = block;
-			bh->b_state |= (1UL << BH_Mapped);
-		}
+		if (block)
+			map_bh(bh, inode->i_sb, block);
 		return 0;
 	}
 	/* don't support allocation of blocks yet */

@@ -276,17 +276,17 @@ static Scsi_Host_Template ecoscsi_template =  {
 
 static int __init ecoscsi_init(void)
 {
-	scsi_register_module(MODULE_SCSI_HA, &ecoscsi_template);
+	scsi_register_host(&ecoscsi_template);
 	if (ecoscsi_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &ecoscsi_template);
+	scsi_unregister_host(&ecoscsi_template);
 	return -ENODEV;
 }
 
 static void __exit ecoscsi_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &ecoscsi_template);
+	scsi_unregister_host(&ecoscsi_template);
 }
 
 module_init(ecoscsi_init);

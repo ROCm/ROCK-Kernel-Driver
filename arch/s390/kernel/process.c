@@ -57,7 +57,6 @@ int cpu_idle(void *unused)
 	/* endless idle loop with no priority at all */
         init_idle();
 	current->nice = 20;
-	current->counter = -100;
 	wait_psw.mask = _WAIT_PSW_MASK;
 	wait_psw.addr = (unsigned long) &&idle_wakeup | 0x80000000L;
 	while(1) {

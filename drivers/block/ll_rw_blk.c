@@ -155,6 +155,11 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_max_sectors(q, MAX_SECTORS);
 	blk_queue_hardsect_size(q, 512);
 
+	/*
+	 * by default assume old behaviour and bounce for any highmem page
+	 */
+	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
+
 	init_waitqueue_head(&q->queue_wait);
 }
 
@@ -508,6 +513,7 @@ static inline int ll_new_mergeable(request_queue_t *q,
 
 	if (req->nr_phys_segments + nr_phys_segs > q->max_phys_segments) {
 		req->flags |= REQ_NOMERGE;
+		q->last_merge = NULL;
 		return 0;
 	}
 
@@ -527,6 +533,7 @@ static inline int ll_new_hw_segment(request_queue_t *q,
 
 	if (req->nr_hw_segments + nr_hw_segs > q->max_hw_segments) {
 		req->flags |= REQ_NOMERGE;
+		q->last_merge = NULL;
 		return 0;
 	}
 
@@ -603,9 +610,6 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 		return 0;
 
 	/* Merge is OK... */
-	if (q->last_merge == &next->queuelist)
-		q->last_merge = NULL;
-
 	req->nr_phys_segments = total_phys_segments;
 	req->nr_hw_segments = total_hw_segments;
 	return 1;
@@ -812,12 +816,8 @@ int blk_init_queue(request_queue_t *q, request_fn_proc *rfn, spinlock_t *lock)
 	q->plug_tq.data		= q;
 	q->queue_flags		= (1 << QUEUE_FLAG_CLUSTER);
 	q->queue_lock		= lock;
+	q->last_merge		= NULL;
 	
-	/*
-	 * by default assume old behaviour and bounce for any highmem page
-	 */
-	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
-
 	blk_queue_segment_boundary(q, 0xffffffff);
 
 	blk_queue_make_request(q, __make_request);
@@ -886,6 +886,12 @@ struct request *blk_get_request(request_queue_t *q, int rw, int gfp_mask)
 	if (!rq && (gfp_mask & __GFP_WAIT))
 		rq = get_request_wait(q, rw);
 
+	if (rq) {
+		rq->flags = 0;
+		rq->buffer = NULL;
+		rq->bio = rq->biotail = NULL;
+		rq->waiting = NULL;
+	}
 	return rq;
 }
 
@@ -951,13 +957,10 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	drive_stat_acct(req, req->nr_sectors, 1);
 
 	/*
-	 * debug stuff...
+	 * it's a bug to let this rq preempt an already started request
 	 */
-	if (insert_here == &q->queue_head) {
-		struct request *__rq = __elv_next_request(q);
-
-		BUG_ON(__rq && (__rq->flags & REQ_STARTED));
-	}
+	if (insert_here->next != &q->queue_head)
+		BUG_ON(list_entry_rq(insert_here->next)->flags & REQ_STARTED);
 
 	/*
 	 * elevator indicated where it wants this request to be
@@ -972,10 +975,16 @@ static inline void add_request(request_queue_t * q, struct request * req,
 void blkdev_release_request(struct request *req)
 {
 	struct request_list *rl = req->rl;
+	request_queue_t *q = req->q;
 
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
 	req->rl = NULL;
+
+	if (q) {
+		if (q->last_merge == &req->queuelist)
+			q->last_merge = NULL;
+	}
 
 	/*
 	 * Request may not have originated from ll_rw_blk. if not,
@@ -992,26 +1001,16 @@ void blkdev_release_request(struct request *req)
 /*
  * Has to be called with the request spinlock acquired
  */
-static void attempt_merge(request_queue_t *q, struct request *req)
+static void attempt_merge(request_queue_t *q, struct request *req,
+			  struct request *next)
 {
-	struct request *next = blkdev_next_request(req);
-
-	/*
-	 * not a rw command
-	 */
-	if (!(next->flags & REQ_CMD))
+	if (!rq_mergeable(req) || !rq_mergeable(next))
 		return;
 
 	/*
 	 * not contigious
 	 */
 	if (req->sector + req->nr_sectors != next->sector)
-		return;
-
-	/*
-	 * don't touch NOMERGE rq, or one that has been started by driver
-	 */
-	if (next->flags & (REQ_NOMERGE | REQ_STARTED))
 		return;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
@@ -1021,10 +1020,10 @@ static void attempt_merge(request_queue_t *q, struct request *req)
 		return;
 
 	/*
-	 * If we are not allowed to merge these requests, then
-	 * return.  If we are allowed to merge, then the count
-	 * will have been updated to the appropriate number,
-	 * and we shouldn't do it here too.
+	 * If we are allowed to merge, then append bio list
+	 * from next to rq and release next. merge_requests_fn
+	 * will have updated segment counts, update sector
+	 * counts here.
 	 */
 	if (q->merge_requests_fn(q, req, next)) {
 		q->elevator.elevator_merge_req_fn(req, next);
@@ -1042,8 +1041,10 @@ static void attempt_merge(request_queue_t *q, struct request *req)
 
 static inline void attempt_back_merge(request_queue_t *q, struct request *rq)
 {
-	if (&rq->queuelist != q->queue_head.prev)
-		attempt_merge(q, rq);
+	struct list_head *next = rq->queuelist.next;
+
+	if (next != &q->queue_head)
+		attempt_merge(q, rq, list_entry_rq(next));
 }
 
 static inline void attempt_front_merge(request_queue_t *q, struct request *rq)
@@ -1051,13 +1052,7 @@ static inline void attempt_front_merge(request_queue_t *q, struct request *rq)
 	struct list_head *prev = rq->queuelist.prev;
 
 	if (prev != &q->queue_head)
-		attempt_merge(q, blkdev_entry_to_request(prev));
-}
-
-static inline void __blk_attempt_remerge(request_queue_t *q, struct request *rq)
-{
-	if (rq->queuelist.next != &q->queue_head)
-		attempt_merge(q, rq);
+		attempt_merge(q, list_entry_rq(prev), rq);
 }
 
 /**
@@ -1078,7 +1073,7 @@ void blk_attempt_remerge(request_queue_t *q, struct request *rq)
 	unsigned long flags;
 
 	spin_lock_irqsave(q->queue_lock, flags);
-	__blk_attempt_remerge(q, rq);
+	attempt_back_merge(q, rq);
 	spin_unlock_irqrestore(q->queue_lock, flags);
 }
 
@@ -1121,8 +1116,7 @@ again:
 	el_ret = elevator->elevator_merge_fn(q, &req, bio);
 	switch (el_ret) {
 		case ELEVATOR_BACK_MERGE:
-			BUG_ON(req->flags & REQ_STARTED);
-			BUG_ON(req->flags & REQ_NOMERGE);
+			BUG_ON(!rq_mergeable(req));
 			if (!q->back_merge_fn(q, req, bio))
 				break;
 
@@ -1136,8 +1130,7 @@ again:
 			goto out;
 
 		case ELEVATOR_FRONT_MERGE:
-			BUG_ON(req->flags & REQ_STARTED);
-			BUG_ON(req->flags & REQ_NOMERGE);
+			BUG_ON(!rq_mergeable(req));
 			if (!q->front_merge_fn(q, req, bio))
 				break;
 
@@ -1297,7 +1290,7 @@ void generic_make_request(struct bio *bio)
 	int minor = MINOR(bio->bi_dev);
 	request_queue_t *q;
 	sector_t minorsize = 0;
-	int nr_sectors = bio_sectors(bio);
+	int ret, nr_sectors = bio_sectors(bio);
 
 	/* Test device or partition size, when known. */
 	if (blk_size[major])
@@ -1351,7 +1344,10 @@ end_io:
 		 */
 		blk_partition_remap(bio);
 
-	} while (q->make_request_fn(q, bio));
+		ret = q->make_request_fn(q, bio);
+		blk_put_queue(q);
+
+	} while (ret);
 }
 
 /*
@@ -1571,21 +1567,23 @@ inline void blk_recalc_rq_segments(struct request *rq)
 
 inline void blk_recalc_rq_sectors(struct request *rq, int nsect)
 {
-	rq->hard_sector += nsect;
-	rq->hard_nr_sectors -= nsect;
-	rq->sector = rq->hard_sector;
-	rq->nr_sectors = rq->hard_nr_sectors;
+	if (rq->flags & REQ_CMD) {
+		rq->hard_sector += nsect;
+		rq->hard_nr_sectors -= nsect;
+		rq->sector = rq->hard_sector;
+		rq->nr_sectors = rq->hard_nr_sectors;
 
-	rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
-	rq->hard_cur_sectors = rq->current_nr_sectors;
+		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
+		rq->hard_cur_sectors = rq->current_nr_sectors;
 
-	/*
-	 * if total number of sectors is less than the first segment
-	 * size, something has gone terribly wrong
-	 */
-	if (rq->nr_sectors < rq->current_nr_sectors) {
-		printk("blk: request botched\n");
-		rq->nr_sectors = rq->current_nr_sectors;
+		/*
+		 * if total number of sectors is less than the first segment
+		 * size, something has gone terribly wrong
+		 */
+		if (rq->nr_sectors < rq->current_nr_sectors) {
+			printk("blk: request botched\n");
+			rq->nr_sectors = rq->current_nr_sectors;
+		}
 	}
 }
 

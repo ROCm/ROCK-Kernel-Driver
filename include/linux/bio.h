@@ -35,6 +35,7 @@
 #endif
 
 #define BIO_MAX_SECTORS	128
+#define BIO_MAX_SIZE	(BIO_MAX_SECTORS << 9)
 
 /*
  * was unsigned short, but we might as well be ready for > 64kB I/O pages

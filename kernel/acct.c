@@ -213,10 +213,10 @@ out_err:
 	goto out;
 }
 
-void acct_auto_close(kdev_t dev)
+void acct_auto_close(struct super_block *sb)
 {
 	lock_kernel();
-	if (acct_file && acct_file->f_dentry->d_inode->i_dev == dev)
+	if (acct_file && acct_file->f_dentry->d_inode->i_sb == sb)
 		sys_acct(NULL);
 	unlock_kernel();
 }

@@ -11,7 +11,9 @@
 #include <asm/assembler.h>
                 .text
 
-ENTRY(test_and_set_bit)
+ENTRY(_test_and_set_bit_be)
+		eor	r0, r0, #0x18		@ big endian byte ordering
+ENTRY(_test_and_set_bit_le)
 		add	r1, r1, r0, lsr #3	@ Get byte offset
 		and	r3, r0, #7		@ Get bit offset
 		mov	r0, #1

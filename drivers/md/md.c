@@ -469,40 +469,45 @@ static void free_disk_sb(mdk_rdev_t * rdev)
 
 static int read_disk_sb(mdk_rdev_t * rdev)
 {
-	int ret = -EINVAL;
-	struct buffer_head *bh = NULL;
-	kdev_t dev = rdev->dev;
-	mdp_super_t *sb;
+	struct address_space *mapping = rdev->bdev->bd_inode->i_mapping;
+	struct page *page;
+	char *p;
 	unsigned long sb_offset;
+	int n = PAGE_CACHE_SIZE / BLOCK_SIZE;
 
 	if (!rdev->sb) {
 		MD_BUG();
-		goto abort;
+		return -EINVAL;
 	}
 
 	/*
 	 * Calculate the position of the superblock,
-	 * it's at the end of the disk
+	 * it's at the end of the disk.
+	 *
+	 * It also happens to be a multiple of 4Kb.
 	 */
 	sb_offset = calc_dev_sboffset(rdev->dev, rdev->mddev, 1);
 	rdev->sb_offset = sb_offset;
-	fsync_dev(dev);
-	set_blocksize (dev, MD_SB_BYTES);
-	bh = bread (dev, sb_offset / MD_SB_BLOCKS, MD_SB_BYTES);
-
-	if (bh) {
-		sb = (mdp_super_t *) bh->b_data;
-		memcpy (rdev->sb, sb, MD_SB_BYTES);
-	} else {
-		printk(NO_SB,partition_name(rdev->dev));
-		goto abort;
-	}
+	page = read_cache_page(mapping, sb_offset/n,
+			(filler_t *)mapping->a_ops->readpage, NULL);
+	if (IS_ERR(page))
+		goto out;
+	wait_on_page(page);
+	if (!Page_Uptodate(page))
+		goto fail;
+	if (PageError(page))
+		goto fail;
+	p = (char *)page_address(page) + BLOCK_SIZE * (sb_offset % n);
+	memcpy((char*)rdev->sb, p, MD_SB_BYTES);
+	page_cache_release(page);
 	printk(KERN_INFO " [events: %08lx]\n", (unsigned long)rdev->sb->events_lo);
-	ret = 0;
-abort:
-	if (bh)
-		brelse (bh);
-	return ret;
+	return 0;
+
+fail:
+	page_cache_release(page);
+out:
+	printk(NO_SB,partition_name(rdev->dev));
+	return -EINVAL;
 }
 
 static unsigned int calc_sb_csum(mdp_super_t * sb)
@@ -884,15 +889,14 @@ static mdk_rdev_t * find_rdev_all(kdev_t dev)
 	return NULL;
 }
 
-#define GETBLK_FAILED KERN_ERR \
-"md: getblk failed for device %s\n"
-
 static int write_disk_sb(mdk_rdev_t * rdev)
 {
-	struct buffer_head *bh;
-	kdev_t dev;
+	struct address_space *mapping = rdev->bdev->bd_inode->i_mapping;
+	struct page *page;
+	unsigned offs;
+	int error;
+	kdev_t dev = rdev->dev;
 	unsigned long sb_offset, size;
-	mdp_super_t *sb;
 
 	if (!rdev->sb) {
 		MD_BUG();
@@ -907,7 +911,6 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 		return 1;
 	}
 
-	dev = rdev->dev;
 	sb_offset = calc_dev_sboffset(dev, rdev->mddev, 1);
 	if (rdev->sb_offset != sb_offset) {
 		printk(KERN_INFO "%s's sb offset has changed from %ld to %ld, skipping\n",
@@ -928,26 +931,32 @@ static int write_disk_sb(mdk_rdev_t * rdev)
 
 	printk(KERN_INFO "(write) %s's sb offset: %ld\n", partition_name(dev), sb_offset);
 	fsync_dev(dev);
-	set_blocksize(dev, MD_SB_BYTES);
-	bh = getblk(dev, sb_offset / MD_SB_BLOCKS, MD_SB_BYTES);
-	if (!bh) {
-		printk(GETBLK_FAILED, partition_name(dev));
-		return 1;
-	}
-	memset(bh->b_data,0,bh->b_size);
-	sb = (mdp_super_t *) bh->b_data;
-	memcpy(sb, rdev->sb, MD_SB_BYTES);
-
-	mark_buffer_uptodate(bh, 1);
-	mark_buffer_dirty(bh);
-	ll_rw_block(WRITE, 1, &bh);
-	wait_on_buffer(bh);
-	brelse(bh);
+	page = grab_cache_page(mapping, sb_offset/(PAGE_CACHE_SIZE/BLOCK_SIZE));
+	offs = sb_offset % (PAGE_CACHE_SIZE/BLOCK_SIZE);
+	if (!page)
+		goto fail;
+	error = mapping->a_ops->prepare_write(NULL, page, offs,
+						offs + MD_SB_BYTES);
+	if (error)
+		goto unlock;
+	memcpy((char *)page_address(page) + offs, rdev->sb, MD_SB_BYTES);
+	error = mapping->a_ops->commit_write(NULL, page, offs,
+						offs + MD_SB_BYTES);
+	if (error)
+		goto unlock;
+	UnlockPage(page);
+	wait_on_page(page);
+	page_cache_release(page);
 	fsync_dev(dev);
 skip:
 	return 0;
+unlock:
+	UnlockPage(page);
+	page_cache_release(page);
+fail:
+	printk("md: write_disk_sb failed for device %s\n", partition_name(dev));
+	return 1;
 }
-#undef GETBLK_FAILED
 
 static void set_this_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 {

@@ -136,14 +136,14 @@ static inline char sb_has_quota_enabled(struct super_block *sb, short type)
 	return is_enabled(sb_dqopt(sb), type);
 }
 
-static inline int const hashfn(kdev_t dev, unsigned int id, short type)
+static inline int const hashfn(struct super_block *sb, unsigned int id, short type)
 {
-	return((HASHDEV(dev) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
+	return((HASHDEV(sb->s_dev) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
 }
 
 static inline void insert_dquot_hash(struct dquot *dquot)
 {
-	struct list_head *head = dquot_hash + hashfn(dquot->dq_dev, dquot->dq_id, dquot->dq_type);
+	struct list_head *head = dquot_hash + hashfn(dquot->dq_sb, dquot->dq_id, dquot->dq_type);
 	list_add(&dquot->dq_hash, head);
 }
 
@@ -153,14 +153,14 @@ static inline void remove_dquot_hash(struct dquot *dquot)
 	INIT_LIST_HEAD(&dquot->dq_hash);
 }
 
-static inline struct dquot *find_dquot(unsigned int hashent, kdev_t dev, unsigned int id, short type)
+static inline struct dquot *find_dquot(unsigned int hashent, struct super_block *sb, unsigned int id, short type)
 {
 	struct list_head *head;
 	struct dquot *dquot;
 
 	for (head = dquot_hash[hashent].next; head != dquot_hash+hashent; head = head->next) {
 		dquot = list_entry(head, struct dquot, dq_hash);
-		if (dquot->dq_dev == dev && dquot->dq_id == id && dquot->dq_type == type)
+		if (dquot->dq_sb == sb && dquot->dq_id == id && dquot->dq_type == type)
 			return dquot;
 	}
 	return NODQUOT;
@@ -289,7 +289,7 @@ static void write_dquot(struct dquot *dquot)
 					sizeof(struct dqblk), &offset);
 	if (ret != sizeof(struct dqblk))
 		printk(KERN_WARNING "VFS: dquota write failed on dev %s\n",
-			kdevname(dquot->dq_dev));
+			kdevname(dquot->dq_sb->s_dev));
 
 	set_fs(fs);
 	up(sem);
@@ -359,7 +359,7 @@ restart:
 	}
 }
 
-int sync_dquots(kdev_t dev, short type)
+int sync_dquots(struct super_block *sb, short type)
 {
 	struct list_head *head;
 	struct dquot *dquot;
@@ -368,7 +368,7 @@ int sync_dquots(kdev_t dev, short type)
 restart:
 	for (head = inuse_list.next; head != &inuse_list; head = head->next) {
 		dquot = list_entry(head, struct dquot, dq_inuse);
-		if (dev && dquot->dq_dev != dev)
+		if (sb && dquot->dq_sb != sb)
 			continue;
                 if (type != -1 && dquot->dq_type != type)
 			continue;
@@ -440,7 +440,8 @@ static void dqput(struct dquot *dquot)
 	if (!dquot->dq_count) {
 		printk("VFS: dqput: trying to free free dquot\n");
 		printk("VFS: device %s, dquot of %s %d\n",
-			kdevname(dquot->dq_dev), quotatypes[dquot->dq_type],
+			kdevname(dquot->dq_sb->s_dev),
+			quotatypes[dquot->dq_type],
 			dquot->dq_id);
 		return;
 	}
@@ -493,7 +494,7 @@ static struct dquot *get_empty_dquot(void)
 
 static struct dquot *dqget(struct super_block *sb, unsigned int id, short type)
 {
-	unsigned int hashent = hashfn(sb->s_dev, id, type);
+	unsigned int hashent = hashfn(sb, id, type);
 	struct dquot *dquot, *empty = NODQUOT;
 	struct quota_mount_options *dqopt = sb_dqopt(sb);
 
@@ -504,7 +505,7 @@ we_slept:
                 return NODQUOT;
 	}
 
-	if ((dquot = find_dquot(hashent, sb->s_dev, id, type)) == NODQUOT) {
+	if ((dquot = find_dquot(hashent, sb, id, type)) == NODQUOT) {
 		if (empty == NODQUOT) {
 			if ((empty = get_empty_dquot()) == NODQUOT)
 				schedule();	/* Try to wait for a moment... */
@@ -513,7 +514,6 @@ we_slept:
 		dquot = empty;
         	dquot->dq_id = id;
         	dquot->dq_type = type;
-        	dquot->dq_dev = sb->s_dev;
         	dquot->dq_sb = sb;
 		/* hash it first so it can be found */
 		insert_dquot_hash(dquot);
@@ -1471,7 +1471,7 @@ asmlinkage long sys_quotactl(int cmd, const char *special, int id, caddr_t addr)
 			flags |= SET_QLIMIT;
 			break;
 		case Q_SYNC:
-			ret = sync_dquots(dev, type);
+			ret = sync_dquots(sb, type);
 			goto out;
 		case Q_GETSTATS:
 			ret = get_stats(addr);

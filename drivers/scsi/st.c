@@ -3867,14 +3867,14 @@ static int __init init_st(void)
 	validate_options();
 
 	st_template.module = THIS_MODULE;
-        return scsi_register_module(MODULE_SCSI_DEV, &st_template);
+        return scsi_register_device(&st_template);
 }
 
 static void __exit exit_st(void)
 {
 	int i;
 
-	scsi_unregister_module(MODULE_SCSI_DEV, &st_template);
+	scsi_unregister_device(&st_template);
 	devfs_unregister_chrdev(SCSI_TAPE_MAJOR, "st");
 	st_registered--;
 	if (scsi_tapes != NULL) {

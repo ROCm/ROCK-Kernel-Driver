@@ -11737,15 +11737,15 @@ aic7xxx_biosparam(Disk *disk, kdev_t dev, int geom[])
 {
   int heads, sectors, cylinders, ret;
   struct aic7xxx_host *p;
-  struct buffer_head *bh;
+  unsigned char *buf;
 
   p = (struct aic7xxx_host *) disk->device->host->hostdata;
-  bh = bread(MKDEV(MAJOR(dev), MINOR(dev)&~0xf), 0, block_size(dev));
+  buf = scsi_bios_ptable(dev);
 
-  if ( bh )
+  if ( buf )
   {
-    ret = scsi_partsize(bh, disk->capacity, &geom[2], &geom[0], &geom[1]);
-    brelse(bh);
+    ret = scsi_partsize(buf, disk->capacity, &geom[2], &geom[0], &geom[1]);
+    kfree(buf);
     if ( ret != -1 )
       return(ret);
   }

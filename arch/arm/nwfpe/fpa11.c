@@ -18,7 +18,7 @@
     along with this program; if not, write to the Free Software
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
-
+#include <linux/compiler.h>
 #include <asm/system.h>
 
 #include "fpa11.h"
@@ -123,47 +123,58 @@ void SetRoundingPrecision(const unsigned int opcode)
   }
 }
 
-/* Emulate the instruction in the opcode. */
-unsigned int EmulateAll(unsigned int opcode)
+void FPA11_CheckInit(FPA11 *fpa11)
 {
-  unsigned int nRc = 0;
-  unsigned long flags;
-  FPA11 *fpa11; 
-  save_flags(flags); sti();
-
-  fpa11 = GET_FPA11();
-
-  if (fpa11->initflag == 0)		/* good place for __builtin_expect */
+  if (unlikely(fpa11->initflag == 0))
   {
     resetFPA11();
     SetRoundingMode(ROUND_TO_NEAREST);
     SetRoundingPrecision(ROUND_EXTENDED);
     fpa11->initflag = 1;
   }
+}
 
-  if (TEST_OPCODE(opcode,MASK_CPRT))
+/* Emulate the instruction in the opcode. */
+unsigned int EmulateAll(unsigned int opcode)
+{
+  unsigned int nRc = 1, code;
+  unsigned long flags;
+  FPA11 *fpa11;
+
+  save_flags(flags); sti();
+
+  code = opcode & 0x00000f00;
+  if (code == 0x00000100 || code == 0x00000200)
   {
-    /* Emulate conversion opcodes. */
-    /* Emulate register transfer opcodes. */
-    /* Emulate comparison opcodes. */
-    nRc = EmulateCPRT(opcode);
-  }
-  else if (TEST_OPCODE(opcode,MASK_CPDO))
-  {
-    /* Emulate monadic arithmetic opcodes. */
-    /* Emulate dyadic arithmetic opcodes. */
-    nRc = EmulateCPDO(opcode);
-  }
-  else if (TEST_OPCODE(opcode,MASK_CPDT))
-  {
-    /* Emulate load/store opcodes. */
-    /* Emulate load/store multiple opcodes. */
-    nRc = EmulateCPDT(opcode);
-  }
-  else
-  {
-    /* Invalid instruction detected.  Return FALSE. */
-    nRc = 0;
+    /* For coprocessor 1 or 2 (FPA11) */
+    code = opcode & 0x0e000000;
+    if (code == 0x0e000000)
+    {
+      if (opcode & 0x00000010)
+      {
+        /* Emulate conversion opcodes. */
+        /* Emulate register transfer opcodes. */
+        /* Emulate comparison opcodes. */
+        nRc = EmulateCPRT(opcode);
+      }
+      else
+      {
+        /* Emulate monadic arithmetic opcodes. */
+        /* Emulate dyadic arithmetic opcodes. */
+        nRc = EmulateCPDO(opcode);
+      }
+    }
+    else if (code == 0x0c000000)
+    {
+      /* Emulate load/store opcodes. */
+      /* Emulate load/store multiple opcodes. */
+      nRc = EmulateCPDT(opcode);
+    }
+    else
+    {
+      /* Invalid instruction detected.  Return FALSE. */
+      nRc = 0;
+    }
   }
 
   restore_flags(flags);

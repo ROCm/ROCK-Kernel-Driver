@@ -1515,7 +1515,7 @@ static void nsp_cs_config(dev_link_t *link)
 		goto cs_failed;
 	}
 
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
+	scsi_register_host(&driver_template);
 
 	DEBUG(0, "GET_SCSI_INFO\n");
 	tail = &link->dev;
@@ -1611,7 +1611,7 @@ static void nsp_cs_release(u_long arg)
 	}
 
 	/* Unlink the device chain */
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+	scsi_unregister_host(&driver_template);
 	link->dev = NULL;
 
 	if (link->win) {

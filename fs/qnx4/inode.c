@@ -213,9 +213,7 @@ int qnx4_get_block( struct inode *inode, sector_t iblock, struct buffer_head *bh
 	phys = qnx4_block_map( inode, iblock );
 	if ( phys ) {
 		// logical block is before EOF
-		bh->b_dev     = inode->i_dev;
-		bh->b_blocknr = phys;
-		bh->b_state  |= (1UL << BH_Mapped);
+		map_bh(bh, inode->i_sb, phys);
 	} else if ( create ) {
 		// to be done.
 	}

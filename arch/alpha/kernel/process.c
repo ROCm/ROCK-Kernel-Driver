@@ -75,7 +75,6 @@ cpu_idle(void)
 {
 	/* An endless idle loop with no priority at all.  */
 	current->nice = 20;
-	current->counter = -100;
 
 	while (1) {
 		/* FIXME -- EV6 and LCA45 know how to power down

@@ -27,6 +27,7 @@
 #include <asm/io.h>
 
 extern char *ide_xfer_verbose (byte xfer_rate);
+extern char *ide_dmafunc_verbose(ide_dma_action_t dmafunc);
 
 /*
  * Maximum number of interfaces per card
@@ -225,29 +226,18 @@ static iftype_t __init icside_identifyif (struct expansion_card *ec)
 
 static int ide_build_sglist(ide_hwif_t *hwif, struct request *rq)
 {
-	struct buffer_head *bh;
+	request_queue_t *q = &hwif->drives[DEVICE_NR(rq->rq_dev) & 1].queue;
 	struct scatterlist *sg = hwif->sg_table;
-	int nents = 0;
+	int nents = blk_rq_map_sg(q, rq, sg);
 
-	if (rq->cmd == READ)
+	if (rq->q && nents > rq->nr_phys_segments)
+		printk("icside: received %d segments, build %d\n",
+			rq->nr_phys_segments, nents);
+
+	if (rq_data_dir(rq) == READ)
 		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
 	else
 		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
-	bh = rq->bh;
-	do {
-		unsigned char *virt_addr = bh->b_data;
-		unsigned int size = bh->b_size;
-
-		while ((bh = bh->b_reqnext) != NULL) {
-			if ((virt_addr + size) != (unsigned char *)bh->b_data)
-				break;
-			size += bh->b_size;
-		}
-		memset(&sg[nents], 0, sizeof(*sg));
-		sg[nents].address = virt_addr;
-		sg[nents].length = size;
-		nents++;
-	} while (bh != NULL);
 
 	return pci_map_sg(NULL, sg, nents, hwif->sg_dma_direction);
 }
@@ -267,39 +257,56 @@ static void icside_destroy_dmatable(ide_drive_t *drive)
 	pci_unmap_sg(NULL, sg, nents, HWIF(drive)->sg_dma_direction);
 }
 
+/*
+ * Configure the IOMD to give the appropriate timings for the transfer
+ * mode being requested.  We take the advice of the ATA standards, and
+ * calculate the cycle time based on the transfer mode, and the EIDE
+ * MW DMA specs that the drive provides in the IDENTIFY command.
+ *
+ * We have the following IOMD DMA modes to choose from:
+ *
+ *	Type	Active		Recovery	Cycle
+ *	A	250 (250)	312 (550)	562 (800)
+ *	B	187		250		437
+ *	C	125 (125)	125 (375)	250 (500)
+ *	D	62		125		187
+ *
+ * (figures in brackets are actual measured timings)
+ *
+ * However, we also need to take care of the read/write active and
+ * recovery timings:
+ *
+ *			Read	Write
+ *  	Mode	Active	-- Recovery --	Cycle	IOMD type
+ *	MW0	215	50	215	480	A
+ *	MW1	80	50	50	150	C
+ *	MW2	70	25	25	120	C
+ */
 static int
 icside_config_if(ide_drive_t *drive, int xfer_mode)
 {
 	int func = ide_dma_off;
+	int cycle_time = 0, use_dma_info = 0;
 
 	switch (xfer_mode) {
-	case XFER_MW_DMA_2:
-		/*
-		 * The cycle time is limited to 250ns by the r/w
-		 * pulse width (90ns), however we should still
-		 * have a maximum burst transfer rate of 8MB/s.
-		 */
-		drive->drive_data = 250;
-		break;
-
-	case XFER_MW_DMA_1:
-		drive->drive_data = 250;
-		break;
-
-	case XFER_MW_DMA_0:
-		drive->drive_data = 480;
-		break;
-
-	default:
-		drive->drive_data = 0;
-		break;
+	case XFER_MW_DMA_2: cycle_time = 250; use_dma_info = 1;	break;
+	case XFER_MW_DMA_1: cycle_time = 250; use_dma_info = 1;	break;
+	case XFER_MW_DMA_0: cycle_time = 480;			break;
 	}
 
-	if (!drive->init_speed)
-		drive->init_speed = (byte) xfer_mode;
+	/*
+	 * If we're going to be doing MW_DMA_1 or MW_DMA_2, we should
+	 * take care to note the values in the ID...
+	 */
+	if (use_dma_info && drive->id->eide_dma_time > cycle_time)
+		cycle_time = drive->id->eide_dma_time;
 
-	if (drive->drive_data &&
-	    ide_config_drive_speed(drive, (byte) xfer_mode) == 0)
+	drive->drive_data = cycle_time;
+
+	if (!drive->init_speed)
+		drive->init_speed = xfer_mode;
+
+	if (cycle_time && ide_config_drive_speed(drive, xfer_mode) == 0)
 		func = ide_dma_on;
 	else
 		drive->drive_data = 480;
@@ -307,7 +314,7 @@ icside_config_if(ide_drive_t *drive, int xfer_mode)
 	printk("%s: %s selected (peak %dMB/s)\n", drive->name,
 		ide_xfer_verbose(xfer_mode), 2000 / drive->drive_data);
 
-	drive->current_speed = (byte) xfer_mode;
+	drive->current_speed = xfer_mode;
 
 	return func;
 }
@@ -414,7 +421,7 @@ static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_
  *  This is setup to be called as an extern for future support
  *  to other special driver code.
  */
-static int check_drive_lists(ide_drive_t *drive, int good_bad)
+static int icside_check_drive_lists(ide_drive_t *drive, int good_bad)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -444,7 +451,7 @@ icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "bad" drives
 	 */
-	if (check_drive_lists(drive, 0)) {
+	if (icside_check_drive_lists(drive, 0)) {
 		func = ide_dma_off;
 		goto out;
 	}
@@ -469,7 +476,7 @@ icside_dma_check(ide_drive_t *drive)
 	/*
 	 * Consult the list of known "good" drives
 	 */
-	if (check_drive_lists(drive, 1)) {
+	if (icside_check_drive_lists(drive, 1)) {
 		if (id->eide_dma_time > 150)
 			goto out;
 		xfer_mode = XFER_MW_DMA_1;
@@ -502,6 +509,11 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	case ide_dma_off_quietly:
 	case ide_dma_on:
+		/*
+		 * We don't need any bouncing.  Yes, this looks the
+		 * wrong way around, but it is correct.
+		 */
+		blk_queue_bounce_limit(&drive->queue, BLK_BOUNCE_ANY);
 		drive->using_dma = (func == ide_dma_on);
 		return 0;
 
@@ -553,7 +565,8 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 
 	case ide_dma_bad_drive:
 	case ide_dma_good_drive:
-		return check_drive_lists(drive, (func == ide_dma_good_drive));
+		return icside_check_drive_lists(drive, (func ==
+						ide_dma_good_drive));
 
 	case ide_dma_verbose:
 		return icside_dma_verbose(drive);
@@ -590,6 +603,15 @@ icside_setup_dma(ide_hwif_t *hwif, int autodma)
 failed:
 	printk(" -- ERROR, unable to allocate DMA table\n");
 	return 0;
+}
+
+int ide_release_dma(ide_hwif_t *hwif)
+{
+	if (hwif->sg_table) {
+		kfree(hwif->sg_table);
+		hwif->sg_table = NULL;
+	}
+	return 1;
 }
 #endif
 

@@ -226,32 +226,20 @@ static int hptraid_make_request (request_queue_t *q, int rw, struct buffer_head 
 
 #include "hptraid.h"
 
-static int read_disk_sb (int major, int minor, unsigned char *buffer,int bufsize)
+static int __init read_disk_sb(struct block_device *bdev,
+				struct highpoint_raid_conf *buf)
 {
-	int ret = -EINVAL;
-	struct buffer_head *bh = NULL;
-	kdev_t dev = MKDEV(major,minor);
-	
-	if (blksize_size[major]==NULL)	 /* device doesn't exist */
-		return -EINVAL;
-	
+	/* Superblock is at 9*512 bytes */
+	Sector sect;
+	unsigned char *p = read_dev_sector(bdev, 9, &sect);
 
-	/* Superblock is at 4096+412 bytes */
-	set_blocksize (dev, 4096);
-	bh = bread (dev, 1, 4096);
-
-	
-	if (bh) {
-		memcpy (buffer, bh->b_data, bufsize);
-	} else {
-		printk(KERN_ERR "hptraid: Error reading superblock.\n");
-		goto abort;
+	if (p) {
+		memcpy(buf, p, 512);
+		put_dev_sector(&sect);
+		return 0;
 	}
-	ret = 0;
-abort:
-	if (bh)
-		brelse (bh);
-	return ret;
+	printk(KERN_ERR "hptraid: Error reading superblock.\n");
+	return -1;
 }
 
 static unsigned long maxsectors (int major,int minor)
@@ -276,55 +264,58 @@ static unsigned long maxsectors (int major,int minor)
 	return lba;
 }
 
+static struct highpoint_raid_conf __initdata prom;
 static void __init probedisk(int major, int minor,int device)
 {
 	int i;
-        struct highpoint_raid_conf *prom;
-	static unsigned char block[4096];
-	struct block_device *bdev;
-	
+	struct block_device *bdev = bdget(MKDEV(major,minor));
+	struct gendisk *gd;
+
+	if (!bdev)
+		return;
+
+	if (blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) < 0)
+		return;
+
 	if (maxsectors(major,minor)==0)
-		return;
-	
-        if (read_disk_sb(major,minor,(unsigned char*)&block,sizeof(block)))
-        	return;
-                                                                                                                 
-        prom = (struct highpoint_raid_conf*)&block[512];
-                
-        if (prom->magic!=  0x5a7816f0)
-        	return;
-        if (prom->type) {
+		goto out;
+
+        if (read_disk_sb(bdev, &prom))
+        	goto out;
+
+        if (prom.magic!=  0x5a7816f0)
+        	goto out;
+        if (prom.type) {
         	printk(KERN_INFO "hptraid: only RAID0 is supported currently\n");
-        	return;
+        	goto out;
         }
 
-	i = prom->disk_number;
+	i = prom.disk_number;
 	if (i<0)
-		return;
+		goto out;
 	if (i>8) 
-		return;
+		goto out;
 
-	bdev = bdget(MKDEV(major,minor));
-	if (bdev && blkdev_get(bdev,FMODE_READ|FMODE_WRITE,0,BDEV_RAW) == 0) {
-        	int j=0;
-        	struct gendisk *gd;
-		raid[device].disk[i].bdev = bdev;
-        	/* This is supposed to prevent others from stealing our underlying disks */
-		/* now blank the /proc/partitions table for the wrong partition table,
-		   so that scripts don't accidentally mount it and crash the kernel */
-		 /* XXX: the 0 is an utter hack  --hch */
-		gd=get_gendisk(MKDEV(major, 0));
-		if (gd!=NULL) {
-			for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
-				gd->part[j].nr_sects=0;					
-		}
-        }
+	raid[device].disk[i].bdev = bdev;
+	/* This is supposed to prevent others from stealing our underlying disks */
+	/* now blank the /proc/partitions table for the wrong partition table,
+	   so that scripts don't accidentally mount it and crash the kernel */
+	 /* XXX: the 0 is an utter hack  --hch */
+	gd=get_gendisk(MKDEV(major, 0));
+	if (gd!=NULL) {
+		int j;
+		for (j=1+(minor<<gd->minor_shift);j<((minor+1)<<gd->minor_shift);j++) 
+			gd->part[j].nr_sects=0;					
+	}
+
 	raid[device].disk[i].device = MKDEV(major,minor);
 	raid[device].disk[i].sectors = maxsectors(major,minor);
-	raid[device].stride = (1<<prom->raid0_shift);
-	raid[device].disks = prom->raid_disks;
-	raid[device].sectors = prom->total_secs;
-			
+	raid[device].stride = (1<<prom.raid0_shift);
+	raid[device].disks = prom.raid_disks;
+	raid[device].sectors = prom.total_secs;
+	return;
+out:
+	blkdev_put(bdev);
 }
 
 static void __init fill_cutoff(int device)

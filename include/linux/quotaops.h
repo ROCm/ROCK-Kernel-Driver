@@ -23,7 +23,7 @@
 extern void dquot_initialize(struct inode *inode, short type);
 extern void dquot_drop(struct inode *inode);
 extern int  quota_off(struct super_block *sb, short type);
-extern int  sync_dquots(kdev_t dev, short type);
+extern int  sync_dquots(struct super_block *sb, short type);
 
 extern int  dquot_alloc_block(struct inode *inode, unsigned long number, char prealloc);
 extern int  dquot_alloc_inode(const struct inode *inode, unsigned long number);
@@ -159,7 +159,7 @@ static __inline__ int DQUOT_TRANSFER(struct inode *inode, struct iattr *iattr)
 	return 0;
 }
 
-#define DQUOT_SYNC(dev)	sync_dquots(dev, -1)
+#define DQUOT_SYNC(sb)	sync_dquots(sb, -1)
 #define DQUOT_OFF(sb)	quota_off(sb, -1)
 
 #else
@@ -171,7 +171,7 @@ static __inline__ int DQUOT_TRANSFER(struct inode *inode, struct iattr *iattr)
 #define DQUOT_DROP(inode)			do { } while(0)
 #define DQUOT_ALLOC_INODE(inode)		(0)
 #define DQUOT_FREE_INODE(inode)			do { } while(0)
-#define DQUOT_SYNC(dev)				do { } while(0)
+#define DQUOT_SYNC(sb)				do { } while(0)
 #define DQUOT_OFF(sb)				do { } while(0)
 #define DQUOT_TRANSFER(inode, iattr)		(0)
 extern __inline__ int DQUOT_PREALLOC_BLOCK_NODIRTY(struct inode *inode, int nr)

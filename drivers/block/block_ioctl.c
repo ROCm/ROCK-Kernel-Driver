@@ -76,9 +76,7 @@ int block_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			err = -ENOTTY;
 	}
 
-#if 0
 	blk_put_queue(q);
-#endif
 	return err;
 }
 

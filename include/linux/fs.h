@@ -1103,7 +1103,7 @@ extern int fs_may_remount_ro(struct super_block *);
 
 extern int try_to_free_buffers(struct page *, unsigned int);
 extern void refile_buffer(struct buffer_head * buf);
-extern void create_empty_buffers(struct page *, kdev_t, unsigned long);
+extern void create_empty_buffers(struct page *, unsigned long);
 extern void end_buffer_io_sync(struct buffer_head *bh, int uptodate);
 
 /* reiserfs_writepage needs this */
@@ -1393,6 +1393,12 @@ static inline struct buffer_head * sb_getblk(struct super_block *sb, int block)
 static inline struct buffer_head * sb_get_hash_table(struct super_block *sb, int block)
 {
 	return get_hash_table(sb->s_dev, block, sb->s_blocksize);
+}
+static inline void map_bh(struct buffer_head *bh, struct super_block *sb, int block)
+{
+	bh->b_state |= 1 << BH_Mapped;
+	bh->b_dev = sb->s_dev;
+	bh->b_blocknr = block;
 }
 extern void wakeup_bdflush(void);
 extern void put_unused_buffer_head(struct buffer_head * bh);

@@ -28,13 +28,12 @@ static int bfs_readdir(struct file * f, void * dirent, filldir_t filldir)
 	struct inode * dir = f->f_dentry->d_inode;
 	struct buffer_head * bh;
 	struct bfs_dirent * de;
-	kdev_t dev = dir->i_dev;
 	unsigned int offset;
 	int block;
 
 	if (f->f_pos & (BFS_DIRENT_SIZE-1)) {
 		printf("Bad f_pos=%08lx for %s:%08lx\n", (unsigned long)f->f_pos, 
-			bdevname(dev), dir->i_ino);
+			bdevname(dir->i_dev), dir->i_ino);
 		return -EBADF;
 	}
 
@@ -256,7 +255,6 @@ static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int
 	struct buffer_head * bh;
 	struct bfs_dirent * de;
 	int block, sblock, eblock, off;
-	kdev_t dev;
 	int i;
 
 	dprintf("name=%s, namelen=%d\n", name, namelen);
@@ -266,7 +264,6 @@ static int bfs_add_entry(struct inode * dir, const char * name, int namelen, int
 	if (namelen > BFS_NAMELEN)
 		return -ENAMETOOLONG;
 
-	dev = dir->i_dev;
 	sblock = dir->iu_sblock;
 	eblock = dir->iu_eblock;
 	for (block=sblock; block<=eblock; block++) {

@@ -355,9 +355,7 @@ affs_get_block(struct inode *inode, sector_t block, struct buffer_head *bh_resul
 	ext_bh = affs_get_extblock(inode, ext);
 	if (IS_ERR(ext_bh))
 		goto err_ext;
-	bh_result->b_blocknr = be32_to_cpu(AFFS_BLOCK(sb, ext_bh, block));
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_state |= (1UL << BH_Mapped);
+	map_bh(bh_result, sb, be32_to_cpu(AFFS_BLOCK(sb, ext_bh, block)));
 
 	if (create) {
 		u32 blocknr = affs_alloc_block(inode, ext_bh->b_blocknr);

@@ -307,6 +307,7 @@ EXPORT_SYMBOL(blkdev_put);
 EXPORT_SYMBOL(ioctl_by_bdev);
 EXPORT_SYMBOL(grok_partitions);
 EXPORT_SYMBOL(register_disk);
+EXPORT_SYMBOL(read_dev_sector);
 EXPORT_SYMBOL(tq_disk);
 EXPORT_SYMBOL(init_buffer);
 EXPORT_SYMBOL(refile_buffer);

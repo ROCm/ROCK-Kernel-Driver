@@ -1049,16 +1049,22 @@ hwgraph_char_device_get(devfs_handle_t de)
 struct file_operations *
 hwgraph_cdevsw_get(devfs_handle_t de)
 {
-	return(devfs_get_ops(de));
+	struct file_operations *fops = devfs_get_ops(de);
+
+	devfs_put_ops(de); /*  FIXME: this may need to be moved to callers  */
+	return(fops);
 }
 
 /*
  * hwgraph_bdevsw_get - returns the fops of the given devfs entry.
 */
-struct file_operations *
+struct file_operations *    /*  FIXME: shouldn't this be a blkdev?  */
 hwgraph_bdevsw_get(devfs_handle_t de)
 {
-	return(devfs_get_ops(de));
+	struct file_operations *fops = devfs_get_ops(de);
+
+	devfs_put_ops(de); /*  FIXME: this may need to be moved to callers  */
+	return(fops);
 }
 
 /*

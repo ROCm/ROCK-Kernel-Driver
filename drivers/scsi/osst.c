@@ -159,6 +159,7 @@ static void osst_detach(Scsi_Device *);
 
 struct Scsi_Device_Template osst_template =
 {
+       module:		THIS_MODULE,
        name:		"OnStream tape",
        tag:		"osst",
        scsi_type:	TYPE_TAPE,
@@ -5583,8 +5584,7 @@ static void osst_detach(Scsi_Device * SDp)
 static int __init init_osst(void) 
 {
 	validate_options();
-	osst_template.module = THIS_MODULE;
-	return scsi_register_module(MODULE_SCSI_DEV, &osst_template);
+	return scsi_register_device(&osst_template);
 }
 
 static void __exit exit_osst (void)
@@ -5592,7 +5592,7 @@ static void __exit exit_osst (void)
   int i;
   OS_Scsi_Tape * STp;
 
-  scsi_unregister_module(MODULE_SCSI_DEV, &osst_template);
+  scsi_unregister_device(&osst_template);
 #ifdef CONFIG_DEVFS_FS
   devfs_unregister_chrdev(MAJOR_NR, "osst");
 #else

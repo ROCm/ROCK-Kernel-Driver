@@ -423,17 +423,17 @@ static Scsi_Host_Template arxescsi_template = ARXEScsi;
 static int __init init_arxe_scsi_driver(void)
 {
         arxescsi_template.module = THIS_MODULE;
-	scsi_register_module(MODULE_SCSI_HA, &arxescsi_template);
+	scsi_register_host(&arxescsi_template);
 	if (arxescsi_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &arxescsi_template);
+	scsi_unregister_host(&arxescsi_template);
 	return -ENODEV;
 }
 
 static void __exit exit_arxe_scsi_driver(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &arxescsi_template);
+	scsi_unregister_host(&arxescsi_template);
 }
 
 module_init(init_arxe_scsi_driver);

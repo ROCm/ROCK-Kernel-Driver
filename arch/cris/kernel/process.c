@@ -119,7 +119,6 @@ void enable_hlt(void)
 int cpu_idle(void *unused)
 {
 	while(1) {
-		current->counter = -100;
 		schedule();
 	}
 }

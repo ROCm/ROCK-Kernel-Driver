@@ -141,7 +141,7 @@ changed:
 }
 
 static inline int get_block(struct inode * inode, sector_t block,
-			struct buffer_head *bh_result, int create)
+			struct buffer_head *bh, int create)
 {
 	int err = -EIO;
 	int offsets[DEPTH];
@@ -160,9 +160,7 @@ reread:
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
 got_it:
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = block_to_cpu(chain[depth-1].key);
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh, inode->i_sb, block_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
@@ -196,7 +194,7 @@ out:
 	if (splice_branch(inode, chain, partial, left) < 0)
 		goto changed;
 
-	bh_result->b_state |= (1UL << BH_New);
+	bh->b_state |= (1UL << BH_New);
 	goto got_it;
 
 changed:

@@ -434,7 +434,7 @@ extern void scsi_sleep(int);
 /*
  * Prototypes for functions in scsicam.c
  */
-extern int  scsi_partsize(struct buffer_head *bh, unsigned long capacity,
+extern int  scsi_partsize(unsigned char *buf, unsigned long capacity,
                     unsigned int *cyls, unsigned int *hds,
                     unsigned int *secs);
 

@@ -73,9 +73,7 @@ int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	secno s;
 	s = hpfs_bmap(inode, iblock);
 	if (s) {
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = s;
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, inode->i_sb, s);
 		return 0;
 	}
 	if (!create) return 0;
@@ -89,9 +87,8 @@ int hpfs_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_
 	}
 	inode->i_blocks++;
 	inode->u.hpfs_i.mmu_private += 512;
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = s;
-	bh_result->b_state |= (1UL << BH_Mapped) | (1UL << BH_New);
+	bh_result->b_state |= 1UL << BH_New;
+	map_bh(bh_result, inode->i_sb, s);
 	return 0;
 }
 

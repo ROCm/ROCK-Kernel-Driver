@@ -205,9 +205,7 @@ static inline int indirect_item_found (int retval, struct item_head * ih)
 static inline void set_block_dev_mapped (struct buffer_head * bh, 
 					 b_blocknr_t block, struct inode * inode)
 {
-  bh->b_dev = inode->i_dev;
-  bh->b_blocknr = block;
-  bh->b_state |= (1UL << BH_Mapped);
+	map_bh(bh, inode->i_sb, block);
 }
 
 
@@ -287,9 +285,7 @@ research:
 	blocknr = get_block_num(ind_item, path.pos_in_item) ;
 	ret = 0 ;
 	if (blocknr) {
-	    bh_result->b_dev = inode->i_dev;
-	    bh_result->b_blocknr = blocknr;
-	    bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, inode->i_sb, blocknr);
 	} else if ((args & GET_BLOCK_NO_HOLE)) {
 	    ret = -ENOENT ;
 	}
@@ -380,10 +376,9 @@ research:
 
 finished:
     pathrelse (&path);
-    bh_result->b_blocknr = 0 ;
-    bh_result->b_dev = inode->i_dev;
+    /* I _really_ doubt that you want it.  Chris? */
+    map_bh(bh_result, inode->i_sb, 0);
     mark_buffer_uptodate (bh_result, 1);
-    bh_result->b_state |= (1UL << BH_Mapped);
     return 0;
 }
 

@@ -865,7 +865,7 @@ static int isofs_statfs (struct super_block *sb, struct statfs *buf)
  * (0 == error.)
  */
 int isofs_get_blocks(struct inode *inode, sector_t iblock,
-		     struct buffer_head **bh_result, unsigned long nblocks)
+		     struct buffer_head **bh, unsigned long nblocks)
 {
 	unsigned long b_off;
 	unsigned offset, sect_size;
@@ -927,16 +927,14 @@ int isofs_get_blocks(struct inode *inode, sector_t iblock,
 			}
 		}
 		
-		if ( *bh_result ) {
-			(*bh_result)->b_dev      = inode->i_dev;
-			(*bh_result)->b_blocknr  = firstext + b_off - offset;
-			(*bh_result)->b_state   |= (1UL << BH_Mapped);
+		if ( *bh ) {
+			map_bh(*bh, inode->i_sb, firstext + b_off - offset);
 		} else {
-			*bh_result = sb_getblk(inode->i_sb, firstext+b_off-offset);
-			if ( !*bh_result )
+			*bh = sb_getblk(inode->i_sb, firstext+b_off-offset);
+			if ( !*bh )
 				goto abort;
 		}
-		bh_result++;	/* Next buffer head */
+		bh++;	/* Next buffer head */
 		b_off++;	/* Next buffer offset */
 		nblocks--;
 		rv++;

@@ -581,17 +581,17 @@ static Scsi_Host_Template eesox_template = {
 
 static int __init eesox_init(void)
 {
-	scsi_register_module(MODULE_SCSI_HA, &eesox_template);
+	scsi_register_host(&eesox_template);
 	if (eesox_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &eesox_template);
+	scsi_unregister_host(&eesox_template);
 	return -ENODEV;
 }
 
 static void __exit eesox_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &eesox_template);
+	scsi_unregister_host(&eesox_template);
 }
 
 module_init(eesox_init);

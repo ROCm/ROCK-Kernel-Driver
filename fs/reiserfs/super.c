@@ -19,6 +19,7 @@
 #include <linux/smp_lock.h>
 #include <linux/locks.h>
 #include <linux/init.h>
+#include <linux/blkdev.h>
 
 #define REISERFS_OLD_BLOCKSIZE 4096
 #define REISERFS_SUPER_MAGIC_STRING_OFFSET_NJ 20
@@ -302,11 +303,11 @@ static int read_bitmaps (struct super_block * s)
        labeling scheme currently used will have enough space. Then we
        need one block for the super.  -Hans */
     bmp = (REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize) + 1;	/* first of bitmap blocks */
-    SB_AP_BITMAP (s)[0] = reiserfs_bread (s, bmp, s->s_blocksize);
+    SB_AP_BITMAP (s)[0] = reiserfs_bread (s, bmp);
     if(!SB_AP_BITMAP(s)[0])
 	return 1;
     for (i = 1, bmp = dl = s->s_blocksize * 8; i < sb_bmap_nr(rs); i ++) {
-	SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp, s->s_blocksize);
+	SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp);
 	if (!SB_AP_BITMAP (s)[i])
 	    return 1;
 	bmp += dl;
@@ -329,7 +330,7 @@ static int read_old_bitmaps (struct super_block * s)
   memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
 
   for (i = 0; i < sb_bmap_nr(rs); i ++) {
-    SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp1 + i, s->s_blocksize);
+    SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp1 + i);
     if (!SB_AP_BITMAP (s)[i])
       return 1;
   }
@@ -355,17 +356,17 @@ void check_bitmap (struct super_block * s)
 		      free, SB_FREE_BLOCKS (s));
 }
 
-static int read_super_block (struct super_block * s, int size, int offset)
+static int read_super_block (struct super_block * s, int offset)
 {
     struct buffer_head * bh;
     struct reiserfs_super_block * rs;
  
 
-    bh = bread (s->s_dev, offset / size, size);
+    bh = sb_bread (s, offset / s->s_blocksize);
     if (!bh) {
       printk ("read_super_block: "
               "bread failed (dev %s, block %d, size %d)\n",
-              kdevname (s->s_dev), offset / size, size);
+              kdevname (s->s_dev), offset / s->s_blocksize, s->s_blocksize);
       return 1;
     }
  
@@ -373,7 +374,7 @@ static int read_super_block (struct super_block * s, int size, int offset)
     if (!is_reiserfs_magic_string (rs)) {
       printk ("read_super_block: "
               "can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
-              kdevname(s->s_dev), bh->b_blocknr, size);
+              kdevname(s->s_dev), bh->b_blocknr, s->s_blocksize);
       brelse (bh);
       return 1;
     }
@@ -381,30 +382,23 @@ static int read_super_block (struct super_block * s, int size, int offset)
     //
     // ok, reiserfs signature (old or new) found in at the given offset
     //    
-    s->s_blocksize = sb_blocksize(rs);
-    s->s_blocksize_bits = 0;
-    while ((1 << s->s_blocksize_bits) != s->s_blocksize)
-	s->s_blocksize_bits ++;
-
     brelse (bh);
     
-    if (s->s_blocksize != size)
-	set_blocksize (s->s_dev, s->s_blocksize);
+    sb_set_blocksize (s, sb_blocksize(rs));
 
-    bh = reiserfs_bread (s, offset / s->s_blocksize, s->s_blocksize);
+    bh = reiserfs_bread (s, offset / s->s_blocksize);
     if (!bh) {
 	printk("read_super_block: "
                 "bread failed (dev %s, block %d, size %d)\n",
-                kdevname (s->s_dev), offset / size, size);
+                kdevname (s->s_dev), offset / s->s_blocksize, s->s_blocksize);
 	return 1;
     }
     
     rs = (struct reiserfs_super_block *)bh->b_data;
-    if (!is_reiserfs_magic_string (rs) ||
-	sb_blocksize(rs) != s->s_blocksize) {
+    if (!is_reiserfs_magic_string (rs) || sb_blocksize(rs) != s->s_blocksize) {
 	printk ("read_super_block: "
 		"can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
-		kdevname(s->s_dev), bh->b_blocknr, size);
+		kdevname(s->s_dev), bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
 	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", kdevname(s->s_dev));
 	return 1;
@@ -612,9 +606,7 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 {
     int size;
     struct inode *root_inode;
-    kdev_t dev = s->s_dev;
     int j;
-    extern int *blksize_size[];
     struct reiserfs_transaction_handle th ;
     int old_format = 0;
     unsigned long blocks;
@@ -633,22 +625,19 @@ struct super_block * reiserfs_read_super (struct super_block * s, void * data, i
 	return NULL;
     }	
 
-    if (blksize_size[MAJOR(dev)] && blksize_size[MAJOR(dev)][MINOR(dev)] != 0) {
-	/* as blocksize is set for partition we use it */
-	size = blksize_size[MAJOR(dev)][MINOR(dev)];
-    } else {
-	size = BLOCK_SIZE;
-	set_blocksize (s->s_dev, BLOCK_SIZE);
-    }
+    size = block_size(s->s_dev);
+    sb_set_blocksize(s, size);
 
     /* read block (64-th 1k block), which can contain reiserfs super block */
-    if (read_super_block (s, size, REISERFS_DISK_OFFSET_IN_BYTES)) {
+    if (read_super_block (s, REISERFS_DISK_OFFSET_IN_BYTES)) {
 	// try old format (undistributed bitmap, super block in 8-th 1k block of a device)
-	if (read_super_block (s, size, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
+	sb_set_blocksize(s, size);
+	if (read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
 	    goto error;
 	else
 	    old_format = 1;
     }
+    s->s_blocksize = size;
 
     s->u.reiserfs_sb.s_mount_state = SB_REISERFS_STATE(s);
     s->u.reiserfs_sb.s_mount_state = REISERFS_VALID_FS ;

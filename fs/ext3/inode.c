@@ -743,9 +743,7 @@ reread:
 	if (!partial) {
 		bh_result->b_state &= ~(1UL << BH_New);
 got_it:
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = le32_to_cpu(chain[depth-1].key);
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, inode->i_sb, le32_to_cpu(chain[depth-1].key));
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
@@ -1265,8 +1263,7 @@ static int ext3_writepage(struct page *page)
 	/* bget() all the buffers */
 	if (order_data) {
 		if (!page->buffers)
-			create_empty_buffers(page,
-				inode->i_dev, inode->i_sb->s_blocksize);
+			create_empty_buffers(page, inode->i_sb->s_blocksize);
 		page_buffers = page->buffers;
 		walk_page_buffers(handle, page_buffers, 0,
 				PAGE_CACHE_SIZE, NULL, bget_one);
@@ -1369,7 +1366,7 @@ static int ext3_block_truncate_page(handle_t *handle,
 		goto out;
 
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, blocksize);
+		create_empty_buffers(page, blocksize);
 
 	/* Find the buffer that contains "offset" */
 	bh = page->buffers;

@@ -167,7 +167,6 @@ struct dquot {
 	/* fields after this point are cleared when invalidating */
 	struct super_block *dq_sb;	/* superblock this applies to */
 	unsigned int dq_id;		/* ID this applies to (uid, gid) */
-	kdev_t dq_dev;			/* Device this applies to */
 	short dq_type;			/* Type of quota */
 	short dq_flags;			/* See DQ_* */
 	unsigned long dq_referenced;	/* Number of times this dquot was 

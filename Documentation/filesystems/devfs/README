@@ -3,7 +3,7 @@ Devfs (Device File System) FAQ
 
 Linux Devfs (Device File System) FAQ
 Richard Gooch
-9-NOV-2001
+21-DEC-2001
 
 -----------------------------------------------------------------------------
 
@@ -66,6 +66,9 @@ Questions and Answers
 
 Making things work
 Alternatives to devfs
+What I don't like about devfs
+How to report bugs
+Strange kernel messages
 
 
 Other resources
@@ -557,8 +560,10 @@ options.
 
 Devfsd
 OK, if you're reading this, I assume you want to play with
-devfs. First you need to compile devfsd, the device management daemon,
-available at 
+devfs. First you should ensure that /usr/src/linux contains a
+recent kernel source tree. Then you need to compile devfsd, the device
+management daemon, available at
+
 http://www.atnf.csiro.au/~rgooch/linux/.
 Because the kernel has a naming scheme
 which is quite different from the old naming scheme, you need to
@@ -1470,6 +1475,8 @@ Questions and Answers
 Making things work
 Alternatives to devfs
 What I don't like about devfs
+How to report bugs
+Strange kernel messages
 
 
 
@@ -1733,6 +1740,93 @@ Devfs is bloatware
 
 This is not even remotely true. As shown above,
 both code and data size are quite modest.
+
+
+How to report bugs
+
+If you have (or think you have) a bug with devfs, please follow the
+steps below:
+
+
+
+please make sure you have the latest devfs patches applied. The
+latest kernel version might not have the latest devfs patches applied
+yet (Linus is very busy)
+
+
+save a copy of your complete kernel logs (preferably by
+using the dmesg programme) for later inclusion in your bug
+report. You may need to use the -s switch to increase the
+internal buffer size so you can capture all the boot messages
+
+
+try booting with devfs=dall passed to the kernel boot
+command line (read the documentation on your bootloader on how to do
+this), and save the result to a file. This may be quite verbose, and
+it may overflow the messages buffer, but try to get as much of it as
+you can
+
+
+if you get an Oops, run ksymoops to decode it so that the
+names of the offending functions are provided. A non-decoded Oops is
+pretty useless
+
+
+send a copy of your devfsd configuration file(s)
+
+send the bug report to me first.
+Don't expect that I will see it if you post it to the linux-kernel
+mailing list. Include all the information listed above, plus
+anything else that you think might be relevant. Put the string
+devfs somewhere in the subject line, so my mail filters mark
+it as urgent
+
+
+
+
+Here is a general guide on how to ask questions in a way that greatly
+improves your chances of getting a reply:
+
+http://www.tuxedo.org/~esr/faqs/smart-questions.html. If you have
+a bug to report, you should also read
+
+http://www.chiark.greenend.org.uk/~sgtatham/bugs.html.
+
+
+Strange kernel messages
+
+You may see devfs-related messages in your kernel logs. Below are some
+messages and what they mean (and what you should do about them, if
+anything).
+
+
+
+devfs_register(fred): could not append to parent, err: -17
+
+You need to check what the error code means, but usually 17 means
+EEXIST. This means that a driver attempted to create an entry
+fred in a directory, but there already was an entry with that
+name. This is often caused by flawed boot scripts which untar a bunch
+of inodes into /dev, as a way to restore permissions. This
+message is harmless, as the device nodes will still
+provide access to the driver (unless you use the devfs=only
+boot option, which is only for dedicated souls:-). If you want to get
+rid of these annoying messages, upgrade to devfsd-v1.3.20 and use the
+recommended RESTORE directive to restore permissions.
+
+
+devfs_mk_dir(bill): using old entry in dir: c1808724 ""
+
+This is similar to the message above, except that a driver attempted
+to create a directory named bill, and the parent directory
+has an entry with the same name. In this case, to ensure that drivers
+continue to work properly, the old entry is re-used and given to the
+driver. In 2.5 kernels, the driver is given a NULL entry, and thus,
+under rare circumstances, may not create the require device nodes.
+The solution is the same as above.
+
+
+
 
 -----------------------------------------------------------------------------
 

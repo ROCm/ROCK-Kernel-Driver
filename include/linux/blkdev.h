@@ -6,7 +6,7 @@
 #include <linux/genhd.h>
 #include <linux/tqueue.h>
 #include <linux/list.h>
-#include <linux/mm.h>
+#include <linux/pagemap.h>
 
 #include <asm/scatterlist.h>
 
@@ -196,8 +196,7 @@ struct request_queue
 #define RQ_SCSI_DISCONNECTING	0xffe0
 
 #define QUEUE_FLAG_PLUGGED	0	/* queue is plugged */
-#define QUEUE_FLAG_NOSPLIT	1	/* can process bio over several goes */
-#define QUEUE_FLAG_CLUSTER	2	/* cluster several segments into 1 */
+#define QUEUE_FLAG_CLUSTER	1	/* cluster several segments into 1 */
 
 #define blk_queue_plugged(q)	test_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
 #define blk_mark_plugged(q)	set_bit(QUEUE_FLAG_PLUGGED, &(q)->queue_flags)
@@ -205,6 +204,14 @@ struct request_queue
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
 #define rq_data_dir(rq)		((rq)->flags & 1)
+
+/*
+ * mergeable request must not have _NOMERGE or _BARRIER bit set, nor may
+ * it already be started by driver.
+ */
+#define rq_mergeable(rq)	\
+	(!((rq)->flags & (REQ_NOMERGE | REQ_STARTED | REQ_BARRIER))	\
+	&& ((rq)->flags & REQ_CMD))
 
 /*
  * noop, requests are automagically marked as active/inactive by I/O
@@ -276,6 +283,11 @@ extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, stru
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern int block_ioctl(kdev_t, unsigned int, unsigned long);
 extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
+
+/*
+ * get ready for proper ref counting
+ */
+#define blk_put_queue(q)	do { } while (0)
 
 /*
  * Access functions for manipulating queue properties
@@ -367,6 +379,15 @@ extern inline unsigned int block_size(kdev_t dev)
 			retval = blksize_size[major][minor];
 	}
 	return retval;
+}
+
+typedef struct {struct page *v;} Sector;
+
+unsigned char *read_dev_sector(struct block_device *, unsigned long, Sector *);
+
+static inline void put_dev_sector(Sector p)
+{
+	page_cache_release(p.v);
 }
 
 #endif

@@ -117,21 +117,8 @@ int raw_open(struct inode *inode, struct file *filp)
 	if (raw_devices[minor].inuse++)
 		goto out;
 
-	/* 
-	 * Don't interfere with mounted devices: we cannot safely set
-	 * the blocksize on a device which is already mounted.  
-	 */
-	
-	sector_size = 512;
-	if (is_mounted(rdev)) {
-		if (blksize_size[MAJOR(rdev)])
-			sector_size = blksize_size[MAJOR(rdev)][MINOR(rdev)];
-	} else
-		sector_size = get_hardsect_size(rdev);
-
-	set_blocksize(rdev, sector_size);
+	sector_size = get_hardsect_size(rdev);
 	raw_devices[minor].sector_size = sector_size;
-
 	for (sector_bits = 0; !(sector_size & 1); )
 		sector_size>>=1, sector_bits++;
 	raw_devices[minor].sector_bits = sector_bits;

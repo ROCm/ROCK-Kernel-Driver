@@ -335,8 +335,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 
 	/* scale priority and nice values from timeslices to -20..20 */
 	/* to make it look like a "normal" Unix priority/nice value  */
-	priority = task->counter;
-	priority = 20 - (priority * 10 + DEF_COUNTER / 2) / DEF_COUNTER;
+	priority = task->dyn_prio;
 	nice = task->nice;
 
 	read_lock(&tasklist_lock);

@@ -117,7 +117,7 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 	(struct hpusbscsi *) new->ctempl.proc_dir = new;
 	new->ctempl.module = THIS_MODULE;
 
-	if (scsi_register_module (MODULE_SCSI_HA, &(new->ctempl)))
+	if (scsi_register_host(&new->ctempl))
 		goto err_out;
 
 	/* adding to list for module unload */
@@ -185,7 +185,7 @@ hpusbscsi_exit (void)
 		tmp = tmp->next;
 		o = (struct hpusbscsi *)old;
 		usb_unlink_urb(&o->controlurb);
-		scsi_unregister_module(MODULE_SCSI_HA,&o->ctempl);
+		scsi_unregister_host(&o->ctempl);
 		kfree(old);
 	}
 

@@ -1405,9 +1405,6 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	SCpnt->done(SCpnt);
 }
 
-static int scsi_register_host(Scsi_Host_Template *);
-static int scsi_unregister_host(Scsi_Host_Template *);
-
 /*
  * Function:    scsi_release_commandblocks()
  *
@@ -1842,7 +1839,7 @@ out:
  * This entry point should be called by a driver if it is trying
  * to add a low level scsi driver to the system.
  */
-static int scsi_register_host(Scsi_Host_Template * tpnt)
+int scsi_register_host(Scsi_Host_Template * tpnt)
 {
 	int pcount;
 	struct Scsi_Host *shpnt;
@@ -1992,7 +1989,7 @@ static int scsi_register_host(Scsi_Host_Template * tpnt)
  * Similarly, this entry point should be called by a loadable module if it
  * is trying to remove a low level scsi driver from the system.
  */
-static int scsi_unregister_host(Scsi_Host_Template * tpnt)
+int scsi_unregister_host(Scsi_Host_Template * tpnt)
 {
 	int online_status;
 	int pcount0, pcount;
@@ -2203,22 +2200,27 @@ err_out:
 	return -1;
 }
 
-static int scsi_unregister_device(struct Scsi_Device_Template *tpnt);
-
 /*
  * This entry point should be called by a loadable module if it is trying
  * add a high level scsi driver to the system.
  */
-static int scsi_register_device_module(struct Scsi_Device_Template *tpnt)
+int scsi_register_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
 	int out_of_space = 0;
 
+#ifdef CONFIG_KMOD
+	if (scsi_hosts == NULL)
+		request_module("scsi_hostadapter");
+#endif
+
 	if (tpnt->next)
 		return 1;
 
-	scsi_register_device(tpnt);
+	tpnt->next = scsi_devicelist;
+	scsi_devicelist = tpnt;
+
 	/*
 	 * First scan the devices that we know about, and see if we notice them.
 	 */
@@ -2274,7 +2276,7 @@ static int scsi_register_device_module(struct Scsi_Device_Template *tpnt)
 		return 0;
 }
 
-static int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
+int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 {
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
@@ -2332,60 +2334,6 @@ static int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 error_out:
 	unlock_kernel();
 	return -1;
-}
-
-
-/* This function should be called by drivers which needs to register
- * with the midlevel scsi system. As of 2.4.0-test9pre3 this is our
- * main device/hosts register function	/mathiasen
- */
-int scsi_register_module(int module_type, void *ptr)
-{
-	switch (module_type) {
-	case MODULE_SCSI_HA:
-		return scsi_register_host((Scsi_Host_Template *) ptr);
-
-		/* Load upper level device handler of some kind */
-	case MODULE_SCSI_DEV:
-#ifdef CONFIG_KMOD
-		if (scsi_hosts == NULL)
-			request_module("scsi_hostadapter");
-#endif
-		return scsi_register_device_module((struct Scsi_Device_Template *) ptr);
-		/* The rest of these are not yet implemented */
-
-		/* Load constants.o */
-	case MODULE_SCSI_CONST:
-
-		/* Load specialized ioctl handler for some device.  Intended for
-		 * cdroms that have non-SCSI2 audio command sets. */
-	case MODULE_SCSI_IOCTL:
-
-	default:
-		return 1;
-	}
-}
-
-/* Reverse the actions taken above
- */
-int scsi_unregister_module(int module_type, void *ptr)
-{
-	int retval = 0;
-
-	switch (module_type) {
-	case MODULE_SCSI_HA:
-		retval = scsi_unregister_host((Scsi_Host_Template *) ptr);
-		break;
-	case MODULE_SCSI_DEV:
-		retval = scsi_unregister_device((struct Scsi_Device_Template *)ptr);
- 		break;
-		/* The rest of these are not yet implemented. */
-	case MODULE_SCSI_CONST:
-	case MODULE_SCSI_IOCTL:
-		break;
-	default:;
-	}
-	return retval;
 }
 
 #ifdef CONFIG_PROC_FS

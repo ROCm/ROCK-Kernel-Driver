@@ -367,7 +367,7 @@ void mts_remove_nolock( struct mts_desc* to_remove )
 	}
 
 	MTS_DEBUG_GOT_HERE();
-	scsi_unregister_module(MODULE_SCSI_HA, &(to_remove->ctempl));
+	scsi_unregister_host(&to_remove->ctempl);
 	unlock_kernel();
 
 	kfree( to_remove );
@@ -982,11 +982,11 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 	MTS_DEBUG("registering SCSI module\n");
 
 	new_desc->ctempl.module = THIS_MODULE;
-	result = scsi_register_module(MODULE_SCSI_HA, &(new_desc->ctempl));
+	result = scsi_register_host(&new_desc->ctempl);
 	/* Will get hit back in microtek_detect by this func */
 	if ( result )
 	{
-		MTS_ERROR( "error %d from scsi_register_module! Help!\n",
+		MTS_ERROR( "error %d from scsi_register_host! Help!\n",
 			   (int)result );
 
 		/* FIXME: need more cleanup? */

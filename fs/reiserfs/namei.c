@@ -1168,7 +1168,7 @@ int reiserfs_rename (struct inode * old_dir, struct dentry *old_dentry,
 	    // FIXME: do we need this? shouldn't we simply continue?
 	    run_task_queue(&tq_disk);
 	    current->policy |= SCHED_YIELD;
-	    /*current->counter = 0;*/
+	    /*current->time_slice = 0;*/
 	    schedule();
 #endif
 	    continue;

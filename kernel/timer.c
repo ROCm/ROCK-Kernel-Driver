@@ -583,10 +583,7 @@ void update_process_times(int user_tick)
 
 	update_one_process(p, user_tick, system, cpu);
 	if (p->pid) {
-		if (--p->counter <= 0) {
-			p->counter = 0;
-			p->need_resched = 1;
-		}
+		expire_task(p);
 		if (p->nice > 0)
 			kstat.per_cpu_nice[cpu] += user_tick;
 		else

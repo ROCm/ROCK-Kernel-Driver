@@ -284,14 +284,7 @@ static int lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t
 
 static inline int loop_get_bs(struct loop_device *lo)
 {
-	int bs = 0;
-
-	if (blksize_size[MAJOR(lo->lo_device)])
-		bs = blksize_size[MAJOR(lo->lo_device)][MINOR(lo->lo_device)];
-	if (!bs)
-		bs = BLOCK_SIZE;	
-
-	return bs;
+	return block_size(lo->lo_device);
 }
 
 static inline unsigned long loop_get_iv(struct loop_device *lo,
@@ -600,7 +593,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	kdev_t		lo_device;
 	int		lo_flags = 0;
 	int		error;
-	int		bs;
 
 	MOD_INC_USE_COUNT;
 
@@ -656,13 +648,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	bs = 0;
-	if (blksize_size[MAJOR(lo_device)])
-		bs = blksize_size[MAJOR(lo_device)][MINOR(lo_device)];
-	if (!bs)
-		bs = BLOCK_SIZE;
-
-	set_blocksize(dev, bs);
+	set_blocksize(dev, block_size(lo_device));
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);

@@ -26,7 +26,7 @@
 					      binary interface will change   */
 
 struct devfsd_notify_struct
-{
+{   /*  Use native C types to ensure same types in kernel and user space     */
     unsigned int type;           /*  DEVFSD_NOTIFY_* value                   */
     unsigned int mode;           /*  Mode of the inode or device entry       */
     unsigned int major;          /*  Major number of device entry            */

@@ -1827,12 +1827,12 @@ void reiserfs_do_truncate (struct reiserfs_transaction_handle *th,
 //void decrement_i_read_sync_counter (struct inode * p_s_inode);
 
 
-#define block_size(inode) ((inode)->i_sb->s_blocksize)
+#define i_block_size(inode) ((inode)->i_sb->s_blocksize)
 #define file_size(inode) ((inode)->i_size)
-#define tail_size(inode) (file_size (inode) & (block_size (inode) - 1))
+#define tail_size(inode) (file_size (inode) & (i_block_size (inode) - 1))
 
 #define tail_has_to_be_packed(inode) (!dont_have_tails ((inode)->i_sb) &&\
-!STORE_TAIL_IN_UNFM(file_size (inode), tail_size(inode), block_size (inode)))
+!STORE_TAIL_IN_UNFM(file_size (inode), tail_size(inode), i_block_size (inode)))
 
 /*
 int get_buffer_by_range (struct super_block * p_s_sb, struct key * p_s_range_begin, struct key * p_s_range_end, 
@@ -1989,10 +1989,9 @@ int get_new_buffer (struct reiserfs_transaction_handle *th, struct buffer_head *
 
 
 /* buffer2.c */
-struct buffer_head * reiserfs_getblk (kdev_t n_dev, int n_block, int n_size);
+struct buffer_head * reiserfs_getblk (struct super_block *super, int n_block);
 void wait_buffer_until_released (const struct buffer_head * bh);
-struct buffer_head * reiserfs_bread (struct super_block *super, int n_block, 
-				     int n_size);
+struct buffer_head * reiserfs_bread (struct super_block *super, int n_block);
 
 /* fix_nodes.c */
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s);

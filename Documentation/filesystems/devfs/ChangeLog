@@ -1794,3 +1794,72 @@ Changes for patch v198
 - Use "existing" directory in <_devfs_make_parent_for_leaf>
 
 - Use slab cache rather than fixed buffer for devfsd events
+===============================================================================
+Changes for patch v199
+
+- Removed obsolete usage of DEVFS_FL_NO_PERSISTENCE
+
+- Send DEVFSD_NOTIFY_REGISTERED events in <devfs_mk_dir>
+
+- Fixed locking bug in <devfs_d_revalidate_wait> due to typo
+
+- Do not send CREATE, CHANGE, ASYNC_OPEN or DELETE events from devfsd
+  or children
+===============================================================================
+Changes for patch v200
+
+- Ported to kernel 2.5.1-pre2
+===============================================================================
+Changes for patch v201
+
+- Fixed bug in <devfsd_read>: was dereferencing freed pointer
+===============================================================================
+Changes for patch v202
+
+- Fixed bug in <devfsd_close>: was dereferencing freed pointer
+
+- Added process group check for devfsd privileges
+===============================================================================
+Changes for patch v203
+
+- Use SLAB_ATOMIC in <devfsd_notify_de> from <devfs_d_delete>
+===============================================================================
+Changes for patch v204
+
+- Removed long obsolete rc.devfs
+
+- Return old entry in <devfs_mk_dir> for 2.4.x kernels
+
+- Updated README from master HTML file
+
+- Increment refcount on module in <check_disc_changed>
+
+- Created <devfs_get_handle> and exported <devfs_put>
+
+- Increment refcount on module in <devfs_get_ops>
+
+- Created <devfs_put_ops> and used where needed to fix races
+
+- Added clarifying comments in response to preliminary EMC code review
+
+- Added poisoning to <devfs_put>
+
+- Improved debugging messages
+
+- Fixed unregister bugs in drivers/md/lvm-fs.c
+===============================================================================
+Changes for patch v205
+
+- Corrected (made useful) debugging message in <unregister>
+
+- Moved <kmem_cache_create> in <mount_devfs_fs> to <init_devfs_fs>
+
+- Fixed drivers/md/lvm-fs.c to create "lvm" entry
+
+- Added magic number to guard against scribbling drivers
+
+- Only return old entry in <devfs_mk_dir> if a directory
+
+- Defined macros for error and debug messages
+
+- Updated README from master HTML file

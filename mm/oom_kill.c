@@ -149,7 +149,8 @@ void oom_kill_task(struct task_struct *p)
 	 * all the memory it needs. That way it should be able to
 	 * exit() and clear out its resources quickly...
 	 */
-	p->counter = 5 * HZ;
+	p->time_slice = 2 * MAX_TSLICE;
+	p->dyn_prio = MAX_DYNPRIO + 1;
 	p->flags |= PF_MEMALLOC | PF_MEMDIE;
 
 	/* This process has hardware access, be more careful. */

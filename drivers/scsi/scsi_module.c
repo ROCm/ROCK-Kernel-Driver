@@ -35,17 +35,17 @@
 static int __init init_this_scsi_driver(void)
 {
 	driver_template.module = THIS_MODULE;
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
+	scsi_register_host(&driver_template);
 	if (driver_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+	scsi_unregister_host(&driver_template);
 	return -ENODEV;
 }
 
 static void __exit exit_this_scsi_driver(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+	scsi_unregister_host(&driver_template);
 }
 
 module_init(init_this_scsi_driver);

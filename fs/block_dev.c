@@ -519,7 +519,10 @@ int check_disk_change(kdev_t dev)
 
 		de = devfs_find_handle (NULL, NULL, i, MINOR (dev),
 					DEVFS_SPECIAL_BLK, 0);
-		if (de) bdops = devfs_get_ops (de);
+		if (de) {
+			bdops = devfs_get_ops (de);
+			devfs_put_ops (de); /* We're running in owner module */
+		}
 	}
 	if (bdops == NULL)
 		return 0;

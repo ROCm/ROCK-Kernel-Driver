@@ -290,7 +290,7 @@ static void aha152x_config_cs(dev_link_t *link)
     }
     aha152x_setup("PCMCIA setup", ints);
     
-    scsi_register_module(MODULE_SCSI_HA, &driver_template);
+    scsi_register_host(&driver_template);
 
     tail = &link->dev;
     info->ndev = 0;
@@ -356,7 +356,7 @@ static void aha152x_release_cs(u_long arg)
 	return;
     }
 
-    scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+    scsi_unregister_host(&driver_template);
     link->dev = NULL;
     
     CardServices(ReleaseConfiguration, link->handle);

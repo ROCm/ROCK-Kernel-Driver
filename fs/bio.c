@@ -444,7 +444,10 @@ int bio_endio(struct bio *bio, int uptodate, int nr_sectors)
 	else
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
 
-	return bio->bi_end_io(bio, nr_sectors);
+	if (bio->bi_end_io)
+		return bio->bi_end_io(bio, nr_sectors);
+
+	return 0;
 }
 
 static void __init biovec_init_pool(void)

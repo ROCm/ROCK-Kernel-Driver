@@ -56,6 +56,14 @@ void clear_local_APIC(void)
 	maxlvt = get_maxlvt();
 
 	/*
+	 * Masking an LVT entry on a P6 can trigger a local APIC error
+	 * if the vector is zero. Mask LVTERR first to prevent this.
+	 */
+	if (maxlvt >= 3) {
+		v = ERROR_APIC_VECTOR; /* any non-zero vector will do */
+		apic_write_around(APIC_LVTERR, v | APIC_LVT_MASKED);
+	}
+	/*
 	 * Careful: we have to set masks only first to deassert
 	 * any level-triggered sources.
 	 */
@@ -65,10 +73,6 @@ void clear_local_APIC(void)
 	apic_write_around(APIC_LVT0, v | APIC_LVT_MASKED);
 	v = apic_read(APIC_LVT1);
 	apic_write_around(APIC_LVT1, v | APIC_LVT_MASKED);
-	if (maxlvt >= 3) {
-		v = apic_read(APIC_LVTERR);
-		apic_write_around(APIC_LVTERR, v | APIC_LVT_MASKED);
-	}
 	if (maxlvt >= 4) {
 		v = apic_read(APIC_LVTPC);
 		apic_write_around(APIC_LVTPC, v | APIC_LVT_MASKED);
@@ -84,6 +88,8 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTERR, APIC_LVT_MASKED);
 	if (maxlvt >= 4)
 		apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
+	apic_write(APIC_ESR, 0);
+	v = apic_read(APIC_ESR);
 }
 
 void __init connect_bsp_APIC(void)
@@ -480,6 +486,7 @@ static void apic_pm_resume(void *data)
 	l &= ~MSR_IA32_APICBASE_BASE;
 	l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 	wrmsr(MSR_IA32_APICBASE, l, h);
+	apic_write(APIC_LVTERR, ERROR_APIC_VECTOR | APIC_LVT_MASKED);
 	apic_write(APIC_ID, apic_pm_state.apic_id);
 	apic_write(APIC_DFR, apic_pm_state.apic_dfr);
 	apic_write(APIC_LDR, apic_pm_state.apic_ldr);
@@ -487,15 +494,15 @@ static void apic_pm_resume(void *data)
 	apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
 	apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
 	apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
+	apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
+	apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
+	apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
+	apic_write(APIC_TMICT, apic_pm_state.apic_tmict);
 	apic_write(APIC_ESR, 0);
 	apic_read(APIC_ESR);
 	apic_write(APIC_LVTERR, apic_pm_state.apic_lvterr);
 	apic_write(APIC_ESR, 0);
 	apic_read(APIC_ESR);
-	apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
-	apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
-	apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
-	apic_write(APIC_TMICT, apic_pm_state.apic_tmict);
 	__restore_flags(flags);
 	if (apic_pm_state.perfctr_pmdev)
 		pm_send(apic_pm_state.perfctr_pmdev, PM_RESUME, data);

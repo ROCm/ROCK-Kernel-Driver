@@ -211,9 +211,7 @@ reread:
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
 got_it:
-		bh_result->b_dev = sb->s_dev;
-		bh_result->b_blocknr = block_to_cpu(sb, chain[depth-1].key);
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, sb, block_to_cpu(sb, chain[depth-1].key));
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;

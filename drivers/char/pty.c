@@ -334,8 +334,7 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 	/*  Register a slave for the master  */
 	if (tty->driver.major == PTY_MASTER_MAJOR)
 		tty_register_devfs(&tty->link->driver,
-				   DEVFS_FL_CURRENT_OWNER |
-				   DEVFS_FL_NO_PERSISTENCE | DEVFS_FL_WAIT,
+				   DEVFS_FL_CURRENT_OWNER | DEVFS_FL_WAIT,
 				   tty->link->driver.minor_start +
 				   MINOR(tty->device)-tty->driver.minor_start);
 	retval = 0;

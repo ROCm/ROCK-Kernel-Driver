@@ -71,6 +71,7 @@ static int sr_init_command(Scsi_Cmnd *);
 
 static struct Scsi_Device_Template sr_template =
 {
+	module:THIS_MODULE,
 	name:"cdrom",
 	tag:"sr",
 	scsi_type:TYPE_ROM,
@@ -826,13 +827,12 @@ static void sr_detach(Scsi_Device * SDp)
 
 static int __init init_sr(void)
 {
-	sr_template.module = THIS_MODULE;
-	return scsi_register_module(MODULE_SCSI_DEV, &sr_template);
+	return scsi_register_device(&sr_template);
 }
 
 static void __exit exit_sr(void)
 {
-	scsi_unregister_module(MODULE_SCSI_DEV, &sr_template);
+	scsi_unregister_device(&sr_template);
 	devfs_unregister_blkdev(MAJOR_NR, "sr");
 	sr_registered--;
 	if (scsi_CDs != NULL) {

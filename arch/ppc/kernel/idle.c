@@ -54,7 +54,6 @@ int idled(void)
 
 	/* endless loop with no priority at all */
 	current->nice = 20;
-	current->counter = -100;
 	init_idle();
 	for (;;) {
 #ifdef CONFIG_SMP

@@ -806,7 +806,7 @@ static int  get_empty_nodes(
     RFALSE( ! *p_n_blocknr,
 	    "PAP-8135: reiserfs_new_blocknrs failed when got new blocks");
 
-    p_s_new_bh = reiserfs_getblk(p_s_sb->s_dev, *p_n_blocknr, p_s_sb->s_blocksize);
+    p_s_new_bh = reiserfs_getblk(p_s_sb, *p_n_blocknr);
     if (atomic_read (&(p_s_new_bh->b_count)) > 1) {
 /*&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&*/
 /*
@@ -1926,7 +1926,7 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FL[n_h] ) ? p_s_tb->lkey[n_h] : B_NR_ITEMS (p_s_tb->FL[n_h]);
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FL[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb, n_son_number, p_s_sb->s_blocksize);
+	p_s_bh = reiserfs_bread(p_s_sb, n_son_number);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {
@@ -1959,7 +1959,7 @@ static int  get_neighbors(
 
 	n_child_position = ( p_s_bh == p_s_tb->FR[n_h] ) ? p_s_tb->rkey[n_h] + 1 : 0;
 	n_son_number = B_N_CHILD_NUM(p_s_tb->FR[n_h], n_child_position);
-	p_s_bh = reiserfs_bread(p_s_sb, n_son_number, p_s_sb->s_blocksize);
+	p_s_bh = reiserfs_bread(p_s_sb, n_son_number);
 	if (!p_s_bh)
 	    return IO_ERROR;
 	if ( FILESYSTEM_CHANGED_TB (p_s_tb) ) {

@@ -604,7 +604,7 @@ static void search_by_key_reada (struct super_block * s, int blocknr)
     if (blocknr == 0)
 	return;
 
-    bh = reiserfs_getblk (s->s_dev, blocknr, s->s_blocksize);
+    bh = reiserfs_getblk (s, blocknr);
   
     if (!buffer_uptodate (bh)) {
 	ll_rw_block (READA, 1, &bh);
@@ -649,8 +649,7 @@ int search_by_key (struct super_block * p_s_sb,
                                        DISK_LEAF_NODE_LEVEL */
     ) {
     int  n_block_number = SB_ROOT_BLOCK (p_s_sb),
-      expected_level = SB_TREE_HEIGHT (p_s_sb),
-      n_block_size    = p_s_sb->s_blocksize;
+      expected_level = SB_TREE_HEIGHT (p_s_sb);
     struct buffer_head  *       p_s_bh;
     struct path_element *       p_s_last_element;
     int				n_node_level, n_retval;
@@ -697,7 +696,7 @@ int search_by_key (struct super_block * p_s_sb,
 	/* Read the next tree node, and set the last element in the path to
            have a pointer to it. */
 	if ( ! (p_s_bh = p_s_last_element->pe_buffer =
-		reiserfs_bread(p_s_sb, n_block_number, n_block_size)) ) {
+		reiserfs_bread(p_s_sb, n_block_number)) ) {
 	    p_s_search_path->path_length --;
 	    pathrelse(p_s_search_path);
 	    return IO_ERROR;

@@ -63,7 +63,6 @@
 #define CONFIG_MTD_BLKDEV_ERASESIZE 128
 #define VERSION "1.1"
 extern int *blk_size[];
-extern int *blksize_size[];
 
 /* Info for the block device */
 typedef struct mtd_raw_dev_data_s {
@@ -905,14 +904,7 @@ static int __init init_blkmtd(void)
   DEBUG(1, "blkmtd: devname = %s\n", bdevname(rdev));
   blocksize = BLOCK_SIZE;
 
-  if(bs) {
-    blocksize = bs;
-  } else {
-    if (blksize_size[maj] && blksize_size[maj][min]) {
-      DEBUG(2, "blkmtd: blksize_size = %d\n", blksize_size[maj][min]);
-      blocksize = blksize_size[maj][min];
-    }
-  }
+  blocksize = bs ? bs : block_size(rdev);
   i = blocksize;
   blocksize_bits = 0;
   while(i != 1) {

@@ -324,7 +324,7 @@ int fsync_super(struct super_block *sb)
 
 	lock_kernel();
 	sync_inodes_sb(sb);
-	DQUOT_SYNC(dev);
+	DQUOT_SYNC(sb);
 	lock_super(sb);
 	if (sb->s_dirt && sb->s_op && sb->s_op->write_super)
 		sb->s_op->write_super(sb);
@@ -346,7 +346,14 @@ int fsync_dev(kdev_t dev)
 
 	lock_kernel();
 	sync_inodes(dev);
-	DQUOT_SYNC(dev);
+	if (dev) {
+		struct super_block *sb = get_super(dev);
+		if (sb) {
+			DQUOT_SYNC(sb);
+			drop_super(sb);
+		}
+	} else
+			DQUOT_SYNC(NULL);
 	sync_supers(dev);
 	unlock_kernel();
 
@@ -1444,7 +1451,7 @@ int discard_bh_page(struct page *page, unsigned long offset, int drop_pagecache)
 	return 1;
 }
 
-void create_empty_buffers(struct page *page, kdev_t dev, unsigned long blocksize)
+void create_empty_buffers(struct page *page, unsigned long blocksize)
 {
 	struct buffer_head *bh, *head, *tail;
 
@@ -1455,8 +1462,6 @@ void create_empty_buffers(struct page *page, kdev_t dev, unsigned long blocksize
 
 	bh = head;
 	do {
-		bh->b_dev = dev;
-		bh->b_blocknr = 0;
 		bh->b_end_io = NULL;
 		tail = bh;
 		bh = bh->b_this_page;
@@ -1518,7 +1523,7 @@ static int __block_write_full_page(struct inode *inode, struct page *page, get_b
 		BUG();
 
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, 1 << inode->i_blkbits);
+		create_empty_buffers(page, 1 << inode->i_blkbits);
 	head = page->buffers;
 
 	block = page->index << (PAGE_CACHE_SHIFT - inode->i_blkbits);
@@ -1585,7 +1590,7 @@ static int __block_prepare_write(struct inode *inode, struct page *page,
 
 	blocksize = 1 << inode->i_blkbits;
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, blocksize);
+		create_empty_buffers(page, blocksize);
 	head = page->buffers;
 
 	bbits = inode->i_blkbits;
@@ -1702,7 +1707,7 @@ int block_read_full_page(struct page *page, get_block_t *get_block)
 		PAGE_BUG(page);
 	blocksize = 1 << inode->i_blkbits;
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, blocksize);
+		create_empty_buffers(page, blocksize);
 	head = page->buffers;
 
 	blocks = PAGE_CACHE_SIZE >> inode->i_blkbits;
@@ -1907,7 +1912,7 @@ int block_truncate_page(struct address_space *mapping, loff_t from, get_block_t 
 		goto out;
 
 	if (!page->buffers)
-		create_empty_buffers(page, inode->i_dev, blocksize);
+		create_empty_buffers(page, blocksize);
 
 	/* Find the buffer that contains "offset" */
 	bh = page->buffers;
@@ -2123,13 +2128,14 @@ int brw_page(int rw, struct page *page, kdev_t dev, sector_t b[], int size)
 		panic("brw_page: page not locked for I/O");
 
 	if (!page->buffers)
-		create_empty_buffers(page, dev, size);
+		create_empty_buffers(page, size);
 	head = bh = page->buffers;
 
 	/* Stage 1: lock all the buffers */
 	do {
 		lock_buffer(bh);
 		bh->b_blocknr = *(b++);
+		bh->b_dev = dev;
 		set_bit(BH_Mapped, &bh->b_state);
 		set_buffer_async_io(bh);
 		bh = bh->b_this_page;

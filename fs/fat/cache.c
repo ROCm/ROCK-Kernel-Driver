@@ -144,7 +144,7 @@ void fat_cache_init(void)
 	}
 	fat_cache = &cache[0];
 	for (count = 0; count < FAT_CACHE; count++) {
-		cache[count].device = 0;
+		cache[count].sb = NULL;
 		cache[count].next = count == FAT_CACHE-1 ? NULL :
 		    &cache[count+1];
 	}
@@ -162,7 +162,7 @@ void fat_cache_lookup(struct inode *inode,int cluster,int *f_clu,int *d_clu)
 		return;
 	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
-		if (inode->i_dev == walk->device
+		if (inode->i_sb == walk->sb
 		    && walk->start_cluster == first
 		    && walk->file_cluster <= cluster
 		    && walk->file_cluster > *f_clu) {
@@ -188,8 +188,8 @@ static void list_cache(void)
 	struct fat_cache *walk;
 
 	for (walk = fat_cache; walk; walk = walk->next) {
-		if (walk->device)
-			printk("<%s,%d>(%d,%d) ", kdevname(walk->device),
+		if (walk->sb)
+			printk("<%s,%d>(%d,%d) ", bdevname(walk->sb->s_dev),
 			       walk->start_cluster, walk->file_cluster,
 			       walk->disk_cluster);
 		else printk("-- ");
@@ -207,7 +207,7 @@ void fat_cache_add(struct inode *inode,int f_clu,int d_clu)
 	last = NULL;
 	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk->next; walk = (last = walk)->next)
-		if (inode->i_dev == walk->device
+		if (inode->i_sb == walk->sb
 		    && walk->start_cluster == first
 		    && walk->file_cluster == f_clu) {
 			if (walk->disk_cluster != d_clu) {
@@ -231,7 +231,7 @@ list_cache();
 			spin_unlock(&fat_cache_lock);
 			return;
 		}
-	walk->device = inode->i_dev;
+	walk->sb = inode->i_sb;
 	walk->start_cluster = first;
 	walk->file_cluster = f_clu;
 	walk->disk_cluster = d_clu;
@@ -255,21 +255,21 @@ void fat_cache_inval_inode(struct inode *inode)
 
 	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
-		if (walk->device == inode->i_dev
+		if (walk->sb == inode->i_sb
 		    && walk->start_cluster == first)
-			walk->device = 0;
+			walk->sb = NULL;
 	spin_unlock(&fat_cache_lock);
 }
 
 
-void fat_cache_inval_dev(kdev_t device)
+void fat_cache_inval_dev(struct super_block *sb)
 {
 	struct fat_cache *walk;
 
 	spin_lock(&fat_cache_lock);
 	for (walk = fat_cache; walk; walk = walk->next)
-		if (walk->device == device)
-			walk->device = 0;
+		if (walk->sb == sb)
+			walk->sb = 0;
 	spin_unlock(&fat_cache_lock);
 }
 

@@ -310,22 +310,16 @@ out:
 
 static int ufs_getfrag_block (struct inode *inode, sector_t fragment, struct buffer_head *bh_result, int create)
 {
-	struct super_block * sb;
-	struct ufs_sb_private_info * uspi;
+	struct super_block * sb = inode->i_sb;
+	struct ufs_sb_private_info * uspi = sb->u.ufs_sb.s_uspi;
 	struct buffer_head * bh;
 	int ret, err, new;
 	unsigned long ptr, phys;
 	
-	sb = inode->i_sb;
-	uspi = sb->u.ufs_sb.s_uspi;
-
 	if (!create) {
 		phys = ufs_frag_map(inode, fragment);
-		if (phys) {
-			bh_result->b_dev = inode->i_dev;
-			bh_result->b_blocknr = phys;
-			bh_result->b_state |= (1UL << BH_Mapped);
-		}
+		if (phys)
+			map_bh(bh_result, sb, phys);
 		return 0;
 	}
 
@@ -392,11 +386,9 @@ get_indirect:
 out:
 	if (err)
 		goto abort;
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = phys;
-	bh_result->b_state |= (1UL << BH_Mapped);
 	if (new)
 		bh_result->b_state |= (1UL << BH_New);
+	map_bh(bh_result, sb, phys);
 abort:
 	unlock_kernel();
 	return err;

@@ -337,7 +337,7 @@ static int do_umount(struct vfsmount *mnt, int flags)
 		spin_unlock(&dcache_lock);
 		lock_kernel();
 		DQUOT_OFF(sb);
-		acct_auto_close(sb->s_dev);
+		acct_auto_close(sb);
 		unlock_kernel();
 		spin_lock(&dcache_lock);
 	}

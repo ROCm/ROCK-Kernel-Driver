@@ -481,17 +481,17 @@ static Scsi_Host_Template powertecscsi_template = {
 
 static int __init powertecscsi_init(void)
 {
-	scsi_register_module(MODULE_SCSI_HA, &powertecscsi_template);
+	scsi_register_host(&powertecscsi_template);
 	if (powertecscsi_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &powertecscsi_template);
+	scsi_unregister_host(&powertecscsi_template);
 	return -ENODEV;
 }
 
 static void __exit powertecscsi_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &powertecscsi_template);
+	scsi_unregister_host(&powertecscsi_template);
 }
 
 module_init(powertecscsi_init);

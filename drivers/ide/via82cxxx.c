@@ -1,5 +1,5 @@
 /*
- * $Id: via82cxxx.c,v 3.29 2001/09/10 10:06:00 vojtech Exp $
+ * $Id: via82cxxx.c,v 3.33 2001/12/23 22:46:12 vojtech Exp $
  *
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
@@ -7,23 +7,21 @@
  *	Michel Aubry
  *	Jeff Garzik
  *	Andre Hedrick
- *
- *  Sponsored by SuSE
  */
 
 /*
  * VIA IDE driver for Linux. Supports
  *
  *   vt82c576, vt82c586, vt82c586a, vt82c586b, vt82c596a, vt82c596b,
- *   vt82c686, vt82c686a, vt82c686b, vt8231, vt8233
+ *   vt82c686, vt82c686a, vt82c686b, vt8231, vt8233, vt8233c, vt8233a
  *
  * southbridges, which can be found in
  *
  *  VIA Apollo Master, VP, VP2, VP2/97, VP3, VPX, VPX/97, MVP3, MVP4, P6, Pro,
  *    ProII, ProPlus, Pro133, Pro133+, Pro133A, Pro133A Dual, Pro133T, Pro133Z,
  *    PLE133, PLE133T, Pro266, Pro266T, ProP4X266, PM601, PM133, PN133, PL133T,
- *    PX266, PM266, KX133, KT133, KT133A, KLE133, KT266, KX266, KM133, KM133A,
- *    KL133, KN133, KM266
+ *    PX266, PM266, KX133, KT133, KT133A, KT133E, KLE133, KT266, KX266, KM133,
+ *    KM133A, KL133, KN133, KM266
  *  PC-Chips VXPro, VXPro+, VXTwo, TXPro-III, TXPro-AGP, AGPPro, ViaGra, BXToo,
  *    BXTel, BXpert
  *  AMD 640, 640 AGP, 750 IronGate, 760, 760MP
@@ -32,9 +30,9 @@
  *
  * chipsets. Supports
  *
- *   PIO 0-5, MWDMA 0-2, SWDMA 0-2 and UDMA 0-5
+ *   PIO 0-5, MWDMA 0-2, SWDMA 0-2 and UDMA 0-6
  *
- * (this includes UDMA33, 66 and 100) modes. UDMA66 and higher modes are
+ * (this includes UDMA33, 66, 100 and 133) modes. UDMA66 and higher modes are
  * autoenabled only in case the BIOS has detected a 80 wire cable. To ignore
  * the BIOS data and assume the cable is present, use 'ide0=ata66' or
  * 'ide1=ata66' on the kernel command line.
@@ -56,8 +54,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/config.h>
@@ -87,10 +85,12 @@
 #define VIA_UDMA_33		0x001
 #define VIA_UDMA_66		0x002
 #define VIA_UDMA_100		0x003
+#define VIA_UDMA_133		0x004
 #define VIA_BAD_PREQ		0x010	/* Crashes if PREQ# till DDACK# set */
 #define VIA_BAD_CLK66		0x020	/* 66 MHz clock doesn't work correctly */
 #define VIA_SET_FIFO		0x040	/* Needs to have FIFO split set */
 #define VIA_NO_UNMASK		0x080	/* Doesn't work with IRQ unmasking on */
+#define VIA_BAD_ID		0x100	/* Has wrong vendor ID (0x1107) */
 
 /*
  * VIA SouthBridge chips.
@@ -104,10 +104,11 @@ static struct via_isa_bridge {
 	unsigned short flags;
 } via_isa_bridges[] = {
 #ifdef FUTURE_BRIDGES
-	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_100 },
-	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_100 },
-	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C,    0x00, 0x2f, VIA_UDMA_100 },
+	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_133 },
+	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_133 },
 #endif
+	{ "vt8233a",	PCI_DEVICE_ID_VIA_8233A,    0x00, 0x2f, VIA_UDMA_133 },
+	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C_0,  0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8233",	PCI_DEVICE_ID_VIA_8233_0,   0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8231",	PCI_DEVICE_ID_VIA_8231,     0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt82c686b",	PCI_DEVICE_ID_VIA_82C686,   0x40, 0x4f, VIA_UDMA_100 },
@@ -121,6 +122,7 @@ static struct via_isa_bridge {
 	{ "vt82c586a",	PCI_DEVICE_ID_VIA_82C586_0, 0x20, 0x2f, VIA_UDMA_33 | VIA_SET_FIFO },
 	{ "vt82c586",	PCI_DEVICE_ID_VIA_82C586_0, 0x00, 0x0f, VIA_UDMA_NONE | VIA_SET_FIFO },
 	{ "vt82c576",	PCI_DEVICE_ID_VIA_82C576,   0x00, 0x2f, VIA_UDMA_NONE | VIA_SET_FIFO | VIA_NO_UNMASK },
+	{ "vt82c576",	PCI_DEVICE_ID_VIA_82C576,   0x00, 0x2f, VIA_UDMA_NONE | VIA_SET_FIFO | VIA_NO_UNMASK | VIA_BAD_ID },
 	{ NULL }
 };
 
@@ -128,7 +130,7 @@ static struct via_isa_bridge *via_config;
 static unsigned char via_enabled;
 static unsigned int via_80w;
 static unsigned int via_clock;
-static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100" };
+static char *via_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA100", "UDMA133" };
 
 /*
  * VIA /proc entry.
@@ -151,7 +153,7 @@ static char *via_control3[] = { "No limit", "64", "128", "192" };
 
 static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 {
-	short speed[4], cycle[4], setup[4], active[4], recover[4], den[4],
+	int speed[4], cycle[4], setup[4], active[4], recover[4], den[4],
 		 uen[4], udma[4], umul[4], active8b[4], recover8b[4];
 	struct pci_dev *dev = bmide_dev;
 	unsigned int v, u, i;
@@ -161,7 +163,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	via_print("----------VIA BusMastering IDE Configuration----------------");
 
-	via_print("Driver Version:                     3.29");
+	via_print("Driver Version:                     3.33");
 	via_print("South Bridge:                       VIA %s", via_config->name);
 
 	pci_read_config_byte(isa_dev, PCI_REVISION_ID, &t);
@@ -170,7 +172,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	via_print("Highest DMA rate:                   %s", via_dma[via_config->flags & VIA_UDMA]);
 
 	via_print("BM-DMA base:                        %#x", via_base);
-	via_print("PCI clock:                          %dMHz", via_clock);
+	via_print("PCI clock:                          %d.%dMHz", via_clock / 1000, via_clock / 100 % 10);
 
 	pci_read_config_byte(dev, VIA_MISC_1, &t);
 	via_print("Master Read  Cycle IRDY:            %dws", (t & 64) >> 6);
@@ -218,40 +220,45 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 		uen[i]       = ((u >> ((3 - i) << 3)) & 0x20);
 		den[i]       = (c & ((i & 1) ? 0x40 : 0x20) << ((i & 2) << 2));
 
-		speed[i] = 20 * via_clock / (active[i] + recover[i]);
-		cycle[i] = 1000 / via_clock * (active[i] + recover[i]);
+		speed[i] = 2 * via_clock / (active[i] + recover[i]);
+		cycle[i] = 1000000 * (active[i] + recover[i]) / via_clock;
 
 		if (!uen[i] || !den[i])
 			continue;
 
 		switch (via_config->flags & VIA_UDMA) {
-			
-			case VIA_UDMA_100:
-				speed[i] = 60 * via_clock / udma[i];
-				cycle[i] = 333 / via_clock * udma[i];
+
+			case VIA_UDMA_33:
+				speed[i] = 2 * via_clock / udma[i];
+				cycle[i] = 1000000 * udma[i] / via_clock;
 				break;
 
 			case VIA_UDMA_66:
-				speed[i] = 40 * via_clock / (udma[i] * umul[i]);
-				cycle[i] = 500 / via_clock * (udma[i] * umul[i]);
+				speed[i] = 4 * via_clock / (udma[i] * umul[i]);
+				cycle[i] = 500000 * (udma[i] * umul[i]) / via_clock;
 				break;
 
-			case VIA_UDMA_33:
-				speed[i] = 20 * via_clock / udma[i];
-				cycle[i] = 1000 / via_clock * udma[i];
+			case VIA_UDMA_100:
+				speed[i] = 6 * via_clock / udma[i];
+				cycle[i] = 333333 * udma[i] / via_clock;
+				break;
+
+			case VIA_UDMA_133:
+				speed[i] = 8 * via_clock / udma[i];
+				cycle[i] = 250000 * udma[i] / via_clock;
 				break;
 		}
 	}
 
 	via_print_drive("Transfer Mode: ", "%10s", den[i] ? (uen[i] ? "UDMA" : "DMA") : "PIO");
 
-	via_print_drive("Address Setup: ", "%8dns", (1000 / via_clock) * setup[i]);
-	via_print_drive("Cmd Active:    ", "%8dns", (1000 / via_clock) * active8b[i]);
-	via_print_drive("Cmd Recovery:  ", "%8dns", (1000 / via_clock) * recover8b[i]);
-	via_print_drive("Data Active:   ", "%8dns", (1000 / via_clock) * active[i]);
-	via_print_drive("Data Recovery: ", "%8dns", (1000 / via_clock) * recover[i]);
+	via_print_drive("Address Setup: ", "%8dns", 1000000 * setup[i] / via_clock);
+	via_print_drive("Cmd Active:    ", "%8dns", 1000000 * active8b[i] / via_clock);
+	via_print_drive("Cmd Recovery:  ", "%8dns", 1000000 * recover8b[i] / via_clock);
+	via_print_drive("Data Active:   ", "%8dns", 1000000 * active[i] / via_clock);
+	via_print_drive("Data Recovery: ", "%8dns", 1000000 * recover[i] / via_clock);
 	via_print_drive("Cycle Time:    ", "%8dns", cycle[i]);
-	via_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 10, speed[i] % 10);
+	via_print_drive("Transfer Rate: ", "%4d.%dMB/s", speed[i] / 1000, speed[i] / 100 % 10);
 
 	return p - buffer;	/* hoping it is less than 4K... */
 }
@@ -280,6 +287,7 @@ static void via_set_speed(struct pci_dev *dev, unsigned char dn, struct ide_timi
 		case VIA_UDMA_33:  t = timing->udma ? (0xe0 | (FIT(timing->udma, 2, 5) - 2)) : 0x03; break;
 		case VIA_UDMA_66:  t = timing->udma ? (0xe8 | (FIT(timing->udma, 2, 9) - 2)) : 0x0f; break;
 		case VIA_UDMA_100: t = timing->udma ? (0xe0 | (FIT(timing->udma, 2, 9) - 2)) : 0x07; break;
+		case VIA_UDMA_133: t = timing->udma ? (0xe0 | (FIT(timing->udma, 2, 9) - 2)) : 0x07; break;
 		default: return;
 	}
 
@@ -296,20 +304,21 @@ static int via_set_drive(ide_drive_t *drive, unsigned char speed)
 {
 	ide_drive_t *peer = HWIF(drive)->drives + (~drive->dn & 1);
 	struct ide_timing t, p;
-	int T, UT;
+	unsigned int T, UT;
 
 	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
 		if (ide_config_drive_speed(drive, speed))
 			printk(KERN_WARNING "ide%d: Drive %d didn't accept speed setting. Oh, well.\n",
 				drive->dn >> 1, drive->dn & 1);
 
-	T = 1000 / via_clock;
+	T = 1000000000 / via_clock;
 
 	switch (via_config->flags & VIA_UDMA) {
 		case VIA_UDMA_33:   UT = T;   break;
 		case VIA_UDMA_66:   UT = T/2; break;
 		case VIA_UDMA_100:  UT = T/3; break;
-		default:	    UT = T;   break;
+		case VIA_UDMA_133:  UT = T/4; break;
+		default: UT = T;
 	}
 
 	ide_timing_compute(drive, speed, &t, T, UT);
@@ -365,7 +374,8 @@ int via82cxxx_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA |
 			(via_config->flags & VIA_UDMA ? XFER_UDMA : 0) |
 			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_100 ? XFER_UDMA_100 : 0));
+			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_100 ? XFER_UDMA_100 : 0) |
+			(w80 && (via_config->flags & VIA_UDMA) >= VIA_UDMA_133 ? XFER_UDMA_133 : 0));
 
 		via_set_drive(drive, speed);
 
@@ -395,14 +405,16 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
  */
 
 	for (via_config = via_isa_bridges; via_config->id; via_config++)
-		if ((isa = pci_find_device(PCI_VENDOR_ID_VIA, via_config->id, NULL))) {
+		if ((isa = pci_find_device(PCI_VENDOR_ID_VIA +
+			!!(via_config->flags & VIA_BAD_ID), via_config->id, NULL))) {
+
 			pci_read_config_byte(isa, PCI_REVISION_ID, &t);
 			if (t >= via_config->rev_min && t <= via_config->rev_max)
 				break;
 		}
 
 	if (!via_config->id) {
-		printk(KERN_WARNING "VP_IDE: Unknown VIA SouthBridge, contact Vojtech Pavlik <vojtech@suse.cz>\n");
+		printk(KERN_WARNING "VP_IDE: Unknown VIA SouthBridge, contact Vojtech Pavlik <vojtech@ucw.cz>\n");
 		return -ENODEV;
 	}
 
@@ -412,22 +424,28 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
 
 	switch (via_config->flags & VIA_UDMA) {
 
-		case VIA_UDMA_100:
-
-			pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);
-			for (i = 24; i >= 0; i -= 8)
-				if (((u >> i) & 0x10) || (((u >> i) & 0x20) && (((u >> i) & 7) < 3)))
-					via_80w |= (1 << (1 - (i >> 4)));	/* BIOS 80-wire bit or UDMA w/ < 50ns/cycle */
-			break;
-
 		case VIA_UDMA_66:
-
 			pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);	/* Enable Clk66 */
 			pci_write_config_dword(dev, VIA_UDMA_TIMING, u | 0x80008);
 			for (i = 24; i >= 0; i -= 8)
 				if (((u >> (i & 16)) & 8) && ((u >> i) & 0x20) && (((u >> i) & 7) < 2))
 					via_80w |= (1 << (1 - (i >> 4)));	/* 2x PCI clock and UDMA w/ < 3T/cycle */
 			break;
+
+		case VIA_UDMA_100:
+			pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);
+			for (i = 24; i >= 0; i -= 8)
+				if (((u >> i) & 0x10) || (((u >> i) & 0x20) && (((u >> i) & 7) < 4)))
+					via_80w |= (1 << (1 - (i >> 4)));	/* BIOS 80-wire bit or UDMA w/ < 60ns/cycle */
+			break;
+
+		case VIA_UDMA_133:
+			pci_read_config_dword(dev, VIA_UDMA_TIMING, &u);
+			for (i = 24; i >= 0; i -= 8)
+				if (((u >> i) & 0x10) || (((u >> i) & 0x20) && (((u >> i) & 7) < 8)))
+					via_80w |= (1 << (1 - (i >> 4)));	/* BIOS 80-wire bit or UDMA w/ < 60ns/cycle */
+			break;
+
 	}
 
 	if (via_config->flags & VIA_BAD_CLK66) {			/* Disable Clk66 */
@@ -466,10 +484,17 @@ unsigned int __init pci_init_via82cxxx(struct pci_dev *dev, const char *name)
  * Determine system bus clock.
  */
 
-	via_clock = system_bus_clock();
-	if (via_clock < 20 || via_clock > 50) {
+	via_clock = system_bus_clock() * 1000;
+
+	switch (via_clock) {
+		case 33000: via_clock = 33333; break;
+		case 37000: via_clock = 37500; break;
+		case 41000: via_clock = 41666; break;
+	}
+
+	if (via_clock < 20000 || via_clock > 50000) {
 		printk(KERN_WARNING "VP_IDE: User given PCI clock speed impossible (%d), using 33 MHz instead.\n", via_clock);
-		printk(KERN_WARNING "VP_IDE: Use ide0=ata66 if you want to force UDMA66/UDMA100.\n");
+		printk(KERN_WARNING "VP_IDE: Use ide0=ata66 if you want to assume 80-wire cable.\n");
 		via_clock = 33;
 	}
 

@@ -41,7 +41,6 @@ void cpu_idle(void *unused)
 	/* endless idle loop with no priority at all */
 	init_idle();
 	current->nice = 20;
-	current->counter = -100;
 
 	while (1) {
 		if (hlt_counter) {

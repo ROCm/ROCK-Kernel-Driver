@@ -76,7 +76,7 @@ struct acct
 #include <linux/config.h>
 
 #ifdef CONFIG_BSD_PROCESS_ACCT
-extern void acct_auto_close(kdev_t dev);
+extern void acct_auto_close(struct super_block *sb);
 extern int acct_process(long exitcode);
 #else
 #define acct_auto_close(x)	do { } while (0)

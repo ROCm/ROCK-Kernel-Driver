@@ -324,11 +324,7 @@ static int udf_get_block(struct inode *inode, sector_t block, struct buffer_head
 	{
 		phys = udf_block_map(inode, block);
 		if (phys)
-		{
-			bh_result->b_dev = inode->i_dev;
-			bh_result->b_blocknr = phys;
-			bh_result->b_state |= (1UL << BH_Mapped);
-		}
+			map_bh(bh_result, inode->i_sb, phys);
 		return 0;
 	}
 
@@ -357,11 +353,9 @@ static int udf_get_block(struct inode *inode, sector_t block, struct buffer_head
 	if (!phys)
 		BUG();
 
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = phys;
-	bh_result->b_state |= (1UL << BH_Mapped);
 	if (new)
 		bh_result->b_state |= (1UL << BH_New);
+	map_bh(bh_result, inode->i_sb, phys);
 abort:
 	unlock_kernel();
 	return err;

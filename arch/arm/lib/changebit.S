@@ -14,7 +14,9 @@
 /* Purpose  : Function to change a bit
  * Prototype: int change_bit(int bit, void *addr)
  */
-ENTRY(change_bit)
+ENTRY(_change_bit_be)
+		eor	r0, r0, #0x18		@ big endian byte ordering
+ENTRY(_change_bit_le)
 		and	r2, r0, #7
 		mov	r3, #1
 		mov	r3, r3, lsl r2

@@ -11,7 +11,9 @@
 #include <asm/assembler.h>
                 .text
 
-ENTRY(test_and_change_bit)
+ENTRY(_test_and_change_bit_be)
+		eor	r0, r0, #0x18		@ big endian byte ordering
+ENTRY(_test_and_change_bit_le)
 		add	r1, r1, r0, lsr #3
 		and	r3, r0, #7
 		mov	r0, #1

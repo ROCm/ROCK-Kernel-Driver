@@ -15,14 +15,14 @@
  * Purpose  : Find a 'zero' bit
  * Prototype: int find_first_zero_bit(void *addr, int maxbit);
  */
-ENTRY(find_first_zero_bit)
+ENTRY(_find_first_zero_bit_le)
 		mov	r2, #0
-.bytelp:	ldrb	r3, [r0, r2, lsr #3]
+1:		ldrb	r3, [r0, r2, lsr #3]
 		eors	r3, r3, #0xff		@ invert bits
 		bne	.found			@ any now set - found zero bit
 		add	r2, r2, #8		@ next bit pointer
 		cmp	r2, r1			@ any more?
-		bcc	.bytelp
+		bcc	1b
 		add	r0, r1, #1		@ no free bits
 		RETINSTR(mov,pc,lr)
 
@@ -30,15 +30,43 @@ ENTRY(find_first_zero_bit)
  * Purpose  : Find next 'zero' bit
  * Prototype: int find_next_zero_bit(void *addr, int maxbit, int offset)
  */
-ENTRY(find_next_zero_bit)
+ENTRY(_find_next_zero_bit_le)
 		ands	ip, r2, #7
-		beq	.bytelp			@ If new byte, goto old routine
+		beq	1b			@ If new byte, goto old routine
 		ldrb	r3, [r0, r2, lsr#3]
+		eor	r3, r3, #0xff		@ now looking for a 1 bit
+		movs	r3, r3, lsr ip		@ shift off unused bits
+		bne	.found
+		orr	r2, r2, #7		@ if zero, then no bits here
+		add	r2, r2, #1		@ align bit pointer
+		b	1b			@ loop for next bit
+
+#ifdef __ARMEB__
+
+ENTRY(_find_first_zero_bit_be)
+		mov	r2, #0
+1:		eor	r3, r2, #0x18		@ big endian byte ordering
+		ldrb	r3, [r0, r3, lsr #3]
+		eors	r3, r3, #0xff		@ invert bits
+		bne	.found			@ any now set - found zero bit
+		add	r2, r2, #8		@ next bit pointer
+		cmp	r2, r1			@ any more?
+		bcc	1b
+		add	r0, r1, #1		@ no free bits
+		RETINSTR(mov,pc,lr)
+
+ENTRY(_find_next_zero_bit_be)
+		ands	ip, r2, #7
+		beq	1b			@ If new byte, goto old routine
+		eor	r3, r2, #0x18		@ big endian byte ordering
+		ldrb	r3, [r0, r3, lsr#3]
 		eor	r3, r3, #0xff		@ now looking for a 1 bit
 		movs	r3, r3, lsr ip		@ shift off unused bits
 		orreq	r2, r2, #7		@ if zero, then no bits here
 		addeq	r2, r2, #1		@ align bit pointer
-		beq	.bytelp			@ loop for next bit
+		beq	1b			@ loop for next bit
+
+#endif
 
 /*
  * One or more bits in the LSB of r3 are assumed to be set.

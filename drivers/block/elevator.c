@@ -101,15 +101,13 @@ inline int bio_rq_in_between(struct bio *bio, struct request *rq,
  */
 inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 {
-	if (!(rq->flags & REQ_CMD))
+	if (!rq_mergeable(rq))
 		return 0;
 
 	/*
 	 * different data direction or already started, don't merge
 	 */
 	if (bio_data_dir(bio) != rq_data_dir(rq))
-		return 0;
-	if (rq->flags & REQ_NOMERGE)
 		return 0;
 
 	/*
@@ -124,21 +122,21 @@ inline int elv_rq_merge_ok(struct request *rq, struct bio *bio)
 inline int elv_try_merge(struct request *__rq, struct bio *bio)
 {
 	unsigned int count = bio_sectors(bio);
-
-	if (!elv_rq_merge_ok(__rq, bio))
-		return ELEVATOR_NO_MERGE;
+	int ret = ELEVATOR_NO_MERGE;
 
 	/*
 	 * we can merge and sequence is ok, check if it's possible
 	 */
-	if (__rq->sector + __rq->nr_sectors == bio->bi_sector) {
-		return ELEVATOR_BACK_MERGE;
-	} else if (__rq->sector - count == bio->bi_sector) {
-		__rq->elevator_sequence -= count;
-		return ELEVATOR_FRONT_MERGE;
+	if (elv_rq_merge_ok(__rq, bio)) {
+		if (__rq->sector + __rq->nr_sectors == bio->bi_sector) {
+			ret = ELEVATOR_BACK_MERGE;
+		} else if (__rq->sector - count == bio->bi_sector) {
+			__rq->elevator_sequence -= count;
+			ret = ELEVATOR_FRONT_MERGE;
+		}
 	}
 
-	return ELEVATOR_NO_MERGE;
+	return ret;
 }
 
 int elevator_linus_merge(request_queue_t *q, struct request **req,
@@ -176,7 +174,7 @@ int elevator_linus_merge(request_queue_t *q, struct request **req,
 			break;
 		if (!(__rq->flags & REQ_CMD))
 			continue;
-		if (__rq->elevator_sequence < 0)
+		if (__rq->elevator_sequence < bio_sectors(bio))
 			break;
 
 		if (!*req && bio_rq_in_between(bio, __rq, &q->queue_head))

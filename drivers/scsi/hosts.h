@@ -521,17 +521,14 @@ struct Scsi_Device_Template
 
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt);
 
-int scsi_register_device(struct Scsi_Device_Template * sdpnt);
 
-/* These are used by loadable modules */
-extern int scsi_register_module(int, void *);
-extern int scsi_unregister_module(int, void *);
-
-/* The different types of modules that we can load and unload */
-#define MODULE_SCSI_HA 1
-#define MODULE_SCSI_CONST 2
-#define MODULE_SCSI_IOCTL 3
-#define MODULE_SCSI_DEV 4
+/*
+ * Driver registration/unregistration.
+ */
+extern int scsi_register_device(struct Scsi_Device_Template *);
+extern int scsi_unregister_device(struct Scsi_Device_Template *);
+extern int scsi_register_host(Scsi_Host_Template *);
+extern int scsi_unregister_host(Scsi_Host_Template *);
 
 
 /*

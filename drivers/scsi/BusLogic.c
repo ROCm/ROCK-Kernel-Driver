@@ -4106,7 +4106,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, KernelDevice_T Device,
   BusLogic_HostAdapter_T *HostAdapter =
     (BusLogic_HostAdapter_T *) Disk->device->host->hostdata;
   BIOS_DiskParameters_T *DiskParameters = (BIOS_DiskParameters_T *) Parameters;
-  struct buffer_head *BufferHead;
+  unsigned char *buf;
   if (HostAdapter->ExtendedTranslationEnabled &&
       Disk->capacity >= 2*1024*1024 /* 1 GB in 512 byte sectors */)
     {
@@ -4128,20 +4128,16 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, KernelDevice_T Device,
     }
   DiskParameters->Cylinders =
     Disk->capacity / (DiskParameters->Heads * DiskParameters->Sectors);
-  /*
-    Attempt to read the first 1024 bytes from the disk device.
-  */
-  BufferHead = bread(MKDEV(MAJOR(Device), MINOR(Device) & ~0x0F), 0, 1024);
-  if (BufferHead == NULL) return 0;
+  buf = scsi_bios_ptable(Device);
+  if (buf == NULL) return 0;
   /*
     If the boot sector partition table flag is valid, search for a partition
     table entry whose end_head matches one of the standard BusLogic geometry
     translations (64/32, 128/32, or 255/63).
   */
-  if (*(unsigned short *) (BufferHead->b_data + 0x1FE) == 0xAA55)
+  if (*(unsigned short *) (buf+64) == 0xAA55)
     {
-      PartitionTable_T *FirstPartitionEntry =
-	(PartitionTable_T *) (BufferHead->b_data + 0x1BE);
+      PartitionTable_T *FirstPartitionEntry = (PartitionTable_T *) buf;
       PartitionTable_T *PartitionEntry = FirstPartitionEntry;
       int SavedCylinders = DiskParameters->Cylinders, PartitionNumber;
       unsigned char PartitionEntryEndHead, PartitionEntryEndSector;
@@ -4195,7 +4191,7 @@ int BusLogic_BIOSDiskParameters(SCSI_Disk_T *Disk, KernelDevice_T Device,
 			   DiskParameters->Heads, DiskParameters->Sectors);
 	}
     }
-  brelse(BufferHead);
+  kfree(buf);
   return 0;
 }
 

@@ -387,18 +387,14 @@ static int pdcraid1_make_request (request_queue_t *q, int rw, struct buffer_head
 
 #include "pdcraid.h"
 
-static unsigned long calc_pdcblock_offset (int major,int minor)
+static unsigned long calc_pdcblock_offset(struct block_device *bdev)
 {
 	unsigned long lba = 0;
-	kdev_t dev;
-	ide_drive_t *ideinfo;
-	
-	dev = MKDEV(major,minor);
-	ideinfo = get_info_ptr (dev);
+	ide_drive_t *ideinfo = get_info_ptr(to_kdev_t(bdev->bd_dev));
+
 	if (ideinfo==NULL)
 		return 0;
-	
-	
+
 	/* first sector of the last cluster */
 	if (ideinfo->head==0) 
 		return 0;
@@ -412,42 +408,32 @@ static unsigned long calc_pdcblock_offset (int major,int minor)
 }
 
 
-static int read_disk_sb (int major, int minor, unsigned char *buffer,int bufsize)
+static int read_disk_sb(struct block_device *bdev, struct promise_raid_conf *p)
 {
-	int ret = -EINVAL;
-	struct buffer_head *bh = NULL;
-	kdev_t dev = MKDEV(major,minor);
 	unsigned long sb_offset;
+	char *buffer;
+	int i;
 
-	if (blksize_size[major]==NULL)   /* device doesn't exist */
-		return -EINVAL;
-                       
-	
 	/*
 	 * Calculate the position of the superblock,
 	 * it's at first sector of the last cylinder
 	 */
-	sb_offset = calc_pdcblock_offset(major,minor)/8;
-	/* The /8 transforms sectors into 4Kb blocks */
+	sb_offset = calc_pdcblock_offset(bdev);
 
 	if (sb_offset==0)
 		return -1;	
-	
-	set_blocksize (dev, 4096);
 
-	bh = bread (dev, sb_offset, 4096);
-	
-	if (bh) {
-		memcpy (buffer, bh->b_data, bufsize);
-	} else {
-		printk(KERN_ERR "pdcraid: Error reading superblock.\n");
-		goto abort;
+	for (i = 0, buffer = (char*)p; i < 4; i++, buffer += 512) {
+		Sector sect;
+		char *q = read_dev_sector(bdev, sb_offset + i, &sect);
+		if (!p) {
+			printk(KERN_ERR "pdcraid: Error reading superblock.\n");
+			return -1;
+		}
+		memcpy(buffer, q, 512);
+		put_dev_sector(&sect);
 	}
-	ret = 0;
-abort:
-	if (bh)
-		brelse (bh);
-	return ret;
+	return 0;
 }
 
 static unsigned int calc_sb_csum (unsigned int* ptr)
@@ -464,12 +450,11 @@ static unsigned int calc_sb_csum (unsigned int* ptr)
 
 static int cookie = 0;
 
+static struct promise_raid_conf __initdata prom;
 static void __init probedisk(int devindex,int device, int raidlevel)
 {
 	int i;
 	int major, minor;
-        struct promise_raid_conf *prom;
-	static unsigned char block[4096];
 	struct block_device *bdev;
 
 	if (devlist[devindex].device!=-1) /* already assigned to another array */
@@ -478,44 +463,48 @@ static void __init probedisk(int devindex,int device, int raidlevel)
 	major = devlist[devindex].major;
 	minor = devlist[devindex].minor; 
 
-        if (read_disk_sb(major,minor,(unsigned char*)&block,sizeof(block)))
-        	return;
-                                                                                                                 
-        prom = (struct promise_raid_conf*)&block[512];
+	bdev = bdget(MKDEV(major,minor));
+	if (!bdev)
+		return;
+
+	if (blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW) != 0)
+		return;
+
+        if (read_disk_sb(bdev, &prom))
+        	goto out;
 
         /* the checksums must match */
-	if (prom->checksum != calc_sb_csum((unsigned int*)prom))
-		return;
-	if (prom->raid.type!=raidlevel) /* different raidlevel */
-		return;
+	if (prom.checksum != calc_sb_csum((unsigned int*)&prom))
+		goto out;
+	if (prom.raid.type!=raidlevel) /* different raidlevel */
+		goto out;
 
-	if ((cookie!=0) && (cookie != prom->raid.magic_1)) /* different array */
-		return;
+	if ((cookie!=0) && (cookie != prom.raid.magic_1)) /* different array */
+		goto out;
 	
-	cookie = prom->raid.magic_1;
+	cookie = prom.raid.magic_1;
 
 	/* This looks evil. But basically, we have to search for our adapternumber
 	   in the arraydefinition, both of which are in the superblock */	
-        for (i=0;(i<prom->raid.total_disks)&&(i<8);i++) {
-        	if ( (prom->raid.disk[i].channel== prom->raid.channel) &&
-        	     (prom->raid.disk[i].device == prom->raid.device) ) {
+        for (i=0;(i<prom.raid.total_disks)&&(i<8);i++) {
+        	if ( (prom.raid.disk[i].channel== prom.raid.channel) &&
+        	     (prom.raid.disk[i].device == prom.raid.device) ) {
 
-        	        bdev = bdget(MKDEV(major,minor));
-        	        if (bdev && blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_RAW) == 0) {
-				raid[device].disk[i].bdev = bdev;
-			}
+			raid[device].disk[i].bdev = bdev;
 			raid[device].disk[i].device = MKDEV(major,minor);
-			raid[device].disk[i].sectors = prom->raid.disk_secs;
-			raid[device].stride = (1<<prom->raid.raid0_shift);
-			raid[device].disks = prom->raid.total_disks;
-			raid[device].sectors = prom->raid.total_secs;
-			raid[device].geom.heads = prom->raid.heads+1;
-			raid[device].geom.sectors = prom->raid.sectors;
-			raid[device].geom.cylinders = prom->raid.cylinders+1;
+			raid[device].disk[i].sectors = prom.raid.disk_secs;
+			raid[device].stride = (1<<prom.raid.raid0_shift);
+			raid[device].disks = prom.raid.total_disks;
+			raid[device].sectors = prom.raid.total_secs;
+			raid[device].geom.heads = prom.raid.heads+1;
+			raid[device].geom.sectors = prom.raid.sectors;
+			raid[device].geom.cylinders = prom.raid.cylinders+1;
 			devlist[devindex].device=device;
-        	     }
+			return;
+		}
         }
-	               
+out:
+	blkdev_put(bdev, BDEV_RAW);
 }
 
 static void __init fill_cutoff(int device)

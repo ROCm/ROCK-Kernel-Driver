@@ -579,17 +579,17 @@ static Scsi_Host_Template cumanascsi2_template = {
 
 static int __init cumanascsi2_init(void)
 {
-	scsi_register_module(MODULE_SCSI_HA, &cumanascsi2_template);
+	scsi_register_host(&cumanascsi2_template);
 	if (cumanascsi2_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &cumanascsi2_template);
+	scsi_unregister_host(&cumanascsi2_template);
 	return -ENODEV;
 }
 
 static void __exit cumanascsi2_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &cumanascsi2_template);
+	scsi_unregister_host(&cumanascsi2_template);
 }
 
 module_init(cumanascsi2_init);

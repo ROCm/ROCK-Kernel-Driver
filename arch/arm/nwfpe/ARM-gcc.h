@@ -1,11 +1,3 @@
-
-/*
--------------------------------------------------------------------------------
-One of the macros `BIGENDIAN' or `LITTLEENDIAN' must be defined.
--------------------------------------------------------------------------------
-*/
-#define LITTLEENDIAN
-
 /*
 -------------------------------------------------------------------------------
 The macro `BITS64' can be defined to indicate that 64-bit integer types are

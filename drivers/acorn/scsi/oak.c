@@ -270,17 +270,17 @@ static Scsi_Host_Template oakscsi_template = {
 
 static int __init oakscsi_init(void)
 {
-	scsi_register_module(MODULE_SCSI_HA, &oakscsi_template);
+	scsi_register_host(&oakscsi_template);
 	if (oakscsi_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &oakscsi_template);
+	scsi_unregister_host(&oakscsi_template);
 	return -ENODEV;
 }
 
 static void __exit oakscsi_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &oakscsi_template);
+	scsi_unregister_host(&oakscsi_template);
 }
 
 module_init(oakscsi_init);

@@ -63,9 +63,9 @@ static void release_task(struct task_struct * p)
 		 * timeslices, because any timeslice recovered here
 		 * was given away by the parent in the first place.)
 		 */
-		current->counter += p->counter;
-		if (current->counter >= MAX_COUNTER)
-			current->counter = MAX_COUNTER;
+		current->time_slice += p->time_slice;
+		if (current->time_slice > MAX_TSLICE)
+			current->time_slice = MAX_TSLICE;
 		p->pid = 0;
 		free_task_struct(p);
 	} else {

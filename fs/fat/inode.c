@@ -185,7 +185,7 @@ void fat_put_super(struct super_block *sb)
 	if (MSDOS_SB(sb)->fat_bits == 32) {
 		fat_clusters_flush(sb);
 	}
-	fat_cache_inval_dev(sb->s_dev);
+	fat_cache_inval_dev(sb);
 	set_blocksize (sb->s_dev,BLOCK_SIZE);
 	if (MSDOS_SB(sb)->nls_disk) {
 		unload_nls(MSDOS_SB(sb)->nls_disk);

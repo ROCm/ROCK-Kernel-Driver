@@ -277,7 +277,7 @@ static void qlogic_config(dev_link_t *link)
     else
 	qlogicfas_preset(link->io.BasePort1, link->irq.AssignedIRQ);
     
-    scsi_register_module(MODULE_SCSI_HA, &driver_template);
+    scsi_register_host(&driver_template);
 
     tail = &link->dev;
     info->ndev = 0;
@@ -341,7 +341,7 @@ static void qlogic_release(u_long arg)
 	return;
     }
 
-    scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+    scsi_unregister_host(&driver_template);
     link->dev = NULL;
     
     CardServices(ReleaseConfiguration, link->handle);

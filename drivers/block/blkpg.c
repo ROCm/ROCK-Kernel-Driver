@@ -201,6 +201,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 	struct gendisk *g;
 	u64 ullval = 0;
 	int intval, *iptr;
+	unsigned short usval;
 
 	if (!dev)
 		return -EINVAL;
@@ -247,9 +248,12 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 			return put_user(iptr[MINOR(dev)], (long *) arg);
 
 		case BLKSECTGET:
-			if ((q = blk_get_queue(dev)))
-				return put_user(q->max_sectors, (unsigned short *)arg);
-			return -EINVAL;
+			if ((q = blk_get_queue(dev)) == NULL)
+				return -EINVAL;
+
+			usval = q->max_sectors;
+			blk_put_queue(q);
+			return put_user(usval, (unsigned short *)arg);
 
 		case BLKFLSBUF:
 			if (!capable(CAP_SYS_ADMIN))
@@ -291,9 +295,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 
 		case BLKBSZGET:
 			/* get the logical block size (cf. BLKSSZGET) */
-			intval = BLOCK_SIZE;
-			if (blksize_size[MAJOR(dev)])
-				intval = blksize_size[MAJOR(dev)][MINOR(dev)];
+			intval = block_size(dev);
 			return put_user(intval, (int *) arg);
 
 		case BLKBSZSET:

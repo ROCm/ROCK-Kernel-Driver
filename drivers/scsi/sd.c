@@ -99,6 +99,7 @@ static void sd_detach(Scsi_Device *);
 static int sd_init_command(Scsi_Cmnd *);
 
 static struct Scsi_Device_Template sd_template = {
+	module:THIS_MODULE,
 	name:"disk",
 	tag:"sd",
 	scsi_type:TYPE_DISK,
@@ -1332,14 +1333,14 @@ static void sd_detach(Scsi_Device * SDp)
 static int __init init_sd(void)
 {
 	sd_template.module = THIS_MODULE;
-	return scsi_register_module(MODULE_SCSI_DEV, &sd_template);
+	return scsi_register_device(&sd_template);
 }
 
 static void __exit exit_sd(void)
 {
 	int i;
 
-	scsi_unregister_module(MODULE_SCSI_DEV, &sd_template);
+	scsi_unregister_device(&sd_template);
 
 	for (i = 0; i < N_USED_SD_MAJORS; i++)
 		devfs_unregister_blkdev(SD_MAJOR(i), "sd");

@@ -55,9 +55,7 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 
 	phys = fat_bmap(inode, iblock);
 	if (phys) {
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = phys;
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, inode->i_sb, phys);
 		return 0;
 	}
 	if (!create)
@@ -74,10 +72,8 @@ int fat_get_block(struct inode *inode, sector_t iblock, struct buffer_head *bh_r
 	phys = fat_bmap(inode, iblock);
 	if (!phys)
 		BUG();
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = phys;
-	bh_result->b_state |= (1UL << BH_Mapped);
 	bh_result->b_state |= (1UL << BH_New);
+	map_bh(bh_result, inode->i_sb, phys);
 	return 0;
 }
 

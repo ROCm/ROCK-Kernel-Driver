@@ -34,7 +34,6 @@ asmlinkage int cpu_idle(void)
 	/* endless idle loop with no priority at all */
 	init_idle();
 	current->nice = 20;
-	current->counter = -100;
 	while (1) {
 		while (!current->need_resched)
 			if (wait_available)

@@ -3142,18 +3142,17 @@ static Scsi_Host_Template acornscsi_template = {
 
 static int __init acornscsi_init(void)
 {
-	acornscsi_template.module = THIS_MODULE;
-	scsi_register_module(MODULE_SCSI_HA, &acornscsi_template);
+	scsi_register_host(&acornscsi_template);
 	if (acornscsi_template.present)
 		return 0;
 
-	scsi_unregister_module(MODULE_SCSI_HA, &acornscsi_template);
+	scsi_unregister_host(&acornscsi_template);
 	return -ENODEV;
 }
 
 static void __exit acornscsi_exit(void)
 {
-	scsi_unregister_module(MODULE_SCSI_HA, &acornscsi_template);
+	scsi_unregister_host(&acornscsi_template);
 }
 
 module_init(acornscsi_init);

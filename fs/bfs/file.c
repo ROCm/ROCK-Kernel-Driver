@@ -25,14 +25,14 @@ struct file_operations bfs_file_operations = {
 	mmap:	generic_file_mmap,
 };
 
-static int bfs_move_block(unsigned long from, unsigned long to, kdev_t dev)
+static int bfs_move_block(unsigned long from, unsigned long to, struct super_block *sb)
 {
 	struct buffer_head *bh, *new;
 
-	bh = bread(dev, from, BFS_BSIZE);
+	bh = sb_bread(sb, from);
 	if (!bh)
 		return -EIO;
-	new = getblk(dev, to, BFS_BSIZE);
+	new = sb_getblk(sb, to);
 	memcpy(new->b_data, bh->b_data, bh->b_size);
 	mark_buffer_dirty(new);
 	bforget(bh);
@@ -40,14 +40,14 @@ static int bfs_move_block(unsigned long from, unsigned long to, kdev_t dev)
 	return 0;
 }
 
-static int bfs_move_blocks(kdev_t dev, unsigned long start, unsigned long end, 
+static int bfs_move_blocks(struct super_block *sb, unsigned long start, unsigned long end, 
 				unsigned long where)
 {
 	unsigned long i;
 
 	dprintf("%08lx-%08lx->%08lx\n", start, end, where);
 	for (i = start; i <= end; i++)
-		if(bfs_move_block(i, where + i, dev)) {
+		if(bfs_move_block(i, where + i, sb)) {
 			dprintf("failed to move block %08lx -> %08lx\n", i, where + i);
 			return -EIO;
 		}
@@ -69,9 +69,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	if (!create) {
 		if (phys <= inode->iu_eblock) {
 			dprintf("c=%d, b=%08lx, phys=%08lx (granted)\n", create, block, phys);
-			bh_result->b_dev = inode->i_dev;
-			bh_result->b_blocknr = phys;
-			bh_result->b_state |= (1UL << BH_Mapped);
+			map_bh(bh_result, sb, phys);
 		}
 		return 0;
 	}
@@ -81,9 +79,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	if (inode->i_size && phys <= inode->iu_eblock) {
 		dprintf("c=%d, b=%08lx, phys=%08lx (interim block granted)\n", 
 				create, block, phys);
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = phys;
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, sb, phys);
 		return 0;
 	}
 
@@ -95,9 +91,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	if (inode->iu_eblock == sb->su_lf_eblk) {
 		dprintf("c=%d, b=%08lx, phys=%08lx (simple extension)\n", 
 				create, block, phys);
-		bh_result->b_dev = inode->i_dev;
-		bh_result->b_blocknr = phys;
-		bh_result->b_state |= (1UL << BH_Mapped);
+		map_bh(bh_result, sb, phys);
 		sb->su_freeb -= phys - inode->iu_eblock;
 		sb->su_lf_eblk = inode->iu_eblock = phys;
 		mark_inode_dirty(inode);
@@ -109,7 +103,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	/* Ok, we have to move this entire file to the next free block */
 	phys = sb->su_lf_eblk + 1;
 	if (inode->iu_sblock) { /* if data starts on block 0 then there is no data */
-		err = bfs_move_blocks(inode->i_dev, inode->iu_sblock, 
+		err = bfs_move_blocks(inode->i_sb, inode->iu_sblock, 
 				inode->iu_eblock, phys);
 		if (err) {
 			dprintf("failed to move ino=%08lx -> fs corruption\n", inode->i_ino);
@@ -128,9 +122,7 @@ static int bfs_get_block(struct inode * inode, sector_t block,
 	sb->su_freeb -= inode->iu_eblock - inode->iu_sblock + 1 - inode->i_blocks;
 	mark_inode_dirty(inode);
 	mark_buffer_dirty(sbh);
-	bh_result->b_dev = inode->i_dev;
-	bh_result->b_blocknr = phys;
-	bh_result->b_state |= (1UL << BH_Mapped);
+	map_bh(bh_result, sb, phys);
 out:
 	unlock_kernel();
 	return err;

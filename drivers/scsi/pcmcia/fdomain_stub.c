@@ -254,7 +254,7 @@ static void fdomain_config(dev_link_t *link)
     ints[2] = link->irq.AssignedIRQ;
     fdomain_setup("PCMCIA setup", ints);
     
-    scsi_register_module(MODULE_SCSI_HA, &driver_template);
+    scsi_register_host(&driver_template);
 
     tail = &link->dev;
     info->ndev = 0;
@@ -319,7 +319,7 @@ static void fdomain_release(u_long arg)
 	return;
     }
 
-    scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+    scsi_unregister_host(&driver_template);
     link->dev = NULL;
     
     CardServices(ReleaseConfiguration, link->handle);

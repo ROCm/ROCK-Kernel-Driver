@@ -121,6 +121,7 @@ static rwlock_t sg_dev_arr_lock = RW_LOCK_UNLOCKED;  /* Also used to lock
 
 static struct Scsi_Device_Template sg_template =
 {
+      module:THIS_MODULE,
       tag:"sg",
       scsi_type:0xff,
       major:SCSI_GENERIC_MAJOR,
@@ -1378,8 +1379,7 @@ MODULE_PARM_DESC(def_reserved_size, "size of buffer reserved for each fd");
 static int __init init_sg(void) {
     if (def_reserved_size >= 0)
 	sg_big_buff = def_reserved_size;
-    sg_template.module = THIS_MODULE;
-    return scsi_register_module(MODULE_SCSI_DEV, &sg_template);
+    return scsi_register_device(&sg_template);
 }
 
 static void __exit exit_sg( void)
@@ -1387,7 +1387,7 @@ static void __exit exit_sg( void)
 #ifdef CONFIG_PROC_FS
     sg_proc_cleanup();
 #endif  /* CONFIG_PROC_FS */
-    scsi_unregister_module(MODULE_SCSI_DEV, &sg_template);
+    scsi_unregister_device(&sg_template);
     devfs_unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
     if(sg_dev_arr != NULL) {
 	kfree((char *)sg_dev_arr);

@@ -94,6 +94,8 @@ rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;	/* outer */
 
 static LIST_HEAD(runqueue_head);
 
+static unsigned long rcl_curr = 0;
+
 /*
  * We align per-CPU scheduling data on cacheline boundaries,
  * to prevent cacheline ping-pong.
@@ -165,10 +167,11 @@ static inline int goodness(struct task_struct * p, int this_cpu, struct mm_struc
 		 * Don't do any other calculations if the time slice is
 		 * over..
 		 */
-		weight = p->counter;
-		if (!weight)
-			goto out;
-			
+		if (!p->time_slice)
+			return 0;
+
+		weight = p->dyn_prio + 1;
+
 #ifdef CONFIG_SMP
 		/* Give a largish advantage to the same processor...   */
 		/* (this is equivalent to penalizing other processors) */
@@ -309,6 +312,9 @@ send_now_idle:
  */
 static inline void add_to_runqueue(struct task_struct * p)
 {
+	p->dyn_prio += rcl_curr - p->rcl_last;
+	p->rcl_last = rcl_curr;
+	if (p->dyn_prio > MAX_DYNPRIO) p->dyn_prio = MAX_DYNPRIO;
 	list_add(&p->run_list, &runqueue_head);
 	nr_running++;
 }
@@ -521,6 +527,24 @@ asmlinkage void schedule_tail(struct task_struct *prev)
 	__schedule_tail(prev);
 }
 
+void expire_task(struct task_struct *p)
+{
+	if (!p->time_slice)
+		p->need_resched = 1;
+	else {
+		if (!--p->time_slice) {
+			if (p->dyn_prio > 0) {
+				--p->time_slice;
+				--p->dyn_prio;
+			}
+			p->need_resched = 1;
+		} else if (p->time_slice < -NICE_TO_TICKS(p->nice)) {
+			p->time_slice = 0;
+			p->need_resched = 1;
+		}
+	}
+}
+
 /*
  *  'schedule()' is the scheduler function. It's a very simple and nice
  * scheduler: it's not perfect, but certainly works for most things.
@@ -563,20 +587,20 @@ need_resched_back:
 
 	/* move an exhausted RR process to be last.. */
 	if (unlikely(prev->policy == SCHED_RR))
-		if (!prev->counter) {
-			prev->counter = NICE_TO_TICKS(prev->nice);
+		if (!prev->time_slice) {
+			prev->time_slice = NICE_TO_TICKS(prev->nice);
 			move_last_runqueue(prev);
 		}
 
 	switch (prev->state) {
-		case TASK_INTERRUPTIBLE:
-			if (signal_pending(prev)) {
-				prev->state = TASK_RUNNING;
-				break;
-			}
-		default:
-			del_from_runqueue(prev);
-		case TASK_RUNNING:;
+	case TASK_INTERRUPTIBLE:
+		if (signal_pending(prev)) {
+			prev->state = TASK_RUNNING;
+			break;
+		}
+	default:
+		del_from_runqueue(prev);
+	case TASK_RUNNING:;
 	}
 	prev->need_resched = 0;
 
@@ -601,14 +625,12 @@ repeat_schedule:
 
 	/* Do we need to re-calculate counters? */
 	if (unlikely(!c)) {
-		struct task_struct *p;
-
-		spin_unlock_irq(&runqueue_lock);
-		read_lock(&tasklist_lock);
-		for_each_task(p)
-			p->counter = (p->counter >> 1) + NICE_TO_TICKS(p->nice);
-		read_unlock(&tasklist_lock);
-		spin_lock_irq(&runqueue_lock);
+		++rcl_curr;
+		list_for_each(tmp, &runqueue_head) {
+			p = list_entry(tmp, struct task_struct, run_list);
+			p->time_slice = NICE_TO_TICKS(p->nice);
+			p->rcl_last = rcl_curr;
+		}
 		goto repeat_schedule;
 	}
 
@@ -1041,17 +1063,17 @@ asmlinkage long sys_sched_yield(void)
 	nr_pending--;
 #endif
 	if (nr_pending) {
+		struct task_struct *ctsk = current;
 		/*
 		 * This process can only be rescheduled by us,
 		 * so this is safe without any locking.
 		 */
-		if (current->policy == SCHED_OTHER)
-			current->policy |= SCHED_YIELD;
-		current->need_resched = 1;
+		if (ctsk->policy == SCHED_OTHER)
+			ctsk->policy |= SCHED_YIELD;
+		ctsk->need_resched = 1;
 
-		spin_lock_irq(&runqueue_lock);
-		move_last_runqueue(current);
-		spin_unlock_irq(&runqueue_lock);
+		ctsk->time_slice = 0;
+		++ctsk->dyn_prio;
 	}
 	return 0;
 }
@@ -1291,9 +1313,10 @@ void __init init_idle(void)
 
 	if (current != &init_task && task_on_runqueue(current)) {
 		printk("UGH! (%d:%d) was on the runqueue, removing.\n",
-			smp_processor_id(), current->pid);
+			   smp_processor_id(), current->pid);
 		del_from_runqueue(current);
 	}
+	current->dyn_prio = 0;
 	sched_data->curr = current;
 	sched_data->last_schedule = get_cycles();
 	clear_bit(current->processor, &wait_init_idle);

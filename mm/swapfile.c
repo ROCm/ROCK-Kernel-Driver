@@ -913,16 +913,19 @@ asmlinkage long sys_swapon(const char * specialfile, int swap_flags)
 	if (S_ISBLK(swap_inode->i_mode)) {
 		kdev_t dev = swap_inode->i_rdev;
 		struct block_device_operations *bdops;
+		devfs_handle_t de;
 
 		p->swap_device = dev;
 		set_blocksize(dev, PAGE_SIZE);
 		
 		bd_acquire(swap_inode);
 		bdev = swap_inode->i_bdev;
-		bdops = devfs_get_ops(devfs_get_handle_from_inode(swap_inode));
+		de = devfs_get_handle_from_inode(swap_inode);
+		bdops = devfs_get_ops(de);  /*  Increments module use count  */
 		if (bdops) bdev->bd_op = bdops;
 
 		error = blkdev_get(bdev, FMODE_READ|FMODE_WRITE, 0, BDEV_SWAP);
+		devfs_put_ops(de);/*Decrement module use count now we're safe*/
 		if (error)
 			goto bad_swap_2;
 		set_blocksize(dev, PAGE_SIZE);

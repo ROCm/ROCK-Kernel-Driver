@@ -1394,7 +1394,7 @@ cleanup_module(void)
 		 */
 		do {
 			if (busy) {
-				current->counter = 0;
+				current->time_slice = 0;
 				schedule();
 			}
 

@@ -2727,15 +2727,15 @@ ahc_linux_biosparam(Disk *disk, kdev_t dev, int geom[])
 	int	ret;
 	int	extended;
 	struct	ahc_softc *ahc;
-	struct	buffer_head *bh;
+	unsigned char *buf;
 
 	ahc = *((struct ahc_softc **)disk->device->host->hostdata);
-	bh = bread(MKDEV(MAJOR(dev), MINOR(dev) & ~0xf), 0, block_size(dev));
+	buf = scsi_bios_ptable(dev);
 
-	if (bh) {
-		ret = scsi_partsize(bh, disk->capacity,
+	if (buf) {
+		ret = scsi_partsize(buf, disk->capacity,
 				    &geom[2], &geom[0], &geom[1]);
-		brelse(bh);
+		kfree(buf);
 		if (ret != -1)
 			return (ret);
 	}

@@ -5,7 +5,7 @@
 
 /*
  * The default limit for the nr of threads is now in
- * /proc/sys/kernel/max-threads.
+ * /proc/sys/kernel/threads-max.
  */
  
 #ifdef CONFIG_SMP
