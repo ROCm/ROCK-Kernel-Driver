@@ -38,6 +38,7 @@
 #include "xfs.h"
 #include "xfs_bmap_btree.h"
 #include "xfs_bit.h"
+#include "xfs_rw.h"
 
 /*
  * System memory size - used to scale certain data structures in XFS.
@@ -48,7 +49,18 @@ unsigned long xfs_physmem;
  * Tunable XFS parameters.  xfs_params is required even when CONFIG_SYSCTL=n,
  * other XFS code uses these values.
  */
-xfs_param_t xfs_params = { 0, 1, 0, 0, 3, 30 * HZ, 0 };
+
+xfs_param_t xfs_params = {
+			/*	MIN	DFLT	MAX	*/
+	restrict_chown:	{	0,	1,	1	},
+	sgid_inherit:	{	0,	0,	1	},
+	symlink_mode:	{	0,	0,	1	},
+	panic_mask:	{	0,	0,	127	},
+	error_level:	{	0,	3,	11	},
+	sync_interval:	{	HZ,	30*HZ,	60*HZ	},
+	stats_clear:	{	0,	0,	1	},
+
+};
 
 /*
  * Global system credential structure.

@@ -68,7 +68,7 @@
  * The attribute `pure' is not implemented in GCC versions earlier
  * than 2.96.
  */
-#if (__GNUC__ == 2 && __GNUC_MINOR >= 96) || __GNUC__ > 2
+#if (__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || __GNUC__ > 2
 #define __attribute_pure__	__attribute__((pure))
 #else
 #define __attribute_pure__	/* unimplemented */
