@@ -63,12 +63,6 @@ ia64_do_show_stack (struct unw_frame_info *info, void *arg)
 }
 
 void
-show_trace_task (struct task_struct *task)
-{
-	show_stack(task, NULL);
-}
-
-void
 show_stack (struct task_struct *task, unsigned long *sp)
 {
 	if (!task)
