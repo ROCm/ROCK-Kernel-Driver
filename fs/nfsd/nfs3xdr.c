@@ -338,7 +338,7 @@ nfs3svc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 	v=0;
 	while (len > 0) {
 		pn = rqstp->rq_resused;
-		take_page(rqstp);
+		svc_take_page(rqstp);
 		args->vec[v].iov_base = page_address(rqstp->rq_respages[pn]);
 		args->vec[v].iov_len = len < PAGE_SIZE? len : PAGE_SIZE;
 		v++;
@@ -603,7 +603,7 @@ nfs3svc_encode_readres(struct svc_rqst *rqstp, u32 *p,
 		rqstp->rq_res.page_base = 0;
 		rqstp->rq_res.page_len = resp->count;
 		if (resp->count & 3) {
-			/* need to page with tail */
+			/* need to pad the tail */
 			rqstp->rq_res.tail[0].iov_base = p;
 			*p = 0;
 			rqstp->rq_res.tail[0].iov_len = 4 - (resp->count & 3);

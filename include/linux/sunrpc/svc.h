@@ -15,6 +15,7 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svcauth.h>
 #include <linux/wait.h>
+#include <linux/mm.h>
 
 /*
  * RPC service.
@@ -171,13 +172,34 @@ xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
 	return vec->iov_len <= PAGE_SIZE;
 }
 
-static int inline take_page(struct svc_rqst *rqstp)
+static int inline svc_take_page(struct svc_rqst *rqstp)
 {
 	if (rqstp->rq_arghi <= rqstp->rq_argused)
 		return -ENOMEM;
 	rqstp->rq_respages[rqstp->rq_resused++] =
 		rqstp->rq_argpages[--rqstp->rq_arghi];
 	return 0;
+}
+
+static void inline svc_pushback_allpages(struct svc_rqst *rqstp)
+{
+        while (rqstp->rq_resused) {
+		if (rqstp->rq_respages[--rqstp->rq_resused] == NULL)
+			continue;
+		rqstp->rq_argpages[rqstp->rq_arghi++] =
+			rqstp->rq_respages[rqstp->rq_resused];
+		rqstp->rq_respages[rqstp->rq_resused] = NULL;
+	}
+}
+
+static void inline svc_free_allpages(struct svc_rqst *rqstp)
+{
+        while (rqstp->rq_resused) {
+		if (rqstp->rq_respages[--rqstp->rq_resused] == NULL)
+			continue;
+		put_page(rqstp->rq_respages[rqstp->rq_resused]);
+		rqstp->rq_respages[rqstp->rq_resused] = NULL;
+	}
 }
 
 struct svc_deferred_req {
