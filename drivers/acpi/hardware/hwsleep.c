@@ -231,7 +231,7 @@ acpi_enter_sleep_state (
 		return_ACPI_STATUS (status);
 	}
 
-	status = acpi_hw_clear_acpi_status();
+	status = acpi_hw_clear_acpi_status(ACPI_MTX_DO_NOT_LOCK);
 	if (ACPI_FAILURE (status)) {
 		return_ACPI_STATUS (status);
 	}
@@ -355,7 +355,7 @@ acpi_enter_sleep_state_s4bios (
 	ACPI_FUNCTION_TRACE ("acpi_enter_sleep_state_s4bios");
 
 	acpi_set_register (ACPI_BITREG_WAKE_STATUS, 1, ACPI_MTX_DO_NOT_LOCK);
-	acpi_hw_clear_acpi_status();
+	acpi_hw_clear_acpi_status(ACPI_MTX_DO_NOT_LOCK);
 
 	acpi_hw_disable_non_wakeup_gpes();
 

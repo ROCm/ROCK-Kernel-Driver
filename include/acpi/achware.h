@@ -108,7 +108,7 @@ acpi_hw_low_level_write (
 
 acpi_status
 acpi_hw_clear_acpi_status (
-   void);
+	u32                             flags);
 
 
 /* GPE support */

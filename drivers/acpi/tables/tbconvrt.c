@@ -287,10 +287,14 @@ acpi_tb_convert_fadt1 (
 		 (acpi_physical_address) (local_fadt->xpm1a_evt_blk.address +
 			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
 
-	acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
-		 (u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
-		 (acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
-			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+	/* PM1B is optional; leave null if not present */
+
+	if (local_fadt->xpm1b_evt_blk.address) {
+		acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
+			 (u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+			 (acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
+				ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+	}
 }
 
 
@@ -379,11 +383,15 @@ acpi_tb_convert_fadt2 (
 			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
 	acpi_gbl_xpm1a_enable.address_space_id = local_fadt->xpm1a_evt_blk.address_space_id;
 
-	acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
-		(u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
-		(acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
-			ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
-	acpi_gbl_xpm1b_enable.address_space_id = local_fadt->xpm1b_evt_blk.address_space_id;
+	/* PM1B is optional; leave null if not present */
+
+	if (local_fadt->xpm1b_evt_blk.address) {
+		acpi_tb_init_generic_address (&acpi_gbl_xpm1b_enable,
+			(u8) ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len),
+			(acpi_physical_address) (local_fadt->xpm1b_evt_blk.address +
+				ACPI_DIV_2 (acpi_gbl_FADT->pm1_evt_len)));
+		acpi_gbl_xpm1b_enable.address_space_id = local_fadt->xpm1b_evt_blk.address_space_id;
+	}
 }
 
 
