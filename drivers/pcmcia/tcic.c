@@ -408,7 +408,8 @@ static int __init init_tcic(void)
 	return -1;
     }
 
-    driver_register(&tcic_driver);
+    if (driver_register(&tcic_driver))
+	return -1;
     
     printk(KERN_INFO "Databook TCIC-2 PCMCIA probe: ");
     sock = 0;
