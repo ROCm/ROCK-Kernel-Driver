@@ -24,8 +24,6 @@ SARCH :=
 endif
 
 LD = $(CROSS_COMPILE)ld -mcrislinux
-LDFLAGS_BLOB	:= --format binary --oformat elf32-cris \
-		   -T arch/cris/$(SARCH)/output_arch.ld
 
 OBJCOPYFLAGS := -O binary -R .note -R .comment -S
 

@@ -664,15 +664,6 @@ When kbuild executes the following steps are followed (roughly):
 		#arch/i386/Makefile
 		LDFLAGS_vmlinux := -e stext
 
-    LDFLAGS_BLOB	Options for $(LD) when linking the initramfs blob
-
-	The image used for initramfs is made during the build process.
-	LDFLAGS_BLOB is used to specify additional flags to be used when
-	creating the initramfs_data.o file.
-	Example:
-		#arch/i386/Makefile
-		LDFLAGS_BLOB := --format binary --oformat elf32-i386
-
     OBJCOPYFLAGS	objcopy flags
 
 	When $(call if_changed,objcopy) is used to translate a .o file,
