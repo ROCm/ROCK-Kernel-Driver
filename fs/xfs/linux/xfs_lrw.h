@@ -70,7 +70,7 @@ struct page_buf_bmap_s;
 #define	XFS_DIORD_ENTER		19
 #define	XFS_DIOWR_ENTER		20
 extern void xfs_rw_enter_trace(int, struct xfs_iocore *,
-			const struct iovec *, int, loff_t, int);
+			const struct iovec *, size_t, loff_t, int);
 extern void xfs_inval_cached_trace(struct xfs_iocore *,
 			xfs_off_t, xfs_off_t, xfs_off_t, xfs_off_t);
 #else
