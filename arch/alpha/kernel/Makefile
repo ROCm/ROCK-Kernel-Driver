@@ -2,7 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET	:= kernel.o
 EXTRA_TARGETS	:= head.o
 
 EXTRA_AFLAGS	:= $(CFLAGS)
