@@ -225,10 +225,15 @@ static struct usb_device_id id_table [] = {
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_S360_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
-	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
+	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_SCH_I330_ID), 
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(GARMIN_VENDOR_ID, GARMIN_IQUE_3600_ID), 
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
@@ -258,6 +263,8 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_1_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NX60_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_NZ90V_ID) },
+	{ USB_DEVICE(SAMSUNG_VENDOR_ID, SAMSUNG_SCH_I330_ID) },
+	{ USB_DEVICE(GARMIN_VENDOR_ID, GARMIN_IQUE_3600_ID) },
 	{ },					/* optional parameter entry */
 	{ }					/* Terminating entry */
 };
