@@ -12,21 +12,46 @@ SECTIONS
 {
   . = GATE_ADDR + SIZEOF_HEADERS;
 
-  .hash				: { *(.hash) }					:rodata
+  .hash				: { *(.hash) }				:readable
   .dynsym			: { *(.dynsym) }
   .dynstr			: { *(.dynstr) }
   .gnu.version			: { *(.gnu.version) }
   .gnu.version_d		: { *(.gnu.version_d) }
   .gnu.version_r		: { *(.gnu.version_r) }
-  .data.patch.mckinley_e9	: { *(.data.patch.mckinley_e9) }
-  .data.patch.fsyscall_table	: { *(.data.patch.fsyscall_table) }
-  .data.patch.vtop		: { *(.data.patch.vtop) }
-  .data.patch.brl_fsys_bubble_down : { *(.data.patch.brl_fsys_bubble_down) }
-  .IA_64.unwind_info		: { *(.IA_64.unwind_info*) }
-  .IA_64.unwind			: { *(.IA_64.unwind*) }				:rodata :unwind
-  .dynamic			: { *(.dynamic) }				:rodata :dynamic
+  .dynamic			: { *(.dynamic) }			:readable :dynamic
 
-  .text	(GATE_ADDR + PAGE_SIZE)	: { *(.text) }					:rodata
+  /*
+   * This linker script is used both with -r and with -shared.  For the layouts to match,
+   * we need to skip more than enough space for the dynamic symbol table et al.  If this
+   * amount is insufficient, ld -shared will barf.  Just increase it here.
+   */
+  . = GATE_ADDR + 0x500;
+
+  .data.patch			: {
+				    __start_gate_mckinley_e9_patchlist = .;
+				    *(.data.patch.mckinley_e9)
+				    __end_gate_mckinley_e9_patchlist = .;
+
+				    __start_gate_vtop_patchlist = .;
+				    *(.data.patch.vtop)
+				    __end_gate_vtop_patchlist = .;
+
+				    __start_gate_fsyscall_patchlist = .;
+				    *(.data.patch.fsyscall_table)
+				    __end_gate_fsyscall_patchlist = .;
+
+				    __start_gate_brl_fsys_bubble_down_patchlist = .;
+				    *(.data.patch.brl_fsys_bubble_down)
+				    __end_gate_brl_fsys_bubble_down_patchlist = .;
+  }									:readable
+  .IA_64.unwind_info		: { *(.IA_64.unwind_info*) }
+  .IA_64.unwind			: { *(.IA_64.unwind*) }			:readable :unwind
+#ifdef HAVE_BUGGY_SEGREL
+  .text (GATE_ADDR + PAGE_SIZE)	: { *(.text) *(.text.*) }		:readable
+#else
+  . = ALIGN (PERCPU_PAGE_SIZE) + (. & (PERCPU_PAGE_SIZE - 1));
+  .text				: { *(.text) *(.text.*) }		:epc
+#endif
 
   /DISCARD/			: {
   	*(.got.plt) *(.got)
@@ -43,9 +68,12 @@ SECTIONS
  */
 PHDRS
 {
-  rodata  PT_LOAD	FILEHDR	PHDRS	FLAGS(4);	/* PF_R */
-  dynamic PT_DYNAMIC			FLAGS(4);	/* PF_R */
-  unwind  0x70000001;					/* PT_IA_64_UNWIND */
+  readable  PT_LOAD	FILEHDR	PHDRS	FLAGS(4);	/* PF_R */
+#ifndef HAVE_BUGGY_SEGREL
+  epc	    PT_LOAD	FILEHDR PHDRS	FLAGS(1);	/* PF_X */
+#endif
+  dynamic   PT_DYNAMIC			FLAGS(4);	/* PF_R */
+  unwind    0x70000001; /* PT_IA_64_UNWIND, but ld doesn't match the name */
 }
 
 /*
@@ -64,4 +92,4 @@ VERSION
 }
 
 /* The ELF entry point can be used to set the AT_SYSINFO value.  */
-ENTRY(syscall_via_epc)
+ENTRY(__kernel_syscall_via_epc)

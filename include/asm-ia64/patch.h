@@ -20,6 +20,6 @@ extern void ia64_patch_imm60 (u64 insn_addr, u64 val);		/* patch "brl" w/ip-rel 
 
 extern void ia64_patch_mckinley_e9 (unsigned long start, unsigned long end);
 extern void ia64_patch_vtop (unsigned long start, unsigned long end);
-extern void ia64_patch_gate (Elf64_Ehdr *ehdr);
+extern void ia64_patch_gate (void);
 
 #endif /* _ASM_IA64_PATCH_H */

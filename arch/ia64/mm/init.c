@@ -287,19 +287,22 @@ put_kernel_page (struct page *page, unsigned long address, pgprot_t pgprot)
 static void
 setup_gate (void)
 {
-	struct page *page0, *page1;
+	struct page *page;
 	extern char __start_gate_section[];
 
 	/*
-	 * Install the gate pages: one read-only page containing the ELF headers etc. and
-	 * one execute-only page, which enables privilege-promotion via "epc":
+	 * Map the gate page twice: once read-only to export the ELF headers etc. and once
+	 * execute-only page to enable privilege-promotion via "epc":
 	 */
-	page0 = virt_to_page(ia64_imva(__start_gate_section));
-	page1 = virt_to_page(ia64_imva(__start_gate_section + PAGE_SIZE));
-	put_kernel_page(page0, GATE_ADDR, PAGE_READONLY);
-	put_kernel_page(page1, GATE_ADDR + PAGE_SIZE, PAGE_GATE);
-
-	ia64_patch_gate((Elf64_Ehdr *) __start_gate_section);
+	page = virt_to_page(ia64_imva(__start_gate_section));
+	put_kernel_page(page, GATE_ADDR, PAGE_READONLY);
+#ifdef HAVE_BUGGY_SEGREL
+	page = virt_to_page(ia64_imva(__start_gate_section + PAGE_SIZE));
+	put_kernel_page(page, GATE_ADDR + PAGE_SIZE, PAGE_GATE);
+#else
+	put_kernel_page(page, GATE_ADDR + PERCPU_PAGE_SIZE, PAGE_GATE);
+#endif
+	ia64_patch_gate();
 }
 
 void __init

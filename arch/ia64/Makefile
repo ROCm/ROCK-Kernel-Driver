@@ -27,6 +27,10 @@ GCC_MINOR_VERSION=$(shell $(CC) -v 2>&1 | fgrep 'gcc version' | cut -f3 -d' ' | 
 
 GAS_STATUS=$(shell arch/ia64/scripts/check-gas $(CC) $(OBJDUMP))
 
+arch-cppflags	:= $(shell arch/ia64/scripts/toolchain-flags $(CC) $(LD) $(OBJDUMP))
+cflags-y	+= $(arch-cppflags)
+AFLAGS		+= $(arch-cppflags)
+
 ifeq ($(GAS_STATUS),buggy)
 $(error Sorry, you need a newer version of the assember, one that is built from	\
 	a source-tree that post-dates 18-Dec-2002.  You can find a pre-compiled	\
