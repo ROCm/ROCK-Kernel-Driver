@@ -46,6 +46,24 @@
 
 /* Change Log
  * 
+ * 2.3.13       05/08/03
+ * o Feature remove: /proc/net/PRO_LAN_Adapters support gone completely
+ * o Feature remove: IDIAG support (use ethtool -t instead)
+ * o Cleanup: fixed spelling mistakes found by community
+ * o Feature add: ethtool cable diag test
+ * o Feature add: ethtool parameter support (ring size, xsum, flow ctrl)
+ * o Cleanup: move e100_asf_enable under CONFIG_PM to avoid warning
+ *   [Stephen Rothwell (sfr@canb.auug.org.au)]
+ * o Bug fix: don't call any netif_carrier_* until netdev registered.
+ *   [Andrew Morton (akpm@digeo.com)]
+ * o Cleanup: replace (skb->len - skb->data_len) with skb_headlen(skb)
+ *   [jmorris@intercode.com.au]
+ * o Bug fix: cleanup of Tx skbs after running ethtool diags
+ * o Bug fix: incorrect reporting of ethtool diag overall results
+ * o Bug fix: must hold xmit_lock before stopping queue in ethtool
+ *   operations that require reset h/w and driver structures.
+ * o Bug fix: statistic command failure would stop statistic collection.
+ * 
  * 2.2.21	02/11/03
  * o Removed marketing brand strings. Instead, Using generic string 
  *   "Intel(R) PRO/100 Network Connection" for all adapters.
@@ -61,21 +79,6 @@
  * o New feature: added ICH5 support
  * 
  * 2.1.27	11/20/02
- *   o Bug fix: Device command timeout due to SMBus processing during init
- *   o Bug fix: Not setting/clearing I (Interrupt) bit in tcb correctly
- *   o Bug fix: Not using EEPROM WoL setting as default in ethtool
- *   o Bug fix: Not able to set autoneg on using ethtool when interface down
- *   o Bug fix: Not able to change speed/duplex using ethtool/mii
- *     when interface up
- *   o Bug fix: Ethtool shows autoneg on when forced to 100/Full
- *   o Bug fix: Compiler error when CONFIG_PROC_FS not defined
- *   o Bug fix: 2.5.44 e100 doesn't load with preemptive kernel enabled
- *     (sleep while holding spinlock)
- *   o Bug fix: 2.1.24-k1 doesn't display complete statistics
- *   o Bug fix: System panic due to NULL watchdog timer dereference during
- *     ifconfig down, rmmod and insmod
- *
- * 2.1.24       10/7/02
  */
  
 #include <linux/config.h>
@@ -138,10 +141,10 @@ static unsigned char e100_delayed_exec_non_cu_cmd(struct e100_private *,
 						  nxmit_cb_entry_t *);
 static void e100_free_nontx_list(struct e100_private *);
 static void e100_non_tx_background(unsigned long);
-
+static inline void e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2003 Intel Corporation";
-char e100_driver_version[]="2.2.21-k1";
+char e100_driver_version[]="2.3.13-k1";
 const char *e100_full_driver_name = "Intel(R) PRO/100 Network Driver";
 char e100_short_driver_name[] = "e100";
 static int e100nics = 0;
@@ -191,7 +194,6 @@ struct net_device_stats *e100_get_stats(struct net_device *);
 static irqreturn_t e100intr(int, void *, struct pt_regs *);
 static void e100_print_brd_conf(struct e100_private *);
 static void e100_set_multi(struct net_device *);
-void e100_set_speed_duplex(struct e100_private *);
 
 static u8 e100_pci_setup(struct pci_dev *, struct e100_private *);
 static u8 e100_sw_init(struct e100_private *);
@@ -213,7 +215,6 @@ u16 e100_eeprom_calculate_chksum(struct e100_private *adapter);
 
 static unsigned char e100_clr_cntrs(struct e100_private *);
 static unsigned char e100_load_microcode(struct e100_private *);
-static unsigned char e100_hw_init(struct e100_private *);
 static unsigned char e100_setup_iaaddr(struct e100_private *, u8 *);
 static unsigned char e100_update_stats(struct e100_private *bdp);
 
@@ -1282,10 +1283,8 @@ e100_init(struct e100_private *bdp)
 	/* read NIC's part number */
 	e100_rd_pwa_no(bdp);
 
-	if (!e100_hw_init(bdp)) {
-		printk(KERN_ERR "e100: hw init failed\n");
+	if (!e100_hw_init(bdp))
 		return false;
-	}
 	/* Interrupts are enabled after device reset */
 	e100_disable_clear_intr(bdp);
 
@@ -1383,11 +1382,11 @@ e100_tco_workaround(struct e100_private *bdp)
  *      true - If the adapter was initialized
  *      false - If the adapter failed initialization
  */
-unsigned char __devinit
+unsigned char
 e100_hw_init(struct e100_private *bdp)
 {
 	if (!e100_phy_init(bdp))
-		return false;
+		goto err;
 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
@@ -1397,27 +1396,25 @@ e100_hw_init(struct e100_private *bdp)
 
 	/* Load the CU BASE (set to 0, because we use linear mode) */
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_CUC_LOAD_BASE, 0))
-		return false;
+		goto err;
 
 	if (!e100_wait_exec_cmplx(bdp, 0, SCB_RUC_LOAD_BASE, 0))
-		return false;
+		goto err;
 
 	/* Load interrupt microcode  */
 	if (e100_load_microcode(bdp)) {
 		bdp->flags |= DF_UCODE_LOADED;
 	}
 
-	e100_config_init(bdp);
-	if (!e100_config(bdp)) {
-		return false;
-	}
+	if (!e100_config(bdp))
+		goto err;
 
 	if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr))
-		return false;
+		goto err;
 
 	/* Clear the internal counters */
 	if (!e100_clr_cntrs(bdp))
-		return false;
+		goto err;
 
 	/* Change for 82558 enhancement */
 	/* If 82558/9 and if the user has enabled flow control, set up the
@@ -1430,6 +1427,9 @@ e100_hw_init(struct e100_private *bdp)
 	}
 
 	return true;
+err:
+	printk(KERN_ERR "e100: hw init failed\n");
+	return false;
 }
 
 /**
@@ -3050,23 +3050,6 @@ e100_isolate_driver(struct e100_private *bdp)
 		bdp->last_tcb = NULL;
 	} 
 	e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
-}
-
-void
-e100_set_speed_duplex(struct e100_private *bdp)
-{
-	int carrier_ok;
-	/* Device may lose link with some siwtches when */
-	/* changing speed/duplex to non-autoneg. e100   */
-	/* needs to remember carrier state in order to  */
-	/* start watchdog timer for recovering link     */
-	if ((carrier_ok = netif_carrier_ok(bdp->device)))
-		e100_isolate_driver(bdp);
-	e100_phy_set_speed_duplex(bdp, true);
-	e100_config_fc(bdp);	/* re-config flow-control if necessary */
-	e100_config(bdp);	
-	if (carrier_ok)
-		e100_deisolate_driver(bdp, false);
 }
 
 static void

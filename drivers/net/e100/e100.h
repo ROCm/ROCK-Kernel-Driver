@@ -112,8 +112,6 @@
 #define E100_MAX_CU_IDLE_WAIT	50	/* Max udelays in wait_cus_idle */
 
 /* HWI feature related constant */
-#define HWI_MAX_LOOP                    100
-#define MAX_SAME_RESULTS		3
 #define HWI_REGISTER_GRANULARITY        80	/* register granularity = 80 Cm */
 #define HWI_NEAR_END_BOUNDARY           1000	/* Near end is defined as < 10 meters */
 
@@ -949,7 +947,6 @@ struct e100_private {
 #ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
-	char ifname[IFNAMSIZ];
 #ifdef E100_CU_DEBUG	
 	u8 last_cmd;
 	u8 last_sub_cmd;
