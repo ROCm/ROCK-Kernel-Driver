@@ -19,6 +19,7 @@
 #include <linux/stddef.h>
 #include <linux/personality.h>
 #include <linux/suspend.h>
+#include <linux/elf.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/i387.h>
@@ -347,6 +348,10 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 	return (void __user *)((esp - frame_size) & -8ul);
 }
 
+/* These symbols are defined with the addresses in the vsyscall page.
+   See vsyscall-sigreturn.S.  */
+extern void __kernel_sigreturn, __kernel_rt_sigreturn;
+
 static void setup_frame(int sig, struct k_sigaction *ka,
 			sigset_t *set, struct pt_regs * regs)
 {
@@ -379,7 +384,7 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	if (err)
 		goto give_sigsegv;
 
-	restorer = (void *) (fix_to_virt(FIX_VSYSCALL) + 32);
+	restorer = &__kernel_sigreturn;
 	if (ka->sa.sa_flags & SA_RESTORER)
 		restorer = ka->sa.sa_restorer;
 
@@ -462,7 +467,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up to return from userspace.  */
-	restorer = (void *) (fix_to_virt(FIX_VSYSCALL) + 64);
+	restorer = &__kernel_rt_sigreturn;
 	if (ka->sa.sa_flags & SA_RESTORER)
 		restorer = ka->sa.sa_restorer;
 	err |= __put_user(restorer, &frame->pretcode);
