@@ -533,7 +533,7 @@ extern void __blk_stop_queue(request_queue_t *q);
 extern void blk_run_queue(request_queue_t *);
 extern void blk_queue_activity_fn(request_queue_t *, activity_fn *, void *);
 extern struct request *blk_rq_map_user(request_queue_t *, int, void __user *, unsigned int);
-extern int blk_rq_unmap_user(struct request *, void __user *, struct bio *, unsigned int);
+extern int blk_rq_unmap_user(struct request *, struct bio *, unsigned int);
 extern int blk_execute_rq(request_queue_t *, struct gendisk *, struct request *);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)
@@ -644,7 +644,6 @@ extern void blk_queue_invalidate_tags(request_queue_t *);
 extern long blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
-extern void blk_rq_data_prep(request_queue_t *, struct request *);
 extern void blk_rq_prep_restart(struct request *);
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
 

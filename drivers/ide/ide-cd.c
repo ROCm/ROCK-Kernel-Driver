@@ -1967,13 +1967,9 @@ static ide_startstop_t cdrom_do_block_pc(ide_drive_t *drive, struct request *rq)
 	 * sg request
 	 */
 	if (rq->bio) {
-		if (rq->data_len & 3) {
-			printk("%s: block pc not aligned, len=%d\n", drive->name, rq->data_len);
-			cdrom_end_request(drive, 0);
-			return ide_stopped;
-		}
-		info->dma = drive->using_dma;
 		info->cmd = rq_data_dir(rq);
+		if (drive->using_dma)
+			info->dma = !(rq->data_len & 15);
 	}
 
 	/* Start sending the command to the drive. */
@@ -3162,7 +3158,7 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	int nslots;
 
 	blk_queue_prep_rq(drive->queue, ide_cdrom_prep_fn);
-	blk_queue_dma_alignment(drive->queue, 3);
+	blk_queue_dma_alignment(drive->queue, 15);
 	drive->queue->unplug_delay = (1 * HZ) / 1000;
 	if (!drive->queue->unplug_delay)
 		drive->queue->unplug_delay = 1;
