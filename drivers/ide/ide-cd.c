@@ -3026,13 +3026,6 @@ int ide_cdrom_ioctl (ide_drive_t *drive,
 		     struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg)
 {
-	int error;
-
-	/* Try the generic SCSI command ioctl's first.. */
-	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
-	if (error != -ENOTTY)
-		return error;
-
 	/* Then the generic cdrom ioctl's.. */
 	return cdrom_ioctl(inode, file, cmd, arg);
 }
