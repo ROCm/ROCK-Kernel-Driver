@@ -152,6 +152,8 @@ extern int cg3_init(void);
 extern int cg3_setup(char*);
 extern int bw2_init(void);
 extern int bw2_setup(char*);
+extern int cg14_init(void);
+extern int cg14_setup(char*);
 
 static struct {
 	const char *name;
@@ -254,6 +256,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_BW2
 	{ "bw2", bw2_init, bw2_setup },
+#endif
+#ifdef CONFIG_FB_CG14
+	{ "cg14", cg14_init, cg14_setup },
 #endif
 
 	/*
