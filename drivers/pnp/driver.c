@@ -175,7 +175,7 @@ int pnp_register_driver(struct pnp_driver *drv)
 void pnp_unregister_driver(struct pnp_driver *drv)
 {
 	pnp_dbg("the driver '%s' has been unregistered", drv->name);
-	remove_driver(&drv->driver);
+	driver_unregister(&drv->driver);
 }
 
 /**
