@@ -360,7 +360,7 @@ static int conf_choice(struct menu *menu)
 			continue;
 		}
 		if (line[0]) {
-			len = strlen(line) - 1;
+			len = strlen(line);
 			line[len] = 0;
 
 			def_menu = NULL;
