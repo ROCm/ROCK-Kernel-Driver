@@ -187,15 +187,17 @@ static inline void pgd_clear(pgd_t * pgdp)	{ }
 
 extern struct page *pte_mem_map(pte_t pte);
 extern struct page *phys_mem_map(unsigned long phys);
+extern unsigned long phys_to_pfn(unsigned long p);
+extern unsigned long pfn_to_phys(unsigned long pfn);
 
 #define pte_page(x) pfn_to_page(pte_pfn(x))
 #define pte_address(x) (__va(pte_val(x) & PAGE_MASK))
 #define mk_phys(a, r) ((a) + (r << REGION_SHIFT))
 #define phys_addr(p) ((p) & ~REGION_MASK)
 #define phys_page(p) (phys_mem_map(p) + ((phys_addr(p)) >> PAGE_SHIFT))
-#define pte_pfn(x) ((unsigned long)(((x).pte_low >> PAGE_SHIFT)))
-#define pfn_pte(pfn, prot) __pte(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
-#define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
+#define pte_pfn(x) phys_to_pfn(pte_val(x))
+#define pfn_pte(pfn, prot) __pte(pfn_to_phys(pfn) | pgprot_val(prot))
+#define pfn_pmd(pfn, prot) __pmd(pfn_to_phys(pfn) | pgprot_val(prot))
 
 static inline pte_t pte_mknewprot(pte_t pte)
 {

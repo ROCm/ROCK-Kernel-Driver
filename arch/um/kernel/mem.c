@@ -71,10 +71,10 @@ void mem_init(void)
 {
 	unsigned long start;
 
+	max_low_pfn = (high_physmem - uml_physmem) >> PAGE_SHIFT;
 #ifdef CONFIG_HIGHMEM
 	highmem_start_page = phys_page(__pa(high_physmem));
 #endif
-	max_mapnr = num_physpages = max_low_pfn;
 
         /* clear the zero-page */
         memset((void *) empty_zero_page, 0, PAGE_SIZE);
@@ -97,7 +97,11 @@ void mem_init(void)
 
 	/* this will put all low memory onto the freelists */
 	totalram_pages = free_all_bootmem();
-	totalram_pages += highmem >> PAGE_SHIFT;
+	totalhigh_pages = highmem >> PAGE_SHIFT;
+	totalram_pages += totalhigh_pages;
+	num_physpages = totalram_pages;
+	max_mapnr = totalram_pages;
+	max_pfn = totalram_pages;
 	printk(KERN_INFO "Memory: %luk available\n", 
 	       (unsigned long) nr_free_pages() << (PAGE_SHIFT-10));
 	kmalloc_ok = 1;
@@ -108,7 +112,7 @@ pte_t *kmap_pte;
 pgprot_t kmap_prot;
 
 #define kmap_get_fixmap_pte(vaddr)					\
-	pte_offset(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
+	pte_offset_kernel(pmd_offset(pgd_offset_k(vaddr), (vaddr)), (vaddr))
 
 void __init kmap_init(void)
 {
@@ -142,8 +146,8 @@ static void __init fixrange_init(unsigned long start, unsigned long end,
 			if (pmd_none(*pmd)) {
 				pte = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
 				set_pmd(pmd, __pmd(_KERNPG_TABLE + 
-						   (unsigned long) pte));
-				if (pte != pte_offset(pmd, 0))
+						   (unsigned long) __pa(pte)));
+				if (pte != pte_offset_kernel(pmd, 0))
 					BUG();
 			}
 			vaddr += PMD_SIZE;
@@ -183,7 +187,8 @@ int init_maps(struct mem_region *region)
 	return(0);
 }
 
-static int setup_one_range(int fd, char *driver, unsigned long start, int len, 
+static int setup_one_range(int fd, char *driver, unsigned long start, 
+			   unsigned long pfn, int len, 
 			   struct mem_region *region)
 {
 	int i;
@@ -195,7 +200,22 @@ static int setup_one_range(int fd, char *driver, unsigned long start, int len,
 		printk("setup_range : no free regions\n");
 		return(-1);
 	}
-	init_range(i, fd, driver, start, len, region);
+
+	if(fd == -1)
+		fd = create_mem_file(len);
+
+	if(region == NULL){
+		region = alloc_bootmem_low_pages(sizeof(*region));
+		if(region == NULL)
+			panic("Failed to allocating mem_region");
+	}
+
+	*region = ((struct mem_region) { driver :	driver,
+					 start_pfn :	pfn,
+					 start :	start, 
+					 len :		len, 
+					 fd :		fd } );
+	regions[i] = region;
 	return(i);
 }
 
@@ -215,7 +235,7 @@ static void init_highmem(void)
 
 	pgd = swapper_pg_dir + __pgd_offset(vaddr);
 	pmd = pmd_offset(pgd, vaddr);
-	pte = pte_offset(pmd, vaddr);
+	pte = pte_offset_kernel(pmd, vaddr);
 	pkmap_page_table = pte;
 
 	kmap_init();
@@ -231,7 +251,8 @@ void setup_highmem(unsigned long len)
 	phys = physmem_size;
 	do {
 		cur = min(len, (unsigned long) REGION_SIZE);
-		i = setup_one_range(-1, NULL, -1, cur, NULL);
+		i = setup_one_range(-1, NULL, -1, phys >> PAGE_SHIFT, cur, 
+				    NULL);
 		if(i == -1){
 			printk("setup_highmem - setup_one_range failed\n");
 			return;
@@ -485,14 +506,15 @@ int nregions(void)
 	return(NREGIONS);
 }
 
-void setup_range(int fd, char *driver, unsigned long start, unsigned long len,
-		 int need_vm, struct mem_region *region, void *reserved)
+void setup_range(int fd, char *driver, unsigned long start, unsigned long pfn,
+		 unsigned long len, int need_vm, struct mem_region *region, 
+		 void *reserved)
 {
 	int i, cur;
 
 	do {
 		cur = min(len, (unsigned long) REGION_SIZE);
-		i = setup_one_range(fd, driver, start, cur, region);
+		i = setup_one_range(fd, driver, start, pfn, cur, region);
 		region = regions[i];
 		if(need_vm && setup_region(region, reserved)){
 			kfree(region);
@@ -500,6 +522,7 @@ void setup_range(int fd, char *driver, unsigned long start, unsigned long len,
 			return;
 		}
 		start += cur;
+		if(pfn != -1) pfn += cur;
 		len -= cur;
 	} while(len > 0);
 }
@@ -535,8 +558,8 @@ int setup_iomem(void)
 
 	for(i = 0; i < num_iomem_regions; i++){
 		iomem = &iomem_regions[i];
-		setup_range(iomem->fd, iomem->name, -1, iomem->size, 1, NULL, 
-			    NULL);
+		setup_range(iomem->fd, iomem->name, -1, -1, iomem->size, 1, 
+			    NULL, NULL);
 	}
 	return(0);
 }
@@ -554,7 +577,7 @@ void setup_physmem(unsigned long start, unsigned long reserve_end,
 {
 	struct mem_region *region = &physmem_region;
 	struct vm_reserved *reserved = &physmem_reserved;
-	unsigned long cur;
+	unsigned long cur, pfn = 0;
 	int do_free = 1, bootmap_size;
 
 	do {
@@ -566,7 +589,7 @@ void setup_physmem(unsigned long start, unsigned long reserve_end,
 		if((region == NULL) || (reserved == NULL))
 			panic("Couldn't allocate physmem region or vm "
 			      "reservation\n");
-		setup_range(-1, NULL, start, cur, 1, region, reserved);
+		setup_range(-1, NULL, start, pfn, cur, 1, region, reserved);
 
 		if(do_free){
 			unsigned long reserve = reserve_end - start;
@@ -579,6 +602,7 @@ void setup_physmem(unsigned long start, unsigned long reserve_end,
 			do_free = 0;
 		}
 		start += cur;
+		pfn += cur >> PAGE_SHIFT;
 		len -= cur;
 		region = NULL;
 		reserved = NULL;
@@ -626,6 +650,56 @@ struct mem_region *page_region(struct page *page, int *index_out)
 	}
 	panic("No region found for page");
 	return(NULL);
+}
+
+unsigned long page_to_pfn(struct page *page)
+{
+	struct mem_region *region = page_region(page, NULL);
+
+	return(region->start_pfn + (page - (struct page *) region->mem_map));
+}
+
+struct mem_region *pfn_to_region(unsigned long pfn, int *index_out)
+{
+	struct mem_region *region;
+	int i;
+
+	for(i = 0; i < NREGIONS; i++){
+		region = regions[i];
+		if(region == NULL)
+			continue;
+
+		if((region->start_pfn <= pfn) &&
+		   (region->start_pfn + (region->len >> PAGE_SHIFT) > pfn)){
+			if(index_out != NULL) 
+				*index_out = i;
+			return(region);
+		}
+	}
+	return(NULL);
+}
+
+struct page *pfn_to_page(unsigned long pfn)
+{
+	struct mem_region *region = pfn_to_region(pfn, NULL);
+	struct page *mem_map = (struct page *) region->mem_map;
+
+	return(&mem_map[pfn - region->start_pfn]);
+}
+
+unsigned long phys_to_pfn(unsigned long p)
+{
+	struct mem_region *region = regions[phys_region_index(p)];
+
+	return(region->start_pfn + (phys_addr(p) >> PAGE_SHIFT));
+}
+
+unsigned long pfn_to_phys(unsigned long pfn)
+{
+	int n;
+	struct mem_region *region = pfn_to_region(pfn, &n);
+
+	return(mk_phys((pfn - region->start_pfn) << PAGE_SHIFT, n));
 }
 
 struct page *page_mem_map(struct page *page)
@@ -730,7 +804,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	struct page *pte;
    
    	do {
-		pte = alloc_pages(GFP_KERNEL | __GFP_HIGHMEM, 0);
+		pte = alloc_pages(GFP_KERNEL, 0);
 		if (pte)
 			clear_highpage(pte);
 		else {

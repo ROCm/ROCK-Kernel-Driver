@@ -16,7 +16,7 @@
 static inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, 
 				struct page *pte)
 {
-	set_pmd(pmd, __pmd(_PAGE_TABLE + phys_addr(page_to_phys(pte))));
+	set_pmd(pmd, __pmd(_PAGE_TABLE + page_to_phys(pte)));
 }
 
 extern pgd_t *pgd_alloc(struct mm_struct *);
