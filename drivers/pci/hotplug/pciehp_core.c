@@ -602,8 +602,8 @@ static int __init pcied_init(void)
 
 	retval = pciehprm_init(PCI);
 	if (!retval) {
-		retval = pci_module_init(&pcie_driver);
-		dbg("pci_module_init = %d\n", retval);
+		retval = pci_register_driver(&pcie_driver);
+		dbg("pci_register_driver = %d\n", retval);
 		info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
 	}
 

@@ -1487,8 +1487,8 @@ static int __init cpqhpc_init(void)
 	cpqhp_debug = debug;
 
 	info (DRIVER_DESC " version: " DRIVER_VERSION "\n");
-	result = pci_module_init(&cpqhpc_driver);
-	dbg("pci_module_init = %d\n", result);
+	result = pci_register_driver(&cpqhpc_driver);
+	dbg("pci_register_driver = %d\n", result);
 	return result;
 }
 

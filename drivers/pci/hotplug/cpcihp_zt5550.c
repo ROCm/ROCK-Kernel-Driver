@@ -283,7 +283,7 @@ static int __init zt5550_init(void)
 	if(!r)
 		return -EBUSY;
 
-	return pci_module_init(&zt5550_hc_driver);
+	return pci_register_driver(&zt5550_hc_driver);
 }
 
 static void __exit

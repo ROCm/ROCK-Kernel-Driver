@@ -1246,7 +1246,7 @@ int ibmphp_register_pci (void)
 	list_for_each (tmp, &ebda_hpc_head) {
 		ctrl = list_entry (tmp, struct controller, ebda_hpc_list);
 		if (ctrl->ctlr_type == 1) {
-			rc = pci_module_init (&ibmphp_driver);
+			rc = pci_register_driver(&ibmphp_driver);
 			break;
 		}
 	}
