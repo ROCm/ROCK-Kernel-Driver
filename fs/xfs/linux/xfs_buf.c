@@ -779,8 +779,9 @@ pagebuf_get(				/* allocate a buffer		*/
 	/* fill in any missing pages */
 	error = _pagebuf_lookup_pages(pb, pb->pb_target->pbr_mapping, flags);
 	if (unlikely(error)) {
-		pagebuf_free(pb);
-		return (NULL);
+		printk(KERN_WARNING
+			"pagebuf_get: warning, failed to lookup pages\n");
+		goto no_buffer;
 	}
 
 	/*
@@ -801,10 +802,7 @@ pagebuf_get(				/* allocate a buffer		*/
 			 * Read ahead call which is already satisfied,
 			 * drop the buffer
 			 */
-			if (flags & (PBF_LOCK | PBF_TRYLOCK))
-				pagebuf_unlock(pb);
-			pagebuf_rele(pb);
-			return NULL;
+			goto no_buffer;
 		} else {
 			PB_TRACE(pb, "get_read_done", (unsigned long)flags);
 			/* We do not want read in the flags */
@@ -813,7 +811,14 @@ pagebuf_get(				/* allocate a buffer		*/
 	} else {
 		PB_TRACE(pb, "get_write", (unsigned long)flags);
 	}
-	return (pb);
+
+	return pb;
+
+no_buffer:
+	if (flags & (PBF_LOCK | PBF_TRYLOCK))
+		pagebuf_unlock(pb);
+	pagebuf_rele(pb);
+	return NULL;
 }
 
 /*
