@@ -649,10 +649,13 @@ static void hwif_register (ide_hwif_t *hwif)
 	/* register with global device tree */
 	strlcpy(hwif->gendev.bus_id,hwif->name,BUS_ID_SIZE);
 	hwif->gendev.driver_data = hwif;
-	if (hwif->pci_dev)
-		hwif->gendev.parent = &hwif->pci_dev->dev;
-	else
-		hwif->gendev.parent = NULL; /* Would like to do = &device_legacy */
+	if (hwif->gendev.parent == NULL) {
+		if (hwif->pci_dev)
+			hwif->gendev.parent = &hwif->pci_dev->dev;
+		else
+			/* Would like to do = &device_legacy */
+			hwif->gendev.parent = NULL;
+	}
 	device_register(&hwif->gendev);
 }
 
