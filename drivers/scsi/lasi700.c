@@ -70,7 +70,7 @@ static Scsi_Host_Template lasi700_template = {
 	.proc_name	= "lasi700",
 	.this_id	= 7,
 };
-MODULE_DEVICE_TABLE(parisc, lasi700_scsi_tbl);
+MODULE_DEVICE_TABLE(parisc, lasi700_ids);
 
 static int __init
 lasi700_probe(struct parisc_device *dev)
