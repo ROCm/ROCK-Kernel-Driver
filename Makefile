@@ -256,10 +256,6 @@ ifdef include_config
 
 -include .config.cmd
 
-ifdef CONFIG_MODULES
-export EXPORT_FLAGS := -DEXPORT_SYMTAB
-endif
-
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
 endif

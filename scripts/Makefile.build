@@ -69,11 +69,6 @@ $(real-objs-m:.o=.lst): quiet_modtag := [M]
 
 $(obj-m)              : quiet_modtag := [M]
 
-$(export-objs)        : export_flags   := $(EXPORT_FLAGS)
-$(export-objs:.o=.i)  : export_flags   := $(EXPORT_FLAGS)
-$(export-objs:.o=.s)  : export_flags   := $(EXPORT_FLAGS)
-$(export-objs:.o=.lst): export_flags   := $(EXPORT_FLAGS)
-
 # Default for not multi-part modules
 modname = $(*F)
 
