@@ -20,6 +20,7 @@
 #include <linux/string.h>
 #include <linux/module.h>
 #include <linux/moduleparam.h>
+#include <linux/param.h>
 
 #include "ieee1394_types.h"
 #include "hosts.h"
@@ -190,7 +191,7 @@ int hpsb_get_config_rom(struct hpsb_host *host, quadlet_t *buffer,
 
 /* Read topology / speed maps and configuration ROM */
 static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
-                     u64 addr, unsigned int length, u16 fl)
+                     u64 addr, size_t length, u16 fl)
 {
 	unsigned long flags;
         int csraddr = addr - CSR_REGISTER_BASE;
@@ -219,7 +220,7 @@ static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
 #define out if (--length == 0) break
 
 static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
-                     u64 addr, unsigned int length, u16 flags)
+                     u64 addr, size_t length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         int oldcycle;
@@ -333,7 +334,7 @@ static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
 }
 
 static int write_regs(struct hpsb_host *host, int nodeid, int destid,
-		      quadlet_t *data, u64 addr, unsigned int length, u16 flags)
+		      quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
         
@@ -659,7 +660,7 @@ static int lock64_regs(struct hpsb_host *host, int nodeid, octlet_t * store,
 }
 
 static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
-		     quadlet_t *data, u64 addr, unsigned int length, u16 flags)
+		     quadlet_t *data, u64 addr, size_t length, u16 flags)
 {
         int csraddr = addr - CSR_REGISTER_BASE;
 

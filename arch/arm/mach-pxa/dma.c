@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/interrupt.h>
 #include <linux/errno.h>
 
 #include <asm/system.h>
@@ -92,7 +93,7 @@ void pxa_free_dma (int dma_ch)
 	local_irq_restore(flags);
 }
 
-static void dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int i, dint = DINT;
 
@@ -111,6 +112,7 @@ static void dma_irq_handler(int irq, void *dev_id, struct pt_regs *regs)
 			}
 		}
 	}
+	return IRQ_HANDLED;
 }
 
 static int __init pxa_dma_init (void)

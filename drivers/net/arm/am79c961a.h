@@ -58,6 +58,18 @@
 #define CSR3_BABLM	0x4000
 #define CSR3_MASKALL	0x5F00
 
+#define CSR4		4
+#define CSR4_JABM	0x0001
+#define CSR4_JAB	0x0002
+#define CSR4_TXSTRTM	0x0004
+#define CSR4_TXSTRT	0x0008
+#define CSR4_RCVCCOM	0x0010
+#define CSR4_RCVCCO	0x0020
+#define CSR4_MFCOM	0x0100
+#define CSR4_MFCO	0x0200
+#define CSR4_ASTRP_RCV	0x0400
+#define CSR4_APAD_XMIT	0x0800
+
 #define CTRL1		5
 #define CTRL1_SPND	0x0001
 
@@ -93,6 +105,8 @@
 #define SIZERXR		76
 #define SIZETXR		78
 
+#define CSR_MFC		112
+
 #define RMD_ENP		0x0100
 #define RMD_STP		0x0200
 #define RMD_CRC		0x0800
@@ -112,6 +126,9 @@
 #define TST_UFLO	0x4000
 #define TST_BUFF	0x8000
 
+#define ISALED0		0x0004
+#define ISALED0_LNKST	0x8000
+
 struct dev_priv {
     struct net_device_stats stats;
     unsigned long	rxbuffer[RX_BUFFERS];
@@ -123,6 +140,7 @@ struct dev_priv {
     unsigned long	rxhdr;
     unsigned long	txhdr;
     spinlock_t		chip_lock;
+    struct timer_list	timer;
 };
 
 extern int	am79c961_probe (struct net_device *dev);
