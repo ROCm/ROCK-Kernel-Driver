@@ -801,7 +801,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 		}
 
 		if (!ret)
-		    fb_delete_videomode(&mode1, &info->monspecs.modelist);
+		    fb_delete_videomode(&mode1, &info->modelist);
 
 		return ret;
 	}
@@ -828,7 +828,7 @@ fb_set_var(struct fb_info *info, struct fb_var_screeninfo *var)
 			fb_set_cmap(&info->cmap, info);
 
 			fb_var_to_videomode(&mode, &info->var);
-			fb_add_videomode(&mode, &info->monspecs.modelist);
+			fb_add_videomode(&mode, &info->modelist);
 
 			if (info->flags & FBINFO_MISC_MODECHANGEUSER) {
 				struct fb_event event;
@@ -1174,14 +1174,14 @@ register_framebuffer(struct fb_info *fb_info)
 	}
 	fb_info->sprite.offset = 0;
 
-	if (!fb_info->monspecs.modelist.prev ||
-	    !fb_info->monspecs.modelist.next ||
-	    list_empty(&fb_info->monspecs.modelist)) {
+	if (!fb_info->modelist.prev ||
+	    !fb_info->modelist.next ||
+	    list_empty(&fb_info->modelist)) {
 	        struct fb_videomode mode;
 
-		INIT_LIST_HEAD(&fb_info->monspecs.modelist);
+		INIT_LIST_HEAD(&fb_info->modelist);
 		fb_var_to_videomode(&mode, &fb_info->var);
-		fb_add_videomode(&mode, &fb_info->monspecs.modelist);
+		fb_add_videomode(&mode, &fb_info->modelist);
 	}
 
 	registered_fb[i] = fb_info;
@@ -1219,7 +1219,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 		kfree(fb_info->pixmap.addr);
 	if (fb_info->sprite.addr && (fb_info->sprite.flags & FB_PIXMAP_DEFAULT))
 		kfree(fb_info->sprite.addr);
-	fb_destroy_modelist(&fb_info->monspecs.modelist);
+	fb_destroy_modelist(&fb_info->modelist);
 	registered_fb[i]=NULL;
 	num_registered_fb--;
 	class_simple_device_remove(MKDEV(FB_MAJOR, i));

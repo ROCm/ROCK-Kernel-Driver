@@ -1115,14 +1115,14 @@ static int rivafb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 	}
 
 	if (!mode_valid) {
-		mode = fb_find_best_mode(var, &info->monspecs.modelist);
+		mode = fb_find_best_mode(var, &info->modelist);
 		if (mode) {
 			riva_update_var(var, mode);
 			mode_valid = 1;
 		}
 	}
 
-	if (!mode_valid && !list_empty(&info->monspecs.modelist))
+	if (!mode_valid && !list_empty(&info->modelist))
 		return -EINVAL;
 
 	if (var->xres_virtual < var->xres)
@@ -1797,7 +1797,7 @@ static void __devinit riva_get_edidinfo(struct fb_info *info)
 
 	fb_edid_to_monspecs(par->EDID, &info->monspecs);
 	fb_videomode_to_modelist(info->monspecs.modedb, info->monspecs.modedb_len,
-				 &info->monspecs.modelist);
+				 &info->modelist);
 	riva_update_default_var(var, info);
 
 	/* if user specified flatpanel, we respect that */
