@@ -457,24 +457,25 @@ out:
 
 static int kstack_depth_to_print = 64;
 
-static int validate_sp(unsigned long sp, struct task_struct *p)
+static int validate_sp(unsigned long sp, struct task_struct *p,
+		       unsigned long nbytes)
 {
 	int cpu = task_cpu(p);
 	unsigned long stack_page = (unsigned long)p->thread_info;
 
 	if (sp >= stack_page + sizeof(struct thread_struct)
-	    && sp <= stack_page + THREAD_SIZE - 112)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
 		return 1;
 
 #ifdef CONFIG_IRQSTACKS
 	stack_page = (unsigned long) hardirq_ctx[cpu];
 	if (sp >= stack_page + sizeof(struct thread_struct)
-	    && sp <= stack_page + THREAD_SIZE - 112)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
 		return 1;
 
 	stack_page = (unsigned long) softirq_ctx[cpu];
 	if (sp >= stack_page + sizeof(struct thread_struct)
-	    && sp <= stack_page + THREAD_SIZE - 112)
+	    && sp <= stack_page + THREAD_SIZE - nbytes)
 		return 1;
 #endif
 
@@ -498,12 +499,12 @@ unsigned long get_wchan(struct task_struct *p)
 		return 0;
 
 	sp = p->thread.ksp;
-	if (!validate_sp(sp, p))
+	if (!validate_sp(sp, p, 112))
 		return 0;
 
 	do {
 		sp = *(unsigned long *)sp;
-		if (!validate_sp(sp, p))
+		if (!validate_sp(sp, p, 112))
 			return 0;
 		if (count > 0) {
 			ip = *(unsigned long *)(sp + 16);
@@ -533,7 +534,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 	lr = 0;
 	printk("Call Trace:\n");
 	do {
-		if (!validate_sp(sp, p))
+		if (!validate_sp(sp, p, 112))
 			return;
 
 		_sp = (unsigned long *) sp;
@@ -552,8 +553,7 @@ void show_stack(struct task_struct *p, unsigned long *_sp)
 		 * See if this is an exception frame.
 		 * We look for the "regshere" marker in the current frame.
 		 */
-		if (sp <= (unsigned long) p->thread_info + THREAD_SIZE
-			+ sizeof(struct pt_regs) + 400
+		if (validate_sp(sp, p, sizeof(struct pt_regs) + 400)
 		    && _sp[12] == 0x7265677368657265) {
 			struct pt_regs *regs = (struct pt_regs *)
 				(sp + STACK_FRAME_OVERHEAD);
