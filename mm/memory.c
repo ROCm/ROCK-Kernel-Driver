@@ -414,7 +414,15 @@ static void zap_pte_range(struct mmu_gather *tlb,
 			    && linear_page_index(details->nonlinear_vma,
 					address+offset) != page->index)
 				set_pte(ptep, pgoff_to_pte(page->index));
-			if (pte_dirty(pte))
+			/*
+			 * PG_uptodate can be cleared by
+			 * invalidate_inode_pages2, so we must not try to write
+			 * not uptodate pages.  Otherwise we risk invalidating
+			 * underlying O_DIRECT writes, and secondly because
+			 * pdflush would BUG().  Coherency of mmaps against
+			 * O_DIRECT still cannot be guaranteed though.
+			 */
+			if (pte_dirty(pte) && PageUptodate(page))
 				set_page_dirty(page);
 			if (pte_young(pte) && !PageAnon(page))
 				mark_page_accessed(page);
