@@ -48,6 +48,8 @@ struct timex;
 struct timezone;
 struct tms;
 struct utimbuf;
+typedef int mqd_t;
+struct mq_attr;
 
 #include <linux/config.h>
 #include <linux/types.h>
@@ -449,6 +451,13 @@ asmlinkage long sys_shmat(int shmid, char __user *shmaddr,
 asmlinkage long sys_shmget(key_t key, size_t size, int flag);
 asmlinkage long sys_shmdt(char __user *shmaddr);
 asmlinkage long sys_shmctl(int shmid, int cmd, struct shmid_ds __user *buf);
+
+asmlinkage long sys_mq_open(const char __user *name, int oflag, mode_t mode, struct mq_attr __user *attr);
+asmlinkage long sys_mq_unlink(const char __user *name);
+asmlinkage long sys_mq_timedsend(mqd_t mqdes, const char __user *msg_ptr, size_t msg_len, unsigned int msg_prio, const struct timespec __user *abs_timeout);
+asmlinkage ssize_t sys_mq_timedreceive(mqd_t mqdes, char __user *msg_ptr, size_t msg_len, unsigned int __user *msg_prio, const struct timespec __user *abs_timeout);
+asmlinkage long sys_mq_notify(mqd_t mqdes, const struct sigevent __user *notification);
+asmlinkage long sys_mq_getsetattr(mqd_t mqdes, const struct mq_attr __user *mqstat, struct mq_attr __user *omqstat);
 
 asmlinkage long sys_pciconfig_iobase(long which, unsigned long bus, unsigned long devfn);
 asmlinkage long sys_pciconfig_read(unsigned long bus, unsigned long dfn,

@@ -260,6 +260,12 @@ cond_syscall(sys_msgctl)
 cond_syscall(sys_shmget)
 cond_syscall(sys_shmdt)
 cond_syscall(sys_shmctl)
+cond_syscall(sys_mq_open)
+cond_syscall(sys_mq_unlink)
+cond_syscall(sys_mq_timedsend)
+cond_syscall(sys_mq_timedreceive)
+cond_syscall(sys_mq_notify)
+cond_syscall(sys_mq_getsetattr)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)
