@@ -30,9 +30,9 @@
  * the project's page is at http://www.linuxtv.org/dvb/
  */
 
-#include "budget.h"
 #include "av7110.h"
 #include "av7110_hw.h"
+#include "budget.h"
 
 #define budget_patch budget
 
@@ -51,7 +51,7 @@ static int budget_wdebi(struct budget_patch *budget, u32 config, int addr, u32 v
 {
         struct saa7146_dev *dev=budget->dev;
 
-        DEB_EE(("budget: %p\n", budget));
+        dprintk(2, "budget: %p\n", budget);
 
         if (count <= 0 || count > 4)
                 return -1;
@@ -71,7 +71,7 @@ static int budget_av7110_send_fw_cmd(struct budget_patch *budget, u16* buf, int 
 {
         int i;
 
-        DEB_EE(("budget: %p\n", budget));
+        dprintk(2, "budget: %p\n", budget);
 
         for (i = 2; i < length; i++)
                 budget_wdebi(budget, DEBINOSWAP, COMMAND + 2*i, (u32) buf[i], 2);
@@ -90,7 +90,7 @@ static void av7110_set22k(struct budget_patch *budget, int state)
 {
         u16 buf[2] = {( COMTYPE_AUDIODAC << 8) | (state ? ON22K : OFF22K), 0};
         
-        DEB_EE(("budget: %p\n", budget));
+        dprintk(2, "budget: %p\n", budget);
         budget_av7110_send_fw_cmd(budget, buf, 2);
 }
 
@@ -101,7 +101,7 @@ static int av7110_send_diseqc_msg(struct budget_patch *budget, int len, u8 *msg,
         u16 buf[18] = { ((COMTYPE_AUDIODAC << 8) | SendDiSEqC),
                 16, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-        DEB_EE(("budget: %p\n", budget));
+        dprintk(2, "budget: %p\n", budget);
 
         if (len>10)
                 len=10;
@@ -126,7 +126,7 @@ int budget_patch_diseqc_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *
 {
         struct budget_patch *budget = fe->before_after_data;
 
-        DEB_EE(("budget: %p\n", budget));
+        dprintk(2, "budget: %p\n", budget);
 
         switch (cmd) {
         case FE_SET_TONE:
@@ -171,7 +171,7 @@ static int budget_patch_attach (struct saa7146_dev* dev, struct saa7146_pci_exte
         if (!(budget = kmalloc (sizeof(struct budget_patch), GFP_KERNEL)))
                 return -ENOMEM;
 
-        DEB_EE(("budget: %p\n",budget));
+        dprintk(2, "budget: %p\n", budget);
 
         if ((err = ttpci_budget_init (budget, dev, info))) {
                 kfree (budget);
@@ -251,10 +251,8 @@ static int __init budget_patch_init(void)
 	return saa7146_register_extension(&budget_extension);
 }
 
-
 static void __exit budget_patch_exit(void)
 {
-        DEB_EE((".\n"));
         saa7146_unregister_extension(&budget_extension); 
 }
 
