@@ -206,6 +206,7 @@ eg.
 	journal_unlock_updates() // carry on with filesystem use.
 </programlisting>
 
+<para>
 The opportunities for abuse and DOS attacks with this should be obvious,
 if you allow unprivileged userspace to trigger codepaths containing these
 calls.
@@ -250,7 +251,6 @@ an example.
    }
    journal_destroy(my_jrnl);
 </programlisting>
-</para>
 </sect1>
 
 </chapter>
