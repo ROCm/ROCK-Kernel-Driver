@@ -12,7 +12,7 @@
  * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- *  $Id: 8250.c,v 1.84 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: 8250.c,v 1.90 2002/07/28 10:03:27 rmk Exp $
  *
  * A note about mapbase / membase
  *
@@ -25,29 +25,17 @@
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/compiler.h>
-#include <linux/errno.h>
-#include <linux/sched.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/slab.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
-#include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 #include <linux/serial_reg.h>
 #include <linux/serialP.h>
 #include <linux/delay.h>
-#include <linux/kmod.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #if defined(CONFIG_SERIAL_8250_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -1951,7 +1939,7 @@ static int __init serial8250_init(void)
 {
 	int ret, i;
 
-	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.84 $ "
+	printk(KERN_INFO "Serial: 8250/16550 driver $Revision: 1.90 $ "
 		"IRQ sharing %sabled\n", share_irqs ? "en" : "dis");
 
 	for (i = 0; i < NR_IRQS; i++)
@@ -1983,7 +1971,7 @@ EXPORT_SYMBOL(unregister_serial);
 EXPORT_SYMBOL(serial8250_get_irq_map);
 
 MODULE_LICENSE("GPL");
-MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.84 $");
+MODULE_DESCRIPTION("Generic 8250/16x50 serial driver $Revision: 1.90 $");
 
 MODULE_PARM(share_irqs, "i");
 MODULE_PARM_DESC(share_irqs, "Share IRQs with other non-8250/16x50 devices"

@@ -22,38 +22,22 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: core.c,v 1.91 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: core.c,v 1.100 2002/07/28 10:03:28 rmk Exp $
  *
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
-#include <linux/ioport.h>
-#include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/console.h>
-#include <linux/sysrq.h>
 #include <linux/pm.h>
 #include <linux/serial_core.h>
 #include <linux/smp_lock.h>
 #include <linux/serial.h> /* for serial_state and serial_icounter_struct */
 
-#include <asm/system.h>
-#include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/uaccess.h>
-#include <asm/bitops.h>
 
 #undef	DEBUG
 #ifdef DEBUG

@@ -11,7 +11,7 @@
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation; either version 2 of the License.
  *
- *  $Id: 8250_pci.c,v 1.19 2002/07/21 21:32:30 rmk Exp $
+ *  $Id: 8250_pci.c,v 1.24 2002/07/29 14:39:56 rmk Exp $
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -30,6 +30,7 @@
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 #include <asm/serial.h>
+#include <asm/io.h>
 
 #include "8250.h"
 

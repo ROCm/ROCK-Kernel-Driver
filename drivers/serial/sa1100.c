@@ -21,35 +21,20 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
- *  $Id: sa1100.c,v 1.43 2002/07/22 15:27:32 rmk Exp $
+ *  $Id: sa1100.c,v 1.50 2002/07/29 14:41:04 rmk Exp $
  *
  */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/errno.h>
-#include <linux/signal.h>
-#include <linux/sched.h>
-#include <linux/interrupt.h>
 #include <linux/tty.h>
-#include <linux/tty_flip.h>
-#include <linux/major.h>
-#include <linux/string.h>
-#include <linux/fcntl.h>
-#include <linux/ptrace.h>
 #include <linux/ioport.h>
-#include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/init.h>
-#include <linux/circ_buf.h>
 #include <linux/serial.h>
 #include <linux/console.h>
 #include <linux/sysrq.h>
 
-#include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/uaccess.h>
-#include <asm/bitops.h>
 #include <asm/hardware.h>
 #include <asm/mach/serial_sa1100.h>
 
@@ -857,7 +842,7 @@ static int __init sa1100_serial_init(void)
 {
 	int ret;
 
-	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.43 $\n");
+	printk(KERN_INFO "Serial: SA11x0 driver $Revision: 1.50 $\n");
 
 	sa1100_init_ports();
 	ret = uart_register_driver(&sa1100_reg);
@@ -886,5 +871,5 @@ module_exit(sa1100_serial_exit);
 EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
-MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.43 $");
+MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.50 $");
 MODULE_LICENSE("GPL");
