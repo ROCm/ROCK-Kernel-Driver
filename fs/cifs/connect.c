@@ -60,6 +60,7 @@ struct smb_vol {
 	mode_t dir_mode;
 	int rw:1;
 	int retry:1;
+	int nosuid:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -619,6 +620,10 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
 			vol->rw = TRUE;
+		} else if (strnicmp(data, "suid", 4) == 0) {
+                        vol->nosuid = FALSE;
+                } else if (strnicmp(data, "nosuid", 6) == 0) {
+                        vol->nosuid = TRUE;
 		} else if (strnicmp(data, "ro", 2) == 0) {
 			vol->rw = FALSE;
 		} else if (strnicmp(data, "hard", 4) == 0) {
@@ -966,6 +971,10 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		FreeXid(xid);
 		return -EINVAL;
 	}
+	if(volume_info.nosuid)
+		sb->s_flags |= MS_NOSUID;
+	else
+		sb->s_flags &= ~MS_NOSUID;
 
 	/* this is needed for ASCII cp to Unicode converts */
 	if(volume_info.iocharset == NULL) {
