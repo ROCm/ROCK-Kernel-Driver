@@ -1,3 +1,7 @@
+Verison 0.95
+------------
+Fix unsafe global variable usage and password hash failure on gcc 3.3.1
+ 
 Version 0.94
 ------------
 Fix to list processing in reopen_files. Fix reconnection when server hung

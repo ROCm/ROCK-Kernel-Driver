@@ -175,12 +175,12 @@ struct cifsTconInfo {
 	struct cifsSesInfo *ses;	/* pointer to session associated with */
 	char treeName[MAX_TREE_SIZE + 1]; /* UNC name of resource (in ASCII not UTF) */
 	char *nativeFileSystem;
-	__u16 tid;		/* The 2 byte transaction id */
+	__u16 tid;		/* The 2 byte tree id */
 	__u16 Flags;		/* optional support bits */
 	enum statusEnum tidStatus;
-	atomic_t useCount;	/* how many mounts (explicit or implicit refer to this share */
+	atomic_t useCount;	/* how many mounts (explicit or implicit) to this share */
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
-	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* note file system name may be truncated - but very unlikely */
+	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
 	/* BB add field for back pointer to sb struct? */
 };

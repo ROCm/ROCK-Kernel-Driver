@@ -23,8 +23,6 @@
    Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-extern int DEBUGLEVEL;
-
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/string.h>
@@ -96,12 +94,6 @@ SMBencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
 
 	SMBOWFencrypt(p21, c8, p24);
 	
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("SMBencrypt: lm#, challenge, response\n"));
-	dump_data(100, (char *) p21, 16);
-	dump_data(100, (char *) c8, 8);
-	dump_data(100, (char *) p24, 24);
-#endif
 	memset(p14,0,15);
 	memset(p21,0,21);
 }
@@ -179,12 +171,6 @@ nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16])
 	memset(nt_p16, '\0', 16);
 	E_md4hash(passwd, nt_p16);
 
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("nt_lm_owf_gen: pwd, nt#\n"));
-	dump_data(120, passwd, strlen(passwd));
-	dump_data(100, (char *) nt_p16, 16);
-#endif
-
 	/* Mangle the passwords into Lanman format */
 	passwd[14] = '\0';
 /*	strupper(passwd); */
@@ -194,11 +180,6 @@ nt_lm_owf_gen(char *pwd, unsigned char nt_p16[16], unsigned char p16[16])
 	memset(p16, '\0', 16);
 	E_P16((unsigned char *) passwd, (unsigned char *) p16);
 
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("nt_lm_owf_gen: pwd, lm#\n"));
-	dump_data(120, passwd, strlen(passwd));
-	dump_data(100, (char *) p16, 16);
-#endif
 	/* clear out local copy of user's password (just being paranoid). */
 	memset(passwd, '\0', sizeof (passwd));
 }
@@ -235,13 +216,6 @@ ntv2_owf_gen(const unsigned char owf[16], const char *user_n,
 	hmac_md5_update((const unsigned char *) dom_u, domain_l * 2, &ctx);
 	hmac_md5_final(kr_buf, &ctx);
 
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("ntv2_owf_gen: user, domain, owfkey, kr\n"));
-	dump_data(100, user_u, user_l * 2);
-	dump_data(100, dom_u, domain_l * 2);
-	dump_data(100, owf, 16);
-	dump_data(100, kr_buf, 16);
-#endif
 	kfree(user_u);
 }
 
@@ -270,12 +244,6 @@ NTLMSSPOWFencrypt(unsigned char passwd[8],
 	memset(p21 + 8, 0xbd, 8);
 
 	E_P24(p21, ntlmchalresp, p24);
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("NTLMSSPOWFencrypt: p21, c8, p24\n"));
-	dump_data(100, (char *) p21, 21);
-	dump_data(100, (char *) ntlmchalresp, 8);
-	dump_data(100, (char *) p24, 24);
-#endif
 }
 
 /* Does the NT MD4 hash then des encryption. */
@@ -289,13 +257,6 @@ SMBNTencrypt(unsigned char *passwd, unsigned char *c8, unsigned char *p24)
 
 	E_md4hash(passwd, p21);
 	SMBOWFencrypt(p21, c8, p24);
-
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("SMBNTencrypt: nt#, challenge, response\n"));
-	dump_data(100, (char *) p21, 16);
-	dump_data(100, (char *) c8, 8);
-	dump_data(100, (char *) p24, 24);
-#endif
 }
 
 /* Does the md5 encryption from the NT hash for NTLMv2. */
@@ -310,37 +271,6 @@ SMBOWFencrypt_ntv2(const unsigned char kr[16],
         hmac_md5_update(srv_chal->data, srv_chal->length, &ctx);
         hmac_md5_update(cli_chal->data, cli_chal->length, &ctx);
         hmac_md5_final(resp_buf, &ctx);
-
-#ifdef DEBUG_PASSWORD
-        DEBUG(100, ("SMBOWFencrypt_ntv2: srv_chal, cli_chal, resp_buf\n"));
-        dump_data(100, srv_chal->data, srv_chal->length);
-        dump_data(100, cli_chal->data, cli_chal->length);
-        dump_data(100, resp_buf, 16);
-#endif
-}
-
-static struct data_blob LMv2_generate_response(const unsigned char ntlm_v2_hash[16],
-                                        const struct data_blob * server_chal)
-{
-        unsigned char lmv2_response[16];
-	struct data_blob lmv2_client_data/* = data_blob(NULL, 8)*/; /* BB Fix BB */
-        struct data_blob final_response /* = data_blob(NULL, 24)*/; /* BB Fix BB */
-
-        /* LMv2 */
-        /* client-supplied random data */
-        get_random_bytes(lmv2_client_data.data, lmv2_client_data.length);
-        /* Given that data, and the challenge from the server, generate a response */
-        SMBOWFencrypt_ntv2(ntlm_v2_hash, server_chal, &lmv2_client_data, lmv2_response);
-        memcpy(final_response.data, lmv2_response, sizeof(lmv2_response));
-
-        /* after the first 16 bytes is the random data we generated above,
-           so the server can verify us with it */
-        memcpy(final_response.data+sizeof(lmv2_response),
-               lmv2_client_data.data, lmv2_client_data.length);
-
-/*        data_blob_free(&lmv2_client_data); */ /* BB fix BB */
-
-        return final_response;
 }
 
 void
@@ -352,11 +282,6 @@ SMBsesskeygen_ntv2(const unsigned char kr[16],
 	hmac_md5_init_limK_to_64(kr, 16, &ctx);
 	hmac_md5_update(nt_resp, 16, &ctx);
 	hmac_md5_final((unsigned char *) sess_key, &ctx);
-
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("SMBsesskeygen_ntv2:\n"));
-	dump_data(100, sess_key, 16);
-#endif
 }
 
 void
@@ -364,11 +289,6 @@ SMBsesskeygen_ntv1(const unsigned char kr[16],
 		   const unsigned char *nt_resp, __u8 sess_key[16])
 {
 	mdfour((unsigned char *) sess_key, (unsigned char *) kr, 16);
-
-#ifdef DEBUG_PASSWORD
-	DEBUG(100, ("SMBsesskeygen_ntv1:\n"));
-	dump_data(100, sess_key, 16);
-#endif
 }
 
 /***********************************************************
@@ -391,39 +311,3 @@ encode_pw_buffer(char buffer[516], char *new_pw, int new_pw_length)
 	return TRUE;
 }
 
-int SMBNTLMv2encrypt(const char *user, const char *domain, const char *password,
-                      const struct data_blob *server_chal,
-                      const struct data_blob *names_blob,
-                      struct data_blob *lm_response, struct data_blob *nt_response,
-                      struct data_blob *nt_session_key,struct nls_table * nls_codepage)
-{
-        unsigned char nt_hash[16];
-        unsigned char ntlm_v2_hash[16];
-        E_md4hash(password, nt_hash);
-
-        /* We don't use the NT# directly.  Instead we use it mashed up with
-           the username and domain.
-           This prevents username swapping during the auth exchange
-        */
-        ntv2_owf_gen(nt_hash, user, domain, ntlm_v2_hash,nls_codepage);
-
-        if (nt_response) {
-/*                *nt_response = NTLMv2_generate_response(ntlm_v2_hash, server_chal,
-                                                        names_blob); */ /* BB fix BB */
-                if (nt_session_key) {
-/*                        *nt_session_key = data_blob(NULL, 16); */ /* BB fix BB */
-
-                        /* The NTLMv2 calculations also provide a session key, for signing etc later */
-                        /* use only the first 16 bytes of nt_response for session key */
-                        SMBsesskeygen_ntv2(ntlm_v2_hash, nt_response->data, nt_session_key->data);
-                }
-        }
-
-        /* LMv2 */
-
-        if (lm_response) {
-                *lm_response = LMv2_generate_response(ntlm_v2_hash, server_chal);
-        }
-
-        return TRUE;
-}

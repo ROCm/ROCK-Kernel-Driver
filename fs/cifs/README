@@ -1,30 +1,30 @@
-The CIFS VFS support for Linux supports many advanced network filesystem
-features such as heirarchical dfs like namespace, hardlinks, locking and more.
-It was designed to comply with the SNIA CIFS Technical Reference (which supersedes
-the 1992 X/Open SMB Standard) as well as to perform best practice practical
-interoperability with Windows 2000, Windows XP, Samba and equivalent 
+The CIFS VFS support for Linux supports many advanced network filesystem 
+features such as heirarchical dfs like namespace, hardlinks, locking and more.  
+It was designed to comply with the SNIA CIFS Technical Reference (which 
+supersedes the 1992 X/Open SMB Standard) as well as to perform best practice 
+practical interoperability with Windows 2000, Windows XP, Samba and equivalent 
 servers.  
 
-For questions or bug reports please contact sfrench@samba.org (sfrench@us.ibm.com)
+For questions or bug reports please contact:
+    sfrench@samba.org (sfrench@us.ibm.com) 
 
 Build instructions:
 ==================
 For Linux 2.4:
-1a) Get the linux kernel source with cifs vfs already in it
-from bitkeeper via bk://cifs.bkbits.net/linux-2.4
-or
-1b) Get the kernel source (e.g.from http://www.kernel.org)
+1) Get the kernel source (e.g.from http://www.kernel.org)
 and download the cifs vfs source (see the project page
 at http://us1.samba.org/samba/Linux_CIFS_client.html)
 and change directory into the top of the kernel directory
 then patch the kernel (e.g. "patch -p1 < cifs_24.patch") 
 to add the cifs vfs to your kernel configure options if
 it has not already been added (e.g. current SuSE and UL
-users do not need to do not need that patch since the cifs vfs is
+users do not need to apply the cifs_24.patch since the cifs vfs is
 already in the kernel configure menu) and then
 mkdir linux/fs/cifs and then copy the current cifs vfs files from
 the cifs download to your kernel build directory e.g.
+
 	cp <cifs_download_dir>/fs/cifs/* to <kernel_download_dir>/fs/cifs
+	
 2) make menuconfig (or make xconfig)
 3) select cifs from within the network filesystem choices
 4) save and exit
@@ -54,55 +54,71 @@ would simply type "make install").
 If you do not have the utility mount.cifs (in the Samba 3.0 source tree and on 
 the CIFS VFS web site) copy it to the same directory in which mount.smbfs and 
 similar files reside (usually /sbin).  Although the helper software is required, 
-mount.cifs is recommended.  Eventually the Samba 3.0 utility program "net" 
-may also be helpful since it may someday provide easier mount syntax for users used 
-to Windows e.g.
-	 net use <mount point> <UNC name or cifs URL> 	 
-Note that running Winbind on all of your Linux clients is useful in 
-in mapping Uids and Gids consistently to the proper network user.
+mount.cifs is recommended.  Eventually the Samba 3.0 utility program "net" may 
+also be helpful since it may someday provide easier mount syntax for users used 
+to Windows e.g.  net use <mount point> <UNC name or cifs URL> Note that running 
+Winbind on all of your Linux clients is useful in in mapping Uids and Gids 
+consistently to the proper network user.  The mount.cifs mount helper can be
+trivially built from Samba 3.0 or later source e.g. by executing:
 
-Samba Considerations
-====================
-To get the maximum benefit from the CIFS VFS, we recommend using a server that
-supports the SNIA CIFS Unix Extensions standard (e.g. Samba 2.2.5 or later or 
-Samba 3.0) but the CIFS vfs works fine with a wide variety of CIFS servers. 
-Note that uid, gid and file permissions will display default values if you do
-not have a server that supports the Unix extensions for CIFS (such as Samba 2.2.3 or
-later).   To enable the Unix CIFS Extensions in the Samba server, add the line:
+	gcc samba/source/client/mount.cifs.c -o mount.cifs
+	
+There is a corresponding manual page for cifs mounting in the Samba 3.0 and
+later source tree in docs/manpages/mount.cifs.8 
+
+Samba Considerations 
+==================== 
+To get the maximum benefit from the CIFS VFS, we recommend using a server that 
+supports the SNIA CIFS Unix Extensions standard (e.g.  Samba 2.2.5 or later or 
+Samba 3.0) but the CIFS vfs works fine with a wide variety of CIFS servers.  
+Note that uid, gid and file permissions will display default values if you do 
+not have a server that supports the Unix extensions for CIFS (such as Samba 
+2.2.3 or later).  To enable the Unix CIFS Extensions in the Samba server, add 
+the line: 
+
 	unix extensions = yes
-to your smb.conf file on the server.  Note that the following smb.conf settings are
-also useful (on the Samba server) when the majority of clients are Unix
-or Linux:
+	
+to your smb.conf file on the server.  Note that the following smb.conf settings 
+are also useful (on the Samba server) when the majority of clients are Unix or 
+Linux: 
+
 	case sensitive = yes
-	delete readonly = yes
-Some administrators also change the "map archive" and the "create mask" parameters
-from their default values.  Creating special devices (mknod) remotely may require
-specifying a mkdev function to Samba. For more information on these see the manual  
-pages ("man smb.conf") on the Samba server system.  Note that the cifs vfs, unlike the
-smbfs vfs, does not read the smb.conf on the client system (the few optional settings
-are passed in on mount via -o parameters instead).  Note that Samba 2.2.7 or later
-includes a fix that allows the CIFS VFS to delete open files (required for strict
-POSIX compliance).  Windows Servers already supported this feature.
+	delete readonly = yes 
+ 
+Some administrators also change the "map archive" and the "create mask" 
+parameters from their default values.  Creating special devices (mknod) remotely 
+may require specifying a mkdev function to Samba.  For more information on these 
+see the manual pages ("man smb.conf") on the Samba server system.  Note that the 
+cifs vfs, unlike the smbfs vfs, does not read the smb.conf on the client system 
+(the few optional settings are passed in on mount via -o parameters instead).  
+Note that Samba 2.2.7 or later includes a fix that allows the CIFS VFS to delete 
+open files (required for strict POSIX compliance).  Windows Servers already 
+supported this feature.  
 
 Use instructions:
 ================
-Once the CIFS VFS support is built into the kernel or installed as a module (cifs.o),
-you can use mount syntax like the following to access Samba or Windows servers:
+Once the CIFS VFS support is built into the kernel or installed as a module 
+(cifs.o), you can use mount syntax like the following to access Samba or Windows 
+servers: 
+
   mount -t cifs //9.53.216.11/e$ /mnt -o user=myname,pass=mypassword
+  
 after -o the following cifs vfs specific options are supported:
+
   user=<username>
   pass=<password>
   domain=<domain name>
+  
 TCP names (in addition to ip addresses) will be available when the mount helper
 (mount.cifs) is complete
 
 Restrictions
 ============
-Servers must support the NTLM SMB dialect (which is the most recent, supported by Samba
-and Windows NT, 2000 and XP and many other SMB/CIFS servers) and servers must support
-either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 1001/1002 support for
-"Netbios-Over-TCP/IP."  Neither of these is likely to be a problem as most servers
-support this.  IPv6 support is planned for the future.  
+Servers must support the NTLM SMB dialect (which is the most recent, supported 
+by Samba and Windows NT, 2000 and XP and many other SMB/CIFS servers) and 
+servers must support either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 
+1001/1002 support for "Netbios-Over-TCP/IP." Neither of these is likely to be a 
+problem as most servers support this.  IPv6 support is planned for the future.  
 
 CIFS VFS Mount Options
 ======================
@@ -178,17 +194,22 @@ Configuration pseudo-files:
   OplockEnabled		If set to one, safe distributed caching enabled.
 			(default 1)
 
-These experimental features and tracing can be enabled by changing flags in /proc/fs/cifs
-(after the cifs module has been installed or built into the kernel, e.g. insmod cifs). 
-To enable a feature set it to 1 e.g. to enable tracing to the kernel message log
-type:
+These experimental features and tracing can be enabled by changing flags in 
+/proc/fs/cifs (after the cifs module has been installed or built into the 
+kernel, e.g.  insmod cifs).  To enable a feature set it to 1 e.g.  to enable 
+tracing to the kernel message log type: 
+
 	echo 1 > /proc/fs/cifs/cifsFYI
+	
 and for more extensive tracing including the start of smb requests and responses
+
 	echo 1 > /proc/fs/cifs/traceSMB
-Also note that "cat /proc/fs/cifs/DebugData" will display some information about the
-active sessions and the shares that are mounted. NTLMv2 enablement and packet
-signing will not work since they the implementation is not quite complete. Do not enable
-these flags unless you are doing specific testing.  Enabling extended security works to
-Windows 2000 Workstations and XP but not to Windows 2000 server or Samba since it does not
-usually send "raw NTLMSSP" (instead it sends NTLMSSP encapsulated in SPNEGO/GSSAPI, which
-support is not complete in the CIFS VFS yet).
+	
+Also note that "cat /proc/fs/cifs/DebugData" will display some information about 
+the active sessions and the shares that are mounted.  NTLMv2 enablement and 
+packet signing will not work since they the implementation is not quite 
+complete.  Do not enable these flags unless you are doing specific testing.  
+Enabling extended security works to Windows 2000 Workstations and XP but not to 
+Windows 2000 server or Samba since it does not usually send "raw NTLMSSP" 
+(instead it sends NTLMSSP encapsulated in SPNEGO/GSSAPI, which support is not 
+complete in the CIFS VFS yet).  
