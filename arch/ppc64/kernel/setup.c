@@ -189,6 +189,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif
 	}
 
+#ifdef CONFIG_PPC_PSERIES
 	if (systemcfg->platform & PLATFORM_PSERIES) {
 		early_console_initialized = 1;
 		register_console(&udbg_console);
@@ -210,6 +211,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 		}
 #endif
 	}
+#endif
 
 	printk("Starting Linux PPC64 %s\n", UTS_RELEASE);
 
@@ -229,7 +231,7 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	mm_init_ppc64();
 
-#ifdef CONFIG_SMP
+#if defined(CONFIG_SMP) && defined(CONFIG_PPC_PSERIES)
 	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
 		vpa_init(boot_cpuid);
 	}
@@ -311,6 +313,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 	seq_printf(m, "\n");
 
+#ifdef CONFIG_PPC_PSERIES
 	/*
 	 * Assume here that all clock rates are the same in a
 	 * smp system.  -- Cort
@@ -329,6 +332,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 			of_node_put(cpu_node);
 		}
 	}
+#endif
 
 	if (ppc_md.setup_residual != NULL)
 		ppc_md.setup_residual(m, cpu_id);
@@ -363,9 +367,6 @@ struct seq_operations cpuinfo_op = {
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-	struct device_node *chosen;
-	char *p;
-
 #ifdef CONFIG_BLK_DEV_INITRD
 	if ((initrd_start == 0) && r3 && r4 && r4 != 0xdeadbeef) {
 		initrd_start = (r3 >= KERNELBASE) ? r3 : (unsigned long)__va(r3);
@@ -381,13 +382,20 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	strlcpy(cmd_line, CONFIG_CMDLINE, sizeof(cmd_line));
 #endif /* CONFIG_CMDLINE */
 
+#ifdef CONFIG_PPC_PSERIES
+	{
+	struct device_node *chosen;
+
 	chosen = of_find_node_by_name(NULL, "chosen");
 	if (chosen != NULL) {
+		char *p;
 		p = get_property(chosen, "bootargs", NULL);
 		if (p != NULL && p[0] != 0)
 			strlcpy(cmd_line, p, sizeof(cmd_line));
 		of_node_put(chosen);
 	}
+	}
+#endif
 
 	/* Look for mem= option on command line */
 	if (strstr(cmd_line, "mem=")) {
@@ -413,28 +421,7 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 }
 
 
-char *bi_tag2str(unsigned long tag)
-{
-	switch (tag) {
-	case BI_FIRST:
-		return "BI_FIRST";
-	case BI_LAST:
-		return "BI_LAST";
-	case BI_CMD_LINE:
-		return "BI_CMD_LINE";
-	case BI_BOOTLOADER_ID:
-		return "BI_BOOTLOADER_ID";
-	case BI_INITRD:
-		return "BI_INITRD";
-	case BI_SYSMAP:
-		return "BI_SYSMAP";
-	case BI_MACHTYPE:
-		return "BI_MACHTYPE";
-	default:
-		return "BI_UNKNOWN";
-	}
-}
-
+#ifdef CONFIG_PPC_PSERIES
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;
@@ -468,6 +455,7 @@ int parse_bootinfo(void)
 
 	return 0;
 }
+#endif
 
 int __init ppc_init(void)
 {

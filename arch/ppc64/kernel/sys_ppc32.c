@@ -2884,3 +2884,40 @@ long ppc32_fadvise64_64(int fd, int advice, u32 offset_high, u32 offset_low,
 	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low,
 			     (u64)len_high << 32 | len_low, advice);
 }
+
+extern long sys_timer_create(clockid_t, sigevent_t *, timer_t *);
+
+long ppc32_timer_create(clockid_t clock,
+			struct compat_sigevent __user *ev32,
+			timer_t __user *timer_id)
+{
+	sigevent_t event;
+	timer_t t;
+	long err;
+	mm_segment_t savefs;
+
+	if (ev32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&event, 0, sizeof(event));
+	if (!access_ok(VERIFY_READ, ev32, sizeof(struct compat_sigevent))
+	    || __get_user(event.sigev_value.sival_int,
+			  &ev32->sigev_value.sival_int)
+	    || __get_user(event.sigev_signo, &ev32->sigev_signo)
+	    || __get_user(event.sigev_notify, &ev32->sigev_notify)
+	    || __get_user(event.sigev_notify_thread_id,
+			  &ev32->sigev_notify_thread_id))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE, timer_id, sizeof(timer_t)))
+		return -EFAULT;
+
+	savefs = get_fs();
+	err = sys_timer_create(clock, &event, &t);
+	set_fs(savefs);
+
+	if (err == 0)
+		err = __put_user(t, timer_id);
+
+	return err;
+}

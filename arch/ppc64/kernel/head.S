@@ -91,20 +91,26 @@
 	.text
 	.globl  _stext
 _stext:
+#ifdef CONFIG_PPC_PSERIES
 _STATIC(__start)
 	b .__start_initialization_pSeries
+#endif
 #ifdef CONFIG_PPC_ISERIES
-	/* At offset 0x20, there is a pointer to iSeries LPAR data.
-	 * This is required by the hypervisor */
+	/*
+	 * At offset 0x20, there is a pointer to iSeries LPAR data.
+	 * This is required by the hypervisor
+	 */
 	. = 0x20
 	.llong hvReleaseData-KERNELBASE
 
-	/* At offset 0x28 and 0x30 are offsets to the msChunks
+	/*
+	 * At offset 0x28 and 0x30 are offsets to the msChunks
 	 * array (used by the iSeries LPAR debugger to do translation
 	 * between physical addresses and absolute addresses) and
-	 * to the pidhash table (also used by the debugger) */
+	 * to the pidhash table (also used by the debugger)
+	 */
 	.llong msChunks-KERNELBASE
-	.llong pidhash-KERNELBASE
+	.llong 0 /* pidhash-KERNELBASE SFRXXX */
 
 	/* Offset 0x38 - Pointer to start of embedded System.map */
 	.globl	embedded_sysmap_start
@@ -114,7 +120,7 @@ embedded_sysmap_start:
 	.globl	embedded_sysmap_end
 embedded_sysmap_end:
 	.llong	0
-#endif
+#else
 
 	/* Secondary processors spin on this value until it goes to 1. */
 	.globl  __secondary_hold_spinloop
@@ -147,6 +153,7 @@ _GLOBAL(__secondary_hold)
 	/* Relocation is off & we are located at an address less */
 	/* than 0x100, so only need to grab low order offset.    */
 	std     r24,__secondary_hold_acknowledge@l(0)
+	sync
 
 	/* All secondary cpu's wait here until told to start. */
 100:    ld      r4,__secondary_hold_spinloop@l(0)
@@ -161,6 +168,7 @@ _GLOBAL(__secondary_hold)
 	b       .pseries_secondary_smp_init
 #else
 	BUG_OPCODE
+#endif
 #endif
 #endif
 
@@ -244,6 +252,14 @@ _GLOBAL(__secondary_hold)
 	std	r22,EX_SRR0(r21);	    /* save SRR0 in exc. frame     */ \
 	ld      r23,LPPACA+LPPACASRR1(r20); /* Get SRR1 from ItLpPaca      */ \
 	std	r23,EX_SRR1(r21);	    /* save SRR1 in exc. frame     */ \
+                                                                         \
+	mfspr   r23,DAR;                /* Save DAR in exc. frame      */ \
+	std	r23,EX_DAR(r21);	                                  \
+	mfspr	r23,DSISR;		/* Save DSISR in exc. frame    */ \
+	stw	r23,EX_DSISR(r21);	                                  \
+	mfspr	r23,SPRG2;		/* Save r20 in exc. frame      */ \
+	std	r23,EX_R20(r21);	                                  \
+                                                                         \
 	mfcr    r23;                        /* save CR in r23              */
 
 /*
@@ -708,21 +724,6 @@ HardwareInterrupt_entry:
 	bl      .do_IRQ
 	b       .ret_from_except
 
-3:
-	/* error - counts out of sync                                      */
-#ifdef CONFIG_XMON
-	bl	.xmon
-#endif
-#ifdef CONFIG_KDB
-        /*          kdb(KDB_REASON_FAULT,regs->trap,regs); */
-	li      r3,1
-	li 	r4,0x200
-	li      r5,0
-	bl	.kdb
-#endif
-4:	b	4b
-
-
 	.globl Alignment_common
 Alignment_common:
 	EXCEPTION_PROLOG_COMMON
@@ -1128,7 +1129,6 @@ _GLOBAL(save_remaining_regs)
 	SET_REG_TO_CONST(r22, MSR_KERNEL)
 
 #ifdef DO_SOFT_DISABLE
-#warning FIX ISERIES
 	stb	r20,PACAPROCENABLED(r13) /* possibly soft enable */
 	ori	r22,r22,MSR_EE		/* always hard enable */
 #else
@@ -1234,6 +1234,7 @@ _GLOBAL(__start_initialization_iSeries)
 	b	.start_here_common
 #endif
 
+#ifdef CONFIG_PPC_PSERIES
 _GLOBAL(__start_initialization_pSeries)
 	mr	r31,r3			/* save parameters */
 	mr	r30,r4
@@ -1343,6 +1344,7 @@ _STATIC(__after_prom_start)
 	sub	r5,r5,r27
 	bl	.copy_and_flush		/* copy the rest */
 	b	.start_here_pSeries
+#endif
 
 /*
  * Copy routine used to copy the kernel to start at physical address 0
@@ -1609,6 +1611,7 @@ _GLOBAL(enable_32b_mode)
 	isync
 	blr
 
+#ifdef CONFIG_PPC_PSERIES
 /*
  * This is where the main kernel code starts.
  */
@@ -1744,6 +1747,7 @@ _STATIC(start_here_pSeries)
 	mtspr	SRR0,r3
 	mtspr	SRR1,r4
 	rfid
+#endif	/* CONFIG_PPC_PSERIES */
 
 	/* This is where all platforms converge execution */
 _STATIC(start_here_common)
@@ -1818,10 +1822,8 @@ _STATIC(start_here_common)
 	/* Load up the kernel context */
 5:
 #ifdef DO_SOFT_DISABLE
-#warning FIX ISERIES
-	mfspr	r4,SPRG3
 	li	r5,0
-	stb	r5,PACAPROCENABLED(r4)	/* Soft Disabled */
+	stb	r5,PACAPROCENABLED(r13)	/* Soft Disabled */
 	mfmsr	r5
 	ori	r5,r5,MSR_EE		/* Hard Enabled */
 	mtmsrd	r5

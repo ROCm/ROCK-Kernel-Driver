@@ -93,7 +93,7 @@ struct rt_sigframe_32 {
 	 * it is a pointer to the user context in the rt stack frame
 	 */
 	u32 puc;
-	struct siginfo32  info;
+	struct compat_siginfo  info;
 	struct ucontext32 uc;
 };
 
@@ -639,7 +639,7 @@ long sys32_rt_sigpending(compat_sigset_t *set, compat_size_t sigsetsize)
 }
 
 
-static int copy_siginfo_to_user32(siginfo_t32 *d, siginfo_t *s)
+static int copy_siginfo_to_user32(compat_siginfo_t *d, siginfo_t *s)
 {
 	int err;
 
@@ -681,7 +681,7 @@ static int copy_siginfo_to_user32(siginfo_t32 *d, siginfo_t *s)
 	return err;
 }
 
-long sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
+long sys32_rt_sigtimedwait(compat_sigset_t *uthese, compat_siginfo_t *uinfo,
 		struct compat_timespec *uts, compat_size_t sigsetsize)
 {
 	sigset_t s;
@@ -714,7 +714,7 @@ long sys32_rt_sigtimedwait(compat_sigset_t *uthese, siginfo_t32 *uinfo,
 
 
 
-static siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
+static siginfo_t * siginfo32to64(siginfo_t *d, compat_siginfo_t *s)
 {
 	d->si_signo = s->si_signo;
 	d->si_errno = s->si_errno;
@@ -758,14 +758,14 @@ static siginfo_t * siginfo32to64(siginfo_t *d, siginfo_t32 *s)
  * (msr in 32-bit mode) and the register representation of a signed int
  * (msr in 64-bit mode) is performed.
  */
-long sys32_rt_sigqueueinfo(u32 pid, u32 sig, siginfo_t32 *uinfo)
+long sys32_rt_sigqueueinfo(u32 pid, u32 sig, compat_siginfo_t *uinfo)
 {
 	siginfo_t info;
-	siginfo_t32 info32;
+	compat_siginfo_t info32;
 	int ret;
 	mm_segment_t old_fs = get_fs();
 	
-	if (copy_from_user (&info32, uinfo, sizeof(siginfo_t32)))
+	if (copy_from_user (&info32, uinfo, sizeof(compat_siginfo_t)))
 		return -EFAULT;
     	/* XXX: Is this correct? */
 	siginfo32to64(&info, &info32);

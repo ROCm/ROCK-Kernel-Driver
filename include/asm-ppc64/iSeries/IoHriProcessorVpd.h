@@ -16,18 +16,15 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _IOHRIPROCESSORVPD_H
+#define _IOHRIPROCESSORVPD_H
 
 //===================================================================
 //
 //	This struct maps Processor Vpd that is DMAd to SLIC by CSP 
 //
 
-#ifndef	_TYPES_H
 #include <asm/types.h>
-#endif
-
-#ifndef _IOHRIPROCESSORVPD_H
-#define _IOHRIPROCESSORVPD_H
 
 struct IoHriProcessorVpd
 {
@@ -87,4 +84,5 @@ struct IoHriProcessorVpd
 
 	char xProcSrc[72];		// CSP format SRC		xB8-xFF
 };
-#endif // _IOHRIPROCESSORVPD_H
+
+#endif /* _IOHRIPROCESSORVPD_H */

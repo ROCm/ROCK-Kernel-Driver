@@ -57,14 +57,13 @@
 #include <asm/irq.h>
 #include <asm/naca.h>
 #include <asm/time.h>
+#include <asm/nvram.h>
 
 #include "i8259.h"
 #include "open_pic.h"
 #include <asm/xics.h>
 #include <asm/ppcdebug.h>
 #include <asm/cputable.h>
-
-extern volatile unsigned char *chrp_int_ack_special;
 
 void chrp_progress(char *, unsigned short);
 
@@ -274,7 +273,10 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.set_rtc_time   = pSeries_set_rtc_time;
 	ppc_md.calibrate_decr = pSeries_calibrate_decr;
 
-	ppc_md.progress = chrp_progress;
+	ppc_md.progress       = chrp_progress;
+
+	ppc_md.nvram_read     = pSeries_nvram_read;
+	ppc_md.nvram_write    = pSeries_nvram_write;
 
         /* Build up the firmware_features bitmask field
          * using contents of device-tree/ibm,hypertas-functions.

@@ -6071,8 +6071,8 @@ static int tg3_set_ringparam(struct net_device *dev, struct ethtool_ringparam *e
 	tp->rx_pending = ering->rx_pending;
 
 	if ((tp->tg3_flags2 & TG3_FLG2_MAX_RXPEND_64) &&
-	    tp->rx_pending > 64)
-		tp->rx_pending = 64;
+	    tp->rx_pending > 63)
+		tp->rx_pending = 63;
 	tp->rx_jumbo_pending = ering->rx_jumbo_pending;
 	tp->tx_pending = ering->tx_pending;
 
@@ -7676,7 +7676,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	    !(tp->tg3_flags2 & TG3_FLG2_TSO_CAPABLE) &&
 	    !(tr32(TG3PCI_PCISTATE) & PCISTATE_BUS_SPEED_HIGH)) {
 		tp->tg3_flags2 |= TG3_FLG2_MAX_RXPEND_64;
-		tp->rx_pending = 64;
+		tp->rx_pending = 63;
 	}
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704)

@@ -20,6 +20,7 @@
 #include <linux/ctype.h>
 #include <linux/time.h>
 #include <linux/string.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
@@ -27,6 +28,7 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
+#include <asm/proc_fs.h>
 #include <asm/machdep.h> /* for ppc_md */
 #include <asm/time.h>
 
@@ -211,36 +213,36 @@ void proc_rtas_init(void)
 		return;
 	}
 	
-	if (proc_rtas == NULL) {
-		proc_rtas = proc_mkdir("rtas", 0);
+	if (proc_ppc64.rtas == NULL) {
+		proc_ppc64_init();
 	}
 
-	if (proc_rtas == NULL) {
+	if (proc_ppc64.rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in proc_rtas_init\n");
 		return;
 	}
 
 	/* /proc/rtas entries */
 
-	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_rtas);
+	entry = create_proc_entry("progress", S_IRUGO|S_IWUSR, proc_ppc64.rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_progress_operations;
 
-	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_rtas); 
+	entry = create_proc_entry("clock", S_IRUGO|S_IWUSR, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_clock_operations;
 
-	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("poweron", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_poweron_operations;
 
-	create_proc_read_entry("sensors", S_IRUGO, proc_rtas, 
+	create_proc_read_entry("sensors", S_IRUGO, proc_ppc64.rtas, 
 			ppc_rtas_sensor_read, NULL);
 	
-	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("frequency", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_freq_operations;
 
-	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_rtas); 
+	entry = create_proc_entry("volume", S_IWUSR|S_IRUGO, proc_ppc64.rtas); 
 	if (entry) entry->proc_fops = &ppc_rtas_tone_volume_operations;
 
-	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_rtas);
+	entry = create_proc_entry("rmo_buffer", S_IRUSR, proc_ppc64.rtas);
 	if (entry) entry->proc_fops = &ppc_rtas_rmo_buf_ops;
 }
 

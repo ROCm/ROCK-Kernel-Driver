@@ -1,3 +1,4 @@
+#define PCIFR(...)
 /************************************************************************/
 /* This module supports the iSeries I/O Address translation mapping     */
 /* Copyright (C) 20yy  <Allan H Trautman> <IBM Corp>                    */

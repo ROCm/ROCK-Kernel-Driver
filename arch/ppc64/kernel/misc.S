@@ -66,32 +66,31 @@ _GLOBAL(get_sp)
 	blr
 		
 #ifdef CONFIG_PPC_ISERIES
-/* unsigned long __no_use_save_flags(void) */
-_GLOBAL(__no_use_save_flags)
-#warning FIX ISERIES
-	mfspr	r4,SPRG3
-	lbz	r3,PACAPROCENABLED(r4)
+/* unsigned long local_save_flags(void) */
+_GLOBAL(local_get_flags)
+	lbz	r3,PACAPROCENABLED(r13)
 	blr
 
-/* void __no_use_restore_flags(unsigned long flags) */	
-_GLOBAL(__no_use_restore_flags)
-/*
- * Just set/clear the MSR_EE bit through restore/flags but do not
- * change anything else.  This is needed by the RT system and makes
- * sense anyway.
- *    -- Cort
- */
-#warning FIX ISERIES
-	mfspr	r6,SPRG3
-	lbz	r5,PACAPROCENABLED(r6)
+/* unsigned long local_irq_disable(void) */
+_GLOBAL(local_irq_disable)
+	lbz	r3,PACAPROCENABLED(r13)
+	li	r4,0
+	stb	r4,PACAPROCENABLED(r13)
+	blr			/* Done */
+
+/* void local_irq_restore(unsigned long flags) */	
+_GLOBAL(local_irq_restore)
+	lbz	r5,PACAPROCENABLED(r13)
 	 /* Check if things are setup the way we want _already_. */
 	cmpw	0,r3,r5
 	beqlr
 	/* are we enabling interrupts? */
 	cmpi	0,r3,0
-	stb	r3,PACAPROCENABLED(r6)
+	stb	r3,PACAPROCENABLED(r13)
 	beqlr
 	/* Check pending interrupts */
+	/*   A decrementer, IPI or PMC interrupt may have occurred
+	 *   while we were in the hypervisor (which enables) */
 	CHECKANYINT(r4,r5)
 	beqlr
 
@@ -101,35 +100,8 @@ _GLOBAL(__no_use_restore_flags)
 	li	r0,0x5555
 	sc
 	blr
+#endif /* CONFIG_PPC_ISERIES */
 
-_GLOBAL(__no_use_cli)
-#warning FIX ISERIES
-	mfspr	r5,SPRG3
-	lbz	r3,PACAPROCENABLED(r5)
-	li	r4,0
-	stb	r4,PACAPROCENABLED(r5)
-	blr			/* Done */
-
-_GLOBAL(__no_use_sti)
-#warning FIX ISERIES
-	mfspr	r6,SPRG3
-	li	r3,1
-	stb	r3,PACAPROCENABLED(r6)
-
-	/* Check for pending interrupts
-	 *   A decrementer, IPI or PMC interrupt may have occurred
-	 *   while we were in the hypervisor (which enables)
-	 */
-	CHECKANYINT(r4,r5)
-	beqlr
-
-	/* 
-	 * Handle pending interrupts in interrupt context
-	 */
-	li	r0,0x5555
-	sc	
-	blr
-#endif
 /*
  * Flush instruction cache.
  */
@@ -595,6 +567,10 @@ SYSCALL(dup)
 SYSCALL(execve)
 SYSCALL(waitpid)
 
+#ifdef CONFIG_PPC_ISERIES	/* hack hack hack */
+#define ppc_rtas	sys_ni_syscall
+#endif
+
 /* Why isn't this a) automatic, b) written in 'C'? */	
 	.balign 8
 _GLOBAL(sys_call_table32)
@@ -838,16 +814,16 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_epoll_ctl
 	.llong .sys_epoll_wait
 	.llong .sys_remap_file_pages
-	.llong .sys_ni_syscall		/* 240 */
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
-	.llong .sys_ni_syscall
+	.llong .ppc32_timer_create	/* 240 */
+	.llong .compat_timer_settime
+	.llong .compat_timer_gettime
+	.llong .sys_timer_getoverrun
+	.llong .sys_timer_delete
 	.llong .compat_clock_settime	/* 245 */
 	.llong .compat_clock_gettime
 	.llong .compat_clock_getres
 	.llong .compat_clock_nanosleep
-	.llong .sys_ni_syscall		/* 249 swapcontext */
+	.llong .sys_ni_syscall
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
 	.llong .compat_statfs64

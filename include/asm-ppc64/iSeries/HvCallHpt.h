@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _HVCALLHPT_H
+#define _HVCALLHPT_H
 
 //============================================================================
 //
@@ -24,30 +26,13 @@
 //
 //============================================================================
 
-//-------------------------------------------------------------------
-// Standard Includes
-//-------------------------------------------------------------------
-#ifndef  _HVCALLSC_H
-#include "HvCallSc.h"
-#endif
-
-#ifndef  _HVTYPES_H
+#include <asm/iSeries/HvCallSc.h>
 #include <asm/iSeries/HvTypes.h>
-#endif
-
-//-------------------------------------------------------------------
-// Other Includes
-//-------------------------------------------------------------------
-
-#ifndef _PPC_MMU_H
 #include <asm/mmu.h>
-#endif
 
 //-----------------------------------------------------------------------------
 // Constants
 //-----------------------------------------------------------------------------
-#ifndef _HVCALLHPT_H
-#define _HVCALLHPT_H
 
 #define HvCallHptGetHptAddress		HvCallHpt +  0
 #define HvCallHptGetHptPages		HvCallHpt +  1
@@ -139,5 +124,4 @@ static inline void		HvCallHpt_addValidate( u32 hpteIndex,
 
 //=============================================================================
 
-#endif // _HVCALLHPT_H
-
+#endif /* _HVCALLHPT_H */

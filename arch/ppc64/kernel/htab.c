@@ -75,6 +75,7 @@ loop_forever(void)
 		;
 }
 
+#ifdef CONFIG_PPC_PSERIES
 static inline void
 create_pte_mapping(unsigned long start, unsigned long end,
 		   unsigned long mode, int large)
@@ -181,6 +182,7 @@ htab_initialize(void)
 }
 #undef KB
 #undef MB
+#endif
 
 /*
  * find_linux_pte returns the address of a linux pte for a given 

@@ -70,7 +70,7 @@ static void yield_shared_processor(void)
 				      lpaca->next_jiffy_update_tb);	  
 
 		lpaca->yielded = 0;        /* Back to IPI's */
-		locale_irq_enable(); 
+		local_irq_enable(); 
 	
 		/*
 		 * The decrementer stops during the yield.  Force a fake 
@@ -89,16 +89,14 @@ int iSeries_idle(void)
 	long oldval;
 	unsigned long CTRL;
 
-	/* endless loop with no priority at all */
-	current->nice = 20;
-	current->counter = -100;
-
 	/* ensure iSeries run light will be out when idle */
-	current->thread.flags &= ~PPC_FLAG_RUN_LIGHT;
+	clear_thread_flag(TIF_RUN_LIGHT);
 	CTRL = mfspr(CTRLF);
 	CTRL &= ~RUNLATCH;
 	mtspr(CTRLT, CTRL);
+#if 0
 	init_idle();	
+#endif
 
 	lpaca = get_paca();
 
@@ -106,26 +104,29 @@ int iSeries_idle(void)
 		if (lpaca->xLpPaca.xSharedProc) {
 			if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
 				process_iSeries_events();
-			if (!current->need_resched)
+			if (!need_resched())
 				yield_shared_processor();
 		} else {
-			/* Avoid an IPI by setting need_resched */
-			oldval = xchg(&current->need_resched, -1);
+			oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
+
 			if (!oldval) {
-				while(current->need_resched == -1) {
+				set_thread_flag(TIF_POLLING_NRFLAG);
+
+				while (!need_resched()) {
 					HMT_medium();
 					if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
 						process_iSeries_events();
 					HMT_low();
 				}
+
+				HMT_medium();
+				clear_thread_flag(TIF_POLLING_NRFLAG);
+			} else {
+				set_need_resched();
 			}
 		}
-		HMT_medium();
-		if (current->need_resched) {
-			lpaca->xLpPaca.xIdle = 0;
-			schedule();
-			check_pgt_cache();
-		}
+
+		schedule();
 	}
 	return 0;
 }
@@ -158,10 +159,11 @@ int default_idle(void)
 	return 0;
 }
 
+#ifdef CONFIG_PPC_PSERIES
 int dedicated_idle(void)
 {
 	long oldval;
-	struct paca_struct *lpaca = get_paca(), *ppaca;;
+	struct paca_struct *lpaca = get_paca(), *ppaca;
 	unsigned long start_snooze;
 
 	ppaca = &paca[(lpaca->xPacaIndex) ^ 1];
@@ -274,6 +276,7 @@ int shared_idle(void)
 
 	return 0;
 }
+#endif
 
 int cpu_idle(void)
 {

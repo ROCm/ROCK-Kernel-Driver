@@ -40,12 +40,7 @@
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
 
-typedef union sigval32 {
-	int sival_int;
-	unsigned int sival_ptr;
-} sigval_t32;
-
-typedef struct siginfo32 {
+typedef struct compat_siginfo {
 	int si_signo;
 	int si_errno;
 	int si_code;
@@ -69,7 +64,7 @@ typedef struct siginfo32 {
 		struct {
 			compat_pid_t _pid;		/* sender's pid */
 			compat_uid_t _uid;		/* sender's uid */
-			sigval_t32 _sigval;
+			compat_sigval_t _sigval;
 		} _rt;
 
 		/* SIGCHLD */
@@ -92,7 +87,7 @@ typedef struct siginfo32 {
 			int _fd;
 		} _sigpoll;
 	} _sifields;
-} siginfo_t32;
+} compat_siginfo_t;
 
 #define __old_sigaction32	old_sigaction32
 
@@ -133,6 +128,20 @@ struct ucontext32 {
 	struct sigcontext32 uc_mcontext;
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
+
+typedef struct compat_sigevent {
+	compat_sigval_t sigev_value;
+	int sigev_signo;
+	int sigev_notify;
+	union {
+		int _pad[SIGEV_PAD_SIZE];
+		int _tid;
+		struct {
+			compat_uptr_t _function;
+			compat_uptr_t _attribute;
+		} _sigev_thread;
+	} _sigev_un;
+} compat_sigevent_t;
 
 struct ipc_kludge_32 {
 	unsigned int msgp;

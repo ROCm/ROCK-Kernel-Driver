@@ -16,13 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-
-#ifndef	_PPC_TYPES_H
-#include	<asm/types.h>
-#endif
-
 #ifndef _LPARMAP_H
 #define _LPARMAP_H
+
+#include <asm/types.h>
 
 /* The iSeries hypervisor will set up mapping for one or more 
  * ESID/VSID pairs (in SLB/segment registers) and will set up

@@ -28,10 +28,7 @@
 #include <asm/types.h>
 #include <asm/ptrace.h>
 #include <asm/iSeries/HvTypes.h>
-#ifndef _HVCALLEVENT_H
 #include <asm/iSeries/HvCallEvent.h>
-#endif
-
 
 //=====================================================================
 //

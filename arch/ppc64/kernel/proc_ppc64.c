@@ -56,6 +56,7 @@ static struct file_operations page_map_fops = {
 	.mmap	= page_map_mmap
 };
 
+#ifdef CONFIG_PPC_PSERIES
 /* routines for /proc/ppc64/ofdt */
 static ssize_t ofdt_write(struct file *, const char __user *, size_t, loff_t *);
 static void proc_ppc64_create_ofdt(struct proc_dir_entry *);
@@ -67,15 +68,20 @@ static char * parse_next_property(char *, char *, char **, int *, unsigned char*
 static struct file_operations ofdt_fops = {
 	.write = ofdt_write
 };
+#endif
 
-static int __init proc_ppc64_init(void)
+int __init proc_ppc64_init(void)
 {
 
-	printk(KERN_INFO "proc_ppc64: Creating /proc/ppc64/\n");
 
-	proc_ppc64.root = proc_mkdir("ppc64", 0);
-	if (!proc_ppc64.root)
+	if (proc_ppc64.root == NULL) {
+		printk(KERN_INFO "proc_ppc64: Creating /proc/ppc64/\n");
+		proc_ppc64.root = proc_mkdir("ppc64", 0);
+		if (!proc_ppc64.root)
+			return 0;
+	} else {
 		return 0;
+	}
 
 	proc_ppc64.naca = create_proc_entry("naca", S_IRUSR, proc_ppc64.root);
 	if ( proc_ppc64.naca ) {
@@ -105,12 +111,18 @@ static int __init proc_ppc64_init(void)
 		}
 	}
 
+#ifdef CONFIG_PPC_PSERIES
 	/* Placeholder for rtas interfaces. */
-	proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
+	if (proc_ppc64.rtas == NULL)
+		proc_ppc64.rtas = proc_mkdir("rtas", proc_ppc64.root);
+
+	if (proc_ppc64.rtas)
+		proc_symlink("rtas", 0, "ppc64/rtas");
 
 	proc_ppc64_create_smt();
 
 	proc_ppc64_create_ofdt(proc_ppc64.root);
+#endif
 
 	return 0;
 }
@@ -192,6 +204,7 @@ static int page_map_mmap( struct file *file, struct vm_area_struct *vma )
 	return 0;
 }
 
+#ifdef CONFIG_PPC_PSERIES
 /* create /proc/ppc64/ofdt write-only by root */
 static void proc_ppc64_create_ofdt(struct proc_dir_entry *parent)
 {
@@ -412,6 +425,7 @@ static void release_prop_list(const struct property *prop)
 	}
 
 }
+#endif	/* defined(CONFIG_PPC_PSERIES) */
 
 static int proc_ppc64_smt_snooze_read(char *page, char **start, off_t off,
 				      int count, int *eof, void *data)
@@ -496,4 +510,3 @@ void proc_ppc64_create_smt(void)
 }
 
 fs_initcall(proc_ppc64_init);
-

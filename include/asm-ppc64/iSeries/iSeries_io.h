@@ -1,8 +1,9 @@
+#ifndef _ISERIES_IO_H
+#define _ISERIES_IO_H
+
 #include <linux/config.h>
 
 #ifdef CONFIG_PPC_ISERIES
-#ifndef _ISERIES_IO_H
-#define _ISERIES_IO_H
 #include <linux/types.h>
 /************************************************************************/
 /* File iSeries_io.h created by Allan Trautman on Thu Dec 28 2000.      */
@@ -41,6 +42,5 @@ extern void* iSeries_memset_io(void *dest, char x, size_t n);
 extern void* iSeries_memcpy_toio(void *dest, void *source, size_t n);
 extern void* iSeries_memcpy_fromio(void *dest, void *source, size_t n);
 
-#endif /*  _ISERIES_IO_H         */
-#endif /*  CONFIG_PPC_ISERIES  */
-
+#endif /* CONFIG_PPC_ISERIES */
+#endif /* _ISERIES_IO_H */

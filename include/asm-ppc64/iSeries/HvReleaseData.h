@@ -16,6 +16,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#ifndef _HVRELEASEDATA_H
+#define _HVRELEASEDATA_H
 
 //=============================================================================
 //
@@ -23,15 +25,7 @@
 //   release so that it can be changed in the future (ie, the virtual 
 //   address of the OS's NACA).
 //
-//-----------------------------------------------------------------------------
-// Standard Includes
-//-----------------------------------------------------------------------------
-#ifndef	_PPC64_TYPES_H
-#include	<asm/types.h>
-#endif
-
-#ifndef _HVRELEASEDATA_H
-#define _HVRELEASEDATA_H
+#include <asm/types.h>
 
 //=============================================================================
 //
@@ -67,4 +61,4 @@ struct	HvReleaseData
 	char	xRsvd3[20];		// Reserved			x2C-x3F
 };
 
-#endif // _HVRELEASEDATA_H
+#endif /* _HVRELEASEDATA_H */
