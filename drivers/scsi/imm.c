@@ -733,7 +733,7 @@ static int imm_init(int host_no)
 
 static inline int imm_send_command(Scsi_Cmnd * cmd)
 {
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
     int k;
 
     /* NOTE: IMM uses byte pairs */
@@ -758,7 +758,7 @@ static int imm_completion(Scsi_Cmnd * cmd)
      *  0     Told to schedule
      *  1     Finished data transfer
      */
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
     unsigned short ppb = IMM_BASE(host_no);
     unsigned long start_jiffies = jiffies;
 
@@ -845,7 +845,7 @@ static int imm_completion(Scsi_Cmnd * cmd)
 int imm_command(Scsi_Cmnd * cmd)
 {
     static int first_pass = 1;
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
 
     if (first_pass) {
 	printk("imm: using non-queuing interface\n");
@@ -867,7 +867,7 @@ int imm_command(Scsi_Cmnd * cmd)
 	schedule();
 
     if (cmd->SCp.phase)		/* Only disconnect if we have connected */
-	imm_disconnect(cmd->host->unique_id);
+	imm_disconnect(cmd->device->host->unique_id);
 
     imm_pb_release(host_no);
     imm_hosts[host_no].cur_cmd = 0;
@@ -883,7 +883,7 @@ static void imm_interrupt(void *data)
 {
     imm_struct *tmp = (imm_struct *) data;
     Scsi_Cmnd *cmd = tmp->cur_cmd;
-    struct Scsi_Host *host = cmd->host;
+    struct Scsi_Host *host = cmd->device->host;
     unsigned long flags;
 
     if (!cmd) {
@@ -930,9 +930,9 @@ static void imm_interrupt(void *data)
 #endif
 
     if (cmd->SCp.phase > 1)
-	imm_disconnect(cmd->host->unique_id);
+	imm_disconnect(cmd->device->host->unique_id);
     if (cmd->SCp.phase > 0)
-	imm_pb_release(cmd->host->unique_id);
+	imm_pb_release(cmd->device->host->unique_id);
 
     spin_lock_irqsave(host->host_lock, flags);
     tmp->cur_cmd = 0;
@@ -943,7 +943,7 @@ static void imm_interrupt(void *data)
 
 static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
 {
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
     unsigned short ppb = IMM_BASE(host_no);
     unsigned char l = 0, h = 0;
     int retv, x;
@@ -972,7 +972,7 @@ static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
 
 	/* Phase 2 - We are now talking to the scsi bus */
     case 2:
-	if (!imm_select(host_no, cmd->target)) {
+	if (!imm_select(host_no, cmd->device->id)) {
 	    imm_fail(host_no, DID_NO_CONNECT);
 	    return 0;
 	}
@@ -1082,7 +1082,7 @@ static int imm_engine(imm_struct * tmp, Scsi_Cmnd * cmd)
 
 int imm_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
 {
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
 
     if (imm_hosts[host_no].cur_cmd) {
 	printk("IMM: bug in imm_queuecommand\n");
@@ -1125,7 +1125,7 @@ int imm_biosparam(struct scsi_device *sdev, struct block_device *dev,
 
 int imm_abort(Scsi_Cmnd * cmd)
 {
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
     /*
      * There is no method for aborting commands since Iomega
      * have tied the SCSI_MESSAGE line high in the interface
@@ -1157,7 +1157,7 @@ void imm_reset_pulse(unsigned int base)
 
 int imm_reset(Scsi_Cmnd * cmd)
 {
-    int host_no = cmd->host->unique_id;
+    int host_no = cmd->device->host->unique_id;
 
     if (cmd->SCp.phase)
 	imm_disconnect(host_no);
