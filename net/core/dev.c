@@ -109,10 +109,6 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#ifdef CONFIG_PLIP
-extern int plip_init(void);
-#endif
-
 #include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
