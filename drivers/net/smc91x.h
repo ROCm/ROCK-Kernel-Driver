@@ -160,6 +160,19 @@ SMC_outw(u16 val, unsigned long ioaddr, int reg)
 #define SMC_insw(a, r, p, l)	insw((a) + (r), p, l)
 #define SMC_outsw(a, r, p, l)	outsw((a) + (r), p, l)
 
+#elif   defined(CONFIG_M32R)
+
+#define SMC_CAN_USE_8BIT	0
+#define SMC_CAN_USE_16BIT	1
+#define SMC_CAN_USE_32BIT	0
+
+#define SMC_inb(a, r)		inb((a) + (r) - 0xa0000000)
+#define SMC_inw(a, r)		inw((a) + (r) - 0xa0000000)
+#define SMC_outb(v, a, r)	outb(v, (a) + (r) - 0xa0000000)
+#define SMC_outw(v, a, r)	outw(v, (a) + (r) - 0xa0000000)
+#define SMC_insw(a, r, p, l)	insw((a) + (r) - 0xa0000000, p, l)
+#define SMC_outsw(a, r, p, l)	outsw((a) + (r) - 0xa0000000, p, l)
+
 #else
 
 #define SMC_CAN_USE_8BIT	1

@@ -15,6 +15,7 @@ static void use_rcsid(void) {rcsid = rcsid; use_rcsid();}
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
+#include <linux/device.h>
 
 #include <asm/system.h>
 #include <asm/m32r.h>
@@ -93,7 +94,7 @@ static struct hw_interrupt_type mappi2_irq_type =
 
 void __init init_IRQ(void)
 {
-#ifdef CONFIG_M32R_SMC91111
+#if defined(CONFIG_SMC91X)
 	/* INT0 : LAN controller (SMC91111) */
 	irq_desc[M32R_IRQ_INT0].status = IRQ_DISABLED;
 	irq_desc[M32R_IRQ_INT0].handler = &mappi2_irq_type;
@@ -101,7 +102,7 @@ void __init init_IRQ(void)
 	irq_desc[M32R_IRQ_INT0].depth = 1;
 	icu_data[M32R_IRQ_INT0].icucr = M32R_ICUCR_IEN|M32R_ICUCR_ISMOD10;
 	disable_mappi2_irq(M32R_IRQ_INT0);
-#endif  /* CONFIG_MAPPI2_SMC9111 */
+#endif  /* CONFIG_SMC91X */
 
 	/* MFT2 : system timer */
 	irq_desc[M32R_IRQ_MFT2].status = IRQ_DISABLED;
@@ -184,3 +185,32 @@ void __init init_IRQ(void)
 
 #endif /* CONFIG_MAPPI2_CFC */
 }
+
+#define LAN_IOSTART     0x300
+#define LAN_IOEND       0x320
+static struct resource smc91x_resources[] = {
+	[0] = {
+		.start  = (LAN_IOSTART),
+		.end    = (LAN_IOEND),
+		.flags  = IORESOURCE_MEM,
+	},
+	[1] = {
+		.start  = M32R_IRQ_INT0,
+		.end    = M32R_IRQ_INT0,
+		.flags  = IORESOURCE_IRQ,
+	}
+};
+
+static struct platform_device smc91x_device = {
+	.name		= "smc91x",
+	.id		= 0,
+	.num_resources  = ARRAY_SIZE(smc91x_resources),
+	.resource       = smc91x_resources,
+};
+
+static int __init platform_init(void)
+{
+	platform_device_register(&smc91x_device);
+	return 0;
+}
+arch_initcall(platform_init);

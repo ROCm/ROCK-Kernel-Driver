@@ -36,6 +36,9 @@ static __inline__ void *_port2addr(unsigned long port)
 {
 	return (void *)(port + NONCACHE_OFFSET);
 }
+
+#define LAN_IOSTART	0x300
+#define LAN_IOEND	0x320
 #ifdef CONFIG_CHIP_OPSP
 static __inline__ void *_port2addr_ne(unsigned long port)
 {
@@ -98,7 +101,7 @@ static __inline__ void _ne_outw(unsigned short w, void *portp)
 
 unsigned char _inb(unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		return _ne_inb(PORT2ADDR_NE(port));
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
@@ -113,7 +116,7 @@ unsigned char _inb(unsigned long port)
 
 unsigned short _inw(unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		return _ne_inw(PORT2ADDR_NE(port));
 #if defined(CONFIG_USB)
         else if (port >= 0x340 && port < 0x3a0)
@@ -198,7 +201,7 @@ unsigned long _inl_p(unsigned long port)
 
 void _outb(unsigned char b, unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_outb(b, PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
@@ -211,7 +214,7 @@ void _outb(unsigned char b, unsigned long port)
 
 void _outw(unsigned short w, unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_outw(w, PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_USB)
@@ -239,7 +242,7 @@ void _outl(unsigned long l, unsigned long port)
 
 void _outb_p(unsigned char b, unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_outb(b, PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
@@ -254,7 +257,7 @@ void _outb_p(unsigned char b, unsigned long port)
 
 void _outw_p(unsigned short w, unsigned long port)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_outw(w, PORT2ADDR_NE(port));
 	else
 #if defined(CONFIG_USB)
@@ -280,7 +283,7 @@ void _outl_p(unsigned long l, unsigned long port)
 
 void _insb(unsigned int port, void * addr, unsigned long count)
 {
-	if (port >= 0x300 && port < 0x320)
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		_ne_insb(PORT2ADDR_NE(port), addr, count);
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
 	  else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
@@ -299,7 +302,7 @@ void _insw(unsigned int port, void * addr, unsigned long count)
 	unsigned short *buf = addr;
 	unsigned short *portp;
 
-	if (port >= 0x300 && port < 0x320) {
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		portp = PORT2ADDR_NE(port);
 		while (count--) *buf++ = *(volatile unsigned short *)portp;
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
@@ -326,7 +329,7 @@ void _outsb(unsigned int port, const void * addr, unsigned long count)
 	const unsigned char *buf = addr;
 	unsigned char *portp;
 
-	if (port >= 0x300 && port < 0x320) {
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		portp = PORT2ADDR_NE(port);
 		while (count--) _ne_outb(*buf++, portp);
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
@@ -344,7 +347,7 @@ void _outsw(unsigned int port, const void * addr, unsigned long count)
 	const unsigned short *buf = addr;
 	unsigned short *portp;
 
-	if (port >= 0x300 && port < 0x320) {
+	if (port >= LAN_IOSTART && port < LAN_IOEND)
 		portp = PORT2ADDR_NE(port);
 		while (count--) *(volatile unsigned short *)portp = *buf++;
 #if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_CFC)
