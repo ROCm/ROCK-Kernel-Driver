@@ -36,13 +36,13 @@
 #include <linux/pci.h>
 #include <linux/pm.h>
 #include <linux/cpufreq.h>
-#include <linux/compatmac.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/delay.h>
+#include <asm/uaccess.h>
 
 #include <acpi/acpi_bus.h>
 #include <acpi/acpi_drivers.h>
