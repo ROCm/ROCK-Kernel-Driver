@@ -378,7 +378,10 @@ void __vunmap(void *addr, int deallocate_pages)
 			__free_page(area->pages[i]);
 		}
 
-		kfree(area->pages);
+		if (area->nr_pages > PAGE_SIZE/sizeof(struct page *))
+			vfree(area->pages);
+		else
+			kfree(area->pages);
 	}
 
 	kfree(area);
@@ -482,7 +485,12 @@ void *__vmalloc(unsigned long size, int gfp_mask, pgprot_t prot)
 	array_size = (nr_pages * sizeof(struct page *));
 
 	area->nr_pages = nr_pages;
-	area->pages = pages = kmalloc(array_size, (gfp_mask & ~__GFP_HIGHMEM));
+	/* Please note that the recursion is strictly bounded. */
+	if (array_size > PAGE_SIZE)
+		pages = __vmalloc(array_size, gfp_mask, PAGE_KERNEL);
+	else
+		pages = kmalloc(array_size, (gfp_mask & ~__GFP_HIGHMEM));
+	area->pages = pages;
 	if (!area->pages) {
 		remove_vm_area(area->addr);
 		kfree(area);
