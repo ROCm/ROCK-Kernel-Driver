@@ -208,7 +208,7 @@ shrink_list(struct list_head *page_list, int nr_pages,
 		 * Otherwise, leave the page on the LRU so it is swappable.
 		 */
 		if (PagePrivate(page)) {
-			if (!try_to_release_page(page, 0))
+			if (!try_to_release_page(page, gfp_mask))
 				goto keep_locked;
 			if (!mapping && page_count(page) == 1)
 				goto free_it;
