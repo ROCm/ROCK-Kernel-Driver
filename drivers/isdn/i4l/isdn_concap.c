@@ -107,7 +107,7 @@ struct concap_proto * isdn_concap_new( int encap )
 	return NULL;
 }
 
-void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
+void isdn_x25_cleanup(isdn_net_dev *p)
 {
 	isdn_net_local *lp = &p->local;
 	struct concap_proto * cprot = p -> cprot;
@@ -122,8 +122,14 @@ void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	p -> cprot = NULL;
 	lp -> dops = NULL;
 	restore_flags(flags);
+}
+
+int isdn_x25_setup(isdn_net_dev *p, int encap)
+{
+	isdn_net_local *lp = &p->local;
+
 	/* ... ,  prepare for configuration of new one ... */
-	switch ( cfg -> p_encap ){
+	switch ( encap ){
 	case ISDN_NET_ENCAP_X25IFACE:
 		lp -> dops = &isdn_concap_reliable_dl_dops;
 	}
@@ -131,14 +137,15 @@ void isdn_x25_encap_changed(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	p -> cprot = isdn_concap_new( cfg -> p_encap );
 	/* p -> cprot == NULL now if p_encap is not supported
 	   by means of the concap_proto mechanism */
-	/* the protocol is not configured yet; this will
-	   happen later when isdn_net_reset() is called */
-}
+	if (!p->cprot)
+		return -EINVAL;
 
-int isdn_x25_setup_dev(isdn_net_dev *p)
-{
+	isdn_other_setup(p);
 	p->dev.type = ARPHRD_X25;	/* change ARP type */
 	p->dev.addr_len = 0;
+
+	/* the protocol is not configured yet; this will
+	   happen later when isdn_x25_open() is called */
 
 	return 0;
 }
@@ -251,9 +258,6 @@ void isdn_x25_receive(isdn_net_local *lp, struct sk_buff *skb)
 				cprot -> pops -> data_ind(cprot,skb);
 				return;
 			}
-	printk(KERN_WARNING "%s: unknown encapsulation, dropping\n",
-	       lp->name);
-	kfree_skb(skb);
 }
 
 void isdn_x25_realrm(isdn_net_dev *p)

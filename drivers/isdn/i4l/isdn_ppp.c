@@ -2895,8 +2895,9 @@ static int isdn_ppp_set_compressor(struct ippp_struct *is, struct isdn_ppp_comp_
 	return -EINVAL;
 }
 
-int isdn_ppp_setup_dev(isdn_net_dev *p)
+int isdn_ppp_setup(isdn_net_dev *p)
 {
+	isdn_other_setup(p);
 	p->dev.type = ARPHRD_PPP;	/* change ARP type */
 	p->dev.addr_len = 0;
 	p->dev.do_ioctl = isdn_ppp_dev_ioctl;

@@ -205,6 +205,9 @@ static void do_dialout(isdn_net_local *lp);
 
 static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
 
+static int isdn_rawip_setup(isdn_net_dev *p);
+static int isdn_ether_setup(isdn_net_dev *p);
+
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
  /*
@@ -1061,10 +1064,8 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	unsigned long flags;
 	isdn_net_local *lp = (isdn_net_local *) ndev->priv;
 
-#ifdef CONFIG_ISDN_X25
-	if (lp->netdev->cprot)
+	if (lp->p_encap == ISDN_NET_ENCAP_X25IFACE)
 		return isdn_x25_start_xmit(skb, ndev);
-#endif
 		
 	/* auto-dialing xmit function */
 	{
@@ -1320,9 +1321,12 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 			}
 			isdn_ppp_receive(lp->netdev, olp, skb);
 			return;
-
-		default:
+		case ISDN_NET_ENCAP_X25IFACE:
 			isdn_x25_receive(lp, skb);
+			return;
+		default:
+			isdn_BUG();
+			kfree_skb(skb);
 			return;
 	}
 
@@ -1928,14 +1932,12 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 	}
 	/* Connect interface with channel */
 	isdn_net_bind_channel(lp, chi);
-#ifdef CONFIG_ISDN_PPP
 	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 		if (isdn_ppp_bind(lp) < 0) {
 			isdn_net_unbind_channel(lp);
 			restore_flags(flags);
 			return -EAGAIN;
 		}
-#endif
 	/* Initiate dialing */
 	restore_flags(flags);
 	init_dialout(lp);
@@ -2102,55 +2104,48 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 	isdn_net_local *lp = &p->local;
 	int retval;
 
+	if (cfg->p_encap < 0 ||
+	    cfg->p_encap > ISDN_NET_ENCAP_MAX_ENCAP) {
+		retval = -EINVAL;
+		goto out;
+	}
 	if (lp->p_encap == cfg->p_encap){
-		/* no change */
+		/* nothing to do */
 		retval = 0;
 		goto out;
 	}
-
 	if (isdn_net_device_started(p)) {
 		retval = -EBUSY;
 		goto out;
 	}
-	isdn_x25_encap_changed(p, cfg);
+	switch (lp->p_encap) {
+	case ISDN_NET_ENCAP_X25IFACE:
+		isdn_x25_cleanup(p);
+		break;
+	}
 
-	switch ( cfg->p_encap ) {
+	switch (cfg->p_encap) {
 	case ISDN_NET_ENCAP_SYNCPPP:
-		retval = isdn_ppp_setup_dev(p);
+		retval = isdn_ppp_setup(p);
 		break;
 	case ISDN_NET_ENCAP_X25IFACE:
-		retval = isdn_x25_setup_dev(p);
+		retval = isdn_x25_setup(p, cfg->p_encap);
 		break;
 	case ISDN_NET_ENCAP_CISCOHDLCK:
-		retval = isdn_ciscohdlck_setup_dev(p);
+		retval = isdn_ciscohdlck_setup(p);
+		break;
+	case ISDN_NET_ENCAP_RAWIP:
+		retval = isdn_rawip_setup(p);
+		break;
+	case ISDN_NET_ENCAP_ETHER:
+		retval = isdn_ether_setup(p);
 		break;
 	default:
-		if (cfg->p_encap < 0 ||
-		    cfg->p_encap > ISDN_NET_ENCAP_MAX_ENCAP) {
-			retval = -EINVAL;
-			break;
-		}
-		retval = 0;
+		retval = isdn_other_setup(p);
+		break;
 	}
-	if (cfg->p_encap == ISDN_NET_ENCAP_RAWIP) {
-		p->dev.hard_header = NULL;
-		p->dev.hard_header_cache = NULL;
-		p->dev.header_cache_update = NULL;
-		p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	} else {
-		p->dev.hard_header = isdn_net_header;
-		if (cfg->p_encap == ISDN_NET_ENCAP_ETHER) {
-			p->dev.hard_header_cache = lp->org_hhc;
-			p->dev.header_cache_update = lp->org_hcu;
-			p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
-		} else {
-			p->dev.hard_header_cache = NULL;
-			p->dev.header_cache_update = NULL;
-			p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-		}
-	}
-
-	lp->p_encap = cfg->p_encap;
+	if (retval == 0)
+		lp->p_encap = cfg->p_encap;
 
  out:
 	return retval;
@@ -2649,5 +2644,41 @@ isdn_net_rmall(void)
 		}
 	}
 	restore_flags(flags);
+	return 0;
+}
+
+
+static int
+isdn_rawip_setup(isdn_net_dev *p)
+{
+	p->dev.hard_header = NULL;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+
+	return 0;
+}
+
+static int
+isdn_ether_setup(isdn_net_dev *p)
+{
+	isdn_net_local *lp = &p->local;
+
+	p->dev.hard_header = isdn_net_header;
+	p->dev.hard_header_cache = lp->org_hhc;
+	p->dev.header_cache_update = lp->org_hcu;
+	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
+
+	return 0;
+}
+
+int
+isdn_other_setup(isdn_net_dev *p)
+{
+	p->dev.hard_header = isdn_net_header;
+	p->dev.hard_header_cache = NULL;
+	p->dev.header_cache_update = NULL;
+	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
+
 	return 0;
 }

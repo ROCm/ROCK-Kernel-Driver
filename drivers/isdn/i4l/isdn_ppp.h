@@ -21,7 +21,7 @@ extern int isdn_ppp_hangup_slave(char *);
 
 #ifdef CONFIG_ISDN_PPP
 
-int  isdn_ppp_setup_dev(isdn_net_dev *p);
+int  isdn_ppp_setup(isdn_net_dev *p);
 void isdn_ppp_wakeup_daemon(isdn_net_local *);
 int  isdn_ppp_bind(isdn_net_local *);
 void isdn_ppp_free(isdn_net_local *);
@@ -31,7 +31,7 @@ int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 #else
 
 static inline int
-isdn_ppp_setup_dev(isdn_net_dev *p)
+isdn_ppp_setup(isdn_net_dev *p)
 {
 	printk(KERN_WARNING "ISDN: SyncPPP support not configured\n");
 	return -EINVAL;

@@ -371,8 +371,9 @@ isdn_ciscohdlck_receive(isdn_net_local *lp, struct sk_buff *skb)
 	kfree_skb(skb);
 }
 
-int isdn_ciscohdlck_setup_dev(isdn_net_dev *p)
+int isdn_ciscohdlck_setup(isdn_net_dev *p)
 {
+	isdn_other_setup(p);
 	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
 
 	return 0;
