@@ -298,7 +298,13 @@ include/linux/autoconf.h: .config
 #	version.h changes when $(KERNELRELEASE) etc change, as defined in
 #	this Makefile
 
+uts_len := 64
+
 include/linux/version.h: Makefile
+	@if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
+	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
+	  exit 1; \
+	fi;
 	@echo -n 'Generating $@'
 	@(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
