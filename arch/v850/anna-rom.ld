@@ -80,6 +80,11 @@ SECTIONS {
 		__root_fs_image_start = . ;
 		*(.root)
 		__root_fs_image_end = . ;
+
+		. = ALIGN (4) ;
+		___initramfs_start = . ;
+			*(.init.ramfs)
+		___initramfs_end = . ;
 	} > ROM
 
 	__rom_copy_src_start = . ;

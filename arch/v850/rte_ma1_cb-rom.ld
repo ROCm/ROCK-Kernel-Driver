@@ -45,9 +45,14 @@ SECTIONS {
 		___stop___ksymtab = . ;
 		. = ALIGN (4) ;
 		__etext = . ;
+
+		. = ALIGN (4) ;
+		___initramfs_start = . ;
+			*(.init.ramfs)
+		___initramfs_end = . ;
 	} > ROM
 
-	__data_load_start = . ;
+	__rom_copy_src_start = . ;
 
 	.data : {
 	        __kram_start = . ;
