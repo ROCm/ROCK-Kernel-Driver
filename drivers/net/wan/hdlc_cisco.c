@@ -311,7 +311,9 @@ int hdlc_cisco_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		hdlc->proto.id = IF_PROTO_CISCO;
 		dev->hard_start_xmit = hdlc->xmit;
 		dev->hard_header = cisco_hard_header;
+		dev->hard_header_cache = NULL;
 		dev->type = ARPHRD_CISCO;
+		dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 		dev->addr_len = 0;
 		return 0;
 	}
