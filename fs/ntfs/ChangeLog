@@ -49,11 +49,6 @@ ToDo/Notes:
 	- In fs/ntfs/aops.c::ntfs_writepage(), if the page is fully outside
 	  i_size, i.e. race with truncate, invalidate the buffers on the page
 	  so that they become freeable and hence the page does not leak.
-	- Implement extension of resident files in the regular file write code
-	  paths (fs/ntfs/aops.c::ntfs_{prepare,commit}_write()).  At present
-	  this only works until the data attribute becomes too big for the mft
-	  record after which we abort the write returning -EOPNOTSUPP from
-	  ntfs_prepare_write().
 	- Remove unused function fs/ntfs/runlist.c::ntfs_rl_merge().  (Adrian
 	  Bunk)
 	- Fix stupid bug in fs/ntfs/attrib.c::ntfs_attr_find() that resulted in

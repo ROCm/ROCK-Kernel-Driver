@@ -1884,6 +1884,12 @@ static int ntfs_prepare_write(struct file *file, struct page *page,
 	/* If we do not need to resize the attribute allocation we are done. */
 	if (new_size <= vi->i_size)
 		goto done;
+
+	// FIXME: We abort for now as this code is not safe.
+	ntfs_error(vi->i_sb, "Changing the file size is not supported yet.  "
+			"Sorry.");
+	return -EOPNOTSUPP;
+
 	/* Map, pin, and lock the (base) mft record. */
 	if (!NInoAttr(ni))
 		base_ni = ni;
