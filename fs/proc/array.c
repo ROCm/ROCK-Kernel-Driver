@@ -228,8 +228,9 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 	sigemptyset(ign);
 	sigemptyset(catch);
 
-	spin_lock_irq(&p->sig->siglock);
+	read_lock(&tasklist_lock);
 	if (p->sig) {
+		spin_lock_irq(&p->sig->siglock);
 		k = p->sig->action;
 		for (i = 1; i <= _NSIG; ++i, ++k) {
 			if (k->sa.sa_handler == SIG_IGN)
@@ -237,8 +238,9 @@ static void collect_sigign_sigcatch(struct task_struct *p, sigset_t *ign,
 			else if (k->sa.sa_handler != SIG_DFL)
 				sigaddset(catch, i);
 		}
+		spin_unlock_irq(&p->sig->siglock);
 	}
-	spin_unlock_irq(&p->sig->siglock);
+	read_unlock(&tasklist_lock);
 }
 
 static inline char * task_sig(struct task_struct *p, char *buffer)
