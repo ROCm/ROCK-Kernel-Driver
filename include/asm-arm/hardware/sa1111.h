@@ -219,8 +219,6 @@
 #define _SAITR          _SA1111( 0x065c )
 #define _SADR           _SA1111( 0x0680 )
 
-#if LANGUAGE == C
-
 #define SACR0		__CCREG(0x0600)
 #define SACR1		__CCREG(0x0604)
 #define SACR2		__CCREG(0x0608)
@@ -245,8 +243,6 @@
 #define SADRCB		__CCREG(0x0658)
 #define SAITR		__CCREG(0x065c)
 #define SADR		__CCREG(0x0680)
-
-#endif  /* LANGUAGE == C */
 
 #define SACR0_ENB	(1<<0)
 #define SACR0_BCKD	(1<<2)
@@ -368,8 +364,6 @@
 #define _PC_SDR		_SA1111( 0x1028 )
 #define _PC_SSR		_SA1111( 0x102c )
 
-#if LANGUAGE == C
-
 #define PA_DDR		__CCREG(0x1000)
 #define PA_DRR		__CCREG(0x1004)
 #define PA_DWR		__CCREG(0x1004)
@@ -385,8 +379,6 @@
 #define PC_DWR		__CCREG(0x1024)
 #define PC_SDR		__CCREG(0x1028)
 #define PC_SSR		__CCREG(0x102c)
-
-#endif  /* LANGUAGE == C */
 
 /*
  * Interrupt Controller
