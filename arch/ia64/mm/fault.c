@@ -96,13 +96,13 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 	 * fault.
 	 */
 	switch (handle_mm_fault(mm, vma, address, (mask & VM_WRITE) != 0)) {
-	      case 1:
+	      case VM_FAULT_MINOR:
 		++current->min_flt;
 		break;
-	      case 2:
+	      case VM_FAULT_MAJOR:
 		++current->maj_flt;
 		break;
-	      case 0:
+	      case VM_FAULT_SIGBUS:
 		/*
 		 * We ran out of memory, or some other thing happened
 		 * to us that made us unable to handle the page fault
@@ -110,8 +110,10 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		 */
 		signal = SIGBUS;
 		goto bad_area;
-	      default:
+	      case VM_FAULT_OOM:
 		goto out_of_memory;
+	      default:
+		BUG();
 	}
 	up_read(&mm->mmap_sem);
 	return;

@@ -114,18 +114,18 @@
 /* 1122 was __NR_old_fstat */
 #define __NR_vhangup			1123
 #define __NR_lchown			1124
-#define __NR_vm86			1125
+#define __NR_remap_file_pages		1125
 #define __NR_wait4			1126
 #define __NR_sysinfo			1127
 #define __NR_clone			1128
 #define __NR_setdomainname		1129
 #define __NR_uname			1130
 #define __NR_adjtimex			1131
-#define __NR_create_module		1132
+/* 1132 was __NR_create_module */
 #define __NR_init_module		1133
 #define __NR_delete_module		1134
-#define __NR_get_kernel_syms		1135
-#define __NR_query_module		1136
+/* 1135 was __NR_get_kernel_syms */
+/* 1136 was __NR_query_module */
 #define __NR_quotactl			1137
 #define __NR_bdflush			1138
 #define __NR_sysfs			1139
@@ -222,7 +222,7 @@
 #define __NR_futex			1230
 #define __NR_sched_setaffinity		1231
 #define __NR_sched_getaffinity		1232
-/* 1233 currently unused */
+#define __NR_set_tid_address		1233
 #define __NR_alloc_hugepages		1234
 #define __NR_free_hugepages		1235
 #define __NR_exit_group			1236
@@ -235,7 +235,8 @@
 #define __NR_epoll_create		1243
 #define __NR_epoll_ctl			1244
 #define __NR_epoll_wait			1245
-#define __NR_semtimedop			1246
+#define __NR_restart_syscall		1246
+#define __NR_semtimedop			1247
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

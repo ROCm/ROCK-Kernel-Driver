@@ -33,34 +33,33 @@
 #ifndef _ASM_IA64_MACHVEC_SN2_H
 #define _ASM_IA64_MACHVEC_SN2_H
 
-extern ia64_mv_setup_t sn1_setup;
+extern ia64_mv_setup_t sn_setup;
 extern ia64_mv_cpu_init_t sn_cpu_init;
-extern ia64_mv_irq_init_t sn1_irq_init;
+extern ia64_mv_irq_init_t sn_irq_init;
 extern ia64_mv_map_nr_t sn2_map_nr;
 extern ia64_mv_send_ipi_t sn2_send_IPI;
 extern ia64_mv_global_tlb_purge_t sn2_global_tlb_purge;
-extern ia64_mv_irq_desc sn1_irq_desc;
-extern ia64_mv_irq_to_vector sn1_irq_to_vector;
-extern ia64_mv_local_vector_to_irq sn1_local_vector_to_irq;
-extern ia64_mv_valid_irq sn1_valid_irq;
-extern ia64_mv_pci_fixup_t sn1_pci_fixup;
-#ifdef Colin /* We are using the same is Generic IA64 calls defined in io.h */
-extern ia64_mv_inb_t sn1_inb;
-extern ia64_mv_inw_t sn1_inw;
-extern ia64_mv_inl_t sn1_inl;
-extern ia64_mv_outb_t sn1_outb;
-extern ia64_mv_outw_t sn1_outw;
-extern ia64_mv_outl_t sn1_outl;
-#endif
-extern ia64_mv_pci_alloc_consistent	sn1_pci_alloc_consistent;
-extern ia64_mv_pci_free_consistent	sn1_pci_free_consistent;
-extern ia64_mv_pci_map_single		sn1_pci_map_single;
-extern ia64_mv_pci_unmap_single		sn1_pci_unmap_single;
-extern ia64_mv_pci_map_sg		sn1_pci_map_sg;
-extern ia64_mv_pci_unmap_sg		sn1_pci_unmap_sg;
-extern ia64_mv_pci_dma_sync_single	sn1_pci_dma_sync_single;
-extern ia64_mv_pci_dma_sync_sg		sn1_pci_dma_sync_sg;
-extern ia64_mv_pci_dma_address		sn1_dma_address;
+extern ia64_mv_irq_desc sn_irq_desc;
+extern ia64_mv_irq_to_vector sn_irq_to_vector;
+extern ia64_mv_local_vector_to_irq sn_local_vector_to_irq;
+extern ia64_mv_pci_fixup_t sn_pci_fixup;
+extern ia64_mv_inb_t sn_inb;
+extern ia64_mv_inw_t sn_inw;
+extern ia64_mv_inl_t sn_inl;
+extern ia64_mv_outb_t sn_outb;
+extern ia64_mv_outw_t sn_outw;
+extern ia64_mv_outl_t sn_outl;
+extern ia64_mv_mmiob_t			sn2_mmiob;
+extern ia64_mv_pci_alloc_consistent	sn_pci_alloc_consistent;
+extern ia64_mv_pci_free_consistent	sn_pci_free_consistent;
+extern ia64_mv_pci_map_single		sn_pci_map_single;
+extern ia64_mv_pci_unmap_single		sn_pci_unmap_single;
+extern ia64_mv_pci_map_sg		sn_pci_map_sg;
+extern ia64_mv_pci_unmap_sg		sn_pci_unmap_sg;
+extern ia64_mv_pci_dma_sync_single	sn_pci_dma_sync_single;
+extern ia64_mv_pci_dma_sync_sg		sn_pci_dma_sync_sg;
+extern ia64_mv_pci_dma_address		sn_dma_address;
+extern ia64_mv_pci_dma_supported	sn_pci_dma_supported;
 
 /*
  * This stuff has dual use!
@@ -69,33 +68,34 @@ extern ia64_mv_pci_dma_address		sn1_dma_address;
  * platform's machvec structure.  When compiling a non-generic kernel,
  * the macros are used directly.
  */
-#define platform_name		"sn2"
-#define platform_setup		sn1_setup
-#define platform_cpu_init	sn_cpu_init
-#define platform_irq_init	sn1_irq_init
-#define platform_send_ipi	sn2_send_IPI
+#define platform_name			"sn2"
+#define platform_setup			sn_setup
+#define platform_cpu_init		sn_cpu_init
+#define platform_irq_init		sn_irq_init
+#define platform_map_nr			sn2_map_nr
+#define platform_send_ipi		sn2_send_IPI
 #define platform_global_tlb_purge       sn2_global_tlb_purge
-#ifdef Colin /* We are using the same is Generic IA64 calls defined in io.h */
-#define platform_inb		sn1_inb
-#define platform_inw		sn1_inw
-#define platform_inl		sn1_inl
-#define platform_outb		sn1_outb
-#define platform_outw		sn1_outw
-#define platform_outl		sn1_outl
-#endif
-#define platform_irq_desc	sn1_irq_desc
-#define platform_irq_to_vector	sn1_irq_to_vector
-#define platform_local_vector_to_irq	sn1_local_vector_to_irq
-#define platform_valid_irq	sn1_valid_irq
-#define platform_pci_dma_init	machvec_noop
-#define platform_pci_alloc_consistent	sn1_pci_alloc_consistent
-#define platform_pci_free_consistent	sn1_pci_free_consistent
-#define platform_pci_map_single		sn1_pci_map_single
-#define platform_pci_unmap_single	sn1_pci_unmap_single
-#define platform_pci_map_sg		sn1_pci_map_sg
-#define platform_pci_unmap_sg		sn1_pci_unmap_sg
-#define platform_pci_dma_sync_single	sn1_pci_dma_sync_single
-#define platform_pci_dma_sync_sg	sn1_pci_dma_sync_sg
-#define platform_pci_dma_address	sn1_dma_address
+#define platform_pci_fixup		sn_pci_fixup
+#define platform_inb			sn_inb
+#define platform_inw			sn_inw
+#define platform_inl			sn_inl
+#define platform_outb			sn_outb
+#define platform_outw			sn_outw
+#define platform_outl			sn_outl
+#define platform_mmiob			sn2_mmiob
+#define platform_irq_desc		sn_irq_desc
+#define platform_irq_to_vector		sn_irq_to_vector
+#define platform_local_vector_to_irq	sn_local_vector_to_irq
+#define platform_pci_dma_init		machvec_noop
+#define platform_pci_alloc_consistent	sn_pci_alloc_consistent
+#define platform_pci_free_consistent	sn_pci_free_consistent
+#define platform_pci_map_single		sn_pci_map_single
+#define platform_pci_unmap_single	sn_pci_unmap_single
+#define platform_pci_map_sg		sn_pci_map_sg
+#define platform_pci_unmap_sg		sn_pci_unmap_sg
+#define platform_pci_dma_sync_single	sn_pci_dma_sync_single
+#define platform_pci_dma_sync_sg	sn_pci_dma_sync_sg
+#define platform_pci_dma_address	sn_dma_address
+#define platform_pci_dma_supported	sn_pci_dma_supported
 
 #endif /* _ASM_IA64_MACHVEC_SN2_H */

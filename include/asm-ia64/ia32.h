@@ -6,30 +6,19 @@
 #ifdef CONFIG_IA32_SUPPORT
 
 #include <linux/binfmts.h>
+#include <linux/compat.h>
 
 /*
  * 32 bit structures for IA32 support.
  */
 
 /* 32bit compatibility types */
-typedef unsigned int	__kernel_size_t32;
-typedef int		__kernel_ssize_t32;
-typedef int		__kernel_ptrdiff_t32;
-typedef int		__kernel_time_t32;
-typedef int		__kernel_clock_t32;
-typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
-typedef unsigned short	__kernel_uid_t32;
 typedef unsigned int	__kernel_uid32_t32;
-typedef unsigned short	__kernel_gid_t32;
 typedef unsigned int	__kernel_gid32_t32;
-typedef unsigned short	__kernel_dev_t32;
-typedef unsigned int	__kernel_ino_t32;
-typedef unsigned short	__kernel_mode_t32;
 typedef unsigned short	__kernel_umode_t32;
 typedef short		__kernel_nlink_t32;
 typedef int		__kernel_daddr_t32;
-typedef int		__kernel_off_t32;
 typedef unsigned int	__kernel_caddr_t32;
 typedef long		__kernel_loff_t32;
 typedef __kernel_fsid_t	__kernel_fsid_t32;
@@ -39,20 +28,14 @@ typedef __kernel_fsid_t	__kernel_fsid_t32;
 #define IA32_PAGE_MASK		(~(IA32_PAGE_SIZE - 1))
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
-#define IA32_TICK(tick)		((unsigned long long)(tick) * IA32_CLOCKS_PER_SEC / CLOCKS_PER_SEC)
-
-struct timespec32 {
-	int	tv_sec;
-	int	tv_nsec;
-};
 
 /* fcntl.h */
 struct flock32 {
        short l_type;
        short l_whence;
-       __kernel_off_t32 l_start;
-       __kernel_off_t32 l_len;
-       __kernel_pid_t32 l_pid;
+       compat_off_t l_start;
+       compat_off_t l_len;
+       compat_pid_t l_pid;
 };
 
 #define F_GETLK64	12
@@ -130,6 +113,44 @@ struct sigcontext_ia32 {
        unsigned int cr2;
 };
 
+/* user.h */
+/*
+ * IA32 (Pentium III/4) FXSR, SSE support
+ *
+ * Provide support for the GDB 5.0+ PTRACE_{GET|SET}FPXREGS requests for
+ * interacting with the FXSR-format floating point environment.  Floating
+ * point data can be accessed in the regular format in the usual manner,
+ * and both the standard and SIMD floating point data can be accessed via
+ * the new ptrace requests.  In either case, changes to the FPU environment
+ * will be reflected in the task's state as expected.
+ */
+struct ia32_user_i387_struct {
+	int	cwd;
+	int	swd;
+	int	twd;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	st_space[20];	/* 8*10 bytes for each FP-reg = 80 bytes */
+};
+
+struct ia32_user_fxsr_struct {
+	unsigned short	cwd;
+	unsigned short	swd;
+	unsigned short	twd;
+	unsigned short	fop;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	mxcsr;
+	int	reserved;
+	int	st_space[32];	/* 8*16 bytes for each FP-reg = 128 bytes */
+	int	xmm_space[32];	/* 8*16 bytes for each XMM-reg = 128 bytes */
+	int	padding[56];
+};
+
 /* signal.h */
 #define _IA32_NSIG	       64
 #define _IA32_NSIG_BPW	       32
@@ -177,29 +198,6 @@ struct ucontext_ia32 {
 	sigset_t	  uc_sigmask;	/* mask last for extensibility */
 };
 
-struct stat32 {
-       unsigned short st_dev;
-       unsigned short __pad1;
-       unsigned int st_ino;
-       unsigned short st_mode;
-       unsigned short st_nlink;
-       unsigned short st_uid;
-       unsigned short st_gid;
-       unsigned short st_rdev;
-       unsigned short __pad2;
-       unsigned int  st_size;
-       unsigned int  st_blksize;
-       unsigned int  st_blocks;
-       unsigned int  st_atime;
-       unsigned int  __unused1;
-       unsigned int  st_mtime;
-       unsigned int  __unused2;
-       unsigned int  st_ctime;
-       unsigned int  __unused3;
-       unsigned int  __unused4;
-       unsigned int  __unused5;
-};
-
 struct stat64 {
 	unsigned short	st_dev;
 	unsigned char	__pad0[10];
@@ -216,11 +214,11 @@ struct stat64 {
 	unsigned int	st_blocks;	/* Number 512-byte blocks allocated. */
 	unsigned int	__pad4;		/* future possible st_blocks high bits */
 	unsigned int	st_atime;
-	unsigned int	__pad5;
+	unsigned int	st_atime_nsec;
 	unsigned int	st_mtime;
-	unsigned int	__pad6;
+	unsigned int	st_mtime_nsec;
 	unsigned int	st_ctime;
-	unsigned int	__pad7;		/* will be high 32 bits of ctime someday */
+	unsigned int	st_ctime_nsec;
 	unsigned int	st_ino_lo;
 	unsigned int	st_ino_hi;
 };
@@ -275,8 +273,8 @@ typedef struct siginfo32 {
 			unsigned int _pid;	/* which child */
 			unsigned int _uid;	/* sender's uid */
 			int _status;		/* exit code */
-			__kernel_clock_t32 _utime;
-			__kernel_clock_t32 _stime;
+			compat_clock_t _utime;
+			compat_clock_t _stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
@@ -462,6 +460,8 @@ typedef elf_fpreg_t elf_fpregset_t[ELF_NFPREG];
 #define IA32_PTRACE_SETREGS	13
 #define IA32_PTRACE_GETFPREGS	14
 #define IA32_PTRACE_SETFPREGS	15
+#define IA32_PTRACE_GETFPXREGS	18
+#define IA32_PTRACE_SETFPXREGS	19
 
 #define ia32_start_thread(regs,new_ip,new_sp) do {				\
 	set_fs(USER_DS);							\

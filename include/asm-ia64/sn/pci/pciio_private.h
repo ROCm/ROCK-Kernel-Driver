@@ -10,6 +10,7 @@
 #define _ASM_SN_PCI_PCIIO_PRIVATE_H
 
 #include <asm/sn/pci/pciio.h>
+#include <asm/sn/pci/pci_defs.h>
 
 /*
  * pciio_private.h -- private definitions for pciio
@@ -49,6 +50,8 @@ struct pciio_intr_s {
     devfs_handle_t            pi_dev;	/* associated pci card */
     device_desc_t	    pi_dev_desc;	/* override device descriptor */
     pciio_intr_line_t       pi_lines;	/* which interrupt line(s) */
+    intr_func_t             pi_func;	/* handler function (when connected) */
+    intr_arg_t              pi_arg;	/* handler parameter (when connected) */
     cpuid_t                 pi_mustruncpu; /* Where we must run. */
     int                     pi_irq;     /* IRQ assigned */
     int                     pi_cpu;     /* cpu assigned */
@@ -57,6 +60,39 @@ struct pciio_intr_s {
 /* PCIIO_INTR (pi_flags) flags */
 #define PCIIO_INTR_CONNECTED	1	/* interrupt handler/thread has been connected */
 #define PCIIO_INTR_NOTHREAD	2	/* interrupt handler wants to be called at interrupt level */
+
+/*
+ * Some PCI provider implementations keep track of PCI window Base Address
+ * Register (BAR) address range assignment via the rmalloc()/rmfree() arena
+ * management routines.  These implementations use the following data
+ * structure for each allocation address space (e.g. memory, I/O, small
+ * window, etc.).
+ *
+ * The ``page size'' encodes the minimum allocation unit and must be a power
+ * of 2.  The main use of this allocation ``page size'' is to control the
+ * number of free address ranges that the mapping allocation software will
+ * need to track.  Smaller values will allow more efficient use of the address
+ * ranges but will result in much larger allocation map structures ...  For
+ * instance, if we want to manage allocations for a 256MB address range,
+ * choosing a 1MB allocation page size will result in up to 1MB being wasted
+ * for allocation requests smaller than 1MB.  The worst case allocation
+ * pattern for the allocation software to track would be a pattern of 1MB
+ * allocated, 1MB free.  This results in the need to track up to 128 free
+ * ranges.
+ */
+struct pciio_win_map_s {
+	struct map	*wm_map;	/* window address map */
+	int		wm_page_size;	/* allocation ``page size'' */
+};
+
+/*
+ * Opaque structure used to keep track of window allocation information.
+ */
+struct pciio_win_alloc_s {
+	pciio_win_map_t	wa_map;		/* window map allocation is from */
+	unsigned long	wa_base;	/* allocation starting page number */
+	size_t		wa_pages;	/* number of pages in allocation */
+};
 
 /*
  * Each PCI Card has one of these.
@@ -76,17 +112,17 @@ struct pciio_info_s {
     error_handler_f        *c_efunc;	/* error handling function */
     error_handler_arg_t     c_einfo;	/* first parameter for efunc */
 
-    struct {				/* state of BASE regs */
-	pciio_space_t		w_space;
-	iopaddr_t		w_base;
-	size_t			w_size;
-        int                     w_devio_index;  /* DevIO[] register used to
-                                                   access this window */
-    }			    c_window[6];
-
-    unsigned		    c_rbase;	/* EXPANSION ROM base addr */
-    unsigned		    c_rsize;	/* EXPANSION ROM size (bytes) */
-
+    struct pciio_win_info_s {           /* state of BASE regs */
+        pciio_space_t           w_space;
+        iopaddr_t               w_base;
+        size_t                  w_size;
+        int                     w_devio_index;   /* DevIO[] register used to
+                                                    access this window */
+	struct pciio_win_alloc_s w_win_alloc;    /* window allocation cookie */
+    }                       c_window[PCI_CFG_BASE_ADDRS + 1];
+#define c_rwindow	c_window[PCI_CFG_BASE_ADDRS]	/* EXPANSION ROM window */
+#define c_rbase		c_rwindow.w_base		/* EXPANSION ROM base addr */
+#define c_rsize		c_rwindow.w_size		/* EXPANSION ROM size (bytes) */
     pciio_piospace_t	    c_piospace;	/* additional I/O spaces allocated */
 };
 
