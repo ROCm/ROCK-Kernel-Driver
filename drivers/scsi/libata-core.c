@@ -2369,6 +2369,9 @@ static void ata_pio_task(void *_data)
 	unsigned long timeout = 0;
 
 	switch (ap->pio_task_state) {
+	case PIO_ST_IDLE:
+		return;
+
 	case PIO_ST:
 		ata_pio_block(ap);
 		break;
@@ -2385,18 +2388,14 @@ static void ata_pio_task(void *_data)
 	case PIO_ST_TMOUT:
 	case PIO_ST_ERR:
 		ata_pio_error(ap);
-		break;
+		return;
 	}
 
-	if ((ap->pio_task_state != PIO_ST_IDLE) &&
-	    (ap->pio_task_state != PIO_ST_TMOUT) &&
-	    (ap->pio_task_state != PIO_ST_ERR)) {
-		if (timeout)
-			queue_delayed_work(ata_wq, &ap->pio_task,
-					   timeout);
-		else
-			queue_work(ata_wq, &ap->pio_task);
-	}
+	if (timeout)
+		queue_delayed_work(ata_wq, &ap->pio_task,
+				   timeout);
+	else
+		queue_work(ata_wq, &ap->pio_task);
 }
 
 static void atapi_request_sense(struct ata_port *ap, struct ata_device *dev,
