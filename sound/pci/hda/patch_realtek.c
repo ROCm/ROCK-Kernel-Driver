@@ -1133,6 +1133,8 @@ snd_kcontrol_new_t alc260_base_mixer[] = {
 	HDA_CODEC_MUTE("PC Speaker Playback Switch", 0x07, 0x05, HDA_INPUT),
 	HDA_CODEC_VOLUME("Headphone Playback Volume", 0x09, 0x0, HDA_OUTPUT),
 	HDA_CODEC_MUTE("Headphone Playback Switch", 0x10, 0x0, HDA_OUTPUT),
+	HDA_CODEC_VOLUME_MONO("Mono Playback Volume", 0x0a, 1, 0x0, HDA_OUTPUT),
+	HDA_CODEC_MUTE_MONO("Mono Playback Switch", 0x11, 1, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME("Capture Volume", 0x04, 0x0, HDA_INPUT),
 	HDA_CODEC_MUTE("Capture Switch", 0x04, 0x0, HDA_INPUT),
 	{
@@ -1162,6 +1164,8 @@ static struct hda_verb alc260_init_verbs[] = {
 	{0x0f, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
 	/* enable HP */
 	{0x10, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
+	/* enable Mono */
+	{0x11, AC_VERB_SET_PIN_WIDGET_CONTROL, 0x40},
 	/* unmute amp left and right */
 	{0x04, AC_VERB_SET_AMP_GAIN_MUTE, 0x7000},
 	/* set connection select to line in (default select for this ADC) */
@@ -1174,6 +1178,10 @@ static struct hda_verb alc260_init_verbs[] = {
 	{0x09, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
 	/* mute pin widget amp left and right (no gain on this amp) */
 	{0x10, AC_VERB_SET_AMP_GAIN_MUTE, 0xb080},
+	/* unmute Mono mixer amp left and right (volume = 0) */
+	{0x0a, AC_VERB_SET_AMP_GAIN_MUTE, 0xb000},
+	/* mute pin widget amp left and right (no gain on this amp) */
+	{0x11, AC_VERB_SET_AMP_GAIN_MUTE, 0xb080},
 	/* mute LINE-2 out */
 	{0x15, AC_VERB_SET_AMP_GAIN_MUTE, 0xb080},
 	/* Amp Indexes: CD = 0x04, Line In 1 = 0x02, Mic 1 = 0x00 & Line In 2 = 0x03 */
@@ -1190,6 +1198,9 @@ static struct hda_verb alc260_init_verbs[] = {
 	/* Unmute Headphone out path */
 	{0x09, AC_VERB_SET_AMP_GAIN_MUTE, (0x7000 | (0x00 << 8))},
 	{0x09, AC_VERB_SET_AMP_GAIN_MUTE, (0x7000 | (0x01 << 8))},
+	/* Unmute Mono out path */
+	{0x0a, AC_VERB_SET_AMP_GAIN_MUTE, (0x7000 | (0x00 << 8))},
+	{0x0a, AC_VERB_SET_AMP_GAIN_MUTE, (0x7000 | (0x01 << 8))},
 	{ }
 };
 
