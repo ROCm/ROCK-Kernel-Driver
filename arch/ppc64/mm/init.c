@@ -566,7 +566,8 @@ void __init mem_init(void)
  */
 void flush_dcache_page(struct page *page)
 {
-	clear_bit(PG_arch_1, &page->flags);
+	if (test_bit(PG_arch_1, &page->flags))
+		clear_bit(PG_arch_1, &page->flags);
 }
 
 void flush_icache_page(struct vm_area_struct *vma, struct page *page)
@@ -589,10 +590,12 @@ void clear_user_page(void *page, unsigned long vaddr, struct page *pg)
 	clear_page(page);
 
 	/* XXX we shouldnt have to do this, but glibc requires it */
-	if (cpu_has_noexecute())
-		clear_bit(PG_arch_1, &pg->flags);
-	else
+	if (cpu_has_noexecute()) {
+		if (test_bit(PG_arch_1, &pg->flags))
+			clear_bit(PG_arch_1, &pg->flags);
+	} else {
 		__flush_dcache_icache(page);
+	}
 }
 
 void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
@@ -609,10 +612,12 @@ void copy_user_page(void *vto, void *vfrom, unsigned long vaddr,
 		return;
 #endif
 
-	if (cpu_has_noexecute())
-		clear_bit(PG_arch_1, &pg->flags);
-	else
+	if (cpu_has_noexecute()) {
+		if (test_bit(PG_arch_1, &pg->flags))
+			clear_bit(PG_arch_1, &pg->flags);
+	} else {
 		__flush_dcache_icache(vto);
+	}
 }
 
 void flush_icache_user_range(struct vm_area_struct *vma, struct page *page,
