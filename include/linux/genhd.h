@@ -81,7 +81,7 @@ struct gendisk {
 
 	devfs_handle_t *de_arr;         /* one per physical disc */
 	struct device **driverfs_dev_arr;/* support driverfs hierarchy */
-	char *flags;                    /* one per physical disc */
+	int flags;
 };
 
 /* drivers/block/genhd.c */

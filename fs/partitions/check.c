@@ -260,7 +260,7 @@ static void devfs_register_partition(struct gendisk *dev, int part)
 	dir = devfs_get_parent(p[0].de);
 	if (!dir)
 		return;
-	if ( dev->flags && (dev->flags[0] & GENHD_FL_REMOVABLE) )
+	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
 	sprintf (devname, "part%d", part);
 	p[part].de = devfs_register (dir, devname, devfs_flags,
@@ -282,7 +282,7 @@ static void devfs_register_disc(struct gendisk *dev)
 
 	if (p[0].de)
 		return;
-	if ( dev->flags && (dev->flags[0] & GENHD_FL_REMOVABLE) )
+	if (dev->flags & GENHD_FL_REMOVABLE)
 		devfs_flags |= DEVFS_FL_REMOVABLE;
 	if (dev->de_arr) {
 		dir = dev->de_arr[0];

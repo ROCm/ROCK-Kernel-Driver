@@ -1302,7 +1302,6 @@ static int sd_attach(Scsi_Device * sdp)
 		struct gendisk disk;
 		devfs_handle_t de;
 		struct device *dev;
-		char flags;
 		char name[5];
 	} *p;
 	struct gendisk *gd;
@@ -1316,7 +1315,6 @@ static int sd_attach(Scsi_Device * sdp)
 		return 1;
 	gd = &p->disk;
 	gd->de_arr = &p->de;
-	gd->flags = &p->flags;
 	gd->driverfs_dev_arr = &p->dev;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_attach: scsi device: <%d,%d,%d,%d>\n", 
@@ -1361,8 +1359,7 @@ static int sd_attach(Scsi_Device * sdp)
 	else
 		sprintf(p->name, "sd%c", 'a'+dsk_nr%26);
 	gd->major_name = p->name;
-        if (sdp->removable)
-		gd->flags[0] |= GENHD_FL_REMOVABLE;
+        gd->flags = sdp->removable ? GENHD_FL_REMOVABLE : 0;
 	sd_disks[dsk_nr] = gd;
 	sd_dskname(dsk_nr, diskname);
 	printk(KERN_NOTICE "Attached scsi %sdisk %s at scsi%d, channel %d, "
