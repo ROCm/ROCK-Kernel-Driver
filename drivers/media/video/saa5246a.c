@@ -1,9 +1,10 @@
 /*
- * Driver for the SAA5246A videotext decoder chip from Philips.
+ * Driver for the SAA5246A or SAA5281 Teletext (=Videotext) decoder chips from
+ * Philips.
  *
- * Only capturing of videotext pages is tested. The SAA5246A chip also has
- * a TV output but my hardware doesn't use it. For this reason this driver
- * does not support changing any TV display settings.
+ * Only capturing of Teletext pages is tested. The videotext chips also have a
+ * TV output but my hardware doesn't use it. For this reason this driver does
+ * not support changing any TV display settings.
  *
  * Copyright (C) 2004 Michael Geng <linux@MichaelGeng.de>
  *
@@ -46,6 +47,10 @@
 #include <linux/videotext.h>
 #include <linux/videodev.h>
 #include "saa5246a.h"
+
+MODULE_AUTHOR("Michael Geng <linux@MichaelGeng.de>");
+MODULE_DESCRIPTION("Philips SAA5246A, SAA5281 Teletext decoder driver");
+MODULE_LICENSE("GPL");
 
 struct saa5246a_device
 {
@@ -764,8 +769,8 @@ static int saa5246a_release(struct inode *inode, struct file *file)
 
 static int __init init_saa_5246a (void)
 {
-	printk(KERN_INFO "SAA5246A driver (" IF_NAME
-		" interface) for VideoText version %d.%d\n",
+	printk(KERN_INFO
+		"SAA5246A (or compatible) Teletext decoder driver version %d.%d\n",
 		MAJOR_VERSION, MINOR_VERSION);
 	return i2c_add_driver(&i2c_driver_videotext);
 }
@@ -796,5 +801,3 @@ static struct video_device saa_template =
 	.release  = video_device_release,
 	.minor    = -1,
 };
-
-MODULE_LICENSE("GPL");
