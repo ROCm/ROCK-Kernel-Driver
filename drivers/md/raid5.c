@@ -1477,9 +1477,9 @@ static int run (mddev_t *mddev)
 	}
 
 	{
-		const char * name = "raid5d";
+		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid5d_md%d",mdidx(mddev));
 
-		conf->thread = md_register_thread(raid5d, conf, name);
+		conf->thread = md_register_thread(raid5d, conf, conf->thread_name);
 		if (!conf->thread) {
 			printk(KERN_ERR "raid5: couldn't allocate thread for md%d\n", mdidx(mddev));
 			goto abort;

@@ -29,6 +29,7 @@
 #define	LEVEL_LINEAR		(-1)
 
 #define MaxSector (~(sector_t)0)
+#define MD_THREAD_NAME_MAX 14
 
 static inline int pers_to_level (int pers)
 {

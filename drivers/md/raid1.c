@@ -1184,9 +1184,9 @@ static int run(mddev_t *mddev)
 
 
 	{
-		const char * name = "raid1d";
+		snprintf(conf->thread_name,MD_THREAD_NAME_MAX,"raid1d_md%d",mdidx(mddev));
 
-		conf->thread = md_register_thread(raid1d, conf, name);
+		conf->thread = md_register_thread(raid1d, conf, conf->thread_name);
 		if (!conf->thread) {
 			printk(THREAD_ERROR, mdidx(mddev));
 			goto out_free_conf;
