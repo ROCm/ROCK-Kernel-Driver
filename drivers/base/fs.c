@@ -93,22 +93,6 @@ static void fill_devpath(struct device * dev, char * path, int length)
 	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
 }
 
-static int create_symlink(struct driver_dir_entry * parent, char * name, char * path)
-{
-	struct driver_file_entry * entry;
-	int error;
-
-	entry = kmalloc(sizeof(struct driver_file_entry),GFP_KERNEL);
-	if (!entry)
-		return -ENOMEM;
-	entry->name = name;
-	entry->mode = S_IRUGO;
-	error = driverfs_create_symlink(parent,entry,path);
-	if (error)
-		kfree(entry);
-	return error;
-}
-
 int device_bus_link(struct device * dev)
 {
 	char * path;
@@ -138,8 +122,7 @@ int device_bus_link(struct device * dev)
 	strcpy(path,"../../..");
 
 	fill_devpath(dev,path,length);
-	error = create_symlink(&dev->bus->device_dir,dev->bus_id,path);
-
+	error = driverfs_create_symlink(&dev->bus->device_dir,dev->bus_id,path);
 	kfree(path);
 	return error;
 }

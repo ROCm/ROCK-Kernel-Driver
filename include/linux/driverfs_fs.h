@@ -54,8 +54,7 @@ driverfs_create_file(struct driver_file_entry * entry,
 
 extern int 
 driverfs_create_symlink(struct driver_dir_entry * parent, 
-			struct driver_file_entry * entry,
-			char * target);
+			char * name, char * target);
 
 extern void
 driverfs_remove_file(struct driver_dir_entry *, const char * name);

@@ -138,7 +138,7 @@ static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, in
 
 	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
 	 * comes from the driverfs API below. */
-	if (dentry->d_fsdata && inode) {
+	if (inode) {
 		d_instantiate(dentry, inode);
 		dget(dentry);
 		error = 0;
@@ -656,13 +656,12 @@ driverfs_create_file(struct driver_file_entry * entry,
  * 
  */
 int driverfs_create_symlink(struct driver_dir_entry * parent, 
-			    struct driver_file_entry * entry,
-			    char * target)
+			    char * name, char * target)
 {
 	struct dentry * dentry;
 	int error = 0;
 
-	if (!entry || !parent)
+	if (!parent)
 		return -EINVAL;
 
 	get_mount();
@@ -672,11 +671,10 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 		return -EINVAL;
 	}
 	down(&parent->dentry->d_inode->i_sem);
-	dentry = get_dentry(parent->dentry,entry->name);
-	if (!IS_ERR(dentry)) {
-		dentry->d_fsdata = (void *)entry;
+	dentry = get_dentry(parent->dentry,name);
+	if (!IS_ERR(dentry))
 		error = driverfs_symlink(parent->dentry->d_inode,dentry,target);
-	} else
+	else
 		error = PTR_ERR(dentry);
 	up(&parent->dentry->d_inode->i_sem);
 	if (error)
