@@ -115,7 +115,7 @@ extern const struct key  MAX_KEY;
    protecting unlink is bigger that a key lf "save link" which
    protects truncate), so there left no items to make truncate
    completion on */
-static void remove_save_link_only (struct super_block * s, struct key * key)
+static void remove_save_link_only (struct super_block * s, struct key * key, int oid_free)
 {
     struct reiserfs_transaction_handle th;
 
@@ -123,7 +123,7 @@ static void remove_save_link_only (struct super_block * s, struct key * key)
      journal_begin (&th, s, JOURNAL_PER_BALANCE_CNT);
  
      reiserfs_delete_solid_item (&th, key);
-     if (is_direct_le_key (KEY_FORMAT_3_5, key))
+     if (oid_free)
         /* removals are protected by direct items */
         reiserfs_release_objectid (&th, le32_to_cpu (key->k_objectid));
 
@@ -196,7 +196,7 @@ static void finish_unfinished (struct super_block * s)
 	       "save" link and release objectid */
             reiserfs_warning ("vs-2180: finish_unfinished: iget failed for %K\n",
                               &obj_key);
-            remove_save_link_only (s, &save_link_key);
+            remove_save_link_only (s, &save_link_key, 1);
             continue;
         }
 
@@ -204,8 +204,20 @@ static void finish_unfinished (struct super_block * s)
 	    /* file is not unlinked */
             reiserfs_warning ("vs-2185: finish_unfinished: file %K is not unlinked\n",
                               &obj_key);
-            remove_save_link_only (s, &save_link_key);
+            remove_save_link_only (s, &save_link_key, 0);
             continue;
+	}
+
+	if (truncate && S_ISDIR (inode->i_mode) ) {
+	    /* We got a truncate request for a dir which is impossible.
+	       The only imaginable way is to execute unfinished truncate request
+	       then boot into old kernel, remove the file and create dir with
+	       the same key. */
+	    reiserfs_warning("green-2101: impossible truncate on a directory %k. Please report\n", INODE_PKEY (inode));
+	    remove_save_link_only (s, &save_link_key, 0);
+	    truncate = 0;
+	    iput (inode); 
+	    continue;
 	}
  
         if (truncate) {
@@ -272,6 +284,8 @@ void add_save_link (struct reiserfs_transaction_handle * th,
 			   4/*length*/, 0xffff/*free space*/);
     } else {
 	/* truncate */
+	if (S_ISDIR (inode->i_mode))
+	    reiserfs_warning("green-2102: Adding a truncate savelink for a directory %k! Please report\n", INODE_PKEY(inode));
 	set_cpu_key_k_offset (&key, 1);
 	set_cpu_key_k_type (&key, TYPE_INDIRECT);
 
