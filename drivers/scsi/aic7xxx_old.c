@@ -10998,15 +10998,11 @@ aic7xxx_biosparam(struct scsi_device *sdev, struct block_device *bdev,
   {
     heads = 255;
     sectors = 63;
-    /* pull this crap because 64bit math in the kernel is a no-no as far
-     * as division is concerned, but 64bit multiplication can be done */
-    /* This shift approximates capacity / (heads * sectors) */
     cylinders = capacity >> 14;
-    /* Now we brute force upping cylinders until we go over by 1 */
-    while( capacity >= (cylinders * sectors * heads))
-      cylinders++;
-    /* Then back it back down by one */
-    cylinders--;
+    if(capacity > (65535 * heads * sectors))
+      cylinders = 65535;
+    else
+      cylinders = ((unsigned int)capacity) / (heads * sectors);
   }
 
   geom[0] = (int)heads;
