@@ -42,6 +42,7 @@
 #include <asm/uaccess.h>
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
+static int proc_do_kdb(ctl_table *table, int write, struct file *filp, void *buffer, size_t *lenp);
 #endif	/* CONFIG_KDB */
 #ifdef CONFIG_XMON
 #include <asm/system.h>
@@ -533,7 +534,7 @@ static ctl_table kern_table[] = {
 		.data		= &kdb_on,
 		.maxlen		= sizeof(kdb_on),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_do_kdb,
 	},
 #endif	/* CONFIG_KDB */
 #ifdef CONFIG_XMON
@@ -2268,6 +2269,22 @@ void unregister_sysctl_table(struct ctl_table_header * table)
 }
 
 #endif /* CONFIG_SYSCTL */
+
+#ifdef	CONFIG_KDB
+static int proc_do_kdb(ctl_table *table, int write, struct file *filp,
+		       void *buffer, size_t *lenp)
+{
+#ifdef	CONFIG_SYSCTL
+	if (KDB_FLAG(NO_CONSOLE) && write) {
+		printk(KERN_ERR "kdb has no working console and has switched itself off\n");
+		return -EINVAL;
+	}
+	return proc_dointvec(table, write, filp, buffer, lenp);
+#else	/* !CONFIG_SYSCTL */
+	return -ENOSYS;
+#endif	/* CONFIG_SYSCTL */
+}
+#endif	/* CONFIG_KDB */
 
 /*
  * No sense putting this after each symbol definition, twice,

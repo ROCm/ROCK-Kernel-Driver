@@ -640,8 +640,9 @@ kdb_io_init(void)
 	}
 
 	if (kdbcons == NULL) {
-		printk("kdb: Initialization failed - no console\n");
-		while (1) {};
+		printk(KERN_ERR "kdb: Initialization failed - no console.  kdb is disabled.\n");
+		KDB_FLAG_SET(NO_CONSOLE);
+		kdb_on = 0;
 	}
 	kdb_input_flush();
 #endif

@@ -99,6 +99,7 @@ extern const char *kdb_diemsg;
 #define KDB_FLAG_CMD_INTERRUPT	(1 << 2)	/* Previous command was interrupted */
 #define KDB_FLAG_NOIPI		(1 << 3)	/* Do not send IPIs */
 #define KDB_FLAG_ONLY_DO_DUMP	(1 << 4)	/* Only do a dump, used when kdb is off */
+#define KDB_FLAG_NO_CONSOLE	(1 << 5)	/* No console is available, kdb is disabled */
 
 	/*
 	 * Internal debug flags
