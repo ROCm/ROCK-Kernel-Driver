@@ -1012,7 +1012,6 @@ static int
 sony_get_subchnl_info(long arg)
 {
 	struct cdrom_subchnl schi;
-	int err;
 
 	/* Get attention stuff */
 	if (check_drive_status() != 0)

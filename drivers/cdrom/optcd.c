@@ -1507,7 +1507,6 @@ static int cdromplaytrkind(unsigned long arg)
 
 static int cdromreadtochdr(unsigned long arg)
 {
-	int status;
 	struct cdrom_tochdr tochdr;
 
 	tochdr.cdth_trk0 = disk_info.first;
@@ -1519,7 +1518,6 @@ static int cdromreadtochdr(unsigned long arg)
 
 static int cdromreadtocentry(unsigned long arg)
 {
-	int status;
 	struct cdrom_tocentry entry;
 	struct cdrom_subchnl *tocptr;
 
@@ -1646,7 +1644,6 @@ static int cdromseek(unsigned long arg)
 #ifdef MULTISESSION
 static int cdrommultisession(unsigned long arg)
 {
-	int status;
 	struct cdrom_multisession ms;
 
 	if (copy_from_user(&ms, (void*) arg, sizeof ms))
