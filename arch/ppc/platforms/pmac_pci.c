@@ -888,6 +888,14 @@ pmac_pcibios_fixup(void)
 {
 	/* Fixup interrupts according to OF tree */
 	pcibios_fixup_OF_interrupts();
+
+	if (pci_find_class(PCI_CLASS_BRIDGE_CARDBUS << 8, NULL)) {
+		request_region(0x0UL, 0x2e0UL, "reserved legacy io");
+		request_region(0x300UL, 0xe0UL, "reserved legacy io");
+		request_region(0x400UL, 0x10000UL-0x400UL, "reserved legacy io");
+		do_not_try_pc_legacy_8250_console = 1;
+	} else
+		request_region(0x0UL, 0x10000UL, "reserved legacy io");
 }
 
 int __pmac

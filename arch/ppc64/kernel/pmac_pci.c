@@ -664,6 +664,8 @@ void __init pmac_pcibios_fixup(void)
 
 	pci_fix_bus_sysdata();
 
+	request_region(0x0UL, 0x10000UL, "reserved legacy io");
+
 #ifdef CONFIG_PMAC_DART
 	iommu_setup_pmac();
 #endif /* CONFIG_PMAC_DART */

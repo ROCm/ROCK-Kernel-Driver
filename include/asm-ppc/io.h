@@ -399,6 +399,10 @@ static inline int isa_check_signature(unsigned long io_addr,
 	return 0;
 }
 
+#define NO_PC_LEGACY_SERIAL_8250_CONSOLE 1
+extern int do_not_try_pc_legacy_8250_console;
+
+
 #endif /* _PPC_IO_H */
 
 #ifdef CONFIG_8260_PCI9

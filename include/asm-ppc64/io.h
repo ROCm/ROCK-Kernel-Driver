@@ -401,6 +401,9 @@ out:
 #define dma_cache_wback(_start,_size)		do { } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { } while (0)
 
+#define NO_PC_LEGACY_SERIAL_8250_CONSOLE 1
+extern int do_not_try_pc_legacy_8250_console;
+
 #endif /* __KERNEL__ */
 
 #endif /* _PPC64_IO_H */

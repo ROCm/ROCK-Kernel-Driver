@@ -476,6 +476,9 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 }
 
 #ifdef CONFIG_PPC_PSERIES
+int do_not_try_pc_legacy_8250_console;
+EXPORT_SYMBOL(do_not_try_pc_legacy_8250_console);
+
 static int __init set_preferred_console(void)
 {
 	struct device_node *prom_stdout;
@@ -520,9 +523,15 @@ static int __init set_preferred_console(void)
 		/* pSeries LPAR virtual console */
 		return add_preferred_console("hvc", 0, NULL);
 	else if (strcmp(name, "ch-a") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 0;
+	}
 	else if (strcmp(name, "ch-b") == 0)
+	{
+		do_not_try_pc_legacy_8250_console = 1;
 		offset = 1;
+	}
 	else
 		return -ENODEV;
 
