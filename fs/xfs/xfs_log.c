@@ -122,9 +122,7 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-#ifdef XFSDEBUG
 STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
-#endif
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -3253,7 +3251,7 @@ xlog_verify_dest_ptr(xlog_t     *log,
 }	/* xlog_verify_dest_ptr */
 
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /* check split LR write */
 STATIC void
 xlog_verify_disk_cycle_no(xlog_t	 *log,

@@ -69,7 +69,7 @@
 #include "xfs_buf_item.h"
 
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 STATIC void
 xfs_bmap_check_leaf_extents(xfs_btree_cur_t *cur, xfs_inode_t *ip, int whichfork);
 #endif
@@ -195,7 +195,7 @@ xfs_bmap_btree_to_extents(
 	int			*logflagsp, /* inode logging flags */
 	int			whichfork); /* data or attr fork */
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
@@ -695,7 +695,7 @@ xfs_bmap_add_extent(
 		*curp = cur;
 	}
 done:
-#ifdef XFSDEBUG
+#ifdef DEBUG
 	if (!error)
 		xfs_bmap_check_leaf_extents(*curp, ip, whichfork);
 #endif
@@ -5790,7 +5790,7 @@ xfs_bmap_eof(
 	return 0;
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Check that the extents list for the inode ip is in the right order.
  */
