@@ -1529,7 +1529,6 @@ static void
 renew_release(struct rpc_task *task)
 {
 	kfree(task->tk_calldata);
-	task->tk_calldata = NULL;
 }
 
 int
