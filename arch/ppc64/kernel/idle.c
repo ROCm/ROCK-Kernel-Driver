@@ -68,15 +68,18 @@ static void yield_shared_processor(void)
 
 int cpu_idle(void)
 {
-	struct Paca *lpaca;
+	struct paca_struct *lpaca;
 	long oldval;
 	unsigned long CTRL;
 
+#warning fix iseries run light
+#if 0
 	/* ensure iSeries run light will be out when idle */
 	current->thread.flags &= ~PPC_FLAG_RUN_LIGHT;
 	CTRL = mfspr(CTRLF);
 	CTRL &= ~RUNLATCH;
 	mtspr(CTRLT, CTRL);
+#endif
 
 	lpaca = get_paca();
 

@@ -295,7 +295,7 @@ iSeries_init_early(void)
 		initrd_start = (unsigned long)__va(naca->xRamDisk);
 		initrd_end   = initrd_start + naca->xRamDiskSize * PAGE_SIZE;
 		initrd_below_start_ok = 1;	// ramdisk in kernel space
-		ROOT_DEV = MKDEV( RAMDISK_MAJOR, 0 );
+		ROOT_DEV = mk_kdev( RAMDISK_MAJOR, 0 );
 
 		if ( ((rd_size*1024)/PAGE_SIZE) < naca->xRamDiskSize )
 			rd_size = (naca->xRamDiskSize*PAGE_SIZE)/1024;
@@ -304,7 +304,7 @@ iSeries_init_early(void)
 #endif /* CONFIG_BLK_DEV_INITRD */
 	  {
                 
-	    /*		ROOT_DEV = MKDEV( VIODASD_MAJOR, 1 ); */
+	    /*		ROOT_DEV = mk_kdev( VIODASD_MAJOR, 1 ); */
 	  }
 
 	iSeries_recal_tb = get_tb();
