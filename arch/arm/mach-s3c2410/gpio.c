@@ -19,6 +19,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * Changelog
+ *	13-Sep-2004  BJD  Implemented change of MISCCR
+ *	14-Sep-2004  BJD  Added getpin call
+ *	14-Sep-2004  BJD  Fixed bug in setpin() call
  */
 
 
@@ -90,9 +94,32 @@ void s3c2410_gpio_setpin(unsigned int pin, unsigned int to)
 	local_irq_save(flags);
 
 	dat = __raw_readl(base + 0x04);
-	dat &= 1 << offs;
+	dat &= ~(1 << offs);
 	dat |= to << offs;
 	__raw_writel(dat, base + 0x04);
 
 	local_irq_restore(flags);
+}
+
+unsigned int s3c2410_gpio_getpin(unsigned int pin)
+{
+	unsigned long base = S3C2410_GPIO_BASE(pin);
+	unsigned long offs = S3C2410_GPIO_OFFSET(pin);
+
+	return __raw_readl(base + 0x04) & (1<< offs);
+}
+
+unsigned int s3c2410_modify_misccr(unsigned int clear, unsigned int change)
+{
+	unsigned long flags;
+	unsigned long misccr;
+
+	local_irq_save(flags);
+	misccr = __raw_readl(S3C2410_MISCCR);
+	misccr &= ~clear;
+	misccr ^= change;
+	__raw_writel(misccr, S3C2410_MISCCR);
+	local_irq_restore(flags);
+
+	return misccr;
 }
