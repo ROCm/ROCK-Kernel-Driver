@@ -187,6 +187,12 @@ cifs_open(struct inode *inode, struct file *file)
 							(file->f_dentry->d_inode->i_size == (loff_t)le64_to_cpu(buf->EndOfFile))) {
 							cFYI(1,("inode unchanged on server"));
 						} else {
+							if(file->f_dentry->d_inode->i_mapping) {
+							/* BB no need to lock inode until after invalidate*/
+							/* since namei code should already have it locked?*/
+								filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
+								filemap_fdatawait(file->f_dentry->d_inode->i_mapping);
+							}
 							cFYI(1,("invalidating remote inode since open detected it changed"));
 							invalidate_remote_inode(file->f_dentry->d_inode);
 						}
@@ -1049,7 +1055,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
 			cifs_copy_cache_pages(mapping, page_list, bytes_read,
-				smb_read_data + 4 /* RFC1000 hdr */ +
+				smb_read_data + 4 /* RFC1001 hdr */ +
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
@@ -1277,20 +1283,20 @@ unix_fill_in_inode(struct inode *tmp_inode,
                 (tmp_inode->i_blksize - 1 + pfindData->NumOfBytes) >> tmp_inode->i_blkbits;
 
 	if (S_ISREG(tmp_inode->i_mode)) {
-		cFYI(1, (" File inode "));
+		cFYI(1, ("File inode"));
 		tmp_inode->i_op = &cifs_file_inode_ops;
 		tmp_inode->i_fop = &cifs_file_ops;
 		tmp_inode->i_data.a_ops = &cifs_addr_ops;
 	} else if (S_ISDIR(tmp_inode->i_mode)) {
-		cFYI(1, (" Directory inode"));
+		cFYI(1, ("Directory inode"));
 		tmp_inode->i_op = &cifs_dir_inode_ops;
 		tmp_inode->i_fop = &cifs_dir_ops;
 	} else if (S_ISLNK(tmp_inode->i_mode)) {
-		cFYI(1, (" Symbolic Link inode "));
+		cFYI(1, ("Symbolic Link inode"));
 		tmp_inode->i_op = &cifs_symlink_inode_ops;
 /* tmp_inode->i_fop = *//* do not need to set to anything */
 	} else {
-		cFYI(1, (" Init special inode "));
+		cFYI(1, ("Special inode")); 
 		init_special_inode(tmp_inode, tmp_inode->i_mode,
 				   tmp_inode->i_rdev);
 	}
