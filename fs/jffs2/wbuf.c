@@ -9,7 +9,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: wbuf.c,v 1.81 2004/11/20 10:44:07 dwmw2 Exp $
+ * $Id: wbuf.c,v 1.82 2004/11/20 22:08:31 dwmw2 Exp $
  *
  */
 
@@ -130,22 +130,8 @@ static inline void jffs2_refile_wbuf_blocks(struct jffs2_sb_info *c)
 	}
 }
 
-/* Recover from failure to write wbuf. Recover the nodes up to the
- * wbuf, not the one which we were starting to try to write. */
-
-static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
+static void jffs2_block_refile(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb)
 {
-	struct jffs2_eraseblock *jeb, *new_jeb;
-	struct jffs2_raw_node_ref **first_raw, **raw;
-	size_t retlen;
-	int ret;
-	unsigned char *buf;
-	uint32_t start, end, ofs, len;
-
-	spin_lock(&c->erase_completion_lock);
-
-	jeb = &c->blocks[c->wbuf_ofs / c->sector_size];
-
 	D1(printk("About to refile bad block at %08x\n", jeb->offset));
 
 	D2(jffs2_dump_block_lists(c));
@@ -175,6 +161,25 @@ static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
 
 	ACCT_SANITY_CHECK(c,jeb);
 	D1(ACCT_PARANOIA_CHECK(jeb));
+}
+
+/* Recover from failure to write wbuf. Recover the nodes up to the
+ * wbuf, not the one which we were starting to try to write. */
+
+static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
+{
+	struct jffs2_eraseblock *jeb, *new_jeb;
+	struct jffs2_raw_node_ref **first_raw, **raw;
+	size_t retlen;
+	int ret;
+	unsigned char *buf;
+	uint32_t start, end, ofs, len;
+
+	spin_lock(&c->erase_completion_lock);
+
+	jeb = &c->blocks[c->wbuf_ofs / c->sector_size];
+
+	jffs2_block_refile(c, jeb);
 
 	/* Find the first node to be recovered, by skipping over every
 	   node which ends before the wbuf starts, or which is obsolete. */
