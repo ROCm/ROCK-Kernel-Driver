@@ -1004,9 +1004,7 @@ static int ip6_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 				offset += skb->len - hlen - sizeof(struct frag_hdr);
 				fh->nexthdr = nexthdr;
 				fh->reserved = 0;
-				if (frag->next != NULL)
-					offset |= 0x0001;
-				fh->frag_off = htons(offset);
+				fh->frag_off = htons(offset | (frag->next != NULL ? 0x0001 : 0));
 				fh->identification = frag_id;
 				frag->nh.ipv6h->payload_len = htons(frag->len - sizeof(struct ipv6hdr));
 				ip6_copy_metadata(frag, skb);
