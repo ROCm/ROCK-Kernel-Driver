@@ -39,6 +39,14 @@ unsigned long last_cli_ip;
 
 #endif
 
+unsigned long long
+sched_clock (void)
+{
+	unsigned long offset = ia64_get_itc();
+
+	return (offset * local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
+}
+
 static void
 itc_reset (void)
 {
@@ -187,7 +195,7 @@ static inline void
 ia64_do_profile (struct pt_regs * regs)
 {
 	unsigned long ip, slot;
-	extern unsigned long prof_cpu_mask;
+	extern cpumask_t prof_cpu_mask;
 
 	profile_hook(regs);
 

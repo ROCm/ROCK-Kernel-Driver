@@ -41,10 +41,6 @@ boottarget-$(CONFIG_PPC_ISERIES) := vmlinux.sminitrd vmlinux.initrd vmlinux.sm
 $(boottarget-y): vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(boot)/$@
 
-%_config: arch/ppc64/configs/%_defconfig
-	rm -f .config arch/ppc64/defconfig
-	cp -f arch/ppc64/configs/$(@:config=defconfig) arch/ppc64/defconfig
-
 bootimage-$(CONFIG_PPC_PSERIES) := zImage
 bootimage-$(CONFIG_PPC_ISERIES) := vmlinux.sm
 BOOTIMAGE := $(bootimage-y)

@@ -99,7 +99,6 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase);
 static void w83977af_change_speed(struct w83977af_ir *self, __u32 speed);
 static int  w83977af_is_receiving(struct w83977af_ir *self);
 
-static int  w83977af_net_init(struct net_device *dev);
 static int  w83977af_net_open(struct net_device *dev);
 static int  w83977af_net_close(struct net_device *dev);
 static int  w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -171,14 +170,16 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	/*
 	 *  Allocate new instance of the driver
 	 */
-	self = kmalloc(sizeof(struct w83977af_ir), GFP_KERNEL);
-	if (self == NULL) {
+	dev = alloc_netdev(sizeof(struct w83977af_ir), "irda%d",
+			   irda_device_setup);
+	if (dev == NULL) {
 		printk( KERN_ERR "IrDA: Can't allocate memory for "
 			"IrDA control block!\n");
 		err = -ENOMEM;
 		goto err_out;
 	}
-	memset(self, 0, sizeof(struct w83977af_ir));
+
+	self = dev->priv;
 	spin_lock_init(&self->lock);
    
 
@@ -230,29 +231,21 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	self->rx_buff.state = OUTSIDE_FRAME;
 	self->tx_buff.data = self->tx_buff.head;
 	self->rx_buff.data = self->rx_buff.head;
-	
-	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		err = -ENOMEM;
-		goto err_out3;
-	}
-	dev->priv = (void *) self;
 	self->netdev = dev;
 
+	/* Keep track of module usage */
+	SET_MODULE_OWNER(dev);
+
 	/* Override the network functions we need to use */
-	dev->init            = w83977af_net_init;
 	dev->hard_start_xmit = w83977af_hard_xmit;
 	dev->open            = w83977af_net_open;
 	dev->stop            = w83977af_net_close;
 	dev->do_ioctl        = w83977af_net_ioctl;
 	dev->get_stats	     = w83977af_net_get_stats;
 
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
+	err = register_netdev(dev);
 	if (err) {
 		ERROR("%s(), register_netdevice() failed!\n", __FUNCTION__);
-		err = -1;
 		goto err_out3;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
@@ -266,7 +259,7 @@ err_out3:
 err_out2:	
 	kfree(self->rx_buff.head);
 err_out1:
-	kfree(self);
+	free_netdev(dev);
 err_out:
 	release_region(iobase, CHIP_IO_EXTENT);
 	return err;
@@ -299,8 +292,7 @@ static int w83977af_close(struct w83977af_ir *self)
 #endif /* CONFIG_USE_W977_PNP */
 
 	/* Remove netdevice */
-	if (self->netdev)
-		unregister_netdev(self->netdev);
+	unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(0 , "%s(), Releasing Region %03x\n", 
@@ -313,7 +305,7 @@ static int w83977af_close(struct w83977af_ir *self)
 	if (self->rx_buff.head)
 		kfree(self->rx_buff.head);
 
-	kfree(self);
+	free_netdev(self->netdev);
 
 	return 0;
 }
@@ -1185,28 +1177,6 @@ static int w83977af_is_receiving(struct w83977af_ir *self)
 	
 	return status;
 }
-
-/*
- * Function w83977af_net_init (dev)
- *
- *    
- *
- */
-static int w83977af_net_init(struct net_device *dev)
-{
-	IRDA_DEBUG(0, "%s()\n", __FUNCTION__ );
-
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Set up to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	return 0;
-}
-
 
 /*
  * Function w83977af_net_open (dev)

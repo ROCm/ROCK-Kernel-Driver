@@ -47,7 +47,7 @@
 /**************************************************/
 /* globals and useful constants                   */
 
-static const char IKCONFIG_VERSION[] = "0.6";
+static const char IKCONFIG_VERSION[] __initdata = "0.7";
 
 static ssize_t
 ikconfig_read_current(struct file *file, char __user *buf,
@@ -72,32 +72,6 @@ static struct file_operations ikconfig_file_ops = {
 	.read = ikconfig_read_current,
 };
 
-
-/***************************************************/
-/* build_info_show: let people read the info       */
-/* we have on the tools used to build this kernel  */
-
-static int build_info_show(struct seq_file *seq, void *v)
-{
-	seq_printf(seq,
-		   "Kernel:    %s\nCompiler:  %s\nVersion_in_Makefile: %s\n",
-		   ikconfig_build_info, LINUX_COMPILER, UTS_RELEASE);
-	return 0;
-}
-
-static int build_info_open(struct inode *inode, struct file *file)
-{
-	return single_open(file, build_info_show, PDE(inode)->data);
-}
-
-static struct file_operations build_info_file_ops = {
-	.owner = THIS_MODULE,
-	.open  = build_info_open,
-	.read  = seq_read,
-	.llseek = seq_lseek,
-	.release = single_release,
-};
-
 /***************************************************/
 /* ikconfig_init: start up everything we need to */
 
@@ -112,26 +86,12 @@ static int __init ikconfig_init(void)
 	entry = create_proc_entry("config.gz", S_IFREG | S_IRUGO,
 				  &proc_root);
 	if (!entry)
-		goto leave;
+		return -ENOMEM;
 
 	entry->proc_fops = &ikconfig_file_ops;
 	entry->size = kernel_config_data_size;
 
-	/* create the "build_info" file */
-	entry = create_proc_entry("config_build_info",
-				  S_IFREG | S_IRUGO, &proc_root);
-	if (!entry)
-		goto leave_gz;
-	entry->proc_fops = &build_info_file_ops;
-
 	return 0;
-
-leave_gz:
-	/* remove the file from proc */
-	remove_proc_entry("config.gz", &proc_root);
-
-leave:
-	return -ENOMEM;
 }
 
 /***************************************************/
@@ -139,9 +99,7 @@ leave:
 
 static void __exit ikconfig_cleanup(void)
 {
-	/* remove the files */
 	remove_proc_entry("config.gz", &proc_root);
-	remove_proc_entry("config_build_info", &proc_root);
 }
 
 module_init(ikconfig_init);

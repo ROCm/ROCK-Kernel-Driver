@@ -52,10 +52,6 @@ char	command_line[COMMAND_LINE_SIZE];
 struct proc_dir_entry * proc_runway_root = NULL;
 struct proc_dir_entry * proc_gsc_root = NULL;
 
-#ifdef CONFIG_EISA
-int EISA_bus;	/* This has to go somewhere in architecture specific code. */
-#endif
-
 void __init setup_cmdline(char **cmdline_p)
 {
 	extern unsigned int boot_args[];

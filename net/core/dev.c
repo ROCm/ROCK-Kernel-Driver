@@ -470,10 +470,10 @@ struct net_device *dev_get_by_name(const char *name)
  *	to be sure the name is not allocated or removed during the test the
  *	caller must hold the rtnl semaphore.
  *
- *	This function primarily exists for back compatibility with older
+ *	This function exists only for back compatibility with older
  *	drivers.
  */
-int dev_get(const char *name)
+int __dev_get(const char *name)
 {
 	struct net_device *dev;
 
@@ -698,7 +698,13 @@ void netdev_state_change(struct net_device *dev)
 
 void dev_load(const char *name)
 {
-	if (!dev_get(name) && capable(CAP_SYS_MODULE))
+	struct net_device *dev;  
+
+	read_lock(&dev_base_lock);
+	dev = __dev_get_by_name(name);
+	read_unlock(&dev_base_lock);
+
+	if (!dev && capable(CAP_SYS_MODULE))
 		request_module("%s", name);
 }
 

@@ -246,7 +246,7 @@ static const struct atmphy_ops uPD98402_ops = {
 };
 
 
-int __init uPD98402_init(struct atm_dev *dev)
+int uPD98402_init(struct atm_dev *dev)
 {
 DPRINTK("phy_init\n");
 	dev->phy = &uPD98402_ops;
@@ -254,22 +254,13 @@ DPRINTK("phy_init\n");
 }
 
 
-#ifdef MODULE
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(uPD98402_init);
 
- 
-int init_module(void)
+static __init int uPD98402_module_init(void)
 {
-	MOD_INC_USE_COUNT;
 	return 0;
 }
-
-
-void cleanup_module(void)
-{
-	/* Nay */
-}
- 
-#endif
+module_init(uPD98402_module_init);
+/* module_exit not defined so not unloadable */

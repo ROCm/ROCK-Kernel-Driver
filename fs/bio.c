@@ -532,6 +532,12 @@ void bio_unmap_user(struct bio *bio, int write_to_vm)
  * check that the pages are still dirty.   If so, fine.  If not, redirty them
  * in process context.
  *
+ * We special-case compound pages here: normally this means reads into hugetlb
+ * pages.  The logic in here doesn't really work right for compound pages
+ * because the VM does not uniformly chase down the head page in all cases.
+ * But dirtiness of compound pages is pretty meaningless anyway: the VM doesn't
+ * handle them at all.  So we skip compound pages here at an early stage.
+ *
  * Note that this code is very hard to test under normal circumstances because
  * direct-io pins the pages with get_user_pages().  This makes
  * is_page_cache_freeable return false, and the VM will not clean the pages.
@@ -553,8 +559,21 @@ void bio_set_pages_dirty(struct bio *bio)
 	for (i = 0; i < bio->bi_vcnt; i++) {
 		struct page *page = bvec[i].bv_page;
 
+		if (page && !PageCompound(page))
+			set_page_dirty_lock(page);
+	}
+}
+
+static void bio_release_pages(struct bio *bio)
+{
+	struct bio_vec *bvec = bio->bi_io_vec;
+	int i;
+
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		struct page *page = bvec[i].bv_page;
+
 		if (page)
-			set_page_dirty_lock(bvec[i].bv_page);
+			put_page(page);
 	}
 }
 
@@ -592,6 +611,7 @@ static void bio_dirty_fn(void *data)
 		struct bio *next = bio->bi_private;
 
 		bio_set_pages_dirty(bio);
+		bio_release_pages(bio);
 		bio_put(bio);
 		bio = next;
 	}
@@ -606,7 +626,7 @@ void bio_check_pages_dirty(struct bio *bio)
 	for (i = 0; i < bio->bi_vcnt; i++) {
 		struct page *page = bvec[i].bv_page;
 
-		if (PageDirty(page)) {
+		if (PageDirty(page) || PageCompound(page)) {
 			page_cache_release(page);
 			bvec[i].bv_page = NULL;
 		} else {

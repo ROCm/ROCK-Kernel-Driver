@@ -2242,7 +2242,6 @@ static int __init lanai_dev_open(struct atm_dev *atmdev)
 		printk(KERN_ERR DEV_LABEL ": can't allocate interrupt\n");
 		goto error_vcctable;
 	}
-	MOD_INC_USE_COUNT;		/* At this point we can't fail */
 	mb();				/* Make sure that all that made it */
 	intr_enable(lanai, INT_ALL & ~(INT_PING | INT_WAKE));
 	/* 3.11: initialize loop mode (i.e. turn looping off) */
@@ -2312,7 +2311,6 @@ static void lanai_dev_close(struct atm_dev *atmdev)
 	service_buffer_deallocate(lanai);
 	iounmap((void *) lanai->base);
 	kfree(lanai);
-	MOD_DEC_USE_COUNT;
 }
 
 /* close a vcc */
@@ -2686,7 +2684,8 @@ static const struct atmdev_ops ops = {
 	.phy_put	= NULL,
 	.phy_get	= NULL,
 	.change_qos	= lanai_change_qos,
-	.proc_read	= lanai_proc_read
+	.proc_read	= lanai_proc_read,
+	.owner		= THIS_MODULE
 };
 
 /* initialize one probed card */

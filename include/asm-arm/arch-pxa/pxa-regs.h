@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  */
 
+#include <linux/config.h>
 
 // FIXME hack so that SA-1111.h will work [cb]
 

@@ -491,7 +491,7 @@ static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
 
 void validate_mem(struct pcmcia_socket *s)
 {
-    resource_map_t *m, *n;
+    resource_map_t *m, mm;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
@@ -510,18 +510,18 @@ void validate_mem(struct pcmcia_socket *s)
     }
     if (lo++)
 	goto out;
-    for (m = mem_db.next; m != &mem_db; m = n) {
-	n = m->next;
+    for (m = mem_db.next; m != &mem_db; m = mm.next) {
+	mm = *m;
 	/* Only probe < 1 MB */
-	if (m->base >= 0x100000) continue;
-	if ((m->base | m->num) & 0xffff) {
-	    ok += do_mem_probe(m->base, m->num, s);
+	if (mm.base >= 0x100000) continue;
+	if ((mm.base | mm.num) & 0xffff) {
+	    ok += do_mem_probe(mm.base, mm.num, s);
 	    continue;
 	}
 	/* Special probe for 64K-aligned block */
 	for (i = 0; i < 4; i++) {
 	    b = order[i] << 12;
-	    if ((b >= m->base) && (b+0x10000 <= m->base+m->num)) {
+	    if ((b >= mm.base) && (b+0x10000 <= mm.base+mm.num)) {
 		if (ok >= mem_limit)
 		    sub_interval(&mem_db, b, 0x10000);
 		else
@@ -537,14 +537,14 @@ void validate_mem(struct pcmcia_socket *s)
 
 void validate_mem(struct pcmcia_socket *s)
 {
-    resource_map_t *m, *n;
+    resource_map_t *m, mm;
     static int done = 0;
     
     if (probe_mem && done++ == 0) {
 	down(&rsrc_sem);
-	for (m = mem_db.next; m != &mem_db; m = n) {
-	    n = m->next;
-	    if (do_mem_probe(m->base, m->num, s))
+	for (m = mem_db.next; m != &mem_db; m = mm.next) {
+	    mm = *m;
+	    if (do_mem_probe(mm.base, mm.num, s))
 		break;
 	}
 	up(&rsrc_sem);

@@ -237,13 +237,6 @@ config SOUND_HARMONY
 	tristate "PA Harmony audio driver"
 	depends on GSC_LASI && SOUND
 
-config SOUND_RME96XX
-	tristate "RME Hammerfall (RME96XX) support (EXPERIMENTAL)"
-	depends on SOUND_PRIME!=n && SOUND && PCI && EXPERIMENTAL
-	help
-	  Say Y or M if you have a Hammerfall, Hammerfall light or Hammerfall
-	  DSP card from RME.
-
 config SOUND_SONICVIBES
 	tristate "S3 SonicVibes"
 	depends on SOUND_PRIME!=n && SOUND && SOUND_GAMEPORT

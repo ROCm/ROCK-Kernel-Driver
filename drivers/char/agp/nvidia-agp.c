@@ -196,7 +196,7 @@ static void nvidia_tlbflush(struct agp_memory *mem)
 			pci_read_config_dword(nvidia_private.dev_1,
 					NVIDIA_1_WBC, &wbc_reg);
 			if ((signed)(end - jiffies) <= 0) {
-				printk(KERN_ERR
+				printk(KERN_ERR PFX
 				    "TLB flush took more than 3 seconds.\n");
 			}
 		} while (wbc_reg & nvidia_private.wbc_mask);

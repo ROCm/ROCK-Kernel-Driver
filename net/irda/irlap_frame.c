@@ -159,9 +159,9 @@ static void irlap_recv_snrm_cmd(struct irlap_cb *self, struct sk_buff *skb,
 {
 	struct snrm_frame *frame;
 
-	frame = (struct snrm_frame *) skb->data;
+	if (pskb_may_pull(skb,sizeof(struct snrm_frame))) {
+		frame = (struct snrm_frame *) skb->data;
 
-	if (skb->len >= sizeof(struct snrm_frame)) {
 		/* Copy the new connection address ignoring the C/R bit */
 		info->caddr = frame->ncaddr & 0xFE;
 
@@ -402,6 +402,11 @@ static void irlap_recv_discovery_xid_rsp(struct irlap_cb *self,
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == LAP_MAGIC, return;);
 
+	if (!pskb_may_pull(skb, sizeof(struct xid_frame))) {
+		ERROR("%s: frame to short!\n", __FUNCTION__);
+		return;
+	}
+		
 	xid = (struct xid_frame *) skb->data;
 
 	info->daddr = le32_to_cpu(xid->saddr);
@@ -469,6 +474,11 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 	__u8 *discovery_info;
 	char *text;
 
+	if (!pskb_may_pull(skb, sizeof(struct xid_frame))) {
+		ERROR("%s: frame to short!\n", __FUNCTION__);
+		return;
+	}
+	
 	xid = (struct xid_frame *) skb->data;
 
 	info->daddr = le32_to_cpu(xid->saddr);
@@ -507,7 +517,8 @@ static void irlap_recv_discovery_xid_cmd(struct irlap_cb *self,
 	 */
 	if (info->s == 0xff) {
 		/* Check if things are sane at this point... */
-		if((discovery_info == NULL) || (skb->len < 3)) {
+		if((discovery_info == NULL) || 
+		   !pskb_may_pull(skb, 3)) {
 			ERROR("%s: discovery frame to short!\n", __FUNCTION__);
 			return;
 		}
@@ -1150,6 +1161,11 @@ static void irlap_recv_frmr_frame(struct irlap_cb *self, struct sk_buff *skb,
 	ASSERT(skb != NULL, return;);
 	ASSERT(info != NULL, return;);
 
+	if (!pskb_may_pull(skb, 4)) {
+		ERROR("%s: frame to short!\n", __FUNCTION__);
+		return;
+	}
+
 	frame = skb->data;
 
 	info->nr = frame[2] >> 5;          /* Next to receive */
@@ -1234,6 +1250,10 @@ static void irlap_recv_test_frame(struct irlap_cb *self, struct sk_buff *skb,
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
+	if (!pskb_may_pull(skb, sizeof(*frame))) {
+		ERROR("%s: frame to short!\n", __FUNCTION__);
+		return;
+	}
 	frame = (struct test_frame *) skb->data;
 
 	/* Broadcast frames must carry saddr and daddr fields */
@@ -1302,15 +1322,9 @@ int irlap_driver_rcv(struct sk_buff *skb, struct net_device *dev,
 		dev_kfree_skb(skb);
 		return -1;
 	}
-	if (skb_is_nonlinear(skb))
-		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
-			ERROR("%s: can't linearize skb!\n", __FUNCTION__);
-			dev_kfree_skb(skb);
-			return -1;
-		}
 
 	/* Check if frame is large enough for parsing */
-	if (skb->len < 2) {
+	if (!pskb_may_pull(skb, 2)) {
 		ERROR("%s: frame to short!\n", __FUNCTION__);
 		dev_kfree_skb(skb);
 		return -1;

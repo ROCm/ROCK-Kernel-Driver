@@ -1619,11 +1619,10 @@ static int __init zatm_module_init(void)
 out:
 	kfree(zatm_dev);
 
-	/* XXX: currently the driver is not unloadable.. */
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
 MODULE_LICENSE("GPL");
 
 module_init(zatm_module_init);
+/* module_exit not defined so not unloadable */

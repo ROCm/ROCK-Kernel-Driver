@@ -2272,8 +2272,6 @@ static int __devinit eni_init_one(struct pci_dev *pci_dev,
 
 	DPRINTK("eni_init_one\n");
 
-	MOD_INC_USE_COUNT; /* @@@ we don't support unloading yet */
-
 	if (pci_enable_device(pci_dev)) {
 		error = -EIO;
 		goto out0;
@@ -2307,7 +2305,6 @@ out2:
 out1:
 	kfree(eni_dev);
 out0:
-	MOD_DEC_USE_COUNT; /* @@@ we don't support unloading yet */
 	return error;
 }
 
@@ -2351,16 +2348,7 @@ static int __init eni_init(void)
 }
 
 
-static void __exit eni_cleanup(void)
-{
-	/*
-	 * Well, there's no way to get rid of the driver yet, so we don't
-	 * have to clean up, right ? :-)
-	 */
-}
-
-
 module_init(eni_init);
-module_exit(eni_cleanup);
+/* @@@ since exit routine not defined, this module can not be unloaded */
 
 MODULE_LICENSE("GPL");

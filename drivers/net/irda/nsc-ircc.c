@@ -143,7 +143,6 @@ static int  nsc_ircc_is_receiving(struct nsc_ircc_cb *self);
 static int  nsc_ircc_read_dongle_id (int iobase);
 static void nsc_ircc_init_dongle_interface (int iobase, int dongle_id);
 
-static int  nsc_ircc_net_init(struct net_device *dev);
 static int  nsc_ircc_net_open(struct net_device *dev);
 static int  nsc_ircc_net_close(struct net_device *dev);
 static int  nsc_ircc_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
@@ -261,14 +260,16 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 
 	MESSAGE("%s, driver loaded (Dag Brattli)\n", driver_name);
 
-	/* Allocate new instance of the driver */
-	self = kmalloc(sizeof(struct nsc_ircc_cb), GFP_KERNEL);
-	if (self == NULL) {
+	dev = alloc_netdev(sizeof(struct nsc_ircc_cb), "irda%d",
+			   irda_device_setup);
+	if (dev == NULL) {
 		ERROR("%s(), can't allocate memory for "
 		       "control block!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
-	memset(self, 0, sizeof(struct nsc_ircc_cb));
+
+	self = dev->priv;
+	self->netdev = dev;
 	spin_lock_init(&self->lock);
    
 	/* Need to store self somewhere */
@@ -288,9 +289,8 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 	if (!ret) {
 		WARNING("%s(), can't get iobase of 0x%03x\n",
 			__FUNCTION__, self->io.fir_base);
-		dev_self[i] = NULL;
-		kfree(self);
-		return -ENODEV;
+		err = -ENODEV;
+		goto out1;
 	}
 
 	/* Initialize QoS for this device */
@@ -313,17 +313,17 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 	self->rx_buff.head = (__u8 *) kmalloc(self->rx_buff.truesize,
 					      GFP_KERNEL|GFP_DMA);
 	if (self->rx_buff.head == NULL) {
-		kfree(self);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out2;
+
 	}
 	memset(self->rx_buff.head, 0, self->rx_buff.truesize);
 	
 	self->tx_buff.head = (__u8 *) kmalloc(self->tx_buff.truesize, 
 					      GFP_KERNEL|GFP_DMA);
 	if (self->tx_buff.head == NULL) {
-		kfree(self->rx_buff.head);
-		kfree(self);
-		return -ENOMEM;
+		err = -ENOMEM;
+		goto out3;
 	}
 	memset(self->tx_buff.head, 0, self->tx_buff.truesize);
 
@@ -336,28 +336,18 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 	self->tx_fifo.len = self->tx_fifo.ptr = self->tx_fifo.free = 0;
 	self->tx_fifo.tail = self->tx_buff.head;
 
-	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
-		return -ENOMEM;
-	}
-
-	dev->priv = (void *) self;
-	self->netdev = dev;
-
 	/* Override the network functions we need to use */
-	dev->init            = nsc_ircc_net_init;
+	SET_MODULE_OWNER(dev);
 	dev->hard_start_xmit = nsc_ircc_hard_xmit_sir;
 	dev->open            = nsc_ircc_net_open;
 	dev->stop            = nsc_ircc_net_close;
 	dev->do_ioctl        = nsc_ircc_net_ioctl;
 	dev->get_stats	     = nsc_ircc_net_get_stats;
 
-	rtnl_lock();
-	err = register_netdevice(dev);
-	rtnl_unlock();
+	err = register_netdev(dev);
 	if (err) {
 		ERROR("%s(), register_netdev() failed!\n", __FUNCTION__);
-		return -1;
+		goto out4;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
 
@@ -380,6 +370,16 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
                 pmdev->data = self;
 
 	return 0;
+ out4:
+	kfree(self->tx_buff.head);
+ out3:
+	kfree(self->rx_buff.head);
+ out2:
+	release_region(self->io.fir_base, self->io.fir_ext);
+ out1:
+	free_netdev(dev);
+	dev_self[i] = NULL;
+	return err;
 }
 
 /*
@@ -399,8 +399,7 @@ static int __exit nsc_ircc_close(struct nsc_ircc_cb *self)
         iobase = self->io.fir_base;
 
 	/* Remove netdevice */
-	if (self->netdev)
-		unregister_netdev(self->netdev);
+	unregister_netdev(self->netdev);
 
 	/* Release the PORT that this driver is using */
 	IRDA_DEBUG(4, "%s(), Releasing Region %03x\n", 
@@ -414,7 +413,7 @@ static int __exit nsc_ircc_close(struct nsc_ircc_cb *self)
 		kfree(self->rx_buff.head);
 
 	dev_self[self->index] = NULL;
-	kfree(self);
+	free_netdev(self->netdev);
 	
 	return 0;
 }
@@ -1988,27 +1987,6 @@ static int nsc_ircc_is_receiving(struct nsc_ircc_cb *self)
 	spin_unlock_irqrestore(&self->lock, flags);
 
 	return status;
-}
-
-/*
- * Function nsc_ircc_net_init (dev)
- *
- *    Initialize network device
- *
- */
-static int nsc_ircc_net_init(struct net_device *dev)
-{
-	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
-
-	/* Keep track of module usage */
-	SET_MODULE_OWNER(dev);
-
-	/* Setup to be a normal IrDA network device driver */
-	irda_device_setup(dev);
-
-	/* Insert overrides below this line! */
-
-	return 0;
 }
 
 /*

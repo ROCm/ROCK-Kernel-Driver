@@ -7,7 +7,6 @@
 #ifndef _PXA_KEYBOARD_H
 #define _PXA_KEYBOARD_H
 
-#include <linux/config.h>
 #include <asm/mach-types.h>
 #include <asm/hardware.h>
 

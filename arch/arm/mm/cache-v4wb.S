@@ -7,7 +7,9 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/config.h>
 #include <linux/linkage.h>
+#include <linux/init.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
 #include "proc-macros.S"
@@ -185,6 +187,9 @@ ENTRY(v4wb_dma_clean_range)
 	.globl	v4wb_dma_flush_range
 	.set	v4wb_dma_flush_range, v4wb_coherent_kern_range
 
+	__INITDATA
+
+	.type	v4wb_cache_fns, #object
 ENTRY(v4wb_cache_fns)
 	.long	v4wb_flush_kern_cache_all
 	.long	v4wb_flush_user_cache_all
@@ -194,3 +199,4 @@ ENTRY(v4wb_cache_fns)
 	.long	v4wb_dma_inv_range
 	.long	v4wb_dma_clean_range
 	.long	v4wb_dma_flush_range
+	.size	v4wb_cache_fns, . - v4wb_cache_fns

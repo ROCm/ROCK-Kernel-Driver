@@ -344,6 +344,7 @@ static inline struct task_struct * good_sigevent(sigevent_t * event)
 		return NULL;
 
 	if ((event->sigev_notify & ~SIGEV_NONE & MIPS_SIGEV) &&
+			event->sigev_signo &&
 			((unsigned) (event->sigev_signo > SIGRTMAX)))
 		return NULL;
 

@@ -80,7 +80,6 @@ struct usb_host_interface {
  * @act_altsetting: index of current altsetting.  this number is always
  *	less than num_altsetting.  after the device is configured, each
  *	interface uses its default setting of zero.
- * @max_altsetting: the max number of altsettings for this interface.
  * @driver: the USB driver that is bound to this interface.
  * @minor: the minor number assigned to this interface, if this
  *	interface is bound to a driver that uses the USB major number.
@@ -118,7 +117,6 @@ struct usb_interface {
 
 	unsigned act_altsetting;	/* active alternate setting */
 	unsigned num_altsetting;	/* number of alternate settings */
-	unsigned max_altsetting;	/* total memory allocated */
 
 	struct usb_driver *driver;	/* driver */
 	int minor;			/* minor number this interface is bound to */

@@ -35,6 +35,7 @@ static const char *version =
 	"lne390.c: Driver revision v0.99.1, 01/09/2000\n";
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>

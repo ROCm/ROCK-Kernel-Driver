@@ -78,7 +78,6 @@
 
 #define CYCLOMX_X25_DEBUG 1
 
-#include <linux/version.h>
 #include <linux/errno.h>	/* return codes */
 #include <linux/if_arp.h>       /* ARPHRD_HWX25 */
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
