@@ -236,6 +236,16 @@ void irlmp_close_lsap(struct lsap_cb *self)
 	lap = self->lap;
 	if (lap) {
 		ASSERT(lap->magic == LMP_LAP_MAGIC, return;);
+		/* We might close a LSAP before it has completed the
+		 * connection setup. In those case, higher layers won't
+		 * send a proper disconnect request. Harmless, except
+		 * that we will forget to close LAP... - Jean II */
+		if(self->lsap_state != LSAP_DISCONNECTED) {
+			self->lsap_state = LSAP_DISCONNECTED;
+			irlmp_do_lap_event(self->lap,
+					   LM_LAP_DISCONNECT_REQUEST, NULL);
+		}
+		/* Now, remove from the link */
 		lsap = hashbin_remove(lap->lsaps, (int) self, NULL);
 	}
 	self->lap = NULL;
