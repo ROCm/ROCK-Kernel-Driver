@@ -927,20 +927,17 @@ direct_io_worker(int rw, struct kiocb *iocb, struct inode *inode,
 			ret = dio->result;	/* Bytes written */
 		finished_one_bio(dio);		/* This can free the dio */
 		blk_run_queues();
-		goto out;
+	} else {
+		finished_one_bio(dio);
+		ret2 = dio_await_completion(dio);
+		if (ret == 0)
+			ret = ret2;
+		if (ret == 0)
+			ret = dio->page_errors;
+		if (ret == 0 && dio->result)
+			ret = dio->result;
+		kfree(dio);
 	}
-
-	finished_one_bio(dio);
-	ret2 = dio_await_completion(dio);
-	if (ret == 0)
-		ret = ret2;
-	if (ret == 0)
-		ret = dio->page_errors;
-
-	if (dio->result)
-		ret = dio->result;
-	kfree(dio);
-out:
 	return ret;
 }
 
