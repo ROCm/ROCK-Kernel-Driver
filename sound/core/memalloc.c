@@ -39,7 +39,7 @@ MODULE_LICENSE("GPL");
 #ifndef SNDRV_CARDS
 #define SNDRV_CARDS	8
 #endif
-static int enable[8] = {[0 ... (SNDRV_CARDS-1)] = 1};
+static int enable[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS-1)] = 1};
 MODULE_PARM(enable, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(enable, "Enable cards to allocate buffers.");
 
