@@ -76,7 +76,7 @@ static void tce_build_iSeries(struct iommu_table *tbl, long index, long npages,
 	
 	while (npages--) {
 		tce.te_word = 0;
-		tce.te_bits.tb_rpn = (virt_to_absolute(uaddr)) >> PAGE_SHIFT;
+		tce.te_bits.tb_rpn = virt_to_abs(uaddr) >> PAGE_SHIFT;
 
 		if (tbl->it_type == TCE_VB) {
 			/* Virtual Bus */
@@ -130,7 +130,7 @@ void __init iommu_vio_init(void)
 	cb.itc_busno = 255;    /* Bus 255 is the virtual bus */
 	cb.itc_virtbus = 0xff; /* Ask for virtual bus */
 	
-	cbp = virt_to_absolute((unsigned long)&cb);
+	cbp = virt_to_abs(&cb);
 	HvCallXm_getTceTableParms(cbp);
 	
 	veth_iommu_table.it_size        = cb.itc_size / 2;
@@ -209,7 +209,7 @@ static void iommu_table_getparms(struct iSeries_Device_Node* dn,
 	parms->itc_slotno  = dn->LogicalSlot;
 	parms->itc_virtbus = 0;
 
-	HvCallXm_getTceTableParms(REALADDR(parms));
+	HvCallXm_getTceTableParms(ISERIES_HV_ADDR(parms));
 
 	if (parms->itc_size == 0)
 		panic("PCI_DMA: parms->size is zero, parms is 0x%p", parms);

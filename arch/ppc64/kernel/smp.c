@@ -629,7 +629,7 @@ int __devinit __cpu_up(unsigned int cpu)
 		tmp = &stab_array[PAGE_SIZE * cpu];
 		memset(tmp, 0, PAGE_SIZE); 
 		paca[cpu].xStab_data.virt = (unsigned long)tmp;
-		paca[cpu].xStab_data.real = (unsigned long)__v2a(tmp);
+		paca[cpu].xStab_data.real = virt_to_abs(tmp);
 	}
 
 	/* create a process for the processor */
