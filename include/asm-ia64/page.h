@@ -57,6 +57,16 @@
 # define REGION_SHIFT	61
 # define HPAGE_SIZE	(__IA64_UL_CONST(1) << HPAGE_SHIFT)
 # define HPAGE_MASK	(~(HPAGE_SIZE - 1))
+static inline int
+check_valid_hugepage_range(unsigned long addr, unsigned long len)
+{
+	if (REGION_NUMBER(addr) == REGION_HPAGE)
+		return -EINVAL;
+	if (REGION_NUMBER(addr+len) == REGION_HPAGE)
+		return -EINVAL;
+	return 0;
+}
+#define ARCH_HAS_VALID_HUGEPAGE_RANGE
 #endif /* CONFIG_HUGETLB_PAGE */
 
 #ifdef __ASSEMBLY__
