@@ -18,13 +18,20 @@
 
 // EBT_ACCEPT means the frame will be bridged
 // EBT_DROP means the frame will be routed
-static struct ebt_entries initial_chain =
-  {0, "BROUTING", 0, EBT_ACCEPT, 0};
+static struct ebt_entries initial_chain = {
+	.name	= "BROUTING",
+	.policy	= EBT_ACCEPT,
+};
 
 static struct ebt_replace initial_table =
 {
-  "broute", 1 << NF_BR_BROUTING, 0, sizeof(struct ebt_entries),
-  { [NF_BR_BROUTING]&initial_chain}, 0, NULL, (char *)&initial_chain
+	.name		= "broute",
+	.valid_hooks	= 1 << NF_BR_BROUTING,
+	.entries_size	= sizeof(struct ebt_entries),
+	.hook_entry	= {
+		[NF_BR_BROUTING]	= &initial_chain,
+	},
+	.entries	= (char *)&initial_chain
 };
 
 static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
@@ -36,8 +43,11 @@ static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
 
 static struct ebt_table broute_table =
 {
-  {NULL, NULL}, "broute", &initial_table, 1 << NF_BR_BROUTING,
-  RW_LOCK_UNLOCKED, check, NULL
+	.name		= "broute",
+	.table		= &initial_table,
+	.valid_hooks	= 1 << NF_BR_BROUTING,
+	.lock		= RW_LOCK_UNLOCKED,
+	.check		= check,
 };
 
 static int ebt_broute(struct sk_buff **pskb)

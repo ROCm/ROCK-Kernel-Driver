@@ -16,16 +16,31 @@
 
 static struct ebt_entries initial_chains[] =
 {
-  {0, "INPUT", 0, EBT_ACCEPT, 0},
-  {0, "FORWARD", 0, EBT_ACCEPT, 0},
-  {0, "OUTPUT", 0, EBT_ACCEPT, 0}
+	{
+		.name	= "INPUT",
+		.policy	= EBT_ACCEPT,
+	},
+	{
+		.name	= "FORWARD",
+		.policy	= EBT_ACCEPT,
+	},
+	{
+		.name	= "OUTPUT",
+		.policy	= EBT_ACCEPT,
+	}
 };
 
 static struct ebt_replace initial_table =
 {
-  "filter", FILTER_VALID_HOOKS, 0, 3 * sizeof(struct ebt_entries),
-  { [NF_BR_LOCAL_IN]&initial_chains[0], [NF_BR_FORWARD]&initial_chains[1],
-    [NF_BR_LOCAL_OUT]&initial_chains[2] }, 0, NULL, (char *)initial_chains
+	.name		= "filter",
+	.valid_hooks	= FILTER_VALID_HOOKS,
+	.entries_size	= 3 * sizeof(struct ebt_entries),
+  	.hook_entry	= {
+		[NF_BR_LOCAL_IN]	= &initial_chains[0],
+		[NF_BR_FORWARD]		= &initial_chains[1],
+    		[NF_BR_LOCAL_OUT]	= &initial_chains[2],
+	},
+	.entries	= (char *)initial_chains
 };
 
 static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
@@ -37,8 +52,11 @@ static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
 
 static struct ebt_table frame_filter =
 { 
-  {NULL, NULL}, "filter", &initial_table, FILTER_VALID_HOOKS, 
-  RW_LOCK_UNLOCKED, check, NULL
+	.name		= "filter",
+	.table		= &initial_table,
+	.valid_hooks	= FILTER_VALID_HOOKS, 
+	.lock		= RW_LOCK_UNLOCKED,
+	.check		= check,
 };
 
 static unsigned int
@@ -49,12 +67,24 @@ ebt_hook (unsigned int hook, struct sk_buff **pskb, const struct net_device *in,
 }
 
 static struct nf_hook_ops ebt_ops_filter[] = {
-	{ { NULL, NULL }, ebt_hook, PF_BRIDGE, NF_BR_LOCAL_IN,
-	   NF_BR_PRI_FILTER_BRIDGED},
-	{ { NULL, NULL }, ebt_hook, PF_BRIDGE, NF_BR_FORWARD,
-	   NF_BR_PRI_FILTER_BRIDGED},
-	{ { NULL, NULL }, ebt_hook, PF_BRIDGE, NF_BR_LOCAL_OUT,
-	   NF_BR_PRI_FILTER_OTHER}
+	{
+		.hook		= ebt_hook,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_LOCAL_IN,
+		.priority	= NF_BR_PRI_FILTER_BRIDGED,
+	},
+	{
+		.hook		= ebt_hook,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_FORWARD,
+		.priority	= NF_BR_PRI_FILTER_BRIDGED
+	},
+	{
+		.hook		= ebt_hook,
+		.pf		= PF_BRIDGE,
+		.hooknum	= NF_BR_LOCAL_OUT,
+		.priority	= NF_BR_PRI_FILTER_OTHER
+	}
 };
 
 static int __init init(void)
