@@ -1090,6 +1090,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 	return x;
 
 out:
+	x->km.state = XFRM_STATE_DEAD;
 	xfrm_state_put(x);
 	return ERR_PTR(-ENOBUFS);
 }
