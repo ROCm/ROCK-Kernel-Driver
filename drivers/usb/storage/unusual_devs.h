@@ -384,7 +384,7 @@ UNUSUAL_DEV(  0x05dc, 0x0001, 0x0000, 0x0001,
 UNUSUAL_DEV(  0x05dc, 0xb002, 0x0000, 0x0113,
 		"Lexar",
 		"USB CF Reader",
-		US_SC_SCSI, US_PR_BULK, NULL,
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
 
 /* Reported by Carlos Villegas <cav@uniscope.co.jp>
