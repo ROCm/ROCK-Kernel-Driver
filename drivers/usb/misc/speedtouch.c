@@ -598,7 +598,7 @@ static void udsl_usb_send_data_complete (struct urb *urb, struct pt_regs *regs)
 		       (unsigned char *) ctx->skb->data,
 		       ctx->skb->len, udsl_usb_send_data_complete, ctx);
 
-	err = usb_submit_urb (urb, GFP_KERNEL);
+	err = usb_submit_urb (urb, GFP_ATOMIC);
 
 	PDEBUG ("udsl_usb_send_data_completion (send packet %p with length %d), retval = %d\n",
 		ctx->skb, ctx->skb->len, err);
@@ -747,7 +747,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 		       usb_rcvbulkpipe (instance->usb_dev, UDSL_ENDPOINT_DATA_IN),
 		       (unsigned char *) ctx->skb->data,
 		       UDSL_RECEIVE_BUFFER_SIZE, udsl_usb_data_receive, ctx);
-	usb_submit_urb (urb, GFP_KERNEL);
+	usb_submit_urb (urb, GFP_ATOMIC);
 	return;
 };
 
