@@ -571,7 +571,7 @@ befs_utf2nls(struct super_block *sb, const char *in,
 		}
 
 		/* convert from Unicode to nls */
-		unilen = nls->uni2char(uni, &result[o], 1);
+		unilen = nls->uni2char(uni, &result[o], in_len - o);
 		if (unilen < 0) {
 			goto conv_err;
 		}
