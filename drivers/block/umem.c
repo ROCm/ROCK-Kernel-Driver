@@ -102,10 +102,6 @@ static int major_nr;
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
-
-static devfs_handle_t devfs_handle;      /*  For the directory */
-
-
 struct cardinfo {
 	int		card_number;
 	struct pci_dev	*dev;
@@ -1160,7 +1156,7 @@ int __init mm_init(void)
 		if (!mm_gendisk[i])
 			goto out;
 	}
-	devfs_handle = devfs_mk_dir(NULL, "umem", NULL);
+	devfs_mk_dir(NULL, "umem", NULL);
 
 	for (i = 0; i < num_cards; i++) {
 		struct gendisk *disk = mm_gendisk[i];
@@ -1201,9 +1197,7 @@ void __exit mm_cleanup(void)
 		del_gendisk(mm_gendisk[i]);
 		put_disk(mm_gendisk[i]);
 	}
-	if (devfs_handle)
-		devfs_unregister(devfs_handle);
-	devfs_handle = NULL;
+	devfs_remove("umem");
 
 	pci_unregister_driver(&mm_pci_driver);
 
