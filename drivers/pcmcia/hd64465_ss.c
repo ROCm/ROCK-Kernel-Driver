@@ -1,5 +1,5 @@
 /*
- * $Id$
+ * $Id: hd64465_ss.c,v 1.7 2003/07/06 14:42:50 lethal Exp $
  *
  * Device driver for the PCMCIA controller module of the
  * Hitachi HD64465 handheld companion chip.
@@ -24,7 +24,6 @@
  *
  * by Greg Banks <gbanks@pocketpenguins.com>
  * (c) 2000 PocketPenguins Inc
- *
  */
 
 #include <linux/types.h>
@@ -37,27 +36,25 @@
 #include <linux/vmalloc.h>
 #include <asm/errno.h>
 #include <linux/irq.h>
-#include <linux/workqueue.h>
+#include <linux/interrupt.h>
 #include <linux/device.h>
 
 #include <asm/io.h>
-#include <asm/hd64465.h>
+#include <asm/hd64465/hd64465.h>
+#include <asm/hd64465/io.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
 #include <pcmcia/cs.h>
+#include <pcmcia/cistpl.h>
+#include <pcmcia/ds.h>
 #include <pcmcia/ss.h>
 #include <pcmcia/bulkmem.h>
-#include <pcmcia/cistpl.h>
 #include "cs_internal.h"
 
 #define MODNAME "hd64465_ss"
 
 /* #define HD64465_DEBUG 1 */
-
-#ifndef HD64465_DEBUG
-#define HD64465_DEBUG 0
-#endif
 
 #if HD64465_DEBUG
 #define DPRINTK(args...)	printk(MODNAME ": " args)
@@ -66,7 +63,8 @@
 #endif
 
 extern int hd64465_io_debug;
-
+extern void * p3_ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags);
+extern void p3_iounmap(void *addr);
 
 /*============================================================*/
 
@@ -74,37 +72,22 @@ extern int hd64465_io_debug;
 
 typedef struct hs_socket_t
 {
+    unsigned int	number;
     u_int   	    	irq;
     u_long  	    	mem_base;
+    void		*io_base;
     u_long  	    	mem_length;
-    void	    	(*handler)(void *info, u_int events);
-    void    	    	*handler_info;
-    u_int   	    	pending_events;
     u_int   	    	ctrl_base;
     socket_state_t  	state;
     pccard_io_map     	io_maps[MAX_IO_WIN];
     pccard_mem_map  	mem_maps[MAX_WIN];
-    struct vm_struct	*io_vma;    /* allocated kernel vm for mapping IO space */
+    struct pcmcia_socket	socket;
 } hs_socket_t;
+
+
 
 #define HS_MAX_SOCKETS 2
 static hs_socket_t hs_sockets[HS_MAX_SOCKETS];
-static spinlock_t hs_pending_event_lock = SPIN_LOCK_UNLOCKED;
-
-/* Calculate socket number from ptr into hs_sockets[] */
-#define hs_sockno(sp) 	(sp - hs_sockets)
-
-static socket_cap_t hs_socket_cap =
-{
-    SS_CAP_PCCARD   	    /* support 16 bit cards */
-    |SS_CAP_STATIC_MAP      /* mappings are fixed in host memory */
-    ,
-    0xffde/*0xffff*/, 	    /* IRQs mapped in s/w so can do any, really */
-    HD64465_PCC_WINDOW,     /* 16MB fixed window size */
-    0,	    	    	    /* no PCI support */
-    0,	    	    	    /* no CardBus support */
-    0	    	    	    /* no bus operations needed */
-};
 
 #define hs_in(sp, r)	    inb((sp)->ctrl_base + (r))
 #define hs_out(sp, v, r)    outb(v, (sp)->ctrl_base + (r))
@@ -179,7 +162,7 @@ static void hs_socket_enable_ireq(hs_socket_t *sp)
 {
     	unsigned short cscier;
 	
-    	DPRINTK("hs_socket_enable_ireq(sock=%d)\n", hs_sockno(sp));
+    	DPRINTK("hs_socket_enable_ireq(sock=%d)\n", sp->number);
 
     	cscier = hs_in(sp, CSCIER);
 	cscier &= ~HD64465_PCCCSCIER_PIREQE_MASK;
@@ -191,7 +174,7 @@ static void hs_socket_disable_ireq(hs_socket_t *sp)
 {
     	unsigned short cscier;
 	
-    	DPRINTK("hs_socket_disable_ireq(sock=%d)\n", hs_sockno(sp));
+    	DPRINTK("hs_socket_disable_ireq(sock=%d)\n", sp->number);
 	
     	cscier = hs_in(sp, CSCIER);
 	cscier &= ~HD64465_PCCCSCIER_PIREQE_MASK;
@@ -255,7 +238,7 @@ static struct hw_interrupt_type hd64465_ss_irq_type = {
  */
 static void hs_map_irq(hs_socket_t *sp, unsigned int irq)
 {
-    	DPRINTK("hs_map_irq(sock=%d irq=%d)\n", hs_sockno(sp), irq);
+    	DPRINTK("hs_map_irq(sock=%d irq=%d)\n", sp->number, irq);
 	
 	if (irq >= HS_NUM_MAPPED_IRQS)
 	    return;
@@ -272,7 +255,7 @@ static void hs_map_irq(hs_socket_t *sp, unsigned int irq)
  */
 static void hs_unmap_irq(hs_socket_t *sp, unsigned int irq)
 {
-    	DPRINTK("hs_unmap_irq(sock=%d irq=%d)\n", hs_sockno(sp), irq);
+    	DPRINTK("hs_unmap_irq(sock=%d irq=%d)\n", sp->number, irq);
 	
 	if (irq >= HS_NUM_MAPPED_IRQS)
 	    return;
@@ -301,7 +284,7 @@ static int hs_set_voltages(hs_socket_t *sp, int Vcc, int Vpp)
 {
     	u_int psr;
 	u_int vcci = 0;
-	u_int sock = hs_sockno(sp);
+	u_int sock = sp->number;
 	
     	DPRINTK("hs_set_voltage(%d, %d, %d)\n", sock, Vcc, Vpp);
 
@@ -359,13 +342,12 @@ static void hs_reset_socket(hs_socket_t *sp, int on)
 
 /*============================================================*/
 
-static int hs_init(unsigned int sock)
+static int hs_init(struct pcmcia_socket *s)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 	
-    	DPRINTK("hs_init(%d)\n", sock);
+    	DPRINTK("hs_init(%d)\n", sp->number);
 	
-	sp->pending_events = 0;
 	sp->state.Vcc = 0;
 	sp->state.Vpp = 0;
 	hs_set_voltages(sp, 0, 0);
@@ -375,9 +357,12 @@ static int hs_init(unsigned int sock)
 
 /*============================================================*/
 
-static int hs_suspend(unsigned int sock)
+static int hs_suspend(struct pcmcia_socket *s)
 {
-    	DPRINTK("hs_suspend(%d)\n", sock);
+#ifdef HD64465_DEBUG
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
+    	DPRINTK("hs_suspend(%d)\n", sp->number);
+#endif
 
     	/* TODO */
 	
@@ -386,32 +371,10 @@ static int hs_suspend(unsigned int sock)
 
 /*============================================================*/
 
-static int hs_register_callback(unsigned int sock,
-    	    void (*handler)(void *, unsigned int), void * info)
+
+static int hs_get_status(struct pcmcia_socket *s, u_int *value)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
-	
-    	DPRINTK("hs_register_callback(%d)\n", sock);
-	sp->handler = handler;
-	sp->handler_info = info;
-	return 0;
-}
-
-/*============================================================*/
-
-static int hs_inquire_socket(unsigned int sock, socket_cap_t *cap)
-{
-    	DPRINTK("hs_inquire_socket(%d)\n", sock);
-
-	*cap = hs_socket_cap;
-	return 0;
-}
-
-/*============================================================*/
-
-static int hs_get_status(unsigned int sock, u_int *value)
-{
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
     	unsigned int isr;
 	u_int status = 0;
 	
@@ -473,9 +436,9 @@ static int hs_get_status(unsigned int sock, u_int *value)
 
 /*============================================================*/
 
-static int hs_get_socket(unsigned int sock, socket_state_t *state)
+static int hs_get_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 
     	DPRINTK("hs_get_socket(%d)\n", sock);
 	
@@ -485,9 +448,9 @@ static int hs_get_socket(unsigned int sock, socket_state_t *state)
 
 /*============================================================*/
 
-static int hs_set_socket(unsigned int sock, socket_state_t *state)
+static int hs_set_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
     	u_long flags;
 	u_int changed;
 	unsigned short cscier;
@@ -495,12 +458,12 @@ static int hs_set_socket(unsigned int sock, socket_state_t *state)
     	DPRINTK("hs_set_socket(sock=%d, flags=%x, csc_mask=%x, Vcc=%d, Vpp=%d, io_irq=%d)\n",
 	    sock, state->flags, state->csc_mask, state->Vcc, state->Vpp, state->io_irq);
 	
-	save_and_cli(flags);	/* Don't want interrupts happening here */
+	local_irq_save(flags);	/* Don't want interrupts happening here */
 
 	if (state->Vpp != sp->state.Vpp ||
 	    state->Vcc != sp->state.Vcc) {
 	    if (!hs_set_voltages(sp, state->Vcc, state->Vpp)) {
-	    	restore_flags(flags);
+	    	local_irq_restore(flags);
 	    	return -EINVAL;
 	    }
 	}
@@ -588,7 +551,7 @@ static int hs_set_socket(unsigned int sock, socket_state_t *state)
 /*    	hd64465_io_debug = 0; */
 	sp->state = *state;
 	    
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 #if HD64465_DEBUG > 10
 	if (state->flags & SS_OUTPUT_ENA)   
@@ -599,10 +562,11 @@ static int hs_set_socket(unsigned int sock, socket_state_t *state)
 
 /*============================================================*/
 
-static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
+static int hs_set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 	int map = io->map;
+	int sock = sp->number;
 	struct pccard_io_map *sio;
 	pgprot_t prot;
 
@@ -639,10 +603,9 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 	    printk(KERN_INFO MODNAME ": MAP_0WS unimplemented\n");
 
 	if (io->flags & MAP_ACTIVE) {
-	    unsigned long pstart, psize, paddrbase, vaddrbase;
+	    unsigned long pstart, psize, paddrbase;
 	    
 	    paddrbase = virt_to_phys((void*)(sp->mem_base + 2 * HD64465_PCC_WINDOW));
-	    vaddrbase = (unsigned long)sp->io_vma->addr;
 	    pstart = io->start & PAGE_MASK;
 	    psize = ((io->stop + PAGE_SIZE) & PAGE_MASK) - pstart;
 
@@ -653,26 +616,17 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 	     * page will be mapped.  But the code allows for weird cards
 	     * that might want IO ports > 4K.
 	     */
-	    DPRINTK("remap_page_range(vaddr=0x%08lx, paddr=0x%08lx, size=0x%08lxx)\n",
-	    	vaddrbase + pstart, paddrbase + pstart, psize);
-#error This does not work.  Firstly remap_page_range() uses current->mm for
-#error the address space, which is wrong for kernel mappings.  remap_page_range
-#error also does flush_{cache,tlb}_range() which ONLY works for user mappings.
-#error Next, remap_page_range() now wants to take a vm_area_struct arg.
-	    remap_page_range(vaddrbase + pstart, paddrbase + pstart, psize, prot);
+	    sp->io_base = p3_ioremap(paddrbase + pstart, psize, pgprot_val(prot));
 	    
 	    /*
 	     * Change the mapping used by inb() outb() etc
 	     */
-	    hd64465_port_map(
-	    	io->start,
+	    hd64465_port_map(io->start,
 		io->stop - io->start + 1,
-	    	vaddrbase + io->start,0);
+	    	(unsigned long)sp->io_base + io->start, 0);
 	} else {
-	    hd64465_port_unmap(
-	    	sio->start,
-		sio->stop - sio->start + 1);
-	    /* TODO: remap_page_range() to mark pages not present ? */
+	    hd64465_port_unmap(sio->start, sio->stop - sio->start + 1);
+	    p3_iounmap(sp->io_base);
 	}
 	
 	*sio = *io;
@@ -681,9 +635,9 @@ static int hs_set_io_map(unsigned int sock, struct pccard_io_map *io)
 
 /*============================================================*/
 
-static int hs_set_mem_map(unsigned int sock, struct pccard_mem_map *mem)
+static int hs_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 {
-    	hs_socket_t *sp = &hs_sockets[sock];
+    	hs_socket_t *sp = container_of(s, struct hs_socket_t, socket);
 	struct pccard_mem_map *smem;
 	int map = mem->map;
 	unsigned long paddr, size;
@@ -722,13 +676,6 @@ static int hs_set_mem_map(unsigned int sock, struct pccard_mem_map *mem)
 
 /*============================================================*/
 
-static void hs_proc_setup(unsigned int sock, struct proc_dir_entry *base)
-{
-    	DPRINTK("hs_proc_setup(%d)\n", sock);
-}
-
-/*============================================================*/
-
 /*
  * This function is registered with the HD64465 glue code to do a
  * secondary demux step on the PCMCIA interrupts.  It handles 
@@ -756,35 +703,9 @@ static int hs_irq_demux(int irq, void *dev)
 
 /*
  * Interrupt handling routine.
- *
- * This uses the schedule_work() technique to cause reportable events
- * such as card insertion and removal to be handled in keventd's
- * process context.
  */
  
-
-static void hs_events_bh(void *dummy)
-{
-	hs_socket_t *sp;
-	u_int events;
-	int i;
-
-	for (i=0; i<HS_MAX_SOCKETS; i++) {
-	    sp = &hs_sockets[i];
-
-	    spin_lock_irq(&hs_pending_event_lock);
-	    events = sp->pending_events;
-	    sp->pending_events = 0;
-	    spin_unlock_irq(&hs_pending_event_lock);
-	    
-	    if (sp->handler)
-		sp->handler(sp->handler_info, events);
-	}
-}
-
-static DECLARE_WORK(hs_events_task, hs_events_bh, NULL);
-
-static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
+static irqreturn_t hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
     	hs_socket_t *sp = (hs_socket_t *)dev;
 	u_int events = 0;
@@ -801,7 +722,7 @@ static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    if ((hs_in(sp, ISR) & HD64465_PCCISR_PCD_MASK) != 0) {
 	    	printk(KERN_NOTICE MODNAME
 		    ": socket %d, card not a supported card type or not inserted correctly\n",
-		    hs_sockno(sp));
+		    sp->number);
 		/* Don't do the rest unless a card is present */
 		cscr &= ~(HD64465_PCCCSCR_PCDC|
 		    	  HD64465_PCCCSCR_PRC|
@@ -839,34 +760,22 @@ static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 
 	hs_out(sp, cscr, CSCR);
 
-	if (events) {
-	    /*
-    	     * Arrange for events to be reported to the registered
-	     * event handler function (from CardServices) in a process
-	     * context (keventd) "soon".
-	     */
-	    spin_lock(&hs_pending_event_lock);
-	    sp->pending_events |= events;
-	    spin_unlock(&hs_pending_event_lock);
-	    
-	    schedule_work(&hs_events_task);
-	}
+	if (events)
+		pcmcia_parse_events(&sp->socket, events);
+
+	return IRQ_HANDLED;
 }
 
 /*============================================================*/
 
 static struct pccard_operations hs_operations = {
-	.owner			= THIS_MODULE,
 	.init			= hs_init,
 	.suspend		= hs_suspend,
-	.register_callback	= hs_register_callback,
-	.inquire_socket		= hs_inquire_socket,
 	.get_status		= hs_get_status,
 	.get_socket		= hs_get_socket,
 	.set_socket		= hs_set_socket,
 	.set_io_map		= hs_set_io_map,
 	.set_mem_map		= hs_set_mem_map,
-	.proc_setup		= hs_proc_setup,
 };
 
 static int hs_init_socket(hs_socket_t *sp, int irq, unsigned long mem_base,
@@ -886,9 +795,6 @@ static int hs_init_socket(hs_socket_t *sp, int irq, unsigned long mem_base,
 	for (i=0 ; i<MAX_WIN ; i++)
 	    sp->mem_maps[i].map = i;
 	
-	if ((sp->io_vma = get_vm_area(HS_IO_MAP_SIZE, VM_IOREMAP)) == 0)
-	    return -ENOMEM;
-
 	hd64465_register_irq_demux(sp->irq, hs_irq_demux, sp);
 	
     	if ((err = request_irq(sp->irq, hs_interrupt, SA_INTERRUPT, MODNAME, sp)) < 0)
@@ -925,9 +831,8 @@ static int hs_init_socket(hs_socket_t *sp, int irq, unsigned long mem_base,
 	
 	hs_reset_socket(sp, 1);
 
-	printk(KERN_INFO "HD64465 PCMCIA bridge socket %d at 0x%08lx irq %d io window %ldK@0x%08lx\n",
-	    	i, sp->mem_base, sp->irq,
-		sp->io_vma->size>>10, (unsigned long)sp->io_vma->addr);
+	printk(KERN_INFO "HD64465 PCMCIA bridge socket %d at 0x%08lx irq %d\n",
+	    	i, sp->mem_base, sp->irq);
 
     	return 0;
 }
@@ -935,7 +840,10 @@ static int hs_init_socket(hs_socket_t *sp, int irq, unsigned long mem_base,
 static void hs_exit_socket(hs_socket_t *sp)
 {
     	unsigned short cscier, gcr;
+	unsigned long flags;
 	
+	local_irq_save(flags);
+
 	/* turn off interrupts in hardware */
     	cscier = hs_in(sp, CSCIER);
 	cscier = (cscier & IER_MASK) | IER_OFF;
@@ -955,19 +863,13 @@ static void hs_exit_socket(hs_socket_t *sp)
 	    free_irq(sp->irq, hs_interrupt);
     	    hd64465_unregister_irq_demux(sp->irq);
 	}
-	if (sp->io_vma != 0)
-	    vfree(sp->io_vma->addr);
-}
 
-static struct pcmcia_socket_class_data hd64465_data = {
-	.nsock = HS_MAX_SOCKETS,
-	.ops = &hs_operations,
-};
+	local_irq_restore(flags);
+}
 
 static struct device_driver hd64465_driver = {
 	.name = "hd64465-pcmcia",
 	.bus = &platform_bus_type,
-	.devclass = &pcmcia_socket_class,
 	.suspend = pcmcia_socket_dev_suspend,
 	.resume = pcmcia_socket_dev_resume,
 };
@@ -996,7 +898,8 @@ static int __init init_hs(void)
 	}
 
 /*	hd64465_io_debug = 1; */
-	register_driver(&hd64465_driver);
+	if (driver_register(&hd64465_driver))
+		return -EINVAL;
 	
 	/* Wake both sockets out of STANDBY mode */
 	/* TODO: wait 15ms */
@@ -1014,14 +917,22 @@ static int __init init_hs(void)
 	v |= HD64465_PCCCSCR_PSWSEL;
 	outb(v, HD64465_REG_PCC0CSCR);
 
-    	hs_set_voltages(&hs_sockets[0], 0, 0);
-    	hs_set_voltages(&hs_sockets[1], 0, 0);
-	
 	/*
 	 * Setup hs_sockets[] structures and request system resources.
 	 * TODO: on memory allocation failure, power down the socket
 	 *       before quitting.
 	 */
+	for (i=0; i<HS_MAX_SOCKETS; i++) {
+		hs_set_voltages(&hs_sockets[i], 0, 0);
+
+		hs_sockets[i].socket.features |=  SS_CAP_PCCARD | SS_CAP_STATIC_MAP;      /* mappings are fixed in host memory */
+		hs_sockets[i].socket.irq_mask =  0xffde;/*0xffff*/	    /* IRQs mapped in s/w so can do any, really */
+		hs_sockets[i].socket.map_size = HD64465_PCC_WINDOW;     /* 16MB fixed window size */
+
+		hs_sockets[i].socket.owner = THIS_MODULE;
+		hs_sockets[i].socket.ss_entry = &hs_operations;
+	}
+
 	i = hs_init_socket(&hs_sockets[0],
 	    HD64465_IRQ_PCMCIA0,
 	    HD64465_PCC0_BASE,
@@ -1040,27 +951,31 @@ static int __init init_hs(void)
 	}
 
 /*	hd64465_io_debug = 0; */
-	hd64465_device.dev.class_data = &hd64465_data;
+
 	platform_device_register(&hd64465_device);
 
-	return 0;
+	for (i=0; i<HS_MAX_SOCKETS; i++) {
+		unsigned int ret;
+		hs_sockets[i].socket.dev.dev = &hd64465_device.dev;		
+		hs_sockets[i].number = i;
+		ret = pcmcia_register_socket(&hs_sockets[i].socket);
+		if (ret && i)
+			pcmcia_unregister_socket(&hs_sockets[0].socket);
+	}
+
+    	return 0;
 }
 
 static void __exit exit_hs(void)
 {
-    	u_long flags;
 	int i;
-	
-	save_and_cli(flags);
 
-    	/*
-	 * Release kernel resources
-	 */
-	for (i=0 ; i<HS_MAX_SOCKETS ; i++)
-	    hs_exit_socket(&hs_sockets[i]);
+	for (i=0 ; i<HS_MAX_SOCKETS ; i++) {
+		pcmcia_unregister_socket(&hs_sockets[i].socket);
+		hs_exit_socket(&hs_sockets[i]);
+	}
+
 	platform_device_unregister(&hd64465_device);
-	
-	restore_flags(flags);
 	unregister_driver(&hd64465_driver);
 }
 

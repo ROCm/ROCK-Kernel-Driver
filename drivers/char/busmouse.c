@@ -357,25 +357,23 @@ int register_busmouse(struct busmouse *ops)
 {
 	unsigned int msedev = MINOR_TO_MOUSE(ops->minor);
 	struct busmouse_data *mse;
-	int ret;
+	int ret = -EINVAL;
 
 	if (msedev >= NR_MICE) {
 		printk(KERN_ERR "busmouse: trying to allocate mouse on minor %d\n",
 		       ops->minor);
-		return -EINVAL;
+		goto out;
 	}
 
+	ret = -ENOMEM;
 	mse = kmalloc(sizeof(*mse), GFP_KERNEL);
 	if (!mse)
-		return -ENOMEM;
+		goto out;
 
 	down(&mouse_sem);
+	ret = -EBUSY;
 	if (busmouse_data[msedev])
-	{
-		up(&mouse_sem);
-		kfree(mse);
-		return -EBUSY;
-	}
+		goto freemem;
 
 	memset(mse, 0, sizeof(*mse));
 
@@ -386,14 +384,22 @@ int register_busmouse(struct busmouse *ops)
 	mse->lock = (spinlock_t)SPIN_LOCK_UNLOCKED;
 	init_waitqueue_head(&mse->wait);
 
-	busmouse_data[msedev] = mse;
 
 	ret = misc_register(&mse->miscdev);
-	if (!ret)
-		ret = msedev;
+
+	if (ret < 0) 
+		goto freemem;
+
+	busmouse_data[msedev] = mse;
+	ret = msedev;
+out:
 	up(&mouse_sem);
-	
 	return ret;
+
+
+freemem:
+	kfree(mse);
+	goto out;
 }
 
 /**

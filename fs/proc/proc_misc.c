@@ -536,7 +536,8 @@ static ssize_t read_profile(struct file *file, char *buf,
 		buf++; p++; count--; read++;
 	}
 	pnt = (char *)prof_buffer + p - sizeof(unsigned int);
-	copy_to_user(buf,(void *)pnt,count);
+	if (copy_to_user(buf,(void *)pnt,count))
+		return -EFAULT;
 	read += count;
 	*ppos += read;
 	return read;
