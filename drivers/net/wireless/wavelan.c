@@ -24,28 +24,6 @@
 
 /*------------------------------------------------------------------*/
 /*
- * Wrapper for disabling interrupts and locking the driver.
- * (note : inline, so optimised away)
- */
-static inline void wv_splhi(net_local *		lp,
-			    unsigned long *	pflags)
-{
-	spin_lock_irqsave(&lp->spinlock, *pflags);
-	/* Note : above does the cli(); itself */
-}
-
-/*------------------------------------------------------------------*/
-/*
- * Wrapper for re-enabling interrupts and un-locking the driver.
- */
-static inline void wv_splx(net_local *		lp,
-			   unsigned long *	pflags)
-{
-	spin_unlock_irqrestore(&lp->spinlock, *pflags);
-}
-
-/*------------------------------------------------------------------*/
-/*
  * Translate irq number to PSA irq parameter
  */
 static u8 wv_irq_to_psa(int irq)
@@ -870,10 +848,10 @@ static inline void wv_82586_reconfig(device * dev)
 
 	/* Check if we can do it now ! */
 	if((netif_running(dev)) && !(netif_queue_stopped(dev))) {
-		wv_splhi(lp, &flags);
+		spin_lock_irqsave(&lp->spinlock, flags);
 		/* May fail */
 		wv_82586_config(dev);
-		wv_splx(lp, &flags);
+		spin_unlock_irqrestore(&lp->spinlock, flags);
 	}
 	else {
 #ifdef DEBUG_CONFIG_INFO
@@ -1814,7 +1792,7 @@ static int wavelan_set_nwid(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Set NWID in WaveLAN. */
 	if (!wrqu->nwid.disabled) {
@@ -1851,7 +1829,7 @@ static int wavelan_set_nwid(struct net_device *dev,
 	update_psa_checksum(dev, ioaddr, lp->hacr);
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -1872,7 +1850,7 @@ static int wavelan_get_nwid(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Read the NWID. */
 	psa_read(ioaddr, lp->hacr,
@@ -1883,7 +1861,7 @@ static int wavelan_get_nwid(struct net_device *dev,
 	wrqu->nwid.fixed = 1;	/* Superfluous */
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -1903,7 +1881,7 @@ static int wavelan_set_freq(struct net_device *dev,
 	int ret;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Attempt to recognise 2.00 cards (2.4 GHz frequency selectable). */
 	if (!(mmc_in(ioaddr, mmroff(0, mmr_fee_status)) &
@@ -1913,7 +1891,7 @@ static int wavelan_set_freq(struct net_device *dev,
 		ret = -EOPNOTSUPP;
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -1934,7 +1912,7 @@ static int wavelan_get_freq(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Attempt to recognise 2.00 cards (2.4 GHz frequency selectable).
 	 * Does it work for everybody, especially old cards? */
@@ -1959,7 +1937,7 @@ static int wavelan_get_freq(struct net_device *dev,
 	}
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -1980,7 +1958,7 @@ static int wavelan_set_sens(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Set the level threshold. */
 	/* We should complain loudly if wrqu->sens.fixed = 0, because we
@@ -1995,7 +1973,7 @@ static int wavelan_set_sens(struct net_device *dev,
 		psa.psa_thr_pre_set);
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -2016,7 +1994,7 @@ static int wavelan_get_sens(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Read the level threshold. */
 	psa_read(ioaddr, lp->hacr,
@@ -2026,7 +2004,7 @@ static int wavelan_get_sens(struct net_device *dev,
 	wrqu->sens.fixed = 1;
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -2047,7 +2025,7 @@ static int wavelan_set_encode(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 
 	/* Check if capable of encryption */
 	if (!mmc_encr(ioaddr)) {
@@ -2096,7 +2074,7 @@ static int wavelan_set_encode(struct net_device *dev,
 	}
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -2117,7 +2095,7 @@ static int wavelan_get_encode(struct net_device *dev,
 	int ret = 0;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Check if encryption is available */
 	if (!mmc_encr(ioaddr)) {
@@ -2143,7 +2121,7 @@ static int wavelan_get_encode(struct net_device *dev,
 	}
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -2191,7 +2169,7 @@ static int wavelan_get_range(struct net_device *dev,
 	range->bitrate[0] = 2000000;	/* 2 Mb/s */
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	/* Attempt to recognise 2.00 cards (2.4 GHz frequency selectable). */
 	if (!(mmc_in(ioaddr, mmroff(0, mmr_fee_status)) &
@@ -2213,7 +2191,7 @@ static int wavelan_get_range(struct net_device *dev,
 	}
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return ret;
 }
@@ -2320,7 +2298,7 @@ static int wavelan_set_qthr(struct net_device *dev,
 	unsigned long flags;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	psa.psa_quality_thr = *(extra) & 0x0F;
 	psa_write(ioaddr, lp->hacr,
@@ -2332,7 +2310,7 @@ static int wavelan_set_qthr(struct net_device *dev,
 		psa.psa_quality_thr);
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return 0;
 }
@@ -2352,7 +2330,7 @@ static int wavelan_get_qthr(struct net_device *dev,
 	unsigned long flags;
 
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	psa_read(ioaddr, lp->hacr,
 		 (char *) &psa.psa_quality_thr - (char *) &psa,
@@ -2360,7 +2338,7 @@ static int wavelan_get_qthr(struct net_device *dev,
 	*(extra) = psa.psa_quality_thr & 0x0F;
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	return 0;
 }
@@ -2541,7 +2519,7 @@ static iw_stats *wavelan_get_wireless_stats(device * dev)
 		return (iw_stats *) NULL;
 	
 	/* Disable interrupts and save flags. */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	wstats = &lp->wstats;
 
@@ -2569,7 +2547,7 @@ static iw_stats *wavelan_get_wireless_stats(device * dev)
 	wstats->discard.misc = 0L;
 
 	/* Enable interrupts and restore flags. */
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 #ifdef DEBUG_IOCTL_TRACE
 	printk(KERN_DEBUG "%s: <-wavelan_get_wireless_stats()\n",
@@ -2903,7 +2881,7 @@ static inline int wv_packet_write(device * dev, void *buf, short length)
 	if (clen < ETH_ZLEN)
 		clen = ETH_ZLEN;
 
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 
 	/* Check nothing bad has happened */
 	if (lp->tx_n_in_use == (NTXBLOCKS - 1)) {
@@ -2911,7 +2889,7 @@ static inline int wv_packet_write(device * dev, void *buf, short length)
 		printk(KERN_INFO "%s: wv_packet_write(): Tx queue full.\n",
 		       dev->name);
 #endif
-		wv_splx(lp, &flags);
+		spin_unlock_irqrestore(&lp->spinlock, flags);
 		return 1;
 	}
 
@@ -2989,7 +2967,7 @@ static inline int wv_packet_write(device * dev, void *buf, short length)
 	if (lp->tx_n_in_use < NTXBLOCKS - 1)
 		netif_wake_queue(dev);
 
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 	
 #ifdef DEBUG_TX_INFO
 	wv_packet_info((u8 *) buf, length, dev->name,
@@ -3030,9 +3008,9 @@ static int wavelan_packet_xmit(struct sk_buff *skb, device * dev)
 	 * we can do it now.
 	 */
 	if (lp->reconfig_82586) {
-		wv_splhi(lp, &flags);
+		spin_lock_irqsave(&lp->spinlock, flags);
 		wv_82586_config(dev);
-		wv_splx(lp, &flags);
+		spin_unlock_irqrestore(&lp->spinlock, flags);
 		/* Check that we can continue */
 		if (lp->tx_n_in_use == (NTXBLOCKS - 1))
 			return 1;
@@ -3892,7 +3870,7 @@ static void wavelan_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Prevent reentrancy. We need to do that because we may have
 	 * multiple interrupt handler running concurrently.
-	 * It is safe because wv_splhi() disables interrupts before acquiring
+	 * It is safe because interrupts are disabled before acquiring
 	 * the spinlock. */
 	spin_lock(&lp->spinlock);
 
@@ -4020,7 +3998,7 @@ static void wavelan_watchdog(device *	dev)
 		return;
 	}
 
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 
 	/* Try to see if some buffers are not free (in case we missed
 	 * an interrupt */
@@ -4060,7 +4038,7 @@ static void wavelan_watchdog(device *	dev)
 	if (lp->tx_n_in_use < NTXBLOCKS - 1)
 		netif_wake_queue(dev);
 
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 	
 #ifdef DEBUG_INTERRUPT_TRACE
 	printk(KERN_DEBUG "%s: <-wavelan_watchdog()\n", dev->name);
@@ -4107,7 +4085,7 @@ static int wavelan_open(device * dev)
 		return -EAGAIN;
 	}
 
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	
 	if (wv_hw_reset(dev) != -1) {
 		netif_start_queue(dev);
@@ -4118,10 +4096,10 @@ static int wavelan_open(device * dev)
 		       "%s: wavelan_open(): impossible to start the card\n",
 		       dev->name);
 #endif
-		wv_splx(lp, &flags);
+		spin_unlock_irqrestore(&lp->spinlock, flags);
 		return -EAGAIN;
 	}
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 	
 #ifdef DEBUG_CALLBACK_TRACE
 	printk(KERN_DEBUG "%s: <-wavelan_open()\n", dev->name);
@@ -4149,9 +4127,9 @@ static int wavelan_close(device * dev)
 	/*
 	 * Flush the Tx and disable Rx.
 	 */
-	wv_splhi(lp, &flags);
+	spin_lock_irqsave(&lp->spinlock, flags);
 	wv_82586_stop(dev);
-	wv_splx(lp, &flags);
+	spin_unlock_irqrestore(&lp->spinlock, flags);
 
 	free_irq(dev->irq, dev);
 

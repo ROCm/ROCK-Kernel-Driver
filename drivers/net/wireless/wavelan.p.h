@@ -521,12 +521,6 @@ struct net_local
 /**************************** PROTOTYPES ****************************/
 
 /* ----------------------- MISC. SUBROUTINES ------------------------ */
-static inline void
-	wv_splhi(net_local *,		/* Disable interrupts, lock driver */
-		 unsigned long *);	/* flags */
-static inline void
-	wv_splx(net_local *,		/* Enable interrupts, unlock driver */
-		unsigned long *);	/* flags */
 static u_char
 	wv_irq_to_psa(int);
 static int

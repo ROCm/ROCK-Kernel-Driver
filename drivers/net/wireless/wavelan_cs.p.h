@@ -680,12 +680,6 @@ void wv_roam_cleanup(struct net_device *dev);
 #endif	/* WAVELAN_ROAMING */
 
 /* ----------------------- MISC SUBROUTINES ------------------------ */
-static inline void
-	wv_splhi(net_local *,		/* Disable interrupts */
-		 unsigned long *);	/* flags */
-static inline void
-	wv_splx(net_local *,		/* ReEnable interrupts */
-		unsigned long *);	/* flags */
 static void
 	cs_error(client_handle_t,	/* Report error to cardmgr */
 		 int,
