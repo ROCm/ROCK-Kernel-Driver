@@ -2688,9 +2688,9 @@ int ide_cdrom_drive_status (struct cdrom_device_info *cdi, int slot_nr)
 	 */
 	if (sense.sense_key == NOT_READY) {
 		if (sense.asc == 0x3a) {
-			if (sense.ascq == 0 || sense.ascq == 1)
+			if (sense.ascq == 1)
 				return CDS_NO_DISC;
-			else if (sense.ascq == 2)
+			else if (sense.ascq == 0 || sense.ascq == 2)
 				return CDS_TRAY_OPEN;
 		}
 	}
