@@ -321,15 +321,15 @@ hfc_fill_fifo(struct BCState *bcs)
 		bcs->tx_cnt -= count;
 		if (PACKET_NOACK == bcs->tx_skb->pkt_type)
 			count = -1;
-		dev_kfree_skb_any(bcs->tx_skb);
+
+		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+		hscx_sched_event(bcs, B_CMPLREADY);
 		bcs->tx_skb = NULL;
 		if (bcs->mode != L1_MODE_TRANS) {
 		  WaitForBusy(cs);
 		  WaitNoBusy(cs);
 		  cs->BC_Read_Reg(cs, HFC_DATA, HFC_CIP | HFC_F1_INC | HFC_SEND | HFC_CHANNEL(bcs->channel));
 		}
-		if (bcs->st->lli.l1writewakeup && (count >= 0))
-			bcs->st->lli.l1writewakeup(bcs->st, count);
 		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
 	restore_flags(flags);

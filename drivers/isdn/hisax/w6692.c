@@ -366,14 +366,10 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 			if (bcs->tx_skb->len) {
 				W6692B_fill_fifo(bcs);
 				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-				 (PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.w6692.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.w6692.count = 0;
-				bcs->tx_skb = NULL;
 			}
+			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+			W6692B_sched_event(bcs, B_CMPLREADY);
+			bcs->hw.w6692.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 			bcs->hw.w6692.count = 0;

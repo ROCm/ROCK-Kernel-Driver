@@ -278,8 +278,6 @@ struct Layer3 {
 struct LLInterface {
 	void (*l3l4) (struct PStack *, int, void *);
 	void *userdata;
-	void (*l1writewakeup) (struct PStack *, int);
-	void (*l2writewakeup) (struct PStack *, int);
 };
 
 
@@ -489,8 +487,9 @@ struct BCState {
 	struct IsdnCardState *cs;
 	int tx_cnt;		/* B-Channel transmit counter */
 	struct sk_buff *tx_skb; /* B-Channel transmit Buffer */
-	struct sk_buff_head rqueue;	/* B-Channel receive Queue */
-	struct sk_buff_head squeue;	/* B-Channel send Queue */
+	struct sk_buff_head rqueue;	/* B-Channel receive queue */
+	struct sk_buff_head squeue;	/* B-Channel send queue */
+	struct sk_buff_head cmpl_queue;	/* B-Channel send complete queue */
 	struct PStack *st;
 	u_char *blog;
 	u_char *conmsg;

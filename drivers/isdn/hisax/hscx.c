@@ -169,6 +169,7 @@ close_hscxstate(struct BCState *bcs)
 		}
 		skb_queue_purge(&bcs->rqueue);
 		skb_queue_purge(&bcs->squeue);
+		skb_queue_purge(&bcs->cmpl_queue);
 		if (bcs->tx_skb) {
 			dev_kfree_skb_any(bcs->tx_skb);
 			bcs->tx_skb = NULL;
@@ -197,6 +198,7 @@ open_hscxstate(struct IsdnCardState *cs, struct BCState *bcs)
 		}
 		skb_queue_head_init(&bcs->rqueue);
 		skb_queue_head_init(&bcs->squeue);
+		skb_queue_head_init(&bcs->cmpl_queue);
 	}
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);

@@ -460,14 +460,10 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 			if (bcs->tx_skb->len) {
 				hdlc_fill_fifo(bcs);
 				return;
-			} else {
-				if (bcs->st->lli.l1writewakeup &&
-					(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hdlc.count);
-				dev_kfree_skb_irq(bcs->tx_skb);
-				bcs->hw.hdlc.count = 0;
-				bcs->tx_skb = NULL;
 			}
+			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+			hdlc_sched_event(bcs, B_CMPLREADY);
+			bcs->hw.hdlc.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 			bcs->hw.hdlc.count = 0;

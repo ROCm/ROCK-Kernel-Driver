@@ -751,35 +751,29 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
   
 	if (istab &0x20) {	// RFO
 		if (cs->debug &L1_DEB_WARN) 
-      debugl1(cs, "bch_int() B-%d: RFO error", hscx);
-	  cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
+			debugl1(cs, "bch_int() B-%d: RFO error", hscx);
+		cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
 	}
 
 	if (istab &0x10) {	// XPR
 		if (bcs->tx_skb) {
 			if (bcs->tx_skb->len) {
-		    bch_fill_fifo(bcs);
-        goto afterXPR;
-      }
-      else {
-				if (bcs->st->lli.l1writewakeup &&
-					  (PACKET_NOACK != bcs->tx_skb->pkt_type)) {    
-					bcs->st->lli.l1writewakeup(bcs->st, bcs->hw.hscx.count);
-        }  
-			  dev_kfree_skb_irq(bcs->tx_skb);
-			  bcs->hw.hscx.count = 0; 
-			  bcs->tx_skb = NULL;
-      }
-    }    
-    if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
-      bcs->hw.hscx.count = 0;
-      set_bit(BC_FLG_BUSY, &bcs->Flag);
-      bch_fill_fifo(bcs);
-    } else {
-      clear_bit(BC_FLG_BUSY, &bcs->Flag);
-      bch_sched_event(bcs, B_XMTBUFREADY);
-    }
-  }
+				bch_fill_fifo(bcs);
+				goto afterXPR;
+			}
+			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+			bch_sched_event(bcs, B_CMPLREADY);
+			bcs->hw.hscx.count = 0; 
+		}
+		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
+			bcs->hw.hscx.count = 0;
+			set_bit(BC_FLG_BUSY, &bcs->Flag);
+			bch_fill_fifo(bcs);
+		} else {
+			clear_bit(BC_FLG_BUSY, &bcs->Flag);
+			bch_sched_event(bcs, B_XMTBUFREADY);
+		}
+	}
   afterXPR:
 
 	if (istab &0x04) {	// XDU

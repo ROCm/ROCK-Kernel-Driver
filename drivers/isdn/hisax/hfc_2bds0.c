@@ -367,10 +367,8 @@ hfc_fill_fifo(struct BCState *bcs)
 		printk(KERN_WARNING "HFC S FIFO channel %d BUSY Error\n", bcs->channel);
 	} else {
 		bcs->tx_cnt -= bcs->tx_skb->len;
-		if (bcs->st->lli.l1writewakeup &&
-			(PACKET_NOACK != bcs->tx_skb->pkt_type))
-			bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
-		dev_kfree_skb_any(bcs->tx_skb);
+		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+		hscx_sched_event(bcs, B_CMPLREADY);
 		bcs->tx_skb = NULL;
 	}
 	WaitForBusy(cs);

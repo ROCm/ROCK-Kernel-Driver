@@ -299,14 +299,9 @@ modem_fill(struct BCState *bcs) {
 		if (bcs->tx_skb->len) {
 			write_modem(bcs);
 			return;
-		} else {
-			if (bcs->st->lli.l1writewakeup &&
-				(PACKET_NOACK != bcs->tx_skb->pkt_type))
-					bcs->st->lli.l1writewakeup(bcs->st,
-						bcs->hw.hscx.count);
-			dev_kfree_skb_any(bcs->tx_skb);
-			bcs->tx_skb = NULL;
 		}
+		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+		hscx_sched_event(bcs, B_CMPLREADY);
 	}
 	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 		bcs->hw.hscx.count = 0;

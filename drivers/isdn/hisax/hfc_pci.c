@@ -742,16 +742,14 @@ hfcpci_fill_fifo(struct BCState *bcs)
 		memcpy(dst, src, count);
 	}
 	bcs->tx_cnt -= bcs->tx_skb->len;
-	if (bcs->st->lli.l1writewakeup &&
-	    (PACKET_NOACK != bcs->tx_skb->pkt_type))
-		bcs->st->lli.l1writewakeup(bcs->st, bcs->tx_skb->len);
+	skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+	hscx_sched_event(bcs, B_CMPLREADY);
 
 	cli();
 	bz->za[new_f1].z1 = cpu_to_le16(new_z1);	/* for next buffer */
 	bz->f1 = new_f1;	/* next frame */
 	restore_flags(flags);
 
-	dev_kfree_skb_any(bcs->tx_skb);
 	bcs->tx_skb = NULL;
 	test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	return;

@@ -528,8 +528,7 @@ static inline void hdlc_xpr_irq(struct fritz_bcs *bcs)
 	}
 	bcs->tx_cnt = 0;
 	bcs->tx_skb = NULL;
-	B_L1L2(bcs, PH_DATA | CONFIRM, (void *) skb->truesize);
-	dev_kfree_skb_irq(skb);
+	B_L1L2(bcs, PH_DATA | CONFIRM, skb);
 }
 
 static void hdlc_irq_one(struct fritz_bcs *bcs, u32 stat)

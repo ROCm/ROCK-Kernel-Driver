@@ -1294,8 +1294,7 @@ hfcpci_b_xmit_irq(struct hfcpci_adapter *adapter, int nr)
 	}
 
 	bcs->tx_skb = NULL;
-	B_L1L2(bcs, PH_DATA | CONFIRM, (void *) skb->truesize);
-	dev_kfree_skb_irq(skb);
+	B_L1L2(bcs, PH_DATA | CONFIRM, skb);
 }
 
 // ----------------------------------------------------------------------
