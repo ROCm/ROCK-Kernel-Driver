@@ -985,6 +985,8 @@ static inline int check_sticky(struct inode *dir, struct inode *inode)
  *  7. If we were asked to remove a directory and victim isn't one - ENOTDIR.
  *  8. If we were asked to remove a non-directory and victim isn't one - EISDIR.
  *  9. We can't remove a root or mountpoint.
+ * 10. We don't allow removal of NFS sillyrenamed files; it's handled by
+ *     nfs_async_unlink().
  */
 static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
 {
@@ -1008,6 +1010,8 @@ static inline int may_delete(struct inode *dir,struct dentry *victim, int isdir)
 		return -EISDIR;
 	if (IS_DEADDIR(dir))
 		return -ENOENT;
+	if (victim->d_flags & DCACHE_NFSFS_RENAMED)
+		return -EBUSY;
 	return 0;
 }
 

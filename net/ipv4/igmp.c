@@ -387,8 +387,17 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 		if (type == IGMPV3_ALLOW_NEW_SOURCES ||
 		    type == IGMPV3_BLOCK_OLD_SOURCES)
 			return skb;
-		if (pmc->crcount || isquery)
+		if (pmc->crcount || isquery) {
+			/* make sure we have room for group header and at
+			 * least one source.
+			 */
+			if (skb && AVAILABLE(skb) < sizeof(struct igmpv3_grec)+
+			    sizeof(__u32)) {
+				igmpv3_sendpack(skb);
+				skb = 0; /* add_grhead will get a new one */
+			}
 			skb = add_grhead(skb, pmc, type, &pgr);
+		}
 		return skb;
 	}
 	pih = skb ? (struct igmpv3_report *)skb->h.igmph : 0;
