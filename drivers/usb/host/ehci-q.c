@@ -360,11 +360,17 @@ halt:
 	if (unlikely (stopped != 0)
 			/* some EHCI 0.95 impls will overlay dummy qtds */ 
 			|| qh->hw_qtd_next == EHCI_LIST_END) {
-		qh_update (ehci, qh,
-			list_empty (&qh->qtd_list)
-				? qh->dummy
-				: list_entry (qh->qtd_list.next,
-					struct ehci_qtd, qtd_list));
+		if (list_empty (&qh->qtd_list))
+			end = qh->dummy;
+		else {
+			end = list_entry (qh->qtd_list.next,
+					struct ehci_qtd, qtd_list);
+			/* first qtd may already be partially processed */
+			if (cpu_to_le32 (end->qtd_dma) == qh->hw_current)
+				end = 0;
+		}
+		if (end)
+			qh_update (ehci, qh, end);
 	}
 
 	return count;
