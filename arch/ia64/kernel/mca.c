@@ -67,8 +67,7 @@
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #include <linux/kdbprivate.h>	/* for switch state wrappers */
-#include "entry.h"		/* for pNonSys */
-#define p5		5	/* from unwind.c, needed for pNonSys */
+#include "entry.h"		/* for PRED_NON_SYSCALL */
 #include <linux/delay.h>
 #endif	/* CONFIG_KDB */
 
@@ -943,6 +942,10 @@ ia64_mca_ucmc_handler(void)
 			&ia64_sal_to_os_handoff_state,
 			&ia64_os_to_sal_handoff_state)); 
 
+#ifdef	CONFIG_KDB
+	kdba_mca_init(SAL_INFO_TYPE_MCA, psp, recover);
+#endif	/* CONFIG_KDB */
+
 	if (recover) {
 		sal_log_record_header_t *rh = IA64_LOG_CURR_BUFFER(SAL_INFO_TYPE_MCA);
 		rh->severity = sal_log_severity_corrected;
@@ -1009,10 +1012,6 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 			cmc_polling_enabled = 1;
 			spin_unlock(&cmc_history_lock);
 			schedule_work(&cmc_disable_work);
-
-#ifdef	CONFIG_KDB
-	kdba_mca_init(SAL_INFO_TYPE_MCA, psp, recover);
-#endif	/* CONFIG_KDB */
 
 			/*
 			 * Corrected errors will still be corrected, but
@@ -1624,7 +1623,7 @@ kdba_release_init_slave_stack(struct pt_regs *regs)
 	if (ia64_init_slave_stack.lock == current) {
 		kdb_save_running(regs);
 		if (!KDB_IS_RUNNING())
-			kdb_printf("%s: INIT slave tripped on cpu %d when not in kdb, probably lost the INIT monarch event\n",
+			kdb_printf("%s: INIT slave tripped on cpu %d when not in kdb, should never happen\n",
 				__FUNCTION__, smp_processor_id());
 		__asm__ __volatile__ ("mov ar.rsc=0;;" ::: "memory");
 		ia64_init_slave_stack.lock = NULL;
@@ -1698,6 +1697,7 @@ kdba_mca_bspstore_fixup(const sal_processor_static_info_t *s)
 	u64 *new_bspstore, *new_bsp;
 	u64 new_bsp_pa, ia64_mca_bspstore_pa;
 	u64 sof, slots;
+	struct ia64_mca_cpu *mca_cpu;
 
 	asm volatile (";;flushrs;; mov %0=ar.bsp;;" : "=r"(new_bsp));
 
@@ -1706,14 +1706,17 @@ kdba_mca_bspstore_fixup(const sal_processor_static_info_t *s)
          * that is not the same as ia64_mca_bspstore but it still points to the
          * same physical page as ia64_mca_bspstore.  Check the physical address
          * instead of the virtual one.
+	 *
+	 * FIXME: is this WAR still required with per cpu data areas?
          */
 
 	new_bsp_pa = ia64_tpa((u64)new_bsp);
-	ia64_mca_bspstore_pa = ia64_tpa((u64)&ia64_mca_bspstore[0]);
+	ia64_mca_bspstore_pa = __get_cpu_var(ia64_mca_data) + offsetof(struct ia64_mca_cpu, rbstore);
+	kdb_printf("%s: ia64_mca_data 0x%lx offsetof %lx ia64_mca_bspstore_pa 0x%lx __va() %p\n", __FUNCTION__, __get_cpu_var(ia64_mca_data), offsetof(struct ia64_mca_cpu, rbstore), ia64_mca_bspstore_pa, __va(ia64_mca_bspstore_pa)); /*temp*/
         if (new_bsp_pa < ia64_mca_bspstore_pa ||
-            new_bsp_pa >= ia64_mca_bspstore_pa + sizeof(ia64_mca_bspstore)) {
-		kdb_printf("%s: MCA is not using ia64_mca_bspstore, no fixup done [0x%p]\n",
-			__FUNCTION__, new_bsp);
+            new_bsp_pa >= ia64_mca_bspstore_pa + sizeof(mca_cpu->rbstore)) {
+		kdb_printf("%s: MCA is not using local_cpu_data ia64_mca_cpu rbstore, no fixup done [0x%p 0x%lx]\n",
+			__FUNCTION__, new_bsp, new_bsp_pa);
                 return;
         }
 
@@ -1721,7 +1724,7 @@ kdba_mca_bspstore_fixup(const sal_processor_static_info_t *s)
         old_bsp = (u64 *)(s->ar[17]);
         sof = s->ar[64] & 0x7f;         /* from ar.pfs at time of MCA */
         slots = ia64_rse_num_regs(old_bspstore, old_bsp) + sof;
-        new_bspstore = ia64_mca_bspstore;
+        new_bspstore = ((struct ia64_mca_cpu *)(__va(__get_cpu_var(ia64_mca_data))))->rbstore;
         new_bsp = ia64_rse_skip_regs(new_bspstore, slots);
 	
 	if (KDBA_MCA_TRACE_TEST())
@@ -1806,21 +1809,21 @@ kdba_mca_init(int sal_info_type, pal_processor_state_info_t *psp, int recover)
 	}
 
 	/* unwind.c::unw_unwind() does special processing for interrupt frames.
-	 * It checks if the pNonSys predicate is set, if the predicate is clear
-	 * then unw_unwind() does _not_ adjust bsp over pt_regs.  Not that this
-	 * is documented, of course.
+	 * It checks if the PRED_NON_SYSCALL predicate is set, if the predicate
+	 * is clear then unw_unwind() does _not_ adjust bsp over pt_regs.  Not
+	 * that this is documented, of course.
 	 *
-	 * pNonSys is normally set by minstate.h::SAVE_MIN.  The MCA handler
-	 * does not use SAVE_MIN; the INIT monarch handler uses SAVE_MIN but
-	 * experience has shown that the pt_regs is useless, it reflects the
-	 * call from SAL to ia64_monarch_init_handler, not the registers at the
-	 * time INIT was received.
+	 * PRED_NON_SYSCALL is normally set by minstate.h::SAVE_MIN.  The MCA
+	 * handler does not use SAVE_MIN; the INIT monarch handler uses
+	 * SAVE_MIN but experience has shown that the pt_regs is useless, it
+	 * reflects the call from SAL to ia64_monarch_init_handler, not the
+	 * registers at the time INIT was received.
 	 *
 	 * Not only do we have to synthesize our own pt_regs for MCA and INIT,
-	 * we must set the pNonSys predicate ourselves, otherwise unwind gets
-	 * intermittent errors :(
+	 * we must set the PRED_NON_SYSCALL predicate ourselves, otherwise
+	 * unwind gets intermittent errors :(
 	 */
-	regs.pr = m->pmsa_pr | (1UL << pNonSys);
+	regs.pr = m->pmsa_pr | (1UL << PRED_NON_SYSCALL);
 	regs.b0 = m->pmsa_br0;
 
 	regs.b6 = s->br[6];

@@ -1,3 +1,23 @@
+2005-03-03 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.11-ia64-1.
+
+2005-02-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.11-rc4-ia64-1.
+
+2005-02-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.11-rc3-bk4-ia64-1.
+
+2005-02-03 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.11-rc3-ia64-1.
+
+2005-01-27 Keith Owens  <kaos@sgi.com>
+
+	* kdb-v4.4-2.6.11-rc2-ia64-1.
+
 2005-01-20 Keith Owens  <kaos@sgi.com>
 
 	* MCA and INIT stacks moved to per-cpu area.

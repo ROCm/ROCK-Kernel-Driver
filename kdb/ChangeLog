@@ -1,3 +1,27 @@
+2005-03-03 Keith Owens  <kaos@sgi.com>
+
+	* Add kdb to drivers/serial/8250_early.c.  Francois Wellenreiter, Bull.
+	* kdb v4.4-2.6.11-common-1.
+
+2005-02-14 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc4-common-1.
+
+2005-02-08 Keith Owens  <kaos@sgi.com>
+
+	* kdb v4.4-2.6.11-rc3-bk4-common-1.
+
+2005-02-03 Keith Owens  <kaos@sgi.com>
+
+	* Print more superblock fields.  Nathan Scott, SGI.
+	* Remove kallsyms correction for modules, Linus took it.
+	* kdb v4.4-2.6.11-rc3-common-1.
+
+2005-01-27 Keith Owens  <kaos@sgi.com>
+
+	* Add bio command.  Nathan Scott, SGI.
+	* kdb v4.4-2.6.11-rc2-common-1.
+
 2005-01-20 Keith Owens  <kaos@sgi.com>
 
 	* Include kallsyms correction for modules until Linus takes it.

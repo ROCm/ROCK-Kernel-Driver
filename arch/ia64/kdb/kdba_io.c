@@ -188,7 +188,7 @@ serial_inp_standard(const struct kdb_serial *kdb_serial, int offset)
 
 	switch (kdb_serial->io_type) {
 	case SERIAL_IO_MEM:
-		return readb(kdb_serial->iobase + offset);
+		return readb((void __iomem *)(kdb_serial->iobase + offset));
 		break;
 	default:
 		return inb(kdb_serial->iobase + offset);
@@ -209,7 +209,7 @@ get_serial_char_standard(void)
 		switch (kdb_serial.io_type) {
 		case SERIAL_IO_MEM:
 			writeb((UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR |
-				UART_FCR_CLEAR_XMIT), fifon);
+				UART_FCR_CLEAR_XMIT), (void __iomem *)fifon);
 			break;
 		default:
 			outb((UART_FCR_ENABLE_FIFO | UART_FCR_CLEAR_RCVR |

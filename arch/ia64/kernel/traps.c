@@ -538,7 +538,7 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		      case 36: siginfo.si_code = TRAP_TRACE; ifa = 0; break;
 		}
 #ifdef	CONFIG_KDB
-		if (!user_mode(regs) && kdb(KDB_REASON_DEBUG, vector, regs))
+		if (!user_mode(&regs) && kdb(KDB_REASON_DEBUG, vector, &regs))
 			return;	/* kdb handled this */
 #endif	/* CONFIG_KDB */
 		siginfo.si_signo = SIGTRAP;

@@ -38,8 +38,13 @@ static char *pg_flag_vals[] = {
 static char *bh_state_vals[] = {
 	"Uptodate", "Dirty", "Lock", "Req",
 	"Mapped", "New", "Async_read", "Async_write",
-	"Delay", "Boundary", "Write_EIO",
+	"Delay", "Boundary", "Write_EIO", "Ordered", "Eopnotsupp",
 	"Private",
+	NULL };
+
+static char *bio_flag_vals[] = {
+	"Uptodate", "RW_block", "EOF", "Seg_valid",
+	"Cloned", "Bounced", "User_mapped", "Eopnotsupp",
 	NULL };
 
 static char *inode_flag_vals[] = {
@@ -112,6 +117,68 @@ kdbm_buffers(int argc, const char **argv, const char **envp,
 	return 0;
 }
 
+int
+print_biovec(struct bio_vec *vec, int vcount)
+{
+	struct bio_vec bvec;
+	unsigned long addr;
+	int diag;
+	int i;
+
+	if (vcount < 1 || vcount > BIO_MAX_PAGES) {
+		kdb_printf("  [skipped iovecs, vcnt is %d]\n", vcount);
+		return 0;
+	}
+
+	addr = (unsigned long)vec;
+	for (i = 0; i < vcount; i++) {
+		if ((diag = kdb_getarea(bvec, addr)))
+			return(diag);
+		addr += sizeof(bvec);
+		kdb_printf("  [%d] page 0x%p length=%u offset=%u\n",
+			i, bvec.bv_page, bvec.bv_len, bvec.bv_offset);
+	}
+	return 0;
+}
+
+static int
+kdbm_bio(int argc, const char **argv, const char **envp,
+	struct pt_regs *regs)
+{
+	struct bio bio;
+	unsigned long addr;
+	long offset = 0;
+	int nextarg;
+	int diag;
+
+	if (argc != 1)
+		return KDB_ARGCOUNT;
+
+	nextarg = 1;
+	if ((diag = kdbgetaddrarg(argc, argv, &nextarg, &addr, &offset, NULL, regs)) ||
+	    (diag = kdb_getarea(bio, addr)))
+		return(diag);
+
+	kdb_printf("bio at 0x%lx\n", addr);
+	kdb_printf("  bno %llu  next 0x%p  dev 0x%x\n",
+		(unsigned long long)bio.bi_sector,
+		bio.bi_next, bio.bi_bdev ? bio.bi_bdev->bd_dev : 0);
+	kdb_printf("  vcnt %u vec 0x%p  rw 0x%lx flags 0x%lx [%s]\n",
+		bio.bi_vcnt, bio.bi_io_vec, bio.bi_rw, bio.bi_flags,
+		map_flags(bio.bi_flags, bio_flag_vals));
+	print_biovec(bio.bi_io_vec, bio.bi_vcnt);
+	kdb_printf("  count %d  private 0x%p\n",
+		atomic_read(&bio.bi_cnt), bio.bi_private);
+	kdb_printf("  bi_end_io ");
+	if (bio.bi_end_io)
+		kdb_symbol_print(kdba_funcptr_value(bio.bi_end_io), NULL, KDB_SP_VALUE);
+	else
+		kdb_printf("(NULL)");
+	kdb_printf("\n");
+
+	return 0;
+}
+
 #ifndef CONFIG_DISCONTIGMEM
 static char *page_flags(unsigned long flags)
 {
@@ -156,6 +223,8 @@ kdbm_page(int argc, const char **argv, const char **envp,
 	kdb_printf("  virtual 0x%p\n", page_address((struct page *)addr));
 	if (page_has_buffers(&page))
 		kdb_printf("  buffers 0x%p\n", page_buffers(&page));
+	else
+		kdb_printf("  private 0x%lx\n", page.private);
 
 	return 0;
 }
@@ -452,6 +521,7 @@ kdbm_sb(int argc, const char **argv, const char **envp,
 	kdb_printf(" s_flags 0x%lx s_root 0x%p\n", sb->s_flags, sb->s_root);
 	kdb_printf(" s_dirt %d s_dirty.next 0x%p s_dirty.prev 0x%p\n",
 		sb->s_dirt, sb->s_dirty.next, sb->s_dirty.prev);
+	kdb_printf(" s_frozen %d s_id [%s]\n", sb->s_frozen, sb->s_id);
 out:
 	if (sb)
 		kfree(sb);
@@ -535,6 +605,7 @@ static int __init kdbm_pg_init(void)
 	kdb_register("inode", kdbm_inode, "<vaddr>", "Display inode", 0);
 	kdb_register("sb", kdbm_sb, "<vaddr>", "Display super_block", 0);
 	kdb_register("bh", kdbm_buffers, "<buffer head address>", "Display buffer", 0);
+	kdb_register("bio", kdbm_bio, "<bio address>", "Display bio", 0);
 	kdb_register("inode_pages", kdbm_inode_pages, "<inode *>", "Display pages in an inode", 0);
 	kdb_register("req", kdbm_request, "<vaddr>", "dump request struct", 0);
 	kdb_register("rqueue", kdbm_rqueue, "<vaddr>", "dump request queue", 0);
@@ -554,6 +625,7 @@ static void __exit kdbm_pg_exit(void)
 	kdb_unregister("inode");
 	kdb_unregister("sb");
 	kdb_unregister("bh");
+	kdb_unregister("bio");
 	kdb_unregister("inode_pages");
 	kdb_unregister("req");
 	kdb_unregister("rqueue");
