@@ -4225,7 +4225,7 @@ perfmon_init_percpu (void)
 	 */
 	for (i=1; (pfm_pmc_desc[i].type & PFM_REG_END) == 0;  i++) {
 		if ((pfm_pmc_desc[i].type & PFM_REG_IMPL) == 0) continue;
-		ia64_set_pmc(i, PMC_DFL_VAL(i));
+		ia64_set_pmc(i, pfm_pmc_desc[i].default_value);
 	}
 	for (i=0; (pfm_pmd_desc[i].type & PFM_REG_END) == 0; i++) {
 		if ((pfm_pmd_desc[i].type & PFM_REG_IMPL) == 0) continue;
