@@ -227,7 +227,7 @@ static struct proc_dir_entry * irq_dir[NR_IRQS];
 #ifdef CONFIG_SMP 
 static struct proc_dir_entry * smp_affinity_entry[NR_IRQS];
 static char irq_user_affinity[NR_IRQS];
-static unsigned long irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = ~0UL };
+static cpumask_t irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 
 static void
 select_smp_affinity(int irq)
@@ -238,15 +238,13 @@ select_smp_affinity(int irq)
 	if (! irq_desc[irq].handler->set_affinity || irq_user_affinity[irq])
 		return;
 
-	while (((cpu_present_mask >> cpu) & 1) == 0)
+	while (!cpu_possible(cpu))
 		cpu = (cpu < (NR_CPUS-1) ? cpu + 1 : 0);
 	last_cpu = cpu;
 
-	irq_affinity[irq] = 1UL << cpu;
-	irq_desc[irq].handler->set_affinity(irq, 1UL << cpu);
+	irq_affinity[irq] = cpumask_of_cpu(cpu);
+	irq_desc[irq].handler->set_affinity(irq, cpumask_of_cpu(cpu));
 }
-
-#define HEX_DIGITS 16
 
 static int
 irq_affinity_read_proc (char *page, char **start, off_t off,
@@ -259,67 +257,28 @@ irq_affinity_read_proc (char *page, char **start, off_t off,
 	return len;
 }
 
-static unsigned int
-parse_hex_value (const char __user *buffer,
-		 unsigned long count, unsigned long *ret)
-{
-	unsigned char hexnum [HEX_DIGITS];
-	unsigned long value;
-	unsigned long i;
-
-	if (!count)
-		return -EINVAL;
-	if (count > HEX_DIGITS)
-		count = HEX_DIGITS;
-	if (copy_from_user(hexnum, buffer, count))
-		return -EFAULT;
-
-	/*
-	 * Parse the first 8 characters as a hex string, any non-hex char
-	 * is end-of-string. '00e1', 'e1', '00E1', 'E1' are all the same.
-	 */
-	value = 0;
-
-	for (i = 0; i < count; i++) {
-		unsigned int c = hexnum[i];
-
-		switch (c) {
-			case '0' ... '9': c -= '0'; break;
-			case 'a' ... 'f': c -= 'a'-10; break;
-			case 'A' ... 'F': c -= 'A'-10; break;
-		default:
-			goto out;
-		}
-		value = (value << 4) | c;
-	}
-out:
-	*ret = value;
-	return 0;
-}
-
 static int
 irq_affinity_write_proc(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
-	unsigned long new_value;
+	cpumask_t new_value;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 
 	/* The special value 0 means release control of the
 	   affinity to kernel.  */
-	if (new_value == 0) {
+	cpus_and(new_value, new_value, cpu_online_map);
+	if (cpus_empty(new_value)) {
 		irq_user_affinity[irq] = 0;
 		select_smp_affinity(irq);
 	}
 	/* Do not allow disabling IRQs completely - it's a too easy
 	   way to make the system unusable accidentally :-) At least
 	   one online CPU still has to be targeted.  */
-	else if (!(new_value & cpu_present_mask))
-		return -EINVAL;
 	else {
 		irq_affinity[irq] = new_value;
 		irq_user_affinity[irq] = 1;
@@ -344,10 +303,10 @@ static int
 prof_cpu_mask_write_proc(struct file *file, const char __user *buffer,
 			 unsigned long count, void *data)
 {
-	unsigned long *mask = (unsigned long *) data, full_count = count, err;
-	unsigned long new_value;
+	unsigned long full_count = count, err;
+	cpumask_t new_value, *mask = (cpumask_t *)data;
 
-	err = parse_hex_value(buffer, count, &new_value);
+	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
 
