@@ -6,7 +6,7 @@
  *                       <medaglia@undl.org.br>                            *
  *                       http://cadu.homelinux.com:8080/                   *
  *                                                                         *
- * DAC Magnitude, DAC sign, exposure and green gain controls added by      *
+ * DAC Magnitude, exposure and green gain controls added by                *
  * Luca Risolia <luca.risolia@studio.unibo.it>                             *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
@@ -95,14 +95,23 @@ static int pas202bcb_get_ctrl(struct sn9c102_device* cam,
 		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0c)) < 0)
 			return -EIO;
 		return 0;
-	case SN9C102_V4L2_CID_DAC_SIGN:
-		if ((ctrl->value = sn9c102_i2c_read(cam, 0x0b)) < 0)
-			return -EIO;
-		ctrl->value &= 0x01;
-		return 0;
 	default:
 		return -EINVAL;
 	}
+}
+
+
+static int pas202bcb_set_pix_format(struct sn9c102_device* cam, 
+                                    const struct v4l2_pix_format* pix)
+{
+	int err = 0;
+
+	if (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
+		err += sn9c102_write_reg(cam, 0x24, 0x17);
+	else
+		err += sn9c102_write_reg(cam, 0x20, 0x17);
+
+	return err;
 }
 
 
@@ -130,13 +139,6 @@ static int pas202bcb_set_ctrl(struct sn9c102_device* cam,
 		break;
 	case SN9C102_V4L2_CID_DAC_MAGNITUDE:
 		err += sn9c102_i2c_write(cam, 0x0c, ctrl->value);
-		break;
-	case SN9C102_V4L2_CID_DAC_SIGN:
-		{
-			int r;
-			err += (r = sn9c102_i2c_read(cam, 0x0b)) < 0 ? r : 0;
-			err += sn9c102_i2c_write(cam, 0x0b, r | ctrl->value);
-		}
 		break;
 	default:
 		return -EINVAL;
@@ -166,10 +168,10 @@ static struct sn9c102_sensor pas202bcb = {
 	.name = "PAS202BCB",
 	.maintainer = "Carlos Eduardo Medaglia Dyonisio "
 	              "<medaglia@undl.org.br>",
+	.sysfs_ops = SN9C102_I2C_READ | SN9C102_I2C_WRITE,
 	.frequency = SN9C102_I2C_400KHZ | SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_2WIRES,
-	.slave_read_id = 0x40,
-	.slave_write_id = 0x40,
+	.i2c_slave_id = 0x40,
 	.init = &pas202bcb_init,
 	.qctrl = {
 		{
@@ -178,7 +180,7 @@ static struct sn9c102_sensor pas202bcb = {
 			.name = "exposure",
 			.minimum = 0x01e5,
 			.maximum = 0x3fff,
-			.step = 0x01,
+			.step = 0x0001,
 			.default_value = 0x01e5,
 			.flags = 0,
 		},
@@ -232,16 +234,6 @@ static struct sn9c102_sensor pas202bcb = {
 			.default_value = 0x04,
 			.flags = 0,
 		},
-		{
-			.id = SN9C102_V4L2_CID_DAC_SIGN,
-			.type = V4L2_CTRL_TYPE_BOOLEAN,
-			.name = "DAC sign",
-			.minimum = 0x00,
-			.maximum = 0x01,
-			.step = 0x01,
-			.default_value = 0x01,
-			.flags = 0,
-		},
 	},
 	.get_ctrl = &pas202bcb_get_ctrl,
 	.set_ctrl = &pas202bcb_set_ctrl,
@@ -265,7 +257,8 @@ static struct sn9c102_sensor pas202bcb = {
 		.height = 480,
 		.pixelformat = V4L2_PIX_FMT_SBGGR8,
 		.priv = 8,
-	}
+	},
+	.set_pix_format = &pas202bcb_set_pix_format
 };
 
 
@@ -286,7 +279,7 @@ int sn9c102_probe_pas202bcb(struct sn9c102_device* cam)
 
 	r0 = sn9c102_i2c_try_read(cam, &pas202bcb, 0x00);
 	r1 = sn9c102_i2c_try_read(cam, &pas202bcb, 0x01);
-	
+
 	if (r0 < 0 || r1 < 0)
 		return -EIO;
 
