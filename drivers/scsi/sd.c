@@ -1334,6 +1334,7 @@ static int __init init_sd(void)
 			       SD_MAJOR(i));
 		else
 			majors++;
+	}
 
 	if (!majors)
 		return -ENODEV;
