@@ -55,33 +55,10 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <linux/time.h>
 
 #include <asm/param.h>
-
-/*
- * The following defines establish the engineering parameters of the PLL
- * model. The HZ variable establishes the timer interrupt frequency, 100 Hz
- * for the SunOS kernel, 256 Hz for the Ultrix kernel and 1024 Hz for the
- * OSF/1 kernel. The SHIFT_HZ define expresses the same value as the
- * nearest power of two in order to avoid hardware multiply operations.
- */
-#if HZ >= 12 && HZ < 24
-# define SHIFT_HZ	4
-#elif HZ >= 24 && HZ < 48
-# define SHIFT_HZ	5
-#elif HZ >= 48 && HZ < 96
-# define SHIFT_HZ	6
-#elif HZ >= 96 && HZ < 192
-# define SHIFT_HZ	7
-#elif HZ >= 192 && HZ < 384
-# define SHIFT_HZ	8
-#elif HZ >= 384 && HZ < 768
-# define SHIFT_HZ	9
-#elif HZ >= 768 && HZ < 1536
-# define SHIFT_HZ	10
-#else
-# error You lose.
-#endif
+#include <asm/timex.h>
 
 /*
  * SHIFT_KG and SHIFT_KF establish the damping of the PLL and are chosen
@@ -151,41 +128,6 @@
 #define PPS_VALID 120		/* pps signal watchdog max (s) */
 #define MAXGLITCH 30		/* pps signal glitch max (s) */
 
-/*
- * Pick up the architecture specific timex specifications
- */
-#include <asm/timex.h>
-
-/* LATCH is used in the interval timer and ftape setup. */
-#define LATCH  ((CLOCK_TICK_RATE + HZ/2) / HZ)	/* For divider */
-
-/* Suppose we want to devide two numbers NOM and DEN: NOM/DEN, the we can
- * improve accuracy by shifting LSH bits, hence calculating:
- *     (NOM << LSH) / DEN
- * This however means trouble for large NOM, because (NOM << LSH) may no
- * longer fit in 32 bits. The following way of calculating this gives us
- * some slack, under the following conditions:
- *   - (NOM / DEN) fits in (32 - LSH) bits.
- *   - (NOM % DEN) fits in (32 - LSH) bits.
- */
-#define SH_DIV(NOM,DEN,LSH) (   ((NOM / DEN) << LSH)                    \
-                             + (((NOM % DEN) << LSH) + DEN / 2) / DEN)
-
-/* HZ is the requested value. ACTHZ is actual HZ ("<< 8" is for accuracy) */
-#define ACTHZ (SH_DIV (CLOCK_TICK_RATE, LATCH, 8))
-
-/* TICK_NSEC is the time between ticks in nsec assuming real ACTHZ */
-#define TICK_NSEC (SH_DIV (1000000UL * 1000, ACTHZ, 8))
-
-/* TICK_USEC is the time between ticks in usec assuming fake USER_HZ */
-#define TICK_USEC ((1000000UL + USER_HZ/2) / USER_HZ)
-
-/* TICK_USEC_TO_NSEC is the time between ticks in nsec assuming real ACTHZ and	*/
-/* a value TUSEC for TICK_USEC (can be set bij adjtimex)		*/
-#define TICK_USEC_TO_NSEC(TUSEC) (SH_DIV (TUSEC * USER_HZ * 1000, ACTHZ, 8))
-
-
-#include <linux/time.h>
 /*
  * syscall interface - used (mainly by NTP daemon)
  * to discipline kernel clock oscillator
