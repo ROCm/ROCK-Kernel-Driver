@@ -4,7 +4,7 @@
 
 obj-y := config.o
 
-EXTRA_TARGETS := $(BOARD)/bootlogo.rh $(BOARD)/crt0_$(MODEL).o
+extra-y := $(BOARD)/bootlogo.rh $(BOARD)/crt0_$(MODEL).o
 
 $(obj)/$(BOARD)/bootlogo.rh: $(src)/bootlogo.h
 	perl $(src)/../68328/bootlogo.pl < $(src)/bootlogo.h \

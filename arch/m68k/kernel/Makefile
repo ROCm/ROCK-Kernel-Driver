@@ -3,9 +3,9 @@
 #
 
 ifndef CONFIG_SUN3
-  EXTRA_TARGETS := head.o
+  extra-y := head.o
 else
-  EXTRA_TARGETS := sun3-head.o
+  extra-y := sun3-head.o
 endif 
 
 obj-y		:= entry.o process.o traps.o ints.o signal.o ptrace.o \

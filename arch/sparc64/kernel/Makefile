@@ -5,7 +5,7 @@
 EXTRA_AFLAGS := -ansi
 EXTRA_CFLAGS := -Werror
 
-EXTRA_TARGETS	:= head.o init_task.o
+extra-y		:= head.o init_task.o
 
 obj-y		:= process.o setup.o cpu.o idprom.o \
 		   traps.o devices.o auxio.o \

@@ -64,7 +64,7 @@ targets 		+= zImage zImage.initrd imagesize.c \
 			   $(patsubst $(obj)/%,%, $(call src-sec, $(required) $(initrd))) \
 			   $(patsubst $(obj)/%,%, $(call gz-sec, $(required) $(initrd))) \
 			   vmlinux.sm vmlinux.initrd vmlinux.sminitrd
-EXTRA_TARGETS		:= sysmap.o initrd.o
+extra-y			:= sysmap.o initrd.o
 
 quiet_cmd_sysmap = SYSMAP   $@
       cmd_sysmap = $(obj)/addSystemMap System.map $< $@

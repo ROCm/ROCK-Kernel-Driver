@@ -4,7 +4,8 @@
 
 head-y			:= head.o
 head-$(CONFIG_PARISC64)	:= head64.o
-EXTRA_TARGETS	:= init_task.o pdc_cons.o process.o unaligned.o $(head-y)
+extra-y			:= init_task.o pdc_cons.o process.o
+			   unaligned.o $(head-y)
 
 AFLAGS_entry.o	:= -traditional
 AFLAGS_pacache.o := -traditional
