@@ -182,6 +182,9 @@ static int print_unex=1;
 #include <linux/device.h>
 #include <linux/buffer_head.h>		/* for invalidate_buffers() */
 
+#ifdef CONFIG_PPC_PMAC
+#include <asm/processor.h>
+#endif
 /*
  * PS/2 floppies have much slower step rates than regular floppies.
  * It's been recommended that take about 1/4 of the default speed
@@ -4236,6 +4239,12 @@ int __init floppy_init(void)
 	int i,unit,drive;
 	int err;
 
+#ifdef CONFIG_PPC_PMAC
+	if(_machine == _MACH_Pmac) {
+		printk("%s: nothing to do on PowerMac\n",__FUNCTION__);
+		return -ENODEV;
+	}
+#endif
 	raw_cmd = NULL;
 
 	for (i=0; i<N_DRIVE; i++) {
