@@ -657,7 +657,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 		if (request_resource(root, res) == 0)
 			return;
 		printk(KERN_INFO "yenta %s: Preassigned resource %d busy, reconfiguring...\n",
-				socket->dev->slot_name, nr);
+				pci_name(socket->dev), nr);
 		res->start = res->end = 0;
 	}
 
@@ -697,7 +697,7 @@ static void yenta_allocate_res(struct yenta_socket *socket, int nr, unsigned typ
 		align = size;
 	} while (size >= min);
 	printk(KERN_INFO "yenta %s: no resource of type %x available, trying to continue...\n",
-			socket->dev->slot_name, type);
+			pci_name(socket->dev), type);
 	res->start = res->end = 0;
 }
 

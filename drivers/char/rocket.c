@@ -2202,7 +2202,7 @@ __init int register_PCI(int i, struct pci_dev *dev)
 		ctlp->AiopNumChan[aiop] = ports_per_aiop;
 
 	printk("Comtrol PCI controller #%d ID 0x%x found in bus:slot:fn %s at address %04lx, "
-	     "%d AIOP(s) (%s)\n", i, dev->device, dev->slot_name,
+	     "%d AIOP(s) (%s)\n", i, dev->device, pci_name(dev),
 	     rcktpt_io_addr[i], num_aiops, rocketModel[i].modelString);
 	printk(KERN_INFO "Installing %s, creating /dev/ttyR%d - %ld\n",
 	       rocketModel[i].modelString,

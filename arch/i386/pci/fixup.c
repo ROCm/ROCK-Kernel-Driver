@@ -15,7 +15,7 @@ static void __devinit pci_fixup_i450nx(struct pci_dev *d)
 	int pxb, reg;
 	u8 busno, suba, subb;
 
-	printk(KERN_WARNING "PCI: Searching for i450NX host bridges on %s\n", d->slot_name);
+	printk(KERN_WARNING "PCI: Searching for i450NX host bridges on %s\n", pci_name(d));
 	reg = 0xd0;
 	for(pxb=0; pxb<2; pxb++) {
 		pci_read_config_byte(d, reg++, &busno);
@@ -38,7 +38,7 @@ static void __devinit pci_fixup_i450gx(struct pci_dev *d)
 	 */
 	u8 busno;
 	pci_read_config_byte(d, 0x4a, &busno);
-	printk(KERN_INFO "PCI: i440KX/GX host bridge %s: secondary bus %02x\n", d->slot_name, busno);
+	printk(KERN_INFO "PCI: i440KX/GX host bridge %s: secondary bus %02x\n", pci_name(d), busno);
 	pci_scan_bus(busno, &pci_root_ops, NULL);
 	pcibios_last_bus = -1;
 }
@@ -51,7 +51,7 @@ static void __devinit  pci_fixup_umc_ide(struct pci_dev *d)
 	 */
 	int i;
 
-	printk(KERN_WARNING "PCI: Fixing base address flags for device %s\n", d->slot_name);
+	printk(KERN_WARNING "PCI: Fixing base address flags for device %s\n", pci_name(d));
 	for(i=0; i<4; i++)
 		d->resource[i].flags |= PCI_BASE_ADDRESS_SPACE_IO;
 }
@@ -63,7 +63,7 @@ static void __devinit  pci_fixup_ncr53c810(struct pci_dev *d)
 	 * Fix class to be PCI_CLASS_STORAGE_SCSI
 	 */
 	if (!d->class) {
-		printk(KERN_WARNING "PCI: fixing NCR 53C810 class code for %s\n", d->slot_name);
+		printk(KERN_WARNING "PCI: fixing NCR 53C810 class code for %s\n", pci_name(d));
 		d->class = PCI_CLASS_STORAGE_SCSI << 8;
 	}
 }
@@ -77,7 +77,7 @@ static void __devinit pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	DBG("PCI: IDE base address fixup for %s\n", d->slot_name);
+	DBG("PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {
@@ -95,7 +95,7 @@ static void __devinit  pci_fixup_ide_trash(struct pci_dev *d)
 	 * There exist PCI IDE controllers which have utter garbage
 	 * in first four base registers. Ignore that.
 	 */
-	DBG("PCI: IDE base address trash cleared for %s\n", d->slot_name);
+	DBG("PCI: IDE base address trash cleared for %s\n", pci_name(d));
 	for(i=0; i<4; i++)
 		d->resource[i].start = d->resource[i].end = d->resource[i].flags = 0;
 }

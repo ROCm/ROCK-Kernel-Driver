@@ -746,7 +746,7 @@ static int __devinit saa7134_initdev(struct pci_dev *pci_dev,
         pci_read_config_byte(pci_dev, PCI_LATENCY_TIMER,  &dev->pci_lat);
         printk(KERN_INFO "%s: found at %s, rev: %d, irq: %d, "
 	       "latency: %d, mmio: 0x%lx\n", dev->name,
-	       pci_dev->slot_name, dev->pci_rev, pci_dev->irq,
+	       pci_name(pci_dev), dev->pci_rev, pci_dev->irq,
 	       dev->pci_lat,pci_resource_start(pci_dev,0));
 	pci_set_master(pci_dev);
 	if (!pci_dma_supported(pci_dev,0xffffffff)) {

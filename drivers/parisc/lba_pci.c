@@ -670,7 +670,7 @@ lba_claim_dev_resources(struct pci_dev *dev)
 		if (dev->resource[i].flags & srch_flags) {
 			pci_claim_resource(dev, i);
 			DBG("   claimed %s %d [%lx,%lx]/%x\n",
-				dev->slot_name, i,
+				pci_name(dev), i,
 				dev->resource[i].start,
 				dev->resource[i].end,
 				(int) dev->resource[i].flags

@@ -2007,7 +2007,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		strncpy(info.driver, "eepro100", sizeof(info.driver)-1);
 		strncpy(info.version, version, sizeof(info.version)-1);
 		if (sp && sp->pdev)
-			strcpy(info.bus_info, sp->pdev->slot_name);
+			strcpy(info.bus_info, pci_name(sp->pdev));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

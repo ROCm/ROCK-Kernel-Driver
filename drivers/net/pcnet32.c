@@ -1588,7 +1588,7 @@ static int pcnet32_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
 		if (lp->pci_dev)
-			strcpy (info.bus_info, lp->pci_dev->slot_name);
+			strcpy (info.bus_info, pci_name(lp->pci_dev));
 		else
 			sprintf(info.bus_info, "VLB 0x%lx", dev->base_addr);
 		if (copy_to_user (useraddr, &info, sizeof (info)))

@@ -128,7 +128,7 @@ static int orinoco_tmd_init_one(struct pci_dev *pdev,
 
 	printk(KERN_DEBUG
 	       "Detected Orinoco/Prism2 TMD device at %s irq:%d, io addr:0x%lx\n",
-	       pdev->slot_name, pdev->irq, pccard_ioaddr);
+	       pci_name(pdev), pdev->irq, pccard_ioaddr);
 
 	hermes_struct_init(&(priv->hw), dev->base_addr,
 			HERMES_IO, HERMES_16BIT_REGSPACING);

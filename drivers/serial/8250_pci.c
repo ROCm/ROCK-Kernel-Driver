@@ -103,7 +103,7 @@ static void moan_device(const char *str, struct pci_dev *dev)
 	       KERN_WARNING "message (0x%04x,0x%04x,0x%04x,0x%04x), the\n"
 	       KERN_WARNING "manufacturer and name of serial board or\n"
 	       KERN_WARNING "modem board to rmk+serial@arm.linux.org.uk.\n",
-	       dev->slot_name, str, dev->vendor, dev->device,
+	       pci_name(dev), str, dev->vendor, dev->device,
 	       dev->subsystem_vendor, dev->subsystem_device);
 }
 

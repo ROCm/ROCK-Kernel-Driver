@@ -37,7 +37,7 @@ struct ethtool_drvinfo {
 	char	version[32];	/* driver version string */
 	char	fw_version[32];	/* firmware version string, if applicable */
 	char	bus_info[ETHTOOL_BUSINFO_LEN];	/* Bus info for this IF. */
-				/* For PCI devices, use pci_dev->slot_name. */
+				/* For PCI devices, use pci_name(pci_dev). */
 	char	reserved1[32];
 	char	reserved2[16];
 	u32	n_stats;	/* number of u64's from ETHTOOL_GSTATS */

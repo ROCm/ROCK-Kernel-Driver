@@ -1393,7 +1393,7 @@ static int b44_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		strcpy (info.driver, DRV_MODULE_NAME);
 		strcpy (info.version, DRV_MODULE_VERSION);
 		memset(&info.fw_version, 0, sizeof(info.fw_version));
-		strcpy (info.bus_info, pci_dev->slot_name);
+		strcpy (info.bus_info, pci_name(pci_dev));
 		info.eedump_len = 0;
 		info.regdump_len = 0;
 		if (copy_to_user (useraddr, &info, sizeof (info)))

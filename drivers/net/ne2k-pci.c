@@ -334,7 +334,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	/* Allocate dev->priv and fill in 8390 specific dev fields. */
 	if (ethdev_init(dev)) {
 		printk (KERN_ERR "ne2kpci(%s): unable to get memory for dev->priv.\n",
-			pdev->slot_name);
+			pci_name(pdev));
 		goto err_out_free_netdev;
 	}
 
@@ -605,7 +605,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
 		strcpy(info.driver, DRV_NAME);
 		strcpy(info.version, DRV_VERSION);
-		strcpy(info.bus_info, pci_dev->slot_name);
+		strcpy(info.bus_info, pci_name(pci_dev));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -2338,7 +2338,7 @@ static int gem_ethtool_ioctl(struct net_device *dev, void *ep_user)
 		strncpy(info.driver, DRV_NAME, ETHTOOL_BUSINFO_LEN);
 		strncpy(info.version, DRV_VERSION, ETHTOOL_BUSINFO_LEN);
 		info.fw_version[0] = '\0';
-		strncpy(info.bus_info, gp->pdev->slot_name, ETHTOOL_BUSINFO_LEN);
+		strncpy(info.bus_info, pci_name(gp->pdev), ETHTOOL_BUSINFO_LEN);
 		info.regdump_len = 0; /*SUNGEM_NREGS;*/
 
 		if (copy_to_user(ep_user, &info, sizeof(info)))

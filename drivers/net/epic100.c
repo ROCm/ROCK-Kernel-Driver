@@ -479,7 +479,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 
 	if (debug > 2) {
 		printk(KERN_DEBUG DRV_NAME "(%s): EEPROM contents\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		for (i = 0; i < 64; i++)
 			printk(" %4.4x%s", read_eeprom(ioaddr, i),
 				   i % 16 == 15 ? "\n" : "");
@@ -500,7 +500,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 				ep->phys[phy_idx++] = phy;
 				printk(KERN_INFO DRV_NAME "(%s): MII transceiver #%d control "
 					   "%4.4x status %4.4x.\n",
-					   pdev->slot_name, phy, mdio_read(dev, phy, 0), mii_status);
+					   pci_name(pdev), phy, mdio_read(dev, phy, 0), mii_status);
 			}
 		}
 		ep->mii_phy_cnt = phy_idx;
@@ -509,10 +509,10 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 			ep->mii.advertising = mdio_read(dev, phy, MII_ADVERTISE);
 			printk(KERN_INFO DRV_NAME "(%s): Autonegotiation advertising %4.4x link "
 				   "partner %4.4x.\n",
-				   pdev->slot_name, ep->mii.advertising, mdio_read(dev, phy, 5));
+				   pci_name(pdev), ep->mii.advertising, mdio_read(dev, phy, 5));
 		} else if ( ! (ep->chip_flags & NO_MII)) {
 			printk(KERN_WARNING DRV_NAME "(%s): ***WARNING***: No MII transceiver found!\n",
-			       pdev->slot_name);
+			       pci_name(pdev));
 			/* Use the known PHY address of the EPII. */
 			ep->phys[0] = 3;
 		}
@@ -528,7 +528,7 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	if (duplex) {
 		ep->mii.force_media = ep->mii.full_duplex = 1;
 		printk(KERN_INFO DRV_NAME "(%s):  Forced full duplex operation requested.\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 	}
 	dev->if_port = ep->default_port = option;
 
@@ -1374,7 +1374,7 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, np->pci_dev->slot_name);
+		strcpy (info.bus_info, pci_name(np->pci_dev));
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;

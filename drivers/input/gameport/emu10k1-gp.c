@@ -78,7 +78,7 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 	}
 	memset(emu, 0, sizeof(struct emu));
 
-	sprintf(emu->phys, "pci%s/gameport0", pdev->slot_name);
+	sprintf(emu->phys, "pci%s/gameport0", pci_name(pdev));
 
 	emu->size = iolen;
 	emu->dev = pdev;
@@ -95,7 +95,7 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 	gameport_register_port(&emu->gameport);
 
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		pdev->dev.name, pdev->slot_name, emu->gameport.speed);
+		pdev->dev.name, pci_name(pdev), emu->gameport.speed);
 
 	return 0;
 }

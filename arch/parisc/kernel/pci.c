@@ -328,7 +328,7 @@ pcibios_align_resource(void *data, struct resource *res,
 	unsigned long mask, align;
 
 	DBG_RES("pcibios_align_resource(%s, (%p) [%lx,%lx]/%x, 0x%lx, 0x%lx)\n",
-		((struct pci_dev *) data)->slot_name,
+		pci_name(((struct pci_dev *) data)),
 		res->parent, res->start, res->end,
 		(int) res->flags, size, alignment);
 
@@ -397,7 +397,7 @@ pcibios_enable_device(struct pci_dev *dev, int mask)
 	if (dev->bus->bridge_ctl & PCI_BRIDGE_CTL_FAST_BACK)
 		cmd |= PCI_COMMAND_FAST_BACK;
 #endif
-	DBGC("PCIBIOS: Enabling device %s cmd 0x%04x\n", dev->slot_name, cmd);
+	DBGC("PCIBIOS: Enabling device %s cmd 0x%04x\n", pci_name(dev), cmd);
 	pci_write_config_word(dev, PCI_COMMAND, cmd);
 	return 0;
 }

@@ -2310,7 +2310,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 			return -EINVAL;
                 strcpy(cap->driver,"bttv");
                 strlcpy(cap->card,btv->video_dev.name,sizeof(cap->card));
-		sprintf(cap->bus_info,"PCI:%s",btv->dev->slot_name);
+		sprintf(cap->bus_info,"PCI:%s",pci_name(btv->dev));
 		cap->version = BTTV_VERSION_CODE;
 		cap->capabilities =
 			V4L2_CAP_VIDEO_CAPTURE |
@@ -3351,7 +3351,7 @@ static int __devinit bttv_probe(struct pci_dev *dev,
         pci_read_config_byte(dev, PCI_CLASS_REVISION, &btv->revision);
         pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
         printk(KERN_INFO "bttv%d: Bt%d (rev %d) at %s, ",
-               bttv_num,btv->id, btv->revision, dev->slot_name);
+               bttv_num,btv->id, btv->revision, pci_name(dev));
         printk("irq: %d, latency: %d, mmio: 0x%lx\n",
 	       btv->dev->irq, lat, pci_resource_start(dev,0));
 	

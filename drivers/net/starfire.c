@@ -323,7 +323,7 @@ static int full_duplex[MAX_UNITS] = {0, };
 #define netif_start_if(dev)
 #define netif_stop_if(dev)
 
-#define PCI_SLOT_NAME(pci_dev)	(pci_dev)->slot_name
+#define PCI_SLOT_NAME(pci_dev)	pci_name(pci_dev)
 
 #endif /* LINUX_VERSION_CODE > 0x20300 */
 

@@ -1453,7 +1453,7 @@ static int __devinit ioc3_probe(struct pci_dev *pdev,
 	ioc3 = (struct ioc3 *) ioremap(ioc3_base, ioc3_size);
 	if (!ioc3) {
 		printk(KERN_CRIT "ioc3eth(%s): ioremap failed, goodbye.\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENOMEM;
 		goto out_res;
 	}
@@ -1473,7 +1473,7 @@ static int __devinit ioc3_probe(struct pci_dev *pdev,
 
 	if (ip->phy == -1) {
 		printk(KERN_CRIT "ioc3-eth(%s): Didn't find a PHY, goodbye.\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		err = -ENODEV;
 		goto out_stop;
 	}

@@ -264,11 +264,11 @@ static int __init map_mpc1211_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	}
 
 	if( irq < 0 ) {
-		PCIDBG(3, "PCI: Error mapping IRQ on device %s\n", dev->slot_name);
+		PCIDBG(3, "PCI: Error mapping IRQ on device %s\n", pci_name(dev));
 		return irq;
 	}
 	
-	PCIDBG(2, "Setting IRQ for slot %s to %d\n", dev->slot_name, irq);
+	PCIDBG(2, "Setting IRQ for slot %s to %d\n", pci_name(dev), irq);
 
 	return irq;
 }

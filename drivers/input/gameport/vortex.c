@@ -115,7 +115,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
         memset(vortex, 0, sizeof(struct vortex));
 
 	vortex->dev = dev;
-	sprintf(vortex->phys, "pci%s/gameport0", dev->slot_name);
+	sprintf(vortex->phys, "pci%s/gameport0", pci_name(dev));
 
 	pci_set_drvdata(dev, vortex);
 
@@ -146,7 +146,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 	gameport_register_port(&vortex->gameport);
 	
 	printk(KERN_INFO "gameport: %s at pci%s speed %d kHz\n",
-		dev->dev.name, dev->slot_name, vortex->gameport.speed);
+		dev->dev.name, pci_name(dev), vortex->gameport.speed);
 
 	return 0;
 }

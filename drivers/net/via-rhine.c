@@ -682,7 +682,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	ioaddr = (long) ioremap (memaddr, io_size);
 	if (!ioaddr) {
 		printk (KERN_ERR "ioremap failed for device %s, region 0x%X @ 0x%lX\n",
-				pdev->slot_name, io_size, memaddr);
+				pci_name(pdev), io_size, memaddr);
 		goto err_out_free_res;
 	}
 
@@ -1754,7 +1754,7 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, np->pdev->slot_name);
+		strcpy (info.bus_info, pci_name(np->pdev));
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;

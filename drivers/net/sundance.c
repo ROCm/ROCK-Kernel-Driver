@@ -1584,7 +1584,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 			struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
 			strcpy(info.driver, DRV_NAME);
 			strcpy(info.version, DRV_VERSION);
-			strcpy(info.bus_info, np->pci_dev->slot_name);
+			strcpy(info.bus_info, pci_name(np->pci_dev));
 			memset(&info.fw_version, 0, sizeof(info.fw_version));
 			if (copy_to_user(useraddr, &info, sizeof(info)))
 				return -EFAULT;

@@ -291,7 +291,7 @@ acpi_pci_irq_derive (
 	}
 
 	if (!irq) {
-		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to derive IRQ for device %s\n", dev->slot_name));
+		ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Unable to derive IRQ for device %s\n", pci_name(dev)));
 		return_VALUE(0);
 	}
 
@@ -316,7 +316,7 @@ acpi_pci_irq_enable (
 	
 	pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
 	if (!pin) {
-		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No interrupt pin configured for device %s\n", dev->slot_name));
+		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "No interrupt pin configured for device %s\n", pci_name(dev)));
 		return_VALUE(0);
 	}
 	pin--;
@@ -344,7 +344,7 @@ acpi_pci_irq_enable (
 	 * driver reported one, then use it. Exit in any case.
 	 */
 	if (!irq) {
-		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), dev->slot_name);
+		printk(KERN_WARNING PREFIX "No IRQ known for interrupt pin %c of device %s", ('A' + pin), pci_name(dev));
 		/* Interrupt Line values above 0xF are forbidden */
 		if (dev->irq && dev->irq >= 0xF) {
 			printk(" - using IRQ %d\n", dev->irq);
@@ -358,7 +358,7 @@ acpi_pci_irq_enable (
 
 	dev->irq = irq;
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", dev->slot_name, dev->irq));
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s using IRQ %d\n", pci_name(dev), dev->irq));
 
 	/* 
 	 * Make sure all (legacy) PCI IRQs are set as level-triggered.

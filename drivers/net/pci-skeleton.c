@@ -704,8 +704,8 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 
 	/* if unknown chip, assume array element #0, original RTL-8139 in this case */
 	printk (KERN_DEBUG PFX "PCI device %s: unknown chip version, assuming RTL-8139\n",
-		pdev->slot_name);
-	printk (KERN_DEBUG PFX "PCI device %s: TxConfig = 0x%lx\n", pdev->slot_name, NETDRV_R32 (TxConfig));
+		pci_name(pdev));
+	printk (KERN_DEBUG PFX "PCI device %s: TxConfig = 0x%lx\n", pci_name(pdev), NETDRV_R32 (TxConfig));
 	tp->chipset = 0;
 
 match:

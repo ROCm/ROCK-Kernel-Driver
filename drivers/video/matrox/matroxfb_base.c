@@ -1070,7 +1070,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 				memset(&r, 0, sizeof(r));
 				strcpy(r.driver, "matroxfb");
 				strcpy(r.card, "Matrox");
-				sprintf(r.bus_info, "PCI:%s", ACCESS_FBINFO(pcidev)->slot_name);
+				sprintf(r.bus_info, "PCI:%s", pci_name(ACCESS_FBINFO(pcidev)));
 				r.version = KERNEL_VERSION(1,0,0);
 				r.capabilities = V4L2_CAP_VIDEO_OUTPUT;
 				if (copy_to_user((void*)arg, &r, sizeof(r)))

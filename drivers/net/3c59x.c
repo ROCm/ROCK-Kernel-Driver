@@ -1091,7 +1091,7 @@ static int __devinit vortex_probe1(struct device *gendev,
 
 	if (gendev) {
 		if ((pdev = DEVICE_PCI(gendev))) {
-			print_name = pdev->slot_name;
+			print_name = pci_name(pdev);
 		}
 
 		if ((edev = DEVICE_EISA(gendev))) {
@@ -2830,7 +2830,7 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		strcpy(info.driver, DRV_NAME);
 		strcpy(info.version, DRV_VERSION);
 		if (VORTEX_PCI(vp))
-			strcpy(info.bus_info, VORTEX_PCI(vp)->slot_name);
+			strcpy(info.bus_info, pci_name(VORTEX_PCI(vp)));
 		else {
 			if (VORTEX_EISA(vp))
 				sprintf (info.bus_info, vp->gendev->bus_id);

@@ -561,7 +561,7 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 		"controller on pci%s\n",
 		via_config->name, t,
 		via_dma[via_config->flags & VIA_UDMA],
-		dev->slot_name);
+		pci_name(dev));
 
 	/*
 	 * Setup /proc/ide/via entry.

@@ -1186,7 +1186,7 @@ static int ns83820_ethtool_ioctl (struct ns83820 *dev, void *useraddr)
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy(info.driver, "ns83820");
 			strcpy(info.version, VERSION);
-			strcpy(info.bus_info, dev->pci_dev->slot_name);
+			strcpy(info.bus_info, pci_name(dev->pci_dev));
 			if (copy_to_user(useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;

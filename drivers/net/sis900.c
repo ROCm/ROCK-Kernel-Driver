@@ -1874,7 +1874,7 @@ static int netdev_ethtool_ioctl (struct net_device *net_dev, void *useraddr)
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, SIS900_MODULE_NAME);
 			strcpy (info.version, SIS900_DRV_VERSION);
-			strcpy (info.bus_info, sis_priv->pci_dev->slot_name);
+			strcpy (info.bus_info, pci_name(sis_priv->pci_dev));
 			if (copy_to_user (useraddr, &info, sizeof (info)))
 				return -EFAULT;
 			return 0;

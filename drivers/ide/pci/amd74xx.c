@@ -365,7 +365,7 @@ static unsigned int __init init_chipset_amd74xx(struct pci_dev *dev, const char 
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
 	printk(KERN_INFO "AMD_IDE: %s (rev %02x) %s controller on pci%s\n",
-		dev->dev.name, t, amd_dma[amd_config->flags & AMD_UDMA], dev->slot_name);
+		dev->dev.name, t, amd_dma[amd_config->flags & AMD_UDMA], pci_name(dev));
 
 /*
  * Register /proc/ide/amd74xx entry

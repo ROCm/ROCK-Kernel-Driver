@@ -3088,7 +3088,7 @@ static int ace_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			 tigonFwReleaseFix);
 		strncpy(info.version, version, sizeof(info.version) - 1);
 		if (ap && ap->pdev)
-			strcpy(info.bus_info, ap->pdev->slot_name);
+			strcpy(info.bus_info, pci_name(ap->pdev));
 		if (copy_to_user(ifr->ifr_data, &info, sizeof(info)))
 			return -EFAULT;
 		return 0;

@@ -1977,7 +1977,7 @@ static int __devinit nsp32_probe(struct pci_dev *pdev, const struct pci_device_i
 	ret = nsp32_detect(pdev);
 
 	nsp32_msg(KERN_INFO, "nsp32 irq: %i mmio: 0x%lx slot: %s model: %s",
-		  pdev->irq, data->MmioAddress, pdev->slot_name,
+		  pdev->irq, data->MmioAddress, pci_name(pdev),
 		  nsp32_model[id->driver_data]);
 
 	nsp32_dbg(NSP32_DEBUG_REGISTER, "exit");

@@ -335,7 +335,7 @@ pcibios_enable_device(struct pci_dev *dev, int mask)
 
 	if (cmd != oldcmd) {
 		printk(KERN_DEBUG "PCI: Enabling device: (%s), cmd %x\n",
-		       dev->slot_name, cmd);
+		       pci_name(dev), cmd);
 		/* Enable the appropriate bits in the PCI command register.  */
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
@@ -354,7 +354,7 @@ pcibios_set_master(struct pci_dev *dev)
 	pci_read_config_byte(dev, PCI_LATENCY_TIMER, &lat);
 	if (lat >= 16) return;
 	printk("PCI: Setting latency timer of device %s to 64\n",
-							dev->slot_name);
+							pci_name(dev));
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, 64);
 }
 

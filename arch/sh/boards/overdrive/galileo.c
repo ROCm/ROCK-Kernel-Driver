@@ -446,7 +446,7 @@ static void __init pci_fixup_ide_bases(struct pci_dev *d)
 	 */
 	if ((d->class >> 8) != PCI_CLASS_STORAGE_IDE)
 		return;
-	printk("PCI: IDE base address fixup for %s\n", d->slot_name);
+	printk("PCI: IDE base address fixup for %s\n", pci_name(d));
 	for(i=0; i<4; i++) {
 		struct resource *r = &d->resource[i];
 		if ((r->start & ~0x80) == 0x374) {
@@ -518,7 +518,7 @@ int pcibios_enable_device(struct pci_dev *dev)
 			printk(KERN_ERR
 			       "PCI: Device %s not available because"
 			       " of resource collisions\n",
-			       dev->slot_name);
+			       pci_name(dev));
 			return -EINVAL;
 		}
 		if (r->flags & IORESOURCE_IO)
@@ -528,7 +528,7 @@ int pcibios_enable_device(struct pci_dev *dev)
 	}
 	if (cmd != old_cmd) {
 		printk("PCI: enabling device %s (%04x -> %04x)\n",
-		       dev->slot_name, old_cmd, cmd);
+		       pci_name(dev), old_cmd, cmd);
 		pci_write_config_word(dev, PCI_COMMAND, cmd);
 	}
 	return 0;
@@ -589,6 +589,6 @@ void pcibios_set_master(struct pci_dev *dev)
 		lat = pcibios_max_latency;
 	else
 		return;
-	printk("PCI: Setting latency timer of device %s to %d\n", dev->slot_name, lat);
+	printk("PCI: Setting latency timer of device %s to %d\n", pci_name(dev), lat);
 	pci_write_config_byte(dev, PCI_LATENCY_TIMER, lat);
 }

@@ -544,7 +544,7 @@ static int __devinit xircom_init_one(struct pci_dev *pdev, const struct pci_devi
 		printk(version);
 #endif
 
-	//printk(KERN_INFO "xircom_init_one(%s)\n", pdev->slot_name);
+	//printk(KERN_INFO "xircom_init_one(%s)\n", pci_name(pdev));
 
 	board_idx++;
 
@@ -1448,7 +1448,7 @@ static int xircom_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		strcpy(info.driver, DRV_NAME);
 		strcpy(info.version, DRV_VERSION);
 		*info.fw_version = 0;
-		strcpy(info.bus_info, tp->pdev->slot_name);
+		strcpy(info.bus_info, pci_name(tp->pdev));
 		if (copy_to_user(useraddr, &info, sizeof(info)))
 		       return -EFAULT;
 		return 0;

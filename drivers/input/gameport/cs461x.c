@@ -287,7 +287,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	port->read = cs461x_gameport_read;
 	port->cooked_read = cs461x_gameport_cooked_read;
 
-	sprintf(phys, "pci%s/gameport0", pdev->slot_name);
+	sprintf(phys, "pci%s/gameport0", pci_name(pdev));
 
 	port->name = name;
 	port->phys = phys;
@@ -301,7 +301,7 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	gameport_register_port(port);
 
 	printk(KERN_INFO "gameport: %s on pci%s speed %d kHz\n",
-		name, pdev->slot_name, port->speed);
+		name, pci_name(pdev), port->speed);
 
 	return 0;
 }

@@ -1373,7 +1373,7 @@ static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_NAME);
 		strcpy (info.version, DRV_VERSION);
-		strcpy (info.bus_info, cp->pdev->slot_name);
+		strcpy (info.bus_info, pci_name(cp->pdev));
 		info.regdump_len = CP_REGS_SIZE;
 		info.n_stats = CP_NUM_STATS;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
@@ -1792,7 +1792,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
 	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pci_rev < 0x20) {
 		printk(KERN_ERR PFX "pci dev %s (id %04x:%04x rev %02x) is not an 8139C+ compatible chip\n",
-		       pdev->slot_name, pdev->vendor, pdev->device, pci_rev);
+		       pci_name(pdev), pdev->vendor, pdev->device, pci_rev);
 		printk(KERN_ERR PFX "Try the \"8139too\" driver instead.\n");
 		return -ENODEV;
 	}
@@ -1828,20 +1828,20 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	if (pdev->irq < 2) {
 		rc = -EIO;
 		printk(KERN_ERR PFX "invalid irq (%d) for pci dev %s\n",
-		       pdev->irq, pdev->slot_name);
+		       pdev->irq, pci_name(pdev));
 		goto err_out_res;
 	}
 	pciaddr = pci_resource_start(pdev, 1);
 	if (!pciaddr) {
 		rc = -EIO;
 		printk(KERN_ERR PFX "no MMIO resource for pci dev %s\n",
-		       pdev->slot_name);
+		       pci_name(pdev));
 		goto err_out_res;
 	}
 	if (pci_resource_len(pdev, 1) < CP_REGS_SIZE) {
 		rc = -EIO;
 		printk(KERN_ERR PFX "MMIO resource (%lx) too small on pci dev %s\n",
-		       pci_resource_len(pdev, 1), pdev->slot_name);
+		       pci_resource_len(pdev, 1), pci_name(pdev));
 		goto err_out_res;
 	}
 
@@ -1862,7 +1862,7 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	if (!regs) {
 		rc = -EIO;
 		printk(KERN_ERR PFX "Cannot map PCI MMIO (%lx@%lx) on pci dev %s\n",
-		       pci_resource_len(pdev, 1), pciaddr, pdev->slot_name);
+		       pci_resource_len(pdev, 1), pciaddr, pci_name(pdev));
 		goto err_out_res;
 	}
 	dev->base_addr = (unsigned long) regs;

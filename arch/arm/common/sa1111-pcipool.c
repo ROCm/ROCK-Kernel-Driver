@@ -59,7 +59,7 @@ static inline const char *slot_name(const struct pci_pool *pool)
 	else if (pcidev_is_sa1111(pdev))
 		return "[SA-1111]";
 	else
-		return pdev->slot_name;
+		return pci_name(pdev);
 }
 
 
@@ -333,7 +333,7 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 
 	if ((page = pool_find_page (pool, dma)) == 0) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p/%lx (bad dma)\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
@@ -346,13 +346,13 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 #ifdef	CONFIG_DEBUG_SLAB
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
 		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%lx\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
 	if (page->bitmap [map] & (1UL << block)) {
 		printk (KERN_ERR "pci_pool_free %s/%s, dma %x already free\n",
-			pool->dev ? pool->dev->slot_name : NULL,
+			pool->dev ? pci_name(pool->dev) : NULL,
 			pool->name, dma);
 		return;
 	}

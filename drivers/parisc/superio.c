@@ -160,7 +160,7 @@ superio_init(struct superio_device *sio)
 	}
 
 	printk (KERN_INFO "SuperIO: Found NS87560 Legacy I/O device at %s (IRQ %i) \n",
-		pdev->slot_name,sio->iosapic_irq);
+		pci_name(pdev),sio->iosapic_irq);
 
 	/* Find our I/O devices */
 	pci_read_config_word (pdev, SIO_SP1BAR, &sio->sp1_base);
@@ -346,7 +346,7 @@ int superio_fixup_irq(struct pci_dev *pcidev)
 		return -1;
 	}
 	printk("superio_fixup_irq(%s) ven 0x%x dev 0x%x from %p\n",
-		pcidev->slot_name,
+		pci_name(pcidev),
 		pcidev->vendor, pcidev->device,
 		__builtin_return_address(0));
 #endif
@@ -487,7 +487,7 @@ static int __devinit superio_probe(struct pci_dev *dev, const struct pci_device_
 {
 #ifdef DEBUG_INIT
 	printk("superio_probe(%s) ven 0x%x dev 0x%x sv 0x%x sd 0x%x class 0x%x\n",
-		dev->slot_name,
+		pci_name(dev),
 		dev->vendor, dev->device,
 		dev->subsystem_vendor, dev->subsystem_device,
 		dev->class);

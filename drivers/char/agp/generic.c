@@ -517,7 +517,7 @@ void agp_device_command(u32 command, int agp_v3)
 			continue;
 
 		printk(KERN_INFO PFX "Putting AGP V%d device at %s into %dx mode\n",
-				agp_v3 ? 3 : 2, device->slot_name, mode);
+				agp_v3 ? 3 : 2, pci_name(device), mode);
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
 }

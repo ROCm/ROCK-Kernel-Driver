@@ -442,7 +442,7 @@ static int __devinit dmfe_init_one (struct pci_dev *pdev,
 	printk(KERN_INFO "%s: Davicom DM%04lx at pci%s,",
 		dev->name,
 		ent->driver_data >> 16,
-		pdev->slot_name);
+		pci_name(pdev));
 	for (i = 0; i < 6; i++)
 		printk("%c%02x", i ? ':' : ' ', dev->dev_addr[i]);
 	printk(", irq %d.\n", dev->irq);
@@ -1019,7 +1019,7 @@ static int dmfe_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		strcpy(info.driver, DRV_NAME);
 		strcpy(info.version, DRV_VERSION);
 		if (db->pdev)
-			strcpy(info.bus_info, db->pdev->slot_name);
+			strcpy(info.bus_info, pci_name(db->pdev));
 		else
 			sprintf(info.bus_info, "EISA 0x%lx %d",
 				dev->base_addr, dev->irq);

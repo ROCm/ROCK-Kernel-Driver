@@ -1567,7 +1567,7 @@ static int __devinit hfcpci_probe(struct pci_dev *pdev,
 	hfcpci_hw_init(adapter);
 
 	printk(KERN_INFO "hisax_hfcpci: found adapter %s at %s\n",
-	       (char *) ent->driver_data, pdev->slot_name);
+	       (char *) ent->driver_data, pci_name(pdev));
 
 	return 0;
 
