@@ -212,16 +212,28 @@ static void ps_set_intr(void)
 static struct pd_unit *pd_current; /* current request's drive */
 static PIA *pi_current; /* current request's PIA */
 static struct request *pd_req;	/* current request */
+static struct request_queue *pd_queue;
 
 static void run_fsm(void)
 {
 	while (1) {
 		enum action res;
+		unsigned long saved_flags;
+		int stop = 0;
 
 		switch(res = phase()) {
 			case Ok: case Fail:
 				pi_unclaim(pi_current);
-				next_request(res);
+				spin_lock_irqsave(&pd_lock, saved_flags);
+				end_request(pd_req, res);
+				pd_req = elv_next_request(pd_queue);
+				if (!pd_req)
+					stop = 1;
+				spin_unlock_irqrestore(&pd_lock, saved_flags);
+				if (stop)
+					return;
+				phase = do_pd_io;
+				ps_set_intr();
 				return;
 			case Wait:
 				pi_unclaim(pi_current);
@@ -703,8 +715,6 @@ static int pd_probe_drive(struct pd_unit *disk)
 	return pd_identify(disk);
 }
 
-static struct request_queue *pd_queue;
-
 static int pd_detect(void)
 {
 	int k, unit;
@@ -800,23 +810,6 @@ static int pd_next_buf(void)
 	pd_buf = pd_req->buffer;
 	spin_unlock_irqrestore(&pd_lock, saved_flags);
 	return 0;
-}
-
-static inline void next_request(int success)
-{
-	unsigned long saved_flags;
-
-	spin_lock_irqsave(&pd_lock, saved_flags);
-	end_request(pd_req, success);
-	pd_req = elv_next_request(pd_queue);
-	if (!pd_req) {
-		spin_unlock_irqrestore(&pd_lock, saved_flags);
-		return;
-	}
-	spin_unlock_irqrestore(&pd_lock, saved_flags);
-
-	phase = do_pd_io;
-	ps_set_intr();
 }
 
 static enum action do_pd_io(void)
