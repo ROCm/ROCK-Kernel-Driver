@@ -1975,9 +1975,7 @@ static dev_link_t *wl3501_attach(void)
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
 	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
 	link->irq.IRQInfo2 = wl3501_irq_mask;
-	if (wl3501_irq_list[0] == -1)
-		link->irq.IRQInfo2 = wl3501_irq_mask;
-	else
+	if (wl3501_irq_list[0] != -1)
 		for (i = 0; i < 4; i++)
 			link->irq.IRQInfo2 |= 1 << wl3501_irq_list[i];
 	link->irq.Handler = wl3501_interrupt;
