@@ -19,6 +19,7 @@
 #include <linux/hugetlb.h>
 #include <linux/profile.h>
 #include <linux/module.h>
+#include <linux/mount.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
@@ -476,6 +477,9 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 
 	if (file && (!file->f_op || !file->f_op->mmap))
 		return -ENODEV;
+
+	if ((prot & PROT_EXEC) && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
+		return -EPERM;
 
 	if (!len)
 		return addr;
