@@ -9,7 +9,7 @@
 # conmakehash:	 Create arrays for initializing the kernel console tables
 
 host-progs	:= fixdep split-include conmakehash docproc kallsyms modpost \
-		   mk_elfconfig
+		   mk_elfconfig pnmtologo
 always		:= $(host-progs) empty.o
 
 modpost-objs	:= modpost.o file2alias.o
