@@ -367,11 +367,11 @@ static int help(struct sk_buff *skb,
 		    { 0 } },
 		  { htonl((array[0] << 24) | (array[1] << 16)
 			  | (array[2] << 8) | array[3]),
-		    { htons(array[4] << 8 | array[5]) },
+		    { .tcp = { htons(array[4] << 8 | array[5]) } },
 		    IPPROTO_TCP }});
 	exp->mask = ((struct ip_conntrack_tuple)
 		{ { 0xFFFFFFFF, { 0 } },
-		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+		  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 
 	exp->expectfn = NULL;
 

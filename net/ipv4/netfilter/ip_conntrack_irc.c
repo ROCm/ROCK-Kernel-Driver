@@ -192,11 +192,11 @@ static int help(struct sk_buff *skb,
 
 			exp->tuple = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
-				  { htonl(dcc_ip), { htons(dcc_port) },
+				  { htonl(dcc_ip), { .tcp = { htons(dcc_port) } },
 				    IPPROTO_TCP }});
 			exp->mask = ((struct ip_conntrack_tuple)
 				{ { 0, { 0 } },
-				  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
+				  { 0xFFFFFFFF, { .tcp = { 0xFFFF } }, 0xFFFF }});
 
 			exp->expectfn = NULL;
 

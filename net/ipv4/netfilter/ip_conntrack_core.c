@@ -168,8 +168,8 @@ static inline int expect_cmp(const struct ip_conntrack_expect *i,
 static void
 destroy_expect(struct ip_conntrack_expect *exp)
 {
-	DEBUGP("destroy_expect(%p) use=%d\n", exp, atomic_read(exp->use));
-	IP_NF_ASSERT(atomic_read(exp->use));
+	DEBUGP("destroy_expect(%p) use=%d\n", exp, atomic_read(&exp->use));
+	IP_NF_ASSERT(atomic_read(&exp->use));
 	IP_NF_ASSERT(!timer_pending(&exp->timeout));
 
 	kfree(exp);
@@ -576,7 +576,7 @@ static int early_drop(struct list_head *chain)
 	int dropped = 0;
 
 	READ_LOCK(&ip_conntrack_lock);
-	h = LIST_FIND(chain, unreplied, struct ip_conntrack_tuple_hash *);
+	h = LIST_FIND_B(chain, unreplied, struct ip_conntrack_tuple_hash *);
 	if (h)
 		atomic_inc(&h->ctrack->ct_general.use);
 	READ_UNLOCK(&ip_conntrack_lock);
@@ -685,6 +685,14 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 			     struct ip_conntrack_expect *, tuple);
 	READ_UNLOCK(&ip_conntrack_expect_tuple_lock);
 
+	/* If master is not in hash table yet (ie. packet hasn't left
+	   this machine yet), how can other end know about expected?
+	   Hence these are not the droids you are looking for (if
+	   master ct never got confirmed, we'd hold a reference to it
+	   and weird things would happen to future packets). */
+	if (expected && !is_confirmed(expected->expectant))
+		expected = NULL;
+
 	/* Look up the conntrack helper for master connections only */
 	if (!expected)
 		conntrack->helper = ip_ct_find_helper(&repl_tuple);
@@ -695,12 +703,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	    && ! del_timer(&expected->timeout))
 		expected = NULL;
 
-	/* If master is not in hash table yet (ie. packet hasn't left
-	   this machine yet), how can other end know about expected?
-	   Hence these are not the droids you are looking for (if
-	   master ct never got confirmed, we'd hold a reference to it
-	   and weird things would happen to future packets). */
-	if (expected && is_confirmed(expected->expectant)) {
+	if (expected) {
 		DEBUGP("conntrack: expectation arrives ct=%p exp=%p\n",
 			conntrack, expected);
 		/* Welcome, Mr. Bond.  We've been expecting you... */
@@ -1282,9 +1285,9 @@ getorigdst(struct sock *sk, int optval, void *user, int *len)
 	struct inet_opt *inet = inet_sk(sk);
 	struct ip_conntrack_tuple_hash *h;
 	struct ip_conntrack_tuple tuple = { { inet->rcv_saddr,
-						{ inet->sport } },
+						{ .tcp = { inet->sport } } },
 					    { inet->daddr,
-						{ inet->dport },
+						{ .tcp = { inet->dport } },
 					      IPPROTO_TCP } };
 
 	/* We only do TCP at the moment: is there a better way? */
