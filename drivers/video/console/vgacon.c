@@ -53,7 +53,7 @@
 #include <video/vga.h>
 #include <asm/io.h>
 
-static spinlock_t vga_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(vga_lock);
 static int cursor_size_lastfrom;
 static int cursor_size_lastto;
 static struct vgastate state;
