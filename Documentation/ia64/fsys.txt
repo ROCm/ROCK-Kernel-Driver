@@ -4,7 +4,7 @@
 		-----------------------------------
 
 		        Started: 13-Jan-2003
-		    Last update: 11-Feb-2003
+		    Last update: 27-Sep-2003
 
 	              David Mosberger-Tang
 		      <davidm@hpl.hp.com>
@@ -145,6 +145,12 @@ speed comes a set of restrictions:
    that could contain sensitive information (note that the current
    task pointer is not considered sensitive: it's already exposed
    through ar.k6).
+
+ o Fsyscall-handlers MUST NOT access user-memory without first
+   validating access-permission (this can be done typically via
+   probe.r.fault and/or probe.w.fault) and without guarding against
+   memory access exceptions (this can be done with the EX() macros
+   defined by asmmacro.h).
 
 The above restrictions may seem draconian, but remember that it's
 possible to trade off some of the restrictions by paying a slightly

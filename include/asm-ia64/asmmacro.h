@@ -68,20 +68,25 @@ name:
  * we'll patch out the work-around bundles with NOPs, so their impact is minimal.
  */
 #define DO_MCKINLEY_E9_WORKAROUND
+
 #ifdef DO_MCKINLEY_E9_WORKAROUND
 	.section ".data.patch.mckinley_e9", "a"
 	.previous
 /* workaround for Itanium 2 Errata 9: */
-# define MCKINLEY_E9_WORKAROUND			\
-	.xdata4 ".data.patch.mckinley_e9", 1f-.;\
-1:{ .mib;					\
-	nop.m 0;				\
-	nop.i 0;				\
-	br.call.sptk.many b7=1f;;		\
-  };						\
-1:
+# define FSYS_RETURN					\
+	.xdata4 ".data.patch.mckinley_e9", 1f-.;	\
+1:{ .mib;						\
+	nop.m 0;					\
+	mov r16=ar.pfs;					\
+	br.call.sptk.many b7=2f;;			\
+  };							\
+2:{ .mib;						\
+	nop.m 0;					\
+	mov ar.pfs=r16;					\
+	br.ret.sptk.many b6;;				\
+  }
 #else
-# define MCKINLEY_E9_WORKAROUND
+# define FSYS_RETURN	br.ret.sptk.many b6
 #endif
 
 #endif /* _ASM_IA64_ASMMACRO_H */
