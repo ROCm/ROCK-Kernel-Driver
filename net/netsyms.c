@@ -577,6 +577,10 @@ EXPORT_SYMBOL(nf_hooks);
 EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_getsockopt);
 EXPORT_SYMBOL(ip_ct_attach);
+#ifdef CONFIG_INET
+#include <linux/netfilter_ipv4.h>
+EXPORT_SYMBOL(ip_route_me_harder);
+#endif
 #endif
 
 EXPORT_SYMBOL(register_gifconf);

@@ -261,7 +261,7 @@ static int ipq_mangle_ipv4(ipq_verdict_msg_t *v, ipq_queue_element_t *e)
 		if (!(iph->tos == e->rt_info.tos
 		      && iph->daddr == e->rt_info.daddr
 		      && iph->saddr == e->rt_info.saddr))
-			return route_me_harder(&e->skb);
+			return ip_route_me_harder(&e->skb);
 	}
 	return 0;
 }

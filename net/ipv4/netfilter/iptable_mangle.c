@@ -162,7 +162,7 @@ ipt_local_hook(unsigned int hook,
 		|| (*pskb)->nh.iph->daddr != daddr
 		|| (*pskb)->nfmark != nfmark
 		|| (*pskb)->nh.iph->tos != tos))
-		return route_me_harder(pskb) == 0 ? ret : NF_DROP;
+		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 
 	return ret;
 }

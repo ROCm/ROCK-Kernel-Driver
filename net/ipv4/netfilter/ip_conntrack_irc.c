@@ -1,8 +1,8 @@
-/* IRC extension for IP connection tracking, Version 1.20
- * (C) 2000-2001 by Harald Welte <laforge@gnumonks.org>
+/* IRC extension for IP connection tracking, Version 1.21
+ * (C) 2000-2002 by Harald Welte <laforge@gnumonks.org>
  * based on RR's ip_conntrack_ftp.c	
  *
- * ip_conntrack_irc.c,v 1.20 2001/12/06 07:42:10 laforge Exp
+ * ip_conntrack_irc.c,v 1.21 2002/02/05 14:49:26 laforge Exp
  *
  *      This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -112,9 +112,9 @@ static int help(const struct iphdr *iph, size_t len,
 
 	struct ip_ct_irc *info = &ct->help.ct_irc_info;
 
-	memset(&mask, 0, sizeof(struct ip_conntrack_tuple));
-	mask.dst.u.tcp.port = 0xFFFF;
-	mask.dst.protonum = 0xFFFF;
+	mask = ((struct ip_conntrack_tuple)
+		{ { 0, { 0 } },
+		  { 0xFFFFFFFF, { 0xFFFF }, 0xFFFF }});
 
 	DEBUGP("entered\n");
 	/* Can't track connections formed before we registered */

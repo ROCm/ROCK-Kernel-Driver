@@ -20,6 +20,10 @@
 #include <linux/if.h>
 #include <linux/netdevice.h>
 #include <linux/brlock.h>
+#include <linux/inetdevice.h>
+#include <net/sock.h>
+#include <net/route.h>
+#include <linux/ip.h>
 
 #define __KERNEL_SYSCALLS__
 #include <linux/unistd.h>
@@ -122,9 +126,10 @@ void nf_unregister_sockopt(struct nf_sockopt_ops *reg)
 	down(&nf_sockopt_mutex);
 	if (reg->use != 0) {
 		/* To be woken by nf_sockopt call... */
+		/* FIXME: Stuart Young's name appears gratuitously. */
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		reg->cleanup_task = current;
 		up(&nf_sockopt_mutex);
-		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule();
 		goto restart;
 	}
@@ -552,6 +557,73 @@ void nf_reinject(struct sk_buff *skb, struct nf_info *info,
 	kfree(info);
 	return;
 }
+
+#ifdef CONFIG_INET
+/* route_me_harder function, used by iptable_nat, iptable_mangle + ip_queue */
+int ip_route_me_harder(struct sk_buff **pskb)
+{
+	struct iphdr *iph = (*pskb)->nh.iph;
+	struct rtable *rt;
+	struct rt_key key = { dst:iph->daddr,
+			      src:iph->saddr,
+			      oif:(*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
+			      tos:RT_TOS(iph->tos)|RTO_CONN,
+#ifdef CONFIG_IP_ROUTE_FWMARK
+			      fwmark:(*pskb)->nfmark
+#endif
+			    };
+	struct net_device *dev_src = NULL;
+	int err;
+
+	/* accomodate ip_route_output_slow(), which expects the key src to be
+	   0 or a local address; however some non-standard hacks like
+	   ipt_REJECT.c:send_reset() can cause packets with foreign
+           saddr to be appear on the NF_IP_LOCAL_OUT hook -MB */
+	if(key.src && !(dev_src = ip_dev_find(key.src)))
+		key.src = 0;
+
+	if ((err=ip_route_output_key(&rt, &key)) != 0) {
+		printk("route_me_harder: ip_route_output_key(dst=%u.%u.%u.%u, src=%u.%u.%u.%u, oif=%d, tos=0x%x, fwmark=0x%lx) error %d\n",
+			NIPQUAD(iph->daddr), NIPQUAD(iph->saddr),
+			(*pskb)->sk ? (*pskb)->sk->bound_dev_if : 0,
+			RT_TOS(iph->tos)|RTO_CONN,
+#ifdef CONFIG_IP_ROUTE_FWMARK
+			(*pskb)->nfmark,
+#else
+			0UL,
+#endif
+			err);
+		goto out;
+	}
+
+	/* Drop old route. */
+	dst_release((*pskb)->dst);
+
+	(*pskb)->dst = &rt->u.dst;
+
+	/* Change in oif may mean change in hh_len. */
+	if (skb_headroom(*pskb) < (*pskb)->dst->dev->hard_header_len) {
+		struct sk_buff *nskb;
+
+		nskb = skb_realloc_headroom(*pskb,
+					    (*pskb)->dst->dev->hard_header_len);
+		if (!nskb) {
+			err = -ENOMEM;
+			goto out;
+		}
+		if ((*pskb)->sk)
+			skb_set_owner_w(nskb, (*pskb)->sk);
+		kfree_skb(*pskb);
+		*pskb = nskb;
+	}
+
+out:
+	if (dev_src)
+		dev_put(dev_src);
+
+	return err;
+}
+#endif /*CONFIG_INET*/
 
 /* This does not belong here, but ipt_REJECT needs it if connection
    tracking in use: without this, connection may not be in hash table,
