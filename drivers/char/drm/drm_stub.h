@@ -66,8 +66,8 @@ static int DRM(stub_open)(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations DRM(stub_fops) = {
-	owner:   THIS_MODULE,
-	open:	 DRM(stub_open)
+	.owner = THIS_MODULE,
+	.open  = DRM(stub_open)
 };
 
 static int DRM(stub_getminor)(const char *name, struct file_operations *fops,

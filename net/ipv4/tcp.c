@@ -846,7 +846,7 @@ ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffset,
 
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
 
-	mss_now = tcp_current_mss(sk);
+	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
 	copied = 0;
 
 	err = -EPIPE;
@@ -921,7 +921,7 @@ wait_for_memory:
 		if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
 			goto do_error;
 
-		mss_now = tcp_current_mss(sk);
+		mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
 	}
 
 out:
@@ -1001,7 +1001,7 @@ static inline int skb_add_data(struct sk_buff *skb, char *from, int copy)
 
 static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 {
-	int tmp = tp->mss_cache;
+	int tmp = tp->mss_cache_std;
 
 	if (sk->route_caps & NETIF_F_SG) {
 		int pgbreak = SKB_MAX_HEAD(MAX_TCP_HEADER);
@@ -1037,7 +1037,7 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, int size)
 	/* This should be in poll */
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
 
-	mss_now = tcp_current_mss(sk);
+	mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
 
 	/* Ok commence sending. */
 	iovlen = msg->msg_iovlen;
@@ -1192,7 +1192,7 @@ wait_for_memory:
 			if ((err = wait_for_tcp_memory(sk, &timeo)) != 0)
 				goto do_error;
 
-			mss_now = tcp_current_mss(sk);
+			mss_now = tcp_current_mss(sk, !(flags&MSG_OOB));
 		}
 	}
 
@@ -2444,7 +2444,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 
 	switch (optname) {
 	case TCP_MAXSEG:
-		val = tp->mss_cache;
+		val = tp->mss_cache_std;
 		if (!val && ((1 << sk->state) & (TCPF_CLOSE | TCPF_LISTEN)))
 			val = tp->user_mss;
 		break;
@@ -2507,7 +2507,7 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 
 		info.tcpi_rto = (1000000 * tp->rto) / HZ;
 		info.tcpi_ato = (1000000 * tp->ack.ato) / HZ;
-		info.tcpi_snd_mss = tp->mss_cache;
+		info.tcpi_snd_mss = tp->mss_cache_std;
 		info.tcpi_rcv_mss = tp->ack.rcv_mss;
 
 		info.tcpi_unacked = tp->packets_out;

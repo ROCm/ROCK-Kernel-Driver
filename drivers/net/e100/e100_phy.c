@@ -622,7 +622,7 @@ e100_find_speed_duplex(struct e100_private *bdp)
  * Returns: void
  *
  */
-static void
+void
 e100_force_speed_duplex(struct e100_private *bdp)
 {
 	u16 control;

@@ -131,14 +131,14 @@ static int i810_freelist_put(drm_device_t *dev, drm_buf_t *buf)
 }
 
 static struct file_operations i810_buffer_fops = {
-	open:	 DRM(open),
-	flush:	 DRM(flush),
-	release: DRM(release),
-	ioctl:	 DRM(ioctl),
-	mmap:	 i810_mmap_buffers,
-	read:	 DRM(read),
-	fasync:	 DRM(fasync),
-      	poll:	 DRM(poll),
+	.open	 = DRM(open),
+	.flush	 = DRM(flush),
+	.release = DRM(release),
+	.ioctl	 = DRM(ioctl),
+	.mmap	 = i810_mmap_buffers,
+	.read	 = DRM(read),
+	.fasync  = DRM(fasync),
+      	.poll	 = DRM(poll),
 };
 
 int i810_mmap_buffers(struct file *filp, struct vm_area_struct *vma)
@@ -272,12 +272,16 @@ static unsigned long i810_alloc_page(drm_device_t *dev)
 	if(address == 0UL)
 		return 0;
 
-#if LINUX_VERSION_CODE < 0x020500
+#if LINUX_VERSION_CODE < 0x020409
 	atomic_inc(&virt_to_page(address)->count);
 	set_bit(PG_locked, &virt_to_page(address)->flags);
 #else
 	get_page(virt_to_page(address));
+#if LINUX_VERSION_CODE < 0x020500
+	LockPage(virt_to_page(address));
+#else
 	SetPageLocked(virt_to_page(address));
+#endif
 #endif
 	return address;
 }
@@ -285,7 +289,7 @@ static unsigned long i810_alloc_page(drm_device_t *dev)
 static void i810_free_page(drm_device_t *dev, unsigned long page)
 {
 	if (page) {
-#if LINUX_VERSION_CODE < 0x020500
+#if LINUX_VERSION_CODE < 0x020409
 		atomic_dec(&virt_to_page(page)->count);
 		clear_bit(PG_locked, &virt_to_page(page)->flags);
 		wake_up(&virt_to_page(page)->wait);
@@ -339,8 +343,6 @@ static int i810_wait_ring(drm_device_t *dev, int n)
 
 	end = jiffies + (HZ*3);
    	while (ring->space < n) {
-	   	int i;
-
 	   	ring->head = I810_READ(LP_RING + RING_HEAD) & HEAD_ADDR;
 	   	ring->space = ring->head - (ring->tail+8);
 		if (ring->space < 0) ring->space += ring->Size;

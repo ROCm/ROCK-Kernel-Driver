@@ -22,3 +22,6 @@
 
 #define ITEGNO_VENDOR_ID	0x0eba
 #define ITEGNO_PRODUCT_ID	0x1080
+
+#define MA620_VENDOR_ID		0x0df7
+#define MA620_PRODUCT_ID	0x0620

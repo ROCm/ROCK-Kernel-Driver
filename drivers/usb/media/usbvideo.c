@@ -70,7 +70,7 @@ static void usbvideo_StopDataPump(struct uvd *uvd);
 static int usbvideo_GetFrame(struct uvd *uvd, int frameNum);
 static int usbvideo_NewFrame(struct uvd *uvd, int framenum);
 static void usbvideo_SoftwareContrastAdjustment(struct uvd *uvd,
-						usbvideo_frame_t *frame);
+						struct usbvideo_frame *frame);
 
 /*******************************/
 /* Memory management functions */
@@ -127,13 +127,13 @@ static void usbvideo_rvfree(void *mem, unsigned long size)
 	vfree(mem);
 }
 
-static void RingQueue_Initialize(RingQueue_t *rq)
+static void RingQueue_Initialize(struct RingQueue *rq)
 {
 	assert(rq != NULL);
 	init_waitqueue_head(&rq->wqh);
 }
 
-static void RingQueue_Allocate(RingQueue_t *rq, int rqLen)
+static void RingQueue_Allocate(struct RingQueue *rq, int rqLen)
 {
 	/* Make sure the requested size is a power of 2 and
 	   round up if necessary. This allows index wrapping
@@ -154,14 +154,14 @@ static void RingQueue_Allocate(RingQueue_t *rq, int rqLen)
 	assert(rq->queue != NULL);
 }
 
-static int RingQueue_IsAllocated(const RingQueue_t *rq)
+static int RingQueue_IsAllocated(const struct RingQueue *rq)
 {
 	if (rq == NULL)
 		return 0;
 	return (rq->queue != NULL) && (rq->length > 0);
 }
 
-static void RingQueue_Free(RingQueue_t *rq)
+static void RingQueue_Free(struct RingQueue *rq)
 {
 	assert(rq != NULL);
 	if (RingQueue_IsAllocated(rq)) {
@@ -171,7 +171,7 @@ static void RingQueue_Free(RingQueue_t *rq)
 	}
 }
 
-int RingQueue_Dequeue(RingQueue_t *rq, unsigned char *dst, int len)
+int RingQueue_Dequeue(struct RingQueue *rq, unsigned char *dst, int len)
 {
 	int rql, toread;
 
@@ -205,7 +205,7 @@ int RingQueue_Dequeue(RingQueue_t *rq, unsigned char *dst, int len)
 
 EXPORT_SYMBOL(RingQueue_Dequeue);
 
-int RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n)
+int RingQueue_Enqueue(struct RingQueue *rq, const unsigned char *cdata, int n)
 {
 	int enqueued = 0;
 
@@ -237,13 +237,13 @@ int RingQueue_Enqueue(RingQueue_t *rq, const unsigned char *cdata, int n)
 
 EXPORT_SYMBOL(RingQueue_Enqueue);
 
-static void RingQueue_InterruptibleSleepOn(RingQueue_t *rq)
+static void RingQueue_InterruptibleSleepOn(struct RingQueue *rq)
 {
 	assert(rq != NULL);
 	interruptible_sleep_on(&rq->wqh);
 }
 
-void RingQueue_WakeUpInterruptible(RingQueue_t *rq)
+void RingQueue_WakeUpInterruptible(struct RingQueue *rq)
 {
 	assert(rq != NULL);
 	if (waitqueue_active(&rq->wqh))
@@ -252,7 +252,7 @@ void RingQueue_WakeUpInterruptible(RingQueue_t *rq)
 
 EXPORT_SYMBOL(RingQueue_WakeUpInterruptible);
 
-void RingQueue_Flush(RingQueue_t *rq)
+void RingQueue_Flush(struct RingQueue *rq)
 {
 	assert(rq != NULL);
 	rq->ri = 0;
@@ -290,7 +290,7 @@ static void usbvideo_VideosizeToString(char *buf, int bufLen, videosize_t vs)
  * History:
  * 01-Feb-2000 Created.
  */
-static void usbvideo_OverlayChar(struct uvd *uvd, usbvideo_frame_t *frame,
+static void usbvideo_OverlayChar(struct uvd *uvd, struct usbvideo_frame *frame,
 				 int x, int y, int ch)
 {
 	static const unsigned short digits[16] = {
@@ -345,7 +345,7 @@ static void usbvideo_OverlayChar(struct uvd *uvd, usbvideo_frame_t *frame,
  * History:
  * 01-Feb-2000 Created.
  */
-static void usbvideo_OverlayString(struct uvd *uvd, usbvideo_frame_t *frame,
+static void usbvideo_OverlayString(struct uvd *uvd, struct usbvideo_frame *frame,
 				   int x, int y, const char *str)
 {
 	while (*str) {
@@ -363,7 +363,7 @@ static void usbvideo_OverlayString(struct uvd *uvd, usbvideo_frame_t *frame,
  * History:
  * 01-Feb-2000 Created.
  */
-static void usbvideo_OverlayStats(struct uvd *uvd, usbvideo_frame_t *frame)
+static void usbvideo_OverlayStats(struct uvd *uvd, struct usbvideo_frame *frame)
 {
 	const int y_diff = 8;
 	char tmp[16];
@@ -542,7 +542,7 @@ static void usbvideo_ReportStatistics(const struct uvd *uvd)
  * purposes.
  */
 void usbvideo_DrawLine(
-	usbvideo_frame_t *frame,
+	struct usbvideo_frame *frame,
 	int x1, int y1,
 	int x2, int y2,
 	unsigned char cr, unsigned char cg, unsigned char cb)
@@ -616,7 +616,7 @@ EXPORT_SYMBOL(usbvideo_DrawLine);
  */
 void usbvideo_TestPattern(struct uvd *uvd, int fullframe, int pmode)
 {
-	usbvideo_frame_t *frame;
+	struct usbvideo_frame *frame;
 	int num_cell = 0;
 	int scan_length = 0;
 	static int num_pass = 0;
@@ -769,7 +769,7 @@ int usbvideo_register(
 	const int num_cams,
 	const int num_extra,
 	const char *driverName,
-	const usbvideo_cb_t *cbTbl,
+	const struct usbvideo_cb *cbTbl,
 	struct module *md,
 	const struct usb_device_id *id_table)
 {
@@ -1640,7 +1640,7 @@ static int usbvideo_v4l_read(struct file *file, char *buf,
 	struct uvd *uvd = file->private_data;
 	int noblock = file->f_flags & O_NONBLOCK;
 	int frmx = -1, i;
-	usbvideo_frame_t *frame;
+	struct usbvideo_frame *frame;
 
 	if (!CAMERA_IS_OPERATIONAL(uvd) || (buf == NULL))
 		return -EFAULT;
@@ -1990,7 +1990,7 @@ static void usbvideo_StopDataPump(struct uvd *uvd)
  */
 static int usbvideo_NewFrame(struct uvd *uvd, int framenum)
 {
-	usbvideo_frame_t *frame;
+	struct usbvideo_frame *frame;
 	int n;
 
 	if (uvd->debug > 1)
@@ -2064,7 +2064,7 @@ static int usbvideo_NewFrame(struct uvd *uvd, int framenum)
  * FLAGS_NO_DECODING set. Therefore, any regular build of any driver
  * based on usbvideo can use this feature at any time.
  */
-static void usbvideo_CollectRawData(struct uvd *uvd, usbvideo_frame_t *frame)
+static void usbvideo_CollectRawData(struct uvd *uvd, struct usbvideo_frame *frame)
 {
 	int n;
 
@@ -2096,7 +2096,7 @@ static void usbvideo_CollectRawData(struct uvd *uvd, usbvideo_frame_t *frame)
 
 static int usbvideo_GetFrame(struct uvd *uvd, int frameNum)
 {
-	usbvideo_frame_t *frame = &uvd->frame[frameNum];
+	struct usbvideo_frame *frame = &uvd->frame[frameNum];
 
 	if (uvd->debug >= 2)
 		info("%s($%p,%d.)", __FUNCTION__, uvd, frameNum);
@@ -2226,7 +2226,7 @@ static int usbvideo_GetFrame(struct uvd *uvd, int frameNum)
  * line above then we just copy next line. Similarly, if we need to
  * create a last line then preceding line is used.
  */
-void usbvideo_DeinterlaceFrame(struct uvd *uvd, usbvideo_frame_t *frame)
+void usbvideo_DeinterlaceFrame(struct uvd *uvd, struct usbvideo_frame *frame)
 {
 	if ((uvd == NULL) || (frame == NULL))
 		return;
@@ -2297,7 +2297,7 @@ EXPORT_SYMBOL(usbvideo_DeinterlaceFrame);
  * 09-Feb-2001  Created.
  */
 static void usbvideo_SoftwareContrastAdjustment(struct uvd *uvd, 
-						usbvideo_frame_t *frame)
+						struct usbvideo_frame *frame)
 {
 	int i, j, v4l_linesize;
 	signed long adj;

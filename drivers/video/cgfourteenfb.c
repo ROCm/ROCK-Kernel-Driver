@@ -362,7 +362,7 @@ static char idstring[60] __initdata = { 0 };
 
 char __init *cgfourteenfb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	unsigned long rphys, phys;
@@ -414,7 +414,7 @@ char __init *cgfourteenfb_init(struct fb_info_sbusfb *fb)
 
 	strcpy(fb->info.modename, "CGfourteen");
 	strcpy(fix->id, "CGfourteen");
-	fix->line_length = fb->var.xres_virtual;
+	fix->line_length = fb->info.var.xres_virtual;
 	fix->accel = FB_ACCEL_SUN_CG14;
 	
 	disp->scrollmode = SCROLL_YREDRAW;

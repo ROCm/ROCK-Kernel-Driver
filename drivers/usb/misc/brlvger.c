@@ -208,8 +208,8 @@ static DECLARE_WAIT_QUEUE_HEAD(open_wait);
 #define err(args...) \
     ({ printk(KERN_ERR "Voyager: " args); \
        printk("\n"); })
-#define dbgprint(args...) \
-    ({ printk(KERN_DEBUG "Voyager: " __FUNCTION__ ": " args); \
+#define dbgprint(fmt, args...) \
+    ({ printk(KERN_DEBUG "Voyager: %s: " fmt, __FUNCTION__ , ##args); \
        printk("\n"); })
 #define dbg(args...) \
     ({ if(debug >= 1) dbgprint(args); })

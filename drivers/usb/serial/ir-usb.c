@@ -261,7 +261,7 @@ static int ir_startup (struct usb_serial *serial)
 		case 0x20: ir_add_bof =  2; break;
 		case 0x40: ir_add_bof =  1; break;
 		case 0x80: ir_add_bof =  0; break;
-		default:
+		default:;
 	}
 
 	kfree (irda_desc);

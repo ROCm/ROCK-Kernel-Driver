@@ -786,6 +786,8 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			newtp->ack.last_seg_size = skb->len-newtp->tcp_header_len;
 		newtp->mss_clamp = req->mss;
 		TCP_ECN_openreq_child(newtp, req);
+		if (newtp->ecn_flags&TCP_ECN_OK)
+			newsk->no_largesend = 1;
 
 		TCP_INC_STATS_BH(TcpPassiveOpens);
 	}

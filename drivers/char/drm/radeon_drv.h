@@ -76,6 +76,7 @@ typedef struct drm_radeon_private {
    	drm_radeon_freelist_t *tail;
 	int last_buf;
 	volatile u32 *scratch;
+	int writeback_works;
 
 	int usec_timeout;
 
@@ -232,6 +233,10 @@ extern int radeon_cp_flip( DRM_IOCTL_ARGS );
 #define RADEON_SCRATCH_REG5		0x15f4
 #define RADEON_SCRATCH_UMSK		0x0770
 #define RADEON_SCRATCH_ADDR		0x0774
+
+#define GET_SCRATCH( x )	(dev_priv->writeback_works			\
+				? DRM_READ32( &dev_priv->scratch[(x)] )		\
+				: RADEON_READ( RADEON_SCRATCH_REG0 + 4*(x) ) )
 
 #define RADEON_HOST_PATH_CNTL		0x0130
 #	define RADEON_HDP_SOFT_RESET		(1 << 26)

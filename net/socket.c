@@ -355,7 +355,7 @@ static struct dentry_operations sockfs_dentry_operations = {
  *	but we take care of internal coherence yet.
  */
 
-static int sock_map_fd(struct socket *sock)
+int sock_map_fd(struct socket *sock)
 {
 	int fd;
 	struct qstr this;

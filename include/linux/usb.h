@@ -1036,6 +1036,14 @@ struct urb *usb_buffer_map (struct urb *urb);
 void usb_buffer_dmasync (struct urb *urb);
 void usb_buffer_unmap (struct urb *urb);
 
+struct scatterlist;
+int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int nents);
+void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int n_hw_ents);
+void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
+		struct scatterlist *sg, int n_hw_ents);
+
 /*-------------------------------------------------------------------*
  *                         SYNCHRONOUS CALL SUPPORT                  *
  *-------------------------------------------------------------------*/

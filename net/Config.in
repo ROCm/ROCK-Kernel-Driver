@@ -26,6 +26,9 @@ if [ "$CONFIG_INET" = "y" ]; then
 	 source net/ipv6/Config.in
       fi
    fi
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      source net/sctp/Config.in
+   fi
 fi
 if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    bool 'Asynchronous Transfer Mode (ATM) (EXPERIMENTAL)' CONFIG_ATM

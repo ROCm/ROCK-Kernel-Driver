@@ -1030,6 +1030,7 @@ rpciod(void *ptr)
 	wake_up(assassin);
 
 	dprintk("RPC: rpciod exiting\n");
+	unlock_kernel();
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

@@ -51,7 +51,7 @@
 #define DRIVER_DATE		"20020611"
 
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		4
+#define DRIVER_MINOR		5
 #define DRIVER_PATCHLEVEL	0
 
 /* Interface history:
@@ -64,9 +64,10 @@
  *     - Add support for new radeon packets (keith)
  *     - Add getparam ioctl (keith)
  *     - Add flip-buffers ioctl, deprecate fullscreen foo (keith).
- * 1.4 - Add r200 packets to cmdbuf ioctl
+ * 1.4 - Add scratch registers to get_param ioctl.
+ * 1.5 - Add r200 packets to cmdbuf ioctl
  *     - Add r200 function to init ioctl
- *     - Add 'scalar2' hack to cmdbuf ioctl (must die)
+ *     - Add 'scalar2' instruction to cmdbuf
  */
 #define DRIVER_IOCTLS							     \
  [DRM_IOCTL_NR(DRM_IOCTL_DMA)]               = { radeon_cp_buffers,  1, 0 }, \

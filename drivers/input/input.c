@@ -38,6 +38,7 @@ EXPORT_SYMBOL(input_close_device);
 EXPORT_SYMBOL(input_accept_process);
 EXPORT_SYMBOL(input_flush_device);
 EXPORT_SYMBOL(input_event);
+EXPORT_SYMBOL(input_devclass);
 
 #define INPUT_MAJOR	13
 #define INPUT_DEVICES	256

@@ -5,11 +5,6 @@
 tristate 'Serial i/o support' CONFIG_SERIO
 
 dep_tristate '  i8042 PC Keyboard controller' CONFIG_SERIO_I8042 $CONFIG_SERIO
-if [ "$CONFIG_SERIO_I8042" != "n" ]; then
-   hex '    Register Base Address' CONFIG_I8042_REG_BASE 60
-   int '    PS/2 Keyboard IRQ' CONFIG_I8042_KBD_IRQ 1
-   int '    PS/2 AUX IRQ' CONFIG_I8042_AUX_IRQ 12
-fi
 dep_tristate '  Serial port line discipline' CONFIG_SERIO_SERPORT $CONFIG_SERIO 
 dep_tristate '  ct82c710 Aux port controller' CONFIG_SERIO_CT82C710 $CONFIG_SERIO
 if [ "$CONFIG_Q40" = "y" ]; then

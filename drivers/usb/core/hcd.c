@@ -1270,6 +1270,9 @@ struct usb_operations usb_hcd_operations = {
 	.buffer_map =		hcd_buffer_map,
 	.buffer_dmasync =	hcd_buffer_dmasync,
 	.buffer_unmap =		hcd_buffer_unmap,
+	.buffer_map_sg =	hcd_buffer_map_sg,
+	.buffer_dmasync_sg =	hcd_buffer_sync_sg,
+	.buffer_unmap_sg =	hcd_buffer_unmap_sg,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 

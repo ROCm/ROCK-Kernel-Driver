@@ -79,6 +79,12 @@ static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 		urb->status = 0;
 	spin_unlock_irqrestore (&urb->lock, flags);
 
+	if (!(urb->transfer_flags & URB_NO_DMA_MAP)
+			&& usb_pipein (urb->pipe))
+		pci_dma_sync_single (hc->hcd.pdev, urb->transfer_dma,
+				urb->transfer_buffer_length,
+				PCI_DMA_FROMDEVICE);
+
 #ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "INTR", usb_pipeout (urb->pipe));
 #endif
@@ -92,6 +98,8 @@ static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 	if (urb_priv->state != URB_DEL)
 		urb->status = -EINPROGRESS;
 	spin_unlock (&urb->lock);
+
+	/* syncing with PCI_DMA_TODEVICE is evidently trouble... */
 
 	spin_lock (&hc->lock);
 	td_submit_urb (hc, urb);
