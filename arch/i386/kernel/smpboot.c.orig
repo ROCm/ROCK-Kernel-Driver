@@ -48,8 +48,6 @@
 #include <asm/mtrr.h>
 #include <asm/pgalloc.h>
 #include <asm/smpboot.h>
-#include <asm/desc.h>
-#include <asm/arch_hooks.h>
 
 /* Set if we find a B stepping CPU			*/
 static int smp_b_stepping;
@@ -1250,36 +1248,4 @@ void __init smp_boot_cpus(void)
 
 smp_done:
 	zap_low_mappings();
-}
-
-extern void (*interrupt[NR_IRQS])(void);
-
-/*
- * The following vectors are part of the Linux architecture, there
- * is no hardware IRQ pin equivalent for them, they are triggered
- * through the ICC by us (IPIs)
- */
-BUILD_SMP_INTERRUPT(reschedule_interrupt,RESCHEDULE_VECTOR)
-BUILD_SMP_INTERRUPT(invalidate_interrupt,INVALIDATE_TLB_VECTOR)
-BUILD_SMP_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
-
-void __init smp_intr_init()
-{
-	/*
-	 * IRQ0 must be given a fixed assignment and initialized,
-	 * because it's used before the IO-APIC is set up.
-	 */
-	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
-
-	/*
-	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
-	 * IPI, driven by wakeup.
-	 */
-	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
-
-	/* IPI for invalidation */
-	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
-
-	/* IPI for generic function call */
-	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
 }

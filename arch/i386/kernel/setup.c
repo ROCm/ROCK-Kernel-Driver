@@ -113,6 +113,7 @@
 #include <asm/dma.h>
 #include <asm/mpspec.h>
 #include <asm/mmu_context.h>
+#include <asm/arch_hooks.h>
 
 /*
  * Machine setup..
@@ -674,9 +675,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, max_low_pfn;
 	int i;
 
-#ifdef CONFIG_VISWS
-	visws_get_board_type_and_rev();
-#endif
+	pre_setup_arch_hook();
 
  	ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;

@@ -55,8 +55,8 @@
 #include <linux/timex.h>
 #include <linux/config.h>
 
-#include <asm/fixmap.h>
-#include <asm/cobalt.h>
+#include <asm/arch_hooks.h>
+#include "do_timer.h"
 
 /*
  * for x86_do_profile()
@@ -409,23 +409,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	}
 #endif
 
-#ifdef CONFIG_VISWS
-	/* Clear the interrupt */
-	co_cpu_write(CO_CPU_STAT,co_cpu_read(CO_CPU_STAT) & ~CO_STAT_TIMEINTR);
-#endif
-	do_timer(regs);
-/*
- * In the SMP case we use the local APIC timer interrupt to do the
- * profiling, except when we simulate SMP mode on a uniprocessor
- * system, in that case we have to call the local interrupt handler.
- */
-#ifndef CONFIG_X86_LOCAL_APIC
-	if (!user_mode(regs))
-		x86_do_profile(regs->eip);
-#else
-	if (!using_apic_timer)
-		smp_local_timer_interrupt(regs);
-#endif
+	do_timer_interrupt_hook(regs);
 
 	/*
 	 * If we have an externally synchronized Linux clock, then update
@@ -466,7 +450,7 @@ static int use_tsc;
  * Time Stamp Counter value at the time of the timer interrupt, so that
  * we later on can estimate the time of day more exactly.
  */
-static void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int count;
 
@@ -556,8 +540,6 @@ unsigned long get_cmos_time(void)
 	return mktime(year, mon, day, hour, min, sec);
 }
 
-static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
-
 /* ------ Calibrate the TSC ------- 
  * Return 2^32 * (1 / (TSC clocks per usec)) for do_fast_gettimeoffset().
  * Too much 64-bit arithmetic here to do this cleanly in C, and for
@@ -570,6 +552,7 @@ static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NUL
 #define CALIBRATE_LATCH	(5 * LATCH)
 #define CALIBRATE_TIME	(5 * 1000020/HZ)
 
+#ifdef CONFIG_X86_TSC
 static unsigned long __init calibrate_tsc(void)
 {
        /* Set the Gate high, disable speaker */
@@ -634,6 +617,7 @@ static unsigned long __init calibrate_tsc(void)
 bad_ctc:
 	return 0;
 }
+#endif /* CONFIG_X86_TSC */
 
 void __init time_init(void)
 {
@@ -656,6 +640,7 @@ void __init time_init(void)
  * to disk; this won't break the kernel, though, 'cuz we're
  * smart.  See arch/i386/kernel/apm.c.
  */
+#ifdef CONFIG_X86_TSC
  	/*
  	 *	Firstly we have to do a CPU check for chips with
  	 * 	a potentially buggy TSC. At this point we haven't run
@@ -696,22 +681,7 @@ void __init time_init(void)
 			}
 		}
 	}
+#endif /* CONFIG_X86_TSC */
 
-#ifdef CONFIG_VISWS
-	printk("Starting Cobalt Timer system clock\n");
-
-	/* Set the countdown value */
-	co_cpu_write(CO_CPU_TIMEVAL, CO_TIME_HZ/HZ);
-
-	/* Start the timer */
-	co_cpu_write(CO_CPU_CTRL, co_cpu_read(CO_CPU_CTRL) | CO_CTRL_TIMERUN);
-
-	/* Enable (unmask) the timer interrupt */
-	co_cpu_write(CO_CPU_CTRL, co_cpu_read(CO_CPU_CTRL) & ~CO_CTRL_TIMEMASK);
-
-	/* Wire cpu IDT entry to s/w handler (and Cobalt APIC to IDT) */
-	setup_irq(CO_IRQ_TIMER, &irq0);
-#else
-	setup_irq(0, &irq0);
-#endif
+	time_init_hook();
 }

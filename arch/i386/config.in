@@ -417,6 +417,14 @@ if [ "$CONFIG_DEBUG_KERNEL" != "n" ]; then
    fi
 fi
 
+if [ "$CONFIG_X86_LOCAL_APIC" = "y" ]; then
+	define_bool CONFIG_X86_EXTRA_IRQS y
+fi
+
 endmenu
 
 source lib/Config.in
+
+if [ "$CONFIG_SMP" = "y" ]; then
+	define_bool CONFIG_X86_SMP y
+fi
