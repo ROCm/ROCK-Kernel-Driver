@@ -165,7 +165,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.24-pre1"
+#define E100_VERSION  "2.0.25-pre1"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -382,6 +382,7 @@ static void e100_set_multi_exec(struct net_device *dev);
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION(E100_FULL_DRIVER_NAME E100_VERSION);
 MODULE_LICENSE("Dual BSD/GPL");
+EXPORT_NO_SYMBOLS;
 
 E100_PARAM(TxDescriptors, "Number of transmit descriptors");
 E100_PARAM(RxDescriptors, "Number of receive descriptors");
@@ -2715,8 +2716,10 @@ e100_exec_non_cu_cmd(struct e100_private *bdp, nxmit_cb_entry_t *command)
 	ntcb_hdr->cb_lnk_ptr = 0;
 
 	wmb();
+	if (in_interrupt())
+		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
-	if (in_interrupt() || netif_running(bdp->device))
+	if (netif_running(bdp->device) && (!bdp->driver_isolated))
 		return e100_delayed_exec_non_cu_cmd(bdp, command);
 
 	spin_lock_bh(&(bdp->bd_non_tx_lock));
