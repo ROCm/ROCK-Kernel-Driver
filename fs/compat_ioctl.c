@@ -1035,6 +1035,7 @@ static int sg_build_iovec(sg_io_hdr_t *sgio, void *dxferp, u16 iovec_count)
 			return -EFAULT;
 	}
 
+	sgio->dxferp = iov;
 	return 0;
 }
 
