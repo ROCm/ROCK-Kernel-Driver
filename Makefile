@@ -766,38 +766,38 @@ endef
 
 ###
 # Cleaning is done on three levels.
-# make clean     Delete all automatically generated files, including
-#                tools and firmware.
-# make mrproper  Delete the current configuration, and related files
-#                Any core files spread around are deleted as well
+# make clean     Delete most generated files
+#                Leave enough to build external modules
+# make mrproper  Delete the current configuration, and all generated files
 # make distclean Remove editor backup files, patch leftover files and the like
 
-# Directories & files removed with 'make clean'
-CLEAN_DIRS  += $(MODVERDIR) include/config include2
-CLEAN_FILES +=	vmlinux System.map \
-		include/linux/autoconf.h include/linux/version.h \
-		include/asm include/linux/modversions.h \
-		kernel.spec .tmp*
-
-# Files removed with 'make mrproper'
-MRPROPER_FILES += .version .config .config.old tags TAGS cscope*
-
-# clean - Delete all intermediate files
-#
-clean-dirs += $(addprefix _clean_,$(ALL_SUBDIRS) Documentation/DocBook scripts)
-.PHONY: $(clean-dirs) clean archclean mrproper archmrproper distclean
-$(clean-dirs):
-	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
-
-clean:		rm-dirs  := $(wildcard $(CLEAN_DIRS))
-mrproper:	rm-dirs  := $(wildcard $(MRPROPER_DIRS))
-quiet_cmd_rmdirs = $(if $(rm-dirs),CLEAN   $(rm-dirs))
+quiet_cmd_rmdirs = $(if $(wildcard $(rm-dirs)),CLEAN   $(wildcard $(rm-dirs)))
       cmd_rmdirs = rm -rf $(rm-dirs)
 
-clean:		rm-files := $(wildcard $(CLEAN_FILES))
-mrproper:	rm-files := $(wildcard $(MRPROPER_FILES))
-quiet_cmd_rmfiles = $(if $(rm-files),CLEAN   $(rm-files))
-      cmd_rmfiles = rm -rf $(rm-files)
+quiet_cmd_rmfiles = $(if $(wildcard $(rm-files)),CLEAN   $(wildcard $(rm-files)))
+      cmd_rmfiles = rm -f $(rm-files)
+
+# Directories & files removed with 'make clean'
+CLEAN_DIRS  += $(MODVERDIR)
+CLEAN_FILES +=	vmlinux System.map kernel.spec \
+                .tmp_kallsyms* .tmp_version .tmp_vmlinux*
+
+# Directories & files removed with 'make mrproper'
+MRPROPER_DIRS  += include/config include2
+MRPROPER_FILES += .config .config.old include/asm .version \
+                  include/linux/autoconf.h include/linux/version.h \
+                  include/linux/modversions.h \
+                  tags TAGS cscope*
+
+# clean - Delete most, but leave enough to build external modules
+#
+clean: rm-dirs  := $(CLEAN_DIRS)
+clean: rm-files := $(CLEAN_FILES)
+clean-dirs      := $(addprefix _clean_,$(ALL_SUBDIRS))
+
+.PHONY: $(clean-dirs) clean archclean
+$(clean-dirs):
+	$(Q)$(MAKE) $(clean)=$(patsubst _clean_%,%,$@)
 
 clean: archclean $(clean-dirs)
 	$(call cmd,rmdirs)
@@ -807,12 +807,25 @@ clean: archclean $(clean-dirs)
 		-o -name '.*.d' -o -name '.*.tmp' -o -name '*.mod.c' \) \
 		-type f -print | xargs rm -f
 
-# mrproper
+# mrproper - Delete all generated files, including .config
 #
-distclean: mrproper
-mrproper: clean archmrproper
+mrproper: rm-dirs  := $(wildcard $(MRPROPER_DIRS))
+mrproper: rm-files := $(wildcard $(MRPROPER_FILES))
+mrproper-dirs      := $(addprefix _mrproper_,Documentation/DocBook scripts)
+
+.PHONY: $(mrproper-dirs) mrproper archmrproper
+$(mrproper-dirs):
+	$(Q)$(MAKE) $(clean)=$(patsubst _mrproper_%,%,$@)
+
+mrproper: clean archmrproper $(mrproper-dirs)
 	$(call cmd,rmdirs)
 	$(call cmd,rmfiles)
+
+# distclean
+#
+.PHONY: distclean
+
+distclean: mrproper
 	@find . $(RCS_FIND_IGNORE) \
 	 	\( -name '*.orig' -o -name '*.rej' -o -name '*~' \
 		-o -name '*.bak' -o -name '#*#' -o -name '.*.orig' \
