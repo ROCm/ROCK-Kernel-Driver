@@ -35,6 +35,7 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
+#include "mach_apic.h"
 
 #undef APIC_LOCKUP_DEBUG
 

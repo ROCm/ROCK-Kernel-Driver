@@ -73,6 +73,12 @@ CONFIG_X86_CYCLONE
   If you are suffering from time skew using a multi-CEC system, say YES.
   Otherwise it is safe to say NO.
 
+CONFIG_X86_SUMMIT
+  This option is needed for IBM systems that use the Summit/EXA chipset.
+  In particular, it is needed for the x440.
+
+  If you don't have one of these computers, you should say N here.
+
 CONFIG_X86_UP_IOAPIC
   An IO-APIC (I/O Advanced Programmable Interrupt Controller) is an
   SMP-capable replacement for PC-style interrupt controllers. Most
