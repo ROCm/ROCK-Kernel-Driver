@@ -2,8 +2,8 @@
  *
  * Name:	skgesirq.c
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.91 $
- * Date:	$Date: 2003/07/04 12:46:22 $
+ * Version:	$Revision: 1.92 $
+ * Date:	$Date: 2003/09/16 14:37:07 $
  * Purpose:	Special IRQ module
  *
  ******************************************************************************/
@@ -27,6 +27,12 @@
  * History:
  *
  *	$Log: skgesirq.c,v $
+ *	Revision 1.92  2003/09/16 14:37:07  rschmidt
+ *	Added debug messages in some SkGePortCheckUp...() routines.
+ *	Fixed compiler warnings for different types.
+ *	Avoided port check up in reset state (eg. coma mode).
+ *	Editorial changes.
+ *	
  *	Revision 1.91  2003/07/04 12:46:22  rschmidt
  *	Added debug messages in SkGePortCheckUpGmac().
  *	Added error log message and new driver event SK_DRV_DOWNSHIFT_DET
@@ -410,7 +416,7 @@
 
 #if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"@(#) $Id: skgesirq.c,v 1.91 2003/07/04 12:46:22 rschmidt Exp $ (C) Marvell.";
+	"@(#) $Id: skgesirq.c,v 1.92 2003/09/16 14:37:07 rschmidt Exp $ (C) Marvell.";
 #endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
@@ -490,7 +496,7 @@ int		Port)	/* Port Index (MAC_1 + n) */
 		("AutoSensing: First mode %d on Port %d\n",
 		(int)SK_LMODE_AUTOFULL, Port));
 
-	pPrt->PLinkMode = SK_LMODE_AUTOFULL;
+	pPrt->PLinkMode = (SK_U8)SK_LMODE_AUTOFULL;
 
 	return;
 }	/* SkHWInitDefSense */
@@ -606,7 +612,7 @@ int		Port)		/* Port Index (MAC_1 + n) */
 	/* Reset Port stati */
     pPrt->PLinkModeStatus = (SK_U8)SK_LMODE_STAT_UNKNOWN;
     pPrt->PFlowCtrlStatus = (SK_U8)SK_FLOW_STAT_NONE;
-	pPrt->PLinkSpeedUsed = SK_LSPEED_STAT_INDETERMINATED;
+	pPrt->PLinkSpeedUsed = (SK_U8)SK_LSPEED_STAT_INDETERMINATED;
 
 	/* Re-init Phy especially when the AutoSense default is set now */
 	SkMacInitPhy(pAC, IoC, Port, SK_FALSE);
@@ -655,19 +661,19 @@ int		Port)	/* Port Index (MAC_1 + n) */
 		case SK_LSPEED_AUTO:
 			/* default is 1000 Mbps */
 		case SK_LSPEED_1000MBPS:
-			pPrt->PLinkSpeedUsed = SK_LSPEED_STAT_1000MBPS;
+			pPrt->PLinkSpeedUsed = (SK_U8)SK_LSPEED_STAT_1000MBPS;
 			break;
 		case SK_LSPEED_100MBPS:
-			pPrt->PLinkSpeedUsed = SK_LSPEED_STAT_100MBPS;
+			pPrt->PLinkSpeedUsed = (SK_U8)SK_LSPEED_STAT_100MBPS;
 			break;
 		case SK_LSPEED_10MBPS:
-			pPrt->PLinkSpeedUsed = SK_LSPEED_STAT_10MBPS;
+			pPrt->PLinkSpeedUsed = (SK_U8)SK_LSPEED_STAT_10MBPS;
 			break;
 		}
 
 		/* Set Link Mode Status */
 		if (pPrt->PLinkMode == SK_LMODE_FULL) {
-			pPrt->PLinkModeStatus = SK_LMODE_STAT_FULL;
+			pPrt->PLinkModeStatus = (SK_U8)SK_LMODE_STAT_FULL;
 		}
 		else {
             pPrt->PLinkModeStatus = (SK_U8)SK_LMODE_STAT_HALF;
@@ -1598,8 +1604,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 			 * (clear Page Received bit if set)
 			 */
 			SkXmPhyRead(pAC, IoC, Port, PHY_XMAC_AUNE_EXP, &ExtStat);
-			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-				("AutoNeg done Port %d\n", Port));
+			
 			return(SK_HW_PS_LINK);
 		}
 		
@@ -1870,7 +1875,7 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	SkMacAutoNegLipaPhy(pAC, IoC, Port, PhyStat);
 	
 	SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-		("AutoNeg: %d, PhyStat: 0x%04X\n", AutoNeg, PhyStat));
+		("CheckUp Port %d, PhyStat: 0x%04X\n", Port, PhyStat));
 
 	SkXmPhyRead(pAC, IoC, Port, PHY_BCOM_1000T_STAT, &ResAb);
 
@@ -1897,8 +1902,11 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 
 	if (AutoNeg) {
 		if ((PhyStat & PHY_ST_AN_OVER) != 0) {
+			
 			SkHWLinkUp(pAC, IoC, Port);
+			
 			Done = SkMacAutoNegDone(pAC, IoC, Port);
+			
 			if (Done != SK_AND_OK) {
 #ifdef DEBUG
 				/* Get PHY parameters, for debugging only */
@@ -1924,9 +1932,6 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 						(void *)NULL);
 				}
 #endif /* DEBUG */
-				
-				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-					("AutoNeg done Port %d\n", Port));
 				return(SK_HW_PS_LINK);
 			}
 		}
@@ -1989,8 +1994,21 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	SK_U16		PhySpecStat;/* PHY Specific Status */
 	SK_U16		ResAb;		/* Master/Slave resolution */
 	SK_EVPARA	Para;
+#ifdef DEBUG
+	SK_U16		Word;		/* I/O helper */
+#endif /* DEBUG */
 
 	pPrt = &pAC->GIni.GP[Port];
+
+	if (pPrt->PHWLinkUp) {
+		return(SK_HW_PS_NONE);
+	}
+
+	/* Read PHY Status */
+	SkGmPhyRead(pAC, IoC, Port, PHY_MARV_STAT, &PhyStat);
+
+	SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
+		("CheckUp Port %d, PhyStat: 0x%04X\n", Port, PhyStat));
 
 	/* Read PHY Interrupt Status */
 	SkGmPhyRead(pAC, IoC, Port, PHY_MARV_INT_STAT, &PhyIsrc);
@@ -2004,16 +2022,6 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 		SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
 			("Link Speed Changed, PhyIsrc: 0x%04X\n", PhyIsrc));
 	}
-
-	if (pPrt->PHWLinkUp) {
-		return(SK_HW_PS_NONE);
-	}
-
-	/* Read PHY Status */
-	SkGmPhyRead(pAC, IoC, Port, PHY_MARV_STAT, &PhyStat);
-
-	SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-		("AutoNeg: %d, PhyStat: 0x%04X\n", AutoNeg, PhyStat));
 
 	SkMacAutoNegLipaPhy(pAC, IoC, Port, PhyStat);
 	
@@ -2034,7 +2042,20 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 	SkGmPhyRead(pAC, IoC, Port, PHY_MARV_PHY_STAT, &PhySpecStat);
 	
 	SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-		("AutoNeg: %d, PhySpecStat: 0x%04X\n", AutoNeg, PhySpecStat));
+		("Phy1000BT: 0x%04X, PhySpecStat: 0x%04X\n", ResAb, PhySpecStat));
+
+#ifdef DEBUG
+	SkGmPhyRead(pAC, IoC, Port, PHY_MARV_AUNE_EXP, &Word);
+
+	if ((PhyIsrc & PHY_M_IS_AN_PR) != 0 || (Word & PHY_ANE_RX_PG) != 0 ||
+		(PhySpecStat & PHY_M_PS_PAGE_REC) != 0)  {
+		/* Read PHY Next Page Link Partner */
+		SkGmPhyRead(pAC, IoC, Port, PHY_MARV_NEPG_LP, &Word);
+
+		SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
+			("Page Received, NextPage: 0x%04X\n", Word));
+	}
+#endif /* DEBUG */
 
 	if ((PhySpecStat & PHY_M_PS_LINK_UP) == 0) {
 		return(SK_HW_PS_NONE);
@@ -2069,8 +2090,6 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 				return(SK_HW_PS_RESTART);
 			}
 			
-			SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-				("AutoNeg done Port %d\n", Port));
 			return(SK_HW_PS_LINK);
 		}
 	}
@@ -2179,8 +2198,6 @@ SK_BOOL	AutoNeg)	/* Is Auto-negotiation used ? */
 				 * extra link down/ups
 				 */
 				SkXmPhyRead(pAC, IoC, Port, PHY_LONE_INT_STAT, &ExtStat);
-				SK_DBG_MSG(pAC, SK_DBGMOD_HWM, SK_DBGCAT_CTRL,
-					("AutoNeg done Port %d\n", Port));
 				return(SK_HW_PS_LINK);
 			}
 		}
@@ -2278,8 +2295,14 @@ SK_EVPARA	Para)		/* Event specific Parameter */
 
 	switch (Event) {
 	case SK_HWEV_WATIM:
-		/* Check whether port came up */
-		PortStat = SkGePortCheckUp(pAC, IoC, (int)Port);
+		if (pPrt->PState == SK_PRT_RESET) {
+		
+			PortStat = SK_HW_PS_NONE;
+		}
+		else {
+			/* Check whether port came up */
+			PortStat = SkGePortCheckUp(pAC, IoC, (int)Port);
+		}
 
 		switch (PortStat) {
 		case SK_HW_PS_RESTART:

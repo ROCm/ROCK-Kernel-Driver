@@ -1,16 +1,17 @@
 /******************************************************************************
  *
  * Name:	ski2c.c
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.57 $
- * Date:	$Date: 2003/01/28 09:17:38 $
+ * Project:	Gigabit Ethernet Adapters, TWSI-Module
+ * Version:	$Revision: 1.59 $
+ * Date:	$Date: 2003/10/20 09:07:25 $
  * Purpose:	Functions to access Voltage and Temperature Sensor
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2003 SysKonnect GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,6 +27,14 @@
  * History:
  *
  *	$Log: ski2c.c,v $
+ *	Revision 1.59  2003/10/20 09:07:25  rschmidt
+ *	Added cast SK_U32 in SkI2cWrite() to avoid compiler warning.
+ *	Editorial changes.
+ *	
+ *	Revision 1.58  2003/09/23 09:22:53  malthoff
+ *	Parameter I2cDevSize added in SkI2cRead and SkI2cWrite to
+ *	support larger devices on the TWSI bus.
+ *	
  *	Revision 1.57  2003/01/28 09:17:38  rschmidt
  *	Fixed handling for sensors on YUKON Fiber.
  *	Editorial changes.
@@ -224,15 +233,15 @@
  *	Created. Sources taken from ML Projekt.
  *	Sources have to be reworked for GE.
  *
- *
  ******************************************************************************/
-
 
 /*
  *	I2C Protocol
  */
+#if (defined(DEBUG) || ((!defined(LINT)) && (!defined(SK_SLIM))))
 static const char SysKonnectFileId[] =
-	"$Id: ski2c.c,v 1.57 2003/01/28 09:17:38 rschmidt Exp $";
+	"@(#) $Id: ski2c.c,v 1.59 2003/10/20 09:07:25 rschmidt Exp $ (C) Marvell. ";
+#endif
 
 #include "h/skdrv1st.h"		/* Driver Specific Definitions */
 #include "h/lm80.h"
@@ -312,7 +321,7 @@ intro()
 {}
 #endif
 
-#ifdef	SK_DIAG
+#ifdef SK_DIAG
 /*
  * I2C Fast Mode timing values used by the LM80.
  * If new devices are added to the I2C bus the timing values have to be checked.
@@ -516,7 +525,6 @@ SK_IOC IoC)	/* I/O Context */
 {
 	/*
 	 * Received bit must be zero.
-	 *
 	 */
 	SkI2cSndBit(IoC, 0);
 }	/* SkI2cSndAck */
@@ -590,7 +598,7 @@ int		Rw)		/* Read / Write Flag */
 	return(SkI2cSndByte(IoC, (Addr<<1) | Rw));
 }	/* SkI2cSndDev */
 
-#endif	/* SK_DIAG */
+#endif /* SK_DIAG */
 
 /*----------------- I2C CTRL Register Functions ----------*/
 
@@ -620,7 +628,7 @@ int		Event)	/* complete event to wait for (I2C_READ or I2C_WRITE) */
 			SK_I2C_STOP(IoC);
 #ifndef SK_DIAG
 			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E002, SKERR_I2C_E002MSG);
-#endif	/* !SK_DIAG */
+#endif /* !SK_DIAG */
 			return(1);
 		}
 		
@@ -661,15 +669,19 @@ SK_IOC	IoC)	/* I/O Context */
 	}
 
 	StartTime = SkOsGetTime(pAC);
+	
 	do {
 		if (SkOsGetTime(pAC) - StartTime > SK_TICKS_PER_SEC / 8) {
+			
 			SK_I2C_STOP(IoC);
 #ifndef SK_DIAG
 			SK_ERR_LOG(pAC, SK_ERRCL_SW, SKERR_I2C_E016, SKERR_I2C_E016MSG);
-#endif	/* !SK_DIAG */
+#endif /* !SK_DIAG */
 			return;
 		}
+		
 		SK_IN32(IoC, B0_ISRC, &IrqSrc);
+
 	} while ((IrqSrc & IS_I2C_READY) == 0);
 
 	pSen->SenState = SK_SEN_IDLE;
@@ -687,18 +699,19 @@ SK_AC	*pAC,		/* Adapter Context */
 SK_IOC	IoC,		/* I/O Context */
 SK_U32	I2cData,	/* I2C Data to write */
 int		I2cDev,		/* I2C Device Address */
+int		I2cDevSize, /* I2C Device Size (e.g. I2C_025K_DEV or I2C_2K_DEV) */
 int		I2cReg,		/* I2C Device Register Address */
 int		I2cBurst)	/* I2C Burst Flag */
 {
 	SK_OUT32(IoC, B2_I2C_DATA, I2cData);
-	SK_I2C_CTL(IoC, I2C_WRITE, I2cDev, I2cReg, I2cBurst);
+	
+	SK_I2C_CTL(IoC, I2C_WRITE, I2cDev, I2cDevSize, I2cReg, I2cBurst);
 	
 	return(SkI2cWait(pAC, IoC, I2C_WRITE));
 }	/* SkI2cWrite*/
 
 
 #ifdef	SK_DIAG
-
 /*
  * reads a single byte or 4 bytes from the I2C device
  *
@@ -708,23 +721,24 @@ SK_U32 SkI2cRead(
 SK_AC	*pAC,		/* Adapter Context */
 SK_IOC	IoC,		/* I/O Context */
 int		I2cDev,		/* I2C Device Address */
+int		I2cDevSize, /* I2C Device Size (e.g. I2C_025K_DEV or I2C_2K_DEV) */
 int		I2cReg,		/* I2C Device Register Address */
 int		I2cBurst)	/* I2C Burst Flag */
 {
 	SK_U32	Data;
 
 	SK_OUT32(IoC, B2_I2C_DATA, 0);
-	SK_I2C_CTL(IoC, I2C_READ, I2cDev, I2cReg, I2cBurst);
+	SK_I2C_CTL(IoC, I2C_READ, I2cDev, I2cDevSize, I2cReg, I2cBurst);
 	
 	if (SkI2cWait(pAC, IoC, I2C_READ) != 0) {
 		w_print("%s\n", SKERR_I2C_E002MSG);
 	}
 	
 	SK_IN32(IoC, B2_I2C_DATA, &Data);
+	
 	return(Data);
 }	/* SkI2cRead */
-
-#endif	/* SK_DIAG */
+#endif /* SK_DIAG */
 
 
 /*
@@ -745,9 +759,10 @@ SK_SENSOR	*pSen)	/* Sensor to be read */
     if (pSen->SenRead != NULL) {
         return((*pSen->SenRead)(pAC, IoC, pSen));
     }
-    else
+	else {
         return(0); /* no success */
-}	/* SkI2cReadSensor*/
+	}
+}	/* SkI2cReadSensor */
 
 /*
  * Do the Init state 0 initialization
@@ -761,12 +776,12 @@ SK_AC	*pAC)	/* Adapter Context */
 	pAC->I2c.CurrSens = 0;
 	
 	/* Begin with timeout control for state machine */
-	pAC->I2c.TimerMode = SK_TIMER_WATCH_STATEMACHINE;
+	pAC->I2c.TimerMode = SK_TIMER_WATCH_SM;
 	
 	/* Set sensor number to zero */
 	pAC->I2c.MaxSens = 0;
 
-#ifndef	SK_DIAG
+#ifndef SK_DIAG
 	/* Initialize Number of Dummy Reads */
 	pAC->I2c.DummyReads = SK_MAX_SENSORS;
 #endif
@@ -840,19 +855,20 @@ SK_IOC	IoC)	/* I/O Context */
     }
 
 	/* Check for 64 Bit Yukon without sensors */
-	if (SkI2cWrite(pAC, IoC, 0, LM80_ADDR, LM80_CFG, 0) != 0) {
+	if (SkI2cWrite(pAC, IoC, 0, LM80_ADDR, I2C_025K_DEV, LM80_CFG, 0) != 0) {
         return(0);
     }
 
-	(void)SkI2cWrite(pAC, IoC, 0xff, LM80_ADDR, LM80_IMSK_1, 0);
+	(void)SkI2cWrite(pAC, IoC, 0xffUL, LM80_ADDR, I2C_025K_DEV, LM80_IMSK_1, 0);
 	
-	(void)SkI2cWrite(pAC, IoC, 0xff, LM80_ADDR, LM80_IMSK_2, 0);
+	(void)SkI2cWrite(pAC, IoC, 0xffUL, LM80_ADDR, I2C_025K_DEV, LM80_IMSK_2, 0);
 	
-	(void)SkI2cWrite(pAC, IoC, 0, LM80_ADDR, LM80_FAN_CTRL, 0);
+	(void)SkI2cWrite(pAC, IoC, 0, LM80_ADDR, I2C_025K_DEV, LM80_FAN_CTRL, 0);
 	
-	(void)SkI2cWrite(pAC, IoC, 0, LM80_ADDR, LM80_TEMP_CTRL, 0);
+	(void)SkI2cWrite(pAC, IoC, 0, LM80_ADDR, I2C_025K_DEV, LM80_TEMP_CTRL, 0);
 	
-	(void)SkI2cWrite(pAC, IoC, LM80_CFG_START, LM80_ADDR, LM80_CFG, 0);
+	(void)SkI2cWrite(pAC, IoC, (SK_U32)LM80_CFG_START, LM80_ADDR, I2C_025K_DEV,
+		LM80_CFG, 0);
 	
 	/*
 	 * MaxSens has to be updated here, because PhyType is not
@@ -957,7 +973,7 @@ SK_IOC	IoC)	/* I/O Context */
 				pAC->I2c.SenTable[i].SenThreErrLow = SK_SEN_PHY_2V5_LOW_ERR;
 			}
 			else {
-				pAC->I2c.SenTable[i].SenDesc = "Voltage ASIC-Co 1V5";
+				pAC->I2c.SenTable[i].SenDesc = "Voltage Core 1V5";
 				pAC->I2c.SenTable[i].SenThreErrHigh = SK_SEN_CORE_1V5_HIGH_ERR;
 				pAC->I2c.SenTable[i].SenThreWarnHigh = SK_SEN_CORE_1V5_HIGH_WARN;
 				pAC->I2c.SenTable[i].SenThreWarnLow = SK_SEN_CORE_1V5_LOW_WARN;
@@ -1015,9 +1031,9 @@ SK_IOC	IoC)	/* I/O Context */
 		pAC->I2c.SenTable[i].SenDev = LM80_ADDR;
 	}
 
-#ifndef	SK_DIAG
+#ifndef SK_DIAG
 	pAC->I2c.DummyReads = pAC->I2c.MaxSens;
-#endif	/* !SK_DIAG */
+#endif /* !SK_DIAG */
 	
 	/* Clear I2C IRQ */
 	SK_OUT32(IoC, B2_I2C_IRQ, I2C_CLR_IRQ);
@@ -1208,15 +1224,13 @@ SK_SENSOR	*pSen)
 			pSen->SenLastErrLogTS = CurrTime;
 
 			if (pSen->SenType == SK_SEN_TEMP) {
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E011,
-					SKERR_I2C_E011MSG);
-			} else if (pSen->SenType == SK_SEN_VOLT) {
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E012,
-					SKERR_I2C_E012MSG);
-			} else
-			{
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E015,
-					SKERR_I2C_E015MSG);
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E011, SKERR_I2C_E011MSG);
+			}
+			else if (pSen->SenType == SK_SEN_VOLT) {
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E012, SKERR_I2C_E012MSG);
+			}
+			else {
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E015, SKERR_I2C_E015MSG);
 			}
 		}
 	}
@@ -1235,8 +1249,7 @@ SK_SENSOR	*pSen)
 			/* This state is the former one */
 
 			/* So check first whether we have to send a trap */
-			if (pSen->SenLastWarnTrapTS + SK_SEN_WARN_TR_HOLD >
-			    CurrTime) {
+			if (pSen->SenLastWarnTrapTS + SK_SEN_WARN_TR_HOLD > CurrTime) {
 				/*
 				 * Do NOT send the Trap. The hold back time
 				 * has to run out first.
@@ -1245,8 +1258,7 @@ SK_SENSOR	*pSen)
 			}
 
 			/* Check now whether we have to log an Error */
-			if (pSen->SenLastWarnLogTS + SK_SEN_WARN_LOG_HOLD >
-			    CurrTime) {
+			if (pSen->SenLastWarnLogTS + SK_SEN_WARN_LOG_HOLD > CurrTime) {
 				/*
 				 * Do NOT log the error. The hold back time
 				 * has to run out first.
@@ -1277,15 +1289,13 @@ SK_SENSOR	*pSen)
 			pSen->SenLastWarnLogTS = CurrTime;
 
 			if (pSen->SenType == SK_SEN_TEMP) {
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E009,
-					SKERR_I2C_E009MSG);
-			} else if (pSen->SenType == SK_SEN_VOLT) {
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E010,
-					SKERR_I2C_E010MSG);
-			} else
-			{
-				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E014,
-					SKERR_I2C_E014MSG);
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E009, SKERR_I2C_E009MSG);
+			}
+			else if (pSen->SenType == SK_SEN_VOLT) {
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E010, SKERR_I2C_E010MSG);
+			}
+			else {
+				SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E014, SKERR_I2C_E014MSG);
 			}
 		}
 	}
@@ -1317,7 +1327,7 @@ SK_SENSOR	*pSen)
 		}
 	}
 	
-#if 0
+#ifdef TEST_ONLY
     /* Dynamic thresholds also for VAUX of LM80 sensor */
 	if (pSen->SenInit == SK_SEN_DYN_INIT_VAUX) {
 
@@ -1359,7 +1369,7 @@ SK_SENSOR	*pSen)
 	if (pSen->SenInit != SK_SEN_DYN_INIT_NONE) {
 		SK_ERR_LOG(pAC, SK_ERRCL_HW, SKERR_I2C_E013, SKERR_I2C_E013MSG);
 	}
-}	/* SkI2cCheckSensor*/
+}	/* SkI2cCheckSensor */
 
 
 /*
@@ -1390,7 +1400,7 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 
 		if (ReadComplete) {
 			/* Check sensor against defined thresholds */
-			SkI2cCheckSensor (pAC, pSen);
+			SkI2cCheckSensor(pAC, pSen);
 
 			/* Increment Current sensor and set appropriate Timeout */
 			pAC->I2c.CurrSens++;
@@ -1414,7 +1424,7 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 			/* Start Timer */
 			ParaLocal.Para64 = (SK_U64)0;
 
-			pAC->I2c.TimerMode = SK_TIMER_WATCH_STATEMACHINE;
+			pAC->I2c.TimerMode = SK_TIMER_WATCH_SM;
 
             SkTimerStart(pAC, IoC, &pAC->I2c.SenTimer, SK_I2C_TIM_WATCH,
 				SKGE_I2C, SK_I2CEV_TIM, ParaLocal);
@@ -1431,7 +1441,7 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 
 			if (ReadComplete) {
 				/* Check sensor against defined thresholds */
-				SkI2cCheckSensor (pAC, pSen);
+				SkI2cCheckSensor(pAC, pSen);
 
 				/* Increment Current sensor and set appropriate Timeout */
 				pAC->I2c.CurrSens++;
@@ -1496,4 +1506,4 @@ SK_EVPARA	Para)	/* Event specific Parameter */
 	return(0);
 }	/* SkI2cEvent*/
 
-#endif	/* !SK_DIAG */
+#endif /* !SK_DIAG */

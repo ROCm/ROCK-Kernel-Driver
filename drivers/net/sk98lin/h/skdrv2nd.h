@@ -2,15 +2,16 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.3 $
- * Date:	$Date: 2003/08/12 16:51:18 $
+ * Version:	$Revision: 1.10 $
+ * Date:	$Date: 2003/12/11 16:04:45 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2003 SysKonnect GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,6 +27,27 @@
  * History:
  *
  *	$Log: skdrv2nd.h,v $
+ *	Revision 1.10  2003/12/11 16:04:45  mlindner
+ *	Add: New pnmi data backup structure
+ *	
+ *	Revision 1.9  2003/11/10 09:31:37  rroesler
+ *	Add: pnmiBackup structure for DIAG backup restore
+ *	
+ *	Revision 1.8  2003/10/22 14:18:32  rroesler
+ *	Fix: DIAG handling for DualNet cards
+ *	
+ *	Revision 1.7  2003/10/07 09:34:59  mlindner
+ *	Add: New defines for lower and upper range values (interrupt moderation)
+ *	
+ *	Revision 1.6  2003/10/07 08:16:51  mlindner
+ *	Fix: Copyright changes
+ *	
+ *	Revision 1.5  2003/09/01 13:10:39  rroesler
+ *	Add: Prototypes for DIAG Attach/Detach functions
+ *	
+ *	Revision 1.4  2003/09/01 12:33:38  rroesler
+ *	Add: Defines for optimized DIAG interaction
+ *	
  *	Revision 1.3  2003/08/12 16:51:18  mlindner
  *	Fix: UDP and TCP Proto checks
  *	Fix: UDP header offset
@@ -206,6 +228,11 @@ extern int		SkPciWriteCfgWord(SK_AC*, int, SK_U16);
 extern int		SkPciWriteCfgByte(SK_AC*, int, SK_U8);
 extern int		SkDrvEvent(SK_AC*, SK_IOC IoC, SK_U32, SK_EVPARA);
 
+#ifdef SK_DIAG_SUPPORT
+extern int		SkDrvEnterDiagMode(SK_AC *pAc);
+extern int		SkDrvLeaveDiagMode(SK_AC *pAc);
+#endif
+
 struct s_DrvRlmtMbuf {
 	SK_MBUF		*pNext;		/* Pointer to next RLMT Mbuf. */
 	SK_U8		*pData;		/* Data buffer (virtually contig.). */
@@ -247,6 +274,7 @@ struct s_DrvRlmtMbuf {
 #define		SK_IOCTL_SETMIB		(SK_IOCTL_BASE + 1)
 #define		SK_IOCTL_PRESETMIB	(SK_IOCTL_BASE + 2)
 #define		SK_IOCTL_GEN		(SK_IOCTL_BASE + 3)
+#define		SK_IOCTL_DIAG		(SK_IOCTL_BASE + 4)
 
 typedef struct s_IOCTL	SK_GE_IOCTL;
 
@@ -462,6 +490,9 @@ struct s_RxPort {
 #define C_INTS_PER_SEC_DEFAULT      2000 
 #define C_INT_MOD_ENABLE_PERCENTAGE   50 /* if higher 50% enable */
 #define C_INT_MOD_DISABLE_PERCENTAGE  50 /* if lower 50% disable */
+#define C_INT_MOD_IPS_LOWER_RANGE     30
+#define C_INT_MOD_IPS_UPPER_RANGE     40000
+
 
 typedef struct s_DynIrqModInfo  DIM_INFO;
 struct s_DynIrqModInfo {
@@ -492,6 +523,11 @@ struct s_DynIrqModInfo {
 typedef struct s_PerStrm	PER_STRM;
 
 #define SK_ALLOC_IRQ	0x00000001
+
+#ifdef SK_DIAG_SUPPORT
+#define	DIAG_ACTIVE		1
+#define	DIAG_NOTACTIVE		0
+#endif
 
 /****************************************************************************
  * Per board structure / Adapter Context structure:
@@ -563,9 +599,18 @@ struct s_AC  {
 	int		PortUp;
 	int		PortDown;
 	int		ChipsetType;	/*  Chipset family type 
-							 *  0 == Genesis family support
-							 *  1 == Yukon family support
-							 */
+					 *  0 == Genesis family support
+					 *  1 == Yukon family support
+					 */
+#ifdef SK_DIAG_SUPPORT
+	SK_U32		DiagModeActive;		/* is diag active?	*/
+	SK_BOOL		DiagFlowCtrl;		/* for control purposes	*/
+	SK_PNMI_STRUCT_DATA PnmiBackup;		/* backup structure for all Pnmi-Data */
+	SK_BOOL         WasIfUp[SK_MAX_MACS];   /* for OpenClose while 
+						 * DIAG is busy with NIC 
+						 */
+#endif
+
 };
 
 

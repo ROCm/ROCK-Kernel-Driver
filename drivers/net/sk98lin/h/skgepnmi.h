@@ -2,8 +2,8 @@
  *
  * Name:	skgepnmi.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.61 $
- * Date:	$Date: 2003/05/23 12:53:52 $
+ * Version:	$Revision: 1.62 $
+ * Date:	$Date: 2003/08/15 12:31:52 $
  * Purpose:	Defines for Private Network Management Interface
  *
  ****************************************************************************/
@@ -27,6 +27,18 @@
  * History:
  *
  *	$Log: skgepnmi.h,v $
+ *	Revision 1.62  2003/08/15 12:31:52  tschilli
+ *	Added new OIDs:
+ *	OID_SKGE_DRIVER_RELDATE
+ *	OID_SKGE_DRIVER_FILENAME
+ *	OID_SKGE_CHIPID
+ *	OID_SKGE_RAMSIZE
+ *	OID_SKGE_VAUXAVAIL
+ *	OID_SKGE_PHY_TYPE
+ *	OID_SKGE_PHY_LP_MODE
+ *	
+ *	Added new define SK_DIAG_ATTACHED for OID_SKGE_DIAG_MODE handling.
+ *	
  *	Revision 1.61  2003/05/23 12:53:52  tschilli
  *	Generic PNMI IOCTL subcommands added.
  *	Function prototype SkPnmiGenIoctl() added.
@@ -568,15 +580,23 @@
 #define OID_SKGE_ALL_DATA				0xFF020190
 
 /* Defines for VCT. */
-#define OID_SKGE_VCT_GET			0xFF020200
-#define OID_SKGE_VCT_SET			0xFF020201
-#define OID_SKGE_VCT_STATUS			0xFF020202
+#define OID_SKGE_VCT_GET				0xFF020200
+#define OID_SKGE_VCT_SET				0xFF020201
+#define OID_SKGE_VCT_STATUS				0xFF020202
 
 #ifdef SK_DIAG_SUPPORT
 /* Defines for driver DIAG mode. */
-#define OID_SKGE_DIAG_MODE			0xFF020204
+#define OID_SKGE_DIAG_MODE				0xFF020204
 #endif /* SK_DIAG_SUPPORT */
 
+/* New OIDs */
+#define OID_SKGE_DRIVER_RELDATE			0xFF020210
+#define OID_SKGE_DRIVER_FILENAME		0xFF020211
+#define OID_SKGE_CHIPID					0xFF020212
+#define OID_SKGE_RAMSIZE				0xFF020213
+#define OID_SKGE_VAUXAVAIL				0xFF020214
+#define OID_SKGE_PHY_TYPE				0xFF020215
+#define OID_SKGE_PHY_LP_MODE			0xFF020216
 
 /* VCT struct to store a backup copy of VCT data after a port reset. */
 typedef struct s_PnmiVct {
@@ -613,6 +633,12 @@ typedef struct s_PnmiVct {
 #define OID_SKGE_TRAP_RLMT_PORT_UP		523
 #define OID_SKGE_TRAP_RLMT_SEGMENTATION	524
 
+#ifdef SK_DIAG_SUPPORT
+/* Defines for driver DIAG mode. */
+#define SK_DIAG_ATTACHED	2
+#define SK_DIAG_RUNNING		1
+#define SK_DIAG_IDLE		0
+#endif /* SK_DIAG_SUPPORT */
 
 /*
  * Generic PNMI IOCTL subcommand definitions.
@@ -730,6 +756,14 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_ERR051MSG	"SkPnmiEvent: Port switch suspicious"
 #define SK_PNMI_ERR052		(SK_ERRBASE_PNMI + 52)
 #define SK_PNMI_ERR052MSG	""
+#define SK_PNMI_ERR053		(SK_ERRBASE_PNMI + 53)
+#define SK_PNMI_ERR053MSG	"General: Driver release date not initialized"
+#define SK_PNMI_ERR054		(SK_ERRBASE_PNMI + 54)
+#define SK_PNMI_ERR054MSG	"General: Driver release date string too long"
+#define SK_PNMI_ERR055		(SK_ERRBASE_PNMI + 55)
+#define SK_PNMI_ERR055MSG	"General: Driver file name not initialized"
+#define SK_PNMI_ERR056		(SK_ERRBASE_PNMI + 56)
+#define SK_PNMI_ERR056MSG	"General: Driver file name string too long"
 
 /*
  * Management counter macros called by the driver
@@ -740,6 +774,11 @@ typedef struct s_PnmiVct {
 #define SK_PNMI_SET_DRIVER_VER(pAC,v)	((pAC)->Pnmi.pDriverVersion = \
 	(char *)(v))
 
+#define SK_PNMI_SET_DRIVER_RELDATE(pAC,v)	((pAC)->Pnmi.pDriverReleaseDate = \
+	(char *)(v))
+
+#define SK_PNMI_SET_DRIVER_FILENAME(pAC,v)	((pAC)->Pnmi.pDriverFileName = \
+	(char *)(v))
 
 #define SK_PNMI_CNT_TX_QUEUE_LEN(pAC,v,p) \
 	{ \
@@ -916,6 +955,8 @@ typedef struct s_PnmiConf {
 	char			ConfMacFactoryAddr[6];
 	SK_U8			ConfPMD;
 	SK_U8			ConfConnector;
+	SK_U32			ConfPhyType;
+	SK_U32			ConfPhyMode;
 	SK_U8			ConfLinkCapability;
 	SK_U8			ConfLinkMode;
 	SK_U8			ConfLinkModeStatus;
@@ -964,9 +1005,14 @@ typedef struct s_PnmiStrucData {
 	SK_U32			DeviceType;
 	char			DriverDescr[SK_PNMI_STRINGLEN1];
 	char			DriverVersion[SK_PNMI_STRINGLEN2];
+	char			DriverReleaseDate[SK_PNMI_STRINGLEN1];
+	char			DriverFileName[SK_PNMI_STRINGLEN1];
 	char			HwDescr[SK_PNMI_STRINGLEN1];
 	char			HwVersion[SK_PNMI_STRINGLEN2];
 	SK_U16			Chipset;
+	SK_U32			ChipId;
+	SK_U8			VauxAvail;
+	SK_U32			RamSize;
 	SK_U32			MtuSize;
 	SK_U32			Action;
 	SK_U32			TestResult;
@@ -1090,6 +1136,8 @@ typedef struct s_PnmiData {
 
 	char			*pDriverDescription;
 	char			*pDriverVersion;
+	char			*pDriverReleaseDate;
+	char			*pDriverFileName;
 
 	int				MacUpdatedFlag;
 	int				RlmtUpdatedFlag;
@@ -1119,6 +1167,9 @@ typedef struct s_PnmiData {
 	SK_U8		VctStatus[SK_MAX_MACS];
 	SK_PNMI_VCT	VctBackup[SK_MAX_MACS];
 	SK_PNMI_VCT_TIMER VctTimeout[SK_MAX_MACS];
+#ifdef SK_DIAG_SUPPORT
+	SK_U32			DiagAttached;
+#endif /* SK_DIAG_SUPPORT */
 } SK_PNMI;
 
 

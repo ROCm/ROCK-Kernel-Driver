@@ -2,8 +2,8 @@
  *
  * Name:	skgeinit.h
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.81 $
- * Date:	$Date: 2003/07/04 12:30:38 $
+ * Version:	$Revision: 1.83 $
+ * Date:	$Date: 2003/09/16 14:07:37 $
  * Purpose:	Structures and prototypes for the GE Init Module
  *
  ******************************************************************************/
@@ -27,6 +27,23 @@
  * History:
  *
  *	$Log: skgeinit.h,v $
+ *	Revision 1.83  2003/09/16 14:07:37  rschmidt
+ *	Moved defines for PHY power down modes from skgehw.h
+ *	Added prototypes for SkMacClearRst()
+ *	Editorial changes
+ *	
+ *	Revision 1.82  2003/09/16 07:18:36  mschmid
+ *	Added members to port structure for MAC control
+ *	- PMacColThres
+ *	- PMacJamLen
+ *	- PMacJamIpgVal
+ *	- PMacJamIpgData
+ *	- PMacIpgData
+ *	- PMacLimit4
+ *	Added PHY power state to port structure
+ *	- PPhyPowerState
+ *	Added function prototypes to enter and leave low power modes
+ *	
  *	Revision 1.81  2003/07/04 12:30:38  rschmidt
  *	Added SK_FAR to pointers in MAC statistic functions (for PXE)
  *	Editorial changes
@@ -594,6 +611,13 @@ extern "C" {
 #define SK_PRT_INIT		2	/* the port is initialized */
 #define SK_PRT_RUN		3	/* the port has an active link */
 
+/* PHY power down modes */
+#define PHY_PM_OPERATIONAL_MODE		0	/* PHY operational mode */
+#define PHY_PM_DEEP_SLEEP			1	/* coma mode --> minimal power */
+#define PHY_PM_IEEE_POWER_DOWN		2	/* IEEE 22.2.4.1.5 compl. power down */
+#define PHY_PM_ENERGY_DETECT		3	/* energy detect */
+#define PHY_PM_ENERGY_DETECT_PLUS	4	/* energy detect plus */
+
 /* Default receive frame limit for Workaround of XMAC Errata */
 #define SK_DEF_RX_WA_LIM	SK_CONSTU64(100)
 
@@ -685,6 +709,13 @@ typedef	struct s_GePort {
 	SK_U8	PCableLen;		/* Cable Length */
 	SK_U8	PMdiPairLen[4];	/* MDI[0..3] Pair Length */
 	SK_U8	PMdiPairSts[4];	/* MDI[0..3] Pair Diagnostic Status */
+	SK_U8	PPhyPowerState;	/* PHY current power state */
+	int		PMacColThres;	/* MAC Collision Threshold */
+	int		PMacJamLen;		/* MAC Jam length */
+	int		PMacJamIpgVal;	/* MAC Jam IPG */
+	int		PMacJamIpgData;	/* MAC IPG Jam to Data */
+	int		PMacIpgData;	/* MAC Data IPG */
+	SK_BOOL PMacLimit4;		/* reset collision counter and backoff algorithm */
 } SK_GEPORT;
 
 /*
@@ -865,6 +896,11 @@ extern void	SkMacHardRst(
 	SK_IOC	IoC,
 	int		Port);
 
+extern void	SkMacClearRst(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port);
+
 extern void	SkXmInitMac(
 	SK_AC	*pAC,
 	SK_IOC	IoC,
@@ -1040,6 +1076,17 @@ extern int SkGmCableDiagStatus(
 	int		Port,
 	SK_BOOL	StartTest);
 
+extern int SkGmEnterLowPowerMode(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port,
+	SK_U8	Mode);
+
+extern int SkGmLeaveLowPowerMode(
+	SK_AC	*pAC,
+	SK_IOC	IoC,
+	int		Port);
+
 #ifdef SK_DIAG
 extern void	SkGePhyRead(
 	SK_AC	*pAC,
@@ -1101,6 +1148,7 @@ extern int	SkGeInitAssignRamToQueues();
 extern void SkMacRxTxDisable();
 extern void	SkMacSoftRst();
 extern void	SkMacHardRst();
+extern void	SkMacClearRst();
 extern void SkMacInitPhy();
 extern int  SkMacRxTxEnable();
 extern void SkMacPromiscMode();
@@ -1131,6 +1179,8 @@ extern int	SkGmResetCounter();
 extern int	SkXmOverflowStatus();
 extern int	SkGmOverflowStatus();
 extern int	SkGmCableDiagStatus();
+extern int	SkGmEnterLowPowerMode();
+extern int	SkGmLeaveLowPowerMode();
 
 #ifdef SK_DIAG
 extern void	SkGePhyRead();
