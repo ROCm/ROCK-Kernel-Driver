@@ -1158,3 +1158,13 @@ void __init mnt_init(unsigned long mempages)
 	init_rootfs();
 	init_mount_tree();
 }
+
+void __put_namespace(struct namespace *namespace)
+{
+	down_write(&namespace->sem);
+	spin_lock(&vfsmount_lock);
+	umount_tree(namespace->root);
+	spin_unlock(&vfsmount_lock);
+	up_write(&namespace->sem);
+	kfree(namespace);
+}

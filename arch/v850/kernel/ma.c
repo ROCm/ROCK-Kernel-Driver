@@ -22,19 +22,19 @@
 #include <asm/atomic.h>
 #include <asm/page.h>
 #include <asm/machdep.h>
-#include <asm/nb85e_timer_d.h>
+#include <asm/v850e_timer_d.h>
 
 #include "mach.h"
 
 void __init mach_sched_init (struct irqaction *timer_action)
 {
 	/* Start hardware timer.  */
-	nb85e_timer_d_configure (0, HZ);
+	v850e_timer_d_configure (0, HZ);
 	/* Install timer interrupt handler.  */
 	setup_irq (IRQ_INTCMD(0), timer_action);
 }
 
-static struct nb85e_intc_irq_init irq_inits[] = {
+static struct v850e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, 		NUM_MACH_IRQS,	1, 7 },
 	{ "CMD", IRQ_INTCMD(0), IRQ_INTCMD_NUM,	1, 5 },
 	{ "DMA", IRQ_INTDMA(0), IRQ_INTDMA_NUM,	1, 2 },
@@ -51,7 +51,7 @@ static struct hw_interrupt_type hw_itypes[NUM_IRQ_INITS];
 /* Initialize MA chip interrupts.  */
 void __init ma_init_irqs (void)
 {
-	nb85e_intc_init_irq_types (irq_inits, hw_itypes);
+	v850e_intc_init_irq_types (irq_inits, hw_itypes);
 }
 
 /* Called before configuring an on-chip UART.  */

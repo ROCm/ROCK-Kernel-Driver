@@ -17,7 +17,7 @@
 
 int broken_hp_bios_irq9;
 
-extern struct pci_ops pci_direct_conf1;
+extern struct pci_raw_ops pci_direct_conf1;
 
 static int pci_visws_enable_irq(struct pci_dev *dev) { return 0; }
 
@@ -101,8 +101,9 @@ static int __init pcibios_init(void)
 	printk(KERN_INFO "PCI: Lithium bridge A bus: %u, "
 		"bridge B (PIIX4) bus: %u\n", pci_bus1, pci_bus0);
 
-	pci_scan_bus(pci_bus0, &pci_direct_conf1, NULL);
-	pci_scan_bus(pci_bus1, &pci_direct_conf1, NULL);
+	raw_pci_ops = &pci_direct_conf1;
+	pci_scan_bus(pci_bus0, &pci_root_ops, NULL);
+	pci_scan_bus(pci_bus1, &pci_root_ops, NULL);
 	pci_fixup_irqs(visws_swizzle, visws_map_irq);
 	pcibios_resource_survey();
 	return 0;

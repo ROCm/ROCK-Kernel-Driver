@@ -11,8 +11,6 @@ struct scsi_mode_data;
 
 
 struct scsi_device {
-	struct class_device	sdev_classdev;
-
 	struct list_head    siblings;   /* list of all devices on this host */
 	struct list_head    same_target_siblings; /* just the devices sharing same target id */
 	struct Scsi_Host *host;
@@ -86,10 +84,11 @@ struct scsi_device {
 	unsigned int max_device_blocked; /* what device_blocked counts down from  */
 #define SCSI_DEFAULT_DEVICE_BLOCKED	3
 
-	struct device sdev_driverfs_dev;
+	struct device		sdev_gendev;
+	struct class_device	sdev_classdev;
 };
 #define	to_scsi_device(d)	\
-	container_of(d, struct scsi_device, sdev_driverfs_dev)
+	container_of(d, struct scsi_device, sdev_gendev)
 
 extern struct scsi_device *scsi_add_device(struct Scsi_Host *,
 		uint, uint, uint);

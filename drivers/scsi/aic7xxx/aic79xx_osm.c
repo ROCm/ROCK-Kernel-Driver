@@ -2173,7 +2173,8 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 	ahd_unlock(ahd, &s);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	scsi_add_host(host, &ahd->dev_softc->dev);
+	scsi_add_host(host, &ahd->dev_softc->dev); /* XXX handle failure */
+	scsi_scan_host(host);
 #endif
 	return (0);
 }

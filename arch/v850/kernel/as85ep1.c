@@ -1,8 +1,8 @@
 /*
  * arch/v850/kernel/as85ep1.c -- AS85EP1 V850E evaluation chip/board
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -21,8 +21,8 @@
 #include <asm/machdep.h>
 #include <asm/atomic.h>
 #include <asm/page.h>
-#include <asm/nb85e_timer_d.h>
-#include <asm/nb85e_uart.h>
+#include <asm/v850e_timer_d.h>
+#include <asm/v850e_uart.h>
 
 #include "mach.h"
 
@@ -90,20 +90,14 @@ void __init mach_early_init (void)
 	AS85EP1_IRAMM = 0x0;	/* 内蔵命令RAMは「read-mode」になります */
 #endif /* !CONFIG_ROM_KERNEL */
 
-	nb85e_intc_disable_irqs ();
+	v850e_intc_disable_irqs ();
 }
 
 void __init mach_setup (char **cmdline)
 {
-#ifdef CONFIG_V850E_NB85E_UART_CONSOLE
-	nb85e_uart_cons_init (1);
-#endif
-
 	AS85EP1_PORT_PMC (LEDS_PORT) = 0; /* Make the LEDs port an I/O port. */
 	AS85EP1_PORT_PM (LEDS_PORT) = 0; /* Make all the bits output pins.  */
 	mach_tick = as85ep1_led_tick;
-
-	ROOT_DEV = MKDEV (BLKMEM_MAJOR, 0);
 }
 
 void __init mach_get_physical_ram (unsigned long *ram_start,
@@ -137,21 +131,21 @@ void __init mach_reserve_bootmem ()
 				 root_fs_image_end - root_fs_image_start);
 }
 
-void mach_gettimeofday (struct timeval *tv)
+void mach_gettimeofday (struct timespec *tv)
 {
 	tv->tv_sec = 0;
-	tv->tv_usec = 0;
+	tv->tv_nsec = 0;
 }
 
 void __init mach_sched_init (struct irqaction *timer_action)
 {
 	/* Start hardware timer.  */
-	nb85e_timer_d_configure (0, HZ);
+	v850e_timer_d_configure (0, HZ);
 	/* Install timer interrupt handler.  */
 	setup_irq (IRQ_INTCMD(0), timer_action);
 }
 
-static struct nb85e_intc_irq_init irq_inits[] = {
+static struct v850e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, 		NUM_MACH_IRQS,	1, 7 },
 	{ "CCC", IRQ_INTCCC(0),	IRQ_INTCCC_NUM, 1, 5 },
 	{ "CMD", IRQ_INTCMD(0), IRQ_INTCMD_NUM,	1, 5 },
@@ -166,7 +160,7 @@ static struct hw_interrupt_type hw_itypes[NUM_IRQ_INITS];
 
 void __init mach_init_irqs (void)
 {
-	nb85e_intc_init_irq_types (irq_inits, hw_itypes);
+	v850e_intc_init_irq_types (irq_inits, hw_itypes);
 }
 
 void machine_restart (char *__unused)

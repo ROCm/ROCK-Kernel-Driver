@@ -25,7 +25,8 @@
  *	82801AA & 82801AB  chip : document number 290655-003, 290677-004,
  *	82801BA & 82801BAM chip : document number 290687-002, 298242-005,
  *	82801CA & 82801CAM chip : document number 290716-001, 290718-001,
- *	82801DB & 82801E   chip : document number 290744-001, 273599-001
+ *	82801DB & 82801E   chip : document number 290744-001, 273599-001,
+ *	82801EB & 82801ER  chip : document number 252516-001
  *
  *  20000710 Nils Faerber
  *	Initial Version 0.01
@@ -42,9 +43,11 @@
  *	     clean up ioctls (WDIOC_GETSTATUS, WDIOC_GETBOOTSTATUS and
  *	     WDIOC_SETOPTIONS), made i810tco_getdevice __init,
  *	     removed boot_status, removed tco_timer_read,
- *	     added support for 82801DB and 82801E chipset, general cleanup.
+ *	     added support for 82801DB and 82801E chipset,
+ *	     added support for 82801EB and 8280ER chipset,
+ *	     general cleanup.
  */
- 
+
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/miscdevice.h>
@@ -164,7 +167,7 @@ static int tco_timer_settimer (unsigned char tmrval)
  * Reload (trigger) the timer. Lock is needed so we don't reload it during
  * a reprogramming event
  */
- 
+
 static void tco_timer_reload (void)
 {
 	spin_lock(&tco_lock);
@@ -307,6 +310,7 @@ static struct pci_device_id i810tco_pci_tbl[] __initdata = {
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_12,	PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_0,	PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_0,	PCI_ANY_ID, PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801EB_0,	PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, },
 };
 MODULE_DEVICE_TABLE (pci, i810tco_pci_tbl);

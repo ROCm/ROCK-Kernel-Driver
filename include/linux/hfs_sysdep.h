@@ -28,9 +28,6 @@
 
 extern struct timezone sys_tz;
 
-#undef offsetof
-#define offsetof(TYPE, MEMB) ((size_t) &((TYPE *)0)->MEMB)
-
 /* Typedefs for integer types by size and signedness */
 typedef __u8            hfs_u8;
 typedef __u16           hfs_u16;

@@ -231,7 +231,7 @@ static int fop_open(struct inode * inode, struct file * file)
 			/* Good, fire up the show */
 			wdt_startup();
 			if (nowayout)
-				MOD_INC_USE_COUNT;
+				__module_get(THIS_MODULE);
 
 			return 0;
 		default:

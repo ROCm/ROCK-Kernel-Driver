@@ -1,5 +1,5 @@
 /*
- * arch/v850/kernel/nb85e_intc.c -- NB85E cpu core interrupt controller (INTC)
+ * arch/v850/kernel/v850e_intc.c -- V850E interrupt controller (INTC)
  *
  *  Copyright (C) 2001,02,03  NEC Electronics Corporation
  *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
@@ -15,18 +15,18 @@
 #include <linux/init.h>
 #include <linux/irq.h>
 
-#include <asm/nb85e_intc.h>
+#include <asm/v850e_intc.h>
 
 static void irq_nop (unsigned irq) { }
 
-static unsigned nb85e_intc_irq_startup (unsigned irq)
+static unsigned v850e_intc_irq_startup (unsigned irq)
 {
-	nb85e_intc_clear_pending_irq (irq);
-	nb85e_intc_enable_irq (irq);
+	v850e_intc_clear_pending_irq (irq);
+	v850e_intc_enable_irq (irq);
 	return 0;
 }
 
-static void nb85e_intc_end_irq (unsigned irq)
+static void v850e_intc_end_irq (unsigned irq)
 {
 	unsigned long psw, temp;
 
@@ -64,22 +64,22 @@ static void nb85e_intc_end_irq (unsigned irq)
 
 /* Initialize HW_IRQ_TYPES for INTC-controlled irqs described in array
    INITS (which is terminated by an entry with the name field == 0).  */
-void __init nb85e_intc_init_irq_types (struct nb85e_intc_irq_init *inits,
+void __init v850e_intc_init_irq_types (struct v850e_intc_irq_init *inits,
 				       struct hw_interrupt_type *hw_irq_types)
 {
-	struct nb85e_intc_irq_init *init;
+	struct v850e_intc_irq_init *init;
 	for (init = inits; init->name; init++) {
 		unsigned i;
 		struct hw_interrupt_type *hwit = hw_irq_types++;
 
 		hwit->typename = init->name;
 
-		hwit->startup  = nb85e_intc_irq_startup;
-		hwit->shutdown = nb85e_intc_disable_irq;
-		hwit->enable   = nb85e_intc_enable_irq;
-		hwit->disable  = nb85e_intc_disable_irq;
+		hwit->startup  = v850e_intc_irq_startup;
+		hwit->shutdown = v850e_intc_disable_irq;
+		hwit->enable   = v850e_intc_enable_irq;
+		hwit->disable  = v850e_intc_disable_irq;
 		hwit->ack      = irq_nop;
-		hwit->end      = nb85e_intc_end_irq;
+		hwit->end      = v850e_intc_end_irq;
 		
 		/* Initialize kernel IRQ infrastructure for this interrupt.  */
 		init_irq_handlers(init->base, init->num, init->interval, hwit);
@@ -92,13 +92,13 @@ void __init nb85e_intc_init_irq_types (struct nb85e_intc_irq_init *inits,
 			   interrupts are initially disabled), then
 			   assume whoever enabled it has set things up
 			   properly, and avoid messing with it.  */
-			if (! nb85e_intc_irq_enabled (irq))
+			if (! v850e_intc_irq_enabled (irq))
 				/* This write also (1) disables the
 				   interrupt, and (2) clears any pending
 				   interrupts.  */
-				NB85E_INTC_IC (irq)
-					= (NB85E_INTC_IC_PR (init->priority)
-					   | NB85E_INTC_IC_MK);
+				V850E_INTC_IC (irq)
+					= (V850E_INTC_IC_PR (init->priority)
+					   | V850E_INTC_IC_MK);
 		}
 	}
 }

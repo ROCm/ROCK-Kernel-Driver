@@ -81,19 +81,15 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	error = scsi_sysfs_add_host(shost, dev);
-
 	if (!shost->can_queue) {
 		printk(KERN_ERR "%s: can_queue = 0 no longer supported\n",
 				sht->name);
 		error = -EINVAL;
 	}
 
-	if (!error) {
+	error = scsi_sysfs_add_host(shost, dev);
+	if (!error)
 		scsi_proc_host_add(shost);
-		scsi_scan_host(shost);
-	}
-			
 	return error;
 }
 
@@ -150,12 +146,6 @@ struct Scsi_Host *scsi_host_alloc(struct scsi_host_template *sht, int privsize)
 				"this driver\n", sht->proc_name);
 		dump_stack();
         }
-
-	/* if its not set in the template, use the default */
-	if (!sht->shost_attrs)
-		 sht->shost_attrs = scsi_sysfs_shost_attrs;
-	if (!sht->sdev_attrs)
-		 sht->sdev_attrs = scsi_sysfs_sdev_attrs;
 
 	shost = kmalloc(sizeof(struct Scsi_Host) + privsize, gfp_mask);
 	if (!shost)
@@ -283,8 +273,8 @@ struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
  **/
 void scsi_host_get(struct Scsi_Host *shost)
 {
-	get_device(&shost->host_gendev);
-	class_device_get(&shost->class_dev);
+	get_device(&shost->shost_gendev);
+	class_device_get(&shost->shost_classdev);
 }
 
 /**
@@ -293,6 +283,6 @@ void scsi_host_get(struct Scsi_Host *shost)
  **/
 void scsi_host_put(struct Scsi_Host *shost)
 {
-	class_device_put(&shost->class_dev);
-	put_device(&shost->host_gendev);
+	class_device_put(&shost->shost_classdev);
+	put_device(&shost->shost_gendev);
 }

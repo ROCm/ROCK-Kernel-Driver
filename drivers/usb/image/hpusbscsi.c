@@ -109,7 +109,8 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 		goto out_unlink_controlurb;
 
 	new->host->hostdata[0] = (unsigned long)new;
-	scsi_add_host(new->host, &intf->dev);
+	scsi_add_host(new->host, &intf->dev); /* XXX handle failure */
+	scsi_scan_host(new->host);
 
 	new->sense_command[0] = REQUEST_SENSE;
 	new->sense_command[4] = HPUSBSCSI_SENSE_LENGTH;

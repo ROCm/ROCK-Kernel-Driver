@@ -113,9 +113,7 @@ static irqreturn_t gbus_int_handle_irq (int irq, void *dev_id,
 		/* Only pay attention to enabled interrupts.  */
 		status &= enable;
 		if (status) {
-			unsigned base_irq
-				= IRQ_GBUS_INT (w * GBUS_INT_BITS_PER_WORD);
-			irq = base_irq;
+			irq = IRQ_GBUS_INT (w * GBUS_INT_BITS_PER_WORD);
 			do {
 				/* There's an active interrupt in word
 				   W, find out which one, and call its
@@ -247,7 +245,7 @@ void __init gbus_int_init_irqs (void)
 	/* First initialize the shared gint interrupts.  */
 	for (i = 0; i < NUM_USED_GINTS; i++) {
 		unsigned gint = used_gint[i].gint;
-		struct nb85e_intc_irq_init gint_irq_init[2];
+		struct v850e_intc_irq_init gint_irq_init[2];
 
 		/* We initialize one GINT interrupt at a time.  */
 		gint_irq_init[0].name = "GINT";
@@ -258,7 +256,7 @@ void __init gbus_int_init_irqs (void)
 
 		gint_irq_init[1].name = 0; /* Terminate the vector.  */
 
-		nb85e_intc_init_irq_types (gint_irq_init, gint_hw_itypes);
+		v850e_intc_init_irq_types (gint_irq_init, gint_hw_itypes);
 	}
 
 	/* Then the GBUS interrupts.  */

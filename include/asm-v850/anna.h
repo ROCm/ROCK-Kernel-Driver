@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/anna.h -- Anna V850E2 evaluation cpu chip/board
  *
- *  Copyright (C) 2001,2002  NEC Corporation
- *  Copyright (C) 2001,2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,8 +14,9 @@
 #ifndef __V850_ANNA_H__
 #define __V850_ANNA_H__
 
+#include <asm/v850e2.h>		/* Based on V850E2 core.  */
 
-#define CPU_ARCH 	"v850e2"
+
 #define CPU_MODEL	"v850e2/anna"
 #define CPU_MODEL_LONG	"NEC V850E2/Anna"
 #define PLATFORM	"anna"
@@ -48,30 +49,6 @@
 
 
 /* Anna specific control registers.  */
-#define ANNA_CSC_ADDR(n)		(0xFFFFF060 + (n) * 2)
-#define ANNA_CSC(n)			(*(volatile u16 *)ANNA_CSC_ADDR(n))
-#define ANNA_BPC_ADDR			0xFFFFF064
-#define ANNA_BPC			(*(volatile u16 *)ANNA_BPC_ADDR)
-#define ANNA_BSC_ADDR			0xFFFFF066
-#define ANNA_BSC			(*(volatile u16 *)ANNA_BSC_ADDR)
-#define ANNA_BEC_ADDR			0xFFFFF068
-#define ANNA_BEC			(*(volatile u16 *)ANNA_BEC_ADDR)
-#define ANNA_BHC_ADDR			0xFFFFF06A
-#define ANNA_BHC			(*(volatile u16 *)ANNA_BHC_ADDR)
-#define ANNA_BCT_ADDR(n)		(0xFFFFF480 + (n) * 2)
-#define ANNA_BCT(n)			(*(volatile u16 *)ANNA_BCT_ADDR(n))
-#define ANNA_DWC_ADDR(n)		(0xFFFFF484 + (n) * 2)
-#define ANNA_DWC(n)			(*(volatile u16 *)ANNA_DWC_ADDR(n))
-#define ANNA_BCC_ADDR			0xFFFFF488
-#define ANNA_BCC			(*(volatile u16 *)ANNA_BCC_ADDR)
-#define ANNA_ASC_ADDR			0xFFFFF48A
-#define ANNA_ASC			(*(volatile u16 *)ANNA_ASC_ADDR)
-#define ANNA_LBS_ADDR			0xFFFFF48E
-#define ANNA_LBS			(*(volatile u16 *)ANNA_LBS_ADDR)
-#define ANNA_SCR3_ADDR			0xFFFFF4AC
-#define ANNA_SCR3			(*(volatile u16 *)ANNA_SCR3_ADDR)
-#define ANNA_RFS3_ADDR			0xFFFFF4AE
-#define ANNA_RFS3			(*(volatile u16 *)ANNA_RFS3_ADDR)
 #define ANNA_ILBEN_ADDR			0xFFFFF7F2
 #define ANNA_ILBEN			(*(volatile u16 *)ANNA_ILBEN_ADDR)
 
@@ -84,9 +61,6 @@
 #define ANNA_PORT_PM_ADDR(n)		(0xFFFFF410 + (n) * 2)
 #define ANNA_PORT_PM(n)			(*(volatile u8 *)ANNA_PORT_PM_ADDR(n))
 
-
-/* NB85E-style interrupt system.  */
-#include <asm/nb85e_intc.h>
 
 /* Hardware-specific interrupt numbers (in the kernel IRQ namespace).  */
 #define IRQ_INTP(n)	(n)	/* Pnnn (pin) interrupts 0-15 */
@@ -116,12 +90,15 @@ extern void anna_init_irqs (void);
 
 
 /* Anna UART details (basically the same as the V850E/MA1, but 2 channels).  */
-#define NB85E_UART_NUM_CHANNELS		2
-#define NB85E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 2)
-#define NB85E_UART_CHIP_NAME 		"V850E2/NA85E2A"
+#define V850E_UART_NUM_CHANNELS		2
+#define V850E_UART_BASE_FREQ		(SYS_CLOCK_FREQ / 2)
+#define V850E_UART_CHIP_NAME 		"V850E2/NA85E2A"
+
+/* This is the UART channel that's actually connected on the board.  */
+#define V850E_UART_CONSOLE_CHANNEL	1
 
 /* This is a function that gets called before configuring the UART.  */
-#define NB85E_UART_PRE_CONFIGURE	anna_uart_pre_configure
+#define V850E_UART_PRE_CONFIGURE	anna_uart_pre_configure
 #ifndef __ASSEMBLY__
 extern void anna_uart_pre_configure (unsigned chan,
 				     unsigned cflags, unsigned baud);
@@ -130,9 +107,9 @@ extern void anna_uart_pre_configure (unsigned chan,
 /* This board supports RTS/CTS for the on-chip UART, but only for channel 1. */
 
 /* CTS for UART channel 1 is pin P37 (bit 7 of port 3).  */
-#define NB85E_UART_CTS(chan)	((chan) == 1 ? !(ANNA_PORT_IO(3) & 0x80) : 1)
+#define V850E_UART_CTS(chan)	((chan) == 1 ? !(ANNA_PORT_IO(3) & 0x80) : 1)
 /* RTS for UART channel 1 is pin P07 (bit 7 of port 0).  */
-#define NB85E_UART_SET_RTS(chan, val)					      \
+#define V850E_UART_SET_RTS(chan, val)					      \
    do {									      \
 	   if (chan == 1) {						      \
 		   unsigned old = ANNA_PORT_IO(0); 			      \
@@ -145,16 +122,16 @@ extern void anna_uart_pre_configure (unsigned chan,
 
 
 /* Timer C details.  */
-#define NB85E_TIMER_C_BASE_ADDR		0xFFFFF600
+#define V850E_TIMER_C_BASE_ADDR		0xFFFFF600
 
 /* Timer D details (the Anna actually has 5 of these; should change later). */
-#define NB85E_TIMER_D_BASE_ADDR		0xFFFFF540
-#define NB85E_TIMER_D_TMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x0)
-#define NB85E_TIMER_D_CMD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x2)
-#define NB85E_TIMER_D_TMCD_BASE_ADDR 	(NB85E_TIMER_D_BASE_ADDR + 0x4)
+#define V850E_TIMER_D_BASE_ADDR		0xFFFFF540
+#define V850E_TIMER_D_TMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x0)
+#define V850E_TIMER_D_CMD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x2)
+#define V850E_TIMER_D_TMCD_BASE_ADDR 	(V850E_TIMER_D_BASE_ADDR + 0x4)
 
-#define NB85E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
-#define NB85E_TIMER_D_TMCD_CS_MIN	1 /* min 2^1 divider */
+#define V850E_TIMER_D_BASE_FREQ		SYS_CLOCK_FREQ
+#define V850E_TIMER_D_TMCD_CS_MIN	1 /* min 2^1 divider */
 
 
 /* For <asm/param.h> */

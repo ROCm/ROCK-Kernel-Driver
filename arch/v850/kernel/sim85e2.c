@@ -1,9 +1,9 @@
 /*
- * arch/v850/kernel/sim85e2c.c -- Machine-specific stuff for
+ * arch/v850/kernel/sim85e2.c -- Machine-specific stuff for
  *	V850E2 RTL simulator
  *
- *  Copyright (C) 2002  NEC Corporation
- *  Copyright (C) 2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2002,03  NEC Electronics Corporation
+ *  Copyright (C) 2002,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -26,17 +26,47 @@
 
 #include "mach.h"
 
+
+/* There are 4 possible areas we can use:
+
+     IRAM (1MB) is fast for instruction fetches, but slow for data
+     DRAM (1020KB) is fast for data, but slow for instructions
+     ERAM is cached, so should be fast for both insns and data
+     SDRAM is external DRAM, similar to ERAM
+*/
+
+#define INIT_MEMC_FOR_SDRAM
+#define USE_SDRAM_AREA
+#define KERNEL_IN_SDRAM_AREA
+
+#define DCACHE_MODE	V850E2_CACHE_BTSC_DCM_WT
+/*#define DCACHE_MODE	V850E2_CACHE_BTSC_DCM_WB_ALLOC*/
+
+#ifdef USE_SDRAM_AREA
+#define RAM_START 	SDRAM_ADDR
+#define RAM_END		(SDRAM_ADDR + SDRAM_SIZE)
+#else
+/* When we use DRAM, we need to account for the fact that the end of it is
+   used for R0_RAM.  */
+#define RAM_START	DRAM_ADDR
+#define RAM_END		R0_RAM_ADDR
+#endif
+
+
 extern void memcons_setup (void);
 
 
-void __init mach_early_init (void)
+#ifdef KERNEL_IN_SDRAM_AREA
+#define EARLY_INIT_SECTION_ATTR __attribute__ ((section (".early.text")))
+#else
+#define EARLY_INIT_SECTION_ATTR __init
+#endif
+
+void EARLY_INIT_SECTION_ATTR mach_early_init (void)
 {
 	extern int panic_timeout;
 
-	/* Don't stop the simulator at `halt' instructions.  */
-	NOTHAL = 1;
-
-	/* The sim85e2c simulator tracks `undefined' values, so to make
+	/* The sim85e2 simulator tracks `undefined' values, so to make
 	   debugging easier, we begin by zeroing out all otherwise
 	   undefined registers.  This is not strictly necessary.
 
@@ -67,10 +97,41 @@ void __init mach_early_init (void)
 	asm volatile ("ldsr r0, 16; ldsr r0, 17; ldsr r0, 18; ldsr r0, 19");
 	asm volatile ("ldsr r0, 20");
 
+
+#ifdef INIT_MEMC_FOR_SDRAM
+	/* Settings for SDRAM controller.  */
+	V850E2_VSWC   = 0x0042;
+	V850E2_BSC    = 0x9286;
+	V850E2_BCT(0) = 0xb000;	/* was: 0 */
+	V850E2_BCT(1) = 0x000b;
+	V850E2_ASC    = 0;
+	V850E2_LBS    = 0xa9aa;	/* was: 0xaaaa */
+	V850E2_LBC(0) = 0;
+	V850E2_LBC(1) = 0;	/* was: 0x3 */
+	V850E2_BCC    = 0;
+	V850E2_RFS(4) = 0x800a;	/* was: 0xf109 */
+	V850E2_SCR(4) = 0x2091;	/* was: 0x20a1 */
+	V850E2_RFS(3) = 0x800c;
+	V850E2_SCR(3) = 0x20a1;
+	V850E2_DWC(0) = 0;
+	V850E2_DWC(1) = 0;
+#endif
+
+#if 0
+#ifdef CONFIG_V850E2_SIM85E2S
 	/* Turn on the caches.  */
-	NA85E2C_CACHE_BTSC
-		|= (NA85E2C_CACHE_BTSC_ICM | NA85E2C_CACHE_BTSC_DCM0);
-	NA85E2C_BUSM_BHC = 0xFFFF;
+	V850E2_CACHE_BTSC = V850E2_CACHE_BTSC_ICM | DCACHE_MODE;
+	V850E2_BHC  = 0x1010;
+#elif CONFIG_V850E2_SIM85E2C
+	V850E2_CACHE_BTSC |= (V850E2_CACHE_BTSC_ICM | V850E2_CACHE_BTSC_DCM0);
+	V850E2_BUSM_BHC = 0xFFFF;
+#endif
+#else
+	V850E2_BHC  = 0;
+#endif
+
+	/* Don't stop the simulator at `halt' instructions.  */
+	SIM85E2_NOTHAL = 1;
 
 	/* Ensure that the simulator halts on a panic, instead of going
 	   into an infinite loop inside the panic function.  */
@@ -84,18 +145,23 @@ void __init mach_setup (char **cmdline)
 
 void mach_get_physical_ram (unsigned long *ram_start, unsigned long *ram_len)
 {
-	/* There are 3 possible areas we can use:
-	     IRAM (1MB) is fast for instruction fetches, but slow for data
-	     DRAM (1020KB) is fast for data, but slow for instructions
-	     ERAM is cached, so should be fast for both insns and data,
-	          _but_ currently only supports write-through caching, so
-		  writes are slow.
-	   Since there's really no area that's good for general kernel
-	   use, we use DRAM -- it won't be good for user programs
-	   (which will be loaded into kernel allocated memory), but
-	   currently we're more concerned with testing the kernel.  */
-	*ram_start = DRAM_ADDR;
-	*ram_len = R0_RAM_ADDR - DRAM_ADDR;
+	*ram_start = RAM_START;
+	*ram_len = RAM_END - RAM_START;
+}
+
+void __init mach_reserve_bootmem ()
+{
+	extern char _root_fs_image_start, _root_fs_image_end;
+	u32 root_fs_image_start = (u32)&_root_fs_image_start;
+	u32 root_fs_image_end = (u32)&_root_fs_image_end;
+
+	/* Reserve the memory used by the root filesystem image if it's
+	   in RAM.  */
+	if (root_fs_image_end > root_fs_image_start
+	    && root_fs_image_start >= RAM_START
+	    && root_fs_image_start < RAM_END)
+		reserve_bootmem (root_fs_image_start,
+				 root_fs_image_end - root_fs_image_start);
 }
 
 void __init mach_sched_init (struct irqaction *timer_action)
@@ -114,7 +180,7 @@ void mach_gettimeofday (struct timespec *tv)
 
 /* Interrupts */
 
-struct nb85e_intc_irq_init irq_inits[] = {
+struct v850e_intc_irq_init irq_inits[] = {
 	{ "IRQ", 0, NUM_MACH_IRQS, 1, 7 },
 	{ 0 }
 };
@@ -123,14 +189,14 @@ struct hw_interrupt_type hw_itypes[1];
 /* Initialize interrupts.  */
 void __init mach_init_irqs (void)
 {
-	nb85e_intc_init_irq_types (irq_inits, hw_itypes);
+	v850e_intc_init_irq_types (irq_inits, hw_itypes);
 }
 
 
 void machine_halt (void) __attribute__ ((noreturn));
 void machine_halt (void)
 {
-	SIMFIN = 0;		/* Halt immediately.  */
+	SIM85E2_SIMFIN = 0;	/* Halt immediately.  */
 	for (;;) {}
 }
 

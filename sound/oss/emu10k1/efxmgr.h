@@ -32,16 +32,30 @@
 #ifndef _EFXMGR_H
 #define _EFXMGR_H
 
-#define WRITE_EFX(a, b, c) sblive_writeptr((a), MICROCODEBASE + (b), 0, (c))
+struct emu_efx_info_t{
+	int opcode_shift;
+	int high_operand_shift;
+	int instruction_start;
+	int gpr_base;
+	int output_base;
+};
+
+
+#define WRITE_EFX(a, b, c) sblive_writeptr((a), emu_efx_info[card->is_audigy].instruction_start + (b), 0, (c))
 
 #define OP(op, z, w, x, y) \
-	do { WRITE_EFX(card, (pc) * 2, ((x) << 10) | (y)); \
-	WRITE_EFX(card, (pc) * 2 + 1, ((op) << 20) | ((z) << 10) | (w)); \
+	do { WRITE_EFX(card, (pc) * 2, ((x) << emu_efx_info[card->is_audigy].high_operand_shift) | (y)); \
+	WRITE_EFX(card, (pc) * 2 + 1, ((op) << emu_efx_info[card->is_audigy].opcode_shift ) | ((z) << emu_efx_info[card->is_audigy].high_operand_shift) | (w)); \
 	++pc; } while (0)
 
 #define NUM_INPUTS 0x20
 #define NUM_OUTPUTS 0x20
 #define NUM_GPRS 0x100
+
+#define A_NUM_INPUTS 0x60
+#define A_NUM_OUTPUTS 0x60  //fixme: this may or may not be true
+#define A_NUM_GPRS 0x200
+
 #define GPR_NAME_SIZE   32
 #define PATCH_NAME_SIZE 32
 
@@ -97,6 +111,9 @@ enum {
 
 #define GPR_BASE 0x100
 #define OUTPUT_BASE 0x20
+
+#define A_GPR_BASE 0x400
+#define A_OUTPUT_BASE 0x60
 
 #define MAX_PATCHES_PAGES 32
 
