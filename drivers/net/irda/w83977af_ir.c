@@ -611,8 +611,8 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	set_dma_addr(self->io.dma, isa_virt_to_bus(self->tx_buff.data));
 	set_dma_count(self->io.dma, self->tx_buff.len);
 #else
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
-		  DMA_MODE_WRITE);	
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
+		       DMA_MODE_WRITE);	
 #endif
 	self->io.direction = IO_XMIT;
 	
@@ -768,8 +768,8 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 	set_dma_addr(self->io.dma, isa_virt_to_bus(self->rx_buff.data));
 	set_dma_count(self->io.dma, self->rx_buff.truesize);
 #else
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_MODE_READ);
+	irda_setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
+		       DMA_MODE_READ);
 #endif
 	/* 
 	 * Reset Rx FIFO. This will also flush the ST_FIFO, it's very 

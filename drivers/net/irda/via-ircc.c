@@ -819,8 +819,8 @@ static int via_ircc_hard_xmit_sir(struct sk_buff *skb,
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
 
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len,
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len,
+		       DMA_TX_MODE);
 
 	SetSendByte(iobase, self->tx_buff.len);
 	RXStart(iobase, OFF);
@@ -899,9 +899,9 @@ static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase)
 	EnAllInt(iobase, ON);
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
-	setup_dma(self->io.dma,
-		  self->tx_fifo.queue[self->tx_fifo.ptr].start,
-		  self->tx_fifo.queue[self->tx_fifo.ptr].len, DMA_TX_MODE);
+	irda_setup_dma(self->io.dma,
+		       self->tx_fifo.queue[self->tx_fifo.ptr].start,
+		       self->tx_fifo.queue[self->tx_fifo.ptr].len, DMA_TX_MODE);
 #ifdef	DBGMSG
 	DBG(printk
 	    (KERN_INFO "dma_xmit:tx_fifo.ptr=%x,len=%x,tx_fifo.len=%x..\n",
@@ -1025,8 +1025,8 @@ static int via_ircc_dma_receive(struct via_ircc_cb *self)
 	EnAllInt(iobase, ON);
 	EnTXDMA(iobase, OFF);
 	EnRXDMA(iobase, ON);
-	setup_dma(self->io.dma2, self->rx_buff.data,
-		  self->rx_buff.truesize, DMA_RX_MODE);
+	irda_setup_dma(self->io.dma2, self->rx_buff.data,
+		       self->rx_buff.truesize, DMA_RX_MODE);
 	TXStart(iobase, OFF);
 	RXStart(iobase, ON);
 

@@ -557,7 +557,7 @@ int irda_device_set_mode(struct net_device* dev, int mode)
  *    Setup the DMA channel. Commonly used by ISA FIR drivers
  *
  */
-void setup_dma(int channel, char *buffer, int count, int mode)
+void irda_setup_dma(int channel, char *buffer, int count, int mode)
 {
 	unsigned long flags;
 
@@ -572,4 +572,5 @@ void setup_dma(int channel, char *buffer, int count, int mode)
 
 	release_dma_lock(flags);
 }
+EXPORT_SYMBOL(irda_setup_dma);
 #endif

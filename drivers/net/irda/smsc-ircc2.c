@@ -1161,8 +1161,8 @@ static void smsc_ircc_dma_xmit(struct smsc_ircc_cb *self, int iobase, int bofs)
 	     IRCC_CFGB_DMA_BURST, iobase+IRCC_SCE_CFGB);
 
 	/* Setup DMA controller (must be done after enabling chip DMA) */
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
+		       DMA_TX_MODE);
 
 	/* Enable interrupt */
 
@@ -1251,8 +1251,8 @@ static int smsc_ircc_dma_receive(struct smsc_ircc_cb *self, int iobase)
 	outb(2050 & 0xff, iobase+IRCC_RX_SIZE_LO);
 
 	/* Setup DMA controller */
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_RX_MODE);
+	irda_setup_dma(self->io.dma, self->rx_buff.data,
+		       self->rx_buff.truesize, DMA_RX_MODE);
 
 	/* Enable burst mode chip Rx DMA */
 	register_bank(iobase, 1);
