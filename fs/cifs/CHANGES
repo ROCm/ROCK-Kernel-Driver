@@ -1,3 +1,8 @@
+Version 1.11
+------------
+Better port 139 support to Windows servers (RFC1001/RFC1002 Session_Initialize) also
+now allowing support for specifying client netbiosname.
+
 Version 1.10
 ------------
 Fix reconnection (and certain failed mounts) to properly wake up the
