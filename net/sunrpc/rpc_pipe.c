@@ -310,6 +310,7 @@ rpc_info_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations rpc_info_operations = {
+	.owner		= THIS_MODULE,
 	.open		= rpc_info_open,
 	.read		= seq_read,
 	.llseek		= seq_lseek,

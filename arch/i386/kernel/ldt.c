@@ -119,7 +119,7 @@ void destroy_context(struct mm_struct *mm)
 	}
 }
 
-static int read_ldt(void * ptr, unsigned long bytecount)
+static int read_ldt(void __user * ptr, unsigned long bytecount)
 {
 	int err;
 	unsigned long size;
@@ -148,7 +148,7 @@ static int read_ldt(void * ptr, unsigned long bytecount)
 	return bytecount;
 }
 
-static int read_default_ldt(void * ptr, unsigned long bytecount)
+static int read_default_ldt(void __user * ptr, unsigned long bytecount)
 {
 	int err;
 	unsigned long size;
@@ -167,7 +167,7 @@ static int read_default_ldt(void * ptr, unsigned long bytecount)
 	return err;
 }
 
-static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
+static int write_ldt(void __user * ptr, unsigned long bytecount, int oldmode)
 {
 	struct mm_struct * mm = current->mm;
 	__u32 entry_1, entry_2, *lp;
@@ -226,7 +226,7 @@ out:
 	return error;
 }
 
-asmlinkage int sys_modify_ldt(int func, void *ptr, unsigned long bytecount)
+asmlinkage int sys_modify_ldt(int func, void __user *ptr, unsigned long bytecount)
 {
 	int ret = -ENOSYS;
 

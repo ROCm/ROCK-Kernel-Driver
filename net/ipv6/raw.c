@@ -47,6 +47,9 @@
 #include <net/rawv6.h>
 #include <net/xfrm.h>
 
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+
 struct sock *raw_v6_htable[RAWV6_HTABLE_SIZE];
 rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
 
@@ -831,80 +834,6 @@ static int rawv6_init_sk(struct sock *sk)
 	return(0);
 }
 
-#define LINE_LEN 190
-#define LINE_FMT "%-190s\n"
-
-static void get_raw6_sock(struct sock *sp, char *tmpbuf, int i)
-{
-	struct ipv6_pinfo *np = inet6_sk(sp);
-	struct in6_addr *dest, *src;
-	__u16 destp, srcp;
-
-	dest  = &np->daddr;
-	src   = &np->rcv_saddr;
-	destp = 0;
-	srcp  = inet_sk(sp)->num;
-	sprintf(tmpbuf,
-		"%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
-		"%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p",
-		i,
-		src->s6_addr32[0], src->s6_addr32[1],
-		src->s6_addr32[2], src->s6_addr32[3], srcp,
-		dest->s6_addr32[0], dest->s6_addr32[1],
-		dest->s6_addr32[2], dest->s6_addr32[3], destp,
-		sp->state, 
-		atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
-		0, 0L, 0,
-		sock_i_uid(sp), 0,
-		sock_i_ino(sp),
-		atomic_read(&sp->refcnt), sp);
-}
-
-int raw6_get_info(char *buffer, char **start, off_t offset, int length)
-{
-	int len = 0, num = 0, i;
-	off_t pos = 0;
-	off_t begin;
-	char tmpbuf[LINE_LEN+2];
-
-	if (offset < LINE_LEN+1)
-		len += sprintf(buffer, LINE_FMT,
-			       "  sl  "						/* 6 */
-			       "local_address                         "		/* 38 */
-			       "remote_address                        "		/* 38 */
-			       "st tx_queue rx_queue tr tm->when retrnsmt"	/* 41 */
-			       "   uid  timeout inode");			/* 21 */
-										/*----*/
-										/*144 */
-	pos = LINE_LEN+1;
-	read_lock(&raw_v6_lock);
-	for (i = 0; i < RAWV6_HTABLE_SIZE; i++) {
-		struct sock *sk;
-
-		for (sk = raw_v6_htable[i]; sk; sk = sk->next, num++) {
-			if (sk->family != PF_INET6)
-				continue;
-			pos += LINE_LEN+1;
-			if (pos <= offset)
-				continue;
-			get_raw6_sock(sk, tmpbuf, i);
-			len += sprintf(buffer+len, LINE_FMT, tmpbuf);
-			if(len >= length)
-				goto out;
-		}
-	}
-out:
-	read_unlock(&raw_v6_lock);
-	begin = len - (pos - offset);
-	*start = buffer + begin;
-	len -= begin;
-	if(len > length)
-		len = length;
-	if (len < 0)
-		len = 0; 
-	return len;
-}
-
 struct proto rawv6_prot = {
 	.name =		"RAW",
 	.close =	rawv6_close,
@@ -922,3 +851,151 @@ struct proto rawv6_prot = {
 	.hash =		raw_v6_hash,
 	.unhash =	raw_v6_unhash,
 };
+
+#ifdef CONFIG_PROC_FS
+struct raw6_iter_state {
+	int bucket;
+};
+
+#define raw6_seq_private(seq) ((struct raw6_iter_state *)&seq->private)
+
+static struct sock *raw6_get_first(struct seq_file *seq)
+{
+	struct sock *sk = NULL;
+	struct raw6_iter_state* state = raw6_seq_private(seq);
+
+	for (state->bucket = 0; state->bucket < RAWV6_HTABLE_SIZE; ++state->bucket) {
+		sk = raw_v6_htable[state->bucket];
+		while (sk && sk->family != PF_INET6)
+			sk = sk->next;
+		if (sk)
+			break;
+	}
+	return sk;
+}
+
+static struct sock *raw6_get_next(struct seq_file *seq, struct sock *sk)
+{
+	struct raw6_iter_state* state = raw6_seq_private(seq);
+
+	do {
+		sk = sk->next;
+try_again:
+		;
+	} while (sk && sk->family != PF_INET6);
+
+	if (!sk && ++state->bucket < RAWV6_HTABLE_SIZE) {
+		sk = raw_v6_htable[state->bucket];
+		goto try_again;
+	}
+	return sk;
+}
+
+static struct sock *raw6_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct sock *sk = raw6_get_first(seq);
+	if (sk)
+		while (pos && (sk = raw6_get_next(seq, sk)) != NULL)
+			--pos;
+	return pos ? NULL : sk;
+}
+
+static void *raw6_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	read_lock(&raw_v6_lock);
+	return *pos ? raw6_get_idx(seq, *pos) : (void *)1;
+}
+
+static void *raw6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct sock *sk;
+
+	if (v == (void *)1)
+		sk = raw6_get_first(seq);
+	else
+		sk = raw6_get_next(seq, v);
+	++*pos;
+	return sk;
+}
+
+static void raw6_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock(&raw_v6_lock);
+}
+
+static void raw6_sock_seq_show(struct seq_file *seq, struct sock *sp, int i)
+{
+	struct ipv6_pinfo *np = inet6_sk(sp);
+	struct in6_addr *dest, *src;
+	__u16 destp, srcp;
+
+	dest  = &np->daddr;
+	src   = &np->rcv_saddr;
+	destp = 0;
+	srcp  = inet_sk(sp)->num;
+	seq_printf(seq,
+		   "%4d: %08X%08X%08X%08X:%04X %08X%08X%08X%08X:%04X "
+		   "%02X %08X:%08X %02X:%08lX %08X %5d %8d %lu %d %p\n",
+		   i,
+		   src->s6_addr32[0], src->s6_addr32[1],
+		   src->s6_addr32[2], src->s6_addr32[3], srcp,
+		   dest->s6_addr32[0], dest->s6_addr32[1],
+		   dest->s6_addr32[2], dest->s6_addr32[3], destp,
+		   sp->state, 
+		   atomic_read(&sp->wmem_alloc), atomic_read(&sp->rmem_alloc),
+		   0, 0L, 0,
+		   sock_i_uid(sp), 0,
+		   sock_i_ino(sp),
+		   atomic_read(&sp->refcnt), sp);
+}
+
+static int raw6_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == (void *)1)
+		seq_printf(seq,
+			   "  sl  "
+			   "local_address                         "
+			   "remote_address                        "
+			   "st tx_queue rx_queue tr tm->when retrnsmt"
+			   "   uid  timeout inode\n");
+	else
+		raw6_sock_seq_show(seq, v, raw6_seq_private(seq)->bucket);
+	return 0;
+}
+
+static struct seq_operations raw6_seq_ops = {
+	.start =	raw6_seq_start,
+	.next =		raw6_seq_next,
+	.stop =		raw6_seq_stop,
+	.show =		raw6_seq_show,
+};
+
+static int raw6_seq_open(struct inode *inode, struct file *file)
+{
+	return seq_open(file, &raw6_seq_ops);
+}
+
+static struct file_operations raw6_seq_fops = {
+	.owner =	THIS_MODULE,
+	.open =		raw6_seq_open,
+	.read =		seq_read,
+	.llseek =	seq_lseek,
+	.release =	seq_release,
+};
+
+int __init raw6_proc_init(void)
+{
+	struct proc_dir_entry *p = create_proc_entry("raw6", S_IRUGO, proc_net);
+
+	if (!p)
+		return -ENOMEM;
+	p->proc_fops = &raw6_seq_fops;
+
+	return 0;
+}
+
+void raw6_proc_exit(void)
+{
+	remove_proc_entry("raw6", proc_net);
+}
+#endif	/* CONFIG_PROC_FS */

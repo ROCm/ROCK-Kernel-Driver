@@ -9,14 +9,11 @@
 #include <linux/init.h>
 #include <linux/netlink.h>
 
-extern int x25_asy_init_ctrl_dev(void);
-  
 extern int dmascc_init(void);
 
 extern int arcnet_init(void); 
 extern int scc_enet_init(void); 
 extern int fec_enet_init(void); 
-extern int dlci_setup(void); 
 extern int sdla_setup(void); 
 extern int sdla_c_setup(void); 
 extern int comx_init(void);
@@ -51,9 +48,6 @@ static struct net_probe pci_probes[] __initdata = {
 #if defined(CONFIG_DMASCC)
 	{dmascc_init, 0},
 #endif	
-#if defined(CONFIG_DLCI)
-	{dlci_setup, 0},
-#endif
 #if defined(CONFIG_SDLA)
 	{sdla_c_setup, 0},
 #endif
@@ -101,19 +95,6 @@ static void __init network_probe(void)
 	}
 }
 
-
-/*
- *	Initialise the line discipline drivers
- */
- 
-static void __init network_ldisc_init(void)
-{
-#if defined(CONFIG_X25_ASY)
-	x25_asy_init_ctrl_dev();
-#endif
-}
-
-
 static void __init special_device_init(void)
 {
 #ifdef CONFIG_NET_SB1000
@@ -133,11 +114,8 @@ static void __init special_device_init(void)
  
 void __init net_device_init(void)
 {
-	/* Devices supporting the new probing API */
+	/* Devices supporting the new^H^H^Hold probing API */
 	network_probe();
-	/* Line disciplines */
-	network_ldisc_init();
 	/* Special devices */
 	special_device_init();
-	/* That kicks off the legacy init functions */
 }

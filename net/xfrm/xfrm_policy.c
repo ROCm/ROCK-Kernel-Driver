@@ -100,7 +100,7 @@ struct xfrm_policy *flow_lookup(int dir, struct flowi *fl,
 		    fle->dir == dir) {
 			if (fle->genid == xfrm_policy_genid) {
 				if ((pol = fle->pol) != NULL)
-					atomic_inc(&pol->refcnt);
+					xfrm_pol_hold(pol);
 				local_bh_enable();
 				return pol;
 			}
@@ -118,7 +118,7 @@ struct xfrm_policy *flow_lookup(int dir, struct flowi *fl,
 			xfrm_pol_put(fle->pol);
 		fle->pol = pol;
 		if (pol)
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 	} else {
 		if (flow_count(cpu) > flow_hwm)
 			flow_cache_shrink(cpu);
@@ -131,7 +131,7 @@ struct xfrm_policy *flow_lookup(int dir, struct flowi *fl,
 			fle->dir = dir;
 			fle->pol = pol;
 			if (pol)
-				atomic_inc(&pol->refcnt);
+				xfrm_pol_hold(pol);
 			fle->next = flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash];
 			flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash] = fle;
 		}
@@ -274,7 +274,7 @@ static void xfrm_policy_timer(unsigned long data)
 	}
 	if (next != LONG_MAX &&
 	    !mod_timer(&xp->timer, jiffies + make_jiffies(next)))
-		atomic_inc(&xp->refcnt);
+		xfrm_pol_hold(xp);
 
 out:
 	xfrm_pol_put(xp);
@@ -392,7 +392,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 			break;
 		}
 	}
-	atomic_inc(&policy->refcnt);
+	xfrm_pol_hold(policy);
 	policy->next = pol ? pol->next : NULL;
 	*p = policy;
 	xfrm_policy_genid++;
@@ -401,7 +401,7 @@ int xfrm_policy_insert(int dir, struct xfrm_policy *policy, int excl)
 	policy->curlft.use_time = 0;
 	if (policy->lft.hard_add_expires_seconds &&
 	    !mod_timer(&policy->timer, jiffies + HZ))
-		atomic_inc(&policy->refcnt);
+		xfrm_pol_hold(policy);
 	write_unlock_bh(&xfrm_policy_lock);
 
 	if (pol) {
@@ -445,7 +445,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 		if (delete)
 			xfrm_policy_genid++;
 		else
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 	}
 	write_unlock_bh(&xfrm_policy_lock);
 	return pol;
@@ -522,7 +522,7 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl,
 
 		match = xfrm_selector_match(sel, fl, family);
 		if (match) {
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 			break;
 		}
 	}
@@ -540,7 +540,7 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 
 		match = xfrm_selector_match(&pol->selector, fl, sk->family);
 		if (match)
-			atomic_inc(&pol->refcnt);
+			xfrm_pol_hold(pol);
 		else
 			pol = NULL;
 	}
@@ -552,7 +552,7 @@ void xfrm_sk_policy_link(struct xfrm_policy *pol, int dir)
 {
 	pol->next = xfrm_policy_list[XFRM_POLICY_MAX+dir];
 	xfrm_policy_list[XFRM_POLICY_MAX+dir] = pol;
-	atomic_inc(&pol->refcnt);
+	xfrm_pol_hold(pol);
 }
 
 void xfrm_sk_policy_unlink(struct xfrm_policy *pol, int dir)

@@ -28,7 +28,7 @@ static int writes_starved = 2;    /* max times reads can starve a write */
 static int fifo_batch = 16;       /* # of sequential requests treated as one
 				     by the above parameters. For throughput. */
 
-static const int deadline_hash_shift = 10;
+static const int deadline_hash_shift = 5;
 #define DL_HASH_BLOCK(sec)	((sec) >> 3)
 #define DL_HASH_FN(sec)		(hash_long(DL_HASH_BLOCK((sec)), deadline_hash_shift))
 #define DL_HASH_ENTRIES		(1 << deadline_hash_shift)
@@ -71,6 +71,8 @@ struct deadline_data {
 	int fifo_batch;
 	int writes_starved;
 	int front_merges;
+
+	mempool_t *drq_pool;
 };
 
 /*
@@ -128,6 +130,21 @@ deadline_add_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
 
 	drq->hash_valid_count = dd->hash_valid_count;
 	list_add(&drq->hash, &dd->hash[DL_HASH_FN(rq_hash_key(rq))]);
+}
+
+/*
+ * move hot entry to front of chain
+ */
+static inline void
+deadline_hot_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
+{
+	struct request *rq = drq->request;
+	struct list_head *head = &dd->hash[DL_HASH_FN(rq_hash_key(rq))];
+
+	if (ON_HASH(drq) && drq->hash.prev != head) {
+		list_del(&drq->hash);
+		list_add(&drq->hash, head);
+	}
 }
 
 static struct request *
@@ -353,6 +370,8 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 out:
 	q->last_merge = &__rq->queuelist;
 out_insert:
+	if (ret)
+		deadline_hot_drq_hash(dd, RQ_DATA(__rq));
 	*insert = &__rq->queuelist;
 	return ret;
 }
@@ -673,28 +692,11 @@ deadline_latter_request(request_queue_t *q, struct request *rq)
 static void deadline_exit(request_queue_t *q, elevator_t *e)
 {
 	struct deadline_data *dd = e->elevator_data;
-	struct deadline_rq *drq;
-	struct request *rq;
-	int i;
 
 	BUG_ON(!list_empty(&dd->fifo_list[READ]));
 	BUG_ON(!list_empty(&dd->fifo_list[WRITE]));
 
-	for (i = READ; i <= WRITE; i++) {
-		struct request_list *rl = &q->rq[i];
-		struct list_head *entry;
-
-		list_for_each(entry, &rl->free) {
-			rq = list_entry_rq(entry);
-
-			if ((drq = RQ_DATA(rq)) == NULL)
-				continue;
-
-			rq->elevator_private = NULL;
-			kmem_cache_free(drq_pool, drq);
-		}
-	}
-
+	mempool_destroy(dd->drq_pool);
 	kfree(dd->hash);
 	kfree(dd);
 }
@@ -706,9 +708,7 @@ static void deadline_exit(request_queue_t *q, elevator_t *e)
 static int deadline_init(request_queue_t *q, elevator_t *e)
 {
 	struct deadline_data *dd;
-	struct deadline_rq *drq;
-	struct request *rq;
-	int i, ret = 0;
+	int i;
 
 	if (!drq_pool)
 		return -ENOMEM;
@@ -720,6 +720,13 @@ static int deadline_init(request_queue_t *q, elevator_t *e)
 
 	dd->hash = kmalloc(sizeof(struct list_head)*DL_HASH_ENTRIES,GFP_KERNEL);
 	if (!dd->hash) {
+		kfree(dd);
+		return -ENOMEM;
+	}
+
+	dd->drq_pool = mempool_create(BLKDEV_MIN_RQ, mempool_alloc_slab, mempool_free_slab, drq_pool);
+	if (!dd->drq_pool) {
+		kfree(dd->hash);
 		kfree(dd);
 		return -ENOMEM;
 	}
@@ -739,33 +746,41 @@ static int deadline_init(request_queue_t *q, elevator_t *e)
 	dd->front_merges = 1;
 	dd->fifo_batch = fifo_batch;
 	e->elevator_data = dd;
+	return 0;
+}
 
-	for (i = READ; i <= WRITE; i++) {
-		struct request_list *rl = &q->rq[i];
-		struct list_head *entry;
+static void deadline_put_request(request_queue_t *q, struct request *rq)
+{
+	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_rq *drq = RQ_DATA(rq);
 
-		list_for_each(entry, &rl->free) {
-			rq = list_entry_rq(entry);
+	if (drq) {
+		mempool_free(drq, dd->drq_pool);
+		rq->elevator_private = NULL;
+	}
+}
 
-			drq = kmem_cache_alloc(drq_pool, GFP_KERNEL);
-			if (!drq) {
-				ret = -ENOMEM;
-				break;
-			}
+static int
+deadline_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
+{
+	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_rq *drq;
 
-			memset(drq, 0, sizeof(*drq));
-			INIT_LIST_HEAD(&drq->fifo);
-			INIT_LIST_HEAD(&drq->hash);
-			RB_CLEAR(&drq->rb_node);
-			drq->request = rq;
-			rq->elevator_private = drq;
-		}
+	drq = mempool_alloc(dd->drq_pool, gfp_mask);
+	if (drq) {
+		RB_CLEAR(&drq->rb_node);
+		drq->request = rq;
+
+		INIT_LIST_HEAD(&drq->hash);
+		drq->hash_valid_count = 0;
+
+		INIT_LIST_HEAD(&drq->fifo);
+
+		rq->elevator_private = drq;
+		return 0;
 	}
 
-	if (ret)
-		deadline_exit(q, e);
-
-	return ret;
+	return 1;
 }
 
 /*
@@ -916,6 +931,8 @@ elevator_t iosched_deadline = {
 	.elevator_queue_empty_fn =	deadline_queue_empty,
 	.elevator_former_req_fn =	deadline_former_request,
 	.elevator_latter_req_fn =	deadline_latter_request,
+	.elevator_set_req_fn =		deadline_set_request,
+	.elevator_put_req_fn = 		deadline_put_request,
 	.elevator_init_fn =		deadline_init,
 	.elevator_exit_fn =		deadline_exit,
 

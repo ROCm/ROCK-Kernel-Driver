@@ -55,11 +55,15 @@ int i2c_device_remove(struct device *dev)
 	return 0;
 }
 
-static struct device_driver i2c_generic_driver = {
-	.name =	"i2c",
+static struct device_driver i2c_adapter_driver = {
+	.name =	"i2c_adapter",
 	.bus = &i2c_bus_type,
 	.probe = i2c_device_probe,
 	.remove = i2c_device_remove,
+};
+
+static struct class i2c_adapter_class = {
+	.name =		"i2c-adapter"
 };
 
 
@@ -94,8 +98,15 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	if (adap->dev.parent == NULL)
 		adap->dev.parent = &legacy_bus;
 	sprintf(adap->dev.bus_id, "i2c-%d", adap->nr);
-	adap->dev.driver = &i2c_generic_driver;
+	adap->dev.driver = &i2c_adapter_driver;
 	device_register(&adap->dev);
+
+	/* Add this adapter to the i2c_adapter class */
+	memset(&adap->class_dev, 0x00, sizeof(struct class_device));
+	adap->class_dev.dev = &adap->dev;
+	adap->class_dev.class = &i2c_adapter_class;
+	strncpy(adap->class_dev.class_id, adap->dev.bus_id, BUS_ID_SIZE);
+	class_device_register(&adap->class_dev);
 
 	/* inform drivers of new adapters */
 	list_for_each(item,&drivers) {
@@ -150,6 +161,7 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	}
 
 	/* clean up the sysfs representation */
+	class_device_unregister(&adap->class_dev);
 	device_unregister(&adap->dev);
 	list_del(&adap->list);
 
@@ -443,14 +455,23 @@ struct bus_type i2c_bus_type = {
 	.match =	i2c_device_match,
 };
 
-
 static int __init i2c_init(void)
 {
-	return bus_register(&i2c_bus_type);
+	int retval;
+
+	retval = bus_register(&i2c_bus_type);
+	if (retval)
+		return retval;
+	retval = driver_register(&i2c_adapter_driver);
+	if (retval)
+		return retval;
+	return class_register(&i2c_adapter_class);
 }
 
 static void __exit i2c_exit(void)
 {
+	class_unregister(&i2c_adapter_class);
+	driver_unregister(&i2c_adapter_driver);
 	bus_unregister(&i2c_bus_type);
 }
 
@@ -475,7 +496,7 @@ int i2c_transfer(struct i2c_adapter * adap, struct i2c_msg msgs[],int num)
 
 		return ret;
 	} else {
-		dev_err(&adap->dev, "I2C level transfers not supported\n");
+		DEB2(dev_dbg(&adap->dev, "I2C level transfers not supported\n"));
 		return -ENOSYS;
 	}
 }

@@ -50,7 +50,7 @@ __xfrm4_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto)
 		    spi == x->id.spi &&
 		    daddr->a4 == x->id.daddr.a4 &&
 		    proto == x->id.proto) {
-			atomic_inc(&x->refcnt);
+			xfrm_state_hold(x);
 			return x;
 		}
 	}
@@ -84,7 +84,7 @@ __xfrm4_find_acq(u8 mode, u16 reqid, u8 proto,
 		    }
 	}
 	if (x0) {
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(x0);
 	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
 		x0->sel.daddr.a4 = daddr->a4;
 		x0->sel.saddr.a4 = saddr->a4;
@@ -99,9 +99,9 @@ __xfrm4_find_acq(u8 mode, u16 reqid, u8 proto,
 		x0->props.reqid = reqid;
 		x0->props.family = AF_INET;
 		x0->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(x0);
 		mod_timer(&x0->timer, jiffies + XFRM_ACQ_EXPIRES*HZ);
-		atomic_inc(&x0->refcnt);
+		xfrm_state_hold(0);
 		list_add_tail(&x0->bydst, xfrm4_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}

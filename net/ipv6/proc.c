@@ -198,6 +198,7 @@ static int sockstat6_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations sockstat6_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = sockstat6_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
@@ -210,6 +211,7 @@ static int snmp6_seq_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations snmp6_seq_fops = {
+	.owner	 = THIS_MODULE,
 	.open	 = snmp6_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,

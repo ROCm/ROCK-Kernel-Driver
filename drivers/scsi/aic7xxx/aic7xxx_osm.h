@@ -768,7 +768,7 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 }
 
 static __inline void
-ahc_list_lockinit()
+ahc_list_lockinit(void)
 {
 	spin_lock_init(&ahc_list_spinlock);
 }

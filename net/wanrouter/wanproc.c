@@ -202,6 +202,7 @@ static int status_open(struct inode *inode, struct file *file)
 
 static struct file_operations config_fops =
 {
+	.owner =	THIS_MODULE,
 	.open =		config_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
@@ -210,6 +211,7 @@ static struct file_operations config_fops =
 
 static struct file_operations status_fops =
 {
+	.owner =	THIS_MODULE,
 	.open =		status_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,
@@ -285,6 +287,7 @@ static int wandev_open(struct inode *inode, struct file *file)
 
 static struct file_operations wandev_fops =
 {
+	.owner =	THIS_MODULE,
 	.open =		wandev_open,
 	.read =		seq_read,
 	.llseek =	seq_lseek,

@@ -240,7 +240,8 @@ struct i2c_adapter {
 
 	int timeout;
 	int retries;
-	struct device dev;	/* the adapter device */
+	struct device dev;		/* the adapter device */
+	struct class_device class_dev;	/* the class device */
 
 #ifdef CONFIG_PROC_FS 
 	/* No need to set this when you initialize the adapter          */
@@ -280,10 +281,12 @@ static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
 						/* Must equal I2C_M_TEN below */
 
 /* i2c adapter classes (bitmask) */
-#define I2C_ADAP_CLASS_SMBUS      (1<<0)        /* lm_sensors, ... */
-#define I2C_ADAP_CLASS_TV_ANALOG  (1<<1)        /* bttv + friends */
-#define I2C_ADAP_CLASS_TV_DIGINAL (1<<2)        /* dbv cards */
-#define I2C_ADAP_CLASS_DDC        (1<<3)        /* i2c-matroxfb ? */
+#define I2C_ADAP_CLASS_SMBUS		(1<<0)	/* lm_sensors, ... */
+#define I2C_ADAP_CLASS_TV_ANALOG	(1<<1)	/* bttv + friends */
+#define I2C_ADAP_CLASS_TV_DIGITAL	(1<<2)	/* dbv cards */
+#define I2C_ADAP_CLASS_DDC		(1<<3)	/* i2c-matroxfb ? */
+#define I2C_ADAP_CLASS_CAM_ANALOG	(1<<4)	/* camera with analog CCD */
+#define I2C_ADAP_CLASS_CAM_DIGITAL	(1<<5)	/* most webcams */
 
 /* i2c_client_address_data is the struct for holding default client
  * addresses for a driver and for the parameters supplied on the

@@ -733,6 +733,7 @@ cache_release(struct inode *inode, struct file *filp)
 
 
 static struct file_operations cache_file_operations = {
+	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
 	.read		= cache_read,
 	.write		= cache_write,

@@ -1235,7 +1235,7 @@ struct gendisk *ata_probe(dev_t dev, int *part, void *data)
 			(void) request_module("ide-disk");
 		if (drive->scsi)
 			(void) request_module("ide-scsi");
-		if (drive->media == ide_cdrom)
+		if (drive->media == ide_cdrom || drive->media == ide_optical)
 			(void) request_module("ide-cd");
 		if (drive->media == ide_tape)
 			(void) request_module("ide-tape");

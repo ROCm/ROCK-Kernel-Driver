@@ -87,15 +87,15 @@ extern int restore_i387( struct _fpstate __user *buf );
 /*
  * ptrace request handers...
  */
-extern int get_fpregs( struct user_i387_struct *buf,
+extern int get_fpregs( struct user_i387_struct __user *buf,
 		       struct task_struct *tsk );
 extern int set_fpregs( struct task_struct *tsk,
-		       struct user_i387_struct *buf );
+		       struct user_i387_struct __user *buf );
 
-extern int get_fpxregs( struct user_fxsr_struct *buf,
+extern int get_fpxregs( struct user_fxsr_struct __user *buf,
 			struct task_struct *tsk );
 extern int set_fpxregs( struct task_struct *tsk,
-			struct user_fxsr_struct *buf );
+			struct user_fxsr_struct __user *buf );
 
 /*
  * FPU state for core dumps...

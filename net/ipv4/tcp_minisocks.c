@@ -760,6 +760,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 			tcp_reset_keepalive_timer(newsk, keepalive_time_when(newtp));
 		newsk->socket = NULL;
 		newsk->sleep = NULL;
+		newsk->owner = NULL;
 
 		newtp->tstamp_ok = req->tstamp_ok;
 		if((newtp->sack_ok = req->sack_ok) != 0) {

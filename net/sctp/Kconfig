@@ -75,6 +75,7 @@ config SCTP_DBG_OBJCNT
 
 choice
 	prompt "SCTP: Cookie HMAC Algorithm"
+	depends on IP_SCTP
 	help
 	  HMAC algorithm to be used during association initialization.  It
 	  is strongly recommended to use HMAC-SHA1 or HMAC-MD5.  See 
