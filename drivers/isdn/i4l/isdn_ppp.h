@@ -26,12 +26,6 @@ isdn_ppp_frame_log(char *info, char *data, int len, int maxlen,
 int
 isdn_ppp_strip_proto(struct sk_buff *skb);
 
-#define IPPP_OPEN	0x01
-#define IPPP_CONNECT	0x02
-#define IPPP_CLOSEWAIT	0x04
-#define IPPP_NOBLOCK	0x08
-#define IPPP_ASSIGNED	0x10
-
 #define IPPP_MAX_HEADER 10
 
 
