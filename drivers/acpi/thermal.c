@@ -1139,6 +1139,16 @@ acpi_thermal_remove_fs (
 	ACPI_FUNCTION_TRACE("acpi_thermal_remove_fs");
 
 	if (acpi_device_dir(device)) {
+		remove_proc_entry(ACPI_THERMAL_FILE_POLLING_FREQ,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_COOLING_MODE,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_TRIP_POINTS,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_TEMPERATURE,
+				  acpi_device_dir(device));
+		remove_proc_entry(ACPI_THERMAL_FILE_STATE,
+				  acpi_device_dir(device));
 		remove_proc_entry(acpi_device_bid(device), acpi_thermal_dir);
 		acpi_device_dir(device) = NULL;
 	}

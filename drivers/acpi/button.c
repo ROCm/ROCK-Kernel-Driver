@@ -108,9 +108,6 @@ static struct file_operations acpi_button_state_fops = {
    -------------------------------------------------------------------------- */
 
 static struct proc_dir_entry	*acpi_button_dir;
-extern struct acpi_device 	*acpi_fixed_pwr_button;
-extern struct acpi_device	*acpi_fixed_sleep_button;
-
 
 static int acpi_button_info_seq_show(struct seq_file *seq, void *offset)
 {
@@ -241,6 +238,16 @@ acpi_button_remove_fs (
 
 	button = acpi_driver_data(device);
 	if (acpi_device_dir(device)) {
+		if (button->type == ACPI_BUTTON_TYPE_LID)
+			remove_proc_entry(ACPI_BUTTON_FILE_STATE,
+					     acpi_device_dir(device));
+		remove_proc_entry(ACPI_BUTTON_FILE_INFO,
+				     acpi_device_dir(device));
+
+		remove_proc_entry(acpi_device_bid(device),
+				     acpi_device_dir(device)->parent);
+
+
 		switch (button->type) {
 			case ACPI_BUTTON_TYPE_POWER:
 			case ACPI_BUTTON_TYPE_POWERF:
@@ -529,12 +536,6 @@ static void __exit
 acpi_button_exit (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_button_exit");
-
-	if(acpi_fixed_pwr_button) 
-		acpi_button_remove(acpi_fixed_pwr_button, ACPI_BUS_TYPE_POWER_BUTTON);
-
-	if(acpi_fixed_sleep_button)
-		acpi_button_remove(acpi_fixed_sleep_button, ACPI_BUS_TYPE_SLEEP_BUTTON);
 
 	acpi_bus_unregister_driver(&acpi_button_driver);
 

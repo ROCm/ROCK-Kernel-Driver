@@ -863,6 +863,29 @@ static int __init asus_hotk_add_fs(struct acpi_device *device)
 	return 0;
 }
 
+static int asus_hotk_remove_fs(struct acpi_device* device)
+{
+	struct asus_hotk* hotk = acpi_driver_data(device);
+
+
+	if(acpi_device_dir(device)){
+		remove_proc_entry(PROC_INFO,acpi_device_dir(device));
+		if (hotk->methods->mt_wled)
+			remove_proc_entry(PROC_WLED,acpi_device_dir(device));
+		if (hotk->methods->mt_mled)
+			remove_proc_entry(PROC_MLED,acpi_device_dir(device));
+		if (hotk->methods->mt_tled)
+			remove_proc_entry(PROC_TLED,acpi_device_dir(device));
+		if (hotk->methods->mt_lcd_switch && hotk->methods->lcd_status) 
+			remove_proc_entry(PROC_LCD, acpi_device_dir(device));
+		if ((hotk->methods->brightness_up && hotk->methods->brightness_down) || (hotk->methods->brightness_get && hotk->methods->brightness_get)) 
+			remove_proc_entry(PROC_BRN, acpi_device_dir(device));
+		if (hotk->methods->display_set) 
+			remove_proc_entry(PROC_DISP, acpi_device_dir(device));
+	}
+	return 0;
+}
+
 
 static void asus_hotk_notify(acpi_handle handle, u32 event, void *data)
 {
@@ -1111,7 +1134,6 @@ static int __init asus_hotk_add(struct acpi_device *device)
 	return(result);
 }
 
-
 static int asus_hotk_remove(struct acpi_device *device, int type)
 {
 	acpi_status status = 0;
@@ -1126,6 +1148,8 @@ static int asus_hotk_remove(struct acpi_device *device, int type)
 					    asus_hotk_notify);
 	if (ACPI_FAILURE(status))
 		printk(KERN_ERR "Asus ACPI: Error removing notify handler\n");
+
+	asus_hotk_remove_fs(device);
 
 	kfree(hotk);
 
