@@ -964,7 +964,8 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		     CLOCK_CTRL_ALTCLK |
 		     CLOCK_CTRL_PWRDOWN_PLL133);
 		udelay(40);
-	} else {
+	} else if (!((GET_ASIC_REV(tp->pci_chip_rev_id) == 5750) &&
+		     (tp->tg3_flags & TG3_FLAG_ENABLE_ASF))) {
 		u32 newbits1, newbits2;
 
 		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5700 ||
