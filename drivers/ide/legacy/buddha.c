@@ -168,7 +168,11 @@ void __init buddha_init(void)
 			continue;
 		
 		board = z->resource.start;
-		
+
+/*
+ * FIXME: we now have selectable mmio v/s iomio transports.
+ */
+
 		if(type != BOARD_XSURF) {
 			if (!request_mem_region(board+BUDDHA_BASE1, 0x800, "IDE"))
 				continue;
@@ -196,12 +200,16 @@ fail_base2:
 				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+buddha_bases[i]),
 						buddha_offsets, 0,
 						(ide_ioreg_t)(buddha_board+buddha_irqports[i]),
-						buddha_ack_intr, IRQ_AMIGA_PORTS);
+						buddha_ack_intr,
+//						budda_iops,
+						IRQ_AMIGA_PORTS);
 			} else {
 				ide_setup_ports(&hw, (ide_ioreg_t)(buddha_board+xsurf_bases[i]),
 						xsurf_offsets, 0,
 						(ide_ioreg_t)(buddha_board+xsurf_irqports[i]),
-						xsurf_ack_intr, IRQ_AMIGA_PORTS);
+						xsurf_ack_intr,
+//						xsurf_iops,
+						IRQ_AMIGA_PORTS);
 			}	
 			
 			index = ide_register_hw(&hw, NULL);

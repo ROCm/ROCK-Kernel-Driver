@@ -340,12 +340,12 @@ void ide_config(dev_link_t *link)
     /* retry registration in case device is still spinning up */
     for (i = 0; i < 10; i++) {
 	if (ctl_base)
-	    OUT_BYTE(0x02, ctl_base); /* Set nIEN = disable device interrupts */
+	    outb(0x02, ctl_base); /* Set nIEN = disable device interrupts */
 	hd = idecs_register(io_base, ctl_base, link->irq.AssignedIRQ);
 	if (hd >= 0) break;
 	if (link->io.NumPorts1 == 0x20) {
 	    if (ctl_base)
-		OUT_BYTE(0x02, ctl_base+0x10);
+		outb(0x02, ctl_base+0x10);
 	    hd = idecs_register(io_base+0x10, ctl_base+0x10,
 			      link->irq.AssignedIRQ);
 	    if (hd >= 0) {

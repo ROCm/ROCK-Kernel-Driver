@@ -137,6 +137,10 @@ void __init gayle_init(void)
 	    irqport = (ide_ioreg_t)ZTWO_VADDR(GAYLE_IRQ_1200);
 	    ack_intr = gayle_ack_intr_a1200;
 	}
+/*
+ * FIXME: we now have selectable modes between mmio v/s iomio
+ */
+
 	phys_base += i*GAYLE_NEXT_PORT;
 
 	res_start = ((unsigned long)phys_base) & ~(GAYLE_NEXT_PORT-1);
@@ -149,7 +153,9 @@ void __init gayle_init(void)
 	ctrlport = GAYLE_HAS_CONTROL_REG ? (base + GAYLE_CONTROL) : 0;
 
 	ide_setup_ports(&hw, base, gayle_offsets,
-			ctrlport, irqport, ack_intr, IRQ_AMIGA_PORTS);
+			ctrlport, irqport, ack_intr,
+//			gaule_iops,
+			IRQ_AMIGA_PORTS);
 
 	index = ide_register_hw(&hw, NULL);
 	if (index != -1) {

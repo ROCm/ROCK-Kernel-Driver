@@ -39,6 +39,8 @@
  */
 #define REALLY_SLOW_IO		/* some systems can safely undef this */
 
+#include <linux/module.h>
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -52,7 +54,13 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#ifdef CONFIG_BLK_DEV_UMC8672_MODULE
+# define _IDE_C
+# include "ide_modes.h"
+# undef _IDE_C
+#else
+# include "ide_modes.h"
+#endif /* CONFIG_BLK_DEV_UMC8672_MODULE */
 
 /*
  * Default speeds.  These can be changed with "auto-tune" and/or hdparm.
@@ -62,11 +70,11 @@
 #define UMC_DRIVE2      1              /* 11 = Fastest Speed */
 #define UMC_DRIVE3      1              /* In case of crash reduce speed */
 
-static byte current_speeds[4] = {UMC_DRIVE0, UMC_DRIVE1, UMC_DRIVE2, UMC_DRIVE3};
-static const byte pio_to_umc [5] = {0,3,7,10,11};	/* rough guesses */
+static u8 current_speeds[4] = {UMC_DRIVE0, UMC_DRIVE1, UMC_DRIVE2, UMC_DRIVE3};
+static const u8 pio_to_umc [5] = {0,3,7,10,11};	/* rough guesses */
 
 /*       0    1    2    3    4    5    6    7    8    9    10   11      */
-static const byte speedtab [3][12] = {
+static const u8 speedtab [3][12] = {
 	{0xf, 0xb, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1 },
 	{0x3, 0x2, 0x2, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1 },
 	{0xff,0xcb,0xc0,0x58,0x36,0x33,0x23,0x22,0x21,0x11,0x10,0x0}};
@@ -77,13 +85,13 @@ static void out_umc (char port,char wert)
 	outb_p(wert,0x109);
 }
 
-static inline byte in_umc (char port)
+static inline u8 in_umc (char port)
 {
 	outb_p(port,0x108);
 	return inb_p(0x109);
 }
 
-static void umc_set_speeds (byte speeds[])
+static void umc_set_speeds (u8 speeds[])
 {
 	int i, tmp;
 
@@ -106,7 +114,7 @@ static void umc_set_speeds (byte speeds[])
 		speeds[0], speeds[1], speeds[2], speeds[3]);
 }
 
-static void tune_umc (ide_drive_t *drive, byte pio)
+static void tune_umc (ide_drive_t *drive, u8 pio)
 {
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = ide_hwifs[HWIF(drive)->index^1].hwgroup;
@@ -116,7 +124,7 @@ static void tune_umc (ide_drive_t *drive, byte pio)
 		drive->name, pio, pio_to_umc[pio]);
 	spin_lock_irqsave(&ide_lock, flags);
 	if (hwgroup && hwgroup->handler != NULL) {
-		printk("umc8672: other interface is busy: exiting tune_umc()\n");
+		printk(KERN_ERR "umc8672: other interface is busy: exiting tune_umc()\n");
 	} else {
 		current_speeds[drive->name[2] - 'a'] = pio_to_umc[pio];
 		umc_set_speeds (current_speeds);
@@ -124,21 +132,21 @@ static void tune_umc (ide_drive_t *drive, byte pio)
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
-void __init init_umc8672 (void)	/* called from ide.c */
+int __init probe_umc8672 (void)
 {
 	unsigned long flags;
 
 	local_irq_save(flags);
 	if (check_region(0x108, 2)) {
 		local_irq_restore(flags);
-		printk("\numc8672: PORTS 0x108-0x109 ALREADY IN USE\n");
-		return;
+		printk(KERN_ERR "umc8672: ports 0x108-0x109 already in use.\n");
+		return 1;
 	}
 	outb_p(0x5A,0x108); /* enable umc */
 	if (in_umc (0xd5) != 0xa0) {
 		local_irq_restore(flags);
-		printk ("umc8672: not found\n");
-		return;  
+		printk(KERN_ERR "umc8672: not found\n");
+		return 1;  
 	}
 	outb_p(0xa5,0x108); /* disable umc */
 
@@ -153,4 +161,77 @@ void __init init_umc8672 (void)	/* called from ide.c */
 	ide_hwifs[0].mate = &ide_hwifs[1];
 	ide_hwifs[1].mate = &ide_hwifs[0];
 	ide_hwifs[1].channel = 1;
+
+#ifndef HWIF_PROBE_CLASSIC_METHOD
+	probe_hwif_init(&ide_hwifs[0]);
+	probe_hwif_init(&ide_hwifs[1]);
+#endif /* HWIF_PROBE_CLASSIC_METHOD */
+
+	return 0;
 }
+
+void __init umc8672_release (void)
+{
+	unsigned long flags;
+
+	local_irq_save(flags);
+	if (ide_hwifs[0].chipset != ide_umc8672 &&
+	    ide_hwifs[1].chipset != ide_umc8672) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	ide_hwifs[0].chipset = ide_unknown;
+	ide_hwifs[1].chipset = ide_unknown;	
+	ide_hwifs[0].tuneproc = NULL;
+	ide_hwifs[1].tuneproc = NULL;
+	ide_hwifs[0].mate = NULL;
+	ide_hwifs[1].mate = NULL;
+	ide_hwifs[0].channel = 0;
+	ide_hwifs[1].channel = 0;
+
+	outb_p(0xa5,0x108); /* disable umc */
+
+	release_region(0x108, 2);
+	local_irq_restore(flags);
+}
+
+#ifndef MODULE
+/*
+ * init_umc8672:
+ *
+ * called by ide.c when parsing command line
+ */
+
+void __init init_umc8672 (void)
+{
+	if (probe_umc8672())
+		printk(KERN_ERR "init_umc8672: umc8672 controller not found.\n");
+}
+
+#else
+
+MODULE_AUTHOR("Wolfram Podien");
+MODULE_DESCRIPTION("Support for UMC 8672 IDE chipset");
+MODULE_LICENSE("GPL");
+
+int __init umc8672_mod_init(void)
+{
+	if (probe_umc8672())
+		return -ENODEV;
+	if (ide_hwifs[0].chipset != ide_umc8672 &&
+	    ide_hwifs[1].chipset != ide_umc8672) {
+		umc8672_release();
+		return -ENODEV;
+	}
+	return 0;
+}
+module_init(umc8672_mod_init);
+
+void __init umc8672_mod_exit(void)
+{
+        umc8672_release();
+}
+module_exit(umc8672_mod_exit);
+#endif
+

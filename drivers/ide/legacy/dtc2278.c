@@ -6,6 +6,8 @@
 
 #undef REALLY_SLOW_IO           /* most systems can safely undef this */
 
+#include <linux/module.h>
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -19,7 +21,13 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#ifdef CONFIG_BLK_DEV_DTC2278_MODULE
+# define _IDE_C
+# include "ide_modes.h"
+# undef _IDE_C
+#else
+# include "ide_modes.h"
+#endif /* CONFIG_BLK_DEV_DTC2278_MODULE */
 
 /*
  * Changing this #undef to #define may solve start up problems in some systems.
@@ -57,20 +65,20 @@ static void sub22 (char b, char c)
 	int i;
 
 	for(i = 0; i < 3; ++i) {
-		IN_BYTE(0x3f6);
+		inb(0x3f6);
 		outb_p(b,0xb0);
-		IN_BYTE(0x3f6);
+		inb(0x3f6);
 		outb_p(c,0xb4);
-		IN_BYTE(0x3f6);
-		if(IN_BYTE(0xb4) == c) {
+		inb(0x3f6);
+		if(inb(0xb4) == c) {
 			outb_p(7,0xb0);
-			IN_BYTE(0x3f6);
+			inb(0x3f6);
 			return;	/* success */
 		}
 	}
 }
 
-static void tune_dtc2278 (ide_drive_t *drive, byte pio)
+static void tune_dtc2278 (ide_drive_t *drive, u8 pio)
 {
 	unsigned long flags;
 
@@ -95,7 +103,7 @@ static void tune_dtc2278 (ide_drive_t *drive, byte pio)
 	HWIF(drive)->drives[!drive->select.b.unit].io_32bit = 1;
 }
 
-void __init init_dtc2278 (void)
+void __init probe_dtc2278 (void)
 {
 	unsigned long flags;
 
@@ -104,9 +112,9 @@ void __init init_dtc2278 (void)
 	 * This enables the second interface
 	 */
 	outb_p(4,0xb0);
-	IN_BYTE(0x3f6);
+	inb(0x3f6);
 	outb_p(0x20,0xb4);
-	IN_BYTE(0x3f6);
+	inb(0x3f6);
 #ifdef ALWAYS_SET_DTC2278_PIO_MODE
 	/*
 	 * This enables PIO mode4 (3?) on the first interface
@@ -129,4 +137,67 @@ void __init init_dtc2278 (void)
 	ide_hwifs[0].mate = &ide_hwifs[1];
 	ide_hwifs[1].mate = &ide_hwifs[0];
 	ide_hwifs[1].channel = 1;
+
+#ifndef HWIF_PROBE_CLASSIC_METHOD
+	probe_hwif_init(&ide_hwifs[0]);
+	probe_hwif_init(&ide_hwifs[1]);
+#endif /* HWIF_PROBE_CLASSIC_METHOD */
+
 }
+
+void __init dtc2278_release (void)
+{
+	if (ide_hwifs[0].chipset != ide_dtc2278 &&
+	    ide_hwifs[1].chipset != ide_dtc2278)
+		return;
+
+	ide_hwifs[0].serialized = 0;
+	ide_hwifs[1].serialized = 0;
+	ide_hwifs[0].chipset = ide_unknown;
+	ide_hwifs[1].chipset = ide_unknown;
+	ide_hwifs[0].tuneproc = NULL;
+	ide_hwifs[0].drives[0].no_unmask = 0;
+	ide_hwifs[0].drives[1].no_unmask = 0;
+	ide_hwifs[1].drives[0].no_unmask = 0;
+	ide_hwifs[1].drives[1].no_unmask = 0;
+	ide_hwifs[0].mate = NULL;
+	ide_hwifs[1].mate = NULL;
+}
+
+#ifndef MODULE
+/*
+ * init_dtc2278:
+ *
+ * called by ide.c when parsing command line
+ */
+
+void __init init_dtc2278 (void)
+{
+	probe_dtc2278();
+}
+
+#else
+
+MODULE_AUTHOR("See Local File");
+MODULE_DESCRIPTION("support of DTC-2278 VLB IDE chipsets");
+MODULE_LICENSE("GPL");
+
+int __init dtc2278_mod_init(void)
+{
+	probe_dtc2278();
+	if (ide_hwifs[0].chipset != ide_dtc2278 &&
+	    ide_hwifs[1].chipset != ide_dtc2278) {
+		dtc2278_release();
+		return -ENODEV;
+	}
+	return 0;
+}
+module_init(dtc2278_mod_init);
+
+void __init dtc2278_mod_exit(void)
+{
+	dtc2278_release();
+}
+module_exit(dtc2278_mod_exit);
+#endif
+

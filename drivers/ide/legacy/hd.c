@@ -50,13 +50,6 @@
 #define DEVICE_NR(device) (minor(device)>>6)
 #include <linux/blk.h>
 
-/* ATA commands we use.
- */
-#define WIN_SPECIFY	0x91 /* set drive geometry translation */
-#define WIN_RESTORE	0x10
-#define WIN_READ	0x20 /* 28-Bit */
-#define WIN_WRITE	0x30 /* 28-Bit */
-
 #define HD_IRQ 14	/* the standard disk interrupt */
 
 #ifdef __arm__

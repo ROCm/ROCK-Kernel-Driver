@@ -38,6 +38,8 @@
 
 #undef REALLY_SLOW_IO		/* most systems can safely undef this */
 
+#include <linux/module.h>
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -51,7 +53,13 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#ifdef CONFIG_BLK_DEV_HT6560B_MODULE
+# define _IDE_C
+# include "ide_modes.h"
+# undef _IDE_C
+#else
+# include "ide_modes.h"
+#endif /* CONFIG_BLK_DEV_HT6560B_MODULE */
 
 /* #define DEBUG */  /* remove comments for DEBUG messages */
 
@@ -68,7 +76,7 @@
  *    bit3 (0x08): "1" 3 cycle time, "0" 2 cycle time	      (?)
  */
 #define HT_CONFIG_PORT	  0x3e6
-#define HT_CONFIG(drivea) (byte)(((drivea)->drive_data & 0xff00) >> 8)
+#define HT_CONFIG(drivea) (u8)(((drivea)->drive_data & 0xff00) >> 8)
 /*
  * FIFO + PREFETCH (both a/b-model)
  */
@@ -114,7 +122,7 @@
  * Active Time for each drive. Smaller value gives higher speed.
  * In case of failures you should probably fall back to a higher value.
  */
-#define HT_TIMING(drivea) (byte)((drivea)->drive_data & 0x00ff)
+#define HT_TIMING(drivea) (u8)((drivea)->drive_data & 0x00ff)
 #define HT_TIMING_DEFAULT 0xff
 
 /*
@@ -130,9 +138,9 @@
 static void ht6560b_selectproc (ide_drive_t *drive)
 {
 	unsigned long flags;
-	static byte current_select = 0;
-	static byte current_timing = 0;
-	byte select, timing;
+	static u8 current_select = 0;
+	static u8 current_timing = 0;
+	u8 select, timing;
 	
 	local_irq_save(flags);
 	
@@ -144,16 +152,16 @@ static void ht6560b_selectproc (ide_drive_t *drive)
 		current_timing = timing;
 		if (drive->media != ide_disk || !drive->present)
 			select |= HT_PREFETCH_MODE;
-		(void) IN_BYTE(HT_CONFIG_PORT);
-		(void) IN_BYTE(HT_CONFIG_PORT);
-		(void) IN_BYTE(HT_CONFIG_PORT);
-		(void) IN_BYTE(HT_CONFIG_PORT);
-		OUT_BYTE(select, HT_CONFIG_PORT);
+		(void) HWIF(drive)->INB(HT_CONFIG_PORT);
+		(void) HWIF(drive)->INB(HT_CONFIG_PORT);
+		(void) HWIF(drive)->INB(HT_CONFIG_PORT);
+		(void) HWIF(drive)->INB(HT_CONFIG_PORT);
+		HWIF(drive)->OUTB(select, HT_CONFIG_PORT);
 		/*
 		 * Set timing for this drive:
 		 */
-		OUT_BYTE(timing, IDE_SELECT_REG);
-		(void) IN_BYTE(IDE_STATUS_REG);
+		HWIF(drive)->OUTB(timing, IDE_SELECT_REG);
+		(void) HWIF(drive)->INB(IDE_STATUS_REG);
 #ifdef DEBUG
 		printk("ht6560b: %s: select=%#x timing=%#x\n",
 			drive->name, select, timing);
@@ -167,31 +175,31 @@ static void ht6560b_selectproc (ide_drive_t *drive)
  */
 static int __init try_to_init_ht6560b(void)
 {
-	byte orig_value;
+	u8 orig_value;
 	int i;
 	
 	/* Autodetect ht6560b */
-	if ((orig_value = IN_BYTE(HT_CONFIG_PORT)) == 0xff)
+	if ((orig_value = inb(HT_CONFIG_PORT)) == 0xff)
 		return 0;
 	
 	for (i=3;i>0;i--) {
-		OUT_BYTE(0x00, HT_CONFIG_PORT);
-		if (!( (~IN_BYTE(HT_CONFIG_PORT)) & 0x3f )) {
-			OUT_BYTE(orig_value, HT_CONFIG_PORT);
+		outb(0x00, HT_CONFIG_PORT);
+		if (!( (~inb(HT_CONFIG_PORT)) & 0x3f )) {
+			outb(orig_value, HT_CONFIG_PORT);
 			return 0;
 		}
 	}
-	OUT_BYTE(0x00, HT_CONFIG_PORT);
-	if ((~IN_BYTE(HT_CONFIG_PORT))& 0x3f) {
-		OUT_BYTE(orig_value, HT_CONFIG_PORT);
+	outb(0x00, HT_CONFIG_PORT);
+	if ((~inb(HT_CONFIG_PORT))& 0x3f) {
+		outb(orig_value, HT_CONFIG_PORT);
 		return 0;
 	}
 	/*
 	 * Ht6560b autodetected
 	 */
-	OUT_BYTE(HT_CONFIG_DEFAULT, HT_CONFIG_PORT);
-	OUT_BYTE(HT_TIMING_DEFAULT, 0x1f6);  /* IDE_SELECT_REG */
-	(void) IN_BYTE(0x1f7);               /* IDE_STATUS_REG */
+	outb(HT_CONFIG_DEFAULT, HT_CONFIG_PORT);
+	outb(HT_TIMING_DEFAULT, 0x1f6);  /* IDE_SELECT_REG */
+	(void) inb(0x1f7);               /* IDE_STATUS_REG */
 	
 	printk("\nht6560b " HT6560B_VERSION
 	       ": chipset detected and initialized"
@@ -202,7 +210,7 @@ static int __init try_to_init_ht6560b(void)
 	return 1;
 }
 
-static byte ht_pio2timings(ide_drive_t *drive, byte pio)
+static u8 ht_pio2timings(ide_drive_t *drive, u8 pio)
 {
 	int active_time, recovery_time;
 	int active_cycles, recovery_cycles;
@@ -238,7 +246,7 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 		printk("ht6560b: drive %s setting pio=%d recovery=%d (%dns) active=%d (%dns)\n", drive->name, pio, recovery_cycles, recovery_time, active_cycles, active_time);
 #endif
 		
-		return (byte)((recovery_cycles << 4) | active_cycles);
+		return (u8)((recovery_cycles << 4) | active_cycles);
 	} else {
 		
 #ifdef DEBUG
@@ -252,7 +260,7 @@ static byte ht_pio2timings(ide_drive_t *drive, byte pio)
 /*
  *  Enable/Disable so called prefetch mode
  */
-static void ht_set_prefetch(ide_drive_t *drive, byte state)
+static void ht_set_prefetch(ide_drive_t *drive, u8 state)
 {
 	unsigned long flags;
 	int t = HT_PREFETCH_MODE << 8;
@@ -278,10 +286,10 @@ static void ht_set_prefetch(ide_drive_t *drive, byte state)
 #endif
 }
 
-static void tune_ht6560b (ide_drive_t *drive, byte pio)
+static void tune_ht6560b (ide_drive_t *drive, u8 pio)
 {
 	unsigned long flags;
-	byte timing;
+	u8 timing;
 	
 	switch (pio) {
 	case 8:         /* set prefetch off */
@@ -304,38 +312,119 @@ static void tune_ht6560b (ide_drive_t *drive, byte pio)
 #endif
 }
 
-void __init init_ht6560b (void)
+void __init probe_ht6560b (void)
 {
 	int t;
 	
-	if (check_region(HT_CONFIG_PORT,1)) {
-		printk(KERN_ERR "ht6560b: PORT %#x ALREADY IN USE\n", HT_CONFIG_PORT);
-	} else {
-		if (try_to_init_ht6560b()) {
-			request_region(HT_CONFIG_PORT, 1, ide_hwifs[0].name);
-			ide_hwifs[0].chipset = ide_ht6560b;
-			ide_hwifs[1].chipset = ide_ht6560b;
-			ide_hwifs[0].selectproc = &ht6560b_selectproc;
-			ide_hwifs[1].selectproc = &ht6560b_selectproc;
-			ide_hwifs[0].tuneproc = &tune_ht6560b;
-			ide_hwifs[1].tuneproc = &tune_ht6560b;
-			ide_hwifs[0].serialized = 1;  /* is this needed? */
-			ide_hwifs[1].serialized = 1;  /* is this needed? */
-			ide_hwifs[0].mate = &ide_hwifs[1];
-			ide_hwifs[1].mate = &ide_hwifs[0];
-			ide_hwifs[1].channel = 1;
+	request_region(HT_CONFIG_PORT, 1, ide_hwifs[0].name);
+	ide_hwifs[0].chipset = ide_ht6560b;
+	ide_hwifs[1].chipset = ide_ht6560b;
+	ide_hwifs[0].selectproc = &ht6560b_selectproc;
+	ide_hwifs[1].selectproc = &ht6560b_selectproc;
+	ide_hwifs[0].tuneproc = &tune_ht6560b;
+	ide_hwifs[1].tuneproc = &tune_ht6560b;
+	ide_hwifs[0].serialized = 1;  /* is this needed? */
+	ide_hwifs[1].serialized = 1;  /* is this needed? */
+	ide_hwifs[0].mate = &ide_hwifs[1];
+	ide_hwifs[1].mate = &ide_hwifs[0];
+	ide_hwifs[1].channel = 1;
 			
-			/*
-			 * Setting default configurations for drives
-			 */
-			t = (HT_CONFIG_DEFAULT << 8);
-			t |= HT_TIMING_DEFAULT;
-			ide_hwifs[0].drives[0].drive_data = t;
-			ide_hwifs[0].drives[1].drive_data = t;
-			t |= (HT_SECONDARY_IF << 8);
-			ide_hwifs[1].drives[0].drive_data = t;
-			ide_hwifs[1].drives[1].drive_data = t;
-		} else
-			printk(KERN_ERR "ht6560b: not found\n");
-	}
+	/*
+	 * Setting default configurations for drives
+	 */
+	t = (HT_CONFIG_DEFAULT << 8);
+	t |= HT_TIMING_DEFAULT;
+	ide_hwifs[0].drives[0].drive_data = t;
+	ide_hwifs[0].drives[1].drive_data = t;
+	t |= (HT_SECONDARY_IF << 8);
+	ide_hwifs[1].drives[0].drive_data = t;
+	ide_hwifs[1].drives[1].drive_data = t;
+
+#ifndef HWIF_PROBE_CLASSIC_METHOD
+	probe_hwif_init(&ide_hwifs[0]);
+	probe_hwif_init(&ide_hwifs[1]);
+#endif /* HWIF_PROBE_CLASSIC_METHOD */
+
 }
+
+void __init ht6560b_release (void)
+{
+	if (ide_hwifs[0].chipset != ide_ht6560b &&
+	    ide_hwifs[1].chipset != ide_ht6560b)
+                return;
+
+	ide_hwifs[0].chipset = ide_unknown;
+	ide_hwifs[1].chipset = ide_unknown;
+	ide_hwifs[0].tuneproc = NULL;
+	ide_hwifs[1].tuneproc = NULL;
+	ide_hwifs[0].selectproc = NULL;
+	ide_hwifs[1].selectproc = NULL;
+	ide_hwifs[0].serialized = 0;
+	ide_hwifs[1].serialized = 0;
+	ide_hwifs[0].mate = NULL;
+	ide_hwifs[1].mate = NULL;
+
+	ide_hwifs[0].drives[0].drive_data = 0;
+	ide_hwifs[0].drives[1].drive_data = 0;
+	ide_hwifs[1].drives[0].drive_data = 0;
+	ide_hwifs[1].drives[1].drive_data = 0;
+	release_region(HT_CONFIG_PORT, 1);
+}
+
+#ifndef MODULE
+/*
+ * init_ht6560b:
+ *
+ * called by ide.c when parsing command line
+ */
+
+void __init init_ht6560b (void)
+{
+	if (check_region(HT_CONFIG_PORT,1)) {
+		printk(KERN_NOTICE "%s: HT_CONFIG_PORT not found\n",
+			__FUNCTION__);
+		return;
+	}
+	if (!try_to_init_ht6560b()) {
+                printk(KERN_NOTICE "%s: HBA not found\n", __FUNCTION__);
+		return;
+	}
+	probe_ht6560b();
+}
+
+#else
+
+MODULE_AUTHOR("See Local File");
+MODULE_DESCRIPTION("HT-6560B EIDE-controller support");
+MODULE_LICENSE("GPL");
+
+int __init ht6560b_mod_init(void)
+{
+	if (check_region(HT_CONFIG_PORT,1)) {
+		printk(KERN_NOTICE "%s: HT_CONFIG_PORT not found\n",
+			__FUNCTION__);
+		return -ENODEV;
+	}
+
+	if (!try_to_init_ht6560b()) {
+		printk(KERN_NOTICE "%s: HBA not found\n", __FUNCTION__);
+		return -ENODEV;
+	}
+
+	probe_ht6560b();
+        if (ide_hwifs[0].chipset != ide_ht6560b &&
+            ide_hwifs[1].chipset != ide_ht6560b) {
+                ht6560b_release();
+                return -ENODEV;
+        }
+        return 0;
+}
+module_init(ht6560b_mod_init);
+
+void __init ht6560b_mod_exit(void)
+{
+        ht6560b_release();
+}
+module_exit(ht6560b_mod_exit);
+#endif
+

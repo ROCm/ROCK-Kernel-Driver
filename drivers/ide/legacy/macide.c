@@ -83,7 +83,7 @@ static void macide_mediabay_interrupt(int irq, void *dev_id, struct pt_regs *reg
 {
 	int state = baboon->mb_status & 0x04;
 
-	printk("macide: media bay %s detected\n", state? "removal":"insertion");
+	printk(KERN_INFO "macide: media bay %s detected\n", state? "removal":"insertion");
 }
 #endif
 
@@ -99,24 +99,30 @@ void macide_init(void)
 	switch (macintosh_config->ide_type) {
 	case MAC_IDE_QUADRA:
 		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
-				0, 0, macide_ack_intr, IRQ_NUBUS_F);
+				0, 0, macide_ack_intr,
+//				quadra_ide_iops,
+				IRQ_NUBUS_F);
 		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_PB:
 		ide_setup_ports(&hw, (ide_ioreg_t)IDE_BASE, macide_offsets,
-				0, 0, macide_ack_intr, IRQ_NUBUS_C);
+				0, 0, macide_ack_intr,
+//				macide_pb_iops,
+				IRQ_NUBUS_C);
 		index = ide_register_hw(&hw, NULL);
 		break;
 	case MAC_IDE_BABOON:
 		ide_setup_ports(&hw, (ide_ioreg_t)BABOON_BASE, macide_offsets,
-				0, 0, NULL, IRQ_BABOON_1);
+				0, 0, NULL,
+//				macide_baboon_iops,
+				IRQ_BABOON_1);
 		index = ide_register_hw(&hw, NULL);
 		if (index == -1) break;
 		if (macintosh_config->ident == MAC_MODEL_PB190) {
 
 			/* Fix breakage in ide-disk.c: drive capacity	*/
 			/* is not initialized for drives without a 	*/
-			/* hardware ID, and we cna't get that without	*/
+			/* hardware ID, and we can't get that without	*/
 			/* probing the drive which freezes a 190.	*/
 
 			ide_drive_t *drive = &ide_hwifs[index].drives[0];
@@ -136,12 +142,12 @@ void macide_init(void)
 
         if (index != -1) {
 		if (macintosh_config->ide_type == MAC_IDE_QUADRA)
-			printk("ide%d: Macintosh Quadra IDE interface\n", index);
+			printk(KERN_INFO "ide%d: Macintosh Quadra IDE interface\n", index);
 		else if (macintosh_config->ide_type == MAC_IDE_PB)
-			printk("ide%d: Macintosh Powerbook IDE interface\n", index);
+			printk(KERN_INFO "ide%d: Macintosh Powerbook IDE interface\n", index);
 		else if (macintosh_config->ide_type == MAC_IDE_BABOON)
-			printk("ide%d: Macintosh Powerbook Baboon IDE interface\n", index);
+			printk(KERN_INFO "ide%d: Macintosh Powerbook Baboon IDE interface\n", index);
 		else
-			printk("ide%d: Unknown Macintosh IDE interface\n", index);
+			printk(KERN_INFO "ide%d: Unknown Macintosh IDE interface\n", index);
 	}
 }

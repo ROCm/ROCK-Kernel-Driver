@@ -39,6 +39,8 @@
 
 #undef REALLY_SLOW_IO           /* most systems can safely undef this */
 
+#include <linux/module.h>
+#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/delay.h>
@@ -52,14 +54,20 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#ifdef CONFIG_BLK_DEV_ALI14XX_MODULE
+# define _IDE_C
+# include "ide_modes.h"
+# undef _IDE_C
+#else
+# include "ide_modes.h"
+#endif /* CONFIG_BLK_DEV_ALI14XX_MODULE */
 
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4
 static int ports[ALI_NUM_PORTS] __initdata = {0x074, 0x0f4, 0x034, 0x0e4};
 
 /* register initialization data */
-typedef struct { byte reg, data; } RegInitializer;
+typedef struct { u8 reg, data; } RegInitializer;
 
 static RegInitializer initData[] __initdata = {
 	{0x01, 0x0f}, {0x02, 0x00}, {0x03, 0x00}, {0x04, 0x00},
@@ -74,7 +82,7 @@ static RegInitializer initData[] __initdata = {
 #define ALI_MAX_PIO 4
 
 /* timing parameter registers for each drive */
-static struct { byte reg1, reg2, reg3, reg4; } regTab[4] = {
+static struct { u8 reg1, reg2, reg3, reg4; } regTab[4] = {
 	{0x03, 0x26, 0x04, 0x27},     /* drive 0 */
 	{0x05, 0x28, 0x06, 0x29},     /* drive 1 */
 	{0x2b, 0x30, 0x2c, 0x31},     /* drive 2 */
@@ -84,24 +92,24 @@ static struct { byte reg1, reg2, reg3, reg4; } regTab[4] = {
 static int basePort;	/* base port address */
 static int regPort;	/* port for register number */
 static int dataPort;	/* port for register data */
-static byte regOn;	/* output to base port to access registers */
-static byte regOff;	/* output to base port to close registers */
+static u8 regOn;	/* output to base port to access registers */
+static u8 regOff;	/* output to base port to close registers */
 
 /*------------------------------------------------------------------------*/
 
 /*
  * Read a controller register.
  */
-static inline byte inReg (byte reg)
+static inline u8 inReg (u8 reg)
 {
 	outb_p(reg, regPort);
-	return IN_BYTE(dataPort);
+	return inb(dataPort);
 }
 
 /*
  * Write a controller register.
  */
-static void outReg (byte data, byte reg)
+static void outReg (u8 data, u8 reg)
 {
 	outb_p(reg, regPort);
 	outb_p(data, dataPort);
@@ -112,11 +120,11 @@ static void outReg (byte data, byte reg)
  * This function computes timing parameters
  * and sets controller registers accordingly.
  */
-static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
+static void ali14xx_tune_drive (ide_drive_t *drive, u8 pio)
 {
 	int driveNum;
 	int time1, time2;
-	byte param1, param2, param3, param4;
+	u8 param1, param2, param3, param4;
 	unsigned long flags;
 	ide_pio_data_t d;
 	int bus_speed = system_bus_clock();
@@ -132,7 +140,7 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 		param3 += 8;
 		param4 += 8;
 	}
-	printk("%s: PIO mode%d, t1=%dns, t2=%dns, cycles = %d+%d, %d+%d\n",
+	printk(KERN_DEBUG "%s: PIO mode%d, t1=%dns, t2=%dns, cycles = %d+%d, %d+%d\n",
 		drive->name, pio, time1, time2, param1, param2, param3, param4);
 
 	/* stuff timing parameters into controller registers */
@@ -153,16 +161,16 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 static int __init findPort (void)
 {
 	int i;
-	byte t;
+	u8 t;
 	unsigned long flags;
 
 	local_irq_save(flags);
 	for (i = 0; i < ALI_NUM_PORTS; ++i) {
 		basePort = ports[i];
-		regOff = IN_BYTE(basePort);
+		regOff = inb(basePort);
 		for (regOn = 0x30; regOn <= 0x33; ++regOn) {
 			outb_p(regOn, basePort);
-			if (IN_BYTE(basePort) == regOn) {
+			if (inb(basePort) == regOn) {
 				regPort = basePort + 4;
 				dataPort = basePort + 8;
 				t = inReg(0) & 0xf0;
@@ -184,7 +192,7 @@ static int __init findPort (void)
  */
 static int __init initRegisters (void) {
 	RegInitializer *p;
-	byte t;
+	u8 t;
 	unsigned long flags;
 
 	local_irq_save(flags);
@@ -192,21 +200,21 @@ static int __init initRegisters (void) {
 	for (p = initData; p->reg != 0; ++p)
 		outReg(p->data, p->reg);
 	outb_p(0x01, regPort);
-	t = IN_BYTE(regPort) & 0x01;
+	t = inb(regPort) & 0x01;
 	outb_p(regOff, basePort);
 	local_irq_restore(flags);
 	return t;
 }
 
-void __init init_ali14xx (void)
+int __init probe_ali14xx (void)
 {
 	/* auto-detect IDE controller port */
 	if (!findPort()) {
-		printk("\nali14xx: not found");
-		return;
+		printk(KERN_ERR "ali14xx: not found.\n");
+		return 1;
 	}
 
-	printk("\nali14xx: base= 0x%03x, regOn = 0x%02x", basePort, regOn);
+	printk(KERN_DEBUG "ali14xx: base= 0x%03x, regOn = 0x%02x.\n", basePort, regOn);
 	ide_hwifs[0].chipset = ide_ali14xx;
 	ide_hwifs[1].chipset = ide_ali14xx;
 	ide_hwifs[0].tuneproc = &ali14xx_tune_drive;
@@ -217,7 +225,80 @@ void __init init_ali14xx (void)
 
 	/* initialize controller registers */
 	if (!initRegisters()) {
-		printk("\nali14xx: Chip initialization failed");
-		return;
+		printk(KERN_ERR "ali14xx: Chip initialization failed.\n");
+		return 1;
 	}
+
+#ifndef HWIF_PROBE_CLASSIC_METHOD
+	probe_hwif_init(&ide_hwifs[0]);
+	probe_hwif_init(&ide_hwifs[1]);
+#endif /* HWIF_PROBE_CLASSIC_METHOD */
+
+	return 0;
 }
+
+void __init ali14xx_release (void)
+{
+	if (ide_hwifs[0].chipset != ide_ali14xx &&
+	    ide_hwifs[1].chipset != ide_ali14xx)
+		return;
+
+	ide_hwifs[0].chipset = ide_unknown;
+	ide_hwifs[1].chipset = ide_unknown;
+	ide_hwifs[0].tuneproc = NULL;
+	ide_hwifs[1].tuneproc = NULL;
+	ide_hwifs[0].mate = NULL;
+	ide_hwifs[1].mate = NULL;
+}
+
+#ifndef MODULE
+/*
+ * init_ali14xx:
+ *
+ * called by ide.c when parsing command line
+ */
+
+void __init init_ali14xx (void)
+{
+	/* auto-detect IDE controller port */
+        if (findPort())
+		if (probe_ali14xx())
+			goto no_detect;
+	return;
+
+no_detect:
+	printk(KERN_ERR "ali14xx: not found.\n");
+	ali14xx_release();
+}
+
+#else
+
+MODULE_AUTHOR("see local file");
+MODULE_DESCRIPTION("support of ALI 14XX IDE chipsets");
+MODULE_LICENSE("GPL");
+
+int __init ali14xx_mod_init(void)
+{
+	/* auto-detect IDE controller port */
+	if (findPort())
+		if (probe_ali14xx()) {
+			ali14xx_release();
+			return -ENODEV;
+		}
+
+	if (ide_hwifs[0].chipset != ide_ali14xx &&
+	    ide_hwifs[1].chipset != ide_ali14xx) {
+		ali14xx_release();
+		return -ENODEV;
+	}
+	return 0;
+}
+module_init(ali14xx_mod_init);
+
+void __init ali14xx_mod_exit(void)
+{
+	ali14xx_release();
+}
+module_exit(ali14xx_mod_exit);
+#endif
+
