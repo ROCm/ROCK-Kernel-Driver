@@ -104,6 +104,7 @@
 #include <asm/io.h>
 
 #include "ide_modes.h"
+#include "opti621.h"
 
 #define OPTI621_MAX_PIO 3
 /* In fact, I do not have any PIO 4 drive
@@ -133,14 +134,13 @@
 #define STRAP_REG 5	/* index of Strap register */
 #define MISC_REG 6	/* index of Miscellaneous register */
 
-int reg_base;
+static int reg_base;
 
 #define PIO_NOT_EXIST 254
 #define PIO_DONT_KNOW 255
 
 /* there are stored pio numbers from other calls of opti621_tune_drive */
-
-static void compute_pios(ide_drive_t *drive, byte pio)
+static void compute_pios(ide_drive_t *drive, u8 pio)
 /* Store values into drive->drive_data
  *	second_contr - 0 for primary controller, 1 for secondary
  *	slave_drive - 0 -> pio is for master, 1 -> pio is for slave
@@ -157,7 +157,8 @@ static void compute_pios(ide_drive_t *drive, byte pio)
 			if (drive->drive_data == PIO_DONT_KNOW)
 				drive->drive_data = ide_get_best_pio_mode(drive, 255, OPTI621_MAX_PIO, NULL);
 #ifdef OPTI621_DEBUG
-			printk("%s: Selected PIO mode %d\n", drive->name, drive->drive_data);
+			printk("%s: Selected PIO mode %d\n",
+				drive->name, drive->drive_data);
 #endif
 		} else {
 			drive->drive_data = PIO_NOT_EXIST;
@@ -165,7 +166,7 @@ static void compute_pios(ide_drive_t *drive, byte pio)
 	}
 }
 
-int cmpt_clk(int time, int bus_speed)
+static int cmpt_clk(int time, int bus_speed)
 /* Returns (rounded up) time in clocks for time in ns,
  * with bus_speed in MHz.
  * Example: bus_speed = 40 MHz, time = 80 ns
@@ -177,33 +178,34 @@ int cmpt_clk(int time, int bus_speed)
 	return ((time*bus_speed+999)/1000);
 }
 
-static void write_reg(byte value, int reg)
+static void write_reg(ide_hwif_t *hwif, u8 value, int reg)
 /* Write value to register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
  * This is from setupvic.exe program.
  */
 {
-	IN_WORD(reg_base+1);
-	IN_WORD(reg_base+1);
-	OUT_BYTE(3, reg_base+2);
-	OUT_BYTE(value, reg_base+reg);
-	OUT_BYTE(0x83, reg_base+2);
+	hwif->INW(reg_base+1);
+	hwif->INW(reg_base+1);
+	hwif->OUTB(3, reg_base+2);
+	hwif->OUTB(value, reg_base+reg);
+	hwif->OUTB(0x83, reg_base+2);
 }
 
-static byte read_reg(int reg)
+static u8 read_reg(ide_hwif_t *hwif, int reg)
 /* Read value from register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
  * This is from setupvic.exe program.
  */
 {
-	byte ret;
-	IN_WORD(reg_base+1);
-	IN_WORD(reg_base+1);
-	OUT_BYTE(3, reg_base+2);
-	ret=IN_BYTE(reg_base+reg);
-	OUT_BYTE(0x83, reg_base+2);
+	u8 ret = 0;
+
+	hwif->INW(reg_base+1);
+	hwif->INW(reg_base+1);
+	hwif->OUTB(3, reg_base+2);
+	ret = hwif->INB(reg_base+reg);
+	hwif->OUTB(0x83, reg_base+2);
 	return ret;
 }
 
@@ -241,16 +243,16 @@ static void compute_clocks(int pio, pio_clocks_t *clks)
 }
 
 /* Main tune procedure, called from tuneproc. */
-static void opti621_tune_drive (ide_drive_t *drive, byte pio)
+static void opti621_tune_drive (ide_drive_t *drive, u8 pio)
 {
 	/* primary and secondary drives share some registers,
 	 * so we have to program both drives
 	 */
 	unsigned long flags;
-	byte pio1, pio2;
+	u8 pio1 = 0, pio2 = 0;
 	pio_clocks_t first, second;
 	int ax, drdy;
-	byte cycle1, cycle2, misc;
+	u8 cycle1, cycle2, misc;
 	ide_hwif_t *hwif = HWIF(drive);
 
 	/* sets drive->drive_data for both drives */
@@ -271,69 +273,111 @@ static void opti621_tune_drive (ide_drive_t *drive, byte pio)
 	misc = READ_PREFETCH | ((ax-1)<<4) | ((drdy-2)<<1);
 
 #ifdef OPTI621_DEBUG
-	printk("%s: master: address: %d, data: %d, recovery: %d, drdy: %d [clk]\n",
-		hwif->name, ax, first.data_time, first.recovery_time, drdy);
-	printk("%s: slave:  address: %d, data: %d, recovery: %d, drdy: %d [clk]\n",
-		hwif->name, ax, second.data_time, second.recovery_time, drdy);
+	printk("%s: master: address: %d, data: %d, "
+		"recovery: %d, drdy: %d [clk]\n",
+		hwif->name, ax, first.data_time,
+		first.recovery_time, drdy);
+	printk("%s: slave:  address: %d, data: %d, "
+		"recovery: %d, drdy: %d [clk]\n",
+		hwif->name, ax, second.data_time,
+		second.recovery_time, drdy);
 #endif
 
 	spin_lock_irqsave(&ide_lock, flags);
 
      	reg_base = hwif->io_ports[IDE_DATA_OFFSET];
-	OUT_BYTE(0xc0, reg_base+CNTRL_REG);	/* allow Register-B */
-	OUT_BYTE(0xff, reg_base+5);	/* hmm, setupvic.exe does this ;-) */
-	IN_BYTE(reg_base+CNTRL_REG); 	/* if reads 0xff, adapter not exist? */
-	read_reg(CNTRL_REG);		/* if reads 0xc0, no interface exist? */
-	read_reg(STRAP_REG);		/* read version, probably 0 */
+
+	/* allow Register-B */
+	hwif->OUTB(0xc0, reg_base+CNTRL_REG);
+	/* hmm, setupvic.exe does this ;-) */
+	hwif->OUTB(0xff, reg_base+5);
+	/* if reads 0xff, adapter not exist? */
+	(void) hwif->INB(reg_base+CNTRL_REG);
+	/* if reads 0xc0, no interface exist? */
+	read_reg(hwif, CNTRL_REG);
+	/* read version, probably 0 */
+	read_reg(hwif, STRAP_REG);
 
 	/* program primary drive */
-	write_reg(0,      MISC_REG);	/* select Index-0 for Register-A */
-	write_reg(cycle1, READ_REG);	/* set read cycle timings */
-	write_reg(cycle1, WRITE_REG);	/* set write cycle timings */
+		/* select Index-0 for Register-A */
+	write_reg(hwif, 0,      MISC_REG);
+		/* set read cycle timings */
+	write_reg(hwif, cycle1, READ_REG);
+		/* set write cycle timings */
+	write_reg(hwif, cycle1, WRITE_REG);
 
 	/* program secondary drive */
-	write_reg(1,      MISC_REG);	/* select Index-1 for Register-B */
-	write_reg(cycle2, READ_REG);	/* set read cycle timings */
-	write_reg(cycle2, WRITE_REG);	/* set write cycle timings */
+		/* select Index-1 for Register-B */
+	write_reg(hwif, 1,      MISC_REG);
+		/* set read cycle timings */
+	write_reg(hwif, cycle2, READ_REG);
+		/* set write cycle timings */
+	write_reg(hwif, cycle2, WRITE_REG);
 
-	write_reg(0x85, CNTRL_REG);	/* use Register-A for drive 0 */
-					/* use Register-B for drive 1 */
+	/* use Register-A for drive 0 */
+	/* use Register-B for drive 1 */
+	write_reg(hwif, 0x85, CNTRL_REG);
 
- 	write_reg(misc, MISC_REG);	/* set address setup, DRDY timings,   */
- 					/*  and read prefetch for both drives */
+	/* set address setup, DRDY timings,   */
+	/*  and read prefetch for both drives */
+ 	write_reg(hwif, misc, MISC_REG);
 
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
 /*
- * ide_init_opti621() is called once for each hwif found at boot.
+ * init_hwif_opti621() is called once for each hwif found at boot.
  */
-void __init ide_init_opti621 (ide_hwif_t *hwif)
+static void __init init_hwif_opti621 (ide_hwif_t *hwif)
 {
 	hwif->autodma = 0;
 	hwif->drives[0].drive_data = PIO_DONT_KNOW;
 	hwif->drives[1].drive_data = PIO_DONT_KNOW;
 	hwif->tuneproc = &opti621_tune_drive;
 
-	/* safety call for Anton A */
-	hwif->dma_base = 0;
+	if (!(hwif->dma_base))
+		return;
+
+	hwif->atapi_dma = 1;
+	hwif->mwdma_mask = 0x07;
+	hwif->swdma_mask = 0x07;
+
+#ifdef CONFIG_BLK_DEV_IDEDMA
+	if (!noautodma)
+		hwif->autodma = 1;
+	hwif->drives[0].autodma = hwif->autodma;
+	hwif->drives[1].autodma = hwif->autodma;
+#endif /* CONFIG_BLK_DEV_IDEDMA */
+
 }
 
-extern void ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_t *d);
-
-void __init fixup_device_opti621 (struct pci_dev *dev, ide_pci_device_t *d)
+static void __init init_dma_opti621 (ide_hwif_t *hwif, unsigned long dmabase)
 {
-#if 0
-	if (IDE_PCI_DEVID_EQ(d->devid, DEVID_OPTI621V) &&
-	    !(PCI_FUNC(dev->devfn) & 1))
-#else
-	if ((dev->device == PCI_DEVICE_ID_OPTI_82C558) &&
-	    (!(PCI_FUNC(dev->devfn) & 1)))
-#endif
-		return; /* OPTI621 is more than only a IDE controller */
+	ide_setup_dma(hwif, dmabase, 8);
+}
 
-	printk("%s: IDE controller on PCI bus %02x dev %02x\n",
-		d->name, dev->bus->number, dev->devfn);
+extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
+
+static void __init init_setup_opti621 (struct pci_dev *dev, ide_pci_device_t *d)
+{
 	ide_setup_pci_device(dev, d);
+}
+
+int __init opti621_scan_pcidev (struct pci_dev *dev)
+{
+	ide_pci_device_t *d;
+
+	if (dev->vendor != PCI_VENDOR_ID_OPTI)
+		return 0;
+
+	for (d = opti621_chipsets; d && d->vendor && d->device; ++d) {
+		if (((d->vendor == dev->vendor) &&
+		     (d->device == dev->device)) &&
+		    (d->init_setup)) {
+			d->init_setup(dev, d);
+			return 1;
+		}
+	}
+	return 0;
 }
 
