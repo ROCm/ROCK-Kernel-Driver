@@ -59,7 +59,7 @@ static LIST_HEAD(adapter_list);
  * This function will be called when the adapter is plugged
  * into the USB bus.
  */
-static int probe_st5481(struct usb_interface *intf
+static int probe_st5481(struct usb_interface *intf,
 			const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
@@ -115,7 +115,7 @@ static int probe_st5481(struct usb_interface *intf
 	st5481_start(adapter);
 
 	dev_set_drvdata(&intf->dev, adapter);
-	return adapter;
+	return 0;
 
  err_b:
 	st5481_release_b(&adapter->bcs[0]);
