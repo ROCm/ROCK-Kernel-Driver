@@ -189,10 +189,10 @@ static inline int vfat_is_used_badchars(const wchar_t *s, int len)
 
 static int vfat_valid_longname(const unsigned char *name, unsigned int len)
 {
-	if (len && name[len-1] == ' ')
-		return 0;
+	if (name[len - 1] == ' ')
+		return -EINVAL;
 	if (len >= 256)
-		return 0;
+		return -ENAMETOOLONG;
 
 	/* MS-DOS "device special files" */
 	if (len == 3 || (len > 3 && name[3] == '.')) {	/* basename == 3 */
@@ -200,18 +200,18 @@ static int vfat_valid_longname(const unsigned char *name, unsigned int len)
 		    !strnicmp(name, "con", 3) ||
 		    !strnicmp(name, "nul", 3) ||
 		    !strnicmp(name, "prn", 3))
-			return 0;
+			return -EINVAL;
 	}
 	if (len == 4 || (len > 4 && name[4] == '.')) {	/* basename == 4 */
 		/* "com1", "com2", ... */
 		if ('1' <= name[3] && name[3] <= '9') {
 			if (!strnicmp(name, "com", 3) ||
 			    !strnicmp(name, "lpt", 3))
-				return 0;
+				return -EINVAL;
 		}
 	}
 
-	return 1;
+	return 0;
 }
 
 static int vfat_find_form(struct inode *dir, unsigned char *name)
@@ -614,8 +614,9 @@ static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 	loff_t offset;
 
 	*slots = 0;
-	if (!vfat_valid_longname(name, len))
-		return -EINVAL;
+	res = vfat_valid_longname(name, len);
+	if (res)
+		return res;
 
 	if(!(page = __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
