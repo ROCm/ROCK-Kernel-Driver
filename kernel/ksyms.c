@@ -602,7 +602,6 @@ EXPORT_SYMBOL(init_task);
 EXPORT_SYMBOL(init_thread_union);
 
 EXPORT_SYMBOL(tasklist_lock);
-EXPORT_SYMBOL(pidhash);
 #if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
 EXPORT_SYMBOL(__per_cpu_offset);
 #endif

@@ -33,7 +33,12 @@ static struct dentry * __unhash_process(struct task_struct *p)
 {
 	struct dentry *proc_dentry;
 	nr_threads--;
-	unhash_pid(p);
+	detach_pid(p, PIDTYPE_PID);
+	if (thread_group_leader(p)) {
+		detach_pid(p, PIDTYPE_PGID);
+		detach_pid(p, PIDTYPE_SID);
+	}
+
 	REMOVE_LINKS(p);
 	p->pid = 0;
 	proc_dentry = p->proc_dentry;
@@ -109,22 +114,18 @@ void unhash_process(struct task_struct *p)
 int session_of_pgrp(int pgrp)
 {
 	struct task_struct *p;
-	int fallback;
+	struct list_head *l;
+	struct pid *pid;
+	int sid = -1;
 
-	fallback = -1;
 	read_lock(&tasklist_lock);
-	for_each_process(p) {
- 		if (p->session <= 0)
- 			continue;
-		if (p->pgrp == pgrp) {
-			fallback = p->session;
+	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
+		if (p->session > 0) {
+			sid = p->session;
 			break;
 		}
-		if (p->pid == pgrp)
-			fallback = p->session;
-	}
 	read_unlock(&tasklist_lock);
-	return fallback;
+	return sid;
 }
 
 /*
@@ -135,21 +136,25 @@ int session_of_pgrp(int pgrp)
  *
  * "I ask you, have you ever known what it is to be an orphan?"
  */
-static int __will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_task)
+static int __will_become_orphaned_pgrp(int pgrp, task_t *ignored_task)
 {
 	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
+	int ret = 1;
 
-	for_each_process(p) {
-		if ((p == ignored_task) || (p->pgrp != pgrp) ||
-		    (p->state == TASK_ZOMBIE) ||
-		    (p->real_parent->pid == 1))
+	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+		if (p == ignored_task
+				|| p->state == TASK_ZOMBIE 
+				|| p->real_parent->pid == 1)
 			continue;
-		if ((p->real_parent->pgrp != pgrp) &&
-		    (p->real_parent->session == p->session)) {
- 			return 0;
+		if (p->real_parent->pgrp != pgrp
+			    && p->real_parent->session == p->session) {
+			ret = 0;
+			break;
 		}
 	}
-	return 1;	/* (sighing) "Often!" */
+	return ret;	/* (sighing) "Often!" */
 }
 
 static int will_become_orphaned_pgrp(int pgrp, struct task_struct * ignored_task)
@@ -171,11 +176,11 @@ int is_orphaned_pgrp(int pgrp)
 static inline int __has_stopped_jobs(int pgrp)
 {
 	int retval = 0;
-	struct task_struct * p;
+	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
 
-	for_each_process(p) {
-		if (p->pgrp != pgrp)
-			continue;
+	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
 		if (p->state != TASK_STOPPED)
 			continue;
 		retval = 1;
@@ -605,7 +610,8 @@ NORET_TYPE void do_exit(long code)
 	if (tsk->pid == 1)
 		panic("Attempted to kill init!");
 	tsk->flags |= PF_EXITING;
-	del_timer_sync(&tsk->real_timer);
+	if (timer_pending(&tsk->real_timer))
+		del_timer_sync(&tsk->real_timer);
 
 	if (unlikely(preempt_count()))
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",

@@ -943,18 +943,18 @@ out_unlock:
 
 int __kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
 {
-	int retval = -EINVAL;
-	if (pgrp > 0) {
-		struct task_struct *p;
+	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pid;
+	int err, retval = -ESRCH;
 
-		retval = -ESRCH;
-		for_each_process(p) {
-			if (p->pgrp == pgrp) {
-				int err = send_sig_info(sig, info, p);
-				if (retval)
-					retval = err;
-			}
-		}
+	if (pgrp <= 0)
+		return -EINVAL;
+
+	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid) {
+		err = send_sig_info(sig, info, p);
+		if (retval)
+			retval = err;
 	}
 	return retval;
 }
@@ -977,28 +977,33 @@ kill_pg_info(int sig, struct siginfo *info, pid_t pgrp)
  * the connection is lost.
  */
 
-int
-kill_sl_info(int sig, struct siginfo *info, pid_t sess)
-{
-	int retval = -EINVAL;
-	if (sess > 0) {
-		struct task_struct *p;
 
-		retval = -ESRCH;
-		read_lock(&tasklist_lock);
-		for_each_process(p) {
-			if (p->leader && p->session == sess) {
-				int err = send_sig_info(sig, info, p);
-				if (retval)
-					retval = err;
-			}
-		}
-		read_unlock(&tasklist_lock);
+int
+kill_sl_info(int sig, struct siginfo *info, pid_t sid)
+{
+	int err, retval = -EINVAL;
+	struct pid *pid;
+	struct list_head *l;
+	struct task_struct *p;
+
+	if (sid <= 0)
+		goto out;
+
+	retval = -ESRCH;
+	read_lock(&tasklist_lock);
+	for_each_task_pid(sid, PIDTYPE_SID, p, l, pid) {
+		if (!p->leader)
+			continue;
+		err = send_sig_info(sig, info, p);
+		if (retval)
+			retval = err;
 	}
+	read_unlock(&tasklist_lock);
+out:
 	return retval;
 }
 
-inline int
+int
 kill_proc_info(int sig, struct siginfo *info, pid_t pid)
 {
 	int error;

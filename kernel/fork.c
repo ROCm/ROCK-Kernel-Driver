@@ -47,17 +47,6 @@ int nr_threads;
 int max_threads;
 unsigned long total_forks;	/* Handle normal Linux uptimes. */
 
-/*
- * Protects next_safe, last_pid and pid_max:
- */
-spinlock_t lastpid_lock = SPIN_LOCK_UNLOCKED;
-
-static int next_safe = DEFAULT_PID_MAX;
-int pid_max = DEFAULT_PID_MAX;
-int last_pid;
-
-struct task_struct *pidhash[PIDHASH_SZ];
-
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
 /*
@@ -75,16 +64,14 @@ void __put_task_struct(struct task_struct *tsk)
 	} else {
 		int cpu = smp_processor_id();
 
-		tsk = task_cache[cpu];
+		tsk = xchg(task_cache + cpu, tsk);
 		if (tsk) {
 			free_thread_info(tsk->thread_info);
 			kmem_cache_free(task_struct_cachep,tsk);
 		}
-		task_cache[cpu] = current;
 	}
 }
 
-/* Protects next_safe and last_pid. */
 void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -140,71 +127,26 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	struct task_struct *tsk;
 	struct thread_info *ti;
 
-	ti = alloc_thread_info();
-	if (!ti)
-		return NULL;
-
-	tsk = kmem_cache_alloc(task_struct_cachep, GFP_KERNEL);
+	tsk = xchg(task_cache + smp_processor_id(), NULL);
 	if (!tsk) {
-		free_thread_info(ti);
-		return NULL;
-	}
+		ti = alloc_thread_info();
+		if (!ti)
+			return NULL;
+
+		tsk = kmem_cache_alloc(task_struct_cachep, GFP_KERNEL);
+		if (!tsk) {
+			free_thread_info(ti);
+			return NULL;
+		}
+	} else
+		ti = tsk->thread_info;
 
 	*ti = *orig->thread_info;
 	*tsk = *orig;
 	tsk->thread_info = ti;
 	ti->task = tsk;
 	atomic_set(&tsk->usage,1);
-
 	return tsk;
-}
-
-static int get_pid(unsigned long flags)
-{
-	struct task_struct *g, *p;
-	int pid;
-
-	if (flags & CLONE_IDLETASK)
-		return 0;
-
-	spin_lock(&lastpid_lock);
-	if (++last_pid > pid_max) {
-		last_pid = 300;		/* Skip daemons etc. */
-		goto inside;
-	}
-
-	if (last_pid >= next_safe) {
-inside:
-		if (nr_threads > pid_max >> 4)
-			pid_max <<= 1;
-		next_safe = pid_max;
-		read_lock(&tasklist_lock);
-	repeat:
-		do_each_thread(g, p) {
-			if (p->pid == last_pid	||
-			   p->pgrp == last_pid	||
-			   p->session == last_pid) {
-				if (++last_pid >= next_safe) {
-					if (last_pid >= pid_max)
-						last_pid = 300;
-					next_safe = pid_max;
-				}
-				goto repeat;
-			}
-			if (p->pid > last_pid && next_safe > p->pid)
-				next_safe = p->pid;
-			if (p->pgrp > last_pid && next_safe > p->pgrp)
-				next_safe = p->pgrp;
-			if (p->session > last_pid && next_safe > p->session)
-				next_safe = p->session;
-		} while_each_thread(g, p);
-
-		read_unlock(&tasklist_lock);
-	}
-	pid = last_pid;
-	spin_unlock(&lastpid_lock);
-
-	return pid;
 }
 
 static inline int dup_mmap(struct mm_struct * mm)
@@ -726,7 +668,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	p->state = TASK_UNINTERRUPTIBLE;
 
 	copy_flags(clone_flags, p);
-	p->pid = get_pid(clone_flags);
+	if (clone_flags & CLONE_IDLETASK)
+		p->pid = 0;
+	else {
+		p->pid = alloc_pidmap();
+		if (p->pid == -1)
+			goto bad_fork_cleanup;
+	}
 	p->proc_dentry = NULL;
 
 	INIT_LIST_HEAD(&p->run_list);
@@ -889,7 +837,13 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	SET_LINKS(p);
 	if (p->ptrace & PT_PTRACED)
 		__ptrace_link(p, current->parent);
-	hash_pid(p);
+
+	attach_pid(p, PIDTYPE_PID, p->pid);
+	if (thread_group_leader(p)) {
+		attach_pid(p, PIDTYPE_PGID, p->pgrp);
+		attach_pid(p, PIDTYPE_SID, p->session);
+	}
+
 	nr_threads++;
 	write_unlock_irq(&tasklist_lock);
 	retval = 0;
@@ -914,6 +868,8 @@ bad_fork_cleanup_semundo:
 bad_fork_cleanup_security:
 	security_ops->task_free_security(p);
 bad_fork_cleanup:
+	if (p->pid > 0)
+		free_pidmap(p->pid);
 	put_exec_domain(p->thread_info->exec_domain);
 	if (p->binfmt && p->binfmt->module)
 		__MOD_DEC_USE_COUNT(p->binfmt->module);

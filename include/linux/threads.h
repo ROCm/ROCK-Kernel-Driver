@@ -17,8 +17,13 @@
 #define MIN_THREADS_LEFT_FOR_ROOT 4
 
 /*
- * This controls the maximum pid allocated to a process
+ * This controls the default maximum pid allocated to a process
  */
-#define DEFAULT_PID_MAX 0x8000
+#define PID_MAX_DEFAULT 0x8000
+
+/*
+ * A maximum of 4 million PIDs should be enough for a while:
+ */
+#define PID_MAX_LIMIT (4*1024*1024)
 
 #endif

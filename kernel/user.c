@@ -64,6 +64,11 @@ static inline struct user_struct *uid_hash_find(uid_t uid, struct list_head *has
 	return NULL;
 }
 
+struct user_struct *find_user(uid_t uid)
+{
+	return uid_hash_find(uid, uidhashentry(uid));
+}
+
 void free_uid(struct user_struct *up)
 {
 	if (up && atomic_dec_and_lock(&up->__count, &uidhash_lock)) {

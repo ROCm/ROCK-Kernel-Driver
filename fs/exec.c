@@ -609,8 +609,6 @@ static inline int de_thread(struct signal_struct *oldsig)
 
 		ptrace_unlink(leader);
 		ptrace_unlink(current);
-		unhash_pid(current);
-		unhash_pid(leader);
 		remove_parent(current);
 		remove_parent(leader);
 		/*
@@ -631,8 +629,6 @@ static inline int de_thread(struct signal_struct *oldsig)
 			current->ptrace = ptrace;
 			__ptrace_link(current, parent);
 		}
-		hash_pid(current);
-		hash_pid(leader);
 		
 		list_add_tail(&current->tasks, &init_task.tasks);
 		state = leader->state;

@@ -28,6 +28,7 @@ extern unsigned long event;
 #include <linux/fs_struct.h>
 #include <linux/compiler.h>
 #include <linux/completion.h>
+#include <linux/pid.h>
 
 struct exec_domain;
 
@@ -266,6 +267,8 @@ struct user_struct {
 	atomic_inc(&__user->__count);			\
 	__user; })
 
+extern struct user_struct *find_user(uid_t);
+
 extern struct user_struct root_user;
 #define INIT_USER (&root_user)
 
@@ -326,9 +329,8 @@ struct task_struct {
 	struct task_struct *group_leader;
 	struct list_head thread_group;
 
-	/* PID hash table linkage. */
-	struct task_struct *pidhash_next;
-	struct task_struct **pidhash_pprev;
+	/* PID/PID hash table linkage. */
+	struct pid_link pids[PIDTYPE_MAX];
 
 	wait_queue_head_t wait_chldexit;	/* for wait4() */
 	struct completion *vfork_done;		/* for vfork() */
@@ -474,38 +476,7 @@ extern struct task_struct init_task;
 
 extern struct   mm_struct init_mm;
 
-/* PID hashing. (shouldnt this be dynamic?) */
-#define PIDHASH_SZ 8192
-extern struct task_struct *pidhash[PIDHASH_SZ];
-
-#define pid_hashfn(x)	((((x) >> 8) ^ (x)) & (PIDHASH_SZ - 1))
-
-static inline void hash_pid(struct task_struct *p)
-{
-	struct task_struct **htable = &pidhash[pid_hashfn(p->pid)];
-
-	if((p->pidhash_next = *htable) != NULL)
-		(*htable)->pidhash_pprev = &p->pidhash_next;
-	*htable = p;
-	p->pidhash_pprev = htable;
-}
-
-static inline void unhash_pid(struct task_struct *p)
-{
-	if(p->pidhash_next)
-		p->pidhash_next->pidhash_pprev = p->pidhash_pprev;
-	*p->pidhash_pprev = p->pidhash_next;
-}
-
-static inline struct task_struct *find_task_by_pid(int pid)
-{
-	struct task_struct *p, **htable = &pidhash[pid_hashfn(pid)];
-
-	for(p = *htable; p && p->pid != pid; p = p->pidhash_next)
-		;
-
-	return p;
-}
+extern struct task_struct *find_task_by_pid(int pid);
 
 /* per-UID process charging. */
 extern struct user_struct * alloc_uid(uid_t);

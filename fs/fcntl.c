@@ -480,7 +480,9 @@ static void send_sigio_to_task(struct task_struct *p,
 
 void send_sigio(struct fown_struct *fown, int fd, int band)
 {
-	struct task_struct * p;
+	struct task_struct *p;
+	struct list_head *l;
+	struct pid *pidptr;
 	int pid;
 	
 	read_lock(&fown->lock);
@@ -493,14 +495,8 @@ void send_sigio(struct fown_struct *fown, int fd, int band)
 		send_sigio_to_task(p, fown, fd, band);
 		goto out_unlock_task;
 	}
-	for_each_process(p) {
-		int match = p->pid;
-		if (pid < 0)
-			match = -p->pgrp;
-		if (pid != match)
-			continue;
-		send_sigio_to_task(p, fown, fd, band);
-	}
+	for_each_task_pid(-pid, PIDTYPE_PGID, p, l, pidptr)
+		send_sigio_to_task(p, fown,fd,band);
 out_unlock_task:
 	read_unlock(&tasklist_lock);
 out_unlock_fown:

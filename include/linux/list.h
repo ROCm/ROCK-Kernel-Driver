@@ -195,6 +195,10 @@ static inline void list_splice_init(struct list_head *list,
 #define list_for_each(pos, head) \
 	for (pos = (head)->next, prefetch(pos->next); pos != (head); \
         	pos = pos->next, prefetch(pos->next))
+
+#define list_for_each_noprefetch(pos, head) \
+	for (pos = (head)->next; pos != (head); pos = pos->next)
+
 /**
  * list_for_each_prev	-	iterate over a list backwards
  * @pos:	the &struct list_head to use as a loop counter.
