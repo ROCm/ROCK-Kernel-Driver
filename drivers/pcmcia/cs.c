@@ -1121,15 +1121,11 @@ EXPORT_SYMBOL(pcmcia_lookup_bus);
     
 ======================================================================*/
 
-int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
+int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status)
 {
-    struct pcmcia_socket *s;
     config_t *c;
     int val;
     
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
     s->ops->get_status(s, &val);
     status->CardState = status->SocketState = 0;
     status->CardState |= (val & SS_DETECT) ? CS_EVENT_CARD_DETECT : 0;
@@ -1141,13 +1137,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
     if (!(s->state & SOCKET_PRESENT))
 	return CS_NO_CARD;
     
-    /* Get info from the PRR, if necessary */
-    if (handle->Function == BIND_FN_ALL) {
-	if (status->Function && (status->Function >= s->functions))
-	    return CS_BAD_ARGS;
-	c = (s->config != NULL) ? &s->config[status->Function] : NULL;
-    } else
-	c = CONFIG(handle);
+    c = (s->config != NULL) ? &s->config[function] : NULL;
     if ((c != NULL) && (c->state & CONFIG_LOCKED) &&
 	(c->IntType & (INT_MEMORY_AND_IO | INT_ZOOMED_VIDEO))) {
 	u_char reg;
@@ -1182,6 +1172,7 @@ int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
 	(val & SS_READY) ? CS_EVENT_READY_CHANGE : 0;
     return CS_SUCCESS;
 } /* get_status */
+EXPORT_SYMBOL(pccard_get_status);
 
 /*======================================================================
 
@@ -2070,7 +2061,6 @@ EXPORT_SYMBOL(pcmcia_deregister_client);
 EXPORT_SYMBOL(pcmcia_eject_card);
 EXPORT_SYMBOL(pcmcia_get_card_services_info);
 EXPORT_SYMBOL(pcmcia_get_mem_page);
-EXPORT_SYMBOL(pcmcia_get_status);
 EXPORT_SYMBOL(pcmcia_insert_card);
 EXPORT_SYMBOL(pcmcia_map_mem_page);
 EXPORT_SYMBOL(pcmcia_modify_configuration);

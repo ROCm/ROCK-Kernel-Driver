@@ -174,6 +174,7 @@ extern struct list_head pcmcia_socket_list;
 int pcmcia_get_window(struct pcmcia_socket *s, window_handle_t *handle, int idx, win_req_t *req);
 int pccard_get_configuration_info(struct pcmcia_socket *s, unsigned int function, config_info_t *config);
 int pccard_reset_card(struct pcmcia_socket *skt);
+int pccard_get_status(struct pcmcia_socket *s, unsigned int function, cs_status_t *status);
 
 #define cs_socket_name(skt)	((skt)->dev.class_id)
 

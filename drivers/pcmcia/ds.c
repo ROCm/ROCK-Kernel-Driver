@@ -966,7 +966,11 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	ret = pccard_reset_card(s->parent);
 	break;
     case DS_GET_STATUS:
-	ret = pcmcia_get_status(s->handle, &buf.status);
+	if (buf.status.Function && 
+	   (buf.status.Function >= s->parent->functions))
+	    ret = CS_BAD_ARGS;
+	else
+	ret = pccard_get_status(s->parent, buf.status.Function, &buf.status);
 	break;
     case DS_VALIDATE_CIS:
 	pcmcia_validate_mem(s->parent);

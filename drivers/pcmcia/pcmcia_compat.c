@@ -102,6 +102,16 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
 }
 EXPORT_SYMBOL(pcmcia_reset_card);
 
+int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
+{
+	struct pcmcia_socket *s;
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	return pccard_get_status(s, handle->Function, status);
+}
+EXPORT_SYMBOL(pcmcia_get_status);
+
 #ifdef CONFIG_PCMCIA_OBSOLETE
 
 int pcmcia_get_first_window(window_handle_t *win, win_req_t *req)
