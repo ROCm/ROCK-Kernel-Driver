@@ -48,7 +48,9 @@ static inline void
 parisc_do_profile(struct pt_regs *regs)
 {
 	unsigned long pc = regs->iaoq[0];
+#if 0
 	extern unsigned long prof_cpu_mask;
+#endif
 	extern char _stext;
 
 	profile_hook(regs);
@@ -60,6 +62,10 @@ parisc_do_profile(struct pt_regs *regs)
 		return;
 
 #if 0
+	/* FIXME: when we have irq affinity to cpu, we need to
+	 * only look at the cpus specified in this mask 
+	 */
+
 	if (!((1 << smp_processor_id()) & prof_cpu_mask))
 		return;
 #endif
@@ -206,7 +212,6 @@ do_settimeofday (struct timespec *tv)
 		 * done, and then undo it!
 		 */
 		nsec -= gettimeoffset() * 1000;
-		nsec -= (jiffies - wall_jiffies) * (NSEC_PER_SEC / HZ);
 
 		wtm_sec  = wall_to_monotonic.tv_sec + (xtime.tv_sec - sec);
 		wtm_nsec = wall_to_monotonic.tv_nsec + (xtime.tv_nsec - nsec);
@@ -221,6 +226,16 @@ do_settimeofday (struct timespec *tv)
 	}
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
+}
+
+/*
+ * XXX: We can do better than this.
+ * Returns nanoseconds
+ */
+
+unsigned long long sched_clock(void)
+{
+	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
 

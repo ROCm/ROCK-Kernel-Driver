@@ -8,6 +8,7 @@
 #include <linux/sched.h>
 #include <linux/thread_info.h>
 #include <linux/version.h>
+#include <linux/ptrace.h>
 
 #include <asm/ptrace.h>
 #include <asm/processor.h>
@@ -248,6 +249,9 @@ int main(void)
 	DEFINE(DTLB_OFF_STRIDE, offsetof(struct pdc_cache_info, dt_off_stride));
 	DEFINE(DTLB_OFF_COUNT, offsetof(struct pdc_cache_info, dt_off_count));
 	DEFINE(DTLB_LOOP, offsetof(struct pdc_cache_info, dt_loop));
+	BLANK();
+	DEFINE(PA_BLOCKSTEP_BIT, 31-PT_BLOCKSTEP_BIT);
+	DEFINE(PA_SINGLESTEP_BIT, 31-PT_SINGLESTEP_BIT);
 	BLANK();
 	return 0;
 }

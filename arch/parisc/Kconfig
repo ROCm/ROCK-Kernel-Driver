@@ -150,6 +150,7 @@ config COMPAT
 
 config HPUX
 	bool "Support for HP-UX binaries"
+	depends on !PARISC64
 
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
@@ -189,6 +190,8 @@ source drivers/message/fusion/Kconfig
 #source drivers/ieee1394/Kconfig
 
 #source drivers/message/i2o/Kconfig
+
+source "net/Kconfig"
 
 #source "drivers/isdn/Kconfig"
 

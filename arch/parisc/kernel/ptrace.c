@@ -23,16 +23,6 @@
 #include <asm/processor.h>
 #include <asm/offsets.h>
 
-/* These are used in entry.S, syscall_restore_rfi.  We need to record the
- * current stepping mode somewhere other than in PSW, because there is no
- * concept of saving and restoring the users PSW over a syscall.  We choose
- * to use these two bits in task->ptrace.  These bits must not clash with
- * any PT_* defined in include/linux/sched.h, and must match with the bit
- * tests in entry.S
- */
-#define PT_SINGLESTEP	0x10000
-#define PT_BLOCKSTEP	0x20000
-
 /* PSW bits we allow the debugger to modify */
 #define USER_PSW_BITS	(PSW_N | PSW_V | PSW_CB)
 

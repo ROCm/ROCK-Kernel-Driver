@@ -41,18 +41,19 @@
  *					prumpf	991016	
  */
 
+#include <stdarg.h>
+
+#include <linux/delay.h>
+#include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/spinlock.h>
-#include <linux/init.h>
-#include <linux/delay.h>
 
 #include <asm/page.h>
 #include <asm/pdc.h>
 #include <asm/system.h>
 #include <asm/processor.h>	/* for boot_cpu_data */
-
-#include <stdarg.h>
 
 static spinlock_t pdc_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long pdc_result[32] __attribute__ ((aligned (8)));
@@ -151,6 +152,7 @@ int pdc_add_valid(unsigned long address)
 
         return retval;
 }
+EXPORT_SYMBOL(pdc_add_valid);
 
 /**
  * pdc_chassis_info - Return chassis information.
@@ -264,6 +266,7 @@ int pdc_iodc_read(unsigned long *actcnt, unsigned long hpa, unsigned int index,
 
 	return retval;
 }
+EXPORT_SYMBOL(pdc_iodc_read);
 
 /**
  * pdc_system_map_find_mods - Locate unarchitected modules.
@@ -518,6 +521,7 @@ int pdc_lan_station_id(char *lan_addr, unsigned long hpa)
 
 	return retval;
 }
+EXPORT_SYMBOL(pdc_lan_station_id);
 
 
 /**
@@ -594,6 +598,7 @@ int pdc_get_initiator( struct hardware_path *hwpath, unsigned char *scsi_id,
 	spin_unlock_irq(&pdc_lock);
 	return retval >= PDC_OK;
 }
+EXPORT_SYMBOL(pdc_get_initiator);
 
 
 /**
@@ -660,6 +665,7 @@ int pdc_tod_read(struct pdc_tod *tod)
 
         return retval;
 }
+EXPORT_SYMBOL(pdc_tod_read);
 
 /**
  * pdc_tod_set - Set the Time-Of-Day clock.
@@ -678,6 +684,7 @@ int pdc_tod_set(unsigned long sec, unsigned long usec)
 
         return retval;
 }
+EXPORT_SYMBOL(pdc_tod_set);
 
 #ifdef __LP64__
 int pdc_mem_mem_table(struct pdc_memory_table_raddr *r_addr,
@@ -772,19 +779,33 @@ int pdc_soft_power_button(int sw_control)
 }
 
 /*
- * pdc_suspend_usb - Stop USB controller
+ * pdc_io_reset - Hack to avoid overlapping range registers of Bridges devices.
+ * Primarily a problem on T600 (which parisc-linux doesn't support) but
+ * who knows what other platform firmware might do with this OS "hook".
+ */
+void pdc_io_reset(void)
+{
+	spin_lock_irq(&pdc_lock);  
+	mem_pdc_call(PDC_IO, PDC_IO_RESET, 0);
+	spin_unlock_irq(&pdc_lock);
+}
+
+/*
+ * pdc_io_reset_devices - Hack to Stop USB controller
  *
  * If PDC used the usb controller, the usb controller
  * is still running and will crash the machines during iommu 
  * setup, because of still running DMA. This PDC call
- * stops the USB controller
+ * stops the USB controller.
+ * Normally called after calling pdc_io_reset().
  */
-void pdc_suspend_usb(void)
+void pdc_io_reset_devices(void)
 {
 	spin_lock_irq(&pdc_lock);  
-	mem_pdc_call(PDC_IO, PDC_IO_SUSPEND_USB, 0);
+	mem_pdc_call(PDC_IO, PDC_IO_RESET_DEVICES, 0);
 	spin_unlock_irq(&pdc_lock);
 }
+
 
 /**
  * pdc_iodc_putc - Console character print using IODC.
@@ -905,6 +926,7 @@ int pdc_sti_call(unsigned long func, unsigned long flags,
 
         return retval;
 }
+EXPORT_SYMBOL(pdc_sti_call);
 
 #ifdef __LP64__
 /**

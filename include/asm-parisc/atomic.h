@@ -129,8 +129,9 @@ __cmpxchg(volatile void *ptr, unsigned long old, unsigned long new_, int size)
 
 
 /* It's possible to reduce all atomic operations to either
- * __atomic_add_return, __atomic_set and __atomic_ret (the latter
- * is there only for consistency). */
+ * __atomic_add_return, atomic_set and atomic_read (the latter
+ * is there only for consistency).
+ */
 
 static __inline__ int __atomic_add_return(int i, atomic_t *v)
 {
@@ -144,7 +145,7 @@ static __inline__ int __atomic_add_return(int i, atomic_t *v)
 	return ret;
 }
 
-static __inline__ void __atomic_set(atomic_t *v, int i) 
+static __inline__ void atomic_set(atomic_t *v, int i) 
 {
 	unsigned long flags;
 	SPIN_LOCK_IRQSAVE(ATOMIC_HASH(v), flags);
@@ -154,27 +155,24 @@ static __inline__ void __atomic_set(atomic_t *v, int i)
 	SPIN_UNLOCK_IRQRESTORE(ATOMIC_HASH(v), flags);
 }
 
-static __inline__ int __atomic_read(atomic_t *v)
+static __inline__ int atomic_read(const atomic_t *v)
 {
 	return v->counter;
 }
 
 /* exported interface */
 
-#define atomic_add(i,v)		((void)(__atomic_add_return( (i),(v))))
-#define atomic_sub(i,v)		((void)(__atomic_add_return(-(i),(v))))
-#define atomic_inc(v)		((void)(__atomic_add_return(   1,(v))))
-#define atomic_dec(v)		((void)(__atomic_add_return(  -1,(v))))
+#define atomic_add(i,v)	((void)(__atomic_add_return( ((int)i),(v))))
+#define atomic_sub(i,v)	((void)(__atomic_add_return(-((int)i),(v))))
+#define atomic_inc(v)	((void)(__atomic_add_return(   1,(v))))
+#define atomic_dec(v)	((void)(__atomic_add_return(  -1,(v))))
 
-#define atomic_add_return(i,v)	(__atomic_add_return( (i),(v)))
-#define atomic_sub_return(i,v)	(__atomic_add_return(-(i),(v)))
+#define atomic_add_return(i,v)	(__atomic_add_return( ((int)i),(v)))
+#define atomic_sub_return(i,v)	(__atomic_add_return(-((int)i),(v)))
 #define atomic_inc_return(v)	(__atomic_add_return(   1,(v)))
 #define atomic_dec_return(v)	(__atomic_add_return(  -1,(v)))
 
 #define atomic_dec_and_test(v)	(atomic_dec_return(v) == 0)
-
-#define atomic_set(v,i)		(__atomic_set((v),i))
-#define atomic_read(v)		(__atomic_read(v))
 
 #define ATOMIC_INIT(i)	{ (i) }
 

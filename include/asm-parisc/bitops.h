@@ -232,24 +232,24 @@ static __inline__ unsigned long __ffs(unsigned long x)
 #if BITS_PER_LONG > 32
 		" ldi       63,%1\n"
 		" extrd,u,*<>  %0,63,32,%%r0\n"
-		" extrd,u,*TR  %0,31,32,%0\n"
+		" extrd,u,*TR  %0,31,32,%0\n"	/* move top 32-bits down */
 		" addi    -32,%1,%1\n"
 #else
 		" ldi       31,%1\n"
 #endif
 		" extru,<>  %0,31,16,%%r0\n"
-		" extru,TR  %0,15,16,%0\n"
+		" extru,TR  %0,15,16,%0\n"	/* xxxx0000 -> 0000xxxx */
 		" addi    -16,%1,%1\n"
 		" extru,<>  %0,31,8,%%r0\n"
-		" extru,TR  %0,23,8,%0\n"
+		" extru,TR  %0,23,8,%0\n"	/* 0000xx00 -> 000000xx */
 		" addi    -8,%1,%1\n"
 		" extru,<>  %0,31,4,%%r0\n"
-		" extru,TR  %0,27,4,%0\n"
+		" extru,TR  %0,27,4,%0\n"	/* 000000x0 -> 0000000x */
 		" addi    -4,%1,%1\n"
 		" extru,<>  %0,31,2,%%r0\n"
-		" extru,TR  %0,29,2,%0\n"
+		" extru,TR  %0,29,2,%0\n"	/* 0000000y, 1100b -> 0011b */
 		" addi    -2,%1,%1\n"
-		" extru,=  %0,31,1,%%r0\n"
+		" extru,=  %0,31,1,%%r0\n"	/* check last bit */
 		" addi    -1,%1,%1\n"
 			: "+r" (x), "=r" (ret) );
 	return ret;
@@ -291,7 +291,7 @@ static __inline__ int fls(int x)
 	"	zdep,TR		%0,27,28,%0\n"		/* x0000000 */
 	"	addi		4,%1,%1\n"
 	"	extru,<>	%0,1,2,%%r0\n"
-	"	zdep,TR		%0,29,30,%0\n"		/* y0000000 (y&3 = 0 */
+	"	zdep,TR		%0,29,30,%0\n"		/* y0000000 (y&3 = 0) */
 	"	addi		2,%1,%1\n"
 	"	extru,=		%0,0,1,%%r0\n"
 	"	addi		1,%1,%1\n"		/* if y & 8, add 1 */

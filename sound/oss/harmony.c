@@ -28,14 +28,14 @@ TODO:
 #include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/types.h>
 #include <linux/mm.h>
 #include <linux/pci.h>
 
-#include <asm/gsc.h>
+#include <asm/parisc-device.h>
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 
 #include "sound_config.h"
 

@@ -430,6 +430,8 @@ void free_initmem(void)
 				     & ~(VM_MAP_OFFSET-1)))
 
 void *vmalloc_start;
+EXPORT_SYMBOL(vmalloc_start);
+
 #ifdef CONFIG_PA11
 unsigned long pcxl_dma_start;
 #endif
@@ -617,8 +619,6 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 static void __init pagetable_init(void)
 {
 	int range;
-
-	printk("pagetable_init\n");
 
 	/* Map each physical memory range to its kernel vaddr */
 

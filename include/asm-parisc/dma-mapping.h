@@ -2,6 +2,7 @@
 #define _PARISC_DMA_MAPPING_H
 
 #include <linux/mm.h>
+#include <linux/config.h>
 #include <asm/cacheflush.h>
 
 /*

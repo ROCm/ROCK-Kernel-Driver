@@ -144,6 +144,30 @@
 #define R_PARISC_LTOFF_TP16DF	231	/* 16 bits LT-TP-rel. address.  */
 #define R_PARISC_HIRESERVE	255
 
+#define PA_PLABEL_FDESC		0x02	/* bit set if PLABEL points to
+					 * a function descriptor, not
+					 * an address */
+
+/* The following are PA function descriptors 
+ *
+ * addr:	the absolute address of the function
+ * gp:		either the data pointer (r27) for non-PIC code or the
+ *		the PLT pointer (r19) for PIC code */
+
+/* Format for the Elf32 Function descriptor */
+typedef struct elf32_fdesc {
+	__u32	addr;
+	__u32	gp;
+} Elf32_Fdesc;
+
+/* Format for the Elf64 Function descriptor */
+typedef struct elf64_fdesc {
+	__u64	dummy[2]; /* FIXME: nothing uses these, why waste
+			   * the space */
+	__u64	addr;
+	__u64	gp;
+} Elf64_Fdesc;
+
 /* Legal values for p_type field of Elf32_Phdr/Elf64_Phdr.  */
 
 #define PT_HP_TLS		(PT_LOOS + 0x0)
@@ -215,7 +239,10 @@ typedef unsigned long elf_greg_t;
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2) \
-	current->personality = PER_LINUX
+	current->personality = PER_LINUX; \
+	current->thread.map_base = DEFAULT_MAP_BASE; \
+	current->thread.task_size = DEFAULT_TASK_SIZE \
+
 #endif
 
 /*

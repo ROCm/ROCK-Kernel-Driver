@@ -988,7 +988,7 @@ static int __devinit sticore_pci_init(struct pci_dev *pd,
 	
 	if (!sti) {
 		printk(KERN_WARNING "Unable to handle STI device '%s'\n",
-			pd->dev.name);
+			pci_name(pd));
 		return -ENODEV;
 	}
 #endif /* CONFIG_PCI */

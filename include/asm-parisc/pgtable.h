@@ -1,6 +1,7 @@
 #ifndef _PARISC_PGTABLE_H
 #define _PARISC_PGTABLE_H
 
+#include <linux/config.h>
 #include <asm/fixmap.h>
 
 #ifndef __ASSEMBLY__

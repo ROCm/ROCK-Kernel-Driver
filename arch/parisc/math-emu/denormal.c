@@ -47,7 +47,7 @@
 #include "sgl_float.h"
 #include "dbl_float.h"
 #include "hppa.h"
-#include "types.h"
+#include <linux/kernel.h>
 /* #include <machine/sys/mdep_private.h> */
 
 #undef Fpustatus_register

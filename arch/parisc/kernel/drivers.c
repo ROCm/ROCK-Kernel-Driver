@@ -28,6 +28,7 @@
 
 /* See comments in include/asm-parisc/pci.h */
 struct hppa_dma_ops *hppa_dma_ops;
+EXPORT_SYMBOL(hppa_dma_ops);
 
 static struct parisc_device root;
 
@@ -155,6 +156,7 @@ int register_parisc_driver(struct parisc_driver *driver)
 
 	return driver_register(&driver->drv);
 }
+EXPORT_SYMBOL(register_parisc_driver);
 
 /**
  * count_parisc_driver - count # of devices this driver would match
@@ -187,6 +189,7 @@ int unregister_parisc_driver(struct parisc_driver *driver)
 	driver_unregister(&driver->drv);
 	return 0;
 }
+EXPORT_SYMBOL(unregister_parisc_driver);
 
 static struct parisc_device *find_device_by_addr(unsigned long hpa)
 {
@@ -257,7 +260,7 @@ char *print_pa_hwpath(struct parisc_device *dev, char *output)
 	path.mod = dev->hw_path;
 	return print_hwpath(&path, output);
 }
-
+EXPORT_SYMBOL(print_pa_hwpath);
 
 #if defined(CONFIG_PCI) || defined(CONFIG_ISA)
 /**
@@ -289,6 +292,7 @@ void get_pci_node_path(struct pci_dev *dev, struct hardware_path *path)
 		padev = padev->parent;
 	}
 }
+EXPORT_SYMBOL(get_pci_node_path);
 
 /**
  * print_pci_hwpath - Returns hardware path for PCI devices
@@ -306,6 +310,8 @@ char *print_pci_hwpath(struct pci_dev *dev, char *output)
 	get_pci_node_path(dev, &path);
 	return print_hwpath(&path, output);
 }
+EXPORT_SYMBOL(print_pci_hwpath);
+
 #endif /* defined(CONFIG_PCI) || defined(CONFIG_ISA) */
 
 

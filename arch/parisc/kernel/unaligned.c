@@ -369,8 +369,8 @@ static int emulate_std(struct pt_regs *regs, int frreg, int flop)
 
 void handle_unaligned(struct pt_regs *regs)
 {
-	unsigned long unaligned_count = 0;
-	unsigned long last_time = 0;
+	static unsigned long unaligned_count = 0;
+	static unsigned long last_time = 0;
 	unsigned long newbase = R1(regs->iir)?regs->gr[R1(regs->iir)]:0;
 	int modify = 0;
 	int ret = -1;
@@ -380,7 +380,6 @@ void handle_unaligned(struct pt_regs *regs)
 	/* if the unaligned access is inside the kernel:
 	 *   if the access is caused by a syscall, then we fault the calling
 	 *     user process
-	 *   otherwise we halt the kernel
 	 */
 	if (!user_mode(regs))
 	{
@@ -427,10 +426,10 @@ void handle_unaligned(struct pt_regs *regs)
 			show_regs(regs);
 #endif		
 		}
-	}
 
-	if (!unaligned_enabled)
-		goto force_sigbus;
+		if (!unaligned_enabled)
+			goto force_sigbus;
+	}
 
 	/* handle modification - OK, it's ugly, see the instruction manual */
 	switch (MAJOR_OP(regs->iir))
