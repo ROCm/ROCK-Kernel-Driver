@@ -31,7 +31,7 @@ void oprofile_reset_stats(void)
 		cpu_buf->sample_lost_task_exit = 0;
 	}
  
-	atomic_set(&oprofile_stats.sample_lost_mmap_sem, 0);
+	atomic_set(&oprofile_stats.sample_lost_no_mm, 0);
 	atomic_set(&oprofile_stats.event_lost_overflow, 0);
 }
 
@@ -68,8 +68,8 @@ void oprofile_create_stats_files(struct super_block * sb, struct dentry * root)
 			&cpu_buf->sample_lost_task_exit);
 	}
  
-	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_mmap_sem",
-		&oprofile_stats.sample_lost_mmap_sem);
+	oprofilefs_create_ro_atomic(sb, dir, "sample_lost_no_mm",
+		&oprofile_stats.sample_lost_no_mm);
 	oprofilefs_create_ro_atomic(sb, dir, "event_lost_overflow",
 		&oprofile_stats.event_lost_overflow);
 }

@@ -298,6 +298,8 @@ static void add_sample(struct mm_struct * mm, struct op_sample * s, int in_kerne
 		add_sample_entry(s->eip, s->event);
 	} else if (mm) {
 		add_us_sample(mm, s);
+	} else {
+		atomic_inc(&oprofile_stats.sample_lost_no_mm);
 	}
 }
  
