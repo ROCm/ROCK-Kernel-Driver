@@ -1494,7 +1494,7 @@ config SCSI_MESH_RESET_DELAY_MS
 
 config SCSI_MAC53C94
 	tristate "53C94 (Power Mac external SCSI) support"
-	depends on PPC_PMAC && SCSI
+	depends on PPC32 && PPC_PMAC && SCSI
 	help
 	  On Power Macintoshes (and clones) with two SCSI buses, the external
 	  SCSI bus is usually controlled by a 53C94 SCSI bus adaptor. Older

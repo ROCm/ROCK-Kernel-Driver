@@ -388,8 +388,7 @@ static void mesh_init(struct mesh_state *ms)
 		mesh_flush_io(mr);
 
 		/* Wait for bus to come back */
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout((init_reset_delay * HZ) / 1000);
+		msleep(init_reset_delay);
 	}
 	
 	/* Reconfigure controller */
@@ -1749,12 +1748,10 @@ static void set_mesh_power(struct mesh_state *ms, int state)
 		return;
 	if (state) {
 		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 1);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/5);
+		msleep(200);
 	} else {
 		pmac_call_feature(PMAC_FTR_MESH_ENABLE, macio_get_of_node(ms->mdev), 0, 0);
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(HZ/100);
+		msleep(10);
 	}
 }			
 
@@ -1772,8 +1769,7 @@ static int mesh_suspend(struct macio_dev *mdev, u32 state)
 	spin_lock_irqsave(ms->host->host_lock, flags);
 	while(ms->phase != idle) {
 		spin_unlock_irqrestore(ms->host->host_lock, flags);
-		current->state = TASK_UNINTERRUPTIBLE;
-		schedule_timeout(HZ/100);
+		msleep(10);
 		spin_lock_irqsave(ms->host->host_lock, flags);
 	}
 	ms->phase = sleeping;

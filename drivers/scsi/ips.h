@@ -96,7 +96,11 @@
    #endif
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-      typedef void irqreturn_t;
+   
+      #ifndef irqreturn_t
+         typedef void irqreturn_t;
+      #endif 
+      
       #define IRQ_NONE
       #define IRQ_HANDLED
       #define IRQ_RETVAL(x)
@@ -1210,13 +1214,13 @@ typedef struct {
 
 #define IPS_VER_MAJOR 7
 #define IPS_VER_MAJOR_STRING "7"
-#define IPS_VER_MINOR 00
-#define IPS_VER_MINOR_STRING "00"
-#define IPS_VER_BUILD 15
-#define IPS_VER_BUILD_STRING "15"
-#define IPS_VER_STRING "7.00.15"
+#define IPS_VER_MINOR 10
+#define IPS_VER_MINOR_STRING "10"
+#define IPS_VER_BUILD 18
+#define IPS_VER_BUILD_STRING "18"
+#define IPS_VER_STRING "7.10.18"
 #define IPS_RELEASE_ID 0x00020000
-#define IPS_BUILD_IDENT 625
+#define IPS_BUILD_IDENT 731
 #define IPS_LEGALCOPYRIGHT_STRING "(C) Copyright IBM Corp. 1994, 2002. All Rights Reserved."
 #define IPS_ADAPTECCOPYRIGHT_STRING "(c) Copyright Adaptec, Inc. 2002 to 2004. All Rights Reserved."
 #define IPS_DELLCOPYRIGHT_STRING "(c) Copyright Dell 2004. All Rights Reserved."
@@ -1227,32 +1231,35 @@ typedef struct {
 #define IPS_VER_SERVERAID2 "2.88.13"
 #define IPS_VER_NAVAJO "2.88.13"
 #define IPS_VER_SERVERAID3 "6.10.24"
-#define IPS_VER_SERVERAID4H "7.00.15"
-#define IPS_VER_SERVERAID4MLx "7.00.15"
-#define IPS_VER_SARASOTA "7.00.15"
-#define IPS_VER_MARCO "7.00.15"
-#define IPS_VER_SEBRING "7.00.15"
+#define IPS_VER_SERVERAID4H "7.10.11"
+#define IPS_VER_SERVERAID4MLx "7.10.18"
+#define IPS_VER_SARASOTA "7.10.18"
+#define IPS_VER_MARCO "7.10.18"
+#define IPS_VER_SEBRING "7.10.18"
+#define IPS_VER_KEYWEST "7.10.18"
 
 /* Compatability IDs for various adapters */
 #define IPS_COMPAT_UNKNOWN ""
-#define IPS_COMPAT_CURRENT "SB610"
+#define IPS_COMPAT_CURRENT "KW710"
 #define IPS_COMPAT_SERVERAID1 "2.25.01"
 #define IPS_COMPAT_SERVERAID2 "2.88.13"
 #define IPS_COMPAT_NAVAJO  "2.88.13"
 #define IPS_COMPAT_KIOWA "2.88.13"
 #define IPS_COMPAT_SERVERAID3H  "SB610"
 #define IPS_COMPAT_SERVERAID3L  "SB610"
-#define IPS_COMPAT_SERVERAID4H  "SB610"
-#define IPS_COMPAT_SERVERAID4M  "SB610"
-#define IPS_COMPAT_SERVERAID4L  "SB610"
-#define IPS_COMPAT_SERVERAID4Mx "SB610"
-#define IPS_COMPAT_SERVERAID4Lx "SB610"
-#define IPS_COMPAT_SARASOTA     "SB610"
-#define IPS_COMPAT_MARCO        "SB610"
-#define IPS_COMPAT_SEBRING      "SB610"
-#define IPS_COMPAT_BIOS "SB610"
+#define IPS_COMPAT_SERVERAID4H  "KW710"
+#define IPS_COMPAT_SERVERAID4M  "KW710"
+#define IPS_COMPAT_SERVERAID4L  "KW710"
+#define IPS_COMPAT_SERVERAID4Mx "KW710"
+#define IPS_COMPAT_SERVERAID4Lx "KW710"
+#define IPS_COMPAT_SARASOTA     "KW710"
+#define IPS_COMPAT_MARCO        "KW710"
+#define IPS_COMPAT_SEBRING      "KW710"
+#define IPS_COMPAT_TAMPA        "KW710"
+#define IPS_COMPAT_KEYWEST      "KW710"
+#define IPS_COMPAT_BIOS "KW710"
 
-#define IPS_COMPAT_MAX_ADAPTER_TYPE 16
+#define IPS_COMPAT_MAX_ADAPTER_TYPE 18
 #define IPS_COMPAT_ID_LENGTH 8
 
 #define IPS_DEFINE_COMPAT_TABLE(tablename) \
@@ -1272,7 +1279,9 @@ typedef struct {
       IPS_COMPAT_SARASOTA,         /* one-channel variety of SARASOTA */  \
       IPS_COMPAT_SARASOTA,         /* two-channel variety of SARASOTA */  \
       IPS_COMPAT_MARCO, \
-      IPS_COMPAT_SEBRING \
+      IPS_COMPAT_SEBRING, \
+      IPS_COMPAT_TAMPA, \
+      IPS_COMPAT_KEYWEST \
    }
 
 

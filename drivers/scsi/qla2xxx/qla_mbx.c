@@ -1403,7 +1403,7 @@ qla2x00_get_port_database(scsi_qla_host_t *ha, fc_port_t *fcport, uint8_t opt)
 	DEBUG11(printk("qla2x00_get_port_database(%ld): entered.\n",
 	    ha->host_no);)
 
-	pd = pci_alloc_consistent(ha->pdev, PORT_DATABASE_SIZE, &pd_dma);
+	pd = dma_pool_alloc(ha->s_dma_pool, GFP_ATOMIC, &pd_dma);
 	if (pd  == NULL) {
 		DEBUG2_3_11(printk("qla2x00_get_port_database(%ld): **** "
 		    "Mem Alloc Failed ****", ha->host_no);)
@@ -1464,7 +1464,7 @@ qla2x00_get_port_database(scsi_qla_host_t *ha, fc_port_t *fcport, uint8_t opt)
 		fcport->port_type = FCT_TARGET;
 
 gpd_error_out:
-	pci_free_consistent(ha->pdev, PORT_DATABASE_SIZE, pd, pd_dma);
+	dma_pool_free(ha->s_dma_pool, pd, pd_dma);
 
 	if (rval != QLA_SUCCESS) {
 		/*EMPTY*/
@@ -1617,14 +1617,12 @@ qla2x00_get_link_status(scsi_qla_host_t *ha, uint16_t loop_id,
 	mbx_cmd_t mc;
 	mbx_cmd_t *mcp = &mc;
 	link_stat_t *stat_buf;
-	dma_addr_t phys_address = 0;
-
+	dma_addr_t stat_buf_dma;
 
 	DEBUG11(printk("qla2x00_get_link_status(%ld): entered.\n",
 	    ha->host_no);)
 
-	stat_buf = pci_alloc_consistent(ha->pdev, sizeof(link_stat_t),
-	    &phys_address);
+	stat_buf = dma_pool_alloc(ha->s_dma_pool, GFP_ATOMIC, &stat_buf_dma);
 	if (stat_buf == NULL) {
 		DEBUG2_3_11(printk("qla2x00_get_link_status(%ld): Failed to "
 		    "allocate memory.\n", ha->host_no));
@@ -1641,10 +1639,10 @@ qla2x00_get_link_status(scsi_qla_host_t *ha, uint16_t loop_id,
 	} else {
 		mcp->mb[1] = loop_id << 8;
 	}
-	mcp->mb[2] = MSW(phys_address);
-	mcp->mb[3] = LSW(phys_address);
-	mcp->mb[6] = MSW(MSD(phys_address));
-	mcp->mb[7] = LSW(MSD(phys_address));
+	mcp->mb[2] = MSW(stat_buf_dma);
+	mcp->mb[3] = LSW(stat_buf_dma);
+	mcp->mb[6] = MSW(MSD(stat_buf_dma));
+	mcp->mb[7] = LSW(MSD(stat_buf_dma));
 
 	mcp->in_mb = MBX_0;
 	mcp->tov = 30;
@@ -1688,8 +1686,7 @@ qla2x00_get_link_status(scsi_qla_host_t *ha, uint16_t loop_id,
 		rval = BIT_1;
 	}
 
-	pci_free_consistent(ha->pdev, sizeof(link_stat_t), stat_buf,
-	    phys_address);
+	dma_pool_free(ha->s_dma_pool, stat_buf, stat_buf_dma);
 
 	return rval;
 }
@@ -2409,7 +2406,7 @@ qla2x00_get_fcal_position_map(scsi_qla_host_t *ha, char *pos_map)
 	char *pmap;
 	dma_addr_t pmap_dma;
 
-	pmap = pci_alloc_consistent(ha->pdev, FCAL_MAP_SIZE, &pmap_dma);
+	pmap = dma_pool_alloc(ha->s_dma_pool, GFP_ATOMIC, &pmap_dma);
 	if (pmap  == NULL) {
 		DEBUG2_3_11(printk("%s(%ld): **** Mem Alloc Failed ****",
 		    __func__, ha->host_no));
@@ -2438,7 +2435,7 @@ qla2x00_get_fcal_position_map(scsi_qla_host_t *ha, char *pos_map)
 		if (pos_map)
 			memcpy(pos_map, pmap, FCAL_MAP_SIZE);
 	}
-	pci_free_consistent(ha->pdev, FCAL_MAP_SIZE, pmap, pmap_dma);
+	dma_pool_free(ha->s_dma_pool, pmap, pmap_dma);
 
 	if (rval != QLA_SUCCESS) {
 		DEBUG2_3_11(printk("%s(%ld): failed=%x.\n", __func__,

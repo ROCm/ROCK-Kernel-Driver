@@ -563,6 +563,20 @@ sg_write(struct file *filp, const char __user *buf, size_t count, loff_t * ppos)
 	hp->usr_ptr = NULL;
 	if (__copy_from_user(cmnd, buf, cmd_size))
 		return -EFAULT;
+	/*
+	 * SG_DXFER_TO_FROM_DEV is functionally equivalent to SG_DXFER_FROM_DEV,
+	 * but is is possible that the app intended SG_DXFER_TO_DEV, because there
+	 * is a non-zero input_size, so emit a warning.
+	 */
+	if (hp->dxfer_direction == SG_DXFER_TO_FROM_DEV)
+		if (printk_ratelimit())
+			printk(KERN_WARNING
+			       "sg_write: data in/out %d/%d bytes for SCSI command 0x%x--"
+			       "guessing data in;\n" KERN_WARNING "   "
+			       "program %s not setting count and/or reply_len properly\n",
+			       old_hdr.reply_len - (int)SZ_SG_HEADER,
+			       input_size, (unsigned int) cmnd[0],
+			       current->comm);
 	k = sg_common_write(sfp, srp, cmnd, sfp->timeout, blocking);
 	return (k < 0) ? k : count;
 }
@@ -576,6 +590,7 @@ sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 	sg_io_hdr_t *hp;
 	unsigned char cmnd[sizeof (dummy_cmdp->sr_cmnd)];
 	int timeout;
+	unsigned long ul_timeout;
 
 	if (count < SZ_SG_IO_HDR)
 		return -EINVAL;
@@ -610,7 +625,8 @@ sg_new_write(Sg_fd * sfp, const char __user *buf, size_t count,
 			return -EBUSY;	/* reserve buffer already being used */
 		}
 	}
-	timeout = msecs_to_jiffies(srp->header.timeout);
+	ul_timeout = msecs_to_jiffies(srp->header.timeout);
+	timeout = (ul_timeout < INT_MAX) ? ul_timeout : INT_MAX;
 	if ((!hp->cmdp) || (hp->cmd_len < 6) || (hp->cmd_len > sizeof (cmnd))) {
 		sg_remove_request(sfp, srp);
 		return -EMSGSIZE;

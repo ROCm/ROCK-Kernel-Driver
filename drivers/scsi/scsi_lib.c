@@ -692,6 +692,7 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	request_queue_t *q = cmd->device->request_queue;
 	struct request *req = cmd->request;
 	int clear_errors = 1;
+	struct scsi_sense_hdr sshdr;
 
 	/*
 	 * Free up any indirection buffers we allocated for DMA purposes. 
@@ -715,7 +716,10 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			      (CHECK_CONDITION << 1) : (result & 0xff);
 		if (result) {
 			clear_errors = 0;
-			if (cmd->sense_buffer[0] & 0x70) {
+			if (scsi_command_normalize_sense(cmd, &sshdr)) {
+				/*
+				 * SG_IO wants to know about deferred errors
+				 */
 				int len = 8 + cmd->sense_buffer[7];
 
 				if (len > SCSI_SENSE_BUFFERSIZE)
@@ -774,17 +778,17 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 	 * can choose a block to remap, etc.
 	 */
 	if (driver_byte(result) != 0) {
-		if ((cmd->sense_buffer[0] & 0x7f) == 0x70) {
+		if (scsi_command_normalize_sense(cmd, &sshdr) &&
+				!scsi_sense_is_deferred(&sshdr)) {
 			/*
 			 * If the device is in the process of becoming ready,
 			 * retry.
 			 */
-			if (cmd->sense_buffer[12] == 0x04 &&
-			    cmd->sense_buffer[13] == 0x01) {
+			if (sshdr.asc == 0x04 && sshdr.ascq == 0x01) {
 				scsi_requeue_command(q, cmd);
 				return;
 			}
-			if ((cmd->sense_buffer[2] & 0xf) == UNIT_ATTENTION) {
+			if (sshdr.sense_key == UNIT_ATTENTION) {
 				if (cmd->device->removable) {
 					/* detected disc change.  set a bit 
 					 * and quietly refuse further access.
@@ -813,7 +817,11 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 		 * failed, we may have read past the end of the disk.
 		 */
 
-		switch (cmd->sense_buffer[2]) {
+		/*
+		 * XXX: Following is probably broken since deferred errors
+		 *	fall through [dpg 20040827]
+		 */
+		switch (sshdr.sense_key) {
 		case ILLEGAL_REQUEST:
 			if (cmd->device->use_10_for_rw &&
 			    (cmd->cmnd[0] == READ_10 ||
@@ -835,8 +843,6 @@ void scsi_io_completion(struct scsi_cmnd *cmd, unsigned int good_bytes,
 			       req->rq_disk ? req->rq_disk->disk_name : "");
 			cmd = scsi_end_request(cmd, 0, this_count, 1);
 			return;
-			break;
-		case MEDIUM_ERROR:
 		case VOLUME_OVERFLOW:
 			printk("scsi%d: ERROR on channel %d, id %d, lun %d, CDB: ",
 			       cmd->device->host->host_no, (int) cmd->device->channel,
@@ -1496,8 +1502,7 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 	}
 
 	sreq->sr_cmd_len = 0;
-	sreq->sr_sense_buffer[0] = 0;
-	sreq->sr_sense_buffer[2] = 0;
+	memset(sreq->sr_sense_buffer, 0, sizeof(sreq->sr_sense_buffer));
 	sreq->sr_data_direction = DMA_FROM_DEVICE;
 
 	memset(buffer, 0, len);
@@ -1508,14 +1513,21 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 	 * ILLEGAL REQUEST sense return identifies the actual command
 	 * byte as the problem.  MODE_SENSE commands can return
 	 * ILLEGAL REQUEST if the code page isn't supported */
-	if (use_10_for_ms && ! scsi_status_is_good(sreq->sr_result) &&
-	    (driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-	    sreq->sr_sense_buffer[2] == ILLEGAL_REQUEST &&
-	    (sreq->sr_sense_buffer[4] & 0x40) == 0x40 &&
-	    sreq->sr_sense_buffer[5] == 0 &&
-	    sreq->sr_sense_buffer[6] == 0 ) {
-		sreq->sr_device->use_10_for_ms = 0;
-		goto retry;
+
+	if (use_10_for_ms && !scsi_status_is_good(sreq->sr_result) &&
+	    (driver_byte(sreq->sr_result) & DRIVER_SENSE)) {
+		struct scsi_sense_hdr sshdr;
+
+		if (scsi_request_normalize_sense(sreq, &sshdr)) {
+			if ((sshdr.sense_key == ILLEGAL_REQUEST) &&
+			    (sshdr.asc == 0x20) && (sshdr.ascq == 0)) {
+				/* 
+				 * Invalid command operation code
+				 */
+				sreq->sr_device->use_10_for_ms = 0;
+				goto retry;
+			}
+		}
 	}
 
 	if(scsi_status_is_good(sreq->sr_result)) {
@@ -1585,11 +1597,12 @@ scsi_test_unit_ready(struct scsi_device *sdev, int timeout, int retries)
 	if (!sreq)
 		return -ENOMEM;
 
-		sreq->sr_data_direction = DMA_NONE;
-        scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
+	sreq->sr_data_direction = DMA_NONE;
+	scsi_wait_req(sreq, cmd, NULL, 0, timeout, retries);
 
 	if ((driver_byte(sreq->sr_result) & DRIVER_SENSE) &&
-	    (sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION &&
+	    ((sreq->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION ||
+	     (sreq->sr_sense_buffer[2] & 0x0f) == NOT_READY) &&
 	    sdev->removable) {
 		sdev->changed = 1;
 		sreq->sr_result = 0;

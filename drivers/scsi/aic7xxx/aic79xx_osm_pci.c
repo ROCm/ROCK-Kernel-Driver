@@ -64,6 +64,10 @@ static struct pci_device_id ahd_linux_pci_id_table[] = {
 		0x9005, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
 		PCI_CLASS_STORAGE_SCSI << 8, 0xFFFF00, 0
 	},
+	{
+		0x9005, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+		PCI_CLASS_STORAGE_RAID << 8, 0xFFFF00, 0
+	},
 	{ 0 }
 };
 

@@ -1098,7 +1098,7 @@ struct BusLogic_HostAdapter {
 	struct BusLogic_DriverOptions *DriverOptions;
 	struct FlashPoint_Info FlashPointInfo;
 	FlashPoint_CardHandle_T CardHandle;
-	struct BusLogic_HostAdapter *Next;
+	struct list_head host_list;
 	struct BusLogic_CCB *All_CCBs;
 	struct BusLogic_CCB *Free_CCBs;
 	struct BusLogic_CCB *FirstCompletedCCB;
@@ -1386,8 +1386,6 @@ static inline void BusLogic_IncrementSizeBucket(BusLogic_CommandSizeBuckets_T Co
 */
 
 static const char *BusLogic_DriverInfo(struct Scsi_Host *);
-static int BusLogic_DetectHostAdapter(struct scsi_host_template *);
-static int BusLogic_ReleaseHostAdapter(struct Scsi_Host *);
 static int BusLogic_QueueCommand(struct scsi_cmnd *, void (*CompletionRoutine) (struct scsi_cmnd *));
 static int BusLogic_BIOSDiskParameters(struct scsi_device *, struct block_device *, sector_t, int *);
 static int BusLogic_ProcDirectoryInfo(struct Scsi_Host *, char *, char **, off_t, int, int);

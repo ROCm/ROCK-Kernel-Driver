@@ -26,8 +26,10 @@
 #include <linux/module.h>
 #include <linux/list.h>
 #include <linux/pci.h>
+#include <linux/dma-mapping.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/dmapool.h>
 #include <linux/mempool.h>
 #include <linux/spinlock.h>
 #include <linux/completion.h>
@@ -232,6 +234,7 @@
 /* ISP request and response entry counts (37-65535) */
 #define REQUEST_ENTRY_CNT_2100		128	/* Number of request entries. */
 #define REQUEST_ENTRY_CNT_2200		2048	/* Number of request entries. */
+#define REQUEST_ENTRY_CNT_2XXX_EXT_MEM	4096	/* Number of request entries. */
 #define RESPONSE_ENTRY_CNT_2100		64	/* Number of response entries.*/
 #define RESPONSE_ENTRY_CNT_2300		512	/* Number of response entries.*/
 
@@ -2028,6 +2031,16 @@ struct qla_board_info {
 	struct qla_fw_info *fw_info;
 };
 
+/* Return data from MBC_GET_ID_LIST call. */
+struct gid_list_info {
+	uint8_t	al_pa;
+	uint8_t	area;
+	uint8_t	domain;		
+	uint8_t	loop_id_2100;	/* ISP2100/ISP2200 -- 4 bytes. */
+	uint16_t loop_id;	/* ISP23XX         -- 6 bytes. */
+};
+#define GID_LIST_SIZE (sizeof(struct gid_list_info) * MAX_FIBRE_DEVICES)
+
 /*
  * Linux Host Adapter structure
  */
@@ -2239,8 +2252,6 @@ typedef struct scsi_qla_host {
 
 	struct io_descriptor	io_descriptors[MAX_IO_DESCRIPTORS];
 	uint16_t		iodesc_signature;
-	port_database_t		*iodesc_pd;
-	dma_addr_t		iodesc_pd_dma;
 
 	/* OS target queue pointers. */
 	os_tgt_t		*otgt[MAX_FIBRE_DEVICES];
@@ -2275,10 +2286,22 @@ typedef struct scsi_qla_host {
 	uint32_t        timer_active;
 	struct timer_list        timer;
 
-	/* Firmware Initialization Control Block data */
-	dma_addr_t	init_cb_dma;         /* Physical address. */
+	dma_addr_t	gid_list_dma;
+	struct gid_list_info *gid_list;
+
+	dma_addr_t	rlc_rsp_dma;
+	rpt_lun_cmd_rsp_t *rlc_rsp;
+
+	/* Small DMA pool allocations -- maximum 256 bytes in length. */ 
+#define DMA_POOL_SIZE	256
+	struct dma_pool *s_dma_pool;
+
+	dma_addr_t	init_cb_dma;
 	init_cb_t       *init_cb;
-  
+
+	dma_addr_t	iodesc_pd_dma;
+	port_database_t *iodesc_pd;
+
 	/* These are used by mailbox operations. */
 	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];
 

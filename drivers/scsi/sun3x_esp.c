@@ -370,7 +370,7 @@ static int sun3x_esp_release(struct Scsi_Host *instance)
 }
 
 static Scsi_Host_Template driver_template = {
-	.proc_name		= "esp",
+	.proc_name		= "sun3x_esp",
 	.proc_info		= &esp_proc_info,
 	.name			= "Sun ESP 100/100a/200",
 	.detect			= sun3x_esp_detect,

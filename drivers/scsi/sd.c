@@ -48,6 +48,7 @@
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
 #include <linux/kref.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 
 #include <scsi/scsi.h>
@@ -943,7 +944,6 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 		 * Issue command to spin up drive when not ready
 		 */
 		} else if (SRpnt->sr_sense_buffer[2] == NOT_READY) {
-			unsigned long time1;
 			if (!spintime) {
 				printk(KERN_NOTICE "%s: Spinning up disk...",
 				       diskname);
@@ -962,12 +962,8 @@ sd_spinup_disk(struct scsi_disk *sdkp, char *diskname,
 				spintime_value = jiffies;
 			}
 			spintime = 1;
-			time1 = HZ;
 			/* Wait 1 second for next try */
-			do {
-				current->state = TASK_UNINTERRUPTIBLE;
-				time1 = schedule_timeout(time1);
-			} while(time1);
+			msleep(1000);
 			printk(".");
 		} else {
 			/* we don't understand the sense code, so it's

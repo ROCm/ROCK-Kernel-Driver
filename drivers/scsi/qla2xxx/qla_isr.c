@@ -30,7 +30,7 @@ static void qla2x00_ms_entry(scsi_qla_host_t *, ms_iocb_entry_t *);
 static int qla2x00_check_sense(struct scsi_cmnd *cp, os_lun_t *);
 
 /**
- * qla2x00_intr_handler() - Process interrupts for the ISP.
+ * qla2100_intr_handler() - Process interrupts for the ISP2100 and ISP2200.
  * @irq:
  * @dev_id: SCSI driver HA context
  * @regs:
@@ -40,20 +40,14 @@ static int qla2x00_check_sense(struct scsi_cmnd *cp, os_lun_t *);
  * Returns handled flag.
  */
 irqreturn_t
-qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
+qla2100_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	scsi_qla_host_t	*ha;
 	device_reg_t	*reg;
+	int		status;
+	unsigned long	flags;
+	unsigned long	iter;
 	uint32_t	mbx;
-	int		status = 0;
-	unsigned long	flags = 0;
-	unsigned long	mbx_flags = 0;
-	unsigned long	intr_iter;
-	uint32_t	stat;
-	uint16_t	hccr;
-
-	/* Don't loop forever, interrupt are OFF */
-	intr_iter = 50; 
 
 	ha = (scsi_qla_host_t *) dev_id;
 	if (!ha) {
@@ -63,107 +57,40 @@ qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	}
 
 	reg = ha->iobase;
+	status = 0;
 
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	for (;;) {
-		/* Relax CPU! */
-		if (!(intr_iter--))
+	for (iter = 50; iter--; ) {
+		if ((RD_REG_WORD(&reg->istatus) & ISR_RISC_INT) == 0)
 			break;
 
-		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
-			if ((RD_REG_WORD(&reg->istatus) & ISR_RISC_INT) == 0)
-				break;
+		if (RD_REG_WORD(&reg->semaphore) & BIT_0) {
+			WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+			RD_REG_WORD(&reg->hccr);
 
-			if (RD_REG_WORD(&reg->semaphore) & BIT_0) {
-				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
-				RD_REG_WORD(&reg->hccr);
-
-				/* Get mailbox data. */
-				mbx = RD_MAILBOX_REG(ha, reg, 0);
-				if (mbx > 0x3fff && mbx < 0x8000) {
-					qla2x00_mbx_completion(ha,
-					    (uint16_t)mbx);
-					status |= MBX_INTERRUPT;
-				} else if (mbx > 0x7fff && mbx < 0xc000) {
-					qla2x00_async_event(ha, mbx);
-				} else {
-					/*EMPTY*/
-					DEBUG2(printk("scsi(%ld): Unrecognized "
-					    "interrupt type (%d)\n",
-					    ha->host_no, mbx));
-				}
-				/* Release mailbox registers. */
-				WRT_REG_WORD(&reg->semaphore, 0);
-				/* Workaround for ISP2100 chip. */
-				if (IS_QLA2100(ha))
-					RD_REG_WORD(&reg->semaphore);
-			} else {
-				qla2x00_process_response_queue(ha);
-	
-				WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
-				RD_REG_WORD(&reg->hccr);
-			}
-		} else /* IS_QLA23XX(ha) */ {
-			stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
-			if (stat & HSR_RISC_PAUSED) {
-				hccr = RD_REG_WORD(&reg->hccr);
-				if (hccr & (BIT_15 | BIT_13 | BIT_11 | BIT_8))
-					qla_printk(KERN_INFO, ha,
-					    "Parity error -- HCCR=%x.\n", hccr);
-				else
-					qla_printk(KERN_INFO, ha,
-					    "RISC paused -- HCCR=%x\n", hccr);
-
-				/*
-				 * Issue a "HARD" reset in order for the RISC
-				 * interrupt bit to be cleared.  Schedule a big
-				 * hammmer to get out of the RISC PAUSED state.
-				 */
-				WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
-				RD_REG_WORD(&reg->hccr);
-				set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
-				break;
-			} else if ((stat & HSR_RISC_INT) == 0)
-				break;
-
-			mbx = MSW(stat);
-			switch (stat & 0xff) {
-			case 0x13:
-				qla2x00_process_response_queue(ha);
-				break;
-			case 0x1:
-			case 0x2:
-			case 0x10:
-			case 0x11:
+			/* Get mailbox data. */
+			mbx = RD_MAILBOX_REG(ha, reg, 0);
+			if (mbx > 0x3fff && mbx < 0x8000) {
 				qla2x00_mbx_completion(ha, (uint16_t)mbx);
 				status |= MBX_INTERRUPT;
-
-				/* Release mailbox registers. */
-				WRT_REG_WORD(&reg->semaphore, 0);
-				break;
-			case 0x12:
+			} else if (mbx > 0x7fff && mbx < 0xc000) {
 				qla2x00_async_event(ha, mbx);
-				break;
-			case 0x15:
-				mbx = mbx << 16 | MBA_CMPLT_1_16BIT;
-				qla2x00_async_event(ha, mbx);
-				break;
-			case 0x16:
-				mbx = mbx << 16 | MBA_SCSI_COMPLETION;
-				qla2x00_async_event(ha, mbx);
-				break;
-			default:
+			} else {
+				/*EMPTY*/
 				DEBUG2(printk("scsi(%ld): Unrecognized "
 				    "interrupt type (%d)\n",
-				    ha->host_no, stat & 0xff));
-				break;
+				    ha->host_no, mbx));
 			}
+			/* Release mailbox registers. */
+			WRT_REG_WORD(&reg->semaphore, 0);
+			RD_REG_WORD(&reg->semaphore);
+		} else {
+			qla2x00_process_response_queue(ha);
+
 			WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
-			RD_REG_WORD_RELAXED(&reg->hccr);
+			RD_REG_WORD(&reg->hccr);
 		}
 	}
-
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	qla2x00_next(ha);
@@ -172,47 +99,129 @@ qla2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (test_bit(MBX_INTR_WAIT, &ha->mbx_cmd_flags) &&
 	    (status & MBX_INTERRUPT) && ha->flags.mbox_int) {
+		spin_lock_irqsave(&ha->mbx_reg_lock, flags);
 
-		/* There was a mailbox completion */
-		DEBUG3(printk("%s(%ld): Going to get mbx reg lock.\n",
-		    __func__, ha->host_no));
-
-		spin_lock_irqsave(&ha->mbx_reg_lock, mbx_flags);
-
-		if (ha->mcp == NULL) {
-			DEBUG3(printk("%s(%ld): Error mbx pointer.\n",
-			    __func__, ha->host_no));
-		} else {
-			DEBUG3(printk("%s(%ld): Going to set mbx intr flags. "
-			    "cmd=%x.\n",
-			    __func__, ha->host_no, ha->mcp->mb[0]));
-		}
 		set_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
-
-		DEBUG3(printk("%s(%ld): Going to wake up mbx function for "
-		    "completion.\n",
-		    __func__, ha->host_no));
-
 		up(&ha->mbx_intr_sem);
 
-		DEBUG3(printk("%s(%ld): Going to release mbx reg lock.\n",
-		    __func__, ha->host_no));
-
-		spin_unlock_irqrestore(&ha->mbx_reg_lock, mbx_flags);
+		spin_unlock_irqrestore(&ha->mbx_reg_lock, flags);
 	}
 
 	if (!list_empty(&ha->done_queue))
 		qla2x00_done(ha);
 
-	/* Wakeup the DPC routine */
-	if ((!ha->flags.mbox_busy &&
-	    (test_bit(ISP_ABORT_NEEDED, &ha->dpc_flags) ||
-		test_bit(RESET_MARKER_NEEDED, &ha->dpc_flags) ||
-		test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags))) &&
-		    ha->dpc_wait && !ha->dpc_active) {
+	return (IRQ_HANDLED);
+}
 
-		up(ha->dpc_wait);
+/**
+ * qla2300_intr_handler() - Process interrupts for the ISP23xx and ISP63xx.
+ * @irq:
+ * @dev_id: SCSI driver HA context
+ * @regs:
+ *
+ * Called by system whenever the host adapter generates an interrupt.
+ *
+ * Returns handled flag.
+ */
+irqreturn_t
+qla2300_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
+{
+	scsi_qla_host_t	*ha;
+	device_reg_t	*reg;
+	int		status;
+	unsigned long	flags;
+	unsigned long	iter;
+	uint32_t	stat;
+	uint32_t	mbx;
+	uint16_t	hccr;
+
+	ha = (scsi_qla_host_t *) dev_id;
+	if (!ha) {
+		printk(KERN_INFO
+		    "%s(): NULL host pointer\n", __func__);
+		return (IRQ_NONE);
 	}
+
+	reg = ha->iobase;
+	status = 0;
+
+	spin_lock_irqsave(&ha->hardware_lock, flags);
+	for (iter = 50; iter--; ) {
+		stat = RD_REG_DWORD(&reg->u.isp2300.host_status);
+		if (stat & HSR_RISC_PAUSED) {
+			hccr = RD_REG_WORD(&reg->hccr);
+			if (hccr & (BIT_15 | BIT_13 | BIT_11 | BIT_8))
+				qla_printk(KERN_INFO, ha,
+				    "Parity error -- HCCR=%x.\n", hccr);
+			else
+				qla_printk(KERN_INFO, ha,
+				    "RISC paused -- HCCR=%x\n", hccr);
+
+			/*
+			 * Issue a "HARD" reset in order for the RISC
+			 * interrupt bit to be cleared.  Schedule a big
+			 * hammmer to get out of the RISC PAUSED state.
+			 */
+			WRT_REG_WORD(&reg->hccr, HCCR_RESET_RISC);
+			RD_REG_WORD(&reg->hccr);
+			set_bit(ISP_ABORT_NEEDED, &ha->dpc_flags);
+			break;
+		} else if ((stat & HSR_RISC_INT) == 0)
+			break;
+
+		mbx = MSW(stat);
+		switch (stat & 0xff) {
+		case 0x13:
+			qla2x00_process_response_queue(ha);
+			break;
+		case 0x1:
+		case 0x2:
+		case 0x10:
+		case 0x11:
+			qla2x00_mbx_completion(ha, (uint16_t)mbx);
+			status |= MBX_INTERRUPT;
+
+			/* Release mailbox registers. */
+			WRT_REG_WORD(&reg->semaphore, 0);
+			break;
+		case 0x12:
+			qla2x00_async_event(ha, mbx);
+			break;
+		case 0x15:
+			mbx = mbx << 16 | MBA_CMPLT_1_16BIT;
+			qla2x00_async_event(ha, mbx);
+			break;
+		case 0x16:
+			mbx = mbx << 16 | MBA_SCSI_COMPLETION;
+			qla2x00_async_event(ha, mbx);
+			break;
+		default:
+			DEBUG2(printk("scsi(%ld): Unrecognized interrupt type "
+			    "(%d)\n",
+			    ha->host_no, stat & 0xff));
+			break;
+		}
+		WRT_REG_WORD(&reg->hccr, HCCR_CLR_RISC_INT);
+		RD_REG_WORD_RELAXED(&reg->hccr);
+	}
+	spin_unlock_irqrestore(&ha->hardware_lock, flags);
+
+	qla2x00_next(ha);
+	ha->last_irq_cpu = smp_processor_id();
+	ha->total_isr_cnt++;
+
+	if (test_bit(MBX_INTR_WAIT, &ha->mbx_cmd_flags) &&
+	    (status & MBX_INTERRUPT) && ha->flags.mbox_int) {
+		spin_lock_irqsave(&ha->mbx_reg_lock, flags);
+
+		set_bit(MBX_INTERRUPT, &ha->mbx_cmd_flags);
+		up(&ha->mbx_intr_sem);
+
+		spin_unlock_irqrestore(&ha->mbx_reg_lock, flags);
+	}
+
+	if (!list_empty(&ha->done_queue))
+		qla2x00_done(ha);
 
 	return (IRQ_HANDLED);
 }
@@ -969,7 +978,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 		    sizeof(cp->sense_buffer))
 			sense_sz = le16_to_cpu(pkt->req_sense_length);
 		else
-			sense_sz = sizeof(cp->sense_buffer) - 1;
+			sense_sz = sizeof(cp->sense_buffer);
 
 		CMD_ACTUAL_SNSLEN(cp) = sense_sz;
 		sp->request_sense_length = sense_sz;
@@ -1039,7 +1048,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 			    sizeof(cp->sense_buffer))
 				sense_sz = le16_to_cpu(pkt->req_sense_length);
 			else
-				sense_sz = sizeof(cp->sense_buffer) - 1;
+				sense_sz = sizeof(cp->sense_buffer);
 
 			CMD_ACTUAL_SNSLEN(cp) = sense_sz;
 			sp->request_sense_length = sense_sz;

@@ -117,7 +117,10 @@ static __inline__ void qla2x00_poll(scsi_qla_host_t *);
 static inline void 
 qla2x00_poll(scsi_qla_host_t *ha)
 {
-	qla2x00_intr_handler(0, ha, NULL);
+	if (IS_QLA2100(ha) || IS_QLA2200(ha))
+		qla2100_intr_handler(0, ha, NULL);
+	else
+		qla2300_intr_handler(0, ha, NULL);
 }
 
 
