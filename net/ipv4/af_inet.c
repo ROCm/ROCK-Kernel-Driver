@@ -493,7 +493,7 @@ int inet_release(struct socket *sock)
 /* It is off by default, see below. */
 int sysctl_ip_nonlocal_bind;
 
-static int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *)uaddr;
 	struct sock *sk = sock->sk;
@@ -729,7 +729,7 @@ do_err:
 /*
  *	This does both peername and sockname.
  */
-static int inet_getname(struct socket *sock, struct sockaddr *uaddr,
+int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 			int *uaddr_len, int peer)
 {
 	struct sock *sk		= sock->sk;
@@ -846,7 +846,7 @@ int inet_shutdown(struct socket *sock, int how)
  *	There's a good 20K of config code hanging around the kernel.
  */
 
-static int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+int inet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	int err = 0;
