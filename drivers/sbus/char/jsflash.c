@@ -42,15 +42,7 @@
  */
 #define MAJOR_NR	JSFD_MAJOR
 
-#define DEVICE_REQUEST jsfd_do_request
-#define DEVICE_NR(device) (MINOR(device))
-#define DEVICE_ON(device)
-#define DEVICE_OFF(device)
-#define DEVICE_NO_RANDOM
-
 #include <linux/blk.h>
-
-
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -657,7 +649,7 @@ int jsfd_init(void) {
 
 	blk_size[JSFD_MAJOR] = jsfd_sizes;
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), DEVICE_REQUEST);
+	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), jsf_do_request);
 	for (i = 0; i < JSF_MAX; i++) {
 		if ((i & JSF_PART_MASK) >= JSF_NPART) continue;
 		jsf = &jsf0;	/* actually, &jsfv[i >> JSF_PART_BITS] */

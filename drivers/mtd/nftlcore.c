@@ -41,8 +41,6 @@
 
 /* NFTL block device stuff */
 #define MAJOR_NR NFTL_MAJOR
-#define DEVICE_OFF(device)
-
 
 #include <linux/blk.h>
 #include <linux/hdreg.h>

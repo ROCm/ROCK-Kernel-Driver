@@ -199,7 +199,6 @@ MODULE_PARM(drive3,"1-7i");
 
 #define MAJOR_NR   major
 #define DEVICE_NR(device) minor(device)
-#define DEVICE_OFF(device)
 
 #include <linux/blk.h>
 #include <linux/blkpg.h>

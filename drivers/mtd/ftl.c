@@ -94,12 +94,6 @@ MODULE_PARM(shuffle_freq, "i");
 
 /* Funky stuff for setting up a block device */
 #define MAJOR_NR		FTL_MAJOR
-#define DEVICE_OFF(device)
-
-#define DEVICE_NR(minor)	((minor)>>5)
-#define REGION_NR(minor)	(((minor)>>3)&3)
-#define PART_NR(minor)		((minor)&7)
-#define MINOR_NR(dev,reg,part)	(((dev)<<5)+((reg)<<3)+(part))
 
 #include <linux/blk.h>
 
