@@ -9,10 +9,18 @@ extern int pci_bus_alloc_resource(struct pci_bus *bus, struct resource *res,
 				  void (*alignf)(void *, struct resource *,
 					  	 unsigned long, unsigned long),
 				  void *alignf_data);
+/* PCI /proc functions */
+#ifdef CONFIG_PROC_FS
 extern int pci_proc_attach_device(struct pci_dev *dev);
 extern int pci_proc_detach_device(struct pci_dev *dev);
 extern int pci_proc_attach_bus(struct pci_bus *bus);
 extern int pci_proc_detach_bus(struct pci_bus *bus);
+#else
+static inline int pci_proc_attach_device(struct pci_dev *dev) { return 0; }
+static inline int pci_proc_detach_device(struct pci_dev *dev) { return 0; }
+static inline int pci_proc_attach_bus(struct pci_bus *bus) { return 0; }
+static inline int pci_proc_detach_bus(struct pci_bus *bus) { return 0; }
+#endif
 
 /* Functions for PCI Hotplug drivers to use */
 extern struct pci_bus * pci_add_new_bus(struct pci_bus *parent, struct pci_dev *dev, int busnr);

@@ -398,9 +398,8 @@ static int cpci_configure_bridge(struct pci_bus* bus, struct pci_dev* dev)
 	child = pci_find_bus(max + 1);
 	if (!child)
 		return -ENODEV;
-#ifdef CONFIG_PROC_FS
 	pci_proc_attach_bus(child);
-#endif
+
 	/*
 	 * Update parent bridge's subordinate field if there were more bridges
 	 * behind the bridge that was scanned.

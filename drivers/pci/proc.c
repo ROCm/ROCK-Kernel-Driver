@@ -599,7 +599,6 @@ __initcall(pci_proc_init);
 
 #ifdef CONFIG_HOTPLUG
 EXPORT_SYMBOL(pci_proc_attach_device);
-EXPORT_SYMBOL(pci_proc_detach_device);
 EXPORT_SYMBOL(pci_proc_attach_bus);
 EXPORT_SYMBOL(pci_proc_detach_bus);
 EXPORT_SYMBOL(proc_bus_pci_dir);
