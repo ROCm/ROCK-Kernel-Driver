@@ -747,10 +747,8 @@ static int proc_setintf(struct dev_state *ps, void __user *arg)
 	if ((ret = findintfif(ps->dev, setintf.interface)) < 0)
 		return ret;
 	interface = ps->dev->actconfig->interface[ret];
-	if (interface->dev.driver) {
-		if ((ret = checkintf(ps, ret)))
-			return ret;
-	}
+	if ((ret = checkintf(ps, ret)))
+		return ret;
 	if (usb_set_interface(ps->dev, setintf.interface, setintf.altsetting))
 		return -EINVAL;
 	return 0;
