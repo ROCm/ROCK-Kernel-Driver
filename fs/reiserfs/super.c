@@ -655,28 +655,30 @@ static int reiserfs_remount (struct super_block * s, int * flags, char * data)
 
 static int read_bitmaps (struct super_block * s)
 {
-    int i, bmp, dl ;
-    struct reiserfs_super_block * rs = SB_DISK_SUPER_BLOCK(s);
+    int i, bmp;
 
-    SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * sb_bmap_nr(rs), GFP_NOFS, s);
+    SB_AP_BITMAP (s) = reiserfs_kmalloc (sizeof (struct buffer_head *) * SB_BMAP_NR(s), GFP_NOFS, s);
     if (SB_AP_BITMAP (s) == 0)
 	return 1;
-    memset (SB_AP_BITMAP (s), 0, sizeof (struct buffer_head *) * sb_bmap_nr(rs));
-
-    /* reiserfs leaves the first 64k unused so that any partition
-       labeling scheme currently used will have enough space. Then we
-       need one block for the super.  -Hans */
-    bmp = (REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize) + 1;	/* first of bitmap blocks */
-    SB_AP_BITMAP (s)[0] = reiserfs_bread (s, bmp);
-    if(!SB_AP_BITMAP(s)[0])
-	return 1;
-    for (i = 1, bmp = dl = s->s_blocksize * 8; i < sb_bmap_nr(rs); i ++) {
-	SB_AP_BITMAP (s)[i] = reiserfs_bread (s, bmp);
-	if (!SB_AP_BITMAP (s)[i])
-	    return 1;
-	bmp += dl;
+    for (i = 0, bmp = REISERFS_DISK_OFFSET_IN_BYTES / s->s_blocksize + 1;
+	 i < SB_BMAP_NR(s); i++, bmp = s->s_blocksize * 8 * i) {
+	SB_AP_BITMAP (s)[i] = getblk (s->s_dev, bmp, s->s_blocksize);
+	if (!buffer_uptodate(SB_AP_BITMAP(s)[i]))
+	    ll_rw_block(READ, 1, SB_AP_BITMAP(s) + i);
     }
-
+    for (i = 0; i < SB_BMAP_NR(s); i++) {
+	wait_on_buffer(SB_AP_BITMAP (s)[i]);
+	if (!buffer_uptodate(SB_AP_BITMAP(s)[i])) {
+	    reiserfs_warning("sh-2029: reiserfs read_bitmaps: "
+			 "bitmap block (#%lu) reading failed\n",
+			 SB_AP_BITMAP(s)[i]->b_blocknr);
+	    for (i = 0; i < SB_BMAP_NR(s); i++)
+		brelse(SB_AP_BITMAP(s)[i]);
+	    reiserfs_kfree(SB_AP_BITMAP(s), sizeof(struct buffer_head *) * SB_BMAP_NR(s), s);
+	    SB_AP_BITMAP(s) = NULL;
+	    return 1;
+	}
+    }
     return 0;
 }
 

@@ -71,7 +71,9 @@ DECLARE_WAIT_QUEUE_HEAD(reiserfs_commit_thread_wait) ;
 static DECLARE_WAIT_QUEUE_HEAD(reiserfs_commit_thread_done) ;
 DECLARE_TASK_QUEUE(reiserfs_commit_thread_tq) ;
 
-#define JOURNAL_TRANS_HALF 1018   /* must be correct to keep the desc and commit structs at 4k */
+#define JOURNAL_TRANS_HALF 1018   /* must be correct to keep the desc and commit
+				     structs at 4k */
+#define BUFNR 64 /*read ahead */
 
 /* cnode stat bits.  Move these into reiserfs_fs.h */
 
@@ -1598,6 +1600,41 @@ static int journal_read_transaction(struct super_block *p_s_sb, unsigned long cu
 **
 ** On exit, it sets things up so the first transaction will work correctly.
 */
+struct buffer_head * reiserfs_breada (kdev_t dev, int block, int bufsize,
+			    unsigned int max_block)
+{
+	struct buffer_head * bhlist[BUFNR];
+	unsigned int blocks = BUFNR;
+	struct buffer_head * bh;
+	int i, j;
+	
+	bh = getblk (dev, block, bufsize);
+	if (buffer_uptodate (bh))
+		return (bh);   
+		
+	if (block + BUFNR > max_block) {
+		blocks = max_block - block;
+	}
+	bhlist[0] = bh;
+	j = 1;
+	for (i = 1; i < blocks; i++) {
+		bh = getblk (dev, block + i, bufsize);
+		if (buffer_uptodate (bh)) {
+			brelse (bh);
+			break;
+		}
+		else bhlist[j++] = bh;
+	}
+	ll_rw_block (READ, j, bhlist);
+	for(i = 1; i < j; i++) 
+		brelse (bhlist[i]);
+	bh = bhlist[0];
+	wait_on_buffer (bh);
+	if (buffer_uptodate (bh))
+		return bh;
+	brelse (bh);
+	return NULL;
+}
 static int journal_read(struct super_block *p_s_sb) {
   struct reiserfs_journal_desc *desc ;
   unsigned long last_flush_trans_id = 0 ;
@@ -1668,7 +1705,8 @@ static int journal_read(struct super_block *p_s_sb) {
   ** all the valid transactions, and pick out the oldest.
   */
   while(continue_replay && cur_dblock < (SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb))) {
-    d_bh = bread(SB_JOURNAL_DEV(p_s_sb), cur_dblock, p_s_sb->s_blocksize) ;
+    d_bh = reiserfs_breada(p_s_sb->s_dev, cur_dblock, p_s_sb->s_blocksize,
+			   SB_ONDISK_JOURNAL_1st_BLOCK(p_s_sb) + SB_ONDISK_JOURNAL_SIZE(p_s_sb)) ;
     ret = journal_transaction_is_valid(p_s_sb, d_bh, &oldest_invalid_trans_id, &newest_mount_id) ;
     if (ret == 1) {
       desc = (struct reiserfs_journal_desc *)d_bh->b_data ;
