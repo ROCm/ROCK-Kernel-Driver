@@ -523,13 +523,13 @@ static int __init wdtpci_init_one (struct pci_dev *dev,
 		return -ENODEV;
 	}
 
+	if (pci_enable_device (dev))
+		goto out;
+
 	irq = dev->irq;
 	io = pci_resource_start (dev, 2);
 	printk ("WDT501-P(PCI-WDG-CSM) driver 0.07 at %X "
 		"(Interrupt %d)\n", io, irq);
-
-	if (pci_enable_device (dev))
-		goto out;
 
 	if (request_region (io, 16, "wdt-pci") == NULL) {
 		printk (KERN_ERR PFX "I/O %d is not free.\n", io);
