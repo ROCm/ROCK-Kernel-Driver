@@ -362,7 +362,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		for (j = 0; j < NR_CPUS; j++)
 			if (cpu_online(j))
 				seq_printf(p, "%10u ",
-					   kstat.irqs[j][i]);
+					   kstat_cpu(j).irqs[i]);
 #else		
 		seq_printf(p, "%10u ", kstat_irqs(i));
 #endif /* CONFIG_SMP */
@@ -423,7 +423,7 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*

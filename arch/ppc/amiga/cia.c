@@ -148,7 +148,7 @@ static void cia_handler(int irq, void *dev_id, struct pt_regs *fp)
 	custom.intreq = base->int_mask;
 	for (i = 0; i < CIA_IRQS; i++, irq++) {
 		if (ints & 1) {
-			kstat.irqs[0][irq]++;
+			kstat_cpu(0).irqs[irq]++;
 			action = desc->action;
 			action->handler(irq, action->dev_id, fp);
 		}

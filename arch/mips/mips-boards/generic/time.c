@@ -139,7 +139,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 		goto null;
 
 	do {
-		kstat.irqs[0][irq]++;
+		kstat_cpu(0).irqs[irq]++;
 		do_timer(regs);
 
 		/* Historical comment/code:

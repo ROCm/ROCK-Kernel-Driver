@@ -217,7 +217,7 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	desc->triggered = 1;
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	action = desc->action;
 	if (action)
@@ -253,7 +253,7 @@ do_edge_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	 */
 	desc->running = 1;
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	do {
 		struct irqaction *action;

@@ -130,7 +130,7 @@ asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 {
 	if (vec >= VEC_INT1 && vec <= VEC_INT7 && !MACH_IS_BVME6000) {
 		vec -= VEC_SPUR;
-		kstat.irqs[0][vec]++;
+		kstat_cpu(0).irqs[vec]++;
 		irq_list[vec].handler(vec, irq_list[vec].dev_id, fp);
 	} else {
 		if (mach_process_int)
@@ -149,7 +149,7 @@ int m68k_get_irq_list(struct seq_file *p, void *v)
 	if (mach_default_handler) {
 		for (i = 0; i < SYS_IRQS; i++) {
 			seq_printf(p, "auto %2d: %10u ", i,
-			               i ? kstat.irqs[0][i] : num_spurious);
+			               i ? kstat_cpu(0).irqs[i] : num_spurious);
 			seq_puts(p, "  ");
 			seq_printf(p, "%s\n", irq_list[i].devname);
 		}

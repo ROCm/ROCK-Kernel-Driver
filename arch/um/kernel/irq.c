@@ -108,7 +108,7 @@ int get_irq_list(char *buf)
 #else
 		for (j = 0; j < num_online_cpus(); j++)
 			p += sprintf(p, "%10u ",
-				kstat.irqs[cpu_logical_map(j)][i]);
+				kstat_cpu(cpu_logical_map(j)).irqs[i]);
 #endif
 		p += sprintf(p, " %14s", irq_desc[i].handler->typename);
 		p += sprintf(p, "  %s", action->name);
@@ -283,7 +283,7 @@ unsigned int do_IRQ(int irq, struct uml_pt_regs *regs)
 	unsigned int status;
 
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*

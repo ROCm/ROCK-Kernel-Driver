@@ -68,7 +68,7 @@ void mips_timer_interrupt(struct pt_regs *regs)
 		goto null;
 
 	do {
-		kstat.irqs[0][irq]++;
+		kstat_cpu(0).irqs[irq]++;
 		do_timer(regs);
 		r4k_cur += r4k_offset;
 		ack_r4ktimer(r4k_cur);

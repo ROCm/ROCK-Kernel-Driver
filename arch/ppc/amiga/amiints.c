@@ -189,7 +189,7 @@ inline void amiga_do_irq(int irq, struct pt_regs *fp)
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction *action = desc->action;
 
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	action->handler(irq, action->dev_id, fp);
 }
 
@@ -198,7 +198,7 @@ void amiga_do_irq_list(int irq, struct pt_regs *fp)
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction *action;
 
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 
 	custom.intreq = ami_intena_vals[irq];
 

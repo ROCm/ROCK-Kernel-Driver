@@ -103,7 +103,7 @@ again:
 	if (LOCAL_HUB_L(PI_RT_COUNT) >= ct_cur[cpu])
 		goto again;
 
-	kstat.irqs[cpu][irq]++;		/* kstat only for bootcpu? */
+	kstat_cpu(cpu).irqs[irq]++;		/* kstat only for bootcpu? */
 
 	if (cpu == 0)
 		do_timer(regs);

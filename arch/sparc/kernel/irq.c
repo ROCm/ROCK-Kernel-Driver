@@ -124,7 +124,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		for (j = 0; j < NR_CPUS; j++) {
 			if (cpu_online(j))
 				seq_printf(p, "%10u ",
-				    kstat.irqs[cpu_logical_map(j)][i]);
+				    kstat_cpu(cpu_logical_map(j)).irqs[i]);
 		}
 #endif
 		seq_printf(p, " %c %s",
@@ -424,7 +424,7 @@ void handler_irq(int irq, struct pt_regs * regs)
 		smp4m_irq_rotate(cpu);
 #endif
 	action = *(irq + irq_action);
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	do {
 		if (!action || !action->handler)
 			unexpected_irq(irq, 0, regs);
@@ -444,7 +444,7 @@ void sparc_floppy_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 	disable_pil_irq(irq);
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	floppy_interrupt(irq, dev_id, regs);
 	irq_exit();
 	enable_pil_irq(irq);

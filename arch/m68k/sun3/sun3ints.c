@@ -58,7 +58,7 @@ void sun3_disable_irq(unsigned int irq)
 
 inline void sun3_do_irq(int irq, struct pt_regs *fp)
 {
-	kstat.irqs[0][SYS_IRQS + irq]++;
+	kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 	*sun3_intreg &= ~(1<<irq);
 	*sun3_intreg |=  (1<<irq);
 }
@@ -71,13 +71,14 @@ int show_sun3_interrupts(struct seq_file *p, void *v)
 static void sun3_int7(int irq, void *dev_id, struct pt_regs *fp)
 {
 	sun3_do_irq(irq,fp);
-	if(!(kstat.irqs[0][SYS_IRQS + irq] % 2000)) 
-		sun3_leds(led_pattern[(kstat.irqs[0][SYS_IRQS+irq]%16000)/2000]);
+	if(!(kstat_cpu(0).irqs[SYS_IRQS + irq] % 2000)) 
+		sun3_leds(led_pattern[(kstat_cpu(0).irqs[SYS_IRQS+irq]%16000)
+			  /2000]);
 }
 
 static void sun3_int5(int irq, void *dev_id, struct pt_regs *fp)
 {
-        kstat.irqs[0][SYS_IRQS + irq]++;
+        kstat_cpu(0).irqs[SYS_IRQS + irq]++;
 #ifdef CONFIG_SUN3
 	intersil_clear();
 #endif
@@ -87,8 +88,8 @@ static void sun3_int5(int irq, void *dev_id, struct pt_regs *fp)
 	intersil_clear();
 #endif
         do_timer(fp);
-        if(!(kstat.irqs[0][SYS_IRQS + irq] % 20))
-                sun3_leds(led_pattern[(kstat.irqs[0][SYS_IRQS+irq]%160)
+        if(!(kstat_cpu(0).irqs[SYS_IRQS + irq] % 20))
+                sun3_leds(led_pattern[(kstat_cpu(0).irqs[SYS_IRQS+irq]%160)
                 /20]);
 }
 
@@ -107,7 +108,7 @@ static void sun3_inthandle(int irq, void *dev_id, struct pt_regs *fp)
 	if(sun3_inthandler[irq] == NULL)
 		panic ("bad interrupt %d received (id %p)\n",irq, dev_id);
 
-        kstat.irqs[0][SYS_IRQS + irq]++;
+        kstat_cpu(0).irqs[SYS_IRQS + irq]++;
         *sun3_intreg &= ~(1<<irq);
 
 	sun3_inthandler[irq](irq, dev_ids[irq], fp);

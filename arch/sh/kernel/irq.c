@@ -239,7 +239,7 @@ asmlinkage int do_IRQ(unsigned long r4, unsigned long r5,
 		     :"=z" (irq));
 	irq = irq_demux(irq);
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	desc = irq_desc + irq;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);

@@ -135,7 +135,7 @@ int show_interrupts(struct seq_file *p, void *v)
 			if (!cpu_online(j))
 				continue;
 			seq_printf(p, "%10u ",
-				   kstat.irqs[j][i]);
+				   kstat_cpu(j).irqs[i]);
 		}
 #endif
 		seq_printf(p, " %s:%lx", action->name,
@@ -738,7 +738,7 @@ void handler_irq(int irq, struct pt_regs *regs)
 #endif
 
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	if (irq == 9)
 		kbd_pt_regs = regs;
@@ -813,7 +813,7 @@ void sparc_floppy_irq(int irq, void *dev_cookie, struct pt_regs *regs)
 	int cpu = smp_processor_id();
 
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 
 	*(irq_work(cpu, irq)) = 0;
 	bucket = get_ino_in_irqaction(action) + ivector_table;

@@ -418,7 +418,7 @@ void indy_buserror_irq(struct pt_regs *regs)
 	int irq = 6;
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	printk("Got a bus error IRQ, shouldn't happen yet\n");
 	show_regs(regs);
 	printk("Spinning...\n");

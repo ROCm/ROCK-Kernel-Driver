@@ -13,7 +13,7 @@ void indy_8254timer_irq(void)
 	int irq = 4;
 
 	irq_enter(cpu, irq);
-	kstat.irqs[0][irq]++;
+	kstat_cpu(0).irqs[irq]++;
 	printk("indy_8254timer_irq: Whoops, should not have gotten this IRQ\n");
 	prom_getchar();
 	ArcEnterInteractiveMode();

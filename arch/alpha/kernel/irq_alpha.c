@@ -59,7 +59,7 @@ do_entInt(unsigned long type, unsigned long vector, unsigned long la_ptr,
 		smp_percpu_timer_interrupt(&regs);
 		cpu = smp_processor_id();
 		if (cpu != boot_cpuid) {
-		        kstat.irqs[cpu][RTC_IRQ]++;
+		        kstat_cpu(cpu).irqs[RTC_IRQ]++;
 		} else {
 			handle_irq(RTC_IRQ, &regs);
 		}

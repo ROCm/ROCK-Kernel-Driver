@@ -102,7 +102,7 @@ found_it:	seq_printf(p, "%3d: ", i);
 		for (x = 0; x < NR_CPUS; x++) {
 			if (cpu_online)
 				seq_printf(p, "%10u ",
-				       kstat.irqs[cpu_logical_map(x)][i]);
+				       kstat_cpu(cpu_logical_map(x)).irqs[i]);
 		}
 #endif
 		seq_printf(p, "%c %s",
@@ -199,7 +199,7 @@ void sun4d_handler_irq(int irq, struct pt_regs * regs)
 	cc_set_iclr(1 << irq);
 	
 	irq_enter();
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 	if (!sbusl) {
 		action = *(irq + irq_action);
 		if (!action)

@@ -256,7 +256,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs *regs)
 	cpu = smp_processor_id();
 	irq_enter(cpu, irq);
 
-	kstat.irqs[cpu][irq]++;
+	kstat_cpu(cpu).irqs[irq]++;
 #if 0
 	if (irq_desc[irq].handler && irq_desc[irq].handler->ack) {
 	//	printk("invoking ack handler\n");
