@@ -32,11 +32,6 @@
 # Makefile for XFS on Linux.
 #
 
-
-# we also have source in the subdirectories..
-vpath %.c =  . linux pagebuf support
-
-
 # This needs -I. because everything does #include <xfs.h> instead of "xfs.h".
 # The code is wrong, local files should be included using "xfs.h", not <xfs.h>
 # but I am not going to change every file at the moment.
@@ -49,7 +44,8 @@ ifeq ($(CONFIG_PAGEBUF_DEBUG),y)
 	EXTRA_CFLAGS += -DPAGEBUF_TRACE
 endif
 
-export-objs			:= page_buf.o ktrace.o xfs_globals.o
+export-objs			:= pagebuf/page_buf.o support/ktrace.o \
+				   linux/xfs_globals.o
 
 obj-$(CONFIG_XFS_FS)		+= xfs.o
 
@@ -65,8 +61,8 @@ xfs-obj-$(CONFIG_XFS_QUOTA)	+= xfs_dquot.o \
 xfs-obj-$(CONFIG_FS_POSIX_ACL)	+= xfs_acl.o
 xfs-obj-$(CONFIG_FS_POSIX_CAP)	+= xfs_cap.o
 xfs-obj-$(CONFIG_FS_POSIX_MAC)	+= xfs_mac.o
-xfs-obj-$(CONFIG_PROC_FS)	+= xfs_stats.o
-xfs-obj-$(CONFIG_SYSCTL)	+= xfs_sysctl.o
+xfs-obj-$(CONFIG_PROC_FS)	+= linux/xfs_stats.o
+xfs-obj-$(CONFIG_SYSCTL)	+= linux/xfs_sysctl.o
 
 
 xfs-objs			+= $(xfs-obj-y) \
@@ -118,11 +114,13 @@ xfs-objs			+= $(xfs-obj-y) \
 				   xfs_rw.o
 
 # Objects in pagebuf/
-xfs-objs			+= page_buf.o \
-				   page_buf_locking.o
+xfs-objs			+= $(addprefix pagebuf/, \
+				   page_buf.o \
+				   page_buf_locking.o)
 
 # Objects in linux/
-xfs-objs			+= xfs_aops.o \
+xfs-objs			+= $(addprefix linux/, \
+				   xfs_aops.o \
 				   xfs_behavior.o \
 				   xfs_file.o \
 				   xfs_fs_subr.o \
@@ -131,16 +129,17 @@ xfs-objs			+= xfs_aops.o \
 				   xfs_iops.o \
 				   xfs_lrw.o \
 				   xfs_super.o \
-				   xfs_vnode.o
+				   xfs_vnode.o)
 
 # Objects in support/
-xfs-objs			+= debug.o \
+xfs-objs			+= $(addprefix support/, \
+				   debug.o \
 				   kmem.o \
 				   ktrace.o \
 				   move.o \
 				   mrlock.o \
 				   qsort.o \
-				   uuid.o
+				   uuid.o)
 
 # If both xfs and kdb modules are built in then xfsidbg is built in.  If xfs is
 # a module and kdb modules are being compiled then xfsidbg must be a module, to

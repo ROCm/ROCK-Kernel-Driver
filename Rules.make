@@ -207,7 +207,7 @@ $(MODVERDIR)/%.ver: %.c FORCE
 targets := $(addprefix $(MODVERDIR)/,$(export-objs:.o=.ver))
 
 fastdep: $(targets) $(subdir-ym)
-	@mkdir -p $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)
+	@mkdir -p $(dir $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR),$(export-objs:.o=.ver)))
 	@touch $(addprefix $(TOPDIR)/.tmp_export-objs/modules/$(RELDIR)/,$(export-objs:.o=.ver))
 
 endif # export-objs 
@@ -245,7 +245,6 @@ O_TARGET := built-in.o
 endif
 endif
 
-#	The echo suppresses the "Nothing to be done for first_rule"
 first_rule: $(if $(KBUILD_BUILTIN),$(O_TARGET) $(L_TARGET) $(EXTRA_TARGETS)) \
 	    $(if $(KBUILD_MODULES),$(obj-m)) \
 	    $(subdir-ym)
