@@ -366,6 +366,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		child = pci_alloc_child_bus(bus, dev, busnr);
 		child->primary = buses & 0xFF;
 		child->subordinate = (buses >> 16) & 0xFF;
+		child->bridge_ctl = bctl;
+
 		cmax = pci_scan_child_bus(child);
 		if (cmax > max) max = cmax;
 	} else {
@@ -400,6 +402,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		pci_write_config_dword(dev, PCI_PRIMARY_BUS, buses);
 
 		if (!is_cardbus) {
+			child->bridge_ctl = PCI_BRIDGE_CTL_NO_ISA;
+
 			/* Now we can scan all subordinate buses... */
 			max = pci_scan_child_bus(child);
 		} else {

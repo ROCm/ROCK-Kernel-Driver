@@ -468,6 +468,8 @@ struct pci_bus {
 
 	char		name[48];
 
+	unsigned short  bridge_ctl;	/* manage NO_ISA/FBB/et al behaviors */
+	unsigned short  pad2;
 	struct device		*bridge;
 	struct class_device	class_dev;
 };
