@@ -58,7 +58,6 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	struct hc_driver	*driver;
 	unsigned long		resource, len;
 	void			*base;
-	u8			latency, limit;
 	struct usb_hcd		*hcd;
 	int			retval, region;
 	char			buf [8], *bufp = buf;
@@ -144,15 +143,6 @@ clean_3:
 	}
 
 	info ("%s @ %s, %s", hcd->description,  dev->slot_name, dev->name);
-
-	pci_read_config_byte (dev, PCI_LATENCY_TIMER, &latency);
-	if (latency) {
-		pci_read_config_byte (dev, PCI_MAX_LAT, &limit);
-		if (limit && limit < latency) {
-			dbg ("PCI latency reduced to max %d", limit);
-			pci_write_config_byte (dev, PCI_LATENCY_TIMER, limit);
-		}
-	}
 
 #ifndef __sparc__
 	sprintf (buf, "%d", dev->irq);
