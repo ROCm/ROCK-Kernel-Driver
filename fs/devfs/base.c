@@ -1802,8 +1802,11 @@ int devfs_generate_path (devfs_handle_t de, char *path, int buflen)
 static struct file_operations *devfs_get_ops (devfs_handle_t de)
 {
     struct file_operations *ops = de->u.cdev.ops;
-    struct module *owner = ops->owner;
+    struct module *owner;
 
+    if (!ops)
+	return NULL;
+    owner = ops->owner;
     read_lock (&de->parent->u.dir.lock);  /*  Prevent module from unloading  */
     if ( (de->next == de) || !try_module_get (owner) )
     {   /*  Entry is already unhooked or module is unloading  */
