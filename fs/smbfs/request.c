@@ -588,12 +588,18 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 	data_count  = WVAL(inbuf, smb_drcnt);
 
 	/* Modify offset for the split header/buffer we use */
-	if (data_offset < hdrlen)
-		goto out_bad_data;
-	if (parm_offset < hdrlen)
-		goto out_bad_parm;
+	if (data_count || data_offset) {
+		if (unlikely(data_offset < hdrlen))
+			goto out_bad_data;
+		else
 	data_offset -= hdrlen;
+	}
+	if (parm_count || parm_offset) {
+		if (unlikely(parm_offset < hdrlen))
+			goto out_bad_parm;
+		else
 	parm_offset -= hdrlen;
+	}
 
 	if (parm_count == parm_tot && data_count == data_tot) {
 		/*
@@ -604,22 +610,22 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 		 * response that fits.
 		 */
 		VERBOSE("single trans2 response  "
-			"dcnt=%d, pcnt=%d, doff=%d, poff=%d\n",
+			"dcnt=%u, pcnt=%u, doff=%u, poff=%u\n",
 			data_count, parm_count,
 			data_offset, parm_offset);
 		req->rq_ldata = data_count;
 		req->rq_lparm = parm_count;
 		req->rq_data = req->rq_buffer + data_offset;
 		req->rq_parm = req->rq_buffer + parm_offset;
-		if (parm_offset + parm_count > req->rq_rlen)
+		if (unlikely(parm_offset + parm_count > req->rq_rlen))
 			goto out_bad_parm;
-		if (data_offset + data_count > req->rq_rlen)
+		if (unlikely(data_offset + data_count > req->rq_rlen))
 			goto out_bad_data;
 		return 0;
 	}
 
 	VERBOSE("multi trans2 response  "
-		"frag=%d, dcnt=%d, pcnt=%d, doff=%d, poff=%d\n",
+		"frag=%d, dcnt=%u, pcnt=%u, doff=%u, poff=%u\n",
 		req->rq_fragment,
 		data_count, parm_count,
 		data_offset, parm_offset);
@@ -646,17 +652,15 @@ static int smb_recv_trans2(struct smb_sb_info *server, struct smb_request *req)
 
 		req->rq_parm = req->rq_trans2buffer;
 		req->rq_data = req->rq_trans2buffer + parm_tot;
-	} else if (req->rq_total_data < data_tot ||
-		   req->rq_total_parm < parm_tot)
+	} else if (unlikely(req->rq_total_data < data_tot ||
+			    req->rq_total_parm < parm_tot))
 		goto out_data_grew;
 
-	if (parm_disp + parm_count > req->rq_total_parm)
+	if (unlikely(parm_disp + parm_count > req->rq_total_parm ||
+		     parm_offset + parm_count > req->rq_rlen))
 		goto out_bad_parm;
-	if (parm_offset + parm_count > req->rq_rlen)
-		goto out_bad_parm;
-	if (data_disp + data_count > req->rq_total_data)
-		goto out_bad_data;
-	if (data_offset + data_count > req->rq_rlen)
+	if (unlikely(data_disp + data_count > req->rq_total_data ||
+		     data_offset + data_count > req->rq_rlen))
 		goto out_bad_data;
 
 	inbuf = req->rq_buffer;
@@ -689,16 +693,15 @@ out_no_mem:
 	goto out;
 out_data_grew:
 	printk(KERN_ERR "smb_trans2: data/params grew!\n");
-	req->rq_errno = -EIO;
-	goto out;
+	goto out_EIO;
 out_bad_parm:
-	printk(KERN_ERR "smb_trans2: invalid parms, disp=%d, cnt=%d, tot=%d, ofs=%d\n",
+	printk(KERN_ERR "smb_trans2: invalid parms, disp=%u, cnt=%u, tot=%u, ofs=%u\n",
 	       parm_disp, parm_count, parm_tot, parm_offset);
-	req->rq_errno = -EIO;
-	goto out;
+	goto out_EIO;
 out_bad_data:
-	printk(KERN_ERR "smb_trans2: invalid data, disp=%d, cnt=%d, tot=%d, ofs=%d\n",
+	printk(KERN_ERR "smb_trans2: invalid data, disp=%u, cnt=%u, tot=%u, ofs=%u\n",
 	       data_disp, data_count, data_tot, data_offset);
+out_EIO:
 	req->rq_errno = -EIO;
 out:
 	return req->rq_errno;
