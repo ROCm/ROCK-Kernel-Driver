@@ -454,7 +454,8 @@ xfs_zero_eof(
 		}
 		ASSERT(nimaps > 0);
 
-		if (imap.br_startblock == HOLESTARTBLOCK) {
+		if (imap.br_state == XFS_EXT_UNWRITTEN ||
+		    imap.br_startblock == HOLESTARTBLOCK) {
 			/*
 			 * This loop handles initializing pages that were
 			 * partially initialized by the code below this
