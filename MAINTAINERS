@@ -1910,7 +1910,7 @@ L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
 
-USB BLUETOOTH DRIVER
+USB BLUETOOTH TTY CONVERTER DRIVER
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
 L:	linux-usb-users@lists.sourceforge.net
