@@ -641,6 +641,7 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 	if(pSesInfo->server->maxBuf == 0) /* no need to send on reconnect */
 		rc = CIFSSMBNegotiate(xid, pSesInfo);
 	pSesInfo->capabilities = pSesInfo->server->capabilities;
+	pSesInfo->sequence_number = 0;
 	if (!rc) {
 		cFYI(1,("Security Mode: 0x%x Capabilities: 0x%x Time Zone: %d",
 			pSesInfo->server->secMode,
@@ -690,9 +691,7 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 				pSesInfo->server->cryptKey,
 				ntlm_session_key);
 			rc = CIFSSessSetup(xid, pSesInfo,
-				session_key,
-				ntlm_session_key,
-				nls_info);
+				ntlm_session_key, nls_info);
 		}
 		if (rc) {
 			cERROR(1,("Send error in SessSetup = %d",rc));
@@ -1024,7 +1023,6 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 int
 CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	      char session_key[CIFS_SESSION_KEY_SIZE],
-	      char session_key2[CIFS_SESSION_KEY_SIZE],
 	      const struct nls_table *nls_codepage)
 {
 	struct smb_hdr *smb_buffer;
@@ -1081,9 +1079,9 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	pSMB->req_no_secext.CaseSensitivePasswordLength =
 	    cpu_to_le16(CIFS_SESSION_KEY_SIZE);
 	bcc_ptr = pByteArea(smb_buffer);
-	/* memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
+	/* memcpy(bcc_ptr, (char *) lm_session_key, CIFS_SESSION_KEY_SIZE);
 	   bcc_ptr += CIFS_SESSION_KEY_SIZE; */
-	memcpy(bcc_ptr, (char *) session_key2, CIFS_SESSION_KEY_SIZE);
+	memcpy(bcc_ptr, (char *) session_key, CIFS_SESSION_KEY_SIZE);
 	bcc_ptr += CIFS_SESSION_KEY_SIZE;
 
 	if (ses->capabilities & CAP_UNICODE) {
@@ -1094,7 +1092,7 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		if(user == NULL)
 			bytes_returned = 0; /* skill null user */
         else
-		    bytes_returned =
+		bytes_returned =
 		        cifs_strtoUCS((wchar_t *) bcc_ptr, user, 100, nls_codepage);
 		bcc_ptr += 2 * bytes_returned;	/* convert num 16 bit words to bytes */
 		bcc_ptr += 2;	/* trailing null */
