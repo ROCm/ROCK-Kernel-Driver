@@ -34,6 +34,7 @@
 #include <linux/fs.h>
 #include <linux/blk.h>
 #include <asm/uaccess.h>
+#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
 #include <linux/module.h>
