@@ -8,7 +8,7 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/string.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 
 extern struct driver_file_entry * device_default_files[];
 
