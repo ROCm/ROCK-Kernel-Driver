@@ -290,7 +290,7 @@ int freecom_transport(struct scsi_cmnd *srb, struct us_data *us)
 		case REQUEST_SENSE:		/* 16 or 18 bytes? spec says 18, lots of devices only have 16 */
 		case MODE_SENSE:
 		case MODE_SENSE_10:
-			length = fst->Count;
+			length = le16_to_cpu(fst->Count);
 			break;
 		default:
  			length = srb->request_bufflen;
