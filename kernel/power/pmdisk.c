@@ -795,6 +795,7 @@ static int __init relocate_pagedir(void)
 	suspend_pagedir_t *new_pagedir, *old_pagedir = pm_pagedir_nosave;
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
+	int err;
 
 	pr_debug("pmdisk: Relocating pagedir\n");
 
@@ -803,32 +804,31 @@ static int __init relocate_pagedir(void)
 		return 0;
 	}
 
+	err = -ENOMEM;
 	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
 		memset(m, 0, PAGE_SIZE);
-		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
+		if (!does_collide_order(old_pagedir, (unsigned long)m,
+					pagedir_order)) {
+			pm_pagedir_nosave = new_pagedir = m;
+			copy_pagedir(new_pagedir, old_pagedir);
+			err = 0;
 			break;
+		}
 		eaten_memory = m;
 		printk( "." ); 
 		*eaten_memory = c;
 		c = eaten_memory;
 	}
 
-	if (!m)
-		return -ENOMEM;
-
-	pm_pagedir_nosave = new_pagedir = m;
-	copy_pagedir(new_pagedir, old_pagedir);
-
 	c = eaten_memory;
 	while(c) {
 		printk(":");
-		f = *c;
+		f = c;
 		c = *c;
-		if (f)
-			free_pages((unsigned long)f, pagedir_order);
+		free_pages((unsigned long)f, pagedir_order);
 	}
 	printk("|\n");
-	return 0;
+	return err;
 }
 
 
