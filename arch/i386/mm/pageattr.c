@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <asm/processor.h>
+#include <asm/tlbflush.h>
 
 static inline pte_t *lookup_address(unsigned long address) 
 { 
