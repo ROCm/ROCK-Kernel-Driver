@@ -93,13 +93,16 @@
 	- Fixed initialization timing problems
 	- Fixed interrupt mask definitions
 
+	LK1.3.5 (jgarzik)
+	- ethtool NWAY_RST, GLINK, [GS]MSGLVL support
+
 TODO:
 	- implement tx_timeout() properly
 */
 
 #define DRV_NAME	"starfire"
-#define DRV_VERSION	"1.03+LK1.3.4"
-#define DRV_RELDATE	"August 14, 2001"
+#define DRV_VERSION	"1.03+LK1.3.5"
+#define DRV_RELDATE	"November 17, 2001"
 
 #include <linux/version.h>
 #include <linux/module.h>
@@ -1767,6 +1770,47 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		return 0;
 	}
 
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		int tmp;
+		int r = -EINVAL;
+		/* if autoneg is off, it's an error */
+		tmp = mdio_read(dev, np->phys[0], MII_BMCR);
+		if (tmp & BMCR_ANENABLE) {
+			tmp |= (BMCR_ANRESTART);
+			mdio_write(dev, np->phys[0], MII_BMCR, tmp);
+			r = 0;
+		}
+		return r;
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		if (mdio_read(dev, np->phys[0], MII_BMSR) & BMSR_LSTATUS)
+			edata.data = 1;
+		else
+			edata.data = 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
 	default:
 		return -EOPNOTSUPP;
 	}
