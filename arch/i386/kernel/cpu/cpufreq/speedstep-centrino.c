@@ -34,6 +34,8 @@
 #include <asm/processor.h>
 #include <asm/cpufeature.h>
 
+#include "speedstep-est-common.h"
+
 #define PFX		"speedstep-centrino: "
 #define MAINTAINER	"Jeremy Fitzhardinge <jeremy@goop.org>"
 
@@ -75,6 +77,8 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model[NR_CPUS];
 static const struct cpu_id *centrino_cpu[NR_CPUS];
+
+static struct cpufreq_driver centrino_driver;
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE
 
@@ -507,6 +511,10 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 
 	if (i != N_IDS)
 		centrino_cpu[policy->cpu] = &cpu_ids[i];
+
+	if (is_const_loops_cpu(policy->cpu)) {
+		centrino_driver.flags |= CPUFREQ_CONST_LOOPS;
+	}
 
 	if (centrino_cpu_init_acpi(policy)) {
 		if (policy->cpu != 0)
