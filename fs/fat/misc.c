@@ -6,6 +6,7 @@
  *		 and date_dos2unix for date==0 by Igor Zhbanov(bsg@uniyar.ac.ru)
  */
 
+#include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/msdos_fs.h>
 #include <linux/buffer_head.h>
@@ -272,6 +273,7 @@ void fat_date_unix2dos(int unix_date,__le16 *time, __le16 *date)
 	*date = cpu_to_le16(nl_day-day_n[month-1]+1+(month << 5)+(year << 9));
 }
 
+EXPORT_SYMBOL(fat_date_unix2dos);
 
 /* Returns the inode number of the directory entry at offset pos. If bh is
    non-NULL, it is brelse'd before. Pos is incremented. The buffer header is
@@ -320,3 +322,5 @@ next:
 
 	return 0;
 }
+
+EXPORT_SYMBOL(fat__get_entry);

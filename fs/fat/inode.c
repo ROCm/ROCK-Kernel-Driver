@@ -11,6 +11,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/init.h>
 #include <linux/time.h>
 #include <linux/slab.h>
 #include <linux/smp_lock.h>
@@ -87,6 +88,8 @@ void fat_attach(struct inode *inode, loff_t i_pos)
 	spin_unlock(&sbi->inode_hash_lock);
 }
 
+EXPORT_SYMBOL(fat_attach);
+
 void fat_detach(struct inode *inode)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
@@ -95,6 +98,8 @@ void fat_detach(struct inode *inode)
 	hlist_del_init(&MSDOS_I(inode)->i_fat_hash);
 	spin_unlock(&sbi->inode_hash_lock);
 }
+
+EXPORT_SYMBOL(fat_detach);
 
 struct inode *fat_iget(struct super_block *sb, loff_t i_pos)
 {
@@ -144,6 +149,8 @@ struct inode *fat_build_inode(struct super_block *sb,
 out:
 	return inode;
 }
+
+EXPORT_SYMBOL(fat_build_inode);
 
 static void fat_delete_inode(struct inode *inode)
 {
@@ -1070,6 +1077,8 @@ out_fail:
 	return error;
 }
 
+EXPORT_SYMBOL(fat_fill_super);
+
 static int fat_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	int free, nr, ret;
@@ -1328,4 +1337,29 @@ out:
 	unlock_kernel();
 	return error;
 }
+
+EXPORT_SYMBOL(fat_notify_change);
+
+int __init fat_cache_init(void);
+void __exit fat_cache_destroy(void);
+
+static int __init init_fat_fs(void)
+{
+	int ret;
+
+	ret = fat_cache_init();
+	if (ret < 0)
+		return ret;
+	return fat_init_inodecache();
+}
+
+static void __exit exit_fat_fs(void)
+{
+	fat_cache_destroy();
+	fat_destroy_inodecache();
+}
+
+module_init(init_fat_fs)
+module_exit(exit_fat_fs)
+
 MODULE_LICENSE("GPL");

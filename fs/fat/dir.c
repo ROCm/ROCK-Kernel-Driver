@@ -13,6 +13,7 @@
  *  Short name translation 1999, 2001 by Wolfram Pienkoss <wp@bszh.de>
  */
 
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/msdos_fs.h>
@@ -334,6 +335,8 @@ struct fat_ioctl_filldir_callback {
 	const char *shortname;
 	int short_len;
 };
+
+EXPORT_SYMBOL(fat_search_long);
 
 static int fat_readdirx(struct inode *inode, struct file *filp, void *dirent,
 			filldir_t filldir, int short_only, int both)
@@ -732,6 +735,8 @@ int fat_add_entries(struct inode *dir,int slots, struct buffer_head **bh,
 	return offset;
 }
 
+EXPORT_SYMBOL(fat_add_entries);
+
 int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 {
 	struct buffer_head *bh;
@@ -767,6 +772,8 @@ int fat_new_dir(struct inode *dir, struct inode *parent, int is_vfat)
 	return 0;
 }
 
+EXPORT_SYMBOL(fat_new_dir);
+
 static int fat_get_short_entry(struct inode *dir, loff_t *pos,
 			       struct buffer_head **bh,
 			       struct msdos_dir_entry **de, loff_t *i_pos)
@@ -799,6 +806,8 @@ int fat_dir_empty(struct inode *dir)
 	brelse(bh);
 	return result;
 }
+
+EXPORT_SYMBOL(fat_dir_empty);
 
 /*
  * fat_subdirs counts the number of sub-directories of dir. It can be run
@@ -839,3 +848,5 @@ int fat_scan(struct inode *dir, const unsigned char *name,
 	}
 	return -ENOENT;
 }
+
+EXPORT_SYMBOL(fat_scan);
