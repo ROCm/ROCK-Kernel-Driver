@@ -4,9 +4,6 @@
 /*
  * The MS-DOS filesystem constants/structures
  */
-#include <linux/msdos_fs_i.h>
-#include <linux/msdos_fs_sb.h>
-
 #include <asm/byteorder.h>
 
 #define MSDOS_ROOT_INO  1 /* == MINIX_ROOT_INO */
@@ -53,16 +50,6 @@
 
 #define MSDOS_VALID_MODE (S_IFREG | S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO)
 	/* valid file mode bits */
-
-static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
-{
-	return sb->u.generic_sbp;
-}
-
-static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
-{
-	return list_entry(inode, struct msdos_inode_info, vfs_inode);
-}
 
 #define MSDOS_NAME 11 /* maximum name length */
 #define MSDOS_LONGNAME 256 /* maximum name length */
@@ -196,6 +183,18 @@ struct vfat_slot_info {
 #ifdef __KERNEL__
 
 #include <linux/nls.h>
+#include <linux/msdos_fs_i.h>
+#include <linux/msdos_fs_sb.h>
+
+static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
+{
+	return sb->u.generic_sbp;
+}
+
+static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
+{
+	return list_entry(inode, struct msdos_inode_info, vfs_inode);
+}
 
 struct fat_cache {
 	struct super_block *sb; /* fs in question.  NULL means unused */
