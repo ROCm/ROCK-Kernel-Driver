@@ -10,7 +10,7 @@ __build:
 # Read .config if it exist, otherwise ignore
 -include .config
 
-include $(obj)/Makefile
+include $(if $(wildcard $(obj)/Kbuild), $(obj)/Kbuild, $(obj)/Makefile)
 
 include scripts/Makefile.lib
 

@@ -6,7 +6,7 @@ This document describes the Linux kernel Makefiles.
 
 	=== 1 Overview
 	=== 2 Who does what
-	=== 3 The kbuild Makefiles
+	=== 3 The kbuild files
 	   --- 3.1 Goal definitions
 	   --- 3.2 Built-in object goals - obj-y
 	   --- 3.3 Loadable module goals - obj-m
@@ -101,11 +101,14 @@ These people need to know about all aspects of the kernel Makefiles.
 This document is aimed towards normal developers and arch developers.
 
 
-=== 3 The kbuild Makefiles
+=== 3 The kbuild files
 
 Most Makefiles within the kernel are kbuild Makefiles that use the
 kbuild infrastructure. This chapter introduce the syntax used in the
 kbuild makefiles.
+The preferred name for the kbuild files is 'Kbuild' but 'Makefile' will
+continue to be supported. All new developmen is expected to use the
+Kbuild filename.
 
 Section 3.1 "Goal definitions" is a quick intro, further chapters provide
 more details, with real examples.
