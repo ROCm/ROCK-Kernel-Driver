@@ -87,9 +87,6 @@ struct vpd_prom {
 #endif
 
 
-void rio_dec_mod_count (void);
-void rio_inc_mod_count (void);
-
 /* Allow us to debug "in the field" without requiring clients to
    recompile.... */
 #if 1

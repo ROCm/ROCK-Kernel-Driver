@@ -1867,6 +1867,7 @@ int rs_init(void)
 	
 	memset(&serial_driver, 0, sizeof(struct tty_driver));
 	serial_driver.magic = TTY_DRIVER_MAGIC;
+	serial_driver.owner = THIS_MODULE;
 	serial_driver.name = "ttyS";
 	serial_driver.major = TTY_MAJOR;
 	serial_driver.minor_start = 64;

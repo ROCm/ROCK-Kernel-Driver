@@ -1198,7 +1198,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		     bluetooth, endpoint->bInterval);
 
 	/* initialize the devfs nodes for this device and let the user know what bluetooths we are bound to */
-	tty_register_device (&bluetooth_tty_driver, minor);
+	tty_register_device (&bluetooth_tty_driver, minor, &intf->dev);
 	info("Bluetooth converter now attached to ttyUB%d (or usb/ttub/%d for devfs)", minor, minor);
 
 	bluetooth_table[minor] = bluetooth;

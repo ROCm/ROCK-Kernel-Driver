@@ -793,6 +793,7 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 
 	/* Initialise the relevant fields. */
 	ip2_tty_driver.magic                = TTY_DRIVER_MAGIC;
+	ip2_tty_driver.owner		    = THIS_MODULE;
 	ip2_tty_driver.name                 = pcTty;
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
 	ip2_tty_driver.driver_name          = pcDriver_name;
@@ -891,10 +892,10 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				    {
 				        tty_register_device(&ip2_tty_driver,
 					    j + ABS_BIGGEST_BOX *
-						    (box+i*ABS_MAX_BOXES));
+						    (box+i*ABS_MAX_BOXES), NULL);
 				            tty_register_device(&ip2_callout_driver,
 					    j + ABS_BIGGEST_BOX *
-						    (box+i*ABS_MAX_BOXES));
+						    (box+i*ABS_MAX_BOXES), NULL);
 			    	    }
 			        }
 			    }
@@ -1567,7 +1568,6 @@ ip2_open( PTTY tty, struct file *pFile )
 	/* Setup pointer links in device and tty structures */
 	pCh->pTTY = tty;
 	tty->driver_data = pCh;
-	MOD_INC_USE_COUNT;
 
 #ifdef IP2DEBUG_OPEN
 	printk(KERN_DEBUG \
@@ -1767,14 +1767,12 @@ ip2_close( PTTY tty, struct file *pFile )
 #endif
 
 	if ( tty_hung_up_p ( pFile ) ) {
-		MOD_DEC_USE_COUNT;
 
 		ip2trace (CHANN, ITRC_CLOSE, 2, 1, 2 );
 
 		return;
 	}
 	if ( tty->count > 1 ) { /* not the last close */
-		MOD_DEC_USE_COUNT;
 
 		ip2trace (CHANN, ITRC_CLOSE, 2, 1, 3 );
 
@@ -1842,7 +1840,6 @@ ip2_close( PTTY tty, struct file *pFile )
 	DBG_CNT("ip2_close: after wakeups--");
 #endif
 
-	MOD_DEC_USE_COUNT;
 
 	ip2trace (CHANN, ITRC_CLOSE, ITRC_RETURN, 1, 1 );
 

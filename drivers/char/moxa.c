@@ -341,6 +341,7 @@ int moxa_init(void)
 	memset(&moxaDriver, 0, sizeof(struct tty_driver));
 	memset(&moxaCallout, 0, sizeof(struct tty_driver));
 	moxaDriver.magic = TTY_DRIVER_MAGIC;
+	moxaDriver.owner = THIS_MODULE;
 	moxaDriver.name = "ttya";
 	moxaDriver.major = ttymajor;
 	moxaDriver.minor_start = 0;
@@ -544,7 +545,6 @@ static void do_moxa_softint(void *private_)
 			ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE);
 		}
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 static int moxa_open(struct tty_struct *tty, struct file *filp)
@@ -556,7 +556,6 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 
 	port = PORTNO(tty);
 	if (port == MAX_PORTS) {
-		MOD_INC_USE_COUNT;
 		return (0);
 	}
 	if (!MoxaPortIsValid(port)) {
@@ -579,7 +578,6 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	}
 	up(&moxaBuffSem);
 
-	MOD_INC_USE_COUNT;
 	ch = &moxaChannels[port];
 	ch->count++;
 	tty->driver_data = ch;
@@ -619,7 +617,6 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 
 	port = PORTNO(tty);
 	if (port == MAX_PORTS) {
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 	if (!MoxaPortIsValid(port)) {
@@ -633,7 +630,6 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 	if (tty_hung_up_p(filp)) {
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 	ch = (struct moxa_str *) tty->driver_data;
@@ -649,7 +645,6 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 		ch->count = 0;
 	}
 	if (ch->count) {
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 	ch->asyncflags |= ASYNC_CLOSING;
@@ -688,7 +683,6 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	ch->asyncflags &= ~(ASYNC_NORMAL_ACTIVE | ASYNC_CALLOUT_ACTIVE |
 			    ASYNC_CLOSING);
 	wake_up_interruptible(&ch->close_wait);
-	MOD_DEC_USE_COUNT;
 }
 
 static int moxa_write(struct tty_struct *tty, int from_user,
@@ -1024,9 +1018,7 @@ static void moxa_poll(unsigned long ignored)
 						wake_up_interruptible(&ch->open_wait);
 					else {
 						set_bit(MOXA_EVENT_HANGUP, &ch->event);
-						MOD_DEC_USE_COUNT;
-						if (schedule_work(&ch->tqueue) == 0)
-							MOD_INC_USE_COUNT;
+						schedule_work(&ch->tqueue);
 					}
 				}
 			}

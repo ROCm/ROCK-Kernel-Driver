@@ -1044,8 +1044,6 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	if (portp == (stlport_t *) NULL)
 		return(-ENODEV);
 
-	MOD_INC_USE_COUNT;
-
 /*
  *	On the first open of the device setup the port hardware, and
  *	initialize the per port data structure.
@@ -1207,14 +1205,12 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 	save_flags(flags);
 	cli();
 	if (tty_hung_up_p(filp)) {
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
 	if ((tty->count == 1) && (portp->refcount != 1))
 		portp->refcount = 1;
 	if (portp->refcount-- > 1) {
-		MOD_DEC_USE_COUNT;
 		restore_flags(flags);
 		return;
 	}
@@ -1267,7 +1263,6 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 	portp->flags &= ~(ASYNC_CALLOUT_ACTIVE | ASYNC_NORMAL_ACTIVE |
 		ASYNC_CLOSING);
 	wake_up_interruptible(&portp->close_wait);
-	MOD_DEC_USE_COUNT;
 	restore_flags(flags);
 }
 
@@ -2241,11 +2236,11 @@ static void stl_offintr(void *private)
 #endif
 
 	if (portp == (stlport_t *) NULL)
-		goto out;
+		return;
 
 	tty = portp->tty;
 	if (tty == (struct tty_struct *) NULL)
-		goto out;
+		return;
 
 	lock_kernel();
 	if (test_bit(ASYI_TXLOW, &portp->istate)) {
@@ -2270,8 +2265,6 @@ static void stl_offintr(void *private)
 		}
 	}
 	unlock_kernel();
-out:
-	MOD_DEC_USE_COUNT;
 }
 
 /*****************************************************************************/
@@ -3229,6 +3222,7 @@ int __init stl_init(void)
  */
 	memset(&stl_serial, 0, sizeof(struct tty_driver));
 	stl_serial.magic = TTY_DRIVER_MAGIC;
+	stl_serial.owner = THIS_MODULE;
 	stl_serial.driver_name = stl_drvname;
 	stl_serial.name = stl_serialname;
 	stl_serial.major = STL_SERIALMAJOR;
@@ -4134,9 +4128,7 @@ static void stl_cd1400txisr(stlpanel_t *panelp, int ioaddr)
 	if ((len == 0) || ((len < STL_TXBUFLOW) &&
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
-		MOD_INC_USE_COUNT;
-		if (schedule_work(&portp->tqueue) == 0)
-			MOD_DEC_USE_COUNT;
+		schedule_work(&portp->tqueue);
 	}
 
 	if (len == 0) {
@@ -4316,9 +4308,7 @@ static void stl_cd1400mdmisr(stlpanel_t *panelp, int ioaddr)
 	misr = inb(ioaddr + EREG_DATA);
 	if (misr & MISR_DCD) {
 		set_bit(ASYI_DCDCHANGE, &portp->istate);
-		MOD_INC_USE_COUNT;
-		if (schedule_task(&portp->tqueue) == 0)
-			MOD_DEC_USE_COUNT;
+		schedule_task(&portp->tqueue);
 		portp->stats.modem++;
 	}
 
@@ -5115,9 +5105,7 @@ static void stl_sc26198txisr(stlport_t *portp)
 	if ((len == 0) || ((len < STL_TXBUFLOW) &&
 	    (test_bit(ASYI_TXLOW, &portp->istate) == 0))) {
 		set_bit(ASYI_TXLOW, &portp->istate);
-		MOD_INC_USE_COUNT;
-		if (schedule_task(&portp->tqueue) == 0)
-			MOD_DEC_USE_COUNT;
+		schedule_task(&portp->tqueue); 
 	}
 
 	if (len == 0) {
@@ -5334,9 +5322,7 @@ static void stl_sc26198otherisr(stlport_t *portp, unsigned int iack)
 		ipr = stl_sc26198getreg(portp, IPR);
 		if (ipr & IPR_DCDCHANGE) {
 			set_bit(ASYI_DCDCHANGE, &portp->istate);
-			MOD_INC_USE_COUNT;
-			if (schedule_task(&portp->tqueue) == 0)
-				MOD_DEC_USE_COUNT;
+			schedule_task(&portp->tqueue); 
 			portp->stats.modem++;
 		}
 		break;

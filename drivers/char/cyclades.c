@@ -2579,15 +2579,12 @@ cy_open(struct tty_struct *tty, struct file * filp)
   int retval, line;
   unsigned long page;
 
-    MOD_INC_USE_COUNT;
     line = tty->index;
     if ((line < 0) || (NR_PORTS <= line)){
-	MOD_DEC_USE_COUNT;
         return -ENODEV;
     }
     info = &cy_port[line];
     if (info->line < 0){
-	MOD_DEC_USE_COUNT;
         return -ENODEV;
     }
     
@@ -2607,7 +2604,6 @@ cy_open(struct tty_struct *tty, struct file * filp)
 	    } else {
 		printk("cyc:Cyclades-Z firmware not yet loaded\n");
 	    }
-	    MOD_DEC_USE_COUNT;
 	    return -ENODEV;
 	}
 #ifdef CONFIG_CYZ_INTR
@@ -2803,7 +2799,6 @@ cy_close(struct tty_struct *tty, struct file *filp)
     CY_LOCK(info, flags);
     /* If the TTY is being hung up, nothing to do */
     if (tty_hung_up_p(filp)) {
-	MOD_DEC_USE_COUNT;
 	CY_UNLOCK(info, flags);
         return;
     }
@@ -2834,7 +2829,6 @@ cy_close(struct tty_struct *tty, struct file *filp)
         info->count = 0;
     }
     if (info->count) {
-	MOD_DEC_USE_COUNT;
 	CY_UNLOCK(info, flags);
         return;
     }
@@ -2931,7 +2925,6 @@ cy_close(struct tty_struct *tty, struct file *filp)
     printk(" cyc:cy_close done\n");
 #endif
 
-    MOD_DEC_USE_COUNT;
     CY_UNLOCK(info, flags);
     return;
 } /* cy_close */
@@ -5494,6 +5487,7 @@ cy_init(void)
     
     memset(&cy_serial_driver, 0, sizeof(struct tty_driver));
     cy_serial_driver.magic = TTY_DRIVER_MAGIC;
+    cy_serial_driver.owner = THIS_MODULE;
     cy_serial_driver.driver_name = "cyclades";
     cy_serial_driver.name = "ttyC";
     cy_serial_driver.major = CYCLADES_MAJOR;
