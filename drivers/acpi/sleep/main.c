@@ -183,14 +183,21 @@ acpi_system_suspend(
 		status = acpi_enter_sleep_state(state);
 		break;
 
-	case ACPI_STATE_S2:
 #ifdef CONFIG_SOFTWARE_SUSPEND
+	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
 		do_suspend_lowlevel(0);
+		break;
 #endif
+	case ACPI_STATE_S4:
+		do_suspend_lowlevel_s4bios(0);
+		break;
+	default:
+		printk(KERN_WARNING PREFIX "don't know how to handle %d state.\n", state);
 		break;
 	}
 	local_irq_restore(flags);
+	printk(KERN_CRIT "Back to C!\n");
 
 	return status;
 }
@@ -211,20 +218,30 @@ acpi_suspend (
 	if (state < ACPI_STATE_S1 || state > ACPI_STATE_S5)
 		return AE_ERROR;
 
+	/* Since we handle S4OS via a different path (swsusp), give up if no s4bios. */
+	if (state == ACPI_STATE_S4 && !acpi_gbl_FACS->S4bios_f)
+		return AE_ERROR;
+
+	/*
+	 * TBD: S1 can be done without device_suspend.  Make a CONFIG_XX
+	 * to handle however when S1 failed without device_suspend.
+	 */
 	freeze_processes();		/* device_suspend needs processes to be stopped */
 
 	/* do we have a wakeup address for S2 and S3? */
-	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3) {
+	/* Here, we support only S4BIOS, those we set the wakeup address */
+	/* S4OS is only supported for now via swsusp.. */
+	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3 || ACPI_STATE_S4) {
 		if (!acpi_wakeup_address)
 			return AE_ERROR;
 		acpi_set_firmware_waking_vector((acpi_physical_address) acpi_wakeup_address);
 	}
 
-	acpi_enter_sleep_state_prep(state);
-
 	status = acpi_system_save_state(state);
 	if (!ACPI_SUCCESS(status))
 		return status;
+
+	acpi_enter_sleep_state_prep(state);
 
 	/* disable interrupts and flush caches */
 	ACPI_DISABLE_IRQS();
@@ -237,8 +254,8 @@ acpi_suspend (
 	 * mode. So, we run these unconditionaly to make sure we have a usable system
 	 * no matter what.
 	 */
-	acpi_system_restore_state(state);
 	acpi_leave_sleep_state(state);
+	acpi_system_restore_state(state);
 
 	/* make sure interrupts are enabled */
 	ACPI_ENABLE_IRQS();
@@ -267,6 +284,10 @@ static int __init acpi_sleep_init(void)
 		if (ACPI_SUCCESS(status)) {
 			sleep_states[i] = 1;
 			printk(" S%d", i);
+		}
+		if (i == ACPI_STATE_S4 && acpi_gbl_FACS->S4bios_f) {
+			sleep_states[i] = 1;
+			printk(" S4bios");
 		}
 	}
 	printk(")\n");

@@ -86,84 +86,6 @@ acpi_ev_is_notify_object (
 
 /*******************************************************************************
  *
- * FUNCTION:    acpi_ev_get_gpe_register_info
- *
- * PARAMETERS:  gpe_number      - Raw GPE number
- *
- * RETURN:      Pointer to the info struct for this GPE register.
- *
- * DESCRIPTION: Returns the register index (index into the GPE register info
- *              table) associated with this GPE.
- *
- ******************************************************************************/
-
-struct acpi_gpe_register_info *
-acpi_ev_get_gpe_register_info (
-	u32                             gpe_number)
-{
-
-	if (gpe_number > acpi_gbl_gpe_number_max) {
-		return (NULL);
-	}
-
-	return (&acpi_gbl_gpe_register_info [ACPI_DIV_8 (acpi_gbl_gpe_number_to_index[gpe_number].number_index)]);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_ev_get_gpe_number_info
- *
- * PARAMETERS:  gpe_number      - Raw GPE number
- *
- * RETURN:      None.
- *
- * DESCRIPTION: Returns the number index (index into the GPE number info table)
- *              associated with this GPE.
- *
- ******************************************************************************/
-
-struct acpi_gpe_number_info *
-acpi_ev_get_gpe_number_info (
-	u32                             gpe_number)
-{
-
-	if (gpe_number > acpi_gbl_gpe_number_max) {
-		return (NULL);
-	}
-
-	return (&acpi_gbl_gpe_number_info [acpi_gbl_gpe_number_to_index[gpe_number].number_index]);
-}
-
-
-/*******************************************************************************
- *
- * FUNCTION:    acpi_ev_get_gpe_number_index
- *
- * PARAMETERS:  gpe_number      - Raw GPE number
- *
- * RETURN:      None.
- *
- * DESCRIPTION: Returns the number index (index into the GPE number info table)
- *              associated with this GPE.
- *
- ******************************************************************************/
-
-u32
-acpi_ev_get_gpe_number_index (
-	u32                             gpe_number)
-{
-
-	if (gpe_number > acpi_gbl_gpe_number_max) {
-		return (ACPI_GPE_INVALID);
-	}
-
-	return (acpi_gbl_gpe_number_to_index[gpe_number].number_index);
-}
-
-
-/*******************************************************************************
- *
  * FUNCTION:    acpi_ev_queue_notify_request
  *
  * PARAMETERS:
@@ -601,6 +523,9 @@ acpi_ev_terminate (void)
 {
 	acpi_native_uint                i;
 	acpi_status                     status;
+	struct acpi_gpe_block_info      *gpe_block;
+	struct acpi_gpe_block_info      *next_gpe_block;
+	struct acpi_gpe_event_info      *gpe_event_info;
 
 
 	ACPI_FUNCTION_TRACE ("ev_terminate");
@@ -625,13 +550,19 @@ acpi_ev_terminate (void)
 		/*
 		 * Disable all GPEs
 		 */
-		for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
-			if (acpi_ev_get_gpe_number_index ((u32)i) != ACPI_GPE_INVALID) {
-				status = acpi_hw_disable_gpe((u32) i);
+		gpe_block = acpi_gbl_gpe_block_list_head;
+		while (gpe_block) {
+			gpe_event_info = gpe_block->event_info;
+			for (i = 0; i < (gpe_block->register_count * 8); i++) {
+				status = acpi_hw_disable_gpe (gpe_event_info);
 				if (ACPI_FAILURE (status)) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Could not disable GPE %d\n", (u32) i));
 				}
+
+				gpe_event_info++;
 			}
+
+			gpe_block = gpe_block->next;
 		}
 
 		/*
@@ -654,21 +585,16 @@ acpi_ev_terminate (void)
 	}
 
 	/*
-	 * Free global tables, etc.
+	 * Free global GPE blocks and related info structures
 	 */
-	if (acpi_gbl_gpe_register_info) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_register_info);
-		acpi_gbl_gpe_register_info = NULL;
-	}
+	gpe_block = acpi_gbl_gpe_block_list_head;
+	while (gpe_block) {
+		next_gpe_block = gpe_block->next;
+		ACPI_MEM_FREE (gpe_block->event_info);
+		ACPI_MEM_FREE (gpe_block->register_info);
+		ACPI_MEM_FREE (gpe_block);
 
-	if (acpi_gbl_gpe_number_info) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_number_info);
-		acpi_gbl_gpe_number_info = NULL;
-	}
-
-	if (acpi_gbl_gpe_number_to_index) {
-		ACPI_MEM_FREE (acpi_gbl_gpe_number_to_index);
-		acpi_gbl_gpe_number_to_index = NULL;
+		gpe_block = next_gpe_block;
 	}
 
 	return_VOID;

@@ -177,6 +177,9 @@ acpi_db_display_resources (
 	char                            *object_arg);
 
 void
+acpi_db_display_gpes (void);
+
+void
 acpi_db_check_integrity (
 	void);
 
@@ -208,6 +211,10 @@ acpi_db_walk_for_specific_objects (
 	void                            *context,
 	void                            **return_value);
 
+void
+acpi_db_generate_gpe (
+	char                            *gpe_arg,
+	char                            *block_arg);
 
 /*
  * dbdisply - debug display commands

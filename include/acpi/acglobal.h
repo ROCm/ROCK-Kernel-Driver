@@ -234,22 +234,7 @@ ACPI_EXTERN u8                                  acpi_gbl_sleep_type_b;
 
 extern      struct acpi_fixed_event_info        acpi_gbl_fixed_event_info[ACPI_NUM_FIXED_EVENTS];
 ACPI_EXTERN struct acpi_fixed_event_handler     acpi_gbl_fixed_event_handlers[ACPI_NUM_FIXED_EVENTS];
-
-ACPI_EXTERN acpi_handle                         acpi_gbl_gpe_obj_handle;
-ACPI_EXTERN u32                                 acpi_gbl_gpe_register_count;
-ACPI_EXTERN u32                                 acpi_gbl_gpe_number_max;
-ACPI_EXTERN struct acpi_gpe_register_info      *acpi_gbl_gpe_register_info;
-ACPI_EXTERN struct acpi_gpe_number_info        *acpi_gbl_gpe_number_info;
-ACPI_EXTERN struct acpi_gpe_block_info          acpi_gbl_gpe_block_info[ACPI_MAX_GPE_BLOCKS];
-
-/*
- * GPE translation table
- * Indexed by the GPE number, returns a valid index into the global GPE tables.
- *
- * This table is needed because the GPE numbers supported by block 1 do not
- * have to be contiguous with the GPE numbers supported by block 0.
- */
-ACPI_EXTERN struct acpi_gpe_index_info         *acpi_gbl_gpe_number_to_index;
+ACPI_EXTERN struct acpi_gpe_block_info          *acpi_gbl_gpe_block_list_head;
 
 
 /*****************************************************************************

@@ -212,6 +212,90 @@ acpi_get_possible_resources (
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_walk_resources
+ *
+ * PARAMETERS:  device_handle   - a handle to the device object for the
+ *                                device we are querying
+ *              Path            - method name of the resources we want
+ *                                (METHOD_NAME__CRS or METHOD_NAME__PRS)
+ *              user_function   - called for each resource
+ *              Context         - passed to user_function
+ *
+ * RETURN:      Status
+ *
+ * DESCRIPTION: Retrieves the current or possible resource list for the
+ *              specified device.  The user_function is called once for
+ *              each resource in the list.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_walk_resources (
+	acpi_handle                             device_handle,
+	char                                    *path,
+	ACPI_WALK_RESOURCE_CALLBACK     user_function,
+	void                                    *context)
+{
+	acpi_status                         status;
+	struct acpi_buffer                  buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_resource                *resource;
+
+	ACPI_FUNCTION_TRACE ("acpi_walk_resources");
+
+
+	if (!device_handle ||
+		(ACPI_STRNCMP (path, METHOD_NAME__CRS, sizeof (METHOD_NAME__CRS)) &&
+		ACPI_STRNCMP (path, METHOD_NAME__PRS, sizeof (METHOD_NAME__PRS)))) {
+		return_ACPI_STATUS (AE_BAD_PARAMETER);
+	}
+
+	status = acpi_rs_get_method_data (device_handle, path, &buffer);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
+	}
+
+	resource = (struct acpi_resource *) buffer.pointer;
+	for (;;) {
+		if (!resource || resource->id == ACPI_RSTYPE_END_TAG) {
+			break;
+		}
+
+		status = user_function (resource, context);
+
+		switch (status) {
+		case AE_OK:
+		case AE_CTRL_DEPTH:
+
+			/* Just keep going */
+			status = AE_OK;
+			break;
+
+		case AE_CTRL_TERMINATE:
+
+			/* Exit now, with OK stats */
+
+			status = AE_OK;
+			goto cleanup;
+
+		default:
+
+			/* All others are valid exceptions */
+
+			goto cleanup;
+		}
+
+		resource = ACPI_NEXT_RESOURCE (resource);
+	}
+
+cleanup:
+
+	acpi_os_free (buffer.pointer);
+
+	return_ACPI_STATUS (status);
+}
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_set_current_resources
  *
  * PARAMETERS:  device_handle   - a handle to the device object for the
@@ -251,4 +335,65 @@ acpi_set_current_resources (
 
 	status = acpi_rs_set_srs_method_data (device_handle, in_buffer);
 	return_ACPI_STATUS (status);
+}
+
+#define COPY_FIELD(out, in, field)  out->field = in->field
+#define COPY_ADDRESS(out, in)                      \
+	COPY_FIELD(out, in, resource_type);             \
+	COPY_FIELD(out, in, producer_consumer);         \
+	COPY_FIELD(out, in, decode);                    \
+	COPY_FIELD(out, in, min_address_fixed);         \
+	COPY_FIELD(out, in, max_address_fixed);         \
+	COPY_FIELD(out, in, attribute);                 \
+	COPY_FIELD(out, in, granularity);               \
+	COPY_FIELD(out, in, min_address_range);         \
+	COPY_FIELD(out, in, max_address_range);         \
+	COPY_FIELD(out, in, address_translation_offset); \
+	COPY_FIELD(out, in, address_length);            \
+	COPY_FIELD(out, in, resource_source);
+
+/*******************************************************************************
+*
+* FUNCTION:    acpi_resource_to_address64
+*
+* PARAMETERS:  resource                - Pointer to a resource
+*              out                     - Pointer to the users's return
+*                                        buffer (a struct
+*                                        struct acpi_resource_address64)
+*
+* RETURN:      Status
+*
+* DESCRIPTION: If the resource is an address16, address32, or address64,
+*              copy it to the address64 return buffer.  This saves the
+*              caller from having to duplicate code for different-sized
+*              addresses.
+*
+******************************************************************************/
+
+acpi_status
+acpi_resource_to_address64 (
+	struct acpi_resource            *resource,
+	struct acpi_resource_address64 *out)
+{
+	struct acpi_resource_address16   *address16;
+	struct acpi_resource_address32   *address32;
+	struct acpi_resource_address64   *address64;
+
+	switch (resource->id) {
+	case ACPI_RSTYPE_ADDRESS16:
+		address16 = (struct acpi_resource_address16 *) &resource->data;
+		COPY_ADDRESS(out, address16);
+		break;
+	case ACPI_RSTYPE_ADDRESS32:
+		address32 = (struct acpi_resource_address32 *) &resource->data;
+		COPY_ADDRESS(out, address32);
+		break;
+	case ACPI_RSTYPE_ADDRESS64:
+		address64 = (struct acpi_resource_address64 *) &resource->data;
+		COPY_ADDRESS(out, address64);
+		break;
+	default:
+		return (AE_BAD_PARAMETER);
+	}
+	return (AE_OK);
 }
