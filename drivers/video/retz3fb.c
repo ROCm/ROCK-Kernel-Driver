@@ -1219,7 +1219,6 @@ static int retz3fb_set_var(struct fb_var_screeninfo *var, int con,
 			struct fb_fix_screeninfo fix;
 			retz3fb_get_fix(&fix, con, info);
 
-			display->screen_base = zinfo->fbmem;
 			display->visual = fix.visual;
 			display->type = fix.type;
 			display->type_aux = fix.type_aux;

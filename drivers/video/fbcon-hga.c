@@ -38,7 +38,7 @@
 
 static inline u8* rowaddr(struct display *p, u_int row)
 {
-	return p->screen_base + HGA_ROWADDR(row);
+	return p->fb_info->screen_base + HGA_ROWADDR(row);
 }
 	
 void fbcon_hga_setup(struct display *p)
@@ -57,8 +57,8 @@ void fbcon_hga_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	
 #if 0
 	if (sx == 0 && dx == 0 && width == p->next_line) {
-		src = p->screen_base+sy*fontheight(p)*width;
-		dest = p->screen_base+dy*fontheight(p)*width;
+		src = p->fb_info->screen_base+sy*fontheight(p)*width;
+		dest = p->fb_info->screen_base+dy*fontheight(p)*width;
 		fb_memmove(dest, src, height*fontheight(p)*width);
 	} else 
 #endif

@@ -57,8 +57,8 @@ void fbcon_mac_bmove(struct display *p, int sy, int sx, int dy, int dx,
    int dl,dr,dt,db,dw,dlo;
    int move_up;
 
-   src = (u8 *) (p->screen_base + sy * fontheight(p) * p->next_line);
-   dest = (u8 *) (p->screen_base + dy * fontheight(p) * p->next_line);
+   src = (u8 *) (p->fb_info->screen_base + sy * fontheight(p) * p->next_line);
+   dest = (u8 *) (p->fb_info->screen_base + dy * fontheight(p) * p->next_line);
 
    if( sx == 0 && width == p->conp->vc_cols) {
      s = height * fontheight(p) * p->next_line;
@@ -197,7 +197,7 @@ void fbcon_mac_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 
    inverse = conp ? attr_reverse(p,conp->vc_attr) : 0;
    pixel = inverse ? PIXEL_WHITE_MAC : PIXEL_BLACK_MAC;
-   dest = (u8 *) (p->screen_base + sy * fontheight(p) * p->next_line);
+   dest = (u8 *) (p->fb_info->screen_base + sy * fontheight(p) * p->next_line);
 
    if( sx == 0 && width == p->conp->vc_cols) {
      s = height * fontheight(p) * p->next_line;
@@ -353,32 +353,32 @@ static void plot_pixel_mac(struct display *p, int bw, int pixel_x, int pixel_y)
 
   switch (p->var.bits_per_pixel) {
   case 1:
-    dest = (u8 *) ((pixel_x >> 3) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x >> 3) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0x80 >> (pixel_x & 7);
     plot_helper(dest, bit, bw);
     break;
 
   case 2:
-    dest = (u8 *) ((pixel_x >> 2) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x >> 2) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0xC0 >> ((pixel_x & 3) << 1);
     plot_helper(dest, bit, bw);
     break;
 
   case 4:
-    dest = (u8 *) ((pixel_x >> 1) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x >> 1) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0xF0 >> ((pixel_x & 1) << 2);
     plot_helper(dest, bit, bw);
     break;
 
   case 8:
-    dest = (u8 *) (pixel_x + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) (pixel_x + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0xFF;
     plot_helper(dest, bit, bw);
     break;
 
 /* FIXME: You can't access framebuffer directly like this! */
   case 16:
-    dest16 = (u16 *) ((pixel_x *2) + p->screen_base + pixel_y * p->next_line);
+    dest16 = (u16 *) ((pixel_x *2) + p->fb_info->screen_base + pixel_y * p->next_line);
     pix16 = 0xFFFF;
     switch (bw) {
     case PIXEL_BLACK_MAC:  *dest16 = ~pix16; break;
@@ -389,7 +389,7 @@ static void plot_pixel_mac(struct display *p, int bw, int pixel_x, int pixel_y)
     break;
 
   case 32:
-    dest32 = (u32 *) ((pixel_x *4) + p->screen_base + pixel_y * p->next_line);
+    dest32 = (u32 *) ((pixel_x *4) + p->fb_info->screen_base + pixel_y * p->next_line);
     pix32 = 0xFFFFFFFF;
     switch (bw) {
     case PIXEL_BLACK_MAC:  *dest32 = ~pix32; break;
@@ -410,30 +410,30 @@ static int get_pixel_mac(struct display *p, int pixel_x, int pixel_y)
 
   switch (p->var.bits_per_pixel) {
   case 1:
-    dest = (u8 *) ((pixel_x / 8) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x / 8) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0x80 >> (pixel_x & 7);
     pixel = *dest & bit;
     break;
   case 2:
-    dest = (u8 *) ((pixel_x / 4) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x / 4) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0xC0 >> (pixel_x & 3);
     pixel = *dest & bit;
     break;
   case 4:
-    dest = (u8 *) ((pixel_x / 2) + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) ((pixel_x / 2) + p->fb_info->screen_base + pixel_y * p->next_line);
     bit = 0xF0 >> (pixel_x & 1);
     pixel = *dest & bit;
     break;
   case 8:
-    dest = (u8 *) (pixel_x + p->screen_base + pixel_y * p->next_line);
+    dest = (u8 *) (pixel_x + p->fb_info->screen_base + pixel_y * p->next_line);
     pixel = *dest;
     break;
   case 16:
-    dest16 = (u16 *) ((pixel_x *2) + p->screen_base + pixel_y * p->next_line);
+    dest16 = (u16 *) ((pixel_x *2) + p->fb_info->screen_base + pixel_y * p->next_line);
     pixel = *dest16 ? 1 : 0;
     break;
   case 32:
-    dest32 = (u32 *) ((pixel_x *4) + p->screen_base + pixel_y * p->next_line);
+    dest32 = (u32 *) ((pixel_x *4) + p->fb_info->screen_base + pixel_y * p->next_line);
     pixel = *dest32 ? 1 : 0;
     break;
   }

@@ -212,8 +212,8 @@ void fbcon_iplan2p8_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	/*  Special (but often used) case: Moving whole lines can be
 	 *  done with memmove()
 	 */
-	fast_memmove(p->screen_base + dy * p->next_line * fontheight(p),
-		     p->screen_base + sy * p->next_line * fontheight(p),
+	fast_memmove(p->fb_info->screen_base + dy * p->next_line * fontheight(p),
+		     p->fb_info->screen_base + sy * p->next_line * fontheight(p),
 		     p->next_line * height * fontheight(p));
      } else {
 	int rows, cols;
@@ -235,8 +235,8 @@ void fbcon_iplan2p8_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	    /* odd->odd or even->even */
 
 	    if (upwards) {
-		src = p->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
-		dst = p->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
+		src = p->fb_info->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
+		dst = p->fb_info->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
 		if (sx & 1) {
 		    memmove_8p_col(dst, src, colsize, bytes);
 		    src += 15;
@@ -259,13 +259,13 @@ void fbcon_iplan2p8_bmove(struct display *p, int sy, int sx, int dy, int dx,
 		}
 	    } else {
 		if (!((sx+width-1) & 1)) {
-		    src = p->screen_base + sy * linesize + ((sx+width-1)>>1)*16;
-		    dst = p->screen_base + dy * linesize + ((dx+width-1)>>1)*16;
+		    src = p->fb_info->screen_base + sy * linesize + ((sx+width-1)>>1)*16;
+		    dst = p->fb_info->screen_base + dy * linesize + ((dx+width-1)>>1)*16;
 		    memmove_8p_col(dst, src, colsize, bytes);
 		    --width;
 		}
-		src = p->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
-		dst = p->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
+		src = p->fb_info->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
+		dst = p->fb_info->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
 		if (width > 1) {
 		    src += colsize * bytes + (sx & 1)*15;
 		    dst += colsize * bytes + (sx & 1)*15;
@@ -282,8 +282,8 @@ void fbcon_iplan2p8_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	/* odd->even or even->odd */
 
 	    if (upwards) {
-		src = p->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
-		dst = p->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
+		src = p->fb_info->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
+		dst = p->fb_info->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
 		for(cols = width; cols > 0; --cols) {
 		    memmove_8p_col(dst, src, colsize, bytes);
 		    INC_8P(src);
@@ -292,8 +292,8 @@ void fbcon_iplan2p8_bmove(struct display *p, int sy, int sx, int dy, int dx,
 	    } else {
 		sx += width-1;
 		dx += width-1;
-		src = p->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
-		dst = p->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
+		src = p->fb_info->screen_base + sy * linesize + (sx>>1)*16 + (sx & 1);
+		dst = p->fb_info->screen_base + dy * linesize + (dx>>1)*16 + (dx & 1);
 		for(cols = width; cols > 0; --cols) {
 		    memmove_8p_col(dst, src, colsize, bytes);
 		    DEC_8P(src);
@@ -328,13 +328,13 @@ void fbcon_iplan2p8_clear(struct vc_data *conp, struct display *p, int sy,
 	else
 	    offset = sy * bytes * fontheight(p);
 	size    = lines * bytes;
-	memset_even_8p(p->screen_base+offset, size, cval1, cval2, cval3, cval4);
+	memset_even_8p(p->fb_info->screen_base+offset, size, cval1, cval2, cval3, cval4);
     } else {
 	if (fontheightlog(p))
 	    offset = ((sy * bytes) << fontheightlog(p)) + (sx>>1)*16 + (sx & 1);
 	else
 	    offset = sy * bytes * fontheight(p) + (sx>>1)*16 + (sx & 1);
-	start = p->screen_base + offset;
+	start = p->fb_info->screen_base + offset;
 	expand8dl(attr_bgcol_ec(p,conp), &pcval1, &pcval2);
 
 	/* Clears are split if the region starts at an odd column or
@@ -370,11 +370,11 @@ void fbcon_iplan2p8_putc(struct vc_data *conp, struct display *p, int c,
     u32 eorx1, eorx2, fgx1, fgx2, bgx1, bgx2, fdx;
 
     if (fontheightlog(p)) {
-	dest = (p->screen_base + ((yy * bytes) << fontheightlog(p)) +
+	dest = (p->fb_info->screen_base + ((yy * bytes) << fontheightlog(p)) +
 		(xx>>1)*16 + (xx & 1));
 	cdat = p->fontdata + ((c & p->charmask) << fontheightlog(p));
     } else {
-	dest = (p->screen_base + yy * bytes * fontheight(p) +
+	dest = (p->fb_info->screen_base + yy * bytes * fontheight(p) +
 		(xx>>1)*16 + (xx & 1));
 	cdat = p->fontdata + (c & p->charmask) * fontheight(p);
     }
@@ -401,10 +401,10 @@ void fbcon_iplan2p8_putcs(struct vc_data *conp, struct display *p,
 
     bytes = p->next_line;
     if (fontheightlog(p))
-	dest0 = (p->screen_base + ((yy * bytes) << fontheightlog(p)) +
+	dest0 = (p->fb_info->screen_base + ((yy * bytes) << fontheightlog(p)) +
 		 (xx>>1)*16 + (xx & 1));
     else
-	dest0 = (p->screen_base + yy * bytes * fontheight(p) +
+	dest0 = (p->fb_info->screen_base + yy * bytes * fontheight(p) +
 		 (xx>>1)*16 + (xx & 1));
 
     c = scr_readw(s);
@@ -442,10 +442,10 @@ void fbcon_iplan2p8_revc(struct display *p, int xx, int yy)
     int bytes;
 
     if (fontheightlog(p))
-	dest = (p->screen_base + ((yy * p->next_line) << fontheightlog(p)) +
+	dest = (p->fb_info->screen_base + ((yy * p->next_line) << fontheightlog(p)) +
 		(xx>>1)*16 + (xx & 1));
     else
-	dest = (p->screen_base + yy * p->next_line * fontheight(p) +
+	dest = (p->fb_info->screen_base + yy * p->next_line * fontheight(p) +
 		(xx>>1)*16 + (xx & 1));
     j = fontheight(p);
     bytes = p->next_line;
@@ -485,7 +485,7 @@ void fbcon_iplan2p8_clear_margins(struct vc_data *conp, struct display *p,
     }
     if (lines) {
 	expand8ql(attr_bgcol_ec(p,conp), &cval1, &cval2, &cval3, &cval4);
-	memset_even_8p(p->screen_base+offset, lines * bytes,
+	memset_even_8p(p->fb_info->screen_base+offset, lines * bytes,
 		       cval1, cval2, cval3, cval4);
     }
 }

@@ -1535,7 +1535,6 @@ static int neofb_set_var (struct fb_var_screeninfo *var, int con,
 
   fb->fix.line_length = display->next_line;
 
-  display->screen_base    = fb->screen_base;
   display->line_length    = fb->fix.line_length;
   display->visual         = fb->fix.visual;
   display->type	          = fb->fix.type;
