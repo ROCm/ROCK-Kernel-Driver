@@ -136,7 +136,7 @@ PCI
 
 IOMMU
 
-  iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]]
+  iommu=[size][,noagp][,off][,force][,noforce][,leak][,memaper[=order]][,soft]
    size  set size of iommu (in bytes)
    noagp don't initialize the AGP driver and use full aperture.
    off   don't use the IOMMU
@@ -144,5 +144,9 @@ IOMMU
    memaper[=order] allocate an own aperture over RAM with size 32MB^order.
    noforce don't force IOMMU usage. Default.
    force  Force IOMMU
+   soft   Use software bounce buffering for non 32bit IO. Default on Intel
+          machines. 
 
+  swiotlb=pages
 
+  Prereserve that many 4K pages for the software IO bounce buffering.

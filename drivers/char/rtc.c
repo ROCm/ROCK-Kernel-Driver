@@ -110,6 +110,8 @@ static int rtc_has_irq = 1;
 #define hpet_rtc_timer_init() 			do { } while (0)
 #define hpet_rtc_dropped_irq() 			0
 static inline irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs) {return 0;}
+#else
+extern irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 #endif
 
 /*
