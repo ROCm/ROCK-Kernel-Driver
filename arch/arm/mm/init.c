@@ -14,6 +14,7 @@
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/mman.h>
 #include <linux/initrd.h>
 
 #include <asm/mach-types.h>
