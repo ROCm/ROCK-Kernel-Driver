@@ -1,5 +1,5 @@
 /*
- * Driver for USB Scanners (linux-2.5.52)
+ * Driver for USB Scanners (linux-2.5.54)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  *
@@ -38,13 +38,7 @@
 
 // #define DEBUG
 
-/* Enable this to support the older ioctl interfaces scanners that
- * a PV8630 Scanner-On-Chip.  The prefered method is the
- * SCANNER_IOCTL_CTRLMSG ioctl.
- */
-// #define PV8630 
-
-#define DRIVER_VERSION "0.4.9"
+#define DRIVER_VERSION "0.4.10"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -268,13 +262,6 @@ MODULE_DEVICE_TABLE (usb, scanner_device_ids);
 /* read_scanner timeouts -- RD_NAK_TIMEOUT * RD_EXPIRE = Number of seconds */
 #define RD_NAK_TIMEOUT (10*HZ)	/* Default number of X seconds to wait */
 #define RD_EXPIRE 12		/* Number of attempts to wait X seconds */
-
-
-/* FIXME: These are NOT registered ioctls()'s */
-#ifdef PV8630
-#define PV8630_IOCTL_INREQUEST 69
-#define PV8630_IOCTL_OUTREQUEST 70
-#endif /* PV8630 */
 
 
 /* read vendor and product IDs from the scanner */

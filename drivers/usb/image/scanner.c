@@ -335,13 +335,13 @@
  *    - Added vendor/product ids for Visioneer scanners.
  *    - Print information about user-supplied ids only once at startup instead
  *      of everytime any USB device is plugged in.
- *
+ *    - Removed PV8630 ioctls. Use the standard ioctls instead.
+ *      
  * TODO
  *    - Remove the 2/3 endpoint limitation
  *    - Performance
  *    - Select/poll methods
  *    - More testing
- *    - Proper registry/assignment for LM9830 ioctl's
  *    - More general usage ioctl's
  *
  *
@@ -736,62 +736,6 @@ ioctl_scanner(struct inode *inode, struct file *file,
 	case SCANNER_IOCTL_PRODUCT :
 		retval = (put_user(dev->descriptor.idProduct, (unsigned int *) arg));
 		break;
-#ifdef PV8630
-	case PV8630_IOCTL_INREQUEST :
-	{
-		struct {
-			__u8  data;
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args))) {
-			retval = -EFAULT;
-			break;
-		}
-
-		retval = usb_control_msg(dev, usb_rcvctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_IN,
-					 args.value, args.index, &args.data,
-					 1, HZ*5);
-
-		dbg("ioctl_scanner(%d): inreq: args.data:%x args.value:%x args.index:%x args.request:%x\n", scn_minor, args.data, args.value, args.index, args.request);
-
-		if (copy_to_user((void *)arg, &args, sizeof(args)))
-			retval = -EFAULT;
-
-		dbg("ioctl_scanner(%d): inreq: result:%d\n", scn_minor, retval);
-
-		break;
-	}
-	case PV8630_IOCTL_OUTREQUEST :
-	{
-		struct {
-			__u8  request;
-			__u16 value;
-			__u16 index;
-		} args;
-
-		if (copy_from_user(&args, (void *)arg, sizeof(args))) {
-			retval = -EFAULT;
-			break;
-		}
-
-		dbg("ioctl_scanner(%d): outreq: args.value:%x args.index:%x args.request:%x\n", scn_minor, args.value, args.index, args.request);
-
-		retval = usb_control_msg(dev, usb_sndctrlpipe(dev, 0),
-					 args.request, USB_TYPE_VENDOR|
-					 USB_RECIP_DEVICE|USB_DIR_OUT,
-					 args.value, args.index, NULL,
-					 0, HZ*5);
-
-		dbg("ioctl_scanner(%d): outreq: result:%d\n", scn_minor, retval);
-
-		break;
-	}
-#endif /* PV8630 */
  	case SCANNER_IOCTL_CTRLMSG:
  	{
  		struct ctrlmsg_ioctl {
