@@ -324,7 +324,7 @@ static inline int fls(int word)
 #endif
 
 /* Compute powers of two for the given integer.  */
-static inline int floor_log2(unsigned long word)
+static inline long floor_log2(unsigned long word)
 {
 #if defined(__alpha_cix__) && defined(__alpha_fix__)
 	return 63 - __kernel_ctlz(word);
@@ -336,7 +336,7 @@ static inline int floor_log2(unsigned long word)
 #endif
 }
 
-static inline int ceil_log2(unsigned int word)
+static inline long ceil_log2(unsigned long word)
 {
 	long bit = floor_log2(word);
 	return bit + (word > (1UL << bit));

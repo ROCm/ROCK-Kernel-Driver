@@ -145,7 +145,7 @@ sys_rt_sigaction(int sig, const struct sigaction __user *act,
  * Atomically swap in the new signal mask, and wait for a signal.
  */
 asmlinkage int
-do_sigsuspend(old_sigset_t mask, struct pt_regs *reg, struct switch_stack *sw)
+do_sigsuspend(old_sigset_t mask, struct pt_regs *regs, struct switch_stack *sw)
 {
 	sigset_t oldset;
 
@@ -156,17 +156,22 @@ do_sigsuspend(old_sigset_t mask, struct pt_regs *reg, struct switch_stack *sw)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	/* Indicate EINTR on return from any possible signal handler,
+	   which will not come back through here, but via sigreturn.  */
+	regs->r0 = EINTR;
+	regs->r19 = 1;
+
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(&oldset, reg, sw, 0, 0))
+		if (do_signal(&oldset, regs, sw, 0, 0))
 			return -EINTR;
 	}
 }
 
 asmlinkage int
 do_rt_sigsuspend(sigset_t __user *uset, size_t sigsetsize,
-		 struct pt_regs *reg, struct switch_stack *sw)
+		 struct pt_regs *regs, struct switch_stack *sw)
 {
 	sigset_t oldset, set;
 
@@ -183,10 +188,15 @@ do_rt_sigsuspend(sigset_t __user *uset, size_t sigsetsize,
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
+	/* Indicate EINTR on return from any possible signal handler,
+	   which will not come back through here, but via sigreturn.  */
+	regs->r0 = EINTR;
+	regs->r19 = 1;
+
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(&oldset, reg, sw, 0, 0))
+		if (do_signal(&oldset, regs, sw, 0, 0))
 			return -EINTR;
 	}
 }

@@ -457,6 +457,7 @@ sys_call_table:
 	.quad sys_mq_timedreceive		/* 435 */
 	.quad sys_mq_notify
 	.quad sys_mq_getsetattr
+	.quad sys_waitid
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

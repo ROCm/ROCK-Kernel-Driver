@@ -17,9 +17,9 @@
 # define __kernel_extbl(val, shift)	__builtin_alpha_extbl(val, shift)
 # define __kernel_extwl(val, shift)	__builtin_alpha_extwl(val, shift)
 # define __kernel_cmpbge(a, b)		__builtin_alpha_cmpbge(a, b)
-# define __kernel_cttz(x)		__builtin_ctz(x)
-# define __kernel_ctlz(x)		__builtin_clz(x)
-# define __kernel_ctpop(x)		__builtin_popcount(x)
+# define __kernel_cttz(x)		__builtin_ctzl(x)
+# define __kernel_ctlz(x)		__builtin_clzl(x)
+# define __kernel_ctpop(x)		__builtin_popcountl(x)
 #else
 # define __kernel_insbl(val, shift)					\
   ({ unsigned long __kir;						\
