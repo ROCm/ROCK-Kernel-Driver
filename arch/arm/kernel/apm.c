@@ -54,10 +54,10 @@
 struct apm_user {
 	struct list_head	list;
 
-	int			suser: 1;
-	int			writer: 1;
-	int			reader: 1;
-	int			suspend_wait: 1;
+	unsigned int		suser: 1;
+	unsigned int		writer: 1;
+	unsigned int		reader: 1;
+	unsigned int		suspend_wait: 1;
 	int			suspend_result;
 
 	int			suspends_pending;
