@@ -25,6 +25,7 @@
 #include "ipacx.h"
 #include "isdnl1.h"
 #include <linux/pci.h>
+#include <linux/isapnp.h>
 
 extern const char *CardType[];
 
@@ -911,11 +912,38 @@ Diva_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 static struct pci_dev *dev_diva __initdata = NULL;
 static struct pci_dev *dev_diva_u __initdata = NULL;
 static struct pci_dev *dev_diva201 __initdata = NULL;
+#ifdef __ISAPNP__
+static struct isapnp_device_id diva_ids[] __initdata = {
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x51),
+	  ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x51), 
+	  (unsigned long) "Diva picola" },
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x51),
+	  ISAPNP_VENDOR('E', 'I', 'C'), ISAPNP_FUNCTION(0x51), 
+	  (unsigned long) "Diva picola" },
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x71),
+	  ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x71), 
+	  (unsigned long) "Diva 2.0" },
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0x71),
+	  ISAPNP_VENDOR('E', 'I', 'C'), ISAPNP_FUNCTION(0x71), 
+	  (unsigned long) "Diva 2.0" },
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0xA1),
+	  ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0xA1), 
+	  (unsigned long) "Diva 2.01" },
+	{ ISAPNP_VENDOR('G', 'D', 'I'), ISAPNP_FUNCTION(0xA1),
+	  ISAPNP_VENDOR('E', 'I', 'C'), ISAPNP_FUNCTION(0xA1), 
+	  (unsigned long) "Diva 2.01" },
+	{ 0, }
+};
+
+static struct isapnp_device_id *pdev = &diva_ids[0];
+static struct pci_bus *pnp_c __devinitdata = NULL;
+#endif
+
 
 int __init
 setup_diva(struct IsdnCard *card)
 {
-	int bytecnt;
+	int bytecnt = 8;
 	u_char val;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
@@ -948,8 +976,75 @@ setup_diva(struct IsdnCard *card)
 			cs->hw.diva.hscx_adr = card->para[1] + DIVA_HSCX_ADR;
 		}
 		cs->irq = card->para[0];
-		bytecnt = 8;
 	} else {
+#ifdef __ISAPNP__
+		if (isapnp_present()) {
+			struct pci_bus *pb;
+			struct pci_dev *pd;
+
+			while(pdev->card_vendor) {
+				if ((pb = isapnp_find_card(pdev->card_vendor,
+					pdev->card_device, pnp_c))) {
+					pnp_c = pb;
+					pd = NULL;
+					if ((pd = isapnp_find_dev(pnp_c,
+						pdev->vendor, pdev->function, pd))) {
+						printk(KERN_INFO "HiSax: %s detected\n",
+							(char *)pdev->driver_data);
+						pd->prepare(pd);
+						pd->deactivate(pd);
+						pd->activate(pd);
+						card->para[1] =
+							pd->resource[0].start;
+						card->para[0] =
+							pd->irq_resource[0].start;
+						if (!card->para[0] || !card->para[1]) {
+							printk(KERN_ERR "Diva PnP:some resources are missing %ld/%lx\n",
+								card->para[0], card->para[1]);
+							pd->deactivate(pd);
+							return(0);
+						}
+						cs->hw.diva.cfg_reg  = card->para[1];
+						cs->irq = card->para[0];
+						if (pdev->function == ISAPNP_FUNCTION(0xA1)) {
+							cs->subtyp = DIVA_IPAC_ISA;
+							cs->hw.diva.ctrl = 0;
+							cs->hw.diva.isac =
+								card->para[1] + DIVA_IPAC_DATA;
+							cs->hw.diva.hscx =
+								card->para[1] + DIVA_IPAC_DATA;
+							cs->hw.diva.isac_adr =
+								card->para[1] + DIVA_IPAC_ADR;
+							cs->hw.diva.hscx_adr =
+								card->para[1] + DIVA_IPAC_ADR;
+							test_and_set_bit(HW_IPAC, &cs->HW_Flags);
+						} else {
+							cs->subtyp = DIVA_ISA;
+							cs->hw.diva.ctrl =
+								card->para[1] + DIVA_ISA_CTRL;
+							cs->hw.diva.isac =
+								card->para[1] + DIVA_ISA_ISAC_DATA;
+							cs->hw.diva.hscx =
+								card->para[1] + DIVA_HSCX_DATA;
+							cs->hw.diva.isac_adr =
+								card->para[1] + DIVA_ISA_ISAC_ADR;
+							cs->hw.diva.hscx_adr =
+								card->para[1] + DIVA_HSCX_ADR;
+						}
+						goto ready;
+					} else {
+						printk(KERN_ERR "Diva PnP: PnP error card found, no device\n");
+						return(0);
+					}
+				}
+				pdev++;
+				pnp_c=NULL;
+			} 
+			if (!pdev->card_vendor) {
+				printk(KERN_INFO "Diva PnP: no ISAPnP card found\n");
+			}
+		}
+#endif
 #if CONFIG_PCI
 		if (!pci_present()) {
 			printk(KERN_ERR "Diva: no PCI bus present\n");
@@ -1019,7 +1114,7 @@ setup_diva(struct IsdnCard *card)
 			bytecnt = 32;
 		}
 	}
-
+ready:
 	printk(KERN_INFO
 		"Diva: %s card configured at %#lx IRQ %d\n",
 		(cs->subtyp == DIVA_PCI) ? "PCI" :

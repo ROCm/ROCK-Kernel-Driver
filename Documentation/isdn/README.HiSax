@@ -76,7 +76,6 @@ Note: PCF, PCF-Pro: up to now, only the ISDN part is supported
       Eicon.Diehl Diva U interface not tested
 
 If you know other passive cards with the Siemens chipset, please let me know.
-To use the PNP cards you need the isapnptools.
 You can combine any card, if there is no conflict between the resources
 (io, mem, irq).
 
@@ -92,8 +91,15 @@ There is also some config needed before you compile the kernel and/or
 modules. It is included in the normal "make [menu]config" target at the
 kernel. Don't forget it, especially to select the right D-channel protocol.
 
-Please note: All PnP cards need to be configured with isapnp and will work
-only with the HiSax driver used as a module.
+Please note: In older versions of the HiSax driver, all PnP cards
+needed to be configured with isapnp and worked only with the HiSax
+driver used as a module.
+
+In the current version, HiSax will automatically use the in-kernel
+ISAPnP support, provided you selected it during kernel configuration
+(CONFIG_ISAPNP), if you don't give the io=, irq= command line parameters.
+
+The affected card types are: 4,7,12,14,19,27-30
 
 a) when built as a module
 -------------------------
@@ -220,6 +226,13 @@ Examples for module loading
  		   (IO 0 (BASE 0x0580))
                    (IO 1 (BASE 0x0180))
    modprobe hisax type=4 protocol=2 irq=10 io0=0x580 io1=0x180
+
+   In the current version of HiSax, you can instead simply use
+
+   modprobe hisax type=4 protocol=2
+
+   if you configured your kernel for ISAPnP. Don't run isapnp in
+   this case!
 
 6. Teles 16.3, Euro ISDN, I/O base 280 hex, IRQ 12 and
    Teles 16.0, 1TR6, IRQ 5, Memory d0000 hex

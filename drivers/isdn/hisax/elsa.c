@@ -28,6 +28,7 @@
 #include "hscx.h"
 #include "isdnl1.h"
 #include <linux/pci.h>
+#include <linux/isapnp.h>
 #include <linux/serial.h>
 #include <linux/serial_reg.h>
 
@@ -860,6 +861,21 @@ probe_elsa(struct IsdnCardState *cs)
 static 	struct pci_dev *dev_qs1000 __devinitdata = NULL;
 static 	struct pci_dev *dev_qs3000 __devinitdata = NULL;
 
+#ifdef __ISAPNP__
+static struct isapnp_device_id elsa_ids[] __initdata = {
+	{ ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0133),
+	  ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0133), 
+	  (unsigned long) "Elsa QS1000" },
+	{ ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0134),
+	  ISAPNP_VENDOR('E', 'L', 'S'), ISAPNP_FUNCTION(0x0134), 
+	  (unsigned long) "Elsa QS3000" },
+	{ 0, }
+};
+
+static struct isapnp_device_id *pdev = &elsa_ids[0];
+static struct pci_bus *pnp_c __devinitdata = NULL;
+#endif
+
 int __devinit
 setup_elsa(struct IsdnCard *card)
 {
@@ -874,6 +890,7 @@ setup_elsa(struct IsdnCard *card)
 	cs->hw.elsa.ctrl_reg = 0;
 	cs->hw.elsa.status = 0;
 	cs->hw.elsa.MFlag = 0;
+	cs->subtyp = 0;
 	if (cs->typ == ISDN_CTYPE_ELSA) {
 		cs->hw.elsa.base = card->para[0];
 		printk(KERN_INFO "Elsa: Microlink IO probing\n");
@@ -935,9 +952,60 @@ setup_elsa(struct IsdnCard *card)
 			return (0);
 		}
 	} else if (cs->typ == ISDN_CTYPE_ELSA_PNP) {
-		cs->hw.elsa.base = card->para[1];
-		cs->irq = card->para[0];
-		cs->subtyp = ELSA_QS1000;
+#ifdef __ISAPNP__
+		if (!card->para[1] && isapnp_present()) {
+			struct pci_bus *pb;
+			struct pci_dev *pd;
+
+			while(pdev->card_vendor) {
+				if ((pb = isapnp_find_card(pdev->card_vendor,
+					pdev->card_device, pnp_c))) {
+					pnp_c = pb;
+					pd = NULL;
+					if ((pd = isapnp_find_dev(pnp_c,
+						pdev->vendor, pdev->function, pd))) {
+						printk(KERN_INFO "HiSax: %s detected\n",
+							(char *)pdev->driver_data);
+						pd->prepare(pd);
+						pd->deactivate(pd);
+						pd->activate(pd);
+						card->para[1] =
+							pd->resource[0].start;
+						card->para[0] =
+							pd->irq_resource[0].start;
+						if (!card->para[0] || !card->para[1]) {
+							printk(KERN_ERR "Elsa PnP:some resources are missing %ld/%lx\n",
+								card->para[0], card->para[1]);
+							pd->deactivate(pd);
+							return(0);
+						}
+						if (pdev->function == ISAPNP_FUNCTION(0x133))
+							cs->subtyp = ELSA_QS1000;
+						else
+							cs->subtyp = ELSA_QS3000;
+						break;
+					} else {
+						printk(KERN_ERR "Elsa PnP: PnP error card found, no device\n");
+						return(0);
+					}
+				}
+				pdev++;
+				pnp_c=NULL;
+			} 
+			if (!pdev->card_vendor) {
+				printk(KERN_INFO "Elsa PnP: no ISAPnP card found\n");
+				return(0);
+			}
+		}
+#endif
+		if (card->para[1] && card->para[0]) { 
+			cs->hw.elsa.base = card->para[1];
+			cs->irq = card->para[0];
+			if (!cs->subtyp)
+				cs->subtyp = ELSA_QS1000;
+		} else {
+			printk(KERN_ERR "Elsa PnP: no parameter\n");
+		}
 		cs->hw.elsa.cfg = cs->hw.elsa.base + ELSA_CONFIG;
 		cs->hw.elsa.ale = cs->hw.elsa.base + ELSA_ALE;
 		cs->hw.elsa.isac = cs->hw.elsa.base + ELSA_ISAC;
@@ -1048,6 +1116,7 @@ setup_elsa(struct IsdnCard *card)
 			break;
 		case ELSA_PCFPRO:
 		case ELSA_PCF:
+		case ELSA_QS3000:
 		case ELSA_QS3000PCI:
 			bytecnt = 16;
 			break;

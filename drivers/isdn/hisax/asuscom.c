@@ -14,6 +14,7 @@
 
 #define __NO_VERSION__
 #include <linux/init.h>
+#include <linux/isapnp.h>
 #include "hisax.h"
 #include "isac.h"
 #include "ipac.h"
@@ -309,6 +310,27 @@ Asus_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 	return(0);
 }
 
+#ifdef __ISAPNP__
+static struct isapnp_device_id asus_ids[] __initdata = {
+	{ ISAPNP_VENDOR('A', 'S', 'U'), ISAPNP_FUNCTION(0x1688),
+	  ISAPNP_VENDOR('A', 'S', 'U'), ISAPNP_FUNCTION(0x1688), 
+	  (unsigned long) "Asus1688 PnP" },
+	{ ISAPNP_VENDOR('A', 'S', 'U'), ISAPNP_FUNCTION(0x1690),
+	  ISAPNP_VENDOR('A', 'S', 'U'), ISAPNP_FUNCTION(0x1690), 
+	  (unsigned long) "Asus1690 PnP" },
+	{ ISAPNP_VENDOR('S', 'I', 'E'), ISAPNP_FUNCTION(0x0020),
+	  ISAPNP_VENDOR('S', 'I', 'E'), ISAPNP_FUNCTION(0x0020), 
+	  (unsigned long) "Isurf2 PnP" },
+	{ ISAPNP_VENDOR('E', 'L', 'F'), ISAPNP_FUNCTION(0x0000),
+	  ISAPNP_VENDOR('E', 'L', 'F'), ISAPNP_FUNCTION(0x0000), 
+	  (unsigned long) "Iscas TE320" },
+	{ 0, }
+};
+
+static struct isapnp_device_id *adev = &asus_ids[0];
+static struct pci_bus *pnp_c __devinitdata = NULL;
+#endif
+
 int __init
 setup_asuscom(struct IsdnCard *card)
 {
@@ -321,7 +343,45 @@ setup_asuscom(struct IsdnCard *card)
 	printk(KERN_INFO "HiSax: Asuscom ISDNLink driver Rev. %s\n", HiSax_getrev(tmp));
 	if (cs->typ != ISDN_CTYPE_ASUSCOM)
 		return (0);
+#ifdef __ISAPNP__
+	if (!card->para[1] && isapnp_present()) {
+		struct pci_bus *pb;
+		struct pci_dev *pd;
 
+		while(adev->card_vendor) {
+			if ((pb = isapnp_find_card(adev->card_vendor,
+				adev->card_device, pnp_c))) {
+				pnp_c = pb;
+				pd = NULL;
+				if ((pd = isapnp_find_dev(pnp_c,
+					adev->vendor, adev->function, pd))) {
+					printk(KERN_INFO "HiSax: %s detected\n",
+						(char *)adev->driver_data);
+					pd->prepare(pd);
+					pd->deactivate(pd);
+					pd->activate(pd);
+					card->para[1] = pd->resource[0].start;
+					card->para[0] = pd->irq_resource[0].start;
+					if (!card->para[0] || !card->para[1]) {
+						printk(KERN_ERR "AsusPnP:some resources are missing %ld/%lx\n",
+						card->para[0], card->para[1]);
+						pd->deactivate(pd);
+						return(0);
+					}
+					break;
+				} else {
+					printk(KERN_ERR "AsusPnP: PnP error card found, no device\n");
+				}
+			}
+			adev++;
+			pnp_c=NULL;
+		} 
+		if (!adev->card_vendor) {
+			printk(KERN_INFO "AsusPnP: no ISAPnP card found\n");
+			return(0);
+		}
+	}
+#endif
 	bytecnt = 8;
 	cs->hw.asus.cfg_reg = card->para[1];
 	cs->irq = card->para[0];
