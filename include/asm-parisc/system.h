@@ -80,7 +80,7 @@ extern struct task_struct *_switch_to(struct task_struct *, struct task_struct *
 #define mtctl(gr, cr) \
 	__asm__ __volatile__("mtctl %0,%1" \
 		: /* no outputs */ \
-		: "r" (gr), "i" (cr))
+		: "r" (gr), "i" (cr) : "memory")
 
 /* these are here to de-mystefy the calling code, and to provide hooks */
 /* which I needed for debugging EIEM problems -PB */
@@ -102,7 +102,7 @@ static inline void set_eiem(unsigned long val)
 #define mtsp(gr, cr) \
 	__asm__ __volatile__("mtsp %0,%1" \
 		: /* no outputs */ \
-		: "r" (gr), "i" (cr))
+		: "r" (gr), "i" (cr) : "memory")
 
 
 /*
@@ -154,7 +154,7 @@ static inline void set_eiem(unsigned long val)
    for the semaphore.  */
 #define __PA_LDCW_ALIGNMENT 16
 #define __ldcw_align(a) ({ \
-  unsigned long __ret = (unsigned long) a;                     		\
+  unsigned long __ret = (unsigned long) &(a)->lock[0];        		\
   __ret = (__ret + __PA_LDCW_ALIGNMENT - 1) & ~(__PA_LDCW_ALIGNMENT - 1); \
   (volatile unsigned int *) __ret;                                      \
 })

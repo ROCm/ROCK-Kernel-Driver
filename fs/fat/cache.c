@@ -147,7 +147,6 @@ static void fat_cache_add(struct inode *inode, struct fat_cache_id *new)
 		goto out;	/* this cache was invalidated */
 
 	cache = fat_cache_merge(inode, new);
-	BUG_ON(new->id == FAT_CACHE_VALID && cache != NULL);
 	if (cache == NULL) {
 		if (MSDOS_I(inode)->nr_caches < fat_max_cache(inode)) {
 			MSDOS_I(inode)->nr_caches++;

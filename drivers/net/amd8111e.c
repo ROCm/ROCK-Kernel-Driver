@@ -809,7 +809,7 @@ static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 #if AMD8111E_VLAN_TAG_USED		
 			if(lp->vlgrp != NULL && (vtag == TT_VLAN_TAGGED)){
 				amd8111e_vlan_rx(lp, skb,
-					 le16_to_cpy(lp->rx_ring[rx_index].tag_ctrl_info));
+					 le16_to_cpu(lp->rx_ring[rx_index].tag_ctrl_info));
 			} else
 #endif
 				netif_receive_skb(skb);

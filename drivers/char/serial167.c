@@ -39,6 +39,9 @@
  * - don't use the panic function in serial167_init
  * - do resource release on failure on serial167_init
  * - include missing restore_flags in mvme167_serial_console_setup
+ *
+ * Kars de Jong <jongk@linux-m68k.org> - 2004/09/06
+ * - replace bottom half handler with task queue handler
  */
 
 #include <linux/config.h>
@@ -88,8 +91,6 @@
 #define STD_COM_FLAGS (0)
 
 #define SERIAL_TYPE_NORMAL  1
-
-DECLARE_TASK_QUEUE(tq_cyclades);
 
 static struct tty_driver *cy_serial_driver;
 extern int serial_console;
@@ -373,8 +374,7 @@ static inline void
 cy_sched_event(struct cyclades_port *info, int event)
 {
     info->event |= 1 << event; /* remember what kind of event and who */
-    queue_task(&info->tqueue, &tq_cyclades); /* it belongs to */
-    mark_bh(CYCLADES_BH);                       /* then trigger event */
+    schedule_work(&info->tqueue);
 } /* cy_sched_event */
 
 
@@ -467,7 +467,7 @@ cd2401_rxerr_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	       and nothing could be done about it!!! */
 	}
     }
-    queue_task(&tty->flip.tqueue, &tq_timer);
+    schedule_delayed_work(&tty->flip.work, 1);
     /* end of service */
     base_addr[CyREOIR] = rfoc ? 0 : CyNOTRANS;
     return IRQ_HANDLED;
@@ -702,7 +702,7 @@ cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
 	    udelay(10L);
 #endif
         }
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
     }
     /* end of service */
     base_addr[CyREOIR] = save_cnt ? 0 : CyNOTRANS;
@@ -713,7 +713,7 @@ cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
  * This routine is used to handle the "bottom half" processing for the
  * serial driver, known also the "software interrupt" processing.
  * This processing is done at the kernel interrupt level, after the
- * cy_interrupt() has returned, BUT WITH INTERRUPTS TURNED ON.  This
+ * cy#/_interrupt() has returned, BUT WITH INTERRUPTS TURNED ON.  This
  * is where time-consuming activities which can not be done in the
  * interrupt driver proper are done; the interrupt driver schedules
  * them using cy_sched_event(), and they get done here.
@@ -721,9 +721,7 @@ cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
  * This is done through one level of indirection--the task queue.
  * When a hardware interrupt service routine wants service by the
  * driver's bottom half, it enqueues the appropriate tq_struct (one
- * per port) to the tq_cyclades work queue and sets a request flag
- * via mark_bh for processing that queue.  When the time is right,
- * do_cyclades_bh is called (because of the mark_bh) and it requests
+ * per port) to the keventd work queue and sets a request flag
  * that the work queue be processed.
  *
  * Although this may seem unwieldy, it gives the system a way to
@@ -731,12 +729,6 @@ cd2401_rx_interrupt(int irq, void *dev_id, struct pt_regs *fp)
  * structure) to the bottom half of the driver.  Previous kernels
  * had to poll every port to see if that port needed servicing.
  */
-static void
-do_cyclades_bh(void)
-{
-    run_task_queue(&tq_cyclades);
-} /* do_cyclades_bh */
-
 static void
 do_softint(void *private_)
 {
@@ -2278,8 +2270,6 @@ scrn[1] = '\0';
 	    return ret;
     }
 
-    init_bh(CYCLADES_BH, do_cyclades_bh);
-
     port_num = 0;
     info = cy_port;
     for (index = 0; index < 1; index++) {
@@ -2317,8 +2307,7 @@ scrn[1] = '\0';
 		info->blocked_open = 0;
 		info->default_threshold = 0;
 		info->default_timeout = 0;
-		info->tqueue.routine = do_softint;
-		info->tqueue.data = info;
+		INIT_WORK(&info->tqueue, do_softint, info);
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		/* info->session */

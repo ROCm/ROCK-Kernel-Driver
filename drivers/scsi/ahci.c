@@ -38,7 +38,7 @@
 #include <asm/io.h>
 
 #define DRV_NAME	"ahci"
-#define DRV_VERSION	"0.11"
+#define DRV_VERSION	"1.00"
 
 
 enum {
@@ -90,6 +90,7 @@ enum {
 	PORT_SCR_STAT		= 0x28, /* SATA phy register: SStatus */
 	PORT_SCR_CTL		= 0x2c, /* SATA phy register: SControl */
 	PORT_SCR_ERR		= 0x30, /* SATA phy register: SError */
+	PORT_SCR_ACT		= 0x34, /* SATA phy register: SActive */
 
 	/* PORT_IRQ_{STAT,MASK} bits */
 	PORT_IRQ_COLD_PRES	= (1 << 31), /* cold presence detect */
@@ -116,6 +117,9 @@ enum {
 				  PORT_IRQ_HBUS_DATA_ERR |
 				  PORT_IRQ_IF_ERR,
 	DEF_PORT_IRQ		= PORT_IRQ_FATAL | PORT_IRQ_PHYRDY |
+				  PORT_IRQ_CONNECT | PORT_IRQ_SG_DONE |
+				  PORT_IRQ_UNK_FIS | PORT_IRQ_SDB_FIS |
+				  PORT_IRQ_DMAS_FIS | PORT_IRQ_PIOS_FIS |
 				  PORT_IRQ_D2H_REG_FIS,
 
 	/* PORT_CMD bits */
@@ -329,8 +333,8 @@ static int ahci_port_start(struct ata_port *ap)
 
 	if (hpriv->cap & HOST_CAP_64)
 		writel((pp->rx_fis_dma >> 16) >> 16, port_mmio + PORT_FIS_ADDR_HI);
-	writel(pp->rx_fis_dma & 0xffffffff, port_mmio + PORT_LST_ADDR);
-	readl(port_mmio + PORT_LST_ADDR); /* flush */
+	writel(pp->rx_fis_dma & 0xffffffff, port_mmio + PORT_FIS_ADDR);
+	readl(port_mmio + PORT_FIS_ADDR); /* flush */
 
 	writel(PORT_CMD_ICC_ACTIVE | PORT_CMD_FIS_RX |
 	       PORT_CMD_POWER_ON | PORT_CMD_SPIN_UP |
@@ -672,10 +676,13 @@ static irqreturn_t ahci_interrupt (int irq, void *dev_instance, struct pt_regs *
 static int ahci_qc_issue(struct ata_queued_cmd *qc)
 {
 	struct ata_port *ap = qc->ap;
-	void *mmio = (void *) ap->ioaddr.cmd_addr;
+	void *port_mmio = (void *) ap->ioaddr.cmd_addr;
 
-	writel(1, mmio + PORT_CMD_ISSUE);
-	readl(mmio + PORT_CMD_ISSUE);	/* flush */
+	writel(1, port_mmio + PORT_SCR_ACT);
+	readl(port_mmio + PORT_SCR_ACT);	/* flush */
+
+	writel(1, port_mmio + PORT_CMD_ISSUE);
+	readl(port_mmio + PORT_CMD_ISSUE);	/* flush */
 
 	return 0;
 }
@@ -774,8 +781,10 @@ static int ahci_host_init(struct ata_probe_ent *probe_ent)
 	}
 
 	for (i = 0; i < probe_ent->n_ports; i++) {
+#if 0 /* BIOSen initialize this incorrectly */
 		if (!(hpriv->port_map & (1 << i)))
 			continue;
+#endif
 
 		port_mmio = ahci_port_base(mmio, i);
 		VPRINTK("mmio %p  port_mmio %p\n", mmio, port_mmio);
@@ -856,6 +865,8 @@ static void ahci_print_info(struct ata_probe_ent *probe_ent)
 	void *mmio = probe_ent->mmio_base;
 	u32 vers, cap, impl, speed;
 	const char *speed_s;
+	u16 cc;
+	const char *scc_s;
 
 	vers = readl(mmio + HOST_VERSION);
 	cap = hpriv->cap;
@@ -869,8 +880,18 @@ static void ahci_print_info(struct ata_probe_ent *probe_ent)
 	else
 		speed_s = "?";
 
+	pci_read_config_word(pdev, 0x0a, &cc);
+	if (cc == 0x0101)
+		scc_s = "IDE";
+	else if (cc == 0x0106)
+		scc_s = "SATA";
+	else if (cc == 0x0104)
+		scc_s = "RAID";
+	else
+		scc_s = "unknown";
+
 	printk(KERN_INFO DRV_NAME "(%s) AHCI %02x%02x.%02x%02x "
-		"%u slots %u ports %s Gbps 0x%x impl\n"
+		"%u slots %u ports %s Gbps 0x%x impl %s mode\n"
 	       	,
 	       	pci_name(pdev),
 
@@ -882,7 +903,8 @@ static void ahci_print_info(struct ata_probe_ent *probe_ent)
 		((cap >> 8) & 0x1f) + 1,
 		(cap & 0x1f) + 1,
 		speed_s,
-		impl);
+		impl,
+		scc_s);
 
 	printk(KERN_INFO DRV_NAME "(%s) flags: "
 	       	"%s%s%s%s%s%s"

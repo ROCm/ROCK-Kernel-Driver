@@ -29,6 +29,7 @@
 #define STREGM	std,ma
 #define RP_OFFSET	16
 #define FRAME_SIZE	128
+#define CALLEE_SAVE_FRAME_SIZE	144
 #else
 #define LDREG	ldw
 #define STREG	stw
@@ -37,6 +38,7 @@
 #define STREGM	stwm
 #define RP_OFFSET	20
 #define FRAME_SIZE	64
+#define CALLEE_SAVE_FRAME_SIZE	128
 #endif
 
 #ifdef CONFIG_PA20
@@ -292,7 +294,7 @@
 
 #ifdef __LP64__
 	.macro	callee_save
-	std,ma	  %r3,	144(%r30)
+	std,ma	  %r3,	CALLEE_SAVE_FRAME_SIZE(%r30)
 	mfctl	  %cr27, %r3
 	std	  %r4,	-136(%r30)
 	std	  %r5,	-128(%r30)
@@ -330,13 +332,13 @@
 	ldd	-128(%r30),    %r5
 	ldd	-136(%r30),    %r4
 	mtctl	%r3, %cr27
-	ldd,mb	-144(%r30),    %r3
+	ldd,mb	-CALLEE_SAVE_FRAME_SIZE(%r30),    %r3
 	.endm
 
 #else /* ! __LP64__ */
 
 	.macro	callee_save
-	stw,ma	 %r3,	128(%r30)
+	stw,ma	 %r3,	CALLEE_SAVE_FRAME_SIZE(%r30)
 	mfctl	 %cr27, %r3
 	stw	 %r4,	-124(%r30)
 	stw	 %r5,	-120(%r30)
@@ -374,7 +376,7 @@
 	ldw	-120(%r30),   %r5
 	ldw	-124(%r30),   %r4
 	mtctl	%r3, %cr27
-	ldw,mb	-128(%r30),   %r3
+	ldw,mb	-CALLEE_SAVE_FRAME_SIZE(%r30),   %r3
 	.endm
 #endif /* ! __LP64__ */
 

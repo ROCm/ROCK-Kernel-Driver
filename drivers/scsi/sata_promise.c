@@ -73,7 +73,7 @@ struct pdc_port_priv {
 
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
-static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
+static int pdc_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
 static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 static void pdc_eng_timeout(struct ata_port *ap);
 static int pdc_port_start(struct ata_port *ap);
@@ -85,7 +85,7 @@ static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 static void pdc_irq_clear(struct ata_port *ap);
 static int pdc_qc_issue_prot(struct ata_queued_cmd *qc);
 
-static Scsi_Host_Template pdc_sata_sht = {
+static Scsi_Host_Template pdc_ata_sht = {
 	.module			= THIS_MODULE,
 	.name			= DRV_NAME,
 	.ioctl			= ata_scsi_ioctl,
@@ -104,7 +104,7 @@ static Scsi_Host_Template pdc_sata_sht = {
 	.bios_param		= ata_std_bios_param,
 };
 
-static struct ata_port_operations pdc_sata_ops = {
+static struct ata_port_operations pdc_ata_ops = {
 	.port_disable		= ata_port_disable,
 	.tf_load		= pdc_tf_load_mmio,
 	.tf_read		= ata_tf_read,
@@ -126,28 +126,28 @@ static struct ata_port_operations pdc_sata_ops = {
 static struct ata_port_info pdc_port_info[] = {
 	/* board_2037x */
 	{
-		.sht		= &pdc_sata_sht,
+		.sht		= &pdc_ata_sht,
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x1f, /* pio0-4 */
 		.mwdma_mask	= 0x07, /* mwdma0-2 */
 		.udma_mask	= 0x7f, /* udma0-6 ; FIXME */
-		.port_ops	= &pdc_sata_ops,
+		.port_ops	= &pdc_ata_ops,
 	},
 
 	/* board_20319 */
 	{
-		.sht		= &pdc_sata_sht,
+		.sht		= &pdc_ata_sht,
 		.host_flags	= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY |
 				  ATA_FLAG_SRST | ATA_FLAG_MMIO,
 		.pio_mask	= 0x1f, /* pio0-4 */
 		.mwdma_mask	= 0x07, /* mwdma0-2 */
 		.udma_mask	= 0x7f, /* udma0-6 ; FIXME */
-		.port_ops	= &pdc_sata_ops,
+		.port_ops	= &pdc_ata_ops,
 	},
 };
 
-static struct pci_device_id pdc_sata_pci_tbl[] = {
+static struct pci_device_id pdc_ata_pci_tbl[] = {
 	{ PCI_VENDOR_ID_PROMISE, 0x3371, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
 	  board_2037x },
 	{ PCI_VENDOR_ID_PROMISE, 0x3373, PCI_ANY_ID, PCI_ANY_ID, 0, 0,
@@ -164,10 +164,10 @@ static struct pci_device_id pdc_sata_pci_tbl[] = {
 };
 
 
-static struct pci_driver pdc_sata_pci_driver = {
+static struct pci_driver pdc_ata_pci_driver = {
 	.name			= DRV_NAME,
-	.id_table		= pdc_sata_pci_tbl,
-	.probe			= pdc_sata_init_one,
+	.id_table		= pdc_ata_pci_tbl,
+	.probe			= pdc_ata_init_one,
 	.remove			= ata_pci_remove_one,
 };
 
@@ -481,7 +481,7 @@ static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 }
 
 
-static void pdc_sata_setup_port(struct ata_ioports *port, unsigned long base)
+static void pdc_ata_setup_port(struct ata_ioports *port, unsigned long base)
 {
 	port->cmd_addr		= base;
 	port->data_addr		= base;
@@ -539,7 +539,7 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 	writel(tmp, mmio + PDC_SLEW_CTL);
 }
 
-static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
+static int pdc_ata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	static int printed_version;
 	struct ata_probe_ent *probe_ent = NULL;
@@ -599,8 +599,8 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
        	probe_ent->irq_flags = SA_SHIRQ;
 	probe_ent->mmio_base = mmio_base;
 
-	pdc_sata_setup_port(&probe_ent->port[0], base + 0x200);
-	pdc_sata_setup_port(&probe_ent->port[1], base + 0x280);
+	pdc_ata_setup_port(&probe_ent->port[0], base + 0x200);
+	pdc_ata_setup_port(&probe_ent->port[1], base + 0x280);
 
 	probe_ent->port[0].scr_addr = base + 0x400;
 	probe_ent->port[1].scr_addr = base + 0x500;
@@ -610,8 +610,8 @@ static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *
 	case board_20319:
        		probe_ent->n_ports = 4;
 
-		pdc_sata_setup_port(&probe_ent->port[2], base + 0x300);
-		pdc_sata_setup_port(&probe_ent->port[3], base + 0x380);
+		pdc_ata_setup_port(&probe_ent->port[2], base + 0x300);
+		pdc_ata_setup_port(&probe_ent->port[3], base + 0x380);
 
 		probe_ent->port[2].scr_addr = base + 0x600;
 		probe_ent->port[3].scr_addr = base + 0x700;
@@ -645,22 +645,22 @@ err_out:
 }
 
 
-static int __init pdc_sata_init(void)
+static int __init pdc_ata_init(void)
 {
-	return pci_module_init(&pdc_sata_pci_driver);
+	return pci_module_init(&pdc_ata_pci_driver);
 }
 
 
-static void __exit pdc_sata_exit(void)
+static void __exit pdc_ata_exit(void)
 {
-	pci_unregister_driver(&pdc_sata_pci_driver);
+	pci_unregister_driver(&pdc_ata_pci_driver);
 }
 
 
 MODULE_AUTHOR("Jeff Garzik");
 MODULE_DESCRIPTION("Promise SATA TX2/TX4 low-level driver");
 MODULE_LICENSE("GPL");
-MODULE_DEVICE_TABLE(pci, pdc_sata_pci_tbl);
+MODULE_DEVICE_TABLE(pci, pdc_ata_pci_tbl);
 
-module_init(pdc_sata_init);
-module_exit(pdc_sata_exit);
+module_init(pdc_ata_init);
+module_exit(pdc_ata_exit);

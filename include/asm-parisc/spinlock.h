@@ -27,21 +27,35 @@ static inline int spin_is_locked(spinlock_t *x)
 
 static inline void _raw_spin_lock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
+	volatile unsigned int *a;
+
+	mb();
+	a = __ldcw_align(x);
 	while (__ldcw(a) == 0)
 		while (*a == 0);
+	mb();
 }
 
 static inline void _raw_spin_unlock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
+	volatile unsigned int *a;
+	mb();
+	a = __ldcw_align(x);
 	*a = 1;
+	mb();
 }
 
 static inline int _raw_spin_trylock(spinlock_t *x)
 {
-	volatile unsigned int *a = __ldcw_align(x);
-	return __ldcw(a) != 0;
+	volatile unsigned int *a;
+	int ret;
+
+	mb();
+	a = __ldcw_align(x);
+        ret = __ldcw(a) != 0;
+	mb();
+
+	return ret;
 }
 	
 #define spin_lock_own(LOCK, LOCATION)	((void)0)

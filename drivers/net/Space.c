@@ -284,9 +284,6 @@ static struct devprobe2 m68k_probes[] __initdata = {
 #ifdef CONFIG_ATARI_PAMSNET	/* Atari PAMsNet Ethernet board */
 	{pamsnet_probe, 0},
 #endif
-#ifdef CONFIG_HPLANCE		/* HP300 internal Ethernet */
-	{hplance_probe, 0},
-#endif
 #ifdef CONFIG_MVME147_NET	/* MVME147 internal Ethernet */
 	{mvme147lance_probe, 0},
 #endif

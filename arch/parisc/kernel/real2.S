@@ -149,7 +149,7 @@ restore_control_regs:
 rfi_virt2real:
 	/* switch to real mode... */
 	ssm		0,0		/* See "relied upon translation" */
-	nop				/* comment in interruption.S */
+	nop				/* PA 2.0 Arch. F-5 */
 	nop
 	nop
 	nop
@@ -186,7 +186,7 @@ rfi_v2r_1:
 	.align 128
 rfi_real2virt:
 	ssm		0,0		/* See "relied upon translation" */
-	nop				/* comment in interruption.S */
+	nop				/* PA 2.0 Arch. F-5 */
 	nop
 	nop
 	nop
