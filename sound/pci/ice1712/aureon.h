@@ -25,10 +25,12 @@
  */      
 
 #define  AUREON_DEVICE_DESC 	       "{Terratec,Aureon 5.1 Sky},"\
-				       "{Terratec,Aureon 7.1 Space},"
+				       "{Terratec,Aureon 7.1 Space},"\
+				       "{Terratec,Aureon 7.1 Universe},"
 
 #define VT1724_SUBDEVICE_AUREON51_SKY	0x3b154711	/* Aureon 5.1 Sky */
 #define VT1724_SUBDEVICE_AUREON71_SPACE	0x3b154511	/* Aureon 7.1 Space */
+#define VT1724_SUBDEVICE_AUREON71_UNIVERSE	0x3b155311	/* Aureon 7.1 Universe */
 
 extern struct snd_ice1712_card_info  snd_vt1724_aureon_cards[];
 

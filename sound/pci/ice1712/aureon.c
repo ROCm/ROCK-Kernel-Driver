@@ -569,5 +569,13 @@ struct snd_ice1712_card_info snd_vt1724_aureon_cards[] __devinitdata = {
 		.eeprom_size = sizeof(aureon71_eeprom),
 		.eeprom_data = aureon71_eeprom,
 	},
+ 	{
+ 		.subvendor = VT1724_SUBDEVICE_AUREON71_UNIVERSE,
+ 		.name = "Terratec Aureon 7.1-Universe",
+ 		.chip_init = aureon_init,
+ 		.build_controls = aureon_add_controls,
+ 		.eeprom_size = sizeof(aureon71_eeprom),
+ 		.eeprom_data = aureon71_eeprom,
+	},
 	{ } /* terminator */
 };
