@@ -238,6 +238,9 @@ struct epitem {
 	/* List header used to link this structure to the eventpoll ready list */
 	struct list_head rdllink;
 
+	/* The file descriptor this item refers to */
+	int fd;
+
 	/* Number of active wait queue attached to poll operations */
 	int nwait;
 
@@ -246,9 +249,6 @@ struct epitem {
 
 	/* The "container" of this item */
 	struct eventpoll *ep;
-
-	/* The file descriptor this item refers to */
-	int fd;
 
 	/* The file this item refers to */
 	struct file *file;
