@@ -38,37 +38,19 @@
 /*
  * Map lock_t from IRIX to Linux spinlocks.
  *
- * Note that linux turns on/off spinlocks depending on CONFIG_SMP.
- * We don't need to worry about SMP or not here.
+ * We do not make use of lock_t from interrupt context, so we do not
+ * have to worry about disabling interrupts at all (unlike IRIX).
  */
-
-#define SPLDECL(s)		unsigned long s
 
 typedef spinlock_t lock_t;
 
+#define SPLDECL(s)			unsigned long s
+
 #define spinlock_init(lock, name)	spin_lock_init(lock)
 #define	spinlock_destroy(lock)
-
-static inline unsigned long mutex_spinlock(lock_t *lock)
-{
-	spin_lock(lock);
-	return 0;
-}
-
-/*ARGSUSED*/
-static inline void mutex_spinunlock(lock_t *lock, unsigned long s)
-{
-	spin_unlock(lock);
-}
-
-static inline void nested_spinlock(lock_t *lock)
-{
-	spin_lock(lock);
-}
-
-static inline void nested_spinunlock(lock_t *lock)
-{
-	spin_unlock(lock);
-}
+#define mutex_spinlock(lock)		({ spin_lock(lock); 0; })
+#define mutex_spinunlock(lock, s)	do { spin_unlock(lock); (void)s; } while (0)
+#define nested_spinlock(lock)		spin_lock(lock)
+#define nested_spinunlock(lock)		spin_unlock(lock)
 
 #endif /* __XFS_SUPPORT_SPIN_H__ */

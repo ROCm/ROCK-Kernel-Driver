@@ -48,11 +48,11 @@ STATIC xfs_log_item_t * xfs_ail_delete(xfs_ail_entry_t *, xfs_log_item_t *);
 STATIC xfs_log_item_t * xfs_ail_min(xfs_ail_entry_t *);
 STATIC xfs_log_item_t * xfs_ail_next(xfs_ail_entry_t *, xfs_log_item_t *);
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 STATIC void xfs_ail_check(xfs_ail_entry_t *);
 #else
 #define	xfs_ail_check(a)
-#endif /* XFSDEBUG */
+#endif /* DEBUG */
 
 
 /*
@@ -553,7 +553,7 @@ xfs_ail_next(
 
 }
 
-#ifdef XFSDEBUG
+#ifdef DEBUG
 /*
  * Check that the list is sorted as it should be.
  */
@@ -593,4 +593,4 @@ xfs_ail_check(
 	ASSERT(lip == (xfs_log_item_t*)base);
 	ASSERT(base->ail_back == prev_lip);
 }
-#endif /* XFSDEBUG */
+#endif /* DEBUG */

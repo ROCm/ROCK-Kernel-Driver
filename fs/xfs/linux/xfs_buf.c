@@ -386,7 +386,7 @@ _pagebuf_lookup_pages(
 
 			XFS_STATS_INC(pb_page_retries);
 			pagebuf_daemon_wakeup();
-			current->state = TASK_UNINTERRUPTIBLE;
+			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(10);
 			goto retry;
 		}
@@ -812,16 +812,13 @@ pagebuf_get_no_daddr(
 	void			*data;
 	int			error;
 
-	if (unlikely(len > 0x20000))
-		goto fail;
-
 	bp = pagebuf_allocate(0);
 	if (unlikely(bp == NULL))
 		goto fail;
 	_pagebuf_initialize(bp, target, 0, len, PBF_FORCEIO);
 
  try_again:
-	data = kmem_alloc(malloc_len, KM_SLEEP);
+	data = kmem_alloc(malloc_len, KM_SLEEP | KM_MAYFAIL);
 	if (unlikely(data == NULL))
 		goto fail_free_buf;
 
@@ -1064,7 +1061,7 @@ _pagebuf_wait_unpin(
 
 	add_wait_queue(&pb->pb_waiters, &wait);
 	for (;;) {
-		current->state = TASK_UNINTERRUPTIBLE;
+		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (atomic_read(&pb->pb_pin_count) == 0)
 			break;
 		if (atomic_read(&pb->pb_io_remaining))
@@ -1072,7 +1069,7 @@ _pagebuf_wait_unpin(
 		schedule();
 	}
 	remove_wait_queue(&pb->pb_waiters, &wait);
-	current->state = TASK_RUNNING;
+	set_current_state(TASK_RUNNING);
 }
 
 /*
@@ -1599,6 +1596,7 @@ pagebuf_daemon(
 	void			*data)
 {
 	struct list_head	tmp;
+	unsigned long		age;
 	xfs_buf_t		*pb, *n;
 
 	/*  Set up the thread  */
@@ -1616,8 +1614,9 @@ pagebuf_daemon(
 			refrigerator(PF_FREEZE);
 
 		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(xfs_flush_interval);
+		schedule_timeout((xfs_buf_timer_centisecs * HZ) / 100);
 
+		age = (xfs_buf_age_centisecs * HZ) / 100;
 		spin_lock(&pbd_delwrite_lock);
 		list_for_each_entry_safe(pb, n, &pbd_delwrite_queue, pb_list) {
 			PB_TRACE(pb, "walkq1", (long)pagebuf_ispin(pb));
@@ -1626,8 +1625,7 @@ pagebuf_daemon(
 			if (!pagebuf_ispin(pb) && !pagebuf_cond_lock(pb)) {
 				if (!force_flush &&
 				    time_before(jiffies,
-						pb->pb_queuetime +
-						xfs_age_buffer)) {
+						pb->pb_queuetime + age)) {
 					pagebuf_unlock(pb);
 					break;
 				}
