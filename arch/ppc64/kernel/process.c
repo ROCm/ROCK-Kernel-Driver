@@ -82,11 +82,12 @@ dump_fpu(struct pt_regs *regs, elf_fpregset_t *fpregs)
 	return 1;
 }
 
-void
-__switch_to(struct task_struct *prev, struct task_struct *new)
+struct task_struct *__switch_to(struct task_struct *prev,
+				struct task_struct *new)
 {
 	struct thread_struct *new_thread, *old_thread;
 	unsigned long flags;
+	struct task_struct *last;
 
 #ifdef CONFIG_SMP
 	/* avoid complexity of lazy save/restore of fpu
@@ -106,8 +107,9 @@ __switch_to(struct task_struct *prev, struct task_struct *new)
 	old_thread = &current->thread;
 
 	local_irq_save(flags);
-	_switch(old_thread, new_thread);
+	last = _switch(old_thread, new_thread);
 	local_irq_restore(flags);
+	return last;
 }
 
 static void show_tsk_stack(struct task_struct *p, unsigned long sp);
