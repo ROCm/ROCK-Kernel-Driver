@@ -660,9 +660,10 @@ int invalidate_partition(struct gendisk *disk, int index)
 {
 	int res = 0;
 	struct block_device *bdev = bdget_disk(disk, index);
-	if (bdev)
+	if (bdev) {
 		res = __invalidate_device(bdev, 1);
-	bdput(bdev);
+		bdput(bdev);
+	}
 	return res;
 }
 
