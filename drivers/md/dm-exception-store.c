@@ -131,8 +131,7 @@ static inline unsigned int sectors_to_pages(unsigned int sectors)
 static int alloc_area(struct pstore *ps)
 {
 	int r = -ENOMEM;
-	size_t i, len, nr_pages;
-	struct page *page, *last = NULL;
+	size_t len, nr_pages;
 
 	len = ps->chunk_size << SECTOR_SHIFT;
 
@@ -145,35 +144,14 @@ static int alloc_area(struct pstore *ps)
 		return r;
 
 	nr_pages = sectors_to_pages(ps->chunk_size);
-
-	/*
-	 * We lock the pages for ps->area into memory since
-	 * they'll be doing a lot of io.  We also chain them
-	 * together ready for dm-io.
-	 */
-	for (i = 0; i < nr_pages; i++) {
-		page = vmalloc_to_page(ps->area + (i * PAGE_SIZE));
-		SetPageLocked(page);
-		if (last)
-			last->list.next = &page->list;
-		last = page;
-	}
-
 	return 0;
 }
 
 static void free_area(struct pstore *ps)
 {
-	size_t i, nr_pages;
-	struct page *page;
+	size_t nr_pages;
 
 	nr_pages = sectors_to_pages(ps->chunk_size);
-	for (i = 0; i < nr_pages; i++) {
-		page = vmalloc_to_page(ps->area + (i * PAGE_SIZE));
-		page->list.next = NULL;
-		ClearPageLocked(page);
-	}
-
 	vfree(ps->area);
 }
 
@@ -189,7 +167,7 @@ static int chunk_io(struct pstore *ps, uint32_t chunk, int rw)
 	where.sector = ps->chunk_size * chunk;
 	where.count = ps->chunk_size;
 
-	return dm_io_sync(1, &where, rw, vmalloc_to_page(ps->area), 0, &bits);
+	return dm_io_sync_vm(1, &where, rw, ps->area, &bits);
 }
 
 /*

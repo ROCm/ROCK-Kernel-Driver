@@ -511,12 +511,8 @@ int write_one_page(struct page *page, int wait)
 	if (wait)
 		wait_on_page_writeback(page);
 
-	spin_lock(&mapping->page_lock);
-	list_del(&page->list);
 	if (test_clear_page_dirty(page)) {
-		list_add(&page->list, &mapping->locked_pages);
 		page_cache_get(page);
-		spin_unlock(&mapping->page_lock);
 		ret = mapping->a_ops->writepage(page, &wbc);
 		if (ret == 0 && wait) {
 			wait_on_page_writeback(page);
@@ -525,8 +521,6 @@ int write_one_page(struct page *page, int wait)
 		}
 		page_cache_release(page);
 	} else {
-		list_add(&page->list, &mapping->clean_pages);
-		spin_unlock(&mapping->page_lock);
 		unlock_page(page);
 	}
 	return ret;
@@ -534,9 +528,8 @@ int write_one_page(struct page *page, int wait)
 EXPORT_SYMBOL(write_one_page);
 
 /*
- * For address_spaces which do not use buffers.  Just set the page's dirty bit
- * and move it to the dirty_pages list.  Also perform space reservation if
- * required.
+ * For address_spaces which do not use buffers.  Just tag the page as dirty in
+ * its radix tree.
  *
  * __set_page_dirty_nobuffers() may return -ENOSPC.  But if it does, the page
  * is still safe, as long as it actually manages to find some blocks at
@@ -554,15 +547,15 @@ int __set_page_dirty_nobuffers(struct page *page)
 		struct address_space *mapping = page->mapping;
 
 		if (mapping) {
-			spin_lock(&mapping->page_lock);
+			spin_lock_irq(&mapping->tree_lock);
 			if (page->mapping) {	/* Race with truncate? */
 				BUG_ON(page->mapping != mapping);
 				if (!mapping->backing_dev_info->memory_backed)
 					inc_page_state(nr_dirty);
-				list_del(&page->list);
-				list_add(&page->list, &mapping->dirty_pages);
+				radix_tree_tag_set(&mapping->page_tree,
+					page->index, PAGECACHE_TAG_DIRTY);
 			}
-			spin_unlock(&mapping->page_lock);
+			spin_unlock_irq(&mapping->tree_lock);
 			if (!PageSwapCache(page))
 				__mark_inode_dirty(mapping->host,
 							I_DIRTY_PAGES);
@@ -601,13 +594,102 @@ EXPORT_SYMBOL(set_page_dirty_lock);
  */
 int test_clear_page_dirty(struct page *page)
 {
-	if (TestClearPageDirty(page)) {
-		struct address_space *mapping = page->mapping;
+	struct address_space *mapping = page->mapping;
+	unsigned long flags;
 
-		if (mapping && !mapping->backing_dev_info->memory_backed)
-			dec_page_state(nr_dirty);
-		return 1;
+	if (mapping) {
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			if (!mapping->backing_dev_info->memory_backed)
+				dec_page_state(nr_dirty);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
 	}
-	return 0;
+	return TestClearPageDirty(page);
 }
 EXPORT_SYMBOL(test_clear_page_dirty);
+
+/*
+ * Clear a page's dirty flag while ignoring dirty memory accounting
+ */
+int __clear_page_dirty(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		if (TestClearPageDirty(page)) {
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_DIRTY);
+			spin_unlock_irqrestore(&mapping->tree_lock, flags);
+			return 1;
+		}
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+		return 0;
+	}
+	return TestClearPageDirty(page);
+}
+
+int test_clear_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestClearPageWriteback(page);
+		if (ret)
+			radix_tree_tag_clear(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestClearPageWriteback(page);
+	}
+	return ret;
+}
+
+int test_set_page_writeback(struct page *page)
+{
+	struct address_space *mapping = page->mapping;
+	int ret;
+
+	if (mapping) {
+		unsigned long flags;
+
+		spin_lock_irqsave(&mapping->tree_lock, flags);
+		ret = TestSetPageWriteback(page);
+		if (ret)
+			radix_tree_tag_set(&mapping->page_tree, page->index,
+						PAGECACHE_TAG_WRITEBACK);
+		spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	} else {
+		ret = TestSetPageWriteback(page);
+	}
+	return ret;
+
+}
+
+/*
+ * Return true if any of the pages in the mapping are marged with the
+ * passed tag.
+ */
+int mapping_tagged(struct address_space *mapping, int tag)
+{
+	unsigned long flags;
+	int ret;
+
+	spin_lock_irqsave(&mapping->tree_lock, flags);
+	ret = radix_tree_tagged(&mapping->page_tree, tag);
+	spin_unlock_irqrestore(&mapping->tree_lock, flags);
+	return ret;
+}
+EXPORT_SYMBOL(mapping_tagged);

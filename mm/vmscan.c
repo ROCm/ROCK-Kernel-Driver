@@ -352,7 +352,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 				goto keep_locked;
 			if (!may_write_to_queue(mapping->backing_dev_info))
 				goto keep_locked;
-			spin_lock(&mapping->page_lock);
 			if (test_clear_page_dirty(page)) {
 				int res;
 				struct writeback_control wbc = {
@@ -361,9 +360,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 					.nonblocking = 1,
 					.for_reclaim = 1,
 				};
-
-				list_move(&page->list, &mapping->locked_pages);
-				spin_unlock(&mapping->page_lock);
 
 				SetPageReclaim(page);
 				res = mapping->a_ops->writepage(page, &wbc);
@@ -379,7 +375,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 				}
 				goto keep;
 			}
-			spin_unlock(&mapping->page_lock);
 		}
 
 		/*
@@ -413,7 +408,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		if (!mapping)
 			goto keep_locked;	/* truncate got there first */
 
-		spin_lock(&mapping->page_lock);
+		spin_lock_irq(&mapping->tree_lock);
 
 		/*
 		 * The non-racy check for busy page.  It is critical to check
@@ -421,7 +416,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		 * not in use by anybody. 	(pagecache + us == 2)
 		 */
 		if (page_count(page) != 2 || PageDirty(page)) {
-			spin_unlock(&mapping->page_lock);
+			spin_unlock_irq(&mapping->tree_lock);
 			goto keep_locked;
 		}
 
@@ -429,7 +424,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 		if (PageSwapCache(page)) {
 			swp_entry_t swap = { .val = page->index };
 			__delete_from_swap_cache(page);
-			spin_unlock(&mapping->page_lock);
+			spin_unlock_irq(&mapping->tree_lock);
 			swap_free(swap);
 			__put_page(page);	/* The pagecache ref */
 			goto free_it;
@@ -437,7 +432,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask, int *nr_scanned)
 #endif /* CONFIG_SWAP */
 
 		__remove_from_page_cache(page);
-		spin_unlock(&mapping->page_lock);
+		spin_unlock_irq(&mapping->tree_lock);
 		__put_page(page);
 
 free_it:

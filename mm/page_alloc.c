@@ -77,13 +77,14 @@ static int bad_range(struct zone *zone, struct page *page)
 
 static void bad_page(const char *function, struct page *page)
 {
-	printk("Bad page state at %s (in process '%s', page %p)\n", function, current->comm, page);
-	printk("flags:0x%08lx mapping:%p mapped:%d count:%d\n",
+	printk(KERN_EMERG "Bad page state at %s (in process '%s', page %p)\n",
+		function, current->comm, page);
+	printk(KERN_EMERG "flags:0x%08lx mapping:%p mapped:%d count:%d\n",
 		page->flags, page->mapping,
 		page_mapped(page), page_count(page));
-	printk("Backtrace:\n");
+	printk(KERN_EMERG "Backtrace:\n");
 	dump_stack();
-	printk("Trying to fix it up, but a reboot is needed\n");
+	printk(KERN_EMERG "Trying to fix it up, but a reboot is needed\n");
 	page->flags &= ~(1 << PG_private	|
 			1 << PG_locked	|
 			1 << PG_lru	|
@@ -106,13 +107,13 @@ static void bad_page(const char *function, struct page *page)
  *
  * The remaining PAGE_SIZE pages are called "tail pages".
  *
- * All pages have PG_compound set.  All pages have their lru.next pointing at
+ * All pages have PG_compound set.  All pages have their ->private pointing at
  * the head page (even the head page has this).
  *
- * The head page's lru.prev, if non-zero, holds the address of the compound
- * page's put_page() function.
+ * The first tail page's ->mapping, if non-zero, holds the address of the
+ * compound page's put_page() function.
  *
- * The order of the allocation is stored in the first tail page's lru.prev.
+ * The order of the allocation is stored in the first tail page's ->index
  * This is only for debug at present.  This usage means that zero-order pages
  * may not be compound.
  */
@@ -121,13 +122,13 @@ static void prep_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
-	page->lru.prev = NULL;
-	page[1].lru.prev = (void *)order;
+	page[1].mapping = 0;
+	page[1].index = order;
 	for (i = 0; i < nr_pages; i++) {
 		struct page *p = page + i;
 
 		SetPageCompound(p);
-		p->lru.next = (void *)page;
+		p->private = (unsigned long)page;
 	}
 }
 
@@ -136,7 +137,7 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
-	if (page[1].lru.prev != (void *)order)
+	if (page[1].index != order)
 		bad_page(__FUNCTION__, page);
 
 	for (i = 0; i < nr_pages; i++) {
@@ -144,7 +145,7 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 
 		if (!PageCompound(p))
 			bad_page(__FUNCTION__, page);
-		if (p->lru.next != (void *)page)
+		if (p->private != (unsigned long)page)
 			bad_page(__FUNCTION__, page);
 		ClearPageCompound(p);
 	}
@@ -206,13 +207,13 @@ static inline void __free_pages_bulk (struct page *page, struct page *base,
 		buddy2 = base + page_idx;
 		BUG_ON(bad_range(zone, buddy1));
 		BUG_ON(bad_range(zone, buddy2));
-		list_del(&buddy1->list);
+		list_del(&buddy1->lru);
 		mask <<= 1;
 		area++;
 		index >>= 1;
 		page_idx &= mask;
 	}
-	list_add(&(base + page_idx)->list, &area->free_list);
+	list_add(&(base + page_idx)->lru, &area->free_list);
 }
 
 static inline void free_pages_check(const char *function, struct page *page)
@@ -262,9 +263,9 @@ free_pages_bulk(struct zone *zone, int count,
 	zone->all_unreclaimable = 0;
 	zone->pages_scanned = 0;
 	while (!list_empty(list) && count--) {
-		page = list_entry(list->prev, struct page, list);
+		page = list_entry(list->prev, struct page, lru);
 		/* have to delete it as __free_pages_bulk list manipulates */
-		list_del(&page->list);
+		list_del(&page->lru);
 		__free_pages_bulk(page, base, zone, area, mask, order);
 		ret++;
 	}
@@ -282,7 +283,7 @@ void __free_pages_ok(struct page *page, unsigned int order)
 	mod_page_state(pgfree, 1 << order);
 	for (i = 0 ; i < (1 << order) ; ++i)
 		free_pages_check(__FUNCTION__, page + i);
-	list_add(&page->list, &list);
+	list_add(&page->lru, &list);
 	kernel_map_pages(page, 1<<order, 0);
 	free_pages_bulk(page_zone(page), 1, &list, order);
 }
@@ -301,7 +302,7 @@ expand(struct zone *zone, struct page *page,
 		area--;
 		high--;
 		size >>= 1;
-		list_add(&page->list, &area->free_list);
+		list_add(&page->lru, &area->free_list);
 		MARK_USED(index, high, area);
 		index += size;
 		page += size;
@@ -364,8 +365,8 @@ static struct page *__rmqueue(struct zone *zone, unsigned int order)
 		if (list_empty(&area->free_list))
 			continue;
 
-		page = list_entry(area->free_list.next, struct page, list);
-		list_del(&page->list);
+		page = list_entry(area->free_list.next, struct page, lru);
+		list_del(&page->lru);
 		index = page - zone->zone_mem_map;
 		if (current_order != MAX_ORDER-1)
 			MARK_USED(index, current_order, area);
@@ -395,7 +396,7 @@ static int rmqueue_bulk(struct zone *zone, unsigned int order,
 		if (page == NULL)
 			break;
 		allocated++;
-		list_add_tail(&page->list, list);
+		list_add_tail(&page->lru, list);
 	}
 	spin_unlock_irqrestore(&zone->lock, flags);
 	return allocated;
@@ -437,7 +438,7 @@ int is_head_of_free_region(struct page *page)
 	spin_lock_irqsave(&zone->lock, flags);
 	for (order = MAX_ORDER - 1; order >= 0; --order)
 		list_for_each(curr, &zone->free_area[order].free_list)
-			if (page == list_entry(curr, struct page, list)) {
+			if (page == list_entry(curr, struct page, lru)) {
 				spin_unlock_irqrestore(&zone->lock, flags);
 				return 1 << order;
 			}
@@ -477,7 +478,7 @@ static void fastcall free_hot_cold_page(struct page *page, int cold)
 	local_irq_save(flags);
 	if (pcp->count >= pcp->high)
 		pcp->count -= free_pages_bulk(zone, pcp->batch, &pcp->list, 0);
-	list_add(&page->list, &pcp->list);
+	list_add(&page->lru, &pcp->list);
 	pcp->count++;
 	local_irq_restore(flags);
 	put_cpu();
@@ -513,8 +514,8 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 			pcp->count += rmqueue_bulk(zone, 0,
 						pcp->batch, &pcp->list);
 		if (pcp->count) {
-			page = list_entry(pcp->list.next, struct page, list);
-			list_del(&page->list);
+			page = list_entry(pcp->list.next, struct page, lru);
+			list_del(&page->lru);
 			pcp->count--;
 		}
 		local_irq_restore(flags);
@@ -525,14 +526,14 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 		spin_lock_irqsave(&zone->lock, flags);
 		page = __rmqueue(zone, order);
 		spin_unlock_irqrestore(&zone->lock, flags);
-		if (order && page)
-			prep_compound_page(page, order);
 	}
 
 	if (page != NULL) {
 		BUG_ON(bad_range(zone, page));
 		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
+		if (order)
+			prep_compound_page(page, order);
 	}
 	return page;
 }
@@ -1373,7 +1374,7 @@ void __init memmap_init_zone(struct page *start, unsigned long size, int nid,
 		set_page_zone(page, NODEZONE(nid, zone));
 		set_page_count(page, 0);
 		SetPageReserved(page);
-		INIT_LIST_HEAD(&page->list);
+		INIT_LIST_HEAD(&page->lru);
 #ifdef WANT_PAGE_VIRTUAL
 		/* The shift won't overflow because ZONE_NORMAL is below 4G. */
 		if (zone != ZONE_HIGHMEM)

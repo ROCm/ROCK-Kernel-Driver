@@ -178,9 +178,8 @@ struct page {
 	page_flags_t flags;		/* atomic flags, some possibly
 					   updated asynchronously */
 	atomic_t count;			/* Usage count, see below. */
-	struct list_head list;		/* ->mapping has some page lists. */
 	struct address_space *mapping;	/* The inode (or ...) we belong to. */
-	unsigned long index;		/* Our offset within mapping. */
+	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list;
 					   protected by zone->lru_lock !! */
 	union {
@@ -241,24 +240,24 @@ extern void FASTCALL(__page_cache_release(struct page *));
 static inline int page_count(struct page *p)
 {
 	if (PageCompound(p))
-		p = (struct page *)p->lru.next;
+		p = (struct page *)p->private;
 	return atomic_read(&(p)->count);
 }
 
 static inline void get_page(struct page *page)
 {
 	if (PageCompound(page))
-		page = (struct page *)page->lru.next;
+		page = (struct page *)page->private;
 	atomic_inc(&page->count);
 }
 
 static inline void put_page(struct page *page)
 {
 	if (PageCompound(page)) {
-		page = (struct page *)page->lru.next;
+		page = (struct page *)page->private;
 		if (put_page_testzero(page)) {
-			if (page->lru.prev) {	/* destructor? */
-				(*(void (*)(struct page *))page->lru.prev)(page);
+			if (page[1].mapping) {	/* destructor? */
+				(*(void (*)(struct page *))page[1].mapping)(page);
 			} else {
 				__page_cache_release(page);
 			}

@@ -7,6 +7,7 @@
 #include "dm.h"
 #include "dm-path-selector.h"
 #include "dm-bio-list.h"
+#include "dm-bio-record.h"
 
 #include <linux/ctype.h>
 #include <linux/init.h>
@@ -50,7 +51,6 @@ struct path {
 struct priority_group {
 	struct list_head list;
 
-	unsigned priority;
 	struct multipath *m;
 	struct path_selector *ps;
 
@@ -63,7 +63,6 @@ struct multipath {
 	struct list_head list;
 	struct dm_target *ti;
 
-	unsigned nr_paths;
 	unsigned nr_priority_groups;
 	struct list_head priority_groups;
 
@@ -77,7 +76,21 @@ struct multipath {
 	struct bio_list failed_ios;
 
 	struct work_struct trigger_event;
+
+	/*
+	 * We must use a mempool of mpath_io structs so that we
+	 * can resubmit bios on error.
+	 */
+	mempool_t *details_pool;
 };
+
+struct mpath_io {
+	struct path *path;
+	struct dm_bio_details details;
+};
+
+#define MIN_IOS 256
+static kmem_cache_t *_details_cache;
 
 static void dispatch_failed_ios(void *data);
 static void trigger_event(void *data);
@@ -159,6 +172,12 @@ static struct multipath *alloc_multipath(void)
 		m->lock = SPIN_LOCK_UNLOCKED;
 		INIT_WORK(&m->dispatch_failed, dispatch_failed_ios, m);
 		INIT_WORK(&m->trigger_event, trigger_event, m);
+		m->details_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
+						 mempool_free_slab, _details_cache);
+		if (!m->details_pool) {
+			kfree(m);
+			return NULL;
+		}
 	}
 
 	return m;
@@ -173,14 +192,13 @@ static void free_multipath(struct multipath *m)
 		free_priority_group(pg, m->ti);
 	}
 
+	mempool_destroy(m->details_pool);
 	kfree(m);
 }
 
 /*-----------------------------------------------------------------
  * The multipath daemon is responsible for resubmitting failed ios.
  *---------------------------------------------------------------*/
-static struct workqueue_struct *_kmpathd_wq;
-
 static int __choose_path(struct multipath *m)
 {
 	struct priority_group *pg;
@@ -219,24 +237,20 @@ static struct path *get_current_path(struct multipath *m)
 	return path;
 }
 
-static int map_io(struct multipath *m, struct bio *bio)
+static int map_io(struct multipath *m, struct bio *bio, struct path **chosen)
 {
-	struct path *path;
-
-	path = get_current_path(m);
-	if (!path)
+	*chosen = get_current_path(m);
+	if (!*chosen)
 		return -EIO;
 
-	bio->bi_bdev = path->dev->bdev;
+	bio->bi_bdev = (*chosen)->dev->bdev;
 	return 0;
 }
 
 static void dispatch_failed_ios(void *data)
 {
 	struct multipath *m = (struct multipath *) data;
-	struct dm_table *map;
 
-	int r;
 	unsigned long flags;
 	struct bio *bio = NULL, *next;
 
@@ -247,20 +261,7 @@ static void dispatch_failed_ios(void *data)
 	while (bio) {
 		next = bio->bi_next;
 		bio->bi_next = NULL;
-
-		bio->bi_rw |= (1 << BIO_RW_SYNC);
-
-		r = map_io(m, bio);
-		if (r)
-			/*
-			 * This wont loop forever because the
-			 * end_io function will fail the ios if
-			 * we've no valid paths left.
-			 */
-			bio_io_error(bio, bio->bi_size);
-		else
-			generic_make_request(bio);
-
+		generic_make_request(bio);
 		bio = next;
 	}
 }
@@ -273,8 +274,8 @@ static void trigger_event(void *data)
 
 /*-----------------------------------------------------------------
  * Constructor/argument parsing:
- * <poll interval> <num priority groups> [<priority> <selector>
- * <num selector args> <num paths> [<path> [<arg>]* ]+ ]+
+ * <num priority groups> [<selector>
+ * <num paths> <num selector args> [<path> [<arg>]* ]+ ]+
  *---------------------------------------------------------------*/
 struct param {
 	unsigned min;
@@ -364,7 +365,6 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 						   struct dm_target *ti)
 {
 	static struct param _params[] = {
-		{0, 1024, ESTR("invalid priority")},
 		{1, 1024, ESTR("invalid number of paths")},
 		{0, 1024, ESTR("invalid number of selector args")}
 	};
@@ -374,7 +374,7 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 	struct priority_group *pg;
 	struct path_selector_type *pst;
 
-	if (as->argc < 3) {
+	if (as->argc < 2) {
 		as->argc = 0;
 		ti->error = ESTR("not enough priority group aruments");
 		return NULL;
@@ -385,10 +385,7 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 		ti->error = ESTR("couldn't allocate priority group");
 		return NULL;
 	}
-
-	r = read_param(_params, shift(as), &pg->priority, &ti->error);
-	if (r)
-		goto bad;
+	pg->m = m;
 
 	pst = dm_get_path_selector(shift(as));
 	if (!pst) {
@@ -407,11 +404,11 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
 	/*
 	 * read the paths
 	 */
-	r = read_param(_params + 1, shift(as), &pg->nr_paths, &ti->error);
+	r = read_param(_params, shift(as), &pg->nr_paths, &ti->error);
 	if (r)
 		goto bad;
 
-	r = read_param(_params + 2, shift(as), &nr_selector_args, &ti->error);
+	r = read_param(_params + 1, shift(as), &nr_selector_args, &ti->error);
 	if (r)
 		goto bad;
 
@@ -440,19 +437,6 @@ static struct priority_group *parse_priority_group(struct arg_set *as,
  bad:
 	free_priority_group(pg, ti);
 	return NULL;
-}
-
-static void __insert_priority_group(struct multipath *m,
-				    struct priority_group *pg)
-{
-	struct priority_group *tmp;
-
-	list_for_each_entry (tmp, &m->priority_groups, list)
-		if (tmp->priority > pg->priority)
-			break;
-
-	list_add_tail(&pg->list, &tmp->list);
-	pg->m = m;
 }
 
 static int multipath_ctr(struct dm_target *ti, unsigned int argc,
@@ -484,12 +468,12 @@ static int multipath_ctr(struct dm_target *ti, unsigned int argc,
 	while (as.argc) {
 		struct priority_group *pg;
 		pg = parse_priority_group(&as, m, ti);
-		if (pg) {
-			m->nr_paths += pg->nr_paths;
-			__insert_priority_group(m, pg);
-		}
+		if (!pg)
+			goto bad;
+
+		m->nr_valid_paths += pg->nr_paths;
+		list_add_tail(&pg->list, &m->priority_groups);
 	}
-	m->nr_valid_paths = m->nr_paths;
 
 	ti->private = m;
 	m->ti = ti;
@@ -511,30 +495,21 @@ static int multipath_map(struct dm_target *ti, struct bio *bio,
 			 union map_info *map_context)
 {
 	int r;
+	struct mpath_io *io;
 	struct multipath *m = (struct multipath *) ti->private;
 
+	io = mempool_alloc(m->details_pool, GFP_NOIO);
+	dm_bio_record(&io->details, bio);
+
 	bio->bi_rw |= (1 << BIO_RW_FAILFAST);
-	r = map_io(m, bio);
-	if (r)
+	r = map_io(m, bio, &io->path);
+	if (r) {
+		mempool_free(io, m->details_pool);
 		return r;
+	}
 
+	map_context->ptr = io;
 	return 1;
-}
-
-/*
- * Only called on the error path.
- */
-static struct path *find_path(struct multipath *m, struct block_device *bdev)
-{
-	struct path *p;
-	struct priority_group *pg;
-
-	list_for_each_entry (pg, &m->priority_groups, list)
-		list_for_each_entry (p, &pg->paths, list)
-			if (p->dev->bdev == bdev)
-				return p;
-
-	return NULL;
 }
 
 static void fail_path(struct path *path)
@@ -550,7 +525,7 @@ static void fail_path(struct path *path)
 
 		path->has_failed = 1;
 		path->pg->ps->type->fail_path(path->pg->ps, path);
-		queue_work(_kmpathd_wq, &m->trigger_event);
+		schedule_work(&m->trigger_event);
 
 		spin_lock(&m->lock);
 		m->nr_valid_paths--;
@@ -564,11 +539,10 @@ static void fail_path(struct path *path)
 	spin_unlock_irqrestore(&path->failed_lock, flags);
 }
 
-static int multipath_end_io(struct dm_target *ti, struct bio *bio,
-			    int error, union map_info *map_context)
+static int do_end_io(struct multipath *m, struct bio *bio,
+		     int error, struct mpath_io *io)
 {
-	struct path *path;
-	struct multipath *m = (struct multipath *) ti->private;
+	int r;
 
 	if (error) {
 		spin_lock(&m->lock);
@@ -578,19 +552,39 @@ static int multipath_end_io(struct dm_target *ti, struct bio *bio,
 		}
 		spin_unlock(&m->lock);
 
-		path = find_path(m, bio->bi_bdev);
-		fail_path(path);
+		fail_path(io->path);
+
+		/* remap */
+		dm_bio_restore(&io->details, bio);
+		r = map_io(m, bio, &io->path);
+		if (r)
+			/* no paths left */
+			return -EIO;
 
 		/* queue for the daemon to resubmit */
 		spin_lock(&m->lock);
 		bio_list_add(&m->failed_ios, bio);
 		spin_unlock(&m->lock);
 
-		queue_work(_kmpathd_wq, &m->dispatch_failed);
+		schedule_work(&m->dispatch_failed);
 		return 1;	/* io not complete */
 	}
 
 	return 0;
+}
+
+static int multipath_end_io(struct dm_target *ti, struct bio *bio,
+			    int error, union map_info *map_context)
+{
+	struct multipath *m = (struct multipath *) ti->private;
+	struct mpath_io *io = (struct mpath_io *) map_context->ptr;
+	int r;
+
+	r  = do_end_io(m, bio, error, io);
+	if (r <= 0)
+		mempool_free(io, m->details_pool);
+
+	return r;
 }
 
 /*
@@ -610,55 +604,43 @@ static int multipath_status(struct dm_target *ti, status_type_t type,
 	struct path *p;
 	char buffer[32];
 
+#define EMIT(x...) sz += ((sz >= maxlen) ? \
+			  0 : scnprintf(result + sz, maxlen - sz, x))
+
 	switch (type) {
 	case STATUSTYPE_INFO:
-		sz += snprintf(result + sz, maxlen - sz, "%u ", m->nr_priority_groups);
+		EMIT("%u ", m->nr_priority_groups);
 
 		list_for_each_entry(pg, &m->priority_groups, list) {
-			sz += snprintf(result + sz, maxlen - sz, "%u %u ",
-                                       pg->nr_paths,
-				       pg->ps->type->info_args);
+			EMIT("%u %u ", pg->nr_paths, pg->ps->type->info_args);
 
 			list_for_each_entry(p, &pg->paths, list) {
 				format_dev_t(buffer, p->dev->bdev->bd_dev);
 				spin_lock_irqsave(&p->failed_lock, flags);
-				sz += snprintf(result + sz, maxlen - sz,
-					       "%s %s %u ", buffer,
-					       p->has_failed ? "F" : "A",
-					       p->fail_count);
+				EMIT("%s %s %u ", buffer,
+				     p->has_failed ? "F" : "A", p->fail_count);
 				pg->ps->type->status(pg->ps, p, type,
 						     result + sz, maxlen - sz);
 				spin_unlock_irqrestore(&p->failed_lock, flags);
-
-				sz = strlen(result);
-				if (sz >= maxlen)
-					break;
 			}
 		}
-
 		break;
 
 	case STATUSTYPE_TABLE:
-		sz += snprintf(result + sz, maxlen - sz, "%u ", m->nr_priority_groups);
+		EMIT("%u ", m->nr_priority_groups);
 
 		list_for_each_entry(pg, &m->priority_groups, list) {
-			sz += snprintf(result + sz, maxlen - sz, "%u %s %u %u ",
-				       pg->priority, pg->ps->type->name,
-				       pg->nr_paths, pg->ps->type->table_args);
+			EMIT("%s %u %u ", pg->ps->type->name,
+			     pg->nr_paths, pg->ps->type->table_args);
 
 			list_for_each_entry(p, &pg->paths, list) {
 				format_dev_t(buffer, p->dev->bdev->bd_dev);
-				sz += snprintf(result + sz, maxlen - sz,
-					       "%s ", buffer);
+				EMIT("%s ", buffer);
 				pg->ps->type->status(pg->ps, p, type,
 						     result + sz, maxlen - sz);
 
-				sz = strlen(result);
-				if (sz >= maxlen)
-					break;
 			}
 		}
-
 		break;
 	}
 
@@ -683,26 +665,27 @@ int __init dm_multipath_init(void)
 {
 	int r;
 
+	/* allocate a slab for the dm_ios */
+	_details_cache = kmem_cache_create("dm_mpath", sizeof(struct mpath_io),
+					   0, 0, NULL, NULL);
+	if (!_details_cache)
+		return -ENOMEM;
+
 	r = dm_register_target(&multipath_target);
 	if (r < 0) {
 		DMERR("%s: register failed %d", multipath_target.name, r);
+		kmem_cache_destroy(_details_cache);
 		return -EINVAL;
 	}
 
 	r = dm_register_path_selectors();
 	if (r && r != -EEXIST) {
 		dm_unregister_target(&multipath_target);
+		kmem_cache_destroy(_details_cache);
 		return r;
 	}
 
-	_kmpathd_wq = create_workqueue("dm-mpath");
-	if (!_kmpathd_wq) {
-		/* FIXME: remove this */
-		dm_unregister_path_selectors();
-		dm_unregister_target(&multipath_target);
-	} else
-		DMINFO("dm_multipath v0.2.0");
-
+	DMINFO("dm_multipath v0.2.0");
 	return r;
 }
 
@@ -710,12 +693,12 @@ void __exit dm_multipath_exit(void)
 {
 	int r;
 
-	destroy_workqueue(_kmpathd_wq);
 	dm_unregister_path_selectors();
 	r = dm_unregister_target(&multipath_target);
 	if (r < 0)
 		DMERR("%s: target unregister failed %d",
 		      multipath_target.name, r);
+	kmem_cache_destroy(_details_cache);
 }
 
 module_init(dm_multipath_init);

@@ -39,33 +39,40 @@ struct kcopyd_client {
 	struct list_head list;
 
 	spinlock_t lock;
-	struct list_head pages;
+	struct page_list *pages;
 	unsigned int nr_pages;
 	unsigned int nr_free_pages;
 };
 
-static inline void __push_page(struct kcopyd_client *kc, struct page *p)
+static struct page_list *alloc_pl(void)
 {
-	list_add(&p->list, &kc->pages);
-	kc->nr_free_pages++;
+	struct page_list *pl;
+
+	pl = kmalloc(sizeof(*pl), GFP_KERNEL);
+	if (!pl)
+		return NULL;
+
+	pl->page = alloc_page(GFP_KERNEL);
+	if (!pl->page) {
+		kfree(pl);
+		return NULL;
+	}
+
+	SetPageLocked(pl->page);
+	return pl;
 }
 
-static inline struct page *__pop_page(struct kcopyd_client *kc)
+static void free_pl(struct page_list *pl)
 {
-	struct page *p;
-
-	p = list_entry(kc->pages.next, struct page, list);
-	list_del(&p->list);
-	kc->nr_free_pages--;
-
-	return p;
+	ClearPageLocked(pl->page);
+	__free_page(pl->page);
+	kfree(pl);
 }
 
 static int kcopyd_get_pages(struct kcopyd_client *kc,
-			    unsigned int nr, struct list_head *pages)
+			    unsigned int nr, struct page_list **pages)
 {
-	struct page *p;
-	INIT_LIST_HEAD(pages);
+	struct page_list *pl;
 
 	spin_lock(&kc->lock);
 	if (kc->nr_free_pages < nr) {
@@ -73,56 +80,63 @@ static int kcopyd_get_pages(struct kcopyd_client *kc,
 		return -ENOMEM;
 	}
 
-	while (nr--) {
-		p = __pop_page(kc);
-		list_add(&p->list, pages);
-	}
+	kc->nr_free_pages -= nr;
+	for (*pages = pl = kc->pages; --nr; pl = pl->next)
+		;
+
+	kc->pages = pl->next;
+	pl->next = 0;
+
 	spin_unlock(&kc->lock);
 
 	return 0;
 }
 
-static void kcopyd_put_pages(struct kcopyd_client *kc, struct list_head *pages)
+static void kcopyd_put_pages(struct kcopyd_client *kc, struct page_list *pl)
 {
-	struct page *page, *next;
+	struct page_list *cursor;
 
 	spin_lock(&kc->lock);
-	list_for_each_entry_safe (page, next, pages, list)
-		__push_page(kc, page);
+	for (cursor = pl; cursor->next; cursor = cursor->next)
+		kc->nr_free_pages++;
+
+	kc->nr_free_pages++;
+	cursor->next = kc->pages;
+	kc->pages = pl;
 	spin_unlock(&kc->lock);
 }
 
 /*
  * These three functions resize the page pool.
  */
-static void drop_pages(struct list_head *pages)
+static void drop_pages(struct page_list *pl)
 {
-	struct page *page, *next;
+	struct page_list *next;
 
-	list_for_each_entry_safe (page, next, pages, list) {
-		ClearPageLocked(page);
-		__free_page(page);
+	while (pl) {
+		next = pl->next;
+		free_pl(pl);
+		pl = next;
 	}
 }
 
 static int client_alloc_pages(struct kcopyd_client *kc, unsigned int nr)
 {
 	unsigned int i;
-	struct page *p;
-	LIST_HEAD(new);
+	struct page_list *pl = NULL, *next;
 
 	for (i = 0; i < nr; i++) {
-		p = alloc_page(GFP_KERNEL);
-		if (!p) {
-			drop_pages(&new);
+		next = alloc_pl();
+		if (!next) {
+			if (pl)
+				drop_pages(pl);
 			return -ENOMEM;
 		}
-
-		SetPageLocked(p);
-		list_add(&p->list, &new);
+		next->next = pl;
+		pl = next;
 	}
 
-	kcopyd_put_pages(kc, &new);
+	kcopyd_put_pages(kc, pl);
 	kc->nr_pages += nr;
 	return 0;
 }
@@ -130,7 +144,8 @@ static int client_alloc_pages(struct kcopyd_client *kc, unsigned int nr)
 static void client_free_pages(struct kcopyd_client *kc)
 {
 	BUG_ON(kc->nr_free_pages != kc->nr_pages);
-	drop_pages(&kc->pages);
+	drop_pages(kc->pages);
+	kc->pages = NULL;
 	kc->nr_free_pages = kc->nr_pages = 0;
 }
 
@@ -164,7 +179,7 @@ struct kcopyd_job {
 
 	sector_t offset;
 	unsigned int nr_pages;
-	struct list_head pages;
+	struct page_list *pages;
 
 	/*
 	 * Set this to ensure you are notified when the job has
@@ -281,7 +296,7 @@ static int run_complete_job(struct kcopyd_job *job)
 	unsigned int write_err = job->write_err;
 	kcopyd_notify_fn fn = job->fn;
 
-	kcopyd_put_pages(job->kc, &job->pages);
+	kcopyd_put_pages(job->kc, job->pages);
 	mempool_free(job, _job_pool);
 	fn(read_err, write_err, context);
 	return 0;
@@ -325,12 +340,12 @@ static int run_io_job(struct kcopyd_job *job)
 
 	if (job->rw == READ)
 		r = dm_io_async(1, &job->source, job->rw,
-				list_entry(job->pages.next, struct page, list),
+				job->pages,
 				job->offset, complete_io, job);
 
 	else
 		r = dm_io_async(job->num_dests, job->dests, job->rw,
-				list_entry(job->pages.next, struct page, list),
+				job->pages,
 				job->offset, complete_io, job);
 
 	return r;
@@ -528,7 +543,7 @@ int kcopyd_copy(struct kcopyd_client *kc, struct io_region *from,
 
 	job->offset = 0;
 	job->nr_pages = 0;
-	INIT_LIST_HEAD(&job->pages);
+	job->pages = NULL;
 
 	job->fn = fn;
 	job->context = context;
@@ -586,7 +601,7 @@ int kcopyd_client_create(unsigned int nr_pages, struct kcopyd_client **result)
 		return -ENOMEM;
 
 	kc->lock = SPIN_LOCK_UNLOCKED;
-	INIT_LIST_HEAD(&kc->pages);
+	kc->pages = NULL;
 	kc->nr_pages = kc->nr_free_pages = 0;
 	r = client_alloc_pages(kc, nr_pages);
 	if (r) {

@@ -11,7 +11,6 @@
 
 #include "dm-log.h"
 #include "dm-io.h"
-#include "dm.h"
 
 static LIST_HEAD(_log_types);
 static spinlock_t _lock = SPIN_LOCK_UNLOCKED;
@@ -147,11 +146,9 @@ struct log_c {
 	struct log_header header;
 
 	struct io_region header_location;
-	struct page *header_pages;
 	struct log_header *disk_header;
 
 	struct io_region bits_location;
-	struct page *bits_pages;
 	uint32_t *disk_bits;
 };
 
@@ -200,8 +197,8 @@ static int read_header(struct log_c *log)
 	int r;
 	unsigned long ebits;
 
-	r = dm_io_sync(1, &log->header_location, READ,
-		       log->header_pages, 0, &ebits);
+	r = dm_io_sync_vm(1, &log->header_location, READ,
+			  log->disk_header, &ebits);
 	if (r)
 		return r;
 
@@ -226,8 +223,8 @@ static inline int write_header(struct log_c *log)
 	unsigned long ebits;
 
 	header_to_disk(&log->header, log->disk_header);
-	return dm_io_sync(1, &log->header_location, WRITE,
-			  log->header_pages, 0, &ebits);
+	return dm_io_sync_vm(1, &log->header_location, WRITE,
+			     log->disk_header, &ebits);
 }
 
 /*----------------------------------------------------------------
@@ -255,8 +252,8 @@ static int read_bits(struct log_c *log)
 	int r;
 	unsigned long ebits;
 
-	r = dm_io_sync(1, &log->bits_location, READ,
-		       log->bits_pages, 0, &ebits);
+	r = dm_io_sync_vm(1, &log->bits_location, READ,
+			  log->disk_bits, &ebits);
 	if (r)
 		return r;
 
@@ -270,8 +267,8 @@ static int write_bits(struct log_c *log)
 	unsigned long ebits;
 	bits_to_disk(log->clean_bits, log->disk_bits,
 		     log->bitset_uint32_count);
-	return dm_io_sync(1, &log->bits_location, WRITE,
-			  log->bits_pages, 0, &ebits);
+	return dm_io_sync_vm(1, &log->bits_location, WRITE,
+			     log->disk_bits, &ebits);
 }
 
 /*----------------------------------------------------------------
@@ -398,8 +395,6 @@ static int disk_ctr(struct dirty_log *log, struct dm_target *ti,
 	if (!lc->disk_header)
 		goto bad;
 
-	lc->header_pages = vmalloc_to_page(lc->disk_header);
-
 	/* setup the disk bitset fields */
 	lc->bits_location.bdev = lc->log_dev->bdev;
 	lc->bits_location.sector = LOG_OFFSET;
@@ -412,7 +407,6 @@ static int disk_ctr(struct dirty_log *log, struct dm_target *ti,
 		vfree(lc->disk_header);
 		goto bad;
 	}
-	lc->bits_pages = vmalloc_to_page(lc->disk_bits);
 	return 0;
 
  bad:

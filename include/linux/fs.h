@@ -324,11 +324,7 @@ struct backing_dev_info;
 struct address_space {
 	struct inode		*host;		/* owner: inode, block_device */
 	struct radix_tree_root	page_tree;	/* radix tree of all pages */
-	spinlock_t		page_lock;	/* and spinlock protecting it */
-	struct list_head	clean_pages;	/* list of clean pages */
-	struct list_head	dirty_pages;	/* list of dirty pages */
-	struct list_head	locked_pages;	/* list of locked pages */
-	struct list_head	io_pages;	/* being prepared for I/O */
+	spinlock_t		tree_lock;	/* and spinlock protecting it */
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
@@ -367,6 +363,15 @@ struct block_device {
 	 */
 	unsigned long		bd_private;
 };
+
+/*
+ * Radix-tre tags, for tagging dirty and writeback pages within the pagecache
+ * radix trees
+ */
+#define PAGECACHE_TAG_DIRTY	0
+#define PAGECACHE_TAG_WRITEBACK	1
+
+int mapping_tagged(struct address_space *mapping, int tag);
 
 /*
  * Use sequence counter to get consistent i_size on 32-bit processors.

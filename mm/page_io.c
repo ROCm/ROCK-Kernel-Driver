@@ -104,7 +104,7 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		goto out;
 	}
 	inc_page_state(pswpout);
-	SetPageWriteback(page);
+	set_page_writeback(page);
 	unlock_page(page);
 	submit_bio(WRITE, bio);
 out:

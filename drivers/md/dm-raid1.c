@@ -859,9 +859,6 @@ static void do_mirror(struct mirror_set *ms)
 	do_recovery(ms);
 	do_reads(ms, &reads);
 	do_writes(ms, &writes);
-	dm_table_get(ms->ti->table);
-	dm_table_unplug_all(ms->ti->table);
-	dm_table_put(ms->ti->table);
 }
 
 static void do_work(void *ignored)
@@ -1194,28 +1191,28 @@ static int mirror_status(struct dm_target *ti, status_type_t type,
 
 	switch (type) {
 	case STATUSTYPE_INFO:
-		sz += snprintf(result + sz, maxlen - sz, "%d ", ms->nr_mirrors);
+		sz += scnprintf(result + sz, maxlen - sz, "%d ", ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			sz += snprintf(result + sz, maxlen - sz, "%s ", buffer);
+			sz += scnprintf(result + sz, maxlen - sz, "%s ", buffer);
 		}
 
-		sz += snprintf(result + sz, maxlen - sz,
+		sz += scnprintf(result + sz, maxlen - sz,
 			       SECTOR_FORMAT "/" SECTOR_FORMAT,
 			       ms->rh.log->type->get_sync_count(ms->rh.log),
 			       ms->nr_regions);
 		break;
 
 	case STATUSTYPE_TABLE:
-		sz += snprintf(result + sz, maxlen - sz,
+		sz += scnprintf(result + sz, maxlen - sz,
 			       "%s 1 " SECTOR_FORMAT " %d ",
 			       ms->rh.log->type->name, ms->rh.region_size,
 			       ms->nr_mirrors);
 
 		for (m = 0; m < ms->nr_mirrors; m++) {
 			format_dev_t(buffer, ms->mirror[m].dev->bdev->bd_dev);
-			sz += snprintf(result + sz, maxlen - sz,
+			sz += scnprintf(result + sz, maxlen - sz,
 				       "%s " SECTOR_FORMAT " ",
 				       buffer, ms->mirror[m].offset);
 		}

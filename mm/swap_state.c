@@ -26,11 +26,7 @@ extern struct address_space_operations swap_aops;
 
 struct address_space swapper_space = {
 	.page_tree	= RADIX_TREE_INIT(GFP_ATOMIC),
-	.page_lock	= SPIN_LOCK_UNLOCKED,
-	.clean_pages	= LIST_HEAD_INIT(swapper_space.clean_pages),
-	.dirty_pages	= LIST_HEAD_INIT(swapper_space.dirty_pages),
-	.io_pages	= LIST_HEAD_INIT(swapper_space.io_pages),
-	.locked_pages	= LIST_HEAD_INIT(swapper_space.locked_pages),
+	.tree_lock	= SPIN_LOCK_UNLOCKED,
 	.a_ops		= &swap_aops,
 	.backing_dev_info = &swap_backing_dev_info,
 	.i_mmap		= LIST_HEAD_INIT(swapper_space.i_mmap),
@@ -150,7 +146,7 @@ int add_to_swap(struct page * page)
 		switch (err) {
 		case 0:				/* Success */
 			SetPageUptodate(page);
-			ClearPageDirty(page);
+			__clear_page_dirty(page);
 			set_page_dirty(page);
 			INC_CACHE_INFO(add_total);
 			return 1;
@@ -183,9 +179,9 @@ void delete_from_swap_cache(struct page *page)
   
 	entry.val = page->index;
 
-	spin_lock(&swapper_space.page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
@@ -196,8 +192,8 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 	struct address_space *mapping = page->mapping;
 	int err;
 
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
+	spin_lock(&mapping->tree_lock);
 
 	err = radix_tree_insert(&swapper_space.page_tree, entry.val, page);
 	if (!err) {
@@ -205,13 +201,12 @@ int move_to_swap_cache(struct page *page, swp_entry_t entry)
 		___add_to_page_cache(page, &swapper_space, entry.val);
 	}
 
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock(&mapping->tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	if (!err) {
 		if (!swap_duplicate(entry))
 			BUG();
-		/* shift page from clean_pages to dirty_pages list */
 		BUG_ON(PageDirty(page));
 		set_page_dirty(page);
 		INC_CACHE_INFO(add_total);
@@ -232,8 +227,8 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 
 	entry.val = page->index;
 
-	spin_lock(&swapper_space.page_lock);
-	spin_lock(&mapping->page_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
+	spin_lock(&mapping->tree_lock);
 
 	err = radix_tree_insert(&mapping->page_tree, index, page);
 	if (!err) {
@@ -241,13 +236,12 @@ int move_from_swap_cache(struct page *page, unsigned long index,
 		___add_to_page_cache(page, mapping, index);
 	}
 
-	spin_unlock(&mapping->page_lock);
-	spin_unlock(&swapper_space.page_lock);
+	spin_unlock(&mapping->tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	if (!err) {
 		swap_free(entry);
-		/* shift page from clean_pages to dirty_pages list */
-		ClearPageDirty(page);
+		__clear_page_dirty(page);
 		set_page_dirty(page);
 	}
 	return err;

@@ -274,13 +274,20 @@ struct dm_table *dm_get_table(struct mapped_device *md)
  */
 static inline void dec_pending(struct dm_io *io, int error)
 {
+	wait_queue_head_t *wq;
+
 	if (error)
 		io->error = error;
 
 	if (atomic_dec_and_test(&io->io_count)) {
-		if (atomic_dec_and_test(&io->md->pending))
+		if (atomic_dec_and_test(&io->md->pending)) {
+			wq = &io->md->wait;
+
 			/* nudge anyone waiting on suspend queue */
-			wake_up(&io->md->wait);
+			smp_mb();
+			if (waitqueue_active(wq))
+			    wake_up(wq);
+		}
 
 		bio_endio(io->bio, io->bio->bi_size, io->error);
 		free_io(io->md, io);
@@ -296,6 +303,9 @@ static int clone_endio(struct bio *bio, unsigned int done, int error)
 
 	if (bio->bi_size)
 		return 1;
+
+	if (!bio_flagged(bio, BIO_UPTODATE) && !error)
+		error = -EIO;
 
 	if (endio) {
 		r = endio(tio->ti, bio, error, &tio->info);
@@ -749,7 +759,9 @@ static void event_callback(void *context)
 
 	down_write(&md->lock);
 	md->event_nr++;
-	wake_up_interruptible(&md->eventq);
+	smp_mb();
+	if (waitqueue_active(&md->eventq))
+		wake_up(&md->eventq);
 	up_write(&md->lock);
 }
 
@@ -885,22 +897,44 @@ int dm_swap_table(struct mapped_device *md, struct dm_table *table)
 	return 0;
 }
 
-static void __lock_disk(struct gendisk *disk)
+/*
+ * Functions to lock and unlock any filesystem running on the
+ * device.
+ */
+static int __lock_fs(struct mapped_device *md)
 {
-	struct block_device *bdev = bdget_disk(disk, 0);
-	if (bdev) {
-		fsync_bdev_lockfs(bdev);
-		bdput(bdev);
+	struct block_device *bdev;
+
+	if (test_and_set_bit(DMF_FS_LOCKED, &md->flags))
+		return 0;
+
+	bdev = bdget_disk(md->disk, 0);
+	if (!bdev) {
+		DMWARN("bdget failed in __lock_fs");
+		return -ENOMEM;
 	}
+
+	fsync_bdev_lockfs(bdev);
+	bdput(bdev);
+	return 0;
 }
 
-static void __unlock_disk(struct gendisk *disk)
+static int __unlock_fs(struct mapped_device *md)
 {
-	struct block_device *bdev = bdget_disk(disk, 0);
-	if (bdev) {
-		unlockfs(bdev);
-		bdput(bdev);
+	struct block_device *bdev;
+
+	if (!test_and_clear_bit(DMF_FS_LOCKED, &md->flags))
+		return 0;
+
+	bdev = bdget_disk(md->disk, 0);
+	if (!bdev) {
+		DMWARN("bdget failed in __unlock_fs");
+		return -ENOMEM;
 	}
+
+	unlockfs(bdev);
+	bdput(bdev);
+	return 0;
 }
 
 /*
@@ -922,9 +956,7 @@ int dm_suspend(struct mapped_device *md)
 		return -EINVAL;
 	}
 
-	if (!test_and_set_bit(DMF_FS_LOCKED, &md->flags)) {
-		__lock_disk(md->disk);
-	}
+	__lock_fs(md);
 	up_read(&md->lock);
 
 	/*
@@ -933,6 +965,11 @@ int dm_suspend(struct mapped_device *md)
 	 */
 	down_write(&md->lock);
 	if (test_bit(DMF_BLOCK_IO, &md->flags)) {
+		/*
+		 * If we get here we know another thread is
+		 * trying to suspend as well, so we leave the fs
+		 * locked for this thread.
+		 */
 		up_write(&md->lock);
 		return -EINVAL;
 	}
@@ -955,7 +992,7 @@ int dm_suspend(struct mapped_device *md)
 	while (1) {
 		set_current_state(TASK_INTERRUPTIBLE);
 
-		if (!atomic_read(&md->pending))
+		if (!atomic_read(&md->pending) || signal_pending(current))
 			break;
 
 		io_schedule();
@@ -964,6 +1001,15 @@ int dm_suspend(struct mapped_device *md)
 
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);
+
+	/* were we interrupted ? */
+	if (atomic_read(&md->pending)) {
+		__unlock_fs(md);
+		clear_bit(DMF_BLOCK_IO, &md->flags);
+		up_write(&md->lock);
+		return -EINTR;
+	}
+
 	set_bit(DMF_SUSPENDED, &md->flags);
 
 	map = dm_get_table(md);
@@ -992,15 +1038,14 @@ int dm_resume(struct mapped_device *md)
 	dm_table_resume_targets(map);
 	clear_bit(DMF_SUSPENDED, &md->flags);
 	clear_bit(DMF_BLOCK_IO, &md->flags);
-	clear_bit(DMF_FS_LOCKED, &md->flags);
 
 	def = bio_list_get(&md->deferred);
 	__flush_deferred_io(md, def);
 	up_write(&md->lock);
+	__unlock_fs(md);
 	dm_table_unplug_all(map);
 	dm_table_put(map);
 
-	__unlock_disk(md->disk);
 
 	return 0;
 }

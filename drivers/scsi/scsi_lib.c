@@ -524,7 +524,7 @@ static struct scsi_cmnd *scsi_end_request(struct scsi_cmnd *cmd, int uptodate,
 	 * to queue the remainder of them.
 	 */
 	if (end_that_request_chunk(req, uptodate, bytes)) {
-		int leftover = (req->hard_nr_sectors << 9) - bytes;
+		int leftover = req->hard_nr_sectors << 9;
 
 		if (blk_pc_request(req))
 			leftover = req->data_len - bytes;

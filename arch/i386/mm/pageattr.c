@@ -67,22 +67,19 @@ static void flush_kernel_map(void *dummy)
 
 static void set_pmd_pte(pte_t *kpte, unsigned long address, pte_t pte) 
 { 
-	struct page *page;
-	unsigned long flags;
-
 	set_pte_atomic(kpte, pte); 	/* change init_mm */
-	if (PTRS_PER_PMD > 1)
-		return;
-
-	spin_lock_irqsave(&pgd_lock, flags);
-	list_for_each_entry(page, &pgd_list, lru) {
-		pgd_t *pgd;
-		pmd_t *pmd;
-		pgd = (pgd_t *)page_address(page) + pgd_index(address);
-		pmd = pmd_offset(pgd, address);
-		set_pte_atomic((pte_t *)pmd, pte);
+#ifndef CONFIG_X86_PAE
+	{
+		struct list_head *l;
+		spin_lock(&mmlist_lock);
+		list_for_each(l, &init_mm.mmlist) {
+			struct mm_struct *mm = list_entry(l, struct mm_struct, mmlist);
+			pmd_t *pmd = pmd_offset(pgd_offset(mm, address), address);
+			set_pte_atomic((pte_t *)pmd, pte);
+		}
+		spin_unlock(&mmlist_lock);
 	}
-	spin_unlock_irqrestore(&pgd_lock, flags);
+#endif
 }
 
 /* 
@@ -135,7 +132,7 @@ __change_page_attr(struct page *page, pgprot_t prot)
 	}
 
 	if (cpu_has_pse && (atomic_read(&kpte_page->count) == 1)) { 
-		list_add(&kpte_page->list, &df_list);
+		list_add(&kpte_page->lru, &df_list);
 		revert_page(kpte_page, address);
 	} 
 	return 0;
@@ -188,7 +185,7 @@ void global_flush_tlb(void)
 	flush_map();
 	n = l.next;
 	while (n != &l) {
-		struct page *pg = list_entry(n, struct page, list);
+		struct page *pg = list_entry(n, struct page, lru);
 		n = n->next;
 		__free_page(pg);
 	}

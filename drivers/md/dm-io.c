@@ -58,11 +58,7 @@ static void bio_set_exit(struct bio_set *bs)
 
 static void mk_name(char *str, size_t len, const char *prefix, unsigned count)
 {
-	int r;
-
-	r = snprintf(str, len, "%s-%u", prefix, count);
-	if (r < 0)
-		str[len - 1] = '\0';
+	snprintf(str, len, "%s-%u", prefix, count);
 }
 
 static int bio_set_init(struct bio_set *bs, const char *slab_prefix,
@@ -75,7 +71,6 @@ static int bio_set_init(struct bio_set *bs, const char *slab_prefix,
 	};
 
 
-	int r;
 	unsigned i, size;
 	struct biovec_pool *bp;
 
@@ -85,9 +80,7 @@ static int bio_set_init(struct bio_set *bs, const char *slab_prefix,
 	/*
 	 * Set up the bio pool.
 	 */
-	r = snprintf(bs->name, sizeof(bs->name), "%s-bio", slab_prefix);
-	if (r < 0)
-		bs->name[sizeof(bs->name) - 1] = '\0';
+	snprintf(bs->name, sizeof(bs->name), "%s-bio", slab_prefix);
 
 	bs->bio_slab = kmem_cache_create(bs->name, sizeof(struct bio), 0,
 					 SLAB_HWCACHE_ALIGN, NULL, NULL);
@@ -380,25 +373,26 @@ void list_get_page(struct dpages *dp,
 		  struct page **p, unsigned long *len, unsigned *offset)
 {
 	unsigned o = dp->context_u;
+	struct page_list *pl = (struct page_list *) dp->context_ptr;
 
-	*p = (struct page *) dp->context_ptr;
+	*p = pl->page;
 	*len = PAGE_SIZE - o;
 	*offset = o;
 }
 
 void list_next_page(struct dpages *dp)
 {
-	struct page *page = (struct page *) dp->context_ptr;
-	dp->context_ptr = list_entry(page->list.next, struct page, list);
+	struct page_list *pl = (struct page_list *) dp->context_ptr;
+	dp->context_ptr = pl->next;
 	dp->context_u = 0;
 }
 
-void list_dp_init(struct dpages *dp, struct page *page, unsigned offset)
+void list_dp_init(struct dpages *dp, struct page_list *pl, unsigned offset)
 {
 	dp->get_page = list_get_page;
 	dp->next_page = list_next_page;
 	dp->context_u = offset;
-	dp->context_ptr = page;
+	dp->context_ptr = pl;
 }
 
 /*
@@ -424,6 +418,28 @@ void bvec_dp_init(struct dpages *dp, struct bio_vec *bvec)
 	dp->get_page = bvec_get_page;
 	dp->next_page = bvec_next_page;
 	dp->context_ptr = bvec;
+}
+
+void vm_get_page(struct dpages *dp,
+		 struct page **p, unsigned long *len, unsigned *offset)
+{
+	*p = vmalloc_to_page(dp->context_ptr);
+	*offset = dp->context_u;
+	*len = PAGE_SIZE - dp->context_u;
+}
+
+void vm_next_page(struct dpages *dp)
+{
+	dp->context_ptr += PAGE_SIZE - dp->context_u;
+	dp->context_u = 0;
+}
+
+void vm_dp_init(struct dpages *dp, void *data)
+{
+	dp->get_page = vm_get_page;
+	dp->next_page = vm_next_page;
+	dp->context_u = ((unsigned long) data) & (PAGE_SIZE - 1);
+	dp->context_ptr = data;
 }
 
 /*-----------------------------------------------------------------
@@ -481,7 +497,7 @@ static void dispatch_io(int rw, unsigned int num_regions,
 	struct dpages old_pages = *dp;
 
 	if (sync)
-		rw |= (1 << BIO_RW_SYNC);
+		rw |= BIO_RW_SYNC;
 
 	/*
 	 * For multiple regions we need to be careful to rewind
@@ -514,15 +530,17 @@ int sync_io(unsigned int num_regions, struct io_region *where,
 	dispatch_io(rw, num_regions, where, dp, &io, 1);
 
 	while (1) {
-		/* FIXME: handle signals */
 		set_current_state(TASK_UNINTERRUPTIBLE);
 
-		if (!atomic_read(&io.count))
+		if (!atomic_read(&io.count) || signal_pending(current))
 			break;
 
-		schedule();
+		io_schedule();
 	}
 	set_current_state(TASK_RUNNING);
+
+	if (atomic_read(&io.count))
+		return -EINTR;
 
 	*error_bits = io.error;
 	return io.error ? -EIO : 0;
@@ -544,11 +562,11 @@ int async_io(unsigned int num_regions, struct io_region *where, int rw,
 }
 
 int dm_io_sync(unsigned int num_regions, struct io_region *where, int rw,
-	       struct page *pages, unsigned int offset,
+	       struct page_list *pl, unsigned int offset,
 	       unsigned long *error_bits)
 {
 	struct dpages dp;
-	list_dp_init(&dp, pages, offset);
+	list_dp_init(&dp, pl, offset);
 	return sync_io(num_regions, where, rw, &dp, error_bits);
 }
 
@@ -560,12 +578,20 @@ int dm_io_sync_bvec(unsigned int num_regions, struct io_region *where, int rw,
 	return sync_io(num_regions, where, rw, &dp, error_bits);
 }
 
+int dm_io_sync_vm(unsigned int num_regions, struct io_region *where, int rw,
+		  void *data, unsigned long *error_bits)
+{
+	struct dpages dp;
+	vm_dp_init(&dp, data);
+	return sync_io(num_regions, where, rw, &dp, error_bits);
+}
+
 int dm_io_async(unsigned int num_regions, struct io_region *where, int rw,
-		struct page *pages, unsigned int offset,
+		struct page_list *pl, unsigned int offset,
 		io_notify_fn fn, void *context)
 {
 	struct dpages dp;
-	list_dp_init(&dp, pages, offset);
+	list_dp_init(&dp, pl, offset);
 	return async_io(num_regions, where, rw, &dp, fn, context);
 }
 
@@ -577,9 +603,18 @@ int dm_io_async_bvec(unsigned int num_regions, struct io_region *where, int rw,
 	return async_io(num_regions, where, rw, &dp, fn, context);
 }
 
+int dm_io_async_vm(unsigned int num_regions, struct io_region *where, int rw,
+		   void *data, io_notify_fn fn, void *context)
+{
+	struct dpages dp;
+	vm_dp_init(&dp, data);
+	return async_io(num_regions, where, rw, &dp, fn, context);
+}
 
 EXPORT_SYMBOL(dm_io_get);
 EXPORT_SYMBOL(dm_io_put);
 EXPORT_SYMBOL(dm_io_sync);
 EXPORT_SYMBOL(dm_io_async);
 EXPORT_SYMBOL(dm_io_async_bvec);
+EXPORT_SYMBOL(dm_io_sync_vm);
+EXPORT_SYMBOL(dm_io_async_vm);
