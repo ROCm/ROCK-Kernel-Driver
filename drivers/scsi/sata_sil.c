@@ -35,7 +35,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME	"sata_sil"
-#define DRV_VERSION	"0.53"
+#define DRV_VERSION	"0.54"
 
 enum {
 	sil_3112		= 0,
