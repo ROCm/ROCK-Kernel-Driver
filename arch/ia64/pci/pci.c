@@ -168,11 +168,6 @@ pcibios_update_irq (struct pci_dev *dev, int irq)
 	/* ??? FIXME -- record old value for shutdown.  */
 }
 
-void __devinit
-pcibios_fixup_pbus_ranges (struct pci_bus * bus, struct pbus_set_ranges_data * ranges)
-{
-}
-
 static inline int
 pcibios_enable_resources (struct pci_dev *dev, int mask)
 {

@@ -127,11 +127,6 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 	return NULL;
 }
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
-					 struct pbus_set_ranges_data *pranges)
-{
-}
-
 void
 pcibios_update_resource(struct pci_dev *dev, struct resource *res,
 			int resource)

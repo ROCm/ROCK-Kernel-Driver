@@ -297,11 +297,6 @@ void __init pcibios_update_irq(struct pci_dev *dev, int irq)
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *bus,
-					 struct pbus_set_ranges_data *ranges)
-{
-}
-
 int pcibios_enable_resources(struct pci_dev *dev)
 {
 	u16 cmd, old_cmd;

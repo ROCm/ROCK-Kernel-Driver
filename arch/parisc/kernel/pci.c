@@ -344,30 +344,34 @@ pcibios_link_hba_resources( struct resource *hba_res, struct resource *r)
 /*
 ** called by drivers/pci/setup-res.c:pci_setup_bridge().
 */
-void __devinit pcibios_fixup_pbus_ranges(
-	struct pci_bus *bus,
-	struct pbus_set_ranges_data *ranges
+void __devinit pcibios_resource_to_bus(
+ 	struct pci_dev *dev,
+	struct pci_bus_region *region,
+	struct resource *res
 	)
 {
+	struct pci_bus *bus = dev->bus;
 	struct pci_hba_data *hba = HBA_DATA(bus->dev->platform_data);
 
-	/*
-	** I/O space may see busnumbers here. Something
-	** in the form of 0xbbxxxx where bb is the bus num
-	** and xxxx is the I/O port space address.
-	** Remaining address translation are done in the
-	** PCI Host adapter specific code - ie dino_out8.
-	*/
-	ranges->io_start = PCI_PORT_ADDR(ranges->io_start);
-	ranges->io_end   = PCI_PORT_ADDR(ranges->io_end);
+	if (res->flags & IORESOURCE_IO) {
+		/*
+		** I/O space may see busnumbers here. Something
+		** in the form of 0xbbxxxx where bb is the bus num
+		** and xxxx is the I/O port space address.
+		** Remaining address translation are done in the
+		** PCI Host adapter specific code - ie dino_out8.
+		*/
+		region->start = PCI_PORT_ADDR(res->start);
+		region->end   = PCI_PORT_ADDR(res->end);
+	} else if (res->flags & IORESOURCE_MEM) {
+		/* Convert MMIO addr to PCI addr (undo global virtualization) */
+		region->start = PCI_BUS_ADDR(hba, res->start);
+		region->end   = PCI_BUS_ADDR(hba, res->end);
+	}
 
-	/* Convert MMIO addr to PCI addr (undo global virtualization) */
-	ranges->mem_start = PCI_BUS_ADDR(hba, ranges->mem_start);
-	ranges->mem_end   = PCI_BUS_ADDR(hba, ranges->mem_end);
-
-	DBG_RES("pcibios_fixup_pbus_ranges(%02x, [%lx,%lx %lx,%lx])\n", bus->number,
-		ranges->io_start, ranges->io_end,
-		ranges->mem_start, ranges->mem_end);
+	DBG_RES("pcibios_resource_to_bus(%02x %s [%lx,%lx])\n",
+		bus->number, res->flags & IORESOURCE_IO ? "IO" : "MEM",
+		region->start, region->end);
 
 	/* KLUGE ALERT
 	** if this resource isn't linked to a "parent", then it seems
@@ -376,6 +380,10 @@ void __devinit pcibios_fixup_pbus_ranges(
 	pcibios_link_hba_resources(&hba->io_space, bus->resource[0]);
 	pcibios_link_hba_resources(&hba->lmmio_space, bus->resource[1]);
 }
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 #define MAX(val1, val2)   ((val1) > (val2) ? (val1) : (val2))
 

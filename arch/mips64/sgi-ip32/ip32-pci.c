@@ -348,12 +348,6 @@ void __init pcibios_fixup_bus (struct pci_bus *b)
 	pci_fixup_irqs (macepci_swizzle, macepci_map_irq);
 }
 
-/* XXX anybody know what this is supposed to do? */
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus * bus,
-					 struct pbus_set_ranges_data * ranges)
-{
-}
-
 /*
  * Handle errors from the bridge.  This includes master and target aborts,
  * various command and address errors, and the interrupt test.  This gets

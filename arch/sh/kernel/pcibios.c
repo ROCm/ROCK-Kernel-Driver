@@ -19,7 +19,6 @@
  *	pcibios_fixup_bus()
  *	pcibios_init()
  *	pcibios_setup()
- *	pcibios_fixup_pbus_ranges()
  */
 
 #include <linux/kernel.h>

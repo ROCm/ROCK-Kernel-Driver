@@ -97,4 +97,7 @@ extern int pcibios_prep_mwi (struct pci_dev *);
 extern int pci_mmap_page_range (struct pci_dev *dev, struct vm_area_struct *vma,
 				enum pci_mmap_state mmap_state, int write_combine);
 
+/* generic pci stuff */
+#include <asm-generic/pci.h>
+
 #endif /* _ASM_IA64_PCI_H */

@@ -12,7 +12,7 @@
  * Nov 2000, Ivan Kokshaysky <ink@jurassic.park.msu.ru>
  *	     PCI-PCI bridges cleanup
  */
-
+#include <linux/config.h>
 #include <linux/string.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -334,20 +334,24 @@ common_swizzle(struct pci_dev *dev, u8 *pinp)
 }
 
 void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus * bus,
-			  struct pbus_set_ranges_data * ranges)
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res)
 {
-	struct pci_controller *hose = (struct pci_controller *)bus->sysdata;
+	struct pci_controller *hose = (struct pci_controller *)dev->sysdata;
+	unsigned long offset = 0;
 
-	ranges->io_start -= hose->io_space->start;
-	ranges->io_end -= hose->io_space->start;
-	ranges->mem_start -= hose->mem_space->start;
-	ranges->mem_end -= hose->mem_space->start;
-/* FIXME: On older alphas we could use dense memory space
-	  to access prefetchable resources. */
-	ranges->prefetch_start -= hose->mem_space->start;
-	ranges->prefetch_end -= hose->mem_space->start;
+	if (res->flags & IORESOURCE_IO)
+		offset = hose->io_space->start;
+	else if (res->flags & IORESOURCE_MEM)
+		offset = hose->mem_space->start;
+
+	region->start = res->start - offset;
+	region->end = res->end - offset;
 }
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 int
 pcibios_enable_device(struct pci_dev *dev, int mask)

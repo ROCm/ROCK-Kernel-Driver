@@ -1107,11 +1107,6 @@ common_swizzle(struct pci_dev *dev, unsigned char *pinp)
 	return PCI_SLOT(dev->devfn);
 }
 
-void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus * bus, struct pbus_set_ranges_data * ranges)
-{
-}
-
 unsigned long resource_fixup(struct pci_dev * dev, struct resource * res,
 			     unsigned long start, unsigned long size)
 {

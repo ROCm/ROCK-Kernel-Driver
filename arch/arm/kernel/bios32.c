@@ -439,17 +439,25 @@ void __devinit pcibios_fixup_bus(struct pci_bus *bus)
  * Convert from Linux-centric to bus-centric addresses for bridge devices.
  */
 void __devinit
-pcibios_fixup_pbus_ranges(struct pci_bus *bus, struct pbus_set_ranges_data *ranges)
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res)
 {
-	struct pci_sys_data *root = bus->sysdata;
+	struct pci_sys_data *root = dev->sysdata;
+	unsigned long offset = 0;
 
-	ranges->io_start -= root->io_offset;
-	ranges->io_end -= root->io_offset;
-	ranges->mem_start -= root->mem_offset;
-	ranges->mem_end -= root->mem_offset;
-	ranges->prefetch_start -= root->mem_offset;
-	ranges->prefetch_end -= root->mem_offset;
+	if (res->flags & IORESOURCE_IO)
+		offset = root->io_offset;
+	if (res->flags & IORESOURCE_MEM)
+		offset = root->mem_offset;
+
+	region->start = res->start - offset;
+	region->end   = res->end - offset;
 }
+
+#ifdef CONFIG_HOTPLUG
+EXPORT_SYMBOL(pcibios_fixup_bus);
+EXPORT_SYMBOL(pcibios_resource_to_bus);
+#endif
 
 /*
  * This is the standard PCI-PCI bridge swizzling algorithm:

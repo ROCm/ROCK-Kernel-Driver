@@ -341,8 +341,10 @@ void __init pcibios_update_irq(struct pci_dev *dev, int irq)
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
 }
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *bus,
-					 struct pbus_set_ranges_data *ranges)
+#if 0	/*  original DDB5074 code */
+void __devinit
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			 struct resource *res)
 {
 	/*
 	 * our caller figure out range by going through the dev structures.  
@@ -350,15 +352,14 @@ void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *bus,
 	 * different view of the addressing space.
 	 */
 
-#if 0	/*  original DDB5074 code */
 	   if (bus->number == 0) {
 	   ranges->io_start -= bus->resource[0]->start;
 	   ranges->io_end -= bus->resource[0]->start;
 	   ranges->mem_start -= bus->resource[1]->start;
 	   ranges->mem_end -= bus->resource[1]->start;
 	   }
-#endif
 }
+#endif
 
 int pcibios_enable_resources(struct pci_dev *dev)
 {
