@@ -92,11 +92,43 @@ static ssize_t pccard_show_vcc(struct class_device *dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(card_vcc, 0400, pccard_show_vcc, NULL);
 
+
+static ssize_t pccard_store_insert(struct class_device *dev, const char *buf, size_t count)
+{
+	ssize_t ret;
+	struct pcmcia_socket *s = to_socket(dev);
+
+	if (!count)
+		return -EINVAL;
+
+	ret = pcmcia_insert_card(s);
+
+	return ret ? ret : count;
+}
+static CLASS_DEVICE_ATTR(card_insert, 0200, NULL, pccard_store_insert);
+
+static ssize_t pccard_store_eject(struct class_device *dev, const char *buf, size_t count)
+{
+	ssize_t ret;
+	struct pcmcia_socket *s = to_socket(dev);
+
+	if (!count)
+		return -EINVAL;
+
+	ret = pcmcia_eject_card(s);
+
+	return ret ? ret : count;
+}
+static CLASS_DEVICE_ATTR(card_eject, 0200, NULL, pccard_store_eject);
+
+
 static struct class_device_attribute *pccard_socket_attributes[] = {
 	&class_device_attr_card_type,
 	&class_device_attr_card_voltage,
 	&class_device_attr_card_vpp,
 	&class_device_attr_card_vcc,
+	&class_device_attr_card_insert,
+	&class_device_attr_card_eject,
 	NULL,
 };
 

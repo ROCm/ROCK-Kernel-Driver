@@ -2043,16 +2043,18 @@ int pcmcia_eject_card(struct pcmcia_socket *skt)
 	down(&skt->skt_sem);
 	do {
 		if (!(skt->state & SOCKET_PRESENT)) {
-			ret = CS_NO_CARD;
+			ret = -ENODEV;
 			break;
 		}
 
 		ret = send_event(skt, CS_EVENT_EJECTION_REQUEST, CS_EVENT_PRI_LOW);
-		if (ret != 0)
+		if (ret != 0) {
+			ret = -EINVAL;
 			break;
+		}
 
 		socket_remove(skt);
-		ret = CS_SUCCESS;
+		ret = 0;
 	} while (0);
 	up(&skt->skt_sem);
 
@@ -2068,14 +2070,14 @@ int pcmcia_insert_card(struct pcmcia_socket *skt)
 	down(&skt->skt_sem);
 	do {
 		if (skt->state & SOCKET_PRESENT) {
-			ret = CS_IN_USE;
+			ret = -EBUSY;
 			break;
 		}
 		if (socket_insert(skt) == CS_NO_CARD) {
-			ret = CS_NO_CARD;
+			ret = -ENODEV;
 			break;
 		}
-		ret = CS_SUCCESS;
+		ret = 0;
 	} while (0);
 	up(&skt->skt_sem);
 
