@@ -33,7 +33,7 @@
 #define insw    __arch_readsw
 #define insl    __arch_readsl*/
 
-#define __io(a)			(a)
+#define __io(a)			((void __iomem *)(a))
 #define __mem_pci(a)            (a) 
 
 #endif
