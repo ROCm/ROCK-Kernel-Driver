@@ -76,6 +76,16 @@ struct i2o_device
 };
 
 /*
+ * context queue entry, used for 32-bit context on 64-bit systems
+ */
+struct i2o_context_list_element {
+	struct i2o_context_list_element *next;
+	u32 context;
+	void *ptr;
+	unsigned int flags;
+};
+
+/*
  * Each I2O controller has one of these objects
  */
 struct i2o_controller
@@ -133,6 +143,11 @@ struct i2o_controller
 
 	void *page_frame;			/* Message buffers */
 	dma_addr_t page_frame_map;		/* Cache map */
+#if BITS_PER_LONG == 64
+	spinlock_t context_list_lock;		/* lock for context_list */
+	struct i2o_context_list_element *context_list; /* list of context id's
+						    and pointers */
+#endif
 };
 
 /*
@@ -321,6 +336,27 @@ extern int i2o_install_controller(struct i2o_controller *);
 extern int i2o_activate_controller(struct i2o_controller *);
 extern void i2o_run_queue(struct i2o_controller *);
 extern int i2o_delete_controller(struct i2o_controller *);
+
+#if BITS_PER_LONG == 64
+extern u32 i2o_context_list_add(void *, struct i2o_controller *);
+extern void *i2o_context_list_get(u32, struct i2o_controller *);
+extern u32 i2o_context_list_remove(void *, struct i2o_controller *);
+#else
+static inline u32 i2o_context_list_add(void *ptr, struct i2o_controller *c)
+{
+	return (u32)ptr;
+}
+
+static inline void *i2o_context_list_get(u32 context, struct i2o_controller *c)
+{
+	return (void *)context;
+}
+
+static inline u32 i2o_context_list_remove(void *ptr, struct i2o_controller *c)
+{
+	return (u32)ptr;
+}
+#endif
 
 /*
  *	Cache strategies
@@ -648,6 +684,10 @@ extern int i2o_delete_controller(struct i2o_controller *);
 
 #define I2O_POST_WAIT_OK	0
 #define I2O_POST_WAIT_TIMEOUT	-ETIMEDOUT
+
+#define I2O_CONTEXT_LIST_MIN_LENGTH	15
+#define I2O_CONTEXT_LIST_USED		0x01
+#define I2O_CONTEXT_LIST_DELETED	0x02
 
 #endif /* __KERNEL__ */
 #endif /* _I2O_H */

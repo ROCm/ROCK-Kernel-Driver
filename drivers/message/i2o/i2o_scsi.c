@@ -62,9 +62,6 @@
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 
-#if BITS_PER_LONG == 64
-#error FIXME: driver does not support 64-bit platforms
-#endif
 
 
 #define VERSION_STRING        "Version 0.1.2"
@@ -233,7 +230,10 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		{
 			spin_unlock_irqrestore(&retry_lock, flags);
 			/* Create a scsi error for this */
-			current_command = (Scsi_Cmnd *)m[3];
+			current_command = (Scsi_Cmnd *)i2o_context_list_get(m[3], c);
+			if(!current_command)
+				return;
+
 			lock = current_command->device->host->host_lock;
 			printk("Aborted %ld\n", current_command->serial_number);
 
@@ -276,16 +276,15 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		printk(KERN_INFO "i2o_scsi: bus reset completed.\n");
 		return;
 	}
-	/*
- 	 *	FIXME: 64bit breakage
-	 */
 
-	current_command = (Scsi_Cmnd *)m[3];
+	current_command = (Scsi_Cmnd *)i2o_context_list_get(m[3], c);
 	
 	/*
 	 *	Is this a control request coming back - eg an abort ?
 	 */
 	 
+	atomic_dec(&queue_depth);
+
 	if(current_command==NULL)
 	{
 		if(st)
@@ -295,8 +294,6 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	}
 	
 	dprintk(KERN_INFO "Completed %ld\n", current_command->serial_number);
-	
-	atomic_dec(&queue_depth);
 	
 	if(st == 0x06)
 	{
@@ -647,9 +644,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	if(tid == -1)
 	{
 		SCpnt->result = DID_NO_CONNECT << 16;
-		spin_lock_irqsave(host->host_lock, flags);
 		done(SCpnt);
-		spin_unlock_irqrestore(host->host_lock, flags);
 		return 0;
 	}
 	
@@ -699,8 +694,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	
 	i2o_raw_writel(I2O_CMD_SCSI_EXEC<<24|HOST_TID<<12|tid, &msg[1]);
 	i2o_raw_writel(scsi_context, &msg[2]);	/* So the I2O layer passes to us */
-	/* Sorry 64bit folks. FIXME */
-	i2o_raw_writel((u32)SCpnt, &msg[3]);	/* We want the SCSI control block back */
+	i2o_raw_writel(i2o_context_list_add(SCpnt, c), &msg[3]);	/* We want the SCSI control block back */
 
 	/* LSI_920_PCI_QUIRK
 	 *
@@ -883,7 +877,7 @@ static int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
  *	@SCpnt: command to abort
  *
  *	Ask the I2O controller to abort a command. This is an asynchrnous
- *	process and oru callback handler will see the command complete
+ *	process and our callback handler will see the command complete
  *	with an aborted message if it succeeds. 
  *
  *	Locks: no locks are held or needed
@@ -894,10 +888,9 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	struct i2o_controller *c;
 	struct Scsi_Host *host;
 	struct i2o_scsi_host *hostdata;
-	unsigned long msg;
-	u32 m;
+	u32 msg[5];
 	int tid;
-	unsigned long timeout;
+	int status = FAILED;
 	
 	printk(KERN_WARNING "i2o_scsi: Aborting command block.\n");
 	
@@ -907,37 +900,22 @@ int i2o_scsi_abort(Scsi_Cmnd * SCpnt)
 	if(tid==-1)
 	{
 		printk(KERN_ERR "i2o_scsi: Impossible command to abort!\n");
-		return FAILED;
+		return status;
 	}
 	c = hostdata->controller;
 
 	spin_unlock_irq(host->host_lock);
 		
-	timeout = jiffies+2*HZ;
-	do
-	{
-		m = le32_to_cpu(I2O_POST_READ32(c));
-		if(m != 0xFFFFFFFF)
-			break;
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(1);
-		mb();
-	}
-	while(time_before(jiffies, timeout));
-	
-	msg = c->mem_offset + m;
-	
-	i2o_raw_writel(FIVE_WORD_MSG_SIZE, msg);
-	i2o_raw_writel(I2O_CMD_SCSI_ABORT<<24|HOST_TID<<12|tid, msg+4);
-	i2o_raw_writel(scsi_context, msg+8);
-	i2o_raw_writel(0, msg+12);	/* Not needed for an abort */
-	i2o_raw_writel((u32)SCpnt, msg+16);	
-	wmb();
-	i2o_post_message(c,m);
-	wmb();
-	
+	msg[0] = FIVE_WORD_MSG_SIZE;
+	msg[1] = I2O_CMD_SCSI_ABORT<<24|HOST_TID<<12|tid;
+	msg[2] = scsi_context;
+	msg[3] = 0;
+	msg[4] = i2o_context_list_remove(SCpnt, c);
+	if(i2o_post_wait(c, msg, sizeof(msg), 240))
+		status = SUCCESS;
+
 	spin_lock_irq(host->host_lock);
-	return SUCCESS;
+	return status;
 }
 
 /**
