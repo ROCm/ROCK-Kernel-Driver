@@ -2306,7 +2306,7 @@ static int __init fbcon_show_logo( void )
 	}
 #endif
 #if defined(CONFIG_FBCON_CFB4)
-	if (depth == 4 && p->type == FB_TYPE_PACKED_PIXELS) {
+	if (depth == 4 && info->fix.type == FB_TYPE_PACKED_PIXELS) {
 		src = logo;
 		for( y1 = 0; y1 < LOGO_H; y1++) {
 			dst = fb + y1*line + x/2;
@@ -2320,7 +2320,7 @@ static int __init fbcon_show_logo( void )
 	}
 #endif
 #if defined(CONFIG_FBCON_CFB8) || defined(CONFIG_FB_SBUS)
-	if (depth == 8 && p->type == FB_TYPE_PACKED_PIXELS) {
+	if (depth == 8 && info->fix.type == FB_TYPE_PACKED_PIXELS) {
 	    /* depth 8 or more, packed, with color registers */
 		
 	    src = logo;
@@ -2335,8 +2335,8 @@ static int __init fbcon_show_logo( void )
 #if defined(CONFIG_FBCON_AFB) || defined(CONFIG_FBCON_ILBM) || \
     defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
     defined(CONFIG_FBCON_IPLAN2P8)
-	if (depth >= 2 && (p->type == FB_TYPE_PLANES ||
-			   p->type == FB_TYPE_INTERLEAVED_PLANES)) {
+	if (depth >= 2 && (info->fix.type == FB_TYPE_PLANES ||
+			   info->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
 	    /* planes (normal or interleaved), with color registers */
 	    int bit;
 	    unsigned char val, mask;
@@ -2344,7 +2344,7 @@ static int __init fbcon_show_logo( void )
 
 #if defined(CONFIG_FBCON_IPLAN2P2) || defined(CONFIG_FBCON_IPLAN2P4) || \
     defined(CONFIG_FBCON_IPLAN2P8)
-	    int line_length = p->line_length;
+	    int line_length = info->fix.line_length;
 
 	    /* for support of Atari interleaved planes */
 #define MAP_X(x)	(line_length ? (x) : ((x) & ~1)*depth + ((x) & 1))
@@ -2388,15 +2388,15 @@ static int __init fbcon_show_logo( void )
 #if defined(CONFIG_FBCON_MFB) || defined(CONFIG_FBCON_AFB) || \
     defined(CONFIG_FBCON_ILBM) || defined(CONFIG_FBCON_HGA)
 
-	if (depth == 1 && (p->type == FB_TYPE_PACKED_PIXELS ||
-			   p->type == FB_TYPE_PLANES ||
-			   p->type == FB_TYPE_INTERLEAVED_PLANES)) {
+	if (depth == 1 && (info->fix.type == FB_TYPE_PACKED_PIXELS ||
+			   info->fix.type == FB_TYPE_PLANES ||
+			   info->fix.type == FB_TYPE_INTERLEAVED_PLANES)) {
 
 	    /* monochrome */
-	    unsigned char inverse = p->inverse || p->visual == FB_VISUAL_MONO01
+	    unsigned char inverse = p->inverse || info->fix.visual == FB_VISUAL_MONO01
 		? 0x00 : 0xff;
 
-	    int is_hga = !strncmp(p->fb_info->modename, "HGA", 3);
+	    int is_hga = !strncmp(info->modename, "HGA", 3);
 	    /* can't use simply memcpy because need to apply inverse */
 	    for( y1 = 0; y1 < LOGO_H; y1++ ) {
 		src = logo + y1*LOGO_LINE;
@@ -2411,7 +2411,7 @@ static int __init fbcon_show_logo( void )
 	}
 #endif
 #if defined(CONFIG_FBCON_VGA_PLANES)
-	if (depth == 4 && p->type == FB_TYPE_VGA_PLANES) {
+	if (depth == 4 && info->fix.type == FB_TYPE_VGA_PLANES) {
 		outb_p(1,0x3ce); outb_p(0xf,0x3cf);
 		outb_p(3,0x3ce); outb_p(0,0x3cf);
 		outb_p(5,0x3ce); outb_p(0,0x3cf);
