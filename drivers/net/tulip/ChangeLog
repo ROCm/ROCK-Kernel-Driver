@@ -1,3 +1,14 @@
+2002-09-18  Ryan Bradetich  <rbradetich@uswest.net>
+
+	tulip hppa support:
+	* eeprom.c (tulip_build_fake_mediatable): new function
+	(tulip_parse_eeprom): call it, when no media table
+	* interrupt.c (phy_interrupt): new function
+	(tulip_interrupt): call it, before checking for no-irq-work
+	* tulip.c: add HAS_PHY_IRQ chip feature flag.
+	add csr12_shadow to tulip_private struct, only for hppa currently.
+	* tulip_core (tulip_init_one): support hppa wonky eeproms
+
 2002-05-11  Juan Quintela  <quintela@mandrakesoft.com>
 
 	* 21142.c (t21142_lnk_change): Revert earlier patch

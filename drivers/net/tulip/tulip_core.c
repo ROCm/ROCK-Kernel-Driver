@@ -1490,6 +1490,25 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
                        tp->flags &= ~HAS_MEDIA_TABLE;
                }
 #endif
+#ifdef __hppa__
+		/* 3x5 HSC (J3514A) has a broken srom */
+		if(ee_data[0] == 0x61 && ee_data[1] == 0x10) {
+			/* pci_vendor_id and subsystem_id are swapped */
+			ee_data[0] = ee_data[2];
+			ee_data[1] = ee_data[3];
+			ee_data[2] = 0x61;
+			ee_data[3] = 0x10;
+
+			/* srom need to be byte-swaped and shifted up 1 word.  
+			 * This shift needs to happen at the end of the MAC
+			 * first because of the 2 byte overlap.
+			 */
+			for(i = 4; i >= 0; i -= 2) {
+				ee_data[17 + i + 3] = ee_data[17 + i];
+				ee_data[16 + i + 5] = ee_data[16 + i];
+			}
+		}
+#endif
 		for (i = 0; i < 6; i ++) {
 			dev->dev_addr[i] = ee_data[i + sa_offset];
 			sum += ee_data[i + sa_offset];
