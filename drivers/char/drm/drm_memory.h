@@ -35,6 +35,7 @@
 
 #include <linux/config.h>
 #include <linux/highmem.h>
+#include <linux/vmalloc.h>
 #include "drmP.h"
 
 /**
