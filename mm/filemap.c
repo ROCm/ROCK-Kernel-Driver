@@ -797,9 +797,9 @@ struct page *find_trylock_page(struct address_space *mapping, unsigned long offs
 }
 
 /*
- * Must be called with the pagecache lock held,
- * will return with it held (but it may be dropped
- * during blocking operations..
+ * Must be called with the mapping lock held for writing.
+ * Will return with it held for writing, but it may be dropped
+ * while locking the page.
  */
 static struct page *__find_lock_page(struct address_space *mapping,
 					unsigned long offset)
@@ -815,11 +815,11 @@ repeat:
 	if (page) {
 		page_cache_get(page);
 		if (TryLockPage(page)) {
-			read_unlock(&mapping->page_lock);
+			write_unlock(&mapping->page_lock);
 			lock_page(page);
-			read_lock(&mapping->page_lock);
+			write_lock(&mapping->page_lock);
 
-			/* Has the page been re-allocated while we slept? */
+			/* Has the page been truncated while we slept? */
 			if (page->mapping != mapping || page->index != offset) {
 				UnlockPage(page);
 				page_cache_release(page);
@@ -830,25 +830,53 @@ repeat:
 	return page;
 }
 
-/*
- * Same as the above, but lock the page too, verifying that
- * it's still valid once we own it.
+/**
+ * find_lock_page - locate, pin and lock a pagecache page
+ *
+ * @mapping - the address_space to search
+ * @offset - the page index
+ *
+ * Locates the desired pagecache page, locks it, increments its reference
+ * count and returns its address.
+ *
+ * Returns zero if the page was not present. find_lock_page() may sleep.
  */
-struct page * find_lock_page(struct address_space *mapping, unsigned long offset)
+
+/*
+ * The write_lock is unfortunate, but __find_lock_page() requires that on
+ * behalf of find_or_create_page().  We could just clone __find_lock_page() -
+ * one for find_lock_page(), one for find_or_create_page()...
+ */
+struct page *find_lock_page(struct address_space *mapping,
+				unsigned long offset)
 {
 	struct page *page;
 
-	read_lock(&mapping->page_lock);
+	write_lock(&mapping->page_lock);
 	page = __find_lock_page(mapping, offset);
-	read_unlock(&mapping->page_lock);
-
+	write_unlock(&mapping->page_lock);
 	return page;
 }
 
-/*
- * Same as above, but create the page if required..
+/**
+ * find_or_create_page - locate or add a pagecache page
+ *
+ * @mapping - the page's address_space
+ * @index - the page's index into the mapping
+ * @gfp_mask - page allocation mode
+ *
+ * Locates a page in the pagecache.  If the page is not present, a new page
+ * is allocated using @gfp_mask and is added to the pagecache and to the VM's
+ * LRU list.  The returned page is locked and has its reference count
+ * incremented.
+ *
+ * find_or_create_page() may sleep, even if @gfp_flags specifies an atomic
+ * allocation!
+ *
+ * find_or_create_page() returns the desired page's address, or zero on
+ * memory exhaustion.
  */
-struct page * find_or_create_page(struct address_space *mapping,
+struct page *find_or_create_page(struct address_space *mapping,
 		unsigned long index, unsigned int gfp_mask)
 {
 	struct page *page;

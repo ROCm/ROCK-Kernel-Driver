@@ -370,8 +370,7 @@ int __init probe (int base)
 		hwif->config_data = config;
 		hwif->drives[0].drive_data =
 		hwif->drives[1].drive_data = QD6500_DEF_DATA;
-		hwif->drives[0].io_32bit =
-		hwif->drives[1].io_32bit = 1;
+		hwif->io_32bit = 1;
 		hwif->tuneproc = &qd6500_tune_drive;
 		return 1;
 	}
@@ -403,8 +402,7 @@ int __init probe (int base)
 			hwif->config_data = config | (control <<8);
 			hwif->drives[0].drive_data =
 			hwif->drives[1].drive_data = QD6580_DEF_DATA;
-			hwif->drives[0].io_32bit =
-			hwif->drives[1].io_32bit = 1;
+			hwif->io_32bit = 1;
 			hwif->tuneproc = &qd6580_tune_drive;
 
 			qd_write_reg(QD_DEF_CONTR,QD_CONTROL_PORT);
@@ -426,11 +424,11 @@ int __init probe (int base)
 				ide_hwifs[i].select_data = base;
 				ide_hwifs[i].config_data = config | (control <<8);
 				ide_hwifs[i].tuneproc = &qd6580_tune_drive;
+				ide_hwifs[i].io_32bit = 1;
 
 				for (j = 0; j < 2; j++) {
 					ide_hwifs[i].drives[j].drive_data =
 					       i?QD6580_DEF_DATA2:QD6580_DEF_DATA;
-					ide_hwifs[i].drives[j].io_32bit = 1;
 				}
 			}
 

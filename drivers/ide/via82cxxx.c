@@ -535,10 +535,10 @@ void __init ide_init_via82cxxx(struct ata_channel *hwif)
 	hwif->tuneproc = &via82cxxx_tune_drive;
 	hwif->speedproc = &via_set_drive;
 	hwif->autodma = 0;
+	hwif->io_32bit = 1;
 
+	hwif->unmask = (via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
 	for (i = 0; i < 2; i++) {
-		hwif->drives[i].io_32bit = 1;
-		hwif->drives[i].unmask = (via_config->flags & VIA_NO_UNMASK) ? 0 : 1;
 		hwif->drives[i].autotune = 1;
 		hwif->drives[i].dn = hwif->unit * 2 + i;
 	}
