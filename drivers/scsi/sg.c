@@ -1439,7 +1439,7 @@ find_empty_slot:
 				MKDEV(SCSI_GENERIC_MAJOR, k), 
 				cl_dev->dev, "%s", 
 				disk->disk_name);
-		if (NULL == sg_class_member)
+		if (IS_ERR(sg_class_member))
 			printk(KERN_WARNING "sg_add: "
 				"class_simple_device_add failed\n");
 		class_set_devdata(sg_class_member, sdp);
