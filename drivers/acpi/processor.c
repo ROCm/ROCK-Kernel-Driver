@@ -39,6 +39,8 @@
 #include <linux/cpufreq.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/dmi.h>
+#include <linux/moduleparam.h>
 
 #include <asm/io.h>
 #include <asm/system.h>
@@ -108,6 +110,8 @@ struct acpi_processor_errata {
 		u8			reserved:6;
 		u32			bmisx;
 	}			piix4;
+	int c2;
+	int c3;
 };
 
 static struct file_operations acpi_processor_info_fops = {
@@ -139,7 +143,12 @@ static struct file_operations acpi_processor_limit_fops = {
 };
 
 static struct acpi_processor	*processors[NR_CPUS];
-static struct acpi_processor_errata errata;
+static struct acpi_processor_errata errata = { 
+	.c2 = -1,
+	.c3 = -1,
+};
+module_param_named(c2, errata.c2, bool, 0);
+module_param_named(c3, errata.c3, bool, 0);
 static void (*pm_idle_save)(void);
 
 
@@ -651,6 +660,11 @@ acpi_processor_get_power_info (
 		else if (errata.smp)
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C2 not supported in SMP mode\n"));
+
+
+		else if (!errata.c2) 
+			printk(KERN_INFO "C2 disabled\n");
+
 		/*
 		 * Otherwise we've met all of our C2 requirements.
 		 * Normalize the C2 latency to expidite policy.
@@ -706,6 +720,9 @@ acpi_processor_get_power_info (
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"C3 not supported on PIIX4 with Type-F DMA\n"));
 		}
+		else if (!errata.c3)
+			printk(KERN_INFO "C3 disabled\n");
+
 		/*
 		 * Otherwise we've met all of our C3 requirements.  
 		 * Normalize the C2 latency to expidite policy.  Enable
@@ -2438,6 +2455,26 @@ acpi_processor_remove (
 	return_VALUE(0);
 }
 
+/* IBM ThinkPad R40e crashes mysteriously when going into C2 or C3. 
+   For now disable this. Probably a bug somewhere else. */
+static int no_c2c3(struct dmi_system_id *id)
+{
+	printk(KERN_INFO 
+	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor=c3=1\n\"",
+	       id->ident);
+	if (errata.c2 == -1) 
+		errata.c2 = 0;
+	if (errata.c3 == -1) 
+		errata.c3 = 0; 
+	return 0;
+}
+
+static struct dmi_system_id __initdata processor_dmi_table[] = { 
+	{ no_c2c3, "IBM ThinkPad R40e", {
+	  DMI_MATCH(DMI_BIOS_VENDOR,"IBM"),
+	  DMI_MATCH(DMI_BIOS_VERSION,"1SET60WW") }},
+	{},
+};
 
 /* We keep the driver loaded even when ACPI is not running. 
    This is needed for the powernow-k8 driver, that works even without
@@ -2467,6 +2504,8 @@ acpi_processor_init (void)
 	acpi_thermal_cpufreq_init();
 
 	acpi_processor_ppc_init();
+
+	dmi_check_system(processor_dmi_table); 
 
 	return_VALUE(0);
 }
