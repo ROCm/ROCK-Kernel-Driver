@@ -39,12 +39,13 @@ libs-y				+= arch/$(ARCH)/lib/
 core-y				+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/
 core-$(CONFIG_IA32_SUPPORT)	+= arch/$(ARCH)/ia32/
 core-$(CONFIG_IA64_DIG) 	+= arch/$(ARCH)/dig/
-core-$(CONFIG_IA64_GENERIC) 	+= arch/$(ARCH)/hp/ arch/$(ARCH)/dig/
-core-$(CONFIG_IA64_HP_SIM)	+= arch/$(ARCH)/hp/
-core-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/ arch/$(ARCH)/dig/
+core-$(CONFIG_IA64_GENERIC) 	+= arch/$(ARCH)/dig/ arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/ \
+				   arch/$(ARCH)/hp/sim/
+core-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/dig/
 core-$(CONFIG_IA64_SGI_SN)	+= arch/$(ARCH)/sn/kernel arch/$(ARCH)/sn/io \
 				   arch/$(ARCH)/sn/fakeprom
 drivers-$(CONFIG_PCI)		+= arch/$(ARCH)/pci/
+drivers-$(CONFIG_IA64_HP_SIM)	+= arch/$(ARCH)/hp/sim/
 drivers-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/common/ arch/$(ARCH)/hp/zx1/
 
 ifdef CONFIG_IA64_SGI_SN
@@ -52,24 +53,28 @@ ifdef CONFIG_IA64_SGI_SN
         SUBDIRS         	+= arch/$(ARCH)/sn/fakeprom
 endif
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+makeboot = $(call descend,arch/ia64/boot,$(1))
+maketool = $(call descend,arch/ia64/tools,$(1))
+
+.PHONY: compressed archclean archmrproper $(TOPDIR)/include/asm-ia64/offsets.h
+
+all: compressed boot
+
+boot: vmlinux
+	+@$(call makeboot,all)
 
 compressed: vmlinux
 	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux-tmp
 	gzip vmlinux-tmp
 	mv vmlinux-tmp.gz vmlinux.gz
 
-rawboot:
-	@$(MAKEBOOT) rawboot
-
 archclean:
-	@$(MAKEBOOT) clean
+	$(MAKE) -rR -f scripts/Makefile.clean obj=arch/$(ARCH)/boot
 
 archmrproper:
-	@$(MAKE) -C arch/$(ARCH)/tools mrproper
 
 prepare: $(TOPDIR)/include/asm-ia64/offsets.h
 
 $(TOPDIR)/include/asm-ia64/offsets.h: include/asm include/linux/version.h \
 				      include/config/MARKER
-	@$(MAKE) -C arch/$(ARCH)/tools $@
+	+@$(call maketool,$@)

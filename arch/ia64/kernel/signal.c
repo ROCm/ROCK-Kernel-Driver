@@ -68,13 +68,13 @@ ia64_rt_sigsuspend (sigset_t *uset, size_t sigsetsize, struct sigscratch *scr)
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	{
 		oldset = current->blocked;
 		current->blocked = set;
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	/*
 	 * The return below usually returns to the signal handler.  We need to
@@ -274,12 +274,12 @@ ia64_rt_sigreturn (struct sigscratch *scr)
 
 	sigdelsetmask(&set, ~_BLOCKABLE);
 
-	spin_lock_irq(&current->sigmask_lock);
+	spin_lock_irq(&current->sig->siglock);
 	{
 		current->blocked = set;
 		recalc_sigpending();
 	}
-	spin_unlock_irq(&current->sigmask_lock);
+	spin_unlock_irq(&current->sig->siglock);
 
 	if (restore_sigcontext(sc, scr))
 		goto give_sigsegv;
@@ -468,13 +468,13 @@ handle_signal (unsigned long sig, struct k_sigaction *ka, siginfo_t *info, sigse
 		ka->sa.sa_handler = SIG_DFL;
 
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
-		spin_lock_irq(&current->sigmask_lock);
+		spin_lock_irq(&current->sig->siglock);
 		{
 			sigorsets(&current->blocked, &current->blocked, &ka->sa.sa_mask);
 			sigaddset(&current->blocked, sig);
 			recalc_sigpending();
 		}
-		spin_unlock_irq(&current->sigmask_lock);
+		spin_unlock_irq(&current->sig->siglock);
 	}
 	return 1;
 }

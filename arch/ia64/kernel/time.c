@@ -35,6 +35,7 @@ unsigned long last_cli_ip;
 
 #endif
 
+#if 0
 static void
 do_profile (unsigned long ip)
 {
@@ -58,6 +59,7 @@ do_profile (unsigned long ip)
 
 	atomic_inc((atomic_t *) &prof_buffer[ip]);
 }
+#endif
 
 /*
  * Return the number of micro-seconds that elapsed since the last update to jiffy.  The
@@ -166,8 +168,11 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		 * four so that we can use a prof_shift of 2 to get instruction-level
 		 * instead of just bundle-level accuracy.
 		 */
+#if 0
+		XXX fix me!
 		if (!user_mode(regs))
 			do_profile(regs->cr_iip + 4*ia64_psr(regs)->ri);
+#endif
 
 #ifdef CONFIG_SMP
 		smp_do_timer(regs);

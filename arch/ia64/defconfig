@@ -61,9 +61,9 @@ CONFIG_IA32_SUPPORT=y
 CONFIG_PERFMON=y
 CONFIG_IA64_PALINFO=y
 CONFIG_EFI_VARS=y
+CONFIG_NR_CPUS=16
 CONFIG_BINFMT_ELF=y
 # CONFIG_BINFMT_MISC is not set
-CONFIG_NR_CPUS=64
 
 #
 # ACPI Support
@@ -100,6 +100,12 @@ CONFIG_PCI_NAMES=y
 # Plug and Play configuration
 #
 # CONFIG_PNP is not set
+# CONFIG_PNP_NAMES is not set
+# CONFIG_PNP_DEBUG is not set
+
+#
+# Protocols
+#
 # CONFIG_ISAPNP is not set
 # CONFIG_PNPBIOS is not set
 
@@ -189,6 +195,8 @@ CONFIG_BLK_DEV_IDEPCI=y
 # CONFIG_BLK_DEV_GENERIC is not set
 CONFIG_IDEPCI_SHARE_IRQ=y
 CONFIG_BLK_DEV_IDEDMA_PCI=y
+# CONFIG_BLK_DEV_IDE_TCQ is not set
+# CONFIG_BLK_DEV_IDE_TCQ_DEFAULT is not set
 # CONFIG_BLK_DEV_OFFBOARD is not set
 # CONFIG_BLK_DEV_IDEDMA_FORCED is not set
 # CONFIG_IDEDMA_PCI_AUTO is not set
@@ -258,6 +266,7 @@ CONFIG_SCSI_LOGGING=y
 # CONFIG_BLK_DEV_3W_XXXX_RAID is not set
 # CONFIG_SCSI_7000FASST is not set
 # CONFIG_SCSI_ACARD is not set
+# CONFIG_SCSI_AACRAID is not set
 # CONFIG_SCSI_AIC7XXX is not set
 # CONFIG_SCSI_AIC7XXX_OLD is not set
 # CONFIG_SCSI_DPT_I2O is not set
@@ -294,6 +303,7 @@ CONFIG_SCSI_QLOGIC_1280=y
 # CONFIG_SCSI_DC390T is not set
 # CONFIG_SCSI_T128 is not set
 # CONFIG_SCSI_U14_34F is not set
+# CONFIG_SCSI_NSP32 is not set
 # CONFIG_SCSI_DEBUG is not set
 
 #
@@ -370,6 +380,11 @@ CONFIG_NET_ETHERNET=y
 # CONFIG_LANCE is not set
 # CONFIG_NET_VENDOR_SMC is not set
 # CONFIG_NET_VENDOR_RACAL is not set
+
+#
+# Tulip family network device support
+#
+# CONFIG_NET_TULIP is not set
 # CONFIG_HP100 is not set
 # CONFIG_NET_ISA is not set
 CONFIG_NET_PCI=y
@@ -437,11 +452,6 @@ CONFIG_EEPRO100=y
 # Wan interfaces
 #
 # CONFIG_WAN is not set
-
-#
-# Tulip family network device support
-#
-# CONFIG_NET_TULIP is not set
 
 #
 # Amateur Radio support
@@ -574,6 +584,8 @@ CONFIG_I2C_ALGOBIT=y
 # CONFIG_I2C_PHILIPSPAR is not set
 # CONFIG_I2C_ELV is not set
 # CONFIG_I2C_VELLEMAN is not set
+# CONFIG_SCx200_I2C is not set
+# CONFIG_SCx200_ACB is not set
 # CONFIG_I2C_ALGOPCF is not set
 CONFIG_I2C_CHARDEV=y
 CONFIG_I2C_PROC=y
@@ -614,12 +626,12 @@ CONFIG_AGP_I460=y
 CONFIG_AGP_HP_ZX1=y
 CONFIG_DRM=y
 CONFIG_DRM_TDFX=y
-CONFIG_DRM_GAMMA=y
 CONFIG_DRM_R128=y
 CONFIG_DRM_RADEON=y
 CONFIG_DRM_I810=y
 CONFIG_DRM_I830=y
 CONFIG_DRM_MGA=y
+# CONFIG_SCx200_GPIO is not set
 # CONFIG_RAW_DRIVER is not set
 
 #
@@ -693,14 +705,17 @@ CONFIG_EXT2_FS=y
 # CONFIG_INTERMEZZO_FS is not set
 CONFIG_NFS_FS=y
 CONFIG_NFS_V3=y
+CONFIG_NFS_V4=y
 # CONFIG_ROOT_NFS is not set
 CONFIG_NFSD=y
 CONFIG_NFSD_V3=y
+CONFIG_NFSD_V4=y
 # CONFIG_NFSD_TCP is not set
 CONFIG_SUNRPC=y
 CONFIG_LOCKD=y
 CONFIG_LOCKD_V4=y
 CONFIG_EXPORTFS=y
+# CONFIG_CIFS is not set
 # CONFIG_SMB_FS is not set
 # CONFIG_NCP_FS is not set
 # CONFIG_NCPFS_PACKET_SIGNING is not set
@@ -711,6 +726,7 @@ CONFIG_EXPORTFS=y
 # CONFIG_NCPFS_SMALLDOS is not set
 # CONFIG_NCPFS_NLS is not set
 # CONFIG_NCPFS_EXTRAS is not set
+# CONFIG_AFS_FS is not set
 # CONFIG_ZISOFS_FS is not set
 
 #
@@ -963,6 +979,7 @@ CONFIG_USB_HIDDEV=y
 # CONFIG_USB_BRLVGER is not set
 # CONFIG_USB_LCD is not set
 # CONFIG_USB_SPEEDTOUCH is not set
+# CONFIG_USB_TEST is not set
 
 #
 # Library routines
@@ -993,8 +1010,6 @@ CONFIG_IA64_EARLY_PRINTK_VGA=y
 # CONFIG_DEBUG_SPINLOCK is not set
 # CONFIG_IA64_DEBUG_CMPXCHG is not set
 # CONFIG_IA64_DEBUG_IRQ is not set
-# CONFIG_KDB is not set
-# CONFIG_KDB_MODULES is not set
 
 #
 # Security options

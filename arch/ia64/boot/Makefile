@@ -8,9 +8,11 @@
 # Copyright (C) 1998 by David Mosberger-Tang <davidm@hpl.hp.com>
 #
 
-LINKFLAGS = -static -T bootloader.lds
+THIS	= arch/$(ARCH)/boot
 
-OBJECTS	= bootloader.o
+LINKFLAGS = -static -T $(THIS)/bootloader.lds
+
+OBJS	= $(THIS)/bootloader.o
 
 targets-$(CONFIG_IA64_HP_SIM)	+= bootloader
 targets-$(CONFIG_IA64_GENERIC)	+= bootloader
@@ -19,8 +21,8 @@ CFLAGS	:= $(CFLAGS) $(CFLAGS_KERNEL)
 
 all:	$(targets-y)
 
-bootloader: $(OBJECTS)
-	$(LD) $(LINKFLAGS) $(OBJECTS) $(TOPDIR)/lib/lib.a $(TOPDIR)/arch/$(ARCH)/lib/lib.a \
+bootloader: $(OBJS)
+	$(LD) $(LINKFLAGS) $(OBJS) $(TOPDIR)/lib/lib.a $(TOPDIR)/arch/$(ARCH)/lib/lib.a \
 	-o bootloader
 
 clean:

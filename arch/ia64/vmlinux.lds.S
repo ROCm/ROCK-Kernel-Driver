@@ -12,11 +12,11 @@ SECTIONS
 {
   /* Sections to be discarded */
   /DISCARD/ : {
-	*(.text.exit)
-	*(.data.exit)
+	*(.exit.text)
+	*(.exit.data)
 	*(.exitcall.exit)
-	*(.IA_64.unwind.text.exit)
-	*(.IA_64.unwind_info.text.exit)
+	*(.IA_64.unwind.exit.text)
+	*(.IA_64.unwind_info.exit.text)
 	}
 
   v = PAGE_OFFSET;	/* this symbol is here to make debugging easier... */
@@ -65,6 +65,13 @@ SECTIONS
 	{ *(__ksymtab) }
   __stop___ksymtab = .;
 
+  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
+	{
+	  __start___kallsyms = .;	/* All kernel symbols */
+	  *(__kallsyms)
+	  __stop___kallsyms = .;
+	}
+
   /* Unwind info & table: */
   . = ALIGN(8);
   .IA_64.unwind_info : AT(ADDR(.IA_64.unwind_info) - PAGE_OFFSET)
@@ -85,15 +92,15 @@ SECTIONS
 
   . = ALIGN(PAGE_SIZE);
   __init_begin = .;
-  .text.init : AT(ADDR(.text.init) - PAGE_OFFSET)
-	{ *(.text.init) }
+  .init.text : AT(ADDR(.init.text) - PAGE_OFFSET)
+	{ *(.init.text) }
 
-  .data.init : AT(ADDR(.data.init) - PAGE_OFFSET)
-	{ *(.data.init) }
+  .init.data : AT(ADDR(.init.data) - PAGE_OFFSET)
+	{ *(.init.data) }
    . = ALIGN(16);
   __setup_start = .;
-  .setup.init : AT(ADDR(.setup.init) - PAGE_OFFSET)
-        { *(.setup.init) }
+  .init.setup : AT(ADDR(.init.setup) - PAGE_OFFSET)
+        { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : AT(ADDR(.initcall.init) - PAGE_OFFSET)
@@ -159,14 +166,6 @@ SECTIONS
 	{ *(.sbss) *(.scommon) }
   .bss : AT(ADDR(.bss) - PAGE_OFFSET)
 	{ *(.bss) *(COMMON) }
-
-  /* XXX Must this come last to avoid shifting other symbols?  --davidm */
-  __kallsyms : AT(ADDR(__kallsyms) - PAGE_OFFSET)
-	{
-	  __start___kallsyms = .;	/* All kernel symbols */
-	  *(__kallsyms)
-	  __stop___kallsyms = .;
-	}
 
   _end = .;
 

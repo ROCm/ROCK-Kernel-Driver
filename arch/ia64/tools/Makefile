@@ -1,5 +1,6 @@
 CFLAGS	= -g -O2 -Wall $(CPPFLAGS)
 
+THIS	= arch/$(ARCH)/tools
 TARGET	= $(TOPDIR)/include/asm-ia64/offsets.h
 
 all:
@@ -9,13 +10,14 @@ fastdep:
 mrproper: clean
 
 clean:
-	rm -f print_offsets.s print_offsets offsets.h
+	rm -f $(THIS)/print_offsets.s $(THIS)/print_offsets $(THIS)/offsets.h
 
-$(TARGET): offsets.h
-	@if ! cmp -s offsets.h ${TARGET}; then	\
+$(TARGET): $(THIS)/offsets.h
+	echo here we go
+	if ! cmp -s $(THIS)/offsets.h ${TARGET}; then	\
 		echo -e "*** Updating ${TARGET}...";	\
-		cp offsets.h ${TARGET};		\
-	else					\
+		cp $(THIS)/offsets.h ${TARGET};		\
+	else						\
 		echo "*** ${TARGET} is up to date";	\
 	fi
 
@@ -30,25 +32,24 @@ $(TARGET): offsets.h
 
 ifeq ($(CROSS_COMPILE),)
 
-offsets.h: print_offsets
-	./print_offsets > offsets.h
+$(THIS)/offsets.h: $(THIS)/print_offsets
+	$(THIS)/print_offsets > $(THIS)/offsets.h
 
 comma	:= ,
 
-print_offsets: print_offsets.c FORCE
+$(THIS)/print_offsets: $(THIS)/print_offsets.c FORCE
 	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) \
-		print_offsets.c -o $@
+		$(THIS)/print_offsets.c -o $@
 
 FORCE:
 
 else
 
-offsets.h: print_offsets.s
-	$(AWK) -f print_offsets.awk $^ > $@
+$(THIS)/offsets.h: $(THIS)/print_offsets.s
+	$(AWK) -f $(THIS)/print_offsets.awk $^ > $@
 
-print_offsets.s: print_offsets.c
-	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S \
-		print_offsets.c -o $@
+$(THIS)/print_offsets.s: $(THIS)/print_offsets.c
+	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S $^ -o $@
 
 endif
 

@@ -361,7 +361,9 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			break;
 
 		      case MODE_SENSE:
-			printk("MODE_SENSE\n");
+			/* sd.c uses this to determine whether disk does write-caching. */
+			memset(sc->request_buffer, 0, 128);
+			sc->result = GOOD;
 			break;
 
 		      case START_STOP:
@@ -390,7 +392,5 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 
 
 static Scsi_Host_Template driver_template = SIMSCSI;
-
-#define __initcall(fn)	late_initcall(fn)
 
 #include "../drivers/scsi/scsi_module.c"
