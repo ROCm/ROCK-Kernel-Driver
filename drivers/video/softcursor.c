@@ -22,7 +22,8 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	unsigned int scan_align = info->sprite.scan_align - 1;
 	unsigned int buf_align = info->sprite.buf_align - 1;
 	unsigned int i, size, dsize, s_pitch, d_pitch;
-	u8 *dst, src[64];
+	struct fb_cursor *cur;
+	u8 *dst, *src;
 
 	if (cursor->set & FB_CUR_SETSIZE) {
 		info->cursor.image.height = cursor->image.height;
@@ -48,8 +49,16 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 		info->cursor.image.depth = cursor->image.depth;
 	}	
 
+	info->cursor.image.data = cursor->image.data;
+
 	if (info->state != FBINFO_STATE_RUNNING)
 		return 0;
+
+	src = kmalloc(64 + sizeof(struct fb_cursor), GFP_ATOMIC);
+	if (!src)
+		return -ENOMEM;
+	cur = (struct fb_cursor *) (src + 64);
+	*cur = info->cursor;
 
 	s_pitch = (info->cursor.image.width + 7) >> 3;
 	dsize = s_pitch * info->cursor.image.height;
@@ -79,9 +88,12 @@ int soft_cursor(struct fb_info *info, struct fb_cursor *cursor)
 	else
 		fb_sysmove_buf_aligned(info, &info->sprite, dst, d_pitch, src,
 				   s_pitch, info->cursor.image.height);
-	info->cursor.image.data = dst;
+	cur->image.data = dst;
 	
-	info->fbops->fb_imageblit(info, &info->cursor.image);
+	info->fbops->fb_imageblit(info, &cur->image);
+
+	kfree(src);
+
 	return 0;
 }
 

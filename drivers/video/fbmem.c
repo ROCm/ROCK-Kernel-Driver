@@ -974,7 +974,7 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 {
 	struct fb_cursor_user cursor_user;
 	struct fb_cursor cursor;
-	char *data = NULL, *mask = NULL;
+	char *data = NULL, *mask = NULL, *info_mask = NULL;
 	u16 *red = NULL, *green = NULL, *blue = NULL, *transp = NULL;
 	int err = -EINVAL;
 	
@@ -982,12 +982,12 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 		return -EFAULT;
 
 	memcpy(&cursor, &cursor_user, sizeof(cursor_user));
-	cursor.mask = NULL;
-	cursor.image.data = NULL;
-	cursor.image.cmap.red = NULL;
-	cursor.image.cmap.green = NULL;
-	cursor.image.cmap.blue = NULL;
-	cursor.image.cmap.transp = NULL;
+	cursor.mask = info->cursor.mask;
+	cursor.image.data = info->cursor.image.data;
+	cursor.image.cmap.red = info->cursor.image.cmap.red;
+	cursor.image.cmap.green = info->cursor.image.cmap.green;
+	cursor.image.cmap.blue = info->cursor.image.cmap.blue;
+	cursor.image.cmap.transp = info->cursor.image.cmap.transp;
 	cursor.data = NULL;
 
 	if (cursor.set & FB_CUR_SETCUR)
@@ -1047,6 +1047,8 @@ fb_cursor(struct fb_info *info, struct fb_cursor_user __user *sprite)
 		
 		cursor.image.data = data;
 		cursor.mask = mask;
+		info_mask = (char *) info->cursor.mask;
+		info->cursor.mask = mask;
 	}
 	info->cursor.set = cursor.set;
 	info->cursor.rop = cursor.rop;
@@ -1058,6 +1060,8 @@ out:
 	kfree(green);
 	kfree(blue);
 	kfree(transp);
+	if (info_mask)
+		info->cursor.mask = info_mask;
 	return err;
 }
 
