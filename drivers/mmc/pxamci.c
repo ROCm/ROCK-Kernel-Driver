@@ -23,7 +23,6 @@
 #include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
-#include <linux/blkdev.h>
 #include <linux/dma-mapping.h>
 #include <linux/mmc/host.h>
 #include <linux/mmc/protocol.h>
@@ -31,6 +30,7 @@
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/scatterlist.h>
 #include <asm/sizes.h>
 
 #include <asm/arch/pxa-regs.h>
