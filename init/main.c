@@ -31,6 +31,7 @@
 #include <linux/security.h>
 #include <linux/workqueue.h>
 #include <linux/profile.h>
+#include <linux/rcupdate.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -390,6 +391,7 @@ asmlinkage void __init start_kernel(void)
 	printk("Kernel command line: %s\n", saved_command_line);
 	parse_options(command_line);
 	trap_init();
+	rcu_init();
 	init_IRQ();
 	sched_init();
 	softirq_init();
