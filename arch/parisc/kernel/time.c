@@ -188,7 +188,7 @@ do_gettimeofday (struct timeval *tv)
 }
 
 int
-do_settimeofday (struct timeval *tv)
+do_settimeofday (struct timespec *tv)
 {
 	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
 		return -EINVAL;

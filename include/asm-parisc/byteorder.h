@@ -30,9 +30,9 @@ static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 */
 static __inline__ __const__ __u64 ___arch__swab64(__u64 x) {
 	__u64 temp;
-	__asm__("permh 3210, %0, %0\n\t"
+	__asm__("permh,3210 %0, %0\n\t"
 		"hshl %0, 8, %1\n\t"
-		"hshr u, %0, 8, %0\n\t"
+		"hshr,u %0, 8, %0\n\t"
 		"or %1, %0, %0"
 		: "=r" (x), "=&r" (temp)
 		: "0" (x));

@@ -671,6 +671,11 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
+	int i;
+	unsigned long nsyms;
+	const char *strtab = NULL;
+	Elf_Sym *newptr, *oldptr;
+	Elf_Shdr *symhdr = NULL;
 #ifdef DEBUG
 	struct fdesc_entry *entry;
 	u32 *addr;
@@ -690,7 +695,49 @@ int module_finalize(const Elf_Ehdr *hdr,
 	       me->arch.got_count, me->arch.got_max,
 	       me->arch.fdesc_count, me->arch.fdesc_max);
 #endif
-		
+
+	/* haven't filled in me->symtab yet, so have to find it
+	 * ourselves */
+	for (i = 1; i < hdr->e_shnum; i++) {
+		if(sechdrs[i].sh_type == SHT_SYMTAB
+		   && (sechdrs[i].sh_type & SHF_ALLOC)) {
+			int strindex = sechdrs[i].sh_link;
+			/* FIXME: AWFUL HACK
+			 * The cast is to drop the const from
+			 * the sechdrs pointer */
+			symhdr = (Elf_Shdr *)&sechdrs[i];
+			strtab = (char *)sechdrs[strindex].sh_addr;
+			break;
+		}
+	}
+
+	printk("module %s: strtab %p, symhdr %p\n",
+	       me->name, strtab, symhdr);
+	
+	/* no symbol table */
+	if(symhdr == NULL)
+		return 0;
+
+	oldptr = (void *)symhdr->sh_addr;
+	newptr = oldptr + 1;	/* we start counting at 1 */
+	nsyms = symhdr->sh_size / sizeof(Elf_Sym);
+	DEBUGP("OLD num_symtab %lu\n", nsyms);
+
+	for (i = 1; i < nsyms; i++) {
+		oldptr++;	/* note, count starts at 1 so preincrement */
+		if(strncmp(strtab + oldptr->st_name,
+			      ".L", 2) == 0)
+			continue;
+
+		if(newptr != oldptr)
+			*newptr++ = *oldptr;
+		else
+			newptr++;
+
+	}
+	nsyms = newptr - (Elf_Sym *)symhdr->sh_addr;
+	DEBUGP("NEW num_symtab %lu\n", nsyms);
+	symhdr->sh_size = nsyms * sizeof(Elf_Sym);
 	return 0;
 }
 
