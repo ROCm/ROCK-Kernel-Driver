@@ -1919,6 +1919,8 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DEACTIVATE | INDICATION:
 		L1L2(st, pr, NULL);
+		clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		skb_queue_purge(&bcs->squeue);
 		bcs->hw.b_if = NULL;
 		break;
 	case PH_DATA | INDICATION:
@@ -2006,6 +2008,9 @@ static void hisax_b_l2l1(struct PStack *st, int pr, void *arg)
 		else
 			set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 		break;
+	case PH_DEACTIVATE | REQUEST:
+		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		skb_queue_purge(&bcs->squeue);
 	default:
 		B_L2L1(b_if, pr, arg);
 		break;
