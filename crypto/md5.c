@@ -40,7 +40,7 @@ struct md5_ctx {
 	u64 byte_count;
 };
 
-static inline void md5_transform(u32 *hash, u32 const *in)
+static void md5_transform(u32 *hash, u32 const *in)
 {
 	u32 a, b, c, d;
 

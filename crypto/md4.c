@@ -37,7 +37,7 @@ struct md4_ctx {
 	u64 byte_count;
 };
 
-static u32 lshift(u32 x, unsigned int s)
+static inline u32 lshift(u32 x, unsigned int s)
 {
 	x &= 0xFFFFFFFF;
 	return ((x << s) & 0xFFFFFFFF) | (x >> (32 - s));
@@ -79,7 +79,7 @@ static inline void cpu_to_le32_array(u32 *buf, unsigned int words)
 	}
 }
 
-static inline void md4_transform(u32 *hash, u32 const *in)
+static void md4_transform(u32 *hash, u32 const *in)
 {
 	u32 a, b, c, d;
 

@@ -1025,7 +1025,6 @@ static void des_small_fips_decrypt(u32 *expkey, u8 *dst, const u8 *src)
 /*
  * RFC2451: Weak key checks SHOULD be performed.
  */
-
 static int setkey(u32 *expkey, const u8 *key, unsigned int keylen, u32 *flags)
 {
 	const u8 *k;
