@@ -339,40 +339,38 @@ void __init setup_arch(char **cmdline_p)
 
 	prom_setsync(prom_sync_me);
 
-	{
-#if !CONFIG_SUN_SERIAL
-		serial_console = 0;
+#ifndef CONFIG_SERIAL_CONSOLE	/* Not CONFIG_SERIAL_SUNCORE: to be gone. */
+	serial_console = 0;
 #else
-		switch (console_fb) {
-		case 0: /* Let get our io devices from prom */
-			{
-				int idev = prom_query_input_device();
-				int odev = prom_query_output_device();
-				if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
-					serial_console = 0;
-				} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
-					serial_console = 1;
-				} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
-					serial_console = 2;
-				} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
-					prom_printf("MrCoffee ttya\n");
-					serial_console = 1;
-				} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
-					serial_console = 0;
-					prom_printf("MrCoffee keyboard\n");
-				} else {
-					prom_printf("Inconsistent or unknown console\n");
-					prom_printf("You cannot mix serial and non serial input/output devices\n");
-					prom_halt();
-				}
+	switch (console_fb) {
+	case 0: /* Let get our io devices from prom */
+		{
+			int idev = prom_query_input_device();
+			int odev = prom_query_output_device();
+			if (idev == PROMDEV_IKBD && odev == PROMDEV_OSCREEN) {
+				serial_console = 0;
+			} else if (idev == PROMDEV_ITTYA && odev == PROMDEV_OTTYA) {
+				serial_console = 1;
+			} else if (idev == PROMDEV_ITTYB && odev == PROMDEV_OTTYB) {
+				serial_console = 2;
+			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OTTYA) {
+				prom_printf("MrCoffee ttya\n");
+				serial_console = 1;
+			} else if (idev == PROMDEV_I_UNK && odev == PROMDEV_OSCREEN) {
+				serial_console = 0;
+				prom_printf("MrCoffee keyboard\n");
+			} else {
+				prom_printf("Inconsistent or unknown console\n");
+				prom_printf("You cannot mix serial and non serial input/output devices\n");
+				prom_halt();
 			}
-			break;
-		case 1: serial_console = 0; break; /* Force one of the framebuffers as console */
-		case 2: serial_console = 1; break; /* Force ttya as console */
-		case 3: serial_console = 2; break; /* Force ttyb as console */
 		}
-#endif
+		break;
+	case 1: serial_console = 0; break; /* Force one of the framebuffers as console */
+	case 2: serial_console = 1; break; /* Force ttya as console */
+	case 3: serial_console = 2; break; /* Force ttyb as console */
 	}
+#endif
 
 	if((boot_flags&BOOTME_DEBUG) && (linux_dbvec!=0) && 
 	   ((*(short *)linux_dbvec) != -1)) {
@@ -382,9 +380,6 @@ void __init setup_arch(char **cmdline_p)
 
 	init_mm.context = (unsigned long) NO_CONTEXT;
 	init_task.thread.kregs = &fake_swapper_regs;
-
-	if (serial_console)
-		conswitchp = NULL;
 
 	paging_init();
 }

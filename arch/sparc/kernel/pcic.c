@@ -248,7 +248,7 @@ static int pcic_read_config(struct pci_bus *bus, unsigned int devfn,
 		return 0;
 	case 4:
 		if (where&3) return -EINVAL;
-		pcic_read_config_dword(bus->number, devfn, where&~3, &v);
+		pcic_read_config_dword(bus->number, devfn, where&~3, val);
 		return 0;
 	}
 	return -EINVAL;
@@ -425,7 +425,7 @@ static void __init pcic_pbm_scan_bus(struct linux_pcic *pcic)
 /*
  * Main entry point from the PCI subsystem.
  */
-static int __init pcibios_init(void)
+static int __init pcic_init(void)
 {
 	struct linux_pcic *pcic;
 
@@ -1030,4 +1030,4 @@ void insl(unsigned long addr, void *dst, unsigned long count) {
 
 #endif
 
-subsys_initcall(pcibios_init);
+subsys_initcall(pcic_init);

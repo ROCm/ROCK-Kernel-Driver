@@ -1642,13 +1642,10 @@ static int __init sunzilog_init(void)
 	/* Sun4 Zilog setup is hard coded, no probing to do.  */
 	if (sparc_cpu_model == sun4) {
 		NUM_SUNZILOG = 2;
-		goto no_probe;
-	}
-
-	node = prom_getchild(prom_root_node);
-	if (sparc_cpu_model == sun4d) {
+	} else if (sparc_cpu_model == sun4d) {
 		int bbnode;
 
+		node = prom_getchild(prom_root_node);
 		NUM_SUNZILOG = 0;
 		while (node &&
 		       (node = prom_searchsiblings(node, "cpu-unit"))) {
@@ -1657,7 +1654,6 @@ static int __init sunzilog_init(void)
 				NUM_SUNZILOG += 2;
 			node = prom_getsibling(node);
 		}
-		goto no_probe;
 	} else if (sparc_cpu_model == sun4u) {
 		int central_node;
 
@@ -1668,26 +1664,27 @@ static int __init sunzilog_init(void)
 		if (central_node != 0 && central_node != -1)
 			node = prom_searchsiblings(prom_getchild(central_node), "fhc");
 		else
-			node = prom_searchsiblings(node, "sbus");
+			node = prom_searchsiblings(prom_getchild(prom_root_node), "sbus");
 		if (node != 0 && node != -1)
 			node = prom_getchild(node);
 		if (node == 0 || node == -1)
 			return -ENODEV;
+
+		node = prom_searchsiblings(node, "zs");
+		if (!node)
+			return -ENODEV;
+		
+		NUM_SUNZILOG = 2;
 	} else {
+		node = prom_getchild(prom_root_node);
 		node = prom_searchsiblings(node, "obio");
 		if (node)
 			node = prom_getchild(node);
+		if (!node)
+			return -ENODEV;
+
 		NUM_SUNZILOG = 2;
-		goto no_probe;
 	}
-
-	node = prom_searchsiblings(node, "zs");
-	if (!node)
-		return -ENODEV;
-		
-	NUM_SUNZILOG = 2;
-
-no_probe:
 
 	sunzilog_alloc_tables();
 
