@@ -1,7 +1,7 @@
 /*
  * TLB support routines.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 08/02/00 A. Mallick <asit.k.mallick@intel.com>
@@ -22,8 +22,10 @@
 #include <asm/pal.h>
 #include <asm/tlbflush.h>
 
-static unsigned long purge_pgbits;
-static unsigned long max_purge_size;
+static struct {
+	unsigned long mask;	/* mask of supported purge page-sizes */
+	unsigned long max_bits;	/* log2() of largest supported purge page-size */
+} purge;
 
 struct ia64_ctx ia64_ctx = {
 	.lock =		SPIN_LOCK_UNLOCKED,
@@ -145,10 +147,10 @@ flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long 
 	}
 
 	nbits = ia64_fls(size + 0xfff);
-	while ((((1UL << nbits) & purge_pgbits) == 0) && (nbits < max_purge_size)) 
+	while (unlikely (((1UL << nbits) & purge.mask) == 0) && (nbits < purge.max_bits))
 		++nbits;
-	if (nbits > max_purge_size)
-		nbits = max_purge_size;
+	if (nbits > purge.max_bits)
+		nbits = purge.max_bits;
 	start &= ~((1UL << nbits) - 1);
 
 # ifdef CONFIG_SMP
@@ -172,9 +174,12 @@ ia64_tlb_init (void)
 	unsigned long tr_pgbits;
 	long status;
 
-	if ((status = ia64_pal_vm_page_size(&tr_pgbits, &purge_pgbits)) !=0) 
-		panic("ia64_pal_vm_page_size=%ld\n", status);
-	max_purge_size = ia64_fls(purge_pgbits);
+	if ((status = ia64_pal_vm_page_size(&tr_pgbits, &purge.mask)) != 0) {
+		printk(KERN_ERR "PAL_VM_PAGE_SIZE failed with status=%ld;"
+		       "defaulting to architected purge page-sizes.\n", status);
+		purge.mask = 0x15557000;
+	}
+	purge.max_bits = ia64_fls(purge.mask);
 
 	ia64_get_ptce(&ptce_info);
 	local_cpu_data->ptce_base = ptce_info.base;
