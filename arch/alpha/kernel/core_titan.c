@@ -258,9 +258,9 @@ titan_init_one_pachip_port(titan_pachip_port *port, int index)
 	hose->sparse_mem_base = 0;
 	hose->sparse_io_base = 0;
 	hose->dense_mem_base
-	  = (TITAN_MEM(index) & 0xffffffffff) | 0x80000000000;
+	  = (TITAN_MEM(index) & 0xffffffffffUL) | 0x80000000000UL;
 	hose->dense_io_base
-	  = (TITAN_IO(index) & 0xffffffffff) | 0x80000000000;
+	  = (TITAN_IO(index) & 0xffffffffffUL) | 0x80000000000UL;
 
 	hose->config_space_base = TITAN_CONF(index);
 	hose->index = index;

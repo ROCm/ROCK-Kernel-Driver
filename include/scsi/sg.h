@@ -91,7 +91,7 @@ Major new features in SG 3.x driver (cf SG 2.x drivers)
 
 typedef struct sg_iovec /* same structure as used by readv() Linux system */
 {                       /* call. It defines one scatter-gather element. */
-    void * iov_base;            /* Starting address  */
+    void __user *iov_base;      /* Starting address  */
     size_t iov_len;             /* Length in bytes  */
 } sg_iovec_t;
 
@@ -104,14 +104,14 @@ typedef struct sg_io_hdr
     unsigned char mx_sb_len;    /* [i] max length to write to sbp */
     unsigned short iovec_count; /* [i] 0 implies no scatter gather */
     unsigned int dxfer_len;     /* [i] byte count of data transfer */
-    void * dxferp;              /* [i], [*io] points to data transfer memory
+    void __user *dxferp;	/* [i], [*io] points to data transfer memory
 					      or scatter gather list */
-    unsigned char * cmdp;       /* [i], [*i] points to command to perform */
-    unsigned char * sbp;        /* [i], [*o] points to sense_buffer memory */
+    unsigned char __user *cmdp; /* [i], [*i] points to command to perform */
+    void __user *sbp;		/* [i], [*o] points to sense_buffer memory */
     unsigned int timeout;       /* [i] MAX_UINT->no timeout (unit: millisec) */
     unsigned int flags;         /* [i] 0 -> default, see SG_FLAG... */
     int pack_id;                /* [i->o] unused internally (normally) */
-    void * usr_ptr;             /* [i->o] unused internally */
+    void __user * usr_ptr;      /* [i->o] unused internally */
     unsigned char status;       /* [o] scsi status */
     unsigned char masked_status;/* [o] shifted, masked scsi status */
     unsigned char msg_status;   /* [o] messaging level data (optional) */
@@ -171,7 +171,7 @@ typedef struct sg_req_info { /* used by SG_GET_REQUEST_TABLE ioctl() */
     char sg_io_owned;   /* 0 -> complete with read(), 1 -> owned by SG_IO */
     char problem;       /* 0 -> no problem detected, 1 -> error to report */
     int pack_id;        /* pack_id associated with request */
-    void * usr_ptr;     /* user provided pointer (in new interface) */
+    void __user *usr_ptr;     /* user provided pointer (in new interface) */
     unsigned int duration; /* millisecs elapsed since written (req_state==1)
 			      or request duration (req_state==2) */
     int unused;

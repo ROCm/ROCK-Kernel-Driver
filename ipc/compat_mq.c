@@ -77,7 +77,8 @@ asmlinkage long compat_sys_mq_open(const char __user *u_name,
 static struct timespec __user *compat_prepare_timeout(
 			const struct compat_timespec __user *u_abs_timeout)
 {
-	struct timespec ts, __user *u_ts;
+	struct timespec ts;
+	struct timespec __user *u_ts;
 
 	if (!u_abs_timeout)
 		return 0;
@@ -110,7 +111,7 @@ asmlinkage ssize_t compat_sys_mq_timedreceive(mqd_t mqdes,
 			size_t msg_len, unsigned int __user *u_msg_prio,
 			const struct compat_timespec __user *u_abs_timeout)
 {
-	struct timespec *u_ts;
+	struct timespec __user *u_ts;
 
 	u_ts = compat_prepare_timeout(u_abs_timeout);
 	if (IS_ERR(u_ts))

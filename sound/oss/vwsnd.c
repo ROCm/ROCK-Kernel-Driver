@@ -240,9 +240,9 @@ enum {
 /* low-level lithium data */
 
 typedef struct lithium {
-	caddr_t		page0;		/* virtual addresses */
-	caddr_t		page1;
-	caddr_t		page2;
+	void *		page0;		/* virtual addresses */
+	void *		page1;
+	void *		page2;
 	spinlock_t	lock;		/* protects codec and UST/MSC access */
 } lithium_t;
 
@@ -659,7 +659,7 @@ static void li_setup_dma(dma_chan_t *chan,
 static void li_shutdown_dma(dma_chan_t *chan)
 {
 	lithium_t *lith = chan->lith;
-	caddr_t lith1 = lith->page1;
+	void * lith1 = lith->page1;
 
 	DBGEV("(chan=0x%p)\n", chan);
 	
@@ -698,7 +698,7 @@ static __inline__ void li_activate_dma(dma_chan_t *chan)
 static void li_deactivate_dma(dma_chan_t *chan)
 {
 	lithium_t *lith = chan->lith;
-	caddr_t lith2 = lith->page2;
+	void * lith2 = lith->page2;
 
 	chan->ctlval &= ~(LI_CCTL_DMA_ENABLE | LI_CCTL_RPTR | LI_CCTL_WPTR);
 	DBGPV("ctlval = 0x%lx\n", chan->ctlval);
@@ -1480,10 +1480,10 @@ typedef struct vwsnd_port {
 	int		hwbuf_size;
 	unsigned long	hwbuf_paddr;
 	unsigned long	hwbuf_vaddr;
-	caddr_t		hwbuf;		/* hwbuf == hwbuf_vaddr */
+	void *		hwbuf;		/* hwbuf == hwbuf_vaddr */
 	int		hwbuf_max;	/* max bytes to preload */
 
-	caddr_t		swbuf;
+	void *		swbuf;
 	unsigned int	swbuf_size;	/* size in bytes */
 	unsigned int	swb_u_idx;	/* index of next user byte */
 	unsigned int	swb_i_idx;	/* index of next intr byte */
@@ -3083,7 +3083,7 @@ static int vwsnd_mixer_release(struct inode *inode, struct file *file)
 
 /* mixer_read_ioctl handles all read ioctls on the mixer device. */
 
-static int mixer_read_ioctl(vwsnd_dev_t *devc, unsigned int nr, caddr_t arg)
+static int mixer_read_ioctl(vwsnd_dev_t *devc, unsigned int nr, void __user *arg)
 {
 	int val = -1;
 
@@ -3145,19 +3145,19 @@ static int mixer_read_ioctl(vwsnd_dev_t *devc, unsigned int nr, caddr_t arg)
 	default:
 		return -EINVAL;
 	}
-	return put_user(val, (int *) arg);
+	return put_user(val, (int __user *) arg);
 }
 
 /* mixer_write_ioctl handles all write ioctls on the mixer device. */
 
-static int mixer_write_ioctl(vwsnd_dev_t *devc, unsigned int nr, caddr_t arg)
+static int mixer_write_ioctl(vwsnd_dev_t *devc, unsigned int nr, void __user *arg)
 {
 	int val;
 	int err;
 
 	DBGEV("(devc=0x%p, nr=0x%x, arg=0x%p)\n", devc, nr, arg);
 
-	err = get_user(val, (int *) arg);
+	err = get_user(val, (int __user *) arg);
 	if (err)
 		return -EFAULT;
 	switch (nr) {
@@ -3196,7 +3196,7 @@ static int mixer_write_ioctl(vwsnd_dev_t *devc, unsigned int nr, caddr_t arg)
 	}
 	if (val < 0)
 		return val;
-	return put_user(val, (int *) arg);
+	return put_user(val, (int __user *) arg);
 }
 
 /* This is the ioctl entry to the mixer driver. */
@@ -3216,9 +3216,9 @@ static int vwsnd_mixer_ioctl(struct inode *ioctl,
 	down(&devc->mix_sema);
 	{
 		if ((cmd & ~nrmask) == MIXER_READ(0))
-			retval = mixer_read_ioctl(devc, nr, (caddr_t) arg);
+			retval = mixer_read_ioctl(devc, nr, (void __user *) arg);
 		else if ((cmd & ~nrmask) == MIXER_WRITE(0))
-			retval = mixer_write_ioctl(devc, nr, (caddr_t) arg);
+			retval = mixer_write_ioctl(devc, nr, (void __user *) arg);
 		else
 			retval = -EINVAL;
 	}
@@ -3313,7 +3313,7 @@ static int __init attach_vwsnd(struct address_info *hw_config)
 	devc->rport.hwbuf_vaddr = __get_free_pages(GFP_KERNEL, HWBUF_ORDER);
 	if (!devc->rport.hwbuf_vaddr)
 		goto fail2;
-	devc->rport.hwbuf = (caddr_t) devc->rport.hwbuf_vaddr;
+	devc->rport.hwbuf = (void *) devc->rport.hwbuf_vaddr;
 	devc->rport.hwbuf_paddr = virt_to_phys(devc->rport.hwbuf);
 
 	/*
@@ -3336,7 +3336,7 @@ static int __init attach_vwsnd(struct address_info *hw_config)
 	devc->wport.hwbuf_vaddr = __get_free_pages(GFP_KERNEL, HWBUF_ORDER);
 	if (!devc->wport.hwbuf_vaddr)
 		goto fail3;
-	devc->wport.hwbuf = (caddr_t) devc->wport.hwbuf_vaddr;
+	devc->wport.hwbuf = (void *) devc->wport.hwbuf_vaddr;
 	devc->wport.hwbuf_paddr = virt_to_phys(devc->wport.hwbuf);
 	DBGP("wport hwbuf = 0x%p\n", devc->wport.hwbuf);
 

@@ -310,7 +310,7 @@ static void sunsu_enable_ms(struct uart_port *port)
 	spin_unlock_irqrestore(&up->port.lock, flags);
 }
 
-static _INLINE_ void
+static _INLINE_ struct tty_struct *
 receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs *regs)
 {
 	struct tty_struct *tty = up->port.info->tty;
@@ -322,7 +322,7 @@ receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs 
 		if (unlikely(tty->flip.count >= TTY_FLIPBUF_SIZE)) {
 			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE)
-				return; // if TTY_DONT_FLIP is set
+				return tty; // if TTY_DONT_FLIP is set
 		}
 		ch = serial_inp(up, UART_RX);
 		*tty->flip.char_buf_ptr = ch;
@@ -396,10 +396,11 @@ receive_chars(struct uart_sunsu_port *up, unsigned char *status, struct pt_regs 
 	ignore_char:
 		*status = serial_inp(up, UART_LSR);
 	} while ((*status & UART_LSR_DR) && (max_count-- > 0));
-	tty_flip_buffer_push(tty);
 
 	if (saw_console_brk)
 		sun_do_break();
+
+	return tty;
 }
 
 static _INLINE_ void transmit_chars(struct uart_sunsu_port *up)
@@ -464,12 +465,23 @@ static irqreturn_t sunsu_serial_interrupt(int irq, void *dev_id, struct pt_regs 
 	spin_lock_irqsave(&up->port.lock, flags);
 
 	do {
+		struct tty_struct *tty;
+
 		status = serial_inp(up, UART_LSR);
+		tty = NULL;
 		if (status & UART_LSR_DR)
-			receive_chars(up, &status, regs);
+			tty = receive_chars(up, &status, regs);
 		check_modem_status(up);
 		if (status & UART_LSR_THRE)
 			transmit_chars(up);
+
+		spin_unlock_irqrestore(&up->port.lock, flags);
+
+		if (tty)
+			tty_flip_buffer_push(tty);
+
+		spin_lock_irqsave(&up->port.lock, flags);
+
 	} while (!(serial_in(up, UART_IIR) & UART_IIR_NO_INT));
 
 	spin_unlock_irqrestore(&up->port.lock, flags);

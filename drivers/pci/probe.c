@@ -366,6 +366,8 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 			return max;
 		busnr = (buses >> 8) & 0xFF;
 		child = pci_alloc_child_bus(bus, dev, busnr);
+		if (!child)
+			return max;
 		child->primary = buses & 0xFF;
 		child->subordinate = (buses >> 16) & 0xFF;
 		child->bridge_ctl = bctl;

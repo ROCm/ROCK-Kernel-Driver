@@ -459,7 +459,7 @@ static int futex_wait(unsigned long uaddr, int val, unsigned long time)
 	 * We hold the mmap semaphore, so the mapping cannot have changed
 	 * since we looked it up.
 	 */
-	if (get_user(curval, (int *)uaddr) != 0) {
+	if (get_user(curval, (int __user *)uaddr) != 0) {
 		ret = -EFAULT;
 		goto out_unqueue;
 	}

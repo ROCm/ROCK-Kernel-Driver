@@ -18,6 +18,7 @@
 #include <asm/system.h>
 #include <asm/page.h>
 #include <asm/processor.h>
+#include <asm/const.h>
 
 /* The kernel image occupies 0x4000000 to 0x1000000 (4MB --> 16MB).
  * The page copy blockops use 0x1000000 to 0x18000000 (16MB --> 24MB).
@@ -26,14 +27,14 @@
  * There is a single static kernel PMD which maps from 0x0 to address
  * 0x400000000.
  */
-#define	TLBTEMP_BASE		0x0000000001000000
-#define MODULES_VADDR		0x0000000002000000
-#define MODULES_LEN		0x000000007e000000
-#define MODULES_END		0x0000000080000000
-#define VMALLOC_START		0x0000000140000000
-#define VMALLOC_END		0x0000000200000000
-#define LOW_OBP_ADDRESS		0x00000000f0000000
-#define HI_OBP_ADDRESS		0x0000000100000000
+#define	TLBTEMP_BASE		_AC(0x0000000001000000,UL)
+#define MODULES_VADDR		_AC(0x0000000002000000,UL)
+#define MODULES_LEN		_AC(0x000000007e000000,UL)
+#define MODULES_END		_AC(0x0000000080000000,UL)
+#define VMALLOC_START		_AC(0x0000000140000000,UL)
+#define VMALLOC_END		_AC(0x0000000200000000,UL)
+#define LOW_OBP_ADDRESS		_AC(0x00000000f0000000,UL)
+#define HI_OBP_ADDRESS		_AC(0x0000000100000000,UL)
 
 /* XXX All of this needs to be rethought so we can take advantage
  * XXX cheetah's full 64-bit virtual address space, ie. no more hole
@@ -49,7 +50,9 @@
  * long). Finally, the higher few bits determine pgde#.
  */
 
-/* PMD_SHIFT determines the size of the area a second-level page table can map */
+/* PMD_SHIFT determines the size of the area a second-level page
+ * table can map
+ */
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
 #define PMD_SIZE	(1UL << PMD_SHIFT)
 #define PMD_MASK	(~(PMD_SIZE-1))
@@ -78,7 +81,8 @@
  */
 #define REAL_PTRS_PER_PMD	(1UL << PMD_BITS)
 #define PTRS_PER_PMD		((const int)(test_thread_flag(TIF_32BIT) ? \
-				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : (REAL_PTRS_PER_PMD)))
+				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : \
+				 (REAL_PTRS_PER_PMD)))
 
 /*
  * We cannot use the top address range because VPTE table lives there. This
@@ -86,9 +90,9 @@
  * vpte size, then aligns it to the number of bytes mapped by one pgde, and
  * thus calculates the number of pgdes needed.
  */
-#define PTRS_PER_PGD	(((1UL << VA_BITS) - VPTE_SIZE + (1UL << (PAGE_SHIFT + \
-			(PAGE_SHIFT-3) + PMD_BITS)) - 1) / (1UL << (PAGE_SHIFT + \
-			(PAGE_SHIFT-3) + PMD_BITS)))
+#define PTRS_PER_PGD (((1UL << VA_BITS) - VPTE_SIZE + (1UL << (PAGE_SHIFT + \
+		      (PAGE_SHIFT-3) + PMD_BITS)) - 1) / (1UL << (PAGE_SHIFT + \
+		      (PAGE_SHIFT-3) + PMD_BITS)))
 
 /* Kernel has a separate 44bit address space. */
 #define USER_PTRS_PER_PGD	((const int)(test_thread_flag(TIF_32BIT)) ? \
@@ -102,33 +106,33 @@
 #endif /* !(__ASSEMBLY__) */
 
 /* Spitfire/Cheetah TTE bits. */
-#define _PAGE_VALID	0x8000000000000000	/* Valid TTE                          */
-#define _PAGE_R		0x8000000000000000	/* Used to keep ref bit up to date    */
-#define _PAGE_SZ4MB	0x6000000000000000	/* 4MB Page                           */
-#define _PAGE_SZ512K	0x4000000000000000	/* 512K Page                          */
-#define _PAGE_SZ64K	0x2000000000000000	/* 64K Page                           */
-#define _PAGE_SZ8K	0x0000000000000000	/* 8K Page                            */
-#define _PAGE_NFO	0x1000000000000000	/* No Fault Only                      */
-#define _PAGE_IE	0x0800000000000000	/* Invert Endianness                  */
-#define _PAGE_SN	0x0000800000000000	/* (Cheetah) Snoop                    */
-#define _PAGE_PADDR_SF	0x000001FFFFFFE000	/* (Spitfire) Phys Address [40:13]    */
-#define _PAGE_PADDR	0x000007FFFFFFE000	/* (Cheetah) Phys Address [42:13]     */
-#define _PAGE_SOFT	0x0000000000001F80	/* Software bits                      */
-#define _PAGE_L		0x0000000000000040	/* Locked TTE                         */
-#define _PAGE_CP	0x0000000000000020	/* Cacheable in Physical Cache        */
-#define _PAGE_CV	0x0000000000000010	/* Cacheable in Virtual Cache         */
-#define _PAGE_E		0x0000000000000008	/* side-Effect                        */
-#define _PAGE_P		0x0000000000000004	/* Privileged Page                    */
-#define _PAGE_W		0x0000000000000002	/* Writable                           */
-#define _PAGE_G		0x0000000000000001	/* Global                             */
+#define _PAGE_VALID	_AC(0x8000000000000000,UL) /* Valid TTE               */
+#define _PAGE_R		_AC(0x8000000000000000,UL) /* Keep ref bit up to date */
+#define _PAGE_SZ4MB	_AC(0x6000000000000000,UL) /* 4MB Page                */
+#define _PAGE_SZ512K	_AC(0x4000000000000000,UL) /* 512K Page               */
+#define _PAGE_SZ64K	_AC(0x2000000000000000,UL) /* 64K Page                */
+#define _PAGE_SZ8K	_AC(0x0000000000000000,UL) /* 8K Page                 */
+#define _PAGE_NFO	_AC(0x1000000000000000,UL) /* No Fault Only           */
+#define _PAGE_IE	_AC(0x0800000000000000,UL) /* Invert Endianness       */
+#define _PAGE_SN	_AC(0x0000800000000000,UL) /* (Cheetah) Snoop         */
+#define _PAGE_PADDR_SF	_AC(0x000001FFFFFFE000,UL) /* (Spitfire) paddr [40:13]*/
+#define _PAGE_PADDR	_AC(0x000007FFFFFFE000,UL) /* (Cheetah) paddr [42:13] */
+#define _PAGE_SOFT	_AC(0x0000000000001F80,UL) /* Software bits           */
+#define _PAGE_L		_AC(0x0000000000000040,UL) /* Locked TTE              */
+#define _PAGE_CP	_AC(0x0000000000000020,UL) /* Cacheable in P-Cache    */
+#define _PAGE_CV	_AC(0x0000000000000010,UL) /* Cacheable in V-Cache    */
+#define _PAGE_E		_AC(0x0000000000000008,UL) /* side-Effect             */
+#define _PAGE_P		_AC(0x0000000000000004,UL) /* Privileged Page         */
+#define _PAGE_W		_AC(0x0000000000000002,UL) /* Writable                */
+#define _PAGE_G		_AC(0x0000000000000001,UL) /* Global                  */
 
 /* Here are the SpitFire software bits we use in the TTE's. */
-#define _PAGE_FILE	0x0000000000001000	/* Pagecache page                     */
-#define _PAGE_MODIFIED	0x0000000000000800	/* Modified Page (ie. dirty)          */
-#define _PAGE_ACCESSED	0x0000000000000400	/* Accessed Page (ie. referenced)     */
-#define _PAGE_READ	0x0000000000000200	/* Readable SW Bit                    */
-#define _PAGE_WRITE	0x0000000000000100	/* Writable SW Bit                    */
-#define _PAGE_PRESENT	0x0000000000000080	/* Present Page (ie. not swapped out) */
+#define _PAGE_FILE	_AC(0x0000000000001000,UL)	/* Pagecache page     */
+#define _PAGE_MODIFIED	_AC(0x0000000000000800,UL)	/* Modified (dirty)   */
+#define _PAGE_ACCESSED	_AC(0x0000000000000400,UL)	/* Accessed (ref'd)   */
+#define _PAGE_READ	_AC(0x0000000000000200,UL)	/* Readable SW Bit    */
+#define _PAGE_WRITE	_AC(0x0000000000000100,UL)	/* Writable SW Bit    */
+#define _PAGE_PRESENT	_AC(0x0000000000000080,UL)	/* Present            */
 
 #if PAGE_SHIFT == 13
 #define _PAGE_SZBITS	_PAGE_SZ8K
@@ -173,7 +177,8 @@
 
 #define _PFN_MASK	_PAGE_PADDR
 
-#define pg_iobits (_PAGE_VALID | _PAGE_PRESENT | __DIRTY_BITS | __ACCESS_BITS | _PAGE_E)
+#define pg_iobits (_PAGE_VALID | _PAGE_PRESENT | __DIRTY_BITS | \
+		   __ACCESS_BITS | _PAGE_E)
 
 #define __P000	PAGE_NONE
 #define __P001	PAGE_READONLY
@@ -260,9 +265,12 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 #define pte_dirty(pte)		(pte_val(pte) & _PAGE_MODIFIED)
 #define pte_young(pte)		(pte_val(pte) & _PAGE_ACCESSED)
 #define pte_wrprotect(pte)	(__pte(pte_val(pte) & ~(_PAGE_WRITE|_PAGE_W)))
-#define pte_rdprotect(pte)	(__pte(((pte_val(pte)<<1UL)>>1UL) & ~_PAGE_READ))
-#define pte_mkclean(pte)	(__pte(pte_val(pte) & ~(_PAGE_MODIFIED|_PAGE_W)))
-#define pte_mkold(pte)		(__pte(((pte_val(pte)<<1UL)>>1UL) & ~_PAGE_ACCESSED))
+#define pte_rdprotect(pte)	\
+	(__pte(((pte_val(pte)<<1UL)>>1UL) & ~_PAGE_READ))
+#define pte_mkclean(pte)	\
+	(__pte(pte_val(pte) & ~(_PAGE_MODIFIED|_PAGE_W)))
+#define pte_mkold(pte)		\
+	(__pte(((pte_val(pte)<<1UL)>>1UL) & ~_PAGE_ACCESSED))
 
 /* Permanent address of a page. */
 #define __page_address(page)	page_address(page)
@@ -280,12 +288,14 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 #define pgd_offset_k(address) pgd_offset(&init_mm, address)
 
 /* Find an entry in the second-level page table.. */
-#define pmd_offset(dir, address)	((pmd_t *) pgd_page(*(dir)) + \
-					((address >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
+#define pmd_offset(dir, address)	\
+	((pmd_t *) pgd_page(*(dir)) + \
+	 ((address >> PMD_SHIFT) & (REAL_PTRS_PER_PMD-1)))
 
 /* Find an entry in the third-level page table.. */
-#define pte_index(dir, address)	((pte_t *) __pmd_page(*(dir)) + \
-					((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+#define pte_index(dir, address)	\
+	((pte_t *) __pmd_page(*(dir)) + \
+	 ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
 #define pte_offset_kernel		pte_index
 #define pte_offset_map			pte_index
 #define pte_offset_map_nested		pte_index
@@ -305,7 +315,8 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 static inline pte_t mk_pte_io(unsigned long page, pgprot_t prot, int space)
 {
 	pte_t pte;
-	pte_val(pte) = ((page) | pgprot_val(prot) | _PAGE_E) & ~(unsigned long)_PAGE_CACHE;
+	pte_val(pte) = (((page) | pgprot_val(prot) | _PAGE_E) &
+			~(unsigned long)_PAGE_CACHE);
 	pte_val(pte) |= (((unsigned long)space) << 32);
 	return pte;
 }
@@ -365,7 +376,8 @@ extern unsigned long *sparc64_valid_addr_bitmap;
 #define kern_addr_valid(addr)	\
 	(test_bit(__pa((unsigned long)(addr))>>22, sparc64_valid_addr_bitmap))
 
-extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned long offset,
+extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from,
+			       unsigned long offset,
 			       unsigned long size, pgprot_t prot, int space);
 
 #include <asm-generic/pgtable.h>
@@ -376,7 +388,9 @@ extern int io_remap_page_range(struct vm_area_struct *vma, unsigned long from, u
 /* We provide a special get_unmapped_area for framebuffer mmaps to try and use
  * the largest alignment possible such that larget PTEs can be used.
  */
-extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsigned long, unsigned long, unsigned long);
+extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long,
+					  unsigned long, unsigned long,
+					  unsigned long);
 #define HAVE_ARCH_FB_UNMAPPED_AREA
 
 /*

@@ -4,17 +4,11 @@
 #define _SPARC64_PAGE_H
 
 #include <linux/config.h>
+#include <asm/const.h>
 
 #define PAGE_SHIFT   13
-#ifndef __ASSEMBLY__
-/* I have my suspicions... -DaveM */
-#define PAGE_SIZE    (1UL << PAGE_SHIFT)
-#else
-#define PAGE_SIZE    (1 << PAGE_SHIFT)
-#endif
-
+#define PAGE_SIZE    (_AC(1,UL) << PAGE_SHIFT)
 #define PAGE_MASK    (~(PAGE_SIZE-1))
-
 
 #ifdef __KERNEL__
 
@@ -99,13 +93,13 @@ typedef unsigned long iopgprot_t;
 #endif
 
 #ifdef CONFIG_HUGETLB_PAGE
-#define HPAGE_SIZE		((1UL) << HPAGE_SHIFT)
+#define HPAGE_SIZE		(_AC(1,UL) << HPAGE_SHIFT)
 #define HPAGE_MASK		(~(HPAGE_SIZE - 1UL))
 #define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
 #endif
 
 #define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_32BIT) ? \
-				 (0x0000000070000000UL) : (PAGE_OFFSET))
+				 (_AC(0x0000000070000000,UL)) : (PAGE_OFFSET))
 
 #endif /* !(__ASSEMBLY__) */
 
@@ -115,7 +109,7 @@ typedef unsigned long iopgprot_t;
 /* We used to stick this into a hard-coded global register (%g4)
  * but that does not make sense anymore.
  */
-#define PAGE_OFFSET		0xFFFFF80000000000
+#define PAGE_OFFSET		_AC(0xFFFFF80000000000,UL)
 
 #define __pa(x)			((unsigned long)(x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))

@@ -46,7 +46,7 @@ struct vers_iter {
 static struct list_head _name_buckets[NUM_BUCKETS];
 static struct list_head _uuid_buckets[NUM_BUCKETS];
 
-void dm_hash_remove_all(void);
+static void dm_hash_remove_all(void);
 
 /*
  * Guards access to both hash tables.
@@ -61,7 +61,7 @@ static void init_buckets(struct list_head *buckets)
 		INIT_LIST_HEAD(buckets + i);
 }
 
-int dm_hash_init(void)
+static int dm_hash_init(void)
 {
 	init_buckets(_name_buckets);
 	init_buckets(_uuid_buckets);
@@ -69,7 +69,7 @@ int dm_hash_init(void)
 	return 0;
 }
 
-void dm_hash_exit(void)
+static void dm_hash_exit(void)
 {
 	dm_hash_remove_all();
 	devfs_remove(DM_DIR);
@@ -195,7 +195,7 @@ static int unregister_with_devfs(struct hash_cell *hc)
  * The kdev_t and uuid of a device can never change once it is
  * initially inserted.
  */
-int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
+static int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
 {
 	struct hash_cell *cell;
 
@@ -234,7 +234,7 @@ int dm_hash_insert(const char *name, const char *uuid, struct mapped_device *md)
 	return -EBUSY;
 }
 
-void __hash_remove(struct hash_cell *hc)
+static void __hash_remove(struct hash_cell *hc)
 {
 	/* remove from the dev hash */
 	list_del(&hc->uuid_list);
@@ -246,7 +246,7 @@ void __hash_remove(struct hash_cell *hc)
 	free_cell(hc);
 }
 
-void dm_hash_remove_all(void)
+static void dm_hash_remove_all(void)
 {
 	int i;
 	struct hash_cell *hc;
@@ -262,7 +262,7 @@ void dm_hash_remove_all(void)
 	up_write(&_hash_lock);
 }
 
-int dm_hash_rename(const char *old, const char *new)
+static int dm_hash_rename(const char *old, const char *new)
 {
 	char *new_name, *old_name;
 	struct hash_cell *hc;
@@ -377,7 +377,7 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	for (i = 0; i < NUM_BUCKETS; i++) {
 		list_for_each_entry (hc, _name_buckets + i, name_list) {
 			needed += sizeof(struct dm_name_list);
-			needed += strlen(hc->name);
+			needed += strlen(hc->name) + 1;
 			needed += ALIGN_MASK;
 		}
 	}
@@ -850,7 +850,6 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	int r;
 	struct mapped_device *md;
 	struct dm_table *table;
-	DECLARE_WAITQUEUE(wq, current);
 
 	md = find_device(param);
 	if (!md)
@@ -859,12 +858,10 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	/*
 	 * Wait for a notification event
 	 */
-	set_current_state(TASK_INTERRUPTIBLE);
-	if (!dm_add_wait_queue(md, &wq, param->event_nr)) {
-		schedule();
-		dm_remove_wait_queue(md, &wq);
+	if (dm_wait_event(md, param->event_nr)) {
+		r = -ERESTARTSYS;
+		goto out;
 	}
- 	set_current_state(TASK_RUNNING);
 
 	/*
 	 * The userland program is going to want to know what

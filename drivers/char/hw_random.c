@@ -79,7 +79,7 @@
 #define RNG_MISCDEV_MINOR		183 /* official */
 
 static int rng_dev_open (struct inode *inode, struct file *filp);
-static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
+static ssize_t rng_dev_read (struct file *filp, char __user *buf, size_t size,
 			     loff_t * offp);
 
 static int __init intel_init (struct pci_dev *dev);
@@ -482,7 +482,7 @@ static int rng_dev_open (struct inode *inode, struct file *filp)
 }
 
 
-static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
+static ssize_t rng_dev_read (struct file *filp, char __user *buf, size_t size,
 			     loff_t * offp)
 {
 	static spinlock_t rng_lock = SPIN_LOCK_UNLOCKED;

@@ -1059,7 +1059,7 @@ static struct xfrm_state * pfkey_msg2xfrm_state(struct sadb_msg *hdr,
 		struct sadb_address *addr = ext_hdrs[SADB_EXT_ADDRESS_PROXY-1];
 
 		/* Nobody uses this, but we try. */
-		pfkey_sadb_addr2xfrm_addr(addr, &x->sel.saddr);
+		x->sel.family = pfkey_sadb_addr2xfrm_addr(addr, &x->sel.saddr);
 		x->sel.prefixlen_s = addr->sadb_address_prefixlen;
 	}
 

@@ -508,7 +508,7 @@ ax25_cb *ax25_create_cb(void)
  */
 
 static int ax25_setsockopt(struct socket *sock, int level, int optname,
-	char *optval, int optlen)
+	char __user *optval, int optlen)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
@@ -522,7 +522,7 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 	if (optlen < sizeof(int))
 		return -EINVAL;
 
-	if (get_user(opt, (int *)optval))
+	if (get_user(opt, (int __user *)optval))
 		return -EFAULT;
 
 	lock_sock(sk);
@@ -648,7 +648,7 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 }
 
 static int ax25_getsockopt(struct socket *sock, int level, int optname,
-	char *optval, int *optlen)
+	char __user *optval, int __user *optlen)
 {
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25;
@@ -1694,7 +1694,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			res = sock_get_timestamp(sk, (struct timeval *)arg);
+			res = sock_get_timestamp(sk, (struct timeval __user *)arg);
 			break;
 	 	}
 		res = -EINVAL;
@@ -1826,7 +1826,7 @@ static int ax25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		break;
 
 	default:
-		res = dev_ioctl(cmd, (void *)arg);
+		res = dev_ioctl(cmd, (void __user *)arg);
 		break;
 	}
 	release_sock(sk);

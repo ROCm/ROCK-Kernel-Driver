@@ -733,7 +733,7 @@ do_confirm:
 }
 
 static int rawv6_seticmpfilter(struct sock *sk, int level, int optname, 
-			       char *optval, int optlen)
+			       char __user *optval, int optlen)
 {
 	switch (optname) {
 	case ICMPV6_FILTER:
@@ -750,7 +750,7 @@ static int rawv6_seticmpfilter(struct sock *sk, int level, int optname,
 }
 
 static int rawv6_geticmpfilter(struct sock *sk, int level, int optname, 
-			       char *optval, int *optlen)
+			       char __user *optval, int __user *optlen)
 {
 	int len;
 
@@ -776,7 +776,7 @@ static int rawv6_geticmpfilter(struct sock *sk, int level, int optname,
 
 
 static int rawv6_setsockopt(struct sock *sk, int level, int optname, 
-			    char *optval, int optlen)
+			    char __user *optval, int optlen)
 {
 	struct raw6_opt *opt = raw6_sk(sk);
 	int val;
@@ -798,7 +798,7 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 					       optlen);
 	};
 
-  	if (get_user(val, (int *)optval))
+  	if (get_user(val, (int __user *)optval))
 		return -EFAULT;
 
 	switch (optname) {
@@ -823,7 +823,7 @@ static int rawv6_setsockopt(struct sock *sk, int level, int optname,
 }
 
 static int rawv6_getsockopt(struct sock *sk, int level, int optname, 
-			    char *optval, int *optlen)
+			    char __user *optval, int __user *optlen)
 {
 	struct raw6_opt *opt = raw6_sk(sk);
 	int val, len;
@@ -875,7 +875,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCINQ:
 		{
@@ -887,7 +887,7 @@ static int rawv6_ioctl(struct sock *sk, int cmd, unsigned long arg)
 			if (skb != NULL)
 				amount = skb->tail - skb->h.raw;
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:

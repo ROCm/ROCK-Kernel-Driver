@@ -38,6 +38,7 @@ static inline int scatterwalk_samebuf(struct scatter_walk *walk_in,
 				      void *src_p, void *dst_p)
 {
 	return walk_in->page == walk_out->page &&
+	       walk_in->offset == walk_out->offset &&
 	       walk_in->data == src_p && walk_out->data == dst_p;
 }
 

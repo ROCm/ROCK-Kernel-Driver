@@ -1385,7 +1385,7 @@ int proc_dostring(ctl_table *table, int write, struct file *filp,
 			if(copy_to_user(buffer, table->data, len))
 				return -EFAULT;
 		if (len < *lenp) {
-			if(put_user('\n', ((char *) buffer) + len))
+			if(put_user('\n', ((char __user *) buffer) + len))
 				return -EFAULT;
 			len++;
 		}
@@ -1448,6 +1448,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 	size_t left, len;
 	
 	char buf[TMPBUFLEN], *p;
+	char __user *s = buffer;
 	
 	if (!table->data || !table->maxlen || !*lenp ||
 	    (filp->f_pos && !write)) {
@@ -1466,12 +1467,12 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 		if (write) {
 			while (left) {
 				char c;
-				if (get_user(c,(char __user *) buffer))
+				if (get_user(c, s))
 					return -EFAULT;
 				if (!isspace(c))
 					break;
 				left--;
-				buffer++;
+				s++;
 			}
 			if (!left)
 				break;
@@ -1479,7 +1480,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 			len = left;
 			if (len > sizeof(buf) - 1)
 				len = sizeof(buf) - 1;
-			if(copy_from_user(buf, buffer, len))
+			if (copy_from_user(buf, s, len))
 				return -EFAULT;
 			buf[len] = 0;
 			p = buf;
@@ -1497,7 +1498,7 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 				break;
 			if (neg)
 				val = -val;
-			buffer += len;
+			s += len;
 			left -= len;
 
 			if (conv(&neg, &lval, i, 1, data))
@@ -1514,23 +1515,22 @@ static int do_proc_dointvec(ctl_table *table, int write, struct file *filp,
 			len = strlen(buf);
 			if (len > left)
 				len = left;
-			if(copy_to_user(buffer, buf, len))
+			if(copy_to_user(s, buf, len))
 				return -EFAULT;
 			left -= len;
-			buffer += len;
+			s += len;
 		}
 	}
 
 	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
+		if(put_user('\n', s))
 			return -EFAULT;
-		left--, buffer++;
+		left--, s++;
 	}
 	if (write) {
-		p = (char *) buffer;
 		while (left) {
 			char c;
-			if (get_user(c, p++))
+			if (get_user(c, s++))
 				return -EFAULT;
 			if (!isspace(c))
 				break;
@@ -1687,6 +1687,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 	int vleft, first=1, neg;
 	size_t len, left;
 	char buf[TMPBUFLEN], *p;
+	char __user *s = buffer;
 	
 	if (!table->data || !table->maxlen || !*lenp ||
 	    (filp->f_pos && !write)) {
@@ -1704,12 +1705,12 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 		if (write) {
 			while (left) {
 				char c;
-				if (get_user(c, (char __user *) buffer))
+				if (get_user(c, s))
 					return -EFAULT;
 				if (!isspace(c))
 					break;
 				left--;
-				buffer++;
+				s++;
 			}
 			if (!left)
 				break;
@@ -1717,7 +1718,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 			len = left;
 			if (len > TMPBUFLEN-1)
 				len = TMPBUFLEN-1;
-			if (copy_from_user(buf, buffer, len))
+			if (copy_from_user(buf, s, len))
 				return -EFAULT;
 			buf[len] = 0;
 			p = buf;
@@ -1733,7 +1734,7 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 				break;
 			if (neg)
 				val = -val;
-			buffer += len;
+			s += len;
 			left -= len;
 
 			if(neg)
@@ -1749,23 +1750,22 @@ static int do_proc_doulongvec_minmax(ctl_table *table, int write,
 			len = strlen(buf);
 			if (len > left)
 				len = left;
-			if(copy_to_user(buffer, buf, len))
+			if(copy_to_user(s, buf, len))
 				return -EFAULT;
 			left -= len;
-			buffer += len;
+			s += len;
 		}
 	}
 
 	if (!write && !first && left) {
-		if(put_user('\n', (char *) buffer))
+		if(put_user('\n', s))
 			return -EFAULT;
-		left--, buffer++;
+		left--, s++;
 	}
 	if (write) {
-		p = (char *) buffer;
 		while (left) {
 			char c;
-			if (get_user(c, p++))
+			if (get_user(c, s++))
 				return -EFAULT;
 			if (!isspace(c))
 				break;
@@ -1999,7 +1999,7 @@ int sysctl_string(ctl_table *table, int __user *name, int nlen,
 				len = table->maxlen;
 			if(copy_to_user(oldval, table->data, len))
 				return -EFAULT;
-			if(put_user(0, ((char *) oldval) + len))
+			if(put_user(0, ((char __user *) oldval) + len))
 				return -EFAULT;
 			if(put_user(len, oldlenp))
 				return -EFAULT;
@@ -2027,10 +2027,14 @@ int sysctl_intvec(ctl_table *table, int __user *name, int nlen,
 		void __user *oldval, size_t __user *oldlenp,
 		void __user *newval, size_t newlen, void **context)
 {
-	int i, *vec, *min, *max;
-	size_t length;
 
 	if (newval && newlen) {
+		int __user *vec = (int __user *) newval;
+		int *min = (int *) table->extra1;
+		int *max = (int *) table->extra2;
+		size_t length;
+		int i;
+
 		if (newlen % sizeof(int) != 0)
 			return -EINVAL;
 
@@ -2040,10 +2044,6 @@ int sysctl_intvec(ctl_table *table, int __user *name, int nlen,
 		if (newlen > table->maxlen)
 			newlen = table->maxlen;
 		length = newlen / sizeof(int);
-
-		vec = (int *) newval;
-		min = (int *) table->extra1;
-		max = (int *) table->extra2;
 
 		for (i = 0; i < length; i++) {
 			int value;
@@ -2071,7 +2071,7 @@ int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
 			if (olen!=sizeof(int))
 				return -EINVAL; 
 		}
-		if (put_user(*(int *)(table->data) / HZ, (int *)oldval) || 
+		if (put_user(*(int *)(table->data)/HZ, (int __user *)oldval) ||
 		    (oldlenp && put_user(sizeof(int),oldlenp)))
 			return -EFAULT;
 	}
@@ -2079,7 +2079,7 @@ int sysctl_jiffies(ctl_table *table, int __user *name, int nlen,
 		int new;
 		if (newlen != sizeof(int))
 			return -EINVAL; 
-		if (get_user(new, (int *)newval))
+		if (get_user(new, (int __user *)newval))
 			return -EFAULT;
 		*(int *)(table->data) = new*HZ; 
 	}

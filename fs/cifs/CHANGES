@@ -1,3 +1,13 @@
+Version 1.16
+------------
+Fix incorrect file size in file handle based setattr on big endian hardware.
+Fix oops in build_path_from_dentry when out of memory.  Add checks for invalid
+and closing file structs in writepage/partialpagewrite.  Add statistics
+for each mounted share (new menuconfig option). Fix endianness problem in
+volume information displayed in /proc/fs/cifs/DebugData (only affects
+affects big endian architectures). Prevent renames while constructing
+path names for open, mkdir and rmdir.
+
 Version 1.15
 ------------
 Change to mempools for alloc smb request buffers and multiplex structs

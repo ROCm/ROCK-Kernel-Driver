@@ -25,7 +25,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 	switch (cmd) {
 	case EXT2_IOC_GETFLAGS:
 		flags = ei->i_flags & EXT2_FL_USER_VISIBLE;
-		return put_user(flags, (int *) arg);
+		return put_user(flags, (int __user *) arg);
 	case EXT2_IOC_SETFLAGS: {
 		unsigned int oldflags;
 
@@ -35,7 +35,7 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
 			return -EACCES;
 
-		if (get_user(flags, (int *) arg))
+		if (get_user(flags, (int __user *) arg))
 			return -EFAULT;
 
 		if (!S_ISDIR(inode->i_mode))
@@ -64,13 +64,13 @@ int ext2_ioctl (struct inode * inode, struct file * filp, unsigned int cmd,
 		return 0;
 	}
 	case EXT2_IOC_GETVERSION:
-		return put_user(inode->i_generation, (int *) arg);
+		return put_user(inode->i_generation, (int __user *) arg);
 	case EXT2_IOC_SETVERSION:
 		if ((current->fsuid != inode->i_uid) && !capable(CAP_FOWNER))
 			return -EPERM;
 		if (IS_RDONLY(inode))
 			return -EROFS;
-		if (get_user(inode->i_generation, (int *) arg))
+		if (get_user(inode->i_generation, (int __user *) arg))
 			return -EFAULT;	
 		inode->i_ctime = CURRENT_TIME;
 		mark_inode_dirty(inode);

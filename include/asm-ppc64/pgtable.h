@@ -47,7 +47,7 @@
 /*
  * Define the address range of the vmalloc VM area.
  */
-#define VMALLOC_START (0xD000000000000000)
+#define VMALLOC_START (0xD000000000000000ul)
 #define VMALLOC_END   (VMALLOC_START + VALID_EA_BITS)
 
 /*
@@ -56,8 +56,8 @@
  */
 #define IMALLOC_START     (ioremap_bot)
 #define IMALLOC_VMADDR(x) ((unsigned long)(x))
-#define PHBS_IO_BASE  	  (0xE000000000000000)	/* Reserve 2 gigs for PHBs */
-#define IMALLOC_BASE      (0xE000000080000000)  
+#define PHBS_IO_BASE  	  (0xE000000000000000ul)	/* Reserve 2 gigs for PHBs */
+#define IMALLOC_BASE      (0xE000000080000000ul)  
 #define IMALLOC_END       (IMALLOC_BASE + VALID_EA_BITS)
 
 /*

@@ -189,15 +189,15 @@ get_kernel_vsid( unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | (ea >> 60);
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* For debug, this path creates a very poor vsid distribuition.
-		 * A user program can access virtual addresses in the form
-		 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
-		 * to hash to the same page table group.
-		 */ 
-		ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* For debug, this path creates a very poor vsid distribuition.
+	 * A user program can access virtual addresses in the form
+	 * 0x0yyyyxxxx000 where yyyy = xxxx to cause multiple mappings
+	 * to hash to the same page table group.
+	 */
+	ordinal = ((ea >> 28) & 0x1fff) | (ea >> 44);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 } 
@@ -212,11 +212,11 @@ get_vsid( unsigned long context, unsigned long ea )
 	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | context;
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
-	ifppcdebug(PPCDBG_HTABSTRESS) {
-		/* See comment above. */
-		ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
-		vsid = ordinal & VSID_MASK;
-	}
+#ifdef HTABSTRESS
+	/* See comment above. */
+	ordinal = ((ea >> 28) & 0x1fff) | (context << 16);
+	vsid = ordinal & VSID_MASK;
+#endif /* HTABSTRESS */
 
 	return vsid;
 }

@@ -40,7 +40,7 @@
  * kernel only maps the minimum needed range of this mapping.
  */
 #define io_p2v(x) (0xf2000000 + ((x) & 0x01ffffff) + (((x) & 0x1c000000) >> 1))
-#define io_v2p(x) (0x40000000 + ((x) & 0x01ffffff) + (((x) & 0x0e000000) << 1))
+#define io_v2p(x) (0x3c000000 + ((x) & 0x01ffffff) + (((x) & 0x0e000000) << 1))
 
 #ifndef __ASSEMBLY__
 

@@ -101,8 +101,6 @@ void hpsb_free_packet(struct hpsb_packet *packet);
  *
  * Use the functions, not the variable.
  */
-#include <asm/atomic.h>
-
 static inline unsigned int get_hpsb_generation(struct hpsb_host *host)
 {
         return atomic_read(&host->generation);

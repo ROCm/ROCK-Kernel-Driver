@@ -376,6 +376,20 @@ struct tcp_opt {
 
 	unsigned long last_synq_overflow; 
 
+/* Receiver side RTT estimation */
+	struct {
+		__u32	rtt;
+		__u32	seq;
+		__u32	time;
+	} rcv_rtt_est;
+
+/* Receiver queue space */
+	struct {
+		int	space;
+		__u32	seq;
+		__u32	time;
+	} rcvq_space;
+
 /* TCP Westwood structure */
         struct {
                 __u32    bw_ns_est;        /* first bandwidth estimation..not too smoothed 8) */

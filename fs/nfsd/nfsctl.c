@@ -91,7 +91,7 @@ struct argresp {
  * possibly a read which collects the result - which is stored in a 
  * file-local buffer.
  */
-static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t *pos)
+static ssize_t TA_write(struct file *file, const char __user *buf, size_t size, loff_t *pos)
 {
 	ino_t ino =  file->f_dentry->d_inode->i_ino;
 	struct argresp *ar;
@@ -130,7 +130,7 @@ static ssize_t TA_write(struct file *file, const char *buf, size_t size, loff_t 
 }
 
 
-static ssize_t TA_read(struct file *file, char *buf, size_t size, loff_t *pos)
+static ssize_t TA_read(struct file *file, char __user *buf, size_t size, loff_t *pos)
 {
 	struct argresp *ar;
 	ssize_t rv = 0;

@@ -24,7 +24,7 @@
 
 #define MAKE_MM_SEG(s)	((mm_segment_t) { (s) })
 
-#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFFFFFFFFF)
+#define KERNEL_DS	MAKE_MM_SEG(0xFFFFFFFFFFFFFFFFUL)
 #define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
 
 #define get_ds()	(KERNEL_DS)
@@ -33,6 +33,16 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
+#ifdef __CHECKER__
+#define CHECK_UPTR(ptr) do {				\
+	__typeof__(*(ptr)) *__dummy_check_uptr =	\
+		(void __user *)&__dummy_check_uptr;	\
+} while(0)
+#else
+#define CHECK_UPTR(ptr)
+#endif
+
+
 #define __addr_ok(addr) (!((unsigned long)(addr) & (current_thread_info()->addr_limit.seg)))
 
 /*
@@ -40,15 +50,16 @@
  */
 #define __range_not_ok(addr,size) ({ \
 	unsigned long flag,sum; \
+	CHECK_UPTR(addr);	\
 	asm("# range_ok\n\r" \
 		"addq %3,%1 ; sbbq %0,%0 ; cmpq %1,%4 ; sbbq $0,%0"  \
 		:"=&r" (flag), "=r" (sum) \
 		:"1" (addr),"g" ((long)(size)),"g" (current_thread_info()->addr_limit.seg)); \
 	flag; })
 
-#define access_ok(type,addr,size) (__range_not_ok(addr,size) == 0)
+#define access_ok(type, addr, size) (__range_not_ok(addr,size) == 0)
 
-extern inline int verify_area(int type, const void * addr, unsigned long size)
+extern inline int verify_area(int type, const void __user * addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -103,6 +114,7 @@ extern void __get_user_8(void);
 #define get_user(x,ptr)							\
 ({	long __val_gu;							\
 	int __ret_gu; 							\
+	CHECK_UPTR(ptr);						\
 	switch(sizeof (*(ptr))) {					\
 	case 1:  __get_user_x(1,__ret_gu,__val_gu,ptr); break;		\
 	case 2:  __get_user_x(2,__ret_gu,__val_gu,ptr); break;		\
@@ -138,6 +150,7 @@ extern void __put_user_bad(void);
 #define __put_user_nocheck(x,ptr,size)			\
 ({							\
 	int __pu_err;					\
+	CHECK_UPTR(ptr);				\
 	__put_user_size((x),(ptr),(size),__pu_err);	\
 	__pu_err;					\
 })
@@ -193,6 +206,7 @@ struct __large_struct { unsigned long buf[100]; };
 ({								\
 	int __gu_err;						\
 	long __gu_val;						\
+	CHECK_UPTR(ptr);					\
 	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
@@ -235,15 +249,15 @@ do {									\
 /* Handles exceptions in both to and from, but doesn't do access_ok */
 extern unsigned long copy_user_generic(void *to, const void *from, unsigned len); 
 
-extern unsigned long copy_to_user(void *to, const void *from, unsigned len); 
-extern unsigned long copy_from_user(void *to, const void *from, unsigned len); 
-extern unsigned long copy_in_user(void *to, const void *from, unsigned len); 
+extern unsigned long copy_to_user(void __user *to, const void *from, unsigned len); 
+extern unsigned long copy_from_user(void *to, const void __user *from, unsigned len); 
+extern unsigned long copy_in_user(void __user *to, const void __user *from, unsigned len); 
 
-static inline int __copy_from_user(void *dst, const void *src, unsigned size) 
+static inline int __copy_from_user(void *dst, const void __user *src, unsigned size) 
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic(dst,src,size);
+		return copy_user_generic(dst,(void *)src,size);
 	switch (size) { 
 	case 1:__get_user_asm(*(u8*)dst,(u8 *)src,ret,"b","b","=q",1); 
 		return ret;
@@ -264,15 +278,15 @@ static inline int __copy_from_user(void *dst, const void *src, unsigned size)
 		__get_user_asm(*(u64*)(8+(char*)dst),(u64*)(8+(char*)src),ret,"q","","=r",8);
 		return ret; 
 	default:
-		return copy_user_generic(dst,src,size); 
+		return copy_user_generic(dst,(void *)src,size); 
 	}
 }	
 
-static inline int __copy_to_user(void *dst, const void *src, unsigned size) 
+static inline int __copy_to_user(void __user *dst, const void *src, unsigned size) 
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic(dst,src,size);
+		return copy_user_generic((void *)dst,src,size);
 	switch (size) { 
 	case 1:__put_user_asm(*(u8*)src,(u8 *)dst,ret,"b","b","iq",1); 
 		return ret;
@@ -295,16 +309,16 @@ static inline int __copy_to_user(void *dst, const void *src, unsigned size)
 		__put_user_asm(1[(u64*)src],1+(u64*)dst,ret,"q","","ir",8);
 		return ret; 
 	default:
-		return copy_user_generic(dst,src,size); 
+		return copy_user_generic((void *)dst,src,size); 
 	}
 }	
 
 
-static inline int __copy_in_user(void *dst, const void *src, unsigned size) 
+static inline int __copy_in_user(void __user *dst, const void __user *src, unsigned size) 
 { 
        int ret = 0;
 	if (!__builtin_constant_p(size))
-		return copy_user_generic(dst,src,size);
+		return copy_user_generic((void *)dst,(void *)src,size);
 	switch (size) { 
 	case 1: { 
 		u8 tmp;
@@ -336,15 +350,15 @@ static inline int __copy_in_user(void *dst, const void *src, unsigned size)
 		return ret;
 	}
 	default:
-		return copy_user_generic(dst,src,size); 
+		return copy_user_generic((void *)dst,(void *)src,size); 
 	}
 }	
 
-long strncpy_from_user(char *dst, const char *src, long count);
-long __strncpy_from_user(char *dst, const char *src, long count);
-long strnlen_user(const char *str, long n);
-long strlen_user(const char *str);
-unsigned long clear_user(void *mem, unsigned long len);
-unsigned long __clear_user(void *mem, unsigned long len);
+long strncpy_from_user(char *dst, const char __user *src, long count);
+long __strncpy_from_user(char *dst, const char __user *src, long count);
+long strnlen_user(const char __user *str, long n);
+long strlen_user(const char __user *str);
+unsigned long clear_user(void __user *mem, unsigned long len);
+unsigned long __clear_user(void __user *mem, unsigned long len);
 
 #endif /* __X86_64_UACCESS_H */

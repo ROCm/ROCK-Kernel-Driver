@@ -527,7 +527,7 @@ done:
 }
 
 int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
-	struct group_filter *optval, int *optlen)
+	struct group_filter __user *optval, int __user *optlen)
 {
 	int err, i, count, copycount;
 	struct in6_addr *group;
@@ -569,7 +569,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 	copycount = count < gsf->gf_numsrc ? count : gsf->gf_numsrc;
 	gsf->gf_numsrc = count;
 	if (put_user(GROUP_FILTER_SIZE(copycount), optlen) ||
-	    copy_to_user((void *)optval, gsf, GROUP_FILTER_SIZE(0))) {
+	    copy_to_user(optval, gsf, GROUP_FILTER_SIZE(0))) {
 		return -EFAULT;
 	}
 	for (i=0; i<copycount; i++) {
@@ -580,7 +580,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 		memset(&ss, 0, sizeof(ss));
 		psin6->sin6_family = AF_INET6;
 		psin6->sin6_addr = psl->sl_addr[i];
-	    	if (copy_to_user((void *)&optval->gf_slist[i], &ss, sizeof(ss)))
+	    	if (copy_to_user(&optval->gf_slist[i], &ss, sizeof(ss)))
 			return -EFAULT;
 	}
 	return 0;

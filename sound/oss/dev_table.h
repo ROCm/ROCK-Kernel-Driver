@@ -156,7 +156,7 @@ typedef struct coproc_operations
 	struct module *owner;
 	int (*open) (void *devc, int sub_device);
 	void (*close) (void *devc, int sub_device);
-	int (*ioctl) (void *devc, unsigned int cmd, caddr_t arg, int local);
+	int (*ioctl) (void *devc, unsigned int cmd, void __user * arg, int local);
 	void (*reset) (void *devc);
 
 	void *devc;		/* Driver specific info */
@@ -171,14 +171,14 @@ struct audio_driver
 			      int count, int intrflag);
 	void (*start_input) (int dev, unsigned long buf, 
 			     int count, int intrflag);
-	int (*ioctl) (int dev, unsigned int cmd, caddr_t arg);
+	int (*ioctl) (int dev, unsigned int cmd, void __user * arg);
 	int (*prepare_for_input) (int dev, int bufsize, int nbufs);
 	int (*prepare_for_output) (int dev, int bufsize, int nbufs);
 	void (*halt_io) (int dev);
 	int (*local_qlen)(int dev);
 	void (*copy_user) (int dev,
 			char *localbuf, int localoffs,
-                        const char *userbuf, int useroffs,
+                        const char __user *userbuf, int useroffs,
                         int max_in, int max_out,
                         int *used, int *returned,
                         int len);
@@ -247,7 +247,7 @@ struct mixer_operations
 	struct module *owner;
 	char id[16];
 	char name[64];
-	int (*ioctl) (int dev, unsigned int cmd, caddr_t arg);
+	int (*ioctl) (int dev, unsigned int cmd, void __user * arg);
 	
 	void *devc;
 	int modify_counter;
@@ -264,13 +264,13 @@ struct synth_operations
 
 	int (*open) (int dev, int mode);
 	void (*close) (int dev);
-	int (*ioctl) (int dev, unsigned int cmd, caddr_t arg);
+	int (*ioctl) (int dev, unsigned int cmd, void __user * arg);
 	int (*kill_note) (int dev, int voice, int note, int velocity);
 	int (*start_note) (int dev, int voice, int note, int velocity);
 	int (*set_instr) (int dev, int voice, int instr);
 	void (*reset) (int dev);
 	void (*hw_control) (int dev, unsigned char *event);
-	int (*load_patch) (int dev, int format, const char *addr,
+	int (*load_patch) (int dev, int format, const char __user *addr,
 	     int offs, int count, int pmgr_flag);
 	void (*aftertouch) (int dev, int voice, int pressure);
 	void (*controller) (int dev, int voice, int ctrl_num, int value);
@@ -317,7 +317,7 @@ struct midi_operations
 		void (*outputintr)(int dev)
 		);
 	void (*close) (int dev);
-	int (*ioctl) (int dev, unsigned int cmd, caddr_t arg);
+	int (*ioctl) (int dev, unsigned int cmd, void __user * arg);
 	int (*outputc) (int dev, unsigned char data);
 	int (*start_read) (int dev);
 	int (*end_read) (int dev);
@@ -348,7 +348,7 @@ struct sound_timer_operations
 	void (*close)(int dev);
 	int (*event)(int dev, unsigned char *ev);
 	unsigned long (*get_time)(int dev);
-	int (*ioctl) (int dev, unsigned int cmd, caddr_t arg);
+	int (*ioctl) (int dev, unsigned int cmd, void __user * arg);
 	void (*arm_timer)(int dev, long time);
 };
 

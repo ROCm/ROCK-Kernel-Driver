@@ -1493,13 +1493,14 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 	ide_drive_t *drive = bdev->bd_disk->private_data;
 	ide_settings_t *setting;
 	int err = 0;
+	void __user *p = (void __user *)arg;
 
 	down(&ide_setting_sem);
 	if ((setting = ide_find_setting_by_ioctl(drive, cmd)) != NULL) {
 		if (cmd == setting->read_ioctl) {
 			err = ide_read_setting(drive, setting);
 			up(&ide_setting_sem);
-			return err >= 0 ? put_user(err, (long *) arg) : err;
+			return err >= 0 ? put_user(err, (long __user *)arg) : err;
 		} else {
 			if (bdev != bdev->bd_contains)
 				err = -EINVAL;
@@ -1514,14 +1515,14 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 	switch (cmd) {
 		case HDIO_GETGEO:
 		{
-			struct hd_geometry *loc = (struct hd_geometry *) arg;
-			u16 bios_cyl = drive->bios_cyl; /* truncate */
-			if (!loc || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
-			if (put_user(drive->bios_head, (u8 *) &loc->heads)) return -EFAULT;
-			if (put_user(drive->bios_sect, (u8 *) &loc->sectors)) return -EFAULT;
-			if (put_user(bios_cyl, (u16 *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(bdev),
-				(unsigned long *) &loc->start)) return -EFAULT;
+			struct hd_geometry geom;
+			if (!p || (drive->media != ide_disk && drive->media != ide_floppy)) return -EINVAL;
+			geom.heads = drive->bios_head;
+			geom.sectors = drive->bios_sect;
+			geom.cylinders = (u16)drive->bios_cyl; /* truncate */
+			geom.start = get_start_sect(bdev);
+			if (copy_to_user(p, &geom, sizeof(struct hd_geometry)))
+				return -EFAULT;
 			return 0;
 		}
 
@@ -1531,7 +1532,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 				return -EINVAL;
 			if (drive->id_read == 0)
 				return -ENOMSG;
-			if (copy_to_user((char *)arg, (char *)drive->id, (cmd == HDIO_GET_IDENTITY) ? sizeof(*drive->id) : 142))
+			if (copy_to_user(p, drive->id, (cmd == HDIO_GET_IDENTITY) ? sizeof(*drive->id) : 142))
 				return -EFAULT;
 			return 0;
 
@@ -1541,7 +1542,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 					drive->nice0		<< 	IDE_NICE_0		|
 					drive->nice1		<<	IDE_NICE_1		|
 					drive->nice2		<<	IDE_NICE_2,
-					(long *) arg);
+					(long __user *) arg);
 
 #ifdef CONFIG_IDE_TASK_IOCTL
 		case HDIO_DRIVE_TASKFILE:
@@ -1570,7 +1571,7 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			hw_regs_t hw;
 			int args[3];
 			if (!capable(CAP_SYS_RAWIO)) return -EACCES;
-			if (copy_from_user(args, (void *)arg, 3 * sizeof(int)))
+			if (copy_from_user(args, p, 3 * sizeof(int)))
 				return -EFAULT;
 			memset(&hw, 0, sizeof(hw));
 			ide_init_hwif_ports(&hw, (unsigned long) args[0],
@@ -1638,12 +1639,12 @@ int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(bdev->bd_disk, cmd, arg);
+			return scsi_cmd_ioctl(bdev->bd_disk, cmd, p);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
 				return -EACCES;
-			if (put_user(HWIF(drive)->bus_state, (long *)arg))
+			if (put_user(HWIF(drive)->bus_state, (long __user *)arg))
 				return -EFAULT;
 			return 0;
 

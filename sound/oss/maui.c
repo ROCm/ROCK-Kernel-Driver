@@ -53,7 +53,7 @@ static int     *maui_osp;
 #define STAT_RX_AVAIL	0x02
 #define STAT_RX_IENA	0x01
 
-static int      (*orig_load_patch) (int dev, int format, const char *addr,
+static int      (*orig_load_patch)(int dev, int format, const char __user *addr,
 			      int offs, int count, int pmgr_flag) = NULL;
 
 #include "maui_boot.h"
@@ -242,7 +242,7 @@ static int maui_short_wait(int mask) {
 	return 0;
 }
 
-static int maui_load_patch(int dev, int format, const char *addr,
+static int maui_load_patch(int dev, int format, const char __user *addr,
 		int offs, int count, int pmgr_flag)
 {
 
@@ -282,7 +282,7 @@ static int maui_load_patch(int dev, int format, const char *addr,
 	for (i = 0; i < left; i++) {
 		unsigned char   data;
 
-		if(get_user(*(unsigned char *) &data, (unsigned char *) &((addr)[hdr_size + i])))
+		if(get_user(*(unsigned char *) &data, (unsigned char __user *) &((addr)[hdr_size + i])))
 			return -EFAULT;
 		if (i == 0 && !(data & 0x80))
 			return -EINVAL;

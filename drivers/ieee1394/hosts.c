@@ -187,6 +187,9 @@ int hpsb_add_host(struct hpsb_host *host)
 void hpsb_remove_host(struct hpsb_host *host)
 {
         host->is_shutdown = 1;
+
+	del_timer_sync(&host->delayed_reset);
+
         host->driver = &dummy_driver;
 
         highlevel_remove_host(host);

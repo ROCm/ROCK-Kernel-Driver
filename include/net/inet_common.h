@@ -31,11 +31,13 @@ extern int			inet_sendmsg(struct kiocb *iocb,
 extern int			inet_shutdown(struct socket *sock, int how);
 extern unsigned int		inet_poll(struct file * file, struct socket *sock, struct poll_table_struct *wait);
 extern int			inet_setsockopt(struct socket *sock, int level,
-						int optname, char *optval, 
+						int optname,
+						char __user *optval, 
 						int optlen);
 extern int			inet_getsockopt(struct socket *sock, int level,
-						int optname, char *optval, 
-						int *optlen);
+						int optname,
+						char __user *optval, 
+						int __user *optlen);
 extern int			inet_listen(struct socket *sock, int backlog);
 
 extern void			inet_sock_release(struct sock *sk);

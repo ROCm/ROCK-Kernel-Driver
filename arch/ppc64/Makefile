@@ -20,8 +20,9 @@ ifeq ($(HAS_BIARCH),y)
 AS              := $(AS) -64
 LD              := $(LD) -m elf64ppc
 CC		:= $(CC) -m64
-CHECK		:= $(CHECK) -m64
 endif
+
+CHECK		:= $(CHECK) -m64 -D__powerpc__=1
 
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)

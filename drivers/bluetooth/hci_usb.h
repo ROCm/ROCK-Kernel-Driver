@@ -23,33 +23,28 @@
    SOFTWARE IS DISCLAIMED.
 */
 
-/*
- * $Id: hci_usb.h,v 1.2 2002/03/18 19:10:04 maxk Exp $
- */
-
-#ifdef __KERNEL__
-
 /* Class, SubClass, and Protocol codes that describe a Bluetooth device */
-#define HCI_DEV_CLASS        0xe0	/* Wireless class */
-#define HCI_DEV_SUBCLASS     0x01	/* RF subclass */
-#define HCI_DEV_PROTOCOL     0x01	/* Bluetooth programming protocol */
+#define HCI_DEV_CLASS		0xe0	/* Wireless class */
+#define HCI_DEV_SUBCLASS	0x01	/* RF subclass */
+#define HCI_DEV_PROTOCOL	0x01	/* Bluetooth programming protocol */
 
-#define HCI_CTRL_REQ	     0x20
-#define HCI_DIGI_REQ	     0x40
+#define HCI_CTRL_REQ		0x20
+#define HCI_DIGI_REQ		0x40
 
-#define HCI_IGNORE           0x01
-#define HCI_RESET            0x02
-#define HCI_DIGIANSWER       0x04
+#define HCI_IGNORE		0x01
+#define HCI_RESET		0x02
+#define HCI_DIGIANSWER		0x04
+#define HCI_BROKEN_ISOC		0x08
 
-#define HCI_MAX_IFACE_NUM	3 
+#define HCI_MAX_IFACE_NUM	3
 
-#define HCI_MAX_BULK_TX     	4
-#define HCI_MAX_BULK_RX     	1
+#define HCI_MAX_BULK_TX		4
+#define HCI_MAX_BULK_RX		1
 
 #define HCI_MAX_ISOC_RX		2
 #define HCI_MAX_ISOC_TX		2
 
-#define HCI_MAX_ISOC_FRAMES     10
+#define HCI_MAX_ISOC_FRAMES	10
 
 struct _urb_queue {
 	struct list_head head;
@@ -79,16 +74,16 @@ static inline void _urb_queue_init(struct _urb_queue *q)
 
 static inline void _urb_queue_head(struct _urb_queue *q, struct _urb *_urb)
 {
-        unsigned long flags;
-        spin_lock_irqsave(&q->lock, flags);
+	unsigned long flags;
+	spin_lock_irqsave(&q->lock, flags);
 	list_add(&_urb->list, &q->head); _urb->queue = q;
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
 static inline void _urb_queue_tail(struct _urb_queue *q, struct _urb *_urb)
 {
-        unsigned long flags;
-        spin_lock_irqsave(&q->lock, flags);
+	unsigned long flags;
+	spin_lock_irqsave(&q->lock, flags);
 	list_add_tail(&_urb->list, &q->head); _urb->queue = q;
 	spin_unlock_irqrestore(&q->lock, flags);
 }
@@ -96,9 +91,9 @@ static inline void _urb_queue_tail(struct _urb_queue *q, struct _urb *_urb)
 static inline void _urb_unlink(struct _urb *_urb)
 {
 	struct _urb_queue *q = _urb->queue;
-        unsigned long flags;
+	unsigned long flags;
 	if (q) {
-        	spin_lock_irqsave(&q->lock, flags);
+		spin_lock_irqsave(&q->lock, flags);
 		list_del(&_urb->list); _urb->queue = NULL;
 		spin_unlock_irqrestore(&q->lock, flags);
 	}
@@ -106,41 +101,33 @@ static inline void _urb_unlink(struct _urb *_urb)
 
 struct _urb *_urb_dequeue(struct _urb_queue *q);
 
-#ifndef container_of
-#define container_of(ptr, type, member) ({                      \
-		        const typeof( ((type *)0)->member ) *__mptr = (ptr);    \
-			        (type *)( (char *)__mptr - offsetof(type,member) );})
-#endif
-
 struct hci_usb {
 	struct hci_dev		*hdev;
 
 	unsigned long		state;
 	
-	struct usb_device 	*udev;
+	struct usb_device	*udev;
 	
 	struct usb_host_endpoint	*bulk_in_ep;
 	struct usb_host_endpoint	*bulk_out_ep;
 	struct usb_host_endpoint	*intr_in_ep;
 
-	struct usb_interface            *isoc_iface;
+	struct usb_interface		*isoc_iface;
 	struct usb_host_endpoint	*isoc_out_ep;
 	struct usb_host_endpoint	*isoc_in_ep;
 
 	__u8			ctrl_req;
 
 	struct sk_buff_head	transmit_q[4];
-	struct sk_buff		*reassembly[4]; // Reassembly buffers
+	struct sk_buff		*reassembly[4];		/* Reassembly buffers */
 
 	rwlock_t		completion_lock;
 
-	atomic_t		pending_tx[4];  // Number of pending requests 
-	struct _urb_queue	pending_q[4];   // Pending requests
-	struct _urb_queue	completed_q[4]; // Completed requests
+	atomic_t		pending_tx[4];		/* Number of pending requests */
+	struct _urb_queue	pending_q[4];		/* Pending requests */
+	struct _urb_queue	completed_q[4];		/* Completed requests */
 };
 
 /* States  */
 #define HCI_USB_TX_PROCESS	1
 #define HCI_USB_TX_WAKEUP	2
-
-#endif /* __KERNEL__ */

@@ -1816,7 +1816,7 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 			       : (fl->fl_type & F_WRLCK) ? "WRITE" : "READ ");
 	}
 	if (inode) {
-#if WE_CAN_BREAK_LSLK_NOW
+#ifdef WE_CAN_BREAK_LSLK_NOW
 		out += sprintf(out, "%d %s:%ld ", fl->fl_pid,
 				inode->i_sb->s_id, inode->i_ino);
 #else

@@ -762,7 +762,7 @@ do_init_arch(int is_pyxis)
 		*(vip)CIA_IOC_PCI_W3_MASK = 0xfff00000;
 		*(vip)CIA_IOC_PCI_T3_BASE = 0 >> 2;
 
-		alpha_mv.pci_dac_offset = 0x200000000;
+		alpha_mv.pci_dac_offset = 0x200000000UL;
 		*(vip)CIA_IOC_PCI_W_DAC = alpha_mv.pci_dac_offset >> 32;
 	}
 

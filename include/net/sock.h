@@ -430,10 +430,11 @@ struct proto {
 	int			(*destroy)(struct sock *sk);
 	void			(*shutdown)(struct sock *sk, int how);
 	int			(*setsockopt)(struct sock *sk, int level, 
-					int optname, char *optval, int optlen);
+					int optname, char __user *optval,
+					int optlen);
 	int			(*getsockopt)(struct sock *sk, int level, 
-					int optname, char *optval, 
-					int *option);  	 
+					int optname, char __user *optval, 
+					int __user *option);  	 
 	int			(*sendmsg)(struct kiocb *iocb, struct sock *sk,
 					   struct msghdr *msg, size_t len);
 	int			(*recvmsg)(struct kiocb *iocb, struct sock *sk,
@@ -1048,7 +1049,7 @@ static inline void net_timestamp(struct timeval *stamp)
 	}		
 } 
 
-extern int sock_get_timestamp(struct sock *, struct timeval *);
+extern int sock_get_timestamp(struct sock *, struct timeval __user *);
 
 /* 
  *	Enable debug/info messages 

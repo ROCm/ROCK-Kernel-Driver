@@ -830,10 +830,10 @@ S: Boulder, CO 80302
 S: USA
 
 N: Thomas Dunbar
-E: tdunbar@vtaix.cc.vt.edu
+E: tdunbar@vt.edu
 D: TeX & METAFONT hacking/maintenance
-S: Dean, Graduate School
-S: Virginia Tech
+S: Virginia Tech Computing Center
+S: 1700 Pratt Drive
 S: Blacksburg, Virginia 24061
 S: USA
 
@@ -1951,9 +1951,9 @@ S: USA
 
 N: Robert M. Love
 E: rml@tech9.net
-E: rml@ufl.edu
+E: rml@novell.com
 D: misc. kernel hacking and debugging
-S: Gainesville, Florida 32608
+S: Cambridge, MA 02139
 S: USA
 
 N: Martin von Löwis

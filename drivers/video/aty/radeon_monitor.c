@@ -653,7 +653,8 @@ static void radeon_fixup_panel_info(struct radeonfb_info *rinfo)
 		rinfo->panel_info.use_bios_dividers = 1;
 	}
 	/* iBook G4 */
-	if (machine_is_compatible("PowerBook6,3")) {
+        if (machine_is_compatible("PowerBook6,3") |
+            machine_is_compatible("PowerBook6,5")) {
 		rinfo->panel_info.ref_divider = rinfo->pll.ref_div;
 		rinfo->panel_info.post_divider = 0x6;
 		rinfo->panel_info.fbk_divider = 0xad;

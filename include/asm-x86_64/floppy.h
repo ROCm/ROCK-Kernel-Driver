@@ -170,7 +170,7 @@ static unsigned long vdma_mem_alloc(unsigned long size)
 static void _fd_dma_mem_free(unsigned long addr, unsigned long size)
 {
 	if((unsigned long) addr >= (unsigned long) high_memory)
-		return vfree((void *)addr);
+		vfree((void *)addr);
 	else
 		free_pages(addr, get_order(size));		
 }

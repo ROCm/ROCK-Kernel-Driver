@@ -3,7 +3,7 @@
  *
  * Support for the IIC peripheral on IBM PPC 4xx
  *
- * Copyright (c) 2003 Zultys Technologies.
+ * Copyright (c) 2003, 2004 Zultys Technologies.
  * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
  *
  * Based on original work by 
@@ -45,7 +45,7 @@
 
 #include "i2c-ibm_iic.h"
 
-#define DRIVER_VERSION "2.0"
+#define DRIVER_VERSION "2.01"
 
 MODULE_DESCRIPTION("IBM IIC driver v" DRIVER_VERSION);
 MODULE_LICENSE("GPL");
@@ -69,14 +69,14 @@ MODULE_PARM_DESC(iic_fast_poll, "Force fast mode (400 kHz)");
 #endif
 
 #if DBG_LEVEL > 0
-#  define DBG(x...)	printk(KERN_DEBUG "ibm-iic" ##x)
+#  define DBG(f,x...)	printk(KERN_DEBUG "ibm-iic" f, ##x)
 #else
-#  define DBG(x...)	((void)0)
+#  define DBG(f,x...)	((void)0)
 #endif
 #if DBG_LEVEL > 1
-#  define DBG2(x...) 	DBG( ##x )
+#  define DBG2(f,x...) 	DBG(f, ##x)
 #else
-#  define DBG2(x...) 	((void)0)
+#  define DBG2(f,x...) 	((void)0)
 #endif
 #if DBG_LEVEL > 2
 static void dump_iic_regs(const char* header, struct ibm_iic_private* dev)
@@ -455,6 +455,16 @@ static int iic_xfer(struct i2c_adapter *adap, struct i2c_msg msgs[], int num)
 	}		
 	for (i = 0; i < num; ++i){
 		if (unlikely(msgs[i].len <= 0)){
+			if (num == 1 && !msgs[0].len){
+				/* Special case for I2C_SMBUS_QUICK emulation.
+				 * Although this logic is FAR FROM PERFECT, this 
+				 * is what previous driver version did.
+				 * IBM IIC doesn't support 0-length transactions
+				 * (except bit-banging through IICx_DIRECTCNTL).
+				 */
+				DBG("%d: zero-length msg kludge\n", dev->idx); 
+				return 0;
+			}
 			DBG("%d: invalid len %d in msg[%d]\n", dev->idx, 
 				msgs[i].len, i);
 			return -EINVAL;
@@ -549,19 +559,24 @@ static int __devinit iic_probe(struct ocp_device *ocp){
 
 	struct ibm_iic_private* dev;
 	struct i2c_adapter* adap;
+	struct ocp_func_iic_data* iic_data = ocp->def->additions;
 	int ret;
-	bd_t* bd = (bd_t*)&__res;
 	
+	if (!iic_data)
+		printk(KERN_WARNING"ibm-iic%d: missing additional data!\n",
+			ocp->def->index);
+
 	if (!(dev = kmalloc(sizeof(*dev), GFP_KERNEL))){
-		printk(KERN_CRIT "ibm-iic: failed to allocate device data\n");
+		printk(KERN_CRIT "ibm-iic%d: failed to allocate device data\n",
+			ocp->def->index);
 		return -ENOMEM;
 	}
 
 	memset(dev, 0, sizeof(*dev));
-	dev->idx = ocp->num;
+	dev->idx = ocp->def->index;
 	ocp_set_drvdata(ocp, dev);
 	
-	if (!(dev->vaddr = ioremap(ocp->paddr, sizeof(struct iic_regs)))){
+	if (!(dev->vaddr = ioremap(ocp->def->paddr, sizeof(struct iic_regs)))){
 		printk(KERN_CRIT "ibm-iic%d: failed to ioremap device registers\n",
 			dev->idx);
 		ret = -ENXIO;
@@ -570,7 +585,7 @@ static int __devinit iic_probe(struct ocp_device *ocp){
 	
 	init_waitqueue_head(&dev->wq);
 
-	dev->irq = iic_force_poll ? -1 : ocp->irq;
+	dev->irq = iic_force_poll ? -1 : ocp->def->irq;
 	if (dev->irq >= 0){
 		/* Disable interrupts until we finish intialization,
 		   assumes level-sensitive IRQ setup...
@@ -589,13 +604,12 @@ static int __devinit iic_probe(struct ocp_device *ocp){
 			dev->idx);
 		
 	/* Board specific settings */
-	BUG_ON(dev->idx >= sizeof(bd->bi_iic_fast) / sizeof(bd->bi_iic_fast[0]));
-	dev->fast_mode = iic_force_fast ? 1 : bd->bi_iic_fast[dev->idx];
+	dev->fast_mode = iic_force_fast ? 1 : (iic_data ? iic_data->fast_mode : 0);
 	
 	/* clckdiv is the same for *all* IIC interfaces, 
 	 * but I'd rather make a copy than introduce another global. --ebs
 	 */
-	dev->clckdiv = iic_clckdiv(bd->bi_opb_busfreq);
+	dev->clckdiv = iic_clckdiv(ocp_sys_info.opb_bus_freq);
 	DBG("%d: clckdiv = %d\n", dev->idx, dev->clckdiv);
 	
 	/* Initialize IIC interface */
@@ -664,7 +678,7 @@ static void __devexit iic_remove(struct ocp_device *ocp)
 
 static struct ocp_device_id ibm_iic_ids[] __devinitdata = 
 {
-	{ .vendor = OCP_VENDOR_IBM, .device = OCP_FUNC_IIC },
+	{ .vendor = OCP_VENDOR_IBM, .function = OCP_FUNC_IIC },
 	{ .vendor = OCP_VENDOR_INVALID }
 };
 
@@ -672,7 +686,7 @@ MODULE_DEVICE_TABLE(ocp, ibm_iic_ids);
 
 static struct ocp_driver ibm_iic_driver =
 {
-	.name 		= "ocp_iic",
+	.name 		= "iic",
 	.id_table	= ibm_iic_ids,
 	.probe		= iic_probe,
 	.remove		= __devexit_p(iic_remove),
@@ -685,7 +699,7 @@ static struct ocp_driver ibm_iic_driver =
 static int __init iic_init(void)
 {
 	printk(KERN_INFO "IBM IIC driver v" DRIVER_VERSION "\n");
-	return ocp_module_init(&ibm_iic_driver);
+	return ocp_register_driver(&ibm_iic_driver);
 }
 
 static void __exit iic_exit(void)

@@ -195,8 +195,13 @@ extern void iounmap(void *addr);
 #define __raw_writel writel
 #define __raw_writeq writeq
 
-void *memcpy_fromio(void*,const void*,unsigned); 
-void *memcpy_toio(void*,const void*,unsigned); 
+void *__memcpy_fromio(void*,unsigned long,unsigned);
+void *__memcpy_toio(unsigned long,const void*,unsigned);
+
+#define memcpy_fromio(to,from,len) \
+  __memcpy_fromio((to),(unsigned long)(from),(len))
+#define memcpy_toio(to,from,len) \
+  __memcpy_toio((unsigned long)(to),(from),(len))
 #define memset_io(a,b,c)	memset((void *)(a),(b),(c))
 
 /*

@@ -168,7 +168,7 @@ extern int pci_dma_supported(struct pci_dev *hwdev, u64 mask);
  * can drive enough of the 64 bits.
  */
 #define PCI64_REQUIRED_MASK	(~(dma64_addr_t)0)
-#define PCI64_ADDR_BASE		0xfffc000000000000
+#define PCI64_ADDR_BASE		0xfffc000000000000UL
 
 /* Usage of the pci_dac_foo interfaces is only valid if this
  * test passes.

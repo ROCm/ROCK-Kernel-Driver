@@ -998,12 +998,10 @@ void usb_disconnect(struct usb_device **pdev)
 	 */
 	usb_disable_device(dev, 0);
 
-	dev_dbg (&dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
-	if (dev->devnum > 0) {
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		usbfs_remove_device(dev);
-	}
+	dev_dbg (&dev->dev, "unregistering device\n");
+	usb_release_address(dev);
+	usbfs_remove_device(dev);
 	up(&dev->serialize);
 	device_unregister(&dev->dev);
 }
@@ -1038,23 +1036,22 @@ void usb_choose_address(struct usb_device *dev)
 	}
 }
 
-
-// hub-only!! ... and only exported for reset/reinit path.
-// otherwise used internally, for usb_new_device()
-int usb_set_address(struct usb_device *dev)
+/**
+ * usb_release_address - deallocate device address (usbcore-internal)
+ * @dev: newly removed device
+ *
+ * Removes and deallocates the address assigned to a device.
+ * Only hub drivers (but not virtual root hub drivers for host
+ * controllers) should ever call this.
+ */
+void usb_release_address(struct usb_device *dev)
 {
-	int retval;
-
-	if (dev->devnum == 0)
-		return -EINVAL;
-	if (dev->state != USB_STATE_DEFAULT && dev->state != USB_STATE_ADDRESS)
-		return -EINVAL;
-	retval = usb_control_msg(dev, usb_snddefctrl(dev), USB_REQ_SET_ADDRESS,
-		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_SET_TIMEOUT);
-	if (retval == 0)
-		dev->state = USB_STATE_ADDRESS;
-	return retval;
+	if (dev->devnum > 0) {
+		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+		dev->devnum = -1;
+	}
 }
+
 
 static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 {
@@ -1067,6 +1064,37 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 	if (usb_string(dev, index, buf, 256) > 0)
 		dev_printk(KERN_INFO, &dev->dev, "%s: %s\n", id, buf);
 	kfree(buf);
+}
+
+static int usb_choose_configuration(struct usb_device *dev)
+{
+	int c, i;
+
+	c = dev->config[0].desc.bConfigurationValue;
+	if (dev->descriptor.bNumConfigurations != 1) {
+		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
+			struct usb_interface_descriptor	*desc;
+
+			/* heuristic:  Linux is more likely to have class
+			 * drivers, so avoid vendor-specific interfaces.
+			 */
+			desc = &dev->config[i].intf_cache[0]
+					->altsetting->desc;
+			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
+				continue;
+			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
+			if (desc->bInterfaceClass == USB_CLASS_COMM
+					&& desc->bInterfaceSubClass == 2
+					&& desc->bInterfaceProtocol == 0xff)
+				continue;
+			c = dev->config[i].desc.bConfigurationValue;
+			break;
+		}
+		dev_info(&dev->dev,
+			"configuration #%d chosen from %d choices\n",
+			c, dev->descriptor.bNumConfigurations);
+	}
+	return c;
 }
 
 /*
@@ -1090,8 +1118,7 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 int usb_new_device(struct usb_device *dev)
 {
 	int err;
-	int i;
-	int config;
+	int c;
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
@@ -1119,41 +1146,16 @@ int usb_new_device(struct usb_device *dev)
 		dev_err(&dev->dev, "can't device_add, error %d\n", err);
 		goto fail;
 	}
-	usb_create_driverfs_dev_files (dev);
+	usb_create_sysfs_dev_files (dev);
 
 	/* choose and set the configuration. that registers the interfaces
 	 * with the driver core, and lets usb device drivers bind to them.
 	 * NOTE:  should interact with hub power budgeting.
 	 */
-	config = dev->config[0].desc.bConfigurationValue;
-	if (dev->descriptor.bNumConfigurations != 1) {
-		for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
-			struct usb_interface_descriptor	*desc;
-
-			/* heuristic:  Linux is more likely to have class
-			 * drivers, so avoid vendor-specific interfaces.
-			 */
-			desc = &dev->config[i].intf_cache[0]
-					->altsetting->desc;
-			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
-				continue;
-			/* COMM/2/all is CDC ACM, except 0xff is MSFT RNDIS */
-			if (desc->bInterfaceClass == USB_CLASS_COMM
-					&& desc->bInterfaceSubClass == 2
-					&& desc->bInterfaceProtocol == 0xff)
-				continue;
-			config = dev->config[i].desc.bConfigurationValue;
-			break;
-		}
-		dev_info(&dev->dev,
-			"configuration #%d chosen from %d choices\n",
-			config,
-			dev->descriptor.bNumConfigurations);
-	}
-	err = usb_set_configuration(dev, config);
+	c = usb_choose_configuration(dev);
+	err = usb_set_configuration(dev, c);
 	if (err) {
-		dev_err(&dev->dev, "can't set config #%d, error %d\n",
-			config, err);
+		dev_err(&dev->dev, "can't set config #%d, error %d\n", c, err);
 		device_del(&dev->dev);
 		goto fail;
 	}
@@ -1166,8 +1168,7 @@ int usb_new_device(struct usb_device *dev)
 	return 0;
 fail:
 	dev->state = USB_STATE_NOTATTACHED;
-	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-	dev->devnum = -1;
+	usb_release_address(dev);
 	usb_put_dev(dev);
 	return err;
 }

@@ -388,43 +388,5 @@ static inline int isa_check_signature(unsigned long io_addr,
 	return 0;
 }
 
-#ifdef CONFIG_NOT_COHERENT_CACHE
-
-/*
- * DMA-consistent mapping functions for PowerPCs that don't support
- * cache snooping.  These allocate/free a region of uncached mapped
- * memory space for use with DMA devices.  Alternatively, you could
- * allocate the space "normally" and use the cache management functions
- * to ensure it is consistent.
- */
-extern void *consistent_alloc(int gfp, size_t size, dma_addr_t *handle);
-extern void consistent_free(void *vaddr);
-extern void consistent_sync(void *vaddr, size_t size, int rw);
-extern void consistent_sync_page(struct page *page, unsigned long offset,
-				 size_t size, int rw);
-
-#define dma_cache_inv(_start,_size) \
-	invalidate_dcache_range(_start, (_start + _size))
-#define dma_cache_wback(_start,_size) \
-	clean_dcache_range(_start, (_start + _size))
-#define dma_cache_wback_inv(_start,_size) \
-	flush_dcache_range(_start, (_start + _size))
-
-#else /* ! CONFIG_NOT_COHERENT_CACHE */
-
-/*
- * Cache coherent cores.
- */
-
-#define dma_cache_inv(_start,_size)		do { } while (0)
-#define dma_cache_wback(_start,_size)		do { } while (0)
-#define dma_cache_wback_inv(_start,_size)	do { } while (0)
-
-#define consistent_alloc(gfp, size, handle)	NULL
-#define consistent_free(addr)			do { } while (0)
-#define consistent_sync(addr, size, rw)		do { } while (0)
-#define consistent_sync_page(pg, off, sz, rw)	do { } while (0)
-
-#endif /* ! CONFIG_NOT_COHERENT_CACHE */
 #endif /* _PPC_IO_H */
 #endif /* __KERNEL__ */

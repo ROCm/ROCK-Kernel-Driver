@@ -42,29 +42,29 @@
 
 /* Misc. PSYCHO PCI controller register offsets and definitions. */
 #define PSYCHO_CONTROL		0x0010UL
-#define  PSYCHO_CONTROL_IMPL	 0xf000000000000000 /* Implementation of this PSYCHO*/
-#define  PSYCHO_CONTROL_VER	 0x0f00000000000000 /* Version of this PSYCHO       */
-#define  PSYCHO_CONTROL_MID	 0x00f8000000000000 /* UPA Module ID of PSYCHO      */
-#define  PSYCHO_CONTROL_IGN	 0x0007c00000000000 /* Interrupt Group Number       */
-#define  PSYCHO_CONTROL_RESV     0x00003ffffffffff0 /* Reserved                     */
-#define  PSYCHO_CONTROL_APCKEN	 0x0000000000000008 /* Address Parity Check Enable  */
-#define  PSYCHO_CONTROL_APERR	 0x0000000000000004 /* Incoming System Addr Parerr  */
-#define  PSYCHO_CONTROL_IAP	 0x0000000000000002 /* Invert UPA Parity            */
-#define  PSYCHO_CONTROL_MODE	 0x0000000000000001 /* PSYCHO clock mode            */
+#define  PSYCHO_CONTROL_IMPL	 0xf000000000000000UL /* Implementation of this PSYCHO*/
+#define  PSYCHO_CONTROL_VER	 0x0f00000000000000UL /* Version of this PSYCHO       */
+#define  PSYCHO_CONTROL_MID	 0x00f8000000000000UL /* UPA Module ID of PSYCHO      */
+#define  PSYCHO_CONTROL_IGN	 0x0007c00000000000UL /* Interrupt Group Number       */
+#define  PSYCHO_CONTROL_RESV     0x00003ffffffffff0UL /* Reserved                     */
+#define  PSYCHO_CONTROL_APCKEN	 0x0000000000000008UL /* Address Parity Check Enable  */
+#define  PSYCHO_CONTROL_APERR	 0x0000000000000004UL /* Incoming System Addr Parerr  */
+#define  PSYCHO_CONTROL_IAP	 0x0000000000000002UL /* Invert UPA Parity            */
+#define  PSYCHO_CONTROL_MODE	 0x0000000000000001UL /* PSYCHO clock mode            */
 #define PSYCHO_PCIA_CTRL	0x2000UL
 #define PSYCHO_PCIB_CTRL	0x4000UL
-#define  PSYCHO_PCICTRL_RESV1	 0xfffffff000000000 /* Reserved                     */
-#define  PSYCHO_PCICTRL_SBH_ERR	 0x0000000800000000 /* Streaming byte hole error    */
-#define  PSYCHO_PCICTRL_SERR	 0x0000000400000000 /* SERR signal asserted         */
-#define  PSYCHO_PCICTRL_SPEED	 0x0000000200000000 /* PCI speed (1 is U2P clock)   */
-#define  PSYCHO_PCICTRL_RESV2	 0x00000001ffc00000 /* Reserved                     */
-#define  PSYCHO_PCICTRL_ARB_PARK 0x0000000000200000 /* PCI arbitration parking      */
-#define  PSYCHO_PCICTRL_RESV3	 0x00000000001ff800 /* Reserved                     */
-#define  PSYCHO_PCICTRL_SBH_INT	 0x0000000000000400 /* Streaming byte hole int enab */
-#define  PSYCHO_PCICTRL_WEN	 0x0000000000000200 /* Power Mgmt Wake Enable       */
-#define  PSYCHO_PCICTRL_EEN	 0x0000000000000100 /* PCI Error Interrupt Enable   */
-#define  PSYCHO_PCICTRL_RESV4	 0x00000000000000c0 /* Reserved                     */
-#define  PSYCHO_PCICTRL_AEN	 0x000000000000003f /* PCI DVMA Arbitration Enable  */
+#define  PSYCHO_PCICTRL_RESV1	 0xfffffff000000000UL /* Reserved                     */
+#define  PSYCHO_PCICTRL_SBH_ERR	 0x0000000800000000UL /* Streaming byte hole error    */
+#define  PSYCHO_PCICTRL_SERR	 0x0000000400000000UL /* SERR signal asserted         */
+#define  PSYCHO_PCICTRL_SPEED	 0x0000000200000000UL /* PCI speed (1 is U2P clock)   */
+#define  PSYCHO_PCICTRL_RESV2	 0x00000001ffc00000UL /* Reserved                     */
+#define  PSYCHO_PCICTRL_ARB_PARK 0x0000000000200000UL /* PCI arbitration parking      */
+#define  PSYCHO_PCICTRL_RESV3	 0x00000000001ff800UL /* Reserved                     */
+#define  PSYCHO_PCICTRL_SBH_INT	 0x0000000000000400UL /* Streaming byte hole int enab */
+#define  PSYCHO_PCICTRL_WEN	 0x0000000000000200UL /* Power Mgmt Wake Enable       */
+#define  PSYCHO_PCICTRL_EEN	 0x0000000000000100UL /* PCI Error Interrupt Enable   */
+#define  PSYCHO_PCICTRL_RESV4	 0x00000000000000c0UL /* Reserved                     */
+#define  PSYCHO_PCICTRL_AEN	 0x000000000000003fUL /* PCI DVMA Arbitration Enable  */
 
 /* U2P Programmer's Manual, page 13-55, configuration space
  * address format:
@@ -403,11 +403,11 @@ enum psycho_error_type {
  */
 #define PSYCHO_STRBUF_CONTROL_A 0x2800UL
 #define PSYCHO_STRBUF_CONTROL_B 0x4800UL
-#define  PSYCHO_STRBUF_CTRL_LPTR    0x00000000000000f0 /* LRU Lock Pointer */
-#define  PSYCHO_STRBUF_CTRL_LENAB   0x0000000000000008 /* LRU Lock Enable */
-#define  PSYCHO_STRBUF_CTRL_RRDIS   0x0000000000000004 /* Rerun Disable */
-#define  PSYCHO_STRBUF_CTRL_DENAB   0x0000000000000002 /* Diagnostic Mode Enable */
-#define  PSYCHO_STRBUF_CTRL_ENAB    0x0000000000000001 /* Streaming Buffer Enable */
+#define  PSYCHO_STRBUF_CTRL_LPTR    0x00000000000000f0UL /* LRU Lock Pointer */
+#define  PSYCHO_STRBUF_CTRL_LENAB   0x0000000000000008UL /* LRU Lock Enable */
+#define  PSYCHO_STRBUF_CTRL_RRDIS   0x0000000000000004UL /* Rerun Disable */
+#define  PSYCHO_STRBUF_CTRL_DENAB   0x0000000000000002UL /* Diagnostic Mode Enable */
+#define  PSYCHO_STRBUF_CTRL_ENAB    0x0000000000000001UL /* Streaming Buffer Enable */
 #define PSYCHO_STRBUF_FLUSH_A   0x2808UL
 #define PSYCHO_STRBUF_FLUSH_B   0x4808UL
 #define PSYCHO_STRBUF_FSYNC_A   0x2810UL
@@ -416,22 +416,22 @@ enum psycho_error_type {
 #define PSYCHO_STC_DATA_B	0xc000UL
 #define PSYCHO_STC_ERR_A	0xb400UL
 #define PSYCHO_STC_ERR_B	0xc400UL
-#define  PSYCHO_STCERR_WRITE	 0x0000000000000002	/* Write Error */
-#define  PSYCHO_STCERR_READ	 0x0000000000000001	/* Read Error */
+#define  PSYCHO_STCERR_WRITE	 0x0000000000000002UL	/* Write Error */
+#define  PSYCHO_STCERR_READ	 0x0000000000000001UL	/* Read Error */
 #define PSYCHO_STC_TAG_A	0xb800UL
 #define PSYCHO_STC_TAG_B	0xc800UL
-#define  PSYCHO_STCTAG_PPN	 0x0fffffff00000000	/* Physical Page Number */
-#define  PSYCHO_STCTAG_VPN	 0x00000000ffffe000	/* Virtual Page Number */
-#define  PSYCHO_STCTAG_VALID	 0x0000000000000002	/* Valid */
-#define  PSYCHO_STCTAG_WRITE	 0x0000000000000001	/* Writable */
+#define  PSYCHO_STCTAG_PPN	 0x0fffffff00000000UL	/* Physical Page Number */
+#define  PSYCHO_STCTAG_VPN	 0x00000000ffffe000UL	/* Virtual Page Number */
+#define  PSYCHO_STCTAG_VALID	 0x0000000000000002UL	/* Valid */
+#define  PSYCHO_STCTAG_WRITE	 0x0000000000000001UL	/* Writable */
 #define PSYCHO_STC_LINE_A	0xb900UL
 #define PSYCHO_STC_LINE_B	0xc900UL
-#define  PSYCHO_STCLINE_LINDX	 0x0000000001e00000	/* LRU Index */
-#define  PSYCHO_STCLINE_SPTR	 0x00000000001f8000	/* Dirty Data Start Pointer */
-#define  PSYCHO_STCLINE_LADDR	 0x0000000000007f00	/* Line Address */
-#define  PSYCHO_STCLINE_EPTR	 0x00000000000000fc	/* Dirty Data End Pointer */
-#define  PSYCHO_STCLINE_VALID	 0x0000000000000002	/* Valid */
-#define  PSYCHO_STCLINE_FOFN	 0x0000000000000001	/* Fetch Outstanding / Flush Necessary */
+#define  PSYCHO_STCLINE_LINDX	 0x0000000001e00000UL	/* LRU Index */
+#define  PSYCHO_STCLINE_SPTR	 0x00000000001f8000UL	/* Dirty Data Start Pointer */
+#define  PSYCHO_STCLINE_LADDR	 0x0000000000007f00UL	/* Line Address */
+#define  PSYCHO_STCLINE_EPTR	 0x00000000000000fcUL	/* Dirty Data End Pointer */
+#define  PSYCHO_STCLINE_VALID	 0x0000000000000002UL	/* Valid */
+#define  PSYCHO_STCLINE_FOFN	 0x0000000000000001UL	/* Fetch Outstanding / Flush Necessary */
 
 static spinlock_t stc_buf_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long stc_error_buf[128];
@@ -555,24 +555,24 @@ static void __psycho_check_stc_error(struct pci_controller_info *p,
  * interrogate the IOMMU state to see if it is the cause.
  */
 #define PSYCHO_IOMMU_CONTROL	0x0200UL
-#define  PSYCHO_IOMMU_CTRL_RESV     0xfffffffff9000000 /* Reserved                      */
-#define  PSYCHO_IOMMU_CTRL_XLTESTAT 0x0000000006000000 /* Translation Error Status      */
-#define  PSYCHO_IOMMU_CTRL_XLTEERR  0x0000000001000000 /* Translation Error encountered */
-#define  PSYCHO_IOMMU_CTRL_LCKEN    0x0000000000800000 /* Enable translation locking    */
-#define  PSYCHO_IOMMU_CTRL_LCKPTR   0x0000000000780000 /* Translation lock pointer      */
-#define  PSYCHO_IOMMU_CTRL_TSBSZ    0x0000000000070000 /* TSB Size                      */
-#define  PSYCHO_IOMMU_TSBSZ_1K      0x0000000000000000 /* TSB Table 1024 8-byte entries */
-#define  PSYCHO_IOMMU_TSBSZ_2K      0x0000000000010000 /* TSB Table 2048 8-byte entries */
-#define  PSYCHO_IOMMU_TSBSZ_4K      0x0000000000020000 /* TSB Table 4096 8-byte entries */
-#define  PSYCHO_IOMMU_TSBSZ_8K      0x0000000000030000 /* TSB Table 8192 8-byte entries */
-#define  PSYCHO_IOMMU_TSBSZ_16K     0x0000000000040000 /* TSB Table 16k 8-byte entries  */
-#define  PSYCHO_IOMMU_TSBSZ_32K     0x0000000000050000 /* TSB Table 32k 8-byte entries  */
-#define  PSYCHO_IOMMU_TSBSZ_64K     0x0000000000060000 /* TSB Table 64k 8-byte entries  */
-#define  PSYCHO_IOMMU_TSBSZ_128K    0x0000000000070000 /* TSB Table 128k 8-byte entries */
-#define  PSYCHO_IOMMU_CTRL_RESV2    0x000000000000fff8 /* Reserved                      */
-#define  PSYCHO_IOMMU_CTRL_TBWSZ    0x0000000000000004 /* Assumed page size, 0=8k 1=64k */
-#define  PSYCHO_IOMMU_CTRL_DENAB    0x0000000000000002 /* Diagnostic mode enable        */
-#define  PSYCHO_IOMMU_CTRL_ENAB     0x0000000000000001 /* IOMMU Enable                  */
+#define  PSYCHO_IOMMU_CTRL_RESV     0xfffffffff9000000UL /* Reserved                      */
+#define  PSYCHO_IOMMU_CTRL_XLTESTAT 0x0000000006000000UL /* Translation Error Status      */
+#define  PSYCHO_IOMMU_CTRL_XLTEERR  0x0000000001000000UL /* Translation Error encountered */
+#define  PSYCHO_IOMMU_CTRL_LCKEN    0x0000000000800000UL /* Enable translation locking    */
+#define  PSYCHO_IOMMU_CTRL_LCKPTR   0x0000000000780000UL /* Translation lock pointer      */
+#define  PSYCHO_IOMMU_CTRL_TSBSZ    0x0000000000070000UL /* TSB Size                      */
+#define  PSYCHO_IOMMU_TSBSZ_1K      0x0000000000000000UL /* TSB Table 1024 8-byte entries */
+#define  PSYCHO_IOMMU_TSBSZ_2K      0x0000000000010000UL /* TSB Table 2048 8-byte entries */
+#define  PSYCHO_IOMMU_TSBSZ_4K      0x0000000000020000UL /* TSB Table 4096 8-byte entries */
+#define  PSYCHO_IOMMU_TSBSZ_8K      0x0000000000030000UL /* TSB Table 8192 8-byte entries */
+#define  PSYCHO_IOMMU_TSBSZ_16K     0x0000000000040000UL /* TSB Table 16k 8-byte entries  */
+#define  PSYCHO_IOMMU_TSBSZ_32K     0x0000000000050000UL /* TSB Table 32k 8-byte entries  */
+#define  PSYCHO_IOMMU_TSBSZ_64K     0x0000000000060000UL /* TSB Table 64k 8-byte entries  */
+#define  PSYCHO_IOMMU_TSBSZ_128K    0x0000000000070000UL /* TSB Table 128k 8-byte entries */
+#define  PSYCHO_IOMMU_CTRL_RESV2    0x000000000000fff8UL /* Reserved                      */
+#define  PSYCHO_IOMMU_CTRL_TBWSZ    0x0000000000000004UL /* Assumed page size, 0=8k 1=64k */
+#define  PSYCHO_IOMMU_CTRL_DENAB    0x0000000000000002UL /* Diagnostic mode enable        */
+#define  PSYCHO_IOMMU_CTRL_ENAB     0x0000000000000001UL /* IOMMU Enable                  */
 #define PSYCHO_IOMMU_TSBBASE	0x0208UL
 #define PSYCHO_IOMMU_FLUSH	0x0210UL
 #define PSYCHO_IOMMU_TAG	0xa580UL
@@ -698,18 +698,18 @@ static void psycho_check_iommu_error(struct pci_controller_info *p,
  * relating to UPA interface transactions.
  */
 #define PSYCHO_UE_AFSR	0x0030UL
-#define  PSYCHO_UEAFSR_PPIO	0x8000000000000000 /* Primary PIO is cause         */
-#define  PSYCHO_UEAFSR_PDRD	0x4000000000000000 /* Primary DVMA read is cause   */
-#define  PSYCHO_UEAFSR_PDWR	0x2000000000000000 /* Primary DVMA write is cause  */
-#define  PSYCHO_UEAFSR_SPIO	0x1000000000000000 /* Secondary PIO is cause       */
-#define  PSYCHO_UEAFSR_SDRD	0x0800000000000000 /* Secondary DVMA read is cause */
-#define  PSYCHO_UEAFSR_SDWR	0x0400000000000000 /* Secondary DVMA write is cause*/
-#define  PSYCHO_UEAFSR_RESV1	0x03ff000000000000 /* Reserved                     */
-#define  PSYCHO_UEAFSR_BMSK	0x0000ffff00000000 /* Bytemask of failed transfer  */
-#define  PSYCHO_UEAFSR_DOFF	0x00000000e0000000 /* Doubleword Offset            */
-#define  PSYCHO_UEAFSR_MID	0x000000001f000000 /* UPA MID causing the fault    */
-#define  PSYCHO_UEAFSR_BLK	0x0000000000800000 /* Trans was block operation    */
-#define  PSYCHO_UEAFSR_RESV2	0x00000000007fffff /* Reserved                     */
+#define  PSYCHO_UEAFSR_PPIO	0x8000000000000000UL /* Primary PIO is cause         */
+#define  PSYCHO_UEAFSR_PDRD	0x4000000000000000UL /* Primary DVMA read is cause   */
+#define  PSYCHO_UEAFSR_PDWR	0x2000000000000000UL /* Primary DVMA write is cause  */
+#define  PSYCHO_UEAFSR_SPIO	0x1000000000000000UL /* Secondary PIO is cause       */
+#define  PSYCHO_UEAFSR_SDRD	0x0800000000000000UL /* Secondary DVMA read is cause */
+#define  PSYCHO_UEAFSR_SDWR	0x0400000000000000UL /* Secondary DVMA write is cause*/
+#define  PSYCHO_UEAFSR_RESV1	0x03ff000000000000UL /* Reserved                     */
+#define  PSYCHO_UEAFSR_BMSK	0x0000ffff00000000UL /* Bytemask of failed transfer  */
+#define  PSYCHO_UEAFSR_DOFF	0x00000000e0000000UL /* Doubleword Offset            */
+#define  PSYCHO_UEAFSR_MID	0x000000001f000000UL /* UPA MID causing the fault    */
+#define  PSYCHO_UEAFSR_BLK	0x0000000000800000UL /* Trans was block operation    */
+#define  PSYCHO_UEAFSR_RESV2	0x00000000007fffffUL /* Reserved                     */
 #define PSYCHO_UE_AFAR	0x0038UL
 
 static irqreturn_t psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
@@ -774,19 +774,19 @@ static irqreturn_t psycho_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 /* Correctable Errors. */
 #define PSYCHO_CE_AFSR	0x0040UL
-#define  PSYCHO_CEAFSR_PPIO	0x8000000000000000 /* Primary PIO is cause         */
-#define  PSYCHO_CEAFSR_PDRD	0x4000000000000000 /* Primary DVMA read is cause   */
-#define  PSYCHO_CEAFSR_PDWR	0x2000000000000000 /* Primary DVMA write is cause  */
-#define  PSYCHO_CEAFSR_SPIO	0x1000000000000000 /* Secondary PIO is cause       */
-#define  PSYCHO_CEAFSR_SDRD	0x0800000000000000 /* Secondary DVMA read is cause */
-#define  PSYCHO_CEAFSR_SDWR	0x0400000000000000 /* Secondary DVMA write is cause*/
-#define  PSYCHO_CEAFSR_RESV1	0x0300000000000000 /* Reserved                     */
-#define  PSYCHO_CEAFSR_ESYND	0x00ff000000000000 /* Syndrome Bits                */
-#define  PSYCHO_CEAFSR_BMSK	0x0000ffff00000000 /* Bytemask of failed transfer  */
-#define  PSYCHO_CEAFSR_DOFF	0x00000000e0000000 /* Double Offset                */
-#define  PSYCHO_CEAFSR_MID	0x000000001f000000 /* UPA MID causing the fault    */
-#define  PSYCHO_CEAFSR_BLK	0x0000000000800000 /* Trans was block operation    */
-#define  PSYCHO_CEAFSR_RESV2	0x00000000007fffff /* Reserved                     */
+#define  PSYCHO_CEAFSR_PPIO	0x8000000000000000UL /* Primary PIO is cause         */
+#define  PSYCHO_CEAFSR_PDRD	0x4000000000000000UL /* Primary DVMA read is cause   */
+#define  PSYCHO_CEAFSR_PDWR	0x2000000000000000UL /* Primary DVMA write is cause  */
+#define  PSYCHO_CEAFSR_SPIO	0x1000000000000000UL /* Secondary PIO is cause       */
+#define  PSYCHO_CEAFSR_SDRD	0x0800000000000000UL /* Secondary DVMA read is cause */
+#define  PSYCHO_CEAFSR_SDWR	0x0400000000000000UL /* Secondary DVMA write is cause*/
+#define  PSYCHO_CEAFSR_RESV1	0x0300000000000000UL /* Reserved                     */
+#define  PSYCHO_CEAFSR_ESYND	0x00ff000000000000UL /* Syndrome Bits                */
+#define  PSYCHO_CEAFSR_BMSK	0x0000ffff00000000UL /* Bytemask of failed transfer  */
+#define  PSYCHO_CEAFSR_DOFF	0x00000000e0000000UL /* Double Offset                */
+#define  PSYCHO_CEAFSR_MID	0x000000001f000000UL /* UPA MID causing the fault    */
+#define  PSYCHO_CEAFSR_BLK	0x0000000000800000UL /* Trans was block operation    */
+#define  PSYCHO_CEAFSR_RESV2	0x00000000007fffffUL /* Reserved                     */
 #define PSYCHO_CE_AFAR	0x0040UL
 
 static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
@@ -857,20 +857,20 @@ static irqreturn_t psycho_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
  */
 #define PSYCHO_PCI_AFSR_A	0x2010UL
 #define PSYCHO_PCI_AFSR_B	0x4010UL
-#define  PSYCHO_PCIAFSR_PMA	0x8000000000000000 /* Primary Master Abort Error   */
-#define  PSYCHO_PCIAFSR_PTA	0x4000000000000000 /* Primary Target Abort Error   */
-#define  PSYCHO_PCIAFSR_PRTRY	0x2000000000000000 /* Primary Excessive Retries    */
-#define  PSYCHO_PCIAFSR_PPERR	0x1000000000000000 /* Primary Parity Error         */
-#define  PSYCHO_PCIAFSR_SMA	0x0800000000000000 /* Secondary Master Abort Error */
-#define  PSYCHO_PCIAFSR_STA	0x0400000000000000 /* Secondary Target Abort Error */
-#define  PSYCHO_PCIAFSR_SRTRY	0x0200000000000000 /* Secondary Excessive Retries  */
-#define  PSYCHO_PCIAFSR_SPERR	0x0100000000000000 /* Secondary Parity Error       */
-#define  PSYCHO_PCIAFSR_RESV1	0x00ff000000000000 /* Reserved                     */
-#define  PSYCHO_PCIAFSR_BMSK	0x0000ffff00000000 /* Bytemask of failed transfer  */
-#define  PSYCHO_PCIAFSR_BLK	0x0000000080000000 /* Trans was block operation    */
-#define  PSYCHO_PCIAFSR_RESV2	0x0000000040000000 /* Reserved                     */
-#define  PSYCHO_PCIAFSR_MID	0x000000003e000000 /* MID causing the error        */
-#define  PSYCHO_PCIAFSR_RESV3	0x0000000001ffffff /* Reserved                     */
+#define  PSYCHO_PCIAFSR_PMA	0x8000000000000000UL /* Primary Master Abort Error   */
+#define  PSYCHO_PCIAFSR_PTA	0x4000000000000000UL /* Primary Target Abort Error   */
+#define  PSYCHO_PCIAFSR_PRTRY	0x2000000000000000UL /* Primary Excessive Retries    */
+#define  PSYCHO_PCIAFSR_PPERR	0x1000000000000000UL /* Primary Parity Error         */
+#define  PSYCHO_PCIAFSR_SMA	0x0800000000000000UL /* Secondary Master Abort Error */
+#define  PSYCHO_PCIAFSR_STA	0x0400000000000000UL /* Secondary Target Abort Error */
+#define  PSYCHO_PCIAFSR_SRTRY	0x0200000000000000UL /* Secondary Excessive Retries  */
+#define  PSYCHO_PCIAFSR_SPERR	0x0100000000000000UL /* Secondary Parity Error       */
+#define  PSYCHO_PCIAFSR_RESV1	0x00ff000000000000UL /* Reserved                     */
+#define  PSYCHO_PCIAFSR_BMSK	0x0000ffff00000000UL /* Bytemask of failed transfer  */
+#define  PSYCHO_PCIAFSR_BLK	0x0000000080000000UL /* Trans was block operation    */
+#define  PSYCHO_PCIAFSR_RESV2	0x0000000040000000UL /* Reserved                     */
+#define  PSYCHO_PCIAFSR_MID	0x000000003e000000UL /* MID causing the error        */
+#define  PSYCHO_PCIAFSR_RESV3	0x0000000001ffffffUL /* Reserved                     */
 #define PSYCHO_PCI_AFAR_A	0x2018UL
 #define PSYCHO_PCI_AFAR_B	0x4018UL
 
@@ -1017,9 +1017,9 @@ static irqreturn_t psycho_pcierr_intr(int irq, void *dev_id, struct pt_regs *reg
 
 /* XXX What about PowerFail/PowerManagement??? -DaveM */
 #define PSYCHO_ECC_CTRL		0x0020
-#define  PSYCHO_ECCCTRL_EE	 0x8000000000000000 /* Enable ECC Checking */
-#define  PSYCHO_ECCCTRL_UE	 0x4000000000000000 /* Enable UE Interrupts */
-#define  PSYCHO_ECCCTRL_CE	 0x2000000000000000 /* Enable CE INterrupts */
+#define  PSYCHO_ECCCTRL_EE	 0x8000000000000000UL /* Enable ECC Checking */
+#define  PSYCHO_ECCCTRL_UE	 0x4000000000000000UL /* Enable UE Interrupts */
+#define  PSYCHO_ECCCTRL_CE	 0x2000000000000000UL /* Enable CE INterrupts */
 #define PSYCHO_UE_INO		0x2e
 #define PSYCHO_CE_INO		0x2f
 #define PSYCHO_PCIERR_A_INO	0x30
@@ -1282,14 +1282,14 @@ static void __init psycho_iommu_init(struct pci_controller_info *p)
 #define PSYCHO_IRQ_RETRY	0x1a00UL
 #define PSYCHO_PCIA_DIAG	0x2020UL
 #define PSYCHO_PCIB_DIAG	0x4020UL
-#define  PSYCHO_PCIDIAG_RESV	 0xffffffffffffff80 /* Reserved                     */
-#define  PSYCHO_PCIDIAG_DRETRY	 0x0000000000000040 /* Disable retry limit          */
-#define  PSYCHO_PCIDIAG_DISYNC	 0x0000000000000020 /* Disable DMA wr / irq sync    */
-#define  PSYCHO_PCIDIAG_DDWSYNC	 0x0000000000000010 /* Disable DMA wr / PIO rd sync */
-#define  PSYCHO_PCIDIAG_IDDPAR	 0x0000000000000008 /* Invert DMA data parity       */
-#define  PSYCHO_PCIDIAG_IPDPAR	 0x0000000000000004 /* Invert PIO data parity       */
-#define  PSYCHO_PCIDIAG_IPAPAR	 0x0000000000000002 /* Invert PIO address parity    */
-#define  PSYCHO_PCIDIAG_LPBACK	 0x0000000000000001 /* Enable loopback mode         */
+#define  PSYCHO_PCIDIAG_RESV	 0xffffffffffffff80UL /* Reserved                     */
+#define  PSYCHO_PCIDIAG_DRETRY	 0x0000000000000040UL /* Disable retry limit          */
+#define  PSYCHO_PCIDIAG_DISYNC	 0x0000000000000020UL /* Disable DMA wr / irq sync    */
+#define  PSYCHO_PCIDIAG_DDWSYNC	 0x0000000000000010UL /* Disable DMA wr / PIO rd sync */
+#define  PSYCHO_PCIDIAG_IDDPAR	 0x0000000000000008UL /* Invert DMA data parity       */
+#define  PSYCHO_PCIDIAG_IPDPAR	 0x0000000000000004UL /* Invert PIO data parity       */
+#define  PSYCHO_PCIDIAG_IPAPAR	 0x0000000000000002UL /* Invert PIO address parity    */
+#define  PSYCHO_PCIDIAG_LPBACK	 0x0000000000000001UL /* Enable loopback mode         */
 
 static void psycho_controller_hwinit(struct pci_controller_info *p)
 {
