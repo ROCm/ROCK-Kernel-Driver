@@ -34,6 +34,8 @@
 #include <asm/timer.h>
 #include <asm/uaccess.h>
 
+extern rwlock_t xtime_lock;
+
 #ifndef CONFIG_PCI
 
 asmlinkage int sys_pciconfig_read(unsigned long bus,
@@ -737,8 +739,10 @@ static void pcic_clear_clock_irq(void)
 
 static void pcic_timer_handler (int irq, void *h, struct pt_regs *regs)
 {
+	write_lock(&xtime_lock);	/* Dummy, to show that we remember */
 	pcic_clear_clock_irq();
 	do_timer(regs);
+	write_unlock(&xtime_lock);
 }
 
 #define USECS_PER_JIFFY  10000  /* We have 100HZ "standard" timer for sparc */
@@ -776,25 +780,17 @@ void __init pci_time_init(void)
 
 static __inline__ unsigned long do_gettimeoffset(void)
 {
-	struct tasklet_struct *t;
-	unsigned long offset = 0;
-
-	/* 
+	/*
 	 * We devide all to 100
 	 * to have microsecond resolution and to avoid overflow
 	 */
-	unsigned long count = 
+	unsigned long count =
 	    readl(pcic0.pcic_regs+PCI_SYS_COUNTER) & ~PCI_SYS_COUNTER_OVERFLOW;
 	count = ((count/100)*USECS_PER_JIFFY) / (TICK_TIMER_LIMIT/100);
-
-	t = &bh_task_vec[TIMER_BH];
-	if (test_bit(TASKLET_STATE_SCHED, &t->state))
-		offset = 1000000;
-	return offset + count;
+	return count;
 }
 
 extern unsigned long wall_jiffies;
-extern rwlock_t xtime_lock;
 
 static void pci_do_gettimeofday(struct timeval *tv)
 {
