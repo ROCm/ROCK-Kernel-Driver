@@ -438,6 +438,10 @@ static int init_slot(int slot, struct eeprom_eisa_slot_info *es)
 		id = le32_to_cpu(inl(SLOT2PORT(slot)+EPI));
 		
 		if (0xffffffff == id) {
+			/* Maybe we didn't expect a card to be here... */
+			if (es->eisa_slot_id == 0xffffffff)
+				return -1;
+			
 			/* this board is not here or it does not 
 			 * support readid 
 			 */
@@ -499,8 +503,7 @@ int eisa_enumerator(unsigned long eeprom_addr,
 			(&eeprom_buf[HPEE_SLOT_INFO(i)]);
 	        
 		if (-1==init_slot(i+1, es)) {
-			return -1;
-			
+			continue;
 		}
 		
 		if (es->config_data_offset < HPEE_MAX_LENGTH) {
@@ -513,6 +516,6 @@ int eisa_enumerator(unsigned long eeprom_addr,
 			return -1;
 		}
 	}
-	return 0;
+	return eh->num_slots;
 }
 

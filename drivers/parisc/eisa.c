@@ -378,19 +378,21 @@ static int __devinit eisa_probe(struct parisc_device *dev)
 		}
 	}
 	eisa_eeprom_init(eisa_dev.eeprom_addr);
-	eisa_enumerator(eisa_dev.eeprom_addr, &eisa_dev.hba.io_space, &eisa_dev.hba.lmmio_space);
+	result = eisa_enumerator(eisa_dev.eeprom_addr, &eisa_dev.hba.io_space, &eisa_dev.hba.lmmio_space);
 	init_eisa_pic();
 
-	/* FIXME : Get the number of slots from the enumerator, not a
-	 * hadcoded value. Also don't enumerate the bus twice. */
-	eisa_dev.root.dev = &dev->dev;
-	dev->dev.driver_data = &eisa_dev.root;
-	eisa_dev.root.bus_base_addr = 0;
-	eisa_dev.root.res = &eisa_dev.hba.io_space;
-	eisa_dev.root.slots = EISA_MAX_SLOTS;
-	if (eisa_root_register (&eisa_dev.root)) {
-		printk(KERN_ERR "EISA: Failed to register EISA root\n");
-		return -1;
+	if (result >= 0) {
+		/* FIXME : Don't enumerate the bus twice. */
+		eisa_dev.root.dev = &dev->dev;
+		dev->dev.driver_data = &eisa_dev.root;
+		eisa_dev.root.bus_base_addr = 0;
+		eisa_dev.root.res = &eisa_dev.hba.io_space;
+		eisa_dev.root.slots = result;
+		eisa_dev.root.dma_mask = 0xffffffff; /* wild guess */
+		if (eisa_root_register (&eisa_dev.root)) {
+			printk(KERN_ERR "EISA: Failed to register EISA root\n");
+			return -1;
+		}
 	}
 	
 	return 0;

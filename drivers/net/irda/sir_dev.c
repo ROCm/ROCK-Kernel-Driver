@@ -201,14 +201,12 @@ void sirdev_write_complete(struct sir_dev *dev)
 int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count) 
 {
 	if (!dev || !dev->netdev) {
-		IRDA_DEBUG(0, "%s(), not ready yet!\n", __FUNCTION__);
-		/* Use WARNING instead of IRDA_DEBUG */
+		WARNING("%s(), not ready yet!\n", __FUNCTION__);
 		return -1;
 	}
 
 	if (!dev->irlap) {
-		IRDA_DEBUG(0, "%s - too early: %p / %d!\n", __FUNCTION__, cp, count);
-		/* Use WARNING instead of IRDA_DEBUG */
+		WARNING("%s - too early: %p / %d!\n", __FUNCTION__, cp, count);
 		return -1;
 	}
 
@@ -218,7 +216,7 @@ int sirdev_receive(struct sir_dev *dev, const unsigned char *cp, size_t count)
 		 */
 		irda_device_set_media_busy(dev->netdev, TRUE);
 		dev->stats.rx_dropped++;
-		printk(KERN_INFO "%s; rx-drop: %d\n", __FUNCTION__, count);
+		IRDA_DEBUG(0, "%s; rx-drop: %d\n", __FUNCTION__, count);
 		return 0;
 	}
 
@@ -431,7 +429,6 @@ static int sirdev_alloc_buffers(struct sir_dev *dev)
 		return -ENOMEM;
 	skb_reserve(dev->rx_buff.skb, 1);
 	dev->rx_buff.head = dev->rx_buff.skb->data;
-	/* No need to memset the buffer, unless you are really pedantic */
 
 	dev->tx_buff.head = kmalloc(dev->tx_buff.truesize, GFP_KERNEL);
 	if (dev->tx_buff.head == NULL) {
@@ -439,8 +436,6 @@ static int sirdev_alloc_buffers(struct sir_dev *dev)
 		dev->rx_buff.skb = NULL;
 		dev->rx_buff.head = NULL;
 		return -ENOMEM;
-		/* Hu ??? This should not be here, Martin ? */
-		memset(dev->tx_buff.head, 0, dev->tx_buff.truesize);
 	}
 
 	dev->tx_buff.data = dev->tx_buff.head;
@@ -492,7 +487,7 @@ static int sirdev_open(struct net_device *ndev)
 
 	netif_wake_queue(ndev);
 
-	printk(KERN_INFO "%s - done, speed = %d\n", __FUNCTION__, dev->speed);
+	IRDA_DEBUG(2, "%s - done, speed = %d\n", __FUNCTION__, dev->speed);
 
 	return 0;
 
@@ -512,7 +507,7 @@ static int sirdev_close(struct net_device *ndev)
 	struct sir_dev *dev = ndev->priv;
 	const struct sir_driver *drv;
 
-	printk(KERN_INFO "%s\n", __FUNCTION__);
+//	IRDA_DEBUG(0, "%s\n", __FUNCTION__);
 
 	netif_stop_queue(ndev);
 
@@ -570,7 +565,7 @@ struct sir_dev * sirdev_get_instance(const struct sir_driver *drv, const char *n
 	struct net_device *ndev;
 	struct sir_dev *dev;
 
-	printk(KERN_INFO "%s - %s\n", __FUNCTION__, name);
+	IRDA_DEBUG(0, "%s - %s\n", __FUNCTION__, name);
 
 	/* instead of adding tests to protect against drv->do_write==NULL
 	 * at several places we refuse to create a sir_dev instance for
@@ -584,8 +579,7 @@ struct sir_dev * sirdev_get_instance(const struct sir_driver *drv, const char *n
 	 */
 	dev = kmalloc(sizeof(*dev), GFP_KERNEL);
 	if (dev == NULL) {
-		printk(KERN_ERR "IrDA: Can't allocate memory for "
-		       "IrDA control block!\n");
+		ERROR("%s - Can't allocate memory for IrDA control block!\n", __FUNCTION__);
 		goto out;
 	}
 	memset(dev, 0, sizeof(*dev));
@@ -638,7 +632,7 @@ int sirdev_put_instance(struct sir_dev *dev)
 {
 	int err = 0;
 
-	printk(KERN_INFO "%s\n", __FUNCTION__);
+	IRDA_DEBUG(0, "%s\n", __FUNCTION__);
 
 	atomic_set(&dev->enable_rx, 0);
 
