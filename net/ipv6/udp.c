@@ -352,8 +352,8 @@ ipv4_connected:
 	fl.fl6_dst = &np->daddr;
 	fl.fl6_src = &saddr;
 	fl.oif = sk->bound_dev_if;
-	fl.uli_u.ports.dport = inet->dport;
-	fl.uli_u.ports.sport = inet->sport;
+	fl.fl_ip_dport = inet->dport;
+	fl.fl_ip_sport = inet->sport;
 
 	if (!fl.oif && (addr_type&IPV6_ADDR_MULTICAST))
 		fl.oif = np->mcast_oif;
@@ -936,8 +936,8 @@ static int udpv6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg
 	fl.fl6_dst = daddr;
 	if (fl.fl6_src == NULL && !ipv6_addr_any(&np->saddr))
 		fl.fl6_src = &np->saddr;
-	fl.uli_u.ports.dport = udh.uh.dest;
-	fl.uli_u.ports.sport = udh.uh.source;
+	fl.fl_ip_dport = udh.uh.dest;
+	fl.fl_ip_sport = udh.uh.source;
 
 	err = ip6_build_xmit(sk, udpv6_getfrag, &udh, &fl, len, opt, hlimit,
 			     msg->msg_flags);

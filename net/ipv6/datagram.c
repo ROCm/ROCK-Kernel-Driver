@@ -91,7 +91,7 @@ void ipv6_local_error(struct sock *sk, int err, struct flowi *fl, u32 info)
 	serr->ee.ee_info = info;
 	serr->ee.ee_data = 0;
 	serr->addr_offset = (u8*)&iph->daddr - skb->nh.raw;
-	serr->port = fl->uli_u.ports.dport;
+	serr->port = fl->fl_ip_dport;
 
 	skb->h.raw = skb->tail;
 	__skb_pull(skb, skb->tail - skb->data);

@@ -50,6 +50,10 @@ struct flowi {
 
 		__u32		spi;
 	} uli_u;
+#define fl_ip_sport	uli_u.ports.sport
+#define fl_ip_dport	uli_u.ports.dport
+#define fl_icmp_type	uli_u.icmpt.type
+#define fl_icmp_code	uli_u.icmpt.code
+#define fl_ipsec_spi	uli_u.spi
 };
-
 #endif

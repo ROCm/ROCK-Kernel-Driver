@@ -295,11 +295,11 @@ extern int xfrm_unregister_km(struct xfrm_mgr *km);
 
 static inline u32 __flow_hash4(struct flowi *fl)
 {
-	u32 hash = fl->fl4_src ^ fl->uli_u.ports.sport;
+	u32 hash = fl->fl4_src ^ fl->fl_ip_sport;
 
 	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
 
-	hash ^= fl->fl4_dst ^ fl->uli_u.ports.dport;
+	hash ^= fl->fl4_dst ^ fl->fl_ip_dport;
 	hash ^= (hash >> 10);
 	hash ^= (hash >> 20);
 	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
@@ -309,13 +309,13 @@ static inline u32 __flow_hash6(struct flowi *fl)
 {
 	u32 hash = fl->fl6_src->s6_addr32[2] ^
 		   fl->fl6_src->s6_addr32[3] ^ 
-		   fl->uli_u.ports.sport;
+		   fl->fl_ip_sport;
 
 	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
 
 	hash ^= fl->fl6_dst->s6_addr32[2] ^
 		fl->fl6_dst->s6_addr32[3] ^ 
-		fl->uli_u.ports.dport;
+		fl->fl_ip_dport;
 	hash ^= (hash >> 10);
 	hash ^= (hash >> 20);
 	return hash & (XFRM_FLOWCACHE_HASH_SIZE-1);
@@ -454,8 +454,8 @@ __xfrm4_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(&fl->fl4_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(&fl->fl4_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->uli_u.ports.dport^sel->dport)&sel->dport_mask) &&
-		!((fl->uli_u.ports.sport^sel->sport)&sel->sport_mask) &&
+		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
+		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }
@@ -465,8 +465,8 @@ __xfrm6_selector_match(struct xfrm_selector *sel, struct flowi *fl)
 {
 	return  addr_match(fl->fl6_dst, &sel->daddr, sel->prefixlen_d) &&
 		addr_match(fl->fl6_src, &sel->saddr, sel->prefixlen_s) &&
-		!((fl->uli_u.ports.dport^sel->dport)&sel->dport_mask) &&
-		!((fl->uli_u.ports.sport^sel->sport)&sel->sport_mask) &&
+		!((fl->fl_ip_dport^sel->dport)&sel->dport_mask) &&
+		!((fl->fl_ip_sport^sel->sport)&sel->sport_mask) &&
 		(fl->proto == sel->proto || !sel->proto) &&
 		(fl->oif == sel->ifindex || !sel->ifindex);
 }

@@ -670,12 +670,12 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 	fl.fl6_dst = &np->daddr;
 	fl.fl6_src = saddr;
 	fl.oif = sk->bound_dev_if;
-	fl.uli_u.ports.dport = usin->sin6_port;
-	fl.uli_u.ports.sport = inet->sport;
+	fl.fl_ip_dport = usin->sin6_port;
+	fl.fl_ip_sport = inet->sport;
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *)np->opt->srcrt;
-		fl.nl_u.ip6_u.daddr = rt0->addr;
+		fl.fl6_dst = rt0->addr;
 	}
 
 	if (!fl.fl6_src)
@@ -796,11 +796,11 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 			   for now.
 			 */
 			fl.proto = IPPROTO_TCP;
-			fl.nl_u.ip6_u.daddr = &np->daddr;
-			fl.nl_u.ip6_u.saddr = &np->saddr;
+			fl.fl6_dst = &np->daddr;
+			fl.fl6_src = &np->saddr;
 			fl.oif = sk->bound_dev_if;
-			fl.uli_u.ports.dport = inet->dport;
-			fl.uli_u.ports.sport = inet->sport;
+			fl.fl_ip_dport = inet->dport;
+			fl.fl_ip_sport = inet->sport;
 
 			dst = ip6_route_output(sk, &fl);
 		} else
@@ -881,12 +881,12 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 	int err = -1;
 
 	fl.proto = IPPROTO_TCP;
-	fl.nl_u.ip6_u.daddr = &req->af.v6_req.rmt_addr;
-	fl.nl_u.ip6_u.saddr = &req->af.v6_req.loc_addr;
+	fl.fl6_dst = &req->af.v6_req.rmt_addr;
+	fl.fl6_src = &req->af.v6_req.loc_addr;
 	fl.fl6_flowlabel = 0;
 	fl.oif = req->af.v6_req.iif;
-	fl.uli_u.ports.dport = req->rmt_port;
-	fl.uli_u.ports.sport = inet_sk(sk)->sport;
+	fl.fl_ip_dport = req->rmt_port;
+	fl.fl_ip_sport = inet_sk(sk)->sport;
 
 	if (dst == NULL) {
 		opt = np->opt;
@@ -901,7 +901,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 
 		if (opt && opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-			fl.nl_u.ip6_u.daddr = rt0->addr;
+			fl.fl6_dst = rt0->addr;
 		}
 
 		dst = ip6_route_output(sk, &fl);
@@ -917,7 +917,7 @@ static int tcp_v6_send_synack(struct sock *sk, struct open_request *req,
 					 &req->af.v6_req.loc_addr, &req->af.v6_req.rmt_addr,
 					 csum_partial((char *)th, skb->len, skb->csum));
 
-		fl.nl_u.ip6_u.daddr = &req->af.v6_req.rmt_addr;
+		fl.fl6_dst = &req->af.v6_req.rmt_addr;
 		err = ip6_xmit(sk, skb, &fl, opt);
 		if (err == NET_XMIT_CN)
 			err = 0;
@@ -1019,19 +1019,18 @@ static void tcp_v6_send_reset(struct sk_buff *skb)
 
 	buff->csum = csum_partial((char *)t1, sizeof(*t1), 0);
 
-	fl.nl_u.ip6_u.daddr = &skb->nh.ipv6h->saddr;
-	fl.nl_u.ip6_u.saddr = &skb->nh.ipv6h->daddr;
+	fl.fl6_dst = &skb->nh.ipv6h->saddr;
+	fl.fl6_src = &skb->nh.ipv6h->daddr;
 	fl.fl6_flowlabel = 0;
 
-	t1->check = csum_ipv6_magic(fl.nl_u.ip6_u.saddr,
-				    fl.nl_u.ip6_u.daddr, 
+	t1->check = csum_ipv6_magic(fl.fl6_src, fl.fl6_dst, 
 				    sizeof(*t1), IPPROTO_TCP,
 				    buff->csum);
 
 	fl.proto = IPPROTO_TCP;
 	fl.oif = tcp_v6_iif(skb);
-	fl.uli_u.ports.dport = t1->dest;
-	fl.uli_u.ports.sport = t1->source;
+	fl.fl_ip_dport = t1->dest;
+	fl.fl_ip_sport = t1->source;
 
 	/* sk = NULL, but it is safe for now. RST socket required. */
 	buff->dst = ip6_route_output(NULL, &fl);
@@ -1084,19 +1083,18 @@ static void tcp_v6_send_ack(struct sk_buff *skb, u32 seq, u32 ack, u32 win, u32 
 
 	buff->csum = csum_partial((char *)t1, tot_len, 0);
 
-	fl.nl_u.ip6_u.daddr = &skb->nh.ipv6h->saddr;
-	fl.nl_u.ip6_u.saddr = &skb->nh.ipv6h->daddr;
+	fl.fl6_dst = &skb->nh.ipv6h->saddr;
+	fl.fl6_src = &skb->nh.ipv6h->daddr;
 	fl.fl6_flowlabel = 0;
 
-	t1->check = csum_ipv6_magic(fl.nl_u.ip6_u.saddr,
-				    fl.nl_u.ip6_u.daddr, 
+	t1->check = csum_ipv6_magic(fl.fl6_src, fl.fl6_dst, 
 				    tot_len, IPPROTO_TCP,
 				    buff->csum);
 
 	fl.proto = IPPROTO_TCP;
 	fl.oif = tcp_v6_iif(skb);
-	fl.uli_u.ports.dport = t1->dest;
-	fl.uli_u.ports.sport = t1->source;
+	fl.fl_ip_dport = t1->dest;
+	fl.fl_ip_sport = t1->source;
 
 	buff->dst = ip6_route_output(NULL, &fl);
 
@@ -1335,16 +1333,16 @@ static struct sock * tcp_v6_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 
 	if (dst == NULL) {
 		fl.proto = IPPROTO_TCP;
-		fl.nl_u.ip6_u.daddr = &req->af.v6_req.rmt_addr;
+		fl.fl6_dst = &req->af.v6_req.rmt_addr;
 		if (opt && opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
-			fl.nl_u.ip6_u.daddr = rt0->addr;
+			fl.fl6_dst = rt0->addr;
 		}
-		fl.nl_u.ip6_u.saddr = &req->af.v6_req.loc_addr;
+		fl.fl6_src = &req->af.v6_req.loc_addr;
 		fl.fl6_flowlabel = 0;
 		fl.oif = sk->bound_dev_if;
-		fl.uli_u.ports.dport = req->rmt_port;
-		fl.uli_u.ports.sport = inet_sk(sk)->sport;
+		fl.fl_ip_dport = req->rmt_port;
+		fl.fl_ip_sport = inet_sk(sk)->sport;
 
 		dst = ip6_route_output(sk, &fl);
 	}
@@ -1732,16 +1730,16 @@ static int tcp_v6_rebuild_header(struct sock *sk)
 		struct flowi fl;
 
 		fl.proto = IPPROTO_TCP;
-		fl.nl_u.ip6_u.daddr = &np->daddr;
-		fl.nl_u.ip6_u.saddr = &np->saddr;
+		fl.fl6_dst = &np->daddr;
+		fl.fl6_src = &np->saddr;
 		fl.fl6_flowlabel = np->flow_label;
 		fl.oif = sk->bound_dev_if;
-		fl.uli_u.ports.dport = inet->dport;
-		fl.uli_u.ports.sport = inet->sport;
+		fl.fl_ip_dport = inet->dport;
+		fl.fl_ip_sport = inet->sport;
 
 		if (np->opt && np->opt->srcrt) {
 			struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
-			fl.nl_u.ip6_u.daddr = rt0->addr;
+			fl.fl6_dst = rt0->addr;
 		}
 
 		dst = ip6_route_output(sk, &fl);
@@ -1774,12 +1772,12 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	fl.fl6_flowlabel = np->flow_label;
 	IP6_ECN_flow_xmit(sk, fl.fl6_flowlabel);
 	fl.oif = sk->bound_dev_if;
-	fl.uli_u.ports.sport = inet->sport;
-	fl.uli_u.ports.dport = inet->dport;
+	fl.fl_ip_sport = inet->sport;
+	fl.fl_ip_dport = inet->dport;
 
 	if (np->opt && np->opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) np->opt->srcrt;
-		fl.nl_u.ip6_u.daddr = rt0->addr;
+		fl.fl6_dst = rt0->addr;
 	}
 
 	dst = __sk_dst_check(sk, np->dst_cookie);
@@ -1799,7 +1797,7 @@ static int tcp_v6_xmit(struct sk_buff *skb, int ipfragok)
 	skb->dst = dst_clone(dst);
 
 	/* Restore final destination back after routing done */
-	fl.nl_u.ip6_u.daddr = &np->daddr;
+	fl.fl6_dst = &np->daddr;
 
 	return ip6_xmit(sk, skb, &fl, np->opt);
 }
