@@ -37,8 +37,4 @@ obj-y += setup-visws.o
 obj-$(CONFIG_X86_VISWS_APIC)	+= visws_apic.o
 endif
 
-kernel-subdir-$(CONFIG_PCI)	+= pci
-subdir-y			:= $(kernel-subdir-y)
-obj-y				+= $(foreach dir,$(subdir-y),$(dir)/$(dir).o)
-
 include $(TOPDIR)/Rules.make
