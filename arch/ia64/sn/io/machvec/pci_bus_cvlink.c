@@ -288,7 +288,9 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	 * special case this.
 	 */
 
-	if (isIO9(nasid) && wid_num == 0xc && bus == 0) {
+	if (isIO9(nasid) && ( (IS_ALTIX(nasid) && wid_num == 0xc)
+				|| (IS_OPUS(nasid) && wid_num == 0xf) )
+				&& bus == 0) {
 		if (slot == 2) {
 			p->force_int_addr = (unsigned long)&b->b_force_always[6].intr;
 			dev_sel = b->b_int_device;
@@ -412,6 +414,11 @@ sn_pci_fixup(int arg)
 
 		device_sysdata = kmalloc(sizeof(struct sn_device_sysdata),
 					 GFP_KERNEL);
+		if (device_sysdata <= 0) {
+			printk("sn_pci_fixup: Cannot allocate memory for device sysdata\n");
+			return;
+		}
+
 		device_sysdata->vhdl = devfn_to_vertex(device_dev->bus->number, device_dev->devfn);
 		device_sysdata->isa64 = 0;
 		device_vertex = device_sysdata->vhdl;
