@@ -661,9 +661,9 @@ int gt96100_init_module(void)
 	pcibios_read_config_word(0, 0, PCI_VENDOR_ID, &vendor_id);
 	pcibios_read_config_word(0, 0, PCI_DEVICE_ID, &device_id);
     
-	if (vendor_id != PCI_VENDOR_ID_GALILEO ||
-	    (device_id != PCI_DEVICE_ID_GALILEO_GT96100 &&
-	     device_id != PCI_DEVICE_ID_GALILEO_GT96100A)) {
+	if (vendor_id != PCI_VENDOR_ID_MARVELL ||
+	    (device_id != PCI_DEVICE_ID_MARVELL_GT96100 &&
+	     device_id != PCI_DEVICE_ID_MARVELL_GT96100A)) {
 		printk(KERN_ERR __FILE__ ": GT96100 not found!\n");
 		return -ENODEV;
 	}

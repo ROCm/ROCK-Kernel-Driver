@@ -258,7 +258,7 @@ struct pci_fixup pcibios_fixups[] = {
 	 qube_raq_via_bmIDE_fixup},
 	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_DEC, PCI_DEVICE_ID_DEC_21142,
 	 qube_raq_tulip_fixup},
-	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_GALILEO, PCI_ANY_ID,
+	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_MARVELL, PCI_ANY_ID,
 	 qube_raq_galileo_fixup},
 	{PCI_FIXUP_HEADER, PCI_VENDOR_ID_NCR, PCI_DEVICE_ID_NCR_53C860,
 	 qube_raq_scsi_fixup},

@@ -1,6 +1,8 @@
 /*
- *	msi.h
+ * File:	msi.h
  *
+ * Copyright (C) 2003-2004 Intel
+ * Copyright (C) Tom Long Nguyen (tom.l.nguyen@intel.com)
  */
 
 #ifndef MSI_H
