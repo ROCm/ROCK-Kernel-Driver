@@ -156,8 +156,6 @@ extern int FASTCALL(page_over_rsslimit(struct page *));
 
 /* linux/mm/swap.c */
 extern void FASTCALL(lru_cache_add(struct page *));
-extern void FASTCALL(__lru_cache_del(struct page *));
-extern void FASTCALL(lru_cache_del(struct page *));
 
 extern void FASTCALL(activate_page(struct page *));
 

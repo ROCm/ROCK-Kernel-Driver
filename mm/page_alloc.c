@@ -90,6 +90,7 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 
 	KERNEL_STAT_ADD(pgfree, 1<<order);
 
+	BUG_ON(PageLRU(page));
 	BUG_ON(PagePrivate(page));
 	BUG_ON(page->mapping != NULL);
 	BUG_ON(PageLocked(page));
@@ -448,15 +449,6 @@ unsigned long get_zeroed_page(unsigned int gfp_mask)
 		return (unsigned long) address;
 	}
 	return 0;
-}
-
-void page_cache_release(struct page *page)
-{
-	if (!PageReserved(page) && put_page_testzero(page)) {
-		if (PageLRU(page))
-			lru_cache_del(page);
-		__free_pages_ok(page, 0);
-	}
 }
 
 void __pagevec_free(struct pagevec *pvec)

@@ -23,13 +23,17 @@
 #define PAGE_CACHE_ALIGN(addr)	(((addr)+PAGE_CACHE_SIZE-1)&PAGE_CACHE_MASK)
 
 #define page_cache_get(x)	get_page(x)
-extern void FASTCALL(page_cache_release(struct page *));
+
+static inline void page_cache_release(struct page *page)
+{
+	if (!PageReserved(page) && put_page_testzero(page))
+		__page_cache_release(page);
+}
 
 static inline struct page *page_cache_alloc(struct address_space *x)
 {
 	return alloc_pages(x->gfp_mask, 0);
 }
-
 
 typedef int filler_t(void *, struct page *);
 

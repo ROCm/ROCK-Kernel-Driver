@@ -165,6 +165,12 @@ shrink_list(struct list_head *page_list, int nr_pages, zone_t *classzone,
 		pte_chain_unlock(page);
 		mapping = page->mapping;
 
+		/*
+		 * FIXME: this is CPU-inefficient for shared mappings.
+		 * try_to_unmap() will set the page dirty and ->vm_writeback
+		 * will write it.  So we're back to page-at-a-time writepage
+		 * in LRU order.
+		 */
 		if (PageDirty(page) && is_page_cache_freeable(page) &&
 					mapping && may_enter_fs) {
 			int (*writeback)(struct page *, int *);

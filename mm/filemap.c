@@ -53,7 +53,6 @@
 /*
  * Lock ordering:
  *
- *  pagemap_lru_lock
  *  ->i_shared_lock		(vmtruncate)
  *    ->private_lock		(__free_pte->__set_page_dirty_buffers)
  *      ->swap_list_lock
