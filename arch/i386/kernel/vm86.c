@@ -44,7 +44,6 @@
 #include <linux/ptrace.h>
 
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/io.h>
 #include <asm/tlbflush.h>
 #include <asm/irq.h>
