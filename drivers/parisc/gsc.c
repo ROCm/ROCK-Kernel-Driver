@@ -79,7 +79,7 @@ EXPORT_SYMBOL(gsc_claim_irq);
 #define GSC_MASK_IRQ(x)	(1<<(GSC_FIX_IRQ(x)))
 
 /* Common interrupt demultiplexer used by Asp, Lasi & Wax.  */
-void busdev_barked(int busdev_irq, void *dev, struct pt_regs *regs)
+irqreturn_t busdev_barked(int busdev_irq, void *dev, struct pt_regs *regs)
 {
 	unsigned long irq;
 	struct busdevice *busdev = (struct busdevice *) dev;
@@ -101,6 +101,7 @@ void busdev_barked(int busdev_irq, void *dev, struct pt_regs *regs)
 
 		do_irq_mask(irq, busdev->busdev_region, regs);
 	}
+	return IRQ_HANDLED;
 }
 
 static void

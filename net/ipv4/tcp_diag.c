@@ -461,13 +461,13 @@ int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 		tcp_listen_lock();
 		for (i = s_i; i < TCP_LHTABLE_SIZE; i++) {
 			struct sock *sk;
+			struct hlist_node *node;
 
 			if (i > s_i)
 				s_num = 0;
 
-			for (sk = tcp_listening_hash[i], num = 0;
-			     sk != NULL;
-			     sk = sk->sk_next, num++) {
+			num = 0;
+			sk_for_each(sk, node, &tcp_listening_hash[i]) {
 				struct inet_opt *inet = inet_sk(sk);
 				if (num < s_num)
 					continue;
@@ -485,6 +485,7 @@ int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 					tcp_listen_unlock();
 					goto done;
 				}
+				++num;
 			}
 		}
 		tcp_listen_unlock();
@@ -499,15 +500,15 @@ skip_listen_ht:
 	for (i = s_i; i < tcp_ehash_size; i++) {
 		struct tcp_ehash_bucket *head = &tcp_ehash[i];
 		struct sock *sk;
+		struct hlist_node *node;
 
 		if (i > s_i)
 			s_num = 0;
 
 		read_lock_bh(&head->lock);
 
-		for (sk = head->chain, num = 0;
-		     sk != NULL;
-		     sk = sk->sk_next, num++) {
+		num = 0;
+		sk_for_each(sk, node, &head->chain) {
 			struct inet_opt *inet = inet_sk(sk);
 
 			if (num < s_num)
@@ -527,12 +528,12 @@ skip_listen_ht:
 				read_unlock_bh(&head->lock);
 				goto done;
 			}
+			++num;
 		}
 
 		if (r->tcpdiag_states&TCPF_TIME_WAIT) {
-			for (sk = tcp_ehash[i+tcp_ehash_size].chain;
-			     sk != NULL;
-			     sk = sk->sk_next, num++) {
+			sk_for_each(sk, node,
+				    &tcp_ehash[i + tcp_ehash_size].chain) {
 				struct inet_opt *inet = inet_sk(sk);
 
 				if (num < s_num)
@@ -553,6 +554,7 @@ skip_listen_ht:
 					read_unlock_bh(&head->lock);
 					goto done;
 				}
+				++num;
 			}
 		}
 		read_unlock_bh(&head->lock);

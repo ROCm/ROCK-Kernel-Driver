@@ -133,17 +133,19 @@ static inline int ipv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
 static inline int tcp_v6_bind_conflict(struct sock *sk,
 				       struct tcp_bind_bucket *tb)
 {
-	struct sock *sk2 = tb->owners;
+	struct sock *sk2;
+	struct hlist_node *node;
 
 	/* We must walk the whole port owner list in this case. -DaveM */
-	for (; sk2; sk2 = sk2->sk_bind_next)
+	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 && sk->sk_bound_dev_if == sk2->sk_bound_dev_if &&
 		    (!sk->sk_reuse || !sk2->sk_reuse ||
 		     sk2->sk_state == TCP_LISTEN) &&
 		     ipv6_rcv_saddr_equal(sk, sk2))
 			break;
+	}
 
-	return sk2 != NULL;
+	return node != NULL;
 }
 
 /* Grrr, addr_type already calculated by caller, but I don't want
@@ -155,6 +157,7 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 {
 	struct tcp_bind_hashbucket *head;
 	struct tcp_bind_bucket *tb;
+	struct hlist_node *node;
 	int ret;
 
 	local_bh_disable();
@@ -171,7 +174,7 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 				rover = low;
 			head = &tcp_bhash[tcp_bhashfn(rover)];
 			spin_lock(&head->lock);
-			for (tb = head->chain; tb; tb = tb->next)
+			tb_for_each(tb, node, &head->chain)
 				if (tb->port == rover)
 					goto next;
 			break;
@@ -188,15 +191,17 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 
 		/* OK, here is the one we will use. */
 		snum = rover;
-		tb = NULL;
 	} else {
 		head = &tcp_bhash[tcp_bhashfn(snum)];
 		spin_lock(&head->lock);
-		for (tb = head->chain; tb != NULL; tb = tb->next)
+		tb_for_each(tb, node, &head->chain)
 			if (tb->port == snum)
-				break;
+				goto tb_found;
 	}
-	if (tb != NULL && tb->owners != NULL) {
+	tb = NULL;
+	goto tb_not_found;
+tb_found:
+	if (tb && !hlist_empty(&tb->owners)) {
 		if (tb->fastreuse > 0 && sk->sk_reuse &&
 		    sk->sk_state != TCP_LISTEN) {
 			goto success;
@@ -206,11 +211,11 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 				goto fail_unlock;
 		}
 	}
+tb_not_found:
 	ret = 1;
-	if (tb == NULL &&
-	    (tb = tcp_bucket_create(head, snum)) == NULL)
+	if (!tb && (tb = tcp_bucket_create(head, snum)) == NULL)
 		goto fail_unlock;
-	if (tb->owners == NULL) {
+	if (hlist_empty(&tb->owners)) {
 		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
 			tb->fastreuse = 1;
 		else
@@ -220,9 +225,9 @@ static int tcp_v6_get_port(struct sock *sk, unsigned short snum)
 		tb->fastreuse = 0;
 
 success:
-	if (!sk->sk_prev)
+	if (!tcp_sk(sk)->bind_hash)
 		tcp_bind_hash(sk, tb, snum);
-	BUG_TRAP(sk->sk_prev == (struct sock *)tb);
+	BUG_TRAP(tcp_sk(sk)->bind_hash == tb);
 	ret = 0;
 
 fail_unlock:
@@ -234,25 +239,23 @@ fail:
 
 static __inline__ void __tcp_v6_hash(struct sock *sk)
 {
-	struct sock **skp;
+	struct hlist_head *list;
 	rwlock_t *lock;
 
-	BUG_TRAP(!sk->sk_pprev);
+	BUG_TRAP(sk_unhashed(sk));
 
 	if (sk->sk_state == TCP_LISTEN) {
-		skp = &tcp_listening_hash[tcp_sk_listen_hashfn(sk)];
+		list = &tcp_listening_hash[tcp_sk_listen_hashfn(sk)];
 		lock = &tcp_lhash_lock;
 		tcp_listen_wlock();
 	} else {
-		skp = &tcp_ehash[(sk->sk_hashent = tcp_v6_sk_hashfn(sk))].chain;
+		sk->sk_hashent = tcp_v6_sk_hashfn(sk);
+		list = &tcp_ehash[sk->sk_hashent].chain;
 		lock = &tcp_ehash[sk->sk_hashent].lock;
 		write_lock(lock);
 	}
 
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-	*skp = sk;
-	sk->sk_pprev = skp;
+	sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(lock);
 }
@@ -276,13 +279,13 @@ static void tcp_v6_hash(struct sock *sk)
 static struct sock *tcp_v6_lookup_listener(struct in6_addr *daddr, unsigned short hnum, int dif)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	struct sock *result = NULL;
 	int score, hiscore;
 
 	hiscore=0;
 	read_lock(&tcp_lhash_lock);
-	sk = tcp_listening_hash[tcp_lhashfn(hnum)];
-	for (; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &tcp_listening_hash[tcp_lhashfn(hnum)]) {
 		if (inet_sk(sk)->num == hnum && sk->sk_family == PF_INET6) {
 			struct ipv6_pinfo *np = inet6_sk(sk);
 			
@@ -325,6 +328,7 @@ static inline struct sock *__tcp_v6_lookup_established(struct in6_addr *saddr, u
 {
 	struct tcp_ehash_bucket *head;
 	struct sock *sk;
+	struct hlist_node *node;
 	__u32 ports = TCP_COMBINED_PORTS(sport, hnum);
 	int hash;
 
@@ -334,13 +338,13 @@ static inline struct sock *__tcp_v6_lookup_established(struct in6_addr *saddr, u
 	hash = tcp_v6_hashfn(daddr, hnum, saddr, sport);
 	head = &tcp_ehash[hash];
 	read_lock(&head->lock);
-	for (sk = head->chain; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &head->chain) {
 		/* For IPV6 do the cheaper port and family tests first. */
 		if(TCP_IPV6_MATCH(sk, saddr, daddr, ports, dif))
 			goto hit; /* You sunk my battleship! */
 	}
 	/* Must check for a TIME_WAIT'er before going to listener hash. */
-	for (sk = (head + tcp_ehash_size)->chain; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &(head + tcp_ehash_size)->chain) {
 		/* FIXME: acme: check this... */
 		struct tcp_tw_bucket *tw = (struct tcp_tw_bucket *)sk;
 
@@ -474,13 +478,14 @@ static int tcp_v6_check_established(struct sock *sk)
 	u32 ports = TCP_COMBINED_PORTS(inet->dport, inet->num);
 	int hash = tcp_v6_hashfn(daddr, inet->num, saddr, inet->dport);
 	struct tcp_ehash_bucket *head = &tcp_ehash[hash];
-	struct sock *sk2, **skp;
+	struct sock *sk2;
+	struct hlist_node *node;
 	struct tcp_tw_bucket *tw;
 
 	write_lock_bh(&head->lock);
 
-	for (skp = &(head + tcp_ehash_size)->chain; (sk2 = *skp) != NULL;
-	     skp = &sk2->sk_next) {
+	/* Check TIME-WAIT sockets first. */
+	sk_for_each(sk2, node, &(head + tcp_ehash_size)->chain) {
 		tw = (struct tcp_tw_bucket*)sk2;
 
 		if(*((__u32 *)&(tw->tw_dport))	== ports	&&
@@ -498,7 +503,6 @@ static int tcp_v6_check_established(struct sock *sk)
 				tp->ts_recent = tw->tw_ts_recent;
 				tp->ts_recent_stamp = tw->tw_ts_recent_stamp;
 				sock_hold(sk2);
-				skp = &head->chain;
 				goto unique;
 			} else
 				goto not_unique;
@@ -506,18 +510,15 @@ static int tcp_v6_check_established(struct sock *sk)
 	}
 	tw = NULL;
 
-	for (skp = &head->chain; (sk2 = *skp) != NULL; skp = &sk2->sk_next) {
+	/* And established part... */
+	sk_for_each(sk2, node, &head->chain) {
 		if(TCP_IPV6_MATCH(sk, saddr, daddr, ports, dif))
 			goto not_unique;
 	}
 
 unique:
-	BUG_TRAP(!sk->sk_pprev);
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-
-	*skp = sk;
-	sk->sk_pprev = skp;
+	BUG_TRAP(sk_unhashed(sk));
+	sk_add_node(sk, &head->chain);
 	sk->sk_hashent = hash;
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock_bh(&head->lock);
@@ -552,11 +553,11 @@ static int tcp_v6_hash_connect(struct sock *sk)
 	}
 
 	head = &tcp_bhash[tcp_bhashfn(inet_sk(sk)->num)];
-	tb = head->chain;
+	tb = tb_head(head);
 
 	spin_lock_bh(&head->lock);
 
-	if (tb->owners == sk && !sk->sk_bind_next) {
+	if (sk_head(&tb->owners) == sk && !sk->sk_bind_node.next) {
 		__tcp_v6_hash(sk);
 		spin_unlock_bh(&head->lock);
 		return 0;
@@ -1946,7 +1947,7 @@ static int tcp_v6_destroy_sock(struct sock *sk)
 	__skb_queue_purge(&tp->ucopy.prequeue);
 
 	/* Clean up a referenced TCP bind bucket. */
-	if (sk->sk_prev)
+	if (tcp_sk(sk)->bind_hash)
 		tcp_put_port(sk);
 
 	/* If sendmsg cached page exists, toss it. */

@@ -152,18 +152,18 @@ static void dn_keepalive(struct sock *sk);
 static kmem_cache_t *dn_sk_cachep;
 static struct proto_ops dn_proto_ops;
 static rwlock_t dn_hash_lock = RW_LOCK_UNLOCKED;
-static struct sock *dn_sk_hash[DN_SK_HASH_SIZE];
-static struct sock *dn_wild_sk;
+static struct hlist_head dn_sk_hash[DN_SK_HASH_SIZE];
+static struct hlist_head dn_wild_sk;
 
 static int __dn_setsockopt(struct socket *sock, int level, int optname, char *optval, int optlen, int flags);
 static int __dn_getsockopt(struct socket *sock, int level, int optname, char *optval, int *optlen, int flags);
 
-static struct sock **dn_find_list(struct sock *sk)
+static struct hlist_head *dn_find_list(struct sock *sk)
 {
 	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->addr.sdn_flags & SDF_WILD)
-		return dn_wild_sk ? NULL : &dn_wild_sk;
+		return hlist_empty(&dn_wild_sk) ? NULL : &dn_wild_sk;
 
 	return &dn_sk_hash[scp->addrloc & DN_SK_HASH_MASK];
 }
@@ -173,14 +173,16 @@ static struct sock **dn_find_list(struct sock *sk)
  */
 static int check_port(unsigned short port)
 {
-	struct sock *sk = dn_sk_hash[port & DN_SK_HASH_MASK];
+	struct sock *sk;
+	struct hlist_node *node;
+
 	if (port == 0)
 		return -1;
-	while(sk) {
+
+	sk_for_each(sk, node, &dn_sk_hash[port & DN_SK_HASH_MASK]) {
 		struct dn_scp *scp = DN_SK(sk);
 		if (scp->addrloc == port)
 			return -1;
-		sk = sk->sk_next;
 	}
 	return 0;
 }
@@ -209,13 +211,10 @@ static unsigned short port = 0x2000;
 static int dn_hash_sock(struct sock *sk)
 {
 	struct dn_scp *scp = DN_SK(sk);
-	struct sock **skp;
+	struct hlist_head *list;
 	int rv = -EUSERS;
 
-	if (sk->sk_next)
-		BUG();
-	if (sk->sk_pprev)
-		BUG();
+	BUG_ON(sk_hashed(sk));
 
 	write_lock_bh(&dn_hash_lock);
 	
@@ -223,12 +222,10 @@ static int dn_hash_sock(struct sock *sk)
 		goto out;
 
 	rv = -EADDRINUSE;
-	if ((skp = dn_find_list(sk)) == NULL)
+	if ((list = dn_find_list(sk)) == NULL)
 		goto out;
 
-	sk->sk_next = *skp;
-	sk->sk_pprev = skp;
-	*skp = sk;
+	sk_add_node(sk, list);
 	rv = 0;
 out:
 	write_unlock_bh(&dn_hash_lock);
@@ -237,39 +234,19 @@ out:
 
 static void dn_unhash_sock(struct sock *sk)
 {
-	struct sock **skp = sk->sk_pprev;
-
-	if (skp == NULL)
-		return;
-
 	write_lock(&dn_hash_lock);
-	while(*skp != sk)
-		skp = &((*skp)->sk_next);
-	*skp = sk->sk_next;
+	sk_del_node_init(sk);
 	write_unlock(&dn_hash_lock);
-
-	sk->sk_next = NULL;
-	sk->sk_pprev = NULL;
 }
 
 static void dn_unhash_sock_bh(struct sock *sk)
 {
-	struct sock **skp = sk->sk_pprev;
-
-	if (skp == NULL)
-		return;
-
 	write_lock_bh(&dn_hash_lock);
-	while(*skp != sk)
-		skp = &((*skp)->sk_next);
-	*skp = sk->sk_next;
+	sk_del_node_init(sk);
 	write_unlock_bh(&dn_hash_lock);
-
-	sk->sk_next = NULL;
-	sk->sk_pprev = NULL;
 }
 
-struct sock **listen_hash(struct sockaddr_dn *addr)
+struct hlist_head *listen_hash(struct sockaddr_dn *addr)
 {
 	int i;
 	unsigned hash = addr->sdn_objnum;
@@ -292,23 +269,17 @@ struct sock **listen_hash(struct sockaddr_dn *addr)
  */
 static void dn_rehash_sock(struct sock *sk)
 {
-	struct sock **skp = sk->sk_pprev;
+	struct hlist_head *list;
 	struct dn_scp *scp = DN_SK(sk);
 
 	if (scp->addr.sdn_flags & SDF_WILD)
 		return;
 
 	write_lock_bh(&dn_hash_lock);
-	while(*skp != sk)
-		skp = &((*skp)->sk_next);
-	*skp = sk->sk_next;
-
+	sk_del_node_init(sk);
 	DN_SK(sk)->addrloc = 0;
-	skp = listen_hash(&DN_SK(sk)->addr);
-
-	sk->sk_next = *skp;
-	sk->sk_pprev = skp;
-	*skp = sk;
+	list = listen_hash(&DN_SK(sk)->addr);
+	sk_add_node(sk, list);
 	write_unlock_bh(&dn_hash_lock);
 }
 
@@ -401,11 +372,12 @@ int dn_username2sockaddr(unsigned char *data, int len, struct sockaddr_dn *sdn, 
 
 struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 {
-	struct sock **skp = listen_hash(addr);
+	struct hlist_head *list = listen_hash(addr);
+	struct hlist_node *node;
 	struct sock *sk;
 
 	read_lock(&dn_hash_lock);
-	for(sk = *skp; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, list) {
 		struct dn_scp *scp = DN_SK(sk);
 		if (sk->sk_state != TCP_LISTEN)
 			continue;
@@ -425,8 +397,13 @@ struct sock *dn_sklist_find_listener(struct sockaddr_dn *addr)
 		return sk;
 	}
 
-	if (dn_wild_sk && (dn_wild_sk->sk_state == TCP_LISTEN))
-		sock_hold((sk = dn_wild_sk));
+	sk = sk_head(&dn_wild_sk);
+	if (sk) {
+	       	if (sk->sk_state == TCP_LISTEN)
+			sock_hold(sk);
+		else
+			sk = NULL;
+	}
 
 	read_unlock(&dn_hash_lock);
 	return sk;
@@ -436,11 +413,11 @@ struct sock *dn_find_by_skb(struct sk_buff *skb)
 {
 	struct dn_skb_cb *cb = DN_SKB_CB(skb);
 	struct sock *sk;
+	struct hlist_node *node;
 	struct dn_scp *scp;
 
 	read_lock(&dn_hash_lock);
-	sk = dn_sk_hash[cb->dst_port & DN_SK_HASH_MASK];
-	for (; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &dn_sk_hash[cb->dst_port & DN_SK_HASH_MASK]) {
 		scp = DN_SK(sk);
 		if (cb->src != dn_saddr2dn(&scp->peer))
 			continue;
@@ -448,14 +425,12 @@ struct sock *dn_find_by_skb(struct sk_buff *skb)
 			continue;
 		if (scp->addrrem && (cb->src_port != scp->addrrem))
 			continue;
-		break;
-	}
-
-	if (sk)
 		sock_hold(sk);
-
+		goto found;
+	}
+	sk = NULL;
+found:
 	read_unlock(&dn_hash_lock);
-
 	return sk;
 }
 
@@ -1229,7 +1204,7 @@ static int dn_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
 	int err = -EOPNOTSUPP;
-	unsigned long amount = 0;
+	long amount = 0;
 	struct sk_buff *skb;
 	int val;
 
@@ -2122,7 +2097,7 @@ static struct sock *dn_socket_get_first(struct seq_file *seq)
 	for(state->bucket = 0;
 	    state->bucket < DN_SK_HASH_SIZE;
 	    ++state->bucket) {
-		n = dn_sk_hash[state->bucket];
+		n = sk_head(&dn_sk_hash[state->bucket]);
 		if (n)
 			break;
 	}
@@ -2135,13 +2110,13 @@ static struct sock *dn_socket_get_next(struct seq_file *seq,
 {
 	struct dn_iter_state *state = seq->private;
 
-	n = n->sk_next;
+	n = sk_next(n);
 try_again:
 	if (n)
 		goto out;
 	if (++state->bucket >= DN_SK_HASH_SIZE)
 		goto out;
-	n = dn_sk_hash[state->bucket];
+	n = sk_head(&dn_sk_hash[state->bucket]);
 	goto try_again;
 out:
 	return n;

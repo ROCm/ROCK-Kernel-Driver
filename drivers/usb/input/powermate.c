@@ -180,7 +180,7 @@ static void powermate_sync_state(struct powermate_device *pm)
 			     (void *) pm->configcr, 0, 0,
 			     powermate_config_complete, pm);
 	pm->config->setup_dma = pm->configcr_dma;
-	pm->config->transfer_flags |= URB_NO_DMA_MAP;
+	pm->config->transfer_flags |= URB_NO_SETUP_DMA_MAP;
 
 	if (usb_submit_urb(pm->config, GFP_ATOMIC))
 		printk(KERN_ERR "powermate: usb_submit_urb(config) failed");
@@ -355,7 +355,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 			 POWERMATE_PAYLOAD_SIZE, powermate_irq,
 			 pm, endpoint->bInterval);
 	pm->irq->transfer_dma = pm->data_dma;
-	pm->irq->transfer_flags |= URB_NO_DMA_MAP;
+	pm->irq->transfer_flags |= URB_NO_TRANSFER_DMA_MAP;
 
 	/* register our interrupt URB with the USB system */
 	if (usb_submit_urb(pm->irq, GFP_KERNEL)) {

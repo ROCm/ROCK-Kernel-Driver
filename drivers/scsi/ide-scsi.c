@@ -612,7 +612,7 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	drive->disk->fops = ide_fops;
 
 	scsi_remove_host(scsihost);
-	scsi_unregister(scsihost);
+	scsi_host_put(scsihost);
 	return 0;
 }
 
@@ -964,7 +964,7 @@ static int idescsi_attach(ide_drive_t *drive)
 	if (!strstr("ide-scsi", drive->driver_req) ||
 	    !drive->present ||
 	    drive->media == ide_disk ||
-	    !(host = scsi_register(&idescsi_template,sizeof(idescsi_scsi_t))))
+	    !(host = scsi_host_alloc(&idescsi_template,sizeof(idescsi_scsi_t))))
 		return 1;
 
 	host->max_id = 1;
@@ -984,7 +984,7 @@ static int idescsi_attach(ide_drive_t *drive)
 		ide_unregister_subdriver(drive);
 	}
 
-	scsi_unregister(host);
+	scsi_host_put(host);
 	return err;
 }
 

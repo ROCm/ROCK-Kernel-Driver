@@ -18,7 +18,8 @@
    LTOFF22X
    LTOFF22X
    LTOFF_FPTR22
-   PCREL21B
+   PCREL21B	(for br.call only; br.cond is not supported out of modules!)
+   PCREL60B	(for brl.cond only; brl.call is not supported for modules!)
    PCREL64LSB
    SECREL32LSB
    SEGREL64LSB
@@ -33,6 +34,7 @@
 #include <linux/string.h>
 #include <linux/vmalloc.h>
 
+#include <asm/patch.h>
 #include <asm/unaligned.h>
 
 #define ARCH_MODULE_DEBUG 0
@@ -158,27 +160,6 @@ slot (const struct insn *insn)
 	return (uint64_t) insn & 0x3;
 }
 
-/* Patch instruction with "val" where "mask" has 1 bits. */
-static void
-apply (struct insn *insn, uint64_t mask, uint64_t val)
-{
-	uint64_t m0, m1, v0, v1, b0, b1, *b = (uint64_t *) bundle(insn);
-#	define insn_mask ((1UL << 41) - 1)
-	unsigned long shift;
-
-	b0 = b[0]; b1 = b[1];
-	shift = 5 + 41 * slot(insn); /* 5 bits of template, then 3 x 41-bit instructions */
-	if (shift >= 64) {
-		m1 = mask << (shift - 64);
-		v1 = val << (shift - 64);
-	} else {
-		m0 = mask << shift; m1 = mask >> (64 - shift);
-		v0 = val  << shift; v1 = val >> (64 - shift);
-		b[0] = (b0 & ~m0) | (v0 & m0);
-	}
-	b[1] = (b1 & ~m1) | (v1 & m1);
-}
-
 static int
 apply_imm64 (struct module *mod, struct insn *insn, uint64_t val)
 {
@@ -187,12 +168,7 @@ apply_imm64 (struct module *mod, struct insn *insn, uint64_t val)
 		       mod->name, slot(insn));
 		return 0;
 	}
-	apply(insn, 0x01fffefe000, (  ((val & 0x8000000000000000) >> 27) /* bit 63 -> 36 */
-				    | ((val & 0x0000000000200000) <<  0) /* bit 21 -> 21 */
-				    | ((val & 0x00000000001f0000) <<  6) /* bit 16 -> 22 */
-				    | ((val & 0x000000000000ff80) << 20) /* bit  7 -> 27 */
-				    | ((val & 0x000000000000007f) << 13) /* bit  0 -> 13 */));
-	apply((void *) insn - 1, 0x1ffffffffff, val >> 22);
+	ia64_patch_imm64((u64) insn, val);
 	return 1;
 }
 
@@ -208,9 +184,7 @@ apply_imm60 (struct module *mod, struct insn *insn, uint64_t val)
 		printk(KERN_ERR "%s: value %ld out of IMM60 range\n", mod->name, (int64_t) val);
 		return 0;
 	}
-	apply(insn, 0x011ffffe000, (  ((val & 0x1000000000000000) >> 24) /* bit 60 -> 36 */
-				    | ((val & 0x00000000000fffff) << 13) /* bit  0 -> 13 */));
-	apply((void *) insn - 1, 0x1fffffffffc, val >> 18);
+	ia64_patch_imm60((u64) insn, val);
 	return 1;
 }
 
@@ -221,10 +195,10 @@ apply_imm22 (struct module *mod, struct insn *insn, uint64_t val)
 		printk(KERN_ERR "%s: value %li out of IMM22 range\n", mod->name, (int64_t)val);
 		return 0;
 	}
-	apply(insn, 0x01fffcfe000, (  ((val & 0x200000) << 15) /* bit 21 -> 36 */
-				    | ((val & 0x1f0000)	<<  6) /* bit 16 -> 22 */
-				    | ((val & 0x00ff80) << 20) /* bit  7 -> 27 */
-				    | ((val & 0x00007f)	<< 13) /* bit  0 -> 13 */));
+	ia64_patch((u64) insn, 0x01fffcfe000, (  ((val & 0x200000) << 15) /* bit 21 -> 36 */
+					       | ((val & 0x1f0000) <<  6) /* bit 16 -> 22 */
+					       | ((val & 0x00ff80) << 20) /* bit  7 -> 27 */
+					       | ((val & 0x00007f) << 13) /* bit  0 -> 13 */));
 	return 1;
 }
 
@@ -235,8 +209,8 @@ apply_imm21b (struct module *mod, struct insn *insn, uint64_t val)
 		printk(KERN_ERR "%s: value %li out of IMM21b range\n", mod->name, (int64_t)val);
 		return 0;
 	}
-	apply(insn, 0x11ffffe000, (  ((val & 0x100000) << 16) /* bit 20 -> 36 */
-				   | ((val & 0x0fffff) << 13) /* bit  0 -> 13 */));
+	ia64_patch((u64) insn, 0x11ffffe000, (  ((val & 0x100000) << 16) /* bit 20 -> 36 */
+					      | ((val & 0x0fffff) << 13) /* bit  0 -> 13 */));
 	return 1;
 }
 
@@ -281,7 +255,7 @@ plt_target (struct plt_entry *plt)
 	b0 = b[0]; b1 = b[1];
 	off = (  ((b1 & 0x00fffff000000000) >> 36)		/* imm20b -> bit 0 */
 	       | ((b0 >> 48) << 20) | ((b1 & 0x7fffff) << 36)	/* imm39 -> bit 20 */
-	       | ((b1 & 0x0800000000000000) << 1));		/* i -> bit 60 */
+	       | ((b1 & 0x0800000000000000) << 0));		/* i -> bit 59 */
 	return (long) plt->bundle[1] + 16*off;
 }
 
@@ -751,7 +725,7 @@ do_reloc (struct module *mod, uint8_t r_type, Elf64_Sym *sym, uint64_t addend,
 			if (gp_addressable(mod, val)) {
 				/* turn "ld8" into "mov": */
 				DEBUGP("%s: patching ld8 at %p to mov\n", __FUNCTION__, location);
-				apply(location, 0x1fff80fe000, 0x10000000000);
+				ia64_patch((u64) location, 0x1fff80fe000, 0x10000000000);
 			}
 			return 0;
 
@@ -889,7 +863,8 @@ module_arch_cleanup (struct module *mod)
 }
 
 #ifdef CONFIG_SMP
-void percpu_modcopy(void *pcpudst, const void *src, unsigned long size)
+void
+percpu_modcopy (void  *pcpudst, const void *src, unsigned long size)
 {
 	unsigned int i;
 	for (i = 0; i < NR_CPUS; i++)

@@ -133,11 +133,8 @@ struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 	if (tb) {
 		tb->port = snum;
 		tb->fastreuse = 0;
-		tb->owners = NULL;
-		if ((tb->next = head->chain) != NULL)
-			tb->next->pprev = &tb->next;
-		head->chain = tb;
-		tb->pprev = &head->chain;
+		INIT_HLIST_HEAD(&tb->owners);
+		hlist_add_head(&tb->node, &head->chain);
 	}
 	return tb;
 }
@@ -145,10 +142,8 @@ struct tcp_bind_bucket *tcp_bucket_create(struct tcp_bind_hashbucket *head,
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 void tcp_bucket_destroy(struct tcp_bind_bucket *tb)
 {
-	if (!tb->owners) {
-		if (tb->next)
-			tb->next->pprev = tb->pprev;
-		*(tb->pprev) = tb->next;
+	if (hlist_empty(&tb->owners)) {
+		__hlist_del(&tb->node);
 		kmem_cache_free(tcp_bucket_cachep, tb);
 	}
 }
@@ -161,12 +156,9 @@ static __inline__ void __tcp_inherit_port(struct sock *sk, struct sock *child)
 	struct tcp_bind_bucket *tb;
 
 	spin_lock(&head->lock);
-	tb = (struct tcp_bind_bucket *)sk->sk_prev;
-	if ((child->sk_bind_next = tb->owners) != NULL)
-		tb->owners->sk_bind_pprev = &child->sk_bind_next;
-	tb->owners	  = child;
-	child->sk_bind_pprev = &tb->owners;
-	child->sk_prev	  = (struct sock *)tb;
+	tb = tcp_sk(sk)->bind_hash;
+	sk_add_bind_node(child, &tb->owners);
+	tcp_sk(child)->bind_hash = tb;
 	spin_unlock(&head->lock);
 }
 
@@ -181,20 +173,18 @@ void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 		   unsigned short snum)
 {
 	inet_sk(sk)->num = snum;
-	if ((sk->sk_bind_next = tb->owners) != NULL)
-		tb->owners->sk_bind_pprev = &sk->sk_bind_next;
-	tb->owners     = sk;
-	sk->sk_bind_pprev = &tb->owners;
-	sk->sk_prev       = (struct sock *)tb;
+	sk_add_bind_node(sk, &tb->owners);
+	tcp_sk(sk)->bind_hash = tb;
 }
 
 static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 {
 	struct inet_opt *inet = inet_sk(sk);
-	struct sock *sk2 = tb->owners;
+	struct sock *sk2;
+	struct hlist_node *node;
 	int reuse = sk->sk_reuse;
 
-	for (; sk2; sk2 = sk2->sk_bind_next) {
+	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 &&
 		    !ipv6_only_sock(sk2) &&
 		    sk->sk_bound_dev_if == sk2->sk_bound_dev_if) {
@@ -207,7 +197,7 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 			}
 		}
 	}
-	return sk2 != NULL;
+	return node != NULL;
 }
 
 /* Obtain a reference to a local port for the given sock,
@@ -216,6 +206,7 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 {
 	struct tcp_bind_hashbucket *head;
+	struct hlist_node *node;
 	struct tcp_bind_bucket *tb;
 	int ret;
 
@@ -234,7 +225,7 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 				rover = low;
 			head = &tcp_bhash[tcp_bhashfn(rover)];
 			spin_lock(&head->lock);
-			for (tb = head->chain; tb; tb = tb->next)
+			tb_for_each(tb, node, &head->chain)
 				if (tb->port == rover)
 					goto next;
 			break;
@@ -253,15 +244,17 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		 * non-NULL and we hold it's mutex.
 		 */
 		snum = rover;
-		tb = NULL;
 	} else {
 		head = &tcp_bhash[tcp_bhashfn(snum)];
 		spin_lock(&head->lock);
-		for (tb = head->chain; tb; tb = tb->next)
+		tb_for_each(tb, node, &head->chain)
 			if (tb->port == snum)
-				break;
+				goto tb_found;
 	}
-	if (tb && tb->owners) {
+	tb = NULL;
+	goto tb_not_found;
+tb_found:
+	if (!hlist_empty(&tb->owners)) {
 		if (sk->sk_reuse > 1)
 			goto success;
 		if (tb->fastreuse > 0 &&
@@ -273,10 +266,11 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 				goto fail_unlock;
 		}
 	}
+tb_not_found:
 	ret = 1;
 	if (!tb && (tb = tcp_bucket_create(head, snum)) == NULL)
 		goto fail_unlock;
-	if (!tb->owners) {
+	if (hlist_empty(&tb->owners)) {
 		if (sk->sk_reuse && sk->sk_state != TCP_LISTEN)
 			tb->fastreuse = 1;
 		else
@@ -285,9 +279,9 @@ static int tcp_v4_get_port(struct sock *sk, unsigned short snum)
 		   (!sk->sk_reuse || sk->sk_state == TCP_LISTEN))
 		tb->fastreuse = 0;
 success:
-	if (!sk->sk_prev)
+	if (!tcp_sk(sk)->bind_hash)
 		tcp_bind_hash(sk, tb, snum);
-	BUG_TRAP(sk->sk_prev == (struct sock *)tb);
+	BUG_TRAP(tcp_sk(sk)->bind_hash == tb);
  	ret = 0;
 
 fail_unlock:
@@ -307,11 +301,9 @@ static void __tcp_put_port(struct sock *sk)
 	struct tcp_bind_bucket *tb;
 
 	spin_lock(&head->lock);
-	tb = (struct tcp_bind_bucket *)sk->sk_prev;
-	if (sk->sk_bind_next)
-		sk->sk_bind_next->sk_bind_pprev = sk->sk_bind_pprev;
-	*(sk->sk_bind_pprev) = sk->sk_bind_next;
-	sk->sk_prev = NULL;
+	tb = tcp_sk(sk)->bind_hash;
+	__sk_del_bind_node(sk);
+	tcp_sk(sk)->bind_hash = NULL;
 	inet->num = 0;
 	tcp_bucket_destroy(tb);
 	spin_unlock(&head->lock);
@@ -354,23 +346,20 @@ void tcp_listen_wlock(void)
 
 static __inline__ void __tcp_v4_hash(struct sock *sk, const int listen_possible)
 {
-	struct sock **skp;
+	struct hlist_head *list;
 	rwlock_t *lock;
 
-	BUG_TRAP(!sk->sk_pprev);
+	BUG_TRAP(sk_unhashed(sk));
 	if (listen_possible && sk->sk_state == TCP_LISTEN) {
-		skp = &tcp_listening_hash[tcp_sk_listen_hashfn(sk)];
+		list = &tcp_listening_hash[tcp_sk_listen_hashfn(sk)];
 		lock = &tcp_lhash_lock;
 		tcp_listen_wlock();
 	} else {
-		skp = &tcp_ehash[(sk->sk_hashent = tcp_sk_hashfn(sk))].chain;
+		list = &tcp_ehash[(sk->sk_hashent = tcp_sk_hashfn(sk))].chain;
 		lock = &tcp_ehash[sk->sk_hashent].lock;
 		write_lock(lock);
 	}
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-	*skp = sk;
-	sk->sk_pprev = skp;
+	__sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(lock);
 	if (listen_possible && sk->sk_state == TCP_LISTEN)
@@ -390,7 +379,7 @@ void tcp_unhash(struct sock *sk)
 {
 	rwlock_t *lock;
 
-	if (!sk->sk_pprev)
+	if (sk_unhashed(sk))
 		goto ende;
 
 	if (sk->sk_state == TCP_LISTEN) {
@@ -403,13 +392,8 @@ void tcp_unhash(struct sock *sk)
 		write_lock_bh(&head->lock);
 	}
 
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (__sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-	}
 	write_unlock_bh(lock);
 
  ende:
@@ -423,14 +407,15 @@ void tcp_unhash(struct sock *sk)
  * connection.  So always assume those are both wildcarded
  * during the search since they can never be otherwise.
  */
-static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
+static struct sock *__tcp_v4_lookup_listener(struct hlist_head *head, u32 daddr,
 					     unsigned short hnum, int dif)
 {
-	struct sock *result = NULL;
+	struct sock *result = NULL, *sk;
+	struct hlist_node *node;
 	int score, hiscore;
 
 	hiscore=-1;
-	for (; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, head) {
 		struct inet_opt *inet = inet_sk(sk);
 
 		if (inet->num == hnum && !ipv6_only_sock(sk)) {
@@ -462,19 +447,20 @@ static struct sock *__tcp_v4_lookup_listener(struct sock *sk, u32 daddr,
 inline struct sock *tcp_v4_lookup_listener(u32 daddr, unsigned short hnum,
 					   int dif)
 {
-	struct sock *sk;
+	struct sock *sk = NULL;
+	struct hlist_head *head;
 
 	read_lock(&tcp_lhash_lock);
-	sk = tcp_listening_hash[tcp_lhashfn(hnum)];
-	if (sk) {
-		struct inet_opt *inet = inet_sk(sk);
+	head = &tcp_listening_hash[tcp_lhashfn(hnum)];
+	if (!hlist_empty(head)) {
+		struct inet_opt *inet = inet_sk((sk = __sk_head(head)));
 
-		if (inet->num == hnum && !sk->sk_next &&
+		if (inet->num == hnum && !sk->sk_node.next &&
 		    (!inet->rcv_saddr || inet->rcv_saddr == daddr) &&
 		    (sk->sk_family == PF_INET || !ipv6_only_sock(sk)) &&
 		    !sk->sk_bound_dev_if)
 			goto sherry_cache;
-		sk = __tcp_v4_lookup_listener(sk, daddr, hnum, dif);
+		sk = __tcp_v4_lookup_listener(head, daddr, hnum, dif);
 	}
 	if (sk) {
 sherry_cache:
@@ -498,21 +484,24 @@ static inline struct sock *__tcp_v4_lookup_established(u32 saddr, u16 sport,
 	TCP_V4_ADDR_COOKIE(acookie, saddr, daddr)
 	__u32 ports = TCP_COMBINED_PORTS(sport, hnum);
 	struct sock *sk;
+	struct hlist_node *node;
 	/* Optimize here for direct hit, only listening connections can
 	 * have wildcards anyways.
 	 */
 	int hash = tcp_hashfn(daddr, hnum, saddr, sport);
 	head = &tcp_ehash[hash];
 	read_lock(&head->lock);
-	for (sk = head->chain; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &head->chain) {
 		if (TCP_IPV4_MATCH(sk, acookie, saddr, daddr, ports, dif))
 			goto hit; /* You sunk my battleship! */
 	}
 
 	/* Must check for a TIME_WAIT'er before going to listener hash. */
-	for (sk = (head + tcp_ehash_size)->chain; sk; sk = sk->sk_next)
+	sk_for_each(sk, node, &(head + tcp_ehash_size)->chain) {
 		if (TCP_IPV4_TW_MATCH(sk, acookie, saddr, daddr, ports, dif))
 			goto hit;
+	}
+	sk = NULL;
 out:
 	read_unlock(&head->lock);
 	return sk;
@@ -562,14 +551,14 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 	__u32 ports = TCP_COMBINED_PORTS(inet->dport, lport);
 	int hash = tcp_hashfn(daddr, lport, saddr, inet->dport);
 	struct tcp_ehash_bucket *head = &tcp_ehash[hash];
-	struct sock *sk2, **skp;
+	struct sock *sk2;
+	struct hlist_node *node;
 	struct tcp_tw_bucket *tw;
 
 	write_lock(&head->lock);
 
 	/* Check TIME-WAIT sockets first. */
-	for (skp = &(head + tcp_ehash_size)->chain; (sk2 = *skp) != NULL;
-	     skp = &sk2->sk_next) {
+	sk_for_each(sk2, node, &(head + tcp_ehash_size)->chain) {
 		tw = (struct tcp_tw_bucket *)sk2;
 
 		if (TCP_IPV4_TW_MATCH(sk2, acookie, saddr, daddr, ports, dif)) {
@@ -599,7 +588,6 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 				tp->ts_recent	    = tw->tw_ts_recent;
 				tp->ts_recent_stamp = tw->tw_ts_recent_stamp;
 				sock_hold(sk2);
-				skp = &head->chain;
 				goto unique;
 			} else
 				goto not_unique;
@@ -608,7 +596,7 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 	tw = NULL;
 
 	/* And established part... */
-	for (skp = &head->chain; (sk2 = *skp) != NULL; skp = &sk2->sk_next) {
+	sk_for_each(sk2, node, &head->chain) {
 		if (TCP_IPV4_MATCH(sk2, acookie, saddr, daddr, ports, dif))
 			goto not_unique;
 	}
@@ -618,13 +606,9 @@ unique:
 	 * in hash table socket with a funny identity. */
 	inet->num = lport;
 	inet->sport = htons(lport);
-	BUG_TRAP(!sk->sk_pprev);
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-
-	*skp = sk;
-	sk->sk_pprev = skp;
 	sk->sk_hashent = hash;
+	BUG_TRAP(sk_unhashed(sk));
+	__sk_add_node(sk, &head->chain);
 	sock_prot_inc_use(sk->sk_prot);
 	write_unlock(&head->lock);
 
@@ -661,6 +645,7 @@ static int tcp_v4_hash_connect(struct sock *sk)
  		int low = sysctl_local_port_range[0];
  		int high = sysctl_local_port_range[1];
  		int remaining = (high - low) + 1;
+		struct hlist_node *node;
  		struct tcp_tw_bucket *tw = NULL;
 
  		local_bh_disable();
@@ -692,9 +677,9 @@ static int tcp_v4_hash_connect(struct sock *sk)
  			 * because the established check is already
  			 * unique enough.
  			 */
- 			for (tb = head->chain; tb; tb = tb->next) {
+			tb_for_each(tb, node, &head->chain) {
  				if (tb->port == rover) {
- 					BUG_TRAP(tb->owners);
+ 					BUG_TRAP(!hlist_empty(&tb->owners));
  					if (tb->fastreuse >= 0)
  						goto next_port;
  					if (!__tcp_v4_check_established(sk,
@@ -729,7 +714,7 @@ ok:
  		spin_unlock(&tcp_portalloc_lock);
 
  		tcp_bind_hash(sk, tb, rover);
- 		if (!sk->sk_pprev) {
+		if (sk_unhashed(sk)) {
  			inet_sk(sk)->sport = htons(rover);
  			__tcp_v4_hash(sk, 0);
  		}
@@ -745,9 +730,9 @@ ok:
  	}
 
  	head  = &tcp_bhash[tcp_bhashfn(snum)];
- 	tb  = (struct tcp_bind_bucket *)sk->sk_prev;
+ 	tb  = tcp_sk(sk)->bind_hash;
 	spin_lock_bh(&head->lock);
-	if (tb->owners == sk && !sk->sk_bind_next) {
+	if (sk_head(&tb->owners) == sk && !sk->sk_bind_node.next) {
 		__tcp_v4_hash(sk, 0);
 		spin_unlock_bh(&head->lock);
 		return 0;
@@ -1363,7 +1348,7 @@ static inline void syn_flood_warning(struct sk_buff *skb)
 {
 	static unsigned long warntime;
 
-	if (jiffies - warntime > HZ * 60) {
+	if (time_after(jiffies, (warntime + HZ * 60))) {
 		warntime = jiffies;
 		printk(KERN_INFO
 		       "possible SYN flooding on port %d. Sending cookies.\n",
@@ -2116,7 +2101,7 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 	__skb_queue_purge(&tp->ucopy.prequeue);
 
 	/* Clean up a referenced TCP bind bucket. */
-	if (sk->sk_prev)
+	if (tp->bind_hash)
 		tcp_put_port(sk);
 
 	/* If sendmsg cached page exists, toss it. */
@@ -2131,6 +2116,18 @@ static int tcp_v4_destroy_sock(struct sock *sk)
 #ifdef CONFIG_PROC_FS
 /* Proc filesystem TCP sock list dumping. */
 
+static inline struct tcp_tw_bucket *tw_head(struct hlist_head *head)
+{
+	return hlist_empty(head) ? NULL :
+		list_entry(head->first, struct tcp_tw_bucket, tw_node);
+}
+
+static inline struct tcp_tw_bucket *tw_next(struct tcp_tw_bucket *tw)
+{
+	return tw->tw_node.next ?
+		hlist_entry(tw->tw_node.next, typeof(*tw), tw_node) : NULL;
+}
+
 static void *listening_get_first(struct seq_file *seq)
 {
 	struct tcp_iter_state* st = seq->private;
@@ -2139,7 +2136,7 @@ static void *listening_get_first(struct seq_file *seq)
 	for (st->bucket = 0; st->bucket < TCP_LHTABLE_SIZE; ++st->bucket) {
 		struct open_request *req;
 		struct tcp_opt *tp;
-		struct sock *sk = tcp_listening_hash[st->bucket];
+		struct sock *sk = sk_head(&tcp_listening_hash[st->bucket]);
 
 		if (!sk)
 			continue;
@@ -2175,6 +2172,7 @@ out:
 static void *listening_get_next(struct seq_file *seq, void *cur)
 {
 	struct tcp_opt *tp;
+	struct hlist_node *node;
 	struct sock *sk = cur;
 	struct tcp_iter_state* st = seq->private;
 
@@ -2197,13 +2195,13 @@ static void *listening_get_next(struct seq_file *seq, void *cur)
 get_req:
 			req = tp->listen_opt->syn_table[st->sbucket];
 		}
-		sk	  = st->syn_wait_sk->sk_next;
+		sk	  = sk_next(st->syn_wait_sk);
 		st->state = TCP_SEQ_STATE_LISTENING;
 		read_unlock_bh(&tp->syn_wait_lock);
 	} else
-		sk = sk->sk_next;
+		sk = sk_next(sk);
 get_sk:
-	while (sk) {
+	sk_for_each_from(sk, node) {
 		if (sk->sk_family == st->family) {
 			cur = sk;
 			goto out;
@@ -2218,10 +2216,9 @@ get_sk:
 			goto get_req;
 		}
 		read_unlock_bh(&tp->syn_wait_lock);
-		sk = sk->sk_next;
 	}
 	if (++st->bucket < TCP_LHTABLE_SIZE) {
-		sk = tcp_listening_hash[st->bucket];
+		sk = sk_head(&tcp_listening_hash[st->bucket]);
 		goto get_sk;
 	}
 	cur = NULL;
@@ -2246,22 +2243,25 @@ static void *established_get_first(struct seq_file *seq)
 
 	for (st->bucket = 0; st->bucket < tcp_ehash_size; ++st->bucket) {
 		struct sock *sk;
+		struct hlist_node *node;
 		struct tcp_tw_bucket *tw;
 	       
 		read_lock(&tcp_ehash[st->bucket].lock);
-		for (sk = tcp_ehash[st->bucket].chain; sk;
-		     sk = sk->sk_next, ++st->num) {
-			if (sk->sk_family != st->family)
+		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
+			if (sk->sk_family != st->family) {
+				++st->num;
 				continue;
+			}
 			rc = sk;
 			goto out;
 		}
 		st->state = TCP_SEQ_STATE_TIME_WAIT;
-		for (tw = (struct tcp_tw_bucket *)
-				tcp_ehash[st->bucket + tcp_ehash_size].chain;
-		     tw; tw = (struct tcp_tw_bucket *)tw->tw_next, ++st->num) {
-			if (tw->tw_family != st->family)
+		tw_for_each(tw, node,
+			    &tcp_ehash[st->bucket + tcp_ehash_size].chain) {
+			if (tw->tw_family != st->family) {
+				++st->num;
 				continue;
+			}
 			rc = tw;
 			goto out;
 		}
@@ -2276,15 +2276,16 @@ static void *established_get_next(struct seq_file *seq, void *cur)
 {
 	struct sock *sk = cur;
 	struct tcp_tw_bucket *tw;
+	struct hlist_node *node;
 	struct tcp_iter_state* st = seq->private;
 
 	if (st->state == TCP_SEQ_STATE_TIME_WAIT) {
 		tw = cur;
-		tw = (struct tcp_tw_bucket *)tw->tw_next;
+		tw = tw_next(tw);
 get_tw:
 		while (tw && tw->tw_family != st->family) {
 			++st->num;
-			tw = (struct tcp_tw_bucket *)tw->tw_next;
+			tw = tw_next(tw);
 		}
 		if (tw) {
 			cur = tw;
@@ -2294,24 +2295,24 @@ get_tw:
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
 		if (++st->bucket < tcp_ehash_size) {
 			read_lock(&tcp_ehash[st->bucket].lock);
-			sk = tcp_ehash[st->bucket].chain;
+			sk = sk_head(&tcp_ehash[st->bucket].chain);
 		} else {
 			cur = NULL;
 			goto out;
 		}
 	} else
-		sk = sk->sk_next;
+		sk = sk_next(sk);
 
-	while (sk && sk->sk_family != st->family) {
+	sk_for_each_from(sk, node) {
+		if (sk->sk_family == st->family)
+			goto found;
 		++st->num;
-		sk = sk->sk_next;
 	}
-	if (!sk) {
-		st->state = TCP_SEQ_STATE_TIME_WAIT;
-		tw = (struct tcp_tw_bucket *)
-				tcp_ehash[st->bucket + tcp_ehash_size].chain;
-		goto get_tw;
-	}
+
+	st->state = TCP_SEQ_STATE_TIME_WAIT;
+	tw = tw_head(&tcp_ehash[st->bucket + tcp_ehash_size].chain);
+	goto get_tw;
+found:
 	cur = sk;
 out:
 	return cur;

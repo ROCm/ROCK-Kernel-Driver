@@ -25,6 +25,7 @@
 #undef TCP_CLEAR_TIMERS
 
 #include <linux/config.h>
+#include <linux/list.h>
 #include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/cache.h>
@@ -42,8 +43,8 @@
  * for the rest.  I'll experiment with dynamic table growth later.
  */
 struct tcp_ehash_bucket {
-	rwlock_t	lock;
-	struct sock	*chain;
+	rwlock_t	  lock;
+	struct hlist_head chain;
 } __attribute__((__aligned__(8)));
 
 /* This is for listening sockets, thus all sockets which possess wildcards. */
@@ -83,15 +84,26 @@ struct tcp_ehash_bucket {
 struct tcp_bind_bucket {
 	unsigned short		port;
 	signed short		fastreuse;
-	struct tcp_bind_bucket	*next;
-	struct sock		*owners;
-	struct tcp_bind_bucket	**pprev;
+	struct hlist_node	node;
+	struct hlist_head	owners;
 };
+
+#define tb_for_each(tb, node, head) hlist_for_each_entry(tb, node, head, node)
 
 struct tcp_bind_hashbucket {
 	spinlock_t		lock;
-	struct tcp_bind_bucket	*chain;
+	struct hlist_head	chain;
 };
+
+static inline struct tcp_bind_bucket *__tb_head(struct tcp_bind_hashbucket *head)
+{
+	return hlist_entry(head->chain.first, struct tcp_bind_bucket, node);
+}
+
+static inline struct tcp_bind_bucket *tb_head(struct tcp_bind_hashbucket *head)
+{
+	return hlist_empty(&head->chain) ? NULL : __tb_head(head);
+}
 
 extern struct tcp_hashinfo {
 	/* This is for sockets with full identity only.  Sockets here will
@@ -116,7 +128,7 @@ extern struct tcp_hashinfo {
 	 * table where wildcard'd TCP sockets can exist.  Hash function here
 	 * is just local port number.
 	 */
-	struct sock *__tcp_listening_hash[TCP_LHTABLE_SIZE];
+	struct hlist_head __tcp_listening_hash[TCP_LHTABLE_SIZE];
 
 	/* All the above members are written once at bootup and
 	 * never written again _or_ are predominantly read-access.
@@ -160,6 +172,12 @@ static __inline__ int tcp_bhashfn(__u16 lport)
 extern void tcp_bind_hash(struct sock *sk, struct tcp_bind_bucket *tb,
 			  unsigned short snum);
 
+#if (BITS_PER_LONG == 64)
+#define TCP_ADDRCMP_ALIGN_BYTES 8
+#else
+#define TCP_ADDRCMP_ALIGN_BYTES 4
+#endif
+
 /* This is a TIME_WAIT bucket.  It works around the memory consumption
  * problems of sockets in such a state on heavily loaded servers, but
  * without violating the protocol specification.
@@ -174,17 +192,16 @@ struct tcp_tw_bucket {
 #define tw_state		__tw_common.skc_state
 #define tw_reuse		__tw_common.skc_reuse
 #define tw_bound_dev_if		__tw_common.skc_bound_dev_if
-#define tw_next			__tw_common.skc_next
-#define tw_pprev		__tw_common.skc_pprev
-#define tw_bind_next		__tw_common.skc_bind_next
-#define tw_bind_pprev		__tw_common.skc_bind_pprev
+#define tw_node			__tw_common.skc_node
+#define tw_bind_node		__tw_common.skc_bind_node
 #define tw_refcnt		__tw_common.skc_refcnt
 	volatile unsigned char	tw_substate;
 	unsigned char		tw_rcv_wscale;
 	__u16			tw_sport;
 	/* Socket demultiplex comparisons on incoming packets. */
 	/* these five are in inet_opt */
-	__u32			tw_daddr;
+	__u32			tw_daddr
+		__attribute__((aligned(TCP_ADDRCMP_ALIGN_BYTES)));
 	__u32			tw_rcv_saddr;
 	__u16			tw_dport;
 	__u16			tw_num;
@@ -198,14 +215,55 @@ struct tcp_tw_bucket {
 	long			tw_ts_recent_stamp;
 	unsigned long		tw_ttd;
 	struct tcp_bind_bucket	*tw_tb;
-	struct tcp_tw_bucket	*tw_next_death;
-	struct tcp_tw_bucket	**tw_pprev_death;
-
+	struct hlist_node	tw_death_node;
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 	struct in6_addr		tw_v6_daddr;
 	struct in6_addr		tw_v6_rcv_saddr;
 #endif
 };
+
+static __inline__ void tw_add_node(struct tcp_tw_bucket *tw,
+				   struct hlist_head *list)
+{
+	hlist_add_head(&tw->tw_node, list);
+}
+
+static __inline__ void tw_add_bind_node(struct tcp_tw_bucket *tw,
+					struct hlist_head *list)
+{
+	hlist_add_head(&tw->tw_bind_node, list);
+}
+
+static inline int tw_dead_hashed(struct tcp_tw_bucket *tw)
+{
+	return tw->tw_death_node.pprev != NULL;
+}
+
+static __inline__ void tw_dead_node_init(struct tcp_tw_bucket *tw)
+{
+	tw->tw_death_node.pprev = NULL;
+}
+
+static __inline__ void __tw_del_dead_node(struct tcp_tw_bucket *tw)
+{
+	__hlist_del(&tw->tw_death_node);
+	tw_dead_node_init(tw);
+}
+
+static __inline__ int tw_del_dead_node(struct tcp_tw_bucket *tw)
+{
+	if (tw_dead_hashed(tw)) {
+		__tw_del_dead_node(tw);
+		return 1;
+	}
+	return 0;
+}
+
+#define tw_for_each(tw, node, head) \
+	hlist_for_each_entry(tw, node, head, tw_node)
+
+#define tw_for_each_inmate(tw, node, safe, jail) \
+	hlist_for_each_entry_safe(tw, node, safe, jail, tw_death_node)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
 
@@ -1417,7 +1475,8 @@ static __inline__ void tcp_set_state(struct sock *sk, int state)
 			TCP_INC_STATS(TcpEstabResets);
 
 		sk->sk_prot->unhash(sk);
-		if (sk->sk_prev && !(sk->sk_userlocks & SOCK_BINDPORT_LOCK))
+		if (tcp_sk(sk)->bind_hash &&
+		    !(sk->sk_userlocks & SOCK_BINDPORT_LOCK))
 			tcp_put_port(sk);
 		/* fall through */
 	default:

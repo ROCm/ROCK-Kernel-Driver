@@ -17,9 +17,6 @@ nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 	struct svc_cred	*cred = &rqstp->rq_cred;
 	int		i;
 
-	if (rqstp->rq_userset)
-		return;
-
 	if (exp->ex_flags & NFSEXP_ALLSQUASH) {
 		cred->cr_uid = exp->ex_anon_uid;
 		cred->cr_gid = exp->ex_anon_gid;
@@ -57,5 +54,4 @@ nfsd_setuser(struct svc_rqst *rqstp, struct svc_export *exp)
 						  current->cap_permitted);
 	}
 
-	rqstp->rq_userset = 1;
 }

@@ -1515,16 +1515,6 @@ static void internal_done(Scsi_Cmnd *SCpnt)
 		up(SCSEM(SCpnt));
 }
 
-static int aha152x_command(Scsi_Cmnd * SCpnt)
-{
-	DECLARE_MUTEX_LOCKED(sem);
-
-	aha152x_internal_queue(SCpnt, &sem, 0, 0, internal_done);
-	down(&sem);
-
-	return SUCCESS;
-}
-
 /*
  *  Abort a command
  *
@@ -3876,7 +3866,6 @@ static Scsi_Host_Template aha152x_driver_template = {
 	.proc_name		= "aha152x",
 	.proc_info		= aha152x_proc_info,
 	.detect			= aha152x_detect,
-	.command		= aha152x_command,
 	.queuecommand		= aha152x_queue,
 	.eh_abort_handler	= aha152x_abort,
 	.eh_device_reset_handler = aha152x_device_reset,

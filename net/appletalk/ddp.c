@@ -85,31 +85,25 @@ static struct proto_ops atalk_dgram_ops;
 *                                                                          *
 \**************************************************************************/
 
-struct sock *atalk_sockets;
+HLIST_HEAD(atalk_sockets);
 rwlock_t atalk_sockets_lock = RW_LOCK_UNLOCKED;
 
-#if 0 /* currently unused -DaveM */
+static inline void __atalk_insert_socket(struct sock *sk)
+{
+	sk_add_node(sk, &atalk_sockets);
+}
+
 static inline void atalk_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
-	sk->sk_next = atalk_sockets;
-	if (sk->sk_next)
-		atalk_sockets->sk_pprev = &sk->sk_next;
-	atalk_sockets = sk;
-	sk->sk_pprev = &atalk_sockets;
+	__atalk_insert_socket(sk);
 	write_unlock_bh(&atalk_sockets_lock);
 }
-#endif
 
 static inline void atalk_remove_socket(struct sock *sk)
 {
 	write_lock_bh(&atalk_sockets_lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
-	}
+	sk_del_node_init(sk);
 	write_unlock_bh(&atalk_sockets_lock);
 }
 
@@ -117,9 +111,10 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 					struct atalk_iface *atif)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	read_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->sk_next) {
+	sk_for_each(s, node, &atalk_sockets) {
 		struct atalk_sock *at = at_sk(s);
 
 		if (to->sat_port != at->src_port)
@@ -128,13 +123,13 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 	    	if (to->sat_addr.s_net == ATADDR_ANYNET &&
 		    to->sat_addr.s_node == ATADDR_BCAST &&
 		    at->src_net == atif->address.s_net)
-			break;
+			goto found;
 
 	    	if (to->sat_addr.s_net == at->src_net &&
 		    (to->sat_addr.s_node == at->src_node ||
 		     to->sat_addr.s_node == ATADDR_BCAST ||
 		     to->sat_addr.s_node == ATADDR_ANYNODE))
-			break;
+			goto found;
 
 	    	/* XXXX.0 -- we got a request for this router. make sure
 		 * that the node is appropriately set. */
@@ -142,9 +137,11 @@ static struct sock *atalk_search_socket(struct sockaddr_at *to,
 		    to->sat_addr.s_net != ATADDR_ANYNET &&
 		    atif->address.s_node == at->src_node) {
 			to->sat_addr.s_node = atif->address.s_node;
-			break; 
+			goto found;
 		}
 	}
+	s = NULL;
+found:
 	read_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
@@ -163,26 +160,21 @@ static struct sock *atalk_find_or_insert_socket(struct sock *sk,
 						struct sockaddr_at *sat)
 {
 	struct sock *s;
+	struct hlist_node *node;
+	struct atalk_sock *at;
 
 	write_lock_bh(&atalk_sockets_lock);
-	for (s = atalk_sockets; s; s = s->sk_next) {
-		struct atalk_sock *at = at_sk(s);
+	sk_for_each(s, node, &atalk_sockets) {
+		at = at_sk(s);
 
 		if (at->src_net == sat->sat_addr.s_net &&
 		    at->src_node == sat->sat_addr.s_node &&
 		    at->src_port == sat->sat_port)
-			break;
+			goto found;
 	}
-
-	if (!s) {
-		/* Wheee, it's free, assign and insert. */
-		sk->sk_next = atalk_sockets;
-		if (sk->sk_next)
-			atalk_sockets->sk_pprev = &sk->sk_next;
-		atalk_sockets = sk;
-		sk->sk_pprev = &atalk_sockets;
-	}
-
+	s = NULL;
+	__atalk_insert_socket(sk); /* Wheee, it's free, assign and insert. */
+found:
 	write_unlock_bh(&atalk_sockets_lock);
 	return s;
 }
@@ -1028,7 +1020,6 @@ static int atalk_release(struct socket *sock)
  */
 static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 {
-	struct sock *s;
 	int retval;
 
 	write_lock_bh(&atalk_sockets_lock);
@@ -1036,7 +1027,10 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 	for (sat->sat_port = ATPORT_RESERVED;
 	     sat->sat_port < ATPORT_LAST;
 	     sat->sat_port++) {
-		for (s = atalk_sockets; s; s = s->sk_next) {
+		struct sock *s;
+		struct hlist_node *node;
+
+		sk_for_each(s, node, &atalk_sockets) {
 			struct atalk_sock *at = at_sk(s);
 
 			if (at->src_net == sat->sat_addr.s_net &&
@@ -1046,11 +1040,7 @@ static int atalk_pick_and_bind_port(struct sock *sk, struct sockaddr_at *sat)
 		}
 
 		/* Wheee, it's free, assign and insert. */
-		sk->sk_next = atalk_sockets;
-		if (sk->sk_next)
-			atalk_sockets->sk_pprev = &sk->sk_next;
-		atalk_sockets = sk;
-		sk->sk_pprev = &atalk_sockets;
+		__atalk_insert_socket(sk);
 		at_sk(sk)->src_port = sat->sat_port;
 		retval = 0;
 		goto out;

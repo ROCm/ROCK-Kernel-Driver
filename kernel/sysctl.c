@@ -540,7 +540,7 @@ static ctl_table kern_table[] = {
 		.procname	= "pid_max",
 		.data		= &pid_max,
 		.maxlen		= sizeof (int),
-		.mode		= 0600,
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
 	{

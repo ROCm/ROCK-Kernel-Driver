@@ -1112,11 +1112,18 @@ asmlinkage long sys32_pause(void)
 
 
 
-static inline long get_tv32(struct timeval *o, struct compat_timeval *i)
+static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 {
-	return (!access_ok(VERIFY_READ, i, sizeof(*i)) ||
-		(__get_user(o->tv_sec, &i->tv_sec) |
-		 __get_user(o->tv_usec, &i->tv_usec)));
+	long usec;
+
+	if (!access_ok(VERIFY_READ, i, sizeof(*i)))
+		return -EFAULT;
+	if (__get_user(o->tv_sec, &i->tv_sec))
+		return -EFAULT;
+	if (__get_user(usec, &i->tv_usec))
+		return -EFAULT;
+	o->tv_nsec = usec * 1000;
+	return 0;
 }
 
 static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
@@ -1140,7 +1147,7 @@ struct sysinfo32 {
 	u32 totalhigh;
 	u32 freehigh;
 	u32 mem_unit;
-	char _f[20-2*sizeof(long)-sizeof(int)];
+	char _f[20-2*sizeof(int)-sizeof(int)];
 };
 
 extern asmlinkage long sys_sysinfo(struct sysinfo *info);
@@ -1199,7 +1206,6 @@ asmlinkage long sys32_sysinfo(struct sysinfo32 *info)
 /* Translations due to time_t size differences.  Which affects all
    sorts of things, like timeval and itimerval.  */
 extern struct timezone sys_tz;
-extern int do_sys_settimeofday(struct timeval *tv, struct timezone *tz);
 
 asmlinkage long sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
@@ -1221,11 +1227,11 @@ asmlinkage long sys32_gettimeofday(struct compat_timeval *tv, struct timezone *t
 
 asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
-	struct timeval ktv;
+	struct timespec kts;
 	struct timezone ktz;
 	
  	if (tv) {
-		if (get_tv32(&ktv, tv))
+		if (get_ts32(&kts, tv))
 			return -EFAULT;
 	}
 	if (tz) {
@@ -1233,7 +1239,7 @@ asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *t
 			return -EFAULT;
 	}
 
-	return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 

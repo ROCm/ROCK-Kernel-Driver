@@ -1819,6 +1819,7 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 	if (this != NULL) {
 		int sz;
 		u32 state;
+		int ret;
 
 		/* Disable the FW */
 		state = mpt_GetIocState(this, 1);
@@ -1829,9 +1830,9 @@ mpt_adapter_disable(MPT_ADAPTER *this, int freeup)
 		if (this->cached_fw != NULL) {
 			ddlprintk((KERN_INFO MYNAM ": Pushing FW onto adapter\n"));
 
-			if ((state = mpt_downloadboot(this, NO_SLEEP)) < 0) {
+			if ((ret = mpt_downloadboot(this, NO_SLEEP)) < 0) {
 				printk(KERN_WARNING MYNAM
-					": firmware downloadboot failure (%d)!\n", state);
+					": firmware downloadboot failure (%d)!\n", ret);
 			}
 		}
 

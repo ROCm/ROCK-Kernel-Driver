@@ -74,6 +74,46 @@ struct raparms {
 static struct raparms *		raparml;
 static struct raparms *		raparm_cache;
 
+/* 
+ * Called from nfsd_lookup and encode_dirent. Check if we have crossed 
+ * a mount point.
+ * Returns -EAGAIN leaving *dpp and *expp unchanged, 
+ *  or nfs_ok having possibly changed *dpp and *expp
+ */
+int
+nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp, 
+		        struct svc_export **expp)
+{
+	struct svc_export *exp = *expp, *exp2 = NULL;
+	struct dentry *dentry = *dpp;
+	struct vfsmount *mnt = mntget(exp->ex_mnt);
+	struct dentry *mounts = dget(dentry);
+	int err = nfs_ok;
+
+	while (follow_down(&mnt,&mounts)&&d_mountpoint(mounts));
+
+	exp2 = exp_get_by_name(exp->ex_client, mnt, mounts, &rqstp->rq_chandle);
+	if (IS_ERR(exp2)) {
+		err = PTR_ERR(exp2);
+		dput(mounts);
+		mntput(mnt);
+		goto out;
+	}
+	if (exp2 && ((exp->ex_flags & NFSEXP_CROSSMNT) || EX_NOHIDE(exp2))) {
+		/* successfully crossed mount point */
+		exp_put(exp);
+		*expp = exp2;
+		dput(dentry);
+		*dpp = mounts;
+	} else {
+		if (exp2) exp_put(exp2);
+		dput(mounts);
+	}
+	mntput(mnt);
+out:
+	return err;
+}
+
 /*
  * Look up one component of a pathname.
  * N.B. After this call _both_ fhp and resfh need an fh_put
@@ -154,34 +194,10 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 		 * check if we have crossed a mount point ...
 		 */
 		if (d_mountpoint(dentry)) {
-			struct svc_export *exp2 = NULL;
-			struct vfsmount *mnt = mntget(exp->ex_mnt);
-			struct dentry *mounts = dget(dentry);
-			while (follow_down(&mnt,&mounts)&&d_mountpoint(mounts))
-				;
-
-			exp2 = exp_get_by_name(exp->ex_client, mnt, 
-					       mounts, &rqstp->rq_chandle);
-			if (IS_ERR(exp2)) {
-				err = PTR_ERR(exp2);
-				dput(mounts);
+			if ((err = nfsd_cross_mnt(rqstp, &dentry, &exp))) {
 				dput(dentry);
-				mntput(mnt);
-				goto out;
+				goto out_nfserr;
 			}
-			if (exp2 &&
-			    ((exp->ex_flags & NFSEXP_CROSSMNT)
-			     || EX_NOHIDE(exp2))) {
-				/* successfully crossed mount point */
-				exp_put(exp);
-				exp = exp2;
-				dput(dentry);
-				dentry = mounts;
-			} else {
-				if (exp2) exp_put(exp2);
-				dput(mounts);
-			}
-			mntput(mnt);
 		}
 	}
 	/*

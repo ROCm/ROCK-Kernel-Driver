@@ -320,10 +320,11 @@ static int llc_rtn_all_conns(struct llc_sap *sap)
 {
 	int rc = 0;
 	struct sock *sk;
+	struct hlist_node *node;
 
 	write_lock_bh(&sap->sk_list.lock);
 
-	for (sk = sap->sk_list.list; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &sap->sk_list.list) {
 		llc_sk(sk)->state = LLC_CONN_STATE_TEMP;
 
 		if (llc_send_disc(sk))

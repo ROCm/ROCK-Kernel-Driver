@@ -1906,10 +1906,10 @@ void tcp_destroy_sock(struct sock *sk)
 	BUG_TRAP(sock_flag(sk, SOCK_DEAD));
 
 	/* It cannot be in hash table! */
-	BUG_TRAP(!sk->sk_pprev);
+	BUG_TRAP(sk_unhashed(sk));
 
 	/* If it has not 0 inet_sk(sk)->num, it must be bound */
-	BUG_TRAP(!inet_sk(sk)->num || sk->sk_prev);
+	BUG_TRAP(!inet_sk(sk)->num || tcp_sk(sk)->bind_hash);
 
 #ifdef TCP_DEBUG
 	if (sk->sk_zapped) {
@@ -2164,7 +2164,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tcp_sack_reset(tp);
 	__sk_dst_reset(sk);
 
-	BUG_TRAP(!inet->num || sk->sk_prev);
+	BUG_TRAP(!inet->num || tp->bind_hash);
 
 	sk->sk_error_report(sk);
 	return err;
@@ -2625,7 +2625,7 @@ void __init tcp_init(void)
 		panic("Failed to allocate TCP established hash table\n");
 	for (i = 0; i < (tcp_ehash_size << 1); i++) {
 		tcp_ehash[i].lock = RW_LOCK_UNLOCKED;
-		tcp_ehash[i].chain = NULL;
+		INIT_HLIST_HEAD(&tcp_ehash[i].chain);
 	}
 
 	do {
@@ -2641,7 +2641,7 @@ void __init tcp_init(void)
 		panic("Failed to allocate TCP bind hash table\n");
 	for (i = 0; i < tcp_bhash_size; i++) {
 		tcp_bhash[i].lock = SPIN_LOCK_UNLOCKED;
-		tcp_bhash[i].chain = NULL;
+		INIT_HLIST_HEAD(&tcp_bhash[i].chain);
 	}
 
 	/* Try to be a bit smarter and adjust defaults depending

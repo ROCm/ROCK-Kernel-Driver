@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1992 - 1997, 2000-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 1992 - 1997, 2000-2003 Silicon Graphics, Inc. All rights reserved.
  */
 #ifndef _ASM_IA64_SN_SN2_ARCH_H
 #define _ASM_IA64_SN_SN2_ARCH_H
@@ -46,6 +46,7 @@
 
 
 #define NASID_MASK_BYTES	((MAX_NASIDS + 7) / 8)
+#define CNASID_MASK_BYTES	(NASID_MASK_BYTES / 2)
 
 
 /*

@@ -135,7 +135,7 @@ oakscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 	struct Scsi_Host *host;
 	int ret = -ENOMEM;
 
-	host = scsi_register(&oakscsi_template, sizeof(struct NCR5380_hostdata));
+	host = scsi_host_alloc(&oakscsi_template, sizeof(struct NCR5380_hostdata));
 	if (!host)
 		goto out;
 
@@ -163,7 +163,7 @@ oakscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	release_region(host->io_port, host->n_io_port);
  unreg:
-	scsi_unregister(host);
+	scsi_host_put(host);
  out:
 	return ret;
 }
@@ -176,7 +176,7 @@ static void __devexit oakscsi_remove(struct expansion_card *ec)
 	scsi_remove_host(host);
 
 	release_region(host->io_port, host->n_io_port);
-	scsi_unregister(host);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id oakscsi_cids[] = {

@@ -41,7 +41,6 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/timer.h>
-#include <linux/proc_fs.h>
 #include <linux/pci.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -132,22 +131,6 @@ static inline int check_io_resource(unsigned long b, unsigned long n,
 
 	region = __request_region(resource_parent(b, n, IORESOURCE_IO, dev),
 				  b, n, "check_io_resource");
-	if (!region)
-		return -EBUSY;
-
-	release_resource(region);
-	kfree(region);
-	return 0;
-}
-
-/* FIXME: Fundamentally racy. */
-static inline int check_mem_resource(unsigned long b, unsigned long n,
-				     struct pci_dev *dev)
-{
-	struct resource *region;
-
-	region = __request_region(resource_parent(b, n, IORESOURCE_MEM, dev),
-				  b, n, "check_mem_resource");
 	if (!region)
 		return -EBUSY;
 
@@ -341,52 +324,103 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 ======================================================================*/
 
 /* Validation function for cards with a valid CIS */
-static int cis_readable(struct pcmcia_socket *s, u_long base)
+static int readable(struct pcmcia_socket *s, struct resource *res, cisinfo_t *info)
 {
-    cisinfo_t info1, info2;
-    int ret;
-    s->cis_mem.sys_start = base;
-    s->cis_mem.sys_stop = base+s->cap.map_size-1;
-    s->cis_virt = ioremap(base, s->cap.map_size);
-    ret = pcmcia_validate_cis(s->clients, &info1);
-    /* invalidate mapping and CIS cache */
-    iounmap(s->cis_virt);
-    destroy_cis_cache(s);
-    if ((ret != 0) || (info1.Chains == 0))
-	return 0;
-    s->cis_mem.sys_start = base+s->cap.map_size;
-    s->cis_mem.sys_stop = base+2*s->cap.map_size-1;
-    s->cis_virt = ioremap(base+s->cap.map_size, s->cap.map_size);
-    ret = pcmcia_validate_cis(s->clients, &info2);
-    iounmap(s->cis_virt);
-    destroy_cis_cache(s);
-    return ((ret == 0) && (info1.Chains == info2.Chains));
+	int ret = -1;
+
+	s->cis_mem.sys_start = res->start;
+	s->cis_mem.sys_stop = res->end;
+	s->cis_virt = ioremap(res->start, s->map_size);
+	if (s->cis_virt) {
+		ret = pcmcia_validate_cis(s->clients, info);
+		/* invalidate mapping and CIS cache */
+		iounmap(s->cis_virt);
+		s->cis_virt = NULL;
+		destroy_cis_cache(s);
+	}
+	s->cis_mem.sys_start = 0;
+	s->cis_mem.sys_stop = 0;
+	if ((ret != 0) || (info->Chains == 0))
+		return 0;
+	return 1;
 }
 
 /* Validation function for simple memory cards */
-static int checksum(struct pcmcia_socket *s, u_long base)
+static int checksum(struct pcmcia_socket *s, struct resource *res)
 {
-    int i, a, b, d;
-    s->cis_mem.sys_start = base;
-    s->cis_mem.sys_stop = base+s->cap.map_size-1;
-    s->cis_virt = ioremap(base, s->cap.map_size);
-    s->cis_mem.card_start = 0;
-    s->cis_mem.flags = MAP_ACTIVE;
-    s->ss_entry->set_mem_map(s, &s->cis_mem);
-    /* Don't bother checking every word... */
-    a = 0; b = -1;
-    for (i = 0; i < s->cap.map_size; i += 44) {
-	d = readl(s->cis_virt+i);
-	a += d; b &= d;
-    }
-    iounmap(s->cis_virt);
-    return (b == -1) ? -1 : (a>>1);
+	pccard_mem_map map;
+	int i, a = 0, b = -1, d;
+	void *virt;
+
+	virt = ioremap(res->start, s->map_size);
+	if (virt) {
+		map.map = 0;
+		map.flags = MAP_ACTIVE;
+		map.speed = 0;
+		map.sys_start = res->start;
+		map.sys_stop = res->end;
+		map.card_start = 0;
+		s->ss_entry->set_mem_map(s, &map);
+
+		/* Don't bother checking every word... */
+		for (i = 0; i < s->map_size; i += 44) {
+			d = readl(virt+i);
+			a += d;
+			b &= d;
+		}
+
+		map.flags = 0;
+		s->ss_entry->set_mem_map(s, &map);
+
+		iounmap(virt);
+	}
+
+	return (b == -1) ? -1 : (a>>1);
 }
 
-static int checksum_match(struct pcmcia_socket *s, u_long base)
+static int
+cis_readable(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 {
-    int a = checksum(s, base), b = checksum(s, base+s->cap.map_size);
-    return ((a == b) && (a >= 0));
+	struct resource *res1, *res2;
+	cisinfo_t info1, info2;
+	int ret = 0;
+
+	res1 = request_mem_region(base, size/2, "cs memory probe");
+	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+
+	if (res1 && res2) {
+		ret = readable(s, res1, &info1);
+		ret += readable(s, res2, &info2);
+	}
+
+	if (res2)
+		release_resource(res2);
+	if (res1)
+		release_resource(res1);
+
+	return (ret == 2) && (info1.Chains == info2.Chains);
+}
+
+static int
+checksum_match(struct pcmcia_socket *s, unsigned long base, unsigned long size)
+{
+	struct resource *res1, *res2;
+	int a = -1, b = -1;
+
+	res1 = request_mem_region(base, size/2, "cs memory probe");
+	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+
+	if (res1 && res2) {
+		a = checksum(s, res1);
+		b = checksum(s, res2);
+	}
+
+	if (res2)
+		release_resource(res2);
+	if (res1)
+		release_resource(res1);
+
+	return (a == b) && (a >= 0);
 }
 
 /*======================================================================
@@ -406,20 +440,20 @@ static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
     bad = fail = 0;
     step = (num < 0x20000) ? 0x2000 : ((num>>4) & ~0x1fff);
     /* cis_readable wants to map 2x map_size */
-    if (step < 2 * s->cap.map_size)
-	step = 2 * s->cap.map_size;
+    if (step < 2 * s->map_size)
+	step = 2 * s->map_size;
     for (i = j = base; i < base+num; i = j + step) {
 	if (!fail) {	
-	    for (j = i; j < base+num; j += step)
-		if ((check_mem_resource(j, step, s->cap.cb_dev) == 0) &&
-		    cis_readable(s, j))
+	    for (j = i; j < base+num; j += step) {
+		if (cis_readable(s, j, step))
 		    break;
+	    }
 	    fail = ((i == base) && (j == base+num));
 	}
 	if (fail) {
 	    for (j = i; j < base+num; j += 2*step)
-		if ((check_mem_resource(j, 2*step, s->cap.cb_dev) == 0) &&
-		    checksum_match(s, j) && checksum_match(s, j + step))
+		if (checksum_match(s, j, step) &&
+		    checksum_match(s, j + step, step))
 		    break;
 	}
 	if (i != j) {
@@ -457,7 +491,7 @@ void validate_mem(struct pcmcia_socket *s)
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
     static int hi = 0, lo = 0;
     u_long b, i, ok = 0;
-    int force_low = !(s->cap.features & SS_CAP_PAGE_REGS);
+    int force_low = !(s->features & SS_CAP_PAGE_REGS);
 
     if (!probe_mem)
 	return;
@@ -541,7 +575,7 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 	for (try = (try >= m->base) ? try : try+align;
 	     (try >= m->base) && (try+num <= m->base+m->num);
 	     try += align) {
-	    if (request_io_resource(try, num, name, s->cap.cb_dev) == 0) {
+	    if (request_io_resource(try, num, name, s->cb_dev) == 0) {
 		*base = try;
 		ret = 0;
 		goto out;
@@ -556,24 +590,26 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, struct pcmcia_socket *s)
+		    int low, char *name, struct pcmcia_socket *s)
 {
     u_long try;
     resource_map_t *m;
     int ret = -1;
 
+    low = low || !(s->features & SS_CAP_PAGE_REGS);
+
     down(&rsrc_sem);
     while (1) {
 	for (m = mem_db.next; m != &mem_db; m = m->next) {
 	    /* first pass >1MB, second pass <1MB */
-	    if ((force_low != 0) ^ (m->base < 0x100000))
+	    if ((low != 0) ^ (m->base < 0x100000))
 		continue;
 
 	    try = (m->base & ~(align-1)) + *base;
 	    for (try = (try >= m->base) ? try : try+align;
 		 (try >= m->base) && (try+num <= m->base+m->num);
 		 try += align) {
-		if (request_mem_resource(try, num, name, s->cap.cb_dev) == 0) {
+		if (request_mem_resource(try, num, name, s->cb_dev) == 0) {
 		    *base = try;
 		    ret = 0;
 		    goto out;
@@ -582,9 +618,9 @@ int find_mem_region(u_long *base, u_long num, u_long align,
 		    break;
 	    }
 	}
-	if (force_low)
+	if (low)
 	    break;
-	force_low++;
+	low++;
     }
  out:
     up(&rsrc_sem);

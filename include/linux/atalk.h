@@ -198,7 +198,7 @@ extern void aarp_cleanup_module(void);
 
 #define at_sk(__sk) ((struct atalk_sock *)(__sk)->sk_protinfo)
 
-extern struct sock *atalk_sockets;
+extern struct hlist_head atalk_sockets;
 extern rwlock_t atalk_sockets_lock;
 
 extern struct atalk_route *atalk_routes;

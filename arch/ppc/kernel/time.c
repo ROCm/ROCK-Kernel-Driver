@@ -239,10 +239,13 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-void do_settimeofday(struct timeval *tv)
+int do_settimeofday(struct timespec *tv)
 {
 	unsigned long flags;
-	int tb_delta, new_usec, new_sec;
+	int tb_delta, new_nsec, new_sec;
+
+	if ((unsigned long)tv->tv_nsec >= NSEC_PER_SEC)
+		return -EINVAL;
 
 	write_seqlock_irqsave(&xtime_lock, flags);
 	/* Updating the RTC is not the job of this code. If the time is
@@ -266,12 +269,12 @@ void do_settimeofday(struct timeval *tv)
 	tb_delta = tb_ticks_since(last_jiffy_stamp(smp_processor_id()));
 	tb_delta += (jiffies - wall_jiffies) * tb_ticks_per_jiffy;
 	new_sec = tv->tv_sec;
-	new_usec = tv->tv_usec - mulhwu(tb_to_us, tb_delta);
-	while (new_usec <0) {
+	new_nsec = tv->tv_nsec - 1000 * mulhwu(tb_to_us, tb_delta);
+	while (new_nsec < 0) {
 		new_sec--; 
-		new_usec += 1000000;
+		new_nsec += NSEC_PER_SEC;
 	}
-	xtime.tv_nsec = (new_usec * 1000);
+	xtime.tv_nsec = new_nsec;
 	xtime.tv_sec = new_sec;
 
 	/* In case of a large backwards jump in time with NTP, we want the 
@@ -285,6 +288,7 @@ void do_settimeofday(struct timeval *tv)
 	time_maxerror = NTP_PHASE_LIMIT;
 	time_esterror = NTP_PHASE_LIMIT;
 	write_sequnlock_irqrestore(&xtime_lock, flags);
+	return 0;
 }
 
 /* This function is only called on the boot processor */

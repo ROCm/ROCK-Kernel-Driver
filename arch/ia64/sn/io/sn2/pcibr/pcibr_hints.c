@@ -4,7 +4,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2001-2002 Silicon Graphics, Inc. All rights reserved.
+ * Copyright (C) 2001-2003 Silicon Graphics, Inc. All rights reserved.
  */
 
 #include <linux/types.h>
@@ -27,20 +27,19 @@
 #include <asm/sn/prio.h>
 #include <asm/sn/xtalk/xbow.h>
 #include <asm/sn/ioc3.h>
-#include <asm/sn/eeprom.h>
 #include <asm/sn/io.h>
 #include <asm/sn/sn_private.h>
 
-pcibr_hints_t           pcibr_hints_get(devfs_handle_t, int);
-void                    pcibr_hints_fix_rrbs(devfs_handle_t);
-void                    pcibr_hints_dualslot(devfs_handle_t, pciio_slot_t, pciio_slot_t);
-void			pcibr_hints_intr_bits(devfs_handle_t, pcibr_intr_bits_f *);
-void                    pcibr_set_rrb_callback(devfs_handle_t, rrb_alloc_funct_t);
-void                    pcibr_hints_handsoff(devfs_handle_t);
-void                    pcibr_hints_subdevs(devfs_handle_t, pciio_slot_t, uint64_t);
+pcibr_hints_t           pcibr_hints_get(vertex_hdl_t, int);
+void                    pcibr_hints_fix_rrbs(vertex_hdl_t);
+void                    pcibr_hints_dualslot(vertex_hdl_t, pciio_slot_t, pciio_slot_t);
+void			pcibr_hints_intr_bits(vertex_hdl_t, pcibr_intr_bits_f *);
+void                    pcibr_set_rrb_callback(vertex_hdl_t, rrb_alloc_funct_t);
+void                    pcibr_hints_handsoff(vertex_hdl_t);
+void                    pcibr_hints_subdevs(vertex_hdl_t, pciio_slot_t, uint64_t);
 
 pcibr_hints_t
-pcibr_hints_get(devfs_handle_t xconn_vhdl, int alloc)
+pcibr_hints_get(vertex_hdl_t xconn_vhdl, int alloc)
 {
     arbitrary_info_t        ainfo = 0;
     graph_error_t	    rv;
@@ -79,7 +78,7 @@ abnormal_exit:
 }
 
 void
-pcibr_hints_fix_some_rrbs(devfs_handle_t xconn_vhdl, unsigned mask)
+pcibr_hints_fix_some_rrbs(vertex_hdl_t xconn_vhdl, unsigned mask)
 {
     pcibr_hints_t           hint = pcibr_hints_get(xconn_vhdl, 1);
 
@@ -91,13 +90,13 @@ pcibr_hints_fix_some_rrbs(devfs_handle_t xconn_vhdl, unsigned mask)
 }
 
 void
-pcibr_hints_fix_rrbs(devfs_handle_t xconn_vhdl)
+pcibr_hints_fix_rrbs(vertex_hdl_t xconn_vhdl)
 {
     pcibr_hints_fix_some_rrbs(xconn_vhdl, 0xFF);
 }
 
 void
-pcibr_hints_dualslot(devfs_handle_t xconn_vhdl,
+pcibr_hints_dualslot(vertex_hdl_t xconn_vhdl,
 		     pciio_slot_t host,
 		     pciio_slot_t guest)
 {
@@ -111,7 +110,7 @@ pcibr_hints_dualslot(devfs_handle_t xconn_vhdl,
 }
 
 void
-pcibr_hints_intr_bits(devfs_handle_t xconn_vhdl,
+pcibr_hints_intr_bits(vertex_hdl_t xconn_vhdl,
 		      pcibr_intr_bits_f *xxx_intr_bits)
 {
     pcibr_hints_t           hint = pcibr_hints_get(xconn_vhdl, 1);
@@ -124,7 +123,7 @@ pcibr_hints_intr_bits(devfs_handle_t xconn_vhdl,
 }
 
 void
-pcibr_set_rrb_callback(devfs_handle_t xconn_vhdl, rrb_alloc_funct_t rrb_alloc_funct)
+pcibr_set_rrb_callback(vertex_hdl_t xconn_vhdl, rrb_alloc_funct_t rrb_alloc_funct)
 {
     pcibr_hints_t           hint = pcibr_hints_get(xconn_vhdl, 1);
 
@@ -133,7 +132,7 @@ pcibr_set_rrb_callback(devfs_handle_t xconn_vhdl, rrb_alloc_funct_t rrb_alloc_fu
 }
 
 void
-pcibr_hints_handsoff(devfs_handle_t xconn_vhdl)
+pcibr_hints_handsoff(vertex_hdl_t xconn_vhdl)
 {
     pcibr_hints_t           hint = pcibr_hints_get(xconn_vhdl, 1);
 
@@ -145,13 +144,13 @@ pcibr_hints_handsoff(devfs_handle_t xconn_vhdl)
 }
 
 void
-pcibr_hints_subdevs(devfs_handle_t xconn_vhdl,
+pcibr_hints_subdevs(vertex_hdl_t xconn_vhdl,
 		    pciio_slot_t slot,
 		    uint64_t subdevs)
 {
     arbitrary_info_t        ainfo = 0;
     char                    sdname[16];
-    devfs_handle_t            pconn_vhdl = GRAPH_VERTEX_NONE;
+    vertex_hdl_t            pconn_vhdl = GRAPH_VERTEX_NONE;
 
     sprintf(sdname, "%s/%d", EDGE_LBL_PCI, slot);
     (void) hwgraph_path_add(xconn_vhdl, sdname, &pconn_vhdl);

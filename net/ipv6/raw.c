@@ -53,35 +53,25 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-struct sock *raw_v6_htable[RAWV6_HTABLE_SIZE];
+struct hlist_head raw_v6_htable[RAWV6_HTABLE_SIZE];
 rwlock_t raw_v6_lock = RW_LOCK_UNLOCKED;
 
 static void raw_v6_hash(struct sock *sk)
 {
-	struct sock **skp = &raw_v6_htable[inet_sk(sk)->num &
-					   (RAWV6_HTABLE_SIZE - 1)];
+	struct hlist_head *list = &raw_v6_htable[inet_sk(sk)->num &
+						 (RAWV6_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v6_lock);
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-	*skp = sk;
-	sk->sk_pprev = skp;
+	sk_add_node(sk, list);
 	sock_prot_inc_use(sk->sk_prot);
- 	sock_hold(sk);
  	write_unlock_bh(&raw_v6_lock);
 }
 
 static void raw_v6_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v6_lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-		__sock_put(sk);
-	}
 	write_unlock_bh(&raw_v6_lock);
 }
 
@@ -90,12 +80,12 @@ static void raw_v6_unhash(struct sock *sk)
 struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			     struct in6_addr *loc_addr, struct in6_addr *rmt_addr)
 {
-	struct sock *s = sk;
+	struct hlist_node *node;
 	int addr_type = ipv6_addr_type(loc_addr);
 
-	for (s = sk; s; s = s->sk_next) {
-		if (inet_sk(s)->num == num) {
-			struct ipv6_pinfo *np = inet6_sk(s);
+	sk_for_each_from(sk, node)
+		if (inet_sk(sk)->num == num) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
 
 			if (!ipv6_addr_any(&np->daddr) &&
 			    ipv6_addr_cmp(&np->daddr, rmt_addr))
@@ -103,16 +93,17 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
-					break;
+					goto found;
 				if ((addr_type & IPV6_ADDR_MULTICAST) &&
-				    inet6_mc_check(s, loc_addr, rmt_addr))
-					break;
+				    inet6_mc_check(sk, loc_addr, rmt_addr))
+					goto found;
 				continue;
 			}
-			break;
+			goto found;
 		}
-	}
-	return s;
+	sk = NULL;
+found:
+	return sk;
 }
 
 /*
@@ -156,7 +147,7 @@ void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 	hash = nexthdr & (MAX_INET_PROTOS - 1);
 
 	read_lock(&raw_v6_lock);
-	sk = raw_v6_htable[hash];
+	sk = sk_head(&raw_v6_htable[hash]);
 
 	/*
 	 *	The first socket found will be delivered after
@@ -176,7 +167,7 @@ void ipv6_raw_deliver(struct sk_buff *skb, int nexthdr)
 			if (clone)
 				rawv6_rcv(sk, clone);
 		}
-		sk = __raw_v6_lookup(sk->sk_next, nexthdr, daddr, saddr);
+		sk = __raw_v6_lookup(sk_next(sk), nexthdr, daddr, saddr);
 	}
 out:
 	read_unlock(&raw_v6_lock);
@@ -926,16 +917,16 @@ struct raw6_iter_state {
 
 static struct sock *raw6_get_first(struct seq_file *seq)
 {
-	struct sock *sk = NULL;
+	struct sock *sk;
+	struct hlist_node *node;
 	struct raw6_iter_state* state = raw6_seq_private(seq);
 
-	for (state->bucket = 0; state->bucket < RAWV6_HTABLE_SIZE; ++state->bucket) {
-		sk = raw_v6_htable[state->bucket];
-		while (sk && sk->sk_family != PF_INET6)
-			sk = sk->sk_next;
-		if (sk)
-			break;
-	}
+	for (state->bucket = 0; state->bucket < RAWV6_HTABLE_SIZE; ++state->bucket)
+		sk_for_each(sk, node, &raw_v6_htable[state->bucket])
+			if (sk->sk_family == PF_INET6)
+				goto out;
+	sk = NULL;
+out:
 	return sk;
 }
 
@@ -944,13 +935,13 @@ static struct sock *raw6_get_next(struct seq_file *seq, struct sock *sk)
 	struct raw6_iter_state* state = raw6_seq_private(seq);
 
 	do {
-		sk = sk->sk_next;
+		sk = sk_next(sk);
 try_again:
 		;
 	} while (sk && sk->sk_family != PF_INET6);
 
 	if (!sk && ++state->bucket < RAWV6_HTABLE_SIZE) {
-		sk = raw_v6_htable[state->bucket];
+		sk = sk_head(&raw_v6_htable[state->bucket]);
 		goto try_again;
 	}
 	return sk;

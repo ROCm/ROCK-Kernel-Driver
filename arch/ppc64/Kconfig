@@ -191,37 +191,7 @@ config KCORE_ELF
 	  "-g" option to preserve debugging information. It is mainly used
 	  for examining kernel data structures on the live kernel.
 
-config BINFMT_ELF
-	bool "Kernel support for 64-bit ELF binaries"
-	help
-	  ELF (Executable and Linkable Format) is a format for libraries and
-	  executables used across different architectures and operating
-	  systems.
-
-config BINFMT_MISC
-	tristate "Kernel support for MISC binaries"
-	---help---
-	  If you say Y here, it will be possible to plug wrapper-driven binary
-	  formats into the kernel. You will like this especially when you use
-	  programs that need an interpreter to run like Java, Python or
-	  Emacs-Lisp.  It's also useful if you often run DOS executables under
-	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>).  Once you have
-	  registered such a binary class with the kernel, you can start one of
-	  those programs simply by typing in its name at a shell prompt; Linux
-	  will automatically feed it to the correct interpreter.
-
-	  You can do other nice things, too. Read the file
-	  <file:Documentation/binfmt_misc.txt> to learn how to use this
-	  feature, and <file:Documentation/java.txt> for information about how
-	  to include Java support.
-
-	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
-	  use this part of the kernel.
-
-	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc. If you
-	  don't know what to answer at this point, say Y.
+source "fs/Kconfig.binfmt"
 
 source "drivers/pci/Kconfig"
 

@@ -31,6 +31,7 @@
 
 #include <asm/types.h>
 #include <asm/byteorder.h>
+#include <linux/list.h>
 #include <linux/poll.h>
 #include <net/sock.h>
 
@@ -119,8 +120,8 @@ struct bt_sock {
 };
 
 struct bt_sock_list {
-	struct sock *head;
-	rwlock_t     lock;
+	struct hlist_head head;
+	rwlock_t	  lock;
 };
 
 int  bt_sock_register(int proto, struct net_proto_family *ops);

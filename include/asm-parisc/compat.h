@@ -4,6 +4,7 @@
  * Architecture specific compatibility types
  */
 #include <linux/types.h>
+#include <linux/sched.h>
 
 #define COMPAT_USER_HZ 100
 
@@ -122,6 +123,14 @@ typedef	u32		compat_uptr_t;
 static inline void *compat_ptr(compat_uptr_t uptr)
 {
 	return (void *)(unsigned long)uptr;
+}
+
+static __inline__ void *compat_alloc_user_space(long len)
+{
+	struct pt_regs *regs = &current->thread.regs;
+	unsigned long usp = regs->gr[30];
+
+	return (void *)(usp + len);
 }
 
 #endif /* _ASM_PARISC_COMPAT_H */

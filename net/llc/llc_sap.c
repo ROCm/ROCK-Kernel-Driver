@@ -34,12 +34,7 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
 {
 	write_lock_bh(&sap->sk_list.lock);
 	llc_sk(sk)->sap = sap;
-	sk->sk_next = sap->sk_list.list;
-	if (sk->sk_next)
-		sap->sk_list.list->sk_pprev = &sk->sk_next;
-	sap->sk_list.list = sk;
-	sk->sk_pprev = &sap->sk_list.list;
-	sock_hold(sk);
+	sk_add_node(sk, &sap->sk_list.list);
 	write_unlock_bh(&sap->sk_list.lock);
 }
 
@@ -48,22 +43,13 @@ void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
  *	@sap: SAP
  *	@sk: pointer to connection
  *
- *	This function removes a connection from sk_list.list of a SAP.
+ *	This function removes a connection from sk_list.list of a SAP if
+ *	the connection was in this list.
  */
 void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
 {
 	write_lock_bh(&sap->sk_list.lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev  = NULL;
-		/*
-		 * This only makes sense if the socket was inserted on the
-		 * list, if sk->sk_pprev is NULL it wasn't
-		 */
-		sock_put(sk);
-	}
+	sk_del_node_init(sk);
 	write_unlock_bh(&sap->sk_list.lock);
 }
 

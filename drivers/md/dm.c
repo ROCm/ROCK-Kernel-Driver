@@ -569,7 +569,7 @@ static int next_free_minor(unsigned int *minor)
 /*
  * Allocate and initialise a blank device with a given minor.
  */
-static struct mapped_device *alloc_dev(unsigned int minor)
+static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 {
 	int r;
 	struct mapped_device *md = kmalloc(sizeof(*md), GFP_KERNEL);
@@ -580,7 +580,7 @@ static struct mapped_device *alloc_dev(unsigned int minor)
 	}
 
 	/* get a minor number for the dev */
-	r = (minor < 0) ? next_free_minor(&minor) : specific_minor(minor);
+	r = persistent ? specific_minor(minor) : next_free_minor(&minor);
 	if (r < 0) {
 		kfree(md);
 		return NULL;
@@ -660,13 +660,13 @@ static void __unbind(struct mapped_device *md)
 /*
  * Constructor for a new device.
  */
-int dm_create(unsigned int minor, struct dm_table *table,
-	      struct mapped_device **result)
+static int create_aux(unsigned int minor, int persistent,
+		      struct dm_table *table, struct mapped_device **result)
 {
 	int r;
 	struct mapped_device *md;
 
-	md = alloc_dev(minor);
+	md = alloc_dev(minor, persistent);
 	if (!md)
 		return -ENXIO;
 
@@ -679,6 +679,17 @@ int dm_create(unsigned int minor, struct dm_table *table,
 
 	*result = md;
 	return 0;
+}
+
+int dm_create(struct dm_table *table, struct mapped_device **result)
+{
+	return create_aux(0, 0, table, result);
+}
+
+int dm_create_with_minor(unsigned int minor,
+			 struct dm_table *table, struct mapped_device **result)
+{
+	return create_aux(minor, 1, table, result);
 }
 
 void dm_get(struct mapped_device *md)

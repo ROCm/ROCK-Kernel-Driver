@@ -62,6 +62,20 @@ config SENSORS_LM85
 	  in the lm_sensors package, which you can download at 
 	  http://www.lm-sensors.nu
 	  
+config SENSORS_LM78
+	tristate "  National Semiconductors LM78 and compatibles"
+	depends on I2C && EXPERIMENTAL
+	help
+	  If you say yes here you get support for National Semiconductor LM78,
+	  LM78-J and LM79.  This can also be built as a module which can be
+	  inserted and removed while the kernel is running.
+
+	  The module will be called lm78.
+
+	  You will also need the latest user-space utilties: you can find them
+	  in the lm_sensors package, which you can download at 
+	  http://www.lm-sensors.nu
+	  
 config SENSORS_VIA686A
 	tristate "  VIA686A"
 	depends on I2C && EXPERIMENTAL

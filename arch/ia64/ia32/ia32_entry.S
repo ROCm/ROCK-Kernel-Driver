@@ -44,14 +44,8 @@ ENTRY(ia32_clone)
 	br.call.sptk.many rp=do_fork
 .ret0:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
-	mov r2=-1000
-	adds r3=IA64_TASK_PID_OFFSET,r8
-	;;
-	cmp.leu p6,p0=r8,r2
 	mov ar.pfs=loc1
 	mov rp=loc0
-	;;
-(p6)	ld4 r8=[r3]
 	br.ret.sptk.many rp
 END(ia32_clone)
 
@@ -183,14 +177,8 @@ GLOBAL_ENTRY(sys32_fork)
 	br.call.sptk.few rp=do_fork
 .ret5:	.restore sp
 	adds sp=IA64_SWITCH_STACK_SIZE,sp	// pop the switch stack
-	mov r2=-1000
-	adds r3=IA64_TASK_PID_OFFSET,r8
-	;;
-	cmp.leu p6,p0=r8,r2
 	mov ar.pfs=loc1
 	mov rp=loc0
-	;;
-(p6)	ld4 r8=[r3]
 	br.ret.sptk.many rp
 END(sys32_fork)
 
@@ -439,8 +427,8 @@ ia32_syscall_table:
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 compat_sys_futex	/* 240 */
-	data8 compat_sys_setaffinity
-	data8 compat_sys_getaffinity
+	data8 compat_sys_sched_setaffinity
+	data8 compat_sys_sched_getaffinity
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall
 	data8 sys_ni_syscall	/* 245 */

@@ -97,7 +97,7 @@ struct sctp_bind_bucket {
 	unsigned short	fastreuse;
 	struct sctp_bind_bucket *next;
 	struct sctp_bind_bucket **pprev;
-	struct sock	        *sk;
+	struct hlist_head       sk_list;
 };
 
 struct sctp_bind_hashbucket {
@@ -313,6 +313,7 @@ struct sctp_opt {
 	/* What is our base endpointer? */
 	struct sctp_endpoint *ep;
 
+	struct sctp_bind_bucket *bind_hash;
 	/* Various Socket Options.  */
 	__u16 default_stream;
 	__u32 default_ppid;

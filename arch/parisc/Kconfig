@@ -103,11 +103,6 @@ config PARISC64
 	  enable this option otherwise. The 64bit kernel is significantly bigger
 	  and slower than the 32bit one.
 
-config COMPAT
-	bool
-	depends on PARISC64
-	default y
-
 config PDC_NARROW
 	bool "32-bit firmware"
 	depends on PARISC64
@@ -145,6 +140,14 @@ config PREEMPT
 #	bool "Preemptible Kernel"
 	default n
 
+config COMPAT
+	bool
+	depends on PARISC64
+	default y
+
+config HPUX
+	bool "Support for HP-UX binaries"
+
 config NR_CPUS
 	int "Maximum number of CPUs (2-32)"
 	depends on SMP
@@ -163,65 +166,7 @@ config KCORE_ELF
 	depends on PROC_FS
 	default y
 
-config BINFMT_SOM
-	tristate "Kernel support for SOM binaries"
-	help
-	  SOM is a binary executable format inherited from HP/UX.  Say Y here
-	  to be able to load and execute SOM binaries directly.
-
-config BINFMT_ELF
-	tristate "Kernel support for ELF binaries"
-	---help---
-	  ELF (Executable and Linkable Format) is a format for libraries and
-	  executables used across different architectures and operating
-	  systems. Saying Y here will enable your kernel to run ELF binaries
-	  and enlarge it by about 13 KB. ELF support under Linux has now all
-	  but replaced the traditional Linux a.out formats (QMAGIC and ZMAGIC)
-	  because it is portable (this does *not* mean that you will be able
-	  to run executables from different architectures or operating systems
-	  however) and makes building run-time libraries very easy. Many new
-	  executables are distributed solely in ELF format. You definitely
-	  want to say Y here.
-
-	  Information about ELF is contained in the ELF HOWTO available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  If you find that after upgrading from Linux kernel 1.2 and saying Y
-	  here, you still can't run any ELF binaries (they just crash), then
-	  you'll have to install the newest ELF runtime libraries, including
-	  ld.so (check the file <file:Documentation/Changes> for location and
-	  latest version).
-
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf. Saying M or N here is dangerous because
-	  some crucial programs on your system might be in ELF format.
-
-config BINFMT_MISC
-	tristate "Kernel support for MISC binaries"
-	---help---
-	  If you say Y here, it will be possible to plug wrapper-driven binary
-	  formats into the kernel. You will like this especially when you use
-	  programs that need an interpreter to run like Java, Python or
-	  Emacs-Lisp. It's also useful if you often run DOS executables under
-	  the Linux DOS emulator DOSEMU (read the DOSEMU-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>). Once you have
-	  registered such a binary class with the kernel, you can start one of
-	  those programs simply by typing in its name at a shell prompt; Linux
-	  will automatically feed it to the correct interpreter.
-
-	  You can do other nice things, too. Read the file
-	  <file:Documentation/binfmt_misc.txt> to learn how to use this
-	  feature, and <file:Documentation/java.txt> for information about how
-	  to include Java support.
-
-	  You must say Y to "/proc file system support" (CONFIG_PROC_FS) to
-	  use this part of the kernel.
-
-	  You may say M here for module support and later load the module when
-	  you have use for it; the module is called binfmt_misc. If you
-	  don't know what to answer at this point, say Y.
+source "fs/Kconfig.binfmt"
 
 endmenu
 

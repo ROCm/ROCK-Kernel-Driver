@@ -200,8 +200,6 @@ void show_regs(struct pt_regs *regs)
 	show_trace(&regs->rsp);
 }
 
-extern void load_gs_index(unsigned);
-
 /*
  * Free current thread data structures etc..
  */

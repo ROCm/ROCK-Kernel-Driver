@@ -93,10 +93,13 @@ out:
 static __inline__ struct sock *x25_get_socket_idx(loff_t pos)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
-	for (s = x25_list; pos && s; s = s->sk_next)
-		--pos;
-
+	sk_for_each(s, node, &x25_list)
+		if (!pos--)
+			goto found;
+	s = NULL;
+found:
 	return s;
 }
 
@@ -114,13 +117,10 @@ static void *x25_seq_socket_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 	if (v == (void *)1) {
-		s = NULL;
-		if (x25_list)
-			s = x25_list;
+		s = sk_head(&x25_list);
 		goto out;
 	}
-	s = v;
-	s = s->sk_next;
+	s = sk_next(v);
 out:
 	return s;
 }

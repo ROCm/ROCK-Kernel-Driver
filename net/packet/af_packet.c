@@ -140,7 +140,7 @@ dev->hard_header == NULL (ll header is added by device, we cannot control it)
  */
 
 /* List of all packet sockets. */
-static struct sock * packet_sklist;
+HLIST_HEAD(packet_sklist);
 static rwlock_t packet_sklist_lock = RW_LOCK_UNLOCKED;
 
 atomic_t packet_socks_nr;
@@ -753,19 +753,12 @@ static int packet_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct packet_opt *po = pkt_sk(sk);
-	struct sock **skp;
 
 	if (!sk)
 		return 0;
 
 	write_lock_bh(&packet_sklist_lock);
-	for (skp = &packet_sklist; *skp; skp = &(*skp)->sk_next) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	sk_del_node_init(sk);
 	write_unlock_bh(&packet_sklist_lock);
 
 	/*
@@ -989,9 +982,7 @@ static int packet_create(struct socket *sock, int protocol)
 	}
 
 	write_lock_bh(&packet_sklist_lock);
-	sk->sk_next = packet_sklist;
-	packet_sklist = sk;
-	sock_hold(sk);
+	sk_add_node(sk, &packet_sklist);
 	write_unlock_bh(&packet_sklist_lock);
 	return(0);
 
@@ -1369,10 +1360,11 @@ int packet_getsockopt(struct socket *sock, int level, int optname,
 static int packet_notifier(struct notifier_block *this, unsigned long msg, void *data)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	struct net_device *dev = (struct net_device*)data;
 
 	read_lock(&packet_sklist_lock);
-	for (sk = packet_sklist; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &packet_sklist) {
 		struct packet_opt *po = pkt_sk(sk);
 
 		switch (msg) {
@@ -1777,12 +1769,13 @@ static int packet_read_proc(char *buffer, char **start, off_t offset,
 	off_t begin=0;
 	int len=0;
 	struct sock *s;
+	struct hlist_node *node;
 	
 	len+= sprintf(buffer,"sk       RefCnt Type Proto  Iface R Rmem   User   Inode\n");
 
 	read_lock(&packet_sklist_lock);
 
-	for (s = packet_sklist; s; s = s->sk_next) {
+	sk_for_each(s, node, &packet_sklist) {
 		struct packet_opt *po = pkt_sk(s);
 
 		len+=sprintf(buffer+len,"%p %-6d %-4d %04x   %-5d %1d %-6u %-6u %-6lu",

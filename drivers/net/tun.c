@@ -179,7 +179,7 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 	size_t len = count;
 
 	if (!(tun->flags & TUN_NO_PI)) {
-		if ((len -= sizeof(pi)) < 0)
+		if ((len -= sizeof(pi)) > len)
 			return -EINVAL;
 
 		memcpy_fromiovec((void *)&pi, iv, sizeof(pi));
@@ -404,6 +404,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 			return -ENOMEM;
 
 		tun = dev->priv;
+		tun->dev = dev;
 		tun->flags = flags;
 
 		if (strchr(dev->name, '%')) {
@@ -566,8 +567,6 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 
 	rtnl_unlock();
 
-	if (!(tun->flags & TUN_PERSIST)) 
-		kfree(tun);
 	return 0;
 }
 

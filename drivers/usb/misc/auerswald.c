@@ -149,8 +149,8 @@ do {			\
 /* External data structures / Interface                              */
 typedef struct
 {
-        char *buf;               /* return buffer for string contents */
-        unsigned int bsize;      /* size of return buffer */
+	char __user *buf;	/* return buffer for string contents */
+	unsigned int bsize;	/* size of return buffer */
 } audevinfo_t,*paudevinfo_t;
 
 /* IO controls */
@@ -1548,7 +1548,7 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 	/* get a string descriptor for the device */
 	case IOCTL_AU_DEVINFO:
 		dbg ("IOCTL_AU_DEVINFO");
-                if (copy_from_user (&devinfo, (void *) arg, sizeof (audevinfo_t))) {
+                if (copy_from_user (&devinfo, (void __user *) arg, sizeof (audevinfo_t))) {
         		ret = -EFAULT;
 	        	break;
                 }
@@ -1578,7 +1578,7 @@ static int auerchar_ioctl (struct inode *inode, struct file *file, unsigned int 
 }
 
 /* Read data from the device */
-static ssize_t auerchar_read (struct file *file, char *buf, size_t count, loff_t * ppos)
+static ssize_t auerchar_read (struct file *file, char __user *buf, size_t count, loff_t * ppos)
 {
         unsigned long flags;
 	pauerchar_t ccp = (pauerchar_t) file->private_data;
@@ -1708,7 +1708,7 @@ doreadlist:
 
 
 /* Write a data block into the right service channel of the device */
-static ssize_t auerchar_write (struct file *file, const char *buf, size_t len, loff_t *ppos)
+static ssize_t auerchar_write (struct file *file, const char __user *buf, size_t len, loff_t *ppos)
 {
 	pauerchar_t ccp = (pauerchar_t) file->private_data;
         pauerswald_t cp = NULL;

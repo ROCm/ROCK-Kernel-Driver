@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <asm/scatterlist.h>
 #include <asm/io.h>
+#include <asm/pci-bridge.h>
 
 struct pci_dev;
 

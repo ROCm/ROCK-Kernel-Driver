@@ -206,7 +206,7 @@ void setup_arch(char **cmdline_p)
 	printk("based on 2.0.38 port by Lineo Inc. <mleslie@lineo.com>.\n");
 #endif
 #ifdef CONFIG_DRAGEN2
-	printk("Dragon Engine II board support by Georges Menie\n");
+	printk("DragonEngine II board support by Georges Menie\n");
 #endif
 
 #ifdef DEBUG

@@ -229,7 +229,8 @@ static char *aac_get_status_string(u32 status);
 int aac_get_containers(struct aac_dev *dev)
 {
 	struct fsa_scsi_hba *fsa_dev_ptr;
-	u32 index, status = 0;
+	u32 index; 
+	int status = 0;
 	struct aac_query_mount *dinfo;
 	struct aac_mount *dresp;
 	struct fib * fibptr;

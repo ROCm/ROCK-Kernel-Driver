@@ -811,7 +811,7 @@ void __init mp_register_lapic (
 
 	processor.mpc_type = MP_PROCESSOR;
 	processor.mpc_apicid = id;
-	processor.mpc_apicver = 0x10; /* TBD: lapic version */
+	processor.mpc_apicver = GET_APIC_VERSION(apic_read(APIC_LVR));
 	processor.mpc_cpuflag = (enabled ? CPU_ENABLED : 0);
 	processor.mpc_cpuflag |= (boot_cpu ? CPU_BOOTPROCESSOR : 0);
 	processor.mpc_cpufeature = (boot_cpu_data.x86 << 8) | 
@@ -948,7 +948,7 @@ void __init mp_override_legacy_irq (
 	 */
 	for (i = 0; i < mp_irq_entries; i++) {
 		if ((mp_irqs[i].mpc_dstapic == intsrc.mpc_dstapic) 
-			&& (mp_irqs[i].mpc_dstirq == intsrc.mpc_dstirq)) {
+			&& (mp_irqs[i].mpc_srcbusirq == intsrc.mpc_srcbusirq)) {
 			mp_irqs[i] = intsrc;
 			found = 1;
 			break;
@@ -1106,6 +1106,8 @@ void __init mp_parse_prt (void)
 			continue;
 		ioapic_pin = irq - mp_ioapic_routing[ioapic].irq_start;
 
+		if (!ioapic && (irq < 16))
+			irq += 16;
 		/* 
 		 * Avoid pin reprogramming.  PRTs typically include entries  
 		 * with redundant pin->irq mappings (but unique PCI devices);

@@ -355,8 +355,16 @@ struct net_device
 	spinlock_t		queue_lock;
 	/* Number of references to this device */
 	atomic_t		refcnt;
-	/* The flag marking that device is unregistered, but held by an user */
-	int			deadbeaf;
+	/* delayed register/unregister */
+	struct list_head	todo_list;
+
+	/* register/unregister state machine */
+	enum { NETREG_UNINITIALIZED=0,
+	       NETREG_REGISTERING,	/* called register_netdevice */
+	       NETREG_REGISTERED,	/* completed register todo */
+	       NETREG_UNREGISTERING,	/* called unregister_netdevice */
+	       NETREG_UNREGISTERED,	/* completed unregister todo */
+	} reg_state;
 
 	/* Net device features */
 	int			features;

@@ -35,8 +35,8 @@ struct llc_sap {
 	struct llc_addr	    laddr;
 	struct list_head    node;
 	struct {
-		rwlock_t    lock;
-		struct sock *list;
+		rwlock_t	  lock;
+		struct hlist_head list;
 	} sk_list;
 };
 

@@ -115,14 +115,15 @@ static void rfcomm_sk_state_change(struct rfcomm_dlc *d, int err)
 static struct sock *__rfcomm_get_sock_by_addr(u8 channel, bdaddr_t *src)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 
-	for (sk = rfcomm_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &rfcomm_sk_list.head) {
 		if (rfcomm_pi(sk)->channel == channel && 
 				!bacmp(&bt_sk(sk)->src, src))
 			break;
 	}
 
-	return sk;
+	return node ? sk : NULL;
 }
 
 /* Find socket with channel and source bdaddr.
@@ -131,8 +132,9 @@ static struct sock *__rfcomm_get_sock_by_addr(u8 channel, bdaddr_t *src)
 static struct sock *__rfcomm_get_sock_by_channel(int state, u8 channel, bdaddr_t *src)
 {
 	struct sock *sk, *sk1 = NULL;
+	struct hlist_node *node;
 
-	for (sk = rfcomm_sk_list.head; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &rfcomm_sk_list.head) {
 		if (state && sk->sk_state != state)
 			continue;
 
@@ -146,7 +148,7 @@ static struct sock *__rfcomm_get_sock_by_channel(int state, u8 channel, bdaddr_t
 				sk1 = sk;
 		}
 	}
-	return sk ? sk : sk1;
+	return node ? sk : sk1;
 }
 
 /* Find socket with given address (channel, src).
@@ -775,11 +777,12 @@ done:
 static void *rfcomm_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	loff_t l = *pos;
 
 	read_lock_bh(&rfcomm_sk_list.lock);
 
-	for (sk = rfcomm_sk_list.head; sk; sk = sk->sk_next)
+	sk_for_each(sk, node, &rfcomm_sk_list.head)
 		if (!l--)
 			return sk;
 	return NULL;
@@ -789,7 +792,7 @@ static void *rfcomm_seq_next(struct seq_file *seq, void *e, loff_t *pos)
 {
 	struct sock *sk = e;
 	(*pos)++;
-	return sk->sk_next;
+	return sk_next(sk);
 }
 
 static void rfcomm_seq_stop(struct seq_file *seq, void *e)

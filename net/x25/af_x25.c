@@ -66,7 +66,7 @@ int sysctl_x25_reset_request_timeout   = X25_DEFAULT_T22;
 int sysctl_x25_clear_request_timeout   = X25_DEFAULT_T23;
 int sysctl_x25_ack_holdback_timeout    = X25_DEFAULT_T2;
 
-struct sock *x25_list;
+HLIST_HEAD(x25_list);
 rwlock_t x25_list_lock = RW_LOCK_UNLOCKED;
 
 static struct proto_ops x25_proto_ops;
@@ -153,22 +153,8 @@ int x25_addr_aton(unsigned char *p, struct x25_address *called_addr,
  */
 static void x25_remove_socket(struct sock *sk)
 {
-	struct sock *s;
-
 	write_lock_bh(&x25_list_lock);
-
-	if ((s = x25_list) == sk)
-		x25_list = s->sk_next;
-	else while (s && s->sk_next) {
-		if (s->sk_next == sk) {
-			s->sk_next = sk->sk_next;
-			sock_put(sk);
-			break;
-		}
-
-		s = s->sk_next;
-	}
-
+	sk_del_node_init(sk);
 	write_unlock_bh(&x25_list_lock);
 }
 
@@ -178,10 +164,11 @@ static void x25_remove_socket(struct sock *sk)
 static void x25_kill_by_device(struct net_device *dev)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	write_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->sk_next)
+	sk_for_each(s, node, &x25_list)
 		if (x25_sk(s)->neighbour && x25_sk(s)->neighbour->dev == dev)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 
@@ -230,9 +217,7 @@ static int x25_device_event(struct notifier_block *this, unsigned long event,
 static void x25_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&x25_list_lock);
-	sk->sk_next = x25_list;
-	x25_list = sk;
-	sock_hold(sk);
+	sk_add_node(sk, &x25_list);
 	write_unlock_bh(&x25_list_lock);
 }
 
@@ -243,19 +228,21 @@ static void x25_insert_socket(struct sock *sk)
 static struct sock *x25_find_listener(struct x25_address *addr)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	read_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->sk_next)
+	sk_for_each(s, node, &x25_list)
 		if ((!strcmp(addr->x25_addr,
 			     x25_sk(s)->source_addr.x25_addr) ||
 		     !strcmp(addr->x25_addr,
 			     null_x25_address.x25_addr)) &&
-		     s->sk_state == TCP_LISTEN)
-			break;
-
-	if (s)
-		sock_hold(s);
+		     s->sk_state == TCP_LISTEN) {
+			sock_hold(s);
+			goto found;
+		}
+	s = NULL;
+found:
 	read_unlock_bh(&x25_list_lock);
 	return s;
 }
@@ -266,12 +253,15 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 struct sock *__x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
-	for (s = x25_list; s; s = s->sk_next)
-		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == nb)
-			break;
-	if (s)
-		sock_hold(s);
+	sk_for_each(s, node, &x25_list)
+		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == nb) {
+			sock_hold(s);
+			goto found;
+		}
+	s = NULL;
+found:
 	return s;
 }
 
@@ -1359,10 +1349,11 @@ struct notifier_block x25_dev_notifier = {
 void x25_kill_by_neigh(struct x25_neigh *nb)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	write_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->sk_next)
+	sk_for_each(s, node, &x25_list)
 		if (x25_sk(s)->neighbour == nb)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 

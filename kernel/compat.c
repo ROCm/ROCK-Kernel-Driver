@@ -354,6 +354,8 @@ asmlinkage long compat_sys_getrusage(int who, struct compat_rusage *ru)
 
 	if (put_compat_rusage(ru, &r))
 		return -EFAULT;
+
+	return 0;
 }
 
 asmlinkage long

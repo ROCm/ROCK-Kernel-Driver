@@ -57,8 +57,8 @@
 /* "do nothing" functions for protocol drivers */
 static void null_rx(struct net_device *dev, int bufnum,
 		    struct archdr *pkthdr, int length);
-static int null_build_header(struct sk_buff *skb, unsigned short type,
-			     uint8_t daddr);
+static int null_build_header(struct sk_buff *skb, struct net_device *dev,
+			     unsigned short type, uint8_t daddr);
 static int null_prepare_tx(struct net_device *dev, struct archdr *pkt,
 			   int length, int bufnum);
 
@@ -479,7 +479,7 @@ static int arcnet_header(struct sk_buff *skb, struct net_device *dev,
 		       arc_bcast_proto->suffix);
 		proto = arc_bcast_proto;
 	}
-	return proto->build_header(skb, type, _daddr);
+	return proto->build_header(skb, dev, type, _daddr);
 }
 
 
@@ -495,6 +495,7 @@ static int arcnet_rebuild_header(struct sk_buff *skb)
 	int status = 0;		/* default is failure */
 	unsigned short type;
 	uint8_t daddr=0;
+	struct ArcProto *proto;
 
 	if (skb->nh.raw - skb->mac.raw != 2) {
 		BUGMSG(D_NORMAL,
@@ -523,7 +524,8 @@ static int arcnet_rebuild_header(struct sk_buff *skb)
 		return 0;
 
 	/* add the _real_ header this time! */
-	arc_proto_map[lp->default_proto[daddr]]->build_header(skb, type, daddr);
+	proto = arc_proto_map[lp->default_proto[daddr]];
+	proto->build_header(skb, dev, type, daddr);
 
 	return 1;		/* success */
 }
@@ -952,10 +954,9 @@ static void null_rx(struct net_device *dev, int bufnum,
 }
 
 
-static int null_build_header(struct sk_buff *skb, unsigned short type,
-			     uint8_t daddr)
+static int null_build_header(struct sk_buff *skb, struct net_device *dev,
+			     unsigned short type, uint8_t daddr)
 {
-	struct net_device *dev = skb->dev;
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
 
 	BUGMSG(D_PROTO,

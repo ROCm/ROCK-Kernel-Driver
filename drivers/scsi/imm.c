@@ -113,7 +113,6 @@ static Scsi_Host_Template driver_template = {
 	.name				= "Iomega VPI2 (imm) interface",
 	.detect				= imm_detect,
 	.release			= imm_release,
-	.command			= imm_command,
 	.queuecommand			= imm_queuecommand,
 	.eh_abort_handler               = imm_abort,
 	.eh_bus_reset_handler           = imm_reset,
@@ -856,39 +855,6 @@ static int imm_completion(Scsi_Cmnd * cmd)
 	    return 0;
     }
     return 1;			/* FINISH_RETURN */
-}
-
-/* deprecated synchronous interface */
-int imm_command(Scsi_Cmnd * cmd)
-{
-    static int first_pass = 1;
-    int host_no = cmd->device->host->unique_id;
-
-    if (first_pass) {
-	printk("imm: using non-queuing interface\n");
-	first_pass = 0;
-    }
-    if (imm_hosts[host_no].cur_cmd) {
-	printk("IMM: bug in imm_command\n");
-	return 0;
-    }
-    imm_hosts[host_no].failed = 0;
-    imm_hosts[host_no].jstart = jiffies;
-    imm_hosts[host_no].cur_cmd = cmd;
-    cmd->result = DID_ERROR << 16;	/* default return code */
-    cmd->SCp.phase = 0;
-
-    imm_pb_claim(host_no);
-
-    while (imm_engine(&imm_hosts[host_no], cmd))
-	schedule();
-
-    if (cmd->SCp.phase)		/* Only disconnect if we have connected */
-	imm_disconnect(cmd->device->host->unique_id);
-
-    imm_pb_release(host_no);
-    imm_hosts[host_no].cur_cmd = 0;
-    return cmd->result;
 }
 
 /*

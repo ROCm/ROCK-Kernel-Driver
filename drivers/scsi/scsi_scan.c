@@ -27,6 +27,7 @@
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/blk.h>
 
@@ -72,29 +73,9 @@ static unsigned int max_scsi_luns = MAX_SCSI_LUNS;
 static unsigned int max_scsi_luns = 1;
 #endif
 
-#ifdef MODULE
-MODULE_PARM(max_scsi_luns, "i");
-MODULE_PARM_DESC(max_scsi_luns,
+module_param_named(max_luns, max_scsi_luns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_luns,
 		 "last scsi LUN (should be between 1 and 2^32-1)");
-#else
-
-static int __init scsi_luns_setup(char *str)
-{
-	unsigned int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		max_scsi_luns = tmp;
-		return 1;
-	} else {
-		printk(KERN_WARNING "scsi_luns_setup: usage max_scsi_luns=n "
-		       "(n should be between 1 and 2^32-1)\n");
-		return 0;
-	}
-}
-
-__setup("max_scsi_luns=", scsi_luns_setup);
-
-#endif
 
 #ifdef CONFIG_SCSI_REPORT_LUNS
 /*
@@ -106,29 +87,10 @@ __setup("max_scsi_luns=", scsi_luns_setup);
  */
 static unsigned int max_scsi_report_luns = 128;
 
-#ifdef MODULE
-MODULE_PARM(max_scsi_report_luns, "i");
-MODULE_PARM_DESC(max_scsi_report_luns,
+module_param_named(max_report_luns, max_scsi_report_luns, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
-#else
-static int __init scsi_report_luns_setup(char *str)
-{
-	unsigned int tmp;
-
-	if (get_option(&str, &tmp) == 1) {
-		max_scsi_report_luns = tmp;
-		return 1;
-	} else {
-		printk(KERN_WARNING "scsi_report_luns_setup: usage"
-		       " max_scsi_report_luns=n (n should be between 1"
-		       " and 16384)\n");
-		return 0;
-	}
-}
-
-__setup("max_scsi_report_luns=", scsi_report_luns_setup);
-#endif
 #endif
 
 /**
@@ -141,7 +103,8 @@ __setup("max_scsi_report_luns=", scsi_report_luns_setup);
  *     @sreq to unlock a device, storing the (unused) results into result.
  *     Called for BLIST_KEY devices.
  **/
-static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
+static void scsi_unlock_floptical(struct scsi_request *sreq,
+				  unsigned char *result)
 {
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 
@@ -154,8 +117,7 @@ static void scsi_unlock_floptical(Scsi_Request *sreq, unsigned char *result)
 	scsi_cmd[5] = 0;
 	sreq->sr_cmd_len = 0;
 	sreq->sr_data_direction = SCSI_DATA_READ;
-	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) result, 0x2a /* size */,
-		      SCSI_TIMEOUT, 3);
+	scsi_wait_req(sreq, scsi_cmd, result, 0x2a /* size */, SCSI_TIMEOUT, 3);
 }
 
 /**
@@ -354,10 +316,10 @@ void scsi_free_sdev(struct scsi_device *sdev)
  *     are copied to the Scsi_Device at @sreq->sr_device (sdev);
  *     any flags value is stored in *@bflags.
  **/
-static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
+static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 			   int *bflags)
 {
-	Scsi_Device *sdev = sreq->sr_device;	/* a bit ugly */
+	struct scsi_device *sdev = sreq->sr_device;	/* a bit ugly */
 	unsigned char scsi_cmd[MAX_COMMAND_SIZE];
 	int possible_inq_resp_len;
 
@@ -522,7 +484,7 @@ static void scsi_set_name(struct scsi_device *sdev, char *inq_result)
  *     SCSI_SCAN_NO_RESPONSE: could not allocate or setup a Scsi_Device
  *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
  **/
-static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
+static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 {
 	struct scsi_device *sdev_sibling;
 	struct scsi_target *starget;
@@ -578,8 +540,6 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	default:
 		printk(KERN_INFO "scsi: unknown device type %d\n", sdev->type);
 	}
-
-	sdev->random = (sdev->type == TYPE_TAPE) ? 0 : 1;
 
 	scsi_set_name(sdev, inq_result);
 
@@ -685,6 +645,9 @@ static int scsi_add_lun(Scsi_Device *sdev, char *inq_result, int *bflags)
 	/* if the device needs this changing, it may do so in the detect
 	 * function */
 	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
+
+	sdev->use_10_for_rw = 1;
+	sdev->use_10_for_ms = 0;
 
 	if(sdev->host->hostt->slave_configure)
 		sdev->host->hostt->slave_configure(sdev);

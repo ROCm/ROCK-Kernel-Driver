@@ -472,30 +472,37 @@ static void
 rpc_depopulate(struct dentry *parent)
 {
 	struct inode *dir = parent->d_inode;
-	HLIST_HEAD(head);
 	struct list_head *pos, *next;
-	struct dentry *dentry;
+	struct dentry *dentry, *dvec[10];
+	int n = 0;
 
 	down(&dir->i_sem);
+repeat:
 	spin_lock(&dcache_lock);
 	list_for_each_safe(pos, next, &parent->d_subdirs) {
 		dentry = list_entry(pos, struct dentry, d_child);
+		spin_lock(&dentry->d_lock);
 		if (!d_unhashed(dentry)) {
 			dget_locked(dentry);
 			__d_drop(dentry);
-			hlist_add_head(&dentry->d_hash, &head);
-		}
+			spin_unlock(&dentry->d_lock);
+			dvec[n++] = dentry;
+			if (n == ARRAY_SIZE(dvec))
+				break;
+		} else
+			spin_unlock(&dentry->d_lock);
 	}
 	spin_unlock(&dcache_lock);
-	while (!hlist_empty(&head)) {
-		dentry = list_entry(head.first, struct dentry, d_hash);
-		/* Private list, so no dcache_lock needed and use __d_drop */
-		__d_drop(dentry);
-		if (dentry->d_inode) {
-			rpc_inode_setowner(dentry->d_inode, NULL);
-			simple_unlink(dir, dentry);
-		}
-		dput(dentry);
+	if (n) {
+		do {
+			dentry = dvec[--n];
+			if (dentry->d_inode) {
+				rpc_inode_setowner(dentry->d_inode, NULL);
+				simple_unlink(dir, dentry);
+			}
+			dput(dentry);
+		} while (n);
+		goto repeat;
 	}
 	up(&dir->i_sem);
 }

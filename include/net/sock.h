@@ -41,6 +41,7 @@
 #define _SOCK_H
 
 #include <linux/config.h>
+#include <linux/list.h>
 #include <linux/timer.h>
 #include <linux/cache.h>
 #include <linux/module.h>
@@ -93,10 +94,8 @@ struct sock;
   *	@skc_state - Connection state
   *	@skc_reuse - %SO_REUSEADDR setting
   *	@skc_bound_dev_if - bound device index if != 0
-  *	@skc_next - main hash linkage for various protocol lookup tables
-  *	@skc_pprev - main hash linkage for various protocol lookup tables
-  *	@skc_bind_next - main hash linkage for various protocol lookup tables
-  *	@skc_bind_pprev - main hash linkage for various protocol lookup tables
+  *	@skc_node - main hash linkage for various protocol lookup tables
+  *	@skc_bind_node - bind hash linkage for various protocol lookup tables
   *	@skc_refcnt - reference count
   *
   *	This is the minimal network layer representation of sockets, the header
@@ -107,10 +106,8 @@ struct sock_common {
 	volatile unsigned char	skc_state;
 	unsigned char		skc_reuse;
 	int			skc_bound_dev_if;
-	struct sock		*skc_next;
-	struct sock		**skc_pprev;
-	struct sock		*skc_bind_next;
-	struct sock		**skc_bind_pprev;
+	struct hlist_node	skc_node;
+	struct hlist_node	skc_bind_node;
 	atomic_t		skc_refcnt;
 };
 
@@ -136,7 +133,6 @@ struct sock_common {
   *	@sk_forward_alloc - space allocated forward
   *	@sk_allocation - allocation mode
   *	@sk_sndbuf - size of send buffer in bytes
-  *	@sk_prev - pointer to previous sock in the list this sock is in
   *	@sk_flags - %SO_LINGER (l_onoff), %SO_BROADCAST, %SO_KEEPALIVE, %SO_OOBINLINE settings
   *	@sk_no_check - %SO_NO_CHECK setting, wether or not checkup packets
   *	@sk_debug - %SO_DEBUG setting
@@ -187,10 +183,8 @@ struct sock {
 #define sk_state		__sk_common.skc_state
 #define sk_reuse		__sk_common.skc_reuse
 #define sk_bound_dev_if		__sk_common.skc_bound_dev_if
-#define sk_next			__sk_common.skc_next
-#define sk_pprev		__sk_common.skc_pprev
-#define sk_bind_next		__sk_common.skc_bind_next
-#define sk_bind_pprev		__sk_common.skc_bind_pprev
+#define sk_node			__sk_common.skc_node
+#define sk_bind_node		__sk_common.skc_bind_node
 #define sk_refcnt		__sk_common.skc_refcnt
 	volatile unsigned char	sk_zapped;
 	unsigned char		sk_shutdown;
@@ -211,7 +205,6 @@ struct sock {
 	int			sk_forward_alloc;
 	unsigned int		sk_allocation;
 	int			sk_sndbuf;
-	struct sock		*sk_prev;
 	unsigned long 		sk_flags;
 	char		 	sk_no_check;
 	unsigned char		sk_debug;
@@ -261,6 +254,106 @@ struct sock {
 						  struct sk_buff *skb);  
 	void                    (*sk_destruct)(struct sock *sk);
 };
+
+/*
+ * Hashed lists helper routines
+ */
+static inline struct sock *__sk_head(struct hlist_head *head)
+{
+	return hlist_entry(head->first, struct sock, sk_node);
+}
+
+static inline struct sock *sk_head(struct hlist_head *head)
+{
+	return hlist_empty(head) ? NULL : __sk_head(head);
+}
+
+static inline struct sock *sk_next(struct sock *sk)
+{
+	return sk->sk_node.next ?
+		hlist_entry(sk->sk_node.next, struct sock, sk_node) : NULL;
+}
+
+static inline int sk_unhashed(struct sock *sk)
+{
+	return hlist_unhashed(&sk->sk_node);
+}
+
+static inline int sk_hashed(struct sock *sk)
+{
+	return sk->sk_node.pprev != NULL;
+}
+
+static __inline__ void sk_node_init(struct hlist_node *node)
+{
+	node->pprev = NULL;
+}
+
+static __inline__ void __sk_del_node(struct sock *sk)
+{
+	__hlist_del(&sk->sk_node);
+}
+
+static __inline__ int __sk_del_node_init(struct sock *sk)
+{
+	if (sk_hashed(sk)) {
+		__sk_del_node(sk);
+		sk_node_init(&sk->sk_node);
+		return 1;
+	}
+	return 0;
+}
+
+static inline void __sock_put(struct sock *sk);
+
+static __inline__ int sk_del_node_init(struct sock *sk)
+{
+	int rc = __sk_del_node_init(sk);
+
+	if (rc) {
+		/* paranoid for a while -acme */
+		WARN_ON(atomic_read(&sk->sk_refcnt) == 1);
+		__sock_put(sk);
+	}
+	return rc;
+}
+
+static __inline__ void __sk_add_node(struct sock *sk, struct hlist_head *list)
+{
+	hlist_add_head(&sk->sk_node, list);
+}
+
+static inline void sock_hold(struct sock *sk);
+
+static __inline__ void sk_add_node(struct sock *sk, struct hlist_head *list)
+{
+	sock_hold(sk);
+	__sk_add_node(sk, list);
+}
+
+static __inline__ void __sk_del_bind_node(struct sock *sk)
+{
+	__hlist_del(&sk->sk_bind_node);
+}
+
+static __inline__ void sk_add_bind_node(struct sock *sk,
+					struct hlist_head *list)
+{
+	hlist_add_head(&sk->sk_bind_node, list);
+}
+
+#define sk_for_each(__sk, node, list) \
+	hlist_for_each_entry(__sk, node, list, sk_node)
+#define sk_for_each_from(__sk, node) \
+	if (__sk && ({ node = &(__sk)->sk_node; 1; })) \
+		hlist_for_each_entry_from(__sk, node, sk_node)
+#define sk_for_each_continue(__sk, node) \
+	if (__sk && ({ node = &(__sk)->sk_node; 1; })) \
+		hlist_for_each_entry_continue(__sk, node, sk_node)
+#define sk_for_each_safe(__sk, node, tmp, list) \
+	hlist_for_each_entry_safe(__sk, node, tmp, list, sk_node)
+#define sk_for_each_bound(__sk, node, list) \
+	hlist_for_each_entry(__sk, node, list, sk_bind_node)
 
 /* Sock flags */
 enum sock_flags {

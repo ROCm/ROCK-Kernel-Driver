@@ -1079,7 +1079,7 @@ lec_arp_clear_vccs(struct lec_arp_table *entry)
 		clear_bit(ATM_VF_READY,&entry->vcc->flags);
                 entry->vcc->push(entry->vcc, NULL);
 #endif
-		atm_async_release_vcc(entry->vcc, -EPIPE);
+		vcc_release_async(entry->vcc, -EPIPE);
                 entry->vcc = NULL;
         }
         if (entry->recv_vcc) {
@@ -1089,7 +1089,7 @@ lec_arp_clear_vccs(struct lec_arp_table *entry)
 		clear_bit(ATM_VF_READY,&entry->recv_vcc->flags);
                 entry->recv_vcc->push(entry->recv_vcc, NULL);
 #endif
-		atm_async_release_vcc(entry->recv_vcc, -EPIPE);
+		vcc_release_async(entry->recv_vcc, -EPIPE);
                 entry->recv_vcc = NULL;
         }        
 }

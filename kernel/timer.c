@@ -440,7 +440,7 @@ repeat:
  * Timekeeping variables
  */
 unsigned long tick_usec = TICK_USEC; 		/* ACTHZ   period (usec) */
-unsigned long tick_nsec = TICK_NSEC(TICK_USEC);	/* USER_HZ period (nsec) */
+unsigned long tick_nsec = TICK_NSEC;		/* USER_HZ period (nsec) */
 
 /* 
  * The current time 
@@ -470,7 +470,7 @@ long time_precision = 1;		/* clock precision (us)		*/
 long time_maxerror = NTP_PHASE_LIMIT;	/* maximum error (us)		*/
 long time_esterror = NTP_PHASE_LIMIT;	/* estimated error (us)		*/
 long time_phase;			/* phase offset (scaled us)	*/
-long time_freq = ((1000000 + HZ/2) % HZ - HZ/2) << SHIFT_USEC;
+long time_freq = (((NSEC_PER_SEC + HZ/2) % HZ - HZ/2) << SHIFT_USEC) / NSEC_PER_USEC;
 					/* frequency offset (scaled ppm)*/
 long time_adj;				/* tick adjust (scaled 1 / HZ)	*/
 long time_reftime;			/* time at last adjustment (s)	*/
@@ -634,12 +634,12 @@ static void update_wall_time_one_tick(void)
 	 * advance the tick more.
 	 */
 	time_phase += time_adj;
-	if (time_phase <= -FINEUSEC) {
+	if (time_phase <= -FINENSEC) {
 		long ltemp = -time_phase >> (SHIFT_SCALE - 10);
 		time_phase += ltemp << (SHIFT_SCALE - 10);
 		delta_nsec -= ltemp;
 	}
-	else if (time_phase >= FINEUSEC) {
+	else if (time_phase >= FINENSEC) {
 		long ltemp = time_phase >> (SHIFT_SCALE - 10);
 		time_phase -= ltemp << (SHIFT_SCALE - 10);
 		delta_nsec += ltemp;
@@ -1109,7 +1109,6 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 {
 	struct sysinfo val;
-	u64 uptime;
 	unsigned long mem_total, sav_total;
 	unsigned int mem_unit, bitcount;
 	unsigned long seq;
@@ -1117,11 +1116,25 @@ asmlinkage long sys_sysinfo(struct sysinfo __user *info)
 	memset((char *)&val, 0, sizeof(struct sysinfo));
 
 	do {
+		struct timespec tp;
 		seq = read_seqbegin(&xtime_lock);
 
-		uptime = jiffies_64 - INITIAL_JIFFIES;
-		do_div(uptime, HZ);
-		val.uptime = (unsigned long) uptime;
+		/*
+		 * This is annoying.  The below is the same thing
+		 * posix_get_clock_monotonic() does, but it wants to
+		 * take the lock which we want to cover the loads stuff
+		 * too.
+		 */
+
+		do_gettimeofday((struct timeval *)&tp);
+		tp.tv_nsec *= NSEC_PER_USEC;
+		tp.tv_sec += wall_to_monotonic.tv_sec;
+		tp.tv_nsec += wall_to_monotonic.tv_nsec;
+		if (tp.tv_nsec - NSEC_PER_SEC >= 0) {
+			tp.tv_nsec = tp.tv_nsec - NSEC_PER_SEC;
+			tp.tv_sec++;
+		}
+		val.uptime = tp.tv_sec + (tp.tv_nsec ? 1 : 0);
 
 		val.loads[0] = avenrun[0] << (SI_LOAD_SHIFT - FSHIFT);
 		val.loads[1] = avenrun[1] << (SI_LOAD_SHIFT - FSHIFT);

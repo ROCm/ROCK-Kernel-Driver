@@ -125,7 +125,6 @@ struct svc_rqst {
 	u32			rq_proc;	/* procedure number */
 	u32			rq_prot;	/* IP protocol */
 	unsigned short
-				rq_userset : 1,	/* auth->setuser OK */
 				rq_secure  : 1;	/* secure port */
 
 
@@ -196,14 +195,14 @@ static inline void svc_pushback_allpages(struct svc_rqst *rqstp)
 
 static inline void svc_pushback_unused_pages(struct svc_rqst *rqstp)
 {
-        while (rqstp->rq_resused) {
+	while (rqstp->rq_resused &&
+	       rqstp->rq_res.pages != &rqstp->rq_respages[rqstp->rq_resused]) {
+
 		if (rqstp->rq_respages[--rqstp->rq_resused] != NULL) {
 			rqstp->rq_argpages[rqstp->rq_arghi++] =
 				rqstp->rq_respages[rqstp->rq_resused];
 			rqstp->rq_respages[rqstp->rq_resused] = NULL;
 		}
-		if (rqstp->rq_res.pages == &rqstp->rq_respages[rqstp->rq_resused])
-			break;
 	}
 }
 
@@ -218,7 +217,6 @@ static inline void svc_free_allpages(struct svc_rqst *rqstp)
 }
 
 struct svc_deferred_req {
-	struct svc_serv		*serv;
 	u32			prot;	/* protocol (UDP or TCP) */
 	struct sockaddr_in	addr;
 	struct svc_sock		*svsk;	/* where reply must go */

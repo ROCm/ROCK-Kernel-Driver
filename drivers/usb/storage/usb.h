@@ -71,8 +71,6 @@ struct us_unusual_dev {
 #define US_FL_SINGLE_LUN      0x00000001 /* allow access to only LUN 0	    */
 #define US_FL_MODE_XLATE      0x00000002 /* translate _6 to _10 commands for
 						    Win/MacOS compatibility */
-#define US_FL_START_STOP      0x00000004 /* ignore START_STOP commands	    */
-#define US_FL_IGNORE_SER      0x00000010 /* Ignore the serial number given  */
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs fixing   */
 #define US_FL_FIX_CAPACITY    0x00000080 /* READ CAPACITY response too big  */
@@ -139,7 +137,7 @@ struct us_data {
 
 	/* thread information */
 	int			pid;		 /* control thread	 */
-	atomic_t		sm_state;	 /* what we are doing	 */
+	int			sm_state;	 /* what we are doing	 */
 
 	/* interrupt communications data */
 	unsigned char		irqdata[2];	 /* data from USB IRQ	 */
@@ -147,7 +145,7 @@ struct us_data {
 	/* control and bulk communications data */
 	struct urb		*current_urb;	 /* non-int USB requests */
 	struct usb_ctrlrequest	*dr;		 /* control requests	 */
-	struct usb_sg_request	*current_sg;	 /* scatter-gather USB   */
+	struct usb_sg_request	current_sg;	 /* scatter-gather USB   */
 
 	/* the semaphore for sleeping the control thread */
 	struct semaphore	sema;		 /* to sleep thread on   */

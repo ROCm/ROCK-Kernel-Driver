@@ -80,35 +80,25 @@
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
 
-struct sock *raw_v4_htable[RAWV4_HTABLE_SIZE];
+struct hlist_head raw_v4_htable[RAWV4_HTABLE_SIZE];
 rwlock_t raw_v4_lock = RW_LOCK_UNLOCKED;
 
 static void raw_v4_hash(struct sock *sk)
 {
-	struct sock **skp = &raw_v4_htable[inet_sk(sk)->num &
-					   (RAWV4_HTABLE_SIZE - 1)];
+	struct hlist_head *head = &raw_v4_htable[inet_sk(sk)->num &
+						 (RAWV4_HTABLE_SIZE - 1)];
 
 	write_lock_bh(&raw_v4_lock);
-	if ((sk->sk_next = *skp) != NULL)
-		(*skp)->sk_pprev = &sk->sk_next;
-	*skp = sk;
-	sk->sk_pprev = skp;
+	sk_add_node(sk, head);
 	sock_prot_inc_use(sk->sk_prot);
- 	sock_hold(sk);
 	write_unlock_bh(&raw_v4_lock);
 }
 
 static void raw_v4_unhash(struct sock *sk)
 {
  	write_lock_bh(&raw_v4_lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-		__sock_put(sk);
-	}
 	write_unlock_bh(&raw_v4_lock);
 }
 
@@ -116,18 +106,20 @@ struct sock *__raw_v4_lookup(struct sock *sk, unsigned short num,
 			     unsigned long raddr, unsigned long laddr,
 			     int dif)
 {
-	struct sock *s = sk;
+	struct hlist_node *node;
 
-	for (; s; s = s->sk_next) {
-		struct inet_opt *inet = inet_sk(s);
+	sk_for_each_from(sk, node) {
+		struct inet_opt *inet = inet_sk(sk);
 
 		if (inet->num == num 					&&
 		    !(inet->daddr && inet->daddr != raddr) 		&&
 		    !(inet->rcv_saddr && inet->rcv_saddr != laddr)	&&
-		    !(s->sk_bound_dev_if && s->sk_bound_dev_if != dif))
-			break; /* gotcha */
+		    !(sk->sk_bound_dev_if && sk->sk_bound_dev_if != dif))
+			goto found; /* gotcha */
 	}
-	return s;
+	sk = NULL;
+found:
+	return sk;
 }
 
 /*
@@ -158,11 +150,13 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 void raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 {
 	struct sock *sk;
+	struct hlist_head *head;
 
 	read_lock(&raw_v4_lock);
-	if ((sk = raw_v4_htable[hash]) == NULL)
+	head = &raw_v4_htable[hash];
+	if (hlist_empty(head))
 		goto out;
-	sk = __raw_v4_lookup(sk, iph->protocol,
+	sk = __raw_v4_lookup(__sk_head(head), iph->protocol,
 			     iph->saddr, iph->daddr,
 			     skb->dev->ifindex);
 
@@ -174,7 +168,7 @@ void raw_v4_input(struct sk_buff *skb, struct iphdr *iph, int hash)
 			if (clone)
 				raw_rcv(sk, clone);
 		}
-		sk = __raw_v4_lookup(sk->sk_next, iph->protocol,
+		sk = __raw_v4_lookup(sk_next(sk), iph->protocol,
 				     iph->saddr, iph->daddr,
 				     skb->dev->ifindex);
 	}
@@ -697,16 +691,18 @@ struct raw_iter_state {
 
 static struct sock *raw_get_first(struct seq_file *seq)
 {
-	struct sock *sk = NULL;
+	struct sock *sk;
 	struct raw_iter_state* state = raw_seq_private(seq);
 
 	for (state->bucket = 0; state->bucket < RAWV4_HTABLE_SIZE; ++state->bucket) {
-		sk = raw_v4_htable[state->bucket];
-		while (sk && sk->sk_family != PF_INET)
-			sk = sk->sk_next;
-		if (sk)
-			break;
+		struct hlist_node *node;
+
+		sk_for_each(sk, node, &raw_v4_htable[state->bucket])
+			if (sk->sk_family == PF_INET)
+				goto found;
 	}
+	sk = NULL;
+found:
 	return sk;
 }
 
@@ -715,13 +711,13 @@ static struct sock *raw_get_next(struct seq_file *seq, struct sock *sk)
 	struct raw_iter_state* state = raw_seq_private(seq);
 
 	do {
-		sk = sk->sk_next;
+		sk = sk_next(sk);
 try_again:
 		;
 	} while (sk && sk->sk_family != PF_INET);
 
 	if (!sk && ++state->bucket < RAWV4_HTABLE_SIZE) {
-		sk = raw_v4_htable[state->bucket];
+		sk = sk_head(&raw_v4_htable[state->bucket]);
 		goto try_again;
 	}
 	return sk;

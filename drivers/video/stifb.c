@@ -66,6 +66,7 @@
 #include <linux/pci.h>
 
 #include <asm/grfioctl.h>	/* for HP-UX compatibility */
+#include <asm/uaccess.h>
 
 #include "sticore.h"
 
@@ -111,6 +112,7 @@ struct stifb_info {
 	int deviceSpecificConfig;
 };
 
+static int __initdata bpp = 8;	/* parameter from modprobe */
 static int __initdata stifb_force_bpp[MAX_STI_ROMS];
 
 /* ------------------- chipset specific functions -------------------------- */
@@ -1336,6 +1338,8 @@ stifb_init(void)
 		sti = sti_get_rom(i);
 		if (!sti)
 			break;
+		if (bpp > 0)
+			stifb_force_bpp[i] = bpp;
 		stifb_init_fb(sti, stifb_force_bpp[i]);
 	}
 	return 0;
@@ -1355,8 +1359,14 @@ stifb_cleanup(void)
 		sti = sti_get_rom(i);
 		if (!sti)
 			break;
-		if (sti->info)
+		if (sti->info) {
+			struct fb_info *info = sti->info;
 			unregister_framebuffer(sti->info);
+			release_mem_region(info->fix.mmio_start, info->fix.mmio_len);
+		        release_mem_region(info->fix.smem_start, info->fix.smem_len);
+		        fb_dealloc_cmap(&info->cmap);
+		        kfree(info); 
+		}
 		sti->info = NULL;
 	}
 }
@@ -1372,9 +1382,10 @@ stifb_setup(char *options)
 	if (strncmp(options, "bpp", 3) == 0) {
 		options += 3;
 		for (i = 0; i < MAX_STI_ROMS; i++) {
-			if (*options++ == ':')
+			if (*options++ == ':') {
 				stifb_force_bpp[i] = simple_strtoul(options, &options, 10);
-			else
+				bpp = -1;
+			} else
 				break;
 		}
 	}
@@ -1390,7 +1401,7 @@ module_exit(stifb_cleanup);
 
 MODULE_AUTHOR("Helge Deller <deller@gmx.de>, Thomas Bogendoerfer <tsbogend@alpha.franken.de>");
 MODULE_DESCRIPTION("Framebuffer driver for HP's NGLE series graphics cards in HP PARISC machines");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 
 MODULE_PARM(bpp, "i");
 MODULE_PARM_DESC(mem, "Bits per pixel (default: 8)");

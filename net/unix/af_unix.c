@@ -124,11 +124,11 @@ int sysctl_unix_max_dgram_qlen = 10;
 
 kmem_cache_t *unix_sk_cachep;
 
-unix_socket *unix_socket_table[UNIX_HASH_SIZE+1];
+struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 rwlock_t unix_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t unix_nr_socks = ATOMIC_INIT(0);
 
-#define unix_sockets_unbound	(unix_socket_table[UNIX_HASH_SIZE])
+#define unix_sockets_unbound	(&unix_socket_table[UNIX_HASH_SIZE])
 
 #define UNIX_ABSTRACT(sk)	(unix_sk(sk)->addr->hash != UNIX_HASH_SIZE)
 
@@ -147,19 +147,19 @@ static inline unsigned unix_hash_fold(unsigned hash)
 
 #define unix_peer(sk) ((sk)->sk_pair)
 
-static inline int unix_our_peer(unix_socket *sk, unix_socket *osk)
+static inline int unix_our_peer(struct sock *sk, struct sock *osk)
 {
 	return unix_peer(osk) == sk;
 }
 
-static inline int unix_may_send(unix_socket *sk, unix_socket *osk)
+static inline int unix_may_send(struct sock *sk, struct sock *osk)
 {
 	return (unix_peer(osk) == NULL || unix_our_peer(sk, osk));
 }
 
-static unix_socket *unix_peer_get(unix_socket *s)
+static struct sock *unix_peer_get(struct sock *s)
 {
-	unix_socket *peer;
+	struct sock *peer;
 
 	unix_state_rlock(s);
 	peer = unix_peer(s);
@@ -209,73 +209,54 @@ static int unix_mkname(struct sockaddr_un * sunaddr, int len, unsigned *hashp)
 	return len;
 }
 
-static void __unix_remove_socket(unix_socket *sk)
+static void __unix_remove_socket(struct sock *sk)
 {
-	struct unix_sock *u = unix_sk(sk);
-	unix_socket **list = u->list;
-
-	if (list) {
-		if (sk->sk_next)
-			sk->sk_next->sk_prev = sk->sk_prev;
-		if (sk->sk_prev)
-			sk->sk_prev->sk_next = sk->sk_next;
-		if (*list == sk)
-			*list = sk->sk_next;
-		u->list = NULL;
-		sk->sk_prev = NULL;
-		sk->sk_next = NULL;
-		__sock_put(sk);
-	}
+	sk_del_node_init(sk);
 }
 
-static void __unix_insert_socket(unix_socket **list, unix_socket *sk)
+static void __unix_insert_socket(struct hlist_head *list, struct sock *sk)
 {
-	struct unix_sock *u = unix_sk(sk);
-	BUG_TRAP(!u->list);
-
-	u->list = list;
-	sk->sk_prev = NULL;
-	sk->sk_next = *list;
-	if (*list)
-		(*list)->sk_prev = sk;
-	*list=sk;
-	sock_hold(sk);
+	BUG_TRAP(sk_unhashed(sk));
+	sk_add_node(sk, list);
 }
 
-static inline void unix_remove_socket(unix_socket *sk)
+static inline void unix_remove_socket(struct sock *sk)
 {
 	write_lock(&unix_table_lock);
 	__unix_remove_socket(sk);
 	write_unlock(&unix_table_lock);
 }
 
-static inline void unix_insert_socket(unix_socket **list, unix_socket *sk)
+static inline void unix_insert_socket(struct hlist_head *list, struct sock *sk)
 {
 	write_lock(&unix_table_lock);
 	__unix_insert_socket(list, sk);
 	write_unlock(&unix_table_lock);
 }
 
-static unix_socket *__unix_find_socket_byname(struct sockaddr_un *sunname,
+static struct sock *__unix_find_socket_byname(struct sockaddr_un *sunname,
 					      int len, int type, unsigned hash)
 {
-	unix_socket *s;
+	struct sock *s;
+	struct hlist_node *node;
 
-	for (s = unix_socket_table[hash ^ type]; s; s = s->sk_next) {
+	sk_for_each(s, node, &unix_socket_table[hash ^ type]) {
 		struct unix_sock *u = unix_sk(s);
 
 		if (u->addr->len == len &&
 		    !memcmp(u->addr->name, sunname, len))
-			break;
+			goto found;
 	}
+	s = NULL;
+found:
 	return s;
 }
 
-static inline unix_socket *
-unix_find_socket_byname(struct sockaddr_un *sunname,
-			int len, int type, unsigned hash)
+static inline struct sock *unix_find_socket_byname(struct sockaddr_un *sunname,
+						   int len, int type,
+						   unsigned hash)
 {
-	unix_socket *s;
+	struct sock *s;
 
 	read_lock(&unix_table_lock);
 	s = __unix_find_socket_byname(sunname, len, type, hash);
@@ -285,21 +266,24 @@ unix_find_socket_byname(struct sockaddr_un *sunname,
 	return s;
 }
 
-static unix_socket *unix_find_socket_byinode(struct inode *i)
+static struct sock *unix_find_socket_byinode(struct inode *i)
 {
-	unix_socket *s;
+	struct sock *s;
+	struct hlist_node *node;
 
 	read_lock(&unix_table_lock);
-	for (s = unix_socket_table[i->i_ino & (UNIX_HASH_SIZE - 1)]; s;
-	     s = s->sk_next) {
+	sk_for_each(s, node,
+		    &unix_socket_table[i->i_ino & (UNIX_HASH_SIZE - 1)]) {
 		struct dentry *dentry = unix_sk(s)->dentry;
 
 		if(dentry && dentry->d_inode == i)
 		{
 			sock_hold(s);
-			break;
+			goto found;
 		}
 	}
+	s = NULL;
+found:
 	read_unlock(&unix_table_lock);
 	return s;
 }
@@ -348,7 +332,7 @@ static void unix_sock_destructor(struct sock *sk)
 	skb_queue_purge(&sk->sk_receive_queue);
 
 	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
-	BUG_TRAP(!u->list);
+	BUG_TRAP(sk_unhashed(sk));
 	BUG_TRAP(!sk->sk_socket);
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive unix socket: %p\n", sk);
@@ -364,12 +348,12 @@ static void unix_sock_destructor(struct sock *sk)
 #endif
 }
 
-static int unix_release_sock (unix_socket *sk, int embrion)
+static int unix_release_sock (struct sock *sk, int embrion)
 {
 	struct unix_sock *u = unix_sk(sk);
 	struct dentry *dentry;
 	struct vfsmount *mnt;
-	unix_socket *skpair;
+	struct sock *skpair;
 	struct sk_buff *skb;
 	int state;
 
@@ -501,12 +485,11 @@ static struct sock * unix_create1(struct socket *sock)
 	u	  = unix_sk(sk);
 	u->dentry = NULL;
 	u->mnt	  = NULL;
-	u->list	  = NULL;
 	rwlock_init(&u->lock);
 	atomic_set(&u->inflight, sock ? 0 : -1);
 	init_MUTEX(&u->readsem); /* single task reading lock */
 	init_waitqueue_head(&u->peer_wait);
-	unix_insert_socket(&unix_sockets_unbound, sk);
+	unix_insert_socket(unix_sockets_unbound, sk);
 out:
 	return sk;
 }
@@ -540,7 +523,7 @@ static int unix_create(struct socket *sock, int protocol)
 
 static int unix_release(struct socket *sock)
 {
-	unix_socket *sk = sock->sk;
+	struct sock *sk = sock->sk;
 
 	if (!sk)
 		return 0;
@@ -600,10 +583,10 @@ out:	up(&u->readsem);
 	return err;
 }
 
-static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
+static struct sock *unix_find_other(struct sockaddr_un *sunname, int len,
 				    int type, unsigned hash, int *error)
 {
-	unix_socket *u;
+	struct sock *u;
 	struct nameidata nd;
 	int err = 0;
 	
@@ -663,7 +646,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	int err;
 	unsigned hash;
 	struct unix_address *addr;
-	unix_socket **list;
+	struct hlist_head *list;
 
 	err = -EINVAL;
 	if (sunaddr->sun_family != AF_UNIX)
@@ -854,7 +837,7 @@ out:
 	return err;
 }
 
-static long unix_wait_for_peer(unix_socket *other, long timeo)
+static long unix_wait_for_peer(struct sock *other, long timeo)
 {
 	struct unix_sock *u = unix_sk(other);
 	int sched;
@@ -883,7 +866,7 @@ static int unix_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 	struct sock *sk = sock->sk;
 	struct unix_sock *u = unix_sk(sk), *newu, *otheru;
 	struct sock *newsk = NULL;
-	unix_socket *other = NULL;
+	struct sock *other = NULL;
 	struct sk_buff *skb = NULL;
 	unsigned hash;
 	int st;
@@ -1076,8 +1059,8 @@ static int unix_socketpair(struct socket *socka, struct socket *sockb)
 
 static int unix_accept(struct socket *sock, struct socket *newsock, int flags)
 {
-	unix_socket *sk = sock->sk;
-	unix_socket *tsk;
+	struct sock *sk = sock->sk;
+	struct sock *tsk;
 	struct sk_buff *skb;
 	int err;
 
@@ -1198,7 +1181,7 @@ static int unix_dgram_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	struct sock *sk = sock->sk;
 	struct unix_sock *u = unix_sk(sk);
 	struct sockaddr_un *sunaddr=msg->msg_name;
-	unix_socket *other = NULL;
+	struct sock *other = NULL;
 	int namelen = 0; /* fake GCC */
 	int err;
 	unsigned hash;
@@ -1344,7 +1327,7 @@ static int unix_stream_sendmsg(struct kiocb *kiocb, struct socket *sock,
 {
 	struct sock_iocb *siocb = kiocb_to_siocb(kiocb);
 	struct sock *sk = sock->sk;
-	unix_socket *other = NULL;
+	struct sock *other = NULL;
 	struct sockaddr_un *sunaddr=msg->msg_name;
 	int err,size;
 	struct sk_buff *skb;
@@ -1540,7 +1523,7 @@ out:
  *	Sleep until data has arrive. But check for races..
  */
  
-static long unix_stream_data_wait(unix_socket * sk, long timeo)
+static long unix_stream_data_wait(struct sock * sk, long timeo)
 {
 	DEFINE_WAIT(wait);
 
@@ -1714,7 +1697,7 @@ out:
 static int unix_shutdown(struct socket *sock, int mode)
 {
 	struct sock *sk = sock->sk;
-	unix_socket *other;
+	struct sock *other;
 
 	mode = (mode+1)&(RCV_SHUTDOWN|SEND_SHUTDOWN);
 
@@ -1829,7 +1812,7 @@ static int unix_read_proc(char *buffer, char **start, off_t offset,
 	off_t begin=0;
 	int len=0;
 	int i;
-	unix_socket *s;
+	struct sock *s;
 	
 	len+= sprintf(buffer,"Num       RefCount Protocol Flags    Type St "
 	    "Inode Path\n");

@@ -297,13 +297,14 @@ int dm_hash_rename(const char *old, const char *new)
 	/*
 	 * rename and move the name cell.
 	 */
+	unregister_with_devfs(hc);
+
 	list_del(&hc->name_list);
 	old_name = hc->name;
 	hc->name = new_name;
 	list_add(&hc->name_list, _name_buckets + hash_str(new_name));
 
 	/* rename the device node in devfs */
-	unregister_with_devfs(hc);
 	register_with_devfs(hc);
 
 	up_write(&_hash_lock);
@@ -560,7 +561,6 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	int r;
 	struct dm_table *t;
 	struct mapped_device *md;
-	unsigned int minor = 0;
 
 	r = check_name(param->name);
 	if (r)
@@ -577,9 +577,10 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		minor = minor(to_kdev_t(param->dev));
+		r = dm_create_with_minor(minor(to_kdev_t(param->dev)), t, &md);
+	else
+		r = dm_create(t, &md);
 
-	r = dm_create(minor, t, &md);
 	if (r) {
 		dm_table_put(t);
 		return r;

@@ -1949,26 +1949,6 @@ static int adpt_ioctl(struct inode *inode, struct file *file, uint cmd,
 	case I2ORESCANCMD:
 		adpt_rescan(pHba);
 		break;
-	case DPT_TARGET_BUSY & 0xFFFF:
-	case DPT_TARGET_BUSY:
-	{
-		TARGET_BUSY_T busy;
-		struct adpt_device* d;
-
-		if (copy_from_user((void*)&busy, (void*)arg, sizeof(TARGET_BUSY_T))) {
-			return -EFAULT;
-		}
-
-		d = adpt_find_device(pHba, busy.channel, busy.id, busy.lun);
-		if(d == NULL){
-			return -ENODEV;
-		}
-		busy.isBusy = ((d->pScsi_dev) && (0 != d->pScsi_dev->access_count)) ? 1 : 0;
-		if (copy_to_user ((char*)arg, &busy, sizeof(busy))) {
-			return -EFAULT;
-		}
-		break;
-	}
 	default:
 		return -EINVAL;
 	}
@@ -2492,10 +2472,6 @@ static s32 adpt_i2o_reparse_lct(adpt_hba* pHba)
 			printk(KERN_WARNING"%s: Device (%d,%d,%d) offline\n",pHba->name,pDev->scsi_channel,pDev->scsi_id,pDev->scsi_lun);
 			if (pDev->pScsi_dev) {
 				pDev->pScsi_dev->online = FALSE;
-				if (pDev->pScsi_dev->access_count) {
-					// A drive that was mounted is no longer there... bad!
-					printk(KERN_WARNING"%s:Mounted drive taken offline\n",pHba->name);
-				}
 			}
 		}
 	}
@@ -2538,7 +2514,7 @@ static int adpt_i2o_activate_hba(adpt_hba* pHba)
 
 	if(pHba->initialized ) {
 		if (adpt_i2o_status_get(pHba) < 0) {
-			if((rcode = adpt_i2o_reset_hba(pHba) != 0)){
+			if((rcode = adpt_i2o_reset_hba(pHba)) != 0){
 				printk(KERN_WARNING"%s: Could NOT reset.\n", pHba->name);
 				return rcode;
 			}
@@ -2564,7 +2540,7 @@ static int adpt_i2o_activate_hba(adpt_hba* pHba)
 			}
 		}
 	} else {
-		if((rcode = adpt_i2o_reset_hba(pHba) != 0)){
+		if((rcode = adpt_i2o_reset_hba(pHba)) != 0){
 			printk(KERN_WARNING"%s: Could NOT reset.\n", pHba->name);
 			return rcode;
 		}

@@ -2307,28 +2307,6 @@ int Pci2220i_QueueCommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		}
 	return 0;
 	}
-static void internal_done(Scsi_Cmnd *SCpnt)
-	{
-	SCpnt->SCp.Status++;
-	}
-/****************************************************************
- *	Name:	Pci2220i_Command
- *
- *	Description:	Process a command from the SCSI manager.
- *
- *	Parameters:		SCpnt - Pointer to SCSI command structure.
- *
- *	Returns:		Status code.
- *
- ****************************************************************/
-int Pci2220i_Command (Scsi_Cmnd *SCpnt)
-	{
-	Pci2220i_QueueCommand (SCpnt, internal_done);
-    SCpnt->SCp.Status = 0;
-	while (!SCpnt->SCp.Status)
-		barrier ();
-	return SCpnt->result;
-	}
 /****************************************************************
  *	Name:			ReadFlash
  *
@@ -2924,7 +2902,6 @@ static Scsi_Host_Template driver_template = {
 	.name			= "PCI-2220I/PCI-2240I",
 	.detect			= Pci2220i_Detect,
 	.release		= Pci2220i_Release,
-	.command		= Pci2220i_Command,
 	.queuecommand		= Pci2220i_QueueCommand,
 	.abort			= Pci2220i_Abort,
 	.reset			= Pci2220i_Reset,

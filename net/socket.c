@@ -79,10 +79,7 @@
 #include <linux/mount.h>
 #include <linux/security.h>
 #include <linux/compat.h>
-
-#if defined(CONFIG_KMOD) && defined(CONFIG_NET)
 #include <linux/kmod.h>
-#endif
 
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
@@ -770,11 +767,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 	unlock_kernel();
 	sock = SOCKET_I(inode);
-#ifdef CONFIG_NET
 	if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 		err = dev_ioctl(cmd, (void *)arg);
 	} else
-#endif  /* CONFIG_NET */
 #ifdef WIRELESS_EXT
 	if (cmd >= SIOCIWFIRST && cmd <= SIOCIWLAST) {
 		err = dev_ioctl(cmd, (void *)arg);
@@ -795,11 +790,8 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFBR:
 		case SIOCSIFBR:
 			err = -ENOPKG;
-			
-#ifdef CONFIG_KMOD
 			if (!br_ioctl_hook)
 				request_module("bridge");
-#endif
 
 			down(&br_ioctl_mutex);
 			if (br_ioctl_hook) 
@@ -809,10 +801,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCGIFVLAN:
 		case SIOCSIFVLAN:
 			err = -ENOPKG;
-#ifdef CONFIG_KMOD
 			if (!vlan_ioctl_hook)
 				request_module("8021q");
-#endif
+
 			down(&vlan_ioctl_mutex);
 			if (vlan_ioctl_hook)
 				err = vlan_ioctl_hook(arg);
@@ -826,10 +817,9 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:
 			err = -ENOPKG;
-#ifdef CONFIG_KMOD
 			if (!dlci_ioctl_hook)
 				request_module("dlci");
-#endif
+
 			if (dlci_ioctl_hook) {
 				down(&dlci_ioctl_mutex);
 				err = dlci_ioctl_hook(cmd, (void *)arg);
@@ -1021,7 +1011,7 @@ int sock_create(int family, int type, int protocol, struct socket **res)
 	if (err)
 		return err;
 		
-#if defined(CONFIG_KMOD) && defined(CONFIG_NET)
+#if defined(CONFIG_KMOD)
 	/* Attempt to load a protocol module if the find failed. 
 	 * 
 	 * 12/09/1996 Marcin: But! this makes REALLY only sense, if the user 

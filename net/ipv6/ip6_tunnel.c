@@ -230,8 +230,6 @@ ip6_tnl_create(struct ip6_tnl_parm *p, struct ip6_tnl **pt)
 	dev->init = ip6ip6_tnl_dev_init;
 	memcpy(&t->parms, p, sizeof (*p));
 	t->parms.name[IFNAMSIZ - 1] = '\0';
-	if (t->parms.hop_limit > 255)
-		t->parms.hop_limit = -1;
 	strcpy(dev->name, t->parms.name);
 	if (!dev->name[0]) {
 		int i = 0;
@@ -952,7 +950,7 @@ ip6ip6_tnl_change(struct ip6_tnl *t, struct ip6_tnl_parm *p)
 	ipv6_addr_copy(&t->parms.laddr, &p->laddr);
 	ipv6_addr_copy(&t->parms.raddr, &p->raddr);
 	t->parms.flags = p->flags;
-	t->parms.hop_limit = (p->hop_limit <= 255 ? p->hop_limit : -1);
+	t->parms.hop_limit = p->hop_limit;
 	t->parms.encap_limit = p->encap_limit;
 	t->parms.flowinfo = p->flowinfo;
 	ip6ip6_tnl_link_config(t);

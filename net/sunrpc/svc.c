@@ -98,6 +98,8 @@ svc_destroy(struct svc_serv *serv)
 				  sk_list);
 		svc_delete_socket(svsk);
 	}
+	
+	cache_clean_deferred(serv);
 
 	/* Unregister service with the portmapper */
 	svc_register(serv, 0, 0);

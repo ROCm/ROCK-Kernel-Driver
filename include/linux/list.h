@@ -380,7 +380,7 @@ static inline void list_splice_init(struct list_head *list,
 
 /**
  * list_for_each_continue_rcu	-	iterate over an rcu-protected list 
- *			continuing from existing point.
+ *			continuing after existing point.
  * @pos:	the &struct list_head to use as a loop counter.
  * @head:	the head for your list.
  */
@@ -522,6 +522,30 @@ static __inline__ void hlist_add_after(struct hlist_node *n,
 	     pos && ({ prefetch(pos->next); 1;}) &&			 \
 		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
 	     pos = pos->next)
+
+/**
+ * hlist_for_each_entry_continue - iterate over a hlist continuing after existing point
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_continue(tpos, pos, member)		 \
+	for (pos = (pos)->next;						 \
+	     pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+
+/**
+ * hlist_for_each_entry_from - iterate over a hlist continuing from existing point
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_from(tpos, pos, member)			 \
+	for (; pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+
 /**
  * hlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
  * @tpos:	the type * to use as a loop counter.

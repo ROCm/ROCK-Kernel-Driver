@@ -123,6 +123,10 @@ static inline void setup_portio_remap(void)
 {
 }
 
+static inline void enable_apic_mode(void)
+{
+}
+
 static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 {
 	return (1);

@@ -178,7 +178,7 @@ static void igmp_gq_start_timer(struct in_device *in_dev)
 
 	in_dev->mr_gq_running = 1;
 	if (!mod_timer(&in_dev->mr_gq_timer, jiffies+tv+2))
-		atomic_inc(&in_dev->refcnt);
+		in_dev_hold(in_dev);
 }
 
 static void igmp_ifc_start_timer(struct in_device *in_dev, int delay)
@@ -186,7 +186,7 @@ static void igmp_ifc_start_timer(struct in_device *in_dev, int delay)
 	int tv = net_random() % delay;
 
 	if (!mod_timer(&in_dev->mr_ifc_timer, jiffies+tv+2))
-		atomic_inc(&in_dev->refcnt);
+		in_dev_hold(in_dev);
 }
 
 static void igmp_mod_timer(struct ip_mc_list *im, int max_delay)
@@ -387,8 +387,17 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 		if (type == IGMPV3_ALLOW_NEW_SOURCES ||
 		    type == IGMPV3_BLOCK_OLD_SOURCES)
 			return skb;
-		if (pmc->crcount || isquery)
+		if (pmc->crcount || isquery) {
+			/* make sure we have room for group header and at
+			 * least one source.
+			 */
+			if (skb && AVAILABLE(skb) < sizeof(struct igmpv3_grec)+
+			    sizeof(__u32)) {
+				igmpv3_sendpack(skb);
+				skb = 0; /* add_grhead will get a new one */
+			}
 			skb = add_grhead(skb, pmc, type, &pgr);
+		}
 		return skb;
 	}
 	pih = skb ? (struct igmpv3_report *)skb->h.igmph : 0;
@@ -661,6 +670,7 @@ static void igmp_gq_timer_expire(unsigned long data)
 
 	in_dev->mr_gq_running = 0;
 	igmpv3_send_report(in_dev, 0);
+	__in_dev_put(in_dev);
 }
 
 static void igmp_ifc_timer_expire(unsigned long data)
@@ -672,6 +682,7 @@ static void igmp_ifc_timer_expire(unsigned long data)
 		in_dev->mr_ifc_count--;
 		igmp_ifc_start_timer(in_dev, IGMP_Unsolicited_Report_Interval);
 	}
+	__in_dev_put(in_dev);
 }
 
 static void igmp_ifc_event(struct in_device *in_dev)
@@ -773,7 +784,7 @@ static void igmp_heard_query(struct in_device *in_dev, struct igmphdr *ih,
 		/* cancel the interface change timer */
 		in_dev->mr_ifc_count = 0;
 		if (del_timer(&in_dev->mr_ifc_timer))
-			atomic_dec(&in_dev->refcnt);
+			__in_dev_put(in_dev);
 		/* clear deleted report items */
 		igmpv3_clear_delrec(in_dev);
 	} else if (len < 12) {
@@ -1188,10 +1199,10 @@ void ip_mc_down(struct in_device *in_dev)
 #ifdef CONFIG_IP_MULTICAST
 	in_dev->mr_ifc_count = 0;
 	if (del_timer(&in_dev->mr_ifc_timer))
-		atomic_dec(&in_dev->refcnt);
+		__in_dev_put(in_dev);
 	in_dev->mr_gq_running = 0;
 	if (del_timer(&in_dev->mr_gq_timer))
-		atomic_dec(&in_dev->refcnt);
+		__in_dev_put(in_dev);
 #endif
 
 	for (i=in_dev->mc_list; i; i=i->next)

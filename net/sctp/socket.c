@@ -3016,14 +3016,15 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	}
 
 
-	if (pp && pp->sk) {
+	if (pp && !hlist_empty(&pp->sk_list)) {
 		/* We had a port hash table hit - there is an
 		 * available port (pp != NULL) and it is being
-		 * used by other socket (pp->sk != NULL); that other
+		 * used by other socket (pp->sk_list not empty); that other
 		 * socket is going to be sk2.
 		 */
 		int reuse = sk->sk_reuse;
-		struct sock *sk2 = pp->sk;
+		struct sock *sk2;
+		struct hlist_node *node;
 
 		SCTP_DEBUG_PRINTK("sctp_get_port() found a "
 				  "possible match\n");
@@ -3040,7 +3041,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * that this port/socket (sk) combination are already
 		 * in an endpoint.
 		 */
-		for (; sk2; sk2 = sk2->sk_bind_next) {
+		sk_for_each_bound(sk2, node, &pp->sk_list) {
 			struct sctp_endpoint *ep2;
 			ep2 = sctp_sk(sk2)->ep;
 
@@ -3048,15 +3049,10 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 				continue;
 
 			if (sctp_bind_addr_match(&ep2->base.bind_addr, addr,
-						 sctp_sk(sk)))
-				goto found;
-		}
-
-	found:
-		/* If we found a conflict, fail.  */
-		if (sk2 != NULL) {
-			ret = (long) sk2;
-			goto fail_unlock;
+						 sctp_sk(sk))) {
+				ret = (long)sk2;
+				goto fail_unlock;
+			}
 		}
 		SCTP_DEBUG_PRINTK("sctp_get_port(): Found a match\n");
 	}
@@ -3071,7 +3067,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 * if sk->sk_reuse is too (that is, if the caller requested
 	 * SO_REUSEADDR on this socket -sk-).
 	 */
-	if (!pp->sk)
+	if (hlist_empty(&pp->sk_list))
 		pp->fastreuse = sk->sk_reuse ? 1 : 0;
 	else if (pp->fastreuse && !sk->sk_reuse)
 		pp->fastreuse = 0;
@@ -3082,12 +3078,9 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	 */
 success:
 	inet_sk(sk)->num = snum;
-	if (!sk->sk_prev) {
-		if ((sk->sk_bind_next = pp->sk) != NULL)
-			pp->sk->sk_bind_pprev = &sk->sk_bind_next;
-		pp->sk = sk;
-		sk->sk_bind_pprev = &pp->sk;
-		sk->sk_prev = (struct sock *) pp;
+	if (!sctp_sk(sk)->bind_hash) {
+		sk_add_bind_node(sk, &pp->sk_list);
+		sctp_sk(sk)->bind_hash = pp;
 	}
 	ret = 0;
 
@@ -3323,7 +3316,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 	if (pp) {
 		pp->port = snum;
 		pp->fastreuse = 0;
-		pp->sk = NULL;
+		INIT_HLIST_HEAD(&pp->sk_list);
 		if ((pp->next = head->chain) != NULL)
 			pp->next->pprev = &pp->next;
 		head->chain = pp;
@@ -3335,7 +3328,7 @@ static struct sctp_bind_bucket *sctp_bucket_create(
 /* Caller must hold hashbucket lock for this tb with local BH disabled */
 static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 {
-	if (!pp->sk) {
+	if (hlist_empty(&pp->sk_list)) {
 		if (pp->next)
 			pp->next->pprev = pp->pprev;
 		*(pp->pprev) = pp->next;
@@ -3352,11 +3345,9 @@ static __inline__ void __sctp_put_port(struct sock *sk)
 	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);
-	pp = (struct sctp_bind_bucket *)sk->sk_prev;
-	if (sk->sk_bind_next)
-		sk->sk_bind_next->sk_bind_pprev = sk->sk_bind_pprev;
-	*(sk->sk_bind_pprev) = sk->sk_bind_next;
-	sk->sk_prev = NULL;
+	pp = sctp_sk(sk)->bind_hash;
+	__sk_del_bind_node(sk);
+	sctp_sk(sk)->bind_hash = NULL;
 	inet_sk(sk)->num = 0;
 	sctp_bucket_destroy(pp);
 	sctp_spin_unlock(&head->lock);

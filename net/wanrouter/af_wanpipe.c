@@ -158,7 +158,7 @@ static void dbg_kfree(void * v, int line) {
 
 
 /* List of all wanpipe sockets. */
-struct sock* wanpipe_sklist;
+HLIST_HEAD(wanpipe_sklist);
 static rwlock_t wanpipe_sklist_lock = RW_LOCK_UNLOCKED;
 
 atomic_t wanpipe_socks_nr;
@@ -949,7 +949,6 @@ static int wanpipe_release(struct socket *sock)
 {
 	wanpipe_opt *wp;
 	struct sock *sk = sock->sk;
-	struct sock **skp;
 	
 	if (!sk)
 		return 0;
@@ -983,13 +982,7 @@ static int wanpipe_release(struct socket *sock)
 
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
@@ -1149,13 +1142,7 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	}
 	
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 
 
@@ -1217,13 +1204,7 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	 * appropriate locks */
 	
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	sk_del_node_init(sk);
 	write_unlock(&wanpipe_sklist_lock);
 
 	sk->sk_socket = NULL;
@@ -1551,9 +1532,7 @@ static int wanpipe_create(struct socket *sock, int protocol)
 	 * can also change the list */
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	sk->sk_next = wanpipe_sklist;
-	wanpipe_sklist = sk;
-	sock_hold(sk);
+	sk_add_node(sk, &wanpipe_sklist);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
@@ -1730,12 +1709,13 @@ static int wanpipe_getname(struct socket *sock, struct sockaddr *uaddr,
 static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void *data)
 {
 	struct sock *sk;
+	hlist_node *node;
 	struct net_device *dev = (struct net_device *)data;
-	struct wanpipe_opt *po;
 
-	for (sk = wanpipe_sklist; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &wanpipe_sklist) {
+		struct wanpipe_opt *po = wp_sk(sk);
 
-		if ((po = wp_sk(sk)) == NULL)
+		if (!po)
 			continue;
 		if (dev == NULL)
 			continue;
@@ -1879,13 +1859,14 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 
 static int wanpipe_debug (struct sock *origsk, void *arg)
 {
-	struct sock *sk=NULL;
+	struct sock *sk;
+	struct hlist_node *node;
 	struct net_device *dev = NULL;
 	wanpipe_common_t *chan=NULL;
 	int cnt=0, err=0;
 	wan_debug_t *dbg_data = (wan_debug_t *)arg;
 
-	for (sk = wanpipe_sklist; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &wanpipe_sklist) {
 		wanpipe_opt *wp = wp_sk(sk);
 
 		if (sk == origsk){
@@ -2448,9 +2429,7 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	newsk->sk_next = wanpipe_sklist;
-	wanpipe_sklist = newsk;
-	sock_hold(sk);
+	sk_add_node(newsk, &wanpipe_sklist);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 

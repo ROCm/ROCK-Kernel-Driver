@@ -35,7 +35,7 @@
 
 
 /* List of all pfkey sockets. */
-static struct sock * pfkey_table;
+HLIST_HEAD(pfkey_table);
 static DECLARE_WAIT_QUEUE_HEAD(pfkey_table_wait);
 static rwlock_t pfkey_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t pfkey_table_users = ATOMIC_INIT(0);
@@ -114,24 +114,14 @@ static struct proto_ops pfkey_ops;
 static void pfkey_insert(struct sock *sk)
 {
 	pfkey_table_grab();
-	sk->sk_next = pfkey_table;
-	pfkey_table = sk;
-	sock_hold(sk);
+	sk_add_node(sk, &pfkey_table);
 	pfkey_table_ungrab();
 }
 
 static void pfkey_remove(struct sock *sk)
 {
-	struct sock **skp;
-
 	pfkey_table_grab();
-	for (skp = &pfkey_table; *skp; skp = &((*skp)->sk_next)) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	sk_del_node_init(sk);
 	pfkey_table_ungrab();
 }
 
@@ -231,6 +221,7 @@ static int pfkey_broadcast(struct sk_buff *skb, int allocation,
 			   int broadcast_flags, struct sock *one_sk)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	struct sk_buff *skb2 = NULL;
 	int err = -ESRCH;
 
@@ -241,7 +232,7 @@ static int pfkey_broadcast(struct sk_buff *skb, int allocation,
 		return -ENOMEM;
 
 	pfkey_lock_table();
-	for (sk = pfkey_table; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &pfkey_table) {
 		struct pfkey_opt *pfk = pfkey_sk(sk);
 		int err2;
 
@@ -2799,12 +2790,13 @@ static int pfkey_read_proc(char *buffer, char **start, off_t offset,
 	off_t begin = 0;
 	int len = 0;
 	struct sock *s;
+	struct hlist_node *node;
 
 	len += sprintf(buffer,"sk       RefCnt Rmem   Wmem   User   Inode\n");
 
 	read_lock(&pfkey_table_lock);
 
-	for (s = pfkey_table; s; s = s->sk_next) {
+	sk_for_each(s, node, &pfkey_table) {
 		len += sprintf(buffer+len,"%p %-6d %-6u %-6u %-6u %-6lu",
 			       s,
 			       atomic_read(&s->sk_refcnt),

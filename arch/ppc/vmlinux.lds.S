@@ -1,9 +1,6 @@
 #include <asm-generic/vmlinux.lds.h>
 
 OUTPUT_ARCH(powerpc)
-SEARCH_DIR(/lib); SEARCH_DIR(/usr/lib); SEARCH_DIR(/usr/local/lib); SEARCH_DIR(/usr/local/powerpc-any-elf/lib);
-/* Do we need any of these for elf?
-   __DYNAMIC = 0;    */
 jiffies = jiffies_64 + 4;
 SECTIONS
 {
@@ -178,4 +175,9 @@ SECTIONS
 
   _end = . ;
   PROVIDE (end = .);
+
+  /* Sections to be discarded. */
+  /DISCARD/ : {
+    *(.exitcall.exit)
+  }
 }

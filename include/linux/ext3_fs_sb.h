@@ -19,6 +19,8 @@
 #ifdef __KERNEL__
 #include <linux/timer.h>
 #include <linux/wait.h>
+#include <linux/blockgroup_lock.h>
+#include <linux/percpu_counter.h>
 #endif
 
 /*
@@ -50,8 +52,11 @@ struct ext3_sb_info {
 	u32 s_next_generation;
 	u32 s_hash_seed[4];
 	int s_def_hash_version;
-	unsigned long s_dir_count;
-	u8 *s_debts;
+        u8 *s_debts;
+	struct percpu_counter s_freeblocks_counter;
+	struct percpu_counter s_freeinodes_counter;
+	struct percpu_counter s_dirs_counter;
+	struct blockgroup_lock s_blockgroup_lock;
 
 	/* Journaling */
 	struct inode * s_journal_inode;
