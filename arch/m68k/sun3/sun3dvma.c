@@ -97,7 +97,7 @@ static void print_holes(struct list_head *holes)
 	printk("end of hole listing...\n");
 	
 }
-#endif DVMA_DEBUG
+#endif /* DVMA_DEBUG */
 
 static inline int refill(void)
 {

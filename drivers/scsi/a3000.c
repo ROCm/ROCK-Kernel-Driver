@@ -225,7 +225,7 @@ static Scsi_Host_Template driver_template = {
 
 #include "scsi_module.c"
 
-int __exit a3000_release(struct Scsi_Host *instance)
+int a3000_release(struct Scsi_Host *instance)
 {
     wd33c93_release();
     DMA(instance)->CNTR = 0;

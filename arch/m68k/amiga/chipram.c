@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/slab.h>
+#include <linux/string.h>
 #include <asm/page.h>
 #include <asm/amigahw.h>
 

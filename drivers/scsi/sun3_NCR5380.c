@@ -1217,8 +1217,8 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
 					    BASR_ACK)) ==
        (BASR_PHASE_MATCH | BASR_ACK)) {
 	    printk("scsi%d: BASR %02x\n", HOSTNO, NCR5380_read(BUS_AND_STATUS_REG));
-	    printk("scsi%d: bus stuck in data phase -- probably a
- single byte overrun!\n", HOSTNO); 
+	    printk("scsi%d: bus stuck in data phase -- probably a single byte "
+		   "overrun!\n", HOSTNO);
 	    printk("not prepared for this error!\n");
 	    printk("please e-mail sammy@sammy.net with a description of how this\n");
 	    printk("error was produced.\n");
