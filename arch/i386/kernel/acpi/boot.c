@@ -43,11 +43,12 @@
 
 #define PREFIX			"ACPI: "
 
-int acpi_noirq __initdata = 0;	/* skip ACPI IRQ initialization */
+int acpi_noirq __initdata;	/* skip ACPI IRQ initialization */
 int acpi_ht __initdata = 1;	/* enable HT */
 
 int acpi_lapic;
 int acpi_ioapic;
+int acpi_strict;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration

@@ -251,17 +251,5 @@ config ACPI_SYSTEM
 	  This driver will enable your system to shut down using ACPI, and
 	  dump your ACPI DSDT table using /proc/acpi/dsdt.
 
-config ACPI_RELAXED_AML
-	bool "Relaxed AML"
-	depends on ACPI_INTERPRETER
-	depends on !IA64_SGI_SN
-	default n
-	help
-	  If you say `Y' here, the ACPI interpreter will relax its checking
-	  for valid AML and will ignore some AML mistakes, such as off-by-one
-	  errors in region sizes.  Some laptops may require this option.  In
-	  particular, many Toshiba laptops require this for correct operation
-	  of the AC module.
-
 endmenu
 

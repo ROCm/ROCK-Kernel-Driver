@@ -171,7 +171,7 @@ u8                                  acpi_gbl_shutdown = TRUE;
 
 const u8                            acpi_gbl_decode_to8bit [8] = {1,2,4,8,16,32,64,128};
 
-const char                          *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT] = {
+const char                          *acpi_gbl_sleep_state_names[ACPI_S_STATE_COUNT] = {
 			  "\\_S0_",
 			  "\\_S1_",
 			  "\\_S2_",
@@ -179,6 +179,11 @@ const char                          *acpi_gbl_db_sleep_states[ACPI_S_STATE_COUNT
 			  "\\_S4_",
 			  "\\_S5_"};
 
+const char                          *acpi_gbl_highest_dstate_names[4] = {
+					   "_S1D",
+					   "_S2D",
+					   "_S3D",
+					   "_S4D"};
 
 /******************************************************************************
  *
