@@ -64,7 +64,7 @@ struct cpuinfo_x86 boot_cpu_data;
 unsigned long mmu_cr4_features;
 EXPORT_SYMBOL_GPL(mmu_cr4_features);
 
-int acpi_disabled __initdata = 0;
+int acpi_disabled = 0;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
