@@ -386,15 +386,6 @@ static __init int broken_ps2_resume(struct dmi_blacklist *d)
 	return 0;
 }
 
-static __init int acer_cpufreq_pst(struct dmi_blacklist *d)
-{
-	printk(KERN_WARNING "%s laptop with broken PST tables in BIOS detected.\n", d->ident);
-	printk(KERN_WARNING "You need to downgrade to 3A21 (09/09/2002), or try a newer BIOS than 3A71 (01/20/2003)\n");
-	printk(KERN_WARNING "cpufreq scaling has been disabled as a result of this.\n");
-	dmi_broken |= BROKEN_CPUFREQ;
-	return 0;
-}
-
 
 /*
  *	Simple "print if true" callback
@@ -745,17 +736,6 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 	{ set_apm_ints, "IBM", {	/* Allow interrupts during suspend on IBM laptops */
 			MATCH(DMI_SYS_VENDOR, "IBM"),
 			NO_MATCH, NO_MATCH, NO_MATCH
-			} },
-
-	/*
-	 * Some Athlon laptops have really fucked PST tables.
-	 * A BIOS update is all that can save them.
-	 * Mention this, and disable cpufreq.
-	 */
-	{ acer_cpufreq_pst, "Acer Aspire", {
-			MATCH(DMI_SYS_VENDOR, "Insyde Software"),
-			MATCH(DMI_BIOS_VERSION, "3A71"),
-			NO_MATCH, NO_MATCH,
 			} },
 
 #ifdef	CONFIG_ACPI_BOOT
