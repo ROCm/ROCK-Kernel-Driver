@@ -1,4 +1,4 @@
-// Portions of this file taken from 
+// Portions of this file taken from
 // Petko Manolov - Petkan (petkan@dce.bg)
 // from his driver pegasus.c
 
@@ -1170,23 +1170,20 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	if (rc)	{
 		// Nope we couldn't find one we liked.
 		// This device was not meant for us to control.
-		kfree( ether_dev );
-		return	NULL;
+		goto error_all;
 	}
 
-	// Now that we FOUND a configuration. let's try to make the 
+	// Now that we FOUND a configuration. let's try to make the
 	// device go into it.
 	if ( usb_set_configuration( usb, ether_dev->bConfigurationValue ) ) {
 		err("usb_set_configuration() failed");
-		kfree( ether_dev );
-		return NULL;
+		goto error_all;
 	}
 
 	// Now set the communication interface up as required.
 	if (usb_set_interface(usb, ether_dev->comm_bInterfaceNumber, ether_dev->comm_bAlternateSetting)) {
 		err("usb_set_interface() failed");
-		kfree( ether_dev );
-		return NULL;
+		goto error_all;
 	}
 
 	// Only turn traffic on right now if we must...
@@ -1194,23 +1191,21 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 		// We found an alternate setting for the data
 		// interface that allows us to turn off traffic.
 		// We should use it.
-		if (usb_set_interface( usb, 
-		                       ether_dev->data_bInterfaceNumber, 
+		if (usb_set_interface( usb,
+		                       ether_dev->data_bInterfaceNumber,
 		                       ether_dev->data_bAlternateSetting_without_traffic)) {
 			err("usb_set_interface() failed");
-			kfree( ether_dev );
-			return NULL;
+			goto error_all;
 		}
 	} else	{
 		// We didn't find an alternate setting for the data
 		// interface that would let us turn off traffic.
 		// Oh well, let's go ahead and do what we must...
-		if (usb_set_interface( usb, 
-		                       ether_dev->data_bInterfaceNumber, 
+		if (usb_set_interface( usb,
+		                       ether_dev->data_bInterfaceNumber,
 		                       ether_dev->data_bAlternateSetting_with_traffic)) {
 			err("usb_set_interface() failed");
-			kfree( ether_dev );
-			return NULL;
+			goto error_all;
 		}
 	}
 
@@ -1220,8 +1215,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 		// Hmm...  The kernel is not sharing today...
 		// Fine, we didn't want it anyway...
 		err( "Unable to initialize ethernet device" );
-		kfree( ether_dev );
-		return	NULL;
+		goto error_all;
 	}
 
 	// Now that we have an ethernet device, let's set it up
@@ -1241,7 +1235,7 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// We'll keep track of this information for later...
 	ether_dev->usb = usb;
 	ether_dev->net = net;
-	
+
 	// and don't forget the MAC address.
 	set_ethernet_addr( ether_dev );
 
@@ -1249,12 +1243,12 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	log_device_info( ether_dev );
 
 	// I claim this interface to be a CDC Ethernet Networking device
-	usb_driver_claim_interface( &CDCEther_driver, 
-	                            &(usb->config[ether_dev->configuration_num].interface[ether_dev->comm_interface]), 
+	usb_driver_claim_interface( &CDCEther_driver,
+	                            &(usb->config[ether_dev->configuration_num].interface[ether_dev->comm_interface]),
 	                            ether_dev );
 	// I claim this interface to be a CDC Ethernet Networking device
-	usb_driver_claim_interface( &CDCEther_driver, 
-	                            &(usb->config[ether_dev->configuration_num].interface[ether_dev->data_interface]), 
+	usb_driver_claim_interface( &CDCEther_driver,
+	                            &(usb->config[ether_dev->configuration_num].interface[ether_dev->data_interface]),
 	                            ether_dev );
 
 	// Does this REALLY do anything???
@@ -1265,6 +1259,14 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 
 	// Okay, we are finally done...
 	return NULL;
+
+	// bailing out with our tail between our knees
+error_all:
+	usb_free_urb(ether_dev->tx_urb);
+	usb_free_urb(ether_dev->rx_urb);
+	usb_free_urb(ether_dev->intr_urb);
+	kfree( ether_dev );
+	return	NULL;
 }
 
 
