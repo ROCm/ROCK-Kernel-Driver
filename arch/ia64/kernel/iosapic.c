@@ -217,10 +217,8 @@ set_rte (unsigned int vector, unsigned int dest, int mask)
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
-		writel(IOSAPIC_RTE_HIGH(rte_index), addr + IOSAPIC_REG_SELECT);
-		writel(high32, addr + IOSAPIC_WINDOW);
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-		writel(low32, addr + IOSAPIC_WINDOW);
+		iosapic_write(addr, IOSAPIC_RTE_HIGH(rte_index), high32);
+		iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
 		iosapic_intr_info[vector].low32 = low32;
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
@@ -249,12 +247,9 @@ mask_irq (unsigned int irq)
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-
 		/* set only the mask bit */
 		low32 = iosapic_intr_info[vec].low32 |= IOSAPIC_MASK;
-
-		writel(low32, addr + IOSAPIC_WINDOW);
+		iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 }
@@ -275,9 +270,8 @@ unmask_irq (unsigned int irq)
 
 	spin_lock_irqsave(&iosapic_lock, flags);
 	{
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
 		low32 = iosapic_intr_info[vec].low32 &= ~IOSAPIC_MASK;
-		writel(low32, addr + IOSAPIC_WINDOW);
+		iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 }
@@ -325,10 +319,8 @@ iosapic_set_affinity (unsigned int irq, cpumask_t mask)
 			low32 |= (IOSAPIC_FIXED << IOSAPIC_DELIVERY_SHIFT);
 
 		iosapic_intr_info[vec].low32 = low32;
-		writel(IOSAPIC_RTE_HIGH(rte_index), addr + IOSAPIC_REG_SELECT);
-		writel(high32, addr + IOSAPIC_WINDOW);
-		writel(IOSAPIC_RTE_LOW(rte_index), addr + IOSAPIC_REG_SELECT);
-		writel(low32, addr + IOSAPIC_WINDOW);
+		iosapic_write(addr, IOSAPIC_RTE_HIGH(rte_index), high32);
+		iosapic_write(addr, IOSAPIC_RTE_LOW(rte_index), low32);
 	}
 	spin_unlock_irqrestore(&iosapic_lock, flags);
 #endif
@@ -351,7 +343,7 @@ iosapic_end_level_irq (unsigned int irq)
 	ia64_vector vec = irq_to_vector(irq);
 
 	move_irq(irq);
-	writel(vec, iosapic_intr_info[vec].addr + IOSAPIC_EOI);
+	iosapic_eoi(iosapic_intr_info[vec].addr, vec);
 }
 
 #define iosapic_shutdown_level_irq	mask_irq
@@ -428,8 +420,7 @@ iosapic_version (char *addr)
 	 *	unsigned int reserved2 : 8;
 	 * }
 	 */
-	writel(IOSAPIC_VERSION, addr + IOSAPIC_REG_SELECT);
-	return readl(IOSAPIC_WINDOW + addr);
+	return iosapic_read(addr, IOSAPIC_VERSION);
 }
 
 /*

@@ -1,13 +1,11 @@
 #ifndef __ASM_IA64_IOSAPIC_H
 #define __ASM_IA64_IOSAPIC_H
 
-#define	IOSAPIC_DEFAULT_ADDR	0xFEC00000
-
 #define	IOSAPIC_REG_SELECT	0x0
 #define	IOSAPIC_WINDOW		0x10
 #define	IOSAPIC_EOI		0x40
 
-#define	IOSAPIC_VERSION	0x1
+#define	IOSAPIC_VERSION		0x1
 
 /*
  * Redirection table entry
@@ -54,6 +52,23 @@
 #ifdef CONFIG_IOSAPIC
 
 #define NR_IOSAPICS			256
+
+static inline unsigned int iosapic_read(char *iosapic, unsigned int reg)
+{
+	writel(reg, iosapic + IOSAPIC_REG_SELECT);
+	return readl(iosapic + IOSAPIC_WINDOW);
+}
+
+static inline void iosapic_write(char *iosapic, unsigned int reg, u32 val)
+{
+	writel(reg, iosapic + IOSAPIC_REG_SELECT);
+	writel(val, iosapic + IOSAPIC_WINDOW);
+}
+
+static inline void iosapic_eoi(char *iosapic, u32 vector)
+{
+	writel(vector, iosapic + IOSAPIC_EOI);
+}
 
 extern void __init iosapic_system_init (int pcat_compat);
 extern void __init iosapic_init (unsigned long address,
