@@ -751,18 +751,15 @@ static int mc32_load_rx_ring(struct net_device *dev)
 	
 	rx_base=lp->rx_chain;
 
-	for(i=0; i<RX_RING_LEN; i++)
-	{
+	for(i=0; i<RX_RING_LEN; i++) {
 		lp->rx_ring[i].skb=alloc_skb(1532, GFP_KERNEL);
-		skb_reserve(lp->rx_ring[i].skb, 18);  
-
-		if(lp->rx_ring[i].skb==NULL)
-		{
-			for(;i>=0;i--)
+		if (lp->rx_ring[i].skb==NULL) {
+			for (;i>=0;i--)
 				kfree_skb(lp->rx_ring[i].skb);
 			return -ENOBUFS;
 		}
-		
+		skb_reserve(lp->rx_ring[i].skb, 18);
+
 		p=isa_bus_to_virt(lp->base+rx_base);
 				
 		p->control=0;
