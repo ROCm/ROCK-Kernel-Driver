@@ -204,7 +204,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 			if (!atkbd->release) {
 				mod_timer(&atkbd->timer,
 					jiffies + (test_bit(atkbd->keycode[code],
-						&atkbd->dev.key) ? HZ/33 : HZ/4) + HZ/100);
+						atkbd->dev.key) ? HZ/33 : HZ/4) + HZ/100);
 				atkbd->lastkey = atkbd->keycode[code];
 			}
 
