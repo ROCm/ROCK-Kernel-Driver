@@ -1931,3 +1931,11 @@ Changes for patch v213
 
 - Protected <scan_dir_for_removable> and <get_removable_partition>
   from changing directory contents
+===============================================================================
+Changes for patch v214
+
+- Switched to ISO C structure field initialisers
+
+- Updated README from master HTML file
+
+- Fixed devfs entry leak in <devfs_readdir> when *readdir fails
