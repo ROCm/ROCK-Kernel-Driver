@@ -15,15 +15,6 @@
 /* entry.S is sensitive to the offsets of these fields */ /* XXX P3 Is it? */
 typedef struct {
 	unsigned int __softirq_pending;
-	unsigned int __unused_1;
-#ifndef CONFIG_SMP
-	unsigned int WAS__local_irq_count;
-#else
-	unsigned int __unused_on_SMP;	/* DaveM says use brlock for SMP irq. KAO */
-#endif
-	unsigned int WAS__local_bh_count;
-	unsigned int __syscall_count;
-        struct task_struct * __ksoftirqd_task;
 } ____cacheline_aligned irq_cpustat_t;
 
 #include <linux/irq_cpustat.h>	/* Standard mappings for irq_cpustat_t above */
@@ -86,11 +77,11 @@ typedef struct {
 #define hardirq_trylock()       (!in_interrupt())
 #define hardirq_endlock()       do { } while (0)
 
-#ifndef CONFIG_SMP
 #define irq_enter()             (preempt_count() += HARDIRQ_OFFSET)
 
 #ifdef CONFIG_PREEMPT
-# define in_atomic()	(preempt_count() != kernel_locked())
+#include <linux/smp_lock.h>
+# define in_atomic()	((preempt_count() & ~PREEMPT_ACTIVE) != kernel_locked())
 # define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
 #else
 # define in_atomic()	(preempt_count() != 0)
@@ -104,63 +95,10 @@ do {                                                                    \
                 preempt_enable_no_resched();                            \
 } while (0)
 
-#else
-
-/* Note that local_irq_count() is replaced by sparc64 specific version for SMP */
-
-/* XXX This is likely to be broken by the above preempt-based IRQs */
-#define irq_enter()		br_read_lock(BR_GLOBALIRQ_LOCK)
-#undef local_irq_count
-#define local_irq_count(cpu)	(__brlock_array[cpu][BR_GLOBALIRQ_LOCK])
-#define irq_exit()		br_read_unlock(BR_GLOBALIRQ_LOCK)
-#endif
-
-#ifdef CONFIG_PREEMPT
-# define in_atomic()	(preempt_count() != kernel_locked())
-#else
-# define in_atomic()	(preempt_count() != 0)
-#endif
-
 #ifndef CONFIG_SMP
-
-#define synchronize_irq(irq)	barrier()
-
-#else /* (CONFIG_SMP) */
-
-static __inline__ int irqs_running(void)
-{
-	int i;
-
-	for (i = 0; i < smp_num_cpus; i++)
-		if (local_irq_count(cpu_logical_map(i)))
-			return 1;
-	return 0;
-}
-
-extern unsigned char global_irq_holder;
-
-static inline void release_irqlock(int cpu)
-{
-	/* if we didn't own the irq lock, just ignore... */
-	if(global_irq_holder == (unsigned char) cpu) {
-		global_irq_holder = NO_PROC_ID;
-		br_write_unlock(BR_GLOBALIRQ_LOCK);
-	}
-}
-
-#if 0
-static inline int hardirq_trylock(int cpu)
-{
-	spinlock_t *lock = &__br_write_locks[BR_GLOBALIRQ_LOCK].lock;
-
-	return (!local_irq_count(cpu) && !spin_is_locked(lock));
-}
-#endif
-
+# define synchronize_irq(irq)	barrier()
+#else /* SMP */
 extern void synchronize_irq(unsigned int irq);
-
-#endif /* CONFIG_SMP */
-
-// extern void show_stack(unsigned long * esp);
+#endif /* SMP */
 
 #endif /* __SPARC_HARDIRQ_H */
