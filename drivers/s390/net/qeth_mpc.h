@@ -14,7 +14,7 @@
 
 #include <asm/qeth.h>
 
-#define VERSION_QETH_MPC_H "$Revision: 1.34 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.35 $"
 
 extern const char *VERSION_QETH_MPC_C;
 
@@ -258,6 +258,7 @@ struct qeth_arp_query_data {
 /* used as parameter for arp_query reply */
 struct qeth_arp_query_info {
 	__u32 udata_len;
+	__u16 mask_bits;
 	__u32 udata_offset;
 	__u32 no_entries;
 	char *udata;
@@ -296,6 +297,29 @@ struct qeth_change_addr {
 	__u8 addr[OSA_ADDR_LEN];
 } __attribute__ ((packed));
 
+
+struct qeth_snmp_cmd {
+	__u8  token[16];
+	__u32 request;
+	__u32 interface;
+	__u32 returncode;
+	__u32 firmwarelevel;
+	__u32 seqno;
+	__u8  data;
+} __attribute__ ((packed));
+
+struct qeth_snmp_ureq_hdr {
+	__u32   data_len;
+	__u32   req_len;
+	__u32   reserved1;
+	__u32   reserved2;
+} __attribute__ ((packed));
+
+struct qeth_snmp_ureq {
+	struct qeth_snmp_ureq_hdr hdr;
+	struct qeth_snmp_cmd cmd;
+} __attribute__((packed));
+
 struct qeth_ipacmd_setadpparms_hdr {
 	__u32 supp_hw_cmds;
 	__u32 reserved1;
@@ -313,6 +337,7 @@ struct qeth_ipacmd_setadpparms {
 	union {
 		struct qeth_query_cmds_supp query_cmds_supp;
 		struct qeth_change_addr change_addr;
+		struct qeth_snmp_cmd snmp;
 		__u32 mode;
 	} data;
 } __attribute__ ((packed));

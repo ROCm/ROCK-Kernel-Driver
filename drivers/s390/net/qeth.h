@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.107 $"
+#define VERSION_QETH_H 		"$Revision: 1.108 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -179,15 +179,26 @@ struct qeth_perf_stats {
 
 	unsigned int sc_dp_p;
 	unsigned int sc_p_dp;
-
+	/* qdio_input_handler: number of times called, time spent in */
 	__u64 inbound_start_time;
 	unsigned int inbound_cnt;
 	unsigned int inbound_time;
+	/* qeth_send_packet: number of times called, time spent in */
 	__u64 outbound_start_time;
 	unsigned int outbound_cnt;
 	unsigned int outbound_time;
-	unsigned int inbound_do_qdio;
-	unsigned int outbound_do_qdio;
+	/* qdio_output_handler: number of times called, time spent in */
+	__u64 outbound_handler_start_time;
+	unsigned int outbound_handler_cnt;
+	unsigned int outbound_handler_time;
+	/* number of calls to and time spent in do_QDIO for inbound queue */
+	__u64 inbound_do_qdio_start_time;
+	unsigned int inbound_do_qdio_cnt;
+	unsigned int inbound_do_qdio_time;
+	/* number of calls to and time spent in do_QDIO for outbound queues */
+	__u64 outbound_do_qdio_start_time;
+	unsigned int outbound_do_qdio_cnt;
+	unsigned int outbound_do_qdio_time;
 };
 #endif /* CONFIG_QETH_PERF_STATS */
 
@@ -714,6 +725,15 @@ struct qeth_card_list_struct {
 
 extern struct qeth_card_list_struct qeth_card_list;
 
+/*notifier list */
+struct qeth_notify_list_struct {
+	struct list_head list;
+	struct task_struct *task;
+	int signum;
+};
+extern spinlock_t qeth_notify_lock;
+extern struct list_head qeth_notify_list;
+
 /*some helper functions*/
 
 inline static __u8
@@ -996,6 +1016,12 @@ qeth_add_rxip(struct qeth_card *, enum qeth_prot_versions, const u8 *);
 
 extern void
 qeth_del_rxip(struct qeth_card *, enum qeth_prot_versions, const u8 *);
+
+extern int
+qeth_notifier_register(struct task_struct *, int );
+
+extern int
+qeth_notifier_unregister(struct task_struct * );
 
 extern void
 qeth_schedule_recovery(struct qeth_card *);
