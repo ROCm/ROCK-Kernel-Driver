@@ -27,7 +27,7 @@
 #include "i82365.h"
 
 #if 0
-#define DEBUG(x,args...)	printk(__FUNCTION__ ": " x,##args)
+#define DEBUG(x,args...)	printk("%s: " x, __FUNCTION__, ##args)
 #else
 #define DEBUG(x,args...)
 #endif
@@ -300,29 +300,6 @@ static int yenta_set_socket(pci_socket_t *socket, socket_state_t *state)
 	return 0;
 }
 
-static int yenta_get_io_map(pci_socket_t *socket, struct pccard_io_map *io)
-{
-	int map;
-	unsigned char ioctl, addr;
-
-	map = io->map;
-	if (map > 1)
-		return -EINVAL;
-
-	io->start = exca_readw(socket, I365_IO(map)+I365_W_START);
-	io->stop = exca_readw(socket, I365_IO(map)+I365_W_STOP);
-
-	ioctl = exca_readb(socket, I365_IOCTL);
-	addr = exca_readb(socket, I365_ADDRWIN);
-	io->speed = to_ns(ioctl & I365_IOCTL_WAIT(map)) ? 1 : 0;
-	io->flags  = (addr & I365_ENA_IO(map)) ? MAP_ACTIVE : 0;
-	io->flags |= (ioctl & I365_IOCTL_0WS(map)) ? MAP_0WS : 0;
-	io->flags |= (ioctl & I365_IOCTL_16BIT(map)) ? MAP_16BIT : 0;
-	io->flags |= (ioctl & I365_IOCTL_IOCS16(map)) ? MAP_AUTOSZ : 0;
-
-	return 0;
-}
-
 static int yenta_set_io_map(pci_socket_t *socket, struct pccard_io_map *io)
 {
 	int map;
@@ -353,41 +330,6 @@ static int yenta_set_io_map(pci_socket_t *socket, struct pccard_io_map *io)
 
 	if (io->flags & MAP_ACTIVE)
 		exca_writeb(socket, I365_ADDRWIN, addr | enable);
-	return 0;
-}
-
-static int yenta_get_mem_map(pci_socket_t *socket, struct pccard_mem_map *mem)
-{
-	int map;
-	unsigned char addr;
-	unsigned int start, stop, page, offset;
-
-	map = mem->map;
-	if (map > 4)
-		return -EINVAL;
-
-	addr = exca_readb(socket, I365_ADDRWIN);
-	mem->flags = (addr & I365_ENA_MEM(map)) ? MAP_ACTIVE : 0;
-
-	start = exca_readw(socket, I365_MEM(map) + I365_W_START);
-	mem->flags |= (start & I365_MEM_16BIT) ? MAP_16BIT : 0;
-	mem->flags |= (start & I365_MEM_0WS) ? MAP_0WS : 0;
-	start = (start & 0x0fff) << 12;
-
-	stop = exca_readw(socket, I365_MEM(map) + I365_W_STOP);
-	mem->speed = to_ns(stop >> 14);
-	stop = ((stop & 0x0fff) << 12) + 0x0fff;
-
-	offset = exca_readw(socket, I365_MEM(map) + I365_W_OFF);
-	mem->flags |= (offset & I365_MEM_WRPROT) ? MAP_WRPROT : 0;
-	mem->flags |= (offset & I365_MEM_REG) ? MAP_ATTRIB : 0;
-	offset = ((offset & 0x3fff) << 12) + start;
-	mem->card_start = offset & 0x3ffffff;
-
-	page = exca_readb(socket, CB_MEM_PAGE(map)) << 24;
-	mem->sys_start = start + page;
-	mem->sys_stop = start + page;
-
 	return 0;
 }
 
@@ -572,7 +514,6 @@ static void yenta_get_socket_capabilities(pci_socket_t *socket, u32 isa_irq_mask
 	socket->cap.pci_irq = socket->cb_irq;
 	socket->cap.irq_mask = yenta_probe_irq(socket, isa_irq_mask);
 	socket->cap.cb_dev = socket->dev;
-	socket->cap.bus = NULL;
 
 	printk("Yenta IRQ list %04x, PCI irq%d\n", socket->cap.irq_mask, socket->cb_irq);
 }
@@ -935,9 +876,7 @@ struct pci_socket_ops yenta_operations = {
 	yenta_get_status,
 	yenta_get_socket,
 	yenta_set_socket,
-	yenta_get_io_map,
 	yenta_set_io_map,
-	yenta_get_mem_map,
 	yenta_set_mem_map,
 	yenta_proc_setup
 };

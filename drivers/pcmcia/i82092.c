@@ -63,9 +63,7 @@ static struct pccard_operations i82092aa_operations = {
 	.get_status		= i82092aa_get_status,
 	.get_socket		= i82092aa_get_socket,
 	.set_socket		= i82092aa_set_socket,
-	.get_io_map		= i82092aa_get_io_map,
 	.set_io_map		= i82092aa_set_io_map,
-	.get_mem_map		= i82092aa_get_mem_map,
 	.set_mem_map		= i82092aa_set_mem_map,
 	.proc_setup		= i82092aa_proc_setup,
 };
@@ -688,34 +686,6 @@ static int i82092aa_set_socket(unsigned int sock, socket_state_t *state)
 	return 0;
 }
 
-static int i82092aa_get_io_map(unsigned int sock, struct pccard_io_map *io)
-{
-	unsigned char map, ioctl, addr;
-	
-	enter("i82092aa_get_io_map");
-	map = io->map;
-	if (map > 1) {
-		leave("i82092aa_get_io_map with -EINVAL");
-		return -EINVAL;
-	}
-	
-	/* FIXME: How does this fit in with the PCI resource (re)allocation */
-	io->start = indirect_read16(sock, I365_IO(map)+I365_W_START);
-	io->stop  = indirect_read16(sock, I365_IO(map)+I365_W_START);
-	
-	ioctl = indirect_read(sock,I365_IOCTL); /* IOCREG: I/O Control Register */
-	addr  = indirect_read(sock,I365_ADDRWIN); /* */
-	
-	io->speed = to_ns(ioctl & I365_IOCTL_WAIT(map)) ? 1 : 0; /* check this out later */
-	io->flags = 0;
-	
-	if (addr & I365_IOCTL_16BIT(map))
-		io->flags |= MAP_AUTOSZ;
-		
-	leave("i82092aa_get_io_map");
-	return 0;
-}
-
 static int i82092aa_set_io_map(unsigned sock, struct pccard_io_map *io)
 {
 	unsigned char map, ioctl;
@@ -757,64 +727,6 @@ static int i82092aa_set_io_map(unsigned sock, struct pccard_io_map *io)
 			
 	leave("i82092aa_set_io_map");	
 	return 0;
-}
-
-static int i82092aa_get_mem_map(unsigned sock, struct pccard_mem_map *mem)
-{
-	unsigned short base, i;
-	unsigned char map, addr;
-	
-	enter("i82092aa_get_mem_map");
-	
-	mem->flags = 0;
-	mem->speed = 0;
-	map = mem->map;
-	if (map > 4) {
-		leave("i82092aa_get_mem_map: -EINVAL");
-		return -EINVAL;
-	}
-	
-	addr = indirect_read(sock, I365_ADDRWIN);
-		
-	if (addr & I365_ENA_MEM(map))
-		mem->flags |= MAP_ACTIVE;		/* yes this mapping is active */
-	
-	base = I365_MEM(map); 
-	
-	/* Find the start address - this register also has mapping info */
-	
-	i = indirect_read16(sock,base+I365_W_START);
-	if (i & I365_MEM_16BIT)
-		mem->flags |= MAP_16BIT;
-	if (i & I365_MEM_0WS)
-		mem->flags |= MAP_0WS;
-	
-	mem->sys_start = ((unsigned long)(i & 0x0fff) << 12);
-	
-	/* Find the end address - this register also has speed info */
-	i = indirect_read16(sock,base+I365_W_STOP);
-	if (i & I365_MEM_WS0)
-		mem->speed = 1;
-	if (i & I365_MEM_WS1)
-		mem->speed += 2;
-	mem->speed = to_ns(mem->speed);
-	mem->sys_stop = ( (unsigned long)(i & 0x0fff) << 12) + 0x0fff;
-	
-	/* Find the card start address, also some more MAP attributes */
-	
-	i = indirect_read16(sock, base+I365_W_OFF);
-	if (i & I365_MEM_WRPROT)
-		mem->flags |= MAP_WRPROT;
-	if (i & I365_MEM_REG)
-		mem->flags |= MAP_ATTRIB;
-	mem->card_start = ( (unsigned long)(i & 0x3fff)<12) + mem->sys_start;
-	mem->card_start &=  0x3ffffff;
-	
-	printk("Card %i is from %lx to %lx \n",sock,mem->sys_start,mem->sys_stop);
-	
-	leave("i82092aa_get_mem_map");
-	return 0;
-	
 }
 
 static int i82092aa_set_mem_map(unsigned sock, struct pccard_mem_map *mem)
