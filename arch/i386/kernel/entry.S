@@ -395,6 +395,11 @@ BUILD_INTERRUPT(call_function_interrupt,CALL_FUNCTION_VECTOR)
 BUILD_INTERRUPT(apic_timer_interrupt,LOCAL_TIMER_VECTOR)
 BUILD_INTERRUPT(error_interrupt,ERROR_APIC_VECTOR)
 BUILD_INTERRUPT(spurious_interrupt,SPURIOUS_APIC_VECTOR)
+
+#ifdef CONFIG_X86_MCE_P4THERMAL
+BUILD_INTERRUPT(thermal_interrupt,THERMAL_APIC_VECTOR)
+#endif
+
 #endif
 
 ENTRY(divide_error)
