@@ -1067,6 +1067,7 @@ Module parameters
     irq_mask - IRQ bitmask, specifies the available IRQs as bits
                (default = 0xffff, all available)
     irq_list - List of available interrupts (default = -1, not specified)
+               4 numbers must be given (if specified).
     ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
@@ -1083,6 +1084,8 @@ Module parameters
 
     About capture IBL, see the description of snd-vx222 module.
 
+    Note: the driver is build only when CONFIG_ISA is set.
+    
   Module snd-vxp440
   -----------------
 
@@ -1090,6 +1093,7 @@ Module parameters
 
     irq_mask - IRQ bitmask, specifies the available IRQs as bits
     irq_list - List of available interrupts (default = -1, not specified)
+               4 numbers must be given (if specified).
     ibl      - Capture IBL size. (default = 0, minimum size)
 
     Module supports up to 8 cards.  The module is compiled only when
@@ -1106,6 +1110,8 @@ Module parameters
 
     About capture IBL, see the description of snd-vx222 module.
 
+    Note: the driver is build only when CONFIG_ISA is set.
+    
   Module snd-ymfpci
   -----------------
 
