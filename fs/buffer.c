@@ -36,6 +36,7 @@
 #include <linux/buffer_head.h>
 #include <linux/bio.h>
 #include <linux/notifier.h>
+#include <linux/cpu.h>
 #include <asm/bitops.h>
 
 static void invalidate_bh_lrus(void);

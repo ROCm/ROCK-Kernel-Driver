@@ -29,6 +29,7 @@
 #include <linux/thread_info.h>
 #include <linux/time.h>
 #include <linux/jiffies.h>
+#include <linux/cpu.h>
 
 #include <asm/uaccess.h>
 #include <asm/div64.h>

@@ -27,6 +27,7 @@
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/sysctl.h>
+#include <linux/cpu.h>
 
 /*
  * The maximum number of pages to writeout in a single bdflush/kupdate

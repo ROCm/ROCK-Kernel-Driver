@@ -31,6 +31,24 @@ struct cpu {
 extern int register_cpu(struct cpu *, int, struct node *);
 extern struct class cpu_class;
 
+struct notifier_block;
+
+#ifdef CONFIG_SMP
+/* Need to know about CPUs going up/down? */
+extern int register_cpu_notifier(struct notifier_block *nb);
+extern void unregister_cpu_notifier(struct notifier_block *nb);
+
+int cpu_up(unsigned int cpu);
+#else
+static inline int register_cpu_notifier(struct notifier_block *nb)
+{
+	return 0;
+}
+static inline void unregister_cpu_notifier(struct notifier_block *nb)
+{
+}
+#endif /* CONFIG_SMP */
+
 /* Stop CPUs going up and down. */
 extern struct semaphore cpucontrol;
 #endif /* _LINUX_CPU_H_ */
