@@ -697,37 +697,37 @@ static struct net_device sbni7_dev = {
 	next:		NEXT_DEV,
 	init:		sbni_probe,
 };
-static struct net_device sbni6_dev =
+static struct net_device sbni6_dev = {
 	name:		"sbni6",
 	next:		&sbni7_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni5_dev =
+static struct net_device sbni5_dev = {
 	name:		"sbni5",
 	next:		&sbni6_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni4_dev =
+static struct net_device sbni4_dev = {
 	name:		"sbni4",
 	next:		&sbni5_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni3_dev =
+static struct net_device sbni3_dev = {
 	name:		"sbni3",
 	next:		&sbni4_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni2_dev =
+static struct net_device sbni2_dev = {
 	name:		"sbni2",
 	next:		&sbni3_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni1_dev =
+static struct net_device sbni1_dev = {
 	name:		"sbni1",
 	next:		&sbni2_dev,
 	init:		sbni_probe,
 };
-static struct net_device sbni0_dev =
+static struct net_device sbni0_dev = {
 	name:		"sbni0",
 	next:		&sbni1_dev,
 	init:		sbni_probe,
