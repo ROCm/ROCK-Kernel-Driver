@@ -265,8 +265,9 @@ extern void		__raw_writeq(u64 b, volatile void __iomem *addr);
  * Mapping from port numbers to __iomem space is pretty easy.
  */
 
-/* These two have to be extern inline so that we don't get redefinition
-   errors building lib/iomap.c.  Which we don't want anyway, but...  */
+/* These two have to be extern inline because of the extern prototype from
+   <asm-generic/iomap.h>.  It is not legal to mix "extern" and "static" for
+   the same declaration.  */
 extern inline void __iomem *ioport_map(unsigned long port, unsigned int size)
 {
 	return IO_CONCAT(__IO_PREFIX,ioportmap) (port);

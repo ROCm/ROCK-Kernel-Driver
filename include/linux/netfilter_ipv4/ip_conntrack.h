@@ -172,9 +172,6 @@ struct ip_conntrack
            plus 1 for any connection(s) we are `master' for */
 	struct nf_conntrack ct_general;
 
-	/* These are my tuples; original and reply */
-	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
-
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 
@@ -199,12 +196,7 @@ struct ip_conntrack
 	/* Helper, if any. */
 	struct ip_conntrack_helper *helper;
 
-	/* Our various nf_ct_info structs specify *what* relation this
-           packet has to the conntrack */
-	struct nf_ct_info infos[IP_CT_NUMBER];
-
 	/* Storage reserved for other modules: */
-
 	union ip_conntrack_proto proto;
 
 	union ip_conntrack_help help;
@@ -220,6 +212,9 @@ struct ip_conntrack
 	} nat;
 #endif /* CONFIG_IP_NF_NAT_NEEDED */
 
+	/* Traversed often, so hopefully in different cacheline to top */
+	/* These are my tuples; original and reply */
+	struct ip_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
 };
 
 /* get master conntrack via master expectation */
@@ -238,8 +233,12 @@ ip_conntrack_tuple_taken(const struct ip_conntrack_tuple *tuple,
 			 const struct ip_conntrack *ignored_conntrack);
 
 /* Return conntrack_info and tuple hash for given skb. */
-extern struct ip_conntrack *
-ip_conntrack_get(struct sk_buff *skb, enum ip_conntrack_info *ctinfo);
+static inline struct ip_conntrack *
+ip_conntrack_get(const struct sk_buff *skb, enum ip_conntrack_info *ctinfo)
+{
+	*ctinfo = skb->nfctinfo;
+	return (struct ip_conntrack *)skb->nfct;
+}
 
 /* decrement reference count on a conntrack */
 extern inline void ip_conntrack_put(struct ip_conntrack *ct);
@@ -306,12 +305,13 @@ struct ip_conntrack_stat
 	unsigned int insert_failed;
 	unsigned int drop;
 	unsigned int early_drop;
-	unsigned int icmp_error;
+	unsigned int error;
 	unsigned int expect_new;
 	unsigned int expect_create;
 	unsigned int expect_delete;
 };
 
+#define CONNTRACK_STAT_INC(count) (__get_cpu_var(ip_conntrack_stat).count++)
 
 /* eg. PROVIDES_CONNTRACK(ftp); */
 #define PROVIDES_CONNTRACK(name)                        \

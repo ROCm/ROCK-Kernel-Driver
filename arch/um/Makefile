@@ -67,7 +67,7 @@ LINK_WRAPS = -Wl,--wrap,malloc -Wl,--wrap,free -Wl,--wrap,calloc
 # included; the values here are meaningless
 
 CONFIG_NEST_LEVEL ?= 0
-CONFIG_KERNEL_HALF_GIGS ?=  0
+CONFIG_KERNEL_HALF_GIGS ?= 0
 
 SIZE = (($(CONFIG_NEST_LEVEL) + $(CONFIG_KERNEL_HALF_GIGS)) * 0x20000000)
 
@@ -109,8 +109,12 @@ CPP_MODE_TT := $(shell [ "$(CONFIG_MODE_TT)" = "y" ] && echo -DMODE_TT)
 CONFIG_KERNEL_STACK_ORDER ?= 2
 STACK_SIZE := $(shell echo $$[ 4096 * (1 << $(CONFIG_KERNEL_STACK_ORDER)) ] )
 
+ifndef START
+  START = $$(($(TOP_ADDR) - $(SIZE)))
+endif
+
 CPPFLAGS_vmlinux.lds = $(shell echo -U$(SUBARCH) \
-	-DSTART=$$(($(TOP_ADDR) - $(SIZE))) -DELF_ARCH=$(ELF_ARCH) \
+	-DSTART=$(START) -DELF_ARCH=$(ELF_ARCH) \
 	-DELF_FORMAT=\"$(ELF_FORMAT)\" $(CPP_MODE_TT) \
 	-DKERNEL_STACK_SIZE=$(STACK_SIZE))
 

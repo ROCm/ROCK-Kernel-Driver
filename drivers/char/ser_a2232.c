@@ -599,10 +599,7 @@ int ch, err, n, p;
 					
 				/* WakeUp if output buffer runs low */
 				if ((port->gs.xmit_cnt <= port->gs.wakeup_chars) && port->gs.tty) {
-					if ((port->gs.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && port->gs.tty->ldisc.write_wakeup){
-						(port->gs.tty->ldisc.write_wakeup)(port->gs.tty);
-					}
-					wake_up_interruptible(&port->gs.tty->write_wait);
+					tty_wakeup(port->gs.tty);
 				}
 			} // if the port is used
 		} // for every port on the board

@@ -1,6 +1,5 @@
 /*
- * Alpha IO and memory functions.. Just expand the inlines in the header
- * files..
+ * Alpha IO and memory functions.
  */
 
 #include <linux/kernel.h>

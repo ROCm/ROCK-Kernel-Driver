@@ -366,10 +366,7 @@ raw3215_tasklet(void *data)
 	tty = raw->tty;
 	if (tty != NULL &&
 	    RAW3215_BUFFER_SIZE - raw->count >= RAW3215_MIN_SPACE) {
-		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    tty->ldisc.write_wakeup)
-			(tty->ldisc.write_wakeup)(tty);
-		wake_up_interruptible(&tty->write_wait);
+	    	tty_wakeup(tty);
 	}
 }
 
@@ -1055,10 +1052,7 @@ tty3215_flush_buffer(struct tty_struct *tty)
 
 	raw = (struct raw3215_info *) tty->driver_data;
 	raw3215_flush_buffer(raw);
-	wake_up_interruptible(&tty->write_wait);
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    tty->ldisc.write_wakeup)
-		(tty->ldisc.write_wakeup)(tty);
+	tty_wakeup(tty);
 }
 
 /*

@@ -53,7 +53,7 @@ struct _ntfs_inode {
 	 * name_len = 0 for files and name = I30 (global constant) and
 	 * name_len = 4 for directories.
 	 */
-	ATTR_TYPES type;	/* Attribute type of this fake inode. */
+	ATTR_TYPE type;	/* Attribute type of this fake inode. */
 	ntfschar *name;		/* Attribute name of this fake inode. */
 	u32 name_len;		/* Attribute name length of this fake inode. */
 	runlist runlist;	/* If state has the NI_NonResident bit set,
@@ -96,7 +96,7 @@ struct _ntfs_inode {
 			u32 block_size;		/* Size of an index block. */
 			u32 vcn_size;		/* Size of a vcn in this
 						   index. */
-			COLLATION_RULES collation_rule; /* The collation rule
+			COLLATION_RULE collation_rule; /* The collation rule
 						   for the index. */
 			u8 block_size_bits; 	/* Log2 of the above. */
 			u8 vcn_size_bits;	/* Log2 of the above. */
@@ -252,7 +252,7 @@ typedef struct {
 	unsigned long mft_no;
 	ntfschar *name;
 	u32 name_len;
-	ATTR_TYPES type;
+	ATTR_TYPE type;
 } ntfs_attr;
 
 typedef int (*test_t)(struct inode *, void *);
@@ -260,7 +260,7 @@ typedef int (*test_t)(struct inode *, void *);
 extern int ntfs_test_inode(struct inode *vi, ntfs_attr *na);
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
-extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
+extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPE type,
 		ntfschar *name, u32 name_len);
 extern struct inode *ntfs_index_iget(struct inode *base_vi, ntfschar *name,
 		u32 name_len);

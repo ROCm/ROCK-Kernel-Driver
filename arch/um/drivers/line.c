@@ -73,9 +73,8 @@ static int buffer_data(struct line *line, const char *buf, int len)
 	else {
 		memcpy(line->tail, buf, end);
 		buf += end;
-		len -= end;
-		memcpy(line->buffer, buf, len);
-		line->tail = line->buffer + len;
+		memcpy(line->buffer, buf, len - end);
+		line->tail = line->buffer + len - end;
 	}
 
 	return(len);
@@ -332,7 +331,7 @@ int line_setup(struct line *lines, int num, char *init, int all_allowed)
 	init++;
 	if((n >= 0) && (n >= num)){
 		printk("line_setup - %d out of range ((0 ... %d) allowed)\n",
-		       n, num);
+		       n, num - 1);
 		return(0);
 	}
 	else if(n >= 0){

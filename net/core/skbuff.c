@@ -311,6 +311,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, int gfp_mask)
 	C(nfcache);
 	C(nfct);
 	nf_conntrack_get(skb->nfct);
+	C(nfctinfo);
 #ifdef CONFIG_NETFILTER_DEBUG
 	C(nf_debug);
 #endif
@@ -377,6 +378,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->nfcache	= old->nfcache;
 	new->nfct	= old->nfct;
 	nf_conntrack_get(old->nfct);
+	new->nfctinfo	= old->nfctinfo;
 #ifdef CONFIG_NETFILTER_DEBUG
 	new->nf_debug	= old->nf_debug;
 #endif

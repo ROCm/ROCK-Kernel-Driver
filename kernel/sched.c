@@ -4577,7 +4577,7 @@ __init static void arch_init_sched_domains(void)
 	}
 }
 
-#define SCHED_DOMAIN_DEBUG
+#undef SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
 void sched_domain_debug(void)
 {

@@ -108,7 +108,7 @@ struct scatterlist;
 
 /* Walks all buses and creates iommu tables */
 extern void iommu_setup_pSeries(void);
-extern void iommu_setup_pmac(void);
+extern void iommu_setup_u3(void);
 
 /* Creates table for an individual device node */
 extern void iommu_devnode_init(struct device_node *dn);
@@ -154,6 +154,8 @@ extern void tce_init_iSeries(void);
 
 extern void pci_iommu_init(void);
 extern void pci_dma_init_direct(void);
+
+extern void alloc_u3_dart_table(void);
 
 extern int ppc64_iommu_off;
 

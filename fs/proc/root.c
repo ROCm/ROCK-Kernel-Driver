@@ -18,7 +18,7 @@
 #include <asm/bitops.h>
 #include <linux/smp_lock.h>
 
-struct proc_dir_entry *proc_net, *proc_bus, *proc_root_fs, *proc_root_driver;
+struct proc_dir_entry *proc_net, *proc_net_stat, *proc_bus, *proc_root_fs, *proc_root_driver;
 
 #ifdef CONFIG_SYSCTL
 struct proc_dir_entry *proc_sys_root;
@@ -53,6 +53,8 @@ void __init proc_root_init(void)
 	}
 	proc_misc_init();
 	proc_net = proc_mkdir("net", NULL);
+	proc_net_stat = proc_mkdir("net/stat", NULL);
+
 #ifdef CONFIG_SYSVIPC
 	proc_mkdir("sysvipc", NULL);
 #endif
@@ -157,5 +159,6 @@ EXPORT_SYMBOL(remove_proc_entry);
 EXPORT_SYMBOL(proc_root);
 EXPORT_SYMBOL(proc_root_fs);
 EXPORT_SYMBOL(proc_net);
+EXPORT_SYMBOL(proc_net_stat);
 EXPORT_SYMBOL(proc_bus);
 EXPORT_SYMBOL(proc_root_driver);

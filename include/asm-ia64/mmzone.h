@@ -27,12 +27,6 @@
 # define NR_NODE_MEMBLKS	(NR_NODES * 4)
 #endif
 
-extern unsigned long max_low_pfn;
-
-#define pfn_valid(pfn)		(((pfn) < max_low_pfn) && ia64_pfn_valid(pfn))
-#define page_to_pfn(page)	((unsigned long) (page - vmem_map))
-#define pfn_to_page(pfn)	(vmem_map + (pfn))
-
 #else /* CONFIG_DISCONTIGMEM */
 # define NR_NODE_MEMBLKS	4
 #endif /* CONFIG_DISCONTIGMEM */

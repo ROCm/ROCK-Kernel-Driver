@@ -23,7 +23,8 @@ target(struct sk_buff **pskb,
 	   If there is a real ct entry correspondig to this packet, 
 	   it'll hang aroun till timing out. We don't deal with it
 	   for performance reasons. JK */
-	(*pskb)->nfct = &ip_conntrack_untracked.infos[IP_CT_NEW];
+	(*pskb)->nfct = &ip_conntrack_untracked.ct_general;
+	(*pskb)->nfctinfo = IP_CT_NEW;
 	nf_conntrack_get((*pskb)->nfct);
 
 	return IPT_CONTINUE;

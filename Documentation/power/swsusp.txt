@@ -20,26 +20,6 @@ From kernel/suspend.c:
 You need to append resume=/dev/your_swap_partition to kernel command
 line. Then you suspend by echo 4 > /proc/acpi/sleep.
 
-Pavel's unreliable guide to swsusp mess
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are currently two versions of swap suspend in the kernel, the old
-"Pavel's" version in kernel/power/swsusp.c and the new "Patrick's"
-version in kernel/power/pmdisk.c. They provide the same functionality;
-the old version looks ugly but was tested, while the new version looks
-nicer but did not receive so much testing. echo 4 > /proc/acpi/sleep
-calls the old version, echo disk > /sys/power/state calls the new one.
-
-[In the future, when the new version is stable enough, two things can
-happen:
-
-* the new version is moved into swsusp.c, and swsusp is renamed to swap
-  suspend (Pavel prefers this)
-
-* pmdisk is kept as is and swsusp.c is removed from the kernel]
-
-
-
 Article about goals and implementation of Software Suspend for Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Author: G‚ábor Kuti
@@ -75,10 +55,6 @@ hardware!
 About the code
 
 Things to implement
-- SMP support. I've done an SMP support but since I don't have access to a kind
-  of this one I cannot test it. Please SMP people test it.  .. Tested it,
-  doesn't work. Had no time to figure out why. There is some mess with
-  interrupts AFAIK..
 - We should only make a copy of data related to kernel segment, since any
   process data won't be changed.
 - Should make more sanity checks. Or are these enough?
@@ -89,11 +65,6 @@ Not so important ideas for implementing
 - Support for adding/removing hardware while suspended?
 - We should not free pages at the beginning so aggressively, most of them
   go there anyway..
-
-Drivers that need support
-- pc_keyb -- perhaps we can wait for vojtech's input patches
-- do IDE cdroms need some kind of support?
-- IDE CD-RW -- how to deal with that?
 
 Sleep states summary (thanx, Ducrot)
 ====================================
@@ -109,7 +80,8 @@ and perhaps
 echo 4b > /proc/acpi/sleep      # for suspend to disk via s4bios
 
 
-FAQ:
+Frequently Asked Questions
+==========================
 
 Q: well, suspending a server is IMHO a really stupid thing,
 but... (Diego Zuccato):

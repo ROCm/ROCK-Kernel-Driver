@@ -841,7 +841,8 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		if (newtp->ecn_flags&TCP_ECN_OK)
 			newsk->sk_no_largesend = 1;
 
-		tcp_vegas_init(newtp);
+		tcp_ca_init(newtp);
+
 		TCP_INC_STATS_BH(TCP_MIB_PASSIVEOPENS);
 	}
 	return newsk;

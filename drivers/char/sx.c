@@ -1046,12 +1046,9 @@ static void sx_transmit_chars (struct sx_port *port)
 	}
 
 	if ((port->gs.xmit_cnt <= port->gs.wakeup_chars) && port->gs.tty) {
-		if ((port->gs.tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-		    port->gs.tty->ldisc.write_wakeup)
-			(port->gs.tty->ldisc.write_wakeup)(port->gs.tty);
+		tty_wakeup(port->gs.tty);
 		sx_dprintk (SX_DEBUG_TRANSMIT, "Waking up.... ldisc (%d)....\n",
 		            port->gs.wakeup_chars); 
-		wake_up_interruptible(&port->gs.tty->write_wait);
 	}
 
 	clear_bit (SX_PORT_TRANSMIT_LOCK, &port->locks);

@@ -84,7 +84,6 @@ extern long register_vpa(unsigned long flags, unsigned long proc,
 			 unsigned long vpa);
 
 int smt_enabled_at_boot = 1;
-int boot_cpuid = 0;
 
 /* Low level assembly function used to backup CPU 0 state */
 extern void __save_cpu_setup(void);

@@ -107,6 +107,7 @@ static struct ipt_match helper_match = {
 
 static int __init init(void)
 {
+	need_ip_conntrack();
 	return ipt_register_match(&helper_match);
 }
 

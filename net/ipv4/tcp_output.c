@@ -436,6 +436,7 @@ void tcp_set_skb_tso_factor(struct sk_buff *skb, unsigned int mss_std)
 		factor /= mss_std;
 		TCP_SKB_CB(skb)->tso_factor = factor;
 	}
+	TCP_SKB_CB(skb)->tso_mss = mss_std;
 }
 
 /* Function to create two new TCP segments.  Shrinks the given segment
@@ -552,7 +553,7 @@ unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
 	return skb->tail;
 }
 
-static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+static int __tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
 {
 	if (skb_cloned(skb) &&
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
@@ -565,9 +566,24 @@ static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 			return -ENOMEM;
 	}
 
-	TCP_SKB_CB(skb)->seq += len;
 	skb->ip_summed = CHECKSUM_HW;
+
+	/* Any change of skb->len requires recalculation of tso
+	 * factor and mss.
+	 */
+	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+
 	return 0;
+}
+
+static inline int tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
+{
+	int err = __tcp_trim_head(tp, skb, len);
+
+	if (!err)
+		TCP_SKB_CB(skb)->seq += len;
+
+	return err;
 }
 
 /* This function synchronize snd mss to current pmtu/exthdr set.
@@ -593,7 +609,7 @@ static int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
    this function.			--ANK (980731)
  */
 
-int tcp_sync_mss(struct sock *sk, u32 pmtu)
+unsigned int tcp_sync_mss(struct sock *sk, u32 pmtu)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
@@ -629,14 +645,45 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 	tp->pmtu_cookie = pmtu;
 	tp->mss_cache = tp->mss_cache_std = mss_now;
 
-	if (sk->sk_route_caps & NETIF_F_TSO) {
+	return mss_now;
+}
+
+/* Compute the current effective MSS, taking SACKs and IP options,
+ * and even PMTU discovery events into account.
+ *
+ * LARGESEND note: !urg_mode is overkill, only frames up to snd_up
+ * cannot be large. However, taking into account rare use of URG, this
+ * is not a big flaw.
+ */
+
+unsigned int tcp_current_mss(struct sock *sk, int large)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	struct dst_entry *dst = __sk_dst_get(sk);
+	int do_large, mss_now;
+
+	mss_now = tp->mss_cache_std;
+	if (dst) {
+		u32 mtu = dst_pmtu(dst);
+		if (mtu != tp->pmtu_cookie ||
+		    tp->ext2_header_len != dst->header_len)
+			mss_now = tcp_sync_mss(sk, mtu);
+	}
+
+	do_large = (large &&
+		    (sk->sk_route_caps & NETIF_F_TSO) &&
+		    !tp->urg_mode);
+
+	if (do_large) {
 		int large_mss, factor;
 
 		large_mss = 65535 - tp->af_specific->net_header_len -
-			tp->ext_header_len - tp->ext2_header_len - tp->tcp_header_len;
+			tp->ext_header_len - tp->ext2_header_len -
+			tp->tcp_header_len;
 
 		if (tp->max_window && large_mss > (tp->max_window>>1))
-			large_mss = max((tp->max_window>>1), 68U - tp->tcp_header_len);
+			large_mss = max((tp->max_window>>1),
+					68U - tp->tcp_header_len);
 
 		/* Always keep large mss multiple of real mss, but
 		 * do not exceed congestion window.
@@ -646,11 +693,15 @@ int tcp_sync_mss(struct sock *sk, u32 pmtu)
 			factor = tp->snd_cwnd;
 
 		tp->mss_cache = mss_now * factor;
+
+		mss_now = tp->mss_cache;
 	}
 
+	if (tp->eff_sacks)
+		mss_now -= (TCPOLEN_SACK_BASE_ALIGNED +
+			    (tp->eff_sacks * TCPOLEN_SACK_PERBLOCK));
 	return mss_now;
 }
-
 
 /* This routine writes packets to the network.  It advances the
  * send_head.  This happens as incoming acks open up the remote
@@ -852,6 +903,9 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		    ((skb_size + next_skb_size) > mss_now))
 			return;
 
+		BUG_ON(TCP_SKB_CB(skb)->tso_factor != 1 ||
+		       TCP_SKB_CB(next_skb)->tso_factor != 1);
+
 		/* Ok.  We will be able to collapse the packet. */
 		__skb_unlink(next_skb, next_skb->list);
 
@@ -949,6 +1003,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
  	unsigned int cur_mss = tcp_current_mss(sk, 0);
+	__u32 data_seq, data_end_seq;
 	int err;
 
 	/* Do not sent more than we queued. 1/4 is reserved for possible
@@ -957,6 +1012,24 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if (atomic_read(&sk->sk_wmem_alloc) >
 	    min(sk->sk_wmem_queued + (sk->sk_wmem_queued >> 2), sk->sk_sndbuf))
 		return -EAGAIN;
+
+	/* What is going on here?  When TSO packets are partially ACK'd,
+	 * we adjust the TCP_SKB_CB(skb)->seq value forward but we do
+	 * not adjust the data area of the SKB.  We defer that to here
+	 * so that we can avoid the work unless we really retransmit
+	 * the packet.
+	 */
+	data_seq = TCP_SKB_CB(skb)->seq;
+	data_end_seq = TCP_SKB_CB(skb)->end_seq;
+	if (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)
+		data_end_seq--;
+
+	if (skb->len > (data_end_seq - data_seq)) {
+		u32 to_trim = skb->len - (data_end_seq - data_seq);
+
+		if (__tcp_trim_head(tp, skb, to_trim))
+			return -ENOMEM;
+	}		
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->snd_una)) {
 		if (before(TCP_SKB_CB(skb)->end_seq, tp->snd_una))
@@ -968,7 +1041,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
-		if (tcp_trim_head(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
+		if (tcp_trim_head(tp, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
 			return -ENOMEM;
 	}
 
@@ -1016,6 +1089,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	   tp->snd_una == (TCP_SKB_CB(skb)->end_seq - 1)) {
 		if (!pskb_trim(skb, 0)) {
 			TCP_SKB_CB(skb)->seq = TCP_SKB_CB(skb)->end_seq - 1;
+			TCP_SKB_CB(skb)->tso_factor = 1;
 			skb->ip_summed = CHECKSUM_NONE;
 			skb->csum = 0;
 		}
@@ -1191,6 +1265,7 @@ void tcp_send_fin(struct sock *sk)
 		TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_FIN);
 		TCP_SKB_CB(skb)->sacked = 0;
 		TCP_SKB_CB(skb)->tso_factor = 1;
+		TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 		/* FIN eats a sequence byte, write_seq advanced by tcp_queue_skb(). */
 		TCP_SKB_CB(skb)->seq = tp->write_seq;
@@ -1223,6 +1298,7 @@ void tcp_send_active_reset(struct sock *sk, int priority)
 	TCP_SKB_CB(skb)->flags = (TCPCB_FLAG_ACK | TCPCB_FLAG_RST);
 	TCP_SKB_CB(skb)->sacked = 0;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 	/* Send it off. */
 	TCP_SKB_CB(skb)->seq = tcp_acceptable_seq(sk, tp);
@@ -1304,6 +1380,7 @@ struct sk_buff * tcp_make_synack(struct sock *sk, struct dst_entry *dst,
 	TCP_SKB_CB(skb)->end_seq = TCP_SKB_CB(skb)->seq + 1;
 	TCP_SKB_CB(skb)->sacked = 0;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 	th->seq = htonl(TCP_SKB_CB(skb)->seq);
 	th->ack_seq = htonl(req->rcv_isn + 1);
 	if (req->rcv_wnd == 0) { /* ignored for retransmitted syns */
@@ -1359,7 +1436,7 @@ static inline void tcp_connect_init(struct sock *sk)
 		tp->window_clamp = dst_metric(dst, RTAX_WINDOW);
 	tp->advmss = dst_metric(dst, RTAX_ADVMSS);
 	tcp_initialize_rcv_mss(sk);
-	tcp_vegas_init(tp);
+	tcp_ca_init(tp);
 
 	tcp_select_initial_window(tcp_full_space(sk),
 				  tp->advmss - (tp->ts_recent_stamp ? tp->tcp_header_len - sizeof(struct tcphdr) : 0),
@@ -1406,12 +1483,13 @@ int tcp_connect(struct sock *sk)
 	TCP_ECN_send_syn(sk, tp, buff);
 	TCP_SKB_CB(buff)->sacked = 0;
 	TCP_SKB_CB(buff)->tso_factor = 1;
+	TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
 	buff->csum = 0;
 	TCP_SKB_CB(buff)->seq = tp->write_seq++;
 	TCP_SKB_CB(buff)->end_seq = tp->write_seq;
 	tp->snd_nxt = tp->write_seq;
 	tp->pushed_seq = tp->write_seq;
-	tcp_vegas_init(tp);
+	tcp_ca_init(tp);
 
 	/* Send it off. */
 	TCP_SKB_CB(buff)->when = tcp_time_stamp;
@@ -1506,6 +1584,7 @@ void tcp_send_ack(struct sock *sk)
 		TCP_SKB_CB(buff)->flags = TCPCB_FLAG_ACK;
 		TCP_SKB_CB(buff)->sacked = 0;
 		TCP_SKB_CB(buff)->tso_factor = 1;
+		TCP_SKB_CB(buff)->tso_mss = tp->mss_cache_std;
 
 		/* Send it off, this clears delayed acks for us. */
 		TCP_SKB_CB(buff)->seq = TCP_SKB_CB(buff)->end_seq = tcp_acceptable_seq(sk, tp);
@@ -1541,6 +1620,7 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent)
 	TCP_SKB_CB(skb)->flags = TCPCB_FLAG_ACK;
 	TCP_SKB_CB(skb)->sacked = urgent;
 	TCP_SKB_CB(skb)->tso_factor = 1;
+	TCP_SKB_CB(skb)->tso_mss = tp->mss_cache_std;
 
 	/* Use a previous sequence.  This should cause the other
 	 * end to send an ack.  Don't queue or clone SKB, just

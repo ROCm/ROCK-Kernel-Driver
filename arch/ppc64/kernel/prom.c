@@ -83,6 +83,7 @@ extern unsigned long klimit;
 static int __initdata dt_root_addr_cells;
 static int __initdata dt_root_size_cells;
 static int __initdata iommu_is_off;
+int __initdata iommu_force_on;
 typedef u32 cell_t;
 
 #if 0
@@ -876,9 +877,11 @@ static int __init early_init_dt_scan_chosen(unsigned long node,
 		return 0;
 	systemcfg->platform = *prop;
 
-	/* check if iommu is forced off */
+	/* check if iommu is forced on or off */
 	if (get_flat_dt_prop(node, "linux,iommu-off", NULL) != NULL)
 		iommu_is_off = 1;
+	if (get_flat_dt_prop(node, "linux,iommu-force-on", NULL) != NULL)
+		iommu_force_on = 1;
 
 #ifdef CONFIG_PPC_PSERIES
 	/* To help early debugging via the front panel, we retreive a minimal

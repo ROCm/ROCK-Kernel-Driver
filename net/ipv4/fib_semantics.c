@@ -43,6 +43,8 @@
 #include <net/sock.h>
 #include <net/ip_fib.h>
 
+#include "fib_lookup.h"
+
 #define FSprintk(a...)
 
 static rwlock_t fib_info_lock = RW_LOCK_UNLOCKED;
@@ -758,51 +760,73 @@ failure:
 	return NULL;
 }
 
-int 
-fib_semantic_match(int type, struct fib_info *fi, const struct flowi *flp, struct fib_result *res)
+int fib_semantic_match(struct list_head *head, const struct flowi *flp,
+		       struct fib_result *res, int prefixlen)
 {
-	int err = fib_props[type].error;
+	struct fib_alias *fa;
+	int nh_sel = 0;
 
-	if (err == 0) {
-		if (fi->fib_flags&RTNH_F_DEAD)
-			return 1;
+	list_for_each_entry(fa, head, fa_list) {
+		int err;
 
-		res->fi = fi;
+		if (fa->fa_tos &&
+		    fa->fa_tos != flp->fl4_tos)
+			continue;
 
-		switch (type) {
-		case RTN_UNICAST:
-		case RTN_LOCAL:
-		case RTN_BROADCAST:
-		case RTN_ANYCAST:
-		case RTN_MULTICAST:
-			for_nexthops(fi) {
-				if (nh->nh_flags&RTNH_F_DEAD)
-					continue;
-				if (!flp->oif || flp->oif == nh->nh_oif)
-					break;
-			}
+		if (fa->fa_scope < flp->fl4_scope)
+			continue;
+
+		fa->fa_state |= FA_S_ACCESSED;
+
+		err = fib_props[fa->fa_type].error;
+		if (err == 0) {
+			struct fib_info *fi = fa->fa_info;
+
+			if (fi->fib_flags & RTNH_F_DEAD)
+				continue;
+
+			switch (fa->fa_type) {
+			case RTN_UNICAST:
+			case RTN_LOCAL:
+			case RTN_BROADCAST:
+			case RTN_ANYCAST:
+			case RTN_MULTICAST:
+				for_nexthops(fi) {
+					if (nh->nh_flags&RTNH_F_DEAD)
+						continue;
+					if (!flp->oif || flp->oif == nh->nh_oif)
+						break;
+				}
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
-			if (nhsel < fi->fib_nhs) {
-				res->nh_sel = nhsel;
-				atomic_inc(&fi->fib_clntref);
-				return 0;
-			}
+				if (nhsel < fi->fib_nhs) {
+					nh_sel = nhsel;
+					goto out_fill_res;
+				}
 #else
-			if (nhsel < 1) {
-				atomic_inc(&fi->fib_clntref);
-				return 0;
-			}
+				if (nhsel < 1) {
+					goto out_fill_res;
+				}
 #endif
-			endfor_nexthops(fi);
-			res->fi = NULL;
-			return 1;
-		default:
-			res->fi = NULL;
-			printk(KERN_DEBUG "impossible 102\n");
-			return -EINVAL;
+				endfor_nexthops(fi);
+				continue;
+
+			default:
+				printk(KERN_DEBUG "impossible 102\n");
+				return -EINVAL;
+			};
 		}
+		return err;
 	}
-	return err;
+	return 1;
+
+out_fill_res:
+	res->prefixlen = prefixlen;
+	res->nh_sel = nh_sel;
+	res->type = fa->fa_type;
+	res->scope = fa->fa_scope;
+	res->fi = fa->fa_info;
+	atomic_inc(&res->fi->fib_clntref);
+	return 0;
 }
 
 /* Find appropriate source address to this destination */

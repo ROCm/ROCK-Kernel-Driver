@@ -634,14 +634,8 @@ static void cpc_tty_flush_buffer(struct tty_struct *tty)
 	}
 
 	CPC_TTY_DBG("%s: call wake_up_interruptible\n",cpc_tty->name);
-	
-	wake_up_interruptible(&tty->write_wait); 
 
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup){
-		CPC_TTY_DBG("%s: call line disc. wake up\n",cpc_tty->name);
-		tty->ldisc.write_wakeup(tty); 
-	} 
-
+	tty_wakeup(tty);	
 	return; 
 } 
 
@@ -692,9 +686,11 @@ static void cpc_tty_rx_work(void * data)
 	st_cpc_tty_area *cpc_tty; 
 	volatile st_cpc_rx_buf * buf;
 	char flags=0,flg_rx=1; 
+	struct tty_ldisc *ld;
 
 	if (cpc_tty_cnt == 0) return;
 
+	
 	for (i=0; (i < 4) && flg_rx ; i++) {
 		flg_rx = 0;
 		port = (int) data;
@@ -702,11 +698,18 @@ static void cpc_tty_rx_work(void * data)
 			cpc_tty = &cpc_tty_area[port];
 		
 			if ((buf=cpc_tty->buf_rx.first) != 0) {
-															
-				if (cpc_tty->tty && (cpc_tty->tty->ldisc.receive_buf)) { 
-					CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
-					cpc_tty->tty->ldisc.receive_buf(cpc_tty->tty, (char *)(buf->data), 
-					&flags, buf->size);
+				
+				if(cpc_tty->tty)
+				{											
+					ld = tty_ldisc_ref(cpc_tty);
+					if(ld)
+					{
+						if (ld->receive_buf)) {
+							CPC_TTY_DBG("%s: call line disc. receive_buf\n",cpc_tty->name);
+							ld->receive_buf(cpc_tty->tty, (char *)(buf->data), &flags, buf->size);
+						}
+						tty_ldisc_deref(ld);
+					}
 				}	
 				cpc_tty->buf_rx.first = cpc_tty->buf_rx.first->next;
 				kfree((unsigned char *)buf);
@@ -916,13 +919,7 @@ static void cpc_tty_tx_work(void *data)
 		CPC_TTY_DBG("%s: the interface is not opened\n",cpc_tty->name);
 		return; 
 	}
-
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup){
-		CPC_TTY_DBG("%s:call line disc. wakeup\n",cpc_tty->name);
-		tty->ldisc.write_wakeup (tty); 
-	}
-
-	wake_up_interruptible(&tty->write_wait); 
+	tty_wakeup(tty);
 }
 
 /*

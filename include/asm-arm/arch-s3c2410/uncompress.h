@@ -100,7 +100,7 @@ putc(char ch)
 }
 
 static void
-puts(const char *ptr)
+putstr(const char *ptr)
 {
 	for (; *ptr != '\0'; ptr++) {
 		putc(*ptr);

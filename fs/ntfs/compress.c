@@ -203,7 +203,7 @@ do_next_sb:
 	 * position in the compression block is one byte before its end so the
 	 * first two checks do not detect it.
 	 */
-	if (cb == cb_end || !le16_to_cpup((u16*)cb) ||
+	if (cb == cb_end || !le16_to_cpup((le16*)cb) ||
 			(*dest_index == dest_max_index &&
 			*dest_ofs == dest_max_ofs)) {
 		int i;
@@ -255,7 +255,7 @@ return_error:
 
 	/* Setup the current sub-block source pointers and validate range. */
 	cb_sb_start = cb;
-	cb_sb_end = cb_sb_start + (le16_to_cpup((u16*)cb) & NTFS_SB_SIZE_MASK)
+	cb_sb_end = cb_sb_start + (le16_to_cpup((le16*)cb) & NTFS_SB_SIZE_MASK)
 			+ 3;
 	if (cb_sb_end > cb_end)
 		goto return_overflow;
@@ -277,7 +277,7 @@ return_error:
 	dp_addr = (u8*)page_address(dp) + do_sb_start;
 
 	/* Now, we are ready to process the current sub-block (sb). */
-	if (!(le16_to_cpup((u16*)cb) & NTFS_SB_IS_COMPRESSED)) {
+	if (!(le16_to_cpup((le16*)cb) & NTFS_SB_IS_COMPRESSED)) {
 		ntfs_debug("Found uncompressed sub-block.");
 		/* This sb is not compressed, just copy it into destination. */
 
@@ -382,7 +382,7 @@ do_next_tag:
 			lg++;
 
 		/* Get the phrase token into i. */
-		pt = le16_to_cpup((u16*)cb);
+		pt = le16_to_cpup((le16*)cb);
 
 		/*
 		 * Calculate starting position of the byte sequence in

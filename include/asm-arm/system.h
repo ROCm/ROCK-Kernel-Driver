@@ -98,9 +98,10 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/kernel.h>
+#include <linux/linkage.h>
 
 struct thread_info;
+struct task_struct;
 
 /* information about the system we're running on */
 extern unsigned int system_rev;
@@ -203,8 +204,6 @@ do {									\
  * `prev' will never be the same as `next'.  schedule() itself
  * contains the memory barrier to tell GCC not to cache `current'.
  */
-struct thread_info;
-struct task_struct;
 extern struct task_struct *__switch_to(struct task_struct *, struct thread_info *, struct thread_info *);
 
 #define switch_to(prev,next,last)					\

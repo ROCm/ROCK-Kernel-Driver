@@ -107,6 +107,8 @@ static const int init_seq[] = {
 
 static int axis_map[] = { 5, 9, 1, 5, 6, 10, 2, 6, 4, 8, 0, 4, 5, 9, 1, 5 };
 
+static void register_slot(int i, struct grip_mp *grip);
+
 /*
  * Returns whether an odd or even number of bits are on in pkt.
  */
@@ -355,7 +357,6 @@ static int get_and_decode_packet(struct grip_mp *grip, int flags)
 	u32 packet;
 	int joytype = 0;
 	int slot = 0;
-	static void register_slot(int i, struct grip_mp *grip);
 
 	/* Get a packet and check for validity */
 

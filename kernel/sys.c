@@ -1734,7 +1734,7 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			unsigned char ncomm[sizeof(me->comm)];
 
 			ncomm[sizeof(me->comm)-1] = 0;
-			if (strncpy_from_user(ncomm, (char *)arg2,
+			if (strncpy_from_user(ncomm, (char __user *)arg2,
 						sizeof(me->comm)-1) < 0)
 				return -EFAULT;
 			set_task_comm(me, ncomm);

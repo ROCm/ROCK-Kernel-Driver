@@ -44,14 +44,14 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 	m->usa_ofs = cpu_to_le16((sizeof(MFT_RECORD) + 1) & ~1);
 	m->usa_count = cpu_to_le16(size / NTFS_BLOCK_SIZE + 1);
 	/* Set the update sequence number to 1. */
-	*(u16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
+	*(le16*)((char*)m + ((sizeof(MFT_RECORD) + 1) & ~1)) = cpu_to_le16(1);
 	m->lsn = cpu_to_le64(0LL);
 	m->sequence_number = cpu_to_le16(1);
-	m->link_count = cpu_to_le16(0);
+	m->link_count = 0;
 	/* Aligned to 8-byte boundary. */
 	m->attrs_offset = cpu_to_le16((le16_to_cpu(m->usa_ofs) +
 			(le16_to_cpu(m->usa_count) << 1) + 7) & ~7);
-	m->flags = cpu_to_le16(0);
+	m->flags = 0;
 	/*
 	 * Using attrs_offset plus eight bytes (for the termination attribute),
 	 * aligned to 8-byte boundary.
@@ -60,10 +60,10 @@ static void __format_mft_record(MFT_RECORD *m, const int size,
 			~7);
 	m->bytes_allocated = cpu_to_le32(size);
 	m->base_mft_record = cpu_to_le64((MFT_REF)0);
-	m->next_attr_instance = cpu_to_le16(0);
+	m->next_attr_instance = 0;
 	a = (ATTR_RECORD*)((char*)m + le16_to_cpu(m->attrs_offset));
 	a->type = AT_END;
-	a->length = cpu_to_le32(0);
+	a->length = 0;
 }
 
 /**
@@ -311,11 +311,11 @@ void unmap_mft_record(ntfs_inode *ni)
 /**
  * map_extent_mft_record - load an extent inode and attach it to its base
  * @base_ni:	base ntfs inode
- * @mref:	mft reference of the extent inode to load (in little endian)
+ * @mref:	mft reference of the extent inode to load
  * @ntfs_ino:	on successful return, pointer to the ntfs_inode structure
  *
  * Load the extent mft record @mref and attach it to its base inode @base_ni.
- * Return the mapped extent mft record if IS_ERR(result) is false. Otherwise
+ * Return the mapped extent mft record if IS_ERR(result) is false.  Otherwise
  * PTR_ERR(result) gives the negative error code.
  *
  * On successful return, @ntfs_ino contains a pointer to the ntfs_inode
@@ -328,8 +328,8 @@ MFT_RECORD *map_extent_mft_record(ntfs_inode *base_ni, MFT_REF mref,
 	ntfs_inode *ni = NULL;
 	ntfs_inode **extent_nis = NULL;
 	int i;
-	unsigned long mft_no = MREF_LE(mref);
-	u16 seq_no = MSEQNO_LE(mref);
+	unsigned long mft_no = MREF(mref);
+	u16 seq_no = MSEQNO(mref);
 	BOOL destroy_ni = FALSE;
 
 	ntfs_debug("Mapping extent mft record 0x%lx (base mft record 0x%lx).",
@@ -980,7 +980,7 @@ static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 		ntfs_debug("Inode 0x%lx is not in icache.", mft_no);
 		/* The inode is not in icache. */
 		/* Skip the record if it is not a mft record (type "FILE"). */
-		if (!ntfs_is_mft_recordp(maddr)) {
+		if (!ntfs_is_mft_recordp((le32*)maddr)) {
 			ntfs_debug("Mft record 0x%lx is not a FILE record, "
 					"continuing search.", mft_no);
 			continue;

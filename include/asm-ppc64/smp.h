@@ -26,6 +26,8 @@
 
 #include <asm/paca.h>
 
+extern int boot_cpuid;
+
 #ifdef CONFIG_SMP
 
 extern void smp_send_debugger_break(int cpu);
@@ -37,7 +39,6 @@ extern void smp_message_recv(int, struct pt_regs *);
 #define hard_smp_processor_id() (get_paca()->hw_cpu_id)
 
 extern cpumask_t cpu_sibling_map[NR_CPUS];
-extern int boot_cpuid;
 
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *

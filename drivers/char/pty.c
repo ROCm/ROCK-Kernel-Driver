@@ -85,10 +85,7 @@ static void pty_unthrottle(struct tty_struct * tty)
 	if (!o_tty)
 		return;
 
-	if ((o_tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) &&
-	    o_tty->ldisc.write_wakeup)
-		(o_tty->ldisc.write_wakeup)(o_tty);
-	wake_up_interruptible(&o_tty->write_wait);
+	tty_wakeup(o_tty);
 	set_bit(TTY_THROTTLED, &tty->flags);
 }
 
@@ -101,6 +98,10 @@ static void pty_unthrottle(struct tty_struct * tty)
  *   (2) avoid redundant copying for cases where count >> receive_room
  * N.B. Calls from user space may now return an error code instead of
  * a count.
+ *
+ * FIXME: Our pty_write method is called with our ldisc lock held but
+ * not our partners. We can't just take the other one blindly without
+ * risking deadlocks.  There is also the small matter of TTY_DONT_FLIP
  */
 static int pty_write(struct tty_struct * tty, int from_user,
 		       const unsigned char *buf, int count)

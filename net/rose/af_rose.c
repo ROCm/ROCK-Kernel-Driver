@@ -882,7 +882,6 @@ static int rose_accept(struct socket *sock, struct socket *newsock, int flags)
 	remove_wait_queue(sk->sk_sleep, &wait);
 
 	newsk = skb->sk;
-	newsk->sk_pair = NULL;
 	newsk->sk_socket = newsock;
 	newsk->sk_sleep = &newsock->wait;
 
@@ -996,7 +995,6 @@ int rose_rx_call_request(struct sk_buff *skb, struct net_device *dev, struct ros
 	make_rose->vr        = 0;
 	make_rose->vl        = 0;
 	sk->sk_ack_backlog++;
-	make->sk_pair = sk;
 
 	rose_insert_socket(make);
 

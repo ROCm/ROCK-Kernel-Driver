@@ -5,9 +5,6 @@ OUTPUT_ARCH(ELF_ARCH)
 ENTRY(_start)
 jiffies = jiffies_64;
 
-SEARCH_DIR("/usr/local/i686-pc-linux-gnu/lib"); SEARCH_DIR("/usr/local/lib"); SEARCH_DIR("/lib"); SEARCH_DIR("/usr/lib");
-/* Do we need any of these for elf?
-   __DYNAMIC = 0;    */
 SECTIONS
 {
   . = START + SIZEOF_HEADERS;

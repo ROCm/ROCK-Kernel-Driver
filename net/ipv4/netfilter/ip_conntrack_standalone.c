@@ -48,8 +48,6 @@ MODULE_LICENSE("GPL");
 extern atomic_t ip_conntrack_count;
 DECLARE_PER_CPU(struct ip_conntrack_stat, ip_conntrack_stat);
 
-unsigned int ip_ct_log_invalid = 0;
-
 static int kill_proto(const struct ip_conntrack *i, void *data)
 {
 	return (i->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.protonum == 
@@ -112,7 +110,7 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 	if (DIRECTION(hash))
 		return 0;
 
-	proto = __ip_ct_find_proto(conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
+	proto = ip_ct_find_proto(conntrack->tuplehash[IP_CT_DIR_ORIGINAL]
 			       .tuple.dst.protonum);
 	IP_NF_ASSERT(proto);
 
@@ -242,7 +240,7 @@ static int exp_seq_show(struct seq_file *s, void *v)
 		   expect->tuple.dst.protonum);
 
 	print_tuple(s, &expect->tuple,
-		    __ip_ct_find_proto(expect->tuple.dst.protonum));
+		    ip_ct_find_proto(expect->tuple.dst.protonum));
 	return seq_putc(s, '\n');
 }
 
@@ -270,10 +268,13 @@ static void *ct_cpu_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
+	if (*pos == 0)
+		return SEQ_START_TOKEN;
+
+	for (cpu = *pos-1; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return &per_cpu(ip_conntrack_stat, cpu);
 	}
 
@@ -284,10 +285,10 @@ static void *ct_cpu_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	int cpu;
 
-	for (cpu = *pos + 1; cpu < NR_CPUS; ++cpu) {
+	for (cpu = *pos; cpu < NR_CPUS; ++cpu) {
 		if (!cpu_possible(cpu))
 			continue;
-		*pos = cpu;
+		*pos = cpu+1;
 		return &per_cpu(ip_conntrack_stat, cpu);
 	}
 
@@ -303,6 +304,11 @@ static int ct_cpu_seq_show(struct seq_file *seq, void *v)
 	unsigned int nr_conntracks = atomic_read(&ip_conntrack_count);
 	struct ip_conntrack_stat *st = v;
 
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq, "entries  searched found new invalid ignore delete delete_list insert insert_failed drop early_drop icmp_error  expect_new expect_create expect_delete\n");
+		return 0;
+	}
+
 	seq_printf(seq, "%08x  %08x %08x %08x %08x %08x %08x %08x "
 			"%08x %08x %08x %08x %08x  %08x %08x %08x \n",
 		   nr_conntracks,
@@ -317,7 +323,7 @@ static int ct_cpu_seq_show(struct seq_file *seq, void *v)
 		   st->insert_failed,
 		   st->drop,
 		   st->early_drop,
-		   st->icmp_error,
+		   st->error,
 
 		   st->expect_new,
 		   st->expect_create,
@@ -513,6 +519,14 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.data		= &ip_conntrack_max,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= NET_IPV4_NF_CONNTRACK_COUNT,
+		.procname	= "ip_conntrack_count",
+		.data		= &ip_conntrack_count,
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{
@@ -729,10 +743,11 @@ static int init_or_cleanup(int init)
 					&exp_file_ops);
 	if (!proc_exp) goto cleanup_proc;
 
-	proc_stat = proc_net_fops_create("ip_conntrack_stat", S_IRUGO,
-					 &ct_cpu_seq_fops);
+	proc_stat = create_proc_entry("ip_conntrack", S_IRUGO, proc_net_stat);
 	if (!proc_stat)
 		goto cleanup_proc_exp;
+
+	proc_stat->proc_fops = &ct_cpu_seq_fops;
 	proc_stat->owner = THIS_MODULE;
 #endif
 
@@ -816,19 +831,13 @@ cleanup_proc_exp:
 int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto)
 {
 	int ret = 0;
-	struct list_head *i;
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	list_for_each(i, &protocol_list) {
-		if (((struct ip_conntrack_protocol *)i)->proto
-		    == proto->proto) {
-			ret = -EBUSY;
-			goto out;
-		}
+	if (ip_ct_protos[proto->proto] != &ip_conntrack_generic_protocol) {
+		ret = -EBUSY;
+		goto out;
 	}
-
-	list_prepend(&protocol_list, proto);
-
+	ip_ct_protos[proto->proto] = proto;
  out:
 	WRITE_UNLOCK(&ip_conntrack_lock);
 	return ret;
@@ -837,10 +846,7 @@ int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto)
 void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 {
 	WRITE_LOCK(&ip_conntrack_lock);
-
-	/* ip_ct_find_proto() returns proto_generic in case there is no protocol 
-	 * helper. So this should be enough - HW */
-	LIST_DELETE(&protocol_list, proto);
+	ip_ct_protos[proto->proto] = &ip_conntrack_generic_protocol;
 	WRITE_UNLOCK(&ip_conntrack_lock);
 	
 	/* Somebody could be still looking at the proto in bh. */
@@ -874,14 +880,13 @@ EXPORT_SYMBOL(ip_conntrack_protocol_unregister);
 EXPORT_SYMBOL(invert_tuplepr);
 EXPORT_SYMBOL(ip_conntrack_alter_reply);
 EXPORT_SYMBOL(ip_conntrack_destroyed);
-EXPORT_SYMBOL(ip_conntrack_get);
 EXPORT_SYMBOL(need_ip_conntrack);
 EXPORT_SYMBOL(ip_conntrack_helper_register);
 EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);
 EXPORT_SYMBOL(ip_ct_refresh_acct);
+EXPORT_SYMBOL(ip_ct_protos);
 EXPORT_SYMBOL(ip_ct_find_proto);
-EXPORT_SYMBOL(__ip_ct_find_proto);
 EXPORT_SYMBOL(ip_ct_find_helper);
 EXPORT_SYMBOL(ip_conntrack_expect_alloc);
 EXPORT_SYMBOL(ip_conntrack_expect_related);

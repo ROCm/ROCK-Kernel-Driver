@@ -747,6 +747,8 @@ done_battery_state_smart(struct adb_request* req)
 		pmu_power_flags &= ~PMU_PWR_AC_PRESENT;
 
 
+	capa = max = amperage = voltage = 0;
+	
 	if (req->reply[1] & 0x04) {
 		bat_flags |= PMU_BATT_PRESENT;
 		switch(req->reply[0]) {
@@ -766,8 +768,7 @@ done_battery_state_smart(struct adb_request* req)
 					req->reply_len, req->reply[0], req->reply[1], req->reply[2], req->reply[3]);
 				break;
 		}
-	} else
-		capa = max = amperage = voltage = 0;
+	}
 
 	if ((req->reply[1] & 0x01) && (amperage > 0))
 		bat_flags |= PMU_BATT_CHARGING;

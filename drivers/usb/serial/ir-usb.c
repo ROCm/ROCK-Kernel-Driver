@@ -449,6 +449,10 @@ static void ir_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			 */
 			tty = port->tty;
 
+			/*
+			 *	FIXME: must not do this in IRQ context,
+			 *	must honour TTY_DONT_FLIP
+			 */
 			tty->ldisc.receive_buf(
 				tty,
 				data+1,
