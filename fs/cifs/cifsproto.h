@@ -63,10 +63,10 @@ extern u64 cifs_UnixTimeToNT(struct timespec);
 extern int cifs_get_inode_info(struct inode **pinode,
 			const unsigned char *search_path, 
 			FILE_ALL_INFO * pfile_info,
-			struct super_block *sb);
+			struct super_block *sb, int xid);
 extern int cifs_get_inode_info_unix(struct inode **pinode,
 			const unsigned char *search_path,
-			struct super_block *sb);
+			struct super_block *sb,int xid);
 
 extern int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, 
 			struct nls_table * nls_info);

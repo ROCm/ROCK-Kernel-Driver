@@ -1,3 +1,8 @@
+Version 1.20
+------------
+Make transaction counts more consistent. Merge /proc/fs/cifs/SimultaneousOps
+info into /proc/fs/cifs/DebugData
+
 Version 1.19
 ------------
 Fix /proc/fs/cifs/Stats and DebugData display to handle larger
