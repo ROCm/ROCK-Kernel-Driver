@@ -1025,7 +1025,6 @@ static int hpc_poll_thread (void *data)
 	debug ("%s - Entry\n", __FUNCTION__);
 	lock_kernel ();
 	daemonize ();
-	reparent_to_init ();
 
 	//  New name
 	strcpy (current->comm, "hpc_poll");

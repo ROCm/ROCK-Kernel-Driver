@@ -616,7 +616,6 @@ static int pnp_dock_thread(void * unused)
 	static struct pnp_docking_station_info now;
 	int docked = -1, d = 0;
 	daemonize();
-	reparent_to_init();
 	strcpy(current->comm, "kpnpbiosd");
 	while(!unloading && !signal_pending(current))
 	{

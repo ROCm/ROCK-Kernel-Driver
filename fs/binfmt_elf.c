@@ -132,7 +132,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	elf_addr_t *sp, *u_platform;
 	const char *k_platform = ELF_PLATFORM;
 	int items;
-	elf_addr_t elf_info[30];
+	elf_addr_t elf_info[40];
 	int ei_index = 0;
 
 	/*

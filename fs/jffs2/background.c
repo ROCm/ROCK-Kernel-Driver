@@ -83,7 +83,6 @@ static int jffs2_garbage_collect_thread(void *_c)
 	struct jffs2_sb_info *c = _c;
 
 	daemonize();
-	current->tty = NULL;
 	c->gc_task = current;
 	up(&c->gc_thread_start);
 

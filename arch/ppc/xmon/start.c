@@ -105,9 +105,9 @@ static void sysrq_handle_xmon(int key, struct pt_regs *regs,
 
 static struct sysrq_key_op sysrq_xmon_op = 
 {
-	handler:	sysrq_handle_xmon,
-	help_msg:	"Xmon",
-	action_msg:	"Entering xmon\n",
+	.handler =	sysrq_handle_xmon,
+	.help_msg =	"Xmon",
+	.action_msg =	"Entering xmon\n",
 };
 #endif
 

@@ -1081,7 +1081,7 @@ again:
 				   frag->page_offset,
 				   frag->size, PCI_DMA_TODEVICE);
 		dprintk("frag: buf=%08Lx  page=%08lx offset=%08lx\n",
-			(long long)buf, (long)(frag->page - mem_map),
+			(long long)buf, (long) page_to_pfn(frag->page),
 			frag->page_offset);
 		len = frag->size;
 		frag++;

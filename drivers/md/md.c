@@ -2486,7 +2486,6 @@ int md_thread(void * arg)
 	 */
 
 	daemonize();
-	reparent_to_init();
 
 	sprintf(current->comm, thread->name);
 	current->exit_signal = SIGCHLD;

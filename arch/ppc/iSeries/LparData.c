@@ -59,21 +59,21 @@ unsigned maxPacas = maxProcessors * 2;
 // 8192 indicates to map 8192 pages (32 MB) of the load area.
 
 struct LparMap xLparMap = { 	
-		xNumberEsids:	4,		// Number ESID/VSID pairs
-		xNumberRanges:	1,		// Number of memory ranges
-		xSegmentTableOffs:  0,		// Segment Table Page (unused)
-		xKernelEsidC:	0xC,		// ESID to map
-		xKernelVsidC:	0xCCC,		// VSID to map
-		xKernelEsidD:	0xD,		// ESID to map
-		xKernelVsidD:	0xDDD,		// VSID to map
-		xKernelEsidE:	0xE,		// ESID to map
-		xKernelVsidE:	0xEEE,		// VSID to map
-		xKernelEsidF:	0xF,		// ESID to map
-		xKernelVsidF:	0xFFF,		// VSID to map
+		.xNumberEsids =4,		// Number ESID/VSID pairs
+		.xNumberRanges =1,		// Number of memory ranges
+		.xSegmentTableOffs =0,		// Segment Table Page (unused)
+		.xKernelEsidC =0xC,		// ESID to map
+		.xKernelVsidC =0xCCC,		// VSID to map
+		.xKernelEsidD =0xD,		// ESID to map
+		.xKernelVsidD =0xDDD,		// VSID to map
+		.xKernelEsidE =0xE,		// ESID to map
+		.xKernelVsidE =0xEEE,		// VSID to map
+		.xKernelEsidF =0xF,		// ESID to map
+		.xKernelVsidF =0xFFF,		// VSID to map
 
-		xPages:		HvPagesToMap,	// # of pages to map (8192)
-		xOffset:	0,		// Offset into load area
-		xVPN:		0xCCC0000	// VPN of first mapped page
+		.xPages =		HvPagesToMap,	// # of pages to map (8192)
+		.xOffset =	0,		// Offset into load area
+		.xVPN =	0xCCC0000	// VPN of first mapped page
 };					
 
 // The Naca has a pointer to the ItVpdAreas.  The hypervisor finds
@@ -119,11 +119,11 @@ struct ItLpQueue xItLpQueue = {};
 	  (lpq),		\
 	  0, 0, {0},		\
 	  { /* LpPaca */		\
-		xDesc: 0xd397d781, /* "LpPa" */	\
-		xSize: sizeof(struct ItLpPaca),	\
-		xFPRegsInUse:	1,		\
-		xDynProcStatus: 2,		\
-		xEndOfQuantum:	0xffffffffffffffff	\
+		.xDesc = 0xd397d781, /* "LpPa" */	\
+		.xSize = sizeof(struct ItLpPaca),	\
+		.xFPRegsInUse =1,		\
+		.xDynProcStatus = 2,		\
+		.xEndOfQuantum =0xffffffffffffffff	\
 	  },			\
 	  { /* LpRegSave */	\
 		0xd397d9e2,	/* "LpRS" */	\
@@ -245,7 +245,7 @@ struct ItIplParmsReal xItIplParmsReal = {};
 
 struct IoHriProcessorVpd xIoHriProcessorVpd[maxProcessors] = {
 	{ 
-	xTimeBaseFreq: 50000000
+	.xTimeBaseFreq = 50000000
 	}
 };
 	

@@ -166,11 +166,11 @@ ppc405_sercons_read(struct console *co, char *ptr, unsigned nb)
 }
 
 static struct console ppc405_sercons = {
-	name:		"dbg_cons",
-	write:		ppc405_console_write,
-	setup:		ppc405_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name =		"dbg_cons",
+	.write =	ppc405_console_write,
+	.setup =	ppc405_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 void

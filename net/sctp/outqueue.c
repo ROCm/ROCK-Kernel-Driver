@@ -104,7 +104,7 @@ void sctp_outqueue_init(sctp_association_t *asoc, sctp_outqueue_t *q)
 void sctp_outqueue_teardown(sctp_outqueue_t *q)
 {
 	sctp_transport_t *transport;
-	list_t *lchunk, *pos;
+	struct list_head *lchunk, *pos;
 	sctp_chunk_t *chunk;
 
 	/* Throw away unacknowledged chunks. */
@@ -948,7 +948,7 @@ static void sctp_sack_update_unack_data(sctp_association_t *assoc,
 int sctp_sack_outqueue(sctp_outqueue_t *q, sctp_sackhdr_t *sack)
 {
 	sctp_chunk_t *tchunk;
-	list_t *lchunk, *transport_list, *pos;
+	struct list_head *lchunk, *transport_list, *pos;
 	__u32 tsn;
 	__u32 sack_ctsn;
 	__u32 ctsn;

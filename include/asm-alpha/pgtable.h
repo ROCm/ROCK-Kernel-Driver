@@ -195,8 +195,8 @@ extern unsigned long __zero_page(void);
 #define PAGE_TO_PA(page)	((page - mem_map) << PAGE_SHIFT)
 #else
 #define PAGE_TO_PA(page) \
-		((((page)-(page)->zone->zone_mem_map) << PAGE_SHIFT) \
-		+ (page)->zone->zone_start_paddr)
+		((( (page) - (page)->zone->zone_mem_map ) \
+		+ (page)->zone->zone_start_pfn) << PAGE_SHIFT)
 #endif
 
 #ifndef CONFIG_DISCONTIGMEM
@@ -216,7 +216,7 @@ extern unsigned long __zero_page(void);
 	unsigned long pfn;							\
 										\
 	pfn = ((unsigned long)((page)-(page)->zone->zone_mem_map)) << 32;	\
-	pfn += (page)->zone->zone_start_paddr << (32-PAGE_SHIFT);		\
+	pfn += (page)->zone->zone_start_pfn << 32);				\
 	pte_val(pte) = pfn | pgprot_val(pgprot);				\
 										\
 	pte;									\

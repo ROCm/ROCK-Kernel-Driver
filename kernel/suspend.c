@@ -468,31 +468,33 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 {
 	int chunk_size;
 	int nr_copy_pages = 0;
-	int loop;
+	int pfn;
+	struct page *page;
 	
 	if (max_mapnr != num_physpages)
 		panic("mapnr is not expected");
-	for (loop = 0; loop < max_mapnr; loop++) {
-		if (PageHighMem(mem_map+loop))
+	for (pfn = 0; pfn < max_mapnr; pfn++) {
+		page = pfn_to_page(pfn);
+		if (PageHighMem(page))
 			panic("Swsusp not supported on highmem boxes. Send 1GB of RAM to <pavel@ucw.cz> and try again ;-).");
-		if (!PageReserved(mem_map+loop)) {
-			if (PageNosave(mem_map+loop))
+		if (!PageReserved(page)) {
+			if (PageNosave(page))
 				continue;
 
-			if ((chunk_size=is_head_of_free_region(mem_map+loop))!=0) {
-				loop += chunk_size - 1;
+			if ((chunk_size=is_head_of_free_region(page))!=0) {
+				pfn += chunk_size - 1;
 				continue;
 			}
-		} else if (PageReserved(mem_map+loop)) {
-			BUG_ON (PageNosave(mem_map+loop));
+		} else if (PageReserved(page)) {
+			BUG_ON (PageNosave(page));
 
 			/*
 			 * Just copy whole code segment. Hopefully it is not that big.
 			 */
-			if (ADDRESS(loop) >= (unsigned long)
-				&__nosave_begin && ADDRESS(loop) < 
+			if (ADDRESS(pfn) >= (unsigned long)
+				&__nosave_begin && ADDRESS(pfn) < 
 				(unsigned long)&__nosave_end) {
-				PRINTK("[nosave %x]", ADDRESS(loop));
+				PRINTK("[nosave %x]", ADDRESS(pfn));
 				continue;
 			}
 			/* Hmm, perhaps copying all reserved pages is not too healthy as they may contain 
@@ -501,7 +503,7 @@ static int count_and_copy_data_pages(struct pbe *pagedir_p)
 
 		nr_copy_pages++;
 		if (pagedir_p) {
-			pagedir_p->orig_address = ADDRESS(loop);
+			pagedir_p->orig_address = ADDRESS(pfn);
 			copy_page(pagedir_p->address, pagedir_p->orig_address);
 			pagedir_p++;
 		}

@@ -80,8 +80,8 @@ static inline void *phys_to_virt(unsigned long x)
  * around in memory.
  */
 #define page_to_pfn(page)					\
-	(((page) - page_zone(page)->zone_mem_map)		\
-	  + (page_zone(page)->zone_start_paddr >> PAGE_SHIFT))
+	(( (page) - page_zone(page)->zone_mem_map)		\
+	  + page_zone(page)->zone_start_pfn)
 
 #define pfn_to_page(pfn)					\
 	(PFN_TO_MAPBASE(pfn) + LOCAL_MAP_NR((pfn) << PAGE_SHIFT))

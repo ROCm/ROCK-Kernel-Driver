@@ -207,7 +207,7 @@ static inline int get_order(unsigned long size)
 #ifdef CONFIG_DISCONTIGMEM
 #define page_to_pfn(page) \
 		((page) - page_zone(page)->zone_mem_map + \
-		(page_zone(page)->zone_start_paddr >> PAGE_SHIFT))
+		(page_zone(page)->zone_start_pfn))
 #define pfn_to_page(pfn)	discontigmem_pfn_to_page(pfn)
 #else
 #define pfn_to_page(pfn)	(mem_map + (pfn))
