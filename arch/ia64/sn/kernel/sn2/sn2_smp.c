@@ -19,6 +19,7 @@
 #include <linux/mmzone.h>
 #include <linux/module.h>
 #include <linux/bitops.h>
+#include <linux/nodemask.h>
 
 #include <asm/processor.h>
 #include <asm/irq.h>

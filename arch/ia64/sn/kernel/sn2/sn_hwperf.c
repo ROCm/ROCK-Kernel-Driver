@@ -30,6 +30,7 @@
 #include <linux/miscdevice.h>
 #include <linux/cpumask.h>
 #include <linux/smp_lock.h>
+#include <linux/nodemask.h>
 #include <asm/processor.h>
 #include <asm/topology.h>
 #include <asm/smp.h>

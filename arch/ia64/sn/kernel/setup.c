@@ -28,6 +28,7 @@
 #include <linux/compiler.h>
 #include <linux/sched.h>
 #include <linux/root_dev.h>
+#include <linux/nodemask.h>
 
 #include <asm/io.h>
 #include <asm/sal.h>
