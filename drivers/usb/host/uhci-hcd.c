@@ -417,13 +417,8 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 	if (!qh)
 		return;
 
-	qh->urbp = NULL;
-
 	/*
 	 * Only go through the hoops if it's actually linked in
-	 * Queued QHs are removed in uhci_delete_queued_urb,
-	 * since (for queued URBs) the pqh is pointed to the next
-	 * QH in the queue, not the next endpoint's QH.
 	 */
 	spin_lock_irqsave(&uhci->frame_list_lock, flags);
 	if (!list_empty(&qh->list)) {
@@ -450,9 +445,20 @@ static void uhci_remove_qh(struct uhci_hcd *uhci, struct uhci_qh *qh)
 		/* continue the rest of the schedule */
 		qh->element = UHCI_PTR_TERM;
 
+		/* If our queue is nonempty, make the next URB the head */
+		if (!list_empty(&qh->urbp->queue_list)) {
+			struct urb_priv *nurbp;
+
+			nurbp = list_entry(qh->urbp->queue_list.next,
+					struct urb_priv, queue_list);
+			nurbp->queued = 0;
+			list_add_tail(&nurbp->qh->list, &qh->list);
+		}
 		list_del_init(&qh->list);
 	}
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
+
+	qh->urbp = NULL;
 
 	spin_lock_irqsave(&uhci->qh_remove_list_lock, flags);
 
@@ -603,39 +609,9 @@ static void uhci_delete_queued_urb(struct uhci_hcd *uhci, struct urb *urb)
 				usb_pipeout(urb->pipe), toggle);
 	}
 
-	if (!urbp->queued) {
-		struct uhci_qh *pqh;
-
-		nurbp->queued = 0;
-
-		/*
-		 * Fixup the previous QH's queue to link to the new head
-		 * of this queue.
-		 */
-		pqh = list_entry(urbp->qh->list.prev, struct uhci_qh, list);
-
-		if (pqh->urbp) {
-			struct list_head *head, *tmp;
-
-			head = &pqh->urbp->queue_list;
-			tmp = head->next;
-			while (head != tmp) {
-				struct urb_priv *turbp =
-					list_entry(tmp, struct urb_priv, queue_list);
-
-				tmp = tmp->next;
-
-				turbp->qh->link = cpu_to_le32(nurbp->qh->dma_handle) | UHCI_PTR_QH;
-			}
-		}
-
-		pqh->link = cpu_to_le32(nurbp->qh->dma_handle) | UHCI_PTR_QH;
-
-		list_add_tail(&nurbp->qh->list, &urbp->qh->list);
-		list_del_init(&urbp->qh->list);
-	} else {
-		/* We're somewhere in the middle (or end). A bit trickier */
-		/*  than the head scenario */
+	if (urbp->queued) {
+		/* We're somewhere in the middle (or end).  The case where
+		 * we're at the head is handled in uhci_remove_qh(). */
 		purbp = list_entry(urbp->queue_list.prev, struct urb_priv,
 				queue_list);
 
@@ -926,50 +902,23 @@ static int uhci_submit_control(struct uhci_hcd *uhci, struct urb *urb, struct ur
 }
 
 /*
- * If control was short, then end status packet wasn't sent, so this
- * reorganize s so it's sent to finish the transfer.  The original QH is
- * removed from the skel and discarded; all TDs except the last (status)
- * are deleted; the last (status) TD is put on a new QH which is reinserted
- * into the skel.  Since the last TD and urb_priv are reused, the TD->link
- * and urb_priv maintain any queued QHs.
+ * If control-IN transfer was short, the status packet wasn't sent.
+ * This routine changes the element pointer in the QH to point at the
+ * status TD.  It's safe to do this even while the QH is live, because
+ * the hardware only updates the element pointer following a successful
+ * transfer.  The inactive TD for the short packet won't cause an update,
+ * so the pointer won't get overwritten.  The next time the controller
+ * sees this QH, it will send the status packet.
  */
 static int usb_control_retrigger_status(struct uhci_hcd *uhci, struct urb *urb)
 {
-	struct list_head *tmp, *head;
 	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
+	struct uhci_td *td;
 
 	urbp->short_control_packet = 1;
 
-	/* Create a new QH to avoid pointer overwriting problems */
-	uhci_remove_qh(uhci, urbp->qh);
-
-	/* Delete all of the TD's except for the status TD at the end */
-	head = &urbp->td_list;
-	tmp = head->next;
-	while (tmp != head && tmp->next != head) {
-		struct uhci_td *td = list_entry(tmp, struct uhci_td, list);
-
-		tmp = tmp->next;
-
-		uhci_remove_td_from_urb(td);
-		uhci_remove_td(uhci, td);
-		uhci_free_td(uhci, td);
-	}
-
-	urbp->qh = uhci_alloc_qh(uhci, urb->dev);
-	if (!urbp->qh)
-		return -ENOMEM;
-
-	urbp->qh->urbp = urbp;
-
-	/* One TD, who cares about Breadth first? */
-	uhci_insert_tds_in_qh(urbp->qh, urb, UHCI_PTR_DEPTH);
-
-	/* Low-speed transfers get a different queue */
-	if (urb->dev->speed == USB_SPEED_LOW)
-		uhci_insert_qh(uhci, uhci->skel_ls_control_qh, urb);
-	else
-		uhci_insert_qh(uhci, uhci->skel_hs_control_qh, urb);
+	td = list_entry(urbp->td_list.prev, struct uhci_td, list);
+	urbp->qh->element = td->dma_handle;
 
 	return -EINPROGRESS;
 }
