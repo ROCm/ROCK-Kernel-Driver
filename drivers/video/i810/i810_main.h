@@ -100,7 +100,7 @@ static inline void __devinit set_mtrr(struct i810fb_par *par)
 	par->mtrr_reg = mtrr_add((u32) par->aperture.physical, 
 		 par->aperture.size, MTRR_TYPE_WRCOMB, 1);
 	if (par->mtrr_reg < 0) {
-		printk("set_mtrr: unable to set MTRR/n");
+		printk(KERN_ERR "set_mtrr: unable to set MTRR\n");
 		return;
 	}
 	par->dev_flags |= HAS_MTRR;
