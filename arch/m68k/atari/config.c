@@ -258,7 +258,9 @@ void __init config_atari(void)
     mach_keyb_init       = atari_keyb_init;
     mach_kbdrate         = atari_kbdrate;
     mach_kbd_translate   = atari_kbd_translate;
+#ifdef CONFIG_MAGIC_SYSRQ
     SYSRQ_KEY            = 0xff;
+#endif
     mach_kbd_leds        = atari_kbd_leds;
     mach_init_IRQ        = atari_init_IRQ;
     mach_request_irq     = atari_request_irq;
