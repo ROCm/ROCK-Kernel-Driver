@@ -48,6 +48,9 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/smpboot.h>
+#include <asm/desc.h>
+#include <asm/arch_hooks.h>
+#include "smpboot_hooks.h"
 
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
@@ -1003,9 +1006,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	 */
 	if (!smp_found_config) {
 		printk(KERN_NOTICE "SMP motherboard not detected.\n");
-#ifndef CONFIG_VISWS
-		io_apic_irqs = 0;
-#endif
+		smpboot_clear_io_apic_irqs();
 		phys_cpu_present_map = 1;
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
@@ -1032,9 +1033,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
 			boot_cpu_physical_apicid);
 		printk(KERN_ERR "... forcing use of dummy APIC emulation. (tell your hw vendor)\n");
-#ifndef CONFIG_VISWS
-		io_apic_irqs = 0;
-#endif
+		smpboot_clear_io_apic_irqs();
 		phys_cpu_present_map = 1;
 		return;
 	}
@@ -1047,9 +1046,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	if (!max_cpus) {
 		smp_found_config = 0;
 		printk(KERN_INFO "SMP mode deactivated, forcing use of dummy APIC emulation.\n");
-#ifndef CONFIG_VISWS
-		io_apic_irqs = 0;
-#endif
+		smpboot_clear_io_apic_irqs();
 		phys_cpu_present_map = 1;
 		return;
 	}
@@ -1106,22 +1103,7 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	/*
 	 * Cleanup possible dangling ends...
 	 */
-#ifndef CONFIG_VISWS
-	{
-		/*
-		 * Install writable page 0 entry to set BIOS data area.
-		 */
-		local_flush_tlb();
-
-		/*
-		 * Paranoid:  Set warm reset code and vector here back
-		 * to default values.
-		 */
-		CMOS_WRITE(0, 0xf);
-
-		*((volatile long *) phys_to_virt(0x467)) = 0;
-	}
-#endif
+	smpboot_setup_warm_reset_vector();
 
 	/*
 	 * Allow the user to impress friends.
@@ -1173,15 +1155,8 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 			}
 		}
 	}
-	     
-#ifndef CONFIG_VISWS
-	/*
-	 * Here we can be sure that there is an IO-APIC in the system. Let's
-	 * go and set it up:
-	 */
-	if (!skip_ioapic_setup && nr_ioapics)
-		setup_IO_APIC();
-#endif
+
+	smpboot_setup_io_apic();
 
 	setup_boot_APIC_clock();
 
@@ -1219,4 +1194,30 @@ int __devinit __cpu_up(unsigned int cpu)
 void __init smp_cpus_done(unsigned int max_cpus)
 {
 	zap_low_mappings();
+}
+
+void __init smp_intr_init()
+{
+	/*
+	 * IRQ0 must be given a fixed assignment and initialized,
+	 * because it's used before the IO-APIC is set up.
+	 */
+	set_intr_gate(FIRST_DEVICE_VECTOR, interrupt[0]);
+
+	/*
+	 * The reschedule interrupt is a CPU-to-CPU reschedule-helper
+	 * IPI, driven by wakeup.
+	 */
+	set_intr_gate(RESCHEDULE_VECTOR, reschedule_interrupt);
+
+	/* IPI for invalidation */
+	set_intr_gate(INVALIDATE_TLB_VECTOR, invalidate_interrupt);
+
+	/* IPI for generic function call */
+	set_intr_gate(CALL_FUNCTION_VECTOR, call_function_interrupt);
+
+	/* thermal monitor LVT interrupt */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+#endif
 }
