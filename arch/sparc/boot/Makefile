@@ -23,7 +23,7 @@ clean:
 	rm -f btfixupprep piggyback tftpboot.img btfix.o btfix.s image
 
 BTOBJS := $(HEAD) $(init-y)
-BTLIBS := $(core-y) $(LIBS) $(drivers-y) $(net-y)
+BTLIBS := $(core-y) $(libs-y) $(drivers-y) $(net-y)
 
 # Actual linking
 image: btfix.o
