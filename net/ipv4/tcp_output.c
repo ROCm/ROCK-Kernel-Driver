@@ -553,7 +553,7 @@ unsigned char * __pskb_trim_head(struct sk_buff *skb, int len)
 	return skb->tail;
 }
 
-static int __tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+static int __tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
 {
 	if (skb_cloned(skb) &&
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
@@ -567,12 +567,18 @@ static int __tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
 	}
 
 	skb->ip_summed = CHECKSUM_HW;
+
+	/* Any change of skb->len requires recalculation of tso
+	 * factor and mss.
+	 */
+	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
+
 	return 0;
 }
 
-static inline int tcp_trim_head(struct sock *sk, struct sk_buff *skb, u32 len)
+static inline int tcp_trim_head(struct tcp_opt *tp, struct sk_buff *skb, u32 len)
 {
-	int err = __tcp_trim_head(sk, skb, len);
+	int err = __tcp_trim_head(tp, skb, len);
 
 	if (!err)
 		TCP_SKB_CB(skb)->seq += len;
@@ -897,6 +903,9 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		    ((skb_size + next_skb_size) > mss_now))
 			return;
 
+		BUG_ON(TCP_SKB_CB(skb)->tso_factor != 1 ||
+		       TCP_SKB_CB(next_skb)->tso_factor != 1);
+
 		/* Ok.  We will be able to collapse the packet. */
 		__skb_unlink(next_skb, next_skb->list);
 
@@ -1018,7 +1027,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	if (skb->len > (data_end_seq - data_seq)) {
 		u32 to_trim = skb->len - (data_end_seq - data_seq);
 
-		if (__tcp_trim_head(sk, skb, to_trim))
+		if (__tcp_trim_head(tp, skb, to_trim))
 			return -ENOMEM;
 	}		
 
@@ -1032,7 +1041,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 			tp->mss_cache = tp->mss_cache_std;
 		}
 
-		if (tcp_trim_head(sk, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
+		if (tcp_trim_head(tp, skb, tp->snd_una - TCP_SKB_CB(skb)->seq))
 			return -ENOMEM;
 	}
 
@@ -1080,6 +1089,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	   tp->snd_una == (TCP_SKB_CB(skb)->end_seq - 1)) {
 		if (!pskb_trim(skb, 0)) {
 			TCP_SKB_CB(skb)->seq = TCP_SKB_CB(skb)->end_seq - 1;
+			TCP_SKB_CB(skb)->tso_factor = 1;
 			skb->ip_summed = CHECKSUM_NONE;
 			skb->csum = 0;
 		}
