@@ -32,7 +32,7 @@ static LIST_HEAD(pwc_decompressor_list);
 
 /* Should the pwc_decompress structure ever change, we increase the 
    version number so that we don't get nasty surprises, or can 
-   dynamicly adjust our structure.
+   dynamically adjust our structure.
  */
 const int pwc_decompressor_version = PWC_MAJOR;
 

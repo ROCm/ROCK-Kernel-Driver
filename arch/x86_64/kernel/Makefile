@@ -2,8 +2,8 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS 	:= head.o head64.o init_task.o
-EXTRA_AFLAGS  := -traditional
+extra-y 	:= head.o head64.o init_task.o
+EXTRA_AFLAGS	:= -traditional
 obj-y	:= process.o semaphore.o signal.o entry.o traps.o irq.o \
 		ptrace.o i8259.o ioport.o ldt.o setup.o time.o sys_x86_64.o \
 		pci-dma.o x8664_ksyms.o i387.o syscall.o vsyscall.o \

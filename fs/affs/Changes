@@ -28,6 +28,11 @@ Known bugs:
 
 Please direct bug reports to: zippel@linux-m68k.org
 
+Version 3.20
+------------
+- kill kernel lock
+- fix for a possible bitmap corruption
+
 Version 3.19
 ------------
 

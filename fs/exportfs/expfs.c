@@ -353,7 +353,7 @@ static int get_name(struct dentry *dentry, char *name,
 	/*
 	 * Open the directory ...
 	 */
-	error = init_private_file(&file, dentry, FMODE_READ);
+	error = open_private_file(&file, dentry, O_RDONLY);
 	if (error)
 		goto out;
 	error = -EINVAL;
@@ -381,8 +381,7 @@ static int get_name(struct dentry *dentry, char *name,
 	}
 
 out_close:
-	if (file.f_op->release)
-		file.f_op->release(dir, &file);
+	close_private_file(&file);
 out:
 	return error;
 }

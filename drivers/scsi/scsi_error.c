@@ -597,28 +597,6 @@ static int scsi_request_sense(struct scsi_cmnd *scmd)
 }
 
 /**
- * scsi_eh_retry_cmd - Retry the original command
- * @scmd:	Original failed SCSI cmd.
- *
- * Notes:
- *    This function will *not* return until the command either times out,
- *    or it completes.
- **/
-static int scsi_eh_retry_cmd(struct scsi_cmnd *scmd)
-{
-	int rtn = SUCCESS;
-
-	for (; scmd->retries < scmd->allowed; scmd->retries++) {
-		scsi_setup_cmd_retry(scmd);
-		rtn = scsi_send_eh_cmnd(scmd, scmd->timeout_per_command);
-		if (rtn != NEEDS_RETRY)
-			break;
-	}
-
-	return rtn;
-}
-
-/**
  * scsi_eh_finish_cmd - Handle a cmd that eh is finished with.
  * @scmd:	Original SCSI cmd that eh has finished.
  * @done_q:	Queue for processed commands.

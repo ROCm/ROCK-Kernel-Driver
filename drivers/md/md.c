@@ -2818,9 +2818,11 @@ int md_thread(void * arg)
 
 void md_wakeup_thread(mdk_thread_t *thread)
 {
-	dprintk("md: waking up MD thread %p.\n", thread);
-	set_bit(THREAD_WAKEUP, &thread->flags);
-	wake_up(&thread->wqueue);
+	if (thread) {
+		dprintk("md: waking up MD thread %p.\n", thread);
+		set_bit(THREAD_WAKEUP, &thread->flags);
+		wake_up(&thread->wqueue);
+	}
 }
 
 mdk_thread_t *md_register_thread(void (*run) (mddev_t *), mddev_t *mddev,

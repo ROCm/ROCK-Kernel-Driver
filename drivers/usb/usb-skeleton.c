@@ -64,7 +64,7 @@
 #define DRIVER_AUTHOR "Greg Kroah-Hartman, greg@kroah.com"
 #define DRIVER_DESC "USB Skeleton Driver"
 
-/* Module paramaters */
+/* Module parameters */
 MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 

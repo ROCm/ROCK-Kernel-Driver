@@ -127,42 +127,6 @@ struct pci_dev *pci_find_dev_by_addr(unsigned long addr)
 	return NULL;
 }
 
-void __devinit pcibios_fixup_pbus_ranges(struct pci_bus *pbus,
-					 struct pbus_set_ranges_data *pranges)
-{
-}
-
-void
-pcibios_update_resource(struct pci_dev *dev, struct resource *root,
-			     struct resource *res, int resource)
-{
-	u32 new, check;
-	int reg;
-	struct pci_controller* hose = PCI_GET_PHB_PTR(dev);
-	
-	new = res->start;
-	if (hose && res->flags & IORESOURCE_MEM)
-		new -= hose->pci_mem_offset;
-	new |= (res->flags & PCI_REGION_FLAG_MASK);
-	if (resource < 6) {
-		reg = PCI_BASE_ADDRESS_0 + 4*resource;
-	} else if (resource == PCI_ROM_RESOURCE) {
-		res->flags |= PCI_ROM_ADDRESS_ENABLE;
-		reg = dev->rom_base_reg;
-	} else {
-		/* Somebody might have asked allocation of a non-standard resource */
-		return;
-	}
-
-	pci_write_config_dword(dev, reg, new);
-	pci_read_config_dword(dev, reg, &check);
-	if ((new ^ check) & ((new & PCI_BASE_ADDRESS_SPACE_IO) ? PCI_BASE_ADDRESS_IO_MASK : PCI_BASE_ADDRESS_MEM_MASK)) {
-		printk(KERN_ERR "PCI: Error while updating region "
-		       "%s/%d (%08x != %08x)\n", dev->slot_name, resource,
-		       new, check);
-	}
-}
-
 static void
 pcibios_fixup_resources(struct pci_dev* dev)
 {

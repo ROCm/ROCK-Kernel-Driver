@@ -368,7 +368,7 @@ struct hci;
 
 #define SL11H_CTL1VAL_RESET	8
 
-/* Interrut enable (addr 6) and interrupt status register bits (addr 0xD) */
+/* Interrupt enable (addr 6) and interrupt status register bits (addr 0xD) */
 #define SL11H_INTMASK_XFERDONE	1
 #define SL11H_INTMASK_SOFINTR	0x10
 #define SL11H_INTMASK_INSRMV	0x20

@@ -525,8 +525,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		 * "mem=nopentium" disables the 4MB page tables.
 		 * "mem=XXX[kKmM]" defines a memory region from HIGH_MEM
 		 * to <mem>, overriding the bios size.
-		 * "mem=XXX[KkmM]@XXX[KkmM]" defines a memory region from
+		 * "memmap=XXX[KkmM]@XXX[KkmM]" defines a memory region from
 		 * <start> to <start>+<mem>, overriding the bios size.
+		 *
+		 * HPA tells me bootloaders need to parse mem=, so no new
+		 * option should be mem=  [also see Documentation/i386/boot.txt]
 		 */
 		if (c == ' ' && !memcmp(from, "mem=", 4)) {
 			if (to != command_line)
@@ -535,8 +538,26 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				from += 9+4;
 				clear_bit(X86_FEATURE_PSE, boot_cpu_data.x86_capability);
 				disable_pse = 1;
-			} else if (!memcmp(from+4, "exactmap", 8)) {
-				from += 8+4;
+			} else {
+				/* If the user specifies memory size, we
+				 * limit the BIOS-provided memory map to
+				 * that size. exactmap can be used to specify
+				 * the exact map. mem=number can be used to
+				 * trim the existing memory map.
+				 */
+				unsigned long long mem_size;
+ 
+				mem_size = memparse(from+4, &from);
+				limit_regions(mem_size);
+				userdef=1;
+			}
+		}
+
+		if (c == ' ' && !memcmp(from, "memmap=", 7)) {
+			if (to != command_line)
+				to--;
+			if (!memcmp(from+7, "exactmap", 8)) {
+				from += 8+7;
 				e820.nr_map = 0;
 				userdef = 1;
 			} else {
@@ -548,7 +569,7 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 				 */
 				unsigned long long start_at, mem_size;
  
-				mem_size = memparse(from+4, &from);
+				mem_size = memparse(from+7, &from);
 				if (*from == '@') {
 					start_at = memparse(from+1, &from);
 					add_memory_region(start_at, mem_size, E820_RAM);

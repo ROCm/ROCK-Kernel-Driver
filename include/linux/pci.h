@@ -485,11 +485,9 @@ struct pci_ops {
 	int (*write)(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val);
 };
 
-struct pbus_set_ranges_data
-{
-	unsigned long io_start, io_end;
-	unsigned long mem_start, mem_end;
-	unsigned long prefetch_start, prefetch_end;
+struct pci_bus_region {
+	unsigned long start;
+	unsigned long end;
 };
 
 struct pci_driver {
@@ -531,10 +529,7 @@ char *pcibios_setup (char *str);
 /* Used only when drivers/pci/setup.c is used */
 void pcibios_align_resource(void *, struct resource *,
 			    unsigned long, unsigned long);
-void pcibios_update_resource(struct pci_dev *, struct resource *,
-			     struct resource *, int);
 void pcibios_update_irq(struct pci_dev *, int irq);
-void pcibios_fixup_pbus_ranges(struct pci_bus *, struct pbus_set_ranges_data *);
 
 /* Generic PCI functions used internally */
 

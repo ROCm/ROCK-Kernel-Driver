@@ -126,7 +126,7 @@
 
 /*
  *	The standard Arnewsh 5206 board only has 1MiB of ram. Not normally
- *	enough to be usefull. Assume the user has fitted something larger,
+ *	enough to be useful. Assume the user has fitted something larger,
  *	at least 4MiB in size. No point in not letting the kernel completely
  *	link, it will be obvious if it is too big when they go to load it.
  */
@@ -300,6 +300,9 @@ SECTIONS {
 		*(.initcall6.init)
 		*(.initcall7.init)
 		__initcall_end = .;
+		__con_initcall_start = .;
+		*(.con_initcall.init)
+		__con_initcall_end = .;
 		. = ALIGN(4);
 		__initramfs_start = .;
 		*(.init.ramfs)

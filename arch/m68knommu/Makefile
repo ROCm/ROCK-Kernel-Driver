@@ -86,8 +86,7 @@ LDFLAGS_BLOB	:= --format binary --oformat elf32-m68k
 
 head-y := arch/m68knommu/platform/$(platform-y)/$(board-y)/crt0_$(model-y).o
 
-CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h.tmp \
-	       include/asm-$(ARCH)/asm-offsets.h \
+CLEAN_FILES := include/asm-$(ARCH)/asm-offsets.h \
 	       arch/$(ARCH)/kernel/asm-offsets.s
 
 core-y	+= arch/m68knommu/kernel/ \
@@ -104,6 +103,4 @@ archclean:
 include/asm-$(ARCH)/asm-offsets.h: arch/$(ARCH)/kernel/asm-offsets.s \
 				   include/asm include/linux/version.h \
 				   include/config/MARKER
-	@echo -n '  Generating $@'
-	@$(generate-asm-offsets.h) < $< > $@.tmp
-	@$(update-if-changed)
+	$(call filechk,gen-asm-offsets)

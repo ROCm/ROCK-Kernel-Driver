@@ -69,7 +69,7 @@ endif
 
 export	ZTEXTADDR ZBSSADDR ZRELADDR INITRD_PHYS PARAMS_PHYS
 
-EXTRA_TARGETS := Image zImage bootpImage
+targets := Image zImage bootpImage
 
 $(obj)/Image: vmlinux FORCE
 	$(call if_changed,objcopy)
@@ -106,5 +106,4 @@ zinstall: $(obj)/zImage
 	$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION) \
 	$(obj)/zImage System.map "$(INSTALL_PATH)"
 
-clean-files := $(addprefix $(obj)/,Image zImage bootpImage)
 subdir-	    := bootp compressed

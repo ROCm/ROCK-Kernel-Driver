@@ -195,11 +195,9 @@ affs_write_inode(struct inode *inode, int unused)
 	if (!inode->i_nlink)
 		// possibly free block
 		return;
-	lock_kernel();
 	bh = affs_bread(sb, inode->i_ino);
 	if (!bh) {
 		affs_error(sb,"write_inode","Cannot read block %lu",inode->i_ino);
-		unlock_kernel();
 		return;
 	}
 	tail = AFFS_TAIL(sb, bh);
@@ -227,7 +225,7 @@ affs_write_inode(struct inode *inode, int unused)
 	affs_fix_checksum(sb, bh);
 	mark_buffer_dirty_inode(bh, inode);
 	affs_brelse(bh);
-	unlock_kernel();
+	affs_free_prealloc(inode);
 }
 
 int
@@ -235,8 +233,6 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	int error;
-
-	lock_kernel();
 
 	pr_debug("AFFS: notify_change(%lu,0x%x)\n",inode->i_ino,attr->ia_valid);
 
@@ -257,7 +253,6 @@ affs_notify_change(struct dentry *dentry, struct iattr *attr)
 	if (!error && (attr->ia_valid & ATTR_MODE))
 		mode_to_prot(inode);
 out:
-	unlock_kernel();
 	return error;
 }
 
@@ -265,15 +260,13 @@ void
 affs_put_inode(struct inode *inode)
 {
 	pr_debug("AFFS: put_inode(ino=%lu, nlink=%u)\n", inode->i_ino, inode->i_nlink);
-	lock_kernel();
 	affs_free_prealloc(inode);
 	if (atomic_read(&inode->i_count) == 1) {
+		down(&inode->i_sem);
 		if (inode->i_size != AFFS_I(inode)->mmu_private)
 			affs_truncate(inode);
-		//if (inode->i_nlink)
-		//	affs_clear_inode(inode);
+		up(&inode->i_sem);
 	}
-	unlock_kernel();
 }
 
 void
@@ -284,9 +277,7 @@ affs_delete_inode(struct inode *inode)
 	if (S_ISREG(inode->i_mode))
 		affs_truncate(inode);
 	clear_inode(inode);
-	lock_kernel();
 	affs_free_block(inode->i_sb, inode->i_ino);
-	unlock_kernel();
 }
 
 void

@@ -79,6 +79,7 @@ extern int dirty_writeback_centisecs;
 extern int dirty_expire_centisecs;
 
 
+void page_writeback_init(void);
 void balance_dirty_pages(struct address_space *mapping);
 void balance_dirty_pages_ratelimited(struct address_space *mapping);
 int pdflush_operation(void (*fn)(unsigned long), unsigned long arg0);

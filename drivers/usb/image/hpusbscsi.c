@@ -303,7 +303,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 		} else {
                 	usb_callback = simple_payload_callback;
 		}
-		/* Now we find out which direction data is to be transfered in */
+		/* Now we find out which direction data is to be transferred in */
 		hpusbscsi->current_data_pipe = DIRECTION_IS_IN(srb->cmnd[0]) ?
 			usb_rcvbulkpipe(hpusbscsi->dev, hpusbscsi->ep_in)
 		:
@@ -410,7 +410,7 @@ DEBUG("Getting status byte %d \n",hpusbscsi->scsi_state_byte);
 	}
 
 	if (hpusbscsi->scallback != NULL && hpusbscsi->state == HP_STATE_WAIT && scsi_state != CHECK_CONDITION <<1 )
-		/* we do a callback to the scsi layer if and only if all data has been transfered */
+		/* we do a callback to the scsi layer if and only if all data has been transferred */
 		hpusbscsi->scallback(hpusbscsi->srb);
 
 	TRACE_STATE;

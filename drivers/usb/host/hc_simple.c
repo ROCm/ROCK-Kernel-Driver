@@ -605,7 +605,7 @@ static struct urb *qu_return_urb (hci_t * hci, struct urb * urb, int resub_ok)
 /***************************************************************************
  * Function Name : sh_scan_iso_urb_list
  *
- * This function goes throught the isochronous urb list and schedule the 
+ * This function goes through the isochronous urb list and schedule the 
  * the transfer.   
  *
  * Note: This function has not tested yet

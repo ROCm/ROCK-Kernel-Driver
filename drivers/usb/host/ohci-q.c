@@ -650,7 +650,7 @@ static void td_submit_urb (
 /* calculate transfer length/status and update the urb
  * PRECONDITION:  irqsafe (only for urb->status locking)
  */
-static void td_done (struct urb *urb, struct td *td)
+static void td_done (struct ohci_hcd *ohci, struct urb *urb, struct td *td)
 {
 	u32	tdINFO = le32_to_cpup (&td->hwINFO);
 	int	cc = 0;
@@ -908,7 +908,7 @@ rescan_this:
 			*prev = td->hwNextTD | savebits;
 
 			/* HC may have partly processed this TD */
-			td_done (urb, td);
+			td_done (ohci, urb, td);
 			urb_priv->td_cnt++;
 
 			/* if URB is done, clean up */
@@ -991,7 +991,7 @@ dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 		struct ed	*ed = td->ed;
 
 		/* update URB's length and status from TD */
-   		td_done (urb, td);
+   		td_done (ohci, urb, td);
   		urb_priv->td_cnt++;
 
 		/* If all this urb's TDs are done, call complete() */
