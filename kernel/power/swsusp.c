@@ -43,9 +43,8 @@
 #include <linux/version.h>
 #include <linux/delay.h>
 #include <linux/reboot.h>
-#include <linux/vt_kern.h>
 #include <linux/bitops.h>
-#include <linux/interrupt.h>
+#include <linux/vt_kern.h>
 #include <linux/kbd_kern.h>
 #include <linux/keyboard.h>
 #include <linux/spinlock.h>
@@ -64,20 +63,12 @@
 #include <asm/pgtable.h>
 #include <asm/io.h>
 
+#include "power.h"
+
 extern long sys_sync(void);
 
 unsigned char software_suspend_enabled = 0;
 
-#define SUSPEND_CONSOLE	(MAX_NR_CONSOLES-1)
-/* With SUSPEND_CONSOLE defined, it suspend looks *really* cool, but
-   we probably do not take enough locks for switching consoles, etc,
-   so bad things might happen.
-*/
-#if !defined(CONFIG_VT) || !defined(CONFIG_VT_CONSOLE)
-#undef SUSPEND_CONSOLE
-#endif
-
-#define TIMEOUT	(6 * HZ)			/* Timeout for stopping processes */
 #define __ADDRESS(x)  ((unsigned long) phys_to_virt(x))
 #define ADDRESS(x) __ADDRESS((x) << PAGE_SHIFT)
 #define ADDRESS2(x) __ADDRESS(__pa(x))		/* Needed for x86-64 where some pages are in memory twice */
@@ -91,9 +82,6 @@ extern int is_head_of_free_region(struct page *);
 spinlock_t suspend_pagedir_lock __nosavedata = SPIN_LOCK_UNLOCKED;
 
 /* Variables to be preserved over suspend */
-static int new_loglevel = 7;
-static int orig_loglevel;
-static int orig_fgconsole, orig_kmsg;
 static int pagedir_order_check;
 static int nr_copy_pages_check;
 
@@ -159,104 +147,6 @@ static const char name_resume[] = "Resume Machine: ";
 #endif
 
 /*
- * Refrigerator and related stuff
- */
-
-#define INTERESTING(p) \
-			/* We don't want to touch kernel_threads..*/ \
-			if (p->flags & PF_IOTHREAD) \
-				continue; \
-			if (p == current) \
-				continue; \
-			if (p->state == TASK_ZOMBIE) \
-				continue;
-
-/* Refrigerator is place where frozen processes are stored :-). */
-void refrigerator(unsigned long flag)
-{
-	/* You need correct to work with real-time processes.
-	   OTOH, this way one process may see (via /proc/) some other
-	   process in stopped state (and thereby discovered we were
-	   suspended. We probably do not care. 
-	 */
-	long save;
-	save = current->state;
-	current->state = TASK_STOPPED;
-	PRINTK("%s entered refrigerator\n", current->comm);
-	printk("=");
-	current->flags &= ~PF_FREEZE;
-	if (flag)
-		flush_signals(current); /* We have signaled a kernel thread, which isn't normal behaviour
-					   and that may lead to 100%CPU sucking because those threads
-					   just don't manage signals. */
-	current->flags |= PF_FROZEN;
-	while (current->flags & PF_FROZEN)
-		schedule();
-	PRINTK("%s left refrigerator\n", current->comm);
-	current->state = save;
-}
-
-/* 0 = success, else # of processes that we failed to stop */
-int freeze_processes(void)
-{
-       int todo;
-       unsigned long start_time;
-	struct task_struct *g, *p;
-	
-	printk( "Stopping tasks: " );
-	start_time = jiffies;
-	do {
-		todo = 0;
-		read_lock(&tasklist_lock);
-		do_each_thread(g, p) {
-			unsigned long flags;
-			INTERESTING(p);
-			if (p->flags & PF_FROZEN)
-				continue;
-
-			/* FIXME: smp problem here: we may not access other process' flags
-			   without locking */
-			p->flags |= PF_FREEZE;
-			spin_lock_irqsave(&p->sighand->siglock, flags);
-			signal_wake_up(p, 0);
-			spin_unlock_irqrestore(&p->sighand->siglock, flags);
-			todo++;
-		} while_each_thread(g, p);
-		read_unlock(&tasklist_lock);
-		yield();			/* Yield is okay here */
-		if (time_after(jiffies, start_time + TIMEOUT)) {
-			printk( "\n" );
-			printk(KERN_ERR " stopping tasks failed (%d tasks remaining)\n", todo );
-			return todo;
-		}
-	} while(todo);
-	
-	printk( "|\n" );
-	BUG_ON(in_atomic());
-	return 0;
-}
-
-void thaw_processes(void)
-{
-	struct task_struct *g, *p;
-
-	printk( "Restarting tasks..." );
-	read_lock(&tasklist_lock);
-	do_each_thread(g, p) {
-		INTERESTING(p);
-		
-		if (p->flags & PF_FROZEN) p->flags &= ~PF_FROZEN;
-		else
-			printk(KERN_INFO " Strange, %s not stopped\n", p->comm );
-		wake_up_process(p);
-	} while_each_thread(g, p);
-
-	read_unlock(&tasklist_lock);
-	printk( " done\n" );
-	MDELAY(500);
-}
-
-/*
  * Saving part...
  */
 
@@ -279,17 +169,6 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	 * Maybe it isn't.] [we'd need to do this for _all_ fs-es]
 	 */
 	return 0;
-}
-
-/*
- * This is our sync function. With this solution we probably won't sleep
- * but that should not be a problem since tasks are stopped..
- */
-
-static inline void do_suspend_sync(void)
-{
-	blk_run_queues();
-#warning This might be broken. We need to somehow wait for data to reach the disk
 }
 
 /* We memorize in swapfile_used what swap devices are used for suspension */
@@ -559,46 +438,11 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 			free_suspend_pagedir((unsigned long) pagedir);
 			return NULL;
 		}
-		printk(".");
 		SetPageNosave(virt_to_page(p->address));
 		p->orig_address = 0;
 		p++;
 	}
 	return pagedir;
-}
-
-static int prepare_suspend_console(void)
-{
-	orig_loglevel = console_loglevel;
-	console_loglevel = new_loglevel;
-
-#ifdef CONFIG_VT
-	orig_fgconsole = fg_console;
-#ifdef SUSPEND_CONSOLE
-	if(vc_allocate(SUSPEND_CONSOLE))
-	  /* we can't have a free VC for now. Too bad,
-	   * we don't want to mess the screen for now. */
-		return 1;
-
-	set_console (SUSPEND_CONSOLE);
-	if(vt_waitactive(SUSPEND_CONSOLE)) {
-		PRINTK("Bummer. Can't switch VCs.");
-		return 1;
-	}
-	orig_kmsg = kmsg_redirect;
-	kmsg_redirect = SUSPEND_CONSOLE;
-#endif
-#endif
-	return 0;
-}
-
-static void restore_console(void)
-{
-	console_loglevel = orig_loglevel;
-#ifdef SUSPEND_CONSOLE
-	set_console (orig_fgconsole);
-#endif
-	return;
 }
 
 static int prepare_suspend_processes(void)
@@ -850,13 +694,12 @@ void do_magic_suspend_2(void)
 	free_pages((unsigned long) pagedir_nosave, pagedir_order);
 	spin_unlock_irq(&suspend_pagedir_lock);
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	PRINTK(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
 }
 
 static void do_software_suspend(void)
 {
 	arch_prepare_suspend();
-	if (prepare_suspend_console())
+	if (pm_prepare_console())
 		printk( "%sCan't allocate a console... proceeding\n", name_suspend);
 	if (!prepare_suspend_processes()) {
 
@@ -866,13 +709,10 @@ static void do_software_suspend(void)
 
 		free_some_memory();
 		
-		/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
-		 *
-		 * We sync here -- so you have consistent filesystem state when things go wrong.
-		 * -- so that noone writes to disk after we do atomic copy of data.
+		/* No need to invalidate any vfsmnt list -- 
+		 * they will be valid after resume, anyway.
 		 */
-		PRINTK("Syncing disks before copy\n");
-		do_suspend_sync();
+		blk_run_queues();
 
 		/* Save state of all device drivers, and stop them. */		   
 		if(drivers_suspend()==0)
@@ -886,12 +726,11 @@ static void do_software_suspend(void)
 			 * using normal kernel mechanism.
 			 */
 			do_magic(0);
-		PRINTK("Restarting processes...\n");
 		thaw_processes();
 	}
 	software_suspend_enabled = 1;
 	MDELAY(1000);
-	restore_console ();
+	pm_restore_console();
 }
 
 /*
@@ -904,7 +743,7 @@ void software_suspend(void)
 		return;
 
 	software_suspend_enabled = 0;
-	BUG_ON(in_interrupt());
+	might_sleep();
 	do_software_suspend();
 }
 
@@ -1114,8 +953,6 @@ static int __read_suspend_image(struct block_device *bdev, union diskpage *cur, 
 		bdev_write_page(bdev, 0, cur);
 	}
 
-	if (prepare_suspend_console())
-		printk("%sCan't allocate a console... proceeding\n", name_resume);
 	printk( "%sSignature found, resuming\n", name_resume );
 	MDELAY(1000);
 
@@ -1236,8 +1073,8 @@ void software_resume(void)
 	}
 	MDELAY(1000);
 
-	orig_loglevel = console_loglevel;
-	console_loglevel = new_loglevel;
+	if (pm_prepare_console())
+		printk("swsusp: Can't allocate a console... proceeding\n");
 
 	if (!resume_file[0] && resume_status == RESUME_SPECIFIED) {
 		printk( "suspension device unspecified\n" );
@@ -1251,7 +1088,7 @@ void software_resume(void)
 	panic("This never returns");
 
 read_failure:
-	console_loglevel = orig_loglevel;
+	pm_restore_console();
 	return;
 }
 
@@ -1277,4 +1114,3 @@ __setup("resume=", resume_setup);
 
 EXPORT_SYMBOL(software_suspend);
 EXPORT_SYMBOL(software_suspend_enabled);
-EXPORT_SYMBOL(refrigerator);

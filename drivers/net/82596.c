@@ -1420,15 +1420,15 @@ static int i596_close(struct net_device *dev)
 	DEB(DEB_INIT,printk(KERN_DEBUG "%s: Shutting down ethercard, status was %4.4x.\n",
 		       dev->name, lp->scb.status));
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&lp->lock, flags);
 
 	wait_cmd(dev,lp,100,"close1 timed out");
 	lp->scb.command = CUC_ABORT | RX_ABORT;
 	CA(dev);
 
 	wait_cmd(dev,lp,100,"close2 timed out");
-	restore_flags(flags);
+
+	spin_unlock_irqrestore(&lp->lock, flags);
 	DEB(DEB_STRUCT,i596_display_data(dev));
 	i596_cleanup_cmd(dev,lp);
 

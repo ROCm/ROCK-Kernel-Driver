@@ -36,10 +36,12 @@
 #define ASI_PCACHE_DATA		0x31 /* (III) PCache data RAM diag		*/
 #define ASI_PCACHE_TAG		0x32 /* (III) PCache tag RAM diag		*/
 #define ASI_PCACHE_SNOOP_TAG	0x33 /* (III) PCache snoop tag RAM diag		*/
+#define ASI_QUAD_LDD_PHYS	0x34 /* (III+) PADDR, qword load		*/
 #define ASI_WCACHE_VALID_BITS	0x38 /* (III) WCache Valid Bits diag		*/
 #define ASI_WCACHE_DATA		0x39 /* (III) WCache data RAM diag		*/
 #define ASI_WCACHE_TAG		0x3a /* (III) WCache tag RAM diag		*/
 #define ASI_WCACHE_SNOOP_TAG	0x3b /* (III) WCache snoop tag RAM diag		*/
+#define ASI_QUAD_LDD_PHYS_L	0x3c /* (III+) PADDR, qword load, little endian	*/
 #define ASI_SRAM_FAST_INIT	0x40 /* (III+) Fast SRAM init			*/
 #define ASI_DCACHE_INVALIDATE	0x42 /* (III) DCache Invalidate diag		*/
 #define ASI_DCACHE_UTAG		0x43 /* (III) DCache uTag diag			*/
