@@ -488,12 +488,14 @@ e1000_ethtool_sring(struct e1000_adapter *adapter,
 	e1000_mac_type mac_type = adapter->hw.mac_type;
 	struct e1000_desc_ring *txdr = &adapter->tx_ring;
 	struct e1000_desc_ring *rxdr = &adapter->rx_ring;
+	struct e1000_desc_ring tx_old, tx_new;
+	struct e1000_desc_ring rx_old, rx_new;
 
-	if(netif_running(adapter->netdev)) {
+	tx_old = adapter->tx_ring;
+	rx_old = adapter->rx_ring;
+	
+	if(netif_running(adapter->netdev))
 		e1000_down(adapter);
-		e1000_free_rx_resources(adapter);
-		e1000_free_tx_resources(adapter);
-	}
 
 	rxdr->count = max(ring->rx_pending,(uint32_t)E1000_MIN_RXD);
 	rxdr->count = min(rxdr->count,(uint32_t)(mac_type < e1000_82544 ?
@@ -506,21 +508,33 @@ e1000_ethtool_sring(struct e1000_adapter *adapter,
 	E1000_ROUNDUP(txdr->count, REQ_TX_DESCRIPTOR_MULTIPLE); 
 
 	if(netif_running(adapter->netdev)) {
+		/* try to get new resources before deleting old */
 		if((err = e1000_setup_rx_resources(adapter)))
 			goto err_setup_rx;
 		if((err = e1000_setup_tx_resources(adapter)))
 			goto err_setup_tx;
-		if((err = e1000_up(adapter)))
-			goto err_up;
-	}
 
+		/* save the new, restore the old in order to free it,
+		 * then restore the new back again */	
+	
+		rx_new = adapter->rx_ring;
+		tx_new = adapter->tx_ring;
+		adapter->rx_ring = rx_old;
+		adapter->tx_ring = tx_old;
+		e1000_free_rx_resources(adapter);
+		e1000_free_tx_resources(adapter);
+		adapter->rx_ring = rx_new;
+		adapter->tx_ring = tx_new;
+		if((err = e1000_up(adapter)))
+			return err;
+	}
 	return 0;
-err_up:
-	e1000_free_tx_resources(adapter);
 err_setup_tx:
 	e1000_free_rx_resources(adapter);
 err_setup_rx:
-	e1000_reset(adapter);
+	adapter->rx_ring = rx_old;
+	adapter->tx_ring = tx_old;
+	e1000_up(adapter);
 	return err;
 }
 
