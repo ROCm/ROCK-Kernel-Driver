@@ -577,6 +577,7 @@ enum {
 	NET_SCTP_HB_INTERVAL             = 10,
 	NET_SCTP_PRESERVE_ENABLE         = 11,
 	NET_SCTP_MAX_BURST               = 12,
+	NET_SCTP_ADDIP_ENABLE		 = 13,
 };
 
 /* CTL_PROC names: */

@@ -124,16 +124,16 @@ int sctp_rcv(struct sk_buff *skb)
 	/* Pull up the IP and SCTP headers. */
 	__skb_pull(skb, skb->h.raw - skb->data);
 	if (skb->len < sizeof(struct sctphdr))
-		goto bad_packet;
+		goto discard_it;
 	if (sctp_rcv_checksum(skb) < 0)
-		goto bad_packet;
+		goto discard_it;
 
 	skb_pull(skb, sizeof(struct sctphdr));
 
 	family = ipver2af(skb->nh.iph->version);
 	af = sctp_get_af_specific(family);
 	if (unlikely(!af))
-		goto bad_packet;
+		goto discard_it;
 
 	/* Initialize local addresses for lookups. */
 	af->from_skb(&src, skb, 1);
@@ -222,9 +222,6 @@ int sctp_rcv(struct sk_buff *skb)
 		sctp_endpoint_put(ep);
 	sock_put(sk);
 	return ret;
-
-bad_packet:
-	SCTP_INC_STATS(SctpChecksumErrors);
 
 discard_it:
 	kfree_skb(skb);

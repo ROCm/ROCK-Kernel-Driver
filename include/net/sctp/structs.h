@@ -190,6 +190,9 @@ extern struct sctp_globals {
 	 */
 	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
+	
+	/* Flag to indicate if addip is enabled. */
+	int addip_enable;
 } sctp_globals;
 
 #define sctp_rto_initial		(sctp_globals.rto_initial)
@@ -217,6 +220,7 @@ extern struct sctp_globals {
 #define sctp_port_hashtable		(sctp_globals.port_hashtable)
 #define sctp_local_addr_list		(sctp_globals.local_addr_list)
 #define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
+#define sctp_addip_enable		(sctp_globals.addip_enable)
 
 /* SCTP Socket type: UDP or TCP style. */
 typedef enum {
@@ -1397,6 +1401,11 @@ struct sctp_association {
 		/* Does peer support ADDIP? */
 		__u8    asconf_capable;
 
+		/* This mask is used to disable sending the ASCONF chunk
+		 * with specified parameter to peer.
+		 */
+		__u16 addip_disabled_mask;
+
 		struct sctp_inithdr i;
 		int cookie_len;
 		void *cookie;
@@ -1708,6 +1717,8 @@ int sctp_assoc_lookup_laddr(struct sctp_association *asoc,
 struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *,
 				     const union sctp_addr *address,
 				     const int gfp);
+void sctp_assoc_del_peer(struct sctp_association *asoc,
+			 const union sctp_addr *addr);
 void sctp_assoc_control_transport(struct sctp_association *,
 				  struct sctp_transport *,
 				  sctp_transport_cmd_t, sctp_sn_error_t);

@@ -1115,6 +1115,9 @@ __init int sctp_init(void)
 			 "(established %d bind %d)\n",
 		sctp_assoc_hashsize, sctp_port_hashsize);
 
+	/* Disable ADDIP by default. */
+	sctp_addip_enable = 0;
+
 	sctp_sysctl_register();
 
 	INIT_LIST_HEAD(&sctp_address_families);

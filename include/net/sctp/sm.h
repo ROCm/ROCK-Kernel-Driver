@@ -268,15 +268,15 @@ struct sctp_chunk *sctp_make_asconf(struct sctp_association *asoc,
 struct sctp_chunk *sctp_make_asconf_update_ip(struct sctp_association *,
 					      union sctp_addr *,
 					      struct sockaddr *,
-					      int, int);
+					      int, __u16);
 struct sctp_chunk *sctp_make_asconf_set_prim(struct sctp_association *asoc,
 					     union sctp_addr *addr);
-struct sctp_chunk *sctp_make_asconf_ack(struct sctp_association *asoc,
-					int serial, int vparam_len);
-
+struct sctp_chunk *sctp_make_asconf_ack(const struct sctp_association *asoc,
+					__u32 serial, int vparam_len);
 struct sctp_chunk *sctp_process_asconf(struct sctp_association *asoc,
-				       struct sctp_chunk *asconf,
-				       int vparam_len);
+				       struct sctp_chunk *asconf);
+int sctp_process_asconf_ack(struct sctp_association *asoc,
+			    struct sctp_chunk *asconf_ack);
 
 void sctp_chunk_assign_tsn(struct sctp_chunk *);
 void sctp_chunk_assign_ssn(struct sctp_chunk *);
@@ -430,6 +430,21 @@ static inline int SSN_lte(__u16 s, __u16 t)
 {
 	return (((s) == (t)) || (((s) - (t)) & SSN_SIGN_BIT));
 }
+
+/*
+ * ADDIP 3.1.1
+ * The valid range of Serial Number is from 0 to 4294967295 (2**32 - 1). Serial
+ * Numbers wrap back to 0 after reaching 4294967295.
+ */
+enum {
+	ADDIP_SERIAL_SIGN_BIT = (1<<31)
+};
+
+static inline int ADDIP_SERIAL_gte(__u16 s, __u16 t)
+{
+	return (((s) == (t)) || (((t) - (s)) & ADDIP_SERIAL_SIGN_BIT));
+}
+
 
 /* Run sctp_add_cmd() generating a BUG() if there is a failure.  */
 static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_arg_t obj)
