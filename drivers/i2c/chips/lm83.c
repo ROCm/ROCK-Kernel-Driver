@@ -270,7 +270,7 @@ static int lm83_detect(struct i2c_adapter *adapter, int address, int kind)
 		    & 0x48) != 0x00) ||
 		    ((i2c_smbus_read_byte_data(new_client, LM83_REG_R_CONFIG)
 		    & 0x41) != 0x00)) {
-			dev_dbg(&client->dev,
+			dev_dbg(&adapter->dev,
 			    "LM83 detection failed at 0x%02x.\n", address);
 			goto exit_free;
 		}
