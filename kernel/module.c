@@ -1066,10 +1066,12 @@ static struct module *load_module(void *umod,
 			DEBUGP("Licence found in section %u\n", i);
 			licenseindex = i;
 		} else if (strcmp(secstrings+sechdrs[i].sh_name,
-				  "__vermagic") == 0) {
+				  "__vermagic") == 0 &&
+			   (sechdrs[i].sh_flags & SHF_ALLOC)) {
 			/* Version magic. */
 			DEBUGP("Version magic found in section %u\n", i);
 			vmagindex = i;
+			sechdrs[i].sh_flags &= ~(unsigned long)SHF_ALLOC;
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
@@ -1090,7 +1092,7 @@ static struct module *load_module(void *umod,
 	}
 	mod = (void *)sechdrs[modindex].sh_addr;
 
-	/* This is allowed: modprobe --force will strip it. */
+	/* This is allowed: modprobe --force will invalidate it. */
 	if (!vmagindex) {
 		tainted |= TAINT_FORCED_MODULE;
 		printk(KERN_WARNING "%s: no version magic, tainting kernel.\n",
