@@ -1123,7 +1123,7 @@ snd_rme32_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 	}
 	
 	/* prefill playback buffer */
-	if (cmd == SNDRV_PCM_TRIGGER_START) {
+	if (cmd == SNDRV_PCM_TRIGGER_START && rme32->fullduplex_mode) {
 		snd_pcm_group_for_each(pos, substream) {
 			s = snd_pcm_group_substream_entry(pos);
 			if (s == rme32->playback_substream) {
