@@ -54,6 +54,7 @@ obj-$(CONFIG_USB_AUERSWALD)	+= misc/
 obj-$(CONFIG_USB_BRLVGER)	+= misc/
 obj-$(CONFIG_USB_EMI26)		+= misc/
 obj-$(CONFIG_USB_LCD)		+= misc/
+obj-$(CONFIG_USB_LEGOTOWER)	+= misc/
 obj-$(CONFIG_USB_RIO500)	+= misc/
 obj-$(CONFIG_USB_SPEEDTOUCH)	+= misc/
 obj-$(CONFIG_USB_TEST)		+= misc/
