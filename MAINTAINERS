@@ -287,6 +287,12 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/PLEB SUPPORT
+P:	Peter Chubb
+M:	pleb@gelato.unsw.edu.au
+W:	http://www.disy.cse.unsw.edu.au/Hardware/PLEB
+S:	Maintained
+
 ARM/PT DIGITAL BOARD PORT
 P:	Stefan Eletzhofer
 M:	stefan.eletzhofer@eletztrick.de
