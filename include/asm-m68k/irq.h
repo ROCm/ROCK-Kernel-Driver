@@ -76,10 +76,10 @@ extern void (*disable_irq)(unsigned int);
 
 struct pt_regs;
 
-extern int sys_request_irq(unsigned int,
-	irqreturn_t (*)(int, void *, struct pt_regs *),
-	unsigned long, const char *, void *);
-extern void sys_free_irq(unsigned int, void *);
+extern int cpu_request_irq(unsigned int,
+			   irqreturn_t (*)(int, void *, struct pt_regs *),
+			   unsigned long, const char *, void *);
+extern void cpu_free_irq(unsigned int, void *);
 
 /*
  * various flags for request_irq() - the Amiga now uses the standard

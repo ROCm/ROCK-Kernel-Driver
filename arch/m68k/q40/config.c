@@ -40,7 +40,7 @@
 extern void floppy_setup(char *str, int *ints);
 
 extern irqreturn_t q40_process_int (int level, struct pt_regs *regs);
-extern irqreturn_t (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
+extern irqreturn_t (*q40_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
 extern void q40_init_IRQ (void);
 extern void q40_free_irq (unsigned int, void *);
 extern int  show_q40_interrupts (struct seq_file *, void *);
@@ -185,7 +185,7 @@ void __init config_q40(void)
     mach_request_irq	 = q40_request_irq;
     enable_irq		 = q40_enable_irq;
     disable_irq          = q40_disable_irq;
-    mach_default_handler = &q40_sys_default_handler;
+    mach_default_handler = &q40_default_handler;
     mach_get_model       = q40_get_model;
     mach_get_hardware_list = q40_get_hardware_list;
 
