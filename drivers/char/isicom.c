@@ -1680,20 +1680,13 @@ static int register_ioregion(void)
 {
 	int count, done=0;
 	for (count=0; count < BOARD_COUNT; count++ ) {
-		if (isi_card[count].base) {
-			if (check_region(isi_card[count].base,16)) {
+		if (isi_card[count].base)
+			if (!request_region(isi_card[count].base,16,ISICOM_NAME)) {
 				printk(KERN_DEBUG "ISICOM: I/O Region 0x%x-0x%x is busy. Card%d will be disabled.\n",
 					isi_card[count].base,isi_card[count].base+15,count+1);
 				isi_card[count].base=0;
-			}
-			else {
-				request_region(isi_card[count].base,16,ISICOM_NAME);
-#ifdef ISICOM_DEBUG				
-				printk(KERN_DEBUG "ISICOM: I/O Region 0x%x-0x%x requested for Card%d.\n",isi_card[count].base,isi_card[count].base+15,count+1);
-#endif				
 				done++;
 			}
-		}	
 	}
 	return done;
 }
