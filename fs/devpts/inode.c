@@ -18,9 +18,27 @@
 #include <linux/mount.h>
 #include <linux/tty.h>
 #include <linux/devpts_fs.h>
-#include "xattr.h"
+#include <linux/xattr.h>
 
 #define DEVPTS_SUPER_MAGIC 0x1cd1
+
+extern struct xattr_handler devpts_xattr_security_handler;
+
+static struct xattr_handler *devpts_xattr_handlers[] = {
+#ifdef CONFIG_DEVPTS_FS_SECURITY
+	&devpts_xattr_security_handler,
+#endif
+	NULL
+};
+
+struct inode_operations devpts_file_inode_operations = {
+#ifdef CONFIG_DEVPTS_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= generic_listxattr,
+	.removexattr	= generic_removexattr,
+#endif
+};
 
 static struct vfsmount *devpts_mnt;
 static struct dentry *devpts_root;
@@ -84,6 +102,7 @@ devpts_fill_super(struct super_block *s, void *data, int silent)
 	s->s_blocksize_bits = 10;
 	s->s_magic = DEVPTS_SUPER_MAGIC;
 	s->s_op = &devpts_sops;
+	s->s_xattr = devpts_xattr_handlers;
 
 	inode = new_inode(s);
 	if (!inode)
@@ -133,13 +152,6 @@ static struct dentry *get_node(int num)
 	down(&root->d_inode->i_sem);
 	return lookup_one_len(s, root, sprintf(s, "%d", num));
 }
-
-static struct inode_operations devpts_file_inode_operations = {
-	.setxattr	= devpts_setxattr,
-	.getxattr	= devpts_getxattr,
-	.listxattr	= devpts_listxattr,
-	.removexattr	= devpts_removexattr,
-};
 
 int devpts_pty_new(struct tty_struct *tty)
 {
@@ -209,10 +221,7 @@ void devpts_pty_kill(int number)
 
 static int __init init_devpts_fs(void)
 {
-	int err = init_devpts_xattr();
-	if (err)
-		return err;
-	err = register_filesystem(&devpts_fs_type);
+	int err = register_filesystem(&devpts_fs_type);
 	if (!err) {
 		devpts_mnt = kern_mount(&devpts_fs_type);
 		if (IS_ERR(devpts_mnt))
@@ -225,7 +234,6 @@ static void __exit exit_devpts_fs(void)
 {
 	unregister_filesystem(&devpts_fs_type);
 	mntput(devpts_mnt);
-	exit_devpts_xattr();
 }
 
 module_init(init_devpts_fs)

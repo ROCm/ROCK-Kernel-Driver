@@ -143,11 +143,6 @@ int pm_send(struct pm_dev *dev, pm_request_t rqst, void *data);
  */
 int pm_send_all(pm_request_t rqst, void *data);
 
-/*
- * Find a device
- */
-struct pm_dev *pm_find(pm_dev_t type, struct pm_dev *from);
-
 static inline void pm_access(struct pm_dev *dev) {}
 static inline void pm_dev_idle(struct pm_dev *dev) {}
 

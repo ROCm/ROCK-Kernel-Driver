@@ -1358,7 +1358,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 	 * put in a delay to throttle resync.
 	 */
 	if (!go_faster && waitqueue_active(&conf->wait_resume))
-		schedule_timeout(HZ);
+		msleep_interruptible(1000);
 	device_barrier(conf, sector_nr + RESYNC_SECTORS);
 
 	/* Again, very different code for resync and recovery.

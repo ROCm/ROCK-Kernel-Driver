@@ -30,7 +30,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel);
  */
 void tpam_enqueue(tpam_card *card, struct sk_buff *skb) {
 
-	dprintk("TurboPAM(tpam_enqueue): card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_enqueue): card=%d\n", card->id);
 
 	/* queue the sk_buff on the board's send queue */
 	skb_queue_tail(&card->sendq, skb);
@@ -49,7 +49,7 @@ void tpam_enqueue(tpam_card *card, struct sk_buff *skb) {
  */
 void tpam_enqueue_data(tpam_channel *channel, struct sk_buff *skb) {
 	
-	dprintk("TurboPAM(tpam_enqueue_data): card=%d, channel=%d\n", 
+	pr_debug("TurboPAM(tpam_enqueue_data): card=%d, channel=%d\n",
 		channel->card->id, channel->num);
 
 	/* if existant, queue the sk_buff on the channel's send queue */
@@ -84,7 +84,7 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 	pci_mpb mpb;
 	skb_header *skbh;
 
-	dprintk("TurboPAM(tpam_irq): IRQ received, card=%d\n", card->id);
+	pr_debug("TurboPAM(tpam_irq): IRQ received, card=%d\n", card->id);
 
 	/* grab the board lock */
 	spin_lock(&card->lock);
@@ -99,7 +99,7 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 	if (!ackupload) {
 		/* it is a new message from the board */
 		
-		dprintk("TurboPAM(tpam_irq): message received, card=%d\n", 
+		pr_debug("TurboPAM(tpam_irq): message received, card=%d\n",
 			card->id);
 
 		/* get the upload pointer */
@@ -176,7 +176,7 @@ irqreturn_t tpam_irq(int irq, void *dev_id, struct pt_regs *regs)
 	else {
 		/* it is a ack from the board */
 
-		dprintk("TurboPAM(tpam_irq): message acknowledged, card=%d\n",
+		pr_debug("TurboPAM(tpam_irq): message acknowledged, card=%d\n",
 			card->id);
 
 		/* board is not busy anymore */
@@ -231,7 +231,7 @@ void tpam_recv_tq(tpam_card *card) {
 				tpam_recv_U3DataInd(card, skb);
 				break;
 			default:
-				dprintk("TurboPAM(tpam_recv_tq): "
+				pr_debug("TurboPAM(tpam_recv_tq): "
 					"unknown messageID %d, card=%d\n", 
 					p->messageID, card->id);
 				break;
@@ -286,13 +286,13 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 	skb_header *skbh;
 	u32 waiting_too_long;
 
-	dprintk("TurboPAM(tpam_sendpacket), card=%d, channel=%d\n", 
+	pr_debug("TurboPAM(tpam_sendpacket), card=%d, channel=%d\n",
 		card->id, channel ? channel->num : -1);
 
 	if (channel) {
 		/* dequeue a packet from the channel's send queue */
 		if (!(skb = skb_dequeue(&channel->sendq))) {
-			dprintk("TurboPAM(tpam_sendpacket): "
+			pr_debug("TurboPAM(tpam_sendpacket): "
 				"card=%d, channel=%d, no packet\n", 
 				card->id, channel->num);
 			return 0;
@@ -301,7 +301,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 		/* if the channel is not ready to receive, requeue the packet
 		 * and return 0 to give a chance to another channel */
 		if (!channel->readytoreceive) {
-			dprintk("TurboPAM(tpam_sendpacket): "
+			pr_debug("TurboPAM(tpam_sendpacket): "
 				"card=%d, channel=%d, channel not ready\n",
 				card->id, channel->num);
 			skb_queue_head(&channel->sendq, skb);
@@ -314,7 +314,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 		/* if the board is busy, requeue the packet and return 1 since
 		 * there is no need to try another channel */
 		if (card->busy) {
-			dprintk("TurboPAM(tpam_sendpacket): "
+			pr_debug("TurboPAM(tpam_sendpacket): "
 				"card=%d, channel=%d, card busy\n",
 				card->id, channel->num);
 			skb_queue_head(&channel->sendq, skb);
@@ -325,7 +325,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 	else {
 		/* dequeue a packet from the board's send queue */
 		if (!(skb = skb_dequeue(&card->sendq))) {
-			dprintk("TurboPAM(tpam_sendpacket): "
+			pr_debug("TurboPAM(tpam_sendpacket): "
 				"card=%d, no packet\n", card->id);
 			return 0;
 		}
@@ -336,7 +336,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 		/* if the board is busy, requeue the packet and return 1 since
 		 * there is no need to try another channel */
 		if (card->busy) {
-			dprintk("TurboPAM(tpam_sendpacket): "
+			pr_debug("TurboPAM(tpam_sendpacket): "
 				"card=%d, card busy\n", card->id);
 			skb_queue_head(&card->sendq, skb);
 			spin_unlock_irq(&card->lock);
@@ -357,7 +357,7 @@ static int tpam_sendpacket(tpam_card *card, tpam_channel *channel) {
 	} while (hpic & 0x00000002);
 
 	skbh = (skb_header *)skb->data;
-	dprintk("TurboPAM(tpam_sendpacket): "
+	pr_debug("TurboPAM(tpam_sendpacket): "
 		"card=%d, card ready, sending %d/%d bytes\n", 
 		card->id, skbh->size, skbh->data_size);
 

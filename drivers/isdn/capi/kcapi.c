@@ -24,6 +24,7 @@
 #include <linux/capi.h>
 #include <linux/kernelcapi.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 #include <asm/uaccess.h>
 #include <linux/isdn/capicmd.h>
 #include <linux/isdn/capiutil.h>
@@ -831,8 +832,7 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 
 		while (card->cardstate != CARD_RUNNING) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);	/* 0.1 sec */
+			msleep_interruptible(100);	/* 0.1 sec */
 
 			if (signal_pending(current)) {
 				capi_ctr_put(card);
@@ -856,8 +856,7 @@ static int old_capi_manufacturer(unsigned int cmd, void __user *data)
 
 		while (card->cardstate > CARD_DETECTED) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ/10);	/* 0.1 sec */
+			msleep_interruptible(100);	/* 0.1 sec */
 
 			if (signal_pending(current))
 				return -EINTR;

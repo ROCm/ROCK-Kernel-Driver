@@ -1124,11 +1124,10 @@ static void isicom_close(struct tty_struct * tty, struct file * filp)
 	port->tty = NULL;
 	if (port->blocked_open) {
 		if (port->close_delay) {
-			set_current_state(TASK_INTERRUPTIBLE);
 #ifdef ISICOM_DEBUG			
 			printk(KERN_DEBUG "ISICOM: scheduling until time out.\n");
 #endif			
-			schedule_timeout(port->close_delay);
+			msleep_interruptible(jiffies_to_msecs(port->close_delay));
 		}
 		wake_up_interruptible(&port->open_wait);
 	}	

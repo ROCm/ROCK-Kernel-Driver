@@ -1595,8 +1595,8 @@ dasd_alloc_queue(struct dasd_device * device)
 
 	device->request_queue->queuedata = device;
 #if 0
-	elevator_exit(device->request_queue);
-	rc = elevator_init(device->request_queue, &elevator_noop);
+	elevator_exit(device->request_queue->elevator);
+	rc = elevator_init(device->request_queue, "noop");
 	if (rc) {
 		blk_cleanup_queue(device->request_queue);
 		return rc;

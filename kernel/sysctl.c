@@ -66,6 +66,7 @@ extern int sysctl_lower_zone_protection;
 extern int min_free_kbytes;
 extern int printk_ratelimit_jiffies;
 extern int printk_ratelimit_burst;
+extern int pid_max_min, pid_max_max;
 
 #if defined(CONFIG_X86_LOCAL_APIC) && defined(__i386__)
 int unknown_nmi_panic;
@@ -575,7 +576,10 @@ static ctl_table kern_table[] = {
 		.data		= &pid_max,
 		.maxlen		= sizeof (int),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= sysctl_intvec,
+		.extra1		= &pid_max_min,
+		.extra2		= &pid_max_max,
 	},
 	{
 		.ctl_name	= KERN_PANIC_ON_OOPS,

@@ -939,6 +939,7 @@ static int __devinit pvr2fb_pci_probe(struct pci_dev *pdev,
 
 	pvr2_fix.mmio_start	= pci_resource_start(pdev, 1);
 	pvr2_fix.mmio_len	= pci_resource_len(pdev, 1);
+	fbinfo->device = &pdev->dev;
 
 	return pvr2fb_common_init();
 }

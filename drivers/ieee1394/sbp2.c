@@ -357,8 +357,7 @@ static int sbp2util_down_timeout(atomic_t *done, int timeout)
 	int i;
 
 	for (i = timeout; (i > 0 && atomic_read(done) == 0); i-= HZ/10) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(HZ/10))	/* 100ms */
+		if (msleep_interruptible(100))	/* 100ms */
 			return(1);
 	}
 	return ((i > 0) ? 0:1);

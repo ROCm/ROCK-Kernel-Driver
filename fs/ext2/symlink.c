@@ -32,17 +32,21 @@ struct inode_operations ext2_symlink_inode_operations = {
 	.readlink	= generic_readlink,
 	.follow_link	= page_follow_link_light,
 	.put_link	= page_put_link,
-	.setxattr	= ext2_setxattr,
-	.getxattr	= ext2_getxattr,
+#ifdef CONFIG_EXT2_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext2_listxattr,
-	.removexattr	= ext2_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 };
  
 struct inode_operations ext2_fast_symlink_inode_operations = {
 	.readlink	= generic_readlink,
 	.follow_link	= ext2_follow_link,
-	.setxattr	= ext2_setxattr,
-	.getxattr	= ext2_getxattr,
+#ifdef CONFIG_EXT2_FS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
 	.listxattr	= ext2_listxattr,
-	.removexattr	= ext2_removexattr,
+	.removexattr	= generic_removexattr,
+#endif
 };

@@ -403,6 +403,10 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	}
 	sbi->flag = flag;
 
+#ifdef CONFIG_JFS_POSIX_ACL
+	sb->s_flags |= MS_POSIXACL;
+#endif
+
 	if (newLVSize) {
 		printk(KERN_ERR "resize option for remount only\n");
 		return -EINVAL;

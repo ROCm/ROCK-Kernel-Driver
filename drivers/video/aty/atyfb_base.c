@@ -1974,7 +1974,7 @@ int __init atyfb_do_init(void)
 
 			info->fix = atyfb_fix;
 			info->par = default_par;
-
+			info->device = &pdev->dev;
 #ifdef __sparc__
 			/*
 			 * Map memory-mapped registers.

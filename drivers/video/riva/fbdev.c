@@ -1858,21 +1858,17 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	NVTRACE_ENTER();
 	assert(pd != NULL);
 
-	info = kmalloc(sizeof(struct fb_info), GFP_KERNEL);
+	info = framebuffer_alloc(sizeof(struct riva_par), &pd->dev);
+
 	if (!info)
 		goto err_out;
 
-	default_par = kmalloc(sizeof(struct riva_par), GFP_KERNEL);
-	if (!default_par)
-		goto err_out_kfree;
-
-	memset(info, 0, sizeof(struct fb_info));
-	memset(default_par, 0, sizeof(struct riva_par));
+	default_par = (struct riva_par *) info->par;
 	default_par->pdev = pd;
 
 	info->pixmap.addr = kmalloc(64 * 1024, GFP_KERNEL);
 	if (info->pixmap.addr == NULL)
-		goto err_out_kfree1;
+		goto err_out_kfree;
 	memset(info->pixmap.addr, 0, 64 * 1024);
 
 	if (pci_enable_device(pd)) {
@@ -1896,7 +1892,7 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 
 	if(default_par->riva.Architecture == 0) {
 		printk(KERN_ERR PFX "unknown NV_ARCH\n");
-		goto err_out_kfree1;
+		goto err_out_free_base0;
 	}
 	if(default_par->riva.Architecture == NV_ARCH_10 ||
 	   default_par->riva.Architecture == NV_ARCH_20 ||
@@ -2001,7 +1997,6 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	fb_destroy_modedb(info->monspecs.modedb);
 	info->monspecs.modedb_len = 0;
 	info->monspecs.modedb = NULL;
-
 	if (register_framebuffer(info) < 0) {
 		printk(KERN_ERR PFX
 			"error registering riva framebuffer\n");
@@ -2040,10 +2035,8 @@ err_out_request:
 	pci_disable_device(pd);
 err_out_enable:
 	kfree(info->pixmap.addr);
-err_out_kfree1:
-	kfree(default_par);
 err_out_kfree:
-	kfree(info);
+	framebuffer_release(info);
 err_out:
 	return -ENODEV;
 }
@@ -2077,8 +2070,7 @@ static void __exit rivafb_remove(struct pci_dev *pd)
 	pci_release_regions(pd);
 	pci_disable_device(pd);
 	kfree(info->pixmap.addr);
-	kfree(par);
-	kfree(info);
+	framebuffer_release(info);
 	pci_set_drvdata(pd, NULL);
 	NVTRACE_LEAVE();
 }

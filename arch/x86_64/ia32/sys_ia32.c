@@ -218,9 +218,6 @@ sys32_mmap(struct mmap_arg_struct __user *arg)
 			return -EBADF;
 	}
 	
-	if (a.prot & PROT_READ) 
-		a.prot |= vm_force_exec32;
-
 	mm = current->mm; 
 	down_write(&mm->mmap_sem); 
 	retval = do_mmap_pgoff(file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
@@ -235,8 +232,6 @@ sys32_mmap(struct mmap_arg_struct __user *arg)
 asmlinkage long 
 sys32_mprotect(unsigned long start, size_t len, unsigned long prot)
 {
-	if (prot & PROT_READ) 
-		prot |= vm_force_exec32;
 	return sys_mprotect(start,len,prot); 
 }
 
@@ -1043,9 +1038,6 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 		if (!file)
 			return -EBADF;
 	}
-
-	if (prot & PROT_READ)
-		prot |= vm_force_exec32;
 
 	down_write(&mm->mmap_sem);
 	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);

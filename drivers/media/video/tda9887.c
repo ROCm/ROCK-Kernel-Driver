@@ -6,6 +6,7 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
+#include <linux/delay.h>
 
 #include <media/audiochip.h>
 #include <media/tuner.h>
@@ -543,8 +544,7 @@ static int tda9887_configure(struct tda9887 *t)
                 printk(PREFIX "i2c i/o error: rc == %d (should be 4)\n",rc);
 
 	if (debug > 2) {
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule_timeout(HZ);
+		msleep_interruptible(1000);
 		tda9887_status(t);
 	}
 	return 0;

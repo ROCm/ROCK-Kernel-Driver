@@ -1981,10 +1981,10 @@ static int tiocswinsz(struct tty_struct *tty, struct tty_struct *real_tty,
 
 static int tioccons(struct file *file)
 {
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	if (file->f_op->write == redirected_tty_write) {
 		struct file *f;
-		if (!capable(CAP_SYS_ADMIN))
-			return -EPERM;
 		spin_lock(&redirect_lock);
 		f = redirect;
 		redirect = NULL;

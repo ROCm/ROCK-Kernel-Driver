@@ -819,8 +819,7 @@ void zoran_close(struct video_device* dev)
          *      be sure its safe to free the buffer. We wait 5-6 fields
          *      which is more than sufficient to be sure.
          */
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule_timeout(HZ/10);        /* Wait 1/10th of a second */
+        msleep(100);			/* Wait 1/10th of a second */
 
 	/* free the allocated framebuffer */
 	if (ztv->fbuffer)
@@ -1568,8 +1567,7 @@ void vbi_close(struct video_device *dev)
          *      be sure its safe to free the buffer. We wait 5-6 fields
          *      which is more than sufficient to be sure.
          */
-        current->state = TASK_UNINTERRUPTIBLE;
-        schedule_timeout(HZ/10);        /* Wait 1/10th of a second */
+        msleep(100);			/* Wait 1/10th of a second */
 
 	for (item=ztv->readinfo; item!=ztv->readinfo+ZORAN_VBI_BUFFERS; item++)
 	{

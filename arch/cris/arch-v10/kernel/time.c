@@ -227,6 +227,9 @@ timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* call the real timer interrupt handler */
 
 	do_timer(regs);
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	
 	/*
 	 * If we have an externally synchronized Linux clock, then update

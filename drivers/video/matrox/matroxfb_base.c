@@ -1143,6 +1143,7 @@ static int matroxfb_ioctl(struct inode *inode, struct file *file,
 					return -EFAULT;
 				return err;
 			}
+		case VIDIOC_S_CTRL_OLD:
 		case VIDIOC_S_CTRL:
 			{
 				struct v4l2_control ctrl;
@@ -1750,6 +1751,12 @@ static int initMatrox2(WPMINFO struct board* b){
 	ACCESS_FBINFO(fbcon.pseudo_palette) = ACCESS_FBINFO(cmap);
 	/* after __init time we are like module... no logo */
 	ACCESS_FBINFO(fbcon.flags) = hotplug ? FBINFO_FLAG_MODULE : FBINFO_FLAG_DEFAULT;
+	ACCESS_FBINFO(fbcon.flags) |= FBINFO_PARTIAL_PAN_OK | 	 /* Prefer panning for scroll under MC viewer/edit */
+				      FBINFO_HWACCEL_COPYAREA |  /* We have hw-assisted bmove */
+				      FBINFO_HWACCEL_FILLRECT |  /* And fillrect */
+				      FBINFO_HWACCEL_IMAGEBLIT | /* And imageblit */
+				      FBINFO_HWACCEL_XPAN |      /* And we support both horizontal */
+				      FBINFO_HWACCEL_YPAN;       /* And vertical panning */
 	ACCESS_FBINFO(video.len_usable) &= PAGE_MASK;
 	fb_alloc_cmap(&ACCESS_FBINFO(fbcon.cmap), 256, 1);
 
@@ -1864,6 +1871,7 @@ static int initMatrox2(WPMINFO struct board* b){
 /* We do not have to set currcon to 0... register_framebuffer do it for us on first console
  * and we do not want currcon == 0 for subsequent framebuffers */
 
+	ACCESS_FBINFO(fbcon).device = &ACCESS_FBINFO(pcidev)->dev;
 	if (register_framebuffer(&ACCESS_FBINFO(fbcon)) < 0) {
 		goto failVideoIO;
 	}

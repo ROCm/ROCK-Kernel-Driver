@@ -150,6 +150,9 @@ void timer_interrupt(struct pt_regs * regs)
 		write_seqlock(&xtime_lock);
 		tb_last_stamp = jiffy_stamp;
 		do_timer(regs);
+#ifndef CONFIG_SMP
+		update_process_times(user_mode(regs));
+#endif
 
 		/*
 		 * update the rtc when needed, this should be performed on the

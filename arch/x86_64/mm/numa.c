@@ -10,6 +10,8 @@
 #include <linux/mmzone.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
+#include <linux/nodemask.h>
+
 #include <asm/e820.h>
 #include <asm/proto.h>
 #include <asm/dma.h>
@@ -151,9 +153,9 @@ void __init numa_init_array(void)
 	for (i = 0; i < MAXNODE; i++) {
 		if (node_online(i))
 			continue;
-		rr = find_next_bit(node_online_map, MAX_NUMNODES, rr);
+		rr = next_node(rr, node_online_map);
 		if (rr == MAX_NUMNODES)
-			rr = find_first_bit(node_online_map, MAX_NUMNODES);
+			rr = first_node(node_online_map);
 		node_data[i] = node_data[rr];
 		cpu_to_node[i] = rr;
 		rr++; 

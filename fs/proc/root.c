@@ -149,9 +149,6 @@ struct proc_dir_entry proc_root = {
 	.parent		= &proc_root,
 };
 
-#ifdef CONFIG_SYSCTL
-EXPORT_SYMBOL(proc_sys_root);
-#endif
 EXPORT_SYMBOL(proc_symlink);
 EXPORT_SYMBOL(proc_mkdir);
 EXPORT_SYMBOL(create_proc_entry);
