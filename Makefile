@@ -673,10 +673,10 @@ $(vmlinux-dirs): prepare-all scripts
 # using a seperate output directory. This allows convinient use
 # of make in output directory
 prepare2:
-	$(Q)if [ ! $(srctree) -ef $(objtree) ]; then       \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile      \
-	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL) \
-	    > $(objtree)/Makefile;                         \
+	$(Q)if /usr/bin/env test ! $(srctree) -ef $(objtree); then \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkmakefile              \
+	    $(srctree) $(objtree) $(VERSION) $(PATCHLEVEL)         \
+	    > $(objtree)/Makefile;                                 \
 	fi
 
 # prepare1 is used to check if we are building in a separate output directory,

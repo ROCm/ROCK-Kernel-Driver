@@ -160,9 +160,7 @@ else
 
 cmd_cc_o_c = $(CC) $(c_flags) -c -o $(@D)/.tmp_$(@F) $<
 cmd_modversions =							\
-	if ! $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then	\
-		mv $(@D)/.tmp_$(@F) $@;					\
-	else								\
+	if $(OBJDUMP) -h $(@D)/.tmp_$(@F) | grep -q __ksymtab; then	\
 		$(CPP) -D__GENKSYMS__ $(c_flags) $<			\
 		| $(GENKSYMS)						\
 		> $(@D)/.tmp_$(@F:.o=.ver);				\
@@ -170,6 +168,8 @@ cmd_modversions =							\
 		$(LD) $(LDFLAGS) -r -o $@ $(@D)/.tmp_$(@F) 		\
 			-T $(@D)/.tmp_$(@F:.o=.ver);			\
 		rm -f $(@D)/.tmp_$(@F) $(@D)/.tmp_$(@F:.o=.ver);	\
+	else								\
+		mv $(@D)/.tmp_$(@F) $@;					\
 	fi;
 endif
 
