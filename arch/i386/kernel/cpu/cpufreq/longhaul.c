@@ -63,11 +63,12 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static unsigned int calc_speed (int mult, int fsb)
 {
-	int mhz;
-	mhz = (mult/10)*fsb;
+	int khz;
+	khz = (mult/10)*fsb;
 	if (mult%10)
-		mhz += fsb/2;
-	return mhz;
+		khz += fsb/2;
+	khz *= 1000;
+	return khz;
 }
 
 
@@ -253,7 +254,7 @@ static int __init longhaul_get_ranges (void)
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
 	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
-		 fsb, lowest_speed, highest_speed);
+		 fsb, lowest_speed/1000, highest_speed/1000);
 
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
 	if(!longhaul_table)
