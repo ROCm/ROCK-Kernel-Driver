@@ -1062,6 +1062,56 @@ read_failure:
 
 late_initcall(software_resume);
 
+
+/**
+ *	swsusp_save - Snapshot memory
+ */
+
+int swsusp_save(void) 
+{
+	return -EPERM;
+}
+
+
+/**
+ *	swsusp_write - Write saved memory image to swap.
+ */
+
+int swsusp_write(void)
+{
+	return 0;
+}
+
+
+/**
+ *	swsusp_read - Read saved image from swap.
+ */
+
+int swsusp_read(void)
+{
+	return -ENOENT;
+}
+
+
+/**
+ *	swsusp_restore - Replace running kernel with saved image.
+ */
+
+int swsusp_restore(void)
+{
+	return 0;
+}
+
+
+/**
+ *	swsusp_free - Free memory allocated to hold snapshot.
+ */
+
+int swsusp_free(void)
+{
+	return 0;
+}
+
 static int __init resume_setup(char *str)
 {
 	strncpy( resume_file, str, 255 );
