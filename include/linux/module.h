@@ -64,12 +64,11 @@ void sort_main_extable(void);
 #define __MODULE_INFO(tag, name, info)					  \
 static const char __module_cat(name,__LINE__)[]				  \
   __attribute_used__							  \
-  __attribute__((section(".modinfo"))) = __stringify(tag) "=" info
+  __attribute__((section(".modinfo"),unused)) = __stringify(tag) "=" info
 
 #define MODULE_GENERIC_TABLE(gtype,name)			\
 extern const struct gtype##_id __mod_##gtype##_table		\
-  __attribute_used__						\
-  __attribute__ ((alias(__stringify(name))))
+  __attribute__ ((unused, alias(__stringify(name))))
 
 #define THIS_MODULE (&__this_module)
 
@@ -166,7 +165,7 @@ void *__symbol_get_gpl(const char *symbol);
 	extern void *__crc_##sym __attribute__((weak));		\
 	static const unsigned long __kcrctab_##sym		\
 	__attribute_used__					\
-	__attribute__((section("__kcrctab" sec)))		\
+	__attribute__((section("__kcrctab" sec), unused))	\
 	= (unsigned long) &__crc_##sym;
 #else
 #define __CRC_SYMBOL(sym, sec)
@@ -180,7 +179,7 @@ void *__symbol_get_gpl(const char *symbol);
 	= MODULE_SYMBOL_PREFIX #sym;                    	\
 	static const struct kernel_symbol __ksymtab_##sym	\
 	__attribute_used__					\
-	__attribute__((section("__ksymtab" sec)))		\
+	__attribute__((section("__ksymtab" sec), unused))	\
 	= { (unsigned long)&sym, __kstrtab_##sym }
 
 #define EXPORT_SYMBOL(sym)					\
