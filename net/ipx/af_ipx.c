@@ -1822,7 +1822,6 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 
 	ipxitf_insert_socket(intrfc, sk);
 	sk->zapped = 0;
-	SOCK_DEBUG(sk, "IPX: bound socket 0x%04X.\n", ntohs(addr->sipx_port) );
 
 	rc = 0;
 out_put:
