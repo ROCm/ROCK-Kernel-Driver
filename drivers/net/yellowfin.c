@@ -65,7 +65,7 @@ static int mtu;
 static int bogus_rx;
 static int dma_ctrl = 0x004A0263; 			/* Constrained by errata */
 static int fifo_cfg = 0x0020;				/* Bypass external Tx FIFO. */
-#elif YF_NEW					/* A future perfect board :->.  */
+#elif defined(YF_NEW)					/* A future perfect board :->.  */
 static int dma_ctrl = 0x00CAC277;			/* Override when loading module! */
 static int fifo_cfg = 0x0028;
 #else
@@ -107,12 +107,6 @@ static int gx_fix;
 #define PKT_BUF_SZ		1536			/* Size of each temporary Rx buffer.*/
 
 #define yellowfin_debug debug
-
-#if !defined(__OPTIMIZE__)
-#warning  You must compile this file with the correct options!
-#warning  See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
 
 #include <linux/module.h>
 #include <linux/kernel.h>

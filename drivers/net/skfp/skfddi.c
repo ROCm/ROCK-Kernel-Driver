@@ -909,7 +909,10 @@ static void skfp_ctl_set_multicast_list_wo_lock(struct net_device *dev)
 				dmi = dev->mc_list;
 
 				for (i = 0; i < dev->mc_count; i++) {
-					mac_add_multicast(smc, dmi->dmi_addr, 1);
+					mac_add_multicast(smc, 
+							  (struct fddi_addr *)dmi->dmi_addr, 
+							  1);
+
 					PRINTK(KERN_INFO "ENABLE MC ADDRESS:");
 					PRINTK(" %02x %02x %02x ",
 					       dmi->dmi_addr[0],

@@ -76,8 +76,8 @@ static int mac_con_resource_index(struct s_smc *smc, int mac);
 static int phy_con_resource_index(struct s_smc *smc, int phy);
 static void smt_send_rdf(struct s_smc *smc, SMbuf *rej, int fc, int reason,
 			 int local);
-static void smt_send_nif(struct s_smc *smc, struct fddi_addr *dest, int fc,
-			 u_long tid, int type, int local);
+static void smt_send_nif(struct s_smc *smc, const struct fddi_addr *dest, 
+			 int fc, u_long tid, int type, int local);
 static void smt_send_ecf(struct s_smc *smc, struct fddi_addr *dest, int fc,
                          u_long tid, int type, int len);
 static void smt_echo_test(struct s_smc *smc, int dna);
@@ -122,6 +122,45 @@ void	hwm_conv_can(struct s_smc *smc, char *data, int len);
 #else
 #define		hwm_conv_can(smc,data,len)
 #endif
+
+
+static inline int is_my_addr(const struct s_smc *smc, 
+			     const struct fddi_addr *addr)
+{
+	return(*(short *)(&addr->a[0]) ==
+		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[0])
+	  && *(short *)(&addr->a[2]) ==
+		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[2])
+	  && *(short *)(&addr->a[4]) ==
+		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[4])) ;
+}
+
+static inline int is_zero(const struct fddi_addr *addr)
+{
+	return(*(short *)(&addr->a[0]) == 0 &&
+	       *(short *)(&addr->a[2]) == 0 &&
+	       *(short *)(&addr->a[4]) == 0 ) ;
+}
+
+static inline int is_broadcast(const struct fddi_addr *addr)
+{
+	return(*(u_short *)(&addr->a[0]) == 0xffff &&
+	       *(u_short *)(&addr->a[2]) == 0xffff &&
+	       *(u_short *)(&addr->a[4]) == 0xffff ) ;
+}
+
+static inline int is_individual(const struct fddi_addr *addr)
+{
+	return(!(addr->a[0] & GROUP_ADDR)) ;
+}
+
+static inline int is_equal(const struct fddi_addr *addr1, 
+			   const struct fddi_addr *addr2)
+{
+	return(*(u_short *)(&addr1->a[0]) == *(u_short *)(&addr2->a[0]) &&
+	       *(u_short *)(&addr1->a[2]) == *(u_short *)(&addr2->a[2]) &&
+	       *(u_short *)(&addr1->a[4]) == *(u_short *)(&addr2->a[4]) ) ;
+}
 
 /*
  * list of mandatory paras in frames
@@ -382,7 +421,7 @@ void smt_event(struct s_smc *smc, int event)
 		 */
 		if (!smc->sm.pend[SMT_TID_NIF])
 			smc->sm.pend[SMT_TID_NIF] = smt_get_tid(smc) ;
-		smt_send_nif(smc,&fddi_broadcast,FC_SMT_NSA,
+		smt_send_nif(smc,&fddi_broadcast, FC_SMT_NSA,
 			smc->sm.pend[SMT_TID_NIF], SMT_REQUEST,0) ;
 		smc->sm.smt_last_notify = time ;
 	}
@@ -926,8 +965,8 @@ static void smt_send_rdf(struct s_smc *smc, SMbuf *rej, int fc, int reason,
 /*
  * generate and send NIF
  */
-static void smt_send_nif(struct s_smc *smc, struct fddi_addr *dest, int fc,
-			 u_long tid, int type, int local)
+static void smt_send_nif(struct s_smc *smc, const struct fddi_addr *dest, 
+			 int fc, u_long tid, int type, int local)
 /* struct fddi_addr *dest;	dest address */
 /* int fc;			frame control */
 /* u_long tid;			transaction id */
@@ -1687,43 +1726,6 @@ void *sm_to_para(struct s_smc *smc, struct smt_header *sm, int para)
 	}
 	return(0) ;
 }
-
-int is_my_addr(struct s_smc *smc, struct fddi_addr *addr)
-{
-	return(*(short *)(&addr->a[0]) ==
-		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[0])
-	  && *(short *)(&addr->a[2]) ==
-		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[2])
-	  && *(short *)(&addr->a[4]) ==
-		*(short *)(&smc->mib.m[MAC0].fddiMACSMTAddress.a[4])) ;
-}
-
-int is_zero(struct fddi_addr *addr)
-{
-	return(*(short *)(&addr->a[0]) == 0 &&
-	       *(short *)(&addr->a[2]) == 0 &&
-	       *(short *)(&addr->a[4]) == 0 ) ;
-}
-
-int is_broadcast(struct fddi_addr *addr)
-{
-	return(*(u_short *)(&addr->a[0]) == 0xffff &&
-	       *(u_short *)(&addr->a[2]) == 0xffff &&
-	       *(u_short *)(&addr->a[4]) == 0xffff ) ;
-}
-
-int is_individual(struct fddi_addr *addr)
-{
-	return(!(addr->a[0] & GROUP_ADDR)) ;
-}
-
-int is_equal(struct fddi_addr *addr1, struct fddi_addr *addr2)
-{
-	return(*(u_short *)(&addr1->a[0]) == *(u_short *)(&addr2->a[0]) &&
-	       *(u_short *)(&addr1->a[2]) == *(u_short *)(&addr2->a[2]) &&
-	       *(u_short *)(&addr1->a[4]) == *(u_short *)(&addr2->a[4]) ) ;
-}
-
 
 #if	0
 /*
