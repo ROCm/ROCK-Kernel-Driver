@@ -106,12 +106,12 @@ static int  __init ethertap_probe(int unit)
 
 	err = register_netdev(dev);
 	if (err)
-		goto out1;
+		goto out_free;
 
 	tap_map[unit]=dev;
 	return 0;
-out1:
-	kfree(dev);
+out_free:
+	free_netdev(dev);
 out:
 	return err;
 }
