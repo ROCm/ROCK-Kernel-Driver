@@ -142,8 +142,10 @@ static int mtouchusb_open (struct input_dev *input)
 
         mtouch->irq->dev = mtouch->udev;
 
-        if (usb_submit_urb (mtouch->irq, GFP_ATOMIC))
+        if (usb_submit_urb (mtouch->irq, GFP_ATOMIC)) {
+                mtouch->open--;
                 return -EIO;
+        }
 
         return 0;
 }
