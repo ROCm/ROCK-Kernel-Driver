@@ -1388,6 +1388,14 @@ M:	emoenke@gwdg.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+SCHEDULER
+P:	Ingo Molnar
+M:	mingo@elte.hu
+P:	Robert Love
+M:	rml@tech9.net
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 SCSI CDROM DRIVER
 P:	Jens Axboe
 M:	axboe@suse.de
