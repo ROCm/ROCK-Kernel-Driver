@@ -132,6 +132,7 @@ static int get_nodes(unsigned long *nodes, unsigned long __user *nmask,
 	unsigned long nlongs;
 	unsigned long endmask;
 
+	--maxnode;
 	bitmap_zero(nodes, MAX_NUMNODES);
 	if (maxnode == 0 || !nmask)
 		return 0;
@@ -145,6 +146,8 @@ static int get_nodes(unsigned long *nodes, unsigned long __user *nmask,
 	/* When the user specified more nodes than supported just check
 	   if the non supported part is all zero. */
 	if (nlongs > BITS_TO_LONGS(MAX_NUMNODES)) {
+		if (nlongs > PAGE_SIZE/sizeof(long))
+			return -EINVAL;
 		for (k = BITS_TO_LONGS(MAX_NUMNODES); k < nlongs; k++) {
 			unsigned long t;
 			if (get_user(t,  nmask + k))
