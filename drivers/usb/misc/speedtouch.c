@@ -113,10 +113,8 @@ static struct usb_device_id udsl_usb_ids[] = {
 	{}			/* list terminator */
 };
 
-/* not exporting this prevents the depmod from generating the map that causes the modules to be isnserted as driver.
- * we do not want this, we want the script run.
-MODULE_DEVICE_TABLE ( usb, udsl_usb_ids);
-*/
+MODULE_DEVICE_TABLE (usb, udsl_usb_ids);
+
 /* context declarations */
 
 struct udsl_data_ctx {
