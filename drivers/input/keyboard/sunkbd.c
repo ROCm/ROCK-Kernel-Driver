@@ -80,8 +80,8 @@ struct sunkbd {
 	char name[64];
 	char phys[32];
 	char type;
-	char reset;
-	char layout;
+	volatile char reset;
+	volatile char layout;
 };
 
 /*
