@@ -446,6 +446,8 @@ static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	if (!ohci->sleeping) {
 		writel (OHCI_INTR_SF, &ohci->regs->intrstatus);
 		writel (OHCI_INTR_SF, &ohci->regs->intrenable);
+		// flush those pci writes
+		(void) readl (&ohci->regs->control);
 	}
 }
 

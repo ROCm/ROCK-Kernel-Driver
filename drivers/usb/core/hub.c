@@ -1175,8 +1175,10 @@ void usb_hub_cleanup(void)
  *
  * Take a look at proc_resetdevice in devio.c for some sample code to
  * do this.
+ * Use this only from within your probe function, otherwise use
+ * usb_reset_device() below, which ensure proper locking
  */
-int usb_reset_device(struct usb_device *dev)
+int usb_physical_reset_device(struct usb_device *dev)
 {
 	struct usb_device *parent = dev->parent;
 	struct usb_device_descriptor *descriptor;
@@ -1305,4 +1307,17 @@ int usb_reset_device(struct usb_device *dev)
 
 	return 0;
 }
+
+int usb_reset_device(struct usb_device *udev)
+{
+	struct device *gdev = &udev->dev;
+	int r;
+	
+	down_read(&gdev->bus->subsys.rwsem);
+	r = usb_physical_reset_device(udev);
+	up_read(&gdev->bus->subsys.rwsem);
+
+	return r;
+}
+
 

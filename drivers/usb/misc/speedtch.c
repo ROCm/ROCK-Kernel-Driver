@@ -1034,6 +1034,23 @@ static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg)
 **  USB  **
 **********/
 
+static int udsl_set_alternate (struct udsl_instance_data *instance)
+{
+	down (&instance->serialize); /* vs self */
+	if (!instance->firmware_loaded) {
+		int ret;
+
+		if ((ret = usb_set_interface (instance->usb_dev, 1, 1)) < 0) {
+			up (&instance->serialize);
+			return ret;
+		}
+		instance->firmware_loaded = 1;
+	}
+	up (&instance->serialize);
+	udsl_fire_receivers (instance);
+	return 0;
+}
+
 static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *user_data)
 {
 	struct udsl_instance_data *instance = usb_get_intfdata (intf);
@@ -1048,14 +1065,7 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 	switch (code) {
 	case UDSL_IOCTL_START:
 		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
-		down (&instance->serialize); /* vs self */
-		if (!instance->firmware_loaded) {
-			usb_set_interface (instance->usb_dev, 1, 1);
-			instance->firmware_loaded = 1;
-		}
-		up (&instance->serialize);
-		udsl_fire_receivers (instance);
-		return 0;
+		return udsl_set_alternate (instance);
 	case UDSL_IOCTL_STOP:
 		instance->atm_dev->signal = ATM_PHY_SIG_LOST;
 		return 0;

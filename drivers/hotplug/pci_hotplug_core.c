@@ -100,7 +100,7 @@ static struct kobj_type hotplug_slot_ktype = {
 	.sysfs_ops = &hotplug_slot_sysfs_ops
 };
 
-static decl_subsys(hotplug_slots, &hotplug_slot_ktype);
+static decl_subsys(hotplug_slots, &hotplug_slot_ktype, NULL);
 
 
 /* these strings match up with the values in pci_bus_speed */

@@ -2815,7 +2815,7 @@ extern void ip_auto_config(void);
 extern void dv_init(void);
 #endif /* CONFIG_NET_DIVERT */
 
-static decl_subsys(net,NULL);
+static decl_subsys(net,NULL,NULL);
 
 
 /*
