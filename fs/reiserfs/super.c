@@ -1487,7 +1487,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     }
     /* make barrer=flush the default */
 
-    if (!reiserfs_barrier_none(s))
+    if (!reiserfs_barrier_none(s) && !flush_barriers_disabled())
 	REISERFS_SB(s)->s_mount_opt |= (1 << REISERFS_BARRIER_FLUSH);
     if (reiserfs_barrier_flush(s))
     	printk("reiserfs: using flush barriers\n");
