@@ -20,4 +20,14 @@
 #define LOAD_BLK(addr,dest)	ldda [addr] ASI_BLK_AIUS, dest
 #define EX_RETVAL(x)		0
 
+	/* Writing to %asi is _expensive_ so we hardcode it.
+	 * Reading %asi to check for KERNEL_DS is comparatively
+	 * cheap.
+	 */
+#define PREAMBLE					\
+	rd		%asi, %g1;			\
+	cmp		%g1, ASI_AIUS;			\
+	bne,pn		%icc, memcpy_user_stub;		\
+	 nop;						\
+
 #include "U1memcpy.S"

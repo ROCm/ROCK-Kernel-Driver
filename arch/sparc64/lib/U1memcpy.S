@@ -193,6 +193,7 @@ FUNC_NAME:		/* %o0=dst, %o1=src, %o2=len */
 	and		%g2, 7, %g2
 	andncc		%g3, 0x7, %g3
 	fmovd		%f0, %f2
+	sub		%g3, 0x8, %g3
 	sub		%o2, %o4, %o2
 
 	add		%g1, %o4, %g1
@@ -444,7 +445,7 @@ FUNC_NAME:		/* %o0=dst, %o1=src, %o2=len */
 2:	membar		#StoreLoad | #StoreStore
 	VISExit
 	retl
-	 mov		%g5, %o0
+	 mov		EX_RETVAL(%g5), %o0
 
 	.align		64
 70:	/* 16 < len <= (5 * 64) */
@@ -539,7 +540,7 @@ FUNC_NAME:		/* %o0=dst, %o1=src, %o2=len */
 	 add		%o1, 4, %o1
 
 85:	retl
-	 mov		%g5, %o0
+	 mov		EX_RETVAL(%g5), %o0
 
 	.align		32
 90:	EX_LD(LOAD(ldub, %o1, %g1))
@@ -548,4 +549,4 @@ FUNC_NAME:		/* %o0=dst, %o1=src, %o2=len */
 	bgu,pt		%XCC, 90b
 	 add		%o1, 1, %o1
 	retl
-	 mov		%g5, %o0
+	 mov		EX_RETVAL(%g5), %o0
