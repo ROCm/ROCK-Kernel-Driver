@@ -95,10 +95,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <asm/io.h>
 #include <asm/unaligned.h>
 #include <asm/processor.h>
-#ifdef SIOCETHTOOL
 #include <linux/ethtool.h>
 #include <linux/inetdevice.h>
-#endif
 
 #include <linux/if.h>
 #include <asm/uaccess.h>
@@ -782,15 +780,7 @@ typedef struct _tcb_ipcb_t {
 	u16 total_tcp_payload;
 } tcb_ipcb_t __attribute__ ((__packed__));
 
-#ifdef MAX_SKB_FRAGS
-#define E100_ZEROCOPY
-#endif
-
-#ifdef E100_ZEROCOPY
 #define E100_TBD_ARRAY_SIZE (2+MAX_SKB_FRAGS)
-#else
-#define E100_TBD_ARRAY_SIZE 2
-#endif /*E100_ZEROCOPY */
 
 /* Transmit Command Block (TCB)*/
 struct _tcb_t {
@@ -811,19 +801,15 @@ struct _tcb_t {
 	 */
 	tbd_t *tbd_ptr;
 
-#ifdef E100_ZEROCOPY
 	u32 tcb_tbd_dflt_ptr;	/* TBD address for non-segmented packet */
 	u32 tcb_tbd_expand_ptr;	/* TBD address for segmented packet */
-#endif				/*E100_ZEROCOPY */
 
 	struct sk_buff *tcb_skb;	/* the associated socket buffer */
 	dma_addr_t tcb_phys;	/* phys addr of the TCB */
 } __attribute__ ((__packed__));
 
-#ifndef _TCB_T_
 #define _TCB_T_
 typedef struct _tcb_t tcb_t;
-#endif
 
 /* Receive Frame Descriptor (RFD) - will be using the simple model*/
 struct _rfd_t {
@@ -844,10 +830,8 @@ struct _rfd_t {
 
 } __attribute__ ((__packed__));
 
-#ifndef _RFD_T_
 #define _RFD_T_
 typedef struct _rfd_t rfd_t;
-#endif
 
 /* Receive Buffer Descriptor (RBD)*/
 typedef struct _rbd_t {
@@ -909,14 +893,12 @@ struct cfg_params {
 	int PollingMaxWork;
 	u32 b_params;
 };
-#ifdef ETHTOOL_TEST 
 struct ethtool_lpbk_data{
         dma_addr_t dma_handle;
         tcb_t *tcb;
         rfd_t *rfd;
 
 };
-#endif
 
 struct e100_private {
 	u32 flags;		/* board management flags */
@@ -1012,23 +994,16 @@ struct e100_private {
 
 	struct tasklet_struct polling_tasklet;
 
-#ifdef ETHTOOL_GWOL
 	/* WOL params for ethtool */
 	u32 wolsupported;
 	u32 wolopts;
 	u16 ip_lbytes;
-#endif
-#ifdef ETHTOOL_TEST 
 	struct ethtool_lpbk_data loopback;
-#endif
-#ifdef ETHTOOL_PHYS_ID
 	struct timer_list blink_timer;	/* led blink timer id */
-#endif
 
 #ifdef CONFIG_PM
 	u32 pci_state[16];
 #endif
-
 };
 
 #define E100_AUTONEG        0
@@ -1056,8 +1031,6 @@ extern void e100_deisolate_driver(struct e100_private *bdp,
 extern unsigned char e100_hw_reset_recover(struct e100_private *bdp,
 					   u32 reset_cmd);
 
-#ifdef ETHTOOL_TEST
-
 #define ROM_TEST_FAIL		0x01
 #define REGISTER_TEST_FAIL	0x02
 #define SELF_TEST_FAIL		0x04
@@ -1073,6 +1046,5 @@ enum test_offsets {
 	E100_LPBK_PHY_FAIL,
 	E100_MAX_TEST_RES
 };
-#endif
 
 #endif

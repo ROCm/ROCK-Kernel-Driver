@@ -535,7 +535,6 @@ e100_config_long_rx(struct e100_private *bdp, unsigned char enable)
 	}
 }
 
-#ifdef ETHTOOL_GWOL
 /**
  * e100_config_wol
  * @bdp: atapter's private data struct
@@ -560,7 +559,6 @@ e100_config_wol(struct e100_private *bdp)
 
 	spin_unlock_bh(&(bdp->config_lock));
 }
-#endif
 
 /**
  * e100_config_loopback_mode
@@ -587,7 +585,7 @@ e100_config_loopback_mode(struct e100_private *bdp, u8 mode)
 		config_byte = CB_CFIG_LOOPBACK_EXTERNAL;
 		break;
 	default:
-		printk(KERN_NOTICE "e100_config_loopback_mode: "
+		printk(KERN_NOTICE "e100: e100_config_loopback_mode: "
 		       "Invalid argument 'mode': %d\n", mode);
 		goto exit;
 	}

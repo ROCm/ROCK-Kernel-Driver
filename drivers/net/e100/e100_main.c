@@ -116,9 +116,7 @@ Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
  *
  * 2.0.30       5/30/02
  */
-
-#undef __NO_VERSION__
-
+ 
 #include <linux/config.h>
 #include <net/checksum.h>
 #include <linux/tcp.h>
@@ -129,11 +127,7 @@ Portions (C) 2002 Red Hat, Inc. under the terms of the GNU GPL v2.
 #include "e100_phy.h"
 #include "e100_vendor.h"
 
-#ifndef CONFIG_PROC_FS
-#undef E100_CONFIG_PROC_FS
-#endif
-
-#ifdef E100_CONFIG_PROC_FS
+#ifdef CONFIG_PROC_FS
 extern int e100_create_proc_subdir(struct e100_private *);
 extern void e100_remove_proc_subdir(struct e100_private *);
 #else
@@ -141,41 +135,24 @@ extern void e100_remove_proc_subdir(struct e100_private *);
 #define e100_remove_proc_subdir(X) do {} while(0)
 #endif
 
-#ifdef SIOCETHTOOL
-#define E100_ETHTOOL_IOCTL
-#endif
-#ifdef E100_ETHTOOL_IOCTL
 static int e100_do_ethtool_ioctl(struct net_device *, struct ifreq *);
 static void e100_get_speed_duplex_caps(struct e100_private *);
 static int e100_ethtool_get_settings(struct net_device *, struct ifreq *);
 static int e100_ethtool_set_settings(struct net_device *, struct ifreq *);
 
-#ifdef ETHTOOL_GDRVINFO
 static int e100_ethtool_get_drvinfo(struct net_device *, struct ifreq *);
-#endif
-#ifdef ETHTOOL_GEEPROM
 static int e100_ethtool_eeprom(struct net_device *, struct ifreq *);
 
 #define E100_EEPROM_MAGIC 0x1234
-#endif
-#ifdef ETHTOOL_GLINK
 static int e100_ethtool_glink(struct net_device *, struct ifreq *);
-#endif
-#ifdef ETHTOOL_NWAY_RST
 static int e100_ethtool_nway_rst(struct net_device *, struct ifreq *);
-#endif
-#ifdef ETHTOOL_GWOL
 static int e100_ethtool_wol(struct net_device *, struct ifreq *);
 static unsigned char e100_setup_filter(struct e100_private *bdp);
 static void e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp);
 static u16 e100_get_ip_lbytes(struct net_device *dev);
 extern void e100_config_wol(struct e100_private *bdp);
-#endif
-#ifdef ETHTOOL_TEST
 extern u32 e100_run_diag(struct net_device *dev, u64 *test_info, u32 flags);
 static int e100_ethtool_test(struct net_device *, struct ifreq *);
-#endif
-#ifdef ETHTOOL_GSTRINGS
 static int e100_ethtool_gstrings(struct net_device *, struct ifreq *);
 static char *test_strings[] = {
 	"E100_EEPROM_TEST_FAIL",
@@ -187,19 +164,10 @@ static char *test_strings[] = {
 	"E100_LPBK_PHY_FAIL"
 };
 
-#endif
-#ifdef	ETHTOOL_PHYS_ID
 static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
-#endif
-#endif /*E100_ETHTOOL_IOCTL */
 
-#ifdef SIOCGMIIPHY
-#define E100_MII_IOCTL
-#endif
-#ifdef E100_MII_IOCTL
 #include <linux/mii.h>
 static int e100_mii_ioctl(struct net_device *, struct ifreq *, int);
-#endif /*E100_MII_IOCTL */
 
 static unsigned char e100_delayed_exec_non_cu_cmd(struct e100_private *,
 						  nxmit_cb_entry_t *);
@@ -457,7 +425,7 @@ static inline void
 e100_exec_cmd(struct e100_private *bdp, u8 cmd_low)
 {
 	writeb(cmd_low, &(bdp->scb->scb_cmd_low));
-	readw(&(bdp->scb->scb_status));	/* flashes last write, read-safe */
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 }
 
 /**
@@ -512,7 +480,7 @@ inline unsigned char
 e100_wait_exec_simple(struct e100_private *bdp, u8 scb_cmd_low)
 {
 	if (!e100_wait_scb(bdp)) {
-		printk(KERN_DEBUG "%s e100_wait_exec_simple: Wait failed\n",
+		printk(KERN_DEBUG "e100: %s: e100_wait_exec_simple: failed\n",
 		       bdp->device->name);
 		return false;
 	}
@@ -524,7 +492,7 @@ void
 e100_exec_cmplx(struct e100_private *bdp, u32 phys_addr, u8 cmd)
 {
 	writel(phys_addr, &(bdp->scb->scb_gen_ptr));
-	readw(&(bdp->scb->scb_status));	/* flashes last write, read-safe */
+	readw(&(bdp->scb->scb_status));	/* flushes last write, read-safe */
 	e100_exec_cmd(bdp, cmd);
 }
 
@@ -612,7 +580,7 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 	dev = alloc_etherdev(sizeof (struct e100_private));
 	if (dev == NULL) {
-		printk(KERN_ERR "Not able to alloc etherdev struct\n");
+		printk(KERN_ERR "e100: Not able to alloc etherdev struct\n");
 		rc = -ENODEV;
 		goto out;
 	}
@@ -681,22 +649,21 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	} else {
 		bdp->rfd_size = 16;
 	}
-
 	e100_check_options(e100nics, bdp);
 
 	if (!e100_init(bdp)) {
-		printk(KERN_ERR "Failed to initialize e100, instance #%d\n",
+		printk(KERN_ERR "e100: Failed to initialize, instance #%d\n",
 		       e100nics);
 		rc = -ENODEV;
 		goto err_pci;
 	}
 
-       /* Check if checksum is valid */
+	/* Check if checksum is valid */
 	cal_checksum = e100_eeprom_calculate_chksum(bdp);
 	read_checksum = e100_eeprom_read(bdp, (bdp->eeprom_size - 1));
 	if (cal_checksum != read_checksum) {
                 printk(KERN_ERR "e100: Corrupted EERPROM on instance #%d\n",
-			                       e100nics);
+		       e100nics);
                 rc = -ENODEV;
                 goto err_pci;
 	}
@@ -710,16 +677,12 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	dev->set_multicast_list = &e100_set_multi;
 	dev->set_mac_address = &e100_set_mac;
 	dev->do_ioctl = &e100_ioctl;
-#ifdef E100_ZEROCOPY
 	if (bdp->flags & USE_IPCB) {
 		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 	}
-#endif
 	e100nics++;
 
-#ifdef E100_ETHTOOL_IOCTL
 	e100_get_speed_duplex_caps(bdp);
-#endif /*E100_ETHTOOL_IOCTL */
 
 	if ((rc = register_netdev(dev)) != 0) {
 		goto err_pci;
@@ -727,7 +690,8 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 
 	bdp->device_type = ent->driver_data;
 	printk(KERN_NOTICE
-	       "%s: %s\n", bdp->device->name, e100_get_brand_msg(bdp));
+	       "e100: %s: %s\n", 
+	       bdp->device->name, e100_get_brand_msg(bdp));
 	e100_print_brd_conf(bdp);
 	bdp->id_string = e100_get_brand_msg(bdp);
 	e100_get_mdix_status(bdp);
@@ -742,11 +706,10 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 	}
 
 	if (e100_create_proc_subdir(bdp) < 0) {
-		printk(KERN_ERR "Failed to create proc directory for %s\n",
+		printk(KERN_ERR "e100: Failed to create proc dir for %s\n",
 		       bdp->device->name);
 	}
 
-#ifdef ETHTOOL_GWOL
 	/* Disabling all WOLs as initialization */
 	bdp->wolsupported = bdp->wolopts = 0;
 	if (bdp->rev_id >= D101A4_REV_ID) {
@@ -755,7 +718,6 @@ e100_found1(struct pci_dev *pcid, const struct pci_device_id *ent)
 			bdp->wolsupported |= WAKE_UCAST | WAKE_ARP;
 		bdp->wolopts = WAKE_MAGIC;
 	}
-#endif
 
 	printk(KERN_NOTICE "\n");
 
@@ -817,7 +779,6 @@ e100_remove1(struct pci_dev *pcid)
 		bdp->non_tx_command_state = E100_NON_TX_IDLE;
 	}
 
-#ifdef ETHTOOL_GWOL
 	/* Set up wol options and enable PME if wol is enabled */
 	if (bdp->wolopts) {
 		e100_do_wol(pcid, bdp);
@@ -827,7 +788,6 @@ e100_remove1(struct pci_dev *pcid)
 		/* If system powers down, device is switched from D1 to D3 */
 		pci_set_power_state(pcid, 1);
 	}
-#endif
 
 	e100_clear_structs(dev);
 
@@ -885,9 +845,10 @@ void __devinit
 e100_check_options(int board, struct e100_private *bdp)
 {
 	if (board >= E100_MAX_NIC) {
-		printk(KERN_NOTICE "No configuration available for board #%d\n",
+		printk(KERN_NOTICE 
+		       "e100: No configuration available for board #%d\n",
 		       board);
-		printk(KERN_NOTICE "Using defaults for all values\n");
+		printk(KERN_NOTICE "e100: Using defaults for all values\n");
 		board = E100_MAX_NIC;
 	}
 
@@ -968,13 +929,14 @@ e100_set_int_option(int *option, int val, int min, int max, int default_val,
 
 	} else if ((val < min) || (val > max)) {
 		printk(KERN_NOTICE
-		       "Invalid %s specified (%i). Valid range is %i-%i\n",
+		       "e100: Invalid %s specified (%i). "
+		       "Valid range is %i-%i\n",
 		       name, val, min, max);
-		printk(KERN_NOTICE "Using default %s of %i\n", name,
+		printk(KERN_NOTICE "e100: Using default %s of %i\n", name,
 		       default_val);
 		*option = default_val;
 	} else {
-		printk(KERN_INFO "Using specified %s of %i\n", name, val);
+		printk(KERN_INFO "e100: Using specified %s of %i\n", name, val);
 		*option = val;
 	}
 }
@@ -1002,15 +964,16 @@ e100_set_bool_option(struct e100_private *bdp, int val, u32 mask,
 
 	} else if ((val != true) && (val != false)) {
 		printk(KERN_NOTICE
-		       "Invalid %s specified (%i). Valid values are %i/%i\n",
+		       "e100: Invalid %s specified (%i). "
+		       "Valid values are %i/%i\n",
 		       name, val, false, true);
-		printk(KERN_NOTICE "Using default %s of %i\n", name,
+		printk(KERN_NOTICE "e100: Using default %s of %i\n", name,
 		       default_val);
 
 		if (default_val)
 			bdp->params.b_params |= mask;
 	} else {
-		printk(KERN_INFO "Using specified %s of %i\n", name, val);
+		printk(KERN_INFO "e100: Using specified %s of %i\n", name, val);
 		if (val)
 			bdp->params.b_params |= mask;
 	}
@@ -1096,9 +1059,7 @@ e100_close(struct net_device *dev)
 	bdp->intr_mask = SCB_INT_MASK;
 	e100_isolate_driver(bdp);
 
-#ifdef ETHTOOL_GWOL
 	bdp->ip_lbytes = e100_get_ip_lbytes(dev);
-#endif
 	free_irq(dev->irq, dev);
 	e100_clear_pools(bdp);
 
@@ -1259,7 +1220,8 @@ e100_set_multi_exec(struct net_device *dev)
 	}
 
 	if (!e100_exec_non_cu_cmd(bdp, cmd)) {
-		printk(KERN_WARNING "%s: Multicast setup failed\n", dev->name);
+		printk(KERN_WARNING "e100: %s: Multicast setup failed\n", 
+		       dev->name);
 	}
 }
 
@@ -1308,19 +1270,15 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	switch (cmd) {
 
-#ifdef E100_ETHTOOL_IOCTL
 	case SIOCETHTOOL:
 		return e100_do_ethtool_ioctl(dev, ifr);
 		break;
-#endif /*E100_ETHTOOL_IOCTL */
 
-#ifdef E100_MII_IOCTL
 	case SIOCGMIIPHY:	/* Get address of MII PHY in use. */
 	case SIOCGMIIREG:	/* Read MII PHY register. */
 	case SIOCSMIIREG:	/* Write to MII PHY register. */
 		return e100_mii_ioctl(dev, ifr, cmd);
 		break;
-#endif /*E100_MII_IOCTL */
 
 	default:
 		return -EOPNOTSUPP;
@@ -1347,7 +1305,7 @@ e100_init(struct e100_private *bdp)
 	e100_sw_init(bdp);
 
 	if (!e100_selftest(bdp, NULL, NULL)) {
-		printk(KERN_ERR "selftest failed\n");
+		printk(KERN_ERR "e100: selftest failed\n");
 		return false;
 	}
 
@@ -1357,7 +1315,7 @@ e100_init(struct e100_private *bdp)
 	e100_rd_pwa_no(bdp);
 
 	if (!e100_hw_init(bdp, PORT_SOFTWARE_RESET)) {
-		printk(KERN_ERR "hw init failed\n");
+		printk(KERN_ERR "e100: hw init failed\n");
 		return false;
 	}
 	e100_dis_intr(bdp);
@@ -1523,7 +1481,6 @@ e100_setup_tcb_pool(tcb_t *head, unsigned int qlen, struct e100_private *bdp)
 				cpu_to_le32(pcurr_tcb->tcb_phys + 0x10);
 		}
 
-#ifdef E100_ZEROCOPY
 		if (bdp->flags & IS_BACHELOR) {
 			pcurr_tcb->tcb_tbd_expand_ptr =
 				cpu_to_le32(pcurr_tcb->tcb_phys + 0x20);
@@ -1532,7 +1489,6 @@ e100_setup_tcb_pool(tcb_t *head, unsigned int qlen, struct e100_private *bdp)
 				cpu_to_le32(pcurr_tcb->tcb_phys + 0x10);
 		}
 		pcurr_tcb->tcb_tbd_dflt_ptr = pcurr_tcb->tcb_tbd_ptr;
-#endif
 
 		if (bdp->flags & USE_IPCB) {
 			pcurr_tcb->tbd_ptr = &(pcurr_tcb->tcbu.tbd_array[1]);
@@ -1593,7 +1549,7 @@ e100_alloc_space(struct e100_private *bdp)
 
 err:
 	printk(KERN_ERR
-	       "%s - Failed to allocate memory\n", e100_short_driver_name);
+	       "e100: Failed to allocate memory\n");
 	return -ENOMEM;
 }
 
@@ -1955,6 +1911,7 @@ e100intr(int irq, void *dev_inst, struct pt_regs *regs)
 	e100_dis_intr(bdp);
 
 	writew(intr_status, &bdp->scb->scb_status);	/* ack intrs */
+	readw(&bdp->scb->scb_status);
 
 	/* the device is closed, don't continue or else bad things may happen. */
 	if (!netif_running(dev)) {
@@ -2009,7 +1966,6 @@ static void inline
 e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb)
 {
 	if (tcb->tcb_skb) {
-#ifdef E100_ZEROCOPY
 		int i;
 		tbd_t *tbd_arr = tcb->tbd_ptr;
 		int frags = skb_shinfo(tcb->tcb_skb)->nr_frags;
@@ -2020,11 +1976,6 @@ e100_tx_skb_free(struct e100_private *bdp, tcb_t *tcb)
 					 le16_to_cpu(tbd_arr->tbd_buf_cnt),
 					 PCI_DMA_TODEVICE);
 		}
-#else
-		pci_unmap_single(bdp->pdev,
-				 le32_to_cpu((tcb->tbd_ptr)->tbd_buf_addr),
-				 tcb->tcb_skb->len, PCI_DMA_TODEVICE);
-#endif
 		dev_kfree_skb_irq(tcb->tcb_skb);
 		tcb->tcb_skb = NULL;
 	}
@@ -2267,7 +2218,6 @@ e100_refresh_txthld(struct e100_private *bdp)
 	}			/* end underrun check */
 }
 
-#ifdef E100_ZEROCOPY
 /**
  * e100_pseudo_hdr_csum - compute IP pseudo-header checksum
  * @ip: points to the header of the IP packet
@@ -2293,7 +2243,6 @@ e100_pseudo_hdr_csum(const struct iphdr *ip)
 
 	return FOLD_CSUM(pseudo);
 }
-#endif /* E100_ZEROCOPY */
 
 /**
  * e100_prepare_xmit_buff - prepare a buffer for transmission
@@ -2333,7 +2282,6 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 
 	tcb->tcb_skb = skb;
 
-#ifdef E100_ZEROCOPY
 	if (skb->ip_summed == CHECKSUM_HW) {
 		const struct iphdr *ip = skb->nh.iph;
 
@@ -2398,12 +2346,6 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 		tcb->tcb_tbd_num = skb_shinfo(skb)->nr_frags + 1;
 		tcb->tcb_tbd_ptr = tcb->tcb_tbd_expand_ptr;
 	}
-#else
-	(tcb->tbd_ptr)->tbd_buf_addr =
-		cpu_to_le32(pci_map_single(bdp->pdev, skb->data,
-					   skb->len, PCI_DMA_TODEVICE));
-	(tcb->tbd_ptr)->tbd_buf_cnt = cpu_to_le16(skb->len);
-#endif
 
 	/* clear the S-BIT on the previous tcb */
 	prev_tcb = bdp->tcb_pool.data;
@@ -2463,12 +2405,12 @@ e100_start_cu(struct e100_private *bdp, tcb_t *tcb)
 		// The last command was a non_tx CU command
 		if (!e100_wait_cus_idle(bdp))
 			printk(KERN_DEBUG
-			       "%s cu_start: timeout waiting for cu\n",
+			       "e100: %s: cu_start: timeout waiting for cu\n",
 			       bdp->device->name);
 		if (!e100_wait_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					  SCB_CUC_START)) {
 			printk(KERN_DEBUG
-			       "%s cu_start: timeout waiting for scb\n",
+			       "e100: %s: cu_start: timeout waiting for scb\n",
 			       bdp->device->name);
 			e100_exec_cmplx(bdp, (u32) (tcb->tcb_phys),
 					SCB_CUC_START);
@@ -2584,7 +2526,8 @@ e100_setup_iaaddr(struct e100_private *bdp, u8 *eaddr)
 
 	res = e100_exec_non_cu_cmd(bdp, cmd);
 	if (!res)
-		printk(KERN_WARNING "%s IA setup failed\n", bdp->device->name);
+		printk(KERN_WARNING "e100: %s: IA setup failed\n", 
+		       bdp->device->name);
 
 exit:
 	return res;
@@ -2630,7 +2573,8 @@ e100_start_ru(struct e100_private *bdp)
 
 	if (!e100_wait_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START)) {
 		printk(KERN_DEBUG
-		       "%s start_ru: wait_scb failed\n", bdp->device->name);
+		       "e100: %s: start_ru: wait_scb failed\n", 
+		       bdp->device->name);
 		e100_exec_cmplx(bdp, rx_struct->dma_addr, SCB_RUC_START);
 	}
 	if (bdp->next_cu_cmd == RESUME_NO_WAIT) {
@@ -3213,9 +3157,8 @@ e100_pci_setup(struct pci_dev *pcid, struct e100_private *bdp)
 	bdp->scb = (scb_t *) ioremap_nocache(dev->mem_start, sizeof (scb_t));
 
 	if (!bdp->scb) {
-		printk(KERN_ERR "%s - %s: Failed to map PCI address 0x%lX\n",
-		       e100_short_driver_name, dev->name,
-		       pci_resource_start(pcid, 0));
+		printk(KERN_ERR "e100: %s: Failed to map PCI address 0x%lX\n",
+		       dev->name, pci_resource_start(pcid, 0));
 		rc = -ENOMEM;
 		goto err_region;
 	}
@@ -3313,7 +3256,8 @@ e100_hw_reset_recover(struct e100_private *bdp, u32 reset_cmd)
 
 		if (!e100_setup_iaaddr(bdp, bdp->device->dev_addr)) {
 			printk(KERN_ERR
-			       "e100_hw_reset_recover: setup iaaddr failed\n");
+			       "e100: e100_hw_reset_recover: "
+			       "setup iaaddr failed\n");
 			return false;
 		}
 
@@ -3343,7 +3287,7 @@ e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
 	if (full_init) {
 		e100_sw_reset(bdp, PORT_SOFTWARE_RESET);
 		if (!e100_hw_reset_recover(bdp, PORT_SOFTWARE_RESET))
-			printk(KERN_ERR "e100_deisolate_driver:"
+			printk(KERN_ERR "e100: e100_deisolate_driver:"
 			       " HW SOFTWARE reset recover failed\n");
 	}
 
@@ -3357,7 +3301,7 @@ e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
 			e100_sw_reset(bdp, PORT_SELECTIVE_RESET);
 
 			if (!e100_hw_reset_recover(bdp, PORT_SELECTIVE_RESET)) {
-				printk(KERN_ERR "e100_deisolate_driver:"
+				printk(KERN_ERR "e100: e100_deisolate_driver:"
 				       " HW reset recover failed\n");
 			}
 		}
@@ -3380,7 +3324,6 @@ e100_deisolate_driver(struct e100_private *bdp, u8 recover, u8 full_init)
 	bdp->driver_isolated = false;
 }
 
-#ifdef E100_ETHTOOL_IOCTL
 static int
 e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3397,48 +3340,32 @@ e100_do_ethtool_ioctl(struct net_device *dev, struct ifreq *ifr)
 	case ETHTOOL_SSET:
 		rc = e100_ethtool_set_settings(dev, ifr);
 		break;
-#ifdef ETHTOOL_GDRVINFO
 	case ETHTOOL_GDRVINFO:
 		rc = e100_ethtool_get_drvinfo(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_NWAY_RST
 	case ETHTOOL_NWAY_RST:
 		rc = e100_ethtool_nway_rst(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_GLINK
 	case ETHTOOL_GLINK:
 		rc = e100_ethtool_glink(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_GEEPROM
 	case ETHTOOL_GEEPROM:
 	case ETHTOOL_SEEPROM:
 		rc = e100_ethtool_eeprom(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_GWOL
 	case ETHTOOL_GWOL:
 	case ETHTOOL_SWOL:
 		rc = e100_ethtool_wol(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_TEST
 	case ETHTOOL_TEST:
 		rc = e100_ethtool_test(dev, ifr);
 		break;
-#endif
-#ifdef ETHTOOL_GSTRINGS
 	case ETHTOOL_GSTRINGS:
 		rc = e100_ethtool_gstrings(dev,ifr);
 		break;
-#endif
-#ifdef	ETHTOOL_PHYS_ID
 	case ETHTOOL_PHYS_ID:
 		rc = e100_ethtool_led_blink(dev,ifr);
 		break;
-#endif
 	default:
 		break;
 	}			//switch
@@ -3576,7 +3503,6 @@ e100_ethtool_set_settings(struct net_device *dev, struct ifreq *ifr)
 	return 0;
 }
 
-#ifdef ETHTOOL_GLINK
 static int
 e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3595,9 +3521,7 @@ e100_ethtool_glink(struct net_device *dev, struct ifreq *ifr)
 
 	return 0;
 }
-#endif
 
-#ifdef ETHTOOL_TEST
 static int
 e100_ethtool_test(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3625,9 +3549,7 @@ exit:
 	kfree(info);
 	return rc;
 }
-#endif
 
-#ifdef ETHTOOL_NWAY_RST
 static int
 e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3646,9 +3568,7 @@ e100_ethtool_nway_rst(struct net_device *dev, struct ifreq *ifr)
 	}
 	return 0;
 }
-#endif
 
-#ifdef ETHTOOL_GDRVINFO
 static int
 e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3665,20 +3585,14 @@ e100_ethtool_get_drvinfo(struct net_device *dev, struct ifreq *ifr)
 		sizeof (info.fw_version) - 1);
 	strncpy(info.bus_info, bdp->pdev->slot_name,
 		sizeof (info.bus_info) - 1);
-#ifdef ETHTOOL_GEEPROM
 	info.eedump_len = (bdp->eeprom_size << 1);	
-#endif
-#ifdef ETHTOOL_TEST
 	info.testinfo_len = E100_MAX_TEST_RES;
-#endif
 	if (copy_to_user(ifr->ifr_data, &info, sizeof (info)))
 		return -EFAULT;
 
 	return 0;
 }
-#endif //ETHTOOL_GDRVINFO
 
-#ifdef ETHTOOL_GEEPROM
 static int
 e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 {
@@ -3750,9 +3664,7 @@ e100_ethtool_eeprom(struct net_device *dev, struct ifreq *ifr)
 	}
 	return 0;
 }
-#endif
 
-#ifdef ETHTOOL_PHYS_ID
 #define E100_BLINK_INTERVAL	(HZ/4)
 /**
  * e100_led_control
@@ -3835,7 +3747,6 @@ e100_ethtool_led_blink(struct net_device *dev, struct ifreq *ifr)
 
 	return 0;
 }
-#endif
 
 static inline int __devinit
 e100_10BaseT_adapter(struct e100_private *bdp)
@@ -3884,7 +3795,6 @@ e100_get_speed_duplex_caps(struct e100_private *bdp)
 
 }
 
-#ifdef ETHTOOL_GWOL
 static unsigned char
 e100_setup_filter(struct e100_private *bdp)
 {
@@ -3917,7 +3827,7 @@ e100_setup_filter(struct e100_private *bdp)
 
 	res = e100_exec_non_cu_cmd(bdp, cmd);
 	if (!res)
-		printk(KERN_WARNING "%s Filter setup failed\n",
+		printk(KERN_WARNING "e100: %s: Filter setup failed\n",
 		       bdp->device->name);
 
 exit:
@@ -3934,9 +3844,9 @@ e100_do_wol(struct pci_dev *pcid, struct e100_private *bdp)
 		if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP))
 			if (!e100_setup_filter(bdp))
 				printk(KERN_ERR
-				       "e100_config WOL options failed\n");
+				       "e100: WOL options failed\n");
 	} else {
-		printk(KERN_ERR "e100_config WOL failed\n");
+		printk(KERN_ERR "e100: config WOL failed\n");
 	}
 }
 
@@ -3998,9 +3908,6 @@ e100_ethtool_wol(struct net_device *dev, struct ifreq *ifr)
 	return res;
 }
 
-#endif
-
-#ifdef ETHTOOL_GSTRINGS
 static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 {
 	struct ethtool_gstrings info;
@@ -4043,10 +3950,7 @@ static int e100_ethtool_gstrings(struct net_device *dev, struct ifreq *ifr)
 	kfree(strings);
 	return 0;
 }
-#endif
-#endif /*E100_ETHTOOL_IOCTL */
 
-#ifdef E100_MII_IOCTL
 static int
 e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
@@ -4083,7 +3987,6 @@ e100_mii_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	}
 	return 0;
 }
-#endif //E100_MII_IOCTL
 
 nxmit_cb_entry_t *
 e100_alloc_non_tx_cmd(struct e100_private *bdp)
@@ -4272,7 +4175,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 	pci_save_state(pcid, bdp->pci_state);
 
 	/* If wol is enabled */
-#ifdef ETHTOOL_GWOL
 	if (bdp->wolopts) {
 		bdp->ip_lbytes = e100_get_ip_lbytes(netdev);
 		e100_do_wol(pcid, bdp);
@@ -4283,10 +4185,6 @@ e100_suspend(struct pci_dev *pcid, u32 state)
 		pci_disable_device(pcid);
 		pci_set_power_state(pcid, state);
 	}
-#else
-	pci_disable_device(pcid);
-	pci_set_power_state(pcid, state);
-#endif
 
 	return 0;
 }
@@ -4307,11 +4205,9 @@ e100_resume(struct pci_dev *pcid)
 		recover = true;
 	}
 
-#ifdef ETHTOOL_GWOL
 	if (bdp->wolopts & (WAKE_UCAST | WAKE_ARP)) {
 		full_init = true;
 	}
-#endif
 
 	e100_deisolate_driver(bdp, recover, full_init);
 
