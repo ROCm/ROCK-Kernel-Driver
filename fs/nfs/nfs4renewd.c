@@ -54,53 +54,91 @@
 #include <linux/nfs4.h>
 #include <linux/nfs_fs.h>
 
-static RPC_WAITQ(nfs4_renewd_queue, "nfs4_renewd_queue");
+#define NFSDBG_FACILITY	NFSDBG_PROC
 
-static void
-renewd(struct rpc_task *task)
+void
+nfs4_renew_state(void *data)
 {
-	struct nfs_server *server = (struct nfs_server *)task->tk_calldata;
-	unsigned long lease = server->lease_time;
-	unsigned long last = server->last_renewal;
-	unsigned long timeout;
+	struct nfs4_client *clp = (struct nfs4_client *)data;
+	long lease, timeout;
+	unsigned long last, now;
 
-	if (!server->nfs4_state)
-		timeout = (2 * lease) / 3;
-	else if (jiffies < last + lease/3)
-		timeout = (2 * lease) / 3 + last - jiffies;
-	else {
+	down_read(&clp->cl_sem);
+	dprintk("%s: start\n", __FUNCTION__);
+	/* Are there any active superblocks? */
+	if (list_empty(&clp->cl_superblocks))
+		goto out; 
+	spin_lock(&clp->cl_lock);
+	lease = clp->cl_lease_time;
+	last = clp->cl_last_renewal;
+	now = jiffies;
+	timeout = (2 * lease) / 3 + (long)last - (long)now;
+	/* Are we close to a lease timeout? */
+	if (time_after(now, last + lease/3)) {
+		spin_unlock(&clp->cl_lock);
 		/* Queue an asynchronous RENEW. */
-		nfs4_proc_renew(server);
+		nfs4_proc_async_renew(clp);
 		timeout = (2 * lease) / 3;
-	}
-
+		spin_lock(&clp->cl_lock);
+	} else
+		dprintk("%s: failed to call renewd. Reason: lease not expired \n",
+				__FUNCTION__);
 	if (timeout < 5 * HZ)    /* safeguard */
 		timeout = 5 * HZ;
-	task->tk_timeout = timeout;
-	task->tk_action = renewd;
-	task->tk_exit = NULL;
-	rpc_sleep_on(&nfs4_renewd_queue, task, NULL, NULL);
-	return;
+	dprintk("%s: requeueing work. Lease period = %ld\n",
+			__FUNCTION__, (timeout + HZ - 1) / HZ);
+	cancel_delayed_work(&clp->cl_renewd);
+	schedule_delayed_work(&clp->cl_renewd, timeout);
+	spin_unlock(&clp->cl_lock);
+out:
+	up_read(&clp->cl_sem);
+	dprintk("%s: done\n", __FUNCTION__);
 }
 
-int
-nfs4_init_renewd(struct nfs_server *server)
+/* Must be called with clp->cl_sem locked for writes */
+void
+nfs4_schedule_state_renewal(struct nfs4_client *clp)
 {
-	struct rpc_task *task;
-	int status;
+	long timeout;
 
-	lock_kernel();
-	status = -ENOMEM;
-	task = rpc_new_task(server->client, NULL, RPC_TASK_ASYNC);
-	if (!task)
-		goto out;
-	task->tk_calldata = server;
-	task->tk_action = renewd;
-	status = rpc_execute(task);
+	spin_lock(&clp->cl_lock);
+	timeout = (2 * clp->cl_lease_time) / 3 + (long)clp->cl_last_renewal
+		- (long)jiffies;
+	if (timeout < 5 * HZ)
+		timeout = 5 * HZ;
+	dprintk("%s: requeueing work. Lease period = %ld\n",
+			__FUNCTION__, (timeout + HZ - 1) / HZ);
+	cancel_delayed_work(&clp->cl_renewd);
+	schedule_delayed_work(&clp->cl_renewd, timeout);
+	spin_unlock(&clp->cl_lock);
+}
 
-out:
-	unlock_kernel();
-	return status;
+void
+nfs4_renewd_prepare_shutdown(struct nfs_server *server)
+{
+	struct nfs4_client *clp = server->nfs4_state;
+
+	if (!clp)
+		return;
+	flush_scheduled_work();
+	down_write(&clp->cl_sem);
+	if (!list_empty(&server->nfs4_siblings))
+		list_del_init(&server->nfs4_siblings);
+	up_write(&clp->cl_sem);
+}
+
+/* Must be called with clp->cl_sem locked for writes */
+void
+nfs4_kill_renewd(struct nfs4_client *clp)
+{
+	down_read(&clp->cl_sem);
+	if (!list_empty(&clp->cl_superblocks)) {
+		up_read(&clp->cl_sem);
+		return;
+	}
+	cancel_delayed_work(&clp->cl_renewd);
+	up_read(&clp->cl_sem);
+	flush_scheduled_work();
 }
 
 /*

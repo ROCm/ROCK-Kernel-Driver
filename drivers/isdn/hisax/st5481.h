@@ -219,15 +219,15 @@ enum {
 #define L1_EVENT_COUNT (EV_TIMER3 + 1)
 
 #define ERR(format, arg...) \
-printk(KERN_ERR __FILE__ ": %s: " format "\n" , __FUNCTION__ , ## arg)
+printk(KERN_ERR "%s:%s: " format "\n" , __FILE__,  __FUNCTION__ , ## arg)
 
 #define WARN(format, arg...) \
-printk(KERN_WARNING __FILE__ ": %s: " format "\n" , __FUNCTION__ , ## arg)
+printk(KERN_WARNING "%s:%s: " format "\n" , __FILE__,  __FUNCTION__ , ## arg)
 
 #define INFO(format, arg...) \
-printk(KERN_INFO __FILE__ ": %s: " format "\n" , __FUNCTION__ , ## arg)
+printk(KERN_INFO "%s:%s: " format "\n" , __FILE__,  __FUNCTION__ , ## arg)
 
-#include "st5481_hdlc.h"
+#include "isdnhdlc.h"
 #include "fsm.h"
 #include "hisax_if.h"
 #include <linux/skbuff.h>
@@ -236,9 +236,9 @@ printk(KERN_INFO __FILE__ ": %s: " format "\n" , __FUNCTION__ , ## arg)
  * FIFO handling
  */
 
-/* Generic FIFO structure */ 
+/* Generic FIFO structure */
 struct fifo {
-	u8 r,w,count,size;
+	u_char r,w,count,size;
 	spinlock_t lock;
 };
 
@@ -270,7 +270,7 @@ static inline int fifo_add(struct fifo *fifo)
 		index = -1;
 	} else {
 		// Return index where to get the next data to add to the FIFO
-		index = fifo->w++ & (fifo->size-1); 
+		index = fifo->w++ & (fifo->size-1);
 		fifo->count++;
 	}
 	spin_unlock_irqrestore(&fifo->lock, flags);
@@ -289,13 +289,13 @@ static inline int fifo_remove(struct fifo *fifo)
 		return -1;
 	}
 
-	spin_lock_irqsave(&fifo->lock, flags);		
+	spin_lock_irqsave(&fifo->lock, flags);
 	if (!fifo->count) {
 		// FIFO empty
 		index = -1;
 	} else {
 		// Return index where to get the next data from the FIFO
-		index = fifo->r++ & (fifo->size-1); 
+		index = fifo->r++ & (fifo->size-1);
 		fifo->count--;
 	}
 	spin_unlock_irqrestore(&fifo->lock, flags);
@@ -336,7 +336,7 @@ struct st5481_intr {
 };
 
 struct st5481_d_out {
-	struct hdlc_vars hdlc_state;
+	struct isdnhdlc_vars hdlc_state;
 	struct urb *urb[2]; /* double buffering */
 	unsigned long busy;
 	struct sk_buff *tx_skb;
@@ -344,15 +344,15 @@ struct st5481_d_out {
 };
 
 struct st5481_b_out {
-	struct hdlc_vars hdlc_state;
+	struct isdnhdlc_vars hdlc_state;
 	struct urb *urb[2]; /* double buffering */
-	u8 flow_event;
+	u_char flow_event;
 	u_long busy;
 	struct sk_buff *tx_skb;
 };
 
 struct st5481_in {
-	struct hdlc_vars hdlc_state;
+	struct isdnhdlc_vars hdlc_state;
 	struct urb *urb[2]; /* double buffering */
 	int mode;
 	int bufsize;
@@ -452,7 +452,7 @@ void st5481_release_isocpipes(struct urb* urb[2]);
 
 int  st5481_isoc_flatten(struct urb *urb);
 void st5481_usb_pipe_reset(struct st5481_adapter *adapter,
-		    u8 pipe, ctrl_complete_t complete, void *context);
+		    u_char pipe, ctrl_complete_t complete, void *context);
 void st5481_usb_ctrl_msg(struct st5481_adapter *adapter,
 		  u8 request, u8 requesttype, u16 value, u16 index,
 		  ctrl_complete_t complete, void *context);
@@ -482,7 +482,7 @@ dump_iso_packet(const char *name, struct urb *urb)
 {
 	int i,j;
 	int len,ofs;
-	u8 *data;
+	u_char *data;
 
 	printk(KERN_DEBUG "%s: packets=%d,errors=%d\n",
 	       name,urb->number_of_packets,urb->error_count);

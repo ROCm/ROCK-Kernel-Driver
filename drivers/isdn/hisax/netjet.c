@@ -1,4 +1,4 @@
-/* $Id: netjet.c,v 1.24.6.6 2001/09/23 22:24:50 kai Exp $
+/* $Id: netjet.c,v 1.29.2.4 2004/02/11 13:21:34 keil Exp $
  *
  * low level stuff for Traverse Technologie NETJet ISDN cards
  *
@@ -25,63 +25,40 @@
 #include <asm/io.h>
 #include "netjet.h"
 
-const char *NETjet_revision = "$Revision: 1.24.6.6 $";
-static spinlock_t netjet_lock = SPIN_LOCK_UNLOCKED;
+const char *NETjet_revision = "$Revision: 1.29.2.4 $";
 
 /* Interface functions */
 
-u8
-NETjet_ReadIC(struct IsdnCardState *cs, u8 offset)
+u_char
+NETjet_ReadIC(struct IsdnCardState *cs, u_char offset)
 {
-	unsigned long flags;
-	u8 ret;
+	u_char ret;
 	
-	spin_lock_irqsave(&netjet_lock, flags);
 	cs->hw.njet.auxd &= 0xfc;
 	cs->hw.njet.auxd |= (offset>>4) & 3;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	ret = bytein(cs->hw.njet.isac + ((offset & 0xf)<<2));
-	spin_unlock_irqrestore(&netjet_lock, flags);
 	return(ret);
 }
 
 void
-NETjet_WriteIC(struct IsdnCardState *cs, u8 offset, u8 value)
+NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	unsigned long flags;
-	
-	spin_lock_irqsave(&netjet_lock, flags);
 	cs->hw.njet.auxd &= 0xfc;
 	cs->hw.njet.auxd |= (offset>>4) & 3;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	byteout(cs->hw.njet.isac + ((offset & 0xf)<<2), value);
-	spin_unlock_irqrestore(&netjet_lock, flags);
 }
 
 void
-NETjet_ReadICfifo(struct IsdnCardState *cs, u8 *data, int size)
+NETjet_ReadICfifo(struct IsdnCardState *cs, u_char *data, int size)
 {
 	cs->hw.njet.auxd &= 0xfc;
 	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
 	insb(cs->hw.njet.isac, data, size);
 }
 
-void 
-NETjet_WriteICfifo(struct IsdnCardState *cs, u8 *data, int size)
-{
-	cs->hw.njet.auxd &= 0xfc;
-	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
-	outsb(cs->hw.njet.isac, data, size);
-}
-
-struct dc_hw_ops netjet_dc_ops = {
-	.read_reg   = NETjet_ReadIC,
-	.write_reg  = NETjet_WriteIC,
-	.read_fifo  = NETjet_ReadICfifo,
-	.write_fifo = NETjet_WriteICfifo,
-};
-
-static u16 fcstab[256] =
+__u16 fcstab[256] =
 {
 	0x0000, 0x1189, 0x2312, 0x329b, 0x4624, 0x57ad, 0x6536, 0x74bf,
 	0x8c48, 0x9dc1, 0xaf5a, 0xbed3, 0xca6c, 0xdbe5, 0xe97e, 0xf8f7,
@@ -117,7 +94,15 @@ static u16 fcstab[256] =
 	0x7bc7, 0x6a4e, 0x58d5, 0x495c, 0x3de3, 0x2c6a, 0x1ef1, 0x0f78
 };
 
-void fill_mem(struct BCState *bcs, u_int *pos, u_int cnt, int chan, u8 fill)
+void 
+NETjet_WriteICfifo(struct IsdnCardState *cs, u_char *data, int size)
+{
+	cs->hw.njet.auxd &= 0xfc;
+	byteout(cs->hw.njet.auxa, cs->hw.njet.auxd);
+	outsb(cs->hw.njet.isac, data, size);
+}
+
+void fill_mem(struct BCState *bcs, u_int *pos, u_int cnt, int chan, u_char fill)
 {
 	u_int mask=0x000000ff, val = 0, *p=pos;
 	u_int i;
@@ -140,7 +125,7 @@ void
 mode_tiger(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-        u8 led;
+        u_char led;
 
 	if (cs->debug & L1_DEB_HSCX)
 		debugl1(cs, "Tiger mode %d bchan %d/%d",
@@ -216,11 +201,11 @@ mode_tiger(struct BCState *bcs, int mode, int bc)
 			bytein(cs->hw.njet.base + NETJET_PULSE_CNT));
 }
 
-static void printframe(struct IsdnCardState *cs, u8 *buf, int count, char *s) {
+static void printframe(struct IsdnCardState *cs, u_char *buf, int count, char *s) {
 	char tmp[128];
 	char *t = tmp;
 	int i=count,j;
-	u8 *p = buf;
+	u_char *p = buf;
 
 	t += sprintf(t, "tiger %s(%4d)", s, count);
 	while (i>0) {
@@ -269,11 +254,11 @@ static void printframe(struct IsdnCardState *cs, u8 *buf, int count, char *s) {
 static int make_raw_data(struct BCState *bcs) {
 // this make_raw is for 64k
 	register u_int i,s_cnt=0;
-	register u8 j;
-	register u8 val;
-	register u8 s_one = 0;
-	register u8 s_val = 0;
-	register u8 bitcnt = 0;
+	register u_char j;
+	register u_char val;
+	register u_char s_one = 0;
+	register u_char s_val = 0;
+	register u_char bitcnt = 0;
 	u_int fcs;
 	
 	if (!bcs->tx_skb) {
@@ -359,11 +344,11 @@ static int make_raw_data(struct BCState *bcs) {
 static int make_raw_data_56k(struct BCState *bcs) {
 // this make_raw is for 56k
 	register u_int i,s_cnt=0;
-	register u8 j;
-	register u8 val;
-	register u8 s_one = 0;
-	register u8 s_val = 0;
-	register u8 bitcnt = 0;
+	register u_char j;
+	register u_char val;
+	register u_char s_one = 0;
+	register u_char s_val = 0;
+	register u_char bitcnt = 0;
 	u_int fcs;
 	
 	if (!bcs->tx_skb) {
@@ -439,7 +424,8 @@ static void got_frame(struct BCState *bcs, int count) {
 		memcpy(skb_put(skb, count), bcs->hw.tiger.rcvbuf, count);
 		skb_queue_tail(&bcs->rqueue, skb);
 	}
-	sched_b_event(bcs, B_RCVBUFREADY);
+	test_and_set_bit(B_RCVBUFREADY, &bcs->event);
+	schedule_work(&bcs->tqueue);
 	
 	if (bcs->cs->debug & L1_DEB_RECEIVE_FRAME)
 		printframe(bcs->cs, bcs->hw.tiger.rcvbuf, count, "rec");
@@ -449,16 +435,16 @@ static void got_frame(struct BCState *bcs, int count) {
 
 static void read_raw(struct BCState *bcs, u_int *buf, int cnt){
 	int i;
-	register u8 j;
-	register u8 val;
+	register u_char j;
+	register u_char val;
 	u_int  *pend = bcs->hw.tiger.rec +NETJET_DMA_RXSIZE -1;
-	register u8 state = bcs->hw.tiger.r_state;
-	register u8 r_one = bcs->hw.tiger.r_one;
-	register u8 r_val = bcs->hw.tiger.r_val;
+	register u_char state = bcs->hw.tiger.r_state;
+	register u_char r_one = bcs->hw.tiger.r_one;
+	register u_char r_val = bcs->hw.tiger.r_val;
 	register u_int bitcnt = bcs->hw.tiger.r_bitcnt;
 	u_int *p = buf;
 	int bits;
-	u8 mask;
+	u_char mask;
 
         if (bcs->mode == L1_MODE_HDLC) { // it's 64k
 		mask = 0xff;
@@ -682,9 +668,7 @@ void netjet_fill_dma(struct BCState *bcs)
 	if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {
 		write_raw(bcs, bcs->hw.tiger.sendp, bcs->hw.tiger.free);
 	} else if (test_and_clear_bit(BC_FLG_HALF, &bcs->Flag)) {
-		p = inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR)
-			- bcs->hw.tiger.send_dma
-			+ bcs->hw.tiger.send;
+		p = bus_to_virt(inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR));
 		sp = bcs->hw.tiger.sendp;
 		if (p == bcs->hw.tiger.s_end)
 			p = bcs->hw.tiger.send -1;
@@ -705,9 +689,7 @@ void netjet_fill_dma(struct BCState *bcs)
 			write_raw(bcs, p, bcs->hw.tiger.free - cnt);
 		}
 	} else if (test_and_clear_bit(BC_FLG_EMPTY, &bcs->Flag)) {
-		p = inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR) 
-			- bcs->hw.tiger.send_dma
-			+ bcs->hw.tiger.send;
+		p = bus_to_virt(inl(bcs->cs->hw.njet.base + NETJET_DMA_READ_ADR));
 		cnt = bcs->hw.tiger.s_end - p;
 		if (cnt < 2) {
 			p = bcs->hw.tiger.send + 1;
@@ -729,7 +711,7 @@ void netjet_fill_dma(struct BCState *bcs)
 
 static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 	u_int mask, val, *p=buf;
-	int i, s_cnt;
+	u_int i, s_cnt;
         
         if (cnt <= 0)
         	return;
@@ -766,7 +748,16 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 			if (!bcs->tx_skb) {
 				debugl1(bcs->cs,"tiger write_raw: NULL skb s_cnt %d", s_cnt);
 			} else {
-				xmit_complete_b(bcs);
+				if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+					(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+					u_long	flags;
+					spin_lock_irqsave(&bcs->aclock, flags);
+					bcs->ackcnt += bcs->tx_skb->len;
+					spin_unlock_irqrestore(&bcs->aclock, flags);
+					schedule_event(bcs, B_ACKPENDING);
+				}
+				dev_kfree_skb_any(bcs->tx_skb);
+				bcs->tx_skb = NULL;
 			}
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->hw.tiger.free = cnt - s_cnt;
@@ -790,7 +781,8 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 						debugl1(bcs->cs, "tiger write_raw: fill rest %d",
 							cnt - s_cnt);
 				}
-				sched_b_event(bcs, B_XMTBUFREADY);
+				test_and_set_bit(B_XMTBUFREADY, &bcs->event);
+				schedule_work(&bcs->tqueue);
 			}
 		}
 	} else if (test_and_clear_bit(BC_FLG_NOFRAME, &bcs->Flag)) {
@@ -838,36 +830,59 @@ void write_tiger(struct IsdnCardState *cs) {
 static void
 tiger_l2l1(struct PStack *st, int pr, void *arg)
 {
+	struct BCState *bcs = st->l1.bcs;
 	struct sk_buff *skb = arg;
-	struct IsdnCardState *cs = st->l1.bcs->cs;
+	u_long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			xmit_data_req_b(st->l1.bcs, skb);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			if (bcs->tx_skb) {
+				skb_queue_tail(&bcs->squeue, skb);
+			} else {
+				bcs->tx_skb = skb;
+				bcs->cs->BC_Send_Data(bcs);
+			}
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
 			break;
 		case (PH_PULL | INDICATION):
-			xmit_pull_ind_b(st->l1.bcs, skb);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			if (bcs->tx_skb) {
+				printk(KERN_WARNING "tiger_l2l1: this shouldn't happen\n");
+			} else {
+				bcs->tx_skb = skb;
+				bcs->cs->BC_Send_Data(bcs);
+			}
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
 			break;
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_b(st);
+			if (!bcs->tx_skb) {
+				test_and_clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			} else
+				test_and_set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
 		case (PH_ACTIVATE | REQUEST):
-			test_and_set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-			mode_tiger(st->l1.bcs, st->l1.mode, st->l1.bc);
-			if (cs->hw.njet.bc_activate)
-				(cs->hw.njet.bc_activate)(cs, st->l1.bc);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			test_and_set_bit(BC_FLG_ACTIV, &bcs->Flag);
+			mode_tiger(bcs, st->l1.mode, st->l1.bc);
+			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG */
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
+			bcs->cs->cardmsg(bcs->cs, MDL_BC_ASSIGN, (void *)(&st->l1.bc));
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | REQUEST):
-			if (cs->hw.njet.bc_deactivate)
-				(cs->hw.njet.bc_deactivate)(cs, st->l1.bc);
+			/* 2001/10/04 Christoph Ersfeld, Formula-n Europe AG */
+			bcs->cs->cardmsg(bcs->cs, MDL_BC_RELEASE, (void *)(&st->l1.bc));
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | CONFIRM):
-			test_and_clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-			test_and_clear_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			mode_tiger(st->l1.bcs, 0, st->l1.bc);
-			L1L2(st, PH_DEACTIVATE | CONFIRM, NULL);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			test_and_clear_bit(BC_FLG_ACTIV, &bcs->Flag);
+			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
+			mode_tiger(bcs, 0, st->l1.bc);
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
+			st->l1.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
 			break;
 	}
 }
@@ -928,7 +943,7 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
 	if (open_tigerstate(st->l1.hardware, bcs))
 		return (-1);
 	st->l1.bcs = bcs;
-	st->l1.l2l1 = tiger_l2l1;
+	st->l2.l2l1 = tiger_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);
@@ -936,47 +951,32 @@ setstack_tiger(struct PStack *st, struct BCState *bcs)
 }
 
  
-static struct bc_l1_ops netjet_l1_ops = {
-	.fill_fifo = netjet_fill_dma,
-	.open      = setstack_tiger,
-	.close     = close_tigerstate,
-};
-
 void __init
 inittiger(struct IsdnCardState *cs)
 {
-	cs->bc_l1_ops = &netjet_l1_ops;
-
-	cs->bcs[0].hw.tiger.send = 
-		pci_alloc_consistent(cs->hw.njet.pdev,
-				     NETJET_DMA_TXSIZE * sizeof(unsigned int),
-				     &cs->bcs[0].hw.tiger.send_dma);
-	if (!cs->bcs[0].hw.tiger.send) {
+	if (!(cs->bcs[0].hw.tiger.send = kmalloc(NETJET_DMA_TXSIZE * sizeof(unsigned int),
+		GFP_KERNEL | GFP_DMA))) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for tiger.send\n");
 		return;
 	}
-	cs->bcs[0].hw.tiger.s_end     = cs->bcs[0].hw.tiger.send     + NETJET_DMA_TXSIZE - 1;
-
-	cs->bcs[1].hw.tiger.send      = cs->bcs[0].hw.tiger.send;
-	cs->bcs[1].hw.tiger.send_dma  = cs->bcs[0].hw.tiger.send_dma;
-	cs->bcs[1].hw.tiger.s_end     = cs->bcs[0].hw.tiger.s_end;
+	cs->bcs[0].hw.tiger.s_irq = cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE/2 - 1;
+	cs->bcs[0].hw.tiger.s_end = cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE - 1;
+	cs->bcs[1].hw.tiger.send = cs->bcs[0].hw.tiger.send;
+	cs->bcs[1].hw.tiger.s_irq = cs->bcs[0].hw.tiger.s_irq;
+	cs->bcs[1].hw.tiger.s_end = cs->bcs[0].hw.tiger.s_end;
 	
 	memset(cs->bcs[0].hw.tiger.send, 0xff, NETJET_DMA_TXSIZE * sizeof(unsigned int));
 	debugl1(cs, "tiger: send buf %x - %x", (u_int)cs->bcs[0].hw.tiger.send,
 		(u_int)(cs->bcs[0].hw.tiger.send + NETJET_DMA_TXSIZE - 1));
-	outl(cs->bcs[0].hw.tiger.send_dma,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.send),
 		cs->hw.njet.base + NETJET_DMA_READ_START);
-	outl(cs->bcs[0].hw.tiger.send_dma + NETJET_DMA_TXSIZE/2 - 1,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.s_irq),
 		cs->hw.njet.base + NETJET_DMA_READ_IRQ);
-	outl(cs->bcs[0].hw.tiger.send_dma + NETJET_DMA_TXSIZE - 1,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.s_end),
 		cs->hw.njet.base + NETJET_DMA_READ_END);
-
-	cs->bcs[0].hw.tiger.rec = 
-		pci_alloc_consistent(cs->hw.njet.pdev,
-				     NETJET_DMA_RXSIZE * sizeof(unsigned int),
-				     &cs->bcs[0].hw.tiger.rec_dma);
-	if (!cs->bcs[0].hw.tiger.rec) {
+	if (!(cs->bcs[0].hw.tiger.rec = kmalloc(NETJET_DMA_RXSIZE * sizeof(unsigned int),
+		GFP_KERNEL | GFP_DMA))) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for tiger.rec\n");
 		return;
@@ -984,39 +984,36 @@ inittiger(struct IsdnCardState *cs)
 	debugl1(cs, "tiger: rec buf %x - %x", (u_int)cs->bcs[0].hw.tiger.rec,
 		(u_int)(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE - 1));
 	cs->bcs[1].hw.tiger.rec = cs->bcs[0].hw.tiger.rec;
-	cs->bcs[1].hw.tiger.rec_dma = cs->bcs[0].hw.tiger.rec_dma;
 	memset(cs->bcs[0].hw.tiger.rec, 0xff, NETJET_DMA_RXSIZE * sizeof(unsigned int));
-	outl(cs->bcs[0].hw.tiger.rec_dma,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec),
 		cs->hw.njet.base + NETJET_DMA_WRITE_START);
-	outl(cs->bcs[0].hw.tiger.rec_dma + NETJET_DMA_RXSIZE/2 - 1,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE/2 - 1),
 		cs->hw.njet.base + NETJET_DMA_WRITE_IRQ);
-	outl(cs->bcs[0].hw.tiger.rec_dma + NETJET_DMA_RXSIZE - 1,
+	outl(virt_to_bus(cs->bcs[0].hw.tiger.rec + NETJET_DMA_RXSIZE - 1),
 		cs->hw.njet.base + NETJET_DMA_WRITE_END);
 	debugl1(cs, "tiger: dmacfg  %x/%x  pulse=%d",
 		inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR),
 		inl(cs->hw.njet.base + NETJET_DMA_READ_ADR),
 		bytein(cs->hw.njet.base + NETJET_PULSE_CNT));
 	cs->hw.njet.last_is0 = 0;
+	cs->bcs[0].BC_SetStack = setstack_tiger;
+	cs->bcs[1].BC_SetStack = setstack_tiger;
+	cs->bcs[0].BC_Close = close_tigerstate;
+	cs->bcs[1].BC_Close = close_tigerstate;
 }
 
-static void
+void
 releasetiger(struct IsdnCardState *cs)
 {
 	if (cs->bcs[0].hw.tiger.send) {
-		pci_free_consistent(cs->hw.njet.pdev,
-				    NETJET_DMA_TXSIZE * sizeof(unsigned int),
-				    cs->bcs[0].hw.tiger.send,
-				    cs->bcs[0].hw.tiger.send_dma);
+		kfree(cs->bcs[0].hw.tiger.send);
 		cs->bcs[0].hw.tiger.send = NULL;
 	}
 	if (cs->bcs[1].hw.tiger.send) {
 		cs->bcs[1].hw.tiger.send = NULL;
 	}
 	if (cs->bcs[0].hw.tiger.rec) {
-		pci_free_consistent(cs->hw.njet.pdev,
-				    NETJET_DMA_RXSIZE * sizeof(unsigned int),
-				    cs->bcs[0].hw.tiger.rec,
-				    cs->bcs[0].hw.tiger.rec_dma);
+		kfree(cs->bcs[0].hw.tiger.rec);
 		cs->bcs[0].hw.tiger.rec = NULL;
 	}
 	if (cs->bcs[1].hw.tiger.rec) {
@@ -1025,11 +1022,11 @@ releasetiger(struct IsdnCardState *cs)
 }
 
 void
-netjet_release(struct IsdnCardState *cs)
+release_io_netjet(struct IsdnCardState *cs)
 {
 	byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	byteout(cs->hw.njet.base + NETJET_IRQMASK1, 0);
 	releasetiger(cs);
-	hisax_release_resources(cs);
+	release_region(cs->hw.njet.base, 256);
 }
 

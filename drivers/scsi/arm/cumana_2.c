@@ -422,8 +422,8 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto out_region;
 	}
 
-	host = scsi_register(&cumanascsi2_template,
-			     sizeof(struct cumanascsi2_info));
+	host = scsi_host_alloc(&cumanascsi2_template,
+			       sizeof(struct cumanascsi2_info));
 	if (!host) {
 		ret = -ENOMEM;
 		goto out_unmap;
@@ -498,7 +498,7 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 	fas216_release(host);
 
  out_free:
-	scsi_unregister(host);
+	scsi_host_put(host);
 
  out_unmap:
 	iounmap(base);
@@ -531,7 +531,7 @@ static void __devexit cumanascsi2_remove(struct expansion_card *ec)
 	release_mem_region(resbase, reslen);
 
 	fas216_release(host);
-	scsi_unregister(host);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id cumanascsi2_cids[] = {

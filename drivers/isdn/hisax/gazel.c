@@ -1,4 +1,4 @@
-/* $Id: gazel.c,v 2.11.6.7 2001/09/23 22:24:47 kai Exp $
+/* $Id: gazel.c,v 2.19.2.4 2004/01/14 16:04:48 keil Exp $
  *
  * low level stuff for Gazel isdn cards
  *
@@ -21,8 +21,7 @@
 #include <linux/pci.h>
 
 extern const char *CardType[];
-const char *gazel_revision = "$Revision: 2.11.6.7 $";
-static spinlock_t gazel_lock = SPIN_LOCK_UNLOCKED;
+const char *gazel_revision = "$Revision: 2.19.2.4 $";
 
 #define R647      1
 #define R685      2
@@ -44,492 +43,642 @@ static spinlock_t gazel_lock = SPIN_LOCK_UNLOCKED;
 #define byteout(addr,val) outb(val,addr)
 #define bytein(addr) inb(addr)
 
-static inline u8
+static inline u_char
 readreg(unsigned int adr, u_short off)
 {
 	return bytein(adr + off);
 }
 
 static inline void
-writereg(unsigned int adr, u_short off, u8 data)
+writereg(unsigned int adr, u_short off, u_char data)
 {
 	byteout(adr + off, data);
 }
 
 
 static inline void
-read_fifo(unsigned int adr, u8 * data, int size)
+read_fifo(unsigned int adr, u_char * data, int size)
 {
 	insb(adr, data, size);
 }
 
 static void
-write_fifo(unsigned int adr, u8 * data, int size)
+write_fifo(unsigned int adr, u_char * data, int size)
 {
 	outsb(adr, data, size);
 }
 
-static u8
-r685_isac_read(struct IsdnCardState *cs, u8 off)
+static inline u_char
+readreg_ipac(unsigned int adr, u_short off)
 {
-	return readreg(cs->hw.gazel.isac, off);
-}
+	register u_char ret;
 
-static u8
-r647_isac_read(struct IsdnCardState *cs, u8 off)
-{
-	return readreg(cs->hw.gazel.isac, (off << 8 & 0xf000) | (off & 0xf));
-}
-
-static void
-r685_isac_write(struct IsdnCardState *cs, u8 off, u8 value)
-{
-	writereg(cs->hw.gazel.isac, off, value);
-}
-
-static void
-r647_isac_write(struct IsdnCardState *cs, u8 off, u8 value)
-{
-	writereg(cs->hw.gazel.isac, (off << 8 & 0xf000) | (off & 0xf), value);
-}
-
-static void
-isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	read_fifo(cs->hw.gazel.isacfifo, data, size);
-}
-
-static void
-isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
-{
-	write_fifo(cs->hw.gazel.isacfifo, data, size);
-}
-
-static struct dc_hw_ops r685_isac_ops = {
-	.read_reg   = r685_isac_read,
-	.write_reg  = r685_isac_write,
-	.read_fifo  = isac_read_fifo,
-	.write_fifo = isac_write_fifo,
-};
-
-static struct dc_hw_ops r647_isac_ops = {
-	.read_reg   = r647_isac_read,
-	.write_reg  = r647_isac_write,
-	.read_fifo  = isac_read_fifo,
-	.write_fifo = isac_write_fifo,
-};
-  
-static u8
-r685_hscx_read(struct IsdnCardState *cs, int hscx, u8 off)
-{
-	return readreg(cs->hw.gazel.hscx[hscx], off);
-}
-
-static u8
-r647_hscx_read(struct IsdnCardState *cs, int hscx, u8 off)
-{
-	return readreg(cs->hw.gazel.hscx[hscx],
-		       (off << 8 & 0xf000) | (off & 0xf));
-}
-
-static void
-r685_hscx_write(struct IsdnCardState *cs, int hscx, u8 off, u8 value)
-{
-	writereg(cs->hw.gazel.hscx[hscx], off, value);
-}
-
-static void
-r647_hscx_write(struct IsdnCardState *cs, int hscx, u8 off, u8 value)
-{
-	writereg(cs->hw.gazel.hscx[hscx],
-		 (off << 8 & 0xf000) | (off & 0xf), value);
-}
-
-static void
-hscx_read_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
-{
-	read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-}
-
-static void
-hscx_write_fifo(struct IsdnCardState *cs, int hscx, u8 * data, int size)
-{
-	write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
-}
-
-static struct bc_hw_ops r685_hscx_ops = {
-	.read_reg   = r685_hscx_read,
-	.write_reg  = r685_hscx_write,
-	.read_fifo  = hscx_read_fifo,
-	.write_fifo = hscx_write_fifo,
-};
-
-static struct bc_hw_ops r647_hscx_ops = {
-	.read_reg   = r647_hscx_read,
-	.write_reg  = r647_hscx_write,
-	.read_fifo  = hscx_read_fifo,
-	.write_fifo = hscx_write_fifo,
-};
-
-static inline u8
-ipac_read(struct IsdnCardState *cs, u_short off)
-{
-	register u8 ret;
-	unsigned long flags;
-
-	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(cs->hw.gazel.ipac, off);
-	ret = bytein(cs->hw.gazel.ipac + 4);
-	spin_unlock_irqrestore(&gazel_lock, flags);
+	byteout(adr, off);
+	ret = bytein(adr + 4);
 	return ret;
 }
 
 static inline void
-ipac_write(struct IsdnCardState *cs, u_short off, u8 data)
+writereg_ipac(unsigned int adr, u_short off, u_char data)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&gazel_lock, flags);
-	byteout(cs->hw.gazel.ipac, off);
-	byteout(cs->hw.gazel.ipac + 4, data);
-	spin_unlock_irqrestore(&gazel_lock, flags);
+	byteout(adr, off);
+	byteout(adr + 4, data);
 }
 
 
 static inline void
-ipac_readfifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+read_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
 {
-	byteout(cs->hw.gazel.ipac, off);
-	insb(cs->hw.gazel.ipac + 4, data, size);
+	byteout(adr, off);
+	insb(adr + 4, data, size);
 }
 
-static inline void
-ipac_writefifo(struct IsdnCardState *cs, u8 off, u8 * data, int size)
+static void
+write_fifo_ipac(unsigned int adr, u_short off, u_char * data, int size)
 {
-	byteout(cs->hw.gazel.ipac, off);
-	outsb(cs->hw.gazel.ipac + 4, data, size);
+	byteout(adr, off);
+	outsb(adr + 4, data, size);
 }
 
-/* This will generate ipac_dc_ops and ipac_bc_ops using the functions
- * above */
+/* Interface functions */
 
-BUILD_IPAC_OPS(ipac);
-
-static int
-r647_reset(struct IsdnCardState *cs)
+static u_char
+ReadISAC(struct IsdnCardState *cs, u_char offset)
 {
-	writereg(cs->hw.gazel.cfg_reg, 0, 0);
-	HZDELAY(10);
-	writereg(cs->hw.gazel.cfg_reg, 0, 1);
-	HZDELAY(2);
-	return 0;
-}
+	u_short off2 = offset;
 
-static int
-r685_reset(struct IsdnCardState *cs)
-{
-	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
-
-	plxcntrl = inl(addr + PLX_CNTRL);
-	plxcntrl |= (RESET_9050 + RESET_GAZEL);
-	outl(plxcntrl, addr + PLX_CNTRL);
-	plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
-	HZDELAY(4);
-	outl(plxcntrl, addr + PLX_CNTRL);
-	HZDELAY(10);
-	outb(INT_ISAC_EN + INT_HSCX_EN + INT_PCI_EN, addr + PLX_INCSR);
-	return 0;
-}
-
-static int
-r753_reset(struct IsdnCardState *cs)
-{
-	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
-
-	if (test_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags))
-		/* we can't read, assume the default */
-		plxcntrl = 0x18784db6;
-	else
-		plxcntrl = inl(addr + PLX_CNTRL);
-	plxcntrl |= (RESET_9050 + RESET_GAZEL);
-	outl(plxcntrl, addr + PLX_CNTRL);
-	ipac_write(cs, IPAC_POTA2, 0x20);
-	HZDELAY(4);
-	plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
-	outl(plxcntrl, addr + PLX_CNTRL);
-	HZDELAY(10);
-	ipac_write(cs, IPAC_POTA2, 0x00);
-	ipac_write(cs, IPAC_ACFG, 0xff);
-	ipac_write(cs, IPAC_AOE, 0x0);
-	ipac_write(cs, IPAC_MASK, 0xff);
-	ipac_write(cs, IPAC_CONF, 0x1);
-	outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
-	ipac_write(cs, IPAC_MASK, 0xc0);
-	return 0;
-}
-
-static int
-r742_reset(struct IsdnCardState *cs)
-{
-	ipac_write(cs, IPAC_POTA2, 0x20);
-	HZDELAY(4);
-	ipac_write(cs, IPAC_POTA2, 0x00);
-	ipac_write(cs, IPAC_ACFG, 0xff);
-	ipac_write(cs, IPAC_AOE, 0x0);
-	ipac_write(cs, IPAC_MASK, 0xff);
-	ipac_write(cs, IPAC_CONF, 0x1);
-	ipac_write(cs, IPAC_MASK, 0xc0);
+	switch (cs->subtyp) {
+		case R647:
+			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
+		case R685:
+			return (readreg(cs->hw.gazel.isac, off2));
+		case R753:
+		case R742:
+			return (readreg_ipac(cs->hw.gazel.ipac, 0x80 + off2));
+	}
 	return 0;
 }
 
 static void
-gazel_init(struct IsdnCardState *cs)
+WriteISAC(struct IsdnCardState *cs, u_char offset, u_char value)
 {
-	int i;
+	u_short off2 = offset;
 
-	for (i = 0; i < 2; i++) {
-		cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
-		cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
+	switch (cs->subtyp) {
+		case R647:
+			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
+		case R685:
+			writereg(cs->hw.gazel.isac, off2, value);
+			break;
+		case R753:
+		case R742:
+			writereg_ipac(cs->hw.gazel.ipac, 0x80 + off2, value);
+			break;
 	}
-	inithscxisac(cs);
 }
 
-static struct card_ops r647_ops = {
-	.init     = gazel_init,
-	.reset    = r647_reset,
-	.release  = hisax_release_resources,
-	.irq_func = hscxisac_irq,
-};
+static void
+ReadISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			read_fifo(cs->hw.gazel.isacfifo, data, size);
+			break;
+		case R753:
+		case R742:
+			read_fifo_ipac(cs->hw.gazel.ipac, 0x80, data, size);
+			break;
+	}
+}
 
-static struct card_ops r685_ops = {
-	.init     = gazel_init,
-	.reset    = r685_reset,
-	.release  = hisax_release_resources,
-	.irq_func = hscxisac_irq,
-};
+static void
+WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			write_fifo(cs->hw.gazel.isacfifo, data, size);
+			break;
+		case R753:
+		case R742:
+			write_fifo_ipac(cs->hw.gazel.ipac, 0x80, data, size);
+			break;
+	}
+}
 
-static struct card_ops r742_ops = {
-	.init     = ipac_init,
-	.reset    = r742_reset,
-	.release  = hisax_release_resources,
-	.irq_func = ipac_irq,
-};
+static void
+ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			read_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			read_fifo_ipac(cs->hw.gazel.ipac, hscx * 0x40, data, size);
+			break;
+	}
+}
 
-static struct card_ops r753_ops = {
-	.init     = ipac_init,
-	.reset    = r753_reset,
-	.release  = hisax_release_resources,
-	.irq_func = ipac_irq,
-};
+static void
+WriteHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
+{
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			write_fifo(cs->hw.gazel.hscxfifo[hscx], data, size);
+			break;
+		case R753:
+		case R742:
+			write_fifo_ipac(cs->hw.gazel.ipac, hscx * 0x40, data, size);
+			break;
+	}
+}
+
+static u_char
+ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
+{
+	u_short off2 = offset;
+
+	switch (cs->subtyp) {
+		case R647:
+			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
+		case R685:
+			return (readreg(cs->hw.gazel.hscx[hscx], off2));
+		case R753:
+		case R742:
+			return (readreg_ipac(cs->hw.gazel.ipac, hscx * 0x40 + off2));
+	}
+	return 0;
+}
+
+static void
+WriteHSCX(struct IsdnCardState *cs, int hscx, u_char offset, u_char value)
+{
+	u_short off2 = offset;
+
+	switch (cs->subtyp) {
+		case R647:
+			off2 = ((off2 << 8 & 0xf000) | (off2 & 0xf));
+		case R685:
+			writereg(cs->hw.gazel.hscx[hscx], off2, value);
+			break;
+		case R753:
+		case R742:
+			writereg_ipac(cs->hw.gazel.ipac, hscx * 0x40 + off2, value);
+			break;
+	}
+}
+
+/*
+ * fast interrupt HSCX stuff goes here
+ */
+
+#define READHSCX(cs, nr, reg) ReadHSCX(cs, nr, reg)
+#define WRITEHSCX(cs, nr, reg, data) WriteHSCX(cs, nr, reg, data)
+#define READHSCXFIFO(cs, nr, ptr, cnt) ReadHSCXfifo(cs, nr, ptr, cnt)
+#define WRITEHSCXFIFO(cs, nr, ptr, cnt) WriteHSCXfifo(cs, nr, ptr, cnt)
+
+#include "hscx_irq.c"
+
+static irqreturn_t
+gazel_interrupt(int intno, void *dev_id, struct pt_regs *regs)
+{
+#define MAXCOUNT 5
+	struct IsdnCardState *cs = dev_id;
+	u_char valisac, valhscx;
+	int count = 0;
+	u_long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	do {
+		valhscx = ReadHSCX(cs, 1, HSCX_ISTA);
+		if (valhscx)
+			hscx_int_main(cs, valhscx);
+		valisac = ReadISAC(cs, ISAC_ISTA);
+		if (valisac)
+			isac_interrupt(cs, valisac);
+		count++;
+	} while ((valhscx || valisac) && (count < MAXCOUNT));
+
+	WriteHSCX(cs, 0, HSCX_MASK, 0xFF);
+	WriteHSCX(cs, 1, HSCX_MASK, 0xFF);
+	WriteISAC(cs, ISAC_MASK, 0xFF);
+	WriteISAC(cs, ISAC_MASK, 0x0);
+	WriteHSCX(cs, 0, HSCX_MASK, 0x0);
+	WriteHSCX(cs, 1, HSCX_MASK, 0x0);
+	spin_unlock_irqrestore(&cs->lock, flags);
+	return IRQ_HANDLED;
+}
+
+
+static irqreturn_t
+gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
+{
+	struct IsdnCardState *cs = dev_id;
+	u_char ista, val;
+	int count = 0;
+	u_long flags;
+	
+	spin_lock_irqsave(&cs->lock, flags);
+	ista = ReadISAC(cs, IPAC_ISTA - 0x80);
+	do {
+		if (ista & 0x0f) {
+			val = ReadHSCX(cs, 1, HSCX_ISTA);
+			if (ista & 0x01)
+				val |= 0x01;
+			if (ista & 0x04)
+				val |= 0x02;
+			if (ista & 0x08)
+				val |= 0x04;
+			if (val) {
+				hscx_int_main(cs, val);
+			}
+		}
+		if (ista & 0x20) {
+			val = 0xfe & ReadISAC(cs, ISAC_ISTA);
+			if (val) {
+				isac_interrupt(cs, val);
+			}
+		}
+		if (ista & 0x10) {
+			val = 0x01;
+			isac_interrupt(cs, val);
+		}
+		ista = ReadISAC(cs, IPAC_ISTA - 0x80);
+		count++;
+	}
+	while ((ista & 0x3f) && (count < MAXCOUNT));
+
+	WriteISAC(cs, IPAC_MASK - 0x80, 0xFF);
+	WriteISAC(cs, IPAC_MASK - 0x80, 0xC0);
+	spin_unlock_irqrestore(&cs->lock, flags);
+	return IRQ_HANDLED;
+}
+void
+release_io_gazel(struct IsdnCardState *cs)
+{
+	unsigned int i;
+
+	switch (cs->subtyp) {
+		case R647:
+			for (i = 0x0000; i < 0xC000; i += 0x1000)
+				release_region(i + cs->hw.gazel.hscx[0], 16);
+			release_region(0xC000 + cs->hw.gazel.hscx[0], 1);
+			break;
+
+		case R685:
+			release_region(cs->hw.gazel.hscx[0], 0x100);
+			release_region(cs->hw.gazel.cfg_reg, 0x80);
+			break;
+
+		case R753:
+			release_region(cs->hw.gazel.ipac, 0x8);
+			release_region(cs->hw.gazel.cfg_reg, 0x80);
+			break;
+
+		case R742:
+			release_region(cs->hw.gazel.ipac, 8);
+			break;
+	}
+}
+
+static int
+reset_gazel(struct IsdnCardState *cs)
+{
+	unsigned long plxcntrl, addr = cs->hw.gazel.cfg_reg;
+
+	switch (cs->subtyp) {
+		case R647:
+			writereg(addr, 0, 0);
+			HZDELAY(10);
+			writereg(addr, 0, 1);
+			HZDELAY(2);
+			break;
+		case R685:
+			plxcntrl = inl(addr + PLX_CNTRL);
+			plxcntrl |= (RESET_9050 + RESET_GAZEL);
+			outl(plxcntrl, addr + PLX_CNTRL);
+			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
+			HZDELAY(4);
+			outl(plxcntrl, addr + PLX_CNTRL);
+			HZDELAY(10);
+			outb(INT_ISAC_EN + INT_HSCX_EN + INT_PCI_EN, addr + PLX_INCSR);
+			break;
+		case R753:
+			plxcntrl = inl(addr + PLX_CNTRL);
+			plxcntrl |= (RESET_9050 + RESET_GAZEL);
+			outl(plxcntrl, addr + PLX_CNTRL);
+			plxcntrl &= ~(RESET_9050 + RESET_GAZEL);
+			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x20);
+			HZDELAY(4);
+			outl(plxcntrl, addr + PLX_CNTRL);
+			HZDELAY(10);
+			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x00);
+			WriteISAC(cs, IPAC_ACFG - 0x80, 0xff);
+			WriteISAC(cs, IPAC_AOE - 0x80, 0x0);
+			WriteISAC(cs, IPAC_MASK - 0x80, 0xff);
+			WriteISAC(cs, IPAC_CONF - 0x80, 0x1);
+			outb(INT_IPAC_EN + INT_PCI_EN, addr + PLX_INCSR);
+			WriteISAC(cs, IPAC_MASK - 0x80, 0xc0);
+			break;
+		case R742:
+			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x20);
+			HZDELAY(4);
+			WriteISAC(cs, IPAC_POTA2 - 0x80, 0x00);
+			WriteISAC(cs, IPAC_ACFG - 0x80, 0xff);
+			WriteISAC(cs, IPAC_AOE - 0x80, 0x0);
+			WriteISAC(cs, IPAC_MASK - 0x80, 0xff);
+			WriteISAC(cs, IPAC_CONF - 0x80, 0x1);
+			WriteISAC(cs, IPAC_MASK - 0x80, 0xc0);
+			break;
+	}
+	return (0);
+}
+
+static int
+Gazel_card_msg(struct IsdnCardState *cs, int mt, void *arg)
+{
+	u_long flags;
+
+	switch (mt) {
+		case CARD_RESET:
+			spin_lock_irqsave(&cs->lock, flags);
+			reset_gazel(cs);
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return (0);
+		case CARD_RELEASE:
+			release_io_gazel(cs);
+			return (0);
+		case CARD_INIT:
+			spin_lock_irqsave(&cs->lock, flags);
+			inithscxisac(cs, 1);
+			if ((cs->subtyp==R647)||(cs->subtyp==R685)) {
+				int i;
+				for (i=0;i<(2+MAX_WAITING_CALLS);i++) {
+					cs->bcs[i].hw.hscx.tsaxr0 = 0x1f;
+					cs->bcs[i].hw.hscx.tsaxr1 = 0x23;
+				}
+			}
+			spin_unlock_irqrestore(&cs->lock, flags);
+			return (0);
+		case CARD_TEST:
+			return (0);
+	}
+	return (0);
+}
+
+static int
+reserve_regions(struct IsdnCard *card, struct IsdnCardState *cs)
+{
+	unsigned int i, j, base = 0, adr = 0, len = 0;
+
+	switch (cs->subtyp) {
+		case R647:
+			base = cs->hw.gazel.hscx[0];
+			if (!request_region(adr = (0xC000 + base), len = 1, "gazel"))
+				goto error;
+			for (i = 0x0000; i < 0xC000; i += 0x1000) {
+				if (!request_region(adr = (i + base), len = 16, "gazel"))
+					goto error;
+			}
+			if (i != 0xC000) {
+				for (j = 0; j < i; j+= 0x1000)
+					release_region(j + base, 16);
+				release_region(0xC000 + base, 1);
+				goto error;
+			}
+			break;
+
+		case R685:
+			if (!request_region(adr = cs->hw.gazel.hscx[0], len = 0x100, "gazel"))
+				goto error;
+			if (!request_region(adr = cs->hw.gazel.cfg_reg, len = 0x80, "gazel")) {
+				release_region(cs->hw.gazel.hscx[0],0x100);
+				goto error;
+			}
+			break;
+
+		case R753:
+			if (!request_region(adr = cs->hw.gazel.ipac, len = 0x8, "gazel"))
+				goto error;
+			if (!request_region(adr = cs->hw.gazel.cfg_reg, len = 0x80, "gazel")) {
+				release_region(cs->hw.gazel.ipac, 8);
+				goto error;
+			}
+			break;
+
+		case R742:
+			if (!request_region(adr = cs->hw.gazel.ipac, len = 0x8, "gazel"))
+				goto error;
+			break;
+	}
+
+	return 0;
+
+      error:
+	printk(KERN_WARNING "Gazel: %s io ports 0x%x-0x%x already in use\n",
+	       CardType[cs->typ], adr, adr + len);
+	return 1;
+}
 
 static int __init
-gazel647_probe(struct IsdnCardState *cs, struct IsdnCard *card)
+setup_gazelisa(struct IsdnCard *card, struct IsdnCardState *cs)
 {
-	int i, base;
+	printk(KERN_INFO "Gazel: ISA PnP card automatic recognition\n");
+	// we got an irq parameter, assume it is an ISA card
+	// R742 decodes address even in not started...
+	// R647 returns FF if not present or not started
+	// eventually needs improvment
+	if (readreg_ipac(card->para[1], IPAC_ID) == 1)
+		cs->subtyp = R742;
+	else
+		cs->subtyp = R647;
 
-	cs->subtyp = R647;
-	cs->irq = card->para[0];
+	setup_isac(cs);
 	cs->hw.gazel.cfg_reg = card->para[1] + 0xC000;
-
-	printk(KERN_INFO "Gazel: Card ISA R647/R648 found\n");
-	cs->dc.isac.adf2 = 0x87;
-	printk(KERN_INFO "Gazel: config irq:%d isac:0x%X  cfg:0x%X\n",
-	       cs->irq, cs->hw.gazel.isac, cs->hw.gazel.cfg_reg);
-	printk(KERN_INFO
-	       "Gazel: hscx A:0x%X  hscx B:0x%X\n",
-	       cs->hw.gazel.hscx[0], cs->hw.gazel.hscx[1]);
-
+	cs->hw.gazel.ipac = card->para[1];
 	cs->hw.gazel.isac = card->para[1] + 0x8000;
 	cs->hw.gazel.hscx[0] = card->para[1];
 	cs->hw.gazel.hscx[1] = card->para[1] + 0x4000;
+	cs->irq = card->para[0];
 	cs->hw.gazel.isacfifo = cs->hw.gazel.isac;
 	cs->hw.gazel.hscxfifo[0] = cs->hw.gazel.hscx[0];
 	cs->hw.gazel.hscxfifo[1] = cs->hw.gazel.hscx[1];
 
-	base = cs->hw.gazel.hscx[0];
-	for (i = 0; i < 0xc000; i += 0x1000) {
-		if (!request_io(&cs->rs, base + i, 16, "gazel"))
-			goto err;
+	switch (cs->subtyp) {
+		case R647:
+			printk(KERN_INFO "Gazel: Card ISA R647/R648 found\n");
+			cs->dc.isac.adf2 = 0x87;
+			printk(KERN_INFO
+				"Gazel: config irq:%d isac:0x%X  cfg:0x%X\n",
+				cs->irq, cs->hw.gazel.isac, cs->hw.gazel.cfg_reg);
+			printk(KERN_INFO
+				"Gazel: hscx A:0x%X  hscx B:0x%X\n",
+				cs->hw.gazel.hscx[0], cs->hw.gazel.hscx[1]);
+
+			break;
+		case R742:
+			printk(KERN_INFO "Gazel: Card ISA R742 found\n");
+			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
+			printk(KERN_INFO
+			       "Gazel: config irq:%d ipac:0x%X\n",
+			       cs->irq, cs->hw.gazel.ipac);
+			break;
 	}
-	if (!request_io(&cs->rs, 0xc000 + base, 1, "gazel"))
-		goto err;
 
-	cs->card_ops = &r647_ops;
-	if (hscxisac_setup(cs, &r647_isac_ops, &r647_hscx_ops))
-		goto err;
-
-	cs->card_ops->reset(cs);
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
-}
-
-static int __init
-gazel742_probe(struct IsdnCardState *cs, struct IsdnCard *card)
-{
-	cs->subtyp = R742;
-	cs->irq = card->para[0];
-	cs->hw.gazel.cfg_reg = card->para[1] + 0xC000;
-
-	printk(KERN_INFO "Gazel: Card ISA R742 found\n");
-	printk(KERN_INFO "Gazel: config irq:%d ipac:0x%X\n",
-	       cs->irq, cs->hw.gazel.ipac);
-
-	if (!request_io(&cs->rs, cs->hw.gazel.ipac, 0x8, "gazel"))
-		goto err;
-
-	cs->card_ops = &r742_ops;
-	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-		goto err;
-
-	cs->card_ops->reset(cs);
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
-}
-
-static int __init
-gazel685_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
-{
-	if (pci_enable_device(pdev))
-		goto err;
-			
-	cs->subtyp               = R685;
-	cs->irq                  = pdev->irq;
-	cs->irq_flags           |= SA_SHIRQ;
-	cs->hw.gazel.cfg_reg     = pci_resource_start(pdev, 1);
-	cs->hw.gazel.isac        = pci_resource_start(pdev, 2) + 0x80;
-	cs->hw.gazel.hscx[0]     = pci_resource_start(pdev, 2);
-	cs->hw.gazel.hscx[1]     = pci_resource_start(pdev, 2) + 0x40;
-	cs->hw.gazel.isacfifo    = cs->hw.gazel.isac;
-	cs->hw.gazel.hscxfifo[0] = cs->hw.gazel.hscx[0];
-	cs->hw.gazel.hscxfifo[1] = cs->hw.gazel.hscx[1];
-	cs->dc.isac.adf2 = 0x87;
-
-	if (!request_io(&cs->rs, cs->hw.gazel.hscx[0], 0x100, "gazel"))
-		goto err;
-	if (!request_io(&cs->rs, cs->hw.gazel.cfg_reg, 0x80, "gazel"))
-		goto err;
-
-	printk(KERN_INFO "Gazel: Card PCI R685 found\n");
-	printk(KERN_INFO "Gazel: config irq:%d isac:0x%X  cfg:0x%X\n",
-	       cs->irq, cs->hw.gazel.isac, cs->hw.gazel.cfg_reg);
-	printk(KERN_INFO "Gazel: hscx A:0x%X  hscx B:0x%X\n",
-	       cs->hw.gazel.hscx[0], cs->hw.gazel.hscx[1]);
-
-	cs->card_ops  = &r685_ops;
-	if (hscxisac_setup(cs, &r685_isac_ops, &r685_hscx_ops))
-		goto err;
-
-	cs->card_ops->reset(cs);
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
-}
-
-static int __init
-gazel753_probe(struct IsdnCardState *cs, struct pci_dev *pdev)
-{
-	u8 pci_rev;
-
-	if (pci_enable_device(pdev))
-		goto err;
-			
-	cs->subtyp           = R753;
-	cs->irq              = pdev->irq;
-	cs->irq_flags       |= SA_SHIRQ;
-	cs->hw.gazel.cfg_reg = pci_resource_start(pdev, 1);
-	cs->hw.gazel.ipac    = pci_resource_start(pdev, 2);
-
-	if (!request_io(&cs->rs, cs->hw.gazel.ipac, 0x8, "gazel"))
-		goto err;
-	if (!request_io(&cs->rs, cs->hw.gazel.cfg_reg, 0x80, "gazel"))
-		goto err;
-
-	printk(KERN_INFO "Gazel: Card PCI R753 found\n");
-	printk(KERN_INFO "Gazel: config irq:%d ipac:0x%X  cfg:0x%X\n",
-	       cs->irq, cs->hw.gazel.ipac, cs->hw.gazel.cfg_reg);
-	/* 
-	 * Erratum for PLX9050, revision 1:
-	 * If bit 7 of BAR 0/1 is set, local config registers
-	 * can not be read (write is okay)
-	 */
-	if (cs->hw.gazel.cfg_reg & 0x80) {
-		pci_read_config_byte(pdev, PCI_REVISION_ID, &pci_rev);
-		if (pci_rev == 1) {
-			printk(KERN_INFO "Gazel: PLX9050 rev1 workaround "
-			       "activated\n");
-			__set_bit(FLG_BUGGY_PLX9050, &cs->HW_Flags);
-		}
-	}
-	cs->card_ops = &r753_ops;
-	if (ipac_setup(cs, &ipac_dc_ops, &ipac_bc_ops))
-		goto err;
-
-	cs->card_ops->reset(cs);
-	return 0;
- err:
-	hisax_release_resources(cs);
-	return -EBUSY;
+	return (0);
 }
 
 static struct pci_dev *dev_tel __initdata = NULL;
-static u16 __initdata dev_id = PCI_DEVICE_ID_PLX_R685;
+
+static int __init
+setup_gazelpci(struct IsdnCardState *cs)
+{
+	u_int pci_ioaddr0 = 0, pci_ioaddr1 = 0;
+	u_char pci_irq = 0, found;
+	u_int nbseek, seekcard;
+
+	printk(KERN_WARNING "Gazel: PCI card automatic recognition\n");
+
+	found = 0;
+	seekcard = PCI_DEVICE_ID_PLX_R685;
+	for (nbseek = 0; nbseek < 3; nbseek++) {
+		if ((dev_tel = pci_find_device(PCI_VENDOR_ID_PLX, seekcard, dev_tel))) {
+			if (pci_enable_device(dev_tel))
+				return 1;
+			pci_irq = dev_tel->irq;
+			pci_ioaddr0 = pci_resource_start(dev_tel, 1);
+			pci_ioaddr1 = pci_resource_start(dev_tel, 2);
+			found = 1;
+		}
+		if (found)
+			break;
+		else {
+			switch (seekcard) {
+				case PCI_DEVICE_ID_PLX_R685:
+					seekcard = PCI_DEVICE_ID_PLX_R753;
+					break;
+				case PCI_DEVICE_ID_PLX_R753:
+					seekcard = PCI_DEVICE_ID_PLX_DJINN_ITOO;
+					break;
+			}
+		}
+	}
+	if (!found) {
+		printk(KERN_WARNING "Gazel: No PCI card found\n");
+		return (1);
+	}
+	if (!pci_irq) {
+		printk(KERN_WARNING "Gazel: No IRQ for PCI card found\n");
+		return 1;
+	}
+	cs->hw.gazel.pciaddr[0] = pci_ioaddr0;
+	cs->hw.gazel.pciaddr[1] = pci_ioaddr1;
+	setup_isac(cs);
+	pci_ioaddr1 &= 0xfffe;
+	cs->hw.gazel.cfg_reg = pci_ioaddr0 & 0xfffe;
+	cs->hw.gazel.ipac = pci_ioaddr1;
+	cs->hw.gazel.isac = pci_ioaddr1 + 0x80;
+	cs->hw.gazel.hscx[0] = pci_ioaddr1;
+	cs->hw.gazel.hscx[1] = pci_ioaddr1 + 0x40;
+	cs->hw.gazel.isacfifo = cs->hw.gazel.isac;
+	cs->hw.gazel.hscxfifo[0] = cs->hw.gazel.hscx[0];
+	cs->hw.gazel.hscxfifo[1] = cs->hw.gazel.hscx[1];
+	cs->irq = pci_irq;
+	cs->irq_flags |= SA_SHIRQ;
+
+	switch (seekcard) {
+		case PCI_DEVICE_ID_PLX_R685:
+			printk(KERN_INFO "Gazel: Card PCI R685 found\n");
+			cs->subtyp = R685;
+			cs->dc.isac.adf2 = 0x87;
+			printk(KERN_INFO
+			    "Gazel: config irq:%d isac:0x%X  cfg:0x%X\n",
+			cs->irq, cs->hw.gazel.isac, cs->hw.gazel.cfg_reg);
+			printk(KERN_INFO
+			       "Gazel: hscx A:0x%X  hscx B:0x%X\n",
+			     cs->hw.gazel.hscx[0], cs->hw.gazel.hscx[1]);
+			break;
+		case PCI_DEVICE_ID_PLX_R753:
+		case PCI_DEVICE_ID_PLX_DJINN_ITOO:
+			printk(KERN_INFO "Gazel: Card PCI R753 found\n");
+			cs->subtyp = R753;
+			test_and_set_bit(HW_IPAC, &cs->HW_Flags);
+			printk(KERN_INFO
+			    "Gazel: config irq:%d ipac:0x%X  cfg:0x%X\n",
+			cs->irq, cs->hw.gazel.ipac, cs->hw.gazel.cfg_reg);
+			break;
+	}
+
+	return (0);
+}
 
 int __init
 setup_gazel(struct IsdnCard *card)
 {
+	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
+	u_char val;
 
 	strcpy(tmp, gazel_revision);
 	printk(KERN_INFO "Gazel: Driver Revision %s\n", HiSax_getrev(tmp));
 
+	if (cs->typ != ISDN_CTYPE_GAZEL)
+		return (0);
+
 	if (card->para[0]) {
-		printk(KERN_INFO "Gazel: ISA card automatic recognition\n");
-		// we got an irq parameter, assume it is an ISA card
-		// R742 decodes address even in not started...
-		// R647 returns FF if not present or not started
-		// eventually needs improvment
-		card->cs->hw.gazel.ipac = card->para[1];
-		if (ipac_read(card->cs, IPAC_ID) == 1) {
-			if (gazel742_probe(card->cs, card))
-				return 0;
-		} else {
-			if (gazel647_probe(card->cs, card))
-				return 0;
-		}
-		return 1;
+		if (setup_gazelisa(card, cs))
+			return (0);
+	} else {
+
+#if CONFIG_PCI
+		if (setup_gazelpci(cs))
+			return (0);
+#else
+		printk(KERN_WARNING "Gazel: Card PCI requested and NO_PCI_BIOS, unable to config\n");
+		return (0);
+#endif				/* CONFIG_PCI */
 	}
 
-	for (;;) {
-		dev_tel = pci_find_device(PCI_VENDOR_ID_PLX, dev_id, dev_tel);
-		if (dev_tel) {
-			switch (dev_id) {
-			case PCI_DEVICE_ID_PLX_R685:
-				if (gazel685_probe(card->cs, dev_tel))
-					return 0;
-				return 1;
-			case PCI_DEVICE_ID_PLX_R753:
-			case PCI_DEVICE_ID_PLX_DJINN_ITOO:
-				if (gazel753_probe(card->cs, dev_tel))
-					return 0;
-				return 1;
+	if (reserve_regions(card, cs)) {
+		return (0);
+	}
+	if (reset_gazel(cs)) {
+		printk(KERN_WARNING "Gazel: wrong IRQ\n");
+		release_io_gazel(cs);
+		return (0);
+	}
+	cs->readisac = &ReadISAC;
+	cs->writeisac = &WriteISAC;
+	cs->readisacfifo = &ReadISACfifo;
+	cs->writeisacfifo = &WriteISACfifo;
+	cs->BC_Read_Reg = &ReadHSCX;
+	cs->BC_Write_Reg = &WriteHSCX;
+	cs->BC_Send_Data = &hscx_fill_fifo;
+	cs->cardmsg = &Gazel_card_msg;
+
+	switch (cs->subtyp) {
+		case R647:
+		case R685:
+			cs->irq_func = &gazel_interrupt;
+			ISACVersion(cs, "Gazel:");
+			if (HscxVersion(cs, "Gazel:")) {
+				printk(KERN_WARNING
+				       "Gazel: wrong HSCX versions check IO address\n");
+				release_io_gazel(cs);
+				return (0);
 			}
-		}
-		switch (dev_id) {
-		case PCI_DEVICE_ID_PLX_R685:
-			dev_id = PCI_DEVICE_ID_PLX_R753;
-		case PCI_DEVICE_ID_PLX_R753:
-			dev_id = PCI_DEVICE_ID_PLX_DJINN_ITOO;
-		default:
 			break;
-		}
+		case R742:
+		case R753:
+			cs->irq_func = &gazel_interrupt_ipac;
+			val = ReadISAC(cs, IPAC_ID - 0x80);
+			printk(KERN_INFO "Gazel: IPAC version %x\n", val);
+			break;
 	}
-	printk(KERN_WARNING "Gazel: No PCI card found\n");
-	return 0;
+
+	return (1);
 }
-
-

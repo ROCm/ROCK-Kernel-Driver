@@ -392,15 +392,15 @@ videocodec_build_table (void)
 	videocodec_buf = (char *) kmalloc(size, GFP_KERNEL);
 
 	i = 0;
-	i += snprintf(videocodec_buf + i, size - 1,
+	i += scnprintf(videocodec_buf + i, size - 1,
 		      "<S>lave or attached <M>aster name  type flags    magic    ");
-	i += snprintf(videocodec_buf + i, size - 1, "(connected as)\n");
+	i += scnprintf(videocodec_buf + i, size -i - 1, "(connected as)\n");
 
 	h = codeclist_top;
 	while (h) {
 		if (i > (size - LINESIZE))
 			break;	// security check
-		i += snprintf(videocodec_buf + i, size,
+		i += scnprintf(videocodec_buf + i, size -i -1,
 			      "S %32s %04x %08lx %08lx (TEMPLATE)\n",
 			      h->codec->name, h->codec->type,
 			      h->codec->flags, h->codec->magic);
@@ -408,7 +408,7 @@ videocodec_build_table (void)
 		while (a) {
 			if (i > (size - LINESIZE))
 				break;	// security check
-			i += snprintf(videocodec_buf + i, size,
+			i += scnprintf(videocodec_buf + i, size -i -1,
 				      "M %32s %04x %08lx %08lx (%s)\n",
 				      a->codec->master_data->name,
 				      a->codec->master_data->type,

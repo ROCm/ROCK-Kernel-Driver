@@ -237,7 +237,7 @@ running once the system is up.
 			Forces specified timesource (if avaliable) to be used
 			when calculating gettimeofday(). If specicified timesource
 			is not avalible, it defaults to PIT. 
-			Format: { pit | tsc | cyclone | ... }
+			Format: { pit | tsc | cyclone | pmtmr }
 
 	hpet=		[IA-32,HPET] option to disable HPET and use PIT.
 			Format: disable
@@ -292,6 +292,9 @@ running once the system is up.
 
 	devfs=		[DEVFS]
 			See Documentation/filesystems/devfs/boot-options.
+
+	dhash_entries=	[KNL]
+			Set number of hash buckets for dentry cache.
  
 	digi=		[HW,SERIAL]
 			IO parameters + enable/disable command.
@@ -309,6 +312,23 @@ running once the system is up.
 	dscc4.setup=	[NET]
 
 	dtc3181e=	[HW,SCSI]
+
+	earlyprintk=	[x86, x86_64]
+			early_printk=vga
+			early_printk=serial[,ttySn[,baudrate]]
+
+			Append ,keep to not disable it when the real console
+			takes over.
+
+			Only vga or serial at a time, not both.
+
+			Currently only ttyS0 and ttyS1 are supported.
+
+			Interaction with the standard serial driver is not
+			very good.
+
+			The VGA output is eventually overwritten by the real
+			console.
 
 	eata=		[HW,SCSI]
 
@@ -424,6 +444,9 @@ running once the system is up.
 	idle=		[HW]
 			Format: idle=poll or idle=halt
  
+	ihash_entries=	[KNL]
+			Set number of hash buckets for inode cache.
+
 	in2000=		[HW,SCSI]
 			See header of drivers/scsi/in2000.c.
 
@@ -873,6 +896,9 @@ running once the system is up.
 
 	resume=		[SWSUSP] Specify the partition device for software suspension
 
+	rhash_entries=	[KNL,NET]
+			Set number of hash buckets for route cache
+
 	riscom8=	[HW,SERIAL]
 			Format: <io_board1>[,<io_board2>[,...<io_boardN>]]
 
@@ -1134,6 +1160,9 @@ running once the system is up.
 	tgfx=		[HW,JOY] TurboGraFX parallel port interface
 	tgfx_2=		See Documentation/input/joystick-parport.txt.
 	tgfx_3=
+
+	thash_entries=	[KNL,NET]
+			Set number of hash buckets for TCP connection
 
 	tipar=		[HW]
 			See header of drivers/char/tipar.c.

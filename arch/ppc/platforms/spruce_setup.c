@@ -28,6 +28,9 @@
 #include <linux/seq_file.h>
 #include <linux/ide.h>
 #include <linux/root_dev.h>
+#include <linux/serial.h>
+#include <linux/tty.h>
+#include <linux/serial_core.h>
 
 #include <asm/system.h>
 #include <asm/pgtable.h>
@@ -39,6 +42,7 @@
 #include <platforms/spruce.h>
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
+#include <asm/kgdb.h>
 
 #include <syslib/cpc700.h>
 
@@ -103,6 +107,48 @@ spruce_show_cpuinfo(struct seq_file *m)
 	return 0;
 }
 
+static void __init
+spruce_early_serial_map(void)
+{
+	u32 uart_clk;
+	struct uart_port serial_req;
+
+	if (SPRUCE_UARTCLK_IS_33M(readb(SPRUCE_FPGA_REG_A)))
+		uart_clk = SPRUCE_BAUD_33M * 16;
+	else
+		uart_clk = SPRUCE_BAUD_30M * 16;
+
+	/* Setup serial port access */
+	memset(&serial_req, 0, sizeof(serial_req));
+	serial_req.uartclk = uart_clk;
+	serial_req.irq = UART0_INT;
+	serial_req.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
+	serial_req.iotype = SERIAL_IO_MEM;
+	serial_req.membase = (u_char *)UART0_IO_BASE;
+	serial_req.regshift = 0;
+
+#if defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG)
+	gen550_init(0, &serial_req);
+#endif
+#ifdef CONFIG_SERIAL_8250
+	if (early_serial_setup(&serial_req) != 0)
+		printk("Early serial init of port 0 failed\n");
+#endif
+
+	/* Assume early_serial_setup() doesn't modify serial_req */
+	serial_req.line = 1;
+	serial_req.irq = UART1_INT;
+	serial_req.membase = (u_char *)UART1_IO_BASE;
+
+#if defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG)
+	gen550_init(1, &serial_req);
+#endif
+#ifdef CONFIG_SERIAL_8250
+	if (early_serial_setup(&serial_req) != 0)
+		printk("Early serial init of port 1 failed\n");
+#endif
+}
+
 TODC_ALLOC();
 
 static void __init
@@ -128,9 +174,10 @@ spruce_setup_arch(void)
 		ROOT_DEV = Root_SDA1;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
+#ifdef CONFIG_VT
 	conswitchp = &dummy_con;
 #endif
+
 
 	/* Identify the system */
 	printk(KERN_INFO "System Identification: IBM Spruce\n");
@@ -146,12 +193,12 @@ spruce_restart(char *cmd)
 	/* rfi restores MSR from SRR1 and sets the PC to the SRR0 value */
 	__asm__ __volatile__
 	("\n\
-	lis	3,0xfff0
-	ori	3,3,0x0100
-	mtspr	26,3
-	li	3,0
-	mtspr	27,3
-	rfi
+	lis	3,0xfff0	\n\
+	ori	3,3,0x0100	\n\
+	mtspr	26,3		\n\
+	li	3,0		\n\
+	mtspr	27,3		\n\
+	rfi			\n\
 	");
 	for(;;);
 }
@@ -175,11 +222,26 @@ spruce_map_io(void)
 			 0x08000000, _PAGE_IO);
 }
 
+/*
+ * Set BAT 3 to map 0xf8000000 to end of physical memory space 1-to-1.
+ */
+static __inline__ void
+spruce_set_bat(void)
+{
+	mb();
+	mtspr(DBAT1U, 0xf8000ffe);
+	mtspr(DBAT1L, 0xf800002a);
+	mb();
+}
+
 void __init
 platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	      unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo(find_bootinfo());
+
+	/* Map in board regs, etc. */
+	spruce_set_bat();
 
 	isa_io_base = SPRUCE_ISA_IO_BASE;
 	pci_dram_offset = SPRUCE_PCI_SYS_MEM_BASE;
@@ -202,4 +264,13 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
+
+	spruce_early_serial_map();
+
+#ifdef CONFIG_SERIAL_TEXT_DEBUG
+	ppc_md.progress = gen550_progress;
+#endif /* CONFIG_SERIAL_TEXT_DEBUG */
+#ifdef CONFIG_KGDB
+	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
+#endif
 }

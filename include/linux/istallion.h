@@ -70,15 +70,9 @@ typedef struct {
 	void			*argp;
 	unsigned int		rxmarkmsk;
 	struct tty_struct	*tty;
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-	struct wait_queue	*open_wait;
-	struct wait_queue	*close_wait;
-	struct wait_queue	*raw_wait;
-#else
 	wait_queue_head_t	open_wait;
 	wait_queue_head_t	close_wait;
 	wait_queue_head_t	raw_wait;
-#endif
 	struct work_struct	tqhangup;
 	asysigs_t		asig;
 	unsigned long		addr;

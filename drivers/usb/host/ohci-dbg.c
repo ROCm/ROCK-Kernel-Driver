@@ -76,7 +76,7 @@ urb_print (struct urb * urb, char * str, int small)
 	do { \
 	if (next) { \
 		unsigned s_len; \
-		s_len = snprintf (*next, *size, format, ## arg ); \
+		s_len = scnprintf (*next, *size, format, ## arg ); \
 		*size -= s_len; *next += s_len; \
 	} else \
 		ohci_dbg(ohci,format, ## arg ); \
@@ -420,7 +420,7 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 		struct list_head	*entry;
 		struct td		*td;
 
-		temp = snprintf (buf, size,
+		temp = scnprintf (buf, size,
 			"ed/%p %cs dev%d ep%d%s max %d %08x%s%s %s",
 			ed,
 			(info & ED_LOWSPEED) ? 'l' : 'f',
@@ -442,7 +442,7 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			scratch = cpu_to_le32p (&td->hwINFO);
 			cbp = le32_to_cpup (&td->hwCBP);
 			be = le32_to_cpup (&td->hwBE);
-			temp = snprintf (buf, size,
+			temp = scnprintf (buf, size,
 					"\n\ttd %p %s %d cc=%x urb %p (%08x)",
 					td,
 					({ char *pid;
@@ -458,7 +458,7 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			buf += temp;
 		}
 
-		temp = snprintf (buf, size, "\n");
+		temp = scnprintf (buf, size, "\n");
 		size -= temp;
 		buf += temp;
 
@@ -515,7 +515,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 	next = buf;
 	size = PAGE_SIZE;
 
-	temp = snprintf (next, size, "size = %d\n", NUM_INTS);
+	temp = scnprintf (next, size, "size = %d\n", NUM_INTS);
 	size -= temp;
 	next += temp;
 
@@ -525,12 +525,12 @@ show_periodic (struct class_device *class_dev, char *buf)
 		if (!(ed = ohci->periodic [i]))
 			continue;
 
-		temp = snprintf (next, size, "%2d [%3d]:", i, ohci->load [i]);
+		temp = scnprintf (next, size, "%2d [%3d]:", i, ohci->load [i]);
 		size -= temp;
 		next += temp;
 
 		do {
-			temp = snprintf (next, size, " ed%d/%p",
+			temp = scnprintf (next, size, " ed%d/%p",
 				ed->interval, ed);
 			size -= temp;
 			next += temp;
@@ -550,7 +550,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 				list_for_each (entry, &ed->td_list)
 					qlen++;
 
-				temp = snprintf (next, size,
+				temp = scnprintf (next, size,
 					" (%cs dev%d ep%d%s-%s qlen %u"
 					" max %d %08x%s%s)",
 					(info & ED_LOWSPEED) ? 'l' : 'f',
@@ -579,7 +579,7 @@ show_periodic (struct class_device *class_dev, char *buf)
 
 		} while (ed);
 
-		temp = snprintf (next, size, "\n");
+		temp = scnprintf (next, size, "\n");
 		size -= temp;
 		next += temp;
 	}
@@ -628,7 +628,7 @@ show_registers (struct class_device *class_dev, char *buf)
 
 	/* other registers mostly affect frame timings */
 	rdata = readl (&regs->fminterval);
-	temp = snprintf (next, size,
+	temp = scnprintf (next, size,
 			"fmintvl 0x%08x %sFSMPS=0x%04x FI=0x%04x\n",
 			rdata, (rdata >> 31) ? " FIT" : "",
 			(rdata >> 16) & 0xefff, rdata & 0xffff);
@@ -636,20 +636,20 @@ show_registers (struct class_device *class_dev, char *buf)
 	next += temp;
 
 	rdata = readl (&regs->fmremaining);
-	temp = snprintf (next, size, "fmremaining 0x%08x %sFR=0x%04x\n",
+	temp = scnprintf (next, size, "fmremaining 0x%08x %sFR=0x%04x\n",
 			rdata, (rdata >> 31) ? " FRT" : "",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;
 
 	rdata = readl (&regs->periodicstart);
-	temp = snprintf (next, size, "periodicstart 0x%04x\n",
+	temp = scnprintf (next, size, "periodicstart 0x%04x\n",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;
 
 	rdata = readl (&regs->lsthresh);
-	temp = snprintf (next, size, "lsthresh 0x%04x\n",
+	temp = scnprintf (next, size, "lsthresh 0x%04x\n",
 			rdata & 0x3fff);
 	size -= temp;
 	next += temp;

@@ -81,7 +81,7 @@ tape_medium_state_show(struct device *dev, char *buf)
 	struct tape_device *tdev;
 
 	tdev = (struct tape_device *) dev->driver_data;
-	return snprintf(buf, PAGE_SIZE, "%i\n", tdev->medium_state);
+	return scnprintf(buf, PAGE_SIZE, "%i\n", tdev->medium_state);
 }
 
 static
@@ -93,7 +93,7 @@ tape_first_minor_show(struct device *dev, char *buf)
 	struct tape_device *tdev;
 
 	tdev = (struct tape_device *) dev->driver_data;
-	return snprintf(buf, PAGE_SIZE, "%i\n", tdev->first_minor);
+	return scnprintf(buf, PAGE_SIZE, "%i\n", tdev->first_minor);
 }
 
 static
@@ -105,7 +105,7 @@ tape_state_show(struct device *dev, char *buf)
 	struct tape_device *tdev;
 
 	tdev = (struct tape_device *) dev->driver_data;
-	return snprintf(buf, PAGE_SIZE, "%s\n", (tdev->first_minor < 0) ?
+	return scnprintf(buf, PAGE_SIZE, "%s\n", (tdev->first_minor < 0) ?
 		"OFFLINE" : tape_state_verbose[tdev->tape_state]);
 }
 
@@ -120,17 +120,17 @@ tape_operation_show(struct device *dev, char *buf)
 
 	tdev = (struct tape_device *) dev->driver_data;
 	if (tdev->first_minor < 0)
-		return snprintf(buf, PAGE_SIZE, "N/A\n");
+		return scnprintf(buf, PAGE_SIZE, "N/A\n");
 
 	spin_lock_irq(get_ccwdev_lock(tdev->cdev));
 	if (list_empty(&tdev->req_queue))
-		rc = snprintf(buf, PAGE_SIZE, "---\n");
+		rc = scnprintf(buf, PAGE_SIZE, "---\n");
 	else {
 		struct tape_request *req;
 
 		req = list_entry(tdev->req_queue.next, struct tape_request,
 			list);
-		rc = snprintf(buf, PAGE_SIZE, "%s\n", tape_op_verbose[req->op]);
+		rc = scnprintf(buf,PAGE_SIZE, "%s\n", tape_op_verbose[req->op]);
 	}
 	spin_unlock_irq(get_ccwdev_lock(tdev->cdev));
 	return rc;
@@ -146,7 +146,7 @@ tape_blocksize_show(struct device *dev, char *buf)
 
 	tdev = (struct tape_device *) dev->driver_data;
 
-	return snprintf(buf, PAGE_SIZE, "%i\n", tdev->char_data.block_size);
+	return scnprintf(buf, PAGE_SIZE, "%i\n", tdev->char_data.block_size);
 }
 
 static

@@ -410,7 +410,6 @@ map_unwritten(
 	/* get an "empty" pagebuf to manage IO completion
 	 * Proper values will be set before returning */
 	pb = pagebuf_lookup(iomapp->iomap_target, 0, 0, 0);
-
 	if (!pb)
 		return -EAGAIN;
 
@@ -473,7 +472,7 @@ map_unwritten(
 			nblocks += bs;
 			atomic_add(bs, &pb->pb_io_remaining);
 			convert_page(inode, page, iomapp, pb, startio, all_bh);
-                        /* stop if converting the next page might add
+			/* stop if converting the next page might add
 			 * enough blocks that the corresponding byte
 			 * count won't fit in our ulong page buf length */
 			if (nblocks >= ((ULONG_MAX - PAGE_SIZE) >> block_bits))
@@ -725,7 +724,7 @@ page_state_convert(
 				iomp = match_offset_to_mapping(page, &iomap,
 								p_offset);
 			}
-			if (iomp) {
+			if (iomp && startio) {
 				if (!bh->b_end_io) {
 					err = map_unwritten(inode, page,
 							head, bh, p_offset,
@@ -735,13 +734,7 @@ page_state_convert(
 						goto error;
 					}
 				}
-				if (startio) {
-					bh_arr[cnt++] = bh;
-				} else {
-					set_buffer_dirty(bh);
-					unlock_buffer(bh);
-					mark_buffer_dirty(bh);
-				}
+				bh_arr[cnt++] = bh;
 				page_dirty = 0;
 			}
 		/*
@@ -887,9 +880,9 @@ linvfs_get_block_core(
 		loff_t			delta;
 
 		/* For unwritten extents do not report a disk address on
-		 * the read case.
+		 * the read case (treat as if we're reading into a hole).
 		 */
-		if (create || ((iomap.iomap_flags & IOMAP_UNWRITTEN) == 0)) {
+		if (create || !(iomap.iomap_flags & IOMAP_UNWRITTEN)) {
 			delta = offset - iomap.iomap_offset;
 			delta >>= inode->i_blkbits;
 
@@ -900,12 +893,9 @@ linvfs_get_block_core(
 			bh_result->b_bdev = iomap.iomap_target->pbr_bdev;
 			set_buffer_mapped(bh_result);
 		}
-		if (iomap.iomap_flags & IOMAP_UNWRITTEN) {
-			if (create) {
-				if (direct)
-					bh_result->b_private = inode;
-				set_buffer_mapped(bh_result);
-			}
+		if (create && (iomap.iomap_flags & IOMAP_UNWRITTEN)) {
+			if (direct)
+				bh_result->b_private = inode;
 			set_buffer_unwritten(bh_result);
 			set_buffer_delay(bh_result);
 		}
@@ -1174,7 +1164,7 @@ linvfs_release_page(
 	int			gfp_mask)
 {
 	struct inode		*inode = page->mapping->host;
-	int			delalloc, unmapped, unwritten;
+	int			dirty, delalloc, unmapped, unwritten;
 
 	count_page_state(page, &delalloc, &unmapped, &unwritten);
 	if (!delalloc && !unwritten)
@@ -1183,13 +1173,20 @@ linvfs_release_page(
 	if (!(gfp_mask & __GFP_FS))
 		return 0;
 
+	/* If we are already inside a transaction or the thread cannot
+	 * do I/O, we cannot release this page.
+	 */
+	if (PFLAGS_TEST_FSTRANS())
+		return 0;
+
 	/*
 	 * Convert delalloc space to real space, do not flush the
 	 * data out to disk, that will be done by the caller.
 	 * Never need to allocate space here - we will always
 	 * come back to writepage in that case.
 	 */
-	if (page_state_convert(inode, page, 0, 0) == 0)
+	dirty = page_state_convert(inode, page, 0, 0);
+	if (dirty == 0 && !unwritten)
 		goto free_buffers;
 	return 0;
 

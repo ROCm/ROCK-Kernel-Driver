@@ -110,7 +110,7 @@ static int lapbeth_rcv(struct sk_buff *skb, struct net_device *dev, struct packe
 	skb_pull(skb, 2);	/* Remove the length bytes */
 	skb_trim(skb, len);	/* Set the length of the data */
 
-	if ((err = lapb_data_received(lapbeth, skb)) != LAPB_OK) {
+	if ((err = lapb_data_received(lapbeth->axdev, skb)) != LAPB_OK) {
 		printk(KERN_DEBUG "lapbether: lapb_data_received err - %d\n", err);
 		goto drop_unlock;
 	}
@@ -125,9 +125,8 @@ drop:
 	return 0;
 }
 
-static int lapbeth_data_indication(void *token, struct sk_buff *skb)
+static int lapbeth_data_indication(struct net_device *dev, struct sk_buff *skb)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)token;
 	unsigned char *ptr;
 
 	skb_push(skb, 1);
@@ -138,7 +137,7 @@ static int lapbeth_data_indication(void *token, struct sk_buff *skb)
 	ptr  = skb->data;
 	*ptr = 0x00;
 
-	skb->dev      = lapbeth->axdev;
+	skb->dev      = dev;
 	skb->protocol = htons(ETH_P_X25);
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
@@ -152,7 +151,6 @@ static int lapbeth_data_indication(void *token, struct sk_buff *skb)
  */
 static int lapbeth_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)dev->priv;
 	int err = -ENODEV;
 
 	/*
@@ -168,12 +166,12 @@ static int lapbeth_xmit(struct sk_buff *skb, struct net_device *dev)
 		err = 0;
 		break;
 	case 0x01:
-		if ((err = lapb_connect_request(lapbeth)) != LAPB_OK)
+		if ((err = lapb_connect_request(dev)) != LAPB_OK)
 			printk(KERN_ERR "lapbeth: lapb_connect_request "
 			       "error: %d\n", err);
 		goto drop_ok;
 	case 0x02:
-		if ((err = lapb_disconnect_request(lapbeth)) != LAPB_OK)
+		if ((err = lapb_disconnect_request(dev)) != LAPB_OK)
 			printk(KERN_ERR "lapbeth: lapb_disconnect_request "
 			       "err: %d\n", err);
 		/* Fall thru */
@@ -183,7 +181,7 @@ static int lapbeth_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	skb_pull(skb, 1);
 
-	if ((err = lapb_data_request(lapbeth, skb)) != LAPB_OK) {
+	if ((err = lapb_data_request(dev, skb)) != LAPB_OK) {
 		printk(KERN_ERR "lapbeth: lapb_data_request error - %d\n", err);
 		err = -ENOMEM;
 		goto drop;
@@ -198,9 +196,9 @@ drop:
 	goto out;
 }
 
-static void lapbeth_data_transmit(void *token, struct sk_buff *skb)
+static void lapbeth_data_transmit(struct net_device *ndev, struct sk_buff *skb)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)token;
+	struct lapbethdev *lapbeth = ndev->priv;
 	unsigned char *ptr;
 	struct net_device *dev;
 	int size = skb->len;
@@ -222,9 +220,8 @@ static void lapbeth_data_transmit(void *token, struct sk_buff *skb)
 	dev_queue_xmit(skb);
 }
 
-static void lapbeth_connected(void *token, int reason)
+static void lapbeth_connected(struct net_device *dev, int reason)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)token;
 	unsigned char *ptr;
 	struct sk_buff *skb = dev_alloc_skb(1);
 
@@ -236,7 +233,7 @@ static void lapbeth_connected(void *token, int reason)
 	ptr  = skb_put(skb, 1);
 	*ptr = 0x01;
 
-	skb->dev      = lapbeth->axdev;
+	skb->dev      = dev;
 	skb->protocol = htons(ETH_P_X25);
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
@@ -245,9 +242,8 @@ static void lapbeth_connected(void *token, int reason)
 	netif_rx(skb);
 }
 
-static void lapbeth_disconnected(void *token, int reason)
+static void lapbeth_disconnected(struct net_device *dev, int reason)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)token;
 	unsigned char *ptr;
 	struct sk_buff *skb = dev_alloc_skb(1);
 
@@ -259,7 +255,7 @@ static void lapbeth_disconnected(void *token, int reason)
 	ptr  = skb_put(skb, 1);
 	*ptr = 0x02;
 
-	skb->dev      = lapbeth->axdev;
+	skb->dev      = dev;
 	skb->protocol = htons(ETH_P_X25);
 	skb->mac.raw  = skb->data;
 	skb->pkt_type = PACKET_HOST;
@@ -303,11 +299,9 @@ static struct lapb_register_struct lapbeth_callbacks = {
  */
 static int lapbeth_open(struct net_device *dev)
 {
-	struct lapbethdev *lapbeth;
 	int err;
 
-	lapbeth = (struct lapbethdev *)dev->priv;
-	if ((err = lapb_register(lapbeth, &lapbeth_callbacks)) != LAPB_OK) {
+	if ((err = lapb_register(dev, &lapbeth_callbacks)) != LAPB_OK) {
 		printk(KERN_ERR "lapbeth: lapb_register error - %d\n", err);
 		return -ENODEV;
 	}
@@ -318,12 +312,11 @@ static int lapbeth_open(struct net_device *dev)
 
 static int lapbeth_close(struct net_device *dev)
 {
-	struct lapbethdev *lapbeth = (struct lapbethdev *)dev->priv;
 	int err;
 
 	netif_stop_queue(dev);
 
-	if ((err = lapb_unregister(lapbeth)) != LAPB_OK)
+	if ((err = lapb_unregister(dev)) != LAPB_OK)
 		printk(KERN_ERR "lapbeth: lapb_unregister error - %d\n", err);
 
 	return 0;
@@ -382,6 +375,7 @@ out:
 	return rc;
 fail:
 	dev_put(dev);
+	free_netdev(ndev);
 	kfree(lapbeth);
 	goto out;
 }

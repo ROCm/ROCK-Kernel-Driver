@@ -193,6 +193,7 @@ int do_settimeofday(struct timespec *tv)
 	time_esterror = NTP_PHASE_LIMIT;
 
 	write_sequnlock_irq (&xtime_lock);
+	clock_was_set();
 	return 0;
 }
 

@@ -560,19 +560,19 @@ static int smb_filetype_to_mode(u32 filetype)
 
 static u32 smb_filetype_from_mode(int mode)
 {
-	if (mode & S_IFREG)
+	if (S_ISREG(mode))
 		return UNIX_TYPE_FILE;
-	if (mode & S_IFDIR)
+	if (S_ISDIR(mode))
 		return UNIX_TYPE_DIR;
-	if (mode & S_IFLNK)
+	if (S_ISLNK(mode))
 		return UNIX_TYPE_SYMLINK;
-	if (mode & S_IFCHR)
+	if (S_ISCHR(mode))
 		return UNIX_TYPE_CHARDEV;
-	if (mode & S_IFBLK)
+	if (S_ISBLK(mode))
 		return UNIX_TYPE_BLKDEV;
-	if (mode & S_IFIFO)
+	if (S_ISFIFO(mode))
 		return UNIX_TYPE_FIFO;
-	if (mode & S_IFSOCK)
+	if (S_ISSOCK(mode))
 		return UNIX_TYPE_SOCKET;
 	return UNIX_TYPE_UNKNOWN;
 }
@@ -1014,12 +1014,6 @@ smb_setup_header(struct smb_request *req, __u8 command, __u16 wct, __u16 bcc)
 	memset(p, '\0', 19);
 	p += 19;
 	p += 8;
-
-	/* FIXME: the request will fail if the 'tid' is changed. This
-	   should perhaps be set just before transmitting ... */
-	WSET(req->rq_header, smb_tid, server->opt.tid);
-	WSET(req->rq_header, smb_pid, 1);
-	WSET(req->rq_header, smb_uid, server->opt.server_uid);
 
 	if (server->opt.protocol > SMB_PROTOCOL_CORE) {
 		int flags = SMB_FLAGS_CASELESS_PATHNAMES;

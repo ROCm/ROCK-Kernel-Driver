@@ -72,6 +72,26 @@ struct inode_operations nfs_dir_inode_operations = {
 	.setattr	= nfs_setattr,
 };
 
+#ifdef CONFIG_NFS_V4
+
+static struct dentry *nfs_atomic_lookup(struct inode *, struct dentry *, struct nameidata *);
+struct inode_operations nfs4_dir_inode_operations = {
+	.create		= nfs_create,
+	.lookup		= nfs_atomic_lookup,
+	.link		= nfs_link,
+	.unlink		= nfs_unlink,
+	.symlink	= nfs_symlink,
+	.mkdir		= nfs_mkdir,
+	.rmdir		= nfs_rmdir,
+	.mknod		= nfs_mknod,
+	.rename		= nfs_rename,
+	.permission	= nfs_permission,
+	.getattr	= nfs_getattr,
+	.setattr	= nfs_setattr,
+};
+
+#endif /* CONFIG_NFS_V4 */
+
 /*
  * Open file
  */
@@ -670,7 +690,7 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, stru
 		goto out;
 
 	error = -ENOMEM;
-	dentry->d_op = &nfs_dentry_operations;
+	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
 
 	lock_kernel();
 
@@ -701,6 +721,119 @@ out:
 	BUG_ON(error > 0);
 	return ERR_PTR(error);
 }
+
+#ifdef CONFIG_NFS_V4
+static int nfs_open_revalidate(struct dentry *, struct nameidata *);
+
+struct dentry_operations nfs4_dentry_operations = {
+	.d_revalidate	= nfs_open_revalidate,
+	.d_delete	= nfs_dentry_delete,
+	.d_iput		= nfs_dentry_iput,
+};
+
+static int is_atomic_open(struct inode *dir, struct nameidata *nd)
+{
+	if (!nd)
+		return 0;
+	/* Check that we are indeed trying to open this file */
+	if ((nd->flags & LOOKUP_CONTINUE) || !(nd->flags & LOOKUP_OPEN))
+		return 0;
+	/* NFS does not (yet) have a stateful open for directories */
+	if (nd->flags & LOOKUP_DIRECTORY)
+		return 0;
+	/* Are we trying to write to a read only partition? */
+	if (IS_RDONLY(dir) && (nd->intent.open.flags & (O_CREAT|O_TRUNC|FMODE_WRITE)))
+		return 0;
+	return 1;
+}
+
+static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
+{
+	struct inode *inode = NULL;
+	int error = 0;
+
+	/* Check that we are indeed trying to open this file */
+	if (!is_atomic_open(dir, nd))
+		goto no_open;
+
+	if (dentry->d_name.len > NFS_SERVER(dir)->namelen) {
+		error = -ENAMETOOLONG;
+		goto out;
+	}
+	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
+
+	/* Let vfs_create() deal with O_EXCL */
+	if (nd->intent.open.flags & O_EXCL)
+		goto no_entry;
+
+	/* Open the file on the server */
+	lock_kernel();
+	inode = nfs4_atomic_open(dir, dentry, nd);
+	unlock_kernel();
+	if (IS_ERR(inode)) {
+		error = PTR_ERR(inode);
+		switch (error) {
+			/* Make a negative dentry */
+			case -ENOENT:
+				inode = NULL;
+				break;
+			/* This turned out not to be a regular file */
+			case -ELOOP:
+				if (!(nd->intent.open.flags & O_NOFOLLOW))
+					goto no_open;
+			/* case -EISDIR: */
+			/* case -EINVAL: */
+			default:
+				goto out;
+		}
+	}
+no_entry:
+	d_add(dentry, inode);
+	nfs_renew_times(dentry);
+out:
+	BUG_ON(error > 0);
+	return ERR_PTR(error);
+no_open:
+	return nfs_lookup(dir, dentry, nd);
+}
+
+static int nfs_open_revalidate(struct dentry *dentry, struct nameidata *nd)
+{
+	struct dentry *parent = NULL;
+	struct inode *inode = dentry->d_inode;
+	int openflags, ret = 0;
+
+	/* NFS only supports OPEN for regular files */
+	if (inode && !S_ISREG(inode->i_mode))
+		goto no_open;
+	parent = dget_parent(dentry);
+	if (!is_atomic_open(parent->d_inode, nd))
+		goto no_open;
+	openflags = nd->intent.open.flags;
+	if (openflags & O_CREAT) {
+		/* If this is a negative dentry, just drop it */
+		if (!inode)
+			goto out;
+		/* If this is exclusive open, just revalidate */
+		if (openflags & O_EXCL)
+			goto no_open;
+	}
+	/* We can't create new files, or truncate existing ones here */
+	openflags &= ~(O_CREAT|O_TRUNC);
+
+	lock_kernel();
+	ret = nfs4_open_revalidate(parent->d_inode, dentry, openflags);
+	unlock_kernel();
+out:
+	dput(parent);
+	if (!ret)
+		d_drop(dentry);
+	return ret;
+no_open:
+	dput(parent);
+	return nfs_lookup_revalidate(dentry, nd);
+}
+#endif /* CONFIG_NFSV4 */
 
 static inline
 int find_dirent_name(nfs_readdir_descriptor_t *desc, struct page *page, struct dentry *dentry)
@@ -1305,6 +1438,9 @@ nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 	if ((mask & MAY_EXEC) == 0) {
 		/* We only need to check permissions on file open() and access() */
 		if (!nd || !(nd->flags & (LOOKUP_OPEN|LOOKUP_ACCESS)))
+			return 0;
+		/* NFSv4 has atomic_open... */
+		if (NFS_PROTO(inode)->version > 3 && (nd->flags & LOOKUP_OPEN))
 			return 0;
 	}
 

@@ -21,6 +21,7 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/svcsock.h>
 #include <linux/sunrpc/auth.h>
+#include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
 
 
@@ -40,6 +41,7 @@ EXPORT_SYMBOL(rpc_release_task);
 
 /* RPC client functions */
 EXPORT_SYMBOL(rpc_create_client);
+EXPORT_SYMBOL(rpc_clone_client);
 EXPORT_SYMBOL(rpc_destroy_client);
 EXPORT_SYMBOL(rpc_shutdown_client);
 EXPORT_SYMBOL(rpc_release_client);
@@ -65,6 +67,7 @@ EXPORT_SYMBOL(xprt_set_timeout);
 /* Client credential cache */
 EXPORT_SYMBOL(rpcauth_register);
 EXPORT_SYMBOL(rpcauth_unregister);
+EXPORT_SYMBOL(rpcauth_create);
 EXPORT_SYMBOL(rpcauth_lookupcred);
 EXPORT_SYMBOL(rpcauth_lookup_credcache);
 EXPORT_SYMBOL(rpcauth_free_credcache);
@@ -87,10 +90,9 @@ EXPORT_SYMBOL(svc_reserve);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(rpc_proc_register);
 EXPORT_SYMBOL(rpc_proc_unregister);
-EXPORT_SYMBOL(rpc_proc_read);
 EXPORT_SYMBOL(svc_proc_register);
 EXPORT_SYMBOL(svc_proc_unregister);
-EXPORT_SYMBOL(svc_proc_read);
+EXPORT_SYMBOL(svc_seq_show);
 #endif
 
 /* caching... */
@@ -125,6 +127,9 @@ EXPORT_SYMBOL(xdr_inline_pages);
 EXPORT_SYMBOL(xdr_shift_buf);
 EXPORT_SYMBOL(xdr_write_pages);
 EXPORT_SYMBOL(xdr_read_pages);
+EXPORT_SYMBOL(xdr_buf_from_iov);
+EXPORT_SYMBOL(xdr_buf_subsegment);
+EXPORT_SYMBOL(xdr_buf_read_netobj);
 
 /* Debugging symbols */
 #ifdef RPC_DEBUG

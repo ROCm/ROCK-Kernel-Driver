@@ -150,6 +150,8 @@ static int ide_setup_pci_baseregs (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_FORCED
 /*
  * Long lost data from 2.0.34 that is now in 2.0.39
@@ -279,6 +281,7 @@ second_chance_to_dma:
 	}
 	return dma_base;
 }
+#endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
 void ide_setup_pci_noise (struct pci_dev *dev, ide_pci_device_t *d)
 {

@@ -146,14 +146,14 @@ options to the driver.  Simply add
 
   options scanner vendor=0x#### product=0x****
 
-to the /etc/modules.conf file replacing the #'s and the *'s with the
+to the /etc/modprobe.conf file replacing the #'s and the *'s with the
 correct IDs.  The IDs can be retrieved from the messages file or
 using "cat /proc/bus/usb/devices".
 
 If the default timeout is too low, i.e. there are frequent "timeout" messages,
 you may want to increase the timeout manually by using the parameter
 "read_timeout".  The time is given in seconds.  This is an example for
-modules.conf with a timeout of 60 seconds:
+modprobe.conf with a timeout of 60 seconds:
 
   options scanner read_timeout=60
  

@@ -23,7 +23,7 @@ static ssize_t node_read_cpumap(struct sys_device * dev, char * buf)
 
 	/* FIXME - someone should pass us a buffer size (count) or
 	 * use seq_file or something to avoid buffer overrun risk. */
-	len = cpumask_snprintf(buf, 99 /* XXX FIXME */, mask);
+	len = cpumask_scnprintf(buf, 99 /* XXX FIXME */, mask);
 	len += sprintf(buf + len, "\n");
 	return len;
 }

@@ -85,10 +85,10 @@ dasd_scan_partitions(struct dasd_device * device)
 	/* See fs/partition/check.c:register_disk,rescan_partitions */
 	bdev = bdget_disk(device->gdp, 0);
 	if (bdev) {
-		if (blkdev_get(bdev, FMODE_READ, 1, BDEV_RAW) >= 0) {
+		if (blkdev_get(bdev, FMODE_READ, 1) >= 0) {
 			/* Can't call rescan_partitions directly. Use ioctl. */
 			ioctl_by_bdev(bdev, BLKRRPART, 0);
-			blkdev_put(bdev, BDEV_RAW);
+			blkdev_put(bdev);
 		}
 	}
 }

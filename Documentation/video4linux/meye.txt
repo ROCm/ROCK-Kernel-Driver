@@ -42,7 +42,7 @@ Driver options:
 ---------------
 
 Several options can be passed to the meye driver, either by adding them
-to /etc/modules.conf file, when the driver is compiled as a module, or
+to /etc/modprobe.conf file, when the driver is compiled as a module, or
 by adding the following to the kernel command line (in your bootloader):
 
 	meye=gbuffers[,gbufsize[,video_nr]]
@@ -59,7 +59,7 @@ Module use:
 -----------
 
 In order to automatically load the meye module on use, you can put those lines
-in your /etc/modules.conf file:
+in your /etc/modprobe.conf file:
 
 	alias char-major-81 videodev
 	alias char-major-81-0 meye

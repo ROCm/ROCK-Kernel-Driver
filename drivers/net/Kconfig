@@ -1720,7 +1720,8 @@ config NET_POCKET
 	  <file:Documentation/Changes>) and you can say N here.
 
 	  Laptop users should read the Linux Laptop home page at
-	  <http://www.linux-on-laptops.com/>.
+	  <http://www.linux-on-laptops.com/> or
+	  Tuxmobil - Linux on Mobile Computers at <http://www.tuxmobil.org/>.
 
 	  Note that the answer to this question doesn't directly affect the
 	  kernel: saying N will just cause the configurator to skip all
@@ -1989,6 +1990,7 @@ config SK98LIN
 	    - Allied Telesyn AT-2970TX/2TX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2971SX Gigabit Ethernet Adapter
 	    - Allied Telesyn AT-2971T Gigabit Ethernet Adapter
+	    - Belkin Gigabit Desktop Card 10/100/1000Base-T Adapter, Copper RJ-45
 	    - DGE-530T Gigabit Ethernet Adapter
 	    - EG1032 v2 Instant Gigabit Network Adapter
 	    - EG1064 v2 Instant Gigabit Network Adapter
@@ -2000,6 +2002,7 @@ config SK98LIN
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Foxconn)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Gigabyte)
 	    - Marvell 88E8001 Gigabit LOM Ethernet Adapter (Iwill)
+	    - Marvell 88E8050 Gigabit LOM Ethernet Adapter (Intel)
 	    - Marvell RDK-8001 Adapter
 	    - Marvell RDK-8002 Adapter
 	    - Marvell RDK-8003 Adapter
@@ -2011,6 +2014,7 @@ config SK98LIN
 	    - Marvell RDK-8010 Adapter
 	    - Marvell RDK-8011 Adapter
 	    - Marvell RDK-8012 Adapter
+	    - Marvell RDK-8052 Adapter
 	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (32 bit)
 	    - Marvell Yukon Gigabit Ethernet 10/100/1000Base-T Adapter (64 bit)
 	    - N-Way PCI-Bus Giga-Card 1000/100/10Mbps(L)

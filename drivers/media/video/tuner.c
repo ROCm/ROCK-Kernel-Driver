@@ -234,6 +234,12 @@ static struct tunertype tuners[] = {
 	  16*157.25,16*454.00,0xa0,0x90,0x30,0x8e,732},
         { "Philips NTSC MK3 (FM1236MK3 or FM1236/F)", Philips, NTSC,
           16*160.00,16*442.00,0x01,0x02,0x04,0x8,732},
+
+        { "Philips 4 in 1 (ATI TV Wonder Pro/Conexant)", Philips, NTSC,
+          16*160.00,16*442.00,0x01,0x02,0x04,0x8e,732},
+	{ "Microtune 4049 FM5",Microtune,PAL,
+	  16*141.00,16*464.00,0xa0,0x90,0x30,0x8e,623},
+
 };
 #define TUNERS ARRAY_SIZE(tuners)
 
@@ -984,19 +990,22 @@ static void set_radio_freq(struct i2c_client *c, unsigned int freq)
 	t->radio_freq(c,freq);
 }
 
-static void set_type(struct i2c_client *c, unsigned int type)
+static void set_type(struct i2c_client *c, unsigned int type, char *source)
 {
 	struct tuner *t = i2c_get_clientdata(c);
 
 	if (t->type != UNSET) {
-		printk("tuner: type already set (%d)\n",t->type);
+		if (t->type != type)
+			printk("tuner: type already set to %d, "
+			       "ignoring request for %d\n", t->type, type);
 		return;
 	}
 	if (type >= TUNERS)
 		return;
 
 	t->type = type;
-	printk("tuner: type set to %d (%s)\n", t->type,tuners[t->type].name);
+	printk("tuner: type set to %d (%s) by %s\n",
+	       t->type,tuners[t->type].name, source);
 	strlcpy(c->name, tuners[t->type].name, sizeof(c->name));
 
 	switch (t->type) {
@@ -1024,7 +1033,8 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
         client_template.adapter = adap;
         client_template.addr = addr;
 
-        printk("tuner: chip found @ 0x%x\n", addr<<1);
+        printk("tuner: chip found at addr 0x%x i2c-bus %s\n",
+	       addr<<1, adap->name);
 
         if (NULL == (client = kmalloc(sizeof(struct i2c_client), GFP_KERNEL)))
                 return -ENOMEM;
@@ -1040,11 +1050,8 @@ static int tuner_attach(struct i2c_adapter *adap, int addr, int kind)
 	t->radio_if2  = 10700*1000; // 10.7MHz - FM radio
 
         i2c_attach_client(client);
-	if (type < TUNERS) {
-		printk("tuner: type forced to %d (%s) [insmod]\n",
-		       t->type,tuners[t->type].name);
-		set_type(client,type);
-	}
+	if (type < TUNERS)
+		set_type(client, type, "insmod option");
 	return 0;
 }
 
@@ -1093,7 +1100,7 @@ tuner_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 	/* --- configuration --- */
 	case TUNER_SET_TYPE:
-		set_type(client,*iarg);
+		set_type(client,*iarg,client->adapter->name);
 		break;
 	case AUDC_SET_RADIO:
 		if (!t->radio) {

@@ -30,6 +30,7 @@
 #include <asm/sal.h>
 #include <asm/sn/sn_sal.h>
 #include <asm/sn/sn2/shub_mmr.h>
+#include <asm/sn/pda.h>
 
 extern irqpda_t	*irqpdaindr;
 extern cnodeid_t master_node_get(vertex_hdl_t vhdl);
@@ -216,7 +217,6 @@ static cpuid_t intr_cpu_choose_from_node(cnodeid_t cnode)
 {
 	cpuid_t		cpu, best_cpu = CPU_NONE;
 	int		slice, min_count = 1000;
-	irqpda_t	*irqs;
 
 	for (slice = CPUS_PER_NODE - 1; slice >= 0; slice--) {
 		int intrs;
@@ -227,8 +227,7 @@ static cpuid_t intr_cpu_choose_from_node(cnodeid_t cnode)
 		if (!cpu_online(cpu))
 			continue;
 
-		irqs = irqpdaindr;
-		intrs = irqs->num_irq_used;
+		intrs = pdacpu(cpu)->sn_num_irqs;
 
 		if (min_count > intrs) {
 			min_count = intrs;
@@ -243,6 +242,7 @@ static cpuid_t intr_cpu_choose_from_node(cnodeid_t cnode)
 			}
 		}
 	}
+	pdacpu(best_cpu)->sn_num_irqs++;
 	return best_cpu;
 }
 

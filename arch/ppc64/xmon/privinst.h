@@ -43,38 +43,11 @@ GSETSPR(274, sprg2)
 GSETSPR(275, sprg3)
 GSETSPR(282, ear)
 GSETSPR(287, pvr)
-GSETSPR(528, bat0u)
-GSETSPR(529, bat0l)
-GSETSPR(530, bat1u)
-GSETSPR(531, bat1l)
-GSETSPR(532, bat2u)
-GSETSPR(533, bat2l)
-GSETSPR(534, bat3u)
-GSETSPR(535, bat3l)
 GSETSPR(1008, hid0)
 GSETSPR(1009, hid1)
 GSETSPR(1010, iabr)
 GSETSPR(1013, dabr)
 GSETSPR(1023, pir)
-
-static inline int get_sr(int n)
-{
-	int ret;
-
-#if 0
-	// DRENG does not assemble 
-	asm (" mfsrin %0,%1" : "=r" (ret) : "r" (n << 28));
-#endif
-	return ret;
-}
-
-static inline void set_sr(int n, int val)
-{
-#if 0
-	// DRENG does not assemble 
-	asm ("mtsrin %0,%1" : : "r" (val), "r" (n << 28));
-#endif
-}
 
 static inline void store_inst(void *p)
 {
@@ -90,4 +63,3 @@ static inline void cinval(void *p)
 {
 	asm volatile ("dcbi 0,%0; icbi 0,%0" : : "r" (p));
 }
-

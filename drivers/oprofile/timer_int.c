@@ -10,7 +10,6 @@
 #include <linux/kernel.h>
 #include <linux/notifier.h>
 #include <linux/smp.h>
-#include <linux/irq.h>
 #include <linux/oprofile.h>
 #include <linux/profile.h>
 #include <linux/init.h>

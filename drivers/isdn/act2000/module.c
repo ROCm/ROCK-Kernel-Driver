@@ -62,19 +62,18 @@ find_channel(act2000_card *card, int channel)
 static void
 act2000_clear_msn(act2000_card *card)
 {
-        struct msn_entry *p = card->msn_list;
-        struct msn_entry *q;
+	struct msn_entry *p = card->msn_list;
+	struct msn_entry *q;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-        card->msn_list = NULL;
-	restore_flags(flags);
-        while (p) {
-                q  = p->next;
-                kfree(p);
-                p = q;
-        }
+	spin_lock_irqsave(&card->lock, flags);
+	card->msn_list = NULL;
+	spin_unlock_irqrestore(&card->lock, flags);
+	while (p) {
+		q  = p->next;
+		kfree(p);
+		p = q;
+	}
 }
 
 /*
@@ -143,13 +142,12 @@ act2000_set_msn(act2000_card *card, char *eazmsn)
 		/* Delete a single MSN */
 		while (p) {
 			if (p->eaz == eazmsn[0]) {
-				save_flags(flags);
-				cli();
+				spin_lock_irqsave(&card->lock, flags);
 				if (q)
 					q->next = p->next;
 				else
 					card->msn_list = p->next;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&card->lock, flags);
 				kfree(p);
 				printk(KERN_DEBUG
 				       "Mapping for EAZ %c deleted\n",
@@ -165,10 +163,9 @@ act2000_set_msn(act2000_card *card, char *eazmsn)
 	while (p) {
 		/* Found in list, replace MSN */
 		if (p->eaz == eazmsn[0]) {
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&card->lock, flags);
 			strcpy(p->msn, &eazmsn[1]);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&card->lock, flags);
 			printk(KERN_DEBUG
 			       "Mapping for EAZ %c changed to %s\n",
 			       eazmsn[0],
@@ -184,10 +181,9 @@ act2000_set_msn(act2000_card *card, char *eazmsn)
 	p->eaz = eazmsn[0];
 	strcpy(p->msn, &eazmsn[1]);
 	p->next = card->msn_list;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&card->lock, flags);
 	card->msn_list = p;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&card->lock, flags);
 	printk(KERN_DEBUG
 	       "Mapping %c -> %s added\n",
 	       eazmsn[0],
@@ -232,10 +228,9 @@ act2000_poll(unsigned long data)
 	unsigned long flags;
 
 	act2000_receive(card);
-        save_flags(flags);
-        cli();
-        mod_timer(&card->ptimer, jiffies+3);
-        restore_flags(flags);
+	spin_lock_irqsave(&card->lock, flags);
+	mod_timer(&card->ptimer, jiffies+3);
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 static int
@@ -311,10 +306,9 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 				return -ENODEV;
 			if (!(chan = find_channel(card, c->arg & 0x0f)))
 				break;
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&card->lock, flags);
 			if (chan->fsm_state != ACT2000_STATE_NULL) {
-				restore_flags(flags);
+				spin_unlock_irqrestore(&card->lock, flags);
 				printk(KERN_WARNING "Dial on channel with state %d\n",
 					chan->fsm_state);
 				return -EBUSY;
@@ -325,7 +319,7 @@ act2000_command(act2000_card * card, isdn_ctrl * c)
 				tmp[0] = c->parm.setup.eazmsn[0];
 			chan->fsm_state = ACT2000_STATE_OCALL;
 			chan->callref = 0xffff;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&card->lock, flags);
 			ret = actcapi_connect_req(card, chan, c->parm.setup.phone,
 						  tmp[0], c->parm.setup.si1,
 						  c->parm.setup.si2);
@@ -580,6 +574,8 @@ act2000_alloccard(int bus, int port, int irq, char *id)
                 return;
         }
         memset((char *) card, 0, sizeof(act2000_card));
+        spin_lock_init(&card->lock);
+        spin_lock_init(&card->mnlock);
 	skb_queue_head_init(&card->sndq);
 	skb_queue_head_init(&card->rcvq);
 	skb_queue_head_init(&card->ackq);

@@ -435,7 +435,7 @@ asmlinkage unsigned int do_IRQ(struct pt_regs regs)
 		long esp;
 
 		__asm__ __volatile__("andl %%esp,%0" :
-					"=r" (esp) : "0" (8191));
+					"=r" (esp) : "0" (THREAD_SIZE - 1));
 		if (unlikely(esp < (sizeof(struct thread_info) + 1024))) {
 			printk("do_IRQ: stack overflow: %ld\n",
 				esp - sizeof(struct thread_info));
@@ -927,7 +927,7 @@ cpumask_t irq_affinity[NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
 static int irq_affinity_read_proc(char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	int len = cpumask_scnprintf(page, count, irq_affinity[(long)data]);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");
@@ -968,7 +968,7 @@ static int irq_affinity_write_proc(struct file *file, const char __user *buffer,
 static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_snprintf(page, count, *(cpumask_t *)data);
+	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");

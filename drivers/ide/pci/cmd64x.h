@@ -69,7 +69,7 @@ static u8 cmd64x_proc;
 static char * print_cmd64x_get_info(char *, struct pci_dev *, int);
 static int cmd64x_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t cmd64x_procs[] __initdata = {
+static ide_pci_host_proc_t cmd64x_procs[] = {
 	{
 		.name		= "cmd64x",
 		.set		= 1,

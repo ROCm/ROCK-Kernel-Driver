@@ -1,5 +1,5 @@
 /*
- * Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+ * Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -29,8 +29,14 @@
  *	- Add support for setting bond's MAC address with special
  *	  handling required for ALB/TLB.
  *
- * 2003/09/24 - Shmulik Hen <shmulik.hen at intel dot com>
+ * 2003/12/01 - Shmulik Hen <shmulik.hen at intel dot com>
  *	- Code cleanup and style changes
+ *
+ * 2003/12/30 - Amir Noam <amir.noam at intel dot com>
+ *	- Fixed: Cannot remove and re-enslave the original active slave.
+ *
+ * 2004/01/14 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Add capability to tag self generated packets in ALB/TLB modes.
  */
 
 //#define BONDING_DEBUG 1
@@ -47,6 +53,7 @@
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
 #include <linux/if_bonding.h>
+#include <linux/if_vlan.h>
 #include <net/ipx.h>
 #include <net/arp.h>
 #include <asm/byteorder.h>
@@ -76,7 +83,7 @@
 
 
 #define TLB_NULL_INDEX		0xffffffff
-#define MAX_LP_RETRY		3
+#define MAX_LP_BURST		3
 
 /* rlb defs */
 #define RLB_HASH_TABLE_SIZE	256
@@ -495,13 +502,33 @@ static void rlb_update_client(struct rlb_client_info *client_info)
 	}
 
 	for (i = 0; i < RLB_ARP_BURST_SIZE; i++) {
-		arp_send(ARPOP_REPLY, ETH_P_ARP,
-			 client_info->ip_dst,
-			 client_info->slave->dev,
-			 client_info->ip_src,
-			 client_info->mac_dst,
-			 client_info->slave->dev->dev_addr,
-			 client_info->mac_dst);
+		struct sk_buff *skb;
+
+		skb = arp_create(ARPOP_REPLY, ETH_P_ARP,
+				 client_info->ip_dst,
+				 client_info->slave->dev,
+				 client_info->ip_src,
+				 client_info->mac_dst,
+				 client_info->slave->dev->dev_addr,
+				 client_info->mac_dst);
+		if (!skb) {
+			printk(KERN_ERR DRV_NAME
+			       ": Error: failed to create an ARP packet\n");
+			continue;
+		}
+
+		skb->dev = client_info->slave->dev;
+
+		if (client_info->tag) {
+			skb = vlan_put_tag(skb, client_info->vlan_id);
+			if (!skb) {
+				printk(KERN_ERR DRV_NAME
+				       ": Error: failed to insert VLAN tag\n");
+				continue;
+			}
+		}
+
+		arp_xmit(skb);
 	}
 }
 
@@ -600,9 +627,10 @@ static void rlb_req_update_subnet_clients(struct bonding *bond, u32 src_ip)
 }
 
 /* Caller must hold both bond and ptr locks for read */
-struct slave *rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
+struct slave *rlb_choose_channel(struct sk_buff *skb, struct bonding *bond)
 {
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
+	struct arp_pkt *arp = (struct arp_pkt *)skb->nh.raw;
 	struct slave *assigned_slave;
 	struct rlb_client_info *client_info;
 	u32 hash_index = 0;
@@ -658,6 +686,15 @@ struct slave *rlb_choose_channel(struct bonding *bond, struct arp_pkt *arp)
 			client_info->ntt = 0;
 		}
 
+		if (!list_empty(&bond->vlan_list)) {
+			unsigned short vlan_id;
+			int res = vlan_get_tag(skb, &vlan_id);
+			if (!res) {
+				client_info->tag = 1;
+				client_info->vlan_id = vlan_id;
+			}
+		}
+
 		if (!client_info->assigned) {
 			u32 prev_tbl_head = bond_info->rx_hashtbl_head;
 			bond_info->rx_hashtbl_head = hash_index;
@@ -688,7 +725,7 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		/* the arp must be sent on the selected
 		* rx channel
 		*/
-		tx_slave = rlb_choose_channel(bond, arp);
+		tx_slave = rlb_choose_channel(skb, bond);
 		if (tx_slave) {
 			memcpy(arp->mac_src,tx_slave->dev->dev_addr, ETH_ALEN);
 		}
@@ -699,7 +736,7 @@ static struct slave *rlb_arp_xmit(struct sk_buff *skb, struct bonding *bond)
 		 * When the arp reply is received the entry will be updated
 		 * with the correct unicast address of the client.
 		 */
-		rlb_choose_channel(bond, arp);
+		rlb_choose_channel(skb, bond);
 
 		/* The ARP relpy packets must be delayed so that
 		 * they can cancel out the influence of the ARP request.
@@ -805,6 +842,40 @@ static void rlb_deinitialize(struct bonding *bond)
 
 	kfree(bond_info->rx_hashtbl);
 	bond_info->rx_hashtbl = NULL;
+	bond_info->rx_hashtbl_head = RLB_NULL_INDEX;
+
+	_unlock_rx_hashtbl(bond);
+}
+
+static void rlb_clear_vlan(struct bonding *bond, unsigned short vlan_id)
+{
+	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
+	u32 curr_index;
+
+	_lock_rx_hashtbl(bond);
+
+	curr_index = bond_info->rx_hashtbl_head;
+	while (curr_index != RLB_NULL_INDEX) {
+		struct rlb_client_info *curr = &(bond_info->rx_hashtbl[curr_index]);
+		u32 next_index = bond_info->rx_hashtbl[curr_index].next;
+		u32 prev_index = bond_info->rx_hashtbl[curr_index].prev;
+
+		if (curr->tag && (curr->vlan_id == vlan_id)) {
+			if (curr_index == bond_info->rx_hashtbl_head) {
+				bond_info->rx_hashtbl_head = next_index;
+			}
+			if (prev_index != RLB_NULL_INDEX) {
+				bond_info->rx_hashtbl[prev_index].next = next_index;
+			}
+			if (next_index != RLB_NULL_INDEX) {
+				bond_info->rx_hashtbl[next_index].prev = prev_index;
+			}
+
+			rlb_init_table_entry(curr);
+		}
+
+		curr_index = next_index;
+	}
 
 	_unlock_rx_hashtbl(bond);
 }
@@ -813,6 +884,7 @@ static void rlb_deinitialize(struct bonding *bond)
 
 static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 {
+	struct bonding *bond = bond_get_bond_by_slave(slave);
 	struct learning_pkt pkt;
 	int size = sizeof(struct learning_pkt);
 	int i;
@@ -822,7 +894,7 @@ static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 	memcpy(pkt.mac_src, mac_addr, ETH_ALEN);
 	pkt.type = __constant_htons(ETH_P_LOOP);
 
-	for (i = 0; i < MAX_LP_RETRY; i++) {
+	for (i = 0; i < MAX_LP_BURST; i++) {
 		struct sk_buff *skb;
 		char *data;
 
@@ -839,6 +911,26 @@ static void alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 		skb->protocol = pkt.type;
 		skb->priority = TC_PRIO_CONTROL;
 		skb->dev = slave->dev;
+
+		if (!list_empty(&bond->vlan_list)) {
+			struct vlan_entry *vlan;
+
+			vlan = bond_next_vlan(bond,
+					      bond->alb_info.current_alb_vlan);
+
+			bond->alb_info.current_alb_vlan = vlan;
+			if (!vlan) {
+				kfree_skb(skb);
+				continue;
+			}
+
+			skb = vlan_put_tag(skb, vlan->vlan_id);
+			if (!skb) {
+				printk(KERN_ERR DRV_NAME
+				       ": Error: failed to insert VLAN tag\n");
+				continue;
+			}
+		}
 
 		dev_queue_xmit(skb);
 	}
@@ -992,6 +1084,7 @@ static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *sla
 static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 {
 	struct slave *tmp_slave1, *tmp_slave2, *free_mac_slave;
+	struct slave *has_bond_addr = bond->curr_active_slave;
 	int i, j, found = 0;
 
 	if (bond->slave_cnt == 0) {
@@ -1049,6 +1142,15 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 			free_mac_slave = tmp_slave1;
 			break;
 		}
+
+		if (!has_bond_addr) {
+			if (!memcmp(tmp_slave1->dev->dev_addr,
+				    bond->dev->dev_addr,
+				    ETH_ALEN)) {
+
+				has_bond_addr = tmp_slave1;
+			}
+		}
 	}
 
 	if (free_mac_slave) {
@@ -1059,7 +1161,8 @@ static int alb_handle_addr_collision_on_attach(struct bonding *bond, struct slav
 		       ": Warning: the hw address of slave %s is in use by "
 		       "the bond; giving it the hw address of %s\n",
 		       slave->dev->name, free_mac_slave->dev->name);
-	} else {
+
+	} else if (has_bond_addr) {
 		printk(KERN_ERR DRV_NAME
 		       ": Error: the hw address of slave %s is in use by the "
 		       "bond; couldn't find a slave with a free hw address to "
@@ -1171,7 +1274,7 @@ void bond_alb_deinitialize(struct bonding *bond)
 int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 {
 	struct bonding *bond = bond_dev->priv;
-	struct ethhdr *eth_data = (struct ethhdr *)skb->mac.raw = skb->data;
+	struct ethhdr *eth_data;
 	struct alb_bond_info *bond_info = &(BOND_ALB_INFO(bond));
 	struct slave *tx_slave = NULL;
 	static u32 ip_bcast = 0xffffffff;
@@ -1179,6 +1282,10 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	int do_tx_balance = 1;
 	u32 hash_index = 0;
 	u8 *hash_start = NULL;
+	int res = 1;
+
+	skb->mac.raw = (unsigned char *)skb->data;
+	eth_data = (struct ethhdr *)skb->data;
 
 	/* make sure that the curr_active_slave and the slaves list do
 	 * not change during tx
@@ -1187,7 +1294,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	read_lock(&bond->curr_slave_lock);
 
 	if (!BOND_IS_OK(bond)) {
-		goto free_out;
+		goto out;
 	}
 
 	switch (ntohs(skb->protocol)) {
@@ -1217,8 +1324,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 			break;
 		}
 
-		if (ipx_hdr(skb)->ipx_type !=
-		    __constant_htons(IPX_TYPE_NCP)) {
+		if (ipx_hdr(skb)->ipx_type != IPX_TYPE_NCP) {
 			/* The only protocol worth balancing in
 			 * this family since it has an "ARP" like
 			 * mechanism
@@ -1253,29 +1359,27 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	}
 
 	if (tx_slave && SLAVE_IS_OK(tx_slave)) {
-		skb->dev = tx_slave->dev;
 		if (tx_slave != bond->curr_active_slave) {
 			memcpy(eth_data->h_source,
 			       tx_slave->dev->dev_addr,
 			       ETH_ALEN);
 		}
-		dev_queue_xmit(skb);
+
+		res = bond_dev_queue_xmit(bond, skb, tx_slave->dev);
 	} else {
-		/* no suitable interface, frame not sent */
 		if (tx_slave) {
 			tlb_clear_slave(bond, tx_slave, 0);
 		}
-		goto free_out;
 	}
 
 out:
+	if (res) {
+		/* no suitable interface, frame not sent */
+		dev_kfree_skb(skb);
+	}
 	read_unlock(&bond->curr_slave_lock);
 	read_unlock(&bond->lock);
 	return 0;
-
-free_out:
-	dev_kfree_skb(skb);
-	goto out;
 }
 
 void bond_alb_monitor(struct bonding *bond)
@@ -1574,5 +1678,17 @@ int bond_alb_set_mac_address(struct net_device *bond_dev, void *addr)
 	}
 
 	return 0;
+}
+
+void bond_alb_clear_vlan(struct bonding *bond, unsigned short vlan_id)
+{
+	if (bond->alb_info.current_alb_vlan &&
+	    (bond->alb_info.current_alb_vlan->vlan_id == vlan_id)) {
+		bond->alb_info.current_alb_vlan = NULL;
+	}
+
+	if (bond->alb_info.rlb_enabled) {
+		rlb_clear_vlan(bond, vlan_id);
+	}
 }
 

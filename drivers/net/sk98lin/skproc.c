@@ -2,6 +2,8 @@
  *
  * Name:	skproc.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
+ * Version:	$Revision: 1.11 $
+ * Date:	$Date: 2003/12/11 16:03:57 $
  * Purpose:	Funktions to display statictic data
  *
  ******************************************************************************/
@@ -22,7 +24,6 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
-
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 

@@ -7,7 +7,11 @@
 
 /* Simple VGA output */
 
+#ifdef __i386__
+#define VGABASE		__pa(__PAGE_OFFSET + 0xb8000UL)
+#else
 #define VGABASE		0xffffffff800b8000UL
+#endif
 
 #define MAX_YPOS	25
 #define MAX_XPOS	80
@@ -22,15 +26,14 @@ static void early_vga_write(struct console *con, const char *str, unsigned n)
 	while ((c = *str++) != '\0' && n-- > 0) {
 		if (current_ypos >= MAX_YPOS) {
 			/* scroll 1 line up */
-			for(k = 1, j = 0; k < MAX_YPOS; k++, j++) {
-				for(i = 0; i < MAX_XPOS; i++) {
+			for (k = 1, j = 0; k < MAX_YPOS; k++, j++) {
+				for (i = 0; i < MAX_XPOS; i++) {
 					writew(readw(VGABASE + 2*(MAX_XPOS*k + i)),
 					       VGABASE + 2*(MAX_XPOS*j + i));
 				}
 			}
-			for(i = 0; i < MAX_XPOS; i++) {
+			for (i = 0; i < MAX_XPOS; i++)
 				writew(0x720, VGABASE + 2*(MAX_XPOS*j + i));
-			}
 			current_ypos = MAX_YPOS-1;
 		}
 		if (c == '\n') {
@@ -38,7 +41,8 @@ static void early_vga_write(struct console *con, const char *str, unsigned n)
 			current_ypos++;
 		} else if (c != '\r')  {
 			writew(((0x7 << 8) | (unsigned short) c),
-			       VGABASE + 2*(MAX_XPOS*current_ypos + current_xpos++));
+			       VGABASE + 2*(MAX_XPOS*current_ypos +
+						current_xpos++));
 			if (current_xpos >= MAX_XPOS) {
 				current_xpos = 0;
 				current_ypos++;
@@ -78,7 +82,7 @@ static int early_serial_putc(unsigned char ch)
 { 
 	unsigned timeout = 0xffff; 
 	while ((inb(early_serial_base + LSR) & XMTRDY) == 0 && --timeout) 
-		rep_nop(); 
+		cpu_relax();
 	outb(ch, early_serial_base + TXR);
 	return timeout ? 0 : -1;
 } 
@@ -93,10 +97,13 @@ static void early_serial_write(struct console *con, const char *s, unsigned n)
 	} 
 } 
 
+#define DEFAULT_BAUD 9600
+
 static __init void early_serial_init(char *opt)
 {
 	unsigned char c; 
-	unsigned divisor, baud = 38400;
+	unsigned divisor;
+	unsigned baud = DEFAULT_BAUD;
 	char *s, *e;
 
 	if (*opt == ',') 
@@ -109,25 +116,26 @@ static __init void early_serial_init(char *opt)
 			early_serial_base = simple_strtoul(s, &e, 16);
 		} else {
 			static int bases[] = { 0x3f8, 0x2f8 };
-		if (!strncmp(s,"ttyS",4)) 
-			s+=4; 
-		port = simple_strtoul(s, &e, 10); 
-		if (port > 1 || s == e) 
-			port = 0; 
-		early_serial_base = bases[port];
-	}
+
+			if (!strncmp(s,"ttyS",4))
+				s += 4;
+			port = simple_strtoul(s, &e, 10);
+			if (port > 1 || s == e)
+				port = 0;
+			early_serial_base = bases[port];
+		}
 	}
 
-	outb(0x3, early_serial_base + LCR); /* 8n1 */
-	outb(0, early_serial_base + IER); /* no interrupt */ 
-	outb(0, early_serial_base + FCR); /* no fifo */ 
-	outb(0x3, early_serial_base + MCR); /* DTR + RTS */ 
+	outb(0x3, early_serial_base + LCR);	/* 8n1 */
+	outb(0, early_serial_base + IER);	/* no interrupt */
+	outb(0, early_serial_base + FCR);	/* no fifo */
+	outb(0x3, early_serial_base + MCR);	/* DTR + RTS */
 
 	s = strsep(&opt, ","); 
 	if (s != NULL) { 
 		baud = simple_strtoul(s, &e, 0); 
 		if (baud == 0 || s == e) 
-			baud = 38400;
+			baud = DEFAULT_BAUD;
 	} 
 	
 	divisor = 115200 / baud; 
@@ -154,8 +162,9 @@ void early_printk(const char *fmt, ...)
 	char buf[512]; 
 	int n; 
 	va_list ap;
+
 	va_start(ap,fmt); 
-	n = vsnprintf(buf,512,fmt,ap);
+	n = vscnprintf(buf,512,fmt,ap);
 	early_console->write(early_console,buf,n);
 	va_end(ap); 
 } 
@@ -169,6 +178,8 @@ int __init setup_early_printk(char *opt)
 
 	if (early_console_initialized)
 		return -1;
+
+	opt = strchr(opt, '=') + 1;
 
 	strlcpy(buf,opt,sizeof(buf)); 
 	space = strchr(buf, ' '); 
@@ -200,19 +211,12 @@ void __init disable_early_printk(void)
 	if (!early_console_initialized || !early_console)
 		return;
 	if (!keep_early) {
-		printk("disabling early console...\n"); 
+		printk("disabling early console\n");
 		unregister_console(early_console);
 		early_console_initialized = 0;
 	} else { 
-		printk("keeping early console.\n"); 
+		printk("keeping early console\n");
 	}
 } 
 
-/* syntax: earlyprintk=vga
-           earlyprintk=serial[,ttySn[,baudrate]] 
-   Append ,keep to not disable it when the real console takes over.
-   Only vga or serial at a time, not both.
-   Currently only ttyS0 and ttyS1 are supported. 
-   Interaction with the standard serial driver is not very good. 
-   The VGA output is eventually overwritten by the real console. */
-__setup("earlyprintk=", setup_early_printk);  
+__setup("earlyprintk=", setup_early_printk);

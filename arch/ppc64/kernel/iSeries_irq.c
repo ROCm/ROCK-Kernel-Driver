@@ -57,6 +57,7 @@ static hw_irq_controller iSeries_IRQ_handler = {
 
 void iSeries_init_irq_desc(irq_desc_t *desc)
 {
+	desc->handler = &iSeries_IRQ_handler;
 }
 
 /* This is called by init_IRQ.  set in ppc_md.init_IRQ by iSeries_setup.c */
@@ -87,22 +88,6 @@ int __init iSeries_allocate_IRQ(HvBusNumber busNumber,
 #define IRQ_TO_IDSEL(irq)	(((((irq) - 1) >> 3) & 7) + 1)
 #define IRQ_TO_FUNC(irq)	(((irq) - 1) & 7)
 
-/*
- * This is called out of iSeries_scan_slot to assign the EADS slot
- * to its IRQ number
- */
-int __init iSeries_assign_IRQ(int irq, HvBusNumber busNumber,
-		HvSubBusNumber subBusNumber, HvAgentId deviceId)
-{
-	irq_desc_t *desc = get_real_irq_desc(irq);
-
-	if (desc == NULL)
-		return -1;
-	desc->handler = &iSeries_IRQ_handler;
-	return 0;
-}
-
-
 /* This is called by iSeries_activate_IRQs */
 static unsigned int iSeries_startup_IRQ(unsigned int irq)
 {
@@ -123,6 +108,11 @@ static unsigned int iSeries_startup_IRQ(unsigned int irq)
 				bus, subBus, deviceId, irq);
 	return 0;
 }
+
+/*
+ * Temporary hack
+ */
+#define get_irq_desc(irq)	&irq_desc[(irq)]
 
 /*
  * This is called out of iSeries_fixup to activate interrupt

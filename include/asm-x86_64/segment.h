@@ -1,6 +1,8 @@
 #ifndef _ASM_SEGMENT_H
 #define _ASM_SEGMENT_H
 
+#include <asm/cache.h>
+
 #define __KERNEL_CS	0x10
 #define __KERNEL_DS	0x18
 
@@ -38,7 +40,7 @@
 #define FS_TLS_SEL ((GDT_ENTRY_TLS_MIN+FS_TLS)*8 + 3)
 
 #define IDT_ENTRIES 256
-#define GDT_ENTRIES 16
+#define GDT_ENTRIES (L1_CACHE_BYTES / 8) 
 #define GDT_SIZE (GDT_ENTRIES * 8)
 #define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8) 
 

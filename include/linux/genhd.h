@@ -64,10 +64,11 @@ struct hd_struct {
 	int policy, partno;
 };
 
-#define GENHD_FL_REMOVABLE  1
-#define GENHD_FL_DRIVERFS  2
-#define GENHD_FL_CD	8
-#define GENHD_FL_UP	16
+#define GENHD_FL_REMOVABLE			1
+#define GENHD_FL_DRIVERFS			2
+#define GENHD_FL_CD				8
+#define GENHD_FL_UP				16
+#define GENHD_FL_SUPPRESS_PARTITION_INFO	32
 
 struct disk_stats {
 	unsigned read_sectors, write_sectors;

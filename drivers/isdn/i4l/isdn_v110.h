@@ -1,19 +1,16 @@
-/* Linux ISDN subsystem, V.110 related functions
+/* $Id: isdn_v110.h,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+ *
+ * Linux ISDN subsystem, V.110 related functions (linklevel).
  *
  * Copyright by Thomas Pfeiffer (pfeiffer@pds.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
-#ifndef ISDN_V110_H
-#define ISDN_V110_H
-
-struct isdn_v110 {
-  int               v110emu;             /* V.110 emulator-mode 0=none */
-  atomic_t          v110use;             /* Usage-Semaphore for stream */
-  isdn_v110_stream  *v110;               /* V.110 private data         */
-};
+#ifndef _isdn_v110_h_
+#define _isdn_v110_h_
 
 /* 
  * isdn_v110_encode will take raw data and encode it using V.110 
@@ -26,10 +23,7 @@ extern struct sk_buff *isdn_v110_encode(isdn_v110_stream *, struct sk_buff *);
  */
 extern struct sk_buff *isdn_v110_decode(isdn_v110_stream *, struct sk_buff *);
 
-extern void isdn_v110_open(struct isdn_slot *slot, struct isdn_v110 *iv110);
-
-extern void isdn_v110_close(struct isdn_slot *slot, struct isdn_v110 *iv110);
-
-extern int  isdn_v110_bsent(struct isdn_slot *slot, struct isdn_v110 *iv110);
+extern int isdn_v110_stat_callback(int, isdn_ctrl *);
+extern void isdn_v110_close(isdn_v110_stream * v);
 
 #endif

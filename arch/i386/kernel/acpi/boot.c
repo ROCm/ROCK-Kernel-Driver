@@ -32,6 +32,7 @@
 #include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/io.h>
+#include <asm/irq.h>
 #include <asm/mpspec.h>
 
 #if defined (CONFIG_X86_LOCAL_APIC)
@@ -45,8 +46,8 @@
 int acpi_noirq __initdata = 0;	/* skip ACPI IRQ initialization */
 int acpi_ht __initdata = 1;	/* enable HT */
 
-int acpi_lapic = 0;
-int acpi_ioapic = 0;
+int acpi_lapic;
+int acpi_ioapic;
 
 /* --------------------------------------------------------------------------
                               Boot-time Configuration
@@ -139,6 +140,10 @@ acpi_parse_lapic (
 		return -EINVAL;
 
 	acpi_table_print_madt_entry(header);
+
+	/* no utility in registering a disabled processor */
+	if (processor->flags.enabled == 0)
+		return 0;
 
 	mp_register_lapic (
 		processor->id,					   /* APIC ID */
@@ -371,6 +376,37 @@ static int __init acpi_parse_hpet(unsigned long phys, unsigned long size)
 }
 #endif
 
+/* detect the location of the ACPI PM Timer */
+#ifdef CONFIG_X86_PM_TIMER
+extern u32 pmtmr_ioport;
+
+static int __init acpi_parse_fadt(unsigned long phys, unsigned long size)
+{
+	struct fadt_descriptor_rev2 *fadt =0;
+
+	fadt = (struct fadt_descriptor_rev2*) __acpi_map_table(phys,size);
+	if(!fadt) {
+		printk(KERN_WARNING PREFIX "Unable to map FADT\n");
+		return 0;
+	}
+
+	if (fadt->revision >= FADT2_REVISION_ID) {
+		/* FADT rev. 2 */
+		if (fadt->xpm_tmr_blk.address_space_id != ACPI_ADR_SPACE_SYSTEM_IO)
+			return 0;
+
+		pmtmr_ioport = fadt->xpm_tmr_blk.address;
+	} else {
+		/* FADT rev. 1 */
+		pmtmr_ioport = fadt->V1_pm_tmr_blk;
+	}
+	if (pmtmr_ioport)
+		printk(KERN_INFO PREFIX "PM-Timer IO Port: %#x\n", pmtmr_ioport);
+	return 0;
+}
+#endif
+
+
 unsigned long __init
 acpi_find_rsdp (void)
 {
@@ -443,6 +479,10 @@ acpi_boot_init (void)
 		return result;
 	}
 
+#ifdef CONFIG_X86_PM_TIMER
+	acpi_table_parse(ACPI_FADT, acpi_parse_fadt);
+#endif
+
 #ifdef CONFIG_X86_LOCAL_APIC
 
 	/* 
@@ -471,7 +511,7 @@ acpi_boot_init (void)
 	 * and (optionally) overriden by a LAPIC_ADDR_OVR entry (64-bit value).
 	 */
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr);
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_ADDR_OVR, acpi_parse_lapic_addr_ovr, 0);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC address override entry\n");
 		return result;
@@ -479,7 +519,8 @@ acpi_boot_init (void)
 
 	mp_register_lapic_address(acpi_lapic_addr);
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic);
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC, acpi_parse_lapic,
+				       MAX_APICS);
 	if (!result) { 
 		printk(KERN_ERR PREFIX "No LAPIC entries present\n");
 		/* TBD: Cleanup to allow fallback to MPS */
@@ -491,7 +532,7 @@ acpi_boot_init (void)
 		return result;
 	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi);
+	result = acpi_table_parse_madt(ACPI_MADT_LAPIC_NMI, acpi_parse_lapic_nmi, 0);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing LAPIC NMI entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
@@ -528,8 +569,8 @@ acpi_boot_init (void)
 		return 1;
 	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic);
-	if (!result) { 
+	result = acpi_table_parse_madt(ACPI_MADT_IOAPIC, acpi_parse_ioapic, MAX_IO_APICS);
+	if (!result) {
 		printk(KERN_ERR PREFIX "No IOAPIC entries present\n");
 		return -ENODEV;
 	}
@@ -541,14 +582,14 @@ acpi_boot_init (void)
 	/* Build a default routing table for legacy (ISA) interrupts. */
 	mp_config_acpi_legacy_irqs();
 
-	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr);
+	result = acpi_table_parse_madt(ACPI_MADT_INT_SRC_OVR, acpi_parse_int_src_ovr, NR_IRQ_VECTORS);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing interrupt source overrides entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */
 		return result;
 	}
 
-	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src);
+	result = acpi_table_parse_madt(ACPI_MADT_NMI_SRC, acpi_parse_nmi_src, NR_IRQ_VECTORS);
 	if (result < 0) {
 		printk(KERN_ERR PREFIX "Error parsing NMI SRC entry\n");
 		/* TBD: Cleanup to allow fallback to MPS */

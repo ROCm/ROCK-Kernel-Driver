@@ -76,24 +76,34 @@ static struct gendisk **disks;
 /*
  * Transfer functions
  */
-static int transfer_none(struct loop_device *lo, int cmd, char *raw_buf,
-			 char *loop_buf, int size, sector_t real_block)
+static int transfer_none(struct loop_device *lo, int cmd,
+			 struct page *raw_page, unsigned raw_off,
+			 struct page *loop_page, unsigned loop_off,
+			 int size, sector_t real_block)
 {
-	if (raw_buf != loop_buf) {
-		if (cmd == READ)
-			memcpy(loop_buf, raw_buf, size);
-		else
-			memcpy(raw_buf, loop_buf, size);
-	}
+	char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
+	char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
 
+	if (cmd == READ)
+		memcpy(loop_buf, raw_buf, size);
+	else
+		memcpy(raw_buf, loop_buf, size);
+
+	kunmap_atomic(raw_buf, KM_USER0);
+	kunmap_atomic(loop_buf, KM_USER1);
+	cond_resched();
 	return 0;
 }
 
-static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
-			char *loop_buf, int size, sector_t real_block)
+static int transfer_xor(struct loop_device *lo, int cmd,
+			struct page *raw_page, unsigned raw_off,
+			struct page *loop_page, unsigned loop_off,
+			int size, sector_t real_block)
 {
-	char	*in, *out, *key;
-	int	i, keysize;
+	char *raw_buf = kmap_atomic(raw_page, KM_USER0) + raw_off;
+	char *loop_buf = kmap_atomic(loop_page, KM_USER1) + loop_off;
+	char *in, *out, *key;
+	int i, keysize;
 
 	if (cmd == READ) {
 		in = raw_buf;
@@ -107,6 +117,10 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 	keysize = lo->lo_encrypt_key_size;
 	for (i = 0; i < size; i++)
 		*out++ = *in++ ^ key[(i & 511) % keysize];
+
+	kunmap_atomic(raw_buf, KM_USER0);
+	kunmap_atomic(loop_buf, KM_USER1);
+	cond_resched();
 	return 0;
 }
 
@@ -162,13 +176,15 @@ figure_loop_size(struct loop_device *lo)
 }
 
 static inline int
-lo_do_transfer(struct loop_device *lo, int cmd, char *rbuf,
-	       char *lbuf, int size, sector_t rblock)
+lo_do_transfer(struct loop_device *lo, int cmd,
+	       struct page *rpage, unsigned roffs,
+	       struct page *lpage, unsigned loffs,
+	       int size, sector_t rblock)
 {
 	if (!lo->transfer)
 		return 0;
 
-	return lo->transfer(lo, cmd, rbuf, lbuf, size, rblock);
+	return lo->transfer(lo, cmd, rpage, roffs, lpage, loffs, size, rblock);
 }
 
 static int
@@ -178,16 +194,15 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	struct address_space *mapping = file->f_mapping;
 	struct address_space_operations *aops = mapping->a_ops;
 	struct page *page;
-	char *kaddr, *data;
 	pgoff_t index;
-	unsigned size, offset;
+	unsigned size, offset, bv_offs;
 	int len;
 	int ret = 0;
 
 	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & ((pgoff_t)PAGE_CACHE_SIZE - 1);
-	data = kmap(bvec->bv_page) + bvec->bv_offset;
+	bv_offs = bvec->bv_offset;
 	len = bvec->bv_len;
 	while (len > 0) {
 		sector_t IV;
@@ -204,25 +219,28 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 			goto fail;
 		if (aops->prepare_write(file, page, offset, offset+size))
 			goto unlock;
-		kaddr = kmap(page);
-		transfer_result = lo_do_transfer(lo, WRITE, kaddr + offset,
-						 data, size, IV);
+		transfer_result = lo_do_transfer(lo, WRITE, page, offset,
+						 bvec->bv_page, bv_offs,
+						 size, IV);
 		if (transfer_result) {
+			char *kaddr;
+
 			/*
 			 * The transfer failed, but we still write the data to
 			 * keep prepare/commit calls balanced.
 			 */
 			printk(KERN_ERR "loop: transfer error block %llu\n",
 			       (unsigned long long)index);
+			kaddr = kmap_atomic(page, KM_USER0);
 			memset(kaddr + offset, 0, size);
+			kunmap_atomic(kaddr, KM_USER0);
 		}
 		flush_dcache_page(page);
-		kunmap(page);
 		if (aops->commit_write(file, page, offset, offset+size))
 			goto unlock;
 		if (transfer_result)
 			goto unlock;
-		data += size;
+		bv_offs += size;
 		len -= size;
 		offset = 0;
 		index++;
@@ -232,7 +250,6 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	}
 	up(&mapping->host->i_sem);
 out:
-	kunmap(bvec->bv_page);
 	return ret;
 
 unlock:
@@ -247,12 +264,10 @@ fail:
 static int
 lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
-	unsigned vecnr;
-	int ret = 0;
+	struct bio_vec *bvec;
+	int i, ret = 0;
 
-	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
-		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
-
+	bio_for_each_segment(bvec, bio, i) {
 		ret = do_lo_send(lo, bvec, bsize, pos);
 		if (ret < 0)
 			break;
@@ -263,7 +278,8 @@ lo_send(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 
 struct lo_read_data {
 	struct loop_device *lo;
-	char *data;
+	struct page *page;
+	unsigned offset;
 	int bsize;
 };
 
@@ -271,7 +287,6 @@ static int
 lo_read_actor(read_descriptor_t *desc, struct page *page,
 	      unsigned long offset, unsigned long size)
 {
-	char *kaddr;
 	unsigned long count = desc->count;
 	struct lo_read_data *p = (struct lo_read_data*)desc->buf;
 	struct loop_device *lo = p->lo;
@@ -282,18 +297,16 @@ lo_read_actor(read_descriptor_t *desc, struct page *page,
 	if (size > count)
 		size = count;
 
-	kaddr = kmap(page);
-	if (lo_do_transfer(lo, READ, kaddr + offset, p->data, size, IV)) {
+	if (lo_do_transfer(lo, READ, page, offset, p->page, p->offset, size, IV)) {
 		size = 0;
 		printk(KERN_ERR "loop: transfer error block %ld\n",
 		       page->index);
 		desc->error = -EINVAL;
 	}
-	kunmap(page);
 	
 	desc->count = count - size;
 	desc->written += size;
-	p->data += size;
+	p->offset += size;
 	return size;
 }
 
@@ -306,24 +319,22 @@ do_lo_receive(struct loop_device *lo,
 	int retval;
 
 	cookie.lo = lo;
-	cookie.data = kmap(bvec->bv_page) + bvec->bv_offset;
+	cookie.page = bvec->bv_page;
+	cookie.offset = bvec->bv_offset;
 	cookie.bsize = bsize;
 	file = lo->lo_backing_file;
 	retval = file->f_op->sendfile(file, &pos, bvec->bv_len,
 			lo_read_actor, &cookie);
-	kunmap(bvec->bv_page);
 	return (retval < 0)? retval: 0;
 }
 
 static int
 lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 {
-	unsigned vecnr;
-	int ret = 0;
+	struct bio_vec *bvec;
+	int i, ret = 0;
 
-	for (vecnr = 0; vecnr < bio->bi_vcnt; vecnr++) {
-		struct bio_vec *bvec = &bio->bi_io_vec[vecnr];
-
+	bio_for_each_segment(bvec, bio, i) {
 		ret = do_lo_receive(lo, bvec, bsize, pos);
 		if (ret < 0)
 			break;
@@ -343,23 +354,6 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 	else
 		ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
 	return ret;
-}
-
-static int loop_end_io_transfer(struct bio *, unsigned int, int);
-
-static void loop_put_buffer(struct bio *bio)
-{
-	/*
-	 * check bi_end_io, may just be a remapped bio
-	 */
-	if (bio && bio->bi_end_io == loop_end_io_transfer) {
-		int i;
-
-		for (i = 0; i < bio->bi_vcnt; i++)
-			__free_page(bio->bi_io_vec[i].bv_page);
-
-		bio_put(bio);
-	}
 }
 
 /*
@@ -399,129 +393,8 @@ static struct bio *loop_get_bio(struct loop_device *lo)
 	return bio;
 }
 
-/*
- * if this was a WRITE lo->transfer stuff has already been done. for READs,
- * queue it for the loop thread and let it do the transfer out of
- * bi_end_io context (we don't want to do decrypt of a page with irqs
- * disabled)
- */
-static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int err)
-{
-	struct bio *rbh = bio->bi_private;
-	struct loop_device *lo = rbh->bi_bdev->bd_disk->private_data;
-
-	if (bio->bi_size)
-		return 1;
-
-	if (err || bio_rw(bio) == WRITE) {
-		bio_endio(rbh, rbh->bi_size, err);
-		if (atomic_dec_and_test(&lo->lo_pending))
-			up(&lo->lo_bh_mutex);
-		loop_put_buffer(bio);
-	} else
-		loop_add_bio(lo, bio);
-
-	return 0;
-}
-
-static struct bio *loop_copy_bio(struct bio *rbh)
-{
-	struct bio *bio;
-	struct bio_vec *bv;
-	int i;
-
-	bio = bio_alloc(__GFP_NOWARN, rbh->bi_vcnt);
-	if (!bio)
-		return NULL;
-
-	/*
-	 * iterate iovec list and alloc pages
-	 */
-	__bio_for_each_segment(bv, rbh, i, 0) {
-		struct bio_vec *bbv = &bio->bi_io_vec[i];
-
-		bbv->bv_page = alloc_page(__GFP_NOWARN|__GFP_HIGHMEM);
-		if (bbv->bv_page == NULL)
-			goto oom;
-
-		bbv->bv_len = bv->bv_len;
-		bbv->bv_offset = bv->bv_offset;
-	}
-
-	bio->bi_vcnt = rbh->bi_vcnt;
-	bio->bi_size = rbh->bi_size;
-
-	return bio;
-
-oom:
-	while (--i >= 0)
-		__free_page(bio->bi_io_vec[i].bv_page);
-
-	bio_put(bio);
-	return NULL;
-}
-
-static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
-{
-	struct bio *bio;
-
-	/*
-	 * When called on the page reclaim -> writepage path, this code can
-	 * trivially consume all memory.  So we drop PF_MEMALLOC to avoid
-	 * stealing all the page reserves and throttle to the writeout rate.
-	 * pdflush will have been woken by page reclaim.  Let it do its work.
-	 */
-	do {
-		int flags = current->flags;
-
-		current->flags &= ~PF_MEMALLOC;
-		bio = loop_copy_bio(rbh);
-		if (flags & PF_MEMALLOC)
-			current->flags |= PF_MEMALLOC;
-
-		if (bio == NULL)
-			blk_congestion_wait(WRITE, HZ/10);
-	} while (bio == NULL);
-
-	bio->bi_end_io = loop_end_io_transfer;
-	bio->bi_private = rbh;
-	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
-	bio->bi_rw = rbh->bi_rw;
-	bio->bi_bdev = lo->lo_device;
-
-	return bio;
-}
-
-static int loop_transfer_bio(struct loop_device *lo,
-			     struct bio *to_bio, struct bio *from_bio)
-{
-	sector_t IV;
-	struct bio_vec *from_bvec, *to_bvec;
-	char *vto, *vfrom;
-	int ret = 0, i;
-
-	IV = from_bio->bi_sector + (lo->lo_offset >> 9);
-
-	__bio_for_each_segment(from_bvec, from_bio, i, 0) {
-		to_bvec = &to_bio->bi_io_vec[i];
-
-		kmap(from_bvec->bv_page);
-		kmap(to_bvec->bv_page);
-		vfrom = page_address(from_bvec->bv_page) + from_bvec->bv_offset;
-		vto = page_address(to_bvec->bv_page) + to_bvec->bv_offset;
-		ret |= lo_do_transfer(lo, bio_data_dir(to_bio), vto, vfrom,
-					from_bvec->bv_len, IV);
-		kunmap(from_bvec->bv_page);
-		kunmap(to_bvec->bv_page);
-		IV += from_bvec->bv_len >> 9;
-	}
-
-	return ret;
-}
-		
 static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 {
-	struct bio *new_bio = NULL;
 	struct loop_device *lo = q->queuedata;
 	int rw = bio_rw(old_bio);
 
@@ -543,31 +416,11 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 		printk(KERN_ERR "loop: unknown command (%x)\n", rw);
 		goto err;
 	}
-
-	/*
-	 * file backed, queue for loop_thread to handle
-	 */
-	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
-		loop_add_bio(lo, old_bio);
-		return 0;
-	}
-
-	/*
-	 * piggy old buffer on original, and submit for I/O
-	 */
-	new_bio = loop_get_buffer(lo, old_bio);
-	if (rw == WRITE) {
-		if (loop_transfer_bio(lo, new_bio, old_bio))
-			goto err;
-	}
-
-	generic_make_request(new_bio);
+	loop_add_bio(lo, old_bio);
 	return 0;
-
 err:
 	if (atomic_dec_and_test(&lo->lo_pending))
 		up(&lo->lo_bh_mutex);
-	loop_put_buffer(new_bio);
 out:
 	bio_io_error(old_bio, old_bio->bi_size);
 	return 0;
@@ -580,20 +433,8 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 {
 	int ret;
 
-	/*
-	 * For block backed loop, we know this is a READ
-	 */
-	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
-		ret = do_bio_filebacked(lo, bio);
-		bio_endio(bio, bio->bi_size, ret);
-	} else {
-		struct bio *rbh = bio->bi_private;
-
-		ret = loop_transfer_bio(lo, bio, rbh);
-
-		bio_endio(rbh, rbh->bi_size, ret);
-		loop_put_buffer(bio);
-	}
+	ret = do_bio_filebacked(lo, bio);
+	bio_endio(bio, bio->bi_size, ret);
 }
 
 /*
@@ -684,31 +525,23 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
 	error = -EINVAL;
-	if (S_ISBLK(inode->i_mode)) {
-		lo_device = I_BDEV(inode);
-		if (lo_device == bdev) {
-			error = -EBUSY;
-			goto out_putf;
-		}
-		lo_blocksize = block_size(lo_device);
-		if (bdev_read_only(lo_device))
-			lo_flags |= LO_FLAGS_READ_ONLY;
-	} else if (S_ISREG(inode->i_mode)) {
+	if (S_ISREG(inode->i_mode) || S_ISBLK(inode->i_mode)) {
 		struct address_space_operations *aops = mapping->a_ops;
 		/*
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		if (!inode->i_fop->sendfile)
+		if (!lo_file->f_op->sendfile)
 			goto out_putf;
 
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
 		lo_blocksize = inode->i_blksize;
-		lo_flags |= LO_FLAGS_DO_BMAP;
-	} else
+		error = 0;
+	} else {
 		goto out_putf;
+	}
 
 	if (!(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
@@ -737,21 +570,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	 */
 	blk_queue_make_request(lo->lo_queue, loop_make_request);
 	lo->lo_queue->queuedata = lo;
-
-	/*
-	 * we remap to a block device, make sure we correctly stack limits
-	 */
-	if (S_ISBLK(inode->i_mode)) {
-		request_queue_t *q = bdev_get_queue(lo_device);
-
-		blk_queue_max_sectors(lo->lo_queue, q->max_sectors);
-		blk_queue_max_phys_segments(lo->lo_queue,q->max_phys_segments);
-		blk_queue_max_hw_segments(lo->lo_queue, q->max_hw_segments);
-		blk_queue_hardsect_size(lo->lo_queue, queue_hardsect_size(q));
-		blk_queue_max_segment_size(lo->lo_queue, q->max_segment_size);
-		blk_queue_segment_boundary(lo->lo_queue, q->seg_boundary_mask);
-		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
-	}
 
 	set_blocksize(bdev, lo_blocksize);
 
@@ -1196,7 +1014,6 @@ int __init loop_init(void)
 		lo->lo_queue = blk_alloc_queue(GFP_KERNEL);
 		if (!lo->lo_queue)
 			goto out_mem4;
-		disks[i]->queue = lo->lo_queue;
 		init_MUTEX(&lo->lo_ctl_mutex);
 		init_MUTEX_LOCKED(&lo->lo_sem);
 		init_MUTEX_LOCKED(&lo->lo_bh_mutex);
@@ -1209,14 +1026,18 @@ int __init loop_init(void)
 		sprintf(disk->devfs_name, "loop/%d", i);
 		disk->private_data = lo;
 		disk->queue = lo->lo_queue;
-		add_disk(disk);
 	}
+
+	/* We cannot fail after we call this, so another loop!*/
+	for (i = 0; i < max_loop; i++)
+		add_disk(disks[i]);
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
 out_mem4:
 	while (i--)
 		blk_put_queue(loop_dev[i].lo_queue);
+	devfs_remove("loop");
 	i = max_loop;
 out_mem3:
 	while (i--)

@@ -22,7 +22,6 @@
 #include <asm/segment.h>
 #include <asm/btfixup.h>
 #include <asm/page.h>
-#include <asm/atomic.h>
 
 /*
  * Bus types

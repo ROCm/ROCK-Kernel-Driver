@@ -180,7 +180,7 @@ asmlinkage void __init sh_cpu_init(void)
 	if (fpu_disabled) {
 		printk("FPU Disabled\n");
 		cpu_data->flags &= ~CPU_HAS_FPU;
-		release_fpu();
+		disable_fpu();
 	}
 
 	/* FPU initialization */

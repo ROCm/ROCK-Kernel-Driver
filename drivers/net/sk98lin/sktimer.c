@@ -2,6 +2,8 @@
  *
  * Name:	sktimer.c
  * Project:	Gigabit Ethernet Adapters, Event Scheduler Module
+ * Version:	$Revision: 1.14 $
+ * Date:	$Date: 2003/09/16 13:46:51 $
  * Purpose:	High level timer functions.
  *
  ******************************************************************************/
@@ -19,6 +21,7 @@
  *	The information in this file is provided "AS IS" without warranty.
  *
  ******************************************************************************/
+
 
 /*
  *	Event queue and dispatcher

@@ -358,8 +358,12 @@ static int eth_configure(int n, void *init, char *mac,
 	rtnl_lock();
 	err = register_netdevice(dev);
 	rtnl_unlock();
-	if (err)
+	if (err) {
+		device->dev = NULL;
+		/* XXX: should we call ->remove() here? */
+		free_netdev(dev);
 		return 1;
+	}
 	lp = dev->priv;
 
 	INIT_LIST_HEAD(&lp->list);

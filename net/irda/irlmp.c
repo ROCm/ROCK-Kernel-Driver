@@ -1193,7 +1193,8 @@ void irlmp_udata_indication(struct lsap_cb *self, struct sk_buff *skb)
  * Function irlmp_connless_data_request (self, skb)
  */
 #ifdef CONFIG_IRDA_ULTRA
-int irlmp_connless_data_request(struct lsap_cb *self, struct sk_buff *userdata)
+int irlmp_connless_data_request(struct lsap_cb *self, struct sk_buff *userdata,
+				__u8 pid)
 {
 	struct sk_buff *clone_skb;
 	struct lap_cb *lap;
@@ -1208,7 +1209,10 @@ int irlmp_connless_data_request(struct lsap_cb *self, struct sk_buff *userdata)
 
 	/* Insert protocol identifier */
 	skb_push(userdata, LMP_PID_HEADER);
-	userdata->data[0] = self->pid;
+	if(self != NULL)
+	  userdata->data[0] = self->pid;
+	else
+	  userdata->data[0] = pid;
 
 	/* Connectionless sockets must use 0x70 */
 	skb_push(userdata, LMP_HEADER);

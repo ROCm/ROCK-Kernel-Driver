@@ -97,7 +97,7 @@ static int __init init_soleng_maps(void)
 
 	nr_parts = parse_mtd_partitions(flash_mtd, probes, &parsed_parts, 0);
 
-#if CONFIG_MTD_SUPERH_RESERVE
+#ifdef CONFIG_MTD_SUPERH_RESERVE
 	if (nr_parts <= 0) {
 		printk(KERN_NOTICE "Using configured partition at 0x%08x.\n",
 		       CONFIG_MTD_SUPERH_RESERVE);

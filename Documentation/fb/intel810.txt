@@ -194,7 +194,7 @@ Using the same setup as described above, load the module like this:
 	modprobe i810fb vram=2 xres=1024 bpp=8 hsync1=30 hsync2=55 vsync1=50 \
 	         vsync2=85 accel=1 mtrr=1
 
-Or just add the following to /etc/modules.conf
+Or just add the following to /etc/modprobe.conf
 
 	options i810fb vram=2 xres=1024 bpp=16 hsync1=30 hsync2=55 vsync1=50 \
 	vsync2=85 accel=1 mtrr=1

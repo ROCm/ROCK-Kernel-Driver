@@ -115,6 +115,7 @@
 /* MacRISC4 / G5 machines
  */
 #define PMAC_TYPE_POWERMAC_G5		0x150	/* First tower */
+#define PMAC_TYPE_UNKNOWN_K2		0x19f	/* Any other K2 based */
 
 /*
  * Motherboard flags

@@ -71,6 +71,8 @@ u64 sn_partition_serial_number;
 
 short physical_node_map[MAX_PHYSNODE_ID];
 
+EXPORT_SYMBOL(physical_node_map);
+
 int	numionodes;
 /*
  * This is the address of the RRegs in the HSpace of the global
@@ -83,6 +85,7 @@ int	numionodes;
 u64 master_node_bedrock_address;
 
 static void sn_init_pdas(char **);
+static void scan_for_ionodes(void);
 
 
 static nodepda_t	*nodepdaindr[MAX_COMPACT_NODES];
@@ -129,7 +132,7 @@ char drive_info[4*16];
  * may not be initialized yet.
  */
 
-static int
+static int __init
 pxm_to_nasid(int pxm)
 {
 	int i;
@@ -356,11 +359,10 @@ sn_setup(char **cmdline_p)
  *
  * One time setup for Node Data Area.  Called by sn_setup().
  */
-void
+void __init
 sn_init_pdas(char **cmdline_p)
 {
 	cnodeid_t	cnode;
-	void scan_for_ionodes(void);
 
 	/*
 	 * Make sure that the PDA fits entirely in the same page as the 
@@ -496,7 +498,7 @@ sn_cpu_init(void)
  * physical_node_map and the pda and increment numionodes.
  */
 
-void
+static void __init
 scan_for_ionodes(void)
 {
 	int nasid = 0;

@@ -190,7 +190,8 @@ int vfs_permission(struct inode * inode, int mask)
 	 * Read/write DACs are always overridable.
 	 * Executable DACs are overridable if at least one exec bit is set.
 	 */
-	if ((mask & (MAY_READ|MAY_WRITE)) || (inode->i_mode & S_IXUGO))
+	if (!(mask & MAY_EXEC) ||
+	    (inode->i_mode & S_IXUGO) || S_ISDIR(inode->i_mode))
 		if (capable(CAP_DAC_OVERRIDE))
 			return 0;
 
@@ -237,30 +238,34 @@ int permission(struct inode * inode,int mask, struct nameidata *nd)
  * except for the cases where we don't hold i_writecount yet. Then we need to
  * use {get,deny}_write_access() - these functions check the sign and refuse
  * to do the change if sign is wrong. Exclusion between them is provided by
- * spinlock (arbitration_lock) and I'll rip the second arsehole to the first
- * who will try to move it in struct inode - just leave it here.
+ * the inode->i_lock spinlock.
  */
-static spinlock_t arbitration_lock = SPIN_LOCK_UNLOCKED;
+
 int get_write_access(struct inode * inode)
 {
-	spin_lock(&arbitration_lock);
+	spin_lock(&inode->i_lock);
 	if (atomic_read(&inode->i_writecount) < 0) {
-		spin_unlock(&arbitration_lock);
+		spin_unlock(&inode->i_lock);
 		return -ETXTBSY;
 	}
 	atomic_inc(&inode->i_writecount);
-	spin_unlock(&arbitration_lock);
+	spin_unlock(&inode->i_lock);
+
 	return 0;
 }
+
 int deny_write_access(struct file * file)
 {
-	spin_lock(&arbitration_lock);
-	if (atomic_read(&file->f_dentry->d_inode->i_writecount) > 0) {
-		spin_unlock(&arbitration_lock);
+	struct inode *inode = file->f_dentry->d_inode;
+
+	spin_lock(&inode->i_lock);
+	if (atomic_read(&inode->i_writecount) > 0) {
+		spin_unlock(&inode->i_lock);
 		return -ETXTBSY;
 	}
-	atomic_dec(&file->f_dentry->d_inode->i_writecount);
-	spin_unlock(&arbitration_lock);
+	atomic_dec(&inode->i_writecount);
+	spin_unlock(&inode->i_lock);
+
 	return 0;
 }
 

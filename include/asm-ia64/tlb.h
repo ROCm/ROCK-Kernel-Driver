@@ -173,6 +173,12 @@ tlb_finish_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long end)
 	check_pgt_cache();
 }
 
+static inline unsigned int
+tlb_is_full_mm(struct mmu_gather *tlb)
+{
+     return tlb->fullmm;
+}
+
 /*
  * Logically, this routine frees PAGE.  On MP machines, the actual freeing of the page
  * must be delayed until after the TLB has been flushed (see comments at the beginning of

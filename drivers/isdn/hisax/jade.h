@@ -1,4 +1,4 @@
-/* $Id: jade.h,v 1.3.6.2 2001/09/23 22:24:49 kai Exp $
+/* $Id: jade.h,v 1.5.2.3 2004/01/14 16:04:48 keil Exp $
  *
  * JADE specific defines
  *
@@ -127,10 +127,9 @@
 #define	jade_TXAUDIOCH1CFG				0x17
 #define	jade_TXAUDIOCH2CFG				0x1A
 
-extern void jade_sched_event(struct BCState *bcs, int event);
+extern int JadeVersion(struct IsdnCardState *cs, char *s);
 extern void modejade(struct BCState *bcs, int mode, int bc);
+extern void clear_pending_jade_ints(struct IsdnCardState *cs);
 extern void initjade(struct IsdnCardState *cs);
-extern void jade_int_main(struct IsdnCardState *cs, u8 val, int jade);
-extern int  jade_setup(struct IsdnCardState *cs, struct bc_hw_ops *jade_ops);
 
 #endif	/* __JADE_H__ */

@@ -143,7 +143,7 @@ config ACPI_NUMA
 	bool "NUMA support"
 	depends on ACPI_INTERPRETER
 	depends on NUMA
-	depends on !X86_64
+	depends on IA64
 	default y if IA64_GENERIC || IA64_SGI_SN2
 
 config ACPI_ASUS
@@ -262,6 +262,24 @@ config ACPI_RELAXED_AML
 	  errors in region sizes.  Some laptops may require this option.  In
 	  particular, many Toshiba laptops require this for correct operation
 	  of the AC module.
+
+config X86_PM_TIMER
+	bool "Power Management Timer Support"
+	depends on X86 && ACPI
+	depends on ACPI_BOOT && EXPERIMENTAL
+	default n
+	help
+	  The Power Management Timer is available on all ACPI-capable,
+	  in most cases even if ACPI is unusable or blacklisted.
+
+	  This timing source is not affected by powermanagement features
+	  like aggressive processor idling, throttling, frequency and/or
+	  voltage scaling, unlike the commonly used Time Stamp Counter
+	  (TSC) timing source.
+
+	  So, if you see messages like 'Losing too many ticks!' in the
+	  kernel logs, and/or you are using a this on a notebook which
+	  does not yet have an HPET, you should say "Y" here.
 
 endmenu
 

@@ -39,12 +39,15 @@
 #include <asm/io.h>
 #include <asm/dbdma.h>
 #include <asm/ide.h>
-#include <asm/mediabay.h>
 #include <asm/pci-bridge.h>
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 #include <asm/sections.h>
 #include <asm/irq.h>
+
+#ifndef CONFIG_PPC64
+#include <asm/mediabay.h>
+#endif
 
 #include "ide-timing.h"
 
@@ -1183,6 +1186,7 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	/* Make sure we have sane timings */
 	sanitize_timings(pmif);
 
+#ifndef CONFIG_PPC64
 	/* XXX FIXME: Media bay stuff need re-organizing */
 	if (np->parent && np->parent->name
 	    && strcasecmp(np->parent->name, "media-bay") == 0) {
@@ -1198,7 +1202,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		 * units, I keep the old way
 		 */
 		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, 0, 1);
-	} else {
+	} else
+#endif
+	{
  		/* This is necessary to enable IDE when net-booting */
 		ppc_md.feature_call(PMAC_FTR_IDE_RESET, np, pmif->aapl_bus_id, 1);
 		ppc_md.feature_call(PMAC_FTR_IDE_ENABLE, np, pmif->aapl_bus_id, 1);
@@ -1238,9 +1244,9 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		hwif->led_act = pmu_hd_kick_blink;
 #endif
 
-	printk(KERN_INFO "ide%d: Found Apple %s controller, bus ID %d%s\n",
-			hwif->index, model_name[pmif->kind], pmif->aapl_bus_id,
-			pmif->mediabay ? " (mediabay)" : "");
+	printk(KERN_INFO "ide%d: Found Apple %s controller, bus ID %d%s, irq %d\n",
+	       hwif->index, model_name[pmif->kind], pmif->aapl_bus_id,
+	       pmif->mediabay ? " (mediabay)" : "", hwif->irq);
 			
 #ifdef CONFIG_PMAC_PBOOK
 	if (pmif->mediabay && check_media_bay_by_base(pmif->regbase, MB_CD) == 0)
@@ -1447,7 +1453,12 @@ pmac_ide_pci_attach(struct pci_dev *pdev, const struct pci_device_id *id)
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	pmif->dma_regs = (volatile struct dbdma_regs*)(base + 0x1000);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PMAC */	
-	pmif->irq = pdev->irq;
+
+	/* We use the OF node irq mapping */
+	if (np->n_intrs == 0)
+		pmif->irq = pdev->irq;
+	else
+		pmif->irq = np->intrs[0].line;
 
 	pci_set_drvdata(pdev, hwif);
 
@@ -1977,12 +1988,6 @@ pmac_ide_dma_write (ide_drive_t *drive)
 	return pmac_ide_dma_begin(drive);
 }
 
-static int __pmac
-pmac_ide_dma_count (ide_drive_t *drive)
-{
-	return HWIF(drive)->ide_dma_begin(drive);
-}
-
 /*
  * Kick the DMA controller into life after the DMA command has been issued
  * to the drive.
@@ -2148,20 +2153,16 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 				    	pmif->dma_table_cpu, pmif->dma_table_dma);
 		return;
 	}
-	hwif->ide_dma_off = &__ide_dma_off;
 	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	hwif->ide_dma_on = &__ide_dma_on;
 	hwif->ide_dma_check = &pmac_ide_dma_check;
 	hwif->ide_dma_read = &pmac_ide_dma_read;
 	hwif->ide_dma_write = &pmac_ide_dma_write;
-	hwif->ide_dma_count = &pmac_ide_dma_count;
 	hwif->ide_dma_begin = &pmac_ide_dma_begin;
 	hwif->ide_dma_end = &pmac_ide_dma_end;
 	hwif->ide_dma_test_irq = &pmac_ide_dma_test_irq;
 	hwif->ide_dma_host_off = &pmac_ide_dma_host_off;
 	hwif->ide_dma_host_on = &pmac_ide_dma_host_on;
-	hwif->ide_dma_good_drive = &__ide_dma_good_drive;
-	hwif->ide_dma_bad_drive = &__ide_dma_bad_drive;
 	hwif->ide_dma_verbose = &__ide_dma_verbose;
 	hwif->ide_dma_timeout = &__ide_dma_timeout;
 	hwif->ide_dma_lostirq = &pmac_ide_dma_lostirq;

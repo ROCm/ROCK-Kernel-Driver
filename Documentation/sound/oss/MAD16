@@ -1,4 +1,5 @@
-(This recipe has been edited to update the configuration symbols.)
+(This recipe has been edited to update the configuration symbols,
+ and change over to modprobe.conf for 2.6)
 
 From: Shaw Carruthers <shaw@shawc.demon.co.uk>
 
@@ -20,9 +21,9 @@ CONFIG_SOUND_ADLIB=m
 CONFIG_SOUND_MAD16=m
 CONFIG_SOUND_YM3812=m
 
-modules.conf has:
+modprobe.conf has:
 
-alias char-major-14 mad16
+alias char-major-14-* mad16
 options sb mad16=1
 options mad16 io=0x530 irq=7 dma=0 dma16=1  && /usr/local/bin/aumix -w 15 -p 20 -m 0 -1 0 -2 0 -3 0 -i 0
 

@@ -70,7 +70,7 @@ MODULE_PARM_DESC(ql2xretrycount,
 int displayConfig;
 module_param(displayConfig, int, 0);
 MODULE_PARM_DESC(displayConfig,
-		"If 1 then display the configuration used in /etc/modules.conf.");
+		"If 1 then display the configuration used in /etc/modprobe.conf.");
 
 int ql2xplogiabsentdevice;
 module_param(ql2xplogiabsentdevice, int, 0);
@@ -2382,8 +2382,9 @@ qla2x00_proc_info(struct Scsi_Host *shost, char *buffer,
 	    ha->brd_info->isp_name, ('A' + tmp_sn/100000), (tmp_sn%100000));
 
 	copy_info(&info,
-	    "Request Queue = 0x%p, Response Queue = 0x%p\n",
-	    (void *)ha->request_dma, (void *)ha->response_dma);
+	    "Request Queue = 0x%llx, Response Queue = 0x%llx\n",
+		(unsigned long long)ha->request_dma,
+		(unsigned long long)ha->response_dma);
 
 	copy_info(&info,
 	    "Request Queue count = %ld, Response Queue count = %ld\n",

@@ -1,4 +1,4 @@
-/* $Id: w6692.h,v 1.2.6.2 2001/09/23 22:24:52 kai Exp $
+/* $Id: w6692.h,v 1.4.2.2 2004/01/12 22:52:29 keil Exp $
  *
  * Winbond W6692 specific defines
  *
@@ -17,6 +17,9 @@
 #define	writeW6692fifo	writeisacfifo
 
 /* B-channel FIFO read/write routines */
+
+#define READW6692BFIFO(cs,bchan,ptr,count) \
+	insb(cs->hw.w6692.iobase+W_B_RFIFO+(bchan?0x40:0),ptr,count)
 
 #define WRITEW6692BFIFO(cs,bchan,ptr,count) \
 	outsb(cs->hw.w6692.iobase+W_B_XFIFO+(bchan?0x40:0),ptr,count)

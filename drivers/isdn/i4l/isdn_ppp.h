@@ -1,57 +1,43 @@
-/* Linux ISDN subsystem, functions for synchronous PPP (linklevel).
+/* $Id: isdn_ppp.h,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+ *
+ * header for Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
  * Copyright 1995,96 by Michael Hipp (Michael.Hipp@student.uni-tuebingen.de)
- *           1999-2002  by Kai Germaschewski <kai@germaschewski.name>
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
-#include "isdn_net_lib.h"
+#include <linux/ppp_defs.h>     /* for PPP_PROTOCOL */
+#include <linux/isdn_ppp.h>	/* for isdn_ppp info */
 
-extern struct file_operations isdn_ppp_fops;
-extern struct isdn_netif_ops isdn_ppp_ops;
+extern int isdn_ppp_read(int, struct file *, char *, int);
+extern int isdn_ppp_write(int, struct file *, const char *, int);
+extern int isdn_ppp_open(int, struct file *);
+extern int isdn_ppp_init(void);
+extern void isdn_ppp_cleanup(void);
+extern int isdn_ppp_free(isdn_net_local *);
+extern int isdn_ppp_bind(isdn_net_local *);
+extern int isdn_ppp_autodial_filter(struct sk_buff *, isdn_net_local *);
+extern int isdn_ppp_xmit(struct sk_buff *, struct net_device *);
+extern void isdn_ppp_receive(isdn_net_dev *, isdn_net_local *, struct sk_buff *);
+extern int isdn_ppp_dev_ioctl(struct net_device *, struct ifreq *, int);
+extern unsigned int isdn_ppp_poll(struct file *, struct poll_table_struct *);
+extern int isdn_ppp_ioctl(int, struct file *, unsigned int, unsigned long);
+extern void isdn_ppp_release(int, struct file *);
+extern int isdn_ppp_dial_slave(char *);
+extern void isdn_ppp_wakeup_daemon(isdn_net_local *);
 
-int isdn_ppp_init(void);
-void isdn_ppp_cleanup(void);
-int isdn_ppp_dial_slave(char *);
-int isdn_ppp_hangup_slave(char *);
+extern int isdn_ppp_register_compressor(struct isdn_ppp_compressor *ipc);
+extern int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc);
 
-struct inl_ppp {
-	unsigned long debug;
-	struct slcompress *slcomp;
-	struct ippp_ccp *ccp;         /* CCP for this channel */
-	unsigned int mp_cfg;
-	struct sk_buff_head mp_frags; /* fragments list */
-	u32 mp_rxseq;                 /* last processed packet seq # */
-	u32 mp_txseq;                 /* current tx seq # */
-};
-
-struct ind_ppp {
-	struct ipppd *ipppd;          /* /dev/ipppX which controls us */
-	unsigned int pppcfg;
-	unsigned long debug;
-	struct ippp_ccp *ccp;         /* CCP for this channel (multilink) */
-	u32 mp_rxseq;                 /* last seq no seen on this channel */
-};
-
-void
-isdn_ppp_frame_log(char *info, char *data, int len, int maxlen, 
-		   int unit, int slot);
-
-int
-isdn_ppp_strip_proto(struct sk_buff *skb, u16 *proto);
-
-void
-ippp_push_proto(struct ind_ppp *ind_ppp, struct sk_buff *skb, u16 proto);
-
-void
-ippp_xmit(isdn_net_dev *idev, struct sk_buff *skb);
-
-void
-ippp_receive(isdn_net_dev *idev, struct sk_buff *skb, u16 proto);
-
-struct sk_buff *
-isdn_ppp_dev_alloc_skb(void *priv, int len, int gfp_mask);
+#define IPPP_OPEN	0x01
+#define IPPP_CONNECT	0x02
+#define IPPP_CLOSEWAIT	0x04
+#define IPPP_NOBLOCK	0x08
+#define IPPP_ASSIGNED	0x10
 
 #define IPPP_MAX_HEADER 10
+
+

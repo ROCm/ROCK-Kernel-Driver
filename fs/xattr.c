@@ -140,7 +140,7 @@ getxattr(struct dentry *d, char __user *name, void __user *value, size_t size)
 			goto out;
 		error = d->d_inode->i_op->getxattr(d, kname, kvalue, size);
 		if (error > 0) {
-			if (copy_to_user(value, kvalue, error))
+			if (size && copy_to_user(value, kvalue, error))
 				error = -EFAULT;
 		} else if (error == -ERANGE && size >= XATTR_SIZE_MAX) {
 			/* The file system tried to returned a value bigger
@@ -222,7 +222,7 @@ listxattr(struct dentry *d, char __user *list, size_t size)
 			goto out;
 		error = d->d_inode->i_op->listxattr(d, klist, size);
 		if (error > 0) {
-			if (copy_to_user(list, klist, error))
+			if (size && copy_to_user(list, klist, error))
 				error = -EFAULT;
 		} else if (error == -ERANGE && size >= XATTR_LIST_MAX) {
 			/* The file system tried to returned a list bigger

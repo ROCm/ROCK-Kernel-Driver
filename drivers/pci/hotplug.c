@@ -29,7 +29,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 
 	/* stuff we want to pass to /sbin/hotplug */
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_CLASS=%04X",
+	length += scnprintf (scratch, buffer_size - length, "PCI_CLASS=%04X",
 			    pdev->class);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -37,7 +37,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_ID=%04X:%04X",
+	length += scnprintf (scratch, buffer_size - length, "PCI_ID=%04X:%04X",
 			    pdev->vendor, pdev->device);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -45,7 +45,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length,
+	length += scnprintf (scratch, buffer_size - length,
 			    "PCI_SUBSYS_ID=%04X:%04X", pdev->subsystem_vendor,
 			    pdev->subsystem_device);
 	if ((buffer_size - length <= 0) || (i >= num_envp))
@@ -54,7 +54,7 @@ int pci_hotplug (struct device *dev, char **envp, int num_envp,
 	scratch += length;
 
 	envp[i++] = scratch;
-	length += snprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
+	length += scnprintf (scratch, buffer_size - length, "PCI_SLOT_NAME=%s",
 			    pci_name(pdev));
 	if ((buffer_size - length <= 0) || (i >= num_envp))
 		return -ENOMEM;
@@ -116,7 +116,7 @@ static int pci_visit_bridge (struct pci_visit * fn,
 	}
 
 	bus = wrapped_dev->dev->subordinate;
-	if(bus) {
+	if (bus) {
 		memset(&wrapped_bus, 0, sizeof(struct pci_bus_wrapped));
 		wrapped_bus.bus = bus;
 
@@ -130,8 +130,8 @@ static int pci_visit_bridge (struct pci_visit * fn,
  * Every bus and every function is presented to a custom
  * function that can act upon it.
  */
-int pci_visit_dev (struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
-		   struct pci_bus_wrapped *wrapped_parent)
+int pci_visit_dev(struct pci_visit *fn, struct pci_dev_wrapped *wrapped_dev,
+		  struct pci_bus_wrapped *wrapped_parent)
 {
 	struct pci_dev* dev = wrapped_dev ? wrapped_dev->dev : NULL;
 	int result = 0;

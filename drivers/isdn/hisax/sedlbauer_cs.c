@@ -53,6 +53,7 @@
 #include <pcmcia/cistpl.h>
 #include <pcmcia/cisreg.h>
 #include <pcmcia/ds.h>
+#include "hisax_cfg.h"
 
 MODULE_DESCRIPTION("ISDN4Linux: PCMCIA client driver for Sedlbauer cards");
 MODULE_AUTHOR("Marcus Niemann");
@@ -92,8 +93,6 @@ MODULE_PARM(irq_list, "1-4i");
 
 static int protocol = 2;        /* EURO-ISDN Default */
 MODULE_PARM(protocol, "i");
-
-extern int sedl_init_pcmcia(int, int, int*, int);
 
 /*====================================================================*/
 
@@ -176,6 +175,7 @@ typedef struct local_info_t {
     dev_link_t		link;
     dev_node_t		node;
     int			stop;
+    int			cardnr;
 } local_info_t;
 
 /*======================================================================
@@ -203,6 +203,7 @@ static dev_link_t *sedlbauer_attach(void)
     local = kmalloc(sizeof(local_info_t), GFP_KERNEL);
     if (!local) return NULL;
     memset(local, 0, sizeof(local_info_t));
+    local->cardnr = -1;
     link = &local->link; link->priv = local;
     
     /* Interrupt setup */
@@ -324,7 +325,7 @@ static void sedlbauer_config(dev_link_t *link)
     config_info_t conf;
     win_req_t req;
     memreq_t map;
-    
+    IsdnCard_t  icard;
 
     DEBUG(0, "sedlbauer_config(0x%p)\n", link);
 
@@ -509,10 +510,19 @@ static void sedlbauer_config(dev_link_t *link)
     printk("\n");
     
     link->state &= ~DEV_CONFIG_PENDING;
- 
-    sedl_init_pcmcia(link->io.BasePort1, link->irq.AssignedIRQ,
-                     &(((local_info_t*)link->priv)->stop),
-                     protocol);
+
+    icard.para[0] = link->irq.AssignedIRQ;
+    icard.para[1] = link->io.BasePort1;
+    icard.protocol = protocol;
+    icard.typ = ISDN_CTYPE_SEDLBAUER_PCMCIA;
+    
+    last_ret = hisax_init_pcmcia(link, &(((local_info_t*)link->priv)->stop), &icard);
+    if (last_ret < 0) {
+    	printk(KERN_ERR "sedlbauer_cs: failed to initialize SEDLBAUER PCMCIA %d at i/o %#x\n",
+    		last_ret, link->io.BasePort1);
+    	sedlbauer_release(link);
+    } else
+    	((local_info_t*)link->priv)->cardnr = last_ret;
 
     return;
 
@@ -532,8 +542,15 @@ cs_failed:
 
 static void sedlbauer_release(dev_link_t *link)
 {
+    local_info_t *local = link->priv;
     DEBUG(0, "sedlbauer_release(0x%p)\n", link);
 
+    if (local) {
+    	if (local->cardnr >= 0) {
+    	    /* no unregister function with hisax */
+	    HiSax_closecard(local->cardnr);
+	}
+    }
     /* Unlink the device chain */
     link->dev = NULL;
 

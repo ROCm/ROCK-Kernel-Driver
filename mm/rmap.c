@@ -171,7 +171,7 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	pte_addr_t pte_paddr = ptep_to_paddr(ptep);
 	struct pte_chain *cur_pte_chain;
 
-	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
+	if (PageReserved(page))
 		return pte_chain;
 
 	pte_chain_lock(page);

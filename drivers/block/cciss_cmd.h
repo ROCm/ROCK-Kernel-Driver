@@ -265,6 +265,7 @@ typedef struct _CfgTable_struct {
   DWORD            Reserved; 
   BYTE             ServerName[16];
   DWORD            HeartBeat;
+  DWORD            SCSI_Prefetch;
 } CfgTable_struct;
 #pragma pack()	 
 #endif // CCISS_CMD_H

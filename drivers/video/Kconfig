@@ -462,6 +462,7 @@ config FB_I810_GTF
 config FB_MATROX
 	tristate "Matrox acceleration"
 	depends on FB && PCI
+	select I2C_ALGOBIT if FB_MATROX_I2C
 	---help---
 	  Say Y here if you have a Matrox Millennium, Matrox Millennium II,
 	  Matrox Mystique, Matrox Mystique 220, Matrox Productiva G100, Matrox
@@ -549,7 +550,6 @@ config FB_MATROX_G100
 config FB_MATROX_I2C
 	tristate "Matrox I2C support"
 	depends on FB_MATROX && I2C
-	select I2C_ALGOBIT
 	---help---
 	  This drivers creates I2C buses which are needed for accessing the
 	  DDC (I2C) bus present on all Matroxes, an I2C bus which
@@ -614,8 +614,8 @@ config FB_MATROX_MULTIHEAD
 	  There is no need for enabling 'Matrox multihead support' if you have
 	  only one Matrox card in the box.
 
-config FB_RADEON
-	tristate "ATI Radeon display support"
+config FB_RADEON_OLD
+	tristate "ATI Radeon display support (Old driver)"
 	depends on FB && PCI
 	help
 	  Choose this option if you want to use an ATI Radeon graphics card as
@@ -623,6 +623,41 @@ config FB_RADEON
 	  don't need to choose this to run the Radeon in plain VGA mode.
 	  There is a product page at
 	  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
+
+config FB_RADEON
+	tristate "ATI Radeon display support"
+	depends on FB && PCI
+	select I2C_ALGOBIT if FB_RADEON_I2C
+	help
+	  Choose this option if you want to use an ATI Radeon graphics card as
+	  a framebuffer device.  There are both PCI and AGP versions.  You
+	  don't need to choose this to run the Radeon in plain VGA mode.
+
+	  If you say Y here and want DDC/I2C support you must first say Y to
+	  "I2C support" and "I2C bit-banging support" in the character devices
+	  section.
+
+	  If you say M here then "I2C support" and "I2C bit-banging support" 
+	  can be build either as modules or built-in.
+
+	  There is a product page at
+	  <http://www.ati.com/na/pages/products/pc/radeon32/index.html>.
+
+config FB_RADEON_I2C
+	bool "DDC/I2C for ATI Radeon support"
+	depends on FB_RADEON && I2C
+	default y
+	help
+	  Say Y here if you want DDC/I2C support for your Radeon board. 
+
+config FB_RADEON_DEBUG
+	bool "Lots of debug output from Radeon driver"
+	depends on FB_RADEON
+	default n
+	help
+	  Say Y here if you want the Radeon driver to output all sorts
+	  of debugging informations to provide to the maintainer when
+	  something goes wrong.
 
 config FB_ATY128
 	tristate "ATI Rage128 display support"

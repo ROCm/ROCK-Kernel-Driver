@@ -15,10 +15,13 @@
 #include <linux/list.h>
 #include <linux/isdn/capilli.h>
 
+#ifdef KCAPI_DEBUG
 #define DBG(format, arg...) do { \
 printk(KERN_DEBUG "%s: " format "\n" , __FUNCTION__ , ## arg); \
 } while (0)
-
+#else
+#define DBG(format, arg...) /* */
+#endif
 
 enum {
 	CARD_DETECTED = 1,
@@ -27,7 +30,7 @@ enum {
 };
 
 extern struct list_head capi_drivers;
-extern spinlock_t capi_drivers_lock;
+extern rwlock_t capi_drivers_list_lock;
 
 extern struct capi20_appl *capi_applications[CAPI_MAXAPPL];
 extern struct capi_ctr *capi_cards[CAPI_MAXCONTR];

@@ -338,12 +338,6 @@ static ctl_table kern_table[] = {
 		.proc_handler	= &proc_dointvec,
 	},
 #endif
-#ifdef __hppa__
-	{KERN_HPPA_PWRSW, "soft-power", &pwrsw_enabled, sizeof (int),
-	 0644, NULL, &proc_dointvec},
-	{KERN_HPPA_UNALIGNED, "unaligned-trap", &unaligned_enabled, sizeof (int),
-	 0644, NULL, &proc_dointvec},
-#endif
 #if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
 	{
 		.ctl_name	= KERN_PPC_POWERSAVE_NAP,
@@ -811,6 +805,22 @@ static ctl_table fs_table[] = {
 		.procname	= "lease-break-time",
 		.data		= &lease_break_time,
 		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= FS_AIO_NR,
+		.procname	= "aio-nr",
+		.data		= &aio_nr,
+		.maxlen		= sizeof(aio_nr),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= FS_AIO_MAX_NR,
+		.procname	= "aio-max-nr",
+		.data		= &aio_max_nr,
+		.maxlen		= sizeof(aio_max_nr),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},

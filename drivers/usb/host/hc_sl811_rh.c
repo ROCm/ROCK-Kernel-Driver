@@ -559,7 +559,7 @@ static int rh_connect_rh (hci_t * hci)
 	struct usb_device *usb_dev;
 
 	hci->rh.devnum = 0;
-	usb_dev = usb_alloc_dev (NULL, hci->bus);
+	usb_dev = usb_alloc_dev (NULL, hci->bus, 0);
 	if (!usb_dev)
 		return -ENOMEM;
 

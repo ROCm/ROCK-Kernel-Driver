@@ -15,10 +15,7 @@
  *
  */
 
-#include <linux/config.h>
-#include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/compiler.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>                  /* for tcphdr */
 #include <net/tcp.h>                    /* for csum_tcpudp_magic */
@@ -370,7 +367,7 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/*
 	 * Okay, now see if we can stuff it in the buffer as-is.
 	 */
-	max_headroom = (((tdev->hard_header_len+15)&~15)+sizeof(struct iphdr));
+	max_headroom = LL_RESERVED_SPACE(tdev) + sizeof(struct iphdr);
 
 	if (skb_headroom(skb) < max_headroom
 	    || skb_cloned(skb) || skb_shared(skb)) {

@@ -97,6 +97,8 @@ struct pci_controller {
 
 	unsigned int windows;
 	struct pci_window *window;
+
+	void *platform_data;
 };
 
 #define PCI_CONTROLLER(busdev) ((struct pci_controller *) busdev->sysdata)
@@ -110,6 +112,10 @@ static inline int pci_name_bus(char *name, struct pci_bus *bus)
 		sprintf(name, "%04x:%02x", pci_domain_nr(bus), bus->number);
 	}
 	return 0;
+}
+
+static inline void pcibios_add_platform_entries(struct pci_dev *dev)
+{
 }
 
 /* generic pci stuff */

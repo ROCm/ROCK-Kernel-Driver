@@ -1,21 +1,26 @@
-/* Linux ISDN subsystem, V.110
+/* $Id: isdn_v110.c,v 1.1.2.2 2004/01/12 22:37:19 keil Exp $
+ *
+ * Linux ISDN subsystem, V.110 related functions (linklevel).
  *
  * Copyright by Thomas Pfeiffer (pfeiffer@pds.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
+ *
  */
 
 #include <linux/string.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
+#include <linux/delay.h>
 
 #include <linux/isdn.h>
 #include "isdn_v110.h"
-#include "isdn_common.h"
 
 #undef ISDN_V110_DEBUG
+
+char *isdn_v110_revision = "$Revision: 1.1.2.2 $";
 
 #define V110_38400 255
 #define V110_19200  15
@@ -82,7 +87,7 @@ FlipBits(unsigned char c, int keylen)
  * structures and returns a pointer to these.
  */
 static isdn_v110_stream *
-do_isdn_v110_open(unsigned char key, int hdrlen, int maxsize)
+isdn_v110_open(unsigned char key, int hdrlen, int maxsize)
 {
 	int i;
 	isdn_v110_stream *v;
@@ -127,8 +132,8 @@ do_isdn_v110_open(unsigned char key, int hdrlen, int maxsize)
 }
 
 /* isdn_v110_close frees private V.110 data structures */
-static void
-do_isdn_v110_close(isdn_v110_stream * v)
+void
+isdn_v110_close(isdn_v110_stream * v)
 {
 	if (v == NULL)
 		return;
@@ -510,94 +515,101 @@ buffer_full:
 	return nskb;
 }
 
-
-void
-isdn_v110_open(struct isdn_slot *slot, struct isdn_v110 *iv110)
-{	
-	isdn_v110_stream *v;
-	int hdrlen = isdn_slot_hdrlen(slot);
-	int maxsize = isdn_slot_maxbufsize(slot);
-
-	atomic_inc(&iv110->v110use);
-	switch (iv110->v110emu) {
-	case ISDN_PROTO_L2_V11096:
-		iv110->v110 = do_isdn_v110_open(V110_9600, hdrlen, maxsize);
-		break;
-	case ISDN_PROTO_L2_V11019:
-		iv110->v110 = do_isdn_v110_open(V110_19200, hdrlen, maxsize);
-		break;
-	case ISDN_PROTO_L2_V11038:
-		iv110->v110 = do_isdn_v110_open(V110_38400, hdrlen, maxsize);
-		break;
-	}
-	if ((v = iv110->v110)) {
-		while (v->SyncInit) {
-			struct sk_buff *skb = isdn_v110_sync(v);
-			if (isdn_slot_write(slot, skb) <= 0) {
-				dev_kfree_skb(skb);
-				/* Unable to send, try later */
-				break;
-			}
-			v->SyncInit--;
-			v->skbidle++;
-		}
-	} else
-		printk(KERN_WARNING "isdn_v110: Couldn't open stream\n");
-	atomic_dec(&iv110->v110use);
-}
-
-void
-isdn_v110_close(struct isdn_slot *slot, struct isdn_v110 *iv110)
-{
-	while (1) {
-		atomic_inc(&iv110->v110use);
-		if (atomic_dec_and_test(&iv110->v110use)) {
-			do_isdn_v110_close(iv110->v110);
-			iv110->v110 = NULL;
-			break;
-		}
-	}
-}
-
 int
-isdn_v110_bsent(struct isdn_slot *slot, struct isdn_v110 *iv110)
+isdn_v110_stat_callback(int idx, isdn_ctrl * c)
 {
-	isdn_v110_stream *v = iv110->v110;
-	int i, ret;
+	isdn_v110_stream *v = NULL;
+	int i;
+	int ret;
 
-	/* Keep the send-queue of the driver filled
-	 * with frames:
-	 * If number of outstanding frames < 3,
-	 * send down an Idle-Frame (or an Sync-Frame, if
-	 * v->SyncInit != 0). 
-	 */
-	atomic_inc(&iv110->v110use);
-	if (v->skbidle > 0) {
-		v->skbidle--;
-		ret = 1;
-	} else {
-		if (v->skbuser > 0)
-			v->skbuser--;
-		ret = 0;
-	}
-	for (i = v->skbuser + v->skbidle; i < 2; i++) {
-		struct sk_buff *skb;
-		if (v->SyncInit > 0)
-			skb = isdn_v110_sync(v);
-		else
-			skb = isdn_v110_idle(v);
-		if (skb) {
-			if (isdn_slot_write(slot, skb) <= 0) {
-				dev_kfree_skb(skb);
-				break;
+	if (idx < 0)
+		return 0;
+	switch (c->command) {
+		case ISDN_STAT_BSENT:
+                        /* Keep the send-queue of the driver filled
+			 * with frames:
+			 * If number of outstanding frames < 3,
+			 * send down an Idle-Frame (or an Sync-Frame, if
+			 * v->SyncInit != 0). 
+			 */
+			if (!(v = dev->v110[idx]))
+				return 0;
+			atomic_inc(&dev->v110use[idx]);
+			if (v->skbidle > 0) {
+				v->skbidle--;
+				ret = 1;
 			} else {
-				if (v->SyncInit)
-					v->SyncInit--;
-				v->skbidle++;
+				if (v->skbuser > 0)
+					v->skbuser--;
+				ret = 0;
 			}
-		} else
+			for (i = v->skbuser + v->skbidle; i < 2; i++) {
+				struct sk_buff *skb;
+				if (v->SyncInit > 0)
+					skb = isdn_v110_sync(v);
+				else
+					skb = isdn_v110_idle(v);
+				if (skb) {
+					if (dev->drv[c->driver]->interface->writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+						dev_kfree_skb(skb);
+						break;
+					} else {
+						if (v->SyncInit)
+							v->SyncInit--;
+						v->skbidle++;
+					}
+				} else
+					break;
+			}
+			atomic_dec(&dev->v110use[idx]);
+			return ret;
+		case ISDN_STAT_DHUP:
+		case ISDN_STAT_BHUP:
+			while (1) {
+				atomic_inc(&dev->v110use[idx]);
+				if (atomic_dec_and_test(&dev->v110use[idx])) {
+					isdn_v110_close(dev->v110[idx]);
+					dev->v110[idx] = NULL;
+					break;
+				}
+				mdelay(1);
+			}
 			break;
+		case ISDN_STAT_BCONN:
+			if (dev->v110emu[idx] && (dev->v110[idx] == NULL)) {
+				int hdrlen = dev->drv[c->driver]->interface->hl_hdrlen;
+				int maxsize = dev->drv[c->driver]->interface->maxbufsize;
+				atomic_inc(&dev->v110use[idx]);
+				switch (dev->v110emu[idx]) {
+					case ISDN_PROTO_L2_V11096:
+						dev->v110[idx] = isdn_v110_open(V110_9600, hdrlen, maxsize);
+						break;
+					case ISDN_PROTO_L2_V11019:
+						dev->v110[idx] = isdn_v110_open(V110_19200, hdrlen, maxsize);
+						break;
+					case ISDN_PROTO_L2_V11038:
+						dev->v110[idx] = isdn_v110_open(V110_38400, hdrlen, maxsize);
+						break;
+					default:;
+				}
+				if ((v = dev->v110[idx])) {
+					while (v->SyncInit) {
+						struct sk_buff *skb = isdn_v110_sync(v);
+						if (dev->drv[c->driver]->interface->writebuf_skb(c->driver, c->arg, 1, skb) <= 0) {
+							dev_kfree_skb(skb);
+							/* Unable to send, try later */
+							break;
+						}
+						v->SyncInit--;
+						v->skbidle++;
+					}
+				} else
+					printk(KERN_WARNING "isdn_v110: Couldn't open stream for chan %d\n", idx);
+				atomic_dec(&dev->v110use[idx]);
+			}
+			break;
+		default:
+			return 0;
 	}
-	atomic_dec(&iv110->v110use);
-	return ret;
+	return 0;
 }

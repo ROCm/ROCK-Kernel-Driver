@@ -829,7 +829,7 @@ static void atmarp_info(struct seq_file *seq, struct net_device *dev,
 	    !clip_vcc || clip_vcc->encap ? "LLC" : "NULL",
 	    (jiffies-(clip_vcc ? clip_vcc->last_use : entry->neigh->used))/HZ);
 
-	off = snprintf(buf, sizeof(buf) - 1, "%d.%d.%d.%d", NIPQUAD(entry->ip));
+	off = scnprintf(buf, sizeof(buf) - 1, "%d.%d.%d.%d", NIPQUAD(entry->ip));
 	while (off < 16)
 		buf[off++] = ' ';
 	buf[off] = '\0';
@@ -994,14 +994,6 @@ static struct file_operations arp_seq_fops = {
 
 static int __init atm_clip_init(void)
 {
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *p;
-
-	p = create_proc_entry("arp", S_IRUGO, atm_proc_root);
-	if (p)
-		p->proc_fops = &arp_seq_fops;
-#endif
-
 	/* we should use neigh_table_init() */
 	clip_tbl.lock = RW_LOCK_UNLOCKED;
 	clip_tbl.kmem_cachep = kmem_cache_create(clip_tbl.id,
@@ -1018,6 +1010,16 @@ static int __init atm_clip_init(void)
 
 	clip_tbl_hook = &clip_tbl;
 	register_atm_ioctl(&clip_ioctl_ops);
+
+#ifdef CONFIG_PROC_FS
+{
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("arp", S_IRUGO, atm_proc_root);
+	if (p)
+		p->proc_fops = &arp_seq_fops;
+}
+#endif
 
 	return 0;
 }

@@ -165,7 +165,7 @@ EXPORT_SYMBOL(bitmap_weight);
 #define unhex(c)			(isdigit(c) ? (c - '0') : (toupper(c) - 'A' + 10))
 
 /**
- * bitmap_snprintf - convert bitmap to an ASCII hex string.
+ * bitmap_scnprintf - convert bitmap to an ASCII hex string.
  * @buf: byte buffer into which string is placed
  * @buflen: reserved size of @buf, in bytes
  * @maskp: pointer to bitmap to convert
@@ -174,7 +174,7 @@ EXPORT_SYMBOL(bitmap_weight);
  * Exactly @nmaskbits bits are displayed.  Hex digits are grouped into
  * comma-separated sets of eight digits per set.
  */
-int bitmap_snprintf(char *buf, unsigned int buflen,
+int bitmap_scnprintf(char *buf, unsigned int buflen,
 	const unsigned long *maskp, int nmaskbits)
 {
 	int i, word, bit, len = 0;
@@ -193,14 +193,14 @@ int bitmap_snprintf(char *buf, unsigned int buflen,
 		word = i / BITS_PER_LONG;
 		bit = i % BITS_PER_LONG;
 		val = (maskp[word] >> bit) & chunkmask;
-		len += snprintf(buf+len, buflen-len, "%s%0*lx", sep,
+		len += scnprintf(buf+len, buflen-len, "%s%0*lx", sep,
 			(chunksz+3)/4, val);
 		chunksz = CHUNKSZ;
 		sep = ",";
 	}
 	return len;
 }
-EXPORT_SYMBOL(bitmap_snprintf);
+EXPORT_SYMBOL(bitmap_scnprintf);
 
 /**
  * bitmap_parse - convert an ASCII hex string into a bitmap.
@@ -220,7 +220,7 @@ EXPORT_SYMBOL(bitmap_snprintf);
 int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
         unsigned long *maskp, int nmaskbits)
 {
-	int i, c, old_c, totaldigits, ndigits, nchunks, nbits;
+	int c, old_c, totaldigits, ndigits, nchunks, nbits;
 	u32 chunk;
 
 	bitmap_clear(maskp, nmaskbits);
@@ -270,9 +270,7 @@ int bitmap_parse(const char __user *ubuf, unsigned int ubuflen,
 			continue;
 
 		bitmap_shift_right(maskp, maskp, CHUNKSZ, nmaskbits);
-		for (i = 0; i < CHUNKSZ; i++)
-			if (chunk & (1 << i))
-				set_bit(i, maskp);
+		*maskp |= chunk;
 		nchunks++;
 		nbits += (nchunks == 1) ? nbits_to_hold_value(chunk) : CHUNKSZ;
 		if (nbits > nmaskbits)

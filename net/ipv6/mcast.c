@@ -152,8 +152,10 @@ int ip6_mc_leave_src(struct sock *sk, struct ipv6_mc_socklist *iml,
 #define IGMP6_UNSOLICITED_IVAL	(10*HZ)
 #define MLD_QRV_DEFAULT		2
 
-#define MLD_V1_SEEN(idev) ((idev)->mc_v1_seen && \
-		time_before(jiffies, (idev)->mc_v1_seen))
+#define MLD_V1_SEEN(idev) (ipv6_devconf.force_mld_version == 1 || \
+		(idev)->cnf.force_mld_version == 1 || \
+		((idev)->mc_v1_seen && \
+		time_before(jiffies, (idev)->mc_v1_seen)))
 
 #define MLDV2_MASK(value, nb) ((nb)>=32 ? (value) : ((1<<(nb))-1) & (value))
 #define MLDV2_EXP(thresh, nbmant, nbexp, value) \
@@ -901,6 +903,33 @@ int ipv6_dev_mc_dec(struct net_device *dev, struct in6_addr *addr)
 }
 
 /*
+ * identify MLD packets for MLD filter exceptions
+ */
+int ipv6_is_mld(struct sk_buff *skb, int nexthdr)
+{
+	struct icmp6hdr *pic;
+
+	if (nexthdr != IPPROTO_ICMPV6)
+		return 0;
+
+	if (!pskb_may_pull(skb, sizeof(struct icmp6hdr)))
+		return 0;
+
+	pic = (struct icmp6hdr *)skb->h.raw;
+
+	switch (pic->icmp6_type) {
+	case ICMPV6_MGM_QUERY:
+	case ICMPV6_MGM_REPORT:
+	case ICMPV6_MGM_REDUCTION:
+	case ICMPV6_MLD2_REPORT:
+		return 1;
+	default:
+		break;
+	}
+	return 0;
+}
+
+/*
  *	check if the interface/address pair is valid
  */
 int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
@@ -918,7 +947,7 @@ int ipv6_chk_mcast_addr(struct net_device *dev, struct in6_addr *group,
 				break;
 		}
 		if (mc) {
-			if (!ipv6_addr_any(src_addr)) {
+			if (src_addr && !ipv6_addr_any(src_addr)) {
 				struct ip6_sf_list *psf;
 
 				spin_lock_bh(&mc->mca_lock);
@@ -1233,12 +1262,13 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 		     IPV6_TLV_ROUTERALERT, 2, 0, 0,
 		     IPV6_TLV_PADN, 0 };
 
-	skb = sock_alloc_send_skb(sk, size + dev->hard_header_len+15, 1, &err);
+	/* we assume size > sizeof(ra) here */
+	skb = sock_alloc_send_skb(sk, size + LL_RESERVED_SPACE(dev), 1, &err);
 
 	if (skb == 0)
 		return 0;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	if (dev->hard_header) {
 		unsigned char ha[MAX_ADDR_LEN];
 
@@ -1580,12 +1610,12 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 	payload_len = len + sizeof(ra);
 	full_len = sizeof(struct ipv6hdr) + payload_len;
 
-	skb = sock_alloc_send_skb(sk, dev->hard_header_len + full_len + 15, 1, &err);
+	skb = sock_alloc_send_skb(sk, LL_RESERVED_SPACE(dev) + full_len, 1, &err);
 
 	if (skb == NULL)
 		return;
 
-	skb_reserve(skb, (dev->hard_header_len + 15) & ~15);
+	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 	if (dev->hard_header) {
 		unsigned char ha[MAX_ADDR_LEN];
 		ndisc_mc_map(snd_addr, ha, dev, 1);

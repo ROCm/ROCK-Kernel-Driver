@@ -48,12 +48,14 @@ config EARLY_PRINTK
 	bool
 	default y
 	help
-	  Write kernel log output directly into the VGA buffer. This is useful
-	  for kernel debugging when your machine crashes very early before
-	  the console code is initialized. For normal operation it is not
-	  recommended because it looks ugly and doesn't cooperate with 
-	  klogd/syslogd or the X server. You should normally N here, unless
-	  you want to debug such a crash.
+	  Write kernel log output directly into the VGA buffer or to a serial
+	  port.
+
+	  This is useful for kernel debugging when your machine crashes very
+	  early before the console code is initialized. For normal operation
+	  it is not recommended because it looks ugly and doesn't cooperate
+	  with klogd/syslogd or the X server. You should normally N here,
+	  unless you want to debug such a crash.
 	  
 config HPET_TIMER
 	bool
@@ -89,6 +91,9 @@ config MK8
 	help
 	  Optimize for AMD Opteron/Athlon64/Hammer/K8 CPUs. 
 
+config MPSC
+       bool "Prescott/Nocona" 
+       
 config GENERIC_CPU
 	bool "Generic-x86-64"
 	help
@@ -101,11 +106,13 @@ endchoice
 #
 config X86_L1_CACHE_BYTES
 	int
-	default "64"
+	default "128" if GENERIC_CPU || MPSC
+	default "64" if MK8
 
 config X86_L1_CACHE_SHIFT
 	int
-	default "6"
+	default "7" if GENERIC_CPU || MPSC
+	default "6" if MK8
 
 config X86_TSC
 	bool
@@ -114,6 +121,23 @@ config X86_TSC
 config X86_GOOD_APIC
 	bool
 	default y
+
+config MICROCODE
+	tristate "/dev/cpu/microcode - Intel CPU microcode support"
+	---help---
+	  If you say Y here the 'File systems' section, you will be
+	  able to update the microcode on Intel processors. You will 
+	  obviously need the actual microcode binary data itself which is 
+	  not shipped with the Linux kernel.
+
+	  For latest news and information on obtaining all the required
+	  ingredients for this driver, check:
+	  <http://www.urbanmyth.org/microcode/>.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called microcode.
+	  If you use modprobe or kmod you may also want to add the line
+	  'alias char-major-10-184 microcode' to your /etc/modules.conf file.
 
 config X86_MSR
 	tristate "/dev/cpu/*/msr - Model-specific register support"
@@ -132,6 +156,11 @@ config X86_CPUID
 	  with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
 	  /dev/cpu/31/cpuid.
 
+config X86_HT
+	bool
+	depends on SMP
+	default y
+       
 config MATH_EMULATION
 	bool
 
@@ -256,9 +285,13 @@ config GART_IOMMU
 	  Normally the kernel will take the right choice by itself.
 	  If unsure say Y 
 
+config SWIOTLB
+       select GART_IOMMU
+       bool "Software IOTLB support"
+
 config DUMMY_IOMMU
 	bool
-	depends on !GART_IOMMU
+	depends on !GART_IOMMU && !SWIOTLB
 	default y
 	help
 	  Don't use IOMMU code. This will cause problems when you have more than 4GB 

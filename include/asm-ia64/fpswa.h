@@ -68,4 +68,6 @@ typedef struct {
 	efi_fpswa_t	 fpswa;
 } fpswa_interface_t;
 
+extern fpswa_interface_t *fpswa_interface;
+
 #endif /* _ASM_IA64_FPSWA_H */

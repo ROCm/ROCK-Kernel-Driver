@@ -55,7 +55,7 @@ static ssize_t pci_bus_show_cpuaffinity(struct class_device *class_dev, char *bu
 	cpumask_t cpumask = pcibus_to_cpumask((to_pci_bus(class_dev))->number);
 	int ret;
 
-	ret = cpumask_snprintf(buf, PAGE_SIZE, cpumask);
+	ret = cpumask_scnprintf(buf, PAGE_SIZE, cpumask);
 	if (ret < PAGE_SIZE)
 		buf[ret++] = '\n';
 	return ret;
@@ -455,8 +455,6 @@ static int pci_setup_device(struct pci_dev * dev)
 	dev->slot_name = dev->dev.bus_id;
 	sprintf(pci_name(dev), "%04x:%02x:%02x.%d", pci_domain_nr(dev->bus),
 		dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-
-	INIT_LIST_HEAD(&dev->pools);
 
 	pci_read_config_dword(dev, PCI_CLASS_REVISION, &class);
 	class >>= 8;				    /* upper 3 bytes */

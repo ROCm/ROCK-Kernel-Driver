@@ -30,7 +30,7 @@ tftpboot			:= /tftpboot
 
 # Normally, we use the 'misc.c' file for decompress_kernel and
 # whatnot.  Sometimes we need to override this however.
-misc-y	:= misc.o
+misc-y	:= misc.o ../common/bootinfo.o
 
 # Normally, we have our images end in .elf, but something we want to
 # change this.
@@ -103,7 +103,7 @@ zimageinitrd-$(pcore)			:= zImage.initrd-STRIPELF
 zimageinitrd-$(CONFIG_SPRUCE)		:= zImage.initrd-TREE
          end-$(CONFIG_SPRUCE)		:= spruce
   entrypoint-$(CONFIG_SPRUCE)		:= 0x00800000
-        misc-$(CONFIG_SPRUCE)		:= misc-spruce.o
+        misc-$(CONFIG_SPRUCE)		+= misc-spruce.o
 
 # SMP images should have a '.smp' suffix.
          end-$(CONFIG_SMP)		+= .smp

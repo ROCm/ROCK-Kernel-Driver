@@ -1883,14 +1883,24 @@ static int do_con_write(struct tty_struct * tty, int from_user,
 	int c, tc, ok, n = 0, draw_x = -1;
 	unsigned int currcons;
 	unsigned long draw_from = 0, draw_to = 0;
-	struct vt_struct *vt = (struct vt_struct *)tty->driver_data;
+	struct vt_struct *vt;
 	u16 himask, charmask;
 	const unsigned char *orig_buf = NULL;
 	int orig_count;
 
 	if (in_interrupt())
 		return count;
-		
+
+	might_sleep();
+
+	acquire_console_sem();
+	vt = (struct vt_struct *)tty->driver_data;
+	if (vt == NULL) {
+		printk(KERN_ERR "vt: argh, driver_data is NULL !\n");
+		release_console_sem();
+		return 0;
+	}
+
 	currcons = vt->vc_num;
 	if (!vc_cons_allocated(currcons)) {
 	    /* could this happen? */
@@ -1899,13 +1909,16 @@ static int do_con_write(struct tty_struct * tty, int from_user,
 		error = 1;
 		printk("con_write: tty %d not allocated\n", currcons+1);
 	    }
+	    release_console_sem();
 	    return 0;
 	}
+	release_console_sem();
 
 	orig_buf = buf;
 	orig_count = count;
 
 	if (from_user) {
+
 		down(&con_buf_sem);
 
 again:
@@ -1928,6 +1941,13 @@ again:
 	 */
 
 	acquire_console_sem();
+
+	vt = (struct vt_struct *)tty->driver_data;
+	if (vt == NULL) {
+		printk(KERN_ERR "vt: argh, driver_data _became_ NULL !\n");
+		release_console_sem();
+		goto out;
+	}
 
 	himask = hi_font_mask;
 	charmask = himask ? 0x1ff : 0xff;
@@ -2442,13 +2462,15 @@ static int con_open(struct tty_struct *tty, struct file * filp)
 
 	acquire_console_sem();
 	i = vc_allocate(currcons);
-	release_console_sem();
-	if (i)
+	if (i) {
+		release_console_sem();
 		return i;
-
+	}
 	vt_cons[currcons]->vc_num = currcons;
 	tty->driver_data = vt_cons[currcons];
 	vc_cons[currcons].d->vc_tty = tty;
+
+	release_console_sem();
 
 	if (!tty->winsize.ws_row && !tty->winsize.ws_col) {
 		tty->winsize.ws_row = video_num_lines;
@@ -2467,10 +2489,12 @@ static void con_close(struct tty_struct *tty, struct file * filp)
 		return;
 
 	vcs_remove_devfs(tty);
+	acquire_console_sem();
 	vt = (struct vt_struct*)tty->driver_data;
 	if (vt)
 		vc_cons[vt->vc_num].d->vc_tty = NULL;
 	tty->driver_data = 0;
+	release_console_sem();
 }
 
 static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols, int do_clear)

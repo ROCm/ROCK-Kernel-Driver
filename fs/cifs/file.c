@@ -925,7 +925,7 @@ static void cifs_copy_cache_pages(struct address_space *mapping,
 			__pagevec_lru_add(plru_pvec);
 		flush_dcache_page(page);
 		SetPageUptodate(page);
-		kunmap_atomic(page,KM_USER0);
+		kunmap_atomic(target,KM_USER0);
 		unlock_page(page);
 		page_cache_release(page);
 		data += PAGE_CACHE_SIZE;

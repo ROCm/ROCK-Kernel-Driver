@@ -12,7 +12,6 @@
 #include <linux/kernel.h>
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/workqueue.h>
 #include "hisax_if.h"
 #include "hisax.h"
 #include "isdnl1.h"
@@ -23,6 +22,7 @@
 #define MAX_DFRAME_LEN_L1 300
 #define B_FIFO_SIZE       64
 #define D_FIFO_SIZE       32
+
 
 // ipacx interrupt mask values    
 #define _MASK_IMASK     0x2E  // global mask
@@ -37,13 +37,16 @@ static inline void cic_int(struct IsdnCardState *cs);
 static void dch_l2l1(struct PStack *st, int pr, void *arg);
 static void dbusy_timer_handler(struct IsdnCardState *cs);
 static void ipacx_new_ph(struct IsdnCardState *cs);
-static void dch_bh(void *data);
+static void dch_bh(struct IsdnCardState *cs);
 static void dch_empty_fifo(struct IsdnCardState *cs, int count);
 static void dch_fill_fifo(struct IsdnCardState *cs);
 static inline void dch_int(struct IsdnCardState *cs);
+static void __devinit dch_setstack(struct PStack *st, struct IsdnCardState *cs);
+static void __devinit dch_init(struct IsdnCardState *cs);
 static void bch_l2l1(struct PStack *st, int pr, void *arg);
-static void ipacx_bc_empty_fifo(struct BCState *bcs, int count);
-static void bch_int(struct IsdnCardState *cs, u8 hscx);
+static void bch_empty_fifo(struct BCState *bcs, int count);
+static void bch_fill_fifo(struct BCState *bcs);
+static void bch_int(struct IsdnCardState *cs, u_char hscx);
 static void bch_mode(struct BCState *bcs, int mode, int bc);
 static void bch_close_state(struct BCState *bcs);
 static int bch_open_state(struct IsdnCardState *cs, struct BCState *bcs);
@@ -51,45 +54,6 @@ static int bch_setstack(struct PStack *st, struct BCState *bcs);
 static void __devinit bch_init(struct IsdnCardState *cs, int hscx);
 static void __init clear_pending_ints(struct IsdnCardState *cs);
 
-static inline u8
-ipacx_bc_read_reg(struct BCState *bcs, u8 addr)
-{
-	struct IsdnCardState *cs = bcs->cs;
-
-	return cs->bc_hw_ops->read_reg(cs, bcs->unit, addr);
-}
-
-static inline void
-ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
-{
-	struct IsdnCardState *cs = bcs->cs;
-
-	cs->bc_hw_ops->write_reg(cs, bcs->unit, addr, val);
-}
-
-static inline u8
-ipacx_read_reg(struct IsdnCardState *cs, u8 addr)
-{
-	return cs->dc_hw_ops->read_reg(cs, addr);
-}
-
-static inline void
-ipacx_write_reg(struct IsdnCardState *cs, u8 addr, u8 val)
-{
-	cs->dc_hw_ops->write_reg(cs, addr, val);
-}
-
-static inline void
-ipacx_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
-{
-	return cs->dc_hw_ops->read_fifo(cs, p, len);
-}
-
-static inline void
-ipacx_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
-{
-	return cs->dc_hw_ops->write_fifo(cs, p, len);
-}
 //----------------------------------------------------------
 // Issue Layer 1 command to chip
 //----------------------------------------------------------
@@ -99,7 +63,10 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 	if (cs->debug &L1_DEB_ISAC)
 		debugl1(cs, "ph_command (%#x) in (%#x)", command,
 			cs->dc.isac.ph_state);
-	ipacx_write_reg(cs, IPACX_CIX0, (command << 4) | 0x0E);
+//###################################  
+//	printk(KERN_INFO "ph_command (%#x)\n", command);
+//###################################  
+	cs->writeisac(cs, IPACX_CIX0, (command << 4) | 0x0E);
 }
 
 //----------------------------------------------------------
@@ -108,12 +75,15 @@ ph_command(struct IsdnCardState *cs, unsigned int command)
 static inline void 
 cic_int(struct IsdnCardState *cs)
 {
-	u8 event;
+	u_char event;
 
-	event = ipacx_read_reg(cs, IPACX_CIR0) >> 4;
+	event = cs->readisac(cs, IPACX_CIR0) >> 4;
 	if (cs->debug &L1_DEB_ISAC) debugl1(cs, "cic_int(event=%#x)", event);
-	cs->dc.isac.ph_state = event;
-	sched_d_event(cs, D_L1STATECHANGE);
+//#########################################  
+//	printk(KERN_INFO "cic_int(%x)\n", event);
+//#########################################  
+  cs->dc.isac.ph_state = event;
+  schedule_event(cs, D_L1STATECHANGE);
 }
 
 //==========================================================
@@ -128,21 +98,63 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) st->l1.hardware;
 	struct sk_buff *skb = arg;
-  u8 cda1_cr, cda2_cr;
+  u_char cda1_cr, cda2_cr;
 
 	switch (pr) {
 		case (PH_DATA |REQUEST):
-			xmit_data_req_d(cs, skb);
+			if (cs->debug &DEB_DLOG_HEX)     LogFrame(cs, skb->data, skb->len);
+			if (cs->debug &DEB_DLOG_VERBOSE) dlogframe(cs, skb, 0);
+			if (cs->tx_skb) {
+				skb_queue_tail(&cs->sq, skb);
+#ifdef L2FRAME_DEBUG
+				if (cs->debug &L1_DEB_LAPD) Logl2Frame(cs, skb, "PH_DATA Queued", 0);
+#endif
+			} else {
+				cs->tx_skb = skb;
+				cs->tx_cnt = 0;
+#ifdef L2FRAME_DEBUG
+				if (cs->debug &L1_DEB_LAPD) Logl2Frame(cs, skb, "PH_DATA", 0);
+#endif
+				dch_fill_fifo(cs);
+			}
 			break;
+      
 		case (PH_PULL |INDICATION):
-			xmit_pull_ind_d(cs, skb);
+			if (cs->tx_skb) {
+				if (cs->debug & L1_DEB_WARN)
+					debugl1(cs, " l2l1 tx_skb exist this shouldn't happen");
+				skb_queue_tail(&cs->sq, skb);
+				break;
+			}
+			if (cs->debug & DEB_DLOG_HEX)     LogFrame(cs, skb->data, skb->len);
+			if (cs->debug & DEB_DLOG_VERBOSE) dlogframe(cs, skb, 0);
+			cs->tx_skb = skb;
+			cs->tx_cnt = 0;
+#ifdef L2FRAME_DEBUG
+			if (cs->debug & L1_DEB_LAPD) Logl2Frame(cs, skb, "PH_DATA_PULLED", 0);
+#endif
+			dch_fill_fifo(cs);
 			break;
+      
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_d(st);
+#ifdef L2FRAME_DEBUG
+			if (cs->debug & L1_DEB_LAPD) debugl1(cs, "-> PH_REQUEST_PULL");
+#endif
+			if (!cs->tx_skb) {
+				clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			} else
+				set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
+
 		case (HW_RESET | REQUEST):
 		case (HW_ENABLE | REQUEST):
-			ph_command(cs, IPACX_CMD_TIM);
+			if ((cs->dc.isac.ph_state == IPACX_IND_RES) ||
+				(cs->dc.isac.ph_state == IPACX_IND_DR) ||
+				(cs->dc.isac.ph_state == IPACX_IND_DC))
+			        ph_command(cs, IPACX_CMD_TIM);
+			else
+				ph_command(cs, IPACX_CMD_RES);
 			break;
 
 		case (HW_INFO3 | REQUEST):
@@ -150,21 +162,21 @@ dch_l2l1(struct PStack *st, int pr, void *arg)
 			break;
 
 		case (HW_TESTLOOP | REQUEST):
-      ipacx_write_reg(cs, IPACX_CDA_TSDP10, 0x80); // Timeslot 0 is B1
-      ipacx_write_reg(cs, IPACX_CDA_TSDP11, 0x81); // Timeslot 0 is B1
-      cda1_cr = ipacx_read_reg(cs, IPACX_CDA1_CR);
-      cda2_cr = ipacx_read_reg(cs, IPACX_CDA2_CR);
+      cs->writeisac(cs, IPACX_CDA_TSDP10, 0x80); // Timeslot 0 is B1
+      cs->writeisac(cs, IPACX_CDA_TSDP11, 0x81); // Timeslot 0 is B1
+      cda1_cr = cs->readisac(cs, IPACX_CDA1_CR);
+      cda2_cr = cs->readisac(cs, IPACX_CDA2_CR);
 			if ((long)arg &1) { // loop B1
-        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr |0x0a); 
+        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr |0x0a); 
       }
       else {  // B1 off
-        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr &~0x0a); 
+        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr &~0x0a); 
       }
 			if ((long)arg &2) { // loop B2
-        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr |0x14); 
+        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr |0x14); 
       }
       else {  // B2 off
-        ipacx_write_reg(cs, IPACX_CDA1_CR, cda1_cr &~0x14); 
+        cs->writeisac(cs, IPACX_CDA1_CR, cda1_cr &~0x14); 
       }
 			break;
 
@@ -194,14 +206,14 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 	int	rbchd, stard;
 
 	if (test_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
-		rbchd = ipacx_read_reg(cs, IPACX_RBCHD);
-		stard = ipacx_read_reg(cs, IPACX_STARD);
+		rbchd = cs->readisac(cs, IPACX_RBCHD);
+		stard = cs->readisac(cs, IPACX_STARD);
 		if (cs->debug) 
       debugl1(cs, "D-Channel Busy RBCHD %02x STARD %02x", rbchd, stard);
 		if (!(stard &0x40)) { // D-Channel Busy
 			set_bit(FLG_L1_DBUSY, &cs->HW_Flags);
       for (st = cs->stlist; st; st = st->next) {
-				st->l2.l1l2(st, PH_PAUSE | INDICATION, NULL); // flow control on
+				st->l1.l1l2(st, PH_PAUSE | INDICATION, NULL); // flow control on
 			}
 		} else {
 			// seems we lost an interrupt; reset transceiver */
@@ -214,7 +226,7 @@ dbusy_timer_handler(struct IsdnCardState *cs)
 				printk(KERN_WARNING "HiSax: ISAC D-Channel Busy no skb\n");
 				debugl1(cs, "D-Channel Busy no skb");
 			}
-			ipacx_write_reg(cs, IPACX_CMDRD, 0x01); // Tx reset, generates XPR
+			cs->writeisac(cs, IPACX_CMDRD, 0x01); // Tx reset, generates XPR
 		}
 	}
 }
@@ -268,9 +280,8 @@ ipacx_new_ph(struct IsdnCardState *cs)
 // bottom half handler for D channel
 //----------------------------------------------------------
 static void
-dch_bh(void *data)
+dch_bh(struct IsdnCardState *cs)
 {
-	struct IsdnCardState *cs = data;
 	struct PStack *st;
 	
 	if (!cs) return;
@@ -278,7 +289,7 @@ dch_bh(void *data)
 	if (test_and_clear_bit(D_CLEARBUSY, &cs->event)) {
 		if (cs->debug) debugl1(cs, "D-Channel Busy cleared");
 		for (st = cs->stlist; st; st = st->next) {
-			st->l2.l1l2(st, PH_PAUSE | CONFIRM, NULL);
+			st->l1.l1l2(st, PH_PAUSE | CONFIRM, NULL);
 		}
 	}
   
@@ -301,8 +312,33 @@ dch_bh(void *data)
 static void 
 dch_empty_fifo(struct IsdnCardState *cs, int count)
 {
-	recv_empty_fifo_d(cs, count);
-	ipacx_write_reg(cs, IPACX_CMDRD, 0x80); // RMC
+	u_char *ptr;
+
+	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
+		debugl1(cs, "dch_empty_fifo()");
+
+  // message too large, remove
+	if ((cs->rcvidx + count) >= MAX_DFRAME_LEN_L1) {
+		if (cs->debug &L1_DEB_WARN)
+			debugl1(cs, "dch_empty_fifo() incoming message too large");
+	  cs->writeisac(cs, IPACX_CMDRD, 0x80); // RMC
+		cs->rcvidx = 0;
+		return;
+	}
+  
+	ptr = cs->rcvbuf + cs->rcvidx;
+	cs->rcvidx += count;
+  
+	cs->readisacfifo(cs, ptr, count);
+	cs->writeisac(cs, IPACX_CMDRD, 0x80); // RMC
+  
+	if (cs->debug &L1_DEB_ISAC_FIFO) {
+		char *t = cs->dlog;
+
+		t += sprintf(t, "dch_empty_fifo() cnt %d", count);
+		QuickHex(t, ptr, count);
+		debugl1(cs, cs->dlog);
+	}
 }
 
 //----------------------------------------------------------
@@ -311,21 +347,28 @@ dch_empty_fifo(struct IsdnCardState *cs, int count)
 static void 
 dch_fill_fifo(struct IsdnCardState *cs)
 {
-	int count, more;
-	unsigned char cmd, *p;
+	int count;
+	u_char cmd, *ptr;
 
-	p = xmit_fill_fifo_d(cs, 32, &count, &more);
-	if (!p)
-		return;
+	if ((cs->debug &L1_DEB_ISAC) && !(cs->debug &L1_DEB_ISAC_FIFO))
+		debugl1(cs, "dch_fill_fifo()");
+    
+	if (!cs->tx_skb) return;
+	count = cs->tx_skb->len;
+	if (count <= 0) return;
 
-	if (more) {
+	if (count > D_FIFO_SIZE) {
+		count = D_FIFO_SIZE;
 		cmd   = 0x08; // XTF
 	} else {
 		cmd   = 0x0A; // XTF | XME
 	}
   
-	ipacx_write_fifo(cs, p, count);
-	ipacx_write_reg(cs, IPACX_CMDRD, cmd);
+	ptr = cs->tx_skb->data;
+	skb_pull(cs->tx_skb, count);
+	cs->tx_cnt += count;
+	cs->writeisacfifo(cs, ptr, count);
+	cs->writeisac(cs, IPACX_CMDRD, cmd);
   
   // set timeout for transmission contol
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
@@ -335,6 +378,14 @@ dch_fill_fifo(struct IsdnCardState *cs)
 	init_timer(&cs->dbusytimer);
 	cs->dbusytimer.expires = jiffies + ((DBUSY_TIMER_VALUE * HZ)/1000);
 	add_timer(&cs->dbusytimer);
+  
+	if (cs->debug &L1_DEB_ISAC_FIFO) {
+		char *t = cs->dlog;
+
+		t += sprintf(t, "dch_fill_fifo() cnt %d", count);
+		QuickHex(t, ptr, count);
+		debugl1(cs, cs->dlog);
+	}
 }
 
 //----------------------------------------------------------
@@ -343,35 +394,46 @@ dch_fill_fifo(struct IsdnCardState *cs)
 static inline void 
 dch_int(struct IsdnCardState *cs)
 {
-	u8 istad, rstad;
+	struct sk_buff *skb;
+	u_char istad, rstad;
 	int count;
 
-	istad = ipacx_read_reg(cs, IPACX_ISTAD);
+	istad = cs->readisac(cs, IPACX_ISTAD);
+//##############################################  
+//	printk(KERN_WARNING "dch_int(istad=%02x)\n", istad);
+//##############################################  
   
 	if (istad &0x80) {  // RME
-	  rstad = ipacx_read_reg(cs, IPACX_RSTAD);
+	  rstad = cs->readisac(cs, IPACX_RSTAD);
 		if ((rstad &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstad &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "dch_int(): invalid frame");
+          debugl1(cs, "dch_int(): invalid frame");
 			if ((rstad &0x40))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "dch_int(): RDO");
+          debugl1(cs, "dch_int(): RDO");
 			if (!(rstad &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "dch_int(): CRC error");
-			ipacx_write_reg(cs, IPACX_CMDRD, 0x80);  // RMC
-			cs->rcvidx = 0;
+          debugl1(cs, "dch_int(): CRC error");
+	    cs->writeisac(cs, IPACX_CMDRD, 0x80);  // RMC
 		} else {  // received frame ok
-			count = ipacx_read_reg(cs, IPACX_RBCLD);
-			// FIXME this looks flaky
-			if (count) count--; // RSTAB is last byte
+			count = cs->readisac(cs, IPACX_RBCLD);
+      if (count) count--; // RSTAB is last byte
 			count &= D_FIFO_SIZE-1;
-			if (count == 0)
-				count = D_FIFO_SIZE;
+			if (count == 0) count = D_FIFO_SIZE;
 			dch_empty_fifo(cs, count);
-			recv_rme_d(cs);
-		}
+			if ((count = cs->rcvidx) > 0) {
+	      cs->rcvidx = 0;
+				if (!(skb = dev_alloc_skb(count)))
+					printk(KERN_WARNING "HiSax dch_int(): receive out of memory\n");
+				else {
+					memcpy(skb_put(skb, count), cs->rcvbuf, count);
+					skb_queue_tail(&cs->rq, skb);
+				}
+			}
+    }
+	  cs->rcvidx = 0;
+		schedule_event(cs, D_RCVBUFREADY);
 	}
 
 	if (istad &0x40) {  // RPF
@@ -380,33 +442,55 @@ dch_int(struct IsdnCardState *cs)
 
 	if (istad &0x20) {  // RFO
 		if (cs->debug &L1_DEB_WARN) debugl1(cs, "dch_int(): RFO");
-	  ipacx_write_reg(cs, IPACX_CMDRD, 0x40); //RRES
+	  cs->writeisac(cs, IPACX_CMDRD, 0x40); //RRES
 	}
   
-	if (istad &0x10) {  // XPR
-		xmit_xpr_d(cs);
-	}  
+  if (istad &0x10) {  // XPR
+		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
+			del_timer(&cs->dbusytimer);
+		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
+			schedule_event(cs, D_CLEARBUSY);
+    if (cs->tx_skb) {
+      if (cs->tx_skb->len) {
+        dch_fill_fifo(cs);
+        goto afterXPR;
+      }
+      else {
+        dev_kfree_skb_irq(cs->tx_skb);
+        cs->tx_skb = NULL;
+        cs->tx_cnt = 0;
+      }
+    }
+    if ((cs->tx_skb = skb_dequeue(&cs->sq))) {
+      cs->tx_cnt = 0;
+      dch_fill_fifo(cs);
+    } 
+    else {
+      schedule_event(cs, D_XMTBUFREADY);
+    }  
+  }  
+  afterXPR:
 
 	if (istad &0x0C) {  // XDU or XMR
-		xmit_xdu_d(cs, NULL);
-	}
+		if (cs->debug &L1_DEB_WARN) debugl1(cs, "dch_int(): XDU");
+	  if (cs->tx_skb) {
+	    skb_push(cs->tx_skb, cs->tx_cnt); // retransmit
+	    cs->tx_cnt = 0;
+			dch_fill_fifo(cs);
+		} else {
+			printk(KERN_WARNING "HiSax: ISAC XDU no skb\n");
+			debugl1(cs, "ISAC XDU no skb");
+		}
+  }
 }
 
 //----------------------------------------------------------
 //----------------------------------------------------------
-static int
+static void __devinit
 dch_setstack(struct PStack *st, struct IsdnCardState *cs)
 {
 	st->l1.l1hw = dch_l2l1;
-	return 0;
 }
-
-static struct dc_l1_ops ipacx_dc_l1_ops = {
-	.fill_fifo  = dch_fill_fifo,
-	.open       = dch_setstack,
-	.bh_func    = dch_bh,
-	.dbusy_func = dbusy_timer_handler,
-};
 
 //----------------------------------------------------------
 //----------------------------------------------------------
@@ -415,12 +499,16 @@ dch_init(struct IsdnCardState *cs)
 {
 	printk(KERN_INFO "HiSax: IPACX ISDN driver v0.1.0\n");
 
-	dc_l1_init(cs, &ipacx_dc_l1_ops);
+	cs->setstack_d      = dch_setstack;
+  
+	cs->dbusytimer.function = (void *) dbusy_timer_handler;
+	cs->dbusytimer.data = (long) cs;
+	init_timer(&cs->dbusytimer);
 
-	ipacx_write_reg(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
-	ipacx_write_reg(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
-	ipacx_write_reg(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
-	ipacx_write_reg(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
+  cs->writeisac(cs, IPACX_TR_CONF0, 0x00);  // clear LDD
+  cs->writeisac(cs, IPACX_TR_CONF2, 0x00);  // enable transmitter
+  cs->writeisac(cs, IPACX_MODED,    0xC9);  // transparent mode 0, RAC, stop/go
+  cs->writeisac(cs, IPACX_MON_CR,   0x00);  // disable monitor channel
 }
 
 
@@ -434,31 +522,59 @@ dch_init(struct IsdnCardState *cs)
 static void
 bch_l2l1(struct PStack *st, int pr, void *arg)
 {
+	struct BCState *bcs = st->l1.bcs;
 	struct sk_buff *skb = arg;
+	u_long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			xmit_data_req_b(st->l1.bcs, skb);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			if (bcs->tx_skb) {
+				skb_queue_tail(&bcs->squeue, skb);
+			} else {
+				bcs->tx_skb = skb;
+				set_bit(BC_FLG_BUSY, &bcs->Flag);
+				bcs->hw.hscx.count = 0;
+				bch_fill_fifo(bcs);
+			}
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
 			break;
 		case (PH_PULL | INDICATION):
-			xmit_pull_ind_b(st->l1.bcs, skb);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			if (bcs->tx_skb) {
+				printk(KERN_WARNING "HiSax bch_l2l1(): this shouldn't happen\n");
+			} else {
+				set_bit(BC_FLG_BUSY, &bcs->Flag);
+				bcs->tx_skb = skb;
+				bcs->hw.hscx.count = 0;
+				bch_fill_fifo(bcs);
+			}
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
 			break;
 		case (PH_PULL | REQUEST):
-			xmit_pull_req_b(st);
+			if (!bcs->tx_skb) {
+				clear_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
+				st->l1.l1l2(st, PH_PULL | CONFIRM, NULL);
+			} else
+				set_bit(FLG_L1_PULL_REQ, &st->l1.Flags);
 			break;
 		case (PH_ACTIVATE | REQUEST):
-			set_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-			bch_mode(st->l1.bcs, st->l1.mode, st->l1.bc);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			set_bit(BC_FLG_ACTIV, &bcs->Flag);
+			bch_mode(bcs, st->l1.mode, st->l1.bc);
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | REQUEST):
 			l1_msg_b(st, pr, arg);
 			break;
 		case (PH_DEACTIVATE | CONFIRM):
-			clear_bit(BC_FLG_ACTIV, &st->l1.bcs->Flag);
-			clear_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			bch_mode(st->l1.bcs, 0, st->l1.bc);
-			st->l2.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
+			spin_lock_irqsave(&bcs->cs->lock, flags);
+			clear_bit(BC_FLG_ACTIV, &bcs->Flag);
+			clear_bit(BC_FLG_BUSY, &bcs->Flag);
+			bch_mode(bcs, 0, st->l1.bc);
+			spin_unlock_irqrestore(&bcs->cs->lock, flags);
+			st->l1.l1l2(st, PH_DEACTIVATE | CONFIRM, NULL);
 			break;
 	}
 }
@@ -467,94 +583,204 @@ bch_l2l1(struct PStack *st, int pr, void *arg)
 // Read B channel fifo to receive buffer
 //----------------------------------------------------------
 static void
-ipacx_bc_empty_fifo(struct BCState *bcs, int count)
+bch_empty_fifo(struct BCState *bcs, int count)
 {
-	recv_empty_fifo_b(bcs, count);
-	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
+	u_char *ptr, hscx;
+	struct IsdnCardState *cs;
+	int cnt;
+
+	cs = bcs->cs;
+  hscx = bcs->hw.hscx.hscx;
+	if ((cs->debug &L1_DEB_HSCX) && !(cs->debug &L1_DEB_HSCX_FIFO))
+		debugl1(cs, "bch_empty_fifo()");
+
+  // message too large, remove
+	if (bcs->hw.hscx.rcvidx + count > HSCX_BUFMAX) {
+		if (cs->debug &L1_DEB_WARN)
+			debugl1(cs, "bch_empty_fifo() incoming packet too large");
+	  cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+		bcs->hw.hscx.rcvidx = 0;
+		return;
+	}
+  
+	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
+	cnt = count;
+	while (cnt--) *ptr++ = cs->BC_Read_Reg(cs, hscx, IPACX_RFIFOB); 
+	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+  
+	ptr = bcs->hw.hscx.rcvbuf + bcs->hw.hscx.rcvidx;
+	bcs->hw.hscx.rcvidx += count;
+  
+	if (cs->debug &L1_DEB_HSCX_FIFO) {
+		char *t = bcs->blog;
+
+		t += sprintf(t, "bch_empty_fifo() B-%d cnt %d", hscx, count);
+		QuickHex(t, ptr, count);
+		debugl1(cs, bcs->blog);
+	}
 }
 
 //----------------------------------------------------------
 // Fill buffer to transmit FIFO
 //----------------------------------------------------------
 static void
-ipacx_bc_fill_fifo(struct BCState *bcs)
+bch_fill_fifo(struct BCState *bcs)
 {
-	int more, count;
-	unsigned char *p;
+	struct IsdnCardState *cs;
+	int more, count, cnt;
+	u_char *ptr, *p, hscx;
 
-	p = xmit_fill_fifo_b(bcs, B_FIFO_SIZE, &count, &more);
-	if (!p)
-		return;
+	cs = bcs->cs;
+	if ((cs->debug &L1_DEB_HSCX) && !(cs->debug &L1_DEB_HSCX_FIFO))
+		debugl1(cs, "bch_fill_fifo()");
 
-	while (count--)
-		ipacx_bc_write_reg(bcs, IPACX_XFIFOB, *p++); 
+	if (!bcs->tx_skb)           return;
+	if (bcs->tx_skb->len <= 0)  return;
 
-	ipacx_bc_write_reg(bcs, IPACX_CMDRB, (more ? 0x08 : 0x0a));
+	hscx = bcs->hw.hscx.hscx;
+	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
+	if (bcs->tx_skb->len > B_FIFO_SIZE) {
+		more  = 1;
+		count = B_FIFO_SIZE;
+	} else {
+		count = bcs->tx_skb->len;
+	}  
+	cnt = count;
+    
+	p = ptr = bcs->tx_skb->data;
+	skb_pull(bcs->tx_skb, count);
+	bcs->tx_cnt -= count;
+	bcs->hw.hscx.count += count;
+	while (cnt--) cs->BC_Write_Reg(cs, hscx, IPACX_XFIFOB, *p++); 
+	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, (more ? 0x08 : 0x0a));
+  
+	if (cs->debug &L1_DEB_HSCX_FIFO) {
+		char *t = bcs->blog;
+
+		t += sprintf(t, "chb_fill_fifo() B-%d cnt %d", hscx, count);
+		QuickHex(t, ptr, count);
+		debugl1(cs, bcs->blog);
+	}
 }
 
 //----------------------------------------------------------
 // B channel interrupt handler
 //----------------------------------------------------------
-
 static void
-reset_xmit(struct BCState *bcs)
+bch_int(struct IsdnCardState *cs, u_char hscx)
 {
-	ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x01);  // XRES
-}
-
-static void
-bch_int(struct IsdnCardState *cs, u8 hscx)
-{
-	u8 istab;
+	u_char istab;
 	struct BCState *bcs;
+	struct sk_buff *skb;
 	int count;
-	u8 rstab;
+	u_char rstab;
 
 	bcs = cs->bcs + hscx;
-	istab = ipacx_bc_read_reg(bcs, IPACX_ISTAB);
+	istab = cs->BC_Read_Reg(cs, hscx, IPACX_ISTAB);
+//##############################################  
+//	printk(KERN_WARNING "bch_int(istab=%02x)\n", istab);
+//##############################################  
 	if (!test_bit(BC_FLG_INIT, &bcs->Flag)) return;
 
 	if (istab &0x80) {	// RME
-		rstab = ipacx_bc_read_reg(bcs, IPACX_RSTAB);
+		rstab = cs->BC_Read_Reg(cs, hscx, IPACX_RSTAB);
 		if ((rstab &0xf0) != 0xa0) { // !(VFR && !RDO && CRC && !RAB)
 			if (!(rstab &0x80))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
+          debugl1(cs, "bch_int() B-%d: invalid frame", hscx);
 			if ((rstab &0x40) && (bcs->mode != L1_MODE_NULL))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
+          debugl1(cs, "bch_int() B-%d: RDO mode=%d", hscx, bcs->mode);
 			if (!(rstab &0x20))
 				if (cs->debug &L1_DEB_WARN) 
-					debugl1(cs, "bch_int() B-%d: CRC error", hscx);
-			ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x80);  // RMC
-			bcs->rcvidx = 0;
-		}  else {  // received frame ok
-			count = ipacx_bc_read_reg(bcs, IPACX_RBCLB) &(B_FIFO_SIZE-1);
-			if (count == 0)
-				count = B_FIFO_SIZE;
-
-			ipacx_bc_empty_fifo(bcs, count);
-			recv_rme_b(bcs);
+          debugl1(cs, "bch_int() B-%d: CRC error", hscx);
+	    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x80);  // RMC
+		} 
+    else {  // received frame ok
+			count = cs->BC_Read_Reg(cs, hscx, IPACX_RBCLB) &(B_FIFO_SIZE-1);
+			if (count == 0) count = B_FIFO_SIZE;
+			bch_empty_fifo(bcs, count);
+			if ((count = bcs->hw.hscx.rcvidx - 1) > 0) {
+				if (cs->debug &L1_DEB_HSCX_FIFO)
+					debugl1(cs, "bch_int Frame %d", count);
+				if (!(skb = dev_alloc_skb(count)))
+					printk(KERN_WARNING "HiSax bch_int(): receive frame out of memory\n");
+				else {
+					memcpy(skb_put(skb, count), bcs->hw.hscx.rcvbuf, count);
+					skb_queue_tail(&bcs->rqueue, skb);
+				}
+			}
 		}
+		bcs->hw.hscx.rcvidx = 0;
+		schedule_event(bcs, B_RCVBUFREADY);
 	}
   
 	if (istab &0x40) {	// RPF
-		ipacx_bc_empty_fifo(bcs, B_FIFO_SIZE);
-		recv_rpf_b(bcs);
+		bch_empty_fifo(bcs, B_FIFO_SIZE);
+
+		if (bcs->mode == L1_MODE_TRANS) { // queue every chunk
+			// receive transparent audio data
+			if (!(skb = dev_alloc_skb(B_FIFO_SIZE)))
+				printk(KERN_WARNING "HiSax bch_int(): receive transparent out of memory\n");
+			else {
+				memcpy(skb_put(skb, B_FIFO_SIZE), bcs->hw.hscx.rcvbuf, B_FIFO_SIZE);
+				skb_queue_tail(&bcs->rqueue, skb);
+			}
+			bcs->hw.hscx.rcvidx = 0;
+			schedule_event(bcs, B_RCVBUFREADY);
+		}
 	}
   
 	if (istab &0x20) {	// RFO
 		if (cs->debug &L1_DEB_WARN) 
 			debugl1(cs, "bch_int() B-%d: RFO error", hscx);
-		ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x40);  // RRES
+		cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x40);  // RRES
 	}
 
 	if (istab &0x10) {	// XPR
-		xmit_xpr_b(bcs);
+		if (bcs->tx_skb) {
+			if (bcs->tx_skb->len) {
+				bch_fill_fifo(bcs);
+				goto afterXPR;
+			} else {
+				if (test_bit(FLG_LLI_L1WAKEUP,&bcs->st->lli.flag) &&
+					(PACKET_NOACK != bcs->tx_skb->pkt_type)) {
+					u_long	flags;
+					spin_lock_irqsave(&bcs->aclock, flags);
+					bcs->ackcnt += bcs->hw.hscx.count;
+					spin_unlock_irqrestore(&bcs->aclock, flags);
+					schedule_event(bcs, B_ACKPENDING);
+				}
+			}
+			dev_kfree_skb_irq(bcs->tx_skb);
+			bcs->hw.hscx.count = 0;
+			bcs->tx_skb = NULL;
+    		}
+		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
+			bcs->hw.hscx.count = 0;
+			set_bit(BC_FLG_BUSY, &bcs->Flag);
+			bch_fill_fifo(bcs);
+		} else {
+			clear_bit(BC_FLG_BUSY, &bcs->Flag);
+			schedule_event(bcs, B_XMTBUFREADY);
+		}
 	}
+  afterXPR:
 
 	if (istab &0x04) {	// XDU
-		xmit_xdu_b(bcs, reset_xmit);
+    if (bcs->mode == L1_MODE_TRANS) {
+			bch_fill_fifo(bcs);
+    }  
+    else {
+      if (bcs->tx_skb) {  // restart transmitting the whole frame
+        skb_push(bcs->tx_skb, bcs->hw.hscx.count);
+        bcs->tx_cnt += bcs->hw.hscx.count;
+        bcs->hw.hscx.count = 0;
+      }
+	    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x01);  // XRES
+      if (cs->debug &L1_DEB_WARN)
+        debugl1(cs, "bch_int() B-%d XDU error", hscx);
+    }
 	}
 }
 
@@ -564,7 +790,7 @@ static void
 bch_mode(struct BCState *bcs, int mode, int bc)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int hscx = bcs->unit;
+	int hscx = bcs->hw.hscx.hscx;
 
         bc = bc ? 1 : 0;  // in case bc is greater than 1
 	if (cs->debug & L1_DEB_HSCX)
@@ -575,33 +801,33 @@ bch_mode(struct BCState *bcs, int mode, int bc)
   // map controller to according timeslot
   if (!hscx)
   {
-    ipacx_write_reg(cs, IPACX_BCHA_TSDP_BC1, 0x80 | bc);
-    ipacx_write_reg(cs, IPACX_BCHA_CR,       0x88); 
+    cs->writeisac(cs, IPACX_BCHA_TSDP_BC1, 0x80 | bc);
+    cs->writeisac(cs, IPACX_BCHA_CR,       0x88); 
   }
   else
   {
-    ipacx_write_reg(cs, IPACX_BCHB_TSDP_BC1, 0x80 | bc);
-    ipacx_write_reg(cs, IPACX_BCHB_CR,       0x88); 
+    cs->writeisac(cs, IPACX_BCHB_TSDP_BC1, 0x80 | bc);
+    cs->writeisac(cs, IPACX_BCHB_CR,       0x88); 
   }
 
 	switch (mode) {
 		case (L1_MODE_NULL):
-		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0xC0);  // rec off
-		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x30);  // std adj.
-		    ipacx_bc_write_reg(bcs, IPACX_MASKB, 0xFF);  // ints off
-		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0xC0);  // rec off
+		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x30);  // std adj.
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, 0xFF);  // ints off
+		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
 		    break;
 		case (L1_MODE_TRANS):
-		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0x88);  // ext transp mode
-		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x00);  // xxx00000
-		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
-		    ipacx_bc_write_reg(bcs, IPACX_MASKB, _MASKB_IMASK);
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0x88);  // ext transp mode
+		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x00);  // xxx00000
+		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, _MASKB_IMASK);
 		    break;
 		case (L1_MODE_HDLC):
-		    ipacx_bc_write_reg(bcs, IPACX_MODEB, 0xC8);  // transp mode 0
-		    ipacx_bc_write_reg(bcs, IPACX_EXMB,  0x01);  // idle=hdlc flags crc enabled
-		    ipacx_bc_write_reg(bcs, IPACX_CMDRB, 0x41);  // validate adjustments
-		    ipacx_bc_write_reg(bcs, IPACX_MASKB, _MASKB_IMASK);
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MODEB, 0xC8);  // transp mode 0
+		    cs->BC_Write_Reg(cs, hscx, IPACX_EXMB,  0x01);  // idle=hdlc flags crc enabled
+		    cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, 0x41);  // validate adjustments
+		    cs->BC_Write_Reg(cs, hscx, IPACX_MASKB, _MASKB_IMASK);
 		    break;
 	}
 }
@@ -612,7 +838,23 @@ static void
 bch_close_state(struct BCState *bcs)
 {
 	bch_mode(bcs, 0, bcs->channel);
-	bc_close(bcs);
+	if (test_and_clear_bit(BC_FLG_INIT, &bcs->Flag)) {
+		if (bcs->hw.hscx.rcvbuf) {
+			kfree(bcs->hw.hscx.rcvbuf);
+			bcs->hw.hscx.rcvbuf = NULL;
+		}
+		if (bcs->blog) {
+			kfree(bcs->blog);
+			bcs->blog = NULL;
+		}
+		skb_queue_purge(&bcs->rqueue);
+		skb_queue_purge(&bcs->squeue);
+		if (bcs->tx_skb) {
+			dev_kfree_skb_any(bcs->tx_skb);
+			bcs->tx_skb = NULL;
+			clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		}
+	}
 }
 
 //----------------------------------------------------------
@@ -620,7 +862,30 @@ bch_close_state(struct BCState *bcs)
 static int
 bch_open_state(struct IsdnCardState *cs, struct BCState *bcs)
 {
-	return bc_open(bcs);
+	if (!test_and_set_bit(BC_FLG_INIT, &bcs->Flag)) {
+		if (!(bcs->hw.hscx.rcvbuf = kmalloc(HSCX_BUFMAX, GFP_ATOMIC))) {
+			printk(KERN_WARNING
+				"HiSax open_bchstate(): No memory for hscx.rcvbuf\n");
+			clear_bit(BC_FLG_INIT, &bcs->Flag);
+			return (1);
+		}
+		if (!(bcs->blog = kmalloc(MAX_BLOG_SPACE, GFP_ATOMIC))) {
+			printk(KERN_WARNING
+				"HiSax open_bchstate: No memory for bcs->blog\n");
+			clear_bit(BC_FLG_INIT, &bcs->Flag);
+			kfree(bcs->hw.hscx.rcvbuf);
+			bcs->hw.hscx.rcvbuf = NULL;
+			return (2);
+		}
+		skb_queue_head_init(&bcs->rqueue);
+		skb_queue_head_init(&bcs->squeue);
+	}
+	bcs->tx_skb = NULL;
+	clear_bit(BC_FLG_BUSY, &bcs->Flag);
+	bcs->event = 0;
+	bcs->hw.hscx.rcvidx = 0;
+	bcs->tx_cnt = 0;
+	return (0);
 }
 
 //----------------------------------------------------------
@@ -631,7 +896,7 @@ bch_setstack(struct PStack *st, struct BCState *bcs)
 	bcs->channel = st->l1.bc;
 	if (bch_open_state(st->l1.hardware, bcs)) return (-1);
 	st->l1.bcs = bcs;
-	st->l1.l2l1 = bch_l2l1;
+	st->l2.l2l1 = bch_l2l1;
 	setstack_manager(st);
 	bcs->st = st;
 	setstack_l1_B(st);
@@ -643,7 +908,9 @@ bch_setstack(struct PStack *st, struct BCState *bcs)
 static void __devinit
 bch_init(struct IsdnCardState *cs, int hscx)
 {
-	cs->bcs[hscx].unit          = hscx;
+	cs->bcs[hscx].BC_SetStack   = bch_setstack;
+	cs->bcs[hscx].BC_Close      = bch_close_state;
+	cs->bcs[hscx].hw.hscx.hscx  = hscx;
 	cs->bcs[hscx].cs            = cs;
 	bch_mode(cs->bcs + hscx, 0, hscx);
 }
@@ -659,16 +926,18 @@ bch_init(struct IsdnCardState *cs, int hscx)
 void 
 interrupt_ipacx(struct IsdnCardState *cs)
 {
-	u8 ista;
-	
-	spin_lock(&cs->lock);
-	while ((ista = ipacx_read_reg(cs, IPACX_ISTA))) {
-		if (ista &0x80) bch_int(cs, 0); // B channel interrupts
-		if (ista &0x40) bch_int(cs, 1);
-		if (ista &0x01) dch_int(cs);    // D channel
-		if (ista &0x10) cic_int(cs);    // Layer 1 state
-	}  
-	spin_unlock(&cs->lock);
+	u_char ista;
+  
+	while ((ista = cs->readisac(cs, IPACX_ISTA))) {
+//#################################################  
+//		printk(KERN_WARNING "interrupt_ipacx(ista=%02x)\n", ista);
+//#################################################  
+    if (ista &0x80) bch_int(cs, 0); // B channel interrupts
+    if (ista &0x40) bch_int(cs, 1);
+    
+    if (ista &0x01) dch_int(cs);    // D channel
+    if (ista &0x10) cic_int(cs);    // Layer 1 state
+  }  
 }
 
 //----------------------------------------------------------
@@ -680,23 +949,17 @@ clear_pending_ints(struct IsdnCardState *cs)
 	int ista;
 
   // all interrupts off
-  ipacx_write_reg(cs, IPACX_MASK, 0xff);
-  ipacx_write_reg(cs, IPACX_MASKD, 0xff);
-  cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, 0xff);
-  cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, 0xff);
+  cs->writeisac(cs, IPACX_MASK, 0xff);
+	cs->writeisac(cs, IPACX_MASKD, 0xff);
+	cs->BC_Write_Reg(cs, 0, IPACX_MASKB, 0xff);
+	cs->BC_Write_Reg(cs, 1, IPACX_MASKB, 0xff);
   
-  ista = ipacx_read_reg(cs, IPACX_ISTA); 
-  if (ista &0x80) cs->bc_hw_ops->read_reg(cs, 0, IPACX_ISTAB);
-  if (ista &0x40) cs->bc_hw_ops->read_reg(cs, 1, IPACX_ISTAB);
-  if (ista &0x10) ipacx_read_reg(cs, IPACX_CIR0);
-  if (ista &0x01) ipacx_read_reg(cs, IPACX_ISTAD); 
+  ista = cs->readisac(cs, IPACX_ISTA); 
+  if (ista &0x80) cs->BC_Read_Reg(cs, 0, IPACX_ISTAB);
+  if (ista &0x40) cs->BC_Read_Reg(cs, 1, IPACX_ISTAB);
+  if (ista &0x10) cs->readisac(cs, IPACX_CIR0);
+  if (ista &0x01) cs->readisac(cs, IPACX_ISTAD); 
 }
-
-static struct bc_l1_ops ipacx_bc_l1_ops = {
-	.fill_fifo = ipacx_bc_fill_fifo,
-	.open      = bch_setstack,
-	.close     = bch_close_state,
-};
 
 //----------------------------------------------------------
 // Does chip configuration work
@@ -706,36 +969,36 @@ void __init
 init_ipacx(struct IsdnCardState *cs, int part)
 {
 	if (part &1) {  // initialise chip
-		cs->bc_l1_ops = &ipacx_bc_l1_ops;
+//##################################################  
+//	printk(KERN_INFO "init_ipacx(%x)\n", part);
+//##################################################  
 		clear_pending_ints(cs);
 		bch_init(cs, 0);
 		bch_init(cs, 1);
 		dch_init(cs);
 	}
 	if (part &2) {  // reenable all interrupts and start chip
-		cs->bc_hw_ops->write_reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
-		cs->bc_hw_ops->write_reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
-		ipacx_write_reg(cs, IPACX_MASKD, _MASKD_IMASK);
-		ipacx_write_reg(cs, IPACX_MASK, _MASK_IMASK); // global mask register
+		cs->BC_Write_Reg(cs, 0, IPACX_MASKB, _MASKB_IMASK);
+		cs->BC_Write_Reg(cs, 1, IPACX_MASKB, _MASKB_IMASK);
+		cs->writeisac(cs, IPACX_MASKD, _MASKD_IMASK);
+		cs->writeisac(cs, IPACX_MASK, _MASK_IMASK); // global mask register
 
-    // reset HDLC Transmitters/receivers
-		ipacx_write_reg(cs, IPACX_CMDRD, 0x41); 
-		cs->bc_hw_ops->write_reg(cs, 0, IPACX_CMDRB, 0x41);
-		cs->bc_hw_ops->write_reg(cs, 1, IPACX_CMDRB, 0x41);
+		// reset HDLC Transmitters/receivers
+		cs->writeisac(cs, IPACX_CMDRD, 0x41); 
+		cs->BC_Write_Reg(cs, 0, IPACX_CMDRB, 0x41);
+		cs->BC_Write_Reg(cs, 1, IPACX_CMDRB, 0x41);
 		ph_command(cs, IPACX_CMD_RES);
 	}
 }
 
-int
-ipacx_setup(struct IsdnCardState *cs, struct dc_hw_ops *ipacx_dc_ops,
-	    struct bc_hw_ops *ipacx_bc_ops)
-{
-	u8 val;
 
-	cs->dc_hw_ops = ipacx_dc_ops;
-	cs->bc_hw_ops = ipacx_bc_ops;
-	val = ipacx_read_reg(cs, IPACX_ID) & 0x3f;
-	printk(KERN_INFO "HiSax: IPACX Design Id: %#x\n", val);
-	return 0;
+void __devinit
+setup_ipacx(struct IsdnCardState *cs)
+{
+	INIT_WORK(&cs->tqueue, (void *)(void *) dch_bh, cs);
+	cs->dbusytimer.function = (void *) dbusy_timer_handler;
+	cs->dbusytimer.data = (long) cs;
+	init_timer(&cs->dbusytimer);
 }
+//----------------- end of file -----------------------
 

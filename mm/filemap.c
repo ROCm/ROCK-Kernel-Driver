@@ -129,10 +129,10 @@ static inline int sync_page(struct page *page)
  * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
  * @mapping: address space structure to write
  *
- * This is a "data integrity" operation, as opposed to a regular memory
- * cleansing writeback.  The difference between these two operations is that
- * if a dirty page/buffer is encountered, it must be waited upon, and not just
- * skipped over.
+ * If sync_mode is WB_SYNC_ALL then this is a "data integrity" operation, as
+ * opposed to a regular memory * cleansing writeback.  The difference between
+ * these two operations is that if a dirty page/buffer is encountered, it must
+ * be waited upon, and not just skipped over.
  */
 static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 {

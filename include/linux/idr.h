@@ -58,7 +58,7 @@ struct idr {
  */
 
 void *idr_find(struct idr *idp, int id);
-int idr_pre_get(struct idr *idp);
+int idr_pre_get(struct idr *idp, unsigned gfp_mask);
 int idr_get_new(struct idr *idp, void *ptr);
 void idr_remove(struct idr *idp, int id);
 void idr_init(struct idr *idp);

@@ -14,7 +14,6 @@
  * TODO:
  *
  * b layer1 delay?
- * hdlc as module
  * hotplug / unregister issues
  * mod_inc/dec_use_count
  * unify parts of d/b channel usb handling
@@ -59,8 +58,8 @@ static LIST_HEAD(adapter_list);
  * This function will be called when the adapter is plugged
  * into the USB bus.
  */
-static int probe_st5481(struct usb_interface *intf,
-			const struct usb_device_id *id)
+static int __devinit probe_st5481(struct usb_interface *intf,
+				     const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct st5481_adapter *adapter;
@@ -140,7 +139,7 @@ static void disconnect_st5481(struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	if (!adapter)
 		return;
-
+	
 	list_del(&adapter->list);
 
 	st5481_stop(adapter);
@@ -196,7 +195,7 @@ static int __init st5481_usb_init(void)
 	st5481_debug = debug;
 #endif
 
-	printk(KERN_INFO "hisax_st5481: ST5481 USB ISDN driver v0.1.0\n");
+	printk(KERN_INFO "hisax_st5481: ST5481 USB ISDN driver $Revision: 2.4.2.3 $\n");
 
 	retval = st5481_d_init();
 	if (retval < 0)

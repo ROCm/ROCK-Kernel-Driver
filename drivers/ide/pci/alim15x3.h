@@ -15,7 +15,7 @@ static u8 ali_proc;
 
 static int ali_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t ali_procs[] __initdata = {
+static ide_pci_host_proc_t ali_procs[] = {
 	{
 		.name		= "ali",
 		.set		= 1,

@@ -60,7 +60,7 @@ static int raw_open(struct inode *inode, struct file *filp)
 	if (!bdev)
 		goto out;
 	igrab(bdev->bd_inode);
-	err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
+	err = blkdev_get(bdev, filp->f_mode, 0);
 	if (err)
 		goto out;
 	err = bd_claim(bdev, raw_open);
@@ -81,7 +81,7 @@ static int raw_open(struct inode *inode, struct file *filp)
 out2:
 	bd_release(bdev);
 out1:
-	blkdev_put(bdev, BDEV_RAW);
+	blkdev_put(bdev);
 out:
 	up(&raw_mutex);
 	return err;
@@ -106,7 +106,7 @@ static int raw_release(struct inode *inode, struct file *filp)
 	up(&raw_mutex);
 
 	bd_release(bdev);
-	blkdev_put(bdev, BDEV_RAW);
+	blkdev_put(bdev);
 	return 0;
 }
 

@@ -1035,20 +1035,11 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
  
 int d_validate(struct dentry *dentry, struct dentry *dparent)
 {
-	unsigned long dent_addr = (unsigned long) dentry;
-	unsigned long min_addr = PAGE_OFFSET;
-	unsigned long align_mask = 0x0F;
 	struct hlist_head *base;
 	struct hlist_node *lhp;
 
-	if (dent_addr < min_addr)
-		goto out;
-	if (dent_addr > (unsigned long)high_memory - sizeof(struct dentry))
-		goto out;
-	if (dent_addr & align_mask)
-		goto out;
-	if ((!kern_addr_valid(dent_addr)) || (!kern_addr_valid(dent_addr -1 +
-						sizeof(struct dentry))))
+	/* Check whether the ptr might be valid at all.. */
+	if (!kmem_ptr_validate(dentry_cache, dentry))
 		goto out;
 
 	if (dentry->d_parent != dparent)
@@ -1540,6 +1531,16 @@ out:
 	return ino;
 }
 
+static __initdata unsigned long dhash_entries;
+static int __init set_dhash_entries(char *str)
+{
+	if (!str)
+		return 0;
+	dhash_entries = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup("dhash_entries=", set_dhash_entries);
+
 static void __init dcache_init(unsigned long mempages)
 {
 	struct hlist_head *d;
@@ -1565,11 +1566,13 @@ static void __init dcache_init(unsigned long mempages)
 	
 	set_shrinker(DEFAULT_SEEKS, shrink_dcache_memory);
 
-#if PAGE_SHIFT < 13
-	mempages >>= (13 - PAGE_SHIFT);
-#endif
-	mempages *= sizeof(struct hlist_head);
-	for (order = 0; ((1UL << order) << PAGE_SHIFT) < mempages; order++)
+	if (!dhash_entries)
+		dhash_entries = PAGE_SHIFT < 13 ?
+				mempages >> (13 - PAGE_SHIFT) :
+				mempages << (PAGE_SHIFT - 13);
+
+	dhash_entries *= sizeof(struct hlist_head);
+	for (order = 0; ((1UL << order) << PAGE_SHIFT) < dhash_entries; order++)
 		;
 
 	do {

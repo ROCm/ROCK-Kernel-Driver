@@ -134,18 +134,18 @@ edd_show_host_bus(struct edd_device *edev, char *buf)
 
 	for (i = 0; i < 4; i++) {
 		if (isprint(info->params.host_bus_type[i])) {
-			p += snprintf(p, left, "%c", info->params.host_bus_type[i]);
+			p += scnprintf(p, left, "%c", info->params.host_bus_type[i]);
 		} else {
-			p += snprintf(p, left, " ");
+			p += scnprintf(p, left, " ");
 		}
 	}
 
 	if (!strncmp(info->params.host_bus_type, "ISA", 3)) {
-		p += snprintf(p, left, "\tbase_address: %x\n",
+		p += scnprintf(p, left, "\tbase_address: %x\n",
 			     info->params.interface_path.isa.base_address);
 	} else if (!strncmp(info->params.host_bus_type, "PCIX", 4) ||
 		   !strncmp(info->params.host_bus_type, "PCI", 3)) {
-		p += snprintf(p, left,
+		p += scnprintf(p, left,
 			     "\t%02x:%02x.%d  channel: %u\n",
 			     info->params.interface_path.pci.bus,
 			     info->params.interface_path.pci.slot,
@@ -154,12 +154,12 @@ edd_show_host_bus(struct edd_device *edev, char *buf)
 	} else if (!strncmp(info->params.host_bus_type, "IBND", 4) ||
 		   !strncmp(info->params.host_bus_type, "XPRS", 4) ||
 		   !strncmp(info->params.host_bus_type, "HTPT", 4)) {
-		p += snprintf(p, left,
+		p += scnprintf(p, left,
 			     "\tTBD: %llx\n",
 			     info->params.interface_path.ibnd.reserved);
 
 	} else {
-		p += snprintf(p, left, "\tunknown: %llx\n",
+		p += scnprintf(p, left, "\tunknown: %llx\n",
 			     info->params.interface_path.unknown.reserved);
 	}
 	return (p - buf);
@@ -178,43 +178,43 @@ edd_show_interface(struct edd_device *edev, char *buf)
 
 	for (i = 0; i < 8; i++) {
 		if (isprint(info->params.interface_type[i])) {
-			p += snprintf(p, left, "%c", info->params.interface_type[i]);
+			p += scnprintf(p, left, "%c", info->params.interface_type[i]);
 		} else {
-			p += snprintf(p, left, " ");
+			p += scnprintf(p, left, " ");
 		}
 	}
 	if (!strncmp(info->params.interface_type, "ATAPI", 5)) {
-		p += snprintf(p, left, "\tdevice: %u  lun: %u\n",
+		p += scnprintf(p, left, "\tdevice: %u  lun: %u\n",
 			     info->params.device_path.atapi.device,
 			     info->params.device_path.atapi.lun);
 	} else if (!strncmp(info->params.interface_type, "ATA", 3)) {
-		p += snprintf(p, left, "\tdevice: %u\n",
+		p += scnprintf(p, left, "\tdevice: %u\n",
 			     info->params.device_path.ata.device);
 	} else if (!strncmp(info->params.interface_type, "SCSI", 4)) {
-		p += snprintf(p, left, "\tid: %u  lun: %llu\n",
+		p += scnprintf(p, left, "\tid: %u  lun: %llu\n",
 			     info->params.device_path.scsi.id,
 			     info->params.device_path.scsi.lun);
 	} else if (!strncmp(info->params.interface_type, "USB", 3)) {
-		p += snprintf(p, left, "\tserial_number: %llx\n",
+		p += scnprintf(p, left, "\tserial_number: %llx\n",
 			     info->params.device_path.usb.serial_number);
 	} else if (!strncmp(info->params.interface_type, "1394", 4)) {
-		p += snprintf(p, left, "\teui: %llx\n",
+		p += scnprintf(p, left, "\teui: %llx\n",
 			     info->params.device_path.i1394.eui);
 	} else if (!strncmp(info->params.interface_type, "FIBRE", 5)) {
-		p += snprintf(p, left, "\twwid: %llx lun: %llx\n",
+		p += scnprintf(p, left, "\twwid: %llx lun: %llx\n",
 			     info->params.device_path.fibre.wwid,
 			     info->params.device_path.fibre.lun);
 	} else if (!strncmp(info->params.interface_type, "I2O", 3)) {
-		p += snprintf(p, left, "\tidentity_tag: %llx\n",
+		p += scnprintf(p, left, "\tidentity_tag: %llx\n",
 			     info->params.device_path.i2o.identity_tag);
 	} else if (!strncmp(info->params.interface_type, "RAID", 4)) {
-		p += snprintf(p, left, "\tidentity_tag: %x\n",
+		p += scnprintf(p, left, "\tidentity_tag: %x\n",
 			     info->params.device_path.raid.array_number);
 	} else if (!strncmp(info->params.interface_type, "SATA", 4)) {
-		p += snprintf(p, left, "\tdevice: %u\n",
+		p += scnprintf(p, left, "\tdevice: %u\n",
 			     info->params.device_path.sata.device);
 	} else {
-		p += snprintf(p, left, "\tunknown: %llx %llx\n",
+		p += scnprintf(p, left, "\tunknown: %llx %llx\n",
 			     info->params.device_path.unknown.reserved1,
 			     info->params.device_path.unknown.reserved2);
 	}
@@ -256,7 +256,7 @@ edd_show_version(struct edd_device *edev, char *buf)
 		return -EINVAL;
 	}
 
-	p += snprintf(p, left, "0x%02x\n", info->version);
+	p += scnprintf(p, left, "0x%02x\n", info->version);
 	return (p - buf);
 }
 
@@ -264,7 +264,7 @@ static ssize_t
 edd_show_disk80_sig(struct edd_device *edev, char *buf)
 {
 	char *p = buf;
-	p += snprintf(p, left, "0x%08x\n", edd_disk80_sig);
+	p += scnprintf(p, left, "0x%08x\n", edd_disk80_sig);
 	return (p - buf);
 }
 
@@ -278,16 +278,16 @@ edd_show_extensions(struct edd_device *edev, char *buf)
 	}
 
 	if (info->interface_support & EDD_EXT_FIXED_DISK_ACCESS) {
-		p += snprintf(p, left, "Fixed disk access\n");
+		p += scnprintf(p, left, "Fixed disk access\n");
 	}
 	if (info->interface_support & EDD_EXT_DEVICE_LOCKING_AND_EJECTING) {
-		p += snprintf(p, left, "Device locking and ejecting\n");
+		p += scnprintf(p, left, "Device locking and ejecting\n");
 	}
 	if (info->interface_support & EDD_EXT_ENHANCED_DISK_DRIVE_SUPPORT) {
-		p += snprintf(p, left, "Enhanced Disk Drive support\n");
+		p += scnprintf(p, left, "Enhanced Disk Drive support\n");
 	}
 	if (info->interface_support & EDD_EXT_64BIT_EXTENSIONS) {
-		p += snprintf(p, left, "64-bit extensions\n");
+		p += scnprintf(p, left, "64-bit extensions\n");
 	}
 	return (p - buf);
 }
@@ -302,21 +302,21 @@ edd_show_info_flags(struct edd_device *edev, char *buf)
 	}
 
 	if (info->params.info_flags & EDD_INFO_DMA_BOUNDARY_ERROR_TRANSPARENT)
-		p += snprintf(p, left, "DMA boundary error transparent\n");
+		p += scnprintf(p, left, "DMA boundary error transparent\n");
 	if (info->params.info_flags & EDD_INFO_GEOMETRY_VALID)
-		p += snprintf(p, left, "geometry valid\n");
+		p += scnprintf(p, left, "geometry valid\n");
 	if (info->params.info_flags & EDD_INFO_REMOVABLE)
-		p += snprintf(p, left, "removable\n");
+		p += scnprintf(p, left, "removable\n");
 	if (info->params.info_flags & EDD_INFO_WRITE_VERIFY)
-		p += snprintf(p, left, "write verify\n");
+		p += scnprintf(p, left, "write verify\n");
 	if (info->params.info_flags & EDD_INFO_MEDIA_CHANGE_NOTIFICATION)
-		p += snprintf(p, left, "media change notification\n");
+		p += scnprintf(p, left, "media change notification\n");
 	if (info->params.info_flags & EDD_INFO_LOCKABLE)
-		p += snprintf(p, left, "lockable\n");
+		p += scnprintf(p, left, "lockable\n");
 	if (info->params.info_flags & EDD_INFO_NO_MEDIA_PRESENT)
-		p += snprintf(p, left, "no media present\n");
+		p += scnprintf(p, left, "no media present\n");
 	if (info->params.info_flags & EDD_INFO_USE_INT13_FN50)
-		p += snprintf(p, left, "use int13 fn50\n");
+		p += scnprintf(p, left, "use int13 fn50\n");
 	return (p - buf);
 }
 
@@ -329,7 +329,7 @@ edd_show_default_cylinders(struct edd_device *edev, char *buf)
 		return -EINVAL;
 	}
 
-	p += snprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
+	p += scnprintf(p, left, "0x%x\n", info->params.num_default_cylinders);
 	return (p - buf);
 }
 
@@ -342,7 +342,7 @@ edd_show_default_heads(struct edd_device *edev, char *buf)
 		return -EINVAL;
 	}
 
-	p += snprintf(p, left, "0x%x\n", info->params.num_default_heads);
+	p += scnprintf(p, left, "0x%x\n", info->params.num_default_heads);
 	return (p - buf);
 }
 
@@ -355,7 +355,7 @@ edd_show_default_sectors_per_track(struct edd_device *edev, char *buf)
 		return -EINVAL;
 	}
 
-	p += snprintf(p, left, "0x%x\n", info->params.sectors_per_track);
+	p += scnprintf(p, left, "0x%x\n", info->params.sectors_per_track);
 	return (p - buf);
 }
 
@@ -368,7 +368,7 @@ edd_show_sectors(struct edd_device *edev, char *buf)
 		return -EINVAL;
 	}
 
-	p += snprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
+	p += scnprintf(p, left, "0x%llx\n", info->params.number_of_sectors);
 	return (p - buf);
 }
 

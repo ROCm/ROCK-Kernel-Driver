@@ -9,8 +9,6 @@
 #ifndef _ASM_IA64_SN_IO_H
 #define _ASM_IA64_SN_IO_H
 
-#include <linux/config.h>
-
 #include <asm/sn/addrs.h>
 
 /* Because we only have PCI I/O ports.  */

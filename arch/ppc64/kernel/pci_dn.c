@@ -181,6 +181,7 @@ struct device_node *fetch_dev_dn(struct pci_dev *dev)
 	}
 	return dn;
 }
+EXPORT_SYMBOL(fetch_dev_dn);
 
 
 /******************************************************************

@@ -1143,7 +1143,7 @@ static irqreturn_t w83977af_interrupt(int irq, void *dev_id,
 
 	outb(icr, iobase+ICR);    /* Restore (new) interrupts */
 	outb(set, iobase+SSR);    /* Restore bank register */
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(isr);
 }
 
 /*

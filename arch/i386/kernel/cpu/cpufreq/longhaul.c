@@ -1,5 +1,5 @@
 /*
- *  (C) 2001-2003  Dave Jones. <davej@codemonkey.org.uk>
+ *  (C) 2001-2004  Dave Jones. <davej@codemonkey.org.uk>
  *  (C) 2002  Padraig Brady. <padraig@antefacto.com>
  *
  *  Licensed under the terms of the GNU GPL License version 2.
@@ -63,11 +63,12 @@ static struct cpufreq_frequency_table *longhaul_table;
 
 static unsigned int calc_speed (int mult, int fsb)
 {
-	int mhz;
-	mhz = (mult/10)*fsb;
+	int khz;
+	khz = (mult/10)*fsb;
 	if (mult%10)
-		mhz += fsb/2;
-	return mhz;
+		khz += fsb/2;
+	khz *= 1000;
+	return khz;
 }
 
 
@@ -185,6 +186,7 @@ static int _guess (int guess, int maxmult)
 	return target;
 }
 
+
 static int guess_fsb(int maxmult)
 {
 	int speed = (cpu_khz/1000);
@@ -200,7 +202,6 @@ static int guess_fsb(int maxmult)
 	}
 	return 0;
 }
-
 
 
 static int __init longhaul_get_ranges (void)
@@ -253,7 +254,7 @@ static int __init longhaul_get_ranges (void)
 	highest_speed = calc_speed (maxmult, fsb);
 	lowest_speed = calc_speed (minmult,fsb);
 	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
-		 fsb, lowest_speed, highest_speed);
+		 fsb, lowest_speed/1000, highest_speed/1000);
 
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
 	if(!longhaul_table)
@@ -267,7 +268,7 @@ static int __init longhaul_get_ranges (void)
 		if (ratio > maxmult || ratio < minmult)
 			continue;
 		longhaul_table[k].frequency = calc_speed (ratio, fsb);
-		longhaul_table[k].index	= (j << 8);
+		longhaul_table[k].index	= j;
 		k++;
 	}
 
@@ -358,7 +359,7 @@ static int longhaul_target (struct cpufreq_policy *policy,
 	return 0;
 }
 
-static int longhaul_cpu_init (struct cpufreq_policy *policy)
+static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	char *cpuname=NULL;

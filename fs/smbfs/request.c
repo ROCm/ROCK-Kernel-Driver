@@ -384,6 +384,12 @@ int smb_request_send_req(struct smb_request *req)
 	struct smb_sb_info *server = req->rq_server;
 	int result;
 
+	if (req->rq_bytes_sent == 0) {
+		WSET(req->rq_header, smb_tid, server->opt.tid);
+		WSET(req->rq_header, smb_pid, 1);
+		WSET(req->rq_header, smb_uid, server->opt.server_uid);
+	}
+
 	result = smb_send_request(req);
 	if (result < 0 && result != -EAGAIN)
 		goto out;

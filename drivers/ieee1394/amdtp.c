@@ -1308,7 +1308,6 @@ static void __exit amdtp_exit_module (void)
 
         hpsb_unregister_highlevel(&amdtp_highlevel);
 	devfs_remove("amdtp");
-	cdev_unmap(IEEE1394_AMDTP_DEV, 16);
 	cdev_del(&amdtp_cdev);
 
 	HPSB_INFO("Unloaded AMDTP driver");

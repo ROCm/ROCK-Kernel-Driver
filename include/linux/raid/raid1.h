@@ -54,8 +54,8 @@ struct r1bio_s {
 	atomic_t		remaining; /* 'have we finished' count,
 					    * used from IRQ handlers
 					    */
-	int			cmd;
 	sector_t		sector;
+	int			sectors;
 	unsigned long		state;
 	mddev_t			*mddev;
 	/*
@@ -63,21 +63,19 @@ struct r1bio_s {
 	 */
 	struct bio		*master_bio;
 	/*
-	 * if the IO is in READ direction, then this bio is used:
+	 * if the IO is in READ direction, then this is where we read
 	 */
-	struct bio		*read_bio;
 	int			read_disk;
 
-	r1bio_t			*next_r1; /* next for retry or in free list */
 	struct list_head	retry_list;
 	/*
 	 * if the IO is in WRITE direction, then multiple bios are used.
 	 * We choose the number when they are allocated.
 	 */
-	struct bio		*write_bios[0];
+	struct bio		*bios[0];
 };
 
 /* bits for r1bio.state */
-#define	R1BIO_Uptodate	1
-
+#define	R1BIO_Uptodate	0
+#define	R1BIO_IsSync	1
 #endif

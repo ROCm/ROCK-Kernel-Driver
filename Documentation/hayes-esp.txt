@@ -109,7 +109,7 @@ option with a space.  For example:
 insmod esp dma=3 trigger=512
 
 The esp module can be automatically loaded when needed.  To cause this to
-happen, add the following lines to /etc/modules.conf (replacing the last line
+happen, add the following lines to /etc/modprobe.conf (replacing the last line
 with options for your configuration):
 
 alias char-major-57 esp

@@ -37,15 +37,15 @@ Quick Install
 Install linux driver as following command:
 
 1. make all
-2. insmod dl2k.o
+2. insmod dl2k.ko
 3. ifconfig eth0 up 10.xxx.xxx.xxx netmask 255.0.0.0
 		    ^^^^^^^^^^^^^^^\	    ^^^^^^^^\
 				    IP		     NETMASK
 Now eth0 should active, you can test it by "ping" or get more information by
 "ifconfig". If tested ok, continue the next step.
 
-4. cp dl2k.o /lib/modules/`uname -r`/kernel/drivers/net
-5. Add the following lines to /etc/modules.conf:
+4. cp dl2k.ko /lib/modules/`uname -r`/kernel/drivers/net
+5. Add the following line to /etc/modprobe.conf:
 	alias eth0 dl2k
 6. Run "netconfig" or "netconf" to create configuration script ifcfg-eth0
    located at /etc/sysconfig/network-scripts or create it manually.
@@ -154,8 +154,8 @@ Installing the Driver
   -----------------
   1. Copy dl2k.o to the network modules directory, typically
      /lib/modules/2.x.x-xx/net or /lib/modules/2.x.x/kernel/drivers/net.
-  2. Locate the boot module configuration file, most commonly modules.conf
-     or conf.modules in the /etc directory. Add the following lines:
+  2. Locate the boot module configuration file, most commonly modprobe.conf
+     or modules.conf (for 2.4) in the /etc directory. Add the following lines:
 
      alias ethx dl2k
      options dl2k <optional parameters>

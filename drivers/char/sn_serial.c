@@ -259,7 +259,7 @@ sn_debug_printf(const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	printed_len = vsnprintf(printk_buf, sizeof(printk_buf), fmt, args);
+	printed_len = vscnprintf(printk_buf, sizeof(printk_buf), fmt, args);
 	early_printk_sn_sal(printk_buf, printed_len);
 	va_end(args);
 	return printed_len;
@@ -772,7 +772,7 @@ sn_sal_read_proc(char *page, char **start, off_t off, int count,
 	int len = 0;
 	off_t	begin = 0;
 
-	len += sprintf(page, "sn_serial: nasid:%d irq:%d tx:%d rx:%d\n",
+	len += sprintf(page, "sn_serial: nasid:%ld irq:%d tx:%d rx:%d\n",
 		       ia64_sn_get_console_nasid(), sn_sal_irq,
 		       sn_total_tx_count, sn_total_rx_count);
 	*eof = 1;

@@ -278,9 +278,7 @@ void pcbit_fsm_event(struct pcbit_dev *dev, struct pcbit_chan *chan,
 	struct fsm_timer_entry *tentry;
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
-
+	spin_lock_irqsave(&dev->lock, flags);
 
         for (action = fsm_table; action->init != 0xff; action++)
                 if (action->init == chan->fsm_state && action->event == event)
@@ -288,9 +286,9 @@ void pcbit_fsm_event(struct pcbit_dev *dev, struct pcbit_chan *chan,
   
 	if (action->init == 0xff) {
 		
+		spin_unlock_irqrestore(&dev->lock, flags);
 		printk(KERN_DEBUG "fsm error: event %x on state %x\n", 
                        event, chan->fsm_state);
-		restore_flags(flags);
 		return;
 	}
 
@@ -315,7 +313,7 @@ void pcbit_fsm_event(struct pcbit_dev *dev, struct pcbit_chan *chan,
                 add_timer(&chan->fsm_timer);
         }
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&dev->lock, flags);
 
 	if (action->callb)
 		action->callb(dev, chan, data);

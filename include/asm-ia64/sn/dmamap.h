@@ -8,12 +8,6 @@
 #ifndef _ASM_IA64_SN_DMAMAP_H
 #define _ASM_IA64_SN_DMAMAP_H
 
-#include <asm/sn/types.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 /*
  * Definitions for allocating, freeing, and using DMA maps
  */
@@ -42,10 +36,6 @@ typedef struct dmamap {
 	paddr_t		dma_addr;	/* Corresponding bus addr for A24/A32 */
 	unsigned long	dma_virtaddr;	/* Beginning virtual address that is mapped */
 } dmamap_t;
-
-#ifdef __cplusplus
-}
-#endif
 
 /* standard flags values for pio_map routines,
  * including {xtalk,pciio}_dmamap calls.

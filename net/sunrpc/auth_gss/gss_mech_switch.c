@@ -70,6 +70,7 @@ gss_mech_register(struct xdr_netobj * mech_type, struct gss_api_ops * ops)
 	}
 	gm->gm_oid.len = mech_type->len;
 	if (!(gm->gm_oid.data = kmalloc(mech_type->len, GFP_KERNEL))) {
+		kfree(gm);
 		printk("Failed to allocate memory in gss_mech_register");
 		return -1;
 	}
@@ -195,7 +196,7 @@ gss_import_sec_context(struct xdr_netobj	*input_token,
 u32
 gss_get_mic(struct gss_ctx	*context_handle,
 	    u32			qop,
-	    struct xdr_netobj	*message,
+	    struct xdr_buf	*message,
 	    struct xdr_netobj	*mic_token)
 {
 	 return context_handle->mech_type->gm_ops
@@ -209,7 +210,7 @@ gss_get_mic(struct gss_ctx	*context_handle,
 
 u32
 gss_verify_mic(struct gss_ctx		*context_handle,
-	       struct xdr_netobj	*message,
+	       struct xdr_buf		*message,
 	       struct xdr_netobj	*mic_token,
 	       u32			*qstate)
 {

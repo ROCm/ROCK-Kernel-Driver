@@ -50,6 +50,9 @@
 #define GARMIN_VENDOR_ID		0x091E
 #define GARMIN_IQUE_3600_ID		0x0004
 
+#define ACEECA_VENDOR_ID		0x4766
+#define ACEECA_MEZ1000_ID		0x0001
+
 /****************************************************************************
  * Handspring Visor Vendor specific request codes (bRequest values)
  * A big thank you to Handspring for providing the following information.

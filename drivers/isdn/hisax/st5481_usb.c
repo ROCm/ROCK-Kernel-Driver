@@ -96,7 +96,7 @@ void st5481_usb_device_ctrl_msg(struct st5481_adapter *adapter,
  * Asynchronous pipe reset (async version of usb_clear_halt).
  */
 void st5481_usb_pipe_reset(struct st5481_adapter *adapter,
-		    u8 pipe,
+		    u_char pipe,
 		    ctrl_complete_t complete, void *context)
 {
 	DBG(1,"pipe=%02x",pipe);
@@ -500,8 +500,8 @@ static void usb_in_complete(struct urb *urb, struct pt_regs *regs)
 			status = len;
 			len = 0;
 		} else {
-			status = hdlc_decode(&in->hdlc_state, ptr, len, &count,
-					     in->rcvbuf, in->bufsize);
+			status = isdnhdlc_decode(&in->hdlc_state, ptr, len, &count,
+				in->rcvbuf, in->bufsize);
 			ptr += count;
 			len -= count;
 		}
@@ -633,8 +633,8 @@ void st5481_in_mode(struct st5481_in *in, int mode)
 
 	if (in->mode != L1_MODE_NULL) {
 		if (in->mode != L1_MODE_TRANS)
-			hdlc_rcv_init(&in->hdlc_state,
-				      in->mode == L1_MODE_HDLC_56K);
+			isdnhdlc_rcv_init(&in->hdlc_state,
+				in->mode == L1_MODE_HDLC_56K);
 		
 		st5481_usb_pipe_reset(in->adapter, in->ep, NULL, NULL);
 		st5481_usb_device_ctrl_msg(in->adapter, in->counter,

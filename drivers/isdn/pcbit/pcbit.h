@@ -51,7 +51,7 @@ struct pcbit_dev {
 	unsigned int id;
 	unsigned int interrupt;			/* set during interrupt 
 						   processing */
-	
+	spinlock_t lock;
 	/* isdn4linux */
 
 	struct msn_entry * msn_list;		/* ISDN address list */

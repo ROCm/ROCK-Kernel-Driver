@@ -195,7 +195,8 @@ static void jfs_put_super(struct super_block *sb)
 	rc = jfs_umount(sb);
 	if (rc)
 		jfs_err("jfs_umount failed with return code %d", rc);
-	unload_nls(sbi->nls_tab);
+	if (sbi->nls_tab)
+		unload_nls(sbi->nls_tab);
 	sbi->nls_tab = NULL;
 
 	kfree(sbi);
@@ -434,9 +435,6 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_root = d_alloc_root(inode);
 	if (!sb->s_root)
 		goto out_no_root;
-
-	if (!sbi->nls_tab)
-		sbi->nls_tab = load_nls_default();
 
 	/* logical blocks are represented by 40 bits in pxd_t, etc. */
 	sb->s_maxbytes = ((u64) sb->s_blocksize) << 40;

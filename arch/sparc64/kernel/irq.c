@@ -1211,7 +1211,7 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 	if (cpus_empty(mask))
 		mask = cpu_online_map;
 
-	len = cpumask_snprintf(page, count, mask);
+	len = cpumask_scnprintf(page, count, mask);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");

@@ -36,6 +36,12 @@ config BINFMT_ZFLAT
 	help
 	  Support FLAT format compressed binaries
 
+config BINFMT_SHARED_FLAT
+	bool "Enable shared FLAT support"
+	depends on BINFMT_FLAT
+	help
+	  Support FLAT shared libraries
+
 config BINFMT_AOUT
 	tristate "Kernel support for a.out and ECOFF binaries"
 	depends on (X86 && !X86_64) || ALPHA || ARM || M68K || MIPS || SPARC

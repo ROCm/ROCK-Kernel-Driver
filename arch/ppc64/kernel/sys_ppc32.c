@@ -76,6 +76,8 @@
 #include <asm/ppc32.h>
 #include <asm/mmu_context.h>
 
+#include "pci.h"
+
 typedef ssize_t (*io_fn_t)(struct file *, char *, size_t, loff_t *);
 typedef ssize_t (*iov_fn_t)(struct file *, const struct iovec *, unsigned long, loff_t *);
 
@@ -2210,7 +2212,7 @@ asmlinkage int sys32_pciconfig_read(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf
 
 
 extern asmlinkage int sys_pciconfig_write(unsigned long bus, unsigned long dfn, unsigned long off,
-					                                unsigned long len, unsigned char *buf);
+					  unsigned long len, unsigned char *buf);
 
 asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubuf)
 {
@@ -2220,6 +2222,64 @@ asmlinkage int sys32_pciconfig_write(u32 bus, u32 dfn, u32 off, u32 len, u32 ubu
 				   (unsigned long) len,
 				   (unsigned char *)AA(ubuf));
 }
+
+#define IOBASE_BRIDGE_NUMBER	0
+#define IOBASE_MEMORY		1
+#define IOBASE_IO		2
+#define IOBASE_ISA_IO		3
+#define IOBASE_ISA_MEM		4
+
+asmlinkage int sys32_pciconfig_iobase(u32 which, u32 in_bus, u32 in_devfn)
+{
+	struct pci_controller* hose;
+	struct list_head *ln;
+	struct pci_bus *bus = NULL;
+	struct device_node *hose_node;
+
+	/* Argh ! Please forgive me for that hack, but that's the
+	 * simplest way to get existing XFree to not lockup on some
+	 * G5 machines... So when something asks for bus 0 io base
+	 * (bus 0 is HT root), we return the AGP one instead.
+	 */
+#ifdef CONFIG_PPC_PMAC
+	if (systemcfg->platform == PLATFORM_POWERMAC &&
+	    machine_is_compatible("MacRISC4"))
+		if (in_bus == 0)
+			in_bus = 0xf0;
+#endif /* CONFIG_PPC_PMAC */
+
+	/* That syscall isn't quite compatible with PCI domains, but it's
+	 * used on pre-domains setup. We return the first match
+	 */
+
+	for (ln = pci_root_buses.next; ln != &pci_root_buses; ln = ln->next) {
+		bus = pci_bus_b(ln);
+		if (in_bus >= bus->number && in_bus < (bus->number + bus->subordinate))
+			break;
+		bus = NULL;
+	}
+	if (bus == NULL || bus->sysdata == NULL)
+		return -ENODEV;
+
+	hose_node = (struct device_node *)bus->sysdata;
+	hose = hose_node->phb;
+
+	switch (which) {
+	case IOBASE_BRIDGE_NUMBER:
+		return (long)hose->first_busno;
+	case IOBASE_MEMORY:
+		return (long)hose->pci_mem_offset;
+	case IOBASE_IO:
+		return (long)hose->io_base_phys;
+	case IOBASE_ISA_IO:
+		return (long)isa_io_base;
+	case IOBASE_ISA_MEM:
+		return -EINVAL;
+	}
+
+	return -EOPNOTSUPP;
+}
+
 
 extern asmlinkage int sys_newuname(struct new_utsname * name);
 

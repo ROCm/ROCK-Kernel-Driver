@@ -171,7 +171,7 @@ struct tagtable {
 	int (*parse)(const struct tag *);
 };
 
-#define __tag __attribute__((unused, __section__(".taglist")))
+#define __tag __attribute_used__ __attribute__((__section__(".taglist")))
 #define __tagtable(tag, fn) \
 static struct tagtable __tagtable_##fn __tag = { tag, fn }
 
@@ -210,9 +210,8 @@ struct early_params {
 	void (*fn)(char **p);
 };
 
-#define __early_param(name,fn)				\
-static struct early_params __early_##fn			\
-__attribute__((section("__early_param"), unused)) =	\
-	{ name, fn }
+#define __early_param(name,fn)					\
+static struct early_params __early_##fn __attribute_used__	\
+__attribute__((__section__("__early_param"))) = { name, fn }
 
 #endif

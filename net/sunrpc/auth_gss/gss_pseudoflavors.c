@@ -92,6 +92,7 @@ gss_register_triple(u32 pseudoflavor, struct gss_api_mech *mech,
 	return 0;
 
 err_unlock:
+	kfree(triple);
 	spin_unlock(&registered_triples_lock);
 err:
 	return -1;

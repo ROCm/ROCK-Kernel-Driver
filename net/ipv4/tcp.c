@@ -2570,6 +2570,16 @@ int tcp_getsockopt(struct sock *sk, int level, int optname, char *optval,
 extern void __skb_cb_too_small_for_tcp(int, int);
 extern void tcpdiag_init(void);
 
+static __initdata unsigned long thash_entries;
+static int __init set_thash_entries(char *str)
+{
+	if (!str)
+		return 0;
+	thash_entries = simple_strtoul(str, &str, 0);
+	return 1;
+}
+__setup("thash_entries=", set_thash_entries);
+
 void __init tcp_init(void)
 {
 	struct sk_buff *skb = NULL;
@@ -2611,6 +2621,10 @@ void __init tcp_init(void)
 	else
 		goal = num_physpages >> (23 - PAGE_SHIFT);
 
+	if (!thash_entries)
+		goal = min(10UL, goal);
+	else
+		goal = (thash_entries * sizeof(struct tcp_ehash_bucket)) >> PAGE_SHIFT;
 	for (order = 0; (1UL << order) < goal; order++)
 		;
 	do {

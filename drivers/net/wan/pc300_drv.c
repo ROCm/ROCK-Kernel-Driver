@@ -290,7 +290,7 @@ static int clock_rate_calc(uclong, uclong, int *);
 static uclong detect_ram(pc300_t *);
 static void plx_init(pc300_t *);
 static void cpc_trace(struct net_device *, struct sk_buff *, char);
-static int cpc_attach(hdlc_device *, unsigned short, unsigned short);
+static int cpc_attach(struct net_device *, unsigned short, unsigned short);
 
 #ifdef CONFIG_PC300_MLPPP
 void cpc_tty_init(pc300dev_t * dev);
@@ -1774,7 +1774,7 @@ void cpc_tx_timeout(struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 	uclong flags;
 	ucchar ilar;
@@ -1802,7 +1802,7 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 	uclong flags;
 #ifdef PC300_DEBUG_TX
@@ -1880,13 +1880,12 @@ int cpc_queue_xmit(struct sk_buff *skb, struct net_device *dev)
 	return 0;
 }
 
-void cpc_net_rx(hdlc_device * hdlc)
+void cpc_net_rx(struct net_device *dev)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
 	pc300dev_t *d = (pc300dev_t *) dev->priv;
 	pc300ch_t *chan = (pc300ch_t *) d->chan;
 	pc300_t *card = (pc300_t *) chan->card;
-	struct net_device_stats *stats = &d->hdlc->stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	int ch = chan->channel;
 #ifdef PC300_DEBUG_RX
 	int i;
@@ -1975,7 +1974,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 	pc300_t *card = (pc300_t *)chan->card; 
 	int ch = chan->channel; 
 	volatile pcsca_bd_t * ptdescr; 
-	struct net_device_stats *stats = &dev->hdlc->stats; 
+	struct net_device_stats *stats = hdlc_stats(dev->dev);
 
     /* Clean up descriptors from previous transmission */
 	ptdescr = (pcsca_bd_t *)(card->hw.rambase +
@@ -1999,7 +1998,7 @@ static void sca_tx_intr(pc300dev_t *dev)
 	} else {
 #endif
 	/* Tell the upper layer we are ready to transmit more packets */
-		netif_wake_queue((struct net_device*)dev->hdlc);
+		netif_wake_queue(dev->dev);
 #ifdef CONFIG_PC300_MLPPP
 	}
 #endif
@@ -2017,8 +2016,8 @@ static void sca_intr(pc300_t * card)
 		for (ch = 0; ch < card->hw.nchan; ch++) {
 			pc300ch_t *chan = &card->chan[ch];
 			pc300dev_t *d = &chan->d;
-			hdlc_device *hdlc = d->hdlc;
-			struct net_device *dev = hdlc_to_dev(hdlc);
+			struct net_device *dev = d->dev;
+			hdlc_device *hdlc = dev_to_hdlc(dev);
 
 			spin_lock(&card->card_lock);
 
@@ -2049,7 +2048,7 @@ static void sca_intr(pc300_t * card)
 							if ((cpc_readb(scabase + DSR_RX(ch)) & DSR_DE)) {
 								rx_dma_stop(card, ch);
 							}
-							cpc_net_rx(hdlc);
+							cpc_net_rx(dev);
 							/* Discard invalid frames */
 							hdlc->stats.rx_errors++;
 							hdlc->stats.rx_over_errors++;
@@ -2073,10 +2072,10 @@ static void sca_intr(pc300_t * card)
 							/* verify if driver is TTY */
 							cpc_tty_receive(d);
 						} else {
-							cpc_net_rx(hdlc);
+							cpc_net_rx(dev);
 						}
 #else
-						cpc_net_rx(hdlc);
+						cpc_net_rx(dev);
 #endif
 						if (card->hw.type == PC300_TE) {
 							cpc_writeb(card->hw.falcbase +
@@ -2829,12 +2828,7 @@ int cpc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 static struct net_device_stats *cpc_get_stats(struct net_device *dev)
 {
-	pc300dev_t *d = (pc300dev_t *) dev->priv;
-
-	if (d)
-		return &d->hdlc->stats;
-	else
-		return NULL;
+	return hdlc_stats(dev);
 }
 
 static int clock_rate_calc(uclong rate, uclong clock, int *br_io)
@@ -3075,10 +3069,9 @@ int tx_config(pc300dev_t * d)
 	return 0;
 }
 
-static int cpc_attach(hdlc_device * hdlc, unsigned short encoding,
+static int cpc_attach(struct net_device *dev, unsigned short encoding,
 		      unsigned short parity)
 {
-	struct net_device * dev = hdlc_to_dev(hdlc);
 	pc300dev_t *d = (pc300dev_t *)dev->priv;
 	pc300ch_t *chan = (pc300ch_t *)d->chan;
 	pc300_t *card = (pc300_t *)chan->card;
@@ -3168,7 +3161,7 @@ int cpc_open(struct net_device *dev)
 		d->if_ptr = &hdlc->state.ppp.pppdev;
 	}
 
-	result = hdlc_open(hdlc);
+	result = hdlc_open(dev);
 	if (hdlc->proto.id == IF_PROTO_PPP) {
 		dev->priv = d;
 	}
@@ -3200,7 +3193,7 @@ int cpc_close(struct net_device *dev)
 	cpc_closech(d);
 	CPC_UNLOCK(card, flags);
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	if (hdlc->proto.id == IF_PROTO_PPP) {
 		d->if_ptr = NULL;
 	}
@@ -3369,17 +3362,14 @@ static void cpc_init_card(pc300_t * card)
 		d->line_on = 0;
 		d->line_off = 0;
 
-		d->hdlc = (hdlc_device *) kmalloc(sizeof(hdlc_device), GFP_KERNEL);
-		if (d->hdlc == NULL)
+		dev = alloc_hdlcdev(NULL);
+		if (dev == NULL)
 			continue;
-		memset(d->hdlc, 0, sizeof(hdlc_device));
 
-		hdlc = d->hdlc;
+		hdlc = dev_to_hdlc(dev);
 		hdlc->xmit = cpc_queue_xmit;
 		hdlc->attach = cpc_attach;
-
-		dev = hdlc_to_dev(hdlc);
-
+		d->dev = dev;
 		dev->mem_start = card->hw.ramphys;
 		dev->mem_end = card->hw.ramphys + card->hw.ramsize - 1;
 		dev->irq = card->hw.irq;
@@ -3397,7 +3387,7 @@ static void cpc_init_card(pc300_t * card)
 		dev->change_mtu = cpc_change_mtu;
 		dev->do_ioctl = cpc_ioctl;
 
-		if (register_hdlc_device(hdlc) == 0) {
+		if (register_hdlc_device(dev) == 0) {
 			dev->priv = d;	/* We need 'priv', hdlc doesn't */
 			printk("%s: Cyclades-PC300/", dev->name);
 			switch (card->hw.type) {
@@ -3425,8 +3415,7 @@ static void cpc_init_card(pc300_t * card)
 		} else {
 			printk ("Dev%d on card(0x%08lx): unable to allocate i/f name.\n",
 				 i + 1, card->hw.ramphys);
-			*(dev->name) = 0;
-			kfree(d->hdlc);
+			free_netdev(dev);
 			continue;
 		}
 	}
@@ -3658,7 +3647,7 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 			   cpc_readw(card->hw.plxbase + card->hw.intctl_reg) & ~(0x0040));
 
 		for (i = 0; i < card->hw.nchan; i++) {
-			unregister_hdlc_device(card->chan[i].d.hdlc);
+			unregister_hdlc_device(card->chan[i].d.dev);
 		}
 		iounmap((void *) card->hw.plxbase);
 		iounmap((void *) card->hw.scabase);
@@ -3671,6 +3660,9 @@ static void __devexit cpc_remove_one(struct pci_dev *pdev)
 			iounmap((void *) card->hw.falcbase);
 			release_mem_region(card->hw.falcphys, card->hw.falcsize);
 		}
+		for (i = 0; i < card->hw.nchan; i++)
+			if (card->chan[i].d.dev);
+				free_netdev(card->chan[i].d.dev);
 		if (card->hw.irq)
 			free_irq(card->hw.irq, card);
 		kfree(card);

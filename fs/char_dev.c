@@ -240,7 +240,6 @@ void unregister_chrdev_region(dev_t from, unsigned count)
 int unregister_chrdev(unsigned int major, const char *name)
 {
 	struct char_device_struct *cd;
-	cdev_unmap(MKDEV(major, 0), 256);
 	cd = __unregister_chrdev_region(major, 0, 256);
 	if (cd && cd->cdev)
 		cdev_del(cd->cdev);
@@ -347,16 +346,19 @@ int cdev_add(struct cdev *p, dev_t dev, unsigned count)
 	err = kobj_map(cdev_map, dev, count, NULL, exact_match, exact_lock, p);
 	if (err)
 		kobject_del(&p->kobj);
+	p->dev = dev;
+	p->count = count;
 	return err;
 }
 
-void cdev_unmap(dev_t dev, unsigned count)
+static void cdev_unmap(dev_t dev, unsigned count)
 {
 	kobj_unmap(cdev_map, dev, count);
 }
 
 void cdev_del(struct cdev *p)
 {
+	cdev_unmap(p->dev, p->count);
 	kobject_del(&p->kobj);
 	kobject_put(&p->kobj);
 }
@@ -458,6 +460,5 @@ EXPORT_SYMBOL(cdev_get);
 EXPORT_SYMBOL(cdev_put);
 EXPORT_SYMBOL(cdev_del);
 EXPORT_SYMBOL(cdev_add);
-EXPORT_SYMBOL(cdev_unmap);
 EXPORT_SYMBOL(register_chrdev);
 EXPORT_SYMBOL(unregister_chrdev);

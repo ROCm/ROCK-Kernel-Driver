@@ -151,6 +151,7 @@ extern void init_idle(task_t *idle, int cpu);
 
 extern void show_state(void);
 extern void show_regs(struct pt_regs *);
+extern void show_trace_task(task_t *tsk);
 
 /*
  * TASK is a pointer to the task whose backtrace we want to see (or NULL for current
@@ -330,6 +331,33 @@ struct k_itimer {
 struct io_context;			/* See blkdev.h */
 void exit_io_context(void);
 
+#define NGROUPS_SMALL		32
+#define NGROUPS_PER_BLOCK	((int)(EXEC_PAGESIZE / sizeof(gid_t)))
+struct group_info {
+	int ngroups;
+	atomic_t usage;
+	gid_t small_block[NGROUPS_SMALL];
+	int nblocks;
+	gid_t *blocks[0];
+};
+
+#define get_group_info(group_info) do { \
+	atomic_inc(&(group_info)->usage); \
+} while (0)
+
+#define put_group_info(group_info) do { \
+	if (atomic_dec_and_test(&(group_info)->usage)) \
+		groups_free(group_info); \
+} while (0)
+
+struct group_info *groups_alloc(int gidsetsize);
+void groups_free(struct group_info *group_info);
+int set_current_groups(struct group_info *group_info);
+/* access the groups "array" with this macro */
+#define GROUP_AT(gi, i) \
+    ((gi)->blocks[(i)/NGROUPS_PER_BLOCK][(i)%NGROUPS_PER_BLOCK])
+
+
 struct task_struct {
 	volatile long state;	/* -1 unrunnable, 0 runnable, >0 stopped */
 	struct thread_info *thread_info;
@@ -404,8 +432,7 @@ struct task_struct {
 /* process credentials */
 	uid_t uid,euid,suid,fsuid;
 	gid_t gid,egid,sgid,fsgid;
-	int ngroups;
-	gid_t	groups[NGROUPS];
+	struct group_info *group_info;
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
 	int keep_capabilities:1;
 	struct user_struct *user;
@@ -708,6 +735,8 @@ extern task_t *child_reaper;
 extern int do_execve(char *, char __user * __user *, char __user * __user *, struct pt_regs *);
 extern long do_fork(unsigned long, unsigned long, struct pt_regs *, unsigned long, int __user *, int __user *);
 extern struct task_struct * copy_process(unsigned long, unsigned long, struct pt_regs *, unsigned long, int __user *, int __user *);
+extern asmlinkage long sys_sched_setscheduler(pid_t pid, int policy,
+					      struct sched_param __user *parm);
 
 #ifdef CONFIG_SMP
 extern void wait_task_inactive(task_t * p);

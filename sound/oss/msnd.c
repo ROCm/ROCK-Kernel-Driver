@@ -25,9 +25,6 @@
  ********************************************************************/
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < 0x020101
-#  define LINUX20
-#endif
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
@@ -35,18 +32,10 @@
 #include <linux/types.h>
 #include <linux/delay.h>
 #include <linux/mm.h>
-#ifdef LINUX20
-#  include <linux/major.h>
-#  include <linux/fs.h>
-#  include <linux/sound.h>
-#  include <asm/segment.h>
-#  include "sound_config.h"
-#else
-#  include <linux/init.h>
-#  include <asm/io.h>
-#  include <asm/uaccess.h>
-#  include <linux/spinlock.h>
-#endif
+#include <linux/init.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
+#include <linux/spinlock.h>
 #include <asm/irq.h>
 #include "msnd.h"
 

@@ -136,6 +136,7 @@ struct ipv6_devconf {
 	__s32		rtr_solicits;
 	__s32		rtr_solicit_interval;
 	__s32		rtr_solicit_delay;
+	__s32		force_mld_version;
 #ifdef CONFIG_IPV6_PRIVACY
 	__s32		use_tempaddr;
 	__s32		temp_valid_lft;
@@ -165,6 +166,7 @@ enum {
 	DEVCONF_REGEN_MAX_RETRY,
 	DEVCONF_MAX_DESYNC_FACTOR,
 	DEVCONF_MAX_ADDRESSES,
+	DEVCONF_FORCE_MLD_VERSION,
 	DEVCONF_MAX
 };
 
@@ -185,7 +187,6 @@ struct inet6_skb_parm
 	int			iif;
 	__u16			ra;
 	__u16			hop;
-	__u16			auth;
 	__u16			dst0;
 	__u16			srcrt;
 	__u16			dst1;
@@ -211,7 +212,6 @@ struct ipv6_pinfo {
 				rxhlim:1,
 				hopopts:1,
 				dstopts:1,
-                                authhdr:1,
                                 rxflow:1;
 		} bits;
 		__u8		all;

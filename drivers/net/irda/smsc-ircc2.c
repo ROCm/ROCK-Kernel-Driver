@@ -154,7 +154,7 @@ static void smsc_ircc_dma_xmit_complete(struct smsc_ircc_cb *self, int iobase);
 static void smsc_ircc_change_speed(void *priv, u32 speed);
 static void smsc_ircc_set_sir_speed(void *priv, u32 speed);
 static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-static void smsc_ircc_interrupt_sir(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev);
 static void smsc_ircc_sir_start(struct smsc_ircc_cb *self);
 #if SMSC_IRCC2_C_SIR_STOP
 static void smsc_ircc_sir_stop(struct smsc_ircc_cb *self);
@@ -1401,9 +1401,9 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 
 	/* Check if we should use the SIR interrupt handler */
 	if (self->io.speed <=  SMSC_IRCC2_MAX_SIR_SPEED) {
-		smsc_ircc_interrupt_sir(irq, dev_id, regs);
+		irqreturn_t ret = smsc_ircc_interrupt_sir(dev);
 		spin_unlock(&self->lock);	
-		return IRQ_HANDLED;
+		return ret;
 	}
 	iobase = self->io.fir_base;
 
@@ -1435,7 +1435,7 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	outb(IRCC_IER_ACTIVE_FRAME|IRCC_IER_EOM, iobase+IRCC_IER);
 
 	spin_unlock(&self->lock);
-	return IRQ_HANDLED;
+	return IRQ_RETVAL(iir);
 }
 
 /*
@@ -1443,20 +1443,12 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
  *
  *    Interrupt handler for SIR modes
  */
-void smsc_ircc_interrupt_sir(int irq, void *dev_id, struct pt_regs *regs) 
+static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev)
 {
-	struct net_device *dev = (struct net_device *) dev_id;
-	struct smsc_ircc_cb *self;
+	struct smsc_ircc_cb *self = dev->priv;
 	int boguscount = 0;
 	int iobase;
 	int iir, lsr;
-
-	if (!dev) {
-		WARNING("%s() irq %d for unknown device.\n",
-			__FUNCTION__, irq);
-		return;
-	}
-	self = (struct smsc_ircc_cb *) dev->priv;
 
 	/* Already locked comming here in smsc_ircc_interrupt() */
 	/*spin_lock(&self->lock);*/
@@ -1497,6 +1489,7 @@ void smsc_ircc_interrupt_sir(int irq, void *dev_id, struct pt_regs *regs)
  	        iir = inb(iobase + UART_IIR) & UART_IIR_ID;
 	}
 	/*spin_unlock(&self->lock);*/
+	return IRQ_RETVAL(iir);
 }
 
 

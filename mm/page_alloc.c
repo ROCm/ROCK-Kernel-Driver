@@ -971,7 +971,13 @@ void show_free_areas(void)
 			printk("\n");
 
 		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
-			struct per_cpu_pageset *pageset = zone->pageset + cpu;
+			struct per_cpu_pageset *pageset;
+
+			if (!cpu_possible(cpu))
+				continue;
+
+			pageset = zone->pageset + cpu;
+
 			for (temperature = 0; temperature < 2; temperature++)
 				printk("cpu %d %s: low %d, high %d, batch %d\n",
 					cpu,
@@ -1536,34 +1542,9 @@ struct seq_operations vmstat_op = {
 
 #endif /* CONFIG_PROC_FS */
 
-static void __devinit init_page_alloc_cpu(int cpu)
-{
-	struct page_state *ps = &per_cpu(page_states, cpu);
-	memset(ps, 0, sizeof(*ps));
-}
-	
-static int __devinit page_alloc_cpu_notify(struct notifier_block *self, 
-				unsigned long action, void *hcpu)
-{
-	int cpu = (unsigned long)hcpu;
-	switch(action) {
-	case CPU_UP_PREPARE:
-		init_page_alloc_cpu(cpu);
-		break;
-	default:
-		break;
-	}
-	return NOTIFY_OK;
-}
-
-static struct notifier_block __devinitdata page_alloc_nb = {
-	.notifier_call	= page_alloc_cpu_notify,
-};
 
 void __init page_alloc_init(void)
 {
-	init_page_alloc_cpu(smp_processor_id());
-	register_cpu_notifier(&page_alloc_nb);
 }
 
 /*

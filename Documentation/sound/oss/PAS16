@@ -129,7 +129,7 @@ CONFIG_SOUND_YM3812
   You can then get OPL3 functionality by issuing the command:
   insmod opl3
   In addition, you must either add the following line to 
-  /etc/modules.conf:
+  /etc/modprobe.conf:
   options opl3 io=0x388
   or else add the following line to /etc/lilo.conf:
   opl3=0x388
@@ -159,5 +159,5 @@ following line would be appropriate:
 append="pas2=0x388,10,3,-1,0,-1,-1,-1 opl3=0x388"
 
 If sound is built totally modular, the above options may be 
-specified in /etc/modules.conf for pas2.o, sb.o and opl3.o 
+specified in /etc/modprobe.conf for pas2, sb and opl3
 respectively. 

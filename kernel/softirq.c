@@ -14,6 +14,7 @@
 #include <linux/notifier.h>
 #include <linux/percpu.h>
 #include <linux/cpu.h>
+#include <linux/kthread.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -299,58 +300,24 @@ void tasklet_kill(struct tasklet_struct *t)
 
 EXPORT_SYMBOL(tasklet_kill);
 
-static void tasklet_init_cpu(int cpu)
-{
-	per_cpu(tasklet_vec, cpu).list = NULL;
-	per_cpu(tasklet_hi_vec, cpu).list = NULL;
-}
-	
-static int tasklet_cpu_notify(struct notifier_block *self, 
-				unsigned long action, void *hcpu)
-{
-	long cpu = (long)hcpu;
-	switch(action) {
-	case CPU_UP_PREPARE:
-		tasklet_init_cpu(cpu);
-		break;
-	default:
-		break;
-	}
-	return 0;
-}
-
-static struct notifier_block tasklet_nb = {
-	.notifier_call	= tasklet_cpu_notify,
-	.next		= NULL,
-};
-
 void __init softirq_init(void)
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
-	tasklet_cpu_notify(&tasklet_nb, (unsigned long)CPU_UP_PREPARE,
-				(void *)(long)smp_processor_id());
-	register_cpu_notifier(&tasklet_nb);
 }
 
 static int ksoftirqd(void * __bind_cpu)
 {
 	int cpu = (int) (long) __bind_cpu;
 
-	daemonize("ksoftirqd/%d", cpu);
 	set_user_nice(current, 19);
 	current->flags |= PF_IOTHREAD;
 
-	/* Migrate to the right CPU */
-	set_cpus_allowed(current, cpumask_of_cpu(cpu));
 	BUG_ON(smp_processor_id() != cpu);
 
-	__set_current_state(TASK_INTERRUPTIBLE);
-	mb();
+	set_current_state(TASK_INTERRUPTIBLE);
 
-	__get_cpu_var(ksoftirqd) = current;
-
-	for (;;) {
+	while (!kthread_should_stop()) {
 		if (!local_softirq_pending())
 			schedule();
 
@@ -363,6 +330,7 @@ static int ksoftirqd(void * __bind_cpu)
 
 		__set_current_state(TASK_INTERRUPTIBLE);
 	}
+	return 0;
 }
 
 static int __devinit cpu_callback(struct notifier_block *nfb,
@@ -370,15 +338,24 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 				  void *hcpu)
 {
 	int hotcpu = (unsigned long)hcpu;
+	struct task_struct *p;
 
-	if (action == CPU_ONLINE) {
-		if (kernel_thread(ksoftirqd, hcpu, CLONE_KERNEL) < 0) {
+	switch (action) {
+	case CPU_UP_PREPARE:
+		BUG_ON(per_cpu(tasklet_vec, hotcpu).list);
+		BUG_ON(per_cpu(tasklet_hi_vec, hotcpu).list);
+		p = kthread_create(ksoftirqd, hcpu, "ksoftirqd/%d", hotcpu);
+		if (IS_ERR(p)) {
 			printk("ksoftirqd for %i failed\n", hotcpu);
 			return NOTIFY_BAD;
 		}
-
-		while (!per_cpu(ksoftirqd, hotcpu))
-			yield();
+		per_cpu(ksoftirqd, hotcpu) = p;
+		kthread_bind(p, hotcpu);
+  		per_cpu(ksoftirqd, hotcpu) = p;
+ 		break;
+	case CPU_ONLINE:
+		wake_up_process(per_cpu(ksoftirqd, hotcpu));
+		break;
  	}
 	return NOTIFY_OK;
 }
@@ -389,7 +366,9 @@ static struct notifier_block __devinitdata cpu_nfb = {
 
 __init int spawn_ksoftirqd(void)
 {
-	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)(long)smp_processor_id());
+	void *cpu = (void *)(long)smp_processor_id();
+	cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
+	cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }

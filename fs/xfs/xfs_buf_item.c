@@ -429,7 +429,7 @@ xfs_buf_item_unpin(
 		 */
 		if (bip->bli_flags & XFS_BLI_STALE_INODE) {
 			xfs_buf_do_callbacks(bp, (xfs_log_item_t *)bip);
-			XFS_BUF_FSPRIVATE(bp, void *) = NULL;
+			XFS_BUF_SET_FSPRIVATE(bp, NULL);
 			XFS_BUF_CLR_IODONE_FUNC(bp);
 		} else {
 			AIL_LOCK(mp,s);

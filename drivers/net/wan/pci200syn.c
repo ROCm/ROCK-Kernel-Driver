@@ -73,7 +73,7 @@ typedef struct {
 
 
 typedef struct port_s {
-	hdlc_device hdlc;	/* HDLC device struct - must be first */
+	struct net_device *dev;
 	struct card_s *card;
 	spinlock_t lock;	/* TX lock */
 	sync_serial_settings settings;
@@ -177,14 +177,13 @@ static void pci200_set_iface(port_t *port)
 
 static int pci200_open(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
-	int result = hdlc_open(hdlc);
+	int result = hdlc_open(dev);
 	if (result)
 		return result;
 
-	sca_open(hdlc);
+	sca_open(dev);
 	pci200_set_iface(port);
 	sca_flush(port_to_card(port));
 	return 0;
@@ -194,10 +193,9 @@ static int pci200_open(struct net_device *dev)
 
 static int pci200_close(struct net_device *dev)
 {
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	sca_close(hdlc);
+	sca_close(dev);
 	sca_flush(port_to_card(dev_to_port(dev)));
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 	return 0;
 }
 
@@ -207,12 +205,11 @@ static int pci200_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 {
 	const size_t size = sizeof(sync_serial_settings);
 	sync_serial_settings new_line, *line = ifr->ifr_settings.ifs_ifsu.sync;
-	hdlc_device *hdlc = dev_to_hdlc(dev);
-	port_t *port = hdlc_to_port(hdlc);
+	port_t *port = dev_to_port(dev);
 
 #ifdef DEBUG_RINGS
 	if (cmd == SIOCDEVPRIVATE) {
-		sca_dump_rings(hdlc);
+		sca_dump_rings(dev);
 		return 0;
 	}
 #endif
@@ -265,8 +262,10 @@ static void pci200_pci_remove_one(struct pci_dev *pdev)
 	card_t *card = pci_get_drvdata(pdev);
 
 	for(i = 0; i < 2; i++)
-		if (card->ports[i].card)
-			unregister_hdlc_device(&card->ports[i].hdlc);
+		if (card->ports[i].card) {
+			struct net_device *dev = port_to_dev(&card->ports[i]);
+			unregister_hdlc_device(dev);
+		}
 
 	if (card->irq)
 		free_irq(card->irq, card);
@@ -281,6 +280,10 @@ static void pci200_pci_remove_one(struct pci_dev *pdev)
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
+	if (card->ports[0].dev)
+		free_netdev(card->ports[0].dev);
+	if (card->ports[1].dev)
+		free_netdev(card->ports[1].dev);
 	kfree(card);
 }
 
@@ -323,6 +326,13 @@ static int __devinit pci200_pci_init_one(struct pci_dev *pdev,
 	}
 	memset(card, 0, sizeof(card_t));
 	pci_set_drvdata(pdev, card);
+	card->ports[0].dev = alloc_hdlcdev(&card->ports[0]);
+	card->ports[1].dev = alloc_hdlcdev(&card->ports[1]);
+	if (!card->ports[0].dev || !card->ports[1].dev) {
+		printk(KERN_ERR "pci200syn: unable to allocate memory\n");
+		pci200_pci_remove_one(pdev);
+		return -ENOMEM;
+	}
 
 	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
 	if (pci_resource_len(pdev, 0) != PCI200SYN_PLX_SIZE ||
@@ -397,7 +407,8 @@ static int __devinit pci200_pci_init_one(struct pci_dev *pdev,
 
 	for(i = 0; i < 2; i++) {
 		port_t *port = &card->ports[i];
-		struct net_device *dev = hdlc_to_dev(&port->hdlc);
+		struct net_device *dev = port_to_dev(port);
+		hdlc_device *hdlc = dev_to_hdlc(dev);
 		port->phy_node = i;
 
 		spin_lock_init(&port->lock);
@@ -409,20 +420,21 @@ static int __devinit pci200_pci_init_one(struct pci_dev *pdev,
 		dev->do_ioctl = pci200_ioctl;
 		dev->open = pci200_open;
 		dev->stop = pci200_close;
-		port->hdlc.attach = sca_attach;
-		port->hdlc.xmit = sca_xmit;
+		hdlc->attach = sca_attach;
+		hdlc->xmit = sca_xmit;
 		port->settings.clock_type = CLOCK_EXT;
-		if(register_hdlc_device(&port->hdlc)) {
+		port->card = card;
+		if(register_hdlc_device(dev)) {
 			printk(KERN_ERR "pci200syn: unable to register hdlc "
 			       "device\n");
+			port->card = NULL;
 			pci200_pci_remove_one(pdev);
 			return -ENOBUFS;
 		}
-		port->card = card;
 		sca_init_sync_port(port);	/* Set up SCA memory */
 
 		printk(KERN_INFO "%s: PCI200SYN node %d\n",
-		       hdlc_to_name(&port->hdlc), port->phy_node);
+		       dev->name, port->phy_node);
 	}
 
 	sca_flush(card);

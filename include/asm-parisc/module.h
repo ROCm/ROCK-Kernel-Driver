@@ -17,11 +17,6 @@
 #define Elf_Rela Elf32_Rela
 #endif
 
-#define module_map(x)		vmalloc(x)
-#define module_unmap(x)		vfree(x)
-#define module_arch_init(x)	(0)
-#define arch_init_modules(x)	do { } while (0)
-
 struct mod_arch_specific
 {
 	unsigned long got_offset, got_count, got_max;

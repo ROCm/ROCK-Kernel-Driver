@@ -5,6 +5,7 @@
  */
 
 #include "dm.h"
+#include "dm-bio-list.h"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -27,11 +28,6 @@ struct dm_io {
 	atomic_t io_count;
 };
 
-struct deferred_io {
-	struct bio *bio;
-	struct deferred_io *next;
-};
-
 /*
  * Bits for the md->flags field.
  */
@@ -52,7 +48,7 @@ struct mapped_device {
 	 */
 	atomic_t pending;
 	wait_queue_head_t wait;
-	struct deferred_io *deferred;
+ 	struct bio_list deferred;
 
 	/*
 	 * The current mapping.
@@ -188,38 +184,19 @@ static inline void free_io(struct mapped_device *md, struct dm_io *io)
 	mempool_free(io, md->io_pool);
 }
 
-static inline struct deferred_io *alloc_deferred(void)
-{
-	return kmalloc(sizeof(struct deferred_io), GFP_NOIO);
-}
-
-static inline void free_deferred(struct deferred_io *di)
-{
-	kfree(di);
-}
-
 /*
  * Add the bio to the list of deferred io.
  */
 static int queue_io(struct mapped_device *md, struct bio *bio)
 {
-	struct deferred_io *di;
-
-	di = alloc_deferred();
-	if (!di)
-		return -ENOMEM;
-
 	down_write(&md->lock);
 
 	if (!test_bit(DMF_BLOCK_IO, &md->flags)) {
 		up_write(&md->lock);
-		free_deferred(di);
 		return 1;
 	}
 
-	di->bio = bio;
-	di->next = md->deferred;
-	md->deferred = di;
+	bio_list_add(&md->deferred, bio);
 
 	up_write(&md->lock);
 	return 0;		/* deferred successfully */
@@ -233,15 +210,6 @@ static int queue_io(struct mapped_device *md, struct bio *bio)
  *   interests of getting something for people to use I give
  *   you this clearly demarcated crap.
  *---------------------------------------------------------------*/
-static inline sector_t to_sector(unsigned int bytes)
-{
-	return bytes >> SECTOR_SHIFT;
-}
-
-static inline unsigned int to_bytes(sector_t sector)
-{
-	return sector << SECTOR_SHIFT;
-}
 
 /*
  * Decrements the number of outstanding ios that a bio has been
@@ -249,14 +217,8 @@ static inline unsigned int to_bytes(sector_t sector)
  */
 static inline void dec_pending(struct dm_io *io, int error)
 {
-	static spinlock_t _uptodate_lock = SPIN_LOCK_UNLOCKED;
-	unsigned long flags;
-
-	if (error) {
-		spin_lock_irqsave(&_uptodate_lock, flags);
+	if (error)
 		io->error = error;
-		spin_unlock_irqrestore(&_uptodate_lock, flags);
-	}
 
 	if (atomic_dec_and_test(&io->io_count)) {
 		if (atomic_dec_and_test(&io->md->pending))
@@ -376,6 +338,7 @@ static struct bio *clone_bio(struct bio *bio, sector_t sector,
 	clone->bi_idx = idx;
 	clone->bi_vcnt = idx + bv_count;
 	clone->bi_size = to_bytes(len);
+	clone->bi_flags &= ~(1 << BIO_SEG_VALID);
 
 	return clone;
 }
@@ -592,41 +555,28 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 
 	/* get a minor number for the dev */
 	r = persistent ? specific_minor(minor) : next_free_minor(&minor);
-	if (r < 0) {
-		kfree(md);
-		return NULL;
-	}
+	if (r < 0)
+		goto bad1;
 
 	memset(md, 0, sizeof(*md));
 	init_rwsem(&md->lock);
 	atomic_set(&md->holders, 1);
 
 	md->queue = blk_alloc_queue(GFP_KERNEL);
-	if (!md->queue) {
-		kfree(md);
-		return NULL;
-	}
+	if (!md->queue)
+		goto bad1;
 
 	md->queue->queuedata = md;
 	blk_queue_make_request(md->queue, dm_request);
 
 	md->io_pool = mempool_create(MIN_IOS, mempool_alloc_slab,
 				     mempool_free_slab, _io_cache);
-	if (!md->io_pool) {
-		free_minor(minor);
-		blk_put_queue(md->queue);
-		kfree(md);
-		return NULL;
-	}
+ 	if (!md->io_pool)
+ 		goto bad2;
 
 	md->disk = alloc_disk(1);
-	if (!md->disk) {
-		mempool_destroy(md->io_pool);
-		free_minor(minor);
-		blk_put_queue(md->queue);
-		kfree(md);
-		return NULL;
-	}
+	if (!md->disk)
+		goto bad3;
 
 	md->disk->major = _major;
 	md->disk->first_minor = minor;
@@ -641,6 +591,16 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	init_waitqueue_head(&md->eventq);
 
 	return md;
+
+
+ bad3:
+	mempool_destroy(md->io_pool);
+ bad2:
+	blk_put_queue(md->queue);
+	free_minor(minor);
+ bad1:
+	kfree(md);
+	return NULL;
 }
 
 static void free_dev(struct mapped_device *md)
@@ -674,7 +634,7 @@ static void __set_size(struct gendisk *disk, sector_t size)
 	bdev = bdget_disk(disk, 0);
 	if (bdev) {
 		down(&bdev->bd_inode->i_sem);
-		i_size_write(bdev->bd_inode, size << SECTOR_SHIFT);
+		i_size_write(bdev->bd_inode, (loff_t)size << SECTOR_SHIFT);
 		up(&bdev->bd_inode->i_sem);
 		bdput(bdev);
 	}
@@ -752,14 +712,14 @@ void dm_put(struct mapped_device *md)
 /*
  * Requeue the deferred bios by calling generic_make_request.
  */
-static void flush_deferred_io(struct deferred_io *c)
+static void flush_deferred_io(struct bio *c)
 {
-	struct deferred_io *n;
+	struct bio *n;
 
 	while (c) {
-		n = c->next;
-		generic_make_request(c->bio);
-		free_deferred(c);
+		n = c->bi_next;
+		c->bi_next = NULL;
+		generic_make_request(c);
 		c = n;
 	}
 }
@@ -841,7 +801,7 @@ int dm_suspend(struct mapped_device *md)
 
 int dm_resume(struct mapped_device *md)
 {
-	struct deferred_io *def;
+	struct bio *def;
 
 	down_write(&md->lock);
 	if (!md->map ||
@@ -854,8 +814,7 @@ int dm_resume(struct mapped_device *md)
 	dm_table_resume_targets(md->map);
 	clear_bit(DMF_SUSPENDED, &md->flags);
 	clear_bit(DMF_BLOCK_IO, &md->flags);
-	def = md->deferred;
-	md->deferred = NULL;
+	def = bio_list_get(&md->deferred);
 	up_write(&md->lock);
 
 	flush_deferred_io(def);

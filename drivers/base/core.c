@@ -76,7 +76,6 @@ static struct sysfs_ops dev_sysfs_ops = {
 static void device_release(struct kobject * kobj)
 {
 	struct device * dev = to_dev(kobj);
-	struct completion * c = dev->complete;
 
 	if (dev->release)
 		dev->release(dev);
@@ -86,8 +85,6 @@ static void device_release(struct kobject * kobj)
 			dev->bus_id);
 		WARN_ON(1);
 	}
-	if (c)
-		complete(c);
 }
 
 static struct kobj_type ktype_device = {
@@ -197,6 +194,7 @@ void device_initialize(struct device *dev)
 	INIT_LIST_HEAD(&dev->children);
 	INIT_LIST_HEAD(&dev->driver_list);
 	INIT_LIST_HEAD(&dev->bus_list);
+	INIT_LIST_HEAD(&dev->dma_pools);
 }
 
 /**
@@ -355,25 +353,6 @@ void device_unregister(struct device * dev)
 
 
 /**
- *	device_unregister_wait - Unregister device and wait for it to be freed.
- *	@dev: Device to unregister.
- *
- *	For the cases where the caller needs to wait for all references to
- *	be dropped from the device before continuing (e.g. modules with
- *	statically allocated devices), this function uses a completion struct
- *	to wait, along with a matching complete() in device_release() above.
- */
-
-void device_unregister_wait(struct device * dev)
-{
-	struct completion c;
-	init_completion(&c);
-	dev->complete = &c;
-	device_unregister(dev);
-	wait_for_completion(&c);
-}
-
-/**
  *	device_for_each_child - device child iterator.
  *	@dev:	parent struct device.
  *	@data:	data for the callback.
@@ -421,7 +400,6 @@ EXPORT_SYMBOL(device_register);
 
 EXPORT_SYMBOL(device_del);
 EXPORT_SYMBOL(device_unregister);
-EXPORT_SYMBOL(device_unregister_wait);
 EXPORT_SYMBOL(get_device);
 EXPORT_SYMBOL(put_device);
 EXPORT_SYMBOL(device_find);

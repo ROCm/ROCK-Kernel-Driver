@@ -24,7 +24,7 @@ The driver can be built direct into the kernel or as a module.
 The pcxx driver can be configured using the command line feature while
 loading the kernel with LILO or LOADLIN or, if built as a module,
 with arguments to insmod and modprobe or with parameters in
-/etc/modules.conf for modprobe and kerneld.
+/etc/modprobe.conf for modprobe and kerneld.
 
 After configuring the driver you need to create the device special files
 as described in "Device file creation:" below and set the appropriate
@@ -91,13 +91,13 @@ devices following that board, you can empty the io-value for that board:
 
 The remaining board still uses ttyD8-ttyD15 and cud8-cud15.
 
-Example line for /etc/modules.conf for use with kerneld and as default
+Example line for /etc/modprobe.conf for use with kerneld and as default
 parameters for modprobe:
 
 options pcxx           io=0x200 numports=8
 
-For kerneld to work you will likely need to add these two lines to your
-/etc/modules.conf:
+For kmod to work you will likely need to add these two lines to your
+/etc/modprobe.conf:
 
 alias char-major-22    pcxx
 alias char-major-23    pcxx

@@ -62,7 +62,7 @@ qla2300_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	    ha->fw_dump_order);
 	if (ha->fw_dump == NULL) {
 		qla_printk(KERN_WARNING, ha,
-		    "Unable to allocated memory for firmware dump (%d/%d).\n",
+		    "Unable to allocated memory for firmware dump (%d/%Zd).\n",
 		    ha->fw_dump_order, sizeof(struct qla2300_fw_dump));
 		return;
 	}
@@ -598,7 +598,7 @@ qla2100_fw_dump(scsi_qla_host_t *ha, int hardware_locked)
 	    ha->fw_dump_order);
 	if (ha->fw_dump == NULL) {
 		qla_printk(KERN_WARNING, ha,
-		    "Unable to allocated memory for firmware dump (%d/%d).\n",
+		    "Unable to allocated memory for firmware dump (%d/%Zd).\n",
 		    ha->fw_dump_order, sizeof(struct qla2100_fw_dump));
 		return;
 	}

@@ -228,7 +228,7 @@ struct dscc4_dev_priv {
 
 	unsigned short encoding;
 	unsigned short parity;
-	hdlc_device hdlc;
+	struct net_device *dev;
 	sync_serial_settings settings;
 	u32 __pad __attribute__ ((aligned (4)));
 };
@@ -364,7 +364,7 @@ static void dscc4_release_ring(struct dscc4_dev_priv *);
 static void dscc4_timer(unsigned long);
 static void dscc4_tx_timeout(struct net_device *);
 static irqreturn_t dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
-static int dscc4_hdlc_attach(hdlc_device *, unsigned short, unsigned short);
+static int dscc4_hdlc_attach(struct net_device *, unsigned short, unsigned short);
 static int dscc4_set_iface(struct dscc4_dev_priv *, struct net_device *);
 static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
 #ifdef DSCC4_POLLING
@@ -373,7 +373,12 @@ static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
 
 static inline struct dscc4_dev_priv *dscc4_priv(struct net_device *dev)
 {
-	return list_entry(dev, struct dscc4_dev_priv, hdlc.netdev);
+	return dev_to_hdlc(dev)->priv;
+}
+
+static inline struct net_device *dscc4_to_dev(struct dscc4_dev_priv *p)
+{
+	return p->dev;
 }
 
 static void scc_patchl(u32 mask, u32 value, struct dscc4_dev_priv *dpriv,
@@ -636,7 +641,7 @@ static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
 				struct net_device *dev)
 {
 	struct RxFD *rx_fd = dpriv->rx_fd + dpriv->rx_current%RX_RING_SIZE;
-	struct net_device_stats *stats = &dpriv->hdlc.stats;
+	struct net_device_stats *stats = hdlc_stats(dev);
 	struct pci_dev *pdev = dpriv->pci_priv->pdev;
 	struct sk_buff *skb;
 	int pkt_len;
@@ -689,10 +694,12 @@ static void dscc4_free1(struct pci_dev *pdev)
 	root = ppriv->root;
 
 	for (i = 0; i < dev_per_card; i++)
-		unregister_hdlc_device(&root[i].hdlc);
+		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 
 	pci_set_drvdata(pdev, NULL);
 
+	for (i = 0; i < dev_per_card; i++)
+		free_netdev(root[i].dev);
 	kfree(root);
 	kfree(ppriv);
 }
@@ -874,17 +881,31 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 	}
 	memset(root, 0, dev_per_card*sizeof(*root));
 
+	for (i = 0; i < dev_per_card; i++) {
+		root[i].dev = alloc_hdlcdev(root + i);
+		if (!root[i].dev) {
+			while (i--)
+				free_netdev(root[i].dev);
+			goto err_free_dev;
+		}
+	}
+
 	ppriv = (struct dscc4_pci_priv *) kmalloc(sizeof(*ppriv), GFP_KERNEL);
 	if (!ppriv) {
 		printk(KERN_ERR "%s: can't allocate private data\n", DRV_NAME);
-		goto err_free_dev;
+		goto err_free_dev2;
 	}
 	memset(ppriv, 0, sizeof(struct dscc4_pci_priv));
+	ret = dscc4_set_quartz(root, quartz);
+	if (ret < 0)
+		goto err_free_priv;
+	ppriv->root = root;
+	spin_lock_init(&ppriv->lock);
 
 	for (i = 0; i < dev_per_card; i++) {
 		struct dscc4_dev_priv *dpriv = root + i;
-		hdlc_device *hdlc = &dpriv->hdlc;
-		struct net_device *d = hdlc_to_dev(hdlc);
+		struct net_device *d = dscc4_to_dev(dpriv);
+		hdlc_device *hdlc = dev_to_hdlc(d);
 
 	        d->base_addr = ioaddr;
 		d->init = NULL;
@@ -905,36 +926,34 @@ static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 		hdlc->xmit = dscc4_start_xmit;
 		hdlc->attach = dscc4_hdlc_attach;
 
-		ret = register_hdlc_device(hdlc);
-		if (ret < 0) {
-			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
-			goto err_unregister;
-	        }
-
 		dscc4_init_registers(dpriv, d);
 		dpriv->parity = PARITY_CRC16_PR0_CCITT;
 		dpriv->encoding = ENCODING_NRZ;
-
+	
 		ret = dscc4_init_ring(d);
-		if (ret < 0) {
-			unregister_hdlc_device(hdlc);
+		if (ret < 0)
 			goto err_unregister;
-		}
+
+		ret = register_hdlc_device(d);
+		if (ret < 0) {
+			printk(KERN_ERR "%s: unable to register\n", DRV_NAME);
+			dscc4_release_ring(dpriv);
+			goto err_unregister;
+	        }
 	}
-	ret = dscc4_set_quartz(root, quartz);
-	if (ret < 0)
-		goto err_unregister;
-	ppriv->root = root;
-	spin_lock_init(&ppriv->lock);
 	pci_set_drvdata(pdev, ppriv);
 	return ret;
 
 err_unregister:
 	while (--i >= 0) {
 		dscc4_release_ring(root + i);
-		unregister_hdlc_device(&root[i].hdlc);
+		unregister_hdlc_device(dscc4_to_dev(&root[i]));
 	}
+err_free_priv:
 	kfree(ppriv);
+err_free_dev2:
+	for (i = 0; i < dev_per_card; i++)
+		free_netdev(root[i].dev);
 err_free_dev:
 	kfree(root);
 err_out:
@@ -964,7 +983,7 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
 	sync_serial_settings *settings = &dpriv->settings;
 
 	if (settings->loopback && (settings->clock_type != CLOCK_INT)) {
-		struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+		struct net_device *dev = dscc4_to_dev(dpriv);
 
 		printk(KERN_INFO "%s: loopback requires clock\n", dev->name);
 		return -1;
@@ -1015,14 +1034,13 @@ static void dscc4_pci_reset(struct pci_dev *pdev, unsigned long ioaddr)
 static int dscc4_open(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
-	hdlc_device *hdlc = &dpriv->hdlc;
 	struct dscc4_pci_priv *ppriv;
 	int ret = -EAGAIN;
 
 	if ((dscc4_loopback_check(dpriv) < 0) || !dev->hard_start_xmit)
 		goto err;
 
-	if ((ret = hdlc_open(hdlc)))
+	if ((ret = hdlc_open(dev)))
 		goto err;
 
 	ppriv = dpriv->pci_priv;
@@ -1103,7 +1121,7 @@ err_disable_scc_events:
 	scc_writel(0xffffffff, dpriv, dev, IMR);
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
 err_out:
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 err:
 	return ret;
 }
@@ -1155,7 +1173,6 @@ static int dscc4_start_xmit(struct sk_buff *skb, struct net_device *dev)
 static int dscc4_close(struct net_device *dev)
 {
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
-	hdlc_device *hdlc = dev_to_hdlc(dev);
 
 	del_timer_sync(&dpriv->timer);
 	netif_stop_queue(dev);
@@ -1166,7 +1183,7 @@ static int dscc4_close(struct net_device *dev)
 
 	dpriv->flags |= FakeReset;
 
-	hdlc_close(hdlc);
+	hdlc_close(dev);
 
 	return 0;
 }
@@ -1467,7 +1484,7 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	int i, handled = 1;
 
 	priv = root->pci_priv;
-	dev = hdlc_to_dev(&root->hdlc);
+	dev = dscc4_to_dev(root);
 
 	spin_lock_irqsave(&priv->lock, flags);
 
@@ -1518,7 +1535,7 @@ out:
 static inline void dscc4_tx_irq(struct dscc4_pci_priv *ppriv,
 				struct dscc4_dev_priv *dpriv)
 {
-	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+	struct net_device *dev = dscc4_to_dev(dpriv);
 	u32 state;
 	int cur, loop = 0;
 
@@ -1549,7 +1566,7 @@ try:
 
 	if (state & SccEvt) {
 		if (state & Alls) {
-			struct net_device_stats *stats = &dpriv->hdlc.stats;
+			struct net_device_stats *stats = hdlc_stats(dev);
 			struct sk_buff *skb;
 			struct TxFD *tx_fd;
 
@@ -1677,7 +1694,7 @@ try:
 		}
 		if (state & Err) {
 			printk(KERN_INFO "%s: Tx ERR\n", dev->name);
-			dev_to_hdlc(dev)->stats.tx_errors++;
+			hdlc_stats(dev)->tx_errors++;
 			state &= ~Err;
 		}
 	}
@@ -1687,7 +1704,7 @@ try:
 static inline void dscc4_rx_irq(struct dscc4_pci_priv *priv,
 				    struct dscc4_dev_priv *dpriv)
 {
-	struct net_device *dev = hdlc_to_dev(&dpriv->hdlc);
+	struct net_device *dev = dscc4_to_dev(dpriv);
 	u32 state;
 	int cur;
 
@@ -1813,7 +1830,7 @@ try:
 				if (!(rx_fd->state2 & DataComplete))
 					break;
 				if (rx_fd->state2 & FrameAborted) {
-					dev_to_hdlc(dev)->stats.rx_over_errors++;
+					hdlc_stats(dev)->rx_over_errors++;
 					rx_fd->state1 |= Hold;
 					rx_fd->state2 = 0x00000000;
 					rx_fd->end = 0xbabeface;
@@ -1961,7 +1978,7 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 	ppriv = pci_get_drvdata(pdev);
 	root = ppriv->root;
 
-	ioaddr = hdlc_to_dev(&root->hdlc)->base_addr;
+	ioaddr = dscc4_to_dev(root)->base_addr;
 
 	dscc4_pci_reset(pdev, ioaddr);
 
@@ -1988,10 +2005,9 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 			   pci_resource_len(pdev, 0));
 }
 
-static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding,
+static int dscc4_hdlc_attach(struct net_device *dev, unsigned short encoding,
 	unsigned short parity)
 {
-	struct net_device *dev = hdlc_to_dev(hdlc);
 	struct dscc4_dev_priv *dpriv = dscc4_priv(dev);
 
 	if (encoding != ENCODING_NRZ &&

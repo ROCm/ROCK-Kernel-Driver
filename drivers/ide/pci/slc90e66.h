@@ -17,7 +17,7 @@ static u8 slc90e66_proc;
 
 static int slc90e66_get_info(char *, char **, off_t, int);
 
-static ide_pci_host_proc_t slc90e66_procs[] __initdata = {
+static ide_pci_host_proc_t slc90e66_procs[] = {
 	{
 		.name		= "slc90e66",
 		.set		= 1,
