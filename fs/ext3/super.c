@@ -1039,8 +1039,9 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	struct buffer_head * bh;
 	struct ext3_super_block *es = 0;
 	struct ext3_sb_info *sbi;
+	unsigned long block;
 	unsigned long sb_block = get_sb_block(&data);
-	unsigned long block, logic_sb_block = 1;
+	unsigned long logic_sb_block;
 	unsigned long offset = 0;
 	unsigned long journal_inum = 0;
 	unsigned long def_mount_opts;
@@ -1073,6 +1074,8 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	if (blocksize != EXT3_MIN_BLOCK_SIZE) {
 		logic_sb_block = (sb_block * EXT3_MIN_BLOCK_SIZE) / blocksize;
 		offset = (sb_block * EXT3_MIN_BLOCK_SIZE) % blocksize;
+	} else {
+		logic_sb_block = sb_block;
 	}
 
 	if (!(bh = sb_bread(sb, logic_sb_block))) {
