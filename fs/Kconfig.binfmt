@@ -23,11 +23,9 @@ config BINFMT_ELF
 	  ld.so (check the file <file:Documentation/Changes> for location and
 	  latest version).
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called binfmt_elf. Saying M or N here is dangerous because
-	  some crucial programs on your system might be in ELF format.
+	  To compile this as a module, choose M here: the module will be called
+	  binfmt_elf. Saying M or N here is dangerous because some crucial
+	  programs on your system might be in ELF format.
 
 config BINFMT_FLAT
 	tristate "Kernel support for flat binaries"

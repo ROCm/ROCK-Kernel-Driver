@@ -269,9 +269,10 @@ int __init ultramca_probe(struct device *gen_dev)
 		goto err_unregister_netdev;
 	}
 
-	rc = request_region(ioaddr, ULTRA_IO_EXTENT, dev->name);
-	if (rc)
+	if (!request_region(ioaddr, ULTRA_IO_EXTENT, dev->name)) {
+		rc = -ENODEV;
 		goto err_unregister_netdev;
+	}
 
 	reg4 = inb(ioaddr + 4) & 0x7f;
 	outb(reg4, ioaddr + 4);

@@ -14,7 +14,7 @@ config USB_DABUSB
 	  isochronous transactions. URB's are explained in
 	  <file:Documentation/usb/URB.txt>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called dabusb.
 
 comment "Video4Linux support is needed for USB Multimedia device support"
@@ -31,7 +31,7 @@ config USB_VICAM
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called vicam.
 
 config USB_DSBR
@@ -49,7 +49,7 @@ config USB_DSBR
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called dsbr100.
 
 config USB_IBMCAM
@@ -66,7 +66,7 @@ config USB_IBMCAM
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called ibmcam.
 
 	  This camera has several configuration options which
@@ -86,7 +86,7 @@ config USB_KONICAWC
 	  "v4l" programs may be found on the WWW at
 	  <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called konicawc.
 
 config USB_OV511
@@ -102,7 +102,7 @@ config USB_OV511
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called ov511.
 
 config USB_PWC
@@ -141,7 +141,7 @@ config USB_PWC
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called pwc.
 
 config USB_SE401
@@ -157,7 +157,7 @@ config USB_SE401
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called se401.
 
 config USB_STV680
@@ -174,6 +174,6 @@ config USB_STV680
 	  Information on this API and pointers to "v4l" programs may be found
 	  on the WWW at <http://roadrunner.swansea.uk.linux.org/v4l.shtml>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called stv680.
 

@@ -17,7 +17,7 @@ config USB_SERIAL
 	  information on the specifics of the different devices that are
 	  supported, and on how to use them.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called usbserial.
 
 config USB_SERIAL_DEBUG
@@ -68,7 +68,7 @@ config USB_SERIAL_BELKIN
 	  adaptor (F5U103 is one of the model numbers) or the Peracom single
 	  port USB to serial adapter.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called belkin_sa.
 
 config USB_SERIAL_WHITEHEAT
@@ -78,7 +78,7 @@ config USB_SERIAL_WHITEHEAT
 	  Say Y here if you want to use a ConnectTech WhiteHEAT 4 port
 	  USB to serial converter device.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called whiteheat.
 
 config USB_SERIAL_DIGI_ACCELEPORT
@@ -93,7 +93,7 @@ config USB_SERIAL_DIGI_ACCELEPORT
 	  This driver works under SMP with the usb-uhci driver.  It does not
 	  work under SMP with the uhci driver.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called digi_acceleport.
 
 config USB_SERIAL_EMPEG
@@ -105,7 +105,7 @@ config USB_SERIAL_EMPEG
 	  device node.  See <file:Documentation/usb/usb-serial.txt> for more
 	  tidbits of information.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called empeg.
 
 config USB_SERIAL_FTDI_SIO
@@ -119,7 +119,7 @@ config USB_SERIAL_FTDI_SIO
 	  See <http://ftdi-usb-sio.sourceforge.net/> for more
 	  information on this driver and the device.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called ftdi_sio.
 
 config USB_SERIAL_VISOR
@@ -131,7 +131,7 @@ config USB_SERIAL_VISOR
 	  <http://usbvisor.sourceforge.net/> for more information on using this
 	  driver.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called visor.
 
 config USB_SERIAL_IPAQ
@@ -143,7 +143,7 @@ config USB_SERIAL_IPAQ
 	  using a USB cradle/cable. For information on using the driver,
 	  read <file:Documentation/usb/usb-serial.txt>.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called ipaq.
 
 config USB_SERIAL_IR
@@ -154,7 +154,7 @@ config USB_SERIAL_IR
 	  devices.  This is useful if you do not want to use the full IrDA
 	  stack.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called ir-usb.
 
 config USB_SERIAL_EDGEPORT
@@ -180,7 +180,7 @@ config USB_SERIAL_EDGEPORT
 	  Edgeport/4 DIN
 	  Edgeport/16 Dual
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called io_edgeport.
 
 config USB_SERIAL_EDGEPORT_TI
@@ -191,7 +191,7 @@ config USB_SERIAL_EDGEPORT_TI
 	  Networks (Digi) that are not supported by the io_edgeport driver.
 	  This includes the Edgeport/1 device.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called io_ti.
 
 config USB_SERIAL_KEYSPAN_PDA
@@ -202,7 +202,7 @@ config USB_SERIAL_KEYSPAN_PDA
 	  serial converter device.  This driver makes use of firmware
 	  developed from scratch by Brian Warner.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called keyspan_pda.
 
 config USB_SERIAL_KEYSPAN
@@ -216,7 +216,7 @@ config USB_SERIAL_KEYSPAN
 
 	  See <http://misc.nu/hugh/keyspan.html> for more information.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called keyspan.
 
 config USB_SERIAL_KEYSPAN_MPR
@@ -310,7 +310,7 @@ config USB_SERIAL_KLSI
 	  Please read <file:Documentation/usb/usb-serial.txt> for more
 	  information.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called kl5kusb105.
 
 config USB_SERIAL_KOBIL_SCT
@@ -328,7 +328,7 @@ config USB_SERIAL_KOBIL_SCT
             - KAAN Professional
 
           Note that you need a current CT-API.
-          To compile this driver as a module, say M here: the
+          To compile this driver as a module, choose M here: the
 	  module will be called kobil_sct.
 
 config USB_SERIAL_MCT_U232
@@ -341,7 +341,7 @@ config USB_SERIAL_MCT_U232
 	  This driver also works with Sitecom U232-P25 and D-Link DU-H3SP USB
 	  BAY devices.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called mct_u232.
 
 config USB_SERIAL_PL2303
@@ -351,7 +351,7 @@ config USB_SERIAL_PL2303
 	  Say Y here if you want to use the PL2303 USB Serial single port
 	  adapter from Prolific.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called pl2303.
 
 config USB_SERIAL_SAFE
@@ -370,7 +370,7 @@ config USB_SERIAL_CYBERJACK
 	  reader. This is an interface to ISO 7816 compatible contactbased
 	  chipcards, e.g. GSM SIMs.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called cyberjack.
 
 	  If unsure, say N.
@@ -383,7 +383,7 @@ config USB_SERIAL_XIRCOM
 	  serial converter device.  This driver makes use of firmware
 	  developed from scratch by Brian Warner.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called keyspan_pda.
 
 config USB_SERIAL_OMNINET
@@ -392,7 +392,7 @@ config USB_SERIAL_OMNINET
 	help
 	  Say Y here if you want to use a ZyXEL omni.net LCD ISDN TA.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called omninet.
 
 config USB_EZUSB

@@ -15,10 +15,8 @@ config IEEE1394
 	  is the core support only, you will also need to select a driver for
 	  your IEEE 1394 adapter.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ieee1394.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ieee1394.
 
 comment "Subsystem Options"
 	depends on IEEE1394
@@ -64,10 +62,8 @@ config IEEE1394_PCILYNX
 	  Instruments PCILynx chip.  Note: this driver is written for revision
 	  2 of this chip and may not work with revision 0.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called pcilynx.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcilynx.
 
 # Non-maintained pcilynx options
 # if [ "$CONFIG_IEEE1394_PCILYNX" != "n" ]; then
@@ -84,10 +80,8 @@ config IEEE1394_OHCI1394
 	  use one of these chipsets.  It should work with any OHCI-1394
 	  compliant card, however.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ohci1394.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ohci1394.
 
 comment "Protocol Drivers"
 	depends on IEEE1394
@@ -128,10 +122,8 @@ config IEEE1394_DV1394
 
 	  The user-space API for dv1394 is documented in dv1394.h.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called dv1394.
+	  To compile this driver as a module, choose M here: the
+	  module will be called dv1394.
 
 config IEEE1394_RAWIO
 	tristate "Raw IEEE1394 I/O support"
@@ -142,10 +134,8 @@ config IEEE1394_RAWIO
 	  direct communication of user programs with the IEEE 1394 bus and
 	  thus with the attached peripherals.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called raw1394.
+	  To compile this driver as a module, choose M here: the
+	  module will be called raw1394.
 
 config IEEE1394_CMP
 	tristate "IEC61883-1 Plug support"
@@ -154,10 +144,8 @@ config IEEE1394_CMP
 	  This option enables the Connection Management Procedures
 	  (IEC61883-1) driver, which implements input and output plugs.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called amdtp.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cmp.
 
 config IEEE1394_AMDTP
 	tristate "IEC61883-6 (Audio transmission) support"
@@ -169,9 +157,7 @@ config IEEE1394_AMDTP
 
 	  The userspace interface is documented in amdtp.h.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called amdtp.
+	  To compile this driver as a module, choose M here: the
+	  module will be called amdtp.
 
 endmenu

@@ -21,10 +21,8 @@ config INPUT_PCSPKR
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcspkr. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcspkr.
 
 config INPUT_SPARCSPKR
 	tristate "SPARC Speaker support"
@@ -35,10 +33,8 @@ config INPUT_SPARCSPKR
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcspkr. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sparcspkr.
 
 config INPUT_M68K_BEEP
 	tristate "M68k Beeper support"
@@ -55,10 +51,8 @@ config INPUT_UINPUT
 	  Say Y here if you want to support user level drivers for input
 	  subsystem accessible under char device 10:223 - /dev/input/uinput.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called uinput.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.	    
+	  To compile this driver as a module, choose M here: the
+	  module will be called uinput.
 
 config INPUT_GSC
 	tristate "PA-RISC GSC PS/2 keyboard/mouse support"

@@ -93,6 +93,7 @@ struct eth_dev {
 	struct usb_ep		*in_ep, *out_ep, *status_ep;
 	const struct usb_endpoint_descriptor
 				*in, *out, *status;
+	struct list_head	tx_reqs, rx_reqs;
 
 	struct net_device	*net;
 	struct net_device_stats	stats;
@@ -102,28 +103,6 @@ struct eth_dev {
 	unsigned long		todo;
 #define	WORK_RX_MEMORY		0
 };
-
-/*-------------------------------------------------------------------------*/
-
-/* This driver keeps a variable number of requests queued, more at
- * high speeds.  (Numbers are just educated guesses, untuned.)
- * Shrink the queue if memory is tight, or make it bigger to
- * handle bigger traffic bursts between IRQs.
- */
-
-static unsigned qmult = 4;
-
-#define HS_FACTOR	5
-
-#define qlen(gadget) \
-	(qmult*((gadget->speed == USB_SPEED_HIGH) ? HS_FACTOR : 1))
-
-/* defer IRQs on highspeed TX */
-#define TX_DELAY	8
-
-
-module_param (qmult, uint, S_IRUGO|S_IWUSR);
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -175,6 +154,7 @@ module_param (qmult, uint, S_IRUGO|S_IWUSR);
  */
 #ifdef	CONFIG_USB_ETH_NET2280
 #define CHIP			"net2280"
+#define DEFAULT_QLEN		4		/* has dma chaining */
 #define DRIVER_VERSION_NUM	0x0101
 #define EP0_MAXPACKET		64
 static const char EP_OUT_NAME [] = "ep-a";
@@ -220,7 +200,7 @@ static const char EP_IN_NAME [] = "ep1in-bulk";
 /* supports remote wakeup, but this driver doesn't */
 
 /* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0);
+#define hw_optimize(g) do {} while (0)
 #endif
 
 /*
@@ -243,7 +223,7 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
 /* doesn't support remote wakeup? */
 
 /* no hw optimizations to apply */
-#define hw_optimize(g) do {} while (0);
+#define hw_optimize(g) do {} while (0)
 #endif
 
 /*-------------------------------------------------------------------------*/
@@ -301,9 +281,32 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
 
 /*-------------------------------------------------------------------------*/
 
+#ifndef DEFAULT_QLEN
+#define DEFAULT_QLEN	2	/* double buffering by default */
+#endif
+
+#ifdef HIGHSPEED
+
+static unsigned qmult = 5;
+module_param (qmult, uint, S_IRUGO|S_IWUSR);
+
+
+/* for dual-speed hardware, use deeper queues at highspeed */
+#define qlen(gadget) \
+	(DEFAULT_QLEN*((gadget->speed == USB_SPEED_HIGH) ? qmult : 1))
+
+/* also defer IRQs on highspeed TX */
+#define TX_DELAY	DEFAULT_QLEN
+
+#else	/* !HIGHSPEED ... full speed: */
+#define qlen(gadget) DEFAULT_QLEN
+#endif
+
+
+/*-------------------------------------------------------------------------*/
+
 #define xprintk(d,level,fmt,args...) \
-	printk(level "%s %s: " fmt , shortname , (d)->gadget->dev.bus_id , \
-		## args)
+	printk(level "%s: " fmt , (d)->net->name , ## args)
 
 #ifdef DEBUG
 #undef DEBUG
@@ -763,6 +766,7 @@ config_buf (enum usb_device_speed speed, u8 *buf, u8 type, unsigned index)
 /*-------------------------------------------------------------------------*/
 
 static void eth_start (struct eth_dev *dev, int gfp_flags);
+static int alloc_requests (struct eth_dev *dev, unsigned n, int gfp_flags);
 
 static int
 set_ether_config (struct eth_dev *dev, int gfp_flags)
@@ -852,11 +856,21 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 	if (!result && (!dev->in_ep || !dev->out_ep))
 		result = -ENODEV;
 
+	if (result == 0)
+		result = alloc_requests (dev, qlen (gadget), gfp_flags);
+
 #ifndef	DEV_CONFIG_CDC
 	if (result == 0) {
 		netif_carrier_on (dev->net);
 		if (netif_running (dev->net))
 			eth_start (dev, GFP_ATOMIC);
+	} else {
+		(void) usb_ep_disable (dev->in_ep);
+		dev->in_ep = 0;
+		dev->in = 0;
+		(void) usb_ep_disable (dev->out_ep);
+		dev->out_ep = 0;
+		dev->out = 0;
 	}
 #endif /* !CONFIG_CDC_ETHER */
 
@@ -869,6 +883,8 @@ set_ether_config (struct eth_dev *dev, int gfp_flags)
 
 static void eth_reset_config (struct eth_dev *dev)
 {
+	struct usb_request	*req;
+
 	if (dev->config == 0)
 		return;
 
@@ -877,17 +893,30 @@ static void eth_reset_config (struct eth_dev *dev)
 	netif_stop_queue (dev->net);
 	netif_carrier_off (dev->net);
 
-	/* just disable endpoints, forcing completion of pending i/o.
-	 * all our completion handlers free their requests in this case.
+	/* disable endpoints, forcing (synchronous) completion of
+	 * pending i/o.  then free the requests.
 	 */
 	if (dev->in_ep) {
 		usb_ep_disable (dev->in_ep);
+		while (likely (!list_empty (&dev->tx_reqs))) {
+			req = container_of (dev->tx_reqs.next,
+						struct usb_request, list);
+			list_del (&req->list);
+			usb_ep_free_request (dev->in_ep, req);
+		}
 		dev->in_ep = 0;
 	}
 	if (dev->out_ep) {
 		usb_ep_disable (dev->out_ep);
+		while (likely (!list_empty (&dev->rx_reqs))) {
+			req = container_of (dev->rx_reqs.next,
+						struct usb_request, list);
+			list_del (&req->list);
+			usb_ep_free_request (dev->out_ep, req);
+		}
 		dev->out_ep = 0;
 	}
+
 #ifdef	EP_STATUS_NUM
 	if (dev->status_ep) {
 		usb_ep_disable (dev->status_ep);
@@ -1345,7 +1374,8 @@ static int eth_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 
 static void defer_kevent (struct eth_dev *dev, int flag)
 {
-	set_bit (flag, &dev->todo);
+	if (test_and_set_bit (flag, &dev->todo))
+		return;
 	if (!schedule_work (&dev->work))
 		ERROR (dev, "kevent %d may have been dropped\n", flag);
 	else
@@ -1366,7 +1396,7 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 	if ((skb = alloc_skb (size, gfp_flags)) == 0) {
 		DEBUG (dev, "no rx skb\n");
 		defer_kevent (dev, WORK_RX_MEMORY);
-		usb_ep_free_request (dev->out_ep, req);
+		list_add (&req->list, &dev->rx_reqs);
 		return -ENOMEM;
 	}
 
@@ -1381,7 +1411,7 @@ rx_submit (struct eth_dev *dev, struct usb_request *req, int gfp_flags)
 	if (retval) {
 		DEBUG (dev, "rx submit --> %d\n", retval);
 		dev_kfree_skb_any (skb);
-		usb_ep_free_request (dev->out_ep, req);
+		list_add (&req->list, &dev->rx_reqs);
 	}
 	return retval;
 }
@@ -1421,6 +1451,14 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 	case -ECONNRESET:		// unlink
 	case -ESHUTDOWN:		// disconnect etc
 		VDEBUG (dev, "rx shutdown, code %d\n", status);
+		goto quiesce;
+
+	/* for hardware automagic (such as pxa) */
+	case -ECONNABORTED:		// endpoint reset
+		DEBUG (dev, "rx %s reset\n", ep->name);
+		defer_kevent (dev, WORK_RX_MEMORY);
+quiesce:
+		dev_kfree_skb_any (skb);
 		goto clean;
 
 	/* data overrun */
@@ -1438,11 +1476,85 @@ static void rx_complete (struct usb_ep *ep, struct usb_request *req)
 		dev_kfree_skb_any (skb);
 	if (!netif_running (dev->net)) {
 clean:
-		usb_ep_free_request (dev->out_ep, req);
+		list_add (&req->list, &dev->rx_reqs);
 		req = 0;
 	}
 	if (req)
 		rx_submit (dev, req, GFP_ATOMIC);
+}
+
+static int prealloc (struct list_head *list, struct usb_ep *ep,
+			unsigned n, int gfp_flags)
+{
+	unsigned		i;
+	struct usb_request	*req;
+
+	if (!n)
+		return -ENOMEM;
+
+	/* queue/recycle up to N requests */
+	i = n;
+	list_for_each_entry (req, list, list) {
+		if (i-- == 0)
+			goto extra;
+	}
+	while (i--) {
+		req = usb_ep_alloc_request (ep, gfp_flags);
+		if (!req)
+			return list_empty (list) ? -ENOMEM : 0;
+		list_add (&req->list, list);
+	}
+	return 0;
+
+extra:
+	/* free extras */
+	for (;;) {
+		struct list_head	*next;
+
+		next = req->list.next;
+		list_del (&req->list);
+		usb_ep_free_request (ep, req);
+
+		if (next == list)
+			break;
+
+		req = container_of (next, struct usb_request, list);
+	}
+	return 0;
+}
+
+static int alloc_requests (struct eth_dev *dev, unsigned n, int gfp_flags)
+{
+	int status;
+
+	status = prealloc (&dev->tx_reqs, dev->in_ep, n, gfp_flags);
+	if (status < 0)
+		goto fail;
+	status = prealloc (&dev->rx_reqs, dev->out_ep, n, gfp_flags);
+	if (status < 0)
+		goto fail;
+	return 0;
+fail:
+	DEBUG (dev, "can't alloc requests\n");
+	return status;
+}
+
+static void rx_fill (struct eth_dev *dev, int gfp_flags)
+{
+	struct usb_request	*req;
+
+	clear_bit (WORK_RX_MEMORY, &dev->todo);
+
+	/* fill unused rxq slots with some skb */
+	while (!list_empty (&dev->rx_reqs)) {
+		req = container_of (dev->rx_reqs.next,
+				struct usb_request, list);
+		list_del_init (&req->list);
+		if (rx_submit (dev, req, gfp_flags) < 0) {
+			defer_kevent (dev, WORK_RX_MEMORY);
+			return;
+		}
+	}
 }
 
 static void eth_work (void *_dev)
@@ -1450,16 +1562,10 @@ static void eth_work (void *_dev)
 	struct eth_dev		*dev = _dev;
 
 	if (test_bit (WORK_RX_MEMORY, &dev->todo)) {
-		struct usb_request	*req = 0;
-
 		if (netif_running (dev->net))
-			req = usb_ep_alloc_request (dev->in_ep, GFP_KERNEL);
+			rx_fill (dev, GFP_KERNEL);
 		else
 			clear_bit (WORK_RX_MEMORY, &dev->todo);
-		if (req != 0) {
-			clear_bit (WORK_RX_MEMORY, &dev->todo);
-			rx_submit (dev, req, GFP_KERNEL);
-		}
 	}
 
 	if (dev->todo)
@@ -1484,10 +1590,10 @@ static void tx_complete (struct usb_ep *ep, struct usb_request *req)
 	}
 	dev->stats.tx_packets++;
 
-	usb_ep_free_request (ep, req);
+	list_add (&req->list, &dev->tx_reqs);
 	dev_kfree_skb_any (skb);
 
-	atomic_inc (&dev->tx_qlen);
+	atomic_dec (&dev->tx_qlen);
 	if (netif_carrier_ok (dev->net))
 		netif_wake_queue (dev->net);
 }
@@ -1499,10 +1605,10 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 	int			retval;
 	struct usb_request	*req = 0;
 
-	if (!(req = usb_ep_alloc_request (dev->in_ep, GFP_ATOMIC))) {
-		DEBUG (dev, "no request\n");
-		goto drop;
-	}
+	req = container_of (dev->tx_reqs.next, struct usb_request, list);
+	list_del (&req->list);
+	if (list_empty (&dev->tx_reqs))
+		netif_stop_queue (net);
 
 	/* no buffer copies needed, unless the network stack did it
 	 * or the hardware can't use skb buffers.
@@ -1537,42 +1643,28 @@ static int eth_start_xmit (struct sk_buff *skb, struct net_device *net)
 		break;
 	case 0:
 		net->trans_start = jiffies;
-		if (atomic_dec_and_test (&dev->tx_qlen))
-			netif_stop_queue (net);
+		atomic_inc (&dev->tx_qlen);
 	}
 
 	if (retval) {
-		DEBUG (dev, "drop, code %d\n", retval);
-drop:
 		dev->stats.tx_dropped++;
 		dev_kfree_skb_any (skb);
-		usb_ep_free_request (dev->in_ep, req);
+		if (list_empty (&dev->tx_reqs))
+			netif_start_queue (net);
+		list_add (&req->list, &dev->tx_reqs);
 	}
 	return 0;
 }
 
 static void eth_start (struct eth_dev *dev, int gfp_flags)
 {
-	struct usb_request	*req;
-	int			retval = 0;
-	unsigned		i;
-	int			size = qlen (dev->gadget);
-
 	DEBUG (dev, "%s\n", __FUNCTION__);
 
 	/* fill the rx queue */
-	for (i = 0; retval == 0 && i < size; i++) {
-		req = usb_ep_alloc_request (dev->in_ep, gfp_flags);
-		if (req)
-			retval = rx_submit (dev, req, gfp_flags);
-		else if (i > 0)
-			defer_kevent (dev, WORK_RX_MEMORY);
-		else
-			retval = -ENOMEM;
-	}
+	rx_fill (dev, gfp_flags);
 
 	/* and open the tx floodgates */ 
-	atomic_set (&dev->tx_qlen, size);
+	atomic_set (&dev->tx_qlen, 0);
 	netif_wake_queue (dev->net);
 }
 
@@ -1590,7 +1682,7 @@ static int eth_stop (struct net_device *net)
 {
 	struct eth_dev		*dev = (struct eth_dev *) net->priv;
 
-	DEBUG (dev, "%s\n", __FUNCTION__);
+	VDEBUG (dev, "%s\n", __FUNCTION__);
 	netif_stop_queue (net);
 
 	DEBUG (dev, "stop stats: rx/tx %ld/%ld, errs %ld/%ld\n",
@@ -1604,6 +1696,7 @@ static int eth_stop (struct net_device *net)
 		usb_ep_disable (dev->out_ep);
 		if (netif_carrier_ok (dev->net)) {
 			DEBUG (dev, "host still using in/out endpoints\n");
+			// FIXME idiom may leave toggle wrong here
 			usb_ep_enable (dev->in_ep, dev->in);
 			usb_ep_enable (dev->out_ep, dev->out);
 		}
@@ -1662,6 +1755,8 @@ eth_bind (struct usb_gadget *gadget)
 	dev = net->priv;
 	spin_lock_init (&dev->lock);
 	INIT_WORK (&dev->work, eth_work, dev);
+	INIT_LIST_HEAD (&dev->tx_reqs);
+	INIT_LIST_HEAD (&dev->rx_reqs);
 
 	/* network device setup */
 	dev->net = net;
@@ -1714,10 +1809,6 @@ eth_bind (struct usb_gadget *gadget)
 	dev->gadget = gadget;
 	set_gadget_data (gadget, dev);
 	gadget->ep0->driver_data = dev;
-	INFO (dev, "%s, " CHIP ", version: " DRIVER_VERSION "\n", driver_desc);
-#ifdef	DEV_CONFIG_CDC
-	INFO (dev, "CDC host enet %s\n", ethaddr);
-#endif
 	
 	/* two kinds of host-initiated state changes:
 	 *  - iff DATA transfer is active, carrier is "on"
@@ -1728,8 +1819,16 @@ eth_bind (struct usb_gadget *gadget)
 
  	// SET_NETDEV_DEV (dev->net, &gadget->dev);
  	status = register_netdev (dev->net);
- 	if (status == 0)
+ 	if (status == 0) {
+
+		INFO (dev, "%s, " CHIP ", version: " DRIVER_VERSION "\n",
+				driver_desc);
+#ifdef	DEV_CONFIG_CDC
+		INFO (dev, "CDC host enet %s\n", ethaddr);
+#endif
  		return status;
+	}
+	dev_dbg(&gadget->dev, "register_netdev failed, %d\n", status);
 fail:
 	eth_unbind (gadget);
 	return status;

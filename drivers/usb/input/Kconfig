@@ -20,7 +20,7 @@ config USB_HID
 
 	  If unsure, say Y.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called hid.
 
 comment "Input core support is needed for USB HID input layer or HIDBP support"
@@ -102,7 +102,7 @@ config USB_KBD
 	  This is almost certainly not what you want.  This is mostly
 	  useful for embedded applications or simple keyboards.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called usbkbd.
 
 	  If even remotely unsure, say N.
@@ -112,13 +112,13 @@ config USB_MOUSE
 	depends on USB && INPUT
 	---help---
 	  Say Y here only if you are absolutely sure that you don't want
-	  to use the generic HID driver for your USB keyboard and prefer
-	  to use the keyboard in its limited Boot Protocol mode instead.
+	  to use the generic HID driver for your USB mouse and prefer
+	  to use the mouse in its limited Boot Protocol mode instead.
 
 	  This is almost certainly not what you want.  This is mostly
 	  useful for embedded applications or simple mice.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called usbmouse.
 
 	  If even remotely unsure, say N.
@@ -134,7 +134,7 @@ config USB_AIPTEK
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called aiptek.
 
 config USB_WACOM
@@ -146,7 +146,7 @@ config USB_WACOM
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called wacom.
 
 config USB_KBTAB
@@ -158,7 +158,7 @@ config USB_KBTAB
 	  (CONFIG_INPUT_MOUSEDEV) and/or "Event interface support"
 	  (CONFIG_INPUT_EVDEV) as well.
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called kbtab.
 
 config USB_POWERMATE
@@ -172,7 +172,7 @@ config USB_POWERMATE
 
 	  You can download userspace tools from http://sowerbutts.com/powermate/
 
-	  To compile this driver as a module, say M here: the
+	  To compile this driver as a module, choose M here: the
 	  module will be called powermate.
 
 config USB_XPAD
@@ -186,6 +186,8 @@ config USB_XPAD
 	  For information about how to connect the X-Box pad to USB, see
 	  Documentation/input/xpad.txt.
 
-	  To compile this driver as a module, say M here: the
-	  module will be called xpad.
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called xpad.  If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
 

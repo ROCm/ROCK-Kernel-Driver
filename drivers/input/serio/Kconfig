@@ -13,10 +13,8 @@ config SERIO
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called serio. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serio.
 
 config SERIO_I8042
 	tristate "i8042 PC Keyboard controller" if EMBEDDED || !X86
@@ -29,10 +27,8 @@ config SERIO_I8042
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called i8042. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called i8042.
 
 config SERIO_SERPORT
 	tristate "Serial port line discipline"
@@ -46,10 +42,8 @@ config SERIO_SERPORT
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called serport. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serport.
 
 config SERIO_CT82C710
 	tristate "ct82c710 Aux port controller"
@@ -61,10 +55,8 @@ config SERIO_CT82C710
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ct82c710. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ct82c710.
 
 config SERIO_Q40KBD
 	tristate "Q40 keyboard controller"
@@ -81,10 +73,8 @@ config SERIO_PARKBD
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called parkbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called parkbd.
 
 config SERIO_RPCKBD
 	tristate "Acorn RiscPC keyboard controller"
@@ -94,10 +84,8 @@ config SERIO_RPCKBD
 	  Say Y here if you have the Acorn RiscPC and want to use an AT
 	  keyboard connected to its keyboard controller.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rpckbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rpckbd.
 
 config SERIO_AMBAKMI
 	tristate "AMBA KMI keyboard controller"
@@ -114,10 +102,8 @@ config SERIO_98KBD
 	  Say Y here if you have the NEC PC-9801/PC-9821 and want to use its
 	  standard keyboard connected to its keyboard controller.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rpckbd.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called 98kbd-io.
 
 config SERIO_PCIPS2
 	tristate "PCI PS/2 keyboard and PS/2 mouse controller"
@@ -126,7 +112,5 @@ config SERIO_PCIPS2
 	  Say Y here if you have a Mobility Docking station with PS/2
 	  keyboard and mice ports.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rpckbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcips2.

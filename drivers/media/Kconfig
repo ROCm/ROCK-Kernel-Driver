@@ -21,10 +21,8 @@ config VIDEO_DEV
 	  Documentation/video4linux/API.html.  Documentation for V4L2 is
 	  available on the web at http://bytesex.org/v4l/
 
-	  This driver is also available as a module called videodev ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called videodev.
 
 source "drivers/media/video/Kconfig"
 

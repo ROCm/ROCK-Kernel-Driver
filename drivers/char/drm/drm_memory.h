@@ -117,10 +117,7 @@ agp_remap (unsigned long offset, unsigned long size, drm_device_t *dev)
 		page_map[i] = pfn_to_page(phys_addr_map[i] >> PAGE_SHIFT);
 	addr = vmap(page_map, num_pages, VM_IOREMAP, PAGE_AGP);
 	vfree(page_map);
-	if (!addr)
-		return NULL;
 
-	flush_tlb_kernel_range((unsigned long) addr, (unsigned long) addr + size);
 	return addr;
 }
 
@@ -224,6 +221,18 @@ void *DRM(alloc)(size_t size, int area)
 	return kmalloc(size, GFP_KERNEL);
 }
 
+/** Wrapper around kmalloc() */
+void *DRM(calloc)(size_t size, size_t nmemb, int area)
+{
+	void *addr;
+
+	addr = kmalloc(size * nmemb, GFP_KERNEL);
+	if (addr != NULL)
+		memset((void *)addr, 0, size * nmemb);
+
+	return addr;
+}
+
 /** Wrapper around kmalloc() and kfree() */
 void *DRM(realloc)(void *oldpt, size_t oldsize, size_t size, int area)
 {
@@ -324,25 +333,25 @@ void DRM(ioremapfree)(void *pt, unsigned long size, drm_device_t *dev)
 
 #if __REALLY_HAVE_AGP
 /** Wrapper around agp_allocate_memory() */
-struct agp_memory *DRM(alloc_agp)(int pages, u32 type)
+DRM_AGP_MEM *DRM(alloc_agp)(int pages, u32 type)
 {
 	return DRM(agp_allocate_memory)(pages, type);
 }
 
 /** Wrapper around agp_free_memory() */
-int DRM(free_agp)(struct agp_memory *handle, int pages)
+int DRM(free_agp)(DRM_AGP_MEM *handle, int pages)
 {
 	return DRM(agp_free_memory)(handle) ? 0 : -EINVAL;
 }
 
 /** Wrapper around agp_bind_memory() */
-int DRM(bind_agp)(struct agp_memory *handle, unsigned int start)
+int DRM(bind_agp)(DRM_AGP_MEM *handle, unsigned int start)
 {
 	return DRM(agp_bind_memory)(handle, start);
 }
 
 /** Wrapper around agp_unbind_memory() */
-int DRM(unbind_agp)(struct agp_memory *handle)
+int DRM(unbind_agp)(DRM_AGP_MEM *handle)
 {
 	return DRM(agp_unbind_memory)(handle);
 }

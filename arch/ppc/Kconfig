@@ -849,10 +849,7 @@ config AMIGA_BUILTIN_SERIAL
 	  If you want to use your Amiga's built-in serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config GVPIOEXT
 	tristate "GVP IO-Extender support"
@@ -882,10 +879,7 @@ config MULTIFACE_III_TTY
 	  If you want to use a Multiface III card's serial port in Linux,
 	  answer Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here.
 
 config A2232
 	tristate "Commodore A2232 serial support (EXPERIMENTAL)"
@@ -901,8 +895,7 @@ config A2232
 
 	  This driver can be built as a module; but then "generic_serial"
 	  will also be built as a module. This has to be loaded before
-	  "ser_a2232". If you want to do this, answer M here and read
-	  "<file:Documentation/modules.txt>".
+	  "ser_a2232". If you want to do this, answer M here.
 
 config WHIPPET_SERIAL
 	tristate "Hisoft Whippet PCMCIA serial support"
@@ -918,10 +911,8 @@ config APNE
 	  If you have a PCMCIA NE2000 compatible adapter, say Y.  Otherwise,
 	  say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you
-	  want). The module is called apne. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called apne.
 
 config SERIAL_CONSOLE
 	bool "Support for serial port console"

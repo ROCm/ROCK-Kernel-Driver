@@ -1019,10 +1019,10 @@ int usb_serial_probe(struct usb_interface *interface,
 		retval = type->probe (serial, id_pattern);
 		module_put(type->owner);
 
-		if (retval < 0) {
+		if (retval) {
 			dbg ("sub driver rejected device");
 			kfree (serial);
-			return -ENODEV;
+			return retval;
 		}
 	}
 

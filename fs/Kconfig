@@ -43,9 +43,7 @@ config EXT2_FS
 	  available from
 	  <http://jnewbigin-pc.it.swin.edu.au/Linux/Explore2fs.htm>.
 
-	  If you want to compile this file system as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
+	  To compile this file system support as a module, choose M here: the
 	  module will be called ext2.  Be aware however that the file system
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this could be dangerous.  Most
@@ -111,9 +109,7 @@ config EXT3_FS
 	  e2fsprogs version 1.20 or later in order to create ext3 journals
 	  (available at <http://sourceforge.net/projects/e2fsprogs/>).
 
-	  If you want to compile this file system as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
+	  To compile this file system support as a module, choose M here: the
 	  module will be called ext3.  Be aware however that the file system
 	  of your root partition (the one containing the directory /) cannot
 	  be compiled as a module, and so this may be dangerous.
@@ -170,11 +166,9 @@ config JBD
 	  If you are using the ext3 file system, you need to say Y here. If
 	  you are not using ext3 then you will probably want to say N.
 
-	  If you want to compile this device as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called jbd.  If you are compiling ext3 into the kernel,
-	  you cannot compile this code as a module.
+	  To compile this device as a module, choose M here: the module will be
+	  called jbd.  If you are compiling ext3 into the kernel, you cannot
+	  compile this code as a module.
 
 config JBD_DEBUG
 	bool "JBD (ext3) debugging support"
@@ -310,9 +304,7 @@ config XFS_FS
 	  for complete details.  This implementation is on-disk compatible
 	  with the IRIX version of XFS.
 
-	  If you want to compile this file system as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>. The
+	  To compile this file system support as a module, choose M here: the
 	  module will be called xfs.  Be aware, however, that if the file
 	  system of your root partition is compiled as a module, you'll need
 	  to use an initial ramdisk (initrd) to boot.
@@ -375,10 +367,8 @@ config MINIX_FS
 	  on older Linux floppy disks.  This option will enlarge your kernel
 	  by about 28 KB. If unsure, say N.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>. The module
-	  will be called minix.  Note that the file system of your root
+	  To compile this file system support as a module, choose M here: the
+	  module will be called minix.  Note that the file system of your root
 	  partition (the one containing the directory /) cannot be compiled as
 	  a module.
 
@@ -390,11 +380,8 @@ config ROMFS_FS
 	  other read-only media as well.  Read
 	  <file:Documentation/filesystems/romfs.txt> for details.
 
-	  This file system support is also available as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called romfs.  If you want to
-	  compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  Note that the file system of your
+	  To compile this file system support as a module, choose M here: the
+	  module will be called romfs.  Note that the file system of your
 	  root partition (the one containing the directory /) cannot be a
 	  module.
 
@@ -450,10 +437,8 @@ config AUTOFS_FS
 	  features, say N here and say Y to "Kernel automounter v4 support",
 	  below.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called autofs.
+	  To compile this support as a module, choose M here: the module will be
+	  called autofs.
 
 	  If you are not a part of a fairly large, distributed network, you
 	  probably do not need an automounter, and can say N here.
@@ -470,11 +455,9 @@ config AUTOFS4_FS
 	  <ftp://ftp.kernel.org/pub/linux/daemons/autofs/testing-v4/>; you also
 	  want to answer Y to "NFS file system support", below.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called autofs4.  You will need to add "alias autofs
-	  autofs4" to your modules configuration file.
+	  To compile this support as a module, choose M here: the module will be
+	  called autofs4.  You will need to add "alias autofs autofs4" to your
+	  modules configuration file.
 
 	  If you are not a part of a fairly large, distributed network or
 	  don't have a laptop which needs to dynamically reconfigure to the
@@ -496,10 +479,8 @@ config ISO9660_FS
 	  available from <http://www.tldp.org/docs.html#howto>), thereby
 	  enlarging your kernel by about 27 KB; otherwise say N.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called isofs.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called isofs.
 
 config JOLIET
 	bool "Microsoft Joliet CDROM extensions"
@@ -537,11 +518,8 @@ config UDF_FS
 	  if written to by other UDF utilities, such as DirectCD.
 	  Please read <file:Documentation/filesystems/udf.txt>.
 
-	  This file system support is also available as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called udf. If you want to
-	  compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called udf.
 
 	  If unsure, say N.
 
@@ -582,12 +560,10 @@ config FAT_FS
 	  The FAT support will enlarge your kernel by about 37 KB. If unsure,
 	  say Y.
 
-	  If you want to compile this as a module however ( = code which can
-	  be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called fat.  Note that if you compile the FAT
-	  support as a module, you cannot compile any of the FAT-based file
-	  systems into the kernel -- they will have to be modules as well.
+	  To compile this as a module, choose M here: the module will be called
+	  fat.  Note that if you compile the FAT support as a module, you
+	  cannot compile any of the FAT-based file systems into the kernel
+	  -- they will have to be modules as well.
 	  The file system of your root partition (the one containing the
 	  directory /) cannot be a module, so don't say M here if you intend
 	  to use UMSDOS as your root file system.
@@ -618,11 +594,8 @@ config MSDOS_FS
 
 	  This option will enlarge your kernel by about 7 KB. If unsure,
 	  answer Y. This will only work if you said Y to "DOS FAT fs support"
-	  as well. If you want to compile this as a module however ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.
-	  The module will be called msdos.
+	  as well. To compile this as a module, choose M here: the module will
+	  be called msdos.
 
 config VFAT_FS
 	tristate "VFAT (Windows-95) fs support"
@@ -643,10 +616,8 @@ config VFAT_FS
 	  the file <file:Documentation/filesystems/vfat.txt> for details.  If
 	  unsure, say Y.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called vfat.
+	  To compile this as a module, choose M here: the module will be called
+	  vfat.
 
 config UMSDOS_FS
 #dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
@@ -672,12 +643,10 @@ config UMSDOS_FS
 
 	  This option enlarges your kernel by about 28 KB and it only works if
 	  you said Y to both "DOS FAT fs support" and "MSDOS fs support"
-	  above.  If you want to compile this as a module ( = code which can
-	  be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called umsdos.  Note that the file system of your
-	  root partition (the one containing the directory /) cannot be a
-	  module, so saying M could be dangerous.  If unsure, say N.
+	  above.  To compile this as a module, choose M here: the module will be
+	  called umsdos.  Note that the file system of your root partition
+	  (the one containing the directory /) cannot be a module, so saying M
+	  could be dangerous.  If unsure, say N.
 
 config NTFS_FS
 	tristate "NTFS file system support"
@@ -700,10 +669,8 @@ config NTFS_FS
 	  For more information see <file:Documentation/filesystems/ntfs.txt>
 	  and <http://linux-ntfs.sourceforge.net/>.
 
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ntfs.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called ntfs.
 
 	  If you are not using Windows NT, 2000, XP or 2003 in addition to
 	  Linux on your computer it is safe to say N.
@@ -921,10 +888,8 @@ config RAMFS
 	  you need a file system which lives in RAM with limit checking use
 	  tmpfs.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ramfs.
+	  To compile this as a module, choose M here: the module will be called
+	  ramfs.
 
 endmenu
 
@@ -945,10 +910,8 @@ config ADFS_FS
 	  /dev/[hs]d?1) on each of your drives. Please read the file
 	  <file:Documentation/filesystems/adfs.txt> for further details.
 
-	  This code is also available as a module called adfs ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the module will be
+	  called adfs.
 
 	  If unsure, say N.
 
@@ -979,11 +942,8 @@ config AFFS_FS
 	  If you want to do this, you will also need to say Y or M to "Loop
 	  device support", above.
 
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called affs.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.  If unsure,
-	  say N.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called affs.  If unsure, say N.
 
 config HFS_FS
 	tristate "Apple Macintosh file system support (EXPERIMENTAL)"
@@ -994,11 +954,8 @@ config HFS_FS
 	  Please read <file:fs/hfs/HFS.txt> to learn about the available mount
 	  options.
 
-	  This file system support is also available as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called hfs.  If you want to
-	  compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called hfs.
 
 config BEFS_FS
 	tristate "BeOS file systemv(BeFS) support (read only) (EXPERIMENTAL)"
@@ -1016,9 +973,7 @@ config BEFS_FS
 
 	  If you don't know what this is about, say N.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/modules.txt. The module will be
+	  To compile this as a module, choose M here: the module will be
 	  called befs.
 
 config BEFS_DEBUG
@@ -1044,12 +999,9 @@ config BFS_FS
 
 	  If you don't know what this is about, say N.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called bfs.  Note that the file system of your root
-	  partition (the one containing the directory /) cannot be compiled as
-	  a module.
+	  To compile this as a module, choose M here: the module will be called
+	  bfs.  Note that the file system of your root partition (the one
+	  containing the directory /) cannot be compiled as a module.
 
 
 
@@ -1065,10 +1017,8 @@ config EFS_FS
 	  what all this is about, it's safe to say N. For more information
 	  about EFS see its home page at <http://aeschi.ch.eu.org/efs/>.
 
-	  If you want to compile the EFS file system support as a module ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called efs.
+	  To compile the EFS file system support as a module, choose M here: the
+	  module will be called efs.
 
 config JFFS_FS
 	tristate "Journalling Flash File System (JFFS) support"
@@ -1151,11 +1101,9 @@ config CRAMFS
 	  See <file:Documentation/filesystems/cramfs.txt> and
 	  <file:fs/cramfs/README> for further information.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called cramfs.  Note that the root file system (the one
-	  containing the directory /) cannot be compiled as a module.
+	  To compile this as a module, choose M here: the module will be called
+	  cramfs.  Note that the root file system (the one containing the
+	  directory /) cannot be compiled as a module.
 
 	  If unsure, say N.
 
@@ -1172,11 +1120,8 @@ config VXFS_FS
 	  fstab(5) is 'vxfs' as it describes the file system format, not
 	  the actual driver.
 
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called freevxfs.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  If
-	  unsure, say N.
+	  To compile this as a module, choose M here: the module will be
+	  called freevxfs.  If unsure, say N.
 
 
 config HPFS_FS
@@ -1190,11 +1135,8 @@ config HPFS_FS
 	  option in order to be able to read them. Read
 	  <file:Documentation/filesystems/hpfs.txt>.
 
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called hpfs.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.  If unsure,
-	  say N.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called hpfs.  If unsure, say N.
 
 
 
@@ -1208,11 +1150,8 @@ config QNX4FS_FS
 	  Unless you say Y to "QNX4FS read-write support" below, you will
 	  only be able to read these file systems.
 
-	  This file system support is also available as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). The module is called qnx4. If you want to
-	  compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called qnx4.
 
 	  If you don't know whether you need it, then you don't need it:
 	  answer N.
@@ -1259,10 +1198,8 @@ config SYSV_FS
 	  <file:Documentation/filesystems/sysv-fs.txt>.
 	  Saying Y here will enlarge your kernel by about 27 KB.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called sysv.
+	  To compile this as a module, choose M here: the module will be called
+	  sysv.
 
 	  If you haven't heard about all of this before, it's safe to say N.
 
@@ -1292,10 +1229,8 @@ config UFS_FS
 	  NeXT character set to the Latin1 character set; use the program
 	  recode ("info recode") for this purpose.
 
-	  If you want to compile the UFS file system support as a module ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>. The module will be called ufs.
+	  To compile the UFS file system support as a module, choose M here: the
+	  module will be called ufs.
 
 	  If you haven't heard about all of this before, it's safe to say N.
 
@@ -1333,10 +1268,8 @@ config NFS_FS
 	  If you say Y here, you should have said Y to TCP/IP networking also.
 	  This option would enlarge your kernel by about 27 KB.
 
-	  This file system is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called nfs. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this file system support as a module, choose M here: the
+	  module will be called nfs.
 
 	  If you are configuring a diskless machine which will mount its root
 	  file system over NFS at boot time, say Y here and to "Kernel
@@ -1391,11 +1324,8 @@ config NFSD
 	  Please read the NFS-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>.
 
-	  The NFS server is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called nfsd.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.  If unsure,
-	  say N.
+	  To compile the NFS server support as a module, choose M here: the
+	  module will be called nfsd.  If unsure, say N.
 
 config NFSD_V3
 	bool "Provide NFSv3 server support"
@@ -1500,10 +1430,8 @@ config SMB_FS
 	  General information about how to connect Linux, Windows machines and
 	  Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.
 
-	  If you want to compile the SMB support as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
-	  module will be called smbfs.  Most people say N, however.
+	  To compile the SMB support as a module, choose M here: the module will
+	  be called smbfs.  Most people say N, however.
 
 config SMB_NLS_DEFAULT
 	bool "Use a default NLS"
@@ -1574,11 +1502,8 @@ config NCP_FS
 	  General information about how to connect Linux, Windows machines and
 	  Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called ncpfs.  Say N unless you are connected to a Novell
-	  network.
+	  To compile this as a module, choose M here: the module will be called
+	  ncpfs.  Say N unless you are connected to a Novell network.
 
 source "fs/ncpfs/Kconfig"
 
@@ -1601,10 +1526,8 @@ config CODA_FS
 	  <file:Documentation/filesystems/coda.txt> and check out the Coda
 	  home page <http://www.coda.cs.cmu.edu/>.
 
-	  If you want to compile the coda client support as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want), say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called coda.
+	  To compile the coda client support as a module, choose M here: the
+	  module will be called coda.
 
 config CODA_FS_OLD_API
 	bool "Use 96-bit Coda file identifiers"

@@ -18,20 +18,17 @@ config VIDEO_BT848
 	  If you say Y or M here, you need to say Y or M to "I2C support" and
 	  "I2C bit-banging interfaces" in the character device section.
 
-	  This driver is available as a module called bttv ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called bttv.
 
 config VIDEO_PMS
 	tristate "Mediavision Pro Movie Studio Video For Linux"
 	depends on VIDEO_DEV && ISA
 	help
-	  Say Y if you have such a thing.  This driver is also available as a
-	  module called pms ( = code which can be inserted in and removed
-	  from the running kernel whenever you want).  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  Say Y if you have such a thing.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called pms.
 
 config VIDEO_PLANB
 	tristate "PlanB Video-In on PowerMac"
@@ -51,10 +48,8 @@ config VIDEO_BWQCAM
 	  Say Y have if you the black and white version of the QuickCam
 	  camera. See the next option for the color version.
 
-	  This driver is also available as a module called bw-qcam ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called bw-qcam.
 
 config VIDEO_CQCAM
 	tristate "QuickCam Colour Video For Linux (EXPERIMENTAL)"
@@ -122,10 +117,8 @@ config VIDEO_SAA5249
 	  Support for I2C bus based teletext using the SAA5249 chip. At the
 	  moment this is only useful on some European WinTV cards.
 
-	  This driver is also available as a module called saa5249 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called saa5249.
 
 config TUNER_3036
 	tristate "SAB3036 tuner"
@@ -159,10 +152,8 @@ config VIDEO_ZORAN
 	  a driver homepage at <http://mjpeg.sf.net/driver-zoran/>. For
 	  more information, check <file:Documentation/video4linux/Zoran>.
 
-	  This driver is available as a module called zr36067 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called zr36067.
  
 config VIDEO_ZORAN_BUZ
 	tristate "Iomega Buz support"
@@ -208,10 +199,8 @@ config VIDEO_ZR36120
 	  and Buster boards. Please read the material in
 	  <file:Documentation/video4linux/zr36120.txt> for more information.
 
-	  This driver is also available as a module called zr36120 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called zr36120.
 
 config VIDEO_MEYE
 	tristate "Sony Vaio Picturebook Motion Eye Video For Linux (EXPERIMENTAL)"
@@ -224,10 +213,8 @@ config VIDEO_MEYE
 	  If you say Y or M here, you need to say Y or M to "Sony Programmable
 	  I/O Control Device" in the character device section.
 
-	  This driver is available as a module called meye ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called meye.
 
 config VIDEO_SAA7134
 	tristate "Philips SAA7134 support"
@@ -236,10 +223,8 @@ config VIDEO_SAA7134
 	  This is a video4linux driver for Philips SAA7130/7134 based
 	  TV cards.
 
-	  This driver is available as a module called saa7134 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called saa7134.
 
 config VIDEO_MXB
 	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
@@ -248,10 +233,8 @@ config VIDEO_MXB
 	  This is a video4linux driver for the 'Multimedia eXtension Board'
 	  TV card by Siemens-Nixdorf.
 	  
-	  This driver is available as a module called mxb ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mxb.
 
 config VIDEO_DPC
 	tristate "Philips-Semiconductors 'dpc7146 demonstration board'"
@@ -263,10 +246,8 @@ config VIDEO_DPC
 	  saa7146 based, analog video card, chances are good that it
 	  will work with this skeleton driver.
 	  
-	  This driver is available as a module called dpc7146 ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called dpc7146.
 
 config VIDEO_HEXIUM_ORION
 	tristate "Hexium HV-PCI6 and Orion frame grabber"
@@ -275,10 +256,8 @@ config VIDEO_HEXIUM_ORION
 	  This is a video4linux driver for the Hexium HV-PCI6 and
 	  Orion frame grabber cards by Hexium.
 	  
-	  This driver is available as a module called hexium_orion
-	  ( = code which can be inserted in and removed from the
-	  running kernel whenever you want). If you want to compile
-	  it as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hexium_orion.
 
 config VIDEO_HEXIUM_GEMINI
 	tristate "Hexium Gemini frame grabber"
@@ -288,10 +267,8 @@ config VIDEO_HEXIUM_GEMINI
 	  grabber card by Hexium. Please note that the Gemini Dual
 	  card is *not* fully supported.
 	  
-	  This driver is available as a module called hexium_gemini
-	  ( = code which can be inserted in and removed from the
-	  running kernel whenever you want). If you want to compile
-	  it as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called hexium_gemini.
 
 endmenu
 

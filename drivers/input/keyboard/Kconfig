@@ -24,10 +24,8 @@ config KEYBOARD_ATKBD
 
 	  If unsure, say Y.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called atkbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called atkbd.
 
 config KEYBOARD_SUNKBD
 	tristate "Sun Type 4 and Type 5 keyboard support"
@@ -38,10 +36,8 @@ config KEYBOARD_SUNKBD
 	  connected either to the Sun keyboard connector or to an serial
 	  (RS-232) port via a simple adapter.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sunkbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sunkbd.
 
 config KEYBOARD_XTKBD
 	tristate "XT Keyboard support"
@@ -53,10 +49,8 @@ config KEYBOARD_XTKBD
 	  parallel port keyboard adapter, you cannot connect it to the
 	  keyboard port on a PC that runs Linux. 
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xtkbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called xtkbd.
 
 config KEYBOARD_NEWTON
 	tristate "Newton keyboard"
@@ -65,10 +59,8 @@ config KEYBOARD_NEWTON
 	help
 	  Say Y here if you have a Newton keyboard on a serial port.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maple_keyb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called newtonkbd.
 
 config KEYBOARD_MAPLE
 	tristate "Maple bus keyboard support"
@@ -77,10 +69,8 @@ config KEYBOARD_MAPLE
 	  Say Y here if you have a DreamCast console running Linux and have
 	  a keyboard attached to its Maple bus.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called maple_keyb. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called maple_keyb.
 
 config KEYBOARD_AMIGA
 	tristate "Amiga keyboard"
@@ -89,10 +79,8 @@ config KEYBOARD_AMIGA
 	  Say Y here if you are running Linux on any AMIGA and have a keyboard
 	  attached.	
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called amikbd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called amikbd.
 
 config KEYBOARD_98KBD
 	tristate "NEC PC-9800 Keyboard support"
@@ -102,8 +90,6 @@ config KEYBOARD_98KBD
 	  Say Y here if you want to use the NEC PC-9801/PC-9821 keyboard (or
 	  compatible) on your system. 
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xtkbd.o. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called 98kbd.
 

@@ -1965,13 +1965,11 @@ static void reset_hc(struct uhci_hcd *uhci)
 	outw(USBCMD_GRESET, io_addr + USBCMD);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((HZ*50+999) / 1000);
-	set_current_state(TASK_RUNNING);
 	outw(0, io_addr + USBCMD);
 
 	/* Another 10ms delay */
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((HZ*10+999) / 1000);
-	set_current_state(TASK_RUNNING);
 	uhci->resume_detect = 0;
 }
 

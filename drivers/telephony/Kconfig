@@ -13,10 +13,8 @@ config PHONE
 	  Note: this has nothing to do with modems.  You do not need to say Y
 	  here in order to be able to use a modem under Linux.
 
-	  This support is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  phonedev.
+	  To compile this driver as a module, choose M here: the
+	  module will be called phonedev.
 
 config PHONE_IXJ
 	tristate "QuickNet Internet LineJack/PhoneJack support"

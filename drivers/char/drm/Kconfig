@@ -75,9 +75,9 @@ config DRM_MGA
 
 config DRM_SIS
 	tristate "SiS video cards"
-	depends on DRM && AGP && FB_SIS
+	depends on DRM && AGP
 	help
 	  Choose this option if you have a SiS 630 or compatibel video 
           chipset. If M is selected the module will be called sis. AGP
-          and SiS FB support is required for this driver to work.
+          support is required for this driver to work.
 
