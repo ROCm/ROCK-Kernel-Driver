@@ -1,7 +1,7 @@
 /*
  *  linux/include/asm-arm/proc-armo/pgtable.h
  *
- *  Copyright (C) 1995-2001 Russell King
+ *  Copyright (C) 1995-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -32,6 +32,7 @@
 
 #define pmd_bad(pmd)		((pmd_val(pmd) & 0xfc000002))
 #define set_pmd(pmdp,pmd)	((*(pmdp)) = (pmd))
+#define pmd_clear(pmdp)		set_pmd(pmdp, __pmd(0))
 
 static inline pmd_t __mk_pmd(pte_t *ptep, unsigned long prot)
 {
@@ -47,6 +48,12 @@ static inline unsigned long pmd_page(pmd_t pmd)
 {
 	return __phys_to_virt(pmd_val(pmd) & ~_PAGE_TABLE);
 }
+
+#define pte_offset_kernel(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_offset_map(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_offset_map_nested(dir,addr)	(pmd_page_kernel(*(dir)) + __pte_index(addr))
+#define pte_unmap(pte)			do { } while (0)
+#define pte_unmap_nested(pte)		do { } while (0)
 
 #define set_pte(pteptr, pteval)	((*(pteptr)) = (pteval))
 
@@ -89,11 +96,11 @@ static inline pte_t pte_mkexec(pte_t pte)       { pte_val(pte) &= ~_PAGE_NOT_USE
 static inline pte_t pte_mkdirty(pte_t pte)      { pte_val(pte) &= ~_PAGE_CLEAN;    return pte; }
 static inline pte_t pte_mkyoung(pte_t pte)      { pte_val(pte) &= ~_PAGE_OLD;      return pte; }
 
-#define pte_alloc_kernel        pte_alloc
-
 /*
  * We don't store cache state bits in the page table here.
  */
 #define pgprot_noncached(prot)	(prot)
+
+extern void pgtable_cache_init(void);
 
 #endif /* __ASM_PROC_PGTABLE_H */

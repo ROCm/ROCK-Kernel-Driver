@@ -602,7 +602,9 @@ ENTRY(cpu_xscale_set_pmd)
  */
 	.align	5
 ENTRY(cpu_xscale_set_pte)
-	str	r1, [r0], #-1024		@ linux version
+	tst	r0, #2048
+	streq	r0, [r0, -r0]			@ BUG_ON
+	str	r1, [r0], #-2048		@ linux version
 
 	bic	r2, r1, #0xff0
 	orr	r2, r2, #PTE_TYPE_EXT		@ extended page
