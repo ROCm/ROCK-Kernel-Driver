@@ -1294,6 +1294,44 @@ void scsi_device_put(struct scsi_device *sdev)
 	module_put(sdev->host->hostt->module);
 }
 
+/**
+ * scsi_set_device_offline - set scsi_device offline
+ * @sdev:	pointer to struct scsi_device to offline. 
+ *
+ * Locks:	host_lock held on entry.
+ **/
+void scsi_set_device_offline(struct scsi_device *sdev)
+{
+	struct scsi_cmnd *scmd;
+	int	cmds_active = 0;
+	unsigned long flags;
+
+	sdev->online = FALSE;
+
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(scmd, &sdev->cmd_list, list) {
+		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE) {
+			/*
+			 * If we are unable to remove the timer, it means
+			 * that the command has already timed out or
+			 * finished.
+			 */
+			if (!scsi_delete_timer(scmd)) {
+				continue;
+			}
+
+			++cmds_active;
+
+			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+		}
+	}
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
+
+	if (!cmds_active) {
+		/* FIXME: Send online state change hotplug event */
+	}
+}
+
 /*
  * Function:	scsi_slave_attach()
  *
