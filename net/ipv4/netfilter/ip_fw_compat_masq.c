@@ -13,7 +13,6 @@
 #include <linux/netdevice.h>
 #include <linux/inetdevice.h>
 #include <linux/proc_fs.h>
-#include <linux/version.h>
 #include <linux/module.h>
 #include <net/route.h>
 

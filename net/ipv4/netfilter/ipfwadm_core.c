@@ -131,7 +131,6 @@
 #include <net/checksum.h>
 #include <linux/proc_fs.h>
 #include <linux/stat.h>
-#include <linux/version.h>
 
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_DESCRIPTION("ipfwadm backwards compatibility layer");
