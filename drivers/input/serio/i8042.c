@@ -371,65 +371,60 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	unsigned long flags;
 	unsigned char str, data;
 	unsigned int dfl;
-	struct {
-		int data;
-		int str;
-	} buffer[I8042_BUFFER_SIZE];
-	int i, j = 0;
 
 	spin_lock_irqsave(&i8042_lock, flags);
-
-	while (j < I8042_BUFFER_SIZE && 
-	    (buffer[j].str = i8042_read_status()) & I8042_STR_OBF)
-		buffer[j++].data = i8042_read_data();
-
+	str = i8042_read_status();
+	data = i8042_read_data();
 	spin_unlock_irqrestore(&i8042_lock, flags);
 
-	for (i = 0; i < j; i++) {
+	if (~str & I8042_STR_OBF) {
+		if (irq) dbg("Interrupt %d, without any data", irq);
+		return IRQ_RETVAL(0);
+	}
 
-		str = buffer[i].str;
-		data = buffer[i].data;
+	dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
+	      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
-		dfl = ((str & I8042_STR_PARITY) ? SERIO_PARITY : 0) |
-		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
+	if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
 
-		if (i8042_mux_values[0].exists && (str & I8042_STR_AUXDATA)) {
+		if (str & I8042_STR_MUXERR) {
+			switch (data) {
+				case 0xfd:
+				case 0xfe: dfl = SERIO_TIMEOUT; break;
+				case 0xff: dfl = SERIO_PARITY; break;
+			}
+			data = 0xfe;
+		} else dfl = 0;
 
-			if (str & I8042_STR_MUXERR) {
-				switch (data) {
-					case 0xfd:
-					case 0xfe: dfl = SERIO_TIMEOUT; break;
-					case 0xff: dfl = SERIO_PARITY; break;
-				}
-				data = 0xfe;
-			} else dfl = 0;
-
-			dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
-				data, (str >> 6), irq, 
-				dfl & SERIO_PARITY ? ", bad parity" : "",
-				dfl & SERIO_TIMEOUT ? ", timeout" : "");
-
-			serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl, regs);
-			continue;
-		}
-
-		dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
-			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+		dbg("%02x <- i8042 (interrupt, aux%d, %d%s%s)",
+			data, (str >> 6), irq, 
 			dfl & SERIO_PARITY ? ", bad parity" : "",
 			dfl & SERIO_TIMEOUT ? ", timeout" : "");
 
-		if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
-			serio_interrupt(&i8042_aux_port, data, dfl, regs);
-			continue;
-		}
-
-		if (!i8042_kbd_values.exists)
-			continue;
-
-		serio_interrupt(&i8042_kbd_port, data, dfl, regs);
+		serio_interrupt(i8042_mux_port + ((str >> 6) & 3), data, dfl, regs);
+		
+		goto irq_ret;
 	}
 
-	return IRQ_RETVAL(j);
+	dbg("%02x <- i8042 (interrupt, %s, %d%s%s)",
+		data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, 
+		dfl & SERIO_PARITY ? ", bad parity" : "",
+		dfl & SERIO_TIMEOUT ? ", timeout" : "");
+
+	if (i8042_aux_values.exists && (str & I8042_STR_AUXDATA)) {
+		serio_interrupt(&i8042_aux_port, data, dfl, regs);
+		goto irq_ret;
+	}
+
+	if (!i8042_kbd_values.exists)
+		goto irq_ret;
+
+	serio_interrupt(&i8042_kbd_port, data, dfl, regs);
+
+irq_ret:
+
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+	return IRQ_RETVAL(1);
 }
 
 /*
@@ -645,7 +640,6 @@ static int __init i8042_port_register(struct i8042_values *values, struct serio 
 static void i8042_timer_func(unsigned long data)
 {
 	i8042_interrupt(0, NULL, NULL);
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 }
 
 
@@ -899,6 +893,9 @@ int __init i8042_init(void)
 
 	dbg_init();
 
+	init_timer(&i8042_timer);
+	i8042_timer.function = i8042_timer_func;
+
 	if (i8042_platform_init())
 		return -EBUSY;
 
@@ -923,8 +920,6 @@ int __init i8042_init(void)
 
 	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 
-	init_timer(&i8042_timer);
-	i8042_timer.function = i8042_timer_func;
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
         if (sysdev_class_register(&kbc_sysclass) == 0) {
