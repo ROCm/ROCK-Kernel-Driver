@@ -119,7 +119,7 @@ firmware_loading_store(struct class_device *class_dev,
 		complete(&fw_priv->completion);
 		break;
 	case 1:
-		kfree(fw_priv->fw->data);
+		vfree(fw_priv->fw->data);
 		fw_priv->fw->data = NULL;
 		fw_priv->fw->size = 0;
 		fw_priv->alloc_size = 0;
@@ -297,6 +297,7 @@ fw_setup_class_device(struct class_device **class_dev_p,
 	}
 	memset(fw_priv->fw, 0, sizeof (*fw_priv->fw));
 
+	*class_dev_p = class_dev;
 	goto out;
 
 error_remove_loading:
@@ -310,7 +311,6 @@ error_kfree:
 	kfree(class_dev);
 	*class_dev_p = NULL;
 out:
-	*class_dev_p = class_dev;
 	return retval;
 }
 static void
@@ -489,6 +489,7 @@ firmware_class_init(void)
 	error = class_register(&firmware_class);
 	if (error) {
 		printk(KERN_ERR "%s: class_register failed\n", __FUNCTION__);
+		return error;
 	}
 	error = class_create_file(&firmware_class, &class_attr_timeout);
 	if (error) {
