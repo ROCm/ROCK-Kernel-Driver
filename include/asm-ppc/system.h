@@ -95,8 +95,6 @@ extern struct task_struct *_switch(struct thread_struct *prev,
 
 extern unsigned int rtas_data;
 
-extern void dump_regs(struct pt_regs *);
-
 static __inline__ unsigned long
 xchg_u32(volatile void *p, unsigned long val)
 {
