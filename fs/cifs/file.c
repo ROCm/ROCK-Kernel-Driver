@@ -1009,7 +1009,7 @@ cifs_user_read(struct file * file, char __user *read_data, size_t read_size,
 	int xid;
 	struct cifsFileInfo * open_file;
 	char * smb_read_data;
-	char * current_offset;
+	char __user * current_offset;
 	struct smb_com_read_rsp * pSMBr;
 
 	xid = GetXid();
@@ -1045,7 +1045,8 @@ cifs_user_read(struct file * file, char __user *read_data, size_t read_size,
 				 &bytes_read, &smb_read_data);
 
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
-            copy_to_user(current_offset,smb_read_data + 4 /* RFC1001 hdr */ + le16_to_cpu(pSMBr->DataOffset), bytes_read);
+			copy_to_user(current_offset,smb_read_data + 4/* RFC1001 hdr*/
+				+ le16_to_cpu(pSMBr->DataOffset), bytes_read);
 			if(smb_read_data) {
 				cifs_buf_release(smb_read_data);
 				smb_read_data = NULL;
