@@ -12,6 +12,7 @@
 #define PDC_OS_BOOT_RENDEZVOUS_HI  0x28
 
 #ifndef ASSEMBLY
+#include <linux/bitops.h>
 #include <linux/threads.h>	/* for NR_CPUS */
 typedef unsigned long address_t;
 
@@ -53,7 +54,7 @@ extern unsigned long cpu_present_mask;
 #define cpu_online(cpu) (cpu_online_map & (1<<(cpu)))
 
 #define cpu_possible(cpu)       (cpu_present_mask & (1<<(cpu)))
-	
+
 extern inline unsigned int num_online_cpus(void)
 {
 	return hweight32(cpu_online_map);

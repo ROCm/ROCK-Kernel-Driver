@@ -72,4 +72,24 @@ struct compat_flock {
 	compat_pid_t		l_pid;
 };
 
+struct compat_statfs {
+	s32		f_type;
+	s32		f_bsize;
+	s32		f_blocks;
+	s32		f_bfree;
+	s32		f_bavail;
+	s32		f_files;
+	s32		f_ffree;
+	__kernel_fsid_t	f_fsid;
+	s32		f_namelen;
+	s32		f_spare[6];
+};
+
+typedef u32		compat_old_sigset_t;	/* at least 32 bits */
+
+#define _COMPAT_NSIG		64
+#define _COMPAT_NSIG_BPW	BITS_PER_LONG
+
+typedef u32		compat_sigset_word;
+
 #endif /* _ASM_PARISC_COMPAT_H */

@@ -203,7 +203,6 @@ parisc_walk_tree(struct device *dev)
 struct parisc_device;
 struct ioc;
 void * ccio_get_iommu(const struct parisc_device *dev);
-struct pci_dev * ccio_get_fake(const struct parisc_device *dev);
 int ccio_request_resource(const struct parisc_device *dev,
 		struct resource *res);
 int ccio_allocate_resource(const struct parisc_device *dev,
@@ -213,7 +212,6 @@ int ccio_allocate_resource(const struct parisc_device *dev,
 		void *alignf_data);
 #else /* !CONFIG_IOMMU_CCIO */
 #define ccio_get_iommu(dev) NULL
-#define ccio_get_fake(dev) NULL
 #define ccio_request_resource(dev, res) request_resource(&iomem_resource, res)
 #define ccio_allocate_resource(dev, res, size, min, max, align, alignf, data) \
 		allocate_resource(&iomem_resource, res, size, min, max, \
