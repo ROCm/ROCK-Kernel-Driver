@@ -1,5 +1,5 @@
 /*
- * Version 2.11
+ * Version 2.12
  *
  * AMD 755/756/766/8111 and nVidia nForce IDE driver for Linux.
  *
@@ -61,6 +61,18 @@ static struct amd_ide_chip {
 	{ PCI_DEVICE_ID_AMD_8111_IDE,  0x00, 0x40, AMD_UDMA_100 },			/* AMD-8111 */
         { PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, 0x00, 0x50, AMD_UDMA_100 },                  /* nVidia nForce */
 	{ PCI_DEVICE_ID_NVIDIA_NFORCE2_IDE, 0x00, 0x50, AMD_UDMA_100 },			/* nVidia nForce 2 */
+	/* nVidia nForce2s */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE2S_IDE, 0x00, 0x50, AMD_UDMA_100 },
+	/* nVidia nForce2s SATA */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE2S_SATA, 0x00, 0x50, AMD_UDMA_100 },
+	/* nVidia nForce3 */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE3_IDE, 0x00, 0x50, AMD_UDMA_100 },
+	/* nVidia nForce3s */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE3S_IDE, 0x00, 0x50, AMD_UDMA_100 },
+	/* nVidia nForce3s SATA */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA, 0x00, 0x50, AMD_UDMA_100 },
+	/* nVidia nForce3s SATA2 */
+	{ PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA2, 0x00, 0x50, AMD_UDMA_100 },
 	{ 0 }
 };
 
@@ -102,7 +114,7 @@ static int amd74xx_get_info(char *buffer, char **addr, off_t offset, int count)
 
 	amd_print("----------AMD BusMastering IDE Configuration----------------");
 
-	amd_print("Driver Version:                     2.11");
+	amd_print("Driver Version:                     2.12");
 	amd_print("South Bridge:                       %s", pci_name(bmide_dev));
 
 	pci_read_config_byte(dev, PCI_REVISION_ID, &t);
@@ -431,6 +443,18 @@ static struct pci_device_id amd74xx_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_IDE, 	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 4},
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 5},
 	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2_IDE, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 6},
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2S_IDE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 7 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2S_SATA,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 8 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3_IDE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 9 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3S_IDE,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 10 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 11 },
+	{ PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE3S_SATA2,
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, 12 },
 	{ 0, },
 };
 
