@@ -231,7 +231,7 @@ static int serverworks_fetch_size(void)
  * more efficent, since agp_memory blocks can be a large number of
  * entries.
  */
-static void serverworks_tlbflush(agp_memory * temp)
+static void serverworks_tlbflush(struct agp_memory *temp)
 {
 	unsigned long end;
 
@@ -308,7 +308,7 @@ static void serverworks_cleanup(void)
 	iounmap((void *) serverworks_private.registers);
 }
 
-static int serverworks_insert_memory(agp_memory * mem,
+static int serverworks_insert_memory(struct agp_memory *mem,
 			     off_t pg_start, int type)
 {
 	int i, j, num_entries;
@@ -349,7 +349,7 @@ static int serverworks_insert_memory(agp_memory * mem,
 	return 0;
 }
 
-static int serverworks_remove_memory(agp_memory * mem, off_t pg_start,
+static int serverworks_remove_memory(struct agp_memory *mem, off_t pg_start,
 			     int type)
 {
 	int i;

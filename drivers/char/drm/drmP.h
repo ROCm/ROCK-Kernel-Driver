@@ -444,7 +444,7 @@ typedef struct drm_device_dma {
 #if __REALLY_HAVE_AGP
 typedef struct drm_agp_mem {
 	unsigned long      handle;
-	agp_memory         *memory;
+	struct agp_memory         *memory;
 	unsigned long      bound; /* address */
 	int                pages;
 	struct drm_agp_mem *prev;
@@ -452,7 +452,7 @@ typedef struct drm_agp_mem {
 } drm_agp_mem_t;
 
 typedef struct drm_agp_head {
-	agp_kern_info      agp_info;
+	struct agp_kern_info      agp_info;
 	drm_agp_mem_t      *memory;
 	unsigned long      mode;
 	int                enabled;
@@ -657,10 +657,10 @@ extern void	     *DRM(ioremap_nocache)(unsigned long offset, unsigned long size)
 extern void	     DRM(ioremapfree)(void *pt, unsigned long size);
 
 #if __REALLY_HAVE_AGP
-extern agp_memory    *DRM(alloc_agp)(int pages, u32 type);
-extern int           DRM(free_agp)(agp_memory *handle, int pages);
-extern int           DRM(bind_agp)(agp_memory *handle, unsigned int start);
-extern int           DRM(unbind_agp)(agp_memory *handle);
+extern struct agp_memory    *DRM(alloc_agp)(int pages, u32 type);
+extern int           DRM(free_agp)(struct agp_memory *handle, int pages);
+extern int           DRM(bind_agp)(struct agp_memory *handle, unsigned int start);
+extern int           DRM(unbind_agp)(struct agp_memory *handle);
 #endif
 
 				/* Misc. IOCTL support (drm_ioctl.h) */
@@ -804,10 +804,10 @@ extern int            DRM(agp_unbind)(struct inode *inode, struct file *filp,
 				      unsigned int cmd, unsigned long arg);
 extern int            DRM(agp_bind)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
-extern agp_memory     *DRM(agp_allocate_memory)(size_t pages, u32 type);
-extern int            DRM(agp_free_memory)(agp_memory *handle);
-extern int            DRM(agp_bind_memory)(agp_memory *handle, off_t start);
-extern int            DRM(agp_unbind_memory)(agp_memory *handle);
+extern struct agp_memory *DRM(agp_allocate_memory)(size_t pages, u32 type);
+extern int            DRM(agp_free_memory)(struct agp_memory *handle);
+extern int            DRM(agp_bind_memory)(struct agp_memory *handle, off_t start);
+extern int            DRM(agp_unbind_memory)(struct agp_memory *handle);
 #endif
 
 				/* Stub support (drm_stub.h) */

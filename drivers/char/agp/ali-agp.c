@@ -33,14 +33,14 @@ static int ali_fetch_size(void)
 	return 0;
 }
 
-static void ali_tlbflush(agp_memory * mem)
+static void ali_tlbflush(struct agp_memory *mem)
 {
 	u32 temp;
 
 	pci_read_config_dword(agp_bridge->dev, ALI_TLBCTRL, &temp);
-// clear tag
-	pci_write_config_dword(agp_bridge->dev, ALI_TAGCTRL,
-			((temp & 0xfffffff0) | 0x00000001|0x00000002));
+	temp &= 0xfffffff0;
+	temp |= (1<<0 | 1<<1);
+	pci_write_config_dword(agp_bridge->dev, ALI_TAGCTRL, temp);
 }
 
 static void ali_cleanup(void)

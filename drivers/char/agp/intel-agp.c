@@ -107,7 +107,7 @@ static void intel_i810_cleanup(void)
 	iounmap((void *) intel_i810_private.registers);
 }
 
-static void intel_i810_tlbflush(agp_memory * mem)
+static void intel_i810_tlbflush(struct agp_memory *mem)
 {
 	return;
 }
@@ -117,7 +117,7 @@ static void intel_i810_agp_enable(u32 mode)
 	return;
 }
 
-static int intel_i810_insert_entries(agp_memory * mem, off_t pg_start,
+static int intel_i810_insert_entries(struct agp_memory *mem, off_t pg_start,
 				int type)
 {
 	int i, j, num_entries;
@@ -166,7 +166,7 @@ insert:
 	return 0;
 }
 
-static int intel_i810_remove_entries(agp_memory * mem, off_t pg_start,
+static int intel_i810_remove_entries(struct agp_memory *mem, off_t pg_start,
 				int type)
 {
 	int i;
@@ -187,9 +187,9 @@ static int intel_i810_remove_entries(agp_memory * mem, off_t pg_start,
  * pointer into hardware.
  * However the Xserver still writes to it through the agp aperture.
  */
-static agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
+static struct agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 {
-	agp_memory *new;
+	struct agp_memory *new;
 	void *addr;
 
 	if (pg_count != 1)
@@ -211,9 +211,9 @@ static agp_memory *alloc_agpphysmem_i8xx(size_t pg_count, int type)
 	return new;
 }
 
-static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
+static struct agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 {
-	agp_memory *new;
+	struct agp_memory *new;
 
 	if (type == AGP_DCACHE_MEMORY) {
 		if (pg_count != intel_i810_private.num_dcache_entries)
@@ -235,7 +235,7 @@ static agp_memory *intel_i810_alloc_by_type(size_t pg_count, int type)
 	return NULL;
 }
 
-static void intel_i810_free_by_type(agp_memory * curr)
+static void intel_i810_free_by_type(struct agp_memory *curr)
 {
 	agp_free_key(curr->key);
 	if(curr->type == AGP_PHYS_MEMORY) {
@@ -434,7 +434,8 @@ static void intel_i830_cleanup(void)
 	iounmap((void *) intel_i830_private.registers);
 }
 
-static int intel_i830_insert_entries(agp_memory *mem,off_t pg_start,int type)
+static int intel_i830_insert_entries(struct agp_memory *mem,off_t pg_start,
+				int type)
 {
 	int i,j,num_entries;
 	void *temp;
@@ -474,7 +475,8 @@ static int intel_i830_insert_entries(agp_memory *mem,off_t pg_start,int type)
 	return(0);
 }
 
-static int intel_i830_remove_entries(agp_memory *mem,off_t pg_start,int type)
+static int intel_i830_remove_entries(struct agp_memory *mem,off_t pg_start,
+				int type)
 {
 	int i;
 
@@ -495,7 +497,7 @@ static int intel_i830_remove_entries(agp_memory *mem,off_t pg_start,int type)
 	return (0);
 }
 
-static agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
+static struct agp_memory *intel_i830_alloc_by_type(size_t pg_count,int type)
 {
 	if (type == AGP_PHYS_MEMORY)
 		return(alloc_agpphysmem_i8xx(pg_count, type));
@@ -562,14 +564,14 @@ static int intel_815_fetch_size(void)
 	return __intel_8xx_fetch_size(temp);
 }
 
-static void intel_tlbflush(agp_memory * mem)
+static void intel_tlbflush(struct agp_memory *mem)
 {
 	pci_write_config_dword(agp_bridge->dev, INTEL_AGPCTRL, 0x2200);
 	pci_write_config_dword(agp_bridge->dev, INTEL_AGPCTRL, 0x2280);
 }
 
 
-static void intel_8xx_tlbflush(agp_memory * mem)
+static void intel_8xx_tlbflush(struct agp_memory *mem)
 {
 	u32 temp;
 	pci_read_config_dword(agp_bridge->dev, INTEL_AGPCTRL, &temp);
@@ -674,7 +676,7 @@ static int intel_815_configure(void)
 	return 0;
 }
 
-static void intel_820_tlbflush(agp_memory * mem)
+static void intel_820_tlbflush(struct agp_memory *mem)
 {
 	return;
 }

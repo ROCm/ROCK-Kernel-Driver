@@ -265,12 +265,12 @@ static void amd_irongate_cleanup(void)
  * entries.
  */
 
-static void amd_irongate_tlbflush(agp_memory *temp)
+static void amd_irongate_tlbflush(struct agp_memory *temp)
 {
 	OUTREG32(amd_irongate_private.registers, AMD_TLBFLUSH, 0x00000001);
 }
 
-static int amd_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int amd_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
 	unsigned long *cur_gatt;
@@ -308,7 +308,7 @@ static int amd_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	return 0;
 }
 
-static int amd_remove_memory(agp_memory *mem, off_t pg_start, int type)
+static int amd_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i;
 	unsigned long *cur_gatt;

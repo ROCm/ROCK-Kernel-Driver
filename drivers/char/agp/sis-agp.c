@@ -33,7 +33,7 @@ static int sis_fetch_size(void)
 	return 0;
 }
 
-static void sis_tlbflush(agp_memory * mem)
+static void sis_tlbflush(struct agp_memory *mem)
 {
 	pci_write_config_byte(agp_bridge->dev, SIS_TLBFLUSH, 0x02);
 }

@@ -38,13 +38,13 @@ static void flush_x86_64_tlb(struct pci_dev *dev)
 	pci_write_config_dword (dev, AMD_X86_64_GARTCACHECTL, tmp);
 }
 
-static void amd_x86_64_tlbflush(agp_memory *temp)
+static void amd_x86_64_tlbflush(struct agp_memory *temp)
 {
 	for_each_nb()
 		flush_x86_64_tlb(hammers[gart_iterator]);
 }
 
-static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int x86_64_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j, num_entries;
 	long tmp;

@@ -148,7 +148,7 @@ static void nvidia_cleanup(void)
  */
 extern int agp_memory_reserved;
 
-static int nvidia_insert_memory(agp_memory * mem, off_t pg_start, int type)
+static int nvidia_insert_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i, j;
 	
@@ -176,7 +176,7 @@ static int nvidia_insert_memory(agp_memory * mem, off_t pg_start, int type)
 }
 
 
-static int nvidia_remove_memory(agp_memory * mem, off_t pg_start, int type)
+static int nvidia_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	int i;
 
@@ -193,7 +193,7 @@ static int nvidia_remove_memory(agp_memory * mem, off_t pg_start, int type)
 }
 
 
-static void nvidia_tlbflush(agp_memory * mem)
+static void nvidia_tlbflush(struct agp_memory *mem)
 {
 	unsigned long end;
 	u32 wbc_reg, temp;

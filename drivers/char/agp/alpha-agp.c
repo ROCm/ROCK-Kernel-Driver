@@ -68,7 +68,7 @@ static void alpha_core_agp_cleanup(void)
 	agp->ops->cleanup(agp);
 }
 
-static void alpha_core_agp_tlbflush(agp_memory *mem)
+static void alpha_core_agp_tlbflush(struct agp_memory *mem)
 {
 	alpha_agp_info *agp = agp_bridge->dev_private_data;
 	alpha_mv.mv_pci_tbi(agp->hose, 0, -1);
@@ -86,7 +86,7 @@ static void alpha_core_agp_enable(u32 mode)
 	agp_device_command(agp->mode.lw, 0);
 }
 
-static int alpha_core_agp_insert_memory(agp_memory *mem, off_t pg_start, 
+static int alpha_core_agp_insert_memory(struct agp_memory *mem, off_t pg_start, 
 					int type)
 {
 	alpha_agp_info *agp = agp_bridge->dev_private_data;
@@ -104,7 +104,7 @@ static int alpha_core_agp_insert_memory(agp_memory *mem, off_t pg_start,
 	return status;
 }
 
-static int alpha_core_agp_remove_memory(agp_memory *mem, off_t pg_start, 
+static int alpha_core_agp_remove_memory(struct agp_memory *mem, off_t pg_start, 
 					int type)
 {
 	alpha_agp_info *agp = agp_bridge->dev_private_data;

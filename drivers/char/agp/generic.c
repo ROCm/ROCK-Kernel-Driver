@@ -69,16 +69,16 @@ static int agp_get_key(void)
 }
 
 
-agp_memory *agp_create_memory(int scratch_pages)
+struct agp_memory *agp_create_memory(int scratch_pages)
 {
-	agp_memory *new;
+	struct agp_memory *new;
 
-	new = kmalloc(sizeof(agp_memory), GFP_KERNEL);
+	new = kmalloc(sizeof(struct agp_memory), GFP_KERNEL);
 
 	if (new == NULL)
 		return NULL;
 
-	memset(new, 0, sizeof(agp_memory));
+	memset(new, 0, sizeof(struct agp_memory));
 	new->key = agp_get_key();
 
 	if (new->key < 0) {
@@ -105,7 +105,7 @@ EXPORT_SYMBOL(agp_create_memory);
  *	It is the only function that can be called when the backend is not owned
  *	by the caller.  (So it can free memory on client death.)
  */
-void agp_free_memory(agp_memory * curr)
+void agp_free_memory(struct agp_memory *curr)
 {
 	size_t i;
 
@@ -143,10 +143,10 @@ EXPORT_SYMBOL(agp_free_memory);
  *
  *	It returns NULL whenever memory is unavailable. 
  */
-agp_memory *agp_allocate_memory(size_t page_count, u32 type)
+struct agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
 	int scratch_pages;
-	agp_memory *new;
+	struct agp_memory *new;
 	size_t i;
 
 	if (agp_bridge->type == NOT_SUPPORTED)
@@ -267,9 +267,9 @@ EXPORT_SYMBOL_GPL(agp_num_entries);
  *	This function copies information about the agp bridge device and the state of
  *	the agp backend into an agp_kern_info pointer.
  */
-int agp_copy_info(agp_kern_info * info)
+int agp_copy_info(struct agp_kern_info *info)
 {
-	memset(info, 0, sizeof(agp_kern_info));
+	memset(info, 0, sizeof(struct agp_kern_info));
 	if (!agp_bridge || agp_bridge->type == NOT_SUPPORTED ||
 	    !agp_bridge->version) {
 		info->chipset = NOT_SUPPORTED;
@@ -311,7 +311,7 @@ EXPORT_SYMBOL(agp_copy_info);
  *	It returns -EINVAL if the pointer == NULL.
  *	It returns -EBUSY if the area of the table requested is already in use.
  */
-int agp_bind_memory(agp_memory *curr, off_t pg_start)
+int agp_bind_memory(struct agp_memory *curr, off_t pg_start)
 {
 	int ret_val;
 
@@ -346,7 +346,7 @@ EXPORT_SYMBOL(agp_bind_memory);
  * It returns -EINVAL if this piece of agp_memory is not currently bound to
  * the graphics aperture translation table or if the agp_memory pointer == NULL
  */
-int agp_unbind_memory(agp_memory *curr)
+int agp_unbind_memory(struct agp_memory *curr)
 {
 	int ret_val;
 
@@ -753,7 +753,7 @@ int agp_generic_free_gatt_table(void)
 EXPORT_SYMBOL(agp_generic_free_gatt_table);
 
 
-int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
+int agp_generic_insert_memory(struct agp_memory * mem, off_t pg_start, int type)
 {
 	int num_entries;
 	size_t i;
@@ -821,7 +821,7 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 EXPORT_SYMBOL(agp_generic_insert_memory);
 
 
-int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
+int agp_generic_remove_memory(struct agp_memory *mem, off_t pg_start, int type)
 {
 	size_t i;
 
@@ -842,14 +842,14 @@ int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 EXPORT_SYMBOL(agp_generic_remove_memory);
 
 
-agp_memory *agp_generic_alloc_by_type(size_t page_count, int type)
+struct agp_memory *agp_generic_alloc_by_type(size_t page_count, int type)
 {
 	return NULL;
 }
 EXPORT_SYMBOL(agp_generic_alloc_by_type);
 
 
-void agp_generic_free_by_type(agp_memory * curr)
+void agp_generic_free_by_type(struct agp_memory *curr)
 {
 	if (curr->memory != NULL)
 		vfree(curr->memory);

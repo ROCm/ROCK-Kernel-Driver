@@ -153,7 +153,7 @@ static int i460_fetch_size (void)
 }
 
 /* There isn't anything to do here since 460 has no GART TLB. */
-static void i460_tlb_flush (agp_memory * mem)
+static void i460_tlb_flush (struct agp_memory *mem)
 {
 	return;
 }
@@ -273,7 +273,8 @@ static int i460_free_gatt_table (void)
  * PAGE_SIZE.
  */
 
-static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, int type)
+static int i460_insert_memory_small_io_page (struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	unsigned long paddr, io_pg_start, io_page_size;
 	int i, j, k, num_entries;
@@ -312,7 +313,8 @@ static int i460_insert_memory_small_io_page (agp_memory *mem, off_t pg_start, in
 	return 0;
 }
 
-static int i460_remove_memory_small_io_page(agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory_small_io_page(struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	int i;
 
@@ -377,7 +379,8 @@ static void i460_free_large_page (struct lp_desc *lp)
 	atomic_sub(I460_KPAGES_PER_IOPAGE, &agp_bridge->current_memory_agp);
 }
 
-static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, int type)
+static int i460_insert_memory_large_io_page (struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	int i, start_offset, end_offset, idx, pg, num_entries;
 	struct lp_desc *start, *end, *lp;
@@ -433,7 +436,8 @@ static int i460_insert_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 	return 0;
 }
 
-static int i460_remove_memory_large_io_page (agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory_large_io_page (struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	int i, pg, start_offset, end_offset, idx, num_entries;
 	struct lp_desc *start, *end, *lp;
@@ -471,7 +475,8 @@ static int i460_remove_memory_large_io_page (agp_memory * mem, off_t pg_start, i
 
 /* Wrapper routines to call the approriate {small_io_page,large_io_page} function */
 
-static int i460_insert_memory (agp_memory * mem, off_t pg_start, int type)
+static int i460_insert_memory (struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
 		return i460_insert_memory_small_io_page(mem, pg_start, type);
@@ -479,7 +484,8 @@ static int i460_insert_memory (agp_memory * mem, off_t pg_start, int type)
 		return i460_insert_memory_large_io_page(mem, pg_start, type);
 }
 
-static int i460_remove_memory (agp_memory * mem, off_t pg_start, int type)
+static int i460_remove_memory (struct agp_memory *mem,
+				off_t pg_start, int type)
 {
 	if (I460_IO_PAGE_SHIFT <= PAGE_SHIFT)
 		return i460_remove_memory_small_io_page(mem, pg_start, type);
