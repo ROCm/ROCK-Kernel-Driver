@@ -25,7 +25,7 @@
  * 	- Jeroen Vreeken
  */
 
-static const char version[] = "0.23";
+static const char version[] = "0.24";
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -980,6 +980,34 @@ static int se401_newframe(struct usb_se401 *se401, int framenr)
 	return 0;
 }
 
+static void usb_se401_remove_disconnected (struct usb_se401 *se401)
+{
+	int i;
+
+        se401->dev = NULL;
+
+	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
+		usb_unlink_urb(se401->urb[i]);
+		usb_free_urb(se401->urb[i]);
+		se401->urb[i] = NULL;
+		kfree(se401->sbuf[i].data);
+	}
+	for (i=0; i<SE401_NUMSCRATCH; i++) if (se401->scratch[i].data) {
+		kfree(se401->scratch[i].data);
+	}
+	if (se401->inturb) {
+		usb_unlink_urb(se401->inturb);
+		usb_free_urb(se401->inturb);
+	}
+        info("%s disconnected", se401->camera_name);
+
+        /* Free the memory */
+	kfree(se401->width);
+	kfree(se401->height);
+	kfree(se401);
+}
+
+
 
 /****************************************************************************
  *
@@ -1015,20 +1043,16 @@ static int se401_close(struct inode *inode, struct file *file)
         struct usb_se401 *se401 = (struct usb_se401 *)dev;
 	int i;
 
-	for (i=0; i<SE401_NUMFRAMES; i++)
-		se401->frame[i].grabstate=FRAME_UNUSED;
-	if (se401->streaming)
-		se401_stop_stream(se401);
-
 	rvfree(se401->fbuf, se401->maxframesize * SE401_NUMFRAMES);
-	se401->user=0;
-
         if (se401->removed) {
-		kfree(se401->width);
-		kfree(se401->height);
-                kfree(se401);
-                se401 = NULL;
+		usb_se401_remove_disconnected(se401);
 		info("device unregistered");
+	} else {
+		for (i=0; i<SE401_NUMFRAMES; i++)
+			se401->frame[i].grabstate=FRAME_UNUSED;
+		if (se401->streaming)
+			se401_stop_stream(se401);
+		se401->user=0;
 	}
 	file->private_data = NULL;
 	return 0;
@@ -1302,7 +1326,7 @@ static struct video_device se401_template = {
 
 
 /***************************/
-static int se401_init(struct usb_se401 *se401)
+static int se401_init(struct usb_se401 *se401, int button)
 {
         int i=0, rc;
         unsigned char cp[0x40];
@@ -1367,22 +1391,25 @@ static int se401_init(struct usb_se401 *se401)
 	se401->readcount=0;
 
 	/* Start interrupt transfers for snapshot button */
-	se401->inturb=usb_alloc_urb(0, GFP_KERNEL);
-	if (!se401->inturb) {
-		info("Allocation of inturb failed");
-		return 1;
-	}
-	FILL_INT_URB(se401->inturb, se401->dev,
-	    usb_rcvintpipe(se401->dev, SE401_BUTTON_ENDPOINT),
-	    &se401->button, sizeof(se401->button),
-	    se401_button_irq,
-	    se401,
-	    HZ/10
-	);
-	if (usb_submit_urb(se401->inturb, GFP_KERNEL)) {
-		info("int urb burned down");
-		return 1;
-	}
+	if (button) {
+		se401->inturb=usb_alloc_urb(0, GFP_KERNEL);
+		if (!se401->inturb) {
+			info("Allocation of inturb failed");
+			return 1;
+		}
+		FILL_INT_URB(se401->inturb, se401->dev,
+		    usb_rcvintpipe(se401->dev, SE401_BUTTON_ENDPOINT),
+		    &se401->button, sizeof(se401->button),
+		    se401_button_irq,
+		    se401,
+		    HZ/10
+		);
+		if (usb_submit_urb(se401->inturb, GFP_KERNEL)) {
+			info("int urb burned down");
+			return 1;
+		}
+	} else
+		se401->inturb=NULL;
 
         /* Flash the led */
         se401_sndctrl(1, se401, SE401_REQ_CAMERA_POWER, 1, NULL, 0);
@@ -1399,6 +1426,7 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
         struct usb_interface_descriptor *interface;
         struct usb_se401 *se401;
         char *camera_name=NULL;
+	int button=1;
 
         /* We don't handle multi-config cameras */
         if (dev->descriptor.bNumConfigurations != 1)
@@ -1422,6 +1450,7 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
         } else if (dev->descriptor.idVendor == 0x047d &&
 	    dev->descriptor.idProduct == 0x5003) {
 		camera_name="Kensington VideoCAM 67016";
+		button=0;
 	} else
 		return NULL;
 
@@ -1447,7 +1476,7 @@ static void* se401_probe(struct usb_device *dev, unsigned int ifnum,
 
 	info("firmware version: %02x", dev->descriptor.bcdDevice & 255);
 
-        if (se401_init(se401)) {
+        if (se401_init(se401, button)) {
 		kfree(se401);
 		return NULL;
 	}
@@ -1479,45 +1508,18 @@ static void se401_disconnect(struct usb_device *dev, void *ptr)
 	if (!se401->user){
 		usb_se401_remove_disconnected(se401);
 	} else {
+		se401->frame[0].grabstate = FRAME_ERROR;
+		se401->frame[0].grabstate = FRAME_ERROR;
+
+		se401->streaming = 0;
+		
+		wake_up_interruptible(&se401->wq);
 		se401->removed = 1;
 	}
-}
-
-static inline void usb_se401_remove_disconnected (struct usb_se401 *se401)
-{
-	int i;
-
-        se401->dev = NULL;
-        se401->frame[0].grabstate = FRAME_ERROR;
-        se401->frame[1].grabstate = FRAME_ERROR;
-
-	se401->streaming = 0;
-
-	wake_up_interruptible(&se401->wq);
-
-	for (i=0; i<SE401_NUMSBUF; i++) if (se401->urb[i]) {
-		usb_unlink_urb(se401->urb[i]);
-		usb_free_urb(se401->urb[i]);
-		se401->urb[i] = NULL;
-		kfree(se401->sbuf[i].data);
-	}
-	for (i=0; i<SE401_NUMSCRATCH; i++) if (se401->scratch[i].data) {
-		kfree(se401->scratch[i].data);
-	}
-	if (se401->inturb) {
-		usb_unlink_urb(se401->inturb);
-		usb_free_urb(se401->inturb);
-	}
-        info("%s disconnected", se401->camera_name);
-
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 	destroy_proc_se401_cam(se401);
 #endif
 
-        /* Free the memory */
-	kfree(se401->width);
-	kfree(se401->height);
-	kfree(se401);
 }
 
 static struct usb_driver se401_driver = {

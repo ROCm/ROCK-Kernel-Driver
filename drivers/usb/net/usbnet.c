@@ -2086,7 +2086,12 @@ static const struct usb_device_id	products [] = {
 	// 1183 = 0x049F, both used as hex values?
 	USB_DEVICE (0x049F, 0x505A),	// Compaq "Itsy"
 	.driver_info =	(unsigned long) &linuxdev_info,
+}, {
+	USB_DEVICE (0x0E7E, 0x1001),	// G.Mate "Yopy"
+	.driver_info =	(unsigned long) &linuxdev_info,
 },
+	// NOTE:  the Sharp Zaurus uses a modified version of
+	// this driver, which is not interoperable with this.
 #endif
 
 #ifdef	CONFIG_USB_NET1080

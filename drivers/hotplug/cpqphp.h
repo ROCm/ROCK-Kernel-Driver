@@ -292,16 +292,14 @@ struct controller {
 	struct pci_resource *io_head;
 	struct pci_resource *bus_head;
 	struct pci_dev *pci_dev;
-	struct pci_ops *pci_ops;
+	struct pci_bus *pci_bus;
 	struct proc_dir_entry* proc_entry;
 	struct proc_dir_entry* proc_entry2;
 	struct event_info event_queue[10];
 	struct slot *slot;
 	u8 next_event;
 	u8 interrupt;
-	u8 bus;
-	u8 device;
-	u8 function;
+	u8 bus;				/* bus number for the pci hotplug controller */
 	u8 rev;
 	u8 slot_device_offset;
 	u8 first_slot;
@@ -695,7 +693,8 @@ static inline int cpq_get_latch_status (struct controller *ctrl, struct slot *sl
 		return 1;
 
 	hp_slot = slot->device - ctrl->slot_device_offset;
-	dbg(__FUNCTION__": slot->device = %d, ctrl->slot_device_offset = %d \n", slot->device, ctrl->slot_device_offset);
+	dbg("%s: slot->device = %d, ctrl->slot_device_offset = %d \n",
+	    __FUNCTION__, slot->device, ctrl->slot_device_offset);
 
 	status = (readl(ctrl->hpc_reg + INT_INPUT_CLEAR) & (0x01L << hp_slot));
 
@@ -733,7 +732,7 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
         DECLARE_WAITQUEUE(wait, current);
 	int retval = 0;
 
-	dbg(__FUNCTION__" - start\n");
+	dbg("%s - start\n", __FUNCTION__);
 	add_wait_queue(&ctrl->queue, &wait);
 	set_current_state(TASK_INTERRUPTIBLE);
 	/* Sleep for up to 1 second to wait for the LED to change. */
@@ -743,7 +742,7 @@ static inline int wait_for_ctrl_irq (struct controller *ctrl)
 	if (signal_pending(current))
 		retval =  -EINTR;
 
-	dbg(__FUNCTION__" - end\n");
+	dbg("%s - end\n", __FUNCTION__);
 	return retval;
 }
 

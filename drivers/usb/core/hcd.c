@@ -1020,6 +1020,16 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	if (status)
 		return status;
 
+	/* increment urb's reference count as part of giving it to the HCD
+	 * (which now controls it).  HCD guarantees that it either returns
+	 * an error or calls giveback(), but not both.
+	 */
+	urb = usb_get_urb (urb);
+	if (urb->dev == hcd->self.root_hub) {
+		urb->transfer_flags |= URB_NO_DMA_MAP;
+		return rh_urb_enqueue (hcd, urb);
+	}
+
 	/* lower level hcd code should use *_dma exclusively */
 	if (!(urb->transfer_flags & URB_NO_DMA_MAP)) {
 		if (usb_pipecontrol (urb->pipe))
@@ -1038,16 +1048,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 					    : PCI_DMA_TODEVICE);
 	}
 
-	/* increment urb's reference count as part of giving it to the HCD
-	 * (which now controls it).  HCD guarantees that it either returns
-	 * an error or calls giveback(), but not both.
-	 */
-	urb = usb_get_urb (urb);
-	if (urb->dev == hcd->self.root_hub)
-		status = rh_urb_enqueue (hcd, urb);
-	else
-		status = hcd->driver->urb_enqueue (hcd, urb, mem_flags);
-	return status;
+	return hcd->driver->urb_enqueue (hcd, urb, mem_flags);
 }
 
 /*-------------------------------------------------------------------------*/

@@ -230,7 +230,6 @@ struct usb_se401 {
 	int nullpackets;
 };
 
-static inline void usb_se401_remove_disconnected (struct usb_se401 *se401);
 
 
 #endif

@@ -163,8 +163,11 @@ static void ipi_handler(void *info)
 	}
 
 	/*  The master has cleared me to execute  */
-	mtrr_if->set(data->smp_reg, data->smp_base, 
-		     data->smp_size, data->smp_type);
+	if (data->smp_reg != ~0UL) 
+		mtrr_if->set(data->smp_reg, data->smp_base, 
+			     data->smp_size, data->smp_type);
+	else
+		mtrr_if->set_all();
 
 	atomic_dec(&data->count);
 	while(atomic_read(&data->gate)) {
@@ -243,7 +246,15 @@ static void set_mtrr(unsigned int reg, unsigned long base,
 	atomic_set(&data.gate,1);
 
 	/* do our MTRR business */
-	mtrr_if->set(reg,base,size,type);
+
+	/* HACK!
+	 * We use this same function to initialize the mtrrs on boot.
+	 * The state of the boot cpu's mtrrs has been saved, and we want
+	 * to replicate across all the APs. 
+	 * If we're doing that @reg is set to something special...
+	 */
+	if (reg != ~0UL) 
+		mtrr_if->set(reg,base,size,type);
 
 	/* wait for the others */
 	while(atomic_read(&data.count)) {
@@ -530,6 +541,20 @@ static void __init init_ifs(void)
 	centaur_init_mtrr();
 }
 
+static void init_other_cpus(void)
+{
+	if (use_intel())
+		get_mtrr_state();
+
+	/* bring up the other processors */
+	set_mtrr(~0UL,0,0,0);
+
+	if (use_intel()) {
+		finalize_mtrr_state();
+		mtrr_state_warn();
+	}
+}
+
 /**
  * mtrr_init - initialie mtrrs on the boot CPU
  *
@@ -537,7 +562,7 @@ static void __init init_ifs(void)
  * initialized (i.e. before smp_init()).
  * 
  */
-int __init mtrr_init(void)
+static int __init mtrr_init(void)
 {
 	init_ifs();
 
@@ -608,21 +633,15 @@ int __init mtrr_init(void)
 			break;
 		}
 	}
+	printk("mtrr: v%s\n",MTRR_VERSION);
+
 	if (mtrr_if) {
 		set_num_var_ranges();
-		if (use_intel()) {
-			/* Only for Intel MTRRs */
-			get_mtrr_state();
-		}
 		init_table();
+		init_other_cpus();
 	}
-#if 0
-	printk("mtrr: v%s Richard Gooch (rgooch@atnf.csiro.au)\n"
-	       "mtrr: detected mtrr type: %s\n",
-	       MTRR_VERSION, mtrr_if_name[mtrr_if]);
-#endif
 	return mtrr_if ? -ENXIO : 0;
 }
 
-//subsys_initcall(mtrr_init);
+core_initcall(mtrr_init);
 

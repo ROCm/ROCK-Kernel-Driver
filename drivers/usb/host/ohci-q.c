@@ -5,7 +5,6 @@
  * (C) Copyright 2000-2002 David Brownell <dbrownell@users.sourceforge.net>
  * 
  * This file is licenced under the GPL.
- * $Id: ohci-q.c,v 1.8 2002/03/27 20:57:01 dbrownell Exp $
  */
 
 static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
@@ -51,6 +50,15 @@ static void finish_urb (struct ohci_hcd *ohci, struct urb *urb)
 	if (likely (urb->status == -EINPROGRESS))
 		urb->status = 0;
 	spin_unlock_irqrestore (&urb->lock, flags);
+
+	switch (usb_pipetype (urb->pipe)) {
+	case PIPE_ISOCHRONOUS:
+		ohci->hcd.self.bandwidth_isoc_reqs--;
+		break;
+	case PIPE_INTERRUPT:
+		ohci->hcd.self.bandwidth_int_reqs--;
+		break;
+	}
 
 #ifdef OHCI_VERBOSE_DEBUG
 	urb_print (urb, "RET", usb_pipeout (urb->pipe));
@@ -111,67 +119,111 @@ static inline void intr_resub (struct ohci_hcd *hc, struct urb *urb)
  * ED handling functions
  *-------------------------------------------------------------------------*/  
 
-/* search for the right branch to insert an interrupt ed into the int tree 
- * do some load balancing;
- * returns the branch
- * FIXME allow for failure, when there's no bandwidth left;
- * and consider iso loads too
+/* search for the right schedule branch to use for a periodic ed.
+ * does some load balancing; returns the branch, or negative errno.
  */
-static int ep_int_balance (struct ohci_hcd *ohci, int interval, int load)
+static int balance (struct ohci_hcd *ohci, int interval, int load)
 {
-	int	i, branch = 0;
+	int	i, branch = -ENOSPC;
 
-	/* search for the least loaded interrupt endpoint branch */
-	for (i = 0; i < NUM_INTS ; i++) 
-		if (ohci->ohci_int_load [branch] > ohci->ohci_int_load [i])
+	/* iso periods can be huge; iso tds specify frame numbers */
+	if (interval > NUM_INTS)
+		interval = NUM_INTS;
+
+	/* search for the least loaded schedule branch of that period
+	 * that has enough bandwidth left unreserved.
+	 */
+	for (i = 0; i < interval ; i++) {
+		if (branch < 0 || ohci->load [branch] > ohci->load [i]) {
+#ifdef CONFIG_USB_BANDWIDTH
+			int	j;
+
+			/* usb 1.1 says 90% of one frame */
+			for (j = i; j < NUM_INTS; j += interval) {
+				if ((ohci->load [j] + load) > 900)
+					break;
+			}
+			if (j < NUM_INTS)
+				continue;
+#endif
 			branch = i; 
-
-	branch = branch % interval;
-	for (i = branch; i < NUM_INTS; i += interval)
-		ohci->ohci_int_load [i] += load;
-
+		}
+	}
 	return branch;
 }
 
 /*-------------------------------------------------------------------------*/
 
-/* the int tree is a binary tree 
- * in order to process it sequentially the indexes of the branches have
- * to be mapped the mapping reverses the bits of a word of num_bits length
+/* both iso and interrupt requests have periods; this routine puts them
+ * into the schedule tree in the apppropriate place.  most iso devices use
+ * 1msec periods, but that's not required.
  */
-static int ep_rev (int num_bits, int word)
+static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 {
-	int			i, wout = 0;
+	unsigned	i;
 
-	for (i = 0; i < num_bits; i++)
-		wout |= (( (word >> i) & 1) << (num_bits - i - 1));
-	return wout;
+	dbg ("%s: link %sed %p branch %d [%dus.], interval %d",
+		ohci->hcd.self.bus_name,
+		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		ed, ed->branch, ed->load, ed->interval);
+
+	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
+		struct ed	**prev = &ohci->periodic [i];
+		u32		*prev_p = &ohci->hcca->int_table [i];
+		struct ed	*here = *prev;
+
+		/* sorting each branch by period (slow before fast)
+		 * lets us share the faster parts of the tree.
+		 * (plus maybe: put interrupt eds before iso)
+		 */
+		while (here && ed != here) {
+			if (ed->interval > here->interval)
+				break;
+			prev = &here->ed_next;
+			prev_p = &here->hwNextED;
+			here = *prev;
+		}
+		if (ed != here) {
+			ed->ed_next = here;
+			if (here)
+				ed->hwNextED = *prev_p;
+			wmb ();
+			*prev = ed;
+			*prev_p = cpu_to_le32p (&ed->dma);
+		}
+		ohci->load [i] += ed->load;
+	}
+	ohci->hcd.self.bandwidth_allocated += ed->load / ed->interval;
 }
-
-/*-------------------------------------------------------------------------*/
 
 /* link an ed into one of the HC chains */
 
-static void ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
+static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 {	 
-	int			int_branch, i;
-	int			inter, interval, load;
-	__u32			*ed_p;
+	int	branch;
 
 	ed->state = ED_OPER;
+	ed->ed_prev = 0;
+	ed->ed_next = 0;
 	ed->hwNextED = 0;
 	wmb ();
 
 	/* we care about rm_list when setting CLE/BLE in case the HC was at
 	 * work on some TD when CLE/BLE was turned off, and isn't quiesced
 	 * yet.  finish_unlinks() restarts as needed, some upcoming INTR_SF.
+	 *
+	 * control and bulk EDs are doubly linked (ed_next, ed_prev), but
+	 * periodic ones are singly linked (ed_next). that's because the
+	 * periodic schedule encodes a tree like figure 3-5 in the ohci
+	 * spec:  each qh can have several "previous" nodes, and the tree
+	 * doesn't have unused/idle descriptors.
 	 */
-
 	switch (ed->type) {
 	case PIPE_CONTROL:
 		if (ohci->ed_controltail == NULL) {
 			writel (ed->dma, &ohci->regs->ed_controlhead);
 		} else {
+			ohci->ed_controltail->ed_next = ed;
 			ohci->ed_controltail->hwNextED = cpu_to_le32 (ed->dma);
 		}
 		ed->ed_prev = ohci->ed_controltail;
@@ -187,6 +239,7 @@ static void ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 		if (ohci->ed_bulktail == NULL) {
 			writel (ed->dma, &ohci->regs->ed_bulkhead);
 		} else {
+			ohci->ed_bulktail->ed_next = ed;
 			ohci->ed_bulktail->hwNextED = cpu_to_le32 (ed->dma);
 		}
 		ed->ed_prev = ohci->ed_bulktail;
@@ -198,74 +251,55 @@ static void ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 		ohci->ed_bulktail = ed;
 		break;
 
-	case PIPE_INTERRUPT:
-		load = ed->intriso.intr_info.int_load;
-		interval = ed->interval;
-		int_branch = ep_int_balance (ohci, interval, load);
-		ed->intriso.intr_info.int_branch = int_branch;
-
-		for (i = 0; i < ep_rev (6, interval); i += inter) {
-			inter = 1;
-			for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i) + int_branch]); 
-				 (*ed_p != 0) && ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval >= interval); 
-				ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) 
-					inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval);
-			ed->hwNextED = *ed_p; 
-			*ed_p = cpu_to_le32 (ed->dma);
+	// case PIPE_INTERRUPT:
+	// case PIPE_ISOCHRONOUS:
+	default:
+		branch = balance (ohci, ed->interval, ed->load);
+		if (branch < 0) {
+			dbg ("%s: ERR %d, interval %d msecs, load %d",
+				ohci->hcd.self.bus_name,
+				branch, ed->interval, ed->load);
+			// FIXME if there are TDs queued, fail them!
+			return branch;
 		}
-		wmb ();
-#ifdef OHCI_VERBOSE_DEBUG
-		ohci_dump_periodic (ohci, "LINK_INT");
-#endif
-		break;
-
-	case PIPE_ISOCHRONOUS:
-		ed->ed_prev = ohci->ed_isotail;
-		if (ohci->ed_isotail != NULL) {
-			ohci->ed_isotail->hwNextED = cpu_to_le32 (ed->dma);
-		} else {
-			for ( i = 0; i < NUM_INTS; i += inter) {
-				inter = 1;
-				for (ed_p = & (ohci->hcca->int_table [ep_rev (5, i)]); 
-					*ed_p != 0; 
-					ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED)) 
-						inter = ep_rev (6, (dma_to_ed (ohci, le32_to_cpup (ed_p)))->interval);
-				*ed_p = cpu_to_le32 (ed->dma);	
-			}	
-		}	
-		wmb ();
-		ohci->ed_isotail = ed;
-#ifdef OHCI_VERBOSE_DEBUG
-		ohci_dump_periodic (ohci, "LINK_ISO");
-#endif
-		break;
+		ed->branch = branch;
+		periodic_link (ohci, ed);
 	}	 	
 
 	/* the HC may not see the schedule updates yet, but if it does
 	 * then they'll be properly ordered.
 	 */
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
 
 /* scan the periodic table to find and unlink this ED */
-static void periodic_unlink (
-	struct ohci_hcd	*ohci,
-	struct ed	*ed,
-	unsigned	index,
-	unsigned	period
-) {
-	for (; index < NUM_INTS; index += period) {
-		__u32	*ed_p = &ohci->hcca->int_table [index];
+static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
+{
+	int	i;
 
-		while (*ed_p != 0) {
-			if ((dma_to_ed (ohci, le32_to_cpup (ed_p))) == ed) {
-				*ed_p = ed->hwNextED;		
-				break;
-			}
-			ed_p = & ((dma_to_ed (ohci, le32_to_cpup (ed_p)))->hwNextED);
+	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
+		struct ed	*temp;
+		struct ed	**prev = &ohci->periodic [i];
+		u32		*prev_p = &ohci->hcca->int_table [i];
+
+		while (*prev && (temp = *prev) != ed) {
+			prev_p = &temp->hwNextED;
+			prev = &temp->ed_next;
 		}
+		if (*prev) {
+			*prev_p = ed->hwNextED;
+			*prev = ed->ed_next;
+		}
+		ohci->load [i] -= ed->load;
 	}	
+	ohci->hcd.self.bandwidth_allocated -= ed->load / ed->interval;
+
+	dbg ("%s: unlink %sed %p branch %d [%dus.], interval %d",
+		ohci->hcd.self.bus_name,
+		(ed->hwINFO & ED_ISO) ? "iso " : "",
+		ed, ed->branch, ed->load, ed->interval);
 }
 
 /* unlink an ed from one of the HC chains. 
@@ -275,8 +309,6 @@ static void periodic_unlink (
  */
 static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed) 
 {
-	int	i;
-
 	ed->hwINFO |= ED_SKIP;
 
 	switch (ed->type) {
@@ -289,13 +321,15 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			writel (le32_to_cpup (&ed->hwNextED),
 				&ohci->regs->ed_controlhead);
 		} else {
+			ed->ed_prev->ed_next = ed->ed_next;
 			ed->ed_prev->hwNextED = ed->hwNextED;
 		}
 		if (ohci->ed_controltail == ed) {
 			ohci->ed_controltail = ed->ed_prev;
+			if (ohci->ed_controltail)
+				ohci->ed_controltail->ed_next = 0;
 		} else {
-			 (dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))
-			 	->ed_prev = ed->ed_prev;
+			ed->ed_next->ed_prev = ed->ed_prev;
 		}
 		break;
 
@@ -308,50 +342,33 @@ static void ed_deschedule (struct ohci_hcd *ohci, struct ed *ed)
 			writel (le32_to_cpup (&ed->hwNextED),
 				&ohci->regs->ed_bulkhead);
 		} else {
+			ed->ed_prev->ed_next = ed->ed_next;
 			ed->ed_prev->hwNextED = ed->hwNextED;
 		}
 		if (ohci->ed_bulktail == ed) {
 			ohci->ed_bulktail = ed->ed_prev;
+			if (ohci->ed_bulktail)
+				ohci->ed_bulktail->ed_next = 0;
 		} else {
-			 (dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))
-			 	->ed_prev = ed->ed_prev;
+			ed->ed_next->ed_prev = ed->ed_prev;
 		}
 		break;
 
-	case PIPE_INTERRUPT:
-		periodic_unlink (ohci, ed, ed->intriso.intr_info.int_branch, ed->interval);
-		for (i = ed->intriso.intr_info.int_branch; i < NUM_INTS; i += ed->interval)
-			ohci->ohci_int_load [i] -= ed->intriso.intr_info.int_load;
-#ifdef OHCI_VERBOSE_DEBUG
-		ohci_dump_periodic (ohci, "UNLINK_INT");
-#endif
-		break;
-
-	case PIPE_ISOCHRONOUS:
-		if (ohci->ed_isotail == ed)
-			ohci->ed_isotail = ed->ed_prev;
-		if (ed->hwNextED != 0) 
-			(dma_to_ed (ohci, le32_to_cpup (&ed->hwNextED)))
-		    		->ed_prev = ed->ed_prev;
-
-		if (ed->ed_prev != NULL)
-			ed->ed_prev->hwNextED = ed->hwNextED;
-		else
-			periodic_unlink (ohci, ed, 0, 1);
-#ifdef OHCI_VERBOSE_DEBUG
-		ohci_dump_periodic (ohci, "UNLINK_ISO");
-#endif
+	// case PIPE_INTERRUPT:
+	// case PIPE_ISOCHRONOUS:
+	default:
+		periodic_unlink (ohci, ed);
 		break;
 	}
 
-	/* FIXME Except for a couple of exceptionally clean unlink cases
+	/* NOTE: Except for a couple of exceptionally clean unlink cases
 	 * (like unlinking the only c/b ED, with no TDs) HCs may still be
-	 * caching this (till SOF).
-	 *
-	 * To avoid racing with the hardware, this needs to use ED_UNLINK
-	 * and delay til next INTR_SF.  Merge with start_urb_unlink().
+	 * caching this operational ED (or its address).  Safe unlinking
+	 * involves not marking it ED_IDLE till INTR_SF; we always do that
+	 * if td_list isn't empty.  Otherwise the race is small; but ...
 	 */
-	ed->state = ED_IDLE;
+	if (ed->state == ED_OPER)
+		ed->state = ED_IDLE;
 }
 
 
@@ -369,7 +386,6 @@ static struct ed *ed_get (
 ) {
 	int			is_out = !usb_pipein (pipe);
 	int			type = usb_pipetype (pipe);
-	int			bus_msecs = 0;
 	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
 	struct ed		*ed; 
 	unsigned		ep;
@@ -378,9 +394,6 @@ static struct ed *ed_get (
 	ep = usb_pipeendpoint (pipe) << 1;
 	if (type != PIPE_CONTROL && is_out)
 		ep |= 1;
-	if (type == PIPE_INTERRUPT)
-		bus_msecs = usb_calc_bus_time (udev->speed, !is_out, 0,
-			usb_maxpacket (udev, pipe, is_out)) / 1000;
 
 	spin_lock_irqsave (&ohci->lock, flags);
 
@@ -422,23 +435,25 @@ static struct ed *ed_get (
 		info = cpu_to_le32 (info);
 		if (udev->speed == USB_SPEED_LOW)
 			info |= ED_LOWSPEED;
-		/* control transfers store pids in tds */
+		/* only control transfers store pids in tds */
 		if (type != PIPE_CONTROL) {
 			info |= is_out ? ED_OUT : ED_IN;
-			if (type == PIPE_ISOCHRONOUS)
-				info |= ED_ISO;
-			if (type == PIPE_INTERRUPT) {
-				ed->intriso.intr_info.int_load = bus_msecs;
-				if (interval > 32)
+			if (type != PIPE_BULK) {
+				/* periodic transfers... */
+				if (type == PIPE_ISOCHRONOUS)
+					info |= ED_ISO;
+				else if (interval > 32)	/* iso can be bigger */
 					interval = 32;
+				ed->interval = interval;
+				ed->load = usb_calc_bus_time (
+					udev->speed, !is_out,
+					type == PIPE_ISOCHRONOUS,
+					usb_maxpacket (udev, pipe, is_out))
+						/ 1000;
 			}
 		}
 		ed->hwINFO = info;
 
-		/* value ignored except on periodic EDs, where
-		 * we know it's already a power of 2
-		 */
-		ed->interval = interval;
 #ifdef DEBUG
 	/*
 	 * There are two other cases we ought to change hwINFO, both during
@@ -473,8 +488,9 @@ done:
  */
 static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 {    
-	ed_deschedule (ohci, ed);
+	ed->hwINFO |= ED_DEQUEUE;
 	ed->state = ED_UNLINK;
+	ed_deschedule (ohci, ed);
 
 	/* SF interrupt might get delayed; record the frame counter value that
 	 * indicates when the HC isn't looking at it, so concurrent unlinks
@@ -483,7 +499,9 @@ static void start_urb_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	 */
 	ed->tick = le16_to_cpu (ohci->hcca->frame_no) + 1;
 
+	/* rm_list is just singly linked, for simplicity */
 	ed->ed_next = ohci->ed_rm_list;
+	ed->ed_prev = 0;
 	ohci->ed_rm_list = ed;
 
 	/* enable SOF interrupt */
@@ -529,7 +547,6 @@ td_fill (unsigned int info,
 
 	/* use this td as the next dummy */
 	td_pt = urb_priv->td [index];
-	td_pt->hwNextTD = 0;
 
 	/* fill the old dummy TD */
 	td = urb_priv->td [index] = urb_priv->ed->dummy;
@@ -547,7 +564,7 @@ td_fill (unsigned int info,
 	if (is_iso) {
 		td->hwCBP = cpu_to_le32 (data & 0xFFFFF000);
 		td->hwPSW [0] = cpu_to_le16 ((data & 0x0FFF) | 0xE000);
-		td->ed->intriso.last_iso = info & 0xffff;
+		td->ed->last_iso = info & 0xffff;
 	} else {
 		td->hwCBP = cpu_to_le32 (data); 
 	}			
@@ -608,9 +625,11 @@ static void td_submit_urb (
 	/* Bulk and interrupt are identical except for where in the schedule
 	 * their EDs live.
 	 */
-	// case PIPE_BULK:
-	// case PIPE_INTERRUPT:
-	default:
+	case PIPE_INTERRUPT:
+		/* ... and periodic urbs have extra accounting */
+		ohci->hcd.self.bandwidth_int_reqs++;
+		/* FALLTHROUGH */
+	case PIPE_BULK:
 		info = is_out
 			? TD_T_TOGGLE | TD_CC | TD_DP_OUT
 			: TD_T_TOGGLE | TD_CC | TD_DP_IN;
@@ -676,6 +695,7 @@ static void td_submit_urb (
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}
+		ohci->hcd.self.bandwidth_isoc_reqs++;
 		break;
 	}
 	if (urb_priv->length != cnt)
@@ -707,8 +727,12 @@ static void td_done (struct urb *urb, struct td *td)
 
 		if (usb_pipeout (urb->pipe))
 			dlen = urb->iso_frame_desc [td->index].length;
-		else
+		else {
+			/* short reads are always OK for ISO */
+			if (cc == TD_DATAUNDERRUN)
+				cc = TD_CC_NOERROR;
 			dlen = tdPSW & 0x3ff;
+		}
 		urb->actual_length += dlen;
 		urb->iso_frame_desc [td->index].actual_length = dlen;
 		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
@@ -802,6 +826,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 			if (td_list->ed->hwHeadP & ED_H) {
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
+#ifdef DEBUG
 					struct urb *urb = td_list->urb;
 
 					/* help for troubleshooting: */
@@ -817,6 +842,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 						1 + td_list->index,
 						urb_priv->length,
 						cc, cc_to_error [cc]);
+#endif
 					td_list->ed->hwHeadP = 
 			    (urb_priv->td [urb_priv->length - 1]->hwNextTD
 				    & __constant_cpu_to_le32 (TD_MASK))
@@ -872,8 +898,7 @@ rescan_all:
 		 * we call a completion since it might have unlinked
 		 * another (earlier) urb
 		 *
-		 * FIXME use td_list to scan, not ed hashtables.
-		 * completely abolish ed hashtables!
+		 * FIXME use td_list to scan, not td hashtables.
 		 */
 rescan_this:
 		completed = 0;
@@ -894,8 +919,7 @@ rescan_this:
 				td_done (urb, td);
 				urb_priv->td_cnt++;
 
-				*td_p = td->hwNextTD | (*td_p
-					& __constant_cpu_to_le32 (0x3));
+				*td_p = td->hwNextTD | (*td_p & ~TD_MASK);
 
 				/* URB is done; clean up */
 				if (urb_priv->td_cnt == urb_priv->length) {

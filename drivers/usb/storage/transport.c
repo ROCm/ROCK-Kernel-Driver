@@ -350,7 +350,7 @@ unsigned int usb_stor_transfer_length(Scsi_Cmnd *srb)
 	 */
 	if (len != srb->request_bufflen) {
 		printk("USB len=%d, request_bufflen=%d\n", len, srb->request_bufflen);
-		show_trace(NULL);
+		BUG();
 	}
 
 	return len;
@@ -882,6 +882,9 @@ void usb_stor_abort_transport(struct us_data *us)
 		US_DEBUGP("-- simulating missing IRQ\n");
 		usb_stor_CBI_irq(us->irq_urb);
 	}
+
+	/* Wait for the aborted command to finish */
+	wait_for_completion(&us->notify);
 
 	/* Reacquire the lock */
 	scsi_lock(us->srb->host);

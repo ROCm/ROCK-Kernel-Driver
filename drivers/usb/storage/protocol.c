@@ -54,10 +54,27 @@
  * Helper routines
  ***********************************************************************/
 
-/* Fix-up the return data from an INQUIRY command to show 
+static void *
+find_data_location(Scsi_Cmnd *srb) {
+	if (srb->use_sg) {
+		/*
+		 * This piece of code only works if the first page is
+		 * big enough to hold more than 3 bytes -- which is
+		 * _very_ likely.
+		 */
+		struct scatterlist *sg;
+
+		sg = (struct scatterlist *) srb->request_buffer;
+		return (void *) page_address(sg[0].page) + sg[0].offset;
+	} else
+		return (void *) srb->request_buffer;
+}
+
+/*
+ * Fix-up the return data from an INQUIRY command to show 
  * ANSI SCSI rev 2 so we don't confuse the SCSI layers above us
  */
-void fix_inquiry_data(Scsi_Cmnd *srb)
+static void fix_inquiry_data(Scsi_Cmnd *srb)
 {
 	unsigned char *data_ptr;
 
@@ -65,22 +82,41 @@ void fix_inquiry_data(Scsi_Cmnd *srb)
 	if (srb->cmnd[0] != INQUIRY)
 		return;
 
-	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2\n");
+	data_ptr = find_data_location(srb);
 
-	/* find the location of the data */
-	if (srb->use_sg) {
-		/* this piece of code only works if the first page is big enough to
-		 * hold more than 3 bytes -- which is _very_ likely
-		 */
-		struct scatterlist *sg;
+	if ((data_ptr[2] & 7) == 2)
+		return;
 
-		sg = (struct scatterlist *) srb->request_buffer;
-		data_ptr = (unsigned char *) page_address(sg[0].page) + sg[0].offset;
-	} else
-		data_ptr = (unsigned char *)srb->request_buffer;
+	US_DEBUGP("Fixing INQUIRY data to show SCSI rev 2 - was %d\n",
+		  data_ptr[2] & 7);
 
 	/* Change the SCSI revision number */
 	data_ptr[2] = (data_ptr[2] & ~7) | 2;
+}
+
+/*
+ * Fix-up the return data from a READ CAPACITY command. My Feiya reader
+ * returns a value that is 1 too large.
+ */
+static void fix_read_capacity(Scsi_Cmnd *srb)
+{
+	unsigned char *dp;
+	unsigned long capacity;
+
+	/* verify that it's a READ CAPACITY command */
+	if (srb->cmnd[0] != READ_CAPACITY)
+		return;
+
+	dp = find_data_location(srb);
+
+	capacity = (dp[0]<<24) + (dp[1]<<16) + (dp[2]<<8) + (dp[3]);
+	US_DEBUGP("US: Fixing capacity: from %ld to %ld\n",
+	       capacity+1, capacity);
+	capacity--;
+	dp[0] = (capacity >> 24);
+	dp[1] = (capacity >> 16);
+	dp[2] = (capacity >> 8);
+	dp[3] = (capacity);
 }
 
 /***********************************************************************
@@ -346,8 +382,11 @@ void usb_stor_transparent_scsi_command(Scsi_Cmnd *srb, struct us_data *us)
 		if ((us->flags & US_FL_MODE_XLATE) && (old_cmnd == MODE_SENSE))
 			usb_stor_scsiSense10to6(srb);
 
-		/* fix the INQUIRY data if necessary */
+		/* Fix the INQUIRY data if necessary */
 		fix_inquiry_data(srb);
+
+		/* Fix the READ CAPACITY result if necessary */
+		if (us->flags & US_FL_FIX_CAPACITY)
+			fix_read_capacity(srb);
 	}
 }
-

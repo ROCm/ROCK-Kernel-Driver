@@ -110,12 +110,54 @@ cyrix_get_free_region(unsigned long base, unsigned long size)
 	return -ENOSPC;
 }
 
+static u32 cr4 = 0;
+static u32 ccr3;
+
+static void prepare_set(void)
+{
+	u32 cr0;
+
+	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
+	if ( cpu_has_pge ) {
+		cr4 = read_cr4();
+		write_cr4(cr4 & (unsigned char) ~(1 << 7));
+	}
+
+	/*  Disable and flush caches. Note that wbinvd flushes the TLBs as
+	    a side-effect  */
+	cr0 = read_cr0() | 0x40000000;
+	wbinvd();
+	write_cr0(cr0);
+	wbinvd();
+
+	/* Cyrix ARRs - everything else were excluded at the top */
+	ccr3 = getCx86(CX86_CCR3);
+
+	/* Cyrix ARRs - everything else were excluded at the top */
+	setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10);
+
+}
+
+static void post_set(void)
+{
+	/*  Flush caches and TLBs  */
+	wbinvd();
+
+	/* Cyrix ARRs - everything else was excluded at the top */
+	setCx86(CX86_CCR3, ccr3);
+		
+	/*  Enable caches  */
+	write_cr0(read_cr0() & 0xbfffffff);
+
+	/*  Restore value of CR4  */
+	if ( cpu_has_pge )
+		write_cr4(cr4);
+}
+
 static void cyrix_set_arr(unsigned int reg, unsigned long base,
 			  unsigned long size, mtrr_type type)
 {
 	unsigned char arr, arr_type, arr_size;
-	u32 cr0, ccr3;
-	u32 cr4 = 0;
 
 	arr = CX86_ARR_BASE + (reg << 1) + reg;	/* avoid multiplication by 3 */
 
@@ -158,24 +200,7 @@ static void cyrix_set_arr(unsigned int reg, unsigned long base,
 		}
 	}
 
-	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-	if ( cpu_has_pge ) {
-		cr4 = read_cr4();
-		write_cr4(cr4 & (unsigned char) ~(1 << 7));
-	}
-
-	/*  Disable and flush caches. Note that wbinvd flushes the TLBs as
-	    a side-effect  */
-	cr0 = read_cr0() | 0x40000000;
-	wbinvd();
-	write_cr0(cr0);
-	wbinvd();
-
-	/* Cyrix ARRs - everything else were excluded at the top */
-	ccr3 = getCx86(CX86_CCR3);
-
-	/* Cyrix ARRs - everything else were excluded at the top */
-	setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10);
+	prepare_set();
 
 	base <<= PAGE_SHIFT;
 	setCx86(arr, ((unsigned char *) &base)[3]);
@@ -183,18 +208,7 @@ static void cyrix_set_arr(unsigned int reg, unsigned long base,
 	setCx86(arr + 2, (((unsigned char *) &base)[1]) | arr_size);
 	setCx86(CX86_RCR_BASE + reg, arr_type);
 
-	/*  Flush caches and TLBs  */
-	wbinvd();
-
-	/* Cyrix ARRs - everything else was excluded at the top */
-	setCx86(CX86_CCR3, ccr3);
-		
-	/*  Enable caches  */
-	write_cr0(read_cr0() & 0xbfffffff);
-
-	/*  Restore value of CR4  */
-	if ( cpu_has_pge )
-		write_cr4(cr4);
+	post_set();
 }
 
 typedef struct {
@@ -210,31 +224,11 @@ arr_state_t arr_state[8] __initdata = {
 
 unsigned char ccr_state[7] __initdata = { 0, 0, 0, 0, 0, 0, 0 };
 
-static void __init
-cyrix_arr_init_secondary(void)
+static void cyrix_set_all(void)
 {
 	int i;
-	u32 cr0, ccr3, cr4 = 0;
 
-	/* flush cache and enable MAPEN */
-	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
-	if ( cpu_has_pge ) {
-		cr4 = read_cr4();
-		write_cr4(cr4 & (unsigned char) ~(1 << 7));
-	}
-
-	/*  Disable and flush caches. Note that wbinvd flushes the TLBs as
-	    a side-effect  */
-	cr0 = read_cr0() | 0x40000000;
-	wbinvd();
-	write_cr0(cr0);
-	wbinvd();
-
-	/* Cyrix ARRs - everything else were excluded at the top */
-	ccr3 = getCx86(CX86_CCR3);
-
-	/* Cyrix ARRs - everything else were excluded at the top */
-	setCx86(CX86_CCR3, (ccr3 & 0x0f) | 0x10);
+	prepare_set();
 
 	/* the CCRs are not contiguous */
 	for (i = 0; i < 4; i++)
@@ -245,18 +239,7 @@ cyrix_arr_init_secondary(void)
 		cyrix_set_arr(i, arr_state[i].base, 
 			      arr_state[i].size, arr_state[i].type);
 
-	/*  Flush caches and TLBs  */
-	wbinvd();
-
-	/* Cyrix ARRs - everything else was excluded at the top */
-	setCx86(CX86_CCR3, ccr3);
-		
-	/*  Enable caches  */
-	write_cr0(read_cr0() & 0xbfffffff);
-
-	/*  Restore value of CR4  */
-	if ( cpu_has_pge )
-		write_cr4(cr4);
+	post_set();
 }
 
 /*
@@ -361,7 +344,7 @@ cyrix_arr_init(void)
 static struct mtrr_ops cyrix_mtrr_ops = {
 	.vendor            = X86_VENDOR_CYRIX,
 	.init              = cyrix_arr_init,
-	.init_secondary    = cyrix_arr_init_secondary,
+	.set_all	   = cyrix_set_all,
 	.set               = cyrix_set_arr,
 	.get               = cyrix_get_arr,
 	.get_free_region   = cyrix_get_free_region,
