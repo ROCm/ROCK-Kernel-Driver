@@ -4,11 +4,11 @@
 /*
  * Compiler-dependent intrinsics.
  *
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
-#include <kernel/config.h>
+#include <linux/config.h>
 
 /*
  * Force an unresolved reference if someone tries to use
