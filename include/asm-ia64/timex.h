@@ -26,5 +26,7 @@ get_cycles (void)
 }
 
 extern unsigned long (*gettimeoffset)(void);
+extern void ia64_reset_wall_time (void);
+extern void ia64_update_wall_time (long delta_nsec);
 
 #endif /* _ASM_IA64_TIMEX_H */

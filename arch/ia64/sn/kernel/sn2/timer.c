@@ -58,8 +58,9 @@ sn_gettimeoffset(void)
 }
 
 
-void sn2_update_wall_time(void)
+void sn2_update_wall_time(long delta_nsec)
 {
+	ia64_update_wall_time(delta_nsec);
 	rtc_offset -= min(rtc_offset, rtc_per_timer_tick);
 	last_wall_rtc = GET_RTC_COUNTER();
 }
@@ -67,6 +68,7 @@ void sn2_update_wall_time(void)
 
 void sn2_reset_wall_time(void)
 {
+	ia64_reset_wall_time();
 	rtc_offset = 0;
 	last_wall_rtc = GET_RTC_COUNTER();
 }

@@ -26,10 +26,10 @@
 #include <asm/system.h>
 
 extern unsigned long wall_jiffies;
-extern unsigned long last_nsec_offset;
-static unsigned long __ia64_gettimeoffset (void);
+unsigned long last_nsec_offset;
+static unsigned long ia64_gettimeoffset (void);
 
-unsigned long (*gettimeoffset)(void) = &__ia64_gettimeoffset;
+unsigned long (*gettimeoffset)(void) = &ia64_gettimeoffset;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
@@ -65,12 +65,38 @@ do_profile (unsigned long ip)
 	atomic_inc((atomic_t *) &prof_buffer[ip]);
 }
 
+void
+ia64_reset_wall_time (void)
+{
+	last_nsec_offset = 0;
+}
+
+/*
+ * Adjust for the fact that xtime has been advanced by delta_nsec (may be negative and/or
+ * larger than NSEC_PER_SEC.
+ */
+void
+ia64_update_wall_time (long delta_nsec)
+{
+	if (last_nsec_offset > 0) {
+		unsigned long new, old;
+
+		do {
+			old = last_nsec_offset;
+			if (old > delta_nsec)
+				new = old - delta_nsec;
+			else
+				new = 0;
+		} while (cmpxchg(&last_nsec_offset, old, new) != old);
+	}
+}
+
 /*
  * Return the number of nano-seconds that elapsed since the last update to jiffy.  The
  * xtime_lock must be at least read-locked when calling this routine.
  */
-static unsigned long
-__ia64_gettimeoffset (void)
+unsigned long
+ia64_gettimeoffset (void)
 {
 	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
 	unsigned long now, last_tick;
@@ -129,9 +155,7 @@ do_settimeofday (struct timeval *tv)
 		time_status |= STA_UNSYNC;
 		time_maxerror = NTP_PHASE_LIMIT;
 		time_esterror = NTP_PHASE_LIMIT;
-		if (update_wall_time_hook)
-			(*reset_wall_time_hook)();
-
+		(*reset_wall_time_hook)();
 	}
 	write_sequnlock_irq(&xtime_lock);
 	clock_was_set();
@@ -345,6 +369,9 @@ static struct irqaction timer_irqaction = {
 void __init
 time_init (void)
 {
+	update_wall_time_hook = ia64_update_wall_time;
+	reset_wall_time_hook = ia64_reset_wall_time;
+
 	register_percpu_irq(IA64_TIMER_VECTOR, &timer_irqaction);
 	efi_gettimeofday(&xtime);
 	ia64_init_itm();
