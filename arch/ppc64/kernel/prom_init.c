@@ -587,19 +587,20 @@ static unsigned long __init prom_next_cell(int s, cell_t **cellp)
 static void reserve_mem(unsigned long base, unsigned long size)
 {
 	unsigned long offset = reloc_offset();
+	unsigned long top = base + size;
 	unsigned long cnt = RELOC(mem_reserve_cnt);
 
-	if (!size)
+	if (size == 0)
 		return;
 
-	base = _ALIGN_DOWN(base, PAGE_SIZE);
-	size = _ALIGN_UP(size, PAGE_SIZE);
-
-	/*
-	 * We need to always keep one empty entry so that we
+	/* We need to always keep one empty entry so that we
 	 * have our terminator with "size" set to 0 since we are
 	 * dumb and just copy this entire array to the boot params
 	 */
+	base = _ALIGN_DOWN(base, PAGE_SIZE);
+	top = _ALIGN_UP(top, PAGE_SIZE);
+	size = top - base;
+
 	if (cnt >= (MEM_RESERVE_MAP_SIZE - 1))
 		prom_panic("Memory reserve map exhausted !\n");
 	RELOC(mem_reserve_map)[cnt].base = base;
