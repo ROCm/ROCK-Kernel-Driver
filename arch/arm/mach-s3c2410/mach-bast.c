@@ -18,6 +18,7 @@
  *     05-Sep-2003 BJD  Moved to v2.6 kernel
  *     06-Jan-2003 BJD  Updates for <arch/map.h>
  *     18-Jan-2003 BJD  Added serial port configuration
+ *     05-Oct-2004 BJD  Power management code
 */
 
 #include <linux/kernel.h>
@@ -33,6 +34,7 @@
 #include <asm/mach/irq.h>
 
 #include <asm/arch/bast-map.h>
+#include <asm/arch/bast-irq.h>
 
 #include <asm/hardware.h>
 #include <asm/io.h>
@@ -41,11 +43,16 @@
 
 //#include <asm/debug-ll.h>
 #include <asm/arch/regs-serial.h>
+#include <asm/arch/regs-gpio.h>
+#include <asm/arch/regs-mem.h>
 
 #include "s3c2410.h"
 #include "devs.h"
 #include "cpu.h"
 #include "usb-simtec.h"
+#include "pm.h"
+
+#define COPYRIGHT ", (c) 2004 Simtec Electronics"
 
 /* macros for virtual address mods for the io space entries */
 #define VA_C5(item) ((item) + BAST_VAM_CS5)
@@ -224,6 +231,36 @@ void __init bast_init_irq(void)
 {
 	s3c2410_init_irq();
 }
+
+#ifdef CONFIG_PM
+
+/* bast_init_pm
+ *
+ * enable the power management functions for the EB2410ITX
+*/
+
+static __init int bast_init_pm(void)
+{
+	unsigned long gstatus4;
+
+	if (!machine_is_bast())
+		return 0;
+
+	printk(KERN_INFO "BAST Power Manangement" COPYRIGHT "\n");
+
+	gstatus4  = (__raw_readl(S3C2410_BANKCON7) & 0x3) << 30;
+	gstatus4 |= (__raw_readl(S3C2410_BANKCON6) & 0x3) << 28;
+	gstatus4 |= (__raw_readl(S3C2410_BANKSIZE) & S3C2410_BANKSIZE_MASK);
+
+	printk(KERN_DEBUG "setting GSTATUS4 to %08lx\n", gstatus4);
+	__raw_writel(gstatus4, S3C2410_GSTATUS4);
+
+	return s3c2410_pm_init();
+}
+
+late_initcall(bast_init_pm);
+#endif
+
 
 MACHINE_START(BAST, "Simtec-BAST")
      MAINTAINER("Ben Dooks <ben@simtec.co.uk>")
