@@ -12,8 +12,7 @@
 #include <asm/memory.h>
 #include <asm/page.h>
 
-/* forward-declare task_struct */
-struct task_struct;
+struct mm_struct;
 
 /*
  * Don't change this structure - ASM code
@@ -43,7 +42,7 @@ extern struct processor {
 	/*
 	 * Idle the processor
 	 */
-	int (*_do_idle)(int mode);
+	int (*_do_idle)(void);
 	/*
 	 * Processor architecture specific
 	 */
@@ -93,7 +92,7 @@ extern struct processor {
 		/*
 		 * Set the page table
 		 */
-		void (*set_pgd)(unsigned long pgd_phys);
+		void (*set_pgd)(unsigned long pgd_phys, struct mm_struct *mm);
 		/*
 		 * Set a PMD (handling IMP bit 4)
 		 */
@@ -113,7 +112,7 @@ extern const struct processor sa110_processor_functions;
 #define cpu_proc_init()				processor._proc_init()
 #define cpu_proc_fin()				processor._proc_fin()
 #define cpu_reset(addr)				processor.reset(addr)
-#define cpu_do_idle(mode)			processor._do_idle(mode)
+#define cpu_do_idle()				processor._do_idle()
 
 #define cpu_cache_clean_invalidate_all()	processor.cache.clean_invalidate_all()
 #define cpu_cache_clean_invalidate_range(s,e,f)	processor.cache.clean_invalidate_range(s,e,f)
@@ -126,11 +125,11 @@ extern const struct processor sa110_processor_functions;
 #define cpu_icache_invalidate_range(s,e)	processor.icache.invalidate_range(s,e)
 #define cpu_icache_invalidate_page(vp)		processor.icache.invalidate_page(vp)
 
-#define cpu_set_pgd(pgd)			processor.pgtable.set_pgd(pgd)
+#define cpu_set_pgd(pgd,mm)			processor.pgtable.set_pgd(pgd,mm)
 #define cpu_set_pmd(pmdp, pmd)			processor.pgtable.set_pmd(pmdp, pmd)
 #define cpu_set_pte(ptep, pte)			processor.pgtable.set_pte(ptep, pte)
 
-#define cpu_switch_mm(pgd,tsk)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)))
+#define cpu_switch_mm(pgd,mm)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)),mm)
 
 #define cpu_get_pgd()	\
 	({						\

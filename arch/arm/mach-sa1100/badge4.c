@@ -34,8 +34,6 @@
 
 static int __init badge4_sa1111_init(void)
 {
-	int ret;
-
 	/*
 	 * Ensure that the memory bus request/grant signals are setup,
 	 * and the grant is held in its inactive state
@@ -45,40 +43,7 @@ static int __init badge4_sa1111_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe(BADGE4_SA1111_BASE);
-	if (ret < 0)
-		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake();
-
-	/*
-	 * The SDRAM configuration of the SA1110 and the SA1111 must
-	 * match.  This is very important to ensure that SA1111 accesses
-	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
-	 * MBGNT signal, so we must have called sa1110_mb_disable()
-	 * beforehand.
-	 */
-	sa1111_configure_smc(1,
-			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
-			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
-
-	/*
-	 * We only need to turn on DCLK whenever we want to use the
-	 * DMA.  It can otherwise be held firmly in the off position.
-	 */
-	SKPCR |= SKPCR_DCLKEN;
-
-	/*
-	 * Enable the SA1110 memory bus request and grant signals.
-	 */
-	sa1110_mb_enable();
-
-	sa1111_init_irq(BADGE4_IRQ_GPIO_SA1111);
-
-	return 0;
+	return sa1111_init(NULL, BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
 }
 
 static int __init badge4_init(void)

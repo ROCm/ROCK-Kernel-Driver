@@ -42,25 +42,9 @@ static int __init graphicsmaster_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	ret = sa1111_probe(0x18000000);
+	ret = sa1111_init(NULL, 0x18000000, ADS_EXT_IRQ(0));
 	if (ret < 0)
 		return ret;
-
-	/*
-	 * We found it.  Wake the chip up.
-	 */
-	sa1111_wake();
-
-	/*
-	 * The SDRAM configuration of the SA1110 and the SA1111 must
-	 * match.  This is very important to ensure that SA1111 accesses
-	 * don't corrupt the SDRAM.  Note that this ungates the SA1111's
-	 * MBGNT signal, so we must have called sa1110_mb_disable()
-	 * beforehand.
-	 */
-	sa1111_configure_smc(1,
-			     FExtr(MDCNFG, MDCNFG_SA1110_DRAC0),
-			     FExtr(MDCNFG, MDCNFG_SA1110_TDL0));
 
 	/*
 	 * Enable PWM control for LCD
@@ -70,19 +54,6 @@ static int __init graphicsmaster_init(void)
 	SKPEN0 = 1;
 	SKPWM1 = 0x01;				// Backlight
 	SKPEN1 = 1;
-
-	/*
-	 * We only need to turn on DCLK whenever we want to use the
-	 * DMA.  It can otherwise be held firmly in the off position.
-	 */
-	SKPCR |= SKPCR_DCLKEN;
-
-	/*
-	 * Enable the SA1110 memory bus request and grant signals.
-	 */
-	sa1110_mb_enable();
-
-	sa1111_init_irq(ADS_EXT_IRQ(0));
 
 	return 0;
 }

@@ -10,10 +10,7 @@
 
 static inline void arch_idle(void)
 {
-	if (!hlt_counter)
-	{
-		cpu_do_idle(0);
-	}
+	cpu_do_idle();
 }
 
 
