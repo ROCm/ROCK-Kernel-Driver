@@ -60,7 +60,7 @@ static const u8 def_config[] = {
  * All other init functions will only set values that are
  * different from the 82557 default.
  */
-void __devinit
+void
 e100_config_init_82557(struct e100_private *bdp)
 {
 	/* initialize config block */
@@ -104,7 +104,7 @@ e100_config_init_82557(struct e100_private *bdp)
 	e100_config_mulcast_enbl(bdp, false);
 }
 
-static void __devinit
+static void
 e100_config_init_82558(struct e100_private *bdp)
 {
 	/* MWI enable. This should be turned on only if the adapter is a 82558/9
@@ -136,7 +136,7 @@ e100_config_init_82558(struct e100_private *bdp)
 	e100_config_long_rx(bdp, true);
 }
 
-static void __devinit
+static void
 e100_config_init_82550(struct e100_private *bdp)
 {
 	/* The D102 chip allows for 32 config bytes.  This value is
@@ -160,7 +160,7 @@ e100_config_init_82550(struct e100_private *bdp)
 }
 
 /* Initialize the adapter's configure block */
-void __devinit
+void
 e100_config_init(struct e100_private *bdp)
 {
 	e100_config_init_82557(bdp);
