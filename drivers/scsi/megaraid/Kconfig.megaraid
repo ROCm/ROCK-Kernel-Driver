@@ -1,14 +1,12 @@
 config MEGARAID_NEWGEN
 	bool "LSI Logic New Generation RAID Device Drivers"
 	depends on PCI && SCSI
-	default y
 	help
 	LSI Logic RAID Device Drivers
 
 config MEGARAID_MM
 	tristate "LSI Logic Management Module (New Driver)"
 	depends on PCI && SCSI && MEGARAID_NEWGEN
-	default m
 	help
 	Management Module provides ioctl, sysfs support for LSI Logic
 	RAID controllers.
@@ -19,7 +17,6 @@ config MEGARAID_MM
 config MEGARAID_MAILBOX
 	tristate "LSI Logic MegaRAID Driver (New Driver)"
 	depends on PCI && SCSI && MEGARAID_MM
-	default $MEGARAID_MM
 	help
 	List of supported controllers
 
@@ -48,11 +45,10 @@ config MEGARAID_MAILBOX
 	LSI MegaRAID SCSI 320-4X	1000:0407:1000:0531
 	LSI MegaRAID SCSI 320-1E	1000:0408:1000:0001
 	LSI MegaRAID SCSI 320-2E	1000:0408:1000:0002
-	LSI MegaRAID SATA 150-2		1095:3112:1000:0534
 	LSI MegaRAID SATA 150-4		1000:1960:1000:4523
 	LSI MegaRAID SATA 150-6		1000:1960:1000:0523
-	LSI MegaRAID SATA 150-4X	1000:0409:1000:1504
-	LSI MegaRAID SATA 150-8X	1000:0409:1000:1508
+	LSI MegaRAID SATA 300-4X	1000:0409:1000:3004
+	LSI MegaRAID SATA 300-8X	1000:0409:1000:3008
 	INTEL RAID Controller SRCU42X	1000:0407:8086:0532
 	INTEL RAID Controller SRCS16	1000:1960:8086:0523
 	INTEL RAID Controller SRCU42E	1000:0408:8086:0002
@@ -62,6 +58,7 @@ config MEGARAID_MAILBOX
 	INTEL RAID Controller SROMBU42E	1000:0408:8086:3499
 	INTEL RAID Controller SRCU51L	1000:1960:8086:0520
 	FSC MegaRAID PCI Express ROMB	1000:0408:1734:1065
+	ACER MegaRAID ROMB-2E		1000:0408:1025:004D
 
 	To compile this driver as a module, choose M here: the
 	module will be called megaraid_mbox
@@ -70,7 +67,6 @@ if MEGARAID_NEWGEN=n
 config MEGARAID_LEGACY
 	tristate "LSI Logic Legacy MegaRAID Driver"
 	depends on PCI && SCSI
-	default m
 	help
 	This driver supports the LSI MegaRAID 418, 428, 438, 466, 762, 490
 	and 467 SCSI host adapters. This driver also support the all U320

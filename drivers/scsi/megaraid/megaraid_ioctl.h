@@ -64,8 +64,6 @@
 #define GET_STATS		0x50000
 #define GET_IOCTL_VERSION	0x01
 
-#define MAX_LSI_CMN_ADAPS	16
-
 #define EXT_IOCTL_SIGN_SZ	16
 #define EXT_IOCTL_SIGN		"$$_EXTD_IOCTL_$$"
 
@@ -249,6 +247,7 @@ typedef struct mm_dmapool {
  * @pdev		: pci dev; used for allocating dma'ble memory
  * @issue_uioc		: Driver supplied routine to issue uioc_t commands
  *			: issue_uioc(drvr_data, kioc, ISSUE/ABORT, uioc_done)
+ * @list		: attach with the global list of adapters
  * @kioc_list		: block of mem for @max_kioc number of kiocs
  * @kioc_pool		: pool of free kiocs
  * @kioc_pool_lock	: protection for free pool
@@ -274,6 +273,7 @@ typedef struct mraid_mmadp {
 
 /* Maintained by common module */
 
+	struct list_head	list;
 	uioc_t			*kioc_list;
 	struct list_head	kioc_pool;
 	spinlock_t		kioc_pool_lock;
