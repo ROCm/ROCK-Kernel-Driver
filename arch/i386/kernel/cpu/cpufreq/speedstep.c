@@ -29,10 +29,6 @@
 
 #include <asm/msr.h>
 
-#ifndef PCI_DEVICE_ID_INTEL_82801DB_12
-#define PCI_DEVICE_ID_INTEL_82801DB_12  0x24cc
-#endif
-
 /* speedstep_chipset:
  *   It is necessary to know which chipset is used. As accesses to 
  * this device occur at various places in this module, we need a 
