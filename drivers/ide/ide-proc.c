@@ -476,7 +476,7 @@ void destroy_proc_ide_interface(ide_hwif_t *hwif)
 	}
 }
 
-void destroy_proc_ide_interfaces(void)
+static void destroy_proc_ide_interfaces(void)
 {
 	int	h;
 
@@ -489,8 +489,6 @@ void destroy_proc_ide_interfaces(void)
 		destroy_proc_ide_interface(hwif);
 	}
 }
-
-EXPORT_SYMBOL(destroy_proc_ide_interfaces);
 
 extern struct seq_operations ide_drivers_op;
 static int ide_drivers_open(struct inode *inode, struct file *file)
