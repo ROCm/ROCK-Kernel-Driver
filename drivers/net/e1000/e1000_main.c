@@ -291,7 +291,9 @@ e1000_up(struct e1000_adapter *adapter)
 			e1000_phy_reset(&adapter->hw);
 	}
 
+	spin_lock_irq(&netdev->xmit_lock);
 	e1000_set_multi(netdev);
+	spin_unlock_irq(&netdev->xmit_lock);
 
 	e1000_restore_vlan(adapter);
 
@@ -520,9 +522,6 @@ e1000_probe(struct pci_dev *pdev,
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
 
- 	/* hard_start_xmit is safe against parallel locking */
- 	netdev->features |= NETIF_F_LLTX; 
- 
 	/* before reading the EEPROM, reset the controller to 
 	 * put the device in a known good starting state */
 	
@@ -732,7 +731,6 @@ e1000_sw_init(struct e1000_adapter *adapter)
 
 	atomic_set(&adapter->irq_sem, 1);
 	spin_lock_init(&adapter->stats_lock);
-	spin_lock_init(&adapter->tx_lock);
 
 	return 0;
 }
@@ -1293,6 +1291,8 @@ e1000_set_mac(struct net_device *netdev, void *p)
  * list or the network interface flags are updated.  This routine is
  * responsible for configuring the hardware for proper multicast,
  * promiscuous mode, and all-multi behavior.
+ *
+ * Called with netdev->xmit_lock held and IRQs disabled.
  **/
 
 static void
@@ -1304,11 +1304,8 @@ e1000_set_multi(struct net_device *netdev)
 	uint32_t rctl;
 	uint32_t hash_value;
 	int i;
-	unsigned long flags;
 
 	/* Check for Promiscuous and All Multicast modes */
-
-	spin_lock_irqsave(&adapter->tx_lock, flags);
 
 	rctl = E1000_READ_REG(hw, RCTL);
 
@@ -1358,8 +1355,6 @@ e1000_set_multi(struct net_device *netdev)
 
 	if(hw->mac_type == e1000_82542_rev2_0)
 		e1000_leave_82542_rst(adapter);
-
-	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 }
 
 /* Need to wait a few seconds after link up to get diagnostic information from
@@ -1786,6 +1781,8 @@ no_fifo_stall_required:
 }
 
 #define TXD_USE_COUNT(S, X) (((S) >> (X)) + 1 )
+
+/* Called with dev->xmit_lock held and interrupts disabled.  */
 static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
@@ -1794,7 +1791,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	unsigned int max_txd_pwr = E1000_MAX_TXD_PWR;
 	unsigned int tx_flags = 0;
 	unsigned int len = skb->len;
-	unsigned long flags;
 	unsigned int nr_frags = 0;
 	unsigned int mss = 0;
 	int count = 0;
@@ -1838,18 +1834,10 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(adapter->pcix_82544)
 		count += nr_frags;
 
- 	local_irq_save(flags); 
- 	if (!spin_trylock(&adapter->tx_lock)) { 
- 		/* Collision - tell upper layer to requeue */ 
- 		local_irq_restore(flags); 
- 		return NETDEV_TX_LOCKED; 
- 	} 
-
 	/* need: count + 2 desc gap to keep tail from touching
 	 * head, otherwise try next time */
 	if(unlikely(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2)) {
 		netif_stop_queue(netdev);
-		spin_unlock_irqrestore(&adapter->tx_lock, flags);
 		return NETDEV_TX_BUSY;
 	}
 
@@ -1857,7 +1845,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		if(unlikely(e1000_82547_fifo_workaround(adapter, skb))) {
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->tx_fifo_stall_timer, jiffies);
-			spin_unlock_irqrestore(&adapter->tx_lock, flags);
 			return NETDEV_TX_BUSY;
 		}
 	}
@@ -1884,7 +1871,6 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(unlikely(E1000_DESC_UNUSED(&adapter->tx_ring) < MAX_SKB_FRAGS + 2))
 		netif_stop_queue(netdev);
 
-	spin_unlock_irqrestore(&adapter->tx_lock, flags);
 	return NETDEV_TX_OK;
 }
 
@@ -2234,13 +2220,13 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 
 	tx_ring->next_to_clean = i;
 
-	spin_lock(&adapter->tx_lock);
+	spin_lock(&netdev->xmit_lock);
 
 	if(unlikely(cleaned && netif_queue_stopped(netdev) &&
 		    netif_carrier_ok(netdev)))
 		netif_wake_queue(netdev);
 
-	spin_unlock(&adapter->tx_lock);
+	spin_unlock(&netdev->xmit_lock);
 
 	return cleaned;
 }
@@ -2819,7 +2805,10 @@ e1000_suspend(struct pci_dev *pdev, uint32_t state)
 
 	if(wufc) {
 		e1000_setup_rctl(adapter);
+
+		spin_lock_irq(&netdev->xmit_lock);
 		e1000_set_multi(netdev);
+		spin_unlock_irq(&netdev->xmit_lock);
 
 		/* turn on all-multi mode if wake on multicast is enabled */
 		if(adapter->wol & E1000_WUFC_MC) {
