@@ -290,10 +290,9 @@ snd_vortex_probe(struct pci_dev *pci, const struct pci_device_id *pci_id)
 		snd_card_free(card);
 		return err;
 	}
-	if ((err = vortex_gameport_register(chip)) < 0) {
-		snd_card_free(card);
-		return err;
-	}
+
+	vortex_gameport_register(chip);
+
 #if 0
 	if (snd_seq_device_new(card, 1, SNDRV_SEQ_DEV_ID_VORTEX_SYNTH,
 			       sizeof(snd_vortex_synth_arg_t), &wave) < 0

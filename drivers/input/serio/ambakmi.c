@@ -134,7 +134,7 @@ static int amba_kmi_probe(struct amba_device *dev, void *id)
 	memset(kmi, 0, sizeof(struct amba_kmi_port));
 	memset(io, 0, sizeof(struct serio));
 
-	io->type	= SERIO_8042;
+	io->id.type	= SERIO_8042;
 	io->write	= amba_kmi_write;
 	io->open	= amba_kmi_open;
 	io->close	= amba_kmi_close;

@@ -417,7 +417,7 @@ static irqreturn_t
 lkkbd_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
 		struct pt_regs *regs)
 {
-	struct lkkbd *lk = serio->private;
+	struct lkkbd *lk = serio_get_drvdata (serio);
 	int i;
 
 	DBG (KERN_INFO "Got byte 0x%02x\n", data);
@@ -623,19 +623,16 @@ lkkbd_reinit (void *data)
 /*
  * lkkbd_connect() probes for a LK keyboard and fills the necessary structures.
  */
-static void
+static int
 lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 {
 	struct lkkbd *lk;
 	int i;
-
-	if ((serio->type & SERIO_TYPE) != SERIO_RS232)
-		return;
-	if ((serio->type & SERIO_PROTO) != SERIO_LKKBD)
-		return;
+	int err;
 
 	if (!(lk = kmalloc (sizeof (struct lkkbd), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
+
 	memset (lk, 0, sizeof (struct lkkbd));
 
 	init_input_dev (&lk->dev);
@@ -665,11 +662,13 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 	lk->dev.event = lkkbd_event;
 	lk->dev.private = lk;
 
-	serio->private = lk;
+	serio_set_drvdata (serio, lk);
 
-	if (serio_open (serio, drv)) {
+	err = serio_open (serio, drv);
+	if (err) {
+		serio_set_drvdata (serio, NULL);
 		kfree (lk);
-		return;
+		return err;
 	}
 
 	sprintf (lk->name, "DEC LK keyboard");
@@ -691,6 +690,8 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 
 	printk (KERN_INFO "input: %s on %s, initiating reset\n", lk->name, serio->phys);
 	lk->serio->write (lk->serio, LK_CMD_POWERCYCLE_RESET);
+
+	return 0;
 }
 
 /*
@@ -699,18 +700,32 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 static void
 lkkbd_disconnect (struct serio *serio)
 {
-	struct lkkbd *lk = serio->private;
+	struct lkkbd *lk = serio_get_drvdata (serio);
 
 	input_unregister_device (&lk->dev);
 	serio_close (serio);
+	serio_set_drvdata (serio, NULL);
 	kfree (lk);
 }
+
+static struct serio_device_id lkkbd_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_LKKBD,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, lkkbd_serio_ids);
 
 static struct serio_driver lkkbd_drv = {
 	.driver		= {
 		.name	= "lkkbd",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= lkkbd_serio_ids,
 	.connect	= lkkbd_connect,
 	.disconnect	= lkkbd_disconnect,
 	.interrupt	= lkkbd_interrupt,
@@ -719,14 +734,14 @@ static struct serio_driver lkkbd_drv = {
 /*
  * The functions for insering/removing us as a module.
  */
-int __init
+static int __init
 lkkbd_init (void)
 {
 	serio_register_driver(&lkkbd_drv);
 	return 0;
 }
 
-void __exit
+static void __exit
 lkkbd_exit (void)
 {
 	serio_unregister_driver(&lkkbd_drv);

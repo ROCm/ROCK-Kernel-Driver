@@ -53,28 +53,27 @@ MODULE_LICENSE("GPL");
 #define VORTEX_DATA_WAIT	20	/* 20 ms */
 
 struct vortex {
-	struct gameport gameport;
+	struct gameport *gameport;
 	struct pci_dev *dev;
-        unsigned char __iomem *base;
-        unsigned char __iomem *io;
-	char phys[32];
+	unsigned char __iomem *base;
+	unsigned char __iomem *io;
 };
 
 static unsigned char vortex_read(struct gameport *gameport)
 {
-	struct vortex *vortex = gameport->driver;
+	struct vortex *vortex = gameport->port_data;
 	return readb(vortex->io + VORTEX_LEG);
 }
 
 static void vortex_trigger(struct gameport *gameport)
 {
-	struct vortex *vortex = gameport->driver;
+	struct vortex *vortex = gameport->port_data;
 	writeb(0xff, vortex->io + VORTEX_LEG);
 }
 
 static int vortex_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct vortex *vortex = gameport->driver;
+	struct vortex *vortex = gameport->port_data;
 	int i;
 
 	*buttons = (~readb(vortex->base + VORTEX_LEG) >> 4) & 0xf;
@@ -89,7 +88,7 @@ static int vortex_cooked_read(struct gameport *gameport, int *axes, int *buttons
 
 static int vortex_open(struct gameport *gameport, int mode)
 {
-	struct vortex *vortex = gameport->driver;
+	struct vortex *vortex = gameport->port_data;
 
 	switch (mode) {
 		case GAMEPORT_MODE_COOKED:
@@ -109,30 +108,17 @@ static int vortex_open(struct gameport *gameport, int mode)
 static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct vortex *vortex;
+	struct gameport *port;
 	int i;
 
-	if (!(vortex = kmalloc(sizeof(struct vortex), GFP_KERNEL)))
-		return -1;
-        memset(vortex, 0, sizeof(struct vortex));
-
-	vortex->dev = dev;
-	sprintf(vortex->phys, "pci%s/gameport0", pci_name(dev));
-
-	pci_set_drvdata(dev, vortex);
-
-	vortex->gameport.driver = vortex;
-	vortex->gameport.fuzz = 64;
-
-	vortex->gameport.read = vortex_read;
-	vortex->gameport.trigger = vortex_trigger;
-	vortex->gameport.cooked_read = vortex_cooked_read;
-	vortex->gameport.open = vortex_open;
-
-	vortex->gameport.name = pci_name(dev);
-	vortex->gameport.phys = vortex->phys;
-	vortex->gameport.id.bustype = BUS_PCI;
-	vortex->gameport.id.vendor = dev->vendor;
-	vortex->gameport.id.product = dev->device;
+	vortex = kcalloc(1, sizeof(struct vortex), GFP_KERNEL);
+	port = gameport_allocate_port();
+	if (!vortex || !port) {
+		printk(KERN_ERR "vortex: Memory allocation failed.\n");
+		kfree(vortex);
+		gameport_free_port(port);
+		return -ENOMEM;
+	}
 
 	for (i = 0; i < 6; i++)
 		if (~pci_resource_flags(dev, i) & IORESOURCE_IO)
@@ -140,14 +126,26 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 
 	pci_enable_device(dev);
 
+	vortex->dev = dev;
+	vortex->gameport = port;
 	vortex->base = ioremap(pci_resource_start(vortex->dev, i),
 				pci_resource_len(vortex->dev, i));
 	vortex->io = vortex->base + id->driver_data;
 
-	gameport_register_port(&vortex->gameport);
+	pci_set_drvdata(dev, vortex);
 
-	printk(KERN_INFO "gameport at pci%s speed %d kHz\n",
-		pci_name(dev), vortex->gameport.speed);
+	port->port_data = vortex;
+	port->fuzz = 64;
+
+	gameport_set_name(port, "AU88x0");
+	gameport_set_phys(port, "pci%s/gameport0", pci_name(dev));
+	port->dev.parent = &dev->dev;
+	port->read = vortex_read;
+	port->trigger = vortex_trigger;
+	port->cooked_read = vortex_cooked_read;
+	port->open = vortex_open;
+
+	gameport_register_port(port);
 
 	return 0;
 }
@@ -155,15 +153,17 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 static void __devexit vortex_remove(struct pci_dev *dev)
 {
 	struct vortex *vortex = pci_get_drvdata(dev);
-	gameport_unregister_port(&vortex->gameport);
+
+	gameport_unregister_port(vortex->gameport);
 	iounmap(vortex->base);
 	kfree(vortex);
 }
 
-static struct pci_device_id vortex_id_table[] =
-{{ 0x12eb, 0x0001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x11000 },
- { 0x12eb, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x28800 },
- { 0 }};
+static struct pci_device_id vortex_id_table[] = {
+	{ 0x12eb, 0x0001, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x11000 },
+	{ 0x12eb, 0x0002, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0x28800 },
+	{ 0 }
+};
 
 static struct pci_driver vortex_driver = {
 	.name =		"vortex_gameport",
@@ -172,12 +172,12 @@ static struct pci_driver vortex_driver = {
 	.remove =	__devexit_p(vortex_remove),
 };
 
-int __init vortex_init(void)
+static int __init vortex_init(void)
 {
 	return pci_module_init(&vortex_driver);
 }
 
-void __exit vortex_exit(void)
+static void __exit vortex_exit(void)
 {
 	pci_unregister_driver(&vortex_driver);
 }

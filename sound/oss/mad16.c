@@ -52,7 +52,7 @@
 
 static int      mad16_conf;
 static int      mad16_cdsel;
-static struct gameport gameport;
+static struct gameport *gameport;
 static DEFINE_SPINLOCK(lock);
 
 #define C928	1
@@ -902,7 +902,30 @@ static int __initdata irq_map[16] =
 	-1, -1, -1, -1
 };
 
-static int __init init_mad16(void)
+static int __devinit mad16_register_gameport(int io_port)
+{
+	if (!request_region(io_port, 1, "mad16 gameport")) {
+		printk(KERN_ERR "mad16: gameport address 0x%#x already in use\n", io_port);
+		return -EBUSY;
+	}
+
+	gameport = gameport_allocate_port();
+	if (!gameport) {
+		printk(KERN_ERR "mad16: can not allocate memory for gameport\n");
+		release_region(io_port, 1);
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gameport, "MAD16 Gameport");
+	gameport_set_phys(gameport, "isa%04x/gameport0", io_port);
+	gameport->io = io_port;
+
+	gameport_register_port(gameport);
+
+	return 0;
+}
+
+static int __devinit init_mad16(void)
 {
 	int dmatype = 0;
 
@@ -1027,17 +1050,9 @@ static int __init init_mad16(void)
 
 	found_mpu = probe_mad16_mpu(&cfg_mpu);
 
-	if (joystick == 1) {
-		/* register gameport */
-		if (!request_region(0x201, 1, "mad16 gameport"))
-			printk(KERN_ERR "mad16: gameport address 0x201 already in use\n");
-		else {
-			printk(KERN_ERR "mad16: gameport enabled at 0x201\n");
-			gameport.io = 0x201;
-			gameport_register_port(&gameport);
-		}
-	}
-	else printk(KERN_ERR "mad16: gameport disabled.\n");
+	if (joystick)
+		mad16_register_gameport(0x201);
+
 	return 0;
 }
 
@@ -1045,10 +1060,10 @@ static void __exit cleanup_mad16(void)
 {
 	if (found_mpu)
 		unload_mad16_mpu(&cfg_mpu);
-	if (gameport.io) {
+	if (gameport) {
 		/* the gameport was initialized so we must free it up */
-		gameport_unregister_port(&gameport);
-		gameport.io = 0;
+		gameport_unregister_port(gameport);
+		gameport = NULL;
 		release_region(0x201, 1);
 	}
 	unload_mad16(&cfg);

@@ -199,9 +199,8 @@ static unsigned int evdev_poll(struct file *file, poll_table *wait)
 {
 	struct evdev_list *list = file->private_data;
 	poll_wait(file, &list->evdev->wait, wait);
-	if (list->head != list->tail)
-		return POLLIN | POLLRDNORM;
-	return 0;
+	return ((list->head == list->tail) ? 0 : (POLLIN | POLLRDNORM)) |
+		(list->evdev->exist ? 0 : (POLLHUP | POLLERR));
 }
 
 static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
@@ -226,14 +225,15 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 
 		case EVIOCGKEYCODE:
 			if (get_user(t, ip)) return -EFAULT;
-			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
+			if (t < 0 || t >= dev->keycodemax || !dev->keycodesize) return -EINVAL;
 			if (put_user(INPUT_KEYCODE(dev, t), ip + 1)) return -EFAULT;
 			return 0;
 
 		case EVIOCSKEYCODE:
 			if (get_user(t, ip)) return -EFAULT;
-			if (t < 0 || t > dev->keycodemax || !dev->keycodesize) return -EINVAL;
+			if (t < 0 || t >= dev->keycodemax || !dev->keycodesize) return -EINVAL;
 			if (get_user(v, ip + 1)) return -EFAULT;
+			if (v < 0 || v > KEY_MAX) return -EINVAL;
 			u = SET_INPUT_KEYCODE(dev, t, v);
 			clear_bit(u, dev->keybit);
 			set_bit(v, dev->keybit);
@@ -441,6 +441,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 static void evdev_disconnect(struct input_handle *handle)
 {
 	struct evdev *evdev = handle->private;
+	struct evdev_list *list;
 
 	class_simple_device_remove(MKDEV(INPUT_MAJOR, EVDEV_MINOR_BASE + evdev->minor));
 	devfs_remove("input/event%d", evdev->minor);
@@ -449,6 +450,8 @@ static void evdev_disconnect(struct input_handle *handle)
 	if (evdev->open) {
 		input_close_device(handle);
 		wake_up_interruptible(&evdev->wait);
+		list_for_each_entry(list, &evdev->list, node)
+			kill_fasync(&list->fasync, SIGIO, POLL_HUP);
 	} else
 		evdev_free(evdev);
 }

@@ -124,7 +124,6 @@ hiddev_lookup_usage(struct hid_device *hid, struct hiddev_usage_ref *uref)
 	int i, j;
 	struct hid_report *report;
 	struct hid_report_enum *report_enum;
-	struct list_head *list;
 	struct hid_field *field;
 
 	if (uref->report_type < HID_REPORT_TYPE_MIN ||
@@ -132,9 +131,8 @@ hiddev_lookup_usage(struct hid_device *hid, struct hiddev_usage_ref *uref)
 
 	report_enum = hid->report_enum +
 		(uref->report_type - HID_REPORT_TYPE_MIN);
-	list = report_enum->report_list.next;
-	while (list != &report_enum->report_list) {
-		report = (struct hid_report *) list;
+
+	list_for_each_entry(report, &report_enum->report_list, list)
 		for (i = 0; i < report->maxfield; i++) {
 			field = report->field[i];
 			for (j = 0; j < field->maxusage; j++) {
@@ -146,8 +144,6 @@ hiddev_lookup_usage(struct hid_device *hid, struct hiddev_usage_ref *uref)
 				}
 			}
 		}
-		list = list->next;
-	}
 
 	return NULL;
 }
@@ -634,9 +630,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				goto inval;
 
 			else if ((cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) &&
-				 (uref_multi->num_values >= HID_MAX_MULTI_USAGES ||
-				  uref->usage_index + uref_multi->num_values >= field->report_count ||
-				  uref->usage_index + uref_multi->num_values < uref->usage_index))
+				 (uref_multi->num_values > HID_MAX_MULTI_USAGES ||
+				  uref->usage_index + uref_multi->num_values >= field->report_count))
 				goto inval;
 			}
 

@@ -123,7 +123,7 @@ static void mtouchusb_irq(struct urb *urb, struct pt_regs *regs)
         input_report_abs(&mtouch->input, ABS_X,
                          MTOUCHUSB_GET_XC(mtouch->data));
         input_report_abs(&mtouch->input, ABS_Y,
-                         MTOUCHUSB_GET_YC(mtouch->data));
+                         MTOUCHUSB_MAX_YC - MTOUCHUSB_GET_YC(mtouch->data));
         input_sync(&mtouch->input);
 
 exit:

@@ -272,7 +272,7 @@ static void vortex_Vort3D_InitializeSource(a3dsrc_t * a, int en);
 
 /* Driver stuff. */
 static int __devinit vortex_gameport_register(vortex_t * card);
-static int __devexit vortex_gameport_unregister(vortex_t * card);
+static int vortex_gameport_unregister(vortex_t * card);
 #ifndef CHIP_AU8820
 static int __devinit vortex_eq_init(vortex_t * vortex);
 static int __devexit vortex_eq_free(vortex_t * vortex);

@@ -46,6 +46,10 @@ MODULE_DESCRIPTION("S3 SonicVibes PCI");
 MODULE_LICENSE("GPL");
 MODULE_SUPPORTED_DEVICE("{{S3,SonicVibes PCI}}");
 
+#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
+#define SUPPORT_JOYSTICK 1
+#endif
+
 #ifndef PCI_VENDOR_ID_S3
 #define PCI_VENDOR_ID_S3             0x5333
 #endif
@@ -242,8 +246,8 @@ struct _snd_sonicvibes {
 	snd_kcontrol_t *master_mute;
 	snd_kcontrol_t *master_volume;
 
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	struct gameport gameport;
+#ifdef SUPPORT_JOYSTICK
+	struct gameport *gameport;
 #endif
 };
 
@@ -1163,15 +1167,47 @@ static void __devinit snd_sonicvibes_proc_init(sonicvibes_t * sonic)
 
  */
 
+#ifdef SUPPORT_JOYSTICK
 static snd_kcontrol_new_t snd_sonicvibes_game_control __devinitdata =
 SONICVIBES_SINGLE("Joystick Speed", 0, SV_IREG_GAME_PORT, 1, 15, 0);
 
+static int __devinit snd_sonicvibes_create_gameport(sonicvibes_t *sonic)
+{
+	struct gameport *gp;
+
+	sonic->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "sonicvibes: cannot allocate memory for gameport\n");
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "SonicVibes Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(sonic->pci));
+	gp->dev.parent = &sonic->pci->dev;
+	gp->io = sonic->game_port;
+
+	gameport_register_port(gp);
+
+	snd_ctl_add(sonic->card, snd_ctl_new1(&snd_sonicvibes_game_control, sonic));
+
+	return 0;
+}
+
+static void snd_sonicvibes_free_gameport(sonicvibes_t *sonic)
+{
+	if (sonic->gameport) {
+		gameport_unregister_port(sonic->gameport);
+		sonic->gameport = NULL;
+	}
+}
+#else
+static inline int snd_sonicvibes_create_gameport(sonicvibes_t *sonic) { return -ENOSYS; }
+static inline void snd_sonicvibes_free_gameport(sonicvibes_t *sonic) { }
+#endif
+
 static int snd_sonicvibes_free(sonicvibes_t *sonic)
 {
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	if (sonic->gameport.io)
-		gameport_unregister_port(&sonic->gameport);
-#endif
+	snd_sonicvibes_free_gameport(sonic);
 	pci_write_config_dword(sonic->pci, 0x40, sonic->dmaa_port);
 	pci_write_config_dword(sonic->pci, 0x48, sonic->dmac_port);
 	if (sonic->irq >= 0)
@@ -1332,7 +1368,6 @@ static int __devinit snd_sonicvibes_create(snd_card_t * card,
 	snd_sonicvibes_debug(sonic);
 #endif
 	sonic->revision = snd_sonicvibes_in(sonic, SV_IREG_REVISION);
-	snd_ctl_add(card, snd_ctl_new1(&snd_sonicvibes_game_control, sonic));
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, sonic, &ops)) < 0) {
 		snd_sonicvibes_free(sonic);
@@ -1459,10 +1494,8 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	sonic->gameport.io = sonic->game_port;
-	gameport_register_port(&sonic->gameport);
-#endif
+
+	snd_sonicvibes_create_gameport(sonic);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

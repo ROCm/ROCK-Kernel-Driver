@@ -49,7 +49,7 @@ static void serport_serio_close(struct serio *serio)
 {
 	struct serport *serport = serio->port_data;
 
-	serport->serio->type = 0;
+	serport->serio->id.type = 0;
 	wake_up_interruptible(&serport->wait);
 }
 
@@ -84,7 +84,7 @@ static int serport_ldisc_open(struct tty_struct *tty)
 	memset(serio, 0, sizeof(struct serio));
 	strlcpy(serio->name, "Serial port", sizeof(serio->name));
 	snprintf(serio->phys, sizeof(serio->phys), "%s/serio0", tty_name(tty, name));
-	serio->type = SERIO_RS232;
+	serio->id.type = SERIO_RS232;
 	serio->write = serport_serio_write;
 	serio->close = serport_serio_close;
 	serio->port_data = serport;
@@ -148,7 +148,7 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 
 	serio_register_port(serport->serio);
 	printk(KERN_INFO "serio: Serial port %s\n", tty_name(tty, name));
-	wait_event_interruptible(serport->wait, !serport->serio->type);
+	wait_event_interruptible(serport->wait, !serport->serio->id.type);
 	serio_unregister_port(serport->serio);
 
 	clear_bit(SERPORT_BUSY, &serport->flags);
@@ -163,9 +163,19 @@ static ssize_t serport_ldisc_read(struct tty_struct * tty, struct file * file, u
 static int serport_ldisc_ioctl(struct tty_struct * tty, struct file * file, unsigned int cmd, unsigned long arg)
 {
 	struct serport *serport = (struct serport*) tty->disc_data;
+	struct serio *serio = serport->serio;
+	unsigned long type;
 
-	if (cmd == SPIOCSTYPE)
-		return get_user(serport->serio->type, (unsigned long __user *) arg);
+	if (cmd == SPIOCSTYPE) {
+		if (get_user(type, (unsigned long __user *) arg))
+			return -EFAULT;
+
+		serio->id.proto	= type & 0x000000ff;
+		serio->id.id	= (type & 0x0000ff00) >> 8;
+		serio->id.extra	= (type & 0x00ff0000) >> 16;
+
+		return 0;
+	}
 
 	return -EINVAL;
 }

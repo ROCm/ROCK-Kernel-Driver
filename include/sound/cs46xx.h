@@ -1720,7 +1720,7 @@ struct _snd_cs46xx {
 	snd_kcontrol_t *eapd_switch; /* for amplifier hack */
 	int accept_valid;	/* accept mmap valid (for OSS) */
 
-	struct snd_cs46xx_gameport *gameport;
+	struct gameport *gameport;
 
 #ifdef CONFIG_SND_CS46XX_DEBUG_GPIO
 	int current_gpio;
@@ -1751,6 +1751,6 @@ int snd_cs46xx_pcm_center_lfe(cs46xx_t *chip, int device, snd_pcm_t **rpcm);
 int snd_cs46xx_mixer(cs46xx_t *chip);
 int snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rmidi);
 int snd_cs46xx_start_dsp(cs46xx_t *chip);
-void snd_cs46xx_gameport(cs46xx_t *chip);
+int snd_cs46xx_gameport(cs46xx_t *chip);
 
 #endif /* __SOUND_CS46XX_H */

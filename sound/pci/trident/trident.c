@@ -157,7 +157,7 @@ static int __devinit snd_trident_probe(struct pci_dev *pci,
 	}
 #endif
 
-	snd_trident_gameport(trident);
+	snd_trident_create_gameport(trident);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

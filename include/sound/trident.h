@@ -448,7 +448,7 @@ struct _snd_trident {
 
 	spinlock_t reg_lock;
 
-	struct snd_trident_gameport *gameport;
+	struct gameport *gameport;
 };
 
 int snd_trident_create(snd_card_t * card,
@@ -457,7 +457,7 @@ int snd_trident_create(snd_card_t * card,
 		       int pcm_spdif_device,
 		       int max_wavetable_size,
 		       trident_t ** rtrident);
-void snd_trident_gameport(trident_t *trident);
+int snd_trident_create_gameport(trident_t *trident);
 
 int snd_trident_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);
 int snd_trident_foldback_pcm(trident_t * trident, int device, snd_pcm_t **rpcm);

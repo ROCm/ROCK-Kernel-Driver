@@ -480,8 +480,7 @@ struct snd_stru_cmipci {
 	snd_rawmidi_t *rmidi;
 
 #ifdef SUPPORT_JOYSTICK
-	struct gameport gameport;
-	struct resource *res_joystick;
+	struct gameport *gameport;
 #endif
 
 	spinlock_t reg_lock;
@@ -2556,6 +2555,71 @@ static void __devinit query_chip(cmipci_t *cm)
 	}
 }
 
+#ifdef SUPPORT_JOYSTICK
+static int __devinit snd_cmipci_create_gameport(cmipci_t *cm, int dev)
+{
+	static int ports[] = { 0x201, 0x200, 0 }; /* FIXME: majority is 0x201? */
+	struct gameport *gp;
+	struct resource *r = NULL;
+	int i, io_port = 0;
+
+	if (joystick_port[dev] == 0)
+		return -ENODEV;
+
+	if (joystick_port[dev] == 1) { /* auto-detect */
+		for (i = 0; ports[i]; i++) {
+			io_port = ports[i];
+			r = request_region(io_port, 1, "CMIPCI gameport");
+			if (r)
+				break;
+		}
+	} else {
+		io_port = joystick_port[dev];
+		r = request_region(io_port, 1, "CMIPCI gameport");
+	}
+
+	if (!r) {
+		printk(KERN_WARNING "cmipci: cannot reserve joystick ports\n");
+		return -EBUSY;
+	}
+
+	cm->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "cmipci: cannot allocate memory for gameport\n");
+		release_resource(r);
+		kfree_nocheck(r);
+		return -ENOMEM;
+	}
+	gameport_set_name(gp, "C-Media Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(cm->pci));
+	gp->dev.parent = &cm->pci->dev;
+	gp->io = io_port;
+	gp->port_data = r;
+
+	snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
+
+	gameport_register_port(cm->gameport);
+
+	return 0;
+}
+
+static void snd_cmipci_free_gameport(cmipci_t *cm)
+{
+	if (cm->gameport) {
+		struct resource *r = cm->gameport->port_data;
+
+		gameport_unregister_port(cm->gameport);
+		cm->gameport = NULL;
+
+		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
+		release_resource(r);
+		kfree_nocheck(r);
+	}
+}
+#else
+static inline int snd_cmipci_create_gameport(cmipci_t *cm, int dev) { return -ENOSYS; }
+static inline void snd_cmipci_free_gameport(cmipci_t *cm) { }
+#endif
 
 static int snd_cmipci_free(cmipci_t *cm)
 {
@@ -2575,14 +2639,8 @@ static int snd_cmipci_free(cmipci_t *cm)
 
 		free_irq(cm->irq, (void *)cm);
 	}
-#ifdef SUPPORT_JOYSTICK
-	if (cm->res_joystick) {
-		gameport_unregister_port(&cm->gameport);
-		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
-		release_resource(cm->res_joystick);
-		kfree_nocheck(cm->res_joystick);
-	}
-#endif
+
+	snd_cmipci_free_gameport(cm);
 	pci_release_regions(cm->pci);
 	pci_disable_device(cm->pci);
 	kfree(cm);
@@ -2799,31 +2857,9 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	snd_cmipci_set_bit(cm, CM_REG_MISC_CTRL, CM_SPDIF48K|CM_SPDF_AC97);
 #endif /* USE_VAR48KRATE */
 
-#ifdef SUPPORT_JOYSTICK
-	if (joystick_port[dev] > 0) {
-		if (joystick_port[dev] == 1) { /* auto-detect */
-			static int ports[] = { 0x201, 0x200, 0 }; /* FIXME: majority is 0x201? */
-			int i;
-			for (i = 0; ports[i]; i++) {
-				joystick_port[dev] = ports[i];
-				cm->res_joystick = request_region(ports[i], 1, "CMIPCI gameport");
-				if (cm->res_joystick)
-					break;
-			}
-		} else {
-			cm->res_joystick = request_region(joystick_port[dev], 1, "CMIPCI gameport");
-		}
-	}
-	if (cm->res_joystick) {
-		cm->gameport.io = joystick_port[dev];
-		snd_cmipci_set_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
-		gameport_register_port(&cm->gameport);
-	} else {
-		if (joystick_port[dev] > 0)
-			printk(KERN_WARNING "cmipci: cannot reserve joystick ports\n");
+	if (snd_cmipci_create_gameport(cm, dev) < 0)
 		snd_cmipci_clear_bit(cm, CM_REG_FUNCTRL1, CM_JYSTK_EN);
-	}
-#endif
+
 	snd_card_set_dev(card, &pci->dev);
 
 	*rcmipci = cm;

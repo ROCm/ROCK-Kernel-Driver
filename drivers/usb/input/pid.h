@@ -25,31 +25,31 @@
 
 #define FF_EFFECTS_MAX 64
 
-#define FF_PID_FLAGS_USED	1  /* If the effect exists */
-#define FF_PID_FLAGS_UPDATING	2  /* If the effect is being updated */
-#define FF_PID_FLAGS_PLAYING	3  /* If the effect is currently being played */
+#define FF_PID_FLAGS_USED	1	/* If the effect exists */
+#define FF_PID_FLAGS_UPDATING	2	/* If the effect is being updated */
+#define FF_PID_FLAGS_PLAYING	3	/* If the effect is currently being played */
 
 #define FF_PID_FALSE	0
 #define FF_PID_TRUE	1
 
 struct hid_pid_effect {
-    unsigned long flags;
-    pid_t owner;
-    unsigned int device_id;  // The device-assigned ID
-    struct ff_effect effect;
+	unsigned long flags;
+	pid_t owner;
+	unsigned int device_id;	/* The device-assigned ID */
+	struct ff_effect effect;
 };
 
 struct hid_ff_pid {
-    struct hid_device *hid;
-    unsigned long int gain;
+	struct hid_device *hid;
+	unsigned long gain;
 
-    struct urb *urbffout;
-    struct usb_ctrlrequest ffcr;
-    spinlock_t lock;
+	struct urb *urbffout;
+	struct usb_ctrlrequest ffcr;
+	spinlock_t lock;
 
-    char ctrl_buffer[8];
+	unsigned char ctrl_buffer[8];
 
-    struct hid_pid_effect effects[FF_EFFECTS_MAX];
+	struct hid_pid_effect effects[FF_EFFECTS_MAX];
 };
 
 /*

@@ -395,6 +395,7 @@ static int powermate_probe(struct usb_interface *intf, const struct usb_device_i
 	pm->input.id.version = le16_to_cpu(udev->descriptor.bcdDevice);
 	pm->input.event = powermate_input_event;
 	pm->input.dev = &intf->dev;
+	pm->input.phys = pm->phys;
 
 	input_register_device(&pm->input);
 

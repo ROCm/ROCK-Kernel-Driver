@@ -100,10 +100,10 @@
 
 /*
  * Expected maximum internal i8042 buffer size. This is used for flushing
- * the i8042 buffers. 32 should be more than enough.
+ * the i8042 buffers.
  */
 
-#define I8042_BUFFER_SIZE	32
+#define I8042_BUFFER_SIZE	16
 
 /*
  * Number of AUX ports on controllers supporting active multiplexing

@@ -4,7 +4,7 @@
  *
  * Copyright 2002-2003  Rusty Russell, IBM Corporation
  *           2003       Kai Germaschewski
- *           
+ *
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -181,6 +181,24 @@ static int do_ccw_entry(const char *filename,
 	return 1;
 }
 
+/* Looks like: "serio:tyNprNidNexN" */
+static int do_serio_entry(const char *filename,
+			  struct serio_device_id *id, char *alias)
+{
+	id->type = TO_NATIVE(id->type);
+	id->proto = TO_NATIVE(id->proto);
+	id->id = TO_NATIVE(id->id);
+	id->extra = TO_NATIVE(id->extra);
+
+	strcpy(alias, "serio:");
+	ADD(alias, "ty", id->type != SERIO_ANY, id->type);
+	ADD(alias, "pr", id->proto != SERIO_ANY, id->proto);
+	ADD(alias, "id", id->id != SERIO_ANY, id->id);
+	ADD(alias, "ex", id->extra != SERIO_ANY, id->extra);
+
+	return 1;
+}
+
 /* looks like: "pnp:dD" */
 static int do_pnp_entry(const char *filename,
 			struct pnp_device_id *id, char *alias)
@@ -270,6 +288,9 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
 	else if (sym_is(symname, "__mod_ccw_device_table"))
 		do_table(symval, sym->st_size, sizeof(struct ccw_device_id),
 			 do_ccw_entry, mod);
+	else if (sym_is(symname, "__mod_serio_device_table"))
+		do_table(symval, sym->st_size, sizeof(struct serio_device_id),
+			 do_serio_entry, mod);
 	else if (sym_is(symname, "__mod_pnp_device_table"))
 		do_table(symval, sym->st_size, sizeof(struct pnp_device_id),
 			 do_pnp_entry, mod);

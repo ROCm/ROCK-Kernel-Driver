@@ -495,7 +495,7 @@ struct snd_cs4281 {
 	unsigned int midcr;
 	unsigned int uartm;
 
-	struct snd_cs4281_gameport *gameport;
+	struct gameport *gameport;
 
 #ifdef CONFIG_PM
 	u32 suspend_regs[SUSPEND_REGISTERS];
@@ -1238,38 +1238,29 @@ static void __devinit snd_cs4281_proc_init(cs4281_t * chip)
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 
-typedef struct snd_cs4281_gameport {
-	struct gameport info;
-	cs4281_t *chip;
-} cs4281_gameport_t;
-
 static void snd_cs4281_gameport_trigger(struct gameport *gameport)
 {
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
-	snd_assert(gp, return);
-	chip = gp->chip;
+	cs4281_t *chip = gameport->port_data;
+
+	snd_assert(chip, return);
 	snd_cs4281_pokeBA0(chip, BA0_JSPT, 0xff);
 }
 
 static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
 {
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
-	snd_assert(gp, return 0);
-	chip = gp->chip;
+	cs4281_t *chip = gameport->port_data;
+
+	snd_assert(chip, return 0);
 	return snd_cs4281_peekBA0(chip, BA0_JSPT);
 }
 
 #ifdef COOKED_MODE
 static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
-	cs4281_t *chip;
+	cs4281_t *chip = gameport->port_data;
 	unsigned js1, js2, jst;
 	
-	snd_assert(gp, return 0);
-	chip = gp->chip;
+	snd_assert(chip, return 0);
 
 	js1 = snd_cs4281_peekBA0(chip, BA0_JSC1);
 	js2 = snd_cs4281_peekBA0(chip, BA0_JSC2);
@@ -1282,10 +1273,12 @@ static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes,
 	axes[2] = ((js2 & JSC2_Y2V_MASK) >> JSC2_Y2V_SHIFT) & 0xFFFF;
 	axes[3] = ((js2 & JSC2_X2V_MASK) >> JSC2_X2V_SHIFT) & 0xFFFF;
 
-	for(jst=0;jst<4;++jst)
-		if(axes[jst]==0xFFFF) axes[jst] = -1;
+	for (jst = 0; jst < 4; ++jst)
+		if (axes[jst] == 0xFFFF) axes[jst] = -1;
 	return 0;
 }
+#else
+#define snd_cs4281_gameport_cooked_read	NULL
 #endif
 
 static int snd_cs4281_gameport_open(struct gameport *gameport, int mode)
@@ -1303,31 +1296,43 @@ static int snd_cs4281_gameport_open(struct gameport *gameport, int mode)
 	return 0;
 }
 
-static void __devinit snd_cs4281_gameport(cs4281_t *chip)
+static int __devinit snd_cs4281_create_gameport(cs4281_t *chip)
 {
-	cs4281_gameport_t *gp;
-	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
-	if (! gp) {
-		snd_printk(KERN_ERR "cannot allocate gameport area\n");
-		return;
+	struct gameport *gp;
+
+	chip->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "cs4281: cannot allocate memory for gameport\n");
+		return -ENOMEM;
 	}
-	memset(gp, 0, sizeof(*gp));
-	gp->info.open = snd_cs4281_gameport_open;
-	gp->info.read = snd_cs4281_gameport_read;
-	gp->info.trigger = snd_cs4281_gameport_trigger;
-#ifdef COOKED_MODE
-	gp->info.cooked_read = snd_cs4281_gameport_cooked_read;
-#endif
-	gp->chip = chip;
-	chip->gameport = gp;
+
+	gameport_set_name(gp, "CS4281 Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
+	gp->dev.parent = &chip->pci->dev;
+	gp->open = snd_cs4281_gameport_open;
+	gp->read = snd_cs4281_gameport_read;
+	gp->trigger = snd_cs4281_gameport_trigger;
+	gp->cooked_read = snd_cs4281_gameport_cooked_read;
+	gp->port_data = chip;
 
 	snd_cs4281_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
 	snd_cs4281_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
-	gameport_register_port(&gp->info);
+
+	gameport_register_port(gp);
+
+	return 0;
 }
 
+static void snd_cs4281_free_gameport(cs4281_t *chip)
+{
+	if (chip->gameport) {
+		gameport_unregister_port(chip->gameport);
+		chip->gameport = NULL;
+	}
+}
 #else
-#define snd_cs4281_gameport(chip) /*NOP*/
+static inline int snd_cs4281_gameport(cs4281_t *chip) { return -ENOSYS; }
+static inline void snd_cs4281_gameport_free(cs4281_t *chip) { }
 #endif /* CONFIG_GAMEPORT || (MODULE && CONFIG_GAMEPORT_MODULE) */
 
 
@@ -1337,12 +1342,8 @@ static void __devinit snd_cs4281_gameport(cs4281_t *chip)
 
 static int snd_cs4281_free(cs4281_t *chip)
 {
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	if (chip->gameport) {
-		gameport_unregister_port(&chip->gameport->info);
-		kfree(chip->gameport);
-	}
-#endif
+	snd_cs4281_free_gameport(chip);
+
 	if (chip->irq >= 0)
 		synchronize_irq(chip->irq);
 
@@ -1990,7 +1991,7 @@ static int __devinit snd_cs4281_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-	snd_cs4281_gameport(chip);
+	snd_cs4281_create_gameport(chip);
 	strcpy(card->driver, "CS4281");
 	strcpy(card->shortname, "Cirrus Logic CS4281");
 	sprintf(card->longname, "%s at 0x%lx, irq %d",

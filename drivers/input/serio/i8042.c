@@ -53,16 +53,16 @@ MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keybo
 
 static unsigned int i8042_noloop;
 module_param_named(noloop, i8042_noloop, bool, 0);
-MODULE_PARM_DESC(dumbkbd, "Disable the AUX Loopback command while probing for the AUX port");
+MODULE_PARM_DESC(noloop, "Disable the AUX Loopback command while probing for the AUX port");
 
 static unsigned int i8042_blink_frequency = 500;
 module_param_named(panicblink, i8042_blink_frequency, uint, 0600);
 MODULE_PARM_DESC(panicblink, "Frequency with which keyboard LEDs should blink when kernel panics");
 
-#ifdef CONFIG_ACPI
-static int i8042_noacpi;
-module_param_named(noacpi, i8042_noacpi, bool, 0);
-MODULE_PARM_DESC(noacpi, "Do not use ACPI to detect controller settings");
+#ifdef CONFIG_PNP
+static int i8042_nopnp;
+module_param_named(nopnp, i8042_nopnp, bool, 0);
+MODULE_PARM_DESC(nopnp, "Do not use PNP to detect controller settings");
 #endif
 
 #define DEBUG
@@ -81,7 +81,7 @@ __obsolete_setup("i8042_dumbkbd");
 
 #include "i8042.h"
 
-DEFINE_SPINLOCK(i8042_lock);
+static DEFINE_SPINLOCK(i8042_lock);
 
 struct i8042_port {
 	struct serio *serio;
@@ -162,16 +162,17 @@ static int i8042_wait_write(void)
 static int i8042_flush(void)
 {
 	unsigned long flags;
-	unsigned char data;
+	unsigned char data, str;
 	int i = 0;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
-	while ((i8042_read_status() & I8042_STR_OBF) && (i++ < I8042_BUFFER_SIZE)) {
+	while (((str = i8042_read_status()) & I8042_STR_OBF) && (i < I8042_BUFFER_SIZE)) {
 		udelay(50);
 		data = i8042_read_data();
+		i++;
 		dbg("%02x <- i8042 (flush, %s)", data,
-			i8042_read_status() & I8042_STR_AUXDATA ? "aux" : "kbd");
+			str & I8042_STR_AUXDATA ? "aux" : "kbd");
 	}
 
 	spin_unlock_irqrestore(&i8042_lock, flags);
@@ -713,7 +714,10 @@ static int i8042_controller_init(void)
  * before doing anything else.
  */
 
-	i8042_flush();
+	if (i8042_flush() == I8042_BUFFER_SIZE) {
+		printk(KERN_ERR "i8042.c: No controller found.\n");
+		return -1;
+	}
 
 	if (i8042_reset) {
 
@@ -796,7 +800,7 @@ static int i8042_controller_init(void)
 /*
  * Reset the controller.
  */
-void i8042_controller_reset(void)
+static void i8042_controller_reset(void)
 {
 	unsigned char param;
 
@@ -831,7 +835,7 @@ void i8042_controller_reset(void)
  * able to talk to the hardware when rebooting.
  */
 
-void i8042_controller_cleanup(void)
+static void i8042_controller_cleanup(void)
 {
 	int i;
 
@@ -854,7 +858,13 @@ void i8042_controller_cleanup(void)
  * kernel panics. Flashing LEDs is useful for users running X who may
  * not see the console and will help distingushing panics from "real"
  * lockups.
+ *
+ * Note that DELAY has a limit of 10ms so we will not get stuck here
+ * waiting for KBC to free up even if KBD interrupt is off
  */
+
+#define DELAY do { mdelay(1); if (++delay > 10) return delay; } while(0)
+
 static long i8042_panic_blink(long count)
 {
 	long delay = 0;
@@ -870,8 +880,6 @@ static long i8042_panic_blink(long count)
 	if (count - last_blink < i8042_blink_frequency)
 		return 0;
 
-	/* Ensures that we will not get stuck here if kbd interrupt is off */
-#define DELAY do { mdelay(1); if (++delay > 10) return delay; } while(0)
 	led ^= 0x01 | 0x04;
 	while (i8042_read_status() & I8042_STR_IBF)
 		DELAY;
@@ -882,18 +890,17 @@ static long i8042_panic_blink(long count)
 	DELAY;
 	i8042_write_data(led);
 	DELAY;
-#undef DELAY
-
 	last_blink = count;
 	return delay;
 }
 
+#undef DELAY
 
 /*
  * Here we try to restore the original BIOS settings
  */
 
-static int i8042_suspend(struct device *dev, u32 state, u32 level)
+static int i8042_suspend(struct device *dev, pm_message_t state, u32 level)
 {
 	if (level == SUSPEND_DISABLE) {
 		del_timer_sync(&i8042_timer);
@@ -921,18 +928,16 @@ static int i8042_resume(struct device *dev, u32 level)
 	}
 
 	if (i8042_mux_present)
-		if (i8042_set_mux_mode(1, NULL) ||
-		    i8042_enable_mux_ports()) {
+		if (i8042_set_mux_mode(1, NULL) || i8042_enable_mux_ports())
 			printk(KERN_WARNING "i8042: failed to resume active multiplexor, mouse won't work.\n");
-		}
 
 /*
- * Reconnect anything that was connected to the ports.
+ * Activate all ports.
  */
 
 	for (i = 0; i < I8042_NUM_PORTS; i++)
-		if (i8042_activate_port(&i8042_ports[i]) == 0)
-			serio_reconnect(i8042_ports[i].serio);
+		i8042_activate_port(&i8042_ports[i]);
+
 /*
  * Restart timer (for polling "stuck" data)
  */
@@ -970,13 +975,13 @@ static void __init i8042_create_kbd_port(void)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type		= i8042_direct ? SERIO_8042 : SERIO_8042_XL,
-		serio->write		= i8042_dumbkbd ? NULL : i8042_kbd_write,
-		serio->open		= i8042_open,
-		serio->close		= i8042_close,
-		serio->start		= i8042_start,
-		serio->stop		= i8042_stop,
-		serio->port_data	= port,
+		serio->id.type		= i8042_direct ? SERIO_8042 : SERIO_8042_XL;
+		serio->write		= i8042_dumbkbd ? NULL : i8042_kbd_write;
+		serio->open		= i8042_open;
+		serio->close		= i8042_close;
+		serio->start		= i8042_start;
+		serio->stop		= i8042_stop;
+		serio->port_data	= port;
 		serio->dev.parent	= &i8042_platform_device->dev;
 		strlcpy(serio->name, "i8042 Kbd Port", sizeof(serio->name));
 		strlcpy(serio->phys, I8042_KBD_PHYS_DESC, sizeof(serio->phys));
@@ -994,13 +999,13 @@ static void __init i8042_create_aux_port(void)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type		= SERIO_8042;
+		serio->id.type		= SERIO_8042;
 		serio->write		= i8042_aux_write;
 		serio->open		= i8042_open;
 		serio->close		= i8042_close;
-		serio->start		= i8042_start,
-		serio->stop		= i8042_stop,
-		serio->port_data	= port,
+		serio->start		= i8042_start;
+		serio->stop		= i8042_stop;
+		serio->port_data	= port;
 		serio->dev.parent	= &i8042_platform_device->dev;
 		strlcpy(serio->name, "i8042 Aux Port", sizeof(serio->name));
 		strlcpy(serio->phys, I8042_AUX_PHYS_DESC, sizeof(serio->phys));
@@ -1018,12 +1023,12 @@ static void __init i8042_create_mux_port(int index)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type		= SERIO_8042;
+		serio->id.type		= SERIO_8042;
 		serio->write		= i8042_aux_write;
 		serio->open		= i8042_open;
 		serio->close		= i8042_close;
-		serio->start		= i8042_start,
-		serio->stop		= i8042_stop,
+		serio->start		= i8042_start;
+		serio->stop		= i8042_stop;
 		serio->port_data	= port;
 		serio->dev.parent	= &i8042_platform_device->dev;
 		snprintf(serio->name, sizeof(serio->name), "i8042 Aux-%d Port", index);
@@ -1038,7 +1043,7 @@ static void __init i8042_create_mux_port(int index)
 	}
 }
 
-int __init i8042_init(void)
+static int __init i8042_init(void)
 {
 	int i;
 	int err;
@@ -1054,16 +1059,21 @@ int __init i8042_init(void)
 	i8042_ports[I8042_AUX_PORT_NO].irq = I8042_AUX_IRQ;
 	i8042_ports[I8042_KBD_PORT_NO].irq = I8042_KBD_IRQ;
 
-	if (i8042_controller_init())
+	if (i8042_controller_init()) {
+		i8042_platform_exit();
 		return -ENODEV;
+	}
 
 	err = driver_register(&i8042_driver);
-	if (err)
+	if (err) {
+		i8042_platform_exit();
 		return err;
+	}
 
 	i8042_platform_device = platform_device_register_simple("i8042", -1, NULL, 0);
 	if (IS_ERR(i8042_platform_device)) {
 		driver_unregister(&i8042_driver);
+		i8042_platform_exit();
 		return PTR_ERR(i8042_platform_device);
 	}
 
@@ -1082,7 +1092,7 @@ int __init i8042_init(void)
 	return 0;
 }
 
-void __exit i8042_exit(void)
+static void __exit i8042_exit(void)
 {
 	int i;
 

@@ -58,8 +58,6 @@ static void power_event(struct input_handle *handle, unsigned int type,
 
 	printk("Entering power_event\n");
 
-	if (type != EV_KEY || type != EV_PWR) return;
-
 	if (type == EV_PWR) {
 		switch (code) {
 			case KEY_SUSPEND:
@@ -76,7 +74,9 @@ static void power_event(struct input_handle *handle, unsigned int type,
 			default:
 				return;
 		}
-	} else {
+	}
+
+	if (type == EV_KEY) {
 		switch (code) {
 			case KEY_SUSPEND:
 				printk("Powering down input device\n");
@@ -102,12 +102,6 @@ static struct input_handle *power_connect(struct input_handler *handler,
 					  struct input_device_id *id)
 {
 	struct input_handle *handle;
-
-	if (!test_bit(EV_KEY, dev->evbit) || !test_bit(EV_PWR, dev->evbit))
-		return NULL;
-
-	if (!test_bit(KEY_SUSPEND, dev->keybit) || (!test_bit(KEY_POWER, dev->keybit)))
-		return NULL;
 
 	if (!(handle = kmalloc(sizeof(struct input_handle), GFP_KERNEL)))
 		return NULL;

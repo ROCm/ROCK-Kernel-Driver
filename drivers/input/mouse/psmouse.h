@@ -44,7 +44,7 @@ struct psmouse {
 	unsigned char pktcnt;
 	unsigned char pktsize;
 	unsigned char type;
-	unsigned char model;
+	unsigned int model;
 	unsigned long last;
 	unsigned long out_of_sync;
 	enum psmouse_state state;

@@ -103,7 +103,7 @@ static void stinger_process_packet(struct stinger *stinger, struct pt_regs *regs
 static irqreturn_t stinger_interrupt(struct serio *serio,
 	unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct stinger* stinger = serio->private;
+	struct stinger *stinger = serio_get_drvdata(serio);
 
 	/* All Stinger packets are 4 bytes */
 
@@ -124,28 +124,28 @@ static irqreturn_t stinger_interrupt(struct serio *serio,
 
 static void stinger_disconnect(struct serio *serio)
 {
-	struct stinger* stinger = serio->private;
+	struct stinger *stinger = serio_get_drvdata(serio);
+
 	input_unregister_device(&stinger->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(stinger);
 }
 
 /*
  * stinger_connect() is the routine that is called when someone adds a
- * new serio device. It looks for the Stinger, and if found, registers
- * it as an input device.
+ * new serio device that supports Stinger protocol and registers it as
+ * an input device.
  */
 
-static void stinger_connect(struct serio *serio, struct serio_driver *drv)
+static int stinger_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct stinger *stinger;
 	int i;
-
-	if (serio->type != (SERIO_RS232 | SERIO_STINGER))
-		return;
+	int err;
 
 	if (!(stinger = kmalloc(sizeof(struct stinger), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(stinger, 0, sizeof(struct stinger));
 
@@ -173,28 +173,45 @@ static void stinger_connect(struct serio *serio, struct serio_driver *drv)
 	}
 
 	stinger->dev.private = stinger;
-	serio->private = stinger;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, stinger);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(stinger);
-		return;
+		return err;
 	}
 
 	input_register_device(&stinger->dev);
 
 	printk(KERN_INFO "input: %s on %s\n",  stinger_name, serio->phys);
 
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id stinger_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_STINGER,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, stinger_serio_ids);
 
 static struct serio_driver stinger_drv = {
 	.driver		= {
 		.name	= "stinger",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= stinger_serio_ids,
 	.interrupt	= stinger_interrupt,
 	.connect	= stinger_connect,
 	.disconnect	= stinger_disconnect,
@@ -204,13 +221,13 @@ static struct serio_driver stinger_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init stinger_init(void)
+static int __init stinger_init(void)
 {
 	serio_register_driver(&stinger_drv);
 	return 0;
 }
 
-void __exit stinger_exit(void)
+static void __exit stinger_exit(void)
 {
 	serio_unregister_driver(&stinger_drv);
 }

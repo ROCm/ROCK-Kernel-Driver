@@ -772,7 +772,7 @@ struct ff_effect {
 #include <linux/fs.h>
 #include <linux/timer.h>
 
-#define NBITS(x) ((((x)-1)/BITS_PER_LONG)+1)
+#define NBITS(x) (((x)/BITS_PER_LONG)+1)
 #define BIT(x)	(1UL<<((x)%BITS_PER_LONG))
 #define LONG(x) ((x)/BITS_PER_LONG)
 

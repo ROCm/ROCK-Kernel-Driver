@@ -66,10 +66,10 @@ struct nkbd {
 	char phys[32];
 };
 
-irqreturn_t nkbd_interrupt(struct serio *serio,
+static irqreturn_t nkbd_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct nkbd *nkbd = serio->private;
+	struct nkbd *nkbd = serio_get_drvdata(serio);
 
 	/* invalid scan codes are probably the init sequence, so we ignore them */
 	if (nkbd->keycode[data & NKBD_KEY]) {
@@ -84,16 +84,14 @@ irqreturn_t nkbd_interrupt(struct serio *serio,
 
 }
 
-void nkbd_connect(struct serio *serio, struct serio_driver *drv)
+static int nkbd_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct nkbd *nkbd;
 	int i;
-
-	if (serio->type != (SERIO_RS232 | SERIO_NEWTON))
-		return;
+	int err;
 
 	if (!(nkbd = kmalloc(sizeof(struct nkbd), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(nkbd, 0, sizeof(struct nkbd));
 
@@ -106,11 +104,14 @@ void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 	nkbd->dev.keycodesize = sizeof(unsigned char);
 	nkbd->dev.keycodemax = ARRAY_SIZE(nkbd_keycode);
 	nkbd->dev.private = nkbd;
-	serio->private = nkbd;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, nkbd);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(nkbd);
-		return;
+		return err;
 	}
 
 	memcpy(nkbd->keycode, nkbd_keycode, sizeof(nkbd->keycode));
@@ -131,33 +132,50 @@ void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 	input_register_device(&nkbd->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", nkbd_name, serio->phys);
+
+	return 0;
 }
 
-void nkbd_disconnect(struct serio *serio)
+static void nkbd_disconnect(struct serio *serio)
 {
-	struct nkbd *nkbd = serio->private;
+	struct nkbd *nkbd = serio_get_drvdata(serio);
+
 	input_unregister_device(&nkbd->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(nkbd);
 }
 
-struct serio_driver nkbd_drv = {
+static struct serio_device_id nkbd_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_NEWTON,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, nkbd_serio_ids);
+
+static struct serio_driver nkbd_drv = {
 	.driver		= {
 		.name	= "newtonkbd",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= nkbd_serio_ids,
 	.interrupt	= nkbd_interrupt,
 	.connect	= nkbd_connect,
 	.disconnect	= nkbd_disconnect,
 };
 
-int __init nkbd_init(void)
+static int __init nkbd_init(void)
 {
 	serio_register_driver(&nkbd_drv);
 	return 0;
 }
 
-void __exit nkbd_exit(void)
+static void __exit nkbd_exit(void)
 {
 	serio_unregister_driver(&nkbd_drv);
 }

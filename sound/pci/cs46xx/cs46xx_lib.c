@@ -2690,37 +2690,28 @@ int __devinit snd_cs46xx_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmi
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 
-typedef struct snd_cs46xx_gameport {
-	struct gameport info;
-	cs46xx_t *chip;
-} cs46xx_gameport_t;
-
 static void snd_cs46xx_gameport_trigger(struct gameport *gameport)
 {
-	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
-	cs46xx_t *chip;
-	snd_assert(gp, return);
-	chip = gp->chip;
+	cs46xx_t *chip = gameport->port_data;
+
+	snd_assert(chip, return);
 	snd_cs46xx_pokeBA0(chip, BA0_JSPT, 0xFF);  //outb(gameport->io, 0xFF);
 }
 
 static unsigned char snd_cs46xx_gameport_read(struct gameport *gameport)
 {
-	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
-	cs46xx_t *chip;
-	snd_assert(gp, return 0);
-	chip = gp->chip;
+	cs46xx_t *chip = gameport->port_data;
+
+	snd_assert(chip, return 0);
 	return snd_cs46xx_peekBA0(chip, BA0_JSPT); //inb(gameport->io);
 }
 
 static int snd_cs46xx_gameport_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	cs46xx_gameport_t *gp = (cs46xx_gameport_t *)gameport;
-	cs46xx_t *chip;
+	cs46xx_t *chip = gameport->port_data;
 	unsigned js1, js2, jst;
-	
-	snd_assert(gp, return 0);
-	chip = gp->chip;
+
+	snd_assert(chip, return 0);
 
 	js1 = snd_cs46xx_peekBA0(chip, BA0_JSC1);
 	js2 = snd_cs46xx_peekBA0(chip, BA0_JSC2);
@@ -2751,33 +2742,44 @@ static int snd_cs46xx_gameport_open(struct gameport *gameport, int mode)
 	return 0;
 }
 
-void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
+int __devinit snd_cs46xx_gameport(cs46xx_t *chip)
 {
-	cs46xx_gameport_t *gp;
-	gp = kmalloc(sizeof(*gp), GFP_KERNEL);
-	if (! gp) {
-		snd_printk("cannot allocate gameport area\n");
-		return;
+	struct gameport *gp;
+
+	chip->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "cs46xx: cannot allocate memory for gameport\n");
+		return -ENOMEM;
 	}
-	memset(gp, 0, sizeof(*gp));
-	gp->info.open = snd_cs46xx_gameport_open;
-	gp->info.read = snd_cs46xx_gameport_read;
-	gp->info.trigger = snd_cs46xx_gameport_trigger;
-	gp->info.cooked_read = snd_cs46xx_gameport_cooked_read;
-	gp->chip = chip;
-	chip->gameport = gp;
+
+	gameport_set_name(gp, "CS46xx Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
+	gp->dev.parent = &chip->pci->dev;
+	gp->port_data = chip;
+
+	gp->open = snd_cs46xx_gameport_open;
+	gp->read = snd_cs46xx_gameport_read;
+	gp->trigger = snd_cs46xx_gameport_trigger;
+	gp->cooked_read = snd_cs46xx_gameport_cooked_read;
 
 	snd_cs46xx_pokeBA0(chip, BA0_JSIO, 0xFF); // ?
 	snd_cs46xx_pokeBA0(chip, BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
-	gameport_register_port(&gp->info);
+
+	gameport_register_port(gp);
+
+	return 0;
 }
 
-#else
-
-void __devinit snd_cs46xx_gameport(cs46xx_t *chip)
+static inline void snd_cs46xx_remove_gameport(cs46xx_t *chip)
 {
+	if (chip->gameport) {
+		gameport_unregister_port(chip->gameport);
+		chip->gameport = NULL;
+	}
 }
-
+#else
+int __devinit snd_cs46xx_gameport(cs46xx_t *chip) { return -ENOSYS; }
+static inline void snd_cs46xx_remove_gameport(cs46xx_t *chip) { }
 #endif /* CONFIG_GAMEPORT */
 
 /*
@@ -2893,12 +2895,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	if (chip->active_ctrl)
 		chip->active_ctrl(chip, 1);
 
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-	if (chip->gameport) {
-		gameport_unregister_port(&chip->gameport->info);
-		kfree(chip->gameport);
-	}
-#endif
+	snd_cs46xx_remove_gameport(chip);
 
 	if (chip->amplifier_ctrl)
 		chip->amplifier_ctrl(chip, -chip->amplifier); /* force to off */

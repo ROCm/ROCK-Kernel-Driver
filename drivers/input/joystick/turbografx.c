@@ -77,7 +77,7 @@ __obsolete_setup("tgfx_3=");
 static int tgfx_buttons[] = { BTN_TRIGGER, BTN_THUMB, BTN_THUMB2, BTN_TOP, BTN_TOP2 };
 static char *tgfx_name = "TurboGraFX Multisystem joystick";
 
-struct tgfx {
+static struct tgfx {
 	struct pardevice *pd;
 	struct timer_list timer;
 	struct input_dev dev[7];
@@ -229,7 +229,7 @@ static struct tgfx __init *tgfx_probe(int *config, int nargs)
 	return tgfx;
 }
 
-int __init tgfx_init(void)
+static int __init tgfx_init(void)
 {
 	tgfx_base[0] = tgfx_probe(tgfx, tgfx_nargs);
 	tgfx_base[1] = tgfx_probe(tgfx_2, tgfx_nargs_2);
@@ -241,7 +241,7 @@ int __init tgfx_init(void)
 	return -ENODEV;
 }
 
-void __exit tgfx_exit(void)
+static void __exit tgfx_exit(void)
 {
 	int i, j;
 

@@ -104,7 +104,7 @@ static void warrior_process_packet(struct warrior *warrior, struct pt_regs *regs
 static irqreturn_t warrior_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct warrior* warrior = serio->private;
+	struct warrior *warrior = serio_get_drvdata(serio);
 
 	if (data & 0x80) {
 		if (warrior->idx) warrior_process_packet(warrior, regs);
@@ -129,9 +129,11 @@ static irqreturn_t warrior_interrupt(struct serio *serio,
 
 static void warrior_disconnect(struct serio *serio)
 {
-	struct warrior* warrior = serio->private;
+	struct warrior *warrior = serio_get_drvdata(serio);
+
 	input_unregister_device(&warrior->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(warrior);
 }
 
@@ -141,16 +143,14 @@ static void warrior_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void warrior_connect(struct serio *serio, struct serio_driver *drv)
+static int warrior_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct warrior *warrior;
 	int i;
-
-	if (serio->type != (SERIO_RS232 | SERIO_WARRIOR))
-		return;
+	int err;
 
 	if (!(warrior = kmalloc(sizeof(struct warrior), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(warrior, 0, sizeof(struct warrior));
 
@@ -186,27 +186,44 @@ static void warrior_connect(struct serio *serio, struct serio_driver *drv)
 
 	warrior->dev.private = warrior;
 
-	serio->private = warrior;
+	serio_set_drvdata(serio, warrior);
 
-	if (serio_open(serio, drv)) {
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(warrior);
-		return;
+		return err;
 	}
 
 	input_register_device(&warrior->dev);
 
 	printk(KERN_INFO "input: Logitech WingMan Warrior on %s\n", serio->phys);
+
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id warrior_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_WARRIOR,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, warrior_serio_ids);
 
 static struct serio_driver warrior_drv = {
 	.driver		= {
 		.name	= "warrior",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= warrior_serio_ids,
 	.interrupt	= warrior_interrupt,
 	.connect	= warrior_connect,
 	.disconnect	= warrior_disconnect,
@@ -216,13 +233,13 @@ static struct serio_driver warrior_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init warrior_init(void)
+static int __init warrior_init(void)
 {
 	serio_register_driver(&warrior_drv);
 	return 0;
 }
 
-void __exit warrior_exit(void)
+static void __exit warrior_exit(void)
 {
 	serio_unregister_driver(&warrior_drv);
 }

@@ -2079,14 +2079,7 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 		release_resource(chip->fm_res);
 		kfree_nocheck(chip->fm_res);
 	}
-#ifdef SUPPORT_JOYSTICK
-	if (chip->joystick_res) {
-		if (chip->gameport.io)
-			gameport_unregister_port(&chip->gameport);
-		release_resource(chip->joystick_res);
-		kfree_nocheck(chip->joystick_res);
-	}
-#endif
+	snd_ymfpci_free_gameport(chip);
 	if (chip->reg_area_virt)
 		iounmap(chip->reg_area_virt);
 	if (chip->work_ptr.area)

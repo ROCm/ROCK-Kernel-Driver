@@ -75,13 +75,15 @@ again:
 
 static void iforce_serio_write_wakeup(struct serio *serio)
 {
-	iforce_serial_xmit((struct iforce *)serio->private);
+	struct iforce *iforce = serio_get_drvdata(serio);
+
+	iforce_serial_xmit(iforce);
 }
 
 static irqreturn_t iforce_serio_irq(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct iforce* iforce = serio->private;
+	struct iforce *iforce = serio_get_drvdata(serio);
 
 	if (!iforce->pkt) {
 		if (data == 0x2b)
@@ -124,45 +126,66 @@ out:
 	return IRQ_HANDLED;
 }
 
-static void iforce_serio_connect(struct serio *serio, struct serio_driver *drv)
+static int iforce_serio_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct iforce *iforce;
-	if (serio->type != (SERIO_RS232 | SERIO_IFORCE))
-		return;
+	int err;
 
-	if (!(iforce = kmalloc(sizeof(struct iforce), GFP_KERNEL))) return;
+	if (!(iforce = kmalloc(sizeof(struct iforce), GFP_KERNEL)))
+		return -ENOMEM;
+
 	memset(iforce, 0, sizeof(struct iforce));
 
 	iforce->bus = IFORCE_232;
 	iforce->serio = serio;
-	serio->private = iforce;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, iforce);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(iforce);
-		return;
+		return err;
 	}
 
 	if (iforce_init_device(iforce)) {
 		serio_close(serio);
+		serio_set_drvdata(serio, NULL);
 		kfree(iforce);
-		return;
+		return -ENODEV;
 	}
+
+	return 0;
 }
 
 static void iforce_serio_disconnect(struct serio *serio)
 {
-	struct iforce* iforce = serio->private;
+	struct iforce *iforce = serio_get_drvdata(serio);
 
 	input_unregister_device(&iforce->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(iforce);
 }
+
+static struct serio_device_id iforce_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_IFORCE,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, iforce_serio_ids);
 
 struct serio_driver iforce_serio_drv = {
 	.driver		= {
 		.name	= "iforce",
 	},
 	.description	= "RS232 I-Force joysticks and wheels driver",
+	.id_table	= iforce_serio_ids,
 	.write_wakeup	= iforce_serio_write_wakeup,
 	.interrupt	= iforce_serio_irq,
 	.connect	= iforce_serio_connect,

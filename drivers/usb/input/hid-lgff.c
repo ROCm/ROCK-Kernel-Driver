@@ -126,6 +126,7 @@ static signed short ff_joystick[] = {
 
 static struct device_type devices[] = {
 	{0x046d, 0xc211, ff_rumble},
+	{0x046d, 0xc219, ff_rumble},
 	{0x046d, 0xc283, ff_joystick},
 	{0x0000, 0x0000, ff_joystick}
 };

@@ -104,8 +104,7 @@ typedef struct {
 	struct pci_dev *pci;
 	unsigned long gcr;
 #ifdef SUPPORT_JOYSTICK
-	struct gameport gameport;
-	struct resource *res_joystick;
+	struct gameport *gameport;
 #endif
 } snd_card_als4000_t;
 
@@ -566,21 +565,80 @@ static void __devinit snd_als4000_configure(sb_t *chip)
 	spin_unlock_irq(&chip->reg_lock);
 }
 
+#ifdef SUPPORT_JOYSTICK
+static int __devinit snd_als4000_create_gameport(snd_card_als4000_t *acard, int dev)
+{
+	struct gameport *gp;
+	struct resource *r;
+	int io_port;
+
+	if (joystick_port[dev] == 0)
+		return -ENODEV;
+
+	if (joystick_port[dev] == 1) { /* auto-detect */
+		for (io_port = 0x200; io_port <= 0x218; io_port += 8) {
+			r = request_region(io_port, 8, "ALS4000 gameport");
+			if (r)
+				break;
+		}
+	} else {
+		io_port = joystick_port[dev];
+		r = request_region(io_port, 8, "ALS4000 gameport");
+	}
+
+	if (!r) {
+		printk(KERN_WARNING "als4000: cannot reserve joystick ports\n");
+		return -EBUSY;
+	}
+
+	acard->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "als4000: cannot allocate memory for gameport\n");
+		release_resource(r);
+		kfree_nocheck(r);
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "ALS4000 Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(acard->pci));
+	gp->dev.parent = &acard->pci->dev;
+	gp->io = io_port;
+	gp->port_data = r;
+
+	/* Enable legacy joystick port */
+	snd_als4000_set_addr(acard->gcr, 0, 0, 0, 1);
+
+	gameport_register_port(acard->gameport);
+
+	return 0;
+}
+
+static void snd_als4000_free_gameport(snd_card_als4000_t *acard)
+{
+	if (acard->gameport) {
+		struct resource *r = acard->gameport->port_data;
+
+		gameport_unregister_port(acard->gameport);
+		acard->gameport = NULL;
+
+		snd_als4000_set_addr(acard->gcr, 0, 0, 0, 0); /* disable joystick */
+		release_resource(r);
+		kfree_nocheck(r);
+	}
+}
+#else
+static inline int snd_als4000_create_gameport(snd_card_als4000_t *acard, int dev) { return -ENOSYS; }
+static inline void snd_als4000_free_gameport(snd_card_als4000_t *acard) { }
+#endif
+
 static void snd_card_als4000_free( snd_card_t *card )
 {
 	snd_card_als4000_t * acard = (snd_card_als4000_t *)card->private_data;
+
 	/* make sure that interrupts are disabled */
 	snd_als4000_gcr_write_addr( acard->gcr, 0x8c, 0);
 	/* free resources */
-#ifdef SUPPORT_JOYSTICK
-	if (acard->res_joystick) {
-		if (acard->gameport.io)
-			gameport_unregister_port(&acard->gameport);
-		snd_als4000_set_addr(acard->gcr, 0, 0, 0, 0); /* disable joystick */
-		release_resource(acard->res_joystick);
-		kfree_nocheck(acard->res_joystick);
-	}
-#endif
+	snd_als4000_free_gameport(acard);
 	pci_release_regions(acard->pci);
 	pci_disable_device(acard->pci);
 }
@@ -596,7 +654,6 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	opl3_t *opl3;
 	unsigned short word;
 	int err;
-	int joystick = 0;
 
 	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
@@ -640,26 +697,9 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	acard->gcr = gcr;
 	card->private_free = snd_card_als4000_free;
 
-	/* disable all legacy ISA stuff except for joystick */
-#ifdef SUPPORT_JOYSTICK
-	if (joystick_port[dev] == 1) {
-		/* auto-detect */
-		long p;
-		for (p = 0x200; p <= 0x218; p += 8) {
-			if ((acard->res_joystick = request_region(p, 8, "ALS4000 gameport")) != NULL) {
-				joystick_port[dev] = p;
-				break;
-			}
-		}
-	} else if (joystick_port[dev] > 0)
-		acard->res_joystick = request_region(joystick_port[dev], 8, "ALS4000 gameport");
-	if (acard->res_joystick)
-		joystick = joystick_port[dev];
-	else
-		joystick = 0;
-#endif
-	snd_als4000_set_addr(gcr, 0, 0, 0, joystick);
-	
+	/* disable all legacy ISA stuff */
+	snd_als4000_set_addr(acard->gcr, 0, 0, 0, 0);
+
 	if ((err = snd_sbdsp_create(card,
 				    gcr + 0x10,
 				    pci->irq,
@@ -711,12 +751,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 		}
 	}
 
-#ifdef SUPPORT_JOYSTICK
-	if (acard->res_joystick) {
-		acard->gameport.io = joystick;
-		gameport_register_port(&acard->gameport);
-	}
-#endif
+	snd_als4000_create_gameport(acard, dev);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

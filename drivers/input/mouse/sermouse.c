@@ -209,7 +209,7 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data, str
 static irqreturn_t sermouse_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct sermouse *sermouse = serio->private;
+	struct sermouse *sermouse = serio_get_drvdata(serio);
 
 	if (time_after(jiffies, sermouse->last + HZ/10)) sermouse->count = 0;
 	sermouse->last = jiffies;
@@ -228,9 +228,11 @@ static irqreturn_t sermouse_interrupt(struct serio *serio,
 
 static void sermouse_disconnect(struct serio *serio)
 {
-	struct sermouse *sermouse = serio->private;
+	struct sermouse *sermouse = serio_get_drvdata(serio);
+
 	input_unregister_device(&sermouse->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(sermouse);
 }
 
@@ -239,19 +241,17 @@ static void sermouse_disconnect(struct serio *serio)
  * an unhandled serio port is found.
  */
 
-static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
+static int sermouse_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct sermouse *sermouse;
 	unsigned char c;
+	int err;
 
-	if ((serio->type & SERIO_TYPE) != SERIO_RS232)
-		return;
-
-	if (!(serio->type & SERIO_PROTO) || ((serio->type & SERIO_PROTO) > SERIO_MZPP))
-		return;
+	if (!serio->id.proto || serio->id.proto > SERIO_MZPP)
+		return -ENODEV;
 
 	if (!(sermouse = kmalloc(sizeof(struct sermouse), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(sermouse, 0, sizeof(struct sermouse));
 
@@ -261,10 +261,8 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	sermouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 	sermouse->dev.private = sermouse;
 
-	serio->private = sermouse;
-
-	sermouse->type = serio->type & SERIO_PROTO;
-	c = (serio->type & SERIO_EXTRA) >> 16;
+	sermouse->type = serio->id.proto;
+	c = serio->id.extra;
 
 	if (c & 0x01) set_bit(BTN_MIDDLE, sermouse->dev.keybit);
 	if (c & 0x02) set_bit(BTN_SIDE, sermouse->dev.keybit);
@@ -282,33 +280,88 @@ static void sermouse_connect(struct serio *serio, struct serio_driver *drv)
 	sermouse->dev.id.version = 0x0100;
 	sermouse->dev.dev = &serio->dev;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, sermouse);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(sermouse);
-		return;
+		return err;
 	}
 
 	input_register_device(&sermouse->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", sermouse_protocols[sermouse->type], serio->phys);
+
+	return 0;
 }
+
+static struct serio_device_id sermouse_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MSC,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_SUN,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MS,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MP,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MZ,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MZP,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MZPP,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, sermouse_serio_ids);
 
 static struct serio_driver sermouse_drv = {
 	.driver		= {
 		.name	= "sermouse",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= sermouse_serio_ids,
 	.interrupt	= sermouse_interrupt,
 	.connect	= sermouse_connect,
 	.disconnect	= sermouse_disconnect,
 };
 
-int __init sermouse_init(void)
+static int __init sermouse_init(void)
 {
 	serio_register_driver(&sermouse_drv);
 	return 0;
 }
 
-void __exit sermouse_exit(void)
+static void __exit sermouse_exit(void)
 {
 	serio_unregister_driver(&sermouse_drv);
 }

@@ -1,18 +1,19 @@
 #
 # Mouse driver configuration
 #
-config INPUT_TOUCHSCREEN
+menuconfig INPUT_TOUCHSCREEN
 	bool "Touchscreens"
-	depends on INPUT
 	help
 	  Say Y here, and a list of supported touchscreens will be displayed.
 	  This option doesn't affect the kernel.
 
 	  If unsure, say Y.
 
+if INPUT_TOUCHSCREEN
+
 config TOUCHSCREEN_BITSY
-	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen input driver"
-	depends on SA1100_BITSY && INPUT && INPUT_TOUCHSCREEN
+	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen"
+	depends on SA1100_BITSY
 	select SERIO
 	help
 	  Say Y here if you have the h3600 (Bitsy) touchscreen.
@@ -22,9 +23,21 @@ config TOUCHSCREEN_BITSY
 	  To compile this driver as a module, choose M here: the
 	  module will be called h3600_ts_input.
 
+config TOUCHSCREEN_CORGI
+	tristate "Corgi touchscreen (for Sharp SL-C7xx)"
+	depends on PXA_SHARPSL
+	default y	
+	help
+	  Say Y here to enable the driver for the touchscreen on the 
+	  Sharp SL-C7xx series of PDAs.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ads7846_ts.
+
 config TOUCHSCREEN_GUNZE
 	tristate "Gunze AHL-51S touchscreen"
-	depends on INPUT && INPUT_TOUCHSCREEN
 	select SERIO
 	help
 	  Say Y here if you have the Gunze AHL-51 touchscreen connected to
@@ -35,3 +48,28 @@ config TOUCHSCREEN_GUNZE
 	  To compile this driver as a module, choose M here: the
 	  module will be called gunze.
 
+config TOUCHSCREEN_ELO
+	tristate "Elo serial touchscreens"
+	select SERIO
+	help
+	  Say Y here if you have an Elo serial touchscreen connected to
+	  your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called gunze.
+
+
+config TOUCHSCREEN_MK712
+	tristate "ICS MicroClock MK712 touchscreen"
+	help
+	  Say Y here if you have the ICS MicroClock MK712 touchscreen
+	  controller chip in your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mk712.
+
+endif

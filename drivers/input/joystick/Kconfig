@@ -1,9 +1,8 @@
 #
 # Joystick driver configuration
 #
-config INPUT_JOYSTICK
+menuconfig INPUT_JOYSTICK
 	bool "Joysticks"
-	depends on INPUT
 	help
 	  If you have a joystick, 6dof controller, gamepad, steering wheel,
 	  weapon control system or something like that you can say Y here
@@ -13,9 +12,11 @@ config INPUT_JOYSTICK
 	  Please read the file <file:Documentation/input/joystick.txt> which
 	  contains more information.
 
+if INPUT_JOYSTICK
+
 config JOYSTICK_ANALOG
 	tristate "Classic PC analog joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	---help---
 	  Say Y here if you have a joystick that connects to the PC
 	  gameport. In addition to the usual PC analog joystick, this driver
@@ -32,7 +33,7 @@ config JOYSTICK_ANALOG
 
 config JOYSTICK_A3D
 	tristate "Assasin 3D and MadCatz Panther devices"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have an FPGaming or MadCatz controller using the
 	  A3D protocol over the PC gameport.
@@ -42,7 +43,7 @@ config JOYSTICK_A3D
 
 config JOYSTICK_ADI
 	tristate "Logitech ADI digital joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Logitech controller using the ADI
 	  protocol over the PC gameport.
@@ -52,7 +53,7 @@ config JOYSTICK_ADI
 
 config JOYSTICK_COBRA
 	tristate "Creative Labs Blaster Cobra gamepad"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Creative Labs Blaster Cobra gamepad.
 
@@ -61,7 +62,7 @@ config JOYSTICK_COBRA
 
 config JOYSTICK_GF2K
 	tristate "Genius Flight2000 Digital joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Genius Flight2000 or MaxFighter digitally
 	  communicating joystick or gamepad.
@@ -71,7 +72,7 @@ config JOYSTICK_GF2K
 
 config JOYSTICK_GRIP
 	tristate "Gravis GrIP joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Gravis controller using the GrIP protocol
 	  over the PC gameport.
@@ -81,7 +82,7 @@ config JOYSTICK_GRIP
 
 config JOYSTICK_GRIP_MP
 	tristate "Gravis GrIP MultiPort"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have the original Gravis GrIP MultiPort, a hub
 	  that connects to the gameport and you connect gamepads to it.
@@ -91,7 +92,7 @@ config JOYSTICK_GRIP_MP
 
 config JOYSTICK_GUILLEMOT
 	tristate "Guillemot joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Guillemot joystick using a digital
 	  protocol over the PC gameport.
@@ -101,7 +102,7 @@ config JOYSTICK_GUILLEMOT
 
 config JOYSTICK_INTERACT
 	tristate "InterAct digital joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have an InterAct gameport or joystick
 	  communicating digitally over the gameport.
@@ -111,7 +112,7 @@ config JOYSTICK_INTERACT
 
 config JOYSTICK_SIDEWINDER
 	tristate "Microsoft SideWinder digital joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a Microsoft controller using the Digital
 	  Overdrive protocol over PC gameport.
@@ -121,7 +122,7 @@ config JOYSTICK_SIDEWINDER
 
 config JOYSTICK_TMDC
 	tristate "ThrustMaster DirectConnect joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you have a ThrustMaster controller using the
 	  DirectConnect (BSP) protocol over the PC gameport.
@@ -133,7 +134,6 @@ source "drivers/input/joystick/iforce/Kconfig"
 
 config JOYSTICK_WARRIOR
 	tristate "Logitech WingMan Warrior joystick"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a Logitech WingMan Warrior joystick connected
@@ -144,7 +144,6 @@ config JOYSTICK_WARRIOR
 
 config JOYSTICK_MAGELLAN
 	tristate "LogiCad3d Magellan/SpaceMouse 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a Magellan or Space Mouse 6DOF controller
@@ -155,7 +154,6 @@ config JOYSTICK_MAGELLAN
 
 config JOYSTICK_SPACEORB
 	tristate "SpaceTec SpaceOrb/Avenger 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a SpaceOrb 360 or SpaceBall Avenger 6DOF
@@ -166,7 +164,6 @@ config JOYSTICK_SPACEORB
 
 config JOYSTICK_SPACEBALL
 	tristate "SpaceTec SpaceBall 6dof controllers"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a SpaceTec SpaceBall 2003/3003/4000 FLX
@@ -178,7 +175,6 @@ config JOYSTICK_SPACEBALL
 
 config JOYSTICK_STINGER
 	tristate "Gravis Stinger gamepad"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a Gravis Stinger connected to one of your
@@ -187,9 +183,8 @@ config JOYSTICK_STINGER
 	  To compile this driver as a module, choose M here: the
 	  module will be called stinger.
 
-config JOYSTICK_TWIDDLER
+config JOYSTICK_TWIDJOY
 	tristate "Twiddler as a joystick"
-	depends on INPUT && INPUT_JOYSTICK
 	select SERIO
 	help
 	  Say Y here if you have a Handykey Twiddler connected to your
@@ -200,7 +195,7 @@ config JOYSTICK_TWIDDLER
 
 config JOYSTICK_DB9
 	tristate "Multisystem, Sega Genesis, Saturn joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && PARPORT
+	depends on PARPORT
 	---help---
 	  Say Y here if you have a Sega Master System gamepad, Sega Genesis
 	  gamepad, Sega Saturn gamepad, or a Multisystem -- Atari, Amiga,
@@ -213,7 +208,7 @@ config JOYSTICK_DB9
 
 config JOYSTICK_GAMECON
 	tristate "Multisystem, NES, SNES, N64, PSX joysticks and gamepads"
-	depends on INPUT && INPUT_JOYSTICK && PARPORT
+	depends on PARPORT
 	---help---
 	  Say Y here if you have a Nintendo Entertainment System gamepad,
 	  Super Nintendo Entertainment System gamepad, Nintendo 64 gamepad,
@@ -227,7 +222,7 @@ config JOYSTICK_GAMECON
 
 config JOYSTICK_TURBOGRAFX
 	tristate "Multisystem joysticks via TurboGraFX device"
-	depends on INPUT && INPUT_JOYSTICK && PARPORT
+	depends on PARPORT
 	help
 	  Say Y here if you have the TurboGraFX interface by Steffen Schwenke,
 	  and want to use it with Multisystem -- Atari, Amiga, Commodore,
@@ -239,7 +234,7 @@ config JOYSTICK_TURBOGRAFX
 
 config JOYSTICK_AMIGA
 	tristate "Amiga joysticks"
-	depends on AMIGA && INPUT && INPUT_JOYSTICK
+	depends on AMIGA
 	help
 	  Say Y here if you have an Amiga with a digital joystick connected
 	  to it.
@@ -249,7 +244,7 @@ config JOYSTICK_AMIGA
 
 config JOYSTICK_JOYDUMP
 	tristate "Gameport data dumper"
-	depends on INPUT && INPUT_JOYSTICK && GAMEPORT
+	select GAMEPORT
 	help
 	  Say Y here if you want to dump data from your joystick into the system
 	  log for debugging purposes. Say N if you are making a production
@@ -258,3 +253,4 @@ config JOYSTICK_JOYDUMP
 	  To compile this driver as a module, choose M here: the
 	  module will be called joydump.
 
+endif

@@ -154,7 +154,7 @@ static void spaceball_process_packet(struct spaceball* spaceball, struct pt_regs
 static irqreturn_t spaceball_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct spaceball *spaceball = serio->private;
+	struct spaceball *spaceball = serio_get_drvdata(serio);
 
 	switch (data) {
 		case 0xd:
@@ -191,31 +191,32 @@ static irqreturn_t spaceball_interrupt(struct serio *serio,
 
 static void spaceball_disconnect(struct serio *serio)
 {
-	struct spaceball* spaceball = serio->private;
+	struct spaceball* spaceball = serio_get_drvdata(serio);
+
 	input_unregister_device(&spaceball->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(spaceball);
 }
 
 /*
  * spaceball_connect() is the routine that is called when someone adds a
- * new serio device. It looks for the Magellan, and if found, registers
- * it as an input device.
+ * new serio device that supports Spaceball protocol and registers it as
+ * an input device.
  */
 
-static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
+static int spaceball_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct spaceball *spaceball;
 	int i, t, id;
+	int err;
 
-	if ((serio->type & ~SERIO_ID) != (SERIO_RS232 | SERIO_SPACEBALL))
-		return;
-
-	if ((id = (serio->type & SERIO_ID) >> 8) > SPACEBALL_MAX_ID)
-		return;
+	if ((id = serio->id.id) > SPACEBALL_MAX_ID)
+		return -ENODEV;
 
 	if (!(spaceball = kmalloc(sizeof(struct spaceball), GFP_KERNEL)))
-		return;
+		return - ENOMEM;
+
 	memset(spaceball, 0, sizeof(struct spaceball));
 
 	spaceball->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
@@ -255,28 +256,45 @@ static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
 	spaceball->dev.id.version = 0x0100;
 	spaceball->dev.dev = &serio->dev;
 
-	serio->private = spaceball;
+	serio_set_drvdata(serio, spaceball);
 
-	if (serio_open(serio, drv)) {
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(spaceball);
-		return;
+		return err;
 	}
 
 	input_register_device(&spaceball->dev);
 
 	printk(KERN_INFO "input: %s on serio%s\n",
 		spaceball_names[id], serio->phys);
+
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id spaceball_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_SPACEBALL,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, spaceball_serio_ids);
 
 static struct serio_driver spaceball_drv = {
 	.driver		= {
 		.name	= "spaceball",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= spaceball_serio_ids,
 	.interrupt	= spaceball_interrupt,
 	.connect	= spaceball_connect,
 	.disconnect	= spaceball_disconnect,
@@ -286,13 +304,13 @@ static struct serio_driver spaceball_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init spaceball_init(void)
+static int __init spaceball_init(void)
 {
 	serio_register_driver(&spaceball_drv);
 	return 0;
 }
 
-void __exit spaceball_exit(void)
+static void __exit spaceball_exit(void)
 {
 	serio_unregister_driver(&spaceball_drv);
 }

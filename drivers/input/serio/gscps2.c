@@ -38,7 +38,7 @@
 #include <asm/parisc-device.h>
 
 MODULE_AUTHOR("Laurent Canet <canetl@esiee.fr>, Thibaut Varene <varenet@esiee.fr>, Helge Deller <deller@gmx.de>");
-MODULE_DESCRIPTION("HP GSC PS/2 port driver");
+MODULE_DESCRIPTION("HP GSC PS2 port driver");
 MODULE_LICENSE("GPL");
 MODULE_DEVICE_TABLE(parisc, gscps2_device_tbl);
 
@@ -363,11 +363,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 	snprintf(serio->name, sizeof(serio->name), "GSC PS/2 %s",
 		 (ps2port->id == GSC_ID_KEYBOARD) ? "keyboard" : "mouse");
 	strlcpy(serio->phys, dev->dev.bus_id, sizeof(serio->phys));
-	serio->idbus		= BUS_GSC;
-	serio->idvendor		= PCI_VENDOR_ID_HP;
-	serio->idproduct	= 0x0001;
-	serio->idversion	= 0x0010;
-	serio->type		= SERIO_8042;
+	serio->id.type		= SERIO_8042;
 	serio->write		= gscps2_write;
 	serio->open		= gscps2_open;
 	serio->close		= gscps2_close;
@@ -448,7 +444,7 @@ static struct parisc_device_id gscps2_device_tbl[] = {
 };
 
 static struct parisc_driver parisc_ps2_driver = {
-	.name		= "GSC PS/2",
+	.name		= "GSC PS2",
 	.id_table	= gscps2_device_tbl,
 	.probe		= gscps2_probe,
 	.remove		= gscps2_remove,

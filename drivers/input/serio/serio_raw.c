@@ -235,7 +235,7 @@ static unsigned int serio_raw_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-struct file_operations serio_raw_fops = {
+static struct file_operations serio_raw_fops = {
 	.owner =	THIS_MODULE,
 	.open =		serio_raw_open,
 	.release =	serio_raw_release,
@@ -253,7 +253,7 @@ struct file_operations serio_raw_fops = {
 static irqreturn_t serio_raw_interrupt(struct serio *serio, unsigned char data,
 					unsigned int dfl, struct pt_regs *regs)
 {
-	struct serio_raw *serio_raw = serio->private;
+	struct serio_raw *serio_raw = serio_get_drvdata(serio);
 	struct serio_raw_list *list;
 	unsigned int head = serio_raw->head;
 
@@ -270,17 +270,14 @@ static irqreturn_t serio_raw_interrupt(struct serio *serio, unsigned char data,
 	return IRQ_HANDLED;
 }
 
-static void serio_raw_connect(struct serio *serio, struct serio_driver *drv)
+static int serio_raw_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct serio_raw *serio_raw;
 	int err;
 
-	if ((serio->type & SERIO_TYPE) != SERIO_8042)
-		return;
-
 	if (!(serio_raw = kmalloc(sizeof(struct serio_raw), GFP_KERNEL))) {
 		printk(KERN_ERR "serio_raw.c: can't allocate memory for a device\n");
-		return;
+		return -ENOMEM;
 	}
 
 	down(&serio_raw_sem);
@@ -292,8 +289,10 @@ static void serio_raw_connect(struct serio *serio, struct serio_driver *drv)
 	INIT_LIST_HEAD(&serio_raw->list);
 	init_waitqueue_head(&serio_raw->wait);
 
-	serio->private = serio_raw;
-	if (serio_open(serio, drv))
+	serio_set_drvdata(serio, serio_raw);
+
+	err = serio_open(serio, drv);
+	if (err)
 		goto out_free;
 
 	list_add_tail(&serio_raw->node, &serio_raw_list);
@@ -322,15 +321,16 @@ out_close:
 	serio_close(serio);
 	list_del_init(&serio_raw->node);
 out_free:
-	serio->private = NULL;
+	serio_set_drvdata(serio, NULL);
 	kfree(serio_raw);
 out:
 	up(&serio_raw_sem);
+	return err;
 }
 
 static int serio_raw_reconnect(struct serio *serio)
 {
-	struct serio_raw *serio_raw = serio->private;
+	struct serio_raw *serio_raw = serio_get_drvdata(serio);
 	struct serio_driver *drv = serio->drv;
 
 	if (!drv || !serio_raw) {
@@ -351,10 +351,10 @@ static void serio_raw_disconnect(struct serio *serio)
 
 	down(&serio_raw_sem);
 
-	serio_raw = serio->private;
+	serio_raw = serio_get_drvdata(serio);
 
 	serio_close(serio);
-	serio->private = NULL;
+	serio_set_drvdata(serio, NULL);
 
 	serio_raw->serio = NULL;
 	if (!serio_raw_cleanup(serio_raw))
@@ -363,11 +363,24 @@ static void serio_raw_disconnect(struct serio *serio)
 	up(&serio_raw_sem);
 }
 
+static struct serio_device_id serio_raw_serio_ids[] = {
+	{
+		.type	= SERIO_8042,
+		.proto	= SERIO_ANY,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, serio_raw_serio_ids);
+
 static struct serio_driver serio_raw_drv = {
 	.driver		= {
 		.name	= "serio_raw",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= serio_raw_serio_ids,
 	.interrupt	= serio_raw_interrupt,
 	.connect	= serio_raw_connect,
 	.reconnect	= serio_raw_reconnect,
@@ -375,13 +388,13 @@ static struct serio_driver serio_raw_drv = {
 	.manual_bind	= 1,
 };
 
-int __init serio_raw_init(void)
+static int __init serio_raw_init(void)
 {
 	serio_register_driver(&serio_raw_drv);
 	return 0;
 }
 
-void __exit serio_raw_exit(void)
+static void __exit serio_raw_exit(void)
 {
 	serio_unregister_driver(&serio_raw_drv);
 }

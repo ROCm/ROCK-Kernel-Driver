@@ -51,17 +51,9 @@ static atomic_t input_device_num = ATOMIC_INIT(0);
 
 #ifdef CONFIG_PROC_FS
 static struct proc_dir_entry *proc_bus_input_dir;
-DECLARE_WAIT_QUEUE_HEAD(input_devices_poll_wait);
+static DECLARE_WAIT_QUEUE_HEAD(input_devices_poll_wait);
 static int input_devices_state;
 #endif
-
-static inline unsigned int ms_to_jiffies(unsigned int ms)
-{
-        unsigned int j;
-        j = (ms * HZ + 500) / 1000;
-        return (j > 0) ? j : 1;
-}
-
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
@@ -97,9 +89,9 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 			change_bit(code, dev->key);
 
-			if (test_bit(EV_REP, dev->evbit) && dev->rep[REP_PERIOD] && dev->timer.data && value) {
+			if (test_bit(EV_REP, dev->evbit) && dev->rep[REP_PERIOD] && dev->rep[REP_DELAY] && dev->timer.data && value) {
 				dev->repeat_key = code;
-				mod_timer(&dev->timer, jiffies + ms_to_jiffies(dev->rep[REP_DELAY]));
+				mod_timer(&dev->timer, jiffies + msecs_to_jiffies(dev->rep[REP_DELAY]));
 			}
 
 			break;
@@ -199,7 +191,8 @@ static void input_repeat_key(unsigned long data)
 	input_event(dev, EV_KEY, dev->repeat_key, 2);
 	input_sync(dev);
 
-	mod_timer(&dev->timer, jiffies + ms_to_jiffies(dev->rep[REP_PERIOD]));
+	if (dev->rep[REP_PERIOD])
+		mod_timer(&dev->timer, jiffies + msecs_to_jiffies(dev->rep[REP_PERIOD]));
 }
 
 int input_accept_process(struct input_handle *handle, struct file *file)

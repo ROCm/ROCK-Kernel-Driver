@@ -74,8 +74,8 @@ static void gunze_process_packet(struct gunze* gunze, struct pt_regs *regs)
 	}
 
 	input_regs(dev, regs);
-	input_report_abs(dev, ABS_X, simple_strtoul(gunze->data + 1, NULL, 10) * 4);
-	input_report_abs(dev, ABS_Y, 3072 - simple_strtoul(gunze->data + 6, NULL, 10) * 3);
+	input_report_abs(dev, ABS_X, simple_strtoul(gunze->data + 1, NULL, 10));
+	input_report_abs(dev, ABS_Y, 1024 - simple_strtoul(gunze->data + 6, NULL, 10));
 	input_report_key(dev, BTN_TOUCH, gunze->data[0] == 'T');
 	input_sync(dev);
 }
@@ -83,7 +83,7 @@ static void gunze_process_packet(struct gunze* gunze, struct pt_regs *regs)
 static irqreturn_t gunze_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct gunze* gunze = serio->private;
+	struct gunze* gunze = serio_get_drvdata(serio);
 
 	if (data == '\r') {
 		gunze_process_packet(gunze, regs);
@@ -101,38 +101,37 @@ static irqreturn_t gunze_interrupt(struct serio *serio,
 
 static void gunze_disconnect(struct serio *serio)
 {
-	struct gunze* gunze = serio->private;
+	struct gunze* gunze = serio_get_drvdata(serio);
+
 	input_unregister_device(&gunze->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(gunze);
 }
 
 /*
  * gunze_connect() is the routine that is called when someone adds a
- * new serio device. It looks whether it was registered as a Gunze touchscreen
- * and if yes, registers it as an input device.
+ * new serio device that supports Gunze protocol and registers it as
+ * an input device.
  */
 
-static void gunze_connect(struct serio *serio, struct serio_driver *drv)
+static int gunze_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct gunze *gunze;
-
-	if (serio->type != (SERIO_RS232 | SERIO_GUNZE))
-		return;
+	int err;
 
 	if (!(gunze = kmalloc(sizeof(struct gunze), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(gunze, 0, sizeof(struct gunze));
 
 	init_input_dev(&gunze->dev);
 	gunze->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 	gunze->dev.keybit[LONG(BTN_TOUCH)] = BIT(BTN_TOUCH);
-	input_set_abs_params(&gunze->dev, ABS_X, 96, 4000, 0, 0);
-	input_set_abs_params(&gunze->dev, ABS_Y, 72, 3000, 0, 0);
+	input_set_abs_params(&gunze->dev, ABS_X, 24, 1000, 0, 0);
+	input_set_abs_params(&gunze->dev, ABS_Y, 24, 1000, 0, 0);
 
 	gunze->serio = serio;
-	serio->private = gunze;
 
 	sprintf(gunze->phys, "%s/input0", serio->phys);
 
@@ -144,25 +143,44 @@ static void gunze_connect(struct serio *serio, struct serio_driver *drv)
 	gunze->dev.id.product = 0x0051;
 	gunze->dev.id.version = 0x0100;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, gunze);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(gunze);
-		return;
+		return err;
 	}
 
 	input_register_device(&gunze->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", gunze_name, serio->phys);
+
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id gunze_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_GUNZE,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, gunze_serio_ids);
 
 static struct serio_driver gunze_drv = {
 	.driver		= {
 		.name	= "gunze",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= gunze_serio_ids,
 	.interrupt	= gunze_interrupt,
 	.connect	= gunze_connect,
 	.disconnect	= gunze_disconnect,
@@ -172,13 +190,13 @@ static struct serio_driver gunze_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init gunze_init(void)
+static int __init gunze_init(void)
 {
 	serio_register_driver(&gunze_drv);
 	return 0;
 }
 
-void __exit gunze_exit(void)
+static void __exit gunze_exit(void)
 {
 	serio_unregister_driver(&gunze_drv);
 }

@@ -484,11 +484,10 @@ static inline void hidinput_disconnect(struct hid_device *hid) { }
 
 int hid_open(struct hid_device *);
 void hid_close(struct hid_device *);
-int hid_find_field(struct hid_device *, unsigned int, unsigned int, struct hid_field **);
 int hid_set_field(struct hid_field *, unsigned, __s32);
 void hid_submit_report(struct hid_device *, struct hid_report *, unsigned char dir);
 void hid_init_reports(struct hid_device *hid);
-int hid_find_report_by_usage(struct hid_device *hid, __u32 wanted_usage, struct hid_report **report, int type);
+struct hid_field *hid_find_field_by_usage(struct hid_device *hid, __u32 wanted_usage, int type);
 int hid_wait_io(struct hid_device* hid);
 
 

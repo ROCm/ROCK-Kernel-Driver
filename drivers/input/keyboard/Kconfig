@@ -1,20 +1,20 @@
 #
 # Input core configuration
 #
-config INPUT_KEYBOARD
+menuconfig INPUT_KEYBOARD
 	bool "Keyboards" if EMBEDDED || !X86
 	default y
-	depends on INPUT
 	help
 	  Say Y here, and a list of supported keyboards will be displayed.
 	  This option doesn't affect the kernel.
 
 	  If unsure, say Y.
 
+if INPUT_KEYBOARD
+
 config KEYBOARD_ATKBD
-	tristate "AT keyboard support" if !PC
+	tristate "AT keyboard" if !PC
 	default y
-	depends on INPUT && INPUT_KEYBOARD
 	select SERIO
 	select SERIO_LIBPS2
 	select SERIO_I8042 if PC
@@ -30,20 +30,46 @@ config KEYBOARD_ATKBD
 	  To compile this driver as a module, choose M here: the
 	  module will be called atkbd.
 
-config KEYBOARD_POSFILTER
-	bool "Point-of-sale Keyboard support (supported only through SLRS)"
-	depends on INPUT && INPUT_KEYBOARD && KEYBOARD_ATKBD
+config KEYBOARD_ATKBD_HP_KEYCODES
+	bool "Use HP keyboard scancodes"
+	depends on PARISC && KEYBOARD_ATKBD
+	default y
 	help
-	  Say Y here if you want to enable the Point-of-sale keyboard
-	  extensions.  This is not normally turned on and is not supported
-	  for general use.  This option should only be turned on for 
-	  SLRS (SuSE Linux Retail Solutions).
+	  Say Y here if you have a PA-RISC machine and want to use an AT or
+	  PS/2 keyboard, and your keyboard uses keycodes that are specific to
+	  PA-RISC keyboards.
 
-	  If unsure, say N.
+	  Say N if you use a standard keyboard.
+
+config KEYBOARD_ATKBD_RDI_KEYCODES
+	bool "Use PrecisionBook keyboard scancodes"
+	depends on KEYBOARD_ATKBD_HP_KEYCODES
+	default n
+	help
+	  If you have an RDI PrecisionBook, say Y here if you want to use its
+	  built-in keyboard (as opposed to an external keyboard).
+
+	  The PrecisionBook has five keys that conflict with those used by most
+	  AT and PS/2 keyboards. These are as follows:
+
+	    PrecisionBook    Standard AT or PS/2
+
+	    F1               F12
+	    Left Ctrl        Left Alt
+	    Caps Lock        Left Ctrl
+	    Right Ctrl       Caps Lock
+	    Left             102nd key (the key to the right of Left Shift)
+
+	  If you say N here, and use the PrecisionBook keyboard, then each key
+	  in the left-hand column will be interpreted as the corresponding key
+	  in the right-hand column.
+
+	  If you say Y here, and use an external keyboard, then each key in the
+	  right-hand column will be interpreted as the key shown in the
+	  left-hand column.
 
 config KEYBOARD_SUNKBD
-	tristate "Sun Type 4 and Type 5 keyboard support"
-	depends on INPUT && INPUT_KEYBOARD
+	tristate "Sun Type 4 and Type 5 keyboard"
 	select SERIO
 	help
 	  Say Y here if you want to use a Sun Type 4 or Type 5 keyboard,
@@ -54,8 +80,7 @@ config KEYBOARD_SUNKBD
 	  module will be called sunkbd.
 
 config KEYBOARD_LKKBD
-	tristate "DECstation/VAXstation LK201/LK401 keyboard support"
-	depends on INPUT && INPUT_KEYBOARD
+	tristate "DECstation/VAXstation LK201/LK401 keyboard"
 	select SERIO
 	help
 	  Say Y here if you want to use a LK201 or LK401 style serial
@@ -67,8 +92,7 @@ config KEYBOARD_LKKBD
 	  module will be called lkkbd.
 
 config KEYBOARD_XTKBD
-	tristate "XT Keyboard support"
-	depends on INPUT && INPUT_KEYBOARD
+	tristate "XT keyboard"
 	select SERIO
 	help
 	  Say Y here if you want to use the old IBM PC/XT keyboard (or
@@ -81,7 +105,6 @@ config KEYBOARD_XTKBD
 
 config KEYBOARD_NEWTON
 	tristate "Newton keyboard"
-	depends on INPUT && INPUT_KEYBOARD
 	select SERIO
 	help
 	  Say Y here if you have a Newton keyboard on a serial port.
@@ -89,9 +112,20 @@ config KEYBOARD_NEWTON
 	  To compile this driver as a module, choose M here: the
 	  module will be called newtonkbd.
 
+config KEYBOARD_CORGI
+	tristate "Corgi keyboard"
+	depends on PXA_SHARPSL
+	default y	
+	help
+	  Say Y here to enable the keyboard on the Sharp Zaurus SL-C7xx 
+	  series of PDAs.
+
+	  To compile this driver as a module, choose M here: the 
+	  module will be called corgikbd.
+
 config KEYBOARD_MAPLE
-	tristate "Maple bus keyboard support"
-	depends on SH_DREAMCAST && INPUT && INPUT_KEYBOARD && MAPLE
+	tristate "Maple bus keyboard"
+	depends on SH_DREAMCAST && MAPLE
 	help
 	  Say Y here if you have a DreamCast console running Linux and have
 	  a keyboard attached to its Maple bus.
@@ -101,10 +135,42 @@ config KEYBOARD_MAPLE
 
 config KEYBOARD_AMIGA
 	tristate "Amiga keyboard"
-	depends on AMIGA && INPUT && INPUT_KEYBOARD
+	depends on AMIGA
 	help
 	  Say Y here if you are running Linux on any AMIGA and have a keyboard
 	  attached.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called amikbd.
+
+config KEYBOARD_HIL_OLD
+	tristate "HP HIL keyboard support (simple driver)"
+	depends on GSC
+	default y
+	help
+	  The "Human Interface Loop" is a older, 8-channel USB-like
+	  controller used in several Hewlett Packard models. This driver
+	  was adapted from the one written for m68k/hp300, and implements
+	  support for a keyboard attached to the HIL port, but not for
+	  any other types of HIL input devices like mice or tablets.
+	  However, it has been thoroughly tested and is stable.
+
+	  If you want full HIL support including support for multiple
+	  keyboards, mices and tablets, you have to enable the
+	  "HP System Device Controller i8042 Support" in the input/serio
+	  submenu.
+
+config KEYBOARD_HIL
+	tristate "HP HIL keyboard support"
+	depends on GSC
+	default y
+	select HP_SDC
+	select HIL_MLC
+	select SERIO
+	help
+	  The "Human Interface Loop" is a older, 8-channel USB-like
+	  controller used in several Hewlett Packard models.
+	  This driver implements support for HIL-keyboards attached
+	  to your machine, so normally you should say Y here.
+
+endif

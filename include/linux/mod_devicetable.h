@@ -165,4 +165,14 @@ struct pnp_card_device_id {
 };
 
 
+#define SERIO_ANY	0xff
+
+struct serio_device_id {
+	__u8 type;
+	__u8 extra;
+	__u8 id;
+	__u8 proto;
+};
+
+
 #endif /* LINUX_MOD_DEVICETABLE_H */

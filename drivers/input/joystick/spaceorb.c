@@ -135,7 +135,7 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb, struct pt_regs *r
 static irqreturn_t spaceorb_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct spaceorb* spaceorb = serio->private;
+	struct spaceorb* spaceorb = serio_get_drvdata(serio);
 
 	if (~data & 0x80) {
 		if (spaceorb->idx) spaceorb_process_packet(spaceorb, regs);
@@ -152,28 +152,29 @@ static irqreturn_t spaceorb_interrupt(struct serio *serio,
 
 static void spaceorb_disconnect(struct serio *serio)
 {
-	struct spaceorb* spaceorb = serio->private;
+	struct spaceorb* spaceorb = serio_get_drvdata(serio);
+
 	input_unregister_device(&spaceorb->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(spaceorb);
 }
 
 /*
  * spaceorb_connect() is the routine that is called when someone adds a
- * new serio device. It looks for the SpaceOrb/Avenger, and if found, registers
+ * new serio device that supports SpaceOrb/Avenger protocol and registers
  * it as an input device.
  */
 
-static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
+static int spaceorb_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct spaceorb *spaceorb;
 	int i, t;
-
-	if (serio->type != (SERIO_RS232 | SERIO_SPACEORB))
-		return;
+	int err;
 
 	if (!(spaceorb = kmalloc(sizeof(struct spaceorb), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
+
 	memset(spaceorb, 0, sizeof(struct spaceorb));
 
 	spaceorb->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
@@ -202,25 +203,42 @@ static void spaceorb_connect(struct serio *serio, struct serio_driver *drv)
 	spaceorb->dev.id.version = 0x0100;
 	spaceorb->dev.dev = &serio->dev;
 
-	serio->private = spaceorb;
+	serio_set_drvdata(serio, spaceorb);
 
-	if (serio_open(serio, drv)) {
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(spaceorb);
-		return;
+		return err;
 	}
 
 	input_register_device(&spaceorb->dev);
+
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id spaceorb_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_SPACEORB,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, spaceorb_serio_ids);
 
 static struct serio_driver spaceorb_drv = {
 	.driver		= {
 		.name	= "spaceorb",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= spaceorb_serio_ids,
 	.interrupt	= spaceorb_interrupt,
 	.connect	= spaceorb_connect,
 	.disconnect	= spaceorb_disconnect,
@@ -230,13 +248,13 @@ static struct serio_driver spaceorb_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init spaceorb_init(void)
+static int __init spaceorb_init(void)
 {
 	serio_register_driver(&spaceorb_drv);
 	return 0;
 }
 
-void __exit spaceorb_exit(void)
+static void __exit spaceorb_exit(void)
 {
 	serio_unregister_driver(&spaceorb_drv);
 }

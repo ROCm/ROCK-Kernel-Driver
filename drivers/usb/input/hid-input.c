@@ -404,7 +404,6 @@ void hidinput_hid_event(struct hid_device *hid, struct hid_field *field, struct 
 		return;
 
 	input_regs(input, regs);
-	input_event(input, EV_MSC, MSC_SCAN, usage->hid);
 
 	if (!usage->type)
 		return;
@@ -483,10 +482,26 @@ void hidinput_report_event(struct hid_device *hid, struct hid_report *report)
 	}
 }
 
+static int hidinput_find_field(struct hid_device *hid, unsigned int type, unsigned int code, struct hid_field **field)
+{
+	struct hid_report *report;
+	int i, j;
+
+	list_for_each_entry(report, &hid->report_enum[HID_OUTPUT_REPORT].report_list, list) {
+		for (i = 0; i < report->maxfield; i++) {
+			*field = report->field[i];
+			for (j = 0; j < (*field)->maxusage; j++)
+				if ((*field)->usage[j].type == type && (*field)->usage[j].code == code)
+					return j;
+		}
+	}
+	return -1;
+}
+
 static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	struct hid_device *hid = dev->private;
-	struct hid_field *field = NULL;
+	struct hid_field *field;
 	int offset;
 
 	if (type == EV_FF)
@@ -495,7 +510,7 @@ static int hidinput_input_event(struct input_dev *dev, unsigned int type, unsign
 	if (type != EV_LED)
 		return -1;
 
-	if ((offset = hid_find_field(hid, type, code, &field)) == -1) {
+	if ((offset = hidinput_find_field(hid, type, code, &field)) == -1) {
 		warn("event field not found");
 		return -1;
 	}
@@ -527,9 +542,7 @@ static void hidinput_close(struct input_dev *dev)
 int hidinput_connect(struct hid_device *hid)
 {
 	struct usb_device *dev = hid->dev;
-	struct hid_report_enum *report_enum;
 	struct hid_report *report;
-	struct list_head *list;
 	struct hid_input *hidinput = NULL;
 	int i, j, k;
 
@@ -544,16 +557,11 @@ int hidinput_connect(struct hid_device *hid)
 	if (i == hid->maxcollection)
 		return -1;
 
-	for (k = HID_INPUT_REPORT; k <= HID_OUTPUT_REPORT; k++) {
-		report_enum = hid->report_enum + k;
-		list = report_enum->report_list.next;
-		while (list != &report_enum->report_list) {
-			report = (struct hid_report *) list;
+	for (k = HID_INPUT_REPORT; k <= HID_OUTPUT_REPORT; k++)
+		list_for_each_entry(report, &hid->report_enum[k].report_list, list) {
 
-			if (!report->maxfield) {
-				list = list->next;
+			if (!report->maxfield)
 				continue;
-			}
 
 			if (!hidinput) {
 				hidinput = kmalloc(sizeof(*hidinput), GFP_KERNEL);
@@ -578,9 +586,6 @@ int hidinput_connect(struct hid_device *hid)
 				hidinput->input.id.product = le16_to_cpu(dev->descriptor.idProduct);
 				hidinput->input.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 				hidinput->input.dev = &hid->intf->dev;
-
-				set_bit(EV_MSC, hidinput->input.evbit);
-				set_bit(MSC_SCAN, hidinput->input.mscbit);
 			}
 
 			for (i = 0; i < report->maxfield; i++)
@@ -598,10 +603,7 @@ int hidinput_connect(struct hid_device *hid)
 				input_register_device(&hidinput->input);
 				hidinput = NULL;
 			}
-
-			list = list->next;
 		}
-	}
 
 	/* This only gets called when we are a single-input (most of the
 	 * time). IOW, not a HID_QUIRK_MULTI_INPUT. The hid_ff_init() is
@@ -619,7 +621,7 @@ void hidinput_disconnect(struct hid_device *hid)
 	struct list_head *lh, *next;
 	struct hid_input *hidinput;
 
-	list_for_each_safe (lh, next, &hid->inputs) {
+	list_for_each_safe(lh, next, &hid->inputs) {
 		hidinput = list_entry(lh, struct hid_input, list);
 		input_unregister_device(&hidinput->input);
 		list_del(&hidinput->list);

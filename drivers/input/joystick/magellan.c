@@ -118,7 +118,7 @@ static void magellan_process_packet(struct magellan* magellan, struct pt_regs *r
 static irqreturn_t magellan_interrupt(struct serio *serio,
 		unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct magellan* magellan = serio->private;
+	struct magellan* magellan = serio_get_drvdata(serio);
 
 	if (data == '\r') {
 		magellan_process_packet(magellan, regs);
@@ -136,28 +136,28 @@ static irqreturn_t magellan_interrupt(struct serio *serio,
 
 static void magellan_disconnect(struct serio *serio)
 {
-	struct magellan* magellan = serio->private;
+	struct magellan* magellan = serio_get_drvdata(serio);
+
 	input_unregister_device(&magellan->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(magellan);
 }
 
 /*
  * magellan_connect() is the routine that is called when someone adds a
- * new serio device. It looks for the Magellan, and if found, registers
- * it as an input device.
+ * new serio device that supports Magellan protocol and registers it as
+ * an input device.
  */
 
-static void magellan_connect(struct serio *serio, struct serio_driver *drv)
+static int magellan_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct magellan *magellan;
 	int i, t;
-
-	if (serio->type != (SERIO_RS232 | SERIO_MAGELLAN))
-		return;
+	int err;
 
 	if (!(magellan = kmalloc(sizeof(struct magellan), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(magellan, 0, sizeof(struct magellan));
 
@@ -185,28 +185,44 @@ static void magellan_connect(struct serio *serio, struct serio_driver *drv)
 	magellan->dev.id.version = 0x0100;
 	magellan->dev.dev = &serio->dev;
 
-	serio->private = magellan;
+	serio_set_drvdata(serio, magellan);
 
-	if (serio_open(serio, drv)) {
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(magellan);
-		return;
+		return err;
 	}
 
 	input_register_device(&magellan->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", magellan_name, serio->phys);
 
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id magellan_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_MAGELLAN,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, magellan_serio_ids);
 
 static struct serio_driver magellan_drv = {
 	.driver		= {
 		.name	= "magellan",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= magellan_serio_ids,
 	.interrupt	= magellan_interrupt,
 	.connect	= magellan_connect,
 	.disconnect	= magellan_disconnect,
@@ -216,13 +232,13 @@ static struct serio_driver magellan_drv = {
  * The functions for inserting/removing us as a module.
  */
 
-int __init magellan_init(void)
+static int __init magellan_init(void)
 {
 	serio_register_driver(&magellan_drv);
 	return 0;
 }
 
-void __exit magellan_exit(void)
+static void __exit magellan_exit(void)
 {
 	serio_unregister_driver(&magellan_drv);
 }

@@ -394,8 +394,7 @@ struct _snd_via82xx {
 	snd_info_entry_t *proc_entry;
 
 #ifdef SUPPORT_JOYSTICK
-	struct gameport gameport;
-	struct resource *res_joystick;
+	struct gameport *gameport;
 #endif
 };
 
@@ -1635,11 +1634,70 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, const char *quirk_ov
 	return 0;
 }
 
+#ifdef SUPPORT_JOYSTICK
+#define JOYSTICK_ADDR	0x200
+static int __devinit snd_via686_create_gameport(via82xx_t *chip, int dev, unsigned char *legacy)
+{
+	struct gameport *gp;
+	struct resource *r;
+
+	if (!joystick[dev])
+		return -ENODEV;
+
+	r = request_region(JOYSTICK_ADDR, 8, "VIA686 gameport");
+	if (!r) {
+		printk(KERN_WARNING "via82xx: cannot reserve joystick port 0x%#x\n", JOYSTICK_ADDR);
+		return -EBUSY;
+	}
+
+	chip->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "via82xx: cannot allocate memory for gameport\n");
+		release_resource(r);
+		kfree_nocheck(r);
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "VIA686 Gameport");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(chip->pci));
+	gp->dev.parent = &chip->pci->dev;
+	gp->io = JOYSTICK_ADDR;
+	gp->port_data = r;
+
+	/* Enable legacy joystick port */
+	*legacy |= VIA_FUNC_ENABLE_GAME;
+	pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, *legacy);
+
+	gameport_register_port(chip->gameport);
+
+	return 0;
+}
+
+static void snd_via686_free_gameport(via82xx_t *chip)
+{
+	if (chip->gameport) {
+		struct resource *r = chip->gameport->port_data;
+
+		gameport_unregister_port(chip->gameport);
+		chip->gameport = NULL;
+		release_resource(r);
+		kfree_nocheck(r);
+	}
+}
+#else
+static inline int snd_via686_create_gameport(via82xx_t *chip, int dev, unsigned char *legacy)
+{
+	return -ENOSYS;
+}
+static inline void snd_via686_free_gameport(via82xx_t *chip) { }
+#endif
+
+
 /*
  *
  */
 
-static int snd_via8233_init_misc(via82xx_t *chip, int dev)
+static int __devinit snd_via8233_init_misc(via82xx_t *chip, int dev)
 {
 	int i, err, caps;
 	unsigned char val;
@@ -1680,7 +1738,7 @@ static int snd_via8233_init_misc(via82xx_t *chip, int dev)
 	return 0;
 }
 
-static int snd_via686_init_misc(via82xx_t *chip, int dev)
+static int __devinit snd_via686_init_misc(via82xx_t *chip, int dev)
 {
 	unsigned char legacy, legacy_cfg;
 	int rev_h = 0;
@@ -1727,15 +1785,6 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		mpu_port[dev] = 0;
 	}
 
-#ifdef SUPPORT_JOYSTICK
-#define JOYSTICK_ADDR	0x200
-	if (joystick[dev] &&
-	    (chip->res_joystick = request_region(JOYSTICK_ADDR, 8, "VIA686 gameport")) != NULL) {
-		legacy |= VIA_FUNC_ENABLE_GAME;
-		chip->gameport.io = JOYSTICK_ADDR;
-	}
-#endif
-
 	pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, legacy);
 	pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, legacy_cfg);
 	if (chip->mpu_res) {
@@ -1750,10 +1799,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, legacy);
 	}
 
-#ifdef SUPPORT_JOYSTICK
-	if (chip->res_joystick)
-		gameport_register_port(&chip->gameport);
-#endif
+	snd_via686_create_gameport(chip, dev, &legacy);
 
 #ifdef CONFIG_PM
 	chip->legacy_saved = legacy;
@@ -1986,14 +2032,9 @@ static int snd_via82xx_free(via82xx_t *chip)
 		kfree_nocheck(chip->mpu_res);
 	}
 	pci_release_regions(chip->pci);
+
 	if (chip->chip_type == TYPE_VIA686) {
-#ifdef SUPPORT_JOYSTICK
-		if (chip->res_joystick) {
-			gameport_unregister_port(&chip->gameport);
-			release_resource(chip->res_joystick);
-			kfree_nocheck(chip->res_joystick);
-		}
-#endif
+		snd_via686_free_gameport(chip);
 		pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE, chip->old_legacy);
 		pci_write_config_byte(chip->pci, VIA_PNP_CONTROL, chip->old_legacy_cfg);
 	}

@@ -122,7 +122,7 @@ static struct serio * __init q40kbd_allocate_port(void)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type		= SERIO_8042;
+		serio->id.type		= SERIO_8042;
 		serio->open		= q40kbd_open;
 		serio->close		= q40kbd_close;
 		serio->dev.parent	= &q40kbd_device->dev;

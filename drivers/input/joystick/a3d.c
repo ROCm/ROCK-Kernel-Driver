@@ -35,38 +35,35 @@
 #include <linux/gameport.h>
 #include <linux/input.h>
 
+#define DRIVER_DESC	"FP-Gaming Assasin 3D joystick driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("FP-Gaming Assasin 3D joystick driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-#define A3D_MAX_START		400	/* 400 us */
-#define A3D_MAX_STROBE		60	/* 40 us */
-#define A3D_DELAY_READ		3	/* 3 ms */
+#define A3D_MAX_START		600	/* 600 us */
+#define A3D_MAX_STROBE		80	/* 80 us */
 #define A3D_MAX_LENGTH		40	/* 40*3 bits */
-#define A3D_REFRESH_TIME	HZ/50	/* 20 ms */
 
 #define A3D_MODE_A3D		1	/* Assassin 3D */
 #define A3D_MODE_PAN		2	/* Panther */
 #define A3D_MODE_OEM		3	/* Panther OEM version */
 #define A3D_MODE_PXL		4	/* Panther XL */
 
-char *a3d_names[] = { NULL, "FP-Gaming Assassin 3D", "MadCatz Panther", "OEM Panther",
+static char *a3d_names[] = { NULL, "FP-Gaming Assassin 3D", "MadCatz Panther", "OEM Panther",
 			"MadCatz Panther XL", "MadCatz Panther XL w/ rudder" };
 
 struct a3d {
 	struct gameport *gameport;
-	struct gameport adc;
+	struct gameport *adc;
 	struct input_dev dev;
-	struct timer_list timer;
 	int axes[4];
 	int buttons;
 	int mode;
 	int length;
-	int used;
 	int reads;
 	int bads;
 	char phys[32];
-	char adcphys[32];
 };
 
 /*
@@ -109,7 +106,9 @@ static int a3d_read_packet(struct gameport *gameport, int length, char *data)
 static int a3d_csum(char *data, int count)
 {
 	int i, csum = 0;
-	for (i = 0; i < count - 2; i++) csum += data[i];
+
+	for (i = 0; i < count - 2; i++)
+		csum += data[i];
 	return (csum & 0x3f) != ((data[count - 2] << 3) | data[count - 1]);
 }
 
@@ -139,7 +138,7 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 
 			a3d->buttons = ((data[3] << 3) | data[4]) & 0xf;
 
-			return;
+			break;
 
 		case A3D_MODE_PXL:
 
@@ -169,24 +168,26 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 
 			input_sync(dev);
 
-			return;
+			break;
 	}
 }
 
 
 /*
- * a3d_timer() reads and analyzes A3D joystick data.
+ * a3d_poll() reads and analyzes A3D joystick data.
  */
 
-static void a3d_timer(unsigned long private)
+static void a3d_poll(struct gameport *gameport)
 {
-	struct a3d *a3d = (void *) private;
+	struct a3d *a3d = gameport_get_drvdata(gameport);
 	unsigned char data[A3D_MAX_LENGTH];
+
 	a3d->reads++;
-	if (a3d_read_packet(a3d->gameport, a3d->length, data) != a3d->length
-		|| data[0] != a3d->mode || a3d_csum(data, a3d->length))
-	 	a3d->bads++; else a3d_read(a3d, data);
-	mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);
+	if (a3d_read_packet(a3d->gameport, a3d->length, data) != a3d->length ||
+	    data[0] != a3d->mode || a3d_csum(data, a3d->length))
+	 	a3d->bads++;
+	else
+		a3d_read(a3d, data);
 }
 
 /*
@@ -195,10 +196,11 @@ static void a3d_timer(unsigned long private)
  * call this more than 50 times a second, which would use too much CPU.
  */
 
-int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
+static int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct a3d *a3d = gameport->driver;
+	struct a3d *a3d = gameport->port_data;
 	int i;
+
 	for (i = 0; i < 4; i++)
 		axes[i] = (a3d->axes[i] < 254) ? a3d->axes[i] : -1;
 	*buttons = a3d->buttons;
@@ -210,13 +212,14 @@ int a3d_adc_cooked_read(struct gameport *gameport, int *axes, int *buttons)
  * any but cooked data.
  */
 
-int a3d_adc_open(struct gameport *gameport, int mode)
+static int a3d_adc_open(struct gameport *gameport, int mode)
 {
-	struct a3d *a3d = gameport->driver;
+	struct a3d *a3d = gameport->port_data;
+
 	if (mode != GAMEPORT_MODE_COOKED)
 		return -1;
-	if (!a3d->used++)
-		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);
+
+	gameport_start_polling(a3d->gameport);
 	return 0;
 }
 
@@ -226,9 +229,9 @@ int a3d_adc_open(struct gameport *gameport, int mode)
 
 static void a3d_adc_close(struct gameport *gameport)
 {
-	struct a3d *a3d = gameport->driver;
-	if (!--a3d->used)
-		del_timer(&a3d->timer);
+	struct a3d *a3d = gameport->port_data;
+
+	gameport_stop_polling(a3d->gameport);
 }
 
 /*
@@ -238,8 +241,8 @@ static void a3d_adc_close(struct gameport *gameport)
 static int a3d_open(struct input_dev *dev)
 {
 	struct a3d *a3d = dev->private;
-	if (!a3d->used++)
-		mod_timer(&a3d->timer, jiffies + A3D_REFRESH_TIME);
+
+	gameport_start_polling(a3d->gameport);
 	return 0;
 }
 
@@ -250,49 +253,53 @@ static int a3d_open(struct input_dev *dev)
 static void a3d_close(struct input_dev *dev)
 {
 	struct a3d *a3d = dev->private;
-	if (!--a3d->used)
-		del_timer(&a3d->timer);
+
+	gameport_stop_polling(a3d->gameport);
 }
 
 /*
  * a3d_connect() probes for A3D joysticks.
  */
 
-static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
+static int a3d_connect(struct gameport *gameport, struct gameport_driver *drv)
 {
 	struct a3d *a3d;
+	struct gameport *adc;
 	unsigned char data[A3D_MAX_LENGTH];
 	int i;
+	int err;
 
-	if (!(a3d = kmalloc(sizeof(struct a3d), GFP_KERNEL)))
-		return;
-	memset(a3d, 0, sizeof(struct a3d));
-
-	gameport->private = a3d;
+	if (!(a3d = kcalloc(1, sizeof(struct a3d), GFP_KERNEL)))
+		return -ENOMEM;
 
 	a3d->gameport = gameport;
-	init_timer(&a3d->timer);
-	a3d->timer.data = (long) a3d;
-	a3d->timer.function = a3d_timer;
 
-	if (gameport_open(gameport, dev, GAMEPORT_MODE_RAW))
+	gameport_set_drvdata(gameport, a3d);
+
+	err = gameport_open(gameport, drv, GAMEPORT_MODE_RAW);
+	if (err)
 		goto fail1;
 
 	i = a3d_read_packet(gameport, A3D_MAX_LENGTH, data);
 
-	if (!i || a3d_csum(data, i))
+	if (!i || a3d_csum(data, i)) {
+		err = -ENODEV;
 		goto fail2;
+	}
 
 	a3d->mode = data[0];
 
 	if (!a3d->mode || a3d->mode > 5) {
 		printk(KERN_WARNING "a3d.c: Unknown A3D device detected "
 			"(%s, id=%d), contact <vojtech@ucw.cz>\n", gameport->phys, a3d->mode);
+		err = -ENODEV;
 		goto fail2;
 	}
 
+	gameport_set_poll_handler(gameport, a3d_poll);
+	gameport_set_poll_interval(gameport, 20);
+
 	sprintf(a3d->phys, "%s/input0", gameport->phys);
-	sprintf(a3d->adcphys, "%s/gameport0", gameport->phys);
 
 	if (a3d->mode == A3D_MODE_PXL) {
 
@@ -315,16 +322,11 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 		a3d_read(a3d, data);
 
 		for (i = 0; i < 4; i++) {
-			if (i < 2) {
-				a3d->dev.absmin[axes[i]] = 48;
-				a3d->dev.absmax[axes[i]] = a3d->dev.abs[axes[i]] * 2 - 48;
-				a3d->dev.absflat[axes[i]] = 8;
-			} else {
-				a3d->dev.absmin[axes[i]] = 2;
-				a3d->dev.absmax[axes[i]] = 253;
-			}
-			a3d->dev.absmin[ABS_HAT0X + i] = -1;
-			a3d->dev.absmax[ABS_HAT0X + i] = 1;
+			if (i < 2)
+				input_set_abs_params(&a3d->dev, axes[i], 48, a3d->dev.abs[axes[i]] * 2 - 48, 0, 8);
+			else
+				input_set_abs_params(&a3d->dev, axes[i], 2, 253, 0, 0);
+			input_set_abs_params(&a3d->dev, ABS_HAT0X + i, -1, 1, 0, 0);
 		}
 
 	} else {
@@ -336,23 +338,23 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 		a3d->dev.relbit[0] |= BIT(REL_X) | BIT(REL_Y);
 		a3d->dev.keybit[LONG(BTN_MOUSE)] |= BIT(BTN_RIGHT) | BIT(BTN_LEFT) | BIT(BTN_MIDDLE);
 
-		a3d->adc.driver = a3d;
-		a3d->adc.open = a3d_adc_open;
-		a3d->adc.close = a3d_adc_close;
-		a3d->adc.cooked_read = a3d_adc_cooked_read;
-		a3d->adc.fuzz = 1;
-
-		a3d->adc.name = a3d_names[a3d->mode];
-		a3d->adc.phys = a3d->adcphys;
-		a3d->adc.id.bustype = BUS_GAMEPORT;
-		a3d->adc.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
-		a3d->adc.id.product = a3d->mode;
-		a3d->adc.id.version = 0x0100;
-
 		a3d_read(a3d, data);
 
-		gameport_register_port(&a3d->adc);
-		printk(KERN_INFO "gameport: %s on %s\n", a3d_names[a3d->mode], gameport->phys);
+		if (!(a3d->adc = adc = gameport_allocate_port()))
+			printk(KERN_ERR "a3d: Not enough memory for ADC port\n");
+		else {
+			adc->port_data = a3d;
+			adc->open = a3d_adc_open;
+			adc->close = a3d_adc_close;
+			adc->cooked_read = a3d_adc_cooked_read;
+			adc->fuzz = 1;
+
+			gameport_set_name(adc, a3d_names[a3d->mode]);
+			gameport_set_phys(adc, "%s/gameport0", gameport->phys);
+			adc->dev.parent = &gameport->dev;
+
+			gameport_register_port(adc);
+		}
 	}
 
 	a3d->dev.private = a3d;
@@ -369,36 +371,46 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 	input_register_device(&a3d->dev);
 	printk(KERN_INFO "input: %s on %s\n", a3d_names[a3d->mode], a3d->phys);
 
-	return;
+	return 0;
+
 fail2:	gameport_close(gameport);
-fail1:  kfree(a3d);
+fail1:  gameport_set_drvdata(gameport, NULL);
+	kfree(a3d);
+	return err;
 }
 
 static void a3d_disconnect(struct gameport *gameport)
 {
+	struct a3d *a3d = gameport_get_drvdata(gameport);
 
-	struct a3d *a3d = gameport->private;
 	input_unregister_device(&a3d->dev);
-	if (a3d->mode < A3D_MODE_PXL)
-		gameport_unregister_port(&a3d->adc);
+	if (a3d->adc) {
+		gameport_unregister_port(a3d->adc);
+		a3d->adc = NULL;
+	}
 	gameport_close(gameport);
+	gameport_set_drvdata(gameport, NULL);
 	kfree(a3d);
 }
 
-static struct gameport_dev a3d_dev = {
-	.connect =	a3d_connect,
-	.disconnect =	a3d_disconnect,
+static struct gameport_driver a3d_drv = {
+	.driver		= {
+		.name	= "adc",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= a3d_connect,
+	.disconnect	= a3d_disconnect,
 };
 
-int __init a3d_init(void)
+static int __init a3d_init(void)
 {
-	gameport_register_device(&a3d_dev);
+	gameport_register_driver(&a3d_drv);
 	return 0;
 }
 
-void __exit a3d_exit(void)
+static void __exit a3d_exit(void)
 {
-	gameport_unregister_device(&a3d_dev);
+	gameport_unregister_driver(&a3d_drv);
 }
 
 module_init(a3d_init);

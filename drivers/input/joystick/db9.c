@@ -619,7 +619,7 @@ static struct db9 __init *db9_probe(int *config, int nargs)
 	return db9;
 }
 
-int __init db9_init(void)
+static int __init db9_init(void)
 {
 	db9_base[0] = db9_probe(db9, db9_nargs);
 	db9_base[1] = db9_probe(db9_2, db9_nargs_2);
@@ -631,7 +631,7 @@ int __init db9_init(void)
 	return -ENODEV;
 }
 
-void __exit db9_exit(void)
+static void __exit db9_exit(void)
 {
 	int i, j;
 

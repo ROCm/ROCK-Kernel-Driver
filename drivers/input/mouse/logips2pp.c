@@ -202,6 +202,9 @@ static struct ps2pp_info *get_model_info(unsigned char model)
 	static struct ps2pp_info ps2pp_list[] = {
 		{ 12,	0,			PS2PP_SIDE_BTN},
 		{ 13,	0,			0 },
+		{ 15,	PS2PP_KIND_MX,					/* MX1000 */
+				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN | PS2PP_HWHEEL },
 		{ 40,	0,			PS2PP_SIDE_BTN },
 		{ 41,	0,			PS2PP_SIDE_BTN },
 		{ 42,	0,			PS2PP_SIDE_BTN },
@@ -210,9 +213,9 @@ static struct ps2pp_info *get_model_info(unsigned char model)
 		{ 51,	0,			0 },
 		{ 52,	PS2PP_KIND_WHEEL,	PS2PP_SIDE_BTN | PS2PP_WHEEL },
 		{ 53,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
-		{ 61,	PS2PP_KIND_MX,
+		{ 61,	PS2PP_KIND_MX,					/* MX700 */
 				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
-				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX700 */
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },
 		{ 73,	0,			PS2PP_SIDE_BTN },
 		{ 75,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
 		{ 76,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
@@ -222,15 +225,17 @@ static struct ps2pp_info *get_model_info(unsigned char model)
 		{ 88,	PS2PP_KIND_WHEEL,	PS2PP_WHEEL },
 		{ 96,	0,			0 },
 		{ 97,	PS2PP_KIND_TP3,		PS2PP_WHEEL | PS2PP_HWHEEL },
-		{ 100,	PS2PP_KIND_MX,
+		{ 100,	PS2PP_KIND_MX,					/* MX510 */
 				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
-				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX510 */
-		{ 112,	PS2PP_KIND_MX,
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },
+		{ 111,  PS2PP_KIND_MX,					/* MX300 */
+				PS2PP_WHEEL | PS2PP_EXTRA_BTN | PS2PP_TASK_BTN },
+		{ 112,	PS2PP_KIND_MX,					/* MX500 */
 				PS2PP_WHEEL | PS2PP_SIDE_BTN | PS2PP_TASK_BTN |
-				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },	/* MX500 */
-		{ 114,	PS2PP_KIND_MX,
+				PS2PP_EXTRA_BTN | PS2PP_NAV_BTN },
+		{ 114,	PS2PP_KIND_MX,					/* MX310 */
 				PS2PP_WHEEL | PS2PP_SIDE_BTN |
-				PS2PP_TASK_BTN | PS2PP_EXTRA_BTN },	/* M310 */
+				PS2PP_TASK_BTN | PS2PP_EXTRA_BTN },
 		{ }
 	};
 	int i;
@@ -238,6 +243,8 @@ static struct ps2pp_info *get_model_info(unsigned char model)
 	for (i = 0; ps2pp_list[i].model; i++)
 		if (model == ps2pp_list[i].model)
 			return &ps2pp_list[i];
+
+	printk(KERN_WARNING "logips2pp: Detected unknown logitech mouse model %d\n", model);
 	return NULL;
 }
 

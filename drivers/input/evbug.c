@@ -88,13 +88,13 @@ static struct input_handler evbug_handler = {
 	.id_table =	evbug_ids,
 };
 
-int __init evbug_init(void)
+static int __init evbug_init(void)
 {
 	input_register_handler(&evbug_handler);
 	return 0;
 }
 
-void __exit evbug_exit(void)
+static void __exit evbug_exit(void)
 {
 	input_unregister_handler(&evbug_handler);
 }

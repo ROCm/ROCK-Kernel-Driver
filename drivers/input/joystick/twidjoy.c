@@ -58,7 +58,9 @@
 #include <linux/serio.h>
 #include <linux/init.h>
 
-MODULE_DESCRIPTION("Handykey Twiddler keyboard as a joystick driver");
+#define DRIVER_DESC	"Handykey Twiddler keyboard as a joystick driver"
+
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 /*
@@ -147,7 +149,7 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy, struct pt_regs *regs
 
 static irqreturn_t twidjoy_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs)
 {
-	struct twidjoy *twidjoy = serio->private;
+	struct twidjoy *twidjoy = serio_get_drvdata(serio);
 
 	/* All Twiddler packets are 5 bytes. The fact that the first byte
 	 * has a MSB of 0 and all other bytes have a MSB of 1 can be used
@@ -175,9 +177,11 @@ static irqreturn_t twidjoy_interrupt(struct serio *serio, unsigned char data, un
 
 static void twidjoy_disconnect(struct serio *serio)
 {
-	struct twidjoy *twidjoy = serio->private;
+	struct twidjoy *twidjoy = serio_get_drvdata(serio);
+
 	input_unregister_device(&twidjoy->dev);
 	serio_close(serio);
+	serio_set_drvdata(serio, NULL);
 	kfree(twidjoy);
 }
 
@@ -187,17 +191,15 @@ static void twidjoy_disconnect(struct serio *serio)
  * it as an input device.
  */
 
-static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
+static int twidjoy_connect(struct serio *serio, struct serio_driver *drv)
 {
 	struct twidjoy_button_spec *bp;
 	struct twidjoy *twidjoy;
 	int i;
-
-	if (serio->type != (SERIO_RS232 | SERIO_TWIDJOY))
-		return;
+	int err;
 
 	if (!(twidjoy = kmalloc(sizeof(struct twidjoy), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset(twidjoy, 0, sizeof(struct twidjoy));
 
@@ -231,27 +233,45 @@ static void twidjoy_connect(struct serio *serio, struct serio_driver *drv)
 	}
 
 	twidjoy->dev.private = twidjoy;
-	serio->private = twidjoy;
 
-	if (serio_open(serio, drv)) {
+	serio_set_drvdata(serio, twidjoy);
+
+	err = serio_open(serio, drv);
+	if (err) {
+		serio_set_drvdata(serio, NULL);
 		kfree(twidjoy);
-		return;
+		return err;
 	}
 
 	input_register_device(&twidjoy->dev);
 
 	printk(KERN_INFO "input: %s on %s\n", twidjoy_name, serio->phys);
+
+	return 0;
 }
 
 /*
- * The serio device structure.
+ * The serio driver structure.
  */
+
+static struct serio_device_id twidjoy_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_TWIDJOY,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, twidjoy_serio_ids);
 
 static struct serio_driver twidjoy_drv = {
 	.driver		= {
 		.name	= "twidjoy",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= twidjoy_serio_ids,
 	.interrupt	= twidjoy_interrupt,
 	.connect	= twidjoy_connect,
 	.disconnect	= twidjoy_disconnect,

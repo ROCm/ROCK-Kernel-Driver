@@ -426,7 +426,7 @@ struct cm_state {
 	struct address_info mpu_data;
 #endif
 #ifdef CONFIG_SOUND_CMPCI_JOYSTICK
-	struct gameport gameport;
+	struct gameport *gameport;
 #endif
 
 	int	chip_version;
@@ -468,17 +468,17 @@ struct cm_state {
 
 static LIST_HEAD(devs);
 
-static	int	mpuio = 0;
-static	int	fmio = 0;
-static	int	joystick = 0;
-static	int	spdif_inverse = 0;
-static	int	spdif_loop = 0;
-static	int	spdif_out = 0;
-static	int	use_line_as_rear = 0;
-static	int	use_line_as_bass = 0;
-static	int	use_mic_as_bass = 0;
-static	int	mic_boost = 0;
-static	int	hw_copy = 0;
+static	int	mpuio;
+static	int	fmio;
+static	int	joystick;
+static	int	spdif_inverse;
+static	int	spdif_loop;
+static	int	spdif_out;
+static	int	use_line_as_rear;
+static	int	use_line_as_bass;
+static	int	use_mic_as_bass;
+static	int	mic_boost;
+static	int	hw_copy;
 module_param(mpuio, int, 0);
 module_param(fmio, int, 0);
 module_param(joystick, bool, 0);
@@ -2984,6 +2984,51 @@ static int query_chip(struct cm_state *s)
 	return ChipVersion;
 }
 
+#ifdef CONFIG_SOUND_CMPCI_JOYSTICK
+static int __devinit cm_create_gameport(struct cm_state *s, int io_port)
+{
+	struct gameport *gp;
+
+	if (!request_region(io_port, CM_EXTENT_GAME, "cmpci GAME")) {
+		printk(KERN_ERR "cmpci: gameport io ports 0x%#x in use\n", io_port);
+		return -EBUSY;
+	}
+
+	if (!(s->gameport = gp = gameport_allocate_port())) {
+		printk(KERN_ERR "cmpci: can not allocate memory for gameport\n");
+		release_region(io_port, CM_EXTENT_GAME);
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "C-Media GP");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(s->dev));
+	gp->dev.parent = &s->dev->dev;
+	gp->io = io_port;
+
+	/* enable joystick */
+	maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0, 0x02);
+
+	gameport_register_port(gp);
+
+	return 0;
+}
+
+static void __devexit cm_free_gameport(struct cm_state *s)
+{
+	if (s->gameport) {
+		int gpio = s->gameport->io;
+
+		gameport_unregister_port(s->gameport);
+		s->gameport = NULL;
+		maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0x02, 0);
+		release_region(gpio, CM_EXTENT_GAME);
+	}
+}
+#else
+static inline int cm_create_gameport(struct cm_state *s, int io_port) { return -ENOSYS; }
+static inline void cm_free_gameport(struct cm_state *s) { }
+#endif
+
 #define	echo_option(x)\
 if (x) strcat(options, "" #x " ")
 
@@ -3229,22 +3274,11 @@ static int __devinit cm_probe(struct pci_dev *pcidev, const struct pci_device_id
 	}
 skip_mpu:
 #endif
-#ifdef CONFIG_SOUND_CMPCI_JOYSTICK
-	/* enable joystick */
-	if (joystick) {
-		s->gameport.io = 0x200;
-		if (!request_region(s->gameport.io, CM_EXTENT_GAME, "cmpci GAME")) {
-			printk(KERN_ERR "cmpci: gameport io ports in use\n");
-			s->gameport.io = 0;
-	       	} else {
-			maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0, 0x02);
-			gameport_register_port(&s->gameport);
-		}
-	} else {
-		maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0x02, 0);
-		s->gameport.io = 0;
-	}
-#endif
+	/* disable joystick port */
+	maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0x02, 0);
+	if (joystick)
+		cm_create_gameport(s, 0x200);
+
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
 	/* put it into driver list */
@@ -3278,13 +3312,9 @@ static void __devexit cm_remove(struct pci_dev *dev)
 
 	if (!s)
 		return;
-#ifdef CONFIG_SOUND_CMPCI_JOYSTICK
-	if (s->gameport.io) {
-		gameport_unregister_port(&s->gameport);
-		release_region(s->gameport.io, CM_EXTENT_GAME);
-		maskb(s->iobase + CODEC_CMI_FUNCTRL1, ~0x02, 0);
-	}
-#endif
+
+	cm_free_gameport(s);
+
 #ifdef CONFIG_SOUND_CMPCI_FM
 	if (s->iosynth) {
 		/* disable FM */

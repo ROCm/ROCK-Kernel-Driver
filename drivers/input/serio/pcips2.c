@@ -150,7 +150,7 @@ static int __devinit pcips2_probe(struct pci_dev *dev, const struct pci_device_i
 	memset(ps2if, 0, sizeof(struct pcips2_data));
 	memset(serio, 0, sizeof(struct serio));
 
-	serio->type		= SERIO_8042;
+	serio->id.type		= SERIO_8042;
 	serio->write		= pcips2_write;
 	serio->open		= pcips2_open;
 	serio->close		= pcips2_close;

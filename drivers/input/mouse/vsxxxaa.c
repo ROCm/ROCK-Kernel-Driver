@@ -470,7 +470,7 @@ static irqreturn_t
 vsxxxaa_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
 		struct pt_regs *regs)
 {
-	struct vsxxxaa *mouse = serio->private;
+	struct vsxxxaa *mouse = serio_get_drvdata (serio);
 
 	vsxxxaa_queue_byte (mouse, data);
 	vsxxxaa_parse_buffer (mouse, regs);
@@ -481,25 +481,22 @@ vsxxxaa_interrupt (struct serio *serio, unsigned char data, unsigned int flags,
 static void
 vsxxxaa_disconnect (struct serio *serio)
 {
-	struct vsxxxaa *mouse = serio->private;
+	struct vsxxxaa *mouse = serio_get_drvdata (serio);
 
 	input_unregister_device (&mouse->dev);
 	serio_close (serio);
+	serio_set_drvdata (serio, NULL);
 	kfree (mouse);
 }
 
-static void
+static int
 vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 {
 	struct vsxxxaa *mouse;
-
-	if ((serio->type & SERIO_TYPE) != SERIO_RS232)
-		return;
-	if ((serio->type & SERIO_PROTO) != SERIO_VSXXXAA)
-		return;
+	int err;
 
 	if (!(mouse = kmalloc (sizeof (struct vsxxxaa), GFP_KERNEL)))
-		return;
+		return -ENOMEM;
 
 	memset (mouse, 0, sizeof (struct vsxxxaa));
 
@@ -522,7 +519,6 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	mouse->dev.absmax[ABS_Y] = 1023;
 
 	mouse->dev.private = mouse;
-	serio->private = mouse;
 
 	sprintf (mouse->name, "DEC VSXXX-AA/-GA mouse or VSXXX-AB digitizer");
 	sprintf (mouse->phys, "%s/input0", serio->phys);
@@ -532,9 +528,13 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	mouse->dev.dev = &serio->dev;
 	mouse->serio = serio;
 
-	if (serio_open (serio, drv)) {
+	serio_set_drvdata (serio, mouse);
+
+	err = serio_open (serio, drv);
+	if (err) {
+		serio_set_drvdata (serio, NULL);
 		kfree (mouse);
-		return;
+		return err;
 	}
 
 	/*
@@ -546,26 +546,41 @@ vsxxxaa_connect (struct serio *serio, struct serio_driver *drv)
 	input_register_device (&mouse->dev);
 
 	printk (KERN_INFO "input: %s on %s\n", mouse->name, mouse->phys);
+
+	return 0;
 }
+
+static struct serio_device_id vsxxaa_serio_ids[] = {
+	{
+		.type	= SERIO_RS232,
+		.proto	= SERIO_VSXXXAA,
+		.id	= SERIO_ANY,
+		.extra	= SERIO_ANY,
+	},
+	{ 0 }
+};
+
+MODULE_DEVICE_TABLE(serio, vsxxaa_serio_ids);
 
 static struct serio_driver vsxxxaa_drv = {
 	.driver		= {
 		.name	= "vsxxxaa",
 	},
 	.description	= DRIVER_DESC,
+	.id_table	= vsxxaa_serio_ids,
 	.connect	= vsxxxaa_connect,
 	.interrupt	= vsxxxaa_interrupt,
 	.disconnect	= vsxxxaa_disconnect,
 };
 
-int __init
+static int __init
 vsxxxaa_init (void)
 {
 	serio_register_driver(&vsxxxaa_drv);
 	return 0;
 }
 
-void __exit
+static void __exit
 vsxxxaa_exit (void)
 {
 	serio_unregister_driver(&vsxxxaa_drv);

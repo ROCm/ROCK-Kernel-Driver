@@ -35,8 +35,10 @@
 #include <linux/gameport.h>
 #include <linux/input.h>
 
+#define DRIVER_DESC	"Gravis GrIP protocol joystick driver"
+
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
-MODULE_DESCRIPTION("Gravis GrIP protocol joystick driver");
+MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
 #define GRIP_MODE_GPP		1
@@ -51,14 +53,10 @@ MODULE_LICENSE("GPL");
 #define GRIP_MAX_CHUNKS_XT	10
 #define GRIP_MAX_BITS_XT	30
 
-#define GRIP_REFRESH_TIME	HZ/50	/* 20 ms */
-
 struct grip {
 	struct gameport *gameport;
-	struct timer_list timer;
 	struct input_dev dev[2];
 	unsigned char mode[2];
-	int used;
 	int reads;
 	int bads;
 	char phys[2][32];
@@ -183,9 +181,9 @@ static int grip_xt_read_packet(struct gameport *gameport, int shift, unsigned in
  * grip_timer() repeatedly polls the joysticks and generates events.
  */
 
-static void grip_timer(unsigned long private)
+static void grip_poll(struct gameport *gameport)
 {
-	struct grip *grip = (void*) private;
+	struct grip *grip = gameport_get_drvdata(gameport);
 	unsigned int data[GRIP_LENGTH_XT];
 	struct input_dev *dev;
 	int i, j;
@@ -279,43 +277,39 @@ static void grip_timer(unsigned long private)
 
 		input_sync(dev);
 	}
-
-	mod_timer(&grip->timer, jiffies + GRIP_REFRESH_TIME);
 }
 
 static int grip_open(struct input_dev *dev)
 {
 	struct grip *grip = dev->private;
-	if (!grip->used++)
-		mod_timer(&grip->timer, jiffies + GRIP_REFRESH_TIME);
+
+	gameport_start_polling(grip->gameport);
 	return 0;
 }
 
 static void grip_close(struct input_dev *dev)
 {
 	struct grip *grip = dev->private;
-	if (!--grip->used)
-		del_timer(&grip->timer);
+
+	gameport_stop_polling(grip->gameport);
 }
 
-static void grip_connect(struct gameport *gameport, struct gameport_dev *dev)
+static int grip_connect(struct gameport *gameport, struct gameport_driver *drv)
 {
 	struct grip *grip;
 	unsigned int data[GRIP_LENGTH_XT];
 	int i, j, t;
+	int err;
 
-	if (!(grip = kmalloc(sizeof(struct grip), GFP_KERNEL)))
-		return;
-	memset(grip, 0, sizeof(struct grip));
-
-	gameport->private = grip;
+	if (!(grip = kcalloc(1, sizeof(struct grip), GFP_KERNEL)))
+		return -ENOMEM;
 
 	grip->gameport = gameport;
-	init_timer(&grip->timer);
-	grip->timer.data = (long) grip;
-	grip->timer.function = grip_timer;
 
-	 if (gameport_open(gameport, dev, GAMEPORT_MODE_RAW))
+	gameport_set_drvdata(gameport, grip);
+
+	err = gameport_open(gameport, drv, GAMEPORT_MODE_RAW);
+	if (err)
 		goto fail1;
 
 	for (i = 0; i < 2; i++) {
@@ -337,8 +331,13 @@ static void grip_connect(struct gameport *gameport, struct gameport_dev *dev)
 		}
 	}
 
-	if (!grip->mode[0] && !grip->mode[1])
+	if (!grip->mode[0] && !grip->mode[1]) {
+		err = -ENODEV;
 		goto fail2;
+	}
+
+	gameport_set_poll_handler(gameport, grip_poll);
+	gameport_set_poll_interval(gameport, 20);
 
 	for (i = 0; i < 2; i++)
 		if (grip->mode[i]) {
@@ -361,68 +360,62 @@ static void grip_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 			for (j = 0; (t = grip_abs[grip->mode[i]][j]) >= 0; j++) {
 
-				set_bit(t, grip->dev[i].absbit);
-
-				if (j < grip_cen[grip->mode[i]]) {
-					grip->dev[i].absmin[t] = 14;
-					grip->dev[i].absmax[t] = 52;
-					grip->dev[i].absfuzz[t] = 1;
-					grip->dev[i].absflat[t] = 2;
-					continue;
-				}
-
-				if (j < grip_anx[grip->mode[i]]) {
-					grip->dev[i].absmin[t] = 3;
-					grip->dev[i].absmax[t] = 57;
-					grip->dev[i].absfuzz[t] = 1;
-					continue;
-				}
-
-				grip->dev[i].absmin[t] = -1;
-				grip->dev[i].absmax[t] = 1;
+				if (j < grip_cen[grip->mode[i]])
+					input_set_abs_params(&grip->dev[i], t, 14, 52, 1, 2);
+				else if (j < grip_anx[grip->mode[i]])
+					input_set_abs_params(&grip->dev[i], t, 3, 57, 1, 0);
+				else
+					input_set_abs_params(&grip->dev[i], t, -1, 1, 0, 0);
 			}
 
 			for (j = 0; (t = grip_btn[grip->mode[i]][j]) >= 0; j++)
 				if (t > 0)
 					set_bit(t, grip->dev[i].keybit);
 
-			input_register_device(grip->dev + i);
-
 			printk(KERN_INFO "input: %s on %s\n",
 				grip_name[grip->mode[i]], gameport->phys);
+			input_register_device(grip->dev + i);
 		}
 
-	return;
+	return 0;
+
 fail2:	gameport_close(gameport);
-fail1:	kfree(grip);
+fail1:	gameport_set_drvdata(gameport, NULL);
+	kfree(grip);
+	return err;
 }
 
 static void grip_disconnect(struct gameport *gameport)
 {
+	struct grip *grip = gameport_get_drvdata(gameport);
 	int i;
 
-	struct grip *grip = gameport->private;
 	for (i = 0; i < 2; i++)
 		if (grip->mode[i])
 			input_unregister_device(grip->dev + i);
 	gameport_close(gameport);
+	gameport_set_drvdata(gameport, NULL);
 	kfree(grip);
 }
 
-static struct gameport_dev grip_dev = {
-	.connect =	grip_connect,
-	.disconnect =	grip_disconnect,
+static struct gameport_driver grip_drv = {
+	.driver		= {
+		.name	= "grip",
+	},
+	.description	= DRIVER_DESC,
+	.connect	= grip_connect,
+	.disconnect	= grip_disconnect,
 };
 
-int __init grip_init(void)
+static int __init grip_init(void)
 {
-	gameport_register_device(&grip_dev);
+	gameport_register_driver(&grip_drv);
 	return 0;
 }
 
-void __exit grip_exit(void)
+static void __exit grip_exit(void)
 {
-	gameport_unregister_device(&grip_dev);
+	gameport_unregister_driver(&grip_drv);
 }
 
 module_init(grip_init);

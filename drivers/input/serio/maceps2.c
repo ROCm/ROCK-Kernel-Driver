@@ -125,7 +125,7 @@ static struct serio * __init maceps2_allocate_port(int idx)
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (serio) {
 		memset(serio, 0, sizeof(struct serio));
-		serio->type		= SERIO_8042;
+		serio->id.type		= SERIO_8042;
 		serio->write		= maceps2_write;
 		serio->open		= maceps2_open;
 		serio->close		= maceps2_close;

@@ -71,6 +71,7 @@ struct mousedev {
 	struct mousedev_hw_data packet;
 	unsigned int pkt_count;
 	int old_x[4], old_y[4];
+	int frac_dx, frac_dy;
 	unsigned long touch;
 };
 
@@ -117,24 +118,31 @@ static struct mousedev mousedev_mix;
 
 static void mousedev_touchpad_event(struct input_dev *dev, struct mousedev *mousedev, unsigned int code, int value)
 {
-	int size;
+	int size, tmp;
+	enum { FRACTION_DENOM = 128 };
 
 	if (mousedev->touch) {
+		size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
+		if (size == 0) size = 256 * 2;
 		switch (code) {
 			case ABS_X:
-				size = dev->absmax[ABS_X] - dev->absmin[ABS_X];
-				if (size == 0) size = xres;
 				fx(0) = value;
-				if (mousedev->pkt_count >= 2)
-					mousedev->packet.dx = ((fx(0) - fx(1)) / 2 + (fx(1) - fx(2)) / 2) * xres / (size * 2);
+				if (mousedev->pkt_count >= 2) {
+					tmp = ((value - fx(2)) * (256 * FRACTION_DENOM)) / size;
+					tmp += mousedev->frac_dx;
+					mousedev->packet.dx = tmp / FRACTION_DENOM;
+					mousedev->frac_dx = tmp - mousedev->packet.dx * FRACTION_DENOM;
+				}
 				break;
 
 			case ABS_Y:
-				size = dev->absmax[ABS_Y] - dev->absmin[ABS_Y];
-				if (size == 0) size = yres;
 				fy(0) = value;
-				if (mousedev->pkt_count >= 2)
-					mousedev->packet.dy = -((fy(0) - fy(1)) / 2 + (fy(1) - fy(2)) / 2) * yres / (size * 2);
+				if (mousedev->pkt_count >= 2) {
+					tmp = -((value - fy(2)) * (256 * FRACTION_DENOM)) / size;
+					tmp += mousedev->frac_dy;
+					mousedev->packet.dy = tmp / FRACTION_DENOM;
+					mousedev->frac_dy = tmp - mousedev->packet.dy * FRACTION_DENOM;
+				}
 				break;
 		}
 	}
@@ -268,6 +276,8 @@ static void mousedev_touchpad_touch(struct mousedev *mousedev, int value)
 			clear_bit(0, &mousedev_mix.packet.buttons);
 		}
 		mousedev->touch = mousedev->pkt_count = 0;
+		mousedev->frac_dx = 0;
+		mousedev->frac_dy = 0;
 	}
 	else
 		if (!mousedev->touch)
@@ -445,7 +455,7 @@ static void mousedev_packet(struct mousedev_list *list, signed char *ps2_data)
 
 	switch (list->mode) {
 		case MOUSEDEV_EMUL_EXPS:
-			ps2_data[3] = mousedev_limit_delta(p->dz, 127);
+			ps2_data[3] = mousedev_limit_delta(p->dz, 7);
 			p->dz -= ps2_data[3];
 			ps2_data[3] = (ps2_data[3] & 0x0f) | ((p->buttons & 0x18) << 1);
 			list->bufsiz = 4;
@@ -585,12 +595,11 @@ static unsigned int mousedev_poll(struct file *file, poll_table *wait)
 {
 	struct mousedev_list *list = file->private_data;
 	poll_wait(file, &list->mousedev->wait, wait);
-	if (list->ready || list->buffer)
-		return POLLIN | POLLRDNORM;
-	return 0;
+	return ((list->ready || list->buffer) ? (POLLIN | POLLRDNORM) : 0) |
+		(list->mousedev->exist ? 0 : (POLLHUP | POLLERR));
 }
 
-struct file_operations mousedev_fops = {
+static struct file_operations mousedev_fops = {
 	.owner =	THIS_MODULE,
 	.read =		mousedev_read,
 	.write =	mousedev_write,
@@ -643,6 +652,7 @@ static struct input_handle *mousedev_connect(struct input_handler *handler, stru
 static void mousedev_disconnect(struct input_handle *handle)
 {
 	struct mousedev *mousedev = handle->private;
+	struct mousedev_list *list;
 
 	class_simple_device_remove(MKDEV(INPUT_MAJOR, MOUSEDEV_MINOR_BASE + mousedev->minor));
 	devfs_remove("input/mouse%d", mousedev->minor);
@@ -650,6 +660,9 @@ static void mousedev_disconnect(struct input_handle *handle)
 
 	if (mousedev->open) {
 		input_close_device(handle);
+		wake_up_interruptible(&mousedev->wait);
+		list_for_each_entry(list, &mousedev->list, node)
+			kill_fasync(&list->fasync, SIGIO, POLL_HUP);
 	} else {
 		if (mousedev_mix.open)
 			input_close_device(handle);

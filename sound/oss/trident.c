@@ -441,7 +441,7 @@ struct trident_card {
 	struct timer_list timer;
 
 	/* Game port support */
-	struct gameport gameport;
+	struct gameport *gameport;
 };
 
 enum dmabuf_mode {
@@ -4257,21 +4257,21 @@ trident_ac97_init(struct trident_card *card)
 static unsigned char
 trident_game_read(struct gameport *gameport)
 {
-	struct trident_card *card = gameport->driver;
+	struct trident_card *card = gameport->port_data;
 	return inb(TRID_REG(card, T4D_GAME_LEG));
 }
 
 static void
 trident_game_trigger(struct gameport *gameport)
 {
-	struct trident_card *card = gameport->driver;
+	struct trident_card *card = gameport->port_data;
 	outb(0xff, TRID_REG(card, T4D_GAME_LEG));
 }
 
 static int
 trident_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct trident_card *card = gameport->driver;
+	struct trident_card *card = gameport->port_data;
 	int i;
 
 	*buttons = (~inb(TRID_REG(card, T4D_GAME_LEG)) >> 4) & 0xf;
@@ -4288,7 +4288,7 @@ trident_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 static int
 trident_game_open(struct gameport *gameport, int mode)
 {
-	struct trident_card *card = gameport->driver;
+	struct trident_card *card = gameport->port_data;
 
 	switch (mode) {
 	case GAMEPORT_MODE_COOKED:
@@ -4301,6 +4301,31 @@ trident_game_open(struct gameport *gameport, int mode)
 	default:
 		return -1;
 	}
+
+	return 0;
+}
+
+static int __devinit
+trident_register_gameport(struct trident_card *card)
+{
+	struct gameport *gp;
+
+	card->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "trident: can not allocate memory for gameport\n");
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "Trident 4DWave");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(card->pci_dev));
+	gp->read = trident_game_read;
+	gp->trigger = trident_game_trigger;
+	gp->cooked_read = trident_game_cooked_read;
+	gp->open = trident_game_open;
+	gp->fuzz = 64;
+	gp->port_data = card;
+
+	gameport_register_port(gp);
 
 	return 0;
 }
@@ -4367,13 +4392,6 @@ trident_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 	card->banks[BANK_A].bitmap = 0UL;
 	card->banks[BANK_B].addresses = &bank_b_addrs;
 	card->banks[BANK_B].bitmap = 0UL;
-
-	card->gameport.driver = card;
-	card->gameport.fuzz = 64;
-	card->gameport.read = trident_game_read;
-	card->gameport.trigger = trident_game_trigger;
-	card->gameport.cooked_read = trident_game_cooked_read;
-	card->gameport.open = trident_game_open;
 
 	init_MUTEX(&card->open_sem);
 	spin_lock_init(&card->lock);
@@ -4508,7 +4526,7 @@ trident_probe(struct pci_dev *pci_dev, const struct pci_device_id *pci_id)
 	trident_enable_loop_interrupts(card);
 
 	/* Register gameport */
-	gameport_register_port(&card->gameport);
+	trident_register_gameport(card);
 
 out:
 	return rc;
@@ -4551,7 +4569,8 @@ trident_remove(struct pci_dev *pci_dev)
 	}
 
 	/* Unregister gameport */
-	gameport_unregister_port(&card->gameport);
+	if (card->gameport)
+		gameport_unregister_port(card->gameport);
 
 	/* Kill interrupts, and SP/DIF */
 	trident_disable_loop_interrupts(card);

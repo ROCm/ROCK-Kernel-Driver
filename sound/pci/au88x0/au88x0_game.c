@@ -44,20 +44,20 @@
 
 static unsigned char vortex_game_read(struct gameport *gameport)
 {
-	vortex_t *vortex = gameport->driver;
+	vortex_t *vortex = gameport->port_data;
 	return hwread(vortex->mmio, VORTEX_GAME_LEGACY);
 }
 
 static void vortex_game_trigger(struct gameport *gameport)
 {
-	vortex_t *vortex = gameport->driver;
+	vortex_t *vortex = gameport->port_data;
 	hwwrite(vortex->mmio, VORTEX_GAME_LEGACY, 0xff);
 }
 
 static int
 vortex_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	vortex_t *vortex = gameport->driver;
+	vortex_t *vortex = gameport->port_data;
 	int i;
 
 	*buttons = (~hwread(vortex->mmio, VORTEX_GAME_LEGACY) >> 4) & 0xf;
@@ -73,7 +73,7 @@ vortex_game_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 
 static int vortex_game_open(struct gameport *gameport, int mode)
 {
-	vortex_t *vortex = gameport->driver;
+	vortex_t *vortex = gameport->port_data;
 
 	switch (mode) {
 	case GAMEPORT_MODE_COOKED:
@@ -100,7 +100,7 @@ static int vortex_gameport_register(vortex_t * vortex)
 		return -1;
 	};
 	
-	vortex->gameport->driver = vortex;
+	vortex->gameport->port_data = vortex;
 	vortex->gameport->fuzz = 64;
 
 	vortex->gameport->read = vortex_game_read;

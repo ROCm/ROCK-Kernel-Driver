@@ -115,7 +115,7 @@ static int __devinit rpckbd_probe(struct device *dev)
 		return -ENOMEM;
 
 	memset(serio, 0, sizeof(struct serio));
-	serio->type		= SERIO_8042;
+	serio->id.type		= SERIO_8042;
 	serio->write		= rpckbd_write;
 	serio->open		= rpckbd_open;
 	serio->close		= rpckbd_close;

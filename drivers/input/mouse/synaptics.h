@@ -92,6 +92,7 @@ struct synaptics_hw_state {
 	unsigned int up:1;
 	unsigned int down:1;
 	unsigned char ext_buttons;
+	signed char scroll;
 };
 
 struct synaptics_data {
@@ -103,6 +104,7 @@ struct synaptics_data {
 
 	unsigned char pkt_type;			/* packet type - old, new, etc */
 	unsigned char mode;			/* current mode byte */
+	int scroll;
 };
 
 #endif /* _SYNAPTICS_H */

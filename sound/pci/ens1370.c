@@ -430,7 +430,7 @@ struct _snd_ensoniq {
 #endif
 
 #ifdef SUPPORT_JOYSTICK
-	struct gameport gameport;
+	struct gameport *gameport;
 #endif
 };
 
@@ -1734,43 +1734,99 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 #endif /* CHIP1370 */
 
 #ifdef SUPPORT_JOYSTICK
-static int snd_ensoniq_joystick(ensoniq_t *ensoniq, long port)
-{
+
 #ifdef CHIP1371
-	if (port == 1) { /* auto-detect */
-		for (port = 0x200; port <= 0x218; port += 8)
-			if (request_region(port, 8, "ens137x: gameport"))
-				break;
-		if (port > 0x218) {
-			snd_printk("no gameport available\n");
-			return -EBUSY;
-		}
-	} else
-#endif
-	{
-		if (!request_region(port, 8, "ens137x: gameport")) {
-			snd_printk("gameport io port 0x%03x in use", ensoniq->gameport.io);
-			return -EBUSY;
-		}
+static int __devinit snd_ensoniq_get_joystick_port(int dev)
+{
+	switch (joystick_port[dev]) {
+	case 0: /* disabled */
+	case 1: /* auto-detect */
+	case 0x200:
+	case 0x208:
+	case 0x210:
+	case 0x218:
+		return joystick_port[dev];
+
+	default:
+		printk(KERN_ERR "ens1371: invalid joystick port %#x", joystick_port[dev]);
+		return 0;
 	}
-	ensoniq->gameport.io = port;
+}
+#else
+static inline int snd_ensoniq_get_joystick_port(int dev)
+{
+	return joystick[dev] ? 0x200 : 0;
+}
+#endif
+
+static int __devinit snd_ensoniq_create_gameport(ensoniq_t *ensoniq, int dev)
+{
+	struct gameport *gp;
+	int io_port;
+
+	io_port = snd_ensoniq_get_joystick_port(dev);
+
+	switch (io_port) {
+	case 0:
+		return -ENOSYS;
+
+	case 1: /* auto_detect */
+		for (io_port = 0x200; io_port <= 0x218; io_port += 8)
+			if (request_region(io_port, 8, "ens137x: gameport"))
+				break;
+		if (io_port > 0x218) {
+			printk(KERN_WARNING "ens137x: no gameport ports available\n");
+			return -EBUSY;
+		}
+		break;
+
+	default:
+		if (!request_region(io_port, 8, "ens137x: gameport")) {
+			printk(KERN_WARNING "ens137x: gameport io port 0x%#x in use\n", io_port);
+			return -EBUSY;
+		}
+		break;
+	}
+
+	ensoniq->gameport = gp = gameport_allocate_port();
+	if (!gp) {
+		printk(KERN_ERR "ens137x: cannot allocate memory for gameport\n");
+		release_region(io_port, 8);
+		return -ENOMEM;
+	}
+
+	gameport_set_name(gp, "ES137x");
+	gameport_set_phys(gp, "pci%s/gameport0", pci_name(ensoniq->pci));
+	gp->dev.parent = &ensoniq->pci->dev;
+	gp->io = io_port;
+
 	ensoniq->ctrl |= ES_JYSTK_EN;
 #ifdef CHIP1371
 	ensoniq->ctrl &= ~ES_1371_JOY_ASELM;
-	ensoniq->ctrl |= ES_1371_JOY_ASEL((ensoniq->gameport.io - 0x200) / 8);
+	ensoniq->ctrl |= ES_1371_JOY_ASEL((io_port - 0x200) / 8);
 #endif
 	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
-	gameport_register_port(&ensoniq->gameport);
+
+	gameport_register_port(ensoniq->gameport);
+
 	return 0;
 }
 
-static void snd_ensoniq_joystick_free(ensoniq_t *ensoniq)
+static void snd_ensoniq_free_gameport(ensoniq_t *ensoniq)
 {
-	gameport_unregister_port(&ensoniq->gameport);
-	ensoniq->ctrl &= ~ES_JYSTK_EN;
-	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
-	release_region(ensoniq->gameport.io, 8);
+	if (ensoniq->gameport) {
+		int port = ensoniq->gameport->io;
+
+		gameport_unregister_port(ensoniq->gameport);
+		ensoniq->gameport = NULL;
+		ensoniq->ctrl &= ~ES_JYSTK_EN;
+		outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
+		release_region(port, 8);
+	}
 }
+#else
+static inline int snd_ensoniq_create_gameport(ensoniq_t *ensoniq, long port) { return -ENOSYS; }
+static inline void snd_ensoniq_free_gameport(ensoniq_t *ensoniq) { }
 #endif /* SUPPORT_JOYSTICK */
 
 /*
@@ -1810,10 +1866,7 @@ static void __devinit snd_ensoniq_proc_init(ensoniq_t * ensoniq)
 
 static int snd_ensoniq_free(ensoniq_t *ensoniq)
 {
-#ifdef SUPPORT_JOYSTICK
-	if (ensoniq->ctrl & ES_JYSTK_EN)
-		snd_ensoniq_joystick_free(ensoniq);
-#endif
+	snd_ensoniq_free_gameport(ensoniq);
 	if (ensoniq->irq < 0)
 		goto __hw_end;
 #ifdef CHIP1370
@@ -2313,22 +2366,9 @@ static int __devinit snd_audiopci_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-#ifdef SUPPORT_JOYSTICK
-#ifdef CHIP1371
-	switch (joystick_port[dev]) {
-	case 1: /* auto-detect */
-	case 0x200:
-	case 0x208:
-	case 0x210:
-	case 0x218:
-		snd_ensoniq_joystick(ensoniq, joystick_port[dev]);
-		break;
-	}
-#else
-	if (joystick[dev])
-		snd_ensoniq_joystick(ensoniq, 0x200);
-#endif
-#endif /* SUPPORT_JOYSTICK */
+
+	snd_ensoniq_create_gameport(ensoniq, dev);
+
 	strcpy(card->driver, DRIVER_NAME);
 
 	strcpy(card->shortname, "Ensoniq AudioPCI");

@@ -16,7 +16,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 
-MODULE_AUTHOR("Victor Krapivin <vik@belcaf.minsk.by>");
+MODULE_AUTHOR("Victor Krapivin");
 MODULE_LICENSE("GPL");
 
 /*
@@ -120,9 +120,6 @@ MODULE_LICENSE("GPL");
 static unsigned long ba0_addr;
 static unsigned int __iomem *ba0;
 
-static char phys[32];
-static char name[] = "CS416x Gameport";
-
 #ifdef CS461X_FULL_MAP
 static unsigned long ba1_addr;
 static union ba1_t {
@@ -160,10 +157,10 @@ static unsigned int cs461x_peekBA0(unsigned long reg)
 static int cs461x_free(struct pci_dev *pdev)
 {
 	struct gameport *port = pci_get_drvdata(pdev);
-	if(port){
+
+	if (port)
 	    gameport_unregister_port(port);
-	    kfree(port);
-	}
+
 	if (ba0) iounmap(ba0);
 #ifdef CS461X_FULL_MAP
 	if (ba1.name.data0) iounmap(ba1.name.data0);
@@ -267,18 +264,17 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
                 return -ENOMEM;
         }
 #else
-	if (ba0 == NULL){
+	if (ba0 == NULL) {
 		cs461x_free(pdev);
 		return -ENOMEM;
 	}
 #endif
 
-	if (!(port = kmalloc(sizeof(struct gameport), GFP_KERNEL))) {
-		printk(KERN_ERR "Memory allocation failed.\n");
+	if (!(port = gameport_allocate_port())) {
+		printk(KERN_ERR "cs461x: Memory allocation failed\n");
 		cs461x_free(pdev);
 		return -ENOMEM;
 	}
-	memset(port, 0, sizeof(struct gameport));
 
 	pci_set_drvdata(pdev, port);
 
@@ -287,21 +283,14 @@ static int __devinit cs461x_pci_probe(struct pci_dev *pdev, const struct pci_dev
 	port->read = cs461x_gameport_read;
 	port->cooked_read = cs461x_gameport_cooked_read;
 
-	sprintf(phys, "pci%s/gameport0", pci_name(pdev));
-
-	port->name = name;
-	port->phys = phys;
-	port->id.bustype = BUS_PCI;
-	port->id.vendor = pdev->vendor;
-	port->id.product = pdev->device;
+	gameport_set_name(port, "CS416x");
+	gameport_set_phys(port, "pci%s/gameport0", pci_name(pdev));
+	port->dev.parent = &pdev->dev;
 
 	cs461x_pokeBA0(BA0_JSIO, 0xFF); // ?
 	cs461x_pokeBA0(BA0_JSCTL, JSCTL_SP_MEDIUM_SLOW);
 
 	gameport_register_port(port);
-
-	printk(KERN_INFO "gameport: %s on pci%s speed %d kHz\n",
-		name, pci_name(pdev), port->speed);
 
 	return 0;
 }
@@ -318,12 +307,12 @@ static struct pci_driver cs461x_pci_driver = {
         .remove =       __devexit_p(cs461x_pci_remove),
 };
 
-int __init cs461x_init(void)
+static int __init cs461x_init(void)
 {
         return pci_module_init(&cs461x_pci_driver);
 }
 
-void __exit cs461x_exit(void)
+static void __exit cs461x_exit(void)
 {
         pci_unregister_driver(&cs461x_pci_driver);
 }

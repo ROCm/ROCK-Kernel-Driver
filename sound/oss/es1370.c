@@ -384,7 +384,7 @@ struct es1370_state {
 		unsigned char obuf[MIDIOUTBUF];
 	} midi;
 
-	struct gameport gameport;
+	struct gameport *gameport;
 	struct semaphore sem;
 };
 
@@ -2556,6 +2556,7 @@ static struct initvol {
 static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_device_id *pciid)
 {
 	struct es1370_state *s;
+	struct gameport *gp = NULL;
 	mm_segment_t fs;
 	int i, val, ret;
 
@@ -2604,12 +2605,17 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 	/* note: setting CTRL_SERR_DIS is reported to break
 	 * mic bias setting (by Kim.Berts@fisub.mail.abb.com) */
 	s->ctrl = CTRL_CDC_EN | (DAC2_SRTODIV(8000) << CTRL_SH_PCLKDIV) | (1 << CTRL_SH_WTSRSEL);
-	s->gameport.io = 0;
-	if (!request_region(0x200, JOY_EXTENT, "es1370"))
+	if (!request_region(0x200, JOY_EXTENT, "es1370")) {
 		printk(KERN_ERR "es1370: joystick io port 0x200 in use\n");
-	else {
+	} else if (!(s->gameport = gp = gameport_allocate_port())) {
+		printk(KERN_ERR "es1370: can not allocate memory for gameport\n");
+		release_region(0x200, JOY_EXTENT);
+	} else {
+		gameport_set_name(gp, "ESS1370");
+		gameport_set_phys(gp, "pci%s/gameport0", pci_name(s->dev));
+		gp->dev.parent = &s->dev->dev;
+		gp->io = 0x200;
 		s->ctrl |= CTRL_JYSTK_EN;
-		s->gameport.io = 0x200;
 	}
 	if (lineout[devindex])
 		s->ctrl |= CTRL_XCTL0;
@@ -2665,9 +2671,10 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
 		mixer_ioctl(s, initvol[i].mixch, (unsigned long)&val);
 	}
 	set_fs(fs);
+
 	/* register gameport */
-	if (s->gameport.io)
-		gameport_register_port(&s->gameport);
+	if (gp)
+		gameport_register_port(gp);
 
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
@@ -2689,8 +2696,10 @@ static int __devinit es1370_probe(struct pci_dev *pcidev, const struct pci_devic
  err_dev1:
 	printk(KERN_ERR "es1370: cannot register misc device\n");
 	free_irq(s->irq, s);
-	if (s->gameport.io)
-		release_region(s->gameport.io, JOY_EXTENT);
+	if (s->gameport) {
+		release_region(s->gameport->io, JOY_EXTENT);
+		gameport_free_port(s->gameport);
+	}
  err_irq:
 	release_region(s->io, ES1370_EXTENT);
  err_region:
@@ -2709,9 +2718,10 @@ static void __devexit es1370_remove(struct pci_dev *dev)
 	outl(0, s->io+ES1370_REG_SERIAL_CONTROL); /* clear serial interrupts */
 	synchronize_irq(s->irq);
 	free_irq(s->irq, s);
-	if (s->gameport.io) {
-		gameport_unregister_port(&s->gameport);
-		release_region(s->gameport.io, JOY_EXTENT);
+	if (s->gameport) {
+		int gpio = s->gameport->io;
+		gameport_unregister_port(s->gameport);
+		release_region(gpio, JOY_EXTENT);
 	}
 	release_region(s->io, ES1370_EXTENT);
 	unregister_sound_dsp(s->dev_audio);

@@ -54,12 +54,11 @@ MODULE_DESCRIPTION("PDPI Lightning 4 gamecard driver");
 MODULE_LICENSE("GPL");
 
 struct l4 {
-	struct gameport gameport;
+	struct gameport *gameport;
 	unsigned char port;
-	char phys[32];
-} *l4_port[8];
+};
 
-char l4_name[] = "PDPI Lightning 4";
+static struct l4 l4_ports[8];
 
 /*
  * l4_wait_ready() waits for the L4 to become ready.
@@ -67,10 +66,10 @@ char l4_name[] = "PDPI Lightning 4";
 
 static int l4_wait_ready(void)
 {
-	unsigned int t;
-	t = L4_TIMEOUT;
+	unsigned int t = L4_TIMEOUT;
+
 	while ((inb(L4_PORT) & L4_BUSY) && t > 0) t--;
-	return -(t<=0);
+	return -(t <= 0);
 }
 
 /*
@@ -79,7 +78,7 @@ static int l4_wait_ready(void)
 
 static int l4_cooked_read(struct gameport *gameport, int *axes, int *buttons)
 {
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->port_data;
 	unsigned char status;
 	int i, result = -1;
 
@@ -112,7 +111,8 @@ fail:	outb(L4_SELECT_ANALOG, L4_PORT);
 
 static int l4_open(struct gameport *gameport, int mode)
 {
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->port_data;
+
         if (l4->port != 0 && mode != GAMEPORT_MODE_COOKED)
 		return -1;
 	outb(L4_SELECT_ANALOG, L4_PORT);
@@ -129,24 +129,29 @@ static int l4_getcal(int port, int *cal)
 
 	outb(L4_SELECT_ANALOG, L4_PORT);
 	outb(L4_SELECT_DIGITAL + (port >> 2), L4_PORT);
+	if (inb(L4_PORT) & L4_BUSY)
+		goto out;
 
-	if (inb(L4_PORT) & L4_BUSY) goto fail;
 	outb(L4_CMD_GETCAL, L4_PORT);
+	if (l4_wait_ready())
+		goto out;
 
-	if (l4_wait_ready()) goto fail;
-	if (inb(L4_PORT) != L4_SELECT_DIGITAL + (port >> 2)) goto fail;
+	if (inb(L4_PORT) != L4_SELECT_DIGITAL + (port >> 2))
+		goto out;
 
-	if (l4_wait_ready()) goto fail;
+	if (l4_wait_ready())
+		goto out;
         outb(port & 3, L4_PORT);
 
 	for (i = 0; i < 4; i++) {
-		if (l4_wait_ready()) goto fail;
+		if (l4_wait_ready())
+			goto out;
 		cal[i] = inb(L4_PORT);
 	}
 
 	result = 0;
 
-fail:	outb(L4_SELECT_ANALOG, L4_PORT);
+out:	outb(L4_SELECT_ANALOG, L4_PORT);
 	return result;
 }
 
@@ -160,24 +165,29 @@ static int l4_setcal(int port, int *cal)
 
 	outb(L4_SELECT_ANALOG, L4_PORT);
 	outb(L4_SELECT_DIGITAL + (port >> 2), L4_PORT);
+	if (inb(L4_PORT) & L4_BUSY)
+		goto out;
 
-	if (inb(L4_PORT) & L4_BUSY) goto fail;
 	outb(L4_CMD_SETCAL, L4_PORT);
+	if (l4_wait_ready())
+		goto out;
 
-	if (l4_wait_ready()) goto fail;
-	if (inb(L4_PORT) != L4_SELECT_DIGITAL + (port >> 2)) goto fail;
+	if (inb(L4_PORT) != L4_SELECT_DIGITAL + (port >> 2))
+		goto out;
 
-	if (l4_wait_ready()) goto fail;
+	if (l4_wait_ready())
+		goto out;
         outb(port & 3, L4_PORT);
 
 	for (i = 0; i < 4; i++) {
-		if (l4_wait_ready()) goto fail;
+		if (l4_wait_ready())
+			goto out;
 		outb(cal[i], L4_PORT);
 	}
 
 	result = 0;
 
-fail:	outb(L4_SELECT_ANALOG, L4_PORT);
+out:	outb(L4_SELECT_ANALOG, L4_PORT);
 	return result;
 }
 
@@ -190,7 +200,7 @@ static int l4_calibrate(struct gameport *gameport, int *axes, int *max)
 {
 	int i, t;
 	int cal[4];
-	struct l4 *l4 = gameport->driver;
+	struct l4 *l4 = gameport->port_data;
 
 	if (l4_getcal(l4->port, cal))
 		return -1;
@@ -209,72 +219,101 @@ static int l4_calibrate(struct gameport *gameport, int *axes, int *max)
 	return 0;
 }
 
+static int __init l4_create_ports(int card_no)
+{
+	struct l4 *l4;
+	struct gameport *port;
+	int i, idx;
+
+	for (i = 0; i < 4; i++) {
+
+		idx = card_no * 4 + i;
+		l4 = &l4_ports[idx];
+
+		if (!(l4->gameport = port = gameport_allocate_port())) {
+			printk(KERN_ERR "lightning: Memory allocation failed\n");
+			while (--i >= 0) {
+				gameport_free_port(l4->gameport);
+				l4->gameport = NULL;
+			}
+			return -ENOMEM;
+		}
+		l4->port = idx;
+
+		port->port_data = l4;
+		port->open = l4_open;
+		port->cooked_read = l4_cooked_read;
+		port->calibrate = l4_calibrate;
+
+		gameport_set_name(port, "PDPI Lightning 4");
+		gameport_set_phys(port, "isa%04x/gameport%d", L4_PORT, idx);
+
+		if (idx == 0)
+			port->io = L4_PORT;
+	}
+
+	return 0;
+}
+
+static int __init l4_add_card(int card_no)
+{
+	int cal[4] = { 255, 255, 255, 255 };
+	int i, rev, result;
+	struct l4 *l4;
+
+	outb(L4_SELECT_ANALOG, L4_PORT);
+	outb(L4_SELECT_DIGITAL + card_no, L4_PORT);
+
+	if (inb(L4_PORT) & L4_BUSY)
+		return -1;
+	outb(L4_CMD_ID, L4_PORT);
+
+	if (l4_wait_ready())
+		return -1;
+
+	if (inb(L4_PORT) != L4_SELECT_DIGITAL + card_no)
+		return -1;
+
+	if (l4_wait_ready())
+		return -1;
+	if (inb(L4_PORT) != L4_ID)
+		return -1;
+
+	if (l4_wait_ready())
+		return -1;
+	rev = inb(L4_PORT);
+
+	if (!rev)
+		return -1;
+
+	result = l4_create_ports(card_no);
+	if (result)
+		return result;
+
+	printk(KERN_INFO "gameport: PDPI Lightning 4 %s card v%d.%d at %#x\n",
+		card_no ? "secondary" : "primary", rev >> 4, rev, L4_PORT);
+
+	for (i = 0; i < 4; i++) {
+		l4 = &l4_ports[card_no * 4 + i];
+
+		if (rev > 0x28)		/* on 2.9+ the setcal command works correctly */
+			l4_setcal(l4->port, cal);
+		gameport_register_port(l4->gameport);
+	}
+
+	return 0;
+}
+
 static int __init l4_init(void)
 {
-	int cal[4] = {255,255,255,255};
-	int i, j, rev, cards = 0;
-	struct gameport *gameport;
-	struct l4 *l4;
+	int i, cards = 0;
 
 	if (!request_region(L4_PORT, 1, "lightning"))
 		return -1;
 
-	for (i = 0; i < 2; i++) {
-
-		outb(L4_SELECT_ANALOG, L4_PORT);
-		outb(L4_SELECT_DIGITAL + i, L4_PORT);
-
-		if (inb(L4_PORT) & L4_BUSY) continue;
-		outb(L4_CMD_ID, L4_PORT);
-
-		if (l4_wait_ready()) continue;
-		if (inb(L4_PORT) != L4_SELECT_DIGITAL + i) continue;
-
-		if (l4_wait_ready()) continue;
-		if (inb(L4_PORT) != L4_ID) continue;
-
-		if (l4_wait_ready()) continue;
-		rev = inb(L4_PORT);
-
-		if (!rev) continue;
-
-		if (!(l4_port[i * 4] = kmalloc(sizeof(struct l4) * 4, GFP_KERNEL))) {
-			printk(KERN_ERR "lightning: Out of memory allocating ports.\n");
-			continue;
-		}
-		memset(l4_port[i * 4], 0, sizeof(struct l4) * 4);
-
-		for (j = 0; j < 4; j++) {
-
-			l4 = l4_port[i * 4 + j] = l4_port[i * 4] + j;
-			l4->port = i * 4 + j;
-
-			sprintf(l4->phys, "isa%04x/gameport%d", L4_PORT, 4 * i + j);
-
-			gameport = &l4->gameport;
-			gameport->driver = l4;
-			gameport->open = l4_open;
-			gameport->cooked_read = l4_cooked_read;
-			gameport->calibrate = l4_calibrate;
-
-			gameport->name = l4_name;
-			gameport->phys = l4->phys;
-			gameport->id.bustype = BUS_ISA;
-
-			if (!i && !j)
-				gameport->io = L4_PORT;
-
-			if (rev > 0x28)		/* on 2.9+ the setcal command works correctly */
-				l4_setcal(l4->port, cal);
-
-			gameport_register_port(gameport);
-		}
-
-		printk(KERN_INFO "gameport: PDPI Lightning 4 %s card v%d.%d at %#x\n",
-			i ? "secondary" : "primary", rev >> 4, rev, L4_PORT);
-
-		cards++;
-	}
+	for (i = 0; i < 2; i++)
+		if (l4_add_card(i) == 0)
+			cards++;
 
 	outb(L4_SELECT_ANALOG, L4_PORT);
 
@@ -289,13 +328,14 @@ static int __init l4_init(void)
 static void __exit l4_exit(void)
 {
 	int i;
-	int cal[4] = {59, 59, 59, 59};
+	int cal[4] = { 59, 59, 59, 59 };
 
 	for (i = 0; i < 8; i++)
-		if (l4_port[i]) {
-			l4_setcal(l4_port[i]->port, cal);
-			gameport_unregister_port(&l4_port[i]->gameport);
+		if (l4_ports[i].gameport) {
+			l4_setcal(l4_ports[i].port, cal);
+			gameport_unregister_port(l4_ports[i].gameport);
 		}
+
 	outb(L4_SELECT_ANALOG, L4_PORT);
 	release_region(L4_PORT, 1);
 }

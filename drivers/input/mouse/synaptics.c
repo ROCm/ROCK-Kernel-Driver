@@ -229,7 +229,7 @@ static void synaptics_set_rate(struct psmouse *psmouse, unsigned int rate)
  ****************************************************************************/
 static int synaptics_pt_write(struct serio *serio, unsigned char c)
 {
-	struct psmouse *parent = serio->parent->private;
+	struct psmouse *parent = serio_get_drvdata(serio->parent);
 	char rate_param = SYN_PS_CLIENT_CMD; /* indicates that we want pass-through port */
 
 	if (psmouse_sliced_command(parent, c))
@@ -246,7 +246,7 @@ static inline int synaptics_is_pt_packet(unsigned char *buf)
 
 static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet)
 {
-	struct psmouse *child = ptport->private;
+	struct psmouse *child = serio_get_drvdata(ptport);
 
 	if (child && child->state == PSMOUSE_ACTIVATED) {
 		serio_interrupt(ptport, packet[1], 0, NULL);
@@ -260,7 +260,8 @@ static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet
 
 static void synaptics_pt_activate(struct psmouse *psmouse)
 {
-	struct psmouse *child = psmouse->ps2dev.serio->child->private;
+	struct serio *ptport = psmouse->ps2dev.serio->child;
+	struct psmouse *child = serio_get_drvdata(ptport);
 	struct synaptics_data *priv = psmouse->private;
 
 	/* adjust the touchpad to child's choice of protocol */
@@ -287,7 +288,7 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 
 	memset(serio, 0, sizeof(struct serio));
 
-	serio->type = SERIO_PS_PSTHRU;
+	serio->id.type = SERIO_PS_PSTHRU;
 	strlcpy(serio->name, "Synaptics pass-through", sizeof(serio->name));
 	strlcpy(serio->phys, "synaptics-pt/serio0", sizeof(serio->name));
 	serio->write = synaptics_pt_write;
@@ -295,7 +296,8 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 
 	psmouse->pt_activate = synaptics_pt_activate;
 
-	psmouse->ps2dev.serio->child = serio;
+	printk(KERN_INFO "serio: %s port at %s\n", serio->name, psmouse->phys);
+	serio_register_port(serio);
 }
 
 /*****************************************************************************
@@ -322,8 +324,11 @@ static void synaptics_parse_hw_state(unsigned char buf[], struct synaptics_data 
 		hw->left  = (buf[0] & 0x01) ? 1 : 0;
 		hw->right = (buf[0] & 0x02) ? 1 : 0;
 
-		if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
+		if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities)) {
 			hw->middle = ((buf[0] ^ buf[3]) & 0x01) ? 1 : 0;
+			if (hw->w == 2)
+				hw->scroll = (signed char)(buf[1]);
+		}
 
 		if (SYN_CAP_FOUR_BUTTON(priv->capabilities)) {
 			hw->up   = ((buf[0] ^ buf[3]) & 0x01) ? 1 : 0;
@@ -378,6 +383,26 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	int i;
 
 	synaptics_parse_hw_state(psmouse->packet, priv, &hw);
+
+	if (hw.scroll) {
+		priv->scroll += hw.scroll;
+
+		while (priv->scroll >= 4) {
+			input_report_key(dev, BTN_BACK, !hw.down);
+			input_sync(dev);
+			input_report_key(dev, BTN_BACK, hw.down);
+			input_sync(dev);
+			priv->scroll -= 4;
+		}
+		while (priv->scroll <= -4) {
+			input_report_key(dev, BTN_FORWARD, !hw.up);
+			input_sync(dev);
+			input_report_key(dev, BTN_FORWARD, hw.up);
+			input_sync(dev);
+			priv->scroll += 4;
+		}
+		return;
+	}
 
 	if (hw.z > 0) {
 		num_fingers = 1;
@@ -528,7 +553,8 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 	if (SYN_CAP_MIDDLE_BUTTON(priv->capabilities))
 		set_bit(BTN_MIDDLE, dev->keybit);
 
-	if (SYN_CAP_FOUR_BUTTON(priv->capabilities)) {
+	if (SYN_CAP_FOUR_BUTTON(priv->capabilities) ||
+	    SYN_CAP_MIDDLE_BUTTON(priv->capabilities)) {
 		set_bit(BTN_FORWARD, dev->keybit);
 		set_bit(BTN_BACK, dev->keybit);
 	}
@@ -551,6 +577,7 @@ static void synaptics_disconnect(struct psmouse *psmouse)
 {
 	synaptics_reset(psmouse);
 	kfree(psmouse->private);
+	psmouse->private = NULL;
 }
 
 static int synaptics_reconnect(struct psmouse *psmouse)
@@ -639,9 +666,6 @@ int synaptics_init(struct psmouse *psmouse)
 
 	priv->pkt_type = SYN_MODEL_NEWABS(priv->model_id) ? SYN_NEWABS : SYN_OLDABS;
 
-	if (SYN_CAP_PASS_THROUGH(priv->capabilities))
-		synaptics_pt_create(psmouse);
-
 	print_ident(priv);
 	set_input_params(&psmouse->dev, priv);
 
@@ -650,6 +674,9 @@ int synaptics_init(struct psmouse *psmouse)
 	psmouse->disconnect = synaptics_disconnect;
 	psmouse->reconnect = synaptics_reconnect;
 	psmouse->pktsize = 6;
+
+	if (SYN_CAP_PASS_THROUGH(priv->capabilities))
+		synaptics_pt_create(psmouse);
 
 #if defined(__i386__)
 	/*

@@ -19,6 +19,51 @@ config GAMEPORT
 	  To compile this driver as a module, choose M here: the
 	  module will be called gameport.
 
+if GAMEPORT
+
+config GAMEPORT_NS558
+	tristate "Classic ISA and PnP gameport support"
+	help
+	  Say Y here if you have an ISA or PnP gameport.
+
+	  If unsure, say Y.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called ns558.
+
+config GAMEPORT_L4
+	tristate "PDPI Lightning 4 gamecard support"
+	help
+	  Say Y here if you have a PDPI Lightning 4 gamecard.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called lightning.
+
+config GAMEPORT_EMU10K1
+	tristate "SB Live and Audigy gameport support"
+	help
+	  Say Y here if you have a SoundBlaster Live! or SoundBlaster
+	  Audigy card and want to use its gameport.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called emu10k1-gp.
+
+config GAMEPORT_VORTEX
+	tristate "Aureal Vortex, Vortex 2 gameport support"
+	help
+	  Say Y here if you have an Aureal Vortex 1 or 2  card and want
+	  to use its gameport.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called vortex.
+
+config GAMEPORT_FM801
+	tristate "ForteMedia FM801 gameport support"
+
+config GAMEPORT_CS461X
+	tristate "Crystal SoundFusion gameport support"
+
+endif
 
 # Yes, SOUND_GAMEPORT looks a bit odd. Yes, it ends up being turned on
 # in every .config. Please don't touch it. It is here to handle an
@@ -37,54 +82,5 @@ config GAMEPORT
 # GAMEPORT is 'y' or 'n', it can be anything".
 config SOUND_GAMEPORT
 	tristate
-	default y if GAMEPORT!=m
 	default m if GAMEPORT=m
-
-config GAMEPORT_NS558
-	tristate "Classic ISA and PnP gameport support"
-	depends on GAMEPORT
-	help
-	  Say Y here if you have an ISA or PnP gameport.
-
-	  If unsure, say Y.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called ns558.
-
-config GAMEPORT_L4
-	tristate "PDPI Lightning 4 gamecard support"
-	depends on GAMEPORT
-	help
-	  Say Y here if you have a PDPI Lightning 4 gamecard.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called lightning.
-
-config GAMEPORT_EMU10K1
-	tristate "SB Live and Audigy gameport support"
-	depends on GAMEPORT
-	help
-	  Say Y here if you have a SoundBlaster Live! or SoundBlaster
-	  Audigy card and want to use its gameport.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called emu10k1-gp.
-
-config GAMEPORT_VORTEX
-	tristate "Aureal Vortex, Vortex 2 gameport support"
-	depends on GAMEPORT
-	help
-	  Say Y here if you have an Aureal Vortex 1 or 2  card and want
-	  to use its gameport.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called vortex.
-
-config GAMEPORT_FM801
-	tristate "ForteMedia FM801 gameport support"
-	depends on GAMEPORT
-
-config GAMEPORT_CS461X
-	tristate "Crystal SoundFusion gameport support"
-	depends on GAMEPORT
-
+	default y

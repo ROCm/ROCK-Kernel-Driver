@@ -245,7 +245,7 @@ static int ps2_probe(struct sa1111_dev *dev)
 	memset(ps2if, 0, sizeof(struct ps2if));
 	memset(serio, 0, sizeof(struct serio));
 
-	serio->type		= SERIO_8042;
+	serio->id.type		= SERIO_8042;
 	serio->write		= ps2_write;
 	serio->open		= ps2_open;
 	serio->close		= ps2_close;
