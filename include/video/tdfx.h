@@ -169,7 +169,6 @@ struct banshee_reg {
   unsigned long miscinit0;	
 };
 
-/*
 struct tdfx_par {
   u32 max_pixclock;
 
@@ -185,7 +184,7 @@ struct tdfx_par {
 
   spinlock_t DAClock;
 };
-*/
+
 #endif /* __KERNEL__ */
 
 #endif /* _TDFX_H */
