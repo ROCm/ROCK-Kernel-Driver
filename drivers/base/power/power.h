@@ -58,7 +58,8 @@ extern void dpm_sysfs_remove(struct device *);
 /*
  * resume.c 
  */
-extern int dpm_resume(void);
+
+extern void dpm_resume(void);
 extern void dpm_power_up(void);
 extern int resume_device(struct device *);
 
