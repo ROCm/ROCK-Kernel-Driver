@@ -401,6 +401,7 @@ static struct poolinfo {
  */
 static struct entropy_store *random_state; /* The default global store */
 static struct entropy_store *sec_random_state; /* secondary store */
+static struct entropy_store *urandom_state; /* For urandom */
 static DECLARE_WAIT_QUEUE_HEAD(random_read_wait);
 static DECLARE_WAIT_QUEUE_HEAD(random_write_wait);
 
@@ -1474,14 +1475,21 @@ static ssize_t extract_entropy(struct entropy_store *r, void * buf,
  */
 void get_random_bytes(void *buf, int nbytes)
 {
-	if (sec_random_state)  
-		extract_entropy(sec_random_state, (char *) buf, nbytes, 
-				EXTRACT_ENTROPY_SECONDARY);
-	else if (random_state)
-		extract_entropy(random_state, (char *) buf, nbytes, 0);
-	else
+	struct entropy_store *r = urandom_state;
+	int flags = EXTRACT_ENTROPY_SECONDARY;
+
+	if (!r)
+		r = sec_random_state;
+	if (!r) {
+		r = random_state;
+		flags = 0;
+	}
+	if (!r) {
 		printk(KERN_NOTICE "get_random_bytes called before "
 				   "random driver initialization\n");
+		return;
+	}
+	extract_entropy(r, (char *) buf, nbytes, flags);
 }
 
 EXPORT_SYMBOL(get_random_bytes);
@@ -1532,8 +1540,12 @@ static int __init rand_initialize(void)
 	if (create_entropy_store(SECONDARY_POOL_SIZE, "secondary",
 				 &sec_random_state))
 		goto err;
+	if (create_entropy_store(SECONDARY_POOL_SIZE, "urandom",
+				 &urandom_state))
+		goto err;
 	clear_entropy_store(random_state);
 	clear_entropy_store(sec_random_state);
+	clear_entropy_store(urandom_state);
 	init_std_data(random_state);
 	init_std_data(sec_random_state);
 #ifdef CONFIG_SYSCTL
@@ -1668,9 +1680,15 @@ static ssize_t
 urandom_read(struct file * file, char __user * buf,
 		      size_t nbytes, loff_t *ppos)
 {
-	return extract_entropy(sec_random_state, buf, nbytes,
-			       EXTRACT_ENTROPY_USER |
-			       EXTRACT_ENTROPY_SECONDARY);
+	int flags = EXTRACT_ENTROPY_USER;
+	unsigned long cpuflags;
+
+	spin_lock_irqsave(&random_state->lock, cpuflags);
+	if (random_state->entropy_count > random_state->poolinfo.POOLBITS)
+		flags |= EXTRACT_ENTROPY_SECONDARY;
+	spin_unlock_irqrestore(&random_state->lock, cpuflags);
+
+	return extract_entropy(urandom_state, buf, nbytes, flags);
 }
 
 static unsigned int
