@@ -536,7 +536,7 @@ xfs_unmount(
 	rvp = XFS_ITOV(rip);
 
 	if (vfsp->vfs_flag & VFS_DMI) {
-		error = XFS_SEND_NAMESP(mp, DM_EVENT_PREUNMOUNT,
+		error = XFS_SEND_PREUNMOUNT(mp, vfsp,
 				rvp, DM_RIGHT_NULL, rvp, DM_RIGHT_NULL,
 				NULL, NULL, 0, 0,
 				(mp->m_dmevmask & (1<<DM_EVENT_PREUNMOUNT))?
