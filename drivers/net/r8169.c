@@ -1116,13 +1116,14 @@ rtl8169_hw_start(struct net_device *dev)
 static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 {
 	desc->buf_addr = 0xdeadbeef;
-	desc->status &= ~(OWNbit | RsvdMask);
+	desc->status &= ~cpu_to_le32(OWNbit | RsvdMask);
 }
 
 static void rtl8169_free_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
 				struct RxDesc *desc)
 {
-	pci_unmap_single(pdev, desc->buf_addr, RX_BUF_SIZE, PCI_DMA_FROMDEVICE);
+	pci_unmap_single(pdev, le32_to_cpu(desc->buf_addr), RX_BUF_SIZE,
+			 PCI_DMA_FROMDEVICE);
 	dev_kfree_skb(*sk_buff);
 	*sk_buff = NULL;
 	rtl8169_make_unusable_by_asic(desc);
@@ -1130,13 +1131,13 @@ static void rtl8169_free_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
 
 static inline void rtl8169_return_to_asic(struct RxDesc *desc)
 {
-	desc->status |= OWNbit + RX_BUF_SIZE;
+	desc->status |= cpu_to_le32(OWNbit + RX_BUF_SIZE);
 }
 
 static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping)
 {
-	desc->buf_addr = mapping;
-	desc->status |= OWNbit + RX_BUF_SIZE;
+	desc->buf_addr = cpu_to_le32(mapping);
+	desc->status |= cpu_to_le32(OWNbit + RX_BUF_SIZE);
 }
 
 static int rtl8169_alloc_rx_skb(struct pci_dev *pdev, struct net_device *dev,
@@ -1201,7 +1202,7 @@ static u32 rtl8169_rx_fill(struct rtl8169_private *tp, struct net_device *dev,
 
 static inline void rtl8169_mark_as_last_descriptor(struct RxDesc *desc)
 {
-	desc->status |= EORbit;
+	desc->status |= cpu_to_le32(EORbit);
 }
 
 static int rtl8169_init_ring(struct net_device *dev)
@@ -1233,8 +1234,8 @@ static void rtl8169_unmap_tx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
 {
 	u32 len = sk_buff[0]->len;
 
-	pci_unmap_single(pdev, desc->buf_addr, len < ETH_ZLEN ? ETH_ZLEN : len,
-			 PCI_DMA_TODEVICE);
+	pci_unmap_single(pdev, le32_to_cpu(desc->buf_addr),
+			 len < ETH_ZLEN ? ETH_ZLEN : len, PCI_DMA_TODEVICE);
 	desc->buf_addr = 0x00;
 	*sk_buff = NULL;
 }
@@ -1300,17 +1301,17 @@ rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	
 	spin_lock_irq(&tp->lock);
 
-	if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
+	if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
 		dma_addr_t mapping;
 
 		mapping = pci_map_single(tp->pci_dev, skb->data, len,
 					 PCI_DMA_TODEVICE);
 
 		tp->Tx_skbuff[entry] = skb;
-		tp->TxDescArray[entry].buf_addr = mapping;
+		tp->TxDescArray[entry].buf_addr = cpu_to_le32(mapping);
 
-		tp->TxDescArray[entry].status = OWNbit | FSbit | LSbit | len |
-				(EORbit * !((entry + 1) % NUM_TX_DESC));
+		tp->TxDescArray[entry].status = cpu_to_le32(OWNbit | FSbit |
+			LSbit | len | (EORbit * !((entry + 1) % NUM_TX_DESC)));
 			
 		RTL_W8(TxPoll, 0x40);	//set polling bit
 
@@ -1351,7 +1352,7 @@ rtl8169_tx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	tx_left = tp->cur_tx - dirty_tx;
 
 	while (tx_left > 0) {
-		if ((tp->TxDescArray[entry].status & OWNbit) == 0) {
+		if (!(le32_to_cpu(tp->TxDescArray[entry].status) & OWNbit)) {
 			int cur = dirty_tx % NUM_TX_DESC;
 			struct sk_buff *skb = tp->Tx_skbuff[cur];
 
@@ -1409,8 +1410,8 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 
 	cur_rx = tp->cur_rx % RX_BUF_SIZE;
 
-	while ((tp->RxDescArray[cur_rx].status & OWNbit) == 0) {
-		u32 status = tp->RxDescArray[cur_rx].status;
+	while (!(le32_to_cpu(tp->RxDescArray[cur_rx].status) & OWNbit)) {
+		u32 status = le32_to_cpu(tp->RxDescArray[cur_rx].status);
 
 		if (status & RxRES) {
 			printk(KERN_INFO "%s: Rx ERROR!!!\n", dev->name);
