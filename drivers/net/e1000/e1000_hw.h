@@ -1480,6 +1480,7 @@ struct e1000_hw {
 #define EEPROM_COMPAT                 0x0003
 #define EEPROM_ID_LED_SETTINGS        0x0004
 #define EEPROM_SERDES_AMPLITUDE       0x0006 /* For SERDES output amplitude adjustment. */
+#define EEPROM_PHY_CLASS_WORD         0x0007
 #define EEPROM_INIT_CONTROL1_REG      0x000A
 #define EEPROM_INIT_CONTROL2_REG      0x000F
 #define EEPROM_INIT_CONTROL3_PORT_B   0x0014
@@ -1512,6 +1513,9 @@ struct e1000_hw {
 
 /* Mask bits for SERDES amplitude adjustment in Word 6 of the EEPROM */
 #define EEPROM_SERDES_AMPLITUDE_MASK  0x000F
+
+/* Mask bit for PHY class in Word 7 of the EEPROM */
+#define EEPROM_PHY_CLASS_A   0x8000
 
 /* Mask bits for fields in Word 0x0a of the EEPROM */
 #define EEPROM_WORD0A_ILOS   0x0010
