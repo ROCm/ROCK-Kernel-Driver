@@ -14,6 +14,8 @@
 /* Defines LLC interface to network layer */
 /* Available primitives */
 #include <linux/if.h>
+#include <linux/if_arp.h>
+#include <linux/llc.h>
 
 #define LLC_DATAUNIT_PRIM	0
 #define LLC_CONN_PRIM		1
@@ -118,5 +120,26 @@ extern void llc_sap_close(struct llc_sap *sap);
 extern int llc_establish_connection(struct sock *sk, u8 *lmac,
 				    u8 *dmac, u8 dsap);
 extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
+extern void llc_build_and_send_ui_pkt(struct llc_sap *sap,
+				      struct sk_buff *skb,
+				      struct sockaddr_llc *addr);
+extern void llc_build_and_send_xid_pkt(struct llc_sap *sap,
+				       struct sk_buff *skb,
+				       struct sockaddr_llc *addr);
+extern void llc_build_and_send_test_pkt(struct llc_sap *sap,
+					struct sk_buff *skb,
+					struct sockaddr_llc *addr);
 extern int llc_send_disc(struct sock *sk);
+
+/**
+ *	llc_proto_type - return eth protocol for ARP header type
+ *	@arphrd: ARP header type.
+ *
+ *	Given an ARP header type return the corresponding ethernet protocol.
+ */
+static __inline__ u16 llc_proto_type(u16 arphrd)
+{
+	return arphrd == ARPHRD_IEEE802_TR ?
+			 htons(ETH_P_TR_802_2) : htons(ETH_P_802_2);
+}
 #endif /* LLC_IF_H */

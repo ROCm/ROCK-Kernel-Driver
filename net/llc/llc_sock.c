@@ -87,23 +87,6 @@ static __inline__ u8 llc_ui_addr_null(struct sockaddr_llc *addr)
 }
 
 /**
- *	llc_ui_protocol_type - return eth protocol for ARP header type
- *	@arphrd: ARP header type.
- *
- *	Given an ARP header type return the corresponding ethernet protocol.
- *	Returns  0 if ARP header type not supported or the corresponding
- *	ethernet protocol type.
- */
-static __inline__ u16 llc_ui_protocol_type(u16 arphrd)
-{
-	u16 rc = htons(ETH_P_802_2);
-
-	if (arphrd == ARPHRD_IEEE802_TR)
-		rc = htons(ETH_P_TR_802_2);
-	return rc;
-}
-
-/**
  *	llc_ui_header_len - return length of llc header based on operation
  *	@sk: Socket which contains a valid llc socket type.
  *	@addr: Complete sockaddr_llc structure received from the user.
@@ -140,7 +123,7 @@ static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb,
 	struct llc_opt* llc = llc_sk(sk);
 	int rc = 0;
 
-	skb->protocol = llc_ui_protocol_type(addr->sllc_arphrd);
+	skb->protocol = llc_proto_type(addr->sllc_arphrd);
 	if (llc_data_accept_state(llc->state) || llc->p_flag) {
 		int timeout = sock_sndtimeo(sk, noblock);
 
@@ -149,35 +132,6 @@ static int llc_ui_send_data(struct sock* sk, struct sk_buff *skb,
 	if (!rc)
 		rc = llc_build_and_send_pkt(sk, skb);
 	return rc;
-}
-
-/**
- *	llc_ui_send_llc1 - send llc1 prim data block to llc layer.
- *	@sap      : Sap the socket is bound to.
- *	@skb      : Data the user wishes to send.
- *	@addr     : Source and destination fields provided by the user.
- *	@primitive: Action the llc layer should perform.
- *
- *	Send an llc1 primitive data block to the llc layer for processing.
- *	This function is used for test, xid and unit_data messages.
- *	Returns 0 upon success, non-zero if action did not succeed.
- */
-static int llc_ui_send_llc1(struct llc_sap *sap, struct sk_buff *skb,
-			    struct sockaddr_llc *addr, int primitive)
-{
-	union llc_u_prim_data prim_data;
-	struct llc_prim_if_block prim;
-
-	prim.data 		  = &prim_data;
-	prim.sap 		  = sap;
-	prim.prim		  = primitive;
-	prim_data.test.skb 	  = skb;
-	prim_data.test.saddr.lsap = sap->laddr.lsap;
-	prim_data.test.daddr.lsap = addr->sllc_dsap;
-	skb->protocol = llc_ui_protocol_type(addr->sllc_arphrd);
-	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
-	memcpy(prim_data.test.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
-	return sap->req(&prim);
 }
 
 /**
@@ -993,15 +947,15 @@ static int llc_ui_sendmsg(struct socket *sock, struct msghdr *msg, int len,
 	if (rc)
 		goto out;
 	if (addr->sllc_test) {
-		rc = llc_ui_send_llc1(llc->sap, skb, addr, LLC_TEST_PRIM);
+		llc_build_and_send_test_pkt(llc->sap, skb, addr);
 		goto out;
 	}
 	if (addr->sllc_xid) {
-		rc = llc_ui_send_llc1(llc->sap, skb, addr, LLC_XID_PRIM);
+		llc_build_and_send_xid_pkt(llc->sap, skb, addr);
 		goto out;
 	}
 	if (sk->type == SOCK_DGRAM || addr->sllc_ua) {
-		rc = llc_ui_send_llc1(llc->sap, skb, addr, LLC_DATAUNIT_PRIM);
+		llc_build_and_send_ui_pkt(llc->sap, skb, addr);
 		goto out;
 	}
 	rc = -ENOPROTOOPT;

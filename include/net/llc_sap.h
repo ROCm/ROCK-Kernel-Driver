@@ -30,7 +30,6 @@ struct llc_sap {
 	u8			 state;
 	u8			 p_bit;
 	u8			 f_bit;
-	llc_prim_call_t		 req;
 	llc_prim_call_t		 ind;
 	llc_prim_call_t		 conf;
 	struct llc_prim_if_block llc_ind_prim, llc_cfm_prim;

@@ -28,24 +28,6 @@
 #include <net/llc_main.h>
 #include <net/llc_mac.h>
 
-static int llc_sap_req(struct llc_prim_if_block *prim);
-static int llc_unitdata_req_handler(struct llc_prim_if_block *prim);
-static int llc_test_req_handler(struct llc_prim_if_block *prim);
-static int llc_xid_req_handler(struct llc_prim_if_block *prim);
-static int llc_rst_req_handler(struct llc_prim_if_block *prim);
-
-/* table of request handler functions */
-static llc_prim_call_t llc_req_prim[LLC_NBR_PRIMITIVES] = {
-	[LLC_DATAUNIT_PRIM]	= llc_unitdata_req_handler,
-	[LLC_CONN_PRIM]		= NULL, /* replaced by llc_establish_connection */
-	[LLC_DATA_PRIM]		= NULL, /* replaced by llc_build_and_send_pkt */
-	[LLC_DISC_PRIM]		= NULL, /* replaced by llc_send_disc */
-	[LLC_RESET_PRIM]	= llc_rst_req_handler,
-	[LLC_FLOWCONTROL_PRIM]	= NULL, /* Not supported at this time */
-	[LLC_XID_PRIM]		= llc_xid_req_handler,
-	[LLC_TEST_PRIM]		= llc_test_req_handler,
-};
-
 /**
  *	llc_sap_open - open interface to the upper layers.
  *	@nw_indicate: pointer to indicate function of upper layer.
@@ -75,7 +57,6 @@ struct llc_sap *llc_sap_open(llc_prim_call_t nw_indicate,
 		goto err;
 	/* allocated a SAP; initialize it and clear out its memory pool */
 	sap->laddr.lsap = lsap;
-	sap->req = llc_sap_req;
 	sap->ind = nw_indicate;
 	sap->conf = nw_confirm;
 	sap->parent_station = llc_station_get();
@@ -102,116 +83,115 @@ void llc_sap_close(struct llc_sap *sap)
 }
 
 /**
- *	llc_sap_req - Request interface for upper layers
- *	@prim: pointer to structure that contains service parameters.
- *
- *	Request interface function to upper layer. Each one who wants to
- *	request a service from LLC, must call this function. Details of
- *	requested service is defined in input argument(prim). Returns 0 for
- *	success, 1 otherwise.
- */
-static int llc_sap_req(struct llc_prim_if_block *prim)
-{
-	int rc = 1;
-
-	if (prim->prim > 8 || prim->prim == 6) {
-		printk(KERN_ERR "%s: invalid primitive %d\n", __FUNCTION__,
-			prim->prim);
-		goto out;
-	}
-	/* receive REQUEST primitive from network layer; call the appropriate
-	 * primitive handler which then packages it up as an event and sends it
-	 * to the SAP or CONNECTION event handler
-	 */
-	if (prim->prim < LLC_NBR_PRIMITIVES)
-	       /* valid primitive; call the function to handle it */
-		rc = llc_req_prim[prim->prim](prim);
-out:
-	return rc;
-}
-
-/**
- *	llc_unitdata_req_handler - unitdata request interface for upper layers
- *	@prim: pointer to structure that contains service parameters
+ *	llc_build_and_send_ui_pkt - unitdata request interface for upper layers
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@addr: destination address
  *
  *	Upper layers calls this function when upper layer wants to send data
- *	using connection-less mode communication (UI pdu). Returns 0 for
- *	success, 1 otherwise.
+ *	using connection-less mode communication (UI pdu).
+ *
+ *	Accept data frame from network layer to be sent using connection-
+ *	less mode communication; timeout/retries handled by network layer;
+ *	package primitive as an event and send to SAP event handler
  */
-static int llc_unitdata_req_handler(struct llc_prim_if_block *prim)
+void llc_build_and_send_ui_pkt(struct llc_sap *sap,
+			       struct sk_buff *skb,
+			       struct sockaddr_llc *addr)
 {
-	int rc = 1;
-	struct llc_sap_state_ev *ev;
-	/* accept data frame from network layer to be sent using connection-
-	 * less mode communication; timeout/retries handled by network layer;
-	 * package primitive as an event and send to SAP event handler
-	 */
-	struct llc_sap *sap = llc_sap_find(prim->data->udata.saddr.lsap);
+	union llc_u_prim_data prim_data;
+	struct llc_prim_if_block prim;
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	if (!sap)
-		goto out;
-	ev = llc_sap_ev(prim->data->udata.skb);
+	skb->protocol = llc_proto_type(addr->sllc_arphrd);
+
+	prim.data = &prim_data;
+	prim.sap  = sap;
+	prim.prim = LLC_DATAUNIT_PRIM;
+
+	prim_data.udata.skb        = skb;
+	prim_data.udata.saddr.lsap = sap->laddr.lsap;
+	prim_data.udata.daddr.lsap = addr->sllc_dsap;
+	memcpy(prim_data.udata.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(prim_data.udata.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_DATAUNIT_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = prim;
-	rc = 0;
-	llc_sap_state_process(sap, prim->data->udata.skb);
-out:
-	return rc;
+	ev->data.prim.data = &prim;
+	llc_sap_state_process(sap, skb);
 }
 
 /**
- *	llc_test_req_handler - TEST interface for upper layers.
- *	@prim: pointer to structure that contains service parameters.
+ *	llc_build_and_send_test_pkt - TEST interface for upper layers.
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@addr: destination address
  *
  *	This function is called when upper layer wants to send a TEST pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-static int llc_test_req_handler(struct llc_prim_if_block *prim)
+void llc_build_and_send_test_pkt(struct llc_sap *sap,
+				 struct sk_buff *skb,
+				 struct sockaddr_llc *addr)
 {
-	int rc = 1;
-	struct llc_sap_state_ev *ev;
-	/* package primitive as an event and send to SAP event handler */
-	struct llc_sap *sap = llc_sap_find(prim->data->udata.saddr.lsap);
-	if (!sap)
-		goto out;
-	ev = llc_sap_ev(prim->data->udata.skb);
+	union llc_u_prim_data prim_data;
+	struct llc_prim_if_block prim;
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	skb->protocol = llc_proto_type(addr->sllc_arphrd);
+
+	prim.data = &prim_data;
+	prim.sap  = sap;
+	prim.prim = LLC_TEST_PRIM;
+
+	prim_data.test.skb        = skb;
+	prim_data.test.saddr.lsap = sap->laddr.lsap;
+	prim_data.test.daddr.lsap = addr->sllc_dsap;
+	memcpy(prim_data.test.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(prim_data.test.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+	
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_TEST_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = prim;
-	rc = 0;
-	llc_sap_state_process(sap, prim->data->udata.skb);
-out:
-	return rc;
+	ev->data.prim.data = &prim;
+	llc_sap_state_process(sap, skb);
 }
 
 /**
- *	llc_xid_req_handler - XID interface for upper layers
- *	@prim: pointer to structure that contains service parameters.
+ *	llc_build_and_send_xid_pkt - XID interface for upper layers
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@addr: destination address
  *
  *	This function is called when upper layer wants to send a XID pdu.
  *	Returns 0 for success, 1 otherwise.
  */
-static int llc_xid_req_handler(struct llc_prim_if_block *prim)
+void llc_build_and_send_xid_pkt(struct llc_sap *sap,
+				struct sk_buff *skb,
+				struct sockaddr_llc *addr)
 {
-	int rc = 1;
-	struct llc_sap_state_ev *ev;
-	/* package primitive as an event and send to SAP event handler */
-	struct llc_sap *sap = llc_sap_find(prim->data->udata.saddr.lsap);
+	union llc_u_prim_data prim_data;
+	struct llc_prim_if_block prim;
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-	if (!sap)
-		goto out;
-	ev = llc_sap_ev(prim->data->udata.skb);
+	skb->protocol = llc_proto_type(addr->sllc_arphrd);
+
+	prim.data = &prim_data;
+	prim.sap  = sap;
+	prim.prim = LLC_XID_PRIM;
+
+	prim_data.xid.skb        = skb;
+	prim_data.xid.saddr.lsap = sap->laddr.lsap;
+	prim_data.xid.daddr.lsap = addr->sllc_dsap;
+	memcpy(prim_data.xid.saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(prim_data.xid.daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
+
 	ev->type	   = LLC_SAP_EV_TYPE_PRIM;
 	ev->data.prim.prim = LLC_XID_PRIM;
 	ev->data.prim.type = LLC_PRIM_TYPE_REQ;
-	ev->data.prim.data = prim;
-	rc = 0;
-	llc_sap_state_process(sap, prim->data->udata.skb);
-out:
-	return rc;
+	ev->data.prim.data = &prim;
+	llc_sap_state_process(sap, skb);
 }
 
 /**
@@ -344,7 +324,7 @@ out:
 }
 
 /**
- *	llc_rst_req_handler - Resets an established LLC connection
+ *	llc_build_and_send_reset_pkt - Resets an established LLC connection
  *	@prim: pointer to structure that contains service parameters.
  *
  *	Called when upper layer wants to reset an established LLC connection
@@ -352,13 +332,12 @@ out:
  *	it to connection component state machine. Returns 0 for success, 1
  *	otherwise.
  */
-static int llc_rst_req_handler(struct llc_prim_if_block *prim)
+int llc_build_and_send_reset_pkt(struct sock *sk,
+				 struct llc_prim_if_block *prim)
 {
-	struct sk_buff *skb;
 	int rc = 1;
-	struct sock *sk = prim->data->res.sk;
+	struct sk_buff *skb = alloc_skb(0, GFP_ATOMIC);
 
-	skb = alloc_skb(0, GFP_ATOMIC);
 	if (skb) {
 		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 

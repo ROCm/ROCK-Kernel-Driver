@@ -23,7 +23,6 @@
 #include <net/llc_pdu.h>
 #include <linux/if_tr.h>
 
-static void llc_sap_free_ev(struct llc_sap *sap, struct sk_buff *skb);
 static int llc_sap_next_state(struct llc_sap *sap, struct sk_buff *skb);
 static int llc_exec_sap_trans_actions(struct llc_sap *sap,
 				      struct llc_sap_state_trans *trans,
@@ -75,11 +74,13 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
 	llc_sap_next_state(sap, skb);
-	if (ev->ind_cfm_flag == LLC_IND) {
-		skb_get(skb);
+	if (ev->ind_cfm_flag == LLC_IND)
 		sap->ind(ev->prim);
-	}
-	llc_sap_free_ev(sap, skb);
+	else if (ev->type == LLC_SAP_EV_TYPE_PDU)
+		kfree_skb(skb);
+	else
+		printk(KERN_INFO ":%s !kfree_skb & it is %s in a list\n",
+			__FUNCTION__, skb->list ? "" : "NOT");
 }
 
 /**
@@ -139,19 +140,6 @@ void llc_sap_send_pdu(struct llc_sap *sap, struct sk_buff *skb)
 {
 	mac_send_pdu(skb);
 	kfree_skb(skb);
-}
-
-/**
- *	llc_sap_free_ev - frees an sap event
- *	@sap: pointer to SAP
- *	@skb: released event
- */
-static void llc_sap_free_ev(struct llc_sap *sap, struct sk_buff *skb)
-{
-	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
-
-	if (ev->type == LLC_SAP_EV_TYPE_PDU)
-		kfree_skb(skb);
 }
 
 /**
