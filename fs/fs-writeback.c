@@ -219,7 +219,7 @@ static void __sync_list(struct list_head *head, int sync_mode,
 	struct list_head * tmp;
 	LIST_HEAD(hold);	/* Unready inodes go here */
 
-	while ((tmp = head->next) != head) {
+	while ((tmp = head->prev) != head) {
 		struct inode *inode = list_entry(tmp, struct inode, i_list);
 		struct address_space *mapping = inode->i_mapping;
 		int really_sync;

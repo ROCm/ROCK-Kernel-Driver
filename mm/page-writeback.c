@@ -29,12 +29,12 @@
 /*
  * Start background writeback (via pdflush) at this level
  */
-static int dirty_background_ratio = 30;
+static int dirty_background_ratio = 20;
 
 /*
  * The generator of dirty data starts async writeback at this level
  */
-static int dirty_async_ratio = 45;
+static int dirty_async_ratio = 60;
 
 /*
  * The generator of dirty data performs sync writeout at this level
