@@ -300,6 +300,7 @@ static void copy_to_high_bio_irq(struct bio *to, struct bio *from)
 		 */
 		vfrom = page_address(fromvec->bv_page) + tovec->bv_offset;
 
+		flush_dcache_page(tovec->bv_page);
 		bounce_copy_vec(tovec, vfrom);
 	}
 }
@@ -406,6 +407,7 @@ static void __blk_queue_bounce(request_queue_t *q, struct bio **bio_orig,
 		if (rw == WRITE) {
 			char *vto, *vfrom;
 
+			flush_dcache_page(from->bv_page);
 			vto = page_address(to->bv_page) + to->bv_offset;
 			vfrom = kmap(from->bv_page) + from->bv_offset;
 			memcpy(vto, vfrom, to->bv_len);
