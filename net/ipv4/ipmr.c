@@ -83,13 +83,13 @@ static int maxvif;
 
 #define VIF_EXISTS(idx) (vif_table[idx].dev != NULL)
 
-int mroute_do_assert;					/* Set in PIM assert	*/
-int mroute_do_pim;
+static int mroute_do_assert;				/* Set in PIM assert	*/
+static int mroute_do_pim;
 
 static struct mfc_cache *mfc_cache_array[MFC_LINES];	/* Forwarding cache	*/
 
 static struct mfc_cache *mfc_unres_queue;		/* Queue of unresolved entries */
-atomic_t cache_resolve_queue_len;			/* Size of unresolved	*/
+static atomic_t cache_resolve_queue_len;		/* Size of unresolved	*/
 
 /* Special spinlock for queue of unresolved entries */
 static spinlock_t mfc_unres_lock = SPIN_LOCK_UNLOCKED;
@@ -102,7 +102,7 @@ static spinlock_t mfc_unres_lock = SPIN_LOCK_UNLOCKED;
    In this case data path is free of exclusive locks at all.
  */
 
-kmem_cache_t *mrt_cachep;
+static kmem_cache_t *mrt_cachep;
 
 static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local);
 static int ipmr_cache_report(struct sk_buff *pkt, vifi_t vifi, int assert);
@@ -158,6 +158,10 @@ struct net_device *ipmr_new_tunnel(struct vifctl *v)
 	return dev;
 
 failure:
+	/* allow the register to be completed before unregistering. */
+	rtnl_unlock();
+	rtnl_lock();
+
 	unregister_netdevice(dev);
 	return NULL;
 }
@@ -182,35 +186,23 @@ static struct net_device_stats *reg_vif_get_stats(struct net_device *dev)
 	return (struct net_device_stats*)dev->priv;
 }
 
-static void vif_dev_destructor(struct net_device *dev)
+static void reg_vif_setup(struct net_device *dev)
 {
-	kfree(dev);
-}
-
-static
-struct net_device *ipmr_reg_vif(struct vifctl *v)
-{
-	struct net_device  *dev;
-	struct in_device *in_dev;
-	int size;
-
-	size = sizeof(*dev) + sizeof(struct net_device_stats);
-	dev = kmalloc(size, GFP_KERNEL);
-	if (!dev)
-		return NULL;
-
-	memset(dev, 0, size);
-
-	dev->priv = dev + 1;
-
-	strcpy(dev->name, "pimreg");
-
 	dev->type		= ARPHRD_PIMREG;
 	dev->mtu		= 1500 - sizeof(struct iphdr) - 8;
 	dev->flags		= IFF_NOARP;
 	dev->hard_start_xmit	= reg_vif_xmit;
 	dev->get_stats		= reg_vif_get_stats;
-	dev->destructor		= vif_dev_destructor;
+	dev->destructor		= (void (*)(struct net_device *)) kfree;
+}
+
+static struct net_device *ipmr_reg_vif(void)
+{
+	struct net_device *dev;
+	struct in_device *in_dev;
+
+	dev = alloc_netdev(sizeof(struct net_device_stats), "pimreg",
+			   reg_vif_setup);
 
 	if (register_netdevice(dev)) {
 		kfree(dev);
@@ -229,6 +221,10 @@ struct net_device *ipmr_reg_vif(struct vifctl *v)
 	return dev;
 
 failure:
+	/* allow the register to be completed before unregistering. */
+	rtnl_unlock();
+	rtnl_lock();
+
 	unregister_netdevice(dev);
 	return NULL;
 }
@@ -316,7 +312,7 @@ static void ipmr_destroy_unres(struct mfc_cache *c)
 
 /* Single timer process for all the unresolved queue. */
 
-void ipmr_expire_process(unsigned long dummy)
+static void ipmr_expire_process(unsigned long dummy)
 {
 	unsigned long now;
 	unsigned long expires;
@@ -335,9 +331,8 @@ void ipmr_expire_process(unsigned long dummy)
 	cp = &mfc_unres_queue;
 
 	while ((c=*cp) != NULL) {
-		long interval = c->mfc_un.unres.expires - now;
-
-		if (interval > 0) {
+		if (time_after(c->mfc_un.unres.expires, now)) {
+			unsigned long interval = c->mfc_un.unres.expires - now;
 			if (interval < expires)
 				expires = interval;
 			cp = &c->next;
@@ -397,7 +392,7 @@ static int vif_add(struct vifctl *vifc, int mrtsock)
 		 */
 		if (reg_vif_num >= 0)
 			return -EADDRINUSE;
-		dev = ipmr_reg_vif(vifc);
+		dev = ipmr_reg_vif();
 		if (!dev)
 			return -ENOBUFS;
 		break;
@@ -683,7 +678,7 @@ ipmr_cache_unresolved(vifi_t vifi, struct sk_buff *skb)
  *	MFC cache manipulation by user space mroute daemon
  */
 
-int ipmr_mfc_delete(struct mfcctl *mfc)
+static int ipmr_mfc_delete(struct mfcctl *mfc)
 {
 	int line;
 	struct mfc_cache *c, **cp;
@@ -704,7 +699,7 @@ int ipmr_mfc_delete(struct mfcctl *mfc)
 	return -ENOENT;
 }
 
-int ipmr_mfc_add(struct mfcctl *mfc, int mrtsock)
+static int ipmr_mfc_add(struct mfcctl *mfc, int mrtsock)
 {
 	int line;
 	struct mfc_cache *uc, *c, **cp;
@@ -1078,9 +1073,7 @@ static int ipmr_device_event(struct notifier_block *this, unsigned long event, v
 
 
 static struct notifier_block ip_mr_notifier={
-	ipmr_device_event,
-	NULL,
-	0
+	.notifier_call = ipmr_device_event,
 };
 
 /*
@@ -1234,7 +1227,7 @@ static void ipmr_queue_xmit(struct sk_buff *skb, struct mfc_cache *c,
 		ipmr_forward_finish);
 }
 
-int ipmr_find_vif(struct net_device *dev)
+static int ipmr_find_vif(struct net_device *dev)
 {
 	int ct;
 	for (ct=maxvif-1; ct>=0; ct--) {
@@ -1246,7 +1239,7 @@ int ipmr_find_vif(struct net_device *dev)
 
 /* "local" means that we should preserve one skb (for local delivery) */
 
-int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local)
+static int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local)
 {
 	int psend = -1;
 	int vif, ct;
@@ -1286,7 +1279,8 @@ int ip_mr_forward(struct sk_buff *skb, struct mfc_cache *cache, int local)
 		       large chunk of pimd to kernel. Ough... --ANK
 		     */
 		    (mroute_do_pim || cache->mfc_un.res.ttls[true_vifi] < 255) &&
-		    jiffies - cache->mfc_un.res.last_assert > MFC_ASSERT_THRESH) {
+		    time_after(jiffies, 
+			       cache->mfc_un.res.last_assert + MFC_ASSERT_THRESH)) {
 			cache->mfc_un.res.last_assert = jiffies;
 			ipmr_cache_report(skb, true_vifi, IGMPMSG_WRONGVIF);
 		}
@@ -1406,24 +1400,19 @@ dont_forward:
 
 int pim_rcv_v1(struct sk_buff * skb)
 {
-	struct igmphdr *pim = (struct igmphdr*)skb->h.raw;
+	struct igmphdr *pim;
 	struct iphdr   *encap;
 	struct net_device  *reg_dev = NULL;
 
-	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
-			kfree_skb(skb);
-			return -ENOMEM;
-		}
-		pim = (struct igmphdr*)skb->h.raw;
-	}
+	if (!pskb_may_pull(skb, sizeof(*pim) + sizeof(*encap))) 
+		goto drop;
+
+	pim = (struct igmphdr*)skb->h.raw;
 
         if (!mroute_do_pim ||
 	    skb->len < sizeof(*pim) + sizeof(*encap) ||
-	    pim->group != PIM_V1_VERSION || pim->code != PIM_V1_REGISTER) {
-		kfree_skb(skb);
-                return -EINVAL;
-        }
+	    pim->group != PIM_V1_VERSION || pim->code != PIM_V1_REGISTER) 
+		goto drop;
 
 	encap = (struct iphdr*)(skb->h.raw + sizeof(struct igmphdr));
 	/*
@@ -1433,11 +1422,9 @@ int pim_rcv_v1(struct sk_buff * skb)
 	   c. packet is not truncated
 	 */
 	if (!MULTICAST(encap->daddr) ||
-	    ntohs(encap->tot_len) == 0 ||
-	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
+	    encap->tot_len == 0 ||
+	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) 
+		goto drop;
 
 	read_lock(&mrt_lock);
 	if (reg_vif_num >= 0)
@@ -1446,10 +1433,8 @@ int pim_rcv_v1(struct sk_buff * skb)
 		dev_hold(reg_dev);
 	read_unlock(&mrt_lock);
 
-	if (reg_dev == NULL) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
+	if (reg_dev == NULL) 
+		goto drop;
 
 	skb->mac.raw = skb->nh.raw;
 	skb_pull(skb, (u8*)encap - skb->data);
@@ -1470,41 +1455,35 @@ int pim_rcv_v1(struct sk_buff * skb)
 	netif_rx(skb);
 	dev_put(reg_dev);
 	return 0;
+ drop:
+	kfree_skb(skb);
+	return 0;
 }
 #endif
 
 #ifdef CONFIG_IP_PIMSM_V2
-int pim_rcv(struct sk_buff * skb)
+static int pim_rcv(struct sk_buff * skb)
 {
-	struct pimreghdr *pim = (struct pimreghdr*)skb->h.raw;
+	struct pimreghdr *pim;
 	struct iphdr   *encap;
 	struct net_device  *reg_dev = NULL;
 
-	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_ATOMIC) != 0) {
-			kfree_skb(skb);
-			return -ENOMEM;
-		}
-		pim = (struct pimreghdr*)skb->h.raw;
-	}
+	if (!pskb_may_pull(skb, sizeof(*pim) + sizeof(*encap))) 
+		goto drop;
 
-        if (skb->len < sizeof(*pim) + sizeof(*encap) ||
-	    pim->type != ((PIM_VERSION<<4)|(PIM_REGISTER)) ||
+	pim = (struct pimreghdr*)skb->h.raw;
+        if (pim->type != ((PIM_VERSION<<4)|(PIM_REGISTER)) ||
 	    (pim->flags&PIM_NULL_REGISTER) ||
-	    (ip_compute_csum((void *)pim, sizeof(*pim)) != 0 &&
-	     ip_compute_csum((void *)pim, skb->len))) {
-		kfree_skb(skb);
-                return -EINVAL;
-        }
+	    (ip_compute_csum((void *)pim, sizeof(*pim)) != 0 && 
+	     (u16)csum_fold(skb_checksum(skb, 0, skb->len, 0)))) 
+		goto drop;
 
 	/* check if the inner packet is destined to mcast group */
 	encap = (struct iphdr*)(skb->h.raw + sizeof(struct pimreghdr));
 	if (!MULTICAST(encap->daddr) ||
-	    ntohs(encap->tot_len) == 0 ||
-	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
+	    encap->tot_len == 0 ||
+	    ntohs(encap->tot_len) + sizeof(*pim) > skb->len) 
+		goto drop;
 
 	read_lock(&mrt_lock);
 	if (reg_vif_num >= 0)
@@ -1513,10 +1492,8 @@ int pim_rcv(struct sk_buff * skb)
 		dev_hold(reg_dev);
 	read_unlock(&mrt_lock);
 
-	if (reg_dev == NULL) {
-		kfree_skb(skb);
-		return -EINVAL;
-	}
+	if (reg_dev == NULL) 
+		goto drop;
 
 	skb->mac.raw = skb->nh.raw;
 	skb_pull(skb, (u8*)encap - skb->data);
@@ -1536,6 +1513,9 @@ int pim_rcv(struct sk_buff * skb)
 #endif
 	netif_rx(skb);
 	dev_put(reg_dev);
+	return 0;
+ drop:
+	kfree_skb(skb);
 	return 0;
 }
 #endif
