@@ -867,6 +867,9 @@ static inline void cfq_account_dispatch(struct cfq_rq *crq)
 	struct cfq_data *cfqd = cfqq->cfqd;
 	unsigned long now, elapsed;
 
+	if (!blk_fs_request(crq->request))
+		return;
+
 	/*
 	 * accounted bit is necessary since some drivers will call
 	 * elv_next_request() many times for the same request (eg ide)
@@ -911,6 +914,9 @@ static inline void
 cfq_account_completion(struct cfq_queue *cfqq, struct cfq_rq *crq)
 {
 	struct cfq_data *cfqd = cfqq->cfqd;
+
+	if (!crq->accounted)
+		return;
 
 	WARN_ON(!cfqd->rq_in_driver);
 	cfqd->rq_in_driver--;

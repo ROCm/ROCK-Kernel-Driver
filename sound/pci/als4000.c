@@ -582,6 +582,7 @@ static void snd_card_als4000_free( snd_card_t *card )
 	}
 #endif
 	pci_release_regions(acard->pci);
+	pci_disable_device(acard->pci);
 }
 
 static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
@@ -612,11 +613,14 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 	if (pci_set_dma_mask(pci, 0x00ffffff) < 0 ||
 	    pci_set_consistent_dma_mask(pci, 0x00ffffff) < 0) {
 		snd_printk("architecture does not support 24bit PCI busmaster DMA\n");
+		pci_disable_device(pci);
 		return -ENXIO;
 	}
 
-	if ((err = pci_request_regions(pci, "ALS4000")) < 0)
+	if ((err = pci_request_regions(pci, "ALS4000")) < 0) {
+		pci_disable_device(pci);
 		return err;
+	}
 	gcr = pci_resource_start(pci, 0);
 
 	pci_read_config_word(pci, PCI_COMMAND, &word);
@@ -627,6 +631,7 @@ static int __devinit snd_card_als4000_probe(struct pci_dev *pci,
 			    sizeof( snd_card_als4000_t ) );
 	if (card == NULL) {
 		pci_release_regions(pci);
+		pci_disable_device(pci);
 		return -ENOMEM;
 	}
 

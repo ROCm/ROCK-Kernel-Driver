@@ -648,6 +648,7 @@ static int snd_bt87x_free(bt87x_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, chip);
 	pci_release_regions(chip->pci);
+	pci_disable_device(chip->pci);
 	kfree(chip);
 	return 0;
 }
@@ -693,8 +694,10 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 		return err;
 
 	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
-	if (!chip)
+	if (!chip) {
+		pci_disable_device(pci);
 		return -ENOMEM;
+	}
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;
@@ -702,6 +705,7 @@ static int __devinit snd_bt87x_create(snd_card_t *card,
 
 	if ((err = pci_request_regions(pci, "Bt87x audio")) < 0) {
 		kfree(chip);
+		pci_disable_device(pci);
 		return err;
 	}
 	chip->mmio = ioremap_nocache(pci_resource_start(pci, 0),
