@@ -87,7 +87,8 @@ static struct board_type products[] = {
 };
 
 /* How long to wait (in millesconds) for board to go into simple mode */
-#define MAX_CONFIG_WAIT 1000 
+#define MAX_CONFIG_WAIT 30000 
+#define MAX_IOCTL_CONFIG_WAIT 1000
 
 #define READ_AHEAD 	 128
 #define NR_CMDS		 384 /* #commands that can be outstanding */
@@ -467,8 +468,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
                         &(c->cfgtable->HostWrite.CoalIntCount));
 		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-		for(i=0;i<MAX_CONFIG_WAIT;i++)
-		{
+		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
 			if (!(readl(c->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
@@ -476,8 +476,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			udelay(1000);
 		}	
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-		if (i >= MAX_CONFIG_WAIT)
-			return( -EFAULT);
+		if (i >= MAX_IOCTL_CONFIG_WAIT)
+			return -EAGAIN;
                 return(0);
         }
 	case CCISS_GETNODENAME:
@@ -514,8 +514,7 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			
 		writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-		for(i=0;i<MAX_CONFIG_WAIT;i++)
-		{
+		for(i=0;i<MAX_IOCTL_CONFIG_WAIT;i++) {
 			if (!(readl(c->vaddr + SA5_DOORBELL) 
 					& CFGTBL_ChangeReq))
 				break;
@@ -523,8 +522,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			udelay(1000);
 		}	
 		spin_unlock_irqrestore(CCISS_LOCK(ctlr), flags);
-		if (i >= MAX_CONFIG_WAIT)
-			return( -EFAULT);
+		if (i >= MAX_IOCTL_CONFIG_WAIT)
+			return -EAGAIN;
                 return(0);
         }
 
@@ -2038,12 +2037,15 @@ static int cciss_pci_init(ctlr_info_t *c, struct pci_dev *pdev)
 		&(c->cfgtable->HostWrite.TransportRequest));
 	writel( CFGTBL_ChangeReq, c->vaddr + SA5_DOORBELL);
 
-	for(i=0;i<MAX_CONFIG_WAIT;i++)
-	{
+	/* under certain very rare conditions, this can take awhile.
+	 * (e.g.: hot replace a failed 144GB drive in a RAID 5 set right
+	 * as we enter this code.) */
+	for(i=0;i<MAX_CONFIG_WAIT;i++) {
 		if (!(readl(c->vaddr + SA5_DOORBELL) & CFGTBL_ChangeReq))
 			break;
 		/* delay and try again */
-		udelay(1000);
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(10);
 	}	
 
 #ifdef CCISS_DEBUG
