@@ -58,6 +58,8 @@ struct timeval32
     int tv_sec, tv_usec;
 };
 
+#define jiffies_to_timeval(a,b) do { (b)->tv_usec = 0; (b)->tv_sec = (a)/HZ; }while(0)
+
 struct elf_prstatus
 {
 	struct elf_siginfo pr_info;	/* Info associated with signal */
@@ -162,6 +164,7 @@ do {							\
 
 #define ELF_PLAT_INIT(r)		elf32_init(r)
 #define setup_arg_pages(bprm)		ia32_setup_arg_pages(bprm)
+int ia32_setup_arg_pages(struct linux_binprm *bprm);
 
 #undef start_thread
 #define start_thread(regs,new_rip,new_rsp) do { \

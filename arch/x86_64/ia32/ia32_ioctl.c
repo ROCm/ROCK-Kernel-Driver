@@ -55,6 +55,7 @@
 #include <linux/module.h>
 #include <linux/serial.h>
 #include <linux/reiserfs_fs.h>
+#include <linux/dirent.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh. This header really is not clean */
 #define min min
@@ -2000,6 +2001,7 @@ static int do_atm_ioctl(unsigned int fd, unsigned int cmd32, unsigned long arg)
 
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh, LVM. Pitty it was not cleaned up before accepted :((. */
+/* AK: dev_t/kdev_t use here is somewhat dubious */
 typedef struct {
 	uint8_t vg_name[NAME_LEN];
 	uint32_t vg_number;
@@ -2034,7 +2036,7 @@ typedef struct {
 	uint8_t pv_name[NAME_LEN];
 	uint8_t vg_name[NAME_LEN];
 	uint8_t system_id[NAME_LEN];
-	kdev_t pv_dev;
+	__u32 pv_dev;
 	uint32_t pv_number;
 	uint32_t pv_status;
 	uint32_t pv_allocatable;
@@ -3084,38 +3086,108 @@ static int serial_struct_ioctl(unsigned fd, unsigned cmd,  void *ptr)
 	return err;	
 }
 
-static int generic_long_put(unsigned int fd, unsigned int cmd, unsigned long arg)
+
+struct dirent32 {
+	unsigned int		d_ino;
+	__kernel_off_t32	d_off;
+	unsigned short	d_reclen;
+	char		d_name[256]; /* We must not include limits.h! */
+};
+
+#define	VFAT_IOCTL_READDIR_BOTH32	_IOR('r', 1, struct dirent32 [2])
+#define	VFAT_IOCTL_READDIR_SHORT32	_IOR('r', 2, struct dirent32 [2])
+
+static int put_dirent32(struct dirent *src, struct dirent32 *dst)
 {
 	int ret; 
-	unsigned long val = 0; 
-	mm_segment_t oldseg = get_fs();
+	ret = put_user(src->d_ino, &dst->d_ino); 
+	ret |= __put_user(src->d_off, &dst->d_off); 
+	ret |= __put_user(src->d_reclen, &dst->d_reclen); 
+	if (__copy_to_user(&dst->d_name, src->d_name, src->d_reclen))
+		ret |= -EFAULT;
+	return ret;
+} 
+
+static int vfat_ioctl32(unsigned fd, unsigned cmd,  void *ptr) 
+{
+	int ret;
+	mm_segment_t oldfs = get_fs();
+	struct dirent d[2]; 
+
 	set_fs(KERNEL_DS);
-	cmd = (cmd & 0xc000ffff)  | (sizeof(unsigned long) << _IOC_SIZESHIFT); 
-	ret = sys_ioctl(fd, cmd, (unsigned long)&val);  
-	set_fs(oldseg); 
-	if (!ret || val) {
-		if (put_user((int)val, (unsigned int *)arg)) 
-			return -EFAULT; 
+	ret = sys_ioctl(fd,cmd,(unsigned long)&d); 
+	set_fs(oldfs); 
+	if (!ret) { 
+		ret |= put_dirent32(&d[0], (struct dirent32 *)ptr); 
+		ret |= put_dirent32(&d[1], ((struct dirent32 *)ptr) + 1); 
 	}
 	return ret; 
 } 
 
-static int generic_long_get(unsigned int fd, unsigned int cmd, unsigned long arg)
+
+
+#define REISERFS_IOC_UNPACK32               _IOW(0xCD,1,int)
+
+static int reiserfs_ioctl32(unsigned fd, unsigned cmd, unsigned long ptr) 
+{ 
+	if (cmd == REISERFS_IOC_UNPACK32) 
+		cmd = REISERFS_IOC_UNPACK; 
+	return sys_ioctl(fd,cmd,ptr); 
+} 
+
+#define AUTOFS_IOC_SETTIMEOUT32 _IOWR(0x93,0x64,unsigned int)
+
+static int autofs_ioctl32(unsigned fd, unsigned cmd, unsigned long ptr) 
 {
 	int ret; 
-	unsigned int ival; 
-	unsigned long val = 0; 
-	mm_segment_t oldseg = get_fs();
-	if (get_user(ival, (unsigned int *)arg))
-		return -EFAULT;
-	val = ival;
+	unsigned long val;
+	mm_segment_t oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	cmd = (cmd & 0xc000ffff)  | (sizeof(unsigned long) << _IOC_SIZESHIFT); 
-	ret = sys_ioctl(fd, cmd, (unsigned long)&val);  
-	set_fs(oldseg); 
+	ret = sys_ioctl(fd, AUTOFS_IOC_SETTIMEOUT32, (unsigned long)&val); 
+	set_fs(oldfs); 
+	if (!ret) 
+		ret = put_user(val, (int *) ptr); 
 	return ret; 
 } 
 
+#define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */
+#define RTC_IRQP_SET32	_IOW('p', 0x0c, unsigned int)	 /* Set IRQ rate    */
+#define RTC_EPOCH_READ32	_IOR('p', 0x0d, unsigned)	 /* Read epoch      */
+#define RTC_EPOCH_SET32		_IOW('p', 0x0e, unsigned)	 /* Set epoch       */
+
+static int rtc32_ioctl(unsigned fd, unsigned cmd, unsigned long arg) 
+{ 
+	unsigned long val;
+	mm_segment_t oldfs = get_fs(); 
+	int ret; 
+	
+	switch (cmd) { 
+	case RTC_IRQP_READ32: 
+		set_fs(KERNEL_DS); 
+		ret = sys_ioctl(fd, RTC_IRQP_READ, (unsigned long)&val); 
+		set_fs(oldfs); 
+		if (!ret)
+			ret = put_user(val, (unsigned int*) arg); 
+		return ret; 
+
+	case RTC_IRQP_SET32: 
+		cmd = RTC_EPOCH_SET; 
+		break; 
+
+	case RTC_EPOCH_READ32:
+		set_fs(KERNEL_DS); 
+		ret = sys_ioctl(fd, RTC_EPOCH_READ, (unsigned long) &val); 
+		set_fs(oldfs); 
+		if (!ret)
+			ret = put_user(val, (unsigned int*) arg); 
+		return ret; 
+
+	case RTC_EPOCH_SET32:
+		cmd = RTC_EPOCH_SET; 
+		break; 
+	} 
+	return sys_ioctl(fd,cmd,arg); 
+} 
 
 struct ioctl_trans {
 	unsigned long cmd;
@@ -3344,14 +3416,10 @@ COMPATIBLE_IOCTL(RTC_RD_TIME)
 COMPATIBLE_IOCTL(RTC_SET_TIME)
 COMPATIBLE_IOCTL(RTC_WKALM_SET)
 COMPATIBLE_IOCTL(RTC_WKALM_RD)
-#define RTC_IRQP_READ32	_IOR('p', 0x0b, unsigned int)	 /* Read IRQ rate   */
-HANDLE_IOCTL(RTC_IRQP_READ32,generic_long_put)
-#define RTC_IRQP_SET32	_IOW('p', 0x0c, unsigned int)	 /* Set IRQ rate    */
-HANDLE_IOCTL(RTC_IRQP_SET32,generic_long_get)
-#define RTC_EPOCH_READ32	_IOR('p', 0x0d, unsigned long)	 /* Read epoch      */
-#define RTC_EPOCH_SET32		_IOW('p', 0x0e, unsigned long)	 /* Set epoch       */
-HANDLE_IOCTL(RTC_EPOCH_READ32, generic_long_put)
-HANDLE_IOCTL(RTC_EPOCH_SET32, generic_long_get)
+HANDLE_IOCTL(RTC_IRQP_READ32,rtc32_ioctl)
+HANDLE_IOCTL(RTC_IRQP_SET32,rtc32_ioctl)
+HANDLE_IOCTL(RTC_EPOCH_READ32, rtc32_ioctl)
+HANDLE_IOCTL(RTC_EPOCH_SET32, rtc32_ioctl)
 /* Little m */
 COMPATIBLE_IOCTL(MTIOCTOP)
 /* Socket level stuff */
@@ -3619,8 +3687,7 @@ COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL)
 COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC)
 COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER)
 COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE)
-#define AUTOFS_IOC_SETTIMEOUT32 _IOWR(0x93,0x64,unsigned int)
-HANDLE_IOCTL(AUTOFS_IOC_SETTIMEOUT32, generic_long_get); 
+HANDLE_IOCTL(AUTOFS_IOC_SETTIMEOUT32, autofs_ioctl32); 
 /* DEVFS */
 COMPATIBLE_IOCTL(DEVFSDIOC_GET_PROTO_REV)
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_EVENT_MASK)
@@ -3687,7 +3754,9 @@ COMPATIBLE_IOCTL(DRM_IOCTL_LOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_UNLOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_FINISH)
 #endif /* DRM */
-COMPATIBLE_IOCTL(REISERFS_IOC_UNPACK);
+HANDLE_IOCTL(REISERFS_IOC_UNPACK32, reiserfs_ioctl32);
+HANDLE_IOCTL(VFAT_IOCTL_READDIR_BOTH32, vfat_ioctl32);
+HANDLE_IOCTL(VFAT_IOCTL_READDIR_SHORT32, vfat_ioctl32);
 /* serial driver */ 
 HANDLE_IOCTL(TIOCGSERIAL, serial_struct_ioctl);
 HANDLE_IOCTL(TIOCSSERIAL, serial_struct_ioctl);
@@ -3854,6 +3923,8 @@ IOCTL_TABLE_END
 #define IOCTL_HASHSIZE 256
 struct ioctl_trans *ioctl32_hash_table[IOCTL_HASHSIZE];
 
+extern struct ioctl_trans ioctl_start[], ioctl_end[]; 
+
 static inline unsigned long ioctl32_hash(unsigned long cmd)
 {
 	return (((cmd >> 6) ^ (cmd >> 4) ^ cmd)) % IOCTL_HASHSIZE;
@@ -3879,7 +3950,6 @@ static void ioctl32_insert_translation(struct ioctl_trans *trans)
 static int __init init_sys32_ioctl(void)
 {
 	int i;
-	extern struct ioctl_trans ioctl_start[], ioctl_end[]; 
 
 	for (i = 0; &ioctl_start[i] < &ioctl_end[0]; i++) {
 		if (ioctl_start[i].next != 0) { 
@@ -3894,57 +3964,108 @@ static int __init init_sys32_ioctl(void)
 
 __initcall(init_sys32_ioctl);
 
-static struct ioctl_trans *additional_ioctls;
+static struct ioctl_trans *ioctl_free_list;
 
-/* Always call these with kernel lock held! */
-
+/* Never free them really. This avoids SMP races. With a Read-Copy-Update
+   enabled kernel we could just use the RCU infrastructure for this. */
+static void free_ioctl(struct ioctl_trans *t) 
+{ 
+	t->cmd = 0; 
+	mb();
+	t->next = ioctl_free_list;
+	ioctl_free_list = t;
+} 
 
 int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *))
 {
-	int i;
-	if (!additional_ioctls) {
-		additional_ioctls = (struct ioctl_trans *)get_zeroed_page(GFP_KERNEL);
-		if (!additional_ioctls)
-			return -ENOMEM;
+	struct ioctl_trans *t;
+	unsigned long hash = ioctl32_hash(cmd);
+
+	lock_kernel(); 
+	for (t = (struct ioctl_trans *)ioctl32_hash_table[hash];
+	     t;
+	     t = t->next) { 
+		if (t->cmd == cmd) {
+			printk("Trying to register duplicated ioctl32 handler %x\n", cmd);
+			unlock_kernel();
+			return -EINVAL; 
 	}
-	for (i = 0; i < PAGE_SIZE/sizeof(struct ioctl_trans); i++)
-		if (!additional_ioctls[i].cmd)
-			break;
-	if (i == PAGE_SIZE/sizeof(struct ioctl_trans))
+	} 
+
+	if (ioctl_free_list) { 
+		t = ioctl_free_list; 
+		ioctl_free_list = t->next; 
+	} else { 
+		t = kmalloc(sizeof(struct ioctl_trans), GFP_KERNEL); 
+		if (!t) { 
+			unlock_kernel();
 		return -ENOMEM;
-	additional_ioctls[i].cmd = cmd;
-	if (!handler)
-		additional_ioctls[i].handler = 
-	    (int (*)(unsigned,unsigned,unsigned long, struct file *))sys_ioctl;
-	else
-		additional_ioctls[i].handler = handler;
-	ioctl32_insert_translation(&additional_ioctls[i]);
+		}
+	}
+	
+	t->next = NULL;
+	t->cmd = cmd;
+	t->handler = handler; 
+	ioctl32_insert_translation(t);
+
+	unlock_kernel();
 	return 0;
 }
 
+static inline int builtin_ioctl(struct ioctl_trans *t)
+{ 
+	return t >= (struct ioctl_trans *)ioctl_start &&
+	       t < (struct ioctl_trans *)ioctl_end; 
+} 
+
+/* Problem: 
+   This function cannot unregister duplicate ioctls, because they are not
+   unique.
+   When they happen we need to extend the prototype to pass handler too. */
 
 int unregister_ioctl32_conversion(unsigned int cmd)
 {
 	unsigned long hash = ioctl32_hash(cmd);
 	struct ioctl_trans *t, *t1;
 
-	t = (struct ioctl_trans *)(long)ioctl32_hash_table[hash];
-	if (!t) return -EINVAL;
-	if (t->cmd == cmd && t >= additional_ioctls &&
-	    (unsigned long)t < ((unsigned long)additional_ioctls) + PAGE_SIZE) {
+	lock_kernel(); 
+
+	t = (struct ioctl_trans *)ioctl32_hash_table[hash];
+	if (!t) { 
+		unlock_kernel();
+		return -EINVAL;
+	} 
+
+	if (t->cmd == cmd) { 
+		if (builtin_ioctl(t)) {
+			printk("%p tried to unregister builtin ioctl %x\n",
+			       __builtin_return_address(0), cmd);
+		} else { 
 		ioctl32_hash_table[hash] = t->next;
-		t->cmd = 0;
+			free_ioctl(t); 
+			unlock_kernel();
 		return 0;
-	} else while (t->next) {
+		}
+	} 
+	while (t->next) {
 		t1 = (struct ioctl_trans *)(long)t->next;
-		if (t1->cmd == cmd && t1 >= additional_ioctls &&
-		    (unsigned long)t1 < ((unsigned long)additional_ioctls) + PAGE_SIZE) {
-			t1->cmd = 0;
+		if (t1->cmd == cmd) { 
+			if (builtin_ioctl(t1)) {
+				printk("%p tried to unregister builtin ioctl %x\n",
+				       __builtin_return_address(0), cmd);
+				goto out;
+			} else { 
 			t->next = t1->next;
+				free_ioctl(t1); 
+				unlock_kernel();
 			return 0;
+		}
 		}
 		t = t1;
 	}
+	printk(KERN_ERR "Trying to free unknown 32bit ioctl handler %x\n", cmd);
+ out:
+	unlock_kernel();
 	return -EINVAL;
 }
 
@@ -3967,10 +4088,10 @@ asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		goto out;
 	}
 
-	t = (struct ioctl_trans *)(long)ioctl32_hash_table [ioctl32_hash (cmd)];
+	t = (struct ioctl_trans *)ioctl32_hash_table [ioctl32_hash (cmd)];
 
 	while (t && t->cmd != cmd)
-		t = (struct ioctl_trans *)(long)t->next;
+		t = (struct ioctl_trans *)t->next;
 	if (t) {
 		handler = t->handler;
 		error = handler(fd, cmd, arg, filp);

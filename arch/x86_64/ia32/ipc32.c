@@ -152,8 +152,8 @@ struct shm_info32 {
 };
 
 struct ipc_kludge {
-	struct msgbuf *msgp;
-	int msgtyp;
+	u32 msgp;
+	s32 msgtyp;
 };
 
 
@@ -268,14 +268,19 @@ semctl32 (int first, int second, int third, void *uptr)
 	return err;
 }
 
+#define MAXBUF (64*1024)
+
 static int
 do_sys32_msgsnd (int first, int second, int third, void *uptr)
 {
-	struct msgbuf *p = kmalloc(second + sizeof(struct msgbuf) + 4, GFP_USER);
+	struct msgbuf *p;
 	struct msgbuf32 *up = (struct msgbuf32 *)uptr;
 	mm_segment_t old_fs;
 	int err;
 
+	if (second >= MAXBUF-sizeof(struct msgbuf))
+		return -EINVAL;
+	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
 	if (!p)
 		return -ENOMEM;
 	err = get_user(p->mtype, &up->mtype);
@@ -312,13 +317,15 @@ do_sys32_msgrcv (int first, int second, int msgtyp, int third, int version, void
 		uptr = (void *)A(ipck.msgp);
 		msgtyp = ipck.msgtyp;
 	}
+	if (second >= MAXBUF-sizeof(struct msgbuf))
+		return -EINVAL; 
 	err = -ENOMEM;
-	p = kmalloc(second + sizeof(struct msgbuf) + 4, GFP_USER);
+	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
 	if (!p)
 		goto out;
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = sys_msgrcv(first, p, second + 4, msgtyp, third);
+	err = sys_msgrcv(first, p, second, msgtyp, third);
 	set_fs(old_fs);
 	if (err < 0)
 		goto free_then_out;
