@@ -39,7 +39,6 @@
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <asm/irq.h>
-#include <linux/compatmac.h>
 #include <asm/m68360.h>
 #include <asm/commproc.h>
 
