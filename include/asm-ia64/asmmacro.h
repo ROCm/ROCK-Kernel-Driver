@@ -2,12 +2,17 @@
 #define _ASM_IA64_ASMMACRO_H
 
 /*
- * Copyright (C) 2000-2001 Hewlett-Packard Co
+ * Copyright (C) 2000-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
 #define ENTRY(name)				\
 	.align 32;				\
+	.proc name;				\
+name:
+
+#define ENTRY_MIN_ALIGN(name)			\
+	.align 16;				\
 	.proc name;				\
 name:
 

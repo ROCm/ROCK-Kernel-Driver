@@ -4,9 +4,11 @@
 /*
  * ELF-specific definitions.
  *
- * Copyright (C) 1998, 1999, 2002 Hewlett-Packard Co
+ * Copyright (C) 1998-1999, 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
+
+#include <linux/config.h>
 
 #include <asm/fpu.h>
 #include <asm/page.h>
@@ -88,6 +90,11 @@ extern void ia64_elf_core_copy_regs (struct pt_regs *src, elf_gregset_t dst);
    relevant until we have real hardware to play with... */
 #define ELF_PLATFORM	0
 
+/*
+ * This should go into linux/elf.h...
+ */
+#define AT_SYSINFO	32
+
 #ifdef __KERNEL__
 struct elf64_hdr;
 extern void ia64_set_personality (struct elf64_hdr *elf_ex, int ibcs2_interpreter);
@@ -99,7 +106,14 @@ extern int dump_task_fpu (struct task_struct *, elf_fpregset_t *);
 #define ELF_CORE_COPY_TASK_REGS(tsk, elf_gregs) dump_task_regs(tsk, elf_gregs)
 #define ELF_CORE_COPY_FPREGS(tsk, elf_fpregs) dump_task_fpu(tsk, elf_fpregs)
 
-
+#ifdef CONFIG_FSYS
+#define ARCH_DLINFO					\
+do {							\
+	extern int syscall_via_epc;			\
+	NEW_AUX_ENT(AT_SYSINFO, syscall_via_epc);	\
+} while (0)
 #endif
+
+#endif /* __KERNEL__ */
 
 #endif /* _ASM_IA64_ELF_H */

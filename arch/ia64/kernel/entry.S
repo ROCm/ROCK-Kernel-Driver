@@ -3,7 +3,7 @@
  *
  * Kernel entry points.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
  * Copyright (C) 1999 Walt Drummond <drummond@valinux.com>
@@ -22,8 +22,8 @@
 /*
  * Global (preserved) predicate usage on syscall entry/exit path:
  *
- *	pKern:		See entry.h.
- *	pUser:		See entry.h.
+ *	pKStk:		See entry.h.
+ *	pUStk:		See entry.h.
  *	pSys:		See entry.h.
  *	pNonSys:	!pSys
  */
@@ -63,7 +63,7 @@ ENTRY(ia64_execve)
 	sxt4 r8=r8			// return 64-bit result
 	;;
 	stf.spill [sp]=f0
-(p6)	cmp.ne pKern,pUser=r0,r0	// a successful execve() lands us in user-mode...
+(p6)	cmp.ne pKStk,pUStk=r0,r0	// a successful execve() lands us in user-mode...
 	mov rp=loc0
 (p6)	mov ar.pfs=r0			// clear ar.pfs on success
 (p7)	br.ret.sptk.many rp
@@ -193,7 +193,7 @@ GLOBAL_ENTRY(ia64_switch_to)
 	;;
 (p6)	srlz.d
 	ld8 sp=[r21]			// load kernel stack pointer of new task
-	mov IA64_KR(CURRENT)=r20	// update "current" application register
+	mov IA64_KR(CURRENT)=in0	// update "current" application register
 	mov r8=r13			// return pointer to previously running task
 	mov r13=in0			// set "current" pointer
 	;;
@@ -569,11 +569,12 @@ END(ia64_ret_from_syscall)
 	// fall through
 GLOBAL_ENTRY(ia64_leave_kernel)
 	PT_REGS_UNWIND_INFO(0)
-	// work.need_resched etc. mustn't get changed by this CPU before it returns to userspace:
-(pUser)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUser
-(pUser)	rsm psr.i
+	// work.need_resched etc. mustn't get changed by this CPU before it returns to
+	// user- or fsys-mode:
+(pUStk)	cmp.eq.unc p6,p0=r0,r0			// p6 <- pUStk
+(pUStk)	rsm psr.i
 	;;
-(pUser)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
+(pUStk)	adds r17=TI_FLAGS+IA64_TASK_SIZE,r13
 	;;
 .work_processed:
 (p6)	ld4 r18=[r17]				// load current_thread_info()->flags
@@ -635,9 +636,9 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 	srlz.i			// ensure interruption collection is off
 	mov b7=r15
+	bsw.0			// switch back to bank 0 (no stop bit required beforehand...)
 	;;
-	bsw.0			// switch back to bank 0
-	;;
+(pUStk)	mov r18=IA64_KR(CURRENT)	// Itanium 2: 12 cycle read latency
 	adds r16=16,r12
 	adds r17=24,r12
 	;;
@@ -665,16 +666,21 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	;;
 	ld8.fill r12=[r16],16
 	ld8.fill r13=[r17],16
+(pUStk)	adds r18=IA64_TASK_THREAD_ON_USTACK_OFFSET,r18
 	;;
 	ld8.fill r14=[r16]
 	ld8.fill r15=[r17]
+(pUStk)	mov r17=1
+	;;
+(pUStk)	st1 [r18]=r17		// restore current->thread.on_ustack
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
 	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
 	;;
 	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
-(pKern)	br.cond.dpnt skip_rbs_switch
+(pKStk)	br.cond.dpnt skip_rbs_switch
+
 	/*
 	 * Restore user backing store.
 	 *
@@ -788,12 +794,12 @@ rse_clear_invalid:
 skip_rbs_switch:
 	mov b6=rB6
 	mov ar.pfs=rARPFS
-(pUser)	mov ar.bspstore=rARBSPSTORE
+(pUStk)	mov ar.bspstore=rARBSPSTORE
 (p9)	mov cr.ifs=rCRIFS
 	mov cr.ipsr=rCRIPSR
 	mov cr.iip=rCRIIP
 	;;
-(pUser)	mov ar.rnat=rARRNAT	// must happen with RSE in lazy mode
+(pUStk)	mov ar.rnat=rARRNAT	// must happen with RSE in lazy mode
 	mov ar.rsc=rARRSC
 	mov ar.unat=rARUNAT
 	mov pr=rARPR,-1

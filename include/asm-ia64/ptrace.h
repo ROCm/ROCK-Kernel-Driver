@@ -218,6 +218,8 @@ struct switch_stack {
 # define ia64_task_regs(t)		(((struct pt_regs *) ((char *) (t) + IA64_STK_OFFSET)) - 1)
 # define ia64_psr(regs)			((struct ia64_psr *) &(regs)->cr_ipsr)
 # define user_mode(regs)		(((struct ia64_psr *) &(regs)->cr_ipsr)->cpl != 0)
+# define user_stack(regs)		(current->thread.on_ustack != 0)
+# define fsys_mode(regs)		(!user_mode(regs) && user_stack(regs))
 
   struct task_struct;			/* forward decl */
 
