@@ -86,7 +86,7 @@
 #define TRACE() printk(KERN_ERR "eth1394:%s[%d] ---- TRACE\n", __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 945 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 951 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -1423,6 +1423,12 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 	u16 dgl;
 	struct packet_task *ptask;
 	struct node_entry *ne;
+
+	if (skb_is_nonlinear(skb)) {
+		ret = skb_linearize(skb, kmflags);
+		if(ret)
+			goto fail;
+	}
 
 	ptask = kmem_cache_alloc(packet_task_cache, kmflags);
 	if(ptask == NULL) {
