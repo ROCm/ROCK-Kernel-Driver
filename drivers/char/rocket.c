@@ -42,10 +42,6 @@
 #include <linux/config.h>
 #include <linux/version.h>
 
-#ifdef CONFIG_PCI
-#define ENABLE_PCI
-#endif
-
 #include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/major.h>
@@ -63,15 +59,8 @@
 #include <linux/fcntl.h>
 #include <linux/ptrace.h>
 #include <linux/ioport.h>
-#ifdef ENABLE_PCI
 #include <linux/pci.h>
-#if (LINUX_VERSION_CODE < 0x020163) /* 2.1.99 */
-#include <linux/bios32.h>
-#endif
-#endif
-#if (LINUX_VERSION_CODE >= 131343) /* 2.1.15 -- XX get correct version */
 #include <linux/init.h>
-#endif
 	
 #include "rocket_int.h"
 #ifdef LOCAL_ROCKET_H
@@ -154,7 +143,6 @@ static unsigned long time_stat_long;
 static unsigned long time_counter;
 #endif
 
-#if ((LINUX_VERSION_CODE > 0x020111) && defined(MODULE))
 MODULE_AUTHOR("Theodore Ts'o");
 MODULE_DESCRIPTION("Comtrol Rocketport driver");
 MODULE_LICENSE("GPL");
@@ -170,39 +158,8 @@ MODULE_PARM(controller, "i");
 MODULE_PARM_DESC(controller, "I/O port for (ISA) rocketport controller");
 MODULE_PARM(support_low_speed, "i");
 MODULE_PARM_DESC(support_low_speed, "0 means support 50 baud, 1 means support 460400 baud");	
-#endif
 
-#if (LINUX_VERSION_CODE < 131336)
-int copy_from_user(void *to, const void *from_user, unsigned long len)
-{
-	int	error;
-
-	error = verify_area(VERIFY_READ, from_user, len);
-	if (error)
-		return len;
-	memcpy_fromfs(to, from_user, len);
-	return 0;
-}
-
-int copy_to_user(void *to_user, const void *from, unsigned long len)
-{
-	int	error;
-	
-	error = verify_area(VERIFY_WRITE, to_user, len);
-	if (error)
-		return len;
-	memcpy_tofs(to_user, from, len);
-	return 0;
-}
-
-static inline int signal_pending(struct task_struct *p)
-{
-	return (p->signal & ~p->blocked) != 0;
-}
-
-#else
 #include <asm/uaccess.h>
-#endif
 
 /*
  * tmp_buf is used as a temporary buffer by rp_write.  We need to
@@ -497,7 +454,7 @@ static void rp_do_poll(unsigned long dummy)
 			continue;
 		ctlp= sCtlNumToCtlPtr(ctrl);
 
-#ifdef ENABLE_PCI
+#ifdef CONFIG_PCI
 		if(ctlp->BusType == isPCI)
 			CtlMask= sPCIGetControllerIntStatus(ctlp);
 		else
@@ -611,12 +568,6 @@ static void init_r_port(int board, int aiop, int chan)
 	rp_table[line] = info;
 }
 
-#if (LINUX_VERSION_CODE < 131394) /* Linux 2.1.66 */
-static int baud_table[] = {
-	0, 50, 75, 110, 134, 150, 200, 300,
-	600, 1200, 1800, 2400, 4800, 9600, 19200,
-	38400, 57600, 115200, 230400, 460800, 0 };
-#endif
 
 /*
  * This routine configures a rocketport port so according to its
@@ -627,9 +578,6 @@ static void configure_r_port(struct r_port *info)
 	unsigned cflag;
 	unsigned long 	flags;
 	int	bits, baud;
-#if (LINUX_VERSION_CODE < 131393) /* Linux 2.1.65 */
-	int i;
-#endif
 	CHANNEL_t	*cp;
 	
 	if (!info->tty || !info->tty->termios)
@@ -665,31 +613,9 @@ static void configure_r_port(struct r_port *info)
 	}
 	
 	/* baud rate */
-#if (LINUX_VERSION_CODE < 131394) /* Linux 2.1.66 */
-	i = cflag & CBAUD;
-	if (i & CBAUDEX) {
-		i &= ~CBAUDEX;
-		if (i < 1 || i > 4) 
-			info->tty->termios->c_cflag &= ~CBAUDEX;
-		else
-			i += 15;
-	}
-	if (i == 15) {
-		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_HI)
-			i += 1;
-		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_VHI)
-			i += 2;
-		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_SHI)
-			i += 3;
-		if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
-			i += 4;
-	}
-	baud = baud_table[i] ? baud_table[i] : 9600;
-#else
 	baud = tty_get_baud_rate(info->tty);
 	if (!baud)
 		baud = 9600;
-#endif
 	info->cps = baud / bits;
 	sSetBaud(cp, (rp_baud_base/baud) - 1);
 	
@@ -990,7 +916,6 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 
 	info->flags |= ROCKET_INITIALIZED;
 
-#if (LINUX_VERSION_CODE >= 131394) /* Linux 2.1.66 */
 	/*
 	 * Set up the tty->alt_speed kludge
 	 */
@@ -1002,7 +927,6 @@ static int rp_open(struct tty_struct *tty, struct file * filp)
 		info->tty->alt_speed = 230400;
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
 		info->tty->alt_speed = 460800;
-#endif
 
 	configure_r_port(info);
 	if (tty->termios->c_cflag & CBAUD) {
@@ -1094,10 +1018,8 @@ static void rp_close(struct tty_struct *tty, struct file * filp)
 	 * If transmission was throttled by the application request,
 	 * just flush the xmit buffer.
 	 */
-#if (LINUX_VERSION_CODE >= 131343)
 	if (tty->flow_stopped)
 		rp_flush_buffer(tty);
-#endif
 
 	/*
 	 * Wait for the transmit buffer to clear
@@ -1218,17 +1140,6 @@ static void rp_set_termios(struct tty_struct *tty, struct termios *old_termios)
 /*
  * Here are the routines used by rp_ioctl
  */
-#if (LINUX_VERSION_CODE < 131394) /* Linux 2.1.66 */
-static void send_break(	struct r_port * info, int duration)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	cli();
-	sSendBreak(&info->channel);
-	schedule_timeout(duration);
-	sClrBreak(&info->channel);
-	sti();
-}
-#else
 static void rp_break(struct tty_struct *tty, int break_state)
 {
 	struct r_port * info = (struct r_port *)tty->driver_data;
@@ -1245,7 +1156,6 @@ static void rp_break(struct tty_struct *tty, int break_state)
 	}
 	restore_flags(flags);
 }
-#endif
 
 static int get_modem_info(struct r_port * info, unsigned int *value)
 {
@@ -1348,7 +1258,6 @@ static int set_config(struct r_port * info, struct rocket_config * new_info)
 	info->close_delay = new_serial.close_delay;
 	info->closing_wait = new_serial.closing_wait;
 
-#if (LINUX_VERSION_CODE >= 131394) /* Linux 2.1.66 */
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_HI)
 		info->tty->alt_speed = 57600;
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_VHI)
@@ -1357,7 +1266,6 @@ static int set_config(struct r_port * info, struct rocket_config * new_info)
 		info->tty->alt_speed = 230400;
 	if ((info->flags & ROCKET_SPD_MASK) == ROCKET_SPD_WARP)
 		info->tty->alt_speed = 460800;
-#endif
 	
 	configure_r_port(info);
 	return 0;
@@ -1389,54 +1297,13 @@ static int rp_ioctl(struct tty_struct *tty, struct file * file,
 		    unsigned int cmd, unsigned long arg)
 {
 	struct r_port * info = (struct r_port *)tty->driver_data;
-#if (LINUX_VERSION_CODE < 131394) /* Linux 2.1.66 */
-	int retval, tmp;
-#endif
 
 	if (cmd != RCKP_GET_PORTS &&
 	    rocket_paranoia_check(info, tty->device, "rp_ioctl"))
 		return -ENODEV;
 
 	switch (cmd) {
-#if (LINUX_VERSION_CODE < 131394) /* Linux 2.1.66 */
-		case TCSBRK:	/* SVID version: non-zero arg --> no break */
-			retval = tty_check_change(tty);
-			if (retval)
-				return retval;
-			tty_wait_until_sent(tty, 0);
-			if (signal_pending(current))
-				return -EINTR;
-			if (!arg) {
-				send_break(info, HZ/4);	/* 1/4 second */
-				if (signal_pending(current))
-					return -EINTR;
-			}
-			return 0;
-		case TCSBRKP:	/* support for POSIX tcsendbreak() */
-			retval = tty_check_change(tty);
-			if (retval)
-				return retval;
-			tty_wait_until_sent(tty, 0);
-			if (signal_pending(current))
-				return -EINTR;
-			send_break(info, arg ? arg*(HZ/10) : HZ/4);
-			if (signal_pending(current))
-				return -EINTR;
-			return 0;
-		case TIOCGSOFTCAR:
-			tmp = C_CLOCAL(tty) ? 1 : 0;
-			if (copy_to_user((void *)arg, &tmp, sizeof(int)))
-				return -EFAULT;
-			return 0;
-		case TIOCSSOFTCAR:
-			if (copy_from_user(&tmp, (void *)arg, sizeof(int)))
-				return -EFAULT;
 
-			tty->termios->c_cflag =
-				((tty->termios->c_cflag & ~CLOCAL) |
-				 (tmp ? CLOCAL : 0));
-			return 0;
-#endif
 		case TIOCMGET:
 			return get_modem_info(info, (unsigned int *) arg);
 		case TIOCMBIS:
@@ -1877,36 +1744,7 @@ static void rp_flush_buffer(struct tty_struct *tty)
 	sFlushTxFIFO(cp);
 }
 
-#ifdef ENABLE_PCI
-#if (LINUX_VERSION_CODE < 0x020163) /* 2.1.99 */
-/* For compatibility */
-static struct pci_dev *pci_find_slot(unsigned char bus,
-				     unsigned char device_fn)
-{
-	unsigned short		vendor_id, device_id;
-	int			ret, error;
-	static struct pci_dev	ret_struct;
-	
-	error = pcibios_read_config_word(bus, device_fn, PCI_VENDOR_ID,
-		&vendor_id);
-	ret = pcibios_read_config_word(bus, device_fn, PCI_DEVICE_ID,
-		&device_id);
-	if (error == 0)
-		error = ret;
-
-	if (error) {
-		printk("PCI RocketPort error: %s not initializing due to error"
-		       "reading configuration space\n",
-		       pcibios_strerror(error));
-		return(0);
-	}
-
-	memset(&ret_struct, 0, sizeof(ret_struct));
-	ret_struct.device = device_id;
-
-	return &ret_struct;
-}
-#endif
+#ifdef CONFIG_PCI
      
 int __init register_PCI(int i, unsigned int bus, unsigned int device_fn)
 {
@@ -1915,10 +1753,6 @@ int __init register_PCI(int i, unsigned int bus, unsigned int device_fn)
 	char *str;
 	CONTROLLER_t	*ctlp;
 	struct pci_dev *dev = pci_find_slot(bus, device_fn);
-#if (LINUX_VERSION_CODE < 0x020163) /* 2.1.99 */
-	int	ret;
-	unsigned int port;
-#endif
 
 	if (!dev)
 		return 0;
@@ -2161,7 +1995,7 @@ int __init rp_init(void)
 		if(init_ISA(i, &reserved_controller))
 			isa_boards_found++;
 	}
-#ifdef ENABLE_PCI
+#ifdef CONFIG_PCI
 	if (pcibios_present()) {
 		if(isa_boards_found < NUM_BOARDS)
 			pci_boards_found = init_PCI(isa_boards_found);
@@ -2219,13 +2053,9 @@ int __init rp_init(void)
 	rocket_driver.stop = rp_stop;
 	rocket_driver.start = rp_start;
 	rocket_driver.hangup = rp_hangup;
-#if (LINUX_VERSION_CODE >= 131394) /* Linux 2.1.66 */
 	rocket_driver.break_ctl = rp_break;
-#endif
-#if (LINUX_VERSION_CODE >= 131343)
 	rocket_driver.send_xchar = rp_send_xchar;
 	rocket_driver.wait_until_sent = rp_wait_until_sent;
-#endif
 
 	/*
 	 * The callout device is just like normal device except for
