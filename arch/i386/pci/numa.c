@@ -1,19 +1,19 @@
 /*
  * numa.c - Low-level PCI access for NUMA-Q machines
  */
+
 #include <linux/pci.h>
 #include <linux/init.h>
-
 #include "pci.h"
 
 #define BUS2QUAD(global) (mp_bus_id_to_node[global])
 #define BUS2LOCAL(global) (mp_bus_id_to_local[global])
 #define QUADLOCAL2BUS(quad,local) (quad_local_to_mp_bus_id[quad][local])
 
-#define PCI_CONF1_ADDRESS(bus, dev, fn, reg) \
+#define PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg) \
 	(0x80000000 | (BUS2LOCAL(bus) << 16) | (dev << 11) | (fn << 8) | (reg & ~3))
 
-static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+static int __pci_conf1_mq_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	unsigned long flags;
 
@@ -22,7 +22,7 @@ static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, 
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl_quad(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
+	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
 
 	switch (len) {
 	case 1:
@@ -41,7 +41,7 @@ static int pci_conf1_read (int seg, int bus, int dev, int fn, int reg, int len, 
 	return 0;
 }
 
-static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+static int __pci_conf1_mq_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	unsigned long flags;
 
@@ -50,7 +50,7 @@ static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len,
 
 	spin_lock_irqsave(&pci_config_lock, flags);
 
-	outl_quad(PCI_CONF1_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
+	outl_quad(PCI_CONF1_MQ_ADDRESS(bus, dev, fn, reg), 0xCF8, BUS2QUAD(bus));
 
 	switch (len) {
 	case 1:
@@ -68,6 +68,25 @@ static int pci_conf1_write (int seg, int bus, int dev, int fn, int reg, int len,
 
 	return 0;
 }
+
+#undef PCI_CONF1_MQ_ADDRESS
+
+static int pci_conf1_mq_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
+{
+	return __pci_conf1_mq_read(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
+}
+
+static int pci_conf1_mq_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
+{
+	return __pci_conf1_mq_write(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
+}
+
+static struct pci_ops pci_direct_conf1_mq = {
+	read:	pci_conf1_mq_read,
+	write:	pci_conf1_mq_write
+};
 
 
 static void __devinit pci_fixup_i450nx(struct pci_dev *d)
@@ -102,8 +121,7 @@ static int __init pci_numa_init(void)
 {
 	int quad;
 
-	pci_config_read = pci_conf1_read;
-	pci_config_write = pci_conf1_write;
+	pci_root_ops = &pci_direct_conf1_mq;
 
 	if (pcibios_scanned++)
 		return 0;

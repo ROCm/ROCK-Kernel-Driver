@@ -37,11 +37,9 @@
 #define PCI_ACCESS_WRITE 1
 
 static int
-mips_pcibios_config_access(unsigned char access_type, struct pci_dev *dev,
-                           unsigned char where, u32 *data)
+mips_pcibios_config_access(unsigned char access_type, struct pci_bus *bus_dev, unsigned int dev_fn, unsigned char where, u32 *data)
 {
-	unsigned char bus = dev->bus->number;
-	unsigned char dev_fn = dev->devfn;
+	unsigned char bus = bus_dev->number;
         u32 intr;
 
 	if ((bus == 0) && (dev_fn >= PCI_DEVFN(31,0)))
@@ -101,109 +99,56 @@ mips_pcibios_config_access(unsigned char access_type, struct pci_dev *dev,
  * read/write a 32bit word and mask/modify the data we actually want.
  */
 static int
-mips_pcibios_read_config_byte (struct pci_dev *dev, int where, u8 *val)
+mips_pcibios_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *val)
 {
 	u32 data = 0;
 
-	if (mips_pcibios_config_access(PCI_ACCESS_READ, dev, where, &data))
-		return -1;
-
-	*val = (data >> ((where & 3) << 3)) & 0xff;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-
-static int
-mips_pcibios_read_config_word (struct pci_dev *dev, int where, u16 *val)
-{
-	u32 data = 0;
-
-	if (where & 1)
+	if((size == 2) && (where & 1))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	if (mips_pcibios_config_access(PCI_ACCESS_READ, dev, where, &data))
-	       return -1;
-
-	*val = (data >> ((where & 3) << 3)) & 0xffff;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-mips_pcibios_read_config_dword (struct pci_dev *dev, int where, u32 *val)
-{
-	u32 data = 0;
-
-	if (where & 3)
+	else if ((size == 4)  && (where & 3))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
-	
-	if (mips_pcibios_config_access(PCI_ACCESS_READ, dev, where, &data))
+	if (mips_pcibios_config_access(PCI_ACCESS_READ, bus, devfn, where, &data))
 		return -1;
-
-	*val = data;
+	if(size == 1) 
+		*val = (u8)(data >> ((where & 3) << 3)) & 0xff;
+	else if (size == 2)
+		*val = (u16)(data >> ((where & 3) << 3)) & 0xffff;
+	else if (size == 4)
+		*val = data;
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 
 static int
-mips_pcibios_write_config_byte (struct pci_dev *dev, int where, u8 val)
+mips_pcibios_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 val)
 {
 	u32 data = 0;
        
-	if (mips_pcibios_config_access(PCI_ACCESS_READ, dev, where, &data))
-		return -1;
-
-	data = (data & ~(0xff << ((where & 3) << 3))) |
-	       (val << ((where & 3) << 3));
-
-	if (mips_pcibios_config_access(PCI_ACCESS_WRITE, dev, where, &data))
-		return -1;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-mips_pcibios_write_config_word (struct pci_dev *dev, int where, u16 val)
-{
-        u32 data = 0;
-
-	if (where & 1)
+	if((size == 2) && (where & 1))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
-       
-        if (mips_pcibios_config_access(PCI_ACCESS_READ, dev, where, &data))
-	       return -1;
-
-	data = (data & ~(0xffff << ((where & 3) << 3))) | 
-	       (val << ((where & 3) << 3));
-
-	if (mips_pcibios_config_access(PCI_ACCESS_WRITE, dev, where, &data))
-	       return -1;
-
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int
-mips_pcibios_write_config_dword(struct pci_dev *dev, int where, u32 val)
-{
-	if (where & 3)
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-
-	if (mips_pcibios_config_access(PCI_ACCESS_WRITE, dev, where, &val))
-	       return -1;
-
+	else if (size == 4) {
+		if(where & 3)
+			return PCIBIOS_BAD_REGISTER_NUMBER;
+		if(mips_pcibios_config_access(PCI_ACCESS_READ, bus, devfn, where, &val))
+			return -1;
+		return PCIBIOS_SUCCESSFUL;
+	}
+	if (mips_pcibios_config_access(PCI_ACCESS_READ, bus, devfn,  where, &data))
+		return -1;
+	if(size == 1) {
+		data = (data & ~(0xff << ((where & 3) << 3))) |
+		       	(val << ((where & 3) << 3));
+	} else if (size == 2) {
+		data = (data & ~(0xffff << ((where & 3) << 3))) | 
+			(val << ((where & 3) << 3));
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 struct pci_ops mips_pci_ops = {
-	mips_pcibios_read_config_byte,
-        mips_pcibios_read_config_word,
-	mips_pcibios_read_config_dword,
-	mips_pcibios_write_config_byte,
-	mips_pcibios_write_config_word,
-	mips_pcibios_write_config_dword
+	.read = 	mips_pcibios_read,
+	.write = 	mips_pcibios_write,
 };
 
 void __init pcibios_init(void)

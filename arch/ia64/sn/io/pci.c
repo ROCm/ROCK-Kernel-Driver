@@ -44,22 +44,21 @@ extern devfs_handle_t pci_bus_to_vertex(unsigned char);
 extern devfs_handle_t devfn_to_vertex(unsigned char bus, unsigned char devfn);
 
 /*
- * snia64_read_config_byte - Read a byte from the config area of the device.
+ * snia64_read - Read from the config area of the device.
  */
-static int snia64_read_config_byte (struct pci_dev *dev,
-                                   int where, unsigned char *val)
+static int snia64_read (struct pci_bus *bus, unsigned char devfn,
+                                   int where, int size, unsigned char *val)
 {
 	unsigned long res = 0;
-	unsigned size = 1;
 	devfs_handle_t device_vertex;
 
-	if ( (dev == (struct pci_dev *)0) || (val == (unsigned char *)0) ) {
+	if ( (bus == NULL) || (val == (unsigned char *)0) ) {
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
+	device_vertex = devfn_to_vertex(bus->number, devfn);
 	if (!device_vertex) {
 		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+		__FUNCTION__, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn));
 		return(-1);
 	}
 	res = pciio_config_get(device_vertex, (unsigned) where, size);
@@ -68,160 +67,40 @@ static int snia64_read_config_byte (struct pci_dev *dev,
 }
 
 /*
- * snia64_read_config_word - Read 2 bytes from the config area of the device.
+ * snia64_write - Writes to the config area of the device.
  */
-static int snia64_read_config_word (struct pci_dev *dev,
-                                   int where, unsigned short *val)
-{
-	unsigned long res = 0;
-	unsigned size = 2; /* 2 bytes */
-	devfs_handle_t device_vertex;
-
-	if ( (dev == (struct pci_dev *)0) || (val == (unsigned short *)0) ) {
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
-	if (!device_vertex) {
-		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-		return(-1);
-	}
-	res = pciio_config_get(device_vertex, (unsigned) where, size);
-	*val = (unsigned short) res;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-/*
- * snia64_read_config_dword - Read 4 bytes from the config area of the device.
- */
-static int snia64_read_config_dword (struct pci_dev *dev,
-                                    int where, unsigned int *val)
-{
-	unsigned long res = 0;
-	unsigned size = 4; /* 4 bytes */
-	devfs_handle_t device_vertex;
-
-	if (where & 3) {
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-	if ( (dev == (struct pci_dev *)0) || (val == (unsigned int *)0) ) {
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
-
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
-	if (!device_vertex) {
-		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-		return(-1);
-	}
-	res = pciio_config_get(device_vertex, (unsigned) where, size);
-	*val = (unsigned int) res;
-	return PCIBIOS_SUCCESSFUL;
-}
-
-/*
- * snia64_write_config_byte - Writes 1 byte to the config area of the device.
- */
-static int snia64_write_config_byte (struct pci_dev *dev,
-                                    int where, unsigned char val)
+static int snia64_write (struct pci_bus *bus, unsigned char devfn,
+                                    int where, int size, unsigned char val)
 {
 	devfs_handle_t device_vertex;
 
-	if ( dev == (struct pci_dev *)0 ) {
+	if ( bus == NULL) {
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
 	/* 
 	 * if it's an IOC3 then we bail out, we special
 	 * case them with pci_fixup_ioc3
 	 */
-	if (dev->vendor == PCI_VENDOR_ID_SGI && 
+	/* Starting 2.5.32 struct pci_dev is not passed down */
+	/*if (dev->vendor == PCI_VENDOR_ID_SGI && 
 	    dev->device == PCI_DEVICE_ID_SGI_IOC3 )
 		return PCIBIOS_SUCCESSFUL;
+	*/
 
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
+	device_vertex = devfn_to_vertex(bus->number, devfn);
 	if (!device_vertex) {
 		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
+		__FUNCTION__, bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn));
 		return(-1);
 	}
-	pciio_config_set( device_vertex, (unsigned)where, 1, (uint64_t) val);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-/*
- * snia64_write_config_word - Writes 2 bytes to the config area of the device.
- */
-static int snia64_write_config_word (struct pci_dev *dev,
-                                    int where, unsigned short val)
-{
-	devfs_handle_t device_vertex = NULL;
-
-	if (where & 1) {
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-	if ( dev == (struct pci_dev *)0 ) {
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
-	/* 
-	 * if it's an IOC3 then we bail out, we special
-	 * case them with pci_fixup_ioc3
-	 */
-	if (dev->vendor == PCI_VENDOR_ID_SGI && 
-	    dev->device == PCI_DEVICE_ID_SGI_IOC3)
-		return PCIBIOS_SUCCESSFUL;
-
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
-	if (!device_vertex) {
-		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-		return(-1);
-	}
-	pciio_config_set( device_vertex, (unsigned)where, 2, (uint64_t) val);
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-/*
- * snia64_write_config_dword - Writes 4 bytes to the config area of the device.
- */
-static int snia64_write_config_dword (struct pci_dev *dev,
-                                     int where, unsigned int val)
-{
-	devfs_handle_t device_vertex;
-
-	if (where & 3) {
-		return PCIBIOS_BAD_REGISTER_NUMBER;
-	}
-	if ( dev == (struct pci_dev *)0 ) {
-		return PCIBIOS_DEVICE_NOT_FOUND;
-	}
-	/* 
-	 * if it's an IOC3 then we bail out, we special
-	 * case them with pci_fixup_ioc3
-	 */
-	if (dev->vendor == PCI_VENDOR_ID_SGI && 
-	    dev->device == PCI_DEVICE_ID_SGI_IOC3)
-		return PCIBIOS_SUCCESSFUL;
-
-	device_vertex = devfn_to_vertex(dev->bus->number, dev->devfn);
-	if (!device_vertex) {
-		DBG("%s : nonexistent device: bus= 0x%x  slot= 0x%x  func= 0x%x\n", 
-		__FUNCTION__, dev->bus->number, PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
-		return(-1);
-	}
-	pciio_config_set( device_vertex, (unsigned)where, 4, (uint64_t) val);
+	pciio_config_set( device_vertex, (unsigned)where, size, (uint64_t) val);
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops snia64_pci_ops = {
-	snia64_read_config_byte,
-	snia64_read_config_word,
-	snia64_read_config_dword,
-	snia64_write_config_byte,
-	snia64_write_config_word,
-	snia64_write_config_dword
+	.read =		snia64_read,
+	.write = 	snia64_write,
 };
 
 /*

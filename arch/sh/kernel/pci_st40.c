@@ -268,7 +268,7 @@ char * __init pcibios_setup(char *str)
 #define SET_CONFIG_BITS(bus,devfn,where)\
   (((bus) << 16) | ((devfn) << 8) | ((where) & ~3) | (bus!=0))
 
-#define CONFIG_CMD(dev, where) SET_CONFIG_BITS((dev)->bus->number,(dev)->devfn,where)
+#define CONFIG_CMD(bus, devfn, where) SET_CONFIG_BITS(bus->number,devfn,where)
 
 
 static int CheckForMasterAbort(void)
@@ -284,79 +284,53 @@ static int CheckForMasterAbort(void)
 }
 
 /* Write to config register */
-static int st40pci_read_config_byte(struct pci_dev *dev, int where,
-				    u8 * val)
+static int st40pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 * val)
 {
-	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
+	ST40PCI_WRITE(PAR, CONFIG_CMD(bus, devfn, where));
+	switch (size) {
+		case 1:
+			*val = (u8)ST40PCI_READ_BYTE(PDR + (where & 3));
+			break;
+		case 2:
+			*val = (u16)ST40PCI_READ_SHORT(PDR + (where & 2));
+			break;
+		case 4:
+		 	*val = ST40PCI_READ(PDR); 
+			break;
+	}
 
-	*val = ST40PCI_READ_BYTE(PDR + (where & 3));
-
-	if (CheckForMasterAbort())
-		*val = 0xff;
-
+	if (CheckForMasterAbort()){
+		switch (size) {
+			case 1:
+				*val = (u8)0xff;
+				break;
+			case 2:
+				*val = (u16)0xffff;
+				break;
+			case 4:
+				*val = 0xffffffff;
+				break;
+		}
+	}
 
 	return PCIBIOS_SUCCESSFUL;
 }
 
-static int st40pci_read_config_word(struct pci_dev *dev, int where,
-				    u16 * val)
+static int st40pci_write(struct pci_bus *bus, unsigned int devfn; int where, int size, u32 val)
 {
 	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
 
-	*val = ST40PCI_READ_SHORT(PDR + (where & 2));
-
-	if (CheckForMasterAbort())
-		*val = 0xffff;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-
-static int st40pci_read_config_dword(struct pci_dev *dev, int where,
-				     u32 * val)
-{
-
-	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
-
-	*val = ST40PCI_READ(PDR);
-
-	if (CheckForMasterAbort())
-		*val = 0xffffffff;
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int st40pci_write_config_byte(struct pci_dev *dev, int where,
-				     u8 val)
-{
-	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
-
-	ST40PCI_WRITE_BYTE(PDR + (where & 3), val);
-
-	CheckForMasterAbort();
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-
-static int st40pci_write_config_word(struct pci_dev *dev, int where,
-				     u16 val)
-{
-	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
-
-	ST40PCI_WRITE_SHORT(PDR + (where & 2), val);
-
-	CheckForMasterAbort();
-
-	return PCIBIOS_SUCCESSFUL;
-}
-
-static int st40pci_write_config_dword(struct pci_dev *dev, int where,
-				      u32 val)
-{
-	ST40PCI_WRITE(PAR, CONFIG_CMD(dev, where));
-
-	ST40PCI_WRITE(PDR, val);
+	switch (size) {
+		case 1:
+			ST40PCI_WRITE_BYTE(PDR + (where & 3), (u8)val);
+			break;
+		case 2:
+			ST40PCI_WRITE_SHORT(PDR + (where & 2), (u16)val);
+			break;
+		case 4:
+			ST40PCI_WRITE(PDR, val);
+			break;
+	}
 
 	CheckForMasterAbort();
 
@@ -364,12 +338,8 @@ static int st40pci_write_config_dword(struct pci_dev *dev, int where,
 }
 
 static struct pci_ops pci_config_ops = {
-	st40pci_read_config_byte,
-	st40pci_read_config_word,
-	st40pci_read_config_dword,
-	st40pci_write_config_byte,
-	st40pci_write_config_word,
-	st40pci_write_config_dword
+	.read = 	st40pci_read,
+	.write = 	st40pci_write,
 };
 
 
