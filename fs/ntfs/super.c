@@ -36,21 +36,20 @@ static unsigned long ntfs_nr_compression_users = 0;
 
 /* Error constants/strings used in inode.c::ntfs_show_options(). */
 typedef enum {
+	/* One of these must be present, default is ON_ERRORS_CONTINUE. */
 	ON_ERRORS_PANIC			= 0x01,
 	ON_ERRORS_REMOUNT_RO		= 0x02,
 	ON_ERRORS_CONTINUE		= 0x04,
+	/* Optional, can be combined with any of the above. */
 	ON_ERRORS_RECOVER		= 0x10,
 } ON_ERRORS_ACTIONS;
 
 const option_t on_errors_arr[] = {
-	{ ON_ERRORS_PANIC,			    "panic" },
-	{ ON_ERRORS_REMOUNT_RO,			    "remount-ro", },
-	{ ON_ERRORS_CONTINUE,			    "continue", },
-	{ ON_ERRORS_RECOVER,			    "recover" },
-	{ ON_ERRORS_RECOVER | ON_ERRORS_PANIC,	    "recover_or_panic" },
-	{ ON_ERRORS_RECOVER | ON_ERRORS_REMOUNT_RO, "recover_or_remount-ro" },
-	{ ON_ERRORS_RECOVER | ON_ERRORS_CONTINUE,   "recover_or_continue" },
-	{ 0,					    NULL }
+	{ ON_ERRORS_PANIC,	"panic" },
+	{ ON_ERRORS_REMOUNT_RO,	"remount-ro", },
+	{ ON_ERRORS_CONTINUE,	"continue", },
+	{ ON_ERRORS_RECOVER,	"recover" },
+	{ 0,			NULL }
 };
 
 static const option_t readdir_opts_arr[] = {
@@ -288,8 +287,8 @@ no_mount_options:
 		vol->mft_zone_multiplier = 1;
 	if (on_errors != -1)
 		vol->on_errors = on_errors;
-	if (!vol->on_errors)
-		vol->on_errors = ON_ERRORS_CONTINUE;
+	if (!vol->on_errors || vol->on_errors == ON_ERRORS_RECOVER)
+		vol->on_errors |= ON_ERRORS_CONTINUE;
 	if (uid != (uid_t)-1)
 		vol->uid = uid;
 	if (gid != (gid_t)-1)
@@ -1837,7 +1836,7 @@ static int __init init_ntfs_fs(void)
 #ifdef MODULE
 			" MODULE"
 #endif
-			"]. Copyright (c) 2001 Anton Altaparmakov.\n");
+			"]. Copyright (c) 2001,2002 Anton Altaparmakov.\n");
 
 	ntfs_debug("Debug messages are enabled.");
 

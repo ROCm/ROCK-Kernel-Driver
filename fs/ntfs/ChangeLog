@@ -33,7 +33,7 @@ ToDo:
 	  in between. Either need different type of optimization as above or
 	  need to change the read/write spinlock to a read/write semaphore.
 
-tng-0.0.8 - Work in progress.
+tng-0.0.8 - 08/03/2002 - BitKeeper ChangeSet 1.457
 
 	- Replace bdevname(sb->s_dev) with sb->s_id.
 	- Remove now superfluous new-line characters in all callers of
@@ -108,6 +108,16 @@ tng-0.0.8 - Work in progress.
 	- Check for lowest_vcn != 0 in ntfs_read_inode() and mark the inode as
 	  bad if found.
 	- Update to 2.5.6-pre2 changes in struct address_space.
+	- Import Sourceforge CVS repository into BitKeeper repository:
+		http://linux-ntfs.bkbits.net/ntfs-tng-2.5
+	- Update fs/Makefile, fs/Config.help, fs/Config.in, and
+	  Documentation/filesystems/ntfs.txt for NTFS TNG.
+	- Create kernel configuration option controlling whether debugging
+	  is enabled or not.
+	- Add the required export of end_buffer_io_sync() from the patches
+	  directory to the kernel code.
+	- Update inode.c::ntfs_show_options() with show_inodes mount option.
+	- Update errors mount option.
 
 tng-0.0.7 - 13/02/2002 - The driver is now feature complete for read-only!
 

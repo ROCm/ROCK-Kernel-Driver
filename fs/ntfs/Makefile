@@ -9,8 +9,9 @@ obj-m   := $(O_TARGET)
 
 EXTRA_CFLAGS = -DNTFS_VERSION=\"TNG-0.0.8\"
 
-# Uncomment this to enable debugging code.
+ifeq ($(CONFIG_NTFS_DEBUG),y)
 EXTRA_CFLAGS += -DDEBUG
+endif
 
 include $(TOPDIR)/Rules.make
 

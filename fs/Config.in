@@ -62,6 +62,9 @@ tristate 'Minix fs support' CONFIG_MINIX_FS
 
 tristate 'FreeVxFS file system support (VERITAS VxFS(TM) compatible)' CONFIG_VXFS_FS
 
+tristate 'NTFS file system support (read only)' CONFIG_NTFS_FS
+dep_mbool '  NTFS debugging support' CONFIG_NTFS_DEBUG $CONFIG_NTFS_FS
+
 tristate 'OS/2 HPFS file system support' CONFIG_HPFS_FS
 
 bool '/proc file system support' CONFIG_PROC_FS

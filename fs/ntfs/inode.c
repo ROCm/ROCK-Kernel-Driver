@@ -1349,6 +1349,13 @@ void ntfs_clear_big_inode(struct inode *vi)
 	return;
 }
 
+static const option_t si_readdir_opts_arr[] = {
+	{ SHOW_SYSTEM,	"system" },
+	{ SHOW_WIN32,	"win32" },
+	{ SHOW_DOS,	"dos" },
+	{ 0,		NULL }
+};
+
 /**
  * ntfs_show_options - show mount options in /proc/mounts
  * @sf:		seq_file in which to write our mount options
@@ -1363,6 +1370,7 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 {
 	ntfs_volume *vol = NTFS_SB(mnt->mnt_sb);
 	int i;
+	char *s;
 
 	seq_printf(sf, ",uid=%i", vol->uid);
 	seq_printf(sf, ",gid=%i", vol->gid);
@@ -1372,14 +1380,26 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 		seq_printf(sf, ",fmask=0%o", vol->fmask);
 		seq_printf(sf, ",dmask=0%o", vol->dmask);
 	}
-	seq_printf(sf, ",mft_zone_multiplier=%i", vol->mft_zone_multiplier);
 	seq_printf(sf, ",nls=%s", vol->nls_map->charset);
-	for (i = 0; on_errors_arr[i].val; i++) {
-		if (on_errors_arr[i].val == vol->on_errors) {
-			seq_printf(sf, ",errors=%s", on_errors_arr[i].str);
-			break;
+	switch (vol->readdir_opts) {
+	case SHOW_ALL:
+		seq_printf(sf, ",show_inodes=all");
+		break;
+	case SHOW_POSIX:
+		seq_printf(sf, ",show_inodes=posix");
+		break;
+	default:
+		for (i = 0; si_readdir_opts_arr[i].val; i++) {
+			if (si_readdir_opts_arr[i].val & vol->readdir_opts)
+				seq_printf(sf, ",show_inodes=%s",
+						si_readdir_opts_arr[i].str);
 		}
 	}
+	for (i = 0; on_errors_arr[i].val; i++) {
+		if (on_errors_arr[i].val & vol->on_errors)
+			seq_printf(sf, ",errors=%s", on_errors_arr[i].str);
+	}
+	seq_printf(sf, ",mft_zone_multiplier=%i", vol->mft_zone_multiplier);
 	return 0;
 }
 
