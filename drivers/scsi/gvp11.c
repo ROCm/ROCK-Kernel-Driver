@@ -62,61 +62,62 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
     static int scsi_alloc_out_of_range = 0;
 
     /* use bounce buffer if the physical address is bad */
-    if (addr & HDATA(cmd->host)->dma_xfer_mask ||
+    if (addr & HDATA(cmd->device->host)->dma_xfer_mask ||
 	(!dir_in && mm_end_of_chunk (addr, cmd->SCp.this_residual)))
     {
-	HDATA(cmd->host)->dma_bounce_len = (cmd->SCp.this_residual + 511)
+	HDATA(cmd->device->host)->dma_bounce_len = (cmd->SCp.this_residual + 511)
 	    & ~0x1ff;
 
  	if( !scsi_alloc_out_of_range ) {
-	    HDATA(cmd->host)->dma_bounce_buffer =
-		kmalloc (HDATA(cmd->host)->dma_bounce_len, GFP_KERNEL);
-	    HDATA(cmd->host)->dma_buffer_pool = BUF_SCSI_ALLOCED;
+	    HDATA(cmd->device->host)->dma_bounce_buffer =
+		kmalloc (HDATA(cmd->device->host)->dma_bounce_len, GFP_KERNEL);
+	    HDATA(cmd->device->host)->dma_buffer_pool = BUF_SCSI_ALLOCED;
 	}
 
-	if ( scsi_alloc_out_of_range || !HDATA(cmd->host)->dma_bounce_buffer) {
-	    HDATA(cmd->host)->dma_bounce_buffer =
-		amiga_chip_alloc(HDATA(cmd->host)->dma_bounce_len,
+	if (scsi_alloc_out_of_range ||
+	    !HDATA(cmd->device->host)->dma_bounce_buffer) {
+	    HDATA(cmd->device->host)->dma_bounce_buffer =
+		amiga_chip_alloc(HDATA(cmd->device->host)->dma_bounce_len,
 				       "GVP II SCSI Bounce Buffer");
 
-	    if(!HDATA(cmd->host)->dma_bounce_buffer)
+	    if(!HDATA(cmd->device->host)->dma_bounce_buffer)
 	    {
-		HDATA(cmd->host)->dma_bounce_len = 0;
+		HDATA(cmd->device->host)->dma_bounce_len = 0;
 		return 1;
 	    }
 
-	    HDATA(cmd->host)->dma_buffer_pool = BUF_CHIP_ALLOCED;
+	    HDATA(cmd->device->host)->dma_buffer_pool = BUF_CHIP_ALLOCED;
 	}
 
 	/* check if the address of the bounce buffer is OK */
-	addr = virt_to_bus(HDATA(cmd->host)->dma_bounce_buffer);
+	addr = virt_to_bus(HDATA(cmd->device->host)->dma_bounce_buffer);
 
-	if (addr & HDATA(cmd->host)->dma_xfer_mask) {
+	if (addr & HDATA(cmd->device->host)->dma_xfer_mask) {
 	    /* fall back to Chip RAM if address out of range */
-	    if( HDATA(cmd->host)->dma_buffer_pool == BUF_SCSI_ALLOCED) {
-		kfree (HDATA(cmd->host)->dma_bounce_buffer);
+	    if( HDATA(cmd->device->host)->dma_buffer_pool == BUF_SCSI_ALLOCED) {
+		kfree (HDATA(cmd->device->host)->dma_bounce_buffer);
 		scsi_alloc_out_of_range = 1;
 	    } else {
-		amiga_chip_free (HDATA(cmd->host)->dma_bounce_buffer);
+		amiga_chip_free (HDATA(cmd->device->host)->dma_bounce_buffer);
             }
 		
-	    HDATA(cmd->host)->dma_bounce_buffer =
-		amiga_chip_alloc(HDATA(cmd->host)->dma_bounce_len,
+	    HDATA(cmd->device->host)->dma_bounce_buffer =
+		amiga_chip_alloc(HDATA(cmd->device->host)->dma_bounce_len,
 				       "GVP II SCSI Bounce Buffer");
 
-	    if(!HDATA(cmd->host)->dma_bounce_buffer)
+	    if(!HDATA(cmd->device->host)->dma_bounce_buffer)
 	    {
-		HDATA(cmd->host)->dma_bounce_len = 0;
+		HDATA(cmd->device->host)->dma_bounce_len = 0;
 		return 1;
 	    }
 
-	    addr = virt_to_bus(HDATA(cmd->host)->dma_bounce_buffer);
-	    HDATA(cmd->host)->dma_buffer_pool = BUF_CHIP_ALLOCED;
+	    addr = virt_to_bus(HDATA(cmd->device->host)->dma_bounce_buffer);
+	    HDATA(cmd->device->host)->dma_buffer_pool = BUF_CHIP_ALLOCED;
 	}
 	    
 	if (!dir_in) {
 	    /* copy to bounce buffer for a write */
-	    memcpy (HDATA(cmd->host)->dma_bounce_buffer,
+	    memcpy (HDATA(cmd->device->host)->dma_bounce_buffer,
 		    cmd->SCp.ptr, cmd->SCp.this_residual);
 	}
     }
@@ -125,11 +126,11 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
     if (!dir_in)
 	cntr |= GVP11_DMAC_DIR_WRITE;
 
-    HDATA(cmd->host)->dma_dir = dir_in;
-    DMA(cmd->host)->CNTR = cntr;
+    HDATA(cmd->device->host)->dma_dir = dir_in;
+    DMA(cmd->device->host)->CNTR = cntr;
 
     /* setup DMA *physical* address */
-    DMA(cmd->host)->ACR = addr;
+    DMA(cmd->device->host)->ACR = addr;
 
     if (dir_in)
 	/* invalidate any cache */
@@ -138,11 +139,11 @@ static int dma_setup (Scsi_Cmnd *cmd, int dir_in)
 	/* push any dirty cache */
 	cache_push (addr, cmd->SCp.this_residual);
 
-    if ((bank_mask = (~HDATA(cmd->host)->dma_xfer_mask >> 18) & 0x01c0))
-	    DMA(cmd->host)->BANK = bank_mask & (addr >> 18);
+    if ((bank_mask = (~HDATA(cmd->device->host)->dma_xfer_mask >> 18) & 0x01c0))
+	    DMA(cmd->device->host)->BANK = bank_mask & (addr >> 18);
 
     /* start DMA */
-    DMA(cmd->host)->ST_DMA = 1;
+    DMA(cmd->device->host)->ST_DMA = 1;
 
     /* return success */
     return 0;

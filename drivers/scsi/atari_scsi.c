@@ -823,7 +823,7 @@ int atari_scsi_bus_reset(Scsi_Cmnd *cmd)
 {
 	int		rv;
 	struct NCR5380_hostdata *hostdata =
-		(struct NCR5380_hostdata *)cmd->host->hostdata;
+		(struct NCR5380_hostdata *)cmd->device->host->hostdata;
 
 	/* For doing the reset, SCSI interrupts must be disabled first,
 	 * since the 5380 raises its IRQ line while _RST is active and we

@@ -1099,7 +1099,7 @@ do_sync_known:
 		 * disconnect.
 		 */
 		ESPMISC(("esp: Selecting device for first time. target=%d "
-			 "lun=%d\n", target, SCptr->lun));
+			 "lun=%d\n", target, SCptr->device->lun));
 		if(!SDptr->borken && !esp_dev->disconnect)
 			esp_dev->disconnect = 1;
 
@@ -1173,7 +1173,7 @@ do_sync_known:
 		if(((SDptr->scsi_level < 3) && (SDptr->type != TYPE_TAPE)) ||
 		   toshiba_cdrom_hwbug_wkaround || SDptr->borken) {
 			ESPMISC((KERN_INFO "esp%d: Disabling DISCONNECT for target %d "
-				 "lun %d\n", esp->esp_id, SCptr->target, SCptr->lun));
+				 "lun %d\n", esp->esp_id, SCptr->device->id, SCptr->device->lun));
 			esp_dev->disconnect = 0;
 			*cmdp++ = IDENTIFY(0, lun);
 		} else {
@@ -1255,8 +1255,8 @@ int esp_queue(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 		esp->dma_led_on(esp);
 
 	/* We use the scratch area. */
-	ESPQUEUE(("esp_queue: target=%d lun=%d ", SCpnt->target, SCpnt->lun));
-	ESPDISC(("N<%02x,%02x>", SCpnt->target, SCpnt->lun));
+	ESPQUEUE(("esp_queue: target=%d lun=%d ", SCpnt->device->id, SCpnt->lun));
+	ESPDISC(("N<%02x,%02x>", SCpnt->device->id, SCpnt->lun));
 
 	esp_get_dmabufs(esp, SCpnt);
 	esp_save_pointers(esp, SCpnt); /* FIXME for tag queueing */
@@ -2235,7 +2235,7 @@ static int esp_do_freebus(struct NCR_ESP *esp, struct ESP_regs *eregs)
 			 * state.
 			 */
 			ESPMISC(("esp: Status <%d> for target %d lun %d\n",
-				 SCptr->SCp.Status, SCptr->target, SCptr->lun));
+				 SCptr->SCp.Status, SCptr->device->id, SCptr->device->lun));
 
 			/* But don't do this when spinning up a disk at
 			 * boot time while we poll for completion as it
@@ -2246,14 +2246,14 @@ static int esp_do_freebus(struct NCR_ESP *esp, struct ESP_regs *eregs)
 			if(esp_should_clear_sync(SCptr) != 0)
 				esp_dev->sync = 0;
 		}
-		ESPDISC(("F<%02x,%02x>", SCptr->target, SCptr->lun));
+		ESPDISC(("F<%02x,%02x>", SCptr->device->id, SCptr->device->lun));
 		esp_done(esp, ((SCptr->SCp.Status & 0xff) |
 			       ((SCptr->SCp.Message & 0xff)<<8) |
 			       (DID_OK << 16)));
 	} else if(esp->prevmsgin == DISCONNECT) {
 		/* Normal disconnect. */
 		esp_cmd(esp, eregs, ESP_CMD_ESEL);
-		ESPDISC(("D<%02x,%02x>", SCptr->target, SCptr->lun));
+		ESPDISC(("D<%02x,%02x>", SCptr->device->id, SCptr->device->lun));
 		append_SC(&esp->disconnected_SC, SCptr);
 		esp->current_SC = NULL;
 		if(esp->issue_SC)
@@ -2811,7 +2811,7 @@ static int esp_select_complete(struct NCR_ESP *esp, struct ESP_regs *eregs)
 			/* Else, there really isn't anyone there. */
 			ESPMISC(("esp: selection failure, maybe nobody there?\n"));
 			ESPMISC(("esp: target %d lun %d\n",
-				 SCptr->target, SCptr->lun));
+				 SCptr->device->id, SCptr->device->lun));
 			esp_done(esp, (DID_BAD_TARGET << 16));
 		}
 		return do_intr_end;
@@ -3084,7 +3084,7 @@ static int check_multibyte_msg(struct NCR_ESP *esp,
 			ESPSDTR(("soff=%2x stp=%2x cfg3=%2x\n",
 				esp_dev->sync_max_offset,
 				esp_dev->sync_min_period,
-				esp->config3[SCptr->target]));
+				esp->config3[SCptr->device->id]));
 
 			esp->snip = 0;
 		} else if(esp_dev->sync_max_offset) {
