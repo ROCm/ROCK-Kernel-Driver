@@ -153,12 +153,12 @@ extern void usb_stor_invoke_transport(Scsi_Cmnd*, struct us_data*);
 extern void usb_stor_abort_transport(struct us_data*);
 extern int usb_stor_transfer_partial(struct us_data*, char*, int);
 
-extern int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
-		unsigned int len, unsigned int *act_len);
+extern int usb_stor_bulk_msg(struct us_data *us, void *data,
+		unsigned int pipe, unsigned int len, unsigned int *act_len);
 extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 		u8 request, u8 requesttype, u16 value, u16 index,
 		void *data, u16 size);
 
-extern int usb_stor_clear_halt(struct us_data*, int );
+extern int usb_stor_clear_halt(struct us_data*, unsigned int pipe);
 extern void usb_stor_transfer(Scsi_Cmnd*, struct us_data*);
 #endif

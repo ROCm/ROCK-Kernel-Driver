@@ -50,12 +50,6 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 
-extern int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
-	u8 request, u8 requesttype, u16 value, u16 index,
-	void *data, u16 size);
-extern int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
-	unsigned int len, unsigned int *act_len);
-
 #define short_pack(LSB,MSB) ( ((u16)(LSB)) | ( ((u16)(MSB))<<8 ) )
 #define LSB_of(s) ((s)&0xFF)
 #define MSB_of(s) ((s)>>8)
@@ -70,7 +64,7 @@ int usbat_read(struct us_data *us,
 	int result;
 
 	result = usb_storage_send_control(us,
-		usb_rcvctrlpipe(us->pusb_dev,0),
+		us->recv_ctrl_pipe,
 		access,
 		0xC0,
 		(u16)reg,
@@ -89,7 +83,7 @@ int usbat_write(struct us_data *us,
 	int result;
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		access|0x01,
 		0x40,
 		short_pack(reg, content),
@@ -115,7 +109,7 @@ int usbat_set_shuttle_features(struct us_data *us,
 	};
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		0x80,
 		0x40,
 		0,
@@ -140,7 +134,7 @@ int usbat_read_block(struct us_data *us,
 	};
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		0x80,
 		0x40,
 		0,
@@ -222,7 +216,7 @@ int usbat_write_block(struct us_data *us,
 	};
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		0x80,
 		0x40,
 		0,
@@ -293,7 +287,7 @@ int usbat_rw_block_test(struct us_data *us,
 		 */
 
 		result = usb_storage_send_control(us,
-			  usb_sndctrlpipe(us->pusb_dev,0),
+			us->send_ctrl_pipe,
 			0x80,
 			0x40,
 			0,
@@ -352,8 +346,7 @@ int usbat_rw_block_test(struct us_data *us,
 
 			if (direction==SCSI_DATA_READ && i==0) {
 				if (usb_stor_clear_halt(us,
-					usb_sndbulkpipe(us->pusb_dev,
-					  us->ep_out)) < 0)
+						us->send_bulk_pipe) < 0)
 					return USB_STOR_TRANSPORT_ERROR;
 			}
 
@@ -413,7 +406,7 @@ int usbat_multiple_write(struct us_data *us,
 	}
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		0x80,
 		0x40,
 		0,
@@ -439,7 +432,7 @@ int usbat_read_user_io(struct us_data *us,
 	int result;
 
 	result = usb_storage_send_control(us,
-		usb_rcvctrlpipe(us->pusb_dev,0),
+		us->recv_ctrl_pipe,
 		0x82,
 		0xC0,
 		0,
@@ -457,7 +450,7 @@ int usbat_write_user_io(struct us_data *us,
 	int result;
 
 	result = usb_storage_send_control(us,
-		usb_sndctrlpipe(us->pusb_dev,0),
+		us->send_ctrl_pipe,
 		0x82,
 		0x40,
 		short_pack(enable_flags, data_flags),

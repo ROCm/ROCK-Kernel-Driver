@@ -40,7 +40,7 @@
 
 int
 usb_storage_send_control(struct us_data *us,
-			 int pipe,
+			 unsigned int pipe,
 			 unsigned char request,
 			 unsigned char requesttype,
 			 unsigned int value,
@@ -85,12 +85,12 @@ usb_storage_raw_bulk(struct us_data *us, int direction, unsigned char *data,
 		     unsigned int len, unsigned int *act_len) {
 
 	int result;
-	int pipe;
+	unsigned int pipe;
 
 	if (direction == SCSI_DATA_READ)
-		pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
+		pipe = us->recv_bulk_pipe;
 	else
-		pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
+		pipe = us->send_bulk_pipe;
 
 	result = usb_stor_bulk_msg(us, data, pipe, len, act_len);
 

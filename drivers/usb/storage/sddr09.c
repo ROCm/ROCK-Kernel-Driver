@@ -224,15 +224,15 @@ sddr09_send_command(struct us_data *us,
 		    unsigned char direction,
 		    unsigned char *xfer_data,
 		    unsigned int xfer_len) {
-	int pipe;
+	unsigned int pipe;
 	unsigned char requesttype = (0x41 | direction);
 
 	// Get the receive or send control pipe number
 
 	if (direction == USB_DIR_IN)
-		pipe = usb_rcvctrlpipe(us->pusb_dev,0);
+		pipe = us->recv_ctrl_pipe;
 	else
-		pipe = usb_sndctrlpipe(us->pusb_dev,0);
+		pipe = us->send_ctrl_pipe;
 
 	return usb_storage_send_control(us, pipe, request, requesttype,
 				   0, 0, xfer_data, xfer_len);

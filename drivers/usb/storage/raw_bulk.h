@@ -3,7 +3,7 @@
 
 /* usb bulk */
 extern int usb_storage_send_control(
-	struct us_data *us, int pipe,
+	struct us_data *us, unsigned int pipe,
 	unsigned char request, unsigned char requesttype,
 	unsigned int value, unsigned int index,
 	unsigned char *xfer_data, unsigned int xfer_len);

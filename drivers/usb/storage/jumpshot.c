@@ -95,8 +95,7 @@ static int jumpshot_get_status(struct us_data  *us)
 		return USB_STOR_TRANSPORT_ERROR;
 
 	// send the setup
-	rc = usb_storage_send_control(us,
-				   usb_rcvctrlpipe(us->pusb_dev, 0),
+	rc = usb_storage_send_control(us, us->recv_ctrl_pipe,
 				   0, 0xA0, 0, 7, &reply, 1);
 
 	if (rc != USB_STOR_TRANSPORT_GOOD)
@@ -160,8 +159,7 @@ static int jumpshot_read_data(struct us_data *us,
 		command[5] |= (sector >> 24) & 0x0F;
 
 		// send the setup + command
-		result = usb_storage_send_control(us,
-					       usb_sndctrlpipe(us->pusb_dev, 0),
+		result = usb_storage_send_control(us, us->send_ctrl_pipe,
 					       0, 0x20, 0, 1, command, 7);
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			goto leave;
@@ -247,8 +245,7 @@ static int jumpshot_write_data(struct us_data *us,
 		command[5] |= (sector >> 24) & 0x0F;
 
 		// send the setup + command
-		result = usb_storage_send_control(
-			us, usb_sndctrlpipe(us->pusb_dev, 0),
+		result = usb_storage_send_control(us, us->send_ctrl_pipe,
 			0, 0x20, 0, 1, command, 7);
 
 		// send the data
@@ -302,8 +299,7 @@ static int jumpshot_id_device(struct us_data *us,
 		return USB_STOR_TRANSPORT_ERROR;
 
 	// send the setup
-	rc = usb_storage_send_control(us,
-				   usb_sndctrlpipe(us->pusb_dev, 0),
+	rc = usb_storage_send_control(us, us->send_ctrl_pipe,
 				   0, 0x20, 0, 6, command, 2);
 
 	if (rc != USB_STOR_TRANSPORT_GOOD) {

@@ -173,7 +173,7 @@ static void us_transfer_freecom(Scsi_Cmnd *srb, struct us_data* us, int transfer
 
 static int
 freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
-                int ipipe, int opipe, int count)
+                unsigned int ipipe, unsigned int opipe, int count)
 {
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
@@ -214,7 +214,7 @@ freecom_readdata (Scsi_Cmnd *srb, struct us_data *us,
 
 static int
 freecom_writedata (Scsi_Cmnd *srb, struct us_data *us,
-                int ipipe, int opipe, int count)
+                int unsigned ipipe, unsigned int opipe, int count)
 {
         freecom_udata_t extra = (freecom_udata_t) us->extra;
         struct freecom_xfer_wrap *fxfr =
@@ -262,7 +262,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 {
         struct freecom_cb_wrap *fcb;
         struct freecom_status  *fst;
-        int ipipe, opipe;             /* We need both pipes. */
+        unsigned int ipipe, opipe;             /* We need both pipes. */
         int result;
         int partial;
         int length;
@@ -276,8 +276,8 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
         US_DEBUGP("Freecom TRANSPORT STARTED\n");
 
         /* Get handles for both transports. */
-        opipe = usb_sndbulkpipe (us->pusb_dev, us->ep_out);
-        ipipe = usb_rcvbulkpipe (us->pusb_dev, us->ep_in);
+        opipe = us->send_bulk_pipe;
+        ipipe = us->recv_bulk_pipe;
 
         /* The ATAPI Command always goes out first. */
         fcb->Type = FCM_PACKET_ATAPI | 0x00;
@@ -515,8 +515,7 @@ freecom_init (struct us_data *us)
                 }
         }
 
-	result = usb_control_msg(us->pusb_dev,
-			usb_rcvctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->recv_ctrl_pipe,
 			0x4c, 0xc0, 0x4346, 0x0, buffer, 0x20, 3*HZ);
 	buffer[32] = '\0';
 	US_DEBUGP("String returned from FC init is: %s\n", buffer);
@@ -528,8 +527,7 @@ freecom_init (struct us_data *us)
 	 */
 
 	/* send reset */
-	result = usb_control_msg(us->pusb_dev,
-			usb_sndctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24d8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from activate reset is %d\n", result);
 
@@ -537,8 +535,7 @@ freecom_init (struct us_data *us)
 	mdelay(250);
 
 	/* clear reset */
-	result = usb_control_msg(us->pusb_dev,
-			usb_sndctrlpipe(us->pusb_dev, 0),
+	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
 			0x4d, 0x40, 0x24f8, 0x0, NULL, 0x0, 3*HZ);
 	US_DEBUGP("result from clear reset is %d\n", result);
 

@@ -488,7 +488,7 @@ int usb_stor_control_msg(struct us_data *us, unsigned int pipe,
 /* This is our function to emulate usb_bulk_msg() with enough control
  * to make aborts/resets/timeouts work
  */
-int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
+int usb_stor_bulk_msg(struct us_data *us, void *data, unsigned int pipe,
 		      unsigned int len, unsigned int *act_len)
 {
 	int status;
@@ -515,13 +515,12 @@ int usb_stor_bulk_msg(struct us_data *us, void *data, int pipe,
  * Since many vendors in this space limit their testing to interoperability
  * with these two OSes, specification violations like this one are common.
  */
-int usb_stor_clear_halt(struct us_data *us, int pipe)
+int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 {
 	int result;
 	int endp = usb_pipeendpoint(pipe) | (usb_pipein(pipe) << 7);
 
-	result = usb_stor_control_msg(us,
-		usb_sndctrlpipe(us->pusb_dev, 0),
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 		USB_REQ_CLEAR_FEATURE, USB_RECIP_ENDPOINT, 0,
 		endp, NULL, 0);		/* note: no 3*HZ timeout */
 	US_DEBUGP("usb_stor_clear_halt: result=%d\n", result);
@@ -556,13 +555,13 @@ int usb_stor_transfer_partial(struct us_data *us, char *buf, int length)
 {
 	int result;
 	int partial;
-	int pipe;
+	unsigned int pipe;
 
-	/* calculate the appropriate pipe information */
+	/* get the appropriate pipe value */
 	if (us->srb->sc_data_direction == SCSI_DATA_READ)
-		pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
+		pipe = us->recv_bulk_pipe;
 	else
-		pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
+		pipe = us->send_bulk_pipe;
 
 	/* transfer the data */
 	US_DEBUGP("usb_stor_transfer_partial(): xfer %d bytes\n", length);
@@ -985,7 +984,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
-	result = usb_stor_control_msg(us, usb_sndctrlpipe(us->pusb_dev,0),
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 				      US_CBI_ADSC, 
 				      USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0, 
 				      us->ifnum, srb->cmnd, srb->cmd_len);
@@ -1097,7 +1096,7 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* COMMAND STAGE */
 	/* let's send the command via the control pipe */
-	result = usb_stor_control_msg(us, usb_sndctrlpipe(us->pusb_dev,0),
+	result = usb_stor_control_msg(us, us->send_ctrl_pipe,
 				      US_CBI_ADSC, 
 				      USB_TYPE_CLASS | USB_RECIP_INTERFACE, 0, 
 				      us->ifnum, srb->cmnd, srb->cmd_len);
@@ -1153,12 +1152,12 @@ int usb_stor_Bulk_max_lun(struct us_data *us)
 {
 	unsigned char data;
 	int result;
-	int pipe;
 
-	/* issue the command -- use usb_control_msg() because
-	 * this is not a scsi queued-command */
-	pipe = usb_rcvctrlpipe(us->pusb_dev, 0);
-	result = usb_control_msg(us->pusb_dev, pipe,
+	/* Issue the command -- use usb_control_msg() because this is
+	 * not a scsi queued-command.  Also note that at this point the
+	 * cached pipe values have not yet been stored. */
+	result = usb_control_msg(us->pusb_dev,
+				 usb_rcvctrlpipe(us->pusb_dev, 0),
 				 US_BULK_GET_MAX_LUN, 
 				 USB_DIR_IN | USB_TYPE_CLASS | 
 				 USB_RECIP_INTERFACE,
@@ -1180,7 +1179,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	struct bulk_cb_wrap bcb;
 	struct bulk_cs_wrap bcs;
 	int result;
-	int pipe;
 	int partial;
 
 	/* set up the command wrapper */
@@ -1193,9 +1191,6 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		bcb.Lun |= srb->target << 4;
 	bcb.Length = srb->cmd_len;
 
-	/* construct the pipe handle */
-	pipe = usb_sndbulkpipe(us->pusb_dev, us->ep_out);
-
 	/* copy the command payload */
 	memset(bcb.CDB, 0, sizeof(bcb.CDB));
 	memcpy(bcb.CDB, srb->cmnd, bcb.Length);
@@ -1205,8 +1200,8 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		  le32_to_cpu(bcb.Signature), bcb.Tag,
 		  (bcb.Lun >> 4), (bcb.Lun & 0x0F), 
 		  bcb.DataTransferLength, bcb.Flags, bcb.Length);
-	result = usb_stor_bulk_msg(us, &bcb, pipe, US_BULK_CB_WRAP_LEN, 
-				   &partial);
+	result = usb_stor_bulk_msg(us, &bcb, us->send_bulk_pipe,
+				US_BULK_CB_WRAP_LEN, &partial);
 	US_DEBUGP("Bulk command transfer result=%d\n", result);
 
 	/* did we abort this command? */
@@ -1217,8 +1212,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* if we stall, we need to clear it before we go on */
 	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-		result = usb_stor_clear_halt(us, pipe);
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
+				us->send_bulk_pipe);
+		result = usb_stor_clear_halt(us, us->send_bulk_pipe);
 
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
@@ -1251,13 +1247,10 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	 * an explanation of how this code works.
 	 */
 
-	/* construct the pipe handle */
-	pipe = usb_rcvbulkpipe(us->pusb_dev, us->ep_in);
-
 	/* get CSW for device status */
 	US_DEBUGP("Attempting to get CSW...\n");
-	result = usb_stor_bulk_msg(us, &bcs, pipe, US_BULK_CS_WRAP_LEN, 
-				   &partial);
+	result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
+				US_BULK_CS_WRAP_LEN, &partial);
 
 	/* did we abort this command? */
 	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
@@ -1267,8 +1260,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	/* did the attempt to read the CSW fail? */
 	if (result == -EPIPE) {
-		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n", pipe);
-		result = usb_stor_clear_halt(us, pipe);
+		US_DEBUGP("clearing endpoint halt for pipe 0x%x\n",
+				us->recv_bulk_pipe);
+		result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
 
 		/* did we abort this command? */
 		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
@@ -1280,7 +1274,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* get the status again */
 		US_DEBUGP("Attempting to get CSW (2nd try)...\n");
-		result = usb_stor_bulk_msg(us, &bcs, pipe,
+		result = usb_stor_bulk_msg(us, &bcs, us->recv_bulk_pipe,
 					   US_BULK_CS_WRAP_LEN, &partial);
 
 		/* did we abort this command? */
@@ -1291,8 +1285,9 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 		/* if it fails again, we need a reset and return an error*/
 		if (result == -EPIPE) {
-			US_DEBUGP("clearing halt for pipe 0x%x\n", pipe);
-			result = usb_stor_clear_halt(us, pipe);
+			US_DEBUGP("clearing halt for pipe 0x%x\n",
+					us->recv_bulk_pipe);
+			result = usb_stor_clear_halt(us, us->recv_bulk_pipe);
 
 			/* did we abort this command? */
 			if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
@@ -1364,7 +1359,7 @@ static int usb_stor_reset_common(struct us_data *us,
 	 *  following a powerup or USB attach event. */
 
 	/* Use usb_control_msg() because this is not a queued-command */
-	result = usb_control_msg(us->pusb_dev, usb_sndctrlpipe(us->pusb_dev,0),
+	result = usb_control_msg(us->pusb_dev, us->send_ctrl_pipe,
 			request, requesttype, value, index, data, size,
 			20*HZ);
 	if (result < 0)
@@ -1377,14 +1372,12 @@ static int usb_stor_reset_common(struct us_data *us,
 
 	/* Use usb_clear_halt() because this is not a queued-command */
 	US_DEBUGP("Soft reset: clearing bulk-in endpoint halt\n");
-	result = usb_clear_halt(us->pusb_dev,
-		usb_rcvbulkpipe(us->pusb_dev, us->ep_in));
+	result = usb_clear_halt(us->pusb_dev, us->recv_bulk_pipe);
 	if (result < 0)
 		goto Done;
 
 	US_DEBUGP("Soft reset: clearing bulk-out endpoint halt\n");
-	result = usb_clear_halt(us->pusb_dev,
-		usb_sndbulkpipe(us->pusb_dev, us->ep_out));
+	result = usb_clear_halt(us->pusb_dev, us->send_bulk_pipe);
 
 	Done:
 
