@@ -77,6 +77,12 @@ static void device_release(struct kobject * kobj)
 	struct device * dev = to_dev(kobj);
 	if (dev->release)
 		dev->release(dev);
+	else {
+		printk(KERN_ERR "Device '%s' does not have a release() function, "
+			"it is broken and must be fixed.\n",
+			dev->bus_id);
+		WARN_ON(1);
+	}
 }
 
 static struct kobj_type ktype_device = {

@@ -194,6 +194,12 @@ static void class_dev_release(struct kobject * kobj)
 
 	if (cls->release)
 		cls->release(cd);
+	else {
+		printk(KERN_ERR "Device class '%s' does not have a release() function, "
+			"it is broken and must be fixed.\n",
+			cd->class_id);
+		WARN_ON(1);
+	}
 }
 
 static struct kobj_type ktype_class_device = {
