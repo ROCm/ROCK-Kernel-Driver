@@ -1523,7 +1523,7 @@ int fastcall io_submit_one(struct kioctx *ctx, struct iocb __user *user_iocb,
 	req->ki_user_data = iocb->aio_data;
 	req->ki_pos = iocb->aio_offset;
 
-	req->ki_buf = (char *)(unsigned long)iocb->aio_buf;
+	req->ki_buf = (char __user *)(unsigned long)iocb->aio_buf;
 	req->ki_left = req->ki_nbytes = iocb->aio_nbytes;
 	req->ki_opcode = iocb->aio_lio_opcode;
 	init_waitqueue_func_entry(&req->ki_wait, aio_wake_function);

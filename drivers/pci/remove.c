@@ -59,6 +59,18 @@ int pci_remove_device_safe(struct pci_dev *dev)
 }
 EXPORT_SYMBOL(pci_remove_device_safe);
 
+void pci_remove_bus(struct pci_bus *b)
+{
+	pci_proc_detach_bus(b);
+
+	spin_lock(&pci_bus_lock);
+	list_del(&b->node);
+	spin_unlock(&pci_bus_lock);
+
+	class_device_unregister(&b->class_dev);
+}
+EXPORT_SYMBOL(pci_remove_bus);
+
 /**
  * pci_remove_bus_device - remove a PCI device and any children
  * @dev: the device to remove
@@ -77,13 +89,7 @@ void pci_remove_bus_device(struct pci_dev *dev)
 		struct pci_bus *b = dev->subordinate;
 
 		pci_remove_behind_bridge(dev);
-		pci_proc_detach_bus(b);
-
-		spin_lock(&pci_bus_lock);
-		list_del(&b->node);
-		spin_unlock(&pci_bus_lock);
-
-		class_device_unregister(&b->class_dev);
+		pci_remove_bus(b);
 		dev->subordinate = NULL;
 	}
 

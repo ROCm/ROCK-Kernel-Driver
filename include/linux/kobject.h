@@ -19,6 +19,7 @@
 #include <linux/list.h>
 #include <linux/sysfs.h>
 #include <linux/rwsem.h>
+#include <linux/kref.h>
 #include <asm/atomic.h>
 
 #define KOBJ_NAME_LEN	20
@@ -26,7 +27,7 @@
 struct kobject {
 	char			* k_name;
 	char			name[KOBJ_NAME_LEN];
-	atomic_t		refcount;
+	struct kref		kref;
 	struct list_head	entry;
 	struct kobject		* parent;
 	struct kset		* kset;
@@ -57,6 +58,8 @@ extern struct kobject * kobject_get(struct kobject *);
 extern void kobject_put(struct kobject *);
 
 extern void kobject_hotplug(const char *action, struct kobject *);
+
+extern char * kobject_get_path(struct kset *, struct kobject *, int);
 
 struct kobj_type {
 	void (*release)(struct kobject *);

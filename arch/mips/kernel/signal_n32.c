@@ -208,7 +208,5 @@ void setup_rt_frame_n32(struct k_sigaction * ka,
 	return;
 
 give_sigsegv:
-	if (signr == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(signr, current);
 }

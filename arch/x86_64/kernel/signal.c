@@ -288,7 +288,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	if (ka->sa.sa_flags & SA_RESTORER) {
 		err |= __put_user(ka->sa.sa_restorer, &frame->pretcode);
 	} else {
-		printk("%s forgot to set SA_RESTORER for signal %d.\n", me->comm, sig); 
+		/* could use a vstub here */
 		goto give_sigsegv; 
 	}
 
@@ -329,9 +329,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs,frame,"signal deliver");
+	force_sigsegv(sig, current);
 }
 
 /*
@@ -339,11 +337,9 @@ give_sigsegv:
  */	
 
 static void
-handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
-	struct pt_regs * regs)
+handle_signal(unsigned long sig, siginfo_t *info, struct k_sigaction *ka,
+		sigset_t *oldset, struct pt_regs *regs)
 {
-	struct k_sigaction *ka = &current->sighand->action[sig-1];
-
 #ifdef DEBUG_SIG
 	printk("handle_signal pid:%d sig:%lu rip:%lx rsp:%lx regs=%p\n", current->pid, sig, 
 		regs->rip, regs->rsp, regs);
@@ -380,9 +376,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 #endif
 	setup_rt_frame(sig, ka, info, oldset, regs);
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
-
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
@@ -399,6 +392,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
  */
 int do_signal(struct pt_regs *regs, sigset_t *oldset)
 {
+	struct k_sigaction ka;
 	siginfo_t info;
 	int signr;
 
@@ -420,7 +414,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
 		/* Reenable any watchpoints before delivering the
 		 * signal to user space. The processor register will
@@ -431,7 +425,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 			asm volatile("movq %0,%%db7"	: : "r" (current->thread.debugreg7));
 
 		/* Whee!  Actually deliver the signal.  */
-		handle_signal(signr, &info, oldset, regs);
+		handle_signal(signr, &info, &ka, oldset, regs);
 		return 1;
 	}
 

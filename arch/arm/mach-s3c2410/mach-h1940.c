@@ -1,6 +1,6 @@
-/* linux/arch/arm/mach-s3c2410/mach-ipaq.c
+/* linux/arch/arm/mach-s3c2410/mach-h1940.c
  *
- * Copyright (c) 2003 Simtec Electronics
+ * Copyright (c) 2003,2004 Simtec Electronics
  *   Ben Dooks <ben@simtec.co.uk>
  *
  * http://www.handhelds.org/projects/h1940.html
@@ -16,6 +16,7 @@
  *     06-Jan-2003 BJD  Updates for <arch/map.h>
  *     18-Jan-2003 BJD  Added serial port configuration
  *     17-Feb-2003 BJD  Copied to mach-ipaq.c
+ *     21-Aug-2004 BJD  Added struct s3c2410_board
 */
 
 #include <linux/kernel.h>
@@ -39,6 +40,7 @@
 #include <asm/arch/regs-serial.h>
 
 #include "s3c2410.h"
+#include "devs.h"
 
 static struct map_desc ipaq_iodesc[] __initdata = {
 	/* nothing here yet */
@@ -77,10 +79,27 @@ static struct s3c2410_uartcfg ipaq_uartcfgs[] = {
 };
 
 
+
+
+static struct platform_device *h1940_devices[] __initdata = {
+	&s3c_device_usb,
+	&s3c_device_lcd,
+	&s3c_device_wdt,
+	&s3c_device_i2c,
+	&s3c_device_iis,
+};
+
+static struct s3c2410_board h1940_board __initdata = {
+	.devices       = h1940_devices,
+	.devices_count = ARRAY_SIZE(h1940_devices)
+};
+
 void __init ipaq_map_io(void)
 {
 	s3c2410_map_io(ipaq_iodesc, ARRAY_SIZE(ipaq_iodesc));
 	s3c2410_uartcfgs = ipaq_uartcfgs;
+
+	s3c2410_set_board(&h1940_board);
 }
 
 void __init ipaq_init_irq(void)

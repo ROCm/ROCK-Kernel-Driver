@@ -22,12 +22,20 @@ typedef struct {
  *
  * - bits 0-7 are the preemption count (max depth: 256)
  * - bits 8-15 are the softirq count (max # of softirqs: 256)
- * - bits 16-23 are the hardirq count (max # of hardirqs: 256)
+ * - bits 16-24 are the hardirq count (max # of hardirqs: 512)
  * - bit 26 is the PREEMPT_ACTIVE flag
+ *
+ * We optimize HARDIRQ_BITS for immediate constant, and only
+ * increase it if really needed.
  */
 #define PREEMPT_BITS	8
 #define SOFTIRQ_BITS	8
+
+#if NR_IRQS > 256
+#define HARDIRQ_BITS	9
+#else
 #define HARDIRQ_BITS	8
+#endif
 
 #define PREEMPT_SHIFT	0
 #define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)

@@ -882,9 +882,7 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 	return 1;
 
   give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 	return 0;
 }
 
@@ -952,9 +950,7 @@ setup_rt_frame_ia32 (int sig, struct k_sigaction *ka, siginfo_t *info,
 	return 1;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 	return 0;
 }
 

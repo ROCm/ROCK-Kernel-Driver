@@ -106,7 +106,7 @@ skip_to_next_endpoint_or_interface_descriptor:
 	return buffer - buffer0 + i;
 }
 
-static void usb_release_interface_cache(struct kref *ref)
+void usb_release_interface_cache(struct kref *ref)
 {
 	struct usb_interface_cache *intfc = ref_to_usb_interface_cache(ref);
 	int j;
@@ -356,7 +356,7 @@ int usb_parse_configuration(struct device *ddev, int cfgidx,
 		if (!intfc)
 			return -ENOMEM;
 		memset(intfc, 0, len);
-		kref_init(&intfc->ref, usb_release_interface_cache);
+		kref_init(&intfc->ref);
 	}
 
 	/* Skip over any Class Specific or Vendor Specific descriptors;
@@ -422,7 +422,8 @@ void usb_destroy_configuration(struct usb_device *dev)
 
 		for (i = 0; i < cf->desc.bNumInterfaces; i++) {
 			if (cf->intf_cache[i])
-				kref_put(&cf->intf_cache[i]->ref);
+				kref_put(&cf->intf_cache[i]->ref, 
+					  usb_release_interface_cache);
 		}
 	}
 	kfree(dev->config);

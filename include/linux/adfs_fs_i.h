@@ -17,7 +17,7 @@ struct adfs_inode_info {
 	__u32		execaddr;	/* RISC OS exec address		*/
 	unsigned int	filetype;	/* RISC OS file type		*/
 	unsigned int	attr;		/* RISC OS permissions		*/
-	int		stamped:1;	/* RISC OS file has date/time	*/
+	unsigned int	stamped:1;	/* RISC OS file has date/time	*/
 	struct inode vfs_inode;
 };
 

@@ -1243,6 +1243,25 @@ force_sig(int sig, struct task_struct *p)
 	force_sig_info(sig, (void*)1L, p);
 }
 
+/*
+ * When things go south during signal handling, we
+ * will force a SIGSEGV. And if the signal that caused
+ * the problem was already a SIGSEGV, we'll want to
+ * make sure we don't even try to deliver the signal..
+ */
+int
+force_sigsegv(int sig, struct task_struct *p)
+{
+	if (sig == SIGSEGV) {
+		unsigned long flags;
+		spin_lock_irqsave(&p->sighand->siglock, flags);
+		p->sighand->action[sig - 1].sa.sa_handler = SIG_DFL;
+		spin_unlock_irqrestore(&p->sighand->siglock, flags);
+	}
+	force_sig(SIGSEGV, p);
+	return 0;
+}
+
 int
 kill_pg(pid_t pgrp, int sig, int priv)
 {
@@ -1724,7 +1743,8 @@ static inline int handle_group_stop(void)
 	return 1;
 }
 
-int get_signal_to_deliver(siginfo_t *info, struct pt_regs *regs, void *cookie)
+int get_signal_to_deliver(siginfo_t *info, struct k_sigaction *return_ka,
+			  struct pt_regs *regs, void *cookie)
 {
 	sigset_t *mask = &current->blocked;
 	int signr = 0;
@@ -1793,8 +1813,15 @@ relock:
 		ka = &current->sighand->action[signr-1];
 		if (ka->sa.sa_handler == SIG_IGN) /* Do nothing.  */
 			continue;
-		if (ka->sa.sa_handler != SIG_DFL) /* Run the handler.  */
+		if (ka->sa.sa_handler != SIG_DFL) {
+			/* Run the handler.  */
+			*return_ka = *ka;
+
+			if (ka->sa.sa_flags & SA_ONESHOT)
+				ka->sa.sa_handler = SIG_DFL;
+
 			break; /* will return non-zero "signr" value */
+		}
 
 		/*
 		 * Now we are doing the default action for this signal.

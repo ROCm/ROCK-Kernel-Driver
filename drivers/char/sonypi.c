@@ -67,7 +67,7 @@ static unsigned long mask = 0xffffffff;
 static inline void sonypi_initq(void) {
         sonypi_device.queue.head = sonypi_device.queue.tail = 0;
 	sonypi_device.queue.len = 0;
-	sonypi_device.queue.s_lock = (spinlock_t)SPIN_LOCK_UNLOCKED;
+	sonypi_device.queue.s_lock = SPIN_LOCK_UNLOCKED;
 	init_waitqueue_head(&sonypi_device.queue.proc_list);
 }
 

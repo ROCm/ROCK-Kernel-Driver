@@ -114,8 +114,6 @@ set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flag
 	    printk(KERN_NOTICE "cs: unable to map card memory!\n");
 	    return NULL;
 	}
-	mem->sys_start = mem->res->start;
-	mem->sys_stop = mem->res->end;
 	s->cis_virt = ioremap(mem->res->start, s->map_size);
     }
     mem->card_start = card_offset;
@@ -124,7 +122,7 @@ set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flag
     if (s->features & SS_CAP_STATIC_MAP) {
 	if (s->cis_virt)
 	    iounmap(s->cis_virt);
-	s->cis_virt = ioremap(mem->sys_start, s->map_size);
+	s->cis_virt = ioremap(mem->static_start, s->map_size);
     }
     return s->cis_virt;
 }

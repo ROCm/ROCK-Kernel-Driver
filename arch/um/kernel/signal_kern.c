@@ -31,17 +31,6 @@
 EXPORT_SYMBOL(block_signals);
 EXPORT_SYMBOL(unblock_signals);
 
-static void force_segv(int sig)
-{
-	if(sig == SIGSEGV){
-		struct k_sigaction *ka;
-
-		ka = &current->sighand->action[SIGSEGV - 1];
-		ka->sa.sa_handler = SIG_DFL;
-	}
-	force_sig(SIGSEGV, current);
-}
-
 #define _S(nr) (1<<((nr)-1))
 
 #define _BLOCKABLE (~(_S(SIGKILL) | _S(SIGSTOP)))
@@ -124,7 +113,7 @@ static int handle_signal(struct pt_regs *regs, unsigned long signr,
 
 	return(0);
  segv:
-	force_segv(signr);
+	force_sigsegv(signr, current);
 	return(1);
 }
 

@@ -58,7 +58,7 @@ static int video_nr = -1;
 static inline void meye_initq(struct meye_queue *queue) {
 	queue->head = queue->tail = 0;
 	queue->len = 0;
-	queue->s_lock = (spinlock_t)SPIN_LOCK_UNLOCKED;
+	queue->s_lock = SPIN_LOCK_UNLOCKED;
 	init_waitqueue_head(&queue->proc_list);
 }
 

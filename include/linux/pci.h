@@ -712,7 +712,7 @@ struct resource *pci_find_parent_resource(const struct pci_dev *dev, struct reso
 int pci_get_interrupt_pin(struct pci_dev *dev, struct pci_dev **bridge);
 extern struct pci_dev *pci_dev_get(struct pci_dev *dev);
 extern void pci_dev_put(struct pci_dev *dev);
-
+extern void pci_remove_bus(struct pci_bus *b);
 extern void pci_remove_bus_device(struct pci_dev *dev);
 
 /* Generic PCI functions exported to card drivers */

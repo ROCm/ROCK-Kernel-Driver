@@ -895,7 +895,7 @@ static int tok_open(struct net_device *dev)
 
 	ti->sram_virt &= ~1; /* to reverse what we do in tok_close */
 	/* init the spinlock */
-	ti->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+	ti->lock = SPIN_LOCK_UNLOCKED;
 	init_timer(&ti->tr_timer);
 	
 	i = tok_init_card(dev);

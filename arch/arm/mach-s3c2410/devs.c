@@ -10,6 +10,7 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
+ *     21-Aug-2004 BJD  Added IRQ_TICK to RTC resources
  *     18-Aug-2004 BJD  Created initial version
 */
 
@@ -229,8 +230,12 @@ static struct resource s3c_rtc_resource[] = {
 		.start = IRQ_RTC,
 		.end   = IRQ_RTC,
 		.flags = IORESOURCE_IRQ,
+	},
+	[2] = {
+		.start = IRQ_TICK,
+		.end   = IRQ_TICK,
+		.flags = IORESOURCE_IRQ
 	}
-
 };
 
 struct platform_device s3c_device_rtc = {

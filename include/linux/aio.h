@@ -67,7 +67,7 @@ struct kiocb {
 	/* State that we remember to be able to restart/retry  */
 	unsigned short		ki_opcode;
 	size_t			ki_nbytes; 	/* copy of iocb->aio_nbytes */
-	char 			*ki_buf;	/* remaining iocb->aio_buf */
+	char 			__user *ki_buf;	/* remaining iocb->aio_buf */
 	size_t			ki_left; 	/* remaining bytes */
 	wait_queue_t		ki_wait;
 	long			ki_retried; 	/* just for testing */

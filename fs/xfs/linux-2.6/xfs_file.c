@@ -259,7 +259,7 @@ linvfs_sendfile(
 	loff_t			*ppos,
 	size_t			count,
 	read_actor_t		actor,
-	void			__user *target)
+	void			*target)
 {
 	vnode_t			*vp = LINVFS_GET_VP(filp->f_dentry->d_inode);
 	ssize_t			rval;

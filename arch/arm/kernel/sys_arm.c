@@ -217,11 +217,8 @@ asmlinkage int sys_ipc(uint call, int first, int second, int third,
 				return ret;
 			return put_user(raddr, (ulong __user *)third);
 		}
-		case 1:	/* iBCS2 emulator entry point */
-			if (!segment_eq(get_fs(), get_ds()))
-				return -EINVAL;
-			return do_shmat(first, (char __user *) ptr,
-					second, (ulong __user *) third);
+		case 1: /* Of course, we don't support iBCS2! */
+			return -EINVAL;
 		}
 	case SHMDT: 
 		return sys_shmdt ((char __user *)ptr);

@@ -574,9 +574,7 @@ static inline void setup_frame(struct k_sigaction * ka, struct pt_regs *regs,
         return;
 
 give_sigsegv:
-	if (signr == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(signr, current);
 }
 
 static inline void setup_rt_frame(struct k_sigaction * ka,
@@ -647,9 +645,7 @@ static inline void setup_rt_frame(struct k_sigaction * ka,
 	return;
 
 give_sigsegv:
-	if (signr == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(signr, current);
 }
 
 static inline void handle_signal(unsigned long sig, siginfo_t *info,

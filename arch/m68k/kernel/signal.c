@@ -842,9 +842,7 @@ adjust_stack:
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 	goto adjust_stack;
 }
 
@@ -925,9 +923,7 @@ adjust_stack:
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 	goto adjust_stack;
 }
 

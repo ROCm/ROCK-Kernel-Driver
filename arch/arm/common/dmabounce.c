@@ -121,9 +121,9 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
 	DO_STATS ( device_info->total_allocs++ );
 
 	buf = kmalloc(sizeof(struct safe_buffer), GFP_ATOMIC);
-	if (buf == 0) {
+	if (buf == NULL) {
 		dev_warn(dev, "%s: kmalloc failed\n", __func__);
-		return 0;
+		return NULL;
 	}
 
 	if (size <= device_info->small_buffer_size) {
@@ -137,16 +137,16 @@ alloc_safe_buffer(struct dmabounce_device_info *device_info, void *ptr,
 
 		DO_STATS ( device_info->lbp_allocs++ );
 	} else {
-		pool = 0;
+		pool = NULL;
 		safe = dma_alloc_coherent(dev, size, &safe_dma_addr, GFP_ATOMIC);
 	}
 
-	if (safe == 0) {
+	if (safe == NULL) {
 		dev_warn(device_info->dev,
 			"%s: could not alloc dma memory (size=%d)\n",
 		       __func__, size);
 		kfree(buf);
-		return 0;
+		return NULL;
 	}
 
 #ifdef STATS
@@ -216,27 +216,33 @@ static inline dma_addr_t
 map_single(struct device *dev, void *ptr, size_t size,
 		enum dma_data_direction dir)
 {
-	dma_addr_t dma_addr;
 	struct dmabounce_device_info *device_info = find_dmabounce_dev(dev);
+	dma_addr_t dma_addr;
+	int needs_bounce = 0;
 
 	if (device_info)
 		DO_STATS ( device_info->map_op_count++ );
 
-	if (dev->dma_mask) {
-		unsigned long limit;
-
-		limit = (*dev->dma_mask + 1) & ~(*dev->dma_mask);
-		if (limit && (size > limit)) {
-			dev_err(dev, "DMA mapping too big "
-				"(requested %#x mask %#Lx)\n",
-				size, *dev->dma_mask);
-			return ~0;
-		}
-	}
-
 	dma_addr = virt_to_dma(dev, ptr);
 
-	if (device_info && dma_needs_bounce(dev, dma_addr, size)) {
+	if (dev->dma_mask) {
+		unsigned long mask = *dev->dma_mask;
+		unsigned long limit;
+
+		limit = (mask + 1) & ~mask;
+		if (limit && size > limit) {
+			dev_err(dev, "DMA mapping too big (requested %#x "
+				"mask %#Lx)\n", size, *dev->dma_mask);
+			return ~0;
+		}
+
+		/*
+		 * Figure out if we need to bounce from the DMA mask.
+		 */
+		needs_bounce = (dma_addr | (dma_addr + size - 1)) & ~mask;
+	}
+
+	if (device_info && (needs_bounce || dma_needs_bounce(dev, dma_addr, size))) {
 		struct safe_buffer *buf;
 
 		buf = alloc_safe_buffer(device_info, ptr, size, dir);

@@ -265,7 +265,7 @@ static int read_mii_word(rtl8150_t * dev, u8 phy, __u8 indx, u16 * reg)
 
 	if (i < MII_TIMEOUT) {
 		get_registers(dev, PHYDAT, 2, data);
-		*reg = le16_to_cpup(data);
+		*reg = data[0] | (data[1] << 8);
 		return 0;
 	} else
 		return 1;

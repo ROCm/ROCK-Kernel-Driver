@@ -577,10 +577,10 @@ static int ep_aio_cancel(struct kiocb *iocb, struct io_event *e)
 	return value;
 }
 
-static long ep_aio_read_retry(struct kiocb *iocb)
+static ssize_t ep_aio_read_retry(struct kiocb *iocb)
 {
 	struct kiocb_priv	*priv = (void *) &iocb->private;
-	int			status = priv->actual;
+	ssize_t			status = priv->actual;
 
 	/* we "retry" to get the right mm context for this: */
 	status = copy_to_user(priv->ubuf, priv->buf, priv->actual);
