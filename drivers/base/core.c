@@ -183,7 +183,7 @@ static int __init device_init_root(void)
 	return iobus_register(&device_root);
 }
 
-int __init device_driver_init(void)
+static int __init device_driver_init(void)
 {
 	int error = 0;
 
@@ -208,8 +208,9 @@ int __init device_driver_init(void)
 	return error;
 }
 
+subsys_initcall(device_driver_init);
+
 EXPORT_SYMBOL(device_register);
 EXPORT_SYMBOL(put_device);
 EXPORT_SYMBOL(iobus_register);
 EXPORT_SYMBOL(put_iobus);
-EXPORT_SYMBOL(device_driver_init);

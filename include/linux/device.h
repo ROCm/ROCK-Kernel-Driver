@@ -163,9 +163,6 @@ extern int (*platform_notify)(struct device * dev);
 
 extern int (*platform_notify_remove)(struct device * dev);
 
-extern int device_driver_init(void);
-
-
 /* device and bus locking helpers.
  *
  * FIXME: Is there anything else we need to do?
