@@ -166,11 +166,11 @@ extern void bt_iounmap(void *addr, unsigned long size);
 /*
  * However PCI ones are not necessarily 1:1 and therefore these interfaces
  * are forbidden in portable PCI drivers.
+ *
+ * Allow them on x86 for legacy drivers, though.
  */
-extern unsigned long virt_to_bus_not_defined_use_pci_map(volatile void *addr);
-#define virt_to_bus virt_to_bus_not_defined_use_pci_map
-extern unsigned long bus_to_virt_not_defined_use_pci_map(volatile void *addr);
-#define bus_to_virt bus_to_virt_not_defined_use_pci_map
+#define virt_to_bus virt_to_phys
+#define bus_to_virt phys_to_virt
 
 /*
  * readX/writeX() are used to access memory mapped devices. On some
