@@ -128,26 +128,18 @@ xdr_decode_fhandle(u32 *p, struct nfs_fh *fh)
  * nanosecond field.
  */
 static inline u32 *
-xdr_encode_time(u32 *p, time_t time)
+xdr_encode_time3(u32 *p, struct timespec *timep)
 {
-	*p++ = htonl(time);
-	*p++ = 0;
+	*p++ = htonl(timep->tv_sec);
+	*p++ = htonl(timep->tv_nsec);
 	return p;
 }
 
 static inline u32 *
-xdr_decode_time3(u32 *p, u64 *timep)
+xdr_decode_time3(u32 *p, struct timespec *timep)
 {
-	u64 tmp = (u64)ntohl(*p++) << 32;
-	*timep = tmp + (u64)ntohl(*p++);
-	return p;
-}
-
-static inline u32 *
-xdr_encode_time3(u32 *p, u64 time)
-{
-	*p++ = htonl(time >> 32);
-	*p++ = htonl(time & 0xFFFFFFFF);
+	timep->tv_sec = ntohl(*p++);
+	timep->tv_nsec = ntohl(*p++);
 	return p;
 }
 
@@ -212,7 +204,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_ATIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_atime.tv_sec);
+		p = xdr_encode_time3(p, &attr->ia_atime);
 	} else if (attr->ia_valid & ATTR_ATIME) {
 		*p++ = xdr_one;
 	} else {
@@ -220,7 +212,7 @@ xdr_encode_sattr(u32 *p, struct iattr *attr)
 	}
 	if (attr->ia_valid & ATTR_MTIME_SET) {
 		*p++ = xdr_two;
-		p = xdr_encode_time(p, attr->ia_mtime.tv_sec);
+		p = xdr_encode_time3(p, &attr->ia_mtime);
 	} else if (attr->ia_valid & ATTR_MTIME) {
 		*p++ = xdr_one;
 	} else {
@@ -288,7 +280,7 @@ nfs3_xdr_sattrargs(struct rpc_rqst *req, u32 *p, struct nfs3_sattrargs *args)
 	p = xdr_encode_sattr(p, args->sattr);
 	*p++ = htonl(args->guard);
 	if (args->guard)
-		p = xdr_encode_time3(p, args->guardtime);
+		p = xdr_encode_time3(p, &args->guardtime);
 	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
 	return 0;
 }
