@@ -212,6 +212,11 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	INIT_LIST_HEAD(&sdev->starved_entry);
 	spin_lock_init(&sdev->list_lock);
 
+
+	/* if the device needs this changing, it may do so in the
+	 * slave_configure function */
+	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
+
 	/*
 	 * Some low level driver could use device->type
 	 */
@@ -627,10 +632,6 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
 		sdev->sdev_target = starget;
 		spin_unlock_irqrestore(sdev->host->host_lock, flags);
 	}
-
-	/* if the device needs this changing, it may do so in the detect
-	 * function */
-	sdev->max_device_blocked = SCSI_DEFAULT_DEVICE_BLOCKED;
 
 	sdev->use_10_for_rw = 1;
 
