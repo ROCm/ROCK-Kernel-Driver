@@ -748,14 +748,6 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 		vc->vc_cols = nr_cols;
 		vc->vc_rows = nr_rows;
 	}
-	p->vrows = info->var.yres_virtual / vc->vc_font.height;
-	if(info->var.yres > (vc->vc_font.height * (vc->vc_rows + 1))) {
-		p->vrows -= (info->var.yres - (vc->vc_font.height * vc->vc_rows)) / vc->vc_font.height;
-	}
-	if ((info->var.yres % vc->vc_font.height) &&
-	    (info->var.yres_virtual % vc->vc_font.height <
-	     info->var.yres % vc->vc_font.height))
-		p->vrows--;
 	vc->vc_can_do_color = info->var.bits_per_pixel != 1;
 	vc->vc_complement_mask = vc->vc_can_do_color ? 0x7700 : 0x0800;
 	if (charcnt == 256) {
@@ -1566,6 +1558,8 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	p->vrows = var.yres_virtual/fh;
 	if (var.yres > (fh * (height + 1)))
 		p->vrows -= (var.yres - (fh * height)) / fh;
+	if ((var.yres % fh) && (var.yres_virtual % fh < var.yres % fh))
+		p->vrows--;
 	return 0;
 }
 
@@ -1835,15 +1829,6 @@ static int fbcon_do_set_font(struct vc_data *vc, struct console_font_op *op,
 	if (resize) {
 		/* reset wrap/pan */
 		info->var.xoffset = info->var.yoffset = p->yscroll = 0;
-		p->vrows = info->var.yres_virtual / h;
-
-#if 0          /* INCOMPLETE - let the console gurus handle this */
-		if(info->var.yres > (h * (vc->vc_rows + 1))
-			p->vrows -= (info->var.yres - (h * vc->vc_rows)) / h;
-#endif
-		if ((info->var.yres % h)
-		    && (info->var.yres_virtual % h < info->var.yres % h))
-			p->vrows--;
 		updatescrollmode(p, vc);
 		vc_resize(vc->vc_num, info->var.xres / w, info->var.yres / h);
 		if (CON_IS_VISIBLE(vc) && softback_buf) {
