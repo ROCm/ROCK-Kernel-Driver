@@ -41,7 +41,7 @@ int ezusb_writememory (struct usb_serial *serial, int address, unsigned char *da
 
 	transfer_buffer =  kmalloc (length, GFP_KERNEL);
 	if (!transfer_buffer) {
-		dev_err(serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, length);
+		dev_err(&serial->dev->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, length);
 		return -ENOMEM;
 	}
 	memcpy (transfer_buffer, data, length);
@@ -56,7 +56,7 @@ int ezusb_set_reset (struct usb_serial *serial, unsigned char reset_bit)
 	dbg("%s - %d", __FUNCTION__, reset_bit);
 	response = ezusb_writememory (serial, CPUCS_REG, &reset_bit, 1, 0xa0);
 	if (response < 0) {
-		dev_err(serial->dev->dev, "%s- %d failed\n", __FUNCTION__, reset_bit);
+		dev_err(&serial->dev->dev, "%s- %d failed\n", __FUNCTION__, reset_bit);
 	}
 	return response;
 }

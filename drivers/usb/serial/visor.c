@@ -303,7 +303,7 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 
 	if (!port->read_urb) {
 		/* this is needed for some brain dead Sony devices */
-		dev_err(port->dev, "Device lied about number of ports, please use a lower one.\n");
+		dev_err(&port->dev, "Device lied about number of ports, please use a lower one.\n");
 		return -ENODEV;
 	}
 
@@ -327,7 +327,7 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 			   visor_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 	if (result) {
-		dev_err(port->dev, "%s - failed submitting read urb, error %d\n",
+		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n",
 			__FUNCTION__, result);
 		goto exit;
 	}
@@ -336,7 +336,7 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 		dbg("%s - adding interrupt input for treo", __FUNCTION__);
 		result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 		if (result)
-			dev_err(port->dev, "%s - failed submitting interrupt urb, error %d\n",
+			dev_err(&port->dev, "%s - failed submitting interrupt urb, error %d\n",
 				__FUNCTION__, result);
 	}
 exit:	
@@ -363,7 +363,7 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 		 * device is still here */
 		transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
 		if (!transfer_buffer) {
-			dev_err(port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x12);
+			dev_err(&port->dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 0x12);
 		} else {
 			/* send a shutdown message to the device */
 			usb_control_msg (serial->dev,
@@ -380,7 +380,7 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 			usb_unlink_urb (port->interrupt_in_urb);
 	}
 	/* Uncomment the following line if you want to see some statistics in your syslog */
-	/* dev_info (port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
+	/* dev_info (&port->dev, "Bytes In = %d  Bytes Out = %d\n", bytes_in, bytes_out); */
 }
 
 
@@ -395,13 +395,13 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 
 	buffer = kmalloc (count, GFP_ATOMIC);
 	if (!buffer) {
-		dev_err(port->dev, "out of memory\n");
+		dev_err(&port->dev, "out of memory\n");
 		return -ENOMEM;
 	}
 
 	urb = usb_alloc_urb(0, GFP_ATOMIC);
 	if (!urb) {
-		dev_err(port->dev, "no more free urbs\n");
+		dev_err(&port->dev, "no more free urbs\n");
 		kfree (buffer);
 		return -ENOMEM;
 	}
@@ -427,7 +427,7 @@ static int visor_write (struct usb_serial_port *port, int from_user, const unsig
 	/* send it down the pipe */
 	status = usb_submit_urb(urb, GFP_ATOMIC);
 	if (status) {
-		dev_err(port->dev, "%s - usb_submit_urb(write bulk) failed with status = %d\n",
+		dev_err(&port->dev, "%s - usb_submit_urb(write bulk) failed with status = %d\n",
 			__FUNCTION__, status);
 		count = status;
 	} else {
@@ -539,7 +539,7 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			   visor_read_bulk_callback, port);
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
-		dev_err(port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&port->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
 	return;
 }
 
@@ -577,7 +577,7 @@ static void visor_read_int_callback (struct urb *urb, struct pt_regs *regs)
 exit:
 	result = usb_submit_urb (urb, GFP_ATOMIC);
 	if (result)
-		dev_err(urb->dev->dev, "%s - Error %d submitting interrupt urb\n",
+		dev_err(&urb->dev->dev, "%s - Error %d submitting interrupt urb\n",
 			__FUNCTION__, result);
 }
 
@@ -597,7 +597,7 @@ static void visor_unthrottle (struct usb_serial_port *port)
 	port->read_urb->dev = port->serial->dev;
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 	if (result)
-		dev_err(port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
+		dev_err(&port->dev, "%s - failed submitting read urb, error %d\n", __FUNCTION__, result);
 }
 
 static int visor_probe (struct usb_serial *serial)
@@ -609,7 +609,7 @@ static int visor_probe (struct usb_serial *serial)
 	unsigned char *transfer_buffer =  kmalloc (256, GFP_KERNEL);
 
 	if (!transfer_buffer) {
-		dev_err(*dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 256);
+		dev_err(dev, "%s - kmalloc(%d) failed.\n", __FUNCTION__, 256);
 		return -ENOMEM;
 	}
 
@@ -622,14 +622,14 @@ static int visor_probe (struct usb_serial *serial)
 	response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), VISOR_GET_CONNECTION_INFORMATION,
 					0xc2, 0x0000, 0x0000, transfer_buffer, 0x12, 300);
 	if (response < 0) {
-		dev_err(*dev, "%s - error getting connection information\n", __FUNCTION__);
+		dev_err(dev, "%s - error getting connection information\n", __FUNCTION__);
 	} else {
 		struct visor_connection_info *connection_info = (struct visor_connection_info *)transfer_buffer;
 		char *string;
 
 		le16_to_cpus(&connection_info->num_ports);
 		num_ports = connection_info->num_ports;
-		dev_info(*dev, "%s: Number of ports: %d\n", serial->type->name, connection_info->num_ports);
+		dev_info(dev, "%s: Number of ports: %d\n", serial->type->name, connection_info->num_ports);
 		for (i = 0; i < num_ports; ++i) {
 			switch (connection_info->connections[i].port_function_id) {
 				case VISOR_FUNCTION_GENERIC:
@@ -651,7 +651,7 @@ static int visor_probe (struct usb_serial *serial)
 					string = "unknown";
 					break;	
 			}
-			dev_info(*dev, "%s: port %d, is for %s use\n", serial->type->name,
+			dev_info(dev, "%s: port %d, is for %s use\n", serial->type->name,
 				 connection_info->connections[i].port, string);
 		/* save off our num_ports info so that we can use it in the calc_num_ports call */
 		usb_set_serial_data(serial, (void *)(long)num_ports);
@@ -667,7 +667,7 @@ static int visor_probe (struct usb_serial *serial)
 					    0xc2, 0x0000, 0x0000, transfer_buffer, 
 					    0x14, 300);
 		if (response < 0) {
-			dev_err(*dev, "%s - error getting first unknown palm command\n", __FUNCTION__);
+			dev_err(dev, "%s - error getting first unknown palm command\n", __FUNCTION__);
 		} else {
 			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
 		}
@@ -676,7 +676,7 @@ static int visor_probe (struct usb_serial *serial)
 					    0xc2, 0x0000, 0x0000, transfer_buffer, 
 					    0x14, 300);
 		if (response < 0) {
-			dev_err(*dev, "%s - error getting second unknown palm command\n", __FUNCTION__);
+			dev_err(dev, "%s - error getting second unknown palm command\n", __FUNCTION__);
 		} else {
 			usb_serial_debug_data (__FILE__, __FUNCTION__, 0x14, transfer_buffer);
 		}
@@ -686,7 +686,7 @@ static int visor_probe (struct usb_serial *serial)
 	response = usb_control_msg (serial->dev, usb_rcvctrlpipe(serial->dev, 0), VISOR_REQUEST_BYTES_AVAILABLE,
 					0xc2, 0x0000, 0x0005, transfer_buffer, 0x02, 300);
 	if (response < 0) {
-		dev_err(*dev, "%s - error getting bytes available request\n", __FUNCTION__);
+		dev_err(dev, "%s - error getting bytes available request\n", __FUNCTION__);
 	}
 
 	kfree (transfer_buffer);
@@ -722,11 +722,11 @@ static int clie_3_5_startup (struct usb_serial *serial)
 				  USB_REQ_GET_CONFIGURATION, USB_DIR_IN,
 				  0, 0, &data, 1, HZ * 3);
 	if (result < 0) {
-		dev_err(*dev, "%s: get config number failed: %d\n", __FUNCTION__, result);
+		dev_err(dev, "%s: get config number failed: %d\n", __FUNCTION__, result);
 		return result;
 	}
 	if (result != 1) {
-		dev_err(*dev, "%s: get config number bad return length: %d\n", __FUNCTION__, result);
+		dev_err(dev, "%s: get config number bad return length: %d\n", __FUNCTION__, result);
 		return -EIO;
 	}
 
@@ -736,11 +736,11 @@ static int clie_3_5_startup (struct usb_serial *serial)
 				  USB_DIR_IN | USB_RECIP_INTERFACE,
 				  0, 0, &data, 1, HZ * 3);
 	if (result < 0) {
-		dev_err(*dev, "%s: get interface number failed: %d\n", __FUNCTION__, result);
+		dev_err(dev, "%s: get interface number failed: %d\n", __FUNCTION__, result);
 		return result;
 	}
 	if (result != 1) {
-		dev_err(*dev, "%s: get interface number bad return length: %d\n", __FUNCTION__, result);
+		dev_err(dev, "%s: get interface number bad return length: %d\n", __FUNCTION__, result);
 		return -EIO;
 	}
 
