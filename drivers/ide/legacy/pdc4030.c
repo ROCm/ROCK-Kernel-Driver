@@ -297,7 +297,7 @@ int __init detect_pdc4030(ide_hwif_t *hwif)
 }
 
 
-static int __init ide_probe_for_pdc4030(void)
+int __init ide_probe_for_pdc4030(void)
 {
 	unsigned int	index;
 	ide_hwif_t	*hwif;
