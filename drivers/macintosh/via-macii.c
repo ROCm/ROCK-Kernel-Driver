@@ -10,6 +10,8 @@
  * Rewrite for Unified ADB by Joshua M. Thompson (funaho@jurai.org)
  *
  * 1999-08-02 (jmt) - Initial rewrite for Unified ADB.
+ * 2000-03-29 Tony Mantler <tonym@mac.linux-m68k.org>
+ * 				- Big overhaul, should actually work now.
  */
  
 #include <stdarg.h>
@@ -98,7 +100,6 @@ struct adb_driver via_macii_driver = {
 
 static enum macii_state {
 	idle,
-	sent_first_byte,
 	sending,
 	reading,
 	read_done,
@@ -133,7 +134,7 @@ static int macii_probe(void)
 
 	via = via1;
 
-	printk("adb: Mac II ADB Driver v0.4 for Unified ADB\n");
+	printk("adb: Mac II ADB Driver v1.0 for Unified ADB\n");
 	return 0;
 }
 
@@ -186,7 +187,7 @@ static void macii_queue_poll(void)
 	static int in_poll=0;
 	static struct adb_request req;
 	unsigned long flags;
-
+	
 	if (in_poll) printk("macii_queue_poll: double poll!\n");
 
 	in_poll++;
@@ -212,7 +213,7 @@ static void macii_retransmit(int device)
 	static int in_retransmit = 0;
 	static struct adb_request rt;
 	unsigned long flags;
-
+	
 	if (in_retransmit) printk("macii_retransmit: double retransmit!\n");
 
 	in_retransmit++;
@@ -256,11 +257,11 @@ static int macii_write(struct adb_request *req)
 {
 	unsigned long flags;
 
-	if (req->nbytes < 2 || req->data[0] != ADB_PACKET) {
+	if (req->nbytes < 2 || req->data[0] != ADB_PACKET || req->nbytes > 15) {
 		req->complete = 1;
 		return -EINVAL;
 	}
-
+	
 	req->next = 0;
 	req->sent = 0;
 	req->complete = 0;
@@ -319,7 +320,7 @@ static void macii_start(void)
 
 	req = current_req;
 	if (!req) return;
-
+	
 	/* assert macii_state == idle */
 	if (macii_state != idle) {
 		printk("macii_start: called while driver busy (%p %x %x)!\n",
@@ -333,7 +334,9 @@ static void macii_start(void)
 	 * IRQ signaled ?? (means ADB controller wants to send, or might 
 	 * be end of packet if we were reading)
 	 */
+#if 0 /* FIXME: This is broke broke broke, for some reason */
 	if ((via[B] & TREQ) == 0) {
+		printk("macii_start: weird poll stuff. huh?\n");
 		/*
 		 *	FIXME - we need to restart this on a timer
 		 *	or a collision at boot hangs us.
@@ -359,6 +362,7 @@ static void macii_start(void)
 			need_poll = 0;
 		}
 	}
+#endif
 	/*
 	 * Another retry pending? (sanity check)
 	 */
@@ -368,7 +372,7 @@ static void macii_start(void)
 
 	/* Now send it. Be careful though, that first byte of the request */
 	/* is actually ADB_PACKET; the real data begins at index 1!	  */
-
+	
 	/* store command byte */
 	command_byte = req->data[1];
 	/* Output mode */
@@ -378,7 +382,7 @@ static void macii_start(void)
 	/* set ADB state to 'command' */
 	via[B] = (via[B] & ~ST_MASK) | ST_CMD;
 
-	macii_state = sent_first_byte;
+	macii_state = sending;
 	data_index = 2;
 
 	restore_flags(flags);
@@ -441,7 +445,7 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 			reply_len = 1;
 			prefix_len = 1;
 			reading_reply = 0;
-
+			
 			macii_state = reading;
 			break;
 
@@ -461,48 +465,15 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 			macii_state = reading;			
 			break;
 
-		case sent_first_byte:
-			req = current_req;
-			/* maybe we're already done (Talk, or Poll)? */
-			if (data_index >= req->nbytes) {
-				/* reset to shift in */
-				/* If it's a Listen command and we're done, someone's doing weird stuff. */
-				if (((command_byte & 0x0C) == 0x08)
-				    && (console_loglevel == 10))
-					printk("macii_interrupt: listen command with no data: %x!\n", 
-						command_byte);
-				/* reset to shift in */
-				via[ACR] &= ~SR_OUT;
-				x = via[SR];
-				/* set ADB state idle - might get SRQ */
-				via[B] = (via[B] & ~ST_MASK) | ST_IDLE;
-
-				req->sent = 1;
-
-				if (req->reply_expected) {
-					macii_state = awaiting_reply;
-				} else {
-					req->complete = 1;
-					current_req = req->next;
-					if (req->done) (*req->done)(req);
-					macii_state = idle;
-					if (current_req || retry_req)
-						macii_start();
-					else
-						macii_retransmit((command_byte & 0xF0) >> 4);
-				}
-			} else {
-				/* SR already set to shift out; send byte */
-				via[SR] = current_req->data[data_index++];
-				/* set state to ST_EVEN (first byte was: ST_CMD) */
-				via[B] = (via[B] & ~ST_MASK) | ST_EVEN;
-				macii_state = sending;
-			}
-			break;
-
 		case sending:
 			req = current_req;
 			if (data_index >= req->nbytes) {
+				/* print an error message if a listen command has no data */
+				if (((command_byte & 0x0C) == 0x08)
+				 /* && (console_loglevel == 10) */
+				    && (data_index == 2))
+					printk("MacII ADB: listen command with no data: %x!\n", 
+						command_byte);
 				/* reset to shift in */
 				via[ACR] &= ~SR_OUT;
 				x = via[SR];
@@ -526,8 +497,13 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 			} else {
 				via[SR] = req->data[data_index++];
 
-				/* invert state bits, toggle ODD/EVEN */
-				via[B] ^= ST_MASK;
+				if ( (via[B] & ST_MASK) == ST_CMD ) {
+					/* just sent the command byte, set to EVEN */
+					via[B] = (via[B] & ~ST_MASK) | ST_EVEN;
+				} else {
+					/* invert state bits, toggle ODD/EVEN */
+					via[B] ^= ST_MASK;
+				}
 			}
 			break;
 
@@ -551,7 +527,7 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 				 * on /INT, meaning we missed it :-(
 				 */
 				x = via[SR];
-				if (x != 0xFF) printk("macii_interrupt: mistaken timeout/SRQ!\n");
+				if (x != 0xFF) printk("MacII ADB: mistaken timeout/SRQ!\n");
 
 				if ((status & TREQ) == (last_status & TREQ)) {
 					/* Not a timeout. Unsolicited SRQ? weird. */
@@ -598,7 +574,7 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 			 * byte of timeout packet! 
 			 * Timeouts are signaled by 4x FF.
 			 */
-			if (!(status & TREQ) && (x == 0x00)) { /* != 0xFF */
+			if (((status & TREQ) == 0) && (x == 0x00)) { /* != 0xFF */
 				/* invert state bits, toggle ODD/EVEN */
 				via[B] ^= ST_MASK;
 
@@ -646,12 +622,12 @@ void macii_interrupt(int irq, void *arg, struct pt_regs *regs)
 				need_poll = 0;
 				break;
 			}
-
+			
+			/* set ADB state to idle */
+			via[B] = (via[B] & ~ST_MASK) | ST_IDLE;
+			
 			/* /IRQ seen, so the ADB controller has data for us */
-			if (!(status & TREQ)) {
-				/* set ADB state to idle */
-				via[B] = (via[B] & ~ST_MASK) | ST_IDLE;
-
+			if ((via[B] & TREQ) != 0) {
 				macii_state = reading;
 
 				reply_buf[0] = command_byte;

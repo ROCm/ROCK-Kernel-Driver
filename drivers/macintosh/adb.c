@@ -64,7 +64,7 @@ static struct adb_driver *adb_driver_list[] = {
 #ifdef CONFIG_ADB_IOP
 	&adb_iop_driver,
 #endif
-#ifdef CONFIG_ADB_PMU
+#if defined(CONFIG_ADB_PMU) || defined(CONFIG_ADB_PMU68K)
 	&via_pmu_driver,
 #endif
 #ifdef CONFIG_ADB_MACIO
@@ -311,9 +311,11 @@ int __init adb_init(void)
 #ifdef CONFIG_PMAC_PBOOK
 		pmu_register_sleep_notifier(&adb_sleep_notifier);
 #endif /* CONFIG_PMAC_PBOOK */
+#ifdef CONFIG_PPC
 		if (machine_is_compatible("AAPL,PowerBook1998") ||
 			machine_is_compatible("PowerBook1,1"))
 			sleepy_trackpad = 1;
+#endif /* CONFIG_PPC */
 		init_completion(&adb_probe_task_comp);
 		adbdev_init();
 		adb_reset_bus();
