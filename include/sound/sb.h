@@ -311,10 +311,6 @@ const snd_pcm_ops_t *snd_sb16dsp_get_pcm_ops(int direction);
 int snd_sb16dsp_configure(sb_t *chip);
 /* sb16.c */
 irqreturn_t snd_sb16dsp_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-int snd_sb16_playback_open(snd_pcm_substream_t *substream);
-int snd_sb16_capture_open(snd_pcm_substream_t *substream);
-int snd_sb16_playback_close(snd_pcm_substream_t *substream);
-int snd_sb16_capture_close(snd_pcm_substream_t *substream);
 
 /* exported mixer stuffs */
 enum {

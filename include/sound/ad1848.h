@@ -203,8 +203,4 @@ static inline int snd_ad1848_add_ctl_elem(ad1848_t *chip, const struct ad1848_mi
 	return snd_ad1848_add_ctl(chip, c->name, c->index, c->type, c->private_value);
 }
 
-#ifdef CONFIG_SND_DEBUG
-void snd_ad1848_debug(ad1848_t *chip);
-#endif
-
 #endif /* __SOUND_AD1848_H */

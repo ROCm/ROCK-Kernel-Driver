@@ -166,8 +166,8 @@ static __CS4231_INLINE__ u8 cs4231_inb(cs4231_t *chip, u8 offset)
 #endif
 }
 
-void snd_cs4231_outm(cs4231_t *chip, unsigned char reg,
-		     unsigned char mask, unsigned char value)
+static void snd_cs4231_outm(cs4231_t *chip, unsigned char reg,
+			    unsigned char mask, unsigned char value)
 {
 	int timeout;
 	unsigned char tmp;
@@ -271,9 +271,9 @@ unsigned char snd_cs4236_ext_in(cs4231_t *chip, unsigned char reg)
 #endif
 }
 
-#ifdef CONFIG_SND_DEBUG
+#if 0
 
-void snd_cs4231_debug(cs4231_t *chip)
+static void snd_cs4231_debug(cs4231_t *chip)
 {
 	printk("CS4231 REGS:      INDEX = 0x%02x  ", cs4231_inb(chip, CS4231P(REGSEL)));
 	printk("                 STATUS = 0x%02x\n", cs4231_inb(chip, CS4231P(STATUS)));
@@ -1026,7 +1026,7 @@ static snd_pcm_uframes_t snd_cs4231_capture_pointer(snd_pcm_substream_t * substr
 
  */
 
-int snd_cs4231_probe(cs4231_t *chip)
+static int snd_cs4231_probe(cs4231_t *chip)
 {
 	unsigned long flags;
 	int i, id, rev;
@@ -1934,7 +1934,6 @@ int snd_cs4231_mixer(cs4231_t *chip)
 
 EXPORT_SYMBOL(snd_cs4231_out);
 EXPORT_SYMBOL(snd_cs4231_in);
-EXPORT_SYMBOL(snd_cs4231_outm);
 EXPORT_SYMBOL(snd_cs4236_ext_out);
 EXPORT_SYMBOL(snd_cs4236_ext_in);
 EXPORT_SYMBOL(snd_cs4231_mce_up);

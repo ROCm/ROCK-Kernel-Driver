@@ -146,9 +146,9 @@ static unsigned char snd_ad1848_in(ad1848_t *chip, unsigned char reg)
 	return inb(AD1848P(chip, REG));
 }
 
-#ifdef CONFIG_SND_DEBUG
+#if 0
 
-void snd_ad1848_debug(ad1848_t *chip)
+static void snd_ad1848_debug(ad1848_t *chip)
 {
 	printk("AD1848 REGS:      INDEX = 0x%02x  ", inb(AD1848P(chip, REGSEL)));
 	printk("                 STATUS = 0x%02x\n", inb(AD1848P(chip, STATUS)));

@@ -46,20 +46,20 @@ static inline int snd_ad1816a_busy_wait(ad1816a_t *chip)
 	return -EBUSY;
 }
 
-inline unsigned char snd_ad1816a_in(ad1816a_t *chip, unsigned char reg)
+static inline unsigned char snd_ad1816a_in(ad1816a_t *chip, unsigned char reg)
 {
 	snd_ad1816a_busy_wait(chip);
 	return inb(AD1816A_REG(reg));
 }
 
-inline void snd_ad1816a_out(ad1816a_t *chip, unsigned char reg,
+static inline void snd_ad1816a_out(ad1816a_t *chip, unsigned char reg,
 			    unsigned char value)
 {
 	snd_ad1816a_busy_wait(chip);
 	outb(value, AD1816A_REG(reg));
 }
 
-inline void snd_ad1816a_out_mask(ad1816a_t *chip, unsigned char reg,
+static inline void snd_ad1816a_out_mask(ad1816a_t *chip, unsigned char reg,
 				 unsigned char mask, unsigned char value)
 {
 	snd_ad1816a_out(chip, reg,
@@ -372,6 +372,7 @@ static snd_pcm_hardware_t snd_ad1816a_capture = {
 	.fifo_size =		0,
 };
 
+#if 0 /* not used now */
 static int snd_ad1816a_timer_close(snd_timer_t *timer)
 {
 	ad1816a_t *chip = snd_timer_chip(timer);
@@ -435,6 +436,7 @@ static struct _snd_timer_hardware snd_ad1816a_timer_table = {
 	.start =	snd_ad1816a_timer_start,
 	.stop =		snd_ad1816a_timer_stop,
 };
+#endif /* not used now */
 
 
 static int snd_ad1816a_playback_open(snd_pcm_substream_t *substream)
@@ -692,6 +694,7 @@ int snd_ad1816a_pcm(ad1816a_t *chip, int device, snd_pcm_t **rpcm)
 	return 0;
 }
 
+#if 0 /* not used now */
 static void snd_ad1816a_timer_free(snd_timer_t *timer)
 {
 	ad1816a_t *chip = timer->private_data;
@@ -720,6 +723,7 @@ int snd_ad1816a_timer(ad1816a_t *chip, int device, snd_timer_t **rtimer)
 		*rtimer = timer;
 	return 0;
 }
+#endif /* not used now */
 
 /*
  *

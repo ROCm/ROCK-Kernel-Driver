@@ -425,7 +425,7 @@ static snd_pcm_hardware_t snd_sb8_capture =
  *
  */
  
-int snd_sb8_open(snd_pcm_substream_t *substream)
+static int snd_sb8_open(snd_pcm_substream_t *substream)
 {
 	sb_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
@@ -471,7 +471,7 @@ int snd_sb8_open(snd_pcm_substream_t *substream)
 	return 0;	
 }
 
-int snd_sb8_close(snd_pcm_substream_t *substream)
+static int snd_sb8_close(snd_pcm_substream_t *substream)
 {
 	unsigned long flags;
 	sb_t *chip = snd_pcm_substream_chip(substream);
