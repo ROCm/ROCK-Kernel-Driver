@@ -56,8 +56,7 @@ halt_msg:
 GLOBAL_ENTRY(_start)
 start_ap:
 	.prologue
-	.save rp, r4		// terminate unwind chain with a NULL rp
-	mov r4=r0
+	.save rp, r0		// terminate unwind chain with a NULL rp
 	.body
 
 	rsm psr.i | psr.ic
