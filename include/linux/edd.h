@@ -37,18 +37,14 @@
 #define EDDEXTSIZE 8		/* change these if you muck with the structures */
 #define EDDPARMSIZE 74
 #define CHECKEXTENSIONSPRESENT 0x41
-#define EXTENDEDREAD 0x42
 #define GETDEVICEPARAMETERS 0x48
 #define LEGACYGETDEVICEPARAMETERS 0x08
 #define EDDMAGIC1 0x55AA
 #define EDDMAGIC2 0xAA55
-#define FIXEDDISKSUBSET 0x0001
-#define GET_DEVICE_PARAMETERS_SUPPORTED 0x0007
 
 
 #define READ_SECTORS 0x02         /* int13 AH=0x02 is READ_SECTORS command */
 #define EDD_MBR_SIG_OFFSET 0x1B8  /* offset of signature in the MBR */
-#define EDD_DEV_ADDR_PACKET_LEN 0x10  /* for int13 fn42 */
 #define EDD_MBR_SIG_BUF    0x290  /* addr in boot params */
 #define EDD_MBR_SIG_MAX 16        /* max number of signatures to store */
 #define EDD_MBR_SIG_NR_BUF 0x1ea  /* addr of number of MBR signtaures at EDD_MBR_SIG_BUF
