@@ -21,25 +21,25 @@
 static void set_bitmap(unsigned long *bitmap, short base, short extent, int new_value)
 {
 	unsigned long mask;
-	unsigned long *bitmap_base = bitmap + (base / sizeof(unsigned long));
-	unsigned short low_index = base & 0x3f;
+	unsigned long *bitmap_base = bitmap + (base / BITS_PER_LONG);
+	unsigned long low_index = base & (BITS_PER_LONG-1);
 	int length = low_index + extent;
 
 	if (low_index != 0) {
 		mask = (~0UL << low_index);
-		if (length < 64)
+		if (length < BITS_PER_LONG)
 			mask &= ~(~0UL << length);
 		if (new_value)
 			*bitmap_base++ |= mask;
 		else
 			*bitmap_base++ &= ~mask;
-		length -= 64;
+		length -= BITS_PER_LONG;
 	}
 
 	mask = (new_value ? ~0UL : 0UL);
-	while (length >= 64) {
+	while (length >= BITS_PER_LONG) {
 		*bitmap_base++ = mask;
-		length -= 64;
+		length -= BITS_PER_LONG;
 	}
 
 	if (length > 0) {
@@ -115,7 +115,7 @@ asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
 		if (!capable(CAP_SYS_RAWIO))
 			return -EPERM;
 	}
-	regs.eflags = (regs.eflags & 0xffffffffffffcfff) | (level << 12);
+	regs.eflags = (regs.eflags &~ 0x3000UL) | (level << 12);
 	return 0;
 }
 
