@@ -558,6 +558,9 @@ cifs_write(struct file * file, const char *write_data,
 	int xid, long_op;
 	struct cifsFileInfo * open_file;
 
+	if(file->f_dentry == NULL)
+		return -EBADF;
+
 	xid = GetXid();
 
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
@@ -686,6 +689,8 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 	read_lock(&GlobalSMBSeslock); 
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
+		if(open_file->closePend)
+			continue;
 		/* We check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
@@ -699,7 +704,15 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 			if ((bytes_written > 0) && (offset)) {
 				rc = 0;
 			} else if(bytes_written < 0) {
-				rc = bytes_written;
+				if(rc == -EBADF) {
+				/* have seen a case in which
+				kernel seemed to have closed/freed a file
+				even with writes active so we might as well
+				see if there are other file structs to try
+				for the same inode before giving up */
+					continue;
+				} else
+					rc = bytes_written;
 			}
 			break;  /* now that we found a valid file handle
 				and tried to write to it we are done, no
