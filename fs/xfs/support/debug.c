@@ -85,8 +85,8 @@ void
 cmn_err(register int level, char *fmt, ...)
 {
 	char	*fp = fmt;
-	ulong	flags;
 	int	len;
+	ulong	flags;
 	va_list	ap;
 
 	level &= XFS_ERR_MASK;
