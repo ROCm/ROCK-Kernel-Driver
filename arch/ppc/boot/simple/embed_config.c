@@ -10,6 +10,7 @@
 #include <linux/types.h>
 #include <linux/config.h>
 #include <linux/string.h>
+#include <asm/reg.h>
 #ifdef CONFIG_8xx
 #include <asm/mpc8xx.h>
 #endif
@@ -520,7 +521,7 @@ embed_config(bd_t **bdp)
 
 	/* can busfreq be calculated? */
 	bd->bi_busfreq = 100000000;
-	__asm__ __volatile__ ("mfspr %0, 287" : "=r" (pvr));
+	pvr = mfspr(PVR);
 	if ((pvr & 0xffff0000) == 0x80820000)
 		clk_8280(bd);
 	else
