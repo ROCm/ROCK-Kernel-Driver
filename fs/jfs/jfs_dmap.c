@@ -1204,6 +1204,12 @@ static int dbAllocNext(struct bmap * bmp, struct dmap * dp, s64 blkno,
 	s8 *leaf;
 	u32 mask;
 
+	if (dp->tree.leafidx != cpu_to_le32(LEAFIND)) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAllocNext: Corrupt dmap page");
+		return -EIO;
+	}
+
 	/* pick up a pointer to the leaves of the dmap tree.
 	 */
 	leaf = dp->tree.stree + le32_to_cpu(dp->tree.leafidx);
@@ -1327,7 +1333,15 @@ dbAllocNear(struct bmap * bmp,
 	    struct dmap * dp, s64 blkno, int nblocks, int l2nb, s64 * results)
 {
 	int word, lword, rc;
-	s8 *leaf = dp->tree.stree + le32_to_cpu(dp->tree.leafidx);
+	s8 *leaf;
+
+	if (dp->tree.leafidx != cpu_to_le32(LEAFIND)) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAllocNear: Corrupt dmap page");
+		return -EIO;
+	}
+
+	leaf = dp->tree.stree + le32_to_cpu(dp->tree.leafidx);
 
 	/* determine the word within the dmap that holds the hint
 	 * (i.e. blkno).  also, determine the last word in the dmap
@@ -1488,6 +1502,13 @@ dbAllocAG(struct bmap * bmp, int agno, s64 nblocks, int l2nb, s64 * results)
 		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
 	budmin = dcp->budmin;
+
+	if (dcp->leafidx != cpu_to_le32(CTLLEAFIND)) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAllocAG: Corrupt dmapctl page");
+		release_metapage(mp);
+		return -EIO;
+	}
 
 	/* search the subtree(s) of the dmap control page that describes
 	 * the allocation group, looking for sufficient free space.  to begin,
@@ -1696,6 +1717,13 @@ static int dbFindCtl(struct bmap * bmp, int l2nb, int level, s64 * blkno)
 			return -EIO;
 		dcp = (struct dmapctl *) mp->data;
 		budmin = dcp->budmin;
+
+		if (dcp->leafidx != cpu_to_le32(CTLLEAFIND)) {
+			jfs_error(bmp->db_ipbmap->i_sb,
+				  "dbFindCtl: Corrupt dmapctl page");
+			release_metapage(mp);
+			return -EIO;
+		}
 
 		/* search the tree within the dmap control page for
 		 * sufficent free space.  if sufficient free space is found,
@@ -2458,6 +2486,13 @@ dbAdjCtl(struct bmap * bmp, s64 blkno, int newval, int alloc, int level)
 	if (mp == NULL)
 		return -EIO;
 	dcp = (struct dmapctl *) mp->data;
+
+	if (dcp->leafidx != cpu_to_le32(CTLLEAFIND)) {
+		jfs_error(bmp->db_ipbmap->i_sb,
+			  "dbAdjCtl: Corrupt dmapctl page");
+		release_metapage(mp);
+		return -EIO;
+	}
 
 	/* determine the leaf number corresponding to the block and
 	 * the index within the dmap control tree.

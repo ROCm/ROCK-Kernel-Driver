@@ -141,10 +141,13 @@ static void jfs_destroy_inode(struct inode *inode)
 {
 	struct jfs_inode_info *ji = JFS_IP(inode);
 
+	spin_lock_irq(&ji->ag_lock);
 	if (ji->active_ag != -1) {
 		struct bmap *bmap = JFS_SBI(inode->i_sb)->bmap;
 		atomic_dec(&bmap->db_active[ji->active_ag]);
+		ji->active_ag = -1;
 	}
+	spin_unlock_irq(&ji->ag_lock);
 
 #ifdef CONFIG_JFS_POSIX_ACL
 	if (ji->i_acl != JFS_ACL_NOT_CACHED) {
@@ -559,6 +562,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 		init_rwsem(&jfs_ip->rdwrlock);
 		init_MUTEX(&jfs_ip->commit_sem);
 		init_rwsem(&jfs_ip->xattr_sem);
+		spin_lock_init(&jfs_ip->ag_lock);
 		jfs_ip->active_ag = -1;
 #ifdef CONFIG_JFS_POSIX_ACL
 		jfs_ip->i_acl = JFS_ACL_NOT_CACHED;
