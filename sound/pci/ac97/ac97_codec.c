@@ -1224,6 +1224,9 @@ static int snd_ac97_cmute_new(snd_card_t *card, char *name, int reg, ac97_t *ac9
 	snd_kcontrol_t *kctl;
 	int stereo = 0;
 
+	if (! snd_ac97_valid_reg(ac97, reg))
+		return 0;
+
 	if (ac97->flags & AC97_STEREO_MUTES) {
 		/* check whether both mute bits work */
 		unsigned short val, val1;
@@ -1254,6 +1257,9 @@ static int snd_ac97_cvol_new(snd_card_t *card, char *name, int reg, unsigned int
 	int err;
 	snd_kcontrol_new_t tmp = AC97_DOUBLE(name, reg, 8, 0, (unsigned int)max, 1);
 	tmp.index = ac97->num;
+
+	if (! snd_ac97_valid_reg(ac97, reg))
+		return 0;
 	if ((err = snd_ctl_add(card, snd_ctl_new1(&tmp, ac97))) < 0)
 		return err;
 	snd_ac97_write_cache(ac97, reg,
@@ -1270,6 +1276,9 @@ static int snd_ac97_cmix_new(snd_card_t *card, const char *pfx, int reg, int che
 	int err;
 	char name[44];
 	unsigned char max;
+
+	if (! snd_ac97_valid_reg(ac97, reg))
+		return 0;
 
 	sprintf(name, "%s Switch", pfx);
 	if ((err = snd_ac97_cmute_new(card, name, reg, ac97)) < 0)
