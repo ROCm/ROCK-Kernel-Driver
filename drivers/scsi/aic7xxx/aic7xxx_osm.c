@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#218 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#220 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -465,7 +465,7 @@ MODULE_PARM_DESC(aic7xxx,
 "	allow_memio		Allow device registers to be memory mapped\n"
 "	debug			Bitmask of debug values to enable\n"
 "	no_probe		Toggle EISA/VLB controller probing\n"
-"	eisa_vl_probe		Toggle EISA/VLB controller probing\n"
+"	probe_eisa_vl		Toggle EISA/VLB controller probing\n"
 "	no_reset		Supress initial bus resets\n"
 "	extended		Enable extended geometry on all controllers\n"
 "	periodic_otag		Send an ordered tagged transaction\n"
@@ -485,7 +485,7 @@ MODULE_PARM_DESC(aic7xxx,
 "		Set tag depth on Controller 1/Target 1 to 10 tags\n"
 "		Shorten the selection timeout to 128ms\n"
 "\n"
-"	options aic7xxx 'aic7xxx=eisa_vl_probe.tag_info:{{}.{.10}}.seltime:1'\n"
+"	options aic7xxx 'aic7xxx=probe_eisa_vl.tag_info:{{}.{.10}}.seltime:1'\n"
 );
 #endif
 
@@ -1682,7 +1682,7 @@ aic7xxx_setup(char *s)
 #endif
 		{ "reverse_scan", &aic7xxx_reverse_scan },
 		{ "no_probe", &aic7xxx_probe_eisa_vl },
-		{ "probe_eisa_vlb", &aic7xxx_probe_eisa_vl },
+		{ "probe_eisa_vl", &aic7xxx_probe_eisa_vl },
 		{ "periodic_otag", &aic7xxx_periodic_otag },
 		{ "pci_parity", &aic7xxx_pci_parity },
 		{ "seltime", &aic7xxx_seltime },
@@ -4735,6 +4735,7 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	u_int  saved_scsiid;
 	u_int  cdb_byte;
 	int    retval;
+	int    was_paused;
 	int    paused;
 	int    wait;
 	int    disconnected;
@@ -4863,10 +4864,9 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 	 * behind our back and that we didn't "just" miss
 	 * an interrupt that would affect this cmd.
 	 */
+	was_paused = ahc_is_paused(ahc);
 	ahc_pause_and_flushwork(ahc);
 	paused = TRUE;
-
-	ahc_dump_card_state(ahc);
 
 	if ((pending_scb->flags & SCB_ACTIVE) == 0) {
 		printf("%s:%d:%d:%d: Command already completed\n",
@@ -4874,6 +4874,10 @@ ahc_linux_queue_recovery_cmd(Scsi_Cmnd *cmd, scb_flag flag)
 		       cmd->device->lun);
 		goto no_cmd;
 	}
+
+	printf("%s: At time of recovery, card was %spaused\n",
+	       was_paused ? "" : "not ");
+	ahc_dump_card_state(ahc);
 
 	disconnected = TRUE;
 	if (flag == SCB_ABORT) {

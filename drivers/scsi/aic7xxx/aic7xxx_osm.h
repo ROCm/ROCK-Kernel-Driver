@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#139 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#140 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -305,7 +305,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #define AHC_SCSI_HAS_HOST_LOCK 0
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.32"
+#define AIC7XXX_DRIVER_VERSION "6.2.33"
 
 /**************************** Front End Queues ********************************/
 /*

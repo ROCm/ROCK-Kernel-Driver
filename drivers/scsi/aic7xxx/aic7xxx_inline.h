@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#41 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_inline.h#42 $
  *
  * $FreeBSD$
  */
@@ -585,6 +585,20 @@ ahc_intr(struct ahc_softc *ahc)
 		intstat = ahc_inb(ahc, INTSTAT);
 	}
 
+	if ((intstat & INT_PEND) == 0) {
+#if AHC_PCI_CONFIG > 0
+		if (ahc->unsolicited_ints > 500) {
+			ahc->unsolicited_ints = 0;
+			if ((ahc->chip & AHC_PCI) != 0
+			 && (ahc_inb(ahc, ERROR) & PCIERRSTAT) != 0)
+				ahc->bus_intr(ahc);
+		}
+#endif
+		ahc->unsolicited_ints++;
+		return (0);
+	}
+	ahc->unsolicited_ints = 0;
+
 	if (intstat & CMDCMPLT) {
 		ahc_outb(ahc, CLRINT, CLRCMDINT);
 
@@ -603,20 +617,6 @@ ahc_intr(struct ahc_softc *ahc)
 			ahc_run_tqinfifo(ahc, /*paused*/FALSE);
 #endif
 	}
-
-	if ((intstat & INT_PEND) == 0) {
-#if AHC_PCI_CONFIG > 0
-		if (ahc->unsolicited_ints > 500) {
-			ahc->unsolicited_ints = 0;
-			if ((ahc->chip & AHC_PCI) != 0
-			 && (ahc_inb(ahc, ERROR) & PCIERRSTAT) != 0)
-				ahc->bus_intr(ahc);
-		}
-#endif
-		ahc->unsolicited_ints++;
-		return (0);
-	}
-	ahc->unsolicited_ints = 0;
 
 	/*
 	 * Handle statuses that may invalidate our cached
