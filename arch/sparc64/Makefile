@@ -8,6 +8,8 @@
 # Copyright (C) 1998 Jakub Jelinek (jj@ultra.linux.cz)
 #
 
+AFLAGS_vmlinux.lds.o += -Usparc
+
 # If the solaris /bin/sh wasn't so broken, I wouldn't need the following
 # line...
 SHELL  =/bin/bash
