@@ -128,10 +128,8 @@ static inline int _raw_spin_trylock(spinlock_t *lock)
 static inline void _raw_spin_lock(spinlock_t *lock)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
-	__label__ here;
-here:
 	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
-		printk("eip: %p\n", &&here);
+		printk("eip: %p\n", __builtin_return_address(0));
 		BUG();
 	}
 #endif
@@ -143,10 +141,8 @@ here:
 static inline void _raw_spin_lock_flags (spinlock_t *lock, unsigned long flags)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
-	__label__ here;
-here:
 	if (unlikely(lock->magic != SPINLOCK_MAGIC)) {
-		printk("eip: %p\n", &&here);
+		printk("eip: %p\n", __builtin_return_address(0));
 		BUG();
 	}
 #endif
