@@ -52,17 +52,9 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 #include <linux/backing-dev.h>
-#include <asm/uaccess.h>
-
-/*
- * 35 has been officially registered as the RAMDISK major number, but
- * so is the original MAJOR number of 1.  We're using 1 in
- * include/linux/major.h for now
- */
-#define MAJOR_NR RAMDISK_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/blkpg.h>
+#include <asm/uaccess.h>
 
 /* The RAM disk size is now a parameter */
 #define NUM_RAMDISKS 16		/* This cannot be overridden (yet) */ 
@@ -386,7 +378,7 @@ static void __exit rd_cleanup (void)
 	devfs_remove("rd/initrd");
 #endif
 	devfs_remove("rd");
-	unregister_blkdev( MAJOR_NR, "ramdisk" );
+	unregister_blkdev(RAMDISK_MAJOR, "ramdisk" );
 }
 
 static struct request_queue rd_queue;
@@ -407,7 +399,7 @@ static int __init rd_init (void)
 	initrd_disk = alloc_disk(1);
 	if (!initrd_disk)
 		return -ENOMEM;
-	initrd_disk->major = MAJOR_NR;
+	initrd_disk->major = RAMDISK_MAJOR;
 	initrd_disk->first_minor = INITRD_MINOR;
 	initrd_disk->fops = &rd_bd_op;	
 	sprintf(initrd_disk->disk_name, "initrd");
@@ -418,8 +410,8 @@ static int __init rd_init (void)
 			goto out;
 	}
 
-	if (register_blkdev(MAJOR_NR, "ramdisk", &rd_bd_op)) {
-		printk("RAMDISK: Could not get major %d", MAJOR_NR);
+	if (register_blkdev(RAMDISK_MAJOR, "ramdisk", &rd_bd_op)) {
+		printk("RAMDISK: Could not get major %d", RAMDISK_MAJOR);
 		err = -EIO;
 		goto out;
 	}
@@ -432,7 +424,7 @@ static int __init rd_init (void)
 		struct gendisk *disk = rd_disks[i];
 		char name[16];
 		/* rd_size is given in kB */
-		disk->major = MAJOR_NR;
+		disk->major = RAMDISK_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &rd_bd_op;
 		disk->queue = &rd_queue;
@@ -452,7 +444,7 @@ static int __init rd_init (void)
 	/* We ought to separate initrd operations here */
 	set_capacity(initrd_disk, (initrd_end-initrd_start+511)>>9);
 	add_disk(initrd_disk);
-	devfs_register(NULL, "rd/initrd", DEVFS_FL_DEFAULT, MAJOR_NR,
+	devfs_register(NULL, "rd/initrd", DEVFS_FL_DEFAULT, RAMDISK_MAJOR,
 			INITRD_MINOR, S_IFBLK | S_IRUSR, &rd_bd_op, NULL);
 #endif
 

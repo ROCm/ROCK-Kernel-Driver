@@ -150,7 +150,8 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_GEO, D_SBY, D_DLY, D_SLV};
 #include <linux/delay.h>
 #include <linux/hdreg.h>
 #include <linux/cdrom.h>	/* for the eject ioctl */
-
+#include <linux/blk.h>
+#include <linux/blkpg.h>
 #include <asm/uaccess.h>
 
 static spinlock_t pd_lock = SPIN_LOCK_UNLOCKED;
@@ -187,12 +188,6 @@ MODULE_PARM(drive2, "1-8i");
 MODULE_PARM(drive3, "1-8i");
 
 #include "paride.h"
-
-#define MAJOR_NR   major
-
-#include <linux/blk.h>
-#include <linux/blkpg.h>
-
 #include "pseudo.h"
 
 #define PD_BITS    4
@@ -895,7 +890,7 @@ static int __init pd_init(void)
 {
 	if (disable)
 		return -1;
-	if (register_blkdev(MAJOR_NR, name, &pd_fops)) {
+	if (register_blkdev(major, name, &pd_fops)) {
 		printk("%s: unable to get major number %d\n", name, major);
 		return -1;
 	}
@@ -906,7 +901,7 @@ static int __init pd_init(void)
 	       name, name, PD_VERSION, major, cluster, nice);
 	pd_init_units();
 	if (!pd_detect()) {
-		unregister_blkdev(MAJOR_NR, name);
+		unregister_blkdev(major, name);
 		return -1;
 	}
 	return 0;
@@ -916,7 +911,7 @@ static void __exit pd_exit(void)
 {
 	struct pd_unit *disk;
 	int unit;
-	unregister_blkdev(MAJOR_NR, name);
+	unregister_blkdev(major, name);
 	for (unit = 0, disk = pd; unit < PD_UNITS; unit++, disk++) {
 		if (disk->present) {
 			struct gendisk *p = disk->gd;

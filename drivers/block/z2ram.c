@@ -25,9 +25,7 @@
 ** implied warranty.
 */
 
-#define MAJOR_NR    Z2RAM_MAJOR
 #define DEVICE_NAME "Z2RAM"
-#define DEVICE_NR(device) (minor(device))
 
 #include <linux/major.h>
 #include <linux/slab.h>
@@ -155,7 +153,7 @@ z2_open( struct inode *inode, struct file *filp )
 	sizeof( z2ram_map[0] );
     int rc = -ENOMEM;
 
-    device = DEVICE_NR( inode->i_rdev );
+    device = minor( inode->i_rdev );
 
     if ( current_device != -1 && current_device != device )
     {
@@ -341,18 +339,18 @@ z2_init( void )
     if ( !MACH_IS_AMIGA )
 	return -ENXIO;
 
-    if ( register_blkdev( MAJOR_NR, DEVICE_NAME, &z2_fops ) )
+    if ( register_blkdev( Z2RAM_MAJOR, DEVICE_NAME, &z2_fops ) )
     {
 	printk( KERN_ERR DEVICE_NAME ": Unable to get major %d\n",
-	    MAJOR_NR );
+	    Z2RAM_MAJOR );
 	return -EBUSY;
     }
     z2ram_gendisk = alloc_disk(1);
     if (!z2ram_gendisk) {
-	unregister_blkdev( MAJOR_NR, DEVICE_NAME );
+	unregister_blkdev( Z2RAM_MAJOR, DEVICE_NAME );
 	return -ENOMEM;
     }
-    z2ram_gendisk->major = MAJOR_NR;
+    z2ram_gendisk->major = Z2RAM_MAJOR;
     z2ram_gendisk->first_minor = 0;
     z2ram_gendisk->fops = &z2_fops;
     sprintf(z2ram_gendisk->disk_name, "z2ram");
@@ -360,7 +358,7 @@ z2_init( void )
     blk_init_queue(&z2_queue, do_z2_request, &z2ram_lock);
     z2ram_gendisk->queue = &z2_queue;
     add_disk(z2ram_gendisk);
-    blk_register_region(MKDEV(MAJOR_NR, 0), Z2MINOR_COUNT, THIS_MODULE,
+    blk_register_region(MKDEV(Z2RAM_MAJOR, 0), Z2MINOR_COUNT, THIS_MODULE,
 				z2_find, NULL, NULL);
 
     return 0;
@@ -388,8 +386,8 @@ void
 cleanup_module( void )
 {
     int i, j;
-    blk_unregister_region(MKDEV(MAJOR_NR, 0), 256);
-    if ( unregister_blkdev( MAJOR_NR, DEVICE_NAME ) != 0 )
+    blk_unregister_region(MKDEV(Z2RAM_MAJOR, 0), 256);
+    if ( unregister_blkdev( Z2RAM_MAJOR, DEVICE_NAME ) != 0 )
 	printk( KERN_ERR DEVICE_NAME ": unregister of device failed\n");
 
     del_gendisk(z2ram_gendisk);

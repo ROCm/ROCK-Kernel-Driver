@@ -78,9 +78,6 @@ static int floppy_count;
 static struct floppy_state floppy_states[MAX_FLOPPIES];
 static spinlock_t swim_iop_lock = SPIN_LOCK_UNLOCKED;
 
-#define MAJOR_NR  FLOPPY_MAJOR
-#define DEVICE_NAME "floppy"
-#define QUEUE (&swim_queue)
 #define CURRENT elv_next_request(&swim_queue)
 
 static char *drive_names[7] = {
@@ -142,9 +139,9 @@ int swimiop_init(void)
 
 	if (!iop_ism_present) return -ENODEV;
 
-	if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
+	if (register_blkdev(FLOPPY_MAJOR, "fd", &floppy_fops)) {
 		printk(KERN_ERR "SWIM-IOP: Unable to get major %d for floppy\n",
-		       MAJOR_NR);
+		       FLOPPY_MAJOR);
 		return -EBUSY;
 	}
 	blk_init_queue(&swim_queue, do_fd_request, &swim_iop_lock);
@@ -190,7 +187,7 @@ int swimiop_init(void)
 		struct gendisk *disk = alloc_disk(1);
 		if (!disk)
 			continue;
-		disk->major = MAJOR_NR;
+		disk->major = FLOPPY_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
 		sprintf(disk->disk_name, "fd%d", i);
@@ -523,9 +520,9 @@ static void start_request(struct floppy_state *fs)
 		wake_up(&fs->wait);
 		return;
 	}
-	while (!blk_queue_empty(QUEUE) && fs->state == idle) {
+	while (!blk_queue_empty(&swim_queue) && fs->state == idle) {
 		if (CURRENT->bh && !buffer_locked(CURRENT->bh))
-			panic(DEVICE_NAME ": block not locked");
+			panic("floppy: block not locked");
 #if 0
 		printk("do_fd_req: dev=%s cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
 		       CURRENT->rq_disk->disk_name, CURRENT->cmd,
