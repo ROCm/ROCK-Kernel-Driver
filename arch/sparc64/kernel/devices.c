@@ -19,6 +19,7 @@
 #include <asm/smp.h>
 #include <asm/spitfire.h>
 #include <asm/timer.h>
+#include <asm/cpudata.h>
 
 /* Used to synchronize acceses to NatSemi SUPER I/O chip configure
  * operations in asm/ns87303.h

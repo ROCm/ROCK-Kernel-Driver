@@ -75,6 +75,10 @@ static __inline__ int hard_smp_processor_id(void)
 
 #endif /* !(__ASSEMBLY__) */
 
+#else
+
+#define num_possible_cpus()	(1)
+
 #endif /* !(CONFIG_SMP) */
 
 #define NO_PROC_ID		0xFF
