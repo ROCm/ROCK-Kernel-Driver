@@ -66,7 +66,7 @@ typedef struct pio_clocks_s {
 
 extern unsigned int init_chipset_cy82c693(struct pci_dev *, const char *);
 extern void init_hwif_cy82c693(ide_hwif_t *);
-extern void init_dma_cy82c693(ide_hwif_t *, unsigned long);
+extern void init_iops_cy82c693(ide_hwif_t *);
 
 static ide_pci_device_t cy82c693_chipsets[] __initdata = {
 	{	/* 0 */
@@ -74,10 +74,10 @@ static ide_pci_device_t cy82c693_chipsets[] __initdata = {
 		device:		PCI_DEVICE_ID_CONTAQ_82C693,
 		name:		"CY82C693",
 		init_chipset:	init_chipset_cy82c693,
-		init_iops:	NULL,
+		init_iops:	init_iops_cy82c693,
 		init_hwif:	init_hwif_cy82c693,
-		init_dma:	init_dma_cy82c693,
-		channels:	2,
+		init_dma:	NULL,
+		channels:	1,
 		autodma:	AUTODMA,
 		enablebits:	{{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		bootable:	ON_BOARD,

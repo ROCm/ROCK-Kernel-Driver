@@ -90,13 +90,12 @@ static char *tw_aen_string[] = {
 	"INFO: Verify started: Unit #",                // 0x029
 	"ERROR: Verify failed: Port #",                // 0x02A
 	"INFO: Verify complete: Unit #",               // 0x02B
-	"ERROR: Overwrote bad sector during rebuild: Port #",   //0x02C
-	"ERROR: Encountered bad sector during rebuild: Port #", //0x02D
-	"INFO: Replacement drive is too small: Port #",         //0x02E
-	"WARNING: Verify error: Unit not previously initialized: Unit #" //0x02F
+	"WARNING: Overwrote bad sector during rebuild: Port #",  //0x02C
+	"ERROR: Encountered bad sector during rebuild: Port #",  //0x02D
+	"ERROR: Replacement drive is too small: Port #",         //0x02E
+	"WARNING: Verify error: Unit not previously initialized: Unit #", //0x02F
+	"ERROR: Drive not supported: Port #"           // 0x030
 };
-
-#define TW_AEN_STRING_MAX                      0x030
 
 /*
    Sense key lookup table

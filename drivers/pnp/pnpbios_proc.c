@@ -68,6 +68,7 @@ static int proc_read_escdinfo(char *buf, char **start, off_t pos,
 	);
 }
 
+#define MAX_SANE_ESCD_SIZE (32*1024)
 static int proc_read_escd(char *buf, char **start, off_t pos,
                           int count, int *eof, void *data)
 {
@@ -79,8 +80,8 @@ static int proc_read_escd(char *buf, char **start, off_t pos,
 		return -EIO;
 
 	/* sanity check */
-	if (escd.escd_size > (32*1024)) {
-		printk(KERN_ERR "PnPBIOS: proc_read_escd: ESCD size is too great\n");
+	if (escd.escd_size > MAX_SANE_ESCD_SIZE) {
+		printk(KERN_ERR "PnPBIOS: proc_read_escd: ESCD size reported by BIOS escd_info call is too great\n");
 		return -EFBIG;
 	}
 
@@ -90,7 +91,14 @@ static int proc_read_escd(char *buf, char **start, off_t pos,
 	if (pnp_bios_read_escd(tmpbuf, escd.nv_storage_base))
 		return -EIO;
 
-	escd_size = (unsigned char)(buf[0]) + (unsigned char)(buf[1])*256;
+	escd_size = (unsigned char)(tmpbuf[0]) + (unsigned char)(tmpbuf[1])*256;
+
+	/* sanity check */
+	if (escd_size > MAX_SANE_ESCD_SIZE) {
+		printk(KERN_ERR "PnPBIOS: proc_read_escd: ESCD size reported by BIOS read_escd call is too great\n");
+		return -EFBIG;
+	}
+
 	escd_left_to_read = escd_size - pos;
 	if (escd_left_to_read < 0) escd_left_to_read = 0;
 	if (escd_left_to_read == 0) *eof = 1;

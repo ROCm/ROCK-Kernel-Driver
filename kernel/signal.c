@@ -1086,6 +1086,7 @@ kill_proc(pid_t pid, int sig, int priv)
  */
 static inline void wake_up_parent(struct task_struct *p)
 {
+	unsigned long flags;
 	struct task_struct *parent = p->parent, *tsk = parent;
 
 	/*
@@ -1095,14 +1096,14 @@ static inline void wake_up_parent(struct task_struct *p)
 		wake_up_interruptible(&tsk->wait_chldexit);
 		return;
 	}
-	spin_lock_irq(&parent->sig->siglock);
+	spin_lock_irqsave(&parent->sig->siglock, flags);
 	do {
 		wake_up_interruptible(&tsk->wait_chldexit);
 		tsk = next_thread(tsk);
 		if (tsk->sig != parent->sig)
 			BUG();
 	} while (tsk != parent);
-	spin_unlock_irq(&parent->sig->siglock);
+	spin_unlock_irqrestore(&parent->sig->siglock, flags);
 }
 
 /*

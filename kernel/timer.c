@@ -888,20 +888,6 @@ asmlinkage long sys_nanosleep(struct timespec *rqtp, struct timespec *rmtp)
 	if (t.tv_nsec >= 1000000000L || t.tv_nsec < 0 || t.tv_sec < 0)
 		return -EINVAL;
 
-
-	if (t.tv_sec == 0 && t.tv_nsec <= 2000000L &&
-	    current->policy != SCHED_NORMAL)
-	{
-		/*
-		 * Short delay requests up to 2 ms will be handled with
-		 * high precision by a busy wait for all real-time processes.
-		 *
-		 * Its important on SMP not to do this holding locks.
-		 */
-		udelay((t.tv_nsec + 999) / 1000);
-		return 0;
-	}
-
 	expire = timespec_to_jiffies(&t) + (t.tv_sec || t.tv_nsec);
 
 	current->state = TASK_INTERRUPTIBLE;

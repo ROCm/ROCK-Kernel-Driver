@@ -477,13 +477,15 @@ void wake_up_forked_process(task_t * p)
  */
 void sched_exit(task_t * p)
 {
-	local_irq_disable();
+	unsigned long flags;
+
+	local_irq_save(flags);
 	if (p->first_time_slice) {
 		p->parent->time_slice += p->time_slice;
 		if (unlikely(p->parent->time_slice > MAX_TIMESLICE))
 			p->parent->time_slice = MAX_TIMESLICE;
 	}
-	local_irq_enable();
+	local_irq_restore(flags);
 	/*
 	 * If the child was a (relative-) CPU hog then decrease
 	 * the sleep_avg of the parent as well.
@@ -2150,3 +2152,20 @@ void __init sched_init(void)
 	enter_lazy_tlb(&init_mm, current, smp_processor_id());
 }
 
+#ifdef CONFIG_DEBUG_KERNEL
+void __might_sleep(char *file, int line)
+{
+#if defined(in_atomic)
+	static unsigned long prev_jiffy;	/* ratelimiting */
+
+	if (in_atomic()) {
+		if (time_before(jiffies, prev_jiffy + HZ))
+			return;
+		prev_jiffy = jiffies;
+		printk("Sleeping function called from illegal"
+				" context at %s:%d\n", file, line);
+		dump_stack();
+	}
+#endif
+}
+#endif

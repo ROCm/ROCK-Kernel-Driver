@@ -632,19 +632,15 @@ static inline wait_queue_head_t *page_waitqueue(struct page *page)
 void wait_on_page_bit(struct page *page, int bit_nr)
 {
 	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
+	DEFINE_WAIT(wait);
 
-	add_wait_queue(waitqueue, &wait);
 	do {
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!test_bit(bit_nr, &page->flags))
-			break;
+		prepare_to_wait(waitqueue, &wait, TASK_UNINTERRUPTIBLE);
 		sync_page(page);
-		schedule();
+		if (test_bit(bit_nr, &page->flags))
+			schedule();
 	} while (test_bit(bit_nr, &page->flags));
-	__set_task_state(tsk, TASK_RUNNING);
-	remove_wait_queue(waitqueue, &wait);
+	finish_wait(waitqueue, &wait);
 }
 EXPORT_SYMBOL(wait_on_page_bit);
 
@@ -690,38 +686,27 @@ void end_page_writeback(struct page *page)
 EXPORT_SYMBOL(end_page_writeback);
 
 /*
- * Get a lock on the page, assuming we need to sleep
- * to get it..
+ * Get a lock on the page, assuming we need to sleep to get it.
+ *
+ * Ugly: running sync_page() in state TASK_UNINTERRUPTIBLE is scary.  If some
+ * random driver's requestfn sets TASK_RUNNING, we could busywait.  However
+ * chances are that on the second loop, the block layer's plug list is empty,
+ * so sync_page() will then return in state TASK_UNINTERRUPTIBLE.
  */
-static void __lock_page(struct page *page)
+void __lock_page(struct page *page)
 {
-	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
+	wait_queue_head_t *wqh = page_waitqueue(page);
+	DEFINE_WAIT(wait);
 
-	add_wait_queue_exclusive(waitqueue, &wait);
-	for (;;) {
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (PageLocked(page)) {
-			sync_page(page);
+	while (TestSetPageLocked(page)) {
+		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
+		sync_page(page);
+		if (PageLocked(page))
 			schedule();
-		}
-		if (!TestSetPageLocked(page))
-			break;
 	}
-	__set_task_state(tsk, TASK_RUNNING);
-	remove_wait_queue(waitqueue, &wait);
+	finish_wait(wqh, &wait);
 }
-
-/*
- * Get an exclusive lock on the page, optimistically
- * assuming it's not locked..
- */
-void lock_page(struct page *page)
-{
-	if (TestSetPageLocked(page))
-		__lock_page(page);
-}
+EXPORT_SYMBOL(__lock_page);
 
 /*
  * a rather lightweight function, finding and getting a reference to a

@@ -250,6 +250,7 @@ second_chance_to_dma:
 
 		switch(dev->device) {
 			case PCI_DEVICE_ID_AL_M5219:
+			case PCI_DEVICE_ID_AL_M5229:
 			case PCI_DEVICE_ID_AMD_VIPER_7409:
 			case PCI_DEVICE_ID_CMD_643:
 			case PCI_DEVICE_ID_SERVERWORKS_CSB5IDE:

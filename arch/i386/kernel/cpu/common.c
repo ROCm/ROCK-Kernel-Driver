@@ -1,6 +1,7 @@
 #include <linux/init.h>
 #include <linux/string.h>
 #include <linux/delay.h>
+#include <linux/cpu.h>
 #include <linux/smp.h>
 #include <asm/semaphore.h>
 #include <asm/processor.h>
@@ -506,3 +507,37 @@ void __init cpu_init (void)
 	current->used_math = 0;
 	stts();
 }
+
+/*
+ * Bulk registration of the cpu devices with the system.
+ * Some of this stuff could possibly be moved into a shared 
+ * location..
+ * Also, these devices should be integrated with other CPU data..
+ */
+
+static struct cpu cpu_devices[NR_CPUS];
+
+static struct device_driver cpu_driver = {
+	.name		= "cpu",
+	.bus		= &system_bus_type,
+	.devclass	= &cpu_devclass,
+};
+
+static int __init register_cpus(void)
+{
+	int i;
+
+	driver_register(&cpu_driver);
+
+	for (i = 0; i < NR_CPUS; i++) {
+		struct sys_device * sysdev = &cpu_devices[i].sysdev;
+		sysdev->name = "cpu";
+		sysdev->id = i;
+		sysdev->dev.driver = &cpu_driver;
+		if (cpu_possible(i))
+			sys_device_register(sysdev);
+	}
+	return 0;
+}
+
+subsys_initcall(register_cpus);
