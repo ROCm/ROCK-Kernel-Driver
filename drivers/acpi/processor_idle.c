@@ -55,7 +55,10 @@ ACPI_MODULE_NAME                ("acpi_processor")
 #define C3_OVERHEAD			4	/* 1us (3.579 ticks per us) */
 
 static void (*pm_idle_save)(void);
-module_param_named(max_cstate, max_cstate, uint, 0644);
+module_param(max_cstate, uint, 0644);
+
+static unsigned int nocst = 0;
+module_param(nocst, uint, 0000);
 
 /* --------------------------------------------------------------------------
                                 Power Management
@@ -506,6 +509,10 @@ static int acpi_processor_get_power_info_cst (struct acpi_processor *pr)
 
 	if (errata.smp)
 		return_VALUE(-ENODEV);
+
+	if (nocst)
+		return_VALUE(-ENODEV);
+
 	pr->power.count = 0;
 	for (i = 0; i < ACPI_PROCESSOR_MAX_POWER; i++)
 		memset(pr->power.states, 0, sizeof(struct acpi_processor_cx));
@@ -800,7 +807,7 @@ int acpi_processor_cst_has_changed (struct acpi_processor *pr)
 	if (!pr)
  		return_VALUE(-EINVAL);
 
-	if (errata.smp) {
+	if (errata.smp || nocst) {
 		return_VALUE(-ENODEV);
 	}
 
@@ -917,7 +924,7 @@ int acpi_processor_power_init(struct acpi_processor *pr, struct acpi_device *dev
 		first_run++;
 	}
 
-	if (!errata.smp && (pr->id == 0) && acpi_fadt.cst_cnt) {
+	if (!errata.smp && (pr->id == 0) && acpi_fadt.cst_cnt && !nocst) {
 		status = acpi_os_write_port(acpi_fadt.smi_cmd, acpi_fadt.cst_cnt, 8);
 		if (ACPI_FAILURE(status)) {
 			ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
