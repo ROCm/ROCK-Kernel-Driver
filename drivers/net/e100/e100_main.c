@@ -132,7 +132,6 @@ static char *test_strings[] = {
 
 static int e100_ethtool_led_blink(struct net_device *, struct ifreq *);
 
-#include <linux/mii.h>
 static int e100_mii_ioctl(struct net_device *, struct ifreq *, int);
 
 static unsigned char e100_delayed_exec_non_cu_cmd(struct e100_private *,

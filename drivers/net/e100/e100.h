@@ -58,6 +58,7 @@
 #include <asm/uaccess.h>
 #include <linux/ip.h>
 #include <linux/if_vlan.h>
+#include <linux/mii.h>
 
 #define E100_REGS_LEN 1
 /*

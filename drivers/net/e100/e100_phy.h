@@ -30,8 +30,6 @@
 
 #include "e100.h"
 
-#include <linux/mii.h>
-
 /*
  * Auto-polarity enable/disable
  * e100_autopolarity = 0 => disable auto-polarity
