@@ -1153,7 +1153,7 @@ static int __imm_attach(struct parport *pb)
 	if (!dev)
 		return -ENOMEM;
 
-	memset(dev, 0, sizeof(dev));
+	memset(dev, 0, sizeof(imm_struct));
 
 	dev->base = -1;
 	dev->mode = IMM_AUTODETECT;
