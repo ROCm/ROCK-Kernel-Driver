@@ -138,6 +138,9 @@ static int __init hydra_init(unsigned long board)
     ei_status.reg_offset = hydra_offsets;
     dev->open = &hydra_open;
     dev->stop = &hydra_close;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+    dev->poll_controller = ei_poll;
+#endif
 #ifdef MODULE
     ei_status.priv = (unsigned long)root_hydra_dev;
     root_hydra_dev = dev;

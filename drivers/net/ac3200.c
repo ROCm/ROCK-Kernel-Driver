@@ -276,6 +276,9 @@ static int __init ac_probe1(int ioaddr, struct net_device *dev)
 
 	dev->open = &ac_open;
 	dev->stop = &ac_close_card;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = ei_poll;
+#endif
 	NS8390_init(dev, 0);
 	return 0;
 out1:

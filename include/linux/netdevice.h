@@ -456,6 +456,12 @@ struct net_device
 						     unsigned char *haddr);
 	int			(*neigh_setup)(struct net_device *dev, struct neigh_parms *);
 	int			(*accept_fastpath)(struct net_device *, struct dst_entry*);
+#ifdef CONFIG_NETPOLL_RX
+	int			netpoll_rx;
+#endif
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	void                    (*poll_controller)(struct net_device *dev);
+#endif
 
 	/* bridge stuff */
 	struct net_bridge_port	*br_port;
@@ -545,6 +551,9 @@ extern int		dev_new_index(void);
 extern struct net_device	*dev_get_by_index(int ifindex);
 extern struct net_device	*__dev_get_by_index(int ifindex);
 extern int		dev_restart(struct net_device *dev);
+#ifdef CONFIG_NETPOLL_TRAP
+extern int		netpoll_trap(void);
+#endif
 
 typedef int gifconf_func_t(struct net_device * dev, char * bufptr, int len);
 extern int		register_gifconf(unsigned int family, gifconf_func_t * gifconf);
@@ -603,12 +612,20 @@ static inline void netif_start_queue(struct net_device *dev)
 
 static inline void netif_wake_queue(struct net_device *dev)
 {
+#ifdef CONFIG_NETPOLL_TRAP
+	if (netpoll_trap())
+		return;
+#endif
 	if (test_and_clear_bit(__LINK_STATE_XOFF, &dev->state))
 		__netif_schedule(dev);
 }
 
 static inline void netif_stop_queue(struct net_device *dev)
 {
+#ifdef CONFIG_NETPOLL_TRAP
+	if (netpoll_trap())
+		return;
+#endif
 	set_bit(__LINK_STATE_XOFF, &dev->state);
 }
 

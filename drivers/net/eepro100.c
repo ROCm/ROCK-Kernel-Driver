@@ -654,6 +654,23 @@ err_out_none:
 	return -ENODEV;
 }
 
+#ifdef CONFIG_NET_POLL_CONTROLLER
+/*
+ * Polling 'interrupt' - used by things like netconsole to send skbs
+ * without having to re-enable interrupts. It's not called while
+ * the interrupt routine is executing.
+ */
+
+static void poll_speedo (struct net_device *dev)
+{
+	/* disable_irq is not very nice, but with the funny lockless design
+	   we have no other choice. */
+	disable_irq(dev->irq);
+	speedo_interrupt (dev->irq, dev, NULL);
+	enable_irq(dev->irq);
+}
+#endif
+
 static int __devinit speedo_found1(struct pci_dev *pdev,
 		long ioaddr, int card_idx, int acpi_idle_state)
 {
@@ -885,6 +902,9 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	dev->get_stats = &speedo_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
 	dev->do_ioctl = &speedo_ioctl;
+#ifdef CONFIG_NET_POLL_CONTROLLER
+	dev->poll_controller = &poll_speedo;
+#endif
 
 	if (register_netdevice(dev))
 		goto err_free_unlock;

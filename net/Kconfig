@@ -658,4 +658,20 @@ source "net/irda/Kconfig"
 
 source "net/bluetooth/Kconfig"
 
+config NETPOLL
+	def_bool NETCONSOLE
+
+config NETPOLL_RX
+	bool "Netpoll support for trapping incoming packets"
+	default n
+	depends on NETPOLL
+
+config NETPOLL_TRAP
+	bool "Netpoll traffic trapping"
+	default n
+	depends on NETPOLL
+
+config NET_POLL_CONTROLLER
+	def_bool NETPOLL
+
 endmenu
