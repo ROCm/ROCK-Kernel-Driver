@@ -1562,13 +1562,13 @@ __setup( "sbni=", sbni_setup );
 static u32
 calc_crc32( u32  crc,  u8  *p,  u32  len )
 {
-	register u32  _crc __asm ( "ax" );
+	register u32  _crc;
 	_crc = crc;
 	
 	__asm __volatile (
 		"xorl	%%ebx, %%ebx\n"
-		"movl	%1, %%esi\n" 
-		"movl	%2, %%ecx\n" 
+		"movl	%2, %%esi\n" 
+		"movl	%3, %%ecx\n" 
 		"movl	$crc32tab, %%edi\n"
 		"shrl	$2, %%ecx\n"
 		"jz	1f\n"
@@ -1604,7 +1604,7 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 		"jnz	0b\n"
 
 	"1:\n"
-		"movl	%2, %%ecx\n"
+		"movl	%3, %%ecx\n"
 		"andl	$3, %%ecx\n"
 		"jz	2f\n"
 
@@ -1629,9 +1629,9 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 		"xorb	2(%%esi), %%bl\n"
 		"xorl	(%%edi,%%ebx,4), %%eax\n"
 	"2:\n"
-		:
-		: "a" (_crc), "g" (p), "g" (len)
-		: "ax", "bx", "cx", "dx", "si", "di"
+		: "=a" (_crc)
+		: "0" (_crc), "g" (p), "g" (len)
+		: "bx", "cx", "dx", "si", "di"
 	);
 
 	return  _crc;
