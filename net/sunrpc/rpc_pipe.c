@@ -50,16 +50,14 @@ __rpc_purge_upcall(struct inode *inode, int err)
 		msg->errno = err;
 		rpci->ops->destroy_msg(msg);
 	}
+	while (!list_empty(&rpci->in_upcall)) {
+		msg = list_entry(rpci->pipe.next, struct rpc_pipe_msg, list);
+		list_del_init(&msg->list);
+		msg->errno = err;
+		rpci->ops->destroy_msg(msg);
+	}
 	rpci->pipelen = 0;
 	wake_up(&rpci->waitq);
-}
-
-void
-rpc_purge_upcall(struct inode *inode, int err)
-{
-	down(&inode->i_sem);
-	__rpc_purge_upcall(inode, err);
-	up(&inode->i_sem);
 }
 
 static void
@@ -97,18 +95,29 @@ rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 	return res;
 }
 
-void
-rpc_inode_setowner(struct inode *inode, void *private)
+static void
+rpc_close_pipes(struct inode *inode)
 {
 	struct rpc_inode *rpci = RPC_I(inode);
 
 	cancel_delayed_work(&rpci->queue_timeout);
 	flush_scheduled_work();
 	down(&inode->i_sem);
-	rpci->private = private;
-	if (!private)
+	if (rpci->ops != NULL) {
+		rpci->nreaders = 0;
 		__rpc_purge_upcall(inode, -EPIPE);
+		rpci->nwriters = 0;
+		if (rpci->ops->release_pipe)
+			rpci->ops->release_pipe(inode);
+		rpci->ops = NULL;
+	}
 	up(&inode->i_sem);
+}
+
+static inline void
+rpc_inode_setowner(struct inode *inode, void *private)
+{
+	RPC_I(inode)->private = private;
 }
 
 static struct inode *
@@ -134,9 +143,11 @@ rpc_pipe_open(struct inode *inode, struct file *filp)
 	int res = -ENXIO;
 
 	down(&inode->i_sem);
-	if (rpci->private != NULL) {
+	if (rpci->ops != NULL) {
 		if (filp->f_mode & FMODE_READ)
 			rpci->nreaders ++;
+		if (filp->f_mode & FMODE_WRITE)
+			rpci->nwriters ++;
 		res = 0;
 	}
 	up(&inode->i_sem);
@@ -149,16 +160,24 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 	struct rpc_inode *rpci = RPC_I(filp->f_dentry->d_inode);
 	struct rpc_pipe_msg *msg;
 
+	down(&inode->i_sem);
+	if (rpci->ops == NULL)
+		goto out;
 	msg = (struct rpc_pipe_msg *)filp->private_data;
 	if (msg != NULL) {
 		msg->errno = -EPIPE;
+		list_del_init(&msg->list);
 		rpci->ops->destroy_msg(msg);
 	}
-	down(&inode->i_sem);
+	if (filp->f_mode & FMODE_WRITE)
+		rpci->nwriters --;
 	if (filp->f_mode & FMODE_READ)
 		rpci->nreaders --;
 	if (!rpci->nreaders)
 		__rpc_purge_upcall(inode, -EPIPE);
+	if (rpci->ops->release_pipe)
+		rpci->ops->release_pipe(inode);
+out:
 	up(&inode->i_sem);
 	return 0;
 }
@@ -172,7 +191,7 @@ rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 	int res = 0;
 
 	down(&inode->i_sem);
-	if (!rpci->private) {
+	if (rpci->ops == NULL) {
 		res = -EPIPE;
 		goto out_unlock;
 	}
@@ -182,7 +201,7 @@ rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 			msg = list_entry(rpci->pipe.next,
 					struct rpc_pipe_msg,
 					list);
-			list_del_init(&msg->list);
+			list_move(&msg->list, &rpci->in_upcall);
 			rpci->pipelen -= msg->len;
 			filp->private_data = msg;
 			msg->copied = 0;
@@ -194,6 +213,7 @@ rpc_pipe_read(struct file *filp, char __user *buf, size_t len, loff_t *offset)
 	res = rpci->ops->upcall(filp, msg, buf, len);
 	if (res < 0 || msg->len == msg->copied) {
 		filp->private_data = NULL;
+		list_del_init(&msg->list);
 		rpci->ops->destroy_msg(msg);
 	}
 out_unlock:
@@ -210,7 +230,7 @@ rpc_pipe_write(struct file *filp, const char __user *buf, size_t len, loff_t *of
 
 	down(&inode->i_sem);
 	res = -EPIPE;
-	if (rpci->private != NULL)
+	if (rpci->ops != NULL)
 		res = rpci->ops->downcall(filp, buf, len);
 	up(&inode->i_sem);
 	return res;
@@ -226,7 +246,7 @@ rpc_pipe_poll(struct file *filp, struct poll_table_struct *wait)
 	poll_wait(filp, &rpci->waitq, wait);
 
 	mask = POLLOUT | POLLWRNORM;
-	if (rpci->private == NULL)
+	if (rpci->ops == NULL)
 		mask |= POLLERR | POLLHUP;
 	if (!list_empty(&rpci->pipe))
 		mask |= POLLIN | POLLRDNORM;
@@ -242,7 +262,7 @@ rpc_pipe_ioctl(struct inode *ino, struct file *filp,
 
 	switch (cmd) {
 	case FIONREAD:
-		if (!rpci->private)
+		if (rpci->ops == NULL)
 			return -EPIPE;
 		len = rpci->pipelen;
 		if (filp->private_data) {
@@ -484,6 +504,7 @@ repeat:
 		do {
 			dentry = dvec[--n];
 			if (dentry->d_inode) {
+				rpc_close_pipes(dentry->d_inode);
 				rpc_inode_setowner(dentry->d_inode, NULL);
 				simple_unlink(dir, dentry);
 			}
@@ -563,7 +584,10 @@ __rpc_rmdir(struct inode *dir, struct dentry *dentry)
 	int error;
 
 	shrink_dcache_parent(dentry);
-	rpc_inode_setowner(dentry->d_inode, NULL);
+	if (dentry->d_inode) {
+		rpc_close_pipes(dentry->d_inode);
+		rpc_inode_setowner(dentry->d_inode, NULL);
+	}
 	if ((error = simple_rmdir(dir, dentry)) != 0)
 		return error;
 	if (!error) {
@@ -715,6 +739,7 @@ rpc_unlink(char *path)
 	}
 	d_drop(dentry);
 	if (dentry->d_inode) {
+		rpc_close_pipes(dentry->d_inode);
 		rpc_inode_setowner(dentry->d_inode, NULL);
 		error = simple_unlink(dir, dentry);
 	}
@@ -790,6 +815,8 @@ init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
 		inode_init_once(&rpci->vfs_inode);
 		rpci->private = NULL;
 		rpci->nreaders = 0;
+		rpci->nwriters = 0;
+		INIT_LIST_HEAD(&rpci->in_upcall);
 		INIT_LIST_HEAD(&rpci->pipe);
 		rpci->pipelen = 0;
 		init_waitqueue_head(&rpci->waitq);

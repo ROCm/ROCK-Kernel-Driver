@@ -482,6 +482,33 @@ err:
 	return err;
 }
 
+static void
+gss_pipe_release(struct inode *inode)
+{
+	struct rpc_inode *rpci = RPC_I(inode);
+	struct rpc_clnt *clnt;
+	struct rpc_auth *auth;
+	struct gss_auth *gss_auth;
+
+	clnt = rpci->private;
+	auth = clnt->cl_auth;
+	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
+	spin_lock(&gss_auth->lock);
+	while (!list_empty(&gss_auth->upcalls)) {
+		struct gss_upcall_msg *gss_msg;
+
+		gss_msg = list_entry(gss_auth->upcalls.next,
+				struct gss_upcall_msg, list);
+		gss_msg->msg.errno = -EPIPE;
+		atomic_inc(&gss_msg->count);
+		__gss_unhash_msg(gss_msg);
+		spin_unlock(&gss_auth->lock);
+		gss_release_msg(gss_msg);
+		spin_lock(&gss_auth->lock);
+	}
+	spin_unlock(&gss_auth->lock);
+}
+
 void
 gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 {
@@ -774,6 +801,7 @@ static struct rpc_pipe_ops gss_upcall_ops = {
 	.upcall		= gss_pipe_upcall,
 	.downcall	= gss_pipe_downcall,
 	.destroy_msg	= gss_pipe_destroy_msg,
+	.release_pipe	= gss_pipe_release,
 };
 
 /*
