@@ -420,15 +420,15 @@ int follow_up(struct vfsmount **mnt, struct dentry **dentry)
 {
 	struct vfsmount *parent;
 	struct dentry *mountpoint;
-	spin_lock(&dcache_lock);
+	spin_lock(&vfsmount_lock);
 	parent=(*mnt)->mnt_parent;
 	if (parent == *mnt) {
-		spin_unlock(&dcache_lock);
+		spin_unlock(&vfsmount_lock);
 		return 0;
 	}
 	mntget(parent);
 	mountpoint=dget((*mnt)->mnt_mountpoint);
-	spin_unlock(&dcache_lock);
+	spin_unlock(&vfsmount_lock);
 	dput(*dentry);
 	*dentry = mountpoint;
 	mntput(*mnt);
@@ -446,9 +446,9 @@ static int follow_mount(struct vfsmount **mnt, struct dentry **dentry)
 		struct vfsmount *mounted = lookup_mnt(*mnt, *dentry);
 		if (!mounted)
 			break;
+		mntput(*mnt);
 		*mnt = mounted;
 		dput(*dentry);
-		mntput(mounted->mnt_parent);
 		*dentry = dget(mounted->mnt_root);
 		res = 1;
 	}
@@ -464,9 +464,9 @@ static inline int __follow_down(struct vfsmount **mnt, struct dentry **dentry)
 
 	mounted = lookup_mnt(*mnt, *dentry);
 	if (mounted) {
+		mntput(*mnt);
 		*mnt = mounted;
 		dput(*dentry);
-		mntput(mounted->mnt_parent);
 		*dentry = dget(mounted->mnt_root);
 		return 1;
 	}
@@ -498,14 +498,16 @@ static inline void follow_dotdot(struct vfsmount **mnt, struct dentry **dentry)
 			dput(old);
 			break;
 		}
+		spin_unlock(&dcache_lock);
+		spin_lock(&vfsmount_lock);
 		parent = (*mnt)->mnt_parent;
 		if (parent == *mnt) {
-			spin_unlock(&dcache_lock);
+			spin_unlock(&vfsmount_lock);
 			break;
 		}
 		mntget(parent);
 		*dentry = dget((*mnt)->mnt_mountpoint);
-		spin_unlock(&dcache_lock);
+		spin_unlock(&vfsmount_lock);
 		dput(old);
 		mntput(*mnt);
 		*mnt = parent;
