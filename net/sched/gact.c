@@ -79,8 +79,7 @@ static int tcf_gact_init(struct rtattr *rta, struct rtattr *est,
 	struct tcf_gact *p;
 	int ret = 0;
 
-	if (rta == NULL ||
-	    rtattr_parse(tb, TCA_GACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_GACT_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_GACT_PARMS - 1] == NULL ||

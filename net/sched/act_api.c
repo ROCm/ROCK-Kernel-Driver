@@ -279,8 +279,7 @@ struct tc_action *tcf_action_init_1(struct rtattr *rta, struct rtattr *est,
 	*err = -EINVAL;
 
 	if (name == NULL) {
-		if (rtattr_parse(tb, TCA_ACT_MAX, RTA_DATA(rta),
-		                 RTA_PAYLOAD(rta)) < 0)
+		if (rtattr_parse_nested(tb, TCA_ACT_MAX, rta) < 0)
 			goto err_out;
 		kind = tb[TCA_ACT_KIND-1];
 		if (kind == NULL)
@@ -344,8 +343,7 @@ struct tc_action *tcf_action_init(struct rtattr *rta, struct rtattr *est,
 	struct tc_action *head = NULL, *act, *act_prev = NULL;
 	int i;
 
-	if (rtattr_parse(tb, TCA_ACT_MAX_PRIO, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0) {
+	if (rtattr_parse_nested(tb, TCA_ACT_MAX_PRIO, rta) < 0) {
 		*err = -EINVAL;
 		return head;
 	}
@@ -467,7 +465,7 @@ tcf_action_get_1(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int *err)
 	int index;
 
 	*err = -EINVAL;
-	if (rtattr_parse(tb, TCA_ACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+	if (rtattr_parse_nested(tb, TCA_ACT_MAX, rta) < 0)
 		return NULL;
 
 	if (tb[TCA_ACT_INDEX - 1] == NULL ||
@@ -552,7 +550,7 @@ static int tca_action_flush(struct rtattr *rta, struct nlmsghdr *n, u32 pid)
 
 	b = (unsigned char *)skb->tail;
 
-	if (rtattr_parse(tb, TCA_ACT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+	if (rtattr_parse_nested(tb, TCA_ACT_MAX, rta) < 0)
 		goto err_out;
 
 	kind = tb[TCA_ACT_KIND-1];
@@ -599,8 +597,7 @@ tca_action_gd(struct rtattr *rta, struct nlmsghdr *n, u32 pid, int event)
 	struct rtattr *tb[TCA_ACT_MAX_PRIO+1];
 	struct tc_action *head = NULL, *act, *act_prev = NULL;
 
-	if (rtattr_parse(tb, TCA_ACT_MAX_PRIO, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0)
+	if (rtattr_parse_nested(tb, TCA_ACT_MAX_PRIO, rta) < 0)
 		return -EINVAL;
 
 	if (event == RTM_DELACTION && n->nlmsg_flags&NLM_F_ROOT) {

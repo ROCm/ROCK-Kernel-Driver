@@ -122,8 +122,7 @@ tcf_ipt_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
 	u32 hook = 0;
 	u32 index = 0;
 
-	if (rta == NULL ||
-	    rtattr_parse(tb, TCA_IPT_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_IPT_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_IPT_HOOK-1] == NULL ||

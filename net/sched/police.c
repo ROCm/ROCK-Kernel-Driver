@@ -171,8 +171,7 @@ static int tcf_act_police_locate(struct rtattr *rta, struct rtattr *est,
 	struct tcf_police *p;
 	struct qdisc_rate_table *R_tab = NULL, *P_tab = NULL;
 
-	if (rta == NULL || rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta),
-	                                RTA_PAYLOAD(rta)) < 0)
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_POLICE_MAX, rta) < 0)
 		return -EINVAL;
 
 	if (tb[TCA_POLICE_TBF-1] == NULL ||
@@ -417,8 +416,7 @@ struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est)
 	struct rtattr *tb[TCA_POLICE_MAX];
 	struct tc_police *parm;
 
-	if (rtattr_parse(tb, TCA_POLICE_MAX, RTA_DATA(rta),
-	                 RTA_PAYLOAD(rta)) < 0)
+	if (rtattr_parse_nested(tb, TCA_POLICE_MAX, rta) < 0)
 		return NULL;
 
 	if (tb[TCA_POLICE_TBF-1] == NULL ||
