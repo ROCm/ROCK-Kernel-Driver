@@ -74,8 +74,13 @@ To install ifenslave.c, do:
 Bond Configuration
 ==================
 
-In Linux kernels 2.6 and above, the module creates its own "bond?" alias, so
-any access to eg.  bond0 will load the bonding module.
+You will need to add at least the following line to /etc/modprobe.conf
+so the bonding driver will automatically load when the bond0 interface is
+configured. Refer to the modprobe.conf manual page for specific modprobe.conf
+syntax details. The Module Parameters section of this document describes each
+bonding driver parameter.
+
+	alias bond0 bonding
 
 Use standard distribution techniques to define the bond0 network interface. For
 example, on modern Red Hat distributions, create an ifcfg-bond0 file in
