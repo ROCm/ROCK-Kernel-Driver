@@ -47,6 +47,8 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/major.h>
 #include <linux/completion.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/uaccess.h>
 #include <asm/ioctls.h>
@@ -56,7 +58,7 @@
 #include <asm/iSeries/HvCallEvent.h>
 #include <asm/iSeries/HvLpConfig.h>
 
-#define VIOTAPE_VERSION		"1.1"
+#define VIOTAPE_VERSION		"1.2"
 #define VIOTAPE_MAXREQ		1
 
 #define VIOTAPE_KERN_WARN	KERN_WARNING "viotape: "
@@ -268,6 +270,34 @@ static struct op_struct	*op_struct_list;
 
 /* forward declaration to resolve interdependence */
 static int chg_state(int index, unsigned char new_state, struct file *file);
+
+/* procfs support */
+static int proc_viotape_show(struct seq_file *m, void *v)
+{
+	int i;
+
+	seq_printf(m, "viotape driver version " VIOTAPE_VERSION "\n");
+	for (i = 0; i < viotape_numdev; i++) {
+		seq_printf(m, "viotape device %d is iSeries resource %10.10s"
+				"type %4.4s, model %3.3s\n",
+				i, viotape_unitinfo[i].rsrcname,
+				viotape_unitinfo[i].type,
+				viotape_unitinfo[i].model);
+	}
+	return 0;
+}
+
+static int proc_viotape_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_viotape_show, NULL);
+}
+
+static struct file_operations proc_viotape_operations = {
+	.open		= proc_viotape_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 /* Decode the device minor number into its parts */
 void get_dev_info(struct inode *ino, struct viot_devinfo_struct *devi)
@@ -912,6 +942,7 @@ int __init viotap_init(void)
 	int ret;
 	char tapename[32];
 	int i;
+	struct proc_dir_entry *e;
 
 	op_struct_list = NULL;
 	if ((ret = add_op_structs(VIOTAPE_MAXREQ)) < 0) {
@@ -988,6 +1019,12 @@ int __init viotap_init(void)
 				viotape_unitinfo[i].model);
 	}
 
+	e = create_proc_entry("iSeries/viotape", S_IFREG|S_IRUGO, NULL);
+	if (e) {
+		e->owner = THIS_MODULE;
+		e->proc_fops = &proc_viotape_operations;
+	}
+
 	return 0;
 
 unreg_class:
@@ -1028,6 +1065,8 @@ static int chg_state(int index, unsigned char new_state, struct file *file)
 static void __exit viotap_exit(void)
 {
 	int i, ret;
+
+	remove_proc_entry("iSeries/viotape", NULL);
 
 	for (i = 0; i < viotape_numdev; ++i) {
 		devfs_remove("iseries/nvt%d", i);

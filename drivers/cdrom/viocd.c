@@ -39,6 +39,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/module.h>
 #include <linux/completion.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <asm/bug.h>
 
@@ -151,6 +153,33 @@ static request_queue_t *viocd_queue;
 static spinlock_t viocd_reqlock;
 
 #define MAX_CD_REQ	1
+
+/* procfs support */
+static int proc_viocd_show(struct seq_file *m, void *v)
+{
+	int i;
+
+	for (i = 0; i < viocd_numdev; i++) {
+		seq_printf(m, "viocd device %d is iSeries resource %10.10s"
+				"type %4.4s, model %3.3s\n",
+				i, viocd_unitinfo[i].rsrcname,
+				viocd_unitinfo[i].type,
+				viocd_unitinfo[i].model);
+	}
+	return 0;
+}
+
+static int proc_viocd_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, proc_viocd_show, NULL);
+}
+
+static struct file_operations proc_viocd_operations = {
+	.open		= proc_viocd_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static int viocd_blk_open(struct inode *inode, struct file *file)
 {
@@ -541,6 +570,7 @@ static int __init viocd_init(void)
 	struct gendisk *gendisk;
 	int deviceno;
 	int ret = 0;
+	struct proc_dir_entry *e;
 
 	if (viopath_hostLp == HvLpIndexInvalid) {
 		vio_set_hostlp();
@@ -629,6 +659,12 @@ static int __init viocd_init(void)
 		add_disk(gendisk);
 	}
 
+	e = create_proc_entry("iSeries/viocd", S_IFREG|S_IRUGO, NULL);
+	if (e) {
+		e->owner = THIS_MODULE;
+		e->proc_fops = &proc_viocd_operations;
+	}
+
 	return 0;
 
 out_undo_vio:
@@ -643,6 +679,7 @@ static void __exit viocd_exit(void)
 {
 	int deviceno;
 
+	remove_proc_entry("iSeries/viocd", NULL);
 	for (deviceno = 0; deviceno < viocd_numdev; deviceno++) {
 		struct disk_info *d = &viocd_diskinfo[deviceno];
 		if (unregister_cdrom(&d->viocd_info) != 0)
