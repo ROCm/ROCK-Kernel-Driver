@@ -903,6 +903,9 @@ static int __init alsa_card_opl3sa2_init(void)
 #ifdef MODULE
 		snd_printk(KERN_ERR "Yamaha OPL3-SA soundcard not found or device busy\n");
 #endif
+#ifdef CONFIG_PNP
+		pnp_unregister_card_driver(&opl3sa2_pnpc_driver);
+#endif
 		return -ENODEV;
 	}
 	return 0;
