@@ -107,7 +107,7 @@ typedef struct xfs_dinode
 		xfs_dir_shortform_t di_dirsf;	/* shortform directory */
 		xfs_dir2_sf_t	di_dir2sf;	/* shortform directory v2 */
 		char		di_c[1];	/* local contents */
-		xfs_dev_t	di_dev;		/* device for IFCHR/IFBLK */
+		xfs_dev_t	di_dev;		/* device for S_IFCHR/S_IFBLK */
 		uuid_t		di_muuid;	/* mount point value */
 		char		di_symlink[1];	/* local symbolic link */
 	}		di_u;
@@ -435,25 +435,6 @@ void xfs_dfork_next_set(xfs_dinode_t *dip, int w, int n);
 #define XFS_DFORK_NEXT_SET(dip,w,n)             XFS_DFORK_NEXT_SET_ARCH(dip,w,n,ARCH_NOCONVERT)
 
 #endif
-
-/*
- * File types (mode field)
- */
-#define	IFMT		S_IFMT
-#define	IFSOCK		S_IFSOCK
-#define	IFLNK		S_IFLNK
-#define	IFREG		S_IFREG
-#define	IFBLK		S_IFBLK
-#define	IFDIR		S_IFDIR
-#define	IFCHR		S_IFCHR
-#define	IFIFO		S_IFIFO
-
-#define	ISUID		S_ISUID
-#define	ISGID		S_ISGID
-#define	ISVTX		S_ISVTX
-#define	IREAD		S_IRUSR
-#define	IWRITE		S_IWUSR
-#define	IEXEC		S_IXUSR
 
 #if XFS_WANT_FUNCS || (XFS_WANT_SPACE && XFSSO_XFS_BUF_TO_DINODE)
 xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);

@@ -216,6 +216,7 @@ static void sigd_close(struct atm_vcc *vcc)
 {
 	struct hlist_node *node;
 	struct sock *s;
+	int i;
 
 	DPRINTK("sigd_close\n");
 	sigd = NULL;
@@ -224,11 +225,15 @@ static void sigd_close(struct atm_vcc *vcc)
 	skb_queue_purge(&vcc->sk->sk_receive_queue);
 
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		struct atm_vcc *vcc = atm_sk(s);
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+		struct hlist_head *head = &vcc_hash[i];
 
-		if (vcc->dev)
-			purge_vcc(vcc);
+		sk_for_each(s, node, head) {
+			struct atm_vcc *vcc = atm_sk(s);
+
+			if (vcc->dev)
+				purge_vcc(vcc);
+		}
 	}
 	read_unlock(&vcc_sklist_lock);
 }

@@ -122,7 +122,7 @@ static void idt77252_tx(struct idt77252_dev *);
  * ATM Interface.
  */
 static void idt77252_dev_close(struct atm_dev *dev);
-static int idt77252_open(struct atm_vcc *vcc, short vpi, int vci);
+static int idt77252_open(struct atm_vcc *vcc);
 static void idt77252_close(struct atm_vcc *vcc);
 static int idt77252_send(struct atm_vcc *vcc, struct sk_buff *skb);
 static int idt77252_send_oam(struct atm_vcc *vcc, void *cell,
@@ -2402,50 +2402,7 @@ idt77252_init_rx(struct idt77252_dev *card, struct vc_map *vc,
 }
 
 static int
-idt77252_find_vcc(struct atm_vcc *vcc, short *vpi, int *vci)
-{
-	struct sock *s;
-	struct atm_vcc *walk;
-
-	read_lock(&vcc_sklist_lock);
-	if (*vpi == ATM_VPI_ANY) {
-		*vpi = 0;
-		s = sk_head(&vcc_sklist);
-		while (s) {
-			walk = atm_sk(s);
-			if (walk->dev != vcc->dev)
-				continue;
-			if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
-				(*vpi)++;
-				s = sk_head(&vcc_sklist);
-				continue;
-			}
-			s = sk_next(s);
-		}
-	}
-
-	if (*vci == ATM_VCI_ANY) {
-		*vci = ATM_NOT_RSV_VCI;
-		s = sk_head(&vcc_sklist);
-		while (s) {
-			walk = atm_sk(s);
-			if (walk->dev != vcc->dev)
-				continue;
-			if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
-				(*vci)++;
-				s = sk_head(&vcc_sklist);
-				continue;
-			}
-			s = sk_next(s);
-		}
-	}
-
-	read_unlock(&vcc_sklist_lock);
-	return 0;
-}
-
-static int
-idt77252_open(struct atm_vcc *vcc, short vpi, int vci)
+idt77252_open(struct atm_vcc *vcc)
 {
 	struct atm_dev *dev = vcc->dev;
 	struct idt77252_dev *card = dev->dev_data;
@@ -2453,8 +2410,8 @@ idt77252_open(struct atm_vcc *vcc, short vpi, int vci)
 	unsigned int index;
 	unsigned int inuse;
 	int error;
-
-	idt77252_find_vcc(vcc, &vpi, &vci);
+	int vci = vcc->vci;
+	short vpi = vcc->vpi;
 
 	if (vpi == ATM_VPI_UNSPEC || vci == ATM_VCI_UNSPEC)
 		return 0;
@@ -2469,8 +2426,6 @@ idt77252_open(struct atm_vcc *vcc, short vpi, int vci)
 		return -EINVAL;
 	}
 
-	vcc->vpi = vpi;
-	vcc->vci = vci;
 	set_bit(ATM_VF_ADDR, &vcc->flags);
 
 	down(&card->mutex);

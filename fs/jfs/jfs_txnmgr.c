@@ -1,6 +1,6 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2003
- *   Portions Copyright (c) Christoph Hellwig, 2001-2002
+ *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Portions Copyright (C) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -1442,7 +1442,6 @@ int diLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		 * page is not itself logged, to prevent pageout of the map
 		 * page before the log;
 		 */
-		assert(tlck->type & tlckFREE);
 
 		/* log LOG_NOREDOINOEXT of the freed inode extent for
 		 * logredo() to start NoRedoPage filters, and to update
@@ -2655,7 +2654,7 @@ void txAbort(tid_t tid, int dirty)
 	 * mark filesystem dirty
 	 */
 	if (dirty)
-		updateSuper(tblk->sb, FM_DIRTY);
+		jfs_error(tblk->sb, "txAbort");
 
 	return;
 }
@@ -2714,7 +2713,7 @@ static void txAbortCommit(struct commit * cd)
 	/*
 	 * mark filesystem dirty
 	 */
-	updateSuper(cd->sb, FM_DIRTY);
+	jfs_error(cd->sb, "txAbortCommit");
 }
 
 

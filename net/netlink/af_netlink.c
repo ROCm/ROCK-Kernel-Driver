@@ -898,8 +898,18 @@ void netlink_ack(struct sk_buff *in_skb, struct nlmsghdr *nlh, int err)
 		size = NLMSG_SPACE(4 + NLMSG_ALIGN(nlh->nlmsg_len));
 
 	skb = alloc_skb(size, GFP_KERNEL);
-	if (!skb)
+	if (!skb) {
+		struct sock *sk;
+
+		sk = netlink_lookup(in_skb->sk->sk_protocol,
+				    NETLINK_CB(in_skb).pid);
+		if (sk) {
+			sk->sk_err = ENOBUFS;
+			sk->sk_error_report(sk);
+			sock_put(sk);
+		}
 		return;
+	}
 
 	rep = __nlmsg_put(skb, NETLINK_CB(in_skb).pid, nlh->nlmsg_seq,
 			  NLMSG_ERROR, sizeof(struct nlmsgerr));

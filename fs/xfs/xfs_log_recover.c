@@ -1529,17 +1529,35 @@ xlog_recover_reorder_trans(
 	xlog_recover_t		*trans)
 {
 	xlog_recover_item_t	*first_item, *itemq, *itemq_next;
+	xfs_buf_log_format_t	*buf_f;
+	xfs_buf_log_format_v1_t	*obuf_f;
+	ushort			flags;
 
 	first_item = itemq = trans->r_itemq;
 	trans->r_itemq = NULL;
 	do {
 		itemq_next = itemq->ri_next;
+		buf_f = (xfs_buf_log_format_t *)itemq->ri_buf[0].i_addr;
+		switch (ITEM_TYPE(itemq)) {
+		case XFS_LI_BUF:
+			flags = buf_f->blf_flags;
+			break;
+		case XFS_LI_6_1_BUF:
+		case XFS_LI_5_3_BUF:
+			obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+			flags = obuf_f->blf_flags;
+			break;
+		}
+
 		switch (ITEM_TYPE(itemq)) {
 		case XFS_LI_BUF:
 		case XFS_LI_6_1_BUF:
 		case XFS_LI_5_3_BUF:
-			xlog_recover_insert_item_frontq(&trans->r_itemq, itemq);
-			break;
+			if ((!flags & XFS_BLI_CANCEL)) {
+				xlog_recover_insert_item_frontq(&trans->r_itemq,
+								itemq);
+				break;
+			}
 		case XFS_LI_INODE:
 		case XFS_LI_6_1_INODE:
 		case XFS_LI_5_3_INODE:
@@ -1668,32 +1686,16 @@ xlog_recover_do_buffer_pass1(
  * made at that point.
  */
 STATIC int
-xlog_recover_do_buffer_pass2(
+xlog_check_buffer_cancelled(
 	xlog_t			*log,
-	xfs_buf_log_format_t	*buf_f)
+	xfs_daddr_t		blkno,
+	uint			len,
+	ushort			flags)
 {
 	xfs_buf_cancel_t	*bcp;
 	xfs_buf_cancel_t	*prevp;
 	xfs_buf_cancel_t	**bucket;
-	xfs_buf_log_format_v1_t	*obuf_f;
-	xfs_daddr_t		blkno = 0;
-	ushort			flags = 0;
-	uint			len = 0;
 
-	switch (buf_f->blf_type) {
-	case XFS_LI_BUF:
-		blkno = buf_f->blf_blkno;
-		flags = buf_f->blf_flags;
-		len = buf_f->blf_len;
-		break;
-	case XFS_LI_6_1_BUF:
-	case XFS_LI_5_3_BUF:
-		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
-		blkno = (xfs_daddr_t) obuf_f->blf_blkno;
-		flags = obuf_f->blf_flags;
-		len = (xfs_daddr_t) obuf_f->blf_len;
-		break;
-	}
 	if (log->l_buf_cancel_table == NULL) {
 		/*
 		 * There is nothing in the table built in pass one,
@@ -1753,6 +1755,34 @@ xlog_recover_do_buffer_pass2(
 	 */
 	ASSERT(!(flags & XFS_BLI_CANCEL));
 	return 0;
+}
+
+STATIC int
+xlog_recover_do_buffer_pass2(
+	xlog_t			*log,
+	xfs_buf_log_format_t	*buf_f)
+{
+	xfs_buf_log_format_v1_t	*obuf_f;
+	xfs_daddr_t		blkno = 0;
+	ushort			flags = 0;
+	uint			len = 0;
+
+	switch (buf_f->blf_type) {
+	case XFS_LI_BUF:
+		blkno = buf_f->blf_blkno;
+		flags = buf_f->blf_flags;
+		len = buf_f->blf_len;
+		break;
+	case XFS_LI_6_1_BUF:
+	case XFS_LI_5_3_BUF:
+		obuf_f = (xfs_buf_log_format_v1_t*)buf_f;
+		blkno = (xfs_daddr_t) obuf_f->blf_blkno;
+		flags = obuf_f->blf_flags;
+		len = (xfs_daddr_t) obuf_f->blf_len;
+		break;
+	}
+
+	return xlog_check_buffer_cancelled(log, blkno, len, flags);
 }
 
 /*
@@ -2009,7 +2039,7 @@ xfs_qm_dqcheck(
 	if (id != -1 && id != INT_GET(ddq->d_id, ARCH_CONVERT)) {
 		if (flags & XFS_QMOPT_DOWARN)
 			cmn_err(CE_ALERT,
-			"%s : ondisk-dquot 0x%x, ID mismatch: "
+			"%s : ondisk-dquot 0x%p, ID mismatch: "
 			"0x%x expected, found id 0x%x",
 			str, ddq, id, INT_GET(ddq->d_id, ARCH_CONVERT));
 		errs++;
@@ -2023,7 +2053,7 @@ xfs_qm_dqcheck(
 			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
+					"%s : Dquot ID 0x%x (0x%p) "
 					"BLK TIMER NOT STARTED",
 					str, (int)
 					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
@@ -2037,7 +2067,7 @@ xfs_qm_dqcheck(
 			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
-					"%s : Dquot ID 0x%x (0x%x) "
+					"%s : Dquot ID 0x%x (0x%p) "
 					"INODE TIMER NOT STARTED",
 					str, (int)
 					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
@@ -2289,6 +2319,14 @@ xlog_recover_do_inode_trans(
 		imap.im_blkno = 0;
 		xfs_imap(log->l_mp, 0, ino, &imap, 0);
 	}
+
+	/*
+	 * Inode buffers can be freed, look out for it,
+	 * and do not replay the inode.
+	 */
+	if (xlog_check_buffer_cancelled(log, imap.im_blkno, imap.im_len, 0))
+		return 0;
+
 	bp = xfs_buf_read_flags(mp->m_ddev_targp, imap.im_blkno, imap.im_len,
 								XFS_BUF_LOCK);
 	if (XFS_BUF_ISERROR(bp)) {
@@ -2345,7 +2383,7 @@ xlog_recover_do_inode_trans(
 	/* Take the opportunity to reset the flush iteration count */
 	dicp->di_flushiter = 0;
 
-	if (unlikely((dicp->di_mode & IFMT) == IFREG)) {
+	if (unlikely((dicp->di_mode & S_IFMT) == S_IFREG)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {
 			XFS_CORRUPTION_ERROR("xlog_recover_do_inode_trans(3)",
@@ -2356,7 +2394,7 @@ xlog_recover_do_inode_trans(
 				item, dip, bp, ino);
 			return XFS_ERROR(EFSCORRUPTED);
 		}
-	} else if (unlikely((dicp->di_mode & IFMT) == IFDIR)) {
+	} else if (unlikely((dicp->di_mode & S_IFMT) == S_IFDIR)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE) &&
 		    (dicp->di_format != XFS_DINODE_FMT_LOCAL)) {

@@ -17,6 +17,7 @@
  */
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -46,6 +47,8 @@
 extern unsigned long wall_jiffies;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 enum sparc_clock_type sp_clock_typ;
@@ -500,6 +503,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	int ret;
@@ -509,6 +514,8 @@ int do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return ret;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 static int sbus_do_settimeofday(struct timespec *tv)
 {

@@ -171,16 +171,20 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 {
 	int len;
 	char * ptr;
-	struct ethhdr *eth = (struct ethhdr *)skb->mac.raw;
+	struct ethhdr *eth;
 	struct bpqdev *bpq;
 
-	skb->sk = NULL;		/* Initially we don't know who it's for */
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+		return NET_RX_DROP;
+
+	if (!pskb_may_pull(skb, sizeof(struct ethhdr)))
+		goto drop;
 
 	rcu_read_lock();
 	dev = bpq_get_ax25_dev(dev);
 
 	if (dev == NULL || !netif_running(dev)) 
-		goto drop;
+		goto drop_unlock;
 
 	/*
 	 * if we want to accept frames from just one ethernet device
@@ -189,10 +193,18 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 
 	bpq = (struct bpqdev *)dev->priv;
 
-	if (!(bpq->acpt_addr[0] & 0x01) && memcmp(eth->h_source, bpq->acpt_addr, ETH_ALEN)) {
-		printk(KERN_DEBUG "bpqether: wrong dest %s\n", bpq_print_ethaddr(eth->h_source));
-		goto drop;
+	eth = (struct ethhdr *)skb->mac.raw;
+
+	if (!(bpq->acpt_addr[0] & 0x01) &&
+	    memcmp(eth->h_source, bpq->acpt_addr, ETH_ALEN)) {
+		if (net_ratelimit())
+			printk(KERN_DEBUG "bpqether: wrong dest %s\n",
+			       bpq_print_ethaddr(eth->h_source));
+		goto drop_unlock;
 	}
+
+	if (skb_cow(skb, sizeof(struct ethhdr)))
+		goto drop_unlock;
 
 	len = skb->data[0] + skb->data[1] * 256 - 5;
 
@@ -212,15 +224,18 @@ static int bpq_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_ty
 
 	netif_rx(skb);
 	dev->last_rx = jiffies;
- unlock:
+unlock:
 
 	rcu_read_unlock();
 
 	return 0;
- drop:
+drop_unlock:
 	kfree_skb(skb);
 	goto unlock;
 
+drop:
+	kfree_skb(skb);
+	return 0;
 }
 
 /*

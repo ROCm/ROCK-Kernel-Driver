@@ -263,7 +263,7 @@ struct udsl_instance_data {
 /* ATM */
 
 static void udsl_atm_dev_close (struct atm_dev *dev);
-static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci);
+static int udsl_atm_open (struct atm_vcc *vcc);
 static void udsl_atm_close (struct atm_vcc *vcc);
 static int udsl_atm_ioctl (struct atm_dev *dev, unsigned int cmd, void *arg);
 static int udsl_atm_send (struct atm_vcc *vcc, struct sk_buff *skb);
@@ -863,11 +863,13 @@ static int udsl_atm_proc_read (struct atm_dev *atm_dev, loff_t *pos, char *page)
 	return 0;
 }
 
-static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
+static int udsl_atm_open (struct atm_vcc *vcc)
 {
 	struct udsl_instance_data *instance = vcc->dev->dev_data;
 	struct udsl_vcc_data *new;
 	unsigned int max_pdu;
+	int vci = vcc->vci;
+	short vpi = vcc->vpi;
 
 	dbg ("udsl_atm_open: vpi %hd, vci %d", vpi, vci);
 
@@ -875,9 +877,6 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 		dbg ("udsl_atm_open: NULL data!");
 		return -ENODEV;
 	}
-
-	if ((vpi == ATM_VPI_ANY) || (vci == ATM_VCI_ANY))
-		return -EINVAL;
 
 	/* only support AAL5 */
 	if ((vcc->qos.aal != ATM_AAL5) || (vcc->qos.rxtp.max_sdu < 0) || (vcc->qos.rxtp.max_sdu > ATM_MAX_AAL5_PDU)) {
@@ -919,8 +918,6 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	}
 
 	vcc->dev_data = new;
-	vcc->vpi = vpi;
-	vcc->vci = vci;
 
 	tasklet_disable (&instance->receive_tasklet);
 	list_add (&new->list, &instance->vcc_list);

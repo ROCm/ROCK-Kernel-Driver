@@ -11,7 +11,7 @@
 
 
 #include <linux/list.h>
-#include <linux/mm.h>
+#include <linux/pagemap.h>
 #include <linux/wait.h>
 #include <linux/nfs_fs_sb.h>
 #include <linux/sunrpc/auth.h>
@@ -28,6 +28,7 @@ struct nfs_page {
 	struct file		*wb_file;
 	struct inode		*wb_inode;
 	struct rpc_cred		*wb_cred;
+	struct nfs4_state	*wb_state;
 	struct page		*wb_page;	/* page to read in/write out */
 	wait_queue_head_t	wb_wait;	/* wait queue */
 	unsigned long		wb_index;	/* Offset >> PAGE_CACHE_SHIFT */
@@ -41,7 +42,7 @@ struct nfs_page {
 
 #define NFS_WBACK_BUSY(req)	(test_bit(PG_BUSY,&(req)->wb_flags))
 
-extern	struct nfs_page *nfs_create_request(struct rpc_cred *, struct inode *,
+extern	struct nfs_page *nfs_create_request(struct file *, struct inode *,
 					    struct page *,
 					    unsigned int, unsigned int);
 extern	void nfs_clear_request(struct nfs_page *req);
@@ -119,6 +120,12 @@ static inline struct nfs_page *
 nfs_list_entry(struct list_head *head)
 {
 	return list_entry(head, struct nfs_page, wb_list);
+}
+
+static inline
+loff_t req_offset(struct nfs_page *req)
+{
+	return (((loff_t)req->wb_index) << PAGE_CACHE_SHIFT) + req->wb_offset;
 }
 
 #endif /* _LINUX_NFS_PAGE_H */

@@ -326,39 +326,29 @@ source "drivers/usb/Kconfig"
 
 menu "Kernel hacking"
 
-config FULLDEBUG
-	bool "Full Symbolic/Source Debugging support"
+config DEBUG_KERNEL
+	bool "Kernel debugging"
+
+config DEBUG_INFO
+	bool "Compile the kernel with debug info"
+	depends on DEBUG_KERNEL
 	help
-	  Enable debuging symbols on kernel build.
+          If you say Y here the resulting kernel image will include
+	  debugging info resulting in a larger kernel image.
+	  Say Y here only if you plan to use gdb to debug the kernel.
+	  If you don't debug the kernel, you can say N.
 
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
+	depends on DEBUG_KERNEL
 	help
 	  Enables console device to interprent special characters as
 	  commands to dump state information.
-
-config HIGHPROFILE
-	bool "Use fast second timer for profiling"
-	help
-	  Use a fast secondary clock to produce profiling information.
-
-config DUMPTOFLASH
-	bool "Panic/Dump to FLASH"
-	depends on COLDFIRE
-	help
-	  Dump any panic of trap output into a flash memory segment
-	  for later analysis.
 
 config NO_KERNEL_MSG
 	bool "Suppress Kernel BUG Messages"
 	help
 	  Do not output any debug BUG messages within the kernel.
-
-config BDM_DISABLE
-	bool "Disable BDM signals"
-	depends on (EXPERIMENTAL && COLDFIRE)
-	help
-	  Disable the CPU's BDM signals.
 
 endmenu
 

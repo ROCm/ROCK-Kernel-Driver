@@ -2643,6 +2643,7 @@ xfs_buf_item_print(xfs_buf_log_item_t *blip, int summary)
 		"stale",	/* 0x4 */
 		"logged",	/* 0x8 */
 		"ialloc",	/* 0x10 */
+		"inode_stale",  /* 0x20 */
 		0
 		};
 	static char *blf_flags[] = {
@@ -4811,6 +4812,7 @@ xfsidbg_xnode(xfs_inode_t *ip)
 		"uiosize",	/* XFS_IUIOSZ */
 		"quiesce",	/* XFS_IQUIESCE */
 		"reclaim",	/* XFS_IRECLAIM */
+		"stale",	/* XFS_ISTALE */
 		NULL
 	};
 

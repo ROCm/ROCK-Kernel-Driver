@@ -980,7 +980,7 @@ static int dscc4_loopback_check(struct dscc4_dev_priv *dpriv)
  *
  * This code doesn't need to be efficient. Keep It Simple
  */
-static void dscc4_pci_reset(struct pci_dev *pdev, u32 ioaddr)
+static void dscc4_pci_reset(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	int i;
 
@@ -1461,7 +1461,8 @@ static irqreturn_t dscc4_irq(int irq, void *token, struct pt_regs *ptregs)
 	struct dscc4_dev_priv *root = token;
 	struct dscc4_pci_priv *priv;
 	struct net_device *dev;
-	u32 ioaddr, state;
+	unsigned long ioaddr;
+	u32 state;
 	unsigned long flags;
 	int i, handled = 1;
 
@@ -1613,7 +1614,7 @@ try:
 				goto try;
 		}
 		if (state & Xpr) {
-			u32 scc_addr, ring;
+			unsigned long scc_addr, ring;
 			int i;
 
 			/*
@@ -1954,7 +1955,7 @@ static void __devexit dscc4_remove_one(struct pci_dev *pdev)
 {
 	struct dscc4_pci_priv *ppriv;
 	struct dscc4_dev_priv *root;
-	u32 ioaddr;
+	unsigned long ioaddr;
 	int i;
 
 	ppriv = pci_get_drvdata(pdev);

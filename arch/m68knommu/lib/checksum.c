@@ -32,6 +32,7 @@
    of the assembly has to go. */
 
 #include <net/checksum.h>
+#include <net/module.h>
 
 static inline unsigned short from32to16(unsigned long x)
 {
@@ -122,6 +123,8 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
 		result += 1;
 	return result;
 }
+
+EXPORT_SYMBOL(csum_partial);
 
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly

@@ -68,7 +68,12 @@ static int x25_data_indication(void *token, struct sk_buff *skb)
 	hdlc_device *hdlc = token;
 	unsigned char *ptr;
 
-	ptr = skb_push(skb, 1);
+	skb_push(skb, 1);
+
+	if (skb_cow(skb, 1))
+		return NET_RX_DROP;
+
+	ptr  = skb->data;
 	*ptr = 0;
 
 	skb->dev = hdlc_to_dev(hdlc);

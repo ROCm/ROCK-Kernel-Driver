@@ -43,15 +43,22 @@
 static void x25_heartbeat_expiry(unsigned long);
 static void x25_timer_expiry(unsigned long);
 
-void x25_start_heartbeat(struct sock *sk)
+void x25_init_timers(struct sock *sk)
 {
-	del_timer(&sk->sk_timer);
+	struct x25_opt *x25 = x25_sk(sk);
 
+	init_timer(&x25->timer);
+	x25->timer.data     = (unsigned long)sk;
+	x25->timer.function = &x25_timer_expiry;
+
+	/* initialized by sock_init_data */
 	sk->sk_timer.data     = (unsigned long)sk;
 	sk->sk_timer.function = &x25_heartbeat_expiry;
-	sk->sk_timer.expires  = jiffies + 5 * HZ;
+}
 
-	add_timer(&sk->sk_timer);
+void x25_start_heartbeat(struct sock *sk)
+{
+	mod_timer(&sk->sk_timer, jiffies + 5 * HZ);
 }
 
 void x25_stop_heartbeat(struct sock *sk)
@@ -63,52 +70,28 @@ void x25_start_t2timer(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	del_timer(&x25->timer);
-
-	x25->timer.data     = (unsigned long)sk;
-	x25->timer.function = &x25_timer_expiry;
-	x25->timer.expires  = jiffies + x25->t2;
-
-	add_timer(&x25->timer);
+	mod_timer(&x25->timer, jiffies + x25->t2);
 }
 
 void x25_start_t21timer(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	del_timer(&x25->timer);
-
-	x25->timer.data     = (unsigned long)sk;
-	x25->timer.function = &x25_timer_expiry;
-	x25->timer.expires  = jiffies + x25->t21;
-
-	add_timer(&x25->timer);
+	mod_timer(&x25->timer, jiffies + x25->t21);
 }
 
 void x25_start_t22timer(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	del_timer(&x25->timer);
-
-	x25->timer.data     = (unsigned long)sk;
-	x25->timer.function = &x25_timer_expiry;
-	x25->timer.expires  = jiffies + x25->t22;
-
-	add_timer(&x25->timer);
+	mod_timer(&x25->timer, jiffies + x25->t22);
 }
 
 void x25_start_t23timer(struct sock *sk)
 {
 	struct x25_opt *x25 = x25_sk(sk);
 
-	del_timer(&x25->timer);
-
-	x25->timer.data     = (unsigned long)sk;
-	x25->timer.function = &x25_timer_expiry;
-	x25->timer.expires  = jiffies + x25->t23;
-
-	add_timer(&x25->timer);
+	mod_timer(&x25->timer, jiffies + x25->t23);
 }
 
 void x25_stop_timer(struct sock *sk)

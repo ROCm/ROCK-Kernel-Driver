@@ -194,7 +194,7 @@ static int sa1100_target(struct cpufreq_policy *policy,
 		new_ppcr = sa11x0_freq_to_ppcr(target_freq);
 		if ((sa11x0_ppcr_to_freq(new_ppcr) > target_freq) &&
 		    (sa11x0_ppcr_to_freq(new_ppcr - 1) >= policy->min))
-			mew_ppcr--;
+			new_ppcr--;
 		break;
 	}
 

@@ -140,13 +140,11 @@ void llc_sap_close(struct llc_sap *sap)
 static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
 	.func = llc_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 static struct packet_type llc_tr_packet_type = {
 	.type = __constant_htons(ETH_P_TR_802_2),
 	.func = llc_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 static int __init llc_init(void)

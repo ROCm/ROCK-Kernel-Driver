@@ -9,6 +9,7 @@
  *	Rick Gorton	<rick.gorton@alpha-processor.com>
  */
  
+#include <linux/module.h>
 #include <linux/string.h>
 
 #include <asm/byteorder.h>
@@ -172,6 +173,8 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
 	result = (result & 0xffffffff) + (result >> 32);
 	return result;
 }
+
+EXPORT_SYMBOL(csum_partial);
 
 /*
  * this routine is used for miscellaneous IP-like checksums, mainly

@@ -113,6 +113,7 @@ nfs_idmap_new(struct nfs_server *server)
         init_MUTEX(&idmap->idmap_lock);
         init_MUTEX(&idmap->idmap_im_lock);
         init_MUTEX(&idmap->idmap_hash_lock);
+	init_waitqueue_head(&idmap->idmap_wq);
 
 	return (idmap);
 
@@ -126,7 +127,10 @@ nfs_idmap_delete(struct nfs_server *server)
 {
 	struct idmap *idmap = server->idmap;
 
+	if (!idmap)
+		return;
 	rpc_unlink(idmap->idmap_path);
+	server->idmap = NULL;
 	kfree(idmap);
 }
 
@@ -181,17 +185,17 @@ nfs_idmap_id(struct nfs_server *server, u_int8_t type, char *name,
 	msg.data = im;
 	msg.len = sizeof(*im);
 
-	init_waitqueue_head(&idmap->idmap_wq);
 	add_wait_queue(&idmap->idmap_wq, &wq);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-
 	if (rpc_queue_upcall(idmap->idmap_dentry->d_inode, &msg) < 0) {
-		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&idmap->idmap_wq, &wq);
 		goto out;
 	}
 
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	up(&idmap->idmap_im_lock);
 	schedule();
+	current->state = TASK_RUNNING;
+	remove_wait_queue(&idmap->idmap_wq, &wq);
 	down(&idmap->idmap_im_lock);
 
 	/*
@@ -252,20 +256,21 @@ nfs_idmap_name(struct nfs_server *server, u_int8_t type, uid_t id,
 	msg.data = im;
 	msg.len = sizeof(*im);
 
-	init_waitqueue_head(&idmap->idmap_wq);
 	add_wait_queue(&idmap->idmap_wq, &wq);
-	set_current_state(TASK_UNINTERRUPTIBLE);
 
 	if (rpc_queue_upcall(idmap->idmap_dentry->d_inode, &msg) < 0) {
-		set_current_state(TASK_RUNNING);
+		remove_wait_queue(&idmap->idmap_wq, &wq);
 		goto out;
 	}
 
 	/*
 	 * XXX add timeouts here
 	 */
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	up(&idmap->idmap_im_lock);
 	schedule();
+	current->state = TASK_RUNNING;
+	remove_wait_queue(&idmap->idmap_wq, &wq);
 	down(&idmap->idmap_im_lock);
 
 	if (im->im_status & IDMAP_STATUS_SUCCESS) {
@@ -298,8 +303,14 @@ idmap_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
                 mlen = buflen;
 
         left = copy_to_user(dst, data, mlen);
-
-        return (mlen - left);
+	if (left < 0) {
+		msg->errno = left;
+		return left;
+	}
+	mlen -= left;
+	msg->copied += mlen;
+	msg->errno = 0;
+        return mlen;
 }
 
 static ssize_t
@@ -342,7 +353,6 @@ idmap_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 	if (match) {
 		memcpy(im, &im_in, sizeof(*im));
 		wake_up(&idmap->idmap_wq);
-		__rpc_purge_current_upcall(filp);
 	} else if (!badmsg) {
 		hashtype = im_in.im_conv == IDMAP_CONV_IDTONAME ?
 		    IDMAP_HASH_TYPE_ID : IDMAP_HASH_TYPE_NAME;
@@ -361,6 +371,8 @@ idmap_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 	struct idmap_msg *im = msg->data;
 	struct idmap *idmap = container_of(im, struct idmap, idmap_im); 
 
+	if (msg->errno >= 0)
+		return;
 	down(&idmap->idmap_im_lock);
 	im->im_status = IDMAP_STATUS_LOOKUPFAIL;
 	wake_up(&idmap->idmap_wq);

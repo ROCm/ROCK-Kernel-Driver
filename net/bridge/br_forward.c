@@ -35,8 +35,7 @@ int br_dev_queue_push_xmit(struct sk_buff *skb)
 {
 #ifdef CONFIG_BRIDGE_NETFILTER
 	/* ip_refrag calls ip_fragment, which doesn't copy the MAC header. */
-	if (skb->nf_bridge)
-		memcpy(skb->data - 16, skb->nf_bridge->hh, 16);
+	nf_bridge_maybe_copy_header(skb);
 #endif
 	skb_push(skb, ETH_HLEN);
 

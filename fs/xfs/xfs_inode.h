@@ -179,7 +179,7 @@ typedef struct xfs_ihash {
  * Inode hashing and hash bucket locking.
  */
 #define XFS_BUCKETS(mp) (37*(mp)->m_sb.sb_agcount-1)
-#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (((uint)ino) % (mp)->m_ihsize))
+#define XFS_IHASH(mp,ino) ((mp)->m_ihash + (((uint)(ino)) % (mp)->m_ihsize))
 
 /*
  * This is the xfs inode cluster hash.  This hash is used by xfs_iflush to
@@ -362,7 +362,8 @@ void xfs_ifork_next_set(xfs_inode_t *ip, int w, int n);
 #define XFS_IUIOSZ	0x0002  /* inode i/o sizes have been explicitly set */
 #define XFS_IQUIESCE    0x0004  /* we have started quiescing for this inode */
 #define XFS_IRECLAIM    0x0008  /* we have started reclaiming this inode    */
-#define XFS_IRECLAIMABLE 0x0010 /* inode can be reclaimed */
+#define XFS_ISTALE	0x0010	/* inode has been staled */
+#define XFS_IRECLAIMABLE 0x0020 /* inode can be reclaimed */
 
 /*
  * Flags for inode locking.
@@ -437,12 +438,12 @@ xfs_inode_t *xfs_bhvtoi(struct bhv_desc *bhvp);
 #define XFS_CHASH(mp,blk) ((mp)->m_chash + (((uint)blk) % (mp)->m_chsize))
 
 /*
- * For multiple groups support: if ISGID bit is set in the parent
+ * For multiple groups support: if S_ISGID bit is set in the parent
  * directory, group of new file is set to that of the parent, and
- * new subdirectory gets ISGID bit from parent.
+ * new subdirectory gets S_ISGID bit from parent.
  */
 #define XFS_INHERIT_GID(pip, vfsp)	((pip) != NULL && \
-	(((vfsp)->vfs_flag & VFS_GRPID) || ((pip)->i_d.di_mode & ISGID)))
+	(((vfsp)->vfs_flag & VFS_GRPID) || ((pip)->i_d.di_mode & S_ISGID)))
 
 /*
  * xfs_iget.c prototypes.
@@ -487,7 +488,8 @@ int		xfs_ialloc(struct xfs_trans *, xfs_inode_t *, mode_t, nlink_t,
 			   struct xfs_buf **, boolean_t *, xfs_inode_t **);
 void		xfs_xlate_dinode_core(xfs_caddr_t, struct xfs_dinode_core *, int,
 			   xfs_arch_t);
-int		xfs_ifree(struct xfs_trans *, xfs_inode_t *);
+int		xfs_ifree(struct xfs_trans *, xfs_inode_t *,
+			   struct xfs_bmap_free *);
 int		xfs_atruncate_start(xfs_inode_t *);
 void		xfs_itruncate_start(xfs_inode_t *, uint, xfs_fsize_t);
 int		xfs_itruncate_finish(struct xfs_trans **, xfs_inode_t *,

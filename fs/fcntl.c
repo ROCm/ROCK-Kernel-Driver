@@ -273,10 +273,14 @@ int f_setown(struct file *filp, unsigned long arg, int force)
 	return 0;
 }
 
+EXPORT_SYMBOL(f_setown);
+
 void f_delown(struct file *filp)
 {
 	f_modown(filp, 0, 0, 0, 1);
 }
+
+EXPORT_SYMBOL(f_delown);
 
 static long do_fcntl(unsigned int fd, unsigned int cmd,
 		     unsigned long arg, struct file * filp)
@@ -580,6 +584,8 @@ out:
 	return result;
 }
 
+EXPORT_SYMBOL(fasync_helper);
+
 void __kill_fasync(struct fasync_struct *fa, int sig, int band)
 {
 	while (fa) {
@@ -599,12 +605,16 @@ void __kill_fasync(struct fasync_struct *fa, int sig, int band)
 	}
 }
 
+EXPORT_SYMBOL(__kill_fasync);
+
 void kill_fasync(struct fasync_struct **fp, int sig, int band)
 {
 	read_lock(&fasync_lock);
 	__kill_fasync(*fp, sig, band);
 	read_unlock(&fasync_lock);
 }
+
+EXPORT_SYMBOL(kill_fasync);
 
 static int __init fasync_init(void)
 {
@@ -616,9 +626,3 @@ static int __init fasync_init(void)
 }
 
 module_init(fasync_init)
-
-EXPORT_SYMBOL(f_setown);
-EXPORT_SYMBOL(f_delown);
-#ifdef CONFIG_NET
-EXPORT_SYMBOL(__kill_fasync);
-#endif

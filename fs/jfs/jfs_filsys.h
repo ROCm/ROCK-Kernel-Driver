@@ -1,5 +1,5 @@
 /*
- *   Copyright (c) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2003
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -31,6 +31,11 @@
  */
 /* mount time flag to disable journaling to disk */
 #define JFS_NOINTEGRITY 0x00000010
+
+/* mount time flags for error handling */
+#define JFS_ERR_REMOUNT_RO 0x00000002   /* remount read-only */
+#define JFS_ERR_CONTINUE   0x00000004   /* continue */
+#define JFS_ERR_PANIC      0x00000008   /* panic */
 
 /* platform option (conditional compilation) */
 #define JFS_AIX		0x80000000	/* AIX support */

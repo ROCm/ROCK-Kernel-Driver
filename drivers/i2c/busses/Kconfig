@@ -157,7 +157,7 @@ config I2C_PHILIPSPAR
 
 config I2C_PIIX4
 	tristate "Intel PIIX4"
-	depends on I2C && PCI && EXPERIMENTAL
+	depends on I2C && PCI && EXPERIMENTAL && !64BIT
 	help
 	  If you say yes to this option, support will be included for the Intel
 	  PIIX4 family of mainboard I2C interfaces.  Specifically, the following

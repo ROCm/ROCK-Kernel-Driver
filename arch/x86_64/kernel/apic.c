@@ -1023,8 +1023,11 @@ static __init int setup_noapictimer(char *str)
 	return 0;
 } 
 
+/* dummy parsing: see setup.c */
+
 __setup("disableapic", setup_disableapic); 
 __setup("nolapic", setup_nolapic);  /* same as disableapic, for compatibility */
+
 __setup("noapictimer", setup_noapictimer); 
 
 /* no "lapic" flag - we only use the lapic when the BIOS tells us so. */

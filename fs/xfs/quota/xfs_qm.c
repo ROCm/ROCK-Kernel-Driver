@@ -1433,7 +1433,7 @@ xfs_qm_qino_alloc(
 	}
 	memset(&zerocr, 0, sizeof(zerocr));
 
-	if ((error = xfs_dir_ialloc(&tp, mp->m_rootip, IFREG, 1, 0,
+	if ((error = xfs_dir_ialloc(&tp, mp->m_rootip, S_IFREG, 1, 0,
 				   &zerocr, 0, 1, ip, &committed))) {
 		xfs_trans_cancel(tp, XFS_TRANS_RELEASE_LOG_RES |
 				 XFS_TRANS_ABORT);

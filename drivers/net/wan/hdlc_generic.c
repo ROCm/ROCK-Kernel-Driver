@@ -279,11 +279,9 @@ EXPORT_SYMBOL(hdlc_ioctl);
 EXPORT_SYMBOL(register_hdlc_device);
 EXPORT_SYMBOL(unregister_hdlc_device);
 
-static struct packet_type hdlc_packet_type =
-{
+static struct packet_type hdlc_packet_type = {
 	.type = __constant_htons(ETH_P_HDLC),
 	.func = hdlc_rcv,
-	.data = PKT_CAN_SHARE_SKB,
 };
 
 

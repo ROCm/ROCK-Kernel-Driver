@@ -137,3 +137,5 @@ void dump_stack ()
 {
 	show_stack (0, 0);
 }
+
+EXPORT_SYMBOL(dump_stack);

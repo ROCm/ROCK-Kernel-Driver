@@ -98,7 +98,7 @@ void usb_major_cleanup(void)
 
 static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
-	int minor = (int)class_get_devdata(class_dev);
+	int minor = (int)(long)class_get_devdata(class_dev);
 	return print_dev_t(buf, MKDEV(USB_MAJOR, minor));
 }
 static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
@@ -182,7 +182,7 @@ int usb_register_dev(struct usb_interface *intf,
 		else
 			temp = name;
 		snprintf(class_dev->class_id, BUS_ID_SIZE, "%s", temp);
-		class_set_devdata(class_dev, (void *)intf->minor);
+		class_set_devdata(class_dev, (void *)(long)intf->minor);
 		class_device_register(class_dev);
 		class_device_create_file(class_dev, &class_device_attr_dev);
 		intf->class_dev = class_dev;

@@ -96,6 +96,7 @@ typedef struct xfs_buf_log_format_t {
 #define	XFS_BLI_STALE		0x04
 #define	XFS_BLI_LOGGED		0x08
 #define	XFS_BLI_INODE_ALLOC_BUF	0x10
+#define XFS_BLI_STALE_INODE	0x20
 
 
 #ifdef __KERNEL__
@@ -130,7 +131,7 @@ typedef struct xfs_buf_log_item {
  * items which have been canceled and should not be replayed.
  */
 typedef struct xfs_buf_cancel {
-	xfs_daddr_t			bc_blkno;
+	xfs_daddr_t		bc_blkno;
 	uint			bc_len;
 	int			bc_refcount;
 	struct xfs_buf_cancel	*bc_next;

@@ -631,6 +631,14 @@ xfs_inode_item_trylock(
 		}
 		/* NOTREACHED */
 	}
+
+	/* Stale items should force out the iclog */
+	if (ip->i_flags & XFS_ISTALE) {
+		xfs_ifunlock(ip);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED|XFS_IUNLOCK_NONOTIFY);
+		return XFS_ITEM_PINNED;
+	}
+
 #ifdef DEBUG
 	if (!XFS_FORCED_SHUTDOWN(ip->i_mount)) {
 		ASSERT(iip->ili_format.ilf_fields != 0);
@@ -1073,4 +1081,12 @@ xfs_iflush_abort(
 	 * Release the inode's flush lock since we're done with it.
 	 */
 	xfs_ifunlock(ip);
+}
+
+void
+xfs_istale_done(
+	xfs_buf_t		*bp,
+	xfs_inode_log_item_t	*iip)
+{
+	xfs_iflush_abort(iip->ili_inode);
 }

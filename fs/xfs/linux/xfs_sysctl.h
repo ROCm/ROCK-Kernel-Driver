@@ -47,7 +47,7 @@ typedef struct xfs_sysctl_val {
 
 typedef struct xfs_param {
 	xfs_sysctl_val_t restrict_chown;/* Root/non-root can give away files.*/
-	xfs_sysctl_val_t sgid_inherit;	/* Inherit ISGID bit if process' GID 
+	xfs_sysctl_val_t sgid_inherit;	/* Inherit S_ISGID bit if process' GID 
 					 * is not a member of the parent dir
 					 * GID */
 	xfs_sysctl_val_t symlink_mode;	/* Link creat mode affected by umask */

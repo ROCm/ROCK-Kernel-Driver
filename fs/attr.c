@@ -5,6 +5,7 @@
  *  changes by Thomas Schoebel-Theuer
  */
 
+#include <linux/module.h>
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/string.h>
@@ -59,6 +60,8 @@ error:
 	return retval;
 }
 
+EXPORT_SYMBOL(inode_change_ok);
+
 int inode_setattr(struct inode * inode, struct iattr * attr)
 {
 	unsigned int ia_valid = attr->ia_valid;
@@ -99,6 +102,8 @@ int inode_setattr(struct inode * inode, struct iattr * attr)
 out:
 	return error;
 }
+
+EXPORT_SYMBOL(inode_setattr);
 
 int setattr_mask(unsigned int ia_valid)
 {
@@ -184,3 +189,5 @@ int notify_change(struct dentry * dentry, struct iattr * attr)
 	}
 	return error;
 }
+
+EXPORT_SYMBOL(notify_change);

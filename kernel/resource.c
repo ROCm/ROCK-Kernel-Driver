@@ -8,6 +8,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -27,12 +28,16 @@ struct resource ioport_resource = {
 	.flags	= IORESOURCE_IO,
 };
 
+EXPORT_SYMBOL(ioport_resource);
+
 struct resource iomem_resource = {
 	.name	= "PCI mem",
 	.start	= 0UL,
 	.end	= ~0UL,
 	.flags	= IORESOURCE_MEM,
 };
+
+EXPORT_SYMBOL(iomem_resource);
 
 static rwlock_t resource_lock = RW_LOCK_UNLOCKED;
 
@@ -199,6 +204,8 @@ int request_resource(struct resource *root, struct resource *new)
 	return conflict ? -EBUSY : 0;
 }
 
+EXPORT_SYMBOL(request_resource);
+
 int release_resource(struct resource *old)
 {
 	int retval;
@@ -208,6 +215,8 @@ int release_resource(struct resource *old)
 	write_unlock(&resource_lock);
 	return retval;
 }
+
+EXPORT_SYMBOL(release_resource);
 
 /*
  * Find empty slot in the resource tree given range and alignment.
@@ -268,6 +277,69 @@ int allocate_resource(struct resource *root, struct resource *new,
 	return err;
 }
 
+EXPORT_SYMBOL(allocate_resource);
+
+/**
+ * insert_resource - Inserts a resource in the resource tree
+ * @parent: parent of the new resource
+ * @new: new resource to insert
+ *
+ * Returns 0 on success, -EBUSY if the resource can't be inserted.
+ *
+ * This function is equivalent of request_resource when no
+ * conflict happens. If a conflict happens, and the conflicting
+ * resources entirely fit within the range of the new resource,
+ * then the new resource is inserted and the conflicting resources
+ * become childs of the new resource. 
+ */
+int insert_resource(struct resource *parent, struct resource *new)
+{
+	int result = 0;
+	struct resource *first, *next;
+
+	write_lock(&resource_lock);
+	first = __request_resource(parent, new);
+	if (!first)
+		goto out;
+
+	result = -EBUSY;
+	if (first == parent)
+		goto out;
+
+	for (next = first; next->sibling; next = next->sibling)
+		if (next->sibling->start > new->end)
+			break;
+
+	/* existing resource overlaps end of new resource */
+	if (next->end > new->end)
+		goto out;
+
+	result = 0;
+
+	new->parent = parent;
+	new->sibling = next->sibling;
+	new->child = first;
+
+	next->sibling = NULL;
+	for (next = first; next; next = next->sibling)
+		next->parent = new;
+
+	if (parent->child == first) {
+		parent->child = new;
+	} else {
+		next = parent->child;
+		while (next->sibling != first)
+			next = next->sibling;
+		next->sibling = new;
+	}
+
+ out:
+	write_unlock(&resource_lock);
+	return result;
+}
+
+EXPORT_SYMBOL(insert_resource);
+
 /*
  * This is compatibility stuff for IO resources.
  *
@@ -315,6 +387,8 @@ struct resource * __request_region(struct resource *parent, unsigned long start,
 	return res;
 }
 
+EXPORT_SYMBOL(__request_region);
+
 int __deprecated __check_region(struct resource *parent, unsigned long start, unsigned long n)
 {
 	struct resource * res;
@@ -327,6 +401,8 @@ int __deprecated __check_region(struct resource *parent, unsigned long start, un
 	kfree(res);
 	return 0;
 }
+
+EXPORT_SYMBOL(__check_region);
 
 void __release_region(struct resource *parent, unsigned long start, unsigned long n)
 {
@@ -356,6 +432,8 @@ void __release_region(struct resource *parent, unsigned long start, unsigned lon
 	}
 	printk(KERN_WARNING "Trying to free nonexistent resource <%08lx-%08lx>\n", start, end);
 }
+
+EXPORT_SYMBOL(__release_region);
 
 /*
  * Called from init/main.c to reserve IO ports.

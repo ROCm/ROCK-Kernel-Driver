@@ -188,7 +188,9 @@ static inline int tcp_bind_conflict(struct sock *sk, struct tcp_bind_bucket *tb)
 	sk_for_each_bound(sk2, node, &tb->owners) {
 		if (sk != sk2 &&
 		    !ipv6_only_sock(sk2) &&
-		    sk->sk_bound_dev_if == sk2->sk_bound_dev_if) {
+		    (!sk->sk_bound_dev_if ||
+		     !sk2->sk_bound_dev_if ||
+		     sk->sk_bound_dev_if == sk2->sk_bound_dev_if)) {
 			if (!reuse || !sk2->sk_reuse ||
 			    sk2->sk_state == TCP_LISTEN) {
 				struct inet_opt *inet2 = inet_sk(sk2);

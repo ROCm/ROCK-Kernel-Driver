@@ -27,6 +27,7 @@
  */
 #include <linux/config.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
 #include <linux/param.h>
@@ -51,6 +52,8 @@
 #include "irq_impl.h"
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 extern unsigned long wall_jiffies;	/* kernel/timer.c */
 
@@ -457,6 +460,8 @@ do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int
 do_settimeofday(struct timespec *tv)
 {
@@ -500,6 +505,8 @@ do_settimeofday(struct timespec *tv)
 	write_sequnlock_irq(&xtime_lock);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 
 /*

@@ -20,18 +20,15 @@ Machine check
 
 APICs
 
-   nolocalapic   Don't use a local or IO-APIC. This should only
-   		 be needed if you have a buggy BIOS. The newer
-		 kernels already turn it off by default if the
-		 BIOS didn't enable the local APIC, so it will
-		 be hopefully not needed.
-		 Note this code path is not very well tested, you are on
-		 your own.
-
    apic		 Use IO-APIC. Default
+		 Unless you have an NVidia or VIA/Uniprocessor board.
+		Then it defaults to off.
 
    noapic	 Don't use the IO-APIC.
-		 Also only lightly tested.
+
+   disableapic	 Don't use the local APIC
+
+   nolapic	 Don't use the local APIC (alias for i386 compatibility)
 
    pirq=...	 See Documentation/i386/IO-APIC.txt
 
@@ -60,13 +57,16 @@ Timing
   Report when timer interrupts are lost because some code turned off
   interrupts for too long.
 
-  nmi_watchdog=NUMBER
+  nmi_watchdog=NUMBER[,panic]
   NUMBER can be:
   0 don't use an NMI watchdog
   1 use the IO-APIC timer for the NMI watchdog
   2 use the local APIC for the NMI watchdog using a performance counter. Note
   This will use one performance counter and the local APIC's performance
   vector.
+  When panic is specified panic when an NMI watchdog timeout occurs.
+  This is useful when you use a panic=... timeout and need the box
+  quickly up again.
 
 Idle loop
 
@@ -127,6 +127,9 @@ NUMA
 ACPI
 
   acpi=off	Don't enable ACPI
+  acpi=ht	Use ACPI boot table parsing, but don't enable ACPI
+		interpreter
+  acpi=force	Force ACPI on (currently not needed)
 
 PCI
 

@@ -35,6 +35,9 @@
 extern int overflowuid;
 extern int overflowgid;
 
+extern void __bad_uid(void);
+extern void __bad_gid(void);
+
 #define DEFAULT_OVERFLOWUID	65534
 #define DEFAULT_OVERFLOWGID	65534
 
@@ -50,37 +53,22 @@ extern int overflowgid;
 #define low2highuid(uid) ((uid) == (old_uid_t)-1 ? (uid_t)-1 : (uid_t)(uid))
 #define low2highgid(gid) ((gid) == (old_gid_t)-1 ? (gid_t)-1 : (gid_t)(gid))
 
-/* Avoid extra ifdefs with these macros */
-
-#define SET_UID16(var, uid)	var = high2lowuid(uid)
-#define SET_GID16(var, gid)	var = high2lowgid(gid)
-#define NEW_TO_OLD_UID(uid)	high2lowuid(uid)
-#define NEW_TO_OLD_GID(gid)	high2lowgid(gid)
-#define OLD_TO_NEW_UID(uid)	low2highuid(uid)
-#define OLD_TO_NEW_GID(gid)	low2highgid(gid)
-
-/* specific to fs/stat.c */
-#define SET_OLDSTAT_UID(stat, uid)	(stat).st_uid = high2lowuid(uid)
-#define SET_OLDSTAT_GID(stat, gid)	(stat).st_gid = high2lowgid(gid)
-#define SET_STAT_UID(stat, uid)		(stat).st_uid = high2lowuid(uid)
-#define SET_STAT_GID(stat, gid)		(stat).st_gid = high2lowgid(gid)
+#define __convert_uid(size, uid) \
+	(size >= sizeof(uid) ? (uid) : high2lowuid(uid))
+#define __convert_gid(size, gid) \
+	(size >= sizeof(gid) ? (gid) : high2lowgid(gid))
+	
 
 #else
 
-#define SET_UID16(var, uid)	do { ; } while (0)
-#define SET_GID16(var, gid)	do { ; } while (0)
-#define NEW_TO_OLD_UID(uid)	(uid)
-#define NEW_TO_OLD_GID(gid)	(gid)
-#define OLD_TO_NEW_UID(uid)	(uid)
-#define OLD_TO_NEW_GID(gid)	(gid)
+#define __convert_uid(size, uid) (uid)
+#define __convert_gid(size, gid) (gid)
 
-#define SET_OLDSTAT_UID(stat, uid)	(stat).st_uid = (uid)
-#define SET_OLDSTAT_GID(stat, gid)	(stat).st_gid = (gid)
-#define SET_STAT_UID(stat, uid)		(stat).st_uid = (uid)
-#define SET_STAT_GID(stat, gid)		(stat).st_gid = (gid)
+#endif /* !CONFIG_UID16 */
 
-#endif /* CONFIG_UID16 */
-
+/* uid/gid input should be always 32bit uid_t */
+#define SET_UID(var, uid) do { (var) = __convert_uid(sizeof(var), (uid)); } while (0)
+#define SET_GID(var, gid) do { (var) = __convert_gid(sizeof(var), (gid)); } while (0)
 
 /*
  * Everything below this line is needed on all architectures, to deal with

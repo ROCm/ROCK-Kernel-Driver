@@ -9,6 +9,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/module.h>
 #include <linux/stat.h>
 #include <linux/time.h>
 #include <linux/smp_lock.h>
@@ -106,6 +107,7 @@ void make_bad_inode(struct inode * inode)
 	inode->i_op = &bad_inode_ops;	
 	inode->i_fop = &bad_file_ops;	
 }
+EXPORT_SYMBOL(make_bad_inode);
 
 /*
  * This tests whether an inode has been flagged as bad. The test uses
@@ -124,3 +126,5 @@ int is_bad_inode(struct inode * inode)
 {
 	return (inode->i_op == &bad_inode_ops);	
 }
+
+EXPORT_SYMBOL(is_bad_inode);

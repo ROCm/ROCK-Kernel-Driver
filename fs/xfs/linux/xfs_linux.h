@@ -195,8 +195,6 @@ static inline void set_buffer_unwritten_io(struct buffer_head *bh)
 
 #define MAXPATHLEN	1024
 
-#define FINVIS		0x0100	/* don't update timestamps - XFS */
-
 #define MIN(a,b)	(min(a,b))
 #define MAX(a,b)	(max(a,b))
 #define howmany(x, y)	(((x)+((y)-1))/(y))

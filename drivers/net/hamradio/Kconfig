@@ -159,7 +159,7 @@ config BAYCOM_PAR
 
 config BAYCOM_EPP
 	tristate "BAYCOM epp driver for AX.25"
-	depends on PARPORT && AX25
+	depends on PARPORT && AX25 && !64BIT
 	---help---
 	  This is a driver for Baycom style simple amateur radio modems that
 	  connect to a parallel interface. The driver supports the EPP

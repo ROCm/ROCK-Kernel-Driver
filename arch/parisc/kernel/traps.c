@@ -129,6 +129,7 @@ void dump_stack(void)
 	show_trace(current, &stack);
 }
 
+EXPORT_SYMBOL(dump_stack);
 
 #ifndef __LP64__
 static int kstack_depth_to_print = 64 * 4;

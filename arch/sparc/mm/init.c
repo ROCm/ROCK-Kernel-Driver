@@ -8,6 +8,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -56,6 +57,9 @@ unsigned long highstart_pfn, highend_pfn;
 
 pte_t *kmap_pte;
 pgprot_t kmap_prot;
+
+EXPORT_SYMBOL(kmap_prot);
+EXPORT_SYMBOL(kmap_pte);
 
 /* These are set in {srmmu,sun4c}_paging_init() */
 unsigned long fix_kmap_begin;

@@ -87,7 +87,7 @@ static int vbi_buffer_prepare(struct file *file, struct videobuf_buffer *vb,
 		return -EINVAL;
 
 	if (STATE_NEEDS_INIT == buf->vb.state) {
-		if (0 != (rc = videobuf_iolock(btv->dev,&buf->vb)))
+		if (0 != (rc = videobuf_iolock(btv->dev, &buf->vb, NULL)))
 			goto fail;
 		if (0 != (rc = vbi_buffer_risc(btv,buf,fh->lines)))
 			goto fail;

@@ -107,8 +107,8 @@ int lapb_validate_nr(struct lapb_cb *lapb, unsigned short nr)
  *	This routine is the centralised routine for parsing the control
  *	information for the different frame formats.
  */
-void lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
-		 struct lapb_frame *frame)
+int lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
+		struct lapb_frame *frame)
 {
 	frame->type = LAPB_ILLEGAL;
 
@@ -117,6 +117,12 @@ void lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
 	       lapb->token, lapb->state,
 	       skb->data[0], skb->data[1], skb->data[2]);
 #endif
+
+	/* We always need to look at 2 bytes, sometimes we need
+	 * to look at 3 and those cases are handled below.
+	 */
+	if (!pskb_may_pull(skb, 2))
+		return -1;
 
 	if (lapb->mode & LAPB_MLP) {
 		if (lapb->mode & LAPB_DCE) {
@@ -148,6 +154,8 @@ void lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
 
 	if (lapb->mode & LAPB_EXTENDED) {
 		if (!(skb->data[0] & LAPB_S)) {
+			if (!pskb_may_pull(skb, 2))
+				return -1;
 			/*
 			 * I frame - carries NR/NS/PF
 			 */
@@ -159,6 +167,8 @@ void lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
 			frame->control[1] = skb->data[1];
 			skb_pull(skb, 2);
 		} else if ((skb->data[0] & LAPB_U) == 1) {
+			if (!pskb_may_pull(skb, 2))
+				return -1;
 			/*
 			 * S frame - take out PF/NR
 			 */
@@ -206,6 +216,8 @@ void lapb_decode(struct lapb_cb *lapb, struct sk_buff *skb,
 
 		skb_pull(skb, 1);
 	}
+
+	return 0;
 }
 
 /* 

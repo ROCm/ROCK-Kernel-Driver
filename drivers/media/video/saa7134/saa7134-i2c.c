@@ -311,6 +311,17 @@ static u32 functionality(struct i2c_adapter *adap)
 	return I2C_FUNC_SMBUS_EMUL;
 }
 
+#ifndef I2C_PEC
+static void inc_use(struct i2c_adapter *adap)
+{
+	MOD_INC_USE_COUNT;
+}
+
+static void dec_use(struct i2c_adapter *adap)
+{
+	MOD_DEC_USE_COUNT;
+}
+#endif
 
 static int attach_inform(struct i2c_client *client)
 {
@@ -330,8 +341,15 @@ static struct i2c_algorithm saa7134_algo = {
 };
 
 static struct i2c_adapter saa7134_adap_template = {
+#ifdef I2C_PEC
 	.owner         = THIS_MODULE,
+#else
+	.inc_use       = inc_use,
+	.dec_use       = dec_use,
+#endif
+#ifdef I2C_ADAP_CLASS_TV_ANALOG
 	.class         = I2C_ADAP_CLASS_TV_ANALOG,
+#endif
 	I2C_DEVNAME("saa7134"),
 	.id            = I2C_ALGO_SAA7134,
 	.algo          = &saa7134_algo,
@@ -393,12 +411,14 @@ saa7134_i2c_scan(struct saa7134_dev *dev)
 void saa7134_i2c_call_clients(struct saa7134_dev *dev,
 			      unsigned int cmd, void *arg)
 {
+	BUG_ON(NULL == dev->i2c_adap.algo_data);
 	i2c_clients_command(&dev->i2c_adap, cmd, arg);
 }
 
 int saa7134_i2c_register(struct saa7134_dev *dev)
 {
 	dev->i2c_adap = saa7134_adap_template;
+	dev->i2c_adap.dev.parent = &dev->pci->dev;
 	strcpy(dev->i2c_adap.name,dev->name);
 	dev->i2c_adap.algo_data = dev;
 	i2c_add_adapter(&dev->i2c_adap);

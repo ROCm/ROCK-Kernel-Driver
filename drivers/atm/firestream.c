@@ -854,7 +854,7 @@ static void process_incoming (struct fs_dev *dev, struct queue *q)
 
 #define DO_DIRECTION(tp) ((tp)->traffic_class != ATM_NONE)
 
-static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
+static int fs_open(struct atm_vcc *atm_vcc)
 {
 	struct fs_dev *dev;
 	struct fs_vcc *vcc;
@@ -867,6 +867,8 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 	int bfp;
 	int to;
 	unsigned short tmc0;
+	short vpi = atm_vcc->vpi;
+	int vci = atm_vcc->vci;
 
 	func_enter ();
 
@@ -874,14 +876,6 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 	fs_dprintk (FS_DEBUG_OPEN, "fs: open on dev: %p, vcc at %p\n", 
 		    dev, atm_vcc);
 
-	error = atm_find_ci(atm_vcc, &vpi, &vci);
-	if (error) {
-		fs_dprintk (FS_DEBUG_OPEN, "fs: find_ci failed.\n");
-		return error;
-	}
-
-	atm_vcc->vpi = vpi;
-	atm_vcc->vci = vci;
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR, &atm_vcc->flags);
 

@@ -1787,22 +1787,21 @@ struct irlmp_iter_state {
 #define LSAP_START_TOKEN	((void *)1)
 #define LINK_START_TOKEN	((void *)2)
 
-static void *irlmp_seq_hb_idx(struct irlmp_iter_state *iter,
-			       hashbin_t *bin, loff_t *off)
+static void *irlmp_seq_hb_idx(struct irlmp_iter_state *iter, loff_t *off)
 {
 	void *element;
 
-	spin_lock_irqsave(&bin->hb_spinlock, iter->flags);
-	for (element = hashbin_get_first(bin);
+	spin_lock_irqsave(&iter->hashbin->hb_spinlock, iter->flags);
+	for (element = hashbin_get_first(iter->hashbin);
 	     element != NULL; 
-	     element = hashbin_get_next(bin)) {
+	     element = hashbin_get_next(iter->hashbin)) {
 		if (!off || *off-- == 0) {
 			/* NB: hashbin left locked */
-			iter->hashbin = bin;
 			return element;
 		}
 	}
-	spin_unlock_irqrestore(&bin->hb_spinlock, iter->flags);
+	spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, iter->flags);
+	iter->hashbin = NULL;
 	return NULL;
 }
 
@@ -1813,18 +1812,19 @@ static void *irlmp_seq_start(struct seq_file *seq, loff_t *pos)
 	void *v;
 	loff_t off = *pos;
 
-	iter->hashbin = NULL;
 	if (off-- == 0)
 		return LSAP_START_TOKEN;
 
-	v = irlmp_seq_hb_idx(iter, irlmp->unconnected_lsaps, &off);
+	iter->hashbin = irlmp->unconnected_lsaps;
+	v = irlmp_seq_hb_idx(iter, &off);
 	if (v)
 		return v;
 
 	if (off-- == 0)
 		return LINK_START_TOKEN;
 
-	return irlmp_seq_hb_idx(iter, irlmp->links, &off);
+	iter->hashbin = irlmp->links;
+	return irlmp_seq_hb_idx(iter, &off);
 }
 
 static void *irlmp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1833,27 +1833,29 @@ static void *irlmp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 
-	if (v == LSAP_START_TOKEN) {
-		v = irlmp_seq_hb_idx(iter, irlmp->unconnected_lsaps, NULL);
+	if (v == LSAP_START_TOKEN) {		/* start of list of lsaps */
+		iter->hashbin = irlmp->unconnected_lsaps;
+		v = irlmp_seq_hb_idx(iter, NULL);
 		return v ? v : LINK_START_TOKEN;
 	}
 
-	if (v == LINK_START_TOKEN) 
-		return irlmp_seq_hb_idx(iter, irlmp->links, NULL);
-
-	ASSERT( iter->hashbin != NULL, return NULL; );
+	if (v == LINK_START_TOKEN) {		/* start of list of links */
+		iter->hashbin = irlmp->links;
+		return irlmp_seq_hb_idx(iter, NULL);
+	}
 
 	v = hashbin_get_next(iter->hashbin);
-	if (v)
-		return v;
 
-	spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, iter->flags);
+	if (v == NULL) {			/* no more in this hash bin */
+		spin_unlock_irqrestore(&iter->hashbin->hb_spinlock, 
+				       iter->flags);
 
-	if (iter->hashbin == irlmp->unconnected_lsaps) {
+		if (iter->hashbin == irlmp->unconnected_lsaps) 
+			v =  LINK_START_TOKEN;
+
 		iter->hashbin = NULL;
-		return LINK_START_TOKEN;
 	}
-	return NULL;
+	return v;
 }
 
 static void irlmp_seq_stop(struct seq_file *seq, void *v)

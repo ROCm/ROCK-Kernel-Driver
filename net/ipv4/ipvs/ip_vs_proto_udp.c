@@ -133,7 +133,7 @@ udp_snat_handler(struct sk_buff **pskb,
 
 	if (unlikely(cp->app != NULL)) {
 		/* Some checks before mangling */
-		if (pp->csum_check && !pp->slave && !pp->csum_check(*pskb, pp))
+		if (pp->csum_check && !pp->csum_check(*pskb, pp))
 			return 0;
 
 		/*
@@ -187,7 +187,7 @@ udp_dnat_handler(struct sk_buff **pskb,
 
 	if (unlikely(cp->app != NULL)) {
 		/* Some checks before mangling */
-		if (pp->csum_check && !pp->slave && !pp->csum_check(*pskb, pp))
+		if (pp->csum_check && !pp->csum_check(*pskb, pp))
 			return 0;
 
 		/*
@@ -401,11 +401,7 @@ static void udp_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_udp = {
 	.name =			"UDP",
 	.protocol =		IPPROTO_UDP,
-	.minhlen =		sizeof(struct udphdr),
-	.minhlen_icmp =		8,
 	.dont_defrag =		0,
-	.skip_nonexisting =	0,
-	.slave =		0,
 	.init =			udp_init,
 	.exit =			udp_exit,
 	.conn_schedule =	udp_conn_schedule,

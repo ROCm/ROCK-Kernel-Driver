@@ -15,3 +15,4 @@ obj-$(CONFIG_DVB_GRUNDIG_29504_401) += grundig_29504-401.o
 obj-$(CONFIG_DVB_MT312) += mt312.o
 obj-$(CONFIG_DVB_VES1820) += ves1820.o
 obj-$(CONFIG_DVB_TDA1004X) += tda1004x.o
+obj-$(CONFIG_DVB_SP887X) += sp887x.o

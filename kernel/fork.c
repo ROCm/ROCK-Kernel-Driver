@@ -53,6 +53,8 @@ DEFINE_PER_CPU(unsigned long, process_counts) = 0;
 
 rwlock_t tasklist_lock __cacheline_aligned = RW_LOCK_UNLOCKED;  /* outer */
 
+EXPORT_SYMBOL(tasklist_lock);
+
 int nr_processes(void)
 {
 	int cpu;
@@ -98,6 +100,8 @@ void add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(add_wait_queue);
+
 void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -108,6 +112,8 @@ void add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(add_wait_queue_exclusive);
+
 void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 {
 	unsigned long flags;
@@ -116,6 +122,8 @@ void remove_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
 	__remove_wait_queue(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
+
+EXPORT_SYMBOL(remove_wait_queue);
 
 void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 {
@@ -128,6 +136,8 @@ void prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int state)
 		__add_wait_queue(q, wait);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
+
+EXPORT_SYMBOL(prepare_to_wait);
 
 void
 prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
@@ -142,6 +152,8 @@ prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
+EXPORT_SYMBOL(prepare_to_wait_exclusive);
+
 void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 {
 	unsigned long flags;
@@ -154,6 +166,8 @@ void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 	}
 }
 
+EXPORT_SYMBOL(finish_wait);
+
 int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 {
 	int ret = default_wake_function(wait, mode, sync);
@@ -162,6 +176,8 @@ int autoremove_wake_function(wait_queue_t *wait, unsigned mode, int sync)
 		list_del_init(&wait->task_list);
 	return ret;
 }
+
+EXPORT_SYMBOL(autoremove_wake_function);
 
 void __init fork_init(unsigned long mempages)
 {
@@ -554,6 +570,8 @@ struct fs_struct *copy_fs_struct(struct fs_struct *old)
 {
 	return __copy_fs_struct(old);
 }
+
+EXPORT_SYMBOL_GPL(copy_fs_struct);
 
 static inline int copy_fs(unsigned long clone_flags, struct task_struct * tsk)
 {
