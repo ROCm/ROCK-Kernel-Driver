@@ -135,20 +135,6 @@ uart_update_mctrl(struct uart_port *port, unsigned int set, unsigned int clear)
 #define uart_set_mctrl(port,set)	uart_update_mctrl(port,set,0)
 #define uart_clear_mctrl(port,clear)	uart_update_mctrl(port,0,clear)
 
-static inline void uart_update_altspeed(struct uart_info *info)
-{
-	unsigned int flags = info->port->flags & UPF_SPD_MASK;
-
-	if (flags == UPF_SPD_HI)
-		info->tty->alt_speed = 57600;
-	if (flags == UPF_SPD_VHI)
-		info->tty->alt_speed = 115200;
-	if (flags == UPF_SPD_SHI)
-		info->tty->alt_speed = 230400;
-	if (flags == UPF_SPD_WARP)
-		info->tty->alt_speed = 460800;
-}
-
 /*
  * Startup the port.  This will be called once per open.  All calls
  * will be serialised by the global port semaphore.
@@ -167,10 +153,8 @@ static int uart_startup(struct uart_info *info, int init_hw)
 	 * once we have successfully opened the port.  Also set
 	 * up the tty->alt_speed kludge
 	 */
-	if (info->tty) {
+	if (info->tty)
 		set_bit(TTY_IO_ERROR, &info->tty->flags);
-		uart_update_altspeed(info);
-	}
 
 	if (port->type == PORT_UNKNOWN)
 		return 0;
@@ -276,15 +260,51 @@ static void uart_shutdown(struct uart_info *info)
 	info->flags &= ~UIF_INITIALIZED;
 }
 
+/**
+ *	uart_get_baud_rate - return baud rate for a particular port
+ *	@port: uart_port structure describing the port in question.
+ *	@tty: the tty structure corresponding to this port
+ *
+ *	Decode the termios structure into a numeric baud rate,
+ *	taking account of the magic 38400 baud rate (with spd_*
+ *	flags), and mapping the %B0 rate to 9600 baud.
+ */
+static unsigned int
+uart_get_baud_rate(struct uart_port *port, struct tty_struct *tty)
+{
+	unsigned int baud = tty_get_baud_rate(tty);
+
+	/*
+	 * The spd_hi, spd_vhi, spd_shi, spd_warp kludge...
+	 * Die! Die! Die!
+	 */
+	if (baud == 38400) {
+		unsigned int flags = port->flags & UPF_SPD_MASK;
+
+		if (flags == UPF_SPD_HI)
+			baud = 57600;
+		if (flags == UPF_SPD_VHI)
+			baud = 115200;
+		if (flags == UPF_SPD_SHI)
+			baud = 230400;
+		if (flags == UPF_SPD_WARP)
+			baud = 460800;
+	}
+
+	/*
+	 * Special case: B0 rate.
+	 */
+	if (baud == 0)
+		baud = 9600;
+
+	return baud;
+}
+
 static inline
 unsigned int uart_calculate_quot(struct uart_info *info, unsigned int baud)
 {
 	struct uart_port *port = info->port;
 	unsigned int quot;
-
-	/* Special case: B0 rate */
-	if (baud == 0)
-		baud = 9600;
 
 	/* Old HI/VHI/custom speed handling */
 	if (baud == 38400 &&
@@ -339,7 +359,7 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 		unsigned int baud;
 
 		/* Determine divisor based on baud rate */
-		baud = tty_get_baud_rate(info->tty);
+		baud = uart_get_baud_rate(port, info->tty);
 		quot = uart_calculate_quot(info, baud);
 		if (quot)
 			break;
@@ -769,10 +789,8 @@ uart_set_info(struct uart_info *info, struct serial_struct *newinfo)
 		goto exit;
 	if (info->flags & UIF_INITIALIZED) {
 		if (((old_flags ^ port->flags) & UPF_SPD_MASK) ||
-		    old_custom_divisor != state->custom_divisor) {
-			uart_update_altspeed(info);
+		    old_custom_divisor != state->custom_divisor)
 			uart_change_speed(info, NULL);
-		}
 	} else
 		retval = uart_startup(info, 1);
  exit:
@@ -1540,8 +1558,9 @@ static int uart_open(struct tty_struct *tty, struct file *filp)
 	 * Any failures from here onwards should not touch the count.
 	 */
 	tty->driver_data = info;
+	tty->low_latency = (info->port->flags & UPF_LOW_LATENCY) ? 1 : 0;
+	tty->alt_speed = 0;
 	info->tty = tty;
-	info->tty->low_latency = (info->port->flags & UPF_LOW_LATENCY) ? 1 : 0;
 
 	/*
 	 * If the port is in the middle of closing, bail out now.
