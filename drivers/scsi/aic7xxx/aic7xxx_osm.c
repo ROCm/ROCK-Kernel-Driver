@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#229 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#230 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -2598,14 +2598,11 @@ ahc_linux_dv_transition(struct ahc_softc *ahc, struct scsi_cmnd *cmd,
 			struct ahc_devinfo *devinfo,
 			struct ahc_linux_target *targ)
 {
-	cam_status cam_status;
 	u_int32_t status;
-	u_int scsi_status;
 
-	scsi_status = ahc_cmd_get_scsi_status(cmd);
-	cam_status = ahc_cmd_get_transaction_status(cmd);
-	status = aic_error_action(cmd, targ->inq_data, cam_status, scsi_status);
-
+	status = aic_error_action(cmd, targ->inq_data,
+				  ahc_cmd_get_transaction_status(cmd),
+				  ahc_cmd_get_scsi_status(cmd));
 	
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_DV) {

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#167 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#168 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2936,13 +2936,11 @@ ahd_linux_dv_transition(struct ahd_softc *ahd, struct scsi_cmnd *cmd,
 			struct ahd_devinfo *devinfo,
 			struct ahd_linux_target *targ)
 {
-	cam_status cam_status;
 	u_int32_t status;
-	u_int scsi_status;
 
-	scsi_status = ahd_cmd_get_scsi_status(cmd);
-	cam_status = ahd_cmd_get_transaction_status(cmd);
-	status = aic_error_action(cmd, targ->inq_data, cam_status, scsi_status);
+	status = aic_error_action(cmd, targ->inq_data,
+				  ahd_cmd_get_transaction_status(cmd),
+				  ahd_cmd_get_scsi_status(cmd));
 
 	
 #ifdef AHD_DEBUG
