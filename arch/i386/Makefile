@@ -75,7 +75,7 @@ mcore-$(CONFIG_X86_SUMMIT)  := mach-default
 # default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 
-HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
+head-y := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
 libs-y 					+= arch/i386/lib/
 core-y					+= arch/i386/kernel/ \
