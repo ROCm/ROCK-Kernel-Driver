@@ -68,7 +68,7 @@ extern void jfs_write_inode(struct inode *inode, int wait);
 
 extern struct dentry *jfs_get_parent(struct dentry *dentry);
 
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS /* see jfs_debug.h */
 extern void jfs_proc_init(void);
 extern void jfs_proc_clean(void);
 #endif
@@ -448,7 +448,7 @@ static int __init init_jfs_fs(void)
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until IO thread starts */
 
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS
 	jfs_proc_init();
 #endif
 
@@ -485,7 +485,7 @@ static void __exit exit_jfs_fs(void)
 	wait_for_completion(&jfsIOwait);	/* Wait until Commit thread exits */
 	wake_up(&jfs_sync_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Sync thread exits */
-#if defined(CONFIG_JFS_DEBUG) && defined(CONFIG_PROC_FS)
+#ifdef PROC_FS_JFS
 	jfs_proc_clean();
 #endif
 	unregister_filesystem(&jfs_fs_type);
