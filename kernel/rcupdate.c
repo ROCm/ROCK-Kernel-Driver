@@ -243,6 +243,12 @@ static void rcu_offline_cpu(int cpu)
 	tasklet_kill_immediate(&RCU_tasklet(cpu), cpu);
 }
 
+#else
+
+static void rcu_offline_cpu(int cpu)
+{
+}
+
 #endif
 
 void rcu_restart_cpu(int cpu)
@@ -326,11 +332,9 @@ static int __devinit rcu_cpu_notify(struct notifier_block *self,
 	case CPU_UP_PREPARE:
 		rcu_online_cpu(cpu);
 		break;
-#ifdef CONFIG_HOTPLUG_CPU
 	case CPU_DEAD:
 		rcu_offline_cpu(cpu);
 		break;
-#endif
 	default:
 		break;
 	}
