@@ -90,7 +90,7 @@ static DECLARE_MUTEX(rsrc_sem);
 typedef struct irq_info_t {
     u_int			Attributes;
     int				time_share, dyn_share;
-    struct socket_info_t	*Socket;
+    struct pcmcia_socket	*Socket;
 } irq_info_t;
 
 /* Table of IRQ assignments */
@@ -341,7 +341,7 @@ static void do_io_probe(ioaddr_t base, ioaddr_t num)
 ======================================================================*/
 
 /* Validation function for cards with a valid CIS */
-static int cis_readable(socket_info_t *s, u_long base)
+static int cis_readable(struct pcmcia_socket *s, u_long base)
 {
     cisinfo_t info1, info2;
     int ret;
@@ -364,7 +364,7 @@ static int cis_readable(socket_info_t *s, u_long base)
 }
 
 /* Validation function for simple memory cards */
-static int checksum(socket_info_t *s, u_long base)
+static int checksum(struct pcmcia_socket *s, u_long base)
 {
     int i, a, b, d;
     s->cis_mem.sys_start = base;
@@ -383,7 +383,7 @@ static int checksum(socket_info_t *s, u_long base)
     return (b == -1) ? -1 : (a>>1);
 }
 
-static int checksum_match(socket_info_t *s, u_long base)
+static int checksum_match(struct pcmcia_socket *s, u_long base)
 {
     int a = checksum(s, base), b = checksum(s, base+s->cap.map_size);
     return ((a == b) && (a >= 0));
@@ -397,7 +397,7 @@ static int checksum_match(socket_info_t *s, u_long base)
     
 ======================================================================*/
 
-static int do_mem_probe(u_long base, u_long num, socket_info_t *s)
+static int do_mem_probe(u_long base, u_long num, struct pcmcia_socket *s)
 {
     u_long i, j, bad, fail, step;
 
@@ -435,7 +435,7 @@ static int do_mem_probe(u_long base, u_long num, socket_info_t *s)
 
 #ifdef CONFIG_PCMCIA_PROBE
 
-static u_long inv_probe(resource_map_t *m, socket_info_t *s)
+static u_long inv_probe(resource_map_t *m, struct pcmcia_socket *s)
 {
     u_long ok;
     if (m == &mem_db)
@@ -451,7 +451,7 @@ static u_long inv_probe(resource_map_t *m, socket_info_t *s)
     return do_mem_probe(m->base, m->num, s);
 }
 
-void validate_mem(socket_info_t *s)
+void validate_mem(struct pcmcia_socket *s)
 {
     resource_map_t *m, *n;
     static u_char order[] = { 0xd0, 0xe0, 0xc0, 0xf0 };
@@ -497,7 +497,7 @@ void validate_mem(socket_info_t *s)
 
 #else /* CONFIG_PCMCIA_PROBE */
 
-void validate_mem(socket_info_t *s)
+void validate_mem(struct pcmcia_socket *s)
 {
     resource_map_t *m, *n;
     static int done = 0;
@@ -529,7 +529,7 @@ void validate_mem(socket_info_t *s)
 ======================================================================*/
 
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
-		   char *name, socket_info_t *s)
+		   char *name, struct pcmcia_socket *s)
 {
     ioaddr_t try;
     resource_map_t *m;
@@ -556,7 +556,7 @@ int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
 }
 
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, socket_info_t *s)
+		    int force_low, char *name, struct pcmcia_socket *s)
 {
     u_long try;
     resource_map_t *m;

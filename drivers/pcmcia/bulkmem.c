@@ -63,7 +63,7 @@ static int do_mtd_request(memory_handle_t handle, mtd_request_t *req,
 {
     int ret, tries;
     client_t *mtd;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     
     mtd = handle->mtd;
     if (mtd == NULL)
@@ -130,7 +130,7 @@ static void retry_erase(erase_busy_t *busy, u_int cause)
     eraseq_entry_t *erase = busy->erase;
     mtd_request_t req;
     client_t *mtd;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     int ret;
 
     DEBUG(2, "cs: trying erase request 0x%p...\n", busy);
@@ -265,7 +265,7 @@ static int mtd_modify_window(window_handle_t win, mtd_mod_win_t *req)
 
 static int mtd_set_vpp(client_handle_t handle, mtd_vpp_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     if (req->Vpp1 != req->Vpp2)
@@ -279,7 +279,7 @@ static int mtd_set_vpp(client_handle_t handle, mtd_vpp_req_t *req)
 
 static int mtd_rdy_mask(client_handle_t handle, mtd_rdy_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
@@ -417,7 +417,7 @@ static int match_region(client_handle_t handle, memory_handle_t list,
 
 int pcmcia_get_first_region(client_handle_t handle, region_info_t *rgn)
 {
-    socket_info_t *s = SOCKET(handle);
+    struct pcmcia_socket *s = SOCKET(handle);
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     
@@ -450,7 +450,7 @@ int pcmcia_get_next_region(client_handle_t handle, region_info_t *rgn)
 int pcmcia_register_mtd(client_handle_t handle, mtd_reg_t *reg)
 {
     memory_handle_t list;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;

@@ -92,9 +92,6 @@ struct cis_cache_entry {
 	unsigned char		cache[0];
 };
 
-/* deprecated - use struct pcmcia_socket instead */
-typedef struct pcmcia_socket socket_info_t;
-
 /* Flags in config state */
 #define CONFIG_LOCKED		0x01
 #define CONFIG_IRQ_REQ		0x02
@@ -131,19 +128,19 @@ typedef struct pcmcia_socket socket_info_t;
     ((h)->event_handler((e), (p), &(h)->event_callback_args))
 
 /* In cardbus.c */
-int cb_alloc(socket_info_t *s);
-void cb_free(socket_info_t *s);
-int read_cb_mem(socket_info_t *s, int space, u_int addr, u_int len, void *ptr);
+int cb_alloc(struct pcmcia_socket *s);
+void cb_free(struct pcmcia_socket *s);
+int read_cb_mem(struct pcmcia_socket *s, int space, u_int addr, u_int len, void *ptr);
 
 /* In cistpl.c */
-int read_cis_mem(socket_info_t *s, int attr,
+int read_cis_mem(struct pcmcia_socket *s, int attr,
 		 u_int addr, u_int len, void *ptr);
-void write_cis_mem(socket_info_t *s, int attr,
+void write_cis_mem(struct pcmcia_socket *s, int attr,
 		   u_int addr, u_int len, void *ptr);
-void release_cis_mem(socket_info_t *s);
-void destroy_cis_cache(socket_info_t *s);
-int verify_cis_cache(socket_info_t *s);
-void preload_cis_cache(socket_info_t *s);
+void release_cis_mem(struct pcmcia_socket *s);
+void destroy_cis_cache(struct pcmcia_socket *s);
+int verify_cis_cache(struct pcmcia_socket *s);
+void preload_cis_cache(struct pcmcia_socket *s);
 int get_first_tuple(client_handle_t handle, tuple_t *tuple);
 int get_next_tuple(client_handle_t handle, tuple_t *tuple);
 int get_tuple_data(client_handle_t handle, tuple_t *tuple);
@@ -167,11 +164,11 @@ int write_memory(memory_handle_t handle, mem_op_t *req, caddr_t buf);
 int copy_memory(memory_handle_t handle, copy_op_t *req);
 
 /* In rsrc_mgr */
-void validate_mem(socket_info_t *s);
+void validate_mem(struct pcmcia_socket *s);
 int find_io_region(ioaddr_t *base, ioaddr_t num, ioaddr_t align,
-		   char *name, socket_info_t *s);
+		   char *name, struct pcmcia_socket *s);
 int find_mem_region(u_long *base, u_long num, u_long align,
-		    int force_low, char *name, socket_info_t *s);
+		    int force_low, char *name, struct pcmcia_socket *s);
 int try_irq(u_int Attributes, int irq, int specific);
 void undo_irq(u_int Attributes, int irq);
 int adjust_resource_info(client_handle_t handle, adjust_t *adj);

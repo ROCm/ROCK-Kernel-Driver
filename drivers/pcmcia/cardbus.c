@@ -119,11 +119,11 @@ static u_int xlate_rom_addr(u_char * b, u_int addr)
 
     These are similar to setup_cis_mem and release_cis_mem for 16-bit
     cards.  The "result" that is used externally is the cb_cis_virt
-    pointer in the socket_info_t structure.
+    pointer in the struct pcmcia_socket structure.
     
 =====================================================================*/
 
-static void cb_release_cis_mem(socket_info_t * s)
+static void cb_release_cis_mem(struct pcmcia_socket * s)
 {
 	if (s->cb_cis_virt) {
 		DEBUG(1, "cs: cb_release_cis_mem()\n");
@@ -133,7 +133,7 @@ static void cb_release_cis_mem(socket_info_t * s)
 	}
 }
 
-static int cb_setup_cis_mem(socket_info_t * s, struct resource *res)
+static int cb_setup_cis_mem(struct pcmcia_socket * s, struct resource *res)
 {
 	unsigned int start, size;
 
@@ -162,7 +162,7 @@ static int cb_setup_cis_mem(socket_info_t * s, struct resource *res)
     
 =====================================================================*/
 
-int read_cb_mem(socket_info_t * s, int space, u_int addr, u_int len, void *ptr)
+int read_cb_mem(struct pcmcia_socket * s, int space, u_int addr, u_int len, void *ptr)
 {
 	struct pci_dev *dev;
 	struct resource *res;
@@ -237,7 +237,7 @@ static void cardbus_assign_irqs(struct pci_bus *bus, int irq)
 	}
 }
 
-int cb_alloc(socket_info_t * s)
+int cb_alloc(struct pcmcia_socket * s)
 {
 	struct pci_bus *bus = s->cap.cb_dev->subordinate;
 	struct pci_dev *dev;
@@ -266,7 +266,7 @@ int cb_alloc(socket_info_t * s)
 	return CS_SUCCESS;
 }
 
-void cb_free(socket_info_t * s)
+void cb_free(struct pcmcia_socket * s)
 {
 	struct pci_dev *bridge = s->cap.cb_dev;
 

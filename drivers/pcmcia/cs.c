@@ -237,7 +237,7 @@ static const lookup_t service_table[] = {
 
 ======================================================================*/
 
-static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned int), void * info)
+static int register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
 {
 	int error;
 
@@ -249,33 +249,33 @@ static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned 
 	return error;
 }
 
-static int get_socket_status(socket_info_t *s, int *val)
+static int get_socket_status(struct pcmcia_socket *s, int *val)
 {
 	return s->ss_entry->get_status(s, val);
 }
 
-static int set_socket(socket_info_t *s, socket_state_t *state)
+static int set_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
 	return s->ss_entry->set_socket(s, state);
 }
 
-static int set_io_map(socket_info_t *s, struct pccard_io_map *io)
+static int set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 {
 	return s->ss_entry->set_io_map(s, io);
 }
 
-static int set_mem_map(socket_info_t *s, struct pccard_mem_map *mem)
+static int set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 {
 	return s->ss_entry->set_mem_map(s, mem);
 }
 
-static int suspend_socket(socket_info_t *s)
+static int suspend_socket(struct pcmcia_socket *s)
 {
 	s->socket = dead_socket;
 	return s->ss_entry->suspend(s);
 }
 
-static int init_socket(socket_info_t *s)
+static int init_socket(struct pcmcia_socket *s)
 {
 	s->socket = dead_socket;
 	return s->ss_entry->init(s);
@@ -287,7 +287,7 @@ static int init_socket(socket_info_t *s)
 static int proc_read_clients(char *buf, char **start, off_t pos,
 			     int count, int *eof, void *data)
 {
-    socket_info_t *s = data;
+    struct pcmcia_socket *s = data;
     client_handle_t c;
     char *p = buf;
 
@@ -313,8 +313,8 @@ static int proc_read_clients(char *buf, char **start, off_t pos,
  * These functions check for the appropriate struct pcmcia_soket arrays,
  * and pass them to the low-level functions pcmcia_{suspend,resume}_socket
  */
-static int socket_resume(socket_info_t *skt);
-static int socket_suspend(socket_info_t *skt);
+static int socket_resume(struct pcmcia_socket *skt);
+static int socket_suspend(struct pcmcia_socket *skt);
 
 int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
 {
@@ -548,9 +548,9 @@ static void free_regions(memory_handle_t *list)
     }
 }
 
-static int send_event(socket_info_t *s, event_t event, int priority);
+static int send_event(struct pcmcia_socket *s, event_t event, int priority);
 
-static void shutdown_socket(socket_info_t *s)
+static void shutdown_socket(struct pcmcia_socket *s)
 {
     client_t **c;
     
@@ -605,7 +605,7 @@ static void shutdown_socket(socket_info_t *s)
     
 ======================================================================*/
 
-static int send_event(socket_info_t *s, event_t event, int priority)
+static int send_event(struct pcmcia_socket *s, event_t event, int priority)
 {
     client_t *client = s->clients;
     int ret;
@@ -626,7 +626,7 @@ static int send_event(socket_info_t *s, event_t event, int priority)
     return ret;
 } /* send_event */
 
-static void pcmcia_error(socket_info_t *skt, const char *fmt, ...)
+static void pcmcia_error(struct pcmcia_socket *skt, const char *fmt, ...)
 {
 	static char buf[128];
 	va_list ap;
@@ -642,7 +642,7 @@ static void pcmcia_error(socket_info_t *skt, const char *fmt, ...)
 
 #define cs_to_timeout(cs) (((cs) * HZ + 99) / 100)
 
-static void socket_remove_drivers(socket_info_t *skt)
+static void socket_remove_drivers(struct pcmcia_socket *skt)
 {
 	client_t *client;
 
@@ -653,7 +653,7 @@ static void socket_remove_drivers(socket_info_t *skt)
 			client->state |= CLIENT_STALE;
 }
 
-static void socket_shutdown(socket_info_t *skt)
+static void socket_shutdown(struct pcmcia_socket *skt)
 {
 	socket_remove_drivers(skt);
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -662,7 +662,7 @@ static void socket_shutdown(socket_info_t *skt)
 	shutdown_socket(skt);
 }
 
-static int socket_reset(socket_info_t *skt)
+static int socket_reset(struct pcmcia_socket *skt)
 {
 	int status, i;
 
@@ -692,7 +692,7 @@ static int socket_reset(socket_info_t *skt)
 	return CS_GENERAL_FAILURE;
 }
 
-static int socket_setup(socket_info_t *skt, int initial_delay)
+static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 {
 	int status, i;
 
@@ -756,7 +756,7 @@ static int socket_setup(socket_info_t *skt, int initial_delay)
  * Handle card insertion.  Setup the socket, reset the card,
  * and then tell the rest of PCMCIA that a card is present.
  */
-static int socket_insert(socket_info_t *skt)
+static int socket_insert(struct pcmcia_socket *skt)
 {
 	int ret;
 
@@ -776,7 +776,7 @@ static int socket_insert(socket_info_t *skt)
 	return ret;
 }
 
-static int socket_suspend(socket_info_t *skt)
+static int socket_suspend(struct pcmcia_socket *skt)
 {
 	if (skt->state & SOCKET_SUSPEND)
 		return CS_IN_USE;
@@ -793,7 +793,7 @@ static int socket_suspend(socket_info_t *skt)
  * our cached copy.  If they are different, the card has been
  * replaced, and we need to tell the drivers.
  */
-static int socket_resume(socket_info_t *skt)
+static int socket_resume(struct pcmcia_socket *skt)
 {
 	int ret;
 
@@ -825,7 +825,7 @@ static int socket_resume(socket_info_t *skt)
 
 static int pccardd(void *__skt)
 {
-	socket_info_t *skt = __skt;
+	struct pcmcia_socket *skt = __skt;
 	DECLARE_WAITQUEUE(wait, current);
 
 	daemonize("pccardd");
@@ -882,7 +882,7 @@ static int pccardd(void *__skt)
 
 static void parse_events(void *info, u_int events)
 {
-	socket_info_t *s = info;
+	struct pcmcia_socket *s = info;
 
 	spin_lock(&s->thread_lock);
 	s->thread_events |= events;
@@ -898,7 +898,7 @@ static void parse_events(void *info, u_int events)
     
 ======================================================================*/
 
-static int alloc_io_space(socket_info_t *s, u_int attr, ioaddr_t *base,
+static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 			  ioaddr_t num, u_int lines, char *name)
 {
     int i;
@@ -962,7 +962,7 @@ static int alloc_io_space(socket_info_t *s, u_int attr, ioaddr_t *base,
     return (i == MAX_IO_WIN);
 } /* alloc_io_space */
 
-static void release_io_space(socket_info_t *s, ioaddr_t base,
+static void release_io_space(struct pcmcia_socket *s, ioaddr_t base,
 			     ioaddr_t num)
 {
     int i;
@@ -990,7 +990,7 @@ static void release_io_space(socket_info_t *s, ioaddr_t base,
 int pcmcia_access_configuration_register(client_handle_t handle,
 					 conf_reg_t *reg)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     int addr;
     u_char val;
@@ -1076,7 +1076,7 @@ int pcmcia_bind_device(bind_req_t *req)
 
 int pcmcia_bind_mtd(mtd_bind_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     memory_handle_t region;
     
     s = req->Socket;
@@ -1106,7 +1106,7 @@ int pcmcia_bind_mtd(mtd_bind_t *req)
 int pcmcia_deregister_client(client_handle_t handle)
 {
     client_t **client;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     memory_handle_t region;
     u_long flags;
     int i;
@@ -1161,7 +1161,7 @@ int pcmcia_deregister_client(client_handle_t handle)
 int pcmcia_get_configuration_info(client_handle_t handle,
 				  config_info_t *config)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     
     if (CHECK_HANDLE(handle))
@@ -1256,7 +1256,7 @@ int pcmcia_get_card_services_info(servinfo_t *info)
 int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req)
 {
     socket_t s;
-    socket_info_t *socket;
+    struct pcmcia_socket *socket;
     if (req->Attributes & CLIENT_THIS_SOCKET)
 	s = req->Socket;
     else
@@ -1274,7 +1274,7 @@ int pcmcia_get_first_client(client_handle_t *handle, client_req_t *req)
 
 int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if ((handle == NULL) || CHECK_HANDLE(*handle))
 	return CS_BAD_HANDLE;
     if ((*handle)->next == NULL) {
@@ -1293,7 +1293,7 @@ int pcmcia_get_next_client(client_handle_t *handle, client_req_t *req)
 
 int pcmcia_get_window(window_handle_t *handle, int idx, win_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     window_t *win;
     int w;
 
@@ -1348,7 +1348,7 @@ int pcmcia_get_next_window(window_handle_t *win, win_req_t *req)
 
 struct pci_bus *pcmcia_lookup_bus(client_handle_t handle)
 {
-	socket_info_t *s;
+	struct pcmcia_socket *s;
 
 	if (CHECK_HANDLE(handle))
 		return NULL;
@@ -1372,7 +1372,7 @@ EXPORT_SYMBOL(pcmcia_lookup_bus);
 
 int pcmcia_get_status(client_handle_t handle, cs_status_t *status)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     int val;
     
@@ -1451,7 +1451,7 @@ int pcmcia_get_mem_page(window_handle_t win, memreq_t *req)
 
 int pcmcia_map_mem_page(window_handle_t win, memreq_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if ((win == NULL) || (win->magic != WINDOW_MAGIC))
 	return CS_BAD_HANDLE;
     if (req->Page != 0)
@@ -1472,7 +1472,7 @@ int pcmcia_map_mem_page(window_handle_t win, memreq_t *req)
 int pcmcia_modify_configuration(client_handle_t handle,
 				modconf_t *mod)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     
     if (CHECK_HANDLE(handle))
@@ -1618,7 +1618,7 @@ int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
 int pcmcia_release_configuration(client_handle_t handle)
 {
     pccard_io_map io = { 0, 0, 0, 0, 1 };
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     int i;
     
     if (CHECK_HANDLE(handle) ||
@@ -1668,7 +1668,7 @@ int pcmcia_release_configuration(client_handle_t handle)
 
 int pcmcia_release_io(client_handle_t handle, io_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     
     if (CHECK_HANDLE(handle) || !(handle->state & CLIENT_IO_REQ))
 	return CS_BAD_HANDLE;
@@ -1703,7 +1703,7 @@ int pcmcia_release_io(client_handle_t handle, io_req_t *req)
 
 int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle) || !(handle->state & CLIENT_IRQ_REQ))
 	return CS_BAD_HANDLE;
     handle->state &= ~CLIENT_IRQ_REQ;
@@ -1739,7 +1739,7 @@ int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
 
 int pcmcia_release_window(window_handle_t win)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     
     if ((win == NULL) || (win->magic != WINDOW_MAGIC))
 	return CS_BAD_HANDLE;
@@ -1769,7 +1769,7 @@ int pcmcia_request_configuration(client_handle_t handle,
 {
     int i;
     u_int base;
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     pccard_io_map iomap;
     
@@ -1898,7 +1898,7 @@ int pcmcia_request_configuration(client_handle_t handle,
 
 int pcmcia_request_io(client_handle_t handle, io_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     
     if (CHECK_HANDLE(handle))
@@ -1962,7 +1962,7 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req)
 
 int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     config_t *c;
     int ret = 0, irq = 0;
     
@@ -2037,7 +2037,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 
 int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle_t *wh)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     window_t *win;
     u_long align;
     int w;
@@ -2122,7 +2122,7 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 
 int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
 {
-	socket_info_t *skt;
+	struct pcmcia_socket *skt;
 	int ret;
     
 	if (CHECK_HANDLE(handle))
@@ -2171,7 +2171,7 @@ int pcmcia_reset_card(client_handle_t handle, client_req_t *req)
 
 int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
 {
-	socket_info_t *skt;
+	struct pcmcia_socket *skt;
 	int ret;
     
 	if (CHECK_HANDLE(handle))
@@ -2198,7 +2198,7 @@ int pcmcia_suspend_card(client_handle_t handle, client_req_t *req)
 
 int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
 {
-	socket_info_t *skt;
+	struct pcmcia_socket *skt;
 	int ret;
     
 	if (CHECK_HANDLE(handle))
@@ -2231,7 +2231,7 @@ int pcmcia_resume_card(client_handle_t handle, client_req_t *req)
 
 int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
 {
-	socket_info_t *skt;
+	struct pcmcia_socket *skt;
 	int ret;
     
 	if (CHECK_HANDLE(handle))
@@ -2260,7 +2260,7 @@ int pcmcia_eject_card(client_handle_t handle, client_req_t *req)
 
 int pcmcia_insert_card(client_handle_t handle, client_req_t *req)
 {
-	socket_info_t *skt;
+	struct pcmcia_socket *skt;
 	int ret;
 
 	if (CHECK_HANDLE(handle))

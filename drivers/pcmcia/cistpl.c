@@ -82,7 +82,7 @@ static const u_int exponent[] = {
 
 INT_MODULE_PARM(cis_width,	0);		/* 16-bit CIS? */
 
-void release_cis_mem(socket_info_t *s)
+void release_cis_mem(struct pcmcia_socket *s)
 {
     if (s->cis_mem.sys_start != 0) {
 	s->cis_mem.flags &= ~MAP_ACTIVE;
@@ -101,7 +101,7 @@ void release_cis_mem(socket_info_t *s)
  * map the memory space.
  */
 static unsigned char *
-set_cis_map(socket_info_t *s, unsigned int card_offset, unsigned int flags)
+set_cis_map(struct pcmcia_socket *s, unsigned int card_offset, unsigned int flags)
 {
     pccard_mem_map *mem = &s->cis_mem;
     if (!(s->cap.features & SS_CAP_STATIC_MAP) &&
@@ -139,7 +139,7 @@ set_cis_map(socket_info_t *s, unsigned int card_offset, unsigned int flags)
 #define IS_ATTR		1
 #define IS_INDIRECT	8
 
-int read_cis_mem(socket_info_t *s, int attr, u_int addr,
+int read_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 		 u_int len, void *ptr)
 {
     u_char *sys, *end, *buf = ptr;
@@ -202,7 +202,7 @@ int read_cis_mem(socket_info_t *s, int attr, u_int addr,
     return 0;
 }
 
-void write_cis_mem(socket_info_t *s, int attr, u_int addr,
+void write_cis_mem(struct pcmcia_socket *s, int attr, u_int addr,
 		   u_int len, void *ptr)
 {
     u_char *sys, *end, *buf = ptr;
@@ -266,7 +266,7 @@ void write_cis_mem(socket_info_t *s, int attr, u_int addr,
     
 ======================================================================*/
 
-static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
+static void read_cis_cache(struct pcmcia_socket *s, int attr, u_int addr,
 			   u_int len, void *ptr)
 {
     struct cis_cache_entry *cis;
@@ -306,7 +306,7 @@ static void read_cis_cache(socket_info_t *s, int attr, u_int addr,
 }
 
 static void
-remove_cis_cache(socket_info_t *s, int attr, u_int addr, u_int len)
+remove_cis_cache(struct pcmcia_socket *s, int attr, u_int addr, u_int len)
 {
 	struct cis_cache_entry *cis;
 
@@ -318,7 +318,7 @@ remove_cis_cache(socket_info_t *s, int attr, u_int addr, u_int len)
 		}
 }
 
-void destroy_cis_cache(socket_info_t *s)
+void destroy_cis_cache(struct pcmcia_socket *s)
 {
 	struct list_head *l, *n;
 
@@ -337,7 +337,7 @@ void destroy_cis_cache(socket_info_t *s)
     
 ======================================================================*/
 
-int verify_cis_cache(socket_info_t *s)
+int verify_cis_cache(struct pcmcia_socket *s)
 {
 	struct cis_cache_entry *cis;
 	char buf[256];
@@ -369,7 +369,7 @@ int verify_cis_cache(socket_info_t *s)
 
 int pcmcia_replace_cis(client_handle_t handle, cisdump_t *cis)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
@@ -409,7 +409,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple);
 
 int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     if (CHECK_HANDLE(handle))
 	return CS_BAD_HANDLE;
     s = SOCKET(handle);
@@ -445,7 +445,7 @@ int pcmcia_get_first_tuple(client_handle_t handle, tuple_t *tuple)
     return pcmcia_get_next_tuple(handle, tuple);
 }
 
-static int follow_link(socket_info_t *s, tuple_t *tuple)
+static int follow_link(struct pcmcia_socket *s, tuple_t *tuple)
 {
     u_char link[5];
     u_int ofs;
@@ -487,7 +487,7 @@ static int follow_link(socket_info_t *s, tuple_t *tuple)
 
 int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     u_char link[2], tmp;
     int ofs, i, attr;
     
@@ -588,7 +588,7 @@ int pcmcia_get_next_tuple(client_handle_t handle, tuple_t *tuple)
 
 int pcmcia_get_tuple_data(client_handle_t handle, tuple_t *tuple)
 {
-    socket_info_t *s;
+    struct pcmcia_socket *s;
     u_int len;
     
     if (CHECK_HANDLE(handle))

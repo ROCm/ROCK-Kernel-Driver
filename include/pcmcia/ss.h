@@ -189,10 +189,6 @@ typedef struct window_t {
 struct config_t;
 struct region_t;
 
-/* in parts of drivers/pcmcia/ this is still known as 
- * socket_info_t 
- */
-
 struct pcmcia_socket {
 	spinlock_t			lock;
 	struct pccard_operations *	ss_entry;
