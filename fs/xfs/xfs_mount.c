@@ -285,9 +285,9 @@ xfs_mount_validate_sb(
 #if !XFS_BIG_BLKNOS
 	if (unlikely(
 	    (sbp->sb_dblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> INT_MAX ||
+		> UINT_MAX ||
 	    (sbp->sb_rblocks << (__uint64_t)(sbp->sb_blocklog - BBSHIFT))
-		> INT_MAX)) {
+		> UINT_MAX)) {
 		cmn_err(CE_WARN,
 	"XFS: File system is too large to be mounted on this system.");
 		return XFS_ERROR(E2BIG);
