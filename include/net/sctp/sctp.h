@@ -475,6 +475,14 @@ for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
      err = (sctp_errhdr_t *)((void *)err + \
 	    WORD_ROUND(ntohs(err->length))))
 
+#define sctp_walk_fwdtsn(pos, chunk)\
+_sctp_walk_fwdtsn((pos), (chunk), ntohs((chunk)->chunk_hdr->length) - sizeof(struct sctp_fwdtsn_chunk))
+
+#define _sctp_walk_fwdtsn(pos, chunk, end)\
+for (pos = chunk->subh.fwdtsn_hdr->skip;\
+     (void *)pos <= (void *)chunk->subh.fwdtsn_hdr->skip + end - sizeof(struct sctp_fwdtsn_skip);\
+     pos++)
+
 /* Round an int up to the next multiple of 4.  */
 #define WORD_ROUND(s) (((s)+3)&~3)
 

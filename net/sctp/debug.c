@@ -1,8 +1,8 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001 International Business Machines Corp.
  * 
  * This file is part of the SCTP kernel reference Implementation
  * 
@@ -43,6 +43,7 @@
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Sridhar Samudrala	    <sri@us.ibm.com>
  * 
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -87,6 +88,9 @@ const char *sctp_cname(const sctp_subtype_t cid)
 
 	case SCTP_CID_ASCONF_ACK:
 		return "ASCONF_ACK";
+
+	case SCTP_CID_FWD_TSN:
+		return "FWD_TSN";
 
 	default:
 		return "unknown chunk";

@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -40,6 +40,7 @@
  *    Hui Huang		    <hui.huang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Sridhar Samudrala	    <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -50,7 +51,7 @@
 #include <net/sctp/sm.h>
 
 static const sctp_sm_table_entry_t bug = {
-	.fn = sctp_sf_bug, 
+	.fn = sctp_sf_bug,
 	.name = "sctp_sf_bug"
 };
 
@@ -73,7 +74,7 @@ const sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
 		return sctp_chunk_event_lookup(event_subtype.chunk, state);
 		break;
 	case SCTP_EVENT_T_TIMEOUT:
-		DO_LOOKUP(SCTP_EVENT_TIMEOUT_MAX, timeout, 
+		DO_LOOKUP(SCTP_EVENT_TIMEOUT_MAX, timeout,
 			  timeout_event_table);
 		break;
 
@@ -485,6 +486,34 @@ const sctp_sm_table_entry_t addip_chunk_event_table[SCTP_NUM_ADDIP_CHUNK_TYPES][
 	TYPE_SCTP_ASCONF,
 	TYPE_SCTP_ASCONF_ACK,
 }; /*state_fn_t addip_chunk_event_table[][] */
+
+#define TYPE_SCTP_FWD_TSN { \
+	/* SCTP_STATE_EMPTY */ \
+	{.fn = sctp_sf_ootb, .name = "sctp_sf_ootb"}, \
+	/* SCTP_STATE_CLOSED */ \
+	{.fn = sctp_sf_tabort_8_4_8, .name = "sctp_sf_tabort_8_4_8"}, \
+	/* SCTP_STATE_COOKIE_WAIT */ \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
+	/* SCTP_STATE_COOKIE_ECHOED */ \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
+	/* SCTP_STATE_ESTABLISHED */ \
+	{.fn = sctp_sf_eat_fwd_tsn, .name = "sctp_sf_eat_fwd_tsn"}, \
+	/* SCTP_STATE_SHUTDOWN_PENDING */ \
+	{.fn = sctp_sf_eat_fwd_tsn, .name = "sctp_sf_eat_fwd_tsn"}, \
+	/* SCTP_STATE_SHUTDOWN_SENT */ \
+	{.fn = sctp_sf_eat_fwd_tsn_fast, .name = "sctp_sf_eat_fwd_tsn_fast"}, \
+	/* SCTP_STATE_SHUTDOWN_RECEIVED */ \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
+	/* SCTP_STATE_SHUTDOWN_ACK_SENT */ \
+	{.fn = sctp_sf_discard_chunk, .name = "sctp_sf_discard_chunk"}, \
+} /* TYPE_SCTP_FWD_TSN */
+
+/* The primary index for this table is the chunk type.
+ * The secondary index for this table is the state.
+ */
+const sctp_sm_table_entry_t prsctp_chunk_event_table[SCTP_NUM_PRSCTP_CHUNK_TYPES][SCTP_STATE_NUM_STATES] = {
+	TYPE_SCTP_FWD_TSN,
+}; /*state_fn_t prsctp_chunk_event_table[][] */
 
 static const sctp_sm_table_entry_t
 chunk_event_table_unknown[SCTP_STATE_NUM_STATES] = {
@@ -923,6 +952,11 @@ const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t cid,
 
 	if (cid >= 0 && cid <= SCTP_CID_BASE_MAX)
 		return &chunk_event_table[cid][state];
+
+	if (sctp_prsctp_enable) {
+		if (cid == SCTP_CID_FWD_TSN)
+			return &prsctp_chunk_event_table[0][state];
+	}
 
 	if (sctp_addip_enable) {
 		if (cid == SCTP_CID_ASCONF)

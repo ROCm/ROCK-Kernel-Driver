@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -37,6 +37,7 @@
  *   Jon Grimm             <jgrimm@us.ibm.com>
  *   La Monte H.P. Yarroll <piggy@acm.org>
  *   Karl Knutson          <karl@athena.chicago.il.us>
+ *   Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -144,6 +145,9 @@ int sctp_tsnmap_check(const struct sctp_tsnmap *, __u32 tsn);
 
 /* Mark this TSN as seen.  */
 void sctp_tsnmap_mark(struct sctp_tsnmap *, __u32 tsn);
+
+/* Mark this TSN and all lower as seen. */
+void sctp_tsnmap_skip(struct sctp_tsnmap *map, __u32 tsn);
 
 /* Retrieve the Cumulative TSN ACK Point.  */
 static inline __u32 sctp_tsnmap_get_ctsn(const struct sctp_tsnmap *map)

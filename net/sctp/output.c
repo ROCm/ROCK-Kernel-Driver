@@ -278,6 +278,7 @@ append:
 	/* It is OK to send this chunk.  */
 	__skb_queue_tail(&packet->chunks, (struct sk_buff *)chunk);
 	packet->size += chunk_len;
+	chunk->transport = packet->transport;
 finish:
 	return retval;
 }
@@ -637,7 +638,8 @@ static sctp_xmit_t sctp_packet_append_data(struct sctp_packet *packet,
 
 	asoc->peer.rwnd = rwnd;
 	/* Has been accepted for transmission. */
-	chunk->msg->can_expire = 0;
+	if (!asoc->peer.prsctp_capable)
+		chunk->msg->can_abandon = 0;
 
 finish:
 	return retval;

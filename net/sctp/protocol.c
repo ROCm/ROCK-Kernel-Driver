@@ -1127,6 +1127,9 @@ __init int sctp_init(void)
 	/* Disable ADDIP by default. */
 	sctp_addip_enable = 0;
 
+	/* Enable PR-SCTP by default. */
+	sctp_prsctp_enable = 1;
+
 	sctp_sysctl_register();
 
 	INIT_LIST_HEAD(&sctp_address_families);

@@ -3205,6 +3205,143 @@ sctp_disposition_t sctp_sf_do_asconf_ack(const struct sctp_endpoint *ep,
 }
 
 /*
+ * PR-SCTP Section 3.6 Receiver Side Implementation of PR-SCTP
+ *
+ * When a FORWARD TSN chunk arrives, the data receiver MUST first update
+ * its cumulative TSN point to the value carried in the FORWARD TSN
+ * chunk, and then MUST further advance its cumulative TSN point locally
+ * if possible.
+ * After the above processing, the data receiver MUST stop reporting any
+ * missing TSNs earlier than or equal to the new cumulative TSN point.
+ *
+ * Verification Tag:  8.5 Verification Tag [Normal verification]
+ *
+ * The return value is the disposition of the chunk.
+ */
+sctp_disposition_t sctp_sf_eat_fwd_tsn(const struct sctp_endpoint *ep,
+				       const struct sctp_association *asoc,
+				       const sctp_subtype_t type,
+				       void *arg,
+				       sctp_cmd_seq_t *commands)
+{
+	struct sctp_chunk *chunk = arg;
+	struct sctp_fwdtsn_hdr *fwdtsn_hdr;
+	__u16 len;
+	__u32 tsn;
+
+	/* RFC 2960 8.5 Verification Tag
+	 *
+	 * When receiving an SCTP packet, the endpoint MUST ensure
+	 * that the value in the Verification Tag field of the
+	 * received SCTP packet matches its own Tag.
+	 */
+	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
+				SCTP_NULL());
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+	}
+
+	fwdtsn_hdr = (struct sctp_fwdtsn_hdr *)chunk->skb->data;
+	chunk->subh.fwdtsn_hdr = fwdtsn_hdr;
+	len = ntohs(chunk->chunk_hdr->length);
+	len -= sizeof(struct sctp_chunkhdr);
+	skb_pull(chunk->skb, len);
+
+	tsn = ntohl(fwdtsn_hdr->new_cum_tsn);
+	SCTP_DEBUG_PRINTK("%s: TSN 0x%x.\n", __FUNCTION__, tsn);
+
+	/* The TSN is too high--silently discard the chunk and count on it
+	 * getting retransmitted later.
+	 */
+	if (sctp_tsnmap_check(&asoc->peer.tsn_map, tsn) < 0)
+		goto discard_noforce;
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_FWDTSN, SCTP_U32(tsn));
+	if (len > sizeof(struct sctp_fwdtsn_hdr))
+		sctp_add_cmd_sf(commands, SCTP_CMD_PROCESS_FWDTSN, 
+				SCTP_CHUNK(chunk));
+	
+	/* Count this as receiving DATA. */
+	if (asoc->autoclose) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
+				SCTP_TO(SCTP_EVENT_TIMEOUT_AUTOCLOSE));
+	}
+	
+	/* FIXME: For now send a SACK, but DATA processing may
+	 * send another. 
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_GEN_SACK, SCTP_NOFORCE());
+	/* Start the SACK timer.  */
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_SACK));
+
+	return SCTP_DISPOSITION_CONSUME;
+
+discard_noforce:
+	return SCTP_DISPOSITION_DISCARD;
+}
+
+sctp_disposition_t sctp_sf_eat_fwd_tsn_fast(
+	const struct sctp_endpoint *ep,
+	const struct sctp_association *asoc,
+	const sctp_subtype_t type,
+	void *arg,
+	sctp_cmd_seq_t *commands)
+{
+	struct sctp_chunk *chunk = arg;
+	struct sctp_fwdtsn_hdr *fwdtsn_hdr;
+	__u16 len;
+	__u32 tsn;
+
+	/* RFC 2960 8.5 Verification Tag
+	 *
+	 * When receiving an SCTP packet, the endpoint MUST ensure
+	 * that the value in the Verification Tag field of the
+	 * received SCTP packet matches its own Tag.
+	 */
+	if (ntohl(chunk->sctp_hdr->vtag) != asoc->c.my_vtag) {
+		sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_BAD_TAG,
+				SCTP_NULL());
+		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+	}
+
+	fwdtsn_hdr = (struct sctp_fwdtsn_hdr *)chunk->skb->data;
+	chunk->subh.fwdtsn_hdr = fwdtsn_hdr;
+	len = ntohs(chunk->chunk_hdr->length);
+	len -= sizeof(struct sctp_chunkhdr);
+	skb_pull(chunk->skb, len);
+
+	tsn = ntohl(fwdtsn_hdr->new_cum_tsn);
+	SCTP_DEBUG_PRINTK("%s: TSN 0x%x.\n", __FUNCTION__, tsn);
+
+	/* The TSN is too high--silently discard the chunk and count on it
+	 * getting retransmitted later.
+	 */
+	if (sctp_tsnmap_check(&asoc->peer.tsn_map, tsn) < 0)
+		goto gen_shutdown;
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPORT_FWDTSN, SCTP_U32(tsn));
+	if (len > sizeof(struct sctp_fwdtsn_hdr))
+		sctp_add_cmd_sf(commands, SCTP_CMD_PROCESS_FWDTSN, 
+				SCTP_CHUNK(chunk));
+	
+	/* Go a head and force a SACK, since we are shutting down. */
+gen_shutdown:
+	/* Implementor's Guide.
+	 *
+	 * While in SHUTDOWN-SENT state, the SHUTDOWN sender MUST immediately
+	 * respond to each received packet containing one or more DATA chunk(s)
+	 * with a SACK, a SHUTDOWN chunk, and restart the T2-shutdown timer
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_GEN_SHUTDOWN, SCTP_NULL());
+	sctp_add_cmd_sf(commands, SCTP_CMD_GEN_SACK, SCTP_FORCE());
+	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_RESTART,
+			SCTP_TO(SCTP_EVENT_TIMEOUT_T2_SHUTDOWN));
+
+        return SCTP_DISPOSITION_CONSUME;
+}
+
+/*
  * Process an unknown chunk.
  *
  * Section: 3.2. Also, 2.1 in the implementor's guide.

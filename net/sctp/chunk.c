@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * Copyright (c) 2003 International Business Machines Corp.
+ * (C) Copyright IBM Corp. 2003, 2004
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -31,6 +31,7 @@
  *
  * Written or modified by:
  *    Jon Grimm             <jgrimm@us.ibm.com>
+ *    Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -55,7 +56,8 @@ void sctp_datamsg_init(struct sctp_datamsg *msg)
 	atomic_set(&msg->refcnt, 1);
 	msg->send_failed = 0;
 	msg->send_error = 0;
-	msg->can_expire = 0;
+	msg->can_abandon = 0;
+	msg->expires_at = 0;
 	INIT_LIST_HEAD(&msg->chunks);
 }
 
@@ -182,14 +184,12 @@ struct sctp_datamsg *sctp_datamsg_from_user(struct sctp_association *asoc,
 	 * have the same expiration.
 	 */
 	if (sinfo->sinfo_timetolive) {
-		struct timeval tv;
-		__u32 ttl = sinfo->sinfo_timetolive;
-
 		/* sinfo_timetolive is in milliseconds */
-		tv.tv_sec = ttl / 1000;
-		tv.tv_usec = ttl % 1000 * 1000;
-		msg->expires_at = jiffies + timeval_to_jiffies(&tv);
-		msg->can_expire = 1;
+		msg->expires_at = jiffies +
+				    MSECS_TO_JIFFIES(sinfo->sinfo_timetolive);
+		msg->can_abandon = 1;
+		SCTP_DEBUG_PRINTK("%s: msg:%p expires_at: %ld jiffies:%ld\n",
+				  __FUNCTION__, msg, msg->expires_at, jiffies);
 	}
 
 	max = asoc->frag_point;
@@ -288,14 +288,11 @@ errout:
 }
 
 /* Check whether this message has expired. */
-int sctp_datamsg_expires(struct sctp_chunk *chunk)
+int sctp_chunk_abandoned(struct sctp_chunk *chunk)
 {
 	struct sctp_datamsg *msg = chunk->msg;
 
-	/* FIXME: When PR-SCTP is supported we can make this
-	 * check more lenient.
-	 */
-	if (!msg->can_expire)
+	if (!msg->can_abandon)
 		return 0;
 
 	if (time_after(jiffies, msg->expires_at))
@@ -305,7 +302,7 @@ int sctp_datamsg_expires(struct sctp_chunk *chunk)
 }
 
 /* This chunk (and consequently entire message) has failed in its sending. */
-void sctp_datamsg_fail(struct sctp_chunk *chunk, int error)
+void sctp_chunk_fail(struct sctp_chunk *chunk, int error)
 {
 	chunk->msg->send_failed = 1;
 	chunk->msg->send_error = error;

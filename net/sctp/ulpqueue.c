@@ -680,6 +680,71 @@ static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
 	return event;
 }
 
+/* Helper function to gather skbs that have possibly become
+ * ordered by forward tsn skipping their dependencies.
+ */
+static inline void sctp_ulpq_reap_ordered(struct sctp_ulpq *ulpq)
+{
+	struct sk_buff *pos, *tmp;
+	struct sctp_ulpevent *cevent;
+	struct sctp_ulpevent *event = NULL;
+	struct sctp_stream *in;
+	struct sk_buff_head temp;
+	__u16 csid, cssn;
+
+	in  = &ulpq->asoc->ssnmap->in;
+
+	/* We are holding the chunks by stream, by SSN.  */
+	sctp_skb_for_each(pos, &ulpq->lobby, tmp) {
+		cevent = (struct sctp_ulpevent *) pos->cb;
+		csid = cevent->stream;
+		cssn = cevent->ssn;
+
+		if (cssn != sctp_ssn_peek(in, csid))
+			break;
+
+		/* Found it, so mark in the ssnmap. */	       
+		sctp_ssn_next(in, csid);
+
+		__skb_unlink(pos, pos->list);
+		if (!event) {						
+			/* Create a temporary list to collect chunks on.  */
+			event = sctp_skb2event(pos);
+			skb_queue_head_init(&temp);
+			__skb_queue_tail(&temp, sctp_event2skb(event));
+		} else {
+			/* Attach all gathered skbs to the event.  */
+			__skb_queue_tail(sctp_event2skb(event)->list, pos);
+		}
+	}
+
+	/* Send event to the ULP.  */
+	if (event)
+		sctp_ulpq_tail_event(ulpq, event);
+}
+
+/* Skip over an SSN. */
+void sctp_ulpq_skip(struct sctp_ulpq *ulpq, __u16 sid, __u16 ssn)
+{
+	struct sctp_stream *in;
+
+	/* Note: The stream ID must be verified before this routine.  */
+	in  = &ulpq->asoc->ssnmap->in;
+
+	/* Is this an old SSN?  If so ignore. */
+	if (SSN_lt(ssn, sctp_ssn_peek(in, sid)))
+		return;
+
+	/* Mark that we are no longer expecting this SSN or lower. */
+	sctp_ssn_skip(in, sid, ssn);
+
+	/* Go find any other chunks that were waiting for
+	 * ordering and deliver them if needed. 
+	 */
+	sctp_ulpq_reap_ordered(ulpq);
+	return;
+}
+
 /* Renege 'needed' bytes from the ordering queue. */
 static __u16 sctp_ulpq_renege_order(struct sctp_ulpq *ulpq, __u16 needed)
 {

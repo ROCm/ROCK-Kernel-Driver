@@ -599,8 +599,7 @@ enum {
 	NET_SCTP_PRESERVE_ENABLE         = 11,
 	NET_SCTP_MAX_BURST               = 12,
 	NET_SCTP_ADDIP_ENABLE		 = 13,
-	NET_SCTP_RMEM			 = 14,
-	NET_SCTP_WMEM			 = 15,
+	NET_SCTP_PRSCTP_ENABLE		 = 14,
 };
 
 /* /proc/sys/net/bridge */
