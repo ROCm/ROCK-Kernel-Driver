@@ -45,7 +45,7 @@ static inline void unmap_extent_mft_record(ntfs_inode *ni)
 
 #ifdef NTFS_RW
 
-/*
+/**
  * flush_dcache_mft_record_page - flush_dcache_page() for mft records
  * @ni:		ntfs inode structure of mft record
  *

@@ -35,6 +35,8 @@ ToDo:
 	  fs/ntfs/inode.h and use it to declare NInoTest{Set,Clear}Dirty.
 	- Move typedefs for ntfs_attr and test_t from fs/ntfs/inode.c to
 	  fs/ntfs/inode.h so they can be used elsewhere.
+	- Determine the mft mirror size as the number of mirrored mft records
+	  and store it in ntfs_volume->mftmirr_size (fs/ntfs/super.c).
 
 2.1.7 - Enable NFS exporting of mounted NTFS volumes.
 

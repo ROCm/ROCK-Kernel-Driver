@@ -657,6 +657,20 @@ static BOOL parse_ntfs_boot_sector(ntfs_volume *vol, const NTFS_BOOT_SECTOR *b)
 	}
 	vol->mftmirr_lcn = ll;
 	ntfs_debug("vol->mftmirr_lcn = 0x%Lx", (long long)vol->mftmirr_lcn);
+	/*
+	 * Work out the size of the mft mirror in number of mft records. If the
+	 * cluster size is less than or equal to the size taken by four mft
+	 * records, the mft mirror stores the first four mft records. If the
+	 * cluster size is bigger than the size taken by four mft records, the
+	 * mft mirror contains as many mft records as will fit into one
+	 * cluster.
+	 */
+	if (vol->cluster_size <= (4 << vol->mft_record_size_bits))
+		vol->mftmirr_size = 4;
+	else
+		vol->mftmirr_size = vol->cluster_size >>
+				vol->mft_record_size_bits;
+	ntfs_debug("vol->mftmirr_size = %i", vol->mftmirr_size);
 	vol->serial_no = le64_to_cpu(b->volume_serial_number);
 	ntfs_debug("vol->serial_no = 0x%Lx",
 			(unsigned long long)vol->serial_no);
@@ -1486,7 +1500,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 			ntfs_error(sb, "Not an NTFS volume.");
 		goto err_out_now;
 	}
-	
+
 	/*
 	 * Extract the data from the boot sector and setup the ntfs super block
 	 * using it.
@@ -1512,7 +1526,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 
 	/*
 	 * Ntfs allows 63 bits for the file size, i.e. correct would be:
-	 * 	sb->s_maxbytes = ~0ULL >> 1;
+	 *	sb->s_maxbytes = ~0ULL >> 1;
 	 * But the kernel uses a long as the page cache page index which on
 	 * 32-bit architectures is only 32-bits. MAX_LFS_FILESIZE is kernel
 	 * defined to the maximum the page cache page index can cope with
