@@ -493,14 +493,14 @@ ohci_readl (const struct ohci_hcd *ohci, const __hc32 *regs)
 static inline unsigned int
 ohci_readl (const struct ohci_hcd *ohci, __hc32 __iomem * regs)
 {
-	return readl ((__force u32 *)regs);
+	return readl(regs);
 }
 #endif
 
 static inline void ohci_writel (const struct ohci_hcd *ohci,
 				const unsigned int val, __hc32 __iomem *regs)
 {
-	writel (val, (__force u32 *)regs);
+	writel (val, regs);
 }
 
 #endif	/* !CONFIG_USB_OHCI_BIG_ENDIAN */
