@@ -127,6 +127,11 @@ acpi_status
 acpi_hw_disable_gpe (
 	struct acpi_gpe_event_info      *gpe_event_info);
 
+acpi_status
+acpi_hw_disable_gpe_block (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
+
 void
 acpi_hw_disable_gpe_for_wakeup (
 	struct acpi_gpe_event_info      *gpe_event_info);
@@ -136,8 +141,13 @@ acpi_hw_clear_gpe (
 	struct acpi_gpe_event_info      *gpe_event_info);
 
 acpi_status
+acpi_hw_clear_gpe_block (
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_info,
+	struct acpi_gpe_block_info      *gpe_block);
+
+acpi_status
 acpi_hw_get_gpe_status (
-	u32                             gpe_number,
+	struct acpi_gpe_event_info      *gpe_event_info,
 	acpi_event_status               *event_status);
 
 acpi_status

@@ -556,6 +556,9 @@ acpi_ut_mutex_initialize (
 		}
 	}
 
+
+	status = acpi_os_create_lock (&acpi_gbl_gpe_lock);
+
 	return_ACPI_STATUS (AE_OK);
 }
 
@@ -589,6 +592,7 @@ acpi_ut_mutex_terminate (
 		(void) acpi_ut_delete_mutex (i);
 	}
 
+	(void) acpi_os_delete_lock (acpi_gbl_gpe_lock);
 	return_VOID;
 }
 

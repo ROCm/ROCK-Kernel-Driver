@@ -46,6 +46,7 @@
 
 #include <acpi/acpi.h>
 #include <acpi/acnamesp.h>
+#include <acpi/acevents.h>
 
 #define _COMPONENT          ACPI_HARDWARE
 	 ACPI_MODULE_NAME    ("hwregs")
@@ -66,9 +67,7 @@
 acpi_status
 acpi_hw_clear_acpi_status (void)
 {
-	acpi_native_uint                i;
 	acpi_status                     status;
-	struct acpi_gpe_block_info      *gpe_block;
 
 
 	ACPI_FUNCTION_TRACE ("hw_clear_acpi_status");
@@ -102,18 +101,7 @@ acpi_hw_clear_acpi_status (void)
 
 	/* Clear the GPE Bits in all GPE registers in all GPE blocks */
 
-	gpe_block = acpi_gbl_gpe_block_list_head;
-	while (gpe_block) {
-		for (i = 0; i < gpe_block->register_count; i++) {
-			status = acpi_hw_low_level_write (8, 0xFF,
-					 &gpe_block->register_info[i].status_address, (u32) i);
-			if (ACPI_FAILURE (status)) {
-				goto unlock_and_exit;
-			}
-		}
-
-		gpe_block = gpe_block->next;
-	}
+	status = acpi_ev_walk_gpe_list (acpi_hw_clear_gpe_block);
 
 unlock_and_exit:
 	(void) acpi_ut_release_mutex (ACPI_MTX_HARDWARE);

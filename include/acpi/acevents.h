@@ -109,8 +109,17 @@ acpi_ev_notify_dispatch (
  * Evgpe - GPE handling and dispatch
  */
 
+acpi_status
+acpi_ev_walk_gpe_list (
+	ACPI_GPE_CALLBACK       gpe_walk_callback);
+
+u8
+acpi_ev_valid_gpe_event (
+	struct acpi_gpe_event_info      *gpe_event_info);
+
 struct acpi_gpe_event_info *
 acpi_ev_get_gpe_event_info (
+	acpi_handle                     gpe_device,
 	u32                             gpe_number);
 
 acpi_status
@@ -119,11 +128,12 @@ acpi_ev_gpe_initialize (
 
 u32
 acpi_ev_gpe_dispatch (
-	struct acpi_gpe_event_info      *gpe_event_info);
+	struct acpi_gpe_event_info      *gpe_event_info,
+	u32                             gpe_number);
 
 u32
 acpi_ev_gpe_detect (
-	void);
+	struct acpi_gpe_xrupt_info      *gpe_xrupt_list);
 
 /*
  * Evregion - Address Space handling
@@ -215,6 +225,10 @@ acpi_ev_initialize_region (
 /*
  * Evsci - SCI (System Control Interrupt) handling/dispatch
  */
+
+u32 ACPI_SYSTEM_XFACE
+acpi_ev_gpe_xrupt_handler (
+	void                            *context);
 
 u32
 acpi_ev_install_sci_handler (

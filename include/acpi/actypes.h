@@ -520,9 +520,6 @@ typedef u32                                     acpi_object_type;
  */
 typedef u32                                     acpi_event_type;
 
-#define ACPI_EVENT_FIXED                0
-#define ACPI_EVENT_GPE                  1
-
 /*
  * Fixed events
  */
