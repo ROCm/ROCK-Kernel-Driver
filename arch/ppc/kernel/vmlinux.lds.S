@@ -1,6 +1,6 @@
 #include <asm-generic/vmlinux.lds.h>
 
-OUTPUT_ARCH(powerpc)
+OUTPUT_ARCH(powerpc:common)
 jiffies = jiffies_64 + 4;
 SECTIONS
 {
