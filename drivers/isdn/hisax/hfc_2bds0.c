@@ -603,13 +603,6 @@ hfcd_bh(void *data)
 		DChannel_proc_xmt(cs);
 }
 
-void
-sched_event_D(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
 static
 int receive_dmsg(struct IsdnCardState *cs)
 {
@@ -707,7 +700,7 @@ int receive_dmsg(struct IsdnCardState *cs)
 #endif
 				} else {
 					skb_queue_tail(&cs->rq, skb);
-					sched_event_D(cs, D_RCVBUFREADY);
+					sched_d_event(cs, D_RCVBUFREADY);
 				}
 			}
 		} else
@@ -838,7 +831,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 			debugl1(cs, "ph_state chg %d->%d", cs->dc.hfcd.ph_state,
 				exval);
 		cs->dc.hfcd.ph_state = exval;
-		sched_event_D(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		val &= ~0x40;
 	}
 	while (val) {
@@ -907,7 +900,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_event_D(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) {
 				if (cs->tx_skb->len) {
 					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
@@ -932,7 +925,7 @@ hfc2bds0_interrupt(struct IsdnCardState *cs, u_char val)
 					debugl1(cs, "hfc_fill_dfifo irq blocked");
 				}
 			} else
-				sched_event_D(cs, D_XMTBUFREADY);
+				sched_d_event(cs, D_XMTBUFREADY);
 		}
       afterXPR:
 		if (cs->hw.hfcD.int_s1 && count--) {

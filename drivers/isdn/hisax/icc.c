@@ -167,13 +167,6 @@ icc_fill_fifo(struct IsdnCardState *cs)
 }
 
 void
-icc_sched_event(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
-void
 icc_interrupt(struct IsdnCardState *cs, u_char val)
 {
 	u_char exval, v1;
@@ -219,7 +212,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			spin_unlock_irqrestore(&icc_lock, flags);
 		}
 		cs->rcvidx = 0;
-		icc_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		icc_empty_fifo(cs, 32);
@@ -233,7 +226,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			icc_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
 		if (cs->tx_skb) {
 			if (cs->tx_skb->len) {
 				icc_fill_fifo(cs);
@@ -248,7 +241,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			cs->tx_cnt = 0;
 			icc_fill_fifo(cs);
 		} else
-			icc_sched_event(cs, D_XMTBUFREADY);
+			sched_d_event(cs, D_XMTBUFREADY);
 	}
       afterXPR:
 	if (val & 0x04) {	/* CISQ */
@@ -259,7 +252,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			cs->dc.icc.ph_state = (exval >> 2) & 0xf;
 			if (cs->debug & L1_DEB_ISAC)
 				debugl1(cs, "ph_state change %x", cs->dc.icc.ph_state);
-			icc_sched_event(cs, D_L1STATECHANGE);
+			sched_d_event(cs, D_L1STATECHANGE);
 		}
 		if (exval & 1) {
 			exval = cs->readisac(cs, ICC_CIR1);
@@ -289,7 +282,7 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				icc_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) { /* Restart frame */
 				skb_push(cs->tx_skb, cs->tx_cnt);
 				cs->tx_cnt = 0;
@@ -367,14 +360,14 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
 				cs->dc.icc.mocr |= 0x0a;
 				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
-				icc_sched_event(cs, D_RX_MON0);
+				sched_d_event(cs, D_RX_MON0);
 			}
 			if (v1 & 0x40) {
 				cs->dc.icc.mocr &= 0x0f;
 				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
 				cs->dc.icc.mocr |= 0xa0;
 				cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
-				icc_sched_event(cs, D_RX_MON1);
+				sched_d_event(cs, D_RX_MON1);
 			}
 			if (v1 & 0x02) {
 				if ((!cs->dc.icc.mon_tx) || (cs->dc.icc.mon_txc && 
@@ -386,11 +379,11 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
 					if (cs->dc.icc.mon_txc &&
 						(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc))
-						icc_sched_event(cs, D_TX_MON0);
+						sched_d_event(cs, D_TX_MON0);
 					goto AfterMOX0;
 				}
 				if (cs->dc.icc.mon_txc && (cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc)) {
-					icc_sched_event(cs, D_TX_MON0);
+					sched_d_event(cs, D_TX_MON0);
 					goto AfterMOX0;
 				}
 				cs->writeisac(cs, ICC_MOX0,
@@ -409,11 +402,11 @@ icc_interrupt(struct IsdnCardState *cs, u_char val)
 					cs->writeisac(cs, ICC_MOCR, cs->dc.icc.mocr);
 					if (cs->dc.icc.mon_txc &&
 						(cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc))
-						icc_sched_event(cs, D_TX_MON1);
+						sched_d_event(cs, D_TX_MON1);
 					goto AfterMOX1;
 				}
 				if (cs->dc.icc.mon_txc && (cs->dc.icc.mon_txp >= cs->dc.icc.mon_txc)) {
-					icc_sched_event(cs, D_TX_MON1);
+					sched_d_event(cs, D_TX_MON1);
 					goto AfterMOX1;
 				}
 				cs->writeisac(cs, ICC_MOX1,
@@ -536,7 +529,7 @@ ICC_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				icc_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)
@@ -628,7 +621,7 @@ initicc(struct IsdnCardState *cs)
 	val = cs->readisac(cs, ICC_CIR0);
 	debugl1(cs, "ICC CIR0 %x", val);
 	cs->dc.icc.ph_state = (val >> 2) & 0xf;
-	icc_sched_event(cs, D_L1STATECHANGE);
+	sched_d_event(cs, D_L1STATECHANGE);
 	/* Disable all IRQ */
 	cs->writeisac(cs, ICC_MASK, 0xFF);
 

@@ -132,13 +132,6 @@ W6692_bh(void *data)
  */
 }
 
-void
-W6692_sched_event(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
 static void
 W6692_empty_fifo(struct IsdnCardState *cs, int count)
 {
@@ -356,7 +349,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			}
 		}
 		cs->rcvidx = 0;
-		W6692_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 	}
 	if (val & W_INT_D_RMR) {	/* RMR */
 		W6692_empty_fifo(cs, W_D_FIFO_THRESH);
@@ -365,7 +358,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			W6692_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
 		if (cs->tx_skb) {
 			if (cs->tx_skb->len) {
 				W6692_fill_fifo(cs);
@@ -380,7 +373,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			cs->tx_cnt = 0;
 			W6692_fill_fifo(cs);
 		} else
-			W6692_sched_event(cs, D_XMTBUFREADY);
+			sched_d_event(cs, D_XMTBUFREADY);
 	}
       afterXFR:
 	if (val & (W_INT_XINT0 | W_INT_XINT1)) {	/* XINT0/1 - never */
@@ -397,7 +390,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				W6692_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) {	/* Restart frame */
 				skb_push(cs->tx_skb, cs->tx_cnt);
 				cs->tx_cnt = 0;
@@ -429,7 +422,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 				cs->dc.w6692.ph_state = v1 & W_CIR_COD_MASK;
 				if (cs->debug & L1_DEB_ISAC)
 					debugl1(cs, "ph_state_change %x", cs->dc.w6692.ph_state);
-				W6692_sched_event(cs, D_L1STATECHANGE);
+				sched_d_event(cs, D_L1STATECHANGE);
 			}
 			if (v1 & W_CIR_SCC) {
 				v1 = cs->readW6692(cs, W_SQR);
@@ -555,7 +548,7 @@ W6692_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				W6692_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)

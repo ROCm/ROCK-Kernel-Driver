@@ -38,7 +38,6 @@ static void dch_l2l1(struct PStack *st, int pr, void *arg);
 static void dbusy_timer_handler(struct IsdnCardState *cs);
 static void ipacx_new_ph(struct IsdnCardState *cs);
 static void dch_bh(void *data);
-static void dch_sched_event(struct IsdnCardState *cs, int event);
 static void dch_empty_fifo(struct IsdnCardState *cs, int count);
 static void dch_fill_fifo(struct IsdnCardState *cs);
 static inline void dch_int(struct IsdnCardState *cs);
@@ -76,8 +75,8 @@ cic_int(struct IsdnCardState *cs)
 
 	event = cs->readisac(cs, IPACX_CIR0) >> 4;
 	if (cs->debug &L1_DEB_ISAC) debugl1(cs, "cic_int(event=%#x)", event);
-  cs->dc.isac.ph_state = event;
-  dch_sched_event(cs, D_L1STATECHANGE);
+	cs->dc.isac.ph_state = event;
+	sched_d_event(cs, D_L1STATECHANGE);
 }
 
 //==========================================================
@@ -297,16 +296,6 @@ dch_bh(void *data)
 }
 
 //----------------------------------------------------------
-// proceed with bottom half handler dch_bh()
-//----------------------------------------------------------
-static void
-dch_sched_event(struct IsdnCardState *cs, int event)
-{
-	set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
-//----------------------------------------------------------
 // Fill buffer from receive FIFO
 //----------------------------------------------------------
 static void 
@@ -415,7 +404,7 @@ dch_int(struct IsdnCardState *cs)
 			}
     }
 	  cs->rcvidx = 0;
-		dch_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 	}
 
 	if (istad &0x40) {  // RPF
@@ -431,7 +420,7 @@ dch_int(struct IsdnCardState *cs)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			dch_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
     if (cs->tx_skb) {
       if (cs->tx_skb->len) {
         dch_fill_fifo(cs);
@@ -448,7 +437,7 @@ dch_int(struct IsdnCardState *cs)
       dch_fill_fifo(cs);
     } 
     else {
-      dch_sched_event(cs, D_XMTBUFREADY);
+      sched_d_event(cs, D_XMTBUFREADY);
     }  
   }  
   afterXPR:

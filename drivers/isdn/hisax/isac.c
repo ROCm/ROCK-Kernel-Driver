@@ -171,13 +171,6 @@ isac_fill_fifo(struct IsdnCardState *cs)
 }
 
 void
-isac_sched_event(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
-void
 isac_interrupt(struct IsdnCardState *cs, u_char val)
 {
 	u_char exval, v1;
@@ -223,7 +216,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			spin_unlock_irqrestore(&isac_lock, flags);
 		}
 		cs->rcvidx = 0;
-		isac_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 	}
 	if (val & 0x40) {	/* RPF */
 		isac_empty_fifo(cs, 32);
@@ -237,7 +230,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 		if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 			del_timer(&cs->dbusytimer);
 		if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-			isac_sched_event(cs, D_CLEARBUSY);
+			sched_d_event(cs, D_CLEARBUSY);
 		if (cs->tx_skb) {
 			if (cs->tx_skb->len) {
 				isac_fill_fifo(cs);
@@ -252,7 +245,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			cs->tx_cnt = 0;
 			isac_fill_fifo(cs);
 		} else
-			isac_sched_event(cs, D_XMTBUFREADY);
+			sched_d_event(cs, D_XMTBUFREADY);
 	}
       afterXPR:
 	if (val & 0x04) {	/* CISQ */
@@ -263,7 +256,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			cs->dc.isac.ph_state = (exval >> 2) & 0xf;
 			if (cs->debug & L1_DEB_ISAC)
 				debugl1(cs, "ph_state change %x", cs->dc.isac.ph_state);
-			isac_sched_event(cs, D_L1STATECHANGE);
+			sched_d_event(cs, D_L1STATECHANGE);
 		}
 		if (exval & 1) {
 			exval = cs->readisac(cs, ISAC_CIR1);
@@ -293,7 +286,7 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				isac_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) { /* Restart frame */
 				skb_push(cs->tx_skb, cs->tx_cnt);
 				cs->tx_cnt = 0;
@@ -371,14 +364,14 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 				cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
 				cs->dc.isac.mocr |= 0x0a;
 				cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
-				isac_sched_event(cs, D_RX_MON0);
+				sched_d_event(cs, D_RX_MON0);
 			}
 			if (v1 & 0x40) {
 				cs->dc.isac.mocr &= 0x0f;
 				cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
 				cs->dc.isac.mocr |= 0xa0;
 				cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
-				isac_sched_event(cs, D_RX_MON1);
+				sched_d_event(cs, D_RX_MON1);
 			}
 			if (v1 & 0x02) {
 				if ((!cs->dc.isac.mon_tx) || (cs->dc.isac.mon_txc && 
@@ -390,11 +383,11 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 					cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
 					if (cs->dc.isac.mon_txc &&
 						(cs->dc.isac.mon_txp >= cs->dc.isac.mon_txc))
-						isac_sched_event(cs, D_TX_MON0);
+						sched_d_event(cs, D_TX_MON0);
 					goto AfterMOX0;
 				}
 				if (cs->dc.isac.mon_txc && (cs->dc.isac.mon_txp >= cs->dc.isac.mon_txc)) {
-					isac_sched_event(cs, D_TX_MON0);
+					sched_d_event(cs, D_TX_MON0);
 					goto AfterMOX0;
 				}
 				cs->writeisac(cs, ISAC_MOX0,
@@ -413,11 +406,11 @@ isac_interrupt(struct IsdnCardState *cs, u_char val)
 					cs->writeisac(cs, ISAC_MOCR, cs->dc.isac.mocr);
 					if (cs->dc.isac.mon_txc &&
 						(cs->dc.isac.mon_txp >= cs->dc.isac.mon_txc))
-						isac_sched_event(cs, D_TX_MON1);
+						sched_d_event(cs, D_TX_MON1);
 					goto AfterMOX1;
 				}
 				if (cs->dc.isac.mon_txc && (cs->dc.isac.mon_txp >= cs->dc.isac.mon_txc)) {
-					isac_sched_event(cs, D_TX_MON1);
+					sched_d_event(cs, D_TX_MON1);
 					goto AfterMOX1;
 				}
 				cs->writeisac(cs, ISAC_MOX1,
@@ -538,7 +531,7 @@ ISAC_l1hw(struct PStack *st, int pr, void *arg)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				isac_sched_event(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			break;
 		default:
 			if (cs->debug & L1_DEB_WARN)
@@ -656,7 +649,7 @@ initisac(struct IsdnCardState *cs)
 	val = cs->readisac(cs, ISAC_CIR0);
 	debugl1(cs, "ISAC CIR0 %x", val);
 	cs->dc.isac.ph_state = (val >> 2) & 0xf;
-	isac_sched_event(cs, D_L1STATECHANGE);
+	sched_d_event(cs, D_L1STATECHANGE);
 
 	/* RESET Receiver and Transmitter */
 	cs->writeisac(cs, ISAC_CMDR, 0x41);

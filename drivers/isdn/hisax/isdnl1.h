@@ -42,6 +42,13 @@ sched_b_event(struct BCState *bcs, int event)
 	schedule_work(&bcs->work);
 }
 
+static inline void
+sched_d_event(struct IsdnCardState *cs, int event)
+{
+	set_bit(event, &cs->event);
+	schedule_work(&cs->work);
+}
+
 /* called with the card lock held */
 static inline void
 xmit_complete_b(struct BCState *bcs)

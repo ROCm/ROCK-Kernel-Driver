@@ -457,16 +457,6 @@ hfcsx_Timer(struct IsdnCardState *cs)
 }
 
 
-/*********************************/
-/* schedule a new D-channel task */
-/*********************************/
-static void
-sched_event_D_sx(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
 /************************************************/
 /* select a b-channel entry matching and active */
 /************************************************/
@@ -501,7 +491,7 @@ receive_dmsg(struct IsdnCardState *cs)
 	  skb = read_fifo(cs, HFCSX_SEL_D_RX, 0);
 	  if (skb) {
 	    skb_queue_tail(&cs->rq, skb);
-	    sched_event_D_sx(cs, D_RCVBUFREADY);
+	    sched_d_event(cs, D_RCVBUFREADY);
 	  }
 	} while (--count && skb);
 
@@ -783,13 +773,13 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			debugl1(cs, "ph_state chg %d->%d", cs->dc.hfcsx.ph_state,
 				exval);
 		cs->dc.hfcsx.ph_state = exval;
-		sched_event_D_sx(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		val &= ~0x40;
 	}
 	if (val & 0x80) {	/* timer irq */
 		if (cs->hw.hfcsx.nt_mode) {
 			if ((--cs->hw.hfcsx.nt_timer) < 0)
-				sched_event_D_sx(cs, D_L1STATECHANGE);
+				sched_d_event(cs, D_L1STATECHANGE);
 		}
 		val &= ~0x80;
 		Write_hfc(cs, HFCSX_CTMT, cs->hw.hfcsx.ctmt | HFCSX_CLTIMER);
@@ -862,7 +852,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_event_D_sx(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) {
 				if (cs->tx_skb->len) {
 					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
@@ -887,7 +877,7 @@ hfcsx_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					debugl1(cs, "hfcsx_fill_dfifo irq blocked");
 				}
 			} else
-				sched_event_D_sx(cs, D_XMTBUFREADY);
+				sched_d_event(cs, D_XMTBUFREADY);
 		}
 	      afterXPR:
 		if (cs->hw.hfcsx.int_s1 && count--) {

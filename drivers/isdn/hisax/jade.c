@@ -134,13 +134,6 @@ modejade(struct BCState *bcs, int mode, int bc)
 	cs->BC_Write_Reg(cs, jade, jade_HDLC_IMR, 0x00);
 }
 
-void
-jade_sched_event(struct BCState *bcs, int event)
-{
-    bcs->event |= 1 << event;
-    schedule_work(&bcs->work);
-}
-
 static void
 jade_l2l1(struct PStack *st, int pr, void *arg)
 {

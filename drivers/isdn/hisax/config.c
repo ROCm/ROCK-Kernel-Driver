@@ -1798,12 +1798,6 @@ void hisax_unregister(struct hisax_d_if *hisax_d_if)
 
 #include "isdnl1.h"
 
-static void hisax_sched_event(struct IsdnCardState *cs, int event)
-{
-	cs->event |= 1 << event;
-	schedule_work(&cs->work);
-}
-
 static void hisax_bh(void *data)
 {
 	struct IsdnCardState *cs = data;
@@ -1847,15 +1841,15 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg)
 	switch (pr) {
 	case PH_ACTIVATE | INDICATION:
 		set_bit(0, &d_if->ph_state);
-		hisax_sched_event(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		break;
 	case PH_DEACTIVATE | INDICATION:
 		clear_bit(0, &d_if->ph_state);
-		hisax_sched_event(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		break;
 	case PH_DATA | INDICATION:
 		skb_queue_tail(&cs->rq, arg);
-		hisax_sched_event(cs, D_RCVBUFREADY);
+		sched_d_event(cs, D_RCVBUFREADY);
 		break;
 	case PH_DATA | CONFIRM:
 		skb = skb_dequeue(&cs->sq);
@@ -1873,7 +1867,7 @@ static void hisax_d_l1l2(struct hisax_if *ifc, int pr, void *arg)
 		break;
 	case PH_DATA_E | INDICATION:
 		skb_queue_tail(&d_if->erq, arg);
-		hisax_sched_event(cs, E_RCVBUFREADY);
+		sched_d_event(cs, E_RCVBUFREADY);
 		break;
 	default:
 		printk("pr %#x\n", pr);

@@ -186,17 +186,6 @@ hfcpci_Timer(struct IsdnCardState *cs)
  */
 }
 
-
-/*********************************/
-/* schedule a new D-channel task */
-/*********************************/
-static void
-sched_event_D_pci(struct IsdnCardState *cs, int event)
-{
-	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->work);
-}
-
 /************************************************/
 /* select a b-channel entry matching and active */
 /************************************************/
@@ -389,7 +378,7 @@ receive_dmsg(struct IsdnCardState *cs)
 			df->za[df->f2 & D_FREG_MASK].z2 = cpu_to_le16((le16_to_cpu(zp->z2) + total) & (D_FIFO_SIZE - 1));
 
 			skb_queue_tail(&cs->rq, skb);
-			sched_event_D_pci(cs, D_RCVBUFREADY);
+			sched_d_event(cs, D_RCVBUFREADY);
 		} else
 			printk(KERN_WARNING "HFC-PCI: D receive out of memory\n");
 	}
@@ -984,13 +973,13 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			debugl1(cs, "ph_state chg %d->%d", cs->dc.hfcpci.ph_state,
 				exval);
 		cs->dc.hfcpci.ph_state = exval;
-		sched_event_D_pci(cs, D_L1STATECHANGE);
+		sched_d_event(cs, D_L1STATECHANGE);
 		val &= ~0x40;
 	}
 	if (val & 0x80) {	/* timer irq */
 		if (cs->hw.hfcpci.nt_mode) {
 			if ((--cs->hw.hfcpci.nt_timer) < 0)
-				sched_event_D_pci(cs, D_L1STATECHANGE);
+				sched_d_event(cs, D_L1STATECHANGE);
 		}
 		val &= ~0x80;
 		Write_hfc(cs, HFCPCI_CTMT, cs->hw.hfcpci.ctmt | HFCPCI_CLTIMER);
@@ -1063,7 +1052,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			if (test_and_clear_bit(FLG_DBUSY_TIMER, &cs->HW_Flags))
 				del_timer(&cs->dbusytimer);
 			if (test_and_clear_bit(FLG_L1_DBUSY, &cs->HW_Flags))
-				sched_event_D_pci(cs, D_CLEARBUSY);
+				sched_d_event(cs, D_CLEARBUSY);
 			if (cs->tx_skb) {
 				if (cs->tx_skb->len) {
 					if (!test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
@@ -1088,7 +1077,7 @@ hfcpci_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					debugl1(cs, "hfcpci_fill_dfifo irq blocked");
 				}
 			} else
-				sched_event_D_pci(cs, D_XMTBUFREADY);
+				sched_d_event(cs, D_XMTBUFREADY);
 		}
 	      afterXPR:
 		if (cs->hw.hfcpci.int_s1 && count--) {
