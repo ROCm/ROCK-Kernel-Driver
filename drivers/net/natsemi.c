@@ -237,11 +237,11 @@ static int full_duplex[MAX_UNITS];
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO DRV_NAME
-	".c:v1.07 1/9/2001  Written by Donald Becker <becker@scyld.com>\n"
-KERN_INFO "  http://www.scyld.com/network/natsemi.html\n"
-KERN_INFO "  (unofficial 2.4.x kernel port, version "
-	DRV_VERSION ", " DRV_RELDATE "  Jeff Garzik, Tjeerd Mulder)\n";
+  KERN_INFO DRV_NAME " dp8381x driver, version "
+      DRV_VERSION ", " DRV_RELDATE "\n"
+  KERN_INFO "  originally by Donald Becker <becker@scyld.com>\n"
+  KERN_INFO "  http://www.scyld.com/network/natsemi.html\n"
+  KERN_INFO "  2.4.x kernel port by Jeff Garzik, Tjeerd Mulder\n";
 
 MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("National Semiconductor DP8381x series PCI Ethernet driver");
@@ -1125,6 +1125,8 @@ static int netdev_open(struct net_device *dev)
 
 static void do_cable_magic(struct net_device *dev)
 {
+	struct netdev_private *np = dev->priv;
+
 	if (np->srr >= SRR_DP83816_A5)
 		return;
 
