@@ -237,6 +237,8 @@ static void probe_bus_iseries(void)
 		vio_register_device_iseries("viodasd", i);
 	for (i = 0; i < HVMAXARCHITECTEDVIRTUALCDROMS; i++)
 		vio_register_device_iseries("viocd", i);
+	for (i = 0; i < HVMAXARCHITECTEDVIRTUALTAPES; i++)
+		vio_register_device_iseries("viotape", i);
 }
 #endif
 
