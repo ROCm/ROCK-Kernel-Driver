@@ -168,9 +168,9 @@ copy_user_page:		/* %o0=dest, %o1=src, %o2=vaddr */
 
 9:
 	VISEntry
-	ldx		[%g6 + TI_FLAGS], %g3
+	ldub		[%g6 + TI_FAULT_CODE], %g3
 	mov		%o0, %g1
-	andcc		%g3, _TIF_BLKCOMMIT, %g0
+	cmp		%g3, 0
 	rd		%asi, %g3
 	be,a,pt		%icc, 1f
 	 wr		%g0, ASI_BLK_P, %asi

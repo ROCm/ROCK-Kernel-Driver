@@ -47,6 +47,7 @@ struct thread_info {
 	struct pt_regs		*kregs;
 	struct exec_domain	*exec_domain;
 	int			preempt_count;
+	int			__pad;
 
 	unsigned long		*utraps;
 
@@ -101,10 +102,11 @@ struct thread_info {
 #define TI_FPREGS	0x00000500
 
 /* We embed this in the uppermost byte of thread_info->flags */
-#define FAULT_CODE_WRITE	0x01	/* Write access, implies D-TLB		*/
-#define FAULT_CODE_DTLB		0x02	/* Miss happened in D-TLB		*/
-#define FAULT_CODE_ITLB		0x04	/* Miss happened in I-TLB		*/
-#define FAULT_CODE_WINFIXUP	0x08	/* Miss happened during spill/fill	*/
+#define FAULT_CODE_WRITE	0x01	/* Write access, implies D-TLB	   */
+#define FAULT_CODE_DTLB		0x02	/* Miss happened in D-TLB	   */
+#define FAULT_CODE_ITLB		0x04	/* Miss happened in I-TLB	   */
+#define FAULT_CODE_WINFIXUP	0x08	/* Miss happened during spill/fill */
+#define FAULT_CODE_BLKCOMMIT	0x10	/* Use blk-commit ASI in copy_page */
 
 #if PAGE_SHIFT == 13
 #define THREAD_SIZE (2*PAGE_SIZE)
@@ -218,10 +220,7 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define TIF_NEWSIGNALS		6	/* wants new-style signals */
 #define TIF_32BIT		7	/* 32-bit binary */
 #define TIF_NEWCHILD		8	/* just-spawned child process */
-
-/* XXX Make this one FAULT_CODE_BLKCOMMIT XXX */
-#define TIF_BLKCOMMIT		9	/* use ASI_BLK_COMMIT_* in copy_user_page */
-
+/* TIF_* value 9 is available */
 #define TIF_POLLING_NRFLAG	10
 #define TIF_SYSCALL_SUCCESS	11
 /* NOTE: Thread flags >= 12 should be ones we have no interest
@@ -239,7 +238,6 @@ register struct thread_info *current_thread_info_reg asm("g6");
 #define _TIF_NEWSIGNALS		(1<<TIF_NEWSIGNALS)
 #define _TIF_32BIT		(1<<TIF_32BIT)
 #define _TIF_NEWCHILD		(1<<TIF_NEWCHILD)
-#define _TIF_BLKCOMMIT		(1<<TIF_BLKCOMMIT)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 #define _TIF_ABI_PENDING	(1<<TIF_ABI_PENDING)
 #define _TIF_SYSCALL_SUCCESS	(1<<TIF_SYSCALL_SUCCESS)
