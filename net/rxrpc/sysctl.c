@@ -68,7 +68,6 @@ static ctl_table rxrpc_dir_sysctl_table[] = {
 	{
 		.ctl_name	= 1,
 		.procname	= "rxrpc",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= rxrpc_sysctl_table
 	},

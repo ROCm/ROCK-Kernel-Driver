@@ -477,16 +477,15 @@ DEFINE_PER_CPU(struct pte_chain *, local_pte_chain) = 0;
  */
 void __pte_chain_free(struct pte_chain *pte_chain)
 {
-	int cpu = get_cpu();
 	struct pte_chain **pte_chainp;
 
+	pte_chainp = &get_cpu_var(local_pte_chain);
 	if (pte_chain->next_and_idx)
 		pte_chain->next_and_idx = 0;
-	pte_chainp = &per_cpu(local_pte_chain, cpu);
 	if (*pte_chainp)
 		kmem_cache_free(pte_chain_cache, *pte_chainp);
 	*pte_chainp = pte_chain;
-	put_cpu();
+	put_cpu_var(local_pte_chain);
 }
 
 /*
@@ -501,21 +500,19 @@ void __pte_chain_free(struct pte_chain *pte_chain)
  */
 struct pte_chain *pte_chain_alloc(int gfp_flags)
 {
-	int cpu;
 	struct pte_chain *ret;
 	struct pte_chain **pte_chainp;
 
 	if (gfp_flags & __GFP_WAIT)
 		might_sleep();
 
-	cpu = get_cpu();
-	pte_chainp = &per_cpu(local_pte_chain, cpu);
+	pte_chainp = &get_cpu_var(local_pte_chain);
 	if (*pte_chainp) {
 		ret = *pte_chainp;
 		*pte_chainp = NULL;
-		put_cpu();
+		put_cpu_var(local_pte_chain);
 	} else {
-		put_cpu();
+		put_cpu_var(local_pte_chain);
 		ret = kmem_cache_alloc(pte_chain_cache, gfp_flags);
 	}
 	return ret;

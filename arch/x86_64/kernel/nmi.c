@@ -34,7 +34,7 @@
 
 extern void default_do_nmi(struct pt_regs *);
 
-unsigned int nmi_watchdog = NMI_LOCAL_APIC;
+unsigned int nmi_watchdog = NMI_IO_APIC;
 static unsigned int nmi_hz = HZ;
 unsigned int nmi_perfctr_msr;	/* the MSR to reset in NMI handler */
 int nmi_watchdog_disabled;
@@ -153,17 +153,19 @@ void enable_lapic_nmi_watchdog(void)
 
 #include <linux/device.h>
 
+static int nmi_pm_active; /* nmi_active before suspend */
+
 static int lapic_nmi_suspend(struct sys_device *dev, u32 state)
 {
+	nmi_pm_active = nmi_active;
 	disable_lapic_nmi_watchdog();
 	return 0;
 }
 
 static int lapic_nmi_resume(struct sys_device *dev)
 {
-#if 0
+	if (nmi_pm_active > 0)
 	enable_lapic_nmi_watchdog();
-#endif
 	return 0;
 }
 
@@ -234,6 +236,8 @@ void setup_apic_nmi_watchdog (void)
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 		if (boot_cpu_data.x86 < 6)
+			return;
+		if (strstr(boot_cpu_data.x86_model_id, "Screwdriver"))
 			return;
 		setup_k7_watchdog();
 		break;

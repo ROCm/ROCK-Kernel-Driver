@@ -7,7 +7,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * Author: David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: inftlcore.c,v 1.11 2003/06/23 12:00:08 dwmw2 Exp $
+ * $Id: inftlcore.c,v 1.14 2003/06/26 08:28:26 dwmw2 Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -573,7 +573,7 @@ static void INFTL_trydeletechain(struct INFTLrecord *inftl, unsigned thisVUC)
 {
 	unsigned char BlockUsed[MAX_SECTORS_PER_UNIT];
 	unsigned char BlockDeleted[MAX_SECTORS_PER_UNIT];
-	unsigned int thisEUN, prevEUN, status;
+	unsigned int thisEUN, status;
 	int block, silly;
 	struct inftl_bci bci;
 	size_t retlen;
@@ -645,26 +645,45 @@ static void INFTL_trydeletechain(struct INFTLrecord *inftl, unsigned thisVUC)
 	DEBUG(MTD_DEBUG_LEVEL1, "INFTL: deleting empty VUC %d\n", thisVUC);
 
 	for (;;) {
-		/* Find oldest unit in chain. */
-		thisEUN = inftl->VUtable[thisVUC];
-		prevEUN = BLOCK_NIL;
-		while (inftl->PUtable[thisEUN] != BLOCK_NIL) {
-			prevEUN = thisEUN;
-			thisEUN = inftl->PUtable[thisEUN];
+		u16 *prevEUN = &inftl->VUtable[thisVUC];
+		thisEUN = *prevEUN;
+
+		/* If the chain is all gone already, we're done */
+		if (thisEUN == BLOCK_NIL) {
+			DEBUG(MTD_DEBUG_LEVEL2, "INFTL: Empty VUC %d for deletion was already absent\n", thisEUN);
+			return;
 		}
+
+		/* Find oldest unit in chain. */
+		while (inftl->PUtable[thisEUN] != BLOCK_NIL) {
+			BUG_ON(thisEUN >= inftl->nb_blocks);
+
+			prevEUN = &inftl->PUtable[thisEUN];
+			thisEUN = *prevEUN;
+		}
+
+		DEBUG(MTD_DEBUG_LEVEL3, "Deleting EUN %d from VUC %d\n",
+		      thisEUN, thisVUC);
 
                 if (INFTL_formatblock(inftl, thisEUN) < 0) {
 			/*
 			 * Could not erase : mark block as reserved.
-			 * FixMe: Update Bad Unit Table on disk.
+			 * FixMe: Update Bad Unit Table on medium.
 			 */
 			inftl->PUtable[thisEUN] = BLOCK_RESERVED;
                 } else {
 			/* Correctly erased : mark it as free */
 			inftl->PUtable[thisEUN] = BLOCK_FREE;
-			inftl->PUtable[prevEUN] = BLOCK_NIL;
 			inftl->numfreeEUNs++;
-                }
+		}
+
+		/* Now sort out whatever was pointing to it... */
+		*prevEUN = BLOCK_NIL;
+
+		/* Ideally we'd actually be responsive to new
+		   requests while we're doing this -- if there's
+		   free space why should others be made to wait? */
+		cond_resched();
 	}
 
 	inftl->VUtable[thisVUC] = BLOCK_NIL;
@@ -837,11 +856,11 @@ foundit:
 
 static int inftl_getgeo(struct mtd_blktrans_dev *dev, struct hd_geometry *geo)
 {
-	struct NFTLrecord *nftl = (void *)dev;
+	struct INFTLrecord *inftl = (void *)dev;
 
-	geo->heads = nftl->heads;
-	geo->sectors = nftl->sectors;
-	geo->cylinders = nftl->cylinders;
+	geo->heads = inftl->heads;
+	geo->sectors = inftl->sectors;
+	geo->cylinders = inftl->cylinders;
 
 	return 0;
 }
@@ -862,7 +881,7 @@ extern char inftlmountrev[];
 
 int __init init_inftl(void)
 {
-	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.11 $, "
+	printk(KERN_INFO "INFTL: inftlcore.c $Revision: 1.14 $, "
 		"inftlmount.c %s\n", inftlmountrev);
 
 	return register_mtd_blktrans(&inftl_tr);

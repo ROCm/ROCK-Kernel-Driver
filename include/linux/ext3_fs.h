@@ -39,12 +39,6 @@ struct statfs;
 #define EXT3_DEFAULT_PREALLOC_BLOCKS	8
 
 /*
- * The second extended file system version
- */
-#define EXT3FS_DATE		"02 Dec 2001"
-#define EXT3FS_VERSION		"2.4-0.9.16"
-
-/*
  * Always enable hashed directories
  */
 #define CONFIG_EXT3_INDEX

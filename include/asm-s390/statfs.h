@@ -9,6 +9,10 @@
 #ifndef _S390_STATFS_H
 #define _S390_STATFS_H
 
+#ifndef __s390x__
+#include <asm-generic/statfs.h>
+#else
+
 #ifndef __KERNEL_STRICT_NAMES
 
 #include <linux/types.h>
@@ -17,19 +21,11 @@ typedef __kernel_fsid_t	fsid_t;
 
 #endif
 
+/*
+ * This is ugly -- we're already 64-bit clean, so just duplicate the 
+ * definitions.
+ */
 struct statfs {
-#ifndef __s390x__
-	long f_type;
-	long f_bsize;
-	long f_blocks;
-	long f_bfree;
-	long f_bavail;
-	long f_files;
-	long f_ffree;
-	__kernel_fsid_t f_fsid;
-	long f_namelen;
-	long f_spare[6];
-#else /* __s390x__ */
 	int  f_type;
 	int  f_bsize;
 	long f_blocks;
@@ -39,8 +35,23 @@ struct statfs {
 	long f_ffree;
 	__kernel_fsid_t f_fsid;
 	int  f_namelen;
-	int  f_spare[6];
-#endif /* __s390x__ */
+	int  f_frsize;
+	int  f_spare[5];
 };
 
+struct statfs64 {
+	int  f_type;
+	int  f_bsize;
+	long f_blocks;
+	long f_bfree;
+	long f_bavail;
+	long f_files;
+	long f_ffree;
+	__kernel_fsid_t f_fsid;
+	int  f_namelen;
+	int  f_frsize;
+	int  f_spare[5];
+};
+
+#endif /* __s390x__ */
 #endif

@@ -52,7 +52,6 @@ extern unsigned long end_pfn_map;
 
 extern unsigned long cpu_initialized;
 
-extern void show_stack(unsigned long * rsp);
 extern void show_trace(unsigned long * rsp);
 extern void show_registers(struct pt_regs *regs);
 

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.42 $
+ * $Revision: 1.46 $
  */
 
 #include <linux/config.h>
@@ -80,7 +80,13 @@ static struct ccw_driver dasd_eckd_driver; /* see below */
 static int
 dasd_eckd_probe (struct ccw_device *cdev)
 {
-	return dasd_generic_probe (cdev, &dasd_eckd_discipline);
+	int ret;
+
+	ret = dasd_generic_probe (cdev, &dasd_eckd_discipline);
+	if (ret)
+		return ret;
+	ccw_device_set_options(cdev, CCWDEV_DO_PATHGROUP);
+	return 0;
 }
 
 static int
@@ -204,7 +210,7 @@ check_XRC (struct ccw1         *de_ccw,
                 data->ep_sys_time = get_clock ();
                 
                 de_ccw->count = sizeof (struct DE_eckd_data);
-                de_ccw->flags = CCW_FLAG_SLI;  
+                de_ccw->flags |= CCW_FLAG_SLI;  
         }
 
         return;
@@ -281,19 +287,11 @@ define_extent(struct ccw1 * ccw, struct DE_eckd_data * data, int trk,
 	/* check for sequential prestage - enhance cylinder range */
 	if (data->attributes.operation == DASD_SEQ_PRESTAGE ||
 	    data->attributes.operation == DASD_SEQ_ACCESS) {
-
-		if (end.cyl + private->attrib.nr_cyl < geo.cyl) {
+		
+		if (end.cyl + private->attrib.nr_cyl < geo.cyl) 
 			end.cyl += private->attrib.nr_cyl;
-			DBF_DEV_EVENT(DBF_NOTICE, device,
-				      "Enhanced DE Cylinder from  %x to %x",
-				      (totrk / geo.head), end.cyl);
-		} else {
+		else
 			end.cyl = (geo.cyl - 1);
-			DBF_DEV_EVENT(DBF_NOTICE, device,
-				      "Enhanced DE Cylinder from  %x to "
-				      "End of device %x",
-				      (totrk / geo.head), end.cyl);
-		}
 	}
 
 	data->beg_ext.cyl = beg.cyl;
@@ -512,12 +510,6 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 		    private->rdc_data.cu_type,
 		    private->rdc_data.cu_model.model);
 	return 0;
-
-        /* get characteristis via diag to determine the kind of
-	 * minidisk under VM needed beacause XRC is not support
-	 * by VM (jet). Can be removed as soon as VM supports XRC
-	 * FIXME: TBD ??? HUM
-	 */
 }
 
 static struct dasd_ccw_req *
@@ -1130,13 +1122,16 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
 		return -ENODEV;
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
-				   1, 0, device);
+				   1, 32, device);
 	if (cqr == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory to allocate initialization request");
 		return -ENOMEM;
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RELEASE;
+        cqr->cpaddr->flags |= CCW_FLAG_SLI;
+        cqr->cpaddr->count = 32;
+	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
 	cqr->expires = 10 * HZ;
@@ -1145,14 +1140,14 @@ dasd_eckd_release(struct block_device *bdev, int no, long args)
 
 	rc = dasd_sleep_on_immediatly(cqr);
 
-	dasd_kfree_request(cqr, cqr->device);
+	dasd_sfree_request(cqr, cqr->device);
 	return rc;
 }
 
 /*
  * Reserve device ioctl.
  * Options are set to 'synchronous wait for interrupt' and
- * 'timeout the request'. This leads to an terminate IO if 
+ * 'timeout the request'. This leads to a terminate IO if 
  * the interrupt is outstanding for a certain time. 
  */
 static int
@@ -1170,14 +1165,16 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 		return -ENODEV;
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
-				   1, 0, device);
-
+				   1, 32, device);
 	if (cqr == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory to allocate initialization request");
 		return -ENOMEM;
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_RESERVE;
+        cqr->cpaddr->flags |= CCW_FLAG_SLI;
+        cqr->cpaddr->count = 32;
+	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
 	cqr->expires = 10 * HZ;
@@ -1186,11 +1183,7 @@ dasd_eckd_reserve(struct block_device *bdev, int no, long args)
 
 	rc = dasd_sleep_on_immediatly(cqr);
 
-	if (rc == -EIO) {
-		/* Request got an error or has been timed out. */
-		dasd_eckd_release(bdev, no, args);
-	}
-	dasd_kfree_request(cqr, cqr->device);
+	dasd_sfree_request(cqr, cqr->device);
 	return rc;
 }
 
@@ -1214,13 +1207,16 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 		return -ENODEV;
 
 	cqr = dasd_smalloc_request(dasd_eckd_discipline.name,
-				   1, 0, device);
+				   1, 32, device);
 	if (cqr == NULL) {
 		MESSAGE(KERN_WARNING, "%s",
 			"No memory to allocate initialization request");
 		return -ENOMEM;
 	}
 	cqr->cpaddr->cmd_code = DASD_ECKD_CCW_SLCK;
+        cqr->cpaddr->flags |= CCW_FLAG_SLI;
+        cqr->cpaddr->count = 32;
+	cqr->cpaddr->cda = (__u32)(addr_t) cqr->data;
 	cqr->device = device;
 	cqr->retries = 0;
 	cqr->expires = 10 * HZ;
@@ -1229,11 +1225,7 @@ dasd_eckd_steal_lock(struct block_device *bdev, int no, long args)
 
 	rc = dasd_sleep_on_immediatly(cqr);
 
-	if (rc == -EIO) {
-		/* Request got an error or has been timed out. */
-		dasd_eckd_release(bdev, no, args);
-	}
-	dasd_kfree_request(cqr, cqr->device);
+	dasd_sfree_request(cqr, cqr->device);
 	return rc;
 }
 
@@ -1330,17 +1322,13 @@ dasd_eckd_set_attrib(struct block_device *bdev, int no, long args)
 
 	private = (struct dasd_eckd_private *) device->private;
 
-	DBF_DEV_EVENT(DBF_ERR, device,
-		      "cache operation mode got "
-		      "%x (%i cylinder prestage)",
-		      attrib.operation, attrib.nr_cyl);
-
 	private->attrib = attrib;
 
 	DBF_DEV_EVENT(DBF_ERR, device,
 		      "cache operation mode set to "
 		      "%x (%i cylinder prestage)",
 		      private->attrib.operation, private->attrib.nr_cyl);
+	
 	return 0;
 }
 

@@ -325,7 +325,7 @@ static inline void finish_erasing(struct tty_struct *tty)
 {
 	if (tty->erasing) {
 		put_char('/', tty);
-		tty->column += 2;
+		tty->column++;
 		tty->erasing = 0;
 	}
 }

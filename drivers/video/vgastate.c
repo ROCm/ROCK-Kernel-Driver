@@ -17,6 +17,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/fb.h>
+#include <linux/vmalloc.h>
 #include <video/vga.h>
 
 struct regstate {

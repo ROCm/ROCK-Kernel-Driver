@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
+#include <linux/suspend.h>
 #include <net/sock.h>
 #include <net/checksum.h>
 #include <net/ip.h>
@@ -1189,6 +1190,9 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 		spin_unlock_bh(&serv->sv_lock);
 
 		schedule_timeout(timeout);
+
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
 
 		spin_lock_bh(&serv->sv_lock);
 		remove_wait_queue(&rqstp->rq_wait, &wait);

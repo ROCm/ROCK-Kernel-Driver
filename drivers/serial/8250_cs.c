@@ -435,7 +435,7 @@ static int multi_config(dev_link_t * link)
 
 	i = CardServices(GetConfigurationInfo, handle, &config);
 	if (i != CS_SUCCESS) {
-		cs_error(handle, GetConfiguration, i);
+		cs_error(handle, GetConfigurationInfo, i);
 		return -1;
 	}
 	link->conf.Vcc = config.Vcc;

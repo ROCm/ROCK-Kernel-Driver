@@ -74,20 +74,16 @@ static struct subsystem hotplug_slots_subsys;
 static ssize_t hotplug_slot_attr_show(struct kobject *kobj,
 		struct attribute *attr, char *buf)
 {
-	struct hotplug_slot *slot=container_of(kobj,
-			struct hotplug_slot,kobj);
-	struct hotplug_slot_attribute *attribute =
-		container_of(attr, struct hotplug_slot_attribute, attr);
+	struct hotplug_slot *slot = to_hotplug_slot(kobj);
+	struct hotplug_slot_attribute *attribute = to_hotplug_attr(attr);
 	return attribute->show ? attribute->show(slot, buf) : 0;
 }
 
 static ssize_t hotplug_slot_attr_store(struct kobject *kobj,
 		struct attribute *attr, const char *buf, size_t len)
 {
-	struct hotplug_slot *slot=container_of(kobj,
-			struct hotplug_slot,kobj);
-	struct hotplug_slot_attribute *attribute =
-		container_of(attr, struct hotplug_slot_attribute, attr);
+	struct hotplug_slot *slot = to_hotplug_slot(kobj);
+	struct hotplug_slot_attribute *attribute = to_hotplug_attr(attr);
 	return attribute->store ? attribute->store(slot, buf, len) : 0;
 }
 
@@ -96,8 +92,16 @@ static struct sysfs_ops hotplug_slot_sysfs_ops = {
 	.store = hotplug_slot_attr_store,
 };
 
+static void hotplug_slot_release(struct kobject *kobj)
+{
+	struct hotplug_slot *slot = to_hotplug_slot(kobj);
+	if (slot->release)
+		slot->release(slot);
+}
+
 static struct kobj_type hotplug_slot_ktype = {
-	.sysfs_ops = &hotplug_slot_sysfs_ops
+	.sysfs_ops = &hotplug_slot_sysfs_ops,
+	.release = &hotplug_slot_release,
 };
 
 static decl_subsys(hotplug_slots, &hotplug_slot_ktype, NULL);

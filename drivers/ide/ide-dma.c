@@ -248,8 +248,11 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 #if 1
 	if (sector_count > 256)
 		BUG();
-		
+
 	if (sector_count > 128) {
+#else
+	while (sector_count > 128) {
+#endif
 		memset(&sg[nents], 0, sizeof(*sg));
 		sg[nents].page = virt_to_page(virt_addr);
 		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
@@ -263,22 +266,7 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
 	sg[nents].length =  sector_count  * SECTOR_SIZE;
 	nents++;
-#else
-        while (sector_count > 128) {
-		memset(&sg[nents], 0, sizeof(*sg));
-		sg[nents].address	= virt_to_page(virt_addr);
-		sg[nents].offset	= (unsigned long)virt_addr & ~PAGE_MASK;
-		sg[nents].length	= 128 * SECTOR_SIZE;
-		nents++;
-		virt_addr		= virt_addr + (128 * SECTOR_SIZE);
-		sector_count		-= 128;
-	};
-	memset(&sg[nents], 0, sizeof(*sg));
-	sg[nents].page		= virt_to_page(virt_addr);
-	sg[nents].offset	= (unsigned long) virt_addr & ~PAGE_MASK;
-	sg[nents].length	= sector_count * SECTOR_SIZE;
-	nents++;
-#endif
+
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
@@ -523,8 +511,7 @@ int __ide_dma_off_quietly (ide_drive_t *drive)
 	if (HWIF(drive)->ide_dma_host_off(drive))
 		return 1;
 
-	if (drive->queue_setup)
-		HWIF(drive)->ide_dma_queued_off(drive);
+	HWIF(drive)->ide_dma_queued_off(drive);
 
 	return 0;
 }
@@ -585,8 +572,9 @@ int __ide_dma_on (ide_drive_t *drive)
 	if (HWIF(drive)->ide_dma_host_on(drive))
 		return 1;
 
-	if (drive->queue_setup)
-		HWIF(drive)->ide_dma_queued_on(drive);
+#ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
+	HWIF(drive)->ide_dma_queued_on(drive);
+#endif
 
 	return 0;
 }

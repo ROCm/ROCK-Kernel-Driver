@@ -18,6 +18,9 @@ obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
 clean-files := oui.c
 
+quiet_cmd_oui2c = OUI2C   $@
+      cmd_oui2c = $(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $@
+
 $(obj)/oui.o: $(obj)/oui.c
 $(obj)/oui.c: $(obj)/oui.db $(obj)/oui2c.sh
-	$(CONFIG_SHELL) $(obj)/oui2c.sh < $(obj)/oui.db > $@
+	$(call if_changed,oui2c)

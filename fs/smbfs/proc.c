@@ -2802,6 +2802,13 @@ out:
 	return result;
 }
 
+static int
+smb_proc_getattr_null(struct smb_sb_info *server, struct dentry *dir,
+		      struct smb_fattr *attr)
+{
+	return -EIO;
+}
+
 int
 smb_proc_getattr(struct dentry *dir, struct smb_fattr *fattr)
 {
@@ -3429,3 +3436,14 @@ static struct smb_ops smb_ops_unix =
 	/* .setattr	= smb_proc_setattr_unix, */
 	.truncate	= smb_proc_trunc64,
 };
+
+/* Place holder until real ops are in place */
+static struct smb_ops smb_ops_null =
+{
+	.getattr	= smb_proc_getattr_null,
+};
+
+void smb_install_null_ops(struct smb_ops *ops)
+{
+	install_ops(ops, &smb_ops_null);
+}

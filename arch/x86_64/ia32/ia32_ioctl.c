@@ -552,7 +552,7 @@ static int do_usbdevfs_reapurb(unsigned int fd, unsigned int cmd, unsigned long 
 	set_fs(old_fs);
 
 	if (err >= 0 &&
-	    put_user(((u32)(long)kptr), compat_ptr(arg)))
+	    put_user((u32)(u64)kptr, (u32 *)arg))
 		err = -EFAULT;
 
 	return err;

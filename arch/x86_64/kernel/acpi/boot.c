@@ -100,7 +100,7 @@ acpi_parse_madt (
 	if (madt->lapic_address)
 		acpi_lapic_addr = (u64) madt->lapic_address;
 
-	printk(KERN_INFO PREFIX "Local APIC address 0x%08x\n",
+	printk(KERN_INFO PREFIX "Local APIC address 0x%016x\n",
 		madt->lapic_address);
 
 	return 0;

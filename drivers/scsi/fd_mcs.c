@@ -589,7 +589,6 @@ static int TOTAL_INTR = 0;
 static int fd_mcs_proc_info(struct Scsi_Host *shpnt, char *buffer, char **start, off_t offset, int length, int inout)
 {
 	int len = 0;
-	int i;
 
 	if (inout)
 		return (-ENOSYS);

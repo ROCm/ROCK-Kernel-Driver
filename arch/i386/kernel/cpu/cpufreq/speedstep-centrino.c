@@ -29,7 +29,7 @@
 #define PFX		"speedstep-centrino: "
 #define MAINTAINER	"Jeremy Fitzhardinge <jeremy@goop.org>"
 
-#define CENTRINO_DEBUG
+/*#define CENTRINO_DEBUG*/
 
 #ifdef CENTRINO_DEBUG
 #define dprintk(msg...) printk(msg)

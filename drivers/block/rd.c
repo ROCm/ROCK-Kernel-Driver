@@ -271,9 +271,6 @@ static int rd_open(struct inode * inode, struct file * filp)
 {
 	unsigned unit = minor(inode->i_rdev);
 
-	if (unit >= NUM_RAMDISKS)
-		return -ENODEV;
-
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().
 	 */

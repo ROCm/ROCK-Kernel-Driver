@@ -7,7 +7,7 @@
  * Written By: Jyoti Shah, Tong Yu, Irene Zubarev, IBM Corporation
  *
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001,2002 IBM Corp.
+ * Copyright (c) 2001-2003 IBM Corp.
  *
  * All rights reserved.
  *
@@ -398,7 +398,6 @@ extern int ibmphp_hpc_readslot (struct slot *, u8, u8 *);
 extern int ibmphp_hpc_writeslot (struct slot *, u8);
 extern void ibmphp_lock_operations (void);
 extern void ibmphp_unlock_operations (void);
-extern int ibmphp_hpc_fillhpslotinfo (struct hotplug_slot *);
 extern int ibmphp_hpc_start_poll_thread (void);
 extern void ibmphp_hpc_stop_poll_thread (void);
 

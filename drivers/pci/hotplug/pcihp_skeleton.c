@@ -1,8 +1,8 @@
 /*
- * PCI Hot Plug Controller Skeleton Driver - 0.1
+ * PCI Hot Plug Controller Skeleton Driver - 0.2
  *
- * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
- * Copyright (c) 2001 IBM Corp.
+ * Copyright (c) 2001,2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (c) 2001,2003 IBM Corp.
  *
  * All rights reserved.
  *
@@ -69,7 +69,7 @@ static LIST_HEAD(slot_list);
 static int debug;
 static int num_slots;
 
-#define DRIVER_VERSION	"0.1"
+#define DRIVER_VERSION	"0.2"
 #define DRIVER_AUTHOR	"Greg Kroah-Hartman <greg@kroah.com>"
 #define DRIVER_DESC	"Hot Plug PCI Controller Skeleton Driver"
 
@@ -288,6 +288,21 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 	return retval;
 }
 
+static void release_slots(struct hotplug_slot *hotplug_slot)
+{
+	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	int retval = 0;
+
+	if (slot == NULL)
+		return -ENODEV;
+
+	dbg(__FUNCTION__" - physical_slot = %s\n", hotplug_slot->name);
+	kfree(slot->hotplug_slot->info);
+	kfree(slot->hotplug_slot->name);
+	kfree(slot->hotplug_slot);
+	kfree(slot);
+}
+
 #define SLOT_NAME_SIZE	10
 static void make_slot_name (struct slot *slot)
 {
@@ -347,6 +362,7 @@ static int init_slots (void)
 		slot->number = i;
 
 		hotplug_slot->private = slot;
+		hotplug_slot->release = &release_slot;
 		make_slot_name (slot);
 		hotplug_slot->ops = &skel_hotplug_slot_ops;
 		
@@ -376,27 +392,23 @@ static int init_slots (void)
 
 	return retval;
 }
-		
-static void cleanup_slots (void)
+
+static void cleanup_slots(void)
 {
 	struct list_head *tmp;
+	struct list_head *next;
 	struct slot *slot;
 
 	/*
-	 * Unregister all of our slots with the pci_hotplug subsystem,
-	 * and free up all memory that we had allocated.
+	 * Unregister all of our slots with the pci_hotplug subsystem.
+	 * Memory will be freed in release_slot() callback after slot's
+	 * lifespan is finished.
 	 */
-	list_for_each (tmp, &slot_list) {
+	list_for_each_safe (tmp, next, &slot_list) {
 		slot = list_entry (tmp, struct slot, slot_list);
 		list_del (&slot->slot_list);
 		pci_hp_deregister (slot->hotplug_slot);
-		kfree (slot->hotplug_slot->info);
-		kfree (slot->hotplug_slot->name);
-		kfree (slot->hotplug_slot);
-		kfree (slot);
 	}
-
-	return;
 }
 		
 static int __init pcihp_skel_init(void)

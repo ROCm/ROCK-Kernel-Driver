@@ -56,19 +56,15 @@ AMD mobile K6-3+
 AMD mobile Duron
 AMD mobile Athlon
 Cyrix Media GXm
-Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
+Intel mobile PIII and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
 Intel Pentium M (Centrino)
 National Semiconductors Geode GX
 Transmeta Crusoe
 VIA Cyrix 3 / C3
-various processors on some ACPI 2.0-compatible systems [**]
+various processors on some ACPI 2.0-compatible systems [*]
 
-[*] only certain Intel mobile PIII processors are supported. If you
-know that you own a speedstep-capable processor, pass the option
-"speedstep_coppermine=1" to the module speedstep.o
-
-[**] Only if "ACPI Processor Performance States" are available
+[*] Only if "ACPI Processor Performance States" are available
 to the ACPI<->BIOS interface.
 
 

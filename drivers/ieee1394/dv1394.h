@@ -64,7 +64,7 @@
 
 	   ioctl(fd, DV1394_INIT, &init);
 
-	   while(1) {
+	   while (1) {
 	          read( <a raw DV file>, buf, DV1394_NTSC_FRAME_SIZE );
 		  write( <the dv1394 FD>, buf, DV1394_NTSC_FRAME_SIZE );
            }
@@ -145,7 +145,7 @@
    (checks of system call return values omitted for brevity; always
    check return values in your code!)
    
-   while( frames left ) {
+   while ( frames left ) {
    
     struct pollfd *pfd = ...;
 
@@ -157,15 +157,15 @@
     
     poll(pfd, 1, -1); (or select(); add a timeout if you want)
 
-    if(pfd->revents) {
+    if (pfd->revents) {
          struct dv1394_status status;
 	 
          ioctl(dv1394_fd, DV1394_GET_STATUS, &status);
 
-	 if(status.dropped_frames > 0) {
+	 if (status.dropped_frames > 0) {
 	      reset_dv1394();
          } else {
-              for(int i = 0; i < status.n_clear_frames; i++) {
+              for (int i = 0; i < status.n_clear_frames; i++) {
 	          copy_DV_frame();
               }
          }

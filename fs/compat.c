@@ -451,7 +451,6 @@ asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
 			break;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-		ret = sys_fcntl(fd, F_GETLK, (unsigned long)&f);
 		ret = sys_fcntl(fd, (cmd == F_GETLK64) ? F_GETLK :
 				((cmd == F_SETLK64) ? F_SETLK : F_SETLKW),
 				(unsigned long)&f);

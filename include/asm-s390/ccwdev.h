@@ -115,6 +115,8 @@ extern int ccw_device_set_options(struct ccw_device *, unsigned long);
 #define CCWDEV_EARLY_NOTIFICATION	0x0001
 /* Report all interrupt conditions. */
 #define CCWDEV_REPORT_ALL	 	0x0002
+/* Try to perform path grouping. */
+#define CCWDEV_DO_PATHGROUP             0x0004
 
 /*
  * ccw_device_start()

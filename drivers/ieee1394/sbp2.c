@@ -79,7 +79,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 942 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 967 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -93,7 +93,7 @@ static char version[] __devinitdata =
  * (probably due to PCI latency/throughput issues with the part). You can
  * bump down the speed if you are running into problems.
  */
-static int max_speed = SPEED_MAX;
+static int max_speed = IEEE1394_SPEED_MAX;
 module_param(max_speed, int, 0644);
 MODULE_PARM_DESC(max_speed, "Force max speed (3 = 800mb, 2 = 400mb default, 1 = 200mb, 0 = 100mb)");
 
@@ -780,8 +780,8 @@ static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *u
 
 		scsi_id->ne = ud->ne;
 		scsi_id->hi = hi;
-		scsi_id->speed_code = SPEED_100;
-		scsi_id->max_payload_size = sbp2_speedto_max_payload[SPEED_100];
+		scsi_id->speed_code = IEEE1394_SPEED_100;
+		scsi_id->max_payload_size = sbp2_speedto_max_payload[IEEE1394_SPEED_100];
 		atomic_set(&scsi_id->sbp2_login_complete, 0);
 		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
 		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);

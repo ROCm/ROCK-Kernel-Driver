@@ -322,7 +322,7 @@ static void __devexit pci_plx9050_exit(struct pci_dev *dev)
  * hope) because it doesn't touch EEPROM settings to prevent conflicts
  * with other OSes (like M$ DOS).
  *
- *  SIIG support added by Andrey Panin <pazke@mail.tp.ru>, 10/1999
+ *  SIIG support added by Andrey Panin <pazke@donpac.ru>, 10/1999
  * 
  * There is two family of SIIG serial cards with different PCI
  * interface chip and different configuration methods:

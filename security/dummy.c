@@ -122,6 +122,16 @@ static int dummy_bprm_check_security (struct linux_binprm *bprm)
 	return 0;
 }
 
+static int dummy_bprm_secureexec (struct linux_binprm *bprm)
+{
+	/* The new userland will simply use the value provided
+	   in the AT_SECURE field to decide whether secure mode
+	   is required.  Hence, this logic is required to preserve
+	   the legacy decision algorithm used by the old userland. */
+	return (current->euid != current->uid ||
+		current->egid != current->gid);
+}
+
 static int dummy_sb_alloc_security (struct super_block *sb)
 {
 	return 0;
@@ -788,6 +798,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, bprm_compute_creds);
 	set_to_dummy_if_null(ops, bprm_set_security);
 	set_to_dummy_if_null(ops, bprm_check_security);
+	set_to_dummy_if_null(ops, bprm_secureexec);
 	set_to_dummy_if_null(ops, sb_alloc_security);
 	set_to_dummy_if_null(ops, sb_free_security);
 	set_to_dummy_if_null(ops, sb_kern_mount);

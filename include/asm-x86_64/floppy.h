@@ -22,7 +22,7 @@
  * floppy accesses go through the track buffer.
  */
 #define _CROSS_64KB(a,s,vdma) \
-(!vdma && ((unsigned long)(a)/K_64 != ((unsigned long)(a) + (s) - 1) / K_64))
+(!(vdma) && ((unsigned long)(a)/K_64 != ((unsigned long)(a) + (s) - 1) / K_64))
 
 #define CROSS_64KB(a,s) _CROSS_64KB(a,s,use_virtual_dma & 1)
 
@@ -62,10 +62,8 @@ static irqreturn_t floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	static int bytes=0;
 	static int dma_wait=0;
 #endif
-	if(!doing_pdma) {
-		floppy_interrupt(irq, dev_id, regs);
-		return IRQ_HANDLED;
-	}
+	if (!doing_pdma)
+		return floppy_interrupt(irq, dev_id, regs);
 
 #ifdef TRACE_FLPY_INT
 	if(!calls)
@@ -115,7 +113,6 @@ static irqreturn_t floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	if(!virtual_dma_count)
 		dma_wait++;
 #endif
-
 	return IRQ_HANDLED;
 }
 

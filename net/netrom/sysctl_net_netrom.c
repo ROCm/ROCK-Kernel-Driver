@@ -162,7 +162,6 @@ static ctl_table nr_dir_table[] = {
 	{
 		.ctl_name	= NET_NETROM,
 		.procname	= "netrom",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= nr_table
 	},
@@ -173,7 +172,6 @@ static ctl_table nr_root_table[] = {
 	{
 		.ctl_name	= CTL_NET,
 		.procname	= "net",
-		.maxlen		= 0,
 		.mode		= 0555,
 		.child		= nr_dir_table
 	},

@@ -45,6 +45,7 @@
  *    Dajiang Zhang 	    <dajiang.zhang@nokia.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Ryan Layer	    <rmlayer@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -537,7 +538,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const struct sctp_endpoint *ep,
 	 * are in good shape.
 	 */
         chunk->subh.cookie_hdr =
-		(sctp_signed_cookie_t *)chunk->skb->data;
+		(struct sctp_signed_cookie *)chunk->skb->data;
 	skb_pull(chunk->skb,
 		 ntohs(chunk->chunk_hdr->length) - sizeof(sctp_chunkhdr_t));
 
@@ -738,7 +739,7 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const struct sctp_endpoint *ep,
 {
 	struct sctp_transport *transport = (struct sctp_transport *) arg;
 
-	if (asoc->overall_error_count > asoc->overall_error_threshold) {
+	if (asoc->overall_error_count > asoc->max_retrans) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
@@ -924,16 +925,16 @@ static int sctp_sf_send_restart_abort(union sctp_addr *ssa,
 {
 	int len;
 	struct sctp_packet *pkt;
-	sctp_addr_param_t *addrparm;
-	sctp_errhdr_t *errhdr;
+	union sctp_addr_param *addrparm;
+	struct sctp_errhdr *errhdr;
 	struct sctp_endpoint *ep;
-	char buffer[sizeof(sctp_errhdr_t) + sizeof(sctp_addr_param_t)];
+	char buffer[sizeof(struct sctp_errhdr)+sizeof(union sctp_addr_param)];
 
 	/* Build the error on the stack.   We are way to malloc crazy
 	 * throughout the code today.
 	 */
-	errhdr = (sctp_errhdr_t *)buffer;
-	addrparm = (sctp_addr_param_t *)errhdr->variable;
+	errhdr = (struct sctp_errhdr *)buffer;
+	addrparm = (union sctp_addr_param *)errhdr->variable;
 
 	/* Copy into a parm format. */
 	len = sockaddr2sctp_addr(ssa, addrparm);
@@ -1618,7 +1619,7 @@ sctp_disposition_t sctp_sf_do_5_2_4_dupcook(const struct sctp_endpoint *ep,
 	/* "Decode" the chunk.  We have no optional parameters so we
 	 * are in good shape.
 	 */
-        chunk->subh.cookie_hdr = (sctp_signed_cookie_t *)chunk->skb->data;
+        chunk->subh.cookie_hdr = (struct sctp_signed_cookie *)chunk->skb->data;
 	skb_pull(chunk->skb, ntohs(chunk->chunk_hdr->length) -
 		 sizeof(sctp_chunkhdr_t));
 
@@ -1866,7 +1867,7 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 	 * yield a higher probability of success on the reattempt.
 	 */
 	stale = ntohl(*(suseconds_t *)((u8 *)err + sizeof(sctp_errhdr_t)));
-	stale = stale << 1 / 1000;
+	stale = (stale * 2) / 1000;
 
 	bht.param_hdr.type = SCTP_PARAM_COOKIE_PRESERVATIVE;
 	bht.param_hdr.length = htons(sizeof(bht));
@@ -1947,22 +1948,23 @@ sctp_disposition_t sctp_sf_do_9_1_abort(const struct sctp_endpoint *ep,
 					sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
+	unsigned len;
 	__u16 error = SCTP_ERROR_NO_ERROR;
 
 	if (!sctp_vtag_verify_either(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
 
-	if (chunk && (ntohs(chunk->chunk_hdr->length) >=
-			(sizeof(struct sctp_chunkhdr) +
-			sizeof(struct sctp_errhdr))))
+	/* Check that chunk header looks valid.  */
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len >= sizeof(struct sctp_chunkhdr) + sizeof(struct sctp_errhdr))
 		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
+
 
  	/* ASSOC_FAILED will DELETE_TCB. */
 	sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED, SCTP_U32(error));
 	SCTP_INC_STATS(SctpAborteds);
 	SCTP_DEC_STATS(SctpCurrEstab);
 
-	/* BUG?  This does not look complete... */
 	return SCTP_DISPOSITION_ABORT;
 }
 
@@ -1978,6 +1980,7 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 				     sctp_cmd_seq_t *commands)
 {
 	struct sctp_chunk *chunk = arg;
+	unsigned len;
 	__u16 error = SCTP_ERROR_NO_ERROR;
 
 	if (!sctp_vtag_verify_either(chunk, asoc))
@@ -1989,9 +1992,9 @@ sctp_disposition_t sctp_sf_cookie_wait_abort(const struct sctp_endpoint *ep,
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
 
-	if (chunk && (ntohs(chunk->chunk_hdr->length) >=
-			(sizeof(struct sctp_chunkhdr) +
-			sizeof(struct sctp_errhdr))))
+	/* Check that chunk header looks valid.  */
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len >= sizeof(struct sctp_chunkhdr) + sizeof(struct sctp_errhdr))
 		error = ((sctp_errhdr_t *)chunk->skb->data)->cause;
 
 	/* CMD_INIT_FAILED will DELETE_TCB. */
@@ -3201,82 +3204,6 @@ sctp_disposition_t sctp_sf_pdiscard(const struct sctp_endpoint *ep,
 	return SCTP_DISPOSITION_CONSUME;
 }
 
-#if 0
-/*
- * We did something stupid but got lucky.  Namely, we sent a HEARTBEAT
- * before the association was all the way up and we did NOT get an
- * ABORT.
- *
- * Log the fact and then process normally.
- *
- * Section: Not specified
- * Verification Tag:  8.5 Verification Tag [Normal verification]
- * Inputs
- * (endpoint, asoc, chunk)
- *
- * Outputs
- * (asoc, reply_msg, msg_up, timers, counters)
- *
- * The return value is the disposition of the chunk.
- */
-sctp_disposition_t lucky(const struct sctp_endpoint *ep,
-			 const struct sctp_association *asoc,
-			 const sctp_subtype_t type,
-			 void *arg,
-			 sctp_cmd_seq_t *commands)
-{
-	struct sctp_chunk *chunk = arg;
-
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (chunk->sctp_hdr->vtag != asoc->c.my_vtag)
-		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
-
-	return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
-}
-#endif /* 0 */
-
-#if 0
-/*
- * The other end is doing something very stupid.  We'll ignore them
- * after logging their idiocy. :-)
- *
- * Section: Not specified
- * Verification Tag:  8.5 Verification Tag [Normal verification]
- * Inputs
- * (endpoint, asoc, chunk)
- *
- * Outputs
- * (asoc, reply_msg, msg_up, timers, counters)
- *
- * The return value is the disposition of the chunk.
- */
-sctp_disposition_t other_stupid(const struct sctp_endpoint *ep,
-				const struct sctp_association *asoc,
-				const sctp_subtype_t type,
-				void *arg,
-				sctp_cmd_seq_t *commands)
-{
-	struct sctp_chunk *chunk = arg;
-
-	/* 8.5 When receiving an SCTP packet, the endpoint MUST ensure
-	 * that the value in the Verification Tag field of the
-	 * received SCTP packet matches its own Tag. ...
-	 */
-	if (chunk->sctp_hdr->vtag != asoc->c.my_vtag)
-		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
-
-	return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
-}
-#endif /* 0 */
 
 /*
  * The other end is violating protocol.
@@ -4070,7 +3997,7 @@ sctp_disposition_t sctp_sf_do_6_3_3_rtx(const struct sctp_endpoint *ep,
 {
 	struct sctp_transport *transport = arg;
 
-	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
+	if (asoc->overall_error_count >= asoc->max_retrans) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
@@ -4241,7 +4168,7 @@ sctp_disposition_t sctp_sf_t2_timer_expire(const struct sctp_endpoint *ep,
 	struct sctp_chunk *reply = NULL;
 
 	SCTP_DEBUG_PRINTK("Timer T2 expired.\n");
-	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
+	if (asoc->overall_error_count >= asoc->max_retrans) {
 		/* Note:  CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
 		sctp_add_cmd_sf(commands, SCTP_CMD_ASSOC_FAILED,
 				SCTP_U32(SCTP_ERROR_NO_ERROR));
@@ -4500,13 +4427,21 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *asoc,
 	if (asoc) {
 		vtag = asoc->peer.i.init_tag;
 	} else {
-		/* Special case the INIT as there is no vtag yet. */
-		if (SCTP_CID_INIT == chunk->chunk_hdr->type) {
+		/* Special case the INIT and stale COOKIE_ECHO as there is no
+		 * vtag yet.
+		 */
+		switch(chunk->chunk_hdr->type) {
+		case SCTP_CID_INIT:
+		{
 			sctp_init_chunk_t *init;
+
 			init = (sctp_init_chunk_t *)chunk->chunk_hdr;
 			vtag = ntohl(init->init_hdr.init_tag);
-		} else {
+			break;
+		}
+		default:	
 			vtag = ntohl(chunk->sctp_hdr->vtag);
+			break;
 		}
 	}
 
@@ -4557,6 +4492,12 @@ void sctp_send_stale_cookie_err(const struct sctp_endpoint *ep,
 	if (err_chunk) {
 		packet = sctp_ootb_pkt_new(asoc, chunk);
 		if (packet) {
+			struct sctp_signed_cookie *cookie;
+
+			/* Override the OOTB vtag from the cookie. */
+			cookie = chunk->subh.cookie_hdr;
+			packet->vtag = cookie->c.peer_vtag;
+			
 			/* Set the skb to the belonging sock for accounting. */
 			err_chunk->skb->sk = ep->base.sk;
 			sctp_packet_append_chunk(packet, err_chunk);

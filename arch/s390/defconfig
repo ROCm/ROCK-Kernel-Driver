@@ -68,6 +68,11 @@ CONFIG_PFAULT=y
 # CONFIG_PCMCIA is not set
 
 #
+# Generic Driver Options
+#
+# CONFIG_FW_LOADER is not set
+
+#
 # SCSI support
 #
 # CONFIG_SCSI is not set
@@ -166,6 +171,7 @@ CONFIG_IPV6=m
 # CONFIG_INET6_AH is not set
 # CONFIG_INET6_ESP is not set
 # CONFIG_INET6_IPCOMP is not set
+# CONFIG_IPV6_TUNNEL is not set
 # CONFIG_XFRM_USER is not set
 
 #

@@ -508,12 +508,87 @@ ide_proc_entry_t generic_subdriver_entries[] = {
 };
 #endif
 
+static struct resource* hwif_request_region(ide_hwif_t *hwif,
+					    unsigned long addr, int num)
+{
+	struct resource *res;
+
+	if (hwif->mmio)
+		res = request_mem_region(addr, num, hwif->name);
+	else
+		res = request_region(addr, num, hwif->name);
+
+	if (!res)
+		printk(KERN_ERR "%s: %s resource 0x%lX-0x%lX not free.\n",
+				hwif->name, hwif->mmio ? "MMIO" : "I/O",
+				addr, addr+num-1);
+	return res;
+}
 
 #define hwif_release_region(addr, num) \
 	((hwif->mmio) ? release_mem_region((addr),(num)) : release_region((addr),(num)))
 
 /**
- *	hwif_unregister		-	free IDE resources
+ *	ide_hwif_request_regions - request resources for IDE
+ *	@hwif: interface to use
+ *
+ *	Requests all the needed resources for an interface.
+ *	Right now core IDE code does this work which is deeply wrong.
+ *	MMIO leaves it to the controller driver,
+ *	PIO will migrate this way over time.
+ */
+int ide_hwif_request_regions(ide_hwif_t *hwif)
+{
+	unsigned long addr;
+	unsigned int i;
+
+	if (hwif->mmio == 2)
+		return 0;
+	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
+	if (addr && !hwif_request_region(hwif, addr, 1))
+		goto control_region_busy;
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	addr = hwif->io_ports[IDE_IRQ_OFFSET];
+	if (addr && !hwif_request_region(hwif, addr, 1))
+		goto irq_region_busy;
+#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+	hwif->straight8 = 0;
+	addr = hwif->io_ports[IDE_DATA_OFFSET];
+	if ((addr | 7) == hwif->io_ports[IDE_STATUS_OFFSET]) {
+		if (!hwif_request_region(hwif, addr, 8))
+			goto data_region_busy;
+		hwif->straight8 = 1;
+		return 0;
+	}
+	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
+		addr = hwif->io_ports[i];
+		if (!hwif_request_region(hwif, addr, 1)) {
+			while (--i)
+				hwif_release_region(addr, 1);
+			goto data_region_busy;
+		}
+	}
+	return 0;
+
+data_region_busy:
+#if defined(CONFIG_AMIGA) || defined(CONFIG_MAC)
+	addr = hwif->io_ports[IDE_IRQ_OFFSET];
+	if (addr)
+		hwif_release_region(addr, 1);
+irq_region_busy:
+#endif /* (CONFIG_AMIGA) || (CONFIG_MAC) */
+	addr = hwif->io_ports[IDE_CONTROL_OFFSET];
+	if (addr)
+		hwif_release_region(addr, 1);
+control_region_busy:
+	/* If any errors are return, we drop the hwif interface. */
+	return -EBUSY;
+}
+
+EXPORT_SYMBOL(ide_hwif_request_regions);
+
+/**
+ *	ide_hwif_release_regions - free IDE resources
  *
  *	Note that we only release the standard ports,
  *	and do not even try to handle any extra ports
@@ -523,8 +598,7 @@ ide_proc_entry_t generic_subdriver_entries[] = {
  *	importantly our caller should be doing this so we need to 
  *	restructure this as a helper function for drivers.
  */
- 
-void hwif_unregister (ide_hwif_t *hwif)
+void ide_hwif_release_regions(ide_hwif_t *hwif)
 {
 	u32 i = 0;
 
@@ -548,7 +622,7 @@ void hwif_unregister (ide_hwif_t *hwif)
 	}
 }
 
-EXPORT_SYMBOL(hwif_unregister);
+EXPORT_SYMBOL(ide_hwif_release_regions);
 
 extern void init_hwif_data(unsigned int index);
 
@@ -635,7 +709,7 @@ void ide_unregister (unsigned int index)
 	 * and do not even try to handle any extra ports
 	 * allocated for weird IDE interface chipsets.
 	 */
-	hwif_unregister(hwif);
+	ide_hwif_release_regions(hwif);
 
 	/*
 	 * Remove us from the hwgroup, and free
@@ -2098,10 +2172,9 @@ int __init ide_setup (char *s)
 #ifdef CONFIG_BLK_DEV_IDEPCI
 				hwif->udma_four = 1;
 				goto done;
-#else /* !CONFIG_BLK_DEV_IDEPCI */
-				hwif->udma_four = 0;
+#else
 				goto bad_hwif;
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 			case -6: /* dma */
 				hwif->autodma = 1;
 				goto done;
@@ -2520,13 +2593,9 @@ struct bus_type ide_bus_type = {
  */
 int __init ide_init (void)
 {
-	static char banner_printed;
-	if (!banner_printed) {
-		printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
-		devfs_mk_dir("ide");
-		system_bus_speed = ide_system_bus_speed();
-		banner_printed = 1;
-	}
+	printk(KERN_INFO "Uniform Multi-Platform E-IDE driver " REVISION "\n");
+	devfs_mk_dir("ide");
+	system_bus_speed = ide_system_bus_speed();
 
 	bus_register(&ide_bus_type);
 

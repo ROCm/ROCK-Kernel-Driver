@@ -23,6 +23,7 @@
 #include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/sysctl.h>
+#include <linux/workqueue.h>
 #include <net/tcp.h>
 #include <net/inet_common.h>
 #include <net/xfrm.h>
@@ -407,15 +408,22 @@ static void tcp_twkill(unsigned long);
 #define TCP_TWKILL_SLOTS	8	/* Please keep this a power of 2. */
 #define TCP_TWKILL_PERIOD	(TCP_TIMEWAIT_LEN/TCP_TWKILL_SLOTS)
 
+#define TCP_TWKILL_QUOTA	100
+
 static struct hlist_head tcp_tw_death_row[TCP_TWKILL_SLOTS];
 static spinlock_t tw_death_lock = SPIN_LOCK_UNLOCKED;
 static struct timer_list tcp_tw_timer = TIMER_INITIALIZER(tcp_twkill, 0, 0);
+static void twkill_work(void *);
+static DECLARE_WORK(tcp_twkill_work, twkill_work, NULL);
+static u32 twkill_thread_slots;
 
-static void tcp_twkill(unsigned long dummy)
+/* Returns non-zero if quota exceeded.  */
+static int tcp_do_twkill_work(int slot, unsigned int quota)
 {
 	struct tcp_tw_bucket *tw;
 	struct hlist_node *node, *safe;
-	int killed = 0;
+	unsigned int killed;
+	int ret;
 
 	/* NOTE: compare this to previous version where lock
 	 * was released after detaching chain. It was racy,
@@ -423,28 +431,84 @@ static void tcp_twkill(unsigned long dummy)
 	 * in 2.3 (with netfilter), and with softnet it is common, because
 	 * soft irqs are not sequenced.
 	 */
-	spin_lock(&tw_death_lock);
-
-	if (tcp_tw_count == 0)
-		goto out;
-
+	killed = 0;
+	ret = 0;
 	tw_for_each_inmate(tw, node, safe,
-			   &tcp_tw_death_row[tcp_tw_death_row_slot]) {
+			   &tcp_tw_death_row[slot]) {
 		__tw_del_dead_node(tw);
 		spin_unlock(&tw_death_lock);
 		tcp_timewait_kill(tw);
 		tcp_tw_put(tw);
 		killed++;
 		spin_lock(&tw_death_lock);
+		if (killed > quota) {
+			ret = 1;
+			break;
+		}
+	}
+
+	tcp_tw_count -= killed;
+	NET_ADD_STATS_BH(TimeWaited, killed);
+
+	return ret;
+}
+
+static void tcp_twkill(unsigned long dummy)
+{
+	int need_timer, ret;
+
+	spin_lock(&tw_death_lock);
+
+	if (tcp_tw_count == 0)
+		goto out;
+
+	need_timer = 0;
+	ret = tcp_do_twkill_work(tcp_tw_death_row_slot, TCP_TWKILL_QUOTA);
+	if (ret) {
+		twkill_thread_slots |= (1 << tcp_tw_death_row_slot);
+		mb();
+		schedule_work(&tcp_twkill_work);
+		need_timer = 1;
+	} else {
+		/* We purged the entire slot, anything left?  */
+		if (tcp_tw_count)
+			need_timer = 1;
 	}
 	tcp_tw_death_row_slot =
 		((tcp_tw_death_row_slot + 1) & (TCP_TWKILL_SLOTS - 1));
-
-	if ((tcp_tw_count -= killed) != 0)
-		mod_timer(&tcp_tw_timer, jiffies+TCP_TWKILL_PERIOD);
-	NET_ADD_STATS_BH(TimeWaited, killed);
+	if (need_timer)
+		mod_timer(&tcp_tw_timer, jiffies + TCP_TWKILL_PERIOD);
 out:
 	spin_unlock(&tw_death_lock);
+}
+
+extern void twkill_slots_invalid(void);
+
+static void twkill_work(void *dummy)
+{
+	int i;
+
+	if ((TCP_TWKILL_SLOTS - 1) > (sizeof(twkill_thread_slots) * 8))
+		twkill_slots_invalid();
+
+	while (twkill_thread_slots) {
+		spin_lock_bh(&tw_death_lock);
+		for (i = 0; i < TCP_TWKILL_SLOTS; i++) {
+			if (!(twkill_thread_slots & (1 << i)))
+				continue;
+
+			while (tcp_do_twkill_work(i, TCP_TWKILL_QUOTA) != 0) {
+				if (need_resched()) {
+					spin_unlock_bh(&tw_death_lock);
+					schedule();
+					spin_lock_bh(&tw_death_lock);
+				}
+			}
+
+			twkill_thread_slots &= ~(1 << i);
+		}
+		spin_unlock_bh(&tw_death_lock);
+	}
 }
 
 /* These are always called from BH context.  See callers in

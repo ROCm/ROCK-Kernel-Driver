@@ -47,7 +47,7 @@ quiet_cmd_syscall = SYSCALL $@
       cmd_syscall = $(CC) -nostdlib $(SYSCFLAGS_$(@F)) \
 		          -Wl,-T,$(filter-out FORCE,$^) -o $@
 
-vsyscall-flags = -shared -s -Wl,-soname=linux-vsyscall.so.1
+vsyscall-flags = -shared -s -Wl,-soname=linux-gate.so.1
 SYSCFLAGS_vsyscall-sysenter.so	= $(vsyscall-flags)
 SYSCFLAGS_vsyscall-int80.so	= $(vsyscall-flags)
 

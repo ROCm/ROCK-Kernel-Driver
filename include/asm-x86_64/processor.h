@@ -280,8 +280,6 @@ extern void prepare_to_copy(struct task_struct *tsk);
  */
 extern long kernel_thread(int (*fn)(void *), void * arg, unsigned long flags);
 
-static inline void release_segments(struct mm_struct *mm) { }
-
 /*
  * Return saved PC of a blocked thread.
  * What is this good for? it will be always the scheduler or ret_from_fork.

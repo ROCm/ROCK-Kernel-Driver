@@ -727,9 +727,8 @@ skip_commit: /* The journal should be unlocked by now. */
 			__journal_unfile_buffer(jh);
 			jh->b_transaction = 0;
 			jbd_unlock_bh_state(bh);
-			journal_remove_journal_head(bh);
-			if (buffer_freed(bh))
-				release_buffer_page(bh);
+			journal_remove_journal_head(bh);  /* needs a brelse */
+			release_buffer_page(bh);
 		}
 		spin_unlock(&journal->j_list_lock);
 	}

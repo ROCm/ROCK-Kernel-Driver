@@ -136,6 +136,7 @@ static inline int arp_packet_match(const struct arphdr *arphdr,
 		dprintf("ARP hardware address length mismatch.\n");
 		dprintf("ar_hln: %02x info->arhln: %02x info->arhln_mask: %02x\n",
 			arphdr->ar_hln, arpinfo->arhln, arpinfo->arhln_mask);
+		return 0;
 	}
 
 	src_devaddr = arpptr;

@@ -1018,7 +1018,6 @@ int qword_get(char **bpp, char *dest, int bufsize)
 
 struct handle {
 	struct cache_detail *cd;
-	char 		    *pbuf;
 };
 
 static void *c_start(struct seq_file *m, loff_t *pos)
@@ -1087,10 +1086,9 @@ static int c_show(struct seq_file *m, void *p)
 {
 	struct cache_head *cp = p;
 	struct cache_detail *cd = ((struct handle*)m->private)->cd;
-	char *pbuf = ((struct handle*)m->private)->pbuf;
 
 	if (p == (void *)1)
-		return cd->cache_show(m, cd, NULL, pbuf);
+		return cd->cache_show(m, cd, NULL);
 
 	ifdebug(CACHE)
 		seq_printf(m, "# expiry=%ld refcnt=%d\n",
@@ -1102,7 +1100,7 @@ static int c_show(struct seq_file *m, void *p)
 	else
 		cache_put(cp, cd);
 
-	return cd->cache_show(m, cd, cp, pbuf);
+	return cd->cache_show(m, cd, cp);
 }
 
 struct seq_operations cache_content_op = {
@@ -1115,26 +1113,19 @@ struct seq_operations cache_content_op = {
 static int content_open(struct inode *inode, struct file *file)
 {
 	int res;
-	char *namebuf = kmalloc(PAGE_SIZE, GFP_KERNEL);
 	struct handle *han;
 	struct cache_detail *cd = PDE(inode)->data;
 
-	if (namebuf == NULL)
+	han = kmalloc(sizeof(*han), GFP_KERNEL);
+	if (han == NULL)
 		return -ENOMEM;
 
-	han = kmalloc(sizeof(*han), GFP_KERNEL);
-	if (han == NULL) {
-		kfree(namebuf);
-		return -ENOMEM;
-	}
-	han->pbuf = namebuf;
 	han->cd = cd;
 
 	res = seq_open(file, &cache_content_op);
-	if (res) {
-		kfree(namebuf);
+	if (res)
 		kfree(han);
-	} else
+	else
 		((struct seq_file *)file->private_data)->private = han;
 
 	return res;
@@ -1143,7 +1134,6 @@ static int content_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *m = (struct seq_file *)file->private_data;
 	struct handle *han = m->private;
-	kfree(han->pbuf);
 	kfree(han);
 	m->private = NULL;
 	return seq_release(inode, file);

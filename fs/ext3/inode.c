@@ -1662,32 +1662,20 @@ void ext3_set_aops(struct inode *inode)
  * This required during truncate. We need to physically zero the tail end
  * of that block so it doesn't yield old data if the file is later grown.
  */
-static int ext3_block_truncate_page(handle_t *handle,
+static int ext3_block_truncate_page(handle_t *handle, struct page *page,
 		struct address_space *mapping, loff_t from)
 {
 	unsigned long index = from >> PAGE_CACHE_SHIFT;
 	unsigned offset = from & (PAGE_CACHE_SIZE-1);
 	unsigned blocksize, iblock, length, pos;
 	struct inode *inode = mapping->host;
-	struct page *page;
 	struct buffer_head *bh;
 	int err;
 	void *kaddr;
 
 	blocksize = inode->i_sb->s_blocksize;
-	length = offset & (blocksize - 1);
-
-	/* Block boundary? Nothing to do */
-	if (!length)
-		return 0;
-
-	length = blocksize - length;
+	length = blocksize - (offset & (blocksize - 1));
 	iblock = index << (PAGE_CACHE_SHIFT - inode->i_sb->s_blocksize_bits);
-
-	page = grab_cache_page(mapping, index);
-	err = -ENOMEM;
-	if (!page)
-		goto out;
 
 	if (!page_has_buffers(page))
 		create_empty_buffers(page, blocksize, 0);
@@ -1756,7 +1744,6 @@ static int ext3_block_truncate_page(handle_t *handle,
 unlock:
 	unlock_page(page);
 	page_cache_release(page);
-out:
 	return err;
 }
 
@@ -2137,13 +2124,15 @@ void ext3_truncate(struct inode * inode)
 	struct ext3_inode_info *ei = EXT3_I(inode);
 	u32 *i_data = ei->i_data;
 	int addr_per_block = EXT3_ADDR_PER_BLOCK(inode->i_sb);
+	struct address_space *mapping = inode->i_mapping;
 	int offsets[4];
 	Indirect chain[4];
 	Indirect *partial;
 	int nr = 0;
 	int n;
 	long last_block;
-	unsigned blocksize;
+	unsigned blocksize = inode->i_sb->s_blocksize;
+	struct page *page;
 
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
 	    S_ISLNK(inode->i_mode)))
@@ -2155,16 +2144,36 @@ void ext3_truncate(struct inode * inode)
 
 	ext3_discard_prealloc(inode);
 
+	/*
+	 * We have to lock the EOF page here, because lock_page() nests
+	 * outside journal_start().
+	 */
+	if ((inode->i_size & (blocksize - 1)) == 0) {
+		/* Block boundary? Nothing to do */
+		page = NULL;
+	} else {
+		page = grab_cache_page(mapping,
+				inode->i_size >> PAGE_CACHE_SHIFT);
+		if (!page)
+			return;
+	}
+
 	handle = start_transaction(inode);
 	if (IS_ERR(handle)) {
+		if (page) {
+			clear_highpage(page);
+			flush_dcache_page(page);
+			unlock_page(page);
+			page_cache_release(page);
+		}
 		return;		/* AKPM: return what? */
 	}
 
-	blocksize = inode->i_sb->s_blocksize;
 	last_block = (inode->i_size + blocksize-1)
 					>> EXT3_BLOCK_SIZE_BITS(inode->i_sb);
 
-	ext3_block_truncate_page(handle, inode->i_mapping, inode->i_size);
+	if (page)
+		ext3_block_truncate_page(handle, page, mapping, inode->i_size);
 
 	n = ext3_block_to_path(inode, last_block, offsets, NULL);
 	if (n == 0)

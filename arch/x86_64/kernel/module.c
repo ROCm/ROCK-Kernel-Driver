@@ -31,9 +31,6 @@
 
 #define DEBUGP(fmt...) 
  
-/* TODO this should be in vmlist, but we must fix get_vm_area first to 
-   handle out of bounds entries properly. 
-   Also need to fix /proc/kcore, /dev/kmem */
 static struct vm_struct *mod_vmlist;
 
 void module_free(struct module *mod, void *module_region)

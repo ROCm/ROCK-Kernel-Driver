@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.6 $
+ *   $Revision: 1.7 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -196,10 +196,12 @@ ccwgroup_online_store (struct device *dev, const char *buf, size_t count)
 
 	value = simple_strtoul(buf, 0, 0);
 
-	if (value)
+	if (value == 1)
 		ccwgroup_set_online(gdev);
-	else
+	else if (value == 0)
 		ccwgroup_set_offline(gdev);
+	else
+		return -EINVAL;
 
 	return count;
 }
@@ -211,7 +213,7 @@ ccwgroup_online_show (struct device *dev, char *buf)
 
 	online = (to_ccwgroupdev(dev)->state == CCWGROUP_ONLINE);
 
-	return sprintf(buf, online ? "1\n" : "0\n");
+	return sprintf(buf, online ? "yes\n" : "no\n");
 }
 
 static DEVICE_ATTR(online, 0644, ccwgroup_online_show, ccwgroup_online_store);

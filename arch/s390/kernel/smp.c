@@ -419,8 +419,6 @@ void __init smp_check_cpus(unsigned int max_cpus)
 	boot_cpu_addr = S390_lowcore.cpu_data.cpu_addr;
         current_thread_info()->cpu = 0;
         num_cpus = 1;
-	cpu_possible_map = 1;
-	cpu_online_map = 1;
         for (curr_cpu = 0;
              curr_cpu <= 65535 && num_cpus < max_cpus; curr_cpu++) {
                 if ((__u16) curr_cpu == boot_cpu_addr)
