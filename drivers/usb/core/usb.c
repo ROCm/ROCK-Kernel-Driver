@@ -748,6 +748,46 @@ call_policy (char *verb, struct usb_device *dev)
 
 #endif	/* CONFIG_HOTPLUG */
 
+/* driverfs files */
+
+/* devices have one current configuration, with one
+ * or more interfaces that are used concurrently 
+ */
+static ssize_t
+show_config (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_device	*udev;
+
+	if (off)
+		return 0;
+	udev = list_entry (dev, struct usb_device, dev);
+	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
+}
+static struct driver_file_entry usb_config_entry = {
+	name:	"configuration",
+	mode:	S_IRUGO,
+	show:	show_config,
+};
+
+/* interfaces have one current setting; alternates
+ * can have different endpoints and class info.
+ */
+static ssize_t
+show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
+{
+	struct usb_interface	*interface;
+
+	if (off)
+		return 0;
+	interface = list_entry (dev, struct usb_interface, dev);
+	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
+}
+static struct driver_file_entry usb_altsetting_entry = {
+	name:	"altsetting",
+	mode:	S_IRUGO,
+	show:	show_altsetting,
+};
+
 
 /*
  * This entrypoint gets called for each new device.
@@ -760,15 +800,35 @@ static void usb_find_drivers(struct usb_device *dev)
 	unsigned rejected = 0;
 	unsigned claimed = 0;
 
+	/* FIXME should get called for each new configuration not just the
+	 * first one for a device. switching configs (or altesettings) should
+	 * undo driverfs and HCD state for the previous interfaces.
+	 */
 	for (ifnum = 0; ifnum < dev->actconfig->bNumInterfaces; ifnum++) {
 		struct usb_interface *interface = &dev->actconfig->interface[ifnum];
+		struct usb_interface_descriptor *desc = interface->altsetting;
 		
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
 		interface->dev.bus = &usb_bus_type;
-		sprintf (&interface->dev.bus_id[0], "%03d%03d", dev->devnum,ifnum);
-		sprintf (&interface->dev.name[0], "figure out some name...");
+		sprintf (&interface->dev.bus_id[0], "if%d",
+			interface->altsetting->bInterfaceNumber);
+		if (!desc->iInterface
+				|| usb_string (dev, desc->iInterface,
+					interface->dev.name,
+					sizeof interface->dev.name) <= 0) {
+			/* typically devices won't bother with interface
+			 * descriptions; this is the normal case.  an
+			 * interface's driver might describe it better.
+			 * (also: iInterface is per-altsetting ...)
+			 */
+			sprintf (&interface->dev.name[0],
+				"usb-%s-%s interface %d",
+				dev->bus->bus_name, dev->devpath,
+				interface->altsetting->bInterfaceNumber);
+		}
 		device_register (&interface->dev);
+		device_create_file (&interface->dev, &usb_altsetting_entry);
 
 		/* if this interface hasn't already been claimed */
 		if (!usb_interface_claimed(interface)) {
@@ -1081,10 +1141,6 @@ void usb_connect(struct usb_device *dev)
 	}
 }
 
-/*
- * These are the actual routines to send
- * and receive control messages.
- */
 
 // hub-only!! ... and only exported for reset/reinit path.
 // otherwise used internally, for usb_new_device()
@@ -1095,6 +1151,64 @@ int usb_set_address(struct usb_device *dev)
 		0, dev->devnum, 0, NULL, 0, HZ * USB_CTRL_GET_TIMEOUT);
 }
 
+
+/* improve on the default device description, if we can ... and
+ * while we're at it, maybe show the vendor and product strings.
+ */
+static void set_device_description (struct usb_device *dev)
+{
+	char	*buf, *here, *end;
+	int	mfgr = dev->descriptor.iManufacturer;
+	int	prod = dev->descriptor.iProduct;
+
+	/* set default; keep it if there are no strings */
+	sprintf (dev->dev.name, "USB device %04x:%04x",
+		 dev->descriptor.idVendor,
+		 dev->descriptor.idProduct);
+	if (!mfgr && !prod)
+		return;
+
+	if (!(buf = kmalloc(256, GFP_KERNEL)))
+		return;
+	here = dev->dev.name;
+	end = here + sizeof dev->dev.name - 2;
+	*end = 0;
+
+	/* much like pci ... describe as either:
+	 * - both strings:   'product descr (vendor descr)'
+	 * - product only:   'product descr (USB device vvvv:pppp)'
+	 * - vendor only:    'USB device vvvv:pppp (vendor descr)'
+	 * - neither string: 'USB device vvvv:pppp'
+	 */
+	if (prod && usb_string (dev, prod, buf, 256) > 0) {
+		strncpy (here, buf, end - here);
+#ifdef DEBUG
+		printk (KERN_INFO "Product: %s\n", buf);
+#endif
+	} else {
+		buf [0] = 0;
+		prod = -1;
+	}
+	here = strchr (here, 0);
+	if (mfgr && usb_string (dev, mfgr, buf, 256) > 0) {
+		*here++ = ' ';
+		*here++ = '(';
+		strncpy (here, buf, end - here - 1);
+		here = strchr (here, 0);
+		*here++ = ')';
+#ifdef DEBUG
+		printk (KERN_INFO "Manufacturer: %s\n", buf);
+#endif
+	} else {
+		if (prod != -1)
+			snprintf (here, end - here - 1,
+				" (USB device %04x:%04x)",
+				dev->descriptor.idVendor,
+				dev->descriptor.idProduct);
+		/* both strings unavailable, keep the default */
+	}
+	kfree(buf);
+}
 
 /*
  * By the time we get here, the device has gotten a new device ID
@@ -1193,11 +1307,9 @@ int usb_new_device(struct usb_device *dev)
 
 	dbg("new device strings: Mfr=%d, Product=%d, SerialNumber=%d",
 		dev->descriptor.iManufacturer, dev->descriptor.iProduct, dev->descriptor.iSerialNumber);
+	set_device_description (dev);
+
 #ifdef DEBUG
-	if (dev->descriptor.iManufacturer)
-		usb_show_string(dev, "Manufacturer", dev->descriptor.iManufacturer);
-	if (dev->descriptor.iProduct)
-		usb_show_string(dev, "Product", dev->descriptor.iProduct);
 	if (dev->descriptor.iSerialNumber)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
@@ -1206,6 +1318,7 @@ int usb_new_device(struct usb_device *dev)
 	err = device_register (&dev->dev);
 	if (err)
 		return err;
+	device_create_file (&dev->dev, &usb_config_entry);
 
 	/* now that the basic setup is over, add a /proc/bus/usb entry */
 	usbfs_add_device(dev);
