@@ -515,10 +515,8 @@ static inline void i2o_flush_reply(struct i2o_controller *c, u32 m)
 static inline struct i2o_message *i2o_msg_out_to_virt(struct i2o_controller *c,
 						      u32 m)
 {
-	if (unlikely
-	    (m < c->out_queue.phys
-	     || m >= c->out_queue.phys + c->out_queue.len))
-		BUG();
+	BUG_ON(m < c->out_queue.phys
+	       || m >= c->out_queue.phys + c->out_queue.len);
 
 	return c->out_queue.virt + (m - c->out_queue.phys);
 };
