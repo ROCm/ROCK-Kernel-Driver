@@ -813,7 +813,7 @@ extern "C" {
 									/* Bit 31..12:	reserved */
 #define	IS_IRQ_MST_ERR	(1L<<11)	/* Bit 11:	IRQ master error */
 									/*	PERR,RMABORT,RTABORT,DATAPERR */
-#define	IS_IRQ_STAT		(1L<<10)	/* Bit 10:	IRQ status execption */
+#define	IS_IRQ_STAT		(1L<<10)	/* Bit 10:	IRQ status exception */
 									/*	RMABORT, RTABORT, DATAPERR */
 #define IS_NO_STAT_M1	(1L<<9)		/* Bit	9:	No Rx Status from MAC1*/
 #define IS_NO_STAT_M2	(1L<<8)		/* Bit	8:	No Rx Status from MAC2*/
