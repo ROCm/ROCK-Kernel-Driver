@@ -73,17 +73,10 @@ static struct platform_device coyote_flash_device = {
 	.resource	= &coyote_flash_resource,
 };
 
-static int __init coyote_init(void)
+static void __init coyote_init(void)
 {
-	if (!machine_is_adi_coyote())
-		return -ENODEV;
-
 	platform_add_device(&coyote_flash_device);
-
-	return 0;
 }
-
-arch_initcall(coyote_init);
 
 MACHINE_START(ADI_COYOTE, "ADI Engineering IXP4XX Coyote Development Platform")
         MAINTAINER("MontaVista Software, Inc.")
@@ -92,6 +85,6 @@ MACHINE_START(ADI_COYOTE, "ADI Engineering IXP4XX Coyote Development Platform")
         MAPIO(coyote_map_io)
         INITIRQ(ixp4xx_init_irq)
         BOOT_PARAMS(0x0100)
+	INIT_MACHINE(coyote_init)
 MACHINE_END
-
 

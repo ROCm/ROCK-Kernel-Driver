@@ -73,17 +73,10 @@ static struct platform_device prpmc1100_flash_device = {
 	.resource	= &prpmc1100_flash_resource,
 };
 
-static int __init prpmc1100_init(void)
+static void __init prpmc1100_init(void)
 {
-	if (!machine_is_prpmc1100())
-		return -ENODEV;
-
 	platform_add_device(&prpmc1100_flash_device);
-
-	return 0;
 }
-
-arch_initcall(prpmc1100_init);
 
 MACHINE_START(PRPMC1100, "Motorola PrPMC1100")
         MAINTAINER("MontaVista Software, Inc.")
@@ -92,5 +85,6 @@ MACHINE_START(PRPMC1100, "Motorola PrPMC1100")
         MAPIO(prpmc1100_map_io)
         INITIRQ(ixp4xx_init_irq)
         BOOT_PARAMS(0x0100)
+	INIT_MACHINE(prpmc1100_init)
 MACHINE_END
 
