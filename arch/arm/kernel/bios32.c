@@ -35,18 +35,17 @@ void pcibios_report_status(u_int status_mask, int warn)
 			continue;
 
 		pci_read_config_word(dev, PCI_STATUS, &status);
+		if (status == 0xffff)
+			continue;
 
-		status &= status_mask;
-		if (status == 0)
+		if ((status & status_mask) == 0)
 			continue;
 
 		/* clear the status errors */
-		pci_write_config_word(dev, PCI_STATUS, status);
+		pci_write_config_word(dev, PCI_STATUS, status & status_mask);
 
 		if (warn)
-			printk("(%02x:%02x.%d: %04X) ", dev->bus->number,
-				PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
-				status);
+			printk("(%s: %04X) ", pci_name(dev), status);
 	}
 }
 

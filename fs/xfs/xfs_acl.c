@@ -388,6 +388,8 @@ xfs_acl_allow_set(
 	vattr_t		va;
 	int		error;
 
+	if (vp->v_inode.i_flags & (S_IMMUTABLE|S_APPEND))
+		return EPERM;
 	if (kind == _ACL_TYPE_DEFAULT && vp->v_type != VDIR)
 		return ENOTDIR;
 	if (vp->v_vfsp->vfs_flag & VFS_RDONLY)

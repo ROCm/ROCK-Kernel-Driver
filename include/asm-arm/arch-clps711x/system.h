@@ -26,7 +26,7 @@ static inline void arch_idle(void)
 {
 	clps_writel(1, HALT);
 	__asm__ __volatile__(
-	"mov	r0, r0
+	"mov	r0, r0\n\
 	mov	r0, r0");
 }
 

@@ -44,7 +44,7 @@
 #undef _USER
 #undef MULTI_USER
 
-#if defined(CONFIG_CPU_ARM610) || defined(CONFIG_CPU_ARM710)
+#ifdef CONFIG_CPU_COPY_V3
 # ifdef _USER
 #  define MULTI_USER 1
 # else
@@ -52,7 +52,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM720T)
+#ifdef CONFIG_CPU_COPY_V4WT
 # ifdef _USER
 #  define MULTI_USER 1
 # else
@@ -60,9 +60,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_ARM920T) || defined(CONFIG_CPU_ARM922T) || \
-    defined(CONFIG_CPU_ARM926T) || defined(CONFIG_CPU_SA110)   || \
-    defined(CONFIG_CPU_ARM1020)
+#ifdef CONFIG_CPU_COPY_V4WB
 # ifdef _USER
 #  define MULTI_USER 1
 # else
@@ -70,7 +68,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_SA1100)
+#ifdef CONFIG_CPU_SA1100
 # ifdef _USER
 #  define MULTI_USER 1
 # else
@@ -78,7 +76,7 @@
 # endif
 #endif
 
-#if defined(CONFIG_CPU_XSCALE)
+#ifdef CONFIG_CPU_XSCALE
 # ifdef _USER
 #  define MULTI_USER 1
 # else

@@ -23,13 +23,16 @@
 #include <linux/coda_fs_i.h>
 #include <linux/coda_cache.h>
 
+static atomic_t permission_epoch = ATOMIC_INIT(0);
+
 /* replace or extend an acl cache hit */
 void coda_cache_enter(struct inode *inode, int mask)
 {
 	struct coda_inode_info *cii = ITOC(inode);
 
-        if ( !coda_cred_ok(&cii->c_cached_cred) ) {
-                coda_load_creds(&cii->c_cached_cred);
+	cii->c_cached_epoch = atomic_read(&permission_epoch);
+	if (cii->c_uid != current->fsuid) {
+                cii->c_uid = current->fsuid;
                 cii->c_cached_perm = mask;
         } else
                 cii->c_cached_perm |= mask;
@@ -42,22 +45,15 @@ void coda_cache_clear_inode(struct inode *inode)
         cii->c_cached_perm = 0;
 }
 
-/* remove all acl caches for a principal (or all principals when cred == NULL)*/
-void coda_cache_clear_all(struct super_block *sb, struct coda_cred *cred)
+/* remove all acl caches */
+void coda_cache_clear_all(struct super_block *sb)
 {
         struct coda_sb_info *sbi;
-        struct coda_inode_info *cii;
-        struct list_head *tmp;
 
         sbi = coda_sbp(sb);
         if (!sbi) BUG();
 
-        list_for_each(tmp, &sbi->sbi_cihead)
-        {
-		cii = list_entry(tmp, struct coda_inode_info, c_cilist);
-                if (!cred || coda_cred_eq(cred, &cii->c_cached_cred))
-                        cii->c_cached_perm = 0;
-	}
+	atomic_inc(&permission_epoch);
 }
 
 
@@ -67,8 +63,9 @@ int coda_cache_check(struct inode *inode, int mask)
 	struct coda_inode_info *cii = ITOC(inode);
         int hit;
 	
-        hit = ((mask & cii->c_cached_perm) == mask) &&
-                coda_cred_ok(&cii->c_cached_cred);
+        hit = (mask & cii->c_cached_perm) == mask &&
+		cii->c_uid == current->fsuid &&
+		cii->c_cached_epoch == atomic_read(&permission_epoch);
 
         return hit;
 }

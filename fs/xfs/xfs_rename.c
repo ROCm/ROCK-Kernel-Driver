@@ -56,7 +56,6 @@
 #include "xfs_trans_space.h"
 #include "xfs_da_btree.h"
 #include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
 
 
 /*
@@ -293,8 +292,8 @@ xfs_rename(
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 				target_dp, DM_EVENT_RENAME)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_RENAME,
-					src_dir_bdp, DM_RIGHT_NULL,
-					target_dir_bdp, DM_RIGHT_NULL,
+					src_dir_vp, DM_RIGHT_NULL,
+					target_dir_vp, DM_RIGHT_NULL,
 					src_name, target_name,
 					0, 0, 0);
 		if (error) {
@@ -650,8 +649,8 @@ std_return:
 	    DM_EVENT_ENABLED(target_dir_vp->v_vfsp,
 				target_dp, DM_EVENT_POSTRENAME)) {
 		(void) XFS_SEND_NAMESP (mp, DM_EVENT_POSTRENAME,
-					src_dir_bdp, DM_RIGHT_NULL,
-					target_dir_bdp, DM_RIGHT_NULL,
+					src_dir_vp, DM_RIGHT_NULL,
+					target_dir_vp, DM_RIGHT_NULL,
 					src_name, target_name,
 					0, error, 0);
 	}

@@ -638,6 +638,9 @@ linvfs_setxattr(
 		return error;
 	}
 
+	if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+		return -EPERM;
+
 	/* Convert Linux syscall to XFS internal ATTR flags */
 	if (flags & XATTR_CREATE)
 		xflags |= ATTR_CREATE;
@@ -786,6 +789,9 @@ linvfs_removexattr(
 			error = xfs_cap_vremove(vp);
 		return error;
 	}
+
+        if (IS_IMMUTABLE(inode) || IS_APPEND(inode))
+		return -EPERM;
 
 	if (strncmp(name, xfs_namespaces[ROOT_NAMES].name,
 			xfs_namespaces[ROOT_NAMES].namelen) == 0) {

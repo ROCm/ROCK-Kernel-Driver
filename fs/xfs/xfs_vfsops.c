@@ -49,7 +49,6 @@
 #include "xfs_btree.h"
 #include "xfs_alloc.h"
 #include "xfs_ialloc.h"
-#include "xfs_alloc.h"
 #include "xfs_attr_sf.h"
 #include "xfs_dir_sf.h"
 #include "xfs_dir2_sf.h"
@@ -64,7 +63,6 @@
 #include "xfs_buf_item.h"
 #include "xfs_extfree_item.h"
 #include "xfs_quota.h"
-#include "xfs_dmapi.h"
 #include "xfs_dir2_trace.h"
 #include "xfs_acl.h"
 #include "xfs_attr.h"
@@ -266,7 +264,7 @@ xfs_start_flags(
 	 */
 	if (ap->flags & XFSMNT_WSYNC)
 		mp->m_flags |= XFS_MOUNT_WSYNC;
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	if (ap->flags & XFSMNT_INO64) {
 		mp->m_flags |= XFS_MOUNT_INO64;
 		mp->m_inoadd = XFS_INO64_OFFSET;
@@ -285,7 +283,7 @@ xfs_start_flags(
 		mp->m_flags |= XFS_MOUNT_OSYNCISOSYNC;
 
 	if (ap->flags & XFSMNT_32BITINODES)
-		mp->m_flags |= XFS_MOUNT_32BITINODES;
+		mp->m_flags |= (XFS_MOUNT_32BITINODES | XFS_MOUNT_32BITINOOPT);
 
 	if (ap->flags & XFSMNT_IOSIZE) {
 		if (ap->iosizelog > XFS_MAX_IO_LOG ||
@@ -333,9 +331,10 @@ xfs_finish_flags(
 {
 	/* Fail a mount where the logbuf is smaller then the log stripe */
 	if (XFS_SB_VERSION_HASLOGV2(&mp->m_sb)) {
-		if (((ap->logbufsize == -1) &&
-		     (mp->m_sb.sb_logsunit > XLOG_BIG_RECORD_BSIZE)) ||
-		    (ap->logbufsize < mp->m_sb.sb_logsunit)) {
+		if ((ap->logbufsize == -1) &&
+		    (mp->m_sb.sb_logsunit > XLOG_BIG_RECORD_BSIZE)) {
+			mp->m_logbsize = mp->m_sb.sb_logsunit;
+		} else if (ap->logbufsize < mp->m_sb.sb_logsunit) {
 			cmn_err(CE_WARN,
 	"XFS: logbuf size must be greater than or equal to log stripe size");
 			return XFS_ERROR(EINVAL);
@@ -534,11 +533,8 @@ xfs_unmount(
 	rvp = XFS_ITOV(rip);
 
 	if (vfsp->vfs_flag & VFS_DMI) {
-		bhv_desc_t	*rbdp;
-
-		rbdp = vn_bhv_lookup_unlocked(VN_BHV_HEAD(rvp), &xfs_vnodeops);
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_PREUNMOUNT,
-				rbdp, DM_RIGHT_NULL, rbdp, DM_RIGHT_NULL,
+				rvp, DM_RIGHT_NULL, rvp, DM_RIGHT_NULL,
 				NULL, NULL, 0, 0,
 				(mp->m_dmevmask & (1<<DM_EVENT_PREUNMOUNT))?
 					0:DM_FLAGS_UNWANTED);
@@ -771,13 +767,13 @@ xfs_statvfs(
 	statp->f_blocks = sbp->sb_dblocks - lsize;
 	statp->f_bfree = statp->f_bavail = sbp->sb_fdblocks;
 	fakeinos = statp->f_bfree << sbp->sb_inopblog;
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 	fakeinos += mp->m_inoadd;
 #endif
 	statp->f_files =
 	    MIN(sbp->sb_icount + fakeinos, (__uint64_t)XFS_MAXINUMBER);
 	if (mp->m_maxicount)
-#if XFS_BIG_FILESYSTEMS
+#if XFS_BIG_INUMS
 		if (!mp->m_inoadd)
 #endif
 			statp->f_files =
@@ -1589,6 +1585,7 @@ xfs_vget(
 #define MNTOPT_NORECOVERY   "norecovery"   /* don't run XFS recovery */
 #define MNTOPT_NOLOGFLUSH   "nologflush"   /* don't hard flush on log writes */
 #define MNTOPT_OSYNCISOSYNC "osyncisosync" /* o_sync is REALLY o_sync */
+#define MNTOPT_64BITINODE   "inode64"  /* inodes can be allocated anywhere */
 
 
 int
@@ -1675,7 +1672,7 @@ xfs_parseargs(
 			args->flags |= XFSMNT_NORECOVERY;
 		} else if (!strcmp(this_char, MNTOPT_INO64)) {
 			args->flags |= XFSMNT_INO64;
-#ifndef XFS_BIG_FILESYSTEMS
+#if !XFS_BIG_INUMS
 			printk("XFS: %s option not allowed on this system\n",
 				MNTOPT_INO64);
 			return EINVAL;
@@ -1696,6 +1693,13 @@ xfs_parseargs(
 				return EINVAL;
 			}
 			dswidth = simple_strtoul(value, &eov, 10);
+		} else if (!strcmp(this_char, MNTOPT_64BITINODE)) {
+			args->flags &= ~XFSMNT_32BITINODES;
+#if !XFS_BIG_INUMS
+			printk("XFS: %s option not allowed on this system\n",
+				MNTOPT_64BITINODE);
+			return EINVAL;
+#endif
 		} else if (!strcmp(this_char, MNTOPT_NOUUID)) {
 			args->flags |= XFSMNT_NOUUID;
 		} else if (!strcmp(this_char, MNTOPT_NOLOGFLUSH)) {

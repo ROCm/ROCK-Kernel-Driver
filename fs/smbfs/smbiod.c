@@ -49,7 +49,7 @@ static spinlock_t servers_lock = SPIN_LOCK_UNLOCKED;
 static long smbiod_flags;
 
 static int smbiod(void *);
-static void smbiod_start(void);
+static int smbiod_start(void);
 
 /*
  * called when there's work for us to do
@@ -65,30 +65,36 @@ void smbiod_wake_up()
 /*
  * start smbiod if none is running
  */
-static void smbiod_start()
+static int smbiod_start()
 {
 	pid_t pid;
 	if (smbiod_state != SMBIOD_DEAD)
-		return;
+		return 0;
 	smbiod_state = SMBIOD_STARTING;
+	__module_get(THIS_MODULE);
 	spin_unlock(&servers_lock);
 	pid = kernel_thread(smbiod, NULL, 0);
+	if (pid < 0)
+		module_put(THIS_MODULE);
 
 	spin_lock(&servers_lock);
-	smbiod_state = SMBIOD_RUNNING;
+	smbiod_state = pid < 0 ? SMBIOD_DEAD : SMBIOD_RUNNING;
 	smbiod_pid = pid;
+	return pid;
 }
 
 /*
  * register a server & start smbiod if necessary
  */
-void smbiod_register_server(struct smb_sb_info *server)
+int smbiod_register_server(struct smb_sb_info *server)
 {
+	int ret;
 	spin_lock(&servers_lock);
 	list_add(&server->entry, &smb_servers);
 	VERBOSE("%p\n", server);
-	smbiod_start();
+	ret = smbiod_start();
 	spin_unlock(&servers_lock);
+	return ret;
 }
 
 /*
@@ -282,7 +288,6 @@ out:
  */
 static int smbiod(void *unused)
 {
-	MOD_INC_USE_COUNT;
 	daemonize("smbiod");
 
 	allow_signal(SIGKILL);
@@ -330,6 +335,5 @@ static int smbiod(void *unused)
 	}
 
 	VERBOSE("SMB Kernel thread exiting (%d) ...\n", current->pid);
-	MOD_DEC_USE_COUNT;
-	return 0;
+	module_put_and_exit(0);
 }

@@ -1394,7 +1394,8 @@ S: USA
 N: Marcel Holtmann
 E: marcel@holtmann.org
 W: http://www.holtmann.org
-D: Author of the Linux Bluetooth Subsystem PC Card drivers
+D: Author and maintainer of the various Bluetooth HCI drivers
+D: Various other Bluetooth related patches, cleanups and fixes
 S: Germany
 
 N: Rob W. W. Hooft
@@ -3460,11 +3461,11 @@ S: Cambridge. CB1 7EG
 S: England
 
 N: Chris Wright
-E: chris@wirex.com
+E: chrisw@osdl.org
 D: hacking on LSM framework and security modules.
-S: c/o WireX
-S: 920 SW 3rd, Ste. 100
-S: Portland, OR 97204
+S: c/o OSDL
+S: 12725 SW Millikan Way, Suite 400
+S: Beaverton, OR 97005
 S: USA
 
 N: Frank Xia
