@@ -518,6 +518,7 @@ struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	newsk->family = PF_INET6;
 	newsk->protocol = IPPROTO_SCTP;
 	newsk->backlog_rcv = sk->prot->backlog_rcv;
+	newsk->shutdown = sk->shutdown;
 
 	newsctp6sk = (struct sctp6_sock *)newsk;
 	newsctp6sk->pinet6 = &newsctp6sk->inet6;

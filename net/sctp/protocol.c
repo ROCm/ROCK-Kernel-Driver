@@ -516,6 +516,7 @@ struct sock *sctp_v4_create_accept_sk(struct sock *sk,
 	newsk->prot = sk->prot;
 	newsk->no_check = sk->no_check;
 	newsk->reuse = sk->reuse;
+	newsk->shutdown = sk->shutdown;
 
 	newsk->destruct = inet_sock_destruct;
 	newsk->zapped = 0;
