@@ -152,7 +152,7 @@ void free_irq(unsigned int irq, void *dev_id)
 		
 		return sun4d_free_irq(irq, dev_id);
 	}
-	cpu_irq = irq & NR_IRQS;
+	cpu_irq = irq & (NR_IRQS - 1);
 	action = *(cpu_irq + irq_action);
         if (cpu_irq > 14) {  /* 14 irq levels on the sparc */
                 printk("Trying to free bogus IRQ %d\n", irq);
@@ -391,7 +391,7 @@ void unexpected_irq(int irq, void *dev_id, struct pt_regs * regs)
 	struct irqaction * action;
 	unsigned int cpu_irq;
 	
-	cpu_irq = irq & NR_IRQS;
+	cpu_irq = irq & (NR_IRQS - 1);
 	action = *(cpu_irq + irq_action);
 
         printk("IO device interrupt, irq = %d\n", irq);
@@ -469,7 +469,7 @@ int request_fast_irq(unsigned int irq,
 	extern struct tt_entry trapbase_cpu1, trapbase_cpu2, trapbase_cpu3;
 #endif
 	
-	cpu_irq = irq & NR_IRQS;
+	cpu_irq = irq & (NR_IRQS - 1);
 	if(cpu_irq > 14)
 		return -EINVAL;
 	if(!handler)
@@ -559,7 +559,7 @@ int request_irq(unsigned int irq,
 					     unsigned long, const char *, void *);
 		return sun4d_request_irq(irq, handler, irqflags, devname, dev_id);
 	}
-	cpu_irq = irq & NR_IRQS;
+	cpu_irq = irq & (NR_IRQS - 1);
 	if(cpu_irq > 14)
 		return -EINVAL;
 
