@@ -1075,6 +1075,8 @@ static int walk_page_buffers(	handle_t *handle,
 static int do_journal_get_write_access(handle_t *handle, 
 				       struct buffer_head *bh)
 {
+	if (!buffer_mapped(bh) || buffer_freed(bh))
+		return 0;
 	return ext3_journal_get_write_access(handle, bh);
 }
 
@@ -1118,6 +1120,8 @@ ext3_journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 /* For commit_write() in data=journal mode */
 static int commit_write_fn(handle_t *handle, struct buffer_head *bh)
 {
+	if (!buffer_mapped(bh) || buffer_freed(bh))
+		return 0;
 	set_buffer_uptodate(bh);
 	return ext3_journal_dirty_metadata(handle, bh);
 }
@@ -1699,11 +1703,19 @@ static int ext3_block_truncate_page(handle_t *handle,
 	}
 
 	err = 0;
+	if (buffer_freed(bh)) {
+		BUFFER_TRACE(bh, "freed: skip");
+		goto unlock;
+	}
+
 	if (!buffer_mapped(bh)) {
+		BUFFER_TRACE(bh, "unmapped");
 		ext3_get_block(inode, iblock, bh, 0);
 		/* unmapped? It's a hole - nothing to do */
-		if (!buffer_mapped(bh))
+		if (!buffer_mapped(bh)) {
+			BUFFER_TRACE(bh, "still unmapped");
 			goto unlock;
+		}
 	}
 
 	/* Ok, it's mapped. Make sure it's up-to-date */
