@@ -663,7 +663,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_rcvmsg(struct sctp_association *asoc,
 	 * for and this information is passed opaquely by the SCTP stack from
 	 * one end to the other.
 	 */
-	info->sinfo_ppid = ntohl(chunk->subh.data_hdr->ppid);
+	info->sinfo_ppid = chunk->subh.data_hdr->ppid;
 
 	/* Sockets API Extensions for SCTP
 	 * Section 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
