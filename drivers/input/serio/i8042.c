@@ -654,24 +654,26 @@ static int __init i8042_check_aux(struct i8042_values *values)
 	i8042_flush();
 
 /*
- * Internal loopback test - filters out AT-type i8042's
+ * Internal loopback test - filters out AT-type i8042's. Unfortunately
+ * SiS screwed up and their 5597 doesn't support the LOOP command even
+ * though it has an AUX port.
  */
 
 	param = 0x5a;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa5)
-		return -1;
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa5) {
 
 /*
  * External connection test - filters out AT-soldered PS/2 i8042's
  * 0x00 - no error, 0x01-0x03 - clock/data stuck, 0xff - general error
  * 0xfa - no error on some notebooks which ignore the spec
- * We ignore general error, since some chips report it even under normal
- * operation.
+ * Because it's common for chipsets to return error on perfectly functioning
+ * AUX ports, we test for this only when the LOOP command failed.
  */
 
-	if (i8042_command(&param, I8042_CMD_AUX_TEST)
-	    || (param && param != 0xfa && param != 0xff))
-		return -1;
+		if (i8042_command(&param, I8042_CMD_AUX_TEST)
+		    	|| (param && param != 0xfa && param != 0xff))
+				return -1;
+	}
 
 /*
  * Bit assignment test - filters out PS/2 i8042's in AT mode
