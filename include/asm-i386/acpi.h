@@ -106,6 +106,10 @@
         :"0"(n_hi), "1"(n_lo))
 
 
+#ifdef CONFIG_ACPI_HT_ONLY
+extern int acpi_lapic;
+#define acpi_ioapic 0
+#else
 #ifndef CONFIG_ACPI_BOOT
 #define acpi_lapic 0
 #define acpi_ioapic 0
@@ -119,6 +123,7 @@ extern int acpi_lapic;
 extern int acpi_ioapic;
 #else
 #define acpi_ioapic 0
+#endif
 #endif
 
 /* Fixmap pages to reserve for ACPI boot-time tables (see fixmap.h) */

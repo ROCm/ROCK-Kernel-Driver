@@ -56,7 +56,7 @@
  *
  * FUNCTION:    acpi_hw_clear_acpi_status
  *
- * PARAMETERS:  none
+ * PARAMETERS:  Flags           - Lock the hardware or not
  *
  * RETURN:      none
  *
@@ -65,7 +65,8 @@
  ******************************************************************************/
 
 acpi_status
-acpi_hw_clear_acpi_status (void)
+acpi_hw_clear_acpi_status (
+	u32                             flags)
 {
 	acpi_status                     status;
 
@@ -77,10 +78,11 @@ acpi_hw_clear_acpi_status (void)
 		ACPI_BITMASK_ALL_FIXED_STATUS,
 		(u16) acpi_gbl_FADT->xpm1a_evt_blk.address));
 
-
-	status = acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
-	if (ACPI_FAILURE (status)) {
-		return_ACPI_STATUS (status);
+	if (flags & ACPI_MTX_LOCK) {
+		status = acpi_ut_acquire_mutex (ACPI_MTX_HARDWARE);
+		if (ACPI_FAILURE (status)) {
+			return_ACPI_STATUS (status);
+		}
 	}
 
 	status = acpi_hw_register_write (ACPI_MTX_DO_NOT_LOCK, ACPI_REGISTER_PM1_STATUS,
@@ -104,7 +106,9 @@ acpi_hw_clear_acpi_status (void)
 	status = acpi_ev_walk_gpe_list (acpi_hw_clear_gpe_block);
 
 unlock_and_exit:
-	(void) acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
+	if (flags & ACPI_MTX_LOCK) {
+		(void) acpi_ut_release_mutex (ACPI_MTX_HARDWARE);
+	}
 	return_ACPI_STATUS (status);
 }
 
@@ -237,8 +241,9 @@ acpi_hw_get_bit_register_info (
  *
  * FUNCTION:    acpi_get_register
  *
- * PARAMETERS:  register_id         - Index of ACPI Register to access
- *              use_lock            - Lock the hardware
+ * PARAMETERS:  register_id     - ID of ACPI bit_register to access
+ *              return_value    - Value that was read from the register
+ *              Flags           - Lock the hardware or not
  *
  * RETURN:      Value is read from specified Register.  Value returned is
  *              normalized to bit0 (is shifted all the way right)
@@ -290,7 +295,8 @@ acpi_get_register (
 
 		*return_value = register_value;
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read value %X\n", register_value));
+		ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read value %8.8X register %X\n",
+				register_value, bit_reg_info->parent_register));
 	}
 
 	return_ACPI_STATUS (status);
@@ -443,7 +449,8 @@ unlock_and_exit:
 
 	ACPI_DEBUG_EXEC (register_value = ((register_value & bit_reg_info->access_bit_mask) >> bit_reg_info->bit_position));
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "ACPI Register Write actual %X\n", register_value));
+	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Set bits: %8.8X actual %8.8X register %X\n",
+			value, register_value, bit_reg_info->parent_register));
 	return_ACPI_STATUS (status);
 }
 
@@ -751,9 +758,14 @@ acpi_hw_low_level_read (
 	default:
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Unsupported address space: %X\n", reg->address_space_id));
-		status = AE_BAD_PARAMETER;
-		break;
+		return (AE_BAD_PARAMETER);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read:  %8.8X width %2d from %8.8X%8.8X (%s)\n",
+			*value, width,
+			ACPI_HIDWORD (reg->address),
+			ACPI_LODWORD (reg->address),
+			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);
 }
@@ -832,9 +844,14 @@ acpi_hw_low_level_write (
 	default:
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Unsupported address space: %X\n", reg->address_space_id));
-		status = AE_BAD_PARAMETER;
-		break;
+		return (AE_BAD_PARAMETER);
 	}
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Wrote: %8.8X width %2d   to %8.8X%8.8X (%s)\n",
+			value, width,
+			ACPI_HIDWORD (reg->address),
+			ACPI_LODWORD (reg->address),
+			acpi_ut_get_region_name (reg->address_space_id)));
 
 	return (status);
 }

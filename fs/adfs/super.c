@@ -189,7 +189,7 @@ static int adfs_remount(struct super_block *sb, int *flags, char *data)
 	return parse_options(sb, data);
 }
 
-static int adfs_statfs(struct super_block *sb, struct statfs *buf)
+static int adfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	struct adfs_sb_info *asb = ADFS_SB(sb);
 
@@ -200,7 +200,7 @@ static int adfs_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_files   = asb->s_ids_per_zone * asb->s_map_size;
 	buf->f_bavail  =
 	buf->f_bfree   = adfs_map_free(sb);
-	buf->f_ffree   = buf->f_bfree * buf->f_files / buf->f_blocks;
+	buf->f_ffree   = (long)(buf->f_bfree * buf->f_files) / (long)buf->f_blocks;
 
 	return 0;
 }

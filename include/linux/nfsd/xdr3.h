@@ -176,7 +176,7 @@ struct nfsd3_readdirres {
 
 struct nfsd3_fsstatres {
 	__u32			status;
-	struct statfs		stats;
+	struct kstatfs		stats;
 	__u32			invarsec;
 };
 

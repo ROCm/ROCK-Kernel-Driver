@@ -183,12 +183,15 @@ static int wait_for_helper(void *data)
 	struct subprocess_info *sub_info = data;
 	pid_t pid;
 
-	pid = kernel_thread(____call_usermodehelper, sub_info,
-			    CLONE_VFORK | SIGCHLD);
+	sub_info->retval = 0;
+	pid = kernel_thread(____call_usermodehelper, sub_info, SIGCHLD);
 	if (pid < 0)
 		sub_info->retval = pid;
 	else
-		sys_wait4(pid, (unsigned int *)&sub_info->retval, 0, NULL);
+		/* We don't have a SIGCHLD signal handler, so this
+		 * always returns -ECHILD, but the important thing is
+		 * that it blocks. */
+		sys_wait4(pid, NULL, 0, NULL);
 
 	complete(sub_info->complete);
 	return 0;
@@ -231,8 +234,7 @@ static void __call_usermodehelper(void *data)
  * (ie. it runs with full root capabilities).
  *
  * Must be called from process context.  Returns a negative error code
- * if program was not execed successfully, or (exitcode << 8 + signal)
- * of the application (0 if wait is not set).
+ * if program was not execed successfully, or 0.
  */
 int call_usermodehelper(char *path, char **argv, char **envp, int wait)
 {

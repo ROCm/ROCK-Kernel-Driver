@@ -269,7 +269,10 @@ static struct backing_dev_info rd_backing_dev_info = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-	int unit = minor(inode->i_rdev);
+	unsigned unit = minor(inode->i_rdev);
+
+	if (unit >= NUM_RAMDISKS)
+		return -ENODEV;
 
 	/*
 	 * Immunize device against invalidate_buffers() and prune_icache().

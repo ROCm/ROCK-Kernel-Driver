@@ -306,7 +306,6 @@ acpi_ds_method_data_set_value (
 {
 	acpi_status                     status;
 	struct acpi_namespace_node      *node;
-	union acpi_operand_object       *new_desc = object;
 
 
 	ACPI_FUNCTION_TRACE ("ds_method_data_set_value");
@@ -325,28 +324,16 @@ acpi_ds_method_data_set_value (
 	}
 
 	/*
-	 * If the object has just been created and is not attached to anything,
-	 * (the reference count is 1), then we can just store it directly into
-	 * the arg/local.  Otherwise, we must copy it.
+	 * Increment ref count so object can't be deleted while installed.
+	 * NOTE: We do not copy the object in order to preserve the call by
+	 * reference semantics of ACPI Control Method invocation.
+	 * (See ACPI specification 2.0_c)
 	 */
-	if (object->common.reference_count > 1) {
-		status = acpi_ut_copy_iobject_to_iobject (object, &new_desc, walk_state);
-		if (ACPI_FAILURE (status)) {
-			return_ACPI_STATUS (status);
-		}
-
-	   ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Object Copied %p, new %p\n",
-		   object, new_desc));
-	}
-	else {
-		/* Increment ref count so object can't be deleted while installed */
-
-		acpi_ut_add_reference (new_desc);
-	}
+	acpi_ut_add_reference (object);
 
 	/* Install the object */
 
-	node->object = new_desc;
+	node->object = object;
 	return_ACPI_STATUS (status);
 }
 

@@ -97,7 +97,8 @@ struct compat_statfs {
 	s32		f_ffree;
 	__kernel_fsid_t	f_fsid;
 	s32		f_namelen;
-	s32		f_spare[6];
+	s32		f_frsize;
+	s32		f_spare[5];
 };
 
 #define COMPAT_RLIM_INFINITY 0xffffffff

@@ -88,6 +88,13 @@ static inline int pci_dma_supported(struct pci_dev *hwdev, u64 mask)
 
 extern int pci_domain_nr(struct pci_bus *bus);
 
+/* Set the name of the bus as it appears in /proc/bus/pci */
+static inline int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	sprintf(name, "%02x", bus->number);
+	return 0;
+}
+
 struct vm_area_struct;
 /* Map a range of PCI memory or I/O space for a device into user space */
 int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,

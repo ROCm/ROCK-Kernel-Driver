@@ -9,6 +9,10 @@ typedef __kernel_fsid_t	fsid_t;
 
 #endif
 
+/*
+ * It appears that PARISC could be 64 _or_ 32 bit.
+ * 64-bit fields must be explicitly 64-bit in statfs64.
+ */
 struct statfs {
 	long f_type;
 	long f_bsize;
@@ -19,7 +23,22 @@ struct statfs {
 	long f_ffree;
 	__kernel_fsid_t f_fsid;
 	long f_namelen;
-	long f_spare[6];
+	long f_frsize;
+	long f_spare[5];
+};
+
+struct statfs64 {
+	long f_type;
+	long f_bsize;
+	u64 f_blocks;
+	u64 f_bfree;
+	u64 f_bavail;
+	u64 f_files;
+	u64 f_ffree;
+	__kernel_fsid_t f_fsid;
+	long f_namelen;
+	long f_frsize;
+	long f_spare[5];
 };
 
 #endif

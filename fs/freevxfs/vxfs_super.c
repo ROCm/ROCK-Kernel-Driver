@@ -55,7 +55,7 @@ MODULE_LICENSE("Dual BSD/GPL");
 
 
 static void		vxfs_put_super(struct super_block *);
-static int		vxfs_statfs(struct super_block *, struct statfs *);
+static int		vxfs_statfs(struct super_block *, struct kstatfs *);
 
 static struct super_operations vxfs_super_ops = {
 	.read_inode =		vxfs_read_inode,
@@ -105,7 +105,7 @@ vxfs_put_super(struct super_block *sbp)
  *   This is everything but complete...
  */
 static int
-vxfs_statfs(struct super_block *sbp, struct statfs *bufp)
+vxfs_statfs(struct super_block *sbp, struct kstatfs *bufp)
 {
 	struct vxfs_sb_info		*infp = VXFS_SBI(sbp);
 

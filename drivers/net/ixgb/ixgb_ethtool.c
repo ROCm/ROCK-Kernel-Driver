@@ -50,7 +50,6 @@ ixgb_eeprom_size(struct ixgb_hw *hw)
 	return (IXGB_EEPROM_SIZE << 1);
 }
 
-#define SUPPORTED_10000baseT_Full (1 << 11)
 #define SPEED_10000 10000
 
 static void

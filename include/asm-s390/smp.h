@@ -59,12 +59,12 @@ extern inline unsigned int num_online_cpus(void)
 #endif /* __s390x__ */
 }
 
-extern inline int any_online_cpu(unsigned int mask)
+extern inline unsigned int any_online_cpu(unsigned int mask)
 {
 	if (mask & cpu_online_map)
 		return __ffs(mask & cpu_online_map);
 
-	return -1;
+	return NR_CPUS;
 }
 
 extern __inline__ __u16 hard_smp_processor_id(void)

@@ -1429,10 +1429,10 @@ W:	http://www.ife.ee.ethz.ch/~sailer/linux/pciaudio.html
 S:	Maintained
 
 PCI SUBSYSTEM
-P:	Martin Mares
-M:	mj@ucw.cz
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:	linux-kernel@vger.kernel.org
-S:	Odd Fixes
+S:	Supported
 
 PCI HOTPLUG CORE
 P:	Greg Kroah-Hartman

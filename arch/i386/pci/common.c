@@ -23,7 +23,24 @@ unsigned int pci_probe = PCI_PROBE_BIOS | PCI_PROBE_CONF1 | PCI_PROBE_CONF2;
 
 int pcibios_last_bus = -1;
 struct pci_bus *pci_root_bus = NULL;
-struct pci_ops *pci_root_ops = NULL;
+struct pci_raw_ops *raw_pci_ops;
+
+static int pci_read(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
+{
+	return raw_pci_ops->read(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
+}
+
+static int pci_write(struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
+{
+	return raw_pci_ops->write(0, bus->number, PCI_SLOT(devfn), 
+		PCI_FUNC(devfn), where, size, value);
+}
+
+struct pci_ops pci_root_ops = {
+	.read = pci_read,
+	.write = pci_write,
+};
 
 /*
  * legacy, numa, and acpi all want to call pcibios_scan_root
@@ -115,7 +132,7 @@ struct pci_bus * __devinit pcibios_scan_root(int busnum)
 
 	printk("PCI: Probing PCI hardware (bus %02x)\n", busnum);
 
-	return pci_scan_bus(busnum, pci_root_ops, NULL);
+	return pci_scan_bus(busnum, &pci_root_ops, NULL);
 }
 
 extern u8 pci_cache_line_size;
@@ -124,7 +141,7 @@ static int __init pcibios_init(void)
 {
 	struct cpuinfo_x86 *c = &boot_cpu_data;
 
-	if (!pci_root_ops) {
+	if (!raw_pci_ops) {
 		printk("PCI: System does not support PCI\n");
 		return 0;
 	}

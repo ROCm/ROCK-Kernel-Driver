@@ -1518,7 +1518,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	// Get rid of old data
 	psg->count = cpu_to_le32(0);
-	psg->sg[0].addr = cpu_to_le32(NULL);
+	psg->sg[0].addr = cpu_to_le32(0);
 	psg->sg[0].count = cpu_to_le32(0);  
 	if (scsicmd->use_sg) {
 		struct scatterlist *sg;
@@ -1558,7 +1558,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 		psg->count = cpu_to_le32(1);
 		psg->sg[0].addr = cpu_to_le32(addr);
 		psg->sg[0].count = cpu_to_le32(scsicmd->request_bufflen);  
-		scsicmd->SCp.ptr = (char *)addr;
+		scsicmd->SCp.ptr = (char *)(ulong)addr;
 		byte_count = scsicmd->request_bufflen;
 	}
 	return byte_count;
@@ -1574,8 +1574,8 @@ static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	// Get rid of old data
 	psg->count = cpu_to_le32(0);
-	psg->sg[0].addr[0] = cpu_to_le32(NULL);
-	psg->sg[0].addr[1] = cpu_to_le32(NULL);
+	psg->sg[0].addr[0] = cpu_to_le32(0);
+	psg->sg[0].addr[1] = cpu_to_le32(0);
 	psg->sg[0].count = cpu_to_le32(0);  
 	if (scsicmd->use_sg) {
 		struct scatterlist *sg;
@@ -1619,7 +1619,7 @@ static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
 		psg->sg[0].addr[1] = (u32)(le_addr>>32);
 		psg->sg[0].addr[0] = (u32)(le_addr & 0xffffffff);
 		psg->sg[0].count = cpu_to_le32(scsicmd->request_bufflen);  
-		scsicmd->SCp.ptr = (char *)addr;
+		scsicmd->SCp.ptr = (char *)(ulong)addr;
 		byte_count = scsicmd->request_bufflen;
 	}
 	return byte_count;

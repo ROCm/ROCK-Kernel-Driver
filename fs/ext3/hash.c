@@ -23,10 +23,10 @@ static void TEA_transform(__u32 buf[4], __u32 const in[])
 	__u32	a = in[0], b = in[1], c = in[2], d = in[3];
 	int	n = 16;
 
-	do {							
-		sum += DELTA;					
-		b0 += ((b1 << 4)+a) ^ (b1+sum) ^ ((b1 >> 5)+b);	
-		b1 += ((b0 << 4)+c) ^ (b0+sum) ^ ((b0 >> 5)+d);	
+	do {
+		sum += DELTA;
+		b0 += ((b1 << 4)+a) ^ (b1+sum) ^ ((b1 >> 5)+b);
+		b1 += ((b0 << 4)+c) ^ (b0+sum) ^ ((b0 >> 5)+d);
 	} while(--n);
 
 	buf[0] += b0;
@@ -107,7 +107,7 @@ static __u32 dx_hack_hash (const char *name, int len)
 	__u32 hash0 = 0x12a3fe2d, hash1 = 0x37abe8f9;
 	while (len--) {
 		__u32 hash = hash1 + (hash0 ^ (*name++ * 7152373));
-		
+
 		if (hash & 0x80000000) hash -= 0x7fffffff;
 		hash1 = hash0;
 		hash0 = hash;
@@ -178,7 +178,7 @@ int ext3fs_dirhash(const char *name, int len, struct dx_hash_info *hinfo)
 		if (i < 4)
 			memcpy(buf, hinfo->seed, sizeof(buf));
 	}
-		
+
 	switch (hinfo->hash_version) {
 	case DX_HASH_LEGACY:
 		hash = dx_hack_hash(name, len);

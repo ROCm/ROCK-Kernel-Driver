@@ -194,6 +194,18 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 
 #define pci_domain_nr(bus) ((struct pci_controller *)(bus)->sysdata)->index
 
+/* Bus number == domain number until we get above 256 busses */
+static inline int pci_name_bus(char *name, struct pci_bus *bus)
+{
+	int domain = pci_domain_nr(bus)
+	if (domain < 256) {
+		sprintf(name, "%02x", domain);
+	} else {
+		sprintf(name, "%04x:%02x", domain, bus->number);
+	}
+	return 0;
+}
+
 #endif /* __KERNEL__ */
 
 /* Values for the `which' argument to sys_pciconfig_iobase.  */

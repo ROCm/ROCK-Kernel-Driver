@@ -126,7 +126,7 @@ static struct inode *qnx4_alloc_inode(struct super_block *sb);
 static void qnx4_destroy_inode(struct inode *inode);
 static void qnx4_read_inode(struct inode *);
 static int qnx4_remount(struct super_block *sb, int *flags, char *data);
-static int qnx4_statfs(struct super_block *, struct statfs *);
+static int qnx4_statfs(struct super_block *, struct kstatfs *);
 
 static struct super_operations qnx4_sops =
 {
@@ -276,7 +276,7 @@ unsigned long qnx4_block_map( struct inode *inode, long iblock )
 	return block;
 }
 
-static int qnx4_statfs(struct super_block *sb, struct statfs *buf)
+static int qnx4_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	lock_kernel();
 

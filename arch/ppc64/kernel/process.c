@@ -129,7 +129,6 @@ struct task_struct *__switch_to(struct task_struct *prev,
 	return last;
 }
 
-static void show_tsk_stack(struct task_struct *p, unsigned long sp);
 char *ppc_find_proc_name(unsigned *p, char *buf, unsigned buflen);
 
 void show_regs(struct pt_regs * regs)
@@ -172,7 +171,7 @@ void show_regs(struct pt_regs * regs)
 	printk("NIP [%016lx] ", regs->nip);
 	printk("%s\n", ppc_find_proc_name((unsigned *)regs->nip,
 	       name_buf, 256));
-	show_tsk_stack(current, regs->gpr[1]);
+	show_stack(current, (unsigned long *)regs->gpr[1]);
 }
 
 void exit_thread(void)
@@ -517,22 +516,26 @@ unsigned long get_wchan(struct task_struct *p)
 	return 0;
 }
 
-static void show_tsk_stack(struct task_struct *p, unsigned long sp)
+void show_stack(struct task_struct *p, unsigned long *_sp)
 {
 	unsigned long ip;
 	unsigned long stack_page = (unsigned long)p->thread_info;
 	int count = 0;
 	char name_buf[256];
+	unsigned long sp = (unsigned long)_sp;
 
 	if (!p)
 		return;
 
+	if (sp == 0)
+		sp = p->thread.ksp;
 	printk("Call Trace:\n");
 	do {
 		if (__get_user(sp, (unsigned long *)sp))
 			break;
-		if (sp < (stack_page + sizeof(struct thread_struct)) ||
-		    sp >= (stack_page + THREAD_SIZE))
+		if (sp < stack_page + sizeof(struct thread_struct))
+			break;
+		if (sp >= stack_page + THREAD_SIZE)
 			break;
 		if (__get_user(ip, (unsigned long *)(sp + 16)))
 			break;
@@ -544,10 +547,10 @@ static void show_tsk_stack(struct task_struct *p, unsigned long sp)
 
 void dump_stack(void)
 {
-	show_tsk_stack(current, (unsigned long)_get_SP());
+	show_stack(current, (unsigned long *)_get_SP());
 }
 
 void show_trace_task(struct task_struct *tsk)
 {
-	show_tsk_stack(tsk, tsk->thread.ksp);
+	show_stack(tsk, (unsigned long *)tsk->thread.ksp);
 }

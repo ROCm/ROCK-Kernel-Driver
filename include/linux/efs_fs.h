@@ -41,7 +41,7 @@ extern struct file_operations efs_dir_operations;
 extern struct address_space_operations efs_symlink_aops;
 
 extern int efs_fill_super(struct super_block *, void *, int);
-extern int efs_statfs(struct super_block *, struct statfs *);
+extern int efs_statfs(struct super_block *, struct kstatfs *);
 
 extern void efs_read_inode(struct inode *);
 extern efs_block_t efs_map_block(struct inode *, efs_block_t);

@@ -218,15 +218,14 @@ struct osf_statfs {
 } *osf_stat;
 
 static int
-linux_to_osf_statfs(struct statfs *linux_stat, struct osf_statfs *osf_stat,
+linux_to_osf_statfs(struct kstatfs *linux_stat, struct osf_statfs *osf_stat,
 		    unsigned long bufsiz)
 {
 	struct osf_statfs tmp_stat;
 
 	tmp_stat.f_type = linux_stat->f_type;
 	tmp_stat.f_flags = 0;	/* mount flags */
-	/* Linux doesn't provide a "fundamental filesystem block size": */
-	tmp_stat.f_fsize = linux_stat->f_bsize;
+	tmp_stat.f_fsize = linux_stat->f_frsize;
 	tmp_stat.f_bsize = linux_stat->f_bsize;
 	tmp_stat.f_blocks = linux_stat->f_blocks;
 	tmp_stat.f_bfree = linux_stat->f_bfree;
@@ -243,7 +242,7 @@ static int
 do_osf_statfs(struct dentry * dentry, struct osf_statfs *buffer,
 	      unsigned long bufsiz)
 {
-	struct statfs linux_stat;
+	struct kstatfs linux_stat;
 	int error = vfs_statfs(dentry->d_inode->i_sb, &linux_stat);
 	if (!error)
 		error = linux_to_osf_statfs(&linux_stat, buffer, bufsiz);

@@ -37,7 +37,7 @@ int pcibios_enable_resources(struct pci_dev *, int);
 
 extern int pcibios_last_bus;
 extern struct pci_bus *pci_root_bus;
-extern struct pci_ops *pci_root_ops;
+extern struct pci_ops pci_root_ops;
 
 /* pci-irq.c */
 

@@ -266,7 +266,7 @@ out:
 	return -EINVAL;
 }
 
-static int cramfs_statfs(struct super_block *sb, struct statfs *buf)
+static int cramfs_statfs(struct super_block *sb, struct kstatfs *buf)
 {
 	buf->f_type = CRAMFS_MAGIC;
 	buf->f_bsize = PAGE_CACHE_SIZE;

@@ -59,7 +59,7 @@ struct pci_fixup pcibios_fixups[1];
 
 
 static int
-__pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
+pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 {
 	int result = 0;
 	u64 data = 0;
@@ -75,7 +75,7 @@ __pci_sal_read (int seg, int bus, int dev, int fn, int reg, int len, u32 *value)
 }
 
 static int
-__pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
+pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 {
 	if ((seg > 255) || (bus > 255) || (dev > 31) || (fn > 7) || (reg > 255))
 		return -EINVAL;
@@ -83,27 +83,32 @@ __pci_sal_write (int seg, int bus, int dev, int fn, int reg, int len, u32 value)
 	return ia64_sal_pci_config_write(PCI_SAL_ADDRESS(seg, bus, dev, fn, reg), len, value);
 }
 
-
-static int
-pci_sal_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
-{
-	return __pci_sal_read(pci_domain_nr(bus), bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
-			      where, size, value);
-}
-
-static int
-pci_sal_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
-{
-	return __pci_sal_write(pci_domain_nr(bus), bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn),
-			       where, size, value);
-}
-
-struct pci_ops pci_sal_ops = {
+struct pci_raw_ops pci_sal_ops = {
 	.read = 	pci_sal_read,
 	.write =	pci_sal_write
 };
 
-struct pci_ops *pci_root_ops = &pci_sal_ops;	/* default to SAL */
+struct pci_raw_ops *raw_pci_ops = &pci_sal_ops;	/* default to SAL */
+
+
+static int
+pci_read (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 *value)
+{
+	return raw_pci_ops->read(pci_domain_nr(bus), bus->number,
+			PCI_SLOT(devfn), PCI_FUNC(devfn), where, size, value);
+}
+
+static int
+pci_write (struct pci_bus *bus, unsigned int devfn, int where, int size, u32 value)
+{
+	return raw_pci_ops->write(pci_domain_nr(bus), bus->number,
+			PCI_SLOT(devfn), PCI_FUNC(devfn), where, size, value);
+}
+
+static struct pci_ops pci_root_ops = {
+	.read = pci_read,
+	.write = pci_write,
+};
 
 static int __init
 pci_acpi_init (void)
@@ -307,7 +312,7 @@ pcibios_scan_root (void *handle, int seg, int bus)
 	info.name = name;
 	acpi_walk_resources(handle, METHOD_NAME__CRS, add_window, &info);
 
-	return scan_root_bus(bus, pci_root_ops, controller);
+	return scan_root_bus(bus, &pci_root_ops, controller);
 
 out3:
 	kfree(controller->window);
