@@ -707,9 +707,8 @@ static inline int wait_for_ctrl_irq(struct controller *ctrl)
 
 	dbg("%s - start\n", __FUNCTION__);
 	add_wait_queue(&ctrl->queue, &wait);
-	set_current_state(TASK_INTERRUPTIBLE);
 	/* Sleep for up to 1 second to wait for the LED to change. */
-	schedule_timeout(1*HZ);
+	msleep_interruptible(1000);
 	remove_wait_queue(&ctrl->queue, &wait);
 	if (signal_pending(current))
 		retval =  -EINTR;
