@@ -50,19 +50,6 @@ config I2O_BLOCK
 	  whenever you want). If you want to compile it as a module, say M
 	  here and read <file:Documentation/modules.txt>.
 
-config I2O_LAN
-	tristate "I2O LAN OSM"
-	depends on NET && I2O
-	help
-	  Include support for the LAN OSM. You will also need to include
-	  support for token ring or FDDI if you wish to use token ring or FDDI
-	  I2O cards with this driver.
-
-	  This support is also available as a module called i2o_lan ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
-
 config I2O_SCSI
 	tristate "I2O SCSI OSM"
 	depends on I2O && SCSI

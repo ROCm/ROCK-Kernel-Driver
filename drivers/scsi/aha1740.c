@@ -315,8 +315,8 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 {
     unchar direction;
     unchar *cmd = (unchar *) SCpnt->cmnd;
-    unchar target = SCpnt->target;
-    struct aha1740_hostdata *host = HOSTDATA(SCpnt->host);
+    unchar target = SCpnt->device->id;
+    struct aha1740_hostdata *host = HOSTDATA(SCpnt->device->host);
     unsigned long flags;
     void *buff = SCpnt->request_buffer;
     int bufflen = SCpnt->request_bufflen;
@@ -416,7 +416,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 	host->ecb[ecbno].datalen = bufflen;
 	host->ecb[ecbno].dataptr = isa_virt_to_bus(buff);
     }
-    host->ecb[ecbno].lun = SCpnt->lun;
+    host->ecb[ecbno].lun = SCpnt->device->lun;
     host->ecb[ecbno].ses = 1;	/* Suppress underrun errors */
     host->ecb[ecbno].dir = direction;
     host->ecb[ecbno].ars = 1;  /* Yes, get the sense on an error */
@@ -449,7 +449,7 @@ static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 #define LOOPCNT_WARN 10		/* excessive mbxout wait -> syslog-msg */
 #define LOOPCNT_MAX 1000000	/* mbxout deadlock -> panic() after ~ 2 sec. */
 	int loopcnt;
-	unsigned int base = SCpnt->host->io_port;
+	unsigned int base = SCpnt->device->host->io_port;
 	DEB(printk("aha1740[%d] critical section\n",ecbno));
 
 	spin_lock_irqsave(&aha1740_lock, flags);
