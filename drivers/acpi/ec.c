@@ -451,7 +451,7 @@ acpi_ec_space_handler (
 		return_VALUE(AE_BAD_PARAMETER);
 
 	if(bit_width != 8) {
-		printk(KERN_WARNING PREFIX "acpi_ec_space_handler: bit_width should be 8\n");
+		/* Embedded Controller region does not use ByteAcc */
 		if (acpi_strict)
 			return_VALUE(AE_BAD_PARAMETER);
 	}
@@ -461,11 +461,11 @@ acpi_ec_space_handler (
 next_byte:
 	switch (function) {
 	case ACPI_READ:
-		result = acpi_ec_read(ec, (u8) address, &temp);
+		result = acpi_ec_read(ec, (u8) address + (i*8), &temp);
 		*value = (acpi_integer) temp;
 		break;
 	case ACPI_WRITE:
-		result = acpi_ec_write(ec, (u8) address, (u8) *value);
+		result = acpi_ec_write(ec, (u8) address + (i*8), (u8) *value);
 		break;
 	default:
 		result = -EINVAL;
