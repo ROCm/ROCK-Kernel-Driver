@@ -4327,9 +4327,9 @@ int BusLogic_BIOSDiskParameters(struct scsi_device *sdev, struct block_device *D
   BugLogic_ProcDirectoryInfo implements /proc/scsi/BusLogic/<N>.
 */
 
-int BusLogic_ProcDirectoryInfo(char *ProcBuffer, char **StartPointer,
+int BusLogic_ProcDirectoryInfo(struct Scsi_Host *shost, char *ProcBuffer, char **StartPointer,
 			       off_t Offset, int BytesAvailable,
-			       int HostNumber, int WriteFlag)
+			       int WriteFlag)
 {
   BusLogic_HostAdapter_T *HostAdapter;
   BusLogic_TargetStatistics_T *TargetStatistics;
@@ -4338,11 +4338,11 @@ int BusLogic_ProcDirectoryInfo(char *ProcBuffer, char **StartPointer,
   for (HostAdapter = BusLogic_FirstRegisteredHostAdapter;
        HostAdapter != NULL;
        HostAdapter = HostAdapter->Next)
-    if (HostAdapter->HostNumber == HostNumber) break;
+    if (HostAdapter->HostNumber == shost->host_no) break;
   if (HostAdapter == NULL)
     {
       BusLogic_Error("Cannot find Host Adapter for SCSI Host %d\n",
-		     NULL, HostNumber);
+		     NULL, shost->host_no);
       return 0;
     }
   TargetStatistics = HostAdapter->TargetStatistics;

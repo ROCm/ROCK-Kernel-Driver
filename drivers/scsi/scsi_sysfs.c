@@ -45,12 +45,13 @@ shost_rd_attr(cmd_per_lun, "%hd\n");
 shost_rd_attr(sg_tablesize, "%hu\n");
 shost_rd_attr(unchecked_isa_dma, "%d\n");
 
-static struct class_device_attribute *const shost_attrs[] = {
+struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	&class_device_attr_unique_id,
 	&class_device_attr_host_busy,
 	&class_device_attr_cmd_per_lun,
 	&class_device_attr_sg_tablesize,
 	&class_device_attr_unchecked_isa_dma,
+	NULL
 };
 
 static struct class shost_class = {
@@ -243,7 +244,8 @@ store_rescan_field (struct device *dev, const char *buf, size_t count)
 
 static DEVICE_ATTR(rescan, S_IRUGO | S_IWUSR, show_rescan_field, store_rescan_field)
 
-static struct device_attribute * const sdev_attrs[] = {
+/* Default template for device attributes.  May NOT be modified */
+struct device_attribute *scsi_sysfs_sdev_attrs[] = {
 	&dev_attr_device_blocked,
 	&dev_attr_queue_depth,
 	&dev_attr_type,
@@ -254,6 +256,7 @@ static struct device_attribute * const sdev_attrs[] = {
 	&dev_attr_rev,
 	&dev_attr_online,
 	&dev_attr_rescan,
+	NULL
 };
 
 static void scsi_device_release(struct device *dev)
@@ -287,9 +290,9 @@ int scsi_device_register(struct scsi_device *sdev)
 	if (error)
 		return error;
 
-	for (i = 0; !error && i < ARRAY_SIZE(sdev_attrs); i++)
+	for (i = 0; !error && sdev->host->hostt->sdev_attrs[i] != NULL; i++)
 		error = device_create_file(&sdev->sdev_driverfs_dev,
-					   sdev_attrs[i]);
+					   sdev->host->hostt->sdev_attrs[i]);
 
 	if (error)
 		scsi_device_unregister(sdev);
@@ -305,8 +308,8 @@ void scsi_device_unregister(struct scsi_device *sdev)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(sdev_attrs); i++)
-		device_remove_file(&sdev->sdev_driverfs_dev, sdev_attrs[i]);
+	for (i = 0; sdev->host->hostt->sdev_attrs[i] != NULL; i++)
+		device_remove_file(&sdev->sdev_driverfs_dev, sdev->host->hostt->sdev_attrs[i]);
 	device_unregister(&sdev->sdev_driverfs_dev);
 }
 
@@ -357,9 +360,9 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 	if (error)
 		goto clean_device;
 
-	for (i = 0; !error && i < ARRAY_SIZE(shost_attrs); i++)
+	for (i = 0; !error && shost->hostt->shost_attrs[i] != NULL; i++)
 		error = class_device_create_file(&shost->class_dev,
-					   shost_attrs[i]);
+					   shost->hostt->shost_attrs[i]);
 	if (error)
 		goto clean_class;
 
@@ -383,3 +386,118 @@ void scsi_sysfs_remove_host(struct Scsi_Host *shost)
 	device_del(&shost->host_gendev);
 }
 
+/** scsi_sysfs_modify_shost_attribute - modify or add a host class attribute
+ *
+ * @class_attrs:host class attribute list to be added to or modified
+ * @attr:	individual attribute to change or added
+ *
+ * returns zero if successful or error if not
+ **/
+int scsi_sysfs_modify_shost_attribute(struct class_device_attribute ***class_attrs,
+				      struct class_device_attribute *attr)
+{
+	int modify = 0;
+	int num_attrs;
+
+	if(*class_attrs == NULL)
+		*class_attrs = scsi_sysfs_shost_attrs;
+
+	for(num_attrs=0; (*class_attrs)[num_attrs] != NULL; num_attrs++)
+		if(strcmp((*class_attrs)[num_attrs]->attr.name, attr->attr.name) == 0)
+			modify = num_attrs;
+
+	if(*class_attrs == scsi_sysfs_shost_attrs || !modify) {
+		/* note: need space for null at the end as well */
+		struct class_device_attribute **tmp_attrs = kmalloc(sizeof(struct class_device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
+		if(tmp_attrs == NULL)
+			return -ENOMEM;
+		memcpy(tmp_attrs, *class_attrs, sizeof(struct class_device_attribute)*num_attrs);
+		if(*class_attrs != scsi_sysfs_shost_attrs)
+			kfree(*class_attrs);
+		*class_attrs = tmp_attrs;
+	}
+	if(modify) {
+		/* spare the caller from having to copy things it's
+		 * not interested in */
+		struct class_device_attribute *old_attr =
+			(*class_attrs)[modify];
+		/* extend permissions */
+		attr->attr.mode |= old_attr->attr.mode;
+
+		/* override null show/store with default */
+		if(attr->show == NULL)
+			attr->show = old_attr->show;
+		if(attr->store == NULL)
+			attr->store = old_attr->store;
+		(*class_attrs)[modify] = attr;
+	} else {
+		(*class_attrs)[num_attrs++] = attr;
+		(*class_attrs)[num_attrs] = NULL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(scsi_sysfs_modify_shost_attribute);
+
+/** scsi_sysfs_modify_sdev_attribute - modify or add a host device attribute
+ *
+ * @dev_attrs:	pointer to the attribute list to be added to or modified
+ * @attr:	individual attribute to change or added
+ *
+ * returns zero if successful or error if not
+ **/
+int scsi_sysfs_modify_sdev_attribute(struct device_attribute ***dev_attrs,
+				     struct device_attribute *attr)
+{
+	int modify = 0;
+	int num_attrs;
+
+	if(*dev_attrs == NULL)
+		*dev_attrs = scsi_sysfs_sdev_attrs;
+
+	for(num_attrs=0; (*dev_attrs)[num_attrs] != NULL; num_attrs++)
+		if(strcmp((*dev_attrs)[num_attrs]->attr.name, attr->attr.name) == 0)
+			modify = num_attrs;
+
+	if(*dev_attrs == scsi_sysfs_sdev_attrs || !modify) {
+		/* note: need space for null at the end as well */
+		struct device_attribute **tmp_attrs = kmalloc(sizeof(struct device_attribute)*(num_attrs + (modify ? 1 : 2)), GFP_KERNEL);
+		if(tmp_attrs == NULL)
+			return -ENOMEM;
+		memcpy(tmp_attrs, *dev_attrs, sizeof(struct device_attribute)*num_attrs);
+		if(*dev_attrs != scsi_sysfs_sdev_attrs)
+			kfree(*dev_attrs);
+		*dev_attrs = tmp_attrs;
+	}
+	if(modify) {
+		/* spare the caller from having to copy things it's
+		 * not interested in */
+		struct device_attribute *old_attr =
+			(*dev_attrs)[modify];
+		/* extend permissions */
+		attr->attr.mode |= old_attr->attr.mode;
+
+		/* override null show/store with default */
+		if(attr->show == NULL)
+			attr->show = old_attr->show;
+		if(attr->store == NULL)
+			attr->store = old_attr->store;
+		(*dev_attrs)[modify] = attr;
+	} else {
+		(*dev_attrs)[num_attrs++] = attr;
+		(*dev_attrs)[num_attrs] = NULL;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(scsi_sysfs_modify_sdev_attribute);
+
+void scsi_sysfs_release_attributes(struct SHT *hostt)
+{
+	if(hostt->sdev_attrs != scsi_sysfs_sdev_attrs)
+		kfree(hostt->sdev_attrs);
+
+	if(hostt->shost_attrs != scsi_sysfs_shost_attrs)
+		kfree(hostt->shost_attrs);
+}
+EXPORT_SYMBOL(scsi_sysfs_release_attributes);

@@ -68,7 +68,7 @@ typedef struct	SHT
      * outside the kernel ie. userspace and it also provides an interface
      * to feed the driver with information. Check eata_dma_proc.c for reference
      */
-    int (*proc_info)(char *, char **, off_t, int, int, int);
+    int (*proc_info)(struct Scsi_Host *, char *, char **, off_t, int, int);
 
     /*
      * The name pointer is a pointer to the name of the SCSI
@@ -356,6 +356,16 @@ typedef struct	SHT
      * FIXME: This should probably be a value in the template */
     #define SCSI_DEFAULT_HOST_BLOCKED	7
 
+    /*
+     * pointer to the sysfs class properties for this host
+     */
+    struct class_device_attribute **shost_attrs;
+
+    /*
+     * Pointer to the SCSI device properties for this host
+     */
+    struct device_attribute **sdev_attrs;
+
 } Scsi_Host_Template;
 
 /*
@@ -570,9 +580,6 @@ extern int scsi_remove_host(struct Scsi_Host *);
 extern int scsi_register_host(Scsi_Host_Template *);
 extern int scsi_unregister_host(Scsi_Host_Template *);
 
-extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
-extern void scsi_host_put(struct Scsi_Host *);
-
 /**
  * scsi_find_device - find a device given the host
  * @shost:	SCSI host pointer
@@ -590,5 +597,7 @@ static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
                         return sdev;
         return NULL;
 }
+
+extern void scsi_sysfs_release_attributes(struct SHT *hostt);
 
 #endif

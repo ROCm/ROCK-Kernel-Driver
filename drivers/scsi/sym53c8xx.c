@@ -1288,8 +1288,8 @@ static struct proc_dir_entry proc_scsi_sym53c8xx = {
 };
 #endif
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func);
+static int sym53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func);
 #endif
 
 /*
@@ -14226,21 +14226,16 @@ static int ncr_host_info(ncb_p np, char *ptr, off_t offset, int len)
 **	- func = 1 means write (parse user control command)
 */
 
-static int sym53c8xx_proc_info(char *buffer, char **start, off_t offset,
-			int length, int hostno, int func)
+static int sym53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+			int length, int func)
 {
-	struct Scsi_Host *host;
 	struct host_data *host_data;
 	ncb_p ncb = 0;
 	int retv;
 
 #ifdef DEBUG_PROC_INFO
-printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
+printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", host->host_no, func);
 #endif
-
-	host = scsi_host_hn_get(hostno);
-	if (!host)
-		return -EINVAL;
 
 	host_data = (struct host_data *) host->hostdata;
 	ncb = host_data->ncb;
@@ -14261,7 +14256,6 @@ printk("sym53c8xx_proc_info: hostno=%d, func=%d\n", hostno, func);
 	}
 
 out:
-	scsi_host_put(host);
 	return retv;
 }
 

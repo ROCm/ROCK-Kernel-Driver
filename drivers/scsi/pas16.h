@@ -122,8 +122,6 @@ static int pas16_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int pas16_bus_reset(Scsi_Cmnd *);
 static int pas16_host_reset(Scsi_Cmnd *);
 static int pas16_device_reset(Scsi_Cmnd *);
-static int pas16_proc_info (char *buffer ,char **start, off_t offset,
-		     int length, int hostno, int inout);
 
 #ifndef NULL
 #define NULL 0

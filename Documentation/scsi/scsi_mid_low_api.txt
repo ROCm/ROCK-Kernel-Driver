@@ -22,7 +22,10 @@ has its own PCI device address. [The one-to-one correspondence between
 a SCSI host and a PCI device is common but not required (e.g. with
 ISA or MCA adapters).]
 
-This version of the document roughly matches linux kernel version 2.5.67 .
+This version of the document roughly matches linux kernel version 2.5.68 .
+This document can be found in the Linux kernel source Documentation/scsi
+directory and is called scsi_mid_low_api.txt . A more recent copy may
+be found at http://www.torque.net/scsi/scsi_mid_low_api.txt.gz .
 
 Documentation
 =============
@@ -142,13 +145,14 @@ scsi_add_host()  --------+
                     slave_configure() -->  scsi_adjust_queue_depth()
 			 |
 		    slave_alloc()
-                    slave_configure() -->  scsi_adjust_queue_depth()
+                    slave_configure()
 			 |
 		    slave_alloc()   **
                     slave_destroy() **
 
-The invocation of scsi_adjust_queue_depth() by the LLD is required
-if slave_configure() is supplied.
+If the LLD wants to adjust the default queue settings, it can invoke
+scsi_adjust_queue_depth() in its slave_configure() routine.
+
 ** For scsi devices that the mid level tries to scan but do not
    respond, a slave_alloc(), slave_destroy() pair is called.
 
@@ -179,7 +183,7 @@ LLD                   mid level                    LLD
 scsi_add_device()  ------+
                          |
 		    slave_alloc()
-                    slave_configure() -->  scsi_adjust_queue_depth()
+                    slave_configure()   [--> scsi_adjust_queue_depth()]
 
 [DEVICE unplug]
 LLD                      mid level                 LLD
@@ -228,13 +232,14 @@ scsi_register_host() -------+
 		      slave_destroy() **
                             |
 		      slave_alloc()
-                      slave_configure()  -->  scsi_adjust_queue_depth()
+                      slave_configure()
 		      slave_alloc()   **
 		      slave_destroy() **
 
-If the LLD does not supply a slave_configure() then the mid level invokes
-scsi_adjust_queue_depth() itself with tagged queuing off and "cmd_per_lun"
-for that host as the queue length.
+The mid level invokes scsi_adjust_queue_depth() with tagged queuing off and
+"cmd_per_lun" for that host as the queue length. These settings can be
+overridden by a slave_configure() supplied by the LLD.
+
 ** For scsi devices that the mid level tries to scan but do not
    respond, a slave_alloc(), slave_destroy() pair is called.
 
@@ -1093,11 +1098,6 @@ int proc_info(char * buffer, char ** start, off_t offset,
  *      Notes: Allows the driver to inspect the response to the initial
  *	INQUIRY done by the scanning code and take appropriate action.
  *	For more details see the hosts.h file.
- *	If this function is not supplied, the mid level will call
- *	scsi_adjust_queue_depth() with the struct Scsi_Host::cmd_per_lun
- *	value on behalf of the given device. If this function is
- *	supplied then its implementation must call
- *	scsi_adjust_queue_depth(). 	
  *
  *	Defined in: LLD
  **/
@@ -1277,8 +1277,9 @@ The following people have contributed to this document:
         Patrick Mansfield <patmans@us.ibm.com> 
 	Christoph Hellwig <hch@infradead.org>
 	Doug Ledford <dledford@redhat.com>
+        Andries Brouwer <Andries.Brouwer@cwi.nl>
 
 
 Douglas Gilbert
 dgilbert@interlog.com
-19th April 2003
+29th April 2003

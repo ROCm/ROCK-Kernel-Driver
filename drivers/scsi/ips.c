@@ -488,7 +488,7 @@ static void ips_cleanup_passthru(ips_ha_t *, ips_scb_t *);
 static void ips_scmd_buf_write(Scsi_Cmnd *scmd, void *data, unsigned int count);
 static void ips_scmd_buf_read(Scsi_Cmnd *scmd, void *data, unsigned int count);
 
-int  ips_proc_info(char *, char **, off_t, int, int, int);
+int  ips_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static int ips_host_info(ips_ha_t *, char *, off_t, int);
 static void copy_mem_info(IPS_INFOSTR *, char *, int);
 static int copy_info(IPS_INFOSTR *, char *, ...);
@@ -1496,8 +1496,8 @@ ips_info(struct Scsi_Host *SH) {
 /*                                                                          */
 /****************************************************************************/
 int
-ips_proc_info(char *buffer, char **start, off_t offset,
-              int length, int hostno, int func) {
+ips_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
+              int length, int func) {
    int           i;
    int           ret;
    ips_ha_t     *ha = NULL;
@@ -1507,7 +1507,7 @@ ips_proc_info(char *buffer, char **start, off_t offset,
    /* Find our host structure */
    for (i = 0; i < ips_next_controller; i++) {
       if (ips_sh[i]) {
-         if (ips_sh[i]->host_no == hostno) {
+         if (ips_sh[i] == host) {
             ha = (ips_ha_t *) ips_sh[i]->hostdata;
             break;
          }

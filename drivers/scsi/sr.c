@@ -559,7 +559,8 @@ static int sr_attach(struct scsi_device *sdev)
 	sprintf(cd->cdi.name, "sr%d", minor);
 
 	sdev->sector_size = 2048;	/* A guess, just in case */
-	sdev->ten = 1;
+	sdev->use_10_for_rw = 1;
+	sdev->use_10_for_ms = 0;
 	sdev->remap = 1;
 
 	/* FIXME: need to handle a get_capabilities failure properly ?? */

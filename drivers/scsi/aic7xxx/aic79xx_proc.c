@@ -278,8 +278,8 @@ done:
  * Return information to handle /proc support for the driver.
  */
 int
-ahd_linux_proc_info(char *buffer, char **start, off_t offset,
-		  int length, int hostno, int inout)
+ahd_linux_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset,
+		  int length, int inout)
 {
 	struct	ahd_softc *ahd;
 	struct	info_str info;
@@ -292,7 +292,7 @@ ahd_linux_proc_info(char *buffer, char **start, off_t offset,
 	retval = -EINVAL;
 	ahd_list_lock(&l);
 	TAILQ_FOREACH(ahd, &ahd_tailq, links) {
-		if (ahd->platform_data->host->host_no == hostno)
+		if (ahd->platform_data->host == shost)
 			break;
 	}
 
