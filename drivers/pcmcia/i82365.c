@@ -1608,9 +1608,11 @@ static int __init init_i82365(void)
 	return -1;
     }
     DEBUG(0, "%s\n", version);
+    if (driver_register(&i82365_driver))
+	return -1;
+
     printk(KERN_INFO "Intel PCIC probe: ");
     sockets = 0;
-    driver_register(&i82365_driver);
 
 #ifdef CONFIG_ISA
     isa_probe();

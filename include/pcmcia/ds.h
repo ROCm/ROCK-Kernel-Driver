@@ -32,6 +32,7 @@
 
 #include <pcmcia/driver_ops.h>
 #include <pcmcia/bulkmem.h>
+#include <linux/device.h>
 
 typedef struct tuple_parse_t {
     tuple_t		tuple;
@@ -142,6 +143,19 @@ int unregister_pccard_driver(dev_info_t *dev_info);
 
 #define register_pcmcia_driver register_pccard_driver
 #define unregister_pcmcia_driver unregister_pccard_driver
+
+extern struct bus_type pcmcia_bus_type;
+
+struct pcmcia_driver {
+	int			use_count, status;
+	dev_link_t		*(*attach)(void);
+	void			(*detach)(dev_link_t *);
+	struct module		*owner;
+	struct device_driver	drv;
+};
+
+int pcmcia_register_driver(struct pcmcia_driver *driver);
+void pcmcia_unregister_driver(struct pcmcia_driver *driver);
 
 #endif /* __KERNEL__ */
 

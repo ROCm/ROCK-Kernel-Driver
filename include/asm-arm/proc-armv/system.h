@@ -63,6 +63,7 @@ extern unsigned long cr_alignment;	/* defined in entry-armv.S */
 #define local_irq_save(x)					\
 	({							\
 		unsigned long temp;				\
+		(void) (&temp == &x);				\
 	__asm__ __volatile__(					\
 	"mrs	%0, cpsr		@ local_irq_save\n"	\
 "	orr	%1, %0, #128\n"					\

@@ -59,9 +59,7 @@ pci_update_resource(struct pci_dev *dev, struct resource *res, int resno)
 		reg = dev->rom_base_reg;
 	} else {
 		/* Hmm, non-standard resource. */
-		printk("PCI: trying to set non-standard region %s/%d\n",
-		       dev->slot_name, resno);
-		return;
+		BUG();
 	}
 
 	pci_write_config_dword(dev, reg, new);
@@ -141,7 +139,7 @@ int pci_assign_resource(struct pci_dev *dev, int resno)
 	if (ret) {
 		printk(KERN_ERR "PCI: Failed to allocate resource %d(%lx-%lx) for %s\n",
 		       resno, res->start, res->end, dev->slot_name);
-	} else {
+	} else if (resno < PCI_BRIDGE_RESOURCES) {
 		pci_update_resource(dev, res, resno);
 	}
 

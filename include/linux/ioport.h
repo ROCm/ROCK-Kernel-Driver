@@ -100,6 +100,7 @@ extern int allocate_resource(struct resource *root, struct resource *new,
 /* Convenience shorthand with allocation */
 #define request_region(start,n,name)	__request_region(&ioport_resource, (start), (n), (name))
 #define request_mem_region(start,n,name) __request_region(&iomem_resource, (start), (n), (name))
+#define rename_region(region, newname) do { (region)->name = (newname); } while (0)
 
 extern struct resource * __request_region(struct resource *, unsigned long start, unsigned long n, const char *name);
 

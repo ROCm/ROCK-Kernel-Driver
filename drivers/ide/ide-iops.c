@@ -686,7 +686,7 @@ u8 eighty_ninty_three (ide_drive_t *drive)
 		int hssbd = 0;
 		int i;
 		/*
-		 * Determime highest Supported SPEC
+		 * Determine highest Supported SPEC
 		 */
 		for (i=1; i<=15; i++)
 			if (drive->id->major_rev_num & (1<<i))

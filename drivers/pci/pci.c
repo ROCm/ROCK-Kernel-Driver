@@ -584,6 +584,9 @@ pci_set_master(struct pci_dev *dev)
 }
 
 #ifndef HAVE_ARCH_PCI_MWI
+/* This can be overridden by arch code. */
+u8 pci_cache_line_size = L1_CACHE_BYTES >> 2;
+
 /**
  * pci_generic_prep_mwi - helper function for pci_set_mwi
  * @dev: the PCI device for which MWI is enabled
@@ -597,32 +600,29 @@ pci_set_master(struct pci_dev *dev)
 static int
 pci_generic_prep_mwi(struct pci_dev *dev)
 {
-	int rc = 0;
-	u8 cache_size;
+	u8 cacheline_size;
 
-	/*
-	 * Looks like this is necessary to deal with on all architectures,
-	 * even this %$#%$# N440BX Intel based thing doesn't get it right.
-	 * Ie. having two NICs in the machine, one will have the cache
-	 * line set at boot time, the other will not.
-	 */
-	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cache_size);
-	cache_size <<= 2;
-	if (cache_size != SMP_CACHE_BYTES) {
-		printk(KERN_WARNING "PCI: %s PCI cache line size set "
-		       "incorrectly (%i bytes) by BIOS/FW, ",
-		       dev->slot_name, cache_size);
-		if (cache_size > SMP_CACHE_BYTES) {
-			printk("expecting %i\n", SMP_CACHE_BYTES);
-			rc = -EINVAL;
-		} else {
-			printk("correcting to %i\n", SMP_CACHE_BYTES);
-			pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE,
-					      SMP_CACHE_BYTES >> 2);
-		}
-	}
+	if (!pci_cache_line_size)
+		return -EINVAL;		/* The system doesn't support MWI. */
 
-	return rc;
+	/* Validate current setting: the PCI_CACHE_LINE_SIZE must be
+	   equal to or multiple of the right value. */
+	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cacheline_size);
+	if (cacheline_size >= pci_cache_line_size &&
+	    (cacheline_size % pci_cache_line_size) == 0)
+		return 0;
+
+	/* Write the correct value. */
+	pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, pci_cache_line_size);
+	/* Read it back. */
+	pci_read_config_byte(dev, PCI_CACHE_LINE_SIZE, &cacheline_size);
+	if (cacheline_size == pci_cache_line_size)
+		return 0;
+
+	printk(KERN_WARNING "PCI: cache line size of %d is not supported "
+	       "by device %s\n", pci_cache_line_size << 2, dev->slot_name);
+
+	return -EINVAL;
 }
 #endif /* !HAVE_ARCH_PCI_MWI */
 

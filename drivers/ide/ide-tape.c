@@ -280,7 +280,7 @@
  *			- Add idetape_onstream_mode_sense_tape_parameter_page
  *			  function to get tape capacity in frames: tape->capacity.
  *			- Add support for DI-50 drives( or any DI- drive).
- *			- 'workaround' for read error/blank block arround block 3000.
+ *			- 'workaround' for read error/blank block around block 3000.
  *			- Implement Early warning for end of media for Onstream.
  *			- Cosmetic code changes for readability.
  *			- Idetape_position_tape should not use SKIP bit during
@@ -514,7 +514,7 @@ typedef struct os_dat_s {
  * AUX
  */
 typedef struct os_aux_s {
-	__u32		format_id;		/* hardware compability AUX is based on */
+	__u32		format_id;		/* hardware compatibility AUX is based on */
 	char		application_sig[4];	/* driver used to write this media */
 	__u32		hdwr;			/* reserved */
 	__u32		update_frame_cntr;	/* for configuration frame */
@@ -1005,7 +1005,7 @@ typedef struct {
 	struct completion *waiting;
 	int onstream_write_error;		/* write error recovery active */
 	int header_ok;				/* header frame verified ok */
-	int linux_media;			/* reading linux-specifc media */
+	int linux_media;			/* reading linux-specific media */
 	int linux_media_version;
 	char application_sig[5];		/* application signature */
 	int filemark_cnt;

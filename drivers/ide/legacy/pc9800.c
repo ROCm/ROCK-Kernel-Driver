@@ -64,9 +64,13 @@ void __init ide_probe_for_pc9800(void)
 	/* Restore original value, just in case. */
 	outb(saved_bank, PC9800_IDE_BANKSELECT);
 
-	/* These ports are probably used by IDE I/F.  */
-	request_region(0x430, 1, "ide");
-	request_region(0x435, 1, "ide");
+	/* These ports are reseved by IDE I/F.  */
+	if (!request_region(0x430, 1, "ide") ||
+	    !request_region(0x435, 1, "ide")) {
+		printk(KERN_WARNING
+			"ide: IO port 0x430 and 0x435 are reserved for IDE"
+			" the card using these ports may not work\n");
+	}
 
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET] == HD_DATA &&
 	    ide_hwifs[1].io_ports[IDE_DATA_OFFSET] == HD_DATA) {

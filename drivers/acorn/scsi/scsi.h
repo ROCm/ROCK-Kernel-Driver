@@ -68,8 +68,7 @@ static inline void put_next_SCp_byte(Scsi_Pointer *SCp, unsigned char c)
 
 static inline void init_SCp(Scsi_Cmnd *SCpnt)
 {
-	SCpnt->SCp.Message = 0;
-	SCpnt->SCp.Status = 0;
+	memset(&SCpnt->SCp, 0, sizeof(struct scsi_pointer));
 
 	if (SCpnt->use_sg) {
 		unsigned long len = 0;
@@ -97,8 +96,6 @@ static inline void init_SCp(Scsi_Cmnd *SCpnt)
 		SCpnt->request_bufflen = len;
 #endif
 	} else {
-		SCpnt->SCp.buffer = NULL;
-		SCpnt->SCp.buffers_residual = 0;
 		SCpnt->SCp.ptr = (unsigned char *)SCpnt->request_buffer;
 		SCpnt->SCp.this_residual = SCpnt->request_bufflen;
 	}

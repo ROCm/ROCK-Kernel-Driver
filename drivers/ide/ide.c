@@ -904,7 +904,7 @@ void ide_setup_ports (	hw_regs_t *hw,
 EXPORT_SYMBOL(ide_setup_ports);
 
 /*
- * Register an IDE interface, specifing exactly the registers etc
+ * Register an IDE interface, specifying exactly the registers etc
  * Set init=1 iff calling before probes have taken place.
  */
 int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
@@ -955,7 +955,7 @@ found:
 EXPORT_SYMBOL(ide_register_hw);
 
 /*
- * Compatability function with existing drivers.  If you want
+ * Compatibility function with existing drivers.  If you want
  * something different, use the function above.
  */
 int ide_register (int arg1, int arg2, int irq)

@@ -75,7 +75,7 @@ E1000_PARAM(TxDescriptors, "Number of transmit descriptors");
  * Valid Range: 80-256 for 82542 and 82543 gigabit ethernet controllers
  * Valid Range: 80-4096 for 82544
  *
- * Default Value: 80
+ * Default Value: 256
  */
 
 E1000_PARAM(RxDescriptors, "Number of receive descriptors");
@@ -201,7 +201,7 @@ E1000_PARAM(InterruptThrottleRate, "Interrupt Throttling Rate");
 #define MIN_TXD                       80
 #define MAX_82544_TXD               4096
 
-#define DEFAULT_RXD                   80
+#define DEFAULT_RXD                  256
 #define MAX_RXD                      256
 #define MIN_RXD                       80
 #define MAX_82544_RXD               4096

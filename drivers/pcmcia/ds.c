@@ -77,16 +77,8 @@ static const char *version =
 
 /*====================================================================*/
 
-typedef struct driver_info_t {
-    dev_info_t		dev_info;
-    int			use_count, status;
-    dev_link_t		*(*attach)(void);
-    void		(*detach)(dev_link_t *);
-    struct driver_info_t *next;
-} driver_info_t;
-
 typedef struct socket_bind_t {
-    driver_info_t	*driver;
+    struct pcmcia_driver	*driver;
     u_char		function;
     dev_link_t		*instance;
     struct socket_bind_t *next;
@@ -124,9 +116,6 @@ typedef struct socket_info_t {
 /* Device driver ID passed to Card Services */
 static dev_info_t dev_info = "Driver Services";
 
-/* Linked list of all registered device drivers */
-static driver_info_t *root_driver = NULL;
-
 static int sockets = 0, major_dev = -1;
 static socket_info_t *socket_table = NULL;
 
@@ -143,35 +132,66 @@ static void cs_error(client_handle_t handle, int func, int ret)
     pcmcia_report_error(handle, &err);
 }
 
-/*======================================================================
+/*======================================================================*/
 
-    Register_pccard_driver() and unregister_pccard_driver() are used
-    tell Driver Services that a PC Card client driver is available to
-    be bound to sockets.
-    
-======================================================================*/
+static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info);
+
+/**
+ * pcmcia_register_driver - register a PCMCIA driver with the bus core
+ *
+ * Registers a PCMCIA driver with the PCMCIA bus core.
+ */
+int pcmcia_register_driver(struct pcmcia_driver *driver)
+{
+	if (!driver)
+		return -EINVAL;
+
+ 	driver->use_count = 0;
+ 	driver->status = init_status;
+	driver->drv.bus = &pcmcia_bus_type;
+
+	return driver_register(&driver->drv);
+}
+EXPORT_SYMBOL(pcmcia_register_driver);
+
+/**
+ * pcmcia_unregister_driver - unregister a PCMCIA driver with the bus core
+ */
+void pcmcia_unregister_driver(struct pcmcia_driver *driver)
+{
+	socket_bind_t *b;
+	int i;
+
+	if (driver->use_count > 0) {
+		/* Blank out any left-over device instances */
+		driver->attach = NULL; driver->detach = NULL;
+		for (i = 0; i < sockets; i++)
+			for (b = socket_table[i].bind; b; b = b->next)
+				if (b->driver == driver) 
+					b->instance = NULL;
+ 	}
+
+	driver_unregister(&driver->drv);
+}
+EXPORT_SYMBOL(pcmcia_unregister_driver);
+
 
 int register_pccard_driver(dev_info_t *dev_info,
 			   dev_link_t *(*attach)(void),
 			   void (*detach)(dev_link_t *))
 {
-    driver_info_t *driver;
+    struct pcmcia_driver *driver;
     socket_bind_t *b;
     int i;
 
     DEBUG(0, "ds: register_pccard_driver('%s')\n", (char *)dev_info);
-    for (driver = root_driver; driver; driver = driver->next)
-	if (strncmp((char *)dev_info, (char *)driver->dev_info,
-		    DEV_NAME_LEN) == 0)
-	    break;
+    driver = get_pcmcia_driver(dev_info);
     if (!driver) {
-	driver = kmalloc(sizeof(driver_info_t), GFP_KERNEL);
+	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
 	if (!driver) return -ENOMEM;
-	strncpy(driver->dev_info, (char *)dev_info, DEV_NAME_LEN);
-	driver->use_count = 0;
-	driver->status = init_status;
-	driver->next = root_driver;
-	root_driver = driver;
+	memset(driver, 0, sizeof(struct pcmcia_driver));
+	driver->drv.name = (char *)dev_info;
+	pcmcia_register_driver(driver);
     }
 
     driver->attach = attach;
@@ -185,7 +205,7 @@ int register_pccard_driver(dev_info_t *dev_info,
 	    b->instance = driver->attach();
 	    if (b->instance == NULL)
 		printk(KERN_NOTICE "ds: unable to create instance "
-		       "of '%s'!\n", driver->dev_info);
+		       "of '%s'!\n", driver->drv.name);
 	}
     
     return 0;
@@ -195,44 +215,45 @@ int register_pccard_driver(dev_info_t *dev_info,
 
 int unregister_pccard_driver(dev_info_t *dev_info)
 {
-    driver_info_t *target, **d = &root_driver;
-    socket_bind_t *b;
-    int i;
-    
+    struct pcmcia_driver *driver;
+
     DEBUG(0, "ds: unregister_pccard_driver('%s')\n",
 	  (char *)dev_info);
-    while ((*d) && (strncmp((*d)->dev_info, (char *)dev_info,
-			    DEV_NAME_LEN) != 0))
-	d = &(*d)->next;
-    if (*d == NULL)
+
+    driver = get_pcmcia_driver(dev_info);
+    if (!driver)
 	return -ENODEV;
     
-    target = *d;
-    if (target->use_count == 0) {
-	*d = target->next;
-	kfree(target);
-    } else {
-	/* Blank out any left-over device instances */
-	target->attach = NULL; target->detach = NULL;
-	for (i = 0; i < sockets; i++)
-	    for (b = socket_table[i].bind; b; b = b->next)
-		if (b->driver == target) b->instance = NULL;
-    }
+    pcmcia_unregister_driver(driver);
+    kfree(driver);
     return 0;
 } /* unregister_pccard_driver */
 
 /*====================================================================*/
 
 #ifdef CONFIG_PROC_FS
+static int proc_read_drivers_callback(struct device_driver *driver, void *d)
+{
+	char **p = d;
+	struct pcmcia_driver *p_dev = container_of(driver, 
+						   struct pcmcia_driver, drv);
+
+	*p += sprintf(*p, "%-24.24s %d %d\n", driver->name, p_dev->status,
+		     p_dev->use_count);
+	d = (void *) p;
+
+	return 0;
+}
+
 static int proc_read_drivers(char *buf, char **start, off_t pos,
 			     int count, int *eof, void *data)
 {
-    driver_info_t *d;
-    char *p = buf;
-    for (d = root_driver; d; d = d->next)
-	p += sprintf(p, "%-24.24s %d %d\n", d->dev_info,
-		     d->status, d->use_count);
-    return (p - buf);
+	char *p = buf;
+
+	bus_for_each_drv(&pcmcia_bus_type, NULL, 
+			 (void *) &p, proc_read_drivers_callback);
+
+	return (p - buf);
 }
 #endif
 
@@ -376,7 +397,7 @@ static int bind_mtd(int i, mtd_info_t *mtd_info)
 
 static int bind_request(int i, bind_info_t *bind_info)
 {
-    struct driver_info_t *driver;
+    struct pcmcia_driver *driver;
     socket_bind_t *b;
     bind_req_t bind_req;
     socket_info_t *s = &socket_table[i];
@@ -384,18 +405,13 @@ static int bind_request(int i, bind_info_t *bind_info)
 
     DEBUG(2, "bind_request(%d, '%s')\n", i,
 	  (char *)bind_info->dev_info);
-    for (driver = root_driver; driver; driver = driver->next)
-	if (strcmp((char *)driver->dev_info,
-		   (char *)bind_info->dev_info) == 0)
-	    break;
+    driver = get_pcmcia_driver(&bind_info->dev_info);
     if (driver == NULL) {
-	driver = kmalloc(sizeof(driver_info_t), GFP_KERNEL);
+	driver = kmalloc(sizeof(struct pcmcia_driver), GFP_KERNEL);
 	if (!driver) return -ENOMEM;
-	strncpy(driver->dev_info, bind_info->dev_info, DEV_NAME_LEN);
-	driver->use_count = 0;
-	driver->next = root_driver;
-	driver->attach = NULL; driver->detach = NULL;
-	root_driver = driver;
+	memset(driver, 0, sizeof(struct pcmcia_driver));
+	driver->drv.name = bind_info->dev_info;
+	pcmcia_register_driver(driver);
     }
 
     for (b = s->bind; b; b = b->next)
@@ -409,7 +425,7 @@ static int bind_request(int i, bind_info_t *bind_info)
 
     bind_req.Socket = i;
     bind_req.Function = bind_info->function;
-    bind_req.dev_info = &driver->dev_info;
+    bind_req.dev_info = (dev_info_t *) driver->drv.name;
     ret = pcmcia_bind_device(&bind_req);
     if (ret != CS_SUCCESS) {
 	cs_error(NULL, BindDevice, ret);
@@ -490,7 +506,7 @@ static int get_device_info(int i, bind_info_t *bind_info, int first)
 #endif
 
     for (b = s->bind; b; b = b->next)
-	if ((strcmp((char *)b->driver->dev_info,
+	if ((strcmp((char *)b->driver->drv.name,
 		    (char *)bind_info->dev_info) == 0) &&
 	    (b->function == bind_info->function))
 	    break;
@@ -524,7 +540,7 @@ static int unbind_request(int i, bind_info_t *bind_info)
     DEBUG(2, "unbind_request(%d, '%s')\n", i,
 	  (char *)bind_info->dev_info);
     for (b = &s->bind; *b; b = &(*b)->next)
-	if ((strcmp((char *)(*b)->driver->dev_info,
+	if ((strcmp((char *)(*b)->driver->drv.name,
 		    (char *)bind_info->dev_info) == 0) &&
 	    ((*b)->function == bind_info->function))
 	    break;
@@ -536,14 +552,6 @@ static int unbind_request(int i, bind_info_t *bind_info)
     if (c->driver->detach) {
 	if (c->instance)
 	    c->driver->detach(c->instance);
-    } else {
-	if (c->driver->use_count == 0) {
-	    driver_info_t **d;
-	    for (d = &root_driver; *d; d = &((*d)->next))
-		if (c->driver == *d) break;
-	    *d = (*d)->next;
-	    kfree(c->driver);
-	}
     }
     *b = c->next;
     kfree(c);
@@ -881,7 +889,18 @@ EXPORT_SYMBOL(unregister_pccard_driver);
 
 /*====================================================================*/
 
-int __init init_pcmcia_ds(void)
+struct bus_type pcmcia_bus_type = {
+	.name = "pcmcia",
+};
+EXPORT_SYMBOL(pcmcia_bus_type);
+
+static int __init init_pcmcia_bus(void)
+{
+	bus_register(&pcmcia_bus_type);
+	return 0;
+}
+
+static int __init init_pcmcia_ds(void)
 {
     client_reg_t client_reg;
     servinfo_t serv;
@@ -967,11 +986,8 @@ int __init init_pcmcia_ds(void)
     return 0;
 }
 
-late_initcall(init_pcmcia_ds);
 
-#ifdef MODULE
-
-void __exit cleanup_module(void)
+static void __exit exit_pcmcia_ds(void)
 {
     int i;
 #ifdef CONFIG_PROC_FS
@@ -984,6 +1000,57 @@ void __exit cleanup_module(void)
 	pcmcia_deregister_client(socket_table[i].handle);
     sockets = 0;
     kfree(socket_table);
+    bus_unregister(&pcmcia_bus_type);
 }
 
+#ifdef MODULE
+
+/* init_pcmcia_bus must be done early, init_pcmcia_ds late. If we load this 
+ * as a module, we can only specify one initcall, though... 
+ */
+static int __init init_pcmcia_module(void) {
+	init_pcmcia_bus();
+	return init_pcmcia_ds();
+}
+module_init(init_pcmcia_module);
+
+#else /* !MODULE */
+subsys_initcall(init_pcmcia_bus);
+late_initcall(init_pcmcia_ds);
 #endif
+
+module_exit(exit_pcmcia_ds);
+
+
+/* helpers for backwards-compatible functions */
+
+/* backwards-compatible accessing of driver --- by name! */
+
+struct cmp_data {
+	void *dev_info;
+	struct pcmcia_driver *drv;
+};
+
+static int cmp_drv_callback(struct device_driver *drv, void *data)
+{
+	struct cmp_data *cmp = data;
+	if (strncmp((char *)cmp->dev_info, (char *)drv->name,
+		    DEV_NAME_LEN) == 0) {
+		cmp->drv = container_of(drv, struct pcmcia_driver, drv);
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info)
+{
+	int ret;
+	struct cmp_data cmp = {
+		.dev_info = dev_info,
+	};
+	
+	ret = bus_for_each_drv(&pcmcia_bus_type, NULL, &cmp, cmp_drv_callback);
+	if (ret)
+		return cmp.drv;
+	return NULL;
+}

@@ -1617,6 +1617,15 @@ failed:
 
 /*====================================================================*/
 
+static struct pcmcia_driver pcnet_driver = {
+	.drv		= {
+		.name	= "pcnet_cs",
+	},
+	.attach		= pcnet_attach,
+	.detach		= pcnet_detach,
+	.owner		= THIS_MODULE,
+};
+
 static int __init init_pcnet_cs(void)
 {
     servinfo_t serv;
@@ -1627,14 +1636,14 @@ static int __init init_pcnet_cs(void)
 	       "does not match!\n");
 	return -EINVAL;
     }
-    register_pccard_driver(&dev_info, &pcnet_attach, &pcnet_detach);
+    pcmcia_register_driver(&pcnet_driver);
     return 0;
 }
 
 static void __exit exit_pcnet_cs(void)
 {
     DEBUG(0, "pcnet_cs: unloading\n");
-    unregister_pccard_driver(&dev_info);
+    pcmcia_unregister_driver(&pcnet_driver);
     while (dev_list != NULL)
 	pcnet_detach(dev_list);
 }

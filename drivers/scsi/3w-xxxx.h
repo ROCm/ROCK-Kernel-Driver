@@ -425,6 +425,7 @@ typedef struct TAG_TW_Device_Extension {
 	u32			aen_count;
 	struct Scsi_Host	*host;
 	spinlock_t		tw_lock;
+	struct semaphore	ioctl_sem;
 	int		        ioctl_size[TW_Q_LENGTH];
 	unsigned short		aen_queue[TW_Q_LENGTH];
 	unsigned char		aen_head;

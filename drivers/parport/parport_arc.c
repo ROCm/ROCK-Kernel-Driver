@@ -65,56 +65,41 @@ static unsigned char arc_read_data(struct parport *p)
 	return data_copy;
 }
 
-static void arc_inc_use_count(void)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void arc_dec_use_count(void)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
-}
-
 static struct parport_operations parport_arc_ops = 
 {
-	arc_write_data,
-	arc_read_data,
+	.write_data	= arc_write_data,
+	.read_data	= arc_read_data,
 
-	arc_write_control,
-	arc_read_control,
-	arc_frob_control,
+	.write_control	= arc_write_control,
+	.read_control	= arc_read_control,
+	.frob_control	= arc_frob_control,
 
-	arc_read_status,
+	.read_status	= arc_read_status,
 
-	arc_enable_irq,
-	arc_disable_irq,
+	.enable_irq	= arc_enable_irq,
+	.disable_irq	= arc_disable_irq,
 
-	arc_data_forward,
-	arc_data_reverse,
+	.data_forward	= arc_data_forward,
+	.data_reverse	= arc_data_reverse,
 
-	arc_init_state,
-	arc_save_state,
-	arc_restore_state,
+	.init_state	= arc_init_state,
+	.save_state	= arc_save_state,
+	.restore_state	= arc_restore_state,
 
-	arc_inc_use_count,
-	arc_dec_use_count,
+	.epp_write_data	= parport_ieee1284_epp_write_data,
+	.epp_read_data	= parport_ieee1284_epp_read_data,
+	.epp_write_addr	= parport_ieee1284_epp_write_addr,
+	.epp_read_addr	= parport_ieee1284_epp_read_addr,
 
-	parport_ieee1284_epp_write_data,
-	parport_ieee1284_epp_read_data,
-	parport_ieee1284_epp_write_addr,
-	parport_ieee1284_epp_read_addr,
-
-	parport_ieee1284_ecp_write_data,
-	parport_ieee1284_ecp_read_data,
-	parport_ieee1284_ecp_write_addr,
+	.ecp_write_data	= parport_ieee1284_ecp_write_data,
+	.ecp_read_data	= parport_ieee1284_ecp_read_data,
+	.ecp_write_addr	= parport_ieee1284_ecp_write_addr,
 	
-	parport_ieee1284_write_compat,
-	parport_ieee1284_read_nibble,
-	parport_ieee1284_read_byte,
+	.compat_write_data	= parport_ieee1284_write_compat,
+	.nibble_read_data	= parport_ieee1284_read_nibble,
+	.byte_read_data		= parport_ieee1284_read_byte,
+
+	.owner		= THIS_MODULE,
 };
 
 /* --- Initialisation code -------------------------------- */
@@ -123,18 +108,24 @@ int parport_arc_init(void)
 {
 	/* Archimedes hardware provides only one port, at a fixed address */
 	struct parport *p;
+	struct resource res;
+	char *fake_name = "parport probe");
 
-	if (check_region(PORT_BASE, 1))
+	res = request_region(PORT_BASE, 1, fake_name);
+	if (res == NULL)
 		return 0;
 
 	p = parport_register_port (PORT_BASE, IRQ_PRINTERACK,
 				   PARPORT_DMA_NONE, &parport_arc_ops);
 
-	if (!p)
+	if (!p) {
+		release_region(PORT_BASE, 1);
 		return 0;
+	}
 
 	p->modes = PARPORT_MODE_ARCSPP;
 	p->size = 1;
+	rename_region(res, p->name);
 
 	printk(KERN_INFO "%s: Archimedes on-board port, using irq %d\n",
 	       p->irq);

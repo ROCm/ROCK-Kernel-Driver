@@ -2064,6 +2064,11 @@ P:	Jeff Garzik
 L:	linux-via@gtf.org
 S:	Odd fixes
 
+VIA RHINE NETWORK DRIVER
+P:	Roger Luethi
+M:	rl@hellgate.ch
+S:	Maintained
+
 UCLINUX
 P:	Greg Ungerer
 M:	gerg@snapgear.com

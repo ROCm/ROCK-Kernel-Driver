@@ -326,7 +326,7 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, int proc_mode)
 	dump_mem(KERN_CRIT "Vectors: ", vectors, vectors + 0x40);
 	dump_mem(KERN_CRIT "Stubs: ", vectors + 0x200, vectors + 0x4b8);
 
-	die("Oops", regs, 0);
+	die("Oops - bad mode", regs, 0);
 	local_irq_disable();
 	panic("bad mode");
 }
@@ -354,7 +354,7 @@ static int bad_syscall(int n, struct pt_regs *regs)
 			 (thumb_mode(regs) ? 2 : 4);
 
 	force_sig_info(SIGILL, &info, current);
-	die_if_kernel("Oops", regs, n);
+	die_if_kernel("Oops - bad syscall", regs, n);
 	return regs->ARM_r0;
 }
 
@@ -472,7 +472,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 			 (thumb_mode(regs) ? 2 : 4);
 
 	force_sig_info(SIGILL, &info, current);
-	die_if_kernel("Oops", regs, no);
+	die_if_kernel("Oops - bad syscall(2)", regs, no);
 	return 0;
 }
 

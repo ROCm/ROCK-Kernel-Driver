@@ -107,3 +107,15 @@ config SERIO_SA1111
 	tristate "Intel SA1111 keyboard controller"
 	depends on SA1111 && SERIO
 
+config SERIO_98KBD
+	tristate "NEC PC-9800 keyboard controller"
+	depends on X86_PC9800 && SERIO
+	help
+	  Say Y here if you have the NEC PC-9801/PC-9821 and want to use its
+	  standard keyboard connected to its keyboard controller.
+
+	  This driver is also available as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want).
+	  The module will be called rpckbd.o. If you want to compile it as a
+	  module, say M here and read <file:Documentation/modules.txt>.
+
