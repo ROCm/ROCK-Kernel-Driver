@@ -38,13 +38,11 @@ struct i386_cpu cpu_devices[NR_CPUS];
 struct i386_node node_devices[MAX_NUMNODES];
 struct i386_memblk memblk_devices[MAX_NR_MEMBLKS];
 
-extern int numnodes;
-
 static int __init topology_init(void)
 {
 	int i;
 
-	for (i = 0; i < numnodes; i++)
+	for (i = 0; i < num_online_nodes(); i++)
 		arch_register_node(i);
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_possible(i)) arch_register_cpu(i);

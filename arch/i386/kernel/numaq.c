@@ -52,6 +52,7 @@ static void __init smp_dump_qct(void)
 	numnodes = 0;
 	for(node = 0; node < MAX_NUMNODES; node++) {
 		if(scd->quads_present31_0 & (1 << node)) {
+			node_set_online(node);
 			numnodes++;
 			eq = &scd->eq[node];
 			/* Convert to pages */
