@@ -47,11 +47,12 @@ bool 'Networking support' CONFIG_NET
 bool 'System V IPC' CONFIG_SYSVIPC
 bool 'BSD Process Accounting' CONFIG_BSD_PROCESS_ACCT
 bool 'Sysctl support' CONFIG_SYSCTL
-define CONFIG_KCORE ELF
+define_bool CONFIG_KCORE_ELF y
 tristate 'Kernel support for ELF binaries' CONFIG_BINFMT_ELF
 tristate 'Kernel support for MISC binaries' CONFIG_BINFMT_MISC
 bool 'Show crashed user process info' CONFIG_PROCESS_DEBUG
 endmenu
+
 
 source drivers/s390/Config.in
 
@@ -68,6 +69,6 @@ comment 'Kernel hacking'
 if [ "$CONFIG_CTC" = "y" ]; then
   bool 'Remote GDB kernel debugging' CONFIG_REMOTE_DEBUG
 fi
-# this does not work. bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
+bool 'Magic SysRq key' CONFIG_MAGIC_SYSRQ
 endmenu
 

@@ -412,7 +412,6 @@ int pcbit_xmit(int driver, int chnum, int ack, struct sk_buff *skb)
 	return len;
 }
 
-
 int pcbit_writecmd(const u_char* buf, int len, int user, int driver, int channel)
 {
 	struct pcbit_dev * dev;
@@ -436,32 +435,36 @@ int pcbit_writecmd(const u_char* buf, int len, int user, int driver, int channel
 		if (len > BANK4 + 1)
 		{
 			printk("pcbit_writecmd: invalid length %d\n", len);
-			return -EFAULT;
+			return -EINVAL;
 		}
 
 		if (user)
 		{
-			u_char cbuf[1024];
+			u_char *cbuf = kmalloc(len, GFP_KERNEL);
+			if (!cbuf)
+				return -ENOMEM;
 
-			copy_from_user(cbuf, buf, len);
-			for (i=0; i<len; i++)
-				writeb(cbuf[i], dev->sh_mem + i);
+			if (copy_from_user(cbuf, buf, len)) {
+				kfree(cbuf);
+				return -EFAULT;
+			}
+			memcpy_toio(dev->sh_mem, cbuf, len);
+			kfree(cbuf);
 		}
 		else
 			memcpy_toio(dev->sh_mem, buf, len);
 		return len;
-		break;
 	case L2_FWMODE:
 		/* this is the hard part */
 		/* dumb board */
-		if (len < 0)
-			return -EINVAL;
-
 		if (user) {		
 			/* get it into kernel space */
 			if ((ptr = kmalloc(len, GFP_KERNEL))==NULL)
 				return -ENOMEM;
-			copy_from_user(ptr, buf, len);
+			if (copy_from_user(ptr, buf, len)) {
+				kfree(ptr);
+				return -EFAULT;
+			}
 			loadbuf = ptr;
 		}
 		else
@@ -493,12 +496,9 @@ int pcbit_writecmd(const u_char* buf, int len, int user, int driver, int channel
 			kfree(ptr);
 
 		return errstat ? errstat : len;
-
-		break;
 	default:
 		return -EBUSY;
 	}
-	return 0;
 }
 
 /*

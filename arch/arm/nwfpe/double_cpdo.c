@@ -1,6 +1,6 @@
 /*
     NetWinder Floating Point Emulator
-    (c) Rebel.com, 1998-1999
+    (c) Rebel.COM, 1998,1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -22,10 +22,6 @@
 #include "softfloat.h"
 #include "fpopcode.h"
 #include "fpa11.h"
-
-extern FPA11 *fpa11;
-
-float64 getDoubleConstant(unsigned int);
 
 float64 float64_exp(float64 Fm);
 float64 float64_ln(float64 Fm);

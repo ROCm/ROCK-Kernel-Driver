@@ -11,6 +11,7 @@
  *  S/390 I/O interrupt processing and I/O request processing is
  *   implemented in arch/s390/kernel/s390io.c
  */
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -20,7 +21,7 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
-#include <linux/slab.h>
+#include <linux/malloc.h>
 #include <linux/string.h>
 #include <linux/random.h>
 #include <linux/smp.h>
@@ -286,7 +287,7 @@ static inline void get_irqlock(int cpu)
  */
 void __global_cli(void)
 {
-	unsigned int flags;
+	unsigned long flags;
 
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_I_SHIFT)) {
@@ -357,48 +358,6 @@ void __global_restore_flags(unsigned long flags)
 
 #endif
 
-/*
- * Note : This fuction should be eliminated as it doesn't comply with the
- *         S/390 irq scheme we have implemented ...
- */
-int handle_IRQ_event( unsigned int irq, int cpu, struct pt_regs * regs)
-{
-	struct irqaction * action;
-	int                status;
-
-	status = 0;
-
-	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
-		return( -ENODEV);
-
-	action = ioinfo[irq]->irq_desc.action;
-
-	if (action)
-	{
-		status |= 1;
-
-		if (!(action->flags & SA_INTERRUPT))
-			__sti();
-
-		do
-		{
-			status |= action->flags;
-			action->handler(irq, action->dev_id, regs);
-			action = action->next;
-		} while (action);
-
-		if (status & SA_SAMPLE_RANDOM)
-			add_interrupt_randomness(irq);
-		__cli();
-
-	} /* endif */
-
-	return status;
-}
-
-void enable_nop(int irq)
-{
-}
 
 void __init init_IRQ(void)
 {
@@ -427,3 +386,8 @@ void init_irq_proc(void)
         /* For now, nothing... */
 }
 
+EXPORT_SYMBOL(__global_cli);
+EXPORT_SYMBOL(__global_sti);
+EXPORT_SYMBOL(__global_save_flags);
+EXPORT_SYMBOL(__global_restore_flags);
+EXPORT_SYMBOL(global_bh_lock);

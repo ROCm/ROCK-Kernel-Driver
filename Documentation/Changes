@@ -31,7 +31,7 @@ al español de este documento en varios formatos.
 Eine deutsche Version dieser Datei finden Sie unter
 <http://www.stefan-winter.de/Changes-2.4.0.txt>.
 
-Last updated: January 11, 2001
+Last updated: April 6, 2001
 
 Chris Ricker (kaboom@gatech.edu or chris.ricker@genetics.utah.edu).
 
@@ -54,7 +54,7 @@ o  binutils               2.9.1.0.25              # ld -v
 o  util-linux             2.10o                   # fdformat --version
 o  modutils               2.4.2                   # insmod -V
 o  e2fsprogs              1.19                    # tune2fs
-o  reiserfsprogs          3.x.0d                  # reiserfsck 2>&1|grep reiserfsprogs
+o  reiserfsprogs          3.x.0j                  # reiserfsck 2>&1|grep reiserfsprogs
 o  pcmcia-cs              3.1.21                  # cardmgr -V
 o  PPP                    2.4.0                   # pppd --version
 o  isdn4k-utils           3.1pre1                 # isdnctrl 2>&1|grep version
@@ -148,7 +148,7 @@ Modutils
 --------
 
 Upgrade to recent modutils to fix various outstanding bugs which are
-seen more frequently under 2.3.x, and to enable auto-loading of USB
+seen more frequently under 2.4.x, and to enable auto-loading of USB
 modules.  In addition, the layout of modules under
 /lib/modules/`uname -r`/ has been made more sane.  This change also
 requires that you upgrade to a recent modutils.
@@ -227,7 +227,7 @@ PPP
 
 The PPP driver has been restructured to support multilink and to
 enable it to operate over diverse media layers.  If you use PPP,
-upgrade pppd to at least 2.4.0b1.
+upgrade pppd to at least 2.4.0.
 
 If you are not using devfs, you must have the device file /dev/ppp
 which can be made by:
@@ -307,16 +307,16 @@ o  <ftp://ftp.kernel.org/pub/linux/utils/kernel/modutils/v2.4/>
 
 Mkinitrd
 --------
-o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/mkinitrd-2.9-1.src.rpm>
+o  <ftp://rawhide.redhat.com/pub/rawhide/SRPMS/SRPMS/>
 
 E2fsprogs
 ---------
-o  <ftp://download.sourceforge.net/pub/sourceforge/e2fsprogs/e2fsprogs-1.19.tar.gz>
-o  <ftp://download.sourceforge.net/pub/sourceforge/e2fsprogs/e2fsprogs-1.19.src.rpm>
+o  <http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.19.tar.gz>
+o  <http://prdownloads.sourceforge.net/e2fsprogs/e2fsprogs-1.19-0.src.rpm>
 
 Reiserfsprogs
 -------------
-o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.0d.tar.gz>
+o  <ftp://ftp.namesys.com/pub/reiserfsprogs/reiserfsprogs-3.x.0j.tar.gz>
 
 LVM toolset
 -----------
@@ -347,7 +347,7 @@ Network
 
 PPP
 ---
-o  <ftp://linuxcare.com.au/pub/ppp/ppp-2.4.0.tar.gz>
+o  <ftp://ftp.samba.org/ppp/ppp-2.4.0.tar.gz>
 
 Isdn4k-utils
 ------------

@@ -6,7 +6,10 @@
  * 
  *  Generic channel device initialisation support. 
  */
+#define TRUE 1
+#define FALSE 0
 #define __KERNEL_SYSCALLS__
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/ctype.h>
@@ -20,6 +23,7 @@
 #include <linux/vmalloc.h>
 #include <asm/s390dyn.h>
 #include <asm/queue.h>
+#include <linux/kmod.h>
 
 typedef struct chandev_model_info chandev_model_info;
 struct chandev_model_info
@@ -229,6 +233,7 @@ static __inline__ void netif_start_queue(net_device *dev)
 static long                 chandev_lock_owner;
 static int                  chandev_lock_cnt; 
 static spinlock_t           chandev_spinlock;
+void                        *chandev_firstlock_addr,*chandev_lastlock_addr; 
 
 typedef struct chandev_not_oper_struct chandev_not_oper_struct;
 
@@ -256,24 +261,6 @@ if(in_interrupt())                \
 for((variable)=(head);(variable)!=NULL;(variable)=(variable)->next)
 
 
-#define CHANDEV_USE_KERNEL_THREADS (LINUX_VERSION_CODE<KERNEL_VERSION(2,4,0))
-
-#if CHANDEV_USE_KERNEL_THREADS
-static void chandev_start_msck_thread(void *unused);
-#if LINUX_VERSION_CODE<KERNEL_VERSION(2,3,0)
-#define chandev_daemonize(name,mask,use_init_fs) s390_daemonize(name,mask)
-#else
-#define chandev_daemonize(args...) s390_daemonize(args)
-#endif
-typedef int chandev_task_retval;
-#define chandev_task_return(val) return(val)       
-#else
-#define chandev_daemonize(noargs...)
-#define chandev_task_retval void
-#define chandev_task_return(val) return
-#endif
-
-
 static void chandev_lock(void)
 {
 	chandev_interrupt_check();
@@ -283,18 +270,33 @@ static void chandev_lock(void)
 		spin_lock(&chandev_spinlock);
 		chandev_lock_cnt=1;
 		chandev_lock_owner=(long)current;
+		chandev_firstlock_addr=__builtin_return_address(0);
 	}
 	else
+	{
 		chandev_lock_cnt++;
+		chandev_lastlock_addr=__builtin_return_address(0);
+	}
 	if(chandev_lock_cnt<0||chandev_lock_cnt>100)
-			panic("odd lock_cnt in lcs %d lcs_chan_lock",chandev_lock_cnt);
+	{
+		printk("odd lock_cnt %d lcs_chan_lock",chandev_lock_cnt);
+		chandev_lock_cnt=1;
+	}
 }
 
+static int chandev_full_unlock(void)
+{
+	int ret_lock_cnt=chandev_lock_cnt;
+	chandev_lock_cnt=0;
+	chandev_lock_owner=CHANDEV_INVALID_LOCK_OWNER;
+	spin_unlock(&chandev_spinlock);
+	return(ret_lock_cnt);
+}
 
 static void chandev_unlock(void)
 {
 	if(chandev_lock_owner!=(long)current)
-		panic("chandev_unlock: current=%lx"
+		printk("chandev_unlock: current=%lx"
 		      " chandev_lock_owner=%lx chandev_lock_cnt=%d\n",
 		      (long)current,
 		      chandev_lock_owner,
@@ -305,19 +307,20 @@ static void chandev_unlock(void)
 		spin_unlock(&chandev_spinlock);
 	}
 	if(chandev_lock_cnt<0)
-		panic("odd lock_cnt in lcs %d lcs_chan_unlock",chandev_lock_cnt);
+	{
+		printk("odd lock_cnt=%d in chan_unlock",chandev_lock_cnt);
+		chandev_full_unlock();
+	}
+
 }
 
-int chandev_full_unlock(void)
+
+void chandev_relock(int saved_lock_cnt)
 {
-	int ret_lock_cnt=chandev_lock_cnt;
-	chandev_lock_cnt=0;
-	chandev_lock_owner=CHANDEV_INVALID_LOCK_OWNER;
-	spin_unlock(&chandev_spinlock);
-	return(ret_lock_cnt);
+	
+	chandev_lock();
+	chandev_lock_cnt=saved_lock_cnt;
 }
-
-
 
 
 void *chandev_alloc(size_t size)
@@ -405,145 +408,8 @@ void chandev_free_all_queue(qheader *qhead)
 }
 
 
-struct files_struct *chandev_new_files_struct(void)
-{
-        struct files_struct *newf = kmem_cache_alloc(files_cachep, SLAB_KERNEL);
-	if (!newf) 
-		return(NULL);
-	memset(newf,0,sizeof(struct files_struct));
-	atomic_set(&newf->count, 1);
-	newf->file_lock	    = RW_LOCK_UNLOCKED;
-	newf->next_fd	    = 0;
-	newf->max_fds	    = NR_OPEN_DEFAULT;
-	newf->max_fdset	    = __FD_SETSIZE;
-	newf->close_on_exec = &newf->close_on_exec_init;
-	newf->open_fds	    = &newf->open_fds_init;
-	newf->fd	    = &newf->fd_array[0];
-	return(newf);
-}
-/*
- * Mostly robbed from kmod.c
- */
 
-static inline void
-use_init_fs_context(void)
-{
-	struct fs_struct *our_fs, *init_fs;
-	struct dentry *root, *pwd;
-	struct vfsmount *rootmnt, *pwdmnt;
-
-	/*
-	 * Make modprobe's fs context be a copy of init's.
-	 *
-	 * We cannot use the user's fs context, because it
-	 * may have a different root than init.
-	 * Since init was created with CLONE_FS, we can grab
-	 * its fs context from "init_task".
-	 *
-	 * The fs context has to be a copy. If it is shared
-	 * with init, then any chdir() call in modprobe will
-	 * also affect init and the other threads sharing
-	 * init_task's fs context.
-	 *
-	 * We created the exec_modprobe thread without CLONE_FS,
-	 * so we can update the fields in our fs context freely.
-	 */
-
-	init_fs = init_task.fs;
-	read_lock(&init_fs->lock);
-	rootmnt = mntget(init_fs->rootmnt);
-	root = dget(init_fs->root);
-	pwdmnt = mntget(init_fs->pwdmnt);
-	pwd = dget(init_fs->pwd);
-	read_unlock(&init_fs->lock);
-
-	/* FIXME - unsafe ->fs access */
-	our_fs = current->fs;
-	our_fs->umask = init_fs->umask;
-	set_fs_root(our_fs, rootmnt, root);
-	set_fs_pwd(our_fs, pwdmnt, pwd);
-	write_lock(&our_fs->lock);
-	if (our_fs->altroot) {
-		struct vfsmount *mnt = our_fs->altrootmnt;
-		struct dentry *dentry = our_fs->altroot;
-		our_fs->altrootmnt = NULL;
-		our_fs->altroot = NULL;
-		write_unlock(&our_fs->lock);
-		dput(dentry);
-		mntput(mnt);
-	} else 
-		write_unlock(&our_fs->lock);
-	dput(root);
-	mntput(rootmnt);
-	dput(pwd);
-	mntput(pwdmnt);
-}
-
-
-static int exec_usermodehelper(char *program_path, char *argv[], char *envp[])
-{
-	int err;
-	wait_queue_head_t    wait;
-
-
-	current->session = 1;
-	current->pgrp = 1;
-
-	/* We copy this off init & can't go until this is set up */
-	init_waitqueue_head(&wait);
-	while(init_task.fs->root==NULL)
-	{
-		sleep_on_timeout(&wait,HZ);
-	}
-	use_init_fs_context();
-
-	/* Prevent parent user process from sending signals to child.
-	   Otherwise, if the modprobe program does not exist, it might
-	   be possible to get a user defined signal handler to execute
-	   as the super user right after the execve fails if you time
-	   the signal just right.
-	*/
-	spin_lock_irq(&current->sigmask_lock);
-	flush_signals(current);
-	flush_signal_handlers(current);
-	spin_unlock_irq(&current->sigmask_lock);
-	 /* current->files sometimes was null this means we need */
-	 /* to build our own */
-	 exit_files(current);
-	 if((current->files=chandev_new_files_struct())==NULL)
-	 {
-		 printk("chandev_new_files_struct allocation failed\n");
-		 return(0);
-	 }
-	 
-	/* Drop the "current user" thing */
-	{
-		struct user_struct *user = current->user;
-		current->user = INIT_USER;
-		atomic_inc(&INIT_USER->__count);
-		atomic_inc(&INIT_USER->processes);
-		atomic_dec(&user->processes);
-		free_uid(user);
-	}
-
-	/* Take all effective privileges.. */
-	current->uid = current->euid = current->fsuid = 0;
-	cap_set_full(current->cap_effective);
-	/* Allow execve & open args to be in kernel space. */
-	set_fs(KERNEL_DS);
-	/* We need stdin out & err for scripts */
-	if (open("/dev/console", O_RDWR, 0)< 0)
-		printk("chandev exec_usermode_helper unable to open an initial console.\n");
-	(void) dup(0);
-	(void) dup(0);
-
-	
-        /* Go, go, go... */
-        err=execve(program_path, argv, envp);
-	return err;
-}
-
-static int exec_start_script(void *unused)
+static int chandev_exec_start_script(void *unused)
 {
 	
 	char **argv,*tempname;
@@ -555,7 +421,8 @@ static int exec_start_script(void *unused)
 	static char * envp[] = { "HOME=/", "TERM=linux", "PATH=/sbin:/usr/sbin:/bin:/usr/bin", NULL };
 	
 	init_waitqueue_head(&wait);
-	s390_daemonize("chandev_script",0,FALSE);
+	strcpy(current->comm,"chandev_script");
+
 	for(loopcnt=0;loopcnt<10&&(jiffies-chandev_last_startmsck_list_update)<HZ;loopcnt++)
 	{
 		sleep_on_timeout(&wait,HZ);
@@ -612,6 +479,12 @@ static int exec_start_script(void *unused)
 		chandev_free_all_list((list **)&startlist_head);
 		chandev_free_all_list((list **)&mscklist_head);
 		chandev_unlock();
+
+		/* We need to wait till there is a root filesystem */
+		while(init_task.fs->root==NULL)
+		{
+			sleep_on_timeout(&wait,HZ);
+		}
 		/* We are basically execve'ing here there normally is no */
 		/* return */
 		retval=exec_usermodehelper(exec_script, argv, envp);
@@ -623,7 +496,7 @@ static int exec_start_script(void *unused)
  Fail2:
 	/* We don't really need to report /bin/chandev not existing */
 	if(retval!=-ENOENT)
-	   printk("exec_start_script failed retval=%d\n",retval);
+	   printk("chandev_exec_start_script failed retval=%d\n",retval);
 	return(0);
 }
 
@@ -643,7 +516,6 @@ void *chandev_allocstr(const char *str,size_t offset)
 static int chandev_add_to_startmsck_list(chandev_startmsck_list **listhead,char *devname,
 chandev_msck_status pre_recovery_action_status,chandev_msck_status post_recovery_action_status)
 {
-	int retval;
 	chandev_startmsck_list *member;
 	int pid;
 	
@@ -664,14 +536,11 @@ chandev_msck_status pre_recovery_action_status,chandev_msck_status post_recovery
 		add_to_list((list **)listhead,(list *)member);
 		chandev_last_startmsck_list_update=jiffies;
 		chandev_unlock();
-		/* We do CLONE_FILES so we can exit_files to get rid of it */
-                /* cheaply & allocate a new one we need current->files &  */
-                /* some tasks have current->files==NULL */
-		pid = kernel_thread(exec_start_script,NULL,CLONE_FILES|SIGCHLD);
+		pid = kernel_thread(chandev_exec_start_script,NULL,SIGCHLD);
 		if(pid<0)
 		{
-			printk("error making kernel thread for exec_start_script\n");
-			retval=pid;
+			printk("error making kernel thread for chandev_exec_start_script\n");
+			return(pid);
 		}
 		else
 			return(0);
@@ -679,11 +548,10 @@ chandev_msck_status pre_recovery_action_status,chandev_msck_status post_recovery
 	}
 	else
 	{
+		chandev_unlock();
 		printk("chandev_add_to_startmscklist memory allocation failed devname=%s\n",devname);
-		retval=-ENOMEM;
+		return(-ENOMEM);
 	}
-	chandev_unlock();
-	return(retval);
 }
 
 
@@ -695,11 +563,7 @@ int chandev_oper_func(int irq,devreg_t *dreg)
 	chandev_last_machine_check=jiffies;
 	if(atomic_dec_and_test(&chandev_msck_thread_lock))
 	{
-#if CHANDEV_USE_KERNEL_THREADS
-		queue_task(&chandev_msck_task_tq,&tq_scheduler);
-#else
 		schedule_task(&chandev_msck_task_tq);
-#endif
 	}
 	atomic_set(&chandev_new_msck,TRUE);
 	return(0);
@@ -719,11 +583,7 @@ static void chandev_not_oper_handler(int irq,int status )
 		spin_unlock(&chandev_not_oper_spinlock);
 		if(atomic_dec_and_test(&chandev_msck_thread_lock))
 		{
-#if CHANDEV_USE_KERNEL_THREADS
-			queue_task(&chandev_msck_task_tq,&tq_scheduler);
-#else
 			schedule_task(&chandev_msck_task_tq);
-#endif
 		}
 	}
 	else
@@ -767,6 +627,18 @@ chandev_activelist *chandev_get_activelist_by_irq(int irq)
 }
 
 
+void chandev_remove_irqinfo_by_irq(unsigned int irq)
+{
+	chandev_irqinfo *remove_irqinfo;
+
+	chandev_lock();
+	/* remove any orphan irqinfo left lying around. */
+        if((remove_irqinfo=chandev_get_irqinfo_by_irq(irq)))
+		chandev_remove_from_list((list **)&chandev_irqinfo_head,
+					 (list *)remove_irqinfo);
+	chandev_unlock();
+	
+}
 
 int chandev_request_irq(unsigned int   irq,
                       void           (*handler)(int, void *, struct pt_regs *),
@@ -790,9 +662,7 @@ int chandev_request_irq(unsigned int   irq,
 		return(-EPERM);
 	}
 	/* remove any orphan irqinfo left lying around. */
-        if((new_irqinfo=chandev_get_irqinfo_by_irq(irq)))
-		chandev_remove_from_list((list **)chandev_irqinfo_head,
-					 (list *)new_irqinfo);
+	chandev_remove_irqinfo_by_irq(irq);
 	chandev_unlock();
 	if((new_irqinfo=chandev_allocstr(devname,offsetof(chandev_irqinfo,devname))))
 	{
@@ -819,6 +689,12 @@ int chandev_request_irq(unsigned int   irq,
 	return(retval);
 }
 
+void chandev_free_irq(unsigned int irq, void *dev_id)
+{
+	/* remove any orphan irqinfo left lying around. */
+	chandev_remove_irqinfo_by_irq(irq);
+	free_irq(irq,dev_id);
+}
 
 
 void chandev_sprint_type_model(char *buff,s32 type,s16 model)
@@ -1148,6 +1024,7 @@ void chandev_del_force(u16 read_devno)
 
 void chandev_shutdown(chandev_activelist *curr_device)
 {
+	int saved_lock_cnt;
 	chandev_lock();
 
 	if(curr_device->category==network_device)
@@ -1155,12 +1032,16 @@ void chandev_shutdown(chandev_activelist *curr_device)
 		/* unregister_netdev calls the dev->close so we shouldn't do this */
 		/* this otherwise we crash */
 		if(curr_device->unreg_dev)
-			curr_device->unreg_dev(curr_device->dev_ptr); 
+		{
+			saved_lock_cnt=chandev_full_unlock();
+			curr_device->unreg_dev(curr_device->dev_ptr);
+			chandev_relock(saved_lock_cnt);
+		}
 	}
+	saved_lock_cnt=chandev_full_unlock();
 	curr_device->shutdownfunc(curr_device->dev_ptr);
+	chandev_relock(saved_lock_cnt);
 	kfree(curr_device->dev_ptr);
-	chandev_free_listmember((list **)&chandev_irqinfo_head,(list *)curr_device->read_irqinfo);
-	chandev_free_listmember((list **)&chandev_irqinfo_head,(list *)curr_device->write_irqinfo);
 	chandev_free_listmember((list **)&chandev_activelist_head,
 				(list *)curr_device);
 	chandev_unlock();
@@ -1492,8 +1373,7 @@ chandev *write_chandev)
 			/* as probefunctions can call schedule & */
                         /* reenter to do a kernel thread & we may deadlock */
 			rc=probefunc(&probeinfo);
-			chandev_lock();
-			chandev_lock_cnt=saved_lock_cnt;
+			chandev_relock(saved_lock_cnt);
 			if(rc==0)
 			{
 				newdevice=probeinfo.newdevice;
@@ -1619,9 +1499,13 @@ void chandev_probe(void)
 			if(curr_irqinfo->msck_status==good&&prevstatus!=good)
 			{
 				if(curr_device->reoperfunc)
+				{
+					int saved_lock_cnt=chandev_full_unlock();
 					curr_device->reoperfunc(curr_device->dev_ptr,
 								(curr_device->read_irqinfo==curr_irqinfo),
 								prevstatus);
+					chandev_relock(saved_lock_cnt);
+				}
 				if(curr_device->category==network_device&&
 				   curr_device->write_irqinfo==curr_irqinfo)
 				{
@@ -1743,13 +1627,12 @@ static void chandev_not_oper_func(int irq,int status)
 }
 
 
-static chandev_task_retval chandev_msck_task(void *unused)
+static void chandev_msck_task(void *unused)
 {
 	int loopcnt,not_oper_probe_required=FALSE;
 	wait_queue_head_t    wait;
 	chandev_not_oper_struct *new_not_oper;
 
-	chandev_daemonize("chandev_msck_kernel_thread",0,TRUE);
 	/* This loop exists because machine checks tend to come in groups & we have
            to wait for the other devnos to appear also */
 	init_waitqueue_head(&wait);
@@ -1780,20 +1663,9 @@ static chandev_task_retval chandev_msck_task(void *unused)
 	}
 	if(not_oper_probe_required)
 		chandev_probe();
-	chandev_task_return(0);
 }
 
 
-
-#if CHANDEV_USE_KERNEL_THREADS
-static void chandev_start_msck_thread(void *unused)
-{
-	/* tq_scheduler sometimes leaves interrupts disabled from do bottom half */
-	__sti();
-	kernel_thread((int (*)(void *))chandev_msck_task,
-		      (void*)NULL,0);
-}
-#endif
 
 
 
@@ -1953,6 +1825,7 @@ static int chandev_setup(char *instr,char *errstr,int lineno)
 	chandev_type     chan_type;
 	char             *str,*currstr,*interpretstr=NULL;
 	int              cnt,strcnt;
+	int              retval=0;
 #define CHANDEV_MAX_EXTRA_INTS 8
 	chandev_int ints[CHANDEV_MAX_EXTRA_INTS+1];
 	memset(ints,0,sizeof(ints));
@@ -2182,17 +2055,29 @@ static int chandev_setup(char *instr,char *errstr,int lineno)
 		else
 			goto BadArgs;
 	}
-	return(1);
+	retval=1;
  BadArgs:
-	printk("chandev_setup bad argument %s",instr);
-	if(errstr)
+	if(!retval)
 	{
-                printk("%s %d interpreted as %s",errstr,lineno,interpretstr);
-		if(strcnt>1)
-			printk(" before semicolon no %d",cnt);
+		printk("chandev_setup bad argument %s",instr);
+		if(errstr)
+		{
+			printk("%s %d interpreted as %s",errstr,lineno,interpretstr);
+			if(strcnt>1)
+				printk(" before semicolon no %d",cnt);
+		}
+		printk(".\n Type man chandev for more info.\n\n");
 	}
-	printk(".\n Type man chandev for more info.\n\n");
-	return(0);
+	eieio();
+	if(chandev_lock_owner==(long)current)
+	{
+		printk("chandev_setup bug chandev_lock_cnt=%d lock_owner=%lx\n"
+                       "firstlock_retaddr=%p last_lock_returnaddr=%p\n",
+		       chandev_lock_cnt,chandev_lock_owner,chandev_firstlock_addr,
+		       chandev_lastlock_addr);
+		chandev_full_unlock();
+        }
+	return(retval);
 }
 #define CHANDEV_KEYWORD "chandev="
 static int chandev_setup_bootargs(char *str,int paramno)
@@ -2608,11 +2493,7 @@ int __init chandev_init(void)
 		chandev_create_proc();
 #endif
 		chandev_msck_task_tq.routine=
-#if CHANDEV_USE_KERNEL_THREADS
-		chandev_start_msck_thread;
-#else
 		chandev_msck_task;
-#endif
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(2,3,0)
 		INIT_LIST_HEAD(&chandev_msck_task_tq.list);
 		chandev_msck_task_tq.sync=0;
@@ -2684,4 +2565,13 @@ void chandev_unregister(chandev_probefunc probefunc,int call_shutdown)
 	}
 	chandev_unlock();
 }
+
+EXPORT_SYMBOL(chandev_register_and_probe);
+EXPORT_SYMBOL(chandev_request_irq);
+EXPORT_SYMBOL(chandev_free_irq);
+EXPORT_SYMBOL(chandev_unregister);
+EXPORT_SYMBOL(chandev_initdevice);
+EXPORT_SYMBOL(chandev_initnetdevice);
+
+
 

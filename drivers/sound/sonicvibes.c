@@ -3,7 +3,7 @@
 /*
  *      sonicvibes.c  --  S3 Sonic Vibes audio driver.
  *
- *      Copyright (C) 1998-2000  Thomas Sailer (sailer@ife.ee.ethz.ch)
+ *      Copyright (C) 1998-2001  Thomas Sailer (t.sailer@alumni.ethz.ch)
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -88,6 +88,10 @@
  *                       use Martin Mares' pci_assign_resource
  *    07.02.2000   0.26  Use pci_alloc_consistent and pci_register_driver
  *    21.11.2000   0.27  Initialize dma buffers in poll, otherwise poll may return a bogus mask
+ *    12.12.2000   0.28  More dma buffer initializations, patch from
+ *                       Tjeerd Mulder <tjeerd.mulder@fujitsu-siemens.com>
+ *    31.01.2001   0.29  Register/Unregister gameport
+ *                       Fix SETTRIGGER non OSS API conformity
  *
  */
 
@@ -114,6 +118,23 @@
 #include <asm/hardirq.h>
 
 #include "dm.h"
+
+#if defined(CONFIG_INPUT_ANALOG) || defined(CONFIG_INPUT_ANALOG_MODULE)
+#include <linux/gameport.h>
+#else
+struct gameport {
+	int io;
+	int size;
+};
+
+extern inline void gameport_register_port(struct gameport *gameport)
+{
+}
+
+extern inline void gameport_unregister_port(struct gameport *gameport)
+{
+}
+#endif
 
 /* --------------------------------------------------------------------- */
 
@@ -301,7 +322,7 @@ struct sv_state {
 	int dev_dmfm;
 
 	/* hardware resources */
-	unsigned long iosb, ioenh, iosynth, iomidi, iogame;  /* long for SPARC */
+	unsigned long iosb, ioenh, iosynth, iomidi;  /* long for SPARC */
 	unsigned int iodmaa, iodmac, irq;
 
         /* mixer stuff */
@@ -340,6 +361,7 @@ struct sv_state {
 		unsigned mapped:1;
 		unsigned ready:1;
 		unsigned endcleared:1;
+		unsigned enabled:1;
 		unsigned ossfragshift;
 		int ossmaxfrags;
 		unsigned subdivision;
@@ -355,6 +377,8 @@ struct sv_state {
 		unsigned char ibuf[MIDIINBUF];
 		unsigned char obuf[MIDIOUTBUF];
 	} midi;
+
+	struct gameport gameport;
 };
 
 /* --------------------------------------------------------------------- */
@@ -786,6 +810,7 @@ static int prog_dmabuf(struct sv_state *s, unsigned rec)
 		wrindir(s, SV_CIDMAABASECOUNT0, db->fragsamples-1);
 	}
 	spin_unlock_irqrestore(&s->lock, flags);
+	db->enabled = 1;
 	db->ready = 1;
 	return 0;
 }
@@ -1343,7 +1368,8 @@ static ssize_t sv_read(struct file *file, char *buffer, size_t count, loff_t *pp
 		if (cnt > count)
 			cnt = count;
 		if (cnt <= 0) {
-			start_adc(s);
+			if (s->dma_adc.enabled)
+				start_adc(s);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret)
 					ret = -EAGAIN;
@@ -1382,7 +1408,8 @@ static ssize_t sv_read(struct file *file, char *buffer, size_t count, loff_t *pp
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_adc(s);
+		if (s->dma_adc.enabled)
+			start_adc(s);
 	}
         remove_wait_queue(&s->dma_adc.wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -1430,7 +1457,8 @@ static ssize_t sv_write(struct file *file, const char *buffer, size_t count, lof
 		if (cnt > count)
 			cnt = count;
 		if (cnt <= 0) {
-			start_dac(s);
+			if (s->dma_dac.enabled)
+				start_dac(s);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret)
 					ret = -EAGAIN;
@@ -1470,7 +1498,8 @@ static ssize_t sv_write(struct file *file, const char *buffer, size_t count, lof
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_dac(s);
+		if (s->dma_dac.enabled)
+			start_dac(s);
 	}
         remove_wait_queue(&s->dma_dac.wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -1706,25 +1735,31 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 			if (val & PCM_ENABLE_INPUT) {
 				if (!s->dma_adc.ready && (ret =  prog_dmabuf(s, 1)))
 					return ret;
+				s->dma_adc.enabled = 1;
 				start_adc(s);
-			} else
+			} else {
+				s->dma_adc.enabled = 0;
 				stop_adc(s);
+			}
 		}
 		if (file->f_mode & FMODE_WRITE) {
 			if (val & PCM_ENABLE_OUTPUT) {
 				if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
 					return ret;
+				s->dma_dac.enabled = 1;
 				start_dac(s);
-			} else
+			} else {
+				s->dma_dac.enabled = 0;
 				stop_dac(s);
+			}
 		}
 		return 0;
 
 	case SNDCTL_DSP_GETOSPACE:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf(s, 0)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		sv_update_ptr(s);
 		abinfo.fragsize = s->dma_dac.fragsize;
@@ -1740,8 +1775,8 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
-		if (!s->dma_adc.ready && (ret =  prog_dmabuf(s, 1)))
-			return ret;
+		if (!s->dma_adc.ready && (val = prog_dmabuf(s, 1)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		sv_update_ptr(s);
 		abinfo.fragsize = s->dma_adc.fragsize;
@@ -1761,8 +1796,8 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_GETODELAY:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf(s, 0)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		sv_update_ptr(s);
                 count = s->dma_dac.count;
@@ -1774,8 +1809,8 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
-		if (!s->dma_adc.ready && (ret =  prog_dmabuf(s, 1)))
-			return ret;
+		if (!s->dma_adc.ready && (val = prog_dmabuf(s, 1)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		sv_update_ptr(s);
                 cinfo.bytes = s->dma_adc.total_bytes;
@@ -1792,8 +1827,8 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
         case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf(s, 0)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		sv_update_ptr(s);
                 cinfo.bytes = s->dma_dac.total_bytes;
@@ -1915,6 +1950,7 @@ static int sv_open(struct inode *inode, struct file *file)
 		if ((minor & 0xf) == SND_DEV_DSP16)
 			fmts |= SV_CFMT_16BIT << SV_CFMT_CSHIFT;
 		s->dma_adc.ossfragshift = s->dma_adc.ossmaxfrags = s->dma_adc.subdivision = 0;
+		s->dma_adc.enabled = 1;
 		set_adc_rate(s, 8000);
 	}
 	if (file->f_mode & FMODE_WRITE) {
@@ -1922,6 +1958,7 @@ static int sv_open(struct inode *inode, struct file *file)
 		if ((minor & 0xf) == SND_DEV_DSP16)
 			fmts |= SV_CFMT_16BIT << SV_CFMT_ASHIFT;
 		s->dma_dac.ossfragshift = s->dma_dac.ossmaxfrags = s->dma_dac.subdivision = 0;
+		s->dma_dac.enabled = 1;
 		set_dac_rate(s, 8000);
 	}
 	set_fmt(s, fmtm, fmts);
@@ -2212,6 +2249,7 @@ static int sv_midi_release(struct inode *inode, struct file *file)
 			if (file->f_flags & O_NONBLOCK) {
 				remove_wait_queue(&s->midi.owait, &wait);
 				set_current_state(TASK_RUNNING);
+				unlock_kernel();
 				return -EBUSY;
 			}
 			tmo = (count * HZ) / 3100;
@@ -2517,13 +2555,14 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	s->ioenh = pci_resource_start(pcidev, RESOURCE_ENH);
 	s->iosynth = pci_resource_start(pcidev, RESOURCE_SYNTH);
 	s->iomidi = pci_resource_start(pcidev, RESOURCE_MIDI);
-	s->iogame = pci_resource_start(pcidev, RESOURCE_GAME);
 	s->iodmaa = pci_resource_start(pcidev, RESOURCE_DDMA);
 	s->iodmac = pci_resource_start(pcidev, RESOURCE_DDMA) + SV_EXTENT_DMA;
+	s->gameport.io = pci_resource_start(pcidev, RESOURCE_GAME);
+	s->gameport.size = pci_resource_len(pcidev,RESOURCE_GAME);
 	pci_write_config_dword(pcidev, 0x40, s->iodmaa | 9);  /* enable and use extended mode */
 	pci_write_config_dword(pcidev, 0x48, s->iodmac | 9);  /* enable */
-	printk(KERN_DEBUG "sv: io ports: %#lx %#lx %#lx %#lx %#lx %#x %#x\n",
-	       s->iosb, s->ioenh, s->iosynth, s->iomidi, s->iogame, s->iodmaa, s->iodmac);
+	printk(KERN_DEBUG "sv: io ports: %#lx %#lx %#lx %#lx %#x %#x %#x\n",
+	       s->iosb, s->ioenh, s->iosynth, s->iomidi, s->gameport.io, s->iodmaa, s->iodmac);
 	s->irq = pcidev->irq;
 	
 	/* hack */
@@ -2548,6 +2587,12 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	if (!request_region(s->iosynth, SV_EXTENT_SYNTH, "S3 SonicVibes Synth")) {
 		printk(KERN_ERR "sv: io ports %#lx-%#lx in use\n", s->iosynth, s->iosynth+SV_EXTENT_SYNTH-1);
 		goto err_region1;
+	}
+	if (!s->gameport.size)
+		s->gameport.io = 0;
+	if (s->gameport.io && !request_region(s->gameport.io, s->gameport.size, "ESS Solo1")) {
+		printk(KERN_ERR "sv: gameport io ports in use\n");
+		s->gameport.io = s->gameport.size = 0;
 	}
 	if (pci_enable_device(pcidev))
 		goto err_irq;
@@ -2600,7 +2645,9 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 		mixer_ioctl(s, initvol[i].mixch, (unsigned long)&val);
 	}
 	set_fs(fs);
-       /* store it in the driver field */
+	/* register gameport */
+	gameport_register_port(&s->gameport);
+	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
 	/* put it into driver list */
 	list_add_tail(&s->devs, &devs);
@@ -2619,6 +2666,8 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 	printk(KERN_ERR "sv: cannot register misc device\n");
 	free_irq(s->irq, s);
  err_irq:
+	if (s->gameport.io)
+		release_region(s->gameport.io, s->gameport.size);
 	release_region(s->iosynth, SV_EXTENT_SYNTH);
  err_region1:
 	release_region(s->iomidi, SV_EXTENT_MIDI);
@@ -2635,29 +2684,33 @@ static int __devinit sv_probe(struct pci_dev *pcidev, const struct pci_device_id
 
 static void __devinit sv_remove(struct pci_dev *dev)
 {
-       struct sv_state *s = pci_get_drvdata(dev);
+	struct sv_state *s = pci_get_drvdata(dev);
 
-       if (!s)
-               return;
-       list_del(&s->devs);
-       outb(~0, s->ioenh + SV_CODEC_INTMASK);  /* disable ints */
-       synchronize_irq();
-       inb(s->ioenh + SV_CODEC_STATUS); /* ack interrupts */
-       wrindir(s, SV_CIENABLE, 0);     /* disable DMAA and DMAC */
-       /*outb(0, s->iodmaa + SV_DMA_RESET);*/
-       /*outb(0, s->iodmac + SV_DMA_RESET);*/
-       free_irq(s->irq, s);
-       release_region(s->iodmac, SV_EXTENT_DMA);
-       release_region(s->iodmaa, SV_EXTENT_DMA);
-       release_region(s->ioenh, SV_EXTENT_ENH);
-       release_region(s->iomidi, SV_EXTENT_MIDI);
-       release_region(s->iosynth, SV_EXTENT_SYNTH);
-       unregister_sound_dsp(s->dev_audio);
-       unregister_sound_mixer(s->dev_mixer);
-       unregister_sound_midi(s->dev_midi);
-       unregister_sound_special(s->dev_dmfm);
-       kfree(s);
-       pci_set_drvdata(dev, NULL);
+	if (!s)
+		return;
+	list_del(&s->devs);
+	outb(~0, s->ioenh + SV_CODEC_INTMASK);  /* disable ints */
+	synchronize_irq();
+	inb(s->ioenh + SV_CODEC_STATUS); /* ack interrupts */
+	wrindir(s, SV_CIENABLE, 0);     /* disable DMAA and DMAC */
+	/*outb(0, s->iodmaa + SV_DMA_RESET);*/
+	/*outb(0, s->iodmac + SV_DMA_RESET);*/
+	free_irq(s->irq, s);
+	if (s->gameport.io) {
+		gameport_unregister_port(&s->gameport);
+		release_region(s->gameport.io, s->gameport.size);
+	}
+	release_region(s->iodmac, SV_EXTENT_DMA);
+	release_region(s->iodmaa, SV_EXTENT_DMA);
+	release_region(s->ioenh, SV_EXTENT_ENH);
+	release_region(s->iomidi, SV_EXTENT_MIDI);
+	release_region(s->iosynth, SV_EXTENT_SYNTH);
+	unregister_sound_dsp(s->dev_audio);
+	unregister_sound_mixer(s->dev_mixer);
+	unregister_sound_midi(s->dev_midi);
+	unregister_sound_special(s->dev_dmfm);
+	kfree(s);
+	pci_set_drvdata(dev, NULL);
 }
 
 static struct pci_device_id id_table[] __devinitdata = {
@@ -2678,7 +2731,7 @@ static int __init init_sonicvibes(void)
 {
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
-	printk(KERN_INFO "sv: version v0.27 time " __TIME__ " " __DATE__ "\n");
+	printk(KERN_INFO "sv: version v0.29 time " __TIME__ " " __DATE__ "\n");
 #if 0
 	if (!(wavetable_mem = __get_free_pages(GFP_KERNEL, 20-PAGE_SHIFT)))
 		printk(KERN_INFO "sv: cannot allocate 1MB of contiguous nonpageable memory for wavetable data\n");

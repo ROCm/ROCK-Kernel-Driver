@@ -1,3 +1,11 @@
+/proc/sound, /dev/sndstat
+-------------------------
+
+/proc/sound and /dev/sndstat is not supported by the
+driver. To find out whether the driver succeeded loading,
+check the kernel log (dmesg).
+
+
 ALaw/uLaw sample formats
 ------------------------
 
@@ -70,4 +78,4 @@ comparatively priced Ensoniq products.
 
 
 Thomas Sailer
-sailer@ife.ee.ethz.ch
+t.sailer@alumni.ethz.ch

@@ -14,7 +14,6 @@
  */
 #include <linux/config.h>
 #include <linux/sched.h>
-
 #include <asm/semaphore.h>
 
 /*
@@ -179,6 +178,7 @@ int __down_trylock(struct semaphore * sem)
  * value..
  */
 asm(
+".text\n"
 ".align 4\n"
 ".globl __down_failed\n"
 "__down_failed:\n\t"
@@ -193,6 +193,7 @@ asm(
 );
 
 asm(
+".text\n"
 ".align 4\n"
 ".globl __down_failed_interruptible\n"
 "__down_failed_interruptible:\n\t"
@@ -205,6 +206,7 @@ asm(
 );
 
 asm(
+".text\n"
 ".align 4\n"
 ".globl __down_failed_trylock\n"
 "__down_failed_trylock:\n\t"
@@ -217,6 +219,7 @@ asm(
 );
 
 asm(
+".text\n"
 ".align 4\n"
 ".globl __up_wakeup\n"
 "__up_wakeup:\n\t"
@@ -232,197 +235,292 @@ asm(
 
 asm(
 "
+.text
 .align 4
 .globl __down_read_failed
 __down_read_failed:
 	pushl	%edx
 	pushl	%ecx
-	jnc	2f
-
-3:	call	down_read_failed_biased
-
-1:	popl	%ecx
+	call	down_read_failed
+	popl	%ecx
 	popl	%edx
 	ret
-
-2:	call	down_read_failed
-	" LOCK "subl	$1,(%eax)
-	jns	1b
-	jnc	2b
-	jmp	3b
 "
 );
 
 asm(
 "
+.text
 .align 4
 .globl __down_write_failed
 __down_write_failed:
 	pushl	%edx
 	pushl	%ecx
-	jnc	2f
-
-3:	call	down_write_failed_biased
-
-1:	popl	%ecx
+	call	down_write_failed
+	popl	%ecx
 	popl	%edx
 	ret
-
-2:	call	down_write_failed
-	" LOCK "subl	$" RW_LOCK_BIAS_STR ",(%eax)
-	jz	1b
-	jnc	2b
-	jmp	3b
 "
 );
 
-struct rw_semaphore *FASTCALL(rwsem_wake_readers(struct rw_semaphore *sem));
-struct rw_semaphore *FASTCALL(rwsem_wake_writer(struct rw_semaphore *sem));
-
-struct rw_semaphore *FASTCALL(down_read_failed_biased(struct rw_semaphore *sem));
-struct rw_semaphore *FASTCALL(down_write_failed_biased(struct rw_semaphore *sem));
-struct rw_semaphore *FASTCALL(down_read_failed(struct rw_semaphore *sem));
-struct rw_semaphore *FASTCALL(down_write_failed(struct rw_semaphore *sem));
-
-struct rw_semaphore *down_read_failed_biased(struct rw_semaphore *sem)
-{
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
-
-	add_wait_queue(&sem->wait, &wait);	/* put ourselves at the head of the list */
-
-	for (;;) {
-		if (sem->read_bias_granted && xchg(&sem->read_bias_granted, 0))
-			break;
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!sem->read_bias_granted)
-			schedule();
-	}
-
-	remove_wait_queue(&sem->wait, &wait);
-	tsk->state = TASK_RUNNING;
-
-	return sem;
-}
-
-struct rw_semaphore *down_write_failed_biased(struct rw_semaphore *sem)
-{
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
-
-	add_wait_queue_exclusive(&sem->write_bias_wait, &wait);	/* put ourselves at the end of the list */
-
-	for (;;) {
-		if (sem->write_bias_granted && xchg(&sem->write_bias_granted, 0))
-			break;
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (!sem->write_bias_granted)
-			schedule();
-	}
-
-	remove_wait_queue(&sem->write_bias_wait, &wait);
-	tsk->state = TASK_RUNNING;
-
-	/* if the lock is currently unbiased, awaken the sleepers
-	 * FIXME: this wakes up the readers early in a bit of a
-	 * stampede -> bad!
-	 */
-	if (atomic_read(&sem->count) >= 0)
-		wake_up(&sem->wait);
-
-	return sem;
-}
-
-/* Wait for the lock to become unbiased.  Readers
- * are non-exclusive. =)
- */
-struct rw_semaphore *down_read_failed(struct rw_semaphore *sem)
-{
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
-
-	__up_read(sem);	/* this takes care of granting the lock */
-
-	add_wait_queue(&sem->wait, &wait);
-
-	while (atomic_read(&sem->count) < 0) {
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (atomic_read(&sem->count) >= 0)
-			break;
-		schedule();
-	}
-
-	remove_wait_queue(&sem->wait, &wait);
-	tsk->state = TASK_RUNNING;
-
-	return sem;
-}
-
-/* Wait for the lock to become unbiased. Since we're
- * a writer, we'll make ourselves exclusive.
- */
-struct rw_semaphore *down_write_failed(struct rw_semaphore *sem)
-{
-	struct task_struct *tsk = current;
-	DECLARE_WAITQUEUE(wait, tsk);
-
-	__up_write(sem);	/* this takes care of granting the lock */
-
-	add_wait_queue_exclusive(&sem->wait, &wait);
-
-	while (atomic_read(&sem->count) < 0) {
-		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
-		if (atomic_read(&sem->count) >= 0)
-			break;	/* we must attempt to acquire or bias the lock */
-		schedule();
-	}
-
-	remove_wait_queue(&sem->wait, &wait);
-	tsk->state = TASK_RUNNING;
-
-	return sem;
-}
-
 asm(
 "
+.text
 .align 4
 .globl __rwsem_wake
 __rwsem_wake:
 	pushl	%edx
 	pushl	%ecx
-
-	jz	1f
-	call	rwsem_wake_readers
-	jmp	2f
-
-1:	call	rwsem_wake_writer
-
-2:	popl	%ecx
+	call	rwsem_wake
+	popl	%ecx
 	popl	%edx
 	ret
 "
 );
 
-/* Called when someone has done an up that transitioned from
- * negative to non-negative, meaning that the lock has been
- * granted to whomever owned the bias.
+struct rw_semaphore *FASTCALL(rwsem_wake(struct rw_semaphore *sem));
+struct rw_semaphore *FASTCALL(down_read_failed(struct rw_semaphore *sem));
+struct rw_semaphore *FASTCALL(down_write_failed(struct rw_semaphore *sem));
+
+/*
+ * implement exchange and add functionality
  */
-struct rw_semaphore *rwsem_wake_readers(struct rw_semaphore *sem)
+static inline int rwsem_atomic_update(int delta, struct rw_semaphore *sem)
 {
-	if (xchg(&sem->read_bias_granted, 1))
-		BUG();
-	wake_up(&sem->wait);
+	int tmp = delta;
+
+#ifndef CONFIG_USING_SPINLOCK_BASED_RWSEM
+	__asm__ __volatile__(
+		LOCK_PREFIX "xadd %0,(%1)"
+		: "+r"(tmp)
+		: "r"(sem)
+		: "memory");
+
+#else
+
+	__asm__ __volatile__(
+		"# beginning rwsem_atomic_update\n\t"
+#ifdef CONFIG_SMP
+LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t" /* try to grab the spinlock */
+		"  js        3f\n" /* jump if failed */
+		"1:\n\t"
+#endif
+		"  xchgl     %0,(%1)\n\t" /* retrieve the old value */
+		"  addl      %0,(%1)\n\t" /* add 0xffff0001, result in memory */
+#ifdef CONFIG_SMP
+		"  movb      $1,"RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t" /* release the spinlock */
+#endif
+		".section .text.lock,\"ax\"\n"
+#ifdef CONFIG_SMP
+		"3:\n\t" /* spin on the spinlock till we get it */
+		"  cmpb      $0,"RWSEM_SPINLOCK_OFFSET_STR"(%1)\n\t"
+		"  rep;nop   \n\t"
+		"  jle       3b\n\t"
+		"  jmp       1b\n"
+#endif
+		".previous\n"
+		"# ending rwsem_atomic_update\n\t"
+		: "+r"(tmp)
+		: "r"(sem)
+		: "memory");
+
+#endif
+	return tmp+delta;
+}
+
+/*
+ * implement compare and exchange functionality on the rw-semaphore count LSW
+ */
+static inline __u16 rwsem_cmpxchgw(struct rw_semaphore *sem, __u16 old, __u16 new)
+{
+#ifndef CONFIG_USING_SPINLOCK_BASED_RWSEM
+	return cmpxchg((__u16*)&sem->count.counter,0,RWSEM_ACTIVE_BIAS);
+
+#else
+	__u16 prev;
+
+	__asm__ __volatile__(
+		"# beginning rwsem_cmpxchgw\n\t"
+#ifdef CONFIG_SMP
+LOCK_PREFIX	"  decb      "RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t" /* try to grab the spinlock */
+		"  js        3f\n" /* jump if failed */
+		"1:\n\t"
+#endif
+		"  cmpw      %w1,(%3)\n\t"
+		"  jne       4f\n\t" /* jump if old doesn't match sem->count LSW */
+		"  movw      %w2,(%3)\n\t" /* replace sem->count LSW with the new value */
+		"2:\n\t"
+#ifdef CONFIG_SMP
+		"  movb      $1,"RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t" /* release the spinlock */
+#endif
+		".section .text.lock,\"ax\"\n"
+#ifdef CONFIG_SMP
+		"3:\n\t" /* spin on the spinlock till we get it */
+		"  cmpb      $0,"RWSEM_SPINLOCK_OFFSET_STR"(%3)\n\t"
+		"  rep;nop   \n\t"
+		"  jle       3b\n\t"
+		"  jmp       1b\n"
+#endif
+		"4:\n\t"
+		"  movw      (%3),%w0\n" /* we'll want to return the current value */
+		"  jmp       2b\n"
+		".previous\n"
+		"# ending rwsem_cmpxchgw\n\t"
+		: "=r"(prev)
+		: "r0"(old), "r"(new), "r"(sem)
+		: "memory");
+
+	return prev;
+#endif
+}
+
+/*
+ * wait for the read lock to be granted
+ * - need to repeal the increment made inline by the caller
+ * - need to throw a write-lock style spanner into the works (sub 0x00010000 from count)
+ */
+struct rw_semaphore *down_read_failed(struct rw_semaphore *sem)
+{
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait,tsk);
+	int count;
+
+	rwsemdebug("[%d] Entering down_read_failed(%08x)\n",current->pid,atomic_read(&sem->count));
+
+	/* this waitqueue context flag will be cleared when we are granted the lock */
+	__set_bit(RWSEM_WAITING_FOR_READ,&wait.flags);
+	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+
+	add_wait_queue_exclusive(&sem->wait, &wait); /* FIFO */
+
+	/* note that we're now waiting on the lock, but no longer actively read-locking */
+	count = rwsem_atomic_update(RWSEM_WAITING_BIAS-RWSEM_ACTIVE_BIAS,sem);
+	rwsemdebug("X(%08x)\n",count);
+
+	/* if there are no longer active locks, wake the front queued process(es) up
+	 * - it might even be this process, since the waker takes a more active part
+	 */
+	if (!(count & RWSEM_ACTIVE_MASK))
+		rwsem_wake(sem);
+
+	/* wait to be given the lock */
+	for (;;) {
+		if (!test_bit(RWSEM_WAITING_FOR_READ,&wait.flags))
+			break;
+		schedule();
+		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+	}
+
+	remove_wait_queue(&sem->wait,&wait);
+	tsk->state = TASK_RUNNING;
+
+	rwsemdebug("[%d] Leaving down_read_failed(%08x)\n",current->pid,atomic_read(&sem->count));
+
 	return sem;
 }
 
-struct rw_semaphore *rwsem_wake_writer(struct rw_semaphore *sem)
+/*
+ * wait for the write lock to be granted
+ */
+struct rw_semaphore *down_write_failed(struct rw_semaphore *sem)
 {
-	if (xchg(&sem->write_bias_granted, 1))
-		BUG();
-	wake_up(&sem->write_bias_wait);
+	struct task_struct *tsk = current;
+	DECLARE_WAITQUEUE(wait,tsk);
+	int count;
+
+	rwsemdebug("[%d] Entering down_write_failed(%08x)\n",
+		   current->pid,atomic_read(&sem->count));
+
+	/* this waitqueue context flag will be cleared when we are granted the lock */
+	__set_bit(RWSEM_WAITING_FOR_WRITE,&wait.flags);
+	set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+
+	add_wait_queue_exclusive(&sem->wait, &wait); /* FIFO */
+
+	/* note that we're waiting on the lock, but no longer actively locking */
+	count = rwsem_atomic_update(-RWSEM_ACTIVE_BIAS,sem);
+	rwsemdebug("[%d] updated(%08x)\n",current->pid,count);
+
+	/* if there are no longer active locks, wake the front queued process(es) up
+	 * - it might even be this process, since the waker takes a more active part
+	 */
+	if (!(count & RWSEM_ACTIVE_MASK))
+		rwsem_wake(sem);
+
+	/* wait to be given the lock */
+	for (;;) {
+		if (!test_bit(RWSEM_WAITING_FOR_WRITE,&wait.flags))
+			break;
+		schedule();
+		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
+	}
+
+	remove_wait_queue(&sem->wait,&wait);
+	tsk->state = TASK_RUNNING;
+
+	rwsemdebug("[%d] Leaving down_write_failed(%08x)\n",current->pid,atomic_read(&sem->count));
+
 	return sem;
 }
 
+/*
+ * handle the lock being released whilst there are processes blocked on it that can now run
+ * - if we come here, then:
+ *   - the 'active part' of the count (&0x0000ffff) reached zero (but may no longer be zero)
+ *   - the 'waiting part' of the count (&0xffff0000) is negative (and will still be so)
+ */
+struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem)
+{
+	int woken, count;
+
+	rwsemdebug("[%d] Entering rwsem_wake(%08x)\n",current->pid,atomic_read(&sem->count));
+
+ try_again:
+	/* try to grab an 'activity' marker
+	 * - need to make sure two copies of rwsem_wake() don't do this for two separate processes
+	 *   simultaneously
+	 * - be horribly naughty, and only deal with the LSW of the atomic counter
+	 */
+	if (rwsem_cmpxchgw(sem,0,RWSEM_ACTIVE_BIAS)!=0) {
+		rwsemdebug("[%d] rwsem_wake: abort wakeup due to renewed activity\n",current->pid);
+		goto out;
+	}
+
+	/* try to grant a single write lock if there's a writer at the front of the queue
+	 * - note we leave the 'active part' of the count incremented by 1 and the waiting part
+	 *   incremented by 0x00010000
+	 */
+	if (wake_up_ctx(&sem->wait,1,-RWSEM_WAITING_FOR_WRITE)==1)
+		goto out;
+
+	/* grant an infinite number of read locks to the readers at the front of the queue
+	 * - note we increment the 'active part' of the count by the number of readers just woken,
+	 *   less one for the activity decrement we've already done
+	 */
+	woken = wake_up_ctx(&sem->wait,65535,-RWSEM_WAITING_FOR_READ);
+	if (woken<=0)
+		goto counter_correction;
+
+	woken *= RWSEM_ACTIVE_BIAS-RWSEM_WAITING_BIAS;
+	woken -= RWSEM_ACTIVE_BIAS;
+	rwsem_atomic_update(woken,sem);
+
+ out:
+	rwsemdebug("[%d] Leaving rwsem_wake(%08x)\n",current->pid,atomic_read(&sem->count));
+	return sem;
+
+	/* come here if we need to correct the counter for odd SMP-isms */
+ counter_correction:
+	count = rwsem_atomic_update(-RWSEM_ACTIVE_BIAS,sem);
+	rwsemdebug("[%d] corrected(%08x)\n",current->pid,count);
+	if (!(count & RWSEM_ACTIVE_MASK))
+		goto try_again;
+	goto out;
+}
+
+/*
+ * rw spinlock fallbacks
+ */
 #if defined(CONFIG_SMP)
 asm(
 "
@@ -451,4 +549,3 @@ __read_lock_failed:
 "
 );
 #endif
-

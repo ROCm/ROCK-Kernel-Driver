@@ -81,14 +81,9 @@ start_sys_seg:	.word	SYSSEG
 
 type_of_loader:	.byte	0		# = 0, old one (LILO, Loadlin,
 					#      Bootlin, SYSLX, bootsect...)
-					# Else it is set by the loader:
-					# 0xTV: T=0 for LILO
-					#	T=1 for Loadlin
-					#	T=2 for bootsect-loader
-					#	T=3 for SYSLX
-					#	T=4 for ETHERBOOT
-					#       V = version
-
+					# See Documentation/i386/boot.txt for
+					# assigned ids
+	
 # flags, unused bits must be zero (RFU) bit within loadflags
 loadflags:
 LOADED_HIGH	= 1			# If set, the kernel is loaded high

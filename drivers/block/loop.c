@@ -316,7 +316,6 @@ static int do_bh_filebacked(struct loop_device *lo, struct buffer_head *bh, int 
 static void loop_put_buffer(struct buffer_head *bh)
 {
 	if (bh) {
-		kunmap(bh->b_page);
 		__free_page(bh->b_page);
 		kmem_cache_free(bh_cachep, bh);
 	}
@@ -408,9 +407,16 @@ static struct buffer_head *loop_get_buffer(struct loop_device *lo,
 	 * blocks... if highmem bounce buffering can get away with it,
 	 * so can we :-)
 	 */
-	bh->b_page = alloc_page(GFP_BUFFER);
-	bh->b_data = kmap(bh->b_page);
+	do {
+		bh->b_page = alloc_page(GFP_BUFFER);
+		if (bh->b_page)
+			break;
 
+		run_task_queue(&tq_disk);
+		schedule_timeout(HZ);
+	} while (1);
+
+	bh->b_data = page_address(bh->b_page);
 	bh->b_end_io = loop_end_io_transfer;
 	bh->b_rsector = rbh->b_rsector + (lo->lo_offset >> 9);
 	init_waitqueue_head(&bh->b_wait);
@@ -455,6 +461,10 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	 * file backed, queue for loop_thread to handle
 	 */
 	if (lo->lo_flags & LO_FLAGS_DO_BMAP) {
+		/*
+		 * rbh locked at this point, noone else should clear
+		 * the dirty flag
+		 */
 		if (rw == WRITE)
 			set_bit(BH_Dirty, &rbh->b_state);
 		loop_add_bh(lo, rbh);
@@ -469,7 +479,8 @@ static int loop_make_request(request_queue_t *q, int rw, struct buffer_head *rbh
 	IV = loop_get_iv(lo, bh->b_rsector);
 	if (rw == WRITE) {
 		set_bit(BH_Dirty, &bh->b_state);
-		if (lo_do_transfer(lo, WRITE, bh->b_data, rbh->b_data, bh->b_size, IV))
+		if (lo_do_transfer(lo, WRITE, bh->b_data, rbh->b_data,
+				   bh->b_size, IV))
 			goto err;
 	}
 

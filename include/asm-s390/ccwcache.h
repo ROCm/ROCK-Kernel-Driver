@@ -62,6 +62,7 @@ typedef struct ccw_req_t {
 #define CQR_STATUS_DONE     0x04	/* request is completed successfully */
 #define CQR_STATUS_ERROR    0x05	/* request is completed with error */
 #define CQR_STATUS_FAILED   0x06	/* request is finally failed */
+#define CQR_STATUS_PENDING  0x07        /* request is waiting for interrupt - ERP only */ 
 
 #define CQR_FLAGS_CHAINED  0x01	/* request is chained by another (last CCW is TIC) */
 

@@ -592,7 +592,7 @@ acpi_ns_get_device_callback (
 
 	status = acpi_cm_execute_STA (node, &flags);
 	if (ACPI_FAILURE (status)) {
-		return (status);
+		return AE_OK;
 	}
 
 	if (!(flags & 0x01)) {

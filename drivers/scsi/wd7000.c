@@ -863,7 +863,7 @@ static inline Scb *alloc_scbs (int needed)
 	 */
 	if (freescbs < needed) {
 	    busy = 0;
-	    panic ("wd7000: can't get enough free SCBs.\n");
+	    printk (KERN_ERR "wd7000: can't get enough free SCBs.\n");
 	    restore_flags (flags);
 	    return (NULL);
 	}
@@ -1593,7 +1593,7 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 	printk ("wd7000_detect: check IO 0x%x region...\n", iobase);
 #endif
 
-	if (!check_region (iobase, 4)) {
+	if (request_region (iobase, 4, "wd7000")) {
 
 #ifdef WD7000_DEBUG
 	    printk ("wd7000_detect: ASC reset (IO 0x%x) ...", iobase);
@@ -1609,12 +1609,12 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 #ifdef WD7000_DEBUG
 	    {
 		printk ("failed!\n");
-		continue;
+		goto err_release;
 	    }
-	    else
+	    else 
 		printk ("ok!\n");
 #else
-		continue;
+	    goto err_release;
 #endif
 
 	    if (inb (iobase + ASC_INTR_STAT) == 1) {
@@ -1627,7 +1627,8 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 		 */
 		sh = scsi_register (tpnt, sizeof (Adapter));
 		if(sh==NULL)
-			continue;
+		    goto err_release;
+
 		host = (Adapter *) sh->hostdata;
 
 #ifdef WD7000_DEBUG
@@ -1650,21 +1651,13 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 			host->iobase, host->irq, host->dma);
 #endif
 
-		if (!wd7000_init (host)) {	/* Initialization failed */
-		    scsi_unregister (sh);
-
-		    continue;
-		}
+		if (!wd7000_init (host)) 	/* Initialization failed */
+		    goto err_unregister;
 
 		/*
 		 *  OK from here - we'll use this adapter/configuration.
 		 */
 		wd7000_revision (host);		/* important for scatter/gather */
-
-		/*
-		 * Register our ports.
-		 */
-		request_region (host->iobase, 4, "wd7000");
 
 		/*
 		 *  For boards before rev 6.0, scatter/gather isn't supported.
@@ -1690,6 +1683,13 @@ int wd7000_detect (Scsi_Host_Template *tpnt)
 	else
 	    printk ("wd7000_detect: IO 0x%x region already allocated!\n", iobase);
 #endif
+
+	continue;
+
+    err_unregister:
+	scsi_unregister (sh);
+    err_release:
+	release_region(iobase, 4);
 
     }
 

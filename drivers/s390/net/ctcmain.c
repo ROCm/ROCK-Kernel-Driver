@@ -1,12 +1,12 @@
 /*
- * $Id: ctcmain.c,v 1.11 2000/12/15 19:34:54 bird Exp $
+ * $Id: ctcmain.c,v 1.17 2001/01/23 14:23:51 felfert Exp $
  *
  * CTC / ESCON network driver
  *
- * Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ * Copyright (C) 2001 IBM Deutschland Entwicklung GmbH, IBM Corporation
  * Author(s): Fritz Elfert (elfert@de.ibm.com, felfert@millenux.com)
  * Fixes by : Jochen Röhrig (roehrig@de.ibm.com)
- * 	      Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *            Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * Documentation used:
  *  - Principles of Operation (IBM doc#: SA22-7201-06)
@@ -36,6 +36,26 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  * $Log: ctcmain.c,v $
+ * Revision 1.17  2001/01/23 14:23:51  felfert
+ * Added ctc based tty.
+ *
+ * Revision 1.16  2001/01/18 16:10:53  felfert
+ * Added fixes by acme@conectiva.com.br.
+ *
+ * Revision 1.15  2001/01/12 15:40:11  felfert
+ * Fixed ITPM# PL030052IME (Unitchecks when using real escon).
+ *
+ * Revision 1.14  2001/01/11 17:43:52  felfert
+ * Fixed ITPM# PL030051IME (Initialization of escon).
+ *
+ * Revision 1.13  2001/01/11 16:40:26  smolinsk
+ * resolved name space conflict with LVM and renamed
+ *  dev_info_t to s390_dev_info_t
+ * worked around a bug in OSA microcode by stepping back to 2k IDALS in idals.c
+ *
+ * Revision 1.12  2000/12/27 09:40:45  tonn
+ * upgrade to test12
+ *
  * Revision 1.11  2000/12/15 19:34:54  bird
  * struct ctc_priv_t: set type of tbusy to "unsigned long"
  *
@@ -89,8 +109,6 @@
 #include <linux/string.h>
 #include <linux/proc_fs.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include <linux/ip.h>
 #include <linux/if_arp.h>
 #include <linux/tcp.h>
@@ -112,6 +130,7 @@
 
 #include <asm/irq.h>
 
+#include "ctctty.h"
 #include "fsm.h"
 
 #ifdef MODULE
@@ -142,7 +161,8 @@ char *ctc = NULL;
 
 #define CTC_PROTO_S390          0
 #define CTC_PROTO_LINUX         1
-#define CTC_PROTO_MAX           1
+#define CTC_PROTO_LINUX_TTY     2
+#define CTC_PROTO_MAX           2
 
 #define CTC_BUFSIZE_LIMIT       65535
 #define CTC_BUFSIZE_DEFAULT     32768
@@ -186,18 +206,12 @@ enum channel_types {
 
 typedef enum channel_types channel_type_t;
 
-static int ctc_no_auto;
+static int ctc_no_auto = 0;
 
 /**
  * If running on 64 bit, this must be changed. XXX Why? (bird)
  */
 typedef unsigned long intparm_t;
-
-#if LINUX_VERSION_CODE < 0x020300
-typedef struct device      net_device;
-#else
-typedef struct net_device  net_device;
-#endif
 
 /**
  * Definition of a per device parameter block
@@ -211,7 +225,7 @@ typedef struct param_t {
 	char           name[MAX_PARAM_NAME_LEN];
 } param;
 
-static param *params;
+static param *params = NULL;
 
 typedef struct {
 	unsigned long maxmulti;
@@ -248,7 +262,7 @@ typedef struct channel_t {
 	__u32               flags;
 
 	/**
-	 * The protocol of this channel (currently always 0)
+	 * The protocol of this channel
 	 */
 	__u16               protocol;
 
@@ -342,7 +356,7 @@ typedef struct channel_t {
 /**
  * Linked list of all detected channels.
  */
-static channel *channels;
+static channel *channels = NULL;
 
 typedef struct ctc_priv_t {
 	struct net_device_stats stats;
@@ -353,6 +367,10 @@ typedef struct ctc_priv_t {
 	 * The finite state machine of this interface.
 	 */
 	fsm_instance            *fsm;
+	/**
+	 * The protocol of this device
+	 */
+	__u16                   protocol;
 	channel                 *channel[2];
 	struct proc_dir_entry   *proc_dentry;
 	struct proc_dir_entry   *proc_stat_entry;
@@ -406,8 +424,8 @@ static __inline__ int ctc_test_and_set_busy(net_device *dev)
  * Print Banner.
  */
 static void print_banner(void) {
-	static int printed;
-	char vbuf[] = "$Revision: 1.11 $";
+	static int printed = 0;
+	char vbuf[] = "$Revision: 1.17 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -796,7 +814,10 @@ static void ctc_bh(channel *ch)
 					dev_kfree_skb(skb);
 					goto again;
 				}
-				netif_rx(skb2);
+				if (ch->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_netif_rx(skb2);
+				else
+					netif_rx(skb2);
 				privptr->stats.rx_packets++;
 				privptr->stats.rx_bytes += skb2->len;
 				/**
@@ -805,7 +826,10 @@ static void ctc_bh(channel *ch)
 				skb_pull(skb, header->length);
 				skb_put(skb, LL_HEADER_LENGTH);
 			} else {
-				netif_rx(skb);
+				if (ch->protocol == CTC_PROTO_LINUX_TTY)
+					ctc_tty_netif_rx(skb);
+				else
+					netif_rx(skb);
 				privptr->stats.rx_packets++;
 				privptr->stats.rx_bytes += skb->len;
 			}
@@ -892,8 +916,10 @@ static void inline ccw_unit_check (channel *ch, unsigned char sense) {
 			       ch->devno);
 			fsm_event(ch->fsm, CH_EVENT_UC_TXPARITY, ch);
 		}
+	} else if (sense & SNS0_CMD_REJECT) {
+			printk(KERN_WARNING "ch-%04x: Command reject\n", ch->devno);
 	} else if (sense == 0) {
-		printk(KERN_DEBUG "ch-%04x: Unit check\n", ch->devno);
+		printk(KERN_DEBUG "ch-%04x: Unit check ZERO\n", ch->devno);
 		fsm_event(ch->fsm, CH_EVENT_UC_ZERO, ch);
 	} else {
 		printk(KERN_WARNING
@@ -1078,15 +1104,15 @@ static void ch_action_rx(fsm_instance *fi, int event, void *arg)
 
 	fsm_deltimer(&ch->timer);
 	if (len < 8) {
-		printk(KERN_WARNING "%s: got packet with length < 8\n",
-		       dev->name);
+		printk(KERN_WARNING "%s: got packet with length %d < 8\n",
+		       dev->name, len);
 		privptr->stats.rx_dropped++;
 		privptr->stats.rx_length_errors++;
 		goto again;
 	}
 	if (len > ch->max_bufsize) {
-		printk(KERN_WARNING "%s: got packet with length > %d\n",
-		       dev->name, ch->max_bufsize);
+		printk(KERN_WARNING "%s: got packet with length %d > %d\n",
+		       dev->name, len, ch->max_bufsize);
 		privptr->stats.rx_dropped++;
 		privptr->stats.rx_length_errors++;
 		goto again;
@@ -1764,14 +1790,18 @@ static int add_channel(int irq, __u16 devno, channel_type_t type)
 	channel **c = &channels;
 	channel *ch;
 	char name[10];
-	int ret = -1;
 
-	if ((ch = (channel *)kmalloc(sizeof(channel), GFP_KERNEL)) == NULL)
-		goto out;
+	if ((ch = (channel *)kmalloc(sizeof(channel), GFP_KERNEL)) == NULL) {
+		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		return -1;
+	}
 	memset(ch, 0, sizeof(channel));
 	if ((ch->ccw = (ccw1_t *)kmalloc(sizeof(ccw1_t) * 5,
-					 GFP_KERNEL|GFP_DMA)) == NULL)
-		goto out_ch;
+					 GFP_KERNEL|GFP_DMA)) == NULL) {
+		kfree(ch);
+		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		return -1;
+	}
 
 	/**
 	 * "static" ccws are used in the following way:
@@ -1804,12 +1834,19 @@ static int add_channel(int irq, __u16 devno, channel_type_t type)
 	ch->fsm = init_fsm(name, ch_state_names,
 			ch_event_names, NR_CH_STATES, NR_CH_EVENTS,
 			ch_fsm, CH_FSM_LEN, GFP_KERNEL);
-	if (ch->fsm == NULL)
-		goto out_ccw;
+	if (ch->fsm == NULL) {
+		printk(KERN_WARNING "ctc: Could not create FSM in add_channel\n");
+		kfree(ch);
+		return -1;
+	}
 	fsm_newstate(ch->fsm, CH_STATE_IDLE);
 	if ((ch->devstat = (devstat_t*)kmalloc(sizeof(devstat_t), GFP_KERNEL))
-	    == NULL)
-		goto out_ccw;
+	    == NULL) {
+		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
+		kfree_fsm(ch->fsm);
+		kfree(ch);
+		return -1;
+	}
 	memset(ch->devstat, 0, sizeof(devstat_t));
 	while (*c && ((*c)->devno < devno))
 		c = &(*c)->next;
@@ -1817,8 +1854,10 @@ static int add_channel(int irq, __u16 devno, channel_type_t type)
 		printk(KERN_DEBUG
 		       "ctc: add_channel: device %04x already in list\n",
 		       (*c)->devno);
-		ret = 0;
-		goto out_devstat;
+		kfree(ch->devstat);
+		kfree_fsm(ch->fsm);
+		kfree(ch);
+		return 0;
 	}
 	fsm_settimer(ch->fsm, &ch->timer);
 	skb_queue_head_init(&ch->io_queue);
@@ -1826,16 +1865,6 @@ static int add_channel(int irq, __u16 devno, channel_type_t type)
 	ch->next = *c;
 	*c = ch;
 	return 0;
-out_devstat:
-	kfree(ch->devstat);
-out_ccw:
-	kfree(ch->ccw);
-out_ch:
-	kfree(ch);
-out:
-	if (ret)
-		printk(KERN_WARNING "ctc: Out of memory in add_channel\n");
-	return ret;
 }
 
 /**
@@ -1846,9 +1875,9 @@ out:
  */
 static void channel_scan(int print_result)
 {
-	int	   irq;
-	int        nr_escon = 0;
-	int        nr_ctca  = 0;
+	int	        irq;
+	int             nr_escon = 0;
+	int             nr_ctca  = 0;
 	s390_dev_info_t di;
 
 	for (irq = 0; irq < NR_IRQS; irq++) {
@@ -2284,6 +2313,8 @@ static int transmit_skb(channel *ch, struct sk_buff *skb) {
 	if (fsm_getstate(ch->fsm) != CH_STATE_TXIDLE) {
 		int l = skb->len + LL_HEADER_LENGTH;
 
+		if (ch->type == channel_type_escon)
+			return -EBUSY;
 		spin_lock_irqsave(&ch->collect_lock, saveflags);
 		if (ch->collect_len + l > ch->max_bufsize - 2)
 			rc = -EBUSY;
@@ -3141,7 +3172,7 @@ __setup("ctc=", ctc_setup);
  *
  * @param dev Pointer to net_device to be initialized.
  *
- * @return 0 on success, !0 on failure.
+ * @returns 0 on success, !0 on failure.
  */
 int ctc_probe(net_device *dev)
 {
@@ -3190,6 +3221,7 @@ int ctc_probe(net_device *dev)
 		return -ENOMEM;
 	memset(dev->priv, 0, sizeof(ctc_priv));
 	privptr = (ctc_priv *)dev->priv;
+	privptr->protocol = proto;
         privptr->proc_dentry = (struct proc_dir_entry *)
 		(((char *)privptr) + sizeof(ctc_priv));
         privptr->proc_stat_entry = (struct proc_dir_entry *)
@@ -3295,6 +3327,7 @@ int ctc_probe(net_device *dev)
 void cleanup_module(void) {
 	channel *c = channels;
 
+	ctc_tty_cleanup();
 	/* we are called if all interfaces are down only, so no need
 	 * to bother around with locking stuff
 	 */
@@ -3313,7 +3346,10 @@ void cleanup_module(void) {
 				 privptr->channel[WRITE]->devstat);
 			kfree_fsm(privptr->channel[READ]->fsm);
 			kfree_fsm(privptr->channel[WRITE]->fsm);
-			unregister_netdev(nd);
+			if (privptr->protocol != CTC_PROTO_LINUX_TTY)
+				unregister_netdev(nd);
+			else
+				ctc_tty_unregister_netdev(nd);
 			kfree_fsm(privptr->fsm);
 			privptr->channel[READ]->netdev = NULL;
 			privptr->channel[WRITE]->netdev = NULL;
@@ -3345,6 +3381,7 @@ int ctc_init(void) {
 	int   cnt[2];
 	int   itype;
 	int   activated;
+	int   ret = 0;
 	param *par;
 
 	print_banner();
@@ -3359,10 +3396,11 @@ int ctc_init(void) {
 #endif
 	activated = 0;
 	par = params;
+	ctc_tty_init();
 	for (itype = 0; itype < 2; itype++) {
 		net_device *dev = NULL;
 		char       *bname = (itype) ? "escon" : "ctc";
-		int        nlen = strlen(bname);
+
 		cnt[itype] = 0;
 		do {
 			dev = kmalloc(sizeof(net_device)
@@ -3370,8 +3408,10 @@ int ctc_init(void) {
 				      + 11 /* name + zero */
 #endif
 				      , GFP_KERNEL);
-			if (!dev)
-				return -ENOMEM;
+			if (!dev) {
+				ret = -ENOMEM;
+				break;
+			}
 			memset(dev, 0, sizeof(net_device));
 #if LINUX_VERSION_CODE < 0x020300
 			dev->name = (unsigned char *)dev + sizeof(net_device);
@@ -3386,10 +3426,10 @@ int ctc_init(void) {
 					if (isdigit(*p))
 						break;
 				if (p && *p) {
+					int it = (strncmp(dev->name, "escon", 5)) ? 1 : 0;
 					n = simple_strtoul(p, NULL, 0);
-					if (n >= cnt[itype] &&
-					    (!strncmp(par->name, bname, nlen)))
-						cnt[itype] = n + 1;
+					if (n >= cnt[it])
+						cnt[it] = n + 1;
 				}
 			} else {
 				if (ctc_no_auto) {
@@ -3406,6 +3446,7 @@ int ctc_init(void) {
 						 __FUNCTION__, dev->name);
 #endif			
 			if (ctc_probe(dev) == 0) {
+				ctc_priv *privptr = (ctc_priv *)dev->priv;
 #ifdef DEBUG
 				printk(KERN_DEBUG
 				       "ctc: %s(): probing succeeded\n",
@@ -3413,28 +3454,49 @@ int ctc_init(void) {
 				printk(KERN_DEBUG
 				       "ctc: %s(): registering device %s\n",
 				       __FUNCTION__, dev->name);
-#endif			
-				if (register_netdev(dev) != 0) {
-					ctc_priv *privptr =
-						(ctc_priv *)dev->priv;
-					printk(KERN_WARNING
-					       "ctc: Couldn't register %s\n",
-					       dev->name);
-					free_irq(privptr->channel[READ]->irq,
-						 privptr->channel[READ]->devstat);
-					free_irq(privptr->channel[WRITE]->irq,
-						 privptr->channel[WRITE]->devstat);
-					channel_free(privptr->channel[READ]);
-					channel_free(privptr->channel[WRITE]);
-					kfree(dev->priv);
-					kfree(dev);
-				} else {
+#endif
+				if (privptr->protocol != CTC_PROTO_LINUX_TTY) {
+					if (register_netdev(dev) != 0) {
+						printk(KERN_WARNING
+						       "ctc: Couldn't register netdev %s\n",
+						       dev->name);
+						free_irq(privptr->channel[READ]->irq,
+							 privptr->channel[READ]->devstat);
+						free_irq(privptr->channel[WRITE]->irq,
+							 privptr->channel[WRITE]->devstat);
+						channel_free(privptr->channel[READ]);
+						channel_free(privptr->channel[WRITE]);
+						kfree(dev->priv);
+						kfree(dev);
+					} else {
 #ifdef DEBUG
-					printk(KERN_DEBUG
-					       "ctc: %s(): register succeed\n",
-					       __FUNCTION__);
+						printk(KERN_DEBUG
+						       "ctc: %s(): register succeed\n",
+						       __FUNCTION__);
 #endif			
-					activated++;
+						activated++;
+					}
+				} else {
+					if (ctc_tty_register_netdev(dev) != 0) {
+						printk(KERN_WARNING
+						       "ctc: Couldn't register ttydev %s\n",
+						       dev->name);
+						free_irq(privptr->channel[READ]->irq,
+							 privptr->channel[READ]->devstat);
+						free_irq(privptr->channel[WRITE]->irq,
+							 privptr->channel[WRITE]->devstat);
+						channel_free(privptr->channel[READ]);
+						channel_free(privptr->channel[WRITE]);
+						kfree(dev->priv);
+						kfree(dev);
+					} else {
+#ifdef DEBUG
+						printk(KERN_DEBUG
+						       "ctc: %s(): register succeed\n",
+						       __FUNCTION__);
+#endif			
+						activated++;
+					}
 				}
 				
 			} else {
@@ -3446,13 +3508,15 @@ int ctc_init(void) {
 				kfree(dev);
 				dev = NULL;
 			}
-		} while (dev);
+		} while (dev && (ret == 0));
 	}
 	if (!activated) {
 		printk(KERN_WARNING "ctc: No devices registered\n");
-		return -ENODEV;
+		ret = -ENODEV;
 	}
-	return 0;
+	if (ret)
+		ctc_tty_cleanup();
+	return ret;
 }
 
 #ifndef MODULE

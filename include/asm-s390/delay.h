@@ -8,7 +8,7 @@
  *  Derived from "include/asm-i386/delay.h"
  *    Copyright (C) 1993 Linus Torvalds
  *
- *  Delay routines calling functions in arch/i386/lib/delay.c
+ *  Delay routines calling functions in arch/s390/lib/delay.c
  */
  
 #ifndef _S390_DELAY_H

@@ -16,10 +16,13 @@ Richard Gooch
   these, the ARRs are used to emulate the MTRRs.
 
   The AMD K6-2 (stepping 8 and above) and K6-3 processors have two
-  MTRRs. These are supported.
+  MTRRs. These are supported.  The AMD Athlon family provide 8 Intel
+  style MTRRs.
   
   The Centaur C6 (WinChip) has 8 MCRs, allowing write-combining. These
   are supported.
+
+  The VIA Cyrix III and VIA C3 CPUs offer 8 Intel style MTRRs.
 
   The CONFIG_MTRR option creates a /proc/mtrr file which may be used
   to manipulate your MTRRs. Typically the X server should use

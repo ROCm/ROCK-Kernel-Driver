@@ -1,15 +1,13 @@
-
 /***************************************************************************
  *
  *  drivers/s390/char/tape.h
  *    tape device driver for 3480/3490E tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
  ****************************************************************************
  */
 
@@ -71,10 +69,14 @@ typedef ccw_req_t* (*tape_reqgen_t)(struct request* req,struct _tape_info_t* tap
 typedef ccw_req_t* (*tape_rwblock_t)(const char* data,size_t count,struct _tape_info_t* tape);
 typedef void (*tape_freeblock_t)(ccw_req_t* cqr,struct _tape_info_t* tape);
 typedef void (*tape_setup_assist_t) (struct _tape_info_t*);
+#ifdef CONFIG_DEVFS_FS
+typedef void (*tape_devfs_handler_t) (struct _tape_info_t*);
+#endif
 typedef tape_event_handler_t tape_event_table_t[TS_SIZE][TE_SIZE];
 typedef struct _tape_discipline_t {
     unsigned int cu_type;
     tape_setup_assist_t setup_assist;
+    tape_event_handler_t error_recovery;
     tape_reqgen_t bread;
     tape_freeblock_t free_bread;
     tape_rwblock_t write_block;
@@ -115,6 +117,10 @@ typedef struct _tape_discipline_t {
 
 typedef struct _tape_frontend_t {
     tape_setup_assist_t device_setup;
+#ifdef CONFIG_DEVFS_FS
+    tape_devfs_handler_t mkdevfstree;
+    tape_devfs_handler_t rmdevfstree;
+#endif
     void* next;
 } tape_frontend_t  __attribute__ ((aligned(8)));
 
@@ -142,6 +148,14 @@ typedef struct _tape_info_t {
     ccw_req_t* cqr;
     atomic_t bh_scheduled;
     struct tq_struct bh_tq;
+#ifdef CONFIG_DEVFS_FS
+    devfs_handle_t devfs_dir;             /* devfs handle for tape/DEVNO directory */
+    devfs_handle_t devfs_char_dir;        /* devfs handle for tape/DEVNO/char directory */
+    devfs_handle_t devfs_block_dir;       /* devfs handle for tape/DEVNO/block directory */
+    devfs_handle_t devfs_nonrewinding;    /* devfs handle for tape/DEVNO/char/nonrewinding device */
+    devfs_handle_t devfs_rewinding;       /* devfs handle for tape/DEVNO/char/rewinding device */
+    devfs_handle_t devfs_disc;            /* devfs handle for tape/DEVNO/block/disc device */
+#endif
     void* discdata;
     void* kernbuf;
     void* userbuf;
@@ -167,6 +181,7 @@ int tape_oper_handler ( int irq, struct _devreg *dreg);
 /* functions for handling the status of a device */
 inline void tapestate_set (tape_info_t * tape, int newstate);
 inline int tapestate_get (tape_info_t * tape);
+void tapestate_event (tape_info_t * tape, int event);
 extern char* state_verbose[TS_SIZE];
 extern char* event_verbose[TE_SIZE];
 

@@ -294,6 +294,8 @@ struct reginit_item PHY_NTC_INIT[] __initdata = {
 #endif
 
 
+static int fs_keystream = 0;
+
 #ifdef DEBUG
 /* I didn't forget to set this to zero before shipping. Hit me with a stick 
    if you get this with the debug default not set to zero again. -- REW */
@@ -308,6 +310,7 @@ MODULE_PARM(fs_debug, "i");
 #endif
 MODULE_PARM(loopback, "i");
 MODULE_PARM(num, "i");
+MODULE_PARM(fs_keystream, "i");
 /* XXX Add rx_buf_sizes, and rx_pool_sizes As per request Amar. -- REW */
 #endif
 
@@ -377,7 +380,7 @@ static inline void fs_kfree_skb (struct sk_buff * skb)
 
 
 
-/* It seems the ATM forum recomends this horribly complicated 16bit
+/* It seems the ATM forum recommends this horribly complicated 16bit
  * floating point format. Turns out the Ambassador uses the exact same
  * encoding. I just copied it over. If Mitch agrees, I'll move it over
  * to the atm_misc file or something like that. (and remove it from 
@@ -716,6 +719,8 @@ static void process_txdone_queue (struct fs_dev *dev, struct queue *q)
 
 
 		switch (STATUS_CODE (qe)) {
+		case 0x01: /* This is for AAL0 where we put the chip in streaming mode */
+			/* Fall through */
 		case 0x02:
 			/* Process a real txdone entry. */
 			tmp = qe->p0;
@@ -796,6 +801,8 @@ static void process_incoming (struct fs_dev *dev, struct queue *q)
 
 		/* Single buffer packet */
 		switch (STATUS_CODE (qe)) {
+		case 0x1:
+			/* Fall through for streaming mode */
 		case 0x2:/* Packet received OK.... */
 			if (atm_vcc) {
 				skb = pe->skb;
@@ -877,7 +884,9 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 	if (vci != ATM_VPI_UNSPEC && vpi != ATM_VCI_UNSPEC)
 		set_bit(ATM_VF_ADDR, &atm_vcc->flags);
 
-	if (atm_vcc->qos.aal != ATM_AAL5) return -EINVAL; /* XXX AAL0 */
+	if ((atm_vcc->qos.aal != ATM_AAL5) &&
+	    (atm_vcc->qos.aal != ATM_AAL2))
+	  return -EINVAL; /* XXX AAL0 */
 
 	fs_dprintk (FS_DEBUG_OPEN, "fs: (itf %d): open %d.%d\n", 
 		    atm_vcc->dev->number, atm_vcc->vpi, atm_vcc->vci);	
@@ -946,12 +955,27 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 		   need to wait for completion anyway, to see if it completed
 		   succesfully. */
 
-		tc->flags = 0
+		switch (atm_vcc->qos.aal) {
+		case ATM_AAL2:
+		case ATM_AAL0:
+		  tc->flags = 0
+		    | TC_FLAGS_TRANSPARENT_PAYLOAD
+		    | TC_FLAGS_PACKET
+		    | (1 << 28)
+		    | TC_FLAGS_TYPE_UBR /* XXX Change to VBR -- PVDL */
+		    | TC_FLAGS_CAL0;
+		  break;
+		case ATM_AAL5:
+		  tc->flags = 0
 			| TC_FLAGS_AAL5
 			| TC_FLAGS_PACKET  /* ??? */
 			| TC_FLAGS_TYPE_CBR
 			| TC_FLAGS_CAL0;
-
+		  break;
+		default:
+			printk ("Unknown aal: %d\n", atm_vcc->qos.aal);
+			tc->flags = 0;
+		}
 		/* Docs are vague about this atm_hdr field. By the way, the FS
 		 * chip makes odd errors if lower bits are set.... -- REW */
 		tc->atm_hdr =  (vpi << 20) | (vci << 4); 
@@ -1025,7 +1049,6 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 
 		for (bfp = 0;bfp < FS_NR_FREE_POOLS; bfp++)
 			if (atm_vcc->qos.rxtp.max_sdu <= dev->rx_fp[bfp].bufsize) break;
-    
 		if (bfp >= FS_NR_FREE_POOLS) {
 			fs_dprintk (FS_DEBUG_OPEN, "No free pool fits sdu: %d.\n", 
 				    atm_vcc->qos.rxtp.max_sdu);
@@ -1037,12 +1060,23 @@ static int fs_open(struct atm_vcc *atm_vcc, short vpi, int vci)
 			return -EINVAL;
 		}
 
-		submit_command (dev, &dev->hp_txq, 
-				QE_CMD_CONFIG_RX | QE_CMD_IMM_INQ | vcc->channo,
-				RC_FLAGS_AAL5 | 
-				RC_FLAGS_BFPS_BFP * bfp |
-				RC_FLAGS_RXBM_PSB, 0, 0);
-    
+		switch (atm_vcc->qos.aal) {
+		case ATM_AAL0:
+		case ATM_AAL2:
+			submit_command (dev, &dev->hp_txq,
+					QE_CMD_CONFIG_RX | QE_CMD_IMM_INQ | vcc->channo,
+					RC_FLAGS_TRANSP |
+					RC_FLAGS_BFPS_BFP * bfp |
+					RC_FLAGS_RXBM_PSB, 0, 0);
+			break;
+		case ATM_AAL5:
+			submit_command (dev, &dev->hp_txq,
+					QE_CMD_CONFIG_RX | QE_CMD_IMM_INQ | vcc->channo,
+					RC_FLAGS_AAL5 |
+					RC_FLAGS_BFPS_BFP * bfp |
+					RC_FLAGS_RXBM_PSB, 0, 0);
+			break;
+		};
 		if (IS_FS50 (dev)) {
 			submit_command (dev, &dev->hp_txq, 
 					QE_CMD_REG_WR | QE_CMD_IMM_INQ,
@@ -1697,7 +1731,7 @@ static int __init fs_init (struct fs_dev *dev)
 
 	/* AN3: 10 */
 	write_fs (dev, SARMODE1, 0 
-		  | (0 * SARMODE1_DEFHEC) /* XXX PHY */
+		  | (fs_keystream * SARMODE1_DEFHEC) /* XXX PHY */
 		  | ((loopback == 1) * SARMODE1_TSTLP) /* XXX Loopback mode enable... */
 		  | (1 * SARMODE1_DCRM)
 		  | (1 * SARMODE1_DCOAM)

@@ -20,6 +20,7 @@
  * cpu_number_map in other architectures.
  */
 
+#include <linux/module.h>
 #include <linux/init.h>
 
 #include <linux/mm.h>
@@ -33,8 +34,7 @@
 #include <asm/pgalloc.h>
 #include <asm/irq.h>
 #include <asm/s390_ext.h>
-
-#include "cpcmd.h"
+#include <asm/cpcmd.h>
 
 /* prototypes */
 extern int cpu_idle(void * unused);
@@ -392,7 +392,7 @@ void smp_send_stop(void)
 
         /* stop all processors */
 
-        smp_signal_others(sigp_stop, 0, TRUE, NULL);
+        smp_signal_others(sigp_stop, 0, 1, NULL);
 
         /* store status of all processors in their lowcores (real 0) */
 
@@ -574,7 +574,7 @@ static int __init fork_by_hand(void)
        struct pt_regs regs;
        /* don't care about the psw and regs settings since we'll never
           reschedule the forked task. */
-       memset(&regs,0,sizeof(pt_regs));
+       memset(&regs,0,sizeof(struct pt_regs));
        return do_fork(CLONE_VM|CLONE_PID, 0, &regs, 0);
 }
 
@@ -758,3 +758,8 @@ void smp_local_timer_interrupt(struct pt_regs * regs)
         }
 }
 
+EXPORT_SYMBOL(lowcore_ptr);
+EXPORT_SYMBOL(kernel_flag);
+EXPORT_SYMBOL(smp_ctl_set_bit);
+EXPORT_SYMBOL(smp_ctl_clear_bit);
+EXPORT_SYMBOL(smp_num_cpus);

@@ -31,35 +31,27 @@ extern int requests_in;
 extern int requests_out;
 #endif
 
-static int 
+static void
 nbd_end_request(struct request *req)
 {
+	struct buffer_head *bh;
+	unsigned nsect;
 	unsigned long flags;
-	int ret = 0;
+	int uptodate = (req->errors == 0) ? 1 : 0;
 
 #ifdef PARANOIA
 	requests_out++;
 #endif
-	/*
-	 * This is a very dirty hack that we have to do to handle
-	 * merged requests because end_request stuff is a bit
-	 * broken. The fact we have to do this only if there
-	 * aren't errors looks even more silly.
-	 */
-	if (!req->errors) {
-		req->sector += req->current_nr_sectors;
-		req->nr_sectors -= req->current_nr_sectors;
-	}
-
 	spin_lock_irqsave(&io_request_lock, flags);
-	if (end_that_request_first( req, !req->errors, "nbd" ))
-		goto out;
-	ret = 1;
-	end_that_request_last( req );
-
-out:
+	while((bh = req->bh) != NULL) {
+		nsect = bh->b_size >> 9;
+		blk_finished_io(nsect);
+		req->bh = bh->b_reqnext;
+		bh->b_reqnext = NULL;
+		bh->b_end_io(bh, uptodate);
+	}
+	blkdev_release_request(req);
 	spin_unlock_irqrestore(&io_request_lock, flags);
-	return ret;
 }
 
 #define MAX_NBD 128

@@ -1,6 +1,6 @@
 /*
-   NetWinder Floating Point Emulator
-   (c) Rebel.com, 1998-1999
+    NetWinder Floating Point Emulator
+    (c) Rebel.COM, 1998,1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 

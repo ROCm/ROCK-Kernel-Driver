@@ -1404,7 +1404,7 @@ void winview_audio(struct bttv *btv, struct video_audio *v, int set)
 	bits_out = (PT2254_DBS_IN_2>>(vol%5));
 	/* tens */
 	bits_out |= (PT2254_DBS_IN_10>>(vol/5));
-	bits_out |= PT2254_L_CHANEL | PT2254_R_CHANEL;
+	bits_out |= PT2254_L_CHANNEL | PT2254_R_CHANNEL;
 	data = btread(BT848_GPIO_DATA);
 	data &= ~(WINVIEW_PT2254_CLK| WINVIEW_PT2254_DATA|
 		  WINVIEW_PT2254_STROBE);

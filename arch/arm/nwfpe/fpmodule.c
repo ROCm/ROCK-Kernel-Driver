@@ -55,6 +55,8 @@ MODULE_DESCRIPTION("NWFPE floating point emulator");
 #else
 #define fp_send_sig	send_sig
 #define kern_fp_enter	fp_enter
+
+extern char fpe_type[];
 #endif
 
 /* kernel function prototypes required */
@@ -72,24 +74,45 @@ extern void nwfpe_enter(void);
 /* Address of user registers on the kernel stack. */
 unsigned int *userRegisters;
 
-int __init fpe_init(void)
+#ifdef MODULE
+/*
+ * Return 0 if we can be unloaded.  This can only happen if
+ * kern_fp_enter is still pointing at nwfpe_enter
+ */
+static int fpe_unload(void)
 {
-  if (sizeof(FPA11) > sizeof(union fp_state))
-    printk(KERN_ERR "nwfpe: bad structure size\n");
-  else {
-    /* Display title, version and copyright information. */
-    printk(KERN_WARNING "NetWinder Floating Point Emulator V0.95 "
-	   "(c) 1998-1999 Rebel.com\n");
+  return (kern_fp_enter == nwfpe_enter) ? 0 : 1;
+}
+#endif
 
-    /* Save pointer to the old FP handler and then patch ourselves in */
-    orig_fp_enter = kern_fp_enter;
-    kern_fp_enter = nwfpe_enter;
+static int __init fpe_init(void)
+{
+  if (sizeof(FPA11) > sizeof(union fp_state)) {
+    printk(KERN_ERR "nwfpe: bad structure size\n");
+    return -EINVAL;
   }
+
+#ifdef MODULE
+  if (!mod_member_present(&__this_module, can_unload))
+    return -EINVAL;
+  __this_module.can_unload = fpe_unload;
+#else
+  if (fpe_type[0] && strcmp(fpe_type, "nwfpe"))
+    return 0;
+#endif
+
+  /* Display title, version and copyright information. */
+  printk(KERN_WARNING "NetWinder Floating Point Emulator V0.95 "
+	 "(c) 1998-1999 Rebel.com\n");
+
+  /* Save pointer to the old FP handler and then patch ourselves in */
+  orig_fp_enter = kern_fp_enter;
+  kern_fp_enter = nwfpe_enter;
 
   return 0;
 }
 
-void __exit fpe_exit(void)
+static void __exit fpe_exit(void)
 {
   /* Restore the values we saved earlier. */
   kern_fp_enter = orig_fp_enter;

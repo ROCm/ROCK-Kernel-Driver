@@ -17,14 +17,13 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 
+#include "ctrlchar.h"
 #include "hwc_rw.h"
-
-extern void hwc_tty_init (void);
 
 #ifdef CONFIG_HWC_CONSOLE
 
 #define  hwc_console_major 4
-#define  hwc_console_minor 0
+#define  hwc_console_minor 64
 #define  hwc_console_name  "console"
 
 void hwc_console_write (struct console *, const char *, unsigned int);
@@ -84,17 +83,16 @@ void __init
 hwc_console_init (void)
 {
 
-#ifdef CONFIG_3215
+#if defined(CONFIG_3215_CONSOLE) || defined(CONFIG_3270_CONSOLE)
 	if (MACHINE_IS_VM)
 		return;
 #endif
 	if (MACHINE_IS_P390)
 		return;
 
+	ctrlchar_init ();
+  
 	if (hwc_init () == 0) {
-
-		hwc_tty_init ();
-
 #ifdef CONFIG_HWC_CONSOLE
 
 		register_console (&hwc_console);

@@ -33,9 +33,11 @@
  */
 extern __inline__ pgd_t *get_pgd_slow (void)
 {
+	pgd_t *ret;
         int i;
-	pgd_t *ret = (pgd_t *)__get_free_pages(GFP_KERNEL,2);
-	if (ret)
+
+	ret = (pgd_t *) __get_free_pages(GFP_KERNEL, 2);
+	if (ret != NULL)
 	        for (i = 0; i < PTRS_PER_PGD; i++) 
 	                pgd_clear(ret + i);
 	return ret;
@@ -77,15 +79,32 @@ extern __inline__ void free_pgd_slow (pgd_t *pgd)
 
 #define pgd_free(pgd)		free_pgd_fast(pgd)
 
+extern inline void pgd_populate(struct mm_struct *mm, pgd_t *pgd, pmd_t *pmd)
+{
+	pgd_val(*pgd) = _PGD_ENTRY | __pa(pmd);
+}
+
 /*
  * page middle directory allocation/free routines.
  */
-extern pmd_t empty_bad_pmd_table[];
-extern pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long address);
+extern inline pmd_t * pmd_alloc_one(struct mm_struct *mm, unsigned long vmaddr)
+{
+	pmd_t *pmd;
+        int i;
 
-extern __inline__ pmd_t *get_pmd_fast (void)
+	pmd = (pmd_t *) __get_free_pages(GFP_KERNEL, 2);
+	if (pmd != NULL) {
+		for (i=0; i < PTRS_PER_PMD; i++)
+			pmd_clear(pmd+i);
+	}
+	return pmd;
+}
+
+extern __inline__ pmd_t *
+pmd_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
 	unsigned long *ret = (unsigned long *) pmd_quicklist;
+
 	if (ret != NULL) {
 		pmd_quicklist = (unsigned long *)(*ret);
 		ret[0] = ret[1];
@@ -94,95 +113,67 @@ extern __inline__ pmd_t *get_pmd_fast (void)
 	return (pmd_t *) ret;
 }
 
-extern __inline__ void free_pmd_fast (pmd_t *pmd)
+extern __inline__ void pmd_free_fast (pmd_t *pmd)
 {
-	if (pmd == empty_bad_pmd_table)
-		return;
 	*(unsigned long *) pmd = (unsigned long) pmd_quicklist;
 	pmd_quicklist = (unsigned long *) pmd;
 	pgtable_cache_size += 4;
 }
 
-extern __inline__ void free_pmd_slow (pmd_t *pmd)
+extern __inline__ void pmd_free_slow (pmd_t *pmd)
 {
 	free_pages((unsigned long) pmd, 2);
 }
 
-extern __inline__ pmd_t *pmd_alloc (pgd_t *pgd, unsigned long vmaddr)
+#define pmd_free(pmd)		pmd_free_fast(pmd)
+
+extern inline void pmd_populate(struct mm_struct *mm, pmd_t *pmd, pte_t *pte)
 {
-	unsigned long offset;
-
-	offset = (vmaddr >> PMD_SHIFT) & (PTRS_PER_PMD - 1);
-	if (pgd_none(*pgd)) {
-		pmd_t *pmd_page = get_pmd_fast();
-
-		if (!pmd_page)
-			return get_pmd_slow(pgd, offset);
-                pgd_set(pgd, pmd_page);
-                return pmd_page + offset;
-	}
-	if (pgd_bad(*pgd))
-		BUG();
-	return (pmd_t *) pgd_page(*pgd) + offset;
+	pmd_val(*pmd) = _PMD_ENTRY | __pa(pte);
+	pmd_val1(*pmd) = _PMD_ENTRY | __pa(pte+256);
 }
-
-#define pmd_alloc_kernel(pgd, addr)	pmd_alloc(pgd, addr)
-#define pmd_free_kernel(pmd)	free_pmd_fast(pmd)
-#define pmd_free(pmd)		free_pmd_fast(pmd)
 
 /*
  * page table entry allocation/free routines.
  */
-extern pte_t empty_bad_pte_table[];
-extern pte_t *get_pte_slow (pmd_t *pmd, unsigned long address_preadjusted);
-
-extern __inline__ pte_t *get_pte_fast (void)
+extern inline pte_t * pte_alloc_one(struct mm_struct *mm, unsigned long vmaddr)
 {
-	unsigned long *ret = (unsigned long *) pte_quicklist;
+	pte_t *pte;
+        int i;
 
-	if (ret != NULL) {
-		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
-		pgtable_cache_size--;
+	pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	if (pte != NULL) {
+		for (i=0; i < PTRS_PER_PTE; i++)
+			pte_clear(pte+i);
 	}
-	return (pte_t *) ret;
+	return pte;
 }
 
-extern __inline__ void free_pte_fast (pte_t *pte)
+extern __inline__ pte_t* pte_alloc_one_fast(struct mm_struct *mm, unsigned long address)
 {
-	if (pte == empty_bad_pte_table)
-		return;
+        unsigned long *ret = (unsigned long *) pte_quicklist;
+
+        if (ret != NULL) {
+                pte_quicklist = (unsigned long *)(*ret);
+                ret[0] = ret[1];
+                pgtable_cache_size--;
+        }
+        return (pte_t *)ret;
+}
+
+extern __inline__ void pte_free_fast (pte_t *pte)
+{
 	*(unsigned long *) pte = (unsigned long) pte_quicklist;
 	pte_quicklist = (unsigned long *) pte;
 	pgtable_cache_size++;
 }
 
-extern __inline__ void free_pte_slow (pte_t *pte)
+extern __inline__ void pte_free_slow (pte_t *pte)
 {
         free_page((unsigned long) pte);
 }
 
-extern __inline__ pte_t *pte_alloc (pmd_t *pmd, unsigned long vmaddr)
-{
-	unsigned long offset;
-
-	offset = (vmaddr >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
-	if (pmd_none(*pmd)) {
-		pte_t *pte_page = get_pte_fast();
-
-		if (!pte_page)
-			return get_pte_slow(pmd, offset);
-		pmd_set(pmd, pte_page);
-		return pte_page + offset;
-	}
-	if (pmd_bad(*pmd))
-		BUG();
-	return (pte_t *) pmd_page(*pmd) + offset;
-}
-
-#define pte_alloc_kernel(pmd, addr)	pte_alloc(pmd, addr)
-#define pte_free_kernel(pte)	free_pte_fast(pte)
-#define pte_free(pte)		free_pte_fast(pte)
+#define pte_free(pte)		pte_free_fast(pte)
 
 extern int do_check_pgt_cache (int, int);
 
@@ -224,11 +215,28 @@ do {  __asm__ __volatile__("ptlb": : :"memory"); } while (0)
  * on each context switch
  */
 
-#define flush_tlb()			local_flush_tlb()
-#define flush_tlb_all()			local_flush_tlb()
-#define flush_tlb_mm(mm)		local_flush_tlb()
-#define flush_tlb_page(vma, va)		local_flush_tlb()
-#define flush_tlb_range(mm, start, end)	local_flush_tlb()
+static inline void flush_tlb(void)
+{
+	local_flush_tlb();
+}
+static inline void flush_tlb_all(void)
+{
+	local_flush_tlb();
+}
+static inline void flush_tlb_mm(struct mm_struct *mm) 
+{
+	local_flush_tlb();
+}
+static inline void flush_tlb_page(struct vm_area_struct *vma,
+				  unsigned long addr)
+{
+	local_flush_tlb();
+}
+static inline void flush_tlb_range(struct mm_struct *mm,
+				   unsigned long start, unsigned long end)
+{
+	local_flush_tlb();
+}
 
 #else
 
@@ -266,11 +274,28 @@ static inline void __flush_tlb_mm(struct mm_struct * mm)
 	}
 }
 
-#define flush_tlb()			__flush_tlb_mm(current->mm)
-#define flush_tlb_all()			global_flush_tlb()
-#define flush_tlb_mm(mm)		__flush_tlb_mm(mm)
-#define flush_tlb_page(vma, va)		__flush_tlb_mm((vma)->vm_mm)
-#define flush_tlb_range(mm, start, end)	__flush_tlb_mm(mm)
+static inline void flush_tlb(void)
+{
+	__flush_tlb_mm(current->mm);
+}
+static inline void flush_tlb_all(void)
+{
+	global_flush_tlb();
+}
+static inline void flush_tlb_mm(struct mm_struct *mm) 
+{
+	__flush_tlb_mm(mm); 
+}
+static inline void flush_tlb_page(struct vm_area_struct *vma,
+				  unsigned long addr)
+{
+	__flush_tlb_mm(vma->vm_mm);
+}
+static inline void flush_tlb_range(struct mm_struct *mm,
+				   unsigned long start, unsigned long end)
+{
+	__flush_tlb_mm(mm); 
+}
 
 #endif
 

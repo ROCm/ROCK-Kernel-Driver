@@ -26,6 +26,14 @@
 struct __wait_queue {
 	unsigned int flags;
 #define WQ_FLAG_EXCLUSIVE	0x01
+#define WQ_FLAG_CONTEXT_0	8	/* context specific flag bit numbers */
+#define WQ_FLAG_CONTEXT_1	9
+#define WQ_FLAG_CONTEXT_2	10
+#define WQ_FLAG_CONTEXT_3	11
+#define WQ_FLAG_CONTEXT_4	12
+#define WQ_FLAG_CONTEXT_5	13
+#define WQ_FLAG_CONTEXT_6	14
+#define WQ_FLAG_CONTEXT_7	15
 	struct task_struct * task;
 	struct list_head task_list;
 #if WAITQUEUE_DEBUG

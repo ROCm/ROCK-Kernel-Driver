@@ -35,11 +35,13 @@ obj-$(CONFIG_INPUT_SERPORT)	+= serport.o serio.o
 obj-$(CONFIG_INPUT_NS558)	+= ns558.o gameport.o
 obj-$(CONFIG_INPUT_LIGHTNING)	+= lightning.o gameport.o
 obj-$(CONFIG_INPUT_PCIGAME)	+= pcigame.o gameport.o
+obj-$(CONFIG_INPUT_CS461X)	+= cs461x.o gameport.o
 
 obj-$(CONFIG_INPUT_WARRIOR)	+= warrior.o serio.o
 obj-$(CONFIG_INPUT_MAGELLAN)	+= magellan.o serio.o
 obj-$(CONFIG_INPUT_SPACEORB)	+= spaceorb.o serio.o
 obj-$(CONFIG_INPUT_SPACEBALL)	+= spaceball.o serio.o
+obj-$(CONFIG_INPUT_STINGER)	+= stinger.o serio.o
 obj-$(CONFIG_INPUT_IFORCE_232)	+= iforce.o serio.o
 obj-$(CONFIG_INPUT_IFORCE_USB)	+= iforce.o
 

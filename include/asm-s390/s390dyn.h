@@ -10,6 +10,10 @@
 #ifndef __s390dyn_h
 #define __s390dyn_h
 
+#ifndef _LINUX_LIST_H
+#include <linux/list.h>
+#endif
+
 struct _devreg;
 
 typedef  int  (* oper_handler_func_t)( int             irq,
@@ -23,6 +27,7 @@ typedef struct _devreg_hc_t {
    }  __attribute__ ((packed)) devreg_hc_t;
 
 typedef struct _devreg {
+	struct list_head list;
 	union {
 		int devno;
 		devreg_hc_t hc;       /* has controller info */
@@ -30,8 +35,6 @@ typedef struct _devreg {
 
 	int                  flag;
 	oper_handler_func_t  oper_func;
-	struct _devreg      *prev;
-	struct _devreg      *next;
 } devreg_t;
 
 #define DEVREG_EXACT_MATCH      0x00000001

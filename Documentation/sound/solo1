@@ -1,3 +1,25 @@
+Recording
+---------
+
+Recording does not work on the author's card, but there
+is at least one report of it working on later silicon.
+The chip behaves differently than described in the data sheet,
+likely due to a chip bug. Working around this would require
+the help of ESS (for example by publishing an errata sheet),
+but ESS has not done so so far.
+
+Also, the chip only supports 24 bit addresses for recording,
+which means it cannot work on some Alpha mainboards.
+
+
+/proc/sound, /dev/sndstat
+-------------------------
+
+/proc/sound and /dev/sndstat is not supported by the
+driver. To find out whether the driver succeeded loading,
+check the kernel log (dmesg).
+
+
 ALaw/uLaw sample formats
 ------------------------
 
@@ -45,4 +67,4 @@ MIDI synthesizer
 The card has an OPL compatible FM synthesizer.
 
 Thomas Sailer
-sailer@ife.ee.ethz.ch
+t.sailer@alumni.ethz.ch

@@ -1,9 +1,12 @@
 /****************************************************************************
  * "CWCIMAGE.H"-- For CS46XX. Ver 1.04
- *      Copyright 1998-2000 (c) Cirrus Logic Corp.
+ *      Copyright 1998-2001 (c) Cirrus Logic Corp.
  *      Version 1.04
  ****************************************************************************
  */
+#ifndef __CS_IMAGE_H
+#define __CS_IMAGE_H
+
 #define CLEAR__COUNT     3
 #define FILL__COUNT      4
 #define BA1__DWORD_SIZE  13*1024+512
@@ -314,3 +317,6 @@ static struct
                             {0x000137f0, sizeof(FillArray3), FillArray3},
                             {0x00020000, sizeof(FillArray4), FillArray4}
                           };
+
+
+#endif

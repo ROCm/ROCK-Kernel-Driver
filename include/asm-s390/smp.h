@@ -8,15 +8,24 @@
  */
 #ifndef __ASM_SMP_H
 #define __ASM_SMP_H
+
 #include <linux/config.h>
-#ifdef CONFIG_SMP
-#ifndef __ASSEMBLY__
+
+#if defined(__KERNEL__) && defined(CONFIG_SMP) && !defined(__ASSEMBLY__)
 
 #include <asm/lowcore.h>
-#include <linux/threads.h>  // FOR NR_CPUS definition only.
-#include <linux/kernel.h>   // FOR FASTCALL definition
 
-#define smp_processor_id() (current->processor)
+/*
+  s390 specific smp.c headers
+ */
+typedef struct
+{
+	int        intresting;
+	sigp_ccode ccode; 
+	__u32      status;
+	__u16      cpu;
+} sigp_info;
+
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
 /*
@@ -31,7 +40,7 @@
  
 #define PROC_CHANGE_PENALTY	20		/* Schedule penalty */
 
-extern void count_cpus(void);
+#define smp_processor_id() (current->processor)
 
 extern __inline__ int cpu_logical_map(int cpu)
 {
@@ -55,25 +64,12 @@ extern __inline__ __u16 hard_smp_processor_id(void)
 
 void smp_local_timer_interrupt(struct pt_regs * regs);
 
-/*
-  s390 specific smp.c headers
- */
-typedef struct
-{
-	int        intresting;
-	sigp_ccode ccode; 
-	__u32      status;
-	__u16      cpu;
-} sigp_info;
-
-sigp_ccode
-smp_ext_call(int cpu, void (*callback)(void *info), void *info, int wait);
-void smp_ext_call_others(void (*callback)(void *info), void *info, int wait);
+sigp_ccode smp_ext_call(int cpu, void (*cb)(void *info), void *info, int wait);
+void smp_ext_call_others(void (*cb)(void *info), void *info, int wait);
 sigp_ccode smp_ext_bitcall(int cpu, ec_bit_sig sig);
 void smp_ext_bitcall_others(ec_bit_sig sig);
 
 int smp_signal_others(sigp_order_code order_code,__u32 parameter,
                       int spin,sigp_info *info);
-#endif
 #endif
 #endif

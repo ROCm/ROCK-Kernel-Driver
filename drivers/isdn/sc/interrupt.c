@@ -34,7 +34,6 @@
 
 extern int indicate_status(int, int, ulong, char *);
 extern void check_phystat(unsigned long);
-extern void dump_messages(int);
 extern int receivemessage(int, RspMessage *);
 extern int sendmessage(int, unsigned int, unsigned int, unsigned int,
         unsigned int, unsigned int, unsigned int, unsigned int *);

@@ -1,5 +1,5 @@
 /*
- *  arch/s390/kernel/delay.c
+ *  arch/s390x/kernel/delay.c
  *    Precise Delay Loops for S390
  *
  *  S390 version

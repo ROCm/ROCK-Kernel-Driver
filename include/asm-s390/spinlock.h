@@ -73,6 +73,8 @@ typedef struct {
 
 #define RW_LOCK_UNLOCKED (rwlock_t) { 0, 0 }
 
+#define rwlock_init(x)	do { *(x) = RW_LOCK_UNLOCKED; } while(0)
+
 #define read_lock(rw)   \
         asm volatile("   l     2,%0\n"   \
                      "   j     1f\n"     \

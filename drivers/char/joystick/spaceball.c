@@ -1,5 +1,5 @@
 /*
- * $Id: spaceball.c,v 1.7 2000/06/24 11:55:40 vojtech Exp $
+ * $Id: spaceball.c,v 1.8 2000/11/23 11:42:39 vojtech Exp $
  *
  *  Copyright (c) 1999-2000 Vojtech Pavlik
  *
@@ -108,10 +108,8 @@ static void spaceball_process_packet(struct spaceball* spaceball)
 
 /*
  * Spaceball 4000 FLX packets all start with a one letter packet-type decriptor,
- * and end in 0x0d. It uses '^' as an escape for 0x0d characters which can
- * occur in the axis values. ^M, ^Q and ^S all mean 0x0d, depending (I think)
- * on whether the axis value is increasing, decreasing, or same as before.
- * (I don't see why this is useful).
+ * and end in 0x0d. It uses '^' as an escape for CR, XOFF and XON characters which
+ * can occur in the axis values.
  */
 
 static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
@@ -126,7 +124,7 @@ static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigne
 			return;
 		case '^':
 			if (!spaceball->escape) {
-				spaceball->escape ^= 1;
+				spaceball->escape = 1;
 				return;
 			}
 			spaceball->escape = 0;
@@ -135,7 +133,7 @@ static void spaceball_interrupt(struct serio *serio, unsigned char data, unsigne
 		case 'S':
 			if (spaceball->escape) {
 				spaceball->escape = 0;
-				data = 0xd;
+				data &= 0x1f;
 			}
 		default:
 			if (spaceball->escape) {

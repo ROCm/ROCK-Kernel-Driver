@@ -8,8 +8,16 @@
  *    Author(s): Ingo Adlung (adlung@de.ibm.com)
  *    ChangeLog: 01/04/2001 Holger Smolinski (smolinsk@de.ibm.com)
  *                          Fixed lost interrupts and do_adapter_IO
+ *               xx/xx/xxxx nnn          multiple changes not reflected
+ *               03/12/2001 Ingo Adlung  blacklist= - changed to cio_ignore=  
+ *               03/14/2001 Ingo Adlung  disable interrupts before start_IO
+ *                                        in Path Group processing 
+ *                                       decrease retry2 on busy while 
+ *                                        disabling sync_isc; reset isc_cnt
+ *                                        on io error during sync_isc enablement
  */
 
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/kernel_stat.h>
@@ -23,7 +31,9 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
-
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#endif 
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -34,6 +44,7 @@
 #include <asm/processor.h>
 #include <asm/lowcore.h>
 #include <asm/idals.h>
+#include <asm/uaccess.h> 
 
 #include <asm/s390io.h>
 #include <asm/s390dyn.h>
@@ -47,9 +58,6 @@
 #undef  CONFIG_DEBUG_IO
 #define CONFIG_DEBUG_CRW
 
-#define REIPL_DEVID_MAGIC 0x87654321
-
-struct s390_irqaction  init_IRQ_action;
 unsigned int           highest_subchannel;
 ioinfo_t              *ioinfo_head = NULL;
 ioinfo_t              *ioinfo_tail = NULL;
@@ -58,7 +66,8 @@ ioinfo_t              *ioinfo[__MAX_SUBCHANNELS] = {
 };
 
 static atomic_t    sync_isc     = ATOMIC_INIT(-1);
-                                          // synchronous irq processing lock
+static int         sync_isc_cnt = 0;      // synchronous irq processing lock
+
 static spinlock_t  adapter_lock = SPIN_LOCK_UNLOCKED;
                                           // adapter interrupt lock
 static psw_t      io_sync_wait;           // wait PSW for sync IO, prot. by sync_isc
@@ -70,22 +79,7 @@ static irb_t     *p_init_irb        = NULL;
 static __u64      irq_IPL_TOD;
 static adapter_int_handler_t adapter_handler   = NULL;
 
-/*
- * Dummy controller type for unused interrupts
- */
-int  do_none(unsigned int irq, int cpu, struct pt_regs * regs) { return 0;}
-int  enable_none(unsigned int irq) { return(-ENODEV); }
-int  disable_none(unsigned int irq) { return(-ENODEV); }
-
-struct hw_interrupt_type no_irq_type = {
-	"none",
-	do_none,
-	enable_none,
-	disable_none
-};
-
 static void init_IRQ_handler( int irq, void *dev_id, struct pt_regs *regs);
-static int  s390_setup_irq(unsigned int irq, struct s390_irqaction * new);
 static void s390_process_subchannels( void);
 static void s390_device_recognition_all( void);
 static void s390_device_recognition_irq( int irq);
@@ -94,7 +88,10 @@ static int  s390_SenseID( int irq, senseid_t *sid, __u8 lpm);
 static int  s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid);
 static int  s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid);
 static int  s390_process_IRQ( unsigned int irq );
+static int  enable_subchannel( unsigned int irq);
 static int  disable_subchannel( unsigned int irq);
+
+void chan_proc_init( void );
 
 static inline void do_adapter_IO( __u32 intparm );
 
@@ -107,6 +104,305 @@ extern int  enable_none(unsigned int irq);
 extern int  disable_none(unsigned int irq);
 
 asmlinkage void do_IRQ( struct pt_regs regs );
+
+
+/* 
+ * "Blacklisting" of certain devices:
+ * Device numbers given in the commandline as blacklist=... won't be known to Linux
+ * These can be single devices or ranges of devices
+ *
+ * Introduced by Cornelia Huck <cohuck@de.ibm.com>
+ * Most of it shamelessly taken from dasd.c 
+ */
+
+typedef struct dev_blacklist_range_t {
+     unsigned int from;                   /* beginning of range */
+     unsigned int to;                     /* end of range */
+     struct dev_blacklist_range_t *next;  /* next range in list */
+} dev_blacklist_range_t;
+
+static dev_blacklist_range_t *dev_blacklist_range_head = NULL; /* Anchor for list of ranges */
+static spinlock_t blacklist_lock = SPIN_LOCK_UNLOCKED;
+
+/* Handling of the blacklist ranges */
+
+/* 
+ * Function: blacklist_range_create
+ * Creates a range from the given parameters
+ */
+static inline dev_blacklist_range_t *blacklist_range_create( int from, int to)
+{
+     dev_blacklist_range_t *range = NULL;
+     range = ( dev_blacklist_range_t *) alloc_bootmem( sizeof( dev_blacklist_range_t ) );
+     if (range == NULL)
+	  return NULL;
+     memset( range, 0, sizeof( dev_blacklist_range_t ));
+     range->from = from;
+     if (to == 0) {           /* only a single device is given */
+	  range->to = from;
+     } else {
+	  range->to = to;
+     }
+     return range;
+}
+
+/* 
+ * Function: blacklist_range_destroy
+ * Free the given range
+ */
+
+static inline void blacklist_range_destroy( dev_blacklist_range_t *range )
+{
+     kfree( range );
+}
+
+/*
+ * Function: blacklist_range_append
+ * Append a range to the list of blacklisted ranges anchored at dev_blacklist_range_head
+ */
+
+static inline void blacklist_range_append( dev_blacklist_range_t *range )
+{
+     dev_blacklist_range_t *temp;
+     long flags;
+
+     spin_lock_irqsave( &blacklist_lock, flags );
+     if (dev_blacklist_range_head == NULL) {
+	  dev_blacklist_range_head = range;
+     } else {
+	  for ( temp = dev_blacklist_range_head;
+		temp && temp->next;
+		temp = temp->next );
+	  temp->next = range;
+     }
+     spin_unlock_irqrestore( &blacklist_lock, flags );
+}
+
+/*
+ * Function: blacklist_range_dechain
+ * Remove a range from the list of blacklisted ranges
+ */
+
+static inline void blacklist_range_dechain( dev_blacklist_range_t *range )
+{
+     dev_blacklist_range_t *temp, *prev = NULL;
+     long flags;
+     
+     spin_lock_irqsave( &blacklist_lock, flags );
+     for ( temp = dev_blacklist_range_head; temp != NULL; temp = temp->next ) {
+	  if ( temp == range )
+	       break;
+	  prev = temp;
+     }
+     if (!temp)
+	  BUG();
+     if (prev) {
+	  prev->next = range->next;
+     } else {
+	  dev_blacklist_range_head = range->next;
+     }
+     spin_unlock_irqrestore( &blacklist_lock, flags );
+}
+
+/* 
+ * Function: blacklist_range_add
+ * Creates a range from the specified arguments and appends it to the list of
+ * blacklisted devices 
+ */
+
+static inline dev_blacklist_range_t *blacklist_range_add( int from, int to )
+{
+     dev_blacklist_range_t *temp;
+
+     temp = blacklist_range_create( from, to );
+     if (!temp) 
+	  return NULL;
+     blacklist_range_append( temp );
+     return temp;
+}
+
+/* 
+ * Function: blacklist_range_remove
+ * Removes a range from the blacklist chain
+ */
+
+static inline void blacklist_range_remove( int from, int to )
+{
+     dev_blacklist_range_t *temp;
+
+     for ( temp = dev_blacklist_range_head; 
+	   (temp->from != from) && (temp->to != to);
+	   temp = temp->next );
+     blacklist_range_dechain( temp );
+     blacklist_range_destroy( temp );
+}
+
+/* Parsing the commandline for blacklist parameters */
+
+/* 
+ * Variable to hold the blacklisted devices given by the parameter line
+ * blacklist=...
+ */
+char *blacklist[256] = {NULL, };
+
+/*
+ * Get the blacklist=... items from the parameter line
+ */
+
+static void blacklist_split_parm_string (char *str)
+{
+	char *tmp = str;
+	int count = 0;
+	do {
+		char *end;
+		int len;
+		end = strchr (tmp, ',');
+		if (end == NULL) {
+			len = strlen (tmp) + 1;
+		} else {
+			len = (long) end - (long) tmp + 1;
+			*end = '\0';
+			end++;
+		}
+		blacklist[count] = alloc_bootmem (len * sizeof (char) );
+		if (blacklist == NULL) {
+			printk (KERN_WARNING "can't store blacklist= parameter no %d\n", count + 1);
+			break;
+		}
+		memset (blacklist[count], 0, len * sizeof (char));
+		memcpy (blacklist[count], tmp, len * sizeof (char));
+		count++;
+		tmp = end;
+	} while (tmp != NULL && *tmp != '\0');
+}
+
+/*
+ * The blacklist parameters as one concatenated string
+ */
+
+static char blacklist_parm_string[1024] __initdata = {0,};
+
+
+/* 
+ * function: blacklist_strtoul
+ * Strip leading '0x' and interpret the values as Hex
+ */
+static inline int blacklist_strtoul (char *str, char **stra)
+{
+	char *temp = str;
+	int val;
+	if (*temp == '0') {
+		temp++;		                /* strip leading zero */
+		if (*temp == 'x')
+			temp++;	                /* strip leading x */
+	}
+	val = simple_strtoul (temp, &temp, 16);	/* interpret anything as hex */
+	*stra = temp;
+	return val;
+}
+
+/*
+ * Function: blacklist_parse
+ * Parse the parameters given to blacklist=... 
+ * Add the blacklisted devices to the blacklist chain
+ */
+
+static inline void blacklist_parse( char **str )
+{
+     char *temp;
+     int from, to;
+
+     while (*str) {
+	  temp = *str;
+	  from = 0;
+	  to = 0;
+	  
+	  from = blacklist_strtoul( temp, &temp );
+	  if (*temp == '-') {
+	       temp++;
+	       to = blacklist_strtoul( temp, &temp );
+	  }
+	  if (!blacklist_range_add( from, to )) {
+	       printk( KERN_WARNING "Blacklisting range from %X to %X failed!\n", from, to);
+	  }
+#ifdef CONFIG_DEBUG_IO
+	  printk( "Blacklisted range from %X to %X\n", from, to );
+#endif
+	  str++;
+     }
+}
+
+
+/*
+ * Initialisation of blacklist 
+ */
+
+void __init blacklist_init( void )
+{
+#ifdef CONFIG_DEBUG_IO     
+     printk( "Reading blacklist...\n");
+#endif
+     blacklist_split_parm_string( blacklist_parm_string );
+     blacklist_parse( blacklist );
+}
+
+
+/*
+ * Get all the blacklist parameters from parameter line
+ */
+
+void __init blacklist_setup (char *str, int *ints)
+{
+	int len = strlen (blacklist_parm_string);
+	if (len != 0) {
+		strcat (blacklist_parm_string, ",");
+	}
+	strcat (blacklist_parm_string, str);
+}
+
+int __init blacklist_call_setup (char *str)
+{
+        int dummy;
+#ifdef CONFIG_DEBUG_IO
+	printk( "Reading blacklist parameters...\n" );
+#endif
+        blacklist_setup(str,&dummy);
+	
+	blacklist_init(); /* Blacklist ranges must be ready when device recognition starts */
+       
+	return 1;
+}
+
+__setup ("cio_ignore=", blacklist_call_setup);
+
+/* Checking if devices are blacklisted */
+
+/*
+ * Function: is_blacklisted
+ * Returns 1 if the given devicenumber can be found in the blacklist, otherwise 0.
+ */
+
+static inline int is_blacklisted( int devno )
+{
+     dev_blacklist_range_t *temp;
+
+     if (dev_blacklist_range_head == NULL) {  
+	  /* no blacklist */
+	  return 0;
+     }
+
+     temp = dev_blacklist_range_head;
+     while (temp) {
+	  if ((temp->from <= devno) && (temp->to >= devno)) {
+	       return 1;                      /* Deviceno is blacklisted */
+	  }
+	  temp = temp->next;
+     }
+     return 0;
+}
+
+/* End of blacklist handling */
+
 
 void s390_displayhex(char *str,void *ptr,s32 cnt);
 
@@ -129,7 +425,7 @@ void s390_displayhex(char *str,void *ptr,s32 cnt)
 	}
 }
 
-static int __init cio_setup( char *parm, int *ints)
+static int __init cio_setup( char *parm )
 {
 	if ( !strcmp( parm, "yes") )
 	{
@@ -219,8 +515,8 @@ int s390_request_irq_special( int                      irq,
                               const char              *devname,
                               void                    *dev_id)
 {
-	int               retval;
-	struct s390_irqaction *action;
+	int		retval = 0;
+	unsigned long	flags;
 
 	if (irq >= __MAX_SUBCHANNELS)
 		return -EINVAL;
@@ -228,52 +524,42 @@ int s390_request_irq_special( int                      irq,
 	if ( !io_handler || !dev_id )
 		return -EINVAL;
 
+	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
+		return -ENODEV;
+
+
 	/*
-	 * during init_IRQ() processing we don't have memory
-	 *  management yet, thus need to use a statically
-	 *  allocated irqaction control block
+	 * The following block of code has to be executed atomically
 	 */
-	if ( init_IRQ_complete )
+	s390irq_spin_lock_irqsave( irq, flags);
+
+	if ( !ioinfo[irq]->ui.flags.ready )
 	{
-		action = (struct s390_irqaction *)
-		            kmalloc( sizeof(struct s390_irqaction),
-		                     GFP_KERNEL);
+		ioinfo[irq]->irq_desc.handler = io_handler;
+		ioinfo[irq]->irq_desc.name    = devname;
+		ioinfo[irq]->irq_desc.dev_id  = dev_id;
+		ioinfo[irq]->ui.flags.ready   = 1;
+
+		enable_subchannel(irq);
 	}
 	else
 	{
-		action = &init_IRQ_action;
+		/*
+		 *  interrupt already owned, and shared interrupts
+		 *   aren't supported on S/390.
+		 */
+		retval = -EBUSY;
 
 	} /* endif */
 
-	if (!action)
-	{
-		return -ENOMEM;
+	s390irq_spin_unlock_irqrestore(irq,flags);
 
-	} /* endif */
 
-	action->handler = io_handler;
-	action->flags   = irqflags;
-	action->name    = devname;
-	action->dev_id  = dev_id;
-
-	retval = s390_setup_irq( irq, action);
-
-	if ( init_IRQ_complete )
-	{
-		if ( !retval )
-		{
-			s390_DevicePathVerification( irq, 0 );
-		}
-		else
-		{
-			kfree(action);
-
-		} /* endif */
-
-	} /* endif */
 
 	if ( retval == 0 )
 	{
+		s390_DevicePathVerification( irq, 0 );
+
 		ioinfo[irq]->ui.flags.newreq = 1;
 		ioinfo[irq]->nopfunc         = not_oper_handler;  	
 	}
@@ -333,10 +619,9 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 	 * disable the device and reset all IRQ info if
 	 *  the IRQ is actually owned by the handler ...
 	 */
-	if ( ioinfo[irq]->irq_desc.action )
+	if ( ioinfo[irq]->ui.flags.ready )
 	{
-		if (    (dev_id == ioinfo[irq]->irq_desc.action->dev_id  )
-		     || (dev_id == (devstat_t *)REIPL_DEVID_MAGIC) )
+		if ( dev_id == ioinfo[irq]->irq_desc.dev_id  )
 		{
 			/* start deregister */
 			ioinfo[irq]->ui.flags.unready = 1;
@@ -413,14 +698,8 @@ void s390_free_irq(unsigned int irq, void *dev_id)
 		
 			} while ( ret == -EBUSY );
 
-			if ( init_IRQ_complete )
-				kfree( ioinfo[irq]->irq_desc.action );
-
-			ioinfo[irq]->irq_desc.action           = NULL;
-			ioinfo[irq]->ui.flags.ready            = 0;
-			ioinfo[irq]->irq_desc.handler->enable  = enable_none;
-			ioinfo[irq]->irq_desc.handler->disable = disable_none;
-			ioinfo[irq]->ui.flags.unready          = 0; /* deregister ended */
+			ioinfo[irq]->ui.flags.ready   = 0;
+			ioinfo[irq]->ui.flags.unready = 0; /* deregister ended */
 
 			ioinfo[irq]->nopfunc = NULL;
 
@@ -458,14 +737,11 @@ int disable_irq(unsigned int irq)
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return( -ENODEV);
 
-	s390irq_spin_lock_irqsave(irq, flags);
+	if ( !ioinfo[irq]->ui.flags.ready )
+		return -ENODEV;
 
-	/*
-	 * At this point we may actually have a pending interrupt being active
-	 * on another CPU. So don't touch the IRQ_INPROGRESS bit..
-	 */
-	ioinfo[irq]->irq_desc.status |= IRQ_DISABLED;
-	ret = ioinfo[irq]->irq_desc.handler->disable(irq);
+	s390irq_spin_lock_irqsave(irq, flags);
+	ret = disable_subchannel(irq);
 	s390irq_spin_unlock_irqrestore(irq, flags);
 
 	synchronize_irq();
@@ -481,11 +757,11 @@ int enable_irq(unsigned int irq)
 	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 		return( -ENODEV);
 
+	if ( !ioinfo[irq]->ui.flags.ready )
+		return -ENODEV;
+
 	s390irq_spin_lock_irqsave(irq, flags);
-
-	ioinfo[irq]->irq_desc.status = 0;
-	ret = ioinfo[irq]->irq_desc.handler->enable(irq);
-
+	ret = enable_subchannel(irq);
 	s390irq_spin_unlock_irqrestore(irq, flags);
 
 	return(ret);
@@ -717,48 +993,6 @@ static int disable_subchannel( unsigned int irq)
 }
 
 
-int s390_setup_irq( unsigned int irq, struct s390_irqaction * new)
-{
-	unsigned long      flags;
-	int                rc = 0;
-
-	if ( ioinfo[irq] == INVALID_STORAGE_AREA )
-	{
-		return( -ENODEV);
-   }
-
-	/*
-	 * The following block of code has to be executed atomically
-	 */
-	s390irq_spin_lock_irqsave( irq, flags);
-
-	if ( ioinfo[irq]->irq_desc.action == NULL )
-	{
-		ioinfo[irq]->irq_desc.action           = new;
-		ioinfo[irq]->irq_desc.status           = 0;
-		ioinfo[irq]->irq_desc.handler->enable  = enable_subchannel;
-		ioinfo[irq]->irq_desc.handler->disable = disable_subchannel;
-		ioinfo[irq]->irq_desc.handler->handle  = handle_IRQ_event;
-
-		ioinfo[irq]->ui.flags.ready            = 1;
-
-		ioinfo[irq]->irq_desc.handler->enable(irq);
-	}
-	else
-	{
-		/*
-		 *  interrupt already owned, and shared interrupts
-		 *   aren't supported on S/390.
-		 */
-		rc = -EBUSY;
-
-	} /* endif */
-
-	s390irq_spin_unlock_irqrestore(irq,flags);
-
-	return( rc);
-}
-
 void s390_init_IRQ( void )
 {
 	unsigned long flags;     /* PSW flags */
@@ -776,7 +1010,8 @@ void s390_init_IRQ( void )
 
 	p_init_schib = alloc_bootmem_low( sizeof(schib_t));
 	p_init_irb   = alloc_bootmem_low( sizeof(irb_t));
-
+	
+	
 	/*
 	 * As we don't know about the calling environment
 	 *  we assure running disabled. Before leaving the
@@ -844,7 +1079,7 @@ int s390_start_IO( int            irq,      /* IRQ */
 	/*
 	 * setup ORB
 	 */
-  	ioinfo[irq]->orb.intparm = (__u32)(__u64)&ioinfo[irq]->u_intparm;
+  	ioinfo[irq]->orb.intparm = (__u32)(long)&ioinfo[irq]->u_intparm;
 	ioinfo[irq]->orb.fmt     = 1;
 
 	ioinfo[irq]->orb.pfch = !(flag & DOIO_DENY_PREFETCH);
@@ -864,13 +1099,10 @@ int s390_start_IO( int            irq,      /* IRQ */
 
 #ifdef CONFIG_ARCH_S390X
 	/* 
-	 * for 64 bit we always support 64 bit IDAWs with 2k page
-	 *  size only
-	 * FIXTHEM: OSA microcode currently has problems with 4k
-         *          we would like to use 4k.
+	 * for 64 bit we always support 64 bit IDAWs with 4k page size only
 	 */
 	ioinfo[irq]->orb.c64 = 1;
-	ioinfo[irq]->orb.i2k = 1;
+	ioinfo[irq]->orb.i2k = 0;
 #endif
 
 	ioinfo[irq]->orb.cpa = (__u32)virt_to_phys( cpa);
@@ -912,7 +1144,7 @@ int s390_start_IO( int            irq,      /* IRQ */
 			 *
 			 * Note : don´t clear saved irb info in case of sense !
 			 */
-			memset( &((devstat_t *)ioinfo[irq]->irq_desc.action->dev_id)->ii.irb,
+			memset( &((devstat_t *)ioinfo[irq]->irq_desc.dev_id)->ii.irb,
 				'\0', sizeof( irb_t) );
 		} /* endif */
 
@@ -1086,7 +1318,7 @@ io_wakeup:
 		/*
 		 * initialize the device driver specific devstat irb area
 		 */
-		memset( &((devstat_t *) ioinfo[irq]->irq_desc.action->dev_id)->ii.irb,
+		memset( &((devstat_t *) ioinfo[irq]->irq_desc.dev_id)->ii.irb,
 		        '\0', sizeof( irb_t) );
 
 		/*
@@ -1178,8 +1410,8 @@ io_wakeup:
 				         ioinfo[irq]->devstat.devno );
 
 				s390_displayhex( buffer,
-		((devstat_t *)(ioinfo[irq]->irq_desc.action->dev_id))->ii.sense.data,
-		((devstat_t *)(ioinfo[irq]->irq_desc.action->dev_id))->rescnt);
+					ioinfo[irq]->irq_desc.dev_id->ii.sense.data,
+					ioinfo[irq]->irq_desc.dev_id->rescnt);
 
 			} /* endif */
 			}
@@ -1221,7 +1453,7 @@ io_wakeup:
 
 		ret = -ENODEV;
 
-		memcpy( ioinfo[irq]->irq_desc.action->dev_id,
+		memcpy( ioinfo[irq]->irq_desc.dev_id,
 		        &(ioinfo[irq]->devstat),
 		        sizeof( devstat_t) );
 
@@ -1579,7 +1811,7 @@ hio_wakeup:
 			/*
 			 * initialize the device driver specific devstat irb area
 			 */
-			memset( &((devstat_t *) ioinfo[irq]->irq_desc.action->dev_id)->ii.irb,
+			memset( &ioinfo[irq]->irq_desc.dev_id->ii.irb,
 			        '\0', sizeof( irb_t) );
 
 			/*
@@ -1840,7 +2072,7 @@ cio_wakeup:
 			/*
 			 * initialize the device driver specific devstat irb area
 			 */
-			memset( &((devstat_t *) ioinfo[irq]->irq_desc.action->dev_id)->ii.irb,
+			memset( &ioinfo[irq]->irq_desc.dev_id->ii.irb,
 			        '\0', sizeof( irb_t) );
 
 			/*
@@ -2007,7 +2239,6 @@ int s390_process_IRQ( unsigned int irq )
 	unsigned int           fctl;       /* function control */
 	unsigned int           stctl;      /* status   control */
 	unsigned int           actl;       /* activity control */
-	struct s390_irqaction *action;
 	struct pt_regs         regs;       /* for interface compatibility only */
 
 	int               issense         = 0;
@@ -2015,6 +2246,7 @@ int s390_process_IRQ( unsigned int irq )
 	int               allow4handler   = 1;
 	int               chnchk          = 0;
 	devstat_t        *dp;
+	devstat_t        *udp;
 #if 0
 	int               cpu             = smp_processor_id();
 
@@ -2029,8 +2261,8 @@ int s390_process_IRQ( unsigned int irq )
 
 	} /* endif */
 
-	action = ioinfo[irq]->irq_desc.action;
-	dp     = &ioinfo[irq]->devstat;
+	dp  = &ioinfo[irq]->devstat;
+	udp = ioinfo[irq]->irq_desc.dev_id;
 	
 
 #ifdef CONFIG_DEBUG_IO
@@ -2040,7 +2272,7 @@ int s390_process_IRQ( unsigned int irq )
 	 *  available when the device possibly becomes ready again. In
 	 *  this case we perform delayed disable_subchannel() processing.
 	 */
-	if ( action == NULL )
+	if ( !ioinfo[irq]->ui.flags.ready )
 	{
 		if ( !ioinfo[irq]->ui.flags.d_disable )
 		{
@@ -2151,7 +2383,11 @@ int s390_process_IRQ( unsigned int irq )
 
 	} /* endif */
 
-	if (    (dp->ii.irb.scsw.stctl == SCSW_STCTL_STATUS_PEND)
+	if( dp->ii.irb.scsw.ectl==0)
+	{
+		issense=0;
+	}
+	else if (    (dp->ii.irb.scsw.stctl == SCSW_STCTL_STATUS_PEND)
 	     &&	(dp->ii.irb.scsw.eswf  == 0                     ))
 	{
 		issense = 0;
@@ -2262,7 +2498,7 @@ int s390_process_IRQ( unsigned int irq )
 		/*
 		 * take fast exit if no handler is available
 		 */
-		if ( !action )
+		if ( !ioinfo[irq]->ui.flags.ready )
 			return( ending_status );     		
 
 		/*
@@ -2291,9 +2527,7 @@ int s390_process_IRQ( unsigned int irq )
 				 *  sensing. When finally calling the IRQ handler we must not overlay
 				 *  the original device status but copy the sense data only.
 				 */
-				memcpy( action->dev_id,
-				        dp,
-				        sizeof( devstat_t) );
+				memcpy( udp, dp, sizeof( devstat_t) );
 
 				s_ccw->cmd_code = CCW_CMD_BASIC_SENSE;
 				s_ccw->cda      = (__u32)virt_to_phys( ioinfo[irq]->sense_data );
@@ -2405,14 +2639,14 @@ int s390_process_IRQ( unsigned int irq )
                  "BASIC SENSE bytes avail %d\n",
                  irq, sense_count );
 #endif
-				ioinfo[irq]->ui.flags.w4sense          = 0;
-				((devstat_t *)(action->dev_id))->flag |= DEVSTAT_FLAG_SENSE_AVAIL;
-				((devstat_t *)(action->dev_id))->scnt  = sense_count;
+				ioinfo[irq]->ui.flags.w4sense = 0;
+				udp->flag |= DEVSTAT_FLAG_SENSE_AVAIL;
+				udp->scnt  = sense_count;
 
 				if ( sense_count >= 0 )
 				{
-					memcpy( ((devstat_t *)(action->dev_id))->ii.sense.data,
-					        &(ioinfo[irq]->sense_data),
+					memcpy( udp->ii.sense.data,
+					        ioinfo[irq]->sense_data,
 					        sense_count);
 				}
 				else
@@ -2430,7 +2664,7 @@ int s390_process_IRQ( unsigned int irq )
 			}
 			else
 			{
-				memcpy( action->dev_id, dp, sdevstat );
+				memcpy( udp, dp, sdevstat );
 
 			}  /* endif */
 
@@ -2456,8 +2690,8 @@ int s390_process_IRQ( unsigned int irq )
 				ioinfo[irq]->ui.flags.repall   = 0;
 				ioinfo[irq]->ui.flags.w4final  = 0;
 
-				dp->flag             |= DEVSTAT_FINAL_STATUS;
-				action->dev_id->flag |= DEVSTAT_FINAL_STATUS;
+				dp->flag  |= DEVSTAT_FINAL_STATUS;
+				udp->flag |= DEVSTAT_FINAL_STATUS;
 
 			} /* endif */
 
@@ -2486,10 +2720,10 @@ int s390_process_IRQ( unsigned int irq )
 				ioinfo[irq]->ui.flags.repall   = 0;
 				ioinfo[irq]->ui.flags.w4final  = 0;
 
-				dp->flag             |= DEVSTAT_FINAL_STATUS;
-				action->dev_id->flag |= DEVSTAT_FINAL_STATUS;
+				dp->flag  |= DEVSTAT_FINAL_STATUS;
+				udp->flag |= DEVSTAT_FINAL_STATUS;
 
-				action->handler( irq, action->dev_id, &regs );
+				ioinfo[irq]->irq_desc.handler( irq, udp, &regs );
 
 				//
 				// reset intparm after final status or we will badly present unsolicited
@@ -2521,7 +2755,7 @@ int s390_process_IRQ( unsigned int irq )
 					 */
 					if ( ret )
 					{
-						action->handler( irq, action->dev_id, &regs );
+						ioinfo[irq]->irq_desc.handler( irq, udp, &regs );
 
 					} /* endif */
 
@@ -2539,17 +2773,17 @@ int s390_process_IRQ( unsigned int irq )
 				 */
 				if ( dp->cstat & SCHN_STAT_PCI )
 				{
-					action->dev_id->flag |= DEVSTAT_PCI;
-					dp->cstat            &= ~SCHN_STAT_PCI;
+					udp->flag |= DEVSTAT_PCI;
+					dp->cstat &= ~SCHN_STAT_PCI;
 				}
 
 				if ( actl & SCSW_ACTL_SUSPENDED )
 				{
-					action->dev_id->flag |= DEVSTAT_SUSPENDED;
+					udp->flag |= DEVSTAT_SUSPENDED;
 
 				} /* endif */
 
-				action->handler( irq, action->dev_id, &regs );
+				ioinfo[irq]->irq_desc.handler( irq, udp, &regs );
 
 			} /* endif */
 
@@ -2623,16 +2857,16 @@ int s390_process_IRQ( unsigned int irq )
 		/*
 		 * take fast exit if no handler is available
 		 */
-		if ( !action )
+		if ( !ioinfo[irq]->ui.flags.ready )
 			return( ending_status );     		
 
-		memcpy( action->dev_id, &(ioinfo[irq]->devstat), sdevstat );
+		memcpy( udp, &(ioinfo[irq]->devstat), sdevstat );
 
 		ioinfo[irq]->devstat.intparm  = 0;
 
 		if ( !ioinfo[irq]->ui.flags.s_pend )
 		{
-			action->handler( irq, action->dev_id, &regs );
+			ioinfo[irq]->irq_desc.handler( irq, udp, &regs );
 
 		} /* endif */
 
@@ -2856,9 +3090,9 @@ int enable_cpu_sync_isc( int irq )
 		if ( atomic_read( &sync_isc ) != irq )
 			atomic_compare_and_swap_spin( -1, irq, &sync_isc );
 
-		ioinfo[irq]->syncnt++;
+		sync_isc_cnt++;
 		
-		if ( ioinfo[irq]->syncnt > 255 ) /* fixme : magic number */
+		if ( sync_isc_cnt > 255 ) /* fixme : magic number */
 		{
 			panic("Too many recursive calls to enable_sync_isc");
 
@@ -2866,7 +3100,7 @@ int enable_cpu_sync_isc( int irq )
 		/*
 		 * we only run the STSCH/MSCH path for the first enablement
 		 */
-		else if ( ioinfo[irq]->syncnt == 1)
+		else if ( sync_isc_cnt == 1 )
 		{
 			ioinfo[irq]->ui.flags.syncio = 1;
 
@@ -2931,9 +3165,16 @@ int enable_cpu_sync_isc( int irq )
 			} /* endif */
 
 		} /* endif */
+
+		if ( rc )	// can only happen if stsch/msch fails
+			sync_isc_cnt = 0;
 	}
 	else
 	{
+#ifdef CONFIG_SYNC_ISC_PARANOIA
+		panic( "enable_sync_isc: called with invalid %x\n", irq );
+#endif
+
 		rc = -EINVAL;
 
 	} /* endif */
@@ -2960,7 +3201,14 @@ int disable_cpu_sync_isc( int irq)
 		 *  msch() processing we may face another pending
 		 *  status we have to process recursively (sync).
 		 */
-		if ( (ioinfo[irq]->syncnt-1) == 0 )
+
+#ifdef CONFIG_SYNC_ISC_PARANOIA
+		if ( atomic_read( &sync_isc ) != irq )
+			panic( "disable_sync_isc: called for %x while %x locked\n",
+				irq, atomic_read( &sync_isc ) );
+#endif
+
+		if ( sync_isc_cnt == 1 )
 		{
 			ccode = stsch( irq, &(ioinfo[irq]->schib) );
 
@@ -2989,6 +3237,8 @@ int disable_cpu_sync_isc( int irq)
 						retry2--;
 						break;
 					case 2:
+					        retry2--;
+						udelay( 100); // give it time
 						break;
 					default:
 						retry2 = 0;
@@ -3011,20 +3261,26 @@ int disable_cpu_sync_isc( int irq)
 
 			} while ( retry1 && ccode );
 
-			ioinfo[irq]->syncnt          = 0;
 			ioinfo[irq]->ui.flags.syncio = 0;
-			
+		
+			sync_isc_cnt = 0;	
 			atomic_set( &sync_isc, -1);
 
 		}
 		else
 		{
-			ioinfo[irq]->syncnt--;
+			sync_isc_cnt--;
 
-   	} /* endif */
+		} /* endif */
 	}
 	else
 	{
+#ifdef CONFIG_SYNC_ISC_PARANOIA
+		if ( atomic_read( &sync_isc ) != -1 )
+			panic( "disable_sync_isc: called with invalid %x while %x locked\n", 
+				irq, atomic_read( &sync_isc ) );
+#endif
+
 		rc = -EINVAL;
 
 	} /* endif */
@@ -3446,7 +3702,7 @@ int read_dev_chars( int irq, void **buffer, int length )
 				rdc_ccw->flags    = CCW_FLAG_SLI;
 				set_normalized_cda( rdc_ccw, (unsigned long)rdc_buf );
 
-				memset( (devstat_t *)(ioinfo[irq]->irq_desc.action->dev_id),
+				memset( ioinfo[irq]->irq_desc.dev_id,
 				        '\0',
 				        sizeof( devstat_t));
 
@@ -3457,7 +3713,7 @@ int read_dev_chars( int irq, void **buffer, int length )
 				                     DOIO_WAIT_FOR_INTERRUPT
 				                      | DOIO_DONT_CALL_INTHDLR );
 				retry--;
-				devflag = ((devstat_t *)(ioinfo[irq]->irq_desc.action->dev_id))->flag;   
+				devflag = ioinfo[irq]->irq_desc.dev_id->flag;   
     
 				clear_normalized_cda( rdc_ccw);  
 
@@ -3579,7 +3835,7 @@ int read_conf_data( int irq, void **buffer, int *length, __u8 lpm )
 		}
 		else
 		{
-			pdevstat = ioinfo[irq]->irq_desc.action->dev_id;
+			pdevstat = ioinfo[irq]->irq_desc.dev_id;
 
 		} /* endif */
 
@@ -3998,7 +4254,6 @@ unsigned int get_devno_by_irq( int irq )
 void s390_device_recognition_irq( int irq )
 {
 	int           ret;
-	unsigned long psw_flags;
 
 	/*
 	 * We issue the SenseID command on I/O subchannels we think are
@@ -4194,7 +4449,17 @@ int s390_validate_subchannel( int irq, int enable )
 
 		if ( p_schib->pmcw.dnv )
 		{
-			if ( ioinfo[irq] == INVALID_STORAGE_AREA )
+		     if ( is_blacklisted( p_schib->pmcw.dev )) {
+			  /* 
+			   * This device must not be known to Linux. So we simply say that 
+			   * there is no device and return ENODEV.
+			   */
+#ifdef CONFIG_DEBUG_IO
+			  printk( "Blacklisted device detected at devno %04X\n", p_schib->pmcw.dev );
+#endif
+			  ret = -ENODEV;
+		     } else {
+		        if ( ioinfo[irq] == INVALID_STORAGE_AREA )
 			{	
 				if ( !init_IRQ_complete )
 				{
@@ -4213,8 +4478,6 @@ int s390_validate_subchannel( int irq, int enable )
 				memcpy( &ioinfo[irq]->schib,
 			           p_init_schib,
 			           sizeof( schib_t));
-				ioinfo[irq]->irq_desc.status  = IRQ_DISABLED;
-				ioinfo[irq]->irq_desc.handler = &no_irq_type;
 			
 				/*
 				 * We have to insert the new ioinfo element
@@ -4438,6 +4701,7 @@ int s390_validate_subchannel( int irq, int enable )
 				ret                        = -ENODEV;    	
 
 			} /* endif */
+		     }
 		}
 		else
 		{
@@ -4520,7 +4784,7 @@ int s390_SenseID( int irq, senseid_t *sid, __u8 lpm )
 	{
 		inlreq   = 0;
 		irq_ret  = 0;
-		pdevstat = ioinfo[irq]->irq_desc.action->dev_id;
+		pdevstat = ioinfo[irq]->irq_desc.dev_id;
 
   	} /* endif */
 
@@ -5045,6 +5309,8 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 	ccw1_t    *spid_ccw;    /* ccw area for SPID command */
 	devstat_t  devstat;     /* required by request_irq() */
 	devstat_t *pdevstat = &devstat;
+        unsigned long flags;
+
 
 	int        irq_ret = 0; /* return code */
 	int        retry   = 5; /* retry count */
@@ -5087,13 +5353,13 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
    }
 	else
 	{
-		pdevstat = ioinfo[irq]->irq_desc.action->dev_id;
+		pdevstat = ioinfo[irq]->irq_desc.dev_id;
 
 	} /* endif */
 
 	if ( irq_ret == 0 )
 	{
-		s390irq_spin_lock( irq);
+		s390irq_spin_lock_irqsave( irq, flags);
 
 		if ( init_IRQ_complete )
 		{
@@ -5233,7 +5499,7 @@ int s390_SetPGID( int irq, __u8 lpm, pgid_t *pgid )
 
 		} /* endif */
 
-		s390irq_spin_unlock( irq);
+		s390irq_spin_unlock_irqrestore( irq, flags);
 
 		/*
 		 * If we installed the irq action handler we have to
@@ -5301,7 +5567,7 @@ int s390_SensePGID( int irq, __u8 lpm, pgid_t *pgid )
    }
 	else
 	{
-		pdevstat = ioinfo[irq]->irq_desc.action->dev_id;
+		pdevstat = ioinfo[irq]->irq_desc.dev_id;
 
 	} /* endif */
 
@@ -5547,7 +5813,7 @@ void s390_do_crw_pending( crwe_t *pcrwe )
 					     && ( nopfunc != NULL ) )
 					{
 						
-						free_irq( irq,ioinfo[irq]->irq_desc.action->dev_id );
+						free_irq( irq,ioinfo[irq]->irq_desc.dev_id );
 						nopfunc( irq,DEVSTAT_DEVICE_GONE );			
 
 					} /* endif */
@@ -5659,10 +5925,170 @@ void
 reipl ( int sch )
 {
 	int i;
+	s390_dev_info_t dev_info;
 
-	for ( i = 0; i < highest_subchannel; i ++ ) {
-	    free_irq ( i, (void*)REIPL_DEVID_MAGIC );
+	for ( i = 0; i <= highest_subchannel; i ++ ) 
+	{
+		if (    get_dev_info_by_irq( i, &dev_info ) == 0
+                    && (dev_info.status & DEVSTAT_DEVICE_OWNED) )
+		{
+			free_irq ( i, ioinfo[i]->irq_desc.dev_id );
+		}
 	}
+
 	do_reipl( 0x10000 | sch );
 }
 
+/* Display info on subchannels in /proc/subchannels. *
+ * Adapted from procfs stuff in dasd.c by Cornelia Huck, 02/28/01.      */
+
+typedef struct {
+     char *data;
+     int len;
+} tempinfo_t;
+
+#define MIN(a,b) ((a)<(b)?(a):(b))
+
+static struct proc_dir_entry *chan_subch_entry;
+
+static int chan_subch_open( struct inode *inode, struct file *file)
+{
+     int rc = 0;
+     int size = 1;
+     int len = 0;
+     int i = 0;
+     int j = 0;
+     tempinfo_t *info;
+     
+     info = (tempinfo_t *) vmalloc( sizeof (tempinfo_t));
+     if (info == NULL) {
+	  printk( KERN_WARNING "No memory available for data\n");
+	  return -ENOMEM;
+     } else {
+	  file->private_data = ( void * ) info;
+     }
+
+     size += (highest_subchannel+1) * 128;
+     info->data = (char *) vmalloc( size );
+     
+     if (size && info->data == NULL) {
+		printk (KERN_WARNING "No memory available for data\n");
+		vfree (info);
+		return -ENOMEM;
+	}
+     
+     len += sprintf( info->data+len, 
+		     "Device sch.  Dev Type/Model CU  in use  PIM PAM POM LPUM CHPIDs\n");
+     len += sprintf( info->data+len, 
+		     "--------------------------------------------------------------------------\n");
+
+     for ( i=0; i <= highest_subchannel; i++) {
+	  if ( !((ioinfo[i] == NULL) || (ioinfo[i] == INVALID_STORAGE_AREA) || !(ioinfo[i]->ui.flags.oper)) ) {
+	       len += sprintf( info->data+len, 
+			       "%04X   %04X  ", 
+			       ioinfo[i]->schib.pmcw.dev, 
+			       i );
+	       if ( ioinfo[i]->senseid.dev_type != 0 ) {
+		    len += sprintf( info->data+len, 
+				    "%04X/%02X   %04X/%02X", 
+				    ioinfo[i]->senseid.dev_type,
+				    ioinfo[i]->senseid.dev_model, 
+				    ioinfo[i]->senseid.cu_type,
+				    ioinfo[i]->senseid.cu_model );
+	       } else {
+		    len += sprintf( info->data+len, 
+				    "%04X/%02X          ", 
+				    ioinfo[i]->senseid.cu_type, 
+				    ioinfo[i]->senseid.cu_model );
+	       }
+	       if (ioinfo[i]->ui.flags.ready) {
+		    len += sprintf( info->data+len, "  yes " );
+	       } else {
+		    len += sprintf( info->data+len, "      " );
+	       }
+	       len += sprintf( info->data+len,
+			       "    %02X  %02X  %02X  %02X   ",
+			       ioinfo[i]->schib.pmcw.pim,
+			       ioinfo[i]->schib.pmcw.pam,
+			       ioinfo[i]->schib.pmcw.pom,
+			       ioinfo[i]->schib.pmcw.lpum );
+	       for ( j=0; j < 8; j++ ) {
+		    len += sprintf( info->data+len,
+				    "%02X",
+				    ioinfo[i]->schib.pmcw.chpid[j] );
+		    if (j==3) {
+			 len += sprintf( info->data+len, " " );
+		    }
+	       }
+	       len += sprintf( info->data+len, "\n" );
+	  }
+     }
+     info->len = len;
+
+     return rc;
+}
+
+static int chan_subch_close( struct inode *inode, struct file *file)
+{
+     int rc = 0;
+     tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+
+     if (p_info) {
+	  if (p_info->data)
+	       vfree( p_info->data );
+	  vfree( p_info );
+     }
+     
+     return rc;
+}
+
+static ssize_t chan_subch_read( struct file *file, char *user_buf, size_t user_len, loff_t * offset)
+{
+     loff_t len;
+     tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+     
+     if ( *offset>=p_info->len) {
+	  return 0;
+     } else {
+	  len = MIN(user_len, (p_info->len - *offset));
+	  if (copy_to_user( user_buf, &(p_info->data[*offset]), len))
+	       return -EFAULT; 
+	  (* offset) += len;
+	  return len;
+     }
+}
+
+static struct file_operations chan_subch_file_ops =
+{
+     read:chan_subch_read,
+     open:chan_subch_open,
+     release:chan_subch_close,
+};
+
+void chan_proc_init( void )
+{
+     chan_subch_entry = create_proc_entry( "subchannels", S_IFREG|S_IRUGO, &proc_root);
+     chan_subch_entry->proc_fops = &chan_subch_file_ops;
+}
+
+__initcall(chan_proc_init);
+
+void chan_proc_cleanup( void )
+{
+     remove_proc_entry( "subchannels", &proc_root);
+}
+
+EXPORT_SYMBOL(halt_IO);
+EXPORT_SYMBOL(clear_IO);
+EXPORT_SYMBOL(do_IO);
+EXPORT_SYMBOL(resume_IO);
+EXPORT_SYMBOL(ioinfo);
+EXPORT_SYMBOL(get_dev_info_by_irq);
+EXPORT_SYMBOL(get_dev_info_by_devno);
+EXPORT_SYMBOL(get_irq_by_devno);
+EXPORT_SYMBOL(get_devno_by_irq);
+EXPORT_SYMBOL(get_irq_first);
+EXPORT_SYMBOL(get_irq_next);
+EXPORT_SYMBOL(read_conf_data);
+EXPORT_SYMBOL(read_dev_chars);
+EXPORT_SYMBOL(s390_request_irq_special);

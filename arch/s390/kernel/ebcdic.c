@@ -9,6 +9,7 @@
  *               Martin Peschke <peschke@fh-brandenburg.de>
  */
 
+#include <linux/module.h>
 #include <asm/types.h>
 
 /*
@@ -389,3 +390,11 @@ __u8 _ebc_toupper[256] =
 	0xF0, 0xF1, 0xF2, 0xF3, 0xF4, 0xF5, 0xF6, 0xF7,
 	0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF
 };
+
+EXPORT_SYMBOL_NOVERS(_ascebc_500);
+EXPORT_SYMBOL_NOVERS(_ebcasc_500);
+EXPORT_SYMBOL_NOVERS(_ascebc);
+EXPORT_SYMBOL_NOVERS(_ebcasc);
+EXPORT_SYMBOL_NOVERS(_ebc_tolower);
+EXPORT_SYMBOL_NOVERS(_ebc_toupper);
+

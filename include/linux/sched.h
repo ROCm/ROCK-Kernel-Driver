@@ -548,6 +548,8 @@ extern unsigned long prof_shift;
 
 extern void FASTCALL(__wake_up(wait_queue_head_t *q, unsigned int mode, int nr));
 extern void FASTCALL(__wake_up_sync(wait_queue_head_t *q, unsigned int mode, int nr));
+extern int FASTCALL(__wake_up_ctx(wait_queue_head_t *q, unsigned int mode, int count, int bit));
+extern int FASTCALL(__wake_up_sync_ctx(wait_queue_head_t *q, unsigned int mode, int count, int bit));
 extern void FASTCALL(sleep_on(wait_queue_head_t *q));
 extern long FASTCALL(sleep_on_timeout(wait_queue_head_t *q,
 				      signed long timeout));
@@ -566,6 +568,8 @@ extern int FASTCALL(wake_up_process(struct task_struct * tsk));
 #define wake_up_interruptible_all(x)	__wake_up((x),TASK_INTERRUPTIBLE, 0)
 #define wake_up_interruptible_sync(x)	__wake_up_sync((x),TASK_INTERRUPTIBLE, 1)
 #define wake_up_interruptible_sync_nr(x) __wake_up_sync((x),TASK_INTERRUPTIBLE,  nr)
+#define wake_up_ctx(x,count,bit)	__wake_up_ctx((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,count,bit)
+#define wake_up_sync_ctx(x,count,bit)	__wake_up_ctx((x),TASK_UNINTERRUPTIBLE | TASK_INTERRUPTIBLE,count,bit)
 asmlinkage long sys_wait4(pid_t pid,unsigned int * stat_addr, int options, struct rusage * ru);
 
 extern int in_group_p(gid_t);

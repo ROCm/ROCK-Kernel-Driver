@@ -658,7 +658,7 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 
 	case BLKFLSBUF: /* flush, 0x1261 */
 		fsync_dev(inode->i_rdev);
-		if ( suser() )invalidate_buffers(inode->i_rdev);
+		if ( capable(CAP_SYS_ADMIN) )invalidate_buffers(inode->i_rdev);
 		return 0;
 
 	case BLKRAGET: /* return the readahead value, 0x1263 */
@@ -671,7 +671,7 @@ int xpram_ioctl (struct inode *inode, struct file *filp,
 		return 0;
 
 	case BLKRASET: /* set the readahead value, 0x1262 */
-		if (!suser()) return -EACCES;
+		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
 		if (arg > 0xff) return -EINVAL; /* limit it */
 		read_ahead[MAJOR(inode->i_rdev)] = arg;
                 atomic_eieio();

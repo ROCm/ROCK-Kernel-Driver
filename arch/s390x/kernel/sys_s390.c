@@ -123,7 +123,7 @@ extern asmlinkage int sys_select(int, fd_set *, fd_set *, fd_set *, struct timev
  *
  * This is really horribly ugly.
  */
-asmlinkage int sys_ipc (uint call, int first, int second, 
+asmlinkage int sys_ipc (uint call, int first, long second, 
                         unsigned long third, void *ptr)
 {
         struct ipc_kludge tmp;

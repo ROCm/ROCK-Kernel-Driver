@@ -4,11 +4,12 @@
  *  drivers/s390/char/tapeblock.c
  *    block device frontend for tape device driver
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
+ *
  ****************************************************************************
  */
 
@@ -22,6 +23,7 @@
 #include <asm/s390dyn.h>
 #include <linux/compatmac.h>
 #ifdef MODULE
+#define __NO_VERSION__
 #include <linux/module.h>
 #endif
 #include "tape.h"
@@ -51,6 +53,21 @@ static void tape_request_fn (void);
 
 static request_queue_t* tapeblock_getqueue (kdev_t kdev);
 
+#ifdef CONFIG_DEVFS_FS
+void
+tapeblock_mkdevfstree (tape_info_t* tape) {
+    tape->devfs_block_dir=devfs_mk_dir (tape->devfs_dir, "block", tape);
+    tape->devfs_disc=devfs_register(tape->devfs_block_dir, "disc",DEVFS_FL_DEFAULT,
+				    tapeblock_major, tape->blk_minor,
+				    TAPEBLOCK_DEFAULTMODE, &tapeblock_fops, tape);
+}
+
+void
+tapeblock_rmdevfstree (tape_info_t* tape) {
+    devfs_unregister(tape->devfs_disc);
+    devfs_unregister(tape->devfs_block_dir);
+}
+#endif
 
 void 
 tapeblock_setup(tape_info_t* tape) {
@@ -59,9 +76,12 @@ tapeblock_setup(tape_info_t* tape) {
     hardsect_size[tapeblock_major][tape->blk_minor]=512;
     blk_init_queue (&tape->request_queue, tape_request_fn); 
     blk_queue_headactive (&tape->request_queue, 0); 
+#ifdef CONFIG_DEVFS_FS
+    tapeblock_mkdevfstree(tape);
+#endif
 }
 
-void
+int
 tapeblock_init(void) {
     int result;
     tape_frontend_t* blkfront,*temp;
@@ -69,7 +89,11 @@ tapeblock_init(void) {
 
     tape_init();
     /* Register the tape major number to the kernel */
+#ifdef CONFIG_DEVFS_FS
+    result = devfs_register_blkdev(tapeblock_major, "tBLK", &tapeblock_fops);
+#else
     result = register_blkdev(tapeblock_major, "tBLK", &tapeblock_fops);
+#endif
     if (result < 0) {
         PRINT_WARN(KERN_ERR "tape: can't get major %d for block device\n", tapeblock_major);
         panic ("cannot get major number for tape block device");
@@ -89,6 +113,10 @@ tapeblock_init(void) {
     blkfront = kmalloc(sizeof(tape_frontend_t),GFP_KERNEL);
     if (blkfront==NULL) panic ("no mem for tape block device structure");
     blkfront->device_setup=tapeblock_setup;
+#ifdef CONFIG_DEVFS_FS
+    blkfront->mkdevfstree = tapeblock_mkdevfstree;
+    blkfront->rmdevfstree = tapeblock_rmdevfstree;
+#endif
     blkfront->next=NULL;
     if (first_frontend==NULL) {
 	first_frontend=blkfront;
@@ -103,6 +131,7 @@ tapeblock_init(void) {
 	tapeblock_setup(tape);
 	tape=tape->next;
     }
+    return 0;
 }
 
 
@@ -111,7 +140,7 @@ tapeblock_uninit(void) {
     unregister_blkdev(tapeblock_major, "tBLK");
 }
 
-static int
+int
 tapeblock_open(struct inode *inode, struct file *filp) {
     tape_info_t *ti;
     kdev_t dev;
@@ -140,7 +169,7 @@ tapeblock_open(struct inode *inode, struct file *filp) {
         ti->position=-1;
         
 	s390irq_spin_unlock_irqrestore (ti->devinfo.irq, lockflags);
-    rc=tapeblock_mediumdetect(ti);
+        rc=tapeblock_mediumdetect(ti);
         if (rc) return rc; // in case of errors, we don't have a size of the medium
 	dev = MKDEV (tapeblock_major, MINOR (inode->i_rdev));	/* Get the device */
 	s390irq_spin_lock_irqsave (ti->devinfo.irq, lockflags);
@@ -155,12 +184,10 @@ tapeblock_open(struct inode *inode, struct file *filp) {
 	return 0;
 }
 
-static int
+int
 tapeblock_release(struct inode *inode, struct file *filp) {
 	long lockflags;
 	tape_info_t *ti,*lastti;
-
-	inode = filp->f_dentry->d_inode;
 	ti = first_tape_info;
 	while ((ti != NULL) && (ti->blk_minor != MINOR (inode->i_rdev)))
 		ti = (tape_info_t *) ti->next;
@@ -177,7 +204,7 @@ tapeblock_release(struct inode *inode, struct file *filp) {
 	}
 	if ((ti == NULL) || (tapestate_get (ti) != TS_IDLE)) {
 #ifdef TAPE_DEBUG
-	debug_text_event (tape_debug_area,6,"b:notidle!");
+	debug_text_event (tape_debug_area,3,"b:notidle!");
 #endif
 		return -ENXIO;	/* error in tape_release */
 	}
@@ -191,6 +218,7 @@ tapeblock_release(struct inode *inode, struct file *filp) {
 #ifdef MODULE
 	MOD_DEC_USE_COUNT;
 #endif				/* MODULE */
+	invalidate_buffers(inode->i_rdev);
 	return 0;
 }
 
@@ -226,7 +254,7 @@ tapeblock_end_request(tape_info_t* tape) {
     tape->discipline->free_bread(tape->cqr,tape);
     tape->cqr=NULL;
     tape->current_request=NULL;
-    tapestate_set(tape,TS_IDLE);
+    if (tapestate_get(tape)!=TS_NOT_OPER) tapestate_set(tape,TS_IDLE);
     return;
 }
 
@@ -258,7 +286,17 @@ tapeblock_exec_IO (tape_info_t* tape) {
 	tapeblock_end_request (tape); // check state, inform user, free mem, dev=idl
     }
     if (tape->cqr!=NULL) BUG(); // tape should be idle now, request should be freed!
-    if (list_empty(&tape->request_queue.queue_head)) { // nothing more to do ;)
+    if (tapestate_get (tape) == TS_NOT_OPER) {
+	tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	tape->devinfo.irq=-1;
+	return;
+    }
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
+	if (list_empty (&tape->request_queue.queue_head)) {
+#else
+	if (tape->request_queue==NULL) {
+#endif
+	// nothing more to do or device has dissapeared;)
 #ifdef TAPE_DEBUG
 	debug_text_event (tape_debug_area,6,"b:Qempty");
 #endif
@@ -342,8 +380,9 @@ schedule_tapeblock_exec_IO (tape_info_t *tape)
         if (atomic_compare_and_swap(0,1,&tape->bh_scheduled)) {
                 return;
         }
-
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
 	INIT_LIST_HEAD(&tape->bh_tq.list);
+#endif
 	tape->bh_tq.sync = 0;
 	tape->bh_tq.routine = (void *) (void *) run_tapeblock_exec_IO;
 	tape->bh_tq.data = tape;
@@ -376,13 +415,14 @@ static request_queue_t* tapeblock_getqueue (kdev_t kdev) {
     return NULL;
 }
 
-static int tapeblock_mediumdetect(tape_info_t* tape) {
-    ccw_req_t* cqr;
+int tapeblock_mediumdetect(tape_info_t* tape) {
+        ccw_req_t* cqr;
     int losize=1,hisize=1,rc;
     long lockflags;
 #ifdef TAPE_DEBUG
     debug_text_event (tape_debug_area,3,"b:medDet");
 #endif
+    PRINT_WARN("Detecting media size. This will take _long_, so get yourself a coffee...\n");
     while (1) { //is interruped by break
 	hisize=hisize << 1; // try twice the size tested before 
 	cqr=tape->discipline->mtseek (tape, hisize);
@@ -414,6 +454,12 @@ static int tapeblock_mediumdetect(tape_info_t* tape) {
 		tapestate_set (tape, TS_IDLE);
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
 		break;
+	}
+	if (tapestate_get (tape) == TS_NOT_OPER) {
+	    tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	    tape->devinfo.irq=-1;
+	    s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+	    return -ENODEV;
 	}
 	if (tapestate_get (tape) != TS_DONE) {
 		tapestate_set (tape, TS_IDLE);
@@ -449,6 +495,12 @@ static int tapeblock_mediumdetect(tape_info_t* tape) {
 	s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
 	return -EIO;
     }
+    if (tapestate_get (tape) == TS_NOT_OPER) {
+	tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	tape->devinfo.irq=-1;
+	s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+	return -ENODEV;
+    }
     if (tapestate_get (tape) != TS_DONE) {
 	tapestate_set (tape, TS_IDLE);
 	s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
@@ -482,6 +534,12 @@ static int tapeblock_mediumdetect(tape_info_t* tape) {
 		return -ERESTARTSYS;
 	}
 	s390irq_spin_lock_irqsave (tape->devinfo.irq, lockflags);
+	if (tapestate_get (tape) == TS_NOT_OPER) {
+	    tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	    tape->devinfo.irq=-1;
+	    s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+	    return -ENODEV;
+	}
 	if (tapestate_get (tape) == TS_FAILED) {
 		tapestate_set (tape, TS_IDLE);
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);

@@ -10,6 +10,8 @@
  * 07/13/00 Added fixup sections for diagnoses ans saved some registers
  * 07/14/00 fixed constraints in newly generated inline asm
  * 10/05/00 adapted to 'new' DASD driver
+ *          fixed return codes of dia250()
+ *          fixed partition handling and HDIO_GETGEO
  */
 
 #include <linux/stddef.h>
@@ -73,10 +75,11 @@ dia210 (void *devchar)
 static __inline__ int
 dia250 (void *iob, int cmd)
 {
-	int rc;
-
-	__asm__ __volatile__ ("    lr    1,%1\n"
-			      "    diag  1,%2,0x250\n"
+ 	__asm__ __volatile__ ("    lr    0,%1\n"
+                              "    diag  0,%0,0x250\n"
+                              "0:  ipm   %0\n"
+                              "    srl   %0,28\n"
+ 			      "    or    %0,1\n"
 			      "1:\n"
 			      ".section .fixup,\"ax\"\n"
 			      "2:  lhi   %0,3\n"
@@ -87,12 +90,12 @@ dia250 (void *iob, int cmd)
 			      ".previous\n"
 			      ".section __ex_table,\"a\"\n"
 			      "    .align 4\n"
-			      "    .long 1b,2b\n"
-			      ".previous\n"
-			      :"=d"   (rc)
-			      :"d"    ((void *) __pa (iob)), "0" (cmd)
-			      :"1");
-	return rc;
+                              "    .long 0b,2b\n"
+                              ".previous\n"
+                              : "+d" (cmd)
+                              : "d" ((void *) __pa (iob))
+                              : "0", "1", "cc" );
+ 	return cmd;
 }
 
 static __inline__ int
@@ -112,7 +115,7 @@ mdsk_init_io (dasd_device_t * device, int blocksize, int offset, int size)
 
 	rc = dia250 (iib, INIT_BIO);
 
-	return rc;
+	return rc&3;
 }
 
 static __inline__ int
@@ -125,7 +128,7 @@ mdsk_term_io (dasd_device_t * device)
 	memset (iib, 0, sizeof (diag_init_io_t));
 	iib->dev_nr = device->devinfo.devno;
 	rc = dia250 (iib, TERM_BIO);
-	return rc;
+	return rc&3;
 }
 
 int
@@ -153,7 +156,12 @@ dasd_start_diag (ccw_req_t * cqr)
 		check_then_set (&cqr->status,
 					       CQR_STATUS_QUEUED,
 					       CQR_STATUS_ERROR);
-	} else {
+        } else if (rc == 0 ) {                                     
+               check_then_set(&cqr->status,        
+                                             CQR_STATUS_QUEUED,   
+                                             CQR_STATUS_DONE);    
+               dasd_schedule_bh(device);                                
+	 } else {
 		if (cqr->expires) {
 			cqr->expires += cqr->startclk;
 		}
@@ -250,13 +258,14 @@ dasd_diag_check_characteristics (struct dasd_device_t *device)
 		   "Null device pointer passed to characteristics checker\n");
 		return -ENODEV;
 	}
-	if (device->private == NULL) {
-                device->private = kmalloc (sizeof (dasd_diag_private_t), GFP_KERNEL);
-                if (device->private == NULL) {
-                        printk (KERN_WARNING PRINTK_HEADER
-                                "memory allocation failed for private data\n");
-                        return -ENOMEM;
-                }
+	if (device->private != NULL) {
+                kfree (device->private);
+        } 
+        device->private = kmalloc (sizeof (dasd_diag_private_t), GFP_KERNEL);
+        if (device->private == NULL) {
+                printk (KERN_WARNING PRINTK_HEADER
+                        "memory allocation failed for private data\n");
+                return -ENOMEM;
 	}
 	private = (dasd_diag_private_t *) device->private;
 	rdc_data = (void *) &(private->rdc_data);
@@ -304,7 +313,7 @@ dasd_diag_check_characteristics (struct dasd_device_t *device)
 		if (cqr == NULL) {
 			printk (KERN_WARNING PRINTK_HEADER
                                 "No memory to allocate initialization request\n");
-                        free_page(private->label);
+                        free_page((long)private->label);
                         kfree(private);
                         device->private = NULL;
                         return -ENOMEM;
@@ -319,7 +328,7 @@ dasd_diag_check_characteristics (struct dasd_device_t *device)
 		memset (iob, 0, sizeof (diag_rw_io_t));
 		iob->dev_nr = rdc_data->dev_nr;
 		iob->block_count = 1;
-		iob->interrupt_params = cqr;
+		iob->interrupt_params = (u32)cqr;
 		iob->bio_list = __pa (bio);
 		rc = dia250 (iob, RW_BIO);
 		if (rc == 0) {
@@ -354,19 +363,26 @@ dasd_diag_check_characteristics (struct dasd_device_t *device)
 static int
 dasd_diag_do_analysis (struct dasd_device_t *device)
 {
-	int sb;
 	dasd_diag_private_t *private = (dasd_diag_private_t *) device->private;
 
 	long *label = private->label;
 
 	/* real size of the volume */
 	device->sizes.blocks = label[7];
+        if (private->rdc_data.vdev_class == DEV_CLASS_FBA) {
+		device->sizes.pt_block = 1;
+	} else if (private->rdc_data.vdev_class == DEV_CLASS_ECKD ||
+		   private->rdc_data.vdev_class == DEV_CLASS_CKD) {
+		device->sizes.pt_block = 2;
+	} else {
+		return -EINVAL;
+        }
 	printk (KERN_INFO PRINTK_HEADER
 		"/dev/%s (%04X): capacity (%dkB blks): %ldkB\n",
 		device->name, device->devinfo.devno,
 		(device->sizes.bp_block >> 10),
 		(device->sizes.blocks << device->sizes.s2b_shift) >> 1);
-        free_page(private->label);
+        free_page((long)private->label);
 	return 0;
 }
 
@@ -393,14 +409,6 @@ dasd_diag_fill_geometry (struct dasd_device_t *device, struct hd_geometry *geo)
 	geo->cylinders = cyls;
 	geo->heads = 16;
 	geo->sectors = 128 >> device->sizes.s2b_shift;
-	if (private->rdc_data.vdev_class == DEV_CLASS_FBA) {
-		geo->start = 1;
-	} else if (private->rdc_data.vdev_class == DEV_CLASS_ECKD ||
-		   private->rdc_data.vdev_class == DEV_CLASS_CKD) {
-		geo->start = 2;
-	} else {
-		return -EINVAL;
-	}
 	return rc;
 }
 
@@ -482,7 +490,7 @@ dasd_diag_build_cp_from_req (dasd_device_t * device, struct request *req)
 		}
 	}
 	rw_cp->device = device;
-	rw_cp->expires = 5 * 0xf424000;		/* 5 seconds */
+	rw_cp->expires = 50 * TOD_SEC;		/* 50 seconds */
 	rw_cp->req = req;
 	check_then_set (&rw_cp->status, CQR_STATUS_EMPTY, CQR_STATUS_FILLED);
 	return rw_cp;
@@ -507,6 +515,7 @@ dasd_discipline_t dasd_diag_discipline =
 {
 	name:"DIAG",
 	ebcname:"DIAG",
+	max_blocks:PAGE_SIZE/sizeof(diag_bio_t),
 	check_characteristics:dasd_diag_check_characteristics,
 	do_analysis:dasd_diag_do_analysis,
 	fill_geometry:dasd_diag_fill_geometry,

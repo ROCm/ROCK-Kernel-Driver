@@ -1,20 +1,20 @@
-all: s390-net.o
+#
+# S/390 network devices
+#
 
-CFLAGS += 
 O_TARGET := s390-net.o
 
-obj-y    := iucv.o
+list-multi := ctc.o
+export-objs := iucv.o
 
-ifeq ($(CONFIG_CTC),y)
-  obj-y += ctcmain.o fsm.o
-else
-  ifeq ($(CONFIG_CTC),m)
-  obj-m += ctc.o
-ctc.o: ctcmain.o fsm.o
-	$(LD) -r ctcmain.o fsm.o -o $@
-  endif
-endif
+ctc-objs := ctcmain.o ctctty.o fsm.o
 
-obj-$(CONFIG_IUCV) += iucv.o netiucv.o
+obj-y += iucv.o
+obj-$(CONFIG_CTC) += ctc.o
+obj-$(CONFIG_IUCV) += netiucv.o
 
 include $(TOPDIR)/Rules.make
+
+ctc.o: $(ctc-objs)
+	$(LD) -r -o $@ $(ctc-objs)
+

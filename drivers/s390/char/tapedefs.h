@@ -1,19 +1,19 @@
 /***********************************************************************
  *  drivers/s390/char/tapedefs.h
- *    tape device driver for S/390 tapes.
+ *    tape device driver for S/390 and zSeries tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s):  Carsten Otte <cotte@de.ibm.com>
+ *                Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress... :-)
+ *
  ***********************************************************************
  */
 
-#define TAPE_DEBUG
-#define CONFIG_S390_TAPE_DYNAMIC //use dyn. dev. attach/detach
-#define TAPEBLOCK_RETRIES 20
+#define TAPE_DEBUG               // use s390 debug feature
+#define CONFIG_S390_TAPE_DYNAMIC // allow devices to be attached or detached on the fly
+#define TAPEBLOCK_RETRIES 20     // number of retries, when a block-dev request fails.
 
 
 /* Kernel Version Compatibility section */
@@ -36,8 +36,11 @@ tape_dequeue_request( request_queue_t * q, struct request *req )
         blkdev_dequeue_request (req);
 }
 #else 
+#define s390_dev_info_t dev_info_t
 typedef struct request *request_queue_t;
+#ifndef init_waitqueue_head
 #define init_waitqueue_head(x) do { *x = NULL; } while(0)
+#endif
 #define blk_init_queue(x,y) do {} while(0)
 #define blk_queue_headactive(x,y) do {} while(0)
 #define INIT_BLK_DEV(d_major,d_request_fn,d_queue_fn,d_current) \

@@ -21,7 +21,7 @@
 #include <linux/stddef.h>
 #include <linux/unistd.h>
 #include <linux/ptrace.h>
-#include <linux/malloc.h>
+#include <linux/slab.h>
 #include <linux/user.h>
 #include <linux/a.out.h>
 #include <linux/tty.h>
@@ -38,10 +38,13 @@
 #include <asm/system.h>
 #include <asm/smp.h>
 #include <asm/mmu_context.h>
+#include <asm/cpcmd.h>
 
 /*
  * Machine setup..
  */
+unsigned long memory_size = 0;
+unsigned long machine_flags = 0;
 __u16 boot_cpu_addr;
 int cpus_initialized = 0;
 unsigned long cpu_initialized = 0;
@@ -50,16 +53,7 @@ volatile int __cpu_logical_map[NR_CPUS]; /* logical cpu to cpu address */
 /*
  * Setup options
  */
-
-#ifdef CONFIG_BLK_DEV_RAM
-extern int rd_doload;                  /* 1 = load ramdisk, 0 = don't load */
-extern int rd_prompt;           /* 1 = prompt for ramdisk, 0 = don't prompt*/
-extern int rd_image_start;             /* starting block # of image        */
-#endif
-
-extern int root_mountflags;
 extern int _text,_etext, _edata, _end;
-
 
 /*
  * This is set up by the setup-routine at boot-time
@@ -205,18 +199,9 @@ void __init setup_arch(char **cmdline_p)
 	       "We are running under VM\n" :
 	       "We are running native\n");
 
-        ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
-#ifdef CONFIG_BLK_DEV_RAM
-        rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
-        rd_prompt = ((RAMDISK_FLAGS & RAMDISK_PROMPT_FLAG) != 0);
-        rd_doload = ((RAMDISK_FLAGS & RAMDISK_LOAD_FLAG) != 0);
-#endif
-	/* nasty stuff with PARMAREAs. we use head.S or parameterline
-	  if (!MOUNT_ROOT_RDONLY)
-	  root_mountflags &= ~MS_RDONLY;
-	*/
+        ROOT_DEV = to_kdev_t(0x0100);
         memory_start = (unsigned long) &_end;    /* fixit if use $CODELO etc*/
-	memory_end = MEMORY_SIZE;                /* detected in head.s */
+	memory_end = memory_size;                /* detected in head.s */
         init_mm.start_code = PAGE_OFFSET;
         init_mm.end_code = (unsigned long) &_etext;
         init_mm.end_data = (unsigned long) &_edata;
@@ -303,9 +288,6 @@ void __init setup_arch(char **cmdline_p)
          * bootmem allocator with an invalid RAM area.
          */
         reserve_bootmem(start_pfn << PAGE_SHIFT, bootmap_size);
-
-
-
 
 #ifdef CONFIG_BLK_DEV_INITRD
         if (INITRD_START) {

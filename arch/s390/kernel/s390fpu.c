@@ -57,10 +57,9 @@ int save_fp_regs1(s390_fp_regs *fpregs)
 
 void save_fp_regs(s390_fp_regs *fpregs)
 {
-#if CONFIG_IEEEFPU_EMULATION
+#if CONFIG_MATHEMU
 	s390_fp_regs *currentfprs;
-#endif
-#if CONFIG_IEEEFPU_EMULATION
+
 	if(!save_fp_regs1(fpregs))
 	{
 		currentfprs=&current->thread.fp_regs;
@@ -119,11 +118,9 @@ int restore_fp_regs1(s390_fp_regs *fpregs)
 
 void restore_fp_regs(s390_fp_regs *fpregs)
 {
-#if CONFIG_IEEEFPU_EMULATION
+#if CONFIG_MATHEMU
 	s390_fp_regs *currentfprs;
-#endif
 
-#if CONFIG_IEEEFPU_EMULATION
 	if(!restore_fp_regs1(fpregs))
 	{
 		currentfprs=&current->thread.fp_regs;
@@ -138,15 +135,4 @@ void restore_fp_regs(s390_fp_regs *fpregs)
 	restore_fp_regs1(fpregs);
 #endif
 }
-
-
-
-
-
-
-
-
-
-
-
 

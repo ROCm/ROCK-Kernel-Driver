@@ -4,12 +4,11 @@
  *  drivers/s390/char/tape34xx.h
  *    common tape device discipline for 34xx tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
  ****************************************************************************
  */
 
@@ -85,6 +84,31 @@
 #define CONTROL_UNIT_END DEV_STAT_CU_END      /* redefine from irq.h */
 #define INCORR_LEN       SCHN_STAT_INCORR_LEN /* redefine from irq.h */
 
+#define SENSE_COMMAND_REJECT        0x80
+#define SENSE_INTERVENTION_REQUIRED 0x40
+#define SENSE_BUS_OUT_CHECK         0x20
+#define SENSE_EQUIPMENT_CHECK       0x10
+#define SENSE_DATA_CHECK            0x08
+#define SENSE_OVERRUN               0x04
+#define SENSE_DEFERRED_UNIT_CHECK   0x02
+#define SENSE_ASSIGNED_ELSEWHERE    0x01
+
+#define SENSE_LOCATE_FAILURE        0x80
+#define SENSE_DRIVE_ONLINE          0x40
+#define SENSE_RESERVED              0x20
+#define SENSE_RECORD_SEQUENCE_ERR   0x10
+#define SENSE_BEGINNING_OF_TAPE     0x08
+#define SENSE_WRITE_MODE            0x04
+#define SENSE_WRITE_PROTECT         0x02
+#define SENSE_NOT_CAPABLE           0x01
+
+#define SENSE_CHANNEL_ADAPTER_CODE  0xE0
+#define SENSE_CHANNEL_ADAPTER_LOC   0x10
+#define SENSE_REPORTING_CU          0x08
+#define SENSE_AUTOMATIC_LOADER      0x04
+#define SENSE_TAPE_SYNC_MODE        0x02
+#define SENSE_TAPE_POSITIONING      0x01
+
 typedef struct _tape34xx_disc_data_t {
     __u8 modeset_byte;
 } tape34xx_disc_data_t  __attribute__ ((packed, aligned(8)));
@@ -130,33 +154,30 @@ void tape34xx_free_bwrite (ccw_req_t*,struct _tape_info_t*);
 void tape34xx_default_handler (tape_info_t * tape);
 void tape34xx_unexpect_uchk_handler (tape_info_t * tape);
 void tape34xx_unused_done(tape_info_t* tape);
-void tape34xx_unused_error(tape_info_t* tape);
 void tape34xx_idle_done(tape_info_t* tape);
-void tape34xx_idle_error(tape_info_t* tape);
 void tape34xx_block_done(tape_info_t* tape);
-void tape34xx_block_error(tape_info_t* tape);
 void tape34xx_bsf_init_done(tape_info_t* tape);
 void tape34xx_dse_init_done(tape_info_t* tape);
 void tape34xx_fsf_init_done(tape_info_t* tape);
-void tape34xx_fsf_init_error(tape_info_t* tape);
 void tape34xx_bsb_init_done(tape_info_t* tape);
 void tape34xx_fsb_init_done(tape_info_t* tape);
 void tape34xx_lbl_init_done(tape_info_t* tape);
-void tape34xx_lbl_init_error(tape_info_t* tape);
 void tape34xx_nop_init_done(tape_info_t* tape);
 void tape34xx_rfo_init_done(tape_info_t* tape);
-void tape34xx_rfo_init_error(tape_info_t* tape);
 void tape34xx_rbi_init_done(tape_info_t* tape);
 void tape34xx_rew_init_done(tape_info_t* tape);
-void tape34xx_rew_init_error(tape_info_t* tape);
 void tape34xx_rew_release_init_done(tape_info_t* tape);
-void tape34xx_rew_release_init_error(tape_info_t* tape);
 void tape34xx_run_init_done(tape_info_t* tape);
-void tape34xx_run_init_error(tape_info_t* tape);
 void tape34xx_wri_init_done(tape_info_t* tape);
-void tape34xx_wri_init_error(tape_info_t* tape);
 void tape34xx_wtm_init_done(tape_info_t* tape);
-void tape34xx_wtm_init_error(tape_info_t* tape);
 
 extern void schedule_tapeblock_exec_IO (tape_info_t *tape);
+
+// the error recovery stuff:
+void tape34xx_error_recovery (tape_info_t* tape);
+void tape34xx_error_recovery_has_failed (tape_info_t* tape,int error_id);
+void tape34xx_error_recovery_succeded(tape_info_t* tape);
+void tape34xx_error_recovery_do_retry(tape_info_t* tape);
+void tape34xx_error_recovery_read_opposite (tape_info_t* tape);
+void  tape34xx_error_recovery_HWBUG (tape_info_t* tape,int condno);
 #endif // _TAPE34XX_H

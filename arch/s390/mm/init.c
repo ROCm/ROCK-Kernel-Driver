@@ -35,27 +35,13 @@
 #include <asm/pgalloc.h>
 #include <asm/dma.h>
 #include <asm/lowcore.h>
+#include <asm/tlb.h>
+
 
 static unsigned long totalram_pages;
 
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving an inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
-char  empty_bad_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
-pte_t empty_bad_pte_table[PTRS_PER_PTE] __attribute__((__aligned__(PAGE_SIZE)));
 
 static int test_access(unsigned long loc)
 {
@@ -84,53 +70,6 @@ static int test_access(unsigned long loc)
 	return rc;
 }
 
-static pte_t * get_bad_pte_table(void)
-{
-	pte_t v;
-	int i;
-
-	v = pte_mkdirty(mk_pte_phys(__pa(empty_bad_page), PAGE_SHARED));
-
-	for (i = 0; i < PAGE_SIZE/sizeof(pte_t); i++)
-		empty_bad_pte_table[i] = v;
-
-	return empty_bad_pte_table;
-}
-
-static inline void invalidate_page(pte_t *pte)
-{
-        int i;
-        for (i=0;i<PTRS_PER_PTE;i++)
-                pte_clear(pte++);
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-        unsigned long pte;
-
-        pte = (unsigned long) __get_free_page(GFP_KERNEL);
-        if (pmd_none(*pmd)) {
-                if (pte) {
-                        invalidate_page((pte_t*) pte);
-                        pmd_val(pmd[0]) = _PAGE_TABLE + __pa(pte);
-                        pmd_val(pmd[1]) = _PAGE_TABLE + __pa(pte)+1024;
-                        pmd_val(pmd[2]) = _PAGE_TABLE + __pa(pte)+2048;
-                        pmd_val(pmd[3]) = _PAGE_TABLE + __pa(pte)+3072;
-                        return (pte_t *) pte + offset;
-                }
-		pte = (unsigned long) get_bad_pte_table();
-                pmd_val(pmd[0]) = _PAGE_TABLE + __pa(pte);
-                pmd_val(pmd[1]) = _PAGE_TABLE + __pa(pte)+1024;
-                pmd_val(pmd[2]) = _PAGE_TABLE + __pa(pte)+2048;
-                pmd_val(pmd[3]) = _PAGE_TABLE + __pa(pte)+3072;
-                return NULL;
-        }
-        free_page(pte);
-        if (pmd_bad(*pmd))
-		BUG();
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
         int freed = 0;
@@ -139,9 +78,9 @@ int do_check_pgt_cache(int low, int high)
                         if(pgd_quicklist)
                                 free_pgd_slow(get_pgd_fast()), freed += 2;
                         if(pmd_quicklist)
-                                free_pmd_slow(get_pmd_fast()), freed++;
+                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0)), freed++;
                         if(pte_quicklist)
-                                free_pte_slow(get_pte_fast()), freed++;
+                                pte_free_slow(pte_alloc_one_fast(NULL, 0)), freed++;
                 } while(pgtable_cache_size > low);
         }
         return freed;

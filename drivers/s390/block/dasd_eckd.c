@@ -15,6 +15,8 @@
  * 10/10/00 reverted last change according to ESS exploitation
  * 10/10/00 now dequeuing init_cqr before freeing *ouch*
  * 26/10/00 fixed ITPM20144ASC (problems when accesing a device formatted by VIF)
+ * 01/23/01 fixed kmalloc statement in dump_sense to be GFP_ATOMIC
+ *          fixed partition handling and HDIO_GETGEO
  */
 
 #include <linux/config.h>
@@ -40,6 +42,8 @@
 #undef PRINTK_HEADER
 #endif				/* PRINTK_HEADER */
 #define PRINTK_HEADER DASD_NAME"(eckd): "
+#undef DASD_CDL // Support compatible disk layout
+#undef CDL_PRINTK
 
 #define ECKD_C0(i) (i->home_bytes)
 #define ECKD_F(i) (i->formula)
@@ -52,36 +56,21 @@
 #define ECKD_F7(i) (i->factor7)
 #define ECKD_F8(i) (i->factor8)
 
-#define DASD_ECKD_CCW_WRITE 0x05
-#define DASD_ECKD_CCW_READ 0x06
-#define DASD_ECKD_CCW_WRITE_HOME_ADDRESS 0x09
-#define DASD_ECKD_CCW_READ_HOME_ADDRESS 0x0a
-#define DASD_ECKD_CCW_WRITE_KD 0x0d
-#define DASD_ECKD_CCW_READ_KD 0x0e
-#define DASD_ECKD_CCW_READ_COUNT 0x12
-#define DASD_ECKD_CCW_WRITE_RECORD_ZERO 0x15
-#define DASD_ECKD_CCW_READ_RECORD_ZERO 0x16
-#define DASD_ECKD_CCW_WRITE_CKD 0x1d
-#define DASD_ECKD_CCW_READ_CKD 0x1e
-#define DASD_ECKD_CCW_LOCATE_RECORD 0x47
-#define DASD_ECKD_CCW_DEFINE_EXTENT 0x63
-#define DASD_ECKD_CCW_WRITE_MT 0x85
-#define DASD_ECKD_CCW_READ_MT 0x86
-#define DASD_ECKD_CCW_WRITE_KD_MT 0x8d
-#define DASD_ECKD_CCW_READ_KD_MT 0x8e
-#define DASD_ECKD_CCW_RELEASE 0x94
-#define DASD_ECKD_CCW_READ_CKD_MT 0x9e
-#define DASD_ECKD_CCW_WRITE_CKD_MT 0x9d
-#define DASD_ECKD_CCW_RESERVE 0xB4
-
 dasd_discipline_t dasd_eckd_discipline;
 
 typedef struct
 dasd_eckd_private_t {
 	dasd_eckd_characteristics_t rdc_data;
 	dasd_eckd_confdata_t conf_data;
+#ifdef DASD_CDL
+        eckd_count_t count_area[5];
+#else
 	eckd_count_t count_area;
+#endif
 	ccw_req_t *init_cqr;
+#ifdef DASD_CDL
+        int uses_cdl; 
+#endif
 } dasd_eckd_private_t;
 
 #ifdef CONFIG_DASD_DYNAMIC
@@ -91,25 +80,36 @@ devreg_t dasd_eckd_known_devices[] =
 	{
 		ci:
 		{hc:
-		 {ctype:0x3990, dtype:0x3390}},
-		flag:DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE,
+		 {ctype:0x3990}},
+		flag: (DEVREG_MATCH_CU_TYPE |
+                       DEVREG_NO_DEV_INFO| 
+                       DEVREG_TYPE_DEVCHARS),
 		oper_func:dasd_oper_handler
 	},
 	{
 		ci:
 		{hc:
-		 {ctype:0x3990, dtype:0x3380}},
-		flag:DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE,
+		 {ctype:0x2105}},
+		flag:(DEVREG_MATCH_CU_TYPE |
+                       DEVREG_NO_DEV_INFO| 
+                       DEVREG_TYPE_DEVCHARS),
 		oper_func:dasd_oper_handler
 	},
 	{
 		ci:
 		{hc:
-		 {ctype:0x9343, dtype:0x9345}},
-		flag:DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE,
+		 {ctype:0x9343}},
+		flag:(DEVREG_MATCH_CU_TYPE |
+                       DEVREG_NO_DEV_INFO| 
+                       DEVREG_TYPE_DEVCHARS),
 		oper_func:dasd_oper_handler
 	}
 };
+#endif
+
+#ifdef DASD_CDL
+int sizes_trk0[]={28,148,84};
+#define LABEL_SIZE 140
 #endif
 
 static inline unsigned int
@@ -210,6 +210,7 @@ recs_per_track (dasd_eckd_characteristics_t * rdc,
 	return rpt;
 }
 
+
 static inline void
 define_extent (ccw1_t * de_ccw,
 	       DE_eckd_data_t * data,
@@ -269,7 +270,11 @@ define_extent (ccw1_t * de_ccw,
 		break;
 	}
 	data->attributes.mode = 0x3;
-	if (private->rdc_data.cu_type == 0x2105) {
+	if (private->rdc_data.cu_type == 0x2105 
+#ifdef DASD_CDL
+            && !(private->uses_cdl && trk < 2)
+#endif
+            ) {
 		data->reserved |= 0x40;
 	}
 	data->beg_ext.cyl = beg.cyl;
@@ -296,6 +301,9 @@ locate_record (ccw1_t * lo_ccw,
 	{trk / (geo.head), trk % (geo.head)};
 	int sector;
 
+#ifdef CDL_PRINTK
+        printk ("Locate: trk %d, rec %d, no_rec %d, cmd %d, reclen %d\n",trk,rec_on_trk,no_rec,cmd,reclen);
+#endif
 	memset (lo_ccw, 0, sizeof (ccw1_t));
 	lo_ccw->cmd_code = DASD_ECKD_CCW_LOCATE_RECORD;
 	lo_ccw->count = 16;
@@ -411,13 +419,14 @@ dasd_eckd_check_characteristics (struct dasd_device_t *device)
 		   "Null device pointer passed to characteristics checker\n");
 		return -ENODEV;
 	}
+        if (device->private != NULL) {
+                kfree(device->private);
+        }
+        device->private = kmalloc (sizeof (dasd_eckd_private_t), GFP_KERNEL);
         if (device->private == NULL) {
-                device->private = kmalloc (sizeof (dasd_eckd_private_t), GFP_KERNEL);
-                if (device->private == NULL) {
-                        printk (KERN_WARNING PRINTK_HEADER
-                                "memory allocation failed for private data\n");
-                        return -ENOMEM;
-                }
+                printk (KERN_WARNING PRINTK_HEADER
+                        "memory allocation failed for private data\n");
+                return -ENOMEM;
         }
 	private = (dasd_eckd_private_t *) device->private;
 	rdc_data = (void *) &(private->rdc_data);
@@ -468,6 +477,22 @@ dasd_eckd_check_characteristics (struct dasd_device_t *device)
 	return 0;
 }
 
+#ifdef DASD_CDL
+static inline int
+dasd_eckd_cdl_reclen (dasd_device_t* device,int recid) {
+        dasd_eckd_private_t *private = (dasd_eckd_private_t *) device->private;
+        int byt_per_blk = device->sizes.bp_block;
+        int blk_per_trk = recs_per_track (&(private->rdc_data), 0, byt_per_blk);
+        if (recid < 3) 
+                return sizes_trk0[recid];
+        if (recid < blk_per_trk)
+                return byt_per_blk;
+        if (recid < 2*blk_per_trk )
+                return LABEL_SIZE;
+        return byt_per_blk;
+}
+#endif
+
 static ccw_req_t *
 dasd_eckd_init_analysis (struct dasd_device_t *device)
 {
@@ -476,9 +501,20 @@ dasd_eckd_init_analysis (struct dasd_device_t *device)
 	DE_eckd_data_t *DE_data;
 	LO_eckd_data_t *LO_data;
 	dasd_eckd_private_t *private = (dasd_eckd_private_t *) device->private;
+#ifdef DASD_CDL
+        eckd_count_t *count_data = private->count_area;
+#else
 	eckd_count_t *count_data = &(private->count_area);
-
-	cqr = ccw_alloc_request (dasd_eckd_discipline.name, 3 + 1, sizeof (DE_eckd_data_t) + sizeof (LO_eckd_data_t));
+#endif
+#ifdef DASD_CDL
+        cqr = ccw_alloc_request (dasd_eckd_discipline.name, 8 + 1, 
+                                 sizeof (DE_eckd_data_t) + 
+                                 2*sizeof (LO_eckd_data_t));
+#else
+	cqr = ccw_alloc_request (dasd_eckd_discipline.name, 3 + 1, 
+                                 sizeof (DE_eckd_data_t) + 
+                                 sizeof (LO_eckd_data_t));
+#endif
 	if (cqr == NULL) {
 		printk (KERN_WARNING PRINTK_HEADER
 			"No memory to allocate initialization request\n");
@@ -489,72 +525,159 @@ dasd_eckd_init_analysis (struct dasd_device_t *device)
 	DE_data = cqr->data;
 	LO_data = cqr->data + sizeof (DE_eckd_data_t);
 	ccw = cqr->cpaddr;
+#ifdef DASD_CDL
+        define_extent (ccw, DE_data, 0, 2, DASD_ECKD_CCW_READ_COUNT, device);
+#else
 	define_extent (ccw, DE_data, 0, 0, DASD_ECKD_CCW_READ_COUNT, device);
+#endif
 	ccw->flags |= CCW_FLAG_CC;
 	ccw++;
+#ifdef DASD_CDL
+        locate_record (ccw, LO_data++, 0, 0, 4, DASD_ECKD_CCW_READ_COUNT, device, 0);
+#else
 	locate_record (ccw, LO_data, 0, 0, 1, DASD_ECKD_CCW_READ_COUNT, device, 0);
+#endif
+#ifdef DASD_CDL
 	ccw->flags |= CCW_FLAG_CC;
 	ccw++;
 	ccw->cmd_code = DASD_ECKD_CCW_READ_COUNT;
 	ccw->count = 8;
-	set_normalized_cda (ccw, __pa (count_data));
+        set_normalized_cda (ccw, __pa (count_data++));
+        ccw->flags |= CCW_FLAG_CC;
+        ccw++;
+        ccw->cmd_code = DASD_ECKD_CCW_READ_COUNT;
+        ccw->count = 8;
+        set_normalized_cda (ccw, __pa (count_data++));
+        ccw->flags |= CCW_FLAG_CC;
+        ccw++;
+        ccw->cmd_code = DASD_ECKD_CCW_READ_COUNT;
+        ccw->count = 8;
+        set_normalized_cda (ccw, __pa (count_data++));
+        ccw->flags |= CCW_FLAG_CC;
+        ccw++;
+        ccw->cmd_code = DASD_ECKD_CCW_READ_COUNT;
+        ccw->count = 8;
+        set_normalized_cda (ccw, __pa (count_data++));
+        ccw->flags |= CCW_FLAG_CC;
+        ccw++;
+        locate_record (ccw, LO_data++, 2, 0, 1, DASD_ECKD_CCW_READ_COUNT, device, 0);
+#endif
+        ccw->flags |= CCW_FLAG_CC;
+        ccw++;
+        ccw->cmd_code = DASD_ECKD_CCW_READ_COUNT;
+        ccw->count = 8;
+        set_normalized_cda (ccw, __pa (count_data));
 	cqr->device = device;
 	cqr->retries = 0;
 	cqr->status = CQR_STATUS_FILLED;
-
 	return cqr;
 }
 
 static int
 dasd_eckd_do_analysis (struct dasd_device_t *device)
 {
-	int rc = 0;
 	int sb, rpt;
 	dasd_eckd_private_t *private = (dasd_eckd_private_t *) device->private;
-	int bs = private->count_area.dl;
+        eckd_count_t *count_area = NULL;
+        char *cdl_msg;
+#ifdef DASD_CDL /* BAD HACK SO FIX ME UP */
+        int i;
+        private -> uses_cdl = 1;
 
+        /* Free the cqr and cleanup device->sizes */
+        dasd_chanq_deq (&device->queue, private->init_cqr);
+        ccw_free_request (private->init_cqr);
+        private->init_cqr = NULL;
+        memset (&(device->sizes), 0, sizeof (dasd_sizes_t));
+        /* Check Track 0 for Compatible Disk Layout */
+        for (i = 0; i < 3; i++) { 
+                if ((i < 3) &&
+                    ((private->count_area[i].kl != 4) ||
+                     (private->count_area[i].dl != 
+                      dasd_eckd_cdl_reclen (device,i) - 4))) {
+                        private -> uses_cdl = 0;
+                        break;
+                } 
+        }
+        if ( i == 3 ) {
+                count_area = &private->count_area[4];
+        }
+        if (private->uses_cdl == 0) { 
+                for (i = 0; i < 5; i++) {
+                        if ((private->count_area[i].kl != 0) ||
+                            (private->count_area[i].dl != 
+                             private->count_area[0].dl)) {
+                                break;
+                        }
+                }
+                if ( i == 5 ) {
+                        count_area = &private->count_area[0];
+                }
+        } else {
+                if (private->count_area[3].record == 1) {
+                        DASD_MESSAGE(KERN_WARNING,device,"%s",
+                                     "Trk 0: no records after VTOC!");
+                }
+        }
+        if (count_area != NULL && /* we found notthing violating our disk layout */
+            count_area ->kl == 0) { 
+                /* find out blocksize */
+                switch (count_area->dl) {
+                case 512:
+                case 1024:
+                case 2048:
+                case 4096:
+                        device->sizes.bp_block = count_area->dl;
+                        break;
+                }
+        }
+#else
 	dasd_chanq_deq (&device->queue, private->init_cqr);
 	ccw_free_request (private->init_cqr);
 	private->init_cqr = NULL;
 	memset (&(device->sizes), 0, sizeof (dasd_sizes_t));
-	switch (bs) {
+	switch (private->count_area.dl) {
 	case 512:
 	case 1024:
 	case 2048:
 	case 4096:
-		device->sizes.bp_block = bs;
+		device->sizes.bp_block = private->count_area.dl;
 		break;
-	default:
-		printk (KERN_INFO PRINTK_HEADER
-			"/dev/%s (%04X): invalid blocksize %d\n"
-			KERN_INFO PRINTK_HEADER
-		 "/dev/%s (%04X): capacity (at 4kB blks): %dkB at %dkB/trk\n",
-			device->name, device->devinfo.devno, bs,
-			device->name, device->devinfo.devno,
-		   (private->rdc_data.no_cyl * private->rdc_data.trk_per_cyl *
-		    recs_per_track (&private->rdc_data, 0, 4096)),
-			recs_per_track (&private->rdc_data, 0, 4096));
-		return -EMEDIUMTYPE;
 	}
+#endif
+        if ( device->sizes.bp_block == 0 ) {
+                DASD_MESSAGE(KERN_WARNING, device,"%s\n",
+                             "Volume has incompatible disk layout");
+                return -EMEDIUMTYPE;
+        }
 	device->sizes.s2b_shift = 0;	/* bits to shift 512 to get a block */
-	for (sb = 512; sb < bs; sb = sb << 1)
+        device->sizes.pt_block = 2;
+	for (sb = 512; sb < device->sizes.bp_block; sb = sb << 1)
 		device->sizes.s2b_shift++;
 
 	rpt = recs_per_track (&private->rdc_data, 0, device->sizes.bp_block);
-	device->sizes.blocks = (private->rdc_data.no_cyl * private->rdc_data.trk_per_cyl *
-	      recs_per_track (&private->rdc_data, 0, device->sizes.bp_block));
-
-	printk (KERN_INFO PRINTK_HEADER
-		"/dev/%s (%04X): capacity (%dkB blks): %dkB at %dkB/trk\n",
-		device->name, device->devinfo.devno,
-		(device->sizes.bp_block >> 10),
-		(private->rdc_data.no_cyl * private->rdc_data.trk_per_cyl *
-	      recs_per_track (&private->rdc_data, 0, device->sizes.bp_block) *
-		 (device->sizes.bp_block >> 9)) >> 1,
-		(recs_per_track (&private->rdc_data, 0, device->sizes.bp_block) * device->sizes.bp_block) >> 10);
+	device->sizes.blocks = (private->rdc_data.no_cyl * 
+                                private->rdc_data.trk_per_cyl *
+                                recs_per_track (&private->rdc_data, 0, 
+                                                device->sizes.bp_block));
+#ifdef DASD_CDL
+        cdl_msg = private->uses_cdl?"compatible disk layout":"classic disk layout";
+#else
+        cdl_msg = "classic disk layout";
+#endif           
+                  
+        DASD_MESSAGE(KERN_INFO,device,"(%dkB blks): %dkB at %dkB/trk %s",
+                     (device->sizes.bp_block >> 10),
+                     (private->rdc_data.no_cyl * 
+                      private->rdc_data.trk_per_cyl *
+                      recs_per_track (&private->rdc_data, 0, 
+                                      device->sizes.bp_block) *
+                      (device->sizes.bp_block >> 9)) >> 1,
+                     (recs_per_track (&private->rdc_data, 0, 
+                                      device->sizes.bp_block) * 
+                      device->sizes.bp_block) >> 10,
+                     cdl_msg);
 	return 0;
-
-	return rc;
 }
 
 static int
@@ -574,7 +697,6 @@ dasd_eckd_fill_geometry (struct dasd_device_t *device, struct hd_geometry *geo)
 	geo->cylinders = private->rdc_data.no_cyl;
 	geo->heads = private->rdc_data.trk_per_cyl;
 	geo->sectors = recs_per_track (&(private->rdc_data), 0, device->sizes.bp_block);
-	geo->start = 2;
 	return rc;
 }
 
@@ -600,6 +722,9 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 	int head = trk % private->rdc_data.trk_per_cyl;
 	int wrccws = rpt;
 	int datasize = sizeof (DE_eckd_data_t) + sizeof (LO_eckd_data_t);
+#ifdef DASD_CDL
+        int formatCDL=0;
+#endif
 
 	if (((fdata->stop_unit == DASD_FORMAT_DEFAULT_STOP_UNIT) &&
 	 trk >= (private->rdc_data.no_cyl * private->rdc_data.trk_per_cyl)) ||
@@ -623,7 +748,15 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 	case 0x01:
 	case 0x03:
 	case 0x04:		/* make track invalid */
+                break;
+#ifdef DASD_CDL /* Format compatible disk Layout */
+        case 0x08:
+        case 0x09:
+        case 0x0b:
+        case 0x0c:
+                formatCDL=1;
 		break;
+#endif
 	default:
 		printk (KERN_WARNING PRINTK_HEADER "Invalid flags 0x%x...terminating!\n", flags);
 		return NULL;
@@ -678,6 +811,7 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 
 		switch (flags) {
 		case 0x03:
+                case 0x0b:
 			define_extent (last_ccw, DE_data, trk, trk,
 				    DASD_ECKD_CCW_WRITE_HOME_ADDRESS, device);
 			last_ccw->flags |= CCW_FLAG_CC;
@@ -688,6 +822,7 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 			last_ccw++;
 			break;
 		case 0x01:
+                case 0x09:
 			define_extent (last_ccw, DE_data, trk, trk,
 				     DASD_ECKD_CCW_WRITE_RECORD_ZERO, device);
 			last_ccw->flags |= CCW_FLAG_CC;
@@ -699,6 +834,7 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 			memset (r0_data, 0, sizeof (eckd_count_t));
 			break;
 		case 0x00:
+                case 0x08:
 			define_extent (last_ccw, DE_data, trk, trk,
 				       DASD_ECKD_CCW_WRITE_CKD, device);
 			last_ccw->flags |= CCW_FLAG_CC;
@@ -710,6 +846,7 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 			last_ccw++;
 			break;
 		case 0x04:
+                case 0x0c:
 			define_extent (last_ccw, DE_data, trk, trk,
 				       DASD_ECKD_CCW_WRITE_CKD, device);
 			last_ccw->flags |= CCW_FLAG_CC;
@@ -747,7 +884,29 @@ dasd_eckd_format_device (dasd_device_t * device, format_data_t * fdata)
 			(ct_data + i)->head = head;
 			(ct_data + i)->record = i + 1;
 			(ct_data + i)->kl = 0;
-			(ct_data + i)->dl = bs;
+#ifdef DASD_CDL
+                        if (formatCDL) { 
+                            // special handling when formatting CDL
+                            switch (trk) {
+                            case 0:
+                                if (i<3) {
+                                    (ct_data + i)->kl = 4;
+                                    (ct_data + i)->dl = sizes_trk0[i]-4;
+                                } else 
+                                    (ct_data + i)->dl = bs;
+                                break;
+                            case 1:
+                                (ct_data + i)->kl = 44;
+                                (ct_data + i)->dl = LABEL_SIZE-44;
+                                break;
+                            default:
+                                (ct_data + i)->dl = bs;
+                                break;
+                            }
+                        }
+                        else
+#endif                            
+                        (ct_data + i)->dl = bs;
 			last_ccw->cmd_code = DASD_ECKD_CCW_WRITE_CKD;
 			last_ccw->flags |= CCW_FLAG_CC | CCW_FLAG_SLI;
 			last_ccw->count = 8;
@@ -791,7 +950,7 @@ dasd_eckd_erp_action (ccw_req_t * cqr)
 	switch (device->devinfo.sid_data.cu_type) {
 	case 0x3990:
 	case 0x2105:
-                /*  return dasd_3990_erp_action; */
+		return dasd_3990_erp_action;
 	case 0x9343:
                 /* Return dasd_9343_erp_action; */
 	default:
@@ -802,12 +961,41 @@ dasd_eckd_erp_action (ccw_req_t * cqr)
 static dasd_erp_postaction_fn_t
 dasd_eckd_erp_postaction (ccw_req_t * cqr)
 {
-	if (cqr->function != default_erp_action)
-                printk (KERN_WARNING PRINTK_HEADER
-                        "unknown ERP action [<%p>]\n",
-                        cqr->function);
 	return default_erp_postaction;
 }
+
+
+#ifdef DASD_CDL
+inline unsigned char
+dasd_eckd_cdl_cmd(dasd_device_t *device,int recid,int cmd) {
+    dasd_eckd_private_t *private = (dasd_eckd_private_t *) device->private;
+    int byt_per_blk = device->sizes.bp_block;
+    int blk_per_trk = recs_per_track (&(private->rdc_data), 0, byt_per_blk);
+    switch (cmd) {
+    case READ:
+        if (recid < 3) 
+            return DASD_ECKD_CCW_READ_KD_MT;
+        if (recid < blk_per_trk)
+            return DASD_ECKD_CCW_READ_MT;
+        if (recid < 2*blk_per_trk)
+            return DASD_ECKD_CCW_READ_KD_MT;
+        return DASD_ECKD_CCW_READ_MT;
+        break;
+    case WRITE:
+        if (recid < 3)
+            return DASD_ECKD_CCW_WRITE_KD_MT;
+        if (recid < blk_per_trk)
+            return DASD_ECKD_CCW_WRITE_MT;
+        if (recid < 2*blk_per_trk)
+            return DASD_ECKD_CCW_WRITE_KD_MT;
+        return DASD_ECKD_CCW_WRITE_MT;
+        break;
+    default:
+        BUG();
+    }
+    return 0; // never executed
+}
+#endif
 
 static ccw_req_t *
 dasd_eckd_build_cp_from_req (dasd_device_t * device, struct request *req)
@@ -826,6 +1014,11 @@ dasd_eckd_build_cp_from_req (dasd_device_t * device, struct request *req)
 	int blk_per_trk = recs_per_track (&(private->rdc_data), 0, byt_per_blk);
 	int btrk = (req->sector >> shift) / blk_per_trk;
 	int etrk = ((req->sector + req->nr_sectors - 1) >> shift) / blk_per_trk;
+#ifdef DASD_CDL
+        int recid = req->sector >> shift;
+        int locate4k_set=0;
+        int nlocs=0;
+#endif
 
 	if (req->cmd == READ) {
 		rw_cmd = DASD_ECKD_CCW_READ_MT;
@@ -845,43 +1038,123 @@ dasd_eckd_build_cp_from_req (dasd_device_t * device, struct request *req)
 		else
 			bhct++;
 	}
-
+#ifndef DASD_CDL
 	rw_cp = dasd_alloc_request (dasd_eckd_discipline.name,
 				    2 + bhct + 1,
 				    sizeof (DE_eckd_data_t) +
 				    sizeof (LO_eckd_data_t));
+#else
+        if (btrk<2 && private->uses_cdl) {
+            nlocs+= 2*blk_per_trk-recid;
+            if (etrk<2)
+                nlocs-=2*blk_per_trk-((req->sector + req->nr_sectors - 1) >> shift);
+        }
+        rw_cp = dasd_alloc_request (dasd_eckd_discipline.name,
+                                    2 + nlocs + bhct + 1,
+                                    sizeof (DE_eckd_data_t) +
+                                    (1+nlocs)*sizeof (LO_eckd_data_t));
+#endif
 	if (!rw_cp) {
 		return NULL;
 	}
 	DE_data = rw_cp->data;
 	LO_data = rw_cp->data + sizeof (DE_eckd_data_t);
 	ccw = rw_cp->cpaddr;
-
 	define_extent (ccw, DE_data, btrk, etrk, rw_cmd, device);
 	ccw->flags |= CCW_FLAG_CC;
+#ifndef DASD_CDL
 	ccw++;
-	locate_record (ccw, LO_data, btrk, (req->sector >> shift) % blk_per_trk + 1,
-	    req->nr_sectors >> shift, rw_cmd, device, device->sizes.bp_block);
+        locate_record (ccw, LO_data, btrk, (req->sector >> shift) % blk_per_trk + 1,
+                       req->nr_sectors >> shift, rw_cmd, device, device->sizes.bp_block);
 	ccw->flags |= CCW_FLAG_CC;
+#endif
 	for (bh = req->bh; bh != NULL;) {
 		if (bh->b_size > byt_per_blk) {
 			for (size = 0; size < bh->b_size; size += byt_per_blk) {
+#ifdef DASD_CDL
+                                if (!locate4k_set) {
+                                    // we need to chain a locate record before our rw-ccw
+                                    ccw++;
+                                    if ((recid/blk_per_trk)<2 && private->uses_cdl) {
+                                        /* Do a locate record for our special blocks */
+                                        locate_record (ccw, LO_data++, recid/blk_per_trk, 
+                                                       recid % blk_per_trk + 1, 1, 
+                                                       dasd_eckd_cdl_cmd(device,recid,req->cmd), 
+                                                       device, 
+                                                       dasd_eckd_cdl_reclen(device,recid));
+                                    } else {
+                                        // Do a locate record for standard blocks */
+                                        locate_record (ccw, LO_data++, recid/blk_per_trk,
+                                                       recid % blk_per_trk + 1, 
+                                                       (((req->sector + req->nr_sectors) >> shift)-recid),
+                                                       rw_cmd,device, device->sizes.bp_block);
+                                        locate4k_set=1;
+                                    }                                        
+                                    ccw->flags |= CCW_FLAG_CC;
+                                }
+#endif
 				ccw++;
+#ifndef DASD_CDL
 				ccw->flags |= CCW_FLAG_CC;
-				ccw->cmd_code = rw_cmd;
-				ccw->count = byt_per_blk;
-				set_normalized_cda (ccw, __pa (bh->b_data + size));
+				ccw->cmd_code= rw_cmd;
+				ccw->count = bh->b_size;
+#else
+                                ccw->flags |= CCW_FLAG_CC;
+                                ccw->cmd_code=locate4k_set?rw_cmd:
+                                    dasd_eckd_cdl_cmd(device,recid,req->cmd);
+                                ccw->count =locate4k_set?bh->b_size:
+                                    dasd_eckd_cdl_reclen(device,recid);
+#endif
+				set_normalized_cda (ccw, __pa (bh->b_data));
+				size += bh->b_size;
+				bh = bh->b_reqnext;
+#ifdef DASD_CDL
+                                recid++;
+#endif
 			}
 			bh = bh->b_reqnext;
 		} else {	/* group N bhs to fit into byt_per_blk */
 			for (size = 0; bh != NULL && size < byt_per_blk;) {
+#ifdef DASD_CDL
+                                if (!locate4k_set) {
+                                    // we need to chain a locate record before our rw-ccw
+                                    ccw++;
+                                    if ((recid/blk_per_trk)<2 && private->uses_cdl) {
+                                        /* Do a locate record for our special blocks */
+                                        locate_record (ccw, LO_data++, recid/blk_per_trk, 
+                                                       recid % blk_per_trk + 1, 1, 
+                                                       dasd_eckd_cdl_cmd(device,recid,req->cmd), 
+                                                       device, 
+                                                       dasd_eckd_cdl_reclen(device,recid));
+                                    } else {
+                                        // Do a locate record for standard blocks */
+                                        locate_record (ccw, LO_data++, recid/blk_per_trk,
+                                                       recid % blk_per_trk + 1, 
+                                                       (((req->sector + req->nr_sectors) >> shift)-recid),
+                                                       rw_cmd,device, device->sizes.bp_block);
+                                        locate4k_set=1;
+                                    }                                        
+                                    ccw->flags |= CCW_FLAG_CC;
+                                }
+#endif
 				ccw++;
+#ifndef DASD_CDL
 				ccw->flags |= CCW_FLAG_DC;
-				ccw->cmd_code = rw_cmd;
+				ccw->cmd_code= rw_cmd;
 				ccw->count = bh->b_size;
+#else
+                                ccw->flags |= locate4k_set?CCW_FLAG_DC:CCW_FLAG_CC;
+                                ccw->cmd_code=locate4k_set?rw_cmd:
+                                    dasd_eckd_cdl_cmd(device,recid,req->cmd);
+                                ccw->count =locate4k_set?bh->b_size:
+                                    dasd_eckd_cdl_reclen(device,recid);
+#endif
 				set_normalized_cda (ccw, __pa (bh->b_data));
 				size += bh->b_size;
 				bh = bh->b_reqnext;
+#ifdef DASD_CDL
+                                recid++;
+#endif
 			}
 			if (size != byt_per_blk) {
 				PRINT_WARN ("Cannot fulfill small request %ld vs. %d (%ld sects)\n",
@@ -1000,14 +1273,13 @@ dasd_eckd_find_cmd (ccw_req_t * cqr, int cmd)
 ccw_req_t *
 dasd_eckd_merge_cp ( dasd_device_t *device )
 {
-        ccw_req_t * cqr;
         return NULL;
 }
 
 static char *
 dasd_eckd_dump_sense (struct dasd_device_t *device, ccw_req_t * req)
 {
-	char *page = (char *) get_free_page (GFP_KERNEL);
+	char *page = (char *) get_free_page (GFP_ATOMIC);
 	devstat_t *stat = &device->dev_status;
 	char *sense = stat->ii.sense.data;
 	int len, sl, sct;
@@ -1027,13 +1299,13 @@ dasd_eckd_dump_sense (struct dasd_device_t *device, ccw_req_t * req)
             ccw1_t *act = req -> cpaddr;
             int i = req -> cplength;
             do {
-#if 0
+#ifdef ERP_DEBUB
                 printk ( KERN_INFO "CCW %p: %08X %08X\n", 
                          act,((int*)act)[0],((int*)act)[1]);
                 printk ( KERN_INFO "DAT: %08X %08X %08X %08X\n", 
                          ((int*)act->cda)[0],((int*)act->cda)[1],
                          ((int*)act->cda)[2],((int*)act->cda)[3]);
-#endif
+#endif /* ERP_DEBUG */
                 act ++;
             } while ( --i );
         }
@@ -1071,6 +1343,7 @@ dasd_discipline_t dasd_eckd_discipline =
 {
 	name:"ECKD",
 	ebcname:"ECKD",
+	max_blocks:255,
 	id_check:dasd_eckd_id_check,
 	check_characteristics:dasd_eckd_check_characteristics,
 	init_analysis:dasd_eckd_init_analysis,
@@ -1101,14 +1374,12 @@ dasd_eckd_init (void)
         {
 	int i;
 	for (i = 0; i < sizeof (dasd_eckd_known_devices) / sizeof (devreg_t); i++) {
-		printk (KERN_INFO PRINTK_HEADER
-			"We are interested in: CU %04X/%02x DEV: %04X/%02Xi\n",
+                printk (KERN_INFO PRINTK_HEADER
+                        "We are interested in: CU %04X/%02x\n",
 			dasd_eckd_known_devices[i].ci.hc.ctype,
-			dasd_eckd_known_devices[i].ci.hc.cmode,
-			dasd_eckd_known_devices[i].ci.hc.dtype,
-			dasd_eckd_known_devices[i].ci.hc.dmode);
+			dasd_eckd_known_devices[i].ci.hc.cmode);
 		s390_device_register (&dasd_eckd_known_devices[i]);
-	}
+        }
         }
 #endif				/* CONFIG_DASD_DYNAMIC */
 	return rc;
@@ -1123,12 +1394,10 @@ dasd_eckd_cleanup( void ) {
 	int i;
         for ( i=0; i<sizeof(dasd_eckd_known_devices)/sizeof(devreg_t); i++) {
 		printk (KERN_INFO PRINTK_HEADER
-			"We are interested in: CU %04X/%02x DEV: %04X/%02Xi\n",
+			"We were interested in: CU %04X/%02x\n",
 			dasd_eckd_known_devices[i].ci.hc.ctype,
-			dasd_eckd_known_devices[i].ci.hc.cmode,
-			dasd_eckd_known_devices[i].ci.hc.dtype,
-			dasd_eckd_known_devices[i].ci.hc.dmode);
-		s390_device_register(&dasd_eckd_known_devices[i]);
+			dasd_eckd_known_devices[i].ci.hc.cmode);
+		s390_device_unregister(&dasd_eckd_known_devices[i]);
 	}
         } 
 #endif /* CONFIG_DASD_DYNAMIC */

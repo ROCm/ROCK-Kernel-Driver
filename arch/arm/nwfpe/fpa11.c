@@ -1,6 +1,6 @@
 /*
     NetWinder Floating Point Emulator
-    (c) Rebel.com, 1998-1999
+    (c) Rebel.COM, 1998,1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -46,8 +46,8 @@ void resetFPA11(void)
     fpa11->fType[i] = typeNone;
   }
   
-  /* FPSR: set system id to FP_EMULATOR, clear all other bits */
-  fpa11->fpsr = FP_EMULATOR;
+  /* FPSR: set system id to FP_EMULATOR, set AC, clear all other bits */
+  fpa11->fpsr = FP_EMULATOR | BIT_AC;
   
   /* FPCR: set SB, AB and DA bits, clear all others */
 #if MAINTAIN_FPCR

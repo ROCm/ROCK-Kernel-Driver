@@ -15,6 +15,8 @@
 #include <linux/tty_driver.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
+#include <linux/devfs_fs_kernel.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 
@@ -184,29 +186,13 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 	struct tty_struct *tty = hwc_tty_data.tty;
 
 	if (tty != NULL) {
-
-		if (count == 2 && (
-		/* hat is 0xb0 in codepage 037 (US etc.) and thus */
-		/* converted to 0x5e in ascii ('^') */
-					  strncmp (buf, "^c", 2) == 0 ||
-		/* hat is 0xb0 in several other codepages (German, */
-		/* UK, ...) and thus converted to ascii octal 252 */
-					  strncmp (buf, "\0252c", 2) == 0)) {
+		char *cchar;
+		if ((cchar = ctrlchar_handle (buf, count, tty))) {
+			if (cchar == (char *) -1)
+				return;
 			tty->flip.count++;
 			*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-			*tty->flip.char_buf_ptr++ = INTR_CHAR (tty);
-		} else if (count == 2 && (
-						 strncmp (buf, "^d", 2) == 0 ||
-					   strncmp (buf, "\0252d", 2) == 0)) {
-			tty->flip.count++;
-			*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-			*tty->flip.char_buf_ptr++ = EOF_CHAR (tty);
-		} else if (count == 2 && (
-						 strncmp (buf, "^z", 2) == 0 ||
-					   strncmp (buf, "\0252z", 2) == 0)) {
-			tty->flip.count++;
-			*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-			*tty->flip.char_buf_ptr++ = SUSP_CHAR (tty);
+			*tty->flip.char_buf_ptr++ = *cchar;
 		} else {
 
 			memcpy (tty->flip.char_buf_ptr, buf, count);
@@ -230,6 +216,13 @@ hwc_tty_input (unsigned char *buf, unsigned int count)
 void 
 hwc_tty_init (void)
 {
+#ifdef CONFIG_3215
+	if (MACHINE_IS_VM)
+		return;
+#endif
+	if (MACHINE_IS_P390)
+		return;
+
 	memset (&hwc_tty_driver, 0, sizeof (struct tty_driver));
 	memset (&hwc_tty_data, 0, sizeof (hwc_tty_data_struct));
 	hwc_tty_driver.magic = TTY_DRIVER_MAGIC;

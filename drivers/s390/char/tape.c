@@ -1,14 +1,13 @@
 
 /***********************************************************************
  *  drivers/s390/char/tape.c
- *    tape device driver for S/390 tapes.
+ *    tape device driver for S/390 and zSeries tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress... :-)
  ***********************************************************************
  */
 
@@ -34,9 +33,21 @@
 #include <asm/s390dyn.h>
 #endif
 #include "tape.h"
+#ifdef CONFIG_S390_TAPE_3490
 #include "tape3490.h"
+#endif
+#ifdef CONFIG_S390_TAPE_3480
 #include "tape3480.h"
-
+#endif
+#ifdef CONFIG_S390_TAPE_BLOCK
+#include "tapeblock.h"
+#endif
+#ifdef CONFIG_S390_TAPE_CHAR
+#include "tapechar.h"
+#endif
+#ifdef CONFIG_PROC_FS
+#include <linux/vmalloc.h>
+#endif
 #define PRINTK_HEADER "T390:"
 
 /* state handling routines */
@@ -91,29 +102,118 @@ char* state_verbose[TS_SIZE]={
 char* event_verbose[TE_SIZE]= {
     "TE_START", "TE_DONE", "TE_FAILED", "TE_ERROR", "TE_OTHER"};
 
-#ifdef CONFIG_PROC_FS		/* don't waste space if unused */
-/*
- * The proc filesystem: function to read and entry
- */
-int
-tape_read_procmem (char *buf, char **start, off_t offset,
-		   int len, int unused)
+/* our root devfs handle */
+#ifdef CONFIG_DEVFS_FS
+devfs_handle_t tape_devfs_root_entry;
+
+inline void
+tape_mkdevfsroots (tape_info_t* tape) 
 {
-	tape_info_t *tape = first_tape_info;
-	len = sprintf (buf, "minor\tstate\n");
-	do {
-		if (len >= PAGE_SIZE - 80)
-			len += sprintf (buf + len, "terminated...\n");
-		len += sprintf (buf + len,
-				"%d\t%s\n", tape->rew_minor,
-				((tapestate_get (tape) >= 0) && (tapestate_get (tape) < TS_SIZE)) ?
-				state_verbose[tapestate_get (tape)] :
-				"UNKNOWN STATE");
-	} while ((tape = (tape_info_t *) (tape->next)) != NULL);
-	return len;
+    char devno [5];
+    sprintf (devno,"%04X",tape->devinfo.devno);
+    tape->devfs_dir=devfs_mk_dir (tape_devfs_root_entry, devno, tape);
 }
 
-#endif				/* CONFIG_PROC_FS */
+inline void
+tape_rmdevfsroots (tape_info_t* tape)
+{
+    devfs_unregister (tape->devfs_dir);
+}
+#endif
+
+#ifdef CONFIG_PROC_FS
+/* our proc tapedevices entry */
+static struct proc_dir_entry *tape_devices_entry;
+
+typedef struct {
+	char *data;
+	int len;
+} tempinfo_t;
+
+
+static int
+tape_devices_open (struct inode *inode, struct file *file)
+{
+    int size=80;
+    tape_info_t* tape;
+    tempinfo_t* tempinfo;
+    char* data;
+    int pos=0;
+    tempinfo = kmalloc (sizeof(tempinfo_t),GFP_KERNEL);
+    if (!tempinfo)
+        return -ENOMEM;
+    for (tape=first_tape_info;tape!=NULL;tape=tape->next)
+        size+=80; // FIXME: Guess better!
+    data=vmalloc(size);
+    if (!data) {
+        kfree (tempinfo);
+        return -ENOMEM;
+    }
+    pos+=sprintf(data+pos,"TapeNo\tDevNo\tCuType\tCuModel\tDevType\tDevModel\tState\n");
+    for (tape=first_tape_info;tape!=NULL;tape=tape->next) {
+        pos+=sprintf(data+pos,"%d\t%04X\t%04X\t%02X\t%04X\t%02X\t\t%s\n",tape->rew_minor/2,
+                     tape->devinfo.devno,tape->devinfo.sid_data.cu_type,
+                     tape->devinfo.sid_data.cu_model,tape->devinfo.sid_data.dev_type,
+                     tape->devinfo.sid_data.dev_model,((tapestate_get(tape) >= 0) &&
+                                                       (tapestate_get(tape) < TS_SIZE)) ?
+                     state_verbose[tapestate_get (tape)] : "TS UNKNOWN");
+    }
+    tempinfo->len=pos;
+    tempinfo->data=data;
+    file->private_data= (void*) tempinfo;
+#ifdef MODULE
+    MOD_INC_USE_COUNT;
+#endif
+    return 0;
+}
+
+static ssize_t
+tape_devices_read (struct file *file, char *user_buf, size_t user_len, loff_t * offset)
+{
+	loff_t len;
+	tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+
+	if (*offset >= p_info->len) {
+		return 0;	/* EOF */
+	} else {
+		len =  user_len<(p_info->len - *offset)?user_len:(p_info->len - *offset);
+		if (copy_to_user (user_buf, &(p_info->data[*offset]), len))
+			return -EFAULT;
+		(*offset) += len;
+		return len;	/* number of bytes "read" */
+	}
+}
+
+static int
+tape_devices_release (struct inode *inode, struct file *file)
+{
+	int rc = 0;
+	tempinfo_t *p_info = (tempinfo_t *) file->private_data;
+	if (p_info) {
+		if (p_info->data)
+			vfree (p_info->data);
+		kfree (p_info);
+	}
+#ifdef MODULE
+        MOD_DEC_USE_COUNT;
+#endif
+	return rc;
+}
+
+static struct file_operations tape_devices_file_ops =
+{
+	read:tape_devices_read,	/* read */
+	open:tape_devices_open,	/* open */
+	release:tape_devices_release,	/* close */
+};
+
+static struct inode_operations tape_devices_inode_ops =
+{
+#if !(LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
+	default_file_ops:&tape_devices_file_ops		/* file ops */
+#endif				/* LINUX_IS_24 */
+};
+#endif /* CONFIG_PROC_FS */
 
 /* SECTION: Managing wrappers for ccwcache */
 
@@ -258,7 +358,11 @@ tape_oper_handler ( int irq, struct _devreg *dreg) {
     int rc,tape_num,retries=0;
     s390_dev_info_t dinfo;
     tape_discipline_t* disc;
+#ifdef CONFIG_DEVFS_FS
+    tape_frontend_t* frontend;
+#endif
     long lockflags;
+    PRINT_WARN ("oper handler was called\n");
     while ((tape!=NULL) && (tape->devinfo.irq!=irq)) 
         tape=tape->next;
     if (tape!=NULL) {
@@ -270,13 +374,19 @@ tape_oper_handler ( int irq, struct _devreg *dreg) {
     rc = get_dev_info_by_irq (irq, &dinfo);
     if (rc == -ENODEV) {
         retries++;
-        if (retries > 5)
+        rc = get_dev_info_by_irq (irq, &dinfo);
+        if (retries > 5) {
+            PRINT_WARN ("No device information for new dev. could be retrieved.\n");
             return -ENODEV;
+        }
     }
     disc = first_discipline;
     while ((disc != NULL) && (disc->cu_type != dinfo.sid_data.cu_type))
         disc = (tape_discipline_t *) (disc->next);
-    
+    if (disc == NULL)
+        PRINT_WARN ("No matching discipline for cu_type %x found\n",dinfo.sid_data.cu_type);
+    if (rc == -ENODEV) 
+        PRINT_WARN ("No device information for new dev. could be retrieved.\n");
     if ((disc == NULL) || (rc == -ENODEV))
         return -ENODEV;
     
@@ -287,6 +397,7 @@ tape_oper_handler ( int irq, struct _devreg *dreg) {
                     "tape info structure\n");
         return -ENOBUFS;
     }
+    memset(tape,0,sizeof(tape_info_t));
     tape->discipline = disc;
     disc->tape = tape;
     tape_num=0;
@@ -306,6 +417,10 @@ tape_oper_handler ( int irq, struct _devreg *dreg) {
         kfree (tape);
         return -ENOBUFS;
     }
+#ifdef CONFIG_DEVFS_FS
+    for (frontend=first_frontend;frontend!=NULL;frontend=frontend->next) 
+        frontend->mkdevfstree(tape);
+#endif
     s390irq_spin_lock_irqsave (irq,lockflags);
     if (first_tape_info == NULL) {
         first_tape_info = tape;
@@ -324,41 +439,61 @@ static void
 tape_noper_handler ( int irq, int status ) {
     tape_info_t *ti=first_tape_info;
     tape_info_t *lastti;
+#ifdef CONFIG_DEVFS_FS
+    tape_frontend_t *frontend;
+#endif
     long lockflags;
     s390irq_spin_lock_irqsave(irq,lockflags);
-    while (ti!=NULL) {
-        if (ti->devinfo.irq==irq) {
-            tapestate_set(ti,TS_NOT_OPER);
-            if (tapestate_get(ti)!=TS_UNUSED) {
-                // device is in use!
-                PRINT_WARN ("Tape #%d was detached while it was busy. Expect errors!",ti->blk_minor);
-                ti->rc=-ENXIO; 
-                wake_up_interruptible(&ti->wq);
-            } else {
-                // device is unused!
-                if (ti==first_tape_info) {
-                    first_tape_info=ti->next;
-                } else {
-                    lastti=first_tape_info;
-                    while (lastti->next!=ti) lastti=lastti->next;
-                    lastti->next=ti->next;
-                }
-                kfree(ti);
-            }
-            s390irq_spin_unlock_irqrestore(irq,lockflags);
-            return;
+    while (ti!=NULL && ti->devinfo.irq!=irq) ti=ti->next;
+    if (ti==NULL) return;
+    if (tapestate_get(ti)!=TS_UNUSED) {
+        // device is in use!
+        PRINT_WARN ("Tape #%d was detached while it was busy. Expect errors!",ti->blk_minor/2);
+        tapestate_set(ti,TS_NOT_OPER);
+        ti->rc=-ENODEV; 
+	ti->wanna_wakeup=1;
+	switch (tapestate_get(ti)) {
+	case TS_REW_RELEASE_INIT:
+	    tapestate_set(ti,TS_NOT_OPER);
+	    wake_up (&ti->wq);
+	    break;
+#ifdef CONFIG_S390_TAPE_BLOCK
+	case TS_BLOCK_INIT:
+	    tapestate_set(ti,TS_NOT_OPER);
+	    schedule_tapeblock_exec_IO(ti);
+	    break;
+#endif
+	default:
+	    tapestate_set(ti,TS_NOT_OPER);
+	    wake_up_interruptible (&ti->wq);
+	}
+    } else {
+        // device is unused!
+        PRINT_WARN ("Tape #%d was detached.\n",ti->blk_minor/2);
+        if (ti==first_tape_info) {
+            first_tape_info=ti->next;
+        } else {
+            lastti=first_tape_info;
+            while (lastti->next!=ti) lastti=lastti->next;
+            lastti->next=ti->next;
         }
-        ti=ti->next;
+#ifdef CONFIG_DEVFS_FS
+        for (frontend=first_frontend;frontend!=NULL;frontend=frontend->next)
+            frontend->rmdevfstree(ti);
+        tape_rmdevfsroots(ti);
+#endif
+        kfree(ti);
     }
     s390irq_spin_unlock_irqrestore(irq,lockflags);
-    PRINT_WARN ("Tape not found for irq %d. Device is detached.",irq);
+    return;
 }
 
 
 void
 tape_dump_sense (devstat_t * stat)
 {
-	int sl, sct;
+	int sl;
+#if 0
 	PRINT_WARN ("------------I/O resulted in unit check:-----------\n");
 	for (sl = 0; sl < 4; sl++) {
 		PRINT_WARN ("Sense:");
@@ -388,6 +523,7 @@ tape_dump_sense (devstat_t * stat)
 		    stat->ii.sense.data[26], stat->ii.sense.data[27],
 		    stat->ii.sense.data[28], stat->ii.sense.data[29],
 		    stat->ii.sense.data[30], stat->ii.sense.data[31]);
+#endif
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,3,"SENSE:");
         for (sl=0;sl<31;sl++) {
@@ -413,6 +549,9 @@ tape_setup (tape_info_t * ti, int irq, int minor)
 	ti->rew_minor = minor;
 	ti->nor_minor = minor + 1;
 	ti->blk_minor = minor;
+#ifdef CONFIG_DEVFS_FS
+        tape_mkdevfsroots(ti);
+#endif
 	/* Register IRQ */
 #ifdef CONFIG_S390_TAPE_DYNAMIC
         rc = s390_request_irq_special (irq, tape_irq, tape_noper_handler,0, "tape", &(ti->devstat));
@@ -424,7 +563,7 @@ tape_setup (tape_info_t * ti, int irq, int minor)
 	if (rc) {
 		PRINT_WARN ("Cannot register irq %d, rc=%d\n", irq, rc);
 	} else
-		PRINT_WARN ("Register irq %d for using with discipline %x\n", irq, ti->discipline->cu_type);
+		PRINT_WARN ("Register irq %d for using with discipline %x dev #%d\n", irq, ti->discipline->cu_type,ti->blk_minor/2);
 	init_waitqueue_head (&ti->wq);
 	ti->kernbuf = ti->userbuf = ti->discdata = NULL;
 	tapestate_set (ti, TS_UNUSED);
@@ -460,7 +599,7 @@ tape_init (void)
 #endif /* TAPE_DEBUG */
 
         /* print banner */        
-        PRINT_WARN ("IBM S/390 Tape Device Driver (ALPHA).\n");
+        PRINT_WARN ("IBM S/390 Tape Device Driver (BETA).\n");
         PRINT_WARN ("(C) IBM Deutschland Entwicklung GmbH, 2000\n");
         opt_char=opt_block=opt_3480=opt_3490="not present";
 #ifdef CONFIG_S390_TAPE_CHAR
@@ -496,6 +635,9 @@ tape_init (void)
             ((tape_discipline_t*) (first_discipline->next))->next=NULL;
         }
 #endif
+#ifdef CONFIG_DEVFS_FS
+        tape_devfs_root_entry=devfs_mk_dir (NULL, "tape", NULL);
+#endif CONFIG_DEVFS_FS
 
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,3,"dev detect");
@@ -558,17 +700,40 @@ tape_init (void)
 
 	/* Allocate local buffer for the ccwcache       */
 	tape_init_emergency_req ();
-
-#if 0				// need to register s.th. for proc? FIXME!
-	if (proc_register_dynamic (&proc_root, &proc_root_tape))
-		PRINT_INFO (KERN_ERR "tape: registering "
-			    "/proc/tape failed\n");
+#ifdef CONFIG_PROC_FS
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
+	tape_devices_entry = create_proc_entry ("tapedevices",
+						S_IFREG | S_IRUGO | S_IWUSR,
+						&proc_root);
+	tape_devices_entry->proc_fops = &tape_devices_file_ops;
+	tape_devices_entry->proc_iops = &tape_devices_inode_ops;
+#else
+	tape_devices_entry = (struct proc_dir_entry *) kmalloc 
+            (sizeof (struct proc_dir_entry), GFP_ATOMIC);
+        if (tape_devices_entry) {
+            memset (tape_devices_entry, 0, sizeof (struct proc_dir_entry));
+            tape_devices_entry->name = "tapedevices";
+            tape_devices_entry->namelen = strlen ("tapedevices");
+            tape_devices_entry->low_ino = 0;
+            tape_devices_entry->mode = (S_IFREG | S_IRUGO | S_IWUSR);
+            tape_devices_entry->nlink = 1;
+            tape_devices_entry->uid = 0;
+            tape_devices_entry->gid = 0;
+            tape_devices_entry->size = 0;
+            tape_devices_entry->get_info = NULL;
+            tape_devices_entry->ops = &tape_devices_inode_ops;
+            proc_register (&proc_root, tape_devices_entry);
+	}
 #endif
+#endif /* CONFIG_PROC_FS */
 
 	return 0;
 }
 
 #ifdef MODULE
+MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte (cotte@de.ibm.com)");
+MODULE_DESCRIPTION("Linux for S/390 channel attached tape device driver");
+
 int
 init_module (void)
 {
@@ -578,7 +743,7 @@ init_module (void)
 #ifdef CONFIG_S390_TAPE_BLOCK
 	tapeblock_init ();
 #endif
-	return 0;
+        return 0;
 }
 
 void
@@ -590,10 +755,6 @@ cleanup_module (void)
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,6,"cleaup mod");
 #endif /* TAPE_DEBUG */
-
-#if 0				/* FIXME: Do we need to register s.th? */
-	proc_unregister (&proc_root, proc_root_tape.low_ino);
-#endif
 
 	tape = first_tape_info;
 	while (tape != NULL) {
@@ -607,13 +768,25 @@ cleanup_module (void)
 		free_irq (temp->devinfo.irq, &(temp->devstat));
                 if (temp->discdata) kfree (temp->discdata);
                 if (temp->kernbuf) kfree (temp->kernbuf);
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98)) // COMPAT:FIXME
-#else
-                kfree (temp->wq);
-#endif
                 if (temp->cqr) tape_free_request(temp->cqr);
+#ifdef CONFIG_DEVFS_FS
+                for (frontend=first_frontend;frontend!=NULL;frontend=frontend->next)
+                    frontend->rmdevfstree(temp);
+                tape_rmdevfsroots(temp);
+#endif
 		kfree (temp);
 	}
+#ifdef CONFIG_DEVFS_FS
+        devfs_unregister (tape_devfs_root_entry);
+#endif CONFIG_DEVFS_FS
+#ifdef CONFIG_PROC_FS
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,3,98))
+	remove_proc_entry ("devices", &proc_root);
+#else
+	proc_unregister (&proc_root, tape_devices_entry->low_ino);
+	kfree (tape_devices_entry);
+#endif				/* LINUX_IS_24 */
+#endif 
 #ifdef CONFIG_S390_TAPE_CHAR
 	tapechar_uninit();
 #endif
@@ -689,18 +862,22 @@ tapestate_event (tape_info_t * tape, int event)
                          state_verbose[tapestate_get (tape)] :
                          "TS UNKNOWN");
 #endif /* TAPE_DEBUG */    
-	if ((event >= 0) &&
-	    (event < TE_SIZE) &&
-	    (tapestate_get (tape) >= 0) &&
-	    (tapestate_get (tape) < TS_SIZE) &&
-	    ((*(tape->discipline->event_table))[tapestate_get (tape)][event] != NULL))
+        if (event == TE_ERROR) { 
+            tape->discipline->error_recovery(tape);
+        } else {
+            if ((event >= 0) &&
+                (event < TE_SIZE) &&
+                (tapestate_get (tape) >= 0) &&
+                (tapestate_get (tape) < TS_SIZE) &&
+                ((*(tape->discipline->event_table))[tapestate_get (tape)][event] != NULL))
 		((*(tape->discipline->event_table))[tapestate_get (tape)][event]) (tape);
-	else {
+            else {
 #ifdef TAPE_DEBUG
                 debug_text_exception (tape_debug_area,3,"TE UNEXPEC");
 #endif /* TAPE_DEBUG */
 		tape->discipline->default_handler (tape);
-	}
+            }
+        }
 }
 
 /*

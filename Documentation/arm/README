@@ -1,5 +1,5 @@
-			   ARM Linux 2.4.0test1
-			   ====================
+			   ARM Linux 2.4
+			   =============
 
     Please check ftp.arm.linux.org.uk:/pub/armlinux for latest updates.
 
@@ -7,9 +7,8 @@ Compilation of kernel
 ---------------------
 
   In order to compile ARM Linux, you will need a compiler capable of
-  generating ARM ELF code with GNU extensions.  GCC-2.7.2.2 ELF, GCC 2.8.1
-  and EGCS are good compilers.  Note that GCC-2.7.2.2 ELF is rare, and
-  you probably don't have it.
+  generating ARM ELF code with GNU extensions.  GCC 2.95.1 and EGCS 1.1.2
+  are good compilers.
 
   To build ARM Linux natively, you shouldn't have to alter the ARCH = line
   in the top level Makefile.  However, if you don't have the ARM Linux ELF
@@ -166,4 +165,4 @@ Kernel entry (head-armv.S)
   receive a reply within one day.
 
 ---
-Russell King (12/06/2000)
+Russell King (26/01/2001)

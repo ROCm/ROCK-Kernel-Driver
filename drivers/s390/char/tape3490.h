@@ -4,12 +4,11 @@
  *  drivers/s390/char/tape3490.h
  *    tape device discipline for 3490E tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
  ****************************************************************************
  */
 

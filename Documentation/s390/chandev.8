@@ -42,8 +42,16 @@ Entering them into /etc/chandev.conf comments are prefixed #.
 .It
 Or from the boot command line using the 'chandev=' keyword
 .El
+.Bl -item
+.It
 Multiple options can be passed separated by semicolons but no spaces are allowed between parameters. The script /bin/chandev will be called automatically on startup or a machine check of a device as follows.
 /bin/chandev <start starting_devnames> <machine_check (devnames pre_recovery_action_status) (post_recovery_action_status)>.
+The chandev layer doesn't open stdin stdout or stderr so it is advisable that you add the following lines to the start of your script.
+.It
+#!/bin/bash
+.It
+exec >/dev/console 2>&1 0>&1
+.El
 
 e.g. if tr0 & ctc0 were starting up & eth0 & eth1 didn't recover from a gone machine check at the same instant the  parameters would be.
 

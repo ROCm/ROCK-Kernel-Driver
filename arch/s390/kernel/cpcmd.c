@@ -10,6 +10,7 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <asm/ebcdic.h>
+#include <asm/cpcmd.h>
 
 void cpcmd(char *cmd, char *response, int rlen)
 {

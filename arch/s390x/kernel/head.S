@@ -261,8 +261,9 @@ iplstart:
 	l     %r1,0xb8                         # load ipl subchannel number
         la    %r2,IPL_BS                       # load start address
         bas   %r14,.Lloader                    # load rest of ipl image
-        st    %r1,__LC_IPLDEV                  # store ipl device number
         l     %r12,.Lparm                      # pointer to parameter area
+        st    %r1,__LC_IPLDEV                  # store ipl device number
+        st    %r1,IPL_DEVICE+4-PARMAREA(%r12)
 
 #
 # load parameter file from ipl device
@@ -405,16 +406,18 @@ start:
 	sr    %r3,%r2
 	la    %r3,1(%r3)
 .done:
-	st    %r3,MEMORY_SIZE-PARMAREA(%r11)	
+	l     %r1,.memsize
+	st    %r3,4(%r1)
 	slr   %r0,%r0
-	st    %r0,INITRD_SIZE-PARMAREA(%r11)
-	st    %r0,INITRD_START-PARMAREA(%r11)
+	st    %r0,INITRD_SIZE+4-PARMAREA(%r11)
+	st    %r0,INITRD_START+4-PARMAREA(%r11)
 	j     startup                   # continue with startup
 .tbl:	.long _ebcasc			# translate table
 .cmd:	.long COMMAND_LINE		# address of command line buffer
 .parm:	.long PARMAREA
 .fourmeg: .long 0x00400000      	# 4M
 .pgmnw:	.long 0x00080000,.pgmx
+.memsize: .long memory_size
 .lowcase:
 	.byte 0x00,0x01,0x02,0x03,0x04,0x05,0x06,0x07 
 	.byte 0x08,0x09,0x0a,0x0b,0x0c,0x0d,0x0e,0x0f
@@ -480,20 +483,34 @@ startup:basr  %r13,0                     # get base
 	bno   .Lloop-.LPG1(%r13)         # r1 < 0x80000000 -> loop
 .Lchkmem:
 	ng    %r1,.L4malign-.LPG1(%r13)  # align to multiples of 4M
-	stg   %r1,MEMORY_SIZE-PARMAREA(%r12)  # store memory size
+	lg    %r2,.Lmemsize-.LPG1(%r13)  # address of variable memory_size
+	stg   %r1,0(%r2)                 # store memory size
+
+	lg    %r12,.Lmflags-.LPG1(%r13)  # get address of machine_flags
 #
 # find out if we are running under VM
 #
         stidp  __LC_CPUID               # store cpuid
 	tm     __LC_CPUID,0xff          # running under VM ?
 	bno    .Lnovm-.LPG1(%r13)
-        oi     MACHINE_FLAGS+7-PARMAREA(%r12),1    # set VM flag
+        oi     7(%r12),1                # set VM flag
 .Lnovm:
         lh     %r0,__LC_CPUID+4         # get cpu version
         chi    %r0,0x7490               # running on a P/390 ?
         bne    .Lnop390-.LPG1(%r13)
-        oi     MACHINE_FLAGS+7-PARMAREA(%r12),4    # set P/390 flag
+        oi     7(%r12),4                # set P/390 flag
 .Lnop390:
+
+#
+# find out if we have the MVPG instruction
+#
+       mvc    __LC_PGM_NEW_PSW(16),.Lpcmvpg-.LPG1(%r13)
+       sgr    %r0,%r0
+       lghi   %r1,0
+       lghi   %r2,0
+       mvpg   %r1,%r2                   # Test CSP instruction
+       oi     7(%r12),16                # set MVPG flag
+.Lchkmvpg:
 
         lpswe .Lentry-.LPG1(13)         # jump to _stext in primary-space,
                                         # virtual and never return ...
@@ -516,24 +533,23 @@ startup:basr  %r13,0                     # get base
         .quad  0xc0000000               # cr14: machine check handling off
         .quad  0                        # cr15: linkage stack operations
 .Lpcmem:.quad  0x0000000180000000,.Lchkmem
+.Lpcmvpg:.quad 0x0000000180000000,.Lchkmvpg
 .Lflt0: .double 0
 .Lparm1:.quad  PARMAREA
 .Lhighoff:.long 0x7fffffff
 .L4malign:.quad 0xffffffffffc00000
 .Lbigmem:.quad 0x04000000
 .Lmaxchunk:.quad  0x00ffffff
+.Lmemsize:.quad memory_size
+.Lmflags:.quad machine_flags
 
 #
 # params at 10400 (setup.h)
 #
 	.org   PARMAREA
-        .quad  0x0100                   # ORIG_ROOT_DEV: ramdisk major/minor
-        .word  0                        # MOUNT_ROOT_RDONLY: no
-	.quad  0                        # MEMORY_SIZE
-	.quad  0                        # MACHINE_FLAGS (bit 0:VM)
+	.quad  0                        # IPL_DEVICE
         .quad  RAMDISK_ORIGIN           # INITRD_START
         .quad  RAMDISK_SIZE             # INITRD_SIZE
-	.word  0                        # RAMDISK_FLAGS
 
         .org   COMMAND_LINE
     	.byte  "root=/dev/ram0 ro"

@@ -89,8 +89,6 @@ static void ps2esdi_normal_interrupt_handler(u_int);
 static void ps2esdi_initial_reset_int_handler(u_int);
 static void ps2esdi_geometry_int_handler(u_int);
 
-static void ps2esdi_continue_request(void);
-
 static int ps2esdi_open(struct inode *inode, struct file *file);
 
 static int ps2esdi_release(struct inode *inode, struct file *file);
@@ -469,29 +467,26 @@ static void do_ps2esdi_request(request_queue_t * q)
 	       DEVICE_NAME,
 	       CURRENT_DEV, MINOR(CURRENT->rq_dev),
 	       CURRENT->cmd, CURRENT->sector,
-	       CURRENT->nr_sectors, CURRENT->buffer);
+	       CURRENT->current_nr_sectors, CURRENT->buffer);
 #endif
 
 	/* standard macro that ensures that requests are really on the
 	   list + sanity checks.                     */
 	INIT_REQUEST;
 
-	if (virt_to_bus(CURRENT->buffer + CURRENT->nr_sectors * 512) > 16 * MB) {
+	if (virt_to_bus(CURRENT->buffer + CURRENT->current_nr_sectors * 512) > 16 * MB) {
 		printk("%s: DMA above 16MB not supported\n", DEVICE_NAME);
 		end_request(FAIL);
-		if (!QUEUE_EMPTY)
-			do_ps2esdi_request(q);
-		return;
 	}			/* check for above 16Mb dmas */
-	if ((CURRENT_DEV < ps2esdi_drives) &&
-	    (CURRENT->sector + CURRENT->nr_sectors <=
+	else if ((CURRENT_DEV < ps2esdi_drives) &&
+	    (CURRENT->sector + CURRENT->current_nr_sectors <=
 	     ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects)) {
 #if 0
 		printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld\n",
 		       DEVICE_NAME,
-		       CURRENT_DEV, MINOR(CURRENT->dev),
+		       CURRENT_DEV, MINOR(CURRENT->rq_dev),
 		       CURRENT->cmd, CURRENT->sector,
-		       CURRENT->nr_sectors);
+		       CURRENT->current_nr_sectors);
 #endif
 
 
@@ -500,21 +495,17 @@ static void do_ps2esdi_request(request_queue_t * q)
 #if 0
 		printk("%s: blocknumber : %d\n", DEVICE_NAME, block);
 #endif
-		count = CURRENT->nr_sectors;
+		count = CURRENT->current_nr_sectors;
 		switch (CURRENT->cmd) {
 		case READ:
 			ps2esdi_readwrite(READ, CURRENT_DEV, block, count);
-			return;
 			break;
 		case WRITE:
 			ps2esdi_readwrite(WRITE, CURRENT_DEV, block, count);
-			return;
 			break;
 		default:
 			printk("%s: Unknown command\n", DEVICE_NAME);
 			end_request(FAIL);
-			if (!QUEUE_EMPTY)
-				do_ps2esdi_request(q);
 			break;
 		}		/* handle different commands */
 	}
@@ -523,8 +514,6 @@ static void do_ps2esdi_request(request_queue_t * q)
 		printk("Grrr. error. ps2esdi_drives: %d, %lu %lu\n", ps2esdi_drives,
 		       CURRENT->sector, ps2esdi[MINOR(CURRENT->rq_dev)].nr_sects);
 		end_request(FAIL);
-		if (!QUEUE_EMPTY)
-			do_ps2esdi_request(q);
 	}
 
 }				/* main strategy routine */
@@ -570,8 +559,6 @@ static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
 	u_short cmd_blk[TYPE_1_CMD_BLK_LENGTH];
 
 	/* do some relevant arithmatic */
-	CURRENT->current_nr_sectors =
-	    (count < (2 * MAX_16BIT / SECT_SIZE)) ? count : (2 * MAX_16BIT / SECT_SIZE);
 	track = block / ps2esdi_info[drive].sect;
 	head = track % ps2esdi_info[drive].head;
 	cylinder = track / ps2esdi_info[drive].head;
@@ -590,13 +577,8 @@ static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
 	/* send the command block to the controller */
 	if (ps2esdi_out_cmd_blk(cmd_blk)) {
 		printk("%s: Controller failed\n", DEVICE_NAME);
-		if ((++CURRENT->errors) < MAX_RETRIES)
-			return do_ps2esdi_request(NULL);
-		else {
+		if ((++CURRENT->errors) >= MAX_RETRIES)
 			end_request(FAIL);
-			if (!QUEUE_EMPTY)
-				do_ps2esdi_request(NULL);
-		}
 	}
 	/* check for failure to put out the command block */ 
 	else {
@@ -680,7 +662,7 @@ static void ps2esdi_prep_dma(char *buffer, u_short length, u_char dma_xmode)
 	buffer=(char *)virt_to_bus(buffer);
 
 #if 0
-	printk("ps2esdi: b_wait: %p\n", CURRENT->bh->b_wait);
+	printk("ps2esdi: b_wait: %p\n", &CURRENT->bh->b_wait);
 #endif
 	cli();
 
@@ -871,7 +853,9 @@ static void ps2esdi_geometry_int_handler(u_int int_ret_code)
 
 static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 {
+	unsigned long flags;
 	u_int status;
+	u_int ending;
 	int i;
 
 	switch (int_ret_code & 0x0f) {
@@ -879,12 +863,14 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		ps2esdi_prep_dma(CURRENT->buffer, CURRENT->current_nr_sectors,
 		    (CURRENT->cmd == READ) ? DMA_READ_16 : DMA_WRITE_16);
 		outb(CTRL_ENABLE_DMA | CTRL_ENABLE_INTR, ESDI_CONTROL);
+		ending = -1;
 		break;
 
 	case INT_ATTN_ERROR:
 		printk("%s: Attention error. interrupt status : %02X\n", DEVICE_NAME,
 		       int_ret_code);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
+		ending = FAIL;
 		break;
 
 	case INT_CMD_COMPLETE:
@@ -893,13 +879,10 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 			printk("%s: timeout reading status word\n", DEVICE_NAME);
 			outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 			outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-			if ((++CURRENT->errors) < MAX_RETRIES)
-				do_ps2esdi_request(NULL);
-			else {
-				end_request(FAIL);
-				if (!QUEUE_EMPTY)
-					do_ps2esdi_request(NULL);
-			}
+			if ((++CURRENT->errors) >= MAX_RETRIES)
+				ending = FAIL;
+			else
+				ending = -1;
 			break;
 		}
 		status = inw(ESDI_STT_INT);
@@ -910,15 +893,16 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 			outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 			outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
 #if 0
-			printk("ps2esdi: cmd_complete b_wait: %p\n", CURRENT->bh->b_wait);
+			printk("ps2esdi: cmd_complete b_wait: %p\n", &CURRENT->bh->b_wait);
 #endif
-			ps2esdi_continue_request();
+			ending = SUCCES;
 			break;
 		default:
 			printk("%s: interrupt for unknown command %02X\n",
 			       DEVICE_NAME, status & 0x1f);
 			outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 			outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
+			ending = -1;
 			break;
 		}
 		break;
@@ -929,7 +913,7 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		dump_cmd_complete_status(int_ret_code);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-		ps2esdi_continue_request();
+		ending = SUCCES;
 		break;
 	case INT_CMD_WARNING:
 	case INT_CMD_ABORT:
@@ -939,22 +923,17 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		dump_cmd_complete_status(int_ret_code);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-		if ((++CURRENT->errors) < MAX_RETRIES)
-			do_ps2esdi_request(NULL);
-		else {
-			end_request(FAIL);
-			if (!QUEUE_EMPTY)
-				do_ps2esdi_request(NULL);
-		}
+		if ((++CURRENT->errors) >= MAX_RETRIES)
+			ending = FAIL;
+		else
+			ending = -1;
 		break;
 
 	case INT_CMD_BLK_ERR:
 		dump_cmd_complete_status(int_ret_code);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
-		end_request(FAIL);
-		if (!QUEUE_EMPTY)
-			do_ps2esdi_request(NULL);
+		ending = FAIL;
 		break;
 
 	case INT_CMD_FORMAT:
@@ -962,12 +941,14 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		       ,DEVICE_NAME);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
+		ending = -1;
 		break;
 
 	case INT_RESET:
 		/* BA printk("%s: reset completed.\n", DEVICE_NAME) */ ;
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
+		ending = -1;
 		break;
 
 	default:
@@ -975,24 +956,16 @@ static void ps2esdi_normal_interrupt_handler(u_int int_ret_code)
 		       DEVICE_NAME, int_ret_code & 0xf);
 		outb((int_ret_code & 0xe0) | ATT_EOI, ESDI_ATTN);
 		outb(CTRL_ENABLE_INTR, ESDI_CONTROL);
+		ending = -1;
 		break;
 	}
-
-}				/* handle interrupts */
-
-
-static void ps2esdi_continue_request(void)
-{
-	if (CURRENT->nr_sectors -= CURRENT->current_nr_sectors) {
-		CURRENT->buffer += CURRENT->current_nr_sectors * SECT_SIZE;
-		CURRENT->sector += CURRENT->current_nr_sectors;
-		do_ps2esdi_request(NULL);
-	} else {
-		end_request(SUCCES);
-		if (!QUEUE_EMPTY)
-			do_ps2esdi_request(NULL);
+	if(ending != -1) {
+		spin_lock_irqsave(io_request_lock, flags);
+		end_request(ending);
+		do_ps2esdi_request(BLK_DEFAULT_QUEUE(MAJOR_NR));
+		spin_unlock_irqrestore(io_request_lock, flags);
 	}
-}
+}				/* handle interrupts */
 
 
 

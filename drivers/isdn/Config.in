@@ -76,8 +76,8 @@ if [ "$CONFIG_ISDN_DRV_HISAX" != "n" ]; then
 	 bool '  Am7930' CONFIG_HISAX_AMD7930
       fi
    fi
-
-   dep_tristate '  Sedlbauer PCMCIA cs module' CONFIG_HISAX_SEDLBAUER_CS $CONFIG_PCMCIA
+   dep_tristate 'Sedlbauer PCMCIA cards' CONFIG_HISAX_SEDLBAUER_CS $CONFIG_PCMCIA
+   dep_tristate 'ELSA PCMCIA MicroLink cards' CONFIG_HISAX_ELSA_CS $CONFIG_PCMCIA
 fi
 endmenu
 

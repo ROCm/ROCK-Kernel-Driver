@@ -12,7 +12,8 @@ endif
 
 L_TARGET = lib.a
 
-obj-y = checksum.o delay.o memset.o strcmp.o strncpy.o uaccess.o
+obj-y = checksum.o delay.o memset.o misaligned.o strcmp.o strncpy.o uaccess.o
+export-objs += misaligned.o
 
 include $(TOPDIR)/Rules.make
 

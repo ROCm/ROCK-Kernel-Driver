@@ -17,6 +17,7 @@ they are gone forever. Keeping this in mind and with a grain of salt this
 document can be still interesting and very helpful.
 
 [ File edited 17.01.1999 - Riccardo Facchetti ]
+[ Edited miroSOUND section 17.09.2000 - Robert Siemer ]
 
 OSS/Free version 3.8 release notes
 ----------------------------------
@@ -1325,26 +1326,38 @@ and kernel failures when sound is used.
 miroSOUND
 ---------
 
-The miroSOUND PCM12 has been used successfully. This card is based on
-the MAD16, OPL4, and CS4231A chips and everything said in the section
-about MAD16 cards applies here, too. The only major difference between
-the PCM12 and other MAD16 cards is that instead of the mixer in the
-CS4231 codec a separate mixer controlled by an on-board 80C32
-microcontroller is used. Control of the mixer takes place via the ACI
-(miro's audio control interface) protocol that is implemented in a
-separate lowlevel driver. Make sure you compile this ACI driver
-together with the normal MAD16 support when you use a miroSOUND PCM12
-card. The ACI mixer is controlled by /dev/mixer and the CS4231 mixer
-by /dev/mixer2. You usually don't want to change anything on the
-CS4231 mixer.
+The miroSOUND PCM1-pro, PCM12 and PCM20 radio has been used
+successfully. This card is based on the MAD16, OPL4, and CS4231A chips
+and everything said in the section about MAD16 cards applies here,
+too. The only major difference between the PCMxx and other MAD16 cards
+is that instead of the mixer in the CS4231 codec a separate mixer
+controlled by an on-board 80C32 microcontroller is used. Control of
+the mixer takes place via the ACI (miro's audio control interface)
+protocol that is implemented in a separate lowlevel driver. Make sure
+you compile this ACI driver together with the normal MAD16 support
+when you use a miroSOUND PCMxx card. The ACI mixer is controlled by
+/dev/mixer and the CS4231 mixer by /dev/mixer1 (depends on load
+time). Only in special cases you want to change something on the CS4231
+mixer.
 
-The miroSOUND PCM12 is capable of full duplex operation (simultaneous
-PCM replay and recording), which allows you to implement nice
-real-time signal processing audio effect software and network
-telephones. The ACI mixer has to be configured into a special "solo"
+The miroSOUND PCM12 and PCM20 radio is capable of full duplex
+operation (simultaneous PCM replay and recording), which allows you to
+implement nice real-time signal processing audio effect software and
+network telephones. The ACI mixer has to be switched into the "solo"
 mode for duplex operation in order to avoid feedback caused by the
-mixer (input hears output signal). See lowlevel/aci.c for details on
-the ioctl() for activating the "solo" mode.
+mixer (input hears output signal). You can de-/activate this mode
+through toggleing the record button for the wave controller with an
+OSS-mixer.
+
+The PCM20 contains a radio tuner, which is also controlled by
+ACI. This radio tuner is supported by the ACI driver together with the
+miropcm20.o module. Also the 7-band equalizer is integrated
+(limited by the OSS-design). Developement has started and maybe
+finished for the RDS decoder on this card, too. You will be able to
+read radio text, the program service name, program type and
+others. Even the v4l radio module benefits from it with a refined
+strength value. See aci.c, radio-miropcm20.c and rds-miropcm20.c for
+more details.
 
 The following configuration parameters have worked fine for the PCM12
 in Markus Kuhn's system, many other configurations might work, too:
@@ -1352,13 +1365,8 @@ CONFIG_MAD16_BASE=0x530, CONFIG_MAD16_IRQ=11, CONFIG_MAD16_DMA=3,
 CONFIG_MAD16_DMA2=0, CONFIG_MAD16_MPU_BASE=0x330, CONFIG_MAD16_MPU_IRQ=10,
 DSP_BUFFSIZE=65536, SELECTED_SOUND_OPTIONS=0x00281000.
 
-The miroSOUND PCM1 pro and the PCM20 are very similar to the PCM12.
-Perhaps the same ACI driver also works for these cards, however this
-has never actually been tested. The PCM20 contains a radio tuner,
-which is also controlled by ACI. This radio tuner is currently not
-supported by the ACI driver, but documentation for it was provided by
-miro and ACI tuner support could easily be added if someone is really
-interested.
+Bas van der Linden is using his PCM1-pro with a configuration that
+differs in: CONFIG_MAD16_IRQ=7, CONFIG_MAD16_DMA=1, CONFIG_MAD16_MPU_IRQ=9
 
 Compaq Deskpro XL
 -----------------

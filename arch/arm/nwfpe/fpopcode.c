@@ -1,6 +1,6 @@
 /*
     NetWinder Floating Point Emulator
-    (c) Rebel.com, 1998-1999
+    (c) Rebel.COM, 1998,1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -26,7 +26,7 @@
 #include "fpmodule.h"
 #include "fpmodule.inl"
 
-static floatx80 floatx80Constant[] = {
+const floatx80 floatx80Constant[] = {
   { 0x0000, 0x0000000000000000ULL},	/* extended 0.0 */
   { 0x3fff, 0x8000000000000000ULL},	/* extended 1.0 */
   { 0x4000, 0x8000000000000000ULL},	/* extended 2.0 */
@@ -37,7 +37,7 @@ static floatx80 floatx80Constant[] = {
   { 0x4002, 0xa000000000000000ULL}	/* extended 10.0 */
 };  
 
-static float64 float64Constant[] = {
+const float64 float64Constant[] = {
   0x0000000000000000ULL,		/* double 0.0 */
   0x3ff0000000000000ULL,		/* double 1.0 */
   0x4000000000000000ULL,		/* double 2.0 */
@@ -48,7 +48,7 @@ static float64 float64Constant[] = {
   0x4024000000000000ULL			/* double 10.0 */
 };  
 
-static float32 float32Constant[] = {
+const float32 float32Constant[] = {
   0x00000000,				/* single 0.0 */
   0x3f800000,				/* single 1.0 */
   0x40000000,				/* single 2.0 */
@@ -58,21 +58,6 @@ static float32 float32Constant[] = {
   0x3f000000,				/* single 0.5 */
   0x41200000				/* single 10.0 */
 };  
-
-floatx80 getExtendedConstant(const unsigned int nIndex)
-{
-   return floatx80Constant[nIndex];
-} 
-
-float64 getDoubleConstant(const unsigned int nIndex)
-{
-   return float64Constant[nIndex];
-} 
-
-float32 getSingleConstant(const unsigned int nIndex)
-{
-   return float32Constant[nIndex];
-} 
 
 unsigned int getTransferLength(const unsigned int opcode)
 {
@@ -135,10 +120,10 @@ unsigned int getDestinationSize(const unsigned int opcode)
   return(nRc);
 }
 
-/* contition code lookup table
+/* condition code lookup table
  index into the table is test code: EQ, NE, ... LT, GT, AL, NV
  bit position in short is condition code: NZCV */
-unsigned short aCC[16] = {
+static const unsigned short aCC[16] = {
     0xF0F0, // EQ == Z set
     0x0F0F, // NE
     0xCCCC, // CS == C set

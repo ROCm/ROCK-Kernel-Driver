@@ -91,8 +91,8 @@
 #define I2C_DPL3518	   0x84
 
 /* more card-specific defines */
-#define PT2254_L_CHANEL 0x10
-#define PT2254_R_CHANEL 0x08
+#define PT2254_L_CHANNEL 0x10
+#define PT2254_R_CHANNEL 0x08
 #define PT2254_DBS_IN_2 0x400
 #define PT2254_DBS_IN_10 0x20000
 #define WINVIEW_PT2254_CLK  0x40

@@ -1,10 +1,12 @@
 # Database of machine macros and numbers
 #
+# This file is linux/arch/arm/tools/mach-types
+#
 # Please do not send patches to this file; it is automatically generated!
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Fri Feb  9 22:27:32 2001
+# Last update: Sat Apr 7 09:45:09 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -35,7 +37,7 @@ p720t			ARCH_P720T		P720T			24
 assabet			SA1100_ASSABET		ASSABET			25
 victor			SA1100_VICTOR		VICTOR			26
 lart			SA1100_LART		LART			27
-ranger			ARCH_RANGER		RANGER			28
+ranger			SA1100_RANGER		RANGER			28
 graphicsclient		SA1100_GRAPHICSCLIENT	GRAPHICSCLIENT		29
 xp860			SA1100_XP860		XP860			30
 cerf			SA1100_CERF		CERF			31
@@ -48,7 +50,7 @@ accelent_l7200		ARCH_L7200_ACCELENT	ACCELENT_L7200		37
 netport			SA1100_NETPORT		NETPORT			38
 pangolin		SA1100_PANGOLIN		PANGOLIN		39
 yopy			SA1100_YOPY		YOPY			40
-coolidge		SA1100_COOLIDGE		coolidge		41
+coolidge		SA1100_COOLIDGE		COOLIDGE		41
 huw_webpanel		SA1100_HUW_WEBPANEL	HUW_WEBPANEL		42
 spotme			ARCH_SPOTME		SPOTME			43
 freebird		ARCH_FREEBIRD		FREEBIRD		44
@@ -65,6 +67,16 @@ flexanet		ARCH_FLEXANET		FLEXANET		54
 webpal			ARCH_WEBPAL		WEBPAL			55
 linpda			SA1100_LINPDA		LINPDA			56
 anakin			ARCH_ANAKIN		ANAKIN			57
+mvi			SA1100_MVI		MVI			58
+jupiter			SA1100_JUPITER		JUPITER			59
+psionw			ARCH_PSIONW		PSIONW			60
+aln			SA1100_ALN		ALN			61
+camelot			ARCH_CAMELOT		CAMELOT			62
+gds2200			SA1100_GDS2200		GDS2200			63
+psion_series7		SA1100_PSION_SERIES7	PSION_SERIES7		64
+xfile			SA1100_XFILE		XFILE			65
+accelent_ep9312		ARCH_ACCELENT_EP9312	ACCELENT_EP9312		66
+ic200			ARCH_IC200		IC200			67
 
 # The following are unallocated
 empeg			SA1100_EMPEG		EMPEG

@@ -13,6 +13,12 @@ int qlogicfas_biosparam(Disk *, kdev_t, int[]);
 #define NULL (0)
 #endif
 
+#ifdef PCMCIA
+#define __QLINIT __devinit
+#else
+#define __QLINIT __init
+#endif
+
 #define QLOGICFAS {		\
 	detect:         qlogicfas_detect,	\
 	info:           qlogicfas_info,		\

@@ -3,7 +3,7 @@
 /*
  *      esssolo1.c  --  ESS Technology Solo1 (ES1946) audio driver.
  *
- *      Copyright (C) 1998-2000  Thomas Sailer (sailer@ife.ee.ethz.ch)
+ *      Copyright (C) 1998-2001  Thomas Sailer (t.sailer@alumni.ethz.ch)
  *
  *      This program is free software; you can redistribute it and/or modify
  *      it under the terms of the GNU General Public License as published by
@@ -70,6 +70,13 @@
  *    19.02.2000   0.14  Use pci_dma_supported to determine if recording should be disabled
  *    13.03.2000   0.15  Reintroduce initialization of a couple of PCI config space registers
  *    21.11.2000   0.16  Initialize dma buffers in poll, otherwise poll may return a bogus mask
+ *    12.12.2000   0.17  More dma buffer initializations, patch from
+ *                       Tjeerd Mulder <tjeerd.mulder@fujitsu-siemens.com>
+ *    31.01.2001   0.18  Register/Unregister gameport, original patch from
+ *                       Nathaniel Daw <daw@cs.cmu.edu>
+ *                       Fix SETTRIGGER non OSS API conformity
+ *    10.03.2001         provide abs function, prevent picking up a bogus kernel macro
+ *                       for abs. Bug report by Andrew Morton <andrewm@uow.edu.au>
  */
 
 /*****************************************************************************/
@@ -98,9 +105,37 @@
 
 #include "dm.h"
 
+#if defined(CONFIG_INPUT_ANALOG) || defined(CONFIG_INPUT_ANALOG_MODULE)
+#include <linux/gameport.h>
+#else
+struct gameport {
+	int io;
+	int size;
+};
+
+extern inline void gameport_register_port(struct gameport *gameport)
+{
+}
+
+extern inline void gameport_unregister_port(struct gameport *gameport)
+{
+}
+#endif
+
 /* --------------------------------------------------------------------- */
 
 #undef OSS_DOCUMENTED_MIXER_SEMANTICS
+
+/* --------------------------------------------------------------------- */
+
+/* prevent picking up a bogus abs macro */
+#undef abs
+extern inline int abs(int x)
+{
+	if (x < 0)
+		return -x;
+	return x;
+}
 
 /* --------------------------------------------------------------------- */
 
@@ -154,7 +189,7 @@ struct solo1_state {
 	int dev_dmfm;
 
 	/* hardware resources */
-	unsigned long iobase, sbbase, vcbase, ddmabase, mpubase, gpbase; /* long for SPARC */
+	unsigned long iobase, sbbase, vcbase, ddmabase, mpubase; /* long for SPARC */
 	unsigned int irq;
 
 	/* mixer registers */
@@ -196,6 +231,7 @@ struct solo1_state {
 		unsigned mapped:1;
 		unsigned ready:1;
 		unsigned endcleared:1;
+		unsigned enabled:1;
 		unsigned ossfragshift;
 		int ossmaxfrags;
 		unsigned subdivision;
@@ -211,6 +247,8 @@ struct solo1_state {
 		unsigned char ibuf[MIDIINBUF];
 		unsigned char obuf[MIDIOUTBUF];
 	} midi;
+
+	struct gameport gameport;
 };
 
 /* --------------------------------------------------------------------- */
@@ -465,6 +503,7 @@ static int prog_dmabuf(struct solo1_state *s, struct dmabuf *db)
 		db->numfrag = db->ossmaxfrags;
 	db->fragsamples = db->fragsize >> sample_shift;
 	db->dmasize = db->numfrag << db->fragshift;
+	db->enabled = 1;
 	return 0;
 }
 
@@ -1024,7 +1063,8 @@ static ssize_t solo1_read(struct file *file, char *buffer, size_t count, loff_t 
 		       read_ctrl(s, 0xb8), inb(s->ddmabase+8), inw(s->ddmabase+4), inb(s->sbbase+0xc), cnt);
 #endif
 		if (cnt <= 0) {
-			start_adc(s);
+			if (s->dma_adc.enabled)
+				start_adc(s);
 #ifdef DEBUGREC
 			printk(KERN_DEBUG "solo1_read: regs: A1: 0x%02x  A2: 0x%02x  A4: 0x%02x  A5: 0x%02x  A8: 0x%02x\n"
 			       KERN_DEBUG "solo1_read: regs: B1: 0x%02x  B2: 0x%02x  B7: 0x%02x  B8: 0x%02x  B9: 0x%02x\n"
@@ -1071,7 +1111,8 @@ static ssize_t solo1_read(struct file *file, char *buffer, size_t count, loff_t 
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_adc(s);
+		if (s->dma_adc.enabled)
+			start_adc(s);
 #ifdef DEBUGREC
 		printk(KERN_DEBUG "solo1_read: reg B8: 0x%02x  DMAstat: 0x%02x  DMAcnt: 0x%04x  SBstat: 0x%02x\n", 
 		       read_ctrl(s, 0xb8), inb(s->ddmabase+8), inw(s->ddmabase+4), inb(s->sbbase+0xc));
@@ -1126,7 +1167,8 @@ static ssize_t solo1_write(struct file *file, const char *buffer, size_t count, 
 		if (cnt > count)
 			cnt = count;
 		if (cnt <= 0) {
-			start_dac(s);
+			if (s->dma_dac.enabled)
+				start_dac(s);
 			if (file->f_flags & O_NONBLOCK) {
 				if (!ret)
 					ret = -EAGAIN;
@@ -1154,7 +1196,8 @@ static ssize_t solo1_write(struct file *file, const char *buffer, size_t count, 
 		count -= cnt;
 		buffer += cnt;
 		ret += cnt;
-		start_dac(s);
+		if (s->dma_dac.enabled)
+			start_dac(s);
 	}
 	remove_wait_queue(&s->dma_dac.wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -1370,27 +1413,33 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if (val & PCM_ENABLE_INPUT) {
 				if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
 					return ret;
+				s->dma_dac.enabled = 1;
 				start_adc(s);
 				if (inb(s->ddmabase+15) & 1)
 					printk(KERN_ERR "solo1: cannot start recording, DDMA mask bit stuck at 1\n");
-			} else
+			} else {
+				s->dma_dac.enabled = 0;
 				stop_adc(s);
+			}
 		}
 		if (file->f_mode & FMODE_WRITE) {
 			if (val & PCM_ENABLE_OUTPUT) {
 				if (!s->dma_dac.ready && (ret = prog_dmabuf_dac(s)))
 					return ret;
+				s->dma_dac.enabled = 1;
 				start_dac(s);
-			} else
+			} else {
+				s->dma_dac.enabled = 0;
 				stop_dac(s);
+			}
 		}
 		return 0;
 
 	case SNDCTL_DSP_GETOSPACE:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf_dac(s)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf_dac(s)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		solo1_update_ptr(s);
 		abinfo.fragsize = s->dma_dac.fragsize;
@@ -1406,8 +1455,8 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	case SNDCTL_DSP_GETISPACE:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
-		if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
-			return ret;
+		if (!s->dma_adc.ready && (val = prog_dmabuf_adc(s)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		solo1_update_ptr(s);
 		abinfo.fragsize = s->dma_adc.fragsize;
@@ -1424,8 +1473,8 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
         case SNDCTL_DSP_GETODELAY:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf_dac(s)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf_dac(s)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		solo1_update_ptr(s);
                 count = s->dma_dac.count;
@@ -1437,8 +1486,8 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
         case SNDCTL_DSP_GETIPTR:
 		if (!(file->f_mode & FMODE_READ))
 			return -EINVAL;
-		if (!s->dma_adc.ready && (ret = prog_dmabuf_adc(s)))
-			return ret;
+		if (!s->dma_adc.ready && (val = prog_dmabuf_adc(s)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		solo1_update_ptr(s);
                 cinfo.bytes = s->dma_adc.total_bytes;
@@ -1452,8 +1501,8 @@ static int solo1_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
         case SNDCTL_DSP_GETOPTR:
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;
-		if (!s->dma_dac.ready && (ret = prog_dmabuf_dac(s)))
-			return ret;
+		if (!s->dma_dac.ready && (val = prog_dmabuf_dac(s)) != 0)
+			return val;
 		spin_lock_irqsave(&s->lock, flags);
 		solo1_update_ptr(s);
                 cinfo.bytes = s->dma_dac.total_bytes;
@@ -1606,7 +1655,9 @@ static int solo1_open(struct inode *inode, struct file *file)
 	s->clkdiv = 96 | 0x80;
 	s->ena = 0;
 	s->dma_adc.ossfragshift = s->dma_adc.ossmaxfrags = s->dma_adc.subdivision = 0;
+	s->dma_adc.enabled = 1;
 	s->dma_dac.ossfragshift = s->dma_dac.ossmaxfrags = s->dma_dac.subdivision = 0;
+	s->dma_dac.enabled = 1;
 	s->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	up(&s->open_sem);
 	prog_codec(s);
@@ -1933,6 +1984,7 @@ static int solo1_midi_release(struct inode *inode, struct file *file)
 			if (file->f_flags & O_NONBLOCK) {
 				remove_wait_queue(&s->midi.owait, &wait);
 				set_current_state(TASK_RUNNING);
+				unlock_kernel();
 				return -EBUSY;
 			}
 			tmo = (count * HZ) / 3100;
@@ -2281,7 +2333,8 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	s->vcbase = pci_resource_start(pcidev, 2);
 	s->ddmabase = s->vcbase + DDMABASE_OFFSET;
 	s->mpubase = pci_resource_start(pcidev, 3);
-	s->gpbase = pci_resource_start(pcidev, 4);
+	s->gameport.io = pci_resource_start(pcidev, 4);
+	s->gameport.size = pci_resource_len(pcidev,4);
 	s->irq = pcidev->irq;
 	if (!request_region(s->iobase, IOBASE_EXTENT, "ESS Solo1")) {
 		printk(KERN_ERR "solo1: io ports in use\n");
@@ -2299,13 +2352,19 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 		printk(KERN_ERR "solo1: io ports in use\n");
 		goto err_region4;
 	}
+	if (!s->gameport.size)
+		s->gameport.io = 0;
+	if (s->gameport.io && !request_region(s->gameport.io, s->gameport.size, "ESS Solo1")) {
+		printk(KERN_ERR "solo1: gameport io ports in use\n");
+		s->gameport.io = s->gameport.size = 0;
+	}
 	if (request_irq(s->irq, solo1_interrupt, SA_SHIRQ, "ESS Solo1", s)) {
 		printk(KERN_ERR "solo1: irq %u in use\n", s->irq);
 		goto err_irq;
 	}
  	if (pci_enable_device(pcidev))
 		goto err_irq;
-	printk(KERN_INFO "solo1: joystick port at %#lx\n", s->gpbase+1);
+	printk(KERN_INFO "solo1: joystick port at %#x\n", s->gameport.io+1);
 	/* register devices */
 	if ((s->dev_audio = register_sound_dsp(&solo1_audio_fops, -1)) < 0)
 		goto err_dev1;
@@ -2317,6 +2376,8 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 		goto err_dev4;
 	if (setup_solo1(s))
 		goto err;
+	/* register gameport */
+	gameport_register_port(&s->gameport);
 	/* store it in the driver field */
 	pci_set_drvdata(pcidev, s);
 	/* put it into driver list */
@@ -2340,6 +2401,8 @@ static int __devinit solo1_probe(struct pci_dev *pcidev, const struct pci_device
 	printk(KERN_ERR "solo1: initialisation error\n");
 	free_irq(s->irq, s);
  err_irq:
+	if (s->gameport.io)
+		release_region(s->gameport.io, s->gameport.size);
 	release_region(s->iobase, IOBASE_EXTENT);
  err_region4:
 	release_region(s->sbbase+FMSYNTH_EXTENT, SBBASE_EXTENT-FMSYNTH_EXTENT);
@@ -2366,6 +2429,10 @@ static void __devinit solo1_remove(struct pci_dev *dev)
 	synchronize_irq();
 	pci_write_config_word(s->dev, 0x60, 0); /* turn off DDMA controller address space */
 	free_irq(s->irq, s);
+	if (s->gameport.io) {
+		gameport_unregister_port(&s->gameport);
+		release_region(s->gameport.io, s->gameport.size);
+	}
 	release_region(s->iobase, IOBASE_EXTENT);
 	release_region(s->sbbase+FMSYNTH_EXTENT, SBBASE_EXTENT-FMSYNTH_EXTENT);
 	release_region(s->ddmabase, DDMABASE_EXTENT);
@@ -2397,7 +2464,7 @@ static int __init init_solo1(void)
 {
 	if (!pci_present())   /* No PCI bus in this machine! */
 		return -ENODEV;
-	printk(KERN_INFO "solo1: version v0.16 time " __TIME__ " " __DATE__ "\n");
+	printk(KERN_INFO "solo1: version v0.18 time " __TIME__ " " __DATE__ "\n");
 	if (!pci_register_driver(&solo1_driver)) {
 		pci_unregister_driver(&solo1_driver);
                 return -ENODEV;

@@ -789,7 +789,11 @@ ide_startstop_t ide_do_reset (ide_drive_t *drive)
 void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 {
 	unsigned long flags;
-	struct request *rq = HWGROUP(drive)->rq;
+	struct request *rq;
+
+	spin_lock_irqsave(&io_request_lock, flags);
+	rq = HWGROUP(drive)->rq;
+	spin_unlock_irqrestore(&io_request_lock, flags);
 
 	if (rq->cmd == IDE_DRIVE_CMD) {
 		byte *args = (byte *) rq->buffer;
@@ -815,10 +819,8 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 	spin_lock_irqsave(&io_request_lock, flags);
 	blkdev_dequeue_request(rq);
 	HWGROUP(drive)->rq = NULL;
-	blkdev_release_request(rq);
+	end_that_request_last(rq);
 	spin_unlock_irqrestore(&io_request_lock, flags);
-	if (rq->sem != NULL)
-		up(rq->sem);	/* inform originator that rq has been serviced */
 }
 
 /*
@@ -1695,7 +1697,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned int major = HWIF(drive)->major;
-	struct list_head * queue_head;
+	struct list_head *queue_head = &drive->queue.queue_head;
 	DECLARE_MUTEX_LOCKED(sem);
 
 #ifdef CONFIG_BLK_DEV_PDC4030
@@ -1708,7 +1710,6 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 	if (action == ide_wait)
 		rq->sem = &sem;
 	spin_lock_irqsave(&io_request_lock, flags);
-	queue_head = &drive->queue.queue_head;
 	if (list_empty(queue_head) || action == ide_preempt) {
 		if (action == ide_preempt)
 			hwgroup->rq = NULL;

@@ -416,7 +416,12 @@ static void DAC1064_restore_1(WPMINFO const struct matrox_hw_state* hw, const st
 	outDAC1064(PMINFO DAC1064_XSYSPLLM, hw->DACclk[3]);
 	outDAC1064(PMINFO DAC1064_XSYSPLLN, hw->DACclk[4]);
 	outDAC1064(PMINFO DAC1064_XSYSPLLP, hw->DACclk[5]);
-	if (!oldhw || memcmp(hw->DACreg, oldhw->DACreg, sizeof(MGA1064_DAC_regs))) {
+	/*
+	 * We must ALWAYS reprogram hardware due to broken XF4 matrox drivers...
+	 *
+	 * if (!oldhw || memcmp(hw->DACreg, oldhw->DACreg, sizeof(MGA1064_DAC_regs))) 
+	 */
+	{
 		unsigned int i;
 
 		for (i = 0; i < sizeof(MGA1064_DAC_regs); i++) {

@@ -7,7 +7,7 @@ tristate 'RAM disk support' CONFIG_BLK_DEV_RAM
 if [ "$CONFIG_BLK_DEV_RAM" = "y" -o "$CONFIG_BLK_DEV_RAM" = "m" ]; then
   int '   Default RAM disk size' CONFIG_BLK_DEV_RAM_SIZE 24576
 fi
-dep_bool '   Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD
+dep_bool '   Initial RAM disk (initrd) support' CONFIG_BLK_DEV_INITRD $CONFIG_BLK_DEV_RAM
 tristate 'XPRAM disk support' CONFIG_BLK_DEV_XPRAM
 
 comment 'S/390 block device drivers'
@@ -18,7 +18,7 @@ if [ "$CONFIG_DASD" != "n"  ]; then
   bool '   Support for FBA  Disks' CONFIG_DASD_FBA
 #  bool '   Support for CKD  Disks' CONFIG_DASD_CKD
   if [ "$CONFIG_ARCH_S390" = "y" ]; then
-    bool '   Support for DIAG access to CMS reserved Disks' CONFIG_DASD_MDSK
+    bool '   Support for DIAG access to CMS reserved Disks' CONFIG_DASD_DIAG
   fi;
 fi
 
@@ -35,9 +35,15 @@ fi
 
 comment 'S/390 character device drivers'
 
-bool 'Support for 3215 line mode terminal' CONFIG_3215
-if [ "$CONFIG_3215" = "y" ]; then
-  bool 'Support for console on 3215 line mode terminal' CONFIG_3215_CONSOLE
+tristate 'Support for locally attached 3270 tubes' CONFIG_3270
+if [ "$CONFIG_3270" = "y" ]; then
+  bool 'Support for console on 3270 line mode terminal' CONFIG_3270_CONSOLE
+fi
+if [ "$CONFIG_3270_CONSOLE" != "y" ]; then
+  bool 'Support for 3215 line mode terminal' CONFIG_3215
+  if [ "$CONFIG_3215" = "y" ]; then
+    bool 'Support for console on 3215 line mode terminal' CONFIG_3215_CONSOLE
+  fi
 fi
 bool 'Support for HWC line mode terminal' CONFIG_HWC
 if [ "$CONFIG_HWC" = "y" ]; then

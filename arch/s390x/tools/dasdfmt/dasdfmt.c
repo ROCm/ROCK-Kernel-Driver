@@ -7,6 +7,7 @@
  *    Author(s): Utz Bacher, <utz.bacher@de.ibm.com>
  *
  *  Device-in-use-checks by Fritz Elfert, <felfert@to.com>
+ *  Compatible Disk Layout enhancements by Carsten Otte, <cotte@de.ibm.com>
  *
  * Still to do:
  *   detect non-switch parameters ("dasdfmt -n 170 XY") and complain about them 
@@ -157,14 +158,15 @@ void
 exit_usage(int exitcode)
 {
 #ifdef RANGE_FORMATTING
-	printf("Usage: %s [-htvyLV] [-l <label>] [-b <blocksize>] [<range>] " \
+	printf("Usage: %s [-htvyCLV] [-l <label>] [-b <blocksize>] [<range>] " \
 		"<diskspec>\n\n",prog_name);
 #else /* RANGE_FORMATTING */
-	printf("Usage: %s [-htvyLV] [-l <label>] [-b <blocksize>] " \
+	printf("Usage: %s [-htvyCLV] [-l <label>] [-b <blocksize>] " \
 		"<diskspec>\n\n",prog_name);
 #endif /* RANGE_FORMATTING */
 	printf("       -t means testmode\n");
 	printf("       -v means verbose mode\n");
+	printf("       -C means format compatible disk layout\n");
 	printf("       -V means print version\n");
 	printf("       -L means don't write disk label\n");
 	printf("       <label> is a label which is converted to EBCDIC and " \
@@ -200,7 +202,7 @@ get_xno_from_xno(int *devno,kdev_t *major_no,kdev_t *minor_no,int mode)
 
 	/*	fgets(line,sizeof(line),file); omit first line */ 
 	while (fgets(line,sizeof(line),file)!=NULL) {
-		rc=sscanf(line,"%X %*[(A-Z)] at (%d:%d)",&d,&ma_i,&mi_i);
+                rc=sscanf(line,"%X %*[(A-Z) ] at (%d:%d)",&d,&ma_i,&mi_i);
 		ma=ma_i;
 		mi=mi_i;
 		if ( (rc==3) &&
@@ -218,7 +220,8 @@ get_xno_from_xno(int *devno,kdev_t *major_no,kdev_t *minor_no,int mode)
 	fclose(file);
 
 	ERRMSG_EXIT(EXIT_FAILURE,"%s: failed to find device in the /proc " \
-		"filesystem (are you sure to have the right param line?)\n",
+		    "filesystem (are you sure to have the right parameter " \
+		    "dasd=xxx?)\n",
 		prog_name);
 }
 
@@ -488,14 +491,14 @@ do_format_dasd(char *dev_name,format_data_t format_params,int testmode,
 	}
 	check_mounted(major_no, minor_no);
 
+	get_xno_from_xno(&devno,&major_no,&minor_no,
+			GIVEN_MAJOR|GIVEN_MINOR);
 	if ((!writenolabel) && (!labelspec)) {
 		sprintf(label,"LNX1 x%04x",devno);
 	}
 	
 	if ( ((withoutprompt)&&(verbosity>=1)) ||
 		(!withoutprompt) ) {
-		get_xno_from_xno(&devno,&major_no,&minor_no,
-			GIVEN_MAJOR|GIVEN_MINOR);
 		printf("\nI am going to format the device %s in the " \
 			"following way:\n",dev_name);
 		printf("   Device number of device : 0x%x\n",devno);
@@ -505,6 +508,9 @@ do_format_dasd(char *dev_name,format_data_t format_params,int testmode,
 			"no":"yes");
 		if (!writenolabel)
 			printf("   Disk label              : %s\n",label);
+		if (format_params.intensity != DASD_FORMAT_DEFAULT_INTENSITY)
+			printf("   Compatible Disk Layout  : %s\n",(format_params.intensity&0x08)?
+			       "yes":"no");
 #ifdef RANGE_FORMATTING
 		printf("   Start track             : %d\n" \
 			,format_params.start_unit);
@@ -558,7 +564,7 @@ do_format_dasd(char *dev_name,format_data_t format_params,int testmode,
 			}
 	
 
-			rc=ioctl(fd,BLKGETSIZE,&new_blksize);
+			rc=ioctl(fd,BLKSSZGET,&new_blksize);
 			if (rc) {
 				ERRMSG("%s: the ioctl call to get blocksize " \
 					"returned with the following error " \
@@ -664,9 +670,9 @@ int main(int argc,char *argv[]) {
 	opterr=0;
 
 #ifdef RANGE_FORMATTING
-	while ( (oc=getopt(argc,argv,"r:s:e:b:n:l:f:hLty?vV")) !=EOF) {
+	while ( (oc=getopt(argc,argv,"r:s:e:b:n:l:f:ChLty?vV")) !=EOF) {
 #endif /* RANGE_FORMATTING */
-	while ( (oc=getopt(argc,argv,"b:n:l:f:hLty?vV")) !=EOF) {
+	while ( (oc=getopt(argc,argv,"b:n:l:f:ChLty?vV")) !=EOF) {
 		switch (oc) {
 		case 'y':
 			withoutprompt=1;
@@ -686,6 +692,9 @@ int main(int argc,char *argv[]) {
 
 		case 'h':
 			exit_usage(0);
+		case 'C':
+                	format_params.intensity&=0x08;
+			break;
 
 		case 'V':
 			printf("%s version 0.99\n",prog_name);

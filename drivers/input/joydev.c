@@ -1,5 +1,5 @@
 /*
- * $Id: joydev.c,v 1.13 2000/08/14 21:05:26 vojtech Exp $
+ * $Id: joydev.c,v 1.19 2001/01/10 19:49:40 vojtech Exp $
  *
  *  Copyright (c) 1999-2000 Vojtech Pavlik 
  *  Copyright (c) 1999 Colin Van Dyke 
@@ -232,9 +232,10 @@ static ssize_t joydev_read(struct file *file, char *buf, size_t count, loff_t *p
 	if (count == sizeof(struct JS_DATA_TYPE)) {
 
 		struct JS_DATA_TYPE data;
+		int i;
 
-		data.buttons =  ((joydev->nkey > 0 && test_bit(joydev->keypam[0], input->key)) ? 1 : 0) |
-				((joydev->nkey > 1 && test_bit(joydev->keypam[1], input->key)) ? 2 : 0);
+		for (data.buttons = i = 0; i < 32 && i < joydev->nkey; i++)
+			data.buttons |= test_bit(joydev->keypam[i], input->key) ? (1 << i) : 0;
 		data.x = (joydev->abs[0] / 256 + 128) >> joydev->glue.JS_CORR.x;
 		data.y = (joydev->abs[1] / 256 + 128) >> joydev->glue.JS_CORR.y;
 
@@ -323,7 +324,7 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct joydev_list *list = file->private_data;
 	struct joydev *joydev = list->joydev;
 	struct input_dev *dev = joydev->handle.dev;
-
+	int i;
 
 	switch (cmd) {
 
@@ -360,6 +361,28 @@ static int joydev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		case JSIOCGCORR:
 			return copy_to_user((struct js_corr *) arg, joydev->corr,
 						sizeof(struct js_corr) * joydev->nabs) ? -EFAULT : 0;
+		case JSIOCSAXMAP:
+			if (copy_from_user((__u8 *) arg, joydev->abspam, sizeof(__u8) * ABS_MAX))
+				return -EFAULT;
+			for (i = 0; i < ABS_MAX; i++) {
+				if (joydev->abspam[i] > ABS_MAX) return -EINVAL;
+				joydev->absmap[joydev->abspam[i]] = i;
+			}
+			return 0;
+		case JSIOCGAXMAP:
+			return copy_to_user((__u8 *) arg, joydev->abspam,
+						sizeof(__u8) * ABS_MAX) ? -EFAULT : 0;
+		case JSIOCSBTNMAP:
+			if (copy_from_user((__u16 *) arg, joydev->absmap, sizeof(__u16) * (KEY_MAX - BTN_MISC)))
+				return -EFAULT;
+			for (i = 0; i < KEY_MAX - BTN_MISC; i++); {
+				if (joydev->keypam[i] > KEY_MAX || joydev->keypam[i] < BTN_MISC) return -EINVAL;
+				joydev->keymap[joydev->abspam[i - BTN_MISC]] = i;
+			}
+			return 0;
+		case JSIOCGBTNMAP:
+			return copy_to_user((__u16 *) arg, joydev->keypam,
+						sizeof(__u16) * (KEY_MAX - BTN_MISC)) ? -EFAULT : 0;
 		default:
 			if ((cmd & ~(_IOC_SIZEMASK << _IOC_SIZESHIFT)) == JSIOCGNAME(0)) {
 				int len;
@@ -454,7 +477,7 @@ static struct input_handle *joydev_connect(struct input_handler *handler, struct
 
 	joydev->devfs = input_register_minor("js%d", minor, JOYDEV_MINOR_BASE);
 
-	printk(KERN_INFO "js%d: Joystick device for input%d\n", minor, dev->number);
+//	printk(KERN_INFO "js%d: Joystick device for input%d\n", minor, dev->number);
 
 	return &joydev->handle;
 }

@@ -9,6 +9,7 @@
  * 11/14/00 redesign by Martin Schwidefsky
  */
 
+#include <linux/module.h>
 #include <linux/malloc.h>
 #include <linux/version.h>
 
@@ -31,9 +32,7 @@
 #define kmem_cache_destroy(x) do {} while(0)
 #endif
 
-#ifdef PRINTK_HEADER
 #undef PRINTK_HEADER
-#endif
 #define PRINTK_HEADER "ccwcache"
 
 /* pointer to list of allocated requests */
@@ -300,4 +299,7 @@ ccwcache_cleanup (void)
 	}
 	debug_unregister( debug_area );
 }
+
+EXPORT_SYMBOL(ccw_alloc_request);
+EXPORT_SYMBOL(ccw_free_request);
 

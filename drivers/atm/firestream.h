@@ -369,6 +369,9 @@ struct fs_transmit_config {
 };
 
 #define TC_FLAGS_AAL5      (0x0 << 29)
+#define TC_FLAGS_TRANSPARENT_PAYLOAD (0x1 << 29)
+#define TC_FLAGS_TRANSPARENT_CELL    (0x2 << 29)
+#define TC_FLAGS_STREAMING (0x1 << 28)
 #define TC_FLAGS_PACKET    (0x0) 
 #define TC_FLAGS_TYPE_ABR  (0x0 << 22)
 #define TC_FLAGS_TYPE_CBR  (0x1 << 22)
@@ -498,8 +501,8 @@ struct fs_dev {
  
 /* Within limits this is user-configurable. */
 /* Note: Currently the sum (10 -> 1k channels) is hardcoded in the driver. */
-#define FS155_VPI_BITS 5
-#define FS155_VCI_BITS 5
+#define FS155_VPI_BITS 4
+#define FS155_VCI_BITS 6
 
 #define FS155_CHANNEL_BITS  (FS155_VPI_BITS + FS155_VCI_BITS)
 #define FS155_NR_CHANNELS   (1 << FS155_CHANNEL_BITS)

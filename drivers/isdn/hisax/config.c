@@ -914,13 +914,12 @@ checkcard(int cardnr, char *id, int *busy_flag)
 
 	save_flags(flags);
 	cli();
-	if (!(cs = (struct IsdnCardState *)
-		kmalloc(sizeof(struct IsdnCardState), GFP_ATOMIC))) {
+	cs = kmalloc(sizeof(struct IsdnCardState), GFP_ATOMIC);
+	if (!cs) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for IsdnCardState(card %d)\n",
 		       cardnr + 1);
-		restore_flags(flags);
-		return (0);
+		goto out;
 	}
 	memset(cs, 0, sizeof(struct IsdnCardState));
 	card->cs = cs;
@@ -939,241 +938,235 @@ checkcard(int cardnr, char *id, int *busy_flag)
 #endif
 	cs->protocol = card->protocol;
 
-	if ((card->typ > 0) && (card->typ <= ISDN_CTYPE_COUNT)) {
-		if (!(cs->dlog = kmalloc(MAX_DLOG_SPACE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for dlog(card %d)\n",
-				cardnr + 1);
-			restore_flags(flags);
-			return (0);
-		}
-		if (!(cs->status_buf = kmalloc(HISAX_STATUS_BUFSIZE, GFP_ATOMIC))) {
-			printk(KERN_WARNING
-				"HiSax: No memory for status_buf(card %d)\n",
-				cardnr + 1);
-			kfree(cs->dlog);
-			restore_flags(flags);
-			return (0);
-		}
-		cs->stlist = NULL;
-		cs->status_read = cs->status_buf;
-		cs->status_write = cs->status_buf;
-		cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
-		cs->typ = card->typ;
-		strcpy(cs->iif.id, id);
-		cs->iif.channels = 2;
-		cs->iif.maxbufsize = MAX_DATA_SIZE;
-		cs->iif.hl_hdrlen = MAX_HEADER_LEN;
-		cs->iif.features =
-			ISDN_FEATURE_L2_X75I |
-			ISDN_FEATURE_L2_HDLC |
-			ISDN_FEATURE_L2_HDLC_56K |
-			ISDN_FEATURE_L2_TRANS |
-			ISDN_FEATURE_L3_TRANS |
-#ifdef	CONFIG_HISAX_1TR6
-			ISDN_FEATURE_P_1TR6 |
-#endif
-#ifdef	CONFIG_HISAX_EURO
-			ISDN_FEATURE_P_EURO |
-#endif
-#ifdef	CONFIG_HISAX_NI1
-			ISDN_FEATURE_P_NI1 |
-#endif
-			0;
-
-		cs->iif.command = HiSax_command;
-		cs->iif.writecmd = NULL;
-		cs->iif.writebuf_skb = HiSax_writebuf_skb;
-		cs->iif.readstat = HiSax_readstatus;
-		register_isdn(&cs->iif);
-		cs->myid = cs->iif.channels;
-		printk(KERN_INFO
-			"HiSax: Card %d Protocol %s Id=%s (%d)\n", cardnr + 1,
-			(card->protocol == ISDN_PTYPE_1TR6) ? "1TR6" :
-			(card->protocol == ISDN_PTYPE_EURO) ? "EDSS1" :
-			(card->protocol == ISDN_PTYPE_LEASED) ? "LEASED" :
-			(card->protocol == ISDN_PTYPE_NI1) ? "NI1" :
-			"NONE", cs->iif.id, cs->myid);
-		switch (card->typ) {
-#if CARD_TELES0
-			case ISDN_CTYPE_16_0:
-			case ISDN_CTYPE_8_0:
-				ret = setup_teles0(card);
-				break;
-#endif
-#if CARD_TELES3
-			case ISDN_CTYPE_16_3:
-			case ISDN_CTYPE_PNP:
-			case ISDN_CTYPE_TELESPCMCIA:
-			case ISDN_CTYPE_COMPAQ_ISA:
-				ret = setup_teles3(card);
-				break;
-#endif
-#if CARD_S0BOX
-			case ISDN_CTYPE_S0BOX:
-				ret = setup_s0box(card);
-				break;
-#endif
-#if CARD_TELESPCI
-			case ISDN_CTYPE_TELESPCI:
-				ret = setup_telespci(card);
-				break;
-#endif
-#if CARD_AVM_A1
-			case ISDN_CTYPE_A1:
-				ret = setup_avm_a1(card);
-				break;
-#endif
-#if CARD_AVM_A1_PCMCIA
-			case ISDN_CTYPE_A1_PCMCIA:
-				ret = setup_avm_a1_pcmcia(card);
-				break;
-#endif
-#if CARD_FRITZPCI
-			case ISDN_CTYPE_FRITZPCI:
-				ret = setup_avm_pcipnp(card);
-				break;
-#endif
-#if CARD_ELSA
-			case ISDN_CTYPE_ELSA:
-			case ISDN_CTYPE_ELSA_PNP:
-			case ISDN_CTYPE_ELSA_PCMCIA:
-			case ISDN_CTYPE_ELSA_PCI:
-				ret = setup_elsa(card);
-				break;
-#endif
-#if CARD_IX1MICROR2
-			case ISDN_CTYPE_IX1MICROR2:
-				ret = setup_ix1micro(card);
-				break;
-#endif
-#if CARD_DIEHLDIVA
-			case ISDN_CTYPE_DIEHLDIVA:
-				ret = setup_diva(card);
-				break;
-#endif
-#if CARD_ASUSCOM
-			case ISDN_CTYPE_ASUSCOM:
-				ret = setup_asuscom(card);
-				break;
-#endif
-#if CARD_TELEINT
-			case ISDN_CTYPE_TELEINT:
-				ret = setup_TeleInt(card);
-				break;
-#endif
-#if CARD_SEDLBAUER
-			case ISDN_CTYPE_SEDLBAUER:
-			case ISDN_CTYPE_SEDLBAUER_PCMCIA:
-			case ISDN_CTYPE_SEDLBAUER_FAX:
-				ret = setup_sedlbauer(card);
-				break;
-#endif
-#if CARD_SPORTSTER
-			case ISDN_CTYPE_SPORTSTER:
-				ret = setup_sportster(card);
-				break;
-#endif
-#if CARD_MIC
-			case ISDN_CTYPE_MIC:
-				ret = setup_mic(card);
-				break;
-#endif
-#if CARD_NETJET_S
-			case ISDN_CTYPE_NETJET_S:
-				ret = setup_netjet_s(card);
-				break;
-#endif
-#if CARD_HFCS
-			case ISDN_CTYPE_TELES3C:
-			case ISDN_CTYPE_ACERP10:
-				ret = setup_hfcs(card);
-				break;
-#endif
-#if CARD_HFC_PCI
-		        case ISDN_CTYPE_HFC_PCI: 
-				ret = setup_hfcpci(card);
-				break;
-#endif
-#if CARD_HFC_SX
-		        case ISDN_CTYPE_HFC_SX: 
-				ret = setup_hfcsx(card);
-				break;
-#endif
-#if CARD_NICCY
-			case ISDN_CTYPE_NICCY:
-				ret = setup_niccy(card);
-				break;
-#endif
-#if CARD_AMD7930
-			case ISDN_CTYPE_AMD7930:
-				ret = setup_amd7930(card);
-				break;
-#endif
-#if CARD_ISURF
-			case ISDN_CTYPE_ISURF:
-				ret = setup_isurf(card);
-				break;
-#endif
-#if CARD_HSTSAPHIR
-			case ISDN_CTYPE_HSTSAPHIR:
-				ret = setup_saphir(card);
-				break;
-#endif
-#if CARD_TESTEMU
-			case ISDN_CTYPE_TESTEMU:
-				ret = setup_testemu(card);
-				break;
-#endif
-#if	CARD_BKM_A4T       
-           	case ISDN_CTYPE_BKM_A4T:
-	        	ret = setup_bkm_a4t(card);
-			break;
-#endif
-#if	CARD_SCT_QUADRO
-	        case ISDN_CTYPE_SCT_QUADRO:
-    			ret = setup_sct_quadro(card);
-			break;
-#endif
-#if CARD_GAZEL
- 		case ISDN_CTYPE_GAZEL:
- 			ret = setup_gazel(card);
- 			break;
-#endif
-#if CARD_W6692
-		case ISDN_CTYPE_W6692:
-			ret = setup_w6692(card);
-			break;
-#endif
-#if CARD_NETJET_U
-			case ISDN_CTYPE_NETJET_U:
-				ret = setup_netjet_u(card);
-				break;
-#endif
-		default:
-			printk(KERN_WARNING
-				"HiSax: Support for %s Card not selected\n",
-				CardType[card->typ]);
-			ll_unload(cs);
-			restore_flags(flags);
-			return (0);
-		}
-	} else {
+	if (card->typ <= 0 || card->typ > ISDN_CTYPE_COUNT) {
 		printk(KERN_WARNING
 		       "HiSax: Card Type %d out of range\n",
 		       card->typ);
-		restore_flags(flags);
-		return (0);
+		goto outf_cs;
+	}
+	if (!(cs->dlog = kmalloc(MAX_DLOG_SPACE, GFP_ATOMIC))) {
+		printk(KERN_WARNING
+		       "HiSax: No memory for dlog(card %d)\n",
+		       cardnr + 1);
+		goto outf_cs;
+	}
+	if (!(cs->status_buf = kmalloc(HISAX_STATUS_BUFSIZE, GFP_ATOMIC))) {
+		printk(KERN_WARNING
+		       "HiSax: No memory for status_buf(card %d)\n",
+		       cardnr + 1);
+		goto outf_dlog;
+	}
+	cs->stlist = NULL;
+	cs->status_read = cs->status_buf;
+	cs->status_write = cs->status_buf;
+	cs->status_end = cs->status_buf + HISAX_STATUS_BUFSIZE - 1;
+	cs->typ = card->typ;
+	strcpy(cs->iif.id, id);
+	cs->iif.channels = 2;
+	cs->iif.maxbufsize = MAX_DATA_SIZE;
+	cs->iif.hl_hdrlen = MAX_HEADER_LEN;
+	cs->iif.features =
+		ISDN_FEATURE_L2_X75I |
+		ISDN_FEATURE_L2_HDLC |
+		ISDN_FEATURE_L2_HDLC_56K |
+		ISDN_FEATURE_L2_TRANS |
+		ISDN_FEATURE_L3_TRANS |
+#ifdef	CONFIG_HISAX_1TR6
+		ISDN_FEATURE_P_1TR6 |
+#endif
+#ifdef	CONFIG_HISAX_EURO
+		ISDN_FEATURE_P_EURO |
+#endif
+#ifdef	CONFIG_HISAX_NI1
+		ISDN_FEATURE_P_NI1 |
+#endif
+		0;
+	
+	cs->iif.command = HiSax_command;
+	cs->iif.writecmd = NULL;
+	cs->iif.writebuf_skb = HiSax_writebuf_skb;
+	cs->iif.readstat = HiSax_readstatus;
+	register_isdn(&cs->iif);
+	cs->myid = cs->iif.channels;
+	printk(KERN_INFO
+	       "HiSax: Card %d Protocol %s Id=%s (%d)\n", cardnr + 1,
+	       (card->protocol == ISDN_PTYPE_1TR6) ? "1TR6" :
+	       (card->protocol == ISDN_PTYPE_EURO) ? "EDSS1" :
+	       (card->protocol == ISDN_PTYPE_LEASED) ? "LEASED" :
+	       (card->protocol == ISDN_PTYPE_NI1) ? "NI1" :
+	       "NONE", cs->iif.id, cs->myid);
+	switch (card->typ) {
+#if CARD_TELES0
+	case ISDN_CTYPE_16_0:
+	case ISDN_CTYPE_8_0:
+		ret = setup_teles0(card);
+		break;
+#endif
+#if CARD_TELES3
+	case ISDN_CTYPE_16_3:
+	case ISDN_CTYPE_PNP:
+	case ISDN_CTYPE_TELESPCMCIA:
+	case ISDN_CTYPE_COMPAQ_ISA:
+		ret = setup_teles3(card);
+		break;
+#endif
+#if CARD_S0BOX
+	case ISDN_CTYPE_S0BOX:
+		ret = setup_s0box(card);
+		break;
+#endif
+#if CARD_TELESPCI
+	case ISDN_CTYPE_TELESPCI:
+		ret = setup_telespci(card);
+		break;
+#endif
+#if CARD_AVM_A1
+	case ISDN_CTYPE_A1:
+		ret = setup_avm_a1(card);
+		break;
+#endif
+#if CARD_AVM_A1_PCMCIA
+	case ISDN_CTYPE_A1_PCMCIA:
+		ret = setup_avm_a1_pcmcia(card);
+		break;
+#endif
+#if CARD_FRITZPCI
+	case ISDN_CTYPE_FRITZPCI:
+		ret = setup_avm_pcipnp(card);
+		break;
+#endif
+#if CARD_ELSA
+	case ISDN_CTYPE_ELSA:
+	case ISDN_CTYPE_ELSA_PNP:
+	case ISDN_CTYPE_ELSA_PCMCIA:
+	case ISDN_CTYPE_ELSA_PCI:
+		ret = setup_elsa(card);
+		break;
+#endif
+#if CARD_IX1MICROR2
+	case ISDN_CTYPE_IX1MICROR2:
+		ret = setup_ix1micro(card);
+		break;
+#endif
+#if CARD_DIEHLDIVA
+	case ISDN_CTYPE_DIEHLDIVA:
+		ret = setup_diva(card);
+		break;
+#endif
+#if CARD_ASUSCOM
+	case ISDN_CTYPE_ASUSCOM:
+		ret = setup_asuscom(card);
+		break;
+#endif
+#if CARD_TELEINT
+	case ISDN_CTYPE_TELEINT:
+		ret = setup_TeleInt(card);
+		break;
+#endif
+#if CARD_SEDLBAUER
+	case ISDN_CTYPE_SEDLBAUER:
+	case ISDN_CTYPE_SEDLBAUER_PCMCIA:
+	case ISDN_CTYPE_SEDLBAUER_FAX:
+		ret = setup_sedlbauer(card);
+		break;
+#endif
+#if CARD_SPORTSTER
+	case ISDN_CTYPE_SPORTSTER:
+		ret = setup_sportster(card);
+		break;
+#endif
+#if CARD_MIC
+	case ISDN_CTYPE_MIC:
+		ret = setup_mic(card);
+		break;
+#endif
+#if CARD_NETJET_S
+	case ISDN_CTYPE_NETJET_S:
+		ret = setup_netjet_s(card);
+		break;
+#endif
+#if CARD_HFCS
+	case ISDN_CTYPE_TELES3C:
+	case ISDN_CTYPE_ACERP10:
+		ret = setup_hfcs(card);
+		break;
+#endif
+#if CARD_HFC_PCI
+	case ISDN_CTYPE_HFC_PCI: 
+		ret = setup_hfcpci(card);
+		break;
+#endif
+#if CARD_HFC_SX
+	case ISDN_CTYPE_HFC_SX: 
+		ret = setup_hfcsx(card);
+		break;
+#endif
+#if CARD_NICCY
+	case ISDN_CTYPE_NICCY:
+		ret = setup_niccy(card);
+		break;
+#endif
+#if CARD_AMD7930
+	case ISDN_CTYPE_AMD7930:
+		ret = setup_amd7930(card);
+		break;
+#endif
+#if CARD_ISURF
+	case ISDN_CTYPE_ISURF:
+		ret = setup_isurf(card);
+		break;
+#endif
+#if CARD_HSTSAPHIR
+	case ISDN_CTYPE_HSTSAPHIR:
+		ret = setup_saphir(card);
+		break;
+#endif
+#if CARD_TESTEMU
+	case ISDN_CTYPE_TESTEMU:
+		ret = setup_testemu(card);
+		break;
+#endif
+#if	CARD_BKM_A4T       
+	case ISDN_CTYPE_BKM_A4T:
+		ret = setup_bkm_a4t(card);
+		break;
+#endif
+#if	CARD_SCT_QUADRO
+	case ISDN_CTYPE_SCT_QUADRO:
+		ret = setup_sct_quadro(card);
+		break;
+#endif
+#if CARD_GAZEL
+	case ISDN_CTYPE_GAZEL:
+		ret = setup_gazel(card);
+		break;
+#endif
+#if CARD_W6692
+	case ISDN_CTYPE_W6692:
+		ret = setup_w6692(card);
+		break;
+#endif
+#if CARD_NETJET_U
+	case ISDN_CTYPE_NETJET_U:
+		ret = setup_netjet_u(card);
+		break;
+#endif
+	default:
+		printk(KERN_WARNING
+		       "HiSax: Support for %s Card not selected\n",
+		       CardType[card->typ]);
+		ll_unload(cs);
+		goto outf_cs;
 	}
 	if (!ret) {
 		ll_unload(cs);
-		restore_flags(flags);
-		return (0);
+		goto outf_cs;
 	}
 	if (!(cs->rcvbuf = kmalloc(MAX_DFRAME_LEN_L1, GFP_ATOMIC))) {
 		printk(KERN_WARNING
 		       "HiSax: No memory for isac rcvbuf\n");
-		return (1);
+		ll_unload(cs);
+		goto outf_cs;
 	}
 	cs->rcvidx = 0;
 	cs->tx_skb = NULL;
@@ -1190,21 +1183,31 @@ checkcard(int cardnr, char *id, int *busy_flag)
 	ret = init_card(cs);
 	if (ret) {
 		closecard(cardnr);
-		restore_flags(flags);
-		return (0);
+		ret = 0;
+		goto outf_cs;
 	}
 	init_tei(cs, cs->protocol);
 	ret = CallcNewChan(cs);
 	if (ret) {
 		closecard(cardnr);
-		restore_flags(flags);
-		return 0;
+		ret = 0;
+		goto outf_cs;
 	}
 	/* ISAR needs firmware download first */
 	if (!test_bit(HW_ISAR, &cs->HW_Flags))
 		ll_run(cs, 0);
+
+	ret = 1;
+	goto out;
+
+ outf_dlog:
+	kfree(cs->dlog);
+ outf_cs:
+	kfree(cs);
+	card->cs = NULL;
+ out:
 	restore_flags(flags);
-	return (1);
+	return ret;
 }
 
 void __devinit
@@ -1253,9 +1256,6 @@ HiSax_inithardware(int *busy_flag)
 		} else {
 			printk(KERN_WARNING "HiSax: Card %s not installed !\n",
 			       CardType[cards[i].typ]);
-			if (cards[i].cs)
-				kfree((void *) cards[i].cs);
-			cards[i].cs = NULL;
 			HiSax_shiftcards(i);
 			nrcards--;
 		}

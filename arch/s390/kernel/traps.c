@@ -35,6 +35,7 @@
 #if CONFIG_REMOTE_DEBUG
 #include <asm/gdb-stub.h>
 #endif
+#include <asm/cpcmd.h>
 
 /* Called from entry.S only */
 extern void handle_per_exception(struct pt_regs *regs);
@@ -51,6 +52,7 @@ int sysctl_userprocess_debug = 0;
 #endif
 
 extern pgm_check_handler_t do_page_fault;
+extern pgm_check_handler_t do_pseudo_page_fault;
 
 spinlock_t die_lock;
 
@@ -140,7 +142,7 @@ DO_ERROR(SIGSEGV, "Unknown program exception", default_trap_handler)
 DO_ERROR(SIGILL,  "privileged operation", privileged_op)
 DO_ERROR(SIGILL,  "execute exception", execute_exception)
 DO_ERROR(SIGSEGV, "addressing exception", addressing_exception)
-DO_ERROR(SIGFPE,  "fixpoint divide exception", divide_exception)
+DO_ERROR(SIGILL,  "fixpoint divide exception", divide_exception)
 DO_ERROR(SIGILL,  "translation exception", translation_exception)
 DO_ERROR(SIGILL,  "special operand exception", special_op_exception)
 DO_ERROR(SIGILL,  "operand exception", operand_exception)
@@ -149,7 +151,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
 	__u16 *location;
-	int do_sig = 0;
+	int signal = 0;
 	int problem_state=(regs->psw.mask & PSW_PROBLEM_STATE);
 
         lock_kernel();
@@ -161,82 +163,93 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	if(*((__u16 *)opcode)==S390_BREAKPOINT_U16)
         {
 		if(do_debugger_trap(regs,SIGTRAP))
-			do_sig=1;
+			signal = SIGILL;
 	}
-#ifdef CONFIG_IEEEFPU_EMULATION
-        else if (problem_state )
+#ifdef CONFIG_MATHEMU
+        else if (problem_state)
 	{
 		if (opcode[0] == 0xb3) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig = math_emu_b3(opcode, regs);
+			signal = math_emu_b3(opcode, regs);
                 } else if (opcode[0] == 0xed) {
 			get_user(*((__u32 *) (opcode+2)),
 				 (__u32 *)(location+1));
-			do_sig = math_emu_ed(opcode, regs);
+			signal = math_emu_ed(opcode, regs);
 		} else if (*((__u16 *) opcode) == 0xb299) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig = math_emu_srnm(opcode, regs);
+			signal = math_emu_srnm(opcode, regs);
 		} else if (*((__u16 *) opcode) == 0xb29c) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig = math_emu_stfpc(opcode, regs);
+			signal = math_emu_stfpc(opcode, regs);
 		} else if (*((__u16 *) opcode) == 0xb29d) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig = math_emu_lfpc(opcode, regs);
+			signal = math_emu_lfpc(opcode, regs);
 		} else
-			do_sig = 1;
+			signal = SIGILL;
         }
 #endif 
 	else
-		do_sig = 1;
-	if (do_sig)
-		do_trap(interruption_code, SIGILL, "illegal operation", regs, NULL);
+		signal = SIGILL;
+        if (signal == SIGFPE) {
+		current->thread.ieee_instruction_pointer = (addr_t) location;
+		do_trap(interruption_code, signal,
+			"floating point exception", regs, NULL);
+        } else if (signal)
+		do_trap(interruption_code, signal,
+			"illegal operation", regs, NULL);
         unlock_kernel();
 }
 
 
 
-#ifdef CONFIG_IEEEFPU_EMULATION
-asmlinkage void specification_exception(struct pt_regs * regs, long interruption_code)
+#ifdef CONFIG_MATHEMU
+asmlinkage void 
+specification_exception(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
 	__u16 *location;
-	int do_sig = 0;
+	int signal = 0;
 
         lock_kernel();
-        if (regs->psw.mask & 0x00010000L) {
+        if (regs->psw.mask & PSW_PROBLEM_STATE) {
 		location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
 		case 0x28: /* LDR Rx,Ry   */
-			do_sig=math_emu_ldr(opcode);
+			signal = math_emu_ldr(opcode);
 			break;
 		case 0x38: /* LER Rx,Ry   */
-			do_sig=math_emu_ler(opcode);
+			signal = math_emu_ler(opcode);
 			break;
 		case 0x60: /* STD R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_std(opcode, regs);
+			signal = math_emu_std(opcode, regs);
 			break;
 		case 0x68: /* LD R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_ld(opcode, regs);
+			signal = math_emu_ld(opcode, regs);
 			break;
 		case 0x70: /* STE R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_ste(opcode, regs);
+			signal = math_emu_ste(opcode, regs);
 			break;
 		case 0x78: /* LE R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_le(opcode, regs);
+			signal = math_emu_le(opcode, regs);
 			break;
 		default:
-			do_sig = 1;
+			signal = SIGILL;
 			break;
                 }
         } else
-		do_sig = 1;
-        if (do_sig)
-                do_trap(interruption_code, SIGILL, "specification exception", regs, NULL);
+		signal = SIGILL;
+        if (signal == SIGFPE) {
+		current->thread.ieee_instruction_pointer = (addr_t) location;
+		do_trap(interruption_code, signal,
+			"floating point exception", regs, NULL);
+        } else if (signal)
+                do_trap(interruption_code, signal,
+			"specification exception", regs, NULL);
         unlock_kernel();
 }
 #else
@@ -247,80 +260,79 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 {
         __u8 opcode[6];
 	__u16 *location;
-	int do_sig = 0;
+	int signal = 0;
 
         lock_kernel();
 	location = (__u16 *)(regs->psw.addr-S390_lowcore.pgm_ilc);
-	if(MACHINE_HAS_IEEE)
-	{
+	if (MACHINE_HAS_IEEE)
 		__asm__ volatile ("stfpc %0\n\t" 
 				  : "=m" (current->thread.fp_regs.fpc));
-	}
-	/* Same code should work when we implement fpu emulation */
-	/* provided we call data exception from the fpu emulator */
-	if(current->thread.fp_regs.fpc&FPC_DXC_MASK)
-	{
-		current->thread.ieee_instruction_pointer=(addr_t)location;
-		force_sig(SIGFPE, current);
-	}
-#ifdef CONFIG_IEEEFPU_EMULATION
-        else if (regs->psw.mask & 0x00010000L) {
+
+#ifdef CONFIG_MATHEMU
+        else if (regs->psw.mask & PSW_PROBLEM_STATE) {
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
 		case 0x28: /* LDR Rx,Ry   */
-			do_sig=math_emu_ldr(opcode);
+			signal = math_emu_ldr(opcode);
 			break;
 		case 0x38: /* LER Rx,Ry   */
-			do_sig=math_emu_ler(opcode);
+			signal = math_emu_ler(opcode);
 			break;
 		case 0x60: /* STD R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_std(opcode, regs);
+			signal = math_emu_std(opcode, regs);
 			break;
 		case 0x68: /* LD R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_ld(opcode, regs);
+			signal = math_emu_ld(opcode, regs);
 			break;
 		case 0x70: /* STE R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_ste(opcode, regs);
+			signal = math_emu_ste(opcode, regs);
 			break;
 		case 0x78: /* LE R,D(X,B) */
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig=math_emu_le(opcode, regs);
+			signal = math_emu_le(opcode, regs);
 			break;
 		case 0xb3:
 			get_user(*((__u16 *) (opcode+2)), location+1);
-			do_sig = math_emu_b3(opcode, regs);
+			signal = math_emu_b3(opcode, regs);
 			break;
                 case 0xed:
 			get_user(*((__u32 *) (opcode+2)),
 				 (__u32 *)(location+1));
-			do_sig = math_emu_ed(opcode, regs);
+			signal = math_emu_ed(opcode, regs);
 			break;
 	        case 0xb2:
 			if (opcode[1] == 0x99) {
 				get_user(*((__u16 *) (opcode+2)), location+1);
-				do_sig = math_emu_srnm(opcode, regs);
+				signal = math_emu_srnm(opcode, regs);
 			} else if (opcode[1] == 0x9c) {
 				get_user(*((__u16 *) (opcode+2)), location+1);
-				do_sig = math_emu_stfpc(opcode, regs);
+				signal = math_emu_stfpc(opcode, regs);
 			} else if (opcode[1] == 0x9d) {
 				get_user(*((__u16 *) (opcode+2)), location+1);
-				do_sig = math_emu_lfpc(opcode, regs);
+				signal = math_emu_lfpc(opcode, regs);
 			} else
-				do_sig = 1;
+				signal = SIGILL;
 			break;
 		default:
-			do_sig = 1;
+			signal = SIGILL;
 			break;
                 }
         }
 #endif 
+	if (current->thread.fp_regs.fpc & FPC_DXC_MASK)
+		signal = SIGFPE;
 	else
-		do_sig = 1;
-        if (do_sig)
-                do_trap(interruption_code, SIGILL, "data exception", regs, NULL);
+		signal = SIGILL;
+        if (signal == SIGFPE) {
+		current->thread.ieee_instruction_pointer = (addr_t) location;
+		do_trap(interruption_code, signal,
+			"floating point exception", regs, NULL);
+	} else if (signal) 
+                do_trap(interruption_code, signal,
+			"data exception", regs, NULL);
         unlock_kernel();
 }
 
@@ -337,17 +349,20 @@ void __init trap_init(void)
         pgm_check_table[1] = &illegal_op;
         pgm_check_table[2] = &privileged_op;
         pgm_check_table[3] = &execute_exception;
+        pgm_check_table[4] = &do_page_fault;
         pgm_check_table[5] = &addressing_exception;
         pgm_check_table[6] = &specification_exception;
         pgm_check_table[7] = &data_exception;
         pgm_check_table[9] = &divide_exception;
-        pgm_check_table[0x12] = &translation_exception;
-        pgm_check_table[0x13] = &special_op_exception;
-        pgm_check_table[0x15] = &operand_exception;
-        pgm_check_table[4] = &do_page_fault;
         pgm_check_table[0x10] = &do_page_fault;
         pgm_check_table[0x11] = &do_page_fault;
+        pgm_check_table[0x12] = &translation_exception;
+        pgm_check_table[0x13] = &special_op_exception;
+ 	pgm_check_table[0x14] = &do_pseudo_page_fault;
+        pgm_check_table[0x15] = &operand_exception;
         pgm_check_table[0x1C] = &privileged_op;
+	if (MACHINE_IS_VM)
+	        cpcmd("SET PAGEX ON", NULL, 0);
 }
 
 

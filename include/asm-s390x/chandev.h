@@ -66,6 +66,12 @@ int chandev_request_irq(unsigned int   irq,
                       unsigned long  irqflags,
                       const char    *devname,
                       void          *dev_id);
+/*
+ * I originally believed this function wouldn't be necessary
+ * I subsequently found that reprobing failed in certain cases :-(,
+ * It is just a wrapper for free irq.
+ */
+void chandev_free_irq(unsigned int irq, void *dev_id);
 
 typedef enum
 {

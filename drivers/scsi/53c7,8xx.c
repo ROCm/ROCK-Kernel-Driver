@@ -175,7 +175,7 @@
  * Architecture : 
  * This driver is built around a Linux queue of commands waiting to 
  * be executed, and a shared Linux/NCR array of commands to start.  Commands
- * are transfered to the array  by the run_process_issue_queue() function 
+ * are transferred to the array  by the run_process_issue_queue() function 
  * which is called whenever a command completes.
  *
  * As commands are completed, the interrupt routine is triggered,
@@ -1899,7 +1899,6 @@ NCR53c8xx_run_tests (struct Scsi_Host *host) {
 		hostdata->script, start);
 	    printk ("scsi%d : DSPS = 0x%x\n", host->host_no,
 		NCR53c7x0_read32(DSPS_REG));
-	    restore_flags(flags);
 	    return -1;
 	}
     	hostdata->test_running = 0;
@@ -5272,7 +5271,7 @@ intr_dma (struct Scsi_Host *host, struct NCR53c7x0_cmd *cmd) {
      * chances of this happening, and handle it if it occurs anyway.
      *
      * Simply continue with what we were doing, and control should
-     * be transfered to the schedule routine which will ultimately
+     * be transferred to the schedule routine which will ultimately
      * pass control onto the reselection or selection (not yet)
      * code.
      */

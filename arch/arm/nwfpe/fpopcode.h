@@ -1,6 +1,6 @@
 /*
     NetWinder Floating Point Emulator
-    (c) Rebel.com, 1998-1999
+    (c) Rebel.COM, 1998,1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
 
@@ -366,11 +366,25 @@ TABLE 5
 /* Get the rounding mode from the opcode. */
 #define getRoundingMode(opcode)		((opcode & MASK_ROUNDING_MODE) >> 5)
 
-float32 getSingleConstant(const unsigned int nIndex);
-float64 getDoubleConstant(const unsigned int nIndex);
-floatx80 getExtendedConstant(const unsigned int nIndex);
+static inline const floatx80 getExtendedConstant(const unsigned int nIndex)
+{
+   extern const floatx80 floatx80Constant[];
+   return floatx80Constant[nIndex];
+} 
 
-unsigned int getRegisterCount(const unsigned int opcode);
-unsigned int getDestinationSize(const unsigned int opcode);
+static inline const float64 getDoubleConstant(const unsigned int nIndex)
+{
+   extern const float64 float64Constant[];
+   return float64Constant[nIndex];
+} 
+
+static inline const float32 getSingleConstant(const unsigned int nIndex)
+{
+   extern const float32 float32Constant[];
+   return float32Constant[nIndex];
+} 
+
+extern unsigned int getRegisterCount(const unsigned int opcode);
+extern unsigned int getDestinationSize(const unsigned int opcode);
 
 #endif

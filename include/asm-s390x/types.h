@@ -41,14 +41,6 @@ typedef signed long  saddr_t;
  */
 #ifdef __KERNEL__
 
-#ifndef TRUE
-#define TRUE 1
-#endif
-
-#ifndef FALSE
-#define FALSE 0
-#endif
-
 typedef signed char s8;
 typedef unsigned char u8;
 

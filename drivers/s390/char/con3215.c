@@ -22,13 +22,16 @@
 
 #include <linux/slab.h>
 #include <linux/bootmem.h>
+#include <linux/devfs_fs_kernel.h>
+
 #include <asm/io.h>
 #include <asm/ebcdic.h>
 #include <asm/uaccess.h>
 #include <asm/delay.h>
-
-#include "../../../arch/s390/kernel/cpcmd.h"
+#include <asm/cpcmd.h>
 #include <asm/irq.h>
+
+#include "ctrlchar.h"
 
 #define NR_3215		    1
 #define NR_3215_REQ	    (4*NR_3215)
@@ -116,7 +119,7 @@ static int __init con3215_setup(char *str)
 {
         int vdev;
 
-        vdev = simple_strtoul(str,&str,16);
+        vdev = simple_strtoul(str,&str,0);
         if (vdev >= 0 && vdev < 65536)
                 raw3215_condevice = vdev;
         return 1;
@@ -470,6 +473,8 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
                 if ((raw = req->info) == NULL)
                         return;              /* That shouldn't happen ... */
 		if (req->type == RAW3215_READ && raw->tty != NULL) {
+			char *cchar;
+
 			tty = raw->tty;
                         count = 160 - req->residual;
                         if (MACHINE_IS_P390) {
@@ -480,33 +485,12 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 			if (count >= TTY_FLIPBUF_SIZE - tty->flip.count)
 				count = TTY_FLIPBUF_SIZE - tty->flip.count - 1;
 			EBCASC(raw->inbuf, count);
-			if (count == 2 && (
-			    /* hat is 0xb0 in codepage 037 (US etc.) and thus */
-			    /* converted to 0x5e in ascii ('^') */
-			    strncmp(raw->inbuf, "^c", 2) == 0 ||
-			    /* hat is 0xb0 in several other codepages (German,*/
-			    /* UK, ...) and thus converted to ascii octal 252 */
-			    strncmp(raw->inbuf, "\252c", 2) == 0) ) {
-				/* emulate a control C = break */
+			if ((cchar = ctrlchar_handle(raw->inbuf, count, tty))) {
+				if (cchar == (char *)-1)
+					goto in_out;
 				tty->flip.count++;
 				*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-				*tty->flip.char_buf_ptr++ = INTR_CHAR(tty);
-				tty_flip_buffer_push(raw->tty);
-			} else if (count == 2 && (
-				   strncmp(raw->inbuf, "^d", 2) == 0 ||
-				    strncmp(raw->inbuf, "\252d", 2) == 0) ) {
-				/* emulate a control D = end of file */
-				tty->flip.count++;
-				*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-				*tty->flip.char_buf_ptr++ = EOF_CHAR(tty);
-				tty_flip_buffer_push(raw->tty);
-			} else if (count == 2 && (
-				   strncmp(raw->inbuf, "^z", 2) == 0 ||
-				    strncmp(raw->inbuf, "\252z", 2) == 0) ) {
-				/* emulate a control Z = suspend */
-				tty->flip.count++;
-				*tty->flip.flag_buf_ptr++ = TTY_NORMAL;
-				*tty->flip.char_buf_ptr++ = SUSP_CHAR(tty);
+				*tty->flip.char_buf_ptr++ = *cchar;
 				tty_flip_buffer_push(raw->tty);
 			} else {
 				memcpy(tty->flip.char_buf_ptr,
@@ -530,6 +514,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 			raw->count -= req->len;
                         raw->written -= req->len;
 		} 
+in_out:
 		raw->flags &= ~RAW3215_WORKING;
 		raw3215_free_req(req);
 		/* check for empty wait */
@@ -792,22 +777,6 @@ raw3215_find_dev(int number)
 }
 
 #ifdef CONFIG_3215_CONSOLE
-
-/*
- * Try to request the console IRQ. Called from init/main.c
- */
-int con3215_activate(void)
-{
-	raw3215_info *raw;
-
-        if (!MACHINE_IS_VM && !MACHINE_IS_P390)
-                return 0;
-	raw = raw3215[0];  /* 3215 console is the first one */
-	if (raw == NULL || raw->irq == -1)
-                /* console device not found in con3215_init */
-		return -1;
-	return raw3215_startup(raw);
-}
 
 /*
  * Write a string to the 3215 console
@@ -1092,12 +1061,10 @@ static void tty3215_start(struct tty_struct *tty)
 	}
 }
 
+
 /*
- * 3215 console driver boottime initialization code.
- * Register console. We can't request the IRQ here, because
- * it's too early (kmalloc isn't working yet). We'll have to
- * buffer all the console requests until we can request the
- * irq. For this purpose we use some pages of fixed memory.
+ * 3215 console initialization code called from console_init().
+ * NOTE: This is called before kmalloc is available.
  */
 void __init con3215_init(void)
 {
@@ -1121,6 +1088,8 @@ void __init con3215_init(void)
 		raw3215_freelist = req;
 	}
 
+	ctrlchar_init();
+
 #ifdef CONFIG_3215_CONSOLE
         raw3215[0] = raw = (raw3215_info *)
                 alloc_bootmem_low(sizeof(raw3215_info));
@@ -1135,6 +1104,10 @@ void __init con3215_init(void)
 	raw->tqueue.data = raw;
         init_waitqueue_head(&raw->empty_wait);
 
+	/* Request the console irq */
+	if ( raw3215_startup(raw) != 0 )
+		raw->irq = -1;
+
 	if (raw->irq != -1) {
 		register_console(&con3215);
 	} else {
@@ -1145,7 +1118,16 @@ void __init con3215_init(void)
 		printk("Couldn't find a 3215 console device\n");
 	}
 #endif
+}
 
+/*
+ * 3215 tty registration code called from tty_init().
+ * Most kernel services (incl. kmalloc) are available at this poimt.
+ */
+void __init tty3215_init(void)
+{
+	if (!MACHINE_IS_VM && !MACHINE_IS_P390)
+                return;
 	/*
 	 * Initialize the tty_driver structure
 	 * Entries in tty3215_driver that are NOT initialized:
@@ -1166,7 +1148,7 @@ void __init con3215_init(void)
 	tty3215_driver.init_termios.c_iflag = IGNBRK | IGNPAR;
 	tty3215_driver.init_termios.c_oflag = ONLCR | XTABS;
 	tty3215_driver.init_termios.c_lflag = ISIG;
-	tty3215_driver.flags = TTY_DRIVER_REAL_RAW;
+	tty3215_driver.flags = TTY_DRIVER_REAL_RAW; 
 	tty3215_driver.refcount = &tty3215_refcount;
 	tty3215_driver.table = tty3215_table;
 	tty3215_driver.termios = tty3215_termios;
@@ -1194,5 +1176,4 @@ void __init con3215_init(void)
 
 	if (tty_register_driver(&tty3215_driver))
 		panic("Couldn't register tty3215 driver\n");
-
 }

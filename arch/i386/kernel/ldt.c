@@ -94,8 +94,6 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 			goto out_unlock;
 		memset(mm->context.segments, 0, LDT_ENTRIES*LDT_ENTRY_SIZE);
 		
-		if (atomic_read(&mm->mm_users) > 1)
-			printk(KERN_WARNING "LDT allocated for cloned task!\n");
 		/*
 		 * Possibly do an SMP cross-call to other CPUs to reload
 		 * their LDTs?

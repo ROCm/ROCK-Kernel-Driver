@@ -228,21 +228,41 @@ extern char empty_zero_page[PAGE_SIZE];
 /*
  * pgd/pmd/pte query functions
  */
-extern inline int pgd_present(pgd_t pgd) { return pgd_val(pgd) != 0; }
-extern inline int pgd_none(pgd_t pgd)    { return pgd_val(pgd) & _PGD_ENTRY_INV; }
+extern inline int pgd_present(pgd_t pgd)
+{
+	return (pgd_val(pgd) & ~PAGE_MASK) == _PGD_ENTRY;
+}
+
+extern inline int pgd_none(pgd_t pgd)
+{
+	return pgd_val(pgd) & _PGD_ENTRY_INV;
+}
+
 extern inline int pgd_bad(pgd_t pgd)
 {
 	return (pgd_val(pgd) & (~PAGE_MASK & ~_PGD_ENTRY_INV)) != _PGD_ENTRY;
 }
 
-extern inline int pmd_present(pmd_t pmd) { return pmd_val(pmd) != 0; }
-extern inline int pmd_none(pmd_t pmd)    { return pmd_val(pmd) & _PMD_ENTRY_INV; }
+extern inline int pmd_present(pmd_t pmd)
+{
+	return (pmd_val(pmd) & ~PAGE_MASK) == _PMD_ENTRY;
+}
+
+extern inline int pmd_none(pmd_t pmd)
+{
+	return pmd_val(pmd) & _PMD_ENTRY_INV;
+}
+
 extern inline int pmd_bad(pmd_t pmd)
 {
 	return (pmd_val(pmd) & (~PAGE_MASK & ~_PMD_ENTRY_INV)) != _PMD_ENTRY;
 }
 
-extern inline int pte_present(pte_t pte) { return pte_val(pte) & _PAGE_PRESENT; }
+extern inline int pte_present(pte_t pte)
+{
+	return pte_val(pte) & _PAGE_PRESENT;
+}
+
 extern inline int pte_none(pte_t pte)
 {
 	return ((pte_val(pte) & 
@@ -411,17 +431,6 @@ extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 #define mk_pte(page,pgprot) mk_pte_phys(__pa(((page)-mem_map)<<PAGE_SHIFT),pgprot)
 
 #define pte_page(x) (mem_map+(unsigned long)((pte_val(x) >> PAGE_SHIFT)))
-
-extern inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
-{
-	pmd_val(*pmdp) = _PMD_ENTRY | __pa(ptep);
-	pmd_val1(*pmdp) = _PMD_ENTRY | __pa(ptep+256);
-}
-
-extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
-{
-	pgd_val(*pgdp) = _PGD_ENTRY | __pa(pmdp);
-}
 
 #define pmd_page(pmd) \
         ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))

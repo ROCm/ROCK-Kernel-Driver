@@ -201,7 +201,7 @@ out:
 
 changed:
 	while (partial > chain) {
-		bforget(partial->bh);
+		brelse(partial->bh);
 		partial--;
 	}
 	goto reread;

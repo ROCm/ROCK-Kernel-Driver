@@ -39,6 +39,8 @@
 #define HWC_BUSY		2
 #define HWC_NOT_OPERATIONAL	3
 
+#define hwc_cmdw_t u32;
+
 #define HWC_CMDW_READDATA 0x00770005
 
 #define HWC_CMDW_WRITEDATA 0x00760005
@@ -207,9 +209,25 @@ static init_hwcb_t init_hwcb_template =
 	0x0000,
 	0x0000,
 	sizeof (_hwcb_mask_t),
-	ET_OpCmd_Mask | ET_PMsgCmd_Mask,
-	ET_Msg_Mask
+	ET_OpCmd_Mask | ET_PMsgCmd_Mask | ET_StateChange_Mask,
+	ET_Msg_Mask | ET_PMsgCmd_Mask
 };
+
+typedef struct {
+	_EBUF_HEADER
+	u8 validity_hwc_active_facility_mask:1;
+	u8 validity_hwc_receive_mask:1;
+	u8 validity_hwc_send_mask:1;
+	u8 validity_read_data_function_mask:1;
+	u16 _zeros:12;
+	u16 mask_length;
+	u64 hwc_active_facility_mask;
+	_hwcb_mask_t hwc_receive_mask;
+	_hwcb_mask_t hwc_send_mask;
+	u32 read_data_function_mask;
+} __attribute__ ((packed)) 
+
+statechangebuf_t;
 
 #define _GDS_VECTOR_HEADER	u16	length; \
 				u16	gds_id;

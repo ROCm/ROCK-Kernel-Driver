@@ -42,7 +42,6 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/processor.h>
-#include <asm/misc390.h>
 #include <asm/irq.h>
 
 spinlock_t semaphore_wake_lock = SPIN_LOCK_UNLOCKED;
@@ -300,12 +299,10 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
             unsigned long fprs[4];     /* fpr 4 and 6                      */
             unsigned long empty[4];
 #if CONFIG_REMOTE_DEBUG
-	    gdb_pt_regs childregs;
+	    struct gdb_pt_regs childregs;
 #else
-            pt_regs childregs;
+            struct pt_regs childregs;
 #endif
-            __u32   pgm_old_ilc;       /* single step magic from entry.S */
-            __u32   pgm_svc_step;
           } *frame;
 
         frame = (struct stack_frame *) (2*PAGE_SIZE + (unsigned long) p) -1;
@@ -321,7 +318,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long new_stackp,
 
         /* fake return stack for resume(), don't go back to schedule */
         frame->gprs[9]  = (unsigned long) frame;
-	frame->pgm_svc_step = 0; /* Nope we aren't single stepping an svc */
+	frame->childregs.old_ilc = -1; /* We are not single stepping an svc */
         /* save fprs, if used in last task */
 	save_fp_regs(&p->thread.fp_regs);
         p->thread.user_seg = __pa((unsigned long) p->mm->pgd) | _SEGMENT_TABLE;

@@ -10,15 +10,6 @@
 
 #include <linux/types.h>
 #include <linux/config.h>
-/* 2.0 compat */
-#if defined(__SMP__) && !defined(CONFIG_SMP)
-# if LINUX_VERSION_CODE < KERNEL_VERSION (2,2,0)
-#  define CONFIG_SMP
-# else
-#  error __SMP__ defined but not CONFIG_SMP
-# endif
-#endif
-
 
 #define IRQ_NONE 255
 

@@ -25,7 +25,7 @@ include $(TOPDIR)/Rules.make
 image: $(CONFIGURE) $(TOPDIR)/vmlinux \
 	iplfba.boot ipleckd.boot ipldump.boot
 	$(OBJCOPY) -O binary $(TOPDIR)/vmlinux image
-	$(NM) $(TOPDIR)/vmlinux | grep -v '\(compiled\)\|\( [aU] \)\|\(\.\)\|\(LASH[RL]DI\)' | sort > $(TOPDIR)/System.map
+	$(NM) $(TOPDIR)/vmlinux | grep -v '\(compiled\)\|\( [aUw] \)\|\(\.\)\|\(LASH[RL]DI\)' | sort > $(TOPDIR)/System.map
 
 listing: ../../../vmlinux
 	$(OBJDUMP) --disassemble --disassemble-all --disassemble-zeroes --reloc $(TOPDIR)/vmlinux > listing

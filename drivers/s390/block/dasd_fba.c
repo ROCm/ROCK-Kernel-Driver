@@ -4,6 +4,7 @@
  * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+ *          fixed partition handling and HDIO_GETGEO
  */
 
 #include <linux/config.h>
@@ -49,15 +50,21 @@ devreg_t dasd_fba_known_devices[] =
 	{
 		ci:
 		{hc:
-		 {ctype:0x6310, dtype:0x9336}},
-		flag:DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE,
+		 {ctype:0x6310,
+                  dtype:0x9336}},
+		flag:(DEVREG_MATCH_CU_TYPE |
+                      DEVREG_MATCH_DEV_TYPE| 
+                      DEVREG_TYPE_DEVCHARS),
 		oper_func:dasd_oper_handler
 	},
 	{
 		ci:
 		{hc:
-		 {ctype:0x3880, dtype:0x3370}},
-		flag:DEVREG_MATCH_CU_TYPE | DEVREG_MATCH_DEV_TYPE,
+		 {ctype:0x3880,
+                  dtype:0x3370}},
+		flag:(DEVREG_MATCH_CU_TYPE |
+                      DEVREG_MATCH_DEV_TYPE| 
+                      DEVREG_TYPE_DEVCHARS),
 		oper_func:dasd_oper_handler
 	}
 };
@@ -123,13 +130,14 @@ dasd_fba_check_characteristics (struct dasd_device_t *device)
 		   "Null device pointer passed to characteristics checker\n");
 		return -ENODEV;
 	}
+        if ( device->private != NULL ) {
+                kfree(device->private);
+        }
+        device->private = kmalloc (sizeof (dasd_fba_private_t), GFP_KERNEL);
 	if (device->private == NULL) {
-		device->private = kmalloc (sizeof (dasd_fba_private_t), GFP_KERNEL);
-		if (device->private == NULL) {
-			printk (KERN_WARNING PRINTK_HEADER
-				"memory allocation failed for private data\n");
-			return -ENOMEM;
-		}
+                printk (KERN_WARNING PRINTK_HEADER
+                        "memory allocation failed for private data\n");
+                return -ENOMEM;
 	}
 	private = (dasd_fba_private_t *) device->private;
 	rdc_data = (void *) &(private->rdc_data);
@@ -179,6 +187,7 @@ dasd_fba_do_analysis (struct dasd_device_t *device)
 		device->sizes.s2b_shift++;
 
 	device->sizes.blocks = (private->rdc_data.blk_bdsa);
+        device->sizes.pt_block = 1;
 
 	return rc;
 }
@@ -203,7 +212,6 @@ dasd_fba_fill_geometry (struct dasd_device_t *device, struct hd_geometry *geo)
 	geo->cylinders = cyls;
 	geo->heads = 16;
 	geo->sectors = 128 >> device->sizes.s2b_shift;
-	geo->start = 1;
 	return rc;
 }
 
@@ -247,7 +255,7 @@ dasd_fba_build_cp_from_req (dasd_device_t * device, struct request *req)
 {
 	ccw_req_t *rw_cp = NULL;
 	int rw_cmd;
-	int bhct;
+	int bhct, i;
 	long size;
 	ccw1_t *ccw;
 	DE_fba_data_t *DE_data;
@@ -276,9 +284,9 @@ dasd_fba_build_cp_from_req (dasd_device_t * device, struct request *req)
 	}
 
 	rw_cp = dasd_alloc_request (dasd_fba_discipline.name,
-				    2 + bhct,
+				    1 + 2*bhct,
 				    sizeof (DE_fba_data_t) +
-				    sizeof (LO_fba_data_t));
+				    bhct*sizeof (LO_fba_data_t));
 	if (!rw_cp) {
 		return NULL;
 	}
@@ -289,29 +297,30 @@ dasd_fba_build_cp_from_req (dasd_device_t * device, struct request *req)
 	define_extent (ccw, DE_data, req->cmd, byt_per_blk,
 		       req->sector, req->nr_sectors);
 	ccw->flags |= CCW_FLAG_CC;
-	ccw++;
-	locate_record (ccw, LO_data, req->cmd, 0, req->nr_sectors);
-	ccw->flags |= CCW_FLAG_CC;
 
-	for (bh = req->bh; bh;) {
+	for (i = 0, bh = req->bh; bh;) {
 		if (bh->b_size > byt_per_blk) {
 			for (size = 0; size < bh->b_size; size += byt_per_blk) {
+                                ccw++;
+                                locate_record (ccw, LO_data, req->cmd, i, 1);
+                                ccw->flags |= CCW_FLAG_CC;
 				ccw++;
-				if (private->rdc_data.mode.bits.data_chain) {
-					ccw->flags |= CCW_FLAG_DC;
-				} else {
-					ccw->flags |= CCW_FLAG_CC;
-				}
+                                ccw->flags |= CCW_FLAG_CC|CCW_FLAG_SLI;
 				ccw->cmd_code = rw_cmd;
 				ccw->count = byt_per_blk;
 				set_normalized_cda (ccw, __pa (bh->b_data + size));
+                                i++;
+                                LO_data++;
 			}
 			bh = bh->b_reqnext;
 		} else {	/* group N bhs to fit into byt_per_blk */
 			for (size = 0; bh != NULL && size < byt_per_blk;) {
+                                ccw++;
+                                locate_record (ccw, LO_data, req->cmd, i, 1);
+                                ccw->flags |= CCW_FLAG_CC;
 				ccw++;
 				if (private->rdc_data.mode.bits.data_chain) {
-					ccw->flags |= CCW_FLAG_DC;
+					ccw->flags |= CCW_FLAG_DC|CCW_FLAG_SLI;
 				} else {
 					PRINT_WARN ("Cannot chain chunks smaller than one block\n");
 					ccw_free_request (rw_cp);
@@ -322,9 +331,11 @@ dasd_fba_build_cp_from_req (dasd_device_t * device, struct request *req)
 				set_normalized_cda (ccw, __pa (bh->b_data));
 				size += bh->b_size;
 				bh = bh->b_reqnext;
+                                i++;
+                                LO_data++;
 			}
 			ccw->flags &= ~CCW_FLAG_DC;
-			ccw->flags |= CCW_FLAG_CC;
+			ccw->flags |= CCW_FLAG_CC|CCW_FLAG_SLI;
 			if (size != byt_per_blk) {
 				PRINT_WARN ("Cannot fulfill request smaller than block\n");
 				ccw_free_request (rw_cp);
@@ -360,6 +371,7 @@ dasd_discipline_t dasd_fba_discipline =
 {
 	name:"FBA ",
 	ebcname:"FBA ",
+	max_blocks:((PAGE_SIZE >> 1)/sizeof(ccw1_t)-1),
 	id_check:dasd_fba_id_check,
 	check_characteristics:dasd_fba_check_characteristics,
 	do_analysis:dasd_fba_do_analysis,
@@ -387,11 +399,9 @@ dasd_fba_init (void)
             int i;
             for (i = 0; i < sizeof (dasd_fba_known_devices) / sizeof (devreg_t); i++) {
 		printk (KERN_INFO PRINTK_HEADER
-			"We are interested in: CU %04X/%02x DEV: %04X/%02Xi\n",
+			"We are interested in: CU %04X/%02x\n",
 			dasd_fba_known_devices[i].ci.hc.ctype,
-			dasd_fba_known_devices[i].ci.hc.cmode,
-			dasd_fba_known_devices[i].ci.hc.dtype,
-			dasd_fba_known_devices[i].ci.hc.dmode);
+			dasd_fba_known_devices[i].ci.hc.cmode);
 		s390_device_register (&dasd_fba_known_devices[i]);
             }
         }
@@ -408,12 +418,10 @@ dasd_fba_cleanup( void ) {
 	int i;
         for ( i=0; i<sizeof(dasd_fba_known_devices)/sizeof(devreg_t); i++) {
                 printk (KERN_INFO PRINTK_HEADER
-                        "We are interested in: CU %04X/%02x DEV: %04X/%02Xi\n",
+                        "We were interested in: CU %04X/%02x\n",
                         dasd_fba_known_devices[i].ci.hc.ctype,
-                        dasd_fba_known_devices[i].ci.hc.cmode,
-                        dasd_fba_known_devices[i].ci.hc.dtype,
-                        dasd_fba_known_devices[i].ci.hc.dmode);
-                s390_device_register(&dasd_fba_known_devices[i]);
+                        dasd_fba_known_devices[i].ci.hc.cmode);
+                s390_device_unregister(&dasd_fba_known_devices[i]);
         }
         }
 #endif /* CONFIG_DASD_DYNAMIC */

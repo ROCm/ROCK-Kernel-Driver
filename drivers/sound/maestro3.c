@@ -81,7 +81,7 @@
  *  do the real work.  The kernel presumably jumps into each of them in turn.
  *  These code images tend to have their own data area, and one can have
  *  multiple data areas representing different states for each of the 'client
- *  instance' code portions.  There is generaly a list in the kernel data
+ *  instance' code portions.  There is generally a list in the kernel data
  *  that points to the data instances for a given piece of code.
  *
  *  We've only been given the binary image for the 'minisrc', mini sample 

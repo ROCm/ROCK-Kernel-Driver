@@ -381,16 +381,16 @@ static void ip6_frag_queue(struct frag_queue *fq, struct sk_buff *skb,
 		 * Required by the RFC.
 		 */
 		if (end & 0x7) {
-			printk(KERN_DEBUG "fragment not rounded to 8bytes\n");
-
 			/*
 			   It is not in specs, but I see no reasons
 			   to send an error in this case. --ANK
 			 */
-			if (offset == 0)
+			if (offset == 0) {
 				icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, 
 						  &skb->nh.ipv6h->payload_len);
-			goto err;
+				return;
+			} else
+				goto err;
 		}
 		if (end > fq->len) {
 			/* Some bits beyond end -> corruption. */

@@ -38,55 +38,12 @@ extern board *adapter[];
 extern unsigned int cinst;
 
 /*
- * Obligitory function prototypes
+ * Obligatory function prototypes
  */
 extern int indicate_status(int,ulong,char*);
 extern int scm_command(isdn_ctrl *);
 extern void *memcpy_fromshmem(int, void *, const void *, size_t);
 
-/*
- * Dump message queue in shared memory to screen
- */
-void dump_messages(int card) 
-{
-	DualPortMemory dpm;
-	unsigned long flags;
-
-	int i =0;
-	
-	if (!IS_VALID_CARD(card)) {
-		pr_debug("Invalid param: %d is not a valid card id\n", card);
-	}
-
-	save_flags(flags);
-	cli();
-	outb(adapter[card]->ioport[adapter[card]->shmem_pgport], 
-		(adapter[card]->shmem_magic >> 14) | 0x80);
-	memcpy_fromshmem(card, &dpm, 0, sizeof(dpm));
-	restore_flags(flags);
-
-	pr_debug("%s: Dumping Request Queue\n", adapter[card]->devicename);
-	for (i = 0; i < dpm.req_head; i++) {
-		pr_debug("%s: Message #%d: (%d,%d,%d), link: %d\n",
-				adapter[card]->devicename, i,
-				dpm.req_queue[i].type,
-				dpm.req_queue[i].class,
-				dpm.req_queue[i].code,
-				dpm.req_queue[i].phy_link_no);
-	}
-
-	pr_debug("%s: Dumping Response Queue\n", adapter[card]->devicename);
-	for (i = 0; i < dpm.rsp_head; i++) {
-		pr_debug("%s: Message #%d: (%d,%d,%d), link: %d, status: %d\n",
-				adapter[card]->devicename, i,
-				dpm.rsp_queue[i].type,
-				dpm.rsp_queue[i].class,
-				dpm.rsp_queue[i].code,
-				dpm.rsp_queue[i].phy_link_no,
-				dpm.rsp_queue[i].rsp_status);
-	}
-
-}	
 
 /*
  * receive a message from the board

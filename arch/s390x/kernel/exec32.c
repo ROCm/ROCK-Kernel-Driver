@@ -82,3 +82,4 @@ int setup_arg_pages32(struct linux_binprm *bprm)
 	return 0;
 }
 
+EXPORT_SYMBOL(setup_arg_pages32);

@@ -8,63 +8,220 @@
 
 #ifndef _S390_PTRACE_H
 #define _S390_PTRACE_H
+
+/*
+ * Offsets in the user_regs_struct. They are used for the ptrace
+ * system call and in entry.S
+ */
+#define PT_PSWMASK  0x00
+#define PT_PSWADDR  0x04
+#define PT_GPR0     0x08
+#define PT_GPR1     0x0C
+#define PT_GPR2     0x10
+#define PT_GPR3     0x14
+#define PT_GPR4     0x18
+#define PT_GPR5     0x1C
+#define PT_GPR6     0x20
+#define PT_GPR7     0x24
+#define PT_GPR8     0x28
+#define PT_GPR9     0x2C
+#define PT_GPR10    0x30
+#define PT_GPR11    0x34
+#define PT_GPR12    0x38
+#define PT_GPR13    0x3C
+#define PT_GPR14    0x40
+#define PT_GPR15    0x44
+#define PT_ACR0     0x48
+#define PT_ACR1     0x4C
+#define PT_ACR2     0x50
+#define PT_ACR3     0x54
+#define PT_ACR4	    0x58
+#define PT_ACR5	    0x5C
+#define PT_ACR6	    0x60
+#define PT_ACR7	    0x64
+#define PT_ACR8	    0x68
+#define PT_ACR9	    0x6C
+#define PT_ACR10    0x70
+#define PT_ACR11    0x74
+#define PT_ACR12    0x78
+#define PT_ACR13    0x7C
+#define PT_ACR14    0x80
+#define PT_ACR15    0x84
+#define PT_ORIGGPR2 0x88
+#define PT_FPC	    0x90
+/*
+ * A nasty fact of life that the ptrace api
+ * only supports passing of longs.
+ */
+#define PT_FPR0_HI  0x98
+#define PT_FPR0_LO  0x9C
+#define PT_FPR1_HI  0xA0
+#define PT_FPR1_LO  0xA4
+#define PT_FPR2_HI  0xA8
+#define PT_FPR2_LO  0xAC
+#define PT_FPR3_HI  0xB0
+#define PT_FPR3_LO  0xB4
+#define PT_FPR4_HI  0xB8
+#define PT_FPR4_LO  0xBC
+#define PT_FPR5_HI  0xC0
+#define PT_FPR5_LO  0xC4
+#define PT_FPR6_HI  0xC8
+#define PT_FPR6_LO  0xCC
+#define PT_FPR7_HI  0xD0
+#define PT_FPR7_LO  0xD4
+#define PT_FPR8_HI  0xD8
+#define PT_FPR8_LO  0XDC
+#define PT_FPR9_HI  0xE0
+#define PT_FPR9_LO  0xE4
+#define PT_FPR10_HI 0xE8
+#define PT_FPR10_LO 0xEC
+#define PT_FPR11_HI 0xF0
+#define PT_FPR11_LO 0xF4
+#define PT_FPR12_HI 0xF8
+#define PT_FPR12_LO 0xFC
+#define PT_FPR13_HI 0x100
+#define PT_FPR13_LO 0x104
+#define PT_FPR14_HI 0x108
+#define PT_FPR14_LO 0x10C
+#define PT_FPR15_HI 0x110
+#define PT_FPR15_LO 0x114
+#define PT_CR_9	    0x118
+#define PT_CR_10    0x11C
+#define PT_CR_11    0x120
+#define PT_IEEE_IP  0x13C
+#define PT_LASTOFF  PT_IEEE_IP
+#define PT_ENDREGS  0x140-1
+
+#define NUM_GPRS	16
+#define NUM_FPRS	16
+#define NUM_CRS		16
+#define NUM_ACRS	16
+#define GPR_SIZE	4
+#define FPR_SIZE	8
+#define FPC_SIZE	4
+#define FPC_PAD_SIZE	4 /* gcc insists on aligning the fpregs */
+#define CR_SIZE		4
+#define ACR_SIZE	4
+
+#define STACK_FRAME_OVERHEAD	96	/* size of minimum stack frame */
+
+#ifndef __ASSEMBLY__
 #include <linux/config.h>
-#include <asm/s390-regs-common.h>
-#include <asm/current.h>
-#include <linux/types.h>
-#include <asm/setup.h>
 #include <linux/stddef.h>
+#include <linux/types.h>
 
+#include <asm/current.h>
+#include <asm/setup.h>
 
-#define S390_REGS   \
-S390_REGS_COMMON    \
-__u32 orig_gpr2;
+/* this typedef defines how a Program Status Word looks like */
+typedef struct 
+{
+        __u32   mask;
+        __u32   addr;
+} psw_t __attribute__ ((aligned(8)));
+
+#ifdef __KERNEL__
+#define FIX_PSW(addr) ((unsigned long)(addr)|0x80000000UL)
+#define ADDR_BITS_REMOVE(addr) ((addr)&0x7fffffff)
+#endif
+
+typedef union
+{
+	float   f;
+	double  d;
+        __u64   ui;
+	struct
+	{
+		__u32 hi;
+		__u32 lo;
+	} fp;
+} freg_t;
 
 typedef struct
 {
-	S390_REGS
+	__u32   fpc;
+	freg_t  fprs[NUM_FPRS];              
+} s390_fp_regs;
+
+#define FPC_EXCEPTION_MASK      0xF8000000
+#define FPC_FLAGS_MASK          0x00F80000
+#define FPC_DXC_MASK            0x0000FF00
+#define FPC_RM_MASK             0x00000003
+#define FPC_VALID_MASK          0xF8F8FF03
+
+/*
+ * The first entries in pt_regs, gdb_pt_regs and user_regs_struct
+ * are common for all three structures. The s390_regs structure
+ * covers the common parts. It simplifies copying the common part
+ * between the three structures.
+ */
+typedef struct
+{
+	psw_t psw;
+	__u32 gprs[NUM_GPRS];
+	__u32 acrs[NUM_ACRS];
+	__u32 orig_gpr2;
 } s390_regs;
 
+/*
+ * The pt_regs struct defines the way the registers are stored on
+ * the stack during a system call.
+ */
 struct pt_regs 
 {
-	S390_REGS
+	psw_t psw;
+	__u32 gprs[NUM_GPRS];
+	__u32 acrs[NUM_ACRS];
+	__u32 orig_gpr2;
 	__u32 trap;
+        __u32 old_ilc;
 };
 
+/*
+ * The gdb_pt_regs struct is used instead of the pt_regs structure
+ * if kernel remote debugging is used.
+ */
 #if CONFIG_REMOTE_DEBUG
-typedef struct
+struct gdb_pt_regs
 {
-	S390_REGS
+	psw_t psw;
+	__u32 gprs[NUM_GPRS];
+	__u32 acrs[NUM_ACRS];
+	__u32 orig_gpr2;
 	__u32 trap;
 	__u32 crs[16];
 	s390_fp_regs fp_regs;
-} gdb_pt_regs;
+};
 #endif
 
-
+/*
+ * Now for the program event recording (trace) definitions.
+ */
 typedef struct
 {
-			__u32   cr[3];
+	__u32 cr[3];
 } per_cr_words  __attribute__((packed));
 
 #define PER_EM_MASK 0xE8000000
+
 typedef	struct
 {
-	unsigned    em_branching:1;
-	unsigned    em_instruction_fetch:1;
-	/* Switching on storage alteration automatically fixes
-	   the storage alteration event bit in the users std. */
-	unsigned    em_storage_alteration:1;
-	unsigned    em_gpr_alt_unused:1;
-	unsigned    em_store_real_address:1;
-	unsigned    :3;
-	unsigned    branch_addr_ctl:1;
-	unsigned    :1;
-	unsigned    storage_alt_space_ctl:1;
-	unsigned    :5;
-	unsigned    :16;
-	addr_t      starting_addr;
-	addr_t      ending_addr;
+	unsigned em_branching          : 1;
+	unsigned em_instruction_fetch  : 1;
+	/*
+	 * Switching on storage alteration automatically fixes
+	 * the storage alteration event bit in the users std.
+	 */
+	unsigned em_storage_alteration : 1;
+	unsigned em_gpr_alt_unused     : 1;
+	unsigned em_store_real_address : 1;
+	unsigned                       : 3;
+	unsigned branch_addr_ctl       : 1;
+	unsigned                       : 1;
+	unsigned storage_alt_space_ctl : 1;
+	unsigned                       : 21;
+	addr_t   starting_addr;
+	addr_t   ending_addr;
 } per_cr_bits  __attribute__((packed));
 
 typedef struct
@@ -76,228 +233,59 @@ typedef struct
 
 typedef struct
 {
-	unsigned       perc_branching:1;               /* 0x096 */
-	unsigned       perc_instruction_fetch:1;
-	unsigned       perc_storage_alteration:1;
-	unsigned       perc_gpr_alt_unused:1;
-	unsigned       perc_store_real_address:1;
-	unsigned       :3;
-	unsigned       :1;
-	unsigned       atmid_validity_bit:1;
-	unsigned       atmid_psw_bit_32:1;
-	unsigned       atmid_psw_bit_5:1;
-	unsigned       atmid_psw_bit_16:1;
-	unsigned       atmid_psw_bit_17:1;
-	unsigned       si:2;
-	addr_t         address;              /* 0x098 */
-	unsigned       :4;                   /* 0x0a1 */
-	unsigned       access_id:4;           
+	unsigned perc_branching          : 1; /* 0x096 */
+	unsigned perc_instruction_fetch  : 1;
+	unsigned perc_storage_alteration : 1;
+	unsigned perc_gpr_alt_unused     : 1;
+	unsigned perc_store_real_address : 1;
+	unsigned                         : 4;
+	unsigned atmid_validity_bit      : 1;
+	unsigned atmid_psw_bit_32        : 1;
+	unsigned atmid_psw_bit_5         : 1;
+	unsigned atmid_psw_bit_16        : 1;
+	unsigned atmid_psw_bit_17        : 1;
+	unsigned si                      : 2;
+	addr_t   address;                     /* 0x098 */
+	unsigned                         : 4; /* 0x0a1 */
+	unsigned access_id               : 4;
 } per_lowcore_bits __attribute__((packed));
-
-typedef enum
-{
-	primary_asce,
-	ar_asce,
-	secondary_asce,
-	home_space_asce
-} per_ai_codes;
 
 typedef struct
 {
-	union
-	{
+	union {
 		per_cr_words   words;
 		per_cr_bits    bits;
 	} control_regs  __attribute__((packed));
-	/* Use these flags instead of setting em_instruction_fetch */
-	/* directly they are used so that single stepping can be */
-	/* switched on & off while not affecting other tracing */
-	unsigned  single_step:1;
-	unsigned  instruction_fetch:1;
-	unsigned  :30;
-	/* These addresses are copied into cr10 & cr11 if single stepping
-	   is switched off */
+	/*
+	 * Use these flags instead of setting em_instruction_fetch
+	 * directly they are used so that single stepping can be
+	 * switched on & off while not affecting other tracing
+	 */
+	unsigned  single_step       : 1;
+	unsigned  instruction_fetch : 1;
+	unsigned                    : 30;
+	/*
+	 * These addresses are copied into cr10 & cr11 if single
+	 * stepping is switched off
+	 */
 	__u32     starting_addr;
 	__u32     ending_addr;
-	union
-	{
+	union {
 		per_lowcore_words words;
 		per_lowcore_bits  bits;
 	} lowcore; 
 } per_struct __attribute__((packed));
 
-
-
-/* this struct defines the way the registers are stored on the
-   stack during a system call. If you change the pt_regs structure,
-   you'll need to change user.h too. 
-
-   N.B. if you modify the pt_regs struct the strace command also has to be
-   modified & recompiled  ( just wait till we have gdb going ).
-
-*/
-
-struct user_regs_struct
-{
-	S390_REGS
-	s390_fp_regs fp_regs;
-/* These per registers are in here so that gdb can modify them itself
- * as there is no "official" ptrace interface for hardware watchpoints.
- * this is the way intel does it
- */
-	per_struct per_info;
-	addr_t  ieee_instruction_pointer; 
-	/* Used to give failing instruction back to user for ieee exceptions */
-};
-
-typedef struct user_regs_struct user_regs_struct;
-
-typedef struct pt_regs pt_regs;
-
-#ifdef __KERNEL__
-#define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
-#define instruction_pointer(regs) ((regs)->psw.addr)
-extern void show_regs(struct pt_regs * regs);
-extern char *task_show_regs(struct task_struct *task, char *buffer);
-#endif
-
-
-
-
-
-#define FIX_PSW(addr) ((unsigned long)(addr)|0x80000000UL)
-
-#define MULT_PROCPTR_TYPES    ((CONFIG_BINFMT_ELF)&&(CONFIG_BINFMT_TOC))
-
 typedef struct
 {
-  long addr;
-  long toc;
-} routine_descriptor;
-extern void fix_routine_descriptor_regs(routine_descriptor *rdes,pt_regs *regs);
-extern __inline__ void 
-fix_routine_descriptor_regs(routine_descriptor *rdes,pt_regs *regs)
-{
-  regs->psw.addr=FIX_PSW(rdes->addr);
-  regs->gprs[12]=rdes->toc;
-}
-
-/*
- * Compiler optimisation should save this stuff from being non optimal
- * & remove uneccessary code ( isnt gcc great DJB. )
- */
-
-/*I'm just using this an indicator of what binformat we are using
- * (DJB) N.B. this needs to stay a macro unfortunately as I am otherwise
- * dereferencing incomplete pointer types in with load_toc_binary
- */
-#if MULT_PROCPTR_TYPES
-#define uses_routine_descriptors() \
-(current->binfmt->load_binary==load_toc_binary)
-#else
-#if CONFIG_BINFMT_TOC
-#define uses_routine_descriptors() 1
-#else
-#define uses_routine_descriptors() 0
-#endif
-#endif
-
-#define pt_off(ptreg)   offsetof(user_regs_struct,ptreg)
-enum
-{
-	PT_PSWMASK=pt_off(psw.mask),
-	PT_PSWADDR=pt_off(psw.addr),
-	PT_GPR0=pt_off(gprs[0]),
-	PT_GPR1=pt_off(gprs[1]),
-	PT_GPR2=pt_off(gprs[2]),
-	PT_GPR3=pt_off(gprs[3]),
-	PT_GPR4=pt_off(gprs[4]),
-	PT_GPR5=pt_off(gprs[5]),
-	PT_GPR6=pt_off(gprs[6]),
-	PT_GPR7=pt_off(gprs[7]),
-	PT_GPR8=pt_off(gprs[8]),
-	PT_GPR9=pt_off(gprs[9]),
-	PT_GPR10=pt_off(gprs[10]),
-	PT_GPR11=pt_off(gprs[11]),
-	PT_GPR12=pt_off(gprs[12]),
-	PT_GPR13=pt_off(gprs[13]),
-	PT_GPR14=pt_off(gprs[14]),
-	PT_GPR15=pt_off(gprs[15]),
-        PT_ACR0=pt_off(acrs[0]),
-        PT_ACR1=pt_off(acrs[1]),
-        PT_ACR2=pt_off(acrs[2]),
-        PT_ACR3=pt_off(acrs[3]),
-        PT_ACR4=pt_off(acrs[4]),
-        PT_ACR5=pt_off(acrs[5]),
-        PT_ACR6=pt_off(acrs[6]),
-        PT_ACR7=pt_off(acrs[7]),
-        PT_ACR8=pt_off(acrs[8]),
-        PT_ACR9=pt_off(acrs[9]),
-        PT_ACR10=pt_off(acrs[10]),
-        PT_ACR11=pt_off(acrs[11]),
-        PT_ACR12=pt_off(acrs[12]),
-        PT_ACR13=pt_off(acrs[13]),
-        PT_ACR14=pt_off(acrs[14]),
-        PT_ACR15=pt_off(acrs[15]),
-	PT_ORIGGPR2=pt_off(orig_gpr2),
-	PT_FPC=pt_off(fp_regs.fpc),
-/*
- *      A nasty fact of life that the ptrace api
- *      only supports passing of longs.
- */
-	PT_FPR0_HI=pt_off(fp_regs.fprs[0].fp.hi),
-	PT_FPR0_LO=pt_off(fp_regs.fprs[0].fp.lo),
-	PT_FPR1_HI=pt_off(fp_regs.fprs[1].fp.hi),
-	PT_FPR1_LO=pt_off(fp_regs.fprs[1].fp.lo),
-	PT_FPR2_HI=pt_off(fp_regs.fprs[2].fp.hi),
-	PT_FPR2_LO=pt_off(fp_regs.fprs[2].fp.lo),
-	PT_FPR3_HI=pt_off(fp_regs.fprs[3].fp.hi),
-	PT_FPR3_LO=pt_off(fp_regs.fprs[3].fp.lo),
-	PT_FPR4_HI=pt_off(fp_regs.fprs[4].fp.hi),
-	PT_FPR4_LO=pt_off(fp_regs.fprs[4].fp.lo),
-	PT_FPR5_HI=pt_off(fp_regs.fprs[5].fp.hi),
-	PT_FPR5_LO=pt_off(fp_regs.fprs[5].fp.lo),
-	PT_FPR6_HI=pt_off(fp_regs.fprs[6].fp.hi),
-	PT_FPR6_LO=pt_off(fp_regs.fprs[6].fp.lo),
-	PT_FPR7_HI=pt_off(fp_regs.fprs[7].fp.hi),
-	PT_FPR7_LO=pt_off(fp_regs.fprs[7].fp.lo),
-	PT_FPR8_HI=pt_off(fp_regs.fprs[8].fp.hi),
-	PT_FPR8_LO=pt_off(fp_regs.fprs[8].fp.lo),
-	PT_FPR9_HI=pt_off(fp_regs.fprs[9].fp.hi),
-	PT_FPR9_LO=pt_off(fp_regs.fprs[9].fp.lo),
-	PT_FPR10_HI=pt_off(fp_regs.fprs[10].fp.hi),
-	PT_FPR10_LO=pt_off(fp_regs.fprs[10].fp.lo),
-	PT_FPR11_HI=pt_off(fp_regs.fprs[11].fp.hi),
-	PT_FPR11_LO=pt_off(fp_regs.fprs[11].fp.lo),
-	PT_FPR12_HI=pt_off(fp_regs.fprs[12].fp.hi),
-	PT_FPR12_LO=pt_off(fp_regs.fprs[12].fp.lo),
-	PT_FPR13_HI=pt_off(fp_regs.fprs[13].fp.hi),
-	PT_FPR13_LO=pt_off(fp_regs.fprs[13].fp.lo),
-	PT_FPR14_HI=pt_off(fp_regs.fprs[14].fp.hi),
-	PT_FPR14_LO=pt_off(fp_regs.fprs[14].fp.lo),
-	PT_FPR15_HI=pt_off(fp_regs.fprs[15].fp.hi),
-	PT_FPR15_LO=pt_off(fp_regs.fprs[15].fp.lo),
-	PT_CR_9=pt_off(per_info.control_regs.words.cr[0]),
-	PT_CR_10=pt_off(per_info.control_regs.words.cr[1]),
-	PT_CR_11=pt_off(per_info.control_regs.words.cr[2]),
-	PT_IEEE_IP=pt_off(ieee_instruction_pointer),
-	PT_LASTOFF=PT_IEEE_IP,
-	PT_ENDREGS=sizeof(user_regs_struct)-1
-};
-
-#define PTRACE_AREA \
-__u32 len;          \
-addr_t  kernel_addr; \
-addr_t  process_addr;
-
-typedef struct
-{
-	 PTRACE_AREA
+	__u32  len;
+	addr_t kernel_addr;
+	addr_t process_addr;
 } ptrace_area;
 
 /*
-  390 specific non posix ptrace requests
-  I chose unusual values so they are unlikely to clash with future ptrace definitions.
+ * S/390 specific non posix ptrace requests. I chose unusual values so
+ * they are unlikely to clash with future ptrace definitions.
  */
 #define PTRACE_PEEKUSR_AREA           0x5000
 #define PTRACE_POKEUSR_AREA           0x5001
@@ -305,7 +293,10 @@ typedef struct
 #define PTRACE_PEEKDATA_AREA	      0x5003
 #define PTRACE_POKETEXT_AREA	      0x5004
 #define PTRACE_POKEDATA_AREA 	      0x5005
-/* PT_PROT definition is loosely based on hppa bsd definition in gdb/hppab-nat.c */
+/*
+ * PT_PROT definition is loosely based on hppa bsd definition in
+ * gdb/hppab-nat.c
+ */
 #define PTRACE_PROT                       21
 
 typedef enum
@@ -321,18 +312,41 @@ typedef struct
 	addr_t           hiaddr;
 	ptprot_flags     prot;
 } ptprot_area;                     
+
+/* Sequence of bytes for breakpoint illegal instruction.  */
+#define S390_BREAKPOINT     {0x0,0x1}
+#define S390_BREAKPOINT_U16 ((__u16)0x0001)
+#define S390_SYSCALL_OPCODE ((__u16)0x0a00)
+#define S390_SYSCALL_SIZE   2
+
+/*
+ * The user_regs_struct defines the way the user registers are
+ * store on the stack for signal handling.
+ */
+struct user_regs_struct
+{
+	psw_t psw;
+	__u32 gprs[NUM_GPRS];
+	__u32 acrs[NUM_ACRS];
+	__u32 orig_gpr2;
+	s390_fp_regs fp_regs;
+	/*
+	 * These per registers are in here so that gdb can modify them
+	 * itself as there is no "official" ptrace interface for hardware
+	 * watchpoints. This is the way intel does it.
+	 */
+	per_struct per_info;
+	addr_t  ieee_instruction_pointer; 
+	/* Used to give failing instruction back to user for ieee exceptions */
+};
+
+#ifdef __KERNEL__
+#define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
+#define instruction_pointer(regs) ((regs)->psw.addr)
+extern void show_regs(struct pt_regs * regs);
+extern char *task_show_regs(struct task_struct *task, char *buffer);
 #endif
 
+#endif /* __ASSEMBLY__ */
 
-
-
-
-
-
-
-
-
-
-
-
-
+#endif /* _S390_PTRACE_H */

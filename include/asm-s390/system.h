@@ -12,7 +12,6 @@
 #define __ASM_SYSTEM_H
 
 #include <linux/config.h>
-#include <asm/types.h>
 #ifdef __KERNEL__
 #include <asm/lowcore.h>
 #endif
@@ -33,6 +32,8 @@ struct task_struct;
 
 #define xchg(ptr,x) ((__typeof__(*(ptr)))__xchg((unsigned long)(x),(ptr),sizeof(*(ptr))))
 
+extern void __misaligned_u16(void);
+extern void __misaligned_u32(void);
 
 static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
 {
@@ -43,14 +44,14 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   nr    1,%0\n"     /* isolate last 2 bits */
                                 "   xr    %0,1\n"     /* align ptr */
                                 "   bras  2,0f\n"
-                                "   icm   1,8,%1\n"   /* for ptr&3 == 0 */
-                                "   stcm  0,8,%1\n"
-                                "   icm   1,4,%1\n"   /* for ptr&3 == 1 */
-                                "   stcm  0,4,%1\n"
-                                "   icm   1,2,%1\n"   /* for ptr&3 == 2 */
-                                "   stcm  0,2,%1\n"
-                                "   icm   1,1,%1\n"   /* for ptr&3 == 3 */
-                                "   stcm  0,1,%1\n"
+                                "   icm   1,8,3(%1)\n"   /* for ptr&3 == 0 */
+                                "   stcm  0,8,3(%1)\n"
+                                "   icm   1,4,3(%1)\n"   /* for ptr&3 == 1 */
+                                "   stcm  0,4,3(%1)\n"
+                                "   icm   1,2,3(%1)\n"   /* for ptr&3 == 2 */
+                                "   stcm  0,2,3(%1)\n"
+                                "   icm   1,1,3(%1)\n"   /* for ptr&3 == 3 */
+                                "   stcm  0,1,3(%1)\n"
                                 "0: sll   1,3\n"
                                 "   la    2,0(1,2)\n" /* r2 points to an icm */
                                 "   l     0,0(%0)\n"  /* get fullword */
@@ -59,20 +60,21 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   cs    0,1,0(%0)\n"
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+a&" (ptr), "+m" (x) :
+                                : "+a&" (ptr) : "a" (&x)
                                 : "memory", "0", "1", "2");
+			break;
                 case 2:
                         if(((__u32)ptr)&1)
-                                panic("misaligned (__u16 *) in __xchg\n");
+				__misaligned_u16();
                         asm volatile (
                                 "   lhi   1,2\n"
                                 "   nr    1,%0\n"     /* isolate bit 2^1 */
                                 "   xr    %0,1\n"     /* align ptr */
                                 "   bras  2,0f\n"
-                                "   icm   1,12,%1\n"   /* for ptr&2 == 0 */
-                                "   stcm  0,12,%1\n"
-                                "   icm   1,3,%1\n"    /* for ptr&2 == 1 */
-                                "   stcm  0,3,%1\n"
+                                "   icm   1,12,2(%1)\n"   /* for ptr&2 == 0 */
+                                "   stcm  0,12,2(%1)\n"
+                                "   icm   1,3,2(%1)\n"    /* for ptr&2 == 1 */
+                                "   stcm  0,3,2(%1)\n"
                                 "0: sll   1,2\n"
                                 "   la    2,0(1,2)\n" /* r2 points to an icm */
                                 "   l     0,0(%0)\n"  /* get fullword */
@@ -81,12 +83,12 @@ static inline unsigned long __xchg(unsigned long x, void * ptr, int size)
                                 "   cs    0,1,0(%0)\n"
                                 "   jl    1b\n"
                                 "   ex    0,4(2)"     /* store *ptr to x */
-                                : "+a&" (ptr), "+m" (x) :
+                                : "+a&" (ptr) : "a" (&x)
                                 : "memory", "0", "1", "2");
                         break;
                 case 4:
                         if(((__u32)ptr)&3)
-                                panic("misaligned (__u32 *) in __xchg\n");
+				__misaligned_u32();
                         asm volatile (
                                 "    l   0,0(%1)\n"
                                 "0:  cs  0,%0,0(%1)\n"

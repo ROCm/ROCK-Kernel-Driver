@@ -206,10 +206,7 @@
 #define DCBDEBUG1(x)
 
 /* Includes */
-#ifdef MODULE
-# include <linux/module.h>
-#endif
-
+#include <linux/module.h>
 #include <asm/dma.h>
 #include <asm/io.h>
 #include <asm/system.h>
@@ -663,16 +660,30 @@ static void __init dc390_fill_with_defaults (void)
  * tmscsim: AdaptID, MaxSpeed (Index), DevMode (Bitmapped), AdaptMode (Bitmapped)
  */
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,3,13)
-void __init dc390_setup (char *str)
+int __init dc390_setup (char *str)
 {	
 	int ints[8];
 	int i, im;
 	(void)get_options (str, ARRAY_SIZE(ints), ints);
+	im = ints[0];
+	if (im > 6)
+	{
+		printk (KERN_NOTICE "DC390: ignore extra params!\n");
+		im = 6;
+	};
+	for (i = 0; i < im; i++)
+		tmscsim[i] = ints[i+1];
+	/* dc390_checkparams (); */
+	return 1;
+};
+#ifndef MODULE
+__setup("tmscsim=", dc390_setup);
+#endif
+
 #else
 void __init dc390_setup (char *str, int *ints)
 {
 	int i, im;
-#endif
 	im = ints[0];
 	if (im > 6)
 	{
@@ -683,12 +694,8 @@ void __init dc390_setup (char *str, int *ints)
 		tmscsim[i] = ints[i+1];
 	/* dc390_checkparams (); */
 };
+#endif
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
-#ifndef MODULE
-__setup("tmscsim=", dc390_setup);
-#endif
-#endif
 
 
 static void __init dc390_EEpromOutDI( PDEVDECL, PUCHAR regval, UCHAR Carry )
@@ -828,7 +835,7 @@ static PDCB __inline__ dc390_findDCB ( PACB pACB, UCHAR id, UCHAR lun)
 /* Queueing philosphy:
  * There are a couple of lists:
  * - Query: Contains the Scsi Commands not yet turned into SRBs (per ACB)
- *   (Note: For new EH, it is unecessary!)
+ *   (Note: For new EH, it is unnecessary!)
  * - Waiting: Contains a list of SRBs not yet sent (per DCB)
  * - Free: List of free SRB slots
  * 
@@ -2852,7 +2859,7 @@ int DC390_proc_info (char *buffer, char **start,
 {
   int dev, spd, spd1;
   char *pos = buffer;
-  PSH shpnt;
+  PSH shpnt = 0;
   PACB pACB;
   PDCB pDCB;
   PSCSICMD pcmd;

@@ -33,6 +33,7 @@
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/spinlock.h>
 #include <linux/usb.h>
 #include <linux/serio.h>
 #include <linux/config.h>

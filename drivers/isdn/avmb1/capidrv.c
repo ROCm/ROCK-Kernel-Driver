@@ -2069,8 +2069,8 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	__u16 datahandle;
 
 	if (!card) {
-		printk(KERN_ERR "capidrv-%d: if_sendbuf called with invalid driverId %d!\n",
-		       card->contrnr, id);
+		printk(KERN_ERR "capidrv: if_sendbuf called with invalid driverId %d!\n",
+		       id);
 		return 0;
 	}
 	if (debugmode > 1)
@@ -2139,8 +2139,8 @@ static int if_readstat(__u8 *buf, int len, int user, int id, int channel)
 	__u8 *p;
 
 	if (!card) {
-		printk(KERN_ERR "capidrv-%d: if_readstat called with invalid driverId %d!\n",
-		       card->contrnr, id);
+		printk(KERN_ERR "capidrv: if_readstat called with invalid driverId %d!\n",
+		       id);
 		return -ENODEV;
 	}
 

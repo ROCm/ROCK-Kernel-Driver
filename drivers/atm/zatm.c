@@ -1826,9 +1826,13 @@ int __init zatm_detect(void)
 			devs++;
 			zatm_dev = (struct zatm_dev *) kmalloc(sizeof(struct
 			    zatm_dev),GFP_KERNEL);
-			if (!zatm_dev) break;
+			if (!zatm_dev) {
+				printk(KERN_EMERG "zatm.c: memory shortage\n");
+				goto out;
+			}
 		}
 	}
+out:
 	return devs;
 }
 

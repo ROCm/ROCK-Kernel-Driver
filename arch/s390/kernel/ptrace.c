@@ -180,9 +180,9 @@ int copy_user(struct task_struct *task,saddr_t useraddr,addr_t copyaddr,int len,
 			copymax=(PT_FPR15_LO+4);
 			realuseraddr=(addr_t)&(((u8 *)&task->thread.fp_regs)[useraddr-PT_FPC]);
 		}
-		else if(useraddr<sizeof(user_regs_struct))
+		else if(useraddr<sizeof(struct user_regs_struct))
 		{
-			copymax=sizeof(user_regs_struct);
+			copymax=sizeof(struct user_regs_struct);
 			realuseraddr=(addr_t)&(((u8 *)&task->thread.per_info)[useraddr-PT_CR_9]);
 		}
 		else 

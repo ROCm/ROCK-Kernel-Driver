@@ -1,5 +1,5 @@
-#ifndef __irq_h
-#define __irq_h
+#ifndef _ASM_IRQ_H
+#define _ASM_IRQ_H
 
 #include <linux/config.h>
 #ifdef __KERNEL__
@@ -17,28 +17,6 @@
 
 extern int disable_irq(unsigned int);
 extern int enable_irq(unsigned int);
-
-/*
- * Interrupt controller descriptor. This is all we need
- * to describe about the low-level hardware.
- */
-struct hw_interrupt_type {
-        const __u8   *typename;
-        int         (*handle)(unsigned int irq,
-                              int cpu,
-                              struct pt_regs * regs);
-        int         (*enable) (unsigned int irq);
-        int         (*disable)(unsigned int irq);
-};
-
-/*
- * Status: reason for being disabled: somebody has
- * done a "disable_irq()" or we must not re-enter the
- * already executing irq..
- */
-#define IRQ_INPROGRESS  1
-#define IRQ_DISABLED    2
-#define IRQ_PENDING     4
 
 /*
  * path management control word
@@ -86,7 +64,7 @@ typedef struct {
       __u32 pfch : 1; /* prefetch */
       __u32 isic : 1; /* initial-status interruption control */
       __u32 alcc : 1; /* address-limit checking control */
-      __u32 ssi  : 1; /* suppress-suspended interruption */
+      __u32 ssi  : 1; /* supress-suspended interruption */
       __u32 zcc  : 1; /* zero condition code */
       __u32 ectl : 1; /* extended control */
       __u32 pno  : 1;     /* path not operational */
@@ -186,7 +164,7 @@ typedef struct {
 
 typedef struct {
       __u8  cmd_code;/* command code */
-      __u8  flags;   /* flags, like IDA addressing, etc. */
+      __u8  flags;   /* flags, like IDA adressing, etc. */
       __u16 count;   /* byte count */
       __u32 cda;     /* data address */
    } __attribute__ ((packed,aligned(8))) ccw1_t;
@@ -456,24 +434,10 @@ typedef  void ( * not_oper_handler_func_t)( int irq,
 
 typedef  int  (* adapter_int_handler_t)( __u32 intparm );
 
-struct s390_irqaction {
-	io_handler_func_t  handler;
-	unsigned long      flags;
-	const char        *name;
-	devstat_t         *dev_id;
-};
-
-/*
- * This is the "IRQ descriptor", which contains various information
- * about the irq, including what kind of hardware handling it has,
- * whether it is disabled etc etc.
- *
- * Pad this out to 32 bytes for cache and indexing reasons.
- */
 typedef struct {
-      unsigned int              status;    /* IRQ status - IRQ_INPROGRESS, IRQ_DISABLED */
-      struct hw_interrupt_type *handler;   /* handle/enable/disable functions */
-      struct s390_irqaction    *action;    /* IRQ action list */
+	io_handler_func_t         handler;  /* interrupt handler routine */
+	const char               *name;     /* device name */
+	devstat_t                *dev_id;   /* device status block */
    } irq_desc_t;
 
 typedef struct {
@@ -531,9 +495,8 @@ typedef struct {
 /*
  * do_IO()
  *
- * Start a S/390 channel program. When the interrupt arrives
- *  handle_IRQ_event() is called, which eventually calls the
- *  IRQ handler, either immediately, delayed (dev-end missing,
+ *  Start a S/390 channel program. When the interrupt arrives, the
+ *  IRQ handler is called, either immediately, delayed (dev-end missing,
  *  or sense required) or never (no IRQ handler registered -
  *  should never occur, as the IRQ (subchannel ID) should be
  *  disabled if no handler is present. Depending on the action
@@ -606,8 +569,6 @@ int s390_request_irq_special( int                      irq,
                               const char              *devname,
                               void                    *dev_id);
 
-extern int handle_IRQ_event( unsigned int irq, int cpu, struct pt_regs *);
-
 extern int set_cons_dev(int irq);
 extern int reset_cons_dev(int irq);
 extern int wait_cons_dev(int irq);
@@ -621,16 +582,13 @@ extern __inline__ int stsch(int irq, volatile schib_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "STSCH 0(%2)\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L), "a" (addr)
-                : "cc", "1" );
+                "   lr    1,%1\n"
+                "   stsch 0(%2)\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode)
+		: "d" (irq | 0x10000), "a" (addr)
+		: "cc", "1" );
         return ccode;
 }
 
@@ -639,15 +597,12 @@ extern __inline__ int msch(int irq, volatile schib_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "MSCH 0(%2)\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L), "a" (addr)
+                "   lr    1,%1\n"
+                "   msch  0(%2)\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode)
+		: "d" (irq | 0x10000L), "a" (addr)
                 : "cc", "1" );
         return ccode;
 }
@@ -657,12 +612,12 @@ extern __inline__ int msch_err(int irq, volatile schib_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "    lgr  1,%1\n"
+                "    lr   1,%1\n"
                 "    msch 0(%2)\n"
                 "0:  ipm  %0\n"
                 "    srl  %0,28\n"
                 "1:\n"
+#ifdef CONFIG_ARCH_S390X
                 ".section .fixup,\"ax\"\n"
                 "2:  l    %0,%3\n"
                 "    jg   1b\n"
@@ -671,12 +626,12 @@ extern __inline__ int msch_err(int irq, volatile schib_t *addr)
                 "   .align 8\n"
                 "   .quad 0b,2b\n"
                 ".previous"
-#else
                 "    lr   1,%1\n"
                 "    msch 0(%2)\n"
                 "0:  ipm  %0\n"
                 "    srl  %0,28\n"
                 "1:\n"
+#else
                 ".section .fixup,\"ax\"\n"
                 "2:  l    %0,%3\n"
                 "    bras 1,3f\n"
@@ -690,7 +645,7 @@ extern __inline__ int msch_err(int irq, volatile schib_t *addr)
                 ".previous"
 #endif
                 : "=d" (ccode)
-                : "r" (irq | 0x10000L), "a" (addr), "i" (__LC_PGM_ILC)
+                : "d" (irq | 0x10000L), "a" (addr), "i" (__LC_PGM_ILC)
                 : "cc", "1" );
         return ccode;
 }
@@ -700,15 +655,12 @@ extern __inline__ int tsch(int irq, volatile irb_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "TSCH 0(%2)\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L), "a" (addr)
+                "   lr    1,%1\n"
+                "   tsch  0(%2)\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L), "a" (addr)
                 : "cc", "1" );
         return ccode;
 }
@@ -718,10 +670,11 @@ extern __inline__ int tpi( volatile tpi_info_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-                "TPI 0(%1)\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "a" (addr)
+                "   tpi   0(%1)\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "a" (addr)
                 : "cc", "1" );
         return ccode;
 }
@@ -731,15 +684,12 @@ extern __inline__ int ssch(int irq, volatile orb_t *addr)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "SSCH 0(%2)\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L), "a" (addr)
+                "   lr    1,%1\n"
+                "   ssch  0(%2)\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L), "a" (addr)
                 : "cc", "1" );
         return ccode;
 }
@@ -749,15 +699,12 @@ extern __inline__ int rsch(int irq)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "RSCH\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L)
+                "   lr    1,%1\n"
+                "   rsch\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L)
                 : "cc", "1" );
         return ccode;
 }
@@ -767,15 +714,12 @@ extern __inline__ int csch(int irq)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "CSCH\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L)
+                "   lr    1,%1\n"
+                "   csch\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L)
                 : "cc", "1" );
         return ccode;
 }
@@ -785,15 +729,12 @@ extern __inline__ int hsch(int irq)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "HSCH\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (irq | 0x10000L)
+                "   lr    1,%1\n"
+                "   hsch\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (irq | 0x10000L)
                 : "cc", "1" );
         return ccode;
 }
@@ -803,9 +744,9 @@ extern __inline__ int iac( void)
         int ccode;
 
         __asm__ __volatile__(
-                "IAC 1\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
+                "   iac   1\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
                 : "=d" (ccode) : : "cc", "1" );
         return ccode;
 }
@@ -815,15 +756,12 @@ extern __inline__ int rchp(int chpid)
         int ccode;
 
         __asm__ __volatile__(
-#ifdef CONFIG_ARCH_S390X
-                "LGR 1,%1\n\t"
-#else
-                "LR 1,%1\n\t"
-#endif
-                "RCHP\n\t"
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "r" (chpid)
+                "   lr    1,%1\n"
+                "   rchp\n"
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "d" (chpid)
                 : "cc", "1" );
         return ccode;
 }
@@ -850,16 +788,16 @@ extern __inline__ int diag210( diag210_t * addr)
 
         __asm__ __volatile__(
 #ifdef CONFIG_ARCH_S390X
-                "SAM31\n\t"
-                "DIAG %1,0,0x210\n\t"
-                "SAM64\n\t"
+                "   sam31\n"
+                "   diag  %1,0,0x210\n"
+                "   sam64\n"
 #else
-                "LR 1,%1\n\t"
-                ".long 0x83110210\n\t"
+                "   diag  %1,0,0x210\n"
 #endif
-                "IPM %0\n\t"
-                "SRL %0,28\n\t"
-                : "=d" (ccode) : "a" (addr)
+                "   ipm   %0\n"
+                "   srl   %0,28"
+                : "=d" (ccode) 
+		: "a" (addr)
                 : "cc" );
         return ccode;
 }
@@ -885,15 +823,9 @@ extern spinlock_t irq_controller_lock;
 static inline void irq_enter(int cpu, unsigned int irq)
 {
         hardirq_enter(cpu);
-#ifdef CONFIG_ARCH_S390X
         while (atomic_read(&global_irq_lock) != 0) {
                 eieio();
         }
-#else
-        while (test_bit(0,&global_irq_lock)) {
-                eieio();
-        }
-#endif
 }
 
 static inline void irq_exit(int cpu, unsigned int irq)
@@ -957,6 +889,9 @@ static inline void s390_do_profile (unsigned long addr)
         spin_lock_irqsave(&(ioinfo[irq]->irq_lock), flags)
 #define s390irq_spin_unlock_irqrestore(irq,flags) \
         spin_unlock_irqrestore(&(ioinfo[irq]->irq_lock), flags)
+
+#define touch_nmi_watchdog() do { } while(0)
+
 #endif /* __KERNEL__ */
 #endif
 

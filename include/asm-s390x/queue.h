@@ -7,8 +7,8 @@
  *
  *  A little set of queue utilies.
  */
+
 #include <linux/stddef.h>
-#include <asm/types.h>
 
 typedef struct queue
 {
@@ -105,8 +105,8 @@ static __inline__ int is_in_list(list *lhead,list *member)
 
 	for(curr=lhead;curr!=NULL;curr=curr->next)
 		if(curr==member)
-			return(TRUE);
-	return(FALSE);
+			return(1);
+	return(0);
 }
 
 static __inline__ int get_prev(list *lhead,list *member,list **prev)
@@ -117,11 +117,11 @@ static __inline__ int get_prev(list *lhead,list *member,list **prev)
 	for(curr=lhead;curr!=NULL;curr=curr->next)
 	{
 		if(curr==member)
-			return(TRUE);
+			return(1);
 		*prev=curr;
 	}
 	*prev=NULL;
-	return(FALSE);
+	return(0);
 }
 
 
@@ -137,9 +137,9 @@ static __inline__ int remove_from_list(list **lhead,list *member)
 			prev->next=member->next;
 		else
 			*lhead=member->next;
-		return(TRUE);
+		return(1);
 	}
-	return(FALSE);
+	return(0);
 }
 
 static __inline__ int remove_from_queue(qheader *qhead,queue *member)
@@ -161,9 +161,9 @@ static __inline__ int remove_from_queue(qheader *qhead,queue *member)
 				qhead->tail=NULL;
 			qhead->head=member->next;
 		}
-		return(TRUE);
+		return(1);
 	}
-	return(FALSE);
+	return(0);
 }
 
 

@@ -231,6 +231,20 @@
   v1.37
     20001109   H. Peter Anvin <hpa@zytor.com>
 	       Use the new centralized CPU feature detects.
+
+  v1.38
+    20010309   Dave Jones <davej@suse.de>
+	       Add support for Cyrix III.
+
+  v1.39
+    20010312   Dave Jones <davej@suse.de>
+               Ugh, I broke AMD support.
+	       Reworked fix by Troels Walsted Hansen <troels@thule.no>
+
+  v1.40
+    20010327   Dave Jones <davej@suse.de>
+	       Adapted Cyrix III support to include VIA C3.
+
 */
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -250,6 +264,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/mm.h>
 #include <linux/module.h>
+#include <linux/pci.h>
 #define MTRR_NEED_STRINGS
 #include <asm/mtrr.h>
 #include <linux/init.h>
@@ -269,7 +284,7 @@
 #include <asm/hardirq.h>
 #include <linux/irq.h>
 
-#define MTRR_VERSION            "1.37 (20001109)"
+#define MTRR_VERSION            "1.40 (20010327)"
 
 #define TRUE  1
 #define FALSE 0
@@ -464,6 +479,27 @@ static unsigned int get_num_var_ranges (void)
 static int have_wrcomb (void)
 {
     unsigned long config, dummy;
+    struct pci_dev *dev = NULL;
+    
+   /* ServerWorks LE chipsets have problems with  write-combining 
+      Don't allow it and  leave room for other chipsets to be tagged */
+
+    if ((dev = pci_find_class(PCI_CLASS_BRIDGE_HOST << 8, NULL)) != NULL) {
+	switch(dev->vendor) {
+        case PCI_VENDOR_ID_SERVERWORKS:
+ 	    switch (dev->device) {
+	    case PCI_DEVICE_ID_SERVERWORKS_LE:
+		return 0;
+		break;
+	    default:
+		break;
+	    }
+	    break;
+	default:
+	    break;
+	}
+    }
+
 
     switch ( mtrr_if )
     {
@@ -1777,7 +1813,8 @@ static void compute_ascii (void)
     }
     devfs_set_file_size (devfs_handle, ascii_buf_bytes);
 #  ifdef CONFIG_PROC_FS
-    proc_root_mtrr->size = ascii_buf_bytes;
+    if (proc_root_mtrr)
+	proc_root_mtrr->size = ascii_buf_bytes;
 #  endif  /*  CONFIG_PROC_FS  */
 }   /*  End Function compute_ascii  */
 
@@ -1938,6 +1975,7 @@ static int __init mtrr_setup(void)
 	get_mtrr = intel_get_mtrr;
 	set_mtrr_up = intel_set_mtrr_up;
 	switch (boot_cpu_data.x86_vendor) {
+
 	case X86_VENDOR_AMD:
 		/* The original Athlon docs said that
 		   total addressable memory is 44 bits wide.
@@ -1956,12 +1994,27 @@ static int __init mtrr_setup(void)
 			size_and_mask = ~size_or_mask & 0xfff00000;
 			break;
 		}
+		size_or_mask  = 0xff000000; /* 36 bits */
+		size_and_mask = 0x00f00000;
+		break;
+
+	case X86_VENDOR_CENTAUR:
+		/* Cyrix III has Intel style MTRRs, but doesn't support PAE */
+		if (boot_cpu_data.x86 == 6 &&
+			(boot_cpu_data.x86_model == 6 ||
+			 boot_cpu_data.x86_model == 7)) {
+			size_or_mask  = 0xfff00000; /* 32 bits */
+			size_and_mask = 0;
+		}
+		break;
+
 	default:
 		/* Intel, etc. */
 		size_or_mask  = 0xff000000; /* 36 bits */
 		size_and_mask = 0x00f00000;
 		break;
 	}
+
     } else if ( test_bit(X86_FEATURE_K6_MTRR, &boot_cpu_data.x86_capability) ) {
 	/* Pre-Athlon (K6) AMD CPU MTRRs */
 	mtrr_if = MTRR_IF_AMD_K6;
@@ -2072,8 +2125,10 @@ int __init mtrr_init(void)
 
 #ifdef CONFIG_PROC_FS
     proc_root_mtrr = create_proc_entry ("mtrr", S_IWUSR | S_IRUGO, &proc_root);
-    proc_root_mtrr->owner = THIS_MODULE;
-    proc_root_mtrr->proc_fops = &mtrr_fops;
+    if (proc_root_mtrr) {
+	proc_root_mtrr->owner = THIS_MODULE;
+	proc_root_mtrr->proc_fops = &mtrr_fops;
+    }
 #endif
 #ifdef CONFIG_DEVFS_FS
     devfs_handle = devfs_register (NULL, "cpu/mtrr", DEVFS_FL_DEFAULT, 0, 0,

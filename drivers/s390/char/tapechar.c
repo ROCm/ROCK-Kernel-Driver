@@ -4,12 +4,12 @@
  *  drivers/s390/char/tapechar.c
  *    character device frontend for tape device driver
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
+ *
  ****************************************************************************
  */
 
@@ -24,6 +24,7 @@
 #include <asm/uaccess.h>
 #include <linux/compatmac.h>
 #ifdef MODULE
+#define __NO_VERSION__
 #include <linux/module.h>
 #endif
 #include "tape.h"
@@ -54,10 +55,33 @@ static struct file_operations tape_fops =
 
 int tape_major = TAPE_MAJOR;
 
+#ifdef CONFIG_DEVFS_FS
+void
+tapechar_mkdevfstree (tape_info_t* tape) {
+    tape->devfs_char_dir=devfs_mk_dir (tape->devfs_dir, "char", tape);
+    tape->devfs_nonrewinding=devfs_register(tape->devfs_char_dir, "nonrewinding",
+					    DEVFS_FL_DEFAULT,tape_major, 
+					    tape->nor_minor, TAPECHAR_DEFAULTMODE, 
+					    &tape_fops, tape);
+    tape->devfs_rewinding=devfs_register(tape->devfs_char_dir, "rewinding",
+					 DEVFS_FL_DEFAULT, tape_major, tape->rew_minor,
+					 TAPECHAR_DEFAULTMODE, &tape_fops, tape);
+}
+
+void
+tapechar_rmdevfstree (tape_info_t* tape) {
+    devfs_unregister(tape->devfs_nonrewinding);
+    devfs_unregister(tape->devfs_rewinding);
+    devfs_unregister(tape->devfs_char_dir);
+}
+#endif
+
 void
 tapechar_setup (tape_info_t * tape)
 {
-    // nothing to do
+#ifdef CONFIG_DEVFS_FS
+    tapechar_mkdevfstree(tape);
+#endif
 }
 
 void
@@ -70,7 +94,11 @@ tapechar_init (void)
 	tape_init();
 
 	/* Register the tape major number to the kernel */
+#ifdef CONFIG_DEVFS_FS
+	result = devfs_register_chrdev (tape_major, "tape", &tape_fops);
+#else
 	result = register_chrdev (tape_major, "tape", &tape_fops);
+#endif
 
 	if (result < 0) {
 		PRINT_WARN (KERN_ERR "tape: can't get major %d\n", tape_major);
@@ -92,6 +120,10 @@ tapechar_init (void)
 		panic ("no major number available for tape char device");		
 	}
 	charfront->device_setup = tapechar_setup;
+#ifdef CONFIG_DEVFS_FS
+	charfront->mkdevfstree = tapechar_mkdevfstree;
+	charfront->rmdevfstree = tapechar_rmdevfstree;
+#endif
 #ifdef TAPE_DEBUG
         debug_text_event (tape_debug_area,3,"c:init ok");
 #endif /* TAPE_DEBUG */
@@ -120,7 +152,7 @@ tapechar_uninit (void)
 /*
  * Tape device read function
  */
-static ssize_t
+ssize_t
 tape_read (struct file *filp, char *data, size_t count, loff_t * ppos)
 {
 	long lockflags;
@@ -184,6 +216,12 @@ tape_read (struct file *filp, char *data, size_t count, loff_t * ppos)
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
 		return tape->rc;
 	}
+	if (tapestate_get (tape) == TS_NOT_OPER) {
+	    tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	    tape->devinfo.irq=-1;
+	    s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+	    return -ENODEV;
+	}
 	if (tapestate_get (tape) != TS_DONE) {
 		tapestate_set (tape, TS_IDLE);
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
@@ -202,7 +240,7 @@ tape_read (struct file *filp, char *data, size_t count, loff_t * ppos)
 /*
  * Tape device write function
  */
-static ssize_t
+ssize_t
 tape_write (struct file *filp, const char *data, size_t count, loff_t * ppos)
 {
 	long lockflags;
@@ -262,7 +300,15 @@ tape_write (struct file *filp, const char *data, size_t count, loff_t * ppos)
 		if (tapestate_get (tape) == TS_FAILED) {
 			tapestate_set (tape, TS_IDLE);
 			s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
+                        if ((tape->rc==-ENOSPC) && (i!=0))
+			  return i*block_size;
 			return tape->rc;
+		}
+		if (tapestate_get (tape) == TS_NOT_OPER) {
+		    tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+		    tape->devinfo.irq=-1;
+		    s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+		    return -ENODEV;
 		}
 		if (tapestate_get (tape) != TS_DONE) {
 			tapestate_set (tape, TS_IDLE);
@@ -446,6 +492,12 @@ tape_mtioctop (struct file *filp, short mt_op, int mt_count)
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
 		return tape->rc;
 	}
+	if (tapestate_get (tape) == TS_NOT_OPER) {
+	    tape->blk_minor=tape->rew_minor=tape->nor_minor=-1;
+	    tape->devinfo.irq=-1;
+	    s390irq_spin_unlock_irqrestore (tape->devinfo.irq,lockflags);
+	    return -ENODEV;
+	}
 	if (tapestate_get (tape) != TS_DONE) {
 		tapestate_set (tape, TS_IDLE);
 		s390irq_spin_unlock_irqrestore (tape->devinfo.irq, lockflags);
@@ -473,7 +525,7 @@ tape_mtioctop (struct file *filp, short mt_op, int mt_count)
 /*
  * Tape device io controls.
  */
-static int
+int
 tape_ioctl (struct inode *inode, struct file *filp,
 	    unsigned int cmd, unsigned long arg)
 {
@@ -589,7 +641,7 @@ tape_ioctl (struct inode *inode, struct file *filp,
 /*
  * Tape device open function.
  */
-static int
+int
 tape_open (struct inode *inode, struct file *filp)
 {
 	tape_info_t *ti;
@@ -637,7 +689,7 @@ tape_open (struct inode *inode, struct file *filp)
 /*
  * Tape device release function.
  */
-static int
+int
 tape_release (struct inode *inode, struct file *filp)
 {
 	long lockflags;
@@ -645,7 +697,6 @@ tape_release (struct inode *inode, struct file *filp)
 	ccw_req_t *cqr = NULL;
 	int rc;
 
-	inode = filp->f_dentry->d_inode;
 	ti = first_tape_info;
 	while ((ti != NULL) && (ti->rew_minor != MINOR (inode->i_rdev)) && (ti->nor_minor != MINOR (inode->i_rdev)))
 		ti = (tape_info_t *) ti->next;

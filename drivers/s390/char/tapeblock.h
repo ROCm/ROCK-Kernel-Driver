@@ -4,11 +4,12 @@
  *  drivers/s390/char/tapechar.h
  *    character device frontend for tape device driver
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
  *
- *  UNDER CONSTRUCTION: Work in progress...:-)
+ *
  ****************************************************************************
  */
 
@@ -18,9 +19,17 @@
 
 #define TAPEBLOCK_READAHEAD 30
 #define TAPEBLOCK_MAJOR 0
-static int tapeblock_open(struct inode *, struct file *);
-static int tapeblock_release(struct inode *, struct file *);
+
+#define TAPEBLOCK_DEFAULTMODE 0060644
+
+int tapeblock_open(struct inode *, struct file *);
+int tapeblock_release(struct inode *, struct file *);
 void tapeblock_setup(tape_info_t* tape);
 void schedule_tapeblock_exec_IO (tape_info_t *tape);
-static int tapeblock_mediumdetect(tape_info_t* tape);
+int tapeblock_mediumdetect(tape_info_t* tape);
+#ifdef CONFIG_DEVFS_FS
+void tapeblock_mkdevfstree (tape_info_t* tape);
+#endif
+int tapeblock_init (void);
+void tapeblock_uninit (void);
 #endif

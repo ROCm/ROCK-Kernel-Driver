@@ -11,6 +11,7 @@ if [ "$CONFIG_JOYSTICK" != "n" ]; then
       dep_tristate '  ns558 gameports' CONFIG_INPUT_NS558 $CONFIG_INPUT
       dep_tristate '  PDPI Lightning 4 gamecard' CONFIG_INPUT_LIGHTNING $CONFIG_INPUT
       dep_tristate '  Aureal Vortex and Trident 4DWave gameports' CONFIG_INPUT_PCIGAME $CONFIG_INPUT
+      dep_tristate '  Crystal SoundFusion gameports' CONFIG_INPUT_CS461X $CONFIG_INPUT
 
    comment 'Gameport joysticks'
       dep_tristate '  Classic PC analog joysticks and gamepads' CONFIG_INPUT_ANALOG $CONFIG_INPUT
@@ -31,6 +32,7 @@ if [ "$CONFIG_JOYSTICK" != "n" ]; then
       dep_tristate '  LogiCad3d Magellan/SpaceMouse 6dof controller' CONFIG_INPUT_MAGELLAN $CONFIG_INPUT
       dep_tristate '  SpaceTec SpaceOrb/Avenger 6dof controller' CONFIG_INPUT_SPACEORB $CONFIG_INPUT
       dep_tristate '  SpaceTec SpaceBall 4000 FLX 6dof controller' CONFIG_INPUT_SPACEBALL $CONFIG_INPUT
+      dep_tristate '  Gravis Stinger gamepad' CONFIG_INPUT_STINGER $CONFIG_INPUT
       dep_tristate '  I-Force/Serial controllers' CONFIG_INPUT_IFORCE_232 $CONFIG_INPUT
       dep_tristate '  I-Force/USB controllers' CONFIG_INPUT_IFORCE_USB $CONFIG_INPUT $CONFIG_USB
 

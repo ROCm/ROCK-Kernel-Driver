@@ -75,7 +75,6 @@ typedef struct _ioinfo {
      unsigned long qintparm;      /* queued interruption parameter  */
      unsigned long qflag;         /* queued flags */
      __u8          qlpm;          /* queued logical path mask */
-     __u32         syncnt;       /* sync I/O recursive usage count */
 
    } __attribute__ ((aligned(8))) ioinfo_t;
 

@@ -2221,7 +2221,10 @@ idi_parse_udata(eicon_card *ccard, eicon_chan *chan, unsigned char *buffer, int 
         static char *connmsg[] =
         {"", "V.21", "V.23", "V.22", "V.22bis", "V.32bis", "V.34",
          "V.8", "Bell 212A", "Bell 103", "V.29 Leased", "V.33 Leased", "V.90",
-         "V.21 CH2", "V.27ter", "V.29", "V.33", "V.17"};
+         "V.21 CH2", "V.27ter", "V.29", "V.33", "V.17", "V.32", "K56Flex",
+         "X2", "V.18", "V.18LH", "V.18HL", "V.21LH", "V.21HL",
+         "Bell 103LH", "Bell 103HL", "V.23", "V.23", "EDT 110",
+         "Baudot45", "Baudot47", "Baudot50", "DTMF" };
 	static u_char dtmf_code[] = {
 	'1','4','7','*','2','5','8','0','3','6','9','#','A','B','C','D'
 	};
@@ -2243,7 +2246,11 @@ idi_parse_udata(eicon_card *ccard, eicon_chan *chan, unsigned char *buffer, int 
 				cmd.driver = ccard->myid;
 				cmd.command = ISDN_STAT_BCONN;
 				cmd.arg = chan->No;
-				sprintf(cmd.parm.num, "%d/%s", p->speed, connmsg[p->norm]);
+                                if (p->norm > 34) {
+                                  sprintf(cmd.parm.num, "%d/(%d)", p->speed, p->norm);
+                                } else {
+                                  sprintf(cmd.parm.num, "%d/%s", p->speed, connmsg[p->norm]);
+                                }
 				ccard->interface.statcallb(&cmd);
 			}
 			eicon_log(ccard, 8, "idi_ind: Ch%d: UDATA_DCD_ON time %d\n", chan->No, p->time);

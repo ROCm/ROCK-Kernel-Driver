@@ -1,5 +1,5 @@
 /*
- * $Id: sidewinder.c,v 1.16 2000/07/14 09:02:41 vojtech Exp $
+ * $Id: sidewinder.c,v 1.18 2001/02/28 07:09:30 vojtech Exp $
  *
  *  Copyright (c) 1998-2000 Vojtech Pavlik
  *
@@ -334,7 +334,7 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 				input_report_abs(dev + i, ABS_Y, GB(i*15+0,1) - GB(i*15+1,1));
 
 				for (j = 0; j < 10; j++)
-					input_report_key(dev, sw_btn[SW_ID_GP][j], !GB(i*15+j+4,1));
+					input_report_key(dev + i, sw_btn[SW_ID_GP][j], !GB(i*15+j+4,1));
 			}
 
 			return 0;

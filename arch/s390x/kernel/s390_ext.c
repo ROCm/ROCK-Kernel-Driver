@@ -7,6 +7,7 @@
  *               Martin Schwidefsky (schwidefsky@de.ibm.com)
  */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/malloc.h>
 #include <asm/lowcore.h>
@@ -74,4 +75,6 @@ int unregister_external_interrupt(__u16 code, ext_int_handler_t handler) {
         return 0;
 }
 
+EXPORT_SYMBOL(register_external_interrupt);
+EXPORT_SYMBOL(unregister_external_interrupt);
 

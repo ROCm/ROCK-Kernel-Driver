@@ -54,8 +54,9 @@ hisax-objs += $(sort $(hisax-objs-y))
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_ISDN_DRV_HISAX)		+= hisax.o
+obj-$(CONFIG_ISDN_DRV_HISAX)	+= hisax.o
 obj-$(CONFIG_HISAX_SEDLBAUER_CS)	+= sedlbauer_cs.o
+obj-$(CONFIG_HISAX_ELSA_CS)	+= elsa_cs.o
 
 MD5FILES 	:= isac.c isdnl1.c isdnl2.c isdnl3.c \
 		   tei.c callc.c cert.c l3dss1.c l3_1tr6.c \

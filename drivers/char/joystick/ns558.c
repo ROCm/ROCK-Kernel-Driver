@@ -1,5 +1,5 @@
 /*
- * $Id: ns558.c,v 1.16 2000/08/17 20:03:56 vojtech Exp $
+ * $Id: ns558.c,v 1.27 2001/03/28 09:25:05 vojtech Exp $
  *
  *  Copyright (c) 1999-2000 Vojtech Pavlik
  *  Copyright (c) 1999 Brian Gerst
@@ -47,7 +47,7 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 #define NS558_PNP	2
 #define NS558_PCI	3
 
-static int ns558_isa_portlist[] = { 0x201, 0x202, 0x203, 0x204, 0x205, 0x207, 0x209,
+static int ns558_isa_portlist[] = { 0x200, 0x201, 0x202, 0x203, 0x204, 0x205, 0x207, 0x209,
 				    0x20b, 0x20c, 0x20e, 0x20f, 0x211, 0x219, 0x101, 0 };
 
 struct ns558 {
@@ -230,25 +230,29 @@ static struct pci_driver ns558_pci_driver;
 /*
  * PnP IDs:
  *
+ * @P@0001 - ALS 100 (no comp. ID)
  * CTL00c1 - SB AWE32 PnP
  * CTL00c3 - SB AWE64 PnP
  * CTL00f0 - SB16 PnP / Vibra 16x
- * CTL7001 - SB Vibra16C PnP
- * CSC0b35 - Crystal ** doesn't have compatibility ID **
+ * CTL7001 - SB Vibra16C PnP (no comp. ID)
+ * CTL7002 - SB AWE32 (no comp. ID)
+ * CSC0b35 - Crystal (no comp. ID)
  * TER1141 - Terratec AD1818
  * YMM0800 - Yamaha OPL3-SA3
  *
  * PNPb02f - Generic gameport
  */
 
-static struct pnp_devid {
-	unsigned int vendor, device;
-} pnp_devids[] = {
-	{ ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x7002) },
-	{ ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0b35) },
-	{ ISAPNP_VENDOR('P','N','P'), ISAPNP_DEVICE(0xb02f) },
+static struct isapnp_device_id pnp_devids[] = {
+	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('@','P','@'), ISAPNP_DEVICE(0x0001), 0 },
+	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x7001), 0 },
+	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','T','L'), ISAPNP_DEVICE(0x7002), 0 },
+	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('C','S','C'), ISAPNP_DEVICE(0x0b35), 0 },
+	{ ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P','N','P'), ISAPNP_DEVICE(0xb02f), 0 },
 	{ 0, },
 };
+
+MODULE_DEVICE_TABLE(isapnp, pnp_devids);
 
 static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
 {
@@ -306,7 +310,7 @@ int __init ns558_init(void)
 	int i = 0;
 #ifdef NSS558_ISAPNP
 	struct pci_dev *dev = NULL;
-	struct pnp_devid *devid;
+	struct isapnp_device_id *devid;
 #endif
 
 /*
@@ -329,7 +333,7 @@ int __init ns558_init(void)
 
 #ifdef NSS558_ISAPNP
 	for (devid = pnp_devids; devid->vendor; devid++) {
-		while ((dev = isapnp_find_dev(NULL, devid->vendor, devid->device, dev))) {
+		while ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, dev))) {
 			ns558 = ns558_pnp_probe(dev, ns558);
 		}
 	}

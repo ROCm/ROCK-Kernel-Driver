@@ -1320,15 +1320,19 @@ int __init blk_dev_init(void)
 #ifdef CONFIG_DDV
 	ddv_init();
 #endif
-#ifdef CONFIG_BLK_DEV_NBD
-	nbd_init();
-#endif
 #ifdef CONFIG_MDISK
 	mdisk_init();
 #endif
 #ifdef CONFIG_DASD
 	dasd_init();
 #endif
+#if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_BLOCK)
+	tapeblock_init();
+#endif
+#ifdef CONFIG_BLK_DEV_XPRAM
+        xpram_init();
+#endif
+
 #ifdef CONFIG_SUN_JSFLASH
 	jsfd_init();
 #endif

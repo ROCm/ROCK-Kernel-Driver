@@ -9,6 +9,7 @@
  *               Alan Altmark (Alan_Altmark@us.ibm.com)
  */
 
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/version.h>
 #include <linux/spinlock.h>
@@ -29,10 +30,6 @@
 //#define DEBUG         /* Turns Printk's on                         */
 //#define DEBUG2        /* This prints the parameter list before and */
 		      /* after the b2f0 call to cp                 */
-#ifdef CONFIG_MODULES
-#define EXPORT_SYMTAB
-#include <linux/module.h>
-#endif
 #undef NULL
 #define NULL 0
 #define ADDED_STOR 64		/* ADDITIONAL STORAGE FOR PATHID @'S */
@@ -2021,7 +2018,6 @@ iucv_unregister (iucv_handle_t handle)
 	return 0;
 }
 
-#ifdef CONFIG_MODULES
 EXPORT_SYMBOL (iucv_accept);
 EXPORT_SYMBOL (iucv_connect);
 EXPORT_SYMBOL (iucv_purge);
@@ -2046,5 +2042,4 @@ EXPORT_SYMBOL (iucv_setmask);
 EXPORT_SYMBOL (iucv_sever);
 EXPORT_SYMBOL (iucv_register_program);
 EXPORT_SYMBOL (iucv_unregister);
-#endif
 

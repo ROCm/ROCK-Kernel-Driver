@@ -9,6 +9,9 @@
  *    Author(s): Holger Smolinski <Holger.Smolinski@de.ibm.com>
  *               Fritz Elfert <felfert@to.com> contributed support for
  *                	/etc/silo.conf based on Intel's lilo
+ *    Changes  :
+ *               01/15/01 Holger Smolinski <Holger.Smolinski@de.ibm.com>
+ *                 adapted to deal with devices and bootsects of various sizes
  */
 
 #include <stddef.h>
@@ -482,6 +485,7 @@ write_bootsect (struct silo_options *o, struct blocklist *blklst)
   int bs, boots;
   char *tmpdev;
   char buffer[4096]={0,};
+  int blocksize, sectsize;
   ITRY (d_fd = open (o->ipldevice, O_RDWR | O_SYNC));
   ITRY (fstat (d_fd, &d_st));
   ITRY (s_fd = open (o->bootmap, O_RDWR | O_TRUNC | O_CREAT | O_SYNC));
@@ -508,6 +512,7 @@ write_bootsect (struct silo_options *o, struct blocklist *blklst)
   NTRY ( tmpdev = tmpnam(NULL) );
   ITRY (mknod (tmpdev, S_IFBLK | S_IRUSR | S_IWUSR, s_st.st_dev));
   ITRY (bd_fd = open (tmpdev, O_RDONLY));
+  ITRY (ioctl(bd_fd,BLKSSZGET,&blocksize));
   ITRY (ioctl(s_fd,FIBMAP,&boots));
   ITRY (ioctl (bd_fd, BIODASDRWTB, &boots));
   PRINT_LEVEL (1, "Bootmap is in block no: 0x%08x\n", boots);
@@ -515,13 +520,21 @@ write_bootsect (struct silo_options *o, struct blocklist *blklst)
   close(s_fd);
   ITRY (unlink(tmpdev));
   /* Now patch the bootsector */
+  ITRY (stat (o->bootsect, &b_st));
+  if ((sectsize = b_st.st_size) > blocksize )
+    {
+      ERROR_LEVEL (0,"Bootsector is larger than sectorsize of volume %d vs %d\n", sectsize, blocksize);
+      rc = -1;
+      errno = EINVAL;
+    }
   ITRY (b_fd = open (o->bootsect, O_RDONLY));
-  NTRY (read (b_fd, buffer, 4096));
+  ITRY (read (b_fd, buffer, sectsize));
   memset (buffer + 0xe0, 0, 8);
   *(int *) (buffer + 0xe0) = boots;
   if ( o -> testlevel <= 0 ) {
-    NTRY (write (d_fd, buffer, 4096));
-    NTRY (write (d_fd, buffer, 4096));
+    ITRY (write (d_fd, buffer, sectsize));
+    ITRY (lseek (d_fd, blocksize, SEEK_SET));
+    ITRY (write (d_fd, buffer, sectsize));
   }
   close (b_fd);
   close (d_fd);

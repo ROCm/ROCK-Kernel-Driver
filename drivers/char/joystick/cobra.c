@@ -131,7 +131,7 @@ static void cobra_timer(unsigned long private)
 			input_report_abs(dev, ABS_Y, ((data[i] >> 2) & 1) - ((data[i] >> 1) & 1));
 
 			for (j = 0; cobra_btn[j]; j++)
-				input_report_key(dev, cobra_btn[j], data[i] & (0x20 << i));
+				input_report_key(dev, cobra_btn[j], data[i] & (0x20 << j));
 
 		}
 

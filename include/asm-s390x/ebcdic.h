@@ -24,24 +24,18 @@ extern __u8 _ebc_toupper[]; /* EBCDIC -> uppercase */
 extern __inline__ void
 codepage_convert(const __u8 *codepage, volatile __u8 * addr, unsigned long nr)
 {
-        static const __u16 tr_op[] = { 0xDC00, 0x1000,0x3000 };
+	if (nr <= 0)
+		return;
         __asm__ __volatile__(
-                "   lgr   1,%0\n"
-                "   lgr   2,%1\n"
-                "   lgr   3,%2\n"
-                "   aghi  2,-256\n"
-                "   jm    1f\n"
-                "0: tr    0(256,1),0(3)\n"
-                "   aghi  1,256\n"
-                "   aghi  2,-256\n"
-                "   jp    0b\n"
-                "1: aghi  2,255\n"
-                "   jm    2f\n"
-                "   ex    2,%3\n"
-                "2:"
-                : /* no output */ 
-                : "a" (addr), "d" (nr), "a" (codepage), "m" (tr_op[0])
-                : "cc", "memory", "1", "2", "3" );
+		"   bras  1,1f\n"
+		"   tr    0(1,%0),0(%2)\n"
+		"0: la    %0,256(%0)\n"
+		"   tr    0(256,%0),0(%2)\n"
+		"1: ahi   %1,-256\n"
+		"   jp    0b\n"
+		"   ex    %1,0(1)"
+		: "+&a" (addr), "+&a" (nr-1)
+		: "a" (codepage) : "cc", "memory", "1" );
 }
 
 #define ASCEBC(addr,nr) codepage_convert(_ascebc, addr, nr)

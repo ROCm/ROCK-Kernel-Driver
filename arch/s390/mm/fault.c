@@ -21,6 +21,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/compatmac.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -263,3 +264,123 @@ do_sigbus:
 }
 
 
+typedef struct _pseudo_wait_t {
+       struct _pseudo_wait_t *next;
+       wait_queue_head_t queue;
+       unsigned long address;
+       int resolved;
+} pseudo_wait_t;
+
+static pseudo_wait_t *pseudo_lock_queue = NULL;
+static spinlock_t pseudo_wait_spinlock; /* spinlock to protect lock queue */
+
+/*
+ * This routine handles pseudo page faults.
+ */
+asmlinkage void
+do_pseudo_page_fault(struct pt_regs *regs, unsigned long error_code)
+{
+        DECLARE_WAITQUEUE(wait, current);
+        pseudo_wait_t wait_struct;
+        pseudo_wait_t *ptr, *last, *next;
+        unsigned long psw_mask;
+        unsigned long address;
+        int kernel_address;
+
+        /*
+         *  get psw mask of Program old psw to find out,
+         *  if user or kernel mode
+         */
+        psw_mask = S390_lowcore.program_old_psw.mask;
+
+        /*
+         * get the failing address
+         * more specific the segment and page table portion of
+         * the address
+         */
+        address = S390_lowcore.trans_exc_code & 0xfffff000;
+
+        if (address & 0x80000000) {
+                /* high bit set -> a page has been swapped in by VM */
+                address &= 0x7fffffff;
+                spin_lock(&pseudo_wait_spinlock);
+                last = NULL;
+                ptr = pseudo_lock_queue;
+                while (ptr != NULL) {
+                        next = ptr->next;
+                        if (address == ptr->address) {
+				 /*
+                                 * This is one of the processes waiting
+                                 * for the page. Unchain from the queue.
+                                 * There can be more than one process
+                                 * waiting for the same page. VM presents
+                                 * an initial and a completion interrupt for
+                                 * every process that tries to access a 
+                                 * page swapped out by VM. 
+                                 */
+                                if (last == NULL)
+                                        pseudo_lock_queue = next;
+                                else
+                                        last->next = next;
+                                /* now wake up the process */
+                                ptr->resolved = 1;
+                                wake_up(&ptr->queue);
+                        } else
+                                last = ptr;
+                        ptr = next;
+                }
+                spin_unlock(&pseudo_wait_spinlock);
+        } else {
+                /* Pseudo page faults in kernel mode is a bad idea */
+                if (!(psw_mask & PSW_PROBLEM_STATE)) {
+                        /*
+			 * VM presents pseudo page faults if the interrupted
+			 * state was not disabled for interrupts. So we can
+			 * get pseudo page fault interrupts while running
+			 * in kernel mode. We simply access the page here
+			 * while we are running disabled. VM will then swap
+			 * in the page synchronously.
+                         */
+			kernel_address = 0;
+                         switch (S390_lowcore.trans_exc_code & 3) {
+                         case 0: /* Primary Segment Table Descriptor */
+                                 kernel_address = 1;
+                                 break;
+                         case 1: /* STD determined via access register */
+                                 if (S390_lowcore.exc_access_id == 0 ||
+                                     regs->acrs[S390_lowcore.exc_access_id]==0)
+                                         kernel_address = 1;
+                                 break;
+                         case 2: /* Secondary Segment Table Descriptor */
+                         case 3: /* Home Segment Table Descriptor */
+                                 break;
+                         }
+                         if (kernel_address)
+                                 /* dereference a virtual kernel address */
+                                 __asm__ __volatile__ (
+                                         "  ic 0,0(%0)"
+                                         : : "a" (address) : "0");
+                         else
+                                 /* dereference a virtual user address */
+                                 __asm__ __volatile__ (
+                                         "  la   2,0(%0)\n"
+                                         "  sacf 512\n"
+                                         "  ic   2,0(2)\n"
+                                         "  sacf 0"
+                                         : : "a" (address) : "2" );
+
+                        return;
+                }
+		/* initialize and add element to pseudo_lock_queue */
+                init_waitqueue_head (&wait_struct.queue);
+                wait_struct.address = address;
+                wait_struct.resolved = 0;
+                spin_lock(&pseudo_wait_spinlock);
+                wait_struct.next = pseudo_lock_queue;
+                pseudo_lock_queue = &wait_struct;
+                spin_unlock(&pseudo_wait_spinlock);
+                /* go to sleep */
+                wait_event(wait_struct.queue, wait_struct.resolved);
+        }
+}
+    

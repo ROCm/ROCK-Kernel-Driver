@@ -3,12 +3,11 @@
  *  drivers/s390/char/tape3480.c
  *    tape device discipline for 3480 tapes.
  *
- *  S390 version
- *    Copyright (C) 2000 IBM Corporation
- *    Author(s): Tuan Ngo-Anh <ngoanh@de.ibm.com>
- *               Carsten Otte <cotte@de.ibm.com>
- *
- *  UNDER CONSTRUCTION: Work in progress...:-)
+ *  S390 and zSeries version
+ *    Copyright (C) 2001 IBM Corporation
+ *    Author(s): Carsten Otte <cotte@de.ibm.com>
+ *               Tuan Ngo-Anh <ngoanh@de.ibm.com>
+ * 
  ****************************************************************************
  */
 
@@ -25,31 +24,31 @@
 tape_event_handler_t tape3480_event_handler_table[TS_SIZE][TE_SIZE] =
 {
     /* {START , DONE, FAILED, ERROR, OTHER } */
-	{NULL, tape34xx_unused_done, NULL, tape34xx_unused_error, NULL},	/* TS_UNUSED */
-	{NULL, tape34xx_idle_done, NULL, tape34xx_idle_error, NULL},	/* TS_IDLE */
+	{NULL, tape34xx_unused_done, NULL, NULL, NULL},	/* TS_UNUSED */
+	{NULL, tape34xx_idle_done, NULL, NULL, NULL},	/* TS_IDLE */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_DONE */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_FAILED */
-	{NULL, tape34xx_block_done, NULL, tape34xx_block_error, NULL},		/* TS_BLOCK_INIT */
+	{NULL, tape34xx_block_done, NULL, NULL, NULL},		/* TS_BLOCK_INIT */
 	{NULL, tape34xx_bsb_init_done, NULL, NULL, NULL},	/* TS_BSB_INIT */
 	{NULL, tape34xx_bsf_init_done, NULL, NULL, NULL},	/* TS_BSF_INIT */
 	{NULL, tape34xx_dse_init_done, NULL, NULL, NULL},	/* TS_DSE_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_EGA_INIT */
 	{NULL, tape34xx_fsb_init_done, NULL, NULL, NULL},	/* TS_FSB_INIT */
-	{NULL, tape34xx_fsf_init_done, NULL, tape34xx_fsf_init_error, NULL},	/* TS_FSF_INIT */
+	{NULL, tape34xx_fsf_init_done, NULL, NULL, NULL},	/* TS_FSF_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_LDI_INIT */
-	{NULL, tape34xx_lbl_init_done, NULL, tape34xx_lbl_init_error, NULL},	/* TS_LBL_INIT */
+	{NULL, tape34xx_lbl_init_done, NULL, NULL, NULL},	/* TS_LBL_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_MSE_INIT */
 	{NULL, tape34xx_nop_init_done, NULL, NULL, NULL},	/* TS_NOP_INIT */
-	{NULL, NULL, NULL, NULL, NULL},		/* TS_RBA_INIT */
+	{NULL, tape34xx_rfo_init_done, NULL, NULL, NULL},		/* TS_RBA_INIT */
 	{NULL, tape34xx_rbi_init_done, NULL, NULL, NULL},	/* TS_RBI_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_RBU_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_RBL_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_RDC_INIT */
-	{NULL, tape34xx_rfo_init_done, NULL, tape34xx_rfo_init_error, NULL},	/* TS_RFO_INIT */
+	{NULL, tape34xx_rfo_init_done, NULL, NULL, NULL},	/* TS_RFO_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_RSD_INIT */
-	{NULL, tape34xx_rew_init_done, NULL, tape34xx_rew_init_error, NULL},	/* TS_REW_INIT */
-	{NULL, tape34xx_rew_release_init_done, NULL, tape34xx_rew_release_init_error, NULL},	/* TS_REW_RELEASE_IMIT */
-	{NULL, tape34xx_run_init_done, NULL, tape34xx_run_init_error, NULL},	/* TS_RUN_INIT */
+	{NULL, tape34xx_rew_init_done, NULL, NULL, NULL},	/* TS_REW_INIT */
+	{NULL, tape34xx_rew_release_init_done, NULL, NULL, NULL},	/* TS_REW_RELEASE_IMIT */
+	{NULL, tape34xx_run_init_done, NULL, NULL, NULL},	/* TS_RUN_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_SEN_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_SID_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_SNP_INIT */
@@ -59,14 +58,16 @@ tape_event_handler_t tape3480_event_handler_table[TS_SIZE][TE_SIZE] =
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_SYN_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_TIO_INIT */
 	{NULL, NULL, NULL, NULL, NULL},		/* TS_UNA_INIT */
-	{NULL, tape34xx_wri_init_done, NULL, tape34xx_wri_init_error, NULL},	/* TS_WRI_INIT */
-	{NULL, tape34xx_wtm_init_done, NULL, tape34xx_wtm_init_error, NULL},	/* TS_WTM_INIT */
+	{NULL, tape34xx_wri_init_done, NULL, NULL, NULL},	/* TS_WRI_INIT */
+	{NULL, tape34xx_wtm_init_done, NULL, NULL, NULL},	/* TS_WTM_INIT */
         {NULL, NULL, NULL, NULL, NULL}};     /* TS_NOT_OPER */
 
 devreg_t tape3480_devreg = {
-    ci : { hc: { ctype: 0x3480, dtype: 0x3480 } }, 
-    flag: DEVREG_MATCH_CU_TYPE,
-    oper_func: tape_oper_handler
+    ci:
+    {hc:
+     {ctype:0x3480}},
+    flag:DEVREG_MATCH_CU_TYPE | DEVREG_TYPE_DEVCHARS,
+    oper_func:tape_oper_handler
 };
 
 
@@ -101,6 +102,7 @@ tape3480_init (void)
 	}
 	disc->cu_type = 0x3480;
 	disc->setup_assist = tape3480_setup_assist;
+	disc->error_recovery = tape34xx_error_recovery;
 	disc->write_block = tape34xx_write_block;
 	disc->free_write_block = tape34xx_free_write_block;
 	disc->read_block = tape34xx_read_block;

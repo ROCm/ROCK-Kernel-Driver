@@ -879,7 +879,7 @@ static int agpioc_reserve_wrap(agp_file_private * priv, unsigned long arg)
 			return -ENOMEM;
 		}
 		if (copy_from_user(segment, (void *) reserve.seg_list,
-				   GFP_KERNEL)) {
+				   sizeof(agp_segment) * reserve.seg_count)) {
 			kfree(segment);
 			return -EFAULT;
 		}

@@ -15,7 +15,6 @@
 #define __SIGP__
 
 #include <asm/ptrace.h>
-#include <asm/misc390.h>
 #include <asm/atomic.h>
 
 /* get real cpu address from logical cpu number */

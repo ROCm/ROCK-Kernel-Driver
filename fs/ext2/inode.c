@@ -568,7 +568,7 @@ out:
 
 changed:
 	while (partial > chain) {
-		bforget(partial->bh);
+		brelse(partial->bh);
 		partial--;
 	}
 	goto reread;
@@ -799,8 +799,8 @@ static inline void ext2_free_data(struct inode *inode, u32 *p, u32 *q)
 				/* Writer: ->i_blocks */
 				inode->i_blocks -= blocks * count;
 				/* Writer: end */
-				ext2_free_blocks (inode, block_to_free, count);
 				mark_inode_dirty(inode);
+				ext2_free_blocks (inode, block_to_free, count);
 			free_this:
 				block_to_free = nr;
 				count = 1;
@@ -811,8 +811,8 @@ static inline void ext2_free_data(struct inode *inode, u32 *p, u32 *q)
 		/* Writer: ->i_blocks */
 		inode->i_blocks -= blocks * count;
 		/* Writer: end */
-		ext2_free_blocks (inode, block_to_free, count);
 		mark_inode_dirty(inode);
+		ext2_free_blocks (inode, block_to_free, count);
 	}
 }
 

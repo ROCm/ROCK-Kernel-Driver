@@ -15,9 +15,7 @@
  * User space memory access functions
  */
 #include <linux/sched.h>
-#if 0
-#include <asm/segment.h>
-#endif
+
 #define VERIFY_READ     0
 #define VERIFY_WRITE    1
 

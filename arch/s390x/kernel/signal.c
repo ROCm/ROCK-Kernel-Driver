@@ -188,7 +188,7 @@ static int save_sigregs(struct pt_regs *regs,_sigregs *sregs)
 	int err;
 	s390_fp_regs fpregs;
   
-	err = __copy_to_user(&sregs->regs,regs,sizeof(s390_regs_common));
+	err = __copy_to_user(&sregs->regs,regs,sizeof(_s390_regs_common));
 	if(!err)
 	{
 		save_fp_regs(&fpregs);
@@ -203,7 +203,7 @@ static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
 	int err;
 	s390_fp_regs fpregs;
 	psw_t saved_psw=regs->psw;
-	err=__copy_from_user(regs,&sregs->regs,sizeof(s390_regs_common));
+	err=__copy_from_user(regs,&sregs->regs,sizeof(_s390_regs_common));
 	if(!err)
 	{
 		regs->orig_gpr2 = -1;		/* disable syscall checks */
@@ -219,7 +219,7 @@ static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
 }
 
 static int
-restore_sigcontext(struct sigcontext *sc, pt_regs *regs,
+restore_sigcontext(struct sigcontext *sc, struct pt_regs *regs,
 		 _sigregs *sregs,sigset_t *set)
 {
 	unsigned int err;
@@ -562,6 +562,7 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 
 			case SIGQUIT: case SIGILL: case SIGTRAP:
 			case SIGABRT: case SIGFPE: case SIGSEGV:
+			case SIGBUS: case SIGSYS: case SIGXCPU: case SIGXFSZ:
                                 if (do_coredump(signr, regs))
                                         exit_code |= 0x80;
                                 /* FALLTHRU */

@@ -22,28 +22,6 @@ extern int math_emu_lfpc(__u8 *, struct pt_regs *);
 extern int math_emu_stfpc(__u8 *, struct pt_regs *);
 extern int math_emu_srnm(__u8 *, struct pt_regs *);
 
-
-extern __u64 __adddf3(__u64,__u64);
-extern __u64 __subdf3(__u64,__u64);
-extern __u64 __muldf3(__u64,__u64);
-extern __u64 __divdf3(__u64,__u64);
-extern long  __cmpdf2(__u64,__u64);
-extern __u64 __negdf2(__u64);
-extern __u64 __absdf2(__u64);
-extern __u32 __addsf3(__u32,__u32);
-extern __u32 __subsf3(__u32,__u32);
-extern __u32 __mulsf3(__u32,__u32);
-extern __u32 __divsf3(__u32,__u32);
-extern __u32 __negsf2(__u32);
-extern __u32 __abssf2(__u32);
-extern long  __cmpsf2(__u32,__u32);
-extern __u32 __truncdfsf2(__u64);
-extern __u32 __fixsfsi(__u32);
-extern __u32 __fixdfsi(__u64);
-extern __u64  __floatsidf(__u32);
-extern __u32  __floatsisf(__u32);
-extern __u64  __extendsfdf2(__u32);
-
 #endif                                 /* __MATHEMU__                      */
 
 

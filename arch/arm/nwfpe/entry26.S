@@ -1,6 +1,6 @@
 /*
     NetWinder Floating Point Emulator
-    (c) Corel Computer Corporation, 1998
+    (c) Rebel.COM, 1998
     (c) Philip Blundell 1998-1999
 
     Direct questions, comments to Scott Bambrough <scottb@netwinder.org>
@@ -84,7 +84,7 @@ nwfpe_enter:
 	beq	fpundefinstr		@ no, return failure
 
 next:
-	ldrt	r6, [r5], #4		@ get the next instruction and
+.Lx1:	ldrt	r6, [r5], #4		@ get the next instruction and
 					@ increment PC
 
 	and	r2, r6, #0x0F000000	@ test for FP insns
@@ -110,3 +110,13 @@ next:
 	adr	lr, 1b
 	orr	lr, lr, #3
 	b	EmulateAll		@ if r0 != 0, goto EmulateAll
+
+.Lret:	b	ret_from_exception	@ let the user eat segfaults
+	
+	@ We need to be prepared for the instruction at .Lx1 to fault.
+	@ Emit the appropriate exception gunk to fix things up.
+	.section __ex_table,"a"
+	.align	3
+	.long	.Lx1
+	ldr	lr, [lr, $(.Lret - .Lx1)/4]
+	.previous

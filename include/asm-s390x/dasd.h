@@ -5,10 +5,15 @@
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
  * History of changes (starts July 2000)
+ * 02/01/01 added dynamic registration of ioctls
  */
 
 #ifndef DASD_H
 #define DASD_H
+
+#undef ERP_DEBUG               /* enable debug messages */
+#undef ERP_FULL_ERP            /* enable full ERP - experimental code !!!! */
+#define CONFIG_DASD_DYNAMIC
 
 #include <linux/ioctl.h>
 #include <asm/irq.h>
@@ -28,6 +33,10 @@
 #define BIODASDFORMAT  _IOW(IOCTL_LETTER,0,format_data_t) 
 /* translate blocknumber of partition to absolute */
 #define BIODASDRWTB    _IOWR(IOCTL_LETTER,0,int)
+
+typedef int(*dasd_ioctl_fn_t) (struct inode *inp, int no, long args);
+int dasd_ioctl_no_register(int no, dasd_ioctl_fn_t handler);
+int dasd_ioctl_no_unregister(int no, dasd_ioctl_fn_t handler);
 
 #define DASD_NAME "dasd"
 #define DASD_PARTN_BITS 2
@@ -49,6 +58,10 @@ typedef struct format_data_t {
 #define DASD_FORMAT_DEFAULT_BLOCKSIZE -1
 #define DASD_FORMAT_DEFAULT_INTENSITY -1
 
+#define DASD_FORMAT_INTENS_WRITE_RECZERO 0x01
+#define DASD_FORMAT_INTENS_WRITE_HOMEADR 0x02
+#define DASD_FORMAT_INTENS_INVALIDATE    0x04
+#define DASD_FORMAT_INTENS_CDL 0x08
 #ifdef __KERNEL__
 #include <linux/version.h>
 #include <linux/major.h>
@@ -135,8 +148,14 @@ dasd_dequeue_request( request_queue_t * q, struct request *req )
 typedef struct dasd_devreg_t {
         devreg_t devreg; /* the devreg itself */
         /* build a linked list of devregs, needed for cleanup */
-        struct dasd_devreg_t *next;
+        struct list_head list;
 } dasd_devreg_t;
+
+typedef struct {
+	struct list_head list;
+	int no;
+	dasd_ioctl_fn_t handler;
+} dasd_ioctl_list_t;
 
 typedef enum {
 	dasd_era_fatal = -1,	/* no chance to recover              */
@@ -168,7 +187,7 @@ do { \
         int d_major = MAJOR(d_device->kdev); \
         int d_minor = MINOR(d_device->kdev); \
         printk(d_loglevel PRINTK_HEADER \
-               "/dev/%s(%d:%d), 0x%04X on SCH 0x%x:" \
+               "/dev/%s(%d:%d),%04X IRQ0x%x:" \
                d_string "\n",d_name,d_major,d_minor,d_devno,d_irq,d_args ); \
 } while(0)
 
@@ -181,6 +200,7 @@ struct dasd_sizes_t {
 	unsigned long blocks; /* size of volume in blocks */
 	unsigned int bp_block; /* bytes per block */
 	unsigned int s2b_shift; /* log2 (bp_block/512) */
+        unsigned int pt_block; /* from which block to read the partn table */
 } dasd_sizes_t;
 
 /* 
@@ -192,6 +212,38 @@ struct dasd_chanq_t {
 	ccw_req_t *head;
 	ccw_req_t *tail;
 } dasd_chanq_t;
+
+#define DASD_DEVICE_FORMAT_STRING "Device: %p"
+#define DASD_DEVICE_DEBUG_EVENT(d_level, d_device, d_str, d_data...)\
+do {\
+        if ( d_device->debug_area != NULL )\
+        debug_sprintf_event(d_device->debug_area,d_level,\
+                    DASD_DEVICE_FORMAT_STRING d_str "\n",\
+                    d_device, d_data);\
+} while(0);
+#define DASD_DEVICE_DEBUG_EXCEPTION(d_level, d_device, d_str, d_data...)\
+do {\
+        if ( d_device->debug_area != NULL )\
+        debug_sprintf_exception(d_device->debug_area,d_level,\
+                        DASD_DEVICE_FORMAT_STRING d_str "\n",\
+                        d_device, d_data);\
+} while(0);
+
+#define DASD_DRIVER_FORMAT_STRING "Driver: <[%p]>"
+#define DASD_DRIVER_DEBUG_EVENT(d_level, d_fn, d_str, d_data...)\
+do {\
+        if ( dasd_debug_area != NULL )\
+        debug_sprintf_event(dasd_debug_area, d_level,\
+                    DASD_DRIVER_FORMAT_STRING #d_fn ":" d_str "\n",\
+                    d_fn, d_data);\
+} while(0);
+#define DASD_DRIVER_DEBUG_EXCEPTION(d_level, d_fn, d_str, d_data...)\
+do {\
+        if ( dasd_debug_area != NULL )\
+        debug_sprintf_exception(dasd_debug_area, d_level,\
+                        DASD_DRIVER_FORMAT_STRING #d_fn ":" d_str "\n",\
+                        d_fn, d_data);\
+} while(0);
 
 struct dasd_device_t;
 struct request;
@@ -230,7 +282,7 @@ typedef ccw_req_t *(*dasd_merge_cp_fn_t)(struct dasd_device_t *);
 typedef struct dasd_discipline_t {
 	char ebcname[8]; /* a name used for tagging and printks */
         char name[8];		/* a name used for tagging and printks */
-
+	int max_blocks;	/* maximum number of blocks to be chained */
 	dasd_ck_id_fn_t id_check;	/* to check sense data */
 	dasd_ck_characteristics_fn_t check_characteristics;	/* to check the characteristics */
 	dasd_init_analysis_fn_t init_analysis;	/* to start the analysis of the volume */
@@ -251,9 +303,13 @@ typedef struct dasd_discipline_t {
 	struct dasd_discipline_t *next;	/* used for list of disciplines */
 } dasd_discipline_t;
 
+#define DASD_MAJOR_INFO_REGISTERED 1
+#define DASD_MAJOR_INFO_IS_STATIC 2
+
 typedef struct major_info_t {
-	struct major_info_t *next;
+	struct list_head list;
 	struct dasd_device_t **dasd_device;
+	int flags;
 	struct gendisk gendisk; /* actually contains the major number */
 } __attribute__ ((packed)) major_info_t;
 
@@ -278,6 +334,7 @@ typedef struct dasd_device_t {
 	struct dasd_chanq_t queue;
         wait_queue_head_t wait_q;
         request_queue_t request_queue;
+        struct timer_list timer;      
 	devstat_t dev_status; /* needed ONLY!! for request_irq */
         dasd_sizes_t sizes;
         char name[16]; /* The name of the device in /dev */
@@ -300,7 +357,7 @@ typedef struct dasd_device_t {
 #define DASD_DEVICE_LEVEL_ANALYSIS_PENDING 0x02
 #define DASD_DEVICE_LEVEL_ANALYSIS_PREPARED 0x04
 #define DASD_DEVICE_LEVEL_ANALYSED 0x08
-#define DASD_DEVICE_LEVEL_PARTITIONED 0x10
+#define DASD_DEVICE_LEVEL_ONLINE 0x10
 
 int dasd_init (void);
 void dasd_discipline_enq (dasd_discipline_t *);
@@ -312,8 +369,12 @@ ccw_req_t *default_erp_postaction (ccw_req_t *);
 int dasd_chanq_deq (dasd_chanq_t *, ccw_req_t *);
 ccw_req_t *dasd_alloc_request (char *, int, int);
 void dasd_free_request (ccw_req_t *);
-int (*genhd_dasd_name) (char *, int, int, struct gendisk *);
+extern int (*genhd_dasd_name) (char *, int, int, struct gendisk *);
+extern int (*genhd_dasd_fillgeo) (int, struct hd_geometry *);
 int dasd_oper_handler (int irq, devreg_t * devreg);
+void dasd_schedule_bh (dasd_device_t *);
+
+debug_info_t *dasd_debug_area;
 
 #endif /* __KERNEL__ */
 

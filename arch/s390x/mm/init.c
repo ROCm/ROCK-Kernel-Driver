@@ -35,31 +35,13 @@
 #include <asm/pgalloc.h>
 #include <asm/dma.h>
 #include <asm/lowcore.h>
+ 
+mmu_gather_t mmu_gathers[NR_CPUS];
 
 static unsigned long totalram_pages;
 
-/*
- * empty_bad_page is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving an inode
- * unused etc..
- *
- * empty_bad_pte_table is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * empty_bad_pmd_table is the accompanying segment table: it is initialized
- * to point to empty_bad_pte_table page tables.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-
 pgd_t swapper_pg_dir[PTRS_PER_PGD] __attribute__((__aligned__(PAGE_SIZE)));
-char  empty_bad_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
 char  empty_zero_page[PAGE_SIZE] __attribute__((__aligned__(PAGE_SIZE)));
-pmd_t empty_bad_pmd_table[PTRS_PER_PMD] __attribute__((__aligned__(PAGE_SIZE)));
-pte_t empty_bad_pte_table[PTRS_PER_PTE] __attribute__((__aligned__(PAGE_SIZE)));
 
 static int test_access(unsigned long loc)
 {
@@ -88,79 +70,6 @@ static int test_access(unsigned long loc)
 	return rc;
 }
 
-static pmd_t *get_bad_pmd_table(void)
-{
-       pmd_t v;
-       int i;
-
-       pmd_set(&v, empty_bad_pte_table);
-
-       for (i = 0; i < PTRS_PER_PMD; i++)
-               empty_bad_pmd_table[i] = v;
-
-       return empty_bad_pmd_table;
-}
-
-static pte_t *get_bad_pte_table(void)
-{
-	pte_t v;
-	int i;
-
-	v = pte_mkdirty(mk_pte_phys(__pa(empty_bad_page), PAGE_SHARED));
-
-	for (i = 0; i < PAGE_SIZE/sizeof(pte_t); i++)
-		empty_bad_pte_table[i] = v;
-
-	return empty_bad_pte_table;
-}
-
-pmd_t *
-get_pmd_slow(pgd_t *pgd, unsigned long offset)
-{
-        pmd_t *pmd;
-        int i;
-
-        pmd = (pmd_t *) __get_free_pages(GFP_KERNEL,2);
-        if (pgd_none(*pgd)) {
-                if (pmd) {
-                        for (i = 0; i < PTRS_PER_PMD; i++)
-                                pmd_clear(pmd+i);
-                        pgd_set(pgd, pmd);
-                        return pmd + offset;
-                }
-                pmd = (pmd_t *) get_bad_pmd_table();
-                pgd_set(pgd, pmd);
-                return NULL;
-        }
-        free_pages((unsigned long)pmd,2);
-        if (pgd_bad(*pgd))
-		BUG();
-        return (pmd_t *) pgd_page(*pgd) + offset;
-}
-
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-        pte_t *pte;
-        int i;
-
-        pte = (pte_t*) __get_free_page(GFP_KERNEL);
-        if (pmd_none(*pmd)) {
-                if (pte) {
-                        for (i=0;i<PTRS_PER_PTE;i++)
-                                pte_clear(pte+i);
-                        pmd_set(pmd,pte);
-                        return pte + offset;
-                }
-		pte = (pte_t*) get_bad_pte_table();
-                pmd_set(pmd,pte);
-                return NULL;
-        }
-        free_page(__pa(pte));
-        if (pmd_bad(*pmd))
-		BUG();
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
         int freed = 0;
@@ -169,9 +78,9 @@ int do_check_pgt_cache(int low, int high)
                         if(pgd_quicklist)
                                 free_pgd_slow(get_pgd_fast()), freed += 4;
                         if(pmd_quicklist)
-                                free_pmd_slow(get_pmd_fast()), freed += 4;
+                                pmd_free_slow(pmd_alloc_one_fast(NULL, 0)), freed += 4;
                         if(pte_quicklist)
-                                free_pte_slow(get_pte_fast()), freed++;
+                                pte_free_slow(pte_alloc_one_fast(NULL, 0)), freed++;
                 } while(pgtable_cache_size > low);
         }
         return freed;
@@ -259,34 +168,34 @@ void __init paging_init(void)
         for (i = 0 ; i < PTRS_PER_PGD ; i++,pg_dir++) {
 
                 if (address >= end_mem) {
-                  pgd_clear(pg_dir);
-                  continue;
+                        pgd_clear(pg_dir);
+                        continue;
                 }          
         
 	        pm_dir = (pmd_t *) alloc_bootmem_low_pages(PAGE_SIZE*4);
-                pgd_set(pg_dir,pm_dir);
+                pgd_populate(&init_mm, pg_dir, pm_dir);
 
                 for (j = 0 ; j < PTRS_PER_PMD ; j++,pm_dir++) {
-                  if (address >= end_mem) {
-                    pmd_clear(pm_dir);
-                    continue; 
-                  }          
-
+                        if (address >= end_mem) {
+                                pmd_clear(pm_dir);
+                                continue; 
+                        }          
+                        
                         pt_dir = (pte_t *) alloc_bootmem_low_pages(PAGE_SIZE);
-                        pmd_set(pm_dir,pt_dir);
+                        pmd_populate(&init_mm, pm_dir, pt_dir);
 	
                         for (k = 0 ; k < PTRS_PER_PTE ; k++,pt_dir++) {
-                          pte = mk_pte_phys(address, PAGE_KERNEL);
-                          if (address >= end_mem) {
-                            pte_clear(&pte); 
-                            continue;
-                          }
-                          set_pte(pt_dir, pte);
-                          address += PAGE_SIZE;
+                                pte = mk_pte_phys(address, PAGE_KERNEL);
+                                if (address >= end_mem) {
+                                        pte_clear(&pte); 
+                                        continue;
+                                }
+                                set_pte(pt_dir, pte);
+                                address += PAGE_SIZE;
                         }
                 }
         }
-
+        
         /* enable virtual mapping in kernel mode */
         __asm__ __volatile__("lctlg 1,1,%0\n\t"
                              "lctlg 7,7,%0\n\t"

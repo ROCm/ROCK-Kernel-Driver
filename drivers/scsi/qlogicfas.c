@@ -118,6 +118,7 @@
 #include <linux/blk.h>	/* to get disk capacity */
 #include <linux/kernel.h>
 #include <linux/string.h>
+#include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/proc_fs.h>
@@ -128,11 +129,11 @@
 #include "sd.h"
 #include "hosts.h"
 #include "qlogicfas.h"
-#include<linux/stat.h>
+#include <linux/stat.h>
 
 /*----------------------------------------------------------------*/
 /* driver state info, local to driver */
-static int	    qbase = 0;	/* Port */
+static int	    qbase;	/* Port */
 static int	    qinitid;	/* initiator ID */
 static int	    qabort;	/* Flag to cause an abort */
 static int	    qlirq = -1;	/* IRQ being used */
@@ -537,7 +538,7 @@ void	qlogicfas_preset(int port, int irq)
 
 /*----------------------------------------------------------------*/
 /* look for qlogic card and init if found */
-int	qlogicfas_detect(Scsi_Host_Template * host)
+int __QLINIT qlogicfas_detect(Scsi_Host_Template * host)
 {
 int	i, j;			/* these are only used by IRQ detect */
 int	qltyp;			/* type of chip */
@@ -556,7 +557,7 @@ host->proc_name =  "qlogicfas";
 
 	if( !qbase ) {
 		for (qbase = 0x230; qbase < 0x430; qbase += 0x100) {
-			if( check_region( qbase , 0x10 ) )
+			if( !request_region( qbase , 0x10, "qlogicfas" ) )
 				continue;
 			REG1;
 			if ( ( (inb(qbase + 0xe) ^ inb(qbase + 0xe)) == 7 )
@@ -616,8 +617,9 @@ host->proc_name =  "qlogicfas";
 	if (qlirq >= 0 && !request_irq(qlirq, do_ql_ihandl, 0, "qlogicfas", NULL))
 		host->can_queue = 1;
 #endif
-	request_region( qbase , 0x10 ,"qlogicfas");
 	hreg = scsi_register( host , 0 );	/* no host data */
+	if (!hreg)
+		goto err_release_mem;
 	hreg->io_port = qbase;
 	hreg->n_io_port = 16;
 	hreg->dma_channel = -1;
@@ -629,6 +631,13 @@ host->proc_name =  "qlogicfas";
 	host->name = qinfo;
 
 	return 1;
+
+ err_release_mem:
+	release_region(qbase, 0x10);
+	if (host->can_queue)
+		free_irq(qlirq, do_ql_ihandl);
+	return 0;
+
 }
 
 /*----------------------------------------------------------------*/

@@ -153,7 +153,7 @@ int copy_user(struct task_struct *task,saddr_t useraddr, addr_t copyaddr,
 			useraddr = 2 * useraddr + sizeof(addr_t) / 2;
 		else if(useraddr < PT_ACR0 / 2 + (PT_ORIGGPR2 - PT_ACR0))
 			useraddr = useraddr + PT_ACR0 / 2;
-		else if(useraddr < PT_ACR0 / 2 + (sizeof(user_regs_struct) - sizeof(addr_t) / 2 - PT_ACR0))
+		else if(useraddr < PT_ACR0 / 2 + (sizeof(struct user_regs_struct) - sizeof(addr_t) / 2 - PT_ACR0))
 			useraddr = useraddr + PT_ACR0 / 2 + sizeof(addr_t) / 2; 
         }
 #endif  
@@ -174,15 +174,15 @@ int copy_user(struct task_struct *task,saddr_t useraddr, addr_t copyaddr,
 			{
 				copymax=PT_PSWMASK;
 			}
-			else if(useraddr<(PT_PSWMASK+PSW_MASK_SIZE))
+			else if(useraddr<(PT_PSWMASK+8))
 			{
-				copymax=(PT_PSWMASK+PSW_MASK_SIZE);
+				copymax=(PT_PSWMASK+8);
 				if(writingtouser)
 					mask=PSW_MASK_DEBUGCHANGE;
 			}
-			else if(useraddr<(PT_PSWADDR+PSW_ADDR_SIZE))
+			else if(useraddr<(PT_PSWADDR+8))
 			{
-				copymax=PT_PSWADDR+PSW_ADDR_SIZE;
+				copymax=PT_PSWADDR+8;
 				mask=PSW_ADDR_DEBUGCHANGE;
 			}
 			else
@@ -194,9 +194,9 @@ int copy_user(struct task_struct *task,saddr_t useraddr, addr_t copyaddr,
 			copymax=(PT_FPR15+sizeof(freg_t));
 			realuseraddr=(addr_t)&(((u8 *)&task->thread.fp_regs)[useraddr-PT_FPC]);
 		}
-		else if(useraddr<sizeof(user_regs_struct))
+		else if(useraddr<sizeof(struct user_regs_struct))
 		{
-			copymax=sizeof(user_regs_struct);
+			copymax=sizeof(struct user_regs_struct);
 			realuseraddr=(addr_t)&(((u8 *)&task->thread.per_info)[useraddr-PT_CR_9]);
 		}
 		else 

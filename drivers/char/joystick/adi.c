@@ -1,5 +1,5 @@
 /*
- * $Id: adi.c,v 1.12 2000/06/03 20:18:52 vojtech Exp $
+ * $Id: adi.c,v 1.15 2001/01/09 13:32:39 vojtech Exp $
  *
  *  Copyright (c) 1998-2000 Vojtech Pavlik
  *
@@ -370,7 +370,8 @@ static void adi_id_decode(struct adi *adi, struct adi_port *port)
 		adi->cname[i] = adi_get_bits(adi, 8);
 	adi->cname[i] = 0;
 
-	if (adi->length != (t = 8 + adi->buttons + adi->axes10 * 10 + adi->axes8 * 8 + adi->hats * 4)) {
+	t = 8 + adi->buttons + adi->axes10 * 10 + adi->axes8 * 8 + adi->hats * 4;
+	if (adi->length != t && adi->length != t + (t & 1)) {
 		printk(KERN_WARNING "adi: Expected length %d != data length %d\n", t, adi->length);
 		adi->length = 0;
 		return;

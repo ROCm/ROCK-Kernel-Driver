@@ -261,8 +261,9 @@ iplstart:
 	l     %r1,0xb8                         # load ipl subchannel number
         la    %r2,IPL_BS                       # load start address
         bas   %r14,.Lloader                    # load rest of ipl image
-        st    %r1,__LC_IPLDEV                  # store ipl device number
         l     %r12,.Lparm                      # pointer to parameter area
+        st    %r1,__LC_IPLDEV                  # store ipl device number
+        st    %r1,IPL_DEVICE-PARMAREA(%r12)
 
 #
 # load parameter file from ipl device
@@ -406,7 +407,8 @@ start:
 	sr    %r3,%r2
 	la    %r3,1(%r3)
 .done:
-	st    %r3,MEMORY_SIZE-PARMAREA(%r11)	
+        l     %r1,.memsize
+	st    %r3,0(%r1)
 	slr   %r0,%r0
 	st    %r0,INITRD_SIZE-PARMAREA(%r11)
 	st    %r0,INITRD_START-PARMAREA(%r11)
@@ -414,6 +416,7 @@ start:
 .tbl:	.long _ebcasc			# translate table
 .cmd:	.long COMMAND_LINE		# address of command line buffer
 .parm:	.long PARMAREA
+.memsize: .long memory_size
 .fourmeg: .long 0x00400000      	# 4M
 .pgmnw:	.long 0x00080000,.pgmx
 .lowcase:
@@ -464,7 +467,7 @@ startup:basr  %r13,0                     # get base
 #
 # find out memory size.
 #
-	mvc   104(8),.Lpcmem-.LPG1(%r13) # setup program check handler
+	mvc   __LC_PGM_NEW_PSW(8),.Lpcmem-.LPG1(%r13)
         lhi   %r2,1
         sll   %r2,17                     # test in increments of 128KB
 	lr    %r1,%r2
@@ -476,77 +479,55 @@ startup:basr  %r13,0                     # get base
 	bnm   .Lloop-.LPG1(%r13)         # r1 < 0x80000000 -> loop
 .Lchkmem:
 	n     %r1,.L4malign-.LPG1(%r13)  # align to multiples of 4M
-	st    %r1,MEMORY_SIZE-PARMAREA(%r12)  # store memory size
-.Lsizeok:
+        l     %r2,.Lmemsize-.LPG1(%r13)  # address of variable memory_size
+	st    %r1,0(%r2)                 # store memory size
 
-#
-# Now we have to move the ramdisk to a location approriate for the
-# memory size. If we have more than 64 MB of memory we move it to 32MB
-# to make room for the page tables set up by paging_init.
-#
-        l     %r1,MEMORY_SIZE-PARMAREA(%r12)
-        cl    %r1,.Lbigmem-.LPG1(%r13)   # memory < 64mb ?
-        bl    .Lnomove-.LPG1(%r13)       # if yes ramdisk @8MB is ok
-        icm   %r4,15,INITRD_START-PARMAREA(%r12)
-        bz    .Lnomove-.LPG1(%r13)
-	l     %r2,.Lrdstart-.LPG1(%r13)  # new address of ramdisk
-	st    %r2,INITRD_START-PARMAREA(%r12)
-        l     %r1,INITRD_SIZE-PARMAREA(%r12)
-	ar    %r2,%r1                    # we start moving at the end
-	ar    %r4,%r1                    #  because new location > old location
-.Lmove:	lr    %r0,%r2                    # new - old is the maximum we can move
-	sr    %r0,%r4                    #  because of overlapping
-	cr    %r0,%r1                    # we shouldn't move more than there is
-	bnh   .Lnoend-.LPG1(%r13)
-	lr    %r0,%r1
-.Lnoend:cl    %r0,.Lmaxchunk-.LPG1(%r13) # mvcl can move 2^24-1 in one go
-	bnh   .Lchunk-.LPG1(%r13)
-	l     %r0,.Lmaxchunk-.LPG1(%r13)
-.Lchunk:sr    %r2,%r0                    # make source & destination pointer
-	sr    %r4,%r0
-	lr    %r3,%r0                    # set source & destination length
-	lr    %r5,%r0
-	mvcl  %r2,%r4
-	sr    %r2,%r0                    # substract length again, since
-	sr    %r4,%r0                    #  mvcl added it to the pointers
-	sr    %r1,%r0                    # substract chunk size from length
-	bnz   .Lmove-.LPG1(%r13)
-.Lnomove:
-
+        l      %r12,.Lmflags-.LPG1(%r13) # get address of machine_flags
 #
 # find out if we are running under VM
 #
         stidp  __LC_CPUID               # store cpuid
 	tm     __LC_CPUID,0xff          # running under VM ?
 	bno    .Lnovm-.LPG1(%r13)
-        oi     MACHINE_FLAGS+3-PARMAREA(%r12),1    # set VM flag
+        oi     3(%r12),1                # set VM flag
 .Lnovm:
         lh     %r0,__LC_CPUID+4         # get cpu version
         chi    %r0,0x7490               # running on a P/390 ?
         bne    .Lnop390-.LPG1(%r13)
-        oi     MACHINE_FLAGS+3-PARMAREA(%r12),4    # set P/390 flag
+        oi     3(%r12),4                # set P/390 flag
 .Lnop390:
 
 #
 # find out if we have an IEEE fpu
 #
-        mvc    104(8),.Lpcfpu-.LPG1(%r13) # setup program check handler
+        mvc    __LC_PGM_NEW_PSW(8),.Lpcfpu-.LPG1(%r13)
         ld     %f0,.Lflt0-.LPG1(%r13)   # load (float) 0.0
         ldr    %f2,%f0
         adbr   %f0,%f2                  # test IEEE add instruction
-        oi     MACHINE_FLAGS+3-PARMAREA(%r12),2    # set IEEE fpu flag
+        oi     3(%r12),2                # set IEEE fpu flag
 .Lchkfpu:
 
 #
 # find out if we have the CSP instruction
 #
-       mvc    104(8),.Lpccsp-.LPG1(%r13) # setup program check handler
+       mvc    __LC_PGM_NEW_PSW(8),.Lpccsp-.LPG1(%r13)
        la     %r0,0
        lr     %r1,%r0
        la     %r2,.Lflt0-.LPG1(%r13)
        csp    %r0,%r2                   # Test CSP instruction
-       oi     MACHINE_FLAGS+3-PARMAREA(%r12),8 # set CSP flag
+       oi     3(%r12),8                 # set CSP flag
 .Lchkcsp:
+
+#
+# find out if we have the MVPG instruction
+#
+       mvc    __LC_PGM_NEW_PSW(8),.Lpcmvpg-.LPG1(%r13)
+       sr     %r0,%r0
+       la     %r1,0
+       la     %r2,0
+       mvpg   %r1,%r2                   # Test CSP instruction
+       oi     3(%r12),16                # set MVPG flag
+.Lchkmvpg:
 
         lpsw  .Lentry-.LPG1(13)         # jump to _stext in primary-space,
                                         # virtual and never return ...
@@ -571,24 +552,23 @@ startup:basr  %r13,0                     # get base
 .Lpcmem:.long  0x00080000,0x80000000 + .Lchkmem
 .Lpcfpu:.long  0x00080000,0x80000000 + .Lchkfpu
 .Lpccsp:.long  0x00080000,0x80000000 + .Lchkcsp
+.Lpcmvpg:.long 0x00080000,0x80000000 + .Lchkmvpg
 .Lflt0: .double 0
 .Lparm1:.long  PARMAREA
 .L4malign:.long 0xffc00000
 .Lbigmem:.long 0x04000000
 .Lrdstart:.long 0x02000000
 .Lmaxchunk:.long  0x00ffffff
+.Lmemsize:.long memory_size
+.Lmflags:.long machine_flags
 
 #
 # params at 10400 (setup.h)
 #
 	.org   PARMAREA
-        .long  0x0100                   # ORIG_ROOT_DEV: ramdisk major/minor
-        .word  0                        # MOUNT_ROOT_RDONLY: no
-	.long  0                        # MEMORY_SIZE
-	.long  0                        # MACHINE_FLAGS (bit 0:VM, bit 1:IEEE)
-        .long  RAMDISK_ORIGIN           # INITRD_START
-        .long  0x800000                 # INITRD_SIZE
-	.word  0                        # RAMDISK_FLAGS
+        .long  0,0                      # IPL_DEVICE
+        .long  0,RAMDISK_ORIGIN         # INITRD_START
+        .long  0,0x800000               # INITRD_SIZE
 
         .org   COMMAND_LINE
     	.byte  "root=/dev/ram0 ro"

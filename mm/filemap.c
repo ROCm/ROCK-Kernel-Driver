@@ -2451,6 +2451,9 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 
 	cached_page = NULL;
 
+	if (!access_ok(VERIFY_READ, buf, count))
+		return -EFAULT;
+
 	down(&inode->i_sem);
 
 	pos = *ppos;
@@ -2533,7 +2536,7 @@ generic_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 		if (status)
 			goto unlock;
 		kaddr = page_address(page);
-		status = copy_from_user(kaddr+offset, buf, bytes);
+		status = __copy_from_user(kaddr+offset, buf, bytes);
 		flush_dcache_page(page);
 		if (status)
 			goto fail_write;

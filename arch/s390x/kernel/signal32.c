@@ -343,7 +343,7 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 }
 
 static int
-restore_sigcontext32(struct sigcontext32 *sc, pt_regs *regs,
+restore_sigcontext32(struct sigcontext32 *sc, struct pt_regs *regs,
 		 _sigregs32 *sregs,sigset_t *set)
 {
 	unsigned int err;

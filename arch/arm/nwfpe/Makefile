@@ -1,7 +1,7 @@
 #
 # linux/arch/arm/nwfpe/Makefile
 #
-# Copyright (C) 1998, 1999 Philip Blundell
+# Copyright (C) 1998, 1999, 2001 Philip Blundell
 #
 
 USE_STANDARD_AS_RULE := true
@@ -14,7 +14,7 @@ obj-n			:=
 
 list-multi		:= nwfpe.o
 
-obj-$(CONFIG_NWFPE)	+= nwfpe.o
+obj-$(CONFIG_FPE_NWFPE)	+= nwfpe.o
 
 nwfpe-objs		:= fpa11.o fpa11_cpdo.o fpa11_cpdt.o fpa11_cprt.o \
 			   fpmodule.o fpopcode.o softfloat.o \

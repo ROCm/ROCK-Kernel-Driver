@@ -1515,11 +1515,11 @@ struct NCR53c7x0_hostdata {
 /* Patch field in dsa structure (assignment should be +=?) */
 #define patch_dsa_32(dsa, symbol, word, value)				\
 	{								\
-	(dsa)[(hostdata->##symbol - hostdata->dsa_start) / sizeof(u32)	\
+	(dsa)[(hostdata->symbol - hostdata->dsa_start) / sizeof(u32)	\
 	    + (word)] = (value);					\
 	if (hostdata->options & OPTION_DEBUG_DSA)			\
 	    printk("scsi : dsa %s symbol %s(%d) word %d now 0x%x\n",	\
-		#dsa, #symbol, hostdata->##symbol, 			\
+		#dsa, #symbol, hostdata->symbol, 			\
 		(word), (u32) le32_to_cpu(value));			\
 	}
 

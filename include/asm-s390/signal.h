@@ -71,6 +71,7 @@ typedef unsigned long sigset_t;
 #define SIGLOST         29
 */
 #define SIGPWR          30
+#define SIGSYS		31
 #define SIGUNUSED       31
 
 /* These should not be considered constants from userland.  */
