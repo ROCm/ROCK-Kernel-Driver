@@ -2185,12 +2185,12 @@ quit:
 	clear_bit(0, &printing);
 }
 
-struct tty_driver console_driver;
+struct tty_driver *console_driver;
 
 static struct tty_driver *vt_console_device(struct console *c, int *index)
 {
 	*index = c->index ? c->index-1 : fg_console;
-	return &console_driver;
+	return console_driver;
 }
 
 struct console vt_console_driver = {
@@ -2522,35 +2522,37 @@ static int __init con_init(void)
 }
 console_initcall(con_init);
 
+static struct tty_operations con_ops = {
+	.open = con_open,
+	.close = con_close,
+	.write = con_write,
+	.write_room = con_write_room,
+	.put_char = con_put_char,
+	.flush_chars = con_flush_chars,
+	.chars_in_buffer = con_chars_in_buffer,
+	.ioctl = vt_ioctl,
+	.stop = con_stop,
+	.start = con_start,
+	.throttle = con_throttle,
+	.unthrottle = con_unthrottle,
+};
+
 int __init vty_init(void)
 {
-	memset(&console_driver, 0, sizeof(struct tty_driver));
-	console_driver.magic = TTY_DRIVER_MAGIC;
-	console_driver.owner = THIS_MODULE;
-	console_driver.devfs_name = "vc/";
-	console_driver.name = "tty";
-	console_driver.name_base = 1;
-	console_driver.major = TTY_MAJOR;
-	console_driver.minor_start = 1;
-	console_driver.num = MAX_NR_CONSOLES;
-	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
-	console_driver.init_termios = tty_std_termios;
-	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-
-	console_driver.open = con_open;
-	console_driver.close = con_close;
-	console_driver.write = con_write;
-	console_driver.write_room = con_write_room;
-	console_driver.put_char = con_put_char;
-	console_driver.flush_chars = con_flush_chars;
-	console_driver.chars_in_buffer = con_chars_in_buffer;
-	console_driver.ioctl = vt_ioctl;
-	console_driver.stop = con_stop;
-	console_driver.start = con_start;
-	console_driver.throttle = con_throttle;
-	console_driver.unthrottle = con_unthrottle;
-
-	if (tty_register_driver(&console_driver))
+	console_driver = alloc_tty_driver(MAX_NR_CONSOLES);
+	if (!console_driver)
+		panic("Couldn't allocate console driver\n");
+	console_driver->owner = THIS_MODULE;
+	console_driver->devfs_name = "vc/";
+	console_driver->name = "tty";
+	console_driver->name_base = 1;
+	console_driver->major = TTY_MAJOR;
+	console_driver->minor_start = 1;
+	console_driver->type = TTY_DRIVER_TYPE_CONSOLE;
+	console_driver->init_termios = tty_std_termios;
+	console_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	tty_set_operations(console_driver, &con_ops);
+	if (tty_register_driver(console_driver))
 		panic("Couldn't register console driver\n");
 
 	kbd_init();

@@ -1322,8 +1322,8 @@ retry_open:
 #ifdef CONFIG_VT
 	if (IS_CONSOLE_DEV(device)) {
 		extern int fg_console;
-		extern struct tty_driver console_driver;
-		driver = &console_driver;
+		extern struct tty_driver *console_driver;
+		driver = console_driver;
 		index = fg_console;
 		noctty = 1;
 		goto got_driver;

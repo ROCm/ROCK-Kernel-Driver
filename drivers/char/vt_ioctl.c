@@ -34,9 +34,9 @@
 #include <linux/selection.h>
 
 char vt_dont_switch;
-extern struct tty_driver console_driver;
+extern struct tty_driver *console_driver;
 
-#define VT_IS_IN_USE(i)	(console_driver.ttys[i] && console_driver.ttys[i]->count)
+#define VT_IS_IN_USE(i)	(console_driver->ttys[i] && console_driver->ttys[i]->count)
 #define VT_BUSY(i)	(VT_IS_IN_USE(i) || i == fg_console || i == sel_cons)
 
 /*
