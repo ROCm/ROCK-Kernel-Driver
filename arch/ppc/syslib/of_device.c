@@ -127,10 +127,10 @@ static int of_device_resume(struct device * dev)
 }
 
 struct bus_type of_platform_bus_type = {
-       name:	"of_platform",
-       match:	of_platform_bus_match,
-       suspend:	of_device_suspend,
-       resume:	of_device_resume,
+       .name	= "of_platform",
+       .match	= of_platform_bus_match,
+       .suspend	= of_device_suspend,
+       .resume	= of_device_resume,
 };
 
 static int __init of_bus_driver_init(void)

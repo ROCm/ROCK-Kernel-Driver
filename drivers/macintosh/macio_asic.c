@@ -123,10 +123,10 @@ static int macio_device_resume(struct device * dev)
 }
 
 struct bus_type macio_bus_type = {
-       name:	"macio",
-       match:	macio_bus_match,
-       suspend:	macio_device_suspend,
-       resume:	macio_device_resume,
+       .name	= "macio",
+       .match	= macio_bus_match,
+       .suspend	= macio_device_suspend,
+       .resume	= macio_device_resume,
 };
 
 static int __init
@@ -378,10 +378,10 @@ static void __devexit macio_pci_remove(struct pci_dev* pdev)
  * will then decide wether it applies or not
  */
 static const struct pci_device_id __devinitdata pci_ids [] = { {
-	.vendor =	PCI_VENDOR_ID_APPLE,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
+	.vendor		= PCI_VENDOR_ID_APPLE,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
 
 	}, { /* end: all zeroes */ }
 };
@@ -389,11 +389,11 @@ MODULE_DEVICE_TABLE (pci, pci_ids);
 
 /* pci driver glue; this is a "new style" PCI driver module */
 static struct pci_driver macio_pci_driver = {
-	.name =		(char *) "macio",
-	.id_table =	pci_ids,
+	.name		= (char *) "macio",
+	.id_table	= pci_ids,
 
-	.probe =	macio_pci_probe,
-	.remove =	macio_pci_remove,
+	.probe		= macio_pci_probe,
+	.remove		= macio_pci_remove,
 };
 
 #endif /* CONFIG_PCI */
