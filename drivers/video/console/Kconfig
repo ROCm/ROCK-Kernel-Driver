@@ -66,12 +66,29 @@ config SGI_NEWPORT_CONSOLE
 
 #  bool 'IODC console' CONFIG_IODC_CONSOLE
 config STI_CONSOLE
-        bool "STI console"
+        bool "STI text console"
         depends on PARISC
+        default y
 	help
           The STI console is the builtin display/keyboard on HP-PARISC
           machines.  Say Y here to build support for it into your kernel.
           The alternative is to use your primary serial port as a console.
+
+config DUMMY_CONSOLE_COLUMNS
+        int "Initial number of STI console screen columns" if STI_CONSOLE
+        depends on STI_CONSOLE || FB_STI
+        default "160"
+        help
+          The default value is 160, which should fit a 1280x1024 monitor.
+          Select 80 if you use a 640x480 resolution by default.
+
+config DUMMY_CONSOLE_ROWS
+        int "Initial number of STI console screen rows" if STI_CONSOLE
+        depends on STI_CONSOLE || FB_STI
+        default "64"
+        help
+          The default value is 64, which should fit a 1280x1024 monitor.
+          Select 25 if you use a 640x480 resolution by default.
 
 config PROM_CONSOLE
 	bool "PROM console"
@@ -120,19 +137,6 @@ config FBCON_ADVANCED
 	  If unsure, say N.
 
 # Guess what we need
-config FBCON_STI
-	tristate
-	depends on !FBCON_ADVANCED && FRAMEBUFFER_CONSOLE && FB_STI
-	default y
-
-config FONTWIDTH8_ONLY
-	bool "Support only 8 pixels wide fonts"
-	depends on FRAMEBUFFER_CONSOLE
-	help
-	  Answer Y here will make the kernel provide only the 8x8 fonts (these
-	  are the less readable).
-
-	  If unsure, say N.
 
 config FONT_SUN8x16
 	bool "Sparc console 8x16 font"
@@ -142,7 +146,7 @@ config FONT_SUN8x16
 
 config FONT_SUN12x22
 	bool "Sparc console 12x22 font (not supported by all drivers)"
-	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
+	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
 	help
 	  This is the high resolution console font for Sun machines with very
 	  big letters (like the letters used in the SPARC PROM). If the
@@ -191,7 +195,7 @@ config FONT_8x16
 
 config FONT_6x11
 	bool "Mac console 6x11 font (not supported by all drivers)" if FONTS
-	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY
+	depends on FRAMEBUFFER_CONSOLE
 	default y if !SPARC32 && !SPARC64 && !FONTS && MAC
 	help
 	  Small console font with Macintosh-style high-half glyphs.  Some Mac

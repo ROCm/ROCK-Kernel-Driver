@@ -111,7 +111,7 @@ static void save_vga_text(struct vgastate *state, caddr_t fbbase)
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
 		for (i = 0; i < 8192; i++) 
-			saved->vga_text[i] = vga_r(fbbase + 2 * 8192, i); 
+			saved->vga_text[8192+i] = vga_r(fbbase + 2 * 8192, i); 
 	}
 
 	/* restore regs */
@@ -184,7 +184,7 @@ static void restore_vga_text(struct vgastate *state, caddr_t fbbase)
 		vga_wgfx(state->vgabase, VGA_GFX_PLANE_READ, 0x3);
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
-		for (i = 0; i < 4 * 8192; i++) 
+		for (i = 0; i < state->memsize; i++) 
 			vga_w(fbbase, i, saved->vga_font1[i]);
 	}
 	
@@ -204,8 +204,7 @@ static void restore_vga_text(struct vgastate *state, caddr_t fbbase)
 		vga_wgfx(state->vgabase, VGA_GFX_MODE, 0x0);
 		vga_wgfx(state->vgabase, VGA_GFX_MISC, 0x5);
 		for (i = 0; i < 8192; i++) 
-			vga_w(fbbase + 2 * 8192, i, 
-			      saved->vga_text[i]);
+			vga_w(fbbase, i, saved->vga_text[8192+i]); 
 	}
 
 	/* unblank screen */

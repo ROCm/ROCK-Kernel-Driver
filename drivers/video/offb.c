@@ -393,6 +393,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	struct fb_fix_screeninfo *fix;
 	struct fb_var_screeninfo *var;
 	struct fb_info *info;
+	int size;
 
 	if (!request_mem_region(res_start, res_size, "offb"))
 		return;
@@ -421,7 +422,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	var = &info->var;
 
 	strcpy(fix->id, "OFfb ");
-	strncat(fix->id, name, sizeof(fix->id));
+	strncat(fix->id, name, sizeof(fix->id) - sizeof("OFfb "));
 	fix->id[sizeof(fix->id) - 1] = '\0';
 
 	var->xres = var->xres_virtual = width;
@@ -522,8 +523,6 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	var->sync = 0;
 	var->vmode = FB_VMODE_NONINTERLACED;
 
-	strcpy(fix->id, "OFfb ");
-	strncat(fix->id, full_name, sizeof(fix->id));
 	info->node = NODEV;
 	info->fbops = &offb_ops;
 	info->screen_base = ioremap(address, fix->smem_len);

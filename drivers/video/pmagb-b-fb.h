@@ -4,7 +4,7 @@
  *      TurboChannel PMAGB-B framebuffer card support,
  *      Copyright (C) 1999, 2000, 2001 by
  *      Michael Engel <engel@unix-ag.org> and 
- *      Karsten Merker <merker@linxutag.org>
+ *      Karsten Merker <merker@linuxtag.org>
  *      This file is subject to the terms and conditions of the GNU General
  *      Public License.  See the file COPYING in the main directory of this
  *      archive for more details.

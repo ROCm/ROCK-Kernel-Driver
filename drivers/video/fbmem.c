@@ -41,6 +41,9 @@
 #include <asm/pgtable.h>
 
 #include <linux/fb.h>
+#define INCLUDE_LINUX_LOGO_DATA
+#include <asm/linux_logo.h>
+
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 #include "console/fbcon.h"
 #endif
@@ -141,6 +144,8 @@ extern int pvr2fb_init(void);
 extern int pvr2fb_setup(char*);
 extern int sstfb_init(void);
 extern int sstfb_setup(char*);
+extern int i810fb_init(void);
+extern int i810fb_setup(char*);
 
 static struct {
 	const char *name;
@@ -155,11 +160,9 @@ static struct {
 	 */
 	{ "sbus", sbusfb_init, sbusfb_setup },
 #endif
-
 	/*
 	 * Chipset specific drivers that use resource management
 	 */
-
 #ifdef CONFIG_FB_RETINAZ3
 	{ "retz3", retz3fb_init, retz3fb_setup },
 #endif
@@ -234,6 +237,12 @@ static struct {
 #endif
 #ifdef CONFIG_FB_TRIDENT
 	{ "trident", tridentfb_init, tridentfb_setup },
+#endif
+#ifdef CONFIG_FB_I810
+	{ "i810fb", i810fb_init, i810fb_setup },
+#endif	
+#ifdef CONFIG_FB_STI
+	{ "stifb", stifb_init, stifb_setup },
 #endif
 
 	/*
@@ -328,9 +337,6 @@ static struct {
 #ifdef CONFIG_FB_VGA16
 	{ "vga16", vga16fb_init, vga16fb_setup },
 #endif 
-#ifdef CONFIG_FB_STI
-	{ "stifb", stifb_init, stifb_setup },
-#endif
 
 #ifdef CONFIG_GSP_RESOLVER
 	/* Not a real frame buffer device... */
@@ -352,14 +358,263 @@ extern const char *global_mode_option;
 
 static initcall_t pref_init_funcs[FB_MAX];
 static int num_pref_init_funcs __initdata = 0;
-
-
 struct fb_info *registered_fb[FB_MAX];
 int num_registered_fb;
+static int nologo;
 
 #ifdef CONFIG_FB_OF
 static int ofonly __initdata = 0;
 #endif
+
+#define LOGO_H		80
+#define LOGO_W		80
+
+static inline unsigned safe_shift(unsigned d, int n)
+{
+	return n < 0 ? d >> -n : d << n;
+}
+
+static void __init fb_set_logocmap(struct fb_info *info)
+{
+	struct fb_cmap palette_cmap;
+	u16 palette_green[16];
+	u16 palette_blue[16];
+	u16 palette_red[16];
+	int i, j, n;
+
+	palette_cmap.start = 0;
+	palette_cmap.len = 16;
+	palette_cmap.red = palette_red;
+	palette_cmap.green = palette_green;
+	palette_cmap.blue = palette_blue;
+
+	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
+		n = LINUX_LOGO_COLORS - i;
+		/* palette_cmap provides space for only 16 colors at once */
+		if (n > 16)
+			n = 16;
+		palette_cmap.start = 32 + i;
+		palette_cmap.len = n;
+		for (j = 0; j < n; ++j) {
+			palette_cmap.red[j] =
+				(linux_logo_red[i + j] << 8) |
+				 linux_logo_red[i + j];
+			palette_cmap.green[j] =
+				(linux_logo_green[i + j] << 8) |
+				 linux_logo_green[i + j];
+			palette_cmap.blue[j] =
+				(linux_logo_blue[i + j] << 8) |
+				 linux_logo_blue[i + j];
+		}
+		fb_set_cmap(&palette_cmap, 1, info);
+	}
+}
+
+static void  __init fb_set_logo_truepalette(struct fb_info *info, u32 *palette)
+{
+	unsigned char mask[9] = { 0,0x80,0xc0,0xe0,0xf0,0xf8,0xfc,0xfe,0xff };
+	unsigned char redmask, greenmask, bluemask;
+	int redshift, greenshift, blueshift;
+	int i;
+
+	/*
+	 * We have to create a temporary palette since console palette is only
+	 * 16 colors long.
+	 */
+	/* Bug: Doesn't obey msb_right ... (who needs that?) */
+	redmask   = mask[info->var.red.length   < 8 ? info->var.red.length   : 8];
+	greenmask = mask[info->var.green.length < 8 ? info->var.green.length : 8];
+	bluemask  = mask[info->var.blue.length  < 8 ? info->var.blue.length  : 8];
+	redshift   = info->var.red.offset   - (8 - info->var.red.length);
+	greenshift = info->var.green.offset - (8 - info->var.green.length);
+	blueshift  = info->var.blue.offset  - (8 - info->var.blue.length);
+
+	for ( i = 0; i < LINUX_LOGO_COLORS; i++) {
+		palette[i+32] = (safe_shift((linux_logo_red[i]   & redmask), redshift) |
+				 safe_shift((linux_logo_green[i] & greenmask), greenshift) |
+				 safe_shift((linux_logo_blue[i]  & bluemask), blueshift));
+	}
+}
+
+static void __init fb_set_logo_directpalette(struct fb_info *info, u32 *palette)
+{
+	int redshift, greenshift, blueshift;
+	int i;
+
+	redshift = info->var.red.offset;
+	greenshift = info->var.green.offset;
+	blueshift = info->var.blue.offset;
+
+	for (i = 32; i < LINUX_LOGO_COLORS; i++)
+		palette[i] = i << redshift | i << greenshift | i << blueshift;
+}
+
+static void __init fb_set_logo(struct fb_info *info, u8 *logo, int needs_logo)
+{
+	int i, j;
+
+	switch (needs_logo) {
+	case 4:
+		for (i = 0; i < (LOGO_W * LOGO_H)/2; i++) {
+			logo[i*2] = linux_logo16[i] >> 4;
+			logo[(i*2)+1] = linux_logo16[i] & 0xf;
+		}
+		break;
+	case 1:
+	case ~1:
+	default:
+		for (i = 0; i < (LOGO_W * LOGO_H)/8; i++)
+			for (j = 0; j < 8; j++)
+				logo[i*8 + j] = (linux_logo_bw[i] &  (7 - j)) ?
+						((needs_logo == 1) ? 1 : 0) :
+						((needs_logo == 1) ? 0 : 1);
+			break;
+	}
+}
+
+/*
+ * Three (3) kinds of logo maps exist.  linux_logo (>16 colors), linux_logo_16
+ * (16 colors) and linux_logo_bw (2 colors).  Depending on the visual format and
+ * color depth of the framebuffer, the DAC, the pseudo_palette, and the logo data
+ * will be adjusted accordingly.
+ *
+ * Case 1 - linux_logo:
+ * Color exceeds the number of console colors (16), thus we set the hardware DAC
+ * using fb_set_cmap() appropriately.  The "needs_cmapreset"  flag will be set.
+ *
+ * For visuals that require color info from the pseudo_palette, we also construct
+ * one for temporary use. The "needs_directpalette" or "needs_truepalette" flags
+ * will be set.
+ *
+ * Case 2 - linux_logo_16:
+ * The number of colors just matches the console colors, thus there is no need
+ * to set the DAC or the pseudo_palette.  However, the bitmap is packed, ie,
+ * each byte contains color information for two pixels (upper and lower nibble).
+ * To be consistent with fb_imageblit() usage, we therefore separate the two
+ * nibbles into separate bytes. The "needs_logo" flag will be set to 4.
+ *
+ * Case 3 - linux_logo_bw:
+ * This is similar with Case 2.  Each byte contains information for 8 pixels.
+ * We isolate each bit and expand each into a byte. The "needs_logo" flag will
+ * be set to 1.
+ */
+int fb_show_logo(struct fb_info *info)
+{
+	unsigned char *fb = info->screen_base, *logo_new = NULL;
+	u32 *palette = NULL, *saved_palette = NULL;
+	int needs_directpalette = 0;
+	int needs_truepalette = 0;
+	int needs_cmapreset = 0;
+	struct fb_image image;
+	int needs_logo = 0;
+	int done = 0, x;
+
+	/* Return if the frame buffer is not mapped */
+	if (!fb || !info->fbops->fb_imageblit)
+		return 0;
+
+	image.depth = info->var.bits_per_pixel;
+
+	/* reasonable default */
+	if (image.depth >= 8)
+		image.data = linux_logo;
+	else if (image.depth >= 4)
+		image.data = linux_logo16;
+	else
+		image.data = linux_logo_bw;
+
+	switch (info->fix.visual) {
+	case FB_VISUAL_TRUECOLOR:
+		needs_truepalette = 1;
+		if (image.depth >= 4 && image.depth <= 8)
+			needs_logo = 4;
+		else if (image.depth < 4)
+			needs_logo = 1;
+		break;
+	case FB_VISUAL_DIRECTCOLOR:
+		if (image.depth >= 24) {
+			needs_directpalette = 1;
+			needs_cmapreset = 1;
+		}
+		/* 16 colors */
+		else if (image.depth >= 16)
+			needs_logo = 4;
+		/* 2 colors */
+		else
+			needs_logo = 1;
+		break;
+	case FB_VISUAL_MONO01:
+		/* reversed 0 = fg, 1 = bg */
+		needs_logo = ~1;
+		break;
+	case FB_VISUAL_MONO10:
+		needs_logo = 1;
+		break;
+	case FB_VISUAL_PSEUDOCOLOR:
+	default:
+		if (image.depth >= 8)
+			needs_cmapreset = 1;
+		/* fall through */
+	case FB_VISUAL_STATIC_PSEUDOCOLOR:
+		/* 16 colors */
+		if (image.depth >= 4 && image.depth < 8)
+			needs_logo = 4;
+		/* 2 colors */
+		else if (image.depth < 4)
+			needs_logo = 1;
+		break;
+	}
+
+	if (needs_cmapreset)
+		fb_set_logocmap(info);
+
+	if (needs_truepalette || needs_directpalette) {
+		palette = kmalloc(256 * 4, GFP_KERNEL);
+		if (palette == NULL)
+			return 1;
+
+		if (needs_truepalette)
+			fb_set_logo_truepalette(info, palette);
+		else
+			fb_set_logo_directpalette(info, palette);
+
+		saved_palette = info->pseudo_palette;
+		info->pseudo_palette = palette;
+	}
+
+	if (needs_logo) {
+		logo_new = kmalloc(LOGO_W * LOGO_H, GFP_KERNEL);
+		if (logo_new == NULL) {
+			if (palette)
+				kfree(palette);
+			if (saved_palette)
+				info->pseudo_palette = saved_palette;
+			return 1;
+		}
+
+		image.data = logo_new;
+		fb_set_logo(info, logo_new, needs_logo);
+	}
+
+	image.width = LOGO_W;
+	image.height = LOGO_H;
+	image.dy = 0;
+
+	for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
+	     x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
+		image.dx = x;
+		info->fbops->fb_imageblit(info, &image);
+		done = 1;
+	}
+
+	if (palette != NULL)
+		kfree(palette);
+	if (saved_palette != NULL)
+		info->pseudo_palette = saved_palette;
+	if (logo_new != NULL)
+		kfree(logo_new);
+	return 0;
+}
 
 static int fbmem_read_proc(char *buf, char **start, off_t offset,
 			   int len, int *eof, void *private)
@@ -460,22 +715,19 @@ static void try_to_load(int fb)
 }
 #endif /* CONFIG_KMOD */
 
-int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
+int
+fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
         int xoffset = var->xoffset;
         int yoffset = var->yoffset;
         int err;
 
-        if (xoffset < 0 || yoffset < 0 ||
+        if (xoffset < 0 || yoffset < 0 || !info->fbops->fb_pan_display ||
             xoffset + info->var.xres > info->var.xres_virtual ||
             yoffset + info->var.yres > info->var.yres_virtual)
                 return -EINVAL;
-        if (info->fbops->fb_pan_display) {
-                if ((err = info->fbops->fb_pan_display(var, info)))
-                        return err;
-                else
-                        return -EINVAL;
-        }
+	if ((err = info->fbops->fb_pan_display(var, info)))
+		return err;
         info->var.xoffset = var->xoffset;
         info->var.yoffset = var->yoffset;
         if (var->vmode & FB_VMODE_YWRAP)
@@ -485,7 +737,8 @@ int fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
         return 0;
 }
 
-int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
+int
+fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	int err;
 
@@ -571,6 +824,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		if (copy_from_user(&cmap, (void *) arg, sizeof(cmap)))
 			return -EFAULT;
 		fb_copy_cmap(&info->cmap, &cmap, 0);
+		return 0;
 	case FBIOPAN_DISPLAY:
 		if (copy_from_user(&var, (void *) arg, sizeof(var)))
 			return -EFAULT;
@@ -704,6 +958,8 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 	vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
 #elif defined(__sh__)
 	pgprot_val(vma->vm_page_prot) &= ~_PAGE_CACHABLE;
+#elif defined(__hppa__)
+	pgprot_val(vma->vm_page_prot) |= _PAGE_NO_CACHE;
 #elif defined(__ia64__)
 	vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
 #else
@@ -737,6 +993,8 @@ fb_open(struct inode *inode, struct file *file)
 		if (res)
 			module_put(info->fbops->owner);
 	}
+	if (!nologo)
+		fb_show_logo(info);
 	return res;
 }
 
@@ -878,46 +1136,49 @@ fbmem_init(void)
 
 int __init video_setup(char *options)
 {
-    int i, j;
+	int i, j;
 
-    if (!options || !*options)
-	    return 0;
+	if (!options || !*options)
+		return 0;
 	   
 #ifdef CONFIG_FB_OF
-    if (!strcmp(options, "ofonly")) {
-	    ofonly = 1;
-	    return 0;
-    }
+	if (!strcmp(options, "ofonly")) {
+		ofonly = 1;
+		return 0;
+	}
 #endif
 
-    if (num_pref_init_funcs == FB_MAX)
-	    return 0;
+	if (!strcmp(options, "nologo"))
+		nologo = 1;				
 
-    for (i = 0; i < NUM_FB_DRIVERS; i++) {
-	    j = strlen(fb_drivers[i].name);
-	    if (!strncmp(options, fb_drivers[i].name, j) &&
-		options[j] == ':') {
-		    if (!strcmp(options+j+1, "off"))
-			    fb_drivers[i].init = NULL;
-		    else {
-			    if (fb_drivers[i].init) {
-				    pref_init_funcs[num_pref_init_funcs++] =
-					    fb_drivers[i].init;
-				    fb_drivers[i].init = NULL;
-			    }
-			    if (fb_drivers[i].setup)
-				    fb_drivers[i].setup(options+j+1);
-		    }
-		    return 0;
-	    }
-    }
+	if (num_pref_init_funcs == FB_MAX)
+		return 0;
 
-    /*
-     * If we get here no fb was specified.
-     * We consider the argument to be a global video mode option.
-     */
-    global_mode_option = options;
-    return 0;
+	for (i = 0; i < NUM_FB_DRIVERS; i++) {
+		j = strlen(fb_drivers[i].name);
+		if (!strncmp(options, fb_drivers[i].name, j) &&
+			options[j] == ':') {
+			if (!strcmp(options+j+1, "off"))
+				fb_drivers[i].init = NULL;
+			else {
+				if (fb_drivers[i].init) {
+					pref_init_funcs[num_pref_init_funcs++] =
+						fb_drivers[i].init;
+					fb_drivers[i].init = NULL;
+				}
+				if (fb_drivers[i].setup)
+					fb_drivers[i].setup(options+j+1);
+			}
+			return 0;
+		}
+	}
+
+	/*
+	 * If we get here no fb was specified.
+	 * We consider the argument to be a global video mode option.
+	 */
+	global_mode_option = options;
+	return 0;
 }
 
 __setup("video=", video_setup);
@@ -928,7 +1189,10 @@ __setup("video=", video_setup);
 
 EXPORT_SYMBOL(register_framebuffer);
 EXPORT_SYMBOL(unregister_framebuffer);
-EXPORT_SYMBOL(registered_fb);
 EXPORT_SYMBOL(num_registered_fb);
+EXPORT_SYMBOL(registered_fb);
+EXPORT_SYMBOL(fb_show_logo);
+EXPORT_SYMBOL(fb_set_var);
+EXPORT_SYMBOL(fb_blank);
 
 MODULE_LICENSE("GPL");
