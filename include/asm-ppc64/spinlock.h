@@ -95,7 +95,7 @@ static __inline__ void _raw_spin_lock(spinlock_t *lock)
 	stdcx.		13,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&lock->lock)
 	: "r0", "r3", "r4", "r5", "ctr", "cr0", "cr1", "cr2", "cr3", "cr4", 
 	  "xer", "memory");
@@ -133,7 +133,7 @@ static __inline__ void _raw_spin_lock(spinlock_t *lock)
 	stdcx.		13,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&lock->lock)
 	: "r3", "r4", "r5", "cr0", "cr1", "ctr", "xer", "memory");
 }
@@ -253,7 +253,7 @@ static __inline__ void _raw_read_lock(rwlock_t *rw)
 	stdcx.		%0,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&rw->lock)
 	: "r0", "r3", "r4", "r5", "ctr", "cr0", "cr1", "cr2", "cr3", "cr4", 
 	  "xer", "memory");
@@ -290,7 +290,7 @@ static __inline__ void _raw_read_lock(rwlock_t *rw)
 	stdcx.		%0,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&rw->lock)
 	: "r3", "r4", "r5", "cr0", "cr1", "ctr", "xer", "memory");
 }
@@ -393,7 +393,7 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 	stdcx.		13,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&rw->lock)
 	: "r0", "r3", "r4", "r5", "ctr", "cr0", "cr1", "cr2", "cr3", "cr4", 
 	  "xer", "memory");
@@ -433,7 +433,7 @@ static __inline__ void _raw_write_lock(rwlock_t *rw)
 	stdcx.		13,0,%2\n\
 	bne-		2b\n\
 	isync"
-	: "=&r"(tmp), "=&r"(tmp2)
+	: "=&b"(tmp), "=&r"(tmp2)
 	: "r"(&rw->lock)
 	: "r3", "r4", "r5", "cr0", "cr1", "ctr", "xer", "memory");
 }
