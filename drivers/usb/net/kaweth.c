@@ -464,7 +464,7 @@ static int kaweth_reset(struct kaweth_device *kaweth)
 }
 
 static void kaweth_usb_receive(struct urb *);
-static void kaweth_resubmit_rx_urb(struct kaweth_device *, int);
+static int kaweth_resubmit_rx_urb(struct kaweth_device *, int);
 
 /****************************************************************
 	int_callback
