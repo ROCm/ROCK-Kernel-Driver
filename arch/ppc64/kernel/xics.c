@@ -609,7 +609,7 @@ static void xics_set_affinity(unsigned int virq, cpumask_t cpumask)
 		cpus_and(tmp, cpu_online_map, cpumask);
 		if (cpus_empty(tmp))
 			return;
-		newmask = get_hard_smp_processor_id(first_cpu(cpumask));
+		newmask = get_hard_smp_processor_id(first_cpu(tmp));
 	}
 
 	status = rtas_call(ibm_set_xive, 3, 1, NULL,
