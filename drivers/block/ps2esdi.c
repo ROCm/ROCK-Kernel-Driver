@@ -157,7 +157,7 @@ static struct gendisk ps2esdi_gendisk[2] = {
 	nr_real:	1
 },{
 	major:		MAJOR_NR,
-	first_minor:	64
+	first_minor:	64,
 	major_name:	"edb",
 	minor_shift:	6,
 	part:		ps2esdi+64,
@@ -491,7 +491,6 @@ static void do_ps2esdi_request(request_queue_t * q)
 	u_int block, count;
 	/* since, this routine is called with interrupts cleared - they 
 	   must be before it finishes  */
-	sti();
 
 #if 0
 	printk("%s:got request. device : %d minor : %d command : %d  sector : %ld count : %ld, buffer: %p\n",
@@ -604,13 +603,16 @@ static void ps2esdi_readwrite(int cmd, u_char drive, u_int block, u_int count)
 	     CURRENT->current_nr_sectors, drive);
 
 	/* send the command block to the controller */
+	spin_unlock_irq(&ps2esdi_lock);
 	if (ps2esdi_out_cmd_blk(cmd_blk)) {
+		spin_lock_irq(&ps2esdi_lock);
 		printk("%s: Controller failed\n", DEVICE_NAME);
 		if ((++CURRENT->errors) >= MAX_RETRIES)
 			end_request(CURRENT, FAIL);
 	}
 	/* check for failure to put out the command block */ 
 	else {
+		spin_lock_irq(&ps2esdi_lock);
 #if 0
 		printk("%s: waiting for xfer\n", DEVICE_NAME);
 #endif
@@ -1099,7 +1101,7 @@ static int ps2esdi_ioctl(struct inode *inode,
 	put_user(ps2esdi_info[dev].head, (char *) &geometry->heads);
 	put_user(ps2esdi_info[dev].sect, (char *) &geometry->sectors);
 	put_user(ps2esdi_info[dev].cyl, (short *) &geometry->cylinders);
-	put_user(get_start_sect(inode->b_rdev), (long *) &geometry->start);
+	put_user(get_start_sect(inode->i_bdev), (long *) &geometry->start);
 	return 0;
 }
 
