@@ -898,12 +898,13 @@ static int proc_prep_residual_read(char * buf, char ** start, off_t off,
 	return n;
 }
 
-void __init
+int __init
 proc_prep_residual_init(void)
 {
 	if (res->ResidualLength)
 		create_proc_read_entry("residual", S_IRUGO, NULL,
 					proc_prep_residual_read, NULL);
+	return 0;
 }
 
 __initcall(proc_prep_residual_init);

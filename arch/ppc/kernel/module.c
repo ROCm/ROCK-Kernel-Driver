@@ -21,6 +21,7 @@
 #include <linux/fs.h>
 #include <linux/string.h>
 #include <linux/kernel.h>
+#include <linux/cache.h>
 
 #if 0
 #define DEBUGP printk
@@ -105,8 +106,9 @@ long module_core_size(const Elf32_Ehdr *hdr,
 		      const char *secstrings,
 		      struct module *module)
 {
-	module->arch.core_plt_offset = module->core_size;
-	return module->core_size + get_plt_size(hdr, sechdrs, secstrings, 0);
+	module->arch.core_plt_offset = ALIGN(module->core_size, 4);
+	return module->arch.core_plt_offset
+		+ get_plt_size(hdr, sechdrs, secstrings, 0);
 }
 
 long module_init_size(const Elf32_Ehdr *hdr,
@@ -114,8 +116,9 @@ long module_init_size(const Elf32_Ehdr *hdr,
 		      const char *secstrings,
 		      struct module *module)
 {
-	module->arch.init_plt_offset = module->init_size;
-	return module->init_size + get_plt_size(hdr, sechdrs, secstrings, 1);
+	module->arch.init_plt_offset = ALIGN(module->init_size, 4);
+	return module->arch.init_plt_offset
+		+ get_plt_size(hdr, sechdrs, secstrings, 1);
 }
 
 int apply_relocate(Elf32_Shdr *sechdrs,
@@ -142,7 +145,7 @@ static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
 {
 	struct ppc_plt_entry *entry;
 
-	DEBUGP("Doing plt for %u\n", (unsigned int)location);
+	DEBUGP("Doing plt for call to 0x%x at 0x%x\n", val, (unsigned int)location);
 	/* Init, or core PLT? */
 	if (location >= mod->module_core
 	    && location < mod->module_core + mod->arch.core_plt_offset)
@@ -162,6 +165,7 @@ static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
 	entry->jump[2] = 0x7d6903a6;			/* mtctr r11 */
 	entry->jump[3] = 0x4e800420;			/* bctr */
 
+	DEBUGP("Initialized plt for 0x%x at %p\n", val, entry);
 	return (uint32_t)entry;
 }
 
