@@ -304,6 +304,17 @@ int drm_getstats( struct inode *inode, struct file *filp,
 	return 0;
 }
 
+/**
+ * Setversion ioctl.
+ *
+ * \param inode device inode.
+ * \param filp file pointer.
+ * \param cmd command.
+ * \param arg user argument, pointing to a drm_lock structure.
+ * \return zero on success or negative number on failure.
+ *
+ * Sets the requested interface version
+ */
 int drm_setversion(DRM_IOCTL_ARGS)
 {
 	DRM_DEVICE;
@@ -311,13 +322,15 @@ int drm_setversion(DRM_IOCTL_ARGS)
 	drm_set_version_t retv;
 	int if_version;
 	drm_set_version_t __user *argp = (void __user *)data;
+	drm_version_t version;
 
 	DRM_COPY_FROM_USER_IOCTL(sv, argp, sizeof(sv));
 
+	dev->driver->version(&version);
 	retv.drm_di_major = DRM_IF_MAJOR;
 	retv.drm_di_minor = DRM_IF_MINOR;
-	retv.drm_dd_major = DRIVER_MAJOR;
-	retv.drm_dd_minor = DRIVER_MINOR;
+	retv.drm_dd_major = version.version_major;
+	retv.drm_dd_minor = version.version_minor;
 
 	DRM_COPY_TO_USER_IOCTL(argp, retv, sizeof(sv));
 
@@ -336,8 +349,8 @@ int drm_setversion(DRM_IOCTL_ARGS)
 	}
 
 	if (sv.drm_dd_major != -1) {
-		if (sv.drm_dd_major != DRIVER_MAJOR ||
-		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > DRIVER_MINOR)
+		if (sv.drm_dd_major != version.version_major ||
+		    sv.drm_dd_minor < 0 || sv.drm_dd_minor > version.version_minor)
 			return EINVAL;
 
 		if (dev->driver->set_version)
