@@ -219,6 +219,9 @@ struct e1000_adapter {
 	struct e1000_phy_info phy_info;
 	struct e1000_phy_stats phy_stats;
 
+	uint32_t test_icr;
+	struct e1000_desc_ring test_tx_ring;
+	struct e1000_desc_ring test_rx_ring;
 
 
 	uint32_t pci_state[16];
