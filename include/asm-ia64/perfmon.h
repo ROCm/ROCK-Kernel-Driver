@@ -41,6 +41,7 @@
 #define PFM_FL_NOTIFY_BLOCK    	 0x04	/* block task on user level notifications */
 #define PFM_FL_SYSTEM_WIDE	 0x08	/* create a system wide context */
 #define PFM_FL_EXCL_IDLE         0x20   /* exclude idle task from system wide session */
+#define PFM_FL_UNSECURE		 0x40   /* allow unsecure monitoring for non self-monitoring task */
 
 /*
  * PMC flags
@@ -125,7 +126,7 @@ typedef struct {
  * Define the version numbers for both perfmon as a whole and the sampling buffer format.
  */
 #define PFM_VERSION_MAJ		1U
-#define PFM_VERSION_MIN		3U
+#define PFM_VERSION_MIN		4U
 #define PFM_VERSION		(((PFM_VERSION_MAJ&0xffff)<<16)|(PFM_VERSION_MIN & 0xffff))
 
 #define PFM_SMPL_VERSION_MAJ	1U
