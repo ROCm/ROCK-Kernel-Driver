@@ -74,7 +74,7 @@ static void svc_disconnect(struct atm_vcc *vcc)
 	}
 	/* beware - socket is still in use by atmsigd until the last
 	   as_indicate has been answered */
-	while ((skb = skb_dequeue(&vcc->listenq))) {
+	while ((skb = skb_dequeue(&vcc->sk->receive_queue))) {
 		DPRINTK("LISTEN REL\n");
 		sigd_enq2(NULL,as_reject,vcc,NULL,NULL,&vcc->qos,0);
 		dev_kfree_skb(skb);
@@ -253,7 +253,7 @@ static int svc_listen(struct socket *sock,int backlog)
 	remove_wait_queue(&vcc->sleep,&wait);
 	if (!sigd) return -EUNATCH;
 	set_bit(ATM_VF_LISTEN,&vcc->flags);
-	vcc->backlog_quota = backlog > 0 ? backlog : ATM_BACKLOG_DEFAULT;
+	vcc->sk->max_ack_backlog = backlog > 0 ? backlog : ATM_BACKLOG_DEFAULT;
 	return vcc->reply;
 }
 
@@ -277,7 +277,7 @@ static int svc_accept(struct socket *sock,struct socket *newsock,int flags)
 		DECLARE_WAITQUEUE(wait,current);
 
 		add_wait_queue(&old_vcc->sleep,&wait);
-		while (!(skb = skb_dequeue(&old_vcc->listenq)) && sigd) {
+		while (!(skb = skb_dequeue(&old_vcc->sk->receive_queue)) && sigd) {
 			if (test_bit(ATM_VF_RELEASED,&old_vcc->flags)) break;
 			if (test_bit(ATM_VF_CLOSE,&old_vcc->flags)) {
 				error = old_vcc->reply;
@@ -306,7 +306,7 @@ static int svc_accept(struct socket *sock,struct socket *newsock,int flags)
 		error = atm_connect(newsock,msg->pvc.sap_addr.itf,
 		    msg->pvc.sap_addr.vpi,msg->pvc.sap_addr.vci);
 		dev_kfree_skb(skb);
-		old_vcc->backlog_quota++;
+		old_vcc->sk->ack_backlog--;
 		if (error) {
 			sigd_enq2(NULL,as_reject,old_vcc,NULL,NULL,
 			    &old_vcc->qos,error);

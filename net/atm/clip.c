@@ -127,6 +127,8 @@ static void idle_timer_check(unsigned long dummy)
 			struct atmarp_entry *entry = NEIGH2ENTRY(n);
 			struct clip_vcc *clip_vcc;
 
+			write_lock(&n->lock);
+
 			for (clip_vcc = entry->vccs; clip_vcc;
 			    clip_vcc = clip_vcc->next)
 				if (clip_vcc->idle_timeout &&
@@ -141,6 +143,7 @@ static void idle_timer_check(unsigned long dummy)
 			if (entry->vccs ||
 			    time_before(jiffies, entry->expires)) {
 				np = &n->next;
+				write_unlock(&n->lock);
 				continue;
 			}
 			if (atomic_read(&n->refcnt) > 1) {
@@ -152,11 +155,13 @@ static void idle_timer_check(unsigned long dummy)
 				     NULL) 
 					dev_kfree_skb(skb);
 				np = &n->next;
+				write_unlock(&n->lock);
 				continue;
 			}
 			*np = n->next;
 			DPRINTK("expired neigh %p\n",n);
 			n->dead = 1;
+			write_unlock(&n->lock);
 			neigh_release(n);
 		}
 	}

@@ -817,12 +817,14 @@ shrink_caches(struct zone *classzone, int priority, int *total_scanned,
  * excessive rotation of the inactive list, which is _supposed_ to be an LRU,
  * yes?
  */
-int try_to_free_pages(struct zone *classzone,
+int try_to_free_pages(struct zone *cz,
 		unsigned int gfp_mask, unsigned int order)
 {
 	int priority;
+	int ret = 0;
 	const int nr_pages = SWAP_CLUSTER_MAX;
 	int nr_reclaimed = 0;
+	struct reclaim_state *reclaim_state = current->reclaim_state;
 
 	inc_page_state(allocstall);
 
@@ -831,11 +833,12 @@ int try_to_free_pages(struct zone *classzone,
 		struct page_state ps;
 
 		get_page_state(&ps);
-		nr_reclaimed += shrink_caches(classzone, priority,
-					&total_scanned, gfp_mask,
-					nr_pages, &ps);
-		if (nr_reclaimed >= nr_pages)
-			return 1;
+		nr_reclaimed += shrink_caches(cz, priority, &total_scanned,
+						gfp_mask, nr_pages, &ps);
+		if (nr_reclaimed >= nr_pages) {
+			ret = 1;
+			goto out;
+		}
 		if (!(gfp_mask & __GFP_FS))
 			break;		/* Let the caller handle it */
 		/*
@@ -847,12 +850,18 @@ int try_to_free_pages(struct zone *classzone,
 
 		/* Take a nap, wait for some writeback to complete */
 		blk_congestion_wait(WRITE, HZ/10);
-		if (classzone - classzone->zone_pgdat->node_zones < ZONE_HIGHMEM)
+		if (cz - cz->zone_pgdat->node_zones < ZONE_HIGHMEM) {
 			shrink_slab(total_scanned, gfp_mask);
+			if (reclaim_state) {
+				nr_reclaimed += reclaim_state->reclaimed_slab;
+				reclaim_state->reclaimed_slab = 0;
+			}
+		}
 	}
 	if ((gfp_mask & __GFP_FS) && !(gfp_mask & __GFP_NORETRY))
 		out_of_memory();
-	return 0;
+out:
+	return ret;
 }
 
 /*
@@ -878,6 +887,7 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 	int to_free = nr_pages;
 	int priority;
 	int i;
+	struct reclaim_state *reclaim_state = current->reclaim_state;
 
 	inc_page_state(pageoutrun);
 
@@ -908,8 +918,11 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				max_scan = SWAP_CLUSTER_MAX;
 			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &nr_mapped, ps, priority);
-			if (i < ZONE_HIGHMEM)
+			if (i < ZONE_HIGHMEM) {
+				reclaim_state->reclaimed_slab = 0;
 				shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
+				to_free += reclaim_state->reclaimed_slab;
+			}
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)
@@ -940,10 +953,14 @@ int kswapd(void *p)
 	pg_data_t *pgdat = (pg_data_t*)p;
 	struct task_struct *tsk = current;
 	DEFINE_WAIT(wait);
+	struct reclaim_state reclaim_state = {
+		.reclaimed_slab = 0,
+	};
 
 	daemonize("kswapd%d", pgdat->node_id);
 	set_cpus_allowed(tsk, node_to_cpumask(pgdat->node_id));
-	
+	current->reclaim_state = &reclaim_state;
+
 	/*
 	 * Tell the memory management that we're a "memory allocator",
 	 * and that if we need more memory we should get access to it

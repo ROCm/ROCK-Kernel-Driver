@@ -1079,15 +1079,9 @@ snd_info_entry_t *snd_info_create_device(const char *name, unsigned int number, 
 	p->data = (void *) entry;
 	entry->p = p;
 	up(&info_mutex);
-#ifdef CONFIG_DEVFS_FS
-	if (strncmp(name, "controlC", 8)) {	/* created in sound.c */
-		char dname[32];
-		sprintf(dname, "snd/%s", name);
-		devfs_register(NULL, dname, DEVFS_FL_DEFAULT,
-				_major, minor, mode,
-				&snd_fops, NULL);
-	}
-#endif
+
+	if (strncmp(name, "controlC", 8) == 0)	/* created in sound.c */
+		devfs_mk_cdev(MKDEV(_major, minor), mode, "snd/%s", name);
 	return entry;
 }
 

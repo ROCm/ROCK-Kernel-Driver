@@ -2088,22 +2088,6 @@ static void tty_default_put_char(struct tty_struct *tty, unsigned char ch)
 }
 
 #ifdef CONFIG_DEVFS_FS
-static void tty_register_devfs(struct tty_driver *driver, unsigned index)
-{
-	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
-	char buf[32];
-
-	if (index >= driver->num) {
-		printk(KERN_ERR "Attempt to register invalid tty line number "
-		       "with devfs (%d).\n", index);
-		return;
-	}
-
-	tty_line_name(driver, index, buf);
-	devfs_register(NULL, buf, 0, MAJOR(dev), MINOR(dev),
-		S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
-}
-
 static void tty_unregister_devfs(struct tty_driver *driver, int index)
 {
 	char path[64];
@@ -2111,21 +2095,130 @@ static void tty_unregister_devfs(struct tty_driver *driver, int index)
 	devfs_remove(path);
 }
 #else
-# define tty_register_devfs(driver, index)	do { } while (0)
 # define tty_unregister_devfs(driver, index)	do { } while (0)
 #endif /* CONFIG_DEVFS_FS */
 
-/*
- * Register a tty device described by <driver>, with minor number <minor>.
- */
-void tty_register_device(struct tty_driver *driver, unsigned index)
+static struct class tty_class = {
+	.name	= "tty",
+};
+
+struct tty_dev {
+	struct list_head node;
+	dev_t dev;
+	struct class_device class_dev;
+};
+#define to_tty_dev(d) container_of(d, struct tty_dev, class_dev)
+
+static LIST_HEAD(tty_dev_list);
+
+static ssize_t show_dev(struct class_device *class_dev, char *buf)
 {
-	tty_register_devfs(driver, index);
+	struct tty_dev *tty_dev = to_tty_dev(class_dev);
+	return sprintf(buf, "%04x\n", tty_dev->dev);
+}
+static CLASS_DEVICE_ATTR(dev, S_IRUGO, show_dev, NULL);
+
+static void tty_add_class_device(char *name, dev_t dev, struct device *device)
+{
+	struct tty_dev *tty_dev = NULL;
+	char *temp;
+	int retval;
+
+	tty_dev = kmalloc(sizeof(*tty_dev), GFP_KERNEL);
+	if (!tty_dev)
+		return;
+	memset(tty_dev, 0x00, sizeof(*tty_dev));
+
+	/* stupid '/' in tty name strings... */
+	temp = strchr(name, '/');
+	if (temp && (temp[1] != 0x00))
+		++temp;
+	else
+		temp = name;
+
+	tty_dev->class_dev.dev = device;
+	tty_dev->class_dev.class = &tty_class;
+	snprintf(tty_dev->class_dev.class_id, BUS_ID_SIZE, "%s", temp);
+	retval = class_device_register(&tty_dev->class_dev);
+	if (retval)
+		goto error;
+	class_device_create_file (&tty_dev->class_dev, &class_device_attr_dev);
+	tty_dev->dev = dev;
+	list_add(&tty_dev->node, &tty_dev_list);
+	return;
+error:
+	kfree(tty_dev);
 }
 
+void tty_remove_class_device(dev_t dev)
+{
+	struct tty_dev *tty_dev = NULL;
+	struct list_head *tmp;
+	int found = 0;
+
+	list_for_each (tmp, &tty_dev_list) {
+		tty_dev = list_entry(tmp, struct tty_dev, node);
+		if ((MAJOR(tty_dev->dev) == MAJOR(dev)) &&
+		    (MINOR(tty_dev->dev) == MINOR(dev))) {
+			found = 1;
+			break;
+		}
+	}
+	if (found) {
+		list_del(&tty_dev->node);
+		class_device_unregister(&tty_dev->class_dev);
+		kfree(tty_dev);
+	}
+}
+
+/**
+ * tty_register_device - register a tty device
+ * @driver: the tty driver that describes the tty device
+ * @index: the index in the tty driver for this tty device
+ * @device: a struct device that is associated with this tty device.
+ *	This field is optional, if there is no known struct device for this
+ *	tty device it can be set to NULL safely.
+ *
+ * This call is required to be made to register an individual tty device if
+ * the tty driver's flags have the TTY_DRIVER_NO_DEVFS bit set.  If that
+ * bit is not set, this function should not be called.
+ */
+void tty_register_device(struct tty_driver *driver, unsigned index,
+			 struct device *device)
+{
+	dev_t dev = MKDEV(driver->major, driver->minor_start) + index;
+	char name[64];
+
+	if (index >= driver->num) {
+		printk(KERN_ERR "Attempt to register invalid tty line number "
+		       " (%d).\n", index);
+		return;
+	}
+
+	tty_line_name(driver, index, name);
+	devfs_mk_cdev(dev, S_IFCHR | S_IRUSR | S_IWUSR, name);
+
+	/* stupid console driver devfs names... change vc/X into ttyX */
+	if (driver->type == TTY_DRIVER_TYPE_CONSOLE)
+		sprintf(name, "tty%d", MINOR(dev));
+
+	/* we don't care about the ptys */
+	if (driver->type != TTY_DRIVER_TYPE_PTY)
+		tty_add_class_device (name, dev, device);
+}
+
+/**
+ * tty_unregister_device - unregister a tty device
+ * @driver: the tty driver that describes the tty device
+ * @index: the index in the tty driver for this tty device
+ *
+ * If a tty device is registered with a call to tty_register_device() then
+ * this function must be made when the tty device is gone.
+ */
 void tty_unregister_device(struct tty_driver *driver, unsigned index)
 {
 	tty_unregister_devfs(driver, index);
+	tty_remove_class_device(MKDEV(driver->major, driver->minor_start) + index);
 }
 
 EXPORT_SYMBOL(tty_register_device);
@@ -2207,7 +2300,7 @@ int tty_register_driver(struct tty_driver *driver)
 	
 	if ( !(driver->flags & TTY_DRIVER_NO_DEVFS) ) {
 		for(i = 0; i < driver->num; i++)
-		    tty_register_device(driver, i);
+		    tty_register_device(driver, i, NULL);
 	}
 	proc_tty_register_driver(driver);
 	return error;
@@ -2288,10 +2381,6 @@ void __init console_init(void)
 extern int vty_init(void);
 #endif
 
-static struct class tty_class = {
-	.name	= "tty",
-};
-
 static int __init tty_class_init(void)
 {
 	return class_register(&tty_class);
@@ -2308,33 +2397,29 @@ void __init tty_init(void)
 	if (register_chrdev_region(TTYAUX_MAJOR, 0, 1,
 				   "/dev/tty", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty driver\n");
-
-	devfs_register (NULL, "tty", 0, TTYAUX_MAJOR, 0,
-			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 0), S_IFCHR|S_IRUGO|S_IWUGO, "tty");
+	tty_add_class_device ("tty", MKDEV(TTYAUX_MAJOR, 0), NULL);
 
 	if (register_chrdev_region(TTYAUX_MAJOR, 1, 1,
 				   "/dev/console", &tty_fops) < 0)
 		panic("Couldn't register /dev/console driver\n");
-
-	devfs_register (NULL, "console", 0, TTYAUX_MAJOR, 1,
-			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 1), S_IFCHR|S_IRUSR|S_IWUSR, "console");
+	tty_add_class_device ("console", MKDEV(TTYAUX_MAJOR, 1), NULL);
 
 #ifdef CONFIG_UNIX98_PTYS
 	if (register_chrdev_region(TTYAUX_MAJOR, 2, 1,
 				   "/dev/ptmx", &tty_fops) < 0)
 		panic("Couldn't register /dev/ptmx driver\n");
-
-	devfs_register (NULL, "ptmx", 0, TTYAUX_MAJOR, 2,
-			S_IFCHR | S_IRUGO | S_IWUGO, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTYAUX_MAJOR, 2), S_IFCHR|S_IRUGO|S_IWUGO, "ptmx");
+	tty_add_class_device ("ptmx", MKDEV(TTYAUX_MAJOR, 2), NULL);
 #endif
 	
 #ifdef CONFIG_VT
 	if (register_chrdev_region(TTY_MAJOR, 0, 1,
 				   "/dev/vc/0", &tty_fops) < 0)
 		panic("Couldn't register /dev/tty0 driver\n");
-
-	devfs_register (NULL, "vc/0", 0, TTY_MAJOR, 0,
-			S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+	devfs_mk_cdev(MKDEV(TTY_MAJOR, 0), S_IFCHR|S_IRUSR|S_IWUSR, "vc/0");
+	tty_add_class_device ("tty0", MKDEV(TTY_MAJOR, 0), NULL);
 
 	vty_init();
 #endif

@@ -6,12 +6,12 @@
 /* list of externed timers */
 extern struct timer_opts timer_pit;
 extern struct timer_opts timer_tsc;
-#ifdef CONFIG_X86_SUMMIT
+#ifdef CONFIG_X86_CYCLONE_TIMER
 extern struct timer_opts timer_cyclone;
 #endif
 /* list of timers, ordered by preference, NULL terminated */
 static struct timer_opts* timers[] = {
-#ifdef CONFIG_X86_SUMMIT
+#ifdef CONFIG_X86_CYCLONE_TIMER
 	&timer_cyclone,
 #endif
 	&timer_tsc,

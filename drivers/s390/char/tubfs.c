@@ -23,36 +23,13 @@ static void fs3270_int(tub_t *tubp, devstat_t *dsp);
 extern void tty3270_refresh(tub_t *);
 
 static struct file_operations fs3270_fops = {
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0))
 	.owner = THIS_MODULE,		/* owner */
-#endif
 	.read 	= fs3270_read,	/* read */
 	.write	= fs3270_write,	/* write */
 	.ioctl	= fs3270_ioctl,	/* ioctl */
 	.open 	= fs3270_open,	/* open */
 	.release = fs3270_close,	/* release */
 };
-
-#ifdef CONFIG_DEVFS_FS
-void fs3270_devfs_register(tub_t *tubp)
-{
-	char name[16];
-
-	sprintf(name, "3270/tub%.4x", tubp->devno);
-	devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-		       IBM_FS3270_MAJOR, tubp->minor,
-		       S_IFCHR | S_IRUSR | S_IWUSR, &fs3270_fops, NULL);
-	sprintf(name, "tty%.4x", tubp->devno);
-	tty_register_devfs_name(&tty3270_driver, 0, tubp->minor,
-				NULL, name);
-}
-
-void fs3270_devfs_unregister(tub_t *tubp)
-{
-	devfs_remove("3270/tub%.4x", tubp->devno);
-	devfs_remove("3270/tty%.4x", tubp->devno);
-}
-#endif
 
 /*
  * fs3270_init() -- Initialize fullscreen tubes
@@ -69,10 +46,8 @@ fs3270_init(void)
 		return -1;
 	}
 	devfs_mk_dir("3270");
-	devfs_register(NULL, "3270/tub", 0,
-			       IBM_FS3270_MAJOR, 0,
-			       S_IFCHR | S_IRUGO | S_IWUGO, 
-			       &fs3270_fops, NULL);
+	devfs_mk_cdev(MKDEV(IBM_FS3270_MAJOR, 0),
+			S_IFCHR|S_IRUGO|S_IWUGO, "3270/tub");
 	fs3270_major = IBM_FS3270_MAJOR;
 	return 0;
 }

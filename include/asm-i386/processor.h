@@ -536,7 +536,7 @@ static inline void rep_nop(void)
 #define ASM_NOP6 K8_NOP6
 #define ASM_NOP7 K8_NOP7
 #define ASM_NOP8 K8_NOP8
-#elif CONFIG_MK7
+#elif defined(CONFIG_MK7)
 #define ASM_NOP1 K7_NOP1
 #define ASM_NOP2 K7_NOP2
 #define ASM_NOP3 K7_NOP3

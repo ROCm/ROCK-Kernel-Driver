@@ -62,8 +62,6 @@ int __verify_write(const void *, unsigned long);
 		:"1" (addr),"g" ((int)(size)),"g" (current_thread_info()->addr_limit.seg)); \
 	flag; })
 
-#ifdef CONFIG_X86_WP_WORKS_OK
-
 /**
  * access_ok: - Checks if a user space pointer is valid
  * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE.  Note that
@@ -84,14 +82,6 @@ int __verify_write(const void *, unsigned long);
  * this function, memory access functions may still return -EFAULT.
  */
 #define access_ok(type,addr,size) (__range_ok(addr,size) == 0)
-
-#else
-
-#define access_ok(type,addr,size) ( (__range_ok(addr,size) == 0) && \
-			 ((type) == VERIFY_READ || boot_cpu_data.wp_works_ok || \
-			  __verify_write((void *)(addr),(size))))
-
-#endif
 
 /**
  * verify_area: - Obsolete, use access_ok()
@@ -191,13 +181,7 @@ extern void __get_user_4(void);
 	__ret_gu;							\
 })
 
-extern void __put_user_1(void);
-extern void __put_user_2(void);
-extern void __put_user_4(void);
-extern void __put_user_8(void);
-
 extern void __put_user_bad(void);
-
 
 /**
  * put_user: - Write a simple value into user space.
@@ -299,6 +283,8 @@ extern void __put_user_bad(void);
 		: "=r"(err)					\
 		: "A" (x), "r" (addr), "i"(-EFAULT), "0"(err))
 
+#ifdef CONFIG_X86_WP_WORKS_OK
+
 #define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
@@ -311,6 +297,18 @@ do {									\
 	}								\
 } while (0)
 
+#else
+
+#define __put_user_size(x,ptr,size,retval,errret)			\
+do {									\
+	__typeof__(*(ptr)) __pus_tmp = x;				\
+	retval = 0;							\
+									\
+	if(unlikely(__copy_to_user_ll(ptr, &__pus_tmp, size) != 0))	\
+		retval = errret;					\
+} while (0)
+
+#endif
 struct __large_struct { unsigned long buf[100]; };
 #define __m(x) (*(struct __large_struct *)(x))
 

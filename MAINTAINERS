@@ -679,7 +679,7 @@ S:	Maintained
 
 EXT3 FILE SYSTEM
 P:	Stephen Tweedie, Andrew Morton
-M:	sct@redhat.com, akpm@zip.com.au, adilger@clusterfs.com
+M:	sct@redhat.com, akpm@digeo.com, adilger@clusterfs.com
 L:	ext3-users@redhat.com
 S:	Maintained
 
@@ -1257,7 +1257,7 @@ S:	Maintained
 
 NETWORK DEVICE DRIVERS
 P:	Andrew Morton
-M:	akpm@zip.com.au
+M:	akpm@digeo.com
 P:	Jeff Garzik
 M:	jgarzik@pobox.com
 L:	linux-net@vger.kernel.org

@@ -5527,11 +5527,10 @@ static int osst_attach(Scsi_Device * SDp)
 	write_unlock(&os_scsi_tapes_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-		char name[8], devfs_name[64];
+		char name[8];
 
 		/*  Rewind entry  */
 		sprintf(name, "ot%s", osst_formats[mode]);
-		sprintf(devfs_name, "%s/ot%s", SDp->devfs_name, osst_formats[mode]);
 
 		sprintf(tpnt->driverfs_dev_r[mode].bus_id, "%s:%s", 
 				SDp->sdev_driverfs_dev.bus_id, name);
@@ -5545,13 +5544,13 @@ static int osst_attach(Scsi_Device * SDp)
 		device_create_file(&tpnt->driverfs_dev_r[mode], 
 				&dev_attr_type);
 		device_create_file(&tpnt->driverfs_dev_r[mode], &dev_attr_kdev);
-		devfs_register(NULL, devfs_name, 0,
-					OSST_MAJOR, dev_num + (mode << 5),
-					S_IFCHR | S_IRUGO | S_IWUGO,
-					&osst_fops, NULL);
+
+		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5)),
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				"%s/ot%s", SDp->devfs_name, osst_formats[mode]);
+
 		/*  No-rewind entry  */
 		sprintf (name, "ot%sn", osst_formats[mode]);
-		sprintf(devfs_name, "%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
 
 		sprintf(tpnt->driverfs_dev_n[mode].bus_id, "%s:%s", 
 				SDp->sdev_driverfs_dev.bus_id, name);
@@ -5566,10 +5565,10 @@ static int osst_attach(Scsi_Device * SDp)
 				&dev_attr_type);
 		device_create_file(&tpnt->driverfs_dev_n[mode], 
 				&dev_attr_kdev);
-		devfs_register(NULL, devfs_name, 0,
-					OSST_MAJOR, dev_num + (mode << 5) + 128,
-					S_IFCHR | S_IRUGO | S_IWUGO,
-					&osst_fops, NULL);
+
+		devfs_mk_cdev(MKDEV(OSST_MAJOR, dev_num + (mode << 5) + 128),
+				S_IFCHR | S_IRUGO | S_IWUGO,
+				"%s/ot%sn", SDp->devfs_name, osst_formats[mode]);
 	}
 	drive->number = devfs_register_tape(SDp->devfs_name);
 

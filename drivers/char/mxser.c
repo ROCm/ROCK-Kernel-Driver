@@ -501,6 +501,7 @@ static int __init mxser_module_init(void)
 
 	memset(&mxvar_sdriver, 0, sizeof(struct tty_driver));
 	mxvar_sdriver.magic = TTY_DRIVER_MAGIC;
+	mxvar_sdriver.owner = THIS_MODULE;
 	mxvar_sdriver.name = "ttyM";
 	mxvar_sdriver.major = ttymajor;
 	mxvar_sdriver.minor_start = 0;
@@ -708,7 +709,6 @@ static void mxser_do_softint(void *private_)
 			tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
 		}
 	}
-	MOD_DEC_USE_COUNT;
 }
 
 /*
@@ -767,8 +767,6 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 	info->session = current->session;
 	info->pgrp = current->pgrp;
 
-	MOD_INC_USE_COUNT;
-
 	return (0);
 }
 
@@ -795,7 +793,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 
 	if (tty_hung_up_p(filp)) {
 		restore_flags(flags);
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 	if ((tty->count == 1) && (info->count != 1)) {
@@ -817,7 +814,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	}
 	if (info->count) {
 		restore_flags(flags);
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 	info->flags |= ASYNC_CLOSING;
@@ -881,7 +877,6 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&info->close_wait);
 	restore_flags(flags);
 
-	MOD_DEC_USE_COUNT;
 }
 
 static int mxser_write(struct tty_struct *tty, int from_user,
@@ -1492,9 +1487,7 @@ static inline void mxser_transmit_chars(struct mxser_struct *info)
 
 	if (info->xmit_cnt < WAKEUP_CHARS) {
 		set_bit(MXSER_EVENT_TXLOW, &info->event);
-		MOD_INC_USE_COUNT;
-		if (schedule_work(&info->tqueue) == 0)
-		    MOD_DEC_USE_COUNT;
+		schedule_work(&info->tqueue);
 	}
 	if (info->xmit_cnt <= 0) {
 		info->IER &= ~UART_IER_THRI;
@@ -1523,9 +1516,7 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 		else if (!((info->flags & ASYNC_CALLOUT_ACTIVE) &&
 			   (info->flags & ASYNC_CALLOUT_NOHUP)))
 			set_bit(MXSER_EVENT_HANGUP, &info->event);
-		MOD_INC_USE_COUNT;
-		if (schedule_work(&info->tqueue) == 0)
-		    MOD_DEC_USE_COUNT;
+		schedule_work(&info->tqueue);
 	}
 	if (info->flags & ASYNC_CTS_FLOW) {
 		if (info->tty->hw_stopped) {
@@ -1535,9 +1526,7 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 				outb(info->IER, info->base + UART_IER);
 
 				set_bit(MXSER_EVENT_TXLOW, &info->event);
-				MOD_INC_USE_COUNT;
-				if (schedule_work(&info->tqueue) == 0)
-					MOD_DEC_USE_COUNT;
+				schedule_work(&info->tqueue);
 			}
 		} else {
 			if (!(status & UART_MSR_CTS)) {

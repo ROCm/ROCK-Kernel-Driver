@@ -549,7 +549,6 @@ MODULE_PARM(dmabug, "i");
 static int __init oss_init(void)
 {
 	int             err;
-	char name_buf[32];
 	int i, j;
 	
 	/* drag in sound_syms.o */
@@ -573,19 +572,18 @@ static int __init oss_init(void)
 	sound_dmap_flag = (dmabuf > 0 ? 1 : 0);
 
 	for (i = 0; i < sizeof (dev_list) / sizeof *dev_list; i++) {
-		sprintf(name_buf, "sound/%s", dev_list[i].name);
-		devfs_register (NULL, name_buf, DEVFS_FL_NONE,
-			SOUND_MAJOR, dev_list[i].minor,
-			S_IFCHR | dev_list[i].mode,
-			&oss_sound_fops, NULL);
+		devfs_mk_cdev(MKDEV(SOUND_MAJOR, dev_list[i].minor),
+				S_IFCHR | dev_list[i].mode,
+				"sound/%s", dev_list[i].name);
+
 		if (!dev_list[i].num)
 			continue;
+
 		for (j = 1; j < *dev_list[i].num; j++) {
-			sprintf(name_buf, "sound/%s%d", dev_list[i].name, j);
-			devfs_register (NULL, name_buf, DEVFS_FL_NONE,
-				SOUND_MAJOR, dev_list[i].minor + (j * 0x10),
-				S_IFCHR | dev_list[i].mode,
-				&oss_sound_fops, NULL);
+			devfs_mk_cdev(MKDEV(SOUND_MAJOR,
+						dev_list[i].minor + (j*0x10)),
+					S_IFCHR | dev_list[i].mode,
+					"sound/%s%d", dev_list[i].name, j);
 		}
 	}
 

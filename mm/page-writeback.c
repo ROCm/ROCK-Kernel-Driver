@@ -20,7 +20,6 @@
 #include <linux/pagemap.h>
 #include <linux/writeback.h>
 #include <linux/init.h>
-#include <linux/sysrq.h>
 #include <linux/backing-dev.h>
 #include <linux/blkdev.h>
 #include <linux/mpage.h>
@@ -237,7 +236,6 @@ static void background_writeout(unsigned long _min_pages)
 		.nonblocking	= 1,
 	};
 
-	CHECK_EMERGENCY_SYNC
 	for ( ; ; ) {
 		struct page_state ps;
 		long background_thresh;

@@ -124,9 +124,7 @@ static int __init mmapper_init(void)
 
 	p_buf = __pa(v_buf);
 
-	devfs_register (NULL, "mmapper", DEVFS_FL_DEFAULT, 
-			30, 0, S_IFCHR | S_IRUGO | S_IWUGO, 
-			&mmapper_fops, NULL); 
+	devfs_mk_cdev(MKDEV(30, 0), S_IFCHR|S_IRUGO|S_IWUGO, "mmapper");
 	devfs_mk_symlink("mmapper0", "mmapper");
 	return(0);
 }

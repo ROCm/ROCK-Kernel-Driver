@@ -181,7 +181,7 @@ static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
 			}
 			if (rawdev->binding) {
 				bdput(rawdev->binding);
-				MOD_DEC_USE_COUNT;
+				module_put(THIS_MODULE);
 			}
 			if (rq.block_major == 0 && rq.block_minor == 0) {
 				/* unbind */
@@ -191,7 +191,7 @@ static int raw_ctl_ioctl(struct inode *inode, struct file *filp,
 				if (rawdev->binding == NULL)
 					err = -ENOMEM;
 				else
-					try_module_get(THIS_MODULE);
+					__module_get(THIS_MODULE);
 			}
 			up(&raw_mutex);
 		} else {

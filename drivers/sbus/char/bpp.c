@@ -1051,11 +1051,8 @@ static int __init bpp_init(void)
 	}
 	devfs_mk_dir("bpp");
 	for (idx = 0; idx < BPP_NO; idx++) {
-		char name[16];
-		sprintf(name, "bpp/%d", idx);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       BPP_MAJOR, idx, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &bpp_fops, NULL);
+		devfs_mk_cdev(MKDEV(BPP_MAJOR, idx),
+				S_IFCHR | S_IRUSR | S_IWUSR, "bpp/%d", idx);
 	}
 
 	return 0;

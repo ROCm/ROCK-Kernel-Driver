@@ -337,10 +337,6 @@ extern int tty3270_major;
 extern int tty3270_proc_misc;
 extern enum tubwhat tty3270_proc_what;
 extern struct tty_driver tty3270_driver;
-#ifdef CONFIG_DEVFS_FS
-extern void fs3270_devfs_register(tub_t *);
-extern void fs3270_devfs_unregister(tub_t *);
-#endif
 
 #ifndef spin_trylock_irqsave
 #define spin_trylock_irqsave(lock, flags) \

@@ -399,6 +399,8 @@ static inline _syscall3(pid_t,waitpid,pid_t,pid,int *,wait_stat,int,options)
  * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
  * but it doesn't work on all toolchains, so we just do it by hand
  */
+#ifndef cond_syscall
 #define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
+#endif
 
 #endif /* _ASM_I386_UNISTD_H_ */

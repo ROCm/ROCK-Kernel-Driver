@@ -39,6 +39,7 @@
 
 #ifdef 	CONFIG_PROC_FS
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 #endif
 
 #include <net/snmp.h>
@@ -564,7 +565,7 @@ static int ip6_dst_gc()
 	static unsigned long last_gc;
 	unsigned long now = jiffies;
 
-	if ((long)(now - last_gc) < ip6_rt_gc_min_interval &&
+	if (time_after(last_gc + ip6_rt_gc_min_interval, now) &&
 	    atomic_read(&ip6_dst_ops.entries) <= ip6_rt_max_size)
 		goto out;
 
@@ -1751,27 +1752,28 @@ static int rt6_proc_info(char *buffer, char **start, off_t offset, int length)
 
 extern struct rt6_statistics rt6_stats;
 
-static int rt6_proc_stats(char *buffer, char **start, off_t offset, int length)
+static int rt6_stats_seq_show(struct seq_file *seq, void *v)
 {
-	int len;
-
-	len = sprintf(buffer, "%04x %04x %04x %04x %04x %04x\n",
+	seq_printf(seq, "%04x %04x %04x %04x %04x %04x\n",
 		      rt6_stats.fib_nodes, rt6_stats.fib_route_nodes,
 		      rt6_stats.fib_rt_alloc, rt6_stats.fib_rt_entries,
 		      rt6_stats.fib_rt_cache,
 		      atomic_read(&ip6_dst_ops.entries));
 
-	len -= offset;
-
-	if (len > length)
-		len = length;
-	if(len < 0)
-		len = 0;
-
-	*start = buffer + offset;
-
-	return len;
+	return 0;
 }
+
+static int rt6_stats_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, rt6_stats_seq_show, NULL);
+}
+
+static struct file_operations rt6_stats_seq_fops = {
+	.open	 = rt6_stats_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
 #endif	/* CONFIG_PROC_FS */
 
 #ifdef CONFIG_SYSCTL
@@ -1877,6 +1879,8 @@ ctl_table ipv6_route_table[] = {
 
 void __init ip6_route_init(void)
 {
+	struct proc_dir_entry *p;
+
 	ip6_dst_ops.kmem_cachep = kmem_cache_create("ip6_dst_cache",
 						     sizeof(struct rt6_info),
 						     0, SLAB_HWCACHE_ALIGN,
@@ -1884,7 +1888,9 @@ void __init ip6_route_init(void)
 	fib6_init();
 #ifdef 	CONFIG_PROC_FS
 	proc_net_create("ipv6_route", 0, rt6_proc_info);
-	proc_net_create("rt6_stats", 0, rt6_proc_stats);
+	p = create_proc_entry("rt6_stats", S_IRUGO, proc_net);
+	if (p)
+		p->proc_fops = &rt6_stats_seq_fops;
 #endif
 	xfrm6_init();
 }
@@ -1894,7 +1900,7 @@ void ip6_route_cleanup(void)
 {
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("ipv6_route");
-	proc_net_remove("rt6_stats");
+	remove_proc_entry("rt6_stats", proc_net);
 #endif
 	xfrm6_fini();
 	rt6_ifdown(NULL);

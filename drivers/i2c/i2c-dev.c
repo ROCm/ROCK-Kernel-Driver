@@ -372,16 +372,11 @@ static int i2cdev_release(struct inode *inode, struct file *file)
 
 int i2cdev_attach_adapter(struct i2c_adapter *adap)
 {
-	char name[12];
 	int i;
 
 	i = i2c_adapter_id(adap);
-	sprintf (name, "i2c/%d", i);
-
-	devfs_register (NULL, name,
-			DEVFS_FL_DEFAULT, I2C_MAJOR, i,
-			S_IFCHR | S_IRUSR | S_IWUSR,
-			&i2cdev_fops, NULL);
+	devfs_mk_cdev(MKDEV(I2C_MAJOR, i),
+			S_IFCHR|S_IRUSR|S_IWUSR, "i2c/%d", i);
 	dev_dbg(&adap->dev, "Registered as minor %d\n", i);
 	return 0;
 }

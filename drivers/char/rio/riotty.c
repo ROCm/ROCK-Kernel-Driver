@@ -139,7 +139,6 @@ default_sg =
 
 
 extern struct rio_info *p;
-extern void rio_inc_mod_count (void);
 
 
 int
@@ -205,8 +204,6 @@ riotopen(struct tty_struct * tty, struct file * filp)
 	tty->driver_data = PortP;
 
 	PortP->gs.tty = tty;
-	if (!PortP->gs.count)
-		rio_inc_mod_count ();
 	PortP->gs.count++;
 
 	rio_dprintk (RIO_DEBUG_TTY, "%d bytes in tx buffer\n",
@@ -215,8 +212,6 @@ riotopen(struct tty_struct * tty, struct file * filp)
 	retval = gs_init_port (&PortP->gs);
 	if (retval) {
 		PortP->gs.count--;
-		if (PortP->gs.count)
-			rio_dec_mod_count ();
 		return -ENXIO;
 	}
 	/*

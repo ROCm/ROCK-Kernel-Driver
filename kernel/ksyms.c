@@ -580,8 +580,6 @@ EXPORT_SYMBOL(fs_overflowgid);
 EXPORT_SYMBOL(fasync_helper);
 EXPORT_SYMBOL(kill_fasync);
 
-EXPORT_SYMBOL(partition_name);
-
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);
 

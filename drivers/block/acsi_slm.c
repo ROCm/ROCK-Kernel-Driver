@@ -1008,11 +1008,8 @@ int slm_init( void )
 	
 	devfs_mk_dir("slm");
 	for (i = 0; i < MAX_SLM; i++) {
-		char name[16];
-		sprintf(name, "slm/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_DEFAULT,
-			       ACSI_MAJOR, i, S_IFCHR | S_IRUSR | S_IWUSR,
-			       &slm_fops, NULL);
+		devfs_mk_cdev(MKDEV(ACSI_MAJOR, i),
+				S_IFCHR|S_IRUSR|S_IWUSR, "slm/%d", i);
 	}
 	return 0;
 }

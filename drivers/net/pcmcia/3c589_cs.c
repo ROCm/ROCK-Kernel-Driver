@@ -159,7 +159,7 @@ static void media_check(unsigned long arg);
 static int el3_config(struct net_device *dev, struct ifmap *map);
 static int el3_open(struct net_device *dev);
 static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void update_stats(struct net_device *dev);
 static struct net_device_stats *el3_get_stats(struct net_device *dev);
 static int el3_rx(struct net_device *dev);
@@ -816,15 +816,16 @@ static int el3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 /* The EL3 interrupt handler. */
-static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct el3_private *lp = dev_id;
     struct net_device *dev = &lp->dev;
     ioaddr_t ioaddr, status;
-    int i = 0;
+    int i = 0, handled = 1;
     
     if (!netif_device_present(dev))
-	return;
+	return IRQ_NONE;
+
     ioaddr = dev->base_addr;
 
     DEBUG(3, "%s: interrupt, status %4.4x.\n",
@@ -833,9 +834,9 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     spin_lock(&lp->lock);    
     while ((status = inw(ioaddr + EL3_STATUS)) &
 	(IntLatch | RxComplete | StatsFull)) {
-	if (!netif_device_present(dev) ||
-	    ((status & 0xe000) != 0x2000)) {
+	if ((status & 0xe000) != 0x2000) {
 	    DEBUG(1, "%s: interrupt from dead card\n", dev->name);
+	    handled = 0;
 	    break;
 	}
 	
@@ -897,7 +898,7 @@ static void el3_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     spin_unlock(&lp->lock);    
     DEBUG(3, "%s: exiting interrupt, status %4.4x.\n",
 	  dev->name, inw(ioaddr + EL3_STATUS));
-    return;
+    return IRQ_RETVAL(handled);
 }
 
 static void media_check(unsigned long arg)

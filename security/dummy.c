@@ -334,6 +334,11 @@ static int dummy_inode_setxattr (struct dentry *dentry, char *name, void *value,
 	return 0;
 }
 
+static void dummy_inode_post_setxattr (struct dentry *dentry, char *name, void *value,
+				       size_t size, int flags)
+{
+}
+
 static int dummy_inode_getxattr (struct dentry *dentry, char *name)
 {
 	return 0;
@@ -803,6 +808,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, inode_getattr);
 	set_to_dummy_if_null(ops, inode_delete);
 	set_to_dummy_if_null(ops, inode_setxattr);
+	set_to_dummy_if_null(ops, inode_post_setxattr);
 	set_to_dummy_if_null(ops, inode_getxattr);
 	set_to_dummy_if_null(ops, inode_listxattr);
 	set_to_dummy_if_null(ops, inode_removexattr);

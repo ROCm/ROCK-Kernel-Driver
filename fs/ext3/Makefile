@@ -14,3 +14,7 @@ endif
 ifeq ($(CONFIG_EXT3_FS_POSIX_ACL),y)
 ext3-objs += acl.o
 endif
+
+ifeq ($(CONFIG_EXT3_FS_SECURITY),y)
+ext3-objs += xattr_security.o
+endif

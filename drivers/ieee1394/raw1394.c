@@ -2531,9 +2531,8 @@ static int __init init_raw1394(void)
 {
 	hpsb_register_highlevel(&raw1394_highlevel);
 
-        devfs_register(NULL, RAW1394_DEVICE_NAME, 0,
-			IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16,
-			S_IFCHR | S_IRUSR | S_IWUSR, &file_ops, NULL);
+        devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16),
+			S_IFCHR | S_IRUSR | S_IWUSR, RAW1394_DEVICE_NAME);
 
         if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_RAW1394,
                                       THIS_MODULE, &file_ops)) {

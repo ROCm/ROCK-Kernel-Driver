@@ -373,16 +373,10 @@ static int init_coda_psdev(void)
 	}
 	devfs_mk_dir ("coda");
 	for (i = 0; i < MAX_CODADEVS; i++) {
-		char name[16];
-		sprintf(name, "coda/%d", i);
-		devfs_register(NULL, name, DEVFS_FL_NONE,
-			       CODA_PSDEV_MAJOR, i,
-			       S_IFCHR | S_IRUSR | S_IWUSR,
-			       &coda_psdev_fops, NULL);
+		devfs_mk_cdev(MKDEV(CODA_PSDEV_MAJOR, i),
+				S_IFCHR|S_IRUSR|S_IWUSR, "coda/%d", i);
 	}
-
 	coda_sysctl_init();
-
 	return 0;
 }
 

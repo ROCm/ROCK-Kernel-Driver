@@ -16,6 +16,7 @@
 #include <linux/input.h>
 #include <linux/module.h>
 #include <linux/random.h>
+#include <linux/major.h>
 #include <linux/pm.h>
 #include <linux/proc_fs.h>
 #include <linux/kmod.h>
@@ -32,7 +33,6 @@ EXPORT_SYMBOL(input_register_device);
 EXPORT_SYMBOL(input_unregister_device);
 EXPORT_SYMBOL(input_register_handler);
 EXPORT_SYMBOL(input_unregister_handler);
-EXPORT_SYMBOL(input_register_minor);
 EXPORT_SYMBOL(input_open_device);
 EXPORT_SYMBOL(input_close_device);
 EXPORT_SYMBOL(input_accept_process);
@@ -40,7 +40,6 @@ EXPORT_SYMBOL(input_flush_device);
 EXPORT_SYMBOL(input_event);
 EXPORT_SYMBOL(input_class);
 
-#define INPUT_MAJOR	13
 #define INPUT_DEVICES	256
 
 static LIST_HEAD(input_dev_list);
@@ -540,15 +539,6 @@ static struct file_operations input_fops = {
 	.owner = THIS_MODULE,
 	.open = input_open_file,
 };
-
-void input_register_minor(char *name, int minor, int minor_base)
-{
-	char devfs_name[16];
-
-	sprintf(devfs_name, name, minor);
-	devfs_register(NULL, devfs_name, 0, INPUT_MAJOR, minor_base + minor,
-			S_IFCHR|S_IRUGO|S_IWUSR, &input_fops, NULL);
-}
 
 #ifdef CONFIG_PROC_FS
 
