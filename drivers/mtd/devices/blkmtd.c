@@ -1189,6 +1189,7 @@ static int __init init_blkmtd(void)
   INIT_LIST_HEAD(&mtd_rawdevice->as.locked_pages);
   mtd_rawdevice->as.host = NULL;
   init_MUTEX(&(mtd_rawdevice->as.i_shared_sem));
+  atomic_set(&(mtd_rawdevice->as.truncate_count), 0);
 
   mtd_rawdevice->as.a_ops = &blkmtd_aops;
   INIT_LIST_HEAD(&mtd_rawdevice->as.i_mmap);

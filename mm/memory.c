@@ -1126,6 +1126,8 @@ void invalidate_mmap_range(struct address_space *mapping,
 			hlen = ULONG_MAX - hba + 1;
 	}
 	down(&mapping->i_shared_sem);
+	/* Protect against page fault */
+	atomic_inc(&mapping->truncate_count);
 	if (unlikely(!list_empty(&mapping->i_mmap)))
 		invalidate_mmap_range_list(&mapping->i_mmap, hba, hlen);
 	if (unlikely(!list_empty(&mapping->i_mmap_shared)))
@@ -1378,8 +1380,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	unsigned long address, int write_access, pte_t *page_table, pmd_t *pmd)
 {
 	struct page * new_page;
+	struct address_space *mapping;
 	pte_t entry;
 	struct pte_chain *pte_chain;
+	int sequence;
 	int ret;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
@@ -1388,6 +1392,10 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 
+	mapping = vma->vm_file->f_dentry->d_inode->i_mapping;
+	sequence = atomic_read(&mapping->truncate_count);
+	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
+retry:
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
 
 	/* no page was available -- either SIGBUS or OOM */
@@ -1416,6 +1424,17 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 
 	spin_lock(&mm->page_table_lock);
+	/*
+	 * For a file-backed vma, someone could have truncated or otherwise
+	 * invalidated this page.  If invalidate_mmap_range got called,
+	 * retry getting the page.
+	 */
+	if (unlikely(sequence != atomic_read(&mapping->truncate_count))) {
+		sequence = atomic_read(&mapping->truncate_count);
+		spin_unlock(&mm->page_table_lock);
+		page_cache_release(new_page);
+		goto retry;
+	}
 	page_table = pte_offset_map(pmd, address);
 
 	/*
