@@ -894,9 +894,9 @@ static int balance_pgdat(pg_data_t *pgdat, int nr_pages, struct page_state *ps)
 				max_scan = to_reclaim * 2;
 			if (max_scan < SWAP_CLUSTER_MAX)
 				max_scan = SWAP_CLUSTER_MAX;
-			to_free -= shrink_zone(zone, max_scan, GFP_KSWAPD,
+			to_free -= shrink_zone(zone, max_scan, GFP_KERNEL,
 					to_reclaim, &nr_mapped, ps, priority);
-			shrink_slab(max_scan + nr_mapped, GFP_KSWAPD);
+			shrink_slab(max_scan + nr_mapped, GFP_KERNEL);
 			if (zone->all_unreclaimable)
 				continue;
 			if (zone->pages_scanned > zone->present_pages * 2)
