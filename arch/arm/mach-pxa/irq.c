@@ -249,18 +249,30 @@ void __init pxa_init_irq(void)
 	int irq;
 
 	/* disable all IRQs */
-	ICMR = ICMR2 = 0;
+	ICMR = 0;
 
 	/* all IRQs are IRQ, not FIQ */
-	ICLR = ICLR2 = 0;
+	ICLR = 0;
 
 	/* clear all GPIO edge detects */
-	GFER0 = GFER1 = GFER2 = GFER3 = 0;
-	GRER0 = GRER1 = GRER2 = GRER3 = 0;
+	GFER0 = 0;
+	GFER1 = 0;
+	GFER2 = 0;
+	GRER0 = 0;
+	GRER1 = 0;
+	GRER2 = 0;
 	GEDR0 = GEDR0;
 	GEDR1 = GEDR1;
 	GEDR2 = GEDR2;
+
+#ifdef CONFIG_PXA27x
+	/* And similarly for the extra regs on the PXA27x */
+	ICMR2 = 0;
+	ICLR2 = 0;
+	GFER3 = 0;
+	GRER3 = 0;
 	GEDR3 = GEDR3;
+#endif
 
 	/* only unmasked interrupts kick us out of idle */
 	ICCR = 1;
