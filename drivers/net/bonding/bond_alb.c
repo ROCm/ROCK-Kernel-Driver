@@ -1255,6 +1255,7 @@ bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 		hash_size = 16;
 		break;
 
+#ifdef FIXME
 	case ETH_P_IPX:
 		if (skb->nh.ipxh->ipx_checksum !=
 		    __constant_htons(IPX_NO_CHECKSUM)) {
@@ -1276,6 +1277,7 @@ bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 		hash_start = (char*)eth_data->h_dest;
 		hash_size = ETH_ALEN;
 		break;
+#endif
 
 	case ETH_P_ARP:
 		do_tx_balance = 0;
