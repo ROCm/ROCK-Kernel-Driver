@@ -80,6 +80,17 @@ void enable_NMI_through_LVT0 (void * dummy)
 	apic_write_around(APIC_LVT0, v);
 }
 
+int get_physical_broadcast(void)
+{
+	unsigned int lvr, version;
+	lvr = apic_read(APIC_LVR);
+	version = GET_APIC_VERSION(lvr);
+	if (version >= 0x14)
+		return 0xff;
+	else
+		return 0xf;
+}
+
 int get_maxlvt(void)
 {
 	unsigned int v, ver, maxlvt;
