@@ -10,7 +10,7 @@
 #include <linux/tty.h>
 
 extern unsigned int
-ctrlchar_handle(const char *buf, int len, struct tty_struct *tty);
+ctrlchar_handle(const unsigned char *buf, int len, struct tty_struct *tty);
 
 
 #define CTRLCHAR_NONE  (1 << 8)
