@@ -240,30 +240,29 @@ do_assignment:
 static void
 early_probe_for_widget(vertex_hdl_t hubv, xwidget_hwid_t hwid)
 {
-	hubreg_t llp_csr_reg;
 	nasid_t nasid;
 	hubinfo_t hubinfo;
+	hubreg_t llp_csr_reg;
+	widgetreg_t widget_id;
+	int result = 0;
+
+	hwid->part_num = XWIDGET_PART_NUM_NONE;
+	hwid->rev_num = XWIDGET_REV_NUM_NONE;
+	hwid->mfg_num = XWIDGET_MFG_NUM_NONE;
 
 	hubinfo_get(hubv, &hubinfo);
 	nasid = hubinfo->h_nasid;
 
 	llp_csr_reg = REMOTE_HUB_L(nasid, IIO_LLP_CSR);
-	/* 
-	 * If link is up, read the widget's part number.
-	 * A direct connect widget must respond to widgetnum=0.
-	 */
-	if (llp_csr_reg & IIO_LLP_CSR_IS_UP) {
-		/* TBD: Put hub into "indirect" mode */
-		/*
-		 * We're able to read from a widget because our hub's 
-		 * WIDGET_ID was set up earlier.
-		 */
-		widgetreg_t widget_id = *(volatile widgetreg_t *)
-			(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID);
+	if (!(llp_csr_reg & IIO_LLP_CSR_IS_UP))
+		return;
 
-		DBG("early_probe_for_widget: Hub Vertex 0x%p is UP widget_id = 0x%x Register 0x%p\n", hubv, widget_id,
-		(volatile widgetreg_t *)(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID) );
+	/* Read the Cross-Talk Widget Id on the other end */
+	result = snia_badaddr_val((volatile void *)
+			(RAW_NODE_SWIN_BASE(nasid, 0x0) + WIDGET_ID), 
+			4, (void *) &widget_id);
 
+	if (result == 0) { /* Found something connected */
 		hwid->part_num = XWIDGET_PART_NUM(widget_id);
 		hwid->rev_num = XWIDGET_REV_NUM(widget_id);
 		hwid->mfg_num = XWIDGET_MFG_NUM(widget_id);
