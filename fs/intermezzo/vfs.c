@@ -525,12 +525,20 @@ int lento_create(const char *name, int mode, struct lento_vfs_context *info)
 {
         int error;
         struct nameidata nd;
+        char * pathname;
         struct dentry *dentry;
         struct presto_file_set *fset;
 
         ENTRY;
+        pathname = getname(name);
+        error = PTR_ERR(pathname);
+        if (IS_ERR(pathname)) {
+                EXIT;
+                goto exit;
+        }
+
         /* this looks up the parent */
-        error = __user_walk(name,  LOOKUP_PARENT, &nd);
+        error = path_lookup(pathname,  LOOKUP_PARENT, &nd);
         if (error) {
 		EXIT;
                 goto exit;
@@ -558,6 +566,7 @@ int lento_create(const char *name, int mode, struct lento_vfs_context *info)
         path_release (&nd);
 	dput(dentry); 
         up(&dentry->d_parent->d_inode->i_sem);
+        putname(pathname);
 exit:
         return error;
 }
@@ -662,14 +671,19 @@ int lento_link(const char * oldname, const char * newname,
                          struct lento_vfs_context *info)
 {
         int error;
-        struct presto_file_set *fset;
 	struct dentry *new_dentry;
 	struct nameidata nd, old_nd;
+        char * to;
+        struct presto_file_set *fset;
 
-	error = __user_walk(from, 0, &old_nd);
+        to = getname(newname);
+        if(IS_ERR(to))
+                return PTR_ERR(to);
+
+	error = __user_walk(oldname, 0, &old_nd);
 	if (error)
 		goto exit;
-	error = __user_walk(newname, LOOKUP_PARENT, &nd);
+	error = path_lookup(to, LOOKUP_PARENT, &nd);
 	if (error)
 		goto out;
 	error = -EXDEV;
@@ -697,6 +711,8 @@ out2:
 out:
 	path_release(&old_nd);
 exit:
+	putname(to);
+
         return error;
 }
 
@@ -805,13 +821,18 @@ exit:
 int lento_unlink(const char *pathname, struct lento_vfs_context *info)
 {
         int error = 0;
+        char * name;
         struct dentry *dentry;
         struct nameidata nd;
         struct presto_file_set *fset;
 
         ENTRY;
 
-        error = __user_walk(pathname, LOOKUP_PARENT, &nd);
+        name = getname(pathname);
+        if(IS_ERR(name))
+                return PTR_ERR(name);
+
+        error = path_lookup(name, LOOKUP_PARENT, &nd))
         if (error)
                 goto exit;
         error = -EISDIR;
@@ -840,6 +861,8 @@ int lento_unlink(const char *pathname, struct lento_vfs_context *info)
 exit1:
         path_release(&nd);
 exit:
+        putname(name);
+
         return error;
 
 slashes:
@@ -951,6 +974,7 @@ int lento_symlink(const char *oldname, const char *newname,
 {
         int error;
         char *from;
+        char *to;
         struct dentry *dentry;
         struct presto_file_set *fset;
         struct nameidata nd;
@@ -964,7 +988,14 @@ int lento_symlink(const char *oldname, const char *newname,
                 goto exit;
         }
 
-        error = __user_walk(newname, LOOKUP_PARENT, &nd);
+        to = getname(newname);
+        error = PTR_ERR(to);
+        if (IS_ERR(to)) {
+                EXIT;
+                goto exit_from;
+        }
+
+        error = path_lookup(to, LOOKUP_PARENT, &nd);
         if (error) {
                 EXIT;
                 goto exit_to;
@@ -987,13 +1018,14 @@ int lento_symlink(const char *oldname, const char *newname,
                 goto exit_lock;
         }
         error = presto_do_symlink(fset, nd.dentry,
-                                  dentry, from, info);
+                                  dentry, oldname, info);
         path_release(&nd);
         EXIT;
  exit_lock:
         up(&nd.dentry->d_inode->i_sem);
         dput(dentry);
  exit_to:
+        putname(to);
  exit_from:
         putname(from);
  exit:
@@ -1108,6 +1140,7 @@ exit:
 int lento_mkdir(const char *name, int mode, struct lento_vfs_context *info)
 {
         int error;
+        char *pathname;
         struct dentry *dentry;
         struct presto_file_set *fset;
         struct nameidata nd;
@@ -1115,7 +1148,14 @@ int lento_mkdir(const char *name, int mode, struct lento_vfs_context *info)
         ENTRY;
         CDEBUG(D_PIOCTL, "name: %s, mode %o, offset %d, recno %d, flags %x\n",
                name, mode, info->slot_offset, info->recno, info->flags);
-        error = __user_walk(pathname, LOOKUP_PARENT, &nd);
+        pathname = getname(name);
+        error = PTR_ERR(pathname);
+        if (IS_ERR(pathname)) {
+                EXIT;
+                return error;
+        }
+
+        error = path_lookup(pathname, LOOKUP_PARENT, &nd);
         if (error)
                 goto out_name;
 
@@ -1139,6 +1179,7 @@ out_dput:
 	path_release(&nd);
 out_name:
         EXIT;
+        putname(pathname);
 	CDEBUG(D_PIOCTL, "error: %d\n", error);
         return error;
 }
@@ -1243,12 +1284,17 @@ int presto_do_rmdir(struct presto_file_set *fset, struct dentry *dir,
 int lento_rmdir(const char *pathname, struct lento_vfs_context *info)
 {
         int error = 0;
+        char * name;
         struct dentry *dentry;
         struct presto_file_set *fset;
         struct nameidata nd;
 
         ENTRY;
-        error = __user_walk(pathname, LOOKUP_PARENT, &nd))
+        name = getname(pathname);
+        if(IS_ERR(name))
+                return PTR_ERR(name);
+
+        error = path_lookup(name, LOOKUP_PARENT, &nd);
         if (error)
                 goto exit;
 
@@ -1281,6 +1327,7 @@ exit1:
         path_release(&nd);
 exit:
         EXIT;
+        putname(name);
         return error;
 }
 
@@ -1390,6 +1437,7 @@ int lento_mknod(const char *filename, int mode, dev_t dev,
                 struct lento_vfs_context *info)
 {
         int error = 0;
+        char * tmp;
         struct dentry * dentry;
         struct nameidata nd;
         struct presto_file_set *fset;
@@ -1398,8 +1446,11 @@ int lento_mknod(const char *filename, int mode, dev_t dev,
 
         if (S_ISDIR(mode))
                 return -EPERM;
+        tmp = getname(filename);
+        if (IS_ERR(tmp))
+                return PTR_ERR(tmp);
 
-        error = __user_walk(filename, LOOKUP_PARENT, &nd);
+        error = path_lookup(tmp, LOOKUP_PARENT, &nd);
         if (error)
                 goto out;
         dentry = lookup_create(&nd, 0);
@@ -1432,6 +1483,8 @@ int lento_mknod(const char *filename, int mode, dev_t dev,
         up(&nd.dentry->d_inode->i_sem);
         path_release(&nd);
 out:
+        putname(tmp);
+
         return error;
 }
 
