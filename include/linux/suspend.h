@@ -48,13 +48,6 @@ extern void drain_local_pages(void);
 extern unsigned int nr_copy_pages __nosavedata;
 extern suspend_pagedir_t *pagedir_nosave __nosavedata;
 
-/* Communication between kernel/suspend.c and arch/i386/suspend.c */
-
-extern void do_magic_resume_1(void);
-extern void do_magic_resume_2(void);
-extern void do_magic_suspend_1(void);
-extern void do_magic_suspend_2(void);
-
 /* Communication between acpi and arch/i386/suspend.c */
 
 extern void do_suspend_lowlevel(int resume);
