@@ -14,8 +14,6 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 
-
-
 __u8 cdb89712_read8(struct map_info *map, unsigned long ofs)
 {
 	return __raw_readb(map->map_priv_1 + ofs);
@@ -65,28 +63,27 @@ void cdb89712_copy_to(struct map_info *map, unsigned long to, const void *from, 
 	}
 }
 
-
 static struct mtd_info *flash_mtd;
 
 struct map_info cdb89712_flash_map = {
-	name: "flash",
-	size: FLASH_SIZE,
-	buswidth: FLASH_WIDTH,
-	read8: cdb89712_read8,
-	read16: cdb89712_read16,
-	read32: cdb89712_read32,
-	copy_from: cdb89712_copy_from,
-	write8: cdb89712_write8,
-	write16: cdb89712_write16,
-	write32: cdb89712_write32,
-	copy_to: cdb89712_copy_to
+	.name		= "flash",
+	.size		= FLASH_SIZE,
+	.buswidth	= FLASH_WIDTH,
+	.read8		= cdb89712_read8,
+	.read16		= cdb89712_read16,
+	.read32		= cdb89712_read32,
+	.copy_from	= cdb89712_copy_from,
+	.write8		= cdb89712_write8,
+	.write16	= cdb89712_write16,
+	.write32	= cdb89712_write32,
+	.copy_to	= cdb89712_copy_to
 };
 
 struct resource cdb89712_flash_resource = {
-	name:   "Flash",
-	start:  FLASH_START,
-	end:    FLASH_START + FLASH_SIZE - 1,
-	flags:  IORESOURCE_IO | IORESOURCE_BUSY,
+	.name	= "Flash",
+	.start	= FLASH_START,
+	.end	= FLASH_START + FLASH_SIZE - 1,
+	.flags	= IORESOURCE_IO | IORESOURCE_BUSY,
 };
 
 static int __init init_cdb89712_flash (void)
@@ -139,31 +136,27 @@ out:
 	return err;
 }
 
-
-
-
-
 static struct mtd_info *sram_mtd;
 
 struct map_info cdb89712_sram_map = {
-	name: "SRAM",
-	size: SRAM_SIZE,
-	buswidth: SRAM_WIDTH,
-	read8: cdb89712_read8,
-	read16: cdb89712_read16,
-	read32: cdb89712_read32,
-	copy_from: cdb89712_copy_from,
-	write8: cdb89712_write8,
-	write16: cdb89712_write16,
-	write32: cdb89712_write32,
-	copy_to: cdb89712_copy_to
+	.name		= "SRAM",
+	.size		= SRAM_SIZE,
+	.buswidth	= SRAM_WIDTH,
+	.read8		= cdb89712_read8,
+	.read16		= cdb89712_read16,
+	.read32		= cdb89712_read32,
+	.copy_from	= cdb89712_copy_from,
+	.write8		= cdb89712_write8,
+	.write16	= cdb89712_write16,
+	.write32	= cdb89712_write32,
+	.copy_to	= cdb89712_copy_to
 };
 
 struct resource cdb89712_sram_resource = {
-	name:   "SRAM",
-	start:  SRAM_START,
-	end:    SRAM_START + SRAM_SIZE - 1,
-	flags:  IORESOURCE_IO | IORESOURCE_BUSY,
+	.name	= "SRAM",
+	.start	= SRAM_START,
+	.end	= SRAM_START + SRAM_SIZE - 1,
+	.flags	= IORESOURCE_IO | IORESOURCE_BUSY,
 };
 
 static int __init init_cdb89712_sram (void)
@@ -212,29 +205,23 @@ out:
 	return err;
 }
 
-
-
-
-
-
-
 static struct mtd_info *bootrom_mtd;
 
 struct map_info cdb89712_bootrom_map = {
-	name: "BootROM",
-	size: BOOTROM_SIZE,
-	buswidth: BOOTROM_WIDTH,
-	read8: cdb89712_read8,
-	read16: cdb89712_read16,
-	read32: cdb89712_read32,
-	copy_from: cdb89712_copy_from,
+	.name		= "BootROM",
+	.size		= BOOTROM_SIZE,
+	.buswidth	= BOOTROM_WIDTH,
+	.read8		= cdb89712_read8,
+	.read16		= cdb89712_read16,
+	.read32		= cdb89712_read32,
+	.copy_from	= cdb89712_copy_from,
 };
 
 struct resource cdb89712_bootrom_resource = {
-	name:   "BootROM",
-	start:  BOOTROM_START,
-	end:    BOOTROM_START + BOOTROM_SIZE - 1,
-	flags:  IORESOURCE_IO | IORESOURCE_BUSY,
+	.name	= "BootROM",
+	.start	= BOOTROM_START,
+	.end	= BOOTROM_START + BOOTROM_SIZE - 1,
+	.flags	= IORESOURCE_IO | IORESOURCE_BUSY,
 };
 
 static int __init init_cdb89712_bootrom (void)
@@ -282,10 +269,6 @@ out_resource:
 out:
 	return err;
 }
-
-
-
-
 
 static int __init init_cdb89712_maps(void)
 {

@@ -76,15 +76,15 @@ static void clps_copy_to(struct map_info *map, unsigned long to, const void *fro
 }
 
 static struct map_info clps_map __initdata = {
-	name:		"clps flash",
-	read8:		clps_read8,
-	read16:		clps_read16,
-	read32:		clps_read32,
-	copy_from:	clps_copy_from,
-	write8:		clps_write8,
-	write16:	clps_write16,
-	write32:	clps_write32,
-	copy_to:	clps_copy_to,
+	.name		= "clps flash",
+	.read8		= clps_read8,
+	.read16		= clps_read16,
+	.read32		= clps_read32,
+	.copy_from	= clps_copy_from,
+	.write8		= clps_write8,
+	.write16	= clps_write16,
+	.write32	= clps_write32,
+	.copy_to	= clps_copy_to,
 };
 
 #ifdef CONFIG_MTD_CEIVA_STATICMAP
@@ -115,23 +115,25 @@ static struct map_info clps_map __initdata = {
 
 static struct mtd_partition ceiva_partitions[] = {
 	{
-		name: "Ceiva BOOT partition",
-		size:   BOOT_PARTITION_SIZE_KiB*1024,
-		offset: 0,
+		.name	= "Ceiva BOOT partition",
+		.size	= BOOT_PARTITION_SIZE_KiB*1024,
 
-	},{
-		name: "Ceiva parameters partition",
-		size:   PARAMS_PARTITION_SIZE_KiB*1024,
-		offset: (16 + 8) * 1024,
-	},{
-		name: "Ceiva kernel partition",
-		size: (KERNEL_PARTITION_SIZE_KiB)*1024,
-		offset: 0x20000,
+	},
+	{
+		.name	= "Ceiva parameters partition",
+		.size	= PARAMS_PARTITION_SIZE_KiB*1024,
+		.offset	= (16 + 8) * 1024,
+	},
+	{
+		.name	= "Ceiva kernel partition",
+		.size	= (KERNEL_PARTITION_SIZE_KiB)*1024,
+		.offset	= 0x20000,
 
-	},{
-		name: "Ceiva root filesystem partition",
-		offset: MTDPART_OFS_APPEND,
-		size: (ROOT_PARTITION_SIZE_KiB)*1024,
+	},
+	{
+		.name	= "Ceiva root filesystem partition",
+		.offset	= MTDPART_OFS_APPEND,
+		.size	= (ROOT_PARTITION_SIZE_KiB)*1024,
 	}
 };
 #endif

@@ -67,38 +67,40 @@ static void iq80310_copy_to(struct map_info *map, unsigned long to, const void *
 }
 
 static struct map_info iq80310_map = {
-	name: "IQ80310 flash",
-	size: WINDOW_SIZE,
-	buswidth: BUSWIDTH,
-	read8:		iq80310_read8,
-	read16:		iq80310_read16,
-	read32:		iq80310_read32,
-	copy_from:	iq80310_copy_from,
-	write8:		iq80310_write8,
-	write16:	iq80310_write16,
-	write32:	iq80310_write32,
-	copy_to:	iq80310_copy_to
+	.name		= "IQ80310 flash",
+	.size		= WINDOW_SIZE,
+	.buswidth	= BUSWIDTH,
+	.read8		= iq80310_read8,
+	.read16		= iq80310_read16,
+	.read32		= iq80310_read32,
+	.copy_from	= iq80310_copy_from,
+	.write8		= iq80310_write8,
+	.write16	= iq80310_write16,
+	.write32	= iq80310_write32,
+	.copy_to	= iq80310_copy_to
 };
 
 static struct mtd_partition iq80310_partitions[4] = {
 	{
-		name:		"Firmware",
-		size:		0x00080000,
-		offset:		0,
-		mask_flags:	MTD_WRITEABLE  /* force read-only */
-	},{
-		name:		"Kernel",
-		size:		0x000a0000,
-		offset:		0x00080000,
-	},{
-		name:		"Filesystem",
-		size:		0x00600000,
-		offset:		0x00120000
-	},{
-		name:		"RedBoot",
-		size:		0x000e0000,
-		offset:		0x00720000,
-		mask_flags:	MTD_WRITEABLE
+		.name		= "Firmware",
+		.size		= 0x00080000,
+		.mask_flags	= MTD_WRITEABLE  /* force read-only */
+	},
+	{
+		.name		= "Kernel",
+		.size		= 0x000a0000,
+		.offset		= 0x00080000,
+	},
+	{
+		.name		= "Filesystem",
+		.size		= 0x00600000,
+		.offset		= 0x00120000
+	},
+	{
+		.name		= "RedBoot",
+		.size		= 0x000e0000,
+		.offset		= 0x00720000,
+		.mask_flags	= MTD_WRITEABLE
 	}
 };
 

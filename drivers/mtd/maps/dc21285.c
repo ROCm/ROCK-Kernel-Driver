@@ -92,16 +92,16 @@ void dc21285_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info dc21285_map = {
-	name: "DC21285 flash",
-	size: 16*1024*1024,
-	read8: dc21285_read8,
-	read16: dc21285_read16,
-	read32: dc21285_read32,
-	copy_from: dc21285_copy_from,
-	write8: dc21285_write8,
-	write16: dc21285_write16,
-	write32: dc21285_write32,
-	copy_to: dc21285_copy_to
+	.name		= "DC21285 flash",
+	.size		= 16*1024*1024,
+	.read8		= dc21285_read8,
+	.read16		= dc21285_read16,
+	.read32		= dc21285_read32,
+	.copy_from	= dc21285_copy_from,
+	.write8		= dc21285_write8,
+	.write16	= dc21285_write16,
+	.write32	= dc21285_write32,
+	.copy_to	= dc21285_copy_to
 };
 
 

@@ -63,17 +63,17 @@ void physmap_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info physmap_map = {
-	name: "Physically mapped flash",
-	size: WINDOW_SIZE,
-	buswidth: BUSWIDTH,
-	read8: physmap_read8,
-	read16: physmap_read16,
-	read32: physmap_read32,
-	copy_from: physmap_copy_from,
-	write8: physmap_write8,
-	write16: physmap_write16,
-	write32: physmap_write32,
-	copy_to: physmap_copy_to
+	.name		= "Physically mapped flash",
+	.size		= WINDOW_SIZE,
+	.buswidth	= BUSWIDTH,
+	.read8		= physmap_read8,
+	.read16		= physmap_read16,
+	.read32		= physmap_read32,
+	.copy_from	= physmap_copy_from,
+	.write8		= physmap_write8,
+	.write16	= physmap_write16,
+	.write32	= physmap_write32,
+	.copy_to	= physmap_copy_to
 };
 
 int __init init_physmap(void)

@@ -98,10 +98,10 @@ intel_iq80310_translate(struct map_pci_info *map, unsigned long ofs)
 }
 
 static struct mtd_pci_info intel_iq80310_info = {
-	init:		intel_iq80310_init,
-	exit:		intel_iq80310_exit,
-	translate:	intel_iq80310_translate,
-	map_name:	"cfi_probe",
+	.init		= intel_iq80310_init,
+	.exit		= intel_iq80310_exit,
+	.translate	= intel_iq80310_translate,
+	.map_name	= "cfi_probe",
 };
 
 /*
@@ -181,10 +181,10 @@ intel_dc21285_translate(struct map_pci_info *map, unsigned long ofs)
 }
 
 static struct mtd_pci_info intel_dc21285_info = {
-	init:		intel_dc21285_init,
-	exit:		intel_dc21285_exit,
-	translate:	intel_dc21285_translate,
-	map_name:	"jedec_probe",
+	.init		= intel_dc21285_init,
+	.exit		= intel_dc21285_exit,
+	.translate	= intel_dc21285_translate,
+	.map_name	= "jedec_probe",
 };
 
 /*
@@ -193,24 +193,22 @@ static struct mtd_pci_info intel_dc21285_info = {
 
 static struct pci_device_id mtd_pci_ids[] __devinitdata = {
 	{
-		vendor:		PCI_VENDOR_ID_INTEL,
-		device:		0x530d,
-		subvendor:	PCI_ANY_ID,
-		subdevice:	PCI_ANY_ID,
-		class:		PCI_CLASS_MEMORY_OTHER << 8,
-		class_mask:	0xffff00,
-		driver_data:	(unsigned long)&intel_iq80310_info,
+		.vendor		= PCI_VENDOR_ID_INTEL,
+		.device		= 0x530d,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.class		= PCI_CLASS_MEMORY_OTHER << 8,
+		.class_mask	= 0xffff00,
+		.driver_data	= (unsigned long)&intel_iq80310_info,
 	},
 	{
-		vendor:		PCI_VENDOR_ID_DEC,
-		device:		PCI_DEVICE_ID_DEC_21285,
-		subvendor:	0,	/* DC21285 defaults to 0 on reset */
-		subdevice:	0,	/* DC21285 defaults to 0 on reset */
-		class:		0,
-		class_mask:	0,
-		driver_data:	(unsigned long)&intel_dc21285_info,
+		.vendor		= PCI_VENDOR_ID_DEC,
+		.device		= PCI_DEVICE_ID_DEC_21285,
+		.subvendor	= 0,	/* DC21285 defaults to 0 on reset */
+		.subdevice	= 0,	/* DC21285 defaults to 0 on reset */
+		.driver_data	= (unsigned long)&intel_dc21285_info,
 	},
-	{ 0, }
+	{ .vendor = 0, }
 };
 
 /*
@@ -275,14 +273,14 @@ static void mtd_pci_copyto(struct map_info *_map, unsigned long to, const void *
 }
 
 static struct map_info mtd_pci_map = {
-	read8:		mtd_pci_read8,
-	read16:		mtd_pci_read16,
-	read32:		mtd_pci_read32,
-	copy_from:	mtd_pci_copyfrom,
-	write8:		mtd_pci_write8,
-	write16:	mtd_pci_write16,
-	write32:	mtd_pci_write32,
-	copy_to:	mtd_pci_copyto,
+	.read8		= mtd_pci_read8,
+	.read16		= mtd_pci_read16,
+	.read32		= mtd_pci_read32,
+	.copy_from	= mtd_pci_copyfrom,
+	.write8		= mtd_pci_write8,
+	.write16	= mtd_pci_write16,
+	.write32	= mtd_pci_write32,
+	.copy_to	= mtd_pci_copyto,
 };
 
 static int __devinit
@@ -359,10 +357,10 @@ mtd_pci_remove(struct pci_dev *dev)
 }
 
 static struct pci_driver mtd_pci_driver = {
-	name:		"MTD PCI",
-	probe:		mtd_pci_probe,
-	remove:		mtd_pci_remove,
-	id_table:	mtd_pci_ids,
+	.name		= "MTD PCI",
+	.probe		= mtd_pci_probe,
+	.remove		= mtd_pci_remove,
+	.id_table	= mtd_pci_ids,
 };
 
 static int __init mtd_pci_maps_init(void)

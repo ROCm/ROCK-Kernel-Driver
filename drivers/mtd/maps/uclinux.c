@@ -66,15 +66,15 @@ void uclinux_copy_to(struct map_info *map, unsigned long to, const void *from, s
 /****************************************************************************/
 
 struct map_info uclinux_ram_map = {
-	name:		"RAM",
-	read8:		uclinux_read8,
-	read16:		uclinux_read16,
-	read32:		uclinux_read32,
-	copy_from:	uclinux_copy_from,
-	write8:		uclinux_write8,
-	write16:	uclinux_write16,
-	write32:	uclinux_write32,
-	copy_to:	uclinux_copy_to,
+	.name		= "RAM",
+	.read8		= uclinux_read8,
+	.read16		= uclinux_read16,
+	.read32		= uclinux_read32,
+	.copy_from	= uclinux_copy_from,
+	.write8		= uclinux_write8,
+	.write16	= uclinux_write16,
+	.write32	= uclinux_write32,
+	.copy_to	= uclinux_copy_to,
 };
 
 struct mtd_info *uclinux_ram_mtdinfo;
@@ -82,7 +82,7 @@ struct mtd_info *uclinux_ram_mtdinfo;
 /****************************************************************************/
 
 struct mtd_partition uclinux_romfs[] = {
-	{ name: "ROMfs", offset: 0 }
+	{ .name = "ROMfs", .offset = 0 }
 };
 
 #define	NUM_PARTITIONS	(sizeof(uclinux_romfs) / sizeof(uclinux_romfs[0]))

@@ -42,19 +42,19 @@ static struct mtd_info *eprom_mtd;
 static struct mtd_partition *parsed_parts;
 
 struct map_info soleng_eprom_map = {
-	name: "Solution Engine EPROM",
-	size: 0x400000,
-	buswidth: 4,
-	copy_from: soleng_copy_from,
+	.name		= "Solution Engine EPROM",
+	.size		= 0x400000,
+	.buswidth	= 4,
+	.copy_from	= soleng_copy_from,
 };
 
 struct map_info soleng_flash_map = {
-	name: "Solution Engine FLASH",
-	size: 0x400000,
-	buswidth: 4,
-	read32: soleng_read32,
-	copy_from: soleng_copy_from,
-	write32: soleng_write32,
+	.name		= "Solution Engine FLASH",
+	.size		= 0x400000,
+	.buswidth	= 4,
+	.read32		= soleng_read32,
+	.copy_from	= soleng_copy_from,
+	.write32	= soleng_write32,
 };
 
 static int __init init_soleng_maps(void)

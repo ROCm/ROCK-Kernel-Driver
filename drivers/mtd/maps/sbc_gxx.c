@@ -90,15 +90,20 @@ static spinlock_t sbc_gxx_spin = SPIN_LOCK_UNLOCKED;
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the
  * device. */
-static struct mtd_partition partition_info[]={
-    { name: "SBC-GXx flash boot partition", 
-      offset: 0, 
-      size:   BOOT_PARTITION_SIZE_KiB*1024 },
-    { name: "SBC-GXx flash data partition", 
-      offset: BOOT_PARTITION_SIZE_KiB*1024, 
-      size: (DATA_PARTITION_SIZE_KiB)*1024 },
-    { name: "SBC-GXx flash application partition", 
-      offset: (BOOT_PARTITION_SIZE_KiB+DATA_PARTITION_SIZE_KiB)*1024 }
+static struct mtd_partition partition_info[] = {
+	{
+		.name	= "SBC-GXx flash boot partition", 
+		.size	= BOOT_PARTITION_SIZE_KiB*1024
+	},
+	{
+		.name	= "SBC-GXx flash data partition", 
+		.offset	= BOOT_PARTITION_SIZE_KiB*1024, 
+		.size	= (DATA_PARTITION_SIZE_KiB)*1024
+	},
+	{
+		.name	= "SBC-GXx flash application partition", 
+		.offset	= (BOOT_PARTITION_SIZE_KiB+DATA_PARTITION_SIZE_KiB)*1024
+	}
 };
 
 #define NUM_PARTITIONS 3
@@ -203,19 +208,20 @@ static void sbc_gxx_copy_to(struct map_info *map, unsigned long to, const void *
 }
 
 static struct map_info sbc_gxx_map = {
-	name: "SBC-GXx flash",
-	size: MAX_SIZE_KiB*1024, /* this must be set to a maximum possible amount
-			 of flash so the cfi probe routines find all
-			 the chips */
-	buswidth: 1,
-	read8: sbc_gxx_read8,
-	read16: sbc_gxx_read16,
-	read32: sbc_gxx_read32,
-	copy_from: sbc_gxx_copy_from,
-	write8: sbc_gxx_write8,
-	write16: sbc_gxx_write16,
-	write32: sbc_gxx_write32,
-	copy_to: sbc_gxx_copy_to
+	.name		= "SBC-GXx flash",
+	.size		= MAX_SIZE_KiB*1024, /* this must be set to a maximum
+						possible amount of flash so
+						the cfi probe routines find
+						all the chips */
+	.buswidth	= 1,
+	.read8		= sbc_gxx_read8,
+	.read16		= sbc_gxx_read16,
+	.read32		= sbc_gxx_read32,
+	.copy_from	= sbc_gxx_copy_from,
+	.write8		= sbc_gxx_write8,
+	.write16	= sbc_gxx_write16,
+	.write32	= sbc_gxx_write32,
+	.copy_to	= sbc_gxx_copy_to
 };
 
 /* MTD device for all of the flash. */
