@@ -85,6 +85,23 @@ static struct irqdesc bad_irq_desc = {
 	.disable_depth	= 1,
 };
 
+#ifdef CONFIG_SMP
+void synchronize_irq(unsigned int irq)
+{
+	struct irqdesc *desc = irq_desc + irq;
+
+	while (desc->running)
+		barrier();
+}
+EXPORT_SYMBOL(synchronize_irq);
+
+#define smp_set_running(desc)	do { desc->running = 1; } while (0)
+#define smp_clear_running(desc)	do { desc->running = 0; } while (0)
+#else
+#define smp_set_running(desc)	do { } while (0)
+#define smp_clear_running(desc)	do { } while (0)
+#endif
+
 /**
  *	disable_irq_nosync - disable an irq without waiting
  *	@irq: Interrupt to disable
@@ -338,12 +355,16 @@ do_simple_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 
 	kstat_cpu(cpu).irqs[irq]++;
 
+	smp_set_running(desc);
+
 	action = desc->action;
 	if (action) {
 		int ret = __do_irq(irq, action, regs);
 		if (ret != IRQ_HANDLED)
 			report_bad_irq(irq, regs, desc, ret);
 	}
+
+	smp_clear_running(desc);
 }
 
 /*
@@ -429,6 +450,8 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 	if (likely(!desc->disable_depth)) {
 		kstat_cpu(cpu).irqs[irq]++;
 
+		smp_set_running(desc);
+
 		/*
 		 * Return with this interrupt masked if no action
 		 */
@@ -443,6 +466,8 @@ do_level_IRQ(unsigned int irq, struct irqdesc *desc, struct pt_regs *regs)
 				   !check_irq_lock(desc, irq, regs)))
 				desc->chip->unmask(irq);
 		}
+
+		smp_clear_running(desc);
 	}
 }
 
