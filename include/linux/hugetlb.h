@@ -52,6 +52,13 @@ mark_mm_hugetlb(struct mm_struct *mm, struct vm_area_struct *vma)
 int prepare_hugepage_range(unsigned long addr, unsigned long len);
 #endif
 
+#ifndef ARCH_HANDLES_HUGEPAGE_FAULTS
+#define handle_hugetlb_mm_fault(mm, vma, a, w)	(VM_FAULT_SIGBUS)
+#else
+int handle_hugetlb_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
+			    unsigned long address, int write_access);
+#endif
+
 #else /* !CONFIG_HUGETLB_PAGE */
 
 static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
