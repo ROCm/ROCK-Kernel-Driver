@@ -184,12 +184,12 @@ ext3_get_acl(struct inode *inode, int type)
 		default:
 			return ERR_PTR(-EINVAL);
 	}
-	retval = ext2_xattr_get(inode, name_index, "", NULL, 0);
+	retval = ext3_xattr_get(inode, name_index, "", NULL, 0);
 	if (retval > 0) {
 		value = kmalloc(retval, GFP_KERNEL);
 		if (!value)
 			return ERR_PTR(-ENOMEM);
-		retval = ext2_xattr_get(inode, name_index, "", value, retval);
+		retval = ext3_xattr_get(inode, name_index, "", value, retval);
 	}
 	if (retval > 0)
 		acl = ext3_acl_from_disk(value, retval);

@@ -209,7 +209,11 @@ EXPORT_SYMBOL(ist_info);
 #endif
 
 EXPORT_SYMBOL(csum_partial);
- 
+
+#ifdef CONFIG_X86_GENERICARCH
+EXPORT_SYMBOL(genapic);
+#endif
+
 #ifdef CONFIG_CRASH_DUMP_MODULE
 #ifdef CONFIG_SMP
 extern irq_desc_t irq_desc[NR_IRQS];
