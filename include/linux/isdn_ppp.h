@@ -172,7 +172,7 @@ enum ippp_ccp_reset_states {
 
 struct ippp_ccp_reset_state {
   enum ippp_ccp_reset_states state;	/* State of this transaction */
-  struct ippp_struct *is;		/* Backlink to device stuff */
+  struct ipppd *is; 		        /* Backlink to device stuff */
   unsigned char id;			/* Backlink id index */
   unsigned char ta:1;			/* The timer is active (flag) */
   unsigned char expra:1;		/* We expect a ResetAck at all */
@@ -189,35 +189,6 @@ struct ippp_ccp_reset_state {
 struct ippp_ccp_reset {
   struct ippp_ccp_reset_state *rs[256];	/* One per possible id */
   unsigned char lastid;			/* Last id allocated by the engine */
-};
-
-struct ippp_struct {
-  struct ippp_struct *next_link;
-  int state;
-  struct sk_buff_head rq;
-  wait_queue_head_t wq;
-  struct task_struct *tk;
-  unsigned int mpppcfg;
-  unsigned int pppcfg;
-  unsigned int mru;
-  unsigned int mpmru;
-  unsigned int mpmtu;
-  unsigned int maxcid;
-  struct isdn_net_dev_s *idev;
-  int unit;
-  int minor;
-  unsigned int last_link_seqno;
-  long mp_seqno;
-#ifdef CONFIG_ISDN_PPP_VJ
-  unsigned char *cbuf;
-  struct slcompress *slcomp;
-#endif
-  unsigned long debug;
-  struct isdn_ppp_compressor *compressor,*decompressor;
-  struct isdn_ppp_compressor *link_compressor,*link_decompressor;
-  void *decomp_stat,*comp_stat,*link_decomp_stat,*link_comp_stat;
-  struct ippp_ccp_reset *reset;	/* Allocated on demand, may never be needed */
-  unsigned long compflags;
 };
 
 #endif /* __KERNEL__ */

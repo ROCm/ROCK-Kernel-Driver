@@ -20,37 +20,65 @@
 #include "isdn_ppp.h"
 #include "isdn_net.h"
 
+struct ipppd {
+	int state;
+	struct sk_buff_head rq;
+	wait_queue_head_t wq;
+	struct task_struct *tk;
+	unsigned int mpppcfg;
+	unsigned int pppcfg;
+	unsigned int mru;
+	unsigned int mpmru;
+	unsigned int mpmtu;
+	unsigned int maxcid;
+	struct isdn_net_dev_s *idev;
+	int unit;
+	int minor;
+	unsigned int last_link_seqno;
+	long mp_seqno;
+#ifdef CONFIG_ISDN_PPP_VJ
+	unsigned char *cbuf;
+	struct slcompress *slcomp;
+#endif
+	unsigned long debug;
+	struct isdn_ppp_compressor *compressor,*decompressor;
+	struct isdn_ppp_compressor *link_compressor,*link_decompressor;
+	void *decomp_stat,*comp_stat,*link_decomp_stat,*link_comp_stat;
+	struct ippp_ccp_reset *reset;	/* Allocated on demand, may never be needed */
+	unsigned long compflags;
+};
+
 /* Prototypes */
 static int isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot);
 static void isdn_ppp_closewait(isdn_net_dev *idev);
 static void isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 				 struct sk_buff *skb, int proto);
 static int isdn_ppp_if_get_unit(char *namebuf);
-static int isdn_ppp_set_compressor(struct ippp_struct *is,struct isdn_ppp_comp_data *);
+static int isdn_ppp_set_compressor(struct ipppd *is,struct isdn_ppp_comp_data *);
 static struct sk_buff *isdn_ppp_decompress(struct sk_buff *,
-				struct ippp_struct *,struct ippp_struct *,int *proto);
+				struct ipppd *,struct ipppd *,int *proto);
 static void isdn_ppp_receive_ccp(isdn_net_dev * net_dev, isdn_net_local * lp,
 				struct sk_buff *skb,int proto);
 static struct sk_buff *isdn_ppp_compress(struct sk_buff *skb_in,int *proto,
-	struct ippp_struct *is,struct ippp_struct *master,int type);
+	struct ipppd *is,struct ipppd *master,int type);
 static void isdn_ppp_send_ccp(isdn_net_dev *net_dev, isdn_net_local *lp,
 	 struct sk_buff *skb);
 
 /* New CCP stuff */
-static void isdn_ppp_ccp_kickup(struct ippp_struct *is);
-static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
+static void isdn_ppp_ccp_kickup(struct ipppd *is);
+static void isdn_ppp_ccp_xmit_reset(struct ipppd *is, int proto,
 				    unsigned char code, unsigned char id,
 				    unsigned char *data, int len);
-static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ippp_struct *is);
-static void isdn_ppp_ccp_reset_free(struct ippp_struct *is);
-static void isdn_ppp_ccp_reset_free_state(struct ippp_struct *is,
+static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ipppd *is);
+static void isdn_ppp_ccp_reset_free(struct ipppd *is);
+static void isdn_ppp_ccp_reset_free_state(struct ipppd *is,
 					  unsigned char id);
 static void isdn_ppp_ccp_timer_callback(unsigned long closure);
-static struct ippp_ccp_reset_state *isdn_ppp_ccp_reset_alloc_state(struct ippp_struct *is,
+static struct ippp_ccp_reset_state *isdn_ppp_ccp_reset_alloc_state(struct ipppd *is,
 						      unsigned char id);
-static void isdn_ppp_ccp_reset_trans(struct ippp_struct *is,
+static void isdn_ppp_ccp_reset_trans(struct ipppd *is,
 				     struct isdn_ppp_resetparams *rp);
-static void isdn_ppp_ccp_reset_ack_rcvd(struct ippp_struct *is,
+static void isdn_ppp_ccp_reset_ack_rcvd(struct ipppd *is,
 					unsigned char id);
 
 
@@ -64,7 +92,7 @@ static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *idev,
 				struct sk_buff *skb);
 static void isdn_ppp_mp_cleanup(isdn_net_local *lp );
 
-static int isdn_ppp_bundle(struct ippp_struct *, int unit);
+static int isdn_ppp_bundle(struct ipppd *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
   
 char *isdn_ppp_revision = "$Revision: 1.85.6.9 $";
@@ -72,16 +100,16 @@ char *isdn_ppp_revision = "$Revision: 1.85.6.9 $";
 #define NR_IPPPDS 64
 
 static spinlock_t ipppds_lock = SPIN_LOCK_UNLOCKED;
-static struct ippp_struct *ipppds[NR_IPPPDS];
+static struct ipppd *ipppds[NR_IPPPDS];
 
-static inline struct ippp_struct *
+static inline struct ipppd *
 ipppd_get(int slot)
 {
 	return ipppds[slot];
 }
 
 static inline void 
-ipppd_put(struct ippp_struct *ipppd)
+ipppd_put(struct ipppd *ipppd)
 {
 }
 
@@ -117,7 +145,7 @@ static void
 isdn_ppp_free(isdn_net_dev *idev)
 {
 	unsigned long flags;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	
 	// FIXME much of this wants to rather happen when disconnected()
 
@@ -249,7 +277,7 @@ isdn_ppp_bind(isdn_net_dev *idev)
 static void
 isdn_ppp_wakeup_daemon(isdn_net_dev *idev)
 {
-	struct ippp_struct *ipppd = ipppd_get(idev->ppp_slot);
+	struct ipppd *ipppd = ipppd_get(idev->ppp_slot);
 
 	if (!ipppd)
 		return;
@@ -267,7 +295,7 @@ isdn_ppp_wakeup_daemon(isdn_net_dev *idev)
 static void
 isdn_ppp_closewait(isdn_net_dev *idev)
 {
-	struct ippp_struct *ipppd = ipppd_get(idev->ppp_slot);
+	struct ipppd *ipppd = ipppd_get(idev->ppp_slot);
 
 	if (!ipppd)
 		return;
@@ -307,7 +335,7 @@ isdn_ppp_open(struct inode *ino, struct file *file)
 {
 	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
 	int slot;
-	struct ippp_struct *is;
+	struct ipppd *is;
 
 	slot = isdn_ppp_get_slot();
 	if (slot < 0)
@@ -357,7 +385,7 @@ static int
 isdn_ppp_release(struct inode *ino, struct file *file)
 {
 	uint minor = minor(ino->i_rdev) - ISDN_MINOR_PPP;
-	struct ippp_struct *is;
+	struct ipppd *is;
 
 	lock_kernel();
 
@@ -443,10 +471,10 @@ isdn_ppp_ioctl(struct inode *ino, struct file *file, unsigned int cmd, unsigned 
 	isdn_net_dev *idev;
 	unsigned long val;
 	int r,i,j;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	struct isdn_ppp_comp_data data;
 
-	is = (struct ippp_struct *) file->private_data;
+	is = (struct ipppd *) file->private_data;
 	idev = is->idev;
 
 	if (is->debug & 0x1)
@@ -608,7 +636,7 @@ static unsigned int
 isdn_ppp_poll(struct file *file, poll_table * wait)
 {
 	unsigned int mask;
-	struct ippp_struct *is;
+	struct ipppd *is;
 
 	is = file->private_data;
 
@@ -652,7 +680,7 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 {
 	struct sk_buff *skb;
 	unsigned char *p;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	int retval;
 
 	is = ipppd_get(slot);
@@ -698,7 +726,7 @@ isdn_ppp_fill_rq(unsigned char *buf, int len, int proto, int slot)
 static ssize_t
 isdn_ppp_read(struct file *file, char *buf, size_t count, loff_t *off)
 {
-	struct ippp_struct *is;
+	struct ipppd *is;
 	struct sk_buff *skb;
 	int retval;
 
@@ -740,7 +768,7 @@ static ssize_t
 isdn_ppp_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
 	isdn_net_dev *idev;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	int proto;
 	unsigned char protobuf[4];
 	int retval;
@@ -845,14 +873,14 @@ isdn_ppp_init(void)
 #endif /* CONFIG_ISDN_MPP */
 
 	for (i = 0; i < NR_IPPPDS; i++) {
-		ipppds[i] = kmalloc(sizeof(struct ippp_struct), GFP_KERNEL);
+		ipppds[i] = kmalloc(sizeof(struct ipppd), GFP_KERNEL);
 		if (!ipppds[i]) {
 			printk(KERN_WARNING "isdn_ppp_init: Could not alloc ippp_table\n");
 			for (i--; i >= 0; i++)
 				kfree(ipppds[i]);
 			return -ENOMEM;
 		}
-		memset(ipppds[i], 0, sizeof(struct ippp_struct));
+		memset(ipppds[i], 0, sizeof(struct ipppd));
 		ipppds[i]->state = 0;
 		skb_queue_head_init(&ipppds[i]->rq);
 	}
@@ -878,7 +906,7 @@ isdn_ppp_cleanup(void)
  * check for address/control field and skip if allowed
  * retval != 0 -> discard packet silently
  */
-static int isdn_ppp_skip_ac(struct ippp_struct *is, struct sk_buff *skb) 
+static int isdn_ppp_skip_ac(struct ipppd *is, struct sk_buff *skb) 
 {
 	if (skb->len < 1)
 		return -1;
@@ -931,7 +959,7 @@ static int isdn_ppp_strip_proto(struct sk_buff *skb)
 static void isdn_ppp_receive(isdn_net_local *lp, isdn_net_dev *idev, 
 			     struct sk_buff *skb)
 {
-	struct ippp_struct *is;
+	struct ipppd *is;
 	int proto;
 
 	/*
@@ -995,7 +1023,7 @@ isdn_ppp_push_higher(isdn_net_local *lp, isdn_net_dev *idev,
 		     struct sk_buff *skb, int proto)
 {
 	struct net_device *dev = &lp->dev;
- 	struct ippp_struct *is;
+ 	struct ipppd *is;
 
 	is = ipppd_get(idev->ppp_slot);
 	if (!is)
@@ -1134,7 +1162,7 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 	isdn_net_local *mlp = ndev->priv;
 	isdn_net_dev *idev = list_entry(mlp->online.next, isdn_net_dev, online);
 	unsigned int proto = PPP_IP;     /* 0x21 */
-	struct ippp_struct *ipt,*ipts;
+	struct ipppd *ipt,*ipts;
 
 	ndev->trans_start = jiffies;
 
@@ -1385,7 +1413,7 @@ static ippp_bundle * isdn_ppp_mp_bundle_alloc(void)
 static int isdn_ppp_mp_init( isdn_net_local * lp, ippp_bundle * add_to )
 {
 	isdn_net_dev *idev = lp->netdev;
-	struct ippp_struct * is;
+	struct ipppd * is;
 
 	if (idev->ppp_slot < 0) {
 		printk(KERN_ERR "%s: >ppp_slot(%d) out of range\n",
@@ -1426,7 +1454,7 @@ static void isdn_ppp_mp_receive(isdn_net_local *lp, isdn_net_dev *dev,
 				struct sk_buff *skb)
 {
 	isdn_net_dev *idev = lp->netdev;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	isdn_net_dev *qdev;
 	ippp_bundle * mp;
 	isdn_mppp_stats * stats;
@@ -1767,7 +1795,7 @@ static void isdn_ppp_mp_print_recv_pkt( int slot, struct sk_buff * skb )
 }
 
 static int
-isdn_ppp_bundle(struct ippp_struct *is, int unit)
+isdn_ppp_bundle(struct ipppd *is, int unit)
 {
 	char ifn[IFNAMSIZ + 1];
 	isdn_net_dev *p;
@@ -1820,7 +1848,7 @@ static int
 isdn_ppp_dev_ioctl_stats(int slot, struct ifreq *ifr, struct net_device *dev)
 {
 	struct ppp_stats *res, t;
-	struct ippp_struct *is;
+	struct ipppd *is;
 	isdn_net_local *lp = (isdn_net_local *) dev->priv;
 	int err;
 
@@ -1979,7 +2007,7 @@ isdn_ppp_hangup_slave(char *name)
 /* Push an empty CCP Data Frame up to the daemon to wake it up and let it
    generate a CCP Reset-Request or tear down CCP altogether */
 
-static void isdn_ppp_ccp_kickup(struct ippp_struct *is)
+static void isdn_ppp_ccp_kickup(struct ipppd *is)
 {
 	isdn_ppp_fill_rq(NULL, 0, PPP_COMP, is->idev->ppp_slot);
 }
@@ -2019,7 +2047,7 @@ static void isdn_ppp_ccp_kickup(struct ippp_struct *is)
    function above but every wrapper does a bit different. Hope I guess
    correct in this hack... */
 
-static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
+static void isdn_ppp_ccp_xmit_reset(struct ipppd *is, int proto,
 				    unsigned char code, unsigned char id,
 				    unsigned char *data, int len)
 {
@@ -2070,7 +2098,7 @@ static void isdn_ppp_ccp_xmit_reset(struct ippp_struct *is, int proto,
 }
 
 /* Allocate the reset state vector */
-static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ippp_struct *is)
+static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ipppd *is)
 {
 	struct ippp_ccp_reset *r;
 	r = kmalloc(sizeof(struct ippp_ccp_reset), GFP_KERNEL);
@@ -2086,7 +2114,7 @@ static struct ippp_ccp_reset *isdn_ppp_ccp_reset_alloc(struct ippp_struct *is)
 }
 
 /* Destroy the reset state vector. Kill all pending timers first. */
-static void isdn_ppp_ccp_reset_free(struct ippp_struct *is)
+static void isdn_ppp_ccp_reset_free(struct ipppd *is)
 {
 	unsigned int id;
 
@@ -2102,7 +2130,7 @@ static void isdn_ppp_ccp_reset_free(struct ippp_struct *is)
 }
 
 /* Free a given state and clear everything up for later reallocation */
-static void isdn_ppp_ccp_reset_free_state(struct ippp_struct *is,
+static void isdn_ppp_ccp_reset_free_state(struct ipppd *is,
 					  unsigned char id)
 {
 	struct ippp_ccp_reset_state *rs;
@@ -2156,7 +2184,7 @@ static void isdn_ppp_ccp_timer_callback(unsigned long closure)
 }
 
 /* Allocate a new reset transaction state */
-static struct ippp_ccp_reset_state *isdn_ppp_ccp_reset_alloc_state(struct ippp_struct *is,
+static struct ippp_ccp_reset_state *isdn_ppp_ccp_reset_alloc_state(struct ipppd *is,
 						      unsigned char id)
 {
 	struct ippp_ccp_reset_state *rs;
@@ -2182,7 +2210,7 @@ static struct ippp_ccp_reset_state *isdn_ppp_ccp_reset_alloc_state(struct ippp_s
 
 /* A decompressor wants a reset with a set of parameters - do what is
    necessary to fulfill it */
-static void isdn_ppp_ccp_reset_trans(struct ippp_struct *is,
+static void isdn_ppp_ccp_reset_trans(struct ipppd *is,
 				     struct isdn_ppp_resetparams *rp)
 {
 	struct ippp_ccp_reset_state *rs;
@@ -2285,7 +2313,7 @@ static void isdn_ppp_ccp_reset_trans(struct ippp_struct *is,
 
 /* An Ack was received for this id. This means we stop the timer and clean
    up the state prior to calling the decompressors reset routine. */
-static void isdn_ppp_ccp_reset_ack_rcvd(struct ippp_struct *is,
+static void isdn_ppp_ccp_reset_ack_rcvd(struct ipppd *is,
 					unsigned char id)
 {
 	struct ippp_ccp_reset_state *rs = is->reset->rs[id];
@@ -2325,14 +2353,14 @@ static void isdn_ppp_ccp_reset_ack_rcvd(struct ippp_struct *is,
  *	   NULL if decompression error
  */
 
-static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb,struct ippp_struct *is,struct ippp_struct *master,
+static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb,struct ipppd *is,struct ipppd *master,
 	int *proto)
 {
 	void *stat = NULL;
 	struct isdn_ppp_compressor *ipc = NULL;
 	struct sk_buff *skb_out;
 	int len;
-	struct ippp_struct *ri;
+	struct ipppd *ri;
 	struct isdn_ppp_resetparams rsparm;
 	unsigned char rsdata[IPPP_RESET_MAXDATABYTES];
 
@@ -2405,7 +2433,7 @@ static struct sk_buff *isdn_ppp_decompress(struct sk_buff *skb,struct ippp_struc
  * and a new skb pointer if we've done it
  */
 static struct sk_buff *isdn_ppp_compress(struct sk_buff *skb_in,int *proto,
-	struct ippp_struct *is,struct ippp_struct *master,int type)
+	struct ipppd *is,struct ipppd *master,int type)
 {
     int ret;
     int new_proto;
@@ -2467,8 +2495,8 @@ static struct sk_buff *isdn_ppp_compress(struct sk_buff *skb_in,int *proto,
 static void isdn_ppp_receive_ccp(isdn_net_dev *idev, isdn_net_local *lp,
 	 struct sk_buff *skb,int proto)
 {
-	struct ippp_struct *is;
-	struct ippp_struct *mis;
+	struct ipppd *is;
+	struct ipppd *mis;
 	int len;
 	struct isdn_ppp_resetparams rsparm;
 	unsigned char rsdata[IPPP_RESET_MAXDATABYTES];	
@@ -2634,7 +2662,7 @@ static void isdn_ppp_receive_ccp(isdn_net_dev *idev, isdn_net_local *lp,
 
 static void isdn_ppp_send_ccp(isdn_net_dev *idev, isdn_net_local *lp, struct sk_buff *skb)
 {
-	struct ippp_struct *mis,*is;
+	struct ipppd *mis,*is;
 	int proto;
 	unsigned char *data;
 
@@ -2746,7 +2774,7 @@ int isdn_ppp_unregister_compressor(struct isdn_ppp_compressor *ipc)
 	return 0;
 }
 
-static int isdn_ppp_set_compressor(struct ippp_struct *is, struct isdn_ppp_comp_data *data)
+static int isdn_ppp_set_compressor(struct ipppd *is, struct isdn_ppp_comp_data *data)
 {
 	struct isdn_ppp_compressor *ipc = ipc_head;
 	int ret;
