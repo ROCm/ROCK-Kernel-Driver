@@ -2453,24 +2453,24 @@ static int __init fbcon_show_logo( void )
  */
  
 const struct consw fb_con = {
-    con_startup: 	fbcon_startup, 
-    con_init: 		fbcon_init,
-    con_deinit: 	fbcon_deinit,
-    con_clear: 		fbcon_clear,
-    con_putc: 		fbcon_putc,
-    con_putcs: 		fbcon_putcs,
-    con_cursor: 	fbcon_cursor,
-    con_scroll: 	fbcon_scroll,
-    con_bmove: 		fbcon_bmove,
-    con_switch: 	fbcon_switch,
-    con_blank: 		fbcon_blank,
-    con_font_op:	fbcon_font_op,
-    con_set_palette: 	fbcon_set_palette,
-    con_scrolldelta: 	fbcon_scrolldelta,
-    con_set_origin: 	fbcon_set_origin,
-    con_invert_region:	fbcon_invert_region,
-    con_screen_pos:	fbcon_screen_pos,
-    con_getxy:		fbcon_getxy,
+    .con_startup = 	fbcon_startup, 
+    .con_init = 	fbcon_init,
+    .con_deinit = 	fbcon_deinit,
+    .con_clear = 	fbcon_clear,
+    .con_putc = 	fbcon_putc,
+    .con_putcs = 	fbcon_putcs,
+    .con_cursor = 	fbcon_cursor,
+    .con_scroll = 	fbcon_scroll,
+    .con_bmove = 	fbcon_bmove,
+    .con_switch = 	fbcon_switch,
+    .con_blank = 	fbcon_blank,
+    .con_font_op =	fbcon_font_op,
+    .con_set_palette = 	fbcon_set_palette,
+    .con_scrolldelta = 	fbcon_scrolldelta,
+    .con_set_origin = 	fbcon_set_origin,
+    .con_invert_region = fbcon_invert_region,
+    .con_screen_pos =	fbcon_screen_pos,
+    .con_getxy =	fbcon_getxy,
 };
 
 
@@ -2483,12 +2483,12 @@ static void fbcon_dummy_op(void) {}
 #define DUMMY	(void *)fbcon_dummy_op
 
 struct display_switch fbcon_dummy = {
-    setup:	DUMMY,
-    bmove:	DUMMY,
-    clear:	DUMMY,
-    putc:	DUMMY,
-    putcs:	DUMMY,
-    revc:	DUMMY,
+    .setup =	DUMMY,
+    .bmove =	DUMMY,
+    .clear =	DUMMY,
+    .putc =	DUMMY,
+    .putcs =	DUMMY,
+    .revc =	DUMMY,
 };
 
 

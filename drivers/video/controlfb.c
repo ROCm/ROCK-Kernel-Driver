@@ -216,16 +216,16 @@ static int default_cmode __initdata = CMODE_NVRAM;
 
 
 static struct fb_ops controlfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	control_get_fix,
-	fb_get_var:	control_get_var,
-	fb_set_var:	control_set_var,
-	fb_get_cmap:	control_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	controlfb_setcolreg,
-	fb_pan_display:	control_pan_display,
-	fb_blank:	controlfb_blank,
-	fb_mmap:	control_mmap,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	control_get_fix,
+	.fb_get_var =	control_get_var,
+	.fb_set_var =	control_set_var,
+	.fb_get_cmap =	control_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	controlfb_setcolreg,
+	.fb_pan_display =control_pan_display,
+	.fb_blank =	controlfb_blank,
+	.fb_mmap =	control_mmap,
 };
 
 

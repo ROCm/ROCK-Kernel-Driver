@@ -123,14 +123,14 @@ sti_detect(void)
 /* ------------ Interfaces to hardware functions ------------ */
 
 struct fbgen_hwswitch sti_switch = {
-	detect:		sti_detect,
-	encode_fix:	sti_encode_fix,
-	decode_var:	sti_decode_var,
-	encode_var:	sti_encode_var,
-	get_par:	sti_get_par,
-	set_par:	sti_set_par,
-	getcolreg:	sti_getcolreg,
-	set_disp:	sti_set_disp
+	.detect =	sti_detect,
+	.encode_fix =	sti_encode_fix,
+	.decode_var =	sti_decode_var,
+	.encode_var =	sti_encode_var,
+	.get_par =	sti_get_par,
+	.set_par =	sti_set_par,
+	.getcolreg =	sti_getcolreg,
+	.set_disp =	sti_set_disp
 };
 
 
@@ -199,12 +199,12 @@ stifb_setup(char *options)
 
 
 static struct fb_ops stifb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_pan_display:	fbgen_pan_display,
-	fb_blank:	fbgen_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	fbgen_get_fix,
+	.fb_get_var =	fbgen_get_var,
+	.fb_set_var =	fbgen_set_var,
+	.fb_get_cmap =	fbgen_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_pan_display =fbgen_pan_display,
+	.fb_blank =	fbgen_blank,
 };

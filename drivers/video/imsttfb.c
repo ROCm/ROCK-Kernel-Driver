@@ -1122,58 +1122,58 @@ imsttfbcon_revc (struct display *disp, int sx, int sy)
 
 #ifdef FBCON_HAS_CFB8
 static struct display_switch fbcon_imstt8 = {
-	setup:		fbcon_cfb8_setup,
-	bmove:		imsttfbcon_bmove,
-	clear:		imsttfbcon_clear,
-	putc:		fbcon_cfb8_putc,
-	putcs:		fbcon_cfb8_putcs,
-	revc:		imsttfbcon_revc,
-	cursor:		imsttfbcon_cursor,
-	set_font:	imsttfbcon_set_font,
-	clear_margins:	fbcon_cfb8_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup =	fbcon_cfb8_setup,
+	.bmove =	imsttfbcon_bmove,
+	.clear =	imsttfbcon_clear,
+	.putc =		fbcon_cfb8_putc,
+	.putcs =	fbcon_cfb8_putcs,
+	.revc =		imsttfbcon_revc,
+	.cursor =	imsttfbcon_cursor,
+	.set_font =	imsttfbcon_set_font,
+	.clear_margins =fbcon_cfb8_clear_margins,
+	.fontwidthmask =FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 #ifdef FBCON_HAS_CFB16
 static struct display_switch fbcon_imstt16 = {
-	setup:		fbcon_cfb16_setup,
-	bmove:		imsttfbcon_bmove,
-	clear:		imsttfbcon_clear,
-	putc:		fbcon_cfb16_putc,
-	putcs:		fbcon_cfb16_putcs,
-	revc:		imsttfbcon_revc,
-	cursor:		imsttfbcon_cursor,
-	set_font:	imsttfbcon_set_font,
-	clear_margins:	fbcon_cfb16_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup =	fbcon_cfb16_setup,
+	.bmove =	imsttfbcon_bmove,
+	.clear =	imsttfbcon_clear,
+	.putc =		fbcon_cfb16_putc,
+	.putcs =	fbcon_cfb16_putcs,
+	.revc =		imsttfbcon_revc,
+	.cursor =	imsttfbcon_cursor,
+	.set_font =	imsttfbcon_set_font,
+	.clear_margins =fbcon_cfb16_clear_margins,
+	.fontwidthmask =FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 #ifdef FBCON_HAS_CFB24
 static struct display_switch fbcon_imstt24 = {
-	setup:		fbcon_cfb24_setup,
-	bmove:		imsttfbcon_bmove,
-	clear:		imsttfbcon_clear,
-	putc:		fbcon_cfb24_putc,
-	putcs:		fbcon_cfb24_putcs,
-	revc:		imsttfbcon_revc,
-	cursor:		imsttfbcon_cursor,
-	set_font:	imsttfbcon_set_font,
-	clear_margins:	fbcon_cfb24_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup =	fbcon_cfb24_setup,
+	.bmove =	imsttfbcon_bmove,
+	.clear =	imsttfbcon_clear,
+	.putc =		fbcon_cfb24_putc,
+	.putcs =	fbcon_cfb24_putcs,
+	.revc =		imsttfbcon_revc,
+	.cursor =	imsttfbcon_cursor,
+	.set_font =	imsttfbcon_set_font,
+	.clear_margins =fbcon_cfb24_clear_margins,
+	.fontwidthmask =FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 #ifdef FBCON_HAS_CFB32
 static struct display_switch fbcon_imstt32 = {
-	setup:		fbcon_cfb32_setup,
-	bmove:		imsttfbcon_bmove,
-	clear:		imsttfbcon_clear,
-	putc:		fbcon_cfb32_putc,
-	putcs:		fbcon_cfb32_putcs,
-	revc:		imsttfbcon_revc,
-	cursor:		imsttfbcon_cursor,
-	set_font:	imsttfbcon_set_font,
-	clear_margins:	fbcon_cfb32_clear_margins,
-	fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup =	fbcon_cfb32_setup,
+	.bmove =	imsttfbcon_bmove,
+	.clear =	imsttfbcon_clear,
+	.putc =		fbcon_cfb32_putc,
+	.putcs =	fbcon_cfb32_putcs,
+	.revc =		imsttfbcon_revc,
+	.cursor =	imsttfbcon_cursor,
+	.set_font =	imsttfbcon_set_font,
+	.clear_margins =fbcon_cfb32_clear_margins,
+	.fontwidthmask =FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif
 
@@ -1617,23 +1617,23 @@ static struct pci_device_id imsttfb_pci_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, imsttfb_pci_tbl);
 
 static struct pci_driver imsttfb_pci_driver = {
-	name:		"imsttfb",
-	id_table:	imsttfb_pci_tbl,
-	probe:		imsttfb_probe,
-	remove:		__devexit_p(imsttfb_remove),
+	.name =		"imsttfb",
+	.id_table =	imsttfb_pci_tbl,
+	.probe =	imsttfb_probe,
+	.remove =	__devexit_p(imsttfb_remove),
 };
 
 static struct fb_ops imsttfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	imsttfb_get_fix,
-	fb_get_var:	imsttfb_get_var,
-	fb_set_var:	imsttfb_set_var,
-	fb_get_cmap:	imsttfb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	imsttfb_setcolreg,
-	fb_pan_display:	imsttfb_pan_display,
-	fb_blank:	imsttfb_blank,
-	fb_ioctl:	imsttfb_ioctl,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	imsttfb_get_fix,
+	.fb_get_var =	imsttfb_get_var,
+	.fb_set_var =	imsttfb_set_var,
+	.fb_get_cmap =	imsttfb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	imsttfb_setcolreg,
+	.fb_pan_display =imsttfb_pan_display,
+	.fb_blank =	imsttfb_blank,
+	.fb_ioctl =	imsttfb_ioctl,
 };
 
 static int

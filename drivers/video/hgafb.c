@@ -111,23 +111,23 @@ static spinlock_t hga_reg_lock = SPIN_LOCK_UNLOCKED;
 /* Framebuffer driver structures */
 
 static struct fb_var_screeninfo hga_default_var = {
-	xres:		720,
-	yres:		348,
-	xres_virtual:	720,
-	yres_virtual:	348,
-	xoffset:	0,
-	yoffset:	0,
-	bits_per_pixel:	1,
-	grayscale:	0,
-	red:		{0, 1, 0},
-	green:		{0, 1, 0},
-	blue:		{0, 1, 0},
-	transp:		{0, 0, 0},
-	nonstd:		0,			/* (FB_NONSTD_HGA ?) */
-	activate:	0,
-	height:		-1,
-	width:		-1,
-	accel_flags:	0,
+	.xres =		720,
+	.yres =		348,
+	.xres_virtual =	720,
+	.yres_virtual =	348,
+	.xoffset =	0,
+	.yoffset =	0,
+	.bits_per_pixel =1,
+	.grayscale =	0,
+	.red =		{0, 1, 0},
+	.green =	{0, 1, 0},
+	.blue =		{0, 1, 0},
+	.transp =	{0, 0, 0},
+	.nonstd =	0,			/* (FB_NONSTD_HGA ?) */
+	.activate =	0,
+	.height =	-1,
+	.width =	-1,
+	.accel_flags =	0,
 	/* pixclock */
 	/* left_margin, right_margin */
 	/* upper_margin, lower_margin */
@@ -137,19 +137,19 @@ static struct fb_var_screeninfo hga_default_var = {
 };
 
 static struct fb_fix_screeninfo hga_fix = {
-	id:		"HGA",
-	smem_start:	(unsigned long) NULL,
-	smem_len:	0,
-	type:		FB_TYPE_PACKED_PIXELS,	/* (not sure) */
-	type_aux:	0,			/* (not sure) */
-	visual:		FB_VISUAL_MONO10,
-	xpanstep:	8,
-	ypanstep:	8,
-	ywrapstep:	0,
-	line_length:	90,
-	mmio_start:	0,
-	mmio_len:	0,
-	accel:		FB_ACCEL_NONE
+	.id =		"HGA",
+	.smem_start =	(unsigned long) NULL,
+	.smem_len =	0,
+	.type =		FB_TYPE_PACKED_PIXELS,	/* (not sure) */
+	.type_aux =	0,			/* (not sure) */
+	.visual =	FB_VISUAL_MONO10,
+	.xpanstep =	8,
+	.ypanstep =	8,
+	.ywrapstep =	0,
+	.line_length =	90,
+	.mmio_start =	0,
+	.mmio_len =	0,
+	.accel =	FB_ACCEL_NONE
 };
 
 static struct fb_info fb_info;
@@ -557,15 +557,13 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 }
 
 static struct fb_ops hgafb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	gen_get_fix,
-	fb_get_var:	gen_get_var,
-	fb_set_var:	hga_set_var,
-	fb_get_cmap:	hga_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	hgafb_setcolreg,
-	fb_pan_display:	hga_pan_display,
-	fb_blank:	hgafb_blank,
+	.owner		= THIS_MODULE,
+	.fb_set_var	= hga_set_var,
+	.fb_get_cmap	= hga_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= hgafb_setcolreg,
+	.fb_pan_display	= hga_pan_display,
+	.fb_blank	= hgafb_blank,
 };
 		
 

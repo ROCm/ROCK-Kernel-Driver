@@ -602,23 +602,23 @@ extern struct device_node *pci_device_to_OF_node(struct pci_dev *dev);
 #endif
 
 static struct fb_ops radeon_fb_ops = {
-	fb_get_fix:		radeonfb_get_fix,
-	fb_get_var:		radeonfb_get_var,
-	fb_set_var:		radeonfb_set_var,
-	fb_get_cmap:		radeonfb_get_cmap,
-	fb_set_cmap:		gen_set_cmap,
-	fb_setcolreg:		radeonfb_setcolreg,
-	fb_pan_display:		radeonfb_pan_display,
-	fb_blank:		radeonfb_blank,
-	fb_ioctl:		radeonfb_ioctl,
+	.fb_get_fix =		radeonfb_get_fix,
+	.fb_get_var =		radeonfb_get_var,
+	.fb_set_var =		radeonfb_set_var,
+	.fb_get_cmap =		radeonfb_get_cmap,
+	.fb_set_cmap =		gen_set_cmap,
+	.fb_setcolreg =		radeonfb_setcolreg,
+	.fb_pan_display =	radeonfb_pan_display,
+	.fb_blank =		radeonfb_blank,
+	.fb_ioctl =		radeonfb_ioctl,
 };
 
 
 static struct pci_driver radeonfb_driver = {
-	name:		"radeonfb",
-	id_table:	radeonfb_pci_table,
-	probe:		radeonfb_pci_register,
-	remove:		__devexit_p(radeonfb_pci_unregister),
+	.name =		"radeonfb",
+	.id_table =	radeonfb_pci_table,
+	.probe =	radeonfb_pci_register,
+	.remove =	__devexit_p(radeonfb_pci_unregister),
 };
 
 
@@ -2485,13 +2485,13 @@ static void fbcon_radeon_clear(struct vc_data *conp, struct display *p,
 
 #ifdef FBCON_HAS_CFB8
 static struct display_switch fbcon_radeon8 = {
-	setup:			fbcon_cfb8_setup,
-	bmove:			fbcon_radeon_bmove,
-	clear:			fbcon_radeon_clear,
-	putc:			fbcon_cfb8_putc,
-	putcs:			fbcon_cfb8_putcs,
-	revc:			fbcon_cfb8_revc,
-	clear_margins:		fbcon_cfb8_clear_margins,
-	fontwidthmask:		FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
+	.setup =		fbcon_cfb8_setup,
+	.bmove =		fbcon_radeon_bmove,
+	.clear =		fbcon_radeon_clear,
+	.putc =			fbcon_cfb8_putc,
+	.putcs =		fbcon_cfb8_putcs,
+	.revc =			fbcon_cfb8_revc,
+	.clear_margins =	fbcon_cfb8_clear_margins,
+	.fontwidthmask =	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16)
 };
 #endif

@@ -30,18 +30,6 @@
 #include <video/fbcon-cfb32.h>
 #include "fbcon-accel.h"
 
-int gen_get_fix(struct fb_fix_screeninfo *fix, int con, struct fb_info *info)
-{
-	*fix = info->fix;
-	return 0;	
-}
-
-int gen_get_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
-{
-	*var = info->var;
-	return 0;	
-}
-
 int gen_set_var(struct fb_var_screeninfo *var, int con, struct fb_info *info)
 {
 	int err;
@@ -175,6 +163,8 @@ void gen_set_disp(int con, struct fb_info *info)
 #ifdef FBCON_HAS_ACCEL
 	display->scrollmode = SCROLL_YNOMOVE;
 	display->dispsw = &fbcon_accel;
+#else
+	display->dispsw = &fbcon_dummy;
 #endif
 	return;
 }
@@ -289,8 +279,6 @@ int fbgen_blank(int blank, struct fb_info *info)
 }
 
 /* generic frame buffer operations */
-EXPORT_SYMBOL(gen_get_fix);
-EXPORT_SYMBOL(gen_get_var);
 EXPORT_SYMBOL(gen_set_var);
 EXPORT_SYMBOL(gen_get_cmap);
 EXPORT_SYMBOL(gen_set_cmap);

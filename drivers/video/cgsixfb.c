@@ -521,13 +521,13 @@ static void cg6_restore_palette (struct fb_info_sbusfb *fb)
 }
 
 static struct display_switch cg6_dispsw __initdata = {
-	setup:		cg6_setup,
-	bmove:		fbcon_redraw_bmove,
-	clear:		cg6_clear,
-	putc:		cg6_putc,
-	putcs:		cg6_putcs,
-	revc:		cg6_revc, 
-	fontwidthmask:	FONTWIDTHRANGE(1,16) /* Allow fontwidths up to 16 */
+	.setup =	cg6_setup,
+	.bmove =	fbcon_redraw_bmove,
+	.clear =	cg6_clear,
+	.putc =		cg6_putc,
+	.putcs =	cg6_putcs,
+	.revc =		cg6_revc, 
+	.fontwidthmask =FONTWIDTHRANGE(1,16) /* Allow fontwidths up to 16 */
 };
 
 static void cg6_setcursormap (struct fb_info_sbusfb *fb, u8 *red, u8 *green, u8 *blue)

@@ -2559,18 +2559,18 @@ static int sisfb_mmap(struct fb_info *info, struct file *file,
 }
 
 static struct fb_ops sisfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	sisfb_get_fix,
-	fb_get_var:	sisfb_get_var,
-	fb_set_var:	sisfb_set_var,
-	fb_get_cmap:	sisfb_get_cmap,
-	fb_set_cmap:	sisfb_set_cmap,
+	.owner		= THIS_MODULE,
+	.fb_get_fix	= sisfb_get_fix,
+	.fb_get_var	= sisfb_get_var,
+	.fb_set_var	= sisfb_set_var,
+	.fb_get_cmap	= sisfb_get_cmap,
+	.fb_set_cmap	= sisfb_set_cmap,
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,23)
-        fb_setcolreg:   sisfb_setcolreg,
-        fb_blank:       sisfb_blank,
+        .fb_setcolreg	= sisfb_setcolreg,
+        .fb_blank	= sisfb_blank,
 #endif
-	fb_ioctl:	sisfb_ioctl,
-	fb_mmap:	sisfb_mmap,
+	.fb_ioctl	= sisfb_ioctl,
+	.fb_mmap	= sisfb_mmap,
 };
 
 /* ------------ Interface to the low level console driver -------------*/
