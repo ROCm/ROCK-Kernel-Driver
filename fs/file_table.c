@@ -18,7 +18,9 @@
 
 
 /* sysctl tunables... */
-struct files_stat_struct files_stat = {0, 0, NR_FILE};
+struct files_stat_struct files_stat = {
+	.max_files = NR_FILE
+};
 
 /* Here the new files go */
 static LIST_HEAD(anon_list);
