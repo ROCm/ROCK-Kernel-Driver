@@ -86,6 +86,7 @@ static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(sctp_association_t *asoc, long *timeo_p,
 				int msg_len);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
+static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p);
 static inline void sctp_sk_addr_set(struct sock *,
 				    const union sctp_addr *newaddr,
 				    union sctp_addr *saveaddr);
@@ -1432,6 +1433,7 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	sctp_transport_t *transport;
 	union sctp_addr to;
 	sctp_scope_t scope;
+	long timeo;
 	int err = 0;
 
 	sctp_lock_sock(sk);
@@ -1495,14 +1497,13 @@ SCTP_STATIC int sctp_connect(struct sock *sk, struct sockaddr *uaddr,
 	transport = sctp_assoc_add_peer(asoc, &to, GFP_KERNEL);
 
 	err = sctp_primitive_ASSOCIATE(asoc, NULL);
-	if (err < 0)
+	if (err < 0) {
 		sctp_association_free(asoc); 
+		goto out_unlock;
+	}
 
-	/* FIXME: Currently we support only non-blocking connect().
-	 * To support blocking connect(), we need to wait for the association
-	 * to be ESTABLISHED before returning.
-	 */ 
-	err = -EINPROGRESS;
+	timeo = sock_sndtimeo(sk, sk->socket->file->f_flags & O_NONBLOCK);
+	err = sctp_wait_for_connect(asoc, &timeo);
 
 out_unlock:
 	sctp_release_sock(sk);
@@ -2896,6 +2897,70 @@ static int sctp_writeable(struct sock *sk)
 	if (amt < 0)
 		amt = 0;
 	return amt;
+}
+
+/* Wait for an association to go into ESTABLISHED state. If timeout is 0,
+ * returns immediately with EINPROGRESS.
+ */
+static int sctp_wait_for_connect(sctp_association_t *asoc, long *timeo_p)
+{
+	struct sock *sk = asoc->base.sk;
+	int err = 0;
+	long current_timeo = *timeo_p;
+	DECLARE_WAITQUEUE(wait, current);
+
+	SCTP_DEBUG_PRINTK("%s: asoc=%p, timeo=%ld\n", __FUNCTION__, asoc,
+			  (long)(*timeo_p));
+
+	add_wait_queue_exclusive(&asoc->wait, &wait);
+
+	/* Increment the association's refcnt.  */
+	sctp_association_hold(asoc);
+
+	for (;;) {
+		__set_current_state(TASK_INTERRUPTIBLE);
+		if (!*timeo_p)
+			goto do_nonblock;
+		if (sk->err || asoc->state >= SCTP_STATE_SHUTDOWN_PENDING ||
+		    asoc->base.dead)
+			goto do_error;
+		if (signal_pending(current))
+			goto do_interrupted;
+
+		if (asoc->state == SCTP_STATE_ESTABLISHED)
+			break;
+
+		/* Let another process have a go.  Since we are going
+		 * to sleep anyway.
+		 */
+		sctp_release_sock(sk);
+		current_timeo = schedule_timeout(current_timeo);
+		sctp_lock_sock(sk);
+
+		*timeo_p = current_timeo;
+	}
+
+out:
+	remove_wait_queue(&asoc->wait, &wait);
+
+	/* Release the association's refcnt.  */
+	sctp_association_put(asoc);
+
+	__set_current_state(TASK_RUNNING);
+
+	return err;
+
+do_error:
+	err = -ECONNABORTED;
+	goto out;
+
+do_interrupted:
+	err = sock_intr_errno(*timeo_p);
+	goto out;
+
+do_nonblock:
+	err = -EINPROGRESS;
+	goto out;
 }
 
 /* This proto struct describes the ULP interface for SCTP.  */
