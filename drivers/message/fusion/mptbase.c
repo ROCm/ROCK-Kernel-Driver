@@ -1515,17 +1515,18 @@ mptbase_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			|| (ioc->chip_type == C1035) || (ioc->chip_type == FC929X))
 		mpt_detect_bound_ports(ioc, pdev);
 
-	if ((r = mpt_do_ioc_recovery(ioc, MPT_HOSTEVENT_IOC_BRINGUP, CAN_SLEEP)) != 0) {
-		printk(KERN_WARNING MYNAM ": WARNING - %s did not initialize properly! (%d)\n",
-				ioc->name, r);
-	}
+	if ((r = mpt_do_ioc_recovery(ioc,
+	  MPT_HOSTEVENT_IOC_BRINGUP, CAN_SLEEP)) != 0) {
+		printk(KERN_WARNING MYNAM
+		  ": WARNING - %s did not initialize properly! (%d)\n",
+		  ioc->name, r);
 
-	if(r != 0 ) {
 		Q_DEL_ITEM(ioc);
 		mpt_adapters[ioc->id] = NULL;
 		free_irq(ioc->pci_irq, ioc);
 		iounmap(mem);
 		kfree(ioc);
+		pci_set_drvdata(pdev, NULL);
 		return r;
 	}
 

@@ -200,8 +200,8 @@ static int	mptscsih_setup(char *str);
 static int  __init   mptscsih_init  (void);
 static void __exit   mptscsih_exit  (void);
 
-static int  __devinit mptscsih_probe (struct pci_dev *, const struct pci_device_id *);
-static void __devexit mptscsih_remove(struct pci_dev *);
+static int  mptscsih_probe (struct pci_dev *, const struct pci_device_id *);
+static void mptscsih_remove(struct pci_dev *);
 static void mptscsih_shutdown(struct device *);
 #ifdef CONFIG_PM
 static int mptscsih_suspend(struct pci_dev *pdev, u32 state);
@@ -1405,7 +1405,7 @@ static char *info_kbuf = NULL;
  *
  */
 
-static int  __devinit
+static int
 mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	struct Scsi_Host	*sh = NULL;
@@ -1718,7 +1718,7 @@ mptscsih_probe_failed:
  *
  *
  */
-static void __devexit
+static void
 mptscsih_remove(struct pci_dev *pdev)
 {
 	MPT_ADAPTER 		*ioc = pci_get_drvdata(pdev);
@@ -1920,7 +1920,7 @@ mptscsih_resume(struct pci_dev *pdev)
 
 static struct mpt_pci_driver mptscsih_driver = {
 	.probe		= mptscsih_probe,
-	.remove		= __devexit_p(mptscsih_remove),
+	.remove		= mptscsih_remove,
 	.shutdown	= mptscsih_shutdown,
 #ifdef CONFIG_PM
 	.suspend	= mptscsih_suspend,
