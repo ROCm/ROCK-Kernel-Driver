@@ -2,7 +2,7 @@ Intro
 =====
 
 This document is designed to provide a list of the minimum levels of
-software necessary to run the 2.5 kernels, as well as provide brief
+software necessary to run the 2.6 kernels, as well as provide brief
 instructions regarding any other "Gotchas" users may encounter when
 trying life on the Bleeding Edge.  If upgrading from a pre-2.4.x
 kernel, please consult the Changes file included with 2.4.x kernels for
