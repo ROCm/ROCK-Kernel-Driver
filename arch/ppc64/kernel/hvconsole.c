@@ -790,6 +790,12 @@ int hvcs_convert(long to_convert)
 		case H_Hardware:
 			return -EIO;
 		case H_Busy:
+		case H_LongBusyOrder1msec:
+		case H_LongBusyOrder10msec:
+		case H_LongBusyOrder100msec:
+		case H_LongBusyOrder1sec:
+		case H_LongBusyOrder10sec:
+		case H_LongBusyOrder100sec:
 			return -EBUSY;
 		case H_Function: /* fall through */
 		default:
