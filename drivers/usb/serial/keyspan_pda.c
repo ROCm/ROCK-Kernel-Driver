@@ -140,7 +140,7 @@ struct keyspan_pda_private {
 #define ENTREGRA_VENDOR_ID		0x1645
 #define ENTREGRA_FAKE_ID		0x8093
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 #ifdef KEYSPAN
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_FAKE_ID) },
 #endif
@@ -153,6 +153,13 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 };
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
+
+static struct usb_driver keyspan_pda_driver = {
+	.name =		"keyspan_pda",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	id_table_combined,
+};
 
 static struct usb_device_id id_table_std [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_ID) },
@@ -862,6 +869,7 @@ static int __init keyspan_pda_init (void)
 #ifdef XIRCOM
 	usb_serial_register (&xircom_pgs_fake_device);
 #endif
+	usb_register (&keyspan_pda_driver);
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
 }
@@ -869,6 +877,7 @@ static int __init keyspan_pda_init (void)
 
 static void __exit keyspan_pda_exit (void)
 {
+	usb_deregister (&keyspan_pda_driver);
 	usb_serial_deregister (&keyspan_pda_device);
 #ifdef KEYSPAN
 	usb_serial_deregister (&keyspan_pda_fake_device);
