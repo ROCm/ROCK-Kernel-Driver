@@ -22,6 +22,7 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/pagemap.h>
+#include <linux/init.h>
 
 #include <linux/nfs.h>
 #include <linux/sunrpc/svc.h>
