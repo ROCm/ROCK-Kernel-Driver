@@ -12,10 +12,19 @@ CONFIG_BLUEZ_HCIUART
 HCI UART (H4) protocol support 
 CONFIG_BLUEZ_HCIUART_H4
   UART (H4) is serial protocol for communication between Bluetooth 
-  device and host. This protocol is required for most UART based 
-  Bluetooth device (including PCMCIA and CF). 
+  device and host. This protocol is required for most Bluetooth devices 
+  with UART interface, including PCMCIA and CF cards. 
 
   Say Y here to compile support for HCI UART (H4) protocol.
+
+HCI BCSP protocol support 
+CONFIG_BLUEZ_HCIUART_BCSP
+  BCSP (BlueCore Serial Protocol) is serial protocol for communication 
+  between Bluetooth device and host. This protocol is required for non
+  USB Bluetooth devices based on CSR BlueCore chip, including PCMCIA and 
+  CF cards.
+
+  Say Y here to compile support for HCI BCSP protocol.
 
 HCI USB driver
 CONFIG_BLUEZ_HCIUSB

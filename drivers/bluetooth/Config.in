@@ -9,6 +9,7 @@ fi
 dep_tristate 'HCI UART driver' CONFIG_BLUEZ_HCIUART $CONFIG_BLUEZ
 if [ "$CONFIG_BLUEZ_HCIUART" != "n" ]; then
    bool '  UART (H4) protocol support' CONFIG_BLUEZ_HCIUART_H4
+   bool '  BCSP protocol support' CONFIG_BLUEZ_HCIUART_BCSP
 fi
 
 dep_tristate 'HCI DTL1 (PC Card) driver' CONFIG_BLUEZ_HCIDTL1 $CONFIG_PCMCIA $CONFIG_BLUEZ

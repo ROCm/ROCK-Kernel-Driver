@@ -23,7 +23,7 @@
 */
 
 /*
- * $Id: hci_h4.h,v 1.1.1.1 2002/03/08 21:03:15 maxk Exp $
+ * $Id: hci_h4.h,v 1.2 2002/09/09 01:17:32 maxk Exp $
  */
 
 #ifdef __KERNEL__
@@ -31,6 +31,7 @@ struct h4_struct {
 	unsigned long rx_state;
 	unsigned long rx_count;
 	struct sk_buff *rx_skb;
+	struct sk_buff_head txq;
 };
 
 /* H4 receiver States */
