@@ -142,6 +142,7 @@ typedef void			(*rpc_action)(struct rpc_task *);
 #define RPC_TASK_RUNNING	0
 #define RPC_TASK_QUEUED		1
 #define RPC_TASK_WAKEUP		2
+#define RPC_TASK_HAS_TIMER	3
 
 #define RPC_IS_RUNNING(t)	(test_bit(RPC_TASK_RUNNING, &(t)->tk_runstate))
 #define rpc_set_running(t)	(set_bit(RPC_TASK_RUNNING, &(t)->tk_runstate))

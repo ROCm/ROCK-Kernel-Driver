@@ -104,6 +104,9 @@ static void rpc_run_timer(struct rpc_task *task)
 		dprintk("RPC: %4d running timer\n", task->tk_pid);
 		callback(task);
 	}
+	smp_mb__before_clear_bit();
+	clear_bit(RPC_TASK_HAS_TIMER, &task->tk_runstate);
+	smp_mb__after_clear_bit();
 }
 
 /*
@@ -122,6 +125,7 @@ __rpc_add_timer(struct rpc_task *task, rpc_action timer)
 		task->tk_timeout_fn = timer;
 	else
 		task->tk_timeout_fn = __rpc_default_timer;
+	set_bit(RPC_TASK_HAS_TIMER, &task->tk_runstate);
 	mod_timer(&task->tk_timer, jiffies + task->tk_timeout);
 }
 
@@ -132,8 +136,10 @@ __rpc_add_timer(struct rpc_task *task, rpc_action timer)
 static inline void
 rpc_delete_timer(struct rpc_task *task)
 {
-	if (del_timer_sync(&task->tk_timer))
+	if (test_and_clear_bit(RPC_TASK_HAS_TIMER, &task->tk_runstate)) {
+		del_singleshot_timer_sync(&task->tk_timer);
 		dprintk("RPC: %4d deleting timer\n", task->tk_pid);
+	}
 }
 
 /*
