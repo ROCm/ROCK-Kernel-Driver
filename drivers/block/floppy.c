@@ -4376,6 +4376,7 @@ int __init floppy_init(void)
 		/* to be cleaned up... */
 		disks[drive]->private_data = (void*)(long)drive;
 		disks[drive]->queue = floppy_queue;
+		disks[drive]->flags |= GENHD_FL_REMOVABLE;
 		add_disk(disks[drive]);
 	}
 

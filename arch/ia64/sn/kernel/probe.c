@@ -8,6 +8,7 @@
  * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All rights reserved.
  */
 
+#include <asm/sn/sgi.h>
 #include <asm/sn/sn_sal.h>
 
 /**

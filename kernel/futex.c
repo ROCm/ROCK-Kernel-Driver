@@ -430,11 +430,10 @@ static int unqueue_me(struct futex_q *q)
 			spin_unlock(lock_ptr);
 			goto retry;
 		}
-		if (likely(!list_empty(&q->list))) {
-			list_del(&q->list);
-			ret = 1;
-		}
+		WARN_ON(list_empty(&q->list));
+		list_del(&q->list);
 		spin_unlock(lock_ptr);
+		ret = 1;
 	}
 
 	drop_key_refs(&q->key);

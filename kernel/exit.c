@@ -403,6 +403,8 @@ void put_files_struct(struct files_struct *files)
 	}
 }
 
+EXPORT_SYMBOL(put_files_struct);
+
 static inline void __exit_files(struct task_struct *tsk)
 {
 	struct files_struct * files = tsk->files;
@@ -792,6 +794,7 @@ NORET_TYPE void do_exit(long code)
 	/* Avoid "noreturn function does return".  */
 	for (;;) ;
 }
+EXPORT_SYMBOL(do_exit);
 
 NORET_TYPE void complete_and_exit(struct completion *comp, long code)
 {

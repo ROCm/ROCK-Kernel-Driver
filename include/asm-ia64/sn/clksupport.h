@@ -23,9 +23,7 @@
 #ifndef _ASM_IA64_SN_CLKSUPPORT_H
 #define _ASM_IA64_SN_CLKSUPPORT_H
 
-#include <linux/config.h>
 #include <asm/sn/arch.h>
-#include <asm/sn/addrs.h>
 
 typedef long clkreg_t;
 

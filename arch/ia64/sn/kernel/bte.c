@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <asm/sn/sgi.h>
 #include <asm/sn/nodepda.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/arch.h>
@@ -14,6 +15,7 @@
 #include <asm/sn/pda.h>
 #include <asm/sn/sn2/shubio.h>
 #include <asm/nodedata.h>
+#include <asm/delay.h>
 
 #include <linux/bootmem.h>
 #include <linux/string.h>

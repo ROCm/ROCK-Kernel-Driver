@@ -9,7 +9,7 @@
    Steve Hirsch, Andreas Koppenh"ofer, Michael Leodolter, Eyal Lebedinsky,
    Michael Schaefer, J"org Weule, and Eric Youngdale.
 
-   Copyright 1992 - 2003 Kai Makisara
+   Copyright 1992 - 2004 Kai Makisara
    email Kai.Makisara@kolumbus.fi
 
    Some small formal changes - aeb, 950809
@@ -17,7 +17,7 @@
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
  */
 
-static char *verstr = "20031228";
+static char *verstr = "20040122";
 
 #include <linux/module.h>
 
@@ -179,6 +179,7 @@ static int sgl_unmap_user_pages(struct scatterlist *, const unsigned int, int);
 
 static int st_probe(struct device *);
 static int st_remove(struct device *);
+static int st_init_command(struct scsi_cmnd *);
 
 static void do_create_driverfs_files(void);
 static void do_remove_driverfs_files(void);
@@ -191,6 +192,7 @@ static struct scsi_driver st_template = {
 		.probe		= st_probe,
 		.remove		= st_remove,
 	},
+	.init_command		= st_init_command,
 };
 
 static int st_compression(Scsi_Tape *, int);
@@ -1272,7 +1274,8 @@ static int setup_buffering(Scsi_Tape *STp, const char *buf, size_t count, int is
 		i = STp->try_dio && try_rdio;
 	else
 		i = STp->try_dio && try_wdio;
-	if (i) {
+	if (i && ((unsigned long)buf & queue_dma_alignment(
+					STp->device->request_queue)) == 0) {
 		i = st_map_user_pages(&(STbp->sg[0]), STbp->use_sg,
 				      (unsigned long)buf, count, (is_read ? READ : WRITE),
 				      STp->max_pfn);
@@ -3389,7 +3392,11 @@ static int st_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 	up(&STp->lock);
-	return scsi_ioctl(STp->device, cmd_in, (void *) arg);
+	i = scsi_cmd_ioctl(STp->disk, cmd_in, arg);
+	if (i != -ENOTTY)
+		return i;
+	else
+		return scsi_ioctl(STp->device, cmd_in, (void *) arg);
 
  out:
 	up(&STp->lock);
@@ -3796,6 +3803,7 @@ static int st_probe(struct device *dev)
 	tpnt->disk = disk;
 	sprintf(disk->disk_name, "st%d", i);
 	disk->private_data = &tpnt->driver;
+	disk->queue = SDp->request_queue;
 	tpnt->driver = &st_template;
 	scsi_tapes[i] = tpnt;
 	dev_num = i;
@@ -3846,42 +3854,6 @@ static int st_probe(struct device *dev)
 		STm->default_compression = ST_DONT_TOUCH;
 		STm->default_blksize = (-1);	/* No forced size */
 		STm->default_density = (-1);	/* No forced density */
-
-		for (j=0; j < 2; j++) {
-			cdev = cdev_alloc();
-			if (!cdev) {
-				printk(KERN_ERR
-				       "st: out of memory. Device not attached.\n");
-				goto out_put_disk;
-			}
-			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%sm%d%s", disk->disk_name,
-				 i, j ? "n" : "");
-			cdev->owner = THIS_MODULE;
-			cdev->ops = &st_fops;
-			STm->cdevs[j] = cdev;
-
-			error = cdev_add(STm->cdevs[j],
-					 MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, i, j)),
-					 1);
-			if (error) {
-				printk(KERN_ERR "st%d: Can't add %s-rewind mode %d\n",
-				       dev_num, j ? "non" : "auto", i);
-			}
-
-			error = sysfs_create_link(&STm->cdevs[j]->kobj, &SDp->sdev_gendev.kobj,
-						  "device");
-			if (error) {
-				printk(KERN_ERR
-				       "st%d: Can't create sysfs link from SCSI device.\n",
-				       dev_num);
-			}
-		}
-	}
-	error = sysfs_create_link(&SDp->sdev_gendev.kobj, &tpnt->modes[0].cdevs[0]->kobj,
-				  "tape");
-	if (error) {
-		printk(KERN_ERR "st%d: Can't create sysfs link from SCSI device.\n",
-		       dev_num);
 	}
 
 	for (i = 0; i < ST_NBR_PARTITIONS; i++) {
@@ -3905,14 +3877,56 @@ static int st_probe(struct device *dev)
 	write_unlock(&st_dev_arr_lock);
 
 	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-	    /*  Rewind entry  */
-	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5)),
-				S_IFCHR | S_IRUGO | S_IWUGO,
-				"%s/mt%s", SDp->devfs_name, st_formats[mode]);
-	    /*  No-rewind entry  */
-	    devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128),
-				S_IFCHR | S_IRUGO | S_IWUGO,
-				"%s/mt%sn", SDp->devfs_name, st_formats[mode]);
+		STm = &(tpnt->modes[mode]);
+		for (j=0; j < 2; j++) {
+			cdev = cdev_alloc();
+			if (!cdev) {
+				printk(KERN_ERR
+				       "st%d: out of memory. Device not attached.\n",
+				       dev_num);
+				goto out_free_tape;
+			}
+			snprintf(cdev->kobj.name, KOBJ_NAME_LEN, "%sm%d%s", disk->disk_name,
+				 mode, j ? "n" : "");
+			cdev->owner = THIS_MODULE;
+			cdev->ops = &st_fops;
+
+			error = cdev_add(cdev,
+					 MKDEV(SCSI_TAPE_MAJOR, TAPE_MINOR(dev_num, mode, j)),
+					 1);
+			if (error) {
+				printk(KERN_ERR "st%d: Can't add %s-rewind mode %d\n",
+				       dev_num, j ? "non" : "auto", mode);
+				printk(KERN_ERR "st%d: Device not attached.\n", dev_num);
+				goto out_free_tape;
+			}
+			STm->cdevs[j] = cdev;
+
+			error = sysfs_create_link(&STm->cdevs[j]->kobj, &SDp->sdev_gendev.kobj,
+						  "device");
+			if (error) {
+				printk(KERN_ERR
+				       "st%d: Can't create sysfs link from SCSI device.\n",
+				       dev_num);
+			}
+		}
+	}
+	error = sysfs_create_link(&SDp->sdev_gendev.kobj, &tpnt->modes[0].cdevs[0]->kobj,
+				  "tape");
+	if (error) {
+		printk(KERN_ERR "st%d: Can't create sysfs link from SCSI device.\n",
+		       dev_num);
+	}
+
+	for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+		/*  Rewind entry  */
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5)),
+			      S_IFCHR | S_IRUGO | S_IWUGO,
+			      "%s/mt%s", SDp->devfs_name, st_formats[mode]);
+		/*  No-rewind entry  */
+		devfs_mk_cdev(MKDEV(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128),
+			      S_IFCHR | S_IRUGO | S_IWUGO,
+			      "%s/mt%sn", SDp->devfs_name, st_formats[mode]);
 	}
 	disk->number = devfs_register_tape(SDp->devfs_name);
 
@@ -3924,18 +3938,30 @@ static int st_probe(struct device *dev)
 
 	return 0;
 
+out_free_tape:
+	for (mode=0; mode < ST_NBR_MODES; mode++) {
+		STm = &(tpnt->modes[mode]);
+		for (j=0; j < 2; j++) {
+			if (STm->cdevs[j]) {
+				if (cdev == STm->cdevs[j])
+					cdev = NULL;
+				sysfs_remove_link(&STm->cdevs[j]->kobj, "device");
+				cdev_unmap(MKDEV(SCSI_TAPE_MAJOR,
+						 TAPE_MINOR(dev_num, mode, j)), 1);
+				cdev_del(STm->cdevs[j]);
+			}
+		}
+	}
+	if (cdev)
+		kobject_put(&cdev->kobj);
+	write_lock(&st_dev_arr_lock);
+	scsi_tapes[dev_num] = NULL;
+	st_nr_dev--;
+	write_unlock(&st_dev_arr_lock);
 out_put_disk:
 	put_disk(disk);
-	if (tpnt) {
-		for (i=0; i < ST_NBR_MODES; i++) {
-			STm = &(tpnt->modes[i]);
-			if (STm->cdevs[0])
-				kobject_put(&STm->cdevs[0]->kobj);
-			if (STm->cdevs[1])
-				kobject_put(&STm->cdevs[1]->kobj);
-		}
+	if (tpnt)
 		kfree(tpnt);
-	}
 out_buffer_free:
 	kfree(buffer);
 out:
@@ -3964,6 +3990,8 @@ static int st_remove(struct device *dev)
 				for (j=0; j < 2; j++) {
 					sysfs_remove_link(&tpnt->modes[mode].cdevs[j]->kobj,
 							  "device");
+					cdev_unmap(MKDEV(SCSI_TAPE_MAJOR,
+							 TAPE_MINOR(i, mode, j)), 1);
 					cdev_del(tpnt->modes[mode].cdevs[j]);
 					tpnt->modes[mode].cdevs[j] = NULL;
 				}
@@ -3983,6 +4011,41 @@ static int st_remove(struct device *dev)
 
 	write_unlock(&st_dev_arr_lock);
 	return 0;
+}
+
+static void st_intr(struct scsi_cmnd *SCpnt)
+{
+	scsi_io_completion(SCpnt, (SCpnt->result ? 0: SCpnt->bufflen >> 9), 1);
+}
+
+/*
+ * st_init_command: only called via the scsi_cmd_ioctl (block SG_IO)
+ * interface for REQ_BLOCK_PC commands.
+ */
+static int st_init_command(struct scsi_cmnd *SCpnt)
+{
+	struct request *rq;
+
+	if (!(SCpnt->request->flags & REQ_BLOCK_PC))
+		return 0;
+
+	rq = SCpnt->request;
+	if (sizeof(rq->cmd) > sizeof(SCpnt->cmnd))
+		return 0;
+
+	memcpy(SCpnt->cmnd, rq->cmd, sizeof(SCpnt->cmnd));
+
+	if (rq_data_dir(rq) == WRITE)
+		SCpnt->sc_data_direction = DMA_TO_DEVICE;
+	else if (rq->data_len)
+		SCpnt->sc_data_direction = DMA_FROM_DEVICE;
+	else
+		SCpnt->sc_data_direction = DMA_NONE;
+
+	SCpnt->timeout_per_command = rq->timeout;
+	SCpnt->transfersize = rq->data_len;
+	SCpnt->done = st_intr;
+	return 1;
 }
 
 static int __init init_st(void)

@@ -19,8 +19,8 @@
  * Change virtual addresses to physical addresses and vv.
  */
 #ifndef CONFIG_SUN3
-extern unsigned long mm_vtop(unsigned long addr) __attribute__ ((const));
-extern unsigned long mm_ptov(unsigned long addr) __attribute__ ((const));
+extern unsigned long mm_vtop(unsigned long addr) __attribute_const__;
+extern unsigned long mm_ptov(unsigned long addr) __attribute_const__;
 #else
 static inline unsigned long mm_vtop(unsigned long vaddr)
 {

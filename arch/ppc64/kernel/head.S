@@ -646,12 +646,14 @@ fast_exception_return:
  */
 	.globl DataAccess_common
 DataAccess_common:
+BEGIN_FTR_SECTION
 	mfspr   r22,DAR
 	srdi    r22,r22,60
 	cmpi    0,r22,0xc
 
 	/* Segment fault on a bolted segment. Go off and map that segment. */
 	beq-	.do_stab_bolted
+END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 stab_bolted_user_return:
 	EXCEPTION_PROLOG_COMMON
 	ld      r3,_DSISR(r1)
@@ -661,10 +663,12 @@ stab_bolted_user_return:
 	rlwinm	r4,r3,32-23,29,29	/* DSISR_STORE -> _PAGE_RW */
 	ld      r3,_DAR(r1)             /* into the hash table */
 
+BEGIN_FTR_SECTION
 	beq+	2f			/* If so handle it */
 	li	r4,0x300                /* Trap number */
 	bl	.do_stab_SI
 	b	1f
+END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 
 2:	li	r5,0x300
 	bl	.do_hash_page_DSI 	/* Try to handle as hpte fault */
@@ -690,7 +694,7 @@ DataAccessSLB_common:
 	EXCEPTION_PROLOG_COMMON
 	ld      r3,_DAR(r1)
 	li      r4,0x380                /* Exception vector  */
-	bl	.ste_allocate
+	bl	.slb_allocate
 	or.	r3,r3,r3		/* Check return code */
 	beq     fast_exception_return   /* Return if we succeeded */
 	addi	r3,r1,STACK_FRAME_OVERHEAD
@@ -705,12 +709,14 @@ DataAccessSLB_common:
 InstructionAccess_common:
 	EXCEPTION_PROLOG_COMMON
 
+BEGIN_FTR_SECTION
 	andis.	r0,r23,0x0020		/* no ste found? */
 	beq+	2f
 	mr	r3,r22			/* SRR0 at interrupt */
 	li	r4,0x400		/* Trap number       */
 	bl	.do_stab_SI
 	b	1f
+END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 
 2:	mr	r3,r22
 	li	r5,0x400
@@ -730,7 +736,7 @@ InstructionAccessSLB_common:
 	EXCEPTION_PROLOG_COMMON
 	mr      r3,r22                  /* SRR0 = NIA        */
 	li	r4,0x480                /* Exception vector  */
-	bl	.ste_allocate
+	bl	.slb_allocate
 	or.	r3,r3,r3		/* Check return code */
 	beq+	fast_exception_return   /* Return if we succeeded */
 
@@ -1006,48 +1012,27 @@ _GLOBAL(do_stab_bolted)
  * r20 - r23, SRR0 and SRR1 are saved in the exception frame.
  * We assume we aren't going to take any exceptions during this procedure.
  */
+/* XXX note fix masking in get_kernel_vsid to match */
 _GLOBAL(do_slb_bolted)
-	stw     r23,EX_CCR(r21) /* save CR in exc. frame */
+	stw	r23,EX_CCR(r21)		/* save CR in exc. frame */
 
-	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
-	mfspr	r21,DAR
-	rldicl  r20,r21,36,32   /* Permits a full 32b of ESID */
-	rldicr  r20,r20,15,48
-	rldicl  r21,r21,4,60
-	or      r20,r20,r21
+	/*
+	 * We take the next entry, round robin. Previously we tried
+	 * to find a free slot first but that took too long. Unfortunately
+	 * we dont have any LRU information to help us choose a slot.
+	 */
 
-	li      r21,9           /* VSID_RANDOMIZER */
-	sldi    r21,r21,32
-	oris    r21,r21,58231
-	ori     r21,r21,39831
-
-	mulld   r20,r20,r21
-	clrldi  r20,r20,28      /* r20 = vsid */
-
-	/* Search the SLB for a free entry */
-	li      r22,1
-1:
-	slbmfee	r23,r22
-	rldicl  r23,r23,37,63
-	cmpwi   r23,0
-	beq     4f              /* Found an invalid entry              */
-
-	addi	r22,r22,1
-	cmpldi	r22,64
-	blt	1b
-
-	/* No free entry - just take the next entry, round-robin */
-	/* XXX we should get the number of SLB entries from the naca */
+	/* r20 = paca */
+	/* use a cpu feature mask if we ever change our slb size */
 SLB_NUM_ENTRIES = 64
-2:	mfspr	r21,SPRG3
-	ld	r22,PACASTABRR(r21)
-	addi	r23,r22,1
-	cmpdi	r23,SLB_NUM_ENTRIES
-	blt	3f
-	li	r23,1
-3:	std	r23,PACASTABRR(r21)
+1:	ld	r22,PACASTABRR(r20)
+	addi	r21,r22,1
+	cmpdi	r21,SLB_NUM_ENTRIES
+	blt+	2f
+	li	r21,1			/* dont touch bolted slot 0 */
+2:	std	r21,PACASTABRR(r20)
 
-	/* r20 = vsid, r22 = entry */
+	/* r20 = paca, r22 = entry */
 
 	/* 
 	 * Never cast out the segment for our kernel stack. Since we
@@ -1056,48 +1041,86 @@ SLB_NUM_ENTRIES = 64
 	 * which gets invalidated due to a tlbie from another cpu at a
 	 * non recoverable point (after setting srr0/1) - Anton
 	 */
-	slbmfee	r23,r22
-	srdi	r23,r23,28
+	slbmfee	r21,r22
+	srdi	r21,r21,27
 	/*
 	 * This is incorrect (r1 is not the kernel stack) if we entered
 	 * from userspace but there is no critical window from userspace
 	 * so this should be OK. Also if we cast out the userspace stack
 	 * segment while in userspace we will fault it straight back in.
 	 */
-	srdi	r21,r1,28
-	cmpd	r21,r23
-	beq-	2b
+	srdi	r23,r1,27
+	ori	r23,r23,1
+	cmpd	r23,r21
+	beq-	1b
 
-	/* Put together the vsid portion of the entry. */
-4:	li      r21,0
-	rldimi  r21,r20,12,0
-	ori     r20,r21,1024
-	ori	r20,r20,128    /* set class bit for kernel region */
-#ifndef CONFIG_PPC_ISERIES
-	ori	r20,r20,256    /* map kernel region with large ptes */
-#endif
+	/* r20 = paca, r22 = entry */
 
-	/* Put together the esid portion of the entry. */
-	mfspr	r21,DAR        /* Get the new esid                     */
-	rldicl  r21,r21,36,28  /* Permits a full 36b of ESID           */
-	li      r23,0
-	rldimi  r23,r21,28,0   /* Insert esid  */
-	oris    r21,r23,2048   /* valid bit    */
-	rldimi  r21,r22,0,52   /* Insert entry */
+	/* (((ea >> 28) & 0x1fff) << 15) | (ea >> 60) */
+	mfspr	r21,DAR
+	rldicl	r23,r21,36,51
+	sldi	r23,r23,15
+	srdi	r21,r21,60
+	or	r23,r23,r21
+
+	/* VSID_RANDOMIZER */
+	li	r21,9
+	sldi	r21,r21,32
+	oris	r21,r21,58231
+	ori	r21,r21,39831
+
+	/* vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK */
+	mulld	r23,r23,r21
+	clrldi	r23,r23,28
+
+	/* r20 = paca, r22 = entry, r23 = vsid */
+
+	/* Put together slb word1 */
+	sldi	r23,r23,12
+
+BEGIN_FTR_SECTION
+	/* set kp and c bits */
+	ori	r23,r23,0x480
+END_FTR_SECTION_IFCLR(CPU_FTR_16M_PAGE)
+BEGIN_FTR_SECTION
+	/* set kp, l and c bits */
+	ori	r23,r23,0x580
+END_FTR_SECTION_IFSET(CPU_FTR_16M_PAGE)
+
+	/* r20 = paca, r22 = entry, r23 = slb word1 */
+
+	/* Put together slb word0 */
+	mfspr	r21,DAR
+	rldicr	r21,r21,0,35	/* get the new esid */
+	oris	r21,r21,2048	/* set valid bit */
+	rldimi	r21,r22,0,52	/* insert entry */
+
+	/* r20 = paca, r21 = slb word0, r23 = slb word1 */
 
 	/* 
 	 * No need for an isync before or after this slbmte. The exception
 	 * we enter with and the rfid we exit with are context synchronizing .
 	 */
-	slbmte  r20,r21
+	slbmte	r23,r21
 
 	/* All done -- return from exception. */
-	mfsprg  r20,3                   /* Load the PACA pointer  */
-	ld      r21,PACAEXCSP(r20)      /* Get the exception frame pointer */
-	addi    r21,r21,EXC_FRAME_SIZE
+	ld	r21,PACAEXCSP(r20)	/* Get the exception frame pointer */
+	addi	r21,r21,EXC_FRAME_SIZE
 	lwz	r23,EX_CCR(r21)		/* get saved CR */
 	/* note that this is almost identical to maskable_exception_exit */
-	mtcr    r23                     /* restore CR */
+
+	/*
+	 * Until everyone updates binutils hardwire the POWER4 optimised
+	 * single field mtcrf
+	 */
+#if 0
+	.machine	push
+	.machine	"power4"
+	mtcrf	0x80,r23
+	.machine	pop
+#else
+	.long 0x7ef80120
+#endif
 
 	mfmsr	r22
 	li	r23, MSR_RI
@@ -1107,10 +1130,10 @@ SLB_NUM_ENTRIES = 64
 	ld	r22,EX_SRR0(r21)	/* Get SRR0 from exc. frame */
 	ld	r23,EX_SRR1(r21)	/* Get SRR1 from exc. frame */
 	mtspr	SRR0,r22
-	mtspr   SRR1,r23
+	mtspr	SRR1,r23
 	ld	r22,EX_R22(r21)		/* restore r22 and r23 */
 	ld	r23,EX_R23(r21)
-	mfspr	r20,SPRG2
+	ld	r20,EX_R20(r21)
 	mfspr	r21,SPRG1
 	rfid
 

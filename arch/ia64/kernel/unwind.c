@@ -650,7 +650,7 @@ free_state_stack (struct unw_reg_state *rs)
 
 /* Unwind decoder routines */
 
-static enum unw_register_index __attribute__((const))
+static enum unw_register_index __attribute_const__
 decode_abreg (unsigned char abreg, int memory)
 {
 	switch (abreg) {

@@ -34,10 +34,8 @@ struct i386_cpu cpu_devices[NR_CPUS];
 #ifdef CONFIG_NUMA
 #include <linux/mmzone.h>
 #include <asm/node.h>
-#include <asm/memblk.h>
 
 struct i386_node node_devices[MAX_NUMNODES];
-struct i386_memblk memblk_devices[MAX_NR_MEMBLKS];
 
 static int __init topology_init(void)
 {
@@ -47,8 +45,6 @@ static int __init topology_init(void)
 		arch_register_node(i);
 	for (i = 0; i < NR_CPUS; i++)
 		if (cpu_possible(i)) arch_register_cpu(i);
-	for (i = 0; i < num_online_memblks(); i++)
-		arch_register_memblk(i);
 	return 0;
 }
 

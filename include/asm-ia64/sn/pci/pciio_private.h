@@ -20,7 +20,7 @@
  * All PCI providers set up PIO using this information.
  */
 struct pciio_piomap_s {
-    unsigned                pp_flags;	/* PCIIO_PIOMAP flags */
+    unsigned int            pp_flags;	/* PCIIO_PIOMAP flags */
     vertex_hdl_t            pp_dev;	/* associated pci card */
     pciio_slot_t            pp_slot;	/* which slot the card is in */
     pciio_space_t           pp_space;	/* which address space */
@@ -33,7 +33,7 @@ struct pciio_piomap_s {
  * All PCI providers set up DMA using this information.
  */
 struct pciio_dmamap_s {
-    unsigned                pd_flags;	/* PCIIO_DMAMAP flags */
+    unsigned int            pd_flags;	/* PCIIO_DMAMAP flags */
     vertex_hdl_t            pd_dev;	/* associated pci card */
     pciio_slot_t            pd_slot;	/* which slot the card is in */
 };
@@ -43,7 +43,7 @@ struct pciio_dmamap_s {
  */
 
 struct pciio_intr_s {
-    unsigned                pi_flags;	/* PCIIO_INTR flags */
+    unsigned int            pi_flags;	/* PCIIO_INTR flags */
     vertex_hdl_t            pi_dev;	/* associated pci card */
     device_desc_t	    pi_dev_desc;	/* override device descriptor */
     pciio_intr_line_t       pi_lines;	/* which interrupt line(s) */

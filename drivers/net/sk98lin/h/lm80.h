@@ -2,8 +2,6 @@
  *
  * Name:	lm80.h	
  * Project:	Gigabit Ethernet Adapters, Common Modules
- * Version:	$Revision: 1.6 $
- * Date:	$Date: 2003/05/13 17:26:52 $
  * Purpose:	Contains all defines for the LM80 Chip
  *		(National Semiconductor).
  *
@@ -20,32 +18,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *	$Log: lm80.h,v $
- *	Revision 1.6  2003/05/13 17:26:52  mkarl
- *	Editorial changes.
- *	
- *	Revision 1.5  2003/03/31 07:15:18  mkarl
- *	Corrected Copyright.
- *	Editorial changes.
- *	
- *	Revision 1.4  2002/04/25 11:04:10  rschmidt
- *	Editorial changes
- *	
- *	Revision 1.3  1999/11/22 13:41:19  cgoos
- *	Changed license header to GPL.
- *	
- *	Revision 1.2  1999/03/12 13:26:51  malthoff
- *	remove __STDC__.
- *	
- *	Revision 1.1  1998/06/19 09:28:31  malthoff
- *	created.
- *	
  *
  ******************************************************************************/
 

@@ -23,6 +23,10 @@
 #undef __sn_readw
 #undef __sn_readl
 #undef __sn_readq
+#undef __sn_readb_relaxed
+#undef __sn_readw_relaxed
+#undef __sn_readl_relaxed
+#undef __sn_readq_relaxed
 
 unsigned int
 __sn_inb (unsigned long port)
@@ -82,6 +86,30 @@ unsigned long
 __sn_readq (void *addr)
 {
 	return ___sn_readq (addr);
+}
+
+unsigned char
+__sn_readb_relaxed (void *addr)
+{
+	return ___sn_readb_relaxed (addr);
+}
+
+unsigned short
+__sn_readw_relaxed (void *addr)
+{
+	return ___sn_readw_relaxed (addr);
+}
+
+unsigned int
+__sn_readl_relaxed (void *addr)
+{
+	return ___sn_readl_relaxed (addr);
+}
+
+unsigned long
+__sn_readq_relaxed (void *addr)
+{
+	return ___sn_readq_relaxed (addr);
 }
 
 #endif

@@ -1488,6 +1488,14 @@ static int make_request (request_queue_t *q, struct bio * bi)
 	sector_t logical_sector, last_sector;
 	struct stripe_head *sh;
 
+	if (bio_data_dir(bi)==WRITE) {
+		disk_stat_inc(mddev->gendisk, writes);
+		disk_stat_add(mddev->gendisk, write_sectors, bio_sectors(bi));
+	} else {
+		disk_stat_inc(mddev->gendisk, reads);
+		disk_stat_add(mddev->gendisk, read_sectors, bio_sectors(bi));
+	}
+
 	logical_sector = bi->bi_sector & ~(STRIPE_SECTORS-1);
 	last_sector = bi->bi_sector + (bi->bi_size>>9);
 
@@ -1639,7 +1647,7 @@ static int run (mddev_t *mddev)
 	struct list_head *tmp;
 
 	if (mddev->level != 6) {
-		PRINTK("raid6: md%d: raid level not set to 6 (%d)\n", mdidx(mddev), mddev->level);
+		PRINTK("raid6: %s: raid level not set to 6 (%d)\n", mdname(mddev), mddev->level);
 		return -EIO;
 	}
 
@@ -1665,7 +1673,7 @@ static int run (mddev_t *mddev)
 
 	mddev->queue->unplug_fn = raid6_unplug_device;
 
-	PRINTK("raid6: run(md%d) called.\n", mdidx(mddev));
+	PRINTK("raid6: run(%s) called.\n", mdname(mddev));
 
 	ITERATE_RDEV(mddev,rdev,tmp) {
 		raid_disk = rdev->raid_disk;
@@ -1698,42 +1706,42 @@ static int run (mddev_t *mddev)
 	conf->max_nr_stripes = NR_STRIPES;
 
 	if (conf->raid_disks < 4) {
-		printk(KERN_ERR "raid6: not enough configured devices for md%d (%d, minimum 4)\n",
-		       mdidx(mddev), conf->raid_disks);
+		printk(KERN_ERR "raid6: not enough configured devices for %s (%d, minimum 4)\n",
+		       mdname(mddev), conf->raid_disks);
 		goto abort;
 	}
 	if (!conf->chunk_size || conf->chunk_size % 4) {
-		printk(KERN_ERR "raid6: invalid chunk size %d for md%d\n",
-		       conf->chunk_size, mdidx(mddev));
+		printk(KERN_ERR "raid6: invalid chunk size %d for %s\n",
+		       conf->chunk_size, mdname(mddev));
 		goto abort;
 	}
 	if (conf->algorithm > ALGORITHM_RIGHT_SYMMETRIC) {
 		printk(KERN_ERR
-		       "raid6: unsupported parity algorithm %d for md%d\n",
-		       conf->algorithm, mdidx(mddev));
+		       "raid6: unsupported parity algorithm %d for %s\n",
+		       conf->algorithm, mdname(mddev));
 		goto abort;
 	}
 	if (mddev->degraded > 2) {
-		printk(KERN_ERR "raid6: not enough operational devices for md%d"
+		printk(KERN_ERR "raid6: not enough operational devices for %s"
 		       " (%d/%d failed)\n",
-		       mdidx(mddev), conf->failed_disks, conf->raid_disks);
+		       mdname(mddev), conf->failed_disks, conf->raid_disks);
 		goto abort;
 	}
 
 #if 0				/* FIX: For now */
 	if (mddev->degraded > 0 &&
 	    mddev->recovery_cp != MaxSector) {
-		printk(KERN_ERR "raid6: cannot start dirty degraded array for md%d\n", mdidx(mddev));
+		printk(KERN_ERR "raid6: cannot start dirty degraded array for %s\n", mdname(mddev));
 		goto abort;
 	}
 #endif
 
 	{
-		mddev->thread = md_register_thread(raid6d, mddev, "md%d_raid6");
+		mddev->thread = md_register_thread(raid6d, mddev, "%s_raid6");
 		if (!mddev->thread) {
 			printk(KERN_ERR
-			       "raid6: couldn't allocate thread for md%d\n",
-			       mdidx(mddev));
+			       "raid6: couldn't allocate thread for %s\n",
+			       mdname(mddev));
 			goto abort;
 		}
 	}
@@ -1747,18 +1755,18 @@ static int run (mddev_t *mddev)
 		md_unregister_thread(mddev->thread);
 		goto abort;
 	} else
-		printk(KERN_INFO "raid6: allocated %dkB for md%d\n",
-		       memory, mdidx(mddev));
+		printk(KERN_INFO "raid6: allocated %dkB for %s\n",
+		       memory, mdname(mddev));
 
 	if (mddev->degraded == 0)
-		printk(KERN_INFO "raid6: raid level %d set md%d active with %d out of %d"
-		       " devices, algorithm %d\n", conf->level, mdidx(mddev),
+		printk(KERN_INFO "raid6: raid level %d set %s active with %d out of %d"
+		       " devices, algorithm %d\n", conf->level, mdname(mddev),
 		       mddev->raid_disks-mddev->degraded, mddev->raid_disks,
 		       conf->algorithm);
 	else
-		printk(KERN_ALERT "raid6: raid level %d set md%d active with %d"
+		printk(KERN_ALERT "raid6: raid level %d set %s active with %d"
 		       " out of %d devices, algorithm %d\n", conf->level,
-		       mdidx(mddev), mddev->raid_disks - mddev->degraded,
+		       mdname(mddev), mddev->raid_disks - mddev->degraded,
 		       mddev->raid_disks, conf->algorithm);
 
 	print_raid6_conf(conf);
@@ -1785,7 +1793,7 @@ abort:
 		kfree(conf);
 	}
 	mddev->private = NULL;
-	printk(KERN_ALERT "raid6: failed to run raid set md%d\n", mdidx(mddev));
+	printk(KERN_ALERT "raid6: failed to run raid set %s\n", mdname(mddev));
 	return -EIO;
 }
 

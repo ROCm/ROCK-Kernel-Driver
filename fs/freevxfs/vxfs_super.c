@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#ident "$Id: vxfs_super.c,v 1.29 2002/01/02 22:02:12 hch Exp hch $"
-
 /*
  * Veritas filesystem driver - superblock related routines.
  */

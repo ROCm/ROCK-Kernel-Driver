@@ -281,6 +281,10 @@ static inline int mdidx (mddev_t * mddev)
 {
 	return mddev->__minor;
 }
+static inline char * mdname (mddev_t * mddev)
+{
+	return mddev->gendisk ? mddev->gendisk->disk_name : "mdX";
+}
 
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
 

@@ -47,6 +47,6 @@ extern u_int32_t lmcEventLogBuf[LMC_EVENTLOGSIZE * LMC_EVENTLOGARGS];
 
 void lmcConsoleLog(char *type, unsigned char *ucData, int iLen);
 void lmcEventLog (u_int32_t EventNum, u_int32_t arg2, u_int32_t arg3);
-inline void lmc_trace(struct net_device *dev, char *msg);
+void lmc_trace(struct net_device *dev, char *msg);
 
 #endif

@@ -9,6 +9,8 @@
 #ifndef _ASM_IA64_SN_HCL_UTIL_H
 #define _ASM_IA64_SN_HCL_UTIL_H
 
+#include <asm/sn/sgi.h>
+
 extern char * dev_to_name(vertex_hdl_t, char *, unsigned int);
 extern int device_master_set(vertex_hdl_t, vertex_hdl_t);
 extern vertex_hdl_t device_master_get(vertex_hdl_t);

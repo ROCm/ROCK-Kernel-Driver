@@ -339,21 +339,21 @@ static void __init setup_per_cpu_areas(void)
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
 {
-	unsigned int i, j=0;
+	unsigned int i;
+	unsigned j = 0;
 
 	/* FIXME: This should be done in userspace --RR */
 	for (i = 0; i < NR_CPUS; i++) {
 		if (num_online_cpus() >= max_cpus)
 			break;
 		if (cpu_possible(i) && !cpu_online(i)) {
-			printk("Bringing up %i\n", i);
 			cpu_up(i);
 			j++;
 		}
 	}
 
 	/* Any cleanup work */
-	printk("CPUS done %u\n", j);
+	printk("Brought up %u CPUs\n", j);
 	smp_cpus_done(max_cpus);
 #if 0
 	/* Get other processors into their bootup holding patterns. */

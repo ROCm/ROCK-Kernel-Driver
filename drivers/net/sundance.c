@@ -986,8 +986,8 @@ static void tx_timeout(struct net_device *dev)
 	{
 		int i;
 		for (i=0; i<TX_RING_SIZE; i++) {
-			printk(KERN_DEBUG "%02x %08Zx %08x %08x(%02x) %08x %08x\n", i,
-				np->tx_ring_dma + i*sizeof(*np->tx_ring),
+			printk(KERN_DEBUG "%02x %08llx %08x %08x(%02x) %08x %08x\n", i,
+				(unsigned long long)np->tx_ring_dma + i*sizeof(*np->tx_ring),
 				le32_to_cpu(np->tx_ring[i].next_desc),
 				le32_to_cpu(np->tx_ring[i].status),
 				(le32_to_cpu(np->tx_ring[i].status) >> 2) & 0xff,
@@ -1136,7 +1136,7 @@ start_tx (struct sk_buff *skb, struct net_device *dev)
 static int
 reset_tx (struct net_device *dev)
 {
-	struct netdev_private *np = (struct netdev_private*) dev->priv;
+	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	struct sk_buff *skb;
 	int i;
@@ -1672,8 +1672,8 @@ static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	switch (cmd) {
 		case SIOCDEVPRIVATE:
 		for (i=0; i<TX_RING_SIZE; i++) {
-			printk(KERN_DEBUG "%02x %08Zx %08x %08x(%02x) %08x %08x\n", i,
-				np->tx_ring_dma + i*sizeof(*np->tx_ring),	
+			printk(KERN_DEBUG "%02x %08llx %08x %08x(%02x) %08x %08x\n", i,
+				(unsigned long long)np->tx_ring_dma + i*sizeof(*np->tx_ring),	
 				le32_to_cpu(np->tx_ring[i].next_desc),
 				le32_to_cpu(np->tx_ring[i].status),
 				(le32_to_cpu(np->tx_ring[i].status) >> 2) 

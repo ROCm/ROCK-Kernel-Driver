@@ -9,6 +9,7 @@
 #include <linux/mm.h>
 #include <linux/smp.h>
 #include <linux/interrupt.h>
+#include <linux/ioctl32.h>
 #include <asm/checksum.h>
 #include <asm/cpcmd.h>
 #include <asm/delay.h>
@@ -74,4 +75,5 @@ EXPORT_SYMBOL(console_device);
 EXPORT_SYMBOL_NOVERS(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);
+EXPORT_SYMBOL(sys_ioctl);
 

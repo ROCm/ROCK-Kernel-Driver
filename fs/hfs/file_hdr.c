@@ -243,7 +243,8 @@ static struct hfs_hdr_layout *dup_layout(const struct hfs_hdr_layout *old)
 	if (HFS_NEW(new)) {
 		memcpy(new, old, sizeof(*new));
 		for (lcv = 0; lcv < new->entries; ++lcv) {
-			(char *)(new->order[lcv]) += (char *)new - (char *)old;
+			new->order[lcv] = (struct hfs_hdr_descr *)
+			((char *)new->order[lcv] + ((char *)new - (char *)old));
 		}
 	}
 	return new;

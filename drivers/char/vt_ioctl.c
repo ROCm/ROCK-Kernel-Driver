@@ -470,6 +470,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		 * currently, setting the mode from KD_TEXT to KD_GRAPHICS
 		 * doesn't do a whole lot. i'm not sure if it should do any
 		 * restoration of modes or what...
+		 *
+		 * XXX It should at least call into the driver, fbdev's definitely
+		 * need to restore their engine state. --BenH
 		 */
 		if (!perm)
 			return -EPERM;
@@ -492,10 +495,12 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		/*
 		 * explicitly blank/unblank the screen if switching modes
 		 */
+		acquire_console_sem();
 		if (arg == KD_TEXT)
 			unblank_screen();
 		else
 			do_blank_screen(1);
+		release_console_sem();
 		return 0;
 
 	case KDGETMODE:
@@ -665,18 +670,29 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -EFAULT;
 		if (tmp.mode != VT_AUTO && tmp.mode != VT_PROCESS)
 			return -EINVAL;
+		acquire_console_sem();
 		vt_cons[console]->vt_mode = tmp;
 		/* the frsig is ignored, so we set it to 0 */
 		vt_cons[console]->vt_mode.frsig = 0;
 		vt_cons[console]->vt_pid = current->pid;
 		/* no switch is required -- saw@shade.msu.ru */
 		vt_cons[console]->vt_newvt = -1; 
+		release_console_sem();
 		return 0;
 	}
 
 	case VT_GETMODE:
-		return copy_to_user((void*)arg, &(vt_cons[console]->vt_mode), 
-							sizeof(struct vt_mode)) ? -EFAULT : 0; 
+	{
+		struct vt_mode tmp;
+		int rc;
+
+		acquire_console_sem();
+		memcpy(&tmp, &vt_cons[console]->vt_mode, sizeof(struct vt_mode));
+		release_console_sem();
+
+		rc = copy_to_user((void*)arg, &tmp, sizeof(struct vt_mode));
+		return rc ? -EFAULT : 0;
+	}
 
 	/*
 	 * Returns global vt state. Note that VT 0 is always open, since
@@ -718,7 +734,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (arg == 0 || arg > MAX_NR_CONSOLES)
 			return -ENXIO;
 		arg--;
+		acquire_console_sem();
 		i = vc_allocate(arg);
+		release_console_sem();
 		if (i)
 			return i;
 		set_console(arg);
@@ -768,17 +786,20 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 				 * The current vt has been released, so
 				 * complete the switch.
 				 */
-				int newvt = vt_cons[console]->vt_newvt;
+				int newvt;
+				acquire_console_sem();
+				newvt = vt_cons[console]->vt_newvt;
 				vt_cons[console]->vt_newvt = -1;
 				i = vc_allocate(newvt);
-				if (i)
+				if (i) {
+					release_console_sem();
 					return i;
+				}
 				/*
 				 * When we actually do the console switch,
 				 * make sure we are atomic with respect to
 				 * other console switches..
 				 */
-				acquire_console_sem();
 				complete_change_console(newvt);
 				release_console_sem();
 			}
@@ -806,16 +827,21 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 			return -ENXIO;
 		if (arg == 0) {
 		    /* disallocate all unused consoles, but leave 0 */
-		    for (i=1; i<MAX_NR_CONSOLES; i++)
-		      if (! VT_BUSY(i))
-			vc_disallocate(i);
+			acquire_console_sem();
+			for (i=1; i<MAX_NR_CONSOLES; i++)
+				if (! VT_BUSY(i))
+					vc_disallocate(i);
+			release_console_sem();
 		} else {
-		    /* disallocate a single console, if possible */
-		    arg--;
-		    if (VT_BUSY(arg))
-		      return -EBUSY;
-		    if (arg)			      /* leave 0 */
-		      vc_disallocate(arg);
+			/* disallocate a single console, if possible */
+			arg--;
+			if (VT_BUSY(arg))
+				return -EBUSY;
+			if (arg) {			      /* leave 0 */
+				acquire_console_sem();
+				vc_disallocate(arg);
+				release_console_sem();
+			}
 		}
 		return 0;
 
@@ -828,8 +854,11 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		if (get_user(ll, &vtsizes->v_rows) ||
 		    get_user(cc, &vtsizes->v_cols))
 			return -EFAULT;
-		for (i = 0; i < MAX_NR_CONSOLES; i++)
+		for (i = 0; i < MAX_NR_CONSOLES; i++) {
+			acquire_console_sem();
                         vc_resize(i, cc, ll);
+			release_console_sem();
+		}
 		return 0;
 	}
 
@@ -870,11 +899,13 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		for (i = 0; i < MAX_NR_CONSOLES; i++) {
 			if (!vc_cons[i].d)
 				continue;
+			acquire_console_sem();
 			if (vlin)
 				vc_cons[i].d->vc_scan_lines = vlin;
 			if (clin)
 				vc_cons[i].d->vc_font.height = clin;
 			vc_resize(i, cc, ll);
+			release_console_sem();
 		}
   		return 0;
 	}

@@ -1,4 +1,3 @@
-#ident "$Id: raid6x86.h,v 1.3 2002/12/12 22:41:27 hpa Exp $"
 /* ----------------------------------------------------------------------- *
  *
  *   Copyright 2002-2004 H. Peter Anvin - All Rights Reserved
@@ -32,18 +31,20 @@ typedef struct {
 /* N.B.: For SSE we only save %xmm0-%xmm7 even for x86-64, since
    the code doesn't know about the additional x86-64 registers */
 typedef struct {
-	unsigned int sarea[8*4];
-	unsigned int cr0;
+	unsigned int sarea[8*4+2];
+	unsigned long cr0;
 } raid6_sse_save_t __attribute__((aligned(16)));
 
 /* This is for x86-64-specific code which uses all 16 XMM registers */
 typedef struct {
-	unsigned int sarea[16*4];
+	unsigned int sarea[16*4+2];
 	unsigned long cr0;
 } raid6_sse16_save_t __attribute__((aligned(16)));
 
-/* On x86-64 the stack is 16-byte aligned */
-#define SAREA(x) (x->sarea)
+/* On x86-64 the stack *SHOULD* be 16-byte aligned, but currently this
+   is buggy in the kernel and it's only 8-byte aligned in places, so
+   we need to do this anyway.  Sigh. */
+#define SAREA(x) ((unsigned int *)((((unsigned long)&(x)->sarea)+15) & ~15))
 
 #else /* __i386__ */
 
@@ -60,6 +61,7 @@ typedef struct {
 	unsigned long cr0;
 } raid6_sse_save_t;
 
+/* Find the 16-byte aligned save area */
 #define SAREA(x) ((unsigned int *)((((unsigned long)&(x)->sarea)+15) & ~15))
 
 #endif

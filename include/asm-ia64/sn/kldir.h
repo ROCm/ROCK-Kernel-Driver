@@ -11,7 +11,7 @@
 #ifndef _ASM_IA64_SN_KLDIR_H
 #define _ASM_IA64_SN_KLDIR_H
 
-#include <asm/sn/sgi.h>
+#include <linux/types.h>
 
 /*
  * The kldir memory area resides at a fixed place in each node's memory and
@@ -136,7 +136,7 @@
 typedef struct kldir_ent_s {
 	u64		magic;		/* Indicates validity of entry      */
 	off_t		offset;		/* Offset from start of node space  */
-	__psunsigned_t	pointer;	/* Pointer to area in some cases    */
+	unsigned long	pointer;	/* Pointer to area in some cases    */
 	size_t		size;		/* Size in bytes 		    */
 	u64		count;		/* Repeat count if array, 1 if not  */
 	size_t		stride;		/* Stride if array, 0 if not        */

@@ -1649,8 +1649,6 @@ static void __devinit neo_unmap_mmio(struct fb_info *info)
 static int __devinit neo_map_video(struct fb_info *info,
 				   struct pci_dev *dev, int video_len)
 {
-	struct neofb_par *par = (struct neofb_par *) info->par;
-
 	DBG("neo_map_video");
 
 	info->fix.smem_start = pci_resource_start(dev, 0);
@@ -1674,7 +1672,7 @@ static int __devinit neo_map_video(struct fb_info *info,
 		       info->screen_base);
 
 #ifdef CONFIG_MTRR
-	par->mtrr =
+	((struct neofb_par *)(info->par))->mtrr =
 	    mtrr_add(info->fix.smem_start, pci_resource_len(dev, 0),
 		     MTRR_TYPE_WRCOMB, 1);
 #endif
@@ -1686,12 +1684,12 @@ static int __devinit neo_map_video(struct fb_info *info,
 
 static void __devinit neo_unmap_video(struct fb_info *info)
 {
-	struct neofb_par *par = (struct neofb_par *) info->par;
 
 	DBG("neo_unmap_video");
 
 	if (info->screen_base) {
 #ifdef CONFIG_MTRR
+		struct neofb_par *par = (struct neofb_par *) info->par;
 		mtrr_del(par->mtrr, info->fix.smem_start,
 			 info->fix.smem_len);
 #endif

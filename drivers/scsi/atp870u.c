@@ -703,19 +703,19 @@ oktosend:
 			bttl = sg_dma_address(&sgpnt[j]);
 			l = sg_dma_len(&sgpnt[j]);
 			while (l > 0x10000) {
-				(u16) (((u16 *) (prd))[i + 3]) = 0x0000;
-				(u16) (((u16 *) (prd))[i + 2]) = 0x0000;
-				(u32) (((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
+				(((u16 *) (prd))[i + 3]) = 0x0000;
+				(((u16 *) (prd))[i + 2]) = 0x0000;
+				(((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
 				l -= 0x10000;
 				bttl += 0x10000;
 				i += 0x04;
 			}
-			(u32) (((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
-			(u16) (((u16 *) (prd))[i + 2]) = cpu_to_le16(l);
-			(u16) (((u16 *) (prd))[i + 3]) = 0;
+			(((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
+			(((u16 *) (prd))[i + 2]) = cpu_to_le16(l);
+			(((u16 *) (prd))[i + 3]) = 0;
 			i += 0x04;
 		}
-		(u16) (((u16 *) (prd))[i - 1]) = cpu_to_le16(0x8000);
+		(((u16 *) (prd))[i - 1]) = cpu_to_le16(0x8000);
 	} else {
 		/*
 		 *      For a linear request write a chain of blocks
@@ -724,16 +724,16 @@ oktosend:
 		l = workrequ->request_bufflen;
 		i = 0;
 		while (l > 0x10000) {
-			(u16) (((u16 *) (prd))[i + 3]) = 0x0000;
-			(u16) (((u16 *) (prd))[i + 2]) = 0x0000;
-			(u32) (((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
+			(((u16 *) (prd))[i + 3]) = 0x0000;
+			(((u16 *) (prd))[i + 2]) = 0x0000;
+			(((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
 			l -= 0x10000;
 			bttl += 0x10000;
 			i += 0x04;
 		}
-		(u16) (((u16 *) (prd))[i + 3]) = cpu_to_le16(0x8000);
-		(u16) (((u16 *) (prd))[i + 2]) = cpu_to_le16(l);
-		(u32) (((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
+		(((u16 *) (prd))[i + 3]) = cpu_to_le16(0x8000);
+		(((u16 *) (prd))[i + 2]) = cpu_to_le16(l);
+		(((u32 *) (prd))[i >> 1]) = cpu_to_le32(bttl);
 	}
 	tmpcip = tmpcip + 4;
 	dev->id[target_id].prdaddru = dev->id[target_id].prd_phys;

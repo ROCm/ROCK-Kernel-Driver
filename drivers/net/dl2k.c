@@ -745,7 +745,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 static void 
 rio_free_tx (struct net_device *dev, int irq) 
 {
-	struct netdev_private *np = (struct netdev_private *) dev->priv;
+	struct netdev_private *np = dev->priv;
 	int entry = np->old_tx % TX_RING_SIZE;
 	int tx_use = 0;
 	unsigned long flag = 0;
@@ -855,7 +855,7 @@ tx_error (struct net_device *dev, int tx_status)
 static int
 receive_packet (struct net_device *dev)
 {
-	struct netdev_private *np = (struct netdev_private *) dev->priv;
+	struct netdev_private *np = dev->priv;
 	int entry = np->cur_rx % RX_RING_SIZE;
 	int cnt = 30;
 

@@ -57,8 +57,9 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
                            "1:  slr   %1,%1\n"
                            "    cs    %1,%0,0(%3)\n"
                            "    jl    0b\n"
-                           : "=&d" (reg1), "=&d" (reg2), "+m" (lp->lock)
-			   : "a" (&lp->lock) : "cc" );
+                           : "=&d" (reg1), "=&d" (reg2), "=m" (lp->lock)
+			   : "a" (&lp->lock), "m" (lp->lock)
+			   : "cc", "memory" );
 #else /* __s390x__ */
 	unsigned long reg1, reg2;
         __asm__ __volatile("    bras  %1,1f\n"
@@ -66,9 +67,9 @@ extern inline void _raw_spin_lock(spinlock_t *lp)
                            "1:  slr   %0,%0\n"
                            "    cs    %0,%1,0(%3)\n"
                            "    jl    0b\n"
-                           : "=&d" (reg1), "=&d" (reg2), "+m" (lp->lock)
-                           : "a" (&lp->lock), "i" (__DIAG44_OPERAND)
-			   : "cc" );
+                           : "=&d" (reg1), "=&d" (reg2), "=m" (lp->lock)
+			   : "a" (&lp->lock), "i" (__DIAG44_OPERAND),
+			     "m" (lp->lock) : "cc", "memory" );
 #endif /* __s390x__ */
 }
 
@@ -82,8 +83,9 @@ extern inline int _raw_spin_trylock(spinlock_t *lp)
 	__asm__ __volatile("    slr   %0,%0\n"
 			   "    basr  %1,0\n"
 			   "0:  cs    %0,%1,0(%3)"
-			   : "=&d" (result), "=&d" (reg), "+m" (lp->lock)
-			   : "a" (&lp->lock) : "cc" );
+			   : "=&d" (result), "=&d" (reg), "=m" (lp->lock)
+			   : "a" (&lp->lock), "m" (lp->lock)
+			   : "cc", "memory" );
 	return !result;
 }
 
@@ -93,7 +95,8 @@ extern inline void _raw_spin_unlock(spinlock_t *lp)
 
 	__asm__ __volatile("cs %0,%3,0(%4)"
 			   : "=d" (old), "=m" (lp->lock)
-			   : "0" (lp->lock), "d" (0), "a" (lp) : "cc" );
+			   : "0" (lp->lock), "d" (0), "a" (lp)
+			   : "cc", "memory" );
 }
 		
 /*
@@ -126,8 +129,8 @@ typedef struct {
                      "   la    3,1(2)\n"     /* one more reader */ \
                      "   cs    2,3,0(%1)\n"  /* try to write new value */ \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) : "a" (&(rw)->lock), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #else /* __s390x__ */
 #define _raw_read_lock(rw)   \
         asm volatile("   lg    2,0(%1)\n"   \
@@ -137,9 +140,9 @@ typedef struct {
                      "   la    3,1(2)\n"   /* one more reader */  \
                      "   csg   2,3,0(%1)\n" /* try to write new value */ \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) \
-		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #endif /* __s390x__ */
 
 #ifndef __s390x__
@@ -151,8 +154,8 @@ typedef struct {
                      "   ahi   3,-1\n"    /* one less reader */ \
                      "   cs    2,3,0(%1)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) : "a" (&(rw)->lock), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #else /* __s390x__ */
 #define _raw_read_unlock(rw) \
         asm volatile("   lg    2,0(%1)\n"   \
@@ -162,9 +165,9 @@ typedef struct {
                      "   bctgr 3,0\n"    /* one less reader */ \
                      "   csg   2,3,0(%1)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) \
-		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #endif /* __s390x__ */
 
 #ifndef __s390x__
@@ -176,8 +179,8 @@ typedef struct {
                      "1: slr   2,2\n"     /* old lock value must be 0 */ \
                      "   cs    2,3,0(%1)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) : "a" (&(rw)->lock), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #else /* __s390x__ */
 #define _raw_write_lock(rw) \
         asm volatile("   llihh 3,0x8000\n" /* new lock value = 0x80...0 */ \
@@ -186,9 +189,9 @@ typedef struct {
                      "1: slgr  2,2\n"      /* old lock value must be 0 */ \
                      "   csg   2,3,0(%1)\n" \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) \
-		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #endif /* __s390x__ */
 
 #ifndef __s390x__
@@ -200,8 +203,8 @@ typedef struct {
                      "   sll   2,31\n"    /* old lock value must be 0x80000000 */ \
                      "   cs    2,3,0(%1)\n" \
                      "   jl    0b"       \
-                     : "+m" ((rw)->lock) : "a" (&(rw)->lock) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) : "a" (&(rw)->lock), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #else /* __s390x__ */
 #define _raw_write_unlock(rw) \
         asm volatile("   slgr  3,3\n"      /* new lock value = 0 */ \
@@ -210,9 +213,9 @@ typedef struct {
                      "1: llihh 2,0x8000\n" /* old lock value must be 0x8..0 */\
                      "   csg   2,3,0(%1)\n"   \
                      "   jl    0b"         \
-                     : "+m" ((rw)->lock) \
-		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND) \
-		     : "2", "3", "cc" )
+                     : "=m" ((rw)->lock) \
+		     : "a" (&(rw)->lock), "i" (__DIAG44_OPERAND), \
+		       "m" ((rw)->lock) : "2", "3", "cc", "memory" )
 #endif /* __s390x__ */
 
 extern inline int _raw_write_trylock(rwlock_t *rw)
@@ -230,8 +233,9 @@ extern inline int _raw_write_trylock(rwlock_t *rw)
 			     "   llihh %1,0x8000\n"
 			     "0: csg %0,%1,0(%3)\n"
 #endif /* __s390x__ */
-			     : "=&d" (result), "=&d" (reg), "+m" (rw->lock)
-			     : "a" (&rw->lock) : "cc" );
+			     : "=&d" (result), "=&d" (reg), "=m" (rw->lock)
+			     : "a" (&rw->lock), "m" (rw->lock)
+			     : "cc", "memory" );
 	return result == 0;
 }
 

@@ -270,95 +270,6 @@ static irqreturn_t parport_pc_interrupt(int irq, void *dev_id, struct pt_regs *r
 	return IRQ_HANDLED;
 }
 
-void parport_pc_write_data(struct parport *p, unsigned char d)
-{
-	outb (d, DATA (p));
-}
-
-unsigned char parport_pc_read_data(struct parport *p)
-{
-	return inb (DATA (p));
-}
-
-void parport_pc_write_control(struct parport *p, unsigned char d)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-
-	/* Take this out when drivers have adapted to the newer interface. */
-	if (d & 0x20) {
-		printk (KERN_DEBUG "%s (%s): use data_reverse for this!\n",
-			p->name, p->cad->name);
-		parport_pc_data_reverse (p);
-	}
-
-	__parport_pc_frob_control (p, wm, d & wm);
-}
-
-unsigned char parport_pc_read_control(struct parport *p)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-	const struct parport_pc_private *priv = p->physport->private_data;
-	return priv->ctr & wm; /* Use soft copy */
-}
-
-unsigned char parport_pc_frob_control (struct parport *p, unsigned char mask,
-				       unsigned char val)
-{
-	const unsigned char wm = (PARPORT_CONTROL_STROBE |
-				  PARPORT_CONTROL_AUTOFD |
-				  PARPORT_CONTROL_INIT |
-				  PARPORT_CONTROL_SELECT);
-
-	/* Take this out when drivers have adapted to the newer interface. */
-	if (mask & 0x20) {
-		printk (KERN_DEBUG "%s (%s): use data_%s for this!\n",
-			p->name, p->cad->name,
-			(val & 0x20) ? "reverse" : "forward");
-		if (val & 0x20)
-			parport_pc_data_reverse (p);
-		else
-			parport_pc_data_forward (p);
-	}
-
-	/* Restrict mask and val to control lines. */
-	mask &= wm;
-	val &= wm;
-
-	return __parport_pc_frob_control (p, mask, val);
-}
-
-unsigned char parport_pc_read_status(struct parport *p)
-{
-	return inb (STATUS (p));
-}
-
-void parport_pc_disable_irq(struct parport *p)
-{
-	__parport_pc_frob_control (p, 0x10, 0);
-}
-
-void parport_pc_enable_irq(struct parport *p)
-{
-	if (p->irq != PARPORT_IRQ_NONE)
-		__parport_pc_frob_control (p, 0x10, 0x10);
-}
-
-void parport_pc_data_forward (struct parport *p)
-{
-	__parport_pc_frob_control (p, 0x20, 0);
-}
-
-void parport_pc_data_reverse (struct parport *p)
-{
-	__parport_pc_frob_control (p, 0x20, 0x20);
-}
-
 void parport_pc_init_state(struct pardevice *dev, struct parport_state *s)
 {
 	s->u.pc.ctr = 0xc;
@@ -418,7 +329,8 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 				left -= 16;
 			} else {
 				/* grab single byte from the warp fifo */
-				*((char *)buf)++ = inb (EPPDATA (port));
+				*((char *)buf) = inb (EPPDATA (port));
+				buf++;
 				got++;
 				left--;
 			}
@@ -445,7 +357,8 @@ static size_t parport_pc_epp_read_data (struct parport *port, void *buf,
 		return length;
 	}
 	for (; got < length; got++) {
-		*((char*)buf)++ = inb (EPPDATA(port));
+		*((char*)buf) = inb (EPPDATA(port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			/* EPP timeout */
 			clear_epp_timeout (port);
@@ -474,7 +387,8 @@ static size_t parport_pc_epp_write_data (struct parport *port, const void *buf,
 		return length;
 	}
 	for (; written < length; written++) {
-		outb (*((char*)buf)++, EPPDATA(port));
+		outb (*((char*)buf), EPPDATA(port));
+		buf++;
 		if (inb (STATUS(port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
@@ -498,7 +412,8 @@ static size_t parport_pc_epp_read_addr (struct parport *port, void *buf,
 		return length;
 	}
 	for (; got < length; got++) {
-		*((char*)buf)++ = inb (EPPADDR (port));
+		*((char*)buf) = inb (EPPADDR (port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
@@ -523,7 +438,8 @@ static size_t parport_pc_epp_write_addr (struct parport *port,
 		return length;
 	}
 	for (; written < length; written++) {
-		outb (*((char*)buf)++, EPPADDR (port));
+		outb (*((char*)buf), EPPADDR (port));
+		buf++;
 		if (inb (STATUS (port)) & 0x01) {
 			clear_epp_timeout (port);
 			break;
@@ -1235,6 +1151,8 @@ dump_parport_state ("fwd idle", port);
  *	******************************************
  */
 
+/* GCC is not inlining extern inline function later overwriten to non-inline,
+   so we use outlined_ variants here.  */
 struct parport_operations parport_pc_ops = 
 {
 	.write_data	= parport_pc_write_data,
@@ -2686,25 +2604,10 @@ static struct parport_pc_superio {
 
 
 enum parport_pc_pci_cards {
-	siig_1s1p_10x_550 = last_sio,
-	siig_1s1p_10x_650,
-	siig_1s1p_10x_850,
-	siig_1p_10x,
+	siig_1p_10x = last_sio,
 	siig_2p_10x,
-	siig_2s1p_10x_550,
-	siig_2s1p_10x_650,
-	siig_2s1p_10x_850,
 	siig_1p_20x,
 	siig_2p_20x,
-	siig_2p1s_20x_550,
-	siig_2p1s_20x_650,
-	siig_2p1s_20x_850,
-	siig_1s1p_20x_550,
-	siig_1s1p_20x_650,
-	siig_1s1p_20x_850,
-	siig_2s1p_20x_550,
-	siig_2s1p_20x_650,
-	siig_2s1p_20x_850,
 	lava_parallel,
 	lava_parallel_dual_a,
 	lava_parallel_dual_b,
@@ -2766,25 +2669,10 @@ static struct parport_pc_pci {
 	 * is non-zero we couldn't use any of the ports. */
 	void (*postinit_hook) (struct pci_dev *pdev, int failed);
 } cards[] __devinitdata = {
-	/* siig_1s1p_10x_550 */		{ 1, { { 3, 4 }, } },
-	/* siig_1s1p_10x_650 */		{ 1, { { 3, 4 }, } },
-	/* siig_1s1p_10x_850 */		{ 1, { { 3, 4 }, } },
 	/* siig_1p_10x */		{ 1, { { 2, 3 }, } },
 	/* siig_2p_10x */		{ 2, { { 2, 3 }, { 4, 5 }, } },
-	/* siig_2s1p_10x_550 */		{ 1, { { 4, 5 }, } },
-	/* siig_2s1p_10x_650 */		{ 1, { { 4, 5 }, } },
-	/* siig_2s1p_10x_850 */		{ 1, { { 4, 5 }, } },
 	/* siig_1p_20x */		{ 1, { { 0, 1 }, } },
 	/* siig_2p_20x */		{ 2, { { 0, 1 }, { 2, 3 }, } },
-	/* siig_2p1s_20x_550 */		{ 2, { { 1, 2 }, { 3, 4 }, } },
-	/* siig_2p1s_20x_650 */		{ 2, { { 1, 2 }, { 3, 4 }, } },
-	/* siig_2p1s_20x_850 */		{ 2, { { 1, 2 }, { 3, 4 }, } },
-	/* siig_1s1p_20x_550 */		{ 1, { { 1, 2 }, } },
-	/* siig_1s1p_20x_650 */		{ 1, { { 1, 2 }, } },
-	/* siig_1s1p_20x_850 */		{ 1, { { 1, 2 }, } },
-	/* siig_2s1p_20x_550 */		{ 1, { { 2, 3 }, } },
-	/* siig_2s1p_20x_650 */		{ 1, { { 2, 3 }, } },
-	/* siig_2s1p_20x_850 */		{ 1, { { 2, 3 }, } },
 	/* lava_parallel */		{ 1, { { 0, -1 }, } },
 	/* lava_parallel_dual_a */	{ 1, { { 0, -1 }, } },
 	/* lava_parallel_dual_b */	{ 1, { { 0, -1 }, } },
@@ -2836,44 +2724,14 @@ static struct pci_device_id parport_pc_pci_tbl[] = {
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, sio_ite_8872 },
 
 	/* PCI cards */
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_550,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1s1p_10x_550 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_650,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1s1p_10x_650 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_10x_850,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1s1p_10x_850 },
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1P_10x,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1p_10x },
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P_10x,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2p_10x },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_550,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_10x_550 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_650,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_10x_650 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_10x_850,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_10x_850 },
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1P_20x,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1p_20x },
 	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P_20x,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2p_20x },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_550,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2p1s_20x_550 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_650,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2p1s_20x_650 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2P1S_20x_850,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2p1s_20x_850 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_550,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_20x_550 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_650,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1s1p_20x_650 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S1P_20x_850,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_1s1p_20x_850 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_550,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_20x_550 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_650,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_20x_650 },
-	{ PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_2S1P_20x_850,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, siig_2s1p_20x_850 },
 	{ PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_PARALLEL,
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, lava_parallel },
 	{ PCI_VENDOR_ID_LAVA, PCI_DEVICE_ID_LAVA_DUAL_PAR_A,

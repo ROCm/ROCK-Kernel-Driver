@@ -94,7 +94,7 @@ xtalk_piomap_alloc_f    (vertex_hdl_t dev,	/* set up mapping for this device */
 			 iopaddr_t xtalk_addr,	/* map for this xtalk_addr range */
 			 size_t byte_count,
 			 size_t byte_count_max,		/* maximum size of a mapping */
-			 unsigned flags);	/* defined in sys/pio.h */
+			 unsigned int flags);	/* defined in sys/pio.h */
 typedef void
 xtalk_piomap_free_f     (xtalk_piomap_t xtalk_piomap);
 
@@ -111,7 +111,7 @@ xtalk_piotrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 iopaddr_t xtalk_addr,	/* Crosstalk address */
 			 size_t byte_count,	/* map this many bytes */
-			 unsigned flags);	/* (currently unused) */
+			 unsigned int flags);	/* (currently unused) */
 
 extern caddr_t
 xtalk_pio_addr		(vertex_hdl_t dev,	/* translate for this device */
@@ -119,7 +119,7 @@ xtalk_pio_addr		(vertex_hdl_t dev,	/* translate for this device */
 			 iopaddr_t xtalk_addr,	/* Crosstalk address */
 			 size_t byte_count,	/* map this many bytes */
 			 xtalk_piomap_t *xtalk_piomapp,	/* RETURNS mapping resources */
-			 unsigned flags);	/* (currently unused) */
+			 unsigned int flags);	/* (currently unused) */
 
 /* DMA MANAGEMENT */
 
@@ -129,7 +129,7 @@ typedef xtalk_dmamap_t
 xtalk_dmamap_alloc_f    (vertex_hdl_t dev,	/* set up mappings for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 size_t byte_count_max,		/* max size of a mapping */
-			 unsigned flags);	/* defined in dma.h */
+			 unsigned int flags);	/* defined in dma.h */
 
 typedef void
 xtalk_dmamap_free_f     (xtalk_dmamap_t dmamap);
@@ -142,7 +142,7 @@ xtalk_dmamap_addr_f     (xtalk_dmamap_t dmamap,		/* use these mapping resources 
 typedef alenlist_t
 xtalk_dmamap_list_f     (xtalk_dmamap_t dmamap,		/* use these mapping resources */
 			 alenlist_t alenlist,	/* map this address/length list */
-			 unsigned flags);
+			 unsigned int flags);
 
 typedef void
 xtalk_dmamap_done_f     (xtalk_dmamap_t dmamap);
@@ -152,13 +152,13 @@ xtalk_dmatrans_addr_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 paddr_t paddr,		/* system physical address */
 			 size_t byte_count,	/* length */
-			 unsigned flags);
+			 unsigned int flags);
 
 typedef alenlist_t
 xtalk_dmatrans_list_f   (vertex_hdl_t dev,	/* translate for this device */
 			 device_desc_t dev_desc,	/* device descriptor */
 			 alenlist_t palenlist,	/* system address/length list */
-			 unsigned flags);
+			 unsigned int flags);
 
 typedef void
 xtalk_dmamap_drain_f	(xtalk_dmamap_t map);	/* drain this map's channel */
@@ -243,7 +243,7 @@ xtalk_early_piotrans_addr_f (xwidget_part_num_t part_num,
 			     int which,
 			     iopaddr_t xtalk_addr,
 			     size_t byte_count,
-			     unsigned flags);
+			     unsigned int flags);
 
 /*
  * Adapters that provide a crosstalk interface adhere to this software interface.

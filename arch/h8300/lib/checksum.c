@@ -32,7 +32,6 @@
    of the assembly has to go. */
 
 #include <net/checksum.h>
-#include <net/module.h>
 
 static inline unsigned short from32to16(unsigned long x)
 {

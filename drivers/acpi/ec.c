@@ -578,8 +578,8 @@ acpi_ec_add (
 	ec->handle = device->handle;
 	ec->uid = -1;
 	ec->lock = SPIN_LOCK_UNLOCKED;
-	sprintf(acpi_device_name(device), "%s", ACPI_EC_DEVICE_NAME);
-	sprintf(acpi_device_class(device), "%s", ACPI_EC_CLASS);
+	strcpy(acpi_device_name(device), ACPI_EC_DEVICE_NAME);
+	strcpy(acpi_device_class(device), ACPI_EC_CLASS);
 	acpi_driver_data(device) = ec;
 
 	/* Use the global lock for all EC transactions? */

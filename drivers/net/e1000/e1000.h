@@ -1,7 +1,7 @@
 /*******************************************************************************
 
   
-  Copyright(c) 1999 - 2003 Intel Corporation. All rights reserved.
+  Copyright(c) 1999 - 2004 Intel Corporation. All rights reserved.
   
   This program is free software; you can redistribute it and/or modify it 
   under the terms of the GNU General Public License as published by the Free 
@@ -91,6 +91,16 @@ struct e1000_adapter;
 #define E1000_ERR(args...) printk(KERN_ERR "e1000: " args)
 
 #define E1000_MAX_INTR 10
+
+/* How many descriptors for TX and RX ? */
+#define E1000_DEFAULT_TXD                  256
+#define E1000_MAX_TXD                      256
+#define E1000_MIN_TXD                       80
+#define E1000_MAX_82544_TXD               4096
+#define E1000_DEFAULT_RXD                  256
+#define E1000_MAX_RXD                      256
+#define E1000_MIN_RXD                       80
+#define E1000_MAX_82544_RXD               4096
 
 /* Supported Rx Buffer Sizes */
 #define E1000_RXBUFFER_2048  2048
@@ -192,10 +202,14 @@ struct e1000_adapter {
 
 	/* TX */
 	struct e1000_desc_ring tx_ring;
+	spinlock_t tx_lock;
 	uint32_t txd_cmd;
 	uint32_t tx_int_delay;
 	uint32_t tx_abs_int_delay;
 	uint32_t gotcl;
+	uint64_t gotcl_old;
+	uint64_t tpt_old;
+	uint64_t colc_old;
 	uint32_t tx_fifo_head;
 	uint32_t tx_head_addr;
 	uint32_t tx_fifo_size;
@@ -210,6 +224,7 @@ struct e1000_adapter {
 	uint32_t rx_abs_int_delay;
 	boolean_t rx_csum;
 	uint32_t gorcl;
+	uint64_t gorcl_old;
 
 	/* Interrupt Throttle Rate */
 	uint32_t itr;

@@ -32,7 +32,6 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/nmi.h>
-#include <asm/edd.h>
 #include <asm/ist.h>
 
 extern void dump_thread(struct pt_regs *, struct user *);
@@ -201,11 +200,6 @@ EXPORT_SYMBOL(kunmap);
 EXPORT_SYMBOL(kmap_atomic);
 EXPORT_SYMBOL(kunmap_atomic);
 EXPORT_SYMBOL(kmap_atomic_to_page);
-#endif
-
-#ifdef CONFIG_EDD_MODULE
-EXPORT_SYMBOL(edd);
-EXPORT_SYMBOL(eddnr);
 #endif
 
 #if defined(CONFIG_X86_SPEEDSTEP_SMI) || defined(CONFIG_X86_SPEEDSTEP_SMI_MODULE)

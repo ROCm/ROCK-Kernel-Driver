@@ -56,6 +56,8 @@ static __force_inline unsigned do_csum(const unsigned char *buff, unsigned len)
 		}
 		count >>= 1;		/* nr of 32-bit words.. */
 		if (count) {
+			unsigned long zero;
+			unsigned count64;
 			if (4 & (unsigned long) buff) {
 				result += *(unsigned int *) buff;
 				count--;
@@ -65,8 +67,8 @@ static __force_inline unsigned do_csum(const unsigned char *buff, unsigned len)
 			count >>= 1;	/* nr of 64-bit words.. */
 
 			/* main loop using 64byte blocks */
-				unsigned long zero = 0; 
-			unsigned count64 = count >> 3; 
+			zero = 0;
+			count64 = count >> 3;
 			while (count64) { 
 				asm("addq 0*8(%[src]),%[res]\n\t"
 				    "adcq 1*8(%[src]),%[res]\n\t"

@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 
-#include <linux/config.h>
+#include <asm/semaphore.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ksys/elsc.h>
 
@@ -158,12 +158,9 @@ struct module_s {
     spinlock_t		lock;		/* Lock for this structure	   */
 
     /* List of nodes in this module */
-    cnodeid_t		nodes[MODULE_MAX_NODES];
-    geoid_t		geoid[MODULE_MAX_NODES];
-    struct {
-		char	moduleid[8];
-    } io[MODULE_MAX_NODES];
-    int			nodecnt;	/* Number of nodes in array        */
+    cnodeid_t		nodes[MAX_SLABS + 1];
+    geoid_t		geoid[MAX_SLABS + 1];
+
     /* Fields for Module System Controller */
     int			mesgpend;	/* Message pending                 */
     int			shutdown;	/* Shutdown in progress            */

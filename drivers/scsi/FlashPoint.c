@@ -12053,14 +12053,14 @@ UCHAR CalcLrc(UCHAR buffer[])
 */
 
 static inline unsigned char
-FlashPoint__ProbeHostAdapter(FlashPoint_Info_T *FlashPointInfo)
+FlashPoint__ProbeHostAdapter(struct FlashPoint_Info *FlashPointInfo)
 {
   return FlashPoint_ProbeHostAdapter((PSCCBMGR_INFO) FlashPointInfo);
 }
 
 
 static inline FlashPoint_CardHandle_T
-FlashPoint__HardwareResetHostAdapter(FlashPoint_Info_T *FlashPointInfo)
+FlashPoint__HardwareResetHostAdapter(struct FlashPoint_Info *FlashPointInfo)
 {
   return FlashPoint_HardwareResetHostAdapter((PSCCBMGR_INFO) FlashPointInfo);
 }
@@ -12073,14 +12073,14 @@ FlashPoint__ReleaseHostAdapter(FlashPoint_CardHandle_T CardHandle)
 
 
 static inline void
-FlashPoint__StartCCB(FlashPoint_CardHandle_T CardHandle, BusLogic_CCB_T *CCB)
+FlashPoint__StartCCB(FlashPoint_CardHandle_T CardHandle, struct BusLogic_CCB *CCB)
 {
   FlashPoint_StartCCB(CardHandle, (PSCCB) CCB);
 }
 
 
 static inline void
-FlashPoint__AbortCCB(FlashPoint_CardHandle_T CardHandle, BusLogic_CCB_T *CCB)
+FlashPoint__AbortCCB(FlashPoint_CardHandle_T CardHandle, struct BusLogic_CCB *CCB)
 {
   FlashPoint_AbortCCB(CardHandle, (PSCCB) CCB);
 }
@@ -12143,11 +12143,11 @@ void FlashPoint_InquireTargetInfo(FlashPoint_CardHandle_T CardHandle,
   Define prototypes for the FlashPoint SCCB Manager Functions.
 */
 
-extern unsigned char FlashPoint_ProbeHostAdapter(FlashPoint_Info_T *);
+extern unsigned char FlashPoint_ProbeHostAdapter(struct FlashPoint_Info *);
 extern FlashPoint_CardHandle_T
-       FlashPoint_HardwareResetHostAdapter(FlashPoint_Info_T *);
-extern void FlashPoint_StartCCB(FlashPoint_CardHandle_T, BusLogic_CCB_T *);
-extern int FlashPoint_AbortCCB(FlashPoint_CardHandle_T, BusLogic_CCB_T *);
+       FlashPoint_HardwareResetHostAdapter(struct FlashPoint_Info *);
+extern void FlashPoint_StartCCB(FlashPoint_CardHandle_T, struct BusLogic_CCB *);
+extern int FlashPoint_AbortCCB(FlashPoint_CardHandle_T, struct BusLogic_CCB *);
 extern boolean FlashPoint_InterruptPending(FlashPoint_CardHandle_T);
 extern int FlashPoint_HandleInterrupt(FlashPoint_CardHandle_T);
 extern void FlashPoint_ReleaseHostAdapter(FlashPoint_CardHandle_T);

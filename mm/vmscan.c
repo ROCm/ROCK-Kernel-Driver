@@ -271,8 +271,6 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			(*nr_mapped)++;
 
 		BUG_ON(PageActive(page));
-		may_enter_fs = (gfp_mask & __GFP_FS) ||
-				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
 		if (PageWriteback(page))
 			goto keep_locked;
@@ -302,6 +300,9 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 			mapping = page->mapping;
 		}
 #endif /* CONFIG_SWAP */
+
+		may_enter_fs = (gfp_mask & __GFP_FS) ||
+				(PageSwapCache(page) && (gfp_mask & __GFP_IO));
 
 		/*
 		 * The page is mapped into the page tables of one or more

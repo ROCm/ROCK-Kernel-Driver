@@ -62,6 +62,15 @@ int oops_in_progress;
  */
 static DECLARE_MUTEX(console_sem);
 struct console *console_drivers;
+/*
+ * This is used for debugging the mess that is the VT code by
+ * keeping track if we have the console semaphore held. It's
+ * definitely not the perfect debug tool (we don't know if _WE_
+ * hold it are racing, but it helps tracking those weird code
+ * path in the console code where we end up in places I want
+ * locked without the console sempahore held
+ */
+static int console_locked;
 
 /*
  * logbuf_lock protects log_buf, log_start, log_end, con_start and logged_chars
@@ -524,6 +533,7 @@ asmlinkage int printk(const char *fmt, ...)
 		goto out;
 	}
 	if (!down_trylock(&console_sem)) {
+		console_locked = 1;
 		/*
 		 * We own the drivers.  We can drop the spinlock and let
 		 * release_console_sem() print the text
@@ -557,9 +567,16 @@ void acquire_console_sem(void)
 	if (in_interrupt())
 		BUG();
 	down(&console_sem);
+	console_locked = 1;
 	console_may_schedule = 1;
 }
 EXPORT_SYMBOL(acquire_console_sem);
+
+int is_console_locked(void)
+{
+	return console_locked;
+}
+EXPORT_SYMBOL(is_console_locked);
 
 /**
  * release_console_sem - unlock the console system
@@ -592,12 +609,14 @@ void release_console_sem(void)
 		spin_unlock_irqrestore(&logbuf_lock, flags);
 		call_console_drivers(_con_start, _log_end);
 	}
+	console_locked = 0;
 	console_may_schedule = 0;
 	up(&console_sem);
 	spin_unlock_irqrestore(&logbuf_lock, flags);
 	if (wake_klogd && !oops_in_progress && waitqueue_active(&log_wait))
 		wake_up_interruptible(&log_wait);
 }
+EXPORT_SYMBOL(release_console_sem);
 
 /** console_conditional_schedule - yield the CPU if required
  *
@@ -633,6 +652,7 @@ void console_unblank(void)
 	 */
 	if (down_trylock(&console_sem) != 0)
 		return;
+	console_locked = 1;
 	console_may_schedule = 0;
 	for (c = console_drivers; c != NULL; c = c->next)
 		if ((c->flags & CON_ENABLED) && c->unblank)

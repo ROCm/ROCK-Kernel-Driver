@@ -261,30 +261,46 @@ void hpsb_register_highlevel(struct hpsb_highlevel *hl)
         return;
 }
 
+static void __unregister_host(struct hpsb_highlevel *hl, struct hpsb_host *host)
+{
+	unsigned long flags;
+	struct list_head *lh, *next;
+	struct hpsb_address_serve *as;
+
+	if (hl->remove_host)
+		hl->remove_host(host);
+
+	/* Remove any addresses that are matched for this highlevel driver
+	 * and this particular host. */
+	write_lock_irqsave(&addr_space_lock, flags);
+	list_for_each_safe (lh, next, &hl->addr_list) {
+		as = list_entry(lh, struct hpsb_address_serve, addr_list);
+
+		if (as->host != host)
+			continue;
+
+		if (!list_empty(&as->addr_list)) {
+			list_del(&as->as_list);
+			list_del(&as->addr_list);
+			kfree(as);
+		}
+	}
+	write_unlock_irqrestore(&addr_space_lock, flags);
+
+	hpsb_destroy_hostinfo(hl, host);
+}
+
 static int highlevel_for_each_host_unreg(struct hpsb_host *host, void *__data)
 {
 	struct hpsb_highlevel *hl = __data;
 
-	hl->remove_host(host);
-	hpsb_destroy_hostinfo(hl, host);
+	__unregister_host(hl, host);
 
 	return 0;
 }
 
 void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
 {
-	struct list_head *lh, *next;
-        struct hpsb_address_serve *as;
-	unsigned long flags;
-
-	write_lock_irqsave(&addr_space_lock, flags);
-	list_for_each_safe (lh, next, &hl->addr_list) {
-                as = list_entry(lh, struct hpsb_address_serve, addr_list);
-                list_del(&as->as_list);
-                kfree(as);
-        }
-	write_unlock_irqrestore(&addr_space_lock, flags);
-
 	write_lock(&hl_irqs_lock);
 	list_del(&hl->irq_list);
 	write_unlock(&hl_irqs_lock);
@@ -293,8 +309,7 @@ void hpsb_unregister_highlevel(struct hpsb_highlevel *hl)
         list_del(&hl->hl_list);
 	up_write(&hl_drivers_sem);
 
-        if (hl->remove_host)
-		nodemgr_for_each_host(hl, highlevel_for_each_host_unreg);
+	nodemgr_for_each_host(hl, highlevel_for_each_host_unreg);
 }
 
 int hpsb_register_addrspace(struct hpsb_highlevel *hl, struct hpsb_host *host,
@@ -435,29 +450,11 @@ void highlevel_add_host(struct hpsb_host *host)
 void highlevel_remove_host(struct hpsb_host *host)
 {
         struct hpsb_highlevel *hl;
-	struct list_head *lh, *next;
-	struct hpsb_address_serve *as;
-	unsigned long flags;
 
 	down_read(&hl_drivers_sem);
-	list_for_each_entry(hl, &hl_drivers, hl_list) {
-		if (hl->remove_host) {
-			hl->remove_host(host);
-			hpsb_destroy_hostinfo(hl, host);
-		}
-        }
+	list_for_each_entry(hl, &hl_drivers, hl_list)
+		__unregister_host(hl, host);
 	up_read(&hl_drivers_sem);
-
-	/* Free up 1394 address space left behind by high level drivers. */
-	write_lock_irqsave(&addr_space_lock, flags);
-	list_for_each_safe (lh, next, &host->addr_space) {
-		as = list_entry(lh, struct hpsb_address_serve, as_list);
-		if (!list_empty(&as->addr_list)) {
-			list_del(&as->addr_list);
-			kfree(as);
-		}
-	}
-	write_unlock_irqrestore(&addr_space_lock, flags);
 }
 
 void highlevel_host_reset(struct hpsb_host *host)
@@ -524,7 +521,7 @@ int highlevel_read(struct hpsb_host *host, int nodeid, void *data,
                                 rcode = RCODE_TYPE_ERROR;
                         }
 
-			(u8 *)data += partlength;
+			data += partlength;
                         length -= partlength;
                         addr += partlength;
 
@@ -570,7 +567,7 @@ int highlevel_write(struct hpsb_host *host, int nodeid, int destid,
                                 rcode = RCODE_TYPE_ERROR;
                         }
 
-			(u8 *)data += partlength;
+			data += partlength;
                         length -= partlength;
                         addr += partlength;
 

@@ -2,8 +2,6 @@
  *
  * Name:	skcsum.h
  * Project:	GEnesis - SysKonnect SK-NET Gigabit Ethernet (SK-98xx)
- * Version:	$Revision: 1.10 $
- * Date:	$Date: 2003/08/20 13:59:57 $
  * Purpose:	Store/verify Internet checksum in send/receive packets.
  *
  ******************************************************************************/
@@ -18,52 +16,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skcsum.h,v $
- *	Revision 1.10  2003/08/20 13:59:57  mschmid
- *	Changed notation of #ifndef SkCsCalculateChecksum to
- *	#ifndef SK_CS_CALCULATE_CHECKSUM
- *	
- *	Revision 1.9  2001/02/06 11:21:39  rassmann
- *	Editorial changes.
- *	
- *	Revision 1.8  2001/02/06 11:15:36  rassmann
- *	Supporting two nets on dual-port adapters.
- *	
- *	Revision 1.7  2000/06/29 13:17:05  rassmann
- *	Corrected reception of a packet with UDP checksum == 0 (which means there
- *	is no UDP checksum).
- *	
- *	Revision 1.6  2000/02/28 12:33:44  cgoos
- *	Changed C++ style comments to C style.
- *	
- *	Revision 1.5  2000/02/21 12:10:05  cgoos
- *	Fixed license comment.
- *	
- *	Revision 1.4  2000/02/21 11:08:37  cgoos
- *	Merged changes back into common source.
- *	
- *	Revision 1.1  1999/07/26 14:47:49  mkarl
- *	changed from common source to windows specific source
- *	added return SKCS_STATUS_IP_CSUM_ERROR_UDP and
- *	SKCS_STATUS_IP_CSUM_ERROR_TCP to pass the NidsTester
- *	changes for Tx csum offload
- *	
- *	Revision 1.2  1998/09/04 12:16:34  mhaveman
- *	Checked in for Stephan to allow compilation.
- *	-Added definition SK_CSUM_EVENT_CLEAR_PROTO_STATS to clear statistic
- *	-Added prototype for SkCsEvent()
- *	
- *	Revision 1.1  1998/09/01 15:36:53  swolf
- *	initial revision
- *
- *	01-Sep-1998 sw	Created.
  *
  ******************************************************************************/
 

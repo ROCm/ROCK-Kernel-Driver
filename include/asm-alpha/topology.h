@@ -39,9 +39,6 @@ static inline int node_to_cpumask(int node)
 	return node_cpu_mask;
 }
 
-# define node_to_memblk(node)		(node)
-# define memblk_to_node(memblk)	(memblk)
-
 /* Cross-node load balancing interval. */
 # define NODE_BALANCE_RATE 10
 

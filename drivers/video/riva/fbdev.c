@@ -495,8 +495,10 @@ static void rivafb_load_cursor_image(struct riva_par *par, u8 *data,
 	u32 b, m, tmp;
 
 	for (i = 0; i < h; i++) {
-		b = *((u32 *)data)++;
-		m = *((u32 *)mask)++;
+		b = *((u32 *)data);
+		b = (u32)((u32 *)b + 1);
+		m = *((u32 *)mask);
+		m = (u32)((u32 *)m + 1);
 		reverse_order(&b);
 		
 		for (j = 0; j < w/2; j++) {
@@ -1437,7 +1439,8 @@ static void rivafb_imageblit(struct fb_info *info,
 	while (size >= 16) {
 		RIVA_FIFO_FREE(par->riva, Bitmap, 16);
 		for (i = 0; i < 16; i++) {
-			tmp = *((u32 *)cdat)++;
+			tmp = *((u32 *)cdat);
+			cdat = (u8 *)((u32 *)cdat + 1);
 			reverse_order(&tmp);
 			d[i] = tmp;
 		}
@@ -1446,7 +1449,8 @@ static void rivafb_imageblit(struct fb_info *info,
 	if (size) {
 		RIVA_FIFO_FREE(par->riva, Bitmap, size);
 		for (i = 0; i < size; i++) {
-			tmp = *((u32 *) cdat)++;
+			tmp = *((u32 *) cdat);
+			cdat = (u8 *)((u32 *)cdat + 1);
 			reverse_order(&tmp);
 			d[i] = tmp;
 		}

@@ -451,15 +451,18 @@ int get_fpxregs( struct user_fxsr_struct __user *buf, struct task_struct *tsk )
 
 int set_fpxregs( struct task_struct *tsk, struct user_fxsr_struct __user *buf )
 {
+	int ret = 0;
+
 	if ( cpu_has_fxsr ) {
-		__copy_from_user( &tsk->thread.i387.fxsave, buf,
-				  sizeof(struct user_fxsr_struct) );
+		if (__copy_from_user( &tsk->thread.i387.fxsave, buf,
+				  sizeof(struct user_fxsr_struct) ))
+			ret = -EFAULT;
 		/* mxcsr bit 6 and 31-16 must be zero for security reasons */
 		tsk->thread.i387.fxsave.mxcsr &= 0xffbf;
-		return 0;
 	} else {
-		return -EIO;
+		ret = -EIO;
 	}
+	return ret;
 }
 
 /*

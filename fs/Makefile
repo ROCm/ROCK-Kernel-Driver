@@ -45,6 +45,7 @@ obj-y				+= devpts/
 obj-$(CONFIG_PROFILING)		+= dcookies.o
  
 # Do not add any filesystems before this line
+obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
 obj-$(CONFIG_EXT3_FS)		+= ext3/ # Before ext2 so root fs can be ext3
 obj-$(CONFIG_JBD)		+= jbd/
 obj-$(CONFIG_EXT2_FS)		+= ext2/
@@ -84,7 +85,6 @@ obj-$(CONFIG_QNX4FS_FS)		+= qnx4/
 obj-$(CONFIG_AUTOFS_FS)		+= autofs/
 obj-$(CONFIG_AUTOFS4_FS)	+= autofs4/
 obj-$(CONFIG_ADFS_FS)		+= adfs/
-obj-$(CONFIG_REISERFS_FS)	+= reiserfs/
 obj-$(CONFIG_UDF_FS)		+= udf/
 obj-$(CONFIG_SUN_OPENPROMFS)	+= openpromfs/
 obj-$(CONFIG_JFS_FS)		+= jfs/

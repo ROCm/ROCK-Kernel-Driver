@@ -21,33 +21,6 @@
 
 #include "qla_def.h"
 
-/*
- *  Local Function Prototypes.
- */
-static void
-qla2x00_mbx_sem_timeout(unsigned long);
-
-static int
-qla2x00_get_mbx_access(scsi_qla_host_t *, uint32_t);
-
-static int
-qla2x00_release_mbx_access(scsi_qla_host_t *, uint32_t);
-
-static int
-qla2x00_mbx_q_add(scsi_qla_host_t *, mbx_cmdq_t **);
-
-static void
-qla2x00_mbx_q_get(scsi_qla_host_t *, mbx_cmdq_t **);
-
-static void
-qla2x00_mbx_q_memb_alloc(scsi_qla_host_t *, mbx_cmdq_t **);
-
-static void
-qla2x00_mbx_q_memb_free(scsi_qla_host_t *, mbx_cmdq_t *);
-
-/***************************/
-/* Function implementation */
-/***************************/
 
 static void
 qla2x00_mbx_sem_timeout(unsigned long data)
@@ -61,281 +34,6 @@ qla2x00_mbx_sem_timeout(unsigned long data)
 	}
 
 	DEBUG11(printk("qla2x00_mbx_sem_timeout: exiting.\n");)
-}
-
-/*
- *  tov = timeout value in seconds
- */
-static int
-qla2x00_get_mbx_access(scsi_qla_host_t *ha, uint32_t tov)
-{
-	int		ret;
-	int		prev_val = 1;  /* assume no access yet */
-	mbx_cmdq_t	*ptmp_mbq;
-	struct timer_list	tmp_cmd_timer;
-	unsigned long	cpu_flags;
-
-
-	DEBUG11(printk("qla2x00_get_mbx_access(%ld): entered.\n",
-	    ha->host_no);)
-
-	while (1) {
-		if (test_bit(MBX_CMD_WANT, &ha->mbx_cmd_flags) == 0) {
-
-			DEBUG11(printk("qla2x00_get_mbx_access(%ld): going "
-			    " to test access flags.\n", ha->host_no);)
-
-			/* No one else is waiting. Go ahead and try to
-			 * get access.
-			 */
-			if ((prev_val = test_and_set_bit(MBX_CMD_ACTIVE,
-			    &ha->mbx_cmd_flags)) == 0) {
-				break;
-			}
-		}
-
-		/* wait for previous command to finish */
-		DEBUG(printk("qla2x00_get_mbx_access(%ld): access "
-		    "flags=%lx. busy. Waiting for access. curr time=0x%lx.\n",
-		    ha->host_no, ha->mbx_cmd_flags, jiffies);)
-
-		DEBUG11(printk("qla2x00_get_mbx_access(%ld): access "
-		    "flags=%lx. busy. Waiting for access. curr time=0x%lx.\n",
-		    ha->host_no, ha->mbx_cmd_flags, jiffies);)
-
-		/*
-		 * Init timer and get semaphore from mbx q. After we got valid
-		 * semaphore pointer the MBX_CMD_WANT flag would also had
-		 * been set.
-		 */
-		qla2x00_mbx_q_add(ha, &ptmp_mbq);
-
-		if (ptmp_mbq == NULL) {
-			/* queue full? problem? can't proceed. */
-			DEBUG2_3_11(printk("qla2x00_get_mbx_access(%ld): ERROR "
-			    "no more mbx_q allowed. exiting.\n", ha->host_no);)
-
-			break;
-		}
-
-		/* init timer and semaphore */
-		init_timer(&tmp_cmd_timer);
-		tmp_cmd_timer.data = (unsigned long)&ptmp_mbq->cmd_sem;
-		tmp_cmd_timer.function =
-		    (void (*)(unsigned long))qla2x00_mbx_sem_timeout;
-		tmp_cmd_timer.expires = jiffies + tov * HZ;
-
-		DEBUG11(printk("get_mbx_access(%ld): adding timer. "
-		    "curr time=0x%lx timeoutval=0x%lx.\n",
-		    ha->host_no, jiffies, tmp_cmd_timer.expires);)
-
-			/* wait. */
-/*	 	 add_timer(&tmp_cmd_timer);*/
-		DEBUG11(printk("get_mbx_access(%ld): going to sleep. "
-		    "current time=0x%lx.\n", ha->host_no, jiffies);)
-
-		down_interruptible(&ptmp_mbq->cmd_sem);
-
-		DEBUG11(printk("get_mbx_access(%ld): woke up. current "
-		    "time=0x%lx.\n",
-		    ha->host_no, jiffies);)
-
-/*		del_timer(&tmp_cmd_timer);*/
-
-		/* try to get lock again. we'll test later to see
-		 * if we actually got the lock.
-		 */
-		prev_val = test_and_set_bit(MBX_CMD_ACTIVE,
-		    &ha->mbx_cmd_flags);
-
-		/*
-		 * After we tried to get access then we check to see
-		 * if we need to clear the MBX_CMD_WANT flag. Don't clear
-		 * this flag before trying to get access or else another
-		 * new thread might grab it before we did.
-		 */
-		spin_lock_irqsave(&ha->mbx_q_lock, cpu_flags);
-		if (ha->mbx_q_head == NULL) {
-			/* We're the last thread in queue. */
-			clear_bit(MBX_CMD_WANT, &ha->mbx_cmd_flags);
-		}
-		qla2x00_mbx_q_memb_free(ha, ptmp_mbq);
-		spin_unlock_irqrestore(&ha->mbx_q_lock, cpu_flags);
-
-		break;
-	}
-
-	if (prev_val == 0) {
-		/* We got the lock */
-		DEBUG11(printk("qla2x00_get_mbx_access(%ld): success.\n",
-		    ha->host_no);)
-
-		ret = QLA_SUCCESS;
-	} else {
-		/* Timeout or resource error. */
-		DEBUG2_3_11(printk("qla2x00_get_mbx_access(%ld): timed out.\n",
-		    ha->host_no);)
-
-		ret = QLA_FUNCTION_TIMEOUT;
-	}
-
-	return ret;
-}
-
-static int
-qla2x00_release_mbx_access(scsi_qla_host_t *ha, uint32_t tov)
-{
-	mbx_cmdq_t	*next_thread;
-
-	DEBUG11(printk("qla2x00_release_mbx_access:(%ld): entered.\n",
-	    ha->host_no);)
-
-	clear_bit(MBX_CMD_ACTIVE, &ha->mbx_cmd_flags);
-
-	/* Wake up one pending mailbox cmd thread in queue. */
-	qla2x00_mbx_q_get(ha, &next_thread);
-	if (next_thread) {
-		DEBUG11(printk("qla2x00_release_mbx_access: found pending "
-		    "mbx cmd. Waking up sem in %p.\n", &next_thread);)
-		up(&next_thread->cmd_sem);
-	}
-
-	DEBUG11(printk("qla2x00_release_mbx_access:(%ld): exiting.\n",
-	    ha->host_no);)
-
-	return QLA_SUCCESS;
-}
-
-/* Allocates a mbx_cmdq_t struct and add to the mbx_q list. */
-static int
-qla2x00_mbx_q_add(scsi_qla_host_t *ha, mbx_cmdq_t **ret_mbq)
-{
-	int		ret;
-	unsigned long	cpu_flags;
-	mbx_cmdq_t	*ptmp = NULL;
-
-	spin_lock_irqsave(&ha->mbx_q_lock, cpu_flags);
-
-	DEBUG11(printk("qla2x00_mbx_q_add: got mbx_q spinlock. "
-	    "Inst=%d.\n", apiHBAInstance);)
-
-	qla2x00_mbx_q_memb_alloc(ha, &ptmp);
-	if (ptmp == NULL) {
-		/* can't add any more threads */
-		DEBUG2_3_11(printk("qla2x00_mbx_q_add: ERROR no more "
-		    "ioctl threads allowed. Inst=%d.\n", apiHBAInstance);)
-
-		ret = QLA_MEMORY_ALLOC_FAILED;
-	} else {
-		if (ha->mbx_q_tail == NULL) {
-			/* First thread to queue. */
-			set_bit(MBX_CMD_WANT, &ha->mbx_cmd_flags);
-
-			ha->mbx_q_head = ptmp;
-		} else {
-			ha->mbx_q_tail->pnext = ptmp;
-		}
-		ha->mbx_q_tail = ptmp;
-
-		/* Now init the semaphore */
-		init_MUTEX_LOCKED(&ptmp->cmd_sem);
-		ret = QLA_SUCCESS;
-	}
-
-	*ret_mbq = ptmp;
-
-	DEBUG11(printk("qla2x00_mbx_q_add: going to release spinlock. "
-	    "ret_mbq=%p, ret=%d. Inst=%d.\n", *ret_mbq, ret, apiHBAInstance);)
-
-	spin_unlock_irqrestore(&ha->mbx_q_lock, cpu_flags);
-
-	return ret;
-}
-
-/* Just remove and return first member from mbx_cmdq.  Don't free anything. */
-static void
-qla2x00_mbx_q_get(scsi_qla_host_t *ha, mbx_cmdq_t **ret_mbq)
-{
-	unsigned long	cpu_flags;
-
-	spin_lock_irqsave(&ha->mbx_q_lock, cpu_flags);
-
-	DEBUG11(printk("qla2x00_mbx_q_get: got mbx_q spinlock. "
-	    "Inst=%d.\n", apiHBAInstance);)
-
-	/* Remove from head */
-	*ret_mbq = ha->mbx_q_head;
-	if (ha->mbx_q_head != NULL) {
-		ha->mbx_q_head = ha->mbx_q_head->pnext;
-		if (ha->mbx_q_head == NULL) {
-			/* That's the last one in queue. */
-			ha->mbx_q_tail = NULL;
-		}
-		(*ret_mbq)->pnext = NULL;
-	}
-
-	DEBUG11(printk("qla2x00_mbx_q_remove: return ret_mbq=%p. Going to "
-	    "release spinlock. Inst=%d.\n", *ret_mbq, apiHBAInstance);)
-
-	spin_unlock_irqrestore(&ha->mbx_q_lock, cpu_flags);
-}
-
-/* Find a free mbx_q member from the array. Must already got the
- * mbx_q_lock spinlock.
- */
-static void
-qla2x00_mbx_q_memb_alloc(scsi_qla_host_t *ha, mbx_cmdq_t **ret_mbx_q_memb)
-{
-	mbx_cmdq_t	*ptmp = NULL;
-
-	DEBUG11(printk("qla2x00_mbx_q_memb_alloc: entered. "
-	    "Inst=%d.\n", apiHBAInstance);)
-
-	ptmp = ha->mbx_sem_pool_head;
-	if (ptmp != NULL) {
-		ha->mbx_sem_pool_head = ptmp->pnext;
-		ptmp->pnext = NULL;
-		if (ha->mbx_sem_pool_head == NULL) {
-			ha->mbx_sem_pool_tail = NULL;
-		}
-	} else {
-		/* We ran out of pre-allocated semaphores.  Try to allocate
-		 * a new one.
-		 */
-		ptmp = kmalloc(sizeof(mbx_cmdq_t), GFP_ATOMIC);
-		if(ptmp)
-			memset(ptmp, 0, sizeof(mbx_cmdq_t));
-	}
-
-	*ret_mbx_q_memb = ptmp;
-
-	DEBUG11(printk("qla2x00_mbx_q_memb_alloc: return waitq_memb=%p. "
-	    "Inst=%d.\n", *ret_mbx_q_memb, apiHBAInstance);)
-}
-
-/* Add the specified mbx_q member back to the free semaphore pool. Must
- * already got the mbx_q_lock spinlock.
- */
-static void
-qla2x00_mbx_q_memb_free(scsi_qla_host_t *ha, mbx_cmdq_t *pfree_mbx_q_memb)
-{
-	DEBUG11(printk("qla2x00_mbx_q_memb_free: entered. Inst=%d.\n",
-	    apiHBAInstance);)
-
-	if (pfree_mbx_q_memb != NULL) {
-		if (ha->mbx_sem_pool_tail != NULL) {
-			/* Add to tail */
-			ha->mbx_sem_pool_tail->pnext = pfree_mbx_q_memb;
-		} else {
-			ha->mbx_sem_pool_head = pfree_mbx_q_memb;
-		}
-		ha->mbx_sem_pool_tail = pfree_mbx_q_memb;
-	}
-
-	/* put it back to the free pool. */
-
-	DEBUG11(printk("qla2x00_mbx_q_memb_free: exiting. "
-	    "Inst=%d.\n", apiHBAInstance);)
 }
 
 /*
@@ -366,7 +64,6 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	struct timer_list	tmp_intr_timer;
 	uint8_t		abort_active = test_bit(ABORT_ISP_ACTIVE, &ha->dpc_flags);
 	uint8_t		io_lock_on = ha->flags.init_done;
-	uint8_t		tmp_stat = 0;
 	uint16_t	command;
 	uint16_t	*iptr, *optr;
 	uint32_t	cnt;
@@ -384,8 +81,7 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	 * during non ISP abort time.
 	 */
 	if (!abort_active) {
-		tmp_stat = qla2x00_get_mbx_access(ha, mcp->tov);
-		if (tmp_stat != QLA_SUCCESS) {
+		if (qla2x00_down_timeout(&ha->mbx_cmd_sem, mcp->tov * HZ)) {
 			/* Timeout occurred. Return error. */
 			DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): cmd "
 			    "access timeout. Exiting.\n", ha->host_no);)
@@ -611,12 +307,8 @@ qla2x00_mailbox_command(scsi_qla_host_t *ha, mbx_cmd_t *mcp)
 	}
 
 	/* Allow next mbx cmd to come in. */
-	if (!abort_active) {
-		tmp_stat = qla2x00_release_mbx_access(ha, mcp->tov);
-
-		if (rval == 0)
-			rval = tmp_stat;
-	}
+	if (!abort_active)
+		up(&ha->mbx_cmd_sem);
 
 	if (rval) {
 		DEBUG2_3_11(printk("qla2x00_mailbox_command(%ld): **** FAILED. "
@@ -815,7 +507,7 @@ qla2x00_execute_fw(scsi_qla_host_t *ha)
 	mcp->mb[0] = MBC_EXECUTE_FIRMWARE;
 	mcp->mb[1] = *ha->brd_info->fw_info[0].fwstart;
 	mcp->out_mb = MBX_1|MBX_0;
-	if (IS_QLA2322(ha)) {
+	if (IS_QLA2322(ha) || IS_QLA6322(ha)) {
 		mcp->mb[2] = 0;
 		mcp->out_mb |= MBX_2;
 	}
@@ -1234,8 +926,6 @@ qla2x00_issue_iocb(scsi_qla_host_t *ha, void*  buffer, dma_addr_t phys_addr,
 	mbx_cmd_t	mc;
 	mbx_cmd_t	*mcp = &mc;
 
-	ENTER("qla2x00_issue_iocb: started");
-
 	mcp->mb[0] = MBC_IOCB_COMMAND_A64;
 	mcp->mb[1] = 0;
 	mcp->mb[2] = MSW(phys_addr);
@@ -1256,7 +946,6 @@ qla2x00_issue_iocb(scsi_qla_host_t *ha, void*  buffer, dma_addr_t phys_addr,
 		    ha->host_no,rval);)
 	} else {
 		/*EMPTY*/
-		LEAVE("qla2x00_issue_iocb: exiting normally");
 	}
 
 	return rval;
@@ -2408,32 +2097,6 @@ qla2x00_get_id_list(scsi_qla_host_t *ha, void *id_list, dma_addr_t id_list_dma,
 	return rval;
 }
 
-#if 0 /* not yet needed */
-int
-qla2x00_dump_ram(scsi_qla_host_t *ha, uint32_t risc_address,
-    dma_addr_t ispdump_dma, uint32_t size)
-{
-	int rval;
-	mbx_cmd_t mc;
-	mbx_cmd_t *mcp = &mc;
-
-	mcp->mb[0] = MBC_DUMP_RAM;
-	mcp->mb[1] = risc_address & 0xffff;
-	mcp->mb[2] = MSW(ispdump_dma);
-	mcp->mb[3] = LSW(ispdump_dma);
-	mcp->mb[4] = 0;
-	mcp->mb[6] = MSW(MSD(ispdump_dma));
-	mcp->mb[7] = LSW(MSD(ispdump_dma));
-	mcp->out_mb = MBX_7|MBX_6|MBX_4|MBX_3|MBX_2|MBX_1|MBX_0;
-	mcp->in_mb = MBX_0;
-	mcp->tov = 30;
-	mcp->flags = 0;
-	rval = qla2x00_mailbox_command(ha, mcp);
-
-	return rval;
-}
-#endif
-
 /*
  * qla2x00_lun_reset
  *	Issue lun reset mailbox command.
@@ -2458,8 +2121,6 @@ qla2x00_lun_reset(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun)
 	mbx_cmd_t	mc;
 	mbx_cmd_t	*mcp = &mc;
 
-	ENTER("qla2x00_lun_reset");
-
 	mcp->mb[0] = MBC_LUN_RESET;
 	if (HAS_EXTENDED_IDS(ha))
 		mcp->mb[1] = loop_id;
@@ -2478,7 +2139,6 @@ qla2x00_lun_reset(scsi_qla_host_t *ha, uint16_t loop_id, uint16_t lun)
 		    (int)ha->instance, rval);
 	} else {
 		/*EMPTY*/
-		LEAVE("qla2x00_lun_reset: exiting normally");
 	}
 
 	return rval;

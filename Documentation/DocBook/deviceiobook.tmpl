@@ -126,7 +126,9 @@
       <para>
 	The functions are named <function>readb</function>,
 	<function>readw</function>, <function>readl</function>,
-	<function>readq</function>, <function>writeb</function>,
+	<function>readq</function>, <function>readb_relaxed</function>,
+	<function>readw_relaxed</function>, <function>readl_relaxed</function>,
+	<function>readq_relaxed</function>, <function>writeb</function>,
 	<function>writew</function>, <function>writel</function> and
 	<function>writeq</function>.
       </para>
@@ -158,6 +160,18 @@
 	device to ensure that writes have occurred in the specific cases the
 	author cares. This kind of property cannot be hidden from driver
 	writers in the API.
+      </para>
+
+      <para>
+	PCI ordering rules also guarantee that PIO read responses arrive
+	after any outstanding DMA writes on that bus, since for some devices
+	the result of a <function>readb</function> call may signal to the
+	driver that a DMA transaction is complete.  In many cases, however,
+	the driver may want to indicate that the next
+	<function>readb</function> call has no relation to any previous DMA
+	writes performed by the device.  The driver can use
+	<function>readb_relaxed</function> for these cases, although only
+	some platforms will honor the relaxed semantics.
       </para>
     </sect1>
 

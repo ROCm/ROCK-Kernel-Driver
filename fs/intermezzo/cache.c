@@ -74,6 +74,14 @@ inline void presto_cache_init_hash(void)
         }
 }
 
+int izo_ioctl_packlen(struct izo_ioctl_data *data)
+{
+        int len = sizeof(struct izo_ioctl_data);
+        len += size_round(data->ioc_inllen1);
+        len += size_round(data->ioc_inllen2);
+        return len;
+}
+
 /* map a device to a cache */
 struct presto_cache *presto_cache_find(struct super_block *s)
 {

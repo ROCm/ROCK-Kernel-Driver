@@ -279,7 +279,7 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_pdc4030,	ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
 		ide_pmac,	ide_etrax100,	ide_acorn,
-		ide_pc9800
+		ide_pc9800,	ide_forced
 } hwif_chipset_t;
 
 /*
@@ -1231,7 +1231,6 @@ typedef struct ide_devices_s {
  */
 #ifndef _IDE_C
 extern	ide_hwif_t	ide_hwifs[];		/* master data repository */
-extern int (*ide_probe)(void);
 
 extern ide_devices_t   *idedisk;
 extern ide_devices_t   *idecd;
@@ -1417,12 +1416,12 @@ typedef struct pkt_task_s {
 	void			*special;
 } pkt_task_t;
 
-extern inline u32 ide_read_24(ide_drive_t *);
+extern u32 ide_read_24(ide_drive_t *);
 
-extern inline void SELECT_DRIVE(ide_drive_t *);
-extern inline void SELECT_INTERRUPT(ide_drive_t *);
-extern inline void SELECT_MASK(ide_drive_t *, int);
-extern inline void QUIRK_LIST(ide_drive_t *);
+extern void SELECT_DRIVE(ide_drive_t *);
+extern void SELECT_INTERRUPT(ide_drive_t *);
+extern void SELECT_MASK(ide_drive_t *, int);
+extern void QUIRK_LIST(ide_drive_t *);
 
 extern void ata_input_data(ide_drive_t *, void *, u32);
 extern void ata_output_data(ide_drive_t *, void *, u32);

@@ -12,8 +12,6 @@
  *      2 of the License, or (at your option) any later version.
  */
 
-/* XXX Note: Changes for bolted region have not been merged - Anton */
-
 #include <linux/config.h>
 #include <asm/pgtable.h>
 #include <asm/mmu.h>
@@ -59,6 +57,15 @@ void stab_initialize(unsigned long stab)
 	}
 }
 
+/* Both the segment table and SLB code uses the following cache */
+#define NR_STAB_CACHE_ENTRIES 8
+DEFINE_PER_CPU(long, stab_cache_ptr);
+DEFINE_PER_CPU(long, stab_cache[NR_STAB_CACHE_ENTRIES]);
+
+/*
+ * Segment table stuff
+ */
+
 /*
  * Create a segment table entry for the given esid/vsid pair.
  */
@@ -91,14 +98,8 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 
 	/*
 	 * Could not find empty entry, pick one with a round robin selection.
-	 * Search all entries in the two groups.  Note that the first time
-	 * we get here, we start with entry 1 so the initializer
-	 * can be common with the SLB castout code.
+	 * Search all entries in the two groups.
 	 */
-
-	/* This assumes we never castout when initializing the stab. */
-	PMC_SW_PROCESSOR(stab_capacity_castouts); 
-
 	castout_entry = get_paca()->xStab_data.next_round_robin;
 	for (i = 0; i < 16; i++) {
 		if (castout_entry < 8) {
@@ -123,22 +124,167 @@ int make_ste(unsigned long stab, unsigned long esid, unsigned long vsid)
 	/* Modify the old entry to the new value. */
 
 	/* Force previous translations to complete. DRENG */
-	asm volatile("isync" : : : "memory" );
+	asm volatile("isync" : : : "memory");
 
 	castout_ste->dw0.dw0.v = 0;
-	asm volatile("sync" : : : "memory" );    /* Order update */
+	asm volatile("sync" : : : "memory");    /* Order update */
 	castout_ste->dw1.dw1.vsid = vsid;
 	old_esid = castout_ste->dw0.dw0.esid;
 	castout_ste->dw0.dw0.esid = esid;
 	castout_ste->dw0.dw0.kp = 1;
-	asm volatile("eieio" : : : "memory" );   /* Order update */
+	asm volatile("eieio" : : : "memory");   /* Order update */
 	castout_ste->dw0.dw0.v  = 1;
 	asm volatile("slbie  %0" : : "r" (old_esid << SID_SHIFT)); 
 	/* Ensure completion of slbie */
-	asm volatile("sync" : : : "memory" );
+	asm volatile("sync" : : : "memory");
 
 	return (global_entry | (castout_entry & 0x7));
 }
+
+static inline void __ste_allocate(unsigned long esid, unsigned long vsid)
+{
+	unsigned char stab_entry;
+	unsigned long *offset;
+	int region_id = REGION_ID(esid << SID_SHIFT);
+
+	stab_entry = make_ste(get_paca()->xStab_data.virt, esid, vsid);
+
+	if (region_id != USER_REGION_ID)
+		return;
+
+	offset = &__get_cpu_var(stab_cache_ptr);
+	if (*offset < NR_STAB_CACHE_ENTRIES) {
+		__get_cpu_var(stab_cache[*offset]) = stab_entry;
+	}
+	(*offset)++;
+}
+
+/*
+ * Allocate a segment table entry for the given ea.
+ */
+int ste_allocate(unsigned long ea)
+{
+	unsigned long vsid, esid;
+	mm_context_t context;
+
+	/* Check for invalid effective addresses. */
+	if (!IS_VALID_EA(ea))
+		return 1;
+
+	/* Kernel or user address? */
+	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
+		vsid = get_kernel_vsid(ea);
+		context = REGION_ID(ea);
+	} else {
+		if (!current->mm)
+			return 1;
+
+		context = current->mm->context;
+		vsid = get_vsid(context, ea);
+	}
+
+	esid = GET_ESID(ea);
+	__ste_allocate(esid, vsid);
+	/* Order update */
+	asm volatile("sync":::"memory");
+
+	return 0;
+}
+
+/*
+ * preload some userspace segments into the segment table.
+ */
+static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
+{
+	unsigned long pc = KSTK_EIP(tsk);
+	unsigned long stack = KSTK_ESP(tsk);
+	unsigned long unmapped_base;
+	unsigned long pc_esid = GET_ESID(pc);
+	unsigned long stack_esid = GET_ESID(stack);
+	unsigned long unmapped_base_esid;
+	unsigned long vsid;
+
+	if (test_tsk_thread_flag(tsk, TIF_32BIT))
+		unmapped_base = TASK_UNMAPPED_BASE_USER32;
+	else
+		unmapped_base = TASK_UNMAPPED_BASE_USER64;
+
+	unmapped_base_esid = GET_ESID(unmapped_base);
+
+	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, pc);
+	__ste_allocate(pc_esid, vsid);
+
+	if (pc_esid == stack_esid)
+		return;
+
+	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, stack);
+	__ste_allocate(stack_esid, vsid);
+
+	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
+		return;
+
+	if (!IS_VALID_EA(unmapped_base) ||
+	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, unmapped_base);
+	__ste_allocate(unmapped_base_esid, vsid);
+
+	/* Order update */
+	asm volatile("sync" : : : "memory");
+}
+
+/* Flush all user entries from the segment table of the current processor. */
+void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
+{
+	STE *stab = (STE *) get_paca()->xStab_data.virt;
+	STE *ste;
+	unsigned long *offset = &__get_cpu_var(stab_cache_ptr);
+
+	/* Force previous translations to complete. DRENG */
+	asm volatile("isync" : : : "memory");
+
+	if (*offset <= NR_STAB_CACHE_ENTRIES) {
+		int i;
+
+		for (i = 0; i < *offset; i++) {
+			ste = stab + __get_cpu_var(stab_cache[i]);
+			ste->dw0.dw0.v = 0;
+		}
+
+		asm volatile("sync; slbia; sync":::"memory");
+	} else {
+		unsigned long entry;
+
+		/* Invalidate all entries. */
+		ste = stab;
+
+		/* Never flush the first entry. */
+		ste += 1;
+		for (entry = 1;
+		     entry < (PAGE_SIZE / sizeof(STE));
+		     entry++, ste++) {
+			unsigned long ea;
+			ea = ste->dw0.dw0.esid << SID_SHIFT;
+			if (ea < KERNELBASE) {
+				ste->dw0.dw0.v = 0;
+			}
+		}
+
+		asm volatile("sync; slbia; sync":::"memory");
+	}
+
+	*offset = 0;
+
+	preload_stab(tsk, mm);
+}
+
+/*
+ * SLB stuff
+ */
 
 /*
  * Create a segment buffer entry for the given esid/vsid pair.
@@ -160,21 +306,10 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large,
 	} vsid_data;
 
 	/*
-	 * Find an empty entry, if one exists. Must start at 0 because
-	 * we use this code to load SLB entry 0 at boot.
+	 * We take the next entry, round robin. Previously we tried
+	 * to find a free slot first but that took too long. Unfortunately
+	 * we dont have any LRU information to help us choose a slot.
 	 */
-	for (entry = 0; entry < naca->slb_size; entry++) {
-		asm volatile("slbmfee  %0,%1" 
-			     : "=r" (esid_data) : "r" (entry)); 
-		if (!esid_data.data.v)
-			goto write_entry;
-	}
-
-	/*
-	 * Could not find empty entry, pick one with a round robin selection.
-	 */
-
-	PMC_SW_PROCESSOR(stab_capacity_castouts); 
 
 	/* 
 	 * Never cast out the segment for our kernel stack. Since we
@@ -190,13 +325,13 @@ void make_slbe(unsigned long esid, unsigned long vsid, int large,
 		if (castout_entry >= naca->slb_size)
 			castout_entry = 1; 
 		asm volatile("slbmfee  %0,%1" : "=r" (esid_data) : "r" (entry));
-	} while (esid_data.data.esid == GET_ESID((unsigned long)_get_SP()));
+	} while (esid_data.data.v &&
+		 esid_data.data.esid == GET_ESID((unsigned long)_get_SP()));
 
 	get_paca()->xStab_data.next_round_robin = castout_entry;
 
 	/* slbie not needed as the previous mapping is still valid. */
 
-write_entry:	
 	/* 
 	 * Write the new SLB entry.
 	 */
@@ -220,211 +355,129 @@ write_entry:
 	asm volatile("slbmte  %0,%1" : : "r" (vsid_data), "r" (esid_data)); 
 }
 
-static inline void __ste_allocate(unsigned long esid, unsigned long vsid,
-				  int kernel_segment, mm_context_t context)
+static inline void __slb_allocate(unsigned long esid, unsigned long vsid,
+				  mm_context_t context)
 {
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
-		int large = 0;
+	int large = 0;
+	int region_id = REGION_ID(esid << SID_SHIFT);
+	unsigned long *offset;
 
-#ifndef CONFIG_PPC_ISERIES
-		if (REGION_ID(esid << SID_SHIFT) == KERNEL_REGION_ID)
+	if (cur_cpu_spec->cpu_features & CPU_FTR_16M_PAGE) {
+		if (region_id == KERNEL_REGION_ID)
 			large = 1;
-		else if (REGION_ID(esid << SID_SHIFT) == USER_REGION_ID)
+		else if (region_id == USER_REGION_ID)
 			large = in_hugepage_area(context, esid << SID_SHIFT);
-#endif
-		make_slbe(esid, vsid, large, kernel_segment);
-	} else {
-		unsigned char top_entry, stab_entry, *segments; 
-
-		stab_entry = make_ste(get_paca()->xStab_data.virt, esid, vsid);
-		PMC_SW_PROCESSOR_A(stab_entry_use, stab_entry & 0xf); 
-
-		segments = get_paca()->xSegments;		
-		top_entry = get_paca()->stab_cache_pointer;
-		if (!kernel_segment && top_entry < STAB_CACHE_SIZE) {
-			segments[top_entry] = stab_entry;
-			if (top_entry == STAB_CACHE_SIZE)
-				top_entry = 0xff;
-			top_entry++;
-			get_paca()->stab_cache_pointer = top_entry;
-		}
 	}
+
+	make_slbe(esid, vsid, large, region_id != USER_REGION_ID);
+
+	if (region_id != USER_REGION_ID)
+		return;
+
+	offset = &__get_cpu_var(stab_cache_ptr);
+	if (*offset < NR_STAB_CACHE_ENTRIES) {
+		__get_cpu_var(stab_cache[*offset]) = esid;
+	}
+	(*offset)++;
 }
 
 /*
  * Allocate a segment table entry for the given ea.
  */
-int ste_allocate(unsigned long ea)
+int slb_allocate(unsigned long ea)
 {
 	unsigned long vsid, esid;
-	int kernel_segment = 0;
 	mm_context_t context;
 
-	PMC_SW_PROCESSOR(stab_faults); 
-
 	/* Check for invalid effective addresses. */
-	if (!IS_VALID_EA(ea))
+	if (unlikely(!IS_VALID_EA(ea)))
 		return 1;
 
 	/* Kernel or user address? */
 	if (REGION_ID(ea) >= KERNEL_REGION_ID) {
-		kernel_segment = 1;
-		vsid = get_kernel_vsid(ea);
 		context = REGION_ID(ea);
+		vsid = get_kernel_vsid(ea);
 	} else {
-		if (! current->mm)
+		if (unlikely(!current->mm))
 			return 1;
 
 		context = current->mm->context;
-		
 		vsid = get_vsid(context, ea);
 	}
 
 	esid = GET_ESID(ea);
-	__ste_allocate(esid, vsid, kernel_segment, context);
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
-		/* Order update */
-		asm volatile("sync":::"memory"); 
-	}
+	__slb_allocate(esid, vsid, context);
 
 	return 0;
 }
 
-unsigned long ppc64_preload_all_segments;
-unsigned long ppc64_stab_preload = 1;
-#define STAB_PRESSURE 0
-#define USE_SLBIE_ON_STAB 0
-
 /*
- * preload all 16 segments for a 32 bit process and the PC and SP segments
- * for a 64 bit process.
+ * preload some userspace segments into the SLB.
  */
-static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
+static void preload_slb(struct task_struct *tsk, struct mm_struct *mm)
 {
-	if (ppc64_preload_all_segments &&
-	    test_tsk_thread_flag(tsk, TIF_32BIT)) {
-		unsigned long esid, vsid;
+	unsigned long pc = KSTK_EIP(tsk);
+	unsigned long stack = KSTK_ESP(tsk);
+	unsigned long unmapped_base;
+	unsigned long pc_esid = GET_ESID(pc);
+	unsigned long stack_esid = GET_ESID(stack);
+	unsigned long unmapped_base_esid;
+	unsigned long vsid;
 
-		for (esid = 0; esid < 16; esid++) {
-			unsigned long ea = esid << SID_SHIFT;
-			vsid = get_vsid(mm->context, ea);
-			__ste_allocate(esid, vsid, 0, mm->context);
-		}
-	} else {
-		unsigned long pc = KSTK_EIP(tsk);
-		unsigned long stack = KSTK_ESP(tsk);
-		unsigned long pc_segment = pc & ~SID_MASK;
-		unsigned long stack_segment = stack & ~SID_MASK;
-		unsigned long vsid;
+	if (test_tsk_thread_flag(tsk, TIF_32BIT))
+		unmapped_base = TASK_UNMAPPED_BASE_USER32;
+	else
+		unmapped_base = TASK_UNMAPPED_BASE_USER64;
 
-		if (pc) {
-			if (!IS_VALID_EA(pc) || 
-			    (REGION_ID(pc) >= KERNEL_REGION_ID))
-				return;
-			vsid = get_vsid(mm->context, pc);
-			__ste_allocate(GET_ESID(pc), vsid, 0, mm->context);
-		}
+	unmapped_base_esid = GET_ESID(unmapped_base);
 
-		if (stack && (pc_segment != stack_segment)) {
-			if (!IS_VALID_EA(stack) || 
-			    (REGION_ID(stack) >= KERNEL_REGION_ID))
-				return;
-			vsid = get_vsid(mm->context, stack);
-			__ste_allocate(GET_ESID(stack), vsid, 0, mm->context);
-		}
-	}
+	if (!IS_VALID_EA(pc) || (REGION_ID(pc) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, pc);
+	__slb_allocate(pc_esid, vsid, mm->context);
 
-	if (!(cur_cpu_spec->cpu_features & CPU_FTR_SLB)) {
-		/* Order update */
-		asm volatile("sync" : : : "memory"); 
-	}
+	if (pc_esid == stack_esid)
+		return;
+
+	if (!IS_VALID_EA(stack) || (REGION_ID(stack) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, stack);
+	__slb_allocate(stack_esid, vsid, mm->context);
+
+	if (pc_esid == unmapped_base_esid || stack_esid == unmapped_base_esid)
+		return;
+
+	if (!IS_VALID_EA(unmapped_base) ||
+	    (REGION_ID(unmapped_base) >= KERNEL_REGION_ID))
+		return;
+	vsid = get_vsid(mm->context, unmapped_base);
+	__slb_allocate(unmapped_base_esid, vsid, mm->context);
 }
 
 /* Flush all user entries from the segment table of the current processor. */
-void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
+void flush_slb(struct task_struct *tsk, struct mm_struct *mm)
 {
-	if (cur_cpu_spec->cpu_features & CPU_FTR_SLB) {
-		/*
-		 * XXX disable 32bit slb invalidate optimisation until we fix
-		 * the issue where a 32bit app execed out of a 64bit app can
-		 * cause segments above 4GB not to be flushed - Anton
-		 */
-		if (0 && !STAB_PRESSURE && test_thread_flag(TIF_32BIT)) {
-			union {
-				unsigned long word0;
-				slb_dword0 data;
-			} esid_data;
-			unsigned long esid;
+	unsigned long *offset = &__get_cpu_var(stab_cache_ptr);
 
-			asm volatile("isync" : : : "memory");
-			for (esid = 0; esid < 16; esid++) {
-				esid_data.word0 = 0;
-				esid_data.data.esid = esid;
-				asm volatile("slbie %0" : : "r" (esid_data));
-			}
-			asm volatile("isync" : : : "memory");
-		} else {
-			asm volatile("isync; slbia; isync":::"memory");
-		}
+	if (*offset <= NR_STAB_CACHE_ENTRIES) {
+		int i;
+		union {
+			unsigned long word0;
+			slb_dword0 data;
+		} esid_data;
 
-		PMC_SW_PROCESSOR(stab_invalidations);
-	} else {
-		STE *stab = (STE *) get_paca()->xStab_data.virt;
-		STE *ste;
-		unsigned long flags;
-
-		/* Force previous translations to complete. DRENG */
 		asm volatile("isync" : : : "memory");
-
-		local_irq_save(flags);
-		if (get_paca()->stab_cache_pointer != 0xff && !STAB_PRESSURE) {
-			int i;
-			unsigned char *segments = get_paca()->xSegments;
-
-			for (i = 0; i < get_paca()->stab_cache_pointer; i++) {
-				ste = stab + segments[i]; 
-				ste->dw0.dw0.v = 0;
-				PMC_SW_PROCESSOR(stab_invalidations); 
-			}
-
-#if USE_SLBIE_ON_STAB
-			asm volatile("sync":::"memory");
-			for (i = 0; i < get_paca()->stab_cache_pointer; i++) {
-				ste = stab + segments[i]; 
-				asm volatile("slbie  %0" : :
-					"r" (ste->dw0.dw0.esid << SID_SHIFT)); 
-			}
-			asm volatile("sync":::"memory");
-#else
-			asm volatile("sync; slbia; sync":::"memory");
-#endif
-
-		} else {
-			unsigned long entry;
-
-			/* Invalidate all entries. */
-			ste = stab;
-
-			/* Never flush the first entry. */ 
-			ste += 1;
-			for (entry = 1;
-			     entry < (PAGE_SIZE / sizeof(STE)); 
-			     entry++, ste++) {
-				unsigned long ea;
-				ea = ste->dw0.dw0.esid << SID_SHIFT;
-				if (STAB_PRESSURE || ea < KERNELBASE) {
-					ste->dw0.dw0.v = 0;
-					PMC_SW_PROCESSOR(stab_invalidations); 
-				}
-			}
-
-			asm volatile("sync; slbia; sync":::"memory");
+		for (i = 0; i < *offset; i++) {
+			esid_data.word0 = 0;
+			esid_data.data.esid = __get_cpu_var(stab_cache[i]);
+			asm volatile("slbie %0" : : "r" (esid_data));
 		}
-
-		get_paca()->stab_cache_pointer = 0;
-		local_irq_restore(flags);
+		asm volatile("isync" : : : "memory");
+	} else {
+		asm volatile("isync; slbia; isync" : : : "memory");
 	}
 
-	if (ppc64_stab_preload)
-		preload_stab(tsk, mm);
+	*offset = 0;
+
+	preload_slb(tsk, mm);
 }

@@ -2,6 +2,7 @@
  * linux/arch/i386/kernel/edd.c
  *  Copyright (C) 2002, 2003 Dell Inc.
  *  by Matt Domsch <Matt_Domsch@dell.com>
+ *  disk80 signature by Matt Domsch, Andrew Wilks, and Sandeep K. Shandilya
  *
  * BIOS Enhanced Disk Drive Services (EDD)
  * conformant to T13 Committee www.t13.org
@@ -59,9 +60,9 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.10 2003-Oct-11"
+#define EDD_VERSION "0.12 2004-Jan-26"
 #define EDD_DEVICE_NAME_SIZE 16
-#define REPORT_URL "http://domsch.com/linux/edd30/results.html"
+#define REPORT_URL "http://linux.dell.com/edd/results.html"
 
 #define left (PAGE_SIZE - (p - buf) - 1)
 
@@ -260,6 +261,14 @@ edd_show_version(struct edd_device *edev, char *buf)
 }
 
 static ssize_t
+edd_show_disk80_sig(struct edd_device *edev, char *buf)
+{
+	char *p = buf;
+	p += snprintf(p, left, "0x%08x\n", edd_disk80_sig);
+	return (p - buf);
+}
+
+static ssize_t
 edd_show_extensions(struct edd_device *edev, char *buf)
 {
 	struct edd_info *info = edd_dev_get_info(edev);
@@ -429,6 +438,15 @@ edd_has_edd30(struct edd_device *edev)
 	return 1;
 }
 
+static int
+edd_has_disk80_sig(struct edd_device *edev)
+{
+	struct edd_info *info = edd_dev_get_info(edev);
+	if (!edev || !info)
+		return 0;
+	return info->device == 0x80;
+}
+
 static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data, NULL);
 static EDD_DEVICE_ATTR(version, 0444, edd_show_version, NULL);
 static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, NULL);
@@ -443,6 +461,7 @@ static EDD_DEVICE_ATTR(default_sectors_per_track, 0444,
 		       edd_has_default_sectors_per_track);
 static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface, edd_has_edd30);
 static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus, edd_has_edd30);
+static EDD_DEVICE_ATTR(mbr_signature, 0444, edd_show_disk80_sig, edd_has_disk80_sig);
 
 
 /* These are default attributes that are added for every edd
@@ -464,6 +483,7 @@ static struct edd_attribute * edd_attrs[] = {
 	&edd_attr_default_sectors_per_track,
 	&edd_attr_interface,
 	&edd_attr_host_bus,
+	&edd_attr_mbr_signature,
 	NULL,
 };
 

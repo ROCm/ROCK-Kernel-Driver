@@ -6018,8 +6018,8 @@ advansys_reset(Scsi_Cmnd *scp)
     } else {
         /* Append to 'done_scp' at the end with 'last_scp'. */
         ASC_ASSERT(last_scp != NULL);
-        REQPNEXT(last_scp) = asc_dequeue_list(&boardp->active,
-            &new_last_scp, ASC_TID_ALL);
+        last_scp->host_scribble = (unsigned char *)asc_dequeue_list(
+			&boardp->active, &new_last_scp, ASC_TID_ALL);
         if (new_last_scp != NULL) {
             ASC_ASSERT(REQPNEXT(last_scp) != NULL);
             for (tscp = REQPNEXT(last_scp); tscp; tscp = REQPNEXT(tscp)) {
@@ -6041,8 +6041,8 @@ advansys_reset(Scsi_Cmnd *scp)
     } else {
         /* Append to 'done_scp' at the end with 'last_scp'. */
         ASC_ASSERT(last_scp != NULL);
-        REQPNEXT(last_scp) = asc_dequeue_list(&boardp->waiting,
-            &new_last_scp, ASC_TID_ALL);
+        last_scp->host_scribble = (unsigned char *)asc_dequeue_list(
+			&boardp->waiting, &new_last_scp, ASC_TID_ALL);
         if (new_last_scp != NULL) {
             ASC_ASSERT(REQPNEXT(last_scp) != NULL);
             for (tscp = REQPNEXT(last_scp); tscp; tscp = REQPNEXT(tscp)) {
@@ -6310,8 +6310,8 @@ advansys_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                     ASC_TID_ALL);
             } else {
                 ASC_ASSERT(last_scp != NULL);
-                REQPNEXT(last_scp) = asc_dequeue_list(&boardp->done,
-                    &new_last_scp, ASC_TID_ALL);
+                last_scp->host_scribble = (unsigned char *)asc_dequeue_list(
+			&boardp->done, &new_last_scp, ASC_TID_ALL);
                 if (new_last_scp != NULL) {
                     ASC_ASSERT(REQPNEXT(last_scp) != NULL);
                     last_scp = new_last_scp;
@@ -6383,7 +6383,7 @@ asc_scsi_done_list(Scsi_Cmnd *scp, int from_isr)
     while (scp != NULL) {
         ASC_DBG1(3, "asc_scsi_done_list: scp 0x%lx\n", (ulong) scp);
         tscp = REQPNEXT(scp);
-        REQPNEXT(scp) = NULL;
+        scp->host_scribble = NULL;
         ASC_STATS(scp->device->host, done);
         ASC_ASSERT(scp->scsi_done != NULL);
 	if (from_isr)
@@ -7434,7 +7434,7 @@ asc_enqueue(asc_queue_t *ascq, REQP reqp, int flag)
     tid = REQPTID(reqp);
     ASC_ASSERT(tid >= 0 && tid <= ADV_MAX_TID);
     if (flag == ASC_FRONT) {
-        REQPNEXT(reqp) = ascq->q_first[tid];
+        reqp->host_scribble = (unsigned char *)ascq->q_first[tid];
         ascq->q_first[tid] = reqp;
         /* If the queue was empty, set the last pointer. */
         if (ascq->q_last[tid] == NULL) {
@@ -7442,10 +7442,10 @@ asc_enqueue(asc_queue_t *ascq, REQP reqp, int flag)
         }
     } else { /* ASC_BACK */
         if (ascq->q_last[tid] != NULL) {
-            REQPNEXT(ascq->q_last[tid]) = reqp;
+            ascq->q_last[tid]->host_scribble = (unsigned char *)reqp;
         }
         ascq->q_last[tid] = reqp;
-        REQPNEXT(reqp) = NULL;
+        reqp->host_scribble = NULL;
         /* If the queue was empty, set the first pointer. */
         if (ascq->q_first[tid] == NULL) {
             ascq->q_first[tid] = reqp;
@@ -7566,7 +7566,7 @@ asc_dequeue_list(asc_queue_t *ascq, REQP *lastpp, int tid)
                     lastp = ascq->q_last[i];
                 } else {
                     ASC_ASSERT(lastp != NULL);
-                    REQPNEXT(lastp) = ascq->q_first[i];
+                    lastp->host_scribble = (unsigned char *)ascq->q_first[i];
                     lastp = ascq->q_last[i];
                 }
                 ascq->q_first[i] = ascq->q_last[i] = NULL;
@@ -7644,8 +7644,8 @@ asc_rmqueue(asc_queue_t *ascq, REQP reqp)
              currp; prevp = currp, currp = REQPNEXT(currp)) {
             if (currp == reqp) {
                 ret = ASC_TRUE;
-                REQPNEXT(prevp) = REQPNEXT(currp);
-                REQPNEXT(reqp) = NULL;
+                prevp->host_scribble = (unsigned char *)REQPNEXT(currp);
+                reqp->host_scribble = NULL;
                 if (ascq->q_last[tid] == reqp) {
                     ascq->q_last[tid] = prevp;
                 }
