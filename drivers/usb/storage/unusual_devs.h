@@ -689,7 +689,7 @@ UNUSUAL_DEV(  0x090a, 0x1001, 0x0100, 0x0100,
 		"Trumpion",
 		"t33520 USB Flash Card Controller",
 		US_SC_DEVICE, US_PR_BULK, NULL,
-		US_FL_MODE_XLATE),
+		US_FL_NEED_OVERRIDE | US_FL_MODE_XLATE),
 
 /* Trumpion Microelectronics MP3 player (felipe_alfaro@linuxmail.org) */
 UNUSUAL_DEV( 0x090a, 0x1200, 0x0000, 0x9999,
