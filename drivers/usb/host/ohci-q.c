@@ -131,8 +131,9 @@ static void intr_resub (struct ohci_hcd *hc, struct urb *urb)
 
 /* search for the right branch to insert an interrupt ed into the int tree 
  * do some load balancing;
- * returns the branch and 
- * sets the interval to interval = 2^integer (ld (interval))
+ * returns the branch
+ * FIXME allow for failure, when there's no bandwidth left;
+ * and consider iso loads too
  */
 static int ep_int_balance (struct ohci_hcd *ohci, int interval, int load)
 {
@@ -148,19 +149,6 @@ static int ep_int_balance (struct ohci_hcd *ohci, int interval, int load)
 		ohci->ohci_int_load [i] += load;
 
 	return branch;
-}
-
-/*-------------------------------------------------------------------------*/
-
-/*  2^int ( ld (inter)) */
-
-static int ep_2_n_interval (int inter)
-{	
-	int	i;
-
-	for (i = 0; ((inter >> i) > 1 ) && (i < 5); i++)
-		continue;
-	return 1 << i;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -230,8 +218,7 @@ static int ep_link (struct ohci_hcd *ohci, struct ed *edi)
 
 	case PIPE_INTERRUPT:
 		load = ed->intriso.intr_info.int_load;
-		interval = ep_2_n_interval (ed->intriso.intr_info.int_period);
-		ed->interval = interval;
+		interval = ed->interval;
 		int_branch = ep_int_balance (ohci, interval, load);
 		ed->intriso.intr_info.int_branch = int_branch;
 
@@ -301,6 +288,7 @@ static void periodic_unlink (
  * just the link to the ed is unlinked.
  * the link from the ed still points to another operational ed or 0
  * so the HC can eventually finish the processing of the unlinked ed
+ * caller guarantees the ED has no active TDs.
  */
 static int start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed) 
 {
@@ -387,84 +375,99 @@ static int start_ed_unlink (struct ohci_hcd *ohci, struct ed *ed)
 
 /*-------------------------------------------------------------------------*/
 
-/* (re)init an endpoint; this _should_ be done once at the
- * usb_set_configuration command, but the USB stack is a bit stateless
- * so we do it at every transaction.
- * if the state of the ed is ED_NEW then a dummy td is added and the
- * state is changed to ED_UNLINK
- * in all other cases the state is left unchanged
- * the ed info fields are set even though most of them should
- * not change
+/* get and maybe (re)init an endpoint. init _should_ be done only as part
+ * of usb_set_configuration() or usb_set_interface() ... but the USB stack
+ * isn't very stateful, so we re-init whenever the HC isn't looking.
  */
-static struct ed *ep_add_ed (
+static struct ed *ed_get (
+	struct ohci_hcd		*ohci,
 	struct usb_device	*udev,
 	unsigned int		pipe,
-	int			interval,
-	int			load,
-	int			mem_flags
+	int			interval
 ) {
-   	struct ohci_hcd		*ohci = hcd_to_ohci (udev->bus->hcpriv);
+	int			is_out = !usb_pipein (pipe);
+	int			type = usb_pipetype (pipe);
+	int			bus_msecs = 0;
 	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
-	struct td		*td;
 	struct ed		*ed; 
 	unsigned		ep;
 	unsigned long		flags;
 
+	ep = usb_pipeendpoint (pipe) << 1;
+	if (type != PIPE_CONTROL && is_out)
+		ep |= 1;
+	if (type == PIPE_INTERRUPT)
+		bus_msecs = usb_calc_bus_time (udev->speed, !is_out, 0,
+			usb_maxpacket (udev, pipe, is_out)) / 1000;
+
 	spin_lock_irqsave (&ohci->lock, flags);
 
-	ep = usb_pipeendpoint (pipe) << 1;
-	if (!usb_pipecontrol (pipe) && usb_pipeout (pipe))
-		ep |= 1;
 	if (!(ed = dev->ep [ep])) {
 		ed = ed_alloc (ohci, SLAB_ATOMIC);
 		if (!ed) {
 			/* out of memory */
-			spin_unlock_irqrestore (&ohci->lock, flags);
-			return NULL;
+			goto done;
 		}
 		dev->ep [ep] = ed;
 	}
 
 	if (ed->state & ED_URB_DEL) {
 		/* pending unlink request */
-		spin_unlock_irqrestore (&ohci->lock, flags);
-		return NULL;
+		ed = 0;
+		goto done;
 	}
 
 	if (ed->state == ED_NEW) {
+		struct td		*td;
+
 		ed->hwINFO = ED_SKIP;
   		/* dummy td; end of td list for ed */
 		td = td_alloc (ohci, SLAB_ATOMIC);
  		if (!td) {
 			/* out of memory */
-			spin_unlock_irqrestore (&ohci->lock, flags);
-			return NULL;
+			ed = 0;
+			goto done;
 		}
 		ed->dummy = td;
 		ed->hwTailP = cpu_to_le32 (td->td_dma);
 		ed->hwHeadP = ed->hwTailP;	/* ED_C, ED_H zeroed */
 		ed->state = ED_UNLINK;
-		ed->type = usb_pipetype (pipe);
+		ed->type = type;
 	}
 
-// FIXME:  don't do this if it's linked to the HC, or without knowing it's
-// safe to clobber state/mode info tied to (previous) config/altsetting.
-// (but dev0/ep0, used by set_address, must get clobbered)
+	/* FIXME:  Don't do this without knowing it's safe to clobber this
+	 * state/mode info.  Currently the upper layers don't support such
+	 * guarantees; we're lucky changing config/altsetting is rare.
+	 */
+  	if (ed->state == ED_UNLINK) {
+		u32	info;
 
-	ed->hwINFO = cpu_to_le32 (usb_pipedevice (pipe)
-			| usb_pipeendpoint (pipe) << 7
-			| (usb_pipeisoc (pipe)? 0x8000: 0)
-			| (usb_pipecontrol (pipe)
-				? 0: (usb_pipeout (pipe)? 0x800: 0x1000)) 
-			| (udev->speed == USB_SPEED_LOW) << 13
-			| usb_maxpacket (udev, pipe, usb_pipeout (pipe))
-				<< 16);
+		info = usb_pipedevice (pipe);
+		info |= (ep >> 1) << 7;
+		info |= usb_maxpacket (udev, pipe, is_out) << 16;
+		info = cpu_to_le32 (info);
+		if (udev->speed == USB_SPEED_LOW)
+			info |= ED_LOWSPEED;
+		/* control transfers store pids in tds */
+		if (type != PIPE_CONTROL) {
+			info |= is_out ? ED_OUT : ED_IN;
+			if (type == PIPE_ISOCHRONOUS)
+				info |= ED_ISO;
+			if (type == PIPE_INTERRUPT) {
+				ed->intriso.intr_info.int_load = bus_msecs;
+				if (interval > 32)
+					interval = 32;
+			}
+		}
+		ed->hwINFO = info;
 
-  	if (ed->type == PIPE_INTERRUPT && ed->state == ED_UNLINK) {
-  		ed->intriso.intr_info.int_period = interval;
-  		ed->intriso.intr_info.int_load = load;
-  	}
+		/* value ignored except on periodic EDs, where
+		 * we know it's already a power of 2
+		 */
+		ed->interval = interval;
+	}
 
+done:
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return ed; 
 }
@@ -736,8 +739,8 @@ static void td_done (struct urb *urb, struct td *td)
 		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
 
 		if (cc != 0)
-			dbg ("  urb %p iso TD %d len %d CC %d",
-				urb, td->index, dlen, cc);
+			dbg ("  urb %p iso TD %p (%d) len %d CC %d",
+				urb, td, 1 + td->index, dlen, cc);
 
 	/* BULK, INT, CONTROL ... drivers see aggregate length/status,
 	 * except that "setup" bytes aren't counted and "short" transfers
@@ -776,9 +779,13 @@ static void td_done (struct urb *urb, struct td *td)
 					- td->data_dma;
 		}
 
+#ifdef VERBOSE_DEBUG
 		if (cc != 0)
-			dbg ("  urb %p TD %d CC %d, len=%d",
-				urb, td->index, cc, urb->actual_length);
+			dbg ("  urb %p TD %p (%d) CC %d, len=%d/%d",
+				urb, td, 1 + td->index, cc,
+				urb->actual_length,
+				urb->transfer_buffer_length);
+#endif
   	}
 }
 
@@ -812,8 +819,8 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 				if (urb_priv && ((td_list->index + 1)
 						< urb_priv->length)) {
 #ifdef OHCI_VERBOSE_DEBUG
-					dbg ("urb %p TD %d of %d, patch ED",
-						td_list->urb,
+					dbg ("urb %p TD %p (%d/%d), patch ED",
+						td_list->urb, td_list,
 						1 + td_list->index,
 						urb_priv->length);
 #endif

@@ -100,7 +100,7 @@
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Jun-10"
+#define DRIVER_VERSION "2002-Jun-15"
 #define DRIVER_AUTHOR "Roman Weissgaerber <weissg@vienna.at>, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -145,8 +145,8 @@ static int ohci_urb_enqueue (
 	urb_print (urb, "SUB", usb_pipein (pipe));
 #endif
 	
-	/* every endpoint has a ed, locate and fill it */
-	if (! (ed = ep_add_ed (urb->dev, pipe, urb->interval, 1, mem_flags)))
+	/* every endpoint has a ed, locate and maybe (re)initialize it */
+	if (! (ed = ed_get (ohci, urb->dev, pipe, urb->interval)))
 		return -ENOMEM;
 
 	/* for the private part of the URB we need the number of TDs (size) */
@@ -498,6 +498,7 @@ static void ohci_irq (struct usb_hcd *hcd)
 	struct ohci_regs	*regs = ohci->regs;
  	int			ints; 
 
+	/* we can eliminate a (slow) readl() if _only_ WDH caused this irq */
 	if ((ohci->hcca->done_head != 0)
 			&& ! (le32_to_cpup (&ohci->hcca->done_head) & 0x01)) {
 		ints =  OHCI_INTR_WDH;
