@@ -458,7 +458,6 @@ static struct ethtool_ops netdev_ethtool_ops;
 static int netdev_close(struct net_device *dev);
 static void reset_rx_descriptors(struct net_device *dev);
 
-
 static void stop_nic_tx(long ioaddr, long crvalue)
 {
 	writel(crvalue & (~CR_W_TXEN), ioaddr + TCRRCR);
@@ -1154,15 +1153,17 @@ static void allocate_rx_buffers(struct net_device *dev)
 		struct sk_buff *skb;
 
 		skb = dev_alloc_skb(np->rx_buf_sz);
-		np->lack_rxbuf->skbuff = skb;
-
 		if (skb == NULL)
 			break;	/* Better luck next round. */
 
+		while (np->lack_rxbuf->skbuff)
+			np->lack_rxbuf = np->lack_rxbuf->next_desc_logical;
+
 		skb->dev = dev;	/* Mark as being used by this device. */
+		np->lack_rxbuf->skbuff = skb;
 		np->lack_rxbuf->buffer = pci_map_single(np->pci_dev, skb->tail,
 			np->rx_buf_sz, PCI_DMA_FROMDEVICE);
-		np->lack_rxbuf = np->lack_rxbuf->next_desc_logical;
+		np->lack_rxbuf->status = RXOWN;
 		++np->really_rx_count;
 	}
 }
@@ -1268,7 +1269,7 @@ static void init_ring(struct net_device *dev)
 	/* initialize rx variables */
 	np->rx_buf_sz = (dev->mtu <= 1500 ? PKT_BUF_SZ : dev->mtu + 32);
 	np->cur_rx = &np->rx_ring[0];
-	np->lack_rxbuf = NULL;
+	np->lack_rxbuf = np->rx_ring;
 	np->really_rx_count = 0;
 
 	/* initial rx descriptors. */
@@ -1400,30 +1401,20 @@ static int start_tx(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static void free_one_rx_descriptor(struct netdev_private *np)
-{
-	if (np->really_rx_count == RX_RING_SIZE)
-		np->cur_rx->status = RXOWN;
-	else {
-		np->lack_rxbuf->skbuff = np->cur_rx->skbuff;
-		np->lack_rxbuf->buffer = np->cur_rx->buffer;
-		np->lack_rxbuf->status = RXOWN;
-		++np->really_rx_count;
-		np->lack_rxbuf = np->lack_rxbuf->next_desc_logical;
-	}
-	np->cur_rx = np->cur_rx->next_desc_logical;
-}
-
-
 /* Stop rx before calling this */
 static void reset_rx_descriptors(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
-
-	while (!(np->cur_rx->status & RXOWN))
-		free_one_rx_descriptor(np);
+	struct fealnx_desc *cur = np->cur_rx;
+	int i;
 
 	allocate_rx_buffers(dev);
+
+	for (i = 0; i < RX_RING_SIZE; i++) {
+		if (cur->skbuff)
+			cur->status = RXOWN;
+		cur = cur->next_desc_logical;
+	}
 
 	writel(np->rx_ring_dma + ((char*)np->cur_rx - (char*)np->rx_ring),
 		dev->base_addr + RXLBA);
@@ -1599,7 +1590,7 @@ static int netdev_rx(struct net_device *dev)
 	long ioaddr = dev->base_addr;
 
 	/* If EOP is set on the next entry, it's a new packet. Send it up. */
-	while (!(np->cur_rx->status & RXOWN)) {
+	while (!(np->cur_rx->status & RXOWN) && np->cur_rx->skbuff) {
 		s32 rx_status = np->cur_rx->status;
 
 		if (np->really_rx_count == 0)
@@ -1651,10 +1642,17 @@ static int netdev_rx(struct net_device *dev)
 					np->stats.rx_length_errors++;
 
 					/* free all rx descriptors related this long pkt */
-					for (i = 0; i < desno; ++i)
-						free_one_rx_descriptor(np);
+					for (i = 0; i < desno; ++i) {
+						if (!np->cur_rx->skbuff) {
+							printk(KERN_DEBUG
+								"%s: I'm scared\n", dev->name);
+							break;
+						}
+						np->cur_rx->status = RXOWN;
+						np->cur_rx = np->cur_rx->next_desc_logical;
+					}
 					continue;
-				} else {	/* something error, need to reset this chip */
+				} else {        /* rx error, need to reset this chip */
 					stop_nic_rx(ioaddr, np->crvalue);
 					reset_rx_descriptors(dev);
 					writel(np->crvalue, ioaddr + TCRRCR);
@@ -1704,8 +1702,6 @@ static int netdev_rx(struct net_device *dev)
 						 PCI_DMA_FROMDEVICE);
 				skb_put(skb = np->cur_rx->skbuff, pkt_len);
 				np->cur_rx->skbuff = NULL;
-				if (np->really_rx_count == RX_RING_SIZE)
-					np->lack_rxbuf = np->cur_rx;
 				--np->really_rx_count;
 			}
 			skb->protocol = eth_type_trans(skb, dev);
@@ -1715,24 +1711,7 @@ static int netdev_rx(struct net_device *dev)
 			np->stats.rx_bytes += pkt_len;
 		}
 
-		if (np->cur_rx->skbuff == NULL) {
-			struct sk_buff *skb;
-
-			skb = dev_alloc_skb(np->rx_buf_sz);
-
-			if (skb != NULL) {
-				skb->dev = dev;	/* Mark as being used by this device. */
-				np->cur_rx->buffer = pci_map_single(np->pci_dev,
-								    skb->tail,
-								    np->rx_buf_sz,
-								    PCI_DMA_FROMDEVICE);
-				np->cur_rx->skbuff = skb;
-				++np->really_rx_count;
-			}
-		}
-
-		if (np->cur_rx->skbuff != NULL)
-			free_one_rx_descriptor(np);
+		np->cur_rx = np->cur_rx->next_desc_logical;
 	}			/* end of while loop */
 
 	/*  allocate skb for rx buffers */
