@@ -27,15 +27,13 @@
 #include <asm/patch.h>
 #include <asm/pgalloc.h>
 #include <asm/sal.h>
+#include <asm/sections.h>
 #include <asm/system.h>
 #include <asm/tlb.h>
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
-
-/* References to section boundaries: */
-extern char _stext, _etext, _edata, __init_begin, __init_end, _end;
 
 extern void ia64_tlb_init (void);
 
@@ -151,8 +149,8 @@ free_initmem (void)
 {
 	unsigned long addr, eaddr;
 
-	addr = (unsigned long) ia64_imva(&__init_begin);
-	eaddr = (unsigned long) ia64_imva(&__init_end);
+	addr = (unsigned long) ia64_imva(__init_begin);
+	eaddr = (unsigned long) ia64_imva(__init_end);
 	while (addr < eaddr) {
 		ClearPageReserved(virt_to_page(addr));
 		set_page_count(virt_to_page(addr), 1);
@@ -161,7 +159,7 @@ free_initmem (void)
 		addr += PAGE_SIZE;
 	}
 	printk(KERN_INFO "Freeing unused kernel memory: %ldkB freed\n",
-	       (&__init_end - &__init_begin) >> 10);
+	       (__init_end - __init_begin) >> 10);
 }
 
 void
@@ -308,7 +306,6 @@ static void
 setup_gate (void)
 {
 	struct page *page;
-	extern char __start_gate_section[];
 
 	/*
 	 * Map the gate page twice: once read-only to export the ELF headers etc. and once
@@ -671,7 +668,7 @@ mem_init (void)
 
 	kclist_add(&kcore_mem, __va(0), max_low_pfn * PAGE_SIZE);
 	kclist_add(&kcore_vmem, (void *)VMALLOC_START, VMALLOC_END-VMALLOC_START);
-	kclist_add(&kcore_kernel, &_stext, &_end - &_stext);
+	kclist_add(&kcore_kernel, _stext, _end - _stext);
 
 	for_each_pgdat(pgdat)
 		totalram_pages += free_all_bootmem_node(pgdat);
@@ -679,9 +676,9 @@ mem_init (void)
 	reserved_pages = 0;
 	efi_memmap_walk(count_reserved_pages, &reserved_pages);
 
-	codesize =  (unsigned long) &_etext - (unsigned long) &_stext;
-	datasize =  (unsigned long) &_edata - (unsigned long) &_etext;
-	initsize =  (unsigned long) &__init_end - (unsigned long) &__init_begin;
+	codesize =  (unsigned long) _etext - (unsigned long) _stext;
+	datasize =  (unsigned long) _edata - (unsigned long) _etext;
+	initsize =  (unsigned long) __init_end - (unsigned long) __init_begin;
 
 	printk(KERN_INFO "Memory: %luk/%luk available (%luk code, %luk reserved, "
 	       "%luk data, %luk init)\n", (unsigned long) nr_free_pages() << (PAGE_SHIFT - 10),

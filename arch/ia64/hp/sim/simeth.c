@@ -223,7 +223,7 @@ simeth_probe1(void)
 	dev->set_multicast_list = set_multicast_list; /* no yet used */
 
 	err = register_netdev(dev);
-	if (dev) {
+	if (err) {
 		kfree(dev);
 		return err;
 	}
