@@ -258,6 +258,7 @@ static inline void __netif_rx_complete(struct net_device *dev)
 {
 	if (!test_bit(__LINK_STATE_RX_SCHED, &dev->state)) BUG();
 	list_del(&dev->poll_list);
+	smp_mb__before_clear_bit();
 	clear_bit(__LINK_STATE_RX_SCHED, &dev->state);
 }
 
