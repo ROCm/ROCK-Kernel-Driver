@@ -104,12 +104,12 @@
 #define PCIX_66MHZ_ECC		0x5
 #define PCIX_100MHZ_ECC		0x6
 #define PCIX_133MHZ_ECC		0x7
-#define PCIX_66MHZ_266		0x8
-#define PCIX_100MHZ_266		0x9
-#define PCIX_133MHZ_266		0x0a
-#define PCIX_66MHZ_533		0x0b
-#define PCIX_100MHZ_533		0x0c
-#define PCIX_133MHZ_533		0x0d
+#define PCIX_66MHZ_266		0x9
+#define PCIX_100MHZ_266		0xa
+#define PCIX_133MHZ_266		0xb
+#define PCIX_66MHZ_533		0x11
+#define PCIX_100MHZ_533		0x12
+#define PCIX_133MHZ_533		0x13
 
 /* Slot Configuration */
 #define SLOT_NUM		0x0000001F
@@ -464,7 +464,8 @@ static int hpc_get_latch_status(struct slot *slot, u8 *status)
 	slot_reg = readl(php_ctlr->creg + SLOT1 + 4*(slot->hp_slot));
 	slot_status = (u16)slot_reg;
 
-	*status = ((slot_status & 0x0100) == 0) ? 1 : 0;
+	*status = ((slot_status & 0x0100) == 0) ? 0 : 1;   /* 0 -> close; 1 -> open */
+
 
 	DBG_LEAVE_ROUTINE 
 	return 0;

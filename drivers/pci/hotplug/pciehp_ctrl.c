@@ -135,7 +135,7 @@ u8 pciehp_handle_switch_change(u8 hp_slot, void *inst_id)
 	p_slot->hpc_ops->get_adapter_status(p_slot, &(func->presence_save));
 	p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 
-	if (!getstatus) {
+	if (getstatus) {
 		/*
 		 * Switch opened
 		 */
@@ -1705,7 +1705,7 @@ int pciehp_enable_slot (struct slot *p_slot)
 	}
 	
 	rc = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
-	if (rc || !getstatus) {
+	if (rc || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
 		return (0);
@@ -1792,7 +1792,7 @@ int pciehp_disable_slot (struct slot *p_slot)
 	}
 
 	ret = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
-	if (ret || !getstatus) {
+	if (ret || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
 		return (0);

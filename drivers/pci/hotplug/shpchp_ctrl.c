@@ -138,7 +138,7 @@ u8 shpchp_handle_switch_change(u8 hp_slot, void *inst_id)
 	p_slot->hpc_ops->get_adapter_status(p_slot, &(func->presence_save));
 	p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
 
-	if (!getstatus) {
+	if (getstatus) {
 		/*
 		 * Switch opened
 		 */
@@ -1219,7 +1219,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 					up(&ctrl->crit_sect);
 				}
 			} else {
-				if ((bus_speed > 0x4) || (max_bus_speed > 0x4))  {
+				if (bus_speed > 0x4) {
 					err("%s: speed of bus %x and adapter %x mismatch\n", __FUNCTION__, bus_speed, adapter_speed);
 					return WRONG_BUS_FREQUENCY;
 				}
@@ -1302,7 +1302,7 @@ static u32 board_added(struct pci_func * func, struct controller * ctrl)
 					up(&ctrl->crit_sect);
 				}
 			} else {
-				if ((bus_speed > 0x2) || (max_bus_speed > 0x2))  {
+				if (bus_speed > 0x2) {
 					err("%s: speed of bus %x and adapter %x mismatch\n", __FUNCTION__, bus_speed, adapter_speed);
 					return WRONG_BUS_FREQUENCY;
 				}
@@ -2107,7 +2107,7 @@ int shpchp_enable_slot (struct slot *p_slot)
 		return (0);
 	}
 	rc = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
-	if (rc || !getstatus) {
+	if (rc || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
 		return (0);
@@ -2192,7 +2192,7 @@ int shpchp_disable_slot (struct slot *p_slot)
 		return (0);
 	}
 	ret = p_slot->hpc_ops->get_latch_status(p_slot, &getstatus);
-	if (ret || !getstatus) {
+	if (ret || getstatus) {
 		info("%s: latch open on slot(%x)\n", __FUNCTION__, p_slot->number);
 		up(&p_slot->ctrl->crit_sect);
 		return (0);
