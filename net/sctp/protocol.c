@@ -81,8 +81,6 @@ static struct sctp_af *sctp_af_v6_specific;
 kmem_cache_t *sctp_chunk_cachep;
 kmem_cache_t *sctp_bucket_cachep;
 
-extern struct net_proto_family inet_family_ops;
-
 extern int sctp_snmp_proc_init(void);
 extern int sctp_snmp_proc_exit(void);
 extern int sctp_eps_proc_init(void);

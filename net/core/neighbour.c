@@ -227,7 +227,6 @@ int neigh_ifdown(struct neigh_table *tbl, struct net_device *dev)
 				   we must kill timers etc. and move
 				   it to safe state.
 				 */
-				n->parms = &tbl->parms;
 				skb_queue_purge(&n->arp_queue);
 				n->output = neigh_blackhole;
 				if (n->nud_state & NUD_VALID)
@@ -273,7 +272,7 @@ static struct neighbour *neigh_alloc(struct neigh_table *tbl)
 	n->updated	  = n->used = now;
 	n->nud_state	  = NUD_NONE;
 	n->output	  = neigh_blackhole;
-	n->parms	  = &tbl->parms;
+	n->parms	  = neigh_parms_clone(&tbl->parms);
 	init_timer(&n->timer);
 	n->timer.function = neigh_timer_handler;
 	n->timer.data	  = (unsigned long)n;
@@ -340,12 +339,16 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 	hash_val = tbl->hash(pkey, dev);
 
 	write_lock_bh(&tbl->lock);
+	if (n->parms->dead) {
+		rc = ERR_PTR(-EINVAL);
+		goto out_tbl_unlock;
+	}
+
 	for (n1 = tbl->hash_buckets[hash_val]; n1; n1 = n1->next) {
 		if (dev == n1->dev && !memcmp(n1->primary_key, pkey, key_len)) {
 			neigh_hold(n1);
-			write_unlock_bh(&tbl->lock);
 			rc = n1;
-			goto out_neigh_release;
+			goto out_tbl_unlock;
 		}
 	}
 
@@ -358,6 +361,8 @@ struct neighbour *neigh_create(struct neigh_table *tbl, const void *pkey,
 	rc = n;
 out:
 	return rc;
+out_tbl_unlock:
+	write_unlock_bh(&tbl->lock);
 out_neigh_release:
 	neigh_release(n);
 	goto out;
@@ -494,6 +499,7 @@ void neigh_destroy(struct neighbour *neigh)
 	skb_queue_purge(&neigh->arp_queue);
 
 	dev_put(neigh->dev);
+	neigh_parms_put(neigh->parms);
 
 	NEIGH_PRINTK2("neigh %p is destroyed.\n", neigh);
 
@@ -1120,6 +1126,7 @@ struct neigh_parms *neigh_parms_alloc(struct net_device *dev,
 	if (p) {
 		memcpy(p, &tbl->parms, sizeof(*p));
 		p->tbl		  = tbl;
+		atomic_set(&p->refcnt, 1);
 		INIT_RCU_HEAD(&p->rcu_head);
 		p->reachable_time =
 				neigh_rand_reach_time(p->base_reachable_time);
@@ -1141,7 +1148,7 @@ static void neigh_rcu_free_parms(struct rcu_head *head)
 	struct neigh_parms *parms =
 		container_of(head, struct neigh_parms, rcu_head);
 
-	kfree(parms);
+	neigh_parms_put(parms);
 }
 
 void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
@@ -1154,6 +1161,7 @@ void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 	for (p = &tbl->parms.next; *p; p = &(*p)->next) {
 		if (*p == parms) {
 			*p = parms->next;
+			parms->dead = 1;
 			write_unlock_bh(&tbl->lock);
 			call_rcu(&parms->rcu_head, neigh_rcu_free_parms);
 			return;
@@ -1163,11 +1171,17 @@ void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 	NEIGH_PRINTK1("neigh_parms_release: not found\n");
 }
 
+void neigh_parms_destroy(struct neigh_parms *parms)
+{
+	kfree(parms);
+}
+
 
 void neigh_table_init(struct neigh_table *tbl)
 {
 	unsigned long now = jiffies;
 
+	atomic_set(&tbl->parms.refcnt, 1);
 	INIT_RCU_HEAD(&tbl->parms.rcu_head);
 	tbl->parms.reachable_time =
 			  neigh_rand_reach_time(tbl->parms.base_reachable_time);

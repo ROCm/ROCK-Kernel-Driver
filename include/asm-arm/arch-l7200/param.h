@@ -16,4 +16,4 @@
 /*
  * See 'time.h' for how the RTC HZ rate is set
  */
-#define __KERNEL_HZ 128
+#define HZ 128

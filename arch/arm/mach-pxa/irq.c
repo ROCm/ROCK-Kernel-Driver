@@ -25,24 +25,48 @@
 
 
 /*
- * This is for IRQs known as PXA_IRQ([8...31]).
+ * This is for peripheral IRQs internal to the PXA chip.
  */
 
-static void pxa_mask_irq(unsigned int irq)
+static void pxa_mask_low_irq(unsigned int irq)
 {
 	ICMR &= ~(1 << (irq + PXA_IRQ_SKIP));
 }
 
-static void pxa_unmask_irq(unsigned int irq)
+static void pxa_unmask_low_irq(unsigned int irq)
 {
 	ICMR |= (1 << (irq + PXA_IRQ_SKIP));
 }
 
-static struct irqchip pxa_internal_chip = {
-	.ack		= pxa_mask_irq,
-	.mask		= pxa_mask_irq,
-	.unmask		= pxa_unmask_irq,
+static struct irqchip pxa_internal_chip_low = {
+	.ack		= pxa_mask_low_irq,
+	.mask		= pxa_mask_low_irq,
+	.unmask		= pxa_unmask_low_irq,
 };
+
+#if PXA_INTERNAL_IRQS > 32
+
+/*
+ * This is for the second set of internal IRQs as found on the PXA27x.
+ */
+
+static void pxa_mask_high_irq(unsigned int irq)
+{
+	ICMR2 &= ~(1 << (irq - 32 + PXA_IRQ_SKIP));
+}
+
+static void pxa_unmask_high_irq(unsigned int irq)
+{
+	ICMR2 |= (1 << (irq - 32 + PXA_IRQ_SKIP));
+}
+
+static struct irqchip pxa_internal_chip_high = {
+	.ack		= pxa_mask_high_irq,
+	.mask		= pxa_mask_high_irq,
+	.unmask		= pxa_unmask_high_irq,
+};
+
+#endif
 
 /*
  * PXA GPIO edge detection for IRQs:
@@ -50,9 +74,9 @@ static struct irqchip pxa_internal_chip = {
  * Use this instead of directly setting GRER/GFER.
  */
 
-static long GPIO_IRQ_rising_edge[3];
-static long GPIO_IRQ_falling_edge[3];
-static long GPIO_IRQ_mask[3];
+static long GPIO_IRQ_rising_edge[4];
+static long GPIO_IRQ_falling_edge[4];
+static long GPIO_IRQ_mask[4];
 
 static int pxa_gpio_irq_type(unsigned int irq, unsigned int type)
 {
@@ -106,13 +130,13 @@ static void pxa_ack_low_gpio(unsigned int irq)
 
 static struct irqchip pxa_low_gpio_chip = {
 	.ack		= pxa_ack_low_gpio,
-	.mask		= pxa_mask_irq,
-	.unmask		= pxa_unmask_irq,
+	.mask		= pxa_mask_low_irq,
+	.unmask		= pxa_unmask_low_irq,
 	.type		= pxa_gpio_irq_type,
 };
 
 /*
- * Demux handler for GPIO 2-80 edge detect interrupts
+ * Demux handler for GPIO>=2 edge detect interrupts
  */
 
 static void pxa_gpio_demux_handler(unsigned int irq, struct irqdesc *desc,
@@ -169,6 +193,23 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irqdesc *desc,
 			} while (mask);
 			loop = 1;
 		}
+
+#if PXA_LAST_GPIO >= 96
+		mask = GEDR3;
+		if (mask) {
+			GEDR3 = mask;
+			irq = IRQ_GPIO(96);
+			desc = irq_desc + irq;
+			do {
+				if (mask & 1)
+					desc->handle(irq, desc, regs);
+				irq++;
+				desc++;
+				mask >>= 1;
+			} while (mask);
+			loop = 1;
+		}
+#endif
 	} while (loop);
 }
 
@@ -208,17 +249,18 @@ void __init pxa_init_irq(void)
 	int irq;
 
 	/* disable all IRQs */
-	ICMR = 0;
+	ICMR = ICMR2 = 0;
 
 	/* all IRQs are IRQ, not FIQ */
-	ICLR = 0;
+	ICLR = ICLR2 = 0;
 
 	/* clear all GPIO edge detects */
-	GFER0 = GFER1 = GFER2 = 0;
-	GRER0 = GRER1 = GRER2 = 0;
+	GFER0 = GFER1 = GFER2 = GFER3 = 0;
+	GRER0 = GRER1 = GRER2 = GRER3 = 0;
 	GEDR0 = GEDR0;
 	GEDR1 = GEDR1;
 	GEDR2 = GEDR2;
+	GEDR3 = GEDR3;
 
 	/* only unmasked interrupts kick us out of idle */
 	ICCR = 1;
@@ -227,10 +269,18 @@ void __init pxa_init_irq(void)
 	GPIO_IRQ_mask[0] = 3;
 
 	for (irq = PXA_IRQ(PXA_IRQ_SKIP); irq <= PXA_IRQ(31); irq++) {
-		set_irq_chip(irq, &pxa_internal_chip);
+		set_irq_chip(irq, &pxa_internal_chip_low);
 		set_irq_handler(irq, do_level_IRQ);
 		set_irq_flags(irq, IRQF_VALID);
 	}
+
+#if PXA_INTERNAL_IRQS > 32
+	for (irq = PXA_IRQ(32); irq < PXA_IRQ(PXA_INTERNAL_IRQS); irq++) {
+		set_irq_chip(irq, &pxa_internal_chip_high);
+		set_irq_handler(irq, do_level_IRQ);
+		set_irq_flags(irq, IRQF_VALID);
+	}
+#endif
 
 	for (irq = IRQ_GPIO0; irq <= IRQ_GPIO1; irq++) {
 		set_irq_chip(irq, &pxa_low_gpio_chip);
@@ -238,13 +288,13 @@ void __init pxa_init_irq(void)
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	for (irq = IRQ_GPIO(2); irq <= IRQ_GPIO(80); irq++) {
+	for (irq = IRQ_GPIO(2); irq <= IRQ_GPIO(PXA_LAST_GPIO); irq++) {
 		set_irq_chip(irq, &pxa_muxed_gpio_chip);
 		set_irq_handler(irq, do_edge_IRQ);
 		set_irq_flags(irq, IRQF_VALID | IRQF_PROBE);
 	}
 
-	/* Install handler for GPIO 2-80 edge detect interrupts */
-	set_irq_chip(IRQ_GPIO_2_80, &pxa_internal_chip);
-	set_irq_chained_handler(IRQ_GPIO_2_80, pxa_gpio_demux_handler);
+	/* Install handler for GPIO>=2 edge detect interrupts */
+	set_irq_chip(IRQ_GPIO_2_x, &pxa_internal_chip_low);
+	set_irq_chained_handler(IRQ_GPIO_2_x, pxa_gpio_demux_handler);
 }

@@ -201,6 +201,10 @@ struct tcp_sack_block {
 	__u32	end_seq;
 };
 
+typedef struct tcp_pcount {
+	__u32	val;
+} tcp_pcount_t;
+
 struct tcp_opt {
 	int	tcp_header_len;	/* Bytes of tcp header to send		*/
 
@@ -274,9 +278,9 @@ struct tcp_opt {
 	__u32	rtt_seq;	/* sequence number to update rttvar	*/
 	__u32	rto;		/* retransmit timeout			*/
 
-	__u32	packets_out;	/* Packets which are "in flight"	*/
-	__u32	left_out;	/* Packets which leaved network		*/
-	__u32	retrans_out;	/* Retransmitted packets out		*/
+	tcp_pcount_t packets_out; /* Packets which are "in flight"	*/
+	tcp_pcount_t left_out;	  /* Packets which leaved network	*/
+	tcp_pcount_t retrans_out; /* Retransmitted packets out		*/
 
 
 /*
@@ -337,9 +341,9 @@ struct tcp_opt {
 	__u8	syn_retries;	/* num of allowed syn retries */
 	__u8	ecn_flags;	/* ECN status bits.			*/
 	__u16	prior_ssthresh; /* ssthresh saved at recovery start	*/
-	__u32	lost_out;	/* Lost packets				*/
-	__u32	sacked_out;	/* SACK'd packets			*/
-	__u32	fackets_out;	/* FACK'd packets			*/
+	tcp_pcount_t lost_out;	/* Lost packets			*/
+	tcp_pcount_t sacked_out;/* SACK'd packets			*/
+	tcp_pcount_t fackets_out;/* FACK'd packets			*/
 	__u32	high_seq;	/* snd_nxt at onset of congestion	*/
 
 	__u32	retrans_stamp;	/* Timestamp of the last retransmit,

@@ -127,6 +127,7 @@ ip_vs_dst_reset(struct ip_vs_dest *dest)
 
 #define IP_VS_XMIT(skb, rt)				\
 do {							\
+	nf_reset(skb);					\
 	(skb)->nfcache |= NFC_IPVS_PROPERTY;		\
 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, (skb), NULL,	\
 		(rt)->u.dst.dev, dst_output);		\
@@ -201,9 +202,6 @@ ip_vs_bypass_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;
 
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif /* CONFIG_NETFILTER_DEBUG */
 	IP_VS_XMIT(skb, rt);
 
 	LeaveFunction(10);
@@ -280,9 +278,6 @@ ip_vs_nat_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;
 
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif /* CONFIG_NETFILTER_DEBUG */
 	IP_VS_XMIT(skb, rt);
 
 	LeaveFunction(10);
@@ -418,10 +413,6 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;
 
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif /* CONFIG_NETFILTER_DEBUG */
-
 	IP_VS_XMIT(skb, rt);
 
 	LeaveFunction(10);
@@ -480,9 +471,6 @@ ip_vs_dr_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;
 
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif /* CONFIG_NETFILTER_DEBUG */
 	IP_VS_XMIT(skb, rt);
 
 	LeaveFunction(10);
@@ -557,9 +545,6 @@ ip_vs_icmp_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;
 
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug = 0;
-#endif /* CONFIG_NETFILTER_DEBUG */
 	IP_VS_XMIT(skb, rt);
 
 	rc = NF_STOLEN;

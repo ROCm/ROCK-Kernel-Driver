@@ -67,6 +67,8 @@ struct neigh_parms
 
 	void	*sysctl_table;
 
+	int dead;
+	atomic_t refcnt;
 	struct rcu_head rcu_head;
 
 	int	base_reachable_time;
@@ -199,6 +201,7 @@ extern struct neighbour 	*neigh_event_ns(struct neigh_table *tbl,
 
 extern struct neigh_parms	*neigh_parms_alloc(struct net_device *dev, struct neigh_table *tbl);
 extern void			neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms);
+extern void			neigh_parms_destroy(struct neigh_parms *parms);
 extern unsigned long		neigh_rand_reach_time(unsigned long base);
 
 extern void			pneigh_enqueue(struct neigh_table *tbl, struct neigh_parms *p,
@@ -219,6 +222,23 @@ extern int			neigh_sysctl_register(struct net_device *dev,
 						      char *p_name,
 						      proc_handler *proc_handler);
 extern void			neigh_sysctl_unregister(struct neigh_parms *p);
+
+static inline void __neigh_parms_put(struct neigh_parms *parms)
+{
+	atomic_dec(&parms->refcnt);
+}
+
+static inline void neigh_parms_put(struct neigh_parms *parms)
+{
+	if (atomic_dec_and_test(&parms->refcnt))
+		neigh_parms_destroy(parms);
+}
+
+static inline struct neigh_parms *neigh_parms_clone(struct neigh_parms *parms)
+{
+	atomic_inc(&parms->refcnt);
+	return parms;
+}
 
 /*
  *	Neighbour references
