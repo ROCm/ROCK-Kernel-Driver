@@ -437,8 +437,11 @@ static void i2c_dec_use_client(struct i2c_client *client)
 
 int i2c_use_client(struct i2c_client *client)
 {
-	if (!i2c_inc_use_client(client))
-		return -ENODEV;
+	int ret;
+
+	ret = i2c_inc_use_client(client);
+	if (ret)
+		return ret;
 
 	if (client->flags & I2C_CLIENT_ALLOW_USE) {
 		if (client->flags & I2C_CLIENT_ALLOW_MULTIPLE_USE)
