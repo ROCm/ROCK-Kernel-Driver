@@ -19,7 +19,7 @@ CONFIG_SYSCTL=y
 # Loadable module support
 #
 CONFIG_MODULES=y
-# CONFIG_MODVERSIONS is not set
+CONFIG_MODVERSIONS=y
 CONFIG_KMOD=y
 
 #
@@ -485,7 +485,6 @@ CONFIG_E100=m
 # CONFIG_LNE390 is not set
 CONFIG_FEALNX=m
 CONFIG_NATSEMI=m
-# CONFIG_NATSEMI_CABLE_MAGIC is not set
 CONFIG_NE2K_PCI=m
 # CONFIG_NE3210 is not set
 # CONFIG_ES3210 is not set
@@ -565,6 +564,34 @@ CONFIG_TULIP=m
 CONFIG_DE4X5=m
 CONFIG_WINBOND_840=m
 # CONFIG_DM9102 is not set
+
+#
+# Amateur Radio support
+#
+CONFIG_HAMRADIO=y
+
+#
+# Packet Radio protocols
+#
+CONFIG_AX25=m
+CONFIG_AX25_DAMA_SLAVE=y
+CONFIG_NETROM=m
+CONFIG_ROSE=m
+
+#
+# AX.25 network device drivers
+#
+# CONFIG_MKISS is not set
+# CONFIG_6PACK is not set
+# CONFIG_BPQETHER is not set
+# CONFIG_SCC_DELAY is not set
+# CONFIG_SCC_TRXECHO is not set
+# CONFIG_BAYCOM_SER_FDX is not set
+# CONFIG_BAYCOM_SER_HDX is not set
+# CONFIG_BAYCOM_PAR is not set
+# CONFIG_BAYCOM_EPP is not set
+# CONFIG_SOUNDMODEM is not set
+# CONFIG_YAM is not set
 
 #
 # Unix 98 PTY support

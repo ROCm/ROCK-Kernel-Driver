@@ -1566,17 +1566,14 @@ void user_instruction_dump (unsigned int *pc)
 	printk("\n");
 }
 
-void show_trace_task(struct task_struct *tsk)
+void show_trace_raw(struct thread_info *tp, unsigned long ksp)
 {
-	unsigned long pc, fp;
-	unsigned long thread_base = (unsigned long) tsk->thread_info;
+	unsigned long pc, fp, thread_base;
 	struct reg_window *rw;
 	int count = 0;
 
-	if (!tsk)
-		return;
-
-	fp = tsk->thread_info->ksp + STACK_BIAS;
+	fp = ksp + STACK_BIAS;
+	thread_base = (unsigned long) tp;
 	do {
 		/* Bogus frame pointer? */
 		if (fp < (thread_base + sizeof(struct thread_info)) ||
@@ -1588,6 +1585,13 @@ void show_trace_task(struct task_struct *tsk)
 		fp = rw->ins[6] + STACK_BIAS;
 	} while (++count < 16);
 	printk("\n");
+}
+
+void show_trace_task(struct task_struct *tsk)
+{
+	if (tsk)
+		show_trace_raw(tsk->thread_info,
+			       tsk->thread_info->ksp);
 }
 
 void die_if_kernel(char *str, struct pt_regs *regs)

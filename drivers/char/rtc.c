@@ -76,6 +76,7 @@
 #include <asm/system.h>
 
 #ifdef __sparc__
+#include <linux/pci.h>
 #include <asm/ebus.h>
 #ifdef __sparc_v9__
 #include <asm/isa.h>
