@@ -288,6 +288,7 @@ void nbd_do_it(struct nbd_device *lo)
 
 	}
  out:
+	return;
 }
 
 void nbd_clear_que(struct nbd_device *lo)
