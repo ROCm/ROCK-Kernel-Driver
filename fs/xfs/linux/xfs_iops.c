@@ -276,6 +276,7 @@ linvfs_symlink(
 		} else {
 			d_instantiate(dentry, ip);
 			validate_fields(dir);
+			validate_fields(ip); /* size needs update */
 			mark_inode_dirty_sync(ip);
 			mark_inode_dirty_sync(dir);
 		}
