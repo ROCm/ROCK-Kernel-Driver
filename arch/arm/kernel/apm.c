@@ -202,7 +202,7 @@ static void apm_suspend(void)
 	}
 	up_read(&user_list_lock);
 
-	wake_up_interruptible(&apm_suspend_waitqueue);
+	wake_up(&apm_suspend_waitqueue);
 }
 
 static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t *ppos)
@@ -306,7 +306,15 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 		flags = current->flags;
 		current->flags |= PF_NOFREEZE;
 
-		wait_event_interruptible(apm_suspend_waitqueue,
+		/*
+		 * Note: do not allow a thread which is acking the suspend
+		 * to escape until the resume is complete.
+		 */
+		if (as->suspend_state == SUSPEND_ACKED)
+			wait_event(apm_suspend_waitqueue,
+					 as->suspend_state == SUSPEND_DONE);
+		else
+			wait_event_interruptible(apm_suspend_waitqueue,
 					 as->suspend_state == SUSPEND_DONE);
 
 		current->flags = flags;
