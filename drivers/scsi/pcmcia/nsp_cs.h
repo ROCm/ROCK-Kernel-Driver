@@ -285,8 +285,6 @@ static int nsp_proc_info(char *buffer, char **start, off_t offset,
 			 int length, int hostno, int inout);
 static int nsp_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 
-static int nsp_abort(Scsi_Cmnd *);
-static int nsp_reset(Scsi_Cmnd *, unsigned int);
 
 /*static int nsp_eh_abort(Scsi_Cmnd * SCpnt);*/
 /*static int nsp_eh_device_reset(Scsi_Cmnd *SCpnt);*/

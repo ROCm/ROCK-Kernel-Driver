@@ -147,8 +147,6 @@ static Scsi_Host_Template driver_template = {
 /*	.eh_device_reset_handler = nsp_eh_device_reset,*/
 	.eh_bus_reset_handler	 = nsp_eh_bus_reset,
 	.eh_host_reset_handler	 = nsp_eh_host_reset,
-	.abort			 = nsp_abort,
-	.reset			 = nsp_reset,
 /*	.slave_attach		 = NULL,*/
 /*	.bios_param		 = NULL,*/
 	.can_queue		 = 1,
@@ -1393,45 +1391,6 @@ static int nsp_proc_info(char  *buffer,
 }
 #undef SPRINTF
 
-/*---------------------------------------------------------------*/
-/* error handler                                                 */
-/*---------------------------------------------------------------*/
-static int nsp_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
-{
-	nsp_hw_data *data = &nsp_data;
-	int ret = 0;
-
-	DEBUG(0, "%s: SCpnt=0x%p why=%d\n", __FUNCTION__, SCpnt, reset_flags);
-
-	if (reset_flags & SCSI_RESET_SUGGEST_BUS_RESET) {
-		nsp_eh_bus_reset(SCpnt);
-
-		ret |= SCSI_RESET_BUS_RESET;
-	}
-
-	if (reset_flags & SCSI_RESET_SUGGEST_HOST_RESET) {
-		nsp_eh_host_reset(SCpnt);
-
-		ret |= SCSI_RESET_HOST_RESET;
-	}
-
-	if (ret != 0) {
-		return SCSI_RESET_SUCCESS | ret;
-	} else {
-		nsphw_init_sync(data);
-		return SCSI_RESET_PUNT;
-	}
-}
-
-static int nsp_abort(Scsi_Cmnd *SCpnt)
-{
-	DEBUG(0, "%s: SCpnt=0x%p\n", __FUNCTION__, SCpnt);
-
-	nsp_eh_host_reset(SCpnt);
-	nsp_eh_bus_reset(SCpnt);
-
-	return SCSI_ABORT_SUCCESS;
-}
 
 /*static int nsp_eh_strategy(struct Scsi_Host *Shost)
 {
