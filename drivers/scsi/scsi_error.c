@@ -1026,7 +1026,8 @@ static int scsi_try_bus_reset(struct scsi_cmnd *scmd)
 	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	if (rtn == SUCCESS) {
-		scsi_sleep(BUS_RESET_SETTLE_TIME);
+		if (!scmd->device->host->hostt->skip_settle_delay)
+			scsi_sleep(BUS_RESET_SETTLE_TIME);
 		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
@@ -1057,7 +1058,8 @@ static int scsi_try_host_reset(struct scsi_cmnd *scmd)
 	spin_unlock_irqrestore(scmd->device->host->host_lock, flags);
 
 	if (rtn == SUCCESS) {
-		scsi_sleep(HOST_RESET_SETTLE_TIME);
+		if (!scmd->device->host->hostt->skip_settle_delay)
+			scsi_sleep(HOST_RESET_SETTLE_TIME);
 		spin_lock_irqsave(scmd->device->host->host_lock, flags);
 		scsi_report_bus_reset(scmd->device->host, scmd->device->channel);
 		spin_unlock_irqrestore(scmd->device->host->host_lock, flags);

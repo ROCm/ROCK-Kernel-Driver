@@ -314,6 +314,11 @@ struct scsi_host_template {
 	unsigned emulated:1;
 
 	/*
+	 * True if the low-level driver performs its own reset-settle delays.
+	 */
+	unsigned skip_settle_delay:1;
+
+	/*
 	 * Countdown for host blocking with no commands outstanding
 	 */
 	unsigned int max_host_blocked;
