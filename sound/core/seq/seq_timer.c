@@ -365,9 +365,11 @@ void snd_seq_timer_continue(seq_timer_t * tmr)
 		return;
 	if (tmr->running)
 		return;
-	if (! tmr->initialized)
+	if (! tmr->initialized) {
+		snd_seq_timer_reset(tmr);
 		if (initialize_timer(tmr) < 0)
 			return;
+	}
 	snd_timer_start(tmr->timeri, tmr->ticks);
 	tmr->running = 1;
 	do_gettimeofday(&tmr->last_update);

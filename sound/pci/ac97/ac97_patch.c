@@ -300,6 +300,20 @@ int patch_ad1881(ac97_t * ac97)
 	return 0;
 }
 
+int patch_ad1885(ac97_t * ac97)
+{
+	unsigned short jack;
+
+	patch_ad1881(ac97);
+	/* This is required to deal with the Intel D815EEAL2 */
+	/* i.e. Line out is actually headphone out from codec */
+
+	/* turn off jack sense bits D8 & D9 */
+	jack = snd_ac97_read(ac97, AC97_AD_JACK_SPDIF);
+	snd_ac97_write_cache(ac97, AC97_AD_JACK_SPDIF, jack | 0x0300);
+	return 0;
+}
+
 int patch_ad1886(ac97_t * ac97)
 {
 	patch_ad1881(ac97);

@@ -91,10 +91,10 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x41445303, 0xffffffff, "AD1819",		patch_ad1819 },
 { 0x41445340, 0xffffffff, "AD1881",		patch_ad1881 },
 { 0x41445348, 0xffffffff, "AD1881A",		patch_ad1881 },
-{ 0x41445360, 0xffffffff, "AD1885",		patch_ad1881 },
+{ 0x41445360, 0xffffffff, "AD1885",		patch_ad1885 },
 { 0x41445361, 0xffffffff, "AD1886",		patch_ad1886 },
 { 0x41445362, 0xffffffff, "AD1887",		patch_ad1881 },
-{ 0x41445372, 0xffffffff, "AD1981A",		NULL },
+{ 0x41445372, 0xffffffff, "AD1981A",		patch_ad1881 },
 { 0x414c4300, 0xfffffff0, "RL5306",	 	NULL },
 { 0x414c4310, 0xfffffff0, "RL5382", 		NULL },
 { 0x414c4320, 0xfffffff0, "RL5383", 		NULL },
@@ -240,12 +240,11 @@ void snd_ac97_write_cache(ac97_t *ac97, unsigned short reg, unsigned short value
 	set_bit(reg, ac97->reg_accessed);
 }
 
-#ifndef CONFIG_SND_DEBUG
-#define snd_ac97_write_cache_test snd_ac97_write_cache
-#else
 static void snd_ac97_write_cache_test(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
-	return snd_ac97_write_cache(ac97, reg, value);
+	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
+  		return;
+#if 0
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return;
 	spin_lock(&ac97->reg_lock);
@@ -254,8 +253,9 @@ static void snd_ac97_write_cache_test(ac97_t *ac97, unsigned short reg, unsigned
 	if (value != ac97->regs[reg])
 		snd_printk("AC97 reg=%02x val=%04x real=%04x\n", reg, value, ac97->regs[reg]);
 	spin_unlock(&ac97->reg_lock);
-}
 #endif
+	snd_ac97_write_cache(ac97, reg, value);
+}
 
 int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 {
@@ -911,6 +911,9 @@ static int snd_ac97_try_volume_mix(ac97_t * ac97, int reg)
 {
 	unsigned short val, mask = 0x8000;
 
+	if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
+		return 0;
+
 	switch (reg) {
 	case AC97_MASTER_TONE:
 		return ac97->caps & 0x04 ? 1 : 0;
@@ -1461,6 +1464,12 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 	*ac97 = *_ac97;
 	ac97->card = card;
 	spin_lock_init(&ac97->reg_lock);
+
+	if (ac97->reset) {
+		ac97->reset(ac97);
+		goto __access_ok;
+	}
+
 	snd_ac97_write(ac97, AC97_RESET, 0);	/* reset to defaults */
 	if (ac97->wait)
 		ac97->wait(ac97);
@@ -1499,6 +1508,10 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_free(ac97);
 		return -EIO;
 	}
+
+	if (ac97->reset) // FIXME: always skipping?
+		goto __ready_ok;
+
 	/* FIXME: add powerdown control */
 	/* nothing should be in powerdown mode */
 	snd_ac97_write_cache_test(ac97, AC97_POWERDOWN, 0);
@@ -1540,6 +1553,7 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		snd_ac97_determine_rates(ac97, AC97_PCM_LFE_DAC_RATE, &ac97->rates_lfe_dac);
 		ac97->scaps |= AC97_SCAP_CENTER_LFE_DAC;
 	}
+	/* additional initializations */
 	if (ac97->init)
 		ac97->init(ac97);
 	snd_ac97_get_name(ac97, ac97->id, name);
@@ -1738,7 +1752,10 @@ static void snd_ac97_proc_regs_read_main(ac97_t *ac97, snd_info_buffer_t * buffe
 	int reg, val;
 
 	for (reg = 0; reg < 0x80; reg += 2) {
-		val = snd_ac97_read(ac97, reg);
+		if (ac97->limited_regs && ! test_bit(reg, ac97->reg_accessed))
+			val = 0xffff;
+		else
+			val = snd_ac97_read(ac97, reg);
 		snd_iprintf(buffer, "%i:%02x = %04x\n", subidx, reg, val);
 	}
 }
@@ -1903,6 +1920,11 @@ void snd_ac97_resume(ac97_t *ac97)
 {
 	int i;
 
+	if (ac97->reset) {
+		ac97->reset(ac97);
+		goto  __reset_ready;
+	}
+
 	snd_ac97_write(ac97, AC97_POWERDOWN, 0);
 	snd_ac97_write(ac97, AC97_RESET, 0);
 	udelay(100);
@@ -1916,6 +1938,7 @@ void snd_ac97_resume(ac97_t *ac97)
 			break;
 		mdelay(1);
 	}
+__reset_ready:
 
 	if (ac97->init)
 		ac97->init(ac97);

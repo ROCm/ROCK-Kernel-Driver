@@ -238,7 +238,7 @@ struct _snd_via686a {
 	snd_card_t *card;
 
 	snd_pcm_t *pcm;
-	snd_pcm_t *pcm_fm;
+	/*snd_pcm_t *pcm_fm;*/
 	viadev_t playback;
 	viadev_t capture;
 	/*viadev_t playback_fm;*/
@@ -564,8 +564,13 @@ static inline unsigned int snd_via686a_cur_ptr(via686a_t *chip, viadev_t *viadev
 		val = 0;
 	else
 		val = ((ptr - (unsigned int)viadev->table_addr) / 8 - 1) % viadev->tbl_entries;
-	val *= viadev->tbl_size;
-	val += viadev->tbl_size - count;
+	if (val < viadev->tbl_entries - 1) {
+		val *= viadev->tbl_size;
+		val += viadev->tbl_size - count;
+	} else {
+		val *= viadev->tbl_size;
+		val += (viadev->size % viadev->tbl_size) + 1 - count;
+	}
 	viadev->lastptr = ptr;
 	viadev->lastcount = count;
 	// printk("pointer: ptr = 0x%x (%i), count = 0x%x, val = 0x%x\n", ptr, count, val);
@@ -632,10 +637,10 @@ static int snd_via686a_playback_open(snd_pcm_substream_t * substream)
 	chip->playback.substream = substream;
 	runtime->hw = snd_via686a_playback;
 	runtime->hw.rates = chip->ac97->rates_front_dac;
-	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
-		return err;
 	if (!(runtime->hw.rates & SNDRV_PCM_RATE_8000))
 		runtime->hw.rate_min = 48000;
+	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
+		return err;
 	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
 		return err;
 #if 0
@@ -658,10 +663,10 @@ static int snd_via686a_capture_open(snd_pcm_substream_t * substream)
 	chip->capture.substream = substream;
 	runtime->hw = snd_via686a_capture;
 	runtime->hw.rates = chip->ac97->rates_adc;
-	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
-		return err;
 	if (!(runtime->hw.rates & SNDRV_PCM_RATE_8000))
 		runtime->hw.rate_min = 48000;
+	if ((err = snd_pcm_sgbuf_init(substream, chip->pci, 32)) < 0)
+		return err;
 	if ((err = snd_pcm_hw_constraint_pow2(runtime, 0, SNDRV_PCM_HW_PARAM_PERIOD_BYTES)) < 0)
 		return err;
 #if 0
@@ -1020,7 +1025,7 @@ static int __devinit snd_via686a_create(snd_card_t * card,
 	if (ac97_clock >= 8000 && ac97_clock <= 48000)
 		chip->ac97_clock = ac97_clock;
 	pci_read_config_byte(pci, PCI_REVISION_ID, &chip->revision);
-	synchronize_irq(pci->irq);
+	synchronize_irq(chip->irq);
 
 	/* initialize offsets */
 	chip->playback.reg_offset = VIA_REG_PLAYBACK_STATUS;

@@ -1532,8 +1532,7 @@ static int snd_ensoniq_free(ensoniq_t *ensoniq)
 	outl(0, ES_REG(ensoniq, CONTROL));	/* switch everything off */
 	outl(0, ES_REG(ensoniq, SERIAL));	/* clear serial interface */
 #endif
-	if(ensoniq->irq >= 0)
-		synchronize_irq(ensoniq->irq);
+	synchronize_irq(ensoniq->irq);
 	pci_set_power_state(ensoniq->pci, 3);
       __hw_end:
 #ifdef CHIP1370

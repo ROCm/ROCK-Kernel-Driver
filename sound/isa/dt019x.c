@@ -168,7 +168,7 @@ static int __init snd_card_dt019x_isapnp(int dev, struct snd_card_dt019x *acard)
 	snd_dma8[dev] = pdev->dma_resource[0].start;
 	snd_irq[dev] = pdev->irq_resource[0].start;
 	snd_printdd("dt019x: found audio interface: port=0x%lx, irq=0x%lx, dma=0x%lx\n",
-			snd_port[dev],snd_irq[dev],smd_dma8[dev]);
+			snd_port[dev],snd_irq[dev],snd_dma8[dev]);
 
 	pdev = acard->devmpu;
 	if (!pdev || pdev->prepare(pdev)<0) 

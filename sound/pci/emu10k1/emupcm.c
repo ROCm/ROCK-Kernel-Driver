@@ -968,11 +968,13 @@ static void snd_emu10k1_pcm_free(snd_pcm_t *pcm)
 {
 	emu10k1_t *emu = snd_magic_cast(emu10k1_t, pcm->private_data, return);
 	emu->pcm = NULL;
+	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
 
 int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 {
 	snd_pcm_t *pcm;
+	snd_pcm_substream_t *substream;
 	int err;
 
 	if (rpcm)
@@ -991,6 +993,10 @@ int __devinit snd_emu10k1_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
 	strcpy(pcm->name, "EMU10K1");
 	emu->pcm = pcm;
+
+	for (substream = pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream; substream; substream = substream->next)
+		snd_pcm_lib_preallocate_pci_pages(emu->pci, substream, 64*1024, 64*1024);
+			return err;
 
 	if (rpcm)
 		*rpcm = pcm;

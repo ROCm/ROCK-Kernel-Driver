@@ -152,6 +152,7 @@
 typedef struct _snd_ac97 ac97_t;
 
 struct _snd_ac97 {
+	void (*reset) (ac97_t *ac97);
 	void (*write) (ac97_t *ac97, unsigned short reg, unsigned short val);
 	unsigned short (*read) (ac97_t *ac97, unsigned short reg);
 	void (*wait) (ac97_t *ac97);
@@ -178,6 +179,7 @@ struct _snd_ac97 {
 	unsigned int rates_mic_adc;
 	unsigned int spdif_status;
 	unsigned short regs[0x80]; /* register cache */
+	unsigned int limited_regs; /* allow limited registers only */
 	bitmap_member(reg_accessed,0x80); /* bit flags */
 	union {			/* vendor specific code */
 		struct {
