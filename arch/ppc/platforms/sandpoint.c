@@ -252,38 +252,6 @@ sandpoint_find_bridges(void)
 	return;
 }
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-static void __init
-sandpoint_early_serial_map(void)
-{
-	struct uart_port serial_req;
-
-	/* Setup serial port access */
-	memset(&serial_req, 0, sizeof(serial_req));
-	serial_req.uartclk = UART_CLK;
-	serial_req.irq = 4;
-	serial_req.flags = STD_COM_FLAGS;
-	serial_req.iotype = SERIAL_IO_MEM;
-	serial_req.membase = (u_char *)SANDPOINT_SERIAL_0;
-
-	gen550_init(0, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 0 failed\n");
-
-	/* Assume early_serial_setup() doesn't modify serial_req */
-	serial_req.line = 1;
-	serial_req.irq = 3; /* XXXX */
-	serial_req.membase = (u_char *)SANDPOINT_SERIAL_1;
-
-	gen550_init(1, &serial_req);
-
-	if (early_serial_setup(&serial_req) != 0)
-		printk(KERN_ERR "Early serial init of port 1 failed\n");
-}
-#endif
-
 static void __init
 sandpoint_setup_arch(void)
 {
@@ -696,15 +664,11 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.nvram_read_val = todc_mc146818_read_val;
 	ppc_md.nvram_write_val = todc_mc146818_write_val;
 
-#if defined(CONFIG_SERIAL_8250) && \
-	(defined(CONFIG_KGDB) || defined(CONFIG_SERIAL_TEXT_DEBUG))
-	sandpoint_early_serial_map();
 #ifdef CONFIG_KGDB
 	ppc_md.kgdb_map_scc = gen550_kgdb_map_scc;
 #endif
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = gen550_progress;
-#endif
 #endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
