@@ -463,8 +463,6 @@ static int load_packet(struct net_device *dev, struct sk_buff *skb);
 static void depca_dbg_open(struct net_device *dev);
 
 #ifdef MODULE
-int init_module(void);
-void cleanup_module(void);
 static int autoprobed = 1, loading_module = 1;
 # else
 static u_char de1xx_irq[] __initdata = { 2, 3, 4, 5, 7, 9, 0 };
