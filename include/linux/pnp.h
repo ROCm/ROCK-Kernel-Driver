@@ -133,7 +133,6 @@ struct pnp_card {
 	struct pnp_protocol * protocol;
 	struct pnp_id * id;		/* contains supported EISA IDs*/
 
-	void	      * protocol_data;	/* Used to store protocol specific data */
 	unsigned char	pnpver;		/* Plug & Play version */
 	unsigned char	productver;	/* product version */
 	unsigned int	serial;		/* serial number */
@@ -148,16 +147,6 @@ struct pnp_card {
 	for((card) = global_to_pnp_card(pnp_cards.next); \
 	(card) != global_to_pnp_card(&pnp_cards); \
 	(card) = global_to_pnp_card((card)->global_list.next))
-
-static inline void *pnp_get_card_protodata (struct pnp_card *pcard)
-{
-	return pcard->protocol_data;
-}
-
-static inline void pnp_set_card_protodata (struct pnp_card *pcard, void *data)
-{
-	pcard->protocol_data = data;
-}
 
 struct pnp_card_link {
 	struct pnp_card * card;
@@ -198,7 +187,6 @@ struct pnp_dev {
 	struct pnp_option * dependent;
 	struct pnp_resource_table res;
 
-	void * protocol_data;		/* Used to store protocol specific data */
 	unsigned short	regs;		/* ISAPnP: supported registers */
 	int 		flags;		/* used by protocols */
 	struct proc_dir_entry *procent;	/* device entry in /proc/bus/isapnp */
@@ -226,16 +214,6 @@ static inline void *pnp_get_drvdata (struct pnp_dev *pdev)
 static inline void pnp_set_drvdata (struct pnp_dev *pdev, void *data)
 {
 	dev_set_drvdata(&pdev->dev, data);
-}
-
-static inline void *pnp_get_protodata (struct pnp_dev *pdev)
-{
-	return pdev->protocol_data;
-}
-
-static inline void pnp_set_protodata (struct pnp_dev *pdev, void *data)
-{
-	pdev->protocol_data = data;
 }
 
 struct pnp_fixup {
