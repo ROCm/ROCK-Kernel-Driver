@@ -530,6 +530,24 @@ arp_announce - INTEGER
 	receiving answer from the resolved target while decreasing
 	the level announces more valid sender's information.
 
+arp_ignore - INTEGER
+	Define different modes for sending replies in response to
+	received ARP requests that resolve local target IP addresses:
+	0 - (default): reply for any local target IP address, configured
+	on any interface
+	1 - reply only if the target IP address is local address
+	configured on the incoming interface
+	2 - reply only if the target IP address is local address
+	configured on the incoming interface and both with the
+	sender's IP address are part from same subnet on this interface
+	3 - do not reply for local addresses configured with scope host,
+	only resolutions for global and link addresses are replied
+	4-7 - reserved
+	8 - do not reply for all local addresses
+
+	The max value from conf/{all,interface}/arp_ignore is used
+	when ARP request is received on the {interface}
+
 tag - INTEGER
 	Allows you to write a number, which can be used as required.
 	Default value is 0.

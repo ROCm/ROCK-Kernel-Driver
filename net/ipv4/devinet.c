@@ -809,6 +809,84 @@ out_unlock_inetdev:
 	goto out;
 }
 
+static u32 confirm_addr_indev(struct in_device *in_dev, u32 dst,
+			      u32 local, int scope)
+{
+	int same = 0;
+	u32 addr = 0;
+
+	for_ifa(in_dev) {
+		if (!addr &&
+		    (local == ifa->ifa_local || !local) &&
+		    ifa->ifa_scope <= scope) {
+			addr = ifa->ifa_local;
+			if (same)
+				break;
+		}
+		if (!same) {
+			same = (!local || inet_ifa_match(local, ifa)) &&
+				(!dst || inet_ifa_match(dst, ifa));
+			if (same && addr) {
+				if (local || !dst)
+					break;
+				/* Is the selected addr into dst subnet? */
+				if (inet_ifa_match(addr, ifa))
+					break;
+				/* No, then can we use new local src? */
+				if (ifa->ifa_scope <= scope) {
+					addr = ifa->ifa_local;
+					break;
+				}
+				/* search for large dst subnet for addr */
+				same = 0;
+			}
+		}
+	} endfor_ifa(in_dev);
+
+	return same? addr : 0;
+}
+
+/*
+ * Confirm that local IP address exists using wildcards:
+ * - dev: only on this interface, 0=any interface
+ * - dst: only in the same subnet as dst, 0=any dst
+ * - local: address, 0=autoselect the local address
+ * - scope: maximum allowed scope value for the local address
+ */
+u32 inet_confirm_addr(const struct net_device *dev, u32 dst, u32 local, int scope)
+{
+	u32 addr = 0;
+	struct in_device *in_dev;
+
+	if (dev) {
+		read_lock(&inetdev_lock);
+		if ((in_dev = __in_dev_get(dev))) {
+			read_lock(&in_dev->lock);
+			addr = confirm_addr_indev(in_dev, dst, local, scope);
+			read_unlock(&in_dev->lock);
+		}
+		read_unlock(&inetdev_lock);
+
+		return addr;
+	}
+
+	read_lock(&dev_base_lock);
+	read_lock(&inetdev_lock);
+	for (dev = dev_base; dev; dev = dev->next) {
+		if ((in_dev = __in_dev_get(dev))) {
+			read_lock(&in_dev->lock);
+			addr = confirm_addr_indev(in_dev, dst, local, scope);
+			read_unlock(&in_dev->lock);
+			if (addr)
+				break;
+		}
+	}
+	read_unlock(&inetdev_lock);
+	read_unlock(&dev_base_lock);
+
+	return addr;
+}
+
 /*
  *	Device notifier
  */
@@ -1132,7 +1210,7 @@ int ipv4_doint_and_flush_strategy(ctl_table *table, int *name, int nlen,
 
 static struct devinet_sysctl_table {
 	struct ctl_table_header *sysctl_header;
-	ctl_table		devinet_vars[19];
+	ctl_table		devinet_vars[20];
 	ctl_table		devinet_dev[2];
 	ctl_table		devinet_conf_dir[2];
 	ctl_table		devinet_proto_dir[2];
@@ -1255,6 +1333,14 @@ static struct devinet_sysctl_table {
 			.ctl_name	= NET_IPV4_CONF_ARP_ANNOUNCE,
 			.procname	= "arp_announce",
 			.data		= &ipv4_devconf.arp_announce,
+			.maxlen		= sizeof(int),
+			.mode		= 0644,
+			.proc_handler	= &proc_dointvec,
+		},
+		{
+			.ctl_name	= NET_IPV4_CONF_ARP_IGNORE,
+			.procname	= "arp_ignore",
+			.data		= &ipv4_devconf.arp_ignore,
 			.maxlen		= sizeof(int),
 			.mode		= 0644,
 			.proc_handler	= &proc_dointvec,
