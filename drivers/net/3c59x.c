@@ -238,12 +238,6 @@ static int vortex_debug = VORTEX_DEBUG;
 static int vortex_debug = 1;
 #endif
 
-#ifndef __OPTIMIZE__
-#error You must compile this file with the correct options!
-#error See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>

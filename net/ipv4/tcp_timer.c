@@ -257,7 +257,7 @@ static void tcp_delack_timer(unsigned long data)
 	TCP_CHECK_TIMER(sk);
 
 out:
-	if (tcp_prot.memory_pressure)
+	if (tcp_memory_pressure)
 		sk_stream_mem_reclaim(sk);
 out_unlock:
 	bh_unlock_sock(sk);
