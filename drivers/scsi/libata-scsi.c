@@ -1328,6 +1328,8 @@ static unsigned int atapi_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 #endif
 	}
 
+	qc->nbytes = cmd->bufflen;
+
 	return 0;
 }
 
