@@ -932,6 +932,12 @@ static int irlap_state_setup(struct irlap_cb *self, IRLAP_EVENT event,
 		/* This frame will actually be sent at the new speed */
 		irlap_send_rr_frame(self, CMD_FRAME);
 
+		/* The timer is set to half the normal timer to quickly
+		 * detect a failure to negociate the new connection
+		 * parameters. IrLAP 6.11.3.2, note 3.
+		 * Note that currently we don't process this failure
+		 * properly, as we should do a quick disconnect.
+		 * Jean II */
 		irlap_start_final_timer(self, self->final_timeout/2);
 		irlap_next_state(self, LAP_NRM_P);
 
@@ -1312,7 +1318,12 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 				irlap_resend_rejected_frames(self, CMD_FRAME);
 
 				self->ack_required = FALSE;
-				irlap_start_final_timer(self, self->final_timeout);
+
+				/* Make sure we account for the time
+				 * to transmit our frames. See comemnts
+				 * in irlap_send_data_primary_poll().
+				 * Jean II */
+				irlap_start_final_timer(self, 2 * self->final_timeout);
 
 				/* Keep state, do not move this line */
 				irlap_next_state(self, LAP_NRM_P);
@@ -1352,8 +1363,9 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 				/* Resend rejected frames */
 				irlap_resend_rejected_frames(self, CMD_FRAME);
 
-				/* Give peer some time to retransmit! */
-				irlap_start_final_timer(self, self->final_timeout);
+				/* Give peer some time to retransmit! 
+				 * But account for our own Tx. */
+				irlap_start_final_timer(self, 2 * self->final_timeout);
 
 				/* Keep state, do not move this line */
 				irlap_next_state(self, LAP_NRM_P);
@@ -1450,6 +1462,8 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 			/* Resend rejected frames */
 			irlap_resend_rejected_frames(self, CMD_FRAME);
 
+			/* Final timer ??? Jean II */
+
 			irlap_next_state(self, LAP_NRM_P);
 		} else if (ret == NR_INVALID) {
 			IRDA_DEBUG(1, "%s(), Received RR with "
@@ -1541,7 +1555,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 			irlap_send_rr_frame(self, CMD_FRAME);
 		} else
 			irlap_resend_rejected_frames(self, CMD_FRAME);
-		irlap_start_final_timer(self, self->final_timeout);
+		irlap_start_final_timer(self, 2 * self->final_timeout);
 		break;
 	case RECV_SREJ_RSP:
 		irlap_update_nr_received(self, info->nr);
@@ -1550,7 +1564,7 @@ static int irlap_state_nrm_p(struct irlap_cb *self, IRLAP_EVENT event,
 			irlap_send_rr_frame(self, CMD_FRAME);
 		} else
 			irlap_resend_rejected_frame(self, CMD_FRAME);
-		irlap_start_final_timer(self, self->final_timeout);
+		irlap_start_final_timer(self, 2 * self->final_timeout);
 		break;
 	case RECV_RD_RSP:
 		IRDA_DEBUG(1, "%s(), RECV_RD_RSP\n", __FUNCTION__);

@@ -1210,6 +1210,8 @@ config SCSI_QLOGICPTI
 	  To compile this driver as a module, choose M here: the
 	  module will be called qlogicpti.
 
+source "drivers/scsi/qla2xxx/Kconfig"
+
 config SCSI_SEAGATE
 	tristate "Seagate ST-02 and Future Domain TMC-8xx SCSI support"
 	depends on X86 && ISA && SCSI && BROKEN
@@ -1473,12 +1475,6 @@ config A3000_SCSI
 	  To compile this driver as a module, choose M here: the
 	  module will be called wd33c93.
 
-config A4000T_SCSI
-	bool "A4000T SCSI support (EXPERIMENTAL)"
-	depends on AMIGA && SCSI && EXPERIMENTAL && BROKEN
-	help
-	  Support for the NCR53C710 SCSI controller on the Amiga 4000T.
-
 config A2091_SCSI
 	tristate "A2091/A590 WD33C93A support"
 	depends on ZORRO && SCSI
@@ -1541,28 +1537,24 @@ config FASTLANE_SCSI
 	  If you have the Phase5 Fastlane Z3 SCSI controller, or plan to use
 	  one in the near future, say Y to this question. Otherwise, say N.
 
-config A4091_SCSI
-	bool "A4091 SCSI support (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
+config SCSI_AMIGA7XX
+	bool "Amiga NCR53c710 SCSI support (EXPERIMENTAL)"
+	depends on AMIGA && SCSI && EXPERIMENTAL && BROKEN
 	help
-	  Support for the NCR53C710 chip on the Amiga 4091 Z3 SCSI2 controller
-	  (1993).  Very obscure -- the 4091 was part of an Amiga 4000 upgrade
-	  plan at the time the Amiga business was sold to DKB.
-
-config WARPENGINE_SCSI
-	bool "WarpEngine SCSI support (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
-	help
-	  Support for MacroSystem Development's WarpEngine Amiga SCSI-2
-	  controller. Info at
-	  <http://www.lysator.liu.se/amiga/ar/guide/ar310.guide?FEATURE5>.
-
-config BLZ603EPLUS_SCSI
-	bool "Blizzard PowerUP 603e+ SCSI (EXPERIMENTAL)"
-	depends on ZORRO && SCSI && EXPERIMENTAL && BROKEN
-	help
-	  If you have an Amiga 1200 with a Phase5 Blizzard PowerUP 603e+
-	  accelerator, say Y. Otherwise, say N.
+	  Support for various NCR53c710-based SCSI controllers on the Amiga.
+	  This includes:
+	    - the builtin SCSI controller on the Amiga 4000T,
+	    - the Amiga 4091 Zorro III SCSI-2 controller,
+	    - the MacroSystem Development's WarpEngine Amiga SCSI-2 controller
+	      (info at
+	      <http://www.lysator.liu.se/amiga/ar/guide/ar310.guide?FEATURE5>),
+	    - the SCSI controller on the Phase5 Blizzard PowerUP 603e+
+	      accelerator card for the Amiga 1200,
+	    - the SCSI controller on the GVP Turbo 040/060 accelerator.
+	  Note that all of the above SCSI controllers, except for the builtin
+	  SCSI controller on the Amiga 4000T, reside on the Zorro expansion
+	  bus, so you also have to enable Zorro bus support if you want to use
+	  them.
 
 config OKTAGON_SCSI
 	tristate "BSC Oktagon SCSI support (EXPERIMENTAL)"
@@ -1660,7 +1652,7 @@ config BVME6000_SCSI
 
 config SCSI_NCR53C7xx_FAST
 	bool "allow FAST-SCSI [10MHz]"
-	depends on A4000T_SCSI || A4091_SCSI || BLZ603EPLUS_SCSI || WARPENGINE_SCSI || MVME16x_SCSI || BVME6000_SCSI
+	depends on SCSI_AMIGA7XX || MVME16x_SCSI || BVME6000_SCSI
 	help
 	  This will enable 10MHz FAST-SCSI transfers with your host
 	  adapter. Some systems have problems with that speed, so it's safest
@@ -1706,7 +1698,6 @@ config WD33C93_PIO
 	default y
 
 #      bool 'Cyberstorm Mk III SCSI support (EXPERIMENTAL)' CONFIG_CYBERSTORMIII_SCSI
-#      bool 'GVP Turbo 040/060 SCSI support (EXPERIMENTAL)' CONFIG_GVP_TURBO_SCSI
 
 config ZFCP
 	tristate "IBM z900 OpenFCP/SCSI support"

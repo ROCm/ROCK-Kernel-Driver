@@ -993,186 +993,11 @@ void abort_timedouts(unsigned long __opaque)
 }
 
 
-/*
- * character device dispatching (see ieee1394_core.h)
- * Dan Maas <dmaas@dcine.com>
- */
-
-static struct {
-	struct file_operations *file_ops;
-	struct module *module;
-} ieee1394_chardevs[16];
-
-static rwlock_t ieee1394_chardevs_lock = RW_LOCK_UNLOCKED;
-
-static int ieee1394_dispatch_open(struct inode *inode, struct file *file);
-
-static struct file_operations ieee1394_chardev_ops = {
-	.owner =THIS_MODULE,
-	.open =	ieee1394_dispatch_open,
-};
-
-/* claim a block of minor numbers */
-int ieee1394_register_chardev(int blocknum,
-			      struct module *module,
-			      struct file_operations *file_ops)
-{
-	int retval;
-
-	if ( (blocknum < 0) || (blocknum > 15) )
-		return -EINVAL;
-
-	write_lock(&ieee1394_chardevs_lock);
-
-	if (ieee1394_chardevs[blocknum].file_ops == NULL) {
-		/* grab the minor block */
-		ieee1394_chardevs[blocknum].file_ops = file_ops;
-		ieee1394_chardevs[blocknum].module = module;
-		
-		retval = 0;
-	} else {
-		/* block already taken */
-		retval = -EBUSY;
-	}
-
-	write_unlock(&ieee1394_chardevs_lock);
-
-	return retval;
-}
-
-/* release a block of minor numbers */
-void ieee1394_unregister_chardev(int blocknum)
-{
-	if ( (blocknum < 0) || (blocknum > 15) )
-		return;
-
-	write_lock(&ieee1394_chardevs_lock);
-
-	if (ieee1394_chardevs[blocknum].file_ops) {
-		ieee1394_chardevs[blocknum].file_ops = NULL;
-		ieee1394_chardevs[blocknum].module = NULL;
-	}
-
-	write_unlock(&ieee1394_chardevs_lock);
-}
-
-/*
-  ieee1394_get_chardev() - look up and acquire a character device
-  driver that has previously registered using ieee1394_register_chardev()
-  
-  On success, returns 1 and sets module and file_ops to the driver.
-  The module will have an incremented reference count.
-   
-  On failure, returns 0.
-  The module will NOT have an incremented reference count.
-*/
-
-static int ieee1394_get_chardev(int blocknum,
-				struct module **module,
-				struct file_operations **file_ops)
-{
-	int ret = 0;
-       
-	if ((blocknum < 0) || (blocknum > 15))
-		return ret;
-
-	read_lock(&ieee1394_chardevs_lock);
-
-	*module = ieee1394_chardevs[blocknum].module;
-	*file_ops = ieee1394_chardevs[blocknum].file_ops;
-
-	if (*file_ops == NULL)
-		goto out;
-
-	if (!try_module_get(*module))
-		goto out;
-
-	/* success! */
-	ret = 1;
-
-out:
-	read_unlock(&ieee1394_chardevs_lock);
-	return ret;
-}
-
-/* the point of entry for open() on any ieee1394 character device */
-static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
-{
-	struct file_operations *file_ops;
-	struct module *module;
-	int blocknum;
-	int retval;
-
-	/*
-	  Maintaining correct module reference counts is tricky here!
-
-	  The key thing to remember is that the VFS increments the
-	  reference count of ieee1394 before it calls
-	  ieee1394_dispatch_open().
-
-	  If the open() succeeds, then we need to transfer this extra
-	  reference to the task-specific driver module (e.g. raw1394).
-	  The VFS will deref the driver module automatically when the
-	  file is later released.
-
-	  If the open() fails, then the VFS will drop the
-	  reference count of whatever module file->f_op->owner points
-	  to, immediately after this function returns.
-	*/
-
-        /* shift away lower four bits of the minor
-	   to get the index of the ieee1394_driver
-	   we want */
-
-	blocknum = (iminor(inode) >> 4) & 0xF;
-
-	/* look up the driver */
-
-	if (ieee1394_get_chardev(blocknum, &module, &file_ops) == 0)
-		return -ENODEV;
-
-	/* redirect all subsequent requests to the driver's
-	   own file_operations */
-	file->f_op = file_ops;
-
-	/* at this point BOTH ieee1394 and the task-specific driver have
-	   an extra reference */
-
-	/* follow through with the open() */
-	retval = file_ops->open(inode, file);
-
-	if (retval == 0) {
-		
-		/* If the open() succeeded, then ieee1394 will be left
-		 * with an extra module reference, so we discard it here.
-		 *
-		 * The task-specific driver still has the extra reference
-		 * given to it by ieee1394_get_chardev(). This extra
-		 * reference prevents the module from unloading while the
-		 * file is open, and will be dropped by the VFS when the
-		 * file is released. */
-
-		module_put(THIS_MODULE);
-	} else {
-		/* point the file's f_ops back to ieee1394. The VFS will then
-		   decrement ieee1394's reference count immediately after this
-		   function returns. */
-		
-		file->f_op = &ieee1394_chardev_ops;
-
-		/* If the open() failed, then we need to drop the extra
-		 * reference we gave to the task-specific driver. */
-
-		module_put(module);
-	}
-
-	return retval;
-}
-
 static int __init ieee1394_init(void)
 {
 	devfs_mk_dir("ieee1394");
-	if (register_chrdev(IEEE1394_MAJOR, "ieee1394", &ieee1394_chardev_ops)) {
+
+	if (register_chrdev_region(IEEE1394_CORE_DEV, 256, "ieee1394")) {
 		HPSB_ERR("unable to register character device major %d!\n", IEEE1394_MAJOR);
 		return -ENODEV;
 	}
@@ -1184,7 +1009,6 @@ static int __init ieee1394_init(void)
 
 	bus_register(&ieee1394_bus_type);
 
-	init_hpsb_highlevel();
 	init_csr();
 
 	if (!disable_nodemgr)
@@ -1206,7 +1030,7 @@ static void __exit ieee1394_cleanup(void)
 
 	kmem_cache_destroy(hpsb_packet_cache);
 
-	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
+	unregister_chrdev_region(IEEE1394_CORE_DEV, 256);
 	devfs_remove("ieee1394");
 }
 
@@ -1234,8 +1058,6 @@ EXPORT_SYMBOL(hpsb_selfid_received);
 EXPORT_SYMBOL(hpsb_selfid_complete);
 EXPORT_SYMBOL(hpsb_packet_sent);
 EXPORT_SYMBOL(hpsb_packet_received);
-EXPORT_SYMBOL(ieee1394_register_chardev);
-EXPORT_SYMBOL(ieee1394_unregister_chardev);
 
 /** ieee1394_transactions.c **/
 EXPORT_SYMBOL(hpsb_get_tlabel);

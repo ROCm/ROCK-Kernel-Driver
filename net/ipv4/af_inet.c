@@ -731,7 +731,7 @@ int inet_getname(struct socket *sock, struct sockaddr *uaddr,
 
 
 int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
-		 int size, int flags)
+		 size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	int addr_len = 0;
@@ -746,7 +746,7 @@ int inet_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 
 
 int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
-		 int size)
+		 size_t size)
 {
 	struct sock *sk = sock->sk;
 

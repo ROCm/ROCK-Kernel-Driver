@@ -1,5 +1,5 @@
 /*
- * Detection routine for the NCR53c710 based MVME16x SCSI Controllers for Linux.
+ * Detection routine for the NCR53c710 based BVME6000 SCSI Controllers for Linux.
  *
  * Based on work by Alan Hourihane
  */
@@ -23,9 +23,6 @@
 
 #include<linux/stat.h>
 
-extern int ncr53c7xx_init(Scsi_Host_Template *tpnt, int board, int chip,
-			  unsigned long base, int io_port, int irq, int dma,
-			  long long options, int clock);
 
 int bvme6000_scsi_detect(Scsi_Host_Template *tpnt)
 {
@@ -51,7 +48,7 @@ int bvme6000_scsi_detect(Scsi_Host_Template *tpnt)
     return 1;
 }
 
-static int mvme6000_scsi_release(struct Scsi_Host *shost)
+static int bvme6000_scsi_release(struct Scsi_Host *shost)
 {
 	if (shost->irq)
 		free_irq(shost->irq, NULL);

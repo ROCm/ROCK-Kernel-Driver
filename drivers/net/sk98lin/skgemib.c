@@ -2,8 +2,8 @@
  *
  * Name:	skgemib.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.9 $
- * Date:	$Date: 2003/05/23 12:55:20 $
+ * Version:	$Revision: 1.11 $
+ * Date:	$Date: 2003/09/15 13:38:12 $
  * Purpose:	Private Network Management Interface Management Database
  *
  ****************************************************************************/
@@ -27,6 +27,19 @@
  * History:
  *
  *	$Log: skgemib.c,v $
+ *	Revision 1.11  2003/09/15 13:38:12  tschilli
+ *	OID_SKGE_PHY_LP_MODE included only after using #define SK_PHY_LP_MODE.
+ *	
+ *	Revision 1.10  2003/08/15 12:28:59  tschilli
+ *	Added new OIDs:
+ *	OID_SKGE_DRIVER_RELDATE
+ *	OID_SKGE_DRIVER_FILENAME
+ *	OID_SKGE_CHIPID
+ *	OID_SKGE_RAMSIZE
+ *	OID_SKGE_VAUXAVAIL
+ *	OID_SKGE_PHY_TYPE
+ *	OID_SKGE_PHY_LP_MODE
+ *	
  *	Revision 1.9  2003/05/23 12:55:20  tschilli
  *	OID_SKGE_BOARDLEVEL added.
  *	
@@ -356,6 +369,16 @@ PNMI_STATIC const SK_PNMI_TAB_ENTRY IdTable[] = {
 		0,
 		SK_PNMI_MAI_OFF(DriverVersion),
 		SK_PNMI_RO, General, 0},
+	{OID_SKGE_DRIVER_RELDATE,
+		1,
+		0,
+		SK_PNMI_MAI_OFF(DriverReleaseDate),
+		SK_PNMI_RO, General, 0},
+	{OID_SKGE_DRIVER_FILENAME,
+		1,
+		0,
+		SK_PNMI_MAI_OFF(DriverFileName),
+		SK_PNMI_RO, General, 0},
 	{OID_SKGE_HW_DESCR,
 		1,
 		0,
@@ -370,6 +393,21 @@ PNMI_STATIC const SK_PNMI_TAB_ENTRY IdTable[] = {
 		1,
 		0,
 		SK_PNMI_MAI_OFF(Chipset),
+		SK_PNMI_RO, General, 0},
+	{OID_SKGE_CHIPID,
+		1,
+		0,
+		SK_PNMI_MAI_OFF(ChipId),
+		SK_PNMI_RO, General, 0},
+	{OID_SKGE_RAMSIZE,
+		1,
+		0,
+		SK_PNMI_MAI_OFF(RamSize),
+		SK_PNMI_RO, General, 0},
+	{OID_SKGE_VAUXAVAIL,
+		1,
+		0,
+		SK_PNMI_MAI_OFF(VauxAvail),
 		SK_PNMI_RO, General, 0},
 	{OID_SKGE_ACTION,
 		1,
@@ -876,6 +914,18 @@ PNMI_STATIC const SK_PNMI_TAB_ENTRY IdTable[] = {
 		sizeof(SK_PNMI_CONF),
 		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfConnector),
 		SK_PNMI_RO, MacPrivateConf, 0},
+	{OID_SKGE_PHY_TYPE,
+		SK_PNMI_MAC_ENTRIES,
+		sizeof(SK_PNMI_CONF),
+		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPhyType),
+		SK_PNMI_RO, MacPrivateConf, 0},
+#ifdef SK_PHY_LP_MODE
+		{OID_SKGE_PHY_LP_MODE,
+		SK_PNMI_MAC_ENTRIES,
+		sizeof(SK_PNMI_CONF),
+		SK_PNMI_OFF(Conf) + SK_PNMI_CNF_OFF(ConfPhyMode),
+		SK_PNMI_RW, MacPrivateConf, 0},
+#endif	
 	{OID_SKGE_LINK_CAP,
 		SK_PNMI_MAC_ENTRIES,
 		sizeof(SK_PNMI_CONF),

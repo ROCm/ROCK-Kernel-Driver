@@ -1659,13 +1659,13 @@ static int dn_data_ready(struct sock *sk, struct sk_buff_head *q, int flags, int
 
 
 static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
-	struct msghdr *msg, int size, int flags)
+	struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
 	struct sk_buff_head *queue = &sk->sk_receive_queue;
-	int target = size > 1 ? 1 : 0;
-	int copied = 0;
+	size_t target = size > 1 ? 1 : 0;
+	size_t copied = 0;
 	int rv = 0;
 	struct sk_buff *skb, *nskb;
 	struct dn_skb_cb *cb = NULL;
@@ -1746,7 +1746,7 @@ static int dn_recvmsg(struct kiocb *iocb, struct socket *sock,
 	}
 
 	for(skb = queue->next; skb != (struct sk_buff *)queue; skb = nskb) {
-		int chunk = skb->len;
+		unsigned int chunk = skb->len;
 		cb = DN_SKB_CB(skb);
 
 		if ((chunk + copied) > size)
@@ -1888,20 +1888,20 @@ static int dn_error(struct sock *sk, int flags, int err)
 }
 
 static int dn_sendmsg(struct kiocb *iocb, struct socket *sock,
-	   struct msghdr *msg, int size)
+	   struct msghdr *msg, size_t size)
 {
 	struct sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
-	int mss;
+	size_t mss;
 	struct sk_buff_head *queue = &scp->data_xmit_queue;
 	int flags = msg->msg_flags;
 	int err = 0;
-	int sent = 0;
+	size_t sent = 0;
 	int addr_len = msg->msg_namelen;
 	struct sockaddr_dn *addr = (struct sockaddr_dn *)msg->msg_name;
 	struct sk_buff *skb = NULL;
 	struct dn_skb_cb *cb;
-	int len;
+	size_t len;
 	unsigned char fctype;
 	long timeo = sock_sndtimeo(sk, flags & MSG_DONTWAIT);
 

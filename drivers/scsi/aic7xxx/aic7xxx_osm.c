@@ -1411,12 +1411,18 @@ ahc_dmamem_alloc(struct ahc_softc *ahc, bus_dma_tag_t dmat, void** vaddr,
 	 * our dma mask when doing allocations.
 	 */
 	if (ahc->dev_softc != NULL)
-		ahc_pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF);
+		if (ahc_pci_set_dma_mask(ahc->dev_softc, 0xFFFFFFFF)) {
+			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
+			return (ENODEV);
+		}
 	*vaddr = pci_alloc_consistent(ahc->dev_softc,
 				      dmat->maxsize, &map->bus_addr);
 	if (ahc->dev_softc != NULL)
-		ahc_pci_set_dma_mask(ahc->dev_softc,
-				     ahc->platform_data->hw_dma_mask);
+		if (ahc_pci_set_dma_mask(ahc->dev_softc,
+				     ahc->platform_data->hw_dma_mask)) {
+			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
+			return (ENODEV);
+		}
 #else /* LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0) */
 	/*
 	 * At least in 2.2.14, malloc is a slab allocator so all

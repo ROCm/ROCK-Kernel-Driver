@@ -22,10 +22,7 @@ subdir-$(CONFIG_PCMCIA)		+= pcmcia
 
 obj-$(CONFIG_SCSI)		+= scsi_mod.o
 
-obj-$(CONFIG_A4000T_SCSI)	+= amiga7xx.o	53c7xx.o
-obj-$(CONFIG_A4091_SCSI)	+= amiga7xx.o	53c7xx.o
-obj-$(CONFIG_BLZ603EPLUS_SCSI)	+= amiga7xx.o	53c7xx.o
-obj-$(CONFIG_WARPENGINE_SCSI)	+= amiga7xx.o	53c7xx.o
+obj-$(CONFIG_SCSI_AMIGA7XX)	+= amiga7xx.o	53c7xx.o
 obj-$(CONFIG_A3000_SCSI)	+= a3000.o	wd33c93.o
 obj-$(CONFIG_A2091_SCSI)	+= a2091.o	wd33c93.o
 obj-$(CONFIG_GVP11_SCSI)	+= gvp11.o	wd33c93.o
@@ -74,6 +71,7 @@ obj-$(CONFIG_SCSI_QLOGIC_FAS)	+= qlogicfas.o
 obj-$(CONFIG_SCSI_QLOGIC_ISP)	+= qlogicisp.o 
 obj-$(CONFIG_SCSI_QLOGIC_FC)	+= qlogicfc.o 
 obj-$(CONFIG_SCSI_QLOGIC_1280)	+= qla1280.o 
+obj-$(CONFIG_SCSI_QLA2XXX)	+= qla2xxx/
 obj-$(CONFIG_SCSI_PAS16)	+= pas16.o
 obj-$(CONFIG_SCSI_SEAGATE)	+= seagate.o
 obj-$(CONFIG_SCSI_FD_8xx)	+= seagate.o

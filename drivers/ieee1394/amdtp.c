@@ -82,6 +82,7 @@
 #include <linux/poll.h>
 #include <linux/ioctl32.h>
 #include <linux/compat.h>
+#include <linux/cdev.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 
@@ -1196,6 +1197,7 @@ static int amdtp_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static struct cdev amdtp_cdev;
 static struct file_operations amdtp_fops =
 {
 	.owner =	THIS_MODULE,
@@ -1262,12 +1264,11 @@ MODULE_LICENSE("GPL");
 
 static int __init amdtp_init_module (void)
 {
-	int ret;
-
-	ret = ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_AMDTP,
-					THIS_MODULE, &amdtp_fops);
-	if (ret) {
-		HPSB_ERR("amdtp: unable to get minor device block");
+	cdev_init(&amdtp_cdev, &amdtp_fops);
+	amdtp_cdev.owner = THIS_MODULE;
+	kobject_set_name(&amdtp_cdev.kobj, "amdtp");
+	if (cdev_add(&amdtp_cdev, IEEE1394_AMDTP_DEV, 16)) {
+		HPSB_ERR("amdtp: unable to add char device");
  		return -EIO;
  	}
 
@@ -1276,12 +1277,15 @@ static int __init amdtp_init_module (void)
 	hpsb_register_highlevel(&amdtp_highlevel);
 
 #ifdef CONFIG_COMPAT
-	ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
-	ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
-	if (ret)
-		HPSB_ERR("amdtp: Error registering ioctl32 translations");
+	{
+		int ret;
+		ret = register_ioctl32_conversion(AMDTP_IOC_CHANNEL, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_PLUG, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_PING, NULL);
+		ret |= register_ioctl32_conversion(AMDTP_IOC_ZAP, NULL);
+		if (ret)
+			HPSB_ERR("amdtp: Error registering ioctl32 translations");
+	}
 #endif
 
 	HPSB_INFO("Loaded AMDTP driver");
@@ -1304,10 +1308,12 @@ static void __exit amdtp_exit_module (void)
 
         hpsb_unregister_highlevel(&amdtp_highlevel);
 	devfs_remove("amdtp");
-        ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_AMDTP);
+	cdev_unmap(IEEE1394_AMDTP_DEV, 16);
+	cdev_del(&amdtp_cdev);
 
 	HPSB_INFO("Unloaded AMDTP driver");
 }
 
 module_init(amdtp_init_module);
 module_exit(amdtp_exit_module);
+MODULE_ALIAS_CHARDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_AMDTP * 16);

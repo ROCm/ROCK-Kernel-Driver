@@ -1029,7 +1029,7 @@ static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 }
 
 int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		int size)
+		size_t size)
 {
 	struct iovec *iov;
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -1498,7 +1498,7 @@ int tcp_read_sock(struct sock *sk, read_descriptor_t *desc,
  */
 
 int tcp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		int len, int nonblock, int flags, int *addr_len)
+		size_t len, int nonblock, int flags, int *addr_len)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	int copied = 0;

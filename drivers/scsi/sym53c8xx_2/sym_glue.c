@@ -2177,7 +2177,7 @@ sym53c8xx_pci_init(struct pci_dev *pdev, struct sym_device *device)
  *  Detach the host.
  *  We have to free resources and halt the NCR chip.
  */
-static int __devexit sym_detach(struct sym_hcb *np)
+static int sym_detach(struct sym_hcb *np)
 {
 	printk("%s: detaching ...\n", sym_name(np));
 

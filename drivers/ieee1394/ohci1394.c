@@ -161,7 +161,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, card , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1087 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1097 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -174,6 +174,7 @@ static void dma_trm_reset(struct dma_trm_ctx *d);
 static int alloc_dma_rcv_ctx(struct ti_ohci *ohci, struct dma_rcv_ctx *d,
 			     enum context_type type, int ctx, int num_desc,
 			     int buf_size, int split_buf_size, int context_base);
+static void stop_dma_rcv_ctx(struct dma_rcv_ctx *d);
 static void free_dma_rcv_ctx(struct dma_rcv_ctx *d);
 
 static int alloc_dma_trm_ctx(struct ti_ohci *ohci, struct dma_trm_ctx *d,
@@ -358,7 +359,7 @@ static void ohci_soft_reset(struct ti_ohci *ohci) {
 	reg_write(ohci, OHCI1394_HCControlSet, OHCI1394_HCControl_softReset);
   
 	for (i = 0; i < OHCI_LOOP_COUNT; i++) {
-		if (!reg_read(ohci, OHCI1394_HCControlSet) & OHCI1394_HCControl_softReset)
+		if (!(reg_read(ohci, OHCI1394_HCControlSet) & OHCI1394_HCControl_softReset))
 			break;
 		mdelay(1);
 	}
@@ -1077,6 +1078,7 @@ static int ohci_devctl(struct hpsb_host *host, enum devctl_cmd cmd, int arg)
                 DBGMSG(ohci->id, "Listening disabled on channel %d", arg);
 
 		if (ohci->ir_legacy_channels == 0) {
+			stop_dma_rcv_ctx(&ohci->ir_legacy_context);
 			free_dma_rcv_ctx(&ohci->ir_legacy_context);
 			DBGMSG(ohci->id, "ISO receive legacy context deactivated");
 		}
@@ -2249,6 +2251,14 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 	if (!event)
 		return IRQ_NONE;
 
+	/* If event is ~(u32)0 cardbus card was ejected.  In this case
+	 * we just return, and clean up in the ohci1394_pci_remove
+	 * function. */
+	if (event == ~(u32) 0) {
+		DBGMSG(ohci->id, "Device removed.");
+		return IRQ_NONE;
+	}
+
 	DBGMSG(ohci->id, "IntEvent: %08x", event);
 
 	if (event & OHCI1394_unrecoverableError) {
@@ -2811,15 +2821,8 @@ static void dma_trm_tasklet (unsigned long data)
 	spin_unlock_irqrestore(&d->lock, flags);
 }
 
-static void free_dma_rcv_ctx(struct dma_rcv_ctx *d)
+static void stop_dma_rcv_ctx(struct dma_rcv_ctx *d)
 {
-	int i;
-
-	if (d->ohci == NULL)
-		return;
-
-	DBGMSG(d->ohci->id, "Freeing dma_rcv_ctx %d", d->ctx);
-
 	if (d->ctrlClear) {
 		ohci1394_stop_context(d->ohci, d->ctrlClear, NULL);
 
@@ -2831,6 +2834,17 @@ static void free_dma_rcv_ctx(struct dma_rcv_ctx *d)
 			tasklet_kill(&d->task);
 		}
 	}
+}
+
+
+static void free_dma_rcv_ctx(struct dma_rcv_ctx *d)
+{
+	int i;
+
+	if (d->ohci == NULL)
+		return;
+
+	DBGMSG(d->ohci->id, "Freeing dma_rcv_ctx %d", d->ctx);
 
 	if (d->buf_cpu) {
 		for (i=0; i<d->num_desc; i++)
@@ -2981,19 +2995,6 @@ static void free_dma_trm_ctx(struct dma_trm_ctx *d)
 		return;
 
 	DBGMSG(d->ohci->id, "Freeing dma_trm_ctx %d", d->ctx);
-
-	if (d->ctrlClear) {
-		ohci1394_stop_context(d->ohci, d->ctrlClear, NULL);
-
-		if (d->type == DMA_CTX_ISO) {
-			/* disable interrupts */
-			reg_write(d->ohci, OHCI1394_IsoXmitIntMaskClear, 1 << d->ctx);
-			ohci1394_unregister_iso_tasklet(d->ohci,
-							&d->ohci->it_legacy_tasklet);
-		} else {
-			tasklet_kill(&d->task);
-		}
-	}
 
 	if (d->prg_cpu) {
 		for (i=0; i<d->num_desc; i++) 
@@ -3511,6 +3512,8 @@ static void ohci1394_pci_remove(struct pci_dev *pdev)
 		free_irq(ohci->dev->irq, ohci);
 
 	case OHCI_INIT_HAVE_TXRX_BUFFERS__MAYBE:
+		/* The ohci_soft_reset() stops all DMA contexts, so we
+		 * dont need to do this.  */
 		/* Free AR dma */
 		free_dma_rcv_ctx(&ohci->ar_req_context);
 		free_dma_rcv_ctx(&ohci->ar_resp_context);

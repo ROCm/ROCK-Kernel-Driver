@@ -17,8 +17,8 @@
 *
 ******************************************************************************/
 
-#ifndef	_IO_HBA_QLA1280_H	/* wrapper symbol for kernel use */
-#define	_IO_HBA_QLA1280_H	/* subject to change without notice */
+#ifndef	_QLA1280_H
+#define	_QLA1280_H
 
 /*
  * Data bit definitions.
@@ -100,55 +100,23 @@
  * on cmd->SCp location of every I/O
  */
 struct srb {
-	Scsi_Cmnd *cmd;		/* (4/8) SCSI command block */
-	struct srb *s_next;	/* (4/8) Next block on LU queue */
-	struct srb *s_prev;	/* (4/8) Previous block on LU queue */
-	uint8_t flags;		/* (1) Status flags. */
-	uint8_t dir;		/* direction of transfer */
-	/*
-	 * This should be moved around to save space.
-	 */
-	dma_addr_t saved_dma_handle;	/* for unmap of single transfers */
+	struct list_head list;		/* (8/16) LU queue */
+	struct scsi_cmnd *cmd;	/* (4/8) SCSI command block */
 	/* NOTE: the sp->cmd will be NULL when this completion is
 	 * called, so you should know the scsi_cmnd when using this */
 	struct completion *wait;
+	dma_addr_t saved_dma_handle;	/* for unmap of single transfers */
+	uint8_t flags;		/* (1) Status flags. */
+	uint8_t dir;		/* direction of transfer */
 };
 
 /*
  * SRB flag definitions
  */
-#define SRB_TIMEOUT		BIT_0	/* Command timed out */
-#define SRB_SENT		BIT_1	/* Command sent to ISP */
-#define SRB_ABORT_PENDING	BIT_2	/* Command abort sent to device */
-#define SRB_ABORTED		BIT_3	/* Command aborted command already */
-
-/*
- * Logical Unit Queue structure
- */
-struct scsi_lu {
-	struct srb *q_first;	/* First block on LU queue */
-	struct srb *q_last;	/* Last block on LU queue */
-	uint8_t q_flag;		/* LU queue state flags */
-	uint8_t q_sense[16];	/* sense data */
-	unsigned long io_cnt;	/* total xfer count */
-	unsigned long resp_time;/* total response time (start - finish) */
-	unsigned long act_time;	/* total actived time (minus queuing time) */
-	unsigned long w_cnt;	/* total writes */
-	unsigned long r_cnt;	/* total reads */
-	uint16_t q_outcnt;	/* Pending jobs for this LU */
-};
-
-/*
- * Logical Unit flags
- */
-#define QLA1280_QBUSY	BIT_0
-#define QLA1280_QWAIT	BIT_1
-#define QLA1280_QSUSP	BIT_2
-#define QLA1280_QSENSE	BIT_3	/* Sense data cache valid */
-#define QLA1280_QRESET	BIT_4
-#define QLA1280_QHBA	BIT_5
-#define QLA1280_BSUSP	BIT_6	/* controller is suspended */
-#define QLA1280_BREM	BIT_7	/* controller is removed */
+#define SRB_TIMEOUT		(1 << 0)	/* Command timed out */
+#define SRB_SENT		(1 << 1)	/* Command sent to ISP */
+#define SRB_ABORT_PENDING	(1 << 2)	/* Command abort sent to device */
+#define SRB_ABORTED		(1 << 3)	/* Command aborted command already */
 
 /*
  *  ISP I/O Register Set structure definitions.
@@ -1021,11 +989,7 @@ struct scsi_qla_host {
 
 	unsigned char *mmpbase;	/* memory mapped address */
 	unsigned long host_no;
-	unsigned long instance;
 	struct pci_dev *pdev;
-	uint32_t device_id;
-	uint8_t pci_bus;
-	uint8_t pci_device_fn;
 	uint8_t devnum;
 	uint8_t revision;
 	uint8_t ports;
@@ -1040,17 +1004,8 @@ struct scsi_qla_host {
 	/* BUS configuration data */
 	struct bus_param bus_settings[MAX_BUSES];
 
-#if 0
-	/* bottom half run queue */
-	struct tq_struct run_qla_bh;
-#endif
-
 	/* Received ISP mailbox data. */
 	volatile uint16_t mailbox_out[MAILBOX_REGISTER_COUNT];
-
-#ifdef UNUSED
-	struct timer_list dev_timer[MAX_TARGETS];
-#endif
 
 	dma_addr_t request_dma;		/* Physical Address */
 	request_t *request_ring;	/* Base virtual address */
@@ -1063,30 +1018,19 @@ struct scsi_qla_host {
 	struct response *response_ring_ptr;	/* Current address. */
 	uint16_t rsp_ring_index;	/* Current index. */
 
-#if WATCHDOGTIMER
-	/* Watchdog queue, lock and total timer */
-	uint8_t watchdog_q_lock;	/* Lock for watchdog queue */
-	struct srb *wdg_q_first;	/* First job on watchdog queue */
-	struct srb *wdg_q_last;	/* Last job on watchdog queue */
-	uint32_t total_timeout;	/* Total timeout (quantum count) */
-	uint32_t watchdogactive;
-#endif
-
-	struct srb *done_q_first;	/* First job on done queue */
-	struct srb *done_q_last;	/* Last job on done queue */
+	struct list_head done_q;	/* Done queue */
 
 	struct completion *mailbox_wait;
 
 	volatile struct {
-		uint32_t mbox_busy:1;			/* 0 */
-		uint32_t online:1;			/* 1 */
-		uint32_t reset_marker:1;		/* 2 */
-		uint32_t disable_host_adapter:1;	/* 4 */
-		uint32_t reset_active:1;		/* 5 */
-		uint32_t abort_isp_active:1;		/* 6 */
-		uint32_t disable_risc_code_load:1;	/* 7 */
-		uint32_t enable_64bit_addressing:1;	/* 8 */
-		uint32_t in_reset:1;			/* 9 */
+		uint32_t online:1;			/* 0 */
+		uint32_t reset_marker:1;		/* 1 */
+		uint32_t disable_host_adapter:1;	/* 2 */
+		uint32_t reset_active:1;		/* 3 */
+		uint32_t abort_isp_active:1;		/* 4 */
+		uint32_t disable_risc_code_load:1;	/* 5 */
+		uint32_t enable_64bit_addressing:1;	/* 6 */
+		uint32_t in_reset:1;			/* 7 */
 		uint32_t ints_enabled:1;
 		uint32_t ignore_nvram:1;
 #ifdef __ia64__
@@ -1098,10 +1042,4 @@ struct scsi_qla_host {
 	int nvram_valid;
 };
 
-/*
- * Macros to help code, maintain, etc.
- */
-#define SUBDEV(b, t, l)		((b << (MAX_T_BITS + MAX_L_BITS)) | (t << MAX_L_BITS) | l)
-#define LU_Q(ha, b, t, l)	(ha->dev[SUBDEV(b, t, l)])
-
-#endif				/* _IO_HBA_QLA1280_H */
+#endif /* _QLA1280_H */

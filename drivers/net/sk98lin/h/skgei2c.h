@@ -1,16 +1,17 @@
 /******************************************************************************
  *
  * Name:	skgei2c.h
- * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.23 $
- * Date:	$Date: 2002/12/19 14:34:27 $
- * Purpose:	Special GEnesis defines for TWSI
+ * Project:	Gigabit Ethernet Adapters, TWSI-Module
+ * Version:	$Revision: 1.25 $
+ * Date:	$Date: 2003/10/20 09:06:05 $
+ * Purpose:	Special defines for TWSI
  *
  ******************************************************************************/
 
 /******************************************************************************
  *
- *	(C)Copyright 1998-2002 SysKonnect GmbH.
+ *	(C)Copyright 1998-2002 SysKonnect.
+ *	(C)Copyright 2002-2003 Marvell.
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License as published by
@@ -26,6 +27,12 @@
  * History:
  *
  *	$Log: skgei2c.h,v $
+ *	Revision 1.25  2003/10/20 09:06:05  rschmidt
+ *	Editorial changes.
+ *	
+ *	Revision 1.24  2003/09/23 09:31:15  malthoff
+ *	Parameter dev_size added to macro definition of SK_I2C_CTL.
+ *	
  *	Revision 1.23  2002/12/19 14:34:27  rschmidt
  *	Added cast in macros SK_I2C_SET_BIT() and SK_I2C_CLR_BIT()
  *	Editorial changes (TWSI)
@@ -107,8 +114,6 @@
  *	Revision 1.1  1998/07/17 11:27:56  gklug
  *	Created.
  *
- *
- *
  ******************************************************************************/
 
 /*
@@ -121,12 +126,13 @@
 /*
  * Macros to access the B2_I2C_CTRL
  */
-#define SK_I2C_CTL(IoC, flag, dev, reg, burst) \
+#define SK_I2C_CTL(IoC, flag, dev, dev_size, reg, burst) \
 	SK_OUT32(IoC, B2_I2C_CTRL,\
 		(flag ? 0x80000000UL : 0x0L) | \
-		(((SK_U32) reg << 16) & I2C_ADDR) | \
-		(((SK_U32) dev << 9) & I2C_DEV_SEL) | \
-		(( burst << 4) & I2C_BURST_LEN))
+		(((SK_U32)reg << 16) & I2C_ADDR) | \
+		(((SK_U32)dev << 9) & I2C_DEV_SEL) | \
+		(dev_size & I2C_DEV_SIZE) | \
+		((burst << 4) & I2C_BURST_LEN))
 
 #define SK_I2C_STOP(IoC) {				\
 	SK_U32	I2cCtrl;				\
@@ -166,42 +172,42 @@
  */
 #define	SK_LM80_VT_LSB		22	/* 22mV LSB resolution */
 #define	SK_LM80_TEMP_LSB	10	/* 1 degree LSB resolution */
-#define	SK_LM80_TEMPEXT_LSB	5	/* 0.5 degree LSB resolution for the
-					 * extension value
-					 */
-#define SK_LM80_FAN_FAKTOR	((22500L*60)/(1*2))
-/* formula: counter = (22500*60)/(rpm * divisor * pulses/2)
+#define	SK_LM80_TEMPEXT_LSB	 5	/* 0.5 degree LSB resolution for ext. val. */
+
+/*
+ * formula: counter = (22500*60)/(rpm * divisor * pulses/2)
  * assuming: 6500rpm, 4 pulses, divisor 1
  */
+#define SK_LM80_FAN_FAKTOR	((22500L*60)/(1*2))
 
 /*
  * Define sensor management data
- * Maximum is reached on copperfield with dual Broadcom.
+ * Maximum is reached on Genesis copper dual port and Yukon-64
  * Board specific maximum is in pAC->I2c.MaxSens
  */
 #define	SK_MAX_SENSORS	8	/* maximal no. of installed sensors */
 #define	SK_MIN_SENSORS	5	/* minimal no. of installed sensors */
 
 /*
- * To watch the statemachine (JS) use the timer in two ways instead of one as hitherto
+ * To watch the state machine (SM) use the timer in two ways
+ * instead of one as hitherto
  */
-#define	SK_TIMER_WATCH_STATEMACHINE	0	/* Watch the statemachine to finish in a specific time */
-#define	SK_TIMER_NEW_GAUGING    	1	/* Start a new gauging when timer expires */
-
+#define	SK_TIMER_WATCH_SM		0	/* Watch the SM to finish in a spec. time */
+#define	SK_TIMER_NEW_GAUGING	1	/* Start a new gauging when timer expires */
 
 /*
- * Defines for the individual Thresholds
+ * Defines for the individual thresholds
  */
 
 /* Temperature sensor */
-#define	SK_SEN_TEMP_HIGH_ERR    800	/* Temperature High Err  Threshold */
+#define	SK_SEN_TEMP_HIGH_ERR	800	/* Temperature High Err  Threshold */
 #define	SK_SEN_TEMP_HIGH_WARN	700	/* Temperature High Warn Threshold */
 #define	SK_SEN_TEMP_LOW_WARN	100	/* Temperature Low  Warn Threshold */
-#define	SK_SEN_TEMP_LOW_ERR       0	/* Temperature Low  Err  Threshold */
+#define	SK_SEN_TEMP_LOW_ERR		  0	/* Temperature Low  Err  Threshold */
 
 /* VCC which should be 5 V */
-#define	SK_SEN_PCI_5V_HIGH_ERR  	5588	/* Voltage PCI High Err  Threshold */
-#define	SK_SEN_PCI_5V_HIGH_WARN     5346	/* Voltage PCI High Warn Threshold */
+#define	SK_SEN_PCI_5V_HIGH_ERR		5588	/* Voltage PCI High Err  Threshold */
+#define	SK_SEN_PCI_5V_HIGH_WARN		5346	/* Voltage PCI High Warn Threshold */
 #define	SK_SEN_PCI_5V_LOW_WARN		4664	/* Voltage PCI Low  Warn Threshold */
 #define	SK_SEN_PCI_5V_LOW_ERR		4422	/* Voltage PCI Low  Err  Threshold */
 
@@ -229,17 +235,16 @@
 #define	SK_SEN_PCI_IO_3V3_HIGH_ERR	3850	/* + 15% V PCI-IO High Err Threshold */
 #define	SK_SEN_PCI_IO_3V3_HIGH_WARN	3674	/* + 10% V PCI-IO High Warn Threshold */
 					/*		3300	mVolt */
-#define	SK_SEN_PCI_IO_3V3_LOW_WARN  2926	/* - 10% V PCI-IO Low Warn Threshold */
-#define	SK_SEN_PCI_IO_3V3_LOW_ERR   2772	/* - 15% V PCI-IO Low Err  Threshold */
-
+#define	SK_SEN_PCI_IO_3V3_LOW_WARN	2926	/* - 10% V PCI-IO Low Warn Threshold */
+#define	SK_SEN_PCI_IO_3V3_LOW_ERR	2772	/* - 15% V PCI-IO Low Err  Threshold */
 
 /*
  * VDD voltage
  */
-#define	SK_SEN_VDD_HIGH_ERR	    3630	/* Voltage ASIC High Err  Threshold */
-#define	SK_SEN_VDD_HIGH_WARN    3476	/* Voltage ASIC High Warn Threshold */
-#define	SK_SEN_VDD_LOW_WARN     3146	/* Voltage ASIC Low  Warn Threshold */
-#define	SK_SEN_VDD_LOW_ERR      2970	/* Voltage ASIC Low  Err  Threshold */
+#define	SK_SEN_VDD_HIGH_ERR		3630	/* Voltage ASIC High Err  Threshold */
+#define	SK_SEN_VDD_HIGH_WARN	3476	/* Voltage ASIC High Warn Threshold */
+#define	SK_SEN_VDD_LOW_WARN		3146	/* Voltage ASIC Low  Warn Threshold */
+#define	SK_SEN_VDD_LOW_ERR		2970	/* Voltage ASIC Low  Err  Threshold */
 
 /*
  * PHY PLL 3V3 voltage
@@ -255,8 +260,8 @@
 #define	SK_SEN_VAUX_3V3_HIGH_ERR	3630	/* Voltage VAUX High Err Threshold */
 #define	SK_SEN_VAUX_3V3_HIGH_WARN	3476	/* Voltage VAUX High Warn Threshold */
 #define	SK_SEN_VAUX_3V3_LOW_WARN	3146	/* Voltage VAUX Low Warn Threshold */
-#define	SK_SEN_VAUX_3V3_LOW_ERR	    2970	/* Voltage VAUX Low Err Threshold */
-#define	SK_SEN_VAUX_0V_WARN_ERR	       0	/* if VAUX not present */
+#define	SK_SEN_VAUX_3V3_LOW_ERR		2970	/* Voltage VAUX Low Err Threshold */
+#define	SK_SEN_VAUX_0V_WARN_ERR		   0	/* if VAUX not present */
 #define	SK_SEN_VAUX_RANGE_LIMITER	1000	/* 1000 mV range delimiter */
 
 /*
@@ -270,7 +275,7 @@
 /*
  * ASIC Core 1V5 voltage (YUKON only)
  */
-#define	SK_SEN_CORE_1V5_HIGH_ERR    1650	/* Voltage ASIC Core High Err Threshold */
+#define	SK_SEN_CORE_1V5_HIGH_ERR	1650	/* Voltage ASIC Core High Err Threshold */
 #define	SK_SEN_CORE_1V5_HIGH_WARN	1575	/* Voltage ASIC Core High Warn Threshold */
 #define	SK_SEN_CORE_1V5_LOW_WARN	1425	/* Voltage ASIC Core Low Warn Threshold */
 #define	SK_SEN_CORE_1V5_LOW_ERR 	1350	/* Voltage ASIC Core Low Err Threshold */
@@ -285,8 +290,8 @@
  */
 #define	SK_SEN_FAN_HIGH_ERR		20000	/* FAN Speed High Err Threshold */
 #define	SK_SEN_FAN_HIGH_WARN	20000	/* FAN Speed High Warn Threshold */
-#define	SK_SEN_FAN_LOW_WARN 	5200	/* FAN Speed Low Warn Threshold */
-#define	SK_SEN_FAN_LOW_ERR		4550	/* FAN Speed Low Err Threshold */
+#define	SK_SEN_FAN_LOW_WARN		 5200	/* FAN Speed Low Warn Threshold */
+#define	SK_SEN_FAN_LOW_ERR		 4550	/* FAN Speed Low Err Threshold */
 
 /*
  * Some Voltages need dynamic thresholds

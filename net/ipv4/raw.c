@@ -324,7 +324,7 @@ error:
 }
 
 static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		       int len)
+		       size_t len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipcm_cookie ipc;
@@ -334,17 +334,6 @@ static int raw_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	u32 saddr;
 	u8  tos;
 	int err;
-
-	/* This check is ONLY to check for arithmetic overflow
-	   on integer(!) len. Not more! Real check will be made
-	   in ip_build_xmit --ANK
-
-	   BTW socket.c -> af_*.c -> ... make multiple
-	   invalid conversions size_t -> int. We MUST repair it f.e.
-	   by replacing all of them with size_t and revise all
-	   the places sort of len += sizeof(struct iphdr)
-	   If len was ULONG_MAX-10 it would be cathastrophe  --ANK
-	 */
 
 	err = -EMSGSIZE;
 	if (len < 0 || len > 0xFFFF)
@@ -523,10 +512,10 @@ out:	return ret;
  */
 
 int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
-		int len, int noblock, int flags, int *addr_len)
+		size_t len, int noblock, int flags, int *addr_len)
 {
 	struct inet_opt *inet = inet_sk(sk);
-	int copied = 0;
+	size_t copied = 0;
 	int err = -EOPNOTSUPP;
 	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;
 	struct sk_buff *skb;

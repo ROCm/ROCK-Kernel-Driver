@@ -315,8 +315,12 @@ unsigned long do_mremap(unsigned long addr,
 	old_len = PAGE_ALIGN(old_len);
 	new_len = PAGE_ALIGN(new_len);
 
-	/* Don't allow the degenerate cases */
-	if (!old_len || !new_len)
+	/*
+	 * We allow a zero old-len as a special case
+	 * for DOS-emu "duplicate shm area" thing. But
+	 * a zero new-len is nonsensical.
+	 */
+	if (!new_len)
 		goto out;
 
 	/* new_addr is only valid if MREMAP_FIXED is specified */

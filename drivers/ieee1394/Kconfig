@@ -40,7 +40,7 @@ config IEEE1394_OUI_DB
 	help
 	  If you say Y here, then an OUI list (vendor unique ID's) will be
 	  compiled into the ieee1394 module. This doesn't really do much
-	  accept being able to display the vendor of a hardware node. The
+	  except being able to display the vendor of a hardware node. The
 	  downside is that it adds about 300k to the size of the module,
 	  or kernel (depending on whether you compile ieee1394 as a
 	  module, or static in the kernel).

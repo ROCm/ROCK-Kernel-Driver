@@ -671,12 +671,13 @@ out:
  *	Returns non-negative upon success, negative otherwise.
  */
 static int llc_ui_recvmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int size, int flags)
+			  struct msghdr *msg, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 	struct sockaddr_llc *uaddr = (struct sockaddr_llc *)msg->msg_name;
 	struct sk_buff *skb;
-	int rc = -ENOMEM, copied = 0, timeout;
+	size_t copied = 0;
+	int rc = -ENOMEM, timeout;
 	int noblock = flags & MSG_DONTWAIT;
 
 	dprintk("%s: receiving in %02X from %02X\n", __FUNCTION__,
@@ -725,7 +726,7 @@ out:
  *	Returns non-negative upon success, negative otherwise.
  */
 static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
-			  struct msghdr *msg, int len)
+			  struct msghdr *msg, size_t len)
 {
 	struct sock *sk = sock->sk;
 	struct llc_opt *llc = llc_sk(sk);
@@ -734,7 +735,8 @@ static int llc_ui_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int noblock = flags & MSG_DONTWAIT;
 	struct net_device *dev;
 	struct sk_buff *skb;
-	int rc = -EINVAL, size = 0, copied = 0, hdrlen;
+	size_t size = 0;
+	int rc = -EINVAL, copied = 0, hdrlen;
 
 	dprintk("%s: sending from %02X to %02X\n", __FUNCTION__,
 		llc->laddr.lsap, llc->daddr.lsap);
