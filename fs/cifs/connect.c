@@ -233,12 +233,14 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					smb negprot error in which case reconnecting here is
 					not going to help - return error to mount */
 				server->tcpStatus = CifsExiting;
+				wake_up(&server->response_q);
 				break;
 			}
 
 			cFYI(1,("Reconnecting after unexpected rcvmsg error "));
 			cifs_reconnect(server);
 			csocket = server->ssocket;
+			wake_up(&server->response_q);
 			continue;
 		}
 
@@ -258,11 +260,30 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			} else if ((temp[0] == (char) 0x83)
 				   && (length == 5)) {
 				/* we get this from Windows 98 instead of error on SMB negprot response */
-				cERROR(1,
-				       ("Negative RFC 1002 Session response. Error = 0x%x",
-					temp[4]));
-				break;
-
+				cFYI(1,("Negative RFC 1002 Session Response Error 0x%x)",temp[4]));
+				if(server->tcpStatus == CifsNew) {
+					/* if nack on negprot (rather than 
+					ret of smb negprot error) reconnecting
+					not going to help, ret error to mount */
+					server->tcpStatus = CifsExiting;
+					/* wake up thread doing negprot */
+					wake_up(&server->response_q);
+					break;
+				} else {
+					/* give server a second to
+					clean up before reconnect attempt */
+					schedule_timeout(HZ);
+					/* always try 445 first on reconnect
+					since we get NACK on some if we ever
+					connected to port 139 (the NACK is 
+					since we do not begin with RFC1001
+					session initialize frame) */
+					server->addr.sockAddr.sin_port = CIFS_PORT;
+					cifs_reconnect(server);
+					csocket = server->ssocket;
+					wake_up(&server->response_q);
+					continue;
+				}
 			} else if (temp[0] != (char) 0) {
 				cERROR(1,
 				       ("Unknown RFC 1001 frame not 0x00 nor 0x85"));
@@ -823,6 +844,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 {
 	int rc = 0;
 	int connected = 0;
+	unsigned short int orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create(PF_INET, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -847,6 +869,10 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	} 
 
 	if(!connected) {
+		/* save original port so we can retry user specified port  
+			later if fall back ports fail this time  */
+		orig_port = psin_server->sin_port;
+
 		/* do not retry on the same port we just failed on */
 		if(psin_server->sin_port != htons(CIFS_PORT)) {
 			psin_server->sin_port = htons(CIFS_PORT);
@@ -869,6 +895,8 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	/* give up here - unless we want to retry on different
 		protocol families some day */
 	if (!connected) {
+		if(orig_port)
+			psin_server->sin_port = orig_port;
 		cFYI(1,("Error %d connecting to server via ipv4",rc));
 		sock_release(*csocket);
 		*csocket = NULL;
