@@ -3191,6 +3191,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_vars,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_conf_dir = {
 		{
@@ -3199,6 +3202,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_dev,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_proto_dir = {
 		{
@@ -3207,6 +3213,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_conf_dir,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 	.addrconf_root_dir = {
 		{
@@ -3215,6 +3224,9 @@ static struct addrconf_sysctl_table
 			.mode		=	0555,
 			.child		=	addrconf_sysctl.addrconf_proto_dir,
 		},
+		{
+			.ctl_name	=	0,	/* sentinel */
+		}
 	},
 };
 
