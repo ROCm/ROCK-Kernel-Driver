@@ -888,4 +888,26 @@ acpi_irq_to_vector (u32 irq)
 	return gsi_to_vector(irq);
 }
 
+int __init
+acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
+{
+	int vector = 0;
+	u32 irq_base;
+	char *iosapic_address;
+
+	if (acpi_madt->flags.pcat_compat && (gsi < 16))
+		return isa_irq_to_vector(gsi);
+
+	if (!iosapic_register_intr)
+		return 0;
+
+	/* Find the IOSAPIC */
+	if (!acpi_find_iosapic(gsi, &irq_base, &iosapic_address)) {
+		/* Turn it on */
+		vector = iosapic_register_intr (gsi, polarity, trigger,
+						irq_base, iosapic_address);
+	}
+	return vector;
+}
+
 #endif /* CONFIG_ACPI_BOOT */

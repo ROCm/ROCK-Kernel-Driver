@@ -192,7 +192,7 @@ ENTRY(vhpt_miss)
 	rfi
 END(vhpt_miss)
 
-	.align 1024
+	.org ia64_ivt+0x400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0400 Entry 1 (size 64 bundles) ITLB (21)
 ENTRY(itlb_miss)
@@ -206,7 +206,7 @@ ENTRY(itlb_miss)
 	mov r16=cr.ifa				// get virtual address
 	mov r29=b0				// save b0
 	mov r31=pr				// save predicates
-itlb_fault:
+.itlb_fault:
 	mov r17=cr.iha				// get virtual address of L3 PTE
 	movl r30=1f				// load nested fault continuation point
 	;;
@@ -230,7 +230,7 @@ itlb_fault:
 	rfi
 END(itlb_miss)
 
-	.align 1024
+	.org ia64_ivt+0x0800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0800 Entry 2 (size 64 bundles) DTLB (9,48)
 ENTRY(dtlb_miss)
@@ -268,7 +268,7 @@ dtlb_fault:
 	rfi
 END(dtlb_miss)
 
-	.align 1024
+	.org ia64_ivt+0x0c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x0c00 Entry 3 (size 64 bundles) Alt ITLB (19)
 ENTRY(alt_itlb_miss)
@@ -288,7 +288,7 @@ ENTRY(alt_itlb_miss)
 	;;
 (p8)	mov cr.iha=r17
 (p8)	mov r29=b0				// save b0
-(p8)	br.cond.dptk itlb_fault
+(p8)	br.cond.dptk .itlb_fault
 #endif
 	extr.u r23=r21,IA64_PSR_CPL0_BIT,2	// extract psr.cpl
 	and r19=r19,r16		// clear ed, reserved bits, and PTE control bits
@@ -306,7 +306,7 @@ ENTRY(alt_itlb_miss)
 	rfi
 END(alt_itlb_miss)
 
-	.align 1024
+	.org ia64_ivt+0x1000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1000 Entry 4 (size 64 bundles) Alt DTLB (7,46)
 ENTRY(alt_dtlb_miss)
@@ -379,7 +379,7 @@ ENTRY(page_fault)
 	br.call.sptk.many b6=ia64_do_page_fault	// ignore return address
 END(page_fault)
 
-	.align 1024
+	.org ia64_ivt+0x1400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1400 Entry 5 (size 64 bundles) Data nested TLB (6,45)
 ENTRY(nested_dtlb_miss)
@@ -440,7 +440,7 @@ ENTRY(nested_dtlb_miss)
 	br.sptk.many b0				// return to continuation point
 END(nested_dtlb_miss)
 
-	.align 1024
+	.org ia64_ivt+0x1800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1800 Entry 6 (size 64 bundles) Instruction Key Miss (24)
 ENTRY(ikey_miss)
@@ -448,7 +448,7 @@ ENTRY(ikey_miss)
 	FAULT(6)
 END(ikey_miss)
 
-	.align 1024
+	.org ia64_ivt+0x1c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x1c00 Entry 7 (size 64 bundles) Data Key Miss (12,51)
 ENTRY(dkey_miss)
@@ -456,7 +456,7 @@ ENTRY(dkey_miss)
 	FAULT(7)
 END(dkey_miss)
 
-	.align 1024
+	.org ia64_ivt+0x2000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2000 Entry 8 (size 64 bundles) Dirty-bit (54)
 ENTRY(dirty_bit)
@@ -512,7 +512,7 @@ ENTRY(dirty_bit)
 	rfi
 END(idirty_bit)
 
-	.align 1024
+	.org ia64_ivt+0x2400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2400 Entry 9 (size 64 bundles) Instruction Access-bit (27)
 ENTRY(iaccess_bit)
@@ -571,7 +571,7 @@ ENTRY(iaccess_bit)
 	rfi
 END(iaccess_bit)
 
-	.align 1024
+	.org ia64_ivt+0x2800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2800 Entry 10 (size 64 bundles) Data Access-bit (15,55)
 ENTRY(daccess_bit)
@@ -618,7 +618,7 @@ ENTRY(daccess_bit)
 	rfi
 END(daccess_bit)
 
-	.align 1024
+	.org ia64_ivt+0x2c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x2c00 Entry 11 (size 64 bundles) Break instruction (33)
 ENTRY(break_fault)
@@ -690,7 +690,7 @@ ENTRY(break_fault)
 	// NOT REACHED
 END(break_fault)
 
-ENTRY(demine_args)
+ENTRY_MIN_ALIGN(demine_args)
 	alloc r2=ar.pfs,8,0,0,0
 	tnat.nz p8,p0=in0
 	tnat.nz p9,p0=in1
@@ -719,7 +719,7 @@ ENTRY(demine_args)
 	br.ret.sptk.many rp
 END(demine_args)
 
-	.align 1024
+	.org ia64_ivt+0x3000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3000 Entry 12 (size 64 bundles) External Interrupt (4)
 ENTRY(interrupt)
@@ -746,19 +746,19 @@ ENTRY(interrupt)
 	br.call.sptk.many b6=ia64_handle_irq
 END(interrupt)
 
-	.align 1024
+	.org ia64_ivt+3400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3400 Entry 13 (size 64 bundles) Reserved
 	DBG_FAULT(13)
 	FAULT(13)
 
-	.align 1024
+	.org ia64_ivt+3800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3800 Entry 14 (size 64 bundles) Reserved
 	DBG_FAULT(14)
 	FAULT(14)
 
-	.align 1024
+	.org ia64_ivt+3c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x3c00 Entry 15 (size 64 bundles) Reserved
 	DBG_FAULT(15)
@@ -803,7 +803,7 @@ ENTRY(dispatch_illegal_op_fault)
 	br.sptk.many ia64_leave_kernel
 END(dispatch_illegal_op_fault)
 
-	.align 1024
+	.org ia64_ivt+0x4000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4000 Entry 16 (size 64 bundles) Reserved
 	DBG_FAULT(16)
@@ -893,7 +893,7 @@ END(dispatch_to_ia32_handler)
 
 #endif /* CONFIG_IA32_SUPPORT */
 
-	.align 1024
+	.org ia64_ivt+4400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4400 Entry 17 (size 64 bundles) Reserved
 	DBG_FAULT(17)
@@ -925,7 +925,7 @@ ENTRY(non_syscall)
 	br.call.sptk.many b6=ia64_bad_break	// avoid WAW on CFM and ignore return addr
 END(non_syscall)
 
-	.align 1024
+	.org ia64_ivt+4800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4800 Entry 18 (size 64 bundles) Reserved
 	DBG_FAULT(18)
@@ -959,7 +959,7 @@ ENTRY(dispatch_unaligned_handler)
 	br.sptk.many ia64_prepare_handle_unaligned
 END(dispatch_unaligned_handler)
 
-	.align 1024
+	.org ia64_ivt+4c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x4c00 Entry 19 (size 64 bundles) Reserved
 	DBG_FAULT(19)
@@ -1005,7 +1005,7 @@ END(dispatch_to_fault_handler)
 // --- End of long entries, Beginning of short entries
 //
 
-	.align 1024
+	.org ia64_ivt+5000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5000 Entry 20 (size 16 bundles) Page Not Present (10,22,49)
 ENTRY(page_not_present)
@@ -1025,7 +1025,7 @@ ENTRY(page_not_present)
 	br.sptk.many page_fault
 END(page_not_present)
 
-	.align 256
+	.org ia64_ivt+5100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5100 Entry 21 (size 16 bundles) Key Permission (13,25,52)
 ENTRY(key_permission)
@@ -1038,7 +1038,7 @@ ENTRY(key_permission)
 	br.sptk.many page_fault
 END(key_permission)
 
-	.align 256
+	.org ia64_ivt+5200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5200 Entry 22 (size 16 bundles) Instruction Access Rights (26)
 ENTRY(iaccess_rights)
@@ -1051,7 +1051,7 @@ ENTRY(iaccess_rights)
 	br.sptk.many page_fault
 END(iaccess_rights)
 
-	.align 256
+	.org ia64_ivt+5300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5300 Entry 23 (size 16 bundles) Data Access Rights (14,53)
 ENTRY(daccess_rights)
@@ -1064,7 +1064,7 @@ ENTRY(daccess_rights)
 	br.sptk.many page_fault
 END(daccess_rights)
 
-	.align 256
+	.org ia64_ivt+5400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5400 Entry 24 (size 16 bundles) General Exception (5,32,34,36,38,39)
 ENTRY(general_exception)
@@ -1079,7 +1079,7 @@ ENTRY(general_exception)
 	br.sptk.many dispatch_to_fault_handler
 END(general_exception)
 
-	.align 256
+	.org ia64_ivt+5500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5500 Entry 25 (size 16 bundles) Disabled FP-Register (35)
 ENTRY(disabled_fp_reg)
@@ -1092,7 +1092,7 @@ ENTRY(disabled_fp_reg)
 	br.sptk.many dispatch_to_fault_handler
 END(disabled_fp_reg)
 
-	.align 256
+	.org ia64_ivt+5600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5600 Entry 26 (size 16 bundles) Nat Consumption (11,23,37,50)
 ENTRY(nat_consumption)
@@ -1100,7 +1100,7 @@ ENTRY(nat_consumption)
 	FAULT(26)
 END(nat_consumption)
 
-	.align 256
+	.org ia64_ivt+5700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5700 Entry 27 (size 16 bundles) Speculation (40)
 ENTRY(speculation_vector)
@@ -1137,13 +1137,13 @@ ENTRY(speculation_vector)
 	rfi				// and go back
 END(speculation_vector)
 
-	.align 256
+	.org ia64_ivt+5800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5800 Entry 28 (size 16 bundles) Reserved
 	DBG_FAULT(28)
 	FAULT(28)
 
-	.align 256
+	.org ia64_ivt+5900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5900 Entry 29 (size 16 bundles) Debug (16,28,56)
 ENTRY(debug_vector)
@@ -1151,7 +1151,7 @@ ENTRY(debug_vector)
 	FAULT(29)
 END(debug_vector)
 
-	.align 256
+	.org ia64_ivt+5a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5a00 Entry 30 (size 16 bundles) Unaligned Reference (57)
 ENTRY(unaligned_access)
@@ -1162,91 +1162,103 @@ ENTRY(unaligned_access)
 	br.sptk.many dispatch_unaligned_handler
 END(unaligned_access)
 
-	.align 256
+	.org ia64_ivt+5b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5b00 Entry 31 (size 16 bundles) Unsupported Data Reference (57)
+ENTRY(unsupported_data_reference)
 	DBG_FAULT(31)
 	FAULT(31)
+END(unsupported_data_reference)
 
-	.align 256
+	.org ia64_ivt+5c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5c00 Entry 32 (size 16 bundles) Floating-Point Fault (64)
+ENTRY(floating_point_fault)
 	DBG_FAULT(32)
 	FAULT(32)
+END(floating_point_fault)
 
-	.align 256
+	.org ia64_ivt+5d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5d00 Entry 33 (size 16 bundles) Floating Point Trap (66)
+ENTRY(floating_point_trap)
 	DBG_FAULT(33)
 	FAULT(33)
+END(floating_point_trap)
 
-	.align 256
+	.org ia64_ivt+5e00
 /////////////////////////////////////////////////////////////////////////////////////////
-// 0x5e00 Entry 34 (size 16 bundles) Lower Privilege Tranfer Trap (66)
+// 0x5e00 Entry 34 (size 16 bundles) Lower Privilege Transfer Trap (66)
+ENTRY(lower_privilege_trap)
 	DBG_FAULT(34)
 	FAULT(34)
+END(lower_privilege_trap)
 
-	.align 256
+	.org ia64_ivt+5f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x5f00 Entry 35 (size 16 bundles) Taken Branch Trap (68)
+ENTRY(taken_branch_trap)
 	DBG_FAULT(35)
 	FAULT(35)
+END(taken_branch_trap)
 
-	.align 256
+	.org ia64_ivt+6000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6000 Entry 36 (size 16 bundles) Single Step Trap (69)
+ENTRY(single_step_trap)
 	DBG_FAULT(36)
 	FAULT(36)
+END(single_step_trap)
 
-	.align 256
+	.org ia64_ivt+6100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6100 Entry 37 (size 16 bundles) Reserved
 	DBG_FAULT(37)
 	FAULT(37)
 
-	.align 256
+	.org ia64_ivt+6200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6200 Entry 38 (size 16 bundles) Reserved
 	DBG_FAULT(38)
 	FAULT(38)
 
-	.align 256
+	.org ia64_ivt+6300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6300 Entry 39 (size 16 bundles) Reserved
 	DBG_FAULT(39)
 	FAULT(39)
 
-	.align 256
+	.org ia64_ivt+6400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6400 Entry 40 (size 16 bundles) Reserved
 	DBG_FAULT(40)
 	FAULT(40)
 
-	.align 256
+	.org ia64_ivt+6500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6500 Entry 41 (size 16 bundles) Reserved
 	DBG_FAULT(41)
 	FAULT(41)
 
-	.align 256
+	.org ia64_ivt+6600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6600 Entry 42 (size 16 bundles) Reserved
 	DBG_FAULT(42)
 	FAULT(42)
 
-	.align 256
+	.org ia64_ivt+6700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6700 Entry 43 (size 16 bundles) Reserved
 	DBG_FAULT(43)
 	FAULT(43)
 
-	.align 256
+	.org ia64_ivt+6800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6800 Entry 44 (size 16 bundles) Reserved
 	DBG_FAULT(44)
 	FAULT(44)
 
-	.align 256
+	.org ia64_ivt+6900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6900 Entry 45 (size 16 bundles) IA-32 Exeception (17,18,29,41,42,43,44,58,60,61,62,72,73,75,76,77)
 ENTRY(ia32_exception)
@@ -1254,7 +1266,7 @@ ENTRY(ia32_exception)
 	FAULT(45)
 END(ia32_exception)
 
-	.align 256
+	.org ia64_ivt+6a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6a00 Entry 46 (size 16 bundles) IA-32 Intercept  (30,31,59,70,71)
 ENTRY(ia32_intercept)
@@ -1284,7 +1296,7 @@ ENTRY(ia32_intercept)
 	FAULT(46)
 END(ia32_intercept)
 
-	.align 256
+	.org ia64_ivt+6b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6b00 Entry 47 (size 16 bundles) IA-32 Interrupt  (74)
 ENTRY(ia32_interrupt)
@@ -1297,121 +1309,121 @@ ENTRY(ia32_interrupt)
 #endif
 END(ia32_interrupt)
 
-	.align 256
+	.org ia64_ivt+6c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6c00 Entry 48 (size 16 bundles) Reserved
 	DBG_FAULT(48)
 	FAULT(48)
 
-	.align 256
+	.org ia64_ivt+6d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6d00 Entry 49 (size 16 bundles) Reserved
 	DBG_FAULT(49)
 	FAULT(49)
 
-	.align 256
+	.org ia64_ivt+6e00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6e00 Entry 50 (size 16 bundles) Reserved
 	DBG_FAULT(50)
 	FAULT(50)
 
-	.align 256
+	.org ia64_ivt+6f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x6f00 Entry 51 (size 16 bundles) Reserved
 	DBG_FAULT(51)
 	FAULT(51)
 
-	.align 256
+	.org ia64_ivt+7000
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7000 Entry 52 (size 16 bundles) Reserved
 	DBG_FAULT(52)
 	FAULT(52)
 
-	.align 256
+	.org ia64_ivt+7100
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7100 Entry 53 (size 16 bundles) Reserved
 	DBG_FAULT(53)
 	FAULT(53)
 
-	.align 256
+	.org ia64_ivt+7200
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7200 Entry 54 (size 16 bundles) Reserved
 	DBG_FAULT(54)
 	FAULT(54)
 
-	.align 256
+	.org ia64_ivt+7300
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7300 Entry 55 (size 16 bundles) Reserved
 	DBG_FAULT(55)
 	FAULT(55)
 
-	.align 256
+	.org ia64_ivt+7400
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7400 Entry 56 (size 16 bundles) Reserved
 	DBG_FAULT(56)
 	FAULT(56)
 
-	.align 256
+	.org ia64_ivt+7500
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7500 Entry 57 (size 16 bundles) Reserved
 	DBG_FAULT(57)
 	FAULT(57)
 
-	.align 256
+	.org ia64_ivt+7600
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7600 Entry 58 (size 16 bundles) Reserved
 	DBG_FAULT(58)
 	FAULT(58)
 
-	.align 256
+	.org ia64_ivt+7700
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7700 Entry 59 (size 16 bundles) Reserved
 	DBG_FAULT(59)
 	FAULT(59)
 
-	.align 256
+	.org ia64_ivt+7800
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7800 Entry 60 (size 16 bundles) Reserved
 	DBG_FAULT(60)
 	FAULT(60)
 
-	.align 256
+	.org ia64_ivt+7900
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7900 Entry 61 (size 16 bundles) Reserved
 	DBG_FAULT(61)
 	FAULT(61)
 
-	.align 256
+	.org ia64_ivt+7a00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7a00 Entry 62 (size 16 bundles) Reserved
 	DBG_FAULT(62)
 	FAULT(62)
 
-	.align 256
+	.org ia64_ivt+7b00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7b00 Entry 63 (size 16 bundles) Reserved
 	DBG_FAULT(63)
 	FAULT(63)
 
-	.align 256
+	.org ia64_ivt+7c00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7c00 Entry 64 (size 16 bundles) Reserved
 	DBG_FAULT(64)
 	FAULT(64)
 
-	.align 256
+	.org ia64_ivt+7d00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7d00 Entry 65 (size 16 bundles) Reserved
 	DBG_FAULT(65)
 	FAULT(65)
 
-	.align 256
+	.org ia64_ivt+7e00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7e00 Entry 66 (size 16 bundles) Reserved
 	DBG_FAULT(66)
 	FAULT(66)
 
-	.align 256
+	.org ia64_ivt+7f00
 /////////////////////////////////////////////////////////////////////////////////////////
 // 0x7f00 Entry 67 (size 16 bundles) Reserved
 	DBG_FAULT(67)
