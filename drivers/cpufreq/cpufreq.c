@@ -153,7 +153,8 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 		 * is not equal to what the cpufreq core thinks is "old frequency".
 		 */
 		if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
-			if ((likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
+			if ((likely(cpufreq_cpu_data[freqs->cpu])) &&
+			    (likely(cpufreq_cpu_data[freqs->cpu]->cur)) &&
 			    (unlikely(freqs->old != cpufreq_cpu_data[freqs->cpu]->cur)))
 			{
 				if (cpufreq_driver->flags & CPUFREQ_PANIC_OUTOFSYNC)
@@ -170,7 +171,8 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 	case CPUFREQ_POSTCHANGE:
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
-		cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
+		if (likely(cpufreq_cpu_data[freqs->cpu]))
+			cpufreq_cpu_data[freqs->cpu]->cur = freqs->new;
 		break;
 	}
 	up_read(&cpufreq_notifier_rwsem);
