@@ -94,7 +94,7 @@ static int icmp_packet(struct ip_conntrack *ct,
 			ct->timeout.function((unsigned long)ct);
 	} else {
 		atomic_inc(&ct->proto.icmp.count);
-		ip_ct_refresh(ct, ip_ct_icmp_timeout);
+		ip_ct_refresh_acct(ct, ctinfo, skb, ip_ct_icmp_timeout);
 	}
 
 	return NF_ACCEPT;

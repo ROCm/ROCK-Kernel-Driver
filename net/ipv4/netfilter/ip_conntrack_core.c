@@ -1165,21 +1165,39 @@ void ip_conntrack_helper_unregister(struct ip_conntrack_helper *me)
 	synchronize_net();
 }
 
-/* Refresh conntrack for this many jiffies. */
-void ip_ct_refresh(struct ip_conntrack *ct, unsigned long extra_jiffies)
+static inline void ct_add_counters(struct ip_conntrack *ct,
+				   enum ip_conntrack_info ctinfo,
+				   const struct sk_buff *skb)
+{
+#ifdef CONFIG_IP_NF_CT_ACCT
+	if (skb) {
+		ct->counters[CTINFO2DIR(ctinfo)].packets++;
+		ct->counters[CTINFO2DIR(ctinfo)].bytes += 
+					ntohs(skb->nh.iph->tot_len);
+	}
+#endif
+}
+
+/* Refresh conntrack for this many jiffies and do accounting (if skb != NULL) */
+void ip_ct_refresh_acct(struct ip_conntrack *ct, 
+		        enum ip_conntrack_info ctinfo,
+			const struct sk_buff *skb,
+			unsigned long extra_jiffies)
 {
 	IP_NF_ASSERT(ct->timeout.data == (unsigned long)ct);
 
 	/* If not in hash table, timer will not be active yet */
-	if (!is_confirmed(ct))
+	if (!is_confirmed(ct)) {
 		ct->timeout.expires = extra_jiffies;
-	else {
+		ct_add_counters(ct, ctinfo, skb);
+	} else {
 		WRITE_LOCK(&ip_conntrack_lock);
 		/* Need del_timer for race avoidance (may already be dying). */
 		if (del_timer(&ct->timeout)) {
 			ct->timeout.expires = jiffies + extra_jiffies;
 			add_timer(&ct->timeout);
 		}
+		ct_add_counters(ct, ctinfo, skb);
 		WRITE_UNLOCK(&ip_conntrack_lock);
 	}
 }

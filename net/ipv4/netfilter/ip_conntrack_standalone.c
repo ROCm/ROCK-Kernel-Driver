@@ -83,6 +83,17 @@ print_expect(char *buffer, const struct ip_conntrack_expect *expect)
 	return len;
 }
 
+#ifdef CONFIG_IP_NF_CT_ACCT
+static unsigned int
+print_counters(char *buffer, struct ip_conntrack_counter *counter)
+{
+	return sprintf(buffer, "packets=%llu bytes=%llu ", 
+			counter->packets, counter->bytes);
+}
+#else
+#define print_counters(x, y)	0
+#endif
+
 static unsigned int
 print_conntrack(char *buffer, struct ip_conntrack *conntrack)
 {
@@ -102,11 +113,15 @@ print_conntrack(char *buffer, struct ip_conntrack *conntrack)
 	len += print_tuple(buffer + len,
 			   &conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
 			   proto);
+	len += print_counters(buffer + len, 
+			      &conntrack->counters[IP_CT_DIR_ORIGINAL]);
 	if (!(test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)))
 		len += sprintf(buffer + len, "[UNREPLIED] ");
 	len += print_tuple(buffer + len,
 			   &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple,
 			   proto);
+	len += print_counters(buffer + len, 
+			      &conntrack->counters[IP_CT_DIR_REPLY]);
 	if (test_bit(IPS_ASSURED_BIT, &conntrack->status))
 		len += sprintf(buffer + len, "[ASSURED] ");
 	len += sprintf(buffer + len, "use=%u ",
@@ -638,7 +653,7 @@ EXPORT_SYMBOL(need_ip_conntrack);
 EXPORT_SYMBOL(ip_conntrack_helper_register);
 EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);
-EXPORT_SYMBOL(ip_ct_refresh);
+EXPORT_SYMBOL(ip_ct_refresh_acct);
 EXPORT_SYMBOL(ip_ct_find_proto);
 EXPORT_SYMBOL(__ip_ct_find_proto);
 EXPORT_SYMBOL(ip_ct_find_helper);

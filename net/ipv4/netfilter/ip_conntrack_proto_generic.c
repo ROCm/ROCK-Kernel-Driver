@@ -50,9 +50,9 @@ static unsigned int generic_print_conntrack(char *buffer,
 /* Returns verdict for packet, or -1 for invalid. */
 static int packet(struct ip_conntrack *conntrack,
 		  const struct sk_buff *skb,
-		  enum ip_conntrack_info conntrackinfo)
+		  enum ip_conntrack_info ctinfo)
 {
-	ip_ct_refresh(conntrack, ip_ct_generic_timeout);
+	ip_ct_refresh_acct(conntrack, ctinfo, skb, ip_ct_generic_timeout);
 	return NF_ACCEPT;
 }
 
