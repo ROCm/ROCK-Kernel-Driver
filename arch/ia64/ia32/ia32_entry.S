@@ -478,8 +478,8 @@ ia32_syscall_table:
  	data8 compat_clock_gettime /* 265 */
  	data8 compat_clock_getres
  	data8 compat_clock_nanosleep
-	data8 sys_statfs64
-	data8 sys_fstatfs64
+	data8 compat_statfs64
+	data8 compat_fstatfs64
  	data8 sys_tgkill	/* 270 */
  	data8 compat_sys_utimes
  	data8 sys32_fadvise64_64
