@@ -8,25 +8,6 @@
 
 #define RAW_VALID_HOOKS ((1 << NF_IP_PRE_ROUTING) | (1 << NF_IP_LOCAL_OUT))
 
-/* Standard entry. */
-struct ipt_standard
-{
-	struct ipt_entry entry;
-	struct ipt_standard_target target;
-};
-
-struct ipt_error_target
-{
-	struct ipt_entry_target target;
-	char errorname[IPT_FUNCTION_MAXNAMELEN];
-};
-
-struct ipt_error
-{
-	struct ipt_entry entry;
-	struct ipt_error_target target;
-};
-
 static struct
 {
 	struct ipt_replace repl;
@@ -100,7 +81,6 @@ static struct
 
 static struct ipt_table packet_raw = { 
 	.name = "raw", 
-	.table = &initial_table.repl,
 	.valid_hooks =  RAW_VALID_HOOKS, 
 	.lock = RW_LOCK_UNLOCKED, 
 	.me = THIS_MODULE
@@ -138,7 +118,7 @@ static int __init init(void)
 	int ret;
 
 	/* Register table */
-	ret = ipt_register_table(&packet_raw);
+	ret = ipt_register_table(&packet_raw, &initial_table.repl);
 	if (ret < 0)
 		return ret;
 

@@ -693,6 +693,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	unsigned long offset;
 	unsigned long req_size;
 	unsigned long next_index;
+	unsigned long prev_index;
 	loff_t isize;
 	struct page *cached_page;
 	int error;
@@ -701,6 +702,7 @@ void do_generic_mapping_read(struct address_space *mapping,
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	next_index = index;
+	prev_index = ra.prev_page;
 	req_size = (desc->count + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
@@ -754,8 +756,9 @@ page_ok:
 		 * When (part of) the same page is read multiple times
 		 * in succession, only mark it as accessed the first time.
 		 */
-		if (ra.prev_page != index)
+		if (prev_index != index)
 			mark_page_accessed(page);
+		prev_index = index;
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so

@@ -440,9 +440,6 @@ struct ipt_table
 	/* A unique name... */
 	char name[IPT_TABLE_MAXNAMELEN];
 
-	/* Seed table: copied in register_table */
-	struct ipt_replace *table;
-
 	/* What hooks you will enter on */
 	unsigned int valid_hooks;
 
@@ -456,7 +453,30 @@ struct ipt_table
 	struct module *me;
 };
 
-extern int ipt_register_table(struct ipt_table *table);
+/* net/sched/ipt.c: Gimme access to your targets!  Gets target->me. */
+extern struct ipt_target *ipt_find_target(const char *name, u8 revision);
+
+/* Standard entry. */
+struct ipt_standard
+{
+	struct ipt_entry entry;
+	struct ipt_standard_target target;
+};
+
+struct ipt_error_target
+{
+	struct ipt_entry_target target;
+	char errorname[IPT_FUNCTION_MAXNAMELEN];
+};
+
+struct ipt_error
+{
+	struct ipt_entry entry;
+	struct ipt_error_target target;
+};
+
+extern int ipt_register_table(struct ipt_table *table,
+			      const struct ipt_replace *repl);
 extern void ipt_unregister_table(struct ipt_table *table);
 extern unsigned int ipt_do_table(struct sk_buff **pskb,
 				 unsigned int hook,

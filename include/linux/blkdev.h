@@ -95,6 +95,7 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2);
 
 struct request_list {
 	int count[2];
+	int starved[2];
 	mempool_t *rq_pool;
 	wait_queue_head_t wait[2];
 	wait_queue_head_t drain;

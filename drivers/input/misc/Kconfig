@@ -5,7 +5,6 @@ config INPUT_MISC
 	bool "Misc"
 	depends on INPUT
 	help
-
 	  Say Y here, and a list of miscellaneous input drivers will be displayed.
 	  Everything that didn't fit into the other categories is here. This option
 	  doesn't affect the kernel.

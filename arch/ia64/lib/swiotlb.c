@@ -357,8 +357,8 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 
 	/* Confirm address can be DMA'd by device */
 	if (address_needs_mapping(hwdev, dev_addr)) {
-		printk("hwdev DMA mask = 0x%016lx, dev_addr = 0x%016lx\n",
-		       *hwdev->dma_mask, dev_addr);
+		printk("hwdev DMA mask = 0x%016Lx, dev_addr = 0x%016lx\n",
+		       (unsigned long long)*hwdev->dma_mask, dev_addr);
 		panic("swiotlb_alloc_coherent: allocated memory is out of "
 		      "range for device");
 	}

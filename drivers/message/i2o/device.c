@@ -66,10 +66,11 @@ int i2o_device_claim(struct i2o_device *dev)
 
 	rc = i2o_device_issue_claim(dev, I2O_CMD_UTIL_CLAIM, I2O_CLAIM_PRIMARY);
 	if (!rc)
-		pr_debug("claim of device %d succeded\n", dev->lct_data.tid);
+		pr_debug("i2o: claim of device %d succeded\n",
+			 dev->lct_data.tid);
 	else
-		pr_debug("claim of device %d failed %d\n", dev->lct_data.tid,
-			 rc);
+		pr_debug("i2o: claim of device %d failed %d\n",
+			 dev->lct_data.tid, rc);
 
 	up(&dev->lock);
 
@@ -111,10 +112,10 @@ int i2o_device_claim_release(struct i2o_device *dev)
 	}
 
 	if (!rc)
-		pr_debug("claim release of device %d succeded\n",
+		pr_debug("i2o: claim release of device %d succeded\n",
 			 dev->lct_data.tid);
 	else
-		pr_debug("claim release of device %d failed %d\n",
+		pr_debug("i2o: claim release of device %d failed %d\n",
 			 dev->lct_data.tid, rc);
 
 	up(&dev->lock);
@@ -133,7 +134,7 @@ static void i2o_device_release(struct device *dev)
 {
 	struct i2o_device *i2o_dev = to_i2o_device(dev);
 
-	pr_debug("Release I2O device %s\n", dev->bus_id);
+	pr_debug("i2o: device %s released\n", dev->bus_id);
 
 	kfree(i2o_dev);
 };
@@ -241,7 +242,7 @@ static struct i2o_device *i2o_device_add(struct i2o_controller *c,
 
 	i2o_driver_notify_device_add_all(dev);
 
-	pr_debug("I2O device %s added\n", dev->device.bus_id);
+	pr_debug("i2o: device %s added\n", dev->device.bus_id);
 
 	return dev;
 };
@@ -304,7 +305,8 @@ int i2o_device_parse_lct(struct i2o_controller *c)
 
 	max = (lct->table_size - 3) / 9;
 
-	pr_debug("LCT has %d entries (LCT size: %d)\n", max, lct->table_size);
+	pr_debug("%s: LCT has %d entries (LCT size: %d)\n", c->name, max,
+		 lct->table_size);
 
 	/* remove devices, which are not in the LCT anymore */
 	list_for_each_entry_safe(dev, tmp, &c->devices, list) {

@@ -124,7 +124,6 @@ static struct
 
 static struct ip6t_table packet_mangler = {
 	.name		= "mangle",
-	.table		= &initial_table.repl,
 	.valid_hooks	= MANGLE_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.me		= THIS_MODULE,
@@ -164,10 +163,6 @@ ip6t_local_hook(unsigned int hook,
 		return NF_ACCEPT;
 	}
 #endif
-
-	/* FIXME: Push down to extensions --RR */
-	if (skb_is_nonlinear(*pskb) && skb_linearize(*pskb, GFP_ATOMIC) != 0)
-		return NF_DROP;
 
 	/* save source/dest address, nfmark, hoplimit, flowlabel, priority,  */
 	memcpy(&saddr, &(*pskb)->nh.ipv6h->saddr, sizeof(saddr));
@@ -237,7 +232,7 @@ static int __init init(void)
 	int ret;
 
 	/* Register table */
-	ret = ip6t_register_table(&packet_mangler);
+	ret = ip6t_register_table(&packet_mangler, &initial_table.repl);
 	if (ret < 0)
 		return ret;
 

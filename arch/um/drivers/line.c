@@ -593,8 +593,8 @@ irqreturn_t winch_interrupt(int irq, void *data, struct pt_regs *unused)
 		}
 	}
 	tty  = winch->tty;
-	line = tty->driver_data;
 	if (tty != NULL) {
+		line = tty->driver_data;
 		chan_window_size(&line->chan_list,
 				 &tty->winsize.ws_row, 
 				 &tty->winsize.ws_col);

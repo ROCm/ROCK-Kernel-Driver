@@ -701,8 +701,6 @@ struct ip_vs_app
  *      (from ip_vs_core.c)
  */
 extern const char *ip_vs_proto_name(unsigned proto);
-extern unsigned int check_for_ip_vs_out(struct sk_buff **skb_p,
-					int (*okfn)(struct sk_buff *));
 extern void ip_vs_init_hash_table(struct list_head *table, int rows);
 #define IP_VS_INIT_HASH_TABLE(t) ip_vs_init_hash_table(t, sizeof(t)/sizeof(t[0]))
 

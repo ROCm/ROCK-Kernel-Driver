@@ -31,7 +31,8 @@
  *
  * it's best to have buff aligned on a 32-bit boundary
  */
-asmlinkage unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum);
+asmlinkage unsigned int csum_partial(const unsigned char *buff,
+				     int len, unsigned int sum);
 
 /*
  * The same as csum_partial, but copies from src while it checksums.
@@ -39,15 +40,16 @@ asmlinkage unsigned int csum_partial(const unsigned char *buff, int len, unsigne
  * Here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
  */
-extern unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
+extern unsigned int csum_partial_copy_nocheck(const unsigned char *src,
+					      unsigned char *dst,
                                               int len, unsigned int sum);
 
 /*
  * This is a new version of the above that records errors it finds in *errp,
  * but continues and zeros thre rest of the buffer.
  */
-extern unsigned int csum_partial_copy_from_user(const char __user *src,
-                                                char *dst,
+extern unsigned int csum_partial_copy_from_user(const unsigned char __user *src,
+                                                unsigned char *dst,
                                                 int len, unsigned int sum,
                                                 int *err_ptr);
 

@@ -80,7 +80,7 @@ static struct rpc_credops gss_credops;
 /* dump the buffer in `emacs-hexl' style */
 #define isprint(c)      ((c > 0x1f) && (c < 0x7f))
 
-static rwlock_t gss_ctx_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(gss_ctx_lock);
 
 struct gss_auth {
 	struct rpc_auth rpc_auth;
@@ -593,9 +593,11 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 			gss_auth->mech->gm_name);
 	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops, RPC_PIPE_WAIT_FOR_OPEN);
 	if (IS_ERR(gss_auth->dentry))
-		goto err_free;
+		goto err_put_mech;
 
 	return auth;
+err_put_mech:
+	gss_mech_put(gss_auth->mech);
 err_free:
 	kfree(gss_auth);
 out_dec:
@@ -612,6 +614,7 @@ gss_destroy(struct rpc_auth *auth)
 
 	gss_auth = container_of(auth, struct gss_auth, rpc_auth);
 	rpc_unlink(gss_auth->path);
+	gss_mech_put(gss_auth->mech);
 
 	rpcauth_free_credcache(auth);
 }

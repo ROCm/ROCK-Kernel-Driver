@@ -200,7 +200,7 @@ config USB_EGALAX
 	  The driver has been tested on a Xenarc 700TSV monitor
 	  with eGalax touchscreen.
 
-	  Have a look at http://linux.chapter7.ch/touchkit/ for
+	  Have a look at <http://linux.chapter7.ch/touchkit/> for
 	  a usage description and the required user-space stuff.
 
 	  To compile this driver as a module, choose M here: the
@@ -228,7 +228,7 @@ config USB_ATI_REMOTE
 	  These are RF remotes with USB receivers. 
 	  The ATI remote comes with many of ATI's All-In-Wonder video cards.
 	  The X10 "Lola" remote is available at:
-	     http://www.x10.com/products/lola_sg1.htm
+	     <http://www.x10.com/products/lola_sg1.htm>
 	  This driver provides mouse pointer, left and right mouse buttons, 
 	  and maps all the other remote buttons to keypress events.
 	  

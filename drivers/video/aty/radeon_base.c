@@ -261,7 +261,7 @@ static struct backlight_controller radeon_backlight_controller = {
 
 #endif /* CONFIG_PPC_OF */
 
-static void __devexit radeon_unmap_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
+static void radeon_unmap_ROM(struct radeonfb_info *rinfo, struct pci_dev *dev)
 {
 	if (!rinfo->bios_seg)
 		return;

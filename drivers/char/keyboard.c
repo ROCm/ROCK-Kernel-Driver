@@ -31,7 +31,6 @@
 #include <linux/tty_flip.h>
 #include <linux/mm.h>
 #include <linux/string.h>
-#include <linux/random.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 
@@ -1030,9 +1029,6 @@ void kbd_keycode(unsigned int keycode, int down, int hw_raw, struct pt_regs *reg
 	unsigned char type, raw_mode;
 	struct tty_struct *tty;
 	int shift_final;
-
-	if (down != 2)
-		add_keyboard_randomness((keycode << 1) ^ down);
 
 	tty = vc->vc_tty;
 

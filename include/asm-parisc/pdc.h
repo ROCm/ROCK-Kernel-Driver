@@ -471,6 +471,13 @@ struct pdc_system_map_addr_info { /* PDC_SYSTEM_MAP/FIND_ADDRESS */
 	unsigned long mod_pgs;
 };
 
+struct pdc_initiator { /* PDC_INITIATOR */
+	int host_id;
+	int factor;
+	int width;
+	int mode;
+};
+
 struct hardware_path {
 	char  flags;	/* see bit definitions below */
 	char  bc[6];	/* Bus Converter routing info to a specific */
@@ -732,10 +739,16 @@ int pdc_mem_map_hpa(struct pdc_memory_map *r_addr, struct pdc_module_path *mod_p
 #endif /* !CONFIG_PA20 */
 int pdc_lan_station_id(char *lan_addr, unsigned long net_hpa);
 
+int pdc_stable_read(unsigned long staddr, void *memaddr, unsigned long count);
+int pdc_stable_write(unsigned long staddr, void *memaddr, unsigned long count);
+int pdc_stable_get_size(unsigned long *size);
+int pdc_stable_verify_contents(void);
+int pdc_stable_initialize(void);
+
 int pdc_pci_irt_size(unsigned long *num_entries, unsigned long hpa);
 int pdc_pci_irt(unsigned long num_entries, unsigned long hpa, void *tbl);
 
-int pdc_get_initiator(struct hardware_path *hwpath, unsigned char *scsi_id, unsigned long *period, char *width, char *mode);
+int pdc_get_initiator(struct hardware_path *, struct pdc_initiator *);
 int pdc_tod_read(struct pdc_tod *tod);
 int pdc_tod_set(unsigned long sec, unsigned long usec);
 

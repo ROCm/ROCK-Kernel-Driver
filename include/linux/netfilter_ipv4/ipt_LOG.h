@@ -4,7 +4,8 @@
 #define IPT_LOG_TCPSEQ		0x01	/* Log TCP sequence numbers */
 #define IPT_LOG_TCPOPT		0x02	/* Log TCP options */
 #define IPT_LOG_IPOPT		0x04	/* Log IP options */
-#define IPT_LOG_MASK		0x07
+#define IPT_LOG_UID		0x08	/* Log UID owning local socket */
+#define IPT_LOG_MASK		0x0f
 
 struct ipt_log_info {
 	unsigned char level;

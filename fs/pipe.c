@@ -86,7 +86,7 @@ pipe_iov_copy_to_user(struct iovec *iov, const void *from, unsigned long len)
 	return 0;
 }
 
-static void release_pipe_buf(struct pipe_inode_info *info, struct pipe_buffer *buf)
+static void anon_pipe_buf_release(struct pipe_inode_info *info, struct pipe_buffer *buf)
 {
 	struct page *page = buf->page;
 
@@ -96,6 +96,23 @@ static void release_pipe_buf(struct pipe_inode_info *info, struct pipe_buffer *b
 	}
 	info->tmp_page = page;
 }
+
+static void *anon_pipe_buf_map(struct file *file, struct pipe_inode_info *info, struct pipe_buffer *buf)
+{
+	return kmap(buf->page);
+}
+
+static void anon_pipe_buf_unmap(struct pipe_inode_info *info, struct pipe_buffer *buf)
+{
+	kunmap(buf->page);
+}
+
+static struct pipe_buf_operations anon_pipe_buf_ops = {
+	.can_merge = 1,
+	.map = anon_pipe_buf_map,
+	.unmap = anon_pipe_buf_unmap,
+	.release = anon_pipe_buf_release,
+};
 
 static ssize_t
 pipe_readv(struct file *filp, const struct iovec *_iov,
@@ -122,14 +139,17 @@ pipe_readv(struct file *filp, const struct iovec *_iov,
 		if (bufs) {
 			int curbuf = info->curbuf;
 			struct pipe_buffer *buf = info->bufs + curbuf;
+			struct pipe_buf_operations *ops = buf->ops;
+			void *addr;
 			size_t chars = buf->len;
 			int error;
 
 			if (chars > total_len)
 				chars = total_len;
 
-			error = pipe_iov_copy_to_user(iov, kmap(buf->page) + buf->offset, chars);
-			kunmap(buf->page);
+			addr = ops->map(filp, info, buf);
+			error = pipe_iov_copy_to_user(iov, addr + buf->offset, chars);
+			ops->unmap(info, buf);
 			if (unlikely(error)) {
 				if (!ret) ret = -EFAULT;
 				break;
@@ -138,8 +158,8 @@ pipe_readv(struct file *filp, const struct iovec *_iov,
 			buf->offset += chars;
 			buf->len -= chars;
 			if (!buf->len) {
-				release_pipe_buf(info, buf);
-				buf->page = NULL;
+				buf->ops = NULL;
+				ops->release(info, buf);
 				curbuf = (curbuf + 1) & (PIPE_BUFFERS-1);
 				info->curbuf = curbuf;
 				info->nrbufs = --bufs;
@@ -219,11 +239,12 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 	if (info->nrbufs && total_len < PAGE_SIZE) {
 		int lastbuf = (info->curbuf + info->nrbufs - 1) & (PIPE_BUFFERS-1);
 		struct pipe_buffer *buf = info->bufs + lastbuf;
+		struct pipe_buf_operations *ops = buf->ops;
 		int offset = buf->offset + buf->len;
-		if (offset + total_len <= PAGE_SIZE) {
-			struct page *page = buf->page;
-			int error = pipe_iov_copy_from_user(offset + kmap(page), iov, total_len);
-			kunmap(page);
+		if (ops->can_merge && offset + total_len <= PAGE_SIZE) {
+			void *addr = ops->map(filp, info, buf);
+			int error = pipe_iov_copy_from_user(offset + addr, iov, total_len);
+			ops->unmap(info, buf);
 			ret = error;
 			do_wakeup = 1;
 			if (error)
@@ -251,7 +272,7 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 			int error;
 
 			if (!page) {
-				page = alloc_page(GFP_KERNEL);
+				page = alloc_page(GFP_HIGHUSER);
 				if (unlikely(!page)) {
 					ret = ret ? : -ENOMEM;
 					break;
@@ -278,6 +299,7 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 
 			/* Insert it into the buffer array */
 			buf->page = page;
+			buf->ops = &anon_pipe_buf_ops;
 			buf->offset = 0;
 			buf->len = chars;
 			info->nrbufs = ++bufs;
@@ -612,8 +634,8 @@ void free_pipe_info(struct inode *inode)
 		__free_page(info->tmp_page);
 	for (i = 0; i < PIPE_BUFFERS; i++) {
 		struct pipe_buffer *buf = info->bufs + i;
-		if (buf->page)
-			release_pipe_buf(info, buf);
+		if (buf->ops)
+			buf->ops->release(info, buf);
 	}
 	kfree(info);
 }

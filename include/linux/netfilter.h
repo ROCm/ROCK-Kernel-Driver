@@ -175,10 +175,6 @@ extern void nf_reinject(struct sk_buff *skb,
 extern void (*ip_ct_attach)(struct sk_buff *, struct sk_buff *);
 extern void nf_ct_attach(struct sk_buff *, struct sk_buff *);
 
-#ifdef CONFIG_NETFILTER_DEBUG
-extern void nf_dump_skb(int pf, struct sk_buff *skb);
-#endif
-
 /* FIXME: Before cache is ever used, this must be implemented for real. */
 extern void nf_invalidate_cache(int pf);
 

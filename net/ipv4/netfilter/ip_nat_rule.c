@@ -35,32 +35,13 @@
 
 #define NAT_VALID_HOOKS ((1<<NF_IP_PRE_ROUTING) | (1<<NF_IP_POST_ROUTING) | (1<<NF_IP_LOCAL_OUT))
 
-/* Standard entry. */
-struct ipt_standard
-{
-	struct ipt_entry entry;
-	struct ipt_standard_target target;
-};
-
-struct ipt_error_target
-{
-	struct ipt_entry_target target;
-	char errorname[IPT_FUNCTION_MAXNAMELEN];
-};
-
-struct ipt_error
-{
-	struct ipt_entry entry;
-	struct ipt_error_target target;
-};
-
 static struct
 {
 	struct ipt_replace repl;
 	struct ipt_standard entries[3];
 	struct ipt_error term;
-} nat_initial_table = {
-    { "nat", NAT_VALID_HOOKS, 4,
+} nat_initial_table __initdata
+= { { "nat", NAT_VALID_HOOKS, 4,
       sizeof(struct ipt_standard) * 3 + sizeof(struct ipt_error),
       { [NF_IP_PRE_ROUTING] = 0,
 	[NF_IP_POST_ROUTING] = sizeof(struct ipt_standard),
@@ -110,7 +91,6 @@ static struct
 
 static struct ipt_table nat_table = {
 	.name		= "nat",
-	.table		= &nat_initial_table.repl,
 	.valid_hooks	= NAT_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.me		= THIS_MODULE,
@@ -285,7 +265,7 @@ int __init ip_nat_rule_init(void)
 {
 	int ret;
 
-	ret = ipt_register_table(&nat_table);
+	ret = ipt_register_table(&nat_table, &nat_initial_table.repl);
 	if (ret != 0)
 		return ret;
 	ret = ipt_register_target(&ipt_snat_reg);

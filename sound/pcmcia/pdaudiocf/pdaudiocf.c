@@ -42,8 +42,6 @@ MODULE_SUPPORTED_DEVICE("{{Sound Core," CARD_NAME "}}");
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable switches */
-static unsigned int irq_mask = 0xffff;
-static int irq_list[4] = { -1 };
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "Index value for " CARD_NAME " soundcard.");
@@ -51,11 +49,6 @@ module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string for " CARD_NAME " soundcard.");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable " CARD_NAME " soundcard.");
-module_param(irq_mask, int, 0444);
-MODULE_PARM_DESC(irq_mask, "IRQ bitmask for " CARD_NAME " soundcard.");
-module_param_array(irq_list, int, NULL, 0444);
-MODULE_PARM_DESC(irq_list, "List of Available interrupts for " CARD_NAME " soundcard.");
- 
 
 /*
  */
@@ -164,12 +157,7 @@ static dev_link_t *snd_pdacf_attach(void)
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT | IRQ_FORCED_PULSE;
 	// link->irq.Attributes = IRQ_TYPE_DYNAMIC_SHARING|IRQ_FIRST_SHARED;
 
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID /* | IRQ_LEVEL_ID */;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = 0 /* | IRQ_LEVEL_ID */;
 	link->irq.Handler = pdacf_interrupt;
 	link->irq.Instance = pdacf;
 	link->conf.Attributes = CONF_ENABLE_IRQ;

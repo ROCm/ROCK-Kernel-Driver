@@ -39,6 +39,12 @@ config GENERIC_CALIBRATE_DELAY
 config GENERIC_ISA_DMA
 	bool
 
+config GENERIC_HARDIRQS
+	def_bool y
+
+config GENERIC_IRQ_PROBE
+	def_bool y
+
 # unless you want to implement ACPI on PA-RISC ... ;-)
 config PM
 	bool

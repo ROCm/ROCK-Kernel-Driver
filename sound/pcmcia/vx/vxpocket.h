@@ -35,8 +35,6 @@ struct snd_vxp_entry {
 	int *index_table;
 	char **id_table;
 	int *enable_table;
-	unsigned int *irq_mask_p;
-	int *irq_list;
 	int *ibl;
 
 	/* h/w config */

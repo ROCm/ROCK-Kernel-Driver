@@ -7,7 +7,7 @@ config IRNET
 	  called irnet.  IrNET is a PPP driver, so you will also need a
 	  working PPP subsystem (driver, daemon and config)...
 
-	  IrNET is an alternate way to tranfer TCP/IP traffic over IrDA.  It
+	  IrNET is an alternate way to transfer TCP/IP traffic over IrDA.  It
 	  uses synchronous PPP over a set of point to point IrDA sockets.  You
 	  can use it between Linux machine or with W2k.
 

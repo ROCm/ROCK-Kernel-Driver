@@ -112,9 +112,7 @@ static inline unsigned long get_segment_eip(struct pt_regs *regs,
 	}
 
 	/* Decode the code segment base from the descriptor */
-	base =   (desc[0] >> 16) |
-		((desc[1] & 0xff) << 16) |
-		 (desc[1] & 0xff000000);
+	base = get_desc_base((unsigned long *)desc);
 
 	if (seg & (1<<2)) { 
 		up(&current->mm->context.sem);

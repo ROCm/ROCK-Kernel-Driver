@@ -33,7 +33,6 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
-#include <linux/suspend.h>
 #include <linux/in.h>
 #include <linux/bitops.h>
 #include <asm/io.h>
@@ -2918,8 +2917,7 @@ static int airo_thread(void *data) {
 			flush_signals(current);
 
 		/* make swsusp happy with our thread */
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+		try_to_freeze(PF_FREEZE);
 
 		if (test_bit(JOB_DIE, &ai->flags))
 			break;

@@ -56,25 +56,6 @@ static struct sctp_ulpevent * sctp_ulpq_order(struct sctp_ulpq *,
 
 /* 1st Level Abstractions */
 
-/* Create a new ULP queue.  */
-struct sctp_ulpq *sctp_ulpq_new(struct sctp_association *asoc, int gfp)
-{
-	struct sctp_ulpq *ulpq;
-
-	ulpq = kmalloc(sizeof(struct sctp_ulpq), gfp);
-	if (!ulpq)
-		goto fail;
-	if (!sctp_ulpq_init(ulpq, asoc))
-		goto fail_init;
-	ulpq->malloced = 1;
-	return ulpq;
-
-fail_init:
-	kfree(ulpq);
-fail:
-	return NULL;
-}
-
 /* Initialize a ULP queue from a block of memory.  */
 struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
 				 struct sctp_association *asoc)
@@ -92,7 +73,7 @@ struct sctp_ulpq *sctp_ulpq_init(struct sctp_ulpq *ulpq,
 
 
 /* Flush the reassembly and ordering queues.  */
-void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
+static void sctp_ulpq_flush(struct sctp_ulpq *ulpq)
 {
 	struct sk_buff *skb;
 	struct sctp_ulpevent *event;

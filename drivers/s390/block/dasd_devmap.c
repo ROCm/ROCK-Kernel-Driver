@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.35 $
+ * $Revision: 1.37 $
  */
 
 #include <linux/config.h>
@@ -70,7 +70,6 @@ int dasd_autodetect = 0;	/* is true, when autodetection is active */
  * strings when running as a module.
  */
 static char *dasd[256];
-
 /*
  * Single spinlock to protect devmap structures and lists.
  */
@@ -485,7 +484,8 @@ dasd_devmap_from_cdev(struct ccw_device *cdev)
 
 	devmap = dasd_find_busid(cdev->dev.bus_id);
 	if (IS_ERR(devmap))
-		devmap = dasd_add_busid(cdev->dev.bus_id, DASD_FEATURE_DEFAULT);
+		devmap = dasd_add_busid(cdev->dev.bus_id,
+					DASD_FEATURE_DEFAULT);
 	return devmap;
 }
 

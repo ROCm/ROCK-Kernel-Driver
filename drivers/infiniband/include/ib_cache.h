@@ -37,16 +37,66 @@
 
 #include <ib_verbs.h>
 
-int ib_cached_gid_get(struct ib_device    *device,
-		      u8                   port,
+/**
+ * ib_get_cached_gid - Returns a cached GID table entry
+ * @device: The device to query.
+ * @port_num: The port number of the device to query.
+ * @index: The index into the cached GID table to query.
+ * @gid: The GID value found at the specified index.
+ *
+ * ib_get_cached_gid() fetches the specified GID table entry stored in
+ * the local software cache.
+ */
+int ib_get_cached_gid(struct ib_device    *device,
+		      u8                   port_num,
 		      int                  index,
 		      union ib_gid        *gid);
-int ib_cached_pkey_get(struct ib_device    *device_handle,
-		       u8                   port,
+
+/**
+ * ib_find_cached_gid - Returns the port number and GID table index where
+ *   a specified GID value occurs.
+ * @device: The device to query.
+ * @gid: The GID value to search for.
+ * @port_num: The port number of the device where the GID value was found.
+ * @index: The index into the cached GID table where the GID was found.  This
+ *   parameter may be NULL.
+ *
+ * ib_find_cached_gid() searches for the specified GID value in
+ * the local software cache.
+ */
+int ib_find_cached_gid(struct ib_device *device,
+		       union ib_gid	*gid,
+		       u8               *port_num,
+		       u16              *index);
+
+/**
+ * ib_get_cached_pkey - Returns a cached PKey table entry
+ * @device: The device to query.
+ * @port_num: The port number of the device to query.
+ * @index: The index into the cached PKey table to query.
+ * @pkey: The PKey value found at the specified index.
+ *
+ * ib_get_cached_pkey() fetches the specified PKey table entry stored in
+ * the local software cache.
+ */
+int ib_get_cached_pkey(struct ib_device    *device_handle,
+		       u8                   port_num,
 		       int                  index,
 		       u16                 *pkey);
-int ib_cached_pkey_find(struct ib_device    *device,
-			u8                   port,
+
+/**
+ * ib_find_cached_pkey - Returns the PKey table index where a specified
+ *   PKey value occurs.
+ * @device: The device to query.
+ * @port_num: The port number of the device to search for the PKey.
+ * @pkey: The PKey value to search for.
+ * @index: The index into the cached PKey table where the PKey was found.
+ *
+ * ib_find_cached_pkey() searches the specified PKey table in
+ * the local software cache.
+ */
+int ib_find_cached_pkey(struct ib_device    *device,
+			u8                   port_num,
 			u16                  pkey,
 			u16                 *index);
 

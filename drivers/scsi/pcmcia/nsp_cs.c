@@ -72,14 +72,6 @@ MODULE_LICENSE("GPL");
 /*====================================================================*/
 /* Parameters that can be set with 'insmod' */
 
-static unsigned int irq_mask = 0xffff;
-module_param(irq_mask, int, 0);
-MODULE_PARM_DESC(irq_mask, "IRQ mask bits (default: 0xffff)");
-
-static int       irq_list[4] = { -1 };
-module_param_array(irq_list, int, NULL, 0);
-MODULE_PARM_DESC(irq_list, "Use specified IRQ number. (default: auto select)");
-
 static int       nsp_burst_mode = BURST_MEM32;
 module_param(nsp_burst_mode, int, 0);
 MODULE_PARM_DESC(nsp_burst_mode, "Burst transfer mode (0=io8, 1=io32, 2=mem32(default))");
@@ -1625,7 +1617,7 @@ static dev_link_t *nsp_cs_attach(void)
 	scsi_info_t  *info;
 	client_reg_t  client_reg;
 	dev_link_t   *link;
-	int	      ret, i;
+	int	      ret;
 	nsp_hw_data  *data = &nsp_data_base;
 
 	nsp_dbg(NSP_DEBUG_INIT, "in");
@@ -1647,14 +1639,7 @@ static dev_link_t *nsp_cs_attach(void)
 
 	/* Interrupt setup */
 	link->irq.Attributes	 = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1	 = IRQ_INFO2_VALID    | IRQ_LEVEL_ID;
-	if (irq_list[0] == -1) {
-		link->irq.IRQInfo2 = irq_mask;
-	} else {
-		for (i = 0; i < 4; i++) {
-			link->irq.IRQInfo2 |= BIT(irq_list[i]);
-		}
-	}
+	link->irq.IRQInfo1	 = IRQ_LEVEL_ID;
 
 	/* Interrupt handler */
 	link->irq.Handler	 = &nspintr;

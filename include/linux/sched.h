@@ -727,7 +727,7 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 #define PF_MEMDIE	0x00001000	/* Killed for out-of-memory */
 #define PF_FLUSHER	0x00002000	/* responsible for disk writeback */
 
-#define PF_FREEZE	0x00004000	/* this task should be frozen for suspend */
+#define PF_FREEZE	0x00004000	/* this task is being frozen for suspend now */
 #define PF_NOFREEZE	0x00008000	/* this thread should not be frozen */
 #define PF_FROZEN	0x00010000	/* frozen for system suspend */
 #define PF_FSTRANS	0x00020000	/* inside a filesystem transaction */

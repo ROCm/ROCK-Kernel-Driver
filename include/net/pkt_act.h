@@ -218,25 +218,22 @@ tcf_hash_search(struct tc_action *a, u32 index)
 
 #ifdef CONFIG_NET_ACT_INIT
 static inline struct tcf_st *
-tcf_hash_check(struct tc_st *parm, struct tc_action *a, int ovr, int bind)
+tcf_hash_check(u32 index, struct tc_action *a, int ovr, int bind)
 {
 	struct tcf_st *p = NULL;
-	if (parm->index && (p = tcf_hash_lookup(parm->index)) != NULL) {
-		spin_lock(&p->lock);
+	if (index && (p = tcf_hash_lookup(index)) != NULL) {
 		if (bind) {
 			p->bindcnt++;
 			p->refcnt++;
 		}
-		spin_unlock(&p->lock);
-		a->priv = (void *) p;
+		a->priv = p;
 	}
 	return p;
 }
 
 static inline struct tcf_st *
-tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int size, int ovr, int bind)
+tcf_hash_create(u32 index, struct rtattr *est, struct tc_action *a, int size, int ovr, int bind)
 {
-	unsigned h;
 	struct tcf_st *p = NULL;
 
 	p = kmalloc(size, GFP_KERNEL);
@@ -252,31 +249,25 @@ tcf_hash_create(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int
 
 	spin_lock_init(&p->lock);
 	p->stats_lock = &p->lock;
-	p->index = parm->index ? : tcf_hash_new_index();
+	p->index = index ? : tcf_hash_new_index();
 	p->tm.install = jiffies;
 	p->tm.lastuse = jiffies;
 #ifdef CONFIG_NET_ESTIMATOR
 	if (est)
 		gen_new_estimator(&p->bstats, &p->rate_est, p->stats_lock, est);
 #endif
-	h = tcf_hash(p->index);
-	write_lock_bh(&tcf_t_lock);
-	p->next = tcf_ht[h];
-	tcf_ht[h] = p;
-	write_unlock_bh(&tcf_t_lock);
-
 	a->priv = (void *) p;
 	return p;
 }
 
-static inline struct tcf_st *
-tcf_hash_init(struct tc_st *parm, struct rtattr *est, struct tc_action *a, int size, int ovr, int bind)
+static inline void tcf_hash_insert(struct tcf_st *p)
 {
-	struct tcf_st *p = tcf_hash_check (parm,a,ovr,bind);
+	unsigned h = tcf_hash(p->index);
 
-	if (!p)
-		p = tcf_hash_create(parm, est, a, size, ovr, bind);
-	return p;
+	write_lock_bh(&tcf_t_lock);
+	p->next = tcf_ht[h];
+	tcf_ht[h] = p;
+	write_unlock_bh(&tcf_t_lock);
 }
 
 #endif

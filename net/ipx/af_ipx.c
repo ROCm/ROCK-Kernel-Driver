@@ -78,7 +78,7 @@ static struct datalink_proto *pSNAP_datalink;
 static struct proto_ops ipx_dgram_ops;
 
 LIST_HEAD(ipx_interfaces);
-spinlock_t ipx_interfaces_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(ipx_interfaces_lock);
 
 struct ipx_interface *ipx_primary_net;
 struct ipx_interface *ipx_internal_net;

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -148,14 +148,14 @@ struct mthca_dev_lim {
 	int cqc_entry_sz;
 	int srq_entry_sz;
 	int uar_scratch_entry_sz;
+	int mtt_seg_sz;
+	int mpt_entry_sz;
 	union {
 		struct {
 			int max_avs;
 		} tavor;
 		struct {
 			int resize_srq;
-			int mtt_entry_sz;
-			int mpt_entry_sz;
 			int max_pbl_sz;
 			u8  bmme_flags;
 			u32 reserved_lkey;
@@ -219,8 +219,7 @@ void mthca_cmd_event(struct mthca_dev *dev, u16 token,
 
 int mthca_SYS_EN(struct mthca_dev *dev, u8 *status);
 int mthca_SYS_DIS(struct mthca_dev *dev, u8 *status);
-int mthca_MAP_FA(struct mthca_dev *dev, int count,
-		 struct scatterlist *sglist, u8 *status);
+int mthca_MAP_FA(struct mthca_dev *dev, struct mthca_icm *icm, u8 *status);
 int mthca_UNMAP_FA(struct mthca_dev *dev, u8 *status);
 int mthca_RUN_FW(struct mthca_dev *dev, u8 *status);
 int mthca_QUERY_FW(struct mthca_dev *dev, u8 *status);

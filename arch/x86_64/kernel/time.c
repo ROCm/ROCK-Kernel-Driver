@@ -955,16 +955,19 @@ void __init time_init_smp(void)
 
 __setup("report_lost_ticks", time_setup);
 
-static long clock_cmos_diff, sleep_start;
+static long clock_cmos_diff;
+static unsigned long sleep_start;
 
 static int timer_suspend(struct sys_device *dev, u32 state)
 {
 	/*
 	 * Estimate time zone so that set_time can update the clock
 	 */
-	clock_cmos_diff = -get_cmos_time();
+	long cmos_time =  get_cmos_time();
+
+	clock_cmos_diff = -cmos_time;
 	clock_cmos_diff += get_seconds();
-	sleep_start = jiffies;
+	sleep_start = cmos_time;
 	return 0;
 }
 
@@ -973,7 +976,7 @@ static int timer_resume(struct sys_device *dev)
 	unsigned long flags;
 	unsigned long sec;
 	unsigned long ctime = get_cmos_time();
-	unsigned long sleep_length = ctime - sleep_start;
+	unsigned long sleep_length = (ctime - sleep_start) * HZ;
 
 	if (vxtime.hpet_address)
 		hpet_reenable();
@@ -983,7 +986,8 @@ static int timer_resume(struct sys_device *dev)
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
 	write_sequnlock_irqrestore(&xtime_lock,flags);
-	jiffies += sleep_length * HZ;
+	jiffies += sleep_length;
+	wall_jiffies += sleep_length;
 	return 0;
 }
 

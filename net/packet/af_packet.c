@@ -146,7 +146,7 @@ dev->hard_header == NULL (ll header is added by device, we cannot control it)
 
 /* List of all packet sockets. */
 static HLIST_HEAD(packet_sklist);
-static rwlock_t packet_sklist_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(packet_sklist_lock);
 
 static atomic_t packet_socks_nr;
 

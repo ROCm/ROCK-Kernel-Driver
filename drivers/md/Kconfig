@@ -200,7 +200,7 @@ config DM_CRYPT
 
 	  Information on how to use dm-crypt can be found on
 
-	  http://www.saout.de/misc/dm-crypt/
+	  <http://www.saout.de/misc/dm-crypt/>
 
 	  To compile this code as a module, choose M here: the module will
 	  be called dm-crypt.

@@ -135,7 +135,7 @@ static void ebt_ulog(const struct sk_buff *skb, unsigned int hooknr,
 
 	size = NLMSG_SPACE(sizeof(*pm) + copy_len);
 	if (size > nlbufsiz) {
-		PRINTR("ebt_ulog: Size %d needed, but nlbufsiz=%d\n",
+		PRINTR("ebt_ulog: Size %Zd needed, but nlbufsiz=%d\n",
 		       size, nlbufsiz);
 		return;
 	}
@@ -255,7 +255,7 @@ static int __init init(void)
 		init_timer(&ulog_buffers[i].timer);
 		ulog_buffers[i].timer.function = ulog_timer;
 		ulog_buffers[i].timer.data = i;
-		ulog_buffers[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&ulog_buffers[i].lock);
 	}
 
 	ebtulognl = netlink_kernel_create(NETLINK_NFLOG, NULL);

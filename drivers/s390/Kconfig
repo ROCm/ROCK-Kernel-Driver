@@ -162,7 +162,7 @@ config S390_TAPE_BLOCK
 	  devices using the block device interface.  This interface is similar
 	  to CD-ROM devices on other platforms.  The tapes can only be
 	  accessed read-only when using this interface.  Have a look at
-	  Documentation/s390/TAPE for further information about creating
+	  <file:Documentation/s390/TAPE> for further information about creating
 	  volumes for and using this interface.  It is safe to say "Y" here.
 
 comment "S/390 tape hardware support"

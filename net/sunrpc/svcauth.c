@@ -28,7 +28,7 @@
 extern struct auth_ops svcauth_null;
 extern struct auth_ops svcauth_unix;
 
-static spinlock_t authtab_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(authtab_lock);
 static struct auth_ops	*authtab[RPC_AUTH_MAXFLAVOR] = {
 	[0] = &svcauth_null,
 	[1] = &svcauth_unix,

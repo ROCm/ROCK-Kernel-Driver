@@ -310,7 +310,7 @@ static int tbf_change(struct Qdisc* sch, struct rtattr *opt)
 	struct Qdisc *child = NULL;
 	int max_size,n;
 
-	if (rtattr_parse(tb, TCA_TBF_PTAB, RTA_DATA(opt), RTA_PAYLOAD(opt)) ||
+	if (rtattr_parse_nested(tb, TCA_TBF_PTAB, opt) ||
 	    tb[TCA_TBF_PARMS-1] == NULL ||
 	    RTA_PAYLOAD(tb[TCA_TBF_PARMS-1]) < sizeof(*qopt))
 		goto done;

@@ -220,8 +220,6 @@ extern int dn_username2sockaddr(unsigned char *data, int len, struct sockaddr_dn
 
 extern void dn_start_slow_timer(struct sock *sk);
 extern void dn_stop_slow_timer(struct sock *sk);
-extern void dn_start_fast_timer(struct sock *sk);
-extern void dn_stop_fast_timer(struct sock *sk);
 
 extern dn_address decnet_address;
 extern int decnet_debug_level;

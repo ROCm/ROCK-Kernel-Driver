@@ -31,6 +31,7 @@
 #include <linux/spinlock.h>
 #include <linux/preempt.h>
 #include <asm/kdebug.h>
+#include <asm/desc.h>
 
 /* kprobe_status settings */
 #define KPROBE_HIT_ACTIVE	0x00000001
@@ -101,10 +102,8 @@ static int kprobe_handler(struct pt_regs *regs)
 	if ((regs->xcs & 4) && (current->mm)) {
 		lp = (unsigned long *) ((unsigned long)((regs->xcs >> 3) * 8)
 					+ (char *) current->mm->context.ldt);
-		addr = (kprobe_opcode_t *) ((((*lp) >> 16 &  0x0000ffff)
-				| (*(lp +1) & 0xff000000)
-				| ((*(lp +1) << 16) & 0x00ff0000))
-				+ regs->eip - sizeof(kprobe_opcode_t));
+		addr = (kprobe_opcode_t *) (get_desc_base(lp) + regs->eip -
+						sizeof(kprobe_opcode_t));
 	} else {
 		addr = (kprobe_opcode_t *)(regs->eip - sizeof(kprobe_opcode_t));
 	}

@@ -34,20 +34,20 @@ static struct protocol_struct {
 	unsigned int pid;
 	int (*func)(struct sk_buff *, ax25_cb *);
 } *protocol_list = NULL;
-static rwlock_t protocol_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(protocol_list_lock);
 
 static struct linkfail_struct {
 	struct linkfail_struct *next;
 	void (*func)(ax25_cb *, int);
 } *linkfail_list = NULL;
-static spinlock_t linkfail_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(linkfail_lock);
 
 static struct listen_struct {
 	struct listen_struct *next;
 	ax25_address  callsign;
 	struct net_device *dev;
 } *listen_list = NULL;
-static spinlock_t listen_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(listen_lock);
 
 int ax25_protocol_register(unsigned int pid,
 	int (*func)(struct sk_buff *, ax25_cb *))

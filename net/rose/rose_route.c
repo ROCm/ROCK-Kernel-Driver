@@ -40,11 +40,11 @@
 static unsigned int rose_neigh_no = 1;
 
 static struct rose_node  *rose_node_list;
-static spinlock_t rose_node_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rose_node_list_lock);
 static struct rose_neigh *rose_neigh_list;
-static spinlock_t rose_neigh_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rose_neigh_list_lock);
 static struct rose_route *rose_route_list;
-static spinlock_t rose_route_list_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rose_route_list_lock);
 
 struct rose_neigh *rose_loopback_neigh;
 

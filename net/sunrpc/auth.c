@@ -89,7 +89,7 @@ rpcauth_destroy(struct rpc_auth *auth)
 	kfree(auth);
 }
 
-static spinlock_t rpc_credcache_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rpc_credcache_lock);
 
 /*
  * Initialize RPC credential cache

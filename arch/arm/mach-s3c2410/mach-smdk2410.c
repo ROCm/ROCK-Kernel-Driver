@@ -97,6 +97,7 @@ static struct s3c24xx_board smdk2410_board __initdata = {
 void __init smdk2410_map_io(void)
 {
 	s3c24xx_init_io(smdk2410_iodesc, ARRAY_SIZE(smdk2410_iodesc));
+	s3c24xx_init_clocks(0);
 	s3c24xx_init_uarts(smdk2410_uartcfgs, ARRAY_SIZE(smdk2410_uartcfgs));
 	s3c24xx_set_board(&smdk2410_board);
 }

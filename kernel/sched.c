@@ -2383,13 +2383,17 @@ void account_system_time(struct task_struct *p, int hardirq_offset,
 void account_steal_time(struct task_struct *p, cputime_t steal)
 {
 	struct cpu_usage_stat *cpustat = &kstat_this_cpu.cpustat;
-	cputime64_t steal64 = cputime_to_cputime64(steal);
+	cputime64_t tmp = cputime_to_cputime64(steal);
 	runqueue_t *rq = this_rq();
 
-	if (p == rq->idle)
-		cpustat->system = cputime64_add(cpustat->system, steal64);
-	else
-		cpustat->steal = cputime64_add(cpustat->steal, steal64);
+	if (p == rq->idle) {
+		p->stime = cputime_add(p->stime, steal);
+		if (atomic_read(&rq->nr_iowait) > 0)
+			cpustat->iowait = cputime64_add(cpustat->iowait, tmp);
+		else
+			cpustat->idle = cputime64_add(cpustat->idle, tmp);
+	} else
+		cpustat->steal = cputime64_add(cpustat->steal, tmp);
 }
 
 /*
@@ -3186,6 +3190,15 @@ int task_nice(const task_t *p)
 {
 	return TASK_NICE(p);
 }
+
+/*
+ * The only users of task_nice are binfmt_elf and binfmt_elf32.
+ * binfmt_elf is no longer modular, but binfmt_elf32 still is.
+ * Therefore, task_nice is needed if there is a compat_mode.
+ */
+#ifdef CONFIG_COMPAT
+EXPORT_SYMBOL_GPL(task_nice);
+#endif
 
 /**
  * idle_cpu - is a given cpu idle currently?

@@ -298,8 +298,9 @@ __SYSCALL(__NR_utime, sys_utime)
 #define __NR_mknod                             133
 __SYSCALL(__NR_mknod, sys_mknod)
 
+/* Only needed for a.out */
 #define __NR_uselib                            134
-__SYSCALL(__NR_uselib, sys_uselib)
+__SYSCALL(__NR_uselib, sys_ni_syscall)
 #define __NR_personality                       135
 __SYSCALL(__NR_personality, sys_personality)
 

@@ -15,7 +15,6 @@
 #include <linux/jffs2.h>
 #include <linux/mtd/mtd.h>
 #include <linux/completion.h>
-#include <linux/suspend.h>
 #include "nodelist.h"
 
 
@@ -93,12 +92,8 @@ static int jffs2_garbage_collect_thread(void *_c)
 			schedule();
 		}
 
-		if (current->flags & PF_FREEZE) {
-			refrigerator(0);
-			/* refrigerator() should recalc sigpending for us
-			   but doesn't. No matter - allow_signal() will. */
+		if (try_to_freeze(0))
 			continue;
-		}
 
 		cond_resched();
 

@@ -19,7 +19,7 @@ extern ctl_table ipv6_icmp_table[];
 
 #ifdef CONFIG_SYSCTL
 
-ctl_table ipv6_table[] = {
+static ctl_table ipv6_table[] = {
 	{
 		.ctl_name	= NET_IPV6_ROUTE,
 		.procname	= "route",

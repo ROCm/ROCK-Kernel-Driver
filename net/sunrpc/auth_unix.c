@@ -187,7 +187,7 @@ static int
 unx_refresh(struct rpc_task *task)
 {
 	task->tk_msg.rpc_cred->cr_flags |= RPCAUTH_CRED_UPTODATE;
-	return task->tk_status = -EACCES;
+	return 0;
 }
 
 static u32 *

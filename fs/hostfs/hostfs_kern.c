@@ -15,7 +15,6 @@
 #include <linux/pagemap.h>
 #include <linux/blkdev.h>
 #include <linux/list.h>
-#include <linux/buffer_head.h>
 #include <linux/root_dev.h>
 #include <linux/statfs.h>
 #include <linux/kdev_t.h>

@@ -18,6 +18,9 @@
  *  Processor information obtained from Chapter 9 (Power and Thermal Management)
  *  of the "BIOS and Kernel Developer's Guide for the AMD Athlon 64 and AMD
  *  Opteron Processors" available for download from www.amd.com
+ *
+ *  Tables for specific CPUs can be infrerred from
+ *	http://www.amd.com/us-en/assets/content_type/white_papers_and_tech_docs/30430.pdf
  */
 
 #include <linux/kernel.h>
@@ -65,7 +68,12 @@ static u32 find_millivolts_from_vid(struct powernow_k8_data *data, u32 vid)
 	return 1550-vid*25;
 }
 
-/* Return the vco fid for an input fid */
+/* Return the vco fid for an input fid
+ *
+ * Each "low" fid has corresponding "high" fid, and you can get to "low" fids
+ * only from corresponding high fids. This returns "high" fid corresponding to
+ * "low" one.
+ */
 static u32 convert_fid_to_vco_fid(u32 fid)
 {
 	if (fid < HI_FID_TABLE_BOTTOM) {
@@ -278,7 +286,7 @@ static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid
 			return 1;
 	}
 
-	while (rvosteps > 0) {
+	while ((rvosteps > 0)  && ((data->rvo + data->currvid) > reqvid)) {
 		if (data->currvid == 0) {
 			rvosteps = 0;
 		} else {
@@ -307,10 +315,7 @@ static int core_voltage_pre_transition(struct powernow_k8_data *data, u32 reqvid
 /* Phase 2 - core frequency transition */
 static int core_frequency_transition(struct powernow_k8_data *data, u32 reqfid)
 {
-	u32 vcoreqfid;
-	u32 vcocurrfid;
-	u32 vcofiddiff;
-	u32 savevid = data->currvid;
+	u32 vcoreqfid, vcocurrfid, vcofiddiff, savevid = data->currvid;
 
 	if ((reqfid < HI_FID_TABLE_BOTTOM) && (data->currfid < HI_FID_TABLE_BOTTOM)) {
 		printk(KERN_ERR PFX "ph2: illegal lo-lo transition 0x%x 0x%x\n",
@@ -498,7 +503,7 @@ static int check_pst_table(struct powernow_k8_data *data, struct pst_s *pst, u8 
 		    || (pst[j].fid & 1)
 		    || (j && (pst[j].fid < HI_FID_TABLE_BOTTOM))) {
 			/* Only first fid is allowed to be in "low" range */
-			printk(KERN_ERR PFX "fid %d invalid : 0x%x\n", j, pst[j].fid);
+			printk(KERN_ERR PFX "two low fids - %d : 0x%x\n", j, pst[j].fid);
 			return -EINVAL;
 		}
 		if (pst[j].fid < lastfid)
@@ -618,7 +623,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 			return -ENODEV;
 		}
 
-		data->vstable = psb->voltagestabilizationtime;
+		data->vstable = psb->vstable;
 		dprintk("voltage stabilization time: %d(*20us)\n", data->vstable);
 
 		dprintk("flags2: 0x%x\n", psb->flags2);
@@ -632,8 +637,8 @@ static int find_psb_table(struct powernow_k8_data *data)
 		dprintk("isochronous relief time: %d\n", data->irt);
 		dprintk("maximum voltage step: %d - 0x%x\n", mvs, data->vidmvs);
 
-		dprintk("numpst: 0x%x\n", psb->numpst);
-		cpst = psb->numpst;
+		dprintk("numpst: 0x%x\n", psb->num_tables);
+		cpst = psb->num_tables;
 		if ((psb->cpuid == 0x00000fc0) || (psb->cpuid == 0x00000fe0) ){
 			thiscpuid = cpuid_eax(CPUID_PROCESSOR_SIGNATURE);
 			if ((thiscpuid == 0x00000fc0) || (thiscpuid == 0x00000fe0) ) {
@@ -651,7 +656,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 		dprintk("maxvid: 0x%x\n", psb->maxvid);
 		maxvid = psb->maxvid;
 
-		data->numps = psb->numpstates;
+		data->numps = psb->numps;
 		dprintk("numpstates: 0x%x\n", data->numps);
 		return fill_powernow_table(data, (struct pst_s *)(psb+1), maxvid);
 	}
@@ -1010,6 +1015,7 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 	/* min/max the cpu is capable of */
 	if (cpufreq_frequency_table_cpuinfo(pol, data->powernow_table)) {
 		printk(KERN_ERR PFX "invalid powernow_table\n");
+		powernow_k8_cpu_exit_acpi(data);
 		kfree(data->powernow_table);
 		kfree(data);
 		return -EINVAL;
@@ -1027,6 +1033,7 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 err_out:
 	set_cpus_allowed(current, oldmask);
 	schedule();
+	powernow_k8_cpu_exit_acpi(data);
 
 	kfree(data);
 	return -ENODEV;

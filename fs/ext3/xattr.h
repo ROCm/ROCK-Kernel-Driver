@@ -16,7 +16,6 @@
 #define EXT3_XATTR_REFCOUNT_MAX		1024
 
 /* Name indexes */
-#define EXT3_XATTR_INDEX_MAX			10
 #define EXT3_XATTR_INDEX_USER			1
 #define EXT3_XATTR_INDEX_POSIX_ACL_ACCESS	2
 #define EXT3_XATTR_INDEX_POSIX_ACL_DEFAULT	3
@@ -30,6 +29,10 @@ struct ext3_xattr_header {
 	__le32	h_blocks;	/* number of disk blocks used */
 	__le32	h_hash;		/* hash value of all attributes */
 	__u32	h_reserved[4];	/* zero right now */
+};
+
+struct ext3_xattr_ibody_header {
+	__le32	h_magic;	/* magic number for identification */
 };
 
 struct ext3_xattr_entry {
@@ -65,8 +68,9 @@ extern struct xattr_handler ext3_xattr_security_handler;
 extern ssize_t ext3_listxattr(struct dentry *, char *, size_t);
 
 extern int ext3_xattr_get(struct inode *, int, const char *, void *, size_t);
+extern int ext3_xattr_list(struct inode *, char *, size_t);
 extern int ext3_xattr_set(struct inode *, int, const char *, const void *, size_t, int);
-extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *,const void *,size_t,int);
+extern int ext3_xattr_set_handle(handle_t *, struct inode *, int, const char *, const void *, size_t, int);
 
 extern void ext3_xattr_delete_inode(handle_t *, struct inode *);
 extern void ext3_xattr_put_super(struct super_block *);
@@ -81,6 +85,12 @@ extern struct xattr_handler *ext3_xattr_handlers[];
 static inline int
 ext3_xattr_get(struct inode *inode, int name_index, const char *name,
 	       void *buffer, size_t size, int flags)
+{
+	return -EOPNOTSUPP;
+}
+
+static inline int
+ext3_xattr_list(struct inode *inode, void *buffer, size_t size)
 {
 	return -EOPNOTSUPP;
 }

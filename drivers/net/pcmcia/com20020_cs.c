@@ -115,12 +115,6 @@ module_param(backplane, int, 0);
 module_param(clockp, int, 0);
 module_param(clockm, int, 0);
 
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 MODULE_LICENSE("GPL");
 
 /*====================================================================*/
@@ -158,7 +152,7 @@ static dev_link_t *com20020_attach(void)
     dev_link_t *link;
     com20020_dev_t *info;
     struct net_device *dev;
-    int i, ret;
+    int ret;
     struct arcnet_local *lp;
     
     DEBUG(0, "com20020_attach()\n");
@@ -192,12 +186,7 @@ static dev_link_t *com20020_attach(void)
     link->io.NumPorts1 = 16;
     link->io.IOAddrLines = 16;
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->conf.Attributes = CONF_ENABLE_IRQ;
     link->conf.Vcc = 50;
     link->conf.IntType = INT_MEMORY_AND_IO;

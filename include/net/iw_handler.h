@@ -418,9 +418,6 @@ struct iw_public_data {
  * Those may be called only within the kernel.
  */
 
-/* Data needed by fs/compat_ioctl.c for 32->64 bit conversion */
-extern const char iw_priv_type_size[];
-
 /* First : function strictly used inside the kernel */
 
 /* Handle /proc/net/wireless, called in net/code/dev.c */

@@ -462,7 +462,7 @@ bad_area_nosemaphore:
 #ifdef CONFIG_IA32_EMULATION
 	/* 32bit vsyscall. map on demand. */
 	if (test_thread_flag(TIF_IA32) &&
-	    address >= 0xffffe000 && address < 0xffffe000 + PAGE_SIZE) { 
+	    address >= VSYSCALL32_BASE && address < VSYSCALL32_END) {
 		if (map_syscall32(mm, address) < 0)
 			goto out_of_memory2;
 		return;

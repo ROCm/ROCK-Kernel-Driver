@@ -3,6 +3,7 @@ SYSFS FILES
   For each InfiniBand device, the InfiniBand drivers create the
   following files under /sys/class/infiniband/<device name>:
 
+    node_type      - Node type (CA, switch or router)
     node_guid      - Node GUID
     sys_image_guid - System image GUID
 
@@ -25,6 +26,7 @@ SYSFS FILES
     sm_lid         - Subnet manager LID for port's subnet
     sm_sl          - Subnet manager SL for port's subnet
     state          - Port state (DOWN, INIT, ARMED, ACTIVE or ACTIVE_DEFER)
+    phys_state     - Port physical state (Sleep, Polling, LinkUp, etc)
 
   There is also a "counters" subdirectory, with files
 

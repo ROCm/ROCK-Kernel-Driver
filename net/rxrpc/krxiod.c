@@ -25,10 +25,10 @@ static DECLARE_COMPLETION(rxrpc_krxiod_dead);
 static atomic_t rxrpc_krxiod_qcount = ATOMIC_INIT(0);
 
 static LIST_HEAD(rxrpc_krxiod_transportq);
-static spinlock_t rxrpc_krxiod_transportq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rxrpc_krxiod_transportq_lock);
 
 static LIST_HEAD(rxrpc_krxiod_callq);
-static spinlock_t rxrpc_krxiod_callq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rxrpc_krxiod_callq_lock);
 
 static volatile int rxrpc_krxiod_die;
 

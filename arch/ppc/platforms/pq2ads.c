@@ -19,8 +19,8 @@
 #include <asm/mpc8260.h>
 
 void __init
-m82xx_board_init(void)
+m82xx_board_setup(void)
 {
 	/* Enable the 2nd UART port */
-        *(volatile uint *)(BCSR_ADDR + 4) &= ~BCSR1_RS232_EN2;
+	*(volatile uint *)(BCSR_ADDR + 4) &= ~BCSR1_RS232_EN2;
 }

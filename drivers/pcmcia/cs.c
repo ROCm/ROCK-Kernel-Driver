@@ -29,7 +29,6 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/device.h>
-#include <linux/suspend.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 
@@ -117,6 +116,11 @@ DECLARE_RWSEM(pcmcia_socket_list_rwsem);
 EXPORT_SYMBOL(pcmcia_socket_list);
 EXPORT_SYMBOL(pcmcia_socket_list_rwsem);
 
+
+#ifdef CONFIG_PCMCIA_PROBE
+/* mask ofIRQs already reserved by other cards, we should avoid using them */
+static u8 pcmcia_used_irq[NR_IRQS];
+#endif
 
 /*====================================================================
 
@@ -711,8 +715,7 @@ static int pccardd(void *__skt)
 		}
 
 		schedule();
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+		try_to_freeze(PF_FREEZE);
 
 		if (!skt->thread)
 			break;
@@ -1297,10 +1300,9 @@ int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
     }
 
 #ifdef CONFIG_PCMCIA_PROBE
-    if (req->AssignedIRQ != s->pci_irq)
-	undo_irq(req->Attributes, req->AssignedIRQ);
+    pcmcia_used_irq[req->AssignedIRQ]--;
 #endif
-    
+
     return CS_SUCCESS;
 } /* cs_release_irq */
 
@@ -1532,72 +1534,96 @@ int pcmcia_request_io(client_handle_t handle, io_req_t *req)
     
 ======================================================================*/
 
+#ifdef CONFIG_PCMCIA_PROBE
+static irqreturn_t test_action(int cpl, void *dev_id, struct pt_regs *regs)
+{
+	return IRQ_NONE;
+}
+#endif
+
 int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 {
-    struct pcmcia_socket *s;
-    config_t *c;
-    int ret = CS_IN_USE, irq = 0;
-    struct pcmcia_device *p_dev = handle_to_pdev(handle);
-    
-    if (CHECK_HANDLE(handle))
-	return CS_BAD_HANDLE;
-    s = SOCKET(handle);
-    if (!(s->state & SOCKET_PRESENT))
-	return CS_NO_CARD;
-    c = CONFIG(handle);
-    if (c->state & CONFIG_LOCKED)
-	return CS_CONFIGURATION_LOCKED;
-    if (c->state & CONFIG_IRQ_REQ)
-	return CS_IN_USE;
+	struct pcmcia_socket *s;
+	config_t *c;
+	int ret = CS_IN_USE, irq = 0;
+	struct pcmcia_device *p_dev = handle_to_pdev(handle);
+
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+	s = SOCKET(handle);
+	if (!(s->state & SOCKET_PRESENT))
+		return CS_NO_CARD;
+	c = CONFIG(handle);
+	if (c->state & CONFIG_LOCKED)
+		return CS_CONFIGURATION_LOCKED;
+	if (c->state & CONFIG_IRQ_REQ)
+		return CS_IN_USE;
 
 #ifdef CONFIG_PCMCIA_PROBE
-    if (s->irq.AssignedIRQ != 0) {
-	/* If the interrupt is already assigned, it must match */
-	irq = s->irq.AssignedIRQ;
-	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int mask = req->IRQInfo2 & s->irq_mask;
-	    ret = ((mask >> irq) & 1) ? 0 : CS_BAD_ARGS;
-	} else
-	    ret = ((req->IRQInfo1&IRQ_MASK) == irq) ? 0 : CS_BAD_ARGS;
-    } else {
-	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int try, mask = req->IRQInfo2 & s->irq_mask;
-	    for (try = 0; try < 2; try++) {
-		for (irq = 0; irq < 32; irq++)
-		    if ((mask >> irq) & 1) {
-			ret = try_irq(req->Attributes, irq, try);
-			if (ret == 0) break;
-		    }
-		if (ret == 0) break;
-	    }
+	if (s->irq.AssignedIRQ != 0) {
+		/* If the interrupt is already assigned, it must be the same */
+		irq = s->irq.AssignedIRQ;
 	} else {
-	    irq = req->IRQInfo1 & IRQ_MASK;
-	    ret = try_irq(req->Attributes, irq, 1);
+		int try;
+		u32 mask = s->irq_mask;
+		void *data = NULL;
+
+		for (try = 0; try < 64; try++) {
+			irq = try % 32;
+
+			/* marked as available by driver, and not blocked by userspace? */
+			if (!((mask >> irq) & 1))
+				continue;
+
+			/* avoid an IRQ which is already used by a PCMCIA card */
+			if ((try < 32) && pcmcia_used_irq[irq])
+				continue;
+
+			/* register the correct driver, if possible, of check whether
+			 * registering a dummy handle works, i.e. if the IRQ isn't
+			 * marked as used by the kernel resource management core */
+			ret = request_irq(irq,
+					  (req->Attributes & IRQ_HANDLE_PRESENT) ? req->Handler : test_action,
+					  ((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) ||
+					   (s->functions > 1) ||
+					   (irq == s->pci_irq)) ? SA_SHIRQ : 0,
+					  p_dev->dev.bus_id,
+					  (req->Attributes & IRQ_HANDLE_PRESENT) ? req->Instance : data);
+			if (!ret) {
+				if (!(req->Attributes & IRQ_HANDLE_PRESENT))
+					free_irq(irq, data);
+				break;
+			}
+		}
 	}
-    }
 #endif
-    if (ret != 0) {
-	if (!s->pci_irq)
-	    return ret;
-	irq = s->pci_irq;
-    }
+	if (ret) {
+		if (!s->pci_irq)
+			return ret;
+		irq = s->pci_irq;
+	}
 
-    if (req->Attributes & IRQ_HANDLE_PRESENT) {
-	if (request_irq(irq, req->Handler,
-			    ((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) || 
-			     (s->functions > 1) ||
-			     (irq == s->pci_irq)) ? SA_SHIRQ : 0,
-			     p_dev->dev.bus_id, req->Instance))
-	    return CS_IN_USE;
-    }
+	if (ret && req->Attributes & IRQ_HANDLE_PRESENT) {
+		if (request_irq(irq, req->Handler,
+				((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) ||
+				 (s->functions > 1) ||
+				 (irq == s->pci_irq)) ? SA_SHIRQ : 0,
+				p_dev->dev.bus_id, req->Instance))
+			return CS_IN_USE;
+	}
 
-    c->irq.Attributes = req->Attributes;
-    s->irq.AssignedIRQ = req->AssignedIRQ = irq;
-    s->irq.Config++;
-    
-    c->state |= CONFIG_IRQ_REQ;
-    handle->state |= CLIENT_IRQ_REQ;
-    return CS_SUCCESS;
+	c->irq.Attributes = req->Attributes;
+	s->irq.AssignedIRQ = req->AssignedIRQ = irq;
+	s->irq.Config++;
+
+	c->state |= CONFIG_IRQ_REQ;
+	handle->state |= CLIENT_IRQ_REQ;
+
+#ifdef CONFIG_PCMCIA_PROBE
+	pcmcia_used_irq[irq]++;
+#endif
+
+	return CS_SUCCESS;
 } /* pcmcia_request_irq */
 
 /*======================================================================

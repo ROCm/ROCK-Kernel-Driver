@@ -54,18 +54,10 @@ MODULE_LICENSE("Dual MPL/GPL");
 
 /* Module parameters */
 
-/* The old way: bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static uint irq_mask = 0xdeb8;
-/* Newer, simpler way of listing specific interrupts */
-static int irq_list[4] = { -1 };
-
 /* Some D-Link cards have buggy CIS. They do work at 5v properly, but
  * don't have any CIS entry for it. This workaround it... */
 static int ignore_cis_vcc; /* = 0 */
 
-module_param(irq_mask, int, 0);
-module_param_array(irq_list, int, NULL, 0);
 module_param(ignore_cis_vcc, int, 0);
 
 /********************************************************************/
@@ -161,7 +153,7 @@ orinoco_cs_attach(void)
 	struct orinoco_pccard *card;
 	dev_link_t *link;
 	client_reg_t client_reg;
-	int ret, i;
+	int ret;
 
 	dev = alloc_orinocodev(sizeof(*card), orinoco_cs_hard_reset);
 	if (! dev)
@@ -175,12 +167,7 @@ orinoco_cs_attach(void)
 
 	/* Interrupt setup */
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	if (irq_list[0] == -1)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < 4; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->irq.Handler = NULL;
 
 	/* General socket configuration defaults can go here.  In this
@@ -415,16 +402,8 @@ orinoco_cs_config(dev_link_t *link)
 	 * the irq structure is initialized.
 	 */
 	if (link->conf.Attributes & CONF_ENABLE_IRQ) {
-		int i;
-
 		link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-		link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-		if (irq_list[0] == -1)
-			link->irq.IRQInfo2 = irq_mask;
-		else
-			for (i=0; i<4; i++)
-				link->irq.IRQInfo2 |= 1 << irq_list[i];
-		
+		link->irq.IRQInfo1 = IRQ_LEVEL_ID;
   		link->irq.Handler = orinoco_interrupt; 
   		link->irq.Instance = dev; 
 		

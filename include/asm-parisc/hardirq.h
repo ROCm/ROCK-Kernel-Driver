@@ -18,6 +18,7 @@
 #include <linux/config.h>
 #include <linux/threads.h>
 #include <linux/cache.h>
+#include <linux/irq.h>
 
 typedef struct {
 	unsigned long __softirq_pending; /* set_bit is used on this */
@@ -28,11 +29,13 @@ typedef struct {
 #define HARDIRQ_BITS	16
 
 /*
- * The hardirq mask has to be large enough to have space for potentially all IRQ sources
- * in the system nesting on a single CPU:
+ * The hardirq mask has to be large enough to have space for potentially all
+ * IRQ sources in the system nesting on a single CPU:
  */
 #if (1 << HARDIRQ_BITS) < NR_IRQS
 # error HARDIRQ_BITS is too low!
 #endif
+
+void ack_bad_irq(unsigned int irq);
 
 #endif /* _PARISC_HARDIRQ_H */

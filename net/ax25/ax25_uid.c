@@ -42,7 +42,7 @@
  */
 
 static ax25_uid_assoc *ax25_uid_list;
-static rwlock_t ax25_uid_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ax25_uid_lock);
 
 int ax25_uid_policy = 0;
 

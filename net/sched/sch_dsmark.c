@@ -125,8 +125,7 @@ static int dsmark_change(struct Qdisc *sch, u32 classid, u32 parent,
 	    "arg 0x%lx\n",sch,p,classid,parent,*arg);
 	if (*arg > p->indices)
 		return -ENOENT;
-	if (!opt || rtattr_parse(tb, TCA_DSMARK_MAX, RTA_DATA(opt),
-				 RTA_PAYLOAD(opt)))
+	if (!opt || rtattr_parse_nested(tb, TCA_DSMARK_MAX, opt))
 		return -EINVAL;
 	if (tb[TCA_DSMARK_MASK-1]) {
 		if (!RTA_PAYLOAD(tb[TCA_DSMARK_MASK-1]))

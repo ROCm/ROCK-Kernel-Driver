@@ -117,7 +117,6 @@ struct dn_fib_table {
 extern void dn_fib_init(void);
 extern void dn_fib_cleanup(void);
 
-extern int dn_fib_rt_message(struct sk_buff *skb);
 extern int dn_fib_ioctl(struct socket *sock, unsigned int cmd, 
 			unsigned long arg);
 extern struct dn_fib_info *dn_fib_create_info(const struct rtmsg *r, 

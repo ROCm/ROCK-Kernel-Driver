@@ -186,7 +186,7 @@ int ip_cmsg_send(struct msghdr *msg, struct ipcm_cookie *ipc)
    sent to multicast group to reach destination designated router.
  */
 struct ip_ra_chain *ip_ra_chain;
-rwlock_t ip_ra_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(ip_ra_lock);
 
 int ip_ra_control(struct sock *sk, unsigned char on, void (*destructor)(struct sock *))
 {

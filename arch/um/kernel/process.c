@@ -371,9 +371,9 @@ void forward_pending_sigio(int target)
 		kill(target, SIGIO);
 }
 
-int can_do_skas(void)
-{
 #ifdef UML_CONFIG_MODE_SKAS
+static inline int check_skas3_ptrace_support(void)
+{
 	struct ptrace_faultinfo fi;
 	void *stack;
 	int pid, n, ret = 1;
@@ -382,29 +382,46 @@ int can_do_skas(void)
 	pid = start_ptraced_child(&stack);
 
 	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
-	if(n < 0){
+	if (n < 0) {
 		if(errno == EIO)
 			printf("not found\n");
-		else printf("No (unexpected errno - %d)\n", errno);
+		else {
+			perror("not found");
+		}
 		ret = 0;
+	} else {
+		printf("found\n");
 	}
-	else printf("found\n");
 
 	init_registers(pid);
 	stop_ptraced_child(pid, stack, 1, 1);
 
+	return(ret);
+}
+
+int can_do_skas(void)
+{
+	int ret = 1;
+
 	printf("Checking for /proc/mm...");
-	if(os_access("/proc/mm", OS_ACC_W_OK) < 0){
+	if (os_access("/proc/mm", OS_ACC_W_OK) < 0) {
 		printf("not found\n");
 		ret = 0;
+		goto out;
+	} else {
+		printf("found\n");
 	}
-	else printf("found\n");
 
-	return(ret);
-#else
-	return(0);
-#endif
+	ret = check_skas3_ptrace_support();
+out:
+	return ret;
 }
+#else
+int can_do_skas(void)
+{
+	return(0);
+}
+#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -134,8 +134,8 @@ EXPORT_SYMBOL(csum_partial);
  */
 
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len,
-			    int sum, int *csum_err)
+csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
+			    int len, int sum, int *csum_err)
 {
 	/*
 	 * GCC doesn't like more than 10 operands for the asm
@@ -326,7 +326,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
  */
 
 unsigned int
-csum_partial_copy_nocheck(const char *src, char *dst, int len, int sum)
+csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst, int len, int sum)
 {
 	unsigned long tmp1, tmp2;
 	__asm__("movel %2,%4\n\t"

@@ -46,7 +46,6 @@
 #include <linux/time.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/suspend.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/usb.h>
