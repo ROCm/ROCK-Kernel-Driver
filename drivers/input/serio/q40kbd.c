@@ -4,7 +4,7 @@
  *  Copyright (c) 2000-2001 Vojtech Pavlik
  *
  *  Based on the work of:
- *	Richard Zidlicky <Richard.Zidlicky@stud.informatik.uni-erlangen.de>	
+ *	Richard Zidlicky <Richard.Zidlicky@stud.informatik.uni-erlangen.de>
  */
 
 /*
@@ -47,23 +47,12 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Q40 PS/2 keyboard controller driver");
 MODULE_LICENSE("GPL");
 
-
-static int q40kbd_open(struct serio *port)
-{
-	return 0;
-}
-static void q40kbd_close(struct serio *port)
-{
-}
-
 static struct serio q40kbd_port =
 {
 	.type	= SERIO_8042,
 	.name	= "Q40 kbd port",
 	.phys	= "Q40",
 	.write	= NULL,
-	.open	= q40kbd_open,
-	.close	= q40kbd_close,
 };
 
 static irqreturn_t q40kbd_interrupt(int irq, void *dev_id,

@@ -9,7 +9,6 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-extern void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
 extern int synaptics_detect(struct psmouse *psmouse);
 extern int synaptics_init(struct psmouse *psmouse);
 extern void synaptics_reset(struct psmouse *psmouse);
@@ -44,13 +43,14 @@ extern void synaptics_reset(struct psmouse *psmouse);
 
 /* synaptics capability bits */
 #define SYN_CAP_EXTENDED(c)		((c) & (1 << 23))
+#define SYN_CAP_MIDDLE_BUTTON(c)	((c) & (1 << 18))
 #define SYN_CAP_PASS_THROUGH(c)		((c) & (1 << 7))
 #define SYN_CAP_SLEEP(c)		((c) & (1 << 4))
 #define SYN_CAP_FOUR_BUTTON(c)		((c) & (1 << 3))
 #define SYN_CAP_MULTIFINGER(c)		((c) & (1 << 1))
 #define SYN_CAP_PALMDETECT(c)		((c) & (1 << 0))
 #define SYN_CAP_VALID(c)		((((c) & 0x00ff00) >> 8) == 0x47)
-#define SYN_EXT_CAP_REQUESTS(c)		((((c) & 0x700000) >> 20) == 1)
+#define SYN_EXT_CAP_REQUESTS(c)		(((c) & 0x700000) >> 20)
 #define SYN_CAP_MULTI_BUTTON_NO(ec)	(((ec) & 0x00f000) >> 12)
 
 /* synaptics modes query bits */
@@ -86,18 +86,12 @@ struct synaptics_hw_state {
 	int y;
 	int z;
 	int w;
-	int left;
-	int right;
-	int up;
-	int down;
-	int b0;
-	int b1;
-	int b2;
-	int b3;
-	int b4;
-	int b5;
-	int b6;
-	int b7;
+	unsigned int left:1;
+	unsigned int right:1;
+	unsigned int middle:1;
+	unsigned int up:1;
+	unsigned int down:1;
+	unsigned char ext_buttons;
 };
 
 struct synaptics_data {
@@ -108,7 +102,6 @@ struct synaptics_data {
 	unsigned long int identity;		/* Identification */
 
 	/* Data for normal processing */
-	unsigned int out_of_sync;		/* # of packets out of sync */
 	int old_w;				/* Previous w value */
 	unsigned char pkt_type;			/* packet type - old, new, etc */
 };

@@ -26,7 +26,6 @@
 #include <linux/input.h>
 #include <linux/serio.h>
 #include <linux/workqueue.h>
-#include <linux/timer.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
 MODULE_DESCRIPTION("AT and PS/2 keyboard driver");
@@ -165,32 +164,48 @@ static unsigned char atkbd_scroll_keys[5][2] = {
 	{ ATKBD_SCR_CLICK, 0x60 },
 };
 
+#define ATKBD_FLAG_ACK		0	/* Waiting for ACK/NAK */
+#define ATKBD_FLAG_CMD		1	/* Waiting for command to finish */
+#define ATKBD_FLAG_CMD1		2	/* First byte of command response */
+#define ATKBD_FLAG_ID		3	/* First byte is not keyboard ID */
+#define ATKBD_FLAG_ENABLED	4	/* Waining for init to finish */
+
 /*
  * The atkbd control structure
  */
 
 struct atkbd {
-	unsigned char keycode[512];
-	struct input_dev dev;
-	struct serio *serio;
-	struct timer_list timer;
+
+	/* Written only during init */
 	char name[64];
 	char phys[32];
+	struct serio *serio;
+	struct input_dev dev;
+
+	unsigned char set;
+	unsigned short id;
+	unsigned char keycode[512];
+	unsigned char translated;
+	unsigned char extra;
+	unsigned char write;
+
+	/* Protected by FLAG_ACK */
+	unsigned char nak;
+
+	/* Protected by FLAG_CMD */
 	unsigned char cmdbuf[4];
 	unsigned char cmdcnt;
-	unsigned char set;
-	unsigned char extra;
-	unsigned char release;
-	int lastkey;
-	volatile signed char ack;
+
+	/* Accessed only from interrupt */
 	unsigned char emul;
-	unsigned short id;
-	unsigned char write;
-	unsigned char translated;
 	unsigned char resend;
+	unsigned char release;
 	unsigned char bat_xl;
 	unsigned int last;
 	unsigned long time;
+
+	/* Flags */
+	unsigned long flags;
 };
 
 static void atkbd_report_key(struct input_dev *dev, struct pt_regs *regs, int code, int value)
@@ -223,7 +238,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 
 #if !defined(__i386__) && !defined (__x86_64__)
 	if ((flags & (SERIO_FRAME | SERIO_PARITY)) && (~flags & SERIO_TIMEOUT) && !atkbd->resend && atkbd->write) {
-		printk("atkbd.c: frame/parity error: %02x\n", flags);
+		printk(KERN_WARNING "atkbd.c: frame/parity error: %02x\n", flags);
 		serio_write(serio, ATKBD_CMD_RESEND);
 		atkbd->resend = 1;
 		goto out;
@@ -233,20 +248,44 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->resend = 0;
 #endif
 
-	if (!atkbd->ack)
+	if (test_bit(ATKBD_FLAG_ACK, &atkbd->flags))
 		switch (code) {
 			case ATKBD_RET_ACK:
-				atkbd->ack = 1;
+				atkbd->nak = 0;
+				if (atkbd->cmdcnt) {
+					set_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+					set_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
+					set_bit(ATKBD_FLAG_ID, &atkbd->flags);
+				}
+				clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 				goto out;
 			case ATKBD_RET_NAK:
-				atkbd->ack = -1;
+				atkbd->nak = 1;
+				clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 				goto out;
 		}
 
-	if (atkbd->cmdcnt) {
-		atkbd->cmdbuf[--atkbd->cmdcnt] = code;
+	if (test_bit(ATKBD_FLAG_CMD, &atkbd->flags)) {
+
+		atkbd->cmdcnt--;
+		atkbd->cmdbuf[atkbd->cmdcnt] = code;
+
+		if (atkbd->cmdcnt == 1) {
+		    	if (code != 0xab && code != 0xac)
+				clear_bit(ATKBD_FLAG_ID, &atkbd->flags);
+			clear_bit(ATKBD_FLAG_CMD1, &atkbd->flags);
+		}
+
+		if (!atkbd->cmdcnt)
+			clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+
 		goto out;
 	}
+
+	if (!test_bit(ATKBD_FLAG_ENABLED, &atkbd->flags))
+		goto out;
+
+	input_event(&atkbd->dev, EV_MSC, MSC_RAW, code);
 
 	if (atkbd->translated) {
 
@@ -266,6 +305,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 
 	switch (code) {
 		case ATKBD_RET_BAT:
+			clear_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
 			serio_rescan(atkbd->serio);
 			goto out;
 		case ATKBD_RET_EMUL0:
@@ -300,15 +340,20 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_KEY_NULL:
 			break;
 		case ATKBD_KEY_UNKNOWN:
-			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x on %s).\n",
-				atkbd->release ? "released" : "pressed",
-				atkbd->translated ? "translated" : "raw",
-				atkbd->set, code, serio->phys);
-			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
-				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
-					" hardware directly.\n");
-			else
-				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' to make it known.\n",						code & 0x80 ? "e0" : "", code & 0x7f);
+			if (data == ATKBD_RET_ACK || data == ATKBD_RET_NAK) {
+				printk(KERN_WARNING "atkbd.c: Spurious %s on %s. Some program, "
+				       "like XFree86, might be trying access hardware directly.\n",
+				       data == ATKBD_RET_ACK ? "ACK" : "NAK", serio->phys);
+			} else {
+				printk(KERN_WARNING "atkbd.c: Unknown key %s "
+				       "(%s set %d, code %#x on %s).\n",
+				       atkbd->release ? "released" : "pressed",
+				       atkbd->translated ? "translated" : "raw",
+				       atkbd->set, code, serio->phys);
+				printk(KERN_WARNING "atkbd.c: Use 'setkeycodes %s%02x <keycode>' "
+				       "to make it known.\n",
+				       code & 0x80 ? "e0" : "", code & 0x7f);
+			}
 			break;
 		case ATKBD_SCR_1:
 			scroll = 1 - atkbd->release * 2;
@@ -367,18 +412,20 @@ out:
 
 static int atkbd_sendbyte(struct atkbd *atkbd, unsigned char byte)
 {
-	int timeout = 20000; /* 200 msec */
-	atkbd->ack = 0;
+	int timeout = 200000; /* 200 msec */
 
 #ifdef ATKBD_DEBUG
 	printk(KERN_DEBUG "atkbd.c: Sent: %02x\n", byte);
 #endif
+
+	set_bit(ATKBD_FLAG_ACK, &atkbd->flags);
+	clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
 	if (serio_write(atkbd->serio, byte))
 		return -1;
+	while (test_bit(ATKBD_FLAG_ACK, &atkbd->flags) && timeout--) udelay(1);
+	clear_bit(ATKBD_FLAG_ACK, &atkbd->flags);
 
-	while (!atkbd->ack && timeout--) udelay(10);
-
-	return -(atkbd->ack <= 0);
+	return -atkbd->nak;
 }
 
 /*
@@ -396,7 +443,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 	atkbd->cmdcnt = receive;
 
 	if (command == ATKBD_CMD_RESET_BAT)
-		timeout = 2000000; /* 2 sec */
+		timeout = 4000000; /* 4 sec */
 
 	if (receive && param)
 		for (i = 0; i < receive; i++)
@@ -404,38 +451,40 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
-			return (atkbd->cmdcnt = 0) - 1;
+			return -1;
 
 	for (i = 0; i < send; i++)
 		if (atkbd_sendbyte(atkbd, param[i]))
-			return (atkbd->cmdcnt = 0) - 1;
+			return -1;
 
-	while (atkbd->cmdcnt && timeout--) {
+	while (test_bit(ATKBD_FLAG_CMD, &atkbd->flags) && timeout--) {
 
-		if (atkbd->cmdcnt == 1 &&
-		    command == ATKBD_CMD_RESET_BAT && timeout > 100000)
-			timeout = 100000;
+		if (!test_bit(ATKBD_FLAG_CMD1, &atkbd->flags)) {
+		    
+			if (command == ATKBD_CMD_RESET_BAT && timeout > 100000)
+				timeout = 100000;
 
-		if (atkbd->cmdcnt == 1 && command == ATKBD_CMD_GETID &&
-		    atkbd->cmdbuf[1] != 0xab && atkbd->cmdbuf[1] != 0xac) {
-			atkbd->cmdcnt = 0;
-			break;
+			if (command == ATKBD_CMD_GETID && !test_bit(ATKBD_FLAG_ID, &atkbd->flags)) {
+				clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
+				atkbd->cmdcnt = 0;
+				break;
+			}
 		}
 
 		udelay(1);
 	}
+
+	clear_bit(ATKBD_FLAG_CMD, &atkbd->flags);
 
 	if (param)
 		for (i = 0; i < receive; i++)
 			param[i] = atkbd->cmdbuf[(receive - 1) - i];
 
 	if (command == ATKBD_CMD_RESET_BAT && atkbd->cmdcnt == 1)
-		atkbd->cmdcnt = 0;
+		return 0;
 
-	if (atkbd->cmdcnt) {
-		atkbd->cmdcnt = 0;
+	if (atkbd->cmdcnt)
 		return -1;
-	}
 
 	return 0;
 }
@@ -663,6 +712,7 @@ static void atkbd_cleanup(struct serio *serio)
 static void atkbd_disconnect(struct serio *serio)
 {
 	struct atkbd *atkbd = serio->private;
+	clear_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
 	input_unregister_device(&atkbd->dev);
 	serio_close(serio);
 	kfree(atkbd);
@@ -701,16 +751,16 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 	}
 
 	if (atkbd->write) {
-		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
+		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP) | BIT(EV_MSC);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
-	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP);
+	} else  atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_REP) | BIT(EV_MSC);
+	atkbd->dev.mscbit[0] = BIT(MSC_RAW);
 
 	if (!atkbd_softrepeat) {
 		atkbd->dev.rep[REP_DELAY] = 250;
 		atkbd->dev.rep[REP_PERIOD] = 33;
 	}
 
-	atkbd->ack = 1;
 	atkbd->serio = serio;
 
 	init_input_dev(&atkbd->dev);
@@ -786,6 +836,8 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	input_register_device(&atkbd->dev);
 
+	set_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
+
 	printk(KERN_INFO "input: %s on %s\n", atkbd->name, serio->phys);
 }
 
@@ -809,17 +861,19 @@ static int atkbd_reconnect(struct serio *serio)
 		param[0] = (test_bit(LED_SCROLLL, atkbd->dev.led) ? 1 : 0)
 		         | (test_bit(LED_NUML,    atkbd->dev.led) ? 2 : 0)
  		         | (test_bit(LED_CAPSL,   atkbd->dev.led) ? 4 : 0);
-		
+
 		if (atkbd_probe(atkbd))
 			return -1;
 		if (atkbd->set != atkbd_set_3(atkbd))
 			return -1;
-		
+
 		atkbd_enable(atkbd);
 
 		if (atkbd_command(atkbd, param, ATKBD_CMD_SETLEDS))
 			return -1;
 	}
+
+	set_bit(ATKBD_FLAG_ENABLED, &atkbd->flags);
 
 	return 0;
 }

@@ -22,6 +22,18 @@
 #define PSMOUSE_ACTIVATED	1
 #define PSMOUSE_IGNORE		2
 
+#define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
+#define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
+#define PSMOUSE_FLAG_CMD1	2	/* First byte of command response */
+#define PSMOUSE_FLAG_ID		3	/* First byte is not keyboard ID */
+
+/* psmouse protocol handler return codes */
+typedef enum {
+	PSMOUSE_BAD_DATA,
+	PSMOUSE_GOOD_DATA,
+	PSMOUSE_FULL_PACKET
+} psmouse_ret_t;
+
 struct psmouse;
 
 struct psmouse_ptport {
@@ -45,13 +57,15 @@ struct psmouse {
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;
+	unsigned long out_of_sync;
 	unsigned char state;
-	char acking;
-	volatile char ack;
+	unsigned char nak;
 	char error;
 	char devname[64];
 	char phys[32];
+	unsigned long flags;
 
+	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs); 
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
 };
@@ -65,10 +79,10 @@ struct psmouse {
 #define PSMOUSE_SYNAPTICS 	7
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
+int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);
 int psmouse_reset(struct psmouse *psmouse);
 
 extern int psmouse_smartscroll;
 extern unsigned int psmouse_rate;
-extern unsigned int psmouse_resetafter;
 
 #endif /* _PSMOUSE_H */

@@ -16,7 +16,7 @@
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
- * 
+ *
  * TODO:
  * - Dino testing (did HP ever shipped a machine on which this port
  *                 was usable/enabled ?)
@@ -44,7 +44,7 @@ MODULE_DEVICE_TABLE(parisc, gscps2_device_tbl);
 
 #define PFX "gscps2.c: "
 
-/* 
+/*
  * Driver constants
  */
 
@@ -222,7 +222,7 @@ static LIST_HEAD(ps2port_list);
 /**
  * gscps2_interrupt() - Interruption service routine
  *
- * This function reads received PS/2 bytes and processes them on 
+ * This function reads received PS/2 bytes and processes them on
  * all interfaces.
  * The problematic part here is, that the keyboard and mouse PS/2 port
  * share the same interrupt and it's not possible to send data if any
@@ -240,9 +240,9 @@ static irqreturn_t gscps2_interrupt(int irq, void *dev, struct pt_regs *regs)
 	  unsigned long flags;
 	  spin_lock_irqsave(&ps2port->lock, flags);
 
-	  while ( (ps2port->buffer[ps2port->append].str = 
+	  while ( (ps2port->buffer[ps2port->append].str =
 		   gscps2_readb_status(ps2port->addr)) & GSC_STAT_RBNE ) {
-		ps2port->buffer[ps2port->append].data = 
+		ps2port->buffer[ps2port->append].data =
 				gscps2_readb_input(ps2port->addr);
 		ps2port->append = ((ps2port->append+1) & BUFFER_SIZE);
 	  }
@@ -349,7 +349,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 
 	if (!dev->irq)
 		return -ENODEV;
-	
+
 	/* Offset for DINO PS/2. Works with LASI even */
 	if (dev->id.sversion == 0x96)
 		hpa += GSC_DINO_OFFSET;
@@ -368,7 +368,7 @@ static int __init gscps2_probe(struct parisc_device *dev)
 	gscps2_reset(ps2port);
 	ps2port->id = readb(ps2port->addr+GSC_ID) & 0x0f;
 	snprintf(ps2port->name, sizeof(ps2port->name)-1, "%s %s",
-		gscps2_serio_port.name, 
+		gscps2_serio_port.name,
 		(ps2port->id == GSC_ID_KEYBOARD) ? "keyboard" : "mouse" );
 
 	memcpy(&ps2port->port, &gscps2_serio_port, sizeof(gscps2_serio_port));
@@ -401,9 +401,9 @@ static int __init gscps2_probe(struct parisc_device *dev)
 		ps2port->port.phys);
 
 	serio_register_port(&ps2port->port);
-	
+
 	return 0;
-	
+
 fail:
 	free_irq(dev->irq, ps2port);
 
@@ -430,7 +430,7 @@ static int __devexit gscps2_remove(struct parisc_device *dev)
 	list_del(&ps2port->node);
 	iounmap(ps2port->addr);
 #if 0
-	release_mem_region(dev->hpa, GSC_STATUS + 4); 
+	release_mem_region(dev->hpa, GSC_STATUS + 4);
 #endif
 	dev_set_drvdata(&dev->dev, NULL);
 	kfree(ps2port);
@@ -441,7 +441,7 @@ static int __devexit gscps2_remove(struct parisc_device *dev)
 static struct parisc_device_id gscps2_device_tbl[] = {
 	{ HPHW_FIO, HVERSION_REV_ANY_ID, HVERSION_ANY_ID, 0x00084 }, /* LASI PS/2 */
 #ifdef DINO_TESTED
-	{ HPHW_FIO, HVERSION_REV_ANY_ID, HVERSION_ANY_ID, 0x00096 }, /* DINO PS/2 */ 
+	{ HPHW_FIO, HVERSION_REV_ANY_ID, HVERSION_ANY_ID, 0x00096 }, /* DINO PS/2 */
 #endif
 	{ 0, }	/* 0 terminated list */
 };

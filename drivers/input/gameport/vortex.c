@@ -83,7 +83,7 @@ static int vortex_cooked_read(struct gameport *gameport, int *axes, int *buttons
 		axes[i] = readw(vortex->io + VORTEX_AXD + i * sizeof(u32));
 		if (axes[i] == 0x1fff) axes[i] = -1;
 	}
-        
+
         return 0;
 }
 
@@ -122,7 +122,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 
 	vortex->gameport.driver = vortex;
 	vortex->gameport.fuzz = 64;
-	
+
 	vortex->gameport.read = vortex_read;
 	vortex->gameport.trigger = vortex_trigger;
 	vortex->gameport.cooked_read = vortex_cooked_read;
@@ -145,7 +145,7 @@ static int __devinit vortex_probe(struct pci_dev *dev, const struct pci_device_i
 	vortex->io = vortex->base + id->driver_data;
 
 	gameport_register_port(&vortex->gameport);
-	
+
 	printk(KERN_INFO "gameport at pci%s speed %d kHz\n",
 		pci_name(dev), vortex->gameport.speed);
 

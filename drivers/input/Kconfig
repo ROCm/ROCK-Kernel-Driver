@@ -41,9 +41,16 @@ config INPUT_MOUSEDEV
 	  module will be called mousedev.
 
 config INPUT_MOUSEDEV_PSAUX
-	bool "Provide legacy /dev/psaux device" if EMBEDDED
+	bool "Provide legacy /dev/psaux device"
 	default y
 	depends on INPUT_MOUSEDEV
+	---help---
+	  Say Y here if you want your mouse also be accessible as char device
+	  10:1 - /dev/psaux. The data available through /dev/psaux is exactly
+	  the same as the data from /dev/input/mice.
+
+	  If unsure, say Y.
+
 
 config INPUT_MOUSEDEV_SCREEN_X
 	int "Horizontal screen resolution"
