@@ -949,34 +949,6 @@ CONFIG_VT_CONSOLE
 
   If unsure, say Y.
 
-CONFIG_SERIAL
-  This selects whether you want to include the driver for the standard
-  serial ports.  The standard answer is Y.  People who might say N
-  here are those that are setting up dedicated Ethernet WWW/FTP
-  servers, or users that have one of the various bus mice instead of a
-  serial mouse and don't intend to use their machine's standard serial
-  port for anything.  (Note that the Cyclades and Stallion multi
-  serial port drivers do not need this driver built in for them to
-  work.)
-
-  If you want to compile this driver as a module, say M here and read
-  <file:Documentation/modules.txt>.  The module will be called
-  serial.o.
-  [WARNING: Do not compile this driver as a module if you are using
-  non-standard serial ports, since the configuration information will
-  be lost when the driver is unloaded.  This limitation may be lifted
-  in the future.]
-
-  BTW1: If you have a mouseman serial mouse which is not recognized by
-  the X window system, try running gpm first.
-
-  BTW2: If you intend to use a software modem (also called Winmodem)
-  under Linux, forget it.  These modems are crippled and require
-  proprietary drivers which are only available under Windows.
-
-  Most people will say Y or M here, so that they can use serial mice,
-  modems and similar devices connecting to the standard serial ports.
-
 CONFIG_SERIAL_CONSOLE
   If you say Y here, it will be possible to use a serial port as the
   system console (the system console is the device which receives all
@@ -1064,25 +1036,6 @@ CONFIG_BBC_I2C
   connects to environmental control devices such as fans and
   temperature sensors.  The second controller also connects to the
   smartcard reader, if present.  Say Y to enable support for these.
-
-CONFIG_BUSMOUSE
-  Say Y here if your machine has a bus mouse as opposed to a serial
-  mouse. Most people have a regular serial MouseSystem or
-  Microsoft mouse (made by Logitech) that plugs into a COM port
-  (rectangular with 9 or 25 pins). These people say N here. 
-
-  If you have a laptop, you either have to check the documentation or
-  experiment a bit to find out whether the trackball is a serial mouse
-  or not; it's best to say Y here for you.
-
-  This is the generic bus mouse driver code. If you have a bus mouse,
-  you will have to say Y here and also to the specific driver for your
-  mouse below.
-
-  This code is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called busmouse.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_DRM
   Kernel-level support for the Direct Rendering Infrastructure (DRI)
@@ -1208,14 +1161,6 @@ CONFIG_SUNOS_EMUL
   <http://www.ultralinux.org/faq.html> for more information.  If you
   want to run SunOS binaries on an Ultra you must also say Y to
   "Kernel support for 32-bit a.out binaries" above.
-
-CONFIG_SUN_KEYBOARD
-  Say Y here to support the keyboard found on Sun 3 and 3x
-  workstations.  It can also be used support Sun Type-5 keyboards
-  through an adaptor.  See
-  <http://www.suse.cz/development/input/adapters.html> and
-  <http://sourceforge.net/projects/linuxconsole/> for details on the
-  latter.
 
 CONFIG_VIDEO_DEV
   Support for audio/video capture and overlay devices and FM radio

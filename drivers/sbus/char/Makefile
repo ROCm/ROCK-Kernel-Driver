@@ -7,15 +7,14 @@
 # Rewritten to use lists instead of if-statements.
 #
 
-export-objs := su.o bbc_i2c.o
-obj-y := sunkbd.o sunkbdmap.o sunmouse.o sunserial.o zs.o
+export-objs := bbc_i2c.o
+obj-y := sunkbdmap.o
 
 vfc-objs := vfc_dev.o vfc_i2c.o
 bbc-objs := bbc_i2c.o bbc_envctrl.o
 
-obj-$(CONFIG_PCI) += su.o pcikbd.o
+obj-$(CONFIG_PCI) += pcikbd.o
 
-obj-$(CONFIG_SAB82532)			+= sab82532.o
 obj-$(CONFIG_ENVCTRL)			+= envctrl.o
 obj-$(CONFIG_DISPLAY7SEG)		+= display7seg.o
 obj-$(CONFIG_WATCHDOG_CP1XXX)		+= cpwatchdog.o

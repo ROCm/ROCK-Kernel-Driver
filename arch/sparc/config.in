@@ -27,13 +27,7 @@ define_bool CONFIG_MCA n
 define_bool CONFIG_PCMCIA n
 define_bool CONFIG_SBUS y
 define_bool CONFIG_SBUSCHAR y
-define_bool CONFIG_BUSMOUSE y
-define_bool CONFIG_SUN_MOUSE y
-define_bool CONFIG_SERIAL y
-define_bool CONFIG_SUN_SERIAL y
 define_bool CONFIG_SERIAL_CONSOLE y
-define_bool CONFIG_SUN_KEYBOARD y
-define_bool CONFIG_SUN_CONSOLE y
 define_bool CONFIG_SUN_AUXIO y
 define_bool CONFIG_SUN_IO y
 define_bool CONFIG_RWSEM_GENERIC_SPINLOCK y
@@ -68,6 +62,7 @@ endmenu
 
 source drivers/mtd/Config.in
 
+source drivers/serial/Config.in
 if [ "$CONFIG_SUN4" != "y" ]; then
    source drivers/sbus/char/Config.in
    source drivers/sbus/audio/Config.in
