@@ -666,7 +666,7 @@ S:	Maintained
 ETHERNET BRIDGE
 P:	Stephen Hemminger
 M:	shemminger@osdl.org
-L:	bridge@math.leidenuniv.nl
+L:	bridge@osdl.org
 W:	http://bridge.sourceforge.net/
 S:	Maintained
 
