@@ -45,6 +45,7 @@ enum {
 	PDC_INT_SEQMASK		= 0x40,	/* Mask of asserted SEQ INTs */
 	PDC_TBG_MODE		= 0x41,	/* TBG mode */
 	PDC_FLASH_CTL		= 0x44, /* Flash control register */
+	PDC_PCI_CTL		= 0x48, /* PCI control and status register */
 	PDC_CTLSTAT		= 0x60,	/* IDE control and status register */
 	PDC_SATA_PLUG_CSR	= 0x6C, /* SATA Plug control/status reg */
 	PDC_SLEW_CTL		= 0x470, /* slew rate control reg */
@@ -76,6 +77,8 @@ enum {
 	board_2037x		= 0,	/* FastTrak S150 TX2plus */
 	board_20319		= 1,	/* FastTrak S150 TX4 */
 	board_20621		= 2,	/* FastTrak S150 SX4 */
+
+	PDC_HAS_PATA		= (1 << 1), /* PDC20375 has PATA */
 
 	PDC_FLAG_20621		= (1 << 30), /* we have a 20621 */
 	PDC_HDMA_RESET		= (1 << 11), /* HDMA reset */
@@ -1604,13 +1607,21 @@ static void pdc_20621_init(struct ata_probe_ent *pe)
 	readl(mmio + PDC_HDMA_CTLSTAT);		/* flush */
 }
 
+static int pdc_pata_possible(struct pci_dev *pdev)
+{
+	if (pdev->device == 0x3375)
+		return 1;
+	return 0;
+}
+
 static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 {
+	struct pci_dev *pdev = pe->pdev;
 	void *mmio = pe->mmio_base;
 	u32 tmp;
 
 	if (chip_id == board_20621)
-		return;
+		BUG();
 
 	/* change FIFO_SHD to 8 dwords. Promise driver does this...
 	 * dunno why.
@@ -1638,6 +1649,14 @@ static void pdc_host_init(unsigned int chip_id, struct ata_probe_ent *pe)
 	tmp &= 0xFFFFF03F; /* clear bit 11 ~ 6 */
 	tmp  |= 0x00000900; /* set bit 11-9 = 100b , bit 8-6 = 100 */
 	writel(tmp, mmio + PDC_SLEW_CTL);
+
+	/* check for PATA port on PDC20375 */
+	if (pdc_pata_possible(pdev)) {
+		tmp = readl(mmio + PDC_PCI_CTL);
+		if (tmp & PDC_HAS_PATA)
+			printk(KERN_INFO DRV_NAME "(%s): sorry, PATA port not supported yet\n",
+			       pci_name(pdev));
+	}
 }
 
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
