@@ -163,7 +163,6 @@ struct dc390_srb	*pFreeSRB;
 struct dc390_srb	*pTmpSRB;
 
 u8		msgin123[4];
-u8		DCBmap[MAX_SCSI_ID];
 u8		Connected;
 u8		pad;
 

@@ -22,6 +22,8 @@
 #include <linux/blkdev.h>
 #include <linux/delay.h>
 
+#include <scsi/scsi_tcq.h>
+
 static inline uint16_t qla2x00_get_cmd_direction(struct scsi_cmnd *cmd);
 static inline cont_entry_t *qla2x00_prep_cont_type0_iocb(scsi_qla_host_t *);
 static inline cont_a64_entry_t *qla2x00_prep_cont_type1_iocb(scsi_qla_host_t *);
@@ -337,6 +339,7 @@ qla2x00_start_scsi(srb_t *sp)
 	uint16_t	req_cnt;
 	uint16_t	tot_dsds;
 	device_reg_t	*reg;
+	char		tag[2];
 
 	/* Setup device pointers. */
 	ret = 0;
@@ -415,14 +418,17 @@ qla2x00_start_scsi(srb_t *sp)
 	cmd_pkt->lun = cpu_to_le16(fclun->lun);
 
 	/* Update tagged queuing modifier */
-	cmd_pkt->control_flags = __constant_cpu_to_le16(CF_SIMPLE_TAG);
-	if (cmd->device->tagged_supported) {
-		switch (cmd->tag) {
-		case HEAD_OF_QUEUE_TAG:
+	if (scsi_populate_tag_msg(cmd, tag)) {
+		switch (tag[0]) {
+		case MSG_SIMPLE_TAG:
+			cmd_pkt->control_flags =
+			    __constant_cpu_to_le16(CF_SIMPLE_TAG);
+			break;
+		case MSG_HEAD_TAG:
 			cmd_pkt->control_flags =
 			    __constant_cpu_to_le16(CF_HEAD_TAG);
 			break;
-		case ORDERED_QUEUE_TAG:
+		case MSG_ORDERED_TAG:
 			cmd_pkt->control_flags =
 			    __constant_cpu_to_le16(CF_ORDERED_TAG);
 			break;

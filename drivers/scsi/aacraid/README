@@ -10,14 +10,23 @@ the original).
 
 Supported Cards/Chipsets
 -------------------------
-	AAR-2410SA SATA
+	Adaptec 2020S
+	Adaptec 2025S
 	Adaptec 2120S
 	Adaptec 2200S
 	Adaptec 2230S
+	Adaptec 2240S
+	Adaptec 2410SA
+	Adaptec 2610SA
+	Adaptec 2810SA
+	Adaptec 21610SA
 	Adaptec 3230S
 	Adaptec 3240S
+	Adaptec 4000SAS
+	Adaptec 4005SAS
+	Adaptec 4800SAS
+	Adaptec 4805SAS
 	Adaptec 5400S
-	ASR-2020S PCI-X
 	Dell PERC 2 Quad Channel
 	Dell PERC 2/Si
 	Dell PERC 3/Si
@@ -49,7 +58,6 @@ Adaptec Unix OEM Product Group
 Mailing List
 -------------------------
 linux-scsi@vger.kernel.org (Interested parties troll here)
-http://mbserver.adaptec.com/ (Currently more Community Support than Devel Support)
 Also note this is very different to Brian's original driver
 so don't expect him to support it.
 Adaptec does support this driver.  Contact either tech support or Mark Salyzyn.

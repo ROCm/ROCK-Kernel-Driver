@@ -35,7 +35,7 @@ ISA or MCA adapters).]
 The SCSI mid level isolates an LLD from other layers such as the SCSI
 upper layer drivers and the block layer.
 
-This version of the document roughly matches linux kernel version 2.6.0-test4.
+This version of the document roughly matches linux kernel version 2.6.8 .
 
 Documentation
 =============
@@ -323,6 +323,16 @@ struct Scsi_Host:
         instance. If the reference count reaches 0 then the given instance
         is freed
 
+The Scsi_device structure has had reference counting infrastructure added.
+This effectively spreads the ownership of struct Scsi_device instances
+across the various SCSI layers which use them. Previously such instances
+were exclusively owned by the mid level. See the access functions declared
+towards the end of include/scsi/scsi_device.h . If an LLD wants to keep
+a copy of a pointer to a Scsi_device instance it should use scsi_device_get()
+to bump its reference count. When it is finished with the pointer it can
+use scsi_device_put() to decrement its reference count (and potentially
+delete it).
+
 ^^ struct Scsi_Host actually has 2 reference counts which are manipulated
 in parallel by these functions.
 
@@ -416,7 +426,7 @@ struct scsi_device * scsi_add_device(struct Scsi_Host *shost,
 /**
  * scsi_add_host - perform sysfs registration and SCSI bus scan.
  * @shost:   pointer to scsi host instance
- * @dev:     pointer to struct device host instance
+ * @dev:     pointer to struct device of type scsi class
  *
  *      Returns 0 on success, negative errno of failure (e.g. -ENOMEM)
  *
@@ -453,7 +463,7 @@ void scsi_add_timer(struct scsi_cmnd *scmd, int timeout,
 
 /**
  * scsi_adjust_queue_depth - change the queue depth on a SCSI device
- * @SDpnt:      pointer to SCSI device to change queue depth on
+ * @sdev:       pointer to SCSI device to change queue depth on
  * @tagged:     0 - no tagged queuing
  *              MSG_SIMPLE_TAG - simple (unordered) tagged queuing
  *              MSG_ORDERED_TAG - ordered tagged queuing
@@ -474,8 +484,8 @@ void scsi_add_timer(struct scsi_cmnd *scmd, int timeout,
  *      Defined in: drivers/scsi/scsi.c [see source code for more notes]
  *
  **/
-void scsi_adjust_queue_depth(struct scsi_device * SDpnt, int tagged, 
-                             int num_tags)
+void scsi_adjust_queue_depth(struct scsi_device * sdev, int tagged, 
+                             int tags)
 
 
 /**
@@ -510,7 +520,7 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
 /**
  * scsi_block_requests - prevent further commands being queued to given host
  *
- * @SHpnt: pointer to host to block commands on
+ * @shost: pointer to host to block commands on
  *
  *      Returns nothing
  *
@@ -521,7 +531,7 @@ unsigned char *scsi_bios_ptable(struct block_device *dev)
  *
  *      Defined in: drivers/scsi/scsi_lib.c
 **/
-void scsi_block_requests(struct Scsi_Host * SHpnt)
+void scsi_block_requests(struct Scsi_Host * shost)
 
 
 /**
@@ -543,9 +553,10 @@ int scsi_delete_timer(struct scsi_cmnd *scmd)
 
 
 /**
- * scsi_host_alloc - create and register a scsi host adapter instance.
- * @shost_tp:   pointer to scsi host template
- * @xtr_bytes:  extra bytes to allocate in hostdata array (which is the
+ * scsi_host_alloc - create a scsi host adapter instance and perform basic
+ *                   initialization.
+ * @sht:        pointer to scsi host template
+ * @privsize:   extra bytes to allocate in hostdata array (which is the
  *              last member of the returned Scsi_Host instance)
  *
  *      Returns pointer to new Scsi_Host instance or NULL on failure
@@ -555,12 +566,15 @@ int scsi_delete_timer(struct scsi_cmnd *scmd)
  *      Notes: When this call returns to the LLD, the SCSI bus scan on
  *      this host has _not_ yet been done.
  *      The hostdata array (by default zero length) is a per host scratch 
- *      area for the LLD.
+ *      area for the LLD's exclusive use.
  *      Both associated refcounting objects have their refcount set to 1.
+ *      Full registration (in sysfs) and a bus scan are performed later when
+ *      scsi_add_host() is called.
  *
  *      Defined in: drivers/scsi/hosts.c .
  **/
-struct Scsi_Host * scsi_host_alloc(struct scsi_host_template *, int xtr_bytes)
+struct Scsi_Host * scsi_host_alloc(struct scsi_host_template * sht,
+                                   int privsize)
 
 
 /**
@@ -619,8 +633,8 @@ int scsi_partsize(unsigned char *buf, unsigned long capacity,
 
 /**
  * scsi_register - create and register a scsi host adapter instance.
- * @shost_tp:   pointer to scsi host template
- * @xtr_bytes:  extra bytes to allocate in hostdata array (which is the
+ * @sht:        pointer to scsi host template
+ * @privsize:   extra bytes to allocate in hostdata array (which is the
  *              last member of the returned Scsi_Host instance)
  *
  *      Returns pointer to new Scsi_Host instance or NULL on failure
@@ -634,7 +648,8 @@ int scsi_partsize(unsigned char *buf, unsigned long capacity,
  *
  *      Defined in: drivers/scsi/hosts.c .
  **/
-struct Scsi_Host * scsi_register(struct scsi_host_template *, int xtr_bytes)
+struct Scsi_Host * scsi_register(struct scsi_host_template * sht,
+                                 int privsize)
 
 
 /**
@@ -711,15 +726,17 @@ void scsi_set_device(struct Scsi_Host * shost, struct device * dev)
  * scsi_to_pci_dma_dir - convert SCSI subsystem direction flag to PCI
  * @scsi_data_direction: SCSI subsystem direction flag
  *
- *      Returns PCI_DMA_TODEVICE given SCSI_DATA_WRITE,
- *              PCI_DMA_FROMDEVICE given SCSI_DATA_READ
- *              PCI_DMA_BIDIRECTIONAL given SCSI_DATA_UNKNOWN
- *              else returns PCI_DMA_NONE
+ *      Returns DMA_TO_DEVICE given SCSI_DATA_WRITE,
+ *              DMA_FROM_DEVICE given SCSI_DATA_READ
+ *              DMA_BIDIRECTIONAL given SCSI_DATA_UNKNOWN
+ *              else returns DMA_NONE
  *
  *      Might block: no
  *
  *      Notes: The SCSI subsystem now uses the same values for these
  *      constants as the PCI subsystem so this function is a nop.
+ *      The recommendation is not to use this conversion function anymore
+ *      (in the 2.6 kernel series) as it is not needed.
  *
  *      Defined in: drivers/scsi/scsi.h .
  **/
@@ -730,13 +747,15 @@ int scsi_to_pci_dma_dir(unsigned char scsi_data_direction)
  * scsi_to_sbus_dma_dir - convert SCSI subsystem direction flag to SBUS
  * @scsi_data_direction: SCSI subsystem direction flag
  *
- *      Returns SBUS_DMA_TODEVICE given SCSI_DATA_WRITE,
- *              SBUS_DMA_FROMDEVICE given SCSI_DATA_READ
- *              SBUS_DMA_BIDIRECTIONAL given SCSI_DATA_UNKNOWN
- *              else returns SBUS_DMA_NONE
+ *      Returns DMA_TO_DEVICE given SCSI_DATA_WRITE,
+ *              FROM_DEVICE given SCSI_DATA_READ
+ *              DMA_BIDIRECTIONAL given SCSI_DATA_UNKNOWN
+ *              else returns DMA_NONE
  *
  *      Notes: The SCSI subsystem now uses the same values for these
  *      constants as the SBUS subsystem so this function is a nop.
+ *      The recommendation is not to use this conversion function anymore
+ *      (in the 2.6 kernel series) as it is not needed.
  *
  *      Might block: no
  *
@@ -749,7 +768,7 @@ int scsi_to_sbus_dma_dir(unsigned char scsi_data_direction)
  * scsi_track_queue_full - track successive QUEUE_FULL events on given
  *                      device to determine if and when there is a need
  *                      to adjust the queue depth on the device.
- * @SDptr: pointer to SCSI device instance
+ * @sdev:  pointer to SCSI device instance
  * @depth: Current number of outstanding SCSI commands on this device,
  *         not counting the one returned as QUEUE_FULL.
  *
@@ -765,13 +784,13 @@ int scsi_to_sbus_dma_dir(unsigned char scsi_data_direction)
  *
  *      Defined in: drivers/scsi/scsi.c .
  **/
-int scsi_track_queue_full(Scsi_Device *SDptr, int depth)
+int scsi_track_queue_full(Scsi_Device *sdev, int depth)
 
 
 /**
  * scsi_unblock_requests - allow further commands to be queued to given host
  *
- * @SHpnt: pointer to host to unblock commands on
+ * @shost: pointer to host to unblock commands on
  *
  *      Returns nothing
  *
@@ -779,7 +798,7 @@ int scsi_track_queue_full(Scsi_Device *SDptr, int depth)
  *
  *      Defined in: drivers/scsi/scsi_lib.c .
 **/
-void scsi_unblock_requests(struct Scsi_Host * SHpnt)
+void scsi_unblock_requests(struct Scsi_Host * shost)
 
 
 /**
@@ -901,20 +920,20 @@ Details:
  *
  *      Returns:
  *
- *	EH_HANDLED:		I fixed the error, please complete the command
- *	EH_RESET_TIMER:		I need more time, reset the timer and
- *				begin counting again
- *	EH_NOT_HANDLED		Begin normal error recovery
-
+ *      EH_HANDLED:             I fixed the error, please complete the command
+ *      EH_RESET_TIMER:         I need more time, reset the timer and
+ *                              begin counting again
+ *      EH_NOT_HANDLED          Begin normal error recovery
+ *
  *
  *      Locks: None held
  *
  *      Calling context: interrupt
  *
- *	Notes: This is to give the LLD an opportunity to do local recovery.
- *	This recovery is limited to determining if the outstanding command
- *	will ever complete.  You may not abort and restart the command from
- *	this callback.
+ *      Notes: This is to give the LLD an opportunity to do local recovery.
+ *      This recovery is limited to determining if the outstanding command
+ *      will ever complete.  You may not abort and restart the command from
+ *      this callback.
  *
  *      Optionally defined in: LLD
  **/
@@ -1110,7 +1129,7 @@ Details:
  *      Optionally defined in: LLD
  **/
     int proc_info(char * buffer, char ** start, off_t offset, 
-                  int length, int hostno, int writeto1_read0)
+                  int length, int host_no, int writeto1_read0)
 
 
 /**
@@ -1120,42 +1139,42 @@ Details:
  *
  *      Returns 0 on success.
  *
- *	If there's a failure, return either:
+ *      If there's a failure, return either:
  *
- *	SCSI_MLQUEUE_DEVICE_BUSY if the device queue is full, or
- *	SCSI_MLQUEUE_HOST_BUSY if the entire host queue is full
+ *      SCSI_MLQUEUE_DEVICE_BUSY if the device queue is full, or
+ *      SCSI_MLQUEUE_HOST_BUSY if the entire host queue is full
  *
- *	On both of these returns, the mid-layer will requeue the I/O
+ *      On both of these returns, the mid-layer will requeue the I/O
  *
- *	- if the return is SCSI_MLQUEUE_DEVICE_BUSY, only that particular
- *	device will be paused, and it will be unpaused when a command to
- *	the device returns (or after a brief delay if there are no more
- *	outstanding commands to it).  Commands to other devices continue
- *	to be processed normally.
+ *      - if the return is SCSI_MLQUEUE_DEVICE_BUSY, only that particular
+ *      device will be paused, and it will be unpaused when a command to
+ *      the device returns (or after a brief delay if there are no more
+ *      outstanding commands to it).  Commands to other devices continue
+ *      to be processed normally.
  *
- *	- if the return is SCSI_MLQUEUE_HOST_BUSY, all I/O to the host
- *	is paused and will be unpaused when any command returns from
- *	the host (or after a brief delay if there are no outstanding
- *	commands to the host).
+ *      - if the return is SCSI_MLQUEUE_HOST_BUSY, all I/O to the host
+ *      is paused and will be unpaused when any command returns from
+ *      the host (or after a brief delay if there are no outstanding
+ *      commands to the host).
  *
- *	For compatibility with earlier versions of queuecommand, any
- *	other return value is treated the same as
- *	SCSI_MLQUEUE_HOST_BUSY.
+ *      For compatibility with earlier versions of queuecommand, any
+ *      other return value is treated the same as
+ *      SCSI_MLQUEUE_HOST_BUSY.
  *
- *	Other types of errors that are detected immediately may be
- *	flagged by setting scp->result to an appropriate value,
- *	invoking the 'done' callback, and then returning 0 from this
- *	function. If the command is not performed immediately (and the
- *	LLD is starting (or will start) the given command) then this
- *	function should place 0 in scp->result and return 0.
+ *      Other types of errors that are detected immediately may be
+ *      flagged by setting scp->result to an appropriate value,
+ *      invoking the 'done' callback, and then returning 0 from this
+ *      function. If the command is not performed immediately (and the
+ *      LLD is starting (or will start) the given command) then this
+ *      function should place 0 in scp->result and return 0.
  *
- *	Command ownership.  If the driver returns zero, it owns the
- *	command and must take responsibility for ensuring the 'done'
- *	callback is executed.  Note: the driver may call done before
- *	returning zero, but after it has called done, it may not
- *	return any value other than zero.  If the driver makes a
- *	non-zero return, it must not execute the command's done
- *	callback at any time.
+ *      Command ownership.  If the driver returns zero, it owns the
+ *      command and must take responsibility for ensuring the 'done'
+ *      callback is executed.  Note: the driver may call done before
+ *      returning zero, but after it has called done, it may not
+ *      return any value other than zero.  If the driver makes a
+ *      non-zero return, it must not execute the command's done
+ *      callback at any time.
  *
  *      Locks: struct Scsi_Host::host_lock held on entry (with "irqsave")
  *             and is expected to be held on return.
@@ -1317,7 +1336,12 @@ of interest:
     sg_tablesize - maximum scatter gather elements allowed by host.
                    0 implies scatter gather not supported by host
     max_sectors  - maximum number of sectors (usually 512 bytes) allowed
-                   in a single SCSI command. 0 implies no maximum.
+                   in a single SCSI command. The default value of 0 leads
+                   to a setting of SCSI_DEFAULT_MAX_SECTORS (defined in
+                   scsi_host.h) which is currently set to 1024. So for a
+                   disk the maximum transfer size is 512 KB when max_sectors
+                   is not defined. Note that this size may not be sufficient
+                   for disk firmware uploads.
     cmd_per_lun  - maximum number of commands that can be queued on devices
                    controlled by the host. Overridden by LLD calls to
                    scsi_adjust_queue_depth().
@@ -1328,6 +1352,9 @@ of interest:
                      0=>disallow SCSI command merging
     hostt        - pointer to driver's struct scsi_host_template from which
                    this struct Scsi_Host instance was spawned
+    hostt->proc_name  - name of LLD. This is the driver name that sysfs uses
+    transportt   - pointer to driver's struct scsi_transport_template instance
+                   (if any). FC and SPI transports currently supported.
     sh_list      - a double linked list of pointers to all struct Scsi_Host
                    instances (currently ordered by ascending host_no)
     my_devices   - a double linked list of pointers to struct scsi_device 
@@ -1335,7 +1362,8 @@ of interest:
     hostdata[0]  - area reserved for LLD at end of struct Scsi_Host. Size
                    is set by the second argument (named 'xtr_bytes') to
                    scsi_host_alloc() or scsi_register().
-The structure is defined in include/scsi/scsi_host.h
+
+The scsi_host structure is defined in include/scsi/scsi_host.h
 
 struct scsi_device
 ------------------
@@ -1347,11 +1375,66 @@ The structure is defined in include/scsi/scsi_device.h
 struct scsi_cmnd
 ----------------
 Instances of this structure convey SCSI commands to the LLD and responses
-back to the mid level. The SCSI mid level will ensure that no more SCSI 
-commands become queued against the LLD than are indicated by 
-scsi_adjust_queue_depth() (or struct Scsi_Host::cmd_per_lun). There will 
-be at least one instance of struct scsi_cmnd available for each SCSI device. 
-The structure is defined in include/scsi/scsi_cmnd.h
+back to the mid level. The SCSI mid level will ensure that no more SCSI
+commands become queued against the LLD than are indicated by
+scsi_adjust_queue_depth() (or struct Scsi_Host::cmd_per_lun). There will
+be at least one instance of struct scsi_cmnd available for each SCSI device.
+Members of interest:
+    cmnd         - array containing SCSI command
+    cmnd_len     - length (in bytes) of SCSI command
+    sc_data_direction - direction of data transfer in data phase. See
+                "enum dma_data_direction" in include/linux/dma-mapping.h
+    request_bufflen - number of data bytes to transfer (0 if no data phase)
+    use_sg       - ==0 -> no scatter gather list, hence transfer data
+                          to/from request_buffer
+                 - >0 ->  scatter gather list (actually an array) in
+                          request_buffer with use_sg elements
+    request_buffer - either contains data buffer or scatter gather list
+                     depending on the setting of use_sg. Scatter gather
+                     elements are defined by 'struct scatterlist' found
+                     in include/asm/scatterlist.h .
+    done         - function pointer that should be invoked by LLD when the
+                   SCSI command is completed (successfully or otherwise).
+                   Should only be called by an LLD if the LLD has accepted
+                   the command (i.e. queuecommand() returned or will return
+                   0). The LLD may invoke 'done'  prior to queuecommand()
+                   finishing.
+    result       - should be set by LLD prior to calling 'done'. A value
+                   of 0 implies a successfully completed command (and all
+                   data (if any) has been transferred to or from the SCSI
+                   target device). 'result' is a 32 bit unsigned integer that
+                   can be viewed as 4 related bytes. The SCSI status value is
+                   in the LSB. See include/scsi/scsi.h status_byte(),
+                   msg_byte(), host_byte() and driver_byte() macros and
+                   related constants.
+    sense_buffer - an array (maximum size: SCSI_SENSE_BUFFERSIZE bytes) that
+                   should be written when the SCSI status (LSB of 'result')
+                   is set to CHECK_CONDITION (2). When CHECK_CONDITION is
+                   set, if the top nibble of sense_buffer[0] has the value 7
+                   then the mid level will assume the sense_buffer array
+                   contains a valid SCSI sense buffer; otherwise the mid
+                   level will issue a REQUEST_SENSE SCSI command to
+                   retrieve the sense buffer. The latter strategy is error
+                   prone in the presence of command queuing so the LLD should
+                   always "auto-sense".
+    device       - pointer to scsi_device object that this command is
+                   associated with.
+    resid        - an LLD should set this signed integer to the requested
+                   transfer length (i.e. 'request_bufflen') less the number
+                   of bytes that are actually transferred. 'resid' is
+                   preset to 0 so an LLD can ignore it if it cannot detect
+                   underruns (overruns should be rare). If possible an LLD
+                   should set 'resid' prior to invoking 'done'. The most
+                   interesting case is data transfers from a SCSI target
+                   device device (i.e. READs) that underrun. 
+    underflow    - LLD should place (DID_ERROR << 16) in 'result' if
+                   actual number of bytes transferred is less than this
+                   figure. Not many LLDs implement this check and some that
+                   do just output an error message to the log rather than
+                   report a DID_ERROR. Better for an LLD to implement
+                   'resid'.
+
+The scsi_cmnd structure is defined in include/scsi/scsi_cmnd.h
 
 
 Locks
@@ -1420,15 +1503,16 @@ to support it.
 Credits
 =======
 The following people have contributed to this document:
-        Mike Anderson <andmike@us.ibm.com>
-        James Bottomley <James.Bottomley@steeleye.com> 
-        Patrick Mansfield <patmans@us.ibm.com> 
-        Christoph Hellwig <hch@infradead.org>
-        Doug Ledford <dledford@redhat.com>
-        Andries Brouwer <Andries.Brouwer@cwi.nl>
-        Randy Dunlap <rddunlap@osdl.org>
+        Mike Anderson <andmike at us dot ibm dot com>
+        James Bottomley <James dot Bottomley at steeleye dot com> 
+        Patrick Mansfield <patmans at us dot ibm dot com> 
+        Christoph Hellwig <hch at infradead dot org>
+        Doug Ledford <dledford at redhat dot com>
+        Andries Brouwer <Andries dot Brouwer at cwi dot nl>
+        Randy Dunlap <rddunlap at osdl dot org>
+        Alan Stern <stern at rowland dot harvard dot edu>
 
 
 Douglas Gilbert
-dgilbert@interlog.com
-29th August 2003
+dgilbert at interlog dot com
+25th August 2004

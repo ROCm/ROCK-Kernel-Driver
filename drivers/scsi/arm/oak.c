@@ -179,6 +179,7 @@ static void __devexit oakscsi_remove(struct expansion_card *ec)
 	ecard_set_drvdata(ec, NULL);
 	scsi_remove_host(host);
 
+	NCR5380_exit(host);
 	release_region(host->io_port, host->n_io_port);
 	scsi_host_put(host);
 }

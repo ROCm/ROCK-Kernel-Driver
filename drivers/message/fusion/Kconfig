@@ -27,39 +27,6 @@ config FUSION_MAX_SGE
 	  necessary (or recommended) unless the user will be running 
 	  large I/O's via the raw interface.
 
-config FUSION_ISENSE
-	tristate "Enhanced SCSI error reporting"
-	depends on MODULES && FUSION && m
-	---help---
-	  The isense module (roughly stands for Interpret SENSE data) is
-	  completely optional.  It simply provides extra English readable
-	  strings in SCSI Error Report(s) that might be generated from the
-	  Fusion MPT SCSI Host driver, for example when a target device
-	  returns a SCSI check condition on a I/O.  Without this module
-	  loaded you might see:
-
-	  SCSI Error Report =-=-= (ioc0,scsi5:0)
-	  SCSI_Status=02h (CHECK_CONDITION)
-	  Original_CDB[]: 2A 00 00 00 00 41 00 00 02 00
-	  SenseData[12h]: 70 00 02 00 00 00 00 0A 00 00 00 00 04 02 02 00 00 00
-	  SenseKey=2h (NOT READY); FRU=02h
-	  ASC/ASCQ=29h/00h
-
-	  Where otherwise, if this module had been loaded, you would see:
-
-	  SCSI Error Report =-=-= (ioc0,scsi5:0)
-	  SCSI_Status=02h (CHECK_CONDITION)
-	  Original_CDB[]: 2A 00 00 00 00 41 00 00 02 00 - "WRITE(10)"
-	  SenseData[12h]: 70 00 02 00 00 00 00 0A 00 00 00 00 04 02 02 00 00 00
-	  SenseKey=2h (NOT READY); FRU=02h
-	  ASC/ASCQ=29h/00h "LOGICAL UNIT NOT READY, INITIALIZING CMD. REQUIRED"
-
-	  Say M for "Enhanced SCSI error reporting" to compile this optional module,
-	  creating a driver named: isense.
-
-	  NOTE: Support for building this feature into the kernel is not
-	  available, due to kernel size considerations.
-
 config FUSION_CTL
 	tristate "Fusion MPT misc device (ioctl) driver"
 	depends on MODULES && FUSION && m

@@ -111,7 +111,6 @@ MODULE_LICENSE("GPL");
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
 static int mptctl_id = -1;
-static struct semaphore mptctl_syscall_sem_ioc[MPT_MAX_ADAPTERS];
 
 static DECLARE_WAIT_QUEUE_HEAD ( mptctl_wait );
 
@@ -139,6 +138,9 @@ static int mptctl_replace_fw (unsigned long arg);
 static int mptctl_do_reset(unsigned long arg);
 static int mptctl_hp_hostinfo(unsigned long arg, unsigned int cmd);
 static int mptctl_hp_targetinfo(unsigned long arg);
+
+static int  mptctl_probe(struct pci_dev *, const struct pci_device_id *);
+static void mptctl_remove(struct pci_dev *);
 
 /*
  * Private function calls.
@@ -208,10 +210,10 @@ mptctl_syscall_down(MPT_ADAPTER *ioc, int nonblock)
 	}
 
 	if (nonblock) {
-		if (down_trylock(&mptctl_syscall_sem_ioc[ioc->id]))
+		if (down_trylock(&ioc->ioctl->sem_ioc))
 			rc = -EAGAIN;
 	} else {
-		if (down_interruptible(&mptctl_syscall_sem_ioc[ioc->id]))
+		if (down_interruptible(&ioc->ioctl->sem_ioc))
 			rc = -ERESTARTSYS;
 	}
 	dctlprintk((KERN_INFO MYNAM "::mptctl_syscall_down return %d\n", rc));
@@ -445,7 +447,7 @@ static int mptctl_bus_reset(MPT_IOCTL *ioctl)
 
 		mptctl_free_tm_flags(ioctl->ioc);
 		del_timer(&ioctl->TMtimer);
-		mpt_free_msg_frame(mptctl_id, ioctl->ioc, mf);
+		mpt_free_msg_frame(ioctl->ioc, mf);
 		ioctl->tmPtr = NULL;
 	}
 
@@ -482,7 +484,7 @@ mptctl_free_tm_flags(MPT_ADAPTER *ioc)
 
 	spin_lock_irqsave(&ioc->FreeQlock, flags);
 
-	hd->tmState = TM_STATE_ERROR;
+	hd->tmState = TM_STATE_NONE;
 	hd->tmPending = 0;
 	spin_unlock_irqrestore(&ioc->FreeQlock, flags);
 
@@ -520,7 +522,7 @@ mptctl_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 		if (ioctl && (ioctl->status & MPT_IOCTL_STATUS_TMTIMER_ACTIVE)){
 			ioctl->status &= ~MPT_IOCTL_STATUS_TMTIMER_ACTIVE;
 			del_timer(&ioctl->TMtimer);
-			mpt_free_msg_frame(mptctl_id, ioc, ioctl->tmPtr);
+			mpt_free_msg_frame(ioc, ioctl->tmPtr);
 		}
 
 	} else {
@@ -630,8 +632,7 @@ mptctl_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned 
 	else
 		ret = -EINVAL;
 
-
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
@@ -1807,7 +1808,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 	struct buflist	bufOut; /* data Out buffer */
 	dma_addr_t	dma_addr_in;
 	dma_addr_t	dma_addr_out;
-	int		dir;	/* PCI data direction */
 	int		sgSize = 0;	/* Num SG elements */
 	int		iocnum, flagsLength;
 	int		sz, rc = 0;
@@ -2117,9 +2117,9 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 
 		/* Set up the dataOut memory allocation */
 		if (karg.dataOutSize > 0) {
-			dir = PCI_DMA_TODEVICE;
 			if (karg.dataInSize > 0) {
 				flagsLength = ( MPI_SGE_FLAGS_SIMPLE_ELEMENT |
+						MPI_SGE_FLAGS_END_OF_BUFFER |
 						MPI_SGE_FLAGS_DIRECTION |
 						mpt_addr_size() )
 						<< MPI_SGE_FLAGS_SHIFT;
@@ -2158,7 +2158,6 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 		}
 
 		if (karg.dataInSize > 0) {
-			dir = PCI_DMA_FROMDEVICE;
 			flagsLength = MPT_SGE_FLAGS_SSIMPLE_READ;
 			flagsLength |= karg.dataInSize;
 
@@ -2196,6 +2195,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 	add_timer(&ioc->ioctl->timer);
 
 	if (hdr->Function == MPI_FUNCTION_SCSI_TASK_MGMT) {
+		DBG_DUMP_TM_REQUEST_FRAME((u32 *)mf);
 		rc = mpt_send_handshake_request(mptctl_id, ioc,
 				sizeof(SCSITaskMgmt_t), (u32*)mf, CAN_SLEEP);
 		if (rc == 0) {
@@ -2206,7 +2206,7 @@ mptctl_do_mpt_command (struct mpt_ioctl_command karg, void __user *mfPtr)
 			del_timer(&ioc->ioctl->timer);
 			ioc->ioctl->status &= ~MPT_IOCTL_STATUS_TIMER_ACTIVE;
 			ioc->ioctl->status |= MPT_IOCTL_STATUS_TM_FAILED;
-			mpt_free_msg_frame(mptctl_id, ioc, mf);
+			mpt_free_msg_frame(ioc, mf);
 		}
 	} else {
 		mpt_put_msg_frame(mptctl_id, ioc, mf);
@@ -2324,7 +2324,7 @@ done_free_mem:
 	 * otherwise, failure occured after mf acquired.
 	 */
 	if (mf)
-		mpt_free_msg_frame(mptctl_id, ioc, mf);
+		mpt_free_msg_frame(ioc, mf);
 
 	return rc;
 }
@@ -2738,7 +2738,7 @@ compat_mptfwxfer_ioctl(unsigned int fd, unsigned int cmd,
 
 	ret = mptctl_do_fw_download(kfw.iocnum, kfw.bufp, kfw.fwlen);
 
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
@@ -2792,55 +2792,91 @@ compat_mpt_command(unsigned int fd, unsigned int cmd,
 	 */
 	ret = mptctl_do_mpt_command (karg, &uarg->MF);
 
-	up(&mptctl_syscall_sem_ioc[iocp->id]);
+	up(&iocp->ioctl->sem_ioc);
 
 	return ret;
 }
 
 #endif
 
+
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-int __init mptctl_init(void)
+/*
+ *	mptctl_probe - Installs ioctl devices per bus.
+ *	@pdev: Pointer to pci_dev structure
+ *
+ *	Returns 0 for success, non-zero for failure.
+ *
+ */
+
+static int
+mptctl_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	int err;
-	int i;
-	int where = 1;
 	int sz;
 	u8 *mem;
-	MPT_ADAPTER *ioc = NULL;
-	int iocnum;
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+
+	/*
+	 * Allocate and inite a MPT_IOCTL structure
+	*/
+	sz = sizeof (MPT_IOCTL);
+	mem = kmalloc(sz, GFP_KERNEL);
+	if (mem == NULL) {
+		err = -ENOMEM;
+		goto out_fail;
+	}
+
+	memset(mem, 0, sz);
+	ioc->ioctl = (MPT_IOCTL *) mem;
+	ioc->ioctl->ioc = ioc;
+	init_timer (&ioc->ioctl->timer);
+	ioc->ioctl->timer.data = (unsigned long) ioc->ioctl;
+	ioc->ioctl->timer.function = mptctl_timer_expired;
+	init_timer (&ioc->ioctl->TMtimer);
+	ioc->ioctl->TMtimer.data = (unsigned long) ioc->ioctl;
+	ioc->ioctl->TMtimer.function = mptctl_timer_expired;
+	sema_init(&ioc->ioctl->sem_ioc, 1);
+	return 0;
+
+out_fail:
+
+	mptctl_remove(pdev);
+	return err;
+}
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+/*
+ *	mptctl_remove - Removed ioctl devices
+ *	@pdev: Pointer to pci_dev structure
+ *
+ *
+ */
+static void
+mptctl_remove(struct pci_dev *pdev)
+{
+	MPT_ADAPTER *ioc = pci_get_drvdata(pdev);
+
+	kfree ( ioc->ioctl );
+}
+
+static struct mpt_pci_driver mptctl_driver = {
+  .probe		= mptctl_probe,
+  .remove		= mptctl_remove,
+};
+
+/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
+static int __init mptctl_init(void)
+{
+	int err;
+	int where = 1;
 
 	show_mptmod_ver(my_NAME, my_VERSION);
 
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		sema_init(&mptctl_syscall_sem_ioc[i], 1);
-
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			/* This adapter instance is found.
-			 * Allocate and inite a MPT_IOCTL structure
-			 */
-			sz = sizeof (MPT_IOCTL);
-			mem = kmalloc(sz, GFP_KERNEL);
-			if (mem == NULL) {
-				err = -ENOMEM;
-				goto out_fail;
-			}
-
-			memset(mem, 0, sz);
-			ioc->ioctl = (MPT_IOCTL *) mem;
-			ioc->ioctl->ioc = ioc;
-			init_timer (&ioc->ioctl->timer);
-			ioc->ioctl->timer.data = (unsigned long) ioc->ioctl;
-			ioc->ioctl->timer.function = mptctl_timer_expired;
-			init_timer (&ioc->ioctl->TMtimer);
-			ioc->ioctl->TMtimer.data = (unsigned long) ioc->ioctl;
-			ioc->ioctl->TMtimer.function = mptctl_timer_expired;
-		}
+	if(mpt_device_driver_register(&mptctl_driver,
+	  MPTCTL_DRIVER) != 0 ) {
+		dprintk((KERN_INFO MYNAM
+		": failed to register dd callbacks\n"));
 	}
 
 #ifdef CONFIG_COMPAT
@@ -2922,29 +2958,14 @@ out_fail:
 	unregister_ioctl32_conversion(HP_GETTARGETINFO);
 #endif
 
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			if (ioc->ioctl) {
-				kfree ( ioc->ioctl );
-				ioc->ioctl = NULL;
-			}
-		}
-	}
+	mpt_device_driver_deregister(MPTCTL_DRIVER);
+
 	return err;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-void mptctl_exit(void)
+static void mptctl_exit(void)
 {
-	int i;
-	MPT_ADAPTER *ioc;
-	int iocnum;
-
 	misc_deregister(&mptctl_miscdev);
 	printk(KERN_INFO MYNAM ": Deregistered /dev/%s @ (major,minor=%d,%d)\n",
 			 mptctl_miscdev.name, MISC_MAJOR, mptctl_miscdev.minor);
@@ -2956,6 +2977,8 @@ void mptctl_exit(void)
 	/* De-register callback handler from base module */
 	mpt_deregister(mptctl_id);
 	printk(KERN_INFO MYNAM ": Deregistered from Fusion MPT base driver\n");
+
+        mpt_device_driver_deregister(MPTCTL_DRIVER);
 
 #ifdef CONFIG_COMPAT
 	unregister_ioctl32_conversion(MPTIOCINFO);
@@ -2973,20 +2996,6 @@ void mptctl_exit(void)
 	unregister_ioctl32_conversion(HP_GETTARGETINFO);
 #endif
 
-	/* Free allocated memory */
-	for (i=0; i<MPT_MAX_ADAPTERS; i++) {
-		ioc = NULL;
-		if (((iocnum = mpt_verify_adapter(i, &ioc)) < 0) ||
-		    (ioc == NULL)) {
-			continue;
-		}
-		else {
-			if (ioc->ioctl) {
-				kfree ( ioc->ioctl );
-				ioc->ioctl = NULL;
-			}
-		}
-	}
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
