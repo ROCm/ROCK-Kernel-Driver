@@ -22,13 +22,13 @@
  * Flush everything (kernel mapping may also have changed due to
  * vmalloc/vfree).
  */
-extern void __flush_tlb_all (void);
+extern void local_flush_tlb_all (void);
 
 #ifdef CONFIG_SMP
   extern void smp_flush_tlb_all (void);
 # define flush_tlb_all()	smp_flush_tlb_all()
 #else
-# define flush_tlb_all()	__flush_tlb_all()
+# define flush_tlb_all()	local_flush_tlb_all()
 #endif
 
 /*
