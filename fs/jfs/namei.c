@@ -1051,15 +1051,17 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 		sb = ip->i_sb;
 		bmask = JFS_SBI(sb)->bsize - 1;
 		xsize = (ssize + bmask) & ~bmask;
-		extent = xaddr = 0;
+		xaddr = 0;
 		xlen = xsize >> JFS_SBI(sb)->l2bsize;
 		if ((rc = xtInsert(tid, ip, 0, 0, xlen, &xaddr, 0))) {
 			txAbort(tid, 0);
 			rc = -ENOSPC;
 			goto out3;
 		}
+		extent = xaddr;
 		ip->i_size = ssize - 1;
 		while (ssize) {
+			/* This is kind of silly since PATH_MAX == 4K */
 			int copy_size = min(ssize, PSIZE);
 
 			mp = get_metapage(ip, xaddr, PSIZE, 1);
@@ -1073,6 +1075,7 @@ static int jfs_symlink(struct inode *dip, struct dentry *dentry,
 			memcpy(mp->data, name, copy_size);
 			flush_metapage(mp);
 			ssize -= copy_size;
+			name += copy_size;
 			xaddr += JFS_SBI(sb)->nbperpage;
 		}
 		ip->i_blocks = LBLK2PBLK(sb, xlen);

@@ -2452,8 +2452,10 @@ static ssize_t vscsi_target_store(struct kobject * kobj, struct attribute * attr
 				err("Error opening block device=%d\n", rc);
 				return rc;
 			}
-		} else 
-			deactivate_block_device(vdev);
+		} else {
+			if (!vdev->disabled) 
+				deactivate_block_device(vdev);
+		}
 	} else if (attr == &vscsi_target_ro_attr)
 		vdev->b.ro = value > 0 ? 1 : 0;
 	else 
