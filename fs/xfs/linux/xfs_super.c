@@ -530,9 +530,8 @@ void
 linvfs_put_super(
 	struct super_block	*sb)
 {
-	int			error;
-	int			sector_size;
 	vfs_t			*vfsp = LINVFS_GET_VFS(sb);
+	int			error;
 
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
