@@ -610,8 +610,10 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 	while (writecount < count) {
 		if (!usblp->wcomplete) {
 			barrier();
-			if (file->f_flags & O_NONBLOCK)
+			if (file->f_flags & O_NONBLOCK) {
+				writecount += transfer_length;
 				return writecount ? writecount : -EAGAIN;
+			}
 
 			timeout = USBLP_WRITE_TIMEOUT;
 			add_wait_queue(&usblp->wait, &wait);
@@ -671,7 +673,8 @@ static ssize_t usblp_write(struct file *file, const char __user *buffer, size_t 
 
 		usblp->writeurb->transfer_buffer_length = transfer_length;
 
-		if (copy_from_user(usblp->writeurb->transfer_buffer, buffer + writecount, transfer_length)) {
+		if (copy_from_user(usblp->writeurb->transfer_buffer, 
+				   buffer + writecount, transfer_length)) {
 			up(&usblp->sem);
 			return writecount ? writecount : -EFAULT;
 		}
