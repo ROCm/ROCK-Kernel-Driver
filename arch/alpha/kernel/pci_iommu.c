@@ -431,7 +431,7 @@ try_again:
 /* Free and unmap a consistent DMA buffer.  CPU_ADDR and DMA_ADDR must
    be values that were returned from pci_alloc_consistent.  SIZE must
    be the same as what as passed into pci_alloc_consistent.
-   References to the memory and mappings assosciated with CPU_ADDR or
+   References to the memory and mappings associated with CPU_ADDR or
    DMA_ADDR past this call are illegal.  */
 
 void

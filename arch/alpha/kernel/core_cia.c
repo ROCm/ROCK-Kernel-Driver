@@ -610,7 +610,7 @@ do_init_arch(int is_pyxis)
 		*(vip)CIA_IOC_CIA_CNFG = temp;
 	}
 
-	/* Syncronize with all previous changes.  */
+	/* Synchronize with all previous changes.  */
 	mb();
 	*(vip)CIA_IOC_CIA_REV;
 
