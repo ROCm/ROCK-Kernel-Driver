@@ -83,6 +83,7 @@
 	mov.l	@(LER0-LER1:16,sp),er1		/* restore ER0 */
 	mov.l	er1,@er0
 	mov.w	@(LEXR-LER1:16,sp),r1		/* restore EXR */
+	mov.b	r1l,r1h
 	mov.w	r1,@(8:16,er0)
 	mov.w	@(LCCR-LER1:16,sp),r1		/* restore the RET addr */
 	mov.b	r1l,r1h
@@ -213,7 +214,6 @@ SYMBOL_NAME_LABEL(system_call)
 	mov.l	er0,@(LER0:16,sp)		/* save the return value */
 	jsr	@SYMBOL_NAME(syscall_trace)
 	bra	SYMBOL_NAME(ret_from_exception):8
-
 
 SYMBOL_NAME_LABEL(ret_from_fork)
 	mov.l	er2,er0

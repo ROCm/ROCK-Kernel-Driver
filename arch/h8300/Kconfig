@@ -223,7 +223,7 @@ config GDB_DEBUG
 
 config CONFIG_SH_STANDARD_BIOS
 	bool "Use gdb protocol serial console"
-	depends on (!H8300H_SIM && H8S_SIM)
+	depends on (!H8300H_SIM && !H8S_SIM)
 	help
 	  serial console output using GDB protocol.
 	  Require eCos/RedBoot
