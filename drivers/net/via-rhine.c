@@ -516,7 +516,7 @@ static void via_rhine_rx(struct net_device *dev);
 static void via_rhine_error(struct net_device *dev, int intr_status);
 static void via_rhine_set_rx_mode(struct net_device *dev);
 static struct net_device_stats *via_rhine_get_stats(struct net_device *dev);
-static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  via_rhine_close(struct net_device *dev);
 static inline void clear_tally_counters(long ioaddr);
 
@@ -715,6 +715,8 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	np->mii_if.dev = dev;
 	np->mii_if.mdio_read = mdio_read;
 	np->mii_if.mdio_write = mdio_write;
+	np->mii_if.phy_id_mask = 0x1f;
+	np->mii_if.reg_num_mask = 0x1f;
 
 	if (dev->mem_start)
 		option = dev->mem_start;
@@ -731,7 +733,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	if (np->mii_if.full_duplex) {
 		printk(KERN_INFO "%s: Set to forced full duplex, autonegotiation"
 			   " disabled.\n", dev->name);
-		np->mii_if.duplex_lock = 1;
+		np->mii_if.force_media = 1;
 	}
 
 	/* The chip-specific entries in the device structure. */
@@ -740,7 +742,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->stop = via_rhine_close;
 	dev->get_stats = via_rhine_get_stats;
 	dev->set_multicast_list = via_rhine_set_rx_mode;
-	dev->do_ioctl = via_rhine_ioctl;
+	dev->do_ioctl = netdev_ioctl;
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	if (np->drv_flags & ReqTxAlign)
@@ -1001,7 +1003,7 @@ static void init_registers(struct net_device *dev)
 		   ioaddr + IntrEnable);
 
 	np->chip_cmd = CmdStart|CmdTxOn|CmdRxOn|CmdNoTxPoll;
-	if (np->mii_if.duplex_lock)
+	if (np->mii_if.force_media)
 		np->chip_cmd |= CmdFDuplex;
 	writew(np->chip_cmd, ioaddr + ChipCmd);
 
@@ -1043,7 +1045,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 		switch (regnum) {
 		case MII_BMCR:					/* Is user forcing speed/duplex? */
 			if (value & 0x9000)			/* Autonegotiation. */
-				np->mii_if.duplex_lock = 0;
+				np->mii_if.force_media = 0;
 			else
 				np->mii_if.full_duplex = (value & 0x0100) ? 1 : 0;
 			break;
@@ -1114,7 +1116,7 @@ static void via_rhine_check_duplex(struct net_device *dev)
 	int negotiated = mii_lpa & np->mii_if.advertising;
 	int duplex;
 
-	if (np->mii_if.duplex_lock  ||  mii_lpa == 0xffff)
+	if (np->mii_if.force_media  ||  mii_lpa == 0xffff)
 		return;
 	duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
 	if (np->mii_if.full_duplex != duplex) {
@@ -1586,7 +1588,7 @@ static void via_rhine_set_rx_mode(struct net_device *dev)
 	writeb(np->rx_thresh | rx_mode, ioaddr + RxConfig);
 }
 
-static int via_rhine_ethtool_ioctl (struct net_device *dev, void *useraddr)
+static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct netdev_private *np = dev->priv;
 	u32 ethcmd;
@@ -1669,41 +1671,28 @@ static int via_rhine_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 	return -EOPNOTSUPP;
 }
-static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
-	unsigned long flags;
-	int retval;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	int rc;
+
+	if (!netif_running(dev))
+		return -EINVAL;
 
 	if (cmd == SIOCETHTOOL)
-		return via_rhine_ethtool_ioctl(dev, (void *) rq->ifr_data);
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
-	spin_lock_irqsave(&np->lock, flags);
-	retval = 0;
-
-	switch(cmd) {
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = np->phys[0] & 0x1f;
-		/* Fall Through */
-
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		break;
-
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN)) {
-			retval = -EPERM;
-			break;
-		}
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-		break;
-	default:
-		retval = -EOPNOTSUPP;
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(dev, &np->mii_if, data, cmd);
+		spin_unlock_irq(&np->lock);
+		if (rc == 1)	/* don't care about duplex change, fix up rc */
+			rc = 0;
 	}
 
-	spin_unlock_irqrestore(&np->lock, flags);
-	return retval;
+	return rc;
 }
 
 static int via_rhine_close(struct net_device *dev)

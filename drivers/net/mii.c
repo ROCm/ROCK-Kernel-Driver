@@ -3,7 +3,27 @@
 	mii.c: MII interface library
 
 	Maintained by Jeff Garzik <jgarzik@mandrakesoft.com>
-	Copyright 2001 Jeff Garzik
+	Copyright 2001,2002 Jeff Garzik
+
+	Various code came from myson803.c and other files by
+	Donald Becker.  Copyright:
+
+		Written 1998-2002 by Donald Becker.
+
+		This software may be used and distributed according
+		to the terms of the GNU General Public License (GPL),
+		incorporated herein by reference.  Drivers based on
+		or derived from this code fall under the GPL and must
+		retain the authorship, copyright and license notice.
+		This file is not a complete program and may only be
+		used when the entire operating system is licensed
+		under the GPL.
+
+		The author may be reached as becker@scyld.com, or C/O
+		Scyld Computing Corporation
+		410 Severn Ave., Suite 210
+		Annapolis MD 21403
+
 
  */
 
@@ -122,7 +142,7 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		bmcr |= (BMCR_ANENABLE | BMCR_ANRESTART);
 		mii->mdio_write(dev, mii->phy_id, MII_BMCR, bmcr);
 
-		mii->duplex_lock = 0;
+		mii->force_media = 0;
 	} else {
 		u32 bmcr, tmp;
 
@@ -139,7 +159,7 @@ int mii_ethtool_sset(struct mii_if_info *mii, struct ethtool_cmd *ecmd)
 		if (bmcr != tmp)
 			mii->mdio_write(dev, mii->phy_id, MII_BMCR, tmp);
 
-		mii->duplex_lock = 1;
+		mii->force_media = 1;
 	}
 	return 0;
 }
@@ -178,13 +198,15 @@ void mii_check_link (struct mii_if_info *mii)
 		netif_carrier_off(mii->dev);
 }
 
-unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
+unsigned int mii_check_media (struct mii_if_info *mii,
+			      unsigned int ok_to_print,
+			      unsigned int init_media)
 {
 	unsigned int old_carrier, new_carrier;
 	int advertise, lpa, media, duplex;
 
 	/* if forced media, go no further */
-	if (mii->duplex_lock)
+	if (mii->force_media)
 		return 0; /* duplex did not change */
 
 	/* check current and old link status */
@@ -194,7 +216,7 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 	/* if carrier state did not change, this is a "bounce",
 	 * just exit as everything is already set correctly
 	 */
-	if (old_carrier == new_carrier)
+	if ((!init_media) && (old_carrier == new_carrier))
 		return 0; /* duplex did not change */
 
 	/* no carrier, nothing much to do */
@@ -211,7 +233,7 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 	netif_carrier_on(mii->dev);
 
 	/* get MII advertise and LPA values */
-	if (mii->advertising)
+	if ((!init_media) && (mii->advertising))
 		advertise = mii->advertising;
 	else {
 		advertise = mii->mdio_read(mii->dev, mii->phy_id, MII_ADVERTISE);
@@ -231,12 +253,79 @@ unsigned int mii_check_media (struct mii_if_info *mii, unsigned int ok_to_print)
 		       duplex ? "full" : "half",
 		       lpa);
 
-	if (mii->full_duplex != duplex) {
+	if ((init_media) || (mii->full_duplex != duplex)) {
 		mii->full_duplex = duplex;
 		return 1; /* duplex changed */
 	}
 
 	return 0; /* duplex did not change */
+}
+
+int generic_mii_ioctl(struct net_device *dev, struct mii_if_info *mii_if,
+		      struct mii_ioctl_data *mii_data, int cmd)
+{
+	int rc = 0;
+	unsigned int duplex_changed = 0;
+
+	mii_data->phy_id &= mii_if->phy_id_mask;
+	mii_data->reg_num &= mii_if->reg_num_mask;
+
+	switch(cmd) {
+	case SIOCGMIIPHY:
+		mii_data->phy_id = mii_if->phy_id;
+		/* fall through */
+
+	case SIOCGMIIREG:
+		mii_data->val_out =
+			mii_if->mdio_read(dev, mii_data->phy_id,
+					  mii_data->reg_num);
+		break;
+
+	case SIOCSMIIREG: {
+		u16 val = mii_data->val_in;
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if (mii_data->phy_id == mii_if->phy_id) {
+			switch(mii_data->reg_num) {
+			case MII_BMCR: {
+				unsigned int new_duplex = 0;
+				if (val & (BMCR_RESET|BMCR_ANENABLE))
+					mii_if->force_media = 1;
+				else
+					mii_if->force_media = 0;
+				if (mii_if->force_media &&
+				    (val & BMCR_FULLDPLX))
+					new_duplex = 1;
+				if (mii_if->full_duplex != new_duplex) {
+					duplex_changed = 1;
+					mii_if->full_duplex = new_duplex;
+				}
+				break;
+			}
+			case MII_ADVERTISE:
+				mii_if->advertising = val;
+				break;
+			default:
+				/* do nothing */
+				break;
+			}
+		}
+
+		mii_if->mdio_write(dev, mii_data->phy_id,
+				   mii_data->reg_num, val);
+		break;
+	}
+
+	default:
+		rc = -EOPNOTSUPP;
+		break;
+	}
+
+	if ((rc == 0) && (duplex_changed))
+		rc = 1;
+	return rc;
 }
 
 MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
@@ -249,4 +338,5 @@ EXPORT_SYMBOL(mii_ethtool_gset);
 EXPORT_SYMBOL(mii_ethtool_sset);
 EXPORT_SYMBOL(mii_check_link);
 EXPORT_SYMBOL(mii_check_media);
+EXPORT_SYMBOL(generic_mii_ioctl);
 

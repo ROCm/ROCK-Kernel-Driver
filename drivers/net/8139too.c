@@ -578,7 +578,6 @@ struct rtl8139_private {
 	signed char phys[4];		/* MII device addresses. */
 	char twistie, twist_row, twist_col;	/* Twister tune state. */
 	unsigned int default_port:4;	/* Last dev->if_port value. */
-	unsigned int medialock:1;	/* Don't sense media type. */
 	spinlock_t lock;
 	chip_t chipset;
 	pid_t thr_pid;
@@ -986,6 +985,8 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 	tp->mii.dev = dev;
 	tp->mii.mdio_read = mdio_read;
 	tp->mii.mdio_write = mdio_write;
+	tp->mii.phy_id_mask = 0x3f;
+	tp->mii.reg_num_mask = 0x1f;
 
 	/* dev is fully set up and ready to use now */
 	DPRINTK("about to register device named %s (%p)...\n", dev->name, dev);
@@ -1041,7 +1042,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 		tp->mii.full_duplex = (option & 0x210) ? 1 : 0;
 		tp->default_port = option & 0xFF;
 		if (tp->default_port)
-			tp->medialock = 1;
+			tp->mii.force_media = 1;
 	}
 	if (board_idx < MAX_UNITS  &&  full_duplex[board_idx] > 0)
 		tp->mii.full_duplex = full_duplex[board_idx];
@@ -1049,7 +1050,7 @@ static int __devinit rtl8139_init_one (struct pci_dev *pdev,
 		printk(KERN_INFO "%s: Media type forced to Full Duplex.\n", dev->name);
 		/* Changing the MII-advertised media because might prevent
 		   re-connection. */
-		tp->mii.duplex_lock = 1;
+		tp->mii.force_media = 1;
 	}
 	if (tp->default_port) {
 		printk(KERN_INFO "  Forcing %dMbps %s-duplex operation.\n",
@@ -1306,7 +1307,7 @@ static int rtl8139_open (struct net_device *dev)
 
 	}
 
-	tp->mii.full_duplex = tp->mii.duplex_lock;
+	tp->mii.full_duplex = tp->mii.force_media;
 	tp->tx_flag = (TX_FIFO_THRESH << 11) & 0x003f0000;
 	tp->twistie = (tp->chipset == CH_8139_K) ? 1 : 0;
 	tp->time_to_die = 0;
@@ -1537,7 +1538,7 @@ static inline void rtl8139_thread_iter (struct net_device *dev,
 
 	mii_lpa = mdio_read (dev, tp->phys[0], MII_LPA);
 
-	if (!tp->mii.duplex_lock && mii_lpa != 0xffff) {
+	if (!tp->mii.force_media && mii_lpa != 0xffff) {
 		int duplex = (mii_lpa & LPA_100FULL)
 		    || (mii_lpa & 0x01C0) == 0x0040;
 		if (tp->mii.full_duplex != duplex) {
@@ -1995,7 +1996,7 @@ static void rtl8139_weird_interrupt (struct net_device *dev,
 		/* Really link-change on new chips. */
 		int lpar = RTL_R16 (NWayLPAR);
 		int duplex = (lpar & LPA_100FULL) || (lpar & 0x01C0) == 0x0040
-				|| tp->mii.duplex_lock;
+				|| tp->mii.force_media;
 		if (tp->mii.full_duplex != duplex) {
 			tp->mii.full_duplex = duplex;
 #if 0
@@ -2439,58 +2440,25 @@ err_out_gregs:
 }
 
 
-static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct rtl8139_private *tp = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
-	int rc = 0;
-	int phy = tp->phys[0] & 0x3f;
+	struct rtl8139_private *np = dev->priv;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	int rc;
 
 	if (!netif_running(dev))
 		return -EINVAL;
 
-	if (cmd != SIOCETHTOOL) {
-		/* With SIOCETHTOOL, this would corrupt the pointer.  */
-		data->phy_id &= 0x3f;
-		data->reg_num &= 0x1f;
-	}
+	if (cmd == SIOCETHTOOL)
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(dev, &np->mii, data, cmd);
+		spin_unlock_irq(&np->lock);
 
-	case SIOCGMIIPHY:	/* Get the address of the PHY in use. */
-		data->phy_id = phy;
-		/* Fall Through */
-
-	case SIOCGMIIREG:	/* Read the specified MII register. */
-		data->val_out = mdio_read (dev, data->phy_id, data->reg_num);
-		break;
-
-	case SIOCSMIIREG:	/* Write the specified MII register */
-		if (!capable (CAP_NET_ADMIN)) {
-			rc = -EPERM;
-			break;
-		}
-
-		if (data->phy_id == phy) {
-			u16 value = data->val_in;
-			switch (data->reg_num) {
-			case 0:
-				/* Check for autonegotiation on or reset. */
-				tp->medialock = (value & 0x9000) ? 0 : 1;
-				if (tp->medialock)
-					tp->mii.full_duplex = (value & 0x0100) ? 1 : 0;
-				break;
-			case 4: tp->mii.advertising = value; break;
-			}
-		}
-		mdio_write(dev, data->phy_id, data->reg_num, data->val_in);
-		break;
-
-	default:
-		rc = -EOPNOTSUPP;
-		break;
+		if (rc == 1)	/* don't care about duplex change, fix up rc */
+			rc = 0;
 	}
 
 	return rc;
