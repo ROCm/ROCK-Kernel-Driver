@@ -27,6 +27,8 @@
 #include <linux/icmp.h>
 #include <net/sock.h>
 #include <net/route.h>
+#include <net/xfrm.h>
+#include <net/ip.h>
 #include <linux/ip.h>
 
 /* In this code, we can be waiting indefinitely for userspace to
@@ -630,7 +632,6 @@ int ip_route_me_harder(struct sk_buff **pskb)
 #ifdef CONFIG_IP_ROUTE_FWMARK
 		fl.nl_u.ip4_u.fwmark = (*pskb)->nfmark;
 #endif
-		fl.proto = iph->protocol;
 		if (ip_route_output_key(&rt, &fl) != 0)
 			return -1;
 
@@ -657,6 +658,20 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	if ((*pskb)->dst->error)
 		return -1;
 
+#ifdef CONFIG_XFRM
+	if (!(IPCB(*pskb)->flags & IPSKB_XFRM_TRANSFORMED)) {
+		struct xfrm_policy_afinfo *afinfo;
+
+		afinfo = xfrm_policy_get_afinfo(AF_INET);
+		if (afinfo != NULL) {
+			afinfo->decode_session(*pskb, &fl);
+			xfrm_policy_put_afinfo(afinfo);
+			if (xfrm_lookup(&(*pskb)->dst, &fl, (*pskb)->sk, 0) != 0)
+				return -1;
+		}
+	}
+#endif
+
 	/* Change in oif may mean change in hh_len. */
 	hh_len = (*pskb)->dst->dev->hard_header_len;
 	if (skb_headroom(*pskb) < hh_len) {
@@ -673,6 +688,71 @@ int ip_route_me_harder(struct sk_buff **pskb)
 
 	return 0;
 }
+
+#ifdef CONFIG_XFRM
+inline int nf_rcv_postxfrm_nonlocal(struct sk_buff *skb)
+{
+	skb->sp->decap_done = 1;
+	dst_release(skb->dst);
+	skb->dst = NULL;
+	nf_reset(skb);
+	return netif_rx(skb);
+}
+
+int nf_rcv_postxfrm_local(struct sk_buff *skb)
+{
+	__skb_push(skb, skb->data - skb->nh.raw);
+	/* Fix header len and checksum if last xfrm was transport mode */
+	if (!skb->sp->x[skb->sp->len - 1].xvec->props.mode) {
+		skb->nh.iph->tot_len = htons(skb->len);
+		ip_send_check(skb->nh.iph);
+	}
+	return nf_rcv_postxfrm_nonlocal(skb);
+}
+
+#ifdef CONFIG_IP_NF_NAT_NEEDED
+#include <linux/netfilter_ipv4/ip_conntrack.h>
+#include <linux/netfilter_ipv4/ip_nat.h>
+
+void nf_nat_decode_session4(struct sk_buff *skb, struct flowi *fl)
+{
+	struct ip_conntrack *ct;
+	struct ip_conntrack_tuple *t;
+	struct ip_nat_info_manip *m;
+	unsigned int i;
+
+	if (skb->nfct == NULL)
+		return;
+	ct = (struct ip_conntrack *)skb->nfct->master;
+
+	for (i = 0; i < ct->nat.info.num_manips; i++) {
+		m = &ct->nat.info.manips[i];
+		t = &ct->tuplehash[m->direction].tuple;
+
+		switch (m->hooknum) {
+		case NF_IP_PRE_ROUTING:
+			if (m->maniptype != IP_NAT_MANIP_DST)
+				break;
+			fl->fl4_dst = t->dst.ip;
+			if (t->dst.protonum == IPPROTO_TCP ||
+			    t->dst.protonum == IPPROTO_UDP)
+				fl->fl_ip_dport = t->dst.u.tcp.port;
+			break;
+#ifdef CONFIG_IP_NF_NAT_LOCAL
+		case NF_IP_LOCAL_IN:
+			if (m->maniptype != IP_NAT_MANIP_SRC)
+				break;
+			fl->fl4_src = t->src.ip;
+			if (t->dst.protonum == IPPROTO_TCP ||
+			    t->dst.protonum == IPPROTO_UDP)
+				fl->fl_ip_sport = t->src.u.tcp.port;
+			break;
+#endif
+		}
+	}
+}
+#endif /* CONFIG_IP_NF_NAT_NEEDED */
+#endif
 
 int skb_ip_make_writable(struct sk_buff **pskb, unsigned int writable_len)
 {
@@ -837,3 +917,4 @@ EXPORT_SYMBOL(nf_setsockopt);
 EXPORT_SYMBOL(nf_unregister_hook);
 EXPORT_SYMBOL(nf_unregister_queue_handler);
 EXPORT_SYMBOL(nf_unregister_sockopt);
+EXPORT_SYMBOL(nf_rcv_postxfrm_local);

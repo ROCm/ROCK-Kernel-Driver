@@ -214,10 +214,6 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 	__skb_pull(skb, ihl);
 
-	/* Free reference early: we don't need it any more, and it may
-           hold ip_conntrack module loaded indefinitely. */
-	nf_reset(skb);
-
         /* Point into the IP datagram, just past the header. */
         skb->h.raw = skb->data;
 
@@ -232,6 +228,13 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 	resubmit:
 		hash = protocol & (MAX_INET_PROTOS - 1);
 		raw_sk = sk_head(&raw_v4_htable[hash]);
+		ipprot = inet_protos[hash];
+		smp_read_barrier_depends();
+
+		if (nf_xfrm_local_done(skb, ipprot)) {
+			nf_rcv_postxfrm_local(skb);
+			goto out;
+		}
 
 		/* If there maybe a raw socket we must check - if not we
 		 * don't care less
@@ -239,14 +242,15 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 		if (raw_sk)
 			raw_v4_input(skb, skb->nh.iph, hash);
 
-		if ((ipprot = inet_protos[hash]) != NULL) {
+		if (ipprot != NULL) {
 			int ret;
 
-			smp_read_barrier_depends();
-			if (!ipprot->no_policy &&
-			    !xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-				kfree_skb(skb);
-				goto out;
+			if (!ipprot->no_policy) {
+				if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+					kfree_skb(skb);
+					goto out;
+				}
+				nf_reset(skb);
 			}
 			ret = ipprot->handler(skb);
 			if (ret < 0) {
@@ -295,8 +299,8 @@ int ip_local_deliver(struct sk_buff *skb)
 		 }
 	}
 
-	return NF_HOOK(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
-		       ip_local_deliver_finish);
+	return NF_HOOK_COND(PF_INET, NF_IP_LOCAL_IN, skb, skb->dev, NULL,
+	                    ip_local_deliver_finish, nf_hook_input_cond(skb));
 }
 
 static inline int ip_rcv_finish(struct sk_buff *skb)
@@ -312,6 +316,9 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		if (ip_route_input(skb, iph->daddr, iph->saddr, iph->tos, dev))
 			goto drop; 
 	}
+
+	if (nf_xfrm_nonlocal_done(skb))
+		return nf_rcv_postxfrm_nonlocal(skb);
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	if (skb->dst->tclassid) {
@@ -434,8 +441,8 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		}
 	}
 
-	return NF_HOOK(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
-		       ip_rcv_finish);
+	return NF_HOOK_COND(PF_INET, NF_IP_PRE_ROUTING, skb, dev, NULL,
+	                    ip_rcv_finish, nf_hook_input_cond(skb));
 
 inhdr_error:
 	IP_INC_STATS_BH(IPSTATS_MIB_INHDRERRORS);
