@@ -3777,7 +3777,7 @@ nfs_stat_to_errno(int stat)
 		if (nfs_errtbl[i].stat == stat)
 			return nfs_errtbl[i].errno;
 	}
-	if (stat < 0) {
+	if (stat <= 10000 || stat > 10100) {
 		/* The server is looney tunes. */
 		return ESERVERFAULT;
 	}
