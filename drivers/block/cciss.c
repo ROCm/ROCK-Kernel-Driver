@@ -578,7 +578,7 @@ int cciss_ioctl32_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	err = sys_ioctl(fd, CCISS_PASSTHRU, (unsigned long) p);
 	if (err)
 		return err;
-	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(&arg32->error_info));
+	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(arg32->error_info));
 	if (err)
 		return -EFAULT;
 	return err;
@@ -610,7 +610,7 @@ int cciss_ioctl32_big_passthru(unsigned int fd, unsigned cmd, unsigned long arg,
 	err = sys_ioctl(fd, CCISS_BIG_PASSTHRU, (unsigned long) p);
 	if (err)
 		return err;
-	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(&arg32->error_info));
+	err |= copy_in_user(&arg32->error_info, &p->error_info, sizeof(arg32->error_info));
 	if (err)
 		return -EFAULT;
 	return err;
