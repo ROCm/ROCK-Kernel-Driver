@@ -1895,7 +1895,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	if (how == 1) {
 #ifdef CONFIG_SYSCTL
 		addrconf_sysctl_unregister(&idev->cnf);
-		neigh_sysctl_unregister(&idev->nd_parms);
+		neigh_sysctl_unregister(idev->nd_parms);
 #endif
 		neigh_parms_release(&nd_tbl, idev->nd_parms);
 		in6_dev_put(idev);
