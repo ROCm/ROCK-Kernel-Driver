@@ -33,7 +33,7 @@
 
 #include "lcd.h"
 
-static spinlock_t lcd_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(lcd_lock);
 
 static int lcd_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg);
