@@ -1593,30 +1593,39 @@ static unsigned int sa1100fb_min_dma_period(struct sa1100fb_info *fbi)
  * subsystem.
  */
 static int
-sa1100fb_clkchg_notifier(struct notifier_block *nb, unsigned long val,
+sa1100fb_freq_transition(struct notifier_block *nb, unsigned long val,
 			 void *data)
 {
-	struct sa1100fb_info *fbi = TO_INF(nb, clockchg);
-	struct cpufreq_minmax *mm = data;
+	struct sa1100fb_info *fbi = TO_INF(nb, freq_transition);
+	struct cpufreq_freqs *f = data;
 	u_int pcd;
 
 	switch (val) {
-	case CPUFREQ_MINMAX:
-		printk(KERN_DEBUG "min dma period: %d ps, old clock %d kHz, "
-			"new clock %d kHz\n", sa1100fb_min_dma_period(fbi),
-			mm->cur_freq, mm->new_freq);
-		/* todo: fill in min/max values */
-		break;
-
 	case CPUFREQ_PRECHANGE:
 		set_ctrlr_state(fbi, C_DISABLE_CLKCHANGE);
 		break;
 
 	case CPUFREQ_POSTCHANGE:
-		pcd = get_pcd(fbi->fb.var.pixclock, cpufreq_get(0));
+		pcd = get_pcd(fbi->fb.var.pixclock, f->new);
 		fbi->reg_lccr3 = (fbi->reg_lccr3 & ~0xff) | LCCR3_PixClkDiv(pcd);
 		set_ctrlr_state(fbi, C_ENABLE_CLKCHANGE);
 		break;
+	}
+	return 0;
+}
+
+static int
+sa1100fb_freq_policy(struct notifier_block *nb, unsigned long val,
+		     void *data)
+{
+	struct sa1100fb_info *fbi = TO_INF(nb, freq_policy);
+	struct cpufreq_policy *policy = data;
+
+	if (val == CPUFREQ_INCOMPATIBLE) {
+		printk(KERN_DEBUG "min dma period: %d ps, "
+			"new clock %d kHz\n", sa1100fb_min_dma_period(fbi),
+			policy->max);
+		/* todo: fill in min/max values */
 	}
 	return 0;
 }
@@ -1831,8 +1840,10 @@ int __init sa1100fb_init(void)
 		fbi->pm->data = fbi;
 #endif
 #ifdef CONFIG_CPU_FREQ
-	fbi->clockchg.notifier_call = sa1100fb_clkchg_notifier;
-	cpufreq_register_notifier(&fbi->clockchg);
+	fbi->freq_transition.notifier_call = sa1100fb_freq_transition;
+	fbi->freq_policy.notifier_call = sa1100fb_freq_policy;
+	cpufreq_register_notifier(&fbi->freq_transition, CPUFREQ_TRANSITION_NOTIFIER);
+	cpufreq_register_notifier(&fbi->freq_policy, CPUFREQ_POLICY_NOTIFIER);
 #endif
 
 	/*
