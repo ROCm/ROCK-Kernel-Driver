@@ -468,11 +468,7 @@ do_io:
 			  * pages shall be accessed in the next
 			  * current window.
 			  */
-			average = ra->average;
-			if (ra->serial_cnt > average)
-				average = (ra->serial_cnt + ra->average + 1) / 2;
-
-			ra->next_size = min(average , (unsigned long)max);
+			ra->next_size = min(ra->average , (unsigned long)max);
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
