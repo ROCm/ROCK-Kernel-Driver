@@ -100,6 +100,7 @@ struct svc_export *	exp_parent(struct svc_client *clp, struct vfsmount *mnt,
 				   struct dentry *dentry);
 int			exp_rootfh(struct svc_client *, 
 					char *path, struct knfsd_fh *, int maxsize);
+int			exp_pseudoroot(struct svc_client *, struct svc_fh *fhp);
 int			nfserrno(int errno);
 
 static inline struct svc_export *

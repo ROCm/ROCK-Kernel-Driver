@@ -550,6 +550,23 @@ out:
 	return err;
 }
 
+/*
+ * Called when we need the filehandle for the root of the pseudofs,
+ * for a given NFSv4 client.   The root is defined to be the
+ * export point with fsid==0
+ */
+int
+exp_pseudoroot(struct svc_client *clp, struct svc_fh *fhp)
+{
+	struct svc_export *exp;
+
+	exp = exp_get_fsid(clp, 0);
+	if (!exp)
+		return nfserr_perm;
+
+	dget(exp->ex_dentry);
+	return fh_compose(fhp, exp, exp->ex_dentry, NULL);
+}
 
 /*
  * Find a valid client given an inet address. We always move the most
