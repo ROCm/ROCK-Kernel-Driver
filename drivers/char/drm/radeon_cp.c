@@ -32,6 +32,7 @@
 #include "drm.h"
 #include "radeon_drm.h"
 #include "radeon_drv.h"
+#include "ati_pcigart.h"
 
 #define RADEON_FIFO_DEBUG	0
 

@@ -52,7 +52,7 @@
 # define ATI_MAX_PCIGART_PAGES		8192	/**< 32 MB aperture, 4K pages */
 # define ATI_PCIGART_PAGE_SIZE		4096	/**< PCI GART page size */
 
-static unsigned long drm_ati_alloc_pcigart_table( void )
+static inline unsigned long drm_ati_alloc_pcigart_table( void )
 {
 	unsigned long address;
 	struct page *page;
@@ -75,7 +75,7 @@ static unsigned long drm_ati_alloc_pcigart_table( void )
 	return address;
 }
 
-static void drm_ati_free_pcigart_table( unsigned long address )
+static inline void drm_ati_free_pcigart_table( unsigned long address )
 {
 	struct page *page;
 	int i;
@@ -91,7 +91,43 @@ static void drm_ati_free_pcigart_table( unsigned long address )
 	free_pages( address, ATI_PCIGART_TABLE_ORDER );
 }
 
-int drm_ati_pcigart_init( drm_device_t *dev,
+static inline int drm_ati_pcigart_cleanup( drm_device_t *dev,
+			      unsigned long addr,
+			      dma_addr_t bus_addr)
+{
+	drm_sg_mem_t *entry = dev->sg;
+	unsigned long pages;
+	int i;
+
+	/* we need to support large memory configurations */
+	if ( !entry ) {
+		DRM_ERROR( "no scatter/gather memory!\n" );
+		return 0;
+	}
+
+	if ( bus_addr ) {
+		pci_unmap_single(dev->pdev, bus_addr,
+				 ATI_PCIGART_TABLE_PAGES * PAGE_SIZE,
+				 PCI_DMA_TODEVICE);
+
+		pages = ( entry->pages <= ATI_MAX_PCIGART_PAGES )
+		        ? entry->pages : ATI_MAX_PCIGART_PAGES;
+
+		for ( i = 0 ; i < pages ; i++ ) {
+			if ( !entry->busaddr[i] ) break;
+			pci_unmap_single(dev->pdev, entry->busaddr[i],
+					 PAGE_SIZE, PCI_DMA_TODEVICE);
+		}
+	}
+
+	if ( addr ) {
+		drm_ati_free_pcigart_table( addr );
+	}
+
+	return 1;
+}
+
+static inline int drm_ati_pcigart_init( drm_device_t *dev,
 			   unsigned long *addr,
 			   dma_addr_t *bus_addr)
 {
@@ -169,38 +205,3 @@ done:
 	return ret;
 }
 
-int drm_ati_pcigart_cleanup( drm_device_t *dev,
-			      unsigned long addr,
-			      dma_addr_t bus_addr)
-{
-	drm_sg_mem_t *entry = dev->sg;
-	unsigned long pages;
-	int i;
-
-	/* we need to support large memory configurations */
-	if ( !entry ) {
-		DRM_ERROR( "no scatter/gather memory!\n" );
-		return 0;
-	}
-
-	if ( bus_addr ) {
-		pci_unmap_single(dev->pdev, bus_addr,
-				 ATI_PCIGART_TABLE_PAGES * PAGE_SIZE,
-				 PCI_DMA_TODEVICE);
-
-		pages = ( entry->pages <= ATI_MAX_PCIGART_PAGES )
-		        ? entry->pages : ATI_MAX_PCIGART_PAGES;
-
-		for ( i = 0 ; i < pages ; i++ ) {
-			if ( !entry->busaddr[i] ) break;
-			pci_unmap_single(dev->pdev, entry->busaddr[i],
-					 PAGE_SIZE, PCI_DMA_TODEVICE);
-		}
-	}
-
-	if ( addr ) {
-		drm_ati_free_pcigart_table( addr );
-	}
-
-	return 1;
-}

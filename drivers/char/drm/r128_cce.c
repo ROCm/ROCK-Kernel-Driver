@@ -32,6 +32,7 @@
 #include "drm.h"
 #include "r128_drm.h"
 #include "r128_drv.h"
+#include "ati_pcigart.h"
 
 #define R128_FIFO_DEBUG		0
 
