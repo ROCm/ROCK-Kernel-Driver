@@ -83,6 +83,26 @@ static int create_tmp_file(unsigned long len)
 	return(fd);
 }
 
+void check_tmpexec(void)
+{
+	void *addr;
+	int err, fd = create_tmp_file(UM_KERN_PAGE_SIZE);
+
+	addr = mmap(NULL, UM_KERN_PAGE_SIZE,
+		    PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE, fd, 0);
+	printf("Checking PROT_EXEC mmap in /tmp...");
+	fflush(stdout);
+	if(addr == MAP_FAILED){
+		err = errno;
+		perror("failed");
+		if(err == EPERM)
+			printf("/tmp must be not mounted noexec\n");
+		exit(1);
+	}
+	printf("OK\n");
+	munmap(addr, UM_KERN_PAGE_SIZE);
+}
+
 static int have_devanon = 0;
 
 void check_devanon(void)
@@ -111,7 +131,7 @@ static int create_anon_file(unsigned long len)
 		exit(1);
 	}
 
-	addr = mmap(NULL, len, PROT_READ | PROT_WRITE , MAP_PRIVATE, fd, 0);
+	addr = mmap(NULL, len, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if(addr == MAP_FAILED){
 		os_print_error((int) addr, "mapping physmem file");
 		exit(1);
