@@ -103,7 +103,7 @@ absolute_to_phys(unsigned long aa)
 #define physRpn_to_absRpn(rpn) (rpn)
 #define absolute_to_phys(aa) (aa)
 
-#endif /* CONFIG_MSCHUNKS */
+#endif /* !CONFIG_MSCHUNKS */
 
 
 static inline unsigned long
