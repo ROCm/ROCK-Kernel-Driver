@@ -48,7 +48,7 @@
  * The idr_get_new *may* call slab for more memory so it must not be
  * called under a spin lock.  Likewise idr_remore may release memory
  * (but it may be ok to do this under a lock...).
- * idr_find is just a memory look up and is quite fast.  A zero return
+ * idr_find is just a memory look up and is quite fast.  A -1 return
  * indicates that the requested id does not exist.
  */
 
@@ -82,6 +82,7 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
  * For some reason mips/mips64 define the SIGEV constants plus 128.
  * Here we define a mask to get rid of the common bits.	 The
  * optimizer should make this costless to all but mips.
+ * Note that no common bits (the non-mips case) will give 0xffffffff.
  */
 #define MIPS_SIGEV ~(SIGEV_NONE & \
 		      SIGEV_SIGNAL & \
@@ -93,7 +94,7 @@ static spinlock_t idr_lock = SPIN_LOCK_UNLOCKED;
  * The timer ID is turned into a timer address by idr_find().
  * Verifying a valid ID consists of:
  *
- * a) checking that idr_find() returns other than zero.
+ * a) checking that idr_find() returns other than -1.
  * b) checking that the timer id matches the one in the timer itself.
  * c) that the timer owner is in the callers thread group.
  */
@@ -162,6 +163,8 @@ static struct k_clock posix_clocks[MAX_CLOCKS];
 
 void register_posix_clock(int clock_id, struct k_clock *new_clock);
 static int do_posix_gettime(struct k_clock *clock, struct timespec *tp);
+static u64 do_posix_clock_monotonic_gettime_parts(
+	struct timespec *tp, struct timespec *mo);
 int do_posix_clock_monotonic_gettime(struct timespec *tp);
 int do_posix_clock_monotonic_settime(struct timespec *tp);
 static struct k_itimer *lock_timer(timer_t timer_id, unsigned long *flags);
@@ -192,7 +195,7 @@ __initcall(init_posix_timers);
 
 static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 {
-	unsigned long sec = tp->tv_sec;
+	long sec = tp->tv_sec;
 	long nsec = tp->tv_nsec + res - 1;
 
 	if (nsec > NSEC_PER_SEC) {
@@ -210,7 +213,7 @@ static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 	 * below.  Here it is enough to just discard the high order
 	 * bits.
 	 */
-	*jiff = (u64)sec * HZ;
+	*jiff = (s64)sec * HZ;
 	/*
 	 * Do the res thing. (Don't forget the add in the declaration of nsec)
 	 */
@@ -219,17 +222,6 @@ static void tstojiffie(struct timespec *tp, int res, u64 *jiff)
 	 * Split to jiffie and sub jiffie
 	 */
 	*jiff += nsec / (NSEC_PER_SEC / HZ);
-}
-
-static void tstotimer(struct itimerspec *time, struct k_itimer *timer)
-{
-	u64 result;
-	int res = posix_clocks[timer->it_clock].res;
-
-	tstojiffie(&time->it_value, res, &result);
-	timer->it_timer.expires = (unsigned long)result;
-	tstojiffie(&time->it_interval, res, &result);
-	timer->it_incr = (unsigned long)result;
 }
 
 static void schedule_next_timer(struct k_itimer *timr)
@@ -690,57 +682,81 @@ sys_timer_getoverrun(timer_t timer_id)
  * If it is relative time, we need to add the current (CLOCK_MONOTONIC)
  * time to it to get the proper time for the timer.
  */
-static int adjust_abs_time(struct k_clock *clock, struct timespec *tp, int abs)
+static int adjust_abs_time(struct k_clock *clock, struct timespec *tp, 
+			   int abs, u64 *exp)
 {
 	struct timespec now;
-	struct timespec oc;
-	do_posix_clock_monotonic_gettime(&now);
+	struct timespec oc = *tp;
+	struct timespec wall_to_mono;
+	u64 jiffies_64_f;
+	int rtn =0;
 
-	if (!abs || (posix_clocks[CLOCK_MONOTONIC].clock_get !=
-							clock->clock_get)) {
-		if (abs)
-			do_posix_gettime(clock, &oc);
-		else
-			oc.tv_nsec = oc.tv_sec = 0;
-
-		tp->tv_sec += now.tv_sec - oc.tv_sec;
-		tp->tv_nsec += now.tv_nsec - oc.tv_nsec;
-
+	if (abs) {
+		/*
+		 * The mask pick up the 4 basic clocks 
+		 */
+		if (!(clock - &posix_clocks[0]) & ~CLOCKS_MASK) {
+			jiffies_64_f = do_posix_clock_monotonic_gettime_parts(
+				&now,  &wall_to_mono);
+			/*
+			 * If we are doing a MONOTONIC clock
+			 */
+			if((clock - &posix_clocks[0]) & CLOCKS_MONO){
+				now.tv_sec += wall_to_mono.tv_sec;
+				now.tv_nsec += wall_to_mono.tv_nsec;
+			}
+		} else {
+			/*
+			 * Not one of the basic clocks
+			 */
+			do_posix_gettime(clock, &now);	
+			jiffies_64_f = get_jiffies_64();
+		}
+		/*
+		 * Take away now to get delta
+		 */
+		oc.tv_sec -= now.tv_sec;
+		oc.tv_nsec -= now.tv_nsec;
 		/*
 		 * Normalize...
 		 */
-		if ((tp->tv_nsec - NSEC_PER_SEC) >= 0) {
-			tp->tv_nsec -= NSEC_PER_SEC;
-			tp->tv_sec++;
+		while ((oc.tv_nsec - NSEC_PER_SEC) >= 0) {
+			oc.tv_nsec -= NSEC_PER_SEC;
+			oc.tv_sec++;
 		}
-		if ((tp->tv_nsec) < 0) {
-			tp->tv_nsec += NSEC_PER_SEC;
-			tp->tv_sec--;
+		while ((oc.tv_nsec) < 0) {
+			oc.tv_nsec += NSEC_PER_SEC;
+			oc.tv_sec--;
 		}
+	}else{
+		jiffies_64_f = get_jiffies_64();
 	}
 	/*
-	 * Check if the requested time is prior to now (if so set now) or
-	 * is more than the timer code can handle (if so we error out).
-	 * The (unsigned) catches the case of prior to "now" with the same
-	 * test.  Only on failure do we sort out what happened, and then
-	 * we use the (unsigned) to error out negative seconds.
+	 * Check if the requested time is prior to now (if so set now)
 	 */
-	if ((unsigned) (tp->tv_sec - now.tv_sec) > (MAX_JIFFY_OFFSET / HZ)) {
-		if ((unsigned) tp->tv_sec < now.tv_sec) {
-			tp->tv_sec = now.tv_sec;
-			tp->tv_nsec = now.tv_nsec;
-		} else
+	if (oc.tv_sec < 0)
+		oc.tv_sec = oc.tv_nsec = 0;
+	tstojiffie(&oc, clock->res, exp);
+
+	/*
+	 * Check if the requested time is more than the timer code
+	 * can handle (if so we error out but return the value too).
+	 */
+	if (*exp > ((u64)MAX_JIFFY_OFFSET))
 			/*
 			 * This is a considered response, not exactly in
 			 * line with the standard (in fact it is silent on
-			 * possible overflows).  We assume such a large
+			 * possible overflows).  We assume such a large 
 			 * value is ALMOST always a programming error and
 			 * try not to compound it by setting a really dumb
 			 * value.
 			 */
-			return -EINVAL;
-	}
-	return 0;
+			rtn = -EINVAL;
+	/*
+	 * return the actual jiffies expire time, full 64 bits
+	 */
+	*exp += jiffies_64_f;
+	return rtn;
 }
 
 /* Set a POSIX.1b interval timer. */
@@ -750,6 +766,7 @@ do_timer_settime(struct k_itimer *timr, int flags,
 		 struct itimerspec *new_setting, struct itimerspec *old_setting)
 {
 	struct k_clock *clock = &posix_clocks[timr->it_clock];
+	u64 expire_64;
 
 	if (old_setting)
 		do_timer_gettime(timr, old_setting);
@@ -788,14 +805,15 @@ do_timer_settime(struct k_itimer *timr, int flags,
 		return 0;
 	}
 
-	if ((flags & TIMER_ABSTIME) &&
-	    (clock->clock_get != do_posix_clock_monotonic_gettime))
-		// FIXME: what is this?
-		;
 	if (adjust_abs_time(clock,
-			    &new_setting->it_value, flags & TIMER_ABSTIME))
+			    &new_setting->it_value, flags & TIMER_ABSTIME, 
+			    &expire_64)) {
 		return -EINVAL;
-	tstotimer(new_setting, timr);
+	}
+	timr->it_timer.expires = (unsigned long)expire_64;	
+	tstojiffie(&new_setting->it_interval, clock->res, &expire_64);
+	timr->it_incr = (unsigned long)expire_64;
+
 
 	/*
 	 * For some reason the timer does not fire immediately if expires is
@@ -964,30 +982,46 @@ static int do_posix_gettime(struct k_clock *clock, struct timespec *tp)
  * Note also that the while loop assures that the sub_jiff_offset
  * will be less than a jiffie, thus no need to normalize the result.
  * Well, not really, if called with ints off :(
- *
- * HELP, this code should make an attempt at resolution beyond the
- * jiffie.  Trouble is this is "arch" dependent...
  */
 
-int do_posix_clock_monotonic_gettime(struct timespec *tp)
+static u64 do_posix_clock_monotonic_gettime_parts(
+	struct timespec *tp, struct timespec *mo)
 {
-	long sub_sec;
-	u64 jiffies_64_f;
-
-#if (BITS_PER_LONG > 32)
-	jiffies_64_f = jiffies_64;
-#else
+	u64 jiff;
+	struct timeval tpv;
 	unsigned int seq;
 
 	do {
 		seq = read_seqbegin(&xtime_lock);
-		jiffies_64_f = jiffies_64;
+		do_gettimeofday(&tpv);
+		*mo = wall_to_monotonic;
+		jiff = jiffies_64;
 
-	} while (read_seqretry(&xtime_lock, seq));
-#endif
-	tp->tv_sec = div_long_long_rem(jiffies_64_f, HZ, &sub_sec);
-	tp->tv_nsec = sub_sec * (NSEC_PER_SEC / HZ);
+	} while(read_seqretry(&xtime_lock, seq));
 
+	/*
+	 * Love to get this before it is converted to usec.
+	 * It would save a div AND a mpy.
+	 */
+	tp->tv_sec = tpv.tv_sec;
+	tp->tv_nsec = tpv.tv_usec * NSEC_PER_USEC;
+
+	return jiff;
+}
+
+int do_posix_clock_monotonic_gettime(struct timespec *tp)
+{
+	struct timespec wall_to_mono;
+
+	do_posix_clock_monotonic_gettime_parts(tp, &wall_to_mono);
+
+	tp->tv_sec += wall_to_mono.tv_sec;
+	tp->tv_nsec += wall_to_mono.tv_nsec;
+
+	if ((tp->tv_nsec - NSEC_PER_SEC) > 0) {
+		tp->tv_nsec -= NSEC_PER_SEC;
+		tp->tv_sec++;
+	}
 	return 0;
 }
 
@@ -1138,7 +1172,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 	struct timespec t;
 	struct timer_list new_timer;
 	DECLARE_WAITQUEUE(abs_wqueue, current);
-	u64 rq_time = 0;
+	u64 rq_time = (u64)0;
 	s64 left;
 	int abs;
 	struct restart_block *restart_block =
@@ -1163,7 +1197,7 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 		if (!rq_time)
 			return -EINTR;
 		left = rq_time - get_jiffies_64();
-		if (left <= 0LL)
+		if (left <= (s64)0)
 			return 0;	/* Already passed */
 	}
 
@@ -1174,14 +1208,14 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 	do {
 		t = *tsave;
 		if (abs || !rq_time) {
-			adjust_abs_time(&posix_clocks[which_clock], &t, abs);
-			tstojiffie(&t, posix_clocks[which_clock].res, &rq_time);
+			adjust_abs_time(&posix_clocks[which_clock], &t, abs,
+					&rq_time);
 		}
 
 		left = rq_time - get_jiffies_64();
-		if (left >= MAX_JIFFY_OFFSET)
-			left = MAX_JIFFY_OFFSET;
-		if (left < 0)
+		if (left >= (s64)MAX_JIFFY_OFFSET)
+			left = (s64)MAX_JIFFY_OFFSET;
+		if (left < (s64)0)
 			break;
 
 		new_timer.expires = jiffies + left;
@@ -1192,12 +1226,12 @@ do_clock_nanosleep(clockid_t which_clock, int flags, struct timespec *tsave)
 
 		del_timer_sync(&new_timer);
 		left = rq_time - get_jiffies_64();
-	} while (left > 0 && !test_thread_flag(TIF_SIGPENDING));
+	} while (left > (s64)0 && !test_thread_flag(TIF_SIGPENDING));
 
 	if (abs_wqueue.task_list.next)
 		finish_wait(&nanosleep_abs_wqueue, &abs_wqueue);
 
-	if (left > 0) {
+	if (left > (s64)0) {
 		unsigned long rmd;
 
 		/*

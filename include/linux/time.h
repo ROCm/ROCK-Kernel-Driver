@@ -140,6 +140,7 @@ mktime (unsigned int year, unsigned int mon,
 }
 
 extern struct timespec xtime;
+extern struct timespec wall_to_monotonic;
 extern seqlock_t xtime_lock;
 
 static inline unsigned long get_seconds(void)
@@ -200,6 +201,9 @@ struct	itimerval {
 #define CLOCK_MONOTONIC_HR	  5
 
 #define MAX_CLOCKS 6
+#define CLOCKS_MASK  (CLOCK_REALTIME | CLOCK_MONOTONIC | \
+                     CLOCK_REALTIME_HR | CLOCK_MONOTONIC_HR)
+#define CLOCKS_MONO (CLOCK_MONOTONIC & CLOCK_MONOTONIC_HR)
 
 /*
  * The various flags for setting POSIX.1b interval timers.
