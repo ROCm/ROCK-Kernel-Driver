@@ -76,8 +76,6 @@ pgd_t * ioremap_pgd = (pgd_t *)&ioremap_dir;
 
 unsigned long klimit = (unsigned long)_end;
 
-HPTE *Hash=0;
-unsigned long Hash_size=0;
 unsigned long _SDR1=0;
 unsigned long _ASR=0;
 
