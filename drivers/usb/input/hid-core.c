@@ -1281,10 +1281,8 @@ void hid_init_reports(struct hid_device *hid)
 			usb_unlink_urb(hid->urbout);
 	}
 
-	if (err) {
+	if (err)
 		warn("timeout initializing reports\n");
-		return;
-	}
 
 	report_enum = hid->report_enum + HID_INPUT_REPORT;
 	list = report_enum->report_list.next;
