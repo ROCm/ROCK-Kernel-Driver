@@ -128,6 +128,19 @@ char drive_info[4 * 16];
 #endif
 
 /*
+ * Get nasid of current cpu early in boot before nodepda is initialized
+ */
+static int
+boot_get_nasid(void)
+{
+	int nasid;
+
+	if (ia64_sn_get_sapic_info(get_sapicid(), &nasid, NULL, NULL))
+		BUG();
+	return nasid;
+}
+
+/*
  * This routine can only be used during init, since
  * smp_boot_data is an init data structure.
  * We have to use smp_boot_data.cpu_phys_id to find
@@ -197,7 +210,7 @@ void __init early_sn_setup(void)
 
 	if (IS_RUNNING_ON_SIMULATOR()) {
 		master_node_bedrock_address = (u64 __iomem *)
-			REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+			REMOTE_HUB(boot_get_nasid(), SH_JUNK_BUS_UART0);
 		printk(KERN_DEBUG "early_sn_setup: setting "
 		       "master_node_bedrock_address to 0x%p\n",
 		       master_node_bedrock_address);
@@ -297,7 +310,7 @@ void __init sn_setup(char **cmdline_p)
 		panic("PROM version too old\n");
 	}
 
-	master_nasid = get_nasid();
+	master_nasid = boot_get_nasid();
 
 	status =
 	    ia64_sal_freq_base(SAL_FREQ_BASE_REALTIME_CLOCK, &ticks_per_sec,
@@ -314,7 +327,7 @@ void __init sn_setup(char **cmdline_p)
 
 	if (IS_RUNNING_ON_SIMULATOR()) {
 		master_node_bedrock_address = (u64 __iomem *)
-			REMOTE_HUB(get_nasid(), SH_JUNK_BUS_UART0);
+			REMOTE_HUB(boot_get_nasid(), SH_JUNK_BUS_UART0);
 		printk(KERN_DEBUG "sn_setup: setting "
 		       "master_node_bedrock_address to 0x%p\n",
 		       master_node_bedrock_address);
@@ -372,6 +385,8 @@ void __init sn_init_pdas(char **cmdline_p)
 		nodepdaindr[cnode] =
 		    alloc_bootmem_node(NODE_DATA(cnode), sizeof(nodepda_t));
 		memset(nodepdaindr[cnode], 0, sizeof(nodepda_t));
+		memset(nodepdaindr[cnode]->phys_cpuid, -1, 
+		    sizeof(nodepdaindr[cnode]->phys_cpuid));
 	}
 
 	/*
@@ -422,8 +437,10 @@ void __init sn_cpu_init(void)
 	int cpuid;
 	int cpuphyid;
 	int nasid;
+	int subnode;
 	int slice;
 	int cnode;
+	int i;
 	static int wars_have_been_checked;
 
 	/*
@@ -434,10 +451,20 @@ void __init sn_cpu_init(void)
 		return;
 
 	cpuid = smp_processor_id();
-	cpuphyid = ((ia64_getreg(_IA64_REG_CR_LID) >> 16) & 0xffff);
-	nasid = cpu_physical_id_to_nasid(cpuphyid);
+	cpuphyid = get_sapicid();
+
+	if (ia64_sn_get_sapic_info(cpuphyid, &nasid, &subnode, &slice))
+		BUG();
+
+	for (i=0; i < NR_NODES; i++) {
+		if (nodepdaindr[i]) {
+			nodepdaindr[i]->phys_cpuid[cpuid].nasid = nasid;
+			nodepdaindr[i]->phys_cpuid[cpuid].slice = slice;
+			nodepdaindr[i]->phys_cpuid[cpuid].subnode = subnode;
+		}
+	}
+
 	cnode = nasid_to_cnodeid(nasid);
-	slice = cpu_physical_id_to_slice(cpuphyid);
 
 	memset(pda, 0, sizeof(pda));
 	pda->p_nodepda = nodepdaindr[cnode];
@@ -574,4 +601,16 @@ static void __init scan_for_ionodes(void)
 		}
 	}
 
+}
+
+int
+nasid_slice_to_cpuid(int nasid, int slice)
+{
+	long cpu;
+	
+	for (cpu=0; cpu < NR_CPUS; cpu++) 
+		if (nodepda->phys_cpuid[cpu].nasid == nasid && nodepda->phys_cpuid[cpu].slice == slice)
+			return cpu;
+
+	return -1;
 }

@@ -94,15 +94,11 @@ static int
 sn_platform_plat_specific_err_print(const u8 * sect_header, u8 ** oemdata,
 				    u64 * oemdata_size)
 {
-	sal_log_plat_specific_err_info_t *psei =
-	    (sal_log_plat_specific_err_info_t *) sect_header;
-	if (!psei->valid.oem_data)
-		return 0;
 	down(&sn_oemdata_mutex);
 	sn_oemdata = oemdata;
 	sn_oemdata_size = oemdata_size;
 	sn_oemdata_bufsize = 0;
-	ia64_sn_plat_specific_err_print(print_hook, (char *)psei);
+	ia64_sn_plat_specific_err_print(print_hook, (char *)sect_header);
 	up(&sn_oemdata_mutex);
 	return 0;
 }
@@ -110,18 +106,24 @@ sn_platform_plat_specific_err_print(const u8 * sect_header, u8 ** oemdata,
 /* Callback when userspace salinfo wants to decode oem data via the platform
  * kernel and/or prom.
  */
-int sn_salinfo_platform_oemdata(const u8 * sect_header, u8 ** oemdata,
-				u64 * oemdata_size)
+int sn_salinfo_platform_oemdata(const u8 *sect_header, u8 **oemdata, u64 *oemdata_size)
 {
-	efi_guid_t guid = *(efi_guid_t *) sect_header;
+	efi_guid_t guid = *(efi_guid_t *)sect_header;
+	int valid = 0;
 	*oemdata_size = 0;
 	vfree(*oemdata);
 	*oemdata = NULL;
-	if (efi_guidcmp(guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0 ||
-	    efi_guidcmp(guid, SAL_PLAT_MEM_DEV_ERR_SECT_GUID) == 0)
-		return sn_platform_plat_specific_err_print(sect_header, oemdata,
-							   oemdata_size);
-	return 0;
+	if (efi_guidcmp(guid, SAL_PLAT_SPECIFIC_ERR_SECT_GUID) == 0) {
+		sal_log_plat_specific_err_info_t *psei = (sal_log_plat_specific_err_info_t *)sect_header;
+		valid = psei->valid.oem_data;
+	} else if (efi_guidcmp(guid, SAL_PLAT_MEM_DEV_ERR_SECT_GUID) == 0) {
+		sal_log_mem_dev_err_info_t *mdei = (sal_log_mem_dev_err_info_t *)sect_header;
+		valid = mdei->valid.oem_data;
+	}
+	if (valid)
+		return sn_platform_plat_specific_err_print(sect_header, oemdata, oemdata_size);
+	else
+		return 0;
 }
 
 static int __init sn_salinfo_init(void)

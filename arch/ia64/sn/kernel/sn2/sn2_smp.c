@@ -32,6 +32,7 @@
 #include <asm/hw_irq.h>
 #include <asm/current.h>
 #include <asm/sn/sn_cpuid.h>
+#include <asm/sn/sn_sal.h>
 #include <asm/sn/addrs.h>
 #include <asm/sn/shub_mmr.h>
 #include <asm/sn/nodepda.h>
@@ -136,7 +137,7 @@ sn2_global_tlb_purge(unsigned long start, unsigned long end,
 	ptc0 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_0);
 	ptc1 = (long *)GLOBAL_MMR_PHYS_ADDR(0, SH_PTC_1);
 
-	mynasid = smp_physical_node_id();
+	mynasid = get_nasid();
 
 	spin_lock_irqsave(&sn2_global_ptc_lock, flags);
 
@@ -205,6 +206,7 @@ void sn2_ptc_deadlock_recovery(unsigned long data0, unsigned long data1)
 
 /**
  * sn_send_IPI_phys - send an IPI to a Nasid and slice
+ * @nasid: nasid to receive the interrupt (may be outside partition)
  * @physid: physical cpuid to receive the interrupt.
  * @vector: command to send
  * @delivery_mode: delivery mechanism
@@ -219,14 +221,11 @@ void sn2_ptc_deadlock_recovery(unsigned long data0, unsigned long data1)
  * %IA64_IPI_DM_NMI - pend an NMI
  * %IA64_IPI_DM_INIT - pend an INIT interrupt
  */
-void sn_send_IPI_phys(long physid, int vector, int delivery_mode)
+void sn_send_IPI_phys(int nasid, long physid, int vector, int delivery_mode)
 {
-	long nasid, slice, val;
+	long val;
 	unsigned long flags = 0;
 	volatile long *p;
-
-	nasid = cpu_physical_id_to_nasid(physid);
-	slice = cpu_physical_id_to_slice(physid);
 
 	p = (long *)GLOBAL_MMR_PHYS_ADDR(nasid, SH_IPI_INT);
 	val = (1UL << SH_IPI_INT_SEND_SHFT) |
@@ -268,8 +267,14 @@ EXPORT_SYMBOL(sn_send_IPI_phys);
 void sn2_send_IPI(int cpuid, int vector, int delivery_mode, int redirect)
 {
 	long physid;
+	int nasid;
 
 	physid = cpu_physical_id(cpuid);
+	nasid = cpuid_to_nasid(cpuid);
 
-	sn_send_IPI_phys(physid, vector, delivery_mode);
+	/* the following is used only when starting cpus at boot time */
+	if (unlikely(nasid == -1))
+		ia64_sn_get_sapic_info(physid, &nasid, NULL, NULL);
+
+	sn_send_IPI_phys(nasid, physid, vector, delivery_mode);
 }

@@ -30,6 +30,12 @@
  * This structure provides a convenient way of keeping together 
  * all per-node data structures. 
  */
+struct phys_cpuid {
+	short			nasid;
+	char			subnode;
+	char			slice;
+};
+
 struct nodepda_s {
 	void 		*pdinfo;	/* Platform-dependent per-node info */
 	spinlock_t		bist_lock;
@@ -46,6 +52,10 @@ struct nodepda_s {
 	 */
 	struct nodepda_s	*pernode_pdaindr[MAX_COMPACT_NODES]; 
 
+	/*
+	 * Array of physical cpu identifiers. Indexed by cpuid.
+	 */
+	struct phys_cpuid	phys_cpuid[NR_CPUS];
 };
 
 typedef struct nodepda_s nodepda_t;

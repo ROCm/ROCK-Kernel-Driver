@@ -1638,7 +1638,7 @@ pfm_ioctl(struct inode *inode, struct file *file, unsigned int cmd, unsigned lon
 }
 
 /*
- * context is locked when coming here and interrupts are disabled
+ * interrupt cannot be masked when coming here
  */
 static inline int
 pfm_do_fasync(int fd, struct file *filp, pfm_context_t *ctx, int on)
@@ -2270,7 +2270,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 	 * 	return -ENOMEM;
 	 */
 	if (size > task->signal->rlim[RLIMIT_MEMLOCK].rlim_cur)
-		return -EAGAIN;
+		return -ENOMEM;
 
 	/*
 	 * We do the easy to undo allocations first.
@@ -2295,10 +2295,6 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 
 	/*
 	 * partially initialize the vma for the sampling buffer
-	 *
-	 * The VM_DONTCOPY flag is very important as it ensures that the mapping
-	 * will never be inherited for any child process (via fork()) which is always
-	 * what we want.
 	 */
 	vma->vm_mm	     = mm;
 	vma->vm_flags	     = VM_READ| VM_MAYREAD |VM_RESERVED;
@@ -2328,6 +2324,7 @@ pfm_smpl_buffer_alloc(struct task_struct *task, pfm_context_t *ctx, unsigned lon
 		goto error;
 	}
 	vma->vm_end = vma->vm_start + size;
+	vma->vm_pgoff = vma->vm_start >> PAGE_SHIFT;
 
 	DPRINT(("aligned size=%ld, hdr=%p mapped @0x%lx\n", size, ctx->ctx_smpl_hdr, vma->vm_start));
 
@@ -3060,11 +3057,12 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 #endif
 		}
 
-		DPRINT(("pmc[%u]=0x%lx loaded=%d access_pmu=%d all_pmcs=0x%lx used_pmds=0x%lx eventid=%ld smpl_pmds=0x%lx reset_pmds=0x%lx reloads_pmcs=0x%lx used_monitors=0x%lx ovfl_regs=0x%lx\n",
+		DPRINT(("pmc[%u]=0x%lx ld=%d apmu=%d flags=0x%lx all_pmcs=0x%lx used_pmds=0x%lx eventid=%ld smpl_pmds=0x%lx reset_pmds=0x%lx reloads_pmcs=0x%lx used_monitors=0x%lx ovfl_regs=0x%lx\n",
 			  cnum,
 			  value,
 			  is_loaded,
 			  can_access_pmu,
+			  flags,
 			  ctx->ctx_all_pmcs[0],
 			  ctx->ctx_used_pmds[0],
 			  ctx->ctx_pmds[cnum].eventid,
@@ -3240,8 +3238,8 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 			}
 		}
 
-		DPRINT(("pmd[%u]=0x%lx loaded=%d access_pmu=%d, hw_value=0x%lx ctx_pmd=0x%lx  short_reset=0x%lx "
-			  "long_reset=0x%lx notify=%c used_pmds=0x%lx reset_pmds=0x%lx reload_pmds=0x%lx all_pmds=0x%lx ovfl_regs=0x%lx\n",
+		DPRINT(("pmd[%u]=0x%lx ld=%d apmu=%d, hw_value=0x%lx ctx_pmd=0x%lx  short_reset=0x%lx "
+			  "long_reset=0x%lx notify=%c seed=0x%lx mask=0x%lx used_pmds=0x%lx reset_pmds=0x%lx reload_pmds=0x%lx all_pmds=0x%lx ovfl_regs=0x%lx\n",
 			cnum,
 			value,
 			is_loaded,
@@ -3251,6 +3249,8 @@ pfm_write_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 			ctx->ctx_pmds[cnum].short_reset,
 			ctx->ctx_pmds[cnum].long_reset,
 			PMC_OVFL_NOTIFY(ctx, cnum) ? 'Y':'N',
+			ctx->ctx_pmds[cnum].seed,
+			ctx->ctx_pmds[cnum].mask,
 			ctx->ctx_used_pmds[0],
 			ctx->ctx_pmds[cnum].reset_pmds[0],
 			ctx->ctx_reload_pmds[0],
@@ -3328,7 +3328,7 @@ pfm_read_pmds(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 	}
 	expert_mode = pfm_sysctl.expert_mode; 
 
-	DPRINT(("loaded=%d access_pmu=%d ctx_state=%d\n",
+	DPRINT(("ld=%d apmu=%d ctx_state=%d\n",
 		is_loaded,
 		can_access_pmu,
 		state));
@@ -3868,7 +3868,7 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 
 			ctx->ctx_ibrs[rnum] = dbreg.val;
 
-			DPRINT(("write ibr%u=0x%lx used_ibrs=0x%x is_loaded=%d access_pmu=%d\n",
+			DPRINT(("write ibr%u=0x%lx used_ibrs=0x%x ld=%d apmu=%d\n",
 				rnum, dbreg.val, ctx->ctx_used_ibrs[0], is_loaded, can_access_pmu));
 		} else {
 			CTX_USED_DBR(ctx, rnum);
@@ -3879,7 +3879,7 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 			}
 			ctx->ctx_dbrs[rnum] = dbreg.val;
 
-			DPRINT(("write dbr%u=0x%lx used_dbrs=0x%x is_loaded=%d access_pmu=%d\n",
+			DPRINT(("write dbr%u=0x%lx used_dbrs=0x%x ld=%d apmu=%d\n",
 				rnum, dbreg.val, ctx->ctx_used_dbrs[0], is_loaded, can_access_pmu));
 		}
 	}
@@ -5851,14 +5851,6 @@ pfm_save_regs(struct task_struct *task)
 		pfm_unprotect_ctx_ctxsw(ctx, flags);
 
 		pfm_context_free(ctx);
-		return;
-	}
-
-	/*
-	 * sanity check
-	 */
-	if (ctx->ctx_last_activation != GET_ACTIVATION()) {
-		pfm_unprotect_ctx_ctxsw(ctx, flags);
 		return;
 	}
 
