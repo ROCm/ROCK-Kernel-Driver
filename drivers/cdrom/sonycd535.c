@@ -135,7 +135,6 @@
 #include <linux/cdrom.h>
 
 #define MAJOR_NR CDU535_CDROM_MAJOR
-#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define sony535_cd_base_io sonycd535 /* for compatible parameter passing with "insmod" */
@@ -221,6 +220,7 @@ static unsigned short read_status_reg;
 static unsigned short data_reg;
 
 static spinlock_t sonycd535_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
+static struct request_queue sonycd535_queue;
 
 static int initialized;			/* Has the drive been initialized? */
 static int sony_disc_changed = 1;	/* Has the disk been changed
@@ -280,17 +280,10 @@ static DECLARE_WAIT_QUEUE_HEAD(cdu535_irq_wait);
  * check or 0 if it hasn't.  Setting flag to 0 resets the changed flag.
  */
 static int
-cdu535_check_media_change(kdev_t full_dev)
+cdu535_check_media_change(struct gendisk *disk)
 {
-	int retval;
-
-	if (minor(full_dev) != 0) {
-		printk(CDU535_MESSAGE_NAME " request error: invalid device.\n");
-		return 0;
-	}
-
 	/* if driver is not initialized, always return 0 */
-	retval = initialized ? sony_disc_changed : 0;
+	int retval = initialized ? sony_disc_changed : 0;
 	sony_disc_changed = 0;
 	return retval;
 }
@@ -793,7 +786,7 @@ size_to_buf(unsigned int size, Byte *buf)
 static void
 do_cdu535_request(request_queue_t * q)
 {
-	unsigned int dev;
+	struct request *req;
 	unsigned int read_size;
 	int  block;
 	int  nsect;
@@ -804,130 +797,121 @@ do_cdu535_request(request_queue_t * q)
 	Byte cmd[2];
 
 	while (1) {
-		if (blk_queue_empty(QUEUE))
+		if (blk_queue_empty(q))
 			return;
 
-		dev = minor(CURRENT->rq_dev);
-		block = CURRENT->sector;
-		nsect = CURRENT->nr_sectors;
-		if (dev != 0) {
-			end_request(CURRENT, 0);
+		req = elv_next_request(q);
+		block = req->sector;
+		nsect = req->nr_sectors;
+		if (!(req->flags & REQ_CMD))
+			continue;	/* FIXME */
+		if (rq_data_dir(req) == WRITE) {
+			end_request(req, 0);
 			continue;
 		}
-		if(CURRENT->flags & REQ_CMD) {
-			switch (rq_data_dir(CURRENT)) {
-			case READ:
-				/*
-				 * If the block address is invalid or the request goes beyond the end of
-				 * the media, return an error.
-				 */
-				if (sony_toc->lead_out_start_lba <= (block / 4)) {
-					end_request(CURRENT, 0);
-					return;
-				}
-				if (sony_toc->lead_out_start_lba <= ((block + nsect) / 4)) {
-					end_request(CURRENT, 0);
-					return;
-				}
-				while (0 < nsect) {
-					/*
-					 * If the requested sector is not currently in the read-ahead buffer,
-					 * it must be read in.
-					 */
-					if ((block < sony_first_block) || (sony_last_block < block)) {
-						sony_first_block = (block / 4) * 4;
-						log_to_msf(block / 4, params);
-						
-						/*
-						 * If the full read-ahead would go beyond the end of the media, trim
-						 * it back to read just till the end of the media.
-						 */
-						if (sony_toc->lead_out_start_lba <= ((block / 4) + sony_buffer_sectors)) {
-							sony_last_block = (sony_toc->lead_out_start_lba * 4) - 1;
-							read_size = sony_toc->lead_out_start_lba - (block / 4);
-						} else {
-							sony_last_block = sony_first_block + (sony_buffer_sectors * 4) - 1;
-							read_size = sony_buffer_sectors;
-						}
-						size_to_buf(read_size, &params[3]);
-						
-						/*
-						 * Read the data.  If the drive was not spinning,
-						 * spin it up and try some more.
-						 */
-						for (spin_up_retry=0 ;; ++spin_up_retry) {
-							/* This loop has been modified to support the Sony
-							 * CDU-510/515 series, thanks to Claudio Porfiri 
-							 * <C.Porfiri@nisms.tei.ericsson.se>.
-							 */
-							/*
-							 * This part is to deal with very slow hardware.  We
-							 * try at most MAX_SPINUP_RETRY times to read the same
-							 * block.  A check for seek_and_read_N_blocks' result is
-							 * performed; if the result is wrong, the CDROM's engine
-							 * is restarted and the operation is tried again.
-							 */
-							/*
-							 * 1995-06-01: The system got problems when downloading
-							 * from Slackware CDROM, the problem seems to be:
-							 * seek_and_read_N_blocks returns BAD_STATUS and we
-							 * should wait for a while before retrying, so a new
-							 * part was added to discriminate the return value from
-							 * seek_and_read_N_blocks for the various cases.
-							 */
-							int readStatus = seek_and_read_N_blocks(params, read_size,
-												status, sony_buffer, (read_size * CDU535_BLOCK_SIZE));
-							if (0 <= readStatus)	/* Good data; common case, placed first */
-								break;
-							if (readStatus == NO_ROOM || spin_up_retry == MAX_SPINUP_RETRY) {
-								/* give up */
-								if (readStatus == NO_ROOM)
-									printk(CDU535_MESSAGE_NAME " No room to read from CD\n");
-								else
-									printk(CDU535_MESSAGE_NAME " Read error: 0x%.2x\n",
-									       status[0]);
-								sony_first_block = -1;
-								sony_last_block = -1;
-								end_request(CURRENT, 0);
-								return;
-							}
-							if (readStatus == BAD_STATUS) {
-								/* Sleep for a while, then retry */
-								current->state = TASK_INTERRUPTIBLE;
-								schedule_timeout(RETRY_FOR_BAD_STATUS*HZ/10);
-							}
-#if DEBUG > 0
-							printk(CDU535_MESSAGE_NAME
-							       " debug: calling spin up when reading data!\n");
-#endif
-							cmd[0] = SONY535_SPIN_UP;
-							do_sony_cmd(cmd, 1, status, NULL, 0, 0);
-						}
-					}
-					/*
-					 * The data is in memory now, copy it to the buffer and advance to the
-					 * next block to read.
-					 */
-					copyoff = block - sony_first_block;
-					memcpy(CURRENT->buffer,
-					       sony_buffer[copyoff / 4] + 512 * (copyoff % 4), 512);
-					
-					block += 1;
-					nsect -= 1;
-					CURRENT->buffer += 512;
-				}
-
-				end_request(CURRENT, 1);
-				break;
-				
-			case WRITE:
-				end_request(CURRENT, 0);
-				break;
-				
-			default:
-				panic("Unknown SONY CD cmd");
-			}
+		if (rq_data_dir(req) != READ)
+			panic("Unknown SONY CD cmd");
+		/*
+		 * If the block address is invalid or the request goes beyond
+		 * the end of the media, return an error.
+		 */
+		if (sony_toc->lead_out_start_lba <= (block/4)) {
+			end_request(req, 0);
+			return;
 		}
+		if (sony_toc->lead_out_start_lba <= ((block + nsect) / 4)) {
+			end_request(req, 0);
+			return;
+		}
+		while (0 < nsect) {
+			/*
+			 * If the requested sector is not currently in
+			 * the read-ahead buffer, it must be read in.
+			 */
+			if ((block < sony_first_block) || (sony_last_block < block)) {
+				sony_first_block = (block / 4) * 4;
+				log_to_msf(block / 4, params);
+				
+				/*
+				 * If the full read-ahead would go beyond the end of the media, trim
+				 * it back to read just till the end of the media.
+				 */
+				if (sony_toc->lead_out_start_lba <= ((block / 4) + sony_buffer_sectors)) {
+					sony_last_block = (sony_toc->lead_out_start_lba * 4) - 1;
+					read_size = sony_toc->lead_out_start_lba - (block / 4);
+				} else {
+					sony_last_block = sony_first_block + (sony_buffer_sectors * 4) - 1;
+					read_size = sony_buffer_sectors;
+				}
+				size_to_buf(read_size, &params[3]);
+				
+				/*
+				 * Read the data.  If the drive was not spinning,
+				 * spin it up and try some more.
+				 */
+				for (spin_up_retry=0 ;; ++spin_up_retry) {
+					/* This loop has been modified to support the Sony
+					 * CDU-510/515 series, thanks to Claudio Porfiri 
+					 * <C.Porfiri@nisms.tei.ericsson.se>.
+					 */
+					/*
+					 * This part is to deal with very slow hardware.  We
+					 * try at most MAX_SPINUP_RETRY times to read the same
+					 * block.  A check for seek_and_read_N_blocks' result is
+					 * performed; if the result is wrong, the CDROM's engine
+					 * is restarted and the operation is tried again.
+					 */
+					/*
+					 * 1995-06-01: The system got problems when downloading
+					 * from Slackware CDROM, the problem seems to be:
+					 * seek_and_read_N_blocks returns BAD_STATUS and we
+					 * should wait for a while before retrying, so a new
+					 * part was added to discriminate the return value from
+					 * seek_and_read_N_blocks for the various cases.
+					 */
+					int readStatus = seek_and_read_N_blocks(params, read_size,
+										status, sony_buffer, (read_size * CDU535_BLOCK_SIZE));
+					if (0 <= readStatus)	/* Good data; common case, placed first */
+						break;
+					if (readStatus == NO_ROOM || spin_up_retry == MAX_SPINUP_RETRY) {
+						/* give up */
+						if (readStatus == NO_ROOM)
+							printk(CDU535_MESSAGE_NAME " No room to read from CD\n");
+						else
+							printk(CDU535_MESSAGE_NAME " Read error: 0x%.2x\n",
+							       status[0]);
+						sony_first_block = -1;
+						sony_last_block = -1;
+						end_request(req, 0);
+						return;
+					}
+					if (readStatus == BAD_STATUS) {
+						/* Sleep for a while, then retry */
+						current->state = TASK_INTERRUPTIBLE;
+						schedule_timeout(RETRY_FOR_BAD_STATUS*HZ/10);
+					}
+#if DEBUG > 0
+					printk(CDU535_MESSAGE_NAME
+					       " debug: calling spin up when reading data!\n");
+#endif
+					cmd[0] = SONY535_SPIN_UP;
+					do_sony_cmd(cmd, 1, status, NULL, 0, 0);
+				}
+			}
+			/*
+			 * The data is in memory now, copy it to the buffer and advance to the
+			 * next block to read.
+			 */
+			copyoff = block - sony_first_block;
+			memcpy(req->buffer,
+			       sony_buffer[copyoff / 4] + 512 * (copyoff % 4), 512);
+			
+			block += 1;
+			nsect -= 1;
+			req->buffer += 512;
+		}
+
+		end_request(req, 1);
 	}
 }
 
@@ -1071,20 +1055,12 @@ cdu_ioctl(struct inode *inode,
 		  unsigned int cmd,
 		  unsigned long arg)
 {
-	unsigned int dev;
 	Byte status[2];
 	Byte cmd_buff[10], params[10];
 	int  i;
 	int  dsc_status;
 	int  err;
 
-	if (!inode) {
-		return -EINVAL;
-	}
-	dev = minor(inode->i_rdev) >> 6;
-	if (dev != 0) {
-		return -EINVAL;
-	}
 	if (check_drive_status() != 0)
 		return -EIO;
 
@@ -1447,11 +1423,11 @@ cdu_release(struct inode *inode,
 
 static struct block_device_operations cdu_fops =
 {
-	.owner			= THIS_MODULE,
-	.open			= cdu_open,
-	.release		= cdu_release,
-	.ioctl			= cdu_ioctl,
-	.check_media_change	= cdu535_check_media_change,
+	.owner		= THIS_MODULE,
+	.open		= cdu_open,
+	.release	= cdu_release,
+	.ioctl		= cdu_ioctl,
+	.media_changed	= cdu535_check_media_change,
 };
 
 static struct gendisk *cdu_disk;
@@ -1582,9 +1558,8 @@ static int __init sony535_init(void)
 		err = -EIO;
 		goto out1;
 	}
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), do_cdu535_request,
-			&sonycd535_lock);
-	blk_queue_hardsect_size(BLK_DEFAULT_QUEUE(MAJOR_NR), CDU535_BLOCK_SIZE);
+	blk_init_queue(&sonycd535_queue, do_cdu535_request, &sonycd535_lock);
+	blk_queue_hardsect_size(&sonycd535_queue, CDU535_BLOCK_SIZE);
 	sony_toc = kmalloc(sizeof(struct s535_sony_toc), GFP_KERNEL);
 	err = -ENOMEM;
 	if (!sony_toc)
@@ -1618,6 +1593,7 @@ static int __init sony535_init(void)
 			sony535_cd_base_io);
 		goto out7;
 	}
+	cdu_disk->queue = &sonycd535_queue;
 	add_disk(cdu_disk);
 	return 0;
 
@@ -1634,7 +1610,7 @@ out4:
 out3:
 	kfree(sony_toc);
 out2:
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
+	blk_cleanup_queue(&sonycd535_queue);
 	unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 out1:
 	devfs_unregister(sony_devfs_handle);
@@ -1699,6 +1675,7 @@ static sony535_exit(void)
 				  DEVFS_SPECIAL_BLK, 0);
 	del_gendisk(cdu_disk);
 	put_disk(cdu_disk);
+	blk_cleanup_queue(&sonycd535_queue);
 	if (unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else
