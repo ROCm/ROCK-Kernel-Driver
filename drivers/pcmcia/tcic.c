@@ -643,7 +643,7 @@ static int tcic_get_status(struct pcmcia_socket *sock, u_int *value)
     reg = tcic_getb(TCIC_PWR);
     if (reg & (TCIC_PWR_VCC(psock)|TCIC_PWR_VPP(psock)))
 	*value |= SS_POWERON;
-    DEBUG(1, "tcic: GetStatus(%d) = %#2.2x\n", lsock, *value);
+    DEBUG(1, "tcic: GetStatus(%d) = %#2.2x\n", psock, *value);
     return 0;
 } /* tcic_get_status */
   
@@ -695,7 +695,7 @@ static int tcic_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
     }
 
     DEBUG(1, "tcic: GetSocket(%d) = flags %#3.3x, Vcc %d, Vpp %d, "
-	  "io_irq %d, csc_mask %#2.2x\n", lsock, state->flags,
+	  "io_irq %d, csc_mask %#2.2x\n", psock, state->flags,
 	  state->Vcc, state->Vpp, state->io_irq, state->csc_mask);
     return 0;
 } /* tcic_get_socket */
@@ -709,7 +709,7 @@ static int tcic_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
     u_short scf1, scf2;
 
     DEBUG(1, "tcic: SetSocket(%d, flags %#3.3x, Vcc %d, Vpp %d, "
-	  "io_irq %d, csc_mask %#2.2x)\n", lsock, state->flags,
+	  "io_irq %d, csc_mask %#2.2x)\n", psock, state->flags,
 	  state->Vcc, state->Vpp, state->io_irq, state->csc_mask);
     tcic_setw(TCIC_ADDR+2, (psock << TCIC_SS_SHFT) | TCIC_ADR2_INDREG);
 
@@ -784,7 +784,7 @@ static int tcic_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
     u_short base, len, ioctl;
     
     DEBUG(1, "tcic: SetIOMap(%d, %d, %#2.2x, %d ns, "
-	  "%#4.4x-%#4.4x)\n", lsock, io->map, io->flags,
+	  "%#4.4x-%#4.4x)\n", psock, io->map, io->flags,
 	  io->speed, io->start, io->stop);
     if ((io->map > 1) || (io->start > 0xffff) || (io->stop > 0xffff) ||
 	(io->stop < io->start)) return -EINVAL;
@@ -821,7 +821,7 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
     u_long base, len, mmap;
 
     DEBUG(1, "tcic: SetMemMap(%d, %d, %#2.2x, %d ns, "
-	  "%#5.5lx-%#5.5lx, %#5.5x)\n", lsock, mem->map, mem->flags,
+	  "%#5.5lx-%#5.5lx, %#5.5x)\n", psock, mem->map, mem->flags,
 	  mem->speed, mem->sys_start, mem->sys_stop, mem->card_start);
     if ((mem->map > 3) || (mem->card_start > 0x3ffffff) ||
 	(mem->sys_start > 0xffffff) || (mem->sys_stop > 0xffffff) ||
