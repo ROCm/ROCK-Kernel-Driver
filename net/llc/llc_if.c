@@ -107,7 +107,7 @@ void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
 	ev->type      = LLC_SAP_EV_TYPE_PRIM;
 	ev->prim      = LLC_DATAUNIT_PRIM;
 	ev->prim_type = LLC_PRIM_TYPE_REQ;
-	llc_sap_state_process(sap, skb, &llc_packet_type);
+	llc_sap_state_process(sap, skb);
 }
 
 /**
@@ -133,7 +133,7 @@ void llc_build_and_send_test_pkt(struct llc_sap *sap,
 	ev->type      = LLC_SAP_EV_TYPE_PRIM;
 	ev->prim      = LLC_TEST_PRIM;
 	ev->prim_type = LLC_PRIM_TYPE_REQ;
-	llc_sap_state_process(sap, skb, &llc_packet_type);
+	llc_sap_state_process(sap, skb);
 }
 
 /**
@@ -159,7 +159,7 @@ void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
 	ev->type      = LLC_SAP_EV_TYPE_PRIM;
 	ev->prim      = LLC_XID_PRIM;
 	ev->prim_type = LLC_PRIM_TYPE_REQ;
-	llc_sap_state_process(sap, skb, &llc_packet_type);
+	llc_sap_state_process(sap, skb);
 }
 
 /**
