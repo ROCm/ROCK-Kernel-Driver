@@ -2390,7 +2390,7 @@ static int check_disc_changed (struct devfs_entry *de)
     /*  Ugly hack to disable messages about unable to read partition table  */
     tmp = warn_no_part;
     warn_no_part = 0;
-    retval = check_disk_change(bdev);
+    retval = full_check_disk_change(bdev);
     warn_no_part = tmp;
 out:
     devfs_put_ops (de);

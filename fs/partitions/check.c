@@ -289,10 +289,13 @@ void driverfs_remove_partitions(struct gendisk *hd, int minor)
 	return;
 }
 
-static void check_partition(struct gendisk *hd, kdev_t dev)
+/*
+ *	DON'T EXPORT
+ */
+void check_partition(struct gendisk *hd, struct block_device *bdev)
 {
 	devfs_handle_t de = NULL;
-	struct block_device *bdev;
+	kdev_t dev = to_kdev_t(bdev->bd_dev);
 	char buf[64];
 	struct parsed_partitions *state;
 	int i;
@@ -314,9 +317,6 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 		if (n - COMPAQ_SMART2_MAJOR <= 7 || n - COMPAQ_CISS_MAJOR <= 7)
 			sprintf(state->name, "p");
 	}
-	bdev = bdget(kdev_t_to_nr(dev));
-	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW))
-		goto out;
 	state->limit = 1<<hd->minor_shift;
 	for (i = 0; check_part[i]; i++) {
 		int res, j;
@@ -328,7 +328,7 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 		if (res < 0) {
 			if (warn_no_part)
 				printk(" unable to read partition table\n");
-			goto setup_devfs;
+			goto out;
 		} 
 		p = hd->part + minor(dev) - hd->first_minor;
 		for (j = 1; j < state->limit; j++) {
@@ -340,12 +340,10 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 			md_autodetect_dev(mk_kdev(major(dev),minor(dev)+j));
 #endif
 		}
-		goto setup_devfs;
+		goto out;
 	}
 
 	printk(" unknown partition table\n");
-setup_devfs:
-	blkdev_put(bdev, BDEV_RAW);
 out:
 	driverfs_create_partitions(hd, minor(dev));
 	devfs_register_partitions (hd, minor(dev), 0);
@@ -463,34 +461,29 @@ void register_disk(struct gendisk *gdev, kdev_t dev, unsigned minors,
 
 void grok_partitions(kdev_t dev, long size)
 {
-	int minors, first_minor, end_minor;
+	struct block_device *bdev;
 	struct gendisk *g = get_gendisk(dev);
 	struct hd_struct *p;
 
 	if (!g)
 		return;
 
-	minors = 1 << g->minor_shift;
-	first_minor = minor(dev);
-	if (first_minor & (minors-1)) {
-		printk("grok_partitions: bad device 0x%02x:%02x\n",
-		       major(dev), first_minor);
-		first_minor &= ~(minors-1);
-	}
-	end_minor = first_minor + minors;
- 
-	p = g->part + first_minor - g->first_minor;
+	p = g->part + minor(dev) - g->first_minor;
 	p[0].nr_sects = size;
 
 	/* No minors to use for partitions */
-	if (minors == 1)
+	if (!g->minor_shift)
 		return;
 
 	/* No such device (e.g., media were just removed) */
 	if (!size)
 		return;
 
-	check_partition(g, mk_kdev(g->major, first_minor));
+	bdev = bdget(kdev_t_to_nr(dev));
+	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW) < 0)
+		return;
+	check_partition(g, bdev);
+	blkdev_put(bdev, BDEV_RAW);
 }
 
 unsigned char *read_dev_sector(struct block_device *bdev, unsigned long n, Sector *p)
