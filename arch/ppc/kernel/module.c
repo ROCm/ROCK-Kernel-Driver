@@ -16,6 +16,7 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 */
 #include <linux/module.h>
+#include <linux/moduleloader.h>
 #include <linux/elf.h>
 #include <linux/vmalloc.h>
 #include <linux/fs.h>
@@ -28,6 +29,8 @@
 #else
 #define DEBUGP(fmt , ...)
 #endif
+
+LIST_HEAD(module_bug_list);
 
 void *module_alloc(unsigned long size)
 {
@@ -267,9 +270,48 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
+	char *secstrings;
+	unsigned int i;
+
+	me->arch.bug_table = NULL;
+	me->arch.num_bugs = 0;
+
+	/* Find the __bug_table section, if present */
+	secstrings = (char *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+	for (i = 1; i < hdr->e_shnum; i++) {
+		if (strcmp(secstrings+sechdrs[i].sh_name, "__bug_table"))
+			continue;
+		me->arch.bug_table = (void *) sechdrs[i].sh_addr;
+		me->arch.num_bugs = sechdrs[i].sh_size / sizeof(struct bug_entry);
+		break;
+	}
+
+	/*
+	 * Strictly speaking this should have a spinlock to protect against
+	 * traversals, but since we only traverse on BUG()s, a spinlock
+	 * could potentially lead to deadlock and thus be counter-productive.
+	 */
+	list_add(&me->arch.bug_list, &module_bug_list);
+
 	return 0;
 }
 
 void module_arch_cleanup(struct module *mod)
 {
+	list_del(&mod->arch.bug_list);
+}
+
+struct bug_entry *module_find_bug(unsigned long bugaddr)
+{
+	struct mod_arch_specific *mod;
+	unsigned int i;
+	struct bug_entry *bug;
+
+	list_for_each_entry(mod, &module_bug_list, bug_list) {
+		bug = mod->bug_table;
+		for (i = 0; i < mod->num_bugs; ++i, ++bug)
+			if (bugaddr == bug->bug_addr)
+				return bug;
+	}
+	return NULL;
 }
