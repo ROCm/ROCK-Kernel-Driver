@@ -24,7 +24,7 @@
  *
  *   +------------------+
  *   | header           |
- *   ¦ entry 1          | |
+ *   | entry 1          | |
  *   | entry 2          | | growing downwards
  *   | entry 3          | v
  *   | four null bytes  |
