@@ -24,6 +24,7 @@
  */
 
 #include <linux/init.h>
+#include <linux/config.h>
 #include <linux/acpi.h>
 #include <asm/pgalloc.h>
 #include <asm/apic.h>
