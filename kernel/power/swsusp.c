@@ -284,8 +284,8 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
  *    would happen on next reboot -- corrupting data.
  *
  *    Note: The buffer we allocate to use to write the suspend header is
- *    not freed; its not needed since system is going down anyway
- *    (plus it causes oops and I'm lazy^H^H^H^Htoo busy).
+ *    not freed; its not needed since the system is going down anyway
+ *    (plus it causes an oops and I'm lazy^H^H^H^Htoo busy).
  */
 static int write_suspend_image(void)
 {
@@ -341,6 +341,7 @@ static int write_suspend_image(void)
 	printk("H");
 	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
 	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
+	BUG_ON (sizeof(struct link) != PAGE_SIZE);
 	if (!(entry = get_swap_page()).val)
 		panic( "\nNot enough swapspace when writing header" );
 	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
@@ -838,23 +839,23 @@ static int relocate_pagedir(void)
 
 static int sanity_check_failed(char *reason)
 {
-	printk(KERN_ERR "%s%s\n",name_resume,reason);
+	printk(KERN_ERR "%s%s\n", name_resume, reason);
 	return -EPERM;
 }
 
 static int sanity_check(struct suspend_header *sh)
 {
-	if(sh->version_code != LINUX_VERSION_CODE)
+	if (sh->version_code != LINUX_VERSION_CODE)
 		return sanity_check_failed("Incorrect kernel version");
-	if(sh->num_physpages != num_physpages)
+	if (sh->num_physpages != num_physpages)
 		return sanity_check_failed("Incorrect memory size");
-	if(strncmp(sh->machine, system_utsname.machine, 8))
+	if (strncmp(sh->machine, system_utsname.machine, 8))
 		return sanity_check_failed("Incorrect machine type");
-	if(strncmp(sh->version, system_utsname.version, 20))
+	if (strncmp(sh->version, system_utsname.version, 20))
 		return sanity_check_failed("Incorrect version");
-	if(sh->num_cpus != num_online_cpus())
+	if (sh->num_cpus != num_online_cpus())
 		return sanity_check_failed("Incorrect number of cpus");
-	if(sh->page_size != PAGE_SIZE)
+	if (sh->page_size != PAGE_SIZE)
 		return sanity_check_failed("Incorrect PAGE_SIZE");
 	return 0;
 }

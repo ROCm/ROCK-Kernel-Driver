@@ -32,9 +32,6 @@ struct suspend_header {
 	int page_size;
 	suspend_pagedir_t *suspend_pagedir;
 	unsigned int num_pbes;
-	struct swap_location {
-		char filename[SWAP_FILENAME_MAXLENGTH];
-	} swap_location[MAX_SWAPFILES];
 };
 
 #define SUSPEND_PD_PAGES(x)     (((x)*sizeof(struct pbe))/PAGE_SIZE+1)
