@@ -1,5 +1,5 @@
-# drivers/mtd/chips/Config.in
-# $Id: Config.in,v 1.12 2001/09/23 15:35:21 dwmw2 Exp $
+# drivers/mtd/chips/Kconfig
+# $Id: Kconfig,v 1.2 2003/05/28 10:59:06 dwmw2 Exp $
 
 menu "RAM/ROM/Flash chip drivers"
 	depends on MTD!=n
@@ -15,7 +15,6 @@ config MTD_CFI
 	  option. Visit <http://www.amd.com/products/nvd/overview/cfi.html>
 	  for more information on CFI.
 
-#dep_tristate '  Detect non-CFI Intel-compatible flash chips' CONFIG_MTD_INTELPROBE $CONFIG_MTD
 config MTD_JEDECPROBE
 	tristate "Detect non-CFI AMD/JEDEC-compatible flash chips"
 	depends on MTD
@@ -145,7 +144,15 @@ config MTD_CFI_AMDSTD
 	  The Common Flash Interface defines a number of different command
 	  sets which a CFI-compliant chip may claim to implement. This code
 	  provides support for one of those command sets, used on chips 
-	  chips including the AMD Am29LV320.
+	  including the AMD Am29LV320.
+
+config MTD_CFI_STAA
+	tristate "Support for ST (Advanced Architecture) flash chips"
+	depends on MTD_GEN_PROBE
+	help
+	  The Common Flash Interface defines a number of different command
+	  sets which a CFI-compliant chip may claim to implement. This code
+	  provides support for one of those command sets.
 
 config MTD_RAM
 	tristate "Support for RAM chips in bus mapping"
@@ -177,10 +184,10 @@ config MTD_OBSOLETE_CHIPS
 	help
 	  This option does not enable any code directly, but will allow you to
 	  select some other chip drivers which are now considered obsolete,
-	  because the generic CONFIG_JEDEC_PROBE code above should now detect
+	  because the generic CONFIG_JEDECPROBE code above should now detect
 	  the chips which are supported by these drivers, and allow the generic
 	  CFI-compatible drivers to drive the chips. Say 'N' here unless you have
-	  already tried the CONFIG_JEDEC_PROBE method and reported its failure
+	  already tried the CONFIG_JEDECPROBE method and reported its failure
 	  to the MTD mailing list at <linux-mtd@lists.infradead.org>
 
 config MTD_AMDSTD
@@ -209,8 +216,7 @@ config MTD_JEDEC
 	  programming flash.  It is commonly used in older AMD chips.  It is
 	  only called JEDEC because the JEDEC association
 	  <http://www.jedec.org/> distributes the identification codes for the
-	  chips. WARNING!!!! This code does not compile and is incomplete as
-	  are the specific JEDEC devices drivers.
+	  chips.
 
 endmenu
 

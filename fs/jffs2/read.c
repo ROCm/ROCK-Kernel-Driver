@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: read.c,v 1.29 2002/11/12 09:51:22 dwmw2 Exp $
+ * $Id: read.c,v 1.31 2003/01/14 14:06:22 dwmw2 Exp $
  *
  */
 
@@ -39,7 +39,7 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsig
 	}
 	if (readlen != sizeof(*ri)) {
 		jffs2_free_raw_inode(ri);
-		printk(KERN_WARNING "Short read from 0x%08x: wanted 0x%x bytes, got 0x%x\n", 
+		printk(KERN_WARNING "Short read from 0x%08x: wanted 0x%zx bytes, got 0x%zx\n", 
 		       ref_offset(fd->raw), sizeof(*ri), readlen);
 		return -EIO;
 	}
@@ -197,8 +197,9 @@ int jffs2_read_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			
 			fragofs = offset - frag->ofs;
 			readlen = min(frag->size - fragofs, end - offset);
-			D1(printk(KERN_DEBUG "Reading %d-%d from node at 0x%x\n", frag->ofs+fragofs, frag->ofs+fragofs+readlen, 
-				  ref_offset(frag->node->raw)));
+			D1(printk(KERN_DEBUG "Reading %d-%d from node at 0x%08x (%d)\n",
+				  frag->ofs+fragofs, frag->ofs+fragofs+readlen,
+				  ref_offset(frag->node->raw), ref_flags(frag->node->raw)));
 			ret = jffs2_read_dnode(c, frag->node, buf, fragofs + frag->ofs - frag->node->ofs, readlen);
 			D2(printk(KERN_DEBUG "node read done\n"));
 			if (ret) {

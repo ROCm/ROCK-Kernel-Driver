@@ -1,8 +1,15 @@
-# drivers/mtd/maps/Config.in
-# $Id: Config.in,v 1.16 2001/09/19 18:28:37 dwmw2 Exp $
+# drivers/mtd/maps/Kconfig
+# $Id: Kconfig,v 1.10 2003/05/28 11:34:44 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
+
+config MTD_COMPLEX_MAPPINGS
+	bool "Support non-linear mappings of flash chips"
+	depends on MTD
+	help
+	  This causes the chip drivers to allow for complicated
+	  paged mappings of flash chips.
 
 config MTD_PHYSMAP
 	tristate "CFI Flash device in physical memory map"
@@ -80,7 +87,7 @@ config MTD_NETSC520
 
 config MTD_SBC_GXX
 	tristate "CFI Flash device mapped on Arcom SBC-GXx boards"
-	depends on X86 && MTD_CFI_INTELEXT && MTD_PARTITIONS
+	depends on X86 && MTD_CFI_INTELEXT && MTD_PARTITIONS && MTD_COMPLEX_MAPPINGS
 	help
 	  This provides a driver for the on-board flash of Arcom Control
 	  Systems' SBC-GXn family of boards, formerly known as SBC-MediaGX.
@@ -91,7 +98,7 @@ config MTD_SBC_GXX
 
 config MTD_ELAN_104NC
 	tristate "CFI Flash device mapped on Arcom ELAN-104NC"
-	depends on X86 && MTD_CFI_INTELEXT && MTD_PARTITIONS
+	depends on X86 && MTD_CFI_INTELEXT && MTD_PARTITIONS && MTD_COMPLEX_MAPPINGS
 	help
 	  This provides a driver for the on-board flash of the Arcom Control
 	  System's ELAN-104NC development board. By default the flash
@@ -99,20 +106,16 @@ config MTD_ELAN_104NC
 	  devices. This board utilizes Intel StrataFlash. More info at
 	  <http://www.arcomcontrols.com/products/icp/pc104/processors/>.
 
-config MTD_MIXMEM
-	tristate "JEDEC Flash device mapped on Mixcom piggyback card"
-	depends on X86 && MTD_JEDEC
+config MTD_LUBBOCK
+	tristate "CFI Flash device mapped on Intel Lubbock XScale eval board"
+	depends on ARCH_LUBBOCK && MTD_CFI_INTELEXT && MTD_PARTITIONS
 	help
-	  This supports the paging arrangement for access to flash chips
-	  on the MixCOM piggyback card, allowing the flash chip drivers
-	  to get on with their job of driving the flash chips without
-	  having to know about the paging. If you have one of these boards,
-	  you probably want to enable this mapping driver. More info is at
-	  <http://www.itc.hu/>.
+	  This provides a driver for the on-board flash of the Intel
+	  'Lubbock' XScale evaluation board.
 
 config MTD_OCTAGON
 	tristate "JEDEC Flash device mapped on Octagon 5066 SBC"
-	depends on X86 && MTD_JEDEC
+	depends on X86 && MTD_JEDEC && MTD_COMPLEX_MAPPINGS
 	help
 	  This provides a 'mapping' driver which supports the way in which
 	  the flash chips are connected in the Octagon-5066 Single Board
@@ -121,7 +124,7 @@ config MTD_OCTAGON
 
 config MTD_VMAX
 	tristate "JEDEC Flash device mapped on Tempustech VMAX SBC301"
-	depends on X86 && MTD_JEDEC
+	depends on X86 && MTD_JEDEC && MTD_COMPLEX_MAPPINGS
 	help
 	  This provides a 'mapping' driver which supports the way in which
 	  the flash chips are connected in the Tempustech VMAX SBC301 Single
@@ -139,9 +142,93 @@ config MTD_SCx200_DOCFLASH
 
 	  If compiled as a module, it will be called scx200_docflash.
 
+config MTD_AMD76XROM
+	tristate "BIOS flash chip on AMD76x southbridge"
+	depends on X86 && MTD_JEDECPROBE
+	help
+	  Support for treating the BIOS flash chip on AMD76x motherboards
+	  as an MTD device - with this you can reprogram your BIOS.
+
+	  BE VERY CAREFUL.
+
+config MTD_ICH2ROM
+	tristate "BIOS flash chip on Intel Hub Controller 2"
+	depends on X86 && MTD_JEDECPROBE && MTD_COMPLEX_MAPPINGS
+	help
+	  Support for treating the BIOS flash chip on ICH2 motherboards
+	  as an MTD device - with this you can reprogram your BIOS.
+
+	  BE VERY CAREFUL.
+
+config MTD_SCB2_FLASH
+	tristate "BIOS flash chip on Intel SCB2 boards"
+	depends on X86 && MTD_JEDECPROBE
+	help
+	  Support for treating the BIOS flash chip on Intel SCB2 boards
+	  as an MTD device - with this you can reprogram your BIOS.
+
+	  BE VERY CAREFUL.
+
+config MTD_TSUNAMI
+	tristate "Flash chips on Tsunami TIG bus"
+	depends on ALPHA_TSUNAMI && MTD_COMPLEX_MAPPINGS
+	help
+	  Support for the flash chip on Tsunami TIG bus.
+
+config MTD_LASAT
+	tristate "Flash chips on LASAT board"
+	depends on LASAT && MTD_CFI
+	help
+	  Support for the flash chips on the Lasat 100 and 200 boards.
+
+config MTD_NETtel
+	tristate "CFI flash device on SnapGear/SecureEdge"
+	depends on X86 && MTD_PARTITIONS && MTD_JEDECPROBE
+	help
+	  Support for flash chips on NETtel/SecureEdge/SnapGear boards.
+
+config MTD_PB1XXX
+	tristate "Flash devices on Alchemy PB1xxx boards"
+	depends on MIPS && ( MIPS_PB1000 || MIPS_PB1100 || MIPS_PB1500 )
+	help
+	  Flash memory access on Alchemy Pb1000/Pb1100/Pb1500 boards
+
+config MTD_PB1XXX_BOOT
+	bool "PB1x00 boot flash device"
+	depends on MTD_PB1XXX && ( MIPS_PB1100 || MIPS_PB1500 )
+	help
+	  Use the first of the two 32MiB flash banks on Pb1100/Pb1500 board.
+	  You can say 'Y' to both this and 'MTD_PB1XXX_USER' below, to use
+	  both banks.
+
+config MTD_PB1XXX_USER
+	bool "PB1x00 user flash device"
+	depends on MTD_PB1XXX && ( MIPS_PB1100 || MIPS_PB1500 )
+	default y if MTD_PB1XX_BOOT = n
+	help
+	  Use the second of the two 32MiB flash banks on Pb1100/Pb1500 board.
+	  You can say 'Y' to both this and 'MTD_PB1XXX_BOOT' above, to use
+	  both banks.
+
+config MTD_DILNETPC
+	tristate "CFI Flash device mapped on DIL/Net PC"
+	depends on X86 && MTD_CONCAT && MTD_PARTITIONS && MTD_CFI_INTELEXT
+	help
+	  MTD map driver for SSV DIL/Net PC Boards "DNP" and "ADNP".
+	  For details, see http://www.ssv-embedded.de/ssv/pc104/p169.htm
+ 	  and http://www.ssv-embedded.de/ssv/pc104/p170.htm
+
+config MTD_DILNETPC_BOOTSIZE
+	hex "Size of DIL/Net PC flash boot partition"
+	depends on MTD_DILNETPC
+	default "0x80000"
+	help
+	  The amount of space taken up by the kernel or Etherboot
+	  on the DIL/Net PC flash chips.
+
 config MTD_L440GX
 	tristate "BIOS flash chip on Intel L440GX boards"
-	depends on X86 && MTD_JEDEC
+	depends on X86 && MTD_JEDECPROBE
 	help
 	  Support for treating the BIOS flash chip on Intel L440GX motherboards
 	  as an MTD device - with this you can reprogram your BIOS.
@@ -150,7 +237,7 @@ config MTD_L440GX
 
 config MTD_TQM8XXL
 	tristate "CFI Flash device mapped on TQM8XXL"
-	depends on MTD_CFI && TQM8xxL && PPC
+	depends on MTD_CFI && PPC32 && 8xx && TQM8xxL
 	help
 	  The TQM8xxL PowerPC board has up to two banks of CFI-compliant
 	  chips, currently uses AMD one. This 'mapping' driver supports
@@ -160,7 +247,7 @@ config MTD_TQM8XXL
 
 config MTD_RPXLITE
 	tristate "CFI Flash device mapped on RPX Lite or CLLF"
-	depends on MTD_CFI && PPC
+	depends on MTD_CFI && PPC32 && 8xx && (RPXCLASSIC || RPXLITE)
 	help
 	  The RPXLite PowerPC board has CFI-compliant chips mapped in
 	  a strange sparse mapping. This 'mapping' driver supports that
@@ -168,9 +255,17 @@ config MTD_RPXLITE
 	  to communicate with the chips on the RPXLite board. More at
 	  <http://www.embeddedplanet.com/rpx_lite_specification_sheet.htm>.
 
+config MTD_MBX860
+	tristate "System flash on MBX860 board"
+	depends on MTD_CFI && PPC32 && 8xx && MBX
+	help
+	  This enables access routines for the flash chips on the Motorola
+	  MBX860 board. If you have one of these boards and would like
+	  to use the flash chips on it, say 'Y'.
+
 config MTD_DBOX2
 	tristate "CFI Flash device mapped on D-Box2"
-	depends on PPC && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
+	depends on PPC32 && 8xx && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
 	help
 	  This enables access routines for the flash chips on the Nokia/Sagem
 	  D-Box 2 board. If you have one of these boards and would like to use
@@ -178,15 +273,47 @@ config MTD_DBOX2
 
 config MTD_CFI_FLAGADM
 	tristate "CFI Flash device mapping on FlagaDM"
-	depends on PPC && MTD_CFI
+	depends on PPC32 && 8xx && MTD_CFI
 	help
 	  Mapping for the Flaga digital module. If you don´t have one, ignore
 	  this setting.
 
+config MTD_BEECH
+	tristate "CFI Flash device mapped on IBM 405LP Beech"
+	depends on MTD_CFI && PPC32 && 40x && BEECH
+	help
+	  This enables access routines for the flash chips on the IBM
+	  405LP Beech board. If you have one of these boards and would like
+	  to use the flash chips on it, say 'Y'.
+
+config MTD_ARCTIC
+	tristate "CFI Flash device mapped on IBM 405LP Arctic"
+	depends on MTD_CFI && PPC32 && 40x && ARCTIC2
+	help
+	  This enables access routines for the flash chips on the IBM 405LP
+	  Arctic board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_EBONY
+	tristate "CFI Flash device mapped on IBM 440GP Ebony"
+	depends on MTD_CFI && PPC32 && 440 && EBONY
+	help
+	  This enables access routines for the flash chips on the IBM 440GP
+	  Ebony board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
+config MTD_REDWOOD
+	tristate "CFI Flash devices mapped on IBM Redwood"
+	depends on MTD_CFI && PPC32 && 4xx && 40x && ( REDWOOD_4 || REDWOOD_5 || REDWOOD_6 )
+	help
+	  This enables access routines for the flash chips on the IBM
+	  Redwood board. If you have one of these boards and would like to
+	  use the flash chips on it, say 'Y'.
+
 config MTD_CSTM_MIPS_IXX
 	tristate "Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board"
-	depends on MIPS && MTD_CFI && MTD_JEDEC && MTD_PARTITIONS
-	---help---
+	depends on MIPS && MTD_CFI && MTD_JEDECPROBE && MTD_PARTITIONS
+	help
 	  This provides a mapping driver for the Integrated Tecnology
 	  Express, Inc (ITE) QED-4N-S01B eval board and the Globespan IVR
 	  Reference Board. It provides the necessary addressing, length,
@@ -242,12 +369,6 @@ config MTD_SOLUTIONENGINE
 	  This enables access to the flash chips on the Hitachi SolutionEngine and
 	  similar boards. Say 'Y' if you are building a kernel for such a board.
 
-config MTD_NORA
-	tristate "CFI Flash device mapped on Nora"
-	depends on ARM && MTD_CFI
-	help
-	  If you had to ask, you don't have one. Say 'N'.
-
 config MTD_ARM_INTEGRATOR
 	tristate "CFI Flash device mapped on ARM Integrator/P720T"
 	depends on ARM && MTD_CFI
@@ -269,7 +390,7 @@ config MTD_SA1100
 
 config MTD_DC21285
 	tristate "CFI Flash device mapped on DC21285 Footbridge"
-	depends on ARM && MTD_CFI && ARCH_FOOTBRIDGE
+	depends on ARM && MTD_CFI && ARCH_FOOTBRIDGE && MTD_COMPLEX_MAPPINGS
 	help
 	  This provides a driver for the flash accessed using Intel's
 	  21285 bridge used with Intel's StrongARM processors. More info at
@@ -281,14 +402,6 @@ config MTD_IQ80310
 	help
 	  This enables access routines for the flash chips on the Intel XScale
 	  IQ80310 evaluation board. If you have one of these boards and would 
-	  like to use the flash chips on it, say 'Y'.
-
-config MTD_IQ80321
-	tristate "CFI Flash device mapped on the XScale IQ80321 board"
-	depends on ARM && MTD_CFI && ARCH_IQ80321
-	help
-	  This enables access routines for the flash chips on the Intel XScale
-	  IQ80321 evaluation board. If you have one of these boards and would
 	  like to use the flash chips on it, say 'Y'.
 
 config MTD_EPXA10DB
@@ -334,6 +447,13 @@ config MTD_CEIVA
 	  This enables access to the flash chips on the Ceiva/Polaroid
 	  PhotoMax Digital Picture Frame.
 	  If you have such a device, say 'Y'.
+
+config MTD_H720X
+	tristate "Hynix evaluation board mappings"
+	depends on ARM && MTD_CFI && ( ARCH_H7201 || ARCH_H7202 )
+	help
+	  This enables access to the flash chips on the Hynix evaluation boards.
+	  If you have such a board, say 'Y'.
 
 # This needs CFI or JEDEC, depending on the cards found.
 config MTD_PCI

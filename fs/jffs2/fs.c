@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.19 2002/11/12 09:53:40 dwmw2 Exp $
+ * $Id: fs.c,v 1.24 2003/04/29 09:52:58 dwmw2 Exp $
  *
  */
 
@@ -16,7 +16,6 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/list.h>
-#include <linux/interrupt.h>
 #include <linux/mtd/mtd.h>
 #include <linux/pagemap.h>
 #include <linux/slab.h>
@@ -35,7 +34,7 @@ int jffs2_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_ffree = 0;
 	buf->f_namelen = JFFS2_MAX_NAME_LEN;
 
-	spin_lock_bh(&c->erase_completion_lock);
+	spin_lock(&c->erase_completion_lock);
 
 	avail = c->dirty_size + c->free_size;
 	if (avail > c->sector_size * JFFS2_RESERVED_BLOCKS_WRITE)
@@ -47,7 +46,7 @@ int jffs2_statfs(struct super_block *sb, struct statfs *buf)
 
 	D1(jffs2_dump_block_lists(c));
 
-	spin_unlock_bh(&c->erase_completion_lock);
+	spin_unlock(&c->erase_completion_lock);
 
 	return 0;
 }
@@ -87,16 +86,13 @@ void jffs2_read_inode (struct inode *inode)
 		up(&f->sem);
 		return;
 	}
-	inode->i_mode = je32_to_cpu(latest_node.mode);
+	inode->i_mode = jemode_to_cpu(latest_node.mode);
 	inode->i_uid = je16_to_cpu(latest_node.uid);
 	inode->i_gid = je16_to_cpu(latest_node.gid);
 	inode->i_size = je32_to_cpu(latest_node.isize);
-	inode->i_atime.tv_sec = je32_to_cpu(latest_node.atime);
-	inode->i_mtime.tv_sec = je32_to_cpu(latest_node.mtime);
-	inode->i_ctime.tv_sec = je32_to_cpu(latest_node.ctime);
-	inode->i_atime.tv_nsec =
-	inode->i_mtime.tv_nsec =
-	inode->i_ctime.tv_nsec = 0;
+	inode->i_atime = ITIME(je32_to_cpu(latest_node.atime));
+	inode->i_mtime = ITIME(je32_to_cpu(latest_node.mtime));
+	inode->i_ctime = ITIME(je32_to_cpu(latest_node.ctime));
 
 	inode->i_nlink = f->inocache->nlink;
 
@@ -104,7 +100,7 @@ void jffs2_read_inode (struct inode *inode)
 	inode->i_blocks = (inode->i_size + 511) >> 9;
 	
 	switch (inode->i_mode & S_IFMT) {
-		unsigned short rdev;
+		jint16_t rdev;
 
 	case S_IFLNK:
 		inode->i_op = &jffs2_symlink_inode_operations;
@@ -151,7 +147,7 @@ void jffs2_read_inode (struct inode *inode)
 	case S_IFSOCK:
 	case S_IFIFO:
 		inode->i_op = &jffs2_file_inode_operations;
-		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(mk_kdev(rdev>>8, rdev&0xff)));
+		init_special_inode(inode, inode->i_mode, kdev_t_to_nr(mk_kdev(je16_to_cpu(rdev)>>8, je16_to_cpu(rdev)&0xff)));
 		break;
 
 	default:
@@ -232,7 +228,7 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 	} else {
 		ri->gid = cpu_to_je16(current->fsgid);
 	}
-	ri->mode =  cpu_to_je32(mode);
+	ri->mode =  cpu_to_jemode(mode);
 	ret = jffs2_do_new_inode (c, f, mode, ri);
 	if (ret) {
 		make_bad_inode(inode);
@@ -241,12 +237,11 @@ struct inode *jffs2_new_inode (struct inode *dir_i, int mode, struct jffs2_raw_i
 	}
 	inode->i_nlink = 1;
 	inode->i_ino = je32_to_cpu(ri->ino);
-	inode->i_mode = je32_to_cpu(ri->mode);
+	inode->i_mode = jemode_to_cpu(ri->mode);
 	inode->i_gid = je16_to_cpu(ri->gid);
 	inode->i_uid = je16_to_cpu(ri->uid);
-	inode->i_atime.tv_nsec = inode->i_ctime.tv_nsec = inode->i_mtime.tv_nsec = 0;
-	inode->i_atime.tv_sec = inode->i_ctime.tv_sec = inode->i_mtime.tv_sec = get_seconds();
-	ri->atime = ri->mtime = ri->ctime = cpu_to_je32(inode->i_mtime.tv_sec);
+	inode->i_atime = inode->i_ctime = inode->i_mtime = CURRENT_TIME;
+	ri->atime = ri->mtime = ri->ctime = cpu_to_je32(I_SEC(inode->i_mtime));
 
 	inode->i_blksize = PAGE_SIZE;
 	inode->i_blocks = 0;
@@ -263,27 +258,32 @@ int jffs2_do_fill_super(struct super_block *sb, void *data, int silent)
 	struct jffs2_sb_info *c;
 	struct inode *root_i;
 	int ret;
+	size_t blocks;
 
 	c = JFFS2_SB_INFO(sb);
 
-	c->sector_size = c->mtd->erasesize;
 	c->flash_size = c->mtd->size;
 
-#if 0
-	if (c->sector_size < 0x10000) {
-		printk(KERN_INFO "jffs2: Erase block size too small (%dKiB). Using 64KiB instead\n",
-		       c->sector_size / 1024);
-		c->sector_size = 0x10000;
-	}
-#endif
+	/* 
+	 * Check, if we have to concatenate physical blocks to larger virtual blocks
+	 * to reduce the memorysize for c->blocks. (kmalloc allows max. 128K allocation)
+	 */
+	blocks = c->flash_size / c->mtd->erasesize;
+	while ((blocks * sizeof (struct jffs2_eraseblock)) > (128 * 1024))
+		blocks >>= 1;
+	
+	c->sector_size = c->flash_size / blocks;
+	if (c->sector_size != c->mtd->erasesize)
+		printk(KERN_INFO "jffs2: Erase block size too small (%dKiB). Using virtual blocks size (%dKiB) instead\n", 
+			c->mtd->erasesize / 1024, c->sector_size / 1024);
+
 	if (c->flash_size < 5*c->sector_size) {
-		printk(KERN_ERR "jffs2: Too few erase blocks (%d)\n",
-		       c->flash_size / c->sector_size);
+		printk(KERN_ERR "jffs2: Too few erase blocks (%d)\n", c->flash_size / c->sector_size);
 		return -EINVAL;
 	}
 
 	c->cleanmarker_size = sizeof(struct jffs2_unknown_node);
-	/* Jörn -- stick alignment for weird 8-byte-page flash here */
+	/* Joern -- stick alignment for weird 8-byte-page flash here */
 
 	if (jffs2_cleanmarker_oob(c)) {
 		/* Cleanmarker is out-of-band, so inline size zero */

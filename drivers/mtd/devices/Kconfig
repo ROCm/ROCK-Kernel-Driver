@@ -1,5 +1,5 @@
-# drivers/mtd/maps/Config.in
-# $Id: Config.in,v 1.5 2001/09/23 15:33:10 dwmw2 Exp $
+# drivers/mtd/maps/Kconfig
+# $Id: Kconfig,v 1.3 2003/05/28 10:54:23 dwmw2 Exp $
 
 menu "Self-contained MTD device drivers"
 	depends on MTD!=n
@@ -37,6 +37,12 @@ config MTD_PMC551_DEBUG
 	  This option makes the PMC551 more verbose during its operation and
 	  is only really useful if you are developing on this driver or
 	  suspect a possible hardware or driver bug.  If unsure say N.
+
+config MTD_MS02NV
+	tristate "DEC MS02-NV NVRAM module support"
+	depends on CONFIG_DECSTATION
+	help
+	  Support for NVRAM module on DECstation.
 
 config MTD_SLRAM
 	tristate "Uncached system RAM"
@@ -108,13 +114,6 @@ config MTD_BLKMTD
 
 comment "Disk-On-Chip Device Drivers"
 
-config MTD_DOC1000
-	tristate "M-Systems Disk-On-Chip 1000"
-	depends on MTD
-	help
-	  This provides an MTD device driver for the M-Systems DiskOnChip
-	  1000 devices, which are obsolete so you probably want to say 'N'.
-
 config MTD_DOC2000
 	tristate "M-Systems Disk-On-Chip 2000 and Millennium"
 	depends on MTD
@@ -148,10 +147,26 @@ config MTD_DOC2001
 	  emulate a block device by using a kind of file system on the flash
 	  chips.
 
+config MTD_DOC2001PLUS
+	tristate "M-Systems Disk-On-Chip Millennium-only alternative driver (see help)"
+	depends on MTD
+	---help---
+	  This provides an alternative MTD device driver for the M-Systems 
+	  DiskOnChip Millennium devices.  Use this if you have problems with
+	  the combined DiskOnChip 2000 and Millennium driver above.  To get
+	  the DiskOnChip probe code to load and use this driver instead of
+	  the other one, you will need to undefine DOC_SINGLE_DRIVER near
+	  the beginning of <file:drivers/mtd/devices/docprobe.c>.
+
+	  If you use this device, you probably also want to enable the NFTL
+	  'NAND Flash Translation Layer' option below, which is used to
+	  emulate a block device by using a kind of file system on the flash
+	  chips.
+
 config MTD_DOCPROBE
 	tristate
-	default m if MTD_DOC2001!=y && MTD_DOC2000!=y && (MTD_DOC2001=m || MTD_DOC2000=m)
-	default y if MTD_DOC2001=y || MTD_DOC2000=y
+	default m if MTD_DOC2001!=y && MTD_DOC2000!=y && MTD_DOC2001PLUS!=y && (MTD_DOC2001=m || MTD_DOC2000=m || MOD_DOC2001PLUS=m)
+	default y if MTD_DOC2001=y || MTD_DOC2000=y || MTD_DOC2001PLUS=y
 	help
 	  This isn't a real config option, it's derived.
 
@@ -200,7 +215,7 @@ config MTD_DOCPROBE_55AA
 	  continue with probing if it is absent.  The signature will always be
 	  present for a DiskOnChip 2000 or a normal DiskOnChip Millennium.
 	  Only if you have overwritten the first block of a DiskOnChip
-	  Millennium will it be  absent.  Enable this option if you are using
+	  Millennium will it be absent.  Enable this option if you are using
 	  LinuxBIOS or if you need to recover a DiskOnChip Millennium on which
 	  you have managed to wipe the first block.
 
