@@ -376,7 +376,7 @@ linvfs_rename(
 STATIC int
 linvfs_readlink(
 	struct dentry	*dentry,
-	char		*buf,
+	char __user	*buf,
 	int		size)
 {
 	vnode_t		*vp = LINVFS_GET_VP(dentry->d_inode);

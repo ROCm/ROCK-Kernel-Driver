@@ -104,7 +104,7 @@ extern ssize_t xfs_write(struct bhv_desc *, struct kiocb *,
 				loff_t *, int, struct cred *);
 extern ssize_t xfs_sendfile(struct bhv_desc *, struct file *,
 				loff_t *, int, size_t, read_actor_t,
-				void *, struct cred *);
+				void __user *, struct cred *);
 
 extern int xfs_dev_is_read_only(struct xfs_mount *, char *);
 
