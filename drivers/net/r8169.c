@@ -40,6 +40,7 @@ VERSION 1.2	<2002/11/30>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/delay.h>
+#include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <linux/init.h>
 
@@ -381,6 +382,20 @@ mdio_read(void *ioaddr, int RegAddr)
 	}
 	return value;
 }
+
+static void rtl8169_get_drvinfo(struct net_device *dev,
+				struct ethtool_drvinfo *info)
+{
+	struct rtl8169_private *tp = dev->priv;
+
+	strcpy(info->driver, RTL8169_DRIVER_NAME);
+	strcpy(info->version, RTL8169_VERSION );
+	strcpy(info->bus_info, pci_name(tp->pci_dev));
+}
+
+static struct ethtool_ops rtl8169_ethtool_ops = {
+	.get_drvinfo		= rtl8169_get_drvinfo,
+};
 
 static void rtl8169_write_gmii_reg_bit(void *ioaddr, int reg, int bitnum,
 				       int bitval)
@@ -793,6 +808,7 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	dev->open = rtl8169_open;
 	dev->hard_start_xmit = rtl8169_start_xmit;
 	dev->get_stats = rtl8169_get_stats;
+	dev->ethtool_ops = &rtl8169_ethtool_ops;
 	dev->stop = rtl8169_close;
 	dev->tx_timeout = rtl8169_tx_timeout;
 	dev->set_multicast_list = rtl8169_set_rx_mode;
