@@ -45,7 +45,6 @@
 #include "../zftape/zftape-write.h"
 #include "../zftape/zftape-ctl.h"
 #include "../zftape/zftape-buffers.h"
-#include "../zftape/zftape_syms.h"
 
 char zft_src[] __initdata = "$Source: /homes/cvs/ftape-stacked/ftape/zftape/zftape-init.c,v $";
 char zft_rev[] __initdata = "$Revision: 1.8 $";
