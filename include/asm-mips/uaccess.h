@@ -3,12 +3,14 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1996, 1997, 1998, 1999, 2000 by Ralf Baechle
+ * Copyright (C) 1996, 1997, 1998, 1999, 2000, 03, 04 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  */
 #ifndef _ASM_UACCESS_H
 #define _ASM_UACCESS_H
 
+#include <linux/config.h>
+#include <linux/compiler.h>
 #include <linux/errno.h>
 #include <linux/thread_info.h>
 
@@ -20,46 +22,42 @@
  * For historical reasons, these macros are grossly misnamed.
  */
 #ifdef CONFIG_MIPS32
+
+#define __UA_LIMIT	0x80000000UL
+
 #define __UA_ADDR	".word"
 #define __UA_LA		"la"
 #define __UA_ADDU	"addu"
-
-#define KERNEL_DS	((mm_segment_t) { (unsigned long) 0L })
-#define USER_DS		((mm_segment_t) { (unsigned long) -1L })
-
-#define VERIFY_READ    0
-#define VERIFY_WRITE   1
-
-#define __access_ok(addr, size, mask)					\
-	(((signed long)((mask)&(addr | ((addr) + (size)) | __ua_size(size)))) >= 0)
- 
-#define __access_mask ((long)(get_fs().seg))
- 
-#define access_ok(type, addr, size)					\
-	__access_ok(((unsigned long)(addr)),(size),__access_mask)
+#define __UA_t0		"$8"
+#define __UA_t1		"$9"
 
 #endif /* CONFIG_MIPS32 */
 
 #ifdef CONFIG_MIPS64
+
+#define __UA_LIMIT	(- TASK_SIZE)
+
 #define __UA_ADDR	".dword"
 #define __UA_LA		"dla"
 #define __UA_ADDU	"daddu"
+#define __UA_t0		"$12"
+#define __UA_t1		"$13"
+
+#endif /* CONFIG_MIPS64 */
+
+/*
+ * USER_DS is a bitmask that has the bits set that may not be set in a valid
+ * userspace address.  Note that we limit 32-bit userspace to 0x7fff8000 but
+ * the arithmetic we're doing only works if the limit is a power of two, so
+ * we use 0x80000000 here on 32-bit kernels.  If a process passes an invalid
+ * address in this range it's the process's problem, not ours :-)
+ */
 
 #define KERNEL_DS	((mm_segment_t) { 0UL })
-#define USER_DS		((mm_segment_t) { -TASK_SIZE })
+#define USER_DS		((mm_segment_t) { __UA_LIMIT })
 
 #define VERIFY_READ    0
 #define VERIFY_WRITE   1
-
-#define __access_ok(addr, size, mask)					\
-	(((signed long)((mask) & ((addr) | ((addr) + (size)) | __ua_size(size)))) == 0)
-
-#define __access_mask get_fs().seg
-
-#define access_ok(type, addr, size)					\
-	__access_ok((unsigned long)(addr), (size), __access_mask)
-
-#endif /* CONFIG_MIPS64 */
 
 #define get_ds()	(KERNEL_DS)
 #define get_fs()	(current_thread_info()->addr_limit)
@@ -84,35 +82,137 @@
 #define __ua_size(size)							\
 	((__builtin_constant_p(size) && (signed long) (size) > 0) ? 0 : (size))
 
+/*
+ * access_ok: - Checks if a user space pointer is valid
+ * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE.  Note that
+ *        %VERIFY_WRITE is a superset of %VERIFY_READ - if it is safe
+ *        to write to a block, it is always safe to read from it.
+ * @addr: User space pointer to start of block to check
+ * @size: Size of block to check
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Checks if a pointer to a block of memory in user space is valid.
+ *
+ * Returns true (nonzero) if the memory block may be valid, false (zero)
+ * if it is definitely invalid.
+ *
+ * Note that, depending on architecture, this function probably just
+ * checks that the pointer is in the user space range - after calling
+ * this function, memory access functions may still return -EFAULT.
+ */
+
+#define __access_mask get_fs().seg
+
+#define __access_ok(addr, size, mask)					\
+	(((signed long)((mask) & ((addr) | ((addr) + (size)) | __ua_size(size)))) == 0)
+
+#define access_ok(type, addr, size)					\
+	likely(__access_ok((unsigned long)(addr), (size),__access_mask))
+
+/*
+ * verify_area: - Obsolete, use access_ok()
+ * @type: Type of access: %VERIFY_READ or %VERIFY_WRITE
+ * @addr: User space pointer to start of block to check
+ * @size: Size of block to check
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * This function has been replaced by access_ok().
+ *
+ * Checks if a pointer to a block of memory in user space is valid.
+ *
+ * Returns zero if the memory block may be valid, -EFAULT
+ * if it is definitely invalid.
+ *
+ * See access_ok() for more details.
+ */
 static inline int verify_area(int type, const void * addr, unsigned long size)
 {
 	return access_ok(type, addr, size) ? 0 : -EFAULT;
 }
 
 /*
- * Uh, these should become the main single-value transfer routines ...
- * They automatically use the right size if we just have the right
- * pointer type ...
+ * put_user: - Write a simple value into user space.
+ * @x:   Value to copy to user space.
+ * @ptr: Destination address, in user space.
  *
- * As MIPS uses the same address space for kernel and user data, we
- * can just do these as direct assignments.
+ * Context: User context only.  This function may sleep.
  *
- * Careful to not
- * (a) re-use the arguments for side effects (sizeof is ok)
- * (b) require any knowledge of processes at this stage
+ * This macro copies a single simple value from kernel space to user
+ * space.  It supports simple types like char and int, but not larger
+ * data types like structures or arrays.
+ *
+ * @ptr must have pointer-to-simple-variable type, and @x must be assignable
+ * to the result of dereferencing @ptr.
+ *
+ * Returns zero on success, or -EFAULT on error.
  */
 #define put_user(x,ptr)	\
 	__put_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+
+/*
+ * get_user: - Get a simple variable from user space.
+ * @x:   Variable to store result.
+ * @ptr: Source address, in user space.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * This macro copies a single simple variable from user space to kernel
+ * space.  It supports simple types like char and int, but not larger
+ * data types like structures or arrays.
+ *
+ * @ptr must have pointer-to-simple-variable type, and the result of
+ * dereferencing @ptr must be assignable to @x without a cast.
+ *
+ * Returns zero on success, or -EFAULT on error.
+ * On error, the variable @x is set to zero.
+ */
 #define get_user(x,ptr) \
 	__get_user_check((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
 /*
- * The "__xxx" versions do not do address space checking, useful when
- * doing multiple accesses to the same area (the user has to do the
- * checks by hand with "access_ok()")
+ * __put_user: - Write a simple value into user space, with less checking.
+ * @x:   Value to copy to user space.
+ * @ptr: Destination address, in user space.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * This macro copies a single simple value from kernel space to user
+ * space.  It supports simple types like char and int, but not larger
+ * data types like structures or arrays.
+ *
+ * @ptr must have pointer-to-simple-variable type, and @x must be assignable
+ * to the result of dereferencing @ptr.
+ *
+ * Caller must check the pointer with access_ok() before calling this
+ * function.
+ *
+ * Returns zero on success, or -EFAULT on error.
  */
 #define __put_user(x,ptr) \
 	__put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
+
+/*
+ * __get_user: - Get a simple variable from user space, with less checking.
+ * @x:   Variable to store result.
+ * @ptr: Source address, in user space.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * This macro copies a single simple variable from user space to kernel
+ * space.  It supports simple types like char and int, but not larger
+ * data types like structures or arrays.
+ *
+ * @ptr must have pointer-to-simple-variable type, and the result of
+ * dereferencing @ptr must be assignable to @x without a cast.
+ *
+ * Caller must check the pointer with access_ok() before calling this
+ * function.
+ *
+ * Returns zero on success, or -EFAULT on error.
+ * On error, the variable @x is set to zero.
+ */
 #define __get_user(x,ptr) \
 	__get_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
@@ -134,6 +234,7 @@ struct __large_struct { unsigned long buf[100]; };
 	long __gu_err;						\
 	__typeof(*(ptr)) __gu_val;				\
 	long __gu_addr;						\
+	might_sleep();						\
 	__asm__("":"=r" (__gu_val));				\
 	__gu_addr = (long) (ptr);				\
 	__asm__("":"=r" (__gu_err));				\
@@ -146,65 +247,66 @@ struct __large_struct { unsigned long buf[100]; };
 	} x = (__typeof__(*(ptr))) __gu_val; __gu_err;		\
 })
 
-#define __get_user_check(x,ptr,size)				\
-({								\
-	long __gu_err;						\
-	__typeof__(*(ptr)) __gu_val;				\
-	long __gu_addr;						\
-	__asm__("":"=r" (__gu_val));				\
-	__gu_addr = (long) (ptr);				\
-	__asm__("":"=r" (__gu_err));				\
-	if (__access_ok(__gu_addr,size,__access_mask)) {	\
-		switch (size) {					\
-		case 1: __get_user_asm("lb"); break;		\
-		case 2: __get_user_asm("lh"); break;		\
-		case 4: __get_user_asm("lw"); break;		\
-		case 8: __GET_USER_DW; break;			\
-		default: __get_user_unknown(); break;		\
-		}						\
-	} x = (__typeof__(*(ptr))) __gu_val; __gu_err;		\
+#define __get_user_check(x,ptr,size)					\
+({									\
+	long __gu_err;							\
+	__typeof__(*(ptr)) __gu_val;					\
+	long __gu_addr;							\
+	might_sleep();							\
+	__asm__("":"=r" (__gu_val));					\
+	__gu_addr = (long) (ptr);					\
+	__asm__("":"=r" (__gu_err));					\
+	if (access_ok(VERIFY_READ,__gu_addr,size)) {			\
+		switch (size) {						\
+		case 1: __get_user_asm("lb"); break;			\
+		case 2: __get_user_asm("lh"); break;			\
+		case 4: __get_user_asm("lw"); break;			\
+		case 8: __GET_USER_DW; break;				\
+		default: __get_user_unknown(); break;			\
+		}							\
+	} x = (__typeof__(*(ptr))) __gu_val; __gu_err;			\
 })
 
-#define __get_user_asm(insn)					\
-({								\
-	__asm__ __volatile__(					\
-	"1:\t" insn "\t%1,%2\n\t"				\
-	"move\t%0,$0\n"						\
-	"2:\n\t"						\
-	".section\t.fixup,\"ax\"\n"				\
-	"3:\tli\t%0,%3\n\t"					\
-	"move\t%1,$0\n\t"					\
-	"j\t2b\n\t"						\
-	".previous\n\t"						\
-	".section\t__ex_table,\"a\"\n\t"			\
-	__UA_ADDR "\t1b,3b\n\t"					\
-	".previous"						\
-	:"=r" (__gu_err), "=r" (__gu_val)			\
-	:"o" (__m(__gu_addr)), "i" (-EFAULT));			\
+#define __get_user_asm(insn)						\
+({									\
+	__asm__ __volatile__(						\
+	"1:\t" insn "\t%1,%2\n\t"					\
+	"move\t%0,$0\n"							\
+	"2:\n\t"							\
+	".section\t.fixup,\"ax\"\n"					\
+	"3:\tli\t%0,%3\n\t"						\
+	"move\t%1,$0\n\t"						\
+	"j\t2b\n\t"							\
+	".previous\n\t"							\
+	".section\t__ex_table,\"a\"\n\t"				\
+	__UA_ADDR "\t1b,3b\n\t"						\
+	".previous"							\
+	:"=r" (__gu_err), "=r" (__gu_val)				\
+	:"o" (__m(__gu_addr)), "i" (-EFAULT));				\
 })
 
 /*
  * Get a long long 64 using 32 bit registers.
  */
-#define __get_user_asm_ll32					\
-({								\
-	__asm__ __volatile__(					\
-	"1:\tlw\t%1,%2\n"					\
-	"2:\tlw\t%D1,%3\n\t"					\
-	"move\t%0,$0\n"						\
-	"3:\t.section\t.fixup,\"ax\"\n"				\
-	"4:\tli\t%0,%4\n\t"					\
-	"move\t%1,$0\n\t"					\
-	"move\t%D1,$0\n\t"					\
-	"j\t3b\n\t"						\
-	".previous\n\t"						\
-	".section\t__ex_table,\"a\"\n\t"			\
-	__UA_ADDR "\t1b,4b\n\t"					\
-	__UA_ADDR "\t2b,4b\n\t"					\
-	".previous"						\
-	:"=r" (__gu_err), "=&r" (__gu_val)			\
-	:"o" (__m(__gu_addr)), "o" (__m(__gu_addr + 4)),	\
-	 "i" (-EFAULT));					\
+#define __get_user_asm_ll32						\
+({									\
+	__asm__ __volatile__(						\
+	"1:\tlw\t%1,%2\n"						\
+	"2:\tlw\t%D1,%3\n\t"						\
+	"move\t%0,$0\n"							\
+	"3:\t.section\t.fixup,\"ax\"\n"					\
+	"4:\tli\t%0,%4\n\t"						\
+	"move\t%1,$0\n\t"						\
+	"move\t%D1,$0\n\t"						\
+	"j\t3b\n\t"							\
+	".previous\n\t"							\
+	".section\t__ex_table,\"a\"\n\t"				\
+	__UA_ADDR "\t1b,4b\n\t"						\
+	__UA_ADDR "\t2b,4b\n\t"						\
+	".previous"							\
+	:"=r" (__gu_err), "=&r" (__gu_val)				\
+	:"o" (__m(__gu_addr)), "o" (__m(__gu_addr + 4)),		\
+	 "i" (-EFAULT));						\
 })
 
 extern void __get_user_unknown(void);
@@ -219,59 +321,61 @@ extern void __get_user_unknown(void);
 #define __PUT_USER_DW __put_user_asm_ll32
 #endif
 
-#define __put_user_nocheck(x,ptr,size)				\
-({								\
-	long __pu_err;						\
-	__typeof__(*(ptr)) __pu_val;				\
-	long __pu_addr;						\
-	__pu_val = (x);						\
-	__pu_addr = (long) (ptr);				\
-	__asm__("":"=r" (__pu_err));				\
-	switch (size) {						\
-	case 1: __put_user_asm("sb"); break;			\
-	case 2: __put_user_asm("sh"); break;			\
-	case 4: __put_user_asm("sw"); break;			\
-	case 8: __PUT_USER_DW; break;				\
-	default: __put_user_unknown(); break;			\
-	}							\
-	__pu_err;						\
+#define __put_user_nocheck(x,ptr,size)					\
+({									\
+	long __pu_err;							\
+	__typeof__(*(ptr)) __pu_val;					\
+	long __pu_addr;							\
+	might_sleep();							\
+	__pu_val = (x);							\
+	__pu_addr = (long) (ptr);					\
+	__asm__("":"=r" (__pu_err));					\
+	switch (size) {							\
+	case 1: __put_user_asm("sb"); break;				\
+	case 2: __put_user_asm("sh"); break;				\
+	case 4: __put_user_asm("sw"); break;				\
+	case 8: __PUT_USER_DW; break;					\
+	default: __put_user_unknown(); break;				\
+	}								\
+	__pu_err;							\
 })
 
-#define __put_user_check(x,ptr,size)				\
-({								\
-	long __pu_err;						\
-	__typeof__(*(ptr)) __pu_val;				\
-	long __pu_addr;						\
-	__pu_val = (x);						\
-	__pu_addr = (long) (ptr);				\
-	__asm__("":"=r" (__pu_err));				\
-	if (__access_ok(__pu_addr,size,__access_mask)) {	\
-		switch (size) {					\
-		case 1: __put_user_asm("sb"); break;		\
-		case 2: __put_user_asm("sh"); break;		\
-		case 4: __put_user_asm("sw"); break;		\
-		case 8: __PUT_USER_DW; break;			\
-		default: __put_user_unknown(); break;		\
-		}						\
-	}							\
-	__pu_err;						\
+#define __put_user_check(x,ptr,size)					\
+({									\
+	long __pu_err;							\
+	__typeof__(*(ptr)) __pu_val;					\
+	long __pu_addr;							\
+	might_sleep();							\
+	__pu_val = (x);							\
+	__pu_addr = (long) (ptr);					\
+	__asm__("":"=r" (__pu_err));					\
+	if (access_ok(VERIFY_WRITE, __pu_addr, size)) {			\
+		switch (size) {						\
+		case 1: __put_user_asm("sb"); break;			\
+		case 2: __put_user_asm("sh"); break;			\
+		case 4: __put_user_asm("sw"); break;			\
+		case 8: __PUT_USER_DW; break;				\
+		default: __put_user_unknown(); break;			\
+		}							\
+	}								\
+	__pu_err;							\
 })
 
-#define __put_user_asm(insn)					\
-({								\
-	__asm__ __volatile__(					\
-	"1:\t" insn "\t%z1, %2\t\t\t# __put_user_asm\n\t"	\
-	"move\t%0, $0\n"					\
-	"2:\n\t"						\
-	".section\t.fixup,\"ax\"\n"				\
-	"3:\tli\t%0,%3\n\t"					\
-	"j\t2b\n\t"						\
-	".previous\n\t"						\
-	".section\t__ex_table,\"a\"\n\t"			\
-	__UA_ADDR "\t1b,3b\n\t"					\
-	".previous"						\
-	:"=r" (__pu_err)					\
-	:"Jr" (__pu_val), "o" (__m(__pu_addr)), "i" (-EFAULT));	\
+#define __put_user_asm(insn)						\
+({									\
+	__asm__ __volatile__(						\
+	"1:\t" insn "\t%z1, %2\t\t\t# __put_user_asm\n\t"		\
+	"move\t%0, $0\n"						\
+	"2:\n\t"							\
+	".section\t.fixup,\"ax\"\n"					\
+	"3:\tli\t%0,%3\n\t"						\
+	"j\t2b\n\t"							\
+	".previous\n\t"							\
+	".section\t__ex_table,\"a\"\n\t"				\
+	__UA_ADDR "\t1b,3b\n\t"						\
+	".previous"							\
+	:"=r" (__pu_err)						\
+	:"Jr" (__pu_val), "o" (__m(__pu_addr)), "i" (-EFAULT));		\
 })
 
 #define __put_user_asm_ll32						\
@@ -331,12 +435,27 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len_r;							\
 })
 
+/*
+ * __copy_to_user: - Copy a block of data into user space, with less checking.
+ * @to:   Destination address, in user space.
+ * @from: Source address, in kernel space.
+ * @n:    Number of bytes to copy.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from kernel space to user space.  Caller must check
+ * the specified block with access_ok() before calling this function.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ */
 #define __copy_to_user(to,from,n)					\
 ({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
+	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -344,12 +463,26 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
+/*
+ * copy_to_user: - Copy a block of data into user space.
+ * @to:   Destination address, in user space.
+ * @from: Source address, in kernel space.
+ * @n:    Number of bytes to copy.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from kernel space to user space.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ */
 #define copy_to_user(to,from,n)						\
 ({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
+	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -383,12 +516,29 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len_r;							\
 })
 
+/*
+ * __copy_from_user: - Copy a block of data from user space, with less checking. * @to:   Destination address, in kernel space.
+ * @from: Source address, in user space.
+ * @n:    Number of bytes to copy.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from user space to kernel space.  Caller must check
+ * the specified block with access_ok() before calling this function.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ *
+ * If some data could not be copied, this function will pad the copied
+ * data to the requested size using zero bytes.
+ */
 #define __copy_from_user(to,from,n)					\
 ({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
+	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -397,12 +547,29 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
+/*
+ * copy_from_user: - Copy a block of data from user space.
+ * @to:   Destination address, in kernel space.
+ * @from: Source address, in user space.
+ * @n:    Number of bytes to copy.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Copy data from user space to kernel space.
+ *
+ * Returns number of bytes that could not be copied.
+ * On success, this will be zero.
+ *
+ * If some data could not be copied, this function will pad the copied
+ * data to the requested size using zero bytes.
+ */
 #define copy_from_user(to,from,n)					\
 ({									\
 	void *__cu_to;							\
 	const void *__cu_from;						\
 	long __cu_len;							\
 									\
+	might_sleep();							\
 	__cu_to = (to);							\
 	__cu_from = (from);						\
 	__cu_len = (n);							\
@@ -412,11 +579,25 @@ extern size_t __copy_user(void *__to, const void *__from, size_t __n);
 	__cu_len;							\
 })
 
+#define __copy_in_user(to, from, n)	__copy_from_user(to, from, n)
+
+/*
+ * __clear_user: - Zero a block of memory in user space, with less checking.
+ * @to:   Destination address, in user space.
+ * @n:    Number of bytes to zero.
+ *
+ * Zero a block of memory in user space.  Caller must check
+ * the specified block with access_ok() before calling this function.
+ *
+ * Returns number of bytes that could not be cleared.
+ * On success, this will be zero.
+ */
 static inline __kernel_size_t
 __clear_user(void *addr, __kernel_size_t size)
 {
 	__kernel_size_t res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, $0\n\t"
@@ -425,30 +606,47 @@ __clear_user(void *addr, __kernel_size_t size)
 		"move\t%0, $6"
 		: "=r" (res)
 		: "r" (addr), "r" (size)
-		: "$4", "$5", "$6", "$8", "$9", "$31");
+		: "$4", "$5", "$6", __UA_t0, __UA_t1, "$31");
 
 	return res;
 }
 
-#define clear_user(addr,n)					\
-({								\
-	void * __cl_addr = (addr);				\
-	unsigned long __cl_size = (n);				\
-	if (__cl_size && access_ok(VERIFY_WRITE,		\
-		((unsigned long)(__cl_addr)), __cl_size))	\
-		__cl_size = __clear_user(__cl_addr, __cl_size);	\
-	__cl_size;						\
+#define clear_user(addr,n)						\
+({									\
+	void * __cl_addr = (addr);					\
+	unsigned long __cl_size = (n);					\
+	if (__cl_size && access_ok(VERIFY_WRITE,			\
+		((unsigned long)(__cl_addr)), __cl_size))		\
+		__cl_size = __clear_user(__cl_addr, __cl_size);		\
+	__cl_size;							\
 })
 
 /*
- * Returns: -EFAULT if exception before terminator, N if the entire
- * buffer filled, else strlen.
+ * __strncpy_from_user: - Copy a NUL terminated string from userspace, with less checking.
+ * @dst:   Destination address, in kernel space.  This buffer must be at
+ *         least @count bytes long.
+ * @src:   Source address, in user space.
+ * @count: Maximum number of bytes to copy, including the trailing NUL.
+ *
+ * Copies a NUL-terminated string from userspace to kernel space.
+ * Caller must check the specified block with access_ok() before calling
+ * this function.
+ *
+ * On success, returns the length of the string (not including the trailing
+ * NUL).
+ *
+ * If access to userspace fails, returns -EFAULT (some data may have been
+ * copied).
+ *
+ * If @count is smaller than the length of the string, copies @count bytes
+ * and returns @count.
  */
 static inline long
 __strncpy_from_user(char *__to, const char *__from, long __len)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -457,16 +655,35 @@ __strncpy_from_user(char *__to, const char *__from, long __len)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (__to), "r" (__from), "r" (__len)
-		: "$2", "$3", "$4", "$5", "$6", "$8", "$31", "memory");
+		: "$2", "$3", "$4", "$5", "$6", __UA_t0, "$31", "memory");
 
 	return res;
 }
 
+/*
+ * strncpy_from_user: - Copy a NUL terminated string from userspace.
+ * @dst:   Destination address, in kernel space.  This buffer must be at
+ *         least @count bytes long.
+ * @src:   Source address, in user space.
+ * @count: Maximum number of bytes to copy, including the trailing NUL.
+ *
+ * Copies a NUL-terminated string from userspace to kernel space.
+ *
+ * On success, returns the length of the string (not including the trailing
+ * NUL).
+ *
+ * If access to userspace fails, returns -EFAULT (some data may have been
+ * copied).
+ *
+ * If @count is smaller than the length of the string, copies @count bytes
+ * and returns @count.
+ */
 static inline long
 strncpy_from_user(char *__to, const char *__from, long __len)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -475,7 +692,7 @@ strncpy_from_user(char *__to, const char *__from, long __len)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (__to), "r" (__from), "r" (__len)
-		: "$2", "$3", "$4", "$5", "$6", "$8", "$31", "memory");
+		: "$2", "$3", "$4", "$5", "$6", __UA_t0, "$31", "memory");
 
 	return res;
 }
@@ -485,28 +702,44 @@ static inline long __strlen_user(const char *s)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		__MODULE_JAL(__strlen_user_nocheck_asm)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (s)
-		: "$2", "$4", "$8", "$31");
+		: "$2", "$4", __UA_t0, "$31");
 
 	return res;
 }
 
+/*
+ * strlen_user: - Get the size of a string in user space.
+ * @str: The string to measure.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Get the size of a NUL-terminated string in user space.
+ *
+ * Returns the size of the string INCLUDING the terminating NUL.
+ * On exception, returns 0.
+ *
+ * If there is a limit on the length of a valid string, you may wish to
+ * consider using strnlen_user() instead.
+ */
 static inline long strlen_user(const char *s)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		__MODULE_JAL(__strlen_user_asm)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (s)
-		: "$2", "$4", "$8", "$31");
+		: "$2", "$4", __UA_t0, "$31");
 
 	return res;
 }
@@ -516,6 +749,7 @@ static inline long __strnlen_user(const char *s, long n)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -523,15 +757,30 @@ static inline long __strnlen_user(const char *s, long n)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (s), "r" (n)
-		: "$2", "$4", "$5", "$8", "$31");
+		: "$2", "$4", "$5", __UA_t0, "$31");
 
 	return res;
 }
 
+/*
+ * strlen_user: - Get the size of a string in user space.
+ * @str: The string to measure.
+ *
+ * Context: User context only.  This function may sleep.
+ *
+ * Get the size of a NUL-terminated string in user space.
+ *
+ * Returns the size of the string INCLUDING the terminating NUL.
+ * On exception, returns 0.
+ *
+ * If there is a limit on the length of a valid string, you may wish to
+ * consider using strnlen_user() instead.
+ */
 static inline long strnlen_user(const char *s, long n)
 {
 	long res;
 
+	might_sleep();
 	__asm__ __volatile__(
 		"move\t$4, %1\n\t"
 		"move\t$5, %2\n\t"
@@ -539,7 +788,7 @@ static inline long strnlen_user(const char *s, long n)
 		"move\t%0, $2"
 		: "=r" (res)
 		: "r" (s), "r" (n)
-		: "$2", "$4", "$5", "$8", "$31");
+		: "$2", "$4", "$5", __UA_t0, "$31");
 
 	return res;
 }
@@ -549,5 +798,7 @@ struct exception_table_entry
 	unsigned long insn;
 	unsigned long nextinsn;
 };
+
+extern int fixup_exception(struct pt_regs *regs);
 
 #endif /* _ASM_UACCESS_H */

@@ -13,9 +13,9 @@
  *  Free Software Foundation; either version 2 of the License, or (at your
  *  option) any later version.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/smp.h>
 #include <linux/string.h>
 
 #include <asm/bootinfo.h>
@@ -23,16 +23,15 @@
 #include <asm/mipsregs.h>
 #include <asm/vr41xx/vr41xx.h>
 
-char arcs_cmdline[CL_SIZE];
-
 const char *get_system_type(void)
 {
 	return "TANBAC TB0226";
 }
 
-void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
+void __init prom_init(void)
 {
-	u32 config;
+	int argc = fw_arg0;
+	char **argv = (char **) fw_arg1;
 	int i;
 
 	/*
@@ -46,19 +45,9 @@ void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
 
 	mips_machgroup = MACH_GROUP_NEC_VR41XX;
 	mips_machtype = MACH_TANBAC_TB0226;
-
-	switch (current_cpu_data.processor_id) {
-	case PRID_VR4131_REV1_2:
-		config = read_c0_config();
-		config &= ~0x00000030UL;
-		config |= 0x00410000UL;
-		write_c0_config(config);
-		break;
-	default:
-		break;
-	}
 }
 
-void __init prom_free_prom_memory (void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }

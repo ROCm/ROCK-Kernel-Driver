@@ -33,14 +33,16 @@
 /*
  * Changes:
  *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
+ *  - New creation, NEC VR4122 and VR4131 are supported.
  *  - Added support for NEC VR4111 and VR4121.
  *
- *  MontaVista Software Inc. <yyuasa@mvista.com> or <source@mvista.com>
- *  - New creation, NEC VR4122 and VR4131 are supported.
+ *  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  - Added support for NEC VR4133.
  */
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/serial.h>
+#include <linux/smp.h>
 
 #include <asm/addrspace.h>
 #include <asm/cpu.h>
@@ -48,12 +50,12 @@
 #include <asm/vr41xx/vr41xx.h>
 
 /* VR4111 and VR4121 SIU Registers */
-#define VR4111_SIURB		KSEG1ADDR(0x0c000000)
-#define VR4111_SIUIRSEL		KSEG1ADDR(0x0c000008)
+#define SIURB_TYPE1		KSEG1ADDR(0x0c000000)
+#define SIUIRSEL_TYPE1		KSEG1ADDR(0x0c000008)
 
-/* VR4122 and VR4131 SIU Registers */
-#define VR4122_SIURB		KSEG1ADDR(0x0f000800)
-#define VR4122_SIUIRSEL		KSEG1ADDR(0x0f000808)
+/* VR4122, VR4131 and VR4133 SIU Registers */
+#define SIURB_TYPE2		KSEG1ADDR(0x0f000800)
+#define SIUIRSEL_TYPE2		KSEG1ADDR(0x0f000808)
 
  #define USE_RS232C		0x00
  #define USE_IRDA		0x01
@@ -66,7 +68,6 @@
  #define TMICMODE		0x20
 
 #define SIU_BASE_BAUD		1152000
-#define SIU_CLOCK		0x0102
 
 /* VR4122 and VR4131 DSIU Registers */
 #define DSIURB			KSEG1ADDR(0x0f000820)
@@ -75,7 +76,6 @@
  #define INTDSIU		0x0800
 
 #define DSIU_BASE_BAUD		1152000
-#define DSIU_CLOCK		0x0802
 
 int vr41xx_serial_ports = 0;
 
@@ -102,11 +102,12 @@ void vr41xx_siu_ifselect(int interface, int module)
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
 	case CPU_VR4121:
-		writew(val, VR4111_SIUIRSEL);
+		writew(val, SIUIRSEL_TYPE1);
 		break;
 	case CPU_VR4122:
 	case CPU_VR4131:
-		writew(val, VR4122_SIUIRSEL);
+	case CPU_VR4133:
+		writew(val, SIUIRSEL_TYPE2);
 		break;
 	default:
 		printk(KERN_INFO "Unexpected CPU of NEC VR4100 series\n");
@@ -129,11 +130,12 @@ void __init vr41xx_siu_init(int interface, int module)
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
 	case CPU_VR4121:
-		s.iomem_base = (unsigned char *)VR4111_SIURB;
+		s.iomem_base = (unsigned char *)SIURB_TYPE1;
 		break;
 	case CPU_VR4122:
 	case CPU_VR4131:
-		s.iomem_base = (unsigned char *)VR4122_SIURB;
+	case CPU_VR4133:
+		s.iomem_base = (unsigned char *)SIURB_TYPE2;
 		break;
 	default:
 		panic("Unexpected CPU of NEC VR4100 series");
@@ -154,7 +156,8 @@ void __init vr41xx_dsiu_init(void)
 	struct serial_struct s;
 
 	if (current_cpu_data.cputype != CPU_VR4122 &&
-	    current_cpu_data.cputype != CPU_VR4131)
+	    current_cpu_data.cputype != CPU_VR4131 &&
+	    current_cpu_data.cputype != CPU_VR4133)
 		return;
 
 	memset(&s, 0, sizeof(s));

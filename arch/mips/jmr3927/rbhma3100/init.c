@@ -1,5 +1,4 @@
-/***********************************************************************
- *
+/*
  * Copyright 2001 MontaVista Software Inc.
  * Author: MontaVista Software, Inc.
  *              ahennessy@mvista.com
@@ -27,8 +26,6 @@
  *  You should have received a copy of the  GNU General Public License along
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
- *
- ***********************************************************************
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -57,16 +54,17 @@ const char *get_system_type(void)
 }
 
 extern void puts(unsigned char *cp);
-int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
+
+void __init prom_init(void)
 {
 #ifdef CONFIG_TOSHIBA_JMR3927
 	/* CCFG */
 	if ((tx3927_ccfgptr->ccfg & TX3927_CCFG_TLBOFF) == 0)
 		puts("Warning: TX3927 TLB off\n");
 #endif
-	prom_argc = argc;
-	prom_argv = argv;
-	prom_envp = envp;
+	prom_argc = fw_arg0;
+	prom_argv = (char **) fw_arg1;
+	prom_envp = (char **) fw_arg2;
 
 	mips_machgroup = MACH_GROUP_TOSHIBA;
 
@@ -76,5 +74,4 @@ int __init prom_init(int argc, char **argv, char **envp, int *prom_vec)
 
 	prom_init_cmdline();
 	add_memory_region(0, JMR3927_SDRAM_SIZE, BOOT_MEM_RAM);
-	return 0;
 }

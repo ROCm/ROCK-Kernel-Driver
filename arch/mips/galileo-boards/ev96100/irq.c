@@ -38,54 +38,9 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/interrupt.h>
-#include <linux/ioport.h>
-#include <linux/timex.h>
-#include <linux/slab.h>
-#include <linux/random.h>
+#include <asm/irq_cpu.h>
 
-#include <asm/bitops.h>
-#include <asm/bootinfo.h>
-#include <asm/io.h>
-#include <asm/mipsregs.h>
-#include <asm/system.h>
-#include <asm/galileo-boards/ev96100int.h>
-
-extern void mips_timer_interrupt(int irq, struct pt_regs *regs);
 extern asmlinkage void ev96100IRQ(void);
-
-static void disable_ev96100_irq(unsigned int irq_nr)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	clear_c0_status(0x100 << irq_nr);
-	local_irq_restore(flags);
-}
-
-static inline void enable_ev96100_irq(unsigned int irq_nr)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	set_c0_status(0x100 << irq_nr);
-	local_irq_restore(flags);
-}
-
-static unsigned int startup_ev96100_irq(unsigned int irq)
-{
-	enable_ev96100_irq(irq);
-
-	return 0;	/* never anything pending */
-}
-
-#define shutdown_ev96100_irq		disable_ev96100_irq
-#define mask_and_ack_ev96100_irq	disable_ev96100_irq
-
-static void end_ev96100_irq (unsigned int irq)
-{
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-		enable_ev96100_irq(irq);
-}
 
 static inline unsigned int ffz8(unsigned int word)
 {
@@ -99,35 +54,14 @@ static inline unsigned int ffz8(unsigned int word)
 	return k;
 }
 
-asmlinkage void ev96100_cpu_irq(unsigned long cause, struct pt_regs * regs)
+asmlinkage void ev96100_cpu_irq(unsigned int pendin)
 {
-	if (!(cause & 0xff00))
-		return;
-
-	do_IRQ(ffz8((cause >> 8) & 0xff), regs);
+	do_IRQ(ffz8(pending >> 8), regs);
 }
-
-static struct hw_interrupt_type ev96100_irq_type = {
-	"EV96100",
-	startup_ev96100_irq,
-	shutdown_ev96100_irq,
-	enable_ev96100_irq,
-	disable_ev96100_irq,
-	mask_and_ack_ev96100_irq,
-	end_ev96100_irq
-};
 
 void __init init_IRQ(void)
 {
-	int i;
-
 	set_except_vector(0, ev96100IRQ);
 	init_generic_irq();
-
-	for (i = 0; i < 8; i++) {
-		irq_desc[i].status	= IRQ_DISABLED;
-		irq_desc[i].action	= 0;
-		irq_desc[i].depth	= 1;
-		irq_desc[i].handler	= &ev96100_irq_type;
-	}
+	mips_cpu_irq_init(0);
 }

@@ -36,12 +36,12 @@
 #include <linux/spinlock.h>
 #include <linux/string.h>
 #include <linux/delay.h>
-#include <asm/au1000.h>
-#include <asm/au1000_dma.h>
+#include <linux/interrupt.h>
 #include <asm/system.h>
+#include <asm/mach-au1x00/au1000.h>
+#include <asm/mach-au1x00/au1000_dma.h>
 
-
-
+#if defined(CONFIG_SOC_AU1000) || defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1100)
 /*
  * A note on resource allocation:
  *
@@ -94,7 +94,6 @@ static const struct {
 	{I2S_DATA, DMA_DW32 | DMA_NC},
 	{I2S_DATA, DMA_DR | DMA_DW32 | DMA_NC}
 };
-
 
 int au1000_dma_read_proc(char *buf, char **start, off_t fpos,
 			 int length, int *eof, void *data)
@@ -152,7 +151,7 @@ void dump_au1000_dma_channel(unsigned int dmanr)
  * Requests the DMA done IRQ if irqhandler != NULL.
  */
 int request_au1000_dma(int dev_id, const char *dev_str,
-		       void (*irqhandler)(int, void *, struct pt_regs *),
+		       irqreturn_t (*irqhandler)(int, void *, struct pt_regs *),
 		       unsigned long irqflags,
 		       void *irq_dev_id)
 {
@@ -198,7 +197,6 @@ int request_au1000_dma(int dev_id, const char *dev_str,
 	return i;
 }
 
-
 void free_au1000_dma(unsigned int dmanr)
 {
 	struct dma_chan *chan = get_dma_chan(dmanr);
@@ -215,3 +213,4 @@ void free_au1000_dma(unsigned int dmanr)
 	chan->irq_dev = NULL;
 	chan->dev_id = -1;
 }
+#endif // AU1000 AU1500 AU1100

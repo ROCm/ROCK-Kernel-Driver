@@ -28,6 +28,7 @@
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
@@ -47,120 +48,31 @@
 #include <asm/mipsregs.h>
 #include <asm/system.h>
 
-
-static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;
-
-/* Function for careful CP0 interrupt mask access */
-static inline void modify_cp0_intmask(unsigned clr_mask_in, unsigned set_mask_in)
-{
-	unsigned long status;
-	unsigned clr_mask;
-	unsigned set_mask;
-
-	/* do the low 8 bits first */
-	clr_mask = 0xff & clr_mask_in;
-	set_mask = 0xff & set_mask_in;
-	status = read_c0_status();
-	status &= ~((clr_mask & 0xFF) << 8);
-	status |= (set_mask & 0xFF) << 8;
-	write_c0_status(status);
-}
-
-static inline void mask_irq(unsigned int irq)
-{
-	modify_cp0_intmask(irq, 0);
-}
-
-static inline void unmask_irq(unsigned int irq)
-{
-	modify_cp0_intmask(0, irq);
-}
-
-static void enable_cp7000_irq(unsigned int irq)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&irq_lock, flags);
-	unmask_irq(1 << irq);
-	spin_unlock_irqrestore(&irq_lock, flags);
-}
-
-static unsigned int startup_cp7000_irq(unsigned int irq)
-{
-	enable_cp7000_irq(irq);
-
-	return 0;				/* never anything pending */
-}
-
-static void disable_cp7000_irq(unsigned int irq)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(&irq_lock, flags);
-	mask_irq(1 << irq);
-	spin_unlock_irqrestore(&irq_lock, flags);
-}
-
-#define shutdown_cp7000_irq disable_cp7000_irq
-
-static void mask_and_ack_cp7000_irq(unsigned int irq)
-{
-	mask_irq(1 << irq);
-}
-
-static void end_cp7000_irq(unsigned int irq)
-{
-	if (!(irq_desc[irq].status & (IRQ_DISABLED|IRQ_INPROGRESS)))
-		unmask_irq(1 << irq);
-}
-
-static struct hw_interrupt_type cp7000_hpcdma_irq_type = {
-#ifdef CONFIG_CPU_SR71000
-	"SR71000",
-#else
-	"RM7000",
-#endif
-	startup_cp7000_irq,
-	shutdown_cp7000_irq,
-	enable_cp7000_irq,
-	disable_cp7000_irq,
-	mask_and_ack_cp7000_irq,
-	end_cp7000_irq,
-	NULL
-};
-
 extern asmlinkage void ocelot_handle_int(void);
 extern void mv64340_irq_init(void);
 extern void uart_irq_init(void);
 extern void cpci_irq_init(void);
 
-static struct irqaction cascade_fpga =
-	{ no_action, SA_INTERRUPT, 0, "cascade via FPGA", NULL, NULL };
-static struct irqaction cascade_mv64340 =
-	{ no_action, SA_INTERRUPT, 0, "cascade via MV64340", NULL, NULL };
+static struct irqaction cascade_fpga = {
+	no_action, SA_INTERRUPT, 0, "cascade via FPGA", NULL, NULL
+};
+
+static struct irqaction cascade_mv64340 = {
+	no_action, SA_INTERRUPT, 0, "cascade via MV64340", NULL, NULL
+};
 
 void __init init_IRQ(void)
 {
-	int i;
-
 	/*
 	 * Clear all of the interrupts while we change the able around a bit.
 	 * int-handler is not on bootstrap
 	 */
-	clear_c0_status(ST0_IM | ST0_BEV);
-	__cli();
+	clear_c0_status(ST0_IM);
 
 	/* Sets the first-level interrupt dispatcher. */
 	set_except_vector(0, ocelot_handle_int);
 	init_generic_irq();
-
-	/* set up handler for first 8 IRQs as the CPU */
-	for (i = 0; i < 8; i++) {
-		irq_desc[i].status	= IRQ_DISABLED;
-		irq_desc[i].action	= 0;
-		irq_desc[i].depth	= 1;
-		irq_desc[i].handler	= &cp7000_hpcdma_irq_type;
-	}
+	mips_cpu_irq_init(0);
 
 	/* set up the cascading interrupts */
 	setup_irq(3, &cascade_fpga);
@@ -175,8 +87,5 @@ void __init init_IRQ(void)
 	printk("start kgdb ...\n");
 	set_debug_traps();
 	breakpoint();	/* you may move this line to whereever you want :-) */
-#endif
-#ifdef CONFIG_GDB_CONSOLE
-	register_gdb_console();
 #endif
 }

@@ -19,6 +19,7 @@
 #ifndef __ASM_SIBYTE_TRACE_PROF_H
 #define __ASM_SIBYTE_TRACE_PROF_H
 
+#undef DBG
 #if SBPROF_TB_DEBUG
 #define DBG(a) a
 #else
@@ -62,10 +63,10 @@ struct sbprof_tb {
 	     saturate 40 bits.  No subsequent use of SCD performance counters
 	     or trace buffer.
    Effect:   Starts gathering random ZBbus profiles using trace buffer. */
-static int sbprof_zbprof_start(struct file *filp);
+extern int sbprof_zbprof_start(struct file *filp);
 
 /* Effect: Stops collection of ZBbus profiles */
-static int sbprof_zbprof_stop(void);
+extern int sbprof_zbprof_stop(void);
 
 
 /***************************************************************************

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2000, 2001 Broadcom Corporation
+ * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -19,10 +19,13 @@
 #ifndef _SIBYTE_BOARD_H
 #define _SIBYTE_BOARD_H
 
+#include <linux/config.h>
+
 #ifdef CONFIG_SIBYTE_BOARD
 
 #if defined(CONFIG_SIBYTE_SWARM) || defined(CONFIG_SIBYTE_PTSWARM) || \
-    defined(CONFIG_SIBYTE_CRHONE) || defined(CONFIG_SIBYTE_CRHINE)
+    defined(CONFIG_SIBYTE_CRHONE) || defined(CONFIG_SIBYTE_CRHINE) || \
+    defined(CONFIG_SIBYTE_LITTLESUR)
 #include <asm/sibyte/swarm.h>
 #endif
 

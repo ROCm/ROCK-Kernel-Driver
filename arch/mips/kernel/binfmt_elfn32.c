@@ -95,6 +95,19 @@ struct elf_prpsinfo32
 #define elf_caddr_t	u32
 #define init_elf_binfmt init_elfn32_binfmt
 
+#define jiffies_to_timeval jiffies_to_compat_timeval
+static __inline__ void
+jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
+{
+	/*
+	 * Convert jiffies to nanoseconds and seperate with
+	 * one divide.
+	 */
+	u64 nsec = (u64)jiffies * TICK_NSEC; 
+	value->tv_sec = div_long_long_rem(nsec, NSEC_PER_SEC, &value->tv_usec);
+	value->tv_usec /= NSEC_PER_USEC;
+}
+
 #define ELF_CORE_EFLAGS EF_MIPS_ABI2
 
 #undef CONFIG_BINFMT_ELF

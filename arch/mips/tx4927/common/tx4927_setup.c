@@ -1,8 +1,4 @@
 /*
- * linux/arch/mips/tx4927/common/tx4927_setup.c
- *
- * common tx4927 setup stuff
- *
  * Author: MontaVista Software, Inc.
  *         source@mvista.com
  *
@@ -28,7 +24,7 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/kernel_stat.h>
@@ -49,13 +45,11 @@
 #include <asm/mipsregs.h>
 #include <asm/system.h>
 #include <asm/time.h>
-#include <asm/time.h>
 #include <asm/tx4927/tx4927.h>
 
 
 #undef DEBUG
 
-void __init tx4927_setup(void);
 void __init tx4927_time_init(void);
 void __init tx4927_timer_setup(struct irqaction *irq);
 void dump_cp0(char *key);
@@ -70,7 +64,7 @@ static void tx4927_write_buffer_flush(void)
 }
 
 
-void __init tx4927_setup(void)
+static void __init tx4927_setup(void)
 {
 	board_time_init = tx4927_time_init;
 	board_timer_setup = tx4927_timer_setup;
@@ -86,6 +80,7 @@ void __init tx4927_setup(void)
 	return;
 }
 
+early_initcall(tx4927_setup);
 
 void __init tx4927_time_init(void)
 {
@@ -120,7 +115,7 @@ void __init tx4927_timer_setup(struct irqaction *irq)
 
 	/* to generate the first timer interrupt */
 	c1 = read_c0_count();
-	count = c1 + (mips_counter_frequency / HZ);
+	count = c1 + (mips_hpt_frequency / HZ);
 	write_c0_compare(count);
 	c2 = read_c0_count();
 

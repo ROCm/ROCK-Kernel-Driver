@@ -74,8 +74,6 @@ static_unused int _sys_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
 	sigset_t *unewset, saveset, newset;
 	size_t sigsetsize;
 
-	save_static(&regs);
-
 	/* XXX Don't preclude handling different sized sigset_t's.  */
 	sigsetsize = regs.regs[5];
 	if (sigsetsize != sizeof(sigset_t))
@@ -155,6 +153,9 @@ asmlinkage int sys_sigaltstack(nabi_no_regargs struct pt_regs regs)
 asmlinkage int restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc)
 {
 	int err = 0;
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	err |= __get_user(regs->cp0_epc, &sc->sc_pc);
 	err |= __get_user(regs->hi, &sc->sc_mdhi);
@@ -490,7 +491,6 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 
 	switch(regs->regs[0]) {
 	case ERESTART_RESTARTBLOCK:
-		current_thread_info()->restart_block.fn = do_no_restart_syscall;
 	case ERESTARTNOHAND:
 		regs->regs[2] = EINTR;
 		break;
@@ -508,9 +508,9 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 	regs->regs[0] = 0;		/* Don't deal with this again.  */
 
 #ifdef CONFIG_TRAD_SIGNALS
-	if (ka->sa.sa_flags & SA_SIGINFO)
+	if (ka->sa.sa_flags & SA_SIGINFO) {
 #else
-	if (1)
+	if (1) {
 #endif
 #ifdef CONFIG_MIPS32_N32
 		if ((current->thread.mflags & MF_ABI_MASK) == MF_N32)
@@ -518,8 +518,11 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 		else
 #endif
 			setup_rt_frame(ka, regs, sig, oldset, info);
+	}
+#ifdef CONFIG_TRAD_SIGNALS
 	else
 		setup_frame(ka, regs, sig, oldset);
+#endif
 
 	if (ka->sa.sa_flags & SA_ONESHOT)
 		ka->sa.sa_handler = SIG_DFL;
@@ -569,6 +572,7 @@ asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		}
 		if (regs->regs[2] == ERESTART_RESTARTBLOCK) {
 			regs->regs[2] = __NR_restart_syscall;
+			regs->regs[7] = regs->regs[26];
 			regs->cp0_epc -= 4;
 		}
 	}

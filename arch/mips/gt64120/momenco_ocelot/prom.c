@@ -27,7 +27,6 @@ struct callvectors {
 };
 
 struct callvectors* debug_vectors;
-char arcs_cmdline[CL_SIZE];
 
 extern unsigned long gt64120_base;
 
@@ -37,10 +36,14 @@ const char *get_system_type(void)
 }
 
 /* [jsun@junsun.net] PMON passes arguments in C main() style */
-void __init prom_init(int argc, char **arg, char** env, struct callvectors *cv)
+void __init prom_init(void)
 {
-	int i;
+	int argc = fw_arg0;
+	char **arg = (char **) fw_arg1;
+	char **env = (char **) fw_arg2;
+	struct callvectors *cv = (struct callvectors *) fw_arg3;
 	uint32_t tmp;
+	int i;
 
 	/* save the PROM vectors for debugging use */
 	debug_vectors = cv;
@@ -74,10 +77,7 @@ void __init prom_init(int argc, char **arg, char** env, struct callvectors *cv)
 	add_memory_region(0, 64 << 20, BOOT_MEM_RAM);
 }
 
-void __init prom_free_prom_memory(void)
+unsigned long __init prom_free_prom_memory(void)
 {
-}
-
-void __init prom_fixup_mem_map(unsigned long start, unsigned long end)
-{
+	return 0;
 }

@@ -72,14 +72,12 @@ EXPORT(o32_syscall_exit)
 	LONG_L	a2, TI_FLAGS($28)	# current->work
 	li	t0, _TIF_ALLWORK_MASK
 	and	t0, a2, t0
-	bnez	a2, o32_syscall_exit_work
+	bnez	t0, o32_syscall_exit_work
 
-	RESTORE_SOME
-	RESTORE_SP_AND_RET
+	j	restore_partial
 
 o32_syscall_exit_work:
-	SAVE_STATIC
-	j	syscall_exit_work
+	j	syscall_exit_work_partial
 
 /* ------------------------------------------------------------------------ */
 
@@ -124,7 +122,7 @@ stackargs:
 	bltz	t0, bad_stack		# -> sp is bad
 
 	lw	t0, PT_R29(sp)		# get old user stack pointer
-	PTR_LA	t1, 3f			# copy 1 to 2 arguments
+	PTR_LA	t1, 4f			# copy 1 to 3 arguments
 	sll	t3, t3, 4
 	subu	t1, t3
 	jr	t1
@@ -139,21 +137,26 @@ stackargs:
 	.set    push
 	.set    noreorder
 	.set	nomacro
-1:	lw	t1, 20(t0)		# argument #6 from usp
+1:	lw	t1, 24(t0)		# argument #7 from usp
+	nop
+	sw	t1, 24(sp)
+	nop
+2:	lw	t1, 20(t0)		# argument #5 from usp
 	nop
 	sw	t1, 20(sp)
 	nop
-2:	lw	t1, 16(t0)		# argument #5 from usp
+3:	lw	t1, 16(t0)		# argument #5 from usp
 	nop
 	sw	t1, 16(sp)
 	nop
-3:	.set	pop
+4:	.set	pop
 
 	j	stack_done		# go back
 
 	.section __ex_table,"a"
 	PTR	1b,bad_stack
 	PTR	2b,bad_stack
+	PTR	3b,bad_stack
 	.previous
 
 	/*
@@ -225,8 +228,8 @@ illegal_syscall:
 	.previous
 #endif
 
+	sw	zero, PT_R7(sp)		# success
 	sw	v0, PT_R2(sp)		# result
-1:
 
 	/* Success, so skip usual error handling garbage.  */
 	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
@@ -597,7 +600,7 @@ out:	jr	ra
 	sys	sys_remap_file_pages	5
 	sys	sys_set_tid_address	1
 	sys	sys_restart_syscall	0
-	sys	sys_fadvise64		6
+	sys	sys_fadvise64_64	7
 	sys	sys_statfs64		3	/* 4255 */
 	sys	sys_fstatfs64		2
 	sys	sys_timer_create	3

@@ -107,9 +107,6 @@
 
 #define MAX_PCI_CLOCK			33333333
 
-#define PCIU_CLOCK			0x0080
-#define PCI_CLOCK			0x2000
-
 static inline int pciu_read_config_byte(int where, u8 * val)
 {
 	u32 data;

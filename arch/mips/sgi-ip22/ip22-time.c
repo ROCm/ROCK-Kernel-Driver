@@ -7,9 +7,10 @@
  * Ralf Baechle or David S. Miller (sorry guys, i'm really not sure)
  *
  * Copyright (C) 2001 by Ladislav Michl
+ * Copyright (C) 2003 Ralf Baechle (ralf@linux-mips.org)
  */
-
 #include <linux/bcd.h>
+#include <linux/ds1286.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/interrupt.h>
@@ -21,7 +22,6 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/time.h>
-#include <asm/ds1286.h>
 #include <asm/sgialib.h>
 #include <asm/sgi/ioc.h>
 #include <asm/sgi/hpc3.h>
@@ -41,7 +41,7 @@ static unsigned long indy_rtc_get_time(void)
 
 	sec = BCD2BIN(hpc3c0->rtcregs[RTC_SECONDS] & 0xff);
 	min = BCD2BIN(hpc3c0->rtcregs[RTC_MINUTES] & 0xff);
-	hrs = BCD2BIN(hpc3c0->rtcregs[RTC_HOURS] & 0x1f);
+	hrs = BCD2BIN(hpc3c0->rtcregs[RTC_HOURS] & 0x3f);
 	day = BCD2BIN(hpc3c0->rtcregs[RTC_DATE] & 0xff);
 	mon = BCD2BIN(hpc3c0->rtcregs[RTC_MONTH] & 0x1f);
 	yrs = BCD2BIN(hpc3c0->rtcregs[RTC_YEAR] & 0xff);
@@ -114,7 +114,7 @@ static unsigned long dosample(void)
 	 * for every 1/HZ seconds. We round off the nearest 1 MHz of master
 	 * clock (= 1000000 / HZ / 2).
 	 */
-	//return (ct1 - ct0 + (500000/HZ/2)) / (500000/HZ) * (500000/HZ);
+	/*return (ct1 - ct0 + (500000/HZ/2)) / (500000/HZ) * (500000/HZ);*/
 	return (ct1 - ct0) / (500000/HZ) * (500000/HZ);
 }
 
@@ -164,7 +164,7 @@ static __init void indy_time_init(void)
 		(int) (r4k_tick / (500000 / HZ)),
 		(int) (r4k_tick % (500000 / HZ)));
 
-	mips_counter_frequency = r4k_tick * HZ;
+	mips_hpt_frequency = r4k_tick * HZ;
 }
 
 /* Generic SGI handler for (spurious) 8254 interrupts */

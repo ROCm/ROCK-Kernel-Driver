@@ -1206,8 +1206,8 @@ static int irix_xstat32_xlate(struct kstat *stat, void *ubuf)
 	ub.st_ino     = stat->ino;
 	ub.st_mode    = stat->mode;
 	ub.st_nlink   = stat->nlink;
-	SET_STAT_UID(ub, stat->uid);
-	SET_STAT_GID(ub, stat->gid);
+	SET_UID(ub.st_uid, stat->uid);
+	SET_GID(ub.st_gid, stat->gid);
 	ub.st_rdev    = sysv_encode_dev(stat->rdev);
 #if BITS_PER_LONG == 32
 	if (stat->size > MAX_NON_LFS)

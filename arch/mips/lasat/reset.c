@@ -1,9 +1,6 @@
 /* 
- *
  * Thomas Horsten <thh@lasat.com>
  * Copyright (C) 2000 LASAT Networks A/S.
- *
- * ########################################################################
  *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
@@ -18,12 +15,9 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- * ########################################################################
- *
  * Reset the LASAT board.
- *
  */
-
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <asm/reboot.h>
 #include <asm/system.h>

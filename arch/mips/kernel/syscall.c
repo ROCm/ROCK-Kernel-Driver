@@ -111,7 +111,7 @@ static inline long
 do_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
         unsigned long flags, unsigned long fd, unsigned long pgoff)
 {
-	int error = -EBADF;
+	unsigned long error = -EBADF;
 	struct file * file = NULL;
 
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
@@ -134,7 +134,7 @@ out:
 asmlinkage unsigned long old_mmap(unsigned long addr, size_t len, int prot,
                                   int flags, int fd, off_t offset)
 {
-	int result;
+	unsigned long result;
 
 	result = -EINVAL;
 	if (offset & ~PAGE_MASK)
@@ -156,7 +156,6 @@ sys_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
 save_static_function(sys_fork);
 static_unused int _sys_fork(nabi_no_regargs struct pt_regs regs)
 {
-	save_static(&regs);
 	return do_fork(SIGCHLD, regs.regs[29], &regs, 0, NULL, NULL);
 }
 
@@ -167,7 +166,6 @@ static_unused int _sys_clone(nabi_no_regargs struct pt_regs regs)
 	unsigned long newsp;
 	int *parent_tidptr, *child_tidptr;
 
-	save_static(&regs);
 	clone_flags = regs.regs[4];
 	newsp = regs.regs[5];
 	if (!newsp)
@@ -297,7 +295,11 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 
 	switch (call) {
 	case SEMOP:
-		return sys_semop (first, (struct sembuf *)ptr, second);
+		return sys_semtimedop (first, (struct sembuf *)ptr, second,
+		                       NULL);
+	case SEMTIMEDOP:
+		return sys_semtimedop (first, (struct sembuf *)ptr, second,
+		                       (const struct timespec __user *)fifth);
 	case SEMGET:
 		return sys_semget (first, second, third);
 	case SEMCTL: {

@@ -52,18 +52,14 @@
 #include <linux/timex.h>
 #include <asm/bootinfo.h>
 #include <asm/page.h>
-#include <asm/bootinfo.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pci.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
 #include <asm/time.h>
-#include <linux/version.h>
 #include <linux/bootmem.h>
 #include <linux/blkdev.h>
-#include <linux/console.h>
 #ifdef CONFIG_RTC_DS1742
 #include <asm/rtc_ds1742.h>
 #endif
@@ -73,20 +69,11 @@
 #include <asm/tx4927/toshiba_rbtx4927.h>
 #ifdef CONFIG_PCI
 #include <asm/tx4927/tx4927_pci.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/kernel.h>
-#include <linux/init.h>
 #include <asm/pci_channel.h>
-#endif
-#ifdef CONFIG_PC_KEYB
-#include <asm/keyboard.h>
 #endif
 #ifdef CONFIG_BLK_DEV_IDEPCI
 #include <linux/hdreg.h>
-#include <asm/ptrace.h>
 #include <linux/ide.h>
-extern struct ide_ops std_ide_ops;
 #endif
 
 #undef TOSHIBA_RBTX4927_SETUP_DEBUG
@@ -326,7 +313,7 @@ void print_pci_status(void)
 	printk("PCIC STATUS %lx\n", tx4927_pcicptr->pcicstatus);
 }
 
-static struct pci_dev *fake_pci_dev(struct pci_channel *hose,
+static struct pci_dev *fake_pci_dev(struct pci_controller *hose,
 				    int top_bus, int busnr, int devfn)
 {
 	static struct pci_dev dev;
@@ -348,7 +335,7 @@ static struct pci_dev *fake_pci_dev(struct pci_channel *hose,
 }
 
 #define EARLY_PCI_OP(rw, size, type)                                    \
-static int early_##rw##_config_##size(struct pci_channel *hose,                \
+static int early_##rw##_config_##size(struct pci_controller *hose,      \
         int top_bus, int bus, int devfn, int offset, type value)        \
 {                                                                       \
         return pci_##rw##_config_##size(                                \
@@ -363,22 +350,15 @@ EARLY_PCI_OP(write, byte, u8)
 EARLY_PCI_OP(write, word, u16)
 EARLY_PCI_OP(write, dword, u32)
 
-static int __init tx4927_pcibios_init(int busno, struct pci_channel *hose)
+static int __init tx4927_pcibios_init(int busno, struct pci_controller *hose)
 {
-	u32 pci_devfn;
-	int devfn_start = 0;
-	int devfn_stop = 0xff;
 	unsigned int id;
+	u32 pci_devfn;
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCIBIOS,
 				       "-\n");
 
-	if (hose->first_devfn)
-		devfn_start = hose->first_devfn;
-	if (hose->last_devfn)
-		devfn_stop = hose->last_devfn;
-
-	for (pci_devfn = devfn_start; pci_devfn < devfn_stop; pci_devfn++) {
+	for (pci_devfn = 0x0; pci_devfn < 0xff; pci_devfn++) {
 		early_read_config_dword(hose, busno, busno, pci_devfn,
 					PCI_VENDOR_ID, &id);
 
@@ -604,7 +584,7 @@ static int __init tx4927_pcibios_init(int busno, struct pci_channel *hose)
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCIBIOS,
 				       "+\n");
 
-	return (busno);
+	return busno;
 }
 
 extern struct resource pci_io_resource;
@@ -852,17 +832,9 @@ void tx4927_pci_setup(void)
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI2,
 				       ":pci setup complete:\n");
-      //tx4927_dump_pcic_settings();
+	//tx4927_dump_pcic_settings();
 
-	{
-		struct pci_channel *p;
-		int busno;
-
-		busno = 0;
-		for (p = mips_pci_channels; p->pci_ops != NULL; p++) {
-			busno = tx4927_pcibios_init(busno, p) + 1;
-		}
-	}
+	tx4927_pcibios_init(0, &tx4927_controller);
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_PCI2, "+\n");
 }
@@ -972,31 +944,6 @@ void __init toshiba_rbtx4927_setup(void)
 	_machine_halt = toshiba_rbtx4927_halt;
 	_machine_power_off = toshiba_rbtx4927_power_off;
 
-
-#ifdef CONFIG_BLK_DEV_IDEPCI
-	{
-		TOSHIBA_RBTX4927_SETUP_DPRINTK
-		    (TOSHIBA_RBTX4927_SETUP_SETUP,
-		     ":ide_ops=&std_ide_ops(modified)\n");
-		ide_ops = &std_ide_ops;
-	}
-#else
-	{
-		TOSHIBA_RBTX4927_SETUP_DPRINTK
-		    (TOSHIBA_RBTX4927_SETUP_SETUP,
-		     ":ide_ops=<NOT_CONFIG>\n");
-	}
-#endif
-
-#ifdef CONFIG_FB
-	{
-		conswitchp = &dummy_con;
-	}
-#endif
-
-
-
-
 #ifdef CONFIG_PCI
 
 	/* PCIC */
@@ -1063,7 +1010,7 @@ void __init toshiba_rbtx4927_setup(void)
 
 	{
 		u32 id = 0;
-		early_read_config_dword(&mips_pci_channels[0], 0, 0, 0x90,
+		early_read_config_dword(&tx4927_controller, 0, 0, 0x90,
 					PCI_VENDOR_ID, &id);
 		if (id == 0x94601055) {
 			tx4927_using_backplane = 1;
@@ -1072,30 +1019,6 @@ void __init toshiba_rbtx4927_setup(void)
 			printk("backplane board NOT installed\n");
 		}
 	}
-
-
-	/* this is only done if backplane board installed, so must wait for pci */
-#ifdef CONFIG_PC_KEYB
-	{
-		if (tx4927_using_backplane) {
-			extern struct kbd_ops std_kbd_ops;
-			kbd_ops = &std_kbd_ops;
-			TOSHIBA_RBTX4927_SETUP_DPRINTK
-			    (TOSHIBA_RBTX4927_SETUP_SETUP,
-			     ":kbd_ops=&std_kbd_ops\n");
-		} else {
-			TOSHIBA_RBTX4927_SETUP_DPRINTK
-			    (TOSHIBA_RBTX4927_SETUP_SETUP,
-			     ":kbd_ops=<NO_BACKPLANE>\n");
-		}
-	}
-#else
-	{
-		TOSHIBA_RBTX4927_SETUP_DPRINTK
-		    (TOSHIBA_RBTX4927_SETUP_SETUP,
-		     ":kbd_ops=<NOT_CONFIG>\n");
-	}
-#endif
 
 	/* this is on ISA bus behind PCI bus, so need PCI up first */
 #ifdef CONFIG_TOSHIBA_FPCIB0
@@ -1167,7 +1090,7 @@ toshiba_rbtx4927_time_init(void)
 				       ":rtc_ds1742_init()+\n");
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
-				       ":Calibrate mips_counter_frequency-\n");
+				       ":Calibrate mips_hpt_frequency-\n");
 	rtc_ds1742_wait();
 
 	/* get the count */
@@ -1180,29 +1103,29 @@ toshiba_rbtx4927_time_init(void)
 	c2 = read_c0_count();
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
-				       ":Calibrate mips_counter_frequency+\n");
+				       ":Calibrate mips_hpt_frequency+\n");
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
 				       ":c1=%12u\n", c1);
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
 				       ":c2=%12u\n", c2);
 
 	/* this diff is as close as we are going to get to counter ticks per sec */
-	mips_counter_frequency = abs(c2 - c1);
+	mips_hpt_frequency = abs(c2 - c1);
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
-				       ":f1=%12u\n", mips_counter_frequency);
+				       ":f1=%12u\n", mips_hpt_frequency);
 
 	/* round to 1/10th of a MHz */
-	mips_counter_frequency /= (100 * 1000);
-	mips_counter_frequency *= (100 * 1000);
+	mips_hpt_frequency /= (100 * 1000);
+	mips_hpt_frequency *= (100 * 1000);
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT,
-				       ":f2=%12u\n", mips_counter_frequency);
+				       ":f2=%12u\n", mips_hpt_frequency);
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_INFO,
-				       ":mips_counter_frequency=%uHz (%uMHz)\n",
-				       mips_counter_frequency,
-				       mips_counter_frequency / 1000000);
+				       ":mips_hpt_frequency=%uHz (%uMHz)\n",
+				       mips_hpt_frequency,
+				       mips_hpt_frequency / 1000000);
 #else
-	mips_counter_frequency = 100000000;
+	mips_hpt_frequency = 100000000;
 #endif
 
 	TOSHIBA_RBTX4927_SETUP_DPRINTK(TOSHIBA_RBTX4927_SETUP_TIME_INIT, "+\n");

@@ -17,18 +17,14 @@
 #define	N_INTPENDJUNK_BITS	8
 #define	INTPENDJUNK_CLRBIT	0x80
 
-#include <asm/sn/intr_public.h>
-
-#ifndef __ASSEMBLY__
-
 /*
  * Macros to manipulate the interrupt register on the calling hub chip.
  */
 
-#define LOCAL_HUB_SEND_INTR(_level)	LOCAL_HUB_S(PI_INT_PEND_MOD, \
-						    (0x100|(_level)))
-#define REMOTE_HUB_SEND_INTR(_hub, _level) \
-		REMOTE_HUB_S((_hub), PI_INT_PEND_MOD, (0x100|(_level)))
+#define LOCAL_HUB_SEND_INTR(level)				\
+	LOCAL_HUB_S(PI_INT_PEND_MOD, (0x100 | (level)))
+#define REMOTE_HUB_SEND_INTR(hub, level)			\
+	REMOTE_HUB_S((hub), PI_INT_PEND_MOD, (0x100 | (level)))
 
 /*
  * When clearing the interrupt, make sure this clear does make it
@@ -36,16 +32,19 @@
  * We do an uncached load of the int_pend0 register to ensure this.
  */
 
-#define LOCAL_HUB_CLR_INTR(_level)	  \
-                LOCAL_HUB_S(PI_INT_PEND_MOD, (_level)),	\
-                LOCAL_HUB_L(PI_INT_PEND0)
-#define REMOTE_HUB_CLR_INTR(_hub, _level) \
-		REMOTE_HUB_S((_hub), PI_INT_PEND_MOD, (_level)),	\
-                REMOTE_HUB_L((_hub), PI_INT_PEND0)
+#define LOCAL_HUB_CLR_INTR(level)	  			\
+do {								\
+	LOCAL_HUB_S(PI_INT_PEND_MOD, (level));			\
+	LOCAL_HUB_L(PI_INT_PEND0);				\
+} while (0);
 
-#else /* __ASSEMBLY__ */
-
-#endif /* __ASSEMBLY__ */
+#define REMOTE_HUB_CLR_INTR(hub, level)				\
+do {								\
+	nasid_t  __hub = (hub);					\
+								\
+	REMOTE_HUB_S(__hub, PI_INT_PEND_MOD, (level));		\
+	REMOTE_HUB_L(__hub, PI_INT_PEND0);			\
+} while (0);
 
 /*
  * Hard-coded interrupt levels:
@@ -63,60 +62,68 @@
  */
 
 
-/* INT_PEND0 hard-coded bits. */
-#ifdef SABLE
-#define SDISK_INTR	63
-#endif
-#ifdef DEBUG_INTR_TSTAMP
-/* hard coded interrupt level for interrupt latency test interrupt */
-#define	CPU_INTRLAT_B	62
-#define	CPU_INTRLAT_A	61
-#endif
+/*
+ * INT_PEND0 hard-coded bits.
+ */
 
-/* Hardcoded bits required by software. */
-#define MSC_MESG_INTR	13
-#define CPU_ACTION_B	11
-#define CPU_ACTION_A	10
+/*
+ * INT_PEND0 bits determined by hardware:
+ */
+#define RESERVED_INTR		 0	/* What is this bit? */
+#define GFX_INTR_A		 1
+#define GFX_INTR_B		 2
+#define PG_MIG_INTR		 3
+#define UART_INTR		 4
+#define CC_PEND_A		 5
+#define CC_PEND_B		 6
 
-/* These are determined by hardware: */
-#define CC_PEND_B	6
-#define CC_PEND_A	5
-#define UART_INTR	4
-#define PG_MIG_INTR	3
-#define GFX_INTR_B	2
-#define GFX_INTR_A	1
-#define RESERVED_INTR	0
+/*
+ * INT_PEND0 used by the kernel for itself ...
+ */
+#define CPU_RESCHED_A_IRQ	 7
+#define CPU_RESCHED_B_IRQ	 8
+#define CPU_CALL_A_IRQ		 9
+#define CPU_CALL_B_IRQ		10
+#define MSC_MESG_INTR		11
+#define BASE_PCI_IRQ		12
 
-/* INT_PEND1 hard-coded bits: */
-#define MSC_PANIC_INTR	63
-#define NI_ERROR_INTR	62
-#define MD_COR_ERR_INTR	61
-#define COR_ERR_INTR_B	60
-#define COR_ERR_INTR_A	59
-#define CLK_ERR_INTR	58
-#define IO_ERROR_INTR	57	/* set up by prom */
+/*
+ * INT_PEND0 again, bits determined by hardware / hardcoded:
+ */
+#define SDISK_INTR		63	/* SABLE name */
+#define IP_PEND0_6_63		63	/* What is this bit? */
 
-#define	DEBUG_INTR_B	55	/* used by symmon to stop all cpus */
-#define	DEBUG_INTR_A	54
+/*
+ * INT_PEND1 hard-coded bits:
+ */
+#define NI_BRDCAST_ERR_A	39
+#define NI_BRDCAST_ERR_B	40
 
-#define BRIDGE_ERROR_INTR 53	/* Setup by PROM to catch Bridge Errors */
+#define LLP_PFAIL_INTR_A	41	/* see ml/SN/SN0/sysctlr.c */
+#define LLP_PFAIL_INTR_B	42
 
-#define IP27_INTR_0	52	/* Reserved for PROM use */
-#define IP27_INTR_1	51	/*   (do not use in Kernel) */
-#define IP27_INTR_2	50
-#define IP27_INTR_3	49
-#define IP27_INTR_4	48
-#define IP27_INTR_5	47
-#define IP27_INTR_6	46
-#define IP27_INTR_7	45
+#define	TLB_INTR_A		43	/* used for tlb flush random */
+#define	TLB_INTR_B		44
 
-#define	TLB_INTR_B	44	/* used for tlb flush random */
-#define	TLB_INTR_A	43
+#define IP27_INTR_0		45	/* Reserved for PROM use */
+#define IP27_INTR_1		46	/* do not use in Kernel */
+#define IP27_INTR_2		47
+#define IP27_INTR_3		48
+#define IP27_INTR_4		49
+#define IP27_INTR_5		50
+#define IP27_INTR_6		51
+#define IP27_INTR_7		52
 
-#define LLP_PFAIL_INTR_B 42	/* see ml/SN/SN0/sysctlr.c */
-#define LLP_PFAIL_INTR_A 41
-
-#define NI_BRDCAST_ERR_B 40
-#define NI_BRDCAST_ERR_A 39
+#define BRIDGE_ERROR_INTR	53	/* Setup by PROM to catch	*/
+					/* Bridge Errors */
+#define	DEBUG_INTR_A		54
+#define	DEBUG_INTR_B		55	/* Used by symmon to stop all cpus */
+#define IO_ERROR_INTR		57	/* Setup by PROM */
+#define CLK_ERR_INTR		58
+#define COR_ERR_INTR_A		59
+#define COR_ERR_INTR_B		60
+#define MD_COR_ERR_INTR		61
+#define NI_ERROR_INTR		62
+#define MSC_PANIC_INTR		63
 
 #endif /* __ASM_SN_INTR_H */

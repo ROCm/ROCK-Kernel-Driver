@@ -13,22 +13,21 @@
  *  Free Software Foundation; either version 2 of the License, or (at your
  *  option) any later version.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 
 #include <asm/bootinfo.h>
 
-char arcs_cmdline[CL_SIZE];
-
 const char *get_system_type(void)
 {
 	return "IBM WorkPad z50";
 }
 
-void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
+void __init prom_init(void)
 {
+	int argc = fw_arg0;
+	char **argv = (char **) fw_arg1;
 	int i;
 
 	/*
@@ -44,6 +43,7 @@ void __init prom_init(int argc, char **argv, unsigned long magic, int *prom_vec)
 	mips_machtype = MACH_IBM_WORKPAD;
 }
 
-void __init prom_free_prom_memory (void)
+unsigned long __init prom_free_prom_memory(void)
 {
+	return 0;
 }

@@ -17,6 +17,7 @@
 #include <asm/fpregdef.h>
 #include <asm/mipsregs.h>
 #include <asm/stackframe.h>
+#include <asm/war.h>
 
 	__INIT
 
@@ -123,84 +124,82 @@ NESTED(except_vec4, 0, sp)
 1:	j	1b			/* Dummy, will be replaced */
 	END(except_vec4)
 
-	/*
-	 * EJTAG debug exception handler.
-	 * The EJTAG debug exception entry point is 0xbfc00480, which
-	 * normally is in the boot PROM, so the boot PROM must do a
-	 * unconditional jump to this vector.
-	 */
+/*
+ * EJTAG debug exception handler.
+ * The EJTAG debug exception entry point is 0xbfc00480, which
+ * normally is in the boot PROM, so the boot PROM must do a
+ * unconditional jump to this vector.
+ */
 NESTED(except_vec_ejtag_debug, 0, sp)
 	j	ejtag_debug_handler
-	 nop
 	END(except_vec_ejtag_debug)
 
 	__FINIT
 
-	/*
-	 * EJTAG debug exception handler.
-	 */
-	NESTED(ejtag_debug_handler, PT_SIZE, sp)
+/*
+ * EJTAG debug exception handler.
+ */
+NESTED(ejtag_debug_handler, PT_SIZE, sp)
+	.set	push
 	.set	noat
 	.set	noreorder
-	mtc0	k0, CP0_DESAVE
+	MTC0	k0, CP0_DESAVE
 	mfc0	k0, CP0_DEBUG
 
 	sll	k0, k0, 30	# Check for SDBBP.
 	bgez	k0, ejtag_return
+	nop
 
-	la	k0, ejtag_debug_buffer
-	sw	k1, 0(k0)
+	PTR_LA	k0, ejtag_debug_buffer
+	LONG_S	k1, 0(k0)
 	SAVE_ALL
 	jal	ejtag_exception_handler
 	 move	a0, sp
 	RESTORE_ALL
-	la	k0, ejtag_debug_buffer
-	lw	k1, 0(k0)
+	PTR_LA	k0, ejtag_debug_buffer
+	LONG_L	k1, 0(k0)
 
 ejtag_return:
-	mfc0	k0, CP0_DESAVE
+	MFC0	k0, CP0_DESAVE
 	.set	mips32
 	deret
-	.set	mips0
-	 nop
-	.set	at
+ 	 nop
+	.set pop
 	END(ejtag_debug_handler)
 
-	/*
-	 * This buffer is reserved for the use of the EJTAG debug
-	 * handler.
-	 */
+/*
+ * This buffer is reserved for the use of the EJTAG debug
+ * handler.
+ */
 	.data
-	EXPORT(ejtag_debug_buffer)
+EXPORT(ejtag_debug_buffer)
 	.fill	LONGSIZE
 	.previous
 
 	__INIT
 
-	/*
-	 * NMI debug exception handler for MIPS reference boards.
-	 * The NMI debug exception entry point is 0xbfc00000, which
-	 * normally is in the boot PROM, so the boot PROM must do a
-	 * unconditional jump to this vector.
-	 */
-	NESTED(except_vec_nmi, 0, sp)
+/*
+ * NMI debug exception handler for MIPS reference boards.
+ * The NMI debug exception entry point is 0xbfc00000, which
+ * normally is in the boot PROM, so the boot PROM must do a
+ * unconditional jump to this vector.
+ */
+NESTED(except_vec_nmi, 0, sp)
 	j	nmi_handler
-	 nop
 	END(except_vec_nmi)
 
 	__FINIT
 
-	NESTED(nmi_handler, PT_SIZE, sp)
+NESTED(nmi_handler, PT_SIZE, sp)
+	.set	push
 	.set	noat
-	.set	noreorder
 	.set	mips3
 	SAVE_ALL
-	jal	nmi_exception_handler
  	move	a0, sp
+	jal	nmi_exception_handler
 	RESTORE_ALL
 	eret
-	.set	at
-	.set	mips0
+	.set	pop
 	END(nmi_handler)
 
 	.macro	__build_clear_none
@@ -236,32 +235,39 @@ ejtag_return:
 	   recognize an unknown escape code.  So make the arguments
 	   start with an n and gas will believe \n is ok ...  */
 	.macro	__BUILD_verbose	nexception
-	ld	a1, PT_EPC(sp)
+	LONG_L	a1, PT_EPC(sp)
+#if CONFIG_MIPS32
+	PRINT("Got \nexception at %08lx\012")
+#endif	
+#if CONFIG_MIPS64
 	PRINT("Got \nexception at %016lx\012")
+#endif	
 	.endm
 
 	.macro	__BUILD_count exception
-	.set	reorder
 	LONG_L	t0,exception_count_\exception
 	LONG_ADDIU t0, 1
 	LONG_S	t0,exception_count_\exception
-	.set	noreorder
 	.comm	exception_count\exception, 8, 8
 	.endm
 
-	.macro	BUILD_HANDLER exception handler clear verbose
+	.macro	__BUILD_HANDLER exception handler clear verbose ext
 	.align	5
 	NESTED(handle_\exception, PT_SIZE, sp)
 	.set	noat
 	SAVE_ALL
+	FEXPORT(handle_\exception\ext)
 	__BUILD_clear_\clear
 	.set	at
 	__BUILD_\verbose \exception
 	move	a0, sp
 	jal	do_\handler
 	j	ret_from_exception
-	 nop
 	END(handle_\exception)
+	.endm
+
+	.macro	BUILD_HANDLER exception handler clear verbose
+	__BUILD_HANDLER	\exception \handler \clear \verbose _int
 	.endm
 
 	BUILD_HANDLER adel ade ade silent		/* #4  */

@@ -3,7 +3,7 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 2002 by Ralf Baechle
+ * Copyright (C) 2002, 2004 by Ralf Baechle
  */
 #ifndef _ASM_WAR_H
 #define _ASM_WAR_H
@@ -11,7 +11,16 @@
 #include <linux/config.h>
 
 /*
- * Pleassures of the R4600 V1.x.  Cite from the IDT R4600 V1.7 errata:
+ * Another R4600 erratum.  Due to the lack of errata information the exact
+ * technical details aren't known.  I've experimentally found that disabling
+ * interrupts during indexed I-cache flushes seems to be sufficient to deal
+ * with the issue.
+ *
+ * #define R4600_V1_INDEX_ICACHEOP_WAR 1
+ */
+
+/*
+ * Pleasures of the R4600 V1.x.  Cite from the IDT R4600 V1.7 errata:
  *
  *  18. The CACHE instructions Hit_Writeback_Invalidate_D, Hit_Writeback_D,
  *      Hit_Invalidate_D and Create_Dirty_Excl_D should only be
@@ -59,6 +68,7 @@
  */
 #ifdef CONFIG_SGI_IP22
 
+#define R4600_V1_INDEX_ICACHEOP_WAR	1
 #define R4600_V1_HIT_CACHEOP_WAR	1
 #define R4600_V2_HIT_CACHEOP_WAR	1
 
@@ -111,8 +121,59 @@
 #endif
 
 /*
+ * Fill buffers not flushed on CACHE instructions
+ * 
+ * Hit_Invalidate_I cacheops invalidate an icache line but the refill
+ * for that line can get stale data from the fill buffer instead of
+ * accessing memory if the previous icache miss was also to that line.
+ *
+ * Workaround: generate an icache refill from a different line
+ *
+ * Affects:
+ *  MIPS 4K		RTL revision <3.0, PRID revision <4
+ */
+#if defined(CONFIG_MIPS_MALTA) || defined(CONFIG_MIPS_ATLAS) || \
+    defined(CONFIG_MIPS_SEAD)
+#define MIPS4K_ICACHE_REFILL_WAR 1
+#endif
+
+/*
+ * Missing implicit forced flush of evictions caused by CACHE
+ * instruction
+ *
+ * Evictions caused by a CACHE instructions are not forced on to the
+ * bus. The BIU gives higher priority to fetches than to the data from
+ * the eviction buffer and no collision detection is performed between
+ * fetches and pending data from the eviction buffer.
+ *
+ * Workaround: Execute a SYNC instruction after the cache instruction
+ *
+ * Affects:
+ *   MIPS 5Kc,5Kf	RTL revision <2.3, PRID revision <8
+ *   MIPS 20Kc		RTL revision <4.0, PRID revision <?
+ */
+#if defined(CONFIG_MIPS_MALTA) || defined(CONFIG_MIPS_ATLAS) || \
+    defined(CONFIG_MIPS_SEAD)
+#define MIPS_CACHE_SYNC_WAR 1
+#endif
+
+/*
+ * From TX49/H2 manual: "If the instruction (i.e. CACHE) is issued for
+ * the line which this instruction itself exists, the following
+ * operation is not guaranteed."
+ *
+ * Workaround: do two phase flushing for Index_Invalidate_I
+ */
+#ifdef CONFIG_CPU_TX49XX
+#define TX49XX_ICACHE_INDEX_INV_WAR 1
+#endif
+
+/*
  * Workarounds default to off
  */
+#ifndef R4600_V1_INDEX_ICACHEOP_WAR
+#define R4600_V1_INDEX_ICACHEOP_WAR	0
+#endif
 #ifndef R4600_V1_HIT_CACHEOP_WAR
 #define R4600_V1_HIT_CACHEOP_WAR	0
 #endif
@@ -127,6 +188,15 @@
 #endif
 #ifndef SIBYTE_1956_WAR
 #define SIBYTE_1956_WAR			0
+#endif
+#ifndef MIPS4K_ICACHE_REFILL_WAR
+#define MIPS4K_ICACHE_REFILL_WAR	0
+#endif
+#ifndef MIPS_CACHE_SYNC_WAR
+#define MIPS_CACHE_SYNC_WAR		0
+#endif
+#ifndef TX49XX_ICACHE_INDEX_INV_WAR
+#define TX49XX_ICACHE_INDEX_INV_WAR	0
 #endif
 
 #endif /* _ASM_WAR_H */

@@ -15,8 +15,8 @@
 #include <asm/pci_channel.h>
 #include <asm/hp-lj/asic.h>
 
-volatile u32 *pci_config_address_reg = (volatile u32 *) 0xfdead000;
-volatile u32 *pci_config_data_reg = (volatile u32 *) 0xfdead000;
+static volatile u32 *pci_config_address_reg = (volatile u32 *) 0xfdead000;
+static volatile u32 *pci_config_data_reg = (volatile u32 *) 0xfdead000;
 
 
 
@@ -107,20 +107,11 @@ struct pci_ops hp_pci_ops = {
 };
 
 
-struct pci_channel mips_pci_channels[] = {
-	{&hp_pci_ops, &ioport_resource, &iomem_resource},
-	{NULL, NULL, NULL}
+struct pci_controller hp_controller = {
+	.pci_ops	= &hp_pci_ops,
+	.io_resource	= &ioport_resource,
+	.mem_resource	= &iomem_resource,
 };
-
-unsigned __init int pcibios_assign_all_busses(void)
-{
-	return 1;
-}
-
-void __init pcibios_fixup(void)
-{
-}
-
 
 void __init pcibios_fixup_irqs(void)
 {
@@ -210,43 +201,4 @@ void __init pci_setup(void)
 	pci_config_data_reg = (u32 *) (((u32) mips_io_port_base) | 0xcfc);
 	pci_config_address_reg =
 	    (u32 *) (((u32) pci_regs_base_offset) | 0xcf8);
-
-}
-
-
-void __init pcibios_fixup_resources(struct pci_dev *dev)
-{
-	int pos;
-	int bases;
-
-	printk("adjusting pci device: %s\n", dev->name);
-
-	switch (dev->hdr_type) {
-	case PCI_HEADER_TYPE_NORMAL:
-		bases = 6;
-		break;
-	case PCI_HEADER_TYPE_BRIDGE:
-		bases = 2;
-		break;
-	case PCI_HEADER_TYPE_CARDBUS:
-		bases = 1;
-		break;
-	default:
-		bases = 0;
-		break;
-	}
-	for (pos = 0; pos < bases; pos++) {
-		struct resource *res = &dev->resource[pos];
-		if (res->start >= IO_MEM_LOGICAL_START &&
-		    res->end <= IO_MEM_LOGICAL_END) {
-			res->start += IO_MEM_VIRTUAL_OFFSET;
-			res->end += IO_MEM_VIRTUAL_OFFSET;
-		}
-		if (res->start >= IO_PORT_LOGICAL_START &&
-		    res->end <= IO_PORT_LOGICAL_END) {
-			res->start += IO_PORT_VIRTUAL_OFFSET;
-			res->end += IO_PORT_VIRTUAL_OFFSET;
-		}
-	}
-
 }

@@ -28,7 +28,7 @@
 #include <asm/fpu.h>
 
 /*
- * Including <asm/unistd.h would give use the 64-bit syscall numbers ...
+ * Including <asm/unistd.h> would give use the 64-bit syscall numbers ...
  */
 #define __NR_O32_sigreturn		4119
 #define __NR_O32_rt_sigreturn		4193
@@ -126,12 +126,12 @@ static inline int get_sigset(sigset_t *kbuf, const compat_sigset_t *ubuf)
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-asmlinkage inline int sys32_sigsuspend(nabi_no_regargs struct pt_regs regs)
+save_static_function(sys32_sigsuspend);
+static_unused int _sys32_sigsuspend(nabi_no_regargs struct pt_regs regs)
 {
 	compat_sigset_t *uset;
 	sigset_t newset, saveset;
 
-	save_static(&regs);
 	uset = (compat_sigset_t *) regs.regs[4];
 	if (get_sigset(&newset, uset))
 		return -EFAULT;
@@ -153,13 +153,13 @@ asmlinkage inline int sys32_sigsuspend(nabi_no_regargs struct pt_regs regs)
 	}
 }
 
-asmlinkage int sys32_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
+save_static_function(sys32_rt_sigsuspend);
+static_unused int _sys32_rt_sigsuspend(nabi_no_regargs struct pt_regs regs)
 {
 	compat_sigset_t *uset;
 	sigset_t newset, saveset;
         size_t sigsetsize;
 
-	save_static(&regs);
 	/* XXX Don't preclude handling different sized sigset_t's.  */
 	sigsetsize = regs.regs[5];
 	if (sigsetsize != sizeof(compat_sigset_t))
@@ -241,7 +241,7 @@ asmlinkage int sys32_sigaltstack(nabi_no_regargs struct pt_regs regs)
 		if (!access_ok(VERIFY_READ, uss, sizeof(*uss)))
 			return -EFAULT;
 		err |= __get_user(sp, &uss->ss_sp);
-		kss.ss_size = (long) sp;
+		kss.ss_sp = (void *) (long) sp;
 		err |= __get_user(kss.ss_size, &uss->ss_size);
 		err |= __get_user(kss.ss_flags, &uss->ss_flags);
 		if (err)
@@ -269,6 +269,9 @@ static asmlinkage int restore_sigcontext32(struct pt_regs *regs,
 					   struct sigcontext32 *sc)
 {
 	int err = 0;
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	err |= __get_user(regs->cp0_epc, &sc->sc_pc);
 	err |= __get_user(regs->hi, &sc->sc_mdhi);
@@ -651,7 +654,6 @@ static inline void handle_signal(unsigned long sig, siginfo_t *info,
 
 	switch (regs->regs[0]) {
 	case ERESTART_RESTARTBLOCK:
-		current_thread_info()->restart_block.fn = do_no_restart_syscall;
 	case ERESTARTNOHAND:
 		regs->regs[2] = EINTR;
 		break;
@@ -712,6 +714,7 @@ asmlinkage int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		}
 		if (regs->regs[2] == ERESTART_RESTARTBLOCK) {
 			regs->regs[2] = __NR_O32_restart_syscall;
+			regs->regs[7] = regs->regs[26];
 			regs->cp0_epc -= 4;
 		}
 	}

@@ -18,6 +18,10 @@
 #ifndef _ASM_GT64120_H
 #define _ASM_GT64120_H
 
+#include <linux/config.h>
+#include <asm/addrspace.h>
+#include <asm/byteorder.h>
+
 #define MSK(n)                    ((1 << (n)) - 1)
 
 /*
@@ -391,9 +395,36 @@
 /*
  *  Misc
  */
-#define GT_DEF_BASE		0x14000000
-#define GT_DEF_PCI0_MEM0_BASE	0x12000000
+#define GT_DEF_PCI0_IO_BASE	0x10000000UL
+#define GT_DEF_PCI0_IO_SIZE	0x02000000UL
+#define GT_DEF_PCI0_MEM0_BASE	0x12000000UL
+#define GT_DEF_PCI0_MEM0_SIZE	0x02000000UL
+#define GT_DEF_BASE		0x14000000UL
+
 #define GT_MAX_BANKSIZE		(256 * 1024 * 1024)   /* Max 256MB bank */
 #define GT_LATTIM_MIN    	6		      /* Minimum lat	*/
+
+/*
+ * The gt64120_dep.h file must define the following macros
+ *
+ *   GT_READ(ofs, data_pointer)
+ *   GT_WRITE(ofs, data)           - read/write GT64120 registers in 32bit
+ *
+ *   TIMER 	- gt64120 timer irq, temporary solution until
+ *		  full gt64120 cascade interrupt support is in place
+ */
+
+#include <mach-gt64120.h>
+
+/*
+ * Because of an error/peculiarity in the Galileo chip, we need to swap the
+ * bytes when running bigendian.  We also provide non-swapping versions.
+ */
+#define __GT_READ(ofs)							\
+	(*(volatile u32 *)(GT64120_BASE+(ofs)))
+#define __GT_WRITE(ofs, data)						\
+	do { *(volatile u32 *)(GT64120_BASE+(ofs)) = (data); } while (0)
+#define GT_READ(ofs)		le32_to_cpu(__GT_READ(ofs))
+#define GT_WRITE(ofs, data)	__GT_WRITE(ofs, cpu_to_le32(data))
 
 #endif /* _ASM_GT64120_H */

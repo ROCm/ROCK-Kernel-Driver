@@ -14,7 +14,6 @@
  * option) any later version.
  *
  */
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
@@ -270,66 +269,3 @@ struct pci_ops ddb5476_ext_pci_ops = {
 	extpci_write_config_word,
 	extpci_write_config_dword
 };
-
-
-#if defined(CONFIG_RUNTIME_DEBUG)
-void jsun_scan_pci_bus(void)
-{
-	struct pci_bus bus;
-	struct pci_dev dev;
-	unsigned int devfn;
-	int j;
-
-	pci_config_workaround = 0;
-
-	bus.parent = NULL;	/* we scan the top level only */
-	dev.bus = &bus;
-	dev.sysdata = NULL;
-
-	/* scan ext pci bus and io pci bus */
-	for (j = 0; j < 1; j++) {
-		printk(KERN_INFO "scan ddb5476 external PCI bus:\n");
-		bus.ops = &ddb5476_ext_pci_ops;
-
-		for (devfn = 0; devfn < 0x100; devfn += 8) {
-			u32 temp;
-			u16 temp16;
-			u8 temp8;
-			int i;
-
-			dev.devfn = devfn;
-			db_verify(pci_read_config_dword(&dev, 0, &temp),
-				  == PCIBIOS_SUCCESSFUL);
-			if (temp == 0xffffffff)
-				continue;
-
-			printk(KERN_INFO "slot %d: (addr %d) \n",
-			       devfn / 8, 11 + devfn / 8);
-
-			/* verify read word and byte */
-			db_verify(pci_read_config_word(&dev, 2, &temp16),
-				  == PCIBIOS_SUCCESSFUL);
-			db_assert(temp16 == (temp >> 16));
-			db_verify(pci_read_config_byte(&dev, 3, &temp8),
-				  == PCIBIOS_SUCCESSFUL);
-			db_assert(temp8 == (temp >> 24));
-			db_verify(pci_read_config_byte(&dev, 1, &temp8),
-				  == PCIBIOS_SUCCESSFUL);
-			db_assert(temp8 == ((temp >> 8) & 0xff));
-
-			for (i = 0; i < 16; i++) {
-				if ((i % 4) == 0)
-					printk(KERN_INFO);
-				db_verify(pci_read_config_dword
-					  (&dev, i * 4, &temp),
-					  == PCIBIOS_SUCCESSFUL);
-				printk("\t%08X", temp);
-				if ((i % 4) == 3)
-					printk("\n");
-			}
-		}
-	}
-
-	pci_config_workaround = 1;
-}
-#endif

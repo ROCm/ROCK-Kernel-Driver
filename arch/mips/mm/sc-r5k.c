@@ -14,6 +14,7 @@
 #include <asm/pgtable.h>
 #include <asm/system.h>
 #include <asm/mmu_context.h>
+#include <asm/r4kcache.h>
 
 /* Secondary cache size in bytes, if present.  */
 static unsigned long scache_size;
@@ -21,24 +22,13 @@ static unsigned long scache_size;
 #define SC_LINE 32
 #define SC_PAGE (128*SC_LINE)
 
-#define cache_op(base,op)                   \
-__asm__ __volatile__("				\
-		.set noreorder;                 \
-		.set mips3;                     \
-		cache %1, (%0);                 \
-		.set mips0;                     \
-		.set reorder"                   \
-		:                               \
-		: "r" (base),                   \
-		  "i" (op));
-
 static inline void blast_r5000_scache(void)
 {
-	unsigned long start = KSEG0;
-	unsigned long end = KSEG0 + scache_size;
+	unsigned long start = INDEX_BASE;
+	unsigned long end = start + scache_size;
 
 	while(start < end) {
-		cache_op(start, R5K_Page_Invalidate_S);
+		cache_op(R5K_Page_Invalidate_S, start);
 		start += SC_PAGE;
 	}
 }
@@ -59,7 +49,7 @@ static void r5k_dma_cache_inv_sc(unsigned long addr, unsigned long size)
 	a = addr & ~(SC_PAGE - 1);
 	end = (addr + size - 1) & ~(SC_PAGE - 1);
 	while (a <= end) {
-		cache_op(a, R5K_Page_Invalidate_S);
+		cache_op(R5K_Page_Invalidate_S, a);
 		a += SC_PAGE;
 	}
 }
@@ -69,7 +59,7 @@ static void r5k_sc_enable(void)
         unsigned long flags;
 
 	local_irq_save(flags);
-	change_c0_config(R5K_CONF_SE, R5K_CONF_SE);
+	set_c0_config(R5K_CONF_SE);
 	blast_r5000_scache();
 	local_irq_restore(flags);
 }
@@ -80,7 +70,7 @@ static void r5k_sc_disable(void)
 
 	local_irq_save(flags);
 	blast_r5000_scache();
-	change_c0_config(R5K_CONF_SE, 0);
+	clear_c0_config(R5K_CONF_SE);
 	local_irq_restore(flags);
 }
 

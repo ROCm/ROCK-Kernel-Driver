@@ -210,7 +210,10 @@ irix_sigreturn(struct pt_regs *regs)
 	int sig, i, base = 0;
 	sigset_t blocked;
 
-	if(regs->regs[2] == 1000)
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
+	if (regs->regs[2] == 1000)
 		base = 1;
 
 	context = (struct sigctx_irix5 *) regs->regs[base + 4];

@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  * Copyright (C) 1997, 2001 Ralf Baechle (ralf@gnu.org)
- * Copyright (C) 2000, 2001 Broadcom Corporation
+ * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -25,14 +25,7 @@
 #include <asm/cpu.h>
 #include <asm/uaccess.h>
 
-#ifdef CONFIG_SIBYTE_DMA_PAGEOPS
 extern void sb1_dma_init(void);
-extern void sb1_clear_page_dma(void * page);
-extern void sb1_copy_page_dma(void * to, void * from);
-#else
-extern void sb1_clear_page(void * page);
-extern void sb1_copy_page(void * to, void * from);
-#endif
 
 /* These are probed at ld_mmu time */
 static unsigned long icache_size;
@@ -85,6 +78,11 @@ static unsigned int dcache_range_cutoff;
 	"	sync				\n"			\
 	"	.set	mips0")
 
+#define mispredict()							\
+	__asm__ __volatile__(						\
+	"	bnezl  $0, 1f		\n" /* Force mispredict */	\
+	"1:				\n");
+
 /*
  * Writeback and invalidate the entire dcache
  */
@@ -107,14 +105,18 @@ static inline void __sb1_writeback_inv_dcache_all(void)
 static inline void __sb1_writeback_inv_dcache_range(unsigned long start,
 	unsigned long end)
 {
+	unsigned long index;
+
 	start &= ~(dcache_line_size - 1);
 	end = (end + dcache_line_size - 1) & ~(dcache_line_size - 1);
 
 	while (start != end) {
-		cache_set_op(Index_Writeback_Inv_D, start);
-		cache_set_op(Index_Writeback_Inv_D, start ^ (1<<12));
+		index = start & dcache_index_mask;
+		cache_set_op(Index_Writeback_Inv_D, index);
+		cache_set_op(Index_Writeback_Inv_D, index ^ (1<<12));
 		start += dcache_line_size;
 	}
+	sync();
 }
 
 /*
@@ -194,6 +196,7 @@ static void sb1_flush_cache_page(struct vm_area_struct *vma, unsigned long addr)
 	if (!(vma->vm_flags & VM_EXEC))
 		return;
 
+	addr &= PAGE_MASK;
 	args.vma = vma;
 	args.addr = addr;
 	on_each_cpu(sb1_flush_cache_page_ipi, (void *) &args, 1, 1);
@@ -219,11 +222,7 @@ static inline void __sb1_flush_icache_range(unsigned long start,
 		cache_set_op(Index_Invalidate_I, start & icache_index_mask);
 		start += icache_line_size;
 	}
-
-	__asm__ __volatile__(
-	"	bnezl  $0, 1f		\n" /* Force mispredict */
-	"1:				\n");
-
+	mispredict();
 	sync();
 }
 
@@ -362,31 +361,10 @@ asm("sb1_flush_icache_page = local_sb1_flush_icache_page");
  */
 static void local_sb1_flush_cache_sigtramp(unsigned long addr)
 {
-	__asm__ __volatile__ (
-	"	.set	push		\n"
-	"	.set	noreorder	\n"
-	"	.set	noat		\n"
-	"	.set	mips4		\n"
-	"	cache	%2, (0<<13)(%0)	\n" /* Index-inval this address */
-	"	cache	%2, (1<<13)(%0)	\n" /* Index-inval this address */
-	"	cache	%2, (2<<13)(%0)	\n" /* Index-inval this address */
-	"	cache	%2, (3<<13)(%0)	\n" /* Index-inval this address */
-	"	xori	$1, %0, 1<<12	\n" /* Flip index bit 12	*/
-	"	cache	%2, (0<<13)($1)	\n" /* Index-inval this address */
-	"	cache	%2, (1<<13)($1)	\n" /* Index-inval this address */
-	"	cache	%2, (2<<13)($1)	\n" /* Index-inval this address */
-	"	cache	%2, (3<<13)($1)	\n" /* Index-inval this address */
-	"	cache	%3, (0<<13)(%1)	\n" /* Index-inval this address */
-	"	cache	%3, (1<<13)(%1)	\n" /* Index-inval this address */
-	"	cache	%3, (2<<13)(%1)	\n" /* Index-inval this address */
-	"	cache	%3, (3<<13)(%1)	\n" /* Index-inval this address */
-	"	bnezl	$0, 1f		\n" /* Force mispredict */
-	"	 nop			\n"
-	"1:                             \n"
-	"	.set	pop		\n"
-	:
-	: "r" (addr & dcache_index_mask), "r" (addr & icache_index_mask),
-	  "i" (Index_Writeback_Inv_D), "i" (Index_Invalidate_I));
+	cache_set_op(Index_Writeback_Inv_D, addr & dcache_index_mask);
+	cache_set_op(Index_Writeback_Inv_D, (addr ^ (1<<12)) & dcache_index_mask);
+	cache_set_op(Index_Invalidate_I, addr & icache_index_mask);
+	mispredict();
 }
 
 #ifdef CONFIG_SMP
@@ -504,20 +482,17 @@ static __init void probe_cache_sizes(void)
 void ld_mmu_sb1(void)
 {
 	extern char except_vec2_sb1;
+	extern char handle_vec2_sb1;
 
 	/* Special cache error handler for SB1 */
-	memcpy((void *)(KSEG0 + 0x100), &except_vec2_sb1, 0x80);
-	memcpy((void *)(KSEG1 + 0x100), &except_vec2_sb1, 0x80);
+	memcpy((void *)(CAC_BASE   + 0x100), &except_vec2_sb1, 0x80);
+	memcpy((void *)(UNCAC_BASE + 0x100), &except_vec2_sb1, 0x80);
+	memcpy((void *)KSEG1ADDR(&handle_vec2_sb1), &handle_vec2_sb1, 0x80);
 
 	probe_cache_sizes();
 
 #ifdef CONFIG_SIBYTE_DMA_PAGEOPS
-	_clear_page = sb1_clear_page_dma;
-	_copy_page = sb1_copy_page_dma;
 	sb1_dma_init();
-#else
-	_clear_page = sb1_clear_page;
-	_copy_page = sb1_copy_page;
 #endif
 
 	/*
@@ -526,7 +501,6 @@ void ld_mmu_sb1(void)
 	 * occur
 	 */
 	flush_cache_range = (void *) sb1_nop;
-	flush_cache_page = sb1_flush_cache_page;
 	flush_cache_mm = (void (*)(struct mm_struct *))sb1_nop;
 	flush_cache_all = sb1_nop;
 
@@ -534,6 +508,9 @@ void ld_mmu_sb1(void)
 	flush_icache_range = sb1_flush_icache_range;
 	flush_icache_page = sb1_flush_icache_page;
 	flush_icache_all = __sb1_flush_icache_all; /* local only */
+
+	/* This implies an Icache flush too, so can't be nop'ed */
+	flush_cache_page = sb1_flush_cache_page;
 
 	flush_cache_sigtramp = sb1_flush_cache_sigtramp;
 	flush_data_cache_page = (void *) sb1_nop;
@@ -547,13 +524,15 @@ void ld_mmu_sb1(void)
 	 * This is the only way to force the update of K0 to complete
 	 * before subsequent instruction fetch.
 	 */
-	write_c0_epc(&&here);
-here:
 	__asm__ __volatile__(
+	"	.set	noat			\n"
 	"	.set	noreorder		\n"
 	"	.set	mips3\n\t		\n"
+	"	la	$1, 1f			\n"
+	"	mtc0	$1, $14			\n"
 	"	eret				\n"
-	"	.set	mips0\n\t		\n"
+	"1:	.set	mips0\n\t		\n"
+	"	.set	at			\n"
 	"	.set	reorder"
 	:
 	:
