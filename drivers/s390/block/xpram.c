@@ -74,9 +74,10 @@ static int xpram_devs;
  */
 static int devs = XPRAM_DEVS;
 static unsigned int sizes[XPRAM_MAX_DEVS];
+static unsigned int sizes_count;
 
 module_param(devs, int, 0);
-MODULE_PARM(sizes,"1-" __MODULE_STRING(XPRAM_MAX_DEVS) "i"); 
+module_param_array(sizes, int, sizes_count, 0);
 
 MODULE_PARM_DESC(devs, "number of devices (\"partitions\"), " \
 		 "the default is " __MODULE_STRING(XPRAM_DEVS) "\n");
