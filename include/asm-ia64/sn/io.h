@@ -41,8 +41,8 @@
 		(((widget) & IIO_ITTE_WIDGET_MASK) << IIO_ITTE_WIDGET_SHIFT)))
 
 #define IIO_ITTE_DISABLE(nasid, bigwin) \
-	IIO_ITTE_PUT((nasid), HUB_PIO_MAP_TO_MEM, \
-		     (bigwin), IIO_ITTE_INVALID_WIDGET, 0)
+	IIO_ITTE_PUT((nasid), (bigwin), HUB_PIO_MAP_TO_MEM, \
+		IIO_ITTE_INVALID_WIDGET, 0)
 
 #define IIO_ITTE_GET(nasid, bigwin) REMOTE_HUB_ADDR((nasid), IIO_ITTE(bigwin))
 
