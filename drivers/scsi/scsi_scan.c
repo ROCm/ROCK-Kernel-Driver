@@ -485,7 +485,7 @@ out:
  **/
 static void scsi_free_sdev(struct scsi_device *sdev)
 {
-	unsigned int flags;
+	unsigned long flags;
 
 	list_del(&sdev->siblings);
 	list_del(&sdev->same_target_siblings);
@@ -1142,7 +1142,7 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 {
 	struct scsi_device *sdev_sibling;
 	struct scsi_target *starget;
-	unsigned int flags;
+	unsigned long flags;
 
 	/*
 	 * XXX do not save the inquiry, since it can change underneath us,
