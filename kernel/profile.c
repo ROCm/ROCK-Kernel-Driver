@@ -12,7 +12,7 @@
 #include <linux/profile.h>
 #include <asm/sections.h>
 
-static unsigned int *prof_buffer;
+static atomic_t *prof_buffer;
 static unsigned long prof_len, prof_shift;
 static int prof_on;
 static cpumask_t prof_cpu_mask = CPU_MASK_ALL;
@@ -40,17 +40,12 @@ __setup("profile=", profile_setup);
 
 void __init profile_init(void)
 {
-	unsigned int size;
- 
 	if (!prof_on) 
 		return;
  
 	/* only text is profiled */
-	prof_len = _etext - _stext;
-	prof_len >>= prof_shift;
-		
-	size = prof_len * sizeof(unsigned int) + PAGE_SIZE - 1;
-	prof_buffer = (unsigned int *) alloc_bootmem(size);
+	prof_len = (_etext - _stext) >> prof_shift;
+	prof_buffer = alloc_bootmem(prof_len*sizeof(atomic_t));
 }
 
 /* Profile event notifications */
@@ -174,7 +169,7 @@ void profile_hit(int type, void *__pc)
 	if (prof_on != type || !prof_buffer)
 		return;
 	pc = ((unsigned long)__pc - (unsigned long)_stext) >> prof_shift;
-	atomic_inc((atomic_t *)&prof_buffer[min(pc, prof_len - 1)]);
+	atomic_inc(&prof_buffer[min(pc, prof_len - 1)]);
 }
 
 void profile_tick(int type, struct pt_regs *regs)
@@ -252,7 +247,7 @@ read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		put_user(*((char *)(&sample_step)+p),buf);
 		buf++; p++; count--; read++;
 	}
-	pnt = (char *)prof_buffer + p - sizeof(unsigned int);
+	pnt = (char *)prof_buffer + p - sizeof(atomic_t);
 	if (copy_to_user(buf,(void *)pnt,count))
 		return -EFAULT;
 	read += count;
@@ -283,7 +278,7 @@ static ssize_t write_profile(struct file *file, const char __user *buf,
 	}
 #endif
 
-	memset(prof_buffer, 0, prof_len * sizeof(*prof_buffer));
+	memset(prof_buffer, 0, prof_len * sizeof(atomic_t));
 	return count;
 }
 
