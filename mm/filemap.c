@@ -21,6 +21,7 @@
 #include <linux/iobuf.h>
 #include <linux/hash.h>
 #include <linux/writeback.h>
+#include <linux/security.h>
 /*
  * This is needed for the following functions:
  *  - try_to_release_page
@@ -1143,6 +1144,10 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 	if (retval)
 		goto fput_in;
 
+	retval = security_ops->file_permission (in_file, MAY_READ);
+	if (retval)
+		goto fput_in;
+
 	/*
 	 * Get output file, and verify that it is ok..
 	 */
@@ -1157,6 +1162,10 @@ static ssize_t common_sendfile(int out_fd, int in_fd, loff_t *offset, size_t cou
 		goto fput_out;
 	out_inode = out_file->f_dentry->d_inode;
 	retval = locks_verify_area(FLOCK_VERIFY_WRITE, out_inode, out_file, out_file->f_pos, count);
+	if (retval)
+		goto fput_out;
+
+	retval = security_ops->file_permission (out_file, MAY_WRITE);
 	if (retval)
 		goto fput_out;
 

@@ -1309,6 +1309,11 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 	fl->fl_next = *before;
 	*before = fl;
 	list_add(&fl->fl_link, &file_lock_list);
+
+	error = security_ops->file_set_fowner(filp);
+	if (error)
+		goto out_unlock;
+
 	filp->f_owner.pid = current->pid;
 	filp->f_owner.uid = current->uid;
 	filp->f_owner.euid = current->euid;
@@ -1352,6 +1357,11 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 
 	error = flock_make_lock(filp, &lock, cmd);
 	if (error < 0)
+		goto out_putf;
+
+	error = security_ops->file_lock(filp, cmd,
+					(cmd & LOCK_NB) ? 0 : 1);
+	if (error)
 		goto out_putf;
 
 	error = flock_lock_file(filp, lock,
@@ -1484,6 +1494,11 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		goto out;
 	}
 
+	error = security_ops->file_lock(filp, file_lock->fl_type,
+	                                cmd == F_SETLKW);
+	if (error)
+		goto out;
+
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);
 		if (error < 0)
@@ -1602,6 +1617,11 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		error = -EINVAL;
 		goto out;
 	}
+
+	error = security_ops->file_lock(filp, file_lock->fl_type,
+					cmd == F_SETLKW64);
+	if (error)
+		goto out;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
 		error = filp->f_op->lock(filp, cmd, file_lock);

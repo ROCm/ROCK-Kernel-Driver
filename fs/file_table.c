@@ -13,6 +13,7 @@
 #include <linux/smp_lock.h>
 #include <linux/iobuf.h>
 #include <linux/fs.h>
+#include <linux/security.h>
 
 /* sysctl tunables... */
 struct files_stat_struct files_stat = {0, 0, NR_FILE};
@@ -43,6 +44,12 @@ struct file * get_empty_filp(void)
 		files_stat.nr_free_files--;
 	new_one:
 		memset(f, 0, sizeof(*f));
+		if (security_ops->file_alloc_security(f)) {
+			list_add(&f->f_list, &free_list);
+			files_stat.nr_free_files++;
+			file_list_unlock();
+			return NULL;
+		}
 		atomic_set(&f->f_count,1);
 		f->f_version = ++event;
 		f->f_uid = current->fsuid;
@@ -117,6 +124,7 @@ void __fput(struct file * file)
 
 	if (file->f_op && file->f_op->release)
 		file->f_op->release(inode, file);
+	security_ops->file_free_security(file);
 	fops_put(file->f_op);
 	if (file->f_mode & FMODE_WRITE)
 		put_write_access(inode);
@@ -149,6 +157,7 @@ struct file * fget(unsigned int fd)
 void put_filp(struct file *file)
 {
 	if(atomic_dec_and_test(&file->f_count)) {
+		security_ops->file_free_security(file);
 		file_list_lock();
 		list_del(&file->f_list);
 		list_add(&file->f_list, &free_list);

@@ -23,6 +23,7 @@
 #include <linux/dnotify.h>
 #include <linux/smp_lock.h>
 #include <linux/personality.h>
+#include <linux/security.h>
 
 #include <asm/namei.h>
 #include <asm/uaccess.h>
@@ -204,9 +205,20 @@ int vfs_permission(struct inode * inode, int mask)
 
 int permission(struct inode * inode,int mask)
 {
+	int retval;
+	int submask;
+
+	/* Ordinary permission routines do not understand MAY_APPEND. */
+	submask = mask & ~MAY_APPEND;
+
 	if (inode->i_op && inode->i_op->permission)
-		return inode->i_op->permission(inode, mask);
-	return vfs_permission(inode, mask);
+		retval = inode->i_op->permission(inode, submask);
+	else
+		retval = vfs_permission(inode, submask);
+	if (retval)
+		return retval;
+
+	return security_ops->inode_permission(inode, mask);
 }
 
 /*
@@ -318,15 +330,17 @@ static inline int exec_permission_lite(struct inode *inode)
 		mode >>= 3;
 
 	if (mode & MAY_EXEC)
-		return 0;
+		goto ok;
 
 	if ((inode->i_mode & S_IXUGO) && capable(CAP_DAC_OVERRIDE))
-		return 0;
+		goto ok;
 
 	if (S_ISDIR(inode->i_mode) && capable(CAP_DAC_READ_SEARCH))
-		return 0;
+		goto ok;
 
 	return -EACCES;
+ok:
+	return security_ops->inode_permission_lite(inode, MAY_EXEC);
 }
 
 /*
@@ -358,8 +372,10 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 			result = dir->i_op->lookup(dir, dentry);
 			if (result)
 				dput(dentry);
-			else
+			else {
 				result = dentry;
+				security_ops->inode_post_lookup(dir, result);
+			}
 		}
 		up(&dir->i_sem);
 		return result;
@@ -388,7 +404,7 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
  */
 static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	int err;
+	int err = -ELOOP;
 	if (current->link_count >= 5)
 		goto loop;
 	if (current->total_link_count >= 40)
@@ -397,6 +413,9 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 		current->state = TASK_RUNNING;
 		schedule();
 	}
+	err = security_ops->inode_follow_link(dentry, nd);
+	if (err)
+		goto loop;
 	current->link_count++;
 	current->total_link_count++;
 	UPDATE_ATIME(dentry->d_inode);
@@ -405,7 +424,7 @@ static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 	return err;
 loop:
 	path_release(nd);
-	return -ELOOP;
+	return err;
 }
 
 int follow_up(struct vfsmount **mnt, struct dentry **dentry)
@@ -897,9 +916,10 @@ struct dentry * lookup_hash(struct qstr *name, struct dentry * base)
 		if (!new)
 			goto out;
 		dentry = inode->i_op->lookup(inode, new);
-		if (!dentry)
+		if (!dentry) {
 			dentry = new;
-		else
+			security_ops->inode_post_lookup(inode, dentry);
+		} else
 			dput(new);
 	}
 out:
@@ -1103,14 +1123,17 @@ int vfs_create(struct inode *dir, struct dentry *dentry, int mode)
 
 	if (!dir->i_op || !dir->i_op->create)
 		return -EACCES;	/* shouldn't it be ENOSYS? */
-
-	DQUOT_INIT(dir);
-
 	mode &= S_IALLUGO;
 	mode |= S_IFREG;
+	error = security_ops->inode_create(dir, dentry, mode);
+	if (error)
+		return error;
+	DQUOT_INIT(dir);
 	error = dir->i_op->create(dir, dentry, mode);
-	if (!error)
+	if (!error) {
 		inode_dir_notify(dir, DN_CREATE);
+		security_ops->inode_post_create(dir, dentry, mode);
+	}
 	return error;
 }
 
@@ -1210,6 +1233,11 @@ int open_namei(const char * pathname, int flag, int mode, struct nameidata *nd)
 	int count = 0;
 
 	acc_mode = ACC_MODE(flag);
+
+	/* Allow the LSM permission hook to distinguish append 
+	   access from general write access. */
+	if (flag & O_APPEND)
+		acc_mode |= MAY_APPEND;
 
 	/*
 	 * The simplest case - just a plain lookup.
@@ -1316,6 +1344,9 @@ do_link:
 	 * stored in nd->last.name and we will have to putname() it when we
 	 * are done. Procfs-like symlinks just set LAST_BIND.
 	 */
+	error = security_ops->inode_follow_link(dentry, nd);
+	if (error)
+		goto exit_dput;
 	UPDATE_ATIME(dentry->d_inode);
 	error = dentry->d_inode->i_op->follow_link(dentry, nd);
 	dput(dentry);
@@ -1379,10 +1410,16 @@ int vfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 	if (!dir->i_op || !dir->i_op->mknod)
 		return -EPERM;
 
+	error = security_ops->inode_mknod(dir, dentry, mode, dev);
+	if (error)
+		return error;
+
 	DQUOT_INIT(dir);
 	error = dir->i_op->mknod(dir, dentry, mode, dev);
-	if (!error)
+	if (!error) {
 		inode_dir_notify(dir, DN_CREATE);
+		security_ops->inode_post_mknod(dir, dentry, mode, dev);
+	}
 	return error;
 }
 
@@ -1440,11 +1477,17 @@ int vfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	if (!dir->i_op || !dir->i_op->mkdir)
 		return -EPERM;
 
-	DQUOT_INIT(dir);
 	mode &= (S_IRWXUGO|S_ISVTX);
+	error = security_ops->inode_mkdir(dir, dentry, mode);
+	if (error)
+		return error;
+
+	DQUOT_INIT(dir);
 	error = dir->i_op->mkdir(dir, dentry, mode);
-	if (!error)
+	if (!error) {
 		inode_dir_notify(dir, DN_CREATE);
+		security_ops->inode_post_mkdir(dir,dentry, mode);
+	}
 	return error;
 }
 
@@ -1527,9 +1570,12 @@ int vfs_rmdir(struct inode *dir, struct dentry *dentry)
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
 	else {
-		error = dir->i_op->rmdir(dir, dentry);
-		if (!error)
-			dentry->d_inode->i_flags |= S_DEAD;
+		error = security_ops->inode_rmdir(dir, dentry);
+		if (!error) {
+			error = dir->i_op->rmdir(dir, dentry);
+			if (!error)
+				dentry->d_inode->i_flags |= S_DEAD;
+		}
 	}
 	up(&dentry->d_inode->i_sem);
 	if (!error) {
@@ -1597,8 +1643,12 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 	down(&dentry->d_inode->i_sem);
 	if (d_mountpoint(dentry))
 		error = -EBUSY;
-	else
-		error = dir->i_op->unlink(dir, dentry);
+	else {
+		error = security_ops->inode_unlink(dir, dentry);
+		if (!error) {
+			error = dir->i_op->unlink(dir, dentry);
+		}
+	}
 	up(&dentry->d_inode->i_sem);
 	if (!error) {
 		d_delete(dentry);
@@ -1659,10 +1709,16 @@ int vfs_symlink(struct inode *dir, struct dentry *dentry, const char *oldname)
 	if (!dir->i_op || !dir->i_op->symlink)
 		return -EPERM;
 
+	error = security_ops->inode_symlink(dir, dentry, oldname);
+	if (error)
+		return error;
+
 	DQUOT_INIT(dir);
 	error = dir->i_op->symlink(dir, dentry, oldname);
-	if (!error)
+	if (!error) {
 		inode_dir_notify(dir, DN_CREATE);
+		security_ops->inode_post_symlink(dir, dentry, oldname);
+	}
 	return error;
 }
 
@@ -1724,12 +1780,18 @@ int vfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *new_de
 	if (S_ISDIR(old_dentry->d_inode->i_mode))
 		return -EPERM;
 
+	error = security_ops->inode_link(old_dentry, dir, new_dentry);
+	if (error)
+		return error;
+
 	down(&old_dentry->d_inode->i_sem);
 	DQUOT_INIT(dir);
 	error = dir->i_op->link(old_dentry, dir, new_dentry);
 	up(&old_dentry->d_inode->i_sem);
-	if (!error)
+	if (!error) {
 		inode_dir_notify(dir, DN_CREATE);
+		security_ops->inode_post_link(old_dentry, dir, new_dentry);
+	}
 	return error;
 }
 
@@ -1821,9 +1883,13 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 	 * If we are going to change the parent - check write permissions,
 	 * we'll need to flip '..'.
 	 */
-	if (new_dir != old_dir)
+	if (new_dir != old_dir) {
 		error = permission(old_dentry->d_inode, MAY_WRITE);
+		if (error)
+			return error;
+	}
 
+	error = security_ops->inode_rename(old_dir, old_dentry, new_dir, new_dentry);
 	if (error)
 		return error;
 
@@ -1844,8 +1910,11 @@ int vfs_rename_dir(struct inode *old_dir, struct dentry *old_dentry,
 			d_rehash(new_dentry);
 		dput(new_dentry);
 	}
-	if (!error)
+	if (!error) {
 		d_move(old_dentry,new_dentry);
+		security_ops->inode_post_rename(old_dir, old_dentry,
+							new_dir, new_dentry);
+	}
 	return error;
 }
 
@@ -1854,6 +1923,10 @@ int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 {
 	struct inode *target;
 	int error;
+
+	error = security_ops->inode_rename(old_dir, old_dentry, new_dir, new_dentry);
+	if (error)
+		return error;
 
 	dget(new_dentry);
 	target = new_dentry->d_inode;
@@ -1867,6 +1940,7 @@ int vfs_rename_other(struct inode *old_dir, struct dentry *old_dentry,
 		/* The following d_move() should become unconditional */
 		if (!(old_dir->i_sb->s_type->fs_flags & FS_ODD_RENAME))
 			d_move(old_dentry, new_dentry);
+		security_ops->inode_post_rename(old_dir, old_dentry, new_dir, new_dentry);
 	}
 	if (target)
 		up(&target->i_sem);

@@ -37,6 +37,16 @@ static int cap_sys_security (unsigned int id, unsigned int call,
 	return -ENOSYS;
 }
 
+static int cap_quotactl (int cmds, int type, int id, struct super_block *sb)
+{
+	return 0;
+}
+
+static int cap_quota_on (struct file *f)
+{
+	return 0;
+}
+
 static int cap_ptrace (struct task_struct *parent, struct task_struct *child)
 {
 	/* Derived from arch/i386/kernel/ptrace.c:sys_ptrace. */
@@ -93,6 +103,11 @@ static void cap_capset_set (struct task_struct *target,
 	target->cap_effective = *effective;
 	target->cap_inheritable = *inheritable;
 	target->cap_permitted = *permitted;
+}
+
+static int cap_acct (struct file *file)
+{
+	return 0;
 }
 
 static int cap_bprm_alloc_security (struct linux_binprm *bprm)
@@ -187,6 +202,294 @@ static void cap_bprm_compute_creds (struct linux_binprm *bprm)
 		unlock_kernel ();
 
 	current->keep_capabilities = 0;
+}
+
+static int cap_sb_alloc_security (struct super_block *sb)
+{
+	return 0;
+}
+
+static void cap_sb_free_security (struct super_block *sb)
+{
+	return;
+}
+
+static int cap_sb_statfs (struct super_block *sb)
+{
+	return 0;
+}
+
+static int cap_mount (char *dev_name, struct nameidata *nd, char *type,
+		      unsigned long flags, void *data)
+{
+	return 0;
+}
+
+static int cap_check_sb (struct vfsmount *mnt, struct nameidata *nd)
+{
+	return 0;
+}
+
+static int cap_umount (struct vfsmount *mnt, int flags)
+{
+	return 0;
+}
+
+static void cap_umount_close (struct vfsmount *mnt)
+{
+	return;
+}
+
+static void cap_umount_busy (struct vfsmount *mnt)
+{
+	return;
+}
+
+static void cap_post_remount (struct vfsmount *mnt, unsigned long flags,
+			      void *data)
+{
+	return;
+}
+
+static void cap_post_mountroot (void)
+{
+	return;
+}
+
+static void cap_post_addmount (struct vfsmount *mnt, struct nameidata *nd)
+{
+	return;
+}
+
+static int cap_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
+{
+	return 0;
+}
+
+static void cap_post_pivotroot (struct nameidata *old_nd, struct nameidata *new_nd)
+{
+	return;
+}
+
+static int cap_inode_alloc_security (struct inode *inode)
+{
+	return 0;
+}
+
+static void cap_inode_free_security (struct inode *inode)
+{
+	return;
+}
+
+static int cap_inode_create (struct inode *inode, struct dentry *dentry,
+			     int mask)
+{
+	return 0;
+}
+
+static void cap_inode_post_create (struct inode *inode, struct dentry *dentry,
+				   int mask)
+{
+	return;
+}
+
+static int cap_inode_link (struct dentry *old_dentry, struct inode *inode,
+			   struct dentry *new_dentry)
+{
+	return 0;
+}
+
+static void cap_inode_post_link (struct dentry *old_dentry, struct inode *inode,
+				 struct dentry *new_dentry)
+{
+	return;
+}
+
+static int cap_inode_unlink (struct inode *inode, struct dentry *dentry)
+{
+	return 0;
+}
+
+static int cap_inode_symlink (struct inode *inode, struct dentry *dentry,
+			      const char *name)
+{
+	return 0;
+}
+
+static void cap_inode_post_symlink (struct inode *inode, struct dentry *dentry,
+				    const char *name)
+{
+	return;
+}
+
+static int cap_inode_mkdir (struct inode *inode, struct dentry *dentry,
+			    int mask)
+{
+	return 0;
+}
+
+static void cap_inode_post_mkdir (struct inode *inode, struct dentry *dentry,
+				  int mask)
+{
+	return;
+}
+
+static int cap_inode_rmdir (struct inode *inode, struct dentry *dentry)
+{
+	return 0;
+}
+
+static int cap_inode_mknod (struct inode *inode, struct dentry *dentry,
+			    int major, dev_t minor)
+{
+	return 0;
+}
+
+static void cap_inode_post_mknod (struct inode *inode, struct dentry *dentry,
+				  int major, dev_t minor)
+{
+	return;
+}
+
+static int cap_inode_rename (struct inode *old_inode, struct dentry *old_dentry,
+			     struct inode *new_inode, struct dentry *new_dentry)
+{
+	return 0;
+}
+
+static void cap_inode_post_rename (struct inode *old_inode,
+				   struct dentry *old_dentry,
+				   struct inode *new_inode,
+				   struct dentry *new_dentry)
+{
+	return;
+}
+
+static int cap_inode_readlink (struct dentry *dentry)
+{
+	return 0;
+}
+
+static int cap_inode_follow_link (struct dentry *dentry,
+				  struct nameidata *nameidata)
+{
+	return 0;
+}
+
+static int cap_inode_permission (struct inode *inode, int mask)
+{
+	return 0;
+}
+
+static int cap_inode_permission_lite (struct inode *inode, int mask)
+{
+	return 0;
+}
+
+static int cap_inode_setattr (struct dentry *dentry, struct iattr *iattr)
+{
+	return 0;
+}
+
+static int cap_inode_getattr (struct vfsmount *mnt, struct dentry *dentry)
+{
+	return 0;
+}
+
+static void cap_post_lookup (struct inode *ino, struct dentry *d)
+{
+	return;
+}
+
+static void cap_delete (struct inode *ino)
+{
+	return;
+}
+
+static int cap_inode_setxattr (struct dentry *dentry, char *name, void *value,
+				size_t size, int flags)
+{
+	return 0;
+}
+
+static int cap_inode_getxattr (struct dentry *dentry, char *name)
+{
+	return 0;
+}
+
+static int cap_inode_listxattr (struct dentry *dentry)
+{
+	return 0;
+}
+
+static int cap_inode_removexattr (struct dentry *dentry, char *name)
+{
+	return 0;
+}
+
+static int cap_file_permission (struct file *file, int mask)
+{
+	return 0;
+}
+
+static int cap_file_alloc_security (struct file *file)
+{
+	return 0;
+}
+
+static void cap_file_free_security (struct file *file)
+{
+	return;
+}
+
+static int cap_file_llseek (struct file *file)
+{
+	return 0;
+}
+
+static int cap_file_ioctl (struct file *file, unsigned int command,
+			   unsigned long arg)
+{
+	return 0;
+}
+
+static int cap_file_mmap (struct file *file, unsigned long prot,
+			  unsigned long flags)
+{
+	return 0;
+}
+
+static int cap_file_mprotect (struct vm_area_struct *vma, unsigned long prot)
+{
+	return 0;
+}
+
+static int cap_file_lock (struct file *file, unsigned int cmd, int blocking)
+{
+	return 0;
+}
+
+static int cap_file_fcntl (struct file *file, unsigned int cmd,
+			   unsigned long arg)
+{
+	return 0;
+}
+
+static int cap_file_set_fowner (struct file *file)
+{
+	return 0;
+}
+
+static int cap_file_send_sigiotask (struct task_struct *tsk,
+				    struct fown_struct *fown, int fd,
+				    int reason)
+{
+	return 0;
+}
+
+static int cap_file_receive (struct file *file)
+{
+	return 0;
 }
 
 static int cap_task_create (unsigned long clone_flags)
@@ -387,41 +690,100 @@ static int cap_unregister (const char *name, struct security_operations *ops)
 }
 
 static struct security_operations capability_ops = {
-	ptrace:				cap_ptrace,
-	capget:				cap_capget,
-	capset_check:			cap_capset_check,
-	capset_set:			cap_capset_set,
-	capable:			cap_capable,
-	sys_security:			cap_sys_security,
+	.ptrace =			cap_ptrace,
+	.capget =			cap_capget,
+	.capset_check =			cap_capset_check,
+	.capset_set =			cap_capset_set,
+	.acct =				cap_acct,
+	.capable =			cap_capable,
+	.sys_security =			cap_sys_security,
+	.quotactl =			cap_quotactl,
+	.quota_on =			cap_quota_on,
+
+	.bprm_alloc_security =		cap_bprm_alloc_security,
+	.bprm_free_security =		cap_bprm_free_security,
+	.bprm_compute_creds =		cap_bprm_compute_creds,
+	.bprm_set_security =		cap_bprm_set_security,
+	.bprm_check_security =		cap_bprm_check_security,
+
+	.sb_alloc_security =		cap_sb_alloc_security,
+	.sb_free_security =		cap_sb_free_security,
+	.sb_statfs =			cap_sb_statfs,
+	.sb_mount =			cap_mount,
+	.sb_check_sb =			cap_check_sb,
+	.sb_umount =			cap_umount,
+	.sb_umount_close =		cap_umount_close,
+	.sb_umount_busy =		cap_umount_busy,
+	.sb_post_remount =		cap_post_remount,
+	.sb_post_mountroot =		cap_post_mountroot,
+	.sb_post_addmount =		cap_post_addmount,
+	.sb_pivotroot =			cap_pivotroot,
+	.sb_post_pivotroot =		cap_post_pivotroot,
 	
-	bprm_alloc_security:		cap_bprm_alloc_security,
-	bprm_free_security:		cap_bprm_free_security,
-	bprm_compute_creds:		cap_bprm_compute_creds,
-	bprm_set_security:		cap_bprm_set_security,
-	bprm_check_security:		cap_bprm_check_security,
+	.inode_alloc_security =		cap_inode_alloc_security,
+	.inode_free_security =		cap_inode_free_security,
+	.inode_create =			cap_inode_create,
+	.inode_post_create =		cap_inode_post_create,
+	.inode_link =			cap_inode_link,
+	.inode_post_link =		cap_inode_post_link,
+	.inode_unlink =			cap_inode_unlink,
+	.inode_symlink =		cap_inode_symlink,
+	.inode_post_symlink =		cap_inode_post_symlink,
+	.inode_mkdir =			cap_inode_mkdir,
+	.inode_post_mkdir =		cap_inode_post_mkdir,
+	.inode_rmdir =			cap_inode_rmdir,
+	.inode_mknod =			cap_inode_mknod,
+	.inode_post_mknod =		cap_inode_post_mknod,
+	.inode_rename =			cap_inode_rename,
+	.inode_post_rename =		cap_inode_post_rename,
+	.inode_readlink =		cap_inode_readlink,
+	.inode_follow_link =		cap_inode_follow_link,
+	.inode_permission =		cap_inode_permission,
+	.inode_permission_lite =	cap_inode_permission_lite,
+	.inode_setattr =		cap_inode_setattr,
+	.inode_getattr =		cap_inode_getattr,
+	.inode_post_lookup =		cap_post_lookup,
+	.inode_delete =			cap_delete,
+	.inode_setxattr =		cap_inode_setxattr,
+	.inode_getxattr =		cap_inode_getxattr,
+	.inode_listxattr =		cap_inode_listxattr,
+	.inode_removexattr =		cap_inode_removexattr,
 	
-	task_create:			cap_task_create,
-	task_alloc_security:		cap_task_alloc_security,
-	task_free_security:		cap_task_free_security,
-	task_setuid:			cap_task_setuid,
-	task_post_setuid:		cap_task_post_setuid,
-	task_setgid:			cap_task_setgid,
-	task_setpgid:			cap_task_setpgid,
-	task_getpgid:			cap_task_getpgid,
-	task_getsid:			cap_task_getsid,
-	task_setgroups:			cap_task_setgroups,
-	task_setnice:			cap_task_setnice,
-	task_setrlimit:			cap_task_setrlimit,
-	task_setscheduler:		cap_task_setscheduler,
-	task_getscheduler:		cap_task_getscheduler,
-	task_wait:			cap_task_wait,
-	task_kill:			cap_task_kill,
-	task_prctl:			cap_task_prctl,
-	task_kmod_set_label:		cap_task_kmod_set_label,
-	task_reparent_to_init:		cap_task_reparent_to_init,
-	
-	register_security:		cap_register,
-	unregister_security:		cap_unregister,
+	.file_permission =		cap_file_permission,
+	.file_alloc_security =		cap_file_alloc_security,
+	.file_free_security =		cap_file_free_security,
+	.file_llseek =			cap_file_llseek,
+	.file_ioctl =			cap_file_ioctl,
+	.file_mmap =			cap_file_mmap,
+	.file_mprotect =		cap_file_mprotect,
+	.file_lock =			cap_file_lock,
+	.file_fcntl =			cap_file_fcntl,
+	.file_set_fowner =		cap_file_set_fowner,
+	.file_send_sigiotask =		cap_file_send_sigiotask,
+	.file_receive =			cap_file_receive,
+
+	.task_create =			cap_task_create,
+	.task_alloc_security =		cap_task_alloc_security,
+	.task_free_security =		cap_task_free_security,
+	.task_setuid =			cap_task_setuid,
+	.task_post_setuid =		cap_task_post_setuid,
+	.task_setgid =			cap_task_setgid,
+	.task_setpgid =			cap_task_setpgid,
+	.task_getpgid =			cap_task_getpgid,
+	.task_getsid =			cap_task_getsid,
+	.task_setgroups =		cap_task_setgroups,
+	.task_setnice =			cap_task_setnice,
+	.task_setrlimit =		cap_task_setrlimit,
+	.task_setscheduler =		cap_task_setscheduler,
+	.task_getscheduler =		cap_task_getscheduler,
+	.task_wait =			cap_task_wait,
+	.task_kill =			cap_task_kill,
+	.task_prctl =			cap_task_prctl,
+	.task_kmod_set_label =		cap_task_kmod_set_label,
+	.task_reparent_to_init =	cap_task_reparent_to_init,
+
+	.register_security =		cap_register,
+	.unregister_security =		cap_unregister,
 };
 
 #if defined(CONFIG_SECURITY_CAPABILITIES_MODULE)

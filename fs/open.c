@@ -17,6 +17,7 @@
 #include <linux/iobuf.h>
 #include <linux/namei.h>
 #include <linux/backing-dev.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -30,6 +31,9 @@ int vfs_statfs(struct super_block *sb, struct statfs *buf)
 		retval = -ENOSYS;
 		if (sb->s_op && sb->s_op->statfs) {
 			memset(buf, 0, sizeof(struct statfs));
+			retval = security_ops->sb_statfs(sb);
+			if (retval)
+				return retval;
 			retval = sb->s_op->statfs(sb, buf);
 		}
 	}

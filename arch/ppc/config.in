@@ -627,3 +627,6 @@ if [ "$CONFIG_4xx" = "y" -o "$CONFIG_GT64260" = "y"		\
    bool 'Support for early boot texts over serial port' CONFIG_SERIAL_TEXT_DEBUG
 fi
 endmenu
+
+source security/Config.in
+
