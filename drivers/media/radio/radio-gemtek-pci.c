@@ -90,24 +90,6 @@ static const char rcsid[] = "$Id: radio-gemtek-pci.c,v 1.1 2001/07/23 08:08:16 t
 
 static int nr_radio = -1;
 
-static int gemtek_pci_open( struct video_device *dev, int flags)
-{
-	struct gemtek_pci_card *card =  dev->priv;
-
-/* Paranoid check */
-	if ( !card )
-		return -ENODEV;
-
-	return 0;
-}
-
-static void gemtek_pci_close( struct video_device *dev )
-{
-/*
- *  The module usage is managed by 'videodev'
- */
-}
-
 static inline u8 gemtek_pci_out( u16 value, u32 port )
 {
 	outw( value, port );
@@ -195,80 +177,65 @@ static inline unsigned int gemtek_pci_getsignal( struct gemtek_pci_card *card )
 	return ( inb( card->iobase ) & 0x08 ) ? 0 : 1;
 }
 
-static int gemtek_pci_ioctl( struct video_device *dev, unsigned int cmd, void *arg)
+static int gemtek_pci_ioctl(struct inode *inode, struct file *file,
+			    unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct gemtek_pci_card *card = dev->priv;
 
 	switch ( cmd ) {
 		case VIDIOCGCAP:
 		{
-			struct video_capability c;
+			struct video_capability *c = arg;
 
-			c.type = VID_TYPE_TUNER;
-			c.channels = 1;
-			c.audios = 1;
-			c.maxwidth = 0;
-			c.maxheight = 0;
-			c.minwidth = 0;
-			c.minheight = 0;
-			strcpy( c.name, "Gemtek PCI Radio" );
-			if ( copy_to_user( arg, &c, sizeof( c ) ) )
-				return -EFAULT;
-
+			memset(c,0,sizeof(*c));
+			c->type = VID_TYPE_TUNER;
+			c->channels = 1;
+			c->audios = 1;
+			strcpy( c->name, "Gemtek PCI Radio" );
 			return 0;
 		} 
 
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner t;
+			struct video_tuner *t = arg;
 
-			if ( copy_from_user( &t, arg, sizeof( struct video_tuner ) ) )
-				return -EFAULT;
-
-			if ( t.tuner ) 
+			if ( t->tuner ) 
 				return -EINVAL;
 
-			t.rangelow = GEMTEK_PCI_RANGE_LOW;
-			t.rangehigh = GEMTEK_PCI_RANGE_HIGH;
-			t.flags = VIDEO_TUNER_LOW;
-			t.mode = VIDEO_MODE_AUTO;
-			t.signal = 0xFFFF * gemtek_pci_getsignal( card );
-			strcpy( t.name, "FM" );
-
-			if ( copy_to_user( arg, &t, sizeof( struct video_tuner ) ) )
-				return -EFAULT;
-
+			t->rangelow = GEMTEK_PCI_RANGE_LOW;
+			t->rangehigh = GEMTEK_PCI_RANGE_HIGH;
+			t->flags = VIDEO_TUNER_LOW;
+			t->mode = VIDEO_MODE_AUTO;
+			t->signal = 0xFFFF * gemtek_pci_getsignal( card );
+			strcpy( t->name, "FM" );
 			return 0;
 		}
 
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner t;
-
-			if ( copy_from_user( &t, arg, sizeof( struct video_tuner ) ) )
-				return -EFAULT;
-
-			if ( t.tuner )
+			struct video_tuner *t = arg;
+			if ( t->tuner )
 				return -EINVAL;
-
 			return 0;
 		}
 
 		case VIDIOCGFREQ:
-			return put_user( card->current_frequency, (u32 *)arg );
-
+		{
+			unsigned long *freq = arg;
+			*freq = card->current_frequency;
+			return 0;
+		}
 		case VIDIOCSFREQ:
 		{
-			u32 frequency;
+			unsigned long *freq = arg;
 	 
-			if ( get_user( frequency, (u32 *)arg ) )
-				return -EFAULT;
-
-			if ( (frequency < GEMTEK_PCI_RANGE_LOW) || (frequency > GEMTEK_PCI_RANGE_HIGH) )
+			if ( (*freq < GEMTEK_PCI_RANGE_LOW) ||
+			     (*freq > GEMTEK_PCI_RANGE_HIGH) )
 				return -EINVAL;
 
-			gemtek_pci_setfrequency( card, frequency );
-			card->current_frequency = frequency;
+			gemtek_pci_setfrequency( card, *freq );
+			card->current_frequency = *freq;
 			card->mute = FALSE;
 
 			return 0;
@@ -276,36 +243,27 @@ static int gemtek_pci_ioctl( struct video_device *dev, unsigned int cmd, void *a
   
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio a;
+			struct video_audio *a = arg;
 
-			memset( &a, 0, sizeof( a ) );
-			a.flags |= VIDEO_AUDIO_MUTABLE;
-			a.volume = 1;
-			a.step = 65535;
-			strcpy( a.name, "Radio" );
-
-			if ( copy_to_user( arg, &a, sizeof( struct video_audio ) ) )
-				return -EFAULT;
-
+			memset( a, 0, sizeof( *a ) );
+			a->flags |= VIDEO_AUDIO_MUTABLE;
+			a->volume = 1;
+			a->step = 65535;
+			strcpy( a->name, "Radio" );
 			return 0;			
 		}
 
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio a;
+			struct video_audio *a = arg;
 
-			if ( copy_from_user( &a, arg, sizeof( struct video_audio ) ) ) 
-				return -EFAULT;	
-
-			if ( a.audio ) 
+			if ( a->audio ) 
 				return -EINVAL;
 
-			if ( a.flags & VIDEO_AUDIO_MUTE ) 
+			if ( a->flags & VIDEO_AUDIO_MUTE ) 
 				gemtek_pci_mute( card );
-
 			else
 				gemtek_pci_unmute( card );
-
 			return 0;
 		}
 
@@ -333,19 +291,22 @@ MODULE_DEVICE_TABLE( pci, gemtek_pci_id );
 
 static u8 mx = 1;
 
-static char gemtek_pci_videodev_name[] = "Gemtek PCI Radio";
+static struct file_operations gemtek_pci_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
-static inline void gemtek_pci_init_struct( struct video_device *dev )
-{
-	memset( dev, 0, sizeof( struct video_device ) );
-	dev->owner = THIS_MODULE;
-	strcpy( dev->name , gemtek_pci_videodev_name );
-	dev->type = VID_TYPE_TUNER;
-	dev->hardware = VID_HARDWARE_GEMTEK;
-	dev->open = gemtek_pci_open;
-	dev->close = gemtek_pci_close;
-	dev->ioctl = gemtek_pci_ioctl;
-}
+static struct video_device vdev_template = {
+	owner:         THIS_MODULE,
+	name:          "Gemtek PCI Radio",
+	type:          VID_TYPE_TUNER,
+	hardware:      VID_HARDWARE_GEMTEK,
+	fops:          &gemtek_pci_fops,
+	kernel_ioctl:  gemtek_pci_ioctl,
+};
 
 static int __devinit gemtek_pci_probe( struct pci_dev *pci_dev, const struct pci_device_id *pci_id )
 {
@@ -378,7 +339,7 @@ static int __devinit gemtek_pci_probe( struct pci_dev *pci_dev, const struct pci
 		printk( KERN_ERR "gemtek_pci: out of memory\n" );
 		goto err_video;
 	}
-	gemtek_pci_init_struct( devradio );
+	*devradio = vdev_template;
 
 	if ( video_register_device( devradio, VFL_TYPE_RADIO , nr_radio) == -1 ) {
 		kfree( devradio );

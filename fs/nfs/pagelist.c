@@ -231,7 +231,7 @@ nfs_wait_on_request(struct nfs_page *req)
  *
  * Moves a maximum of 'nmax' elements from one list to another.
  * The elements are checked to ensure that they form a contiguous set
- * of pages, and that they originated from the same file.
+ * of pages, and that the RPC credentials are the same.
  */
 int
 nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
@@ -245,7 +245,7 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
 
 		req = nfs_list_entry(head->next);
 		if (prev) {
-			if (req->wb_file != prev->wb_file)
+			if (req->wb_cred != prev->wb_cred)
 				break;
 			if (page_index(req->wb_page) != page_index(prev->wb_page)+1)
 				break;
@@ -272,14 +272,14 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
  *
  * Tries to coalesce more requests by traversing the request's wb_list.
  * Moves the resulting list into dst. Requests are guaranteed to be
- * contiguous, and to originate from the same file.
+ * contiguous, and have the same RPC credentials.
  */
 static int
 nfs_scan_forward(struct nfs_page *req, struct list_head *dst, int nmax)
 {
 	struct nfs_server *server = NFS_SERVER(req->wb_inode);
 	struct list_head *pos, *head = req->wb_list_head;
-	struct file *file = req->wb_file;
+	struct rpc_cred *cred = req->wb_cred;
 	unsigned long idx = page_index(req->wb_page) + 1;
 	int npages = 0;
 
@@ -300,7 +300,7 @@ nfs_scan_forward(struct nfs_page *req, struct list_head *dst, int nmax)
 			break;
 		if (req->wb_offset != 0)
 			break;
-		if (req->wb_file != file)
+		if (req->wb_cred != cred)
 			break;
 	}
 	return npages;

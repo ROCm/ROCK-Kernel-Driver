@@ -42,7 +42,6 @@
 static int io = CONFIG_RADIO_AZTECH_PORT; 
 static int radio_nr = -1;
 static int radio_wait_time = 1000;
-static int users = 0;
 static struct semaphore lock;
 
 struct az_device
@@ -158,96 +157,85 @@ static int az_setfreq(struct az_device *dev, unsigned long frequency)
 	return 0;
 }
 
-static int az_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int az_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, void *arg)
 {
-	struct az_device *az=dev->priv;
+	struct video_device *dev = video_devdata(file);
+	struct az_device *az = dev->priv;
 	
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			strcpy(v.name, "Aztech Radio");
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "Aztech Radio");
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			struct video_tuner *v = arg;
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow=(87*16000);
-			v.rangehigh=(108*16000);
-			v.flags=VIDEO_TUNER_LOW;
-			v.mode=VIDEO_MODE_AUTO;
-			v.signal=0xFFFF*az_getsigstr(az);
+			v->rangelow=(87*16000);
+			v->rangehigh=(108*16000);
+			v->flags=VIDEO_TUNER_LOW;
+			v->mode=VIDEO_MODE_AUTO;
+			v->signal=0xFFFF*az_getsigstr(az);
 			if(az_getstereo(az))
-				v.flags|=VIDEO_TUNER_STEREO_ON;
-			strcpy(v.name, "FM");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+				v->flags|=VIDEO_TUNER_STEREO_ON;
+			strcpy(v->name, "FM");
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
-			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &az->curfreq, sizeof(az->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = az->curfreq;
 			return 0;
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&az->curfreq, arg,sizeof(az->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			az->curfreq = *freq;
 			az_setfreq(az, az->curfreq);
 			return 0;
+		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags|=VIDEO_AUDIO_MUTABLE|VIDEO_AUDIO_VOLUME;
+			struct video_audio *v = arg;
+			memset(v,0, sizeof(*v));
+			v->flags|=VIDEO_AUDIO_MUTABLE|VIDEO_AUDIO_VOLUME;
 			if(az->stereo)
-				v.mode=VIDEO_SOUND_STEREO;
+				v->mode=VIDEO_SOUND_STEREO;
 			else
-				v.mode=VIDEO_SOUND_MONO;
-			v.volume=az->curvol;
-			v.step=16384;
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+				v->mode=VIDEO_SOUND_MONO;
+			v->volume=az->curvol;
+			v->step=16384;
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
-			az->curvol=v.volume;
+			az->curvol=v->volume;
 
-			az->stereo=(v.mode&VIDEO_SOUND_STEREO)?1:0;
-			if(v.flags&VIDEO_AUDIO_MUTE) 
+			az->stereo=(v->mode&VIDEO_SOUND_STEREO)?1:0;
+			if(v->flags&VIDEO_AUDIO_MUTE) 
 				az_setvol(az,0);
 			else
-				az_setvol(az,az->curvol);								
+				az_setvol(az,az->curvol);
 			return 0;
 		}
 		default:
@@ -255,20 +243,15 @@ static int az_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int az_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void az_close(struct video_device *dev)
-{
-	users--;
-}
-
 static struct az_device aztech_unit;
+
+static struct file_operations aztech_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device aztech_radio=
 {
@@ -276,9 +259,8 @@ static struct video_device aztech_radio=
 	name:		"Aztech radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_AZTECH,
-	open:		az_open,
-	close:		az_close,
-	ioctl:		az_ioctl,
+	fops:           &aztech_fops,
+	kernel_ioctl:   az_ioctl,
 };
 
 static int __init aztech_init(void)

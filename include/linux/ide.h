@@ -746,12 +746,6 @@ int ide_xlate_1024 (kdev_t, int, int, const char *);
 ide_drive_t *get_info_ptr (kdev_t i_rdev);
 
 /*
- * Start a reset operation for an IDE interface.
- * The caller should return immediately after invoking this.
- */
-ide_startstop_t ide_do_reset (ide_drive_t *);
-
-/*
  * Re-Start an operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
@@ -953,7 +947,7 @@ void ide_destroy_dmatable (ide_drive_t *drive);
 ide_startstop_t ide_dma_intr (ide_drive_t *drive);
 int check_drive_lists (ide_drive_t *drive, int good_bad);
 int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive);
-int ide_release_dma (ide_hwif_t *hwif);
+extern void ide_release_dma(ide_hwif_t *hwif);
 void ide_setup_dma (ide_hwif_t *hwif, unsigned long dmabase, unsigned int num_ports) __init;
 #endif
 

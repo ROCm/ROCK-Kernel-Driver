@@ -87,7 +87,9 @@
 #define BTTV_PV_BT878P_PLUS 0x46
 #define BTTV_FLYVIDEO98EZ   0x47
 #define BTTV_PV_BT878P_9B   0x48
-
+#define BTTV_SENSORAY311    0x49
+#define BTTV_RV605          0x4a
+#define BTTV_WINDVR         0x4c
 
 /* i2c address list */
 #define I2C_TSA5522        0xc2
@@ -95,7 +97,7 @@
 #define I2C_TDA8425        0x82
 #define I2C_TDA9840        0x84
 #define I2C_TDA9850        0xb6 /* also used by 9855,9873 */
-#define I2C_TDA9874A       0xb0 /* also used by 9875 */
+#define I2C_TDA9874        0xb0 /* also used by 9875 */
 #define I2C_TDA9875        0xb0
 #define I2C_HAUPEE         0xa0
 #define I2C_STBEE          0xae
@@ -123,7 +125,7 @@ struct tvcard
         int tuner;
         int svhs;
         u32 gpiomask;
-        u32 muxsel[8];
+        u32 muxsel[16];
         u32 audiomux[6]; /* Tuner, Radio, external, internal, mute, stereo */
         u32 gpiomask2;   /* GPIO MUX mask */
 
@@ -141,6 +143,7 @@ struct tvcard
 	int tuner_type;
 	int has_radio;
 	void (*audio_hook)(struct bttv *btv, struct video_audio *v, int set);
+	void (*muxsel_hook)(struct bttv *btv, unsigned int input);
 };
 
 extern struct tvcard bttv_tvcards[];
@@ -148,11 +151,12 @@ extern const int bttv_num_tvcards;
 
 /* identification / initialization of the card */
 extern void bttv_idcard(struct bttv *btv);
-extern void bttv_init_card(struct bttv *btv);
+extern void bttv_init_card1(struct bttv *btv);
+extern void bttv_init_card2(struct bttv *btv);
 
 /* card-specific funtions */
 extern void tea5757_set_freq(struct bttv *btv, unsigned short freq);
-extern void bttv_boot_msp34xx(struct bttv *btv, int pin);
+extern void bttv_tda9880_setnorm(struct bttv *btv, int norm);
 
 /* kernel cmd line parse helper */
 extern int bttv_parse(char *str, int max, int *vals);

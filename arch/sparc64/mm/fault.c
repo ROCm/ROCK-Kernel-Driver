@@ -55,13 +55,21 @@ void syscall_trace_exit(struct pt_regs *regs)
  */
 void set_brkpt(unsigned long addr, unsigned char mask, int flags, int mode)
 {
-	unsigned long lsubits = LSU_CONTROL_IC|LSU_CONTROL_DC|LSU_CONTROL_IM|LSU_CONTROL_DM;
+	unsigned long lsubits;
+
+	__asm__ __volatile__("ldxa [%%g0] %1, %0"
+			     : "=r" (lsubits)
+			     : "i" (ASI_LSU_CONTROL));
+	lsubits &= ~(LSU_CONTROL_PM | LSU_CONTROL_VM |
+		     LSU_CONTROL_PR | LSU_CONTROL_VR |
+		     LSU_CONTROL_PW | LSU_CONTROL_VW);
 
 	__asm__ __volatile__("stxa	%0, [%1] %2\n\t"
 			     "membar	#Sync"
 			     : /* no outputs */
 			     : "r" (addr), "r" (mode ? VIRT_WATCHPOINT : PHYS_WATCHPOINT),
 			       "i" (ASI_DMMU));
+
 	lsubits |= ((unsigned long)mask << (mode ? 25 : 33));
 	if (flags & VM_READ)
 		lsubits |= (mode ? LSU_CONTROL_VR : LSU_CONTROL_PR);

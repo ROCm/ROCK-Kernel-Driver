@@ -91,7 +91,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define DISPLAY_SVWKS_TIMINGS	1
 #undef SVWKS_DEBUG_DRIVE_INFO
@@ -263,7 +263,7 @@ static int svwks_tune_chipset (ide_drive_t *drive, byte speed)
 	byte pio_timing		= 0x00;
 	unsigned short csb5_pio	= 0x00;
 
-	byte pio	= ide_get_best_pio_mode(drive, 255, 5, NULL);
+	byte pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
         switch (drive->dn) {
 		case 0: drive_pci = 0x41; drive_pci2 = 0x45; break;
@@ -364,9 +364,9 @@ static void config_chipset_for_pio (ide_drive_t *drive)
 	unsigned short xfer_pio = drive->id->eide_pio_modes;
 	byte timing, speed, pio;
 
-	pio = ide_get_best_pio_mode(drive, 255, 5, NULL);
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
-	if (xfer_pio> 4)
+	if (xfer_pio > 4)
 		xfer_pio = 0;
 
 	if (drive->id->eide_pio_iordy > 0)
@@ -416,30 +416,11 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	struct pci_dev *dev	= HWIF(drive)->pci_dev;
 	byte udma_66	= eighty_ninty_three(drive);
 	int ultra66	= (dev->device == PCI_DEVICE_ID_SERVERWORKS_CSB5IDE) ? 1 : 0;
-	int ultra100 	= (ultra66 && svwks_revision >= SVWKS_CSB5_REVISION_NEW) ? 1 : 0;
-	byte speed;
+	int ultra100	= (ultra66 && svwks_revision >= SVWKS_CSB5_REVISION_NEW) ? 1 : 0;
 
-	if ((id->dma_ultra & 0x0020) && (udma_66) && (ultra100)) {
-		speed = XFER_UDMA_5;
-	} else if (id->dma_ultra & 0x0010) {
-		speed = ((udma_66) && (ultra66)) ? XFER_UDMA_4 : XFER_UDMA_2;
-	} else if (id->dma_ultra & 0x0008) {
-		speed = ((udma_66) && (ultra66)) ? XFER_UDMA_3 : XFER_UDMA_1;
-	} else if (id->dma_ultra & 0x0004) {
-		speed = XFER_UDMA_2;
-	} else if (id->dma_ultra & 0x0002) {
-		speed = XFER_UDMA_1;
-	} else if (id->dma_ultra & 0x0001) {
-		speed = XFER_UDMA_0;
-	} else if (id->dma_mword & 0x0004) {
-		speed = XFER_MW_DMA_2;
-	} else if (id->dma_mword & 0x0002) {
-		speed = XFER_MW_DMA_1;
-	} else if (id->dma_1word & 0x0004) {
-		speed = XFER_SW_DMA_2;
-	} else {
-		speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
-	}
+	byte speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA
+				| ((udma_66 && ultra66) ? XFER_UDMA_66 : 0)
+				| ((udma_66 && ultra100) ? XFER_UDMA_100 : 0));
 
 	(void) svwks_tune_chipset(drive, speed);
 

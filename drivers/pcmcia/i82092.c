@@ -37,6 +37,7 @@ static struct pci_device_id i82092aa_pci_ids[] = {
 	 },
 	 {} 
 };
+MODULE_DEVICE_TABLE(pci, i82092aa_pci_ids);
 
 static struct pci_driver i82092aa_pci_drv = {
 	name:           "i82092aa",
@@ -91,42 +92,41 @@ static int socket_count;  /* shortcut */
 static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	unsigned char configbyte;
-	int i;
+	int i, ret;
 	
 	enter("i82092aa_pci_probe");
 	
-	if (pci_enable_device(dev))
-		return -EIO;
+	if ((ret = pci_enable_device(dev)))
+		return ret;
 		
 	pci_read_config_byte(dev, 0x40, &configbyte);  /* PCI Configuration Control */
 	switch(configbyte&6) {
 		case 0:
-			printk(KERN_INFO "i82092aa: configured as a 2 socket device.\n");
 			socket_count = 2;
 			break;
 		case 2:
-			printk(KERN_INFO "i82092aa: configured as a 1 socket device.\n");
 			socket_count = 1;
 			break;
 		case 4:
 		case 6:
-			printk(KERN_INFO "i82092aa: configured as a 4 socket device.\n");
 			socket_count = 4;
 			break;
 			
 		default:
 			printk(KERN_ERR "i82092aa: Oops, you did something we didn't think of.\n");
-			return -EIO;
-			break;
+			ret = -EIO;
+			goto err_out_disable;
+	}
+	printk(KERN_INFO "i82092aa: configured as a %d socket device.\n", socket_count);
+
+	if (request_region(pci_resource_start(dev, 0), 2, "i82092aa")) {
+		ret = -EBUSY;
+		goto err_out_disable;
 	}
 	
 	for (i = 0;i<socket_count;i++) {
 		sockets[i].card_state = 1; /* 1 = present but empty */
-		sockets[i].io_base = (dev->resource[0].start & ~1);
-		 if (sockets[i].io_base > 0) 
-		 	request_region(sockets[i].io_base, 2, "i82092aa");
-		 
-		
+		sockets[i].io_base = pci_resource_start(dev, 0);
 		sockets[i].cap.features |= SS_CAP_PCCARD;
 		sockets[i].cap.map_size = 0x1000;
 		sockets[i].cap.irq_mask = 0;
@@ -144,20 +144,28 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 	configbyte = 0xFF; /* bitmask, one bit per event, 1 = PCI interrupt, 0 = ISA interrupt */
 	pci_write_config_byte(dev, 0x50, configbyte); /* PCI Interrupt Routing Register */
 
-
 	/* Register the interrupt handler */
 	dprintk(KERN_DEBUG "Requesting interrupt %i \n",dev->irq);
-	if (request_irq(dev->irq, i82092aa_interrupt, SA_SHIRQ, "i82092aa", i82092aa_interrupt)) {
+	if ((ret = request_irq(dev->irq, i82092aa_interrupt, SA_SHIRQ, "i82092aa", i82092aa_interrupt))) {
 		printk(KERN_ERR "i82092aa: Failed to register IRQ %d, aborting\n", dev->irq);
-		return -EIO;
+		goto err_out_free_res;
 	}
 		 
-	
-	if (register_ss_entry(socket_count, &i82092aa_operations) != 0)
-		printk(KERN_NOTICE "i82092aa: register_ss_entry() failed\n");
+	if ((ret = register_ss_entry(socket_count, &i82092aa_operations) != 0)) {
+		printk(KERN_ERR "i82092aa: register_ss_entry() failed\n");
+		goto err_out_free_irq;
+	}
 
 	leave("i82092aa_pci_probe");
 	return 0;
+
+err_out_free_irq:
+	free_irq(dev->irq, i82092aa_interrupt);
+err_out_free_res:
+	release_region(pci_resource_start(dev, 0), 2);
+err_out_disable:
+	pci_disable_device(dev);
+	return ret;			
 }
 
 static void __exit i82092aa_pci_remove(struct pci_dev *dev)

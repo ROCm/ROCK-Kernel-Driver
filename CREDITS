@@ -1914,13 +1914,13 @@ S: Santa Clara, CA 95052
 S: USA
 
 N: Petko Manolov
-E: petkan@dce.bg
-D: USB ethernet (pegasus) driver
+E: petkan@users.sourceforge.net
+D: USB ethernet pegasus/pegasus-II driver
 D: optimizing i[45]86 string routines
-D: i386 task swithing hacks
-S: 5, Vrah Mancho str.
-S: 1324 Sofia
-S: Bulgaria
+D: i386 task switching hacks
+S: 482 Shadowgraph Dr.
+S: San Jose, CA  95110
+S: USA
 
 N: Martin Mares
 E: mj@ucw.cz

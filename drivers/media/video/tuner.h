@@ -22,6 +22,8 @@
 #ifndef _TUNER_H
 #define _TUNER_H
 
+#include "id.h"
+
 #define TUNER_TEMIC_PAL     0        /* 4002 FH5 (3X 7756, 9483) */
 #define TUNER_PHILIPS_PAL_I 1
 #define TUNER_PHILIPS_NTSC  2

@@ -349,88 +349,78 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
 	{
 		case VTXIOCGETINFO: 
 		{
-			vtx_info_t info;
-			info.version_major = VTX_VER_MAJ;
-			info.version_minor = VTX_VER_MIN;
-			info.numpages = NUM_DAUS;
-			/*info.cct_type = CCT_TYPE;*/
-			if(copy_to_user((void*)arg, &info, sizeof(vtx_info_t)))
-				return -EFAULT;
+			vtx_info_t *info = arg;
+			info->version_major = VTX_VER_MAJ;
+			info->version_minor = VTX_VER_MIN;
+			info->numpages = NUM_DAUS;
+			/*info->cct_type = CCT_TYPE;*/
 			return 0;
 		}
 
 		case VTXIOCCLRPAGE: 
 		{
-			vtx_pagereq_t req;
+			vtx_pagereq_t *req = arg;
       
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (req.pgbuf < 0 || req.pgbuf >= NUM_DAUS)
+			if (req->pgbuf < 0 || req->pgbuf >= NUM_DAUS)
 				return -EINVAL;
-			memset(t->vdau[req.pgbuf].pgbuf, ' ', sizeof(t->vdau[0].pgbuf));
-			t->vdau[req.pgbuf].clrfound = TRUE;
+			memset(t->vdau[req->pgbuf].pgbuf, ' ', sizeof(t->vdau[0].pgbuf));
+			t->vdau[req->pgbuf].clrfound = TRUE;
 			return 0;
 		}
 
 		case VTXIOCCLRFOUND: 
 		{
-			vtx_pagereq_t req;
+			vtx_pagereq_t *req = arg;
       
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (req.pgbuf < 0 || req.pgbuf >= NUM_DAUS)
+			if (req->pgbuf < 0 || req->pgbuf >= NUM_DAUS)
 				return -EINVAL;
-			t->vdau[req.pgbuf].clrfound = TRUE;
+			t->vdau[req->pgbuf].clrfound = TRUE;
 			return 0;
 		}
 
 		case VTXIOCPAGEREQ: 
 		{
-			vtx_pagereq_t req;
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (!(req.pagemask & PGMASK_PAGE))
-				req.page = 0;
-			if (!(req.pagemask & PGMASK_HOUR))
-				req.hour = 0;
-			if (!(req.pagemask & PGMASK_MINUTE))
-				req.minute = 0;
-			if (req.page < 0 || req.page > 0x8ff) /* 7FF ?? */
+			vtx_pagereq_t *req = arg;
+			if (!(req->pagemask & PGMASK_PAGE))
+				req->page = 0;
+			if (!(req->pagemask & PGMASK_HOUR))
+				req->hour = 0;
+			if (!(req->pagemask & PGMASK_MINUTE))
+				req->minute = 0;
+			if (req->page < 0 || req->page > 0x8ff) /* 7FF ?? */
 				return -EINVAL;
-			req.page &= 0x7ff;
-			if (req.hour < 0 || req.hour > 0x3f || req.minute < 0 || req.minute > 0x7f ||
-				req.pagemask < 0 || req.pagemask >= PGMASK_MAX || req.pgbuf < 0 || req.pgbuf >= NUM_DAUS)
+			req->page &= 0x7ff;
+			if (req->hour < 0 || req->hour > 0x3f || req->minute < 0 || req->minute > 0x7f ||
+				req->pagemask < 0 || req->pagemask >= PGMASK_MAX || req->pgbuf < 0 || req->pgbuf >= NUM_DAUS)
 				return -EINVAL;
-			t->vdau[req.pgbuf].sregs[0] = (req.pagemask & PG_HUND ? 0x10 : 0) | (req.page / 0x100);
-			t->vdau[req.pgbuf].sregs[1] = (req.pagemask & PG_TEN ? 0x10 : 0) | ((req.page / 0x10) & 0xf);
-			t->vdau[req.pgbuf].sregs[2] = (req.pagemask & PG_UNIT ? 0x10 : 0) | (req.page & 0xf);
-			t->vdau[req.pgbuf].sregs[3] = (req.pagemask & HR_TEN ? 0x10 : 0) | (req.hour / 0x10);
-			t->vdau[req.pgbuf].sregs[4] = (req.pagemask & HR_UNIT ? 0x10 : 0) | (req.hour & 0xf);
-			t->vdau[req.pgbuf].sregs[5] = (req.pagemask & MIN_TEN ? 0x10 : 0) | (req.minute / 0x10);
-			t->vdau[req.pgbuf].sregs[6] = (req.pagemask & MIN_UNIT ? 0x10 : 0) | (req.minute & 0xf);
-			t->vdau[req.pgbuf].stopped = FALSE;
-			t->vdau[req.pgbuf].clrfound = TRUE;
-			t->is_searching[req.pgbuf] = TRUE;
+			t->vdau[req->pgbuf].sregs[0] = (req->pagemask & PG_HUND ? 0x10 : 0) | (req->page / 0x100);
+			t->vdau[req->pgbuf].sregs[1] = (req->pagemask & PG_TEN ? 0x10 : 0) | ((req->page / 0x10) & 0xf);
+			t->vdau[req->pgbuf].sregs[2] = (req->pagemask & PG_UNIT ? 0x10 : 0) | (req->page & 0xf);
+			t->vdau[req->pgbuf].sregs[3] = (req->pagemask & HR_TEN ? 0x10 : 0) | (req->hour / 0x10);
+			t->vdau[req->pgbuf].sregs[4] = (req->pagemask & HR_UNIT ? 0x10 : 0) | (req->hour & 0xf);
+			t->vdau[req->pgbuf].sregs[5] = (req->pagemask & MIN_TEN ? 0x10 : 0) | (req->minute / 0x10);
+			t->vdau[req->pgbuf].sregs[6] = (req->pagemask & MIN_UNIT ? 0x10 : 0) | (req->minute & 0xf);
+			t->vdau[req->pgbuf].stopped = FALSE;
+			t->vdau[req->pgbuf].clrfound = TRUE;
+			t->is_searching[req->pgbuf] = TRUE;
 			return 0;
 		}
 
 		case VTXIOCGETSTAT: 
 		{
-			vtx_pagereq_t req;
+			vtx_pagereq_t *req = arg;
 			u8 infobits[10];
 			vtx_pageinfo_t info;
 			int a;
 
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (req.pgbuf < 0 || req.pgbuf >= NUM_DAUS)
+			if (req->pgbuf < 0 || req->pgbuf >= NUM_DAUS)
 				return -EINVAL;
-			if (!t->vdau[req.pgbuf].stopped) 
+			if (!t->vdau[req->pgbuf].stopped) 
 			{
 				if (i2c_senddata(t, 2, 0, -1) ||
-					i2c_sendbuf(t, 3, sizeof(t->vdau[0].sregs), t->vdau[req.pgbuf].sregs) ||
+					i2c_sendbuf(t, 3, sizeof(t->vdau[0].sregs), t->vdau[req->pgbuf].sregs) ||
 					i2c_senddata(t, 8, 0, 25, 0, ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', ' ', -1) ||
-					i2c_senddata(t, 2, 0, t->vdau[req.pgbuf].sregs[0] | 8, -1) ||
+					i2c_senddata(t, 2, 0, t->vdau[req->pgbuf].sregs[0] | 8, -1) ||
 					i2c_senddata(t, 8, 0, 25, 0, -1))
 					return -EIO;
 				jdelay(PAGE_WAIT);
@@ -438,43 +428,43 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
 					return -EIO;
 
 				if (!(infobits[8] & 0x10) && !(infobits[7] & 0xf0) &&	/* check FOUND-bit */
-					(memcmp(infobits, t->vdau[req.pgbuf].laststat, sizeof(infobits)) || 
-					time_after_eq(jiffies, t->vdau[req.pgbuf].expire)))
+					(memcmp(infobits, t->vdau[req->pgbuf].laststat, sizeof(infobits)) || 
+					time_after_eq(jiffies, t->vdau[req->pgbuf].expire)))
 				{		/* check if new page arrived */
 					if (i2c_senddata(t, 8, 0, 0, 0, -1) ||
-						i2c_getdata(t, VTX_PAGESIZE, t->vdau[req.pgbuf].pgbuf))
+						i2c_getdata(t, VTX_PAGESIZE, t->vdau[req->pgbuf].pgbuf))
 						return -EIO;
-					t->vdau[req.pgbuf].expire = jiffies + PGBUF_EXPIRE;
-					memset(t->vdau[req.pgbuf].pgbuf + VTX_PAGESIZE, ' ', VTX_VIRTUALSIZE - VTX_PAGESIZE);
+					t->vdau[req->pgbuf].expire = jiffies + PGBUF_EXPIRE;
+					memset(t->vdau[req->pgbuf].pgbuf + VTX_PAGESIZE, ' ', VTX_VIRTUALSIZE - VTX_PAGESIZE);
 					if (t->virtual_mode) 
 					{
 						/* Packet X/24 */
 						if (i2c_senddata(t, 8, 0, 0x20, 0, -1) ||
-							i2c_getdata(t, 40, t->vdau[req.pgbuf].pgbuf + VTX_PAGESIZE + 20 * 40))
+							i2c_getdata(t, 40, t->vdau[req->pgbuf].pgbuf + VTX_PAGESIZE + 20 * 40))
 							return -EIO;
 						/* Packet X/27/0 */
 						if (i2c_senddata(t, 8, 0, 0x21, 0, -1) ||
-							i2c_getdata(t, 40, t->vdau[req.pgbuf].pgbuf + VTX_PAGESIZE + 16 * 40))
+							i2c_getdata(t, 40, t->vdau[req->pgbuf].pgbuf + VTX_PAGESIZE + 16 * 40))
 							return -EIO;
 						/* Packet 8/30/0...8/30/15
 						 * FIXME: AFAIK, the 5249 does hamming-decoding for some bytes in packet 8/30,
 						 *        so we should undo this here.
 						 */
 						if (i2c_senddata(t, 8, 0, 0x22, 0, -1) ||
-							i2c_getdata(t, 40, t->vdau[req.pgbuf].pgbuf + VTX_PAGESIZE + 23 * 40))
+							i2c_getdata(t, 40, t->vdau[req->pgbuf].pgbuf + VTX_PAGESIZE + 23 * 40))
 							return -EIO;
 					}
-					t->vdau[req.pgbuf].clrfound = FALSE;
-					memcpy(t->vdau[req.pgbuf].laststat, infobits, sizeof(infobits));
+					t->vdau[req->pgbuf].clrfound = FALSE;
+					memcpy(t->vdau[req->pgbuf].laststat, infobits, sizeof(infobits));
 				}
 				else
 				{
-					memcpy(infobits, t->vdau[req.pgbuf].laststat, sizeof(infobits));
+					memcpy(infobits, t->vdau[req->pgbuf].laststat, sizeof(infobits));
 				}
 			}
 			else
 			{
-				memcpy(infobits, t->vdau[req.pgbuf].laststat, sizeof(infobits));
+				memcpy(infobits, t->vdau[req->pgbuf].laststat, sizeof(infobits));
 			}
 
 			info.pagenum = ((infobits[8] << 8) & 0x700) | ((infobits[1] << 4) & 0xf0) | (infobits[0] & 0x0f);
@@ -502,59 +492,57 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
 					break;
 				}
 			}
-			if (t->vdau[req.pgbuf].clrfound)
+			if (t->vdau[req->pgbuf].clrfound)
 				info.notfound = 1;
-			if(copy_to_user(req.buffer, &info, sizeof(vtx_pageinfo_t)))
+			if(copy_to_user(req->buffer, &info, sizeof(vtx_pageinfo_t)))
 				return -EFAULT;
 			if (!info.hamming && !info.notfound) 
 			{
-				t->is_searching[req.pgbuf] = FALSE;
+				t->is_searching[req->pgbuf] = FALSE;
 			}
 			return 0;
 		}
 
 		case VTXIOCGETPAGE: 
 		{
-			vtx_pagereq_t req;
+			vtx_pagereq_t *req = arg;
 			int start, end;
 
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (req.pgbuf < 0 || req.pgbuf >= NUM_DAUS || req.start < 0 ||
-				req.start > req.end || req.end >= (virtual_mode ? VTX_VIRTUALSIZE : VTX_PAGESIZE))
+			if (req->pgbuf < 0 || req->pgbuf >= NUM_DAUS || req->start < 0 ||
+				req->start > req->end || req->end >= (virtual_mode ? VTX_VIRTUALSIZE : VTX_PAGESIZE))
 				return -EINVAL;
-			if(copy_to_user(req.buffer, &t->vdau[req.pgbuf].pgbuf[req.start], req.end - req.start + 1))
+			if(copy_to_user(req->buffer, &t->vdau[req->pgbuf].pgbuf[req->start], req->end - req->start + 1))
 				return -EFAULT;
 				
 			 /* 
 			  *	Always read the time directly from SAA5249
 			  */
 			  
-			if (req.start <= 39 && req.end >= 32) 
+			if (req->start <= 39 && req->end >= 32) 
 			{
 				int len;
 				char buf[16];  
-				start = MAX(req.start, 32);
-				end = MIN(req.end, 39);
+				start = MAX(req->start, 32);
+				end = MIN(req->end, 39);
 				len=end-start+1;
 				if (i2c_senddata(t, 8, 0, 0, start, -1) ||
 					i2c_getdata(t, len, buf))
 					return -EIO;
-				if(copy_to_user(req.buffer+start-req.start, buf, len))
+				if(copy_to_user(req->buffer+start-req->start, buf, len))
 					return -EFAULT;
 			}
 			/* Insert the current header if DAU is still searching for a page */
-			if (req.start <= 31 && req.end >= 7 && t->is_searching[req.pgbuf]) 
+			if (req->start <= 31 && req->end >= 7 && t->is_searching[req->pgbuf]) 
 			{
 				char buf[32];
 				int len;
-				start = MAX(req.start, 7);
-				end = MIN(req.end, 31);
+				start = MAX(req->start, 7);
+				end = MIN(req->end, 31);
 				len=end-start+1;
 				if (i2c_senddata(t, 8, 0, 0, start, -1) ||
 					i2c_getdata(t, len, buf))
 					return -EIO;
-				if(copy_to_user(req.buffer+start-req.start, buf, len))
+				if(copy_to_user(req->buffer+start-req->start, buf, len))
 					return -EFAULT;
 			}
 			return 0;
@@ -562,14 +550,12 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
 
 		case VTXIOCSTOPDAU: 
 		{
-			vtx_pagereq_t req;
+			vtx_pagereq_t *req = arg;
 
-			if(copy_from_user(&req, (void*)arg, sizeof(vtx_pagereq_t)))
-				return -EFAULT;
-			if (req.pgbuf < 0 || req.pgbuf >= NUM_DAUS)
+			if (req->pgbuf < 0 || req->pgbuf >= NUM_DAUS)
 				return -EINVAL;
-			t->vdau[req.pgbuf].stopped = TRUE;
-			t->is_searching[req.pgbuf] = FALSE;
+			t->vdau[req->pgbuf].stopped = TRUE;
+			t->is_searching[req->pgbuf] = FALSE;
 			return 0;
 		}
 
@@ -604,8 +590,10 @@ static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *ar
  *	Handle the locking
  */
  
-static int saa5249_ioctl(struct video_device *vd, unsigned int cmd, void *arg) 
+static int saa5249_ioctl(struct inode *inode, struct file *file,
+			 unsigned int cmd, void *arg) 
 {
+	struct video_device *vd = video_devdata(file);
 	struct saa5249_device *t=vd->priv;
 	int err;
 	
@@ -616,13 +604,20 @@ static int saa5249_ioctl(struct video_device *vd, unsigned int cmd, void *arg)
 	return err;
 }
 
-static int saa5249_open(struct video_device *vd, int nb) 
+static int saa5249_open(struct inode *inode, struct file *file) 
 {
+	struct video_device *vd = video_devdata(file);
 	struct saa5249_device *t=vd->priv;
-	int pgbuf;
+	int err,pgbuf;
 
-	if (t->client==NULL) 
-		return -ENODEV;
+	err = video_exclusive_open(inode,file);
+	if (err < 0)
+		return err;
+	
+	if (t->client==NULL) {
+		err = -ENODEV;
+		goto fail;
+	}
 
 	if (i2c_senddata(t, 0, 0, -1) ||		/* Select R11 */
 						/* Turn off parity checks (we do this ourselves) */
@@ -631,7 +626,8 @@ static int saa5249_open(struct video_device *vd, int nb)
 		i2c_senddata(t, 4, NUM_DAUS, disp_modes[t->disp_mode][1], disp_modes[t->disp_mode][2], 7, -1)) /* Set display to page 4 */
 	
 	{
-		return -EIO;
+		err = -EIO;
+		goto fail;
 	}
 
 	for (pgbuf = 0; pgbuf < NUM_DAUS; pgbuf++) 
@@ -646,21 +642,22 @@ static int saa5249_open(struct video_device *vd, int nb)
 	}
 	t->virtual_mode=FALSE;
 	return 0;
+
+ fail:
+	video_exclusive_release(inode,file);
+	return err;
 }
 
 
 
-static void saa5249_release(struct video_device *vd) 
+static int saa5249_release(struct inode *inode, struct file *file) 
 {
+	struct video_device *vd = video_devdata(file);
 	struct saa5249_device *t=vd->priv;
 	i2c_senddata(t, 1, 0x20, -1);		/* Turn off CCT */
 	i2c_senddata(t, 5, 3, 3, -1);		/* Turn off TV-display */
-	return;
-}
-
-static long saa5249_write(struct video_device *v, const char *buf, unsigned long l, int nb)
-{
-	return -EINVAL;
+	video_exclusive_release(inode,file);
+	return 0;
 }
 
 static int __init init_saa_5249 (void)
@@ -678,16 +675,22 @@ static void __exit cleanup_saa_5249 (void)
 module_init(init_saa_5249);
 module_exit(cleanup_saa_5249);
 
+static struct file_operations saa_fops = {
+	owner:		THIS_MODULE,
+	open:		saa5249_open,
+	release:       	saa5249_release,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
+
 static struct video_device saa_template =
 {
 	owner:		THIS_MODULE,
 	name:		IF_NAME,
 	type:		VID_TYPE_TELETEXT,	/*| VID_TYPE_TUNER ?? */
 	hardware:	VID_HARDWARE_SAA5249,
-	open:		saa5249_open,
-	close:		saa5249_release,
-	write:		saa5249_write,
-	ioctl:		saa5249_ioctl,
+	fops:           &saa_fops,
+	kernel_ioctl:  	saa5249_ioctl,
 };
 
 MODULE_LICENSE("GPL");

@@ -52,7 +52,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /*
  * Default speeds.  These can be changed with "auto-tune" and/or hdparm.
@@ -113,7 +113,11 @@ static void tune_umc (ide_drive_t *drive, byte pio)
 	unsigned long flags;
 	ide_hwgroup_t *hwgroup = ide_hwifs[HWIF(drive)->index^1].hwgroup;
 
-	pio = ide_get_best_pio_mode(drive, pio, 4, NULL);
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	else
+		pio = min_t(byte, pio, 4);
+
 	printk("%s: setting umc8672 to PIO mode%d (speed %d)\n", drive->name, pio, pio_to_umc[pio]);
 	save_flags(flags);	/* all CPUs */
 	cli();			/* all CPUs */

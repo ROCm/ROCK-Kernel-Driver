@@ -33,7 +33,6 @@
 static int io = CONFIG_RADIO_TRUST_PORT; 
 static int radio_nr = -1;
 static int ioval = 0xf;
-static int users = 0;
 static __u16 curvol;
 static __u16 curbass;
 static __u16 curtreble;
@@ -155,114 +154,89 @@ static void tr_setfreq(unsigned long f)
 	write_i2c(5, TSA6060T_ADDR, (f << 1) | 1, f >> 7, 0x60 | ((f >> 15) & 1), 0);
 }
 
-static int tr_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int tr_ioctl(struct inode *inode, struct file *file,
+		    unsigned int cmd, void *arg)
 {
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
+			struct video_capability *v = arg;
 
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-
-			strcpy(v.name, "Trust FM Radio");
-
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "Trust FM Radio");
 
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
+			struct video_tuner *v = arg;
 
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-
-			if(v.tuner)	/* Only 1 tuner */ 
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
 
-			v.rangelow = 87500 * 16;
-			v.rangehigh = 108000 * 16;
-			v.flags = VIDEO_TUNER_LOW;
-			v.mode = VIDEO_MODE_AUTO;
+			v->rangelow = 87500 * 16;
+			v->rangehigh = 108000 * 16;
+			v->flags = VIDEO_TUNER_LOW;
+			v->mode = VIDEO_MODE_AUTO;
 
-			v.signal = tr_getsigstr();
+			v->signal = tr_getsigstr();
 			if(tr_getstereo())
-				v.flags |= VIDEO_TUNER_STEREO_ON;
+				v->flags |= VIDEO_TUNER_STEREO_ON;
 
-			strcpy(v.name, "FM");
-
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			strcpy(v->name, "FM");
 
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner != 0)
+			struct video_tuner *v = arg;
+			if(v->tuner != 0)
 				return -EINVAL;
-
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &curfreq, sizeof(curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = curfreq;
 			return 0;
-
+		}
 		case VIDIOCSFREQ:
 		{
-			unsigned long f;
-
-			if(copy_from_user(&f, arg, sizeof(curfreq)))
-				return -EFAULT;
-			tr_setfreq(f);
+			unsigned long *freq = arg;
+			tr_setfreq(*freq);
 			return 0;
 		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
+			struct video_audio *v = arg;
 
-			memset(&v,0, sizeof(v));
-			v.flags = VIDEO_AUDIO_MUTABLE | VIDEO_AUDIO_VOLUME |
+			memset(v,0, sizeof(*v));
+			v->flags = VIDEO_AUDIO_MUTABLE | VIDEO_AUDIO_VOLUME |
 			          VIDEO_AUDIO_BASS | VIDEO_AUDIO_TREBLE;
-			v.mode = curstereo? VIDEO_SOUND_STEREO : VIDEO_SOUND_MONO;
-			v.volume = curvol * 2048;
-			v.step = 2048;
-			v.bass = curbass * 4370;
-			v.treble = curtreble * 4370;
+			v->mode = curstereo? VIDEO_SOUND_STEREO : VIDEO_SOUND_MONO;
+			v->volume = curvol * 2048;
+			v->step = 2048;
+			v->bass = curbass * 4370;
+			v->treble = curtreble * 4370;
 			
-			strcpy(v.name, "Trust FM Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			strcpy(v->name, "Trust FM Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
+			struct video_audio *v = arg;
 
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			if(v->audio) 
 				return -EINVAL;
-
-			tr_setvol(v.volume);					
-			tr_setbass(v.bass);
-			tr_settreble(v.treble);
-			tr_setstereo(v.mode & VIDEO_SOUND_STEREO);
-			tr_setmute(v.flags & VIDEO_AUDIO_MUTE);
+			tr_setvol(v->volume);					
+			tr_setbass(v->bass);
+			tr_settreble(v->treble);
+			tr_setstereo(v->mode & VIDEO_SOUND_STEREO);
+			tr_setmute(v->flags & VIDEO_AUDIO_MUTE);
 			return 0;
 		}
 		default:
@@ -270,18 +244,13 @@ static int tr_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int tr_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void tr_close(struct video_device *dev)
-{
-	users--;
-}
+static struct file_operations trust_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device trust_radio=
 {
@@ -289,9 +258,8 @@ static struct video_device trust_radio=
 	name:		"Trust FM Radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_TRUST,
-	open:		tr_open,
-	close:		tr_close,
-	ioctl:		tr_ioctl,
+	fops:           &trust_fops,
+	kernel_ioctl:	tr_ioctl,
 };
 
 static int __init trust_init(void)

@@ -1671,11 +1671,16 @@ ide_do_rw_cdrom (ide_drive_t *drive, struct request *rq, unsigned long block)
 	} else if (rq->flags & (REQ_PC | REQ_SENSE)) {
 		return cdrom_do_packet_command(drive);
 	} else if (rq->flags & REQ_SPECIAL) {
+
 		/*
+		 * FIXME: Kill REQ_SEPCIAL and replace it will command commands
+		 * queued at the request queue instead as suggested (abd
+		 * rightly so) by Linus.
+		 *
 		 * right now this can only be a reset...
 		 */
-		cdrom_end_request(drive, 1);
-		return ide_do_reset(drive);
+		cdrom_end_request(drive, 1); return ide_stopped;
+
 	} else if (rq->flags & REQ_BLOCK_PC) {
 		return cdrom_do_block_pc(drive, rq);
 	}

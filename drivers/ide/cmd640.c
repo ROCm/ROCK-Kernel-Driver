@@ -112,7 +112,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /*
  * This flag is set in ide.c by the parameter:  ide0=cmd640_vlb
@@ -589,15 +589,11 @@ static void program_drive_counts (unsigned int index)
 /*
  * Set a specific pio_mode for a drive
  */
-static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cycle_time)
+static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cycle_time, unsigned int active_time, unsigned int setup_time)
 {
-	int setup_time, active_time, recovery_time, clock_time;
+	int recovery_time, clock_time;
 	byte setup_count, active_count, recovery_count, recovery_count2, cycle_count;
 
-	if (pio_mode > 5)
-		pio_mode = 5;
-	setup_time  = ide_pio_timings[pio_mode].setup_time;
-	active_time = ide_pio_timings[pio_mode].active_time;
 	recovery_time = cycle_time - (setup_time + active_time);
 	clock_time = 1000 / system_bus_speed;
 	cycle_count = (cycle_time + clock_time - 1) / clock_time;
@@ -635,7 +631,7 @@ static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cyc
 	 *
 	 * But we do not, because:
 	 *	1) this is the wrong place to do it (proper is do_special() in ide.c)
-	 * 	2) in practice this is rarely, if ever, necessary
+	 *	2) in practice this is rarely, if ever, necessary
 	 */
 	program_drive_counts (index);
 }
@@ -646,7 +642,7 @@ static void cmd640_set_mode (unsigned int index, byte pio_mode, unsigned int cyc
 static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
 {
 	byte b;
-	ide_pio_data_t  d;
+	struct ata_timing *t;
 	unsigned int index = 0;
 
 	while (drive != cmd_drives[index]) {
@@ -674,14 +670,16 @@ static void cmd640_tune_drive (ide_drive_t *drive, byte mode_wanted)
 			return;
 	}
 
-	(void) ide_get_best_pio_mode (drive, mode_wanted, 5, &d);
-	cmd640_set_mode (index, d.pio_mode, d.cycle_time);
+	if (mode_wanted == 255)
+		t = ata_timing_data(ata_timing_mode(drive, XFER_PIO | XFER_EPIO));
+	else
+		t = ata_timing_data(XFER_PIO_0 + min_t(byte, mode_wanted, 4));
 
-	printk ("%s: selected cmd640 PIO mode%d (%dns)%s",
-		drive->name,
-		d.pio_mode,
-		d.cycle_time,
-		d.overridden ? " (overriding vendor mode)" : "");
+	cmd640_set_mode(index, t->mode - XFER_PIO_0, t->cycle, t->active, t->setup);
+
+	printk ("%s: selected cmd640 PIO mode%d (%dns)",
+		drive->name, t->mode, t->cycle);
+
 	display_clocks(index);
 	return;
 }

@@ -46,7 +46,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define PDC202XX_DEBUG_DRIVE_INFO		0
 #define PDC202XX_DECODE_REGISTER_INFO		0
@@ -681,9 +681,11 @@ static int config_chipset_for_pio (ide_drive_t *drive, byte pio)
 {
 	byte speed = 0x00;
 
-	pio = (pio == 5) ? 4 : pio;
-	speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, pio, NULL);
-        
+	if (pio == 255)
+		speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		speed = XFER_PIO_0 + min_t(byte, pio, 4);
+
 	return ((int) pdc202xx_tune_chipset(drive, speed));
 }
 

@@ -27,8 +27,8 @@
 static loff_t presto_e2_freespace(struct presto_cache *cache,
                                          struct super_block *sb)
 {
-        unsigned long freebl = le32_to_cpu(sb->u.ext2_sb.s_es->s_free_blocks_count);
-        unsigned long avail =   freebl - le32_to_cpu(sb->u.ext2_sb.s_es->s_r_blocks_count);
+        unsigned long freebl = le32_to_cpu(EXT2_SB(sb)->s_es->s_free_blocks_count);
+        unsigned long avail =   freebl - le32_to_cpu(EXT2_SB(sb)->s_es->s_r_blocks_count);
 	return (avail <<  EXT2_BLOCK_SIZE_BITS(sb));
 }
 
@@ -41,7 +41,7 @@ static void *presto_e2_trans_start(struct presto_file_set *fset, struct inode *i
              strcmp(fset->fset_cache->cache_type, "ext2"))
                 return NULL;
 
-        avail_kmlblocks = inode->i_sb->u.ext2_sb.s_es->s_free_blocks_count;
+        avail_kmlblocks = EXT2_SB(inode->i_sb)->s_es->s_free_blocks_count;
         
         if ( avail_kmlblocks < 3 ) {
                 return ERR_PTR(-ENOSPC);

@@ -1084,62 +1084,52 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	
 	case VIDIOCPWCSCQUAL:
 	{	
-		int qual, ret;
+		int *qual = arg;
+		int ret;
 
-		if (copy_from_user(&qual, arg, sizeof(int)))
-			return -EFAULT;
-			
-		if (qual < 0 || qual > 3)
+		if (*qual < 0 || *qual > 3)
 			return -EINVAL;
-		ret = pwc_try_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, qual, pdev->vsnapshot);
+		ret = pwc_try_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, *qual, pdev->vsnapshot);
 		if (ret < 0)
 			return ret;
-		pdev->vcompression = qual;
+		pdev->vcompression = *qual;
 		break;
 	}
 	
 	case VIDIOCPWCGCQUAL:
 	{
-		if (copy_to_user(arg, &pdev->vcompression, sizeof(int)))
-			return -EFAULT;
+		int *qual = arg;
+
+		*qual = pdev->vcompression;
 		break;
 	}
 
 	case VIDIOCPWCSAGC:
 	{
-		int agc;
+		int *agc = arg;
 		
-		if (copy_from_user(&agc, arg, sizeof(agc)))
-			return -EFAULT;	
-		else {
-			if (pwc_set_agc(pdev, agc < 0 ? 1 : 0, agc))
-				return -EINVAL;
-		}
+		if (pwc_set_agc(pdev, *agc < 0 ? 1 : 0, *agc))
+			return -EINVAL;
 		break;
 	}
 	
 	case VIDIOCPWCGAGC:
 	{
-		int agc;
+		int *agc = arg;
 		
-		if (pwc_get_agc(pdev, &agc))
+		if (pwc_get_agc(pdev, agc))
 			return -EINVAL;
-		if (copy_to_user(arg, &agc, sizeof(agc)))
-			return -EFAULT;
 		break;
 	}
 	
 	case VIDIOCPWCSSHUTTER:
 	{
-		int shutter_speed, ret;
+		int *shutter_speed = arg;
+		int ret;
 
-		if (copy_from_user(&shutter_speed, arg, sizeof(shutter_speed)))
-			return -EFAULT;
-		else {
-			ret = pwc_set_shutter_speed(pdev, shutter_speed < 0 ? 1 : 0, shutter_speed);
-			if (ret < 0)
-				return ret;
-		}
+		ret = pwc_set_shutter_speed(pdev, *shutter_speed < 0 ? 1 : 0, *shutter_speed);
+		if (ret < 0)
+			return ret;
 		break;
 	}
 	
@@ -1149,48 +1139,40 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 
         case VIDIOCPWCSAWB:
 	{
-		struct pwc_whitebalance wb;
+		struct pwc_whitebalance *wb = arg;
 		int ret;
 		
-		if (copy_from_user(&wb, arg, sizeof(wb)))
-			return -EFAULT;
-	
-		ret = pwc_set_awb(pdev, wb.mode);
-		if (ret >= 0 && wb.mode == PWC_WB_MANUAL) {
-			pwc_set_red_gain(pdev, wb.manual_red);
-			pwc_set_blue_gain(pdev, wb.manual_blue);
+		ret = pwc_set_awb(pdev, wb->mode);
+		if (ret >= 0 && wb->mode == PWC_WB_MANUAL) {
+			pwc_set_red_gain(pdev, wb->manual_red);
+			pwc_set_blue_gain(pdev, wb->manual_blue);
 		}
 		break;
 	}
 
 	case VIDIOCPWCGAWB:
 	{
-		struct pwc_whitebalance wb;
+		struct pwc_whitebalance *wb = arg;
 		
-		memset(&wb, 0, sizeof(wb));
-		wb.mode = pwc_get_awb(pdev);
-		if (wb.mode < 0)
+		memset(wb, 0, sizeof(*wb));
+		wb->mode = pwc_get_awb(pdev);
+		if (wb->mode < 0)
 			return -EINVAL;
-		wb.manual_red = pwc_get_red_gain(pdev);
-		wb.manual_blue = pwc_get_blue_gain(pdev);
-		if (wb.mode == PWC_WB_AUTO) {
-			wb.read_red = pwc_read_red_gain(pdev);
-			wb.read_blue = pwc_read_blue_gain(pdev);
+		wb->manual_red = pwc_get_red_gain(pdev);
+		wb->manual_blue = pwc_get_blue_gain(pdev);
+		if (wb->mode == PWC_WB_AUTO) {
+			wb->read_red = pwc_read_red_gain(pdev);
+			wb->read_blue = pwc_read_blue_gain(pdev);
 		}
-		if (copy_to_user(arg, &wb, sizeof(wb)))
-			return -EFAULT;
 		break;
 	}
 
         case VIDIOCPWCSLED:
 	{
 		int ret;
-		struct pwc_leds leds;
+		struct pwc_leds *leds = arg;
 
-		if (copy_from_user(&leds, arg, sizeof(leds)))
-			return -EFAULT;
-
-		ret = pwc_set_leds(pdev, leds.led_on, leds.led_off);
+		ret = pwc_set_leds(pdev, leds->led_on, leds->led_off);
 		if (ret<0)
 		    return ret;
 	    break;
@@ -1201,13 +1183,11 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	case VIDIOCPWCGLED:
 	{
 		int led;
-		struct pwc_leds leds;
+		struct pwc_leds *leds = arg;
 		
-		led = pwc_get_leds(pdev, &leds.led_on, &leds.led_off); 
+		led = pwc_get_leds(pdev, &leds->led_on, &leds->led_off); 
 		if (led < 0)
 			return -EINVAL;
-		if (copy_to_user(arg, &leds, sizeof(leds)))
-			return -EFAULT;
 		break;
 	}
 

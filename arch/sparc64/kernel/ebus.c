@@ -208,7 +208,8 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 	dev->num_addrs = len / sizeof(struct linux_prom_registers);
 
 	for (i = 0; i < dev->num_addrs; i++) {
-		if (dev->bus->is_rio == 0)
+		/* XXX Learn how to interpret ebus ranges... -DaveM */
+		if (regs[i].which_io >= 0x10)
 			n = (regs[i].which_io - 0x10) >> 2;
 		else
 			n = regs[i].which_io;

@@ -351,90 +351,6 @@ static ide_startstop_t icside_dmaintr(ide_drive_t *drive)
 	return ide_error(drive, "dma_intr", stat);
 }
 
-/*
- * The following is a sick duplication from ide-dma.c ;(
- *
- * This should be defined in one place only.
- */
-struct drive_list_entry {
-	char * id_model;
-	char * id_firmware;
-};
-
-static struct drive_list_entry drive_whitelist [] = {
-	{ "Micropolis 2112A",			"ALL"		},
-	{ "CONNER CTMA 4000",			"ALL"		},
-	{ "CONNER CTT8000-A",			"ALL"		},
-	{ "ST34342A",				"ALL"		},
-	{ NULL,					0		}
-};
-
-static struct drive_list_entry drive_blacklist [] = {
-	{ "WDC AC11000H",			"ALL"		},
-	{ "WDC AC22100H",			"ALL"		},
-	{ "WDC AC32500H",			"ALL"		},
-	{ "WDC AC33100H",			"ALL"		},
-	{ "WDC AC31600H",			"ALL"		},
-	{ "WDC AC32100H",			"24.09P07"	},
-	{ "WDC AC23200L",			"21.10N21"	},
-	{ "Compaq CRD-8241B",			"ALL"		},
-	{ "CRD-8400B",				"ALL"		},
-	{ "CRD-8480B",				"ALL"		},
-	{ "CRD-8480C",				"ALL"		},
-	{ "CRD-8482B",				"ALL"		},
- 	{ "CRD-84",				"ALL"		},
-	{ "SanDisk SDP3B",			"ALL"		},
-	{ "SanDisk SDP3B-64",			"ALL"		},
-	{ "SANYO CD-ROM CRD",			"ALL"		},
-	{ "HITACHI CDR-8",			"ALL"		},
-	{ "HITACHI CDR-8335",			"ALL"		},
-	{ "HITACHI CDR-8435",			"ALL"		},
-	{ "Toshiba CD-ROM XM-6202B",		"ALL"		},
-	{ "CD-532E-A",				"ALL"		},
-	{ "E-IDE CD-ROM CR-840",		"ALL"		},
-	{ "CD-ROM Drive/F5A",			"ALL"		},
-	{ "RICOH CD-R/RW MP7083A",		"ALL"		},
-	{ "WPI CDD-820",			"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148C",		"ALL"		},
-	{ "SAMSUNG CD-ROM SC-148F",		"ALL"		},
-	{ "SAMSUNG CD-ROM SC",			"ALL"		},
-	{ "SanDisk SDP3B-64",			"ALL"		},
-	{ "SAMSUNG CD-ROM SN-124",		"ALL"		},
-	{ "PLEXTOR CD-R PX-W8432T",		"ALL"		},
-	{ "ATAPI CD-ROM DRIVE 40X MAXIMUM",	"ALL"		},
-	{ "_NEC DV5800A",			"ALL"		},
-	{ NULL,					0		}
-};
-
-static int in_drive_list(struct hd_driveid *id, struct drive_list_entry * drive_table)
-{
-	for ( ; drive_table->id_model ; drive_table++)
-		if ((!strcmp(drive_table->id_model, id->model)) &&
-		    ((!strstr(drive_table->id_firmware, id->fw_rev)) ||
-		     (!strcmp(drive_table->id_firmware, "ALL"))))
-			return 1;
-	return 0;
-}
-
-/*
- *  For both Blacklisted and Whitelisted drives.
- *  This is setup to be called as an extern for future support
- *  to other special driver code.
- */
-static int icside_check_drive_lists(ide_drive_t *drive, int good_bad)
-{
-	struct hd_driveid *id = drive->id;
-
-	if (good_bad) {
-		return in_drive_list(id, drive_whitelist);
-	} else {
-		int blacklist = in_drive_list(id, drive_blacklist);
-		if (blacklist)
-			printk("%s: Disabling DMA for %s\n", drive->name, id->model);
-		return(blacklist);
-	}
-	return 0;
-}
 
 static int
 icside_dma_check(ide_drive_t *drive)
@@ -447,14 +363,6 @@ icside_dma_check(ide_drive_t *drive)
 
 	if (!id || !(id->capability & 1) || !autodma)
 		goto out;
-
-	/*
-	 * Consult the list of known "bad" drives
-	 */
-	if (icside_check_drive_lists(drive, 0)) {
-		func = ide_dma_off;
-		goto out;
-	}
 
 	/*
 	 * Enable DMA on any drive that has multiword DMA
@@ -471,16 +379,6 @@ icside_dma_check(ide_drive_t *drive)
 			func = ide_dma_on;
 		}
 		goto out;
-	}
-
-	/*
-	 * Consult the list of known "good" drives
-	 */
-	if (icside_check_drive_lists(drive, 1)) {
-		if (id->eide_dma_time > 150)
-			goto out;
-		xfer_mode = XFER_MW_DMA_1;
-		func = ide_dma_on;
 	}
 
 out:
@@ -563,11 +461,6 @@ icside_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 	case ide_dma_test_irq:
 		return inb((unsigned long)hwif->hw.priv) & 1;
 
-	case ide_dma_bad_drive:
-	case ide_dma_good_drive:
-		return icside_check_drive_lists(drive, (func ==
-						ide_dma_good_drive));
-
 	case ide_dma_verbose:
 		return icside_dma_verbose(drive);
 
@@ -605,13 +498,12 @@ failed:
 	return 0;
 }
 
-int ide_release_dma(ide_hwif_t *hwif)
+void ide_release_dma(ide_hwif_t *hwif)
 {
 	if (hwif->sg_table) {
 		kfree(hwif->sg_table);
 		hwif->sg_table = NULL;
 	}
-	return 1;
 }
 #endif
 

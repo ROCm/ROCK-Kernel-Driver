@@ -50,7 +50,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 // #define DEBUG
 /* if BROKEN_LEVEL is defined it limits the DMA mode
@@ -473,7 +473,9 @@ static void config_art_rwp_pio (ide_drive_t *drive, byte pio)
 #endif
 
 	config_drive_art_rwp(drive);
-	pio = ide_get_best_pio_mode(drive, 255, pio, NULL);
+
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 	if (xfer_pio> 4)
 		xfer_pio = 0;

@@ -48,7 +48,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /* port addresses for auto-detection */
 #define ALI_NUM_PORTS 4
@@ -66,8 +66,6 @@ static RegInitializer initData[] __initdata = {
 	{0x31, 0x00}, {0x32, 0x00}, {0x33, 0x00}, {0x34, 0xff},
 	{0x35, 0x03}, {0x00, 0x00}
 };
-
-#define ALI_MAX_PIO 4
 
 /* timing parameter registers for each drive */
 static struct { byte reg1, reg2, reg3, reg4; } regTab[4] = {
@@ -114,21 +112,26 @@ static void ali14xx_tune_drive (ide_drive_t *drive, byte pio)
 	int time1, time2;
 	byte param1, param2, param3, param4;
 	unsigned long flags;
-	ide_pio_data_t d;
+	struct ata_timing *t;
 
-	pio = ide_get_best_pio_mode(drive, pio, ALI_MAX_PIO, &d);
+	if (pio == 255)
+		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		pio = XFER_PIO_0 + min_t(byte, pio, 4);
+
+	t = ata_timing_data(pio);
 
 	/* calculate timing, according to PIO mode */
-	time1 = d.cycle_time;
-	time2 = ide_pio_timings[pio].active_time;
+	time1 = t->cycle;
+	time2 = t->active;
 	param3 = param1 = (time2 * system_bus_speed + 999) / 1000;
 	param4 = param2 = (time1 * system_bus_speed + 999) / 1000 - param1;
-	if (pio < 3) {
+	if (pio < XFER_PIO_3) {
 		param3 += 8;
 		param4 += 8;
 	}
 	printk("%s: PIO mode%d, t1=%dns, t2=%dns, cycles = %d+%d, %d+%d\n",
-		drive->name, pio, time1, time2, param1, param2, param3, param4);
+		drive->name, pio - XFER_PIO_0, time1, time2, param1, param2, param3, param4);
 
 	/* stuff timing parameters into controller registers */
 	driveNum = (HWIF(drive)->index << 1) + drive->select.b.unit;

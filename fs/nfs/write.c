@@ -764,6 +764,7 @@ int
 nfs_flush_incompatible(struct file *file, struct page *page)
 {
 	struct inode	*inode = page->mapping->host;
+	struct rpc_cred	*cred = nfs_file_cred(file);
 	struct nfs_page	*req;
 	int		status = 0;
 	/*
@@ -776,7 +777,7 @@ nfs_flush_incompatible(struct file *file, struct page *page)
 	 */
 	req = nfs_find_request(inode,page);
 	if (req) {
-		if (req->wb_file != file || req->wb_page != page)
+		if (req->wb_file != file || req->wb_cred != cred || req->wb_page != page)
 			status = nfs_wb_page(inode, page);
 		nfs_release_request(req);
 	}
@@ -1011,6 +1012,9 @@ nfs_writeback_done(struct rpc_task *task)
 	dprintk("NFS: %4d nfs_writeback_done (status %d)\n",
 		task->tk_pid, task->tk_status);
 
+	if (nfs_async_handle_jukebox(task))
+		return;
+
 	/* We can't handle that yet but we check for it nevertheless */
 	if (resp->count < argp->count && task->tk_status >= 0) {
 		static unsigned long    complain;
@@ -1203,6 +1207,9 @@ nfs_commit_done(struct rpc_task *task)
 
         dprintk("NFS: %4d nfs_commit_done (status %d)\n",
                                 task->tk_pid, task->tk_status);
+
+	if (nfs_async_handle_jukebox(task))
+		return;
 
 	nfs_write_attributes(inode, resp->fattr);
 	while (!list_empty(&data->pages)) {

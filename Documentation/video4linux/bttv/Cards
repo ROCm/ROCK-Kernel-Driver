@@ -15,6 +15,10 @@ supported (unless specifications by the card manufacturer are given).
 All other cards only differ by additional components as tuners, sound decoders,
 EEPROMs, teletext decoders ...
 
+Unsupported Cards: 
+------------------
+Cards with Zoran (ZR) or Philips (SAA) or ISA are not supported by this driver. 
+
 
 MATRIX Vision
 -------------
@@ -137,19 +141,36 @@ Lifeview Flyvideo Series:
       1851:1850 = Flyvideo 98
       1851:1851 = Flyvideo 98 EZ (capture only)
   2) There is a print on the PCB:
-      LR25       = Flyvideo (Zoran)
-      LR37 Rev.C = Capture only (ZR36120 + SAA7110)
+      LR25       = Flyvideo (Zoran ZR36120, SAA7110A)
+      LR26 Rev.N = Flyvideo II (Bt848)
+           Rev.O = Flyvideo II (Bt878)
+      LR37 Rev.C = Flyvideo EZ (Capture only, ZR36120 + SAA7110)
+      LR38 Rev.A1= Flyvideo II EZ (Bt848 capture only)
       LR50 Rev.Q = Flyvideo 98 (w/eeprom and PCI subsystem ID)
-      LR50 Rev.W = Flyvideo 98 (no eeprom)
+           Rev.W = Flyvideo 98 (no eeprom)
       LR51 Rev.E = Flyvideo 98 EZ (capture only)
       LR90       = Flyvideo 2000 series
-      LR90 Rev.F = Lifetec/Medion LT 9815
+      LR91       = Stereo daughter card for LR90
       LR97       = Flyvideo DVBS
+      LR138 Rev.C= Flyvideo 2000 (SAA7130)
+	        or Flyvideo 3000 (SAA7134) w/Stereo TV
+		   These exist in variations w/FM and w/Remote sometimes denoted
+		   by suffixes "FM" and "R".
+
+      Lifeview.com.tw states (Feb. 2002):
+      "The FlyVideo2000 and FlyVideo2000s product name have renamed to FlyVideo98."
+      Their Bt8x8 cards are listed as discontinued.
+      Flyvideo 2000S was probably sold as Flyvideo 3000 in some contries(Europe?).
+      The new Flyvideo 2000/3000 are SAA7130/SAA7134 based. 
+      Flyvideo 2100/3100 are half-sized cards (for system integrators etc.)
 
   "Flyvideo II" had been the name for the 848 cards, nowadays (in Germany)
   this name is re-used for LR50 Rev.W.
-  The Lifeview website has even more names: Flyvideo III,2100,3000,3100.
+  The Lifeview website mentioned Flyvideo III at some time, but such a card
+  has never been seen. 
   These cards are sold by many OEMs too.
+
+  FlyVideo A2 = LR90 Rev.F (w/Remote, w/o FM, stereo TV by tda9821)
 
 
 Typhoon TV card series:
@@ -176,6 +197,7 @@ Typhoon TV card series:
 
 Guillemot
 ---------
+  Maxi-TV PCI (ZR36120)
   Maxi TV Video 2 = LR50 Rev.Q (FI1216MF, PAL BG+SECAM)
   Maxi TV Video 3 = CPH064 (PAL BG + SECAM)
 
@@ -208,3 +230,163 @@ Phoebemicro
 Genius/Kye
 ----------
    Video Wonder/Genius Internet Video Kit = LR37 Rev.C
+   Video Wonder Pro II (848 or 878) = LR26
+
+Tekram
+------
+   VideoCap C205 (Bt848)
+   VideoCap C210 (Zoran ZR36120 +Philips)
+   CaptureTV M200 (ISA)
+   CaptureTV M205 (Bt848)
+
+Lucky Star
+----------
+   Image World Conference TV = LR50 Rev. Q
+
+Leadtek
+-------
+   WinView 601 (Bt848)
+   WinView 610 (Zoran)
+   WinFast2000
+
+KNC One
+-------
+   TV-Station
+   TV-Station SE (+Software Bundle)
+   TV-Station pro (+TV stereo)
+   TV-Station FM (+Radio)
+   TV-Station RDS (+RDS)
+
+PV951 cards:
+------------
+  These are sold as:
+   Boeder TV-FM Video Capture Card
+   Titanmedia Supervision TV-2400
+   Provideo PV951 TF
+   3DeMon PV951
+   MediaForte TV-Vision PV951
+   Yoko PV951
+
+Highscreen
+----------
+   TV Karte = LR50 Rev.S
+   TV-Boostar = Terratec Terra TV+ Version 1.0 (Bt848, TDA9821) "ceb105.pcb"
+
+Zoltrix
+-------
+   Face To Face TV MAX (Bt848) (PCB "VP-8482 Rev1.3")
+   Genie TV (Bt878) (PCB "VP-8790 Rev 2.1")
+
+AVerMedia
+---------
+   AVer FunTV Lite (ISA, AV3001 chipset)  "M101.C"
+   AVerTV
+   AVerTV Stereo
+   AVerTV Studio (w/FM)
+   AVerMedia TV98 with Remote 
+   AVerMedia TV/FM98 Stereo
+   AVerMedia TVCAM98
+   TVCapture (Bt848)
+   TVPhone (Bt848)
+   TVCapture98 (="AVerMedia TV98" in USA) (Bt878)
+   TVPhone98 (Bt878, w/FM)
+
+   PCB      PCI-ID      Model-Name      Eeprom  Tuner  Sound    Country
+   --------------------------------------------------------------------
+   M1A8-A      --       AVer TV-Phone           FM1216  --
+   M168-T   1461:0003   AVerTV Studio   48:17   FM1216 TDA9840T  D    (1) w/FM w/Remote
+   M168-U   1461:0004   TVCapture98     40:11   FI1216   --      D    w/Remote
+   M168II-B 1461:0003   Medion MD9592   48:16   FM1216 TDA9873H  D    w/FM
+
+   (1) Daughterboard MB68-A with TDA9820T and TDA9840T
+
+Aimslab
+-------
+   Video Highway Xtreme (aka "VHX") (Bt848, FM w/ TEA5757)
+
+IXMicro
+-------
+   IXTV BT848
+   IXTV BT878
+   TurboTV (Bt848)
+
+Lifetec/Medion/Tevion/Aldi
+-------
+   LT9415/MD9415 = LR90 Rev. F
+          MD9592 = Avermedia TVphone98 (PCI_ID=1461:0003), PCB-Rev=M168II-B (w/TDA9873H)
+
+Modular Technologies (www.modulartech.com) UK
+--------------------
+   MM100 PCTV (Bt848)
+   MM205 PCTV (Bt878)
+   MM210 PCTV (Bt878) (Galaxy TV)
+
+Terratec
+--------
+   Terra TV+ Version 1.0 (Bt848), "ceb105.PCB" printed on the PCB, TDA9821
+   Terra TV+ Version 1.1 (Bt878), "LR74 Rev.E" printed on the PCB, TDA9821
+   Terra TValueRadio,             "LR102 Rev.C" printed on the PCB
+   Terra TV/Radio+ Version 1.0,   "80-CP2830100-0" TTTV3 printed on the PCB, i
+				     "CPH010-E83" on the back, SAA6588T, TDA9873H
+   Terra TValue Version BT878,    "80-CP2830110-0 TTTV4" printed on the PCB, 
+				     "CPH011-D83" on back
+   Terra TValue Version 1.0       "ceb105.PCB" (really identical to Terra TV+ Version 1.0)
+
+   LR74 is a newer PCB revision of ceb105 (both incl. connector for Active Radio Upgrade)
+
+
+Technisat
+---------
+   Mediafocus I (ZR36120/ZR36125)
+   Mediafocus II (SAA7146)
+
+Siemens
+-------
+   Multimedia eXtension Board (MXB) (SAA7146, SAA7111)
+
+Stradis
+-------
+   SDM275,SDM250,SDM026,SDM025 (SAA7146, IBMMPEG2): MPEG2 decoder only
+
+Powercolor
+----------
+   MTV878
+   MTV878R w/Remote Control
+   MTV878F w/Remote Control w/FM radio
+
+Pinnacle
+--------
+   Mirovideo PCTV (Bt848)
+   Mirovideo PCTV SE (Bt848)
+   Mirovideo PCTV Pro (Bt848 + Daughterboard)
+   Studio PCTV Rave (Bt878 w/o infrared)
+   Studio PCTV
+   Studio PCTV Pro (Bt878 stereo w/ FM)
+
+   DC1+ (ISA)
+   DC10  (zr36057 + zr36060 + saa7110 + adv7176)
+   DC10+ (zr36067 + zr36060 + saa7110 + adv7176)
+   DC20
+   DC30
+   DC30+ (zr36067 + zr36050 + zr36016 + vpx3220 + adv7176)
+
+Lenco
+-----
+   MXR-9565 (=Technisat Mediafocus?)
+   MXR-9571 (Bt848)
+   MXR-9575
+   MXR-9477 (Bt878)
+   MXTV-9578CP (= Prolink PV-BT878P+4E)
+
+Iomega
+------
+   Buz (Zoran zr36067 + zr36060 + SAA7111 + SAA7185)
+
+LML
+---
+   LML33 (zr36067 + zr36060 + bt819+ bt856)
+
+Grandtec
+--------
+   Grand Video Capture (Bt848)
+   Multi Capture Card  (Bt878)

@@ -518,7 +518,7 @@ static struct i2c_client client_template =
         &driver
 };
 
-int tda7432_init(void)
+static int tda7432_init(void)
 {
 
 	if ( (loudness < 0) || (loudness > 15) )
@@ -531,7 +531,7 @@ int tda7432_init(void)
 	return 0;
 }
 
-void tda7432_fini(void)
+static void tda7432_fini(void)
 {
 	i2c_del_driver(&driver);
 }

@@ -31,7 +31,6 @@
 
 static int io = CONFIG_RADIO_GEMTEK_PORT; 
 static int radio_nr = -1;
-static int users = 0;
 static spinlock_t lock;
 
 struct gemtek_device
@@ -139,87 +138,77 @@ int gemtek_getsigstr(struct gemtek_device *dev)
 	return 1;		/* signal present */
 }
 
-static int gemtek_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
+static int gemtek_ioctl(struct inode *inode, struct file *file,
+			unsigned int cmd, void *arg)
 {
+	struct video_device *dev = video_devdata(file);
 	struct gemtek_device *rt=dev->priv;
 
 	switch(cmd)
 	{
 		case VIDIOCGCAP:
 		{
-			struct video_capability v;
-			v.type=VID_TYPE_TUNER;
-			v.channels=1;
-			v.audios=1;
-			/* No we don't do pictures */
-			v.maxwidth=0;
-			v.maxheight=0;
-			v.minwidth=0;
-			v.minheight=0;
-			strcpy(v.name, "GemTek");
-			if(copy_to_user(arg,&v,sizeof(v)))
-				return -EFAULT;
+			struct video_capability *v = arg;
+			memset(v,0,sizeof(*v));
+			v->type=VID_TYPE_TUNER;
+			v->channels=1;
+			v->audios=1;
+			strcpy(v->name, "GemTek");
 			return 0;
 		}
 		case VIDIOCGTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg,sizeof(v))!=0) 
-				return -EFAULT;
-			if(v.tuner)	/* Only 1 tuner */ 
+			struct video_tuner *v = arg;
+			if(v->tuner)	/* Only 1 tuner */ 
 				return -EINVAL;
-			v.rangelow=87*16000;
-			v.rangehigh=108*16000;
-			v.flags=VIDEO_TUNER_LOW;
-			v.mode=VIDEO_MODE_AUTO;
-			v.signal=0xFFFF*gemtek_getsigstr(rt);
-			strcpy(v.name, "FM");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			v->rangelow=87*16000;
+			v->rangehigh=108*16000;
+			v->flags=VIDEO_TUNER_LOW;
+			v->mode=VIDEO_MODE_AUTO;
+			v->signal=0xFFFF*gemtek_getsigstr(rt);
+			strcpy(v->name, "FM");
 			return 0;
 		}
 		case VIDIOCSTUNER:
 		{
-			struct video_tuner v;
-			if(copy_from_user(&v, arg, sizeof(v)))
-				return -EFAULT;
-			if(v.tuner!=0)
+			struct video_tuner *v = arg;
+			if(v->tuner!=0)
 				return -EINVAL;
 			/* Only 1 tuner so no setting needed ! */
 			return 0;
 		}
 		case VIDIOCGFREQ:
-			if(copy_to_user(arg, &rt->curfreq, sizeof(rt->curfreq)))
-				return -EFAULT;
+		{
+			unsigned long *freq = arg;
+			*freq = rt->curfreq;
 			return 0;
+		}
 		case VIDIOCSFREQ:
-			if(copy_from_user(&rt->curfreq, arg,sizeof(rt->curfreq)))
-				return -EFAULT;
-		/* needs to be called twice in order for getsigstr to work */
+		{
+			unsigned long *freq = arg;
+			rt->curfreq = *freq;
+			/* needs to be called twice in order for getsigstr to work */
 			gemtek_setfreq(rt, rt->curfreq);
 			gemtek_setfreq(rt, rt->curfreq);
 			return 0;
+		}
 		case VIDIOCGAUDIO:
 		{	
-			struct video_audio v;
-			memset(&v,0, sizeof(v));
-			v.flags|=VIDEO_AUDIO_MUTABLE;
-			v.volume=1;
-			v.step=65535;
-			strcpy(v.name, "Radio");
-			if(copy_to_user(arg,&v, sizeof(v)))
-				return -EFAULT;
+			struct video_audio *v = 0;
+			memset(v,0, sizeof(*v));
+			v->flags|=VIDEO_AUDIO_MUTABLE;
+			v->volume=1;
+			v->step=65535;
+			strcpy(v->name, "Radio");
 			return 0;			
 		}
 		case VIDIOCSAUDIO:
 		{
-			struct video_audio v;
-			if(copy_from_user(&v, arg, sizeof(v))) 
-				return -EFAULT;	
-			if(v.audio) 
+			struct video_audio *v = arg;
+			if(v->audio) 
 				return -EINVAL;
 
-			if(v.flags&VIDEO_AUDIO_MUTE) 
+			if(v->flags&VIDEO_AUDIO_MUTE) 
 				gemtek_mute(rt);
 			else
 			        gemtek_unmute(rt);
@@ -231,20 +220,15 @@ static int gemtek_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 	}
 }
 
-static int gemtek_open(struct video_device *dev, int flags)
-{
-	if(users)
-		return -EBUSY;
-	users++;
-	return 0;
-}
-
-static void gemtek_close(struct video_device *dev)
-{
-	users--;
-}
-
 static struct gemtek_device gemtek_unit;
+
+static struct file_operations gemtek_fops = {
+	owner:		THIS_MODULE,
+	open:           video_exclusive_open,
+	release:        video_exclusive_release,
+	ioctl:		video_generic_ioctl,
+	llseek:         no_llseek,
+};
 
 static struct video_device gemtek_radio=
 {
@@ -252,9 +236,8 @@ static struct video_device gemtek_radio=
 	name:		"GemTek radio",
 	type:		VID_TYPE_TUNER,
 	hardware:	VID_HARDWARE_GEMTEK,
-	open:		gemtek_open,
-	close:		gemtek_close,
-	ioctl:		gemtek_ioctl,
+	fops:           &gemtek_fops,
+	kernel_ioctl:	gemtek_ioctl,
 };
 
 static int __init gemtek_init(void)

@@ -1,4 +1,4 @@
-/* $Id: tg3.c,v 1.43.2.74 2002/03/06 22:22:29 davem Exp $
+/* $Id: tg3.c,v 1.43.2.79 2002/03/12 07:11:17 davem Exp $
  * tg3.c: Broadcom Tigon3 ethernet driver.
  *
  * Copyright (C) 2001, 2002 David S. Miller (davem@redhat.com)
@@ -42,7 +42,11 @@
  */
 #define TG3_MINI_RING_WORKS 0
 
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+#define TG3_VLAN_TAG_USED 1
+#else
 #define TG3_VLAN_TAG_USED 0
+#endif
 
 #include "tg3.h"
 
@@ -78,15 +82,16 @@
  * them in the NIC onboard memory.
  */
 #define TG3_RX_RING_SIZE		512
-#define TG3_RX_RING_PENDING		200
+#define TG3_DEF_RX_RING_PENDING		200
 #if TG3_MINI_RING_WORKS
 #define TG3_RX_MINI_RING_SIZE		256 /* ??? */
-#define TG3_RX_MINI_RING_PENDING	100
+#define TG3_DEF_RX_MINI_RING_PENDING	100
 #endif
 #define TG3_RX_JUMBO_RING_SIZE		256
-#define TG3_RX_JUMBO_RING_PENDING	100
+#define TG3_DEF_RX_JUMBO_RING_PENDING	100
 #define TG3_RX_RCB_RING_SIZE		1024
 #define TG3_TX_RING_SIZE		512
+#define TG3_DEF_TX_RING_PENDING		(TG3_TX_RING_SIZE - 1)
 
 #define TG3_RX_RING_BYTES	(sizeof(struct tg3_rx_buffer_desc) * \
 				 TG3_RX_RING_SIZE)
@@ -100,10 +105,12 @@
 			         TG3_RX_RCB_RING_SIZE)
 #define TG3_TX_RING_BYTES	(sizeof(struct tg3_tx_buffer_desc) * \
 				 TG3_TX_RING_SIZE)
+#define TX_RING_GAP(TP)	\
+	(TG3_TX_RING_SIZE - (TP)->tx_pending)
 #define TX_BUFFS_AVAIL(TP)						\
 	(((TP)->tx_cons <= (TP)->tx_prod) ?				\
-	  (TP)->tx_cons + (TG3_TX_RING_SIZE - 1) - (TP)->tx_prod :	\
-	  (TP)->tx_cons - (TP)->tx_prod - 1)
+	  (TP)->tx_cons + (TP)->tx_pending - (TP)->tx_prod :		\
+	  (TP)->tx_cons - (TP)->tx_prod - TX_RING_GAP(TP))
 #define NEXT_TX(N)		(((N) + 1) & (TG3_TX_RING_SIZE - 1))
 
 #define RX_PKT_BUF_SZ		(1536 + tp->rx_offset + 64)
@@ -1346,6 +1353,7 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 			aninfo.flags |= (MR_AN_ENABLE);
 
 			for (i = 0; i < 6; i++) {
+				unsigned int tick;
 				u32 tmp;
 
 				tw32(MAC_TX_AUTO_NEG, 0);
@@ -1358,7 +1366,8 @@ static int tg3_setup_fiber_phy(struct tg3 *tp)
 
 				aninfo.state = ANEG_STATE_UNKNOWN;
 				aninfo.cur_time = 0;
-				while (aninfo.cur_time < 95000) {
+				tick = 0;
+				while (++tick < 95000) {
 					status = tg3_fiber_aneg_smachine(tp, &aninfo);
 					if (status == ANEG_DONE ||
 					    status == ANEG_FAILED)
@@ -1782,7 +1791,7 @@ static void tg3_rx(struct tg3 *tp)
 			skb = copy_skb;
 		}
 
-		if (!(tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) &&
+		if ((tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) &&
 		    (desc->type_flags & RXD_FLAG_TCPUDP_CSUM)) {
 			skb->csum = htons((desc->ip_tcp_csum & RXD_TCPCSUM_MASK)
 					  >> RXD_TCPCSUM_SHIFT);
@@ -1835,61 +1844,99 @@ next_pkt_nopost:
 #endif
 }
 
-#define RATE_SAMPLE_INTERVAL	(1 * HZ)
-
 #define PKT_RATE_LOW		22000
 #define PKT_RATE_HIGH		61000
 
 static void tg3_rate_sample(struct tg3 *tp, unsigned long ticks)
 {
 	u32 delta, rx_now, tx_now;
-	int new_vals;
+	int new_vals, do_tx, do_rx;
 
 	rx_now = tp->hw_stats->rx_ucast_packets.low;
 	tx_now = tp->hw_stats->COS_out_packets[0].low;
 
 	delta  = (rx_now - tp->last_rx_count);
 	delta += (tx_now - tp->last_tx_count);
-	delta /= (ticks / RATE_SAMPLE_INTERVAL);
+	delta /= (ticks / tp->coalesce_config.rate_sample_jiffies);
 
 	tp->last_rx_count = rx_now;
 	tp->last_tx_count = tx_now;
 
 	new_vals = 0;
-	if (delta < PKT_RATE_LOW) {
-		if (tp->coalesce_config.rx_max_coalesced_frames !=
-		    LOW_RXMAX_FRAMES) {
+	do_tx = (tp->tg3_flags & TG3_FLAG_ADAPTIVE_TX) != 0;
+	do_rx = (tp->tg3_flags & TG3_FLAG_ADAPTIVE_RX) != 0;
+	if (delta < tp->coalesce_config.pkt_rate_low) {
+		if (do_rx &&
+		    tp->coalesce_config.rx_max_coalesced_frames !=
+		    tp->coalesce_config.rx_max_coalesced_frames_low) {
 			tp->coalesce_config.rx_max_coalesced_frames =
 				LOW_RXMAX_FRAMES;
 			tp->coalesce_config.rx_coalesce_ticks =
 				LOW_RXCOL_TICKS;
 			new_vals = 1;
 		}
-	} else if (delta < PKT_RATE_HIGH) {
-		if (tp->coalesce_config.rx_max_coalesced_frames !=
-		    DEFAULT_RXMAX_FRAMES) {
+		if (do_tx &&
+		    tp->coalesce_config.tx_max_coalesced_frames !=
+		    tp->coalesce_config.tx_max_coalesced_frames_low) {
+			tp->coalesce_config.tx_max_coalesced_frames =
+				tp->coalesce_config.tx_max_coalesced_frames_low;
+			tp->coalesce_config.tx_coalesce_ticks =
+				tp->coalesce_config.tx_coalesce_ticks_low;
+			new_vals = 1;
+		}
+	} else if (delta < tp->coalesce_config.pkt_rate_high) {
+		if (do_rx &&
+		    tp->coalesce_config.rx_max_coalesced_frames !=
+		    tp->coalesce_config.rx_max_coalesced_frames_def) {
 			tp->coalesce_config.rx_max_coalesced_frames =
-				DEFAULT_RXMAX_FRAMES;
+				tp->coalesce_config.rx_max_coalesced_frames_def;
 			tp->coalesce_config.rx_coalesce_ticks =
-				DEFAULT_RXCOL_TICKS;
+				tp->coalesce_config.rx_coalesce_ticks_def;
+			new_vals = 1;
+		}
+		if (do_tx &&
+		    tp->coalesce_config.tx_max_coalesced_frames !=
+		    tp->coalesce_config.tx_max_coalesced_frames_def) {
+			tp->coalesce_config.tx_max_coalesced_frames =
+				tp->coalesce_config.tx_max_coalesced_frames_def;
+			tp->coalesce_config.tx_coalesce_ticks =
+				tp->coalesce_config.tx_coalesce_ticks_def;
 			new_vals = 1;
 		}
 	} else {
-		if (tp->coalesce_config.rx_max_coalesced_frames !=
-		    HIGH_RXMAX_FRAMES) {
+		if (do_rx &&
+		    tp->coalesce_config.rx_max_coalesced_frames !=
+		    tp->coalesce_config.rx_max_coalesced_frames_high) {
 			tp->coalesce_config.rx_max_coalesced_frames =
-				HIGH_RXMAX_FRAMES;
+				tp->coalesce_config.rx_max_coalesced_frames_high;
 			tp->coalesce_config.rx_coalesce_ticks =
-				HIGH_RXCOL_TICKS;
+				tp->coalesce_config.rx_coalesce_ticks_high;
+			new_vals = 1;
+		}
+		if (do_tx &&
+		    tp->coalesce_config.tx_max_coalesced_frames !=
+		    tp->coalesce_config.tx_max_coalesced_frames_high) {
+			tp->coalesce_config.tx_max_coalesced_frames =
+				tp->coalesce_config.tx_max_coalesced_frames_high;
+			tp->coalesce_config.tx_coalesce_ticks =
+				tp->coalesce_config.tx_coalesce_ticks_high;
 			new_vals = 1;
 		}
 	}
 
 	if (new_vals) {
-		tw32(HOSTCC_RXCOL_TICKS,
-		     tp->coalesce_config.rx_coalesce_ticks);
-		tw32(HOSTCC_RXMAX_FRAMES,
-		     tp->coalesce_config.rx_max_coalesced_frames);
+		if (do_rx) {
+			tw32(HOSTCC_RXCOL_TICKS,
+			     tp->coalesce_config.rx_coalesce_ticks);
+			tw32(HOSTCC_RXMAX_FRAMES,
+			     tp->coalesce_config.rx_max_coalesced_frames);
+		}
+		if (do_tx) {
+			tw32(HOSTCC_TXCOL_TICKS,
+			     tp->coalesce_config.tx_coalesce_ticks);
+			tw32(HOSTCC_TXMAX_FRAMES,
+			     tp->coalesce_config.tx_max_coalesced_frames);
+		}
 	}
 
 	tp->last_rate_sample = jiffies;
@@ -1919,10 +1966,11 @@ static void tg3_interrupt_main_work(struct tg3 *tp)
 		did_pkts = 1;
 	}
 
-	if (did_pkts) {
+	if (did_pkts &&
+	    (tp->tg3_flags & (TG3_FLAG_ADAPTIVE_RX | TG3_FLAG_ADAPTIVE_TX))) {
 		unsigned long ticks = jiffies - tp->last_rate_sample;
 
-		if (ticks >= RATE_SAMPLE_INTERVAL)
+		if (ticks >= tp->coalesce_config.rate_sample_jiffies)
 			tg3_rate_sample(tp, ticks);
 	}
 }
@@ -2590,14 +2638,14 @@ static void tg3_init_rings(struct tg3 *tp)
 	}
 
 	/* Now allocate fresh SKBs for each rx ring. */
-	for (i = 0; i < TG3_RX_RING_PENDING; i++) {
+	for (i = 0; i < tp->rx_pending; i++) {
 		if (tg3_alloc_rx_skb(tp, RXD_OPAQUE_RING_STD,
 				     -1, i) < 0)
 			break;
 	}
 
 #if TG3_MINI_RING_WORKS
-	for (i = 0; i < TG3_RX_MINI_RING_PENDING; i++) {
+	for (i = 0; i < tp->rx_mini_pending; i++) {
 		if (tg3_alloc_rx_skb(tp, RXD_OPAQUE_RING_MINI,
 				     -1, i) < 0)
 			break;
@@ -2605,7 +2653,7 @@ static void tg3_init_rings(struct tg3 *tp)
 #endif
 
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE) {
-		for (i = 0; i < TG3_RX_JUMBO_RING_PENDING; i++) {
+		for (i = 0; i < tp->rx_jumbo_pending; i++) {
 			if (tg3_alloc_rx_skb(tp, RXD_OPAQUE_RING_JUMBO,
 					     -1, i) < 0)
 				break;
@@ -3420,11 +3468,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 	}
 
 	/* Setup replenish thresholds. */
-	tw32(RCVBDI_STD_THRESH, TG3_RX_RING_PENDING / 8);
+	tw32(RCVBDI_STD_THRESH, tp->rx_pending / 8);
 #if TG3_MINI_RING_WORKS
-	tw32(RCVBDI_MINI_THRESH, TG3_RX_MINI_RING_PENDING / 8);
+	tw32(RCVBDI_MINI_THRESH, tp->rx_mini_pending / 8);
 #endif
-	tw32(RCVBDI_JUMBO_THRESH, TG3_RX_JUMBO_RING_PENDING / 8);
+	tw32(RCVBDI_JUMBO_THRESH, tp->rx_jumbo_pending / 8);
 
 	/* Clear out send RCB ring in SRAM. */
 	for (i = NIC_SRAM_SEND_RCB; i < NIC_SRAM_RCV_RET_RCB; i += TG3_BDINFO_SIZE)
@@ -3462,17 +3510,17 @@ static int tg3_reset_hw(struct tg3 *tp)
 			BDINFO_FLAGS_MAXLEN_SHIFT),
 		       0);
 
-	tp->rx_std_ptr = TG3_RX_RING_PENDING;
+	tp->rx_std_ptr = tp->rx_pending;
 	tw32_mailbox(MAILBOX_RCV_STD_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_std_ptr);
 #if TG3_MINI_RING_WORKS
-	tp->rx_mini_ptr = TG3_RX_MINI_RING_PENDING;
+	tp->rx_mini_ptr = tp->rx_mini_pending;
 	tw32_mailbox(MAILBOX_RCV_MINI_PROD_IDX + TG3_64BIT_REG_LOW,
 		     tp->rx_mini_ptr);
 #endif
 
 	if (tp->tg3_flags & TG3_FLAG_JUMBO_ENABLE)
-		tp->rx_jumbo_ptr = TG3_RX_JUMBO_RING_PENDING;
+		tp->rx_jumbo_ptr = tp->rx_jumbo_pending;
 	else
 		tp->rx_jumbo_ptr = 0;
 	tw32_mailbox(MAILBOX_RCV_JUMBO_PROD_IDX + TG3_64BIT_REG_LOW,
@@ -3607,6 +3655,9 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32(MAC_RX_MODE, RX_MODE_RESET);
 	udelay(10);
 	tw32(MAC_RX_MODE, tp->rx_mode);
+
+	if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1)
+		tw32(MAC_SERDES_CFG, 0x616000);
 
 	err = tg3_setup_phy(tp);
 	if (err)
@@ -4050,6 +4101,8 @@ static int tg3_open(struct net_device *dev)
 }
 #endif
 
+static struct net_device_stats *tg3_get_stats(struct net_device *);
+
 static int tg3_close(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;
@@ -4072,6 +4125,9 @@ static int tg3_close(struct net_device *dev)
 	spin_unlock_irq(&tp->lock);
 
 	free_irq(dev->irq, dev);
+
+	memcpy(&tp->net_stats_prev, tg3_get_stats(tp->dev),
+	       sizeof(tp->net_stats_prev));
 
 	tg3_free_consistent(tp);
 
@@ -4121,46 +4177,53 @@ static struct net_device_stats *tg3_get_stats(struct net_device *dev)
 {
 	struct tg3 *tp = dev->priv;
 	struct net_device_stats *stats = &tp->net_stats;
+	struct net_device_stats *old_stats = &tp->net_stats_prev;
 	struct tg3_hw_stats *hw_stats = tp->hw_stats;
 
-	/* XXX Fix this... this is wrong because
-	 * XXX it means every open/close we lose the stats.
-	 */
 	if (!hw_stats)
-		return stats;
+		return old_stats;
 
-	stats->rx_packets =
+	stats->rx_packets = old_stats->rx_packets +
 		get_stat64(&hw_stats->rx_ucast_packets) +
 		get_stat64(&hw_stats->rx_mcast_packets) +
 		get_stat64(&hw_stats->rx_bcast_packets);
 		
-	stats->tx_packets =
+	stats->tx_packets = old_stats->tx_packets +
 		get_stat64(&hw_stats->COS_out_packets[0]);
 
-	stats->rx_bytes = get_stat64(&hw_stats->rx_octets);
-	stats->tx_bytes = get_stat64(&hw_stats->tx_octets);
+	stats->rx_bytes = old_stats->rx_bytes +
+		get_stat64(&hw_stats->rx_octets);
+	stats->tx_bytes = old_stats->tx_bytes +
+		get_stat64(&hw_stats->tx_octets);
 
-	stats->rx_errors = get_stat64(&hw_stats->rx_errors);
-	stats->tx_errors =
+	stats->rx_errors = old_stats->rx_errors +
+		get_stat64(&hw_stats->rx_errors);
+	stats->tx_errors = old_stats->tx_errors +
 		get_stat64(&hw_stats->tx_errors) +
 		get_stat64(&hw_stats->tx_mac_errors) +
 		get_stat64(&hw_stats->tx_carrier_sense_errors) +
 		get_stat64(&hw_stats->tx_discards);
 
-	stats->multicast = get_stat64(&hw_stats->rx_mcast_packets);
-	stats->collisions = get_stat64(&hw_stats->tx_collisions);
+	stats->multicast = old_stats->multicast +
+		get_stat64(&hw_stats->rx_mcast_packets);
+	stats->collisions = old_stats->collisions +
+		get_stat64(&hw_stats->tx_collisions);
 
-	stats->rx_length_errors =
+	stats->rx_length_errors = old_stats->rx_length_errors +
 		get_stat64(&hw_stats->rx_frame_too_long_errors) +
 		get_stat64(&hw_stats->rx_undersize_packets);
 
-	stats->rx_over_errors = get_stat64(&hw_stats->rxbds_empty);
-	stats->rx_frame_errors = get_stat64(&hw_stats->rx_align_errors);
-	stats->tx_aborted_errors = get_stat64(&hw_stats->tx_discards);
-	stats->tx_carrier_errors =
+	stats->rx_over_errors = old_stats->rx_over_errors +
+		get_stat64(&hw_stats->rxbds_empty);
+	stats->rx_frame_errors = old_stats->rx_frame_errors +
+		get_stat64(&hw_stats->rx_align_errors);
+	stats->tx_aborted_errors = old_stats->tx_aborted_errors +
+		get_stat64(&hw_stats->tx_discards);
+	stats->tx_carrier_errors = old_stats->tx_carrier_errors +
 		get_stat64(&hw_stats->tx_carrier_sense_errors);
 
-	stats->rx_crc_errors = calc_crc_errors(tp);
+	stats->rx_crc_errors = old_stats->rx_crc_errors +
+		calc_crc_errors(tp);
 
 	return stats;
 }
@@ -4255,16 +4318,18 @@ static void tg3_set_rx_mode(struct net_device *dev)
 	spin_unlock_irq(&tp->lock);
 }
 
+#define TG3_REGDUMP_LEN		(32 * 1024)
+
 static u8 *tg3_get_regs(struct tg3 *tp)
 {
-	u8 *orig_p = kmalloc((32 * 1024), GFP_KERNEL);
+	u8 *orig_p = kmalloc(TG3_REGDUMP_LEN, GFP_KERNEL);
 	u8 *p;
 	int i;
 
 	if (orig_p == NULL)
 		return NULL;
 
-	memset(orig_p, 0, (32 * 1024));
+	memset(orig_p, 0, TG3_REGDUMP_LEN);
 
 	spin_lock_irq(&tp->lock);
 
@@ -4320,6 +4385,177 @@ do {	p = orig_p + (reg);	\
 	return orig_p;
 }
 
+static void tg3_to_ethtool_coal(struct tg3 *tp,
+				struct ethtool_coalesce *ecoal)
+{
+	ecoal->rx_coalesce_usecs =
+		tp->coalesce_config.rx_coalesce_ticks_def;
+	ecoal->rx_max_coalesced_frames =
+		tp->coalesce_config.rx_max_coalesced_frames_def;
+	ecoal->rx_coalesce_usecs_irq =
+		tp->coalesce_config.rx_coalesce_ticks_during_int_def;
+	ecoal->rx_max_coalesced_frames_irq =
+		tp->coalesce_config.rx_max_coalesced_frames_during_int_def;
+
+	ecoal->tx_coalesce_usecs =
+		tp->coalesce_config.tx_coalesce_ticks_def;
+	ecoal->tx_max_coalesced_frames =
+		tp->coalesce_config.tx_max_coalesced_frames_def;
+	ecoal->tx_coalesce_usecs_irq =
+		tp->coalesce_config.tx_coalesce_ticks_during_int_def;
+	ecoal->tx_max_coalesced_frames_irq =
+		tp->coalesce_config.tx_max_coalesced_frames_during_int_def;
+
+	ecoal->stats_block_coalesce_usecs =
+		tp->coalesce_config.stats_coalesce_ticks_def;
+
+	ecoal->use_adaptive_rx_coalesce =
+		(tp->tg3_flags & TG3_FLAG_ADAPTIVE_RX) != 0;
+	ecoal->use_adaptive_tx_coalesce =
+		(tp->tg3_flags & TG3_FLAG_ADAPTIVE_TX) != 0;
+
+	ecoal->pkt_rate_low =
+		tp->coalesce_config.pkt_rate_low;
+	ecoal->rx_coalesce_usecs_low =
+		tp->coalesce_config.rx_coalesce_ticks_low;
+	ecoal->rx_max_coalesced_frames_low =
+		tp->coalesce_config.rx_max_coalesced_frames_low;
+	ecoal->tx_coalesce_usecs_low =
+		tp->coalesce_config.tx_coalesce_ticks_low;
+	ecoal->tx_max_coalesced_frames_low =
+		tp->coalesce_config.tx_max_coalesced_frames_low;
+
+	ecoal->pkt_rate_high =
+		tp->coalesce_config.pkt_rate_high;
+	ecoal->rx_coalesce_usecs_high =
+		tp->coalesce_config.rx_coalesce_ticks_high;
+	ecoal->rx_max_coalesced_frames_high =
+		tp->coalesce_config.rx_max_coalesced_frames_high;
+	ecoal->tx_coalesce_usecs_high =
+		tp->coalesce_config.tx_coalesce_ticks_high;
+	ecoal->tx_max_coalesced_frames_high =
+		tp->coalesce_config.tx_max_coalesced_frames_high;
+
+	ecoal->rate_sample_interval =
+		tp->coalesce_config.rate_sample_jiffies / HZ;
+}
+
+static int tg3_from_ethtool_coal(struct tg3 *tp,
+				 struct ethtool_coalesce *ecoal)
+{
+	/* Make sure we are not getting garbage. */
+	if ((ecoal->rx_coalesce_usecs == 0 &&
+	     ecoal->rx_max_coalesced_frames == 0) ||
+	    (ecoal->tx_coalesce_usecs == 0 &&
+	     ecoal->tx_max_coalesced_frames == 0) ||
+	    ecoal->stats_block_coalesce_usecs == 0)
+		return -EINVAL;
+	if (ecoal->use_adaptive_rx_coalesce ||
+	    ecoal->use_adaptive_tx_coalesce) {
+		if (ecoal->pkt_rate_low > ecoal->pkt_rate_high)
+			return -EINVAL;
+		if (ecoal->rate_sample_interval == 0)
+			return -EINVAL;
+		if (ecoal->use_adaptive_rx_coalesce &&
+		    ((ecoal->rx_coalesce_usecs_low == 0 &&
+		      ecoal->rx_max_coalesced_frames_low == 0) ||
+		     (ecoal->rx_coalesce_usecs_high == 0 &&
+		      ecoal->rx_max_coalesced_frames_high == 0)))
+			return -EINVAL;
+		if (ecoal->use_adaptive_tx_coalesce &&
+		    ((ecoal->tx_coalesce_usecs_low == 0 &&
+		      ecoal->tx_max_coalesced_frames_low == 0) ||
+		     (ecoal->tx_coalesce_usecs_high == 0 &&
+		      ecoal->tx_max_coalesced_frames_high == 0)))
+			return -EINVAL;
+	}
+
+	/* Looks good, let it rip. */
+	spin_lock_irq(&tp->lock);
+	tp->coalesce_config.rx_coalesce_ticks =
+		tp->coalesce_config.rx_coalesce_ticks_def =
+		ecoal->rx_coalesce_usecs;
+	tp->coalesce_config.rx_max_coalesced_frames =
+		tp->coalesce_config.rx_max_coalesced_frames_def =
+		ecoal->rx_max_coalesced_frames;
+	tp->coalesce_config.rx_coalesce_ticks_during_int =
+		tp->coalesce_config.rx_coalesce_ticks_during_int_def =
+		ecoal->rx_coalesce_usecs_irq;
+	tp->coalesce_config.rx_max_coalesced_frames_during_int =
+		tp->coalesce_config.rx_max_coalesced_frames_during_int_def =
+		ecoal->rx_max_coalesced_frames_irq;
+	tp->coalesce_config.tx_coalesce_ticks =
+		tp->coalesce_config.tx_coalesce_ticks_def =
+		ecoal->tx_coalesce_usecs;
+	tp->coalesce_config.tx_max_coalesced_frames =
+		tp->coalesce_config.tx_max_coalesced_frames_def =
+		ecoal->tx_max_coalesced_frames;
+	tp->coalesce_config.tx_coalesce_ticks_during_int =
+		tp->coalesce_config.tx_coalesce_ticks_during_int_def =
+		ecoal->tx_coalesce_usecs_irq;
+	tp->coalesce_config.tx_max_coalesced_frames_during_int =
+		tp->coalesce_config.tx_max_coalesced_frames_during_int_def =
+		ecoal->tx_max_coalesced_frames_irq;
+	tp->coalesce_config.stats_coalesce_ticks =
+		tp->coalesce_config.stats_coalesce_ticks_def =
+		ecoal->stats_block_coalesce_usecs;
+
+	if (ecoal->use_adaptive_rx_coalesce)
+		tp->tg3_flags |= TG3_FLAG_ADAPTIVE_RX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_ADAPTIVE_RX;
+	if (ecoal->use_adaptive_tx_coalesce)
+		tp->tg3_flags |= TG3_FLAG_ADAPTIVE_TX;
+	else
+		tp->tg3_flags &= ~TG3_FLAG_ADAPTIVE_TX;
+
+	tp->coalesce_config.pkt_rate_low = ecoal->pkt_rate_low;
+	tp->coalesce_config.pkt_rate_high = ecoal->pkt_rate_high;
+	tp->coalesce_config.rate_sample_jiffies =
+		ecoal->rate_sample_interval * HZ;
+
+	tp->coalesce_config.rx_coalesce_ticks_low =
+		ecoal->rx_coalesce_usecs_low;
+	tp->coalesce_config.rx_max_coalesced_frames_low =
+		ecoal->rx_max_coalesced_frames_low;
+	tp->coalesce_config.tx_coalesce_ticks_low =
+		ecoal->tx_coalesce_usecs_low;
+	tp->coalesce_config.tx_max_coalesced_frames_low =
+		ecoal->tx_max_coalesced_frames_low;
+
+	tp->coalesce_config.rx_coalesce_ticks_high =
+		ecoal->rx_coalesce_usecs_high;
+	tp->coalesce_config.rx_max_coalesced_frames_high =
+		ecoal->rx_max_coalesced_frames_high;
+	tp->coalesce_config.tx_coalesce_ticks_high =
+		ecoal->tx_coalesce_usecs_high;
+	tp->coalesce_config.tx_max_coalesced_frames_high =
+		ecoal->tx_max_coalesced_frames_high;
+
+	tw32(HOSTCC_RXCOL_TICKS,
+	     tp->coalesce_config.rx_coalesce_ticks_def);
+	tw32(HOSTCC_RXMAX_FRAMES,
+	     tp->coalesce_config.rx_max_coalesced_frames_def);
+	tw32(HOSTCC_RXCOAL_TICK_INT,
+	     tp->coalesce_config.rx_coalesce_ticks_during_int_def);
+	tw32(HOSTCC_RXCOAL_MAXF_INT,
+	     tp->coalesce_config.rx_max_coalesced_frames_during_int_def);
+	tw32(HOSTCC_TXCOL_TICKS,
+	     tp->coalesce_config.tx_coalesce_ticks_def);
+	tw32(HOSTCC_TXMAX_FRAMES,
+	     tp->coalesce_config.tx_max_coalesced_frames_def);
+	tw32(HOSTCC_TXCOAL_TICK_INT,
+	     tp->coalesce_config.tx_coalesce_ticks_during_int_def);
+	tw32(HOSTCC_TXCOAL_MAXF_INT,
+	     tp->coalesce_config.tx_max_coalesced_frames_during_int_def);
+	tw32(HOSTCC_STAT_COAL_TICKS,
+	     tp->coalesce_config.stats_coalesce_ticks_def);
+
+	spin_unlock_irq(&tp->lock);
+
+	return 0;
+}
+
 static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 {
 	struct tg3 *tp = dev->priv;
@@ -4334,7 +4570,10 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_MODULE_NAME);
 		strcpy (info.version, DRV_MODULE_VERSION);
+		memset(&info.fw_version, 0, sizeof(info.fw_version));
 		strcpy (info.bus_info, pci_dev->slot_name);
+		info.eedump_len = 0;
+		info.regdump_len = TG3_REGDUMP_LEN;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;
@@ -4368,8 +4607,8 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		cmd.phy_address = PHY_ADDR;
 		cmd.transceiver = 0;
 		cmd.autoneg = tp->link_config.autoneg;
-		cmd.maxtxpkt = tp->coalesce_config.tx_max_coalesced_frames;
-		cmd.maxrxpkt = tp->coalesce_config.rx_max_coalesced_frames;
+		cmd.maxtxpkt = tp->coalesce_config.tx_max_coalesced_frames_def;
+		cmd.maxrxpkt = tp->coalesce_config.rx_max_coalesced_frames_def;
 		if (copy_to_user(useraddr, &cmd, sizeof(cmd)))
 			return -EFAULT;
 		return 0;
@@ -4422,9 +4661,11 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		}
 
 		if (cmd.maxtxpkt || cmd.maxrxpkt) {
-			tp->coalesce_config.tx_max_coalesced_frames =
+			tp->coalesce_config.tx_max_coalesced_frames_def =
+				tp->coalesce_config.tx_max_coalesced_frames =
 				cmd.maxtxpkt;
-			tp->coalesce_config.rx_max_coalesced_frames =
+			tp->coalesce_config.rx_max_coalesced_frames_def =
+				tp->coalesce_config.rx_max_coalesced_frames =
 				cmd.maxrxpkt;
 
 			/* Coalescing config bits can be updated without
@@ -4448,8 +4689,8 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 		if (copy_from_user(&regs, useraddr, sizeof(regs)))
 			return -EFAULT;
-		if (regs.len > (32 * 1024))
-			regs.len = (32 * 1024);
+		if (regs.len > TG3_REGDUMP_LEN)
+			regs.len = TG3_REGDUMP_LEN;
 		regs.version = 0;
 		if (copy_to_user(useraddr, &regs, sizeof(regs)))
 			return -EFAULT;
@@ -4529,6 +4770,196 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 		edata.data = netif_carrier_ok(tp->dev) ? 1 : 0;
 		if (copy_to_user(useraddr, &edata, sizeof(edata)))
 			return -EFAULT;
+	}
+	case ETHTOOL_GCOALESCE: {
+		struct ethtool_coalesce ecoal = { ETHTOOL_GCOALESCE };
+
+		tg3_to_ethtool_coal(tp, &ecoal);
+		if (copy_to_user(useraddr, &ecoal, sizeof(ecoal)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SCOALESCE: {
+		struct ethtool_coalesce ecoal;
+
+		if (copy_from_user(&ecoal, useraddr, sizeof(ecoal)))
+			return -EINVAL;
+
+		return tg3_from_ethtool_coal(tp, &ecoal);
+	}
+	case ETHTOOL_GRINGPARAM: {
+		struct ethtool_ringparam ering = { ETHTOOL_GRINGPARAM };
+
+		ering.rx_max_pending = TG3_RX_RING_SIZE - 1;
+#if TG3_MINI_RING_WORKS
+		ering.rx_mini_max_pending = TG3_RX_MINI_RING_SIZE - 1;
+#else
+		ering.rx_mini_max_pending = 0;
+#endif
+		ering.rx_jumbo_max_pending = TG3_RX_JUMBO_RING_SIZE - 1;
+
+		ering.rx_pending = tp->rx_pending;
+#if TG3_MINI_RING_WORKS
+		ering.rx_mini_pending = tp->rx_mini_pending;
+#else
+		ering.rx_mini_pending = 0;
+#endif
+		ering.rx_jumbo_pending = tp->rx_jumbo_pending;
+		ering.tx_pending = tp->tx_pending;
+
+		if (copy_to_user(useraddr, &ering, sizeof(ering)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SRINGPARAM: {
+		struct ethtool_ringparam ering;
+
+		if (copy_from_user(&ering, useraddr, sizeof(ering)))
+			return -EFAULT;
+
+		if ((ering.rx_pending > TG3_RX_RING_SIZE - 1) ||
+#if TG3_MINI_RING_WORKS
+		    (ering.rx_mini_pending > TG3_RX_MINI_RING_SIZE - 1) ||
+#endif
+		    (ering.rx_jumbo_pending > TG3_RX_JUMBO_RING_SIZE - 1) ||
+		    (ering.tx_pending > TG3_TX_RING_SIZE - 1))
+			return -EINVAL;
+
+		spin_lock_irq(&tp->lock);
+
+		tp->rx_pending = ering.rx_pending;
+#if TG3_MINI_RING_WORKS
+		tp->rx_mini_pending = ering.rx_mini_pending;
+#endif
+		tp->rx_jumbo_pending = ering.rx_jumbo_pending;
+		tp->tx_pending = ering.tx_pending;
+
+		tg3_halt(tp);
+		tg3_init_rings(tp);
+		tg3_init_hw(tp);
+		netif_wake_queue(tp->dev);
+		spin_unlock_irq(&tp->lock);
+
+		return 0;
+	}
+	case ETHTOOL_GPAUSEPARAM: {
+		struct ethtool_pauseparam epause = { ETHTOOL_GPAUSEPARAM };
+
+		epause.autoneg =
+			(tp->tg3_flags & TG3_FLAG_PAUSE_AUTONEG) != 0;
+		epause.rx_pause =
+			(tp->tg3_flags & TG3_FLAG_PAUSE_RX) != 0;
+		epause.tx_pause =
+			(tp->tg3_flags & TG3_FLAG_PAUSE_TX) != 0;
+		if (copy_to_user(useraddr, &epause, sizeof(epause)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SPAUSEPARAM: {
+		struct ethtool_pauseparam epause;
+
+		if (copy_from_user(&epause, useraddr, sizeof(epause)))
+			return -EFAULT;
+
+		spin_lock_irq(&tp->lock);
+		if (epause.autoneg)
+			tp->tg3_flags |= TG3_FLAG_PAUSE_AUTONEG;
+		else
+			tp->tg3_flags &= ~TG3_FLAG_PAUSE_AUTONEG;
+		if (epause.rx_pause)
+			tp->tg3_flags |= TG3_FLAG_PAUSE_RX;
+		else
+			tp->tg3_flags &= ~TG3_FLAG_PAUSE_RX;
+		if (epause.tx_pause)
+			tp->tg3_flags |= TG3_FLAG_PAUSE_TX;
+		else
+			tp->tg3_flags &= ~TG3_FLAG_PAUSE_TX;
+		tg3_halt(tp);
+		tg3_init_rings(tp);
+		tg3_init_hw(tp);
+		spin_unlock_irq(&tp->lock);
+
+		return 0;
+	}
+	case ETHTOOL_GRXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GRXCSUM };
+
+		edata.data =
+			(tp->tg3_flags & TG3_FLAG_RX_CHECKSUMS) != 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SRXCSUM: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+			if (edata.data != 0)
+				return -EINVAL;
+			return 0;
+		}
+
+		spin_lock_irq(&tp->lock);
+		if (edata.data)
+			tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
+		else
+			tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
+		spin_unlock_irq(&tp->lock);
+
+		return 0;
+	}
+	case ETHTOOL_GTXCSUM: {
+		struct ethtool_value edata = { ETHTOOL_GTXCSUM };
+
+		edata.data =
+			(tp->dev->features & NETIF_F_IP_CSUM) != 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_STXCSUM: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) {
+			if (edata.data != 0)
+				return -EINVAL;
+			return 0;
+		}
+
+		if (edata.data)
+			tp->dev->features |= NETIF_F_IP_CSUM;
+		else
+			tp->dev->features &= ~NETIF_F_IP_CSUM;
+
+		return 0;
+	}
+	case ETHTOOL_GSG: {
+		struct ethtool_value edata = { ETHTOOL_GSG };
+
+		edata.data =
+			(tp->dev->features & NETIF_F_SG) != 0;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_SSG: {
+		struct ethtool_value edata;
+
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+
+		if (edata.data)
+			tp->dev->features |= NETIF_F_SG;
+		else
+			tp->dev->features &= ~NETIF_F_SG;
+
+		return 0;
 	}
 	};
 
@@ -5126,10 +5557,10 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 		/* If not using tagged status, set the *_during_int
 		 * coalesce default config values to zero.
 		 */
-		tp->coalesce_config.rx_coalesce_ticks_during_int = 0;
-		tp->coalesce_config.rx_max_coalesced_frames_during_int = 0;
-		tp->coalesce_config.tx_coalesce_ticks_during_int = 0;
-		tp->coalesce_config.tx_max_coalesced_frames_during_int = 0;
+		tp->coalesce_config.rx_coalesce_ticks_during_int_def = 0;
+		tp->coalesce_config.rx_max_coalesced_frames_during_int_def = 0;
+		tp->coalesce_config.tx_coalesce_ticks_during_int_def = 0;
+		tp->coalesce_config.tx_max_coalesced_frames_during_int_def = 0;
 	}
 
 	if (GET_CHIP_REV(tp->pci_chip_rev_id) != CHIPREV_5700_AX &&
@@ -5566,20 +5997,57 @@ static void __devinit tg3_init_link_config(struct tg3 *tp)
 
 static void __devinit tg3_init_coalesce_config(struct tg3 *tp)
 {
-	tp->coalesce_config.rx_coalesce_ticks = DEFAULT_RXCOL_TICKS;
-	tp->coalesce_config.rx_max_coalesced_frames = DEFAULT_RXMAX_FRAMES;
-	tp->coalesce_config.rx_coalesce_ticks_during_int =
+	tp->coalesce_config.rx_coalesce_ticks_def = DEFAULT_RXCOL_TICKS;
+	tp->coalesce_config.rx_max_coalesced_frames_def = DEFAULT_RXMAX_FRAMES;
+	tp->coalesce_config.rx_coalesce_ticks_during_int_def =
 		DEFAULT_RXCOAL_TICK_INT;
-	tp->coalesce_config.rx_max_coalesced_frames_during_int =
+	tp->coalesce_config.rx_max_coalesced_frames_during_int_def =
 		DEFAULT_RXCOAL_MAXF_INT;
-	tp->coalesce_config.tx_coalesce_ticks = DEFAULT_TXCOL_TICKS;
-	tp->coalesce_config.tx_max_coalesced_frames = DEFAULT_TXMAX_FRAMES;
-	tp->coalesce_config.tx_coalesce_ticks_during_int =
+	tp->coalesce_config.tx_coalesce_ticks_def = DEFAULT_TXCOL_TICKS;
+	tp->coalesce_config.tx_max_coalesced_frames_def = DEFAULT_TXMAX_FRAMES;
+	tp->coalesce_config.tx_coalesce_ticks_during_int_def =
 		DEFAULT_TXCOAL_TICK_INT;
-	tp->coalesce_config.tx_max_coalesced_frames_during_int =
+	tp->coalesce_config.tx_max_coalesced_frames_during_int_def =
 		DEFAULT_TXCOAL_MAXF_INT;
-	tp->coalesce_config.stats_coalesce_ticks =
+	tp->coalesce_config.stats_coalesce_ticks_def =
 		DEFAULT_STAT_COAL_TICKS;
+
+	tp->coalesce_config.rx_coalesce_ticks_low =
+		LOW_RXCOL_TICKS;
+	tp->coalesce_config.rx_max_coalesced_frames_low =
+		LOW_RXMAX_FRAMES;
+	tp->coalesce_config.tx_coalesce_ticks_low =
+		LOW_TXCOL_TICKS;
+	tp->coalesce_config.tx_max_coalesced_frames_low =
+		LOW_TXMAX_FRAMES;
+
+	tp->coalesce_config.rx_coalesce_ticks_high =
+		HIGH_RXCOL_TICKS;
+	tp->coalesce_config.rx_max_coalesced_frames_high =
+		HIGH_RXMAX_FRAMES;
+	tp->coalesce_config.tx_coalesce_ticks_high =
+		HIGH_TXCOL_TICKS;
+	tp->coalesce_config.tx_max_coalesced_frames_high =
+		HIGH_TXMAX_FRAMES;
+
+	/* Active == default */
+	tp->coalesce_config.rx_coalesce_ticks =
+		tp->coalesce_config.rx_coalesce_ticks_def;
+	tp->coalesce_config.rx_max_coalesced_frames =
+		tp->coalesce_config.rx_max_coalesced_frames_def;
+	tp->coalesce_config.tx_coalesce_ticks =
+		tp->coalesce_config.tx_coalesce_ticks_def;
+	tp->coalesce_config.tx_max_coalesced_frames =
+		tp->coalesce_config.tx_max_coalesced_frames_def;
+	tp->coalesce_config.stats_coalesce_ticks =
+		tp->coalesce_config.stats_coalesce_ticks_def;
+
+	tp->coalesce_config.rate_sample_jiffies = (1 * HZ);
+	tp->coalesce_config.pkt_rate_low = 22000;
+	tp->coalesce_config.pkt_rate_high = 61000;
+
+	tp->tg3_flags |= TG3_FLAG_ADAPTIVE_RX;
+	tp->tg3_flags &= ~(TG3_FLAG_ADAPTIVE_TX);
 }
 
 static void __devinit tg3_init_bufmgr_config(struct tg3 *tp)
@@ -5743,6 +6211,13 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 
 	tg3_init_bufmgr_config(tp);
 
+	tp->rx_pending = TG3_DEF_RX_RING_PENDING;
+#if TG3_MINI_RING_WORKS
+	tp->rx_mini_pending = TG3_DEF_RX_MINI_RING_PENDING;
+#endif
+	tp->rx_jumbo_pending = TG3_DEF_RX_JUMBO_RING_PENDING;
+	tp->tx_pending = TG3_DEF_TX_RING_PENDING;
+
 	dev->open = tg3_open;
 	dev->stop = tg3_close;
 	dev->get_stats = tg3_get_stats;
@@ -5777,8 +6252,11 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	/* Tigon3 can do ipv4 only... and some chips have buggy
 	 * checksumming.
 	 */
-	if ((tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) == 0)
+	if ((tp->tg3_flags & TG3_FLAG_BROKEN_CHECKSUMS) == 0) {
 		dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
+		tp->tg3_flags |= TG3_FLAG_RX_CHECKSUMS;
+	} else
+		tp->tg3_flags &= ~TG3_FLAG_RX_CHECKSUMS;
 
 	err = register_netdev(dev);
 	if (err) {

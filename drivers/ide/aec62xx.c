@@ -24,7 +24,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #define DISPLAY_AEC62XX_TIMINGS
 
@@ -412,16 +412,11 @@ static int config_chipset_for_dma (ide_drive_t *drive, byte ultra)
 static void aec62xx_tune_drive (ide_drive_t *drive, byte pio)
 {
 	byte speed;
-	byte new_pio = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
 
-	switch(pio) {
-		case 5:		speed = new_pio; break;
-		case 4:		speed = XFER_PIO_4; break;
-		case 3:		speed = XFER_PIO_3; break;
-		case 2:		speed = XFER_PIO_2; break;
-		case 1:		speed = XFER_PIO_1; break;
-		default:	speed = XFER_PIO_0; break;
-	}
+	if (pio == 255)
+		speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
+	else
+		speed = XFER_PIO_0 + min_t(byte, pio, 4);
 
 	switch(HWIF(drive)->pci_dev->device) {
 		case PCI_DEVICE_ID_ARTOP_ATP850UF:

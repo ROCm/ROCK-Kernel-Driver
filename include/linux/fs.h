@@ -289,7 +289,6 @@ extern void set_bh_page(struct buffer_head *bh, struct page *page, unsigned long
 
 #include <linux/pipe_fs_i.h>
 /* #include <linux/umsdos_fs_i.h> */
-#include <linux/romfs_fs_i.h>
 
 /*
  * Attribute flags.  These should be or-ed together to figure out what
@@ -453,8 +452,6 @@ struct inode {
 	unsigned int		i_attr_flags;
 	__u32			i_generation;
 	union {
-		/* struct umsdos_inode_info	umsdos_i; */
-		struct romfs_inode_info		romfs_i;
 		void				*generic_ip;
 	} u;
 };
@@ -648,17 +645,14 @@ struct quota_mount_options
 #define MNT_FORCE	0x00000001	/* Attempt to forcibily umount */
 #define MNT_DETACH	0x00000002	/* Just detach from the tree */
 
-#include <linux/ext2_fs_sb.h>
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
 #include <linux/ntfs_fs_sb.h>
 #include <linux/msdos_fs_sb.h>
 #include <linux/iso_fs_sb.h>
-#include <linux/nfs_fs_sb.h>
 #include <linux/sysv_fs_sb.h>
 #include <linux/affs_fs_sb.h>
 #include <linux/ufs_fs_sb.h>
-#include <linux/efs_fs_sb.h>
 #include <linux/romfs_fs_sb.h>
 #include <linux/smb_fs_sb.h>
 #include <linux/hfs_fs_sb.h>
@@ -667,7 +661,6 @@ struct quota_mount_options
 #include <linux/reiserfs_fs_sb.h>
 #include <linux/bfs_fs_sb.h>
 #include <linux/udf_fs_sb.h>
-#include <linux/ncp_fs_sb.h>
 #include <linux/jffs2_fs_sb.h>
 
 extern struct list_head super_blocks;
@@ -704,17 +697,14 @@ struct super_block {
 	char s_id[32];				/* Informational name */
 
 	union {
-		struct ext2_sb_info	ext2_sb;
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
 		struct ntfs_sb_info	ntfs_sb;
 		struct msdos_sb_info	msdos_sb;
 		struct isofs_sb_info	isofs_sb;
-		struct nfs_sb_info	nfs_sb;
 		struct sysv_sb_info	sysv_sb;
 		struct affs_sb_info	affs_sb;
 		struct ufs_sb_info	ufs_sb;
-		struct efs_sb_info	efs_sb;
 		struct shmem_sb_info	shmem_sb;
 		struct romfs_sb_info	romfs_sb;
 		struct smb_sb_info	smbfs_sb;
@@ -724,7 +714,6 @@ struct super_block {
 		struct reiserfs_sb_info	reiserfs_sb;
 		struct bfs_sb_info	bfs_sb;
 		struct udf_sb_info	udf_sb;
-		struct ncp_sb_info	ncpfs_sb;
 		struct jffs2_sb_info	jffs2_sb;
 		void			*generic_sbp;
 	} u;
@@ -957,6 +946,11 @@ void kill_block_super(struct super_block *sb);
 void kill_anon_super(struct super_block *sb);
 void kill_litter_super(struct super_block *sb);
 void deactivate_super(struct super_block *sb);
+int set_anon_super(struct super_block *s, void *data);
+struct super_block *sget(struct file_system_type *type,
+			int (*test)(struct super_block *,void *),
+			int (*set)(struct super_block *,void *),
+			void *data);
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \

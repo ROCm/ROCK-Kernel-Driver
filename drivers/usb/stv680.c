@@ -1121,13 +1121,13 @@ static int stv680_newframe (struct usb_stv *stv680, int framenr)
  * Video4Linux
  *********************************************************************/
 
-static int stv_open (struct video_device *dev, int flags)
+static int stv_open (struct inode *inode, struct file *file)
 {
+	struct video_device *dev = video_devdata(file);
 	struct usb_stv *stv680 = (struct usb_stv *) dev;
 	int err = 0;
 
 	/* we are called with the BKL held */
-	MOD_INC_USE_COUNT;
 	stv680->user = 1;
 	err = stv_init (stv680);	/* main initialization routine for camera */
 
@@ -1137,18 +1137,17 @@ static int stv_open (struct video_device *dev, int flags)
 			PDEBUG (0, "STV(e): Could not rvmalloc frame bufer");
 			err = -ENOMEM;
 		}
+		file->private_data = dev;
 	}
-	if (err) {
-		MOD_DEC_USE_COUNT;
+	if (err)
 		stv680->user = 0;
-	}
 
 	return err;
 }
 
-static void stv_close (struct video_device *dev)
+static int stv_close (struct inode *inode, struct file *file)
 {
-	/* called with BKL held */
+	struct video_device *dev = file->private_data;
 	struct usb_stv *stv680 = (struct usb_stv *) dev;
 	int i;
 
@@ -1164,21 +1163,18 @@ static void stv_close (struct video_device *dev)
 	stv680->user = 0;
 
 	if (stv680->removed) {
-		video_unregister_device (&stv680->vdev);
 		kfree (stv680);
 		stv680 = NULL;
 		PDEBUG (0, "STV(i): device unregistered");
 	}
-	MOD_DEC_USE_COUNT;
+	file->private_data = NULL;
+	return 0;
 }
 
-static long stv680_write (struct video_device *dev, const char *buf, unsigned long count, int noblock)
+static int stv680_ioctl (struct inode *inode, struct file *file,
+			 unsigned int cmd, void *arg)
 {
-	return -EINVAL;
-}
-
-static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
-{
+	struct video_device *vdev = file->private_data;
 	struct usb_stv *stv680 = (struct usb_stv *) vdev;
 
 	if (!stv680->udev)
@@ -1186,89 +1182,57 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 
 	switch (cmd) {
 	case VIDIOCGCAP:{
-			struct video_capability b;
+			struct video_capability *b = arg;
 
-			strcpy (b.name, stv680->camera_name);
-			b.type = VID_TYPE_CAPTURE;
-			b.channels = 1;
-			b.audios = 0;
-			b.maxwidth = stv680->maxwidth;
-			b.maxheight = stv680->maxheight;
-			b.minwidth = stv680->maxwidth / 2;
-			b.minheight = stv680->maxheight / 2;
-
-			if (copy_to_user (arg, &b, sizeof (b))) {
-				PDEBUG (2, "STV(e): VIDIOCGGAP failed");
-				return -EFAULT;
-			}
+			strcpy (b->name, stv680->camera_name);
+			b->type = VID_TYPE_CAPTURE;
+			b->channels = 1;
+			b->audios = 0;
+			b->maxwidth = stv680->maxwidth;
+			b->maxheight = stv680->maxheight;
+			b->minwidth = stv680->maxwidth / 2;
+			b->minheight = stv680->maxheight / 2;
 			return 0;
 		}
 	case VIDIOCGCHAN:{
-			struct video_channel v;
+			struct video_channel *v = arg;
 
-			if (copy_from_user (&v, arg, sizeof (v)))
-				return -EFAULT;
-			if (v.channel != 0)
+			if (v->channel != 0)
 				return -EINVAL;
-
-			v.flags = 0;
-			v.tuners = 0;
-			v.type = VIDEO_TYPE_CAMERA;
-			strcpy (v.name, "STV Camera");
-
-			if (copy_to_user (arg, &v, sizeof (v))) {
-				PDEBUG (2, "STV(e): VIDIOCGCHAN failed");
-				return -EFAULT;
-			}
+			v->flags = 0;
+			v->tuners = 0;
+			v->type = VIDEO_TYPE_CAMERA;
+			strcpy (v->name, "STV Camera");
 			return 0;
 		}
 	case VIDIOCSCHAN:{
-			int v;
-
-			if (copy_from_user (&v, arg, sizeof (v))) {
-				PDEBUG (2, "STV(e): VIDIOCSCHAN failed");
-				return -EFAULT;
-			}
-			if (v != 0)
+			struct video_channel *v = arg;
+			if (v->channel != 0)
 				return -EINVAL;
-
 			return 0;
 		}
 	case VIDIOCGPICT:{
-			struct video_picture p;
+			struct video_picture *p = arg;
 
-			stv680_get_pict (stv680, &p);
-			if (copy_to_user (arg, &p, sizeof (p))) {
-				PDEBUG (2, "STV(e): VIDIOCGPICT failed");
-				return -EFAULT;
-			}
+			stv680_get_pict (stv680, p);
 			return 0;
 		}
 	case VIDIOCSPICT:{
-			struct video_picture p;
+			struct video_picture *p = arg;
 
-			if (copy_from_user (&p, arg, sizeof (p))) {
-				PDEBUG (2, "STV(e): VIDIOCSPICT failed");
-				return -EFAULT;
-			}
-			copy_from_user (&p, arg, sizeof (p));
-			PDEBUG (2, "STV(i): palette set to %i in VIDIOSPICT", p.palette);
-
-			if (stv680_set_pict (stv680, &p))
+			if (stv680_set_pict (stv680, p))
 				return -EINVAL;
 			return 0;
 		}
 	case VIDIOCSWIN:{
-			struct video_window vw;
+			struct video_window *vw = arg;
 
-			if (copy_from_user (&vw, arg, sizeof (vw)))
-				return -EFAULT;
-			if (vw.flags)
+			if (vw->flags)
 				return -EINVAL;
-			if (vw.clipcount)
+			if (vw->clipcount)
 				return -EINVAL;
-			if (vw.width != stv680->vwidth) {
-				if (stv680_set_size (stv680, vw.width, vw.height)) {
+			if (vw->width != stv680->vwidth) {
+				if (stv680_set_size (stv680, vw->width, vw->height)) {
 					PDEBUG (2, "STV(e): failed (from user) set size in VIDIOCSWIN");
 					return -EINVAL;
 				}
@@ -1276,74 +1240,59 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 			return 0;
 		}
 	case VIDIOCGWIN:{
-			struct video_window vw;
+			struct video_window *vw = arg;
 
-			vw.x = 0;	/* FIXME */
-			vw.y = 0;
-			vw.chromakey = 0;
-			vw.flags = 0;
-			vw.clipcount = 0;
-			vw.width = stv680->vwidth;
-			vw.height = stv680->vheight;
-
-			if (copy_to_user (arg, &vw, sizeof (vw))) {
-				PDEBUG (2, "STV(e): VIDIOCGWIN failed");
-				return -EFAULT;
-			}
+			vw->x = 0;	/* FIXME */
+			vw->y = 0;
+			vw->chromakey = 0;
+			vw->flags = 0;
+			vw->clipcount = 0;
+			vw->width = stv680->vwidth;
+			vw->height = stv680->vheight;
 			return 0;
 		}
 	case VIDIOCGMBUF:{
-			struct video_mbuf vm;
+			struct video_mbuf *vm = arg;
 			int i;
 
-			memset (&vm, 0, sizeof (vm));
-			vm.size = STV680_NUMFRAMES * stv680->maxframesize;
-			vm.frames = STV680_NUMFRAMES;
+			memset (vm, 0, sizeof (*vm));
+			vm->size = STV680_NUMFRAMES * stv680->maxframesize;
+			vm->frames = STV680_NUMFRAMES;
 			for (i = 0; i < STV680_NUMFRAMES; i++)
-				vm.offsets[i] = stv680->maxframesize * i;
-
-			if (copy_to_user ((void *) arg, (void *) &vm, sizeof (vm))) {
-				PDEBUG (2, "STV(e): VIDIOCGMBUF failed");
-				return -EFAULT;
-			}
-
+				vm->offsets[i] = stv680->maxframesize * i;
 			return 0;
 		}
 	case VIDIOCMCAPTURE:{
-			struct video_mmap vm;
+			struct video_mmap *vm = arg;
 
-			if (copy_from_user (&vm, arg, sizeof (vm))) {
-				PDEBUG (2, "STV(e): VIDIOCMCAPTURE failed");
-				return -EFAULT;
-			}
-			if (vm.format != STV_VIDEO_PALETTE) {
+			if (vm->format != STV_VIDEO_PALETTE) {
 				PDEBUG (2, "STV(i): VIDIOCMCAPTURE vm.format (%i) != VIDEO_PALETTE (%i)",
-					vm.format, STV_VIDEO_PALETTE);
-				if ((vm.format == 3) && (swapRGB_on == 0))  {
+					vm->format, STV_VIDEO_PALETTE);
+				if ((vm->format == 3) && (swapRGB_on == 0))  {
 					PDEBUG (2, "STV(i): VIDIOCMCAPTURE swapRGB is (auto) ON");
 					/* this may fix those apps (e.g., xawtv) that want BGR */
 					swapRGB = 1;
 				}
 				return -EINVAL;
 			}
-			if (vm.frame >= STV680_NUMFRAMES) {
+			if (vm->frame >= STV680_NUMFRAMES) {
 				PDEBUG (2, "STV(e): VIDIOCMCAPTURE vm.frame > NUMFRAMES");
 				return -EINVAL;
 			}
-			if ((stv680->frame[vm.frame].grabstate == FRAME_ERROR)
-			    || (stv680->frame[vm.frame].grabstate == FRAME_GRABBING)) {
+			if ((stv680->frame[vm->frame].grabstate == FRAME_ERROR)
+			    || (stv680->frame[vm->frame].grabstate == FRAME_GRABBING)) {
 				PDEBUG (2, "STV(e): VIDIOCMCAPTURE grabstate (%i) error",
-					stv680->frame[vm.frame].grabstate);
+					stv680->frame[vm->frame].grabstate);
 				return -EBUSY;
 			}
 			/* Is this according to the v4l spec??? */
-			if (stv680->vwidth != vm.width) {
-				if (stv680_set_size (stv680, vm.width, vm.height)) {
+			if (stv680->vwidth != vm->width) {
+				if (stv680_set_size (stv680, vm->width, vm->height)) {
 					PDEBUG (2, "STV(e): VIDIOCMCAPTURE set_size failed");
 					return -EINVAL;
 				}
 			}
-			stv680->frame[vm.frame].grabstate = FRAME_READY;
+			stv680->frame[vm->frame].grabstate = FRAME_READY;
 
 			if (!stv680->streaming)
 				stv680_start_stream (stv680);
@@ -1351,30 +1300,21 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 			return 0;
 		}
 	case VIDIOCSYNC:{
-			int frame, ret = 0;
+			int *frame = arg;
+			int ret = 0;
 
-			if (copy_from_user ((void *) &frame, arg, sizeof (int))) {
-				PDEBUG (2, "STV(e): VIDIOCSYNC failed");
-				return -EFAULT;
-			}
-			if (frame < 0 || frame >= STV680_NUMFRAMES) {
+			if (*frame < 0 || *frame >= STV680_NUMFRAMES) {
 				PDEBUG (2, "STV(e): Bad frame # in VIDIOCSYNC");
 				return -EINVAL;
 			}
-			ret = stv680_newframe (stv680, frame);
-			stv680->frame[frame].grabstate = FRAME_UNUSED;
+			ret = stv680_newframe (stv680, *frame);
+			stv680->frame[*frame].grabstate = FRAME_UNUSED;
 			return ret;
 		}
 	case VIDIOCGFBUF:{
-			struct video_buffer vb;
+			struct video_buffer *vb = arg;
 
-			memset (&vb, 0, sizeof (vb));
-			vb.base = NULL;	/* frame buffer not supported, not used */
-
-			if (copy_to_user ((void *) arg, (void *) &vb, sizeof (vb))) {
-				PDEBUG (2, "STV(e): VIDIOCSYNC failed");
-				return -EFAULT;
-			}
+			memset (vb, 0, sizeof (*vb));
 			return 0;
 		}
 	case VIDIOCKEY:
@@ -1402,10 +1342,12 @@ static int stv680_ioctl (struct video_device *vdev, unsigned int cmd, void *arg)
 	return 0;
 }
 
-static int stv680_mmap (struct vm_area_struct *vma, struct video_device *dev, const char *adr, unsigned long size)
+static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 {
+	struct video_device *dev = file->private_data;
 	struct usb_stv *stv680 = (struct usb_stv *) dev;
-	unsigned long start = (unsigned long) adr;
+	unsigned long start = vma->vm_start;
+	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
 
 	down (&stv680->lock);
@@ -1438,8 +1380,10 @@ static int stv680_mmap (struct vm_area_struct *vma, struct video_device *dev, co
 	return 0;
 }
 
-static long stv680_read (struct video_device *dev, char *buf, unsigned long count, int noblock)
+static int stv680_read (struct file *file, char *buf,
+			size_t count, loff_t *ppos)
 {
+	struct video_device *dev = file->private_data;
 	unsigned long int realcount = count;
 	int ret = 0;
 	struct usb_stv *stv680 = (struct usb_stv *) dev;
@@ -1484,28 +1428,22 @@ static long stv680_read (struct video_device *dev, char *buf, unsigned long coun
 	return realcount;
 }				/* stv680_read */
 
-static int stv_init_done (struct video_device *dev)
-{
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	if (create_proc_stv680_cam ((struct usb_stv *) dev) < 0)
-		return -1;
-#endif
-	return 0;
-}
-
+static struct file_operations stv680_fops = {
+	owner:		THIS_MODULE,
+	open:		stv_open,
+	release:       	stv_close,
+	read:		stv680_read,
+	mmap:		stv680_mmap,
+	ioctl:          video_generic_ioctl,
+	llseek:         no_llseek,
+};
 static struct video_device stv680_template = {
 	owner:		THIS_MODULE,
 	name:		"STV0680 USB camera",
 	type:		VID_TYPE_CAPTURE,
 	hardware:	VID_HARDWARE_SE401,
-	open:		stv_open,
-	close:		stv_close,
-	read:		stv680_read,
-	write:		stv680_write,
-	ioctl:		stv680_ioctl,
-	mmap:		stv680_mmap,
-	initialize:	stv_init_done,
+	fops:           &stv680_fops,
+	kernel_ioctl:	stv680_ioctl,
 };
 
 static void *__devinit stv680_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
@@ -1552,6 +1490,9 @@ static void *__devinit stv680_probe (struct usb_device *dev, unsigned int ifnum,
 		PDEBUG (0, "STV(e): video_register_device failed");
 		return NULL;
 	}
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+	create_proc_stv680_cam (stv680);
+#endif
 	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev.minor);
 
 	return stv680;
@@ -1593,15 +1534,13 @@ static void stv680_disconnect (struct usb_device *dev, void *ptr)
 {
 	struct usb_stv *stv680 = (struct usb_stv *) ptr;
 
-	lock_kernel ();
 	/* We don't want people trying to open up the device */
+	video_unregister_device (&stv680->vdev);
 	if (!stv680->user) {
-		video_unregister_device (&stv680->vdev);
 		usb_stv680_remove_disconnected (stv680);
 	} else {
 		stv680->removed = 1;
 	}
-	unlock_kernel ();
 }
 
 static struct usb_driver stv680_driver = {

@@ -551,7 +551,6 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 {
 	struct request *rq	= HWGROUP(drive)->rq;
 	task_struct_t *taskfile	= (task_struct_t *) task->tfRegister;
-	ide_startstop_t startstop;
 	unsigned long timeout;
 	byte stat;
 

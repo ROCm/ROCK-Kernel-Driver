@@ -303,7 +303,7 @@ static inline unsigned long ext2_find_near(struct inode *inode, Indirect *ind)
 	 * the same cylinder group then.
 	 */
 	return (ei->i_block_group * EXT2_BLOCKS_PER_GROUP(inode->i_sb)) +
-	       le32_to_cpu(inode->i_sb->u.ext2_sb.s_es->s_first_data_block);
+	       le32_to_cpu(EXT2_SB(inode->i_sb)->s_es->s_first_data_block);
 }
 
 /**
@@ -886,7 +886,7 @@ static struct ext2_inode *ext2_get_inode(struct super_block *sb, ino_t ino,
 	*p = NULL;
 	if ((ino != EXT2_ROOT_INO && ino != EXT2_ACL_IDX_INO &&
 	     ino != EXT2_ACL_DATA_INO && ino < EXT2_FIRST_INO(sb)) ||
-	    ino > le32_to_cpu(sb->u.ext2_sb.s_es->s_inodes_count))
+	    ino > le32_to_cpu(EXT2_SB(sb)->s_es->s_inodes_count))
 		goto Einval;
 
 	block_group = (ino - 1) / EXT2_INODES_PER_GROUP(sb);

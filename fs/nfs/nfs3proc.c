@@ -17,6 +17,37 @@
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
+/* A wrapper to handle the EJUKEBOX error message */
+static int
+nfs3_rpc_wrapper(struct rpc_clnt *clnt, struct rpc_message *msg, int flags)
+{
+	sigset_t oldset;
+	int res;
+	rpc_clnt_sigmask(clnt, &oldset);
+	do {
+		res = rpc_call_sync(clnt, msg, flags);
+		if (res != -EJUKEBOX)
+			break;
+		set_current_state(TASK_INTERRUPTIBLE);
+		schedule_timeout(NFS_JUKEBOX_RETRY_TIME);
+		res = -ERESTARTSYS;
+	} while (!signalled());
+	rpc_clnt_sigunmask(clnt, &oldset);
+	return res;
+}
+
+static inline int
+nfs3_rpc_call_wrapper(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)
+{
+	struct rpc_message msg = { proc, argp, resp, NULL };
+	return nfs3_rpc_wrapper(clnt, &msg, flags);
+}
+
+#define rpc_call(clnt, proc, argp, resp, flags) \
+		nfs3_rpc_call_wrapper(clnt, proc, argp, resp, flags)
+#define rpc_call_sync(clnt, msg, flags) \
+		nfs3_rpc_wrapper(clnt, msg, flags)
+
 /*
  * Bare-bones access to getattr: this is for nfs_read_super.
  */

@@ -23,7 +23,7 @@
 
 #include <asm/io.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 #ifndef SPLIT_BYTE
 #define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
@@ -272,17 +272,17 @@ static void program_drive_counts (ide_drive_t *drive, int setup_count, int activ
 
 /*
  * Attempts to set the interface PIO mode.
- * The preferred method of selecting PIO modes (e.g. mode 4) is 
+ * The preferred method of selecting PIO modes (e.g. mode 4) is
  * "echo 'piomode:4' > /proc/ide/hdx/settings".  Special cases are
  * 8: prefetch off, 9: prefetch on, 255: auto-select best mode.
  * Called with 255 at boot time.
  */
 static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 {
-	int setup_time, active_time, recovery_time, clock_time, pio_mode, cycle_time;
+	int recovery_time, clock_time;
 	byte recovery_count2, cycle_count;
 	int setup_count, active_count, recovery_count;
-	ide_pio_data_t  d;
+	struct ata_timing *t;
 
 	switch (mode_wanted) {
 		case 8: /* set prefetch off */
@@ -291,27 +291,21 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 			/*set_prefetch_mode(index, mode_wanted);*/
 			cmdprintk("%s: %sabled cmd640 prefetch\n", drive->name, mode_wanted ? "en" : "dis");
 			return;
+		case 255: mode_wanted = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	}
 
-	mode_wanted = ide_get_best_pio_mode (drive, mode_wanted, 5, &d);
-	pio_mode = d.pio_mode;
-	cycle_time = d.cycle_time;
+	t = ata_timing_data(XFER_PIO_0 + min_t(byte, mode_wanted, 4));
 
 	/*
 	 * I copied all this complicated stuff from cmd640.c and made a few minor changes.
 	 * For now I am just going to pray that it is correct.
 	 */
-	if (pio_mode > 5)
-		pio_mode = 5;
-	setup_time  = ide_pio_timings[pio_mode].setup_time;
-	active_time = ide_pio_timings[pio_mode].active_time;
-	recovery_time = cycle_time - (setup_time + active_time);
+
+	recovery_time = t->cycle - (t->setup + t->active);
 	clock_time = 1000 / system_bus_speed;
-	cycle_count = (cycle_time + clock_time - 1) / clock_time;
-
-	setup_count = (setup_time + clock_time - 1) / clock_time;
-
-	active_count = (active_time + clock_time - 1) / clock_time;
+	cycle_count = (t->cycle + clock_time - 1) / clock_time;
+	setup_count = (t->setup + clock_time - 1) / clock_time;
+	active_count = (t->active + clock_time - 1) / clock_time;
 
 	recovery_count = (recovery_time + clock_time - 1) / clock_time;
 	recovery_count2 = cycle_count - (setup_count + active_count);
@@ -334,9 +328,8 @@ static void cmd64x_tuneproc (ide_drive_t *drive, byte mode_wanted)
 	 */
 	program_drive_counts (drive, setup_count, active_count, recovery_count);
 
-	cmdprintk("%s: selected cmd646 PIO mode%d : %d (%dns)%s, clocks=%d/%d/%d\n",
-		drive->name, pio_mode, mode_wanted, cycle_time,
-		d.overridden ? " (overriding vendor mode)" : "",
+	cmdprintk("%s: selected cmd646 PIO mode%d : %d (%dns), clocks=%d/%d/%d\n",
+		drive->name, t.mode - XFER_PIO_0, mode_wanted, cycle_time,
 		setup_count, active_count, recovery_count);
 }
 
@@ -391,7 +384,7 @@ static void cmd680_tuneproc (ide_drive_t *drive, byte mode_wanted)
 static void config_cmd64x_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 {
 	byte speed	= 0x00;
-	byte set_pio	= ide_get_best_pio_mode(drive, 4, 5, NULL);
+	byte set_pio	= ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 	cmd64x_tuneproc(drive, set_pio);
 	speed = XFER_PIO_0 + set_pio;
@@ -408,7 +401,7 @@ static void config_cmd680_chipset_for_pio (ide_drive_t *drive, byte set_speed)
 	u8 speed		= 0x00;
 	u8 mode_pci		= 0x00;
 	u8 channel_timings	= cmd680_taskfile_timing(hwif);
-	u8 set_pio		= ide_get_best_pio_mode(drive, 4, 5, NULL);
+	u8 set_pio		= ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 
 	pci_read_config_byte(dev, addr_mask, &mode_pci);
 	mode_pci &= ~((unit) ? 0x30 : 0x03);

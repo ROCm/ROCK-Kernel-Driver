@@ -223,4 +223,6 @@ static inline void flush_tlb_pgtables(struct mm_struct *mm,
 	/* i386 does not keep any page table caches in TLB */
 }
 
+#define check_pgt_cache()	do { } while (0)
+
 #endif /* _I386_PGALLOC_H */

@@ -62,7 +62,7 @@ struct tvcard
 {
 	[ ... ]
         u32 gpiomask;
-        u32 audiomux[5];  /* audio mux: tuner, radio, external, internal, mute */
+        u32 audiomux[6]; /* Tuner, Radio, external, internal, mute, stereo */
 };
 
 gpiomask specifies which pins are used to control the audio mux chip.
@@ -127,6 +127,9 @@ tuner_type      - same as tuner= insmod option
 *_modulename    - hint whenever some card needs this or that audio
                   module loaded to work properly.
 has_radio	- whenever this TV card has a radio tuner.
+no_msp34xx	- "1" disables loading of msp3400.o module
+no_tda9875	- "1" disables loading of tda9875.o module 
+needs_tvaudio	- set to "1" to load tvaudio.o module 
 
 If some config item is specified both from the tvcards array and as
 insmod option, the insmod option takes precedence.

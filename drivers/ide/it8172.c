@@ -41,7 +41,7 @@
 #include <asm/io.h>
 #include <asm/it8172/it8172_int.h>
 
-#include "ide_modes.h"
+#include "ata-timing.h"
 
 /*
  * Prototypes
@@ -64,8 +64,12 @@ static void it8172_tune_drive (ide_drive_t *drive, byte pio)
     int is_slave	= (&HWIF(drive)->drives[1] == drive);
     int master_port	= 0x40;
     int slave_port      = 0x44;
-    
-    pio = ide_get_best_pio_mode(drive, pio, 5, NULL);
+
+    if (pio == 255)
+	pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+    else
+       pio = min_t(byte, pio, 4);
+
     pci_read_config_word(HWIF(drive)->pci_dev, master_port, &master_data);
     pci_read_config_dword(HWIF(drive)->pci_dev, slave_port, &slave_data);
 
@@ -181,30 +185,12 @@ static int it8172_tune_chipset (ide_drive_t *drive, byte speed)
     return err;
 }
 
-static int it8172_config_drive_for_dma (ide_drive_t *drive)
+static int it8172_config_drive_for_dma(ide_drive_t *drive)
 {
     struct hd_driveid *id = drive->id;
     byte speed;
 
-    if (id->dma_ultra & 0x0010) {
-	speed = XFER_UDMA_2;
-    } else if (id->dma_ultra & 0x0008) {
-	speed = XFER_UDMA_1;
-    } else if (id->dma_ultra & 0x0004) {
-	speed = XFER_UDMA_2;
-    } else if (id->dma_ultra & 0x0002) {
-	speed = XFER_UDMA_1;
-    } else if (id->dma_ultra & 0x0001) {
-	speed = XFER_UDMA_0;
-    } else if (id->dma_mword & 0x0004) {
-	speed = XFER_MW_DMA_2;
-    } else if (id->dma_mword & 0x0002) {
-	speed = XFER_MW_DMA_1;
-    } else if (id->dma_1word & 0x0004) {
-	speed = XFER_SW_DMA_2;
-    } else {
-	speed = XFER_PIO_0 + ide_get_best_pio_mode(drive, 255, 5, NULL);
-    }
+    speed = ata_timing_mode(drive, XFER_PIO | XFER_EPIO | XFER_SWDMA | XFER_MWDMA | XFER_UDMA);
 
     (void) it8172_tune_chipset(drive, speed);
 
