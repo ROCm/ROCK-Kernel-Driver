@@ -951,19 +951,19 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 	} else {
 		base -= buf->head->iov_len;
 		if (base < buf->page_len) {
-			ppages = buf->pages +
-				 ((base + buf->page_base) >> PAGE_CACHE_SHIFT);
-			c = kmap(*ppages) +
-			    ((base + buf->page_base) & ~PAGE_CACHE_MASK);
+			base += buf->page_base;
+			ppages = buf->pages + (base >> PAGE_CACHE_SHIFT);
 			todo  = desc->array_len * desc->elem_size;
 			avail_here = min(todo, buf->page_len - base);
+			unsigned int avail_page = PAGE_CACHE_SIZE -
+						  (base & ~PAGE_CACHE_MASK);
+			avail_page = min(avail_here, avail_page);
+			c = kmap(*ppages) + (base & ~PAGE_CACHE_MASK);
+			base -= buf->page_base;
+
 		    process_pages:
 			todo -= avail_here;
 			while (avail_here) {
-				unsigned int avail_page = PAGE_CACHE_SIZE;
-				if (ppages == buf->pages)
-					avail_page -= buf->page_base;
-				avail_page = min(avail_here, avail_page);
 				avail_here -= avail_page;
 				if (copied || avail_page < desc->elem_size) {
 					unsigned int l = min(avail_page,
@@ -976,11 +976,12 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 					avail_page -= l;
 					c += l;
 					if (copied == desc->elem_size) {
-						if (!encode)
+						if (!encode) {
 							err = desc->xcode(
 								desc, elem);
 							if (err)
 								goto out;
+						}
 						copied = 0;
 					}
 				}
@@ -1007,12 +1008,13 @@ xdr_xcode_array2(struct xdr_buf *buf, unsigned int base,
 					copied += l;
 				}
 				if (avail_here) {
-					kunmap(*ppages++);
+					kunmap(*ppages);
+					ppages++;
 					c = kmap(*ppages);
-					avail_page = min(
-						(unsigned int) PAGE_CACHE_SIZE,
-						(unsigned int) avail_here);
 				}
+
+				avail_page = min(avail_here,
+					 (unsigned int) PAGE_CACHE_SIZE);
 			}
 			if (todo) {
 				c = buf->tail->iov_base;
