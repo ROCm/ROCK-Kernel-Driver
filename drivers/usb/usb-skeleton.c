@@ -525,6 +525,7 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	int minor;
 	int buffer_size;
 	int i;
+	int retval;
 	char name[10];
 
 	
@@ -535,14 +536,20 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	}
 
 	down (&minor_table_mutex);
-	if (usb_register_dev (&skel_driver, 1, &minor)) {
+	retval = usb_register_dev (&skel_driver, 1, &minor);
+	if (retval) {
+		if (retval != -ENODEV) {
+			/* something prevented us from registering this driver */
+			err ("Not able to get a minor for this device.");
+			goto exit;
+		}
 		/* we could not get a dynamic minor, so lets find one of our own */
 		for (minor = 0; minor < MAX_DEVICES; ++minor) {
 			if (minor_table[minor] == NULL)
 				break;
 		}
 		if (minor >= MAX_DEVICES) {
-			info ("Too many devices plugged in, can not handle this device.");
+			err ("Too many devices plugged in, can not handle this device.");
 			goto exit;
 		}
 	}

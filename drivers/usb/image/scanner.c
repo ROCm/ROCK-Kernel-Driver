@@ -812,6 +812,7 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	int ep_cnt;
 	int ix;
 	int scn_minor;
+	int retval;
 
 	char valid_device = 0;
 	char have_bulk_in, have_bulk_out, have_intr;
@@ -953,7 +954,13 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	
 	down(&scn_mutex);
 
-	if (usb_register_dev(&scanner_driver, 1, &scn_minor)) {
+	retval = usb_register_dev(&scanner_driver, 1, &scn_minor);
+	if (retval) {
+		if (retval != -ENODEV) {
+			err ("Not able to get a minor for this device.");
+			up(&scn_mutex);
+			return NULL;
+		}
 		for (scn_minor = 0; scn_minor < SCN_MAX_MNR; scn_minor++) {
 			if (!p_scn_table[scn_minor])
 				break;

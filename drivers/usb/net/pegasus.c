@@ -62,6 +62,8 @@
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
+static const char driver_name [] = "pegasus";
+
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
 #define	BMSR_MEDIA	(BMSR_10HALF | BMSR_10FULL | BMSR_100HALF | \
@@ -811,7 +813,6 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 {
 	pegasus_t *pegasus;
 	int cmd;
-	char tmp[128];
 
 	pegasus = net->priv;
 	if (get_user(cmd, (int *) uaddr))
@@ -819,12 +820,11 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 	switch (cmd) {
 	case ETHTOOL_GDRVINFO:{
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-			strncpy(info.driver, DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+			strncpy(info.driver, driver_name, sizeof info.driver);
 			strncpy(info.version, DRIVER_VERSION,
 				ETHTOOL_BUSINFO_LEN);
-			sprintf(tmp, "usb%d:%d", pegasus->usb->bus->busnum,
-				pegasus->usb->devnum);
-			strncpy(info.bus_info, tmp, ETHTOOL_BUSINFO_LEN);
+			usb_make_path(pegasus->usb, info.bus_info,
+				sizeof info.bus_info);
 			if (copy_to_user(uaddr, &info, sizeof(info)))
 				return -EFAULT;
 			return 0;
@@ -833,8 +833,7 @@ static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
 			struct ethtool_cmd ecmd;
 			short lpa, bmcr;
 
-			if (copy_from_user(&ecmd, uaddr, sizeof(ecmd)))
-				return -EFAULT;
+			memset(&ecmd, 0, sizeof ecmd);
 			ecmd.supported = (SUPPORTED_10baseT_Half |
 					  SUPPORTED_10baseT_Full |
 					  SUPPORTED_100baseT_Half |
@@ -1104,7 +1103,7 @@ static void pegasus_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver pegasus_driver = {
-	name:		"pegasus",
+	name:		driver_name,
 	probe:		pegasus_probe,
 	disconnect:	pegasus_disconnect,
 	id_table:	pegasus_ids,

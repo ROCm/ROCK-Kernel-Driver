@@ -327,6 +327,7 @@ void usb_stor_show_sense(
 	case 0x3502: what="enclosure services unavailable"; break;
 	case 0x3503: what="enclosure services transfer failure"; break;
 	case 0x3504: what="enclosure services transfer refused"; break;
+	case 0x3A00: what="medium not present"; break;
 	case 0x3B0F: what="end of medium reached"; break;
 	case 0x3F02: what="changed operating definition"; break;
 	case 0x4100: what="data path failure (should use 40 NN)"; break;

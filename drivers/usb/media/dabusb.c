@@ -727,6 +727,7 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 			   const struct usb_device_id *id)
 {
 	int devnum;
+	int retval;
 	pdabusb_t s;
 
 	dbg("dabusb: probe: vendor id 0x%x, device id 0x%x ifnum:%d",
@@ -739,7 +740,10 @@ static void *dabusb_probe (struct usb_device *usbdev, unsigned int ifnum,
 	if (ifnum != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
 		return NULL;
 
-	if (usb_register_dev (&dabusb_driver, 1, &devnum)) {
+	retval = usb_register_dev (&dabusb_driver, 1, &devnum);
+	if (retval) {
+		if (retval != -ENODEV)
+			return NULL;
 		devnum = dabusb_find_struct ();
 		if (devnum == -1)
 			return NULL;

@@ -1948,7 +1948,13 @@ static void *auerswald_probe (struct usb_device *usbdev, unsigned int ifnum,
 	init_waitqueue_head (&cp->bufferwait);
 
 	down (&dev_table_mutex);
-	if (usb_register_dev (&auerswald_driver, 1, &dtindex)) {
+	ret = usb_register_dev (&auerswald_driver, 1, &dtindex);
+	if (ret) {
+		if (ret != -ENODEV) {
+			err ("Not able to get a minor for this device.");
+			up (&dev_table_mutex);
+			goto pfail;
+		}
 		/* find a free slot in the device table */
 		for (dtindex = 0; dtindex < AUER_MAX_DEVICES; ++dtindex) {
 			if (dev_table[dtindex] == NULL)
