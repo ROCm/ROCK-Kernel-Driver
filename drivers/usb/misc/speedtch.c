@@ -167,8 +167,8 @@ struct udsl_control {
 	struct atm_skb_data atm_data;
 	unsigned int num_cells;
 	unsigned int num_entire;
-	unsigned char cell_header [ATM_CELL_HEADER];
 	unsigned int pdu_padding;
+	unsigned char cell_header [ATM_CELL_HEADER];
 	unsigned char aal5_trailer [ATM_AAL5_TRAILER];
 };
 
@@ -483,8 +483,7 @@ static unsigned int udsl_write_cells (unsigned int howmany, struct sk_buff *skb,
 		memset (target, 0, ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER);
 		target += ATM_CELL_PAYLOAD - ATM_AAL5_TRAILER;
 
-		if (--ctrl->num_cells)
-			BUG();
+		BUG_ON (--ctrl->num_cells);
 	}
 
 	memcpy (target, ctrl->aal5_trailer, ATM_AAL5_TRAILER);
@@ -674,11 +673,11 @@ static void udsl_complete_send (struct urb *urb, struct pt_regs *regs)
 static void udsl_process_send (unsigned long data)
 {
 	struct udsl_send_buffer *buf;
-	int err;
 	struct udsl_instance_data *instance = (struct udsl_instance_data *) data;
-	unsigned int num_written;
 	struct sk_buff *skb;
 	struct udsl_sender *snd;
+	int err;
+	unsigned int num_written;
 
 made_progress:
 	spin_lock_irq (&instance->send_lock);
@@ -712,16 +711,15 @@ made_progress:
 			list_add (&snd->list, &instance->spare_senders);
 			spin_unlock_irq (&instance->send_lock);
 			list_add (&buf->list, &instance->filled_send_buffers);
-			return;
+			return; /* bail out */
 		}
 
 		spin_lock_irq (&instance->send_lock);
 	} /* while */
 	spin_unlock_irq (&instance->send_lock);
 
-	if (!instance->current_skb && !(instance->current_skb = skb_dequeue (&instance->sndqueue))) {
+	if (!instance->current_skb && !(instance->current_skb = skb_dequeue (&instance->sndqueue)))
 		return; /* done - no more skbs */
-	}
 
 	skb = instance->current_skb;
 
