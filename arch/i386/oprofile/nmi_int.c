@@ -58,7 +58,7 @@ static void nmi_save_registers(struct op_msrs * msrs)
 	unsigned int const nr_ctrls = model->num_controls; 
 	struct op_msr_group * counters = &msrs->counters;
 	struct op_msr_group * controls = &msrs->controls;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < nr_ctrs; ++i) {
 		rdmsr(counters->addrs[i],
@@ -108,7 +108,7 @@ static void nmi_restore_registers(struct op_msrs * msrs)
 	unsigned int const nr_ctrls = model->num_controls; 
 	struct op_msr_group * counters = &msrs->counters;
 	struct op_msr_group * controls = &msrs->controls;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < nr_ctrls; ++i) {
 		wrmsr(controls->addrs[i],
@@ -182,7 +182,7 @@ struct op_counter_config counter_config[OP_MAX_COUNTER];
 
 static int nmi_create_files(struct super_block * sb, struct dentry * root)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < model->num_counters; ++i) {
 		struct dentry * dir;

@@ -33,7 +33,7 @@ static int sysfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_op = &sysfs_ops;
 	sysfs_sb = sb;
 
-	inode = sysfs_new_inode(S_IFDIR | S_IRUGO | S_IWUSR);
+	inode = sysfs_new_inode(S_IFDIR | S_IRWXU | S_IRUGO | S_IXUGO);
 	if (inode) {
 		inode->i_op = &simple_dir_inode_operations;
 		inode->i_fop = &simple_dir_operations;

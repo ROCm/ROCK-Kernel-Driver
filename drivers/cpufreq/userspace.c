@@ -511,7 +511,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_min_freq[cpu] = policy->min;
 		cpu_max_freq[cpu] = policy->max;
 		cpu_cur_freq[cpu] = policy->cur;
-		device_create_file (policy->intf.dev, &dev_attr_scaling_setspeed);
+		device_create_file (policy->dev, &dev_attr_scaling_setspeed);
 		memcpy (&current_policy[cpu], policy, sizeof(struct cpufreq_policy));
 		up(&userspace_sem);
 		break;
@@ -520,7 +520,7 @@ static int cpufreq_governor_userspace(struct cpufreq_policy *policy,
 		cpu_is_managed[cpu] = 0;
 		cpu_min_freq[cpu] = 0;
 		cpu_max_freq[cpu] = 0;
-		device_remove_file (policy->intf.dev, &dev_attr_scaling_setspeed);
+		device_remove_file (policy->dev, &dev_attr_scaling_setspeed);
 		up(&userspace_sem);
 		module_put(THIS_MODULE);
 		break;

@@ -125,9 +125,7 @@ int register_filesystem(struct file_system_type * fs)
 	if (!res) {
 		/* we implicitly possess reference to @fs during registration,
 		 * so it cannot be unregister from under us. */
-		if (register_fs_subsys(fs))
-			printk(KERN_WARNING "Failed to register '%s' in sysfs\n",
-			       fs->name);
+		register_fs_subsys(fs);
 	}
 	return res;
 }
