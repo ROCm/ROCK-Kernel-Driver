@@ -252,8 +252,24 @@ extern void tasklet_init(struct tasklet_struct *t,
  * or zero if none occurred, or a negative irq number
  * if more than one irq occurred.
  */
+
+#if defined(CONFIG_GENERIC_HARDIRQS) && !defined(CONFIG_GENERIC_IRQ_PROBE) 
+static inline unsigned long probe_irq_on(void)
+{
+	return 0;
+}
+static inline int probe_irq_off(unsigned long val)
+{
+	return 0;
+}
+static inline unsigned int probe_irq_mask(unsigned long val)
+{
+	return 0;
+}
+#else
 extern unsigned long probe_irq_on(void);	/* returns 0 on failure */
 extern int probe_irq_off(unsigned long);	/* returns 0 or negative on failure */
 extern unsigned int probe_irq_mask(unsigned long);	/* returns mask of ISA interrupts */
+#endif
 
 #endif

@@ -73,7 +73,8 @@ void aty_set_cursor_shape(struct fb_info *info)
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	struct fb_cursor *cursor = &info->cursor;
 	struct aty_cursor *c = par->cursor;
-	u8 *ram, m, b;
+	u8 m, b;
+	u8 __iomem *ram;
 	int x, y;
 
 	if (!c)
@@ -178,7 +179,7 @@ int atyfb_cursor(struct fb_info *info, struct fb_cursor *cursor)
 struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 {
 	struct aty_cursor *cursor;
-	unsigned long addr;
+	void __iomem *addr;
 
 	cursor = kmalloc(sizeof(struct aty_cursor), GFP_ATOMIC);
 	if (!cursor)
@@ -195,8 +196,8 @@ struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 	addr = info->fix.smem_start - 0x800000 + info->fix.smem_len;
 	cursor->ram = (u8 *) ioremap(addr, 1024);
 #else
-	addr = (unsigned long) info->screen_base + info->fix.smem_len;
-	cursor->ram = (u8 *) addr;
+	addr = info->screen_base + info->fix.smem_len;
+	cursor->ram = addr;
 #endif
 #endif
 	if (!cursor->ram) {

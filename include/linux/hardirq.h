@@ -14,7 +14,7 @@
  * - bits 8-15 are the softirq count (max # of softirqs: 256)
  * - bits 16-27 are the hardirq count (max # of hardirqs: 4096)
  *
- * - ( bit 26 is the PREEMPT_ACTIVE flag. )
+ * - ( bit 28 is the PREEMPT_ACTIVE flag. )
  *
  * PREEMPT_MASK: 0x000000ff
  * SOFTIRQ_MASK: 0x0000ff00

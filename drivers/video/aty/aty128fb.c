@@ -397,7 +397,7 @@ struct aty128fb_par {
 	struct aty128_ddafifo fifo_reg;
 	u32 accel_flags;
 	struct aty128_constants constants;  /* PLL and others      */
-	void *regbase;                      /* remapped mmio       */
+	void __iomem *regbase;              /* remapped mmio       */
 	u32 vram_size;                      /* onboard video ram   */
 	int chip_gen;
 	const struct aty128_meminfo *mem;   /* onboard mem info    */
@@ -450,9 +450,9 @@ static int aty128_decode_var(struct fb_var_screeninfo *var,
                              struct aty128fb_par *par);
 #if 0
 static void __init aty128_get_pllinfo(struct aty128fb_par *par,
-				      void *bios);
-static void __init *aty128_map_ROM(struct pci_dev *pdev, const struct aty128fb_par *par);
-static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom);
+				      void __iomem *bios);
+static void __init __iomem *aty128_map_ROM(struct pci_dev *pdev, const struct aty128fb_par *par);
+static void __init aty128_unmap_ROM(struct pci_dev *dev, void __iomem * rom);
 #endif
 static void aty128_timings(struct aty128fb_par *par);
 static void aty128_init_engine(struct aty128fb_par *par);
@@ -788,7 +788,7 @@ static u32 depth_to_dst(u32 depth)
 
 
 #ifndef __sparc__
-static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom)
+static void __init aty128_unmap_ROM(struct pci_dev *dev, void __iomem * rom)
 {
 	struct resource *r = &dev->resource[PCI_ROM_RESOURCE];
 	
@@ -806,12 +806,12 @@ static void __init aty128_unmap_ROM(struct pci_dev *dev, void * rom)
 }
 
 
-static void * __init aty128_map_ROM(const struct aty128fb_par *par, struct pci_dev *dev)
+static void __iomem * __init aty128_map_ROM(const struct aty128fb_par *par, struct pci_dev *dev)
 {
 	struct resource *r;
 	u16 dptr;
 	u8 rom_type;
-	void *bios;
+	void __iomem *bios;
 
     	/* Fix from ATI for problem with Rage128 hardware not leaving ROM enabled */
     	unsigned int temp;
@@ -903,7 +903,7 @@ static void * __init aty128_map_ROM(const struct aty128fb_par *par, struct pci_d
 	return NULL;
 }
 
-static void __init aty128_get_pllinfo(struct aty128fb_par *par, unsigned char *bios)
+static void __init aty128_get_pllinfo(struct aty128fb_par *par, unsigned char __iomem *bios)
 {
 	unsigned int bios_hdr;
 	unsigned int bios_pll;
@@ -925,7 +925,7 @@ static void __init aty128_get_pllinfo(struct aty128fb_par *par, unsigned char *b
 }           
 
 #ifdef CONFIG_X86
-static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
+static void __iomem *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
 {
 	/* I simplified this code as we used to miss the signatures in
 	 * a lot of case. It's now closer to XFree, we just don't check
@@ -933,10 +933,10 @@ static void *  __devinit aty128_find_mem_vbios(struct aty128fb_par *par)
 	 * if we end up having conflicts
 	 */
         u32  segstart;
-        unsigned char *rom_base = NULL;
+        unsigned char __iomem *rom_base = NULL;
                                                 
         for (segstart=0x000c0000; segstart<0x000f0000; segstart+=0x00001000) {
-                rom_base = (char *)ioremap(segstart, 0x10000);
+                rom_base = ioremap(segstart, 0x10000);
 		if (rom_base == NULL)
 			return NULL;
                 if ((*rom_base == 0x55) && (((*(rom_base + 1)) & 0xff) == 0xaa))
@@ -1885,7 +1885,7 @@ static int __init aty128_probe(struct pci_dev *pdev, const struct pci_device_id 
 	struct fb_info *info;
 	int err;
 #ifndef __sparc__
-	void *bios = NULL;
+	void __iomem *bios = NULL;
 #endif
 
 	/* Enable device in PCI config */

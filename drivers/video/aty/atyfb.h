@@ -59,15 +59,15 @@ union aty_pll {
 struct aty_cursor {
 	u8 bits[8][64];
 	u8 mask[8][64];
-	u8 *ram;
+	u8 __iomem *ram;
 };
 
 struct atyfb_par {
-	struct aty_cmap_regs *aty_cmap_regs;
+	struct aty_cmap_regs __iomem *aty_cmap_regs;
 	const struct aty_dac_ops *dac_ops;
 	const struct aty_pll_ops *pll_ops;
 	struct aty_cursor *cursor;
-	unsigned long ati_regbase;
+	void __iomem *ati_regbase;
 	unsigned long clk_wr_offset;
 	struct crtc crtc;
 	union aty_pll pll;

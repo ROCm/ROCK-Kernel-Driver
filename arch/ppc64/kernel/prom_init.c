@@ -675,7 +675,7 @@ static void __init prom_init_mem(void)
 	if ( RELOC(of_platform) == PLATFORM_PSERIES_LPAR )
 		RELOC(alloc_top) = RELOC(rmo_top);
 	else
-		RELOC(alloc_top) = min(0x40000000ul, RELOC(ram_top));
+		RELOC(alloc_top) = RELOC(rmo_top) = min(0x40000000ul, RELOC(ram_top));
 	RELOC(alloc_bottom) = PAGE_ALIGN(RELOC(klimit) - offset + 0x4000);
 	RELOC(alloc_top_high) = RELOC(ram_top);
 
