@@ -196,6 +196,7 @@ static int lbmIOWait(struct lbuf * bp, int flag);
 static bio_end_io_t lbmIODone;
 static void lbmStartIO(struct lbuf * bp);
 static void lmGCwrite(struct jfs_log * log, int cant_block);
+static int lmLogSync(struct jfs_log * log, int nosyncwait);
 
 
 
@@ -810,7 +811,7 @@ static void lmGCwrite(struct jfs_log * log, int cant_write)
  * NOTE:
  *	This routine is called a interrupt time by lbmIODone
  */
-void lmPostGC(struct lbuf * bp)
+static void lmPostGC(struct lbuf * bp)
 {
 	unsigned long flags;
 	struct jfs_log *log = bp->l_log;
@@ -933,7 +934,7 @@ void lmPostGC(struct lbuf * bp)
  *			
  * serialization: LOG_LOCK() held on entry/exit
  */
-int lmLogSync(struct jfs_log * log, int nosyncwait)
+static int lmLogSync(struct jfs_log * log, int nosyncwait)
 {
 	int logsize;
 	int written;		/* written since last syncpt */

@@ -62,7 +62,11 @@ struct tblock {
 					 * ready transactions wait on this
 					 * event for group commit completion.
 					 */
-	struct inode *ip;	/* inode being created or deleted */
+	union {
+		struct inode *ip; /* inode being deleted */
+		pxd_t ixpxd;	/* pxd of inode extent for created inode */
+	} u;
+	u32 ino;		/* inode number being created */
 };
 
 extern struct tblock *TxBlock;	/* transaction block table */

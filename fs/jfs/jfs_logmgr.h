@@ -505,7 +505,6 @@ struct logsyncblk {
 
 extern int lmLogOpen(struct super_block *sb);
 extern int lmLogClose(struct super_block *sb);
-extern int lmLogSync(struct jfs_log * log, int nosyncwait);
 extern int lmLogShutdown(struct jfs_log * log);
 extern int lmLogInit(struct jfs_log * log);
 extern int lmLogFormat(struct jfs_log *log, s64 logAddress, int logSize);

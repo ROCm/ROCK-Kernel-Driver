@@ -161,12 +161,14 @@ EXPORT_SYMBOL(filemap_fdatawrite);
 
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
- * purposes.
+ * purposes - I/O may not be started against all dirty pages.
  */
 int filemap_flush(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_NONE);
 }
+
+EXPORT_SYMBOL(filemap_flush);
 
 /**
  * filemap_fdatawait - walk the list of locked pages of the given address
