@@ -3,7 +3,15 @@
  *  Split out from setup.c by davej@suse.de
  */
 
+#include <linux/smp.h>
 #include <linux/init.h>
+#include <linux/irq.h>
+#include <linux/interrupt.h>
+
+#include <asm/fixmap.h>
+#include <asm/cobalt.h>
+#include <asm/arch_hooks.h>
+#include <asm/io.h>
 
 char visws_board_type = -1;
 char visws_board_rev = -1;
@@ -120,9 +128,43 @@ void __init visws_get_board_type_and_rev(void)
 			visws_board_rev = raw;
 		}
 
-		printk(KERN_INFO "Silicon Graphics %s (rev %d)\n",
-			visws_board_type == VISWS_320 ? "320" :
-			(visws_board_type == VISWS_540 ? "540" :
-					"unknown"), visws_board_rev);
-	}
+	printk(KERN_INFO "Silicon Graphics %s (rev %d)\n",
+	       visws_board_type == VISWS_320 ? "320" :
+	       (visws_board_type == VISWS_540 ? "540" :
+		"unknown"), visws_board_rev);
+}
+
+void __init pre_intr_init_hook(void)
+{
+	init_VISWS_APIC_irqs();
+}
+
+void __init intr_init_hook(void)
+{
+#ifdef CONFIG_X86_LOCAL_APIC
+	apic_intr_init();
+#endif
+}
+
+void __init pre_setup_arch_hook()
+{
+	visws_get_board_type_and_rev();
+}
+static struct irqaction irq0  = { timer_interrupt, SA_INTERRUPT, 0, "timer", NULL, NULL};
+
+void __init time_init_hook(void)
+{
+	printk("Starting Cobalt Timer system clock\n");
+
+	/* Set the countdown value */
+	co_cpu_write(CO_CPU_TIMEVAL, CO_TIME_HZ/HZ);
+
+	/* Start the timer */
+	co_cpu_write(CO_CPU_CTRL, co_cpu_read(CO_CPU_CTRL) | CO_CTRL_TIMERUN);
+
+	/* Enable (unmask) the timer interrupt */
+	co_cpu_write(CO_CPU_CTRL, co_cpu_read(CO_CPU_CTRL) & ~CO_CTRL_TIMEMASK);
+
+	/* Wire cpu IDT entry to s/w handler (and Cobalt APIC to IDT) */
+	setup_irq(CO_IRQ_TIMER, &irq0);
 }
