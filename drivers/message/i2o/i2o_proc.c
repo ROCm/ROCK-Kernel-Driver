@@ -3337,7 +3337,7 @@ static int create_i2o_procfs(void)
 	struct i2o_controller *pctrl = NULL;
 	int i;
 
-	i2o_proc_dir_root = proc_mkdir("i2o", 0);
+	i2o_proc_dir_root = proc_mkdir("i2o", NULL);
 	if(!i2o_proc_dir_root)
 		return -1;
 	i2o_proc_dir_root->owner = THIS_MODULE;
@@ -3371,7 +3371,7 @@ static int __exit destroy_i2o_procfs(void)
 	}
 
 	if(!atomic_read(&i2o_proc_dir_root->count))
-		remove_proc_entry("i2o", 0);
+		remove_proc_entry("i2o", NULL);
 	else
 		return -1;
 

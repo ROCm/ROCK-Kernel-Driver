@@ -222,7 +222,7 @@ struct video_window
 	__u32	width,height;		/* Its size */
 	__u32	chromakey;
 	__u32	flags;
-	struct	video_clip *clips;	/* Set only */
+	struct	video_clip __user *clips;	/* Set only */
 	int	clipcount;
 #define VIDEO_WINDOW_INTERLACE	1
 #define VIDEO_WINDOW_CHROMAKEY	16	/* Overlay by chromakey */

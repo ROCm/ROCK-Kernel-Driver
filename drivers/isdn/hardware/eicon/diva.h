@@ -9,19 +9,19 @@ void divasa_xdi_driver_unload(void);
 void *diva_driver_add_card(void *pdev, unsigned long CardOrdinal);
 void diva_driver_remove_card(void *pdiva);
 
-typedef int (*divas_xdi_copy_to_user_fn_t) (void *os_handle, void *dst,
+typedef int (*divas_xdi_copy_to_user_fn_t) (void *os_handle, void __user *dst,
 					    const void *src, int length);
 
 typedef int (*divas_xdi_copy_from_user_fn_t) (void *os_handle, void *dst,
-					      const void *src, int length);
+					      const void __user *src, int length);
 
-int diva_xdi_read(void *adapter, void *os_handle, void *dst,
+int diva_xdi_read(void *adapter, void *os_handle, void __user *dst,
 		  int max_length, divas_xdi_copy_to_user_fn_t cp_fn);
 
-int diva_xdi_write(void *adapter, void *os_handle, const void *src,
+int diva_xdi_write(void *adapter, void *os_handle, const void __user *src,
 		   int length, divas_xdi_copy_from_user_fn_t cp_fn);
 
-void *diva_xdi_open_adapter(void *os_handle, const void *src,
+void *diva_xdi_open_adapter(void *os_handle, const void __user *src,
 			    int length,
 			    divas_xdi_copy_from_user_fn_t cp_fn);
 

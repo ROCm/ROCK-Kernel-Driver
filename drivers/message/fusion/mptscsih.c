@@ -99,7 +99,7 @@ MODULE_LICENSE("GPL");
 
 /* Set string for command line args from insmod */
 #ifdef MODULE
-char *mptscsih = 0;
+char *mptscsih = NULL;
 #endif
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/

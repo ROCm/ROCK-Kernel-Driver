@@ -585,7 +585,7 @@ static unsigned long int value(char **buffer, unsigned long *count, int *err)
 	return ret;
 }
 
-static int cpia_write_proc(struct file *file, const char *buf,
+static int cpia_write_proc(struct file *file, const char __user *buf,
                            unsigned long count, void *data)
 {
 	struct cam_data *cam = data;
@@ -1400,7 +1400,7 @@ static void destroy_proc_cpia_cam(struct cam_data *cam)
 
 static void proc_cpia_create(void)
 {
-	cpia_proc_root = create_proc_entry("cpia", S_IFDIR, 0);
+	cpia_proc_root = create_proc_entry("cpia", S_IFDIR, NULL);
 
 	if (cpia_proc_root)
 		cpia_proc_root->owner = THIS_MODULE;
@@ -1410,7 +1410,7 @@ static void proc_cpia_create(void)
 
 static void __exit proc_cpia_destroy(void)
 {
-	remove_proc_entry("cpia", 0);
+	remove_proc_entry("cpia", NULL);
 }
 #endif /* CONFIG_PROC_FS */
 
@@ -1624,7 +1624,7 @@ static int free_frame_buf(struct cam_data *cam)
 	int i;
 	
 	rvfree(cam->frame_buf, FRAME_NUM*CPIA_MAX_FRAME_SIZE);
-	cam->frame_buf = 0;
+	cam->frame_buf = NULL;
 	for (i=0; i < FRAME_NUM; i++)
 		cam->frame[i].data = NULL;
 
@@ -3299,7 +3299,7 @@ static int cpia_close(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t cpia_read(struct file *file, char *buf,
+static ssize_t cpia_read(struct file *file, char __user *buf,
 			 size_t count, loff_t *ppos)
 {
 	struct video_device *dev = file->private_data;

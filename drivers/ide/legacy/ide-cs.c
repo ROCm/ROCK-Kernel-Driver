@@ -230,7 +230,7 @@ void ide_config(dev_link_t *link)
 	cisparse_t	parse;
 	config_info_t	conf;
 	cistpl_cftable_entry_t dflt;
-    } *stk = 0;
+    } *stk = NULL;
     cistpl_cftable_entry_t *cfg;
     int i, pass, last_ret = 0, last_fn = 0, hd, is_kme = 0;
     unsigned long io_base, ctl_base;

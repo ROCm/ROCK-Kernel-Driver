@@ -631,8 +631,8 @@ void store_print_tb (struct tree_balance * tb)
 	    tbSh = PATH_H_PBUFFER (tb->tb_path, h);
 	    tbFh = PATH_H_PPARENT (tb->tb_path, h);
 	} else {
-	    tbSh = 0;
-	    tbFh = 0;
+	    tbSh = NULL;
+	    tbFh = NULL;
 	}
 	sprintf (print_tb_buf + strlen (print_tb_buf),
 		 "* %d * %3lld(%2d) * %3lld(%2d) * %3lld(%2d) * %5lld * %5lld * %5lld * %5lld * %5lld *\n",
@@ -695,10 +695,10 @@ static void check_leaf_block_head (struct buffer_head * bh)
   blkh = B_BLK_HEAD (bh);
   nr = blkh_nr_item(blkh);
   if ( nr > (bh->b_size - BLKH_SIZE) / IH_SIZE)
-    reiserfs_panic (0, "vs-6010: check_leaf_block_head: invalid item number %z", bh);
+    reiserfs_panic (NULL, "vs-6010: check_leaf_block_head: invalid item number %z", bh);
   if ( blkh_free_space(blkh) > 
       bh->b_size - BLKH_SIZE - IH_SIZE * nr )
-    reiserfs_panic (0, "vs-6020: check_leaf_block_head: invalid free space %z", bh);
+    reiserfs_panic (NULL, "vs-6020: check_leaf_block_head: invalid free space %z", bh);
     
 }
 
@@ -708,14 +708,14 @@ static void check_internal_block_head (struct buffer_head * bh)
     
     blkh = B_BLK_HEAD (bh);
     if (!(B_LEVEL (bh) > DISK_LEAF_NODE_LEVEL && B_LEVEL (bh) <= MAX_HEIGHT))
-	reiserfs_panic (0, "vs-6025: check_internal_block_head: invalid level %z", bh);
+	reiserfs_panic (NULL, "vs-6025: check_internal_block_head: invalid level %z", bh);
 
     if (B_NR_ITEMS (bh) > (bh->b_size - BLKH_SIZE) / IH_SIZE)
-	reiserfs_panic (0, "vs-6030: check_internal_block_head: invalid item number %z", bh);
+	reiserfs_panic (NULL, "vs-6030: check_internal_block_head: invalid item number %z", bh);
 
     if (B_FREE_SPACE (bh) != 
 	bh->b_size - BLKH_SIZE - KEY_SIZE * B_NR_ITEMS (bh) - DC_SIZE * (B_NR_ITEMS (bh) + 1))
-	reiserfs_panic (0, "vs-6040: check_internal_block_head: invalid free space %z", bh);
+	reiserfs_panic (NULL, "vs-6040: check_internal_block_head: invalid free space %z", bh);
 
 }
 

@@ -729,7 +729,7 @@ static void cosa_sppp_timeout(struct net_device *dev)
 	cosa_kick(chan->cosa);
 	if (chan->tx_skb) {
 		dev_kfree_skb(chan->tx_skb);
-		chan->tx_skb = 0;
+		chan->tx_skb = NULL;
 	}
 	netif_wake_queue(dev);
 }
@@ -745,11 +745,11 @@ static int cosa_sppp_close(struct net_device *d)
 	spin_lock_irqsave(&chan->cosa->lock, flags);
 	if (chan->rx_skb) {
 		kfree_skb(chan->rx_skb);
-		chan->rx_skb = 0;
+		chan->rx_skb = NULL;
 	}
 	if (chan->tx_skb) {
 		kfree_skb(chan->tx_skb);
-		chan->tx_skb = 0;
+		chan->tx_skb = NULL;
 	}
 	chan->usage=0;
 	chan->cosa->usage--;
@@ -791,7 +791,7 @@ static int sppp_rx_done(struct channel_data *chan)
 	chan->stats.rx_packets++;
 	chan->stats.rx_bytes += chan->cosa->rxsize;
 	netif_rx(chan->rx_skb);
-	chan->rx_skb = 0;
+	chan->rx_skb = NULL;
 	chan->pppdev.dev->last_rx = jiffies;
 	return 0;
 }
@@ -807,7 +807,7 @@ static int sppp_tx_done(struct channel_data *chan, int size)
 		return 1;
 	}
 	dev_kfree_skb_irq(chan->tx_skb);
-	chan->tx_skb = 0;
+	chan->tx_skb = NULL;
 	chan->stats.tx_packets++;
 	chan->stats.tx_bytes += size;
 	netif_wake_queue(chan->pppdev.dev);

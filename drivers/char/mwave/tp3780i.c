@@ -277,7 +277,7 @@ int tp3780I_ReleaseResources(THINKPAD_BD_DATA * pBDData)
 	release_region(pSettings->usDspBaseIO & (~3), 16);
 
 	if (pSettings->bInterruptClaimed) {
-		free_irq(pSettings->usDspIrq, 0);
+		free_irq(pSettings->usDspIrq, NULL);
 		pSettings->bInterruptClaimed = FALSE;
 	}
 
@@ -372,7 +372,7 @@ int tp3780I_EnableDSP(THINKPAD_BD_DATA * pBDData)
 		PRINTK_ERROR(KERN_ERR_MWAVE "tp3780i::tp3780I_EnableDSP: Error: Could not get UART IRQ %x\n", pSettings->usUartIrq);
 		goto exit_cleanup;
 	} else {		/* no conflict just release */
-		free_irq(pSettings->usUartIrq, 0);
+		free_irq(pSettings->usUartIrq, NULL);
 	}
 
 	if (request_irq(pSettings->usDspIrq, &DspInterrupt, 0, "mwave_3780i", 0)) {
@@ -416,7 +416,7 @@ exit_cleanup:
 	if (bDSPPoweredUp)
 		smapi_set_DSP_power_state(FALSE);
 	if (bInterruptAllocated) {
-		free_irq(pSettings->usDspIrq, 0);
+		free_irq(pSettings->usDspIrq, NULL);
 		pSettings->bInterruptClaimed = FALSE;
 	}
 	return -EIO;
@@ -433,7 +433,7 @@ int tp3780I_DisableDSP(THINKPAD_BD_DATA * pBDData)
 	if (pBDData->bDSPEnabled) {
 		dsp3780I_DisableDSP(&pBDData->rDspSettings);
 		if (pSettings->bInterruptClaimed) {
-			free_irq(pSettings->usDspIrq, 0);
+			free_irq(pSettings->usDspIrq, NULL);
 			pSettings->bInterruptClaimed = FALSE;
 		}
 		smapi_set_DSP_power_state(FALSE);

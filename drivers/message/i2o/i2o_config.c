@@ -857,7 +857,7 @@ static int ioctl_passthru(unsigned long arg)
 	u32 sg_count = 0;
 	int sg_index = 0;
 	u32 i = 0;
-	void *p = 0;
+	void *p = NULL;
 	unsigned int iop;
 
 	if (get_user(iop, &cmd->iop) || get_user(user_msg, &cmd->msg))

@@ -1068,7 +1068,7 @@ static void init_bt848(struct bttv *btv)
 	init_irqreg(btv);
 }
 
-extern void bttv_reinit_bt848(struct bttv *btv)
+void bttv_reinit_bt848(struct bttv *btv)
 {
 	unsigned long flags;
 
@@ -2261,7 +2261,7 @@ static int bttv_do_ioctl(struct inode *inode, struct file *file,
 		w2.w.width   = win->width;
 		w2.w.height  = win->height;
 		w2.clipcount = win->clipcount;
-		w2.clips     = (struct v4l2_clip*)win->clips;
+		w2.clips     = (struct v4l2_clip __user *)win->clips;
 		retval = setup_window(fh, btv, &w2, 0);
 		if (0 == retval) {
 			/* on v4l1 this ioctl affects the read() size too */
@@ -2821,7 +2821,7 @@ static int bttv_ioctl(struct inode *inode, struct file *file,
 	}
 }
 
-static ssize_t bttv_read(struct file *file, char *data,
+static ssize_t bttv_read(struct file *file, char __user *data,
 			 size_t count, loff_t *ppos)
 {
 	struct bttv_fh *fh = file->private_data;

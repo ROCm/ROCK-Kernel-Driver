@@ -161,7 +161,7 @@ ext2_get_acl(struct inode *inode, int type)
 	int retval;
 
 	if (!test_opt(inode->i_sb, POSIX_ACL))
-		return 0;
+		return NULL;
 
 	switch(type) {
 		case ACL_TYPE_ACCESS:

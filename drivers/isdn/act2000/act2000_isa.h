@@ -128,7 +128,7 @@ typedef enum {
 extern int act2000_isa_detect(unsigned short portbase);
 extern int act2000_isa_config_irq(act2000_card * card, short irq);
 extern int act2000_isa_config_port(act2000_card * card, unsigned short portbase);
-extern int act2000_isa_download(act2000_card * card, act2000_ddef * cb);
+extern int act2000_isa_download(act2000_card * card, act2000_ddef __user * cb);
 extern void act2000_isa_release(act2000_card * card);
 extern void act2000_isa_receive(act2000_card *card);
 extern void act2000_isa_send(act2000_card *card);

@@ -125,7 +125,7 @@ void copy_from_pam(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_pam_to_user(tpam_card *card, void *to, const void *from, u32 n) {
+int copy_from_pam_to_user(tpam_card *card, void __user *to, const void *from, u32 n) {
 	void *page;
 	u32 count;
 
@@ -171,7 +171,7 @@ int copy_from_pam_to_user(tpam_card *card, void *to, const void *from, u32 n) {
  *
  * Return: 0 if OK, <0 if error.
  */
-int copy_from_user_to_pam(tpam_card *card, void *to, const void *from, u32 n) {
+int copy_from_user_to_pam(tpam_card *card, void *to, const void __user *from, u32 n) {
 	void *page;
 	u32 count;
 

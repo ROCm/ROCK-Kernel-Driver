@@ -356,7 +356,7 @@ static int aac_slave_configure(struct scsi_device *sdev)
 	return 0;
 }
 
-static int aac_ioctl(struct scsi_device *sdev, int cmd, void * arg)
+static int aac_ioctl(struct scsi_device *sdev, int cmd, void __user * arg)
 {
 	struct aac_dev *dev = (struct aac_dev *)sdev->host->hostdata;
 	return aac_do_ioctl(dev, cmd, arg);
@@ -463,7 +463,7 @@ static int aac_cfg_open(struct inode *inode, struct file *file)
 static int aac_cfg_ioctl(struct inode *inode,  struct file *file,
 		unsigned int cmd, unsigned long arg)
 {
-	return aac_do_ioctl(file->private_data, cmd, (void *)arg);
+	return aac_do_ioctl(file->private_data, cmd, (void __user *)arg);
 }
 
 static struct file_operations aac_cfg_fops = {

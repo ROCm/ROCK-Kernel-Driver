@@ -57,7 +57,7 @@ static int tea6415c_id = 0;
 /* this function is called by i2c_probe */
 static int tea6415c_detect(struct i2c_adapter *adapter, int address, int kind)
 {
-	struct	i2c_client *client = 0;
+	struct	i2c_client *client = NULL;
 	int err = 0;
 
 	/* let's see whether this adapter can support what we need */

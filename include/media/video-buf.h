@@ -226,10 +226,10 @@ int videobuf_streamoff(struct file *file, struct videobuf_queue *q);
 int videobuf_read_start(struct file *file, struct videobuf_queue *q);
 void videobuf_read_stop(struct file *file, struct videobuf_queue *q);
 ssize_t videobuf_read_stream(struct file *file, struct videobuf_queue *q,
-			     char *data, size_t count, loff_t *ppos,
+			     char __user *data, size_t count, loff_t *ppos,
 			     int vbihack);
 ssize_t videobuf_read_one(struct file *file, struct videobuf_queue *q,
-			  char *data, size_t count, loff_t *ppos);
+			  char __user *data, size_t count, loff_t *ppos);
 unsigned int videobuf_poll_stream(struct file *file,
 				  struct videobuf_queue *q,
 				  poll_table *wait);

@@ -53,7 +53,7 @@ static void print_matrix(char *ch, char out[])
 	}
 }
 
-static ssize_t rds_f_read(struct file *file, char *buffer, size_t length, loff_t *offset)
+static ssize_t rds_f_read(struct file *file, char __user *buffer, size_t length, loff_t *offset)
 {
 //	i = sprintf(text_buffer, "length: %d, offset: %d\n", length, *offset);
 

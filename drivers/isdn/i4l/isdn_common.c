@@ -959,7 +959,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			interruptible_sleep_on(&(dev->info_waitq));
 		}
 		p = isdn_statstr();
-		file->private_data = 0;
+		file->private_data = NULL;
 		if ((len = strlen(p)) <= count) {
 			if (copy_to_user(buf, p, len)) {
 				retval = -EFAULT;
@@ -992,7 +992,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			retval = -ENOMEM;
 			goto out;
 		}
-		len = isdn_readbchan(drvidx, chidx, p, 0, count,
+		len = isdn_readbchan(drvidx, chidx, p, NULL, count,
 				     &dev->drv[drvidx]->rcv_waitq[chidx]);
 		*off += len;
 		if (copy_to_user(buf,p,len)) 
@@ -1018,7 +1018,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			if (count > dev->drv[drvidx]->stavail)
 				count = dev->drv[drvidx]->stavail;
 			len = dev->drv[drvidx]->interface->
-				readstat(buf, count, 1, drvidx,
+				readstat(buf, count, drvidx,
 					 isdn_minor2chan(minor));
 		} else {
 			len = 0;
@@ -1091,7 +1091,7 @@ isdn_write(struct file *file, const char __user *buf, size_t count, loff_t * off
 		 */
 		if (dev->drv[drvidx]->interface->writecmd)
 			retval = dev->drv[drvidx]->interface->
-				writecmd(buf, count, 1, drvidx, isdn_minor2chan(minor));
+				writecmd(buf, count, drvidx, isdn_minor2chan(minor));
 		else
 			retval = count;
 		goto out;

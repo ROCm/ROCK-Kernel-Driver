@@ -522,11 +522,11 @@ struct uioctl_t {
 	u8 mbox[18];		/* 16 bytes + 2 status bytes */
 	mega_passthru pthru;
 #if BITS_PER_LONG == 32
-	char *data;		/* buffer <= 4096 for 0x80 commands */
+	char __user *data;		/* buffer <= 4096 for 0x80 commands */
 	char pad[4];
 #endif
 #if BITS_PER_LONG == 64
-	char *data;
+	char __user *data;
 #endif
 } __attribute__ ((packed));
 
@@ -622,12 +622,12 @@ typedef struct {
 	u32		adapno;		/* adapter number */
 	union {
 		u8	__raw_mbox[18];
-		caddr_t	__uaddr; /* xferaddr for non-mbox cmds */
+		void __user *__uaddr; /* xferaddr for non-mbox cmds */
 	}__ua;
 
 #define uioc_rmbox	__ua.__raw_mbox
 #define MBOX(uioc)	((megacmd_t *)&((uioc).__ua.__raw_mbox[0]))
-#define MBOX_P(uioc)	((megacmd_t *)&((uioc)->__ua.__raw_mbox[0]))
+#define MBOX_P(uioc)	((megacmd_t __user *)&((uioc)->__ua.__raw_mbox[0]))
 #define uioc_uaddr	__ua.__uaddr
 
 	u32		xferlen;	/* xferlen for DCMD and non-mbox
@@ -990,14 +990,12 @@ typedef enum { LOCK_INT, LOCK_EXT } lockscope_t;
 const char *megaraid_info (struct Scsi_Host *);
 
 static int mega_query_adapter(adapter_t *);
-static inline int issue_scb(adapter_t *, scb_t *);
+static int issue_scb(adapter_t *, scb_t *);
 static int mega_setup_mailbox(adapter_t *);
 
 static int megaraid_queue (Scsi_Cmnd *, void (*)(Scsi_Cmnd *));
 static scb_t * mega_build_cmd(adapter_t *, Scsi_Cmnd *, int *);
-static inline scb_t *mega_allocate_scb(adapter_t *, Scsi_Cmnd *);
 static void __mega_runpendq(adapter_t *);
-static inline void mega_runpendq(adapter_t *);
 static int issue_scb_block(adapter_t *, u_char *);
 
 static irqreturn_t megaraid_isr_memmapped(int, void *, struct pt_regs *);
@@ -1014,10 +1012,9 @@ static int mega_print_inquiry(char *, char *);
 
 static int mega_build_sglist (adapter_t *adapter, scb_t *scb,
 			      u32 *buffer, u32 *length);
-static inline int mega_busywait_mbox (adapter_t *);
 static int __mega_busywait_mbox (adapter_t *);
 static void mega_rundoneq (adapter_t *);
-static inline void mega_cmd_done(adapter_t *, u8 [], int, int);
+static void mega_cmd_done(adapter_t *, u8 [], int, int);
 static inline void mega_free_sgl (adapter_t *adapter);
 static void mega_8_to_40ld (mraid_inquiry *inquiry,
 		mega_inquiry3 *enquiry3, mega_product_info *);
@@ -1025,8 +1022,8 @@ static void mega_8_to_40ld (mraid_inquiry *inquiry,
 static int megadev_open (struct inode *, struct file *);
 static int megadev_ioctl (struct inode *, struct file *, unsigned int,
 		unsigned long);
-static int mega_m_to_n(void *, nitioctl_t *);
-static int mega_n_to_m(void *, megacmd_t *);
+static int mega_m_to_n(void __user *, nitioctl_t *);
+static int mega_n_to_m(void __user *, megacmd_t *);
 
 static int mega_init_scb (adapter_t *);
 
@@ -1053,10 +1050,6 @@ static int proc_rdrv(adapter_t *, char *, int, int);
 
 static int mega_adapinq(adapter_t *, dma_addr_t);
 static int mega_internal_dev_inquiry(adapter_t *, u8, u8, dma_addr_t);
-static inline caddr_t mega_allocate_inquiry(dma_addr_t *, struct pci_dev *);
-static inline void mega_free_inquiry(caddr_t, dma_addr_t, struct pci_dev *);
-static inline int make_local_pdev(adapter_t *, struct pci_dev **);
-static inline void free_local_pdev(struct pci_dev *);
 
 static int mega_support_ext_cdb(adapter_t *);
 static mega_passthru* mega_prepare_passthru(adapter_t *, scb_t *,
@@ -1065,7 +1058,6 @@ static mega_ext_passthru* mega_prepare_extpassthru(adapter_t *,
 		scb_t *, Scsi_Cmnd *, int, int);
 static void mega_enum_raid_scsi(adapter_t *);
 static void mega_get_boot_drv(adapter_t *);
-static inline int mega_get_ldrv_num(adapter_t *, Scsi_Cmnd *, int);
 static int mega_support_random_del(adapter_t *);
 static int mega_del_logdrv(adapter_t *, int);
 static int mega_do_del_logdrv(adapter_t *, int);

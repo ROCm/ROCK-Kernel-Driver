@@ -184,7 +184,7 @@ struct saa7146_use_ops  {
         int(*open)(struct saa7146_dev *, struct file *);
         void (*release)(struct saa7146_dev *, struct file *);
         void (*irq_done)(struct saa7146_dev *, unsigned long status);
-	ssize_t (*read)(struct file *, char *, size_t, loff_t *);
+	ssize_t (*read)(struct file *, char __user *, size_t, loff_t *);
 };
 
 /* from saa7146_fops.c */

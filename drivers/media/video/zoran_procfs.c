@@ -196,7 +196,7 @@ zoran_read_proc (char  *buffer,
 
 static int
 zoran_write_proc (struct file   *file,
-		  const char    *buffer,
+		  const char    __user *buffer,
 		  unsigned long  count,
 		  void          *data)
 {
@@ -252,7 +252,7 @@ zoran_proc_init (struct zoran *zr)
 	char name[8];
 
 	snprintf(name, 7, "zoran%d", zr->id);
-	if ((zr->zoran_proc = create_proc_entry(name, 0, 0))) {
+	if ((zr->zoran_proc = create_proc_entry(name, 0, NULL))) {
 		zr->zoran_proc->read_proc = zoran_read_proc;
 		zr->zoran_proc->write_proc = zoran_write_proc;
 		zr->zoran_proc->data = zr;
@@ -278,7 +278,7 @@ zoran_proc_cleanup (struct zoran *zr)
 
 	snprintf(name, 7, "zoran%d", zr->id);
 	if (zr->zoran_proc) {
-		remove_proc_entry(name, 0);
+		remove_proc_entry(name, NULL);
 	}
 	zr->zoran_proc = NULL;
 #endif

@@ -223,7 +223,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 
 
     /* Set direct item header to insert. */
-    make_le_item_head (&s_ih, 0, get_inode_item_key_version (p_s_inode), pos1 + 1,
+    make_le_item_head (&s_ih, NULL, get_inode_item_key_version (p_s_inode), pos1 + 1,
 		       TYPE_DIRECT, round_tail_len, 0xffff/*ih_free_space*/);
 
     /* we want a pointer to the first byte of the tail in the page.

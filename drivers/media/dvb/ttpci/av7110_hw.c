@@ -737,7 +737,7 @@ static enum av7110_window_display_type bpp2bit[8] = {
 };
 
 static inline int LoadBitmap(struct av7110 *av7110, u16 format,
-			     u16 dx, u16 dy, int inc, u8* data)
+			     u16 dx, u16 dy, int inc, u8 __user * data)
 {
 	int bpp;
 	int i;
@@ -887,7 +887,7 @@ static int OSDSetPalette(struct av7110 *av7110, u32 *colors, u8 first, u8 last)
 }
 
 static int OSDSetBlock(struct av7110 *av7110, int x0, int y0,
-		       int x1, int y1, int inc, u8 *data)
+		       int x1, int y1, int inc, u8 __user *data)
 {
 	uint w, h, bpp, bpl, size, lpb, bnum, brest;
 	int i;
@@ -953,17 +953,32 @@ int av7110_osd_cmd(struct av7110 *av7110, osd_cmd_t *dc)
 		return 0;
 	case OSD_SetPalette:
 	{
+		int len = dc->x0-dc->color+1;
+		void *buf;
+		if (len <= 0)
+			return 0;
+
+		buf = kmalloc(len * 4, GFP_KERNEL);
+		if (!buf)
+			return -ENOMEM;
+
+		if (copy_from_user(buf, dc->data, len * 4)) {
+			kfree(buf);
+			return -EFAULT;
+		}
+
 		if (FW_VERSION(av7110->arm_app) >= 0x2618)
-			OSDSetPalette(av7110, (u32 *)dc->data, dc->color, dc->x0);
+			OSDSetPalette(av7110, buf, dc->color, dc->x0);
 		else {
-			int i, len = dc->x0-dc->color+1;
-			u8 *colors = (u8 *)dc->data;
+			int i;
+			u8 *colors = buf;
 
 			for (i = 0; i<len; i++)
 				OSDSetColor(av7110, dc->color + i,
 					colors[i * 4], colors[i * 4 + 1],
 					colors[i * 4 + 2], colors[i * 4 + 3]);
 		}
+		kfree(buf);
 		return 0;
 	}
 	case OSD_SetTrans:

@@ -1080,7 +1080,7 @@ int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 	}
 }
 
-static int query_disk(struct aac_dev *dev, void *arg)
+static int query_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_query_disk qd;
 	struct fsa_scsi_hba *fsa_dev_ptr;
@@ -1117,7 +1117,7 @@ static int query_disk(struct aac_dev *dev, void *arg)
 	return 0;
 }
 
-static int force_delete_disk(struct aac_dev *dev, void *arg)
+static int force_delete_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_delete_disk dd;
 	struct fsa_scsi_hba *fsa_dev_ptr;
@@ -1140,7 +1140,7 @@ static int force_delete_disk(struct aac_dev *dev, void *arg)
 	return 0;
 }
 
-static int delete_disk(struct aac_dev *dev, void *arg)
+static int delete_disk(struct aac_dev *dev, void __user *arg)
 {
 	struct aac_delete_disk dd;
 	struct fsa_scsi_hba *fsa_dev_ptr;
@@ -1167,7 +1167,7 @@ static int delete_disk(struct aac_dev *dev, void *arg)
 	}
 }
 
-int aac_dev_ioctl(struct aac_dev *dev, int cmd, void *arg)
+int aac_dev_ioctl(struct aac_dev *dev, int cmd, void __user *arg)
 {
 	switch (cmd) {
 	case FSACTL_QUERY_DISK:

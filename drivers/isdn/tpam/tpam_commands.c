@@ -120,7 +120,7 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 	dprintk("TurboPAM(tpam_command_ioctl_dspload): card=%d\n", card->id);
 
 	/* get the IOCTL parameter from userspace */
-	if (copy_from_user(&tdl, (void *)arg, sizeof(tpam_dsp_ioctl)))
+	if (copy_from_user(&tdl, (void __user *)arg, sizeof(tpam_dsp_ioctl)))
 		return -EFAULT;
 
 	/* if the board's firmware was started, protect against writes
@@ -131,7 +131,7 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 
 	/* write the data in the board's memory */
 	return copy_from_user_to_pam(card, (void *)tdl.address, 
-				     (void *)arg + sizeof(tpam_dsp_ioctl), 
+				     (void __user *)arg + sizeof(tpam_dsp_ioctl), 
 				     tdl.data_len);
 }
 
@@ -150,7 +150,7 @@ static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 	dprintk("TurboPAM(tpam_command_ioctl_dspsave): card=%d\n", card->id);
 
 	/* get the IOCTL parameter from userspace */
-	if (copy_from_user(&tdl, (void *)arg, sizeof(tpam_dsp_ioctl)))
+	if (copy_from_user(&tdl, (void __user *)arg, sizeof(tpam_dsp_ioctl)))
 		return -EFAULT;
 
 	/* protect against read from unallowed memory areas */
@@ -158,7 +158,7 @@ static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 		return -EPERM;
 
 	/* read the data from the board's memory */
-	return copy_from_pam_to_user(card, (void *)arg + sizeof(tpam_dsp_ioctl),
+	return copy_from_pam_to_user(card, (void __user *)arg + sizeof(tpam_dsp_ioctl),
 				     (void *)tdl.address, tdl.data_len);
 }
 
