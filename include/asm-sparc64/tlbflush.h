@@ -90,10 +90,9 @@ static __inline__ void flush_tlb_pgtables(struct mm_struct *mm, unsigned long st
 {
 	/* Note the signed type.  */
 	long s = start, e = end, vpte_base;
-	if (s > e)
 		/* Nobody should call us with start below VM hole and end above.
 		   See if it is really true.  */
-		BUG();
+	BUG_ON(s > e);
 #if 0
 	/* Currently free_pgtables guarantees this.  */
 	s &= PMD_MASK;

@@ -48,8 +48,7 @@ static inline void _raw_spin_lock(spinlock_t *lock)
 static inline void _raw_spin_unlock(spinlock_t *lock)
 {
 #ifdef CONFIG_DEBUG_SPINLOCK
-	if (!spin_is_locked(lock))
-		BUG();
+	BUG_ON(!spin_is_locked(lock));
 #endif
 
 	lock->lock = 0;

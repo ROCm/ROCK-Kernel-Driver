@@ -270,8 +270,7 @@ extern char * d_path(struct dentry *, struct vfsmount *, char *, int);
 static inline struct dentry *dget(struct dentry *dentry)
 {
 	if (dentry) {
-		if (!atomic_read(&dentry->d_count))
-			BUG();
+		BUG_ON(!atomic_read(&dentry->d_count));
 		atomic_inc(&dentry->d_count);
 	}
 	return dentry;

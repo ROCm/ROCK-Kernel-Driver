@@ -105,8 +105,7 @@ static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
 static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
 				    size_t size, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 	/* nothing to do */
 }
 
@@ -134,8 +133,7 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 static inline void pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,
 				  size_t size, int direction)
 {
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 	/* Nothing to do */
 }
 
@@ -159,8 +157,7 @@ static inline int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
 {
 	int i;
 
-	if (direction == PCI_DMA_NONE)
-		BUG();
+	BUG_ON(direction == PCI_DMA_NONE);
 
 	/*
 	 * temporary 2.4 hack
