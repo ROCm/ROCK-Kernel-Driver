@@ -139,7 +139,7 @@ parse_unisys_oem (char *oemptr, int oem_entries)
 	} else {
 		printk("\nEnabling ES7000 specific features...\n");
 		es7000_plat = 1;
-		platform_rename_gsi = es7000_rename_gsi;
+		ioapic_renumber_irq = es7000_rename_gsi;
 	}
 	return es7000_plat;
 }
