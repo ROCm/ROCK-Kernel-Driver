@@ -656,6 +656,8 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 	    count = info->fix.smem_len;
 	if (count + p > info->fix.smem_len)
 		count = info->fix.smem_len - p;
+	if (info->fbops->fb_sync)
+		info->fbops->fb_sync(info);
 	if (count) {
 	    char *base_addr;
 
@@ -692,6 +694,8 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	    count = info->fix.smem_len - p;
 	    err = -ENOSPC;
 	}
+	if (info->fbops->fb_sync)
+		info->fbops->fb_sync(info);
 	if (count) {
 	    char *base_addr;
 

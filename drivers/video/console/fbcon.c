@@ -432,12 +432,13 @@ void accel_putcs(struct vc_data *vc, struct display *p,
 		image.width = vc->vc_font.width;
 		while (count--) {
 			image.data = p->fontdata + 
-				(scr_readw(s++) & charmask) * 
-				vc->vc_font.height * width;
+				(scr_readw(s++) & charmask) * cellsize;
 			info->fbops->fb_imageblit(info, &image);
 			image.dx += vc->vc_font.width;
 		}	
 	}
+	if (info->fbops->fb_sync)
+		info->fbops->fb_sync(info);
 }
 
 void accel_clear_margins(struct vc_data *vc, struct display *p,

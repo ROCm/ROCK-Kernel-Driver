@@ -99,7 +99,8 @@ static inline u32 pixel_to_pat32(const struct fb_info *p, pixel_t pixel)
      *  the correct start position
      */
 
-static inline unsigned long pixel_to_pat(const struct fb_info *p, pixel_t pixel, int left)
+static inline unsigned long pixel_to_pat(const struct fb_info *p, 
+					 pixel_t pixel, int left)
 {
     unsigned long pat = pixel;
     u32 bpp = p->var.bits_per_pixel;
@@ -373,7 +374,8 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	vxres = p->var.xres_virtual;
 	vyres = p->var.yres_virtual;
 
-	if (!rect->width || !rect->height || rect->dx > vxres || rect->dy > vyres)
+	if (!rect->width || !rect->height || 
+	    rect->dx > vxres || rect->dy > vyres)
 		return;
 
 	/* We could use hardware clipping but on many cards you get around
@@ -392,14 +394,18 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 	else
 		fg = rect->color;
 	
-	dst = (unsigned long *)((unsigned long)p->screen_base & ~(BYTES_PER_LONG-1));
+	dst = (unsigned long *)((unsigned long)p->screen_base & 
+				~(BYTES_PER_LONG-1));
 	dst_idx = ((unsigned long)p->screen_base & (BYTES_PER_LONG-1))*8;
 	dst_idx += rect->dy*p->fix.line_length*8+rect->dx*bpp;
 	/* FIXME For now we support 1-32 bpp only */
 	left = BITS_PER_LONG % bpp;
+	if (p->fbops->fb_sync)
+		p->fbops->fb_sync(p);
 	if (!left) {
 		u32 pat = pixel_to_pat32(p, fg);
-		void (*fill_op32)(unsigned long *dst, int dst_idx, u32 pat, u32 n) = NULL;
+		void (*fill_op32)(unsigned long *dst, int dst_idx, u32 pat, 
+				  u32 n) = NULL;
 		
 		switch (rect->rop) {
 		case ROP_XOR:
@@ -420,8 +426,9 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 		unsigned long pat = pixel_to_pat(p, fg, (left-dst_idx) % bpp);
 		int right = bpp-left;
 		int r;
-		void (*fill_op)(unsigned long *dst, int dst_idx, unsigned long pat, 
-				int left, int right, u32 n) = NULL;
+		void (*fill_op)(unsigned long *dst, int dst_idx, 
+				unsigned long pat, int left, int right, 
+				u32 n) = NULL;
 		
 		switch (rect->rop) {
 		case ROP_XOR:
@@ -435,7 +442,8 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 		while (height--) {
 			dst += dst_idx >> SHIFT_PER_LONG;
 			dst_idx &= (BITS_PER_LONG-1);
-			fill_op(dst, dst_idx, pat, left, right, rect->width*bpp);
+			fill_op(dst, dst_idx, pat, left, right, 
+				rect->width*bpp);
 			r = (p->fix.line_length*8) % bpp;
 			pat = pat << (bpp-r) | pat >> r;
 			dst_idx += p->fix.line_length*8;
