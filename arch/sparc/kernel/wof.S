@@ -8,7 +8,6 @@
 #include <asm/contregs.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
-#include <asm/asm_offsets.h>
 #include <asm/psr.h>
 #include <asm/smp.h>
 #include <asm/asi.h>
@@ -211,20 +210,18 @@ spwin_user_stack_is_bolixed:
 	bne	spwin_bad_ustack_from_kernel
 	 nop
 
-	ld	[%curptr + TI_TASK], %glob_tmp
-
 	/* Oh well, throw this one window into the per-task window
 	 * buffer, the first one.
 	 */
-	st	%sp, [%glob_tmp + AOFF_task_thread + AOFF_thread_rwbuf_stkptrs]
-	STORE_WINDOW(glob_tmp + AOFF_task_thread + AOFF_thread_reg_window)
+	st	%sp, [%curptr + TI_RWIN_SPTRS]
+	STORE_WINDOW(curptr + TI_REG_WINDOW)
 	restore	%g0, %g0, %g0
 
 	/* LOCATION: Trap Window */
 
 	/* Back in the trap window, update winbuffer save count. */
 	mov	1, %twin_tmp
-	st	%twin_tmp, [%glob_tmp + AOFF_task_thread + AOFF_thread_w_saved]
+	st	%twin_tmp, [%curptr + TI_W_SAVED]
 
 		/* Compute new user window mask.  What we are basically
 		 * doing is taking two windows, the invalid one at trap
@@ -275,8 +272,7 @@ spwin_bad_ustack_from_kernel:
 	 * a per-process window buffer until we can properly handle
 	 * this later on.
 	 */
-	ld	[%curptr + TI_TASK], %glob_tmp	/* Using curptr one last time */
-	SAVE_BOLIXED_USER_STACK(glob_tmp, g6)	/* ...now using g6 as scratch */
+	SAVE_BOLIXED_USER_STACK(curptr, glob_tmp)
 	restore	%g0, %g0, %g0
 
 	/* LOCATION: Trap window */

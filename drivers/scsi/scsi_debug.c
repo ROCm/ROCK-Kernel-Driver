@@ -55,7 +55,7 @@
 #include "scsi_logging.h"
 #include "scsi_debug.h"
 
-static const char * scsi_debug_version_str = "Version: 1.70 (20030507)";
+static const char * scsi_debug_version_str = "Version: 1.71 (20031007)";
 
 /* Additional Sense Code (ASC) used */
 #define NO_ADDED_SENSE 0x0
@@ -1541,7 +1541,7 @@ static int __init scsi_debug_init(void)
         }
 
 	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts) {
-		printk(KERN_INFO "scsi_debug: ... built %d host(s)\n",
+		printk(KERN_INFO "scsi_debug_init: built %d host(s)\n",
 		       scsi_debug_add_host);
 	}
 	return 0;
@@ -1565,8 +1565,15 @@ static void __exit scsi_debug_exit(void)
 device_initcall(scsi_debug_init);
 module_exit(scsi_debug_exit);
 
+void pseudo_0_release(struct device * dev)
+{
+	if (SCSI_DEBUG_OPT_NOISE & scsi_debug_opts)
+		printk(KERN_INFO "scsi_debug: pseudo_0_release() called\n");
+}
+
 static struct device pseudo_primary = {
 	.bus_id		= "pseudo_0",
+	.release	= pseudo_0_release,
 };
 
 static int pseudo_lld_bus_match(struct device *dev, 

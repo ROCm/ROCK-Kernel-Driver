@@ -234,10 +234,6 @@ struct SYM_FWB_SCR {
 struct SYM_FWZ_SCR {
 	u32 snooptest		[  9];
 	u32 snoopend		[  2];
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	u32 start_ram		[  1];
-	u32 scripta0_ba		[  4];
-#endif
 };
 
 static struct SYM_FWA_SCR SYM_FWA_SCR = {
@@ -1851,24 +1847,5 @@ static struct SYM_FWZ_SCR SYM_FWZ_SCR = {
 	 */
 	SCR_INT,
 		99,
-#ifdef SYM_OPT_NO_BUS_MEMORY_MAPPING
-	/*
-	 *  We may use MEMORY MOVE instructions to load the on chip-RAM,
-	 *  if it happens that mapping PCI memory is not possible.
-	 *  But writing the RAM from the CPU is the preferred method, 
-	 *  since PCI 2.2 seems to disallow PCI self-mastering.
-	 */
-}/*-------------------------< START_RAM >------------------------*/,{
-	/*
-	 *  Load the script into on-chip RAM, 
-	 *  and jump to start point.
-	 */
-	SCR_COPY (sizeof(struct SYM_FWA_SCR)),
-}/*-------------------------< SCRIPTA0_BA >----------------------*/,{
-		0,
-		PADDR_A (start),
-	SCR_JUMP,
-		PADDR_A (init),
-#endif /* SYM_OPT_NO_BUS_MEMORY_MAPPING */
 }/*--------------------------<>----------------------------------*/
 };

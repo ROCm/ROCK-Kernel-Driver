@@ -230,6 +230,10 @@ ia64_phys_addr_valid (unsigned long addr)
 
 #define mk_pte(page, pgprot)	pfn_pte(page_to_pfn(page), (pgprot))
 
+/* This takes a physical page address that is used by the remapping functions */
+#define mk_pte_phys(physpage, pgprot) \
+({ pte_t __pte; pte_val(__pte) = physpage + pgprot_val(pgprot); __pte; })
+
 #define pte_modify(_pte, newprot) \
 	(__pte((pte_val(_pte) & ~_PAGE_CHG_MASK) | (pgprot_val(newprot) & _PAGE_CHG_MASK)))
 
@@ -454,6 +458,15 @@ extern struct page *zero_page_memmap_ptr;
 
 /* We provide our own get_unmapped_area to cope with VA holes for userland */
 #define HAVE_ARCH_UNMAPPED_AREA
+
+#ifdef CONFIG_HUGETLB_PAGE
+#define HUGETLB_PGDIR_SHIFT	(HPAGE_SHIFT + 2*(PAGE_SHIFT-3))
+#define HUGETLB_PGDIR_SIZE	(__IA64_UL(1) << HUGETLB_PGDIR_SHIFT)
+#define HUGETLB_PGDIR_MASK	(~(HUGETLB_PGDIR_SIZE-1))
+struct mmu_gather;
+extern void hugetlb_free_pgtables(struct mmu_gather *tlb,
+	struct vm_area_struct * prev, unsigned long start, unsigned long end);
+#endif
 
 typedef pte_t *pte_addr_t;
 

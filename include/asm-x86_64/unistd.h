@@ -623,11 +623,11 @@ __syscall_return(type,__res); \
 type name (type1 arg1,type2 arg2,type3 arg3,type4 arg4,type5 arg5,type6 arg6) \
 { \
 long __res; \
-__asm__ volatile ("movq %5,%%r10 ; movq %6,%%r8 ; movq %7,%%r9" __syscall \
+__asm__ volatile ("movq %5,%%r10 ; movq %6,%%r8 ; movq %7,%%r9 ; " __syscall \
 	: "=a" (__res) \
 	: "0" (__NR_##name),"D" ((long)(arg1)),"S" ((long)(arg2)), \
-	  "d" ((long)(arg3)),"g" ((long)(arg4)),"g" ((long)(arg5), \
-	  "g" ((long)(arg6),) : \
+	  "d" ((long)(arg3)), "g" ((long)(arg4)), "g" ((long)(arg5)), \
+	  "g" ((long)(arg6)) : \
 	__syscall_clobber,"r8","r10","r9" ); \
 __syscall_return(type,__res); \
 }

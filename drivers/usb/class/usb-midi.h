@@ -28,12 +28,6 @@
 #define USB_SUBCLASS_MIDISTREAMING	3
 #endif
 
-#define USB_DT_CS_DEVICE		0x21
-#define USB_DT_CS_CONFIG		0x22
-#define USB_DT_CS_STRING		0x23
-#define USB_DT_CS_INTERFACE		0x24
-#define USB_DT_CS_ENDPOINT		0x25
-
 /* ------------------------------------------------------------------------- */
 /* Roland MIDI Devices */
 

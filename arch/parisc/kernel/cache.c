@@ -292,5 +292,10 @@ void __flush_dcache_page(struct page *page)
 		break;
 	}
 }
-
 EXPORT_SYMBOL(__flush_dcache_page);
+
+/* Defined in arch/parisc/kernel/pacache.S */
+EXPORT_SYMBOL(flush_kernel_dcache_range_asm);
+EXPORT_SYMBOL(flush_kernel_dcache_page);
+EXPORT_SYMBOL(flush_data_cache_local);
+EXPORT_SYMBOL(flush_kernel_icache_range_asm);

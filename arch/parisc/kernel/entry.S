@@ -77,13 +77,13 @@
 	ldil	L%KERNEL_PSW, %r1
 	ldo	R%KERNEL_PSW(%r1), %r1
 	mtctl	%r1, %cr22
-	mtctl	%r0, %cr17
-	mtctl	%r0, %cr17
+	mtctl	%r0, %cr17	/* Clear IIASQ tail */
+	mtctl	%r0, %cr17	/* Clear IIASQ head */
 	ldil	L%4f, %r1
 	ldo	R%4f(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* Set IIAOQ tail */
 	ldo	4(%r1), %r1
-	mtctl	%r1, %cr18
+	mtctl	%r1, %cr18	/* Set IIAOQ head */
 	rfir
 	nop
 4:

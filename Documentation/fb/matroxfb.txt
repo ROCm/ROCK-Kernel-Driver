@@ -31,7 +31,7 @@ pass to the kernel this command line: "video=matroxfb:vesa:0x1BB".
 You should compile in both vgacon (to boot if you remove you Matrox from
 box) and matroxfb (for graphics mode). You should not compile-in vesafb
 unless you have primary display on non-Matrox VBE2.0 device (see 
-Documentation/vesafb.txt for details).
+Documentation/fb/vesafb.txt for details).
 
 Currently supported video modes are (through vesa:... interface, PowerMac
 has [as addon] compatibility code):

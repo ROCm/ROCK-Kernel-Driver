@@ -447,9 +447,10 @@ void input_register_device(struct input_dev *dev)
 	list_add_tail(&dev->node, &input_dev_list);
 
 	list_for_each_entry(handler, &input_handler_list, node)
-		if ((id = input_match_device(handler->id_table, dev)))
-			if ((handle = handler->connect(handler, dev, id)))
-				input_link_handle(handle);
+		if (!handler->blacklist || !input_match_device(handler->blacklist, dev))
+			if ((id = input_match_device(handler->id_table, dev)))
+				if ((handle = handler->connect(handler, dev, id)))
+					input_link_handle(handle);
 
 #ifdef CONFIG_HOTPLUG
 	input_call_hotplug("add", dev);
@@ -507,9 +508,10 @@ void input_register_handler(struct input_handler *handler)
 	list_add_tail(&handler->node, &input_handler_list);
 	
 	list_for_each_entry(dev, &input_dev_list, node)
-		if ((id = input_match_device(handler->id_table, dev)))
-			if ((handle = handler->connect(handler, dev, id)))
-				input_link_handle(handle);
+		if (!handler->blacklist || !input_match_device(handler->blacklist, dev))
+			if ((id = input_match_device(handler->id_table, dev)))
+				if ((handle = handler->connect(handler, dev, id)))
+					input_link_handle(handle);
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;

@@ -41,6 +41,7 @@
 	( ((addr > (TASK_HPAGE_BASE-len)) && (addr < TASK_HPAGE_END)) || \
 	  ((current->mm->context & CONTEXT_LOW_HPAGES) && \
 	   (addr > (TASK_HPAGE_BASE_32-len)) && (addr < TASK_HPAGE_END_32)) )
+#define hugetlb_free_pgtables free_pgtables
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 
 #define in_hugepage_area(context, addr) \

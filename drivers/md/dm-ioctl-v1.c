@@ -566,7 +566,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	if (r)
 		return r;
 
-	r = dm_table_create(&t, get_mode(param));
+	r = dm_table_create(&t, get_mode(param), param->target_count);
 	if (r)
 		return r;
 
@@ -894,7 +894,7 @@ static int reload(struct dm_ioctl *param, struct dm_ioctl *user)
 	struct mapped_device *md;
 	struct dm_table *t;
 
-	r = dm_table_create(&t, get_mode(param));
+	r = dm_table_create(&t, get_mode(param), param->target_count);
 	if (r)
 		return r;
 

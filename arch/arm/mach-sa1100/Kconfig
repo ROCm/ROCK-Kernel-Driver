@@ -304,7 +304,7 @@ config SA1100_YOPY
 	depends on ARCH_SA1100
 	help
 	  Say Y here to support the Yopy PDA.  Product information at
-	  <http://www.yopy.com/>.  See Documentation/arm/SA110/Yopy
+	  <http://www.yopy.com/>.  See Documentation/arm/SA1100/Yopy
 	  for more.
 
 config SA1100_STORK

@@ -216,21 +216,6 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 }
 
 /*
- * Unimplemented system calls.  This is called only for stuff that
- * we're supposed to implement but haven't done so yet.  Everything
- * else goes to sys_ni_syscall.
- *
- * XXX Remove this for v2.6.1.
- */
-asmlinkage long
-ia64_ni_syscall (unsigned long arg0, unsigned long arg1, unsigned long arg2, unsigned long arg3,
-		 unsigned long arg4, unsigned long arg5, unsigned long arg6, unsigned long arg7,
-		 unsigned long stack)
-{
-	return -ENOSYS;
-}
-
-/*
  * disabled_fph_fault() is called when a user-level process attempts to access f32..f127
  * and it doesn't own the fp-high register partition.  When this happens, we save the
  * current fph partition in the task_struct of the fpu-owner (if necessary) and then load

@@ -254,9 +254,9 @@ asmlinkage void process_int(unsigned long vec, struct pt_regs *fp)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 
-	for (i = 0; i < NR_IRQS; i++) {
+	if (i < NR_IRQS) {
 		if (irq_list[i].flags & IRQ_FLG_STD)
 			continue;
 
@@ -269,7 +269,7 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_printf(p, "%s\n", irq_list[i].devname);
 	}
 
-	if (mach_get_irq_list)
+	if (i == NR_IRQS && mach_get_irq_list)
 		mach_get_irq_list(p, v);
 	return(0);
 }

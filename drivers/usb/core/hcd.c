@@ -1165,6 +1165,7 @@ static int hcd_unlink_urb (struct urb *urb)
 	struct device			*sys = 0;
 	unsigned long			flags;
 	struct completion_splice	splice;
+	struct list_head		*tmp;
 	int				retval;
 
 	if (!urb)
@@ -1203,7 +1204,12 @@ static int hcd_unlink_urb (struct urb *urb)
 	 */
 	WARN_ON (!HCD_IS_RUNNING (hcd->state) && hcd->state != USB_STATE_HALT);
 
-	if (!urb->hcpriv) {
+	/* insist the urb is still queued */
+	list_for_each(tmp, &dev->urb_list) {
+		if (tmp == &urb->urb_list)
+			break;
+	}
+	if (tmp != &urb->urb_list) {
 		retval = -EINVAL;
 		goto done;
 	}

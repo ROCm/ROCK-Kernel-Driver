@@ -19,6 +19,8 @@
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/workqueue.h>
+#include <linux/notifier.h>
+#include <linux/netdevice.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
 
@@ -690,6 +692,8 @@ static inline int policy_to_flow_dir(int dir)
 	};
 }
 
+static int stale_bundle(struct dst_entry *dst);
+
 /* Main function: finds/creates a bundle for given flow.
  *
  * At the moment we eat a raw IP route. Mostly to speed up lookups
@@ -814,10 +818,11 @@ restart:
 		}
 
 		write_lock_bh(&policy->lock);
-		if (unlikely(policy->dead)) {
+		if (unlikely(policy->dead || stale_bundle(dst))) {
 			/* Wow! While we worked on resolving, this
 			 * policy has gone. Retry. It is not paranoia,
 			 * we just cannot enlist new bundle to dead object.
+			 * We can't enlist stable bundles either.
 			 */
 			write_unlock_bh(&policy->lock);
 
@@ -985,18 +990,27 @@ int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 
 static struct dst_entry *xfrm_dst_check(struct dst_entry *dst, u32 cookie)
 {
+	if (!stale_bundle(dst))
+		return dst;
+
+	dst_release(dst);
+	return NULL;
+}
+
+static int stale_bundle(struct dst_entry *dst)
+{
 	struct dst_entry *child = dst;
 
 	while (child) {
 		if (child->obsolete > 0 ||
+		    (child->dev && !netif_running(child->dev)) ||
 		    (child->xfrm && child->xfrm->km.state != XFRM_STATE_VALID)) {
-			dst_release(dst);
-			return NULL;
+			return 1;
 		}
 		child = child->child;
 	}
 
-	return dst;
+	return 0;
 }
 
 static void xfrm_dst_destroy(struct dst_entry *dst)
@@ -1022,78 +1036,51 @@ static struct dst_entry *xfrm_negative_advice(struct dst_entry *dst)
 	return dst;
 }
 
+static void xfrm_prune_bundles(int (*func)(struct dst_entry *))
+{
+	int i;
+	struct xfrm_policy *pol;
+	struct dst_entry *dst, **dstp, *gc_list = NULL;
+
+	read_lock_bh(&xfrm_policy_lock);
+	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
+		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
+			write_lock(&pol->lock);
+			dstp = &pol->bundles;
+			while ((dst=*dstp) != NULL) {
+				if (func(dst)) {
+					*dstp = dst->next;
+					dst->next = gc_list;
+					gc_list = dst;
+				} else {
+					dstp = &dst->next;
+				}
+			}
+			write_unlock(&pol->lock);
+		}
+	}
+	read_unlock_bh(&xfrm_policy_lock);
+
+	while (gc_list) {
+		dst = gc_list;
+		gc_list = dst->next;
+		dst_free(dst);
+	}
+}
+
+static int unused_bundle(struct dst_entry *dst)
+{
+	return !atomic_read(&dst->__refcnt);
+}
+
 static void __xfrm_garbage_collect(void)
 {
-	int i;
-	struct xfrm_policy *pol;
-	struct dst_entry *dst, **dstp, *gc_list = NULL;
-
-	read_lock_bh(&xfrm_policy_lock);
-	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
-		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
-			write_lock(&pol->lock);
-			dstp = &pol->bundles;
-			while ((dst=*dstp) != NULL) {
-				if (atomic_read(&dst->__refcnt) == 0) {
-					*dstp = dst->next;
-					dst->next = gc_list;
-					gc_list = dst;
-				} else {
-					dstp = &dst->next;
-				}
-			}
-			write_unlock(&pol->lock);
-		}
-	}
-	read_unlock_bh(&xfrm_policy_lock);
-
-	while (gc_list) {
-		dst = gc_list;
-		gc_list = dst->next;
-		dst_free(dst);
-	}
+	xfrm_prune_bundles(unused_bundle);
 }
 
-static int bundle_depends_on(struct dst_entry *dst, struct xfrm_state *x)
+int xfrm_flush_bundles(void)
 {
-	do {
-		if (dst->xfrm == x)
-			return 1;
-	} while ((dst = dst->child) != NULL);
-	return 0;
-}
-
-int xfrm_flush_bundles(struct xfrm_state *x)
-{
-	int i;
-	struct xfrm_policy *pol;
-	struct dst_entry *dst, **dstp, *gc_list = NULL;
-
-	read_lock_bh(&xfrm_policy_lock);
-	for (i=0; i<2*XFRM_POLICY_MAX; i++) {
-		for (pol = xfrm_policy_list[i]; pol; pol = pol->next) {
-			write_lock(&pol->lock);
-			dstp = &pol->bundles;
-			while ((dst=*dstp) != NULL) {
-				if (bundle_depends_on(dst, x)) {
-					*dstp = dst->next;
-					dst->next = gc_list;
-					gc_list = dst;
-				} else {
-					dstp = &dst->next;
-				}
-			}
-			write_unlock(&pol->lock);
-		}
-	}
-	read_unlock_bh(&xfrm_policy_lock);
-
-	while (gc_list) {
-		dst = gc_list;
-		gc_list = dst->next;
-		dst_free(dst);
-	}
-
+	xfrm_prune_bundles(stale_bundle);
 	return 0;
 }
 
@@ -1216,6 +1203,21 @@ void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
 	read_unlock(&afinfo->lock);
 }
 
+static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	switch (event) {
+	case NETDEV_DOWN:
+		xfrm_flush_bundles();
+	}
+	return NOTIFY_DONE;
+}
+
+struct notifier_block xfrm_dev_notifier = {
+	xfrm_dev_event,
+	NULL,
+	0
+};
+
 void __init xfrm_policy_init(void)
 {
 	xfrm_dst_cache = kmem_cache_create("xfrm_dst_cache",
@@ -1226,6 +1228,7 @@ void __init xfrm_policy_init(void)
 		panic("XFRM: failed to allocate xfrm_dst_cache\n");
 
 	INIT_WORK(&xfrm_policy_gc_work, xfrm_policy_gc_task, NULL);
+	register_netdevice_notifier(&xfrm_dev_notifier);
 }
 
 void __init xfrm_init(void)

@@ -226,7 +226,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	unsigned char *mpt=((unsigned char *)mpc)+count;
 
 	if (memcmp(mpc->mpc_signature,MPC_SIGNATURE,4)) {
-		panic("SMP mptable: bad signature [%c%c%c%c]!\n",
+		printk("SMP mptable: bad signature [%c%c%c%c]!\n",
 			mpc->mpc_signature[0],
 			mpc->mpc_signature[1],
 			mpc->mpc_signature[2],
@@ -234,7 +234,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 		return 0;
 	}
 	if (mpf_checksum((unsigned char *)mpc,mpc->mpc_length)) {
-		panic("SMP mptable: checksum error!\n");
+		printk("SMP mptable: checksum error!\n");
 		return 0;
 	}
 	if (mpc->mpc_spec!=0x01 && mpc->mpc_spec!=0x04) {
@@ -881,7 +881,6 @@ void __init mp_parse_prt (void)
 {
 	struct list_head	*node = NULL;
 	struct acpi_prt_entry	*entry = NULL;
-	int			vector = 0;
 	int			ioapic = -1;
 	int			ioapic_pin = 0;
 	int			irq = 0;
@@ -933,20 +932,22 @@ void __init mp_parse_prt (void)
 		if ((1<<bit) & mp_ioapic_routing[ioapic].pin_programmed[idx]) {
 			printk(KERN_DEBUG "Pin %d-%d already programmed\n",
 				mp_ioapic_routing[ioapic].apic_id, ioapic_pin);
+ 			if (use_pci_vector() && !platform_legacy_irq(irq))
+ 				irq = IO_APIC_VECTOR(irq);
 			entry->irq = irq;
 			continue;
 		}
 
 		mp_ioapic_routing[ioapic].pin_programmed[idx] |= (1<<bit);
-
-		vector = io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low);
-		if (vector)
+		if (!io_apic_set_pci_routing(ioapic, ioapic_pin, irq, edge_level, active_high_low)) {
+ 			if (use_pci_vector() && !platform_legacy_irq(irq))
+ 				irq = IO_APIC_VECTOR(irq);
 			entry->irq = irq;
-
-		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d -> vector 0x%02x"
+ 		}
+		printk(KERN_DEBUG "%02x:%02x:%02x[%c] -> %d-%d"
 			" -> IRQ %d\n", entry->id.segment, entry->id.bus, 
 			entry->id.device, ('A' + entry->pin), 
-			mp_ioapic_routing[ioapic].apic_id, ioapic_pin, vector, 
+			mp_ioapic_routing[ioapic].apic_id, ioapic_pin,
 			entry->irq);
 	}
 	

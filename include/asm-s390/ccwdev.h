@@ -69,7 +69,7 @@ ccw_device_id_match(const struct ccw_device_id *array,
 /* The struct ccw device is our replacement for the globally accessible
  * ioinfo array. ioinfo will mutate into a subchannel device later.
  *
- * Reference: Documentation/driver-model.txt */
+ * Reference: Documentation/s390/driver-model.txt */
 struct ccw_device {
 	spinlock_t *ccwlock;
 	struct ccw_device_private *private;	/* cio private information */

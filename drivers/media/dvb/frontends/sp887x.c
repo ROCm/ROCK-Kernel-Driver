@@ -1,11 +1,39 @@
+/*
+   Driver for the Microtune 7202D Frontend
+*/
 
+/*
+   This driver needs a copy of the Avermedia firmware. The version tested
+   is part of the Avermedia DVB-T 1.3.26.3 Application. If the software is
+   installed in Windows the file will be in the /Program Files/AVerTV DVB-T/
+   directory and is called sc_main.mc. Alternatively it can "extracted" from
+   the install cab files. Copy this file to /etc/dvb/sc_main.mc.
+   With this version of the file the first 10 bytes are discarded and the
+   next 0x4000 loaded. This may change in future versions.
+ */
+
+#define __KERNEL_SYSCALLS__
+#include <linux/kernel.h>
+#include <linux/vmalloc.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/string.h>
+#include <linux/slab.h>
+#include <linux/fs.h>
+#include <linux/unistd.h>
+#include <linux/fcntl.h>
+#include <linux/errno.h>
 #include <linux/i2c.h>
+
 
 #include "dvb_frontend.h"
 #include "dvb_functions.h"
 
+#ifndef DVB_SP887X_FIRMWARE_FILE
+#define DVB_SP887X_FIRMWARE_FILE "/etc/dvb/sc_main.mc"
+#endif
+
+static char *sp887x_firmware = DVB_SP887X_FIRMWARE_FILE;
 
 #if 0
 #define dprintk(x...) printk(x)
@@ -39,7 +67,7 @@ struct dvb_frontend_info sp887x_info = {
 		FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_RECOVER
 };
 
-
+static int errno;
 
 static
 int i2c_writebytes (struct dvb_frontend *fe, u8 addr, u8 *buf, u8 len)
@@ -112,6 +140,7 @@ u16 sp887x_readreg (struct dvb_frontend *fe, u16 reg)
 static
 void sp887x_microcontroller_stop (struct dvb_frontend *fe)
 {
+	dprintk("%s\n", __FUNCTION__);
 	sp887x_writereg(fe, 0xf08, 0x000);
 	sp887x_writereg(fe, 0xf09, 0x000);		
 
@@ -123,6 +152,7 @@ void sp887x_microcontroller_stop (struct dvb_frontend *fe)
 static
 void sp887x_microcontroller_start (struct dvb_frontend *fe)
 {
+	dprintk("%s\n", __FUNCTION__);
 	sp887x_writereg(fe, 0xf08, 0x000);
 	sp887x_writereg(fe, 0xf09, 0x000);		
 
@@ -135,6 +165,7 @@ static
 void sp887x_setup_agc (struct dvb_frontend *fe)
 {
 	/* setup AGC parameters */
+	dprintk("%s\n", __FUNCTION__);
 	sp887x_writereg(fe, 0x33c, 0x054);
 	sp887x_writereg(fe, 0x33b, 0x04c);
 	sp887x_writereg(fe, 0x328, 0x000);
@@ -152,8 +183,6 @@ void sp887x_setup_agc (struct dvb_frontend *fe)
 }
 
 
-#include "sp887x_firm.h"
-
 #define BLOCKSIZE 30
 
 /**
@@ -162,13 +191,62 @@ void sp887x_setup_agc (struct dvb_frontend *fe)
 static
 int sp887x_initial_setup (struct dvb_frontend *fe)
 {
-	u8 buf [BLOCKSIZE];
+	u8 buf [BLOCKSIZE+2];
+	unsigned char *firmware = NULL;
 	int i;
+	int fd;
+	int filesize;
+	int fw_size;
+	mm_segment_t fs;
+
+	dprintk("%s\n", __FUNCTION__);
 
 	/* soft reset */
 	sp887x_writereg(fe, 0xf1a, 0x000);
 
 	sp887x_microcontroller_stop (fe);
+
+	fs = get_fs();
+
+	// Load the firmware
+	set_fs(get_ds());
+	fd = open(sp887x_firmware, 0, 0);
+	if (fd < 0) {
+		printk(KERN_WARNING "%s: Unable to open firmware %s\n", __FUNCTION__,
+		       sp887x_firmware);
+		return -EIO;
+	}
+	filesize = lseek(fd, 0L, 2);
+	if (filesize <= 0) {
+		printk(KERN_WARNING "%s: Firmware %s is empty\n", __FUNCTION__,
+		       sp887x_firmware);
+		sys_close(fd);
+		return -EIO;
+	}
+
+	fw_size = 0x4000;
+
+	// allocate buffer for it
+	firmware = vmalloc(fw_size);
+	if (firmware == NULL) {
+		printk(KERN_WARNING "%s: Out of memory loading firmware\n",
+		       __FUNCTION__);
+		sys_close(fd);
+		return -EIO;
+	}
+
+	// read it!
+	// read the first 16384 bytes from the file
+	// ignore the first 10 bytes
+	lseek(fd, 10, 0);
+	if (read(fd, firmware, fw_size) != fw_size) {
+		printk(KERN_WARNING "%s: Failed to read firmware\n", __FUNCTION__);
+		vfree(firmware);
+		sys_close(fd);
+		return -EIO;
+	}
+	sys_close(fd);
+	set_fs(fs);
 
 	printk ("%s: firmware upload... ", __FUNCTION__);
 
@@ -179,12 +257,12 @@ int sp887x_initial_setup (struct dvb_frontend *fe)
 	/* dummy write (wrap around to start of memory) */
 	sp887x_writereg(fe, 0x8f0a, 0x0000);
 
-	for (i=0; i<sizeof(sp887x_firm); i+=BLOCKSIZE) {
+	for (i=0; i<fw_size; i+=BLOCKSIZE) {
 		int c = BLOCKSIZE;
 		int err;
 
-		if (i+c > sizeof(sp887x_firm))
-			c = sizeof(sp887x_firm) - i;
+		if (i+c > fw_size)
+			c = fw_size - i;
 
 		/* bit 0x8000 in address is set to enable 13bit mode */
 		/* bit 0x4000 enables multibyte read/write transfers */
@@ -192,14 +270,17 @@ int sp887x_initial_setup (struct dvb_frontend *fe)
 		buf[0] = 0xcf;
 		buf[1] = 0x0a;
 
-		memcpy(&buf[2], &sp887x_firm[i], c);
+		memcpy(&buf[2], firmware + i, c);
 
 		if ((err = i2c_writebytes (fe, 0x70, buf, c+2)) < 0) {
 			printk ("failed.\n");
 			printk ("%s: i2c error (err == %i)\n", __FUNCTION__, err);
+			vfree(firmware);
 			return err;
 		}
 	}
+
+	vfree(firmware);
 
 	/* don't write RS bytes between packets */
 	sp887x_writereg(fe, 0xc13, 0x001);

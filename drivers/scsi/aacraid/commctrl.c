@@ -28,7 +28,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -37,11 +36,10 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
+#include <linux/dma-mapping.h>
 #include <linux/blkdev.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#include "scsi.h"
-#include "hosts.h"
 
 #include "aacraid.h"
 
@@ -439,16 +437,16 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 	
 	switch(srbcmd->flags){
 	case SRB_DataOut:
-		data_dir = SCSI_DATA_WRITE;
+		data_dir = DMA_TO_DEVICE;
 		break;
 	case (SRB_DataIn | SRB_DataOut):
-		data_dir = SCSI_DATA_UNKNOWN;  
+		data_dir = DMA_BIDIRECTIONAL;
 		break;
 	case SRB_DataIn:
-		data_dir = SCSI_DATA_READ;
+		data_dir = DMA_FROM_DEVICE;
 		break;
 	default:
-		data_dir = SCSI_DATA_NONE;
+		data_dir = DMA_NONE;
 	}
 	if( dev->pae_support ==1 ) {
 		struct sgmap64* psg = (struct sgmap64*)&srbcmd->sg;
@@ -484,7 +482,7 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 					goto cleanup;
 				}
 			}
-			addr = pci_map_single(dev->pdev, p, psg->sg[i].count, scsi_to_pci_dma_dir(data_dir));
+			addr = pci_map_single(dev->pdev, p, psg->sg[i].count, data_dir);
 
 			le_addr = cpu_to_le64(addr);
 			psg->sg[i].addr[1] = (u32)(le_addr>>32);
@@ -526,7 +524,7 @@ int aac_send_raw_srb(struct aac_dev* dev, void* arg)
 					goto cleanup;
 				}
 			}
-			addr = pci_map_single(dev->pdev, p, psg->sg[i].count, scsi_to_pci_dma_dir(data_dir));
+			addr = pci_map_single(dev->pdev, p, psg->sg[i].count, data_dir);
 
 			psg->sg[i].addr = cpu_to_le32(addr);
 			psg->sg[i].count = cpu_to_le32(psg->sg[i].count);  

@@ -189,7 +189,7 @@ EXPORT_SYMBOL(unw_access_ar);
 EXPORT_SYMBOL(unw_access_pr);
 
 #ifdef CONFIG_SMP
-# if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 4)
+# if __GNUC__ < 3 || (__GNUC__ == 3 && __GNUC_MINOR__ < 3)
 /*
  * This is not a normal routine and we don't want a function descriptor for it, so we use
  * a fake declaration here.

@@ -65,10 +65,15 @@
  *          - Clean up interrupt handler registration
  *          - Fix memory leaks
  *          - Fix allocation of scsi host structs and private data
+ * 18/11/03 Christoph Hellwig <hch@lst.de>
+ *	    - Port to new probing API
+ *	    - Fix some more leaks in init failure cases
+ * TODO:
+ *	    - use list.h macros for SCB queue
+ *	  ( - merge with i60uscsi.c )
  **************************************************************************/
 
 #include <linux/module.h>
-
 #include <linux/errno.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
@@ -76,37 +81,19 @@
 #include <linux/init.h>
 #include <linux/blkdev.h>
 #include <linux/spinlock.h>
-#include <linux/stat.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/ioport.h>
-//#include <linux/sched.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
-
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "scsi.h"
-#include "hosts.h"
-#include "inia100.h"
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
 
-static Scsi_Host_Template driver_template = {
-	.proc_name	= "inia100",
-	.name		= inia100_REVID,
-	.detect		= inia100_detect,
-	.release	= inia100_release,
-	.queuecommand	= inia100_queue,
-	.eh_abort_handler = inia100_abort,
-	.eh_bus_reset_handler	= inia100_bus_reset,
-	.eh_device_reset_handler = inia100_device_reset,
-	.can_queue	= 1,
-	.this_id	= 1,
-	.sg_tablesize	= SG_ALL,
-	.cmd_per_lun 	= 1,
-	.use_clustering	= ENABLE_CLUSTERING,
-};
-#include "scsi_module.c"
+#include "inia100.h"
 
 #define ORC_RDWORD(x,y)         (short)(inl((int)((ULONG)((ULONG)x+(UCHAR)y)) ))
 
@@ -115,32 +102,19 @@ char *inia100_InitioName = "by Initio Corporation";
 char *inia100_ProductName = "INI-A100U2W";
 char *inia100_Version = "v1.02d";
 
-/* set by inia100_setup according to the command line */
-static int setup_called = 0;
-
-/* ---- INTERNAL VARIABLES ---- */
-#define NUMBER(arr)     (sizeof(arr) / sizeof(arr[0]))
-static char *setup_str = (char *) NULL;
-
-static irqreturn_t inia100_intr(int, void *, struct pt_regs *);
-static void inia100_panic(char *msg);
-
 /* ---- EXTERNAL FUNCTIONS ---- */
 extern void inia100SCBPost(BYTE * pHcb, BYTE * pScb);
-extern int Addinia100_into_Adapter_table(WORD, WORD, struct pci_dev *, int);
 extern int init_inia100Adapter_table(int);
 extern ORC_SCB *orc_alloc_scb(ORC_HCS * hcsp);
 extern void orc_exec_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
 extern void orc_release_scb(ORC_HCS * hcsp, ORC_SCB * scbp);
-extern void orc_release_dma(ORC_HCS * hcsp, Scsi_Cmnd * cmnd);
+extern void orc_release_dma(ORC_HCS * hcsp, struct scsi_cmnd * cmnd);
 extern void orc_interrupt(ORC_HCS * hcsp);
-extern int orc_device_reset(ORC_HCS * pHCB, Scsi_Cmnd *SCpnt, unsigned int target);
+extern int orc_device_reset(ORC_HCS * pHCB, struct scsi_cmnd *SCpnt, unsigned int target);
 extern int orc_reset_scsi_bus(ORC_HCS * pHCB);
 extern int abort_SCB(ORC_HCS * hcsp, ORC_SCB * pScb);
-extern int orc_abort_srb(ORC_HCS * hcsp, Scsi_Cmnd *SCpnt);
-extern void get_orcPCIConfig(ORC_HCS * pCurHcb, int ch_idx);
+extern int orc_abort_srb(ORC_HCS * hcsp, struct scsi_cmnd *SCpnt);
 extern int init_orchid(ORC_HCS * hcsp);
-extern struct inia100_Adpt_Struc *inia100_adpt;
 
 /*****************************************************************************
  Function name  : inia100AppendSRBToQueue
@@ -150,7 +124,7 @@ extern struct inia100_Adpt_Struc *inia100_adpt;
  Output         : None.
  Return         : None.
 *****************************************************************************/
-static void inia100AppendSRBToQueue(ORC_HCS * pHCB, Scsi_Cmnd * pSRB)
+static void inia100AppendSRBToQueue(ORC_HCS * pHCB, struct scsi_cmnd * pSRB)
 {
 	ULONG flags;
 
@@ -173,277 +147,17 @@ static void inia100AppendSRBToQueue(ORC_HCS * pHCB, Scsi_Cmnd * pSRB)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static Scsi_Cmnd *inia100PopSRBFromQueue(ORC_HCS * pHCB)
+static struct scsi_cmnd *inia100PopSRBFromQueue(ORC_HCS * pHCB)
 {
-	Scsi_Cmnd *pSRB;
+	struct scsi_cmnd *pSRB;
 	ULONG flags;
 	spin_lock_irqsave(&(pHCB->pSRB_lock), flags);
-	if ((pSRB = (Scsi_Cmnd *) pHCB->pSRB_head) != NULL) {
-		pHCB->pSRB_head = (Scsi_Cmnd *) pHCB->pSRB_head->SCp.ptr;
+	if ((pSRB = (struct scsi_cmnd *) pHCB->pSRB_head) != NULL) {
+		pHCB->pSRB_head = (struct scsi_cmnd *) pHCB->pSRB_head->SCp.ptr;
 		pSRB->SCp.ptr = NULL;
 	}
 	spin_unlock_irqrestore(&(pHCB->pSRB_lock), flags);
 	return (pSRB);
-}
-
-/*****************************************************************************
- Function name  : inia100_setup
- Description    : 
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-void inia100_setup(char *str, int *ints)
-{
-	if (setup_called)
-		inia100_panic("inia100: inia100_setup called twice.\n");
-
-	setup_called = ints[0];
-	setup_str = str;
-}
-
-/*****************************************************************************
- Function name	: orc_ReturnNumberOfAdapters
- Description	: This function will scan PCI bus to get all Orchid card
- Input		: None.
- Output		: None.
- Return		: SUCCESSFUL	- Successful scan
-		  ohterwise	- No drives founded
-*****************************************************************************/
-int orc_ReturnNumberOfAdapters(void)
-{
-	unsigned int iAdapters;
-
-	iAdapters = 0;
-	/*
-	 * PCI-bus probe.
-	 */
-	{
-		/*
-		 * Note: I removed the struct pci_device_list stuff since this
-		 * driver only cares about one device ID.  If that changes in
-		 * the future it can be added in with only a very moderate
-		 * amount of work.  It made the double scan of the device list
-		 * for getting a count and allocating the device list easier
-		 * to not have the for(i ... ) loop in there....
-		 */
-		unsigned int dRegValue;
-		WORD wBIOS, wBASE;
-#ifdef MMAPIO
-		unsigned long page_offset, base;
-#endif
-		struct pci_dev *pdev = NULL;
-
-		/*
-		 * Get a count of adapters that we expect to be able to use.
-		 * Pass that count to init_inia100Adapter_table() for malloc
-		 * reasons.
-		 */
-		pdev = NULL;
-		while((pdev=pci_find_device(ORC_VENDOR_ID, ORC_DEVICE_ID, pdev)))
-		{
-			if (pci_enable_device(pdev))
-				continue;
-			if (pci_set_dma_mask(pdev, (u64)0xffffffff)) {
-				printk(KERN_WARNING "Unable to set 32bit DMA "
-					"on inia100 adapter, ignoring.\n");
-				continue;
-			}
-			iAdapters++;
-		}
-		if(init_inia100Adapter_table(iAdapters))
-			return 0;
-		/*
-		 * Now go through the adapters again actually setting them up
-		 * and putting them in the table this time.
-		 */
-		pdev = NULL;
-		while((pdev=pci_find_device(ORC_VENDOR_ID, ORC_DEVICE_ID, pdev)))
-		{
-			/*
-			 * Read sundry information from PCI BIOS.
-			 */
-			dRegValue = pci_resource_start(pdev, 0);
-			if (dRegValue == -1) {	/* Check return code */
-				printk("\n\rinia100: orchid read configuration error.\n");
-				iAdapters--;
-				continue;	/* Read configuration space error  */
-			}
-
-			/* <02> read from base address + 0x50 offset to get the wBIOS balue. */
-			wBASE = (WORD) dRegValue;
-
-			/* Now read the interrupt line value */
-			dRegValue = pdev->irq;
-
-			wBIOS = ORC_RDWORD(wBASE, 0x50);
-
-			pci_set_master(pdev);
-
-#ifdef MMAPIO
-			base = wBASE & PAGE_MASK;
-			page_offset = wBASE - base;
-
-			/*
-			 * replace the next line with this one if you are using 2.1.x:
-			 * temp_p->maddr = ioremap(base, page_offset + 256);
-			 */
-			wBASE = ioremap(base, page_offset + 256);
-			if (wBASE) {
-				wBASE += page_offset;
-			}
-#endif
-
-			Addinia100_into_Adapter_table(wBIOS, wBASE, pdev, iAdapters);
-		}	/* while(pdev=....) */
-	}			/* PCI BIOS present */
-	return (iAdapters);
-}
-
-/*****************************************************************************
- Function name  : inia100_detect
- Description    : 
- Input          : pHCB  -       Pointer to host adapter structure
- Output         : None.
- Return         : pSRB  -       Pointer to SCSI request block.
-*****************************************************************************/
-int inia100_detect(Scsi_Host_Template * tpnt)
-{
-	ORC_HCS *pHCB;
-	struct Scsi_Host *hreg;
-	U32 sz;
-	U32 i;			/* 01/14/98                     */
-	int ok = 0, iAdapters;
-	ULONG dBiosAdr;
-	BYTE *pbBiosAdr;
-	struct pci_dev *pdev;
-
-	tpnt->proc_name = "inia100";
-	if (setup_called) {
-		/* Setup by inia100_setup          */
-		printk("inia100: processing commandline: ");
-	}
-	/* Get total number of adapters in the motherboard */
-	iAdapters = orc_ReturnNumberOfAdapters();
-
-	/* printk("inia100: Total Initio Adapters = %d\n", iAdapters); */
-	if (iAdapters == 0)	/* If no orc founded, return */
-		return (0);
-
-#if 0
-	printk("orc_num_scb= %x orc_num_ch= %x hcsize= %x scbsize= %x escbsize= %x\n",
-	       orc_num_scb, orc_num_ch, sizeof(ORC_HCS), sizeof(ORC_SCB), sizeof(ESCB));
-#endif
-
-	for (i = 0; i < iAdapters; i++) {
-		pdev = inia100_adpt[i].ADPT_pdev;
-		hreg = scsi_register(tpnt, sizeof(ORC_HCS));
-		if (hreg == NULL) {
-			goto out_disable;
-		}
-		pHCB = (ORC_HCS *)hreg->hostdata;
-		pHCB->pdev = pdev;
-		pHCB->pSRB_head = NULL;	/* Initial SRB save queue       */
-		pHCB->pSRB_tail = NULL;	/* Initial SRB save queue       */
-		pHCB->pSRB_lock = SPIN_LOCK_UNLOCKED; /* SRB save queue lock */
-		pHCB->BitAllocFlagLock = SPIN_LOCK_UNLOCKED;
-		/* Get total memory needed for SCB */
-		sz = ORC_MAXQUEUE * sizeof(ORC_SCB);
-		if ((pHCB->HCS_virScbArray = (PVOID) pci_alloc_consistent(pdev, sz, &pHCB->HCS_physScbArray)) == NULL) {
-			printk("inia100: SCB memory allocation error\n");
-			goto out_unregister;
-		}
-		memset((unsigned char *) pHCB->HCS_virScbArray, 0, sz);
-
-		/* Get total memory needed for ESCB */
-		sz = ORC_MAXQUEUE * sizeof(ESCB);
-		if ((pHCB->HCS_virEscbArray = (PVOID) pci_alloc_consistent(pdev, sz, &pHCB->HCS_physEscbArray)) == NULL) {
-			printk("inia100: ESCB memory allocation error\n");
-			goto out_unalloc;
-		}
-		memset((unsigned char *) pHCB->HCS_virEscbArray, 0, sz);
-
-		get_orcPCIConfig(pHCB, i);
-
-		dBiosAdr = pHCB->HCS_BIOS;
-		dBiosAdr = (dBiosAdr << 4);
-
-		pbBiosAdr = phys_to_virt(dBiosAdr);
-
-		if (init_orchid(pHCB)) {	/* Initial orchid chip    */
-			printk("inia100: initial orchid fail!!\n");
-			goto out_unalloc;
-		}
-		if (!request_region(pHCB->HCS_Base, 256, "inia100")) {
-			printk(KERN_WARNING "inia100: io port 0x%x, is busy.\n", 
-			       pHCB->HCS_Base);
-			return (0);
-		}
-
-		hreg->io_port = pHCB->HCS_Base;
-		hreg->n_io_port = 0xff;
-		hreg->can_queue = ORC_MAXQUEUE;	/* 03/05/98                   */
-
-		hreg->unique_id = pHCB->HCS_Base;
-		hreg->max_id = pHCB->HCS_MaxTar;
-
-		hreg->max_lun = 16;	/* 10/21/97                     */
-/*
-   hreg->max_lun = 8;
-   hreg->max_channel = 1;
- */
-		hreg->irq = pHCB->HCS_Intr;
-		hreg->this_id = pHCB->HCS_SCSI_ID;	/* Assign HCS index           */
-
-#if 1
-		hreg->sg_tablesize = TOTAL_SG_ENTRY;	/* Maximun support is 32 */
-#else
-		hreg->sg_tablesize = SG_NONE;	/* No SG                        */
-#endif
-
-		/* Initial orc chip           */
-		ok = request_irq(pHCB->HCS_Intr, inia100_intr, SA_SHIRQ, "inia100", hreg);
-		if (ok < 0) {
-			if (ok == -EINVAL) {
-				printk("inia100: bad IRQ %d.\n", pHCB->HCS_Intr);
-				printk("         Contact author.\n");
-			} else {
-				if (ok == -EBUSY)
-					printk("inia100: IRQ %d already in use. Configure another.\n", pHCB->HCS_Intr);
-				else {
-					printk("\ninia100: Unexpected error code on requesting IRQ %d.\n",
-					       pHCB->HCS_Intr);
-					printk("         Contact author.\n");
-				}
-			}
-			goto out_irq;
-		}
-	}
-
-	tpnt->this_id = -1;
-	tpnt->can_queue = 1;
-	kfree(inia100_adpt);
-	return 1;
-
-out_irq:
-        release_region(pHCB->HCS_Base, 256);
-out_unalloc:
-	if(pHCB->HCS_virEscbArray) {
-		pci_free_consistent(pHCB->pdev, ORC_MAXQUEUE * sizeof(ESCB),
-			pHCB->HCS_virEscbArray, pHCB->HCS_physEscbArray);
-		pHCB->HCS_virEscbArray = NULL;
-	}
-	if(pHCB->HCS_virScbArray) {
-		pci_free_consistent(pHCB->pdev, ORC_MAXQUEUE * sizeof(ORC_SCB),
-			pHCB->HCS_virScbArray, pHCB->HCS_physScbArray);
-		pHCB->HCS_virScbArray = NULL;
-	}
-out_unregister:
-	scsi_unregister(hreg);
-out_disable:
-	pci_disable_device(pdev);
-	kfree(inia100_adpt);
-	return i;
 }
 
 /*****************************************************************************
@@ -453,7 +167,7 @@ out_disable:
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
+static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, struct scsi_cmnd * SCpnt)
 {				/* Create corresponding SCB     */
 	struct scatterlist *pSrbSG;
 	ORC_SG *pSG;		/* Pointer to SG list           */
@@ -479,7 +193,7 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
 			TotalLen = 0;
 			pSrbSG = (struct scatterlist *) SCpnt->request_buffer;
 			count_sg = pci_map_sg(pHCB->pdev, pSrbSG, SCpnt->use_sg,
-				scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+					SCpnt->sc_data_direction);
 			pSCB->SCB_SGLen = (U32) (count_sg * 8);
 			for (i = 0; i < count_sg; i++, pSG++, pSrbSG++) {
 				pSG->SG_Ptr = (U32) sg_dma_address(pSrbSG);
@@ -490,7 +204,7 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
 			pSCB->SCB_SGLen = 0x8;
 			pSG->SG_Ptr = (U32) pci_map_single(pHCB->pdev,
 				SCpnt->request_buffer, SCpnt->request_bufflen,
-				scsi_to_pci_dma_dir(SCpnt->sc_data_direction));
+				SCpnt->sc_data_direction);
 			SCpnt->host_scribble = (void *)pSG->SG_Ptr;
 			pSG->SG_Len = (U32) SCpnt->request_bufflen;
 		} else {
@@ -526,7 +240,7 @@ static void inia100BuildSCB(ORC_HCS * pHCB, ORC_SCB * pSCB, Scsi_Cmnd * SCpnt)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
+static int inia100_queue(struct scsi_cmnd * SCpnt, void (*done) (struct scsi_cmnd *))
 {
 	register ORC_SCB *pSCB;
 	ORC_HCS *pHCB;		/* Point to Host adapter control block */
@@ -553,7 +267,7 @@ static int inia100_queue(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static int inia100_abort(Scsi_Cmnd * SCpnt)
+static int inia100_abort(struct scsi_cmnd * SCpnt)
 {
 	ORC_HCS *hcsp;
 
@@ -569,7 +283,7 @@ static int inia100_abort(Scsi_Cmnd * SCpnt)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
+static int inia100_bus_reset(struct scsi_cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
 	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
@@ -583,7 +297,7 @@ static int inia100_bus_reset(Scsi_Cmnd * SCpnt)
  Output         : None.
  Return         : pSRB  -       Pointer to SCSI request block.
 *****************************************************************************/
-static int inia100_device_reset(Scsi_Cmnd * SCpnt)
+static int inia100_device_reset(struct scsi_cmnd * SCpnt)
 {				/* I need Host Control Block Information */
 	ORC_HCS *pHCB;
 	pHCB = (ORC_HCS *) SCpnt->device->host->hostdata;
@@ -602,7 +316,7 @@ static int inia100_device_reset(Scsi_Cmnd * SCpnt)
 *****************************************************************************/
 void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 {
-	Scsi_Cmnd *pSRB;	/* Pointer to SCSI request block */
+	struct scsi_cmnd *pSRB;	/* Pointer to SCSI request block */
 	ORC_HCS *pHCB;
 	ORC_SCB *pSCB;
 	ESCB *pEScb;
@@ -610,7 +324,7 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 	pHCB = (ORC_HCS *) pHcb;
 	pSCB = (ORC_SCB *) pScb;
 	pEScb = pSCB->SCB_EScb;
-	if ((pSRB = (Scsi_Cmnd *) pEScb->SCB_Srb) == 0) {
+	if ((pSRB = (struct scsi_cmnd *) pEScb->SCB_Srb) == 0) {
 		printk("inia100SCBPost: SRB pointer is empty\n");
 		orc_release_scb(pHCB, pSCB);	/* Release SCB for current channel */
 		return;
@@ -676,47 +390,187 @@ void inia100SCBPost(BYTE * pHcb, BYTE * pScb)
 static irqreturn_t inia100_intr(int irqno, void *devid, struct pt_regs *regs)
 {
 	struct Scsi_Host *host = (struct Scsi_Host *)devid;
-	ORC_HCS *pHcb;
+	ORC_HCS *pHcb = (ORC_HCS *)host->hostdata;
 	unsigned long flags;
 
- 	pHcb = (ORC_HCS *)host->hostdata;	/* Host adapter control block */
 	spin_lock_irqsave(host->host_lock, flags);
 	orc_interrupt(pHcb);
 	spin_unlock_irqrestore(host->host_lock, flags);
+
 	return IRQ_HANDLED;
 }
 
-/* 
- * Dump the current driver status and panic...
- */
-static void inia100_panic(char *msg)
+static struct scsi_host_template inia100_template = {
+	.proc_name		= "inia100",
+	.name			= inia100_REVID,
+	.queuecommand		= inia100_queue,
+	.eh_abort_handler	= inia100_abort,
+	.eh_bus_reset_handler	= inia100_bus_reset,
+	.eh_device_reset_handler = inia100_device_reset,
+	.can_queue		= 1,
+	.this_id		= 1,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun 		= 1,
+	.use_clustering		= ENABLE_CLUSTERING,
+};
+
+static int __devinit inia100_probe_one(struct pci_dev *pdev,
+		const struct pci_device_id *id)
 {
-	printk("\ninia100_panic: %s\n", msg);
-	panic("inia100 panic");
+	struct Scsi_Host *shost;
+	ORC_HCS *pHCB;
+	unsigned long port, bios;
+	int ok = -ENODEV;
+	u32 sz;
+	unsigned long dBiosAdr;
+	char *pbBiosAdr;
+
+	if (pci_enable_device(pdev))
+		goto out;
+	if (pci_set_dma_mask(pdev, 0xffffffffULL)) {
+		printk(KERN_WARNING "Unable to set 32bit DMA "
+				    "on inia100 adapter, ignoring.\n");
+		goto out_disable_device;
+	}
+
+	port = pci_resource_start(pdev, 0);
+	if (!request_region(pHCB->HCS_Base, 256, "inia100")) {
+		printk(KERN_WARNING "inia100: io port 0x%x, is busy.\n", 
+		       pHCB->HCS_Base);
+		goto out_disable_device; /* XXX: undo init_orchid() ?? */
+	}
+
+	/* <02> read from base address + 0x50 offset to get the bios balue. */
+	bios = ORC_RDWORD(port, 0x50);
+
+	pci_set_master(pdev);
+
+	shost = scsi_host_alloc(&inia100_template, sizeof(ORC_HCS));
+	if (!shost)
+		goto out_release_region;
+
+	pHCB = (ORC_HCS *)shost->hostdata;
+	pHCB->pdev = pdev;
+	pHCB->HCS_Base = port;
+	pHCB->HCS_BIOS = bios;
+	pHCB->pSRB_head = NULL;	/* Initial SRB save queue       */
+	pHCB->pSRB_tail = NULL;	/* Initial SRB save queue       */
+	pHCB->pSRB_lock = SPIN_LOCK_UNLOCKED; /* SRB save queue lock */
+	pHCB->BitAllocFlagLock = SPIN_LOCK_UNLOCKED;
+
+	/* Get total memory needed for SCB */
+	sz = ORC_MAXQUEUE * sizeof(ORC_SCB);
+	pHCB->HCS_virScbArray = pci_alloc_consistent(pdev, sz, &pHCB->HCS_physScbArray);
+	if (!pHCB->HCS_virScbArray) {
+		printk("inia100: SCB memory allocation error\n");
+		goto out_host_put;
+	}
+	memset(pHCB->HCS_virScbArray, 0, sz);
+
+	/* Get total memory needed for ESCB */
+	sz = ORC_MAXQUEUE * sizeof(ESCB);
+	pHCB->HCS_virEscbArray = pci_alloc_consistent(pdev, sz, &pHCB->HCS_physEscbArray);
+	if (!pHCB->HCS_virEscbArray) {
+		printk("inia100: ESCB memory allocation error\n");
+		goto out_free_scb_array;
+	}
+	memset(pHCB->HCS_virEscbArray, 0, sz);
+
+	dBiosAdr = pHCB->HCS_BIOS;
+	dBiosAdr = (dBiosAdr << 4);
+	pbBiosAdr = phys_to_virt(dBiosAdr);
+	if (init_orchid(pHCB)) {	/* Initialize orchid chip */
+		printk("inia100: initial orchid fail!!\n");
+		goto out_free_escb_array;
+	}
+
+	shost->io_port = pHCB->HCS_Base;
+	shost->n_io_port = 0xff;
+	shost->can_queue = ORC_MAXQUEUE;
+	shost->unique_id = shost->io_port;
+	shost->max_id = pHCB->HCS_MaxTar;
+	shost->max_lun = 16;
+	shost->irq = pHCB->HCS_Intr;
+	shost->this_id = pHCB->HCS_SCSI_ID;	/* Assign HCS index */
+	shost->sg_tablesize = TOTAL_SG_ENTRY;
+
+	/* Initial orc chip           */
+	ok = request_irq(pHCB->HCS_Intr, inia100_intr, SA_SHIRQ, "inia100", shost);
+	if (ok < 0) {
+		printk(KERN_WARNING "inia100: unable to get irq %d\n", pHCB->HCS_Intr);
+		goto out_free_escb_array;
+	}
+
+	pci_set_drvdata(pdev, shost);
+
+	ok = scsi_add_host(shost, &pdev->dev);
+	if (!ok)
+		goto out_free_irq;
+
+	scsi_scan_host(shost);
+	return 0;
+
+ out_free_irq:
+        free_irq(shost->irq, shost);
+ out_free_escb_array:
+	pci_free_consistent(pdev, ORC_MAXQUEUE * sizeof(ESCB),
+			pHCB->HCS_virEscbArray, pHCB->HCS_physEscbArray);
+ out_free_scb_array:
+	pci_free_consistent(pdev, ORC_MAXQUEUE * sizeof(ORC_SCB),
+			pHCB->HCS_virScbArray, pHCB->HCS_physScbArray);
+ out_host_put:
+	scsi_host_put(shost);
+ out_release_region:
+        release_region(pHCB->HCS_Base, 256);
+ out_disable_device:
+	pci_disable_device(pdev);
+ out:
+	return ok;
 }
 
-/*
- * Release ressources
- */
-static int inia100_release(struct Scsi_Host *hreg)
+static void __devexit inia100_remove_one(struct pci_dev *pdev)
 {
-	ORC_HCS *pHCB = (ORC_HCS *)hreg->hostdata;
+	struct Scsi_Host *shost = pci_get_drvdata(pdev);
+	ORC_HCS *pHCB = (ORC_HCS *)shost->hostdata;
 
-        free_irq(hreg->irq, hreg);
-        release_region(hreg->io_port, 256);
-	if(pHCB->HCS_virEscbArray) {
-		pci_free_consistent(pHCB->pdev, ORC_MAXQUEUE * sizeof(ESCB),
+	scsi_remove_host(shost);
+
+        free_irq(shost->irq, shost);
+	pci_free_consistent(pdev, ORC_MAXQUEUE * sizeof(ESCB),
 			pHCB->HCS_virEscbArray, pHCB->HCS_physEscbArray);
-		pHCB->HCS_virEscbArray = NULL;
-	}
-	if(pHCB->HCS_virScbArray) {
-		pci_free_consistent(pHCB->pdev, ORC_MAXQUEUE * sizeof(ORC_SCB),
+	pci_free_consistent(pdev, ORC_MAXQUEUE * sizeof(ORC_SCB),
 			pHCB->HCS_virScbArray, pHCB->HCS_physScbArray);
-		pHCB->HCS_virScbArray = NULL;
-	}
-	pci_disable_device(pHCB->pdev);
-        return 0;
+        release_region(shost->io_port, 256);
+
+	scsi_host_put(shost);
 } 
 
+static struct pci_device_id inia100_pci_tbl[] = {
+	{ORC_VENDOR_ID, ORC_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
+	{0,}
+};
+MODULE_DEVICE_TABLE(pci, inia100_pci_tbl);
+
+static struct pci_driver inia100_pci_driver = {
+	.name		= "inia100",
+	.id_table	= inia100_pci_tbl,
+	.probe		= inia100_probe_one,
+	.remove		= __devexit_p(inia100_remove_one),
+};
+
+static int __init inia100_init(void)
+{
+	return pci_module_init(&inia100_pci_driver);
+}
+
+static void __exit inia100_exit(void)
+{
+	pci_unregister_driver(&inia100_pci_driver);
+}
+
+MODULE_DESCRIPTION("Initio A100U2W SCSI driver");
+MODULE_AUTHOR("Initio Corporation");
 MODULE_LICENSE("Dual BSD/GPL");
-/*#include "inia100scsi.c" */
+
+module_init(inia100_init);
+module_exit(inia100_exit);

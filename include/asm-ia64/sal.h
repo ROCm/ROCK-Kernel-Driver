@@ -71,7 +71,9 @@ extern spinlock_t sal_lock;
 # define SAL_CALL_REENTRANT(result,args...) do {	\
 	struct ia64_fpreg __ia64_scs_fr[6];		\
 	ia64_save_scratch_fpregs(__ia64_scs_fr);	\
+	preempt_disable();				\
 	__SAL_CALL(result, args);			\
+	preempt_enable();				\
 	ia64_load_scratch_fpregs(__ia64_scs_fr);	\
 } while (0)
 
@@ -725,14 +727,16 @@ ia64_sal_mc_rendez (void)
  * Allow the OS to specify the interrupt number to be used by SAL to interrupt OS during
  * the machine check rendezvous sequence as well as the mechanism to wake up the
  * non-monarch processor at the end of machine check processing.
+ * Returns the complete ia64_sal_retval because some calls return more than just a status
+ * value.
  */
-static inline s64
+static inline struct ia64_sal_retval
 ia64_sal_mc_set_params (u64 param_type, u64 i_or_m, u64 i_or_m_val, u64 timeout, u64 rz_always)
 {
 	struct ia64_sal_retval isrv;
 	SAL_CALL(isrv, SAL_MC_SET_PARAMS, param_type, i_or_m, i_or_m_val,
 		 timeout, rz_always, 0, 0);
-	return isrv.status;
+	return isrv;
 }
 
 /* Read from PCI configuration space */
@@ -804,10 +808,12 @@ ia64_sal_update_pal (u64 param_buf, u64 scratch_buf, u64 scratch_buf_size,
 
 extern unsigned long sal_platform_features;
 
+extern int (*salinfo_platform_oemdata)(const u8 *, u8 **, u64 *);
+
 struct sal_ret_values {
 	long r8; long r9; long r10; long r11;
 };
 
 #endif /* __ASSEMBLY__ */
 
-#endif /* _ASM_IA64_PAL_H */
+#endif /* _ASM_IA64_SAL_H */

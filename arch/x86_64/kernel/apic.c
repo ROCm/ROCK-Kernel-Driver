@@ -42,6 +42,8 @@ static DEFINE_PER_CPU(int, prof_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_old_multiplier) = 1;
 static DEFINE_PER_CPU(int, prof_counter) = 1;
 
+static void apic_pm_activate(void);
+
 void enable_NMI_through_LVT0 (void * dummy)
 {
 	unsigned int v, ver;
@@ -435,6 +437,7 @@ void __init setup_local_APIC (void)
 
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		setup_apic_nmi_watchdog();
+	apic_pm_activate();
 }
 
 #ifdef CONFIG_PM
@@ -556,7 +559,7 @@ device_initcall(init_lapic_sysfs);
 
 #else	/* CONFIG_PM */
 
-static inline void apic_pm_activate(void) { }
+static void apic_pm_activate(void) { }
 
 #endif	/* CONFIG_PM */
 
@@ -579,7 +582,6 @@ static int __init detect_init_APIC (void)
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
-	apic_pm_activate();
 	return 0;
 }
 

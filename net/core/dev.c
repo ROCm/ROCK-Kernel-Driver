@@ -1543,7 +1543,7 @@ static inline int __handle_bridge(struct sk_buff *skb,
 			struct packet_type **pt_prev, int *ret)
 {
 #if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	if (skb->dev->br_port) {
+	if (skb->dev->br_port && skb->pkt_type != PACKET_LOOPBACK) {
 		*ret = handle_bridge(skb, *pt_prev);
 		if (br_handle_frame_hook(skb) == 0)
 			return 1;

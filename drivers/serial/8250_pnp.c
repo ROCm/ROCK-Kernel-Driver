@@ -42,6 +42,8 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"ADC0001",		0	},
 	/* SXPro 288 External Data Fax Modem Plug & Play */
 	{	"ADC0002",		0	},
+	/* PROLiNK 1456VH ISA PnP K56flex Fax Modem */
+	{	"AEI0250",		0	},
 	/* Actiontec ISA PNP 56K X2 Fax Modem */
 	{	"AEI1240",		0	},
 	/* Rockwell 56K ACF II Fax+Data+Voice Modem */
@@ -74,6 +76,9 @@ static const struct pnp_device_id pnp_dev_table[] = {
 	{	"DMB1032",		0	},
 	/* Creative Modem Blaster V.90 DI5660 */
 	{	"DMB2001",		0	},
+	/* E-Tech */
+	/* E-Tech CyberBULLET PC56RVP */
+	{	"ETT0002",		0	},
 	/* FUJITSU */
 	/* Fujitsu 33600 PnP-I2 R Plug & Play */
 	{	"FUJ0202",		0	},

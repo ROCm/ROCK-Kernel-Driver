@@ -559,3 +559,96 @@ asmlinkage long compat_sys_fcntl(unsigned int fd, unsigned int cmd,
 	return compat_sys_fcntl64(fd, cmd, arg);
 }
 
+extern asmlinkage long sys_io_setup(unsigned nr_reqs, aio_context_t *ctx);
+
+asmlinkage long
+compat_sys_io_setup(unsigned nr_reqs, u32 *ctx32p)
+{
+	long ret;
+	aio_context_t ctx64;
+
+	mm_segment_t oldfs = get_fs();
+	if (unlikely(get_user(ctx64, ctx32p)))
+		return -EFAULT;
+
+	set_fs(KERNEL_DS);
+	ret = sys_io_setup(nr_reqs, &ctx64);
+	set_fs(oldfs);
+	/* truncating is ok because it's a user address */
+	if (!ret)
+		ret = put_user((u32) ctx64, ctx32p);
+	return ret;
+}
+
+extern asmlinkage long sys_io_getevents(aio_context_t ctx_id,
+					  long min_nr,
+					  long nr,
+					  struct io_event *events,
+					  struct timespec *timeout);
+
+asmlinkage long
+compat_sys_io_getevents(aio_context_t ctx_id,
+				 unsigned long min_nr,
+				 unsigned long nr,
+				 struct io_event *events,
+				 struct compat_timespec *timeout)
+{
+	long ret;
+	struct timespec t;
+	struct timespec *ut = NULL;
+
+	ret = -EFAULT;
+	if (unlikely(!access_ok(VERIFY_WRITE, events, 
+				nr * sizeof(struct io_event))))
+		goto out;
+	if (timeout) {
+		if (get_compat_timespec(&t, timeout))
+			goto out;
+
+		ut = compat_alloc_user_space(sizeof(*ut));
+		if (copy_to_user(ut, &t, sizeof(t)) )
+			goto out;
+	} 
+	ret = sys_io_getevents(ctx_id, min_nr, nr, events, ut);
+out:
+	return ret;
+}
+
+extern asmlinkage long sys_io_submit(aio_context_t, long, 
+				struct iocb __user **);
+
+static inline long
+copy_iocb(long nr, u32 *ptr32, u64 *ptr64)
+{
+	compat_uptr_t uptr;
+	int i;
+
+	for (i = 0; i < nr; ++i) {
+		if (get_user(uptr, ptr32 + i))
+			return -EFAULT;
+		if (put_user((u64)compat_ptr(uptr), ptr64 + i))
+			return -EFAULT;
+	}
+	return 0;
+}
+
+#define MAX_AIO_SUBMITS 	(PAGE_SIZE/sizeof(struct iocb *))
+
+asmlinkage long
+compat_sys_io_submit(aio_context_t ctx_id, int nr, u32 *iocb)
+{
+	struct iocb **iocb64; 
+	long ret;
+
+	if (unlikely(nr < 0))
+		return -EINVAL;
+
+	if (nr > MAX_AIO_SUBMITS)
+		nr = MAX_AIO_SUBMITS;
+	
+	iocb64 = compat_alloc_user_space(nr * sizeof(*iocb64));
+	ret = copy_iocb(nr, iocb, (u64 *) iocb64);
+	if (!ret)
+		ret = sys_io_submit(ctx_id, nr, iocb64);
+	return ret;
+}

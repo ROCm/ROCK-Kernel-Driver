@@ -413,7 +413,7 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 			break;
 	}
 	if (p < pend) {
-		for (q = pend; q >= p; q--)
+		for (q = pend - 1; q >= p; q--)
 			*(q + 1) = *q;
 	}
 	p->start_paddr = paddr;
@@ -608,66 +608,6 @@ acpi_boot_init (void)
 	/* Make boot-up look pretty */
 	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
-}
-
-/*
- * PCI Interrupt Routing
- */
-
-#ifdef CONFIG_PCI
-int __init
-acpi_get_prt (struct pci_vector_struct **vectors, int *count)
-{
-	struct pci_vector_struct *vector;
-	struct list_head *node;
-	struct acpi_prt_entry *entry;
-	int i = 0;
-
-	if (!vectors || !count)
-		return -EINVAL;
-
-	*vectors = NULL;
-	*count = 0;
-
-	if (acpi_prt.count < 0) {
-		printk(KERN_ERR PREFIX "No PCI interrupt routing entries\n");
-		return -ENODEV;
-	}
-
-	/* Allocate vectors */
-
-	*vectors = kmalloc(sizeof(struct pci_vector_struct) * acpi_prt.count, GFP_KERNEL);
-	if (!(*vectors))
-		return -ENOMEM;
-
-	/* Convert PRT entries to IOSAPIC PCI vectors */
-
-	vector = *vectors;
-
-	list_for_each(node, &acpi_prt.entries) {
-		entry = (struct acpi_prt_entry *)node;
-		vector[i].segment = entry->id.segment;
-		vector[i].bus    = entry->id.bus;
-		vector[i].pci_id = ((u32) entry->id.device << 16) | 0xffff;
-		vector[i].pin    = entry->pin;
-		vector[i].irq    = entry->link.index;
-		i++;
-	}
-	*count = acpi_prt.count;
-	return 0;
-}
-#endif /* CONFIG_PCI */
-
-/* Assume IA64 always use I/O SAPIC */
-
-int __init
-acpi_get_interrupt_model (int *type)
-{
-        if (!type)
-                return -EINVAL;
-
-	*type = ACPI_IRQ_MODEL_IOSAPIC;
-        return 0;
 }
 
 int

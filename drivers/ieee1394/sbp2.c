@@ -77,7 +77,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1034 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1082 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -361,38 +361,34 @@ static int sbp2util_down_timeout(atomic_t *done, int timeout)
 static void sbp2_free_packet(struct hpsb_packet *packet)
 {
 	hpsb_free_tlabel(packet);
-	free_hpsb_packet(packet);
+	hpsb_free_packet(packet);
 }
 
-/*
- * This function is called to retrieve a block write packet from our
- * packet pool. This function is used in place of calling
- * alloc_hpsb_packet (which costs us three kmallocs). Instead we just pull
- * out a free request packet and re-initialize values in it. I'm sure this
- * can still stand some more optimization.
+/* This is much like hpsb_node_write(), except it ignores the response
+ * subaction and returns immediately. Can be used from interrupts.
  */
-static struct hpsb_packet *
-sbp2util_allocate_write_packet(struct sbp2scsi_host_info *hi,
-			       struct node_entry *ne, u64 addr,
-			       size_t data_size,
-			       quadlet_t *data)
+int sbp2util_node_write_no_wait(struct node_entry *ne, u64 addr,
+				quadlet_t *buffer, size_t length)
 {
 	struct hpsb_packet *packet;
 
-	packet = hpsb_make_writepacket(hi->host, ne->nodeid,
-				       addr, data, data_size);
-
+	packet = hpsb_make_writepacket(ne->host, ne->nodeid,
+				       addr, buffer, length);
         if (!packet)
-                return NULL;
+                return -ENOMEM;
 
 	hpsb_set_packet_complete_task(packet, (void (*)(void*))sbp2_free_packet,
 				      packet);
 
 	hpsb_node_fill_packet(ne, packet);
 
-	return packet;
-}
+        if (hpsb_send_packet(packet) < 0) {
+		sbp2_free_packet(packet);
+		return -EIO;
+	}
 
+	return 0;
+}
 
 /*
  * This function is called to create a pool of command orbs used for
@@ -1734,35 +1730,26 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
  */
 static int sbp2_agent_reset(struct scsi_id_instance_data *scsi_id, int wait) 
 {
-	struct sbp2scsi_host_info *hi = scsi_id->hi;
-	struct hpsb_packet *packet;
 	quadlet_t data;
-	
+	u64 addr;
+	int retval;
+
 	SBP2_DEBUG("sbp2_agent_reset");
 
 	/*
 	 * Ok, let's write to the target's management agent register
 	 */
 	data = ntohl(SBP2_AGENT_RESET_DATA);
-	packet = sbp2util_allocate_write_packet(hi, scsi_id->ne,
-						scsi_id->sbp2_command_block_agent_addr +
-						SBP2_AGENT_RESET_OFFSET,
-						4, &data);
+	addr = scsi_id->sbp2_command_block_agent_addr + SBP2_AGENT_RESET_OFFSET;
 
-	if (!packet) {
-		SBP2_ERR("sbp2util_allocate_write_packet failed");
-		return(-ENOMEM);
-	}
+	if (wait)
+		retval = hpsb_node_write(scsi_id->ne, addr, &data, 4);
+	else
+		retval = sbp2util_node_write_no_wait(scsi_id->ne, addr, &data, 4);
 
-	if (!hpsb_send_packet(packet)) {
-		SBP2_ERR("hpsb_send_packet failed");
-		sbp2_free_packet(packet); 
-		return(-EIO);
-	}
-
-	if (wait) {
-		down(&packet->state_change);
-		down(&packet->state_change);
+	if (retval < 0) {
+		SBP2_ERR("hpsb_node_write failed.\n");
+		return -EIO;
 	}
 
 	/*
@@ -2032,8 +2019,9 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 				 struct sbp2_command_info *command)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
-        struct hpsb_packet *packet;
 	struct sbp2_command_orb *command_orb = &command->command_orb;
+	struct node_entry *ne = scsi_id->ne;
+	u64 addr;
 
 	outstanding_orb_incr;
 	SBP2_ORB_DEBUG("sending command orb %p, total orbs = %x",
@@ -2049,40 +2037,30 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 	 * Check to see if there are any previous orbs to use
 	 */
 	if (scsi_id->last_orb == NULL) {
-	
+		quadlet_t data[2];
+
 		/*
 		 * Ok, let's write to the target's management agent register
 		 */
-		if (hpsb_node_entry_valid(scsi_id->ne)) {
+		addr = scsi_id->sbp2_command_block_agent_addr + SBP2_ORB_POINTER_OFFSET;
+		data[0] = ORB_SET_NODE_ID(hi->host->node_id);
+		data[1] = command->command_orb_dma;
+		sbp2util_cpu_to_be32_buffer(data, 8);
 
-			packet = sbp2util_allocate_write_packet(hi, scsi_id->ne,
-								scsi_id->sbp2_command_block_agent_addr +
-								SBP2_ORB_POINTER_OFFSET, 8, NULL);
-		
-			if (!packet) {
-				SBP2_ERR("sbp2util_allocate_write_packet failed");
-				return(-ENOMEM);
-			}
-		
-			packet->data[0] = ORB_SET_NODE_ID(hi->host->node_id);
-			packet->data[1] = command->command_orb_dma;
-			sbp2util_cpu_to_be32_buffer(packet->data, 8);
-		
-			SBP2_ORB_DEBUG("write command agent, command orb %p", command_orb);
+		SBP2_ORB_DEBUG("write command agent, command orb %p", command_orb);
 
-			if (!hpsb_send_packet(packet)) {
-				SBP2_ERR("hpsb_send_packet failed");
-				sbp2_free_packet(packet); 
-				return(-EIO);
-			}
-
-			SBP2_ORB_DEBUG("write command agent complete");
+		if (sbp2util_node_write_no_wait(ne, addr, data, 8) < 0) {
+			SBP2_ERR("sbp2util_node_write_no_wait failed.\n");
+			return -EIO;
 		}
+
+		SBP2_ORB_DEBUG("write command agent complete");
 
 		scsi_id->last_orb = command_orb;
 		scsi_id->last_orb_dma = command->command_orb_dma;
 
 	} else {
+		quadlet_t data;
 
 		/*
 		 * We have an orb already sent (maybe or maybe not
@@ -2102,25 +2080,14 @@ static int sbp2_link_orb_command(struct scsi_id_instance_data *scsi_id,
 		/*
 		 * Ring the doorbell
 		 */
-		if (hpsb_node_entry_valid(scsi_id->ne)) {
-			quadlet_t data = cpu_to_be32(command->command_orb_dma);
+		data = cpu_to_be32(command->command_orb_dma);
+		addr = scsi_id->sbp2_command_block_agent_addr + SBP2_DOORBELL_OFFSET;
 
-			packet = sbp2util_allocate_write_packet(hi, scsi_id->ne,
-					scsi_id->sbp2_command_block_agent_addr +
-					SBP2_DOORBELL_OFFSET, 4, &data);
-	
-			if (!packet) {
-				SBP2_ERR("sbp2util_allocate_write_packet failed");
-				return(-ENOMEM);
-			}
+		SBP2_ORB_DEBUG("ring doorbell, command orb %p", command_orb);
 
-			SBP2_ORB_DEBUG("ring doorbell, command orb %p", command_orb);
-
-			if (!hpsb_send_packet(packet)) {
-				SBP2_ERR("hpsb_send_packet failed");
-				sbp2_free_packet(packet);
-				return(-EIO);
-			}
+		if (sbp2util_node_write_no_wait(ne, addr, &data, 4) < 0) {
+			SBP2_ERR("sbp2util_node_write_no_wait failed");
+			return(-EIO);
 		}
 
 		scsi_id->last_orb = command_orb;

@@ -24,7 +24,7 @@ History:
 ========
 0.1.0  11/20/1998  First version, draft
 1.0.0  11/1998     Alan Cox changes, incorporation in 2.2.0
-                   as /usr/src/linux/Documentation/sound/Introduction
+                   as /usr/src/linux/Documentation/sound/oss/Introduction
 1.1.0  6/30/1999   Second version, added notes on making the drivers,
                    added info on multiple sound cards of similar types,]
                    added more diagnostics info, added info about esd.

@@ -175,7 +175,7 @@ int conf_string(struct menu *menu)
 			break;
 		case '?':
 			/* print help */
-			if (line[1] == 0) {
+			if (line[1] == '\n') {
 				help = nohelp_text;
 				if (menu->sym->help)
 					help = menu->sym->help;

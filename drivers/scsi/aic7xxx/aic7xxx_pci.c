@@ -39,7 +39,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#66 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx_pci.c#69 $
  *
  * $FreeBSD$
  */
@@ -76,7 +76,7 @@ ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 #define ID_9005_SISL_MASK		0x000FFFFF00000000ull
 #define ID_9005_SISL_ID			0x0005900500000000ull
 #define ID_AIC7850			0x5078900400000000ull
-#define ID_AHA_2902_04_10_15_20_30C	0x5078900478509004ull
+#define ID_AHA_2902_04_10_15_20C_30C	0x5078900478509004ull
 #define ID_AIC7855			0x5578900400000000ull
 #define ID_AIC7859			0x3860900400000000ull
 #define ID_AHA_2930CU			0x3860900438699004ull
@@ -245,9 +245,9 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 {
 	/* aic7850 based controllers */
 	{
-		ID_AHA_2902_04_10_15_20_30C,
+		ID_AHA_2902_04_10_15_20C_30C,
 		ID_ALL_MASK,
-		"Adaptec 2902/04/10/15/20/30C SCSI adapter",
+		"Adaptec 2902/04/10/15/20C/30C SCSI adapter",
 		ahc_aic785X_setup
 	},
 	/* aic7860 based controllers */
@@ -877,7 +877,7 @@ ahc_pci_config(struct ahc_softc *ahc, struct ahc_pci_identity *entry)
 		scsiseq = 0;
 	}
 
-	error = ahc_reset(ahc);
+	error = ahc_reset(ahc, /*reinit*/FALSE);
 	if (error != 0)
 		return (ENXIO);
 
@@ -1289,6 +1289,14 @@ ahc_pci_test_register_access(struct ahc_softc *ahc)
 	ahc_outb(ahc, HCNTRL, hcntrl|PAUSE);
 	while (ahc_is_paused(ahc) == 0)
 		;
+
+	/* Clear any PCI errors that occurred before our driver attached. */
+	status1 = ahc_pci_read_config(ahc->dev_softc,
+				      PCIR_STATUS + 1, /*bytes*/1);
+	ahc_pci_write_config(ahc->dev_softc, PCIR_STATUS + 1,
+			     status1, /*bytes*/1);
+	ahc_outb(ahc, CLRINT, CLRPARERR);
+
 	ahc_outb(ahc, SEQCTL, PERRORDIS);
 	ahc_outb(ahc, SCBPTR, 0);
 	ahc_outl(ahc, SCB_BASE, 0x5aa555aa);

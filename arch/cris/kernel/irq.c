@@ -89,11 +89,11 @@ static struct irqaction *irq_action[NR_IRQS];
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction * action;
 	unsigned long flags;
 
-	for (i = 0; i < NR_IRQS; i++) {
+	if (i < NR_IRQS) {
 		local_irq_save(flags);
 		action = irq_action[i];
 		if (!action) 

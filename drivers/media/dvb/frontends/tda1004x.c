@@ -108,7 +108,7 @@ static struct dvb_frontend_info tda10045h_info = {
 	.frequency_min = 51000000,
 	.frequency_max = 858000000,
 	.frequency_stepsize = 166667,
-	.caps = FE_CAN_INVERSION_AUTO |
+	.caps =
 	    FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	    FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
 	    FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 | FE_CAN_QAM_AUTO |

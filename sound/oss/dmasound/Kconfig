@@ -10,7 +10,7 @@ config DMASOUND_ATARI
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
 	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  <file:Documentation/kbuild/modules.txt>.
 
 config DMASOUND_PMAC
 	tristate "PowerMac DMA sound support"
@@ -24,7 +24,7 @@ config DMASOUND_PMAC
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
 	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  <file:Documentation/kbuild/modules.txt>.
 
 config DMASOUND_PAULA
 	tristate "Amiga DMA sound support"
@@ -38,7 +38,7 @@ config DMASOUND_PAULA
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
 	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  <file:Documentation/kbuild/modules.txt>.
 
 config DMASOUND_Q40
 	tristate "Q40 sound support"
@@ -52,7 +52,7 @@ config DMASOUND_Q40
 	  This driver is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you
 	  want). If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>.
+	  <file:Documentation/kbuild/modules.txt>.
 
 config DMASOUND
 	tristate

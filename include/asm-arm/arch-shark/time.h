@@ -34,8 +34,6 @@ void __init time_init(void)
 	outb(HZ_TIME & 0xff, 0x40);     /* LSB of count */
 	outb(HZ_TIME >> 8, 0x40);
 
-	xtime.tv_sec = 0;
-
 	timer_irq.handler = timer_interrupt;
 	setup_irq(IRQ_TIMER, &timer_irq);
 }

@@ -1,42 +1,9 @@
 #ifndef __LINUX_CPUMASK_H
 #define __LINUX_CPUMASK_H
 
-#include <linux/config.h>
-#include <linux/kernel.h>
 #include <linux/threads.h>
-#include <linux/types.h>
-#include <linux/bitmap.h>
-
-#if NR_CPUS > BITS_PER_LONG && NR_CPUS != 1
-#define CPU_ARRAY_SIZE		BITS_TO_LONGS(NR_CPUS)
-
-struct cpumask
-{
-	unsigned long mask[CPU_ARRAY_SIZE];
-};
-
-typedef struct cpumask cpumask_t;
-
-#else
-typedef unsigned long cpumask_t;
-#endif
-
-#ifdef CONFIG_SMP
-#if NR_CPUS > BITS_PER_LONG
-#include <asm-generic/cpumask_array.h>
-#else
-#include <asm-generic/cpumask_arith.h>
-#endif
-#else
-#include <asm-generic/cpumask_up.h>
-#endif
-
-#if NR_CPUS <= 4*BITS_PER_LONG
-#include <asm-generic/cpumask_const_value.h>
-#else
-#include <asm-generic/cpumask_const_reference.h>
-#endif
-
+#include <asm/cpumask.h>
+#include <asm/bug.h>
 
 #ifdef CONFIG_SMP
 
@@ -53,19 +20,31 @@ extern cpumask_t cpu_online_map;
 static inline int next_online_cpu(int cpu, cpumask_t map)
 {
 	do
-		cpu = next_cpu_const(cpu, map);
+		cpu = next_cpu_const(cpu, mk_cpumask_const(map));
 	while (cpu < NR_CPUS && !cpu_online(cpu));
 	return cpu;
 }
 
 #define for_each_cpu(cpu, map)						\
-	for (cpu = first_cpu_const(map);				\
+	for (cpu = first_cpu_const(mk_cpumask_const(map));		\
 		cpu < NR_CPUS;						\
-		cpu = next_cpu_const(cpu,map))
+		cpu = next_cpu_const(cpu,mk_cpumask_const(map)))
 
 #define for_each_online_cpu(cpu, map)					\
-	for (cpu = first_cpu_const(map);				\
+	for (cpu = first_cpu_const(mk_cpumask_const(map));		\
 		cpu < NR_CPUS;						\
 		cpu = next_online_cpu(cpu,map))
+
+extern int __mask_snprintf_len(char *buf, unsigned int buflen,
+		const unsigned long *maskp, unsigned int maskbytes);
+
+#define cpumask_snprintf(buf, buflen, map)				\
+	__mask_snprintf_len(buf, buflen, cpus_addr(map), sizeof(map))
+
+extern int __mask_parse_len(const char __user *ubuf, unsigned int ubuflen,
+	unsigned long *maskp, unsigned int maskbytes);
+
+#define cpumask_parse(buf, buflen, map)					\
+	__mask_parse_len(buf, buflen, cpus_addr(map), sizeof(map))
 
 #endif /* __LINUX_CPUMASK_H */

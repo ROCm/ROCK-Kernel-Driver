@@ -628,9 +628,6 @@ iosapic_init (unsigned long phys_addr, unsigned int gsi_base)
 	iosapic_lists[num_iosapic].num_rte = num_rte;
 	num_iosapic++;
 
-	printk(KERN_INFO "  IOSAPIC v%x.%x, address 0x%lx, GSIs 0x%x-0x%x\n",
-	       (ver & 0xf0) >> 4, (ver & 0x0f), phys_addr, gsi_base, gsi_base + num_rte - 1);
-
 	if ((gsi_base == 0) && pcat_compat) {
 		/*
 		 * Map the legacy ISA devices into the IOSAPIC data.  Some of these may

@@ -226,6 +226,27 @@ static const char EP_IN_NAME [] = "ep2in-bulk";
 #define hw_optimize(g) do {} while (0)
 #endif
 
+/*
+ * Toshiba TC86C001 ("Goku-S") UDC
+ *
+ * This has three semi-configurable full speed bulk/interrupt endpoints.
+ */
+#ifdef	CONFIG_USB_ETH_GOKU
+#define CHIP			"goku"
+#define DRIVER_VERSION_NUM	0x0106
+#define EP0_MAXPACKET		8
+static const char EP_OUT_NAME [] = "ep1-bulk";
+#define EP_OUT_NUM	1
+static const char EP_IN_NAME [] = "ep2-bulk";
+#define EP_IN_NUM	2
+static const char EP_STATUS_NAME [] = "ep3-bulk";
+#define EP_STATUS_NUM	3
+#define SELFPOWER USB_CONFIG_ATT_SELFPOWER
+/* doesn't support remote wakeup */
+
+#define hw_optimize(g) do {} while (0)
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 #ifndef EP0_MAXPACKET

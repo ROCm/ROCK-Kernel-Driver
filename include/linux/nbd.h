@@ -35,6 +35,9 @@ enum {
 /* Define PARANOIA to include extra sanity checking code in here & driver */
 #define PARANOIA
 
+/* userspace doesn't need the nbd_device structure */
+#ifdef __KERNEL__
+
 struct nbd_device {
 	int flags;
 	int harderror;		/* Code of hard error			*/
@@ -52,6 +55,8 @@ struct nbd_device {
 	int blksize;
 	u64 bytesize;
 };
+
+#endif
 
 /* This now IS in some kind of include file...	*/
 

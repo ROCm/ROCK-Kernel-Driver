@@ -321,10 +321,7 @@ static int __sabre_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 static int sabre_read_pci_cfg(struct pci_bus *bus, unsigned int devfn,
 			      int where, int size, u32 *value)
 {
-	if (bus->number)
-		return __sabre_read_pci_cfg(bus, devfn, where, size, value);
-
-	if (sabre_out_of_range(devfn)) {
+	if (!bus->number && sabre_out_of_range(devfn)) {
 		switch (size) {
 		case 1:
 			*value = 0xff;
@@ -338,6 +335,15 @@ static int sabre_read_pci_cfg(struct pci_bus *bus, unsigned int devfn,
 		}
 		return PCIBIOS_SUCCESSFUL;
 	}
+
+	if (bus->number || PCI_SLOT(devfn))
+		return __sabre_read_pci_cfg(bus, devfn, where, size, value);
+
+	/* When accessing PCI config space of the PCI controller itself (bus
+	 * 0, device slot 0, function 0) there are restrictions.  Each
+	 * register must be accessed as it's natural size.  Thus, for example
+	 * the Vendor ID must be accessed as a 16-bit quantity.
+	 */
 
 	switch (size) {
 	case 1:

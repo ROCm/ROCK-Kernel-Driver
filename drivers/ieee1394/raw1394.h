@@ -30,6 +30,8 @@
 
 #define RAW1394_REQ_ARM_REGISTER    300
 #define RAW1394_REQ_ARM_UNREGISTER  301
+#define RAW1394_REQ_ARM_SET_BUF     302
+#define RAW1394_REQ_ARM_GET_BUF     303
 
 #define RAW1394_REQ_RESET_NOTIFY    400
 
@@ -148,6 +150,9 @@ struct raw1394_iso_config {
 
 	/* xmit only - iso transmission speed */
 	__u8 speed;
+
+	/* The mode of the dma when receiving iso data. Must be supported by chip */
+	__u8 dma_mode;
 
 	/* max. latency of buffer, in packets (-1 if you don't care) */
 	__s32 irq_interval;

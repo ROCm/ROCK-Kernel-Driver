@@ -64,14 +64,14 @@ __flush_whole_cache:
 	mov	pc, lr
 
 /*
- *	flush_user_cache_range(start, end, vm_flags)
+ *	flush_user_cache_range(start, end, flags)
  *
  *	Clean and invalidate a range of cache entries in the specified
  *	address space.
  *
  *	- start - start address (inclusive, page aligned)
  *	- end	- end address (exclusive, page aligned)
- *	- vma	- vma_area_struct describing address space
+ *	- flags	- vma_area_struct flags describing address space
  */
 ENTRY(v4wt_flush_user_cache_range)
 	sub	r3, r1, r0			@ calculate total size

@@ -106,7 +106,7 @@ static ssize_t sa1100dog_write(struct file *file, const char *data, size_t len, 
 		OSMR3 = OSCR + pre_margin;
 	}
 
-	return len ? 1 : 0;
+	return len;
 }
 
 static struct watchdog_info ident = {

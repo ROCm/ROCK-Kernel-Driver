@@ -20,6 +20,8 @@ struct file_operations fat_file_operations = {
 	.write		= fat_file_write,
 	.mmap		= generic_file_mmap,
 	.fsync		= file_fsync,
+	.readv		= generic_file_readv,
+	.writev		= generic_file_writev,
 	.sendfile	= generic_file_sendfile,
 };
 

@@ -14,6 +14,8 @@ static void pci_free_resources(struct pci_dev *dev)
 {
 	int i;
 
+ 	msi_remove_pci_irq_vectors(dev);
+
 	for (i = 0; i < PCI_NUM_RESOURCES; i++) {
 		struct resource *res = dev->resource + i;
 		if (res->parent)

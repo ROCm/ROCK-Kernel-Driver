@@ -72,7 +72,7 @@ static inline void read_sunos_user(struct pt_regs *regs, unsigned long offset,
 				   struct task_struct *tsk, long *addr)
 {
 	struct pt_regs *cregs = tsk->thread.kregs;
-	struct thread_struct *t = &tsk->thread;
+	struct thread_info *t = tsk->thread_info;
 	int v;
 	
 	if(offset >= 1024)
@@ -93,16 +93,16 @@ static inline void read_sunos_user(struct pt_regs *regs, unsigned long offset,
 	}
 	switch(offset) {
 	case 0:
-		v = tsk->thread_info->ksp;
+		v = t->ksp;
 		break;
 	case 4:
-		v = tsk->thread_info->kpc;
+		v = t->kpc;
 		break;
 	case 8:
-		v = tsk->thread_info->kpsr;
+		v = t->kpsr;
 		break;
 	case 12:
-		v = tsk->thread_info->uwinmask;
+		v = t->uwinmask;
 		break;
 	case 832:
 		v = t->w_saved;
@@ -167,7 +167,7 @@ static inline void write_sunos_user(struct pt_regs *regs, unsigned long offset,
 				    struct task_struct *tsk)
 {
 	struct pt_regs *cregs = tsk->thread.kregs;
-	struct thread_struct *t = &tsk->thread;
+	struct thread_info *t = tsk->thread_info;
 	unsigned long value = regs->u_regs[UREG_I3];
 
 	if(offset >= 1024)

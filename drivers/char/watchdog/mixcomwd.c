@@ -156,9 +156,8 @@ static ssize_t mixcomwd_write(struct file *file, const char *data, size_t len, l
 			}
 		}
 		mixcomwd_ping();
-		return 1;
 	}
-	return 0;
+	return len;
 }
 
 static int mixcomwd_ioctl(struct inode *inode, struct file *file,

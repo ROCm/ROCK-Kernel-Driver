@@ -54,6 +54,10 @@
 # error "struct cpuinfo_ia64 too big!"
 #endif
 
+#ifdef CONFIG_EFI
+int efi_enabled = 1;
+#endif
+
 #ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
 #endif

@@ -1,4 +1,4 @@
-For now this is a raw copy from the old Documentation/modules.txt,
+For now this is a raw copy from the old Documentation/kbuild/modules.txt,
 which was removed in 2.6.0-test5.
 The information herein is correct but not complete.
 

@@ -1,7 +1,7 @@
 #
 # Makefile for the Linux aic7xxx SCSI driver.
 #
-# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#6 $
+# $Id: //depot/linux-aic79xx-2.5.0/drivers/scsi/aic7xxx/Makefile#7 $
 #
 
 # Let kbuild descend into aicasm when cleaning
@@ -12,15 +12,15 @@ obj-$(CONFIG_SCSI_AIC79XX)	+= aic79xx.o
 
 # Core Fast -> U160 files
 aic7xxx-y					+= aic7xxx_core.o	\
-						   aic7xxx_93cx6.o	\
-						   aic7770.o
+						   aic7xxx_93cx6.o
+aic7xxx-$(CONFIG_EISA)				+= aic7770.o
 aic7xxx-$(CONFIG_PCI)				+= aic7xxx_pci.o
 aic7xxx-$(CONFIG_AIC7XXX_REG_PRETTY_PRINT)	+= aic7xxx_reg_print.o
 
 # Platform Specific Fast -> U160 Files
 aic7xxx-y					+= aic7xxx_osm.o	\
-						   aic7xxx_proc.o	\
-						   aic7770_osm.o
+						   aic7xxx_proc.o
+aic7xxx-$(CONFIG_EISA)				+= aic7770_osm.o
 aic7xxx-$(CONFIG_PCI)				+= aic7xxx_osm_pci.o
 
 # Core U320 files
@@ -33,7 +33,10 @@ aic79xx-y					+= aic79xx_osm.o	\
 						   aic79xx_proc.o	\
 						   aic79xx_osm_pci.o
 
-EXTRA_CFLAGS += -Idrivers/scsi -Werror
+EXTRA_CFLAGS += -Idrivers/scsi
+ifdef WARNINGS_BECOME_ERRORS
+EXTRA_CFLAGS += -Werror
+endif
 #EXTRA_CFLAGS += -g
 
 # Files generated that shall be removed upon make clean

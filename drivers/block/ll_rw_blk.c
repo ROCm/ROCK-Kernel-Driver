@@ -2460,7 +2460,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 
 	if (!uptodate) {
 		error = -EIO;
-		if (!(req->flags & REQ_QUIET))
+		if (blk_fs_request(req) && !(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
 				(unsigned long long)req->sector);

@@ -430,9 +430,19 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 	if (!console_drivers)
 		pdc_console_restart();
 
-	if (code == 1)
-	    transfer_pim_to_trap_frame(regs);
+	/* Not all paths will gutter the processor... */
+	switch(code){
 
+	case 1:
+		transfer_pim_to_trap_frame(regs);
+		break;
+
+	default:
+		/* Fall through */
+		break;
+
+	}
+	    
 	show_stack(NULL, (unsigned long *)regs->gr[30]);
 
 	printk("\n");
@@ -447,6 +457,7 @@ void parisc_terminate(char *msg, struct pt_regs *regs, int code, unsigned long o
 	 * system will shut down immediately right here. */
 	pdc_soft_power_button(0);
 	
+	/* Gutter the processor! */
 	for(;;)
 	    ;
 }
@@ -557,20 +568,45 @@ void handle_interruption(int code, struct pt_regs *regs)
 		si.si_addr = (void *) regs->iaoq[0];
 		force_sig_info(SIGFPE, &si, current);
 		return;
-
+		
+	case 13:
+		/* Conditional Trap
+		   The condition succees in an instruction which traps 
+		   on condition  */
+		if(user_mode(regs)){
+			si.si_signo = SIGFPE;
+			/* Set to zero, and let the userspace app figure it out from
+		   	   the insn pointed to by si_addr */
+			si.si_code = 0;
+			si.si_addr = (void *) regs->iaoq[0];
+			force_sig_info(SIGFPE, &si, current);
+			return;
+		} else 
+			/* The kernel doesn't want to handle condition codes */
+			break;
+		
 	case 14:
 		/* Assist Exception Trap, i.e. floating point exception. */
 		die_if_kernel("Floating point exception", regs, 0); /* quiet */
 		handle_fpe(regs);
 		return;
-
+		
+	case 15:
+		/* Data TLB miss fault/Data page fault */
+		/* Fall through */
+	case 16:
+		/* Non-access instruction TLB miss fault */
+		/* The instruction TLB entry needed for the target address of the FIC
+		   is absent, and hardware can't find it, so we get to cleanup */
+		/* Fall through */
 	case 17:
 		/* Non-access data TLB miss fault/Non-access data page fault */
 		/* TODO: Still need to add slow path emulation code here */
-		pdc_chassis_send_status(PDC_CHASSIS_DIRECT_PANIC);
-		
+		/* TODO: Understand what is meant by the TODO listed
+		         above this one. (Carlos) */
 		fault_address = regs->ior;
-		parisc_terminate("Non access data tlb fault!",regs,code,fault_address);
+		fault_space = regs->isr;
+		break;
 
 	case 18:
 		/* PCXS only -- later cpu's split this into types 26,27 & 28 */
@@ -580,9 +616,8 @@ void handle_interruption(int code, struct pt_regs *regs)
 			return;
 		}
 		/* Fall Through */
-
-	case 15: /* Data TLB miss fault/Data page fault */
-	case 26: /* PCXL: Data memory access rights trap */
+	case 26: 
+		/* PCXL: Data memory access rights trap */
 		fault_address = regs->ior;
 		fault_space   = regs->isr;
 		break;
@@ -638,7 +673,6 @@ void handle_interruption(int code, struct pt_regs *regs)
 			up_read(&current->mm->mmap_sem);
 		}
 		/* Fall Through */
-
 	case 27: 
 		/* Data memory protection ID trap */
 		die_if_kernel("Protection id trap", regs, code);

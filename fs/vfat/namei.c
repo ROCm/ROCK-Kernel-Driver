@@ -25,23 +25,6 @@
 #include <linux/buffer_head.h>
 #include <linux/namei.h>
 
-#define DEBUG_LEVEL 0
-#if (DEBUG_LEVEL >= 1)
-#  define PRINTK1(x) printk x
-#else
-#  define PRINTK1(x)
-#endif
-#if (DEBUG_LEVEL >= 2)
-#  define PRINTK2(x) printk x
-#else
-#  define PRINTK2(x)
-#endif
-#if (DEBUG_LEVEL >= 3)
-#  define PRINTK3(x) printk x
-#else
-#  define PRINTK3(x)
-#endif
-
 static int vfat_hashi(struct dentry *parent, struct qstr *qstr);
 static int vfat_hash(struct dentry *parent, struct qstr *qstr);
 static int vfat_cmpi(struct dentry *dentry, struct qstr *a, struct qstr *b);
@@ -573,13 +556,18 @@ xlate_to_uni(const unsigned char *name, int len, unsigned char *outname,
 	int charlen;
 
 	if (utf8) {
+		int name_len = strlen(name);
+
 		*outlen = utf8_mbstowcs((wchar_t *)outname, name, PAGE_SIZE);
-		if (name[len-1] == '.')
-			*outlen-=2;
+
+		/*
+		 * We stripped '.'s before and set len appropriately,
+		 * but utf8_mbstowcs doesn't care about len
+		 */
+		*outlen -= (name_len-len);
+
 		op = &outname[*outlen * sizeof(wchar_t)];
 	} else {
-		if (name[len-1] == '.') 
-			len--;
 		if (nls) {
 			for (i = 0, ip = name, op = outname, *outlen = 0;
 			     i < len && *outlen <= 260; *outlen += 1)
@@ -694,7 +682,6 @@ static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 	for (cksum = i = 0; i < 11; i++) {
 		cksum = (((cksum&1)<<7)|((cksum&0xfe)>>1)) + msdos_name[i];
 	}
-	PRINTK3(("vfat_fill_slots 3: slots=%d\n",*slots));
 
 	for (ps = ds, slot = *slots; slot > 0; slot--, ps++) {
 		ps->id = slot;
@@ -711,7 +698,6 @@ static int vfat_build_slots(struct inode *dir, const unsigned char *name,
 	de = (struct msdos_dir_entry *) ps;
 
 shortname:
-	PRINTK3(("vfat_fill_slots 9\n"));
 	/* build the entry of 8.3 alias name */
 	(*slots)++;
 	memcpy(de->name, msdos_name, MSDOS_NAME);
@@ -734,18 +720,22 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 {
 	struct msdos_dir_slot *dir_slots;
 	loff_t offset;
-	int slots, slot;
-	int res;
+	int res, slots, slot;
+	unsigned int len;
 	struct msdos_dir_entry *dummy_de;
 	struct buffer_head *dummy_bh;
 	loff_t dummy_i_pos;
 
-	dir_slots = (struct msdos_dir_slot *)
+	len = vfat_striptail_len(qname);
+	if (len == 0)
+		return -ENOENT;
+
+	dir_slots =
 	       kmalloc(sizeof(struct msdos_dir_slot) * MSDOS_SLOTS, GFP_KERNEL);
 	if (dir_slots == NULL)
 		return -ENOMEM;
 
-	res = vfat_build_slots(dir, qname->name, vfat_striptail_len(qname),
+	res = vfat_build_slots(dir, qname->name, len,
 			       dir_slots, &slots, is_dir);
 	if (res < 0)
 		goto cleanup;
@@ -796,11 +786,16 @@ static int vfat_find(struct inode *dir,struct qstr* qname,
 {
 	struct super_block *sb = dir->i_sb;
 	loff_t offset;
+	unsigned int len;
 	int res;
 
-	res = fat_search_long(dir, qname->name, vfat_striptail_len(qname),
-			(MSDOS_SB(sb)->options.name_check != 's'),
-			&offset,&sinfo->longname_offset);
+	len = vfat_striptail_len(qname);
+	if (len == 0)
+		return -ENOENT;
+
+	res = fat_search_long(dir, qname->name, len,
+			      (MSDOS_SB(sb)->options.name_check != 's'),
+			      &offset, &sinfo->longname_offset);
 	if (res>0) {
 		sinfo->long_slots = res-1;
 		if (fat_get_entry(dir,&offset,last_bh,last_de,&sinfo->i_pos)>=0)
@@ -820,9 +815,6 @@ struct dentry *vfat_lookup(struct inode *dir,struct dentry *dentry, struct namei
 	struct msdos_dir_entry *de;
 	int table;
 	
-	PRINTK2(("vfat_lookup: name=%s, len=%d\n", 
-		 dentry->d_name.name, dentry->d_name.len));
-
 	lock_kernel();
 	table = (MSDOS_SB(dir->i_sb)->options.name_check == 's') ? 2 : 0;
 	dentry->d_op = &vfat_dentry_ops[table];
@@ -955,7 +947,6 @@ int vfat_unlink(struct inode *dir, struct dentry* dentry)
 	struct buffer_head *bh = NULL;
 	struct msdos_dir_entry *de;
 
-	PRINTK1(("vfat_unlink: %s\n", dentry->d_name.name));
 	lock_kernel();
 	res = vfat_find(dir,&dentry->d_name,&sinfo,&bh,&de);
 	if (res < 0) {
@@ -1036,14 +1027,18 @@ int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
 	new_inode = new_dentry->d_inode;
 	lock_kernel();
 	res = vfat_find(old_dir,&old_dentry->d_name,&old_sinfo,&old_bh,&old_de);
-	PRINTK3(("vfat_rename 2\n"));
-	if (res < 0) goto rename_done;
+	if (res < 0)
+		goto rename_done;
 
 	is_dir = S_ISDIR(old_inode->i_mode);
 
-	if (is_dir && (res = fat_scan(old_inode,MSDOS_DOTDOT,&dotdot_bh,
-				&dotdot_de,&dotdot_i_pos)) < 0)
-		goto rename_done;
+	if (is_dir) {
+		if (fat_scan(old_inode, MSDOS_DOTDOT, &dotdot_bh,
+			     &dotdot_de, &dotdot_i_pos) < 0) {
+			res = -EIO;
+			goto rename_done;
+		}
+	}
 
 	if (new_dentry->d_inode) {
 		res = vfat_find(new_dir,&new_dentry->d_name,&sinfo,&new_bh,

@@ -246,11 +246,11 @@ typedef unsigned char	byte;	/* used everywhere */
 /*
  * Timeouts for various operations:
  */
-#define WAIT_DRQ	(5*HZ/100)	/* 50msec - spec allows up to 20ms */
+#define WAIT_DRQ	(HZ/10)		/* 100msec - spec allows up to 20ms */
 #if defined(CONFIG_APM) || defined(CONFIG_APM_MODULE)
 #define WAIT_READY	(5*HZ)		/* 5sec - some laptops are very slow */
 #else
-#define WAIT_READY	(3*HZ/100)	/* 30msec - should be instantaneous */
+#define WAIT_READY	(HZ/10)		/* 100msec - should be instantaneous */
 #endif /* CONFIG_APM || CONFIG_APM_MODULE */
 #define WAIT_PIDENTIFY	(10*HZ)	/* 10sec  - should be less than 3ms (?), if all ATAPI CD is closed at boot */
 #define WAIT_WORSTCASE	(30*HZ)	/* 30sec  - worst case when spinning up */
@@ -1693,6 +1693,8 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 #define GOOD_DMA_DRIVE		1
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
+extern int ide_build_sglist(ide_drive_t *, struct request *);
+extern int ide_raw_build_sglist(ide_drive_t *, struct request *);
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
 extern void ide_destroy_dmatable(ide_drive_t *);
 extern ide_startstop_t ide_dma_intr(ide_drive_t *);

@@ -9,7 +9,7 @@ and others whose names I could not find.
 This documentation is relevant for the PAS16 driver (pas2_card.c and
 friends) under kernel version 2.3.99 and later.  If you are
 unfamiliar with configuring sound under Linux, please read the
-Sound-HOWTO, linux/Documentation/sound/Introduction and other 
+Sound-HOWTO, linux/Documentation/sound/oss/Introduction and other
 relevant docs first.
 
 The following information is relevant information from README.OSS
@@ -73,8 +73,8 @@ CONFIG_SOUND
   You want to read the Sound-HOWTO, available from
   http://www.tldp.org/docs.html#howto . General information
   about the modular sound system is contained in the files
-  Documentation/sound/Introduction. The file
-  Documentation/sound/README.OSS contains some slightly outdated but
+  Documentation/sound/oss/Introduction. The file
+  Documentation/sound/oss/README.OSS contains some slightly outdated but
   still useful information as well.
 
 OSS sound modules
@@ -119,7 +119,7 @@ CONFIG_SOUND_YM3812
   cards may have software (TSR) FM emulation. Enabling FM support with
   these cards may cause trouble (I don't currently know of any such
   cards, however).
-  Please read the file Documentation/sound/OPL3 if your card has an
+  Please read the file Documentation/sound/oss/OPL3 if your card has an
   OPL3 chip.
   If you compile the driver into the kernel, you have to add
   "opl3=<io>" to the kernel command line.

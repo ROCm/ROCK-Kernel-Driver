@@ -161,9 +161,8 @@ ibwdt_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 			}
 		}
 		ibwdt_ping();
-		return 1;
 	}
-	return 0;
+	return count;
 }
 
 static int

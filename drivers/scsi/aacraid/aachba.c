@@ -4,6 +4,7 @@
  *
  * based on the old aacraid driver that is..
  * Adaptec aacraid device driver for Linux.
+ *
  * Copyright (c) 2000 Adaptec, Inc. (aacraid@adaptec.com)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -22,7 +23,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/types.h>
@@ -31,11 +31,14 @@
 #include <linux/spinlock.h>
 #include <linux/slab.h>
 #include <linux/completion.h>
+#include <linux/blkdev.h>
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
-#include <linux/blkdev.h>
-#include "scsi.h"
-#include "hosts.h"
+
+#include <scsi/scsi.h>
+#include <scsi/scsi_cmnd.h>
+#include <scsi/scsi_device.h>
+#include <scsi/scsi_host.h>
 
 #include "aacraid.h"
 
@@ -194,9 +197,9 @@ struct sense_data {
  
 static struct fsa_scsi_hba *fsa_dev[MAXIMUM_NUM_ADAPTERS];	/*  SCSI Device Instance Pointers */
 static struct sense_data sense_data[MAXIMUM_NUM_CONTAINERS];
-static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* sgmap);
-static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg);
-static int aac_send_srb_fib(Scsi_Cmnd* scsicmd);
+static unsigned long aac_build_sg(struct scsi_cmnd* scsicmd, struct sgmap* sgmap);
+static unsigned long aac_build_sg64(struct scsi_cmnd* scsicmd, struct sgmap64* psg);
+static int aac_send_srb_fib(struct scsi_cmnd* scsicmd);
 #ifdef AAC_DETAILED_STATUS_INFO
 static char *aac_get_status_string(u32 status);
 #endif
@@ -444,7 +447,7 @@ void set_sense(u8 *sense_buf, u8 sense_key, u8 sense_code,
 	}
 }
 
-static void aac_io_done(Scsi_Cmnd * scsicmd)
+static void aac_io_done(struct scsi_cmnd * scsicmd)
 {
 	unsigned long cpu_flags;
 	struct Scsi_Host *host = scsicmd->device->host;
@@ -453,7 +456,7 @@ static void aac_io_done(Scsi_Cmnd * scsicmd)
 	spin_unlock_irqrestore(host->host_lock, cpu_flags);
 }
 
-static void __aac_io_done(Scsi_Cmnd * scsicmd)
+static void __aac_io_done(struct scsi_cmnd * scsicmd)
 {
 	scsicmd->scsi_done(scsicmd);
 }
@@ -538,11 +541,11 @@ static void read_callback(void *context, struct fib * fibptr)
 {
 	struct aac_dev *dev;
 	struct aac_read_reply *readreply;
-	Scsi_Cmnd *scsicmd;
+	struct scsi_cmnd *scsicmd;
 	u32 lba;
 	u32 cid;
 
-	scsicmd = (Scsi_Cmnd *) context;
+	scsicmd = (struct scsi_cmnd *) context;
 
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	cid =TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
@@ -557,11 +560,11 @@ static void read_callback(void *context, struct fib * fibptr)
 		pci_unmap_sg(dev->pdev, 
 			(struct scatterlist *)scsicmd->buffer,
 			scsicmd->use_sg,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 	else if(scsicmd->request_bufflen)
 		pci_unmap_single(dev->pdev, (dma_addr_t)(ulong)scsicmd->SCp.ptr,
 				 scsicmd->request_bufflen,
-				 scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+				 scsicmd->sc_data_direction);
 	readreply = (struct aac_read_reply *)fib_data(fibptr);
 	if (le32_to_cpu(readreply->status) == ST_OK)
 		scsicmd->result = DID_OK << 16 | COMMAND_COMPLETE << 8 | SAM_STAT_GOOD;
@@ -584,11 +587,11 @@ static void write_callback(void *context, struct fib * fibptr)
 {
 	struct aac_dev *dev;
 	struct aac_write_reply *writereply;
-	Scsi_Cmnd *scsicmd;
+	struct scsi_cmnd *scsicmd;
 	u32 lba;
 	u32 cid;
 
-	scsicmd = (Scsi_Cmnd *) context;
+	scsicmd = (struct scsi_cmnd *) context;
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	cid = TARGET_LUN_TO_CONTAINER(scsicmd->device->id, scsicmd->device->lun);
 
@@ -601,11 +604,11 @@ static void write_callback(void *context, struct fib * fibptr)
 		pci_unmap_sg(dev->pdev, 
 			(struct scatterlist *)scsicmd->buffer,
 			scsicmd->use_sg,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 	else if(scsicmd->request_bufflen)
 		pci_unmap_single(dev->pdev, (dma_addr_t)(ulong)scsicmd->SCp.ptr,
 				 scsicmd->request_bufflen,
-				 scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+				 scsicmd->sc_data_direction);
 
 	writereply = (struct aac_write_reply *) fib_data(fibptr);
 	if (le32_to_cpu(writereply->status) == ST_OK)
@@ -625,7 +628,7 @@ static void write_callback(void *context, struct fib * fibptr)
 	aac_io_done(scsicmd);
 }
 
-int aac_read(Scsi_Cmnd * scsicmd, int cid)
+int aac_read(struct scsi_cmnd * scsicmd, int cid)
 {
 	u32 lba;
 	u32 count;
@@ -736,7 +739,7 @@ int aac_read(Scsi_Cmnd * scsicmd, int cid)
 	return -1;
 }
 
-static int aac_write(Scsi_Cmnd * scsicmd, int cid)
+static int aac_write(struct scsi_cmnd * scsicmd, int cid)
 {
 	u32 lba;
 	u32 count;
@@ -853,7 +856,7 @@ static int aac_write(Scsi_Cmnd * scsicmd, int cid)
  *	aacraid firmware.
  */
  
-int aac_scsi_cmd(Scsi_Cmnd * scsicmd)
+int aac_scsi_cmd(struct scsi_cmnd * scsicmd)
 {
 	u32 cid = 0;
 	struct fsa_scsi_hba *fsa_dev_ptr;
@@ -1215,9 +1218,9 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
 {
 	struct aac_dev *dev;
 	struct aac_srb_reply *srbreply;
-	Scsi_Cmnd *scsicmd;
+	struct scsi_cmnd *scsicmd;
 
-	scsicmd = (Scsi_Cmnd *) context;
+	scsicmd = (struct scsi_cmnd *) context;
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 
 	if (fibptr == NULL)
@@ -1233,10 +1236,10 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
 		pci_unmap_sg(dev->pdev, 
 			(struct scatterlist *)scsicmd->buffer,
 			scsicmd->use_sg,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 	else if(scsicmd->request_bufflen)
 		pci_unmap_single(dev->pdev, (ulong)scsicmd->SCp.ptr, scsicmd->request_bufflen,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 
 	/*
 	 * First check the fib status
@@ -1396,7 +1399,7 @@ static void aac_srb_callback(void *context, struct fib * fibptr)
  * scsicmd passed in.
  */
 
-static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
+static int aac_send_srb_fib(struct scsi_cmnd* scsicmd)
 {
 	struct fib* cmd_fibcontext;
 	struct aac_dev* dev;
@@ -1414,17 +1417,16 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 
 	dev = (struct aac_dev *)scsicmd->device->host->hostdata;
 	switch(scsicmd->sc_data_direction){
-	case SCSI_DATA_WRITE:
+	case DMA_TO_DEVICE:
 		flag = SRB_DataOut;
 		break;
-	case SCSI_DATA_UNKNOWN:  
+	case DMA_BIDIRECTIONAL:
 		flag = SRB_DataIn | SRB_DataOut;
 		break;
-	case SCSI_DATA_READ:
+	case DMA_FROM_DEVICE:
 		flag = SRB_DataIn;
 		break;
-	case SCSI_DATA_NONE: 
-	default:
+	case DMA_NONE:
 		flag = SRB_NoDataXfer;
 		break;
 	}
@@ -1507,7 +1509,7 @@ static int aac_send_srb_fib(Scsi_Cmnd* scsicmd)
 	return -1;
 }
 
-static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
+static unsigned long aac_build_sg(struct scsi_cmnd* scsicmd, struct sgmap* psg)
 {
 	struct aac_dev *dev;
 	unsigned long byte_count = 0;
@@ -1524,7 +1526,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 		sg = (struct scatterlist *) scsicmd->request_buffer;
 
 		sg_count = pci_map_sg(dev->pdev, sg, scsicmd->use_sg,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 		psg->count = cpu_to_le32(sg_count);
 
 		byte_count = 0;
@@ -1551,7 +1553,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 		addr = pci_map_single(dev->pdev,
 				scsicmd->request_buffer,
 				scsicmd->request_bufflen,
-				scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+				scsicmd->sc_data_direction);
 		psg->count = cpu_to_le32(1);
 		psg->sg[0].addr = cpu_to_le32(addr);
 		psg->sg[0].count = cpu_to_le32(scsicmd->request_bufflen);  
@@ -1562,7 +1564,7 @@ static unsigned long aac_build_sg(Scsi_Cmnd* scsicmd, struct sgmap* psg)
 }
 
 
-static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
+static unsigned long aac_build_sg64(struct scsi_cmnd* scsicmd, struct sgmap64* psg)
 {
 	struct aac_dev *dev;
 	unsigned long byte_count = 0;
@@ -1581,7 +1583,7 @@ static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
 		sg = (struct scatterlist *) scsicmd->request_buffer;
 
 		sg_count = pci_map_sg(dev->pdev, sg, scsicmd->use_sg,
-			scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+			scsicmd->sc_data_direction);
 		psg->count = cpu_to_le32(sg_count);
 
 		byte_count = 0;
@@ -1610,7 +1612,7 @@ static unsigned long aac_build_sg64(Scsi_Cmnd* scsicmd, struct sgmap64* psg)
 		addr = pci_map_single(dev->pdev,
 				scsicmd->request_buffer,
 				scsicmd->request_bufflen,
-				scsi_to_pci_dma_dir(scsicmd->sc_data_direction));
+				scsicmd->sc_data_direction);
 		psg->count = cpu_to_le32(1);
 		le_addr = cpu_to_le64(addr);
 		psg->sg[0].addr[1] = (u32)(le_addr>>32);

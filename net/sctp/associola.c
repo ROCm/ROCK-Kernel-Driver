@@ -58,6 +58,7 @@
 #include <linux/in.h>
 #include <net/ipv6.h>
 #include <net/sctp/sctp.h>
+#include <net/sctp/sm.h>
 
 /* Forward declarations for internal functions. */
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc);

@@ -29,6 +29,7 @@
 #include <linux/init.h>
 #ifdef CONFIG_MCA
 #include <linux/mca.h>
+#include <linux/mca-legacy.h>
 #endif /* CONFIG_MCA */
 
 #include "eicon.h"

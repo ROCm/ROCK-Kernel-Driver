@@ -111,13 +111,14 @@ void do_gettimeofday(struct timeval *tv)
 		sec = xtime.tv_sec;
 		usec = xtime.tv_nsec / 1000;
 
-		/*
-		 * If time_adjust is negative then NTP is slowing the clock
-		 * so make sure not to go into next possible interval.
-		 * Better to lose some accuracy than have time go backwards..
-		 */
-		if (unlikely(time_adjust < 0) && usec > tickadj)
-			usec = tickadj;
+		/* i386 does some correction here to keep the clock 
+		   monotonus even when ntpd is fixing drift.
+		   But they didn't work for me, there is a non monotonic
+		   clock anyways with ntp.
+		   I dropped all corrections now until a real solution can
+		   be found. Note when you fix it here you need to do the same
+		   in arch/x86_64/kernel/vsyscall.c and export all needed
+		   variables in vmlinux.lds. -AK */ 
 
 		t = (jiffies - wall_jiffies) * (1000000L / HZ) +
 			do_gettimeoffset();
@@ -592,6 +593,7 @@ static int hpet_init(void)
 	if (!vxtime.hpet_address)
 		return -1;
 	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
+	__set_fixmap(VSYSCALL_HPET, vxtime.hpet_address, PAGE_KERNEL_VSYSCALL_NOCACHE);
 
 /*
  * Read the period, compute tick and quotient.
