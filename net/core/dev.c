@@ -107,6 +107,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/netpoll.h>
+#include <linux/rcupdate.h>
 #ifdef CONFIG_NET_RADIO
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
@@ -1305,6 +1306,20 @@ int __skb_linearize(struct sk_buff *skb, int gfp_mask)
 	return 0;
 }
 
+#define HARD_TX_LOCK_BH(dev, cpu) {			\
+	if ((dev->features & NETIF_F_LLTX) == 0) {	\
+		spin_lock_bh(&dev->xmit_lock);		\
+		dev->xmit_lock_owner = cpu;		\
+	}						\
+}
+
+#define HARD_TX_UNLOCK_BH(dev) {			\
+	if ((dev->features & NETIF_F_LLTX) == 0) {	\
+		dev->xmit_lock_owner = -1;		\
+		spin_unlock_bh(&dev->xmit_lock);	\
+	}						\
+}
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1348,18 +1363,35 @@ int dev_queue_xmit(struct sk_buff *skb)
 	      	if (skb_checksum_help(&skb, 0))
 	      		goto out_kfree_skb;
 
-	/* Grab device queue */
-	spin_lock_bh(&dev->queue_lock);
+	rcu_read_lock();
+	/* Updates of qdisc are serialized by queue_lock. 
+	 * The struct Qdisc which is pointed to by qdisc is now a 
+	 * rcu structure - it may be accessed without acquiring 
+	 * a lock (but the structure may be stale.) The freeing of the
+	 * qdisc will be deferred until it's known that there are no 
+	 * more references to it.
+	 * 
+	 * If the qdisc has an enqueue function, we still need to 
+	 * hold the queue_lock before calling it, since queue_lock
+	 * also serializes access to the device queue.
+	 */
+
 	q = dev->qdisc;
+	smp_read_barrier_depends();
 	if (q->enqueue) {
+		/* Grab device queue */
+		spin_lock_bh(&dev->queue_lock);
+
 		rc = q->enqueue(skb, q);
 
 		qdisc_run(dev);
 
 		spin_unlock_bh(&dev->queue_lock);
+		rcu_read_unlock();
 		rc = rc == NET_XMIT_BYPASS ? NET_XMIT_SUCCESS : rc;
 		goto out;
 	}
+	rcu_read_unlock();
 
 	/* The device has no queue. Common case for software devices:
 	   loopback, all the sorts of tunnels...
@@ -1374,17 +1406,12 @@ int dev_queue_xmit(struct sk_buff *skb)
 	   Either shot noqueue qdisc, it is even simpler 8)
 	 */
 	if (dev->flags & IFF_UP) {
+		preempt_disable();
 		int cpu = smp_processor_id();
 
 		if (dev->xmit_lock_owner != cpu) {
-			/*
-			 * The spin_lock effectivly does a preempt lock, but 
-			 * we are about to drop that...
-			 */
-			preempt_disable();
-			spin_unlock(&dev->queue_lock);
-			spin_lock(&dev->xmit_lock);
-			dev->xmit_lock_owner = cpu;
+
+			HARD_TX_LOCK_BH(dev, cpu);
 			preempt_enable();
 
 			if (!netif_queue_stopped(dev)) {
@@ -1393,18 +1420,17 @@ int dev_queue_xmit(struct sk_buff *skb)
 
 				rc = 0;
 				if (!dev->hard_start_xmit(skb, dev)) {
-					dev->xmit_lock_owner = -1;
-					spin_unlock_bh(&dev->xmit_lock);
+					HARD_TX_UNLOCK_BH(dev);
 					goto out;
 				}
 			}
-			dev->xmit_lock_owner = -1;
-			spin_unlock_bh(&dev->xmit_lock);
+			HARD_TX_UNLOCK_BH(dev);
 			if (net_ratelimit())
 				printk(KERN_CRIT "Virtual device %s asks to "
 				       "queue packet!\n", dev->name);
 			goto out_enetdown;
 		} else {
+			preempt_enable();
 			/* Recursion is detected! It is possible,
 			 * unfortunately */
 			if (net_ratelimit())
@@ -1412,7 +1438,6 @@ int dev_queue_xmit(struct sk_buff *skb)
 				       "%s, fix it urgently!\n", dev->name);
 		}
 	}
-	spin_unlock_bh(&dev->queue_lock);
 out_enetdown:
 	rc = -ENETDOWN;
 out_kfree_skb:

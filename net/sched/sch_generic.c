@@ -30,6 +30,7 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
+#include <linux/rcupdate.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 
@@ -387,6 +388,9 @@ struct Qdisc * qdisc_create_dflt(struct net_device *dev, struct Qdisc_ops *ops)
 	sch->dev = dev;
 	sch->stats.lock = &dev->queue_lock;
 	atomic_set(&sch->refcnt, 1);
+	/* enqueue is accessed locklessly - make sure it's visible
+	 * before we set a netdevice's qdisc pointer to sch */
+	smp_wmb();
 	if (!ops->init || ops->init(sch, NULL) == 0)
 		return sch;
 
@@ -404,17 +408,35 @@ void qdisc_reset(struct Qdisc *qdisc)
 		ops->reset(qdisc);
 }
 
+/* this is the rcu callback function to clean up a qdisc when there 
+ * are no further references to it */
+
+static void __qdisc_destroy (void * arg) 
+{
+	struct Qdisc    *qdisc = (struct Qdisc *) arg;
+	struct Qdisc_ops  *ops = qdisc->ops;
+
+#ifdef CONFIG_NET_ESTIMATOR
+	qdisc_kill_estimator(&qdisc->stats);
+#endif
+	if (ops->reset)
+		ops->reset(qdisc);
+	if (ops->destroy)
+		ops->destroy(qdisc);
+	module_put(ops->owner);
+
+	if (!(qdisc->flags&TCQ_F_BUILTIN))
+		kfree(qdisc);
+}
+
 /* Under dev->queue_lock and BH! */
 
 void qdisc_destroy(struct Qdisc *qdisc)
 {
-	struct Qdisc_ops *ops = qdisc->ops;
-	struct net_device *dev;
+	struct net_device *dev = qdisc->dev;
 
 	if (!atomic_dec_and_test(&qdisc->refcnt))
 		return;
-
-	dev = qdisc->dev;
 
 	if (dev) {
 		struct Qdisc *q, **qp;
@@ -425,16 +447,9 @@ void qdisc_destroy(struct Qdisc *qdisc)
 			}
 		}
 	}
-#ifdef CONFIG_NET_ESTIMATOR
-	qdisc_kill_estimator(&qdisc->stats);
-#endif
-	if (ops->reset)
-		ops->reset(qdisc);
-	if (ops->destroy)
-		ops->destroy(qdisc);
-	module_put(ops->owner);
-	if (!(qdisc->flags&TCQ_F_BUILTIN))
-		kfree(qdisc);
+
+	call_rcu(&qdisc->q_rcu, __qdisc_destroy, qdisc);
+
 }
 
 

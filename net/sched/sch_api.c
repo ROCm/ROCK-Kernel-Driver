@@ -450,6 +450,9 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	if (!try_module_get(ops->owner))
 		goto err_out;
 
+	/* enqueue is accessed locklessly - make sure it's visible
+	 * before we set a netdevice's qdisc pointer to sch */
+	smp_wmb();
 	if (!ops->init || (err = ops->init(sch, tca[TCA_OPTIONS-1])) == 0) {
 		write_lock(&qdisc_tree_lock);
 		sch->next = dev->qdisc_list;
