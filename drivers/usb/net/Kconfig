@@ -212,7 +212,8 @@ config USB_ARMLINUX
 	help
 	  Choose this option to support the "usb-eth" networking driver
 	  used by most of the ARM Linux community with device controllers
-	  such as the SA-11x0 and PXA-25x UDCs.
+	  such as the SA-11x0 and PXA-25x UDCs, or the tftp capabilities
+	  in some PXA versions of the "blob" boot loader.
 
 	  Although the ROMs shipped with Sharp Zaurus products use a
 	  different link level framing protocol, you can have them use
