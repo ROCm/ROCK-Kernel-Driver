@@ -1,7 +1,11 @@
 /*
  * class.c - basic device class management
+ *
+ * Copyright (c) 2002-3 Patrick Mochel
+ * Copyright (c) 2002-3 Open Source Development Labs
  * 
- * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
+ * This file is released under the GPLv2
+ *
  */
 
 #undef DEBUG
@@ -148,9 +152,6 @@ static void class_device_driver_unlink(struct class_device * class_dev)
 }
 
 
-#define to_class_dev(obj) container_of(obj,struct class_device,kobj)
-#define to_class_dev_attr(_attr) container_of(_attr,struct class_device_attribute,attr)
-
 static ssize_t
 class_device_attr_show(struct kobject * kobj, struct attribute * attr,
 		       char * buf)
@@ -182,8 +183,20 @@ static struct sysfs_ops class_dev_sysfs_ops = {
 	.store	= class_device_attr_store,
 };
 
+static void class_dev_release(struct kobject * kobj)
+{
+	struct class_device *cd = to_class_dev(kobj);
+	struct class * cls = cd->class;
+
+	pr_debug("device class '%s': release.\n",cd->class_id);
+
+	if (cls->release)
+		cd->release(cd);
+}
+
 static struct kobj_type ktype_class_device = {
 	.sysfs_ops	= &class_dev_sysfs_ops,
+	.release	= class_dev_release,
 };
 
 static int class_hotplug_filter(struct kset *kset, struct kobject *kobj)
@@ -311,11 +324,8 @@ void class_device_del(struct class_device *class_dev)
 		up_write(&parent->subsys.rwsem);
 	}
 
-	if (class_dev->dev) {
-		class_device_dev_unlink(class_dev);
-		class_device_driver_unlink(class_dev);
-		put_device(class_dev->dev);
-	}
+	class_device_dev_unlink(class_dev);
+	class_device_driver_unlink(class_dev);
 	
 	kobject_del(&class_dev->kobj);
 

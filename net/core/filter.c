@@ -36,14 +36,13 @@
 #include <linux/filter.h>
 
 /* No hurry in this branch */
-
 static u8 *load_pointer(struct sk_buff *skb, int k)
 {
 	u8 *ptr = NULL;
 
-	if (k>=SKF_NET_OFF)
+	if (k >= SKF_NET_OFF)
 		ptr = skb->nh.raw + k - SKF_NET_OFF;
-	else if (k>=SKF_LL_OFF)
+	else if (k >= SKF_LL_OFF)
 		ptr = skb->mac.raw + k - SKF_LL_OFF;
 
 	if (ptr >= skb->head && ptr < skb->tail)
@@ -80,268 +79,224 @@ int sk_run_filter(struct sk_buff *skb, struct sock_filter *filter, int flen)
 	/*
 	 * Process array of filter instructions.
 	 */
-
-	for(pc = 0; pc < flen; pc++)
-	{
+	for (pc = 0; pc < flen; pc++) {
 		fentry = &filter[pc];
 			
-		switch(fentry->code)
-		{
-			case BPF_ALU|BPF_ADD|BPF_X:
-				A += X;
+		switch (fentry->code) {
+		case BPF_ALU|BPF_ADD|BPF_X:
+			A += X;
+			continue;
+		case BPF_ALU|BPF_ADD|BPF_K:
+			A += fentry->k;
+			continue;
+		case BPF_ALU|BPF_SUB|BPF_X:
+			A -= X;
+			continue;
+		case BPF_ALU|BPF_SUB|BPF_K:
+			A -= fentry->k;
+			continue;
+		case BPF_ALU|BPF_MUL|BPF_X:
+			A *= X;
+			continue;
+		case BPF_ALU|BPF_MUL|BPF_K:
+			A *= fentry->k;
+			continue;
+		case BPF_ALU|BPF_DIV|BPF_X:
+			if (X == 0)
+				return 0;
+			A /= X;
+			continue;
+		case BPF_ALU|BPF_DIV|BPF_K:
+			if (fentry->k == 0)
+				return 0;
+			A /= fentry->k;
+			continue;
+		case BPF_ALU|BPF_AND|BPF_X:
+			A &= X;
+			continue;
+		case BPF_ALU|BPF_AND|BPF_K:
+			A &= fentry->k;
+			continue;
+		case BPF_ALU|BPF_OR|BPF_X:
+			A |= X;
+			continue;
+		case BPF_ALU|BPF_OR|BPF_K:
+			A |= fentry->k;
+			continue;
+		case BPF_ALU|BPF_LSH|BPF_X:
+			A <<= X;
+			continue;
+		case BPF_ALU|BPF_LSH|BPF_K:
+			A <<= fentry->k;
+			continue;
+		case BPF_ALU|BPF_RSH|BPF_X:
+			A >>= X;
+			continue;
+		case BPF_ALU|BPF_RSH|BPF_K:
+			A >>= fentry->k;
+			continue;
+		case BPF_ALU|BPF_NEG:
+			A = -A;
+			continue;
+		case BPF_JMP|BPF_JA:
+			pc += fentry->k;
+			continue;
+		case BPF_JMP|BPF_JGT|BPF_K:
+			pc += (A > fentry->k) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JGE|BPF_K:
+			pc += (A >= fentry->k) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JEQ|BPF_K:
+			pc += (A == fentry->k) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JSET|BPF_K:
+			pc += (A & fentry->k) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JGT|BPF_X:
+			pc += (A > X) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JGE|BPF_X:
+			pc += (A >= X) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JEQ|BPF_X:
+			pc += (A == X) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_JMP|BPF_JSET|BPF_X:
+			pc += (A & X) ? fentry->jt : fentry->jf;
+			continue;
+		case BPF_LD|BPF_W|BPF_ABS:
+			k = fentry->k;
+ load_w:
+			if (k >= 0 && (unsigned int)(k+sizeof(u32)) <= len) {
+				A = ntohl(*(u32*)&data[k]);
 				continue;
+			}
+			if (k < 0) {
+				u8 *ptr;
 
-			case BPF_ALU|BPF_ADD|BPF_K:
-				A += fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_SUB|BPF_X:
-				A -= X;
-				continue;
-
-			case BPF_ALU|BPF_SUB|BPF_K:
-				A -= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_MUL|BPF_X:
-				A *= X;
-				continue;
-
-			case BPF_ALU|BPF_MUL|BPF_K:
-				A *= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_DIV|BPF_X:
-				if(X == 0)
-					return (0);
-				A /= X;
-				continue;
-
-			case BPF_ALU|BPF_DIV|BPF_K:
-				if(fentry->k == 0)
-					return (0);
-				A /= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_AND|BPF_X:
-				A &= X;
-				continue;
-
-			case BPF_ALU|BPF_AND|BPF_K:
-				A &= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_OR|BPF_X:
-				A |= X;
-				continue;
-
-			case BPF_ALU|BPF_OR|BPF_K:
-				A |= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_LSH|BPF_X:
-				A <<= X;
-				continue;
-
-			case BPF_ALU|BPF_LSH|BPF_K:
-				A <<= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_RSH|BPF_X:
-				A >>= X;
-				continue;
-
-			case BPF_ALU|BPF_RSH|BPF_K:
-				A >>= fentry->k;
-				continue;
-
-			case BPF_ALU|BPF_NEG:
-				A = -A;
-				continue;
-
-			case BPF_JMP|BPF_JA:
-				pc += fentry->k;
-				continue;
-
-			case BPF_JMP|BPF_JGT|BPF_K:
-				pc += (A > fentry->k) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JGE|BPF_K:
-				pc += (A >= fentry->k) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JEQ|BPF_K:
-				pc += (A == fentry->k) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JSET|BPF_K:
-				pc += (A & fentry->k) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JGT|BPF_X:
-				pc += (A > X) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JGE|BPF_X:
-				pc += (A >= X) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JEQ|BPF_X:
-				pc += (A == X) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_JMP|BPF_JSET|BPF_X:
-				pc += (A & X) ? fentry->jt : fentry->jf;
-				continue;
-
-			case BPF_LD|BPF_W|BPF_ABS:
-				k = fentry->k;
-load_w:
-				if(k >= 0 && (unsigned int)(k+sizeof(u32)) <= len) {
-					A = ntohl(*(u32*)&data[k]);
+				if (k >= SKF_AD_OFF)
+					break;
+				ptr = load_pointer(skb, k);
+				if (ptr) {
+					A = ntohl(*(u32*)ptr);
 					continue;
 				}
-				if (k<0) {
-					u8 *ptr;
-
-					if (k>=SKF_AD_OFF)
-						break;
-					if ((ptr = load_pointer(skb, k)) != NULL) {
-						A = ntohl(*(u32*)ptr);
-						continue;
-					}
-				} else {
-					u32 tmp;
-					if (!skb_copy_bits(skb, k, &tmp, 4)) {
-						A = ntohl(tmp);
-						continue;
-					}
-				}
-				return 0;
-
-			case BPF_LD|BPF_H|BPF_ABS:
-				k = fentry->k;
-load_h:
-				if(k >= 0 && (unsigned int) (k + sizeof(u16)) <= len) {
-					A = ntohs(*(u16*)&data[k]);
+			} else {
+				u32 tmp;
+				if (!skb_copy_bits(skb, k, &tmp, 4)) {
+					A = ntohl(tmp);
 					continue;
 				}
-				if (k<0) {
-					u8 *ptr;
+			}
+			return 0;
+		case BPF_LD|BPF_H|BPF_ABS:
+			k = fentry->k;
+ load_h:
+			if (k >= 0 && (unsigned int)(k + sizeof(u16)) <= len) {
+				A = ntohs(*(u16*)&data[k]);
+				continue;
+			}
+			if (k < 0) {
+				u8 *ptr;
 
-					if (k>=SKF_AD_OFF)
-						break;
-					if ((ptr = load_pointer(skb, k)) != NULL) {
-						A = ntohs(*(u16*)ptr);
-						continue;
-					}
-				} else {
-					u16 tmp;
-					if (!skb_copy_bits(skb, k, &tmp, 2)) {
-						A = ntohs(tmp);
-						continue;
-					}
+				if (k >= SKF_AD_OFF)
+					break;
+				ptr = load_pointer(skb, k);
+				if (ptr) {
+					A = ntohs(*(u16*)ptr);
+					continue;
 				}
-				return 0;
-
-			case BPF_LD|BPF_B|BPF_ABS:
-				k = fentry->k;
+			} else {
+				u16 tmp;
+				if (!skb_copy_bits(skb, k, &tmp, 2)) {
+					A = ntohs(tmp);
+					continue;
+				}
+			}
+			return 0;
+		case BPF_LD|BPF_B|BPF_ABS:
+			k = fentry->k;
 load_b:
-				if(k >= 0 && (unsigned int)k < len) {
-					A = data[k];
+			if (k >= 0 && (unsigned int)k < len) {
+				A = data[k];
+				continue;
+			}
+			if (k < 0) {
+				u8 *ptr;
+
+				if (k >= SKF_AD_OFF)
+					break;
+				ptr = load_pointer(skb, k);
+				if (ptr) {
+					A = *ptr;
 					continue;
 				}
-				if (k<0) {
-					u8 *ptr;
-
-					if (k>=SKF_AD_OFF)
-						break;
-					if ((ptr = load_pointer(skb, k)) != NULL) {
-						A = *ptr;
-						continue;
-					}
-				} else {
-					u8 tmp;
-					if (!skb_copy_bits(skb, k, &tmp, 1)) {
-						A = tmp;
-						continue;
-					}
+			} else {
+				u8 tmp;
+				if (!skb_copy_bits(skb, k, &tmp, 1)) {
+					A = tmp;
+					continue;
 				}
+			}
+			return 0;
+		case BPF_LD|BPF_W|BPF_LEN:
+			A = len;
+			continue;
+		case BPF_LDX|BPF_W|BPF_LEN:
+			X = len;
+			continue;
+		case BPF_LD|BPF_W|BPF_IND:
+			k = X + fentry->k;
+			goto load_w;
+		case BPF_LD|BPF_H|BPF_IND:
+			k = X + fentry->k;
+			goto load_h;
+		case BPF_LD|BPF_B|BPF_IND:
+			k = X + fentry->k;
+			goto load_b;
+		case BPF_LDX|BPF_B|BPF_MSH:
+			k = fentry->k;
+			if (k >= 0 && (unsigned int)k >= len)
 				return 0;
-
-			case BPF_LD|BPF_W|BPF_LEN:
-				A = len;
-				continue;
-
-			case BPF_LDX|BPF_W|BPF_LEN:
-				X = len;
-				continue;
-
-			case BPF_LD|BPF_W|BPF_IND:
-				k = X + fentry->k;
-				goto load_w;
-
-                       case BPF_LD|BPF_H|BPF_IND:
-				k = X + fentry->k;
-				goto load_h;
-
-                       case BPF_LD|BPF_B|BPF_IND:
-				k = X + fentry->k;
-				goto load_b;
-
-			case BPF_LDX|BPF_B|BPF_MSH:
-				k = fentry->k;
-				if(k >= 0 && (unsigned int)k >= len)
-					return (0);
-				X = (data[k] & 0xf) << 2;
-				continue;
-
-			case BPF_LD|BPF_IMM:
-				A = fentry->k;
-				continue;
-
-			case BPF_LDX|BPF_IMM:
-				X = fentry->k;
-				continue;
-
-			case BPF_LD|BPF_MEM:
-				A = mem[fentry->k];
-				continue;
-
-			case BPF_LDX|BPF_MEM:
-				X = mem[fentry->k];
-				continue;
-
-			case BPF_MISC|BPF_TAX:
-				X = A;
-				continue;
-
-			case BPF_MISC|BPF_TXA:
-				A = X;
-				continue;
-
-			case BPF_RET|BPF_K:
-				return ((unsigned int)fentry->k);
-
-			case BPF_RET|BPF_A:
-				return ((unsigned int)A);
-
-			case BPF_ST:
-				mem[fentry->k] = A;
-				continue;
-
-			case BPF_STX:
-				mem[fentry->k] = X;
-				continue;
-
-			default:
-				/* Invalid instruction counts as RET */
-				return (0);
+			X = (data[k] & 0xf) << 2;
+			continue;
+		case BPF_LD|BPF_IMM:
+			A = fentry->k;
+			continue;
+		case BPF_LDX|BPF_IMM:
+			X = fentry->k;
+			continue;
+		case BPF_LD|BPF_MEM:
+			A = mem[fentry->k];
+			continue;
+		case BPF_LDX|BPF_MEM:
+			X = mem[fentry->k];
+			continue;
+		case BPF_MISC|BPF_TAX:
+			X = A;
+			continue;
+		case BPF_MISC|BPF_TXA:
+			A = X;
+			continue;
+		case BPF_RET|BPF_K:
+			return ((unsigned int)fentry->k);
+		case BPF_RET|BPF_A:
+			return ((unsigned int)A);
+		case BPF_ST:
+			mem[fentry->k] = A;
+			continue;
+		case BPF_STX:
+			mem[fentry->k] = X;
+			continue;
+		default:
+			/* Invalid instruction counts as RET */
+			return 0;
 		}
 
-		/* Handle ancillary data, which are impossible
-		   (or very difficult) to get parsing packet contents.
+		/*
+		 * Handle ancillary data, which are impossible
+		 * (or very difficult) to get parsing packet contents.
 		 */
 		switch (k-SKF_AD_OFF) {
 		case SKF_AD_PROTOCOL:
@@ -358,7 +313,7 @@ load_b:
 		}
 	}
 
-	return (0);
+	return 0;
 }
 
 /**
@@ -373,75 +328,55 @@ load_b:
  *
  * Returns 0 if the rule set is legal or a negative errno code if not.
  */
-
 int sk_chk_filter(struct sock_filter *filter, int flen)
 {
 	struct sock_filter *ftest;
-        int pc;
+	int pc;
 
-	if ((unsigned int) flen >= (~0U / sizeof(struct sock_filter)))
+	if ((unsigned int)flen >= (~0U / sizeof(struct sock_filter)))
 		return -EINVAL;
 
-       /*
-        * Check the filter code now.
-        */
-	for(pc = 0; pc < flen; pc++)
-	{
-		/*
-                 *	All jumps are forward as they are not signed
-                 */
-                 
-                ftest = &filter[pc];
-		if(BPF_CLASS(ftest->code) == BPF_JMP)
-		{
-			/*
-			 *	But they mustn't jump off the end.
-			 */
-			if(BPF_OP(ftest->code) == BPF_JA)
-			{
-				/* Note, the large ftest->k might cause
-				   loops. Compare this with conditional
-				   jumps below, where offsets are limited. --ANK (981016)
+	/* check the filter code now */
+	for (pc = 0; pc < flen; pc++) {
+		/* all jumps are forward as they are not signed */
+		ftest = &filter[pc];
+		if (BPF_CLASS(ftest->code) == BPF_JMP) {
+			/* but they mustn't jump off the end */
+			if (BPF_OP(ftest->code) == BPF_JA) {
+				/*
+				 * Note, the large ftest->k might cause loops.
+				 * Compare this with conditional jumps below,
+				 * where offsets are limited. --ANK (981016)
 				 */
 				if (ftest->k >= (unsigned)(flen-pc-1))
 					return -EINVAL;
-			}
-                        else
-			{
-				/*
-				 *	For conditionals both must be safe
-				 */
- 				if(pc + ftest->jt +1 >= flen || pc + ftest->jf +1 >= flen)
+			} else {
+				/* for conditionals both must be safe */
+ 				if (pc + ftest->jt +1 >= flen ||
+				    pc + ftest->jf +1 >= flen)
 					return -EINVAL;
 			}
-                }
+		}
 
-                /*
-                 *	Check that memory operations use valid addresses.
-                 */
-                 
-                if (ftest->k >= BPF_MEMWORDS)
-                {
-                	/*
-                	 *	But it might not be a memory operation...
-                	 */
+		/* check that memory operations use valid addresses. */
+		if (ftest->k >= BPF_MEMWORDS) {
+			/* but it might not be a memory operation... */
 			switch (ftest->code) {
 			case BPF_ST:	
 			case BPF_STX:	
 			case BPF_LD|BPF_MEM:	
 			case BPF_LDX|BPF_MEM:	
-                		return -EINVAL;
+				return -EINVAL;
 			}
 		}
-        }
+	}
 
 	/*
-	 *	The program must end with a return. We don't care where they
-	 *	jumped within the script (its always forwards) but in the
-	 *	end they _will_ hit this.
+	 * The program must end with a return. We don't care where they
+	 * jumped within the script (its always forwards) but in the end
+	 * they _will_ hit this.
 	 */
-	 
-        return (BPF_CLASS(filter[flen - 1].code) == BPF_RET)?0:-EINVAL;
+        return (BPF_CLASS(filter[flen - 1].code) == BPF_RET) ? 0 : -EINVAL;
 }
 
 /**
@@ -454,7 +389,6 @@ int sk_chk_filter(struct sock_filter *filter, int flen)
  * occurs or there is insufficient memory for the filter a negative
  * errno code is returned. On success the return is zero.
  */
-
 int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 {
 	struct sk_filter *fp; 
@@ -463,12 +397,11 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 
 	/* Make sure new filter is there and in the right amounts. */
         if (fprog->filter == NULL || fprog->len > BPF_MAXINSNS)
-                return (-EINVAL);
+                return -EINVAL;
 
-	fp = (struct sk_filter *)sock_kmalloc(sk, fsize+sizeof(*fp), GFP_KERNEL);
-	if(fp == NULL)
-		return (-ENOMEM);
-
+	fp = sock_kmalloc(sk, fsize+sizeof(*fp), GFP_KERNEL);
+	if (!fp)
+		return -ENOMEM;
 	if (copy_from_user(fp->insns, fprog->filter, fsize)) {
 		sock_kfree_s(sk, fp, fsize+sizeof(*fp)); 
 		return -EFAULT;
@@ -477,7 +410,8 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 	atomic_set(&fp->refcnt, 1);
 	fp->len = fprog->len;
 
-	if ((err = sk_chk_filter(fp->insns, fp->len))==0) {
+	err = sk_chk_filter(fp->insns, fp->len);
+	if (!err) {
 		struct sk_filter *old_fp;
 
 		spin_lock_bh(&sk->lock.slock);
@@ -489,6 +423,5 @@ int sk_attach_filter(struct sock_fprog *fprog, struct sock *sk)
 
 	if (fp)
 		sk_filter_release(sk, fp);
-
-	return (err);
+	return err;
 }

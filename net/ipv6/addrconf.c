@@ -19,7 +19,7 @@
  *
  *	Janos Farkas			:	delete timer on ifdown
  *	<chexum@bankinf.banki.hu>
- *	Andi Kleen			:	kill doube kfree on module
+ *	Andi Kleen			:	kill double kfree on module
  *						unload.
  *	Maciej W. Rozycki		:	FDDI support
  *	sekiya@USAGI			:	Don't send too many RS
@@ -343,6 +343,7 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 				"%s(): cannot create /proc/net/dev_snmp6/%s\n",
 				__FUNCTION__, dev->name));
 			neigh_parms_release(&nd_tbl, ndev->nd_parms);
+			ndev->dead = 1;
 			in6_dev_finish_destroy(ndev);
 			return NULL;
 		}
@@ -1256,7 +1257,7 @@ static void sit_route_add(struct net_device *dev)
 	rtmsg.rtmsg_type	= RTMSG_NEWROUTE;
 	rtmsg.rtmsg_metric	= IP6_RT_PRIO_ADDRCONF;
 
-	/* prefix length - 96 bytes "::d.d.d.d" */
+	/* prefix length - 96 bits "::d.d.d.d" */
 	rtmsg.rtmsg_dst_len	= 96;
 	rtmsg.rtmsg_flags	= RTF_UP|RTF_NONEXTHOP;
 	rtmsg.rtmsg_ifindex	= dev->ifindex;

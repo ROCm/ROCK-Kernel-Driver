@@ -46,7 +46,7 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 	snprintf(cpu->sysdev.class_dev.class_id, BUS_ID_SIZE, "cpu%d", num);
 	retval = class_device_register(&cpu->sysdev.class_dev);
 	if (retval) {
-		// FIXME cleanup sys_device_register
+		sys_device_unregister(&cpu->sysdev);
 		return retval;
 	}
 	return 0;
@@ -58,10 +58,12 @@ int __init cpu_dev_init(void)
 	int error;
 
 	error = class_register(&cpu_class);
-	if (!error) {
-		error = driver_register(&cpu_driver);
-		if (error)
-			class_unregister(&cpu_class);
-	}
+	if (error)
+		goto out;
+	
+	error = driver_register(&cpu_driver);
+	if (error)
+		class_unregister(&cpu_class);
+out:
 	return error;
 }

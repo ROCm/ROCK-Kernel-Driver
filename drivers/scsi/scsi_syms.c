@@ -29,8 +29,8 @@
  * This source file contains the symbol table used by scsi loadable
  * modules.
  */
-EXPORT_SYMBOL(scsi_register_device);
-EXPORT_SYMBOL(scsi_unregister_device);
+EXPORT_SYMBOL(scsi_register_driver);
+EXPORT_SYMBOL(scsi_register_interface);
 EXPORT_SYMBOL(scsi_register_host);
 EXPORT_SYMBOL(scsi_unregister_host);
 EXPORT_SYMBOL(scsi_add_host);

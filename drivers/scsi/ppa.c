@@ -277,7 +277,7 @@ int ppa_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offs
     int len = 0;
 
     for (i = 0; i < 4; i++)
-	if (ppa_hosts[i] == host)
+	if (ppa_hosts[i].host == host->host_no)
 	    break;
 
     if (inout)

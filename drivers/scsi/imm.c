@@ -254,7 +254,7 @@ static inline int imm_proc_write(int hostno, char *buffer, int length)
 }
 
 int imm_proc_info(struct Scsi_Host *host, char *buffer, char **start, off_t offset,
-		  int length, int hostno, int inout)
+		  int length, int inout)
 {
     int i;
     int len = 0;

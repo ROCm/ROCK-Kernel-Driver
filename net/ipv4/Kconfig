@@ -343,6 +343,10 @@ config SYN_COOKIES
 
 config INET_AH
 	tristate "IP: AH transformation"
+	select CRYPTO
+	select CRYPTO_HMAC
+	select CRYPTO_MD5
+	select CRYPTO_SHA1
 	---help---
 	  Support for IPsec AH.
 
@@ -350,6 +354,11 @@ config INET_AH
 
 config INET_ESP
 	tristate "IP: ESP transformation"
+	select CRYPTO
+	select CRYPTO_HMAC
+	select CRYPTO_MD5
+	select CRYPTO_SHA1
+	select CRYPTO_DES
 	---help---
 	  Support for IPsec ESP.
 
@@ -357,6 +366,8 @@ config INET_ESP
 
 config INET_IPCOMP
 	tristate "IP: IPComp transformation"
+	select CRYPTO
+	select CRYPTO_DEFLATE
 	---help---
 	  Support for IP Paylod Compression (RFC3173), typically needed
 	  for IPsec.
