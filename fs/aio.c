@@ -522,7 +522,7 @@ int aio_put_req(struct kiocb *req)
 /*	Lookup an ioctx id.  ioctx_list is lockless for reads.
  *	FIXME: this is O(n) and is only suitable for development.
  */
-static struct kioctx *lookup_ioctx(unsigned long ctx_id)
+struct kioctx *lookup_ioctx(unsigned long ctx_id)
 {
 	struct kioctx *ioctx;
 	struct mm_struct *mm;
@@ -984,9 +984,9 @@ asmlinkage long sys_io_destroy(aio_context_t ctx)
 	return -EINVAL;
 }
 
-static int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
+int FASTCALL(io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 				  struct iocb *iocb));
-static int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
+int io_submit_one(struct kioctx *ctx, struct iocb *user_iocb,
 			 struct iocb *iocb)
 {
 	struct kiocb *req;
