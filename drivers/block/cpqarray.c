@@ -1533,6 +1533,9 @@ static int revalidate_allvol(kdev_t dev)
 }
 
 /* Borrowed and adapted from sd.c */
+/*
+ * FIXME: exclusion with ->open()
+ */
 static int revalidate_logvol(kdev_t dev, int maxusage)
 {
 	int ctlr, target;

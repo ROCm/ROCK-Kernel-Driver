@@ -93,8 +93,6 @@ static void ps2esdi_geometry_int_handler(u_int);
 
 static int ps2esdi_open(struct inode *inode, struct file *file);
 
-static int ps2esdi_release(struct inode *inode, struct file *file);
-
 static int ps2esdi_ioctl(struct inode *inode, struct file *file,
 			 u_int cmd, u_long arg);
 
@@ -111,11 +109,8 @@ static void ps2esdi_reset_timer(unsigned long unused);
 static u_int dma_arb_level;		/* DMA arbitration level */
 
 static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_int);
-static DECLARE_WAIT_QUEUE_HEAD(ps2esdi_wait_open);
 
 static int no_int_yet;
-static int access_count[MAX_HD];
-static char ps2esdi_valid[MAX_HD];
 static int ps2esdi_sizes[MAX_HD << 6];
 static int ps2esdi_drives;
 static struct hd_struct ps2esdi[MAX_HD << 6];
@@ -152,7 +147,6 @@ static struct block_device_operations ps2esdi_fops =
 {
 	owner:		THIS_MODULE,
 	open:		ps2esdi_open,
-	release:	ps2esdi_release,
 	ioctl:		ps2esdi_ioctl,
 };
 
@@ -441,13 +435,11 @@ static int __init ps2esdi_geninit(void)
 	}
 	blk_queue_max_sectors(BLK_DEFAULT_QUEUE(MAJOR_NR), 128);
 
-	for (i = 0; i < ps2esdi_drives; i++) {
+	for (i = 0; i < ps2esdi_drives; i++)
 		register_disk(&ps2esdi_gendisk,mk_kdev(MAJOR_NR,i<<6),1<<6,
 				&ps2esdi_fops,
 				ps2esdi_info[i].head * ps2esdi_info[i].sect *
 				ps2esdi_info[i].cyl);
-		ps2esdi_valid[i] = 1;
-	}
 	return 0;
 
 err_out3:
@@ -1083,31 +1075,10 @@ static void dump_cmd_complete_status(u_int int_ret_code)
 static int ps2esdi_open(struct inode *inode, struct file *file)
 {
 	int dev = DEVICE_NR(inode->i_rdev);
-
-	if (dev < ps2esdi_drives) {
-		while (!ps2esdi_valid[dev])
-			sleep_on(&ps2esdi_wait_open);
-
-		access_count[dev]++;
-
-		return (0);
-	} else
-		return (-ENODEV);
-}
-
-
-
-static int ps2esdi_release(struct inode *inode, struct file *file)
-{
-	int dev = DEVICE_NR(inode->i_rdev);
-
-	if (dev < ps2esdi_drives) {
-		access_count[dev]--;
-	}
+	if (dev >= ps2esdi_drives)
+		return -ENODEV;
 	return 0;
 }
-
-
 
 static int ps2esdi_ioctl(struct inode *inode,
 			 struct file *file, u_int cmd, u_long arg)
@@ -1155,24 +1126,20 @@ static int ps2esdi_ioctl(struct inode *inode,
 static int ps2esdi_reread_partitions(kdev_t dev)
 {
 	int target = DEVICE_NR(dev);
-	int res;
+	kdev_t device = mk_kdev(MAJOR_NR, target << 6);
+	int res = dev_lock_part(device);
 
-	cli();
-	ps2esdi_valid[target] = (access_count[target] != 1);
-	sti();
-	if (ps2esdi_valid[target])
-		return (-EBUSY);
+	if (res < 0)
+		return res;
 
-	res = wipe_partitions(dev);
+	res = wipe_partitions(device);
 	if (res == 0)
-		grok_partitions(dev, ps2esdi_info[target].head
+		grok_partitions(device, ps2esdi_info[target].head
 				* ps2esdi_info[target].cyl
 				* ps2esdi_info[target].sect);
  
-	ps2esdi_valid[target] = 1;
-	wake_up(&ps2esdi_wait_open);
-
-	return (res);
+	dev_unlock_part(device);
+	return res;
 }
 
 static void ps2esdi_reset_timer(unsigned long unused)

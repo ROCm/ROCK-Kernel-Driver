@@ -507,16 +507,6 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!scsi_block_when_processing_errors(sdp))
 		return -ENXIO;
 	/*
-	 * Make sure that only one process can do a check_change_disk at 
-	 * one time.  This is also used to lock out further access when 
-	 * the partition table is being re-read.
-	 */
-
-	while (sdp->busy) {
-		barrier();
-		cpu_relax();
-	}
-	/*
 	 * The following code can sleep.
 	 * Module unloading must be prevented
 	 */
@@ -527,9 +517,7 @@ static int sd_open(struct inode *inode, struct file *filp)
 	sdp->access_count++;
 
 	if (sdp->removable) {
-		sdp->allow_revalidate = 1;
 		check_disk_change(inode->i_rdev);
-		sdp->allow_revalidate = 0;
 
 		/*
 		 * If the drive is empty, just let the open fail.
@@ -1464,9 +1452,10 @@ static int sd_attach(Scsi_Device * sdp)
 int revalidate_scsidisk(kdev_t dev, int maxusage)
 {
 	int dsk_nr = DEVICE_NR(dev);
-	int res;
 	Scsi_Disk * sdkp;
 	Scsi_Device * sdp;
+	kdev_t device = mk_kdev(major(dev), minor(dev) & ~15);
+	int res;
 
 	SCSI_LOG_HLQUEUE(3, printk("revalidate_scsidisk: dsk_nr=%d\n", 
 				   DEVICE_NR(dev)));
@@ -1474,24 +1463,20 @@ int revalidate_scsidisk(kdev_t dev, int maxusage)
 	if ((NULL == sdkp) || (NULL == (sdp = sdkp->device)))
 		return -ENODEV;
 
-	if (sdp->busy || ((sdp->allow_revalidate == 0) && 
-			  (sdp->access_count > maxusage))) {
-		printk(KERN_WARNING "Device busy for revalidation "
-		       "(access_count=%d)\n", sdp->access_count);
-		return -EBUSY;
-	}
-	sdp->busy = 1;
+	res = dev_lock_part(device);
+	if (res < 0)
+		return res;
 
-	res = wipe_partitions(dev);
+	res = wipe_partitions(device);
 	if (res)
 		goto leave;
 
 	sd_init_onedisk(sdkp, dsk_nr);
 
-	grok_partitions(dev, sdkp->capacity);
+	grok_partitions(device, sdkp->capacity);
 
 leave:
-	sdp->busy = 0;
+	dev_unlock_part(device);
 	return res;
 }
 

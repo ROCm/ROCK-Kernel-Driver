@@ -1154,25 +1154,20 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 
 static int ftl_reread_partitions(kdev_t dev)
 {
-    int minor = minor(dev);
-    partition_t *part = myparts[minor >> 4];
-    int res;
-
-    DEBUG(0, "ftl_cs: ftl_reread_partition(%d)\n", minor);
-    if ((atomic_read(&part->open) > 1)) {
-	    return -EBUSY;
-    }
-
-    res = wipe_partitions(dev);
-    if (res)
-	goto leave;
-
-    scan_header(part);
-
-    register_disk(&ftl_gendisk, whole >> PART_BITS, MAX_PART,
-		  &ftl_blk_fops, le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
-
-    return res;
+	int minor = minor(dev);
+	partition_t *part = myparts[minor >> 4];
+	kdev_t device = mk_kdev(MAJOR_NR, minor & ~15);
+	int res = dev_lock_part(device);
+	if (rec < 0)
+		return res;
+	res = wipe_partitions(device);
+	if (!res) {
+		scan_header(part);
+		grok_partitions(device,
+			le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
+	}
+	dev_unlock_part(device);
+	return res;
 }
 
 /*======================================================================
@@ -1282,13 +1277,13 @@ static void ftl_notify_add(struct mtd_info *mtd)
 
 	partition->mtd = mtd;
 
-	if ((scan_header(partition) == 0) && 
-	    (build_maps(partition) == 0)) {
-		
+	if ((scan_header(partition) == 0) && (build_maps(partition) == 0)) {
 		partition->state = FTL_FORMATTED;
 		atomic_set(&partition->open, 0);
 		myparts[device] = partition;
-		ftl_reread_partitions(device << 4);
+		register_disk(&ftl_gendisk, mk_kdev(MAJOR_NR, device << 4),
+			      MAX_PART, &ftl_blk_fops,
+			      le32_to_cpu(partition->header.FormattedSize)/SECTOR_SIZE);
 #ifdef PCMCIA_DEBUG
 		printk(KERN_INFO "ftl_cs: opening %d kb FTL partition\n",
 		       le32_to_cpu(partition->header.FormattedSize) >> 10);

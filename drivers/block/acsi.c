@@ -248,8 +248,6 @@ static int				NDevices = 0;
 static int				acsi_sizes[MAX_DEV<<4] = { 0, };
 static struct hd_struct	acsi_part[MAX_DEV<<4] = { {0,0}, };
 static int 				access_count[MAX_DEV] = { 0, };
-static char 			busy[MAX_DEV] = { 0, };
-static DECLARE_WAIT_QUEUE_HEAD(busy_wait);
 
 static int				CurrentNReq;
 static int				CurrentNSect;
@@ -1161,8 +1159,6 @@ static int acsi_open( struct inode * inode, struct file * filp )
 	if (device >= NDevices)
 		return -ENXIO;
 	aip = &acsi_info[device];
-	while (busy[device])
-		sleep_on(&busy_wait);
 
 	if (access_count[device] == 0 && aip->removable) {
 #if 0
@@ -1803,10 +1799,6 @@ void cleanup_module(void)
 }
 #endif
 
-#define DEVICE_BUSY busy[device]
-#define USAGE access_count[device]
-#define GENDISK_STRUCT acsi_gendisk
-
 /*
  * This routine is called to flush all partitions and partition tables
  * for a changed scsi disk, and then re-read the new partition table.
@@ -1828,24 +1820,15 @@ void cleanup_module(void)
 
 static int revalidate_acsidisk( int dev, int maxusage )
 {
-	int device;
-	struct gendisk * gdev;
-	int res;
-	struct acsi_info_struct *aip;
-	
-	device = DEVICE_NR(minor(dev));
-	aip = &acsi_info[device];
-	gdev = &GENDISK_STRUCT;
+	int unit = DEVICE_NR(minor(dev));
+	struct acsi_info_struct *aip = &acsi_info[unit];
+	kdev_t device = mk_kdev(MAJOR_NR, unit<<4);
+	int res = dev_lock_part(device);
 
-	cli();
-	if (DEVICE_BUSY || USAGE > maxusage) {
-		sti();
-		return -EBUSY;
-	};
-	DEVICE_BUSY = 1;
-	sti();
+	if (res < 0)
+		return res;
 
-	res = wipe_partitions(dev);
+	res = wipe_partitions(device);
 
 	stdma_lock( NULL, NULL );
 
@@ -1862,10 +1845,9 @@ static int revalidate_acsidisk( int dev, int maxusage )
 	stdma_release();
 
 	if (!res)
-		grok_partitions(dev, aip->size);
+		grok_partitions(device, aip->size);
 
-	DEVICE_BUSY = 0;
-	wake_up(&busy_wait);
+	dev_unlock_part(device);
 	return res;
 }
 

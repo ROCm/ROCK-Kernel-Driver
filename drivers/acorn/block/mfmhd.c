@@ -184,8 +184,6 @@ struct mfm_info {
 #define NEED_1_RECAL -2
 #define NEED_2_RECAL -3
 		 int cylinder;
-	unsigned int access_count;
-	unsigned int busy;
 	struct {
 		char recal;
 		char report;
@@ -197,7 +195,6 @@ struct mfm_info {
 
 static struct hd_struct mfm[MFM_MAXDRIVES << 6];
 static int mfm_sizes[MFM_MAXDRIVES << 6];
-static DECLARE_WAIT_QUEUE_HEAD(mfm_wait_open);
 
 /* Stuff from the assembly routines */
 extern unsigned int hdc63463_baseaddress;	/* Controller base address */
@@ -1219,24 +1216,8 @@ static int mfm_ioctl(struct inode *inode, struct file *file, u_int cmd, u_long a
 static int mfm_open(struct inode *inode, struct file *file)
 {
 	int dev = DEVICE_NR(minor(inode->i_rdev));
-
 	if (dev >= mfm_drives)
 		return -ENODEV;
-
-	while (mfm_info[dev].busy)
-		sleep_on (&mfm_wait_open);
-
-	mfm_info[dev].access_count++;
-	return 0;
-}
-
-/*
- * Releasing a block device means we sync() it, so that it can safely
- * be forgotten about...
- */
-static int mfm_release(struct inode *inode, struct file *file)
-{
-	mfm_info[DEVICE_NR(minor(inode->i_rdev))].access_count--;
 	return 0;
 }
 
@@ -1296,7 +1277,6 @@ static struct block_device_operations mfm_fops =
 {
 	owner:		THIS_MODULE,
 	open:		mfm_open,
-	release:	mfm_release,
 	ioctl:		mfm_ioctl,
 };
 
@@ -1425,33 +1405,19 @@ int mfm_init (void)
 /*
  * This routine is called to flush all partitions and partition tables
  * for a changed MFM disk, and then re-read the new partition table.
- * If we are revalidating due to an ioctl, we have USAGE == 1.
  */
 static int mfm_reread_partitions(kdev_t dev)
 {
-	unsigned int start, i, maxp, target = DEVICE_NR(minor(dev));
-	unsigned long flags;
-
-	local_irq_save(flags);
-	if (mfm_info[target].busy || mfm_info[target].access_count > 1) {
-		local_irq_restore (flags);
-		return -EBUSY;
-	}
-	mfm_info[target].busy = 1;
-	local_irq_restore (flags);
-
-	maxp = 1 << mfm_gendisk.minor_shift;
-	start = target << mfm_gendisk.minor_shift;
-
-	wipe_partitions(mk_kdev(MAJOR_NR, start));
-
+	unsigned int unit = DEVICE_NR(minor(dev));
+	kdev_t device = mk_kdev(MAJOR_NR, unit << mfm_gendisk.minor_shift);
+	int err = dev_lock_part(device);
+	if (err)
+		return err;
+	wipe_partitions(device);
 	/* Divide by 2, since sectors are 2 times smaller than usual ;-) */
-
-	grok_partitions(&mfm_gendisk, target, 1<<6, mfm_info[target].heads *
-		    mfm_info[target].cylinders * mfm_info[target].sectors / 2);
-
-	mfm_info[target].busy = 0;
-	wake_up (&mfm_wait_open);
+	grok_partitions(device, mfm_info[unit].heads *
+		    mfm_info[unit].cylinders * mfm_info[unit].sectors / 2);
+	dev_unlock_part(device);
 	return 0;
 }
 

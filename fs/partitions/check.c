@@ -372,23 +372,8 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 			sprintf(state->name, "p");
 	}
 	bdev = bdget(kdev_t_to_nr(dev));
-	bdev->bd_contains = bdev;
-	bdev->bd_inode->i_size = (loff_t)hd->part[minor(dev)].nr_sects << 9;
-	if (!bdev->bd_openers) {
-		struct blk_dev_struct *p = blk_dev + major(dev);
-		unsigned bsize = bdev_hardsect_size(bdev);
-		while (bsize < PAGE_CACHE_SIZE) {
-			if (bdev->bd_inode->i_size & bsize)
-				break;
-			bsize <<= 1;
-		}
-		if (p->queue)
-			bdev->bd_queue =  p->queue(dev);
-		else
-			bdev->bd_queue = &p->request_queue;
-		bdev->bd_block_size = bsize;
-		bdev->bd_inode->i_blkbits = blksize_bits(bsize);
-	}
+	if (blkdev_get(bdev, FMODE_READ, 0, BDEV_RAW))
+		goto out;
 	state->limit = 1<<hd->minor_shift;
 	for (i = 0; check_part[i]; i++) {
 		int res, j;
@@ -417,10 +402,8 @@ static void check_partition(struct gendisk *hd, kdev_t dev)
 
 	printk(" unknown partition table\n");
 setup_devfs:
-	invalidate_bdev(bdev, 1);
-	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
-	bdput(bdev);
-
+	blkdev_put(bdev, BDEV_RAW);
+out:
 	/* Setup driverfs tree */
 	if (hd->sizes)
 		driverfs_create_partitions(hd, minor(dev));

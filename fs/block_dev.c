@@ -293,6 +293,8 @@ struct block_device *bdget(dev_t dev)
 			new_bdev->bd_queue = NULL;
 			new_bdev->bd_contains = NULL;
 			new_bdev->bd_inode = inode;
+			new_bdev->bd_part_count = 0;
+			sema_init(&new_bdev->bd_part_sem, 1);
 			inode->i_mode = S_IFBLK;
 			inode->i_rdev = kdev;
 			inode->i_bdev = new_bdev;
@@ -415,9 +417,9 @@ int get_blkdev_list(char * p)
 	Return the function table of a device.
 	Load the driver if needed.
 */
-const struct block_device_operations * get_blkfops(unsigned int major)
+struct block_device_operations * get_blkfops(unsigned int major)
 {
-	const struct block_device_operations *ret = NULL;
+	struct block_device_operations *ret = NULL;
 
 	/* major 0 is used for non-device mounts */
 	if (major && major < MAX_BLKDEV) {
@@ -479,7 +481,7 @@ int unregister_blkdev(unsigned int major, const char * name)
 int check_disk_change(kdev_t dev)
 {
 	int i;
-	const struct block_device_operations * bdops = NULL;
+	struct block_device_operations * bdops = NULL;
 
 	i = major(dev);
 	if (i < MAX_BLKDEV)
@@ -567,10 +569,16 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 			}
 		}
 	}
-	if (current_ops->open) {
-		ret = current_ops->open(inode, file);
-		if (ret)
-			goto out2;
+	if (bdev->bd_contains == bdev) {
+		if (current_ops->open) {
+			ret = current_ops->open(inode, file);
+			if (ret)
+				goto out2;
+		}
+	} else {
+		down(&bdev->bd_contains->bd_part_sem);
+		bdev->bd_contains->bd_part_count++;
+		up(&bdev->bd_contains->bd_part_sem);
 	}
 	if (!bdev->bd_op)
 		bdev->bd_op = ops;
@@ -688,8 +696,14 @@ int blkdev_put(struct block_device *bdev, int kind)
 	}
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
-	if (bdev->bd_op->release)
-		ret = bdev->bd_op->release(bd_inode, NULL);
+	if (bdev->bd_contains == bdev) {
+		if (bdev->bd_op->release)
+			ret = bdev->bd_op->release(bd_inode, NULL);
+	} else {
+		down(&bdev->bd_contains->bd_part_sem);
+		bdev->bd_contains->bd_part_count--;
+		up(&bdev->bd_contains->bd_part_sem);
+	}
 	if (!bdev->bd_openers) {
 		if (bdev->bd_op->owner)
 			__MOD_DEC_USE_COUNT(bdev->bd_op->owner);

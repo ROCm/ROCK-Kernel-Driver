@@ -812,31 +812,21 @@ static void del_battery_timer(void)
  * Note no locks taken out here.  In a worst case scenario, we could drop
  * a chunk of system memory.  But that should never happen, since validation
  * happens at open or mount time, when locks are held.
+ *
+ *	That's crap, since doing that while some partitions are opened
+ * or mounted will give you really nasty results.
  */
 static int mm_revalidate(kdev_t i_rdev)
 {
-	int i;
-
 	int card_number = DEVICE_NR(i_rdev);
-	/* first partition, # of partitions */
-	int part1 = (card_number << MM_SHIFT) + 1;
-	int npart = (1 << MM_SHIFT) -1;
-
-	/* first clear old partition information */
-	for (i=0; i<npart ;i++) {
-		mm_gendisk.sizes[part1+i]=0;
-		mm_gendisk.part[part1+i].start_sect = 0;
-		mm_gendisk.part[part1+i].nr_sects = 0;
-	}
-
-	mm_gendisk.part[card_number << MM_SHIFT].nr_sects =
-		cards[card_number].mm_size << 1;
-
-
-	/* then fill new info */
+	kdev_t device = mk_mdev(MAJOR_NR, card_number << MM_SHIFT);
+	int res = dev_lock_part(device);
+	if (res < 0)
+		return res;
+	wipe_partitions(device);
 	printk(KERN_INFO "mm partition check: (%d)\n", card_number);
-	grok_partitions(mk_kdev(major_nr,part1-1),
-			mm_gendisk.sizes[card_number<<MM_SHIFT]);
+	grok_partitions(device, cards[card_number].mm_size << 1);
+	dev_unlock_part(device);
 	return 0;
 }
 /*
@@ -925,22 +915,12 @@ static int mm_open(struct inode *i, struct file *filp)
 }
 /*
 -----------------------------------------------------------------------------------
---                              mm_do_release
------------------------------------------------------------------------------------
-*/
-static int mm_do_release(struct inode *i, struct file *filp)
-{
-	return 0;
-}
-/*
------------------------------------------------------------------------------------
 --                             mm_fops
 -----------------------------------------------------------------------------------
 */
 static struct block_device_operations mm_fops = {
 	owner:		THIS_MODULE,
 	open:		mm_open,
-	release:	mm_do_release,
 	ioctl:		mm_ioctl,
 	revalidate:	mm_revalidate,
 	check_media_change: mm_check_change,

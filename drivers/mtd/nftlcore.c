@@ -115,7 +115,6 @@ static void NFTL_setup(struct mtd_info *mtd)
 #endif
 
         /* linux stuff */
-	nftl->usecount = 0;
 	nftl->cylinders = 1024;
 	nftl->heads = 16;
 
@@ -153,8 +152,9 @@ static void NFTL_setup(struct mtd_info *mtd)
 #if LINUX_VERSION_CODE < 0x20328
 	resetup_one_dev(&nftl_gendisk, firstfree);
 #else
-	grok_partitions(mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
-			nftl->nr_sects);
+	register_disk(&nftl_gendisk,
+		      mk_kdev(MAJOR_NR,firstfree<<NFTL_PARTN_BITS),
+		      1<<NFTL_PARTN_BITS, &nftl_fops, nftl->nr_sects);
 #endif
 }
 
@@ -800,16 +800,17 @@ static int nftl_ioctl(struct inode * inode, struct file * file, unsigned int cmd
 
 	case BLKRRPART:
 		if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-		if (nftl->usecount > 1) return -EBUSY;
-		/* 
-		 * We have to flush all buffers and invalidate caches,
-		 * or we won't be able to re-use the partitions,
-		 * if there was a change and we don't want to reboot
-		 */
-		res = wipe_partitions(inode->i_rdev);
+		{
+		kdev_t device = mk_kdev(MAJOR_NR,
+			minor(inode->i_rdev) & -(1<<NFTL_PARTN_BITS));
+		res = dev_lock_part(device);
+		if (res < 0)
+			return res;
+		res = wipe_partitions(device);
 		if (!res)
-			grok_partitions(inode->i_rdev, nftl->nr_sects);
-
+			grok_partitions(device, nftl->nr_sects);
+		dev_unlock_part(device);
+		}
 		return res;
 
 #if (LINUX_VERSION_CODE < 0x20303)		
@@ -955,7 +956,6 @@ static int nftl_open(struct inode *ip, struct file *fp)
 		return -EROFS;
 #endif /* !CONFIG_NFTL_RW */
 
-	thisNFTL->usecount++;
 	if (!get_mtd_device(thisNFTL->mtd, -1))
 		return /* -E'SBUGGEREDOFF */ -ENXIO;
 
@@ -972,7 +972,6 @@ static int nftl_release(struct inode *inode, struct file *fp)
 
 	if (thisNFTL->mtd->sync)
 		thisNFTL->mtd->sync(thisNFTL->mtd);
-	thisNFTL->usecount--;
 
 	put_mtd_device(thisNFTL->mtd);
 

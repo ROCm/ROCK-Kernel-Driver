@@ -414,12 +414,11 @@ int pd_init (void)
 }
 
 static int pd_open (struct inode *inode, struct file *file)
+{
+	int unit = DEVICE_NR(inode->i_rdev);
 
-{       int unit = DEVICE_NR(inode->i_rdev);
-
-        if ((unit >= PD_UNITS) || (!PD.present)) return -ENODEV;
-
-	wait_event (pd_wait_open, pd_valid);
+        if ((unit >= PD_UNITS) || (!PD.present))
+		return -ENODEV;
 
         PD.access++;
 
@@ -480,12 +479,8 @@ static int pd_ioctl(struct inode *inode,struct file *file,
 }
 
 static int pd_release (struct inode *inode, struct file *file)
-
-{       kdev_t devp;
-	int	unit;
-
-        devp = inode->i_rdev;
-	unit = DEVICE_NR(devp);
+{
+	int	unit = DEVICE_NR(inode->i_rdev);
 
 	if ((unit >= PD_UNITS) || (PD.access <= 0)) 
 		return -EINVAL;
@@ -513,29 +508,22 @@ static int pd_check_media( kdev_t dev)
 
 static int pd_revalidate(kdev_t dev)
 {
-	int unit, res;
-	long flags;
+	int unit = DEVICE_NR(dev);
+	kdev_t device = mk_kdev(MAJOR_NR, unit << PD_BITS);
+	int res;
 
-	unit = DEVICE_NR(dev);
 	if ((unit >= PD_UNITS) || !PD.present)
 		return -ENODEV;
 
-	save_flags(flags);
-	cli(); 
-	if (PD.access > 1) {
-		restore_flags(flags);
-		return -EBUSY;
-	}
-	pd_valid = 0;
-	restore_flags(flags);   
-
-	res = wipe_partitions(dev);
+	res = dev_part_lock(device);
+	if (res < 0)
+		return res;
+	res = wipe_partitions(device);
 
 	if (res == 0 && pd_identify(unit))
-		grok_partitions(dev, PD.capacity);
+		grok_partitions(device, PD.capacity);
 
-	pd_valid = 1;
-	wake_up(&pd_wait_open);
+	dev_unlock_part(device);
  
         return res;
 }

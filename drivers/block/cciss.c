@@ -735,6 +735,10 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 }
 
 /* Borrowed and adapted from sd.c */
+/*
+ * FIXME: we are missing the exclusion with ->open() here - it can happen
+ * just as we are rereading partition tables.
+ */
 static int revalidate_logvol(kdev_t dev, int maxusage)
 {
         int ctlr, target;
@@ -1304,13 +1308,12 @@ static int register_new_disk(kdev_t dev, int ctlr)
 	hba[ctlr]->drv[logvol].usage_count = 0;
 	max_p = 1 << gdev->minor_shift;
         start = logvol<< gdev->minor_shift;
+	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
 
-	wipe_partitions(MAJOR_NR + ctlr, start);
-
+	wipe_partitions(kdev);
 	++hba[ctlr]->num_luns;
 	gdev->nr_real = hba[ctlr]->highest_lun + 1;
 	/* setup partitions per disk */
-	kdev = mk_kdev(MAJOR_NR + ctlr, logvol<< gdev->minor_shift);
 	grok_partitions(kdev, hba[ctlr]->drv[logvol].nr_blocks);
 	
 	kfree(ld_buff);
