@@ -975,10 +975,10 @@ typedef struct smb_com_transaction_change_notify_rsp {
 
 /* response contains array of the following structures */
 struct file_notify_information {
-	__u32 NextEntryOffset;
-	__u32 Action;
-	__u32 FileNameLength;
-	__u8  FileName[1];
+	__le32 NextEntryOffset;
+	__le32 Action;
+	__le32 FileNameLength;
+	__u8  FileName[0];
 }; 
 
 struct reparse_data {
@@ -1077,6 +1077,7 @@ struct smb_t2_rsp {
 #define SMB_QUERY_FILE_UNIX_BASIC       0x200
 #define SMB_QUERY_FILE_UNIX_LINK        0x201
 #define SMB_QUERY_POSIX_ACL             0x204
+#define SMB_QUERY_XATTR                 0x205
 #define SMB_QUERY_FILE_INTERNAL_INFO    0x3ee
 #define SMB_QUERY_FILE_ACCESS_INFO      0x3f0
 #define SMB_QUERY_FILE_NAME_INFO2       0x3f1 /* 0x30 bytes */
@@ -1091,8 +1092,9 @@ struct smb_t2_rsp {
 #define SMB_SET_FILE_END_OF_FILE_INFO   0x104
 #define SMB_SET_FILE_UNIX_BASIC         0x200
 #define SMB_SET_FILE_UNIX_LINK          0x201
-#define SMB_SET_POSIX_ACL               0x204
 #define SMB_SET_FILE_UNIX_HLINK         0x203
+#define SMB_SET_POSIX_ACL               0x204
+#define SMB_SET_XATTR                   0x205
 #define SMB_SET_FILE_BASIC_INFO2        0x3ec
 #define SMB_SET_FILE_RENAME_INFORMATION 0x3f2 /* BB check if qpathinfo level too */
 #define SMB_FILE_ALL_INFO2              0x3fa
@@ -1501,6 +1503,7 @@ typedef struct {
 /* Linux/Unix extensions capability flags */
 #define CIFS_UNIX_FCNTL_CAP             0x00000001 /* support for fcntl locks */
 #define CIFS_UNIX_POSIX_ACL_CAP         0x00000002
+#define CIFS_UNIX_XATTR_CAP             0x00000004 /*support for new namespace*/
 
 /* DeviceType Flags */
 #define FILE_DEVICE_CD_ROM              0x00000002
@@ -1908,6 +1911,15 @@ struct xsymlink {
 /* if room left, then end with \n then 0x20s by convention but not required */
 	char path[1024];  
 };
+
+typedef struct {
+	/* BB do we need another field for flags? BB */
+	__u32 xattr_name_len;
+	__u32 xattr_value_len;
+	char  xattr_name[0];
+	/* followed by xattr_value[xattr_value_len], no pad */
+} FILE_XATTR_INFO;	/* extended attribute, info level 205 */
+
 
 #endif 
 

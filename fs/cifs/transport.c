@@ -450,13 +450,13 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	if(timeout != MAX_SCHEDULE_TIMEOUT) {
 		timeout += jiffies;
 		wait_event(ses->server->response_q,
-			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			(!(midQ->midState & MID_REQUEST_SUBMITTED)) || 
 			time_after(jiffies, timeout) || 
 			((ses->server->tcpStatus != CifsGood) &&
 			 (ses->server->tcpStatus != CifsNew)));
 	} else {
 		wait_event(ses->server->response_q,
-			(midQ->midState & MID_RESPONSE_RECEIVED) || 
+			(!(midQ->midState & MID_REQUEST_SUBMITTED)) || 
 			((ses->server->tcpStatus != CifsGood) &&
 			 (ses->server->tcpStatus != CifsNew)));
 	}
