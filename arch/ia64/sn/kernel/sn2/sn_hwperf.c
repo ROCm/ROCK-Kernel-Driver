@@ -530,8 +530,7 @@ sn_hwperf_ioctl(struct inode *in, struct file *fp, u32 op, u64 arg)
 	}
 
 error:
-	if (p)
-		vfree(p);
+	vfree(p);
 
 	lock_kernel();
 	return r;
@@ -642,7 +641,6 @@ int sn_topology_release(struct inode *inode, struct file *file)
 {
 	struct seq_file *seq = file->private_data;
 
-	if (seq->private)
-		vfree(seq->private);
+	vfree(seq->private);
 	return seq_release(inode, file);
 }
