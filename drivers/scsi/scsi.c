@@ -2001,10 +2001,7 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	list_add_tail(&tpnt->list, &scsi_devicelist);
 	up_write(&scsi_devicelist_mutex);
 
-	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
-	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-
-	driver_register(&tpnt->scsi_driverfs_driver);
+	scsi_upper_driver_register(tpnt);
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) 
@@ -2019,7 +2016,6 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
 	
-	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
 	 * Next, detach the devices from the driver.
@@ -2036,6 +2032,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	down_write(&scsi_devicelist_mutex);
 	list_del(&tpnt->list);
 	up_write(&scsi_devicelist_mutex);
+
+	scsi_upper_driver_unregister(tpnt);
 
 	/*
 	 * Final cleanup for the driver is done in the driver sources in the
@@ -2135,34 +2133,6 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 	mempool_free(sgl, sgp->pool);
 }
 
-static int scsi_bus_match(struct device *scsi_driverfs_dev, 
-                          struct device_driver *scsi_driverfs_drv)
-{
-        char *p=0;
-
-        if (!strcmp("sd", scsi_driverfs_drv->name)) {
-                if ((p = strstr(scsi_driverfs_dev->bus_id, ":disc")) || 
-		    (p = strstr(scsi_driverfs_dev->bus_id, ":p"))) { 
-                        return 1;
-                }
-        } else if (!strcmp("sg", scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id, ":gen"))
-                        return 1;
-        } else if (!strcmp("sr",scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id,":cd"))
-                        return 1;
-        } else if (!strcmp("st",scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id,":mt"))
-                        return 1;
-        }
-        return 0;
-}
-
-struct bus_type scsi_driverfs_bus_type = {
-        .name	= "scsi",
-        .match	= scsi_bus_match,
-};
-
 static int __init init_scsi(void)
 {
 	int i;
@@ -2189,7 +2159,7 @@ static int __init init_scsi(void)
 	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
-	bus_register(&scsi_driverfs_bus_type);
+	scsi_sysfs_register();
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	return 0;
 }
@@ -2198,7 +2168,7 @@ static void __exit exit_scsi(void)
 {
 	int i;
 
-	bus_unregister(&scsi_driverfs_bus_type);
+	scsi_sysfs_unregister();
 	scsi_dev_info_list_delete();
 	devfs_unregister(scsi_devfs_handle);
 	scsi_exit_procfs();
@@ -2212,5 +2182,5 @@ static void __exit exit_scsi(void)
 	}
 }
 
-module_init(init_scsi);
+subsys_initcall(init_scsi);
 module_exit(exit_scsi);

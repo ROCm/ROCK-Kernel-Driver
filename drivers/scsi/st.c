@@ -176,10 +176,12 @@ static struct Scsi_Device_Template st_template = {
 	.module =	THIS_MODULE,
 	.list =		LIST_HEAD_INIT(st_template.list),
 	.name =		"tape", 
-	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
 	.attach =	st_attach, 
-	.detach =	st_detach
+	.detach =	st_detach,
+	.scsi_driverfs_driver = {
+		.name = "st",
+	},
 };
 
 static int st_compression(Scsi_Tape *, int);
@@ -3826,7 +3828,7 @@ static int st_attach(Scsi_Device * SDp)
 	    sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_r[mode].bus = SDp->sdev_driverfs_dev.bus;
 	    tpnt->driverfs_dev_r[mode].driver_data =
 			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5));
 	    device_register(&tpnt->driverfs_dev_r[mode]);
@@ -3845,7 +3847,7 @@ static int st_attach(Scsi_Device * SDp)
 	    sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
 		    SDp->sdev_driverfs_dev.name, name);
 	    tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-	    tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
+	    tpnt->driverfs_dev_n[mode].bus = SDp->sdev_driverfs_dev.bus;
 	    tpnt->driverfs_dev_n[mode].driver_data =
 			(void *)(long)__mkdev(SCSI_TAPE_MAJOR, dev_num + (mode << 5) + 128);
 	    device_register(&tpnt->driverfs_dev_n[mode]);

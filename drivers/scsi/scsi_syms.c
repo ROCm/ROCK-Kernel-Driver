@@ -104,6 +104,6 @@ EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
 
 /*
- * driverfs support for determining driver types
+ * sysfs support
  */
-EXPORT_SYMBOL(scsi_driverfs_bus_type);
+EXPORT_SYMBOL(shost_devclass);

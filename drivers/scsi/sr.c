@@ -73,11 +73,13 @@ static struct Scsi_Device_Template sr_template = {
 	.module		= THIS_MODULE,
 	.list		= LIST_HEAD_INIT(sr_template.list),
 	.name		= "cdrom",
-	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
 	.attach		= sr_attach,
 	.detach		= sr_detach,
-	.init_command	= sr_init_command
+	.init_command	= sr_init_command,
+	.scsi_driverfs_driver = {
+		.name   = "sr",
+	},
 };
 
 static int sr_nr_dev;	/* XXX(hch) bad hack, we want a bitmap instead */

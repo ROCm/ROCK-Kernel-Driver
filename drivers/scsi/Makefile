@@ -123,7 +123,8 @@ obj-$(CONFIG_BLK_DEV_SR)	+= sr_mod.o
 obj-$(CONFIG_CHR_DEV_SG)	+= sg.o
 
 scsi_mod-objs	:= scsi.o hosts.o scsi_ioctl.o constants.o scsicam.o \
-		   scsi_error.o scsi_lib.o scsi_scan.o scsi_syms.o
+		   scsi_error.o scsi_lib.o scsi_scan.o scsi_syms.o \
+		   scsi_sysfs.o
 
 ifdef CONFIG_PROC_FS
 scsi_mod-objs	+= scsi_proc.o

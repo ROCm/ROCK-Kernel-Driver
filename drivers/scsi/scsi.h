@@ -401,9 +401,6 @@ typedef struct scsi_request Scsi_Request;
 
 extern unsigned int scsi_logging_level;		/* What do we log? */
 
-extern struct bus_type scsi_driverfs_bus_type;
-
-
 /*
  * These are the error handling functions defined in scsi_error.c
  */
@@ -988,5 +985,11 @@ static inline Scsi_Cmnd *scsi_find_tag(Scsi_Device *SDpnt, int tag) {
 #define SCSI_SENSE_VALID(scmd) ((scmd->sense_buffer[0] & 0x70) == 0x70)
 
 int scsi_set_medium_removal(Scsi_Device *dev, char state);
+
+extern int scsi_device_register(struct scsi_device *);
+extern void scsi_device_unregister(struct scsi_device *);
+
+extern int scsi_sysfs_register(void);
+extern void scsi_sysfs_unregister(void);
 
 #endif

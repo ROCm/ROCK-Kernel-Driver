@@ -105,11 +105,13 @@ static struct Scsi_Device_Template sd_template = {
 	.module		= THIS_MODULE,
 	.list		= LIST_HEAD_INIT(sd_template.list),
 	.name		= "disk",
-	.tag		= "sd",
 	.scsi_type	= TYPE_DISK,
 	.attach		= sd_attach,
 	.detach		= sd_detach,
 	.init_command	= sd_init_command,
+	.scsi_driverfs_driver = {
+		.name   = "sd",
+	},
 };
 
 static struct scsi_disk *sd_find_by_sdev(Scsi_Device *sd)
@@ -1343,7 +1345,6 @@ static void __exit exit_sd(void)
 	scsi_unregister_device(&sd_template);
 	for (i = 0; i < SD_MAJORS; i++)
 		unregister_blkdev(SD_MAJOR(i), "sd");
-	driver_unregister(&sd_template.scsi_driverfs_driver);
 }
 
 /*

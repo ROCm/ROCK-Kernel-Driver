@@ -288,7 +288,7 @@ int scsi_remove_host(struct Scsi_Host *shost)
 	return 0;
 }
 
-int scsi_add_host(struct Scsi_Host *shost)
+int __scsi_add_host(struct Scsi_Host *shost)
 {
 	Scsi_Host_Template *sht = shost->hostt;
 	struct scsi_device *sdev;
@@ -297,7 +297,6 @@ int scsi_add_host(struct Scsi_Host *shost)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	device_register(&shost->host_driverfs_dev);
 	scsi_scan_host(shost);
 			
 	list_for_each_entry (sdev, &shost->my_devices, siblings) {
@@ -307,6 +306,22 @@ int scsi_add_host(struct Scsi_Host *shost)
 	}
 
 	return saved_error;
+}
+
+/**
+ * scsi_add_host - add a scsi host
+ * @shost:	scsi host pointer to add
+ * @dev:	a struct device of type scsi class
+ *
+ * Return value: 
+ * 	0 on success / != 0 for error
+ **/
+int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
+{
+	dev->class_data = shost;
+	shost->host_gendev = dev;
+
+	return __scsi_add_host(shost);
 }
 
 /**
@@ -333,9 +348,8 @@ void scsi_unregister(struct Scsi_Host *shost)
 
 	shost->hostt->present--;
 
-	/* Cleanup proc and driverfs */
+	/* Cleanup proc */
 	scsi_proc_host_rm(shost);
-	device_unregister(&shost->host_driverfs_dev);
 
 	kfree(shost);
 }
@@ -448,11 +462,6 @@ found:
 
 	scsi_proc_host_add(shost);
 
-	strncpy(shost->host_driverfs_dev.name, shost_tp->proc_name,
-		DEVICE_NAME_SIZE-1);
-	sprintf(shost->host_driverfs_dev.bus_id, "scsi%d",
-		shost->host_no);
-
 	shost->eh_notify = &sem;
 	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
 	/*
@@ -509,7 +518,7 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	 */
 	list_for_each_entry(shost, &scsi_host_list, sh_list)
 		if (shost->hostt == shost_tp)
-			if (scsi_add_host(shost))
+			if (__scsi_add_host(shost))
 				goto out_of_space;
 
 	return 0;

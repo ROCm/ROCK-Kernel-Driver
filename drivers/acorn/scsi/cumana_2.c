@@ -503,7 +503,7 @@ cumanascsi2_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	fas216_init(host);
 
-	ret = scsi_add_host(host);
+	ret = scsi_add_host(host, &ec->dev);
 	if (ret == 0)
 		goto out;
 

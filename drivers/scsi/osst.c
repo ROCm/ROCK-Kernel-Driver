@@ -167,10 +167,12 @@ struct Scsi_Device_Template osst_template =
 	.module =       THIS_MODULE,
 	.list =         LIST_HEAD_INIT(osst_template.list),
 	.name =         "OnStream Tape",
-	.tag =          "osst",
 	.scsi_type =    TYPE_TAPE,
 	.attach =       osst_attach,
-	.detach =       osst_detach
+	.detach =       osst_detach,
+	.scsi_driverfs_driver = {
+		.name	= "osst",
+	},
 };
 
 static int osst_int_ioctl(OS_Scsi_Tape *STp, Scsi_Request ** aSRpnt, unsigned int cmd_in,unsigned long arg);
@@ -5585,7 +5587,7 @@ static int osst_attach(Scsi_Device * SDp)
 		sprintf(tpnt->driverfs_dev_r[mode].name, "%s%s", 
 				SDp->sdev_driverfs_dev.name, name);
 		tpnt->driverfs_dev_r[mode].parent = &SDp->sdev_driverfs_dev;
-		tpnt->driverfs_dev_r[mode].bus = &scsi_driverfs_bus_type;
+		tpnt->driverfs_dev_r[mode].bus = SDp->sdev_driverfs_dev.bus;
 		tpnt->driverfs_dev_r[mode].driver_data =
 			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5));
 		device_register(&tpnt->driverfs_dev_r[mode]);
@@ -5604,7 +5606,7 @@ static int osst_attach(Scsi_Device * SDp)
 		sprintf(tpnt->driverfs_dev_n[mode].name, "%s%s", 
 				SDp->sdev_driverfs_dev.name, name);
 		tpnt->driverfs_dev_n[mode].parent= &SDp->sdev_driverfs_dev;
-		tpnt->driverfs_dev_n[mode].bus = &scsi_driverfs_bus_type;
+		tpnt->driverfs_dev_n[mode].bus = SDp->sdev_driverfs_dev.bus;
 		tpnt->driverfs_dev_n[mode].driver_data =
 			(void *)(long)__mkdev(MAJOR_NR, dev_num + (mode << 5) + 128);
 		device_register(&tpnt->driverfs_dev_n[mode]);
@@ -5633,43 +5635,47 @@ static void osst_detach(Scsi_Device * SDp)
   int i, mode;
 
   write_lock(&os_scsi_tapes_lock);
-  for(i=0; i<osst_max_dev; i++) {
-	tpnt = os_scsi_tapes[i];
-	if(tpnt != NULL && tpnt->device == SDp) {
-		tpnt->device = NULL;
-		for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-			devfs_unregister (tpnt->de_r[mode]);
-			tpnt->de_r[mode] = NULL;
-			devfs_unregister (tpnt->de_n[mode]);
-			tpnt->de_n[mode] = NULL;
-		}
-		devfs_unregister_tape(tpnt->drive->number);
-		put_disk(tpnt->drive);
-		os_scsi_tapes[i] = NULL;
-		scsi_slave_detach(SDp);
-		osst_nr_dev--;
-		write_unlock(&os_scsi_tapes_lock);
-		for (mode = 0; mode < ST_NBR_MODES; ++mode) {
-			device_remove_file(&tpnt->driverfs_dev_r[mode],
-					&dev_attr_type);
-			device_remove_file(&tpnt->driverfs_dev_r[mode],
-					&dev_attr_kdev);
-			device_unregister(&tpnt->driverfs_dev_r[mode]);
-			device_remove_file(&tpnt->driverfs_dev_n[mode],
-					&dev_attr_type);
-			device_remove_file(&tpnt->driverfs_dev_n[mode],
-					&dev_attr_kdev);
-			device_unregister(&tpnt->driverfs_dev_n[mode]);
+  if (os_scsi_tapes != NULL) {
+	  for(i=0; i<osst_max_dev; i++) {
+		tpnt = os_scsi_tapes[i];
+		if(tpnt != NULL && tpnt->device == SDp) {
+			tpnt->device = NULL;
+			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+				devfs_unregister (tpnt->de_r[mode]);
+				tpnt->de_r[mode] = NULL;
+				devfs_unregister (tpnt->de_n[mode]);
+				tpnt->de_n[mode] = NULL;
 			}
-		if (tpnt->header_cache != NULL) vfree(tpnt->header_cache);
-		if (tpnt->buffer) {
-			normalize_buffer(tpnt->buffer);
-			kfree(tpnt->buffer);
+			devfs_unregister_tape(tpnt->drive->number);
+			put_disk(tpnt->drive);
+			os_scsi_tapes[i] = NULL;
+			scsi_slave_detach(SDp);
+			osst_nr_dev--;
+			write_unlock(&os_scsi_tapes_lock);
+			for (mode = 0; mode < ST_NBR_MODES; ++mode) {
+				device_remove_file(&tpnt->driverfs_dev_r[mode],
+						&dev_attr_type);
+				device_remove_file(&tpnt->driverfs_dev_r[mode],
+						&dev_attr_kdev);
+				device_unregister(&tpnt->driverfs_dev_r[mode]);
+				device_remove_file(&tpnt->driverfs_dev_n[mode],
+						&dev_attr_type);
+				device_remove_file(&tpnt->driverfs_dev_n[mode],
+						&dev_attr_kdev);
+				device_unregister(&tpnt->driverfs_dev_n[mode]);
+			}
+			if (tpnt->header_cache != NULL)
+				vfree(tpnt->header_cache);
+			if (tpnt->buffer) {
+				normalize_buffer(tpnt->buffer);
+				kfree(tpnt->buffer);
+			}
+			kfree(tpnt);
+			break;
 		}
-		kfree(tpnt);
-		return;
-	}
+	  }
   }
+
   write_unlock(&os_scsi_tapes_lock);
   return;
 }
@@ -5687,9 +5693,6 @@ static int __init init_osst(void)
 		printk(KERN_ERR "osst :E: Unable to register major %d for OnStream tapes\n",MAJOR_NR);
 		return 1;
 	}
-	osst_template.scsi_driverfs_driver.name = (char *)osst_template.tag;
-	osst_template.scsi_driverfs_driver.bus  = &scsi_driverfs_bus_type;
-	driver_register(&osst_template.scsi_driverfs_driver);
 
 	return 0;
 }
@@ -5701,7 +5704,6 @@ static void __exit exit_osst (void)
 
 	scsi_unregister_device(&osst_template);
 	unregister_chrdev(MAJOR_NR, "osst");
-	driver_unregister(&osst_template.scsi_driverfs_driver);
 
 	if (os_scsi_tapes) {
 		for (i=0; i < osst_max_dev; ++i) {

@@ -122,10 +122,12 @@ static struct Scsi_Device_Template sg_template = {
 	.module = THIS_MODULE,
 	.list = LIST_HEAD_INIT(sg_template.list),
 	.name = "generic",
-	.tag = "sg",
 	.scsi_type = 0xff,
 	.attach = sg_attach,
-	.detach = sg_detach
+	.detach = sg_detach,
+	.scsi_driverfs_driver = {
+		.name = "sg",
+	},
 };
 
 typedef struct sg_scatter_hold { /* holding area for scsi scatter gather info */
@@ -1462,7 +1464,7 @@ find_empty_slot:
 	sprintf(sdp->sg_driverfs_dev.name, "%sgeneric",
 		scsidp->sdev_driverfs_dev.name);
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
-	sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
+	sdp->sg_driverfs_dev.bus = scsidp->sdev_driverfs_dev.bus;
 
 	sg_nr_dev++;
 	sg_dev_arr[k] = sdp;
