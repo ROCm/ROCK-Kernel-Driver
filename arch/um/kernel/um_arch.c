@@ -293,6 +293,9 @@ int linux_main(int argc, char **argv)
 	if(!jail || debug)
 		remap_data(ROUND_DOWN(&_stext), ROUND_UP(&_etext), 1);
 	remap_data(ROUND_DOWN(&_sdata), ROUND_UP(&_edata), 1);
+
+	mode_tt = 1;
+
 	brk_start = (unsigned long) sbrk(0);
 	remap_data(ROUND_DOWN(&__bss_start), ROUND_UP(brk_start), 1);
 

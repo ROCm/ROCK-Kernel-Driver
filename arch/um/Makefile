@@ -52,8 +52,8 @@ SYMLINK_HEADERS = include/asm-um/archparam.h include/asm-um/system.h \
 	include/asm-um/sigcontext.h include/asm-um/processor.h \
 	include/asm-um/ptrace.h include/asm-um/arch-signal.h
 
-ARCH_SYMLINKS = include/asm-um/arch arch/um/include/sysdep arch/um/os \
-	$(SYMLINK_HEADERS)
+ARCH_SYMLINKS = include/asm-um/arch $(ARCH_DIR)/include/sysdep $(ARCH_DIR)/os \
+	$(SYMLINK_HEADERS) $(ARCH_DIR)/include/uml-config.h
 
 GEN_HEADERS = $(ARCH_DIR)/include/task.h
 
@@ -75,8 +75,8 @@ $(ARCH_DIR)/uml.lds.s : $(ARCH_DIR)/uml.lds.S scripts FORCE
 AFLAGS_uml.lds.o = -U$(SUBARCH) -DSTART=$$(($(TOP_ADDR) - $(SIZE))) \
 	-DELF_ARCH=$(ELF_ARCH) -DELF_FORMAT=\"$(ELF_FORMAT)\" -P -C -Uum
 
-linux: arch/um/uml.lds.s vmlinux
-	$(CC) -Wl,-T,arch/um/uml.lds.s -o $@ $(LINK_PROFILE) \
+linux: $(ARCH_DIR)/uml.lds.s vmlinux
+	$(CC) -Wl,-T,$(ARCH_DIR)/uml.lds.s -o $@ $(LINK_PROFILE) \
 	$(LINK_WRAPS) -static vmlinux -L/usr/lib -lutil
 
 
@@ -121,11 +121,14 @@ $(SYMLINK_HEADERS):
 include/asm-um/arch:
 	cd $(TOPDIR)/include/asm-um && ln -sf ../asm-$(SUBARCH) arch
 
-arch/um/include/sysdep:
-	cd $(TOPDIR)/arch/um/include && ln -sf sysdep-$(SUBARCH) sysdep
+$(ARCH_DIR)/include/sysdep:
+	cd $(ARCH_DIR)/include && ln -sf sysdep-$(SUBARCH) sysdep
 
-arch/um/os:
+$(ARCH_DIR)/os:
 	cd $(ARCH_DIR) && ln -sf os-$(OS) os
+
+$(ARCH_DIR)/include/uml-config.h :
+	ln -sf $(TOPDIR)/include/linux/autoconf.h $@
 
 $(ARCH_DIR)/include/task.h : $(ARCH_DIR)/util/mk_task
 	$< > $@

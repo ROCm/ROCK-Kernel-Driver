@@ -93,8 +93,12 @@ static int execve1(char *file, char **argv, char **env)
 
 int um_execve(char *file, char **argv, char **env)
 {
-	if(execve1(file, argv, env) == 0) do_longjmp(current->thread.jmp);
-	return(-1);
+	int err;
+
+	err = execve1(file, argv, env);
+	if(!err) 
+		do_longjmp(current->thread.exec_buf, 1);
+	return(err);
 }
 
 int sys_execve(char *file, char **argv, char **env)
