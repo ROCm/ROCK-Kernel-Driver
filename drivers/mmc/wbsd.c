@@ -33,7 +33,7 @@
 #define DBG(x...) \
 	printk(KERN_DEBUG DRIVER_NAME ": " x)
 #define DBGF(f, x...) \
-	printk(KERN_DEBUG DRIVER_NAME " [%s()]: " f, __func__, ##x)
+	printk(KERN_DEBUG DRIVER_NAME " [%s()]: " f, __func__ , ##x)
 #else
 #define DBG(x...)	do { } while (0)
 #define DBGF(x...)	do { } while (0)
