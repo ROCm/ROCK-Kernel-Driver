@@ -9,7 +9,7 @@
 #define _53C700_H
 
 /* Turn on for general debugging---too verbose for normal use */
-#undef NCR_700_DEBUG
+#undef	NCR_700_DEBUG
 /* Debug the tag queues, checking hash queue allocation and deallocation
  * and search for duplicate tags */
 #undef NCR_700_TAG_DEBUG
@@ -189,8 +189,7 @@ struct NCR_700_command_slot {
 	#define NCR_700_SLOT_BUSY (1|NCR_700_SLOT_MAGIC) /* slot has command active on HA */
 	#define NCR_700_SLOT_QUEUED (2|NCR_700_SLOT_MAGIC) /* slot has command to be made active on HA */
 	__u8	state;
-	#define NCR_700_NO_TAG	0xdead
-	__u16	tag;
+	int	tag;
 	__u32	resume_offset;
 	Scsi_Cmnd	*cmnd;
 	/* The pci_mapped address of the actual command in cmnd */

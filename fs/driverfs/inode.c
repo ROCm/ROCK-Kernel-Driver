@@ -149,6 +149,10 @@ static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	lock_kernel();
 	dentry->d_op = &driverfs_dentry_dir_ops;
  	res = driverfs_mknod(dir, dentry, mode | S_IFDIR, 0);
+ 	if (!res) {
+ 		dir->i_nlink++;
+ 		dentry->d_inode->i_nlink++;
+ 	}
 	unlock_kernel();
 	return res;
 }
@@ -206,21 +210,27 @@ static int driverfs_empty(struct dentry *dentry)
 
 static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 {
+	struct inode *inode = dentry->d_inode;
+
+	lock_kernel();
+	inode->i_nlink--;
+	unlock_kernel();
+	dput(dentry);
+	return 0;
+}
+
+static int driverfs_rmdir(struct inode *dir, struct dentry *dentry)
+{
 	int error = -ENOTEMPTY;
 
 	if (driverfs_empty(dentry)) {
-		struct inode *inode = dentry->d_inode;
-
-		lock_kernel();
-		inode->i_nlink--;
-		unlock_kernel();
-		dput(dentry);
+		dentry->d_inode->i_nlink--;
+		driverfs_unlink(dir, dentry);
+		dir->i_nlink--;
 		error = 0;
 	}
 	return error;
 }
-
-#define driverfs_rmdir driverfs_unlink
 
 /**
  * driverfs_read_file - "read" data from a file.
