@@ -59,35 +59,11 @@ static inline void do_profile (unsigned long pc)
  */
 static void timer_interrupt(int irq, void *dummy, struct pt_regs * regs)
 {
-	/* last time the cmos clock got updated */
-	static long last_rtc_update=0;
-
 	do_timer(regs);
 
 	if (!user_mode(regs))
 		do_profile(regs->pc);
 
-	/*
-	 * If we have an externally synchronized Linux clock, then update
-	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
-	 * called as close as possible to 500 ms before the new second starts.
-	 */
-	/*
-	 * This code hopefully becomes obsolete in 2.5 or earlier
-	 * Should it ever be reenabled it must be serialized with
-	 * genrtc.c operation
-	 */
-#if 0
-	if ((time_status & STA_UNSYNC) == 0 &&
-	    xtime.tv_sec > last_rtc_update + 660 &&
-	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) tick) / 2 &&
-	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) tick) / 2) {
-	  if (set_rtc_mmss(xtime.tv_sec) == 0)
-	    last_rtc_update = xtime.tv_sec;
-	  else
-	    last_rtc_update = xtime.tv_sec - 600; /* do it again in 60 s */
-	}
-#endif
 #ifdef CONFIG_HEARTBEAT
 	/* use power LED as a heartbeat instead -- much more useful
 	   for debugging -- based on the version for PReP by Cort */
