@@ -227,7 +227,7 @@
 #define __NR_lookup_dcookie     208 /* Linux Specific                              */
 #define __NR_fadvise64          209 /* Linux Specific                              */
 #define __NR_fadvise64_64       210 /* Linux Specific                              */
-/* #define __NR_vm86            211    Linux Specific - i386 specific, unused      */
+#define __NR_tgkill             211 /* Linux Specific                              */
 #define __NR_waitpid            212 /* Linux Specific                              */
 #define __NR_swapoff            213 /* Linux Specific                              */
 #define __NR_sysinfo            214 /* Linux Specific                              */
