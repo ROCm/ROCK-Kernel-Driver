@@ -3,8 +3,6 @@
  *
  * WARNING: these things are HUGE.  4 kbytes per counter on 32-way P4.
  */
-#ifndef _LINUX_PERCPU_COUNTER_H
-#define _LINUX_PERCPU_COUNTER_H
 
 #include <linux/config.h>
 #include <linux/spinlock.h>
@@ -103,5 +101,3 @@ static inline void percpu_counter_dec(struct percpu_counter *fbc)
 {
 	percpu_counter_mod(fbc, -1);
 }
-
-#endif /* _LINUX_PERCPU_COUNTER_H */

@@ -217,14 +217,7 @@ int d_invalidate(struct dentry * dentry)
 		spin_unlock(&dcache_lock);
 		return 0;
 	}
-
-        /* network invalidation by Lustre */
-	if (dentry->d_flags & DCACHE_LUSTRE_INVALID) {
-		spin_unlock(&dcache_lock);
-		return 0;
-	}
-
-        /*
+	/*
 	 * Check whether to do a partial shrink_dcache
 	 * to get rid of unused child entries.
 	 */
@@ -1122,23 +1115,14 @@ void d_delete(struct dentry * dentry)
  * Adds a dentry to the hash according to its name.
  */
  
-void __d_rehash(struct dentry * entry, int lock)
+void d_rehash(struct dentry * entry)
 {
 	struct hlist_head *list = d_hash(entry->d_parent, entry->d_name.hash);
-	if (lock)
-		spin_lock(&dcache_lock);
+	spin_lock(&dcache_lock);
  	entry->d_vfs_flags &= ~DCACHE_UNHASHED;
 	entry->d_bucket = list;
  	hlist_add_head_rcu(&entry->d_hash, list);
-	if (lock)
-		spin_unlock(&dcache_lock);
-}
-
-EXPORT_SYMBOL(__d_rehash);
-
-void d_rehash(struct dentry * entry)
-{
-	__d_rehash(entry, 1);
+	spin_unlock(&dcache_lock);
 }
 
 #define do_switch(x,y) do { \
@@ -1201,11 +1185,12 @@ static inline void switch_names(struct dentry * dentry, struct dentry * target)
  * dcache entries should not be moved in this way.
  */
 
-void __d_move(struct dentry * dentry, struct dentry * target)
+void d_move(struct dentry * dentry, struct dentry * target)
 {
 	if (!dentry->d_inode)
 		printk(KERN_WARNING "VFS: moving negative dcache entry\n");
 
+	spin_lock(&dcache_lock);
 	write_seqlock(&rename_lock);
 	/*
 	 * XXXX: do we really need to take target->d_lock?
@@ -1258,14 +1243,6 @@ already_unhashed:
 	spin_unlock(&target->d_lock);
 	spin_unlock(&dentry->d_lock);
 	write_sequnlock(&rename_lock);
-}
-
-EXPORT_SYMBOL(__d_move);
-
-void d_move(struct dentry *dentry, struct dentry *target)
-{
-	spin_lock(&dcache_lock);
-	__d_move(dentry, target);
 	spin_unlock(&dcache_lock);
 }
 

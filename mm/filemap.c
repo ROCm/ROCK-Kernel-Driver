@@ -105,9 +105,6 @@ void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page_mapping(page);
 
-	if (mapping->a_ops->removepage)
-		mapping->a_ops->removepage(page);
-
 	if (likely(!PageSwapCache(page))) {
 		BUG_ON(PageAnon(page));
 		WARN_ON(page->mapcount);

@@ -4,7 +4,6 @@
 #ifdef __KERNEL__
 
 #include <asm/atomic.h>
-#include <linux/string.h>
 #include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/cache.h>
@@ -25,11 +24,6 @@ struct vfsmount;
 
 #define IS_ROOT(x) ((x) == (x)->d_parent)
 
-struct dentry_params {
-	unsigned long   p_inum;
-	void            *p_ptr;
-};
-
 /*
  * "quick string" -- eases parameter passing, but more importantly
  * saves "metadata" about the string (ie length and the hash).
@@ -40,8 +34,6 @@ struct qstr {
 	unsigned int hash;
 	char name_str[0];
 };
-
-#include <linux/namei.h>
 
 struct dentry_stat_t {
 	int nr_dentry;
@@ -161,8 +153,6 @@ d_iput:		no		no		yes
 
 #define DCACHE_REFERENCED	0x0008  /* Recently used, don't discard. */
 #define DCACHE_UNHASHED		0x0010	
-#define DCACHE_LUSTRE_INVALID     0x0020  /* Lustre invalidated */
-
 
 extern spinlock_t dcache_lock;
 
@@ -234,7 +224,6 @@ extern int have_submounts(struct dentry *);
  * This adds the entry to the hash queues.
  */
 extern void d_rehash(struct dentry *);
-extern void __d_rehash(struct dentry *, int lock);
 
 /**
  * d_add - add dentry to hash queues
@@ -253,7 +242,6 @@ static inline void d_add(struct dentry *entry, struct inode *inode)
 
 /* used for rename() and baskets */
 extern void d_move(struct dentry *, struct dentry *);
-extern void __d_move(struct dentry *, struct dentry *);
 
 /* appendix may either be NULL or be used for transname suffixes */
 extern struct dentry * d_lookup(struct dentry *, struct qstr *);

@@ -834,7 +834,6 @@ struct block_device *lookup_bdev(const char *path)
 	if (!path || !*path)
 		return ERR_PTR(-EINVAL);
 
-	intent_init(&nd.intent, IT_LOOKUP);
 	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
 	if (error)
 		return ERR_PTR(error);

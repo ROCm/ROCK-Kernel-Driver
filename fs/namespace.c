@@ -108,7 +108,6 @@ static int check_mnt(struct vfsmount *mnt)
 
 static void detach_mnt(struct vfsmount *mnt, struct nameidata *old_nd)
 {
-	memset(old_nd, 0, sizeof(*old_nd));
 	old_nd->dentry = mnt->mnt_mountpoint;
 	old_nd->mnt = mnt->mnt_parent;
 	mnt->mnt_parent = mnt;
@@ -534,8 +533,6 @@ static int do_loopback(struct nameidata *nd, char *old_name, int recurse)
 		return err;
 	if (!old_name || !*old_name)
 		return -EINVAL;
-
-	intent_init(&old_nd.intent, IT_LOOKUP);
 	err = path_lookup(old_name, LOOKUP_FOLLOW, &old_nd);
 	if (err)
 		return err;
@@ -604,7 +601,6 @@ static int do_move_mount(struct nameidata *nd, char *old_name)
 		return -EPERM;
 	if (!old_name || !*old_name)
 		return -EINVAL;
-	intent_init(&old_nd.intent, IT_LOOKUP);
 	err = path_lookup(old_name, LOOKUP_FOLLOW, &old_nd);
 	if (err)
 		return err;
@@ -754,7 +750,6 @@ long do_mount(char * dev_name, char * dir_name, char *type_page,
 	int retval = 0;
 	int mnt_flags = 0;
 
-	intent_init(&nd.intent, IT_LOOKUP);
 	/* Discard magic */
 	if ((flags & MS_MGC_MSK) == MS_MGC_VAL)
 		flags &= ~MS_MGC_MSK;

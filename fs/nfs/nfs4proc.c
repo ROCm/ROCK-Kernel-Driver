@@ -792,17 +792,17 @@ nfs4_atomic_open(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 	struct nfs4_state *state;
 
 	if (nd->flags & LOOKUP_CREATE) {
-		attr.ia_mode = nd->intent.it_create_mode;
+		attr.ia_mode = nd->intent.open.create_mode;
 		attr.ia_valid = ATTR_MODE;
 		if (!IS_POSIXACL(dir))
 			attr.ia_mode &= ~current->fs->umask;
 	} else {
 		attr.ia_valid = 0;
-		BUG_ON(nd->intent.it_flags & O_CREAT);
+		BUG_ON(nd->intent.open.flags & O_CREAT);
 	}
 
 	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, &dentry->d_name, nd->intent.it_flags, &attr, cred);
+	state = nfs4_do_open(dir, &dentry->d_name, nd->intent.open.flags, &attr, cred);
 	put_rpccred(cred);
 	if (IS_ERR(state))
 		return (struct inode *)state;

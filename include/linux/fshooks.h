@@ -90,18 +90,12 @@ void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info,
 
 #define FSHOOK_BEGIN_USER_WALK(type, err, path, flags, nd, field, args...) \
 		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, flags, &nd, &info.field), nd, args)
-#define FSHOOK_BEGIN_USER_WALK_IT(type, err, path, flags, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk_it(path, flags, &nd, &info.field), nd, args)
 
 #define FSHOOK_BEGIN_USER_PATH_WALK(type, err, path, nd, field, args...) \
 		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, LOOKUP_FOLLOW, &nd, &info.field), nd, args)
-#define FSHOOK_BEGIN_USER_PATH_WALK_IT(type, err, path, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk_it(path, LOOKUP_FOLLOW, &nd, &info.field), nd, args)
 
 #define FSHOOK_BEGIN_USER_PATH_WALK_LINK(type, err, path, nd, field, args...) \
 		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk(path, 0, &nd, &info.field), nd, args)
-#define FSHOOK_BEGIN_USER_PATH_WALK_LINK_IT(type, err, path, nd, field, args...) \
-		FSHOOK_BEGIN_USER_WALK_COMMON(type, err, __user_walk_it(path, 0, &nd, &info.field), nd, args)
 
 #define FSHOOK_END_USER_WALK(type, err, field) \
 				(void)(&info != (struct fshook_##type##_info *)-1L); \
@@ -132,18 +126,12 @@ void fshook_run_post(fshook_info_t info, member_type(struct fshook_generic_info,
 
 #define FSHOOK_BEGIN_USER_WALK(type, err, path, flags, nd, field, args...) \
 	if (!(err = __user_walk(path, flags, &nd, 0))) {
-#define FSHOOK_BEGIN_USER_WALK_IT(type, err, path, flags, nd, field, args...) \
-	if (!(err = __user_walk_it(path, flags, &nd, 0))) {
 
 #define FSHOOK_BEGIN_USER_PATH_WALK(type, err, path, nd, field, args...) \
 	if (!(err = user_path_walk(path, &nd))) {
-#define FSHOOK_BEGIN_USER_PATH_WALK_IT(type, err, path, nd, field, args...) \
-	if (!(err = user_path_walk_it(path, &nd))) {
 
 #define FSHOOK_BEGIN_USER_PATH_WALK_LINK(type, err, path, nd, field, args...) \
 	if (!(err = user_path_walk_link(path, &nd))) {
-#define FSHOOK_BEGIN_USER_PATH_WALK_LINK_IT(type, err, path, nd, field, args...) \
-	if (!(err = user_path_walk_link_it(path, &nd))) {
 
 #define FSHOOK_END_USER_WALK(type, err, field) ((void)0);}
 

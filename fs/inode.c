@@ -221,7 +221,6 @@ void __iget(struct inode * inode)
 	inodes_stat.nr_unused--;
 }
 
-EXPORT_SYMBOL(__iget);
 /**
  * clear_inode - clear an inode
  * @inode: inode to clear

@@ -52,8 +52,6 @@ static wait_queue_head_t congestion_wqh[2] = {
  */
 static struct workqueue_struct *kblockd_workqueue; 
 
-int dev_check_rdonly(dev_t dev);
-
 unsigned long blk_max_low_pfn, blk_max_pfn;
 
 EXPORT_SYMBOL(blk_max_low_pfn);
@@ -2526,13 +2524,6 @@ end_io:
 		if (test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))
 			goto end_io;
 
-		/* this is cfs's dev_rdonly check */
-		if (bio->bi_rw == WRITE &&
-				dev_check_rdonly(bio->bi_bdev->bd_dev)) {
-			bio_endio(bio, bio->bi_size, 0);
-			break;
-		}
-
 		/*
 		 * If this device has partitions, remap block n
 		 * of partition p to block n+start(p) of the disk.
@@ -3064,58 +3055,6 @@ void swap_io_context(struct io_context **ioc1, struct io_context **ioc2)
 	*ioc2 = temp;
 }
 
-#define MAX_RDONLY_DEVS		16
-
-static dev_t rdonly_devs[MAX_RDONLY_DEVS] = {0, };
-
-/*
- * Debug code for turning block devices "read-only" (will discard writes
- * silently).  This is for filesystem crash/recovery testing.
- */
-void dev_set_rdonly(struct block_device *bdev, int no_write)
-{
-	if (no_write >= MAX_RDONLY_DEVS) {
-		printk(KERN_ALERT "%s:%d illegal arg %d (max %d)\n",
-				__FILE__, __LINE__, no_write, MAX_RDONLY_DEVS);
-		return;
-	}
-
-	if (bdev) {
-		printk(KERN_WARNING "Turning device %s read-only at %d\n",
-				bdev->bd_disk ? bdev->bd_disk->disk_name : "?",
-				no_write);
-		rdonly_devs[no_write] = bdev->bd_dev;
-	}
-}
-
-void dev_clear_rdonly(int no_write)
-{
-	if (no_write >= MAX_RDONLY_DEVS) {
-		printk(KERN_ALERT "%s:%d illegal arg %d (max %d)\n",
-				__FILE__, __LINE__, no_write, MAX_RDONLY_DEVS);
-		return;
-	}
-
-	if (rdonly_devs[no_write] == 0)
-		return;
-	
-	printk(KERN_WARNING "Clearing read-only at %d\n", no_write);
-	rdonly_devs[no_write] = 0;
-}
-
-int dev_check_rdonly(dev_t dev)
-{
-	int i;
-
-	for (i = 0; i < MAX_RDONLY_DEVS; i++)
-		if (rdonly_devs[i] == dev)
-			return 1;
-	return 0;
-}
-
-EXPORT_SYMBOL(dev_set_rdonly);
-EXPORT_SYMBOL(dev_clear_rdonly);
-EXPORT_SYMBOL(dev_check_rdonly);
 
 /*
  * sysfs parts below

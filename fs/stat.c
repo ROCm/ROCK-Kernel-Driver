@@ -37,7 +37,7 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 
 EXPORT_SYMBOL(generic_fillattr);
 
-int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_intent *it, struct kstat *stat)
+int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
 	int retval;
@@ -46,8 +46,6 @@ int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_in
 	if (retval)
 		return retval;
 
-	if (inode->i_op->getattr_it)
-		return inode->i_op->getattr_it(mnt, dentry, it, stat);
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(mnt, dentry, stat);
 
@@ -64,20 +62,14 @@ int vfs_getattr_it(struct vfsmount *mnt, struct dentry *dentry, struct lookup_in
 
 EXPORT_SYMBOL(vfs_getattr);
 
-int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
-{
-	return vfs_getattr_it(mnt, dentry, NULL, stat);
-}
-
 int vfs_stat(char __user *name, struct kstat *stat)
 {
 	struct nameidata nd;
 	int error;
-	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK_IT(stat, error, name, nd, path, .link = false)
+	FSHOOK_BEGIN_USER_PATH_WALK(stat, error, name, nd, path, .link = false)
 
-		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
 
 	FSHOOK_END_USER_WALK(stat, error, path)
@@ -91,11 +83,10 @@ int vfs_lstat(char __user *name, struct kstat *stat)
 {
 	struct nameidata nd;
 	int error;
-	intent_init(&nd.intent, IT_GETATTR);
 
-	FSHOOK_BEGIN_USER_PATH_WALK_LINK_IT(stat, error, name, nd, path, .link = true)
+	FSHOOK_BEGIN_USER_PATH_WALK_LINK(stat, error, name, nd, path, .link = true)
 
-		error = vfs_getattr_it(nd.mnt, nd.dentry, &nd.intent, stat);
+		error = vfs_getattr(nd.mnt, nd.dentry, stat);
 		path_release(&nd);
 
 	FSHOOK_END_USER_WALK(stat, error, path)
@@ -108,8 +99,6 @@ EXPORT_SYMBOL(vfs_lstat);
 int vfs_fstat(unsigned int fd, struct kstat *stat)
 {
 	int error;
-	struct nameidata nd;
-	intent_init(&nd.intent, IT_GETATTR);
 
 	FSHOOK_BEGIN(fstat, error, .fd = fd)
 
@@ -117,8 +106,7 @@ int vfs_fstat(unsigned int fd, struct kstat *stat)
 
 	error = -EBADF;
 	if (f) {
-		error = vfs_getattr_it(f->f_vfsmnt, f->f_dentry, &nd.intent, stat);
-		intent_release(&nd.intent);
+		error = vfs_getattr(f->f_vfsmnt, f->f_dentry, stat);
 		fput(f);
 	}
 

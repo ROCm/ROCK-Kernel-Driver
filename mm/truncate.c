@@ -42,7 +42,7 @@ static inline void truncate_partial_page(struct page *page, unsigned partial)
  * its lock, b) when a concurrent invalidate_inode_pages got there first and
  * c) when tmpfs swizzles a page between a tmpfs inode and swapper_space.
  */
-void
+static void
 truncate_complete_page(struct address_space *mapping, struct page *page)
 {
 	if (page->mapping != mapping)
@@ -57,7 +57,7 @@ truncate_complete_page(struct address_space *mapping, struct page *page)
 	remove_from_page_cache(page);
 	page_cache_release(page);	/* pagecache ref */
 }
-EXPORT_SYMBOL_GPL(truncate_complete_page);
+
 /*
  * This is for invalidate_inode_pages().  That function can be called at
  * any time, and is not supposed to throw away dirty pages.  But pages can

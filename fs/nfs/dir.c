@@ -709,7 +709,7 @@ int nfs_is_exclusive_create(struct inode *dir, struct nameidata *nd)
 		return 0;
 	if (!nd || (nd->flags & LOOKUP_CONTINUE) || !(nd->flags & LOOKUP_CREATE))
 		return 0;
-	return (nd->intent.it_flags & O_EXCL) != 0;
+	return (nd->intent.open.flags & O_EXCL) != 0;
 }
 
 static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
@@ -782,7 +782,7 @@ static int is_atomic_open(struct inode *dir, struct nameidata *nd)
 	if (nd->flags & LOOKUP_DIRECTORY)
 		return 0;
 	/* Are we trying to write to a read only partition? */
-	if (IS_RDONLY(dir) && (nd->intent.it_flags & (O_CREAT|O_TRUNC|FMODE_WRITE)))
+	if (IS_RDONLY(dir) && (nd->intent.open.flags & (O_CREAT|O_TRUNC|FMODE_WRITE)))
 		return 0;
 	return 1;
 }
@@ -803,7 +803,7 @@ static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry
 	dentry->d_op = NFS_PROTO(dir)->dentry_ops;
 
 	/* Let vfs_create() deal with O_EXCL */
-	if (nd->intent.it_flags & O_EXCL)
+	if (nd->intent.open.flags & O_EXCL)
 		goto no_entry;
 
 	/* Open the file on the server */
@@ -811,7 +811,7 @@ static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry
 	/* Revalidate parent directory attribute cache */
 	nfs_revalidate_inode(NFS_SERVER(dir), dir);
 
-	if (nd->intent.it_flags & O_CREAT) {
+	if (nd->intent.open.flags & O_CREAT) {
 		nfs_begin_data_update(dir);
 		inode = nfs4_atomic_open(dir, dentry, nd);
 		nfs_end_data_update(dir);
@@ -827,7 +827,7 @@ static struct dentry *nfs_atomic_lookup(struct inode *dir, struct dentry *dentry
 				break;
 			/* This turned out not to be a regular file */
 			case -ELOOP:
-				if (!(nd->intent.it_flags & O_NOFOLLOW))
+				if (!(nd->intent.open.flags & O_NOFOLLOW))
 					goto no_open;
 			/* case -EISDIR: */
 			/* case -EINVAL: */
@@ -861,7 +861,7 @@ static int nfs_open_revalidate(struct dentry *dentry, struct nameidata *nd)
 	dir = parent->d_inode;
 	if (!is_atomic_open(dir, nd))
 		goto no_open;
-	openflags = nd->intent.it_flags;
+	openflags = nd->intent.open.flags;
 	if (openflags & O_CREAT) {
 		/* If this is a negative dentry, just drop it */
 		if (!inode)
@@ -1026,7 +1026,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
 	attr.ia_valid = ATTR_MODE;
 
 	if (nd && (nd->flags & LOOKUP_CREATE))
-		open_flags = nd->intent.it_flags;
+		open_flags = nd->intent.open.flags;
 
 	/*
 	 * The 0 argument passed into the create function should one day

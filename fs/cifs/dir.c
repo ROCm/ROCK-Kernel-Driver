@@ -173,23 +173,23 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 	}
 
 	if(nd) {
-		if ((nd->intent.it_flags & O_ACCMODE) == O_RDONLY)
+		if ((nd->intent.open.flags & O_ACCMODE) == O_RDONLY)
 			desiredAccess = GENERIC_READ;
-		else if ((nd->intent.it_flags & O_ACCMODE) == O_WRONLY) {
+		else if ((nd->intent.open.flags & O_ACCMODE) == O_WRONLY) {
 			desiredAccess = GENERIC_WRITE;
 			write_only = TRUE;
-		} else if ((nd->intent.it_flags & O_ACCMODE) == O_RDWR) {
+		} else if ((nd->intent.open.flags & O_ACCMODE) == O_RDWR) {
 			/* GENERIC_ALL is too much permission to request */
 			/* can cause unnecessary access denied on create */
 			/* desiredAccess = GENERIC_ALL; */
 			desiredAccess = GENERIC_READ | GENERIC_WRITE;
 		}
 
-		if((nd->intent.it_flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
+		if((nd->intent.open.flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
 			disposition = FILE_CREATE;
-		else if((nd->intent.it_flags & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC))
+		else if((nd->intent.open.flags & (O_CREAT | O_TRUNC)) == (O_CREAT | O_TRUNC))
 			disposition = FILE_OVERWRITE_IF;
-		else if((nd->intent.it_flags & O_CREAT) == O_CREAT)
+		else if((nd->intent.open.flags & O_CREAT) == O_CREAT)
 			disposition = FILE_OPEN_IF;
 		else {
 			cFYI(1,("Create flag not set in create function"));
@@ -359,7 +359,7 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry, struct name
 	      parent_dir_inode, direntry->d_name.name, direntry));
 
 	if(nd) {  /* BB removeme */
-		cFYI(1,("In lookup nd flags 0x%x open intent flags 0x%x",nd->flags,nd->intent.it_flags));
+		cFYI(1,("In lookup nd flags 0x%x open intent flags 0x%x",nd->flags,nd->intent.open.flags));
 	} /* BB removeme BB */
 	/* BB Add check of incoming data - e.g. frame not longer than maximum SMB - let server check the namelen BB */
 

@@ -27,9 +27,7 @@
  */
 
 static struct file_system_type *file_systems;
-rwlock_t file_systems_lock = RW_LOCK_UNLOCKED;
-
-EXPORT_SYMBOL(file_systems_lock);
+static rwlock_t file_systems_lock = RW_LOCK_UNLOCKED;
 
 /* WARNING: This can be used only if we _already_ own a reference */
 void get_filesystem(struct file_system_type *fs)
