@@ -478,7 +478,7 @@ static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 	ni = NTFS_I(vi);
 	vol = ni->vol;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx.", vi->i_ino, ni->type, page->index);
 
 	BUG_ON(!NInoNonResident(ni));
@@ -923,13 +923,13 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	if (unlikely(bytes > PAGE_CACHE_SIZE))
 		bytes = PAGE_CACHE_SIZE;
 
-	// TODO: Consider using PageWriteback() + unlock_page() in 2.6 once the
-	// "VM fiddling has ended". Note, don't forget to replace all the
-	// unlock_page() calls further below with end_page_writeback() ones.
-#if 0
+	/*
+	 * Keep the VM happy.  This must be done otherwise the radix-tree tag
+	 * PAGECACHE_TAG_DIRTY remains set even though the page is clean.
+	 */
+	BUG_ON(PageWriteback(page));
 	set_page_writeback(page);
 	unlock_page(page);
-#endif
 
 	/*
 	 * Here, we don't need to zero the out of bounds area everytime because
@@ -945,7 +945,10 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	 * expose data to userspace/disk which should never have been exposed.
 	 *
 	 * FIXME: Ensure that i_size increases do the zeroing/overwriting and
-	 * if we cannot guarantee that, then enable the zeroing below.
+	 * if we cannot guarantee that, then enable the zeroing below.  If the
+	 * zeroing below is enabled, we MUST move the unlock_page() from above
+	 * to after the kunmap_atomic(), i.e. just before the
+	 * end_page_writeback().
 	 */
 
 	kaddr = kmap_atomic(page, KM_USER0);
@@ -963,7 +966,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 #endif
 	kunmap_atomic(kaddr, KM_USER0);
 
-	unlock_page(page);
+	end_page_writeback(page);
 
 	/* Mark the mft record dirty, so it gets written back. */
 	mark_mft_record_dirty(ctx->ntfs_ino);
@@ -1018,7 +1021,7 @@ static int ntfs_prepare_nonresident_write(struct page *page,
 	ni = NTFS_I(vi);
 	vol = ni->vol;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 
@@ -1375,7 +1378,7 @@ static int ntfs_prepare_write(struct file *file, struct page *page,
 	struct inode *vi = page->mapping->host;
 	ntfs_inode   *ni = NTFS_I(vi);
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 
@@ -1483,7 +1486,7 @@ static int ntfs_commit_nonresident_write(struct page *page,
 
 	vi = page->mapping->host;
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino,
 			NTFS_I(vi)->type, page->index, from, to);
 
@@ -1579,7 +1582,7 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	vi = page->mapping->host;
 	ni = NTFS_I(vi);
 
-	ntfs_debug("Entering for inode %li, attribute type 0x%x, page index "
+	ntfs_debug("Entering for inode 0x%lx, attribute type 0x%x, page index "
 			"0x%lx, from = %u, to = %u.", vi->i_ino, ni->type,
 			page->index, from, to);
 

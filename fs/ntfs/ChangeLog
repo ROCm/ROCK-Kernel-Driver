@@ -56,6 +56,10 @@ ToDo:
 	  written out by then and hence no dirty (meta)data will be lost.  We
 	  also check for this case and emit an error message telling the user
 	  to run chkdsk.
+	- Use set_page_writeback() and end_page_writeback() in the resident
+	  attribute code path of fs/ntfs/aops.c::ntfs_writepage() otherwise
+	  the radix-tree tag PAGECACHE_TAG_DIRTY remains set even though the
+	  page is clean.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 
