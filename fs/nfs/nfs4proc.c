@@ -1017,45 +1017,36 @@ nfs4_proc_readlink(struct inode *inode, struct page *page)
 }
 
 static int
-nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
-	       struct nfs_fattr *fattr, int flags,
-	       unsigned int base, unsigned int count,
-	       struct page *page, int *eofp)
+nfs4_proc_read(struct nfs_read_data *rdata)
 {
+	int flags = rdata->flags;
+	struct inode *inode = rdata->inode;
+	struct nfs_fattr *fattr = rdata->res.fattr;
+	nfs4_stateid *stateid = &rdata->args.stateid;
 	struct nfs_server *server = NFS_SERVER(inode);
 	struct nfs4_state_owner	*sp;
-	uint64_t offset = page_offset(page) + base;
-	struct nfs_readargs arg = {
-		.fh		= NFS_FH(inode),
-		.offset		= offset,
-		.count		= count,
-		.pgbase		= base,
-		.pages		= &page,
-	};
-	struct nfs_readres res = {
-		.fattr		= fattr,
-		.count		= count,
-	};
 	struct rpc_message msg = {
 		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_READ],
-		.rpc_argp	= &arg,
-		.rpc_resp	= &res,
-		.rpc_cred	= cred,
+		.rpc_argp	= &rdata->args,
+		.rpc_resp	= &rdata->res,
+		.rpc_cred	= rdata->cred,
 	};
 	unsigned long timestamp = jiffies;
 	int status;
 
-	dprintk("NFS call  read %d @ %Ld\n", count, (long long)offset);
+	dprintk("NFS call  read %d @ %Ld\n", rdata->args.count,
+			(long long) rdata->args.offset);
+
 	/*
-	* Try first to use O_RDONLY, then O_RDWR stateid.
-	*/
+	 * Try first to use O_RDONLY, then O_RDWR stateid.
+	 */
 	sp = nfs4_get_inode_share(inode, O_RDONLY);
 	if (!sp)
 		sp = nfs4_get_inode_share(inode, O_RDWR);
 	if (sp)
-		memcpy(arg.stateid,sp->so_stateid, sizeof(nfs4_stateid));
+		memcpy(stateid, sp->so_stateid, sizeof(nfs4_stateid));
 	else
-		memcpy(arg.stateid, zero_stateid, sizeof(nfs4_stateid));
+		memcpy(stateid, zero_stateid, sizeof(nfs4_stateid));
 
 	fattr->valid = 0;
 	status = rpc_call_sync(server->client, &msg, flags);
@@ -1066,7 +1057,6 @@ nfs4_proc_read(struct inode *inode, struct rpc_cred *cred,
 			nfs_zap_caches(inode);
 	}
 	dprintk("NFS reply read: %d\n", status);
-	*eofp = res.eof;
 	return status;
 }
 

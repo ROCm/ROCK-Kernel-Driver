@@ -590,6 +590,7 @@ struct nfs4_compound {
 #endif /* CONFIG_NFS_V4 */
 
 struct nfs_read_data {
+	int			flags;
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
@@ -633,10 +634,7 @@ struct nfs_rpc_ops {
 			    struct nfs_fh *, struct nfs_fattr *);
 	int	(*access)  (struct inode *, struct rpc_cred *, int);
 	int	(*readlink)(struct inode *, struct page *);
-	int	(*read)    (struct inode *, struct rpc_cred *,
-			    struct nfs_fattr *,
-			    int, unsigned int, unsigned int,
-			    struct page *, int *eofp);
+	int	(*read)    (struct nfs_read_data *);
 	int	(*write)   (struct inode *, struct rpc_cred *,
 			    struct nfs_fattr *,
 			    int, unsigned int, unsigned int,

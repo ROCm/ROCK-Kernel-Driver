@@ -69,19 +69,28 @@ void nfs_readdata_release(struct rpc_task *task)
 static int
 nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 {
-	struct rpc_cred	*cred = NULL;
-	struct nfs_fattr fattr;
-	unsigned int	offset = 0;
 	unsigned int	rsize = NFS_SERVER(inode)->rsize;
 	unsigned int	count = PAGE_CACHE_SIZE;
 	int		result;
-	int		flags = IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0;
-	int		eof;
+	struct nfs_read_data	rdata = {
+		.flags		= (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0),
+		.cred		= NULL,
+		.inode		= inode,
+		.args		= {
+			.fh		= NFS_FH(inode),
+			.pages		= &page,
+			.pgbase		= 0UL,
+			.count		= rsize,
+		},
+		.res		= {
+			.fattr		= &rdata.fattr,
+		}
+	};
 
 	dprintk("NFS: nfs_readpage_sync(%p)\n", page);
 
 	if (file)
-		cred = nfs_file_cred(file);
+		rdata.cred = nfs_file_cred(file);
 
 	/*
 	 * This works now because the socket layer never tries to DMA
@@ -89,17 +98,19 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 	 */
 	do {
 		if (count < rsize)
-			rsize = count;
+			rdata.args.count = count;
+		rdata.res.count = rdata.args.count;
+		rdata.args.offset = page_offset(page) + rdata.args.pgbase;
 
 		dprintk("NFS: nfs_proc_read(%s, (%s/%Ld), %Lu, %u)\n",
 			NFS_SERVER(inode)->hostname,
 			inode->i_sb->s_id,
 			(long long)NFS_FILEID(inode),
-			(unsigned long long)offset, rsize);
+			(unsigned long long)rdata.args.pgbase,
+			rdata.args.count);
 
 		lock_kernel();
-		result = NFS_PROTO(inode)->read(inode, cred, &fattr, flags,
-						offset, rsize, page, &eof);
+		result = NFS_PROTO(inode)->read(&rdata);
 		unlock_kernel();
 
 		/*
@@ -111,14 +122,14 @@ nfs_readpage_sync(struct file *file, struct inode *inode, struct page *page)
 				result = -EINVAL;
 			goto io_error;
 		}
-		count  -= result;
-		offset += result;
-		if (result < rsize)	/* NFSv2ism */
+		count -= result;
+		rdata.args.pgbase += result;
+		if (result < rdata.args.count)	/* NFSv2ism */
 			break;
 	} while (count);
 
 	if (count)
-		memclear_highpage_flush(page, offset, count);
+		memclear_highpage_flush(page, rdata.args.pgbase, count);
 	SetPageUptodate(page);
 	if (PageError(page))
 		ClearPageError(page);
