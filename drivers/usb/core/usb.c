@@ -23,6 +23,13 @@
  */
 
 #include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+	#define DEBUG
+#else
+	#undef DEBUG
+#endif
+
 #include <linux/module.h>
 #include <linux/string.h>
 #include <linux/bitops.h>
@@ -33,12 +40,6 @@
 #include <linux/spinlock.h>
 #include <linux/errno.h>
 #include <linux/smp_lock.h>
-
-#ifdef CONFIG_USB_DEBUG
-	#define DEBUG
-#else
-	#undef DEBUG
-#endif
 #include <linux/usb.h>
 
 #include <asm/io.h>
@@ -677,13 +678,14 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 
 	memset(dev, 0, sizeof(*dev));
 
+	device_initialize(&dev->dev);
+
 	usb_bus_get(bus);
 
 	if (!parent)
 		dev->devpath [0] = '0';
 	dev->bus = bus;
 	dev->parent = parent;
-	atomic_set(&dev->refcnt, 1);
 	INIT_LIST_HEAD(&dev->filelist);
 
 	init_MUTEX(&dev->serialize);
@@ -695,7 +697,7 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
 }
 
 /**
- * usb_get_dev - increments the reference count of the device
+ * usb_get_dev - increments the reference count of the usb device structure
  * @dev: the device being referenced
  *
  * Each live reference to a device should be refcounted.
@@ -708,35 +710,53 @@ struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus)
  */
 struct usb_device *usb_get_dev (struct usb_device *dev)
 {
-	if (dev) {
-		atomic_inc (&dev->refcnt);
-		return dev;
-	}
-	return NULL;
+	struct device *tmp;
+
+	if (!dev)
+		return NULL;
+
+	tmp = get_device(&dev->dev);
+	if (tmp)        
+		return to_usb_device(tmp);
+	else
+		return NULL;
 }
 
 /**
- * usb_put_dev - free a usb device structure when all users of it are finished.
+ * usb_put_dev - release a use of the usb device structure
  * @dev: device that's been disconnected
- * Context: !in_interrupt ()
  *
  * Must be called when a user of a device is finished with it.  When the last
  * user of the device calls this function, the memory of the device is freed.
- *
- * Used by hub and virtual root hub drivers.  The device is completely
- * gone, everything is cleaned up, so it's time to get rid of these last
- * records of this device.
  */
 void usb_put_dev(struct usb_device *dev)
 {
-	if (atomic_dec_and_test(&dev->refcnt)) {
-		if (dev->bus->op->deallocate)
-			dev->bus->op->deallocate(dev);
-		usb_destroy_configuration (dev);
-		usb_bus_put (dev->bus);
-		kfree (dev);
-	}
+	if (dev)
+		put_device(&dev->dev);
 }
+
+/**
+ * usb_release_dev - free a usb device structure when all users of it are finished.
+ * @dev: device that's been disconnected
+ *
+ * Will be called only by the device core when all users of this usb device are
+ * done.
+ */
+static void usb_release_dev(struct device *dev)
+{
+	struct usb_device *udev;
+
+	udev = to_usb_device(dev);
+	if (!udev)
+		return;
+
+	if (udev->bus && udev->bus->op && udev->bus->op->deallocate)
+		udev->bus->op->deallocate(udev);
+	usb_destroy_configuration (udev);
+	usb_bus_put (udev->bus);
+	kfree (udev);
+}
+
 
 /**
  * usb_get_current_frame_number - return current bus frame number
@@ -980,6 +1000,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	dev->dev.parent = parent;
 	dev->dev.driver = &usb_generic_driver;
 	dev->dev.bus = &usb_bus_type;
+	dev->dev.release = usb_release_dev;
+	usb_get_dev(dev);
 	if (dev->dev.bus_id[0] == 0)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
 			 dev->bus->busnum, dev->devpath);
@@ -1096,7 +1118,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 #endif
 
 	/* put into sysfs, with device and config specific files */
-	err = device_register (&dev->dev);
+	err = device_add (&dev->dev);
 	if (err)
 		return err;
 	usb_create_driverfs_dev_files (dev);
@@ -1130,7 +1152,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 				desc->bInterfaceNumber);
 		}
 		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
-		device_register (&interface->dev);
+		device_add (&interface->dev);
 		usb_create_driverfs_intf_files (interface);
 	}
 
