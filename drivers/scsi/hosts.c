@@ -125,7 +125,6 @@ void scsi_free_shost(struct Scsi_Host *shost)
  **/
 struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 {
-	extern int blk_nohighio;
 	struct Scsi_Host *shost;
 	int gfp_mask = GFP_KERNEL, rval;
 	DECLARE_COMPLETION(complete);
@@ -186,8 +185,7 @@ struct Scsi_Host *scsi_host_alloc(Scsi_Host_Template *sht, int privsize)
 	shost->unchecked_isa_dma = sht->unchecked_isa_dma;
 	shost->use_clustering = sht->use_clustering;
 	shost->use_blk_tcq = sht->use_blk_tcq;
-	if (!blk_nohighio)
-		shost->highmem_io = sht->highmem_io;
+	shost->highmem_io = sht->highmem_io;
 
 	if (!sht->max_host_blocked)
 		shost->max_host_blocked = sht->max_host_blocked;

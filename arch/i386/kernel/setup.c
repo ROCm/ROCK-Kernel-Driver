@@ -96,7 +96,6 @@ extern void dmi_scan_machine(void);
 extern void generic_apic_probe(char *);
 extern int root_mountflags;
 extern char _text, _etext, _edata, _end;
-extern int blk_nohighio;
 
 unsigned long saved_videomode;
 
@@ -991,15 +990,6 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #endif
 }
-
-static int __init highio_setup(char *str)
-{
-	printk("i386: disabling HIGHMEM block I/O\n");
-	blk_nohighio = 1;
-	return 1;
-}
-__setup("nohighio", highio_setup);
- 
 
 #include "setup_arch_post.h"
 /*

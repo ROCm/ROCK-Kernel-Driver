@@ -49,8 +49,6 @@ static spinlock_t blk_plug_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 static int queue_nr_requests;
 
 unsigned long blk_max_low_pfn, blk_max_pfn;
-int blk_nohighio = 0;
-
 static wait_queue_head_t congestion_wqh[2];
 
 /*
@@ -2334,7 +2332,6 @@ EXPORT_SYMBOL(blk_queue_hardsect_size);
 EXPORT_SYMBOL(blk_queue_segment_boundary);
 EXPORT_SYMBOL(blk_queue_dma_alignment);
 EXPORT_SYMBOL(blk_rq_map_sg);
-EXPORT_SYMBOL(blk_nohighio);
 EXPORT_SYMBOL(blk_dump_rq_flags);
 EXPORT_SYMBOL(submit_bio);
 EXPORT_SYMBOL(blk_phys_contig_segment);
