@@ -58,10 +58,11 @@ SECTIONS
 	__initcall_end = .;
   }
 
-  . = ALIGN(64);
-  __per_cpu_start = .;
-  .data.percpu  : { *(.data.percpu) }
-  __per_cpu_end = .;
+  .data.percpu ALIGN(64): {
+	__per_cpu_start = .;
+	*(.data.percpu)
+	__per_cpu_end = .;
+  }
 
   /* The initial task and kernel stack */
   .data.init_thread ALIGN(2*8192) : {

@@ -51,14 +51,16 @@ obj-$(CONFIG_SMP) += dec_and_lock.o
 
 include $(TOPDIR)/Rules.make
 
-__divqu.o: $(ev6)divide.S
-	$(CC) $(AFLAGS) -DDIV -c -o __divqu.o $(ev6)divide.S
+$(obj)/__divqu.o: $(obj)/$(ev6)divide.S
+	$(CC) $(AFLAGS) -DDIV -c -o $(obj)/__divqu.o $(obj)/$(ev6)divide.S
 
-__remqu.o: $(ev6)divide.S
-	$(CC) $(AFLAGS) -DREM -c -o __remqu.o $(ev6)divide.S
+$(obj)/__remqu.o: $(obj)/$(ev6)divide.S
+	$(CC) $(AFLAGS) -DREM -c -o $(obj)/__remqu.o $(obj)/$(ev6)divide.S
 
-__divlu.o: $(ev6)divide.S
-	$(CC) $(AFLAGS) -DDIV -DINTSIZE -c -o __divlu.o $(ev6)divide.S
+$(obj)/__divlu.o: $(obj)/$(ev6)divide.S
+	$(CC) $(AFLAGS) -DDIV -DINTSIZE \
+		-c -o $(obj)/__divlu.o $(obj)/$(ev6)divide.S
 
-__remlu.o: $(ev6)divide.S
-	$(CC) $(AFLAGS) -DREM -DINTSIZE -c -o __remlu.o $(ev6)divide.S
+$(obj)/__remlu.o: $(obj)/$(ev6)divide.S
+	$(CC) $(AFLAGS) -DREM -DINTSIZE \
+		-c -o $(obj)/__remlu.o $(obj)/$(ev6)divide.S
