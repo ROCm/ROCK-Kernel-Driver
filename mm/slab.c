@@ -519,11 +519,11 @@ enum {
 	FULL
 } g_cpucache_up;
 
-static DEFINE_PER_CPU(struct timer_list, reap_timers);
+static DEFINE_PER_CPU(struct work_struct, reap_work);
 
-static void reap_timer_fnc(unsigned long data);
 static void free_block(kmem_cache_t* cachep, void** objpp, int len);
 static void enable_cpucache (kmem_cache_t *cachep);
+static void cache_reap (void *unused);
 
 static inline void ** ac_entry(struct array_cache *ac)
 {
@@ -573,35 +573,26 @@ static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
 }
 
 /*
- * Start the reap timer running on the target CPU.  We run at around 1 to 2Hz.
- * Add the CPU number into the expiry time to minimize the possibility of the
- * CPUs getting into lockstep and contending for the global cache chain lock.
+ * Initiate the reap timer running on the target CPU.  We run at around 1 to 2Hz
+ * via the workqueue/eventd.
+ * Add the CPU number into the expiration time to minimize the possibility of
+ * the CPUs getting into lockstep and contending for the global cache chain
+ * lock.
  */
 static void __devinit start_cpu_timer(int cpu)
 {
-	struct timer_list *rt = &per_cpu(reap_timers, cpu);
+	struct work_struct *reap_work = &per_cpu(reap_work, cpu);
 
-	if (rt->function == NULL) {
-		init_timer(rt);
-		rt->expires = jiffies + HZ + 3*cpu;
-		rt->data = cpu;
-		rt->function = reap_timer_fnc;
-		add_timer_on(rt, cpu);
+	/*
+	 * When this gets called from do_initcalls via cpucache_init(),
+	 * init_workqueues() has already run, so keventd will be setup
+	 * at that time.
+	 */
+	if (keventd_up() && reap_work->func == NULL) {
+		INIT_WORK(reap_work, cache_reap, NULL);
+		schedule_delayed_work_on(cpu, reap_work, HZ + 3 * cpu);
 	}
 }
-
-#ifdef CONFIG_HOTPLUG_CPU
-static void stop_cpu_timer(int cpu)
-{
-	struct timer_list *rt = &per_cpu(reap_timers, cpu);
-
-	if (rt->function) {
-		del_timer_sync(rt);
-		WARN_ON(timer_pending(rt));
-		rt->function = NULL;
-	}
-}
-#endif
 
 static struct array_cache *alloc_arraycache(int cpu, int entries, int batchcount)
 {
@@ -654,7 +645,6 @@ static int __devinit cpuup_callback(struct notifier_block *nfb,
 		break;
 #ifdef CONFIG_HOTPLUG_CPU
 	case CPU_DEAD:
-		stop_cpu_timer(cpu);
 		/* fall thru */
 	case CPU_UP_CANCELED:
 		down(&cache_chain_sem);
@@ -2674,24 +2664,23 @@ static void drain_array_locked(kmem_cache_t *cachep,
 /**
  * cache_reap - Reclaim memory from caches.
  *
- * Called from a timer, every few seconds
+ * Called from workqueue/eventd every few seconds.
  * Purpose:
  * - clear the per-cpu caches for this CPU.
  * - return freeable pages to the main free memory pool.
  *
  * If we cannot acquire the cache chain semaphore then just give up - we'll
- * try again next timer interrupt.
+ * try again on the next iteration.
  */
-static void cache_reap (void)
+static void cache_reap(void *unused)
 {
 	struct list_head *walk;
 
-#if DEBUG
-	BUG_ON(!in_interrupt());
-	BUG_ON(in_irq());
-#endif
-	if (down_trylock(&cache_chain_sem))
+	if (down_trylock(&cache_chain_sem)) {
+		/* Give up. Setup the next iteration. */
+		schedule_delayed_work(&__get_cpu_var(reap_work), REAPTIMEOUT_CPUC + smp_processor_id());
 		return;
+	}
 
 	list_for_each(walk, &cache_chain) {
 		kmem_cache_t *searchp;
@@ -2755,22 +2744,8 @@ next:
 	}
 	check_irq_on();
 	up(&cache_chain_sem);
-}
-
-/*
- * This is a timer handler.  There is one per CPU.  It is called periodially
- * to shrink this CPU's caches.  Otherwise there could be memory tied up
- * for long periods (or for ever) due to load changes.
- */
-static void reap_timer_fnc(unsigned long cpu)
-{
-	struct timer_list *rt = &__get_cpu_var(reap_timers);
-
-	/* CPU hotplug can drag us off cpu: don't run on wrong CPU */
-	if (!cpu_is_offline(cpu)) {
-		cache_reap();
-		mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);
-	}
+	/* Setup the next iteration */
+	schedule_delayed_work(&__get_cpu_var(reap_work), REAPTIMEOUT_CPUC + smp_processor_id());
 }
 
 #ifdef CONFIG_PROC_FS
