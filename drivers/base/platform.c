@@ -276,7 +276,7 @@ static int platform_match(struct device * dev, struct device_driver * drv)
 	return (strncmp(pdev->name, drv->name, BUS_ID_SIZE) == 0);
 }
 
-static int platform_suspend(struct device * dev, u32 state)
+static int platform_suspend(struct device * dev, pm_message_t state)
 {
 	int ret = 0;
 

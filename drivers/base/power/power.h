@@ -71,14 +71,14 @@ extern int resume_device(struct device *);
 /*
  * suspend.c
  */
-extern int suspend_device(struct device *, u32);
+extern int suspend_device(struct device *, pm_message_t);
 
 
 /*
  * runtime.c
  */
 
-extern int dpm_runtime_suspend(struct device *, u32);
+extern int dpm_runtime_suspend(struct device *, pm_message_t);
 extern void dpm_runtime_resume(struct device *);
 
 #else /* CONFIG_PM */
@@ -93,7 +93,7 @@ static inline void device_pm_remove(struct device * dev)
 
 }
 
-static inline int dpm_runtime_suspend(struct device * dev, u32 state)
+static inline int dpm_runtime_suspend(struct device * dev, pm_message_t state)
 {
 	return 0;
 }
