@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/testchangebit.S
+ *  linux/arch/arm26/lib/testchangebit.S
  *
  *  Copyright (C) 1995-1996 Russell King
  *

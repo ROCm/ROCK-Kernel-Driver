@@ -21,6 +21,8 @@
 #include <asm/uaccess.h>
 #include <asm/rtc.h>
 
+#include <asm/mach/time.h>
+
 #define RTC_DR		(0)
 #define RTC_MR		(4)
 #define RTC_STAT	(8)

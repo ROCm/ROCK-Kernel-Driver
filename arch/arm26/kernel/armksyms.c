@@ -7,6 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
+#include <linux/module.h>
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/user.h>
@@ -27,8 +28,6 @@
 #include <asm/elf.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include <asm/pgalloc.h>
-//#include <asm/proc-fns.h>
 #include <asm/processor.h>
 #include <asm/semaphore.h>
 #include <asm/system.h>
@@ -69,8 +68,9 @@ extern void fp_enter(void);
 /*
  * This has a special calling convention; it doesn't
  * modify any of the usual registers, except for LR.
+ * FIXME - we used to use our own local version - looks to be in kernel/softirq now
  */
-extern void __do_softirq(void);
+//extern void __do_softirq(void);
 
 #define EXPORT_SYMBOL_ALIAS(sym,orig)		\
  const char __kstrtab_##sym[]			\
@@ -95,7 +95,7 @@ EXPORT_SYMBOL(ret_from_exception);
 EXPORT_SYMBOL(kd_mksound);
 #endif
 
-EXPORT_SYMBOL(__do_softirq);
+//EXPORT_SYMBOL(__do_softirq);
 
 	/* platform dependent support */
 EXPORT_SYMBOL(dump_thread);
@@ -212,12 +212,6 @@ EXPORT_SYMBOL(sys_lseek);
 EXPORT_SYMBOL(sys_open);
 EXPORT_SYMBOL(sys_exit);
 EXPORT_SYMBOL(sys_wait4);
-
-	/* semaphores */
-EXPORT_SYMBOL(__down_failed);
-EXPORT_SYMBOL(__down_interruptible_failed);
-EXPORT_SYMBOL(__down_trylock_failed);
-EXPORT_SYMBOL(__up_wakeup);
 
 EXPORT_SYMBOL(get_wchan);
 

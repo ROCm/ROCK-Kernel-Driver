@@ -49,25 +49,22 @@ static void
 sclp_conbuf_callback(struct sclp_buffer *buffer, int rc)
 {
 	unsigned long flags;
-	struct sclp_buffer *next;
 	void *page;
 
-	/* Ignore return code - because console-writes aren't critical,
-	   we do without a sophisticated error recovery mechanism.  */
-	page = sclp_unmake_buffer(buffer);
-	spin_lock_irqsave(&sclp_con_lock, flags);
-	/* Remove buffer from outqueue */
-	list_del(&buffer->list);
-	sclp_con_buffer_count--;
-	list_add_tail((struct list_head *) page, &sclp_con_pages);
-	/* Check if there is a pending buffer on the out queue. */
-	next = NULL;
-	if (!list_empty(&sclp_con_outqueue))
-		next = list_entry(sclp_con_outqueue.next,
-				  struct sclp_buffer, list);
-	spin_unlock_irqrestore(&sclp_con_lock, flags);
-	if (next != NULL)
-		sclp_emit_buffer(next, sclp_conbuf_callback);
+	do {
+		page = sclp_unmake_buffer(buffer);
+		spin_lock_irqsave(&sclp_con_lock, flags);
+		/* Remove buffer from outqueue */
+		list_del(&buffer->list);
+		sclp_con_buffer_count--;
+		list_add_tail((struct list_head *) page, &sclp_con_pages);
+		/* Check if there is a pending buffer on the out queue. */
+		buffer = NULL;
+		if (!list_empty(&sclp_con_outqueue))
+			buffer = list_entry(sclp_con_outqueue.next,
+					    struct sclp_buffer, list);
+		spin_unlock_irqrestore(&sclp_con_lock, flags);
+	} while (buffer && sclp_emit_buffer(buffer, sclp_conbuf_callback));
 }
 
 static inline void
@@ -76,6 +73,7 @@ sclp_conbuf_emit(void)
 	struct sclp_buffer* buffer;
 	unsigned long flags;
 	int count;
+	int rc;
 
 	spin_lock_irqsave(&sclp_con_lock, flags);
 	buffer = sclp_conbuf;
@@ -87,8 +85,11 @@ sclp_conbuf_emit(void)
 	list_add_tail(&buffer->list, &sclp_con_outqueue);
 	count = sclp_con_buffer_count++;
 	spin_unlock_irqrestore(&sclp_con_lock, flags);
-	if (count == 0)
-		sclp_emit_buffer(buffer, sclp_conbuf_callback);
+	if (count)
+		return;
+	rc = sclp_emit_buffer(buffer, sclp_conbuf_callback);
+	if (rc)
+		sclp_conbuf_callback(buffer, rc);
 }
 
 /*

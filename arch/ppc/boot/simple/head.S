@@ -135,9 +135,9 @@ haveOF:
 			 */
 #endif
 
-#ifdef	CONFIG_EV64260
-	/* Move 64260's base regs & CS window for external UART */
-	bl	ev64260_init
+#ifdef	CONFIG_MV64X60
+	/* mv64x60 specific hook to do things like moving register base, etc. */
+	bl	mv64x60_init
 #endif
 
 	/* Get the load address.

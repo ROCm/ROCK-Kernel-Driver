@@ -255,25 +255,22 @@ static void
 sclp_ttybuf_callback(struct sclp_buffer *buffer, int rc)
 {
 	unsigned long flags;
-	struct sclp_buffer *next;
 	void *page;
 
-	/* Ignore return code - because tty-writes aren't critical,
-	   we do without a sophisticated error recovery mechanism.  */
-	page = sclp_unmake_buffer(buffer);
-	spin_lock_irqsave(&sclp_tty_lock, flags);
-	/* Remove buffer from outqueue */
-	list_del(&buffer->list);
-	sclp_tty_buffer_count--;
-	list_add_tail((struct list_head *) page, &sclp_tty_pages);
-	/* Check if there is a pending buffer on the out queue. */
-	next = NULL;
-	if (!list_empty(&sclp_tty_outqueue))
-		next = list_entry(sclp_tty_outqueue.next,
-				  struct sclp_buffer, list);
-	spin_unlock_irqrestore(&sclp_tty_lock, flags);
-	if (next != NULL)
-		sclp_emit_buffer(next, sclp_ttybuf_callback);
+	do {
+		page = sclp_unmake_buffer(buffer);
+		spin_lock_irqsave(&sclp_tty_lock, flags);
+		/* Remove buffer from outqueue */
+		list_del(&buffer->list);
+		sclp_tty_buffer_count--;
+		list_add_tail((struct list_head *) page, &sclp_tty_pages);
+		/* Check if there is a pending buffer on the out queue. */
+		buffer = NULL;
+		if (!list_empty(&sclp_tty_outqueue))
+			buffer = list_entry(sclp_tty_outqueue.next,
+					    struct sclp_buffer, list);
+		spin_unlock_irqrestore(&sclp_tty_lock, flags);
+	} while (buffer && sclp_emit_buffer(buffer, sclp_ttybuf_callback));
 	wake_up(&sclp_tty_waitq);
 	/* check if the tty needs a wake up call */
 	if (sclp_tty != NULL) {
@@ -286,14 +283,17 @@ __sclp_ttybuf_emit(struct sclp_buffer *buffer)
 {
 	unsigned long flags;
 	int count;
+	int rc;
 
 	spin_lock_irqsave(&sclp_tty_lock, flags);
 	list_add_tail(&buffer->list, &sclp_tty_outqueue);
 	count = sclp_tty_buffer_count++;
 	spin_unlock_irqrestore(&sclp_tty_lock, flags);
-
-	if (count == 0)
-		sclp_emit_buffer(buffer, sclp_ttybuf_callback);
+	if (count)
+		return;
+	rc = sclp_emit_buffer(buffer, sclp_ttybuf_callback);
+	if (rc)
+		sclp_ttybuf_callback(buffer, rc);
 }
 
 /*

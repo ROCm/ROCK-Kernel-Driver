@@ -102,7 +102,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	com_port = serial_init(0, NULL);
 #endif
 
-#ifdef CONFIG_44x
+#if defined(CONFIG_44x) && defined(PPC44x_EMAC0_MR0)
 	/* Reset MAL */
 	mtdcr(DCRN_MALCR(DCRN_MAL_BASE), MALCR_MMSR);
 	/* Wait for reset */

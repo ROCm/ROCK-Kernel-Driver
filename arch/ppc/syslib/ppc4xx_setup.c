@@ -133,12 +133,7 @@ ppc4xx_map_io(void)
 void __init
 ppc4xx_init_IRQ(void)
 {
-	int i;
-
 	ppc4xx_pic_init();
-
-	for (i = 0; i < NR_IRQS; i++)
-		irq_desc[i].handler = ppc4xx_pic;
 }
 
 static void

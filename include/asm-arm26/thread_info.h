@@ -18,6 +18,7 @@
 struct task_struct;
 struct exec_domain;
 
+#include <linux/compiler.h>
 #include <asm/fpstate.h>
 #include <asm/ptrace.h>
 #include <asm/types.h>
@@ -80,7 +81,7 @@ static inline struct thread_info *current_thread_info(void)
 }
 
 /* FIXME - PAGE_SIZE < 32K */
-#define THREAD_SIZE		(8192)
+#define THREAD_SIZE		(8*32768) // FIXME - this needs attention (see kernel/fork.c which gets a nice div by zero if this is lower than 8*32768
 #define __get_user_regs(x) (((struct pt_regs *)((unsigned long)(x) + THREAD_SIZE - 8)) - 1)
 
 extern struct thread_info *alloc_thread_info(struct task_struct *task);

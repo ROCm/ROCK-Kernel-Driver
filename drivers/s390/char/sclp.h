@@ -95,6 +95,7 @@ struct sclp_req {
 	sclp_cmdw_t command;		/* sclp command to execute */
 	void	*sccb;			/* pointer to the sccb to execute */
 	char	status;			/* status of this request */
+	int     start_count;		/* number of SVCs done for this req */
 	/* Callback that is called after reaching final status. */
 	void (*callback)(struct sclp_req *, void *data);
 	void *callback_data;
@@ -123,12 +124,13 @@ struct sclp_register {
 };
 
 /* externals from sclp.c */
-void sclp_add_request(struct sclp_req *req);
+int sclp_add_request(struct sclp_req *req);
 void sclp_sync_wait(void);
 int sclp_register(struct sclp_register *reg);
 void sclp_unregister(struct sclp_register *reg);
-char *sclp_error_message(u16 response_code);
 int sclp_remove_processed(struct sccb_header *sccb);
+int sclp_deactivate(void);
+int sclp_reactivate(void);
 
 /* useful inlines */
 

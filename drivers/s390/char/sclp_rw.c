@@ -54,7 +54,6 @@ sclp_make_buffer(void *page, unsigned short columns, unsigned short htab)
 	buffer = ((struct sclp_buffer *) ((addr_t) sccb + PAGE_SIZE)) - 1;
 	buffer->sccb = sccb;
 	buffer->retry_count = 0;
-	init_timer(&buffer->retry_timer);
 	buffer->mto_number = 0;
 	buffer->mto_char_sum = 0;
 	buffer->current_line = NULL;
@@ -365,17 +364,7 @@ sclp_rw_init(void)
 	return rc;
 }
 
-static void
-sclp_buffer_retry(unsigned long data)
-{
-	struct sclp_buffer *buffer = (struct sclp_buffer *) data;
-	buffer->request.status = SCLP_REQ_FILLED;
-	buffer->sccb->header.response_code = 0x0000;
-	sclp_add_request(&buffer->request);
-}
-
-#define SCLP_BUFFER_MAX_RETRY		5
-#define	SCLP_BUFFER_RETRY_INTERVAL	2
+#define SCLP_BUFFER_MAX_RETRY		1
 
 /*
  * second half of Write Event Data-function that has to be done after
@@ -404,7 +393,7 @@ sclp_writedata_callback(struct sclp_req *request, void *data)
 		break;
 
 	case 0x0340: /* Contained SCLP equipment check */
-		if (buffer->retry_count++ > SCLP_BUFFER_MAX_RETRY) {
+		if (++buffer->retry_count > SCLP_BUFFER_MAX_RETRY) {
 			rc = -EIO;
 			break;
 		}
@@ -413,26 +402,26 @@ sclp_writedata_callback(struct sclp_req *request, void *data)
 			/* not all buffers were processed */
 			sccb->header.response_code = 0x0000;
 			buffer->request.status = SCLP_REQ_FILLED;
-			sclp_add_request(request);
-			return;
-		}
-		rc = 0;
+			rc = sclp_add_request(request);
+			if (rc == 0)
+				return;
+		} else
+			rc = 0;
 		break;
 
 	case 0x0040: /* SCLP equipment check */
 	case 0x05f0: /* Target resource in improper state */
-		if (buffer->retry_count++ > SCLP_BUFFER_MAX_RETRY) {
+		if (++buffer->retry_count > SCLP_BUFFER_MAX_RETRY) {
 			rc = -EIO;
 			break;
 		}
-		/* wait some time, then retry request */
-		buffer->retry_timer.function = sclp_buffer_retry;
-		buffer->retry_timer.data = (unsigned long) buffer;
-		buffer->retry_timer.expires = jiffies +
-						SCLP_BUFFER_RETRY_INTERVAL*HZ;
-		add_timer(&buffer->retry_timer);
-		return;
-
+		/* retry request */
+		sccb->header.response_code = 0x0000;
+		buffer->request.status = SCLP_REQ_FILLED;
+		rc = sclp_add_request(request);
+		if (rc == 0)
+			return;
+		break;
 	default:
 		if (sccb->header.response_code == 0x71f0)
 			rc = -ENOMEM;
@@ -446,9 +435,10 @@ sclp_writedata_callback(struct sclp_req *request, void *data)
 
 /*
  * Setup the request structure in the struct sclp_buffer to do SCLP Write
- * Event Data and pass the request to the core SCLP loop.
+ * Event Data and pass the request to the core SCLP loop. Return zero on
+ * success, non-zero otherwise.
  */
-void
+int
 sclp_emit_buffer(struct sclp_buffer *buffer,
 		 void (*callback)(struct sclp_buffer *, int))
 {
@@ -459,11 +449,8 @@ sclp_emit_buffer(struct sclp_buffer *buffer,
 		sclp_finalize_mto(buffer);
 
 	/* Are there messages in the output buffer ? */
-	if (buffer->mto_number == 0) {
-		if (callback != NULL)
-			callback(buffer, 0);
-		return;
-	}
+	if (buffer->mto_number == 0)
+		return -EIO;
 
 	sccb = buffer->sccb;
 	if (sclp_rw_event.sclp_send_mask & EvTyp_Msg_Mask)
@@ -472,16 +459,13 @@ sclp_emit_buffer(struct sclp_buffer *buffer,
 	else if (sclp_rw_event.sclp_send_mask & EvTyp_PMsgCmd_Mask)
 		/* Use write priority message */
 		sccb->msg_buf.header.type = EvTyp_PMsgCmd;
-	else {
-		if (callback != NULL)
-			callback(buffer, -ENOSYS);
-		return;
-	}
+	else
+		return -ENOSYS;
 	buffer->request.command = SCLP_CMDW_WRITEDATA;
 	buffer->request.status = SCLP_REQ_FILLED;
 	buffer->request.callback = sclp_writedata_callback;
 	buffer->request.callback_data = buffer;
 	buffer->request.sccb = sccb;
 	buffer->callback = callback;
-	sclp_add_request(&buffer->request);
+	return sclp_add_request(&buffer->request);
 }

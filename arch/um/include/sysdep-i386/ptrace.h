@@ -15,6 +15,9 @@
 #ifdef UML_CONFIG_MODE_SKAS
 #include "ptrace-skas.h"
 #endif
+#ifndef PTRACE_SYSEMU_SINGLESTEP
+#define PTRACE_SYSEMU_SINGLESTEP 32
+#endif
 
 #include "choose-mode.h"
 

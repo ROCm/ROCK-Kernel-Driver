@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/kernel/dma-arc.c
+ *  linux/arch/arm26/kernel/dma.c
  *
  *  Copyright (C) 1998-1999 Dave Gilbert / Russell King
  *  Copyright (C) 2003 Ian Molton

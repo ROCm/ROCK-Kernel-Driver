@@ -108,6 +108,8 @@ extern int iommu_aperture_allowed;
 extern int fix_aperture;
 extern int force_iommu;
 
+extern int reboot_force;
+
 extern void smp_local_timer_interrupt(struct pt_regs * regs);
 
 long do_arch_prctl(struct task_struct *task, int code, unsigned long addr);

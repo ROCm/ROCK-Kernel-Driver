@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/copypage.S
+ *  linux/arch/arm26/lib/copypage.S
  *
  *  Copyright (C) 1995-1999 Russell King
  *

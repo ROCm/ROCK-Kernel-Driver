@@ -49,7 +49,7 @@
  *		New SMP locking.
  *		Jan Kara, <jack@suse.cz>, 10/2002
  *
- *		Added journalled quota support
+ *		Added journalled quota support, fix lock inversion problems
  *		Jan Kara, <jack@suse.cz>, 2003,2004
  *
  * (C) Copyright 1994 - 1997 Marco van Wieringen 
@@ -75,7 +75,8 @@
 #include <linux/proc_fs.h>
 #include <linux/security.h>
 #include <linux/kmod.h>
-#include <linux/pagemap.h>
+#include <linux/namei.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 
@@ -114,7 +115,7 @@
  * operations on dquots don't hold dq_lock as they copy data under dq_data_lock
  * spinlock to internal buffers before writing.
  *
- * Lock ordering (including related VFS locks) is following:
+ * Lock ordering (including related VFS locks) is the following:
  *   i_sem > dqonoff_sem > iprune_sem > journal_lock > dqptr_sem >
  *   > dquot->dq_lock > dqio_sem
  * i_sem on quota files is special (it's below dqio_sem)
@@ -183,8 +184,7 @@ static void put_quota_format(struct quota_format_type *fmt)
  * on all three lists, depending on its current state.
  *
  * All dquots are placed to the end of inuse_list when first created, and this
- * list is used for the sync and invalidate operations, which must look
- * at every dquot.
+ * list is used for invalidate operation, which must look at every dquot.
  *
  * Unused dquots (dq_count == 0) are added to the free_dquots list when freed,
  * and this list is searched whenever we need an available dquot.  Dquots are
@@ -774,8 +774,13 @@ static inline void dquot_decr_space(struct dquot *dquot, qsize_t number)
 	clear_bit(DQ_BLKS_B, &dquot->dq_flags);
 }
 
+static int flag_print_warnings = 1;
+
 static inline int need_print_warning(struct dquot *dquot)
 {
+	if (!flag_print_warnings)
+		return 0;
+
 	switch (dquot->dq_type) {
 		case USRQUOTA:
 			return current->fsuid == dquot->dq_id;
@@ -803,6 +808,7 @@ static void print_warning(struct dquot *dquot, const char warntype)
 
 	if (!need_print_warning(dquot) || (flag && test_and_set_bit(flag, &dquot->dq_flags)))
 		return;
+
 	tty_write_message(current->signal->tty, dquot->dq_sb->s_id);
 	if (warntype == ISOFTWARN || warntype == BSOFTWARN)
 		tty_write_message(current->signal->tty, ": warning, ");
@@ -1314,10 +1320,14 @@ int vfs_quota_off(struct super_block *sb, int type)
 {
 	int cnt;
 	struct quota_info *dqopt = sb_dqopt(sb);
+	struct inode *toputinode[MAXQUOTAS];
+	struct vfsmount *toputmnt[MAXQUOTAS];
 
 	/* We need to serialize quota_off() for device */
 	down(&dqopt->dqonoff_sem);
 	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
+		toputinode[cnt] = NULL;
+		toputmnt[cnt] = NULL;
 		if (type != -1 && cnt != type)
 			continue;
 		if (!sb_has_quota_enabled(sb, cnt))
@@ -1337,14 +1347,51 @@ int vfs_quota_off(struct super_block *sb, int type)
 			dqopt->ops[cnt]->free_file_info(sb, cnt);
 		put_quota_format(dqopt->info[cnt].dqi_format);
 
-		fput(dqopt->files[cnt]);
+		toputinode[cnt] = dqopt->files[cnt];
+		toputmnt[cnt] = dqopt->mnt[cnt];
 		dqopt->files[cnt] = NULL;
+		dqopt->mnt[cnt] = NULL;
 		dqopt->info[cnt].dqi_flags = 0;
 		dqopt->info[cnt].dqi_igrace = 0;
 		dqopt->info[cnt].dqi_bgrace = 0;
 		dqopt->ops[cnt] = NULL;
 	}
 	up(&dqopt->dqonoff_sem);
+	/* Sync the superblock so that buffers with quota data are written to
+	 * disk (and so userspace sees correct data afterwards).
+	 * The reference to vfsmnt we are still holding protects us from
+	 * umount (we don't have it only when quotas are turned on/off for
+	 * journal replay but in that case we are guarded by the fs anyway). */
+	if (sb->s_op->sync_fs)
+		sb->s_op->sync_fs(sb, 1);
+	sync_blockdev(sb->s_bdev);
+	/* Now the quota files are just ordinary files and we can set the
+	 * inode flags back. Moreover we discard the pagecache so that
+	 * userspace sees the writes we did bypassing the pagecache. We
+	 * must also discard the blockdev buffers so that we see the
+	 * changes done by userspace on the next quotaon() */
+	for (cnt = 0; cnt < MAXQUOTAS; cnt++)
+		if (toputinode[cnt]) {
+			down(&dqopt->dqonoff_sem);
+			/* If quota was reenabled in the meantime, we have
+			 * nothing to do */
+			if (!sb_has_quota_enabled(sb, cnt)) {
+				down(&toputinode[cnt]->i_sem);
+				toputinode[cnt]->i_flags &= ~(S_IMMUTABLE |
+				  S_NOATIME | S_NOQUOTA);
+				truncate_inode_pages(&toputinode[cnt]->i_data, 0);
+				up(&toputinode[cnt]->i_sem);
+				mark_inode_dirty(toputinode[cnt]);
+				iput(toputinode[cnt]);
+			}
+			up(&dqopt->dqonoff_sem);
+			/* We don't hold the reference when we turned on quotas
+			 * just for the journal replay... */
+			if (toputmnt[cnt])
+				mntput(toputmnt[cnt]);
+		}
+	if (sb->s_bdev)
+		invalidate_bdev(sb->s_bdev, 0);
 	return 0;
 }
 
@@ -1352,68 +1399,56 @@ int vfs_quota_off(struct super_block *sb, int type)
  *	Turn quotas on on a device
  */
 
-/* Helper function when we already have file open */
-static int vfs_quota_on_file(struct file *f, int type, int format_id)
+/* Helper function when we already have the inode */
+static int vfs_quota_on_inode(struct inode *inode, int type, int format_id)
 {
 	struct quota_format_type *fmt = find_quota_format(format_id);
-	struct inode *inode;
-	struct super_block *sb = f->f_dentry->d_sb;
+	struct super_block *sb = inode->i_sb;
 	struct quota_info *dqopt = sb_dqopt(sb);
-	struct dquot *to_drop[MAXQUOTAS];
-	int error, cnt;
-	unsigned int oldflags = -1;
+	int error;
+	int oldflags = -1;
 
 	if (!fmt)
 		return -ESRCH;
-	error = -EIO;
-	if (!f->f_op || !f->f_op->read || !f->f_op->write)
+	if (!S_ISREG(inode->i_mode)) {
+		error = -EACCES;
 		goto out_fmt;
-	inode = f->f_dentry->d_inode;
-	error = -EACCES;
-	if (!S_ISREG(inode->i_mode))
+	}
+	if (IS_RDONLY(inode)) {
+		error = -EROFS;
 		goto out_fmt;
+	}
+	if (!sb->s_op->quota_write || !sb->s_op->quota_read) {
+		error = -EINVAL;
+		goto out_fmt;
+	}
 
+	/* As we bypass the pagecache we must now flush the inode so that
+	 * we see all the changes from userspace... */
+	write_inode_now(inode, 1);
+	/* And now flush the block cache so that kernel sees the changes */
+	invalidate_bdev(sb->s_bdev, 0);
 	down(&inode->i_sem);
 	down(&dqopt->dqonoff_sem);
 	if (sb_has_quota_enabled(sb, type)) {
-		up(&inode->i_sem);
 		error = -EBUSY;
 		goto out_lock;
 	}
 	/* We don't want quota and atime on quota files (deadlocks possible)
-	 * We also need to set GFP mask differently because we cannot recurse
-	 * into filesystem when allocating page for quota inode */
+	 * Also nobody should write to the file - we use special IO operations
+	 * which ignore the immutable bit. */
 	down_write(&dqopt->dqptr_sem);
-	oldflags = inode->i_flags & (S_NOATIME | S_NOQUOTA);
-	inode->i_flags |= S_NOQUOTA | S_NOATIME;
+	oldflags = inode->i_flags & (S_NOATIME | S_IMMUTABLE | S_NOQUOTA);
+	inode->i_flags |= S_NOQUOTA | S_NOATIME | S_IMMUTABLE;
 	up_write(&dqopt->dqptr_sem);
-	up(&inode->i_sem);
 
-	dqopt->files[type] = f;
+	error = -EIO;
+	dqopt->files[type] = igrab(inode);
+	if (!dqopt->files[type])
+		goto out_lock;
 	error = -EINVAL;
 	if (!fmt->qf_ops->check_quota_file(sb, type))
 		goto out_file_init;
-	/*
-	 * We write to quota files deep within filesystem code.  We don't want
-	 * the VFS to reenter filesystem code when it tries to allocate a
-	 * pagecache page for the quota file write.  So clear __GFP_FS in
-	 * the quota file's allocation flags.
-	 */
-	mapping_set_gfp_mask(inode->i_mapping,
-		mapping_gfp_mask(inode->i_mapping) & ~__GFP_FS);
-
-	down_write(&dqopt->dqptr_sem);
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
-		to_drop[cnt] = inode->i_dquot[cnt];
-		inode->i_dquot[cnt] = NODQUOT;
-	}
-	up_write(&dqopt->dqptr_sem);
-	/* We must put dquots outside of dqptr_sem because we may need to
-	 * start transaction for dquot_release() */
-	for (cnt = 0; cnt < MAXQUOTAS; cnt++) {
-		if (to_drop[cnt])
-			dqput(to_drop[cnt]);
-	}
 
 	dqopt->ops[type] = fmt->qf_ops;
 	dqopt->info[type].dqi_format = fmt;
@@ -1424,6 +1459,7 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 		goto out_file_init;
 	}
 	up(&dqopt->dqio_sem);
+	up(&inode->i_sem);
 	set_enable_flags(dqopt, type);
 
 	add_dquot_ref(sb, type);
@@ -1433,19 +1469,18 @@ static int vfs_quota_on_file(struct file *f, int type, int format_id)
 
 out_file_init:
 	dqopt->files[type] = NULL;
+	iput(inode);
 out_lock:
 	up(&dqopt->dqonoff_sem);
 	if (oldflags != -1) {
-		down(&inode->i_sem);
 		down_write(&dqopt->dqptr_sem);
-		/* Reset the NOATIME flag back. I know it could change in the
-		 * mean time but playing with NOATIME flags on a quota file is
-		 * never a good idea */
-		inode->i_flags &= ~(S_NOATIME | S_NOQUOTA);
+		/* Set the flags back (in the case of accidental quotaon()
+		 * on a wrong file we don't want to mess up the flags) */
+		inode->i_flags &= ~(S_NOATIME | S_NOQUOTA | S_IMMUTABLE);
 		inode->i_flags |= oldflags;
 		up_write(&dqopt->dqptr_sem);
-		up(&inode->i_sem);
 	}
+	up(&inode->i_sem);
 out_fmt:
 	put_quota_format(fmt);
 
@@ -1455,47 +1490,40 @@ out_fmt:
 /* Actual function called from quotactl() */
 int vfs_quota_on(struct super_block *sb, int type, int format_id, char *path)
 {
-	struct file *f;
+	struct nameidata nd;
 	int error;
 
-	f = filp_open(path, O_RDWR, 0600);
-	if (IS_ERR(f))
-		return PTR_ERR(f);
-	error = security_quota_on(f);
+	error = path_lookup(path, LOOKUP_FOLLOW, &nd);
+	if (error < 0)
+		return error;
+	error = security_quota_on(nd.dentry);
 	if (error)
-		goto out_f;
-	error = vfs_quota_on_file(f, type, format_id);
-	if (!error)
-		return 0;
-out_f:
-	filp_close(f, NULL);
+		goto out_path;
+	/* Quota file not on the same filesystem? */
+	if (nd.mnt->mnt_sb != sb)
+		error = -EXDEV;
+	else {
+		error = vfs_quota_on_inode(nd.dentry->d_inode, type, format_id);
+		if (!error)
+			sb_dqopt(sb)->mnt[type] = mntget(nd.mnt);
+	}
+out_path:
+	path_release(&nd);
 	return error;
 }
 
 /*
- * Function used by filesystems when filp_open() would fail (filesystem is
- * being mounted now). We will use a private file structure. Caller is
- * responsible that it's IO functions won't need vfsmnt structure or
- * some dentry tricks...
+ * This function is used when filesystem needs to initialize quotas
+ * during mount time.
  */
 int vfs_quota_on_mount(int type, int format_id, struct dentry *dentry)
 {
-	struct file *f;
 	int error;
 
-	dget(dentry);	/* Get a reference for struct file */
-	f = dentry_open(dentry, NULL, O_RDWR);
-	if (IS_ERR(f)) {
-		error = PTR_ERR(f);
-		goto out_dentry;
-	}
-	error = vfs_quota_on_file(f, type, format_id);
-	if (!error)
-		return 0;
-	fput(f);
-out_dentry:
-	dput(dentry);
-	return error;
+	error = security_quota_on(dentry);
+	if (error)
+		return error;
+	return vfs_quota_on_inode(dentry->d_inode, type, format_id);
 }
 
 /* Generic routine for getting common part of quota structure */
@@ -1720,6 +1748,14 @@ static ctl_table fs_dqstats_table[] = {
 		.data		= &dqstats.syncs,
 		.maxlen		= sizeof(int),
 		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	},
+	{
+		.ctl_name	= FS_DQ_WARNINGS,
+		.procname	= "warnings",
+		.data		= &flag_print_warnings,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
 	{ .ctl_name = 0 },

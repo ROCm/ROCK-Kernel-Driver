@@ -50,6 +50,7 @@ restrictions referred to are that the relevant option is valid if:
 	MOUSE	Appropriate mouse support is enabled.
 	MTD	MTD support is enabled.
 	NET	Appropriate network support is enabled.
+	NUMA	NUMA support is enabled.
 	NFS	Appropriate NFS support is enabled.
 	OSS	OSS sound support is enabled.
 	PARIDE	The ParIDE subsystem is enabled.
@@ -475,6 +476,10 @@ running once the system is up.
 			Format: <io>,<irq>,<dma>,<dma16>
  
 	gvp11=		[HW,SCSI]
+
+	hashdist=	[KNL,NUMA] Large hashes allocated during boot
+			are distributed across NUMA nodes.  Defaults on
+			for IA-64, off otherwise.
 
 	hcl=		[IA-64] SGI's Hardware Graph compatibility layer
 
