@@ -714,7 +714,7 @@ static void sunzilog_start_tx(struct uart_port *port, unsigned int tty_start)
 		port->icount.tx++;
 
 		if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
-			uart_event(&up->port, EVT_WRITE_WAKEUP);
+			uart_write_wakeup(&up->port);
 	}
 }
 
