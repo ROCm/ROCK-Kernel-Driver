@@ -173,13 +173,13 @@
 #define DPRINT(a)
 #endif
 
-static struct request_queue floppy_queue;
+static struct request_queue *floppy_queue;
 
 #define MAJOR_NR FLOPPY_MAJOR
 #define FLOPPY_DMA 0
 #define DEVICE_NAME "floppy"
-#define QUEUE (&floppy_queue)
-#define CURRENT elv_next_request(&floppy_queue)
+#define QUEUE (floppy_queue)
+#define CURRENT elv_next_request(floppy_queue)
 
 /* Disk types: DD */
 static struct archy_disk_type {
@@ -1567,7 +1567,10 @@ int fd1772_init(void)
 
 	enable_dma(FIQ_FD1772);	/* This inserts a call to our command end routine */
 
-	blk_init_queue(&floppy_queue, do_fd_request, &lock);
+	floppy_queue = blk_init_queue(do_fd_request, &lock);
+	if (!floppy_queue)
+		goto err_queue;
+
 	for (i = 0; i < FD_MAX_UNITS; i++) {
 		unit[i].track = -1;
 		disks[i]->major = MAJOR_NR;
@@ -1575,7 +1578,7 @@ int fd1772_init(void)
 		disks[i]->fops = &floppy_fops;
 		sprintf(disks[i]->disk_name, "fd%d", i);
 		disks[i]->private_data = &unit[i];
-		disks[i]->queue = &floppy_queue;
+		disks[i]->queue = floppy_queue;
 		set_capacity(disks[i], MAX_DISK_SIZE * 2);
 	}
 	blk_register_region(MKDEV(MAJOR_NR, 0), 256, THIS_MODULE,
@@ -1588,6 +1591,8 @@ int fd1772_init(void)
 
 	return 0;
 
+ err_queue:
+	kfree(DMAbuffer);
  err_dma2:
 	free_dma(FIQ_FD1772);
 

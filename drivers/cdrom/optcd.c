@@ -81,8 +81,8 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR OPTICS_CDROM_MAJOR
-#define QUEUE (&opt_queue)
-#define CURRENT elv_next_request(&opt_queue)
+#define QUEUE (opt_queue)
+#define CURRENT elv_next_request(opt_queue)
 
 
 /* Debug support */
@@ -266,7 +266,7 @@ static DECLARE_WAIT_QUEUE_HEAD(waitq);
 static void sleep_timer(unsigned long data);
 static struct timer_list delay_timer = TIMER_INITIALIZER(sleep_timer, 0, 0);
 static spinlock_t optcd_lock = SPIN_LOCK_UNLOCKED;
-static struct request_queue opt_queue;
+static struct request_queue *opt_queue;
 
 /* Timer routine: wake up when desired flag goes low,
    or when timeout expires. */
@@ -2068,9 +2068,16 @@ static int __init optcd_init(void)
 	}
 
 
-	blk_init_queue(&opt_queue, do_optcd_request, &optcd_lock);
-	blk_queue_hardsect_size(&opt_queue, 2048);
-	optcd_disk->queue = &opt_queue;
+	opt_queue = blk_init_queue(do_optcd_request, &optcd_lock);
+	if (!opt_queue) {
+		unregister_blkdev(MAJOR_NR, "optcd");
+		release_region(optcd_port, 4);
+		put_disk(optcd_disk);
+		return -ENOMEM;
+	}
+
+	blk_queue_hardsect_size(opt_queue, 2048);
+	optcd_disk->queue = opt_queue;
 	add_disk(optcd_disk);
 
 	printk(KERN_INFO "optcd: DOLPHIN 8000 AT CDROM at 0x%x\n", optcd_port);
@@ -2086,7 +2093,7 @@ static void __exit optcd_exit(void)
 		printk(KERN_ERR "optcd: what's that: can't unregister\n");
 		return;
 	}
-	blk_cleanup_queue(&opt_queue);
+	blk_cleanup_queue(opt_queue);
 	release_region(optcd_port, 4);
 	printk(KERN_INFO "optcd: module released.\n");
 }

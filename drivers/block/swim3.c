@@ -33,7 +33,7 @@
 #include <asm/machdep.h>
 #include <asm/pmac_feature.h>
 
-static struct request_queue swim3_queue;
+static struct request_queue *swim3_queue;
 static struct gendisk *disks[2];
 static struct request *fd_req;
 
@@ -312,7 +312,7 @@ static void start_request(struct floppy_state *fs)
 		wake_up(&fs->wait);
 		return;
 	}
-	while (fs->state == idle && (req = elv_next_request(&swim3_queue))) {
+	while (fs->state == idle && (req = elv_next_request(swim3_queue))) {
 #if 0
 		printk("do_fd_req: dev=%s cmd=%d sec=%ld nr_sec=%ld buf=%p\n",
 		       req->rq_disk->disk_name, req->cmd,
@@ -1005,14 +1005,20 @@ int swim3_init(void)
 		err = -EBUSY;
 		goto out;
 	}
-	blk_init_queue(&swim3_queue, do_fd_request, &swim3_lock);
+
+	swim3_queue = blk_init_queue(do_fd_request, &swim3_lock);
+	if (!swim3_queue) {
+		err = -ENOMEM;
+		goto out_queue;
+	}
+
 	for (i = 0; i < floppy_count; i++) {
 		struct gendisk *disk = disks[i];
 		disk->major = FLOPPY_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &floppy_fops;
 		disk->private_data = &floppy_states[i];
-		disk->queue = &swim3_queue;
+		disk->queue = swim3_queue;
 		sprintf(disk->disk_name, "fd%d", i);
 		sprintf(disk->devfs_name, "floppy/%d", i);
 		set_capacity(disk, 2880);
@@ -1020,6 +1026,8 @@ int swim3_init(void)
 	}
 	return 0;
 
+out_queue:
+	unregister_blkdev(FLOPPY_MAJOR, "fd");
 out:
 	while (i--)
 		put_disk(disks[i]);

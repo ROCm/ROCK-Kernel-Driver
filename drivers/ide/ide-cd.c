@@ -1364,7 +1364,7 @@ static ide_startstop_t cdrom_start_read (ide_drive_t *drive, unsigned int block)
 	if (cdrom_read_from_buffer(drive))
 		return ide_stopped;
 
-	blk_attempt_remerge(&drive->queue, rq);
+	blk_attempt_remerge(drive->queue, rq);
 
 	/* Clear the local sector buffer. */
 	info->nsectors_buffered = 0;
@@ -1929,7 +1929,7 @@ static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 	 * remerge requests, often the plugging will not have had time
 	 * to do this properly
 	 */
-	blk_attempt_remerge(&drive->queue, rq);
+	blk_attempt_remerge(drive->queue, rq);
 
 	info->nsectors_buffered = 0;
 
@@ -3100,10 +3100,10 @@ int ide_cdrom_setup (ide_drive_t *drive)
 	 * default to read-only always and fix latter at the bottom
 	 */
 	set_disk_ro(drive->disk, 1);
-	blk_queue_hardsect_size(&drive->queue, CD_FRAMESIZE);
+	blk_queue_hardsect_size(drive->queue, CD_FRAMESIZE);
 
-	blk_queue_prep_rq(&drive->queue, ide_cdrom_prep_fn);
-	blk_queue_dma_alignment(&drive->queue, 3);
+	blk_queue_prep_rq(drive->queue, ide_cdrom_prep_fn);
+	blk_queue_dma_alignment(drive->queue, 3);
 
 	drive->special.all	= 0;
 	drive->ready_stat	= 0;
@@ -3260,7 +3260,7 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 		printk("%s: ide_cdrom_cleanup failed to unregister device from the cdrom driver.\n", drive->name);
 	kfree(info);
 	drive->driver_data = NULL;
-	blk_queue_prep_rq(&drive->queue, NULL);
+	blk_queue_prep_rq(drive->queue, NULL);
 	del_gendisk(g);
 	g->fops = ide_fops;
 	return 0;

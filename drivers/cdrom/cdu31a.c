@@ -237,7 +237,7 @@ static volatile unsigned short sony_cd_result_reg;
 static volatile unsigned short sony_cd_read_reg;
 static volatile unsigned short sony_cd_fifost_reg;
 
-static struct request_queue cdu31a_queue;
+static struct request_queue *cdu31a_queue;
 static spinlock_t cdu31a_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
 
 static int sony_spun_up = 0;	/* Has the drive been spun up? */
@@ -3436,7 +3436,9 @@ int __init cdu31a_init(void)
 	is_a_cdu31a =
 	    strcmp("CD-ROM CDU31A", drive_config.product_id) == 0;
 
-	blk_init_queue(&cdu31a_queue, do_cdu31a_request, &cdu31a_lock);
+	cdu31a_queue = blk_init_queue(do_cdu31a_request, &cdu31a_lock);
+	if (!cdu31a_queue)
+		goto errout0;
 
 	init_timer(&cdu31a_abort_timer);
 	cdu31a_abort_timer.function = handle_abort_timeout;
@@ -3444,16 +3446,19 @@ int __init cdu31a_init(void)
 	scd_info.mask = deficiency;
 	scd_gendisk = disk;
 	if (register_cdrom(&scd_info))
-		goto errout0;
-	disk->queue = &cdu31a_queue;
+		goto err;
+	disk->queue = cdu31a_queue;
 	add_disk(disk);
 
 	disk_changed = 1;
 	return (0);
 
+err:
+	blk_cleanup_queue(cdu31a_queue);
 errout0:
+	if (cdu31a_irq)
+		free_irq(cdu31a_irq, NULL);
 	printk("Unable to register CDU-31a with Uniform cdrom driver\n");
-	blk_cleanup_queue(&cdu31a_queue);
 	put_disk(disk);
 errout1:
 	if (unregister_blkdev(MAJOR_NR, "cdu31a")) {
@@ -3480,7 +3485,7 @@ void __exit cdu31a_exit(void)
 		return;
 	}
 
-	blk_cleanup_queue(&cdu31a_queue);
+	blk_cleanup_queue(cdu31a_queue);
 
 	if (cdu31a_irq > 0)
 		free_irq(cdu31a_irq, NULL);

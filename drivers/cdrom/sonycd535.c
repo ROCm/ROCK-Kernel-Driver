@@ -219,7 +219,7 @@ static unsigned short read_status_reg;
 static unsigned short data_reg;
 
 static spinlock_t sonycd535_lock = SPIN_LOCK_UNLOCKED; /* queue lock */
-static struct request_queue sonycd535_queue;
+static struct request_queue *sonycd535_queue;
 
 static int initialized;			/* Has the drive been initialized? */
 static int sony_disc_changed = 1;	/* Has the disk been changed
@@ -1551,8 +1551,13 @@ static int __init sony535_init(void)
 		err = -EIO;
 		goto out1;
 	}
-	blk_init_queue(&sonycd535_queue, do_cdu535_request, &sonycd535_lock);
-	blk_queue_hardsect_size(&sonycd535_queue, CDU535_BLOCK_SIZE);
+	sonycd535_queue = blk_init_queue(do_cdu535_request, &sonycd535_lock);
+	if (!sonycd535_queue) {
+		err = -ENOMEM;
+		goto out1a;
+	}
+
+	blk_queue_hardsect_size(sonycd535_queue, CDU535_BLOCK_SIZE);
 	sony_toc = kmalloc(sizeof(struct s535_sony_toc), GFP_KERNEL);
 	err = -ENOMEM;
 	if (!sony_toc)
@@ -1587,7 +1592,7 @@ static int __init sony535_init(void)
 			sony535_cd_base_io);
 		goto out7;
 	}
-	cdu_disk->queue = &sonycd535_queue;
+	cdu_disk->queue = sonycd535_queue;
 	add_disk(cdu_disk);
 	return 0;
 
@@ -1604,7 +1609,8 @@ out4:
 out3:
 	kfree(sony_toc);
 out2:
-	blk_cleanup_queue(&sonycd535_queue);
+	blk_cleanup_queue(sonycd535_queue);
+out1a:
 	unregister_blkdev(MAJOR_NR, CDU535_HANDLE);
 out1:
 	if (sony535_irq_used)
@@ -1666,7 +1672,7 @@ sony535_exit(void)
 	kfree(sony_toc);
 	del_gendisk(cdu_disk);
 	put_disk(cdu_disk);
-	blk_cleanup_queue(&sonycd535_queue);
+	blk_cleanup_queue(sonycd535_queue);
 	if (unregister_blkdev(MAJOR_NR, CDU535_HANDLE) == -EINVAL)
 		printk("Uh oh, couldn't unregister " CDU535_HANDLE "\n");
 	else

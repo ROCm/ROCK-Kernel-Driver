@@ -1798,7 +1798,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 		set_bit(IDEFLOPPY_ZIP_DRIVE, &floppy->flags);
 		/* This value will be visible in the /proc/ide/hdx/settings */
 		floppy->ticks = IDEFLOPPY_TICKS_DELAY;
-		blk_queue_max_sectors(&drive->queue, 64);
+		blk_queue_max_sectors(drive->queue, 64);
 	}
 
 	/*
@@ -1807,7 +1807,7 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 	*      it, so please don't remove this.
 	*/
 	if (strncmp(drive->id->model, "IOMEGA Clik!", 11) == 0) {
-		blk_queue_max_sectors(&drive->queue, 64);
+		blk_queue_max_sectors(drive->queue, 64);
 		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
 	}
 

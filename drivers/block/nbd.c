@@ -681,13 +681,11 @@ static int __init nbd_init(void)
 		 * every gendisk to have its very own request_queue struct.
 		 * These structs are big so we dynamically allocate them.
 		 */
-		disk->queue = kmalloc(sizeof(struct request_queue), GFP_KERNEL);
+		disk->queue = blk_init_queue(do_nbd_request, &nbd_lock);
 		if (!disk->queue) {
 			put_disk(disk);
 			goto out;
 		}
-		memset(disk->queue, 0, sizeof(struct request_queue));
-		blk_init_queue(disk->queue, do_nbd_request, &nbd_lock);
 	}
 
 	if (register_blkdev(NBD_MAJOR, "nbd")) {
@@ -724,7 +722,8 @@ static int __init nbd_init(void)
 	return 0;
 out:
 	while (i--) {
-		kfree(nbd_dev[i].disk->queue);
+		if (nbd_dev[i].disk->queue)
+			blk_cleanup_queue(nbd_dev[i].disk->queue);
 		put_disk(nbd_dev[i].disk);
 	}
 	return err;
@@ -736,11 +735,8 @@ static void __exit nbd_cleanup(void)
 	for (i = 0; i < MAX_NBD; i++) {
 		struct gendisk *disk = nbd_dev[i].disk;
 		if (disk) {
-			if (disk->queue) {
+			if (disk->queue)
 				blk_cleanup_queue(disk->queue);
-				kfree(disk->queue);
-				disk->queue = NULL;
-			}
 			del_gendisk(disk);
 			put_disk(disk);
 		}

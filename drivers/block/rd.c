@@ -67,7 +67,7 @@
 
 static struct gendisk *rd_disks[NUM_RAMDISKS];
 static struct block_device *rd_bdev[NUM_RAMDISKS];/* Protected device data */
-static struct request_queue *rd_queue;
+static struct request_queue *rd_queue[NUM_RAMDISKS];
 
 /*
  * Parameters for the boot-loading of the RAM disk.  These are set by
@@ -309,7 +309,6 @@ static void __exit rd_cleanup (void)
 		del_gendisk(rd_disks[i]);
 		put_disk(rd_disks[i]);
 	}
-	kfree(rd_queue);
 	devfs_remove("rd");
 	unregister_blkdev(RAMDISK_MAJOR, "ramdisk" );
 }
@@ -333,14 +332,9 @@ static int __init rd_init (void)
 			goto out;
 	}
 
-	rd_queue = kmalloc(NUM_RAMDISKS * sizeof(struct request_queue),
-			     GFP_KERNEL);
-	if (!rd_queue)
-		goto out;
-	memset(rd_queue, 0, NUM_RAMDISKS * sizeof(struct request_queue));
 	if (register_blkdev(RAMDISK_MAJOR, "ramdisk")) {
 		err = -EIO;
-		goto out_queue;
+		goto out;
 	}
 
 	devfs_mk_dir("rd");
@@ -348,13 +342,17 @@ static int __init rd_init (void)
 	for (i = 0; i < NUM_RAMDISKS; i++) {
 		struct gendisk *disk = rd_disks[i];
 
-		blk_queue_make_request(&rd_queue[i], &rd_make_request);
+		rd_queue[i] = blk_alloc_queue(GFP_KERNEL);
+		if (!rd_queue[i])
+			goto out_queue;
+
+		blk_queue_make_request(rd_queue[i], &rd_make_request);
 
 		/* rd_size is given in kB */
 		disk->major = RAMDISK_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &rd_bd_op;
-		disk->queue = &rd_queue[i];
+		disk->queue = rd_queue[i];
 		sprintf(disk->disk_name, "ram%d", i);
 		sprintf(disk->devfs_name, "rd/%d", i);
 		set_capacity(disk, rd_size * 2);
@@ -368,7 +366,7 @@ static int __init rd_init (void)
 
 	return 0;
 out_queue:
-	kfree(rd_queue);
+	unregister_blkdev(RAMDISK_MAJOR, "ramdisk");
 out:
 	while (i--)
 		put_disk(rd_disks[i]);

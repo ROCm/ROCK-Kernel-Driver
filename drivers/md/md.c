@@ -177,6 +177,7 @@ static void mddev_put(mddev_t *mddev)
 	if (!mddev->raid_disks && list_empty(&mddev->disks)) {
 		list_del(&mddev->all_mddevs);
 		mddev_map[mdidx(mddev)] = NULL;
+		blk_put_queue(mddev->queue);
 		kfree(mddev);
 		MOD_DEC_USE_COUNT;
 	}
@@ -217,7 +218,14 @@ static mddev_t * mddev_find(int unit)
 	INIT_LIST_HEAD(&new->all_mddevs);
 	init_timer(&new->safemode_timer);
 	atomic_set(&new->active, 1);
-	blk_queue_make_request(&new->queue, md_fail_request);
+
+	new->queue = blk_alloc_queue(GFP_KERNEL);
+	if (!new->queue) {
+		kfree(new);
+		return NULL;
+	}
+
+	blk_queue_make_request(new->queue, md_fail_request);
 
 	goto retry;
 }
@@ -1470,7 +1478,7 @@ static struct kobject *md_probe(dev_t dev, int *part, void *data)
 	sprintf(disk->disk_name, "md%d", mdidx(mddev));
 	disk->fops = &md_fops;
 	disk->private_data = mddev;
-	disk->queue = &mddev->queue;
+	disk->queue = mddev->queue;
 	add_disk(disk);
 	disks[mdidx(mddev)] = disk;
 	up(&disks_sem);
@@ -1603,14 +1611,14 @@ static int do_md_run(mddev_t * mddev)
 	mddev->pers = pers[pnum];
 	spin_unlock(&pers_lock);
 
-	blk_queue_make_request(&mddev->queue, mddev->pers->make_request);
+	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
 	printk("%s: setting max_sectors to %d, segment boundary to %d\n",
 		disk->disk_name,
 		chunk_size >> 9,
 		(chunk_size>>1)-1);
-	blk_queue_max_sectors(&mddev->queue, chunk_size >> 9);
-	blk_queue_segment_boundary(&mddev->queue, (chunk_size>>1) - 1);
-	mddev->queue.queuedata = mddev;
+	blk_queue_max_sectors(mddev->queue, chunk_size >> 9);
+	blk_queue_segment_boundary(mddev->queue, (chunk_size>>1) - 1);
+	mddev->queue->queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
 	if (err) {

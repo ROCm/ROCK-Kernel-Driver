@@ -2471,8 +2471,12 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Initialize the I/O Request Queue.
   */
-  RequestQueue = &Controller->RequestQueue;
-  blk_init_queue(RequestQueue, DAC960_RequestFunction, &Controller->queue_lock);
+  RequestQueue = blk_init_queue(DAC960_RequestFunction,&Controller->queue_lock);
+  if (!RequestQueue) {
+      unregister_blkdev(MajorNumber, "dac960");
+      return false;
+  }
+  Controller->RequestQueue = RequestQueue;
   blk_queue_bounce_limit(RequestQueue, Controller->BounceBufferLimit);
   RequestQueue->queuedata = Controller;
   blk_queue_max_hw_segments(RequestQueue,
@@ -2516,7 +2520,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   /*
     Remove the I/O Request Queue.
   */
-  blk_cleanup_queue(&Controller->RequestQueue);
+  blk_cleanup_queue(Controller->RequestQueue);
 }
 
 /*
@@ -2713,7 +2717,7 @@ DAC960_DetectController(struct pci_dev *PCI_Device,
 	if (!Controller->disks[i])
 		goto Failure;
 	Controller->disks[i]->private_data = (void *)i;
-	Controller->disks[i]->queue = &Controller->RequestQueue;
+	Controller->disks[i]->queue = Controller->RequestQueue;
   }
   init_waitqueue_head(&Controller->CommandWaitQueue);
   init_waitqueue_head(&Controller->HealthStatusWaitQueue);
@@ -3243,7 +3247,7 @@ static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *Command)
 static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
 				     boolean WaitForCommand)
 {
-  struct request_queue *RequestQueue = &Controller->RequestQueue;
+  struct request_queue *RequestQueue = Controller->RequestQueue;
   struct request *Request;
   DAC960_Command_T *Command;
 
@@ -3277,7 +3281,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
   Command->BlockCount = Request->nr_sectors;
   Command->Request = Request;
   blkdev_dequeue_request(Request);
-  Command->SegmentCount = blk_rq_map_sg(&Controller->RequestQueue,
+  Command->SegmentCount = blk_rq_map_sg(Controller->RequestQueue,
 		  Command->Request, Command->cmd_sglist);
   /* pci_map_sg MAY change the value of SegCount */
   Command->SegmentCount = pci_map_sg(Command->PciDevice, Command->cmd_sglist,
@@ -3313,7 +3317,7 @@ static void DAC960_queue_partial_rw(DAC960_Command_T *Command)
    * code should almost never be called, just go with a
    * simple coding.
    */
-  (void)blk_rq_map_sg(&Controller->RequestQueue, Command->Request,
+  (void)blk_rq_map_sg(Controller->RequestQueue, Command->Request,
                                         Command->cmd_sglist);
 
   (void)pci_map_sg(Command->PciDevice, Command->cmd_sglist, 1,

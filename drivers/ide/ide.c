@@ -745,7 +745,8 @@ void ide_unregister (unsigned int index)
 			drive->id = NULL;
 		}
 		drive->present = 0;
-		blk_cleanup_queue(&drive->queue);
+		blk_cleanup_queue(drive->queue);
+		drive->queue = NULL;
 	}
 	if (hwif->next == hwif) {
 		BUG_ON(hwgroup->hwif != hwif);

@@ -126,7 +126,7 @@ struct cardinfo {
 				    */
 	struct bio	*bio, *currentbio, **biotail;
 
-	request_queue_t queue;
+	request_queue_t *queue;
 
 	struct mm_page {
 		dma_addr_t		page_dma;
@@ -986,9 +986,13 @@ static int __devinit mm_pci_probe(struct pci_dev *dev, const struct pci_device_i
 	card->bio = NULL;
 	card->biotail = &card->bio;
 
-	blk_queue_make_request(&card->queue, mm_make_request);
-	card->queue.queuedata = card;
-	card->queue.unplug_fn = mm_unplug_device;
+	card->queue = blk_alloc_queue(GFP_KERNEL);
+	if (!card->queue)
+		goto failed_alloc;
+
+	blk_queue_make_request(card->queue, mm_make_request);
+	card->queue->queuedata = card;
+	card->queue->unplug_fn = mm_unplug_device;
 
 	tasklet_init(&card->tasklet, process_page, (unsigned long)card);
 
@@ -1143,6 +1147,7 @@ static void mm_pci_remove(struct pci_dev *dev)
 		pci_free_consistent(card->dev, PAGE_SIZE*2,
 				    card->mm_pages[1].desc,
 				    card->mm_pages[1].page_dma);
+	blk_put_queue(card->queue);
 }
 
 static const struct pci_device_id mm_pci_ids[] = { {
@@ -1209,7 +1214,7 @@ int __init mm_init(void)
 		disk->first_minor  = i << MM_SHIFT;
 		disk->fops = &mm_fops;
 		disk->private_data = &cards[i];
-		disk->queue = &cards[i].queue;
+		disk->queue = cards[i].queue;
 		set_capacity(disk, cards[i].mm_size << 1);
 		add_disk(disk);
 	}
