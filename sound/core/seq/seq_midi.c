@@ -464,7 +464,9 @@ static int __init alsa_seq_midi_init(void)
 		snd_seq_midisynth_unregister_port,
 	};
 	memset(&synths, 0, sizeof(synths));
+	snd_seq_autoload_lock();
 	snd_seq_device_register_driver(SNDRV_SEQ_DEV_ID_MIDISYNTH, &ops, 0);
+	snd_seq_autoload_unlock();
 	return 0;
 }
 
