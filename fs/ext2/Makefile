@@ -16,5 +16,3 @@ endif
 ifeq ($(CONFIG_EXT2_FS_POSIX_ACL),y)
 ext2-objs += acl.o
 endif
-
-include $(TOPDIR)/Rules.make

@@ -31,5 +31,3 @@ ifneq ($(CONFIG_IA64),y)
 # to get a correct value for the wait-channel (WCHAN in ps). --davidm
 CFLAGS_sched.o := $(PROFILING) -fno-omit-frame-pointer
 endif
-
-include $(TOPDIR)/Rules.make

@@ -100,8 +100,6 @@ host-progs	:= bin2hex hex2hex
 clean-files := maui_boot.h msndperm.c msndinit.c pndsperm.c pndspini.c \
                pss_boot.h trix_boot.h
 
-include $(TOPDIR)/Rules.make
-
 # Firmware files that need translation
 #
 # The translated files are protected by a file that keeps track

@@ -17,5 +17,3 @@ endif
 # EXTRA_CFLAGS += -DDEBUG_NCP=1
 
 CFLAGS_ncplib_kernel.o := -finline-functions
-
-include $(TOPDIR)/Rules.make

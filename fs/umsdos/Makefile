@@ -6,8 +6,6 @@ obj-$(CONFIG_UMSDOS) += umsdos.o
 
 umsdos-objs := dir.o  inode.o ioctl.o mangle.o namei.o rdir.o emd.o
 
-include $(TOPDIR)/Rules.make
-
 p:
 	proto *.c >/usr/include/linux/umsdos_fs.p
 

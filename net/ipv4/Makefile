@@ -23,5 +23,3 @@ obj-$(CONFIG_NETFILTER)	+= netfilter/
 obj-$(CONFIG_XFRM_USER) += xfrm_user.o
 
 obj-y += xfrm_policy.o xfrm_state.o xfrm_input.o
-
-include $(TOPDIR)/Rules.make
