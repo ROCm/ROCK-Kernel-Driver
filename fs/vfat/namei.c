@@ -866,24 +866,22 @@ int vfat_create(struct inode *dir,struct dentry* dentry,int mode,
 
 	lock_kernel();
 	res = vfat_add_entry(dir, &dentry->d_name, 0, &sinfo, &bh, &de);
-	if (res < 0) {
-		unlock_kernel();
-		return res;
-	}
+	if (res < 0)
+		goto out;
 	inode = fat_build_inode(sb, de, sinfo.i_pos, &res);
 	brelse(bh);
-	if (!inode) {
-		unlock_kernel();
-		return res;
-	}
+	if (!inode)
+		goto out;
+	res = 0;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 	inode->i_version++;
 	dir->i_version++;
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_instantiate(dentry,inode);
+out:
 	unlock_kernel();
-	return 0;
+	return res;
 }
 
 static void vfat_remove_entry(struct inode *dir,struct vfat_slot_info *sinfo,
@@ -919,16 +917,13 @@ int vfat_rmdir(struct inode *dir,struct dentry* dentry)
 
 	lock_kernel();
 	res = fat_dir_empty(dentry->d_inode);
-	if (res) {
-		unlock_kernel();
-		return res;
-	}
+	if (res)
+		goto out;
 
 	res = vfat_find(dir,&dentry->d_name,&sinfo, &bh, &de);
-	if (res<0) {
-		unlock_kernel();
-		return res;
-	}
+	if (res < 0)
+		goto out;
+	res = 0;
 	dentry->d_inode->i_nlink = 0;
 	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
 	fat_detach(dentry->d_inode);
@@ -936,8 +931,9 @@ int vfat_rmdir(struct inode *dir,struct dentry* dentry)
 	/* releases bh */
 	vfat_remove_entry(dir,&sinfo,bh,de);
 	dir->i_nlink--;
+out:
 	unlock_kernel();
-	return 0;
+	return res;
 }
 
 int vfat_unlink(struct inode *dir, struct dentry* dentry)
@@ -949,16 +945,15 @@ int vfat_unlink(struct inode *dir, struct dentry* dentry)
 
 	lock_kernel();
 	res = vfat_find(dir,&dentry->d_name,&sinfo,&bh,&de);
-	if (res < 0) {
-		unlock_kernel();
-		return res;
-	}
+	if (res < 0)
+		goto out;
 	dentry->d_inode->i_nlink = 0;
 	dentry->d_inode->i_mtime = dentry->d_inode->i_atime = CURRENT_TIME;
 	fat_detach(dentry->d_inode);
 	mark_inode_dirty(dentry->d_inode);
 	/* releases bh */
 	vfat_remove_entry(dir,&sinfo,bh,de);
+out:
 	unlock_kernel();
 
 	return res;
@@ -976,13 +971,11 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 
 	lock_kernel();
 	res = vfat_add_entry(dir, &dentry->d_name, 1, &sinfo, &bh, &de);
-	if (res < 0) {
-		unlock_kernel();
-		return res;
-	}
+	if (res < 0)
+		goto out;
 	inode = fat_build_inode(sb, de, sinfo.i_pos, &res);
 	if (!inode)
-		goto out;
+		goto out_brelse;
 	inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
 	inode->i_version++;
@@ -994,8 +987,9 @@ int vfat_mkdir(struct inode *dir,struct dentry* dentry,int mode)
 		goto mkdir_failed;
 	dentry->d_time = dentry->d_parent->d_inode->i_version;
 	d_instantiate(dentry,inode);
-out:
+out_brelse:
 	brelse(bh);
+out:
 	unlock_kernel();
 	return res;
 
@@ -1008,8 +1002,7 @@ mkdir_failed:
 	vfat_remove_entry(dir,&sinfo,bh,de);
 	iput(inode);
 	dir->i_nlink--;
-	unlock_kernel();
-	return res;
+	goto out;
 }
  
 int vfat_rename(struct inode *old_dir,struct dentry *old_dentry,
