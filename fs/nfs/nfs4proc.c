@@ -227,7 +227,7 @@ static int _nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *st
 		}
 		o_arg.u.delegation_type = delegation->type;
 	}
-	status = rpc_call_sync(server->client, &msg, 0);
+	status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 	nfs4_increment_seqid(status, sp);
 	if (status == 0) {
 		memcpy(&state->stateid, &o_res.stateid, sizeof(state->stateid));
@@ -297,7 +297,7 @@ static int _nfs4_open_delegation_recall(struct dentry *dentry, struct nfs4_state
 	arg.seqid = sp->so_seqid;
 	arg.open_flags = state->state;
 	memcpy(arg.u.delegation.data, state->stateid.data, sizeof(arg.u.delegation.data));
-	status = rpc_call_sync(server->client, &msg, 0);
+	status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 	nfs4_increment_seqid(status, sp);
 	if (status >= 0) {
 		memcpy(state->stateid.data, res.stateid.data,
@@ -348,7 +348,7 @@ static int _nfs4_proc_open_confirm(struct rpc_clnt *clnt, const struct nfs_fh *f
 	};
 	int status;
 
-	status = rpc_call_sync(clnt, &msg, 0);
+	status = rpc_call_sync(clnt, &msg, RPC_TASK_NOINTR);
 	nfs4_increment_seqid(status, sp);
 	if (status >= 0)
 		memcpy(stateid, &res.stateid, sizeof(*stateid));
@@ -526,7 +526,7 @@ static int _nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct
 	o_arg.id = sp->so_id;
 	o_arg.clientid = clp->cl_clientid,
 
-	status = rpc_call_sync(server->client, &msg, 0);
+	status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 	nfs4_increment_seqid(status, sp);
 	if (status)
 		goto out_err;
@@ -688,7 +688,7 @@ static int _nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
 	/* Serialization for the sequence id */
 	arg.seqid = sp->so_seqid,
-	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
+	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, RPC_TASK_NOINTR);
 
         /* hmm. we are done with the inode, and in the process of freeing
 	 * the state_owner. we keep this around to process errors
@@ -739,7 +739,7 @@ static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mod
 	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
 		return 0;
 	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
-	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
+	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, RPC_TASK_NOINTR);
 	nfs4_increment_seqid(status, sp);
 	if (!status)
 		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
@@ -2403,7 +2403,7 @@ static int _nfs4_proc_unlck(struct nfs4_state *state, int cmd, struct file_lock 
 		luargs.seqid = lsp->ls_seqid;
 		memcpy(&luargs.stateid, &lsp->ls_stateid, sizeof(luargs.stateid));
 		arg.u.locku = &luargs;
-		status = rpc_call_sync(server->client, &msg, 0);
+		status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 		nfs4_increment_lock_seqid(status, lsp);
 	}
 
@@ -2479,7 +2479,7 @@ static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *r
 		arg.u.lock = &largs;
 		down(&owner->so_sema);
 		otl.open_seqid = owner->so_seqid;
-		status = rpc_call_sync(server->client, &msg, 0);
+		status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 		/* increment open_owner seqid on success, and 
 		* seqid mutating errors */
 		nfs4_increment_seqid(status, owner);
@@ -2492,7 +2492,7 @@ static int _nfs4_do_setlk(struct nfs4_state *state, int cmd, struct file_lock *r
 		largs.u.exist_lock = &el;
 		largs.new_lock_owner = 0;
 		arg.u.lock = &largs;
-		status = rpc_call_sync(server->client, &msg, 0);
+		status = rpc_call_sync(server->client, &msg, RPC_TASK_NOINTR);
 	}
 	/* increment seqid on success, and * seqid mutating errors*/
 	nfs4_increment_lock_seqid(status, lsp);

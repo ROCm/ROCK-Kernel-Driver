@@ -698,7 +698,7 @@ __rpc_execute(struct rpc_task *task)
 		if (current->pid == rpciod_pid)
 			printk(KERN_ERR "RPC: rpciod waiting on sync task!\n");
 
-		if (!task->tk_client->cl_intr) {
+		if (RPC_TASK_UNINTERRUPTIBLE(task)) {
 			__wait_event(task->tk_wait, !RPC_IS_SLEEPING(task));
 		} else {
 			__wait_event_interruptible(task->tk_wait, !RPC_IS_SLEEPING(task), status);
@@ -884,6 +884,8 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, rpc_action call
 		atomic_inc(&clnt->cl_users);
 		if (clnt->cl_softrtry)
 			task->tk_flags |= RPC_TASK_SOFT;
+		if (!clnt->cl_intr)
+			task->tk_flags |= RPC_TASK_NOINTR;
 	}
 
 #ifdef RPC_DEBUG
