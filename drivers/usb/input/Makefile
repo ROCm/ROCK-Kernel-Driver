@@ -3,32 +3,32 @@
 #
 
 # Multipart objects.
-usbhid-objs	:= hid-core.o
+hid-objs	:= hid-core.o
 
 # Optional parts of multipart objects.
 
 ifeq ($(CONFIG_USB_HIDDEV),y)
-	usbhid-objs	+= hiddev.o
+	hid-objs        += hiddev.o
 endif
 ifeq ($(CONFIG_USB_HIDINPUT),y)
-	usbhid-objs	+= hid-input.o
+	hid-objs        += hid-input.o
 endif
 ifeq ($(CONFIG_HID_PID),y)
-	usbhid-objs	+= pid.o
+	hid-objs	+= pid.o
 endif
 ifeq ($(CONFIG_LOGITECH_FF),y)
-	usbhid-objs	+= hid-lgff.o
+	hid-objs	+= hid-lgff.o
 endif
 ifeq ($(CONFIG_THRUSTMASTER_FF),y)
-	usbhid-objs	+= hid-tmff.o
+	hid-objs	+= hid-tmff.o
 endif
 ifeq ($(CONFIG_HID_FF),y)
-	usbhid-objs	+= hid-ff.o
+	hid-objs	+= hid-ff.o
 endif
 
 obj-$(CONFIG_USB_AIPTEK)	+= aiptek.o
 obj-$(CONFIG_USB_ATI_REMOTE)	+= ati_remote.o
-obj-$(CONFIG_USB_HID)		+= usbhid.o
+obj-$(CONFIG_USB_HID)		+= hid.o
 obj-$(CONFIG_USB_KBD)		+= usbkbd.o
 obj-$(CONFIG_USB_KBTAB)		+= kbtab.o
 obj-$(CONFIG_USB_MOUSE)		+= usbmouse.o
