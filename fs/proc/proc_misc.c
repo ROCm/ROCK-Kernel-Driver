@@ -161,8 +161,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Dirty:        %8lu kB\n"
 		"Writeback:    %8lu kB\n"
 		"PageTables:   %8lu kB\n"
-		"PteChainTot:  %8lu kB\n"
-		"PteChainUsed: %8lu kB\n",
+		"ReverseMaps:  %8lu\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.sharedram),
@@ -179,8 +178,7 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_dirty),
 		K(ps.nr_writeback),
 		K(ps.nr_page_table_pages),
-		K(ps.nr_pte_chain_pages),
-		ps.used_pte_chains_bytes >> 10
+		ps.nr_reverse_maps
 		);
 
 	return proc_calc_metrics(page, start, off, count, eof, len);

@@ -566,8 +566,7 @@ void get_page_state(struct page_state *ret)
 		ret->nr_active += ps->nr_active;
 		ret->nr_inactive += ps->nr_inactive;
 		ret->nr_page_table_pages += ps->nr_page_table_pages;
-		ret->nr_pte_chain_pages += ps->nr_pte_chain_pages;
-		ret->used_pte_chains_bytes += ps->used_pte_chains_bytes;
+		ret->nr_reverse_maps += ps->nr_reverse_maps;
 	}
 }
 
