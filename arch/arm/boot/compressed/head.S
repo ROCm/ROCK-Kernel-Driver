@@ -117,6 +117,15 @@
 		.macro	writeb, rb
 		str	\rb, [r3, #0]
 		.endm
+#elif defined(CONFIG_ARCH_S3C2410)
+#include <config/debug/s3c2410/port.h>
+			.macro loadsp, rb
+		mov	\rb, #0x50000000
+		add	\rb, \rb, #0x4000 * CONFIG_DEBUG_S3C2410_UART
+		.endm
+		.macro	writeb, rb
+		strb	\rb, [r3, #0x20]
+		.endm
 #else
 #error no serial architecture defined
 #endif

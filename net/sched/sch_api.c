@@ -1099,8 +1099,54 @@ static int tc_dump_tclass(struct sk_buff *skb, struct netlink_callback *cb)
 	return skb->len;
 }
 
-int psched_us_per_tick = 1;
-int psched_tick_per_us = 1;
+/* Main classifier routine: scans classifier chain attached
+   to this qdisc, (optionally) tests for protocol and asks
+   specific classifiers.
+ */
+int tc_classify(struct sk_buff *skb, struct tcf_proto *tp,
+	struct tcf_result *res)
+{
+	int err = 0;
+	u32 protocol = skb->protocol;
+#ifdef CONFIG_NET_CLS_ACT
+	struct tcf_proto *otp = tp;
+reclassify:
+#endif
+	protocol = skb->protocol;
+
+	for ( ; tp; tp = tp->next) {
+		if ((tp->protocol == protocol ||
+			tp->protocol == __constant_htons(ETH_P_ALL)) &&
+			(err = tp->classify(skb, tp, res)) >= 0) {
+#ifdef CONFIG_NET_CLS_ACT
+			if ( TC_ACT_RECLASSIFY == err) {
+				__u32 verd = (__u32) G_TC_VERD(skb->tc_verd);
+				tp = otp;
+
+				if (MAX_REC_LOOP < verd++) {
+					printk("rule prio %d protocol %02x reclassify is buggy packet dropped\n",
+						tp->prio&0xffff, ntohs(tp->protocol));
+					return TC_ACT_SHOT;
+				}
+				skb->tc_verd = SET_TC_VERD(skb->tc_verd,verd);
+				goto reclassify;
+			} else {
+				if (skb->tc_verd) 
+					skb->tc_verd = SET_TC_VERD(skb->tc_verd,0);
+				return err;
+			}
+#else
+
+			return err;
+#endif
+		}
+
+	}
+	return -1;
+}
+
+static int psched_us_per_tick = 1;
+static int psched_tick_per_us = 1;
 
 #ifdef CONFIG_PROC_FS
 static int psched_show(struct seq_file *seq, void *v)
@@ -1124,21 +1170,6 @@ static struct file_operations psched_fops = {
 	.llseek = seq_lseek,
 	.release = single_release,
 };	
-#endif
-
-#ifdef CONFIG_NET_SCH_CLK_GETTIMEOFDAY
-int psched_tod_diff(int delta_sec, int bound)
-{
-	int delta;
-
-	if (bound <= 1000000 || delta_sec > (0x7FFFFFFF/1000000)-1)
-		return bound;
-	delta = delta_sec * 1000000;
-	if (delta > bound)
-		delta = bound;
-	return delta;
-}
-EXPORT_SYMBOL(psched_tod_diff);
 #endif
 
 #ifdef CONFIG_NET_SCH_CLK_CPU
@@ -1246,3 +1277,4 @@ EXPORT_SYMBOL(qdisc_get_rtab);
 EXPORT_SYMBOL(qdisc_put_rtab);
 EXPORT_SYMBOL(register_qdisc);
 EXPORT_SYMBOL(unregister_qdisc);
+EXPORT_SYMBOL(tc_classify);

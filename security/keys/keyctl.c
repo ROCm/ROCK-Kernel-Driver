@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
+#include <linux/syscalls.h>
 #include <linux/keyctl.h>
 #include <linux/fs.h>
 #include <linux/err.h>
@@ -231,7 +232,7 @@ asmlinkage long sys_request_key(const char __user *_type,
  * - the keyring must have search permission to be found
  * - implements keyctl(KEYCTL_GET_KEYRING_ID)
  */
-static long keyctl_get_keyring_ID(key_serial_t id, int create)
+long keyctl_get_keyring_ID(key_serial_t id, int create)
 {
 	struct key *key;
 	long ret;
@@ -254,7 +255,7 @@ static long keyctl_get_keyring_ID(key_serial_t id, int create)
  * join the session keyring
  * - implements keyctl(KEYCTL_JOIN_SESSION_KEYRING)
  */
-static long keyctl_join_session_keyring(const char __user *_name)
+long keyctl_join_session_keyring(const char __user *_name)
 {
 	char *name;
 	long nlen, ret;
@@ -297,9 +298,9 @@ static long keyctl_join_session_keyring(const char __user *_name)
  * - the key must be writable
  * - implements keyctl(KEYCTL_UPDATE)
  */
-static long keyctl_update_key(key_serial_t id,
-			      const void __user *_payload,
-			      size_t plen)
+long keyctl_update_key(key_serial_t id,
+		       const void __user *_payload,
+		       size_t plen)
 {
 	struct key *key;
 	void *payload;
@@ -346,7 +347,7 @@ static long keyctl_update_key(key_serial_t id,
  * - the key must be writable
  * - implements keyctl(KEYCTL_REVOKE)
  */
-static long keyctl_revoke_key(key_serial_t id)
+long keyctl_revoke_key(key_serial_t id)
 {
 	struct key *key;
 	long ret;
@@ -372,7 +373,7 @@ static long keyctl_revoke_key(key_serial_t id)
  * - the keyring must be writable
  * - implements keyctl(KEYCTL_CLEAR)
  */
-static long keyctl_keyring_clear(key_serial_t ringid)
+long keyctl_keyring_clear(key_serial_t ringid)
 {
 	struct key *keyring;
 	long ret;
@@ -398,7 +399,7 @@ static long keyctl_keyring_clear(key_serial_t ringid)
  * - the key must be linkable
  * - implements keyctl(KEYCTL_LINK)
  */
-static long keyctl_keyring_link(key_serial_t id, key_serial_t ringid)
+long keyctl_keyring_link(key_serial_t id, key_serial_t ringid)
 {
 	struct key *keyring, *key;
 	long ret;
@@ -432,7 +433,7 @@ static long keyctl_keyring_link(key_serial_t id, key_serial_t ringid)
  * - we don't need any permissions on the key
  * - implements keyctl(KEYCTL_UNLINK)
  */
-static long keyctl_keyring_unlink(key_serial_t id, key_serial_t ringid)
+long keyctl_keyring_unlink(key_serial_t id, key_serial_t ringid)
 {
 	struct key *keyring, *key;
 	long ret;
@@ -470,9 +471,9 @@ static long keyctl_keyring_unlink(key_serial_t id, key_serial_t ringid)
  *	type;uid;gid;perm;description<NUL>
  * - implements keyctl(KEYCTL_DESCRIBE)
  */
-static long keyctl_describe_key(key_serial_t keyid,
-				char __user *buffer,
-				size_t buflen)
+long keyctl_describe_key(key_serial_t keyid,
+			 char __user *buffer,
+			 size_t buflen)
 {
 	struct key *key;
 	char *tmpbuf;
@@ -532,10 +533,10 @@ static long keyctl_describe_key(key_serial_t keyid,
  *   there's one specified
  * - implements keyctl(KEYCTL_SEARCH)
  */
-static long keyctl_keyring_search(key_serial_t ringid,
-				  const char __user *_type,
-				  const char __user *_description,
-				  key_serial_t destringid)
+long keyctl_keyring_search(key_serial_t ringid,
+			   const char __user *_type,
+			   const char __user *_description,
+			   key_serial_t destringid)
 {
 	struct key_type *ktype;
 	struct key *keyring, *key, *dest;
@@ -649,9 +650,7 @@ static int keyctl_read_key_same(const struct key *key, const void *target)
  *   irrespective of how much we may have copied
  * - implements keyctl(KEYCTL_READ)
  */
-static long keyctl_read_key(key_serial_t keyid,
-			    char __user *buffer,
-			    size_t buflen)
+long keyctl_read_key(key_serial_t keyid, char __user *buffer, size_t buflen)
 {
 	struct key *key, *skey;
 	long ret;
@@ -711,7 +710,7 @@ static long keyctl_read_key(key_serial_t keyid,
  * - if the uid or gid is -1, then that parameter is not changed
  * - implements keyctl(KEYCTL_CHOWN)
  */
-static long keyctl_chown_key(key_serial_t id, uid_t uid, gid_t gid)
+long keyctl_chown_key(key_serial_t id, uid_t uid, gid_t gid)
 {
 	struct key *key;
 	long ret;
@@ -770,7 +769,7 @@ static long keyctl_chown_key(key_serial_t id, uid_t uid, gid_t gid)
  * - the keyring owned by the changer
  * - implements keyctl(KEYCTL_SETPERM)
  */
-static long keyctl_setperm_key(key_serial_t id, key_perm_t perm)
+long keyctl_setperm_key(key_serial_t id, key_perm_t perm)
 {
 	struct key *key;
 	long ret;
@@ -814,10 +813,10 @@ static long keyctl_setperm_key(key_serial_t id, key_perm_t perm)
  * instantiate the key with the specified payload, and, if one is given, link
  * the key into the keyring
  */
-static long keyctl_instantiate_key(key_serial_t id,
-				   const void __user *_payload,
-				   size_t plen,
-				   key_serial_t ringid)
+long keyctl_instantiate_key(key_serial_t id,
+			    const void __user *_payload,
+			    size_t plen,
+			    key_serial_t ringid)
 {
 	struct key *key, *keyring;
 	void *payload;
@@ -877,9 +876,7 @@ static long keyctl_instantiate_key(key_serial_t id,
  * negatively instantiate the key with the given timeout (in seconds), and, if
  * one is given, link the key into the keyring
  */
-static long keyctl_negate_key(key_serial_t id,
-			      unsigned timeout,
-			      key_serial_t ringid)
+long keyctl_negate_key(key_serial_t id, unsigned timeout, key_serial_t ringid)
 {
 	struct key *key, *keyring;
 	long ret;
@@ -916,7 +913,6 @@ static long keyctl_negate_key(key_serial_t id,
 /*****************************************************************************/
 /*
  * the key control system call
- * - currently invoked through prctl()
  */
 asmlinkage long sys_keyctl(int option, unsigned long arg2, unsigned long arg3,
 			   unsigned long arg4, unsigned long arg5)

@@ -12,6 +12,8 @@
 #define OMAP_UART1_BASE		(unsigned char *)0xfffb0000
 #define OMAP_UART2_BASE		(unsigned char *)0xfffb0800
 #define OMAP_UART3_BASE		(unsigned char *)0xfffb9800
+#define OMAP_MAX_NR_PORTS	3
+#define PORT_OMAP		16	/* Temporary */
 
 #ifndef __ASSEMBLY__
 
@@ -19,7 +21,9 @@
 #include <asm/irq.h>
 
 #define OMAP1510_BASE_BAUD	(12000000/16)
-#define OMAP1610_BASE_BAUD	(48000000/16)
+#define OMAP16XX_BASE_BAUD	(48000000/16)
+
+#define UART_SYSC		0x15
 
 /* OMAP FCR trigger  redefinitions */
 #define UART_FCR_R_TRIGGER_8	0x00	/* Mask for receive trigger set at 8 */

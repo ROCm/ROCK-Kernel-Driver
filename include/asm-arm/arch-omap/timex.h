@@ -28,8 +28,6 @@
 #if !defined(__ASM_ARCH_OMAP_TIMEX_H)
 #define __ASM_ARCH_OMAP_TIMEX_H
 
-#include <asm/arch/clocks.h>
-/* TC clock */
-#define CLOCK_TICK_RATE		((OMAP_CK_MAX_RATE*1000000)/2)
+#define CLOCK_TICK_RATE		(HZ * 100000UL)
 
 #endif /* __ASM_ARCH_OMAP_TIMEX_H */

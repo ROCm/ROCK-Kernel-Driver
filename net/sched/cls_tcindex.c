@@ -12,7 +12,8 @@
 #include <linux/errno.h>
 #include <linux/netdevice.h>
 #include <net/ip.h>
-#include <net/pkt_sched.h>
+#include <net/act_api.h>
+#include <net/pkt_cls.h>
 #include <net/route.h>
 
 

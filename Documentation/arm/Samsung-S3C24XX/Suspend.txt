@@ -1,0 +1,88 @@
+			S3C24XX Suspend Support
+			=======================
+
+
+Introduction
+------------
+
+  The S3C2410 supports a low-power suspend mode, where the SDRAM is kept
+  in Self-Refresh mode, and all but the esential peripheral blocks are
+  powered down. For more information on how this works, please look
+  at the S3C2410 datasheets from Samsung.
+
+
+Requirements
+------------
+
+  1) A bootloader that can support the necessary resume operation
+
+  2) Support for at least 1 source for resume
+
+  3) CONFIG_PM enabled in the kernel
+
+  4) Any peripherals that are going to be powered down at the same
+     time require suspend/resume support.
+
+
+Resuming
+--------
+
+  The S3C2410 user manual defines the process of sending the CPU to
+  sleep and how it resumes. The default behaviour of the Linux code
+  is to set the GSTATUS3 register to the physical address of the
+  code to resume Linux operation.
+
+  GSTATUS4 is currently left alone by the sleep code, and is free to
+  use for any other purposes.
+
+
+Machine Support
+---------------
+
+  The machine specific functions must call the s3c2410_pm_init() function
+  to say that it's bootloader is capable of resuming. This can be as
+  simple as adding the following to the file:
+
+  late_initcall(s3c2410_pm_init);
+
+  A board can do its own setup before calling s3c2410_pm_init, if it
+  needs to setup anything else for power management support.
+
+  There is currently no support for over-riding the default method of
+  saving the resume address, if your board requires it, then contact
+  the maintainer and discuss what is required.
+
+
+Configuration
+-------------
+
+  The S3C2410 specific configuration in `System Type` defines various
+  aspects of how the S3C2410 suspend and resume support is configured
+
+  `S3C2410 PM Suspend debug`
+
+    This option prints messages to the serial console before and after
+    the actual suspend, giving detailed information on what is
+    happening
+
+
+  `S3C2410 PM Suspend Memory CRC`
+
+    Allows the entire memory to be checksummed before and after the
+    suspend to see if there has been any corruption of the contents.
+
+    This support requires the CRC32 function to be enabled.
+
+
+  `S3C2410 PM Suspend CRC Chunksize (KiB)`
+
+    Defines the size of memory each CRC chunk covers. A smaller value
+    will mean that the CRC data block will take more memory, but will
+    identify any faults with better precision
+
+
+Document Author
+---------------
+
+Ben Dooks, (c) 2004 Simtec Electronics
+

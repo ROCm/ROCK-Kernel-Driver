@@ -363,6 +363,15 @@ mcpn765_init2(void)
 	return;
 }
 
+static int __init
+mcpn765_request_cascade(void)
+{
+	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
+			i8259_irq);
+	return 0;
+}
+arch_initcall(mcpn765_request_cascade);
+
 /*
  * Interrupt setup and service.
  * Have MPIC on HAWK and cascaded 8259s on VIA 82586 cascaded to MPIC.
@@ -376,8 +385,6 @@ mcpn765_init_IRQ(void)
 		ppc_md.progress("init_irq: enter", 0);
 
 	openpic_init(NUM_8259_INTERRUPTS);
-	openpic_hookup_cascade(NUM_8259_INTERRUPTS, "82c59 cascade",
-			i8259_irq);
 
 	for(i=0; i < NUM_8259_INTERRUPTS; i++)
 		irq_desc[i].handler = &i8259_pic;

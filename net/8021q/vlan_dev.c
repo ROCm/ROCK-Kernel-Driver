@@ -1,4 +1,4 @@
-/*
+/* -*- linux-c -*-
  * INET		802.1Q VLAN
  *		Ethernet-type device handling.
  *
@@ -484,13 +484,26 @@ int vlan_dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	       veth->h_vlan_proto, veth->h_vlan_TCI, veth->h_vlan_encapsulated_proto);
 #endif
 
-	stats->tx_packets++; /* for statics only */
-	stats->tx_bytes += skb->len;
-
 	skb->dev = VLAN_DEV_INFO(dev)->real_dev;
-	dev_queue_xmit(skb);
 
-	return 0;
+	{
+		/* Please note, dev_queue_xmit consumes the pkt regardless of the
+		 * error value.  So, will copy the skb first and free if successful.
+		 */
+		struct sk_buff* skb2 = skb_get(skb);
+		int rv = dev_queue_xmit(skb2);
+		if (rv == 0) {
+			/* Was success, need to free the skb reference since we bumped up the
+			 * user count above.
+			 */
+
+			stats->tx_packets++; /* for statics only */
+			stats->tx_bytes += skb->len;
+
+			kfree_skb(skb);
+		}
+		return rv;
+	}
 }
 
 int vlan_dev_hwaccel_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
@@ -621,6 +634,44 @@ int vlan_dev_set_vlan_flag(char *dev_name, __u32 flag, short flag_val)
 
 	return -EINVAL;
 }
+
+
+int vlan_dev_get_realdev_name(const char *dev_name, char* result)
+{
+	struct net_device *dev = dev_get_by_name(dev_name);
+	int rv = 0;
+	if (dev) {
+		if (dev->priv_flags & IFF_802_1Q_VLAN) {
+			strncpy(result, VLAN_DEV_INFO(dev)->real_dev->name, 23);
+			rv = 0;
+		} else {
+			rv = -EINVAL;
+		}
+		dev_put(dev);
+	} else {
+		rv = -ENODEV;
+	}
+	return rv;
+}
+
+int vlan_dev_get_vid(const char *dev_name, unsigned short* result)
+{
+	struct net_device *dev = dev_get_by_name(dev_name);
+	int rv = 0;
+	if (dev) {
+		if (dev->priv_flags & IFF_802_1Q_VLAN) {
+			*result = VLAN_DEV_INFO(dev)->vlan_id;
+			rv = 0;
+		} else {
+			rv = -EINVAL;
+		}
+		dev_put(dev);
+	} else {
+		rv = -ENODEV;
+	}
+	return rv;
+}
+
 
 int vlan_dev_set_mac_address(struct net_device *dev, void *addr_struct_p)
 {

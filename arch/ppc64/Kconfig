@@ -376,6 +376,11 @@ source "arch/ppc64/Kconfig.debug"
 
 source "security/Kconfig"
 
+config KEYS_COMPAT
+	bool
+	depends on COMPAT && KEYS
+	default y
+
 source "crypto/Kconfig"
 
 source "lib/Kconfig"

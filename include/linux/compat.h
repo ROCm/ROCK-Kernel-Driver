@@ -119,6 +119,8 @@ long compat_sys_shmat(int first, int second, compat_uptr_t third, int version,
 long compat_sys_shmctl(int first, int second, void __user *uptr);
 long compat_sys_semtimedop(int semid, struct sembuf __user *tsems,
 		unsigned nsems, const struct compat_timespec __user *timeout);
+asmlinkage long compat_sys_keyctl(u32 option,
+			      u32 arg2, u32 arg3, u32 arg4, u32 arg5);
 
 asmlinkage ssize_t compat_sys_readv(unsigned long fd,
 		const struct compat_iovec __user *vec, unsigned long vlen);

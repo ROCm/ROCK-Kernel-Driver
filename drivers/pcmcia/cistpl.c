@@ -331,6 +331,14 @@ void destroy_cis_cache(struct pcmcia_socket *s)
 		list_del(&cis->node);
 		kfree(cis);
 	}
+
+	/*
+	 * If there was a fake CIS, destroy that as well.
+	 */
+	if (s->fake_cis) {
+		kfree(s->fake_cis);
+		s->fake_cis = NULL;
+	}
 }
 
 /*======================================================================

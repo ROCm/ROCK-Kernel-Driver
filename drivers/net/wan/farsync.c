@@ -857,6 +857,18 @@ fst_tx_dma_complete(struct fst_card_info *card, struct fst_port_info *port,
 	dev->trans_start = jiffies;
 }
 
+/*
+ * Mark it for our own raw sockets interface
+ */
+static unsigned short farsync_type_trans(struct sk_buff *skb,
+					 struct net_device *dev)
+{
+	skb->dev = dev;
+	skb->mac.raw = skb->data;
+	skb->pkt_type = PACKET_HOST;
+	return htons(ETH_P_CUST);
+}
+
 /*      Rx dma complete interrupt
  */
 static void
@@ -881,17 +893,10 @@ fst_rx_dma_complete(struct fst_card_info *card, struct fst_port_info *port,
 
 	/* Push upstream */
 	dbg(DBG_RX, "Pushing the frame up the stack\n");
-	skb->mac.raw = skb->data;
-	skb->dev = dev;
-	if (port->mode == FST_RAW) {
-		/*
-		 * Mark it for our own raw sockets interface
-		 */
-		skb->protocol = htons(ETH_P_CUST);
-		skb->pkt_type = PACKET_HOST;
-	} else {
-		skb->protocol = hdlc_type_trans(skb, skb->dev);
-	}
+	if (port->mode == FST_RAW)
+		skb->protocol = farsync_type_trans(skb, dev);
+	else
+		skb->protocol = hdlc_type_trans(skb, dev);
 	rx_status = netif_rx(skb);
 	fst_process_rx_status(rx_status, port_to_dev(port)->name);
 	if (rx_status == NET_RX_DROP)
@@ -1316,17 +1321,10 @@ fst_intr_rx(struct fst_card_info *card, struct fst_port_info *port)
 
 		/* Push upstream */
 		dbg(DBG_RX, "Pushing frame up the stack\n");
-		skb->mac.raw = skb->data;
-		skb->dev = dev;
-		if (port->mode == FST_RAW) {
-			/*
-			 * Mark it for our own raw sockets interface
-			 */
-			skb->protocol = htons(ETH_P_CUST);
-			skb->pkt_type = PACKET_HOST;
-		} else {
-			skb->protocol = hdlc_type_trans(skb, skb->dev);
-		}
+		if (port->mode == FST_RAW)
+			skb->protocol = farsync_type_trans(skb, dev);
+		else
+			skb->protocol = hdlc_type_trans(skb, dev);
 		rx_status = netif_rx(skb);
 		fst_process_rx_status(rx_status, port_to_dev(port)->name);
 		if (rx_status == NET_RX_DROP) {
