@@ -41,6 +41,7 @@
 
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
+#include "aic79xx_pci.h"
 
 static int	ahd_linux_pci_dev_probe(struct pci_dev *pdev,
 					const struct pci_device_id *ent);
@@ -51,16 +52,31 @@ static int	ahd_linux_pci_reserve_mem_region(struct ahd_softc *ahd,
 						 uint8_t **maddr);
 static void	ahd_linux_pci_dev_remove(struct pci_dev *pdev);
 
-/* We do our own ID filtering.  So, grab all SCSI storage class devices. */
+/* Define the macro locally since it's different for different class of chips.
+ */
+#define ID(x)            \
+	ID2C(x),         \
+	ID2C(IDIROC(x))
+
 static struct pci_device_id ahd_linux_pci_id_table[] = {
-	{
-		0x9005, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
-		PCI_CLASS_STORAGE_SCSI << 8, 0xFFFF00, 0
-	},
-	{
-		0x9005, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
-		PCI_CLASS_STORAGE_RAID << 8, 0xFFFF00, 0
-	},
+	/* aic7901 based controllers */
+	ID(ID_AHA_29320A),
+	ID(ID_AHA_29320ALP),
+	/* aic7902 based controllers */
+	ID(ID_AHA_29320),
+	ID(ID_AHA_29320B),
+	ID(ID_AHA_29320LP),
+	ID(ID_AHA_39320),
+	ID(ID_AHA_39320_B),
+	ID(ID_AHA_39320A),
+	ID(ID_AHA_39320D),
+	ID(ID_AHA_39320D_HP),
+	ID(ID_AHA_39320D_B),
+	ID(ID_AHA_39320D_B_HP),
+	/* Generic chip probes for devices we don't know exactly. */
+	ID16(ID_AIC7901 & ID_9005_GENERIC_MASK),
+	ID(ID_AIC7901A & ID_DEV_VENDOR_MASK),
+	ID16(ID_AIC7902 & ID_9005_GENERIC_MASK),
 	{ 0 }
 };
 
