@@ -342,6 +342,13 @@ static int __init sbc60xxwdt_init(void)
 {
 	int rc = -EBUSY;
 
+	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
+	{
+		timeout = WATCHDOG_TIMEOUT;
+		printk(KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
+			timeout);
+ 	}
+
 	if (!request_region(wdt_start, 1, "SBC 60XX WDT"))
 	{
 		printk(KERN_ERR PFX "I/O address 0x%04x already in use\n",
@@ -360,13 +367,6 @@ static int __init sbc60xxwdt_init(void)
 			goto err_out_region1;
 		}
 	}
-
-	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
-	{
-		timeout = WATCHDOG_TIMEOUT;
-		printk(KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
-			timeout);
- 	}
 
 	init_timer(&timer);
 	timer.function = wdt_timer_ping;
@@ -388,7 +388,8 @@ static int __init sbc60xxwdt_init(void)
 		goto err_out_miscdev;
 	}
 
-	printk(KERN_INFO PFX "WDT driver for 60XX single board computer initialised.\n");
+	printk(KERN_INFO PFX "WDT driver for 60XX single board computer initialised. timeout=%d sec (nowayout=%d)\n",
+		timeout, nowayout);
 
 	return 0;
 
