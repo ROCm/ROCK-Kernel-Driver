@@ -50,11 +50,13 @@ EXPORT_SYMBOL(handle_page_fault);
 EXPORT_SYMBOL(find_iomem);
 
 #ifdef CONFIG_MODE_TT
+EXPORT_SYMBOL(strncpy_from_user_tt);
 EXPORT_SYMBOL(copy_from_user_tt);
 EXPORT_SYMBOL(copy_to_user_tt);
 #endif
 
 #ifdef CONFIG_MODE_SKAS
+EXPORT_SYMBOL(strncpy_from_user_skas);
 EXPORT_SYMBOL(copy_to_user_skas);
 EXPORT_SYMBOL(copy_from_user_skas);
 #endif
