@@ -169,6 +169,19 @@ struct ipmi_smi
 	/* My LUN.  This should generally stay the SMS LUN, but just in
 	   case... */
 	unsigned char my_lun;
+
+	/* The event receiver for my BMC, only really used at panic
+	   shutdown as a place to store this. */
+	unsigned char event_receiver;
+	unsigned char event_receiver_lun;
+	unsigned char local_sel_device;
+	unsigned char local_event_generator;
+
+	/* A cheap hack, if this is non-null and a message to an
+	   interface comes in with a NULL user, call this routine with
+	   it.  Note that the message will still be freed by the
+	   caller.  This only works on the system interface. */
+	void (*null_user_handler)(ipmi_smi_t intf, struct ipmi_smi_msg *msg);
 };
 
 int
@@ -1465,6 +1478,9 @@ static int handle_bmc_rsp(ipmi_smi_t          intf,
 	}
 
 	if (!found) {
+		/* Special handling for NULL users. */
+		if (!recv_msg->user && intf->null_user_handler)
+			intf->null_user_handler(intf, msg);
 		/* The user for the message went away, so give up. */
 		ipmi_free_recv_msg(recv_msg);
 	} else {
@@ -1733,7 +1749,7 @@ static struct timer_list ipmi_timer;
 
 /* Call every 100 ms. */
 #define IPMI_TIMEOUT_TIME	100
-#define IPMI_TIMEOUT_JIFFIES	(IPMI_TIMEOUT_TIME/(1000/HZ))
+#define IPMI_TIMEOUT_JIFFIES	((IPMI_TIMEOUT_TIME * HZ)/1000)
 
 /* Request events from the queue every second.  Hopefully, in the
    future, IPMI will add a way to know immediately if an event is
@@ -1813,18 +1829,48 @@ static void dummy_recv_done_handler(struct ipmi_recv_msg *msg)
 {
 }
 
-static void send_panic_events(void)
+#ifdef CONFIG_IPMI_PANIC_STRING
+static void event_receiver_fetcher(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
+{
+	if ((msg->rsp[0] == (IPMI_NETFN_SENSOR_EVENT_RESPONSE << 2))
+	    && (msg->rsp[1] == IPMI_GET_EVENT_RECEIVER_CMD)
+	    && (msg->rsp[2] == IPMI_CC_NO_ERROR))
+	{
+		/* A get event receiver command, save it. */
+		intf->event_receiver = msg->rsp[3];
+		intf->event_receiver_lun = msg->rsp[4] & 0x3;
+	}
+}
+
+static void device_id_fetcher(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
+{
+	if ((msg->rsp[0] == (IPMI_NETFN_APP_RESPONSE << 2))
+	    && (msg->rsp[1] == IPMI_GET_DEVICE_ID_CMD)
+	    && (msg->rsp[2] == IPMI_CC_NO_ERROR))
+	{
+		/* A get device id command, save if we are an event
+		   receiver or generator. */
+		intf->local_sel_device = (msg->rsp[8] >> 2) & 1;
+		intf->local_event_generator = (msg->rsp[8] >> 5) & 1;
+	}
+}
+#endif
+
+static void send_panic_events(char *str)
 {
 	struct ipmi_msg                   msg;
 	ipmi_smi_t                        intf;
-	unsigned char                     data[8];
+	unsigned char                     data[16];
 	int                               i;
-	struct ipmi_system_interface_addr addr;
+	struct ipmi_system_interface_addr *si;
+	struct ipmi_addr                  addr;
 	struct ipmi_smi_msg               smi_msg;
 	struct ipmi_recv_msg              recv_msg;
 
-	addr.addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
-	addr.channel = IPMI_BMC_CHANNEL;
+	si = (struct ipmi_system_interface_addr *) &addr;
+	si->addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
+	si->channel = IPMI_BMC_CHANNEL;
+	si->lun = 0;
 
 	/* Fill in an event telling that we have failed. */
 	msg.netfn = 0x04; /* Sensor or Event. */
@@ -1837,12 +1883,13 @@ static void send_panic_events(void)
 	data[4] = 0x6f; /* Sensor specific, IPMI table 36-1 */
 	data[5] = 0xa1; /* Runtime stop OEM bytes 2 & 3. */
 
-	/* These used to have the first three bytes of the panic string,
-	   but not only is that not terribly useful, it's not available
-	   any more. */
-	data[3] = 0;
-	data[6] = 0;
-	data[7] = 0;
+	/* Put a few breadcrumbs in.  Hopefully later we can add more things
+	   to make the panic events more useful. */
+	if (str) {
+		data[3] = str[0];
+		data[6] = str[1];
+		data[7] = str[2];
+	}
 
 	smi_msg.done = dummy_smi_done_handler;
 	recv_msg.done = dummy_recv_done_handler;
@@ -1853,10 +1900,11 @@ static void send_panic_events(void)
 		if (intf == NULL)
 			continue;
 
+		/* Send the event announcing the panic. */
 		intf->handlers->set_run_to_completion(intf->send_info, 1);
 		i_ipmi_request(NULL,
 			       intf,
-			       (struct ipmi_addr *) &addr,
+			       &addr,
 			       0,
 			       &msg,
 			       &smi_msg,
@@ -1865,6 +1913,130 @@ static void send_panic_events(void)
 			       intf->my_address,
 			       intf->my_lun);
 	}
+
+#ifdef CONFIG_IPMI_PANIC_STRING
+	/* On every interface, dump a bunch of OEM event holding the
+	   string. */
+	if (!str) 
+		return;
+
+	for (i=0; i<MAX_IPMI_INTERFACES; i++) {
+		char                  *p = str;
+		struct ipmi_ipmb_addr *ipmb;
+		int                   j;
+
+		intf = ipmi_interfaces[i];
+		if (intf == NULL)
+			continue;
+
+		/* First job here is to figure out where to send the
+		   OEM events.  There's no way in IPMI to send OEM
+		   events using an event send command, so we have to
+		   find the SEL to put them in and stick them in
+		   there. */
+
+		/* Get capabilities from the get device id. */
+		intf->local_sel_device = 0;
+		intf->local_event_generator = 0;
+		intf->event_receiver = 0;
+
+		/* Request the device info from the local MC. */
+		msg.netfn = IPMI_NETFN_APP_REQUEST;
+		msg.cmd = IPMI_GET_DEVICE_ID_CMD;
+		msg.data = NULL;
+		msg.data_len = 0;
+		intf->null_user_handler = device_id_fetcher;
+		i_ipmi_request(NULL,
+			       intf,
+			       &addr,
+			       0,
+			       &msg,
+			       &smi_msg,
+			       &recv_msg,
+			       0,
+			       intf->my_address,
+			       intf->my_lun);
+
+		if (intf->local_event_generator) {
+			/* Request the event receiver from the local MC. */
+			msg.netfn = IPMI_NETFN_SENSOR_EVENT_REQUEST;
+			msg.cmd = IPMI_GET_EVENT_RECEIVER_CMD;
+			msg.data = NULL;
+			msg.data_len = 0;
+			intf->null_user_handler = event_receiver_fetcher;
+			i_ipmi_request(NULL,
+				       intf,
+				       &addr,
+				       0,
+				       &msg,
+				       &smi_msg,
+				       &recv_msg,
+				       0,
+				       intf->my_address,
+				       intf->my_lun);
+		}
+		intf->null_user_handler = NULL;
+
+		/* Validate the event receiver.  The low bit must not
+		   be 1 (it must be a valid IPMB address), it cannot
+		   be zero, and it must not be my address. */
+                if (((intf->event_receiver & 1) == 0)
+		    && (intf->event_receiver != 0)
+		    && (intf->event_receiver != intf->my_address))
+		{
+			/* The event receiver is valid, send an IPMB
+			   message. */
+			ipmb = (struct ipmi_ipmb_addr *) &addr;
+			ipmb->addr_type = IPMI_IPMB_ADDR_TYPE;
+			ipmb->channel = 0; /* FIXME - is this right? */
+			ipmb->lun = intf->event_receiver_lun;
+			ipmb->slave_addr = intf->event_receiver;
+		} else if (intf->local_sel_device) {
+			/* The event receiver was not valid (or was
+			   me), but I am an SEL device, just dump it
+			   in my SEL. */
+			si = (struct ipmi_system_interface_addr *) &addr;
+			si->addr_type = IPMI_SYSTEM_INTERFACE_ADDR_TYPE;
+			si->channel = IPMI_BMC_CHANNEL;
+			si->lun = 0;
+		} else
+			continue; /* No where to send the event. */
+
+		
+		msg.netfn = IPMI_NETFN_STORAGE_REQUEST; /* Storage. */
+		msg.cmd = IPMI_ADD_SEL_ENTRY_CMD;
+		msg.data = data;
+		msg.data_len = 16;
+
+		j = 0;
+		while (*p) {
+			int size = strlen(p);
+
+			if (size > 11)
+				size = 11;
+			data[0] = 0;
+			data[1] = 0;
+			data[2] = 0xf0; /* OEM event without timestamp. */
+			data[3] = intf->my_address;
+			data[4] = j++; /* sequence # */
+			/* Always give 11 bytes, so strncpy will fill
+			   it with zeroes for me. */
+			strncpy(data+5, p, 11);
+			p += size;
+
+			i_ipmi_request(NULL,
+				       intf,
+				       &addr,
+				       0,
+				       &msg,
+				       &smi_msg,
+				       &recv_msg,
+				       0,
+				       intf->my_address,
+				       intf->my_lun);
+		}
+	}	
+#endif /* CONFIG_IPMI_PANIC_STRING */
 }
 #endif /* CONFIG_IPMI_PANIC_EVENT */
 
@@ -1891,7 +2063,7 @@ static int panic_event(struct notifier_block *this,
 	}
 
 #ifdef CONFIG_IPMI_PANIC_EVENT
-	send_panic_events();
+	send_panic_events(ptr);
 #endif
 
 	return NOTIFY_DONE;

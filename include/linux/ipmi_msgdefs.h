@@ -37,22 +37,32 @@
 /* Various definitions for IPMI messages used by almost everything in
    the IPMI stack. */
 
-#define IPMI_NETFN_APP_REQUEST	0x06
-#define IPMI_NETFN_APP_RESPONSE	0x07
+/* NetFNs and commands used inside the IPMI stack. */
 
-#define IPMI_BMC_SLAVE_ADDR	0x20
+#define IPMI_NETFN_SENSOR_EVENT_REQUEST		0x04
+#define IPMI_NETFN_SENSOR_EVENT_RESPONSE	0x05
+#define IPMI_GET_EVENT_RECEIVER_CMD	0x01
 
+#define IPMI_NETFN_APP_REQUEST			0x06
+#define IPMI_NETFN_APP_RESPONSE			0x07
 #define IPMI_GET_DEVICE_ID_CMD		0x01
-
 #define IPMI_CLEAR_MSG_FLAGS_CMD	0x30
 #define IPMI_GET_MSG_FLAGS_CMD		0x31
 #define IPMI_SEND_MSG_CMD		0x34
 #define IPMI_GET_MSG_CMD		0x33
-
 #define IPMI_SET_BMC_GLOBAL_ENABLES_CMD	0x2e
 #define IPMI_GET_BMC_GLOBAL_ENABLES_CMD	0x2f
 #define IPMI_READ_EVENT_MSG_BUFFER_CMD	0x35
 
+#define IPMI_NETFN_STORAGE_REQUEST		0x0a
+#define IPMI_NETFN_STORAGE_RESPONSE		0x0b
+#define IPMI_ADD_SEL_ENTRY_CMD		0x44
+
+/* The default slave address */
+#define IPMI_BMC_SLAVE_ADDR	0x20
+
 #define IPMI_MAX_MSG_LENGTH	80
+
+#define IPMI_CC_NO_ERROR	0
 
 #endif /* __LINUX_IPMI_MSGDEFS_H */
