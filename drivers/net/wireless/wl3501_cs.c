@@ -2104,6 +2104,28 @@ static int wl3501_get_frag_threshold(struct net_device *dev,
 	return rc;
 }
 
+static int wl3501_get_txpow(struct net_device *dev,
+			    struct iw_request_info *info,
+			    union iwreq_data *wrqu, char *extra)
+{
+	u16 txpow;
+	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
+	int rc = wl3501_get_mib_value(this,
+				      WL3501_MIB_ATTR_CURRENT_TX_PWR_LEVEL,
+				      &txpow, sizeof(txpow));
+	if (!rc) {
+		wrqu->txpower.value = txpow;
+		wrqu->txpower.disabled = 0;
+		/*
+		 * From the MIB values I think this can be configurable,
+		 * as it lists several tx power levels -acme
+		 */
+		wrqu->txpower.fixed = 0;
+		wrqu->txpower.flags = IW_TXPOW_MWATT;
+	}
+	return rc;
+}
+
 static int wl3501_get_encode(struct net_device *dev,
 			     struct iw_request_info *info,
 			     union iwreq_data *wrqu, char *extra)
@@ -2180,6 +2202,7 @@ static const iw_handler	wl3501_handler[] = {
 	[SIOCGIWRATE	- SIOCIWFIRST] = wl3501_get_rate,
 	[SIOCGIWRTS	- SIOCIWFIRST] = wl3501_get_rts_threshold,
 	[SIOCGIWFRAG	- SIOCIWFIRST] = wl3501_get_frag_threshold,
+	[SIOCGIWTXPOW	- SIOCIWFIRST] = wl3501_get_txpow,
 	[SIOCGIWENCODE	- SIOCIWFIRST] = wl3501_get_encode,
 	[SIOCGIWPOWER	- SIOCIWFIRST] = wl3501_get_power,
 };
