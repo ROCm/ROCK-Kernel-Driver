@@ -89,7 +89,7 @@ static void subfs_send_signal(void)
 
 
 /* If the option "procuid" is chosen when subfs is mounted, the uid
- * and gid numbers for the current process will  bea dded to the mount
+ * and gid numbers for the current process will  be added to the mount
  * option line.  Hence, non-unix filesystems will be mounted with
  * that ownership.
  */
