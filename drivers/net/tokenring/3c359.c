@@ -1129,7 +1129,7 @@ static irqreturn_t xl_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				xl_freemem(dev) ; 
 				free_irq(dev->irq,dev); 
 				unregister_netdev(dev) ; 
-				kfree(dev) ;  
+				free_netdev(dev) ;  
 				xl_reset(dev) ; 
 				writel(ACK_INTERRUPT | LATCH_ACK, xl_mmio + MMIO_COMMAND) ; 
 				spin_unlock(&xl_priv->xl_lock) ; 

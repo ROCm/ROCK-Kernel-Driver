@@ -250,7 +250,7 @@ static struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int c
 	nt->parms = *parms;
 
 	if (register_netdevice(dev) < 0) {
-		kfree(dev);
+		free_netdev(dev);
 		goto failed;
 	}
 
@@ -899,7 +899,7 @@ int __init ipip_init(void)
 	return err;
  fail:
 	xfrm4_tunnel_deregister(&ipip_handler);
-	kfree(ipip_fb_tunnel_dev);
+	free_netdev(ipip_fb_tunnel_dev);
 	goto out;
 }
 

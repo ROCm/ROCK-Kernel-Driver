@@ -206,7 +206,7 @@ static struct net_device *ipmr_reg_vif(void)
 			   reg_vif_setup);
 
 	if (register_netdevice(dev)) {
-		kfree(dev);
+		free_netdev(dev);
 		return NULL;
 	}
 	dev->iflink = 0;

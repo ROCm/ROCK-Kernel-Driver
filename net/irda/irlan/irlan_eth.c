@@ -60,7 +60,7 @@ void irlan_eth_setup(struct net_device *dev)
 	dev->hard_start_xmit    = irlan_eth_xmit; 
 	dev->get_stats	        = irlan_eth_get_stats;
 	dev->set_multicast_list = irlan_eth_set_multicast_list;
-	dev->destructor		= (void (*)(struct net_device *)) kfree;
+	dev->destructor		= free_netdev;
 
 	SET_MODULE_OWNER(dev);
 

@@ -224,7 +224,7 @@ simeth_probe1(void)
 
 	err = register_netdev(dev);
 	if (err) {
-		kfree(dev);
+		free_netdev(dev);
 		return err;
 	}
 

@@ -1095,7 +1095,7 @@ static int fr_del_pvc(hdlc_device *hdlc, unsigned int dlci, int type)
 	if (dev->flags & IFF_UP)
 		return -EBUSY;		/* PVC in use */
 
-	unregister_netdevice(dev); /* the destructor will kfree(dev) */
+	unregister_netdevice(dev); /* the destructor will free_netdev(dev) */
 	*get_dev_p(pvc, type) = NULL;
 
 	if (!pvc_is_used(pvc)) {
@@ -1119,7 +1119,8 @@ static void fr_destroy(hdlc_device *hdlc)
 
 	while (pvc) {
 		pvc_device *next = pvc->next;
-		if (pvc->main)	/* the destructor will kfree(main + ether) */
+		/* destructors will free_netdev() main and ether */
+		if (pvc->main)
 			unregister_netdevice(pvc->main);
 
 		if (pvc->ether)

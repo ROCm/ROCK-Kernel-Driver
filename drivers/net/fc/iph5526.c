@@ -4501,7 +4501,7 @@ static int __init iph5526_init(void)
 		iph5526_probe_pci(dev);
 		err = register_netdev(dev);
 		if (err < 0) {
-			kfree(dev);
+			free_netdev(dev);
 			printk("iph5526.c: init_fcdev failed for card #%d\n", i+1);
 			break;
 		}

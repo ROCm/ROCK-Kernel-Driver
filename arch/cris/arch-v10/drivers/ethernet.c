@@ -482,7 +482,7 @@ etrax_ethernet_init(void)
 	/* Register device */
 	err = register_netdev(dev);
 	if (err) {
-		kfree(dev);
+		free_netdev(dev);
 		return err;
 	}
 

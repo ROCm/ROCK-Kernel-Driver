@@ -280,7 +280,7 @@ static struct ip_tunnel * ipgre_tunnel_locate(struct ip_tunnel_parm *parms, int 
 	nt->parms = *parms;
 
 	if (register_netdevice(dev) < 0) {
-		kfree(dev);
+		free_netdev(dev);
 		goto failed;
 	}
 
@@ -1276,7 +1276,7 @@ out:
 	return err;
 fail:
 	inet_del_protocol(&ipgre_protocol, IPPROTO_GRE);
-	kfree(ipgre_fb_tunnel_dev);
+	free_netdev(ipgre_fb_tunnel_dev);
 	goto out;
 }
 

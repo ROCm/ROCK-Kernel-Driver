@@ -566,7 +566,7 @@ out_free_unregister:
 	goto out_put_dev;
 
 out_free_newdev:
-	kfree(new_dev);
+	free_netdev(new_dev);
 
 out_unlock:
 	rtnl_unlock();

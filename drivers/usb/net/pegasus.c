@@ -1283,7 +1283,7 @@ out4:
 	usb_set_intfdata(intf, NULL);
 	free_skb_pool(pegasus);
 out3:
-	kfree(net);
+	free_netdev(net);
 out2:
 	free_all_urbs(pegasus);
 out1:

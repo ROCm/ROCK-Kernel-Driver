@@ -852,7 +852,7 @@ out1:
 	free_all_urbs(dev);
 out:
 	kfree(dev->intr_buff);
-	kfree(netdev);
+	free_netdev(netdev);
 	kfree(dev);
 	return -EIO;
 }
