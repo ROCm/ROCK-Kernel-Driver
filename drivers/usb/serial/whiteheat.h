@@ -1,6 +1,9 @@
 /*
  * USB ConnectTech WhiteHEAT driver
  *
+ *      Copyright (C) 2002
+ *          Connect Tech Inc.	
+ *
  *      Copyright (C) 1999, 2000
  *          Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -17,8 +20,9 @@
 #define __LINUX_USB_SERIAL_WHITEHEAT_H
 
 
-#define FALSE				0
-#define TRUE				1
+#define FALSE	0
+#define TRUE	1
+
 
 /* WhiteHEAT commands */
 #define WHITEHEAT_OPEN			1	/* open the port */
@@ -39,109 +43,192 @@
 #define WHITEHEAT_CMD_COMPLETE		16	/* reply for certain commands */
 #define WHITEHEAT_CMD_FAILURE		17	/* reply for failed commands */
 
-/* Data for the WHITEHEAT_SETUP_PORT command */
-#define WHITEHEAT_CTS_FLOW		0x08
-#define WHITEHEAT_RTS_FLOW		0x80
-#define WHITEHEAT_DSR_FLOW		0x10
-#define WHITEHEAT_DTR_FLOW		0x02
+
+/*
+ * Commands to the firmware
+ */
+
+
+/*
+ * WHITEHEAT_OPEN
+ * WHITEHEAT_CLOSE
+ * WHITEHEAT_STATUS
+ * WHITEHEAT_GET_DTR_RTS
+ * WHITEHEAT_REPORT_TX_DONE
+*/
+struct whiteheat_simple {
+	__u8	port;	/* port number (1 to N) */
+};
+
+
+/*
+ * WHITEHEAT_SETUP_PORT
+ */
+#define WHITEHEAT_PAR_NONE	'n'	/* no parity */
+#define WHITEHEAT_PAR_EVEN	'e'	/* even parity */
+#define WHITEHEAT_PAR_ODD	'o'	/* odd parity */
+#define WHITEHEAT_PAR_SPACE	'0'	/* space (force 0) parity */
+#define WHITEHEAT_PAR_MARK	'1'	/* mark (force 1) parity */
+
+#define WHITEHEAT_SFLOW_NONE	'n'	/* no software flow control */
+#define WHITEHEAT_SFLOW_RX	'r'	/* XOFF/ON is sent when RX fills/empties */
+#define WHITEHEAT_SFLOW_TX	't'	/* when received XOFF/ON will stop/start TX */
+#define WHITEHEAT_SFLOW_RXTX	'b'	/* both SFLOW_RX and SFLOW_TX */
+
+#define WHITEHEAT_HFLOW_NONE		0x00	/* no hardware flow control */
+#define WHITEHEAT_HFLOW_RTS_TOGGLE	0x01	/* RTS is on during transmit, off otherwise */
+#define WHITEHEAT_HFLOW_DTR		0x02	/* DTR is off/on when RX fills/empties */
+#define WHITEHEAT_HFLOW_CTS		0x08	/* when received CTS off/on will stop/start TX */
+#define WHITEHEAT_HFLOW_DSR		0x10	/* when received DSR off/on will stop/start TX */
+#define WHITEHEAT_HFLOW_RTS		0x80	/* RTS is off/on when RX fills/empties */
+
 struct whiteheat_port_settings {
 	__u8	port;		/* port number (1 to N) */
-	__u32	baud;		/* any value allowed, default 9600, arrives little endian, range is 7 - 460800 */
-	__u8	bits;		/* 5, 6, 7, or 8, default 8 */
+	__u32	baud;		/* any value 7 - 460800, firmware calculates best fit; arrives little endian */
+	__u8	bits;		/* 5, 6, 7, or 8 */
 	__u8	stop;		/* 1 or 2, default 1 (2 = 1.5 if bits = 5) */
-	__u8	parity;		/* 'n, e, o, 0, or 1' (ascii), default 'n'
-				 *	n = none	e = even	o = odd
-				 *	0 = force 0	1 = force 1	*/
-	__u8	sflow;		/* 'n, r, t, or b' (ascii), default 'n'
-				 *	n = none
-				 *	r = receive (XOFF/XON transmitted when receiver fills / empties)
-				 *	t = transmit (XOFF/XON received will stop/start TX)
-				 *	b = both 	*/
-	__u8	xoff;		/* XOFF byte value, default 0x13 */
-	__u8	xon;		/* XON byte value, default 0x11 */
-	__u8	hflow;		/* bits indicate mode as follows:
-				 *	CTS (0x08) (CTS off/on will control/cause TX off/on)
-				 *	DSR (0x10) (DSR off/on will control/cause TX off/on)
-				 *	RTS (0x80) (RTS off/on when receiver fills/empties)
-				 *	DTR (0x02) (DTR off/on when receiver fills/empties) */
-	__u8	lloop;		/* local loopback 0 or 1, default 0 */
+	__u8	parity;		/* see WHITEHEAT_PAR_* above */
+	__u8	sflow;		/* see WHITEHEAT_SFLOW_* above */
+	__u8	xoff;		/* XOFF byte value */
+	__u8	xon;		/* XON byte value */
+	__u8	hflow;		/* see WHITEHEAT_HFLOW_* above */
+	__u8	lloop;		/* 0/1 turns local loopback mode off/on */
 } __attribute__ ((packed));
 
-/* data for WHITEHEAT_SET_RTS, WHITEHEAT_SET_DTR, and WHITEHEAT_SET_BREAK commands */
-struct whiteheat_rdb_set {
+
+/*
+ * WHITEHEAT_SET_RTS
+ * WHITEHEAT_SET_DTR
+ * WHITEHEAT_SET_BREAK
+ */
+#define WHITEHEAT_RTS_OFF	0x00
+#define WHITEHEAT_RTS_ON	0x01
+#define WHITEHEAT_DTR_OFF	0x00
+#define WHITEHEAT_DTR_ON	0x01
+#define WHITEHEAT_BREAK_OFF	0x00
+#define WHITEHEAT_BREAK_ON	0x01
+
+struct whiteheat_set_rdb {
 	__u8	port;		/* port number (1 to N) */
-	__u8	state;		/* 0 = off, non-zero = on */
+	__u8	state;		/* 0/1 turns signal off/on */
 };
 
-/* data for:
-	WHITEHEAT_OPEN
-	WHITEHEAT_CLOSE
-	WHITEHEAT_STATUS
-	WHITEHEAT_GET_DTR_RTS
-	WHITEHEAT_REPORT_TX_DONE */
-struct whiteheat_min_set {
-	__u8	port;		/* port number (1 to N) */
+
+/*
+ * WHITEHEAT_DUMP
+ */
+#define WHITEHEAT_DUMP_MEM_DATA		'd'  /* data */
+#define WHITEHEAT_DUMP_MEM_IDATA	'i'  /* idata */
+#define WHITEHEAT_DUMP_MEM_BDATA	'b'  /* bdata */
+#define WHITEHEAT_DUMP_MEM_XDATA	'x'  /* xdata */
+
+/*
+ * Allowable address ranges (firmware checks address):
+ * Type DATA:  0x00 - 0xff
+ * Type IDATA: 0x80 - 0xff
+ * Type BDATA: 0x20 - 0x2f
+ * Type XDATA: 0x0000 - 0xffff
+ *
+ * B/I/DATA all read the local memory space
+ * XDATA reads the external memory space
+ * BDATA returns bits as bytes
+ *
+ * NOTE: 0x80 - 0xff (local space) are the Special Function Registers
+ *       of the 8051, and some have on-read side-effects.
+ */
+
+struct whiteheat_dump {
+	__u8	mem_type;	/* see WHITEHEAT_DUMP_* above */
+	__u16	addr;		/* address, see restrictions above */
+	__u16	length;		/* number of bytes to dump, max 63 bytes */
 };
 
-/* data for WHITEHEAT_PURGE command */
-#define WHITEHEAT_PURGE_INPUT		0x01
-#define WHITEHEAT_PURGE_OUTPUT		0x02
-struct whiteheat_purge_set {
+
+/*
+ * WHITEHEAT_PURGE
+ */
+#define WHITEHEAT_PURGE_RX	0x01	/* purge rx fifos */
+#define WHITEHEAT_PURGE_TX	0x02	/* purge tx fifos */
+
+struct whiteheat_purge {
 	__u8	port;		/* port number (1 to N) */
 	__u8	what;		/* bit pattern of what to purge */
 };
 
-/* data for WHITEHEAT_DUMP command */
-struct whiteheat_dump_info {
-	__u8	mem_type;	/* memory type: 'd' = data, 'i' = idata, 'b' = bdata, 'x' = xdata */
-	__u16	addr;		/* memory address to dump, address range depends on the above mem_type:
-				 *	'd' = 0 to ff (80 to FF is SFR's)
-				 *	'i' = 80 to ff
-				 *	'b' = 20 to 2f (bits returned as bytes)
-				 *	'x' = 0000 to ffff (also code space)	*/
-	__u16	length;		/* number of bytes to dump, max 64 */
-};
 
-/* data for WHITEHEAT_ECHO command */
-struct whiteheat_echo_set {
+/*
+ * WHITEHEAT_ECHO
+ */
+struct whiteheat_echo {
 	__u8	port;		/* port number (1 to N) */
-	__u8	length;		/* length of message to echo */
+	__u8	length;		/* length of message to echo, max 61 bytes */
 	__u8	echo_data[61];	/* data to echo */
 };
 
-/* data returned from WHITEHEAT_STATUS command */
-#define WHITEHEAT_OVERRUN_ERROR		0x02
-#define WHITEHEAT_PARITY_ERROR		0x04
-#define WHITEHEAT_FRAMING_ERROR		0x08
-#define WHITEHEAT_BREAK_ERROR		0x10
 
-#define WHITEHEAT_OHFLOW		0x01	/* TX is stopped by CTS (waiting for CTS to go ON) */
-#define WHITEHEAT_IHFLOW		0x02	/* remote TX is stopped by RTS */
-#define WHITEHEAT_OSFLOW		0x04	/* TX is stopped by XOFF received (waiting for XON to occur) */
-#define WHITEHEAT_ISFLOW		0x08	/* remote TX is stopped by XOFF transmitted */
-#define WHITEHEAT_TX_DONE		0x80	/* TX has completed */
+/*
+ * WHITEHEAT_DO_TEST
+ */
+#define WHITEHEAT_TEST_UART_RW		0x01  /* read/write uart registers */
+#define WHITEHEAT_TEST_UART_INTR	0x02  /* uart interrupt */
+#define WHITEHEAT_TEST_SETUP_CONT	0x03  /* setup for PORT_CONT/PORT_DISCONT */
+#define WHITEHEAT_TEST_PORT_CONT	0x04  /* port connect */
+#define WHITEHEAT_TEST_PORT_DISCONT	0x05  /* port disconnect */
+#define WHITEHEAT_TEST_UART_CLK_START	0x06  /* uart clock test start */
+#define WHITEHEAT_TEST_UART_CLK_STOP	0x07  /* uart clock test stop */
+#define WHITEHEAT_TEST_MODEM_FT		0x08  /* modem signals, requires a loopback cable/connector */
+#define WHITEHEAT_TEST_ERASE_EEPROM	0x09  /* erase eeprom */
+#define WHITEHEAT_TEST_READ_EEPROM	0x0a  /* read eeprom */
+#define WHITEHEAT_TEST_PROGRAM_EEPROM	0x0b  /* program eeprom */
 
-#define WHITEHEAT_MODEM_EVENT		0x01
-#define WHITEHEAT_ERROR_EVENT		0x02
-#define WHITEHEAT_FLOW_EVENT		0x04
-#define WHITEHEAT_CONNECT_EVENT		0x08
+struct whiteheat_test {
+	__u8	port;		/* port number (1 to n) */
+	__u8	test;		/* see WHITEHEAT_TEST_* above*/
+	__u8	info[32];	/* additional info */
+};
+
+
+/*
+ * Replies from the firmware
+ */
+
+
+/*
+ * WHITEHEAT_STATUS
+ */
+#define WHITEHEAT_EVENT_MODEM		0x01	/* modem field is valid */
+#define WHITEHEAT_EVENT_ERROR		0x02	/* error field is valid */
+#define WHITEHEAT_EVENT_FLOW		0x04	/* flow field is valid */
+#define WHITEHEAT_EVENT_CONNECT		0x08	/* connect field is valid */
+
+#define WHITEHEAT_FLOW_NONE		0x00	/* no flow control active */
+#define WHITEHEAT_FLOW_HARD_OUT		0x01	/* TX is stopped by CTS (waiting for CTS to go on) */
+#define WHITEHEAT_FLOW_HARD_IN		0x02	/* remote TX is stopped by RTS */
+#define WHITEHEAT_FLOW_SOFT_OUT		0x04	/* TX is stopped by XOFF received (waiting for XON) */
+#define WHITEHEAT_FLOW_SOFT_IN		0x08	/* remote TX is stopped by XOFF transmitted */
+#define WHITEHEAT_FLOW_TX_DONE		0x80	/* TX has completed */
+
 struct whiteheat_status_info {
 	__u8	port;		/* port number (1 to N) */
-	__u8	event;		/* indicates which of the following bytes are the current event */
-	__u8	modem;		/* modem signal status (copy of UART MSR register) */
-	__u8	error;		/* PFO and RX break (copy of UART LSR register) */
-	__u8	flow;		/* flow control state */
-	__u8	connect;	/* connect state, non-zero value indicates connected */
+	__u8	event;		/* indicates what the current event is, see WHITEHEAT_EVENT_* above */
+	__u8	modem;		/* modem signal status (copy of uart's MSR register) */
+	__u8	error;		/* line status (copy of uart's LSR register) */
+	__u8	flow;		/* flow control state, see WHITEHEAT_FLOW_* above */
+	__u8	connect;	/* 0 means not connected, non-zero means connected */
 };
 
-/* data returned from WHITEHEAT_EVENT command */
-struct whiteheat_event {
-	__u8	port;		/* port number (1 to N) */
-	__u8	event;		/* indicates which of the following bytes are the current event */
-	__u8	info;		/* either modem, error, flow, or connect information */
+
+/*
+ * WHITEHEAT_GET_DTR_RTS
+ */
+struct whiteheat_dr_info {
+	__u8	mcr;		/* copy of uart's MCR register */
 };
 
-/* data retured by the WHITEHEAT_GET_HW_INFO command */
+
+/*
+ * WHITEHEAT_GET_HW_INFO
+ */
 struct whiteheat_hw_info {
 	__u8	hw_id;		/* hardware id number, WhiteHEAT = 0 */
 	__u8	sw_major_rev;	/* major version number */
@@ -166,5 +253,30 @@ struct whiteheat_hw_info {
 	} hw_eeprom_info;	/* EEPROM contents */
 };
 
-#endif
 
+/*
+ * WHITEHEAT_EVENT
+ */
+struct whiteheat_event_info {
+	__u8	port;		/* port number (1 to N) */
+	__u8	event;		/* see whiteheat_status_info.event */
+	__u8	info;		/* see whiteheat_status_info.modem, .error, .flow, .connect */
+};
+
+
+/*
+ * WHITEHEAT_DO_TEST
+ */
+#define WHITEHEAT_TEST_FAIL	0x00  /* test failed */
+#define WHITEHEAT_TEST_UNKNOWN	0x01  /* unknown test requested */
+#define WHITEHEAT_TEST_PASS	0xff  /* test passed */
+
+struct whiteheat_test_info {
+	__u8	port;		/* port number (1 to N) */
+	__u8	test;		/* indicates which test this is a response for, see WHITEHEAT_DO_TEST above */
+	__u8	status;		/* see WHITEHEAT_TEST_* above */
+	__u8	results[32];	/* test-dependent results */
+};
+
+
+#endif
