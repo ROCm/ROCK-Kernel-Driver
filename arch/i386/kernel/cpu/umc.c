@@ -13,11 +13,11 @@ static void __init init_umc(struct cpuinfo_x86 * c)
 static struct cpu_dev umc_cpu_dev __initdata = {
 	.c_vendor	= "UMC",
 	.c_ident 	= { "UMC UMC UMC" },
-	c_models: {
-		{ X86_VENDOR_UMC,	4,
+	.c_models = {
+		{ .vendor = X86_VENDOR_UMC, .family = 4, .model_names =
 		  { 
-			  [1] "U5D", 
-			  [2] "U5S", 
+			  [1] = "U5D", 
+			  [2] = "U5S", 
 		  }
 		},
 	},
