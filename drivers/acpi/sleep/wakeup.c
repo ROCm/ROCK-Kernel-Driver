@@ -151,6 +151,8 @@ static int __init acpi_wakeup_device_init(void)
 {
 	struct list_head * node, * next;
 
+	if (acpi_disabled)
+		return 0;
 	printk("ACPI wakeup devices: \n");
 
 	spin_lock(&acpi_device_lock);
