@@ -1404,7 +1404,7 @@ ide_startstop_t flagged_task_out_intr(ide_drive_t *);
 ide_startstop_t flagged_pre_task_mulout_intr(ide_drive_t *, struct request *);
 ide_startstop_t flagged_task_mulout_intr(ide_drive_t *);
 
-int ide_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
 	ide_task_request_t	*req_task;
 	ide_task_t		args;
@@ -1626,7 +1626,7 @@ EXPORT_SYMBOL(ide_wait_cmd);
 /*
  * FIXME : this needs to map into at taskfile. <andre@linux-ide.org>
  */
-int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_cmd_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
 #if 1
 	int err = 0;
@@ -1764,7 +1764,7 @@ EXPORT_SYMBOL(ide_wait_cmd_task);
 /*
  * FIXME : this needs to map into at taskfile. <andre@linux-ide.org>
  */
-int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int ide_task_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
 	int err = 0;
 	u8 args[7], *argbuf = args;
@@ -2185,7 +2185,7 @@ ide_startstop_t flagged_task_mulout_intr (ide_drive_t *drive)
 
 #ifdef CONFIG_PKT_TASK_IOCTL
 
-int pkt_taskfile_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg)
+int pkt_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
 #if 0
 	switch(req_task->data_phase) {

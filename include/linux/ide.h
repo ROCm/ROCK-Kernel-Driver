@@ -1207,6 +1207,8 @@ typedef struct ide_driver_s {
 
 #define DRIVER(drive)		((drive)->driver)
 
+extern int generic_ide_ioctl(struct block_device *, unsigned, unsigned long);
+
 /*
  * IDE modules.
  */
@@ -1483,9 +1485,9 @@ extern ide_post_handler_t * ide_post_handler_parser(struct hd_drive_task_hdr *, 
 /* Expects args is a full set of TF registers and parses the command type */
 extern int ide_cmd_type_parser(ide_task_t *);
 
-int ide_taskfile_ioctl(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-int ide_cmd_ioctl(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
-int ide_task_ioctl(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
+int ide_taskfile_ioctl(ide_drive_t *, unsigned int, unsigned long);
+int ide_cmd_ioctl(ide_drive_t *, unsigned int, unsigned long);
+int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
 #if 0
 

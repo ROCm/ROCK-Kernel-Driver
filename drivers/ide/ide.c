@@ -2400,10 +2400,10 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
-static int ide_ioctl (struct inode *inode, struct file *file,
-			unsigned int cmd, unsigned long arg)
+int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
+			unsigned long arg)
 {
-	ide_drive_t *drive = inode->i_bdev->bd_disk->private_data;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
 	ide_settings_t *setting;
 	int err = 0;
 
@@ -2412,7 +2412,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			err = ide_read_setting(drive, setting);
 			return err >= 0 ? put_user(err, (long *) arg) : err;
 		} else {
-			if (inode->i_bdev != inode->i_bdev->bd_contains)
+			if (bdev != bdev->bd_contains)
 				return -EINVAL;
 			return ide_write_setting(drive, setting, arg);
 		}
@@ -2427,7 +2427,7 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->bios_head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->bios_sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(bios_cyl, (u16 *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(inode->i_bdev),
+			if (put_user((unsigned)get_start_sect(bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
@@ -2439,14 +2439,14 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			if (put_user(drive->head, (u8 *) &loc->heads)) return -EFAULT;
 			if (put_user(drive->sect, (u8 *) &loc->sectors)) return -EFAULT;
 			if (put_user(drive->cyl, (unsigned int *) &loc->cylinders)) return -EFAULT;
-			if (put_user((unsigned)get_start_sect(inode->i_bdev),
+			if (put_user((unsigned)get_start_sect(bdev),
 				(unsigned long *) &loc->start)) return -EFAULT;
 			return 0;
 		}
 
 		case HDIO_OBSOLETE_IDENTITY:
 		case HDIO_GET_IDENTITY:
-			if (inode->i_bdev != inode->i_bdev->bd_contains)
+			if (bdev != bdev->bd_contains)
 				return -EINVAL;
 			if (drive->id == NULL)
 				return -ENOMSG;
@@ -2468,12 +2468,12 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 				return -EACCES;
 			switch(drive->media) {
 				case ide_disk:
-					return ide_taskfile_ioctl(drive, inode, file, cmd, arg);
+					return ide_taskfile_ioctl(drive, cmd, arg);
 #ifdef CONFIG_PKT_TASK_IOCTL
 				case ide_cdrom:
 				case ide_tape:
 				case ide_floppy:
-					return pkt_taskfile_ioctl(drive, inode, file, cmd, arg);
+					return pkt_taskfile_ioctl(drive, cmd, arg);
 #endif /* CONFIG_PKT_TASK_IOCTL */
 				default:
 					return -ENOMSG;
@@ -2483,12 +2483,12 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case HDIO_DRIVE_CMD:
 			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 				return -EACCES;
-			return ide_cmd_ioctl(drive, inode, file, cmd, arg);
+			return ide_cmd_ioctl(drive, cmd, arg);
 
 		case HDIO_DRIVE_TASK:
 			if (!capable(CAP_SYS_ADMIN) || !capable(CAP_SYS_RAWIO))
 				return -EACCES;
-			return ide_task_ioctl(drive, inode, file, cmd, arg);
+			return ide_task_ioctl(drive, cmd, arg);
 
 		case HDIO_SCAN_HWIF:
 		{
@@ -2545,15 +2545,14 @@ static int ide_ioctl (struct inode *inode, struct file *file,
  *				} 
  *				HWIF(drive)->multiproc(drive);
  */
-				return file->f_op->ioctl(inode, file,
-								BLKRRPART, 0);
+				return ioctl_by_bdev(bdev, BLKRRPART, 0);
 			}
 			return 0;
 		}
 
 		case CDROMEJECT:
 		case CDROMCLOSETRAY:
-			return scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+			return scsi_cmd_ioctl(bdev, cmd, arg);
 
 		case HDIO_GET_BUSSTATE:
 			if (!capable(CAP_SYS_ADMIN))
@@ -2570,10 +2569,22 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 			return 0;
 
 		default:
-			if (drive->driver != NULL)
-				return DRIVER(drive)->ioctl(drive, inode, file, cmd, arg);
-			return -EPERM;
+			return -EINVAL;
 	}
+}
+
+EXPORT_SYMBOL(generic_ide_ioctl);
+
+static int ide_ioctl (struct inode *inode, struct file *file,
+			unsigned int cmd, unsigned long arg)
+{
+	struct block_device *bdev = inode->i_bdev;
+	ide_drive_t *drive = bdev->bd_disk->private_data;
+	int err = generic_ide_ioctl(bdev, cmd, arg);
+
+	if (err == -EINVAL && drive->driver)
+		err = DRIVER(drive)->ioctl(drive, inode, file, cmd, arg);
+	return err;
 }
 
 static int ide_check_media_change(struct gendisk *disk)
