@@ -24,6 +24,7 @@
 #define PALM_M500_ID			0x0001
 #define PALM_M505_ID			0x0002
 #define PALM_M515_ID			0x0003
+#define PALM_I705_ID			0x0020
 #define PALM_M125_ID			0x0040
 #define PALM_M130_ID			0x0050
 
