@@ -20,30 +20,322 @@
  *  the native cpu endians. I also need to deal with MSB position in the word.
  *  
  */
+#include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/fb.h>
 #include <linux/slab.h>
 #include <asm/types.h>
 #include <asm/io.h>
-#include <video/fbcon.h>
+
+#define LONG_MASK  (BITS_PER_LONG - 1)
 
 #if BITS_PER_LONG == 32
-#define FB_READ		fb_readl
-#define FB_WRITE	fb_writel
+#define FB_WRITEL fb_writel
+#define FB_READL  fb_readl
+#define SHIFT_PER_LONG 5
+#define BYTES_PER_LONG 4
 #else
-#define FB_READ		fb_readq
-#define FB_WRITE	fb_writeq
+#define FB_WRITEL fb_writeq
+#define FB_READL  fb_readq(x)
+#define SHIFT_PER_LONG 6
+#define BYTES_PER_LONG 8
 #endif
+
+static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
+		   int src_idx, unsigned long n)
+{
+	unsigned long first, last;
+	int shift = dst_idx-src_idx, left, right;
+	unsigned long d0, d1;
+	int m;
+	
+	if (!n)
+		return;
+	
+	shift = dst_idx-src_idx;
+	first = ~0UL >> dst_idx;
+	last = ~(~0UL >> ((dst_idx+n) % BITS_PER_LONG));
+	
+	if (!shift) {
+		// Same alignment for source and dest
+		
+		if (dst_idx+n <= BITS_PER_LONG) {
+			// Single word
+			if (last)
+				first &= last;
+			FB_WRITEL((*src & first) | (FB_READL(dst) & ~first), dst);
+		} else {
+			// Multiple destination words
+			// Leading bits
+			if (first) {
+				
+				FB_WRITEL((*src & first) | (FB_READL(dst) & ~first), dst);
+				dst++;
+				src++;
+				n -= BITS_PER_LONG-dst_idx;
+			}
+			
+			// Main chunk
+			n /= BITS_PER_LONG;
+			while (n >= 8) {
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				FB_WRITEL(*src++, dst++);
+				n -= 8;
+			}
+			while (n--)
+				FB_WRITEL(*src++, dst++);
+			// Trailing bits
+			if (last)
+				FB_WRITEL((*src & last) | (FB_READL(dst) & ~last), dst);
+		}
+	} else {
+		// Different alignment for source and dest
+		
+		right = shift & (BITS_PER_LONG-1);
+		left = -shift & (BITS_PER_LONG-1);
+		
+		if (dst_idx+n <= BITS_PER_LONG) {
+			// Single destination word
+			if (last)
+				first &= last;
+			if (shift > 0) {
+				// Single source word
+				FB_WRITEL(((*src >> right) & first) | (FB_READL(dst) & ~first), dst);
+			} else if (src_idx+n <= BITS_PER_LONG) {
+				// Single source word
+				FB_WRITEL(((*src << left) & first) | (FB_READL(dst) & ~first), dst);
+			} else {
+				// 2 source words
+				d0 = *src++;
+				d1 = *src;
+				FB_WRITEL(((d0 << left | d1 >> right) & first) | (FB_READL(dst) & ~first), dst);
+			}
+		} else {
+			// Multiple destination words
+			d0 = *src++;
+			// Leading bits
+			if (shift > 0) {
+				// Single source word
+				FB_WRITEL(((d0 >> right) & first) | (FB_READL(dst) & ~first), dst);
+				dst++;
+				n -= BITS_PER_LONG-dst_idx;
+			} else {
+				// 2 source words
+				d1 = *src++;
+				FB_WRITEL(((d0 << left | d1 >> right) & first) | (FB_READL(dst) & ~first), dst);
+				d0 = d1;
+				dst++;
+				n -= BITS_PER_LONG-dst_idx;
+			}
+			
+			// Main chunk
+			m = n % BITS_PER_LONG;
+			n /= BITS_PER_LONG;
+			while (n >= 4) {
+				d1 = *src++;
+				FB_WRITEL(d0 << left | d1 >> right, dst++);
+				d0 = d1;
+				d1 = *src++;
+				FB_WRITEL(d0 << left | d1 >> right, dst++);
+				d0 = d1;
+				d1 = *src++;
+				FB_WRITEL(d0 << left | d1 >> right, dst++);
+				d0 = d1;
+				d1 = *src++;
+				FB_WRITEL(d0 << left | d1 >> right, dst++);
+				d0 = d1;
+				n -= 4;
+			}
+			while (n--) {
+				d1 = *src++;
+				FB_WRITEL(d0 << left | d1 >> right, dst++);
+				d0 = d1;
+			}
+			
+			// Trailing bits
+			if (last) {
+				if (m <= right) {
+					// Single source word
+					FB_WRITEL(((d0 << left) & last) | (FB_READL(dst) & ~last), dst);
+				} else {
+					// 2 source words
+					d1 = *src;
+					FB_WRITEL(((d0 << left | d1 >> right) & last) | (FB_READL(dst) & ~last), dst);
+				}
+			}
+		}
+	}
+}
+
+static void bitcpy_rev(unsigned long *dst, int dst_idx,
+		       const unsigned long *src, int src_idx, unsigned long n)
+{
+	unsigned long first, last;
+	int shift = dst_idx-src_idx, left, right;
+	unsigned long d0, d1;
+	int m;
+	
+	if (!n)
+		return;
+	
+	dst += (n-1)/BITS_PER_LONG;
+	src += (n-1)/BITS_PER_LONG;
+	if ((n-1) % BITS_PER_LONG) {
+		dst_idx += (n-1) % BITS_PER_LONG;
+		dst += dst_idx >> SHIFT_PER_LONG;
+		dst_idx &= BITS_PER_LONG-1;
+		src_idx += (n-1) % BITS_PER_LONG;
+		src += src_idx >> SHIFT_PER_LONG;
+		src_idx &= BITS_PER_LONG-1;
+	}
+	
+	shift = dst_idx-src_idx;
+	first = ~0UL << (BITS_PER_LONG-1-dst_idx);
+	last = ~(~0UL << (BITS_PER_LONG-1-((dst_idx-n) % BITS_PER_LONG)));
+	
+	if (!shift) {
+		// Same alignment for source and dest
+		
+		if ((unsigned long)dst_idx+1 >= n) {
+			// Single word
+			if (last)
+				first &= last;
+			FB_WRITEL((*src & first) | (FB_READL(dst) & ~first), dst);
+		} else {
+			// Multiple destination words
+			// Leading bits
+			if (first) {
+				FB_WRITEL((*src & first) | (FB_READL(dst) & ~first), dst);
+				dst--;
+				src--;
+				n -= dst_idx+1;
+			}
+			
+			// Main chunk
+			n /= BITS_PER_LONG;
+			while (n >= 8) {
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				FB_WRITEL(*src--, dst--);
+				n -= 8;
+			}
+			while (n--)
+				FB_WRITEL(*src--, dst--);
+			
+			// Trailing bits
+			if (last)
+				FB_WRITEL((*src & last) | (FB_READL(dst) & ~last), dst);
+		}
+	} else {
+		// Different alignment for source and dest
+		
+		right = shift & (BITS_PER_LONG-1);
+		left = -shift & (BITS_PER_LONG-1);
+		
+		if ((unsigned long)dst_idx+1 >= n) {
+			// Single destination word
+			if (last)
+				first &= last;
+			if (shift < 0) {
+				// Single source word
+				FB_WRITEL((*src << left & first) | (FB_READL(dst) & ~first), dst);
+			} else if (1+(unsigned long)src_idx >= n) {
+				// Single source word
+				FB_WRITEL(((*src >> right) & first) | (FB_READL(dst) & ~first), dst);
+			} else {
+				// 2 source words
+				d0 = *src--;
+				d1 = *src;
+				FB_WRITEL(((d0 >> right | d1 << left) & first) | (FB_READL(dst) & ~first), dst);
+			}
+		} else {
+			// Multiple destination words
+			d0 = *src--;
+			// Leading bits
+			if (shift < 0) {
+				// Single source word
+				FB_WRITEL(((d0 << left) & first) | (FB_READL(dst) & ~first), dst);
+				dst--;
+				n -= dst_idx+1;
+			} else {
+				// 2 source words
+				d1 = *src--;
+				FB_WRITEL(((d0 >> right | d1 << left) & first) | (FB_READL(dst) & ~first), dst);
+				d0 = d1;
+				dst--;
+				n -= dst_idx+1;
+			}
+			
+			// Main chunk
+			m = n % BITS_PER_LONG;
+			n /= BITS_PER_LONG;
+			while (n >= 4) {
+				d1 = *src--;
+				FB_WRITEL(d0 >> right | d1 << left, dst--);
+				d0 = d1;
+				d1 = *src--;
+				FB_WRITEL(d0 >> right | d1 << left, dst--);
+				d0 = d1;
+				d1 = *src--;
+				FB_WRITEL(d0 >> right | d1 << left, dst--);
+				d0 = d1;
+				d1 = *src--;
+				FB_WRITEL(d0 >> right | d1 << left, dst--);
+				d0 = d1;
+				n -= 4;
+			}
+			while (n--) {
+				d1 = *src--;
+				FB_WRITEL(d0 >> right | d1 << left, dst--);
+				d0 = d1;
+			}
+			
+			// Trailing bits
+			if (last) {
+				if (m <= left) {
+					// Single source word
+					FB_WRITEL(((d0 >> right) & last) | (FB_READL(dst) & ~last), dst);
+				} else {
+					// 2 source words
+					d1 = *src;
+					FB_WRITEL(((d0 >> right | d1 << left) & last) |
+						  (FB_READL(dst) & ~last), dst);
+				}
+			}
+		}
+	}
+}
 
 void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 {
-	int x2, y2, lineincr, shift, shift_right, shift_left, old_dx, old_dy;
-	int j, linesize = p->fix.line_length, bpl = sizeof(unsigned long);
-	unsigned long start_index, end_index, start_mask, end_mask, last;
+	int x2, y2, old_dx, old_dy, vxres, vyres;
+	unsigned long next_line = p->fix.line_length;
+	int dst_idx = 0, src_idx = 0, rev_copy = 0;
 	unsigned long *dst = NULL, *src = NULL;
-	char *src1, *dst1;
-	int tmp, height;
+
+	/* We want rotation but lack hardware to do it for us. */
+	if (!p->fbops->fb_rotate && p->var.rotate) {
+	}	
+	
+	vxres = p->var.xres_virtual;
+	vyres = p->var.yres_virtual;
+
+	if (area->dx > vxres || area->sx > vxres || 
+	    area->dy > vyres || area->sy > vyres)
+		return;
 
 	/* clip the destination */
 	old_dx = area->dx;
@@ -57,8 +349,8 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 	y2 = area->dy + area->height;
 	area->dx = area->dx > 0 ? area->dx : 0;
 	area->dy = area->dy > 0 ? area->dy : 0;
-	x2 = x2 < p->var.xres_virtual ? x2 : p->var.xres_virtual;
-	y2 = y2 < p->var.yres_virtual ? y2 : p->var.yres_virtual;
+	x2 = x2 < vxres ? x2 : vxres;
+	y2 = y2 < vyres ? y2 : vyres;
 	area->width = x2 - area->dx;
 	area->height = y2 - area->dy;
 
@@ -66,165 +358,51 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 	area->sx += (area->dx - old_dx);
 	area->sy += (area->dy - old_dy);
 
-	height = area->height;
-
 	/* the source must be completely inside the virtual screen */
 	if (area->sx < 0 || area->sy < 0 ||
-	    (area->sx + area->width) > p->var.xres_virtual ||
-	    (area->sy + area->height) > p->var.yres_virtual)
+	    (area->sx + area->width) > vxres ||
+	    (area->sy + area->height) > vyres)
 		return;
-
-	if (area->dy < area->sy
-	    || (area->dy == area->sy && area->dx < area->sx)) {
-		/* start at the top */
-		src1 = p->screen_base + area->sy * linesize +
-		    ((area->sx * p->var.bits_per_pixel) >> 3);
-		dst1 = p->screen_base + area->dy * linesize +
-		    ((area->dx * p->var.bits_per_pixel) >> 3);
-		lineincr = linesize;
-	} else {
-		/* start at the bottom */
-		src1 = p->screen_base + (area->sy + area->height-1) * linesize
-			+ (((area->sx + area->width - 1) * p->var.bits_per_pixel) >> 3);
-		dst1 = p->screen_base + (area->dy + area->height-1) * linesize
-			+ (((area->dx + area->width - 1) * p->var.bits_per_pixel) >> 3);
-		lineincr = -linesize;
+	
+	if (area->dy > area->sy || (area->dy == area->sy && area->dx > area->sx)) {
+		area->dy += area->height;
+		area->sy += area->height;
+		rev_copy = 1;
 	}
 
-	if ((BITS_PER_LONG % p->var.bits_per_pixel) == 0) {
-		int ppw = BITS_PER_LONG / p->var.bits_per_pixel;
-		int n = ((area->width * p->var.bits_per_pixel) >> 3);
-
-		start_index = ((unsigned long) src1 & (bpl - 1));
-		end_index = ((unsigned long) (src1 + n) & (bpl - 1));
-		shift = ((unsigned long) dst1 & (bpl - 1)) -
-		    	((unsigned long) src1 & (bpl - 1));
-		start_mask = end_mask = 0;
-
-		if (start_index) {
-			start_mask = -1 >> (start_index << 3);
-			n -= (bpl - start_index);
-		}
-
-		if (end_index) {
-			end_mask = -1 << ((bpl - end_index) << 3);
-			n -= end_index;
-		}
-		n /= bpl;
-
-		if (n <= 0) {
-			if (start_mask) {
-				if (end_mask)
-					end_mask &= start_mask;
-				else
-					end_mask = start_mask;
-				start_mask = 0;
-			}
-			n = 0;
-		}
-
-		if (shift) {
-			if (shift > 0) {
-				/* dest is over to right more */
-				shift_right =
-				    shift * p->var.bits_per_pixel;
-				shift_left =
-				    (ppw - shift) * p->var.bits_per_pixel;
-			} else {
-				/* source is to the right more */
-				shift_right =
-				    (ppw + shift) * p->var.bits_per_pixel;
-				shift_left =
-				    -shift * p->var.bits_per_pixel;
-			}
-			/* general case, positive increment */
-			if (lineincr > 0) {
-				if (shift < 0)
-					n++;
-				do {
-					dst = (unsigned long *) dst1;
-					src = (unsigned long *) src1;
-
-					last = (FB_READ(src) & start_mask);
-
-					if (shift > 0)
-						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
-					for (j = 0; j < n; j++) {
-						dst++;
-						tmp = FB_READ(src);
-						src++;
-						FB_WRITE((last << shift_left) | (tmp >> shift_right), dst);
-						last = tmp;
-						src++;
-					}
-					FB_WRITE(FB_READ(dst) | (last << shift_left), dst);
-					src1 += lineincr;
-					dst1 += lineincr;
-				} while (--height);
-			} else {
-				/* general case, negative increment */
-				if (shift > 0)
-					n++;
-				do {
-					dst = (unsigned long *) dst1;
-					src = (unsigned long *) src1;
-
-					last = (FB_READ(src) & end_mask);
-
-					if (shift < 0)
-						FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
-					for (j = 0; j < n; j++) {
-						dst--;
-						tmp = FB_READ(src);
-						src--;
-						FB_WRITE((tmp << shift_left) | (last >> shift_right), dst);
-						last = tmp;
-						src--;
-					}
-					FB_WRITE(FB_READ(dst) | (last >> shift_right), dst);
-					src1 += lineincr;
-					dst1 += lineincr;
-				} while (--height);
-			}
-		} else {
-			/* no shift needed */
-			if (lineincr > 0) {
-				/* positive increment */
-				do {
-					dst = (unsigned long *) (dst1 - start_index);
-					src = (unsigned long *) (src1 - start_index);
-
-					if (start_mask)
-						FB_WRITE(FB_READ(src) | start_mask, dst);
-
-					for (j = 0; j < n; j++) {
-						FB_WRITE(FB_READ(src), dst);
-						dst++;
-						src++;
-					}
-
-					if (end_mask)
-						FB_WRITE(FB_READ(src) | end_mask, dst);
-					src1 += lineincr;
-					dst1 += lineincr;
-				} while (--height);
-			} else {
-				/* negative increment */
-				do {
-					dst = (unsigned long *) dst1;
-					src = (unsigned long *) src1;
-
-					if (start_mask)
-						FB_WRITE(FB_READ(src) | start_mask, dst);
-					for (j = 0; j < n; j++) {
-						FB_WRITE(FB_READ(src), dst);
-						dst--;
-						src--;
-					}
-					src1 += lineincr;
-					dst1 += lineincr;
-				} while (--height);
-			}
-		}
+	dst = src = (unsigned long *)((unsigned long)p->screen_base & ~(BYTES_PER_LONG-1));
+	dst_idx = src_idx = (unsigned long)p->screen_base & (BYTES_PER_LONG-1);
+	dst_idx += area->dy*next_line*8 + area->dx*p->var.bits_per_pixel;
+	src_idx += area->sy*next_line*8 + area->sx*p->var.bits_per_pixel;
+	
+	if (rev_copy) {
+		while (area->height--) {
+			dst_idx -= next_line*8;
+			src_idx -= next_line*8;
+			dst += dst_idx >> SHIFT_PER_LONG;
+			dst_idx &= (BYTES_PER_LONG-1);
+			src += src_idx >> SHIFT_PER_LONG;
+			src_idx &= (BYTES_PER_LONG-1);
+			bitcpy_rev((unsigned long*)dst, dst_idx, (unsigned long *)src,
+					src_idx, area->width*p->var.bits_per_pixel);
+		}	
+	} else {
+		while (area->height--) {
+			dst += dst_idx >> SHIFT_PER_LONG;
+			dst_idx &= (BYTES_PER_LONG-1);
+			src += src_idx >> SHIFT_PER_LONG;
+			src_idx &= (BYTES_PER_LONG-1);
+			bitcpy((unsigned long*)dst, dst_idx, (unsigned long *)src,
+				   src_idx, area->width*p->var.bits_per_pixel);
+			dst_idx += next_line*8;
+			src_idx += next_line*8;
+		}	
 	}
 }
+
+EXPORT_SYMBOL(cfb_copyarea);
+
+MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
+MODULE_DESCRIPTION("Generic software accelerated copyarea");
+MODULE_LICENSE("GPL");
+

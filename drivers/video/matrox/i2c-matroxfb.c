@@ -120,7 +120,7 @@ static int i2c_bus_reg(struct i2c_bit_adapter* b, struct matrox_fb_info* minfo,
 	b->mask.data = data;
 	b->mask.clock = clock;
 	b->adapter = matrox_i2c_adapter_template;
-	sprintf(b->adapter.name, name, GET_FB_IDX(minfo->fbcon.node));
+	sprintf(b->adapter.name, name, minor(minfo->fbcon.node));
 	b->adapter.data = b;
 	b->adapter.algo_data = &b->bac;
 	b->bac = matrox_i2c_algo_template;
