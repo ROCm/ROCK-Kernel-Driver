@@ -2902,6 +2902,11 @@ int siocdevprivate_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 IOCTL_TABLE_START
 #include <linux/compat_ioctl.h>
 
+/* Might be moved to compat_ioctl.h with some ifdefs... */
+COMPATIBLE_IOCTL(TIOCSTART)
+COMPATIBLE_IOCTL(TIOCSTOP)
+COMPATIBLE_IOCTL(TIOCSLTC)
+
 /* PA-specific ioctls */
 COMPATIBLE_IOCTL(PA_PERF_ON)
 COMPATIBLE_IOCTL(PA_PERF_OFF)
