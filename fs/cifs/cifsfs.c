@@ -301,6 +301,7 @@ struct inode_operations cifs_dir_inode_ops = {
 /*	revalidate:cifs_revalidate,   */
 	.setattr = cifs_setattr,
 	.symlink = cifs_symlink,
+	.mknod   = cifs_mknod,
 };
 
 struct inode_operations cifs_file_inode_ops = {

@@ -88,8 +88,7 @@ extern int CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 			const struct nls_table *);
 extern int CIFSNTLMSSPAuthSessSetup(unsigned int xid,
 			struct cifsSesInfo *ses, char *ntlm_session_key,
-			char *lanman_session_key,int ntlmv2_flag,
-			const struct nls_table *);
+			int ntlmv2_flag, const struct nls_table *);
 
 extern int CIFSTCon(unsigned int xid, struct cifsSesInfo *ses,
 			const char *tree, struct cifsTconInfo *tcon,
@@ -156,7 +155,7 @@ extern int CIFSSMBSetFileSize(const int xid, struct cifsTconInfo *tcon,
 			 __u64 size, __u16 fileHandle,__u32 opener_pid, int AllocSizeFlag);
 extern int CIFSSMBUnixSetPerms(const int xid, struct cifsTconInfo *pTcon,
 			char *full_path, __u64 mode, __u64 uid,
-			__u64 gid, const struct nls_table *nls_codepage);
+			__u64 gid, dev_t dev, const struct nls_table *nls_codepage);
 
 extern int CIFSSMBMkDir(const int xid, struct cifsTconInfo *tcon,
 			const char *newName,
@@ -229,8 +228,8 @@ extern int cifs_sign_smb(struct smb_hdr *, struct cifsSesInfo *,__u32 *);
 extern int cifs_verify_signature(const struct smb_hdr *, const char * mac_key,
 	__u32 expected_sequence_number);
 extern int cifs_calculate_mac_key(char * key,const char * rn,const char * pass);
-
-/* BB routines below not implemented yet BB */
+extern void CalcNTLMv2_partial_mac_key(struct cifsSesInfo *, struct nls_table *);
+extern void CalcNTLMv2_response(const struct cifsSesInfo *,char * );
 
 extern int CIFSBuildServerList(int xid, char *serverBufferList,
 			int recordlength, int *entries,
