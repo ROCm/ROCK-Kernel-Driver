@@ -457,6 +457,8 @@ static struct ethtool_ops ace_ethtool_ops = {
 	.get_drvinfo = ace_get_drvinfo,
 };
 
+static void ace_watchdog(struct net_device *dev);
+
 static int __devinit acenic_probe_one(struct pci_dev *pdev,
 		const struct pci_device_id *id)
 {
@@ -485,7 +487,6 @@ static int __devinit acenic_probe_one(struct pci_dev *pdev,
 	dev->vlan_rx_kill_vid = ace_vlan_rx_kill_vid;
 #endif
 	if (1) {
-		static void ace_watchdog(struct net_device *dev);
 		dev->tx_timeout = &ace_watchdog;
 		dev->watchdog_timeo = 5*HZ;
 	}

@@ -87,7 +87,7 @@ MODULE_PARM_DESC(card,     "card type");
 static DECLARE_MUTEX(devlist_lock);
 LIST_HEAD(saa7134_devlist);
 static LIST_HEAD(mops_list);
-static unsigned int saa7134_devcount;
+unsigned int saa7134_devcount;
 
 #define dprintk(fmt, arg...)	if (core_debug) \
 	printk(KERN_DEBUG "%s/core: " fmt, dev->name , ## arg)
