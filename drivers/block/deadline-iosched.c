@@ -28,7 +28,7 @@ static int writes_starved = 2;    /* max times reads can starve a write */
 static int fifo_batch = 16;       /* # of sequential requests treated as one
 				     by the above parameters. For throughput. */
 
-static const int deadline_hash_shift = 10;
+static const int deadline_hash_shift = 5;
 #define DL_HASH_BLOCK(sec)	((sec) >> 3)
 #define DL_HASH_FN(sec)		(hash_long(DL_HASH_BLOCK((sec)), deadline_hash_shift))
 #define DL_HASH_ENTRIES		(1 << deadline_hash_shift)
@@ -128,6 +128,21 @@ deadline_add_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
 
 	drq->hash_valid_count = dd->hash_valid_count;
 	list_add(&drq->hash, &dd->hash[DL_HASH_FN(rq_hash_key(rq))]);
+}
+
+/*
+ * move hot entry to front of chain
+ */
+static inline void
+deadline_hot_drq_hash(struct deadline_data *dd, struct deadline_rq *drq)
+{
+	struct request *rq = drq->request;
+	struct list_head *head = &dd->hash[DL_HASH_FN(rq_hash_key(rq))];
+
+	if (ON_HASH(drq) && drq->hash.prev != head) {
+		list_del(&drq->hash);
+		list_add(&drq->hash, head);
+	}
 }
 
 static struct request *
@@ -353,6 +368,8 @@ deadline_merge(request_queue_t *q, struct list_head **insert, struct bio *bio)
 out:
 	q->last_merge = &__rq->queuelist;
 out_insert:
+	if (ret)
+		deadline_hot_drq_hash(dd, RQ_DATA(__rq));
 	*insert = &__rq->queuelist;
 	return ret;
 }
