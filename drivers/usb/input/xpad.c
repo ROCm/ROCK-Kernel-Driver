@@ -1,68 +1,70 @@
 /*
- * USB XBOX HID Gamecontroller - v0.0.3
+ * X-Box gamepad - v0.0.5
  *
  * Copyright (c) 2002 Marko Friedemann <mfr@bmx-chemnitz.de>
  *
  *
- *      This program is free software; you can redistribute it and/or
- *      modify it under the terms of the GNU General Public License as
- *      published by the Free Software Foundation; either version 2 of
- *      the License, or (at your option) any later version.
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License as
+ * published by the Free Software Foundation; either version 2 of
+ * the License, or (at your option) any later version.
  *
- *      This program is distributed in the hope that it will be useful,
- *      but WITHOUT ANY WARRANTY; without even the implied warranty of
- *      MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *      GNU General Public License for more details.
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
  *
- *      You should have received a copy of the GNU General Public License
- *      along with this program; if not, write to the Free Software
- *      Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  *
  * This driver is based on:
- *  - information from      http://euc.jp/periphs/xbox-controller.ja.html
- *  - the iForce driver     drivers/char/joystick/iforce.c
- *  - the skeleton-driver   drivers/usb/usb-skeleton.c
+ *  - information from     http://euc.jp/periphs/xbox-controller.ja.html
+ *  - the iForce driver    drivers/char/joystick/iforce.c
+ *  - the skeleton-driver  drivers/usb/usb-skeleton.c
  *
  * Thanks to:
- *  - ITO Takayuki for providing xpad information on his website
- *  - Vojtech Pavlik      - iforce driver / input subsystem
- *  - Greg Kroah-Hartman  - usb-skeleton driver
+ *  - ITO Takayuki for providing essential xpad information on his website
+ *  - Vojtech Pavlik     - iforce driver / input subsystem
+ *  - Greg Kroah-Hartman - usb-skeleton driver
  *
  * TODO:
- *	- get the black button to work
- *      - fine tune axes
- *      - fix "analog" buttons
- *	- get rumble working
+ *  - fine tune axes
+ *  - fix "analog" buttons (reported as digital now)
+ *  - get rumble working
  *
  * History:
  *
- * 2002-06-27 - 0.0.1 - first version, just said "XBOX HID controller"
+ * 2002-06-27 - 0.0.1 : first version, just said "XBOX HID controller"
  *
- * 2002-07-02 - 0.0.2 - basic working version
- *      all axes and 9 of the 10 buttons work (german InterAct device)
- *      the black button does not work
+ * 2002-07-02 - 0.0.2 : basic working version
+ *  - all axes and 9 of the 10 buttons work (german InterAct device)
+ *  - the black button does not work
  *
+ * 2002-07-14 - 0.0.3 : rework by Vojtech Pavlik
+ *  - indentation fixes
+ *  - usb + input init sequence fixes
+ *
+ * 2002-07-16 - 0.0.4 : minor changes, merge with Vojtech's v0.0.3
+ *  - verified the lack of HID and report descriptors
+ *  - verified that ALL buttons WORK
+ *  - fixed d-pad to axes mapping
+ *
+ * 2002-07-17 - 0.0.5 : simplified d-pad handling
  */
 
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/input.h>
-#include <linux/sched.h>
-#include <linux/signal.h>
-#include <linux/errno.h>
-#include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/fcntl.h>
 #include <linux/module.h>
-#include <linux/spinlock.h>
-#include <linux/list.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/usb.h>
 
-#define DRIVER_VERSION "v0.0.3"
+#define DRIVER_VERSION "v0.0.5"
 #define DRIVER_AUTHOR "Marko Friedemann <mfr@bmx-chemnitz.de>"
 #define DRIVER_DESC "X-Box pad driver"
 
@@ -75,28 +77,23 @@ static struct xpad_device {
 } xpad_device[] = {
 	{ 0x045e, 0x0202, "Microsoft X-Box pad (US)" },
 	{ 0x045e, 0x0285, "Microsoft X-Box pad (Japan)" },
-	{ 0x05fd, 0x107a, "InterAct X-Box pad (Germany)" },
+	{ 0x05fd, 0x107a, "InterAct 'PowerPad Pro' X-Box pad (Germany)" },
 	{ 0x0000, 0x0000, "X-Box pad" }
 };
 
 static signed short xpad_btn[] = {
-	BTN_A, BTN_B, BTN_C, BTN_X, BTN_Y, BTN_Z,       /* 6 "analog" buttons */
-	BTN_START, BTN_BACK, BTN_THUMBL, BTN_THUMBR,    /* start/back + stick press */
-	-1                                              /* terminating entry */
+	BTN_A, BTN_B, BTN_C, BTN_X, BTN_Y, BTN_Z,	/* "analog" buttons */
+	BTN_START, BTN_BACK, BTN_THUMBL, BTN_THUMBR,	/* start/back/sticks */
+	-1						/* terminating entry */
 };
 
 static signed short xpad_abs[] = {
 	ABS_X, ABS_Y,		/* left stick */
 	ABS_RX, ABS_RY,		/* right stick */
 	ABS_Z, ABS_RZ,		/* triggers left/right */
-	ABS_HAT0X, ABS_HAT0Y,	/* dpad */
-	-1                          /* terminating entry */
+	ABS_HAT0X, ABS_HAT0Y,	/* digital pad */
+	-1			/* terminating entry */
 };
-
-static struct {
-	__s32 x;
-	__s32 y;
-} xpad_hat_to_axis[] = { {0, 0}, {0, -1}, {1, -1}, {1, 0}, {1, 1}, {0, 1}, {-1, 1}, {-1, 0}, {-1, -1} };
 
 static struct usb_device_id xpad_table [] = {
 	{ USB_INTERFACE_INFO('X', 'B', 0) },	/* X-Box USB-IF not approved class */
@@ -113,28 +110,17 @@ struct usb_xpad {
 	unsigned char idata[XPAD_PKT_LEN];	/* input data */
 	
 	char phys[65];				/* physical device path */
-	int open_count;				/* how many times has this been opened */
+	int open_count;				/* reference count */
 };
 
 /*
- *      xpad_process_packet
+ *	xpad_process_packet
  *
- *      Completes a request by converting the data into events for the input subsystem.
- *      
- *      The used report descriptor given below was taken from ITO Takayukis website:
- *          http://euc.jp/periphs/xbox-controller.ja.html
+ *	Completes a request by converting the data into events for the
+ *	input subsystem.
  *
- * ----------------------------------------------------------------------------------------------------------------
- * |  padding | byte-cnt | dpad sb12 | reserved |   bt A   |   bt B   |   bt X   |   bt Y   | bt black | bt white |
- * | 01234567 | 01234567 | 0123 4567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 |
- * |    0     |    1     |     2     |    3     |    4     |    5     |    6     |    7     |    8     |    9     |
- * ----------------------------------------------------------------------------------------------------------------
- *
- * ---------------------------------------------------------------------------------------------------------------
- * |  trig L  |  trig R  |     left stick X    |     left stick Y    |     right stick X   |     right stick Y   |
- * | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 | 01234567 |
- * |    10    |    11    |    12    |    13    |    14    |    15    |    16    |    17    |    18    |    19    |
- * ---------------------------------------------------------------------------------------------------------------
+ *	The used report descriptor was taken from ITO Takayukis website:
+ *	 http://euc.jp/periphs/xbox-controller.ja.html
  */
 
 static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *data)
@@ -154,8 +140,8 @@ static void xpad_process_packet(struct usb_xpad *xpad, u16 cmd, unsigned char *d
 	input_report_abs(dev, ABS_RZ, data[11]);
 	
 	/* digital pad */
-	input_report_abs(dev, ABS_HAT0X, xpad_hat_to_axis[data[2] & 0x0f].x);
-	input_report_abs(dev, ABS_HAT0Y, xpad_hat_to_axis[data[2] & 0x0f].y);
+	input_report_abs(dev, ABS_HAT0X, !!(data[2] & 0x08) - !!(data[2] & 0x04));
+	input_report_abs(dev, ABS_HAT0Y, !!(data[2] & 0x02) - !!(data[2] & 0x01));
 	
 	/* start/back buttons and stick press left/right */
 	input_report_key(dev, BTN_START, (data[2] & 0x10) >> 4);
@@ -224,7 +210,7 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 		return NULL;
 	}
 	memset(xpad, 0, sizeof(struct usb_xpad));
-
+	
 	xpad->irq_in = usb_alloc_urb(0, GFP_KERNEL);
         if (!xpad->irq_in) {
 		err("cannot allocate memory for new pad irq urb");
@@ -234,11 +220,13 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	
 	ep_irq_in = udev->actconfig->interface[ifnum].altsetting[0].endpoint + 0;
 	
-	FILL_INT_URB(xpad->irq_in, udev, usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
-	xpad->idata, XPAD_PKT_LEN, xpad_irq_in, xpad, ep_irq_in->bInterval);
+	FILL_INT_URB(xpad->irq_in, udev,
+		usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
+		xpad->idata, XPAD_PKT_LEN, xpad_irq_in, xpad,
+		ep_irq_in->bInterval);
 	
 	xpad->udev = udev;
-
+	
 	xpad->dev.idbus = BUS_USB;
 	xpad->dev.idvendor = udev->descriptor.idVendor;
 	xpad->dev.idproduct = udev->descriptor.idProduct;
@@ -248,38 +236,38 @@ static void * xpad_probe(struct usb_device *udev, unsigned int ifnum, const stru
 	xpad->dev.phys = xpad->phys;
 	xpad->dev.open = xpad_open;
 	xpad->dev.close = xpad_close;
-
+	
 	usb_make_path(udev, path, 64);
 	snprintf(xpad->phys, 64,  "%s/input0", path);
 	
 	xpad->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
-
+	
 	for (i = 0; xpad_btn[i] >= 0; i++)
-	set_bit(xpad_btn[i], xpad->dev.keybit);
+		set_bit(xpad_btn[i], xpad->dev.keybit);
 	
 	for (i = 0; xpad_abs[i] >= 0; i++) {
-
+		
 		signed short t = xpad_abs[i];
-
+		
 		set_bit(t, xpad->dev.absbit);
 		
 		switch (t) {
 			case ABS_X:
 			case ABS_Y:
 			case ABS_RX:
-			case ABS_RY:
+			case ABS_RY:	/* the two sticks */
 				xpad->dev.absmax[t] =  32767;
 				xpad->dev.absmin[t] = -32768;
 				xpad->dev.absflat[t] = 128;
 				xpad->dev.absfuzz[t] = 16;
 				break;
 			case ABS_Z:
-			case ABS_RZ:
+			case ABS_RZ:	/* the triggers */
 				xpad->dev.absmax[t] = 255;
 				xpad->dev.absmin[t] = 0;
 				break;
 			case ABS_HAT0X:
-			case ABS_HAT0Y:
+			case ABS_HAT0Y:	/* the d-pad */
 				xpad->dev.absmax[t] =  1;
 				xpad->dev.absmin[t] = -1;
 				break;
@@ -304,10 +292,10 @@ static void xpad_disconnect(struct usb_device *udev, void *ptr)
 }
 
 static struct usb_driver xpad_driver = {
-	.name =     "xpad",
-	.probe =    xpad_probe,
-	.disconnect = xpad_disconnect,
-	.id_table = xpad_table,
+	.name		= "xpad",
+	.probe		= xpad_probe,
+	.disconnect	= xpad_disconnect,
+	.id_table	= xpad_table,
 };
 
 static int __init usb_xpad_init(void)
