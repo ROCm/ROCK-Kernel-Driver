@@ -12,6 +12,7 @@
 #include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/mm.h>
+#include <linux/notifier.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -260,10 +261,39 @@ void tasklet_kill(struct tasklet_struct *t)
 	clear_bit(TASKLET_STATE_SCHED, &t->state);
 }
 
+
+static void tasklet_init_cpu(int cpu)
+{
+	per_cpu(tasklet_vec, cpu).list = NULL;
+	per_cpu(tasklet_hi_vec, cpu).list = NULL;
+}
+	
+static int tasklet_cpu_notify(struct notifier_block *self, 
+				unsigned long action, void *hcpu)
+{
+	long cpu = (long)hcpu;
+	switch(action) {
+	case CPU_UP_PREPARE:
+		tasklet_init_cpu(cpu);
+		break;
+	default:
+		break;
+	}
+	return 0;
+}
+
+static struct notifier_block tasklet_nb = {
+	.notifier_call	= tasklet_cpu_notify,
+	.next		= NULL,
+};
+
 void __init softirq_init()
 {
 	open_softirq(TASKLET_SOFTIRQ, tasklet_action, NULL);
 	open_softirq(HI_SOFTIRQ, tasklet_hi_action, NULL);
+	tasklet_cpu_notify(&tasklet_nb, (unsigned long)CPU_UP_PREPARE,
+				(void *)(long)smp_processor_id());
+	register_cpu_notifier(&tasklet_nb);
 }
 
 static int ksoftirqd(void * __bind_cpu)
@@ -320,7 +350,9 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
-static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
+static struct notifier_block __devinitdata cpu_nfb = {
+	.notifier_call = cpu_callback
+};
 
 __init int spawn_ksoftirqd(void)
 {
