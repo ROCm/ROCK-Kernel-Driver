@@ -5,10 +5,23 @@
 
 CHAN_OBJS := chan_kern.o chan_user.o line.o 
 
+# This nonsense is due to kbuild.  In the 2.4 build, I stick -lpcap in 
+# pcap-objs, and that is just included in the link command.  The 2.5 kbuild
+# filters out everything from pcap-objs which are not in the built-in.o
+# dependencies, which are $(obj-y).  So, -lpcap must be in $(obj-y), too.
+# However, make magically expands -lfoo prerequisites into /usr/lib/libfoo.a
+# file names.  This causes the kbuild filtering to filter the -lpcap from
+# pcap-objs, causing the link to fail.
+# So, what this does is figure out by hand (crudely) what file -lpcap really 
+# is and just use it.
+
+PCAP = $(shell for f in echo {/lib,/usr/lib}/libpcap.{a,so}; do \
+       [ -f $$f ] && echo $$f ; done | head -1)
+
 slip-objs := slip_kern.o slip_user.o
 daemon-objs := daemon_kern.o daemon_user.o
 mcast-objs := mcast_kern.o mcast_user.o
-pcap-objs := pcap_kern.o pcap_user.o
+pcap-objs := pcap_kern.o pcap_user.o $(PCAP)
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
 hostaudio-objs := hostaudio_kern.o hostaudio_user.o
@@ -23,7 +36,7 @@ obj-$(CONFIG_SSL) += ssl.o
 obj-$(CONFIG_UML_NET_SLIP) += slip.o
 obj-$(CONFIG_UML_NET_DAEMON) += daemon.o 
 obj-$(CONFIG_UML_NET_MCAST) += mcast.o 
-obj-$(CONFIG_UML_NET_PCAP) += pcap.o 
+obj-$(CONFIG_UML_NET_PCAP) += pcap.o $(PCAP)
 obj-$(CONFIG_UML_NET) += net.o 
 obj-$(CONFIG_MCONSOLE) += mconsole.o
 obj-$(CONFIG_MMAPPER) += mmapper_kern.o 
