@@ -19,7 +19,7 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/* $Id: i2c-dev.h,v 1.10 2001/11/19 19:01:46 mds Exp $ */
+/* $Id: i2c-dev.h,v 1.11 2002/07/07 15:42:47 mds Exp $ */
 
 #ifndef I2C_DEV_H
 #define I2C_DEV_H
@@ -144,7 +144,7 @@ static inline __s32 i2c_smbus_read_block_data(int file, __u8 command,
 	else {
 		for (i = 1; i <= data.block[0]; i++)
 			values[i-1] = data.block[i];
-			return data.block[0];
+		return data.block[0];
 	}
 }
 
@@ -190,6 +190,27 @@ static inline __s32 i2c_smbus_write_i2c_block_data(int file, __u8 command,
 	data.block[0] = length;
 	return i2c_smbus_access(file,I2C_SMBUS_WRITE,command,
 	                        I2C_SMBUS_I2C_BLOCK_DATA, &data);
+}
+
+/* Returns the number of read bytes */
+static inline __s32 i2c_smbus_block_process_call(int file, __u8 command,
+                                                 __u8 length, __u8 *values)
+{
+	union i2c_smbus_data data;
+	int i;
+	if (length > 32)
+		length = 32;
+	for (i = 1; i <= length; i++)
+		data.block[i] = values[i-1];
+	data.block[0] = length;
+	if (i2c_smbus_access(file,I2C_SMBUS_WRITE,command,
+	                     I2C_SMBUS_BLOCK_PROC_CALL,&data))
+		return -1;
+	else {
+		for (i = 1; i <= data.block[0]; i++)
+			values[i-1] = data.block[i];
+		return data.block[0];
+	}
 }
 
 #endif /* ndef __KERNEL__ */
