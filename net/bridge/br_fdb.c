@@ -41,15 +41,15 @@ static __inline__ int has_expired(struct net_bridge *br,
 	return 0;
 }
 
-static __inline__ void copy_fdb(struct __fdb_entry *ent, struct net_bridge_fdb_entry *f)
+static __inline__ void copy_fdb(struct __fdb_entry *ent, 
+				const struct net_bridge_fdb_entry *f)
 {
 	memset(ent, 0, sizeof(struct __fdb_entry));
 	memcpy(ent->mac_addr, f->addr.addr, ETH_ALEN);
 	ent->port_no = f->dst?f->dst->port_no:0;
 	ent->is_local = f->is_local;
-	ent->ageing_timer_value = 0;
-	if (!f->is_static)
-		ent->ageing_timer_value = jiffies - f->ageing_timer;
+	ent->ageing_timer_value = f->is_static ? 0 
+		: ((jiffies - f->ageing_timer) * USER_HZ) / HZ;
 }
 
 static __inline__ int br_mac_hash(unsigned char *mac)
