@@ -837,7 +837,7 @@ qla2x00_queuecommand(struct scsi_cmnd *cmd, void (*fn)(struct scsi_cmnd *))
 		device_reg_t *reg;
 		reg = ha->iobase;
 		
-		if (RD_REG_WORD(ISP_RSP_Q_IN(ha, reg)) != ha->rsp_ring_index) {
+		if (ha->response_ring_ptr->signature != RESPONSE_PROCESSED) {
 			spin_lock_irqsave(&ha->hardware_lock, flags);	
 			qla2x00_process_response_queue(ha);
 			spin_unlock_irqrestore(&ha->hardware_lock, flags);
@@ -4243,9 +4243,6 @@ qla2x00_process_response_queue_in_zio_mode(scsi_qla_host_t *ha)
 	spin_lock_irqsave(&ha->hardware_lock,flags);
 	qla2x00_process_response_queue(ha);
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
-
-	if (!list_empty(&ha->done_queue))
-		qla2x00_done(ha);
 }
 
 /*
