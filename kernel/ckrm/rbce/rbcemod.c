@@ -2191,10 +2191,16 @@ static const char* event_names[CKRM_NUM_EVENTS] = {
 	AENT(MANUAL),
 };
 
-void * rbce_tc_classify(enum ckrm_event event, struct task_struct* tsk)
+void * rbce_tc_classify(enum ckrm_event event, ...)
 {
+	va_list args;
 	void *cls = NULL;
-
+	struct task_struct *tsk;
+	
+	va_start(args, event);
+	tsk = va_arg(args, struct task_struct *);
+	va_end(args);
+	
 	/* we only have to deal with events between 
 	 * [ CKRM_LATCHABLE_EVENTS .. CKRM_NONLATCHABLE_EVENTS ) 
 	 */
@@ -2281,11 +2287,18 @@ static struct ckrm_eng_callback rbce_taskclass_ecbs = {
 
 int sc_classtype = -1;
 
-void * rbce_sc_classify(enum ckrm_event event, 
-			struct ckrm_net_struct *ns, struct task_struct *tsk)
+void * rbce_sc_classify(enum ckrm_event event, ...)
 {
 	// no special consideratation
 	void *result;
+	va_list args;
+	struct task_struct *tsk;
+	struct ckrm_net_struct *ns;
+
+	va_start(args, event);
+	ns = va_arg(args, struct ckrm_net_struct *);
+	tsk = va_arg(args, struct task_struct *);
+	va_end(args);
 
 	result = rbce_classify(tsk, ns, RBCE_TERMFLAG_ALL,sc_classtype);
 
