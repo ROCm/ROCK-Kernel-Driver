@@ -341,6 +341,7 @@ static int driver_probe (struct usb_interface *intf,
 static void driver_disconnect(struct usb_interface *intf)
 {
 	struct dev_state *ps = usb_get_intfdata (intf);
+	unsigned int ifnum = intf->altsetting->desc.bInterfaceNumber;
 
 	if (!ps)
 		return;
@@ -349,11 +350,12 @@ static void driver_disconnect(struct usb_interface *intf)
 	 * all pending I/O requests; 2.6 does that.
 	 */
 
-	clear_bit(intf->cur_altsetting->desc.bInterfaceNumber, &ps->ifclaimed);
+	if (ifnum < 8*sizeof(ps->ifclaimed))
+		clear_bit(ifnum, &ps->ifclaimed);
 	usb_set_intfdata (intf, NULL);
 
 	/* force async requests to complete */
-	destroy_all_async (ps);
+	destroy_async_on_interface(ps, ifnum);
 }
 
 struct usb_driver usbdevfs_driver = {
