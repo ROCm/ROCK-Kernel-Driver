@@ -287,8 +287,12 @@ checkentry(const char *tablename,
        return 1;
 }
 
-static struct ip6t_match rt_match
-= { { NULL, NULL }, "rt", &match, &checkentry, NULL, THIS_MODULE };
+static struct ip6t_match rt_match = {
+	.name		= "rt",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

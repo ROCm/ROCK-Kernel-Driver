@@ -265,12 +265,16 @@ checkentry(const char *tablename,
        return 1;
 }
 
-static struct ip6t_match opts_match
+static struct ip6t_match opts_match = {
 #if HOPBYHOP
-= { { NULL, NULL }, "hbh", &match, &checkentry, NULL, THIS_MODULE };
+	.name		= "hbh",
 #else
-= { { NULL, NULL }, "dst", &match, &checkentry, NULL, THIS_MODULE };
+	.name		= "dst",
 #endif
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

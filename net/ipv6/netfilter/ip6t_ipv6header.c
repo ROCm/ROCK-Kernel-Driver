@@ -196,14 +196,12 @@ ipv6header_destroy(void *matchinfo,
 	return;
 }
 
-static struct ip6t_match
-ip6t_ipv6header_match = {
-	{ NULL, NULL },
-	"ipv6header",
-	&ipv6header_match,
-	&ipv6header_checkentry,
-	&ipv6header_destroy,
-	THIS_MODULE
+static struct ip6t_match ip6t_ipv6header_match = {
+	.name		= "ipv6header",
+	.match		= &ipv6header_match,
+	.checkentry	= &ipv6header_checkentry,
+	.destroy	= &ipv6header_destroy,
+	.me		= THIS_MODULE,
 };
 
 static int  __init ipv6header_init(void)

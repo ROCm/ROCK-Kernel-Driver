@@ -47,8 +47,12 @@ ip6t_mac_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ip6t_match mac_match
-= { { NULL, NULL }, "mac", &match, &ip6t_mac_checkentry, NULL, THIS_MODULE };
+static struct ip6t_match mac_match = {
+	.name		= "mac",
+	.match		= &match,
+	.checkentry	= &ip6t_mac_checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

@@ -69,8 +69,12 @@ ip6t_eui64_checkentry(const char *tablename,
 	return 1;
 }
 
-static struct ip6t_match eui64_match
-= { { NULL, NULL }, "eui64", &match, &ip6t_eui64_checkentry, NULL, THIS_MODULE };
+static struct ip6t_match eui64_match = {
+	.name		= "eui64",
+	.match		= &match,
+	.checkentry	= &ip6t_eui64_checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

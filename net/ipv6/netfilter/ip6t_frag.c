@@ -232,8 +232,12 @@ checkentry(const char *tablename,
        return 1;
 }
 
-static struct ip6t_match frag_match
-= { { NULL, NULL }, "frag", &match, &checkentry, NULL, THIS_MODULE };
+static struct ip6t_match frag_match = {
+	.name		= "frag",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {

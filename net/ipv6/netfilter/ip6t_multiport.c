@@ -84,8 +84,12 @@ checkentry(const char *tablename,
 		&& multiinfo->count <= IP6T_MULTI_PORTS;
 }
 
-static struct ip6t_match multiport_match
-= { { NULL, NULL }, "multiport", &match, &checkentry, NULL, THIS_MODULE };
+static struct ip6t_match multiport_match = {
+	.name		= "multiport",
+	.match		= &match,
+	.checkentry	= &checkentry,
+	.me		= THIS_MODULE,
+};
 
 static int __init init(void)
 {
