@@ -94,16 +94,7 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
     int size = len*sizeof(u16);
 
     if (cmap->len != len) {
-	if (cmap->red)
-	    kfree(cmap->red);
-	if (cmap->green)
-	    kfree(cmap->green);
-	if (cmap->blue)
-	    kfree(cmap->blue);
-	if (cmap->transp)
-	    kfree(cmap->transp);
-	cmap->red = cmap->green = cmap->blue = cmap->transp = NULL;
-	cmap->len = 0;
+	fb_dealloc_cmap(cmap);
 	if (!len)
 	    return 0;
 	if (!(cmap->red = kmalloc(size, GFP_ATOMIC)))
@@ -124,6 +115,29 @@ int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp)
     return 0;
 }
 
+/**
+ *      fb_dealloc_cmap - deallocate a colormap
+ *      @cmap: frame buffer colormap structure
+ *
+ *      Deallocates a colormap that was previously allocated with
+ *      fb_alloc_cmap().
+ *
+ */
+
+void fb_dealloc_cmap(struct fb_cmap *cmap)
+{
+	if (cmap->red)
+		kfree(cmap->red);
+	if (cmap->green)
+		kfree(cmap->green);
+	if (cmap->blue)
+		kfree(cmap->blue);
+	if (cmap->transp)
+		kfree(cmap->transp);
+
+	cmap->red = cmap->green = cmap->blue = cmap->transp = NULL;
+	cmap->len = 0;
+}
 
 /**
  *	fb_copy_cmap - copy a colormap
@@ -296,6 +310,7 @@ void fb_invert_cmaps(void)
      */
 
 EXPORT_SYMBOL(fb_alloc_cmap);
+EXPORT_SYMBOL(fb_dealloc_cmap);
 EXPORT_SYMBOL(fb_copy_cmap);
 EXPORT_SYMBOL(fb_set_cmap);
 EXPORT_SYMBOL(fb_default_cmap);

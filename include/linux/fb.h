@@ -331,12 +331,6 @@ struct fb_image {
 
 #ifdef __KERNEL__
 
-#if 1 /* to go away in 2.5.0 */
-extern int GET_FB_IDX(kdev_t rdev);
-#else
-#define GET_FB_IDX(node)	(minor(node))
-#endif
-
 #include <linux/fs.h>
 #include <linux/poll.h>
 #include <linux/init.h>
@@ -386,8 +380,6 @@ struct fb_ops {
 		    unsigned long arg, struct fb_info *info);
     /* perform fb specific mmap */
     int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
-    /* switch to/from raster image mode */
-    int (*fb_rasterimg)(struct fb_info *info, int start);
 };
 
 struct fb_info {
@@ -481,6 +473,7 @@ extern int fbmon_dpms(const struct fb_info *fb_info);
 
 /* drivers/video/fbcmap.c */
 extern int fb_alloc_cmap(struct fb_cmap *cmap, int len, int transp);
+extern void fb_dealloc_cmap(struct fb_cmap *cmap);
 extern void fb_copy_cmap(struct fb_cmap *from, struct fb_cmap *to,
 			 int fsfromto);
 extern int fb_set_cmap(struct fb_cmap *cmap, int kspc, struct fb_info *fb_info);
@@ -540,55 +533,5 @@ extern int __init fb_find_mode(struct fb_var_screeninfo *var,
 #endif
 
 #endif /* __KERNEL__ */
-
-#if 1
-
-#define FBCMD_GET_CURRENTPAR	0xDEAD0005
-#define FBCMD_SET_CURRENTPAR	0xDEAD8005
-
-#endif
-
-
-#if 1 /* Preliminary */
-
-   /*
-    *    Hardware Cursor
-    */
-
-#define FBIOGET_FCURSORINFO     0x4607
-#define FBIOGET_VCURSORINFO     0x4608
-#define FBIOPUT_VCURSORINFO     0x4609
-#define FBIOGET_CURSORSTATE     0x460A
-#define FBIOPUT_CURSORSTATE     0x460B
-
-
-struct fb_fix_cursorinfo {
-	__u16 crsr_width;		/* width and height of the cursor in */
-	__u16 crsr_height;		/* pixels (zero if no cursor)	*/
-	__u16 crsr_xsize;		/* cursor size in display pixels */
-	__u16 crsr_ysize;
-	__u16 crsr_color1;		/* colormap entry for cursor color1 */
-	__u16 crsr_color2;		/* colormap entry for cursor color2 */
-};
-
-struct fb_var_cursorinfo {
-	__u16 width;
-	__u16 height;
-	__u16 xspot;
-	__u16 yspot;
-	__u8 data[1];			/* field with [height][width]        */
-};
-
-struct fb_cursorstate {
-	__s16 xoffset;
-	__s16 yoffset;
-	__u16 mode;
-};
-
-#define FB_CURSOR_OFF		0
-#define FB_CURSOR_ON		1
-#define FB_CURSOR_FLASH		2
-
-#endif /* Preliminary */
 
 #endif /* _LINUX_FB_H */

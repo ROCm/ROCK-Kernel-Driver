@@ -1605,7 +1605,7 @@ aty128_init(struct fb_info *info, const char *name)
 #endif
 
 	printk(KERN_INFO "fb%d: %s frame buffer device on %s\n",
-	       GET_FB_IDX(info->node), info->fix.id, name);
+	       minor(info->node), info->fix.id, name);
 
 	return 1;	/* success! */
 }

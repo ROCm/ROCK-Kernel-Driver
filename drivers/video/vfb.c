@@ -448,7 +448,7 @@ int __init vfb_init(void)
 
 	printk(KERN_INFO
 	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), videomemorysize >> 10);
+	       minor(fb_info.node), videomemorysize >> 10);
 	return 0;
 }
 

@@ -201,7 +201,7 @@ static int fbcon_scrolldelta(struct vc_data *conp, int lines);
  *  Internal routines
  */
 
-static void fbcon_setup(int con, int init, int logo);
+static void fbcon_set_display(int con, int init, int logo);
 static __inline__ int real_y(struct display *p, int ypos);
 static void fbcon_vbl_handler(int irq, void *dummy, struct pt_regs *fp);
 static __inline__ void updatescrollmode(struct display *p);
@@ -315,7 +315,7 @@ void gen_set_disp(int con, struct fb_info *info)
                 int unit;
 
                 for (unit = 0; unit < MAX_NR_CONSOLES; unit++)
-        		if (fb_display[unit].conp && con2fb_map[unit] == GET_FB_IDX(info->node))
+        		if (fb_display[unit].conp && con2fb_map[unit] == minor(info->node))
                                 fb_display[unit].var = info->var;
         }
         */
@@ -541,8 +541,8 @@ static void fbcon_init(struct vc_data *conp, int init)
     fb_display[unit].conp = conp;
     fb_display[unit].fb_info = info;
     /* clear out the cmap so we don't have dangling pointers */
-    fbcon_setup(unit, init, !init);
-    /* Must be done after fbcon_setup to prevent excess updates */
+    fbcon_set_display(unit, init, !init);
+    /* Must be done after fbcon_set_display to prevent excess updates */
     conp->vc_display_fg = &info->display_fg;
     if (!info->display_fg)
         info->display_fg = conp;
@@ -563,7 +563,7 @@ static void fbcon_deinit(struct vc_data *conp)
 static int fbcon_changevar(int con)
 {
     if (fb_display[con].conp)
-	    fbcon_setup(con, 0, 0);
+	    fbcon_set_display(con, 0, 0);
     return 0;
 }
 
@@ -604,7 +604,7 @@ static void fbcon_font_widths(struct display *p)
 
 #define fontwidthvalid(p,w) ((p)->dispsw->fontwidthmask & FONTWIDTH(w))
 
-static void fbcon_setup(int con, int init, int logo)
+static void fbcon_set_display(int con, int init, int logo)
 {
     struct display *p = &fb_display[con];
     struct fb_info *info = p->fb_info;
@@ -680,7 +680,7 @@ static void fbcon_setup(int con, int init, int logo)
     
     if (!fontwidthvalid(p,fontwidth(p))) {
 	/* ++Geert: changed from panic() to `correct and continue' */
-	printk(KERN_ERR "fbcon_setup: No support for fontwidth %d\n", fontwidth(p));
+	printk(KERN_ERR "fbcon_set_display: No support for fontwidth %d\n", fontwidth(p));
 	p->dispsw = &fbcon_dummy;
     }
     if (p->dispsw->set_font)
@@ -762,7 +762,7 @@ static void fbcon_setup(int con, int init, int logo)
     }
 
     if (p->dispsw == &fbcon_dummy)
-	printk(KERN_WARNING "fbcon_setup: type %d (aux %d, depth %d) not "
+	printk(KERN_WARNING "fbcon_set_display: type %d (aux %d, depth %d) not "
 	       "supported\n", info->fix.type, info->fix.type_aux, 
 		info->var.bits_per_pixel);
     p->dispsw->setup(p);
@@ -772,7 +772,7 @@ static void fbcon_setup(int con, int init, int logo)
 
     if (!init) {
 	if (conp->vc_cols != nr_cols || conp->vc_rows != nr_rows)
-	    vc_resize_con(nr_rows, nr_cols, con);
+	    vc_resize(con, nr_cols, nr_rows);
 	else if (CON_IS_VISIBLE(conp) &&
 		 vt_cons[conp->vc_num]->vc_mode == KD_TEXT) {
 	    if (p->dispsw->clear_margins)
@@ -1825,7 +1825,7 @@ static int fbcon_do_set_font(int unit, struct console_font_op *op, u8 *data, int
 	if ((info->var.yres % h) && (info->var.yres_virtual % h < info->var.yres % h))
 	    p->vrows--;
 	updatescrollmode(p);
-	vc_resize_con( info->var.yres/h, info->var.xres/w, unit );
+	vc_resize(unit, info->var.xres/w, info->var.yres/h);
         if (CON_IS_VISIBLE(conp) && softback_buf) {
 	    int l = fbcon_softback_size / conp->vc_size_row;
 	    if (l > 5)
@@ -2289,9 +2289,6 @@ static int __init fbcon_show_logo( void )
 	}
 #endif
  
-    if (info->fbops->fb_rasterimg)
-    	info->fbops->fb_rasterimg(info, 1);
-
     for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
     	 x < info->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
 #if defined (CONFIG_FBCON_ACCEL)
@@ -2410,9 +2407,6 @@ static int __init fbcon_show_logo( void )
 #endif
     }
    
-    if (info->fbops->fb_rasterimg)
-    	info->fbops->fb_rasterimg(info, 0);
-
 #if defined (CONFIG_FBCON_ACCEL)
 	if (palette != NULL)
 		kfree(palette);

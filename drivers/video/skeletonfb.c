@@ -447,7 +447,7 @@ int __init xxxfb_init(void)
 	
     if (register_framebuffer(&info) < 0)
 	return -EINVAL;
-    printk(KERN_INFO "fb%d: %s frame buffer device\n", GET_FB_IDX(info.node),
+    printk(KERN_INFO "fb%d: %s frame buffer device\n", minor(info.node),
 	   info.fix.id);
     return 0;
 }

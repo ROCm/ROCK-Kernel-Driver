@@ -714,26 +714,7 @@ source "sound/Kconfig"
 
 endmenu
 
-
-menu "Console drivers"
-	depends on VT
-
 source "drivers/video/Kconfig"
-
-#  bool 'IODC console' CONFIG_IODC_CONSOLE
-config STI_CONSOLE
-	bool "STI console"
-	help
-	  The STI console is the builtin display/keyboard on HP-PARISC
-	  machines.  Say Y here to build support for it into your kernel.
-	  The alternative is to use your primary serial port as a console.
-
-config DUMMY_CONSOLE
-	bool
-	depends on STI_CONSOLE || !IODC_CONSOLE && GSC_PS2
-	default y
-
-endmenu
 
 # endmenu
 

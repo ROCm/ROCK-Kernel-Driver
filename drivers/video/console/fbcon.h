@@ -13,8 +13,8 @@
 
 #include <linux/config.h>
 #include <linux/types.h>
-#include <linux/console_struct.h>
 #include <linux/vt_buffer.h>
+#include <linux/vt_kern.h>
 
 #include <asm/io.h>
 

@@ -540,7 +540,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 	}
 
 	printk(KERN_INFO "fb%d: Open Firmware frame buffer device on %s\n",
-	       GET_FB_IDX(info->node), full_name);
+	       minor(info->node), full_name);
 }
 
 MODULE_LICENSE("GPL");

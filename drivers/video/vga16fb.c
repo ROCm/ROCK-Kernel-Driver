@@ -1236,7 +1236,7 @@ int __init vga16fb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(vga16fb.node), vga16fb.modename);
+	       minor(vga16fb.node), vga16fb.modename);
 
 	return 0;
 }

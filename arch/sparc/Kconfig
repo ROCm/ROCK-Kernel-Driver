@@ -409,23 +409,7 @@ config PRINTER
 
 endmenu
 
-
-menu "Console drivers"
-
-config PROM_CONSOLE
-	bool "PROM console"
-	help
-	  Say Y to build a console driver for Sun machines that uses the
-	  terminal emulation built into their console PROMS.
-
-config DUMMY_CONSOLE
-	bool
-	depends on !PROM_CONSOLE
-	default y
-
 source "drivers/video/Kconfig"
-
-endmenu
 
 source "drivers/mtd/Kconfig"
 

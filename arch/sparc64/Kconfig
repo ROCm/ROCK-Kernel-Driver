@@ -517,18 +517,7 @@ config WATCHDOG_RIO
 
 endmenu
 
-
-menu "Console drivers"
-
-config PROM_CONSOLE
-	bool "PROM console"
-	help
-	  Say Y to build a console driver for Sun machines that uses the
-	  terminal emulation built into their console PROMS.
-
 source "drivers/video/Kconfig"
-
-endmenu
 
 source "drivers/serial/Kconfig"
 

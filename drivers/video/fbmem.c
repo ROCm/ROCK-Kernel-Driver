@@ -381,7 +381,7 @@ static int fbmem_read_proc(char *buf, char **start, off_t offset,
 	for (fi = registered_fb; fi < &registered_fb[FB_MAX] && len < 4000; fi++)
 		if (*fi)
 			clen += sprintf(buf + clen, "%d %s\n",
-				        GET_FB_IDX((*fi)->node),
+				        minor((*fi)->node),
 				        (*fi)->fix.id);
 	*start = buf + offset;
 	if (clen > offset)
@@ -396,7 +396,7 @@ fb_read(struct file *file, char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 
 	if (!info || ! info->screen_base)
@@ -425,7 +425,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	struct inode *inode = file->f_dentry->d_inode;
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	int err;
 
@@ -468,7 +468,7 @@ static int
 fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	 unsigned long arg)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	struct fb_var_screeninfo var;
@@ -562,7 +562,7 @@ fb_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 static int 
 fb_mmap(struct file *file, struct vm_area_struct * vma)
 {
-	int fbidx = GET_FB_IDX(file->f_dentry->d_inode->i_rdev);
+	int fbidx = minor(file->f_dentry->d_inode->i_rdev);
 	struct fb_info *info = registered_fb[fbidx];
 	struct fb_ops *fb = info->fbops;
 	unsigned long off;
@@ -658,28 +658,10 @@ fb_mmap(struct file *file, struct vm_area_struct * vma)
 #endif /* !sparc32 */
 }
 
-#if 1 /* to go away in 2.5.0 */
-int GET_FB_IDX(kdev_t rdev)
-{
-    int fbidx = minor(rdev);
-    if (fbidx >= 32) {
-	int newfbidx = fbidx >> 5;
-	static int warned;
-	if (!(warned & (1<<newfbidx))) {
-	    warned |= 1<<newfbidx;
-	    printk("Warning: Remapping obsolete /dev/fb* minor %d to %d\n",
-		   fbidx, newfbidx);
-	}
-	fbidx = newfbidx;
-    }
-    return fbidx;
-}
-#endif
-
 static int
 fb_open(struct inode *inode, struct file *file)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info;
 	int res = 0;
 
@@ -702,7 +684,7 @@ fb_open(struct inode *inode, struct file *file)
 static int 
 fb_release(struct inode *inode, struct file *file)
 {
-	int fbidx = GET_FB_IDX(inode->i_rdev);
+	int fbidx = minor(inode->i_rdev);
 	struct fb_info *info;
 
 	lock_kernel();
@@ -800,7 +782,6 @@ register_framebuffer(struct fb_info *fb_info)
 	    devfs_register (devfs_handle, name_buf, DEVFS_FL_DEFAULT,
 			    FB_MAJOR, i, S_IFCHR | S_IRUGO | S_IWUGO,
 			    &fb_fops, NULL);
-
 	return 0;
 }
 
@@ -820,7 +801,7 @@ unregister_framebuffer(struct fb_info *fb_info)
 {
 	int i, j;
 
-	i = GET_FB_IDX(fb_info->node);
+	i = minor(fb_info->node);
 #ifdef CONFIG_FRAMEBUFFER_CONSOLE
 	for (j = 0; j < MAX_NR_CONSOLES; j++)
 		if (con2fb_map[j] == i)
@@ -982,8 +963,5 @@ EXPORT_SYMBOL(register_framebuffer);
 EXPORT_SYMBOL(unregister_framebuffer);
 EXPORT_SYMBOL(registered_fb);
 EXPORT_SYMBOL(num_registered_fb);
-#if 1 /* to go away in 2.5.0 */
-EXPORT_SYMBOL(GET_FB_IDX);
-#endif
 
 MODULE_LICENSE("GPL");

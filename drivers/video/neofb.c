@@ -1896,7 +1896,7 @@ static int __devinit neofb_probe(struct pci_dev *dev,
 		goto failed;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(info->node), info->modename);
+	       minor(info->node), info->modename);
 
 	/*
 	 * Our driver data

@@ -248,9 +248,6 @@ int __init g364fb_init(void)
 
 	if (register_framebuffer(&fb_info) < 0)
 		return -EINVAL;
-
-	printk("fb%d: %s frame buffer device\n", GET_FB_IDX(fb_info.node),
-	       fb_info.fix.id);
 	return 0;
 }
 

@@ -33,7 +33,6 @@
 #include <linux/module.h>
 #include <linux/tty.h>
 #include <linux/console.h>
-#include <linux/console_struct.h>
 #include <linux/string.h>
 #include <linux/kd.h>
 #include <linux/slab.h>
@@ -364,7 +363,7 @@ static void mdacon_init(struct vc_data *c, int init)
 		c->vc_cols = mda_num_columns;
 		c->vc_rows = mda_num_lines;
 	} else {
-		vc_resize_con(mda_num_lines, mda_num_columns, c->vc_num);
+		vc_resize(c->vc_num, mda_num_columns, mda_num_lines);
         }
 	
 	/* make the first MDA console visible */

@@ -1299,7 +1299,7 @@ stifb_init_fb(struct sti_struct *sti, int force_bpp)
 
 	printk(KERN_INFO 
 	    "fb%d: %s %dx%d-%d frame buffer device, id: %04x, mmio: 0x%04lx\n",
-		GET_FB_IDX(fb->info.node), 
+		minor(fb->info.node), 
 		fb->info.modename,
 		disp->var.xres, 
 		disp->var.yres,

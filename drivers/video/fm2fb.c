@@ -273,7 +273,7 @@ int __init fm2fb_init(void)
 		if (register_framebuffer(&fb_info) < 0)
 			return -EINVAL;
 
-		printk("fb%d: %s frame buffer device\n", GET_FB_IDX(fb_info.node), fb_fix.id);
+		printk("fb%d: %s frame buffer device\n", minor(fb_info.node), fb_fix.id);
 		return 0;
 	}
 	return -ENXIO;

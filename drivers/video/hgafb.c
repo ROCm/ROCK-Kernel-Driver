@@ -526,7 +526,7 @@ int __init hgafb_init(void)
                 return -EINVAL;
 
         printk(KERN_INFO "fb%d: %s frame buffer device\n",
-               GET_FB_IDX(fb_info.node), fb_info.modename);
+               minor(fb_info.node), fb_info.modename);
 	
 	return 0;
 }

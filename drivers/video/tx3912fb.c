@@ -309,7 +309,7 @@ int __init tx3912fb_init(void)
 		return -1;
 
 	printk(KERN_INFO "fb%d: TX3912 frame buffer using %uKB.\n",
-	       GET_FB_IDX(fb_info.node), (u_int) (fb_info.fix.smem_len >> 10));
+	       minor(fb_info.node), (u_int) (fb_info.fix.smem_len >> 10));
 	return 0;
 }
 

@@ -49,7 +49,6 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/console.h>
-#include <linux/console_struct.h>
 #include <linux/errno.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
@@ -137,7 +136,7 @@ static void sticon_init(struct vc_data *c, int init)
 	vc_cols = PTR_STI(sti->glob_cfg)->onscreen_x / sti_font_x(sti);
 	vc_rows = PTR_STI(sti->glob_cfg)->onscreen_y / sti_font_y(sti);
 
-	vc_resize_con(vc_rows, vc_cols, c->vc_num);
+	vc_resize(c->vc_num, vc_cols, vc_rows);
 }
 
 static void sticon_deinit(struct vc_data *c)

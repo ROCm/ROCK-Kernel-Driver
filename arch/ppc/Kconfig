@@ -1045,11 +1045,6 @@ config CMDLINE
 	  some command-line options at build time by entering them here.  In
 	  most cases you will need to specify the root device here.
 
-config FB_CONSOLE
-	bool
-	depends on APUS
-	default y
-
 config AMIGA
 	bool
 	depends on APUS
@@ -1424,24 +1419,7 @@ source "net/irda/Kconfig"
 
 source "drivers/isdn/Kconfig"
 
-
-menu "Console drivers"
-
-config VGA_CONSOLE
-	bool "VGA text console"
-	depends on !4xx && !8xx
-	help
-	  Saying Y here will allow you to use Linux in text mode through a
-	  display that complies with the generic VGA standard.  This can be
-	  useful on PReP systems and IBM RS/6000 or pSeries machines but is of
-	  limited usefulness on Apple machines.
-
-	  Say N here if you have an Apple machine.
-
 source "drivers/video/Kconfig"
-
-endmenu
-
 
 menu "iSeries device drivers"
 	depends on PPC_ISERIES

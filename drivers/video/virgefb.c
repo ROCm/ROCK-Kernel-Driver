@@ -1806,7 +1806,7 @@ int __init virgefb_init(void)
 	}
 
 	printk(KERN_INFO "fb%d: %s frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), fb_info.modename, v_ram_size>>10);
+	       minor(fb_info.node), fb_info.modename, v_ram_size>>10);
 
 	/* TODO: This driver cannot be unloaded yet */
 

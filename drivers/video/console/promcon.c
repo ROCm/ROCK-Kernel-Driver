@@ -15,7 +15,6 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <linux/console.h>
-#include <linux/console_struct.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
 #include <linux/fb.h>
@@ -184,7 +183,7 @@ promcon_init(struct vc_data *conp, int init)
 	}
 	if (!init) {
 		if (conp->vc_cols != pw + 1 || conp->vc_rows != ph + 1)
-			vc_resize_con(ph + 1, pw + 1, conp->vc_num);
+			vc_resize(conp->unit, pw + 1, ph + 1);
 	}
 }
 

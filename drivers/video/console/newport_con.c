@@ -16,7 +16,6 @@
 #include <linux/kd.h>
 #include <linux/selection.h>
 #include <linux/console.h>
-#include <linux/console_struct.h>
 #include <linux/vt_kern.h>
 #include <linux/mm.h>
 #include <linux/module.h>

@@ -739,7 +739,7 @@ int __init sgivwfb_init(void)
 
 	printk(KERN_INFO
 	       "fb%d: Virtual frame buffer device, using %ldK of video memory\n",
-	       GET_FB_IDX(fb_info.node), sgivwfb_mem_size >> 10);
+	       minor(fb_info.node), sgivwfb_mem_size >> 10);
 
 	return 0;
 

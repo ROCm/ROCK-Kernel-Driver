@@ -353,7 +353,7 @@ int __init vesafb_init(void)
 		return -EINVAL;
 
 	printk(KERN_INFO "fb%d: %s frame buffer device\n",
-	       GET_FB_IDX(fb_info.node), fb_info.fix.id);
+	       minor(fb_info.node), fb_info.fix.id);
 	return 0;
 }
 

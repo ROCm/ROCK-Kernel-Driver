@@ -41,7 +41,6 @@
 #include <linux/kernel.h>
 #include <linux/tty.h>
 #include <linux/console.h>
-#include <linux/console_struct.h>
 #include <linux/string.h>
 #include <linux/kd.h>
 #include <linux/slab.h>
@@ -888,7 +887,12 @@ vgacon_adjust_height(unsigned fontheight)
 	outb_p( vde, vga_video_port_val );
 	spin_unlock_irq(&vga_lock);	
 
-	vc_resize_all(rows, 0);			/* Adjust console size */
+	for (i = 0; i < MAX_NR_CONSOLES; i++) {
+		struct vc_data *c = vc_cons[i].d;
+
+		if (c && c->vc_sw == &vga_con)
+			vc_resize(c->vc_num, 0, rows);	/* Adjust console size */
+	}
 	return 0;
 }
 

@@ -122,7 +122,7 @@ int q40fb_init(void)
 	}
 
         printk(KERN_INFO "fb%d: Q40 frame buffer alive and kicking !\n",
-	       GET_FB_IDX(fb_info.node));
+	       minor(fb_info.node));
 	return 0;
 }
 
