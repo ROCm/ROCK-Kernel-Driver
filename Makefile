@@ -831,8 +831,7 @@ ifeq ($(filter ../% /%,$(SUBDIRS)),)
 clean_subdirs := .
 clean: _clean archclean $(clean-dirs)
 	$(call cmd,rmclean)
-mrproper distclean: _mrproper archmrproper
-	@echo "  Making $@ in the srctree"
+mrproper distclean: clean _mrproper archmrproper
 	$(call cmd,mrproper)
 
 else
@@ -840,7 +839,6 @@ else
 clean_subdirs := $(filter ../% /%,$(SUBDIRS))
 clean: _clean
 mrproper distclean: _mrproper
-	@echo "  Making $@ in $(clean_subdirs)"
 	$(Q)rm -rf $(MODVERDIR)
 
 endif

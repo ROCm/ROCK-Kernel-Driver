@@ -738,6 +738,8 @@ nfs_init_locked(struct inode *inode, void *opaque)
 
 #ifdef CONFIG_NFS_ACL
 static struct inode_operations nfs_special_inode_operations = {
+	.getattr =	nfs_getattr,
+	.setattr =	nfs_setattr,
 	.listxattr =	nfs_listxattr,
 	.getxattr =	nfs_getxattr,
 	.setxattr =	nfs_setxattr,
