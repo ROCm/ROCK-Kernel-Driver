@@ -465,7 +465,22 @@ restart:
 	rt = fn->leaf;
 
 	if ((rt->rt6i_flags & RTF_CACHE)) {
+		struct neighbour *neigh;
 		rt = rt6_device_match(rt, fl->oif, strict);
+		/* removing routes created by icmp redirect */
+		if ((neigh = rt->rt6i_nexthop) != NULL) {
+			read_lock_bh(&neigh->lock);
+			if (neigh->nud_state == NUD_FAILED
+			 || (!(neigh->flags & NTF_ROUTER) && (rt->rt6i_flags & RTF_GATEWAY))) {
+				read_unlock_bh(&neigh->lock);
+				dst_hold(&rt->u.dst);
+				read_unlock_bh(&rt6_lock);
+				rt->rt6i_expires = jiffies - 1;
+				ip6_del_rt(rt, NULL, NULL);
+				goto relookup;
+			}
+			read_unlock_bh(&neigh->lock);
+		}
 		BACKTRACK();
 		dst_hold(&rt->u.dst);
 		goto out;
@@ -1038,7 +1053,7 @@ source_ok:
 	nrt->rt6i_src.plen = rt->rt6i_src.plen;
 #endif
 
-	nrt->rt6i_flags = RTF_GATEWAY|RTF_UP|RTF_DYNAMIC|RTF_CACHE;
+	nrt->rt6i_flags = RTF_GATEWAY|RTF_UP|RTF_DYNAMIC|RTF_CACHE|RTF_EXPIRES;
 	if (on_link)
 		nrt->rt6i_flags &= ~RTF_GATEWAY;
 
