@@ -1978,7 +1978,8 @@ int __init atyfb_do_init(void)
 			/*
 			 * Map memory-mapped registers.
 			 */
-			default_par->ati_regbase = addr + 0x7ffc00UL;
+			default_par->ati_regbase = (void __iomem *)
+				(addr + 0x7ffc00UL);
 			info->fix.mmio_start = addr + 0x7ffc00UL;
 
 			/*
@@ -2289,7 +2290,8 @@ int __init atyfb_do_init(void)
 			    default_par->mmap_map[0].voff +
 			    info->fix.smem_len;
 			default_par->mmap_map[1].poff =
-			    default_par->ati_regbase & PAGE_MASK;
+			    ((unsigned long) default_par->ati_regbase &
+			     PAGE_MASK);
 			default_par->mmap_map[1].size = PAGE_SIZE;
 			default_par->mmap_map[1].prot_mask = _PAGE_CACHE;
 			default_par->mmap_map[1].prot_flag = _PAGE_E;
