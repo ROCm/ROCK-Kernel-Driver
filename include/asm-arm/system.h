@@ -95,6 +95,7 @@
  * the compiler from one version to another so a bit of paranoia won't hurt.
  * This string is meant to be concatenated with the inline asm string and
  * will cause compilation to stop on mismatch.
+ * (for details, see gcc PR 15089)
  */
 #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
 

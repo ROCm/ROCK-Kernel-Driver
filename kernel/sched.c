@@ -304,6 +304,7 @@ static DEFINE_PER_CPU(struct runqueue, runqueues);
  * explicitly disabling preemption.
  */
 static runqueue_t *task_rq_lock(task_t *p, unsigned long *flags)
+	__acquires(rq->lock)
 {
 	struct runqueue *rq;
 
@@ -319,6 +320,7 @@ repeat_lock_task:
 }
 
 static inline void task_rq_unlock(runqueue_t *rq, unsigned long *flags)
+	__releases(rq->lock)
 {
 	spin_unlock_irqrestore(&rq->lock, *flags);
 }
@@ -426,6 +428,7 @@ struct file_operations proc_schedstat_operations = {
  * rq_lock - lock a given runqueue and disable interrupts.
  */
 static runqueue_t *this_rq_lock(void)
+	__acquires(rq->lock)
 {
 	runqueue_t *rq;
 
@@ -437,6 +440,7 @@ static runqueue_t *this_rq_lock(void)
 }
 
 static inline void rq_unlock(runqueue_t *rq)
+	__releases(rq->lock)
 {
 	spin_unlock_irq(&rq->lock);
 }
@@ -1318,6 +1322,7 @@ void fastcall sched_exit(task_t * p)
  * details.)
  */
 static void finish_task_switch(task_t *prev)
+	__releases(rq->lock)
 {
 	runqueue_t *rq = this_rq();
 	struct mm_struct *mm = rq->prev_mm;
@@ -1349,6 +1354,7 @@ static void finish_task_switch(task_t *prev)
  * @prev: the thread we just switched away from.
  */
 asmlinkage void schedule_tail(task_t *prev)
+	__releases(rq->lock)
 {
 	finish_task_switch(prev);
 
@@ -1441,10 +1447,13 @@ unsigned long nr_iowait(void)
  * you need to do so manually before calling.
  */
 static void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
+	__acquires(rq1->lock)
+	__acquires(rq2->lock)
 {
-	if (rq1 == rq2)
+	if (rq1 == rq2) {
 		spin_lock(&rq1->lock);
-	else {
+		__acquire(rq2->lock);	/* Fake it out ;) */
+	} else {
 		if (rq1 < rq2) {
 			spin_lock(&rq1->lock);
 			spin_lock(&rq2->lock);
@@ -1462,16 +1471,23 @@ static void double_rq_lock(runqueue_t *rq1, runqueue_t *rq2)
  * you need to do so manually after calling.
  */
 static void double_rq_unlock(runqueue_t *rq1, runqueue_t *rq2)
+	__releases(rq1->lock)
+	__releases(rq2->lock)
 {
 	spin_unlock(&rq1->lock);
 	if (rq1 != rq2)
 		spin_unlock(&rq2->lock);
+	else
+		__release(rq2->lock);
 }
 
 /*
  * double_lock_balance - lock the busiest runqueue, this_rq is locked already.
  */
 static void double_lock_balance(runqueue_t *this_rq, runqueue_t *busiest)
+	__releases(this_rq->lock)
+	__acquires(busiest->lock)
+	__acquires(this_rq->lock)
 {
 	if (unlikely(!spin_trylock(&busiest->lock))) {
 		if (busiest < this_rq) {
@@ -3411,6 +3427,7 @@ asmlinkage long sys_sched_yield(void)
 	 * Since we are going to call schedule() anyway, there's
 	 * no need to preempt or enable interrupts:
 	 */
+	__release(rq->lock);
 	_raw_spin_unlock(&rq->lock);
 	preempt_enable_no_resched();
 

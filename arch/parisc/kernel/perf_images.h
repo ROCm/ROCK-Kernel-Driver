@@ -2,6 +2,7 @@
  *    Imagine for use with the Onyx (PCX-U) CPU interface 
  *
  *    Copyright (C) 2001 Randolph Chung <tausq at parisc-linux.org>
+ *    Copyright (C) 2001 Hewlett-Packard (Grant Grundler)
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by

@@ -1,8 +1,9 @@
 /*
 **  System Bus Adapter (SBA) I/O MMU manager
 **
-**	(c) Copyright 2000 Grant Grundler
-**	(c) Copyright 2000 Hewlett-Packard Company
+**	(c) Copyright 2000-2004 Grant Grundler <grundler @ parisc-linux x org>
+**	(c) Copyright 2004 Naresh Kumar Inna <knaresh at india x hp x com>
+**	(c) Copyright 2000-2004 Hewlett-Packard Company
 **
 **	Portions (c) 1999 Dave S. Miller (from sparc64 I/O MMU code)
 **

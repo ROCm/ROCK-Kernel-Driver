@@ -1276,7 +1276,7 @@ struct wide_stack {
 long real64_call(unsigned long fn, ...)
 {
 	va_list args;
-	extern struct wide_stack real64_stack __attribute__ ((alias ("real_stack")));
+	extern struct wide_stack real64_stack;
 	extern unsigned long real64_call_asm(unsigned long *,
 					     unsigned long *, 
 					     unsigned long);

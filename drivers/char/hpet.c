@@ -664,7 +664,8 @@ int hpet_control(struct hpet_task *tp, unsigned int cmd, unsigned long arg)
 
 static struct time_interpolator hpet_interpolator = {
 	.source = TIME_SOURCE_MMIO64,
-	.shift = 10
+	.shift = 10,
+	.mask = 0xffffffffffffffffLL
 };
 
 #endif

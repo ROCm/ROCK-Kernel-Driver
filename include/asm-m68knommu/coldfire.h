@@ -22,7 +22,7 @@
 #define	MCF_MBAR2	0x80000000
 #define	MCF_IPSBAR	0x40000000
 
-#ifdef CONFIG_M5282
+#if defined(CONFIG_M527x) || defined(CONFIG_M528x)
 #undef MCF_MBAR
 #define	MCF_MBAR	MCF_IPSBAR
 #endif
@@ -60,8 +60,14 @@
 #define	MCF_CLK		66000000
 #elif defined(CONFIG_CLOCK_70MHz)
 #define	MCF_CLK		70000000
+#elif defined(CONFIG_CLOCK_100MHz)
+#define	MCF_CLK		100000000
 #elif defined(CONFIG_CLOCK_140MHz)
 #define	MCF_CLK		140000000
+#elif defined(CONFIG_CLOCK_150MHz)
+#define	MCF_CLK		150000000
+#elif defined(CONFIG_CLOCK_166MHz)
+#define	MCF_CLK		166000000
 #else
 #error "Don't know what your ColdFire CPU clock frequency is??"
 #endif
@@ -70,7 +76,7 @@
  *	One some ColdFire family members the bus clock (used by internal
  *	peripherals) is not the same as the CPU clock.
  */
-#ifdef CONFIG_M5249
+#if defined(CONFIG_M5249) || defined(CONFIG_M527x)
 #define	MCF_BUSCLK	(MCF_CLK / 2)
 #else
 #define	MCF_BUSCLK	MCF_CLK

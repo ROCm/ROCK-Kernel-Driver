@@ -1,7 +1,7 @@
 /*
  *  linux/arch/m68knommu/kernel/setup.c
  *
- *  Copyright (C) 1999-2002  Greg Ungerer (gerg@snapgear.com)
+ *  Copyright (C) 1999-2004  Greg Ungerer (gerg@snapgear.com)
  *  Copyright (C) 1998,1999  D. Jeff Dionne <jeff@lineo.ca>
  *  Copyleft  ()) 2000       James D. Schettine {james@telos-systems.com}
  *  Copyright (C) 1998       Kenneth Albanowski <kjahds@kjahds.com>
@@ -106,11 +106,14 @@ void (*mach_power_off)( void ) = NULL;
 #if defined(CONFIG_M5249)
 	#define CPU "COLDFIRE(m5249)"
 #endif
+#if defined(CONFIG_M527x)
+	#define CPU "COLDFIRE(m5270/5271/5274/5275)"
+#endif
 #if defined(CONFIG_M5272)
 	#define CPU "COLDFIRE(m5272)"
 #endif
-#if defined(CONFIG_M5282)
-	#define CPU "COLDFIRE(m5282)"
+#if defined(CONFIG_M528x)
+	#define CPU "COLDFIRE(m5280/5282)"
 #endif
 #if defined(CONFIG_M5307)
 	#define	CPU "COLDFIRE(m5307)"

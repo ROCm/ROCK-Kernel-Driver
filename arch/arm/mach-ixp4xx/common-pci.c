@@ -33,7 +33,6 @@
 #include <asm/system.h>
 #include <asm/mach/pci.h>
 #include <asm/hardware.h>
-#include <asm/sizes.h>
 
 
 /*

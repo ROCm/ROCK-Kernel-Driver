@@ -28,6 +28,11 @@ extern void device_shutdown(void);
 extern struct semaphore dpm_sem;
 
 /*
+ * Used to serialize changes to the dpm_* lists.
+ */
+extern struct semaphore dpm_list_sem;
+
+/*
  * The PM lists.
  */
 extern struct list_head dpm_active;

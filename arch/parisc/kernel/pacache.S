@@ -68,7 +68,7 @@ flush_tlb_all_local:
 	 * consolidated.
 	 */
 
-	rsm     PSW_SM_I,%r19      /* relied upon translation! */
+	rsm     PSW_SM_I,%r19	/* relied upon translation! PA 2.0 Arch. F-5 */
 	nop
 	nop
 	nop
@@ -475,9 +475,9 @@ copy_user_page_asm:
 	.procend
 #endif
 
-	.export clear_user_page_asm,code
+	.export __clear_user_page_asm,code
 
-clear_user_page_asm:
+__clear_user_page_asm:
 	.proc
 	.callinfo NO_CALLS
 	.entry

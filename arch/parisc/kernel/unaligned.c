@@ -492,7 +492,6 @@ void handle_unaligned(struct pt_regs *regs)
 			show_regs(regs);
 #endif		
 		}
-
 		if (!unaligned_enabled)
 			goto force_sigbus;
 	}
@@ -555,16 +554,6 @@ void handle_unaligned(struct pt_regs *regs)
 			newbase += IM14(regs->iir&~4);
 		}
 		break;
-	}
-
-	if (regs->isr != regs->sr[7])
-	{
-		printk(KERN_CRIT "isr verification failed (isr: " RFMT ", sr7: " RFMT "\n",
-			regs->isr, regs->sr[7]);
-
-		/* don't kill him though, since he has appropriate access to the page, or we
-		 * would never have gotten here.
-		 */
 	}
 
 	/* TODO: make this cleaner... */

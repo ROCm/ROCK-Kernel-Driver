@@ -13,23 +13,4 @@
 
 	.globl	hp300_reset
 hp300_reset:
-	.chip	68030
-	oriw    #0x0700,%sr			/* cli() */
-	movel	hp300_phys_ram_base, %d1
-	movel	#0, %d0
-	movec	%d0, %vbr			/* reset vector table */
-	lea	zero, %a0
-	lea	1f, %a1
-	add	%d1, %a0
-	add	%d1, %a1
-	pmove	%tc, %a0@
-	bclr	#7, %a0@
-	pmove	%a0@, %tc			/* goodbye MMU */
-	jmp	%a1@
-1:	movel	#0x808, %d0
-	movec	%d0, %cacr			/* cache off */
-	moveb	#0, 0x1ffff
-	movel	#0x1a4, %a0
-	jmp	%a0@
-
-zero:	.quad	0
+	jmp	hp300_reset

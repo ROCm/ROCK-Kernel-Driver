@@ -750,7 +750,7 @@ map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm)
 #if PTRS_PER_PMD == 1
 	pmd = (pmd_t *)__pa(pg_dir);
 #else
-	pmd = (pmd_t *) (PAGE_MASK & pgd_val(*pg_dir));
+	pmd = (pmd_t *) pgd_address(*pg_dir);
 
 	/*
 	 * pmd is physical at this point
@@ -761,7 +761,7 @@ map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm)
 		pmd = (pmd_t *) __pa(pmd);
 	}
 
-	pgd_val(*pg_dir) = _PAGE_TABLE | (unsigned long) pmd;
+	__pgd_val_set(*pg_dir, PxD_FLAG_PRESENT | PxD_FLAG_VALID | (unsigned long) pmd);
 #endif
 	/* now change pmd to kernel virtual addresses */
 
@@ -771,11 +771,11 @@ map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm)
 	 * pg_table is physical at this point
 	 */
 
-	pg_table = (pte_t *) (PAGE_MASK & pmd_val(*pmd));
+	pg_table = (pte_t *) pmd_address(*pmd);
 	if (!pg_table)
 		pg_table = (pte_t *) __pa(get_zeroed_page(GFP_KERNEL));
 
-	pmd_val(*pmd) = _PAGE_TABLE | (unsigned long) pg_table;
+	__pmd_val_set(*pmd, PxD_FLAG_PRESENT | PxD_FLAG_VALID | (unsigned long) pg_table);
 
 	/* now change pg_table to kernel virtual addresses */
 

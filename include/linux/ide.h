@@ -1194,14 +1194,6 @@ ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
  */
 extern ide_startstop_t ide_abort(ide_drive_t *, const char *);
 
-/*
- * Issue a simple drive command
- * The drive must be selected beforehand.
- *
- * (drive, command, nsector, handler)
- */
-extern void ide_cmd(ide_drive_t *, u8, u8, ide_handler_t *);
-
 extern void ide_fix_driveid(struct hd_driveid *);
 /*
  * ide_fixstring() cleans up and (optionally) byte-swaps a text string,
@@ -1366,7 +1358,6 @@ extern ide_startstop_t recal_intr(ide_drive_t *);
 extern ide_startstop_t task_no_data_intr(ide_drive_t *);
 extern ide_startstop_t task_in_intr(ide_drive_t *);
 extern ide_startstop_t pre_task_out_intr(ide_drive_t *, struct request *);
-extern ide_startstop_t task_out_intr(ide_drive_t *);
 
 extern int ide_raw_taskfile(ide_drive_t *, ide_task_t *, u8 *);
 
@@ -1376,7 +1367,6 @@ int ide_task_ioctl(ide_drive_t *, unsigned int, unsigned long);
 
 extern int system_bus_clock(void);
 
-extern u8 ide_auto_reduce_xfer(ide_drive_t *);
 extern int ide_driveid_update(ide_drive_t *);
 extern int ide_ata66_check(ide_drive_t *, ide_task_t *);
 extern int ide_config_drive_speed(ide_drive_t *, u8);

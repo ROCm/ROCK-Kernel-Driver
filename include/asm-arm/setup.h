@@ -203,8 +203,6 @@ struct meminfo {
 	} bank[NR_BANKS];
 };
 
-extern struct meminfo meminfo;
-
 /*
  * Early command line parameters.
  */
