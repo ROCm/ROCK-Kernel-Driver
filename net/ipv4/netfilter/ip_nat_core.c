@@ -49,7 +49,6 @@ static unsigned int ip_nat_htable_size;
 static struct list_head *bysource;
 static struct list_head *byipsproto;
 LIST_HEAD(protos);
-LIST_HEAD(helpers);
 
 extern struct ip_nat_protocol unknown_nat_protocol;
 
@@ -498,13 +497,6 @@ get_unique_tuple(struct ip_conntrack_tuple *tuple,
 	return ret;
 }
 
-static inline int
-helper_cmp(const struct ip_nat_helper *helper,
-	   const struct ip_conntrack_tuple *tuple)
-{
-	return ip_ct_tuple_mask_cmp(tuple, &helper->tuple, &helper->mask);
-}
-
 /* Where to manip the reply packets (will be reverse manip). */
 static unsigned int opposite_hook[NF_IP_NUMHOOKS]
 = { [NF_IP_PRE_ROUTING] = NF_IP_POST_ROUTING,
@@ -643,8 +635,7 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 
 	/* If there's a helper, assign it; based on new tuple. */
 	if (!conntrack->master)
-		info->helper = LIST_FIND(&helpers, helper_cmp, struct ip_nat_helper *,
-					 &reply);
+		info->helper = ip_nat_find_helper(&reply);
 
 	/* It's done. */
 	info->initialized |= (1 << HOOK2MANIP(hooknum));
