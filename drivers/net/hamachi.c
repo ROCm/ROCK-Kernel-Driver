@@ -1460,64 +1460,6 @@ static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 	spin_unlock(&hmp->lock);
 }
 
-#ifdef TX_CHECKSUM
-/*
- * Copied from eth_type_trans(), with reduced header, since we don't
- * get it on RX, only on TX.
- */
-static unsigned short hamachi_eth_type_trans(struct sk_buff *skb,
-  struct net_device *dev)
-{
-	struct ethhdr *eth;
-	unsigned char *rawp;
-	
-	skb->mac.raw=skb->data;
-	skb_pull(skb,dev->hard_header_len-8);  /* artificially enlarged on tx */
-	eth= skb->mac.ethernet;
-	
-	if(*eth->h_dest&1)
-	{
-		if(memcmp(eth->h_dest,dev->broadcast, ETH_ALEN)==0)
-			skb->pkt_type=PACKET_BROADCAST;
-		else
-			skb->pkt_type=PACKET_MULTICAST;
-	}
-	
-	/*
-	 *	This ALLMULTI check should be redundant by 1.4
-	 *	so don't forget to remove it.
-	 *
-	 *	Seems, you forgot to remove it. All silly devices
-	 *	seems to set IFF_PROMISC.
-	 */
-	 
-	else if(dev->flags&(IFF_PROMISC/*|IFF_ALLMULTI*/))
-	{
-		if(memcmp(eth->h_dest,dev->dev_addr, ETH_ALEN))
-			skb->pkt_type=PACKET_OTHERHOST;
-	}
-	
-	if (ntohs(eth->h_proto) >= 1536)
-		return eth->h_proto;
-		
-	rawp = skb->data;
-	
-	/*
-	 *	This is a magic hack to spot IPX packets. Older Novell breaks
-	 *	the protocol design and runs IPX over 802.3 without an 802.2 LLC
-	 *	layer. We look for FFFF which isn't a used 802.2 SSAP/DSAP. This
-	 *	won't work for fault tolerant netware but does for the rest.
-	 */
-	if (*(unsigned short *)rawp == 0xFFFF)
-		return htons(ETH_P_802_3);
-		
-	/*
-	 *	Real 802.2 LLC
-	 */
-	return htons(ETH_P_802_2);
-}
-#endif  /* TX_CHECKSUM */
-
 /* This routine is logically part of the interrupt handler, but seperated
    for clarity and better register allocation. */
 static int hamachi_rx(struct net_device *dev)
@@ -1622,12 +1564,7 @@ static int hamachi_rx(struct net_device *dev)
 				skb_put(skb = hmp->rx_skbuff[entry], pkt_len);
 				hmp->rx_skbuff[entry] = NULL;
 			}
-#ifdef TX_CHECKSUM
-			/* account for extra TX hard_header bytes */
-			skb->protocol = hamachi_eth_type_trans(skb, dev);
-#else
 			skb->protocol = eth_type_trans(skb, dev);
-#endif
 
 
 #ifdef RX_CHECKSUM

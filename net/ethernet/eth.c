@@ -161,7 +161,7 @@ unsigned short eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	unsigned char *rawp;
 	
 	skb->mac.raw=skb->data;
-	skb_pull(skb,dev->hard_header_len);
+	skb_pull(skb,ETH_HLEN);
 	eth= skb->mac.ethernet;
 	
 	if(*eth->h_dest&1)
