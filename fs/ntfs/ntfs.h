@@ -61,8 +61,6 @@ extern kmem_cache_t *ntfs_attr_ctx_cache;
 
 /* The various operations structs defined throughout the driver files. */
 extern struct super_operations ntfs_sops;
-extern struct super_operations ntfs_mount_sops;
-
 extern struct address_space_operations ntfs_aops;
 extern struct address_space_operations ntfs_mft_aops;
 
@@ -74,14 +72,6 @@ extern struct inode_operations ntfs_dir_inode_ops;
 
 extern struct  file_operations ntfs_empty_file_ops;
 extern struct inode_operations ntfs_empty_inode_ops;
-
-/* Generic macros to convert pointers to values and vice versa. */
-#ifndef p2n
-#define p2n(p)		((ptrdiff_t)((ptrdiff_t*)(p)))
-#endif
-#ifndef n2p
-#define n2p(p)		((ptrdiff_t*)((ptrdiff_t)(p)))
-#endif
 
 /**
  * NTFS_SB - return the ntfs volume given a vfs super block

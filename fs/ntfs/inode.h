@@ -269,7 +269,7 @@ extern ntfs_inode *ntfs_new_extent_inode(struct super_block *sb,
 		unsigned long mft_no);
 extern void ntfs_clear_extent_inode(ntfs_inode *ni);
 
-extern void ntfs_read_inode_mount(struct inode *vi);
+extern int ntfs_read_inode_mount(struct inode *vi);
 
 extern void ntfs_put_inode(struct inode *vi);
 
