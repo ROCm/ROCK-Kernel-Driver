@@ -45,6 +45,7 @@
 	can_queue: 255,		/* max simultaneous cmds      */\
 	this_id: -1,		/* scsi id of host adapter    */\
 	sg_tablesize: 0,	/* max scatter-gather cmds    */\
+	max_sectors: 2048,	/* max physical sectors in 1 cmd */\
 	cmd_per_lun: 3,		/* cmds per lun (linked cmds) */\
 	present: 0,		/* number of 7xxx's present   */\
 	unchecked_isa_dma: 0,	/* no memory DMA restrictions */\
