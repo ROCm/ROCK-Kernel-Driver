@@ -15,7 +15,7 @@
 #include <asm/io.h>
 #include <asm/byteorder.h>
 
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 #include <linux/types.h>
 
 #define M32R_PCC_IOMAP_SIZE 0x1000
@@ -27,7 +27,7 @@
 
 extern void pcc_ioread(int, unsigned long, void *, size_t, size_t, int);
 extern void pcc_iowrite(int, unsigned long, void *, size_t, size_t, int);
-#endif /* CONFIG_PCMCIA && CONFIG_M32RPCC */
+#endif /* CONFIG_PCMCIA && CONFIG_M32R_PCC */
 
 #define PORT2ADDR(port)  _port2addr(port)
 
@@ -80,7 +80,7 @@ unsigned char _inb(unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		return _ne_inb(PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
         if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   unsigned char b;
 	   pcc_ioread(0, port, &b, sizeof(b), 1, 0);
@@ -100,7 +100,7 @@ unsigned short _inw(unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		return _ne_inw(PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   unsigned short w;
 	   pcc_ioread(0, port, &w, sizeof(w), 1, 0);
@@ -116,7 +116,7 @@ unsigned short _inw(unsigned long port)
 
 unsigned long _inl(unsigned long port)
 {
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   unsigned long l;
 	   pcc_ioread(0, port, &l, sizeof(l), 1, 0);
@@ -137,7 +137,7 @@ unsigned char _inb_p(unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		v = _ne_inb(PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   unsigned char b;
 	   pcc_ioread(0, port, &b, sizeof(b), 1, 0);
@@ -161,7 +161,7 @@ unsigned short _inw_p(unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		v = _ne_inw(PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   unsigned short w;
 	   pcc_ioread(0, port, &w, sizeof(w), 1, 0);
@@ -192,7 +192,7 @@ void _outb(unsigned char b, unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		_ne_outb(b, PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, &b, sizeof(b), 1, 0);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -207,7 +207,7 @@ void _outw(unsigned short w, unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		_ne_outw(w, PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, &w, sizeof(w), 1, 0);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -219,7 +219,7 @@ void _outw(unsigned short w, unsigned long port)
 
 void _outl(unsigned long l, unsigned long port)
 {
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, &l, sizeof(l), 1, 0);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -234,7 +234,7 @@ void _outb_p(unsigned char b, unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		_ne_outb(b, PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, &b, sizeof(b), 1, 0);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -251,7 +251,7 @@ void _outw_p(unsigned short w, unsigned long port)
 	if (port >= 0x300 && port < 0x320)
 		_ne_outw(w, PORT2ADDR_NE(port));
 	else
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, &w, sizeof(w), 1, 0);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -277,7 +277,7 @@ void _insb(unsigned int port, void * addr, unsigned long count)
 	if (port >= 0x300 && port < 0x320){
 		portp = PORT2ADDR_NE(port);
 		while(count--) *buf++ = *(volatile unsigned char *)portp;
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_ioread(0, port, (void *)addr, sizeof(unsigned char), count, 1);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -297,7 +297,7 @@ void _insw(unsigned int port, void * addr, unsigned long count)
 	if (port >= 0x300 && port < 0x320) {
 		portp = PORT2ADDR_NE(port);
 		while (count--) *buf++ = _ne_inw(portp);
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_ioread(0, port, (void *)addr, sizeof(unsigned short), count, 1);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -326,7 +326,7 @@ void _outsb(unsigned int port, const void * addr, unsigned long count)
 	if (port >= 0x300 && port < 0x320) {
 		portp = PORT2ADDR_NE(port);
 		while (count--) _ne_outb(*buf++, portp);
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, (void *)addr, sizeof(unsigned char), count, 1);
 	} else if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
@@ -346,7 +346,7 @@ void _outsw(unsigned int port, const void * addr, unsigned long count)
 	if (port >= 0x300 && port < 0x320) {
 		portp = PORT2ADDR_NE(port);
 		while (count--) _ne_outw(*buf++, portp);
-#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32RPCC)
+#if defined(CONFIG_PCMCIA) && defined(CONFIG_M32R_PCC)
 	} else if (port >= M32R_PCC_IOSTART0 && port <= M32R_PCC_IOEND0) {
 	   pcc_iowrite(0, port, (void *)addr, sizeof(unsigned short), count, 1);
 	} else 	if (port >= M32R_PCC_IOSTART1 && port <= M32R_PCC_IOEND1) {
