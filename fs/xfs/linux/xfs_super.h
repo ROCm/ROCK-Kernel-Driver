@@ -112,7 +112,7 @@ extern void xfs_qm_exit(void);
 
 struct xfs_inode;
 struct xfs_mount;
-struct pb_target;
+struct xfs_buftarg;
 struct block_device;
 
 extern __uint64_t xfs_max_file_offset(unsigned int);
@@ -126,12 +126,12 @@ extern int  xfs_blkdev_get(struct xfs_mount *, const char *,
 				struct block_device **);
 extern void xfs_blkdev_put(struct block_device *);
 
-extern struct pb_target *xfs_alloc_buftarg(struct block_device *);
-extern void xfs_relse_buftarg(struct pb_target *);
-extern void xfs_free_buftarg(struct pb_target *);
-extern void xfs_flush_buftarg(struct pb_target *);
-extern int xfs_readonly_buftarg(struct pb_target *);
-extern void xfs_setsize_buftarg(struct pb_target *, unsigned int, unsigned int);
-extern unsigned int xfs_getsize_buftarg(struct pb_target *);
+extern struct xfs_buftarg *xfs_alloc_buftarg(struct block_device *);
+extern void xfs_relse_buftarg(struct xfs_buftarg *);
+extern void xfs_free_buftarg(struct xfs_buftarg *);
+extern void xfs_flush_buftarg(struct xfs_buftarg *);
+extern int xfs_readonly_buftarg(struct xfs_buftarg *);
+extern void xfs_setsize_buftarg(struct xfs_buftarg *, unsigned int, unsigned int);
+extern unsigned int xfs_getsize_buftarg(struct xfs_buftarg *);
 
 #endif	/* __XFS_SUPER_H__ */
