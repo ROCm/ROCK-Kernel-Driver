@@ -737,7 +737,6 @@ int ip_conntrack_tcp_update(struct sk_buff *skb,
 	return 1;
 }
  
-EXPORT_SYMBOL(ip_conntrack_tcp_update);
 #endif
 
 #define	TH_FIN	0x01
