@@ -245,28 +245,6 @@ struct llc_sap *llc_sap_alloc(void)
 	return sap;
 }
 
-/*
- * FIXME: this will go away as soon as sap->release_connections is introduced
- * in the next changesets.
- */
-extern int llc_release_connections(struct llc_sap *sap);
-
-/**
- *	llc_free_sap - frees a sap
- *	@sap: Address of the sap
- *
- * 	Frees all associated connections (if any), removes this sap from
- * 	the list of saps in te station and them frees the memory for this sap.
- */
-void llc_free_sap(struct llc_sap *sap)
-{
-	llc_release_connections(sap);
-	write_lock_bh(&sap->station->sap_list.lock);
-	list_del(&sap->node);
-	write_unlock_bh(&sap->station->sap_list.lock);
-	kfree(sap);
-}
-
 /**
  *	llc_sap_open - open interface to the upper layers.
  *	@lsap: SAP number.
@@ -308,10 +286,16 @@ out:
  *
  *	Close interface function to upper layer. Each one who wants to
  *	close an open SAP (for example NetBEUI) should call this function.
+ * 	Removes this sap from the list of saps in the station and then
+ * 	frees the memory for this sap.
  */
 void llc_sap_close(struct llc_sap *sap)
 {
-	llc_free_sap(sap);
+	WARN_ON(!hlist_empty(&sap->sk_list.list));
+	write_lock_bh(&sap->station->sap_list.lock);
+	list_del(&sap->node);
+	write_unlock_bh(&sap->station->sap_list.lock);
+	kfree(sap);
 }
 
 EXPORT_SYMBOL(llc_sap_open);

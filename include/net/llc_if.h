@@ -100,22 +100,8 @@ static __inline__ int llc_mac_match(u8 *mac1, u8 *mac2)
 	return !memcmp(mac1, mac2, IFHWADDRLEN);
 }
 
-struct llc_sap;
-
-extern struct llc_sap *llc_sap_open(u8 lsap,
-				    int (*func)(struct sk_buff *skb,
-						struct net_device *dev,
-						struct packet_type *pt));
-extern void llc_sap_close(struct llc_sap *sap);
-
 extern int llc_establish_connection(struct sock *sk, u8 *lmac,
 				    u8 *dmac, u8 dsap);
 extern int llc_build_and_send_pkt(struct sock *sk, struct sk_buff *skb);
-extern void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
-				      u8 *dmac, u8 dsap);
-extern void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
-				       u8 *dmac, u8 dsap);
-extern void llc_build_and_send_test_pkt(struct llc_sap *sap, struct sk_buff *skb,
-					u8 *dmac, u8 dsap);
 extern int llc_send_disc(struct sock *sk);
 #endif /* LLC_IF_H */

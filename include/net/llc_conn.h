@@ -105,4 +105,5 @@ extern struct sock *llc_lookup_dgram(struct llc_sap *sap,
 extern void llc_save_primitive(struct sk_buff* skb, u8 prim);
 extern u8 llc_data_accept_state(u8 state);
 extern void llc_build_offset_table(void);
+extern int llc_release_sockets(struct llc_sap *sap);
 #endif /* LLC_CONN_H */

@@ -184,8 +184,10 @@ static int llc_ui_release(struct socket *sock)
 	if (!sk->sk_zapped)
 		llc_sap_unassign_sock(llc->sap, sk);
 	release_sock(sk);
-	if (llc->sap && hlist_empty(&llc->sap->sk_list.list))
+	if (llc->sap && hlist_empty(&llc->sap->sk_list.list)) {
+		llc_release_sockets(llc->sap);
 		llc_sap_close(llc->sap);
+	}
 	sock_put(sk);
 	llc_sk_free(sk);
 out:

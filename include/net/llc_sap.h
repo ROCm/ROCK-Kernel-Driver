@@ -44,4 +44,17 @@ extern void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk);
 extern void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb);
 extern void llc_sap_rtn_pdu(struct llc_sap *sap, struct sk_buff *skb);
+extern struct llc_sap *llc_sap_open(u8 lsap,
+				    int (*rcv)(struct sk_buff *skb,
+					       struct net_device *dev,
+					       struct packet_type *pt));
+extern void llc_sap_close(struct llc_sap *sap);
+
+extern void llc_build_and_send_ui_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				      u8 *dmac, u8 dsap);
+extern void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				       u8 *dmac, u8 dsap);
+extern void llc_build_and_send_test_pkt(struct llc_sap *sap,
+					struct sk_buff *skb, u8 *dmac, u8 dsap);
+
 #endif /* LLC_SAP_H */

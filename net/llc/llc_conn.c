@@ -736,13 +736,13 @@ static atomic_t llc_sock_nr;
 #endif
 
 /**
- *	llc_release_conns - releases all connections of a sap
- *	@sap: sap to release its connections
+ *	llc_release_sockets - releases all sockets in a sap
+ *	@sap: sap to release its sockets
  *
  *	Releases all connections of a sap. Returns 0 if all actions complete
  *	successfully, nonzero otherwise
  */
-int llc_release_connections(struct llc_sap *sap)
+int llc_release_sockets(struct llc_sap *sap)
 {
 	int rc = 0;
 	struct sock *sk;
