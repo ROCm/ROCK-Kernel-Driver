@@ -375,26 +375,6 @@ typedef struct prio_array prio_array_t;
 struct backing_dev_info;
 struct reclaim_state;
 
-/* POSIX.1b interval timer structure. */
-struct k_itimer {
-	struct list_head list;		 /* free/ allocate list */
-	spinlock_t it_lock;
-	clockid_t it_clock;		/* which timer type */
-	timer_t it_id;			/* timer id */
-	int it_overrun;			/* overrun on pending signal  */
-	int it_overrun_last;		 /* overrun on last delivered signal */
-	int it_requeue_pending;          /* waiting to requeue this timer */
-	int it_sigev_notify;		 /* notify word of sigevent struct */
-	int it_sigev_signo;		 /* signo word of sigevent struct */
-	sigval_t it_sigev_value;	 /* value word of sigevent struct */
-	unsigned long it_incr;		/* interval specified in jiffies */
-	struct task_struct *it_process;	/* process to send signal to */
-	struct timer_list it_timer;
-	struct sigqueue *sigq;		/* signal queue entry. */
-	struct list_head abs_timer_entry; /* clock abs_timer_list */
-	struct timespec wall_to_prev;   /* wall_to_monotonic used when set */
-};
-
 #ifdef CONFIG_SCHEDSTATS
 struct sched_info {
 	/* cumulative counters */
