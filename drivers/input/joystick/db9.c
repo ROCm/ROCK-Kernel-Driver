@@ -531,9 +531,7 @@ static struct db9 __init *db9_probe(int *config)
 		return NULL;
 	}
 
-	for (pp = parport_enumerate(); pp && (config[0] > 0); pp = pp->next)
-		config[0]--;
-
+	pp = parport_find_number(config[0]);
 	if (!pp) {
 		printk(KERN_ERR "db9.c: no such parport\n");
 		return NULL;
@@ -542,12 +540,15 @@ static struct db9 __init *db9_probe(int *config)
 	if (db9_bidirectional[config[1]]) {
 		if (!(pp->modes & PARPORT_MODE_TRISTATE)) {
 			printk(KERN_ERR "db9.c: specified parport is not bidirectional\n");
+			parport_put_port(pp);
 			return NULL;
 		}
 	}
 
-	if (!(db9 = kmalloc(sizeof(struct db9), GFP_KERNEL)))
+	if (!(db9 = kmalloc(sizeof(struct db9), GFP_KERNEL))) {
+		parport_put_port(pp);
 		return NULL;
+	}
 	memset(db9, 0, sizeof(struct db9));
 
 	db9->mode = config[1];
@@ -556,6 +557,7 @@ static struct db9 __init *db9_probe(int *config)
 	db9->timer.function = db9_timer;
 
 	db9->pd = parport_register_device(pp, "db9", NULL, NULL, NULL, PARPORT_DEV_EXCL, NULL);
+	parport_put_port(pp);
 
 	if (!db9->pd) {
 		printk(KERN_ERR "db9.c: parport busy already - lp.o loaded?\n");

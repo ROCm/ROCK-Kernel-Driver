@@ -991,9 +991,7 @@ static int epp_open(struct net_device *dev)
 	
 	baycom_paranoia_check(dev, "epp_open", -ENXIO);
 	bc = (struct baycom_state *)dev->priv;
-        pp = parport_enumerate();
-        while (pp && pp->base != dev->base_addr) 
-                pp = pp->next;
+        pp = parport_find_base(dev->base_addr);
         if (!pp) {
                 printk(KERN_ERR "%s: parport at 0x%lx unknown\n", bc_drvname, dev->base_addr);
                 return -ENXIO;
@@ -1001,17 +999,21 @@ static int epp_open(struct net_device *dev)
 #if 0
         if (pp->irq < 0) {
                 printk(KERN_ERR "%s: parport at 0x%lx has no irq\n", bc_drvname, pp->base);
+		parport_put_port(pp);
                 return -ENXIO;
         }
 #endif
 	if ((~pp->modes) & (PARPORT_MODE_TRISTATE | PARPORT_MODE_PCSPP | PARPORT_MODE_SAFEININT)) {
                 printk(KERN_ERR "%s: parport at 0x%lx cannot be used\n",
 		       bc_drvname, pp->base);
+		parport_put_port(pp);
                 return -EIO;
 	}
 	memset(&bc->modem, 0, sizeof(bc->modem));
-        if (!(bc->pdev = parport_register_device(pp, dev->name, NULL, epp_wakeup, 
-                                                 epp_interrupt, PARPORT_DEV_EXCL, dev))) {
+        bc->pdev = parport_register_device(pp, dev->name, NULL, epp_wakeup, 
+					epp_interrupt, PARPORT_DEV_EXCL, dev);
+	parport_put_port(pp);
+        if (!bc->pdev) {
                 printk(KERN_ERR "%s: cannot register parport at 0x%lx\n", bc_drvname, pp->base);
                 return -ENXIO;
         }
