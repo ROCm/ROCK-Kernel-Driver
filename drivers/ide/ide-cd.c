@@ -2242,6 +2242,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 		struct atapi_toc_header hdr;
 		struct atapi_toc_entry  ent;
 	} ms_tmp;
+	long last_written;
 
 	if (toc == NULL) {
 		/* Try to allocate space. */
@@ -2260,6 +2261,13 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	if (CDROM_STATE_FLAGS(drive)->toc_valid)
 		return 0;
+
+	/* Try to get the total cdrom capacity. */
+	stat = cdrom_read_capacity(drive, &toc->capacity, sense);
+	if (stat)
+		toc->capacity = 0x1fffff;
+
+	set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
 
 	/* First read just the header, so we know how long the TOC is. */
 	stat = cdrom_read_tocentry(drive, 0, 1, 0, (char *) &toc->hdr,
@@ -2368,13 +2376,11 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	toc->xa_flag = (ms_tmp.hdr.first_track != ms_tmp.hdr.last_track);
 
 	/* Now try to get the total cdrom capacity. */
-	stat = cdrom_get_last_written(cdi, (long *) &toc->capacity);
-	if (stat || !toc->capacity)
-		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
-	if (stat)
-		toc->capacity = 0x1fffff;
-
-	set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
+	stat = cdrom_get_last_written(cdi, &last_written);
+	if (!stat && last_written) {
+		toc->capacity = last_written;
+		set_capacity(drive->disk, toc->capacity * SECTORS_PER_FRAME);
+	}
 
 	/* Remember that we've read this stuff. */
 	CDROM_STATE_FLAGS(drive)->toc_valid = 1;
@@ -3215,7 +3221,8 @@ int ide_cdrom_setup (ide_drive_t *drive)
 
 	nslots = ide_cdrom_probe_capabilities (drive);
 
-	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram)
+	if (CDROM_CONFIG_FLAGS(drive)->dvd_ram ||
+	    CDROM_CONFIG_FLAGS(drive)->mo_drive)
 		set_disk_ro(drive->disk, 0);
 
 #if 0
