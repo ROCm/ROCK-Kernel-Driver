@@ -93,43 +93,6 @@ static __inline__ int tcp_v6_sk_hashfn(struct sock *sk)
 	return tcp_v6_hashfn(laddr, lport, faddr, fport);
 }
 
-static inline int ipv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
-{
-	struct ipv6_pinfo *np = inet6_sk(sk);
-	int addr_type = ipv6_addr_type(&np->rcv_saddr);
-
-	if (!inet_sk(sk2)->rcv_saddr && !ipv6_only_sock(sk))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 &&
-	    ipv6_addr_any(&inet6_sk(sk2)->rcv_saddr) &&
-	    !(ipv6_only_sock(sk2) && addr_type == IPV6_ADDR_MAPPED))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_ANY &&
-	    (!ipv6_only_sock(sk) ||
-	     !(sk2->sk_family == AF_INET6 ?
-	       (ipv6_addr_type(&inet6_sk(sk2)->rcv_saddr) == IPV6_ADDR_MAPPED) :
-	        1)))
-		return 1;
-
-	if (sk2->sk_family == AF_INET6 &&
-	    !ipv6_addr_cmp(&np->rcv_saddr,
-			   (sk2->sk_state != TCP_TIME_WAIT ?
-			    &inet6_sk(sk2)->rcv_saddr :
-			    &((struct tcp_tw_bucket *)sk)->tw_v6_rcv_saddr)))
-		return 1;
-
-	if (addr_type == IPV6_ADDR_MAPPED &&
-	    !ipv6_only_sock(sk2) &&
-	    (!inet_sk(sk2)->rcv_saddr ||
-	     !inet_sk(sk)->rcv_saddr ||
-	     inet_sk(sk)->rcv_saddr == inet_sk(sk2)->rcv_saddr))
-		return 1;
-
-	return 0;
-}
-
 static inline int tcp_v6_bind_conflict(struct sock *sk,
 				       struct tcp_bind_bucket *tb)
 {
