@@ -215,11 +215,11 @@ struct raid5_private_data {
 	 */
 	atomic_t		active_stripes;
 	struct list_head	inactive_list;
-	md_wait_queue_head_t	wait_for_stripe;
+	wait_queue_head_t	wait_for_stripe;
 	int			inactive_blocked;	/* release of inactive stripes blocked,
 							 * waiting for 25% to be free
 							 */        
-	md_spinlock_t		device_lock;
+	spinlock_t		device_lock;
 
 	int			plugged;
 	struct tq_struct	plug_tq;

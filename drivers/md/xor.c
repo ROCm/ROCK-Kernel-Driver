@@ -19,7 +19,6 @@
 #define BH_TRACE 0
 #include <linux/module.h>
 #include <linux/raid/md.h>
-#include <linux/raid/md_compatible.h>
 #include <linux/raid/xor.h>
 #include <asm/xor.h>
 
@@ -103,7 +102,7 @@ calibrate_xor_block(void)
 	void *b1, *b2;
 	struct xor_block_template *f, *fastest;
 
-	b1 = (void *) md__get_free_pages(GFP_KERNEL, 2);
+	b1 = (void *) __get_free_pages(GFP_KERNEL, 2);
 	if (! b1) {
 		printk("raid5: Yikes!  No memory available.\n");
 		return -ENOMEM;
@@ -137,7 +136,7 @@ calibrate_xor_block(void)
 	return 0;
 }
 
-MD_EXPORT_SYMBOL(xor_block);
+EXPORT_SYMBOL(xor_block);
 MODULE_LICENSE("GPL");
 
 module_init(calibrate_xor_block);
