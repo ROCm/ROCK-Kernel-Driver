@@ -25,7 +25,6 @@
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
-
 /* glue for the OS independant part of ixgb 
  * includes register access macros
  */
@@ -52,8 +51,8 @@
 #define CMD_MEM_WRT_INVALIDATE PCI_COMMAND_INVALIDATE
 
 typedef enum {
-        FALSE = 0,
-        TRUE = 1
+	FALSE = 0,
+	TRUE = 1
 } boolean_t;
 
 #define MSGOUT(S, A, B)	printk(KERN_DEBUG S "\n", A, B)
@@ -87,4 +86,4 @@ typedef enum {
 
 #define IXGB_MEMCPY memcpy
 
-#endif /* IXGB_OSDEP_H */
+#endif				/* IXGB_OSDEP_H */

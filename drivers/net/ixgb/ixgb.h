@@ -64,15 +64,13 @@ struct ixgb_adapter;
 
 #define BAR_0           0
 #define BAR_1           1
-#define BAR_5           5 
+#define BAR_5           5
 #define PCI_DMA_64BIT   0xffffffffffffffffULL
 #define PCI_DMA_32BIT   0x00000000ffffffffULL
-
 
 #include "ixgb_hw.h"
 #include "ixgb_ee.h"
 #include "ixgb_ids.h"
-
 
 #if _DEBUG_DRIVER_
 #define IXGB_DBG(args...) printk(KERN_DEBUG "ixgb: " args)
@@ -100,27 +98,27 @@ struct ixgb_adapter;
 /* wrapper around a pointer to a socket buffer,
  * so a DMA handle can be stored along with the buffer */
 struct ixgb_buffer {
-        struct sk_buff *skb;
-        uint64_t dma;
-        unsigned long length;
-        unsigned long time_stamp;
+	struct sk_buff *skb;
+	uint64_t dma;
+	unsigned long length;
+	unsigned long time_stamp;
 };
 
 struct ixgb_desc_ring {
-        /* pointer to the descriptor ring memory  */
-        void *desc;
-        /* physical address of the descriptor ring  */
-        dma_addr_t dma;
-        /* length of descriptor ring in bytes  */
-        unsigned int size;
-        /* number of descriptors in the ring  */
-        unsigned int count;
-        /* next descriptor to associate a buffer with  */
-        unsigned int next_to_use;
-        /* next descriptor to check for DD status bit  */
-        unsigned int next_to_clean;
-        /* array of buffer information structs  */
-        struct ixgb_buffer *buffer_info;
+	/* pointer to the descriptor ring memory  */
+	void *desc;
+	/* physical address of the descriptor ring  */
+	dma_addr_t dma;
+	/* length of descriptor ring in bytes  */
+	unsigned int size;
+	/* number of descriptors in the ring  */
+	unsigned int count;
+	/* next descriptor to associate a buffer with  */
+	unsigned int next_to_use;
+	/* next descriptor to check for DD status bit  */
+	unsigned int next_to_clean;
+	/* array of buffer information structs  */
+	struct ixgb_buffer *buffer_info;
 };
 
 #define IXGB_DESC_UNUSED(R) \
@@ -134,54 +132,54 @@ struct ixgb_desc_ring {
 /* board specific private data structure */
 
 struct ixgb_adapter {
-        struct timer_list watchdog_timer;
+	struct timer_list watchdog_timer;
 	struct vlan_group *vlgrp;
-        char *id_string;
-        uint32_t bd_number;
-        uint32_t rx_buffer_len;
-        uint32_t part_num;
-        uint16_t link_speed;
-        uint16_t link_duplex;
-        atomic_t irq_sem;
-        struct work_struct tx_timeout_task;
+	char *id_string;
+	uint32_t bd_number;
+	uint32_t rx_buffer_len;
+	uint32_t part_num;
+	uint16_t link_speed;
+	uint16_t link_duplex;
+	atomic_t irq_sem;
+	struct work_struct tx_timeout_task;
 
 #ifdef ETHTOOL_PHYS_ID
-        struct timer_list blink_timer;
-        unsigned long led_status;
+	struct timer_list blink_timer;
+	unsigned long led_status;
 #endif
 #ifdef _INTERNAL_LOOPBACK_DRIVER_
-        struct ixgb_desc_ring diag_tx_ring;
-        struct ixgb_desc_ring diag_rx_ring;
+	struct ixgb_desc_ring diag_tx_ring;
+	struct ixgb_desc_ring diag_rx_ring;
 #endif
-        /* TX */
-        struct ixgb_desc_ring tx_ring;
-        unsigned long timeo_start;
-        uint32_t tx_cmd_type;
-        int max_data_per_txd;
-        uint64_t hw_csum_tx_good;
-        uint64_t hw_csum_tx_error;
-        boolean_t tx_csum;
-        uint32_t tx_int_delay;
-        boolean_t tx_int_delay_enable;
+	/* TX */
+	struct ixgb_desc_ring tx_ring;
+	unsigned long timeo_start;
+	uint32_t tx_cmd_type;
+	int max_data_per_txd;
+	uint64_t hw_csum_tx_good;
+	uint64_t hw_csum_tx_error;
+	boolean_t tx_csum;
+	uint32_t tx_int_delay;
+	boolean_t tx_int_delay_enable;
 
-        /* RX */
-        struct ixgb_desc_ring rx_ring;
-        uint64_t hw_csum_rx_error;
-        uint64_t hw_csum_rx_good;
-        uint32_t rx_int_delay;
-        boolean_t raidc;
-        boolean_t rx_csum;
+	/* RX */
+	struct ixgb_desc_ring rx_ring;
+	uint64_t hw_csum_rx_error;
+	uint64_t hw_csum_rx_good;
+	uint32_t rx_int_delay;
+	boolean_t raidc;
+	boolean_t rx_csum;
 
-        /* OS defined structs */
-        struct net_device *netdev;
-        struct pci_dev *pdev;
-        struct net_device_stats net_stats;
+	/* OS defined structs */
+	struct net_device *netdev;
+	struct pci_dev *pdev;
+	struct net_device_stats net_stats;
 
-        /* structs defined in ixgb_hw.h */
-        struct ixgb_hw hw;
-        struct ixgb_hw_stats stats;
-        uint32_t pci_state[16];
-        char ifname[IFNAMSIZ];
+	/* structs defined in ixgb_hw.h */
+	struct ixgb_hw hw;
+	struct ixgb_hw_stats stats;
+	uint32_t pci_state[16];
+	char ifname[IFNAMSIZ];
 };
 
-#endif /* _IXGB_H_ */
+#endif				/* _IXGB_H_ */

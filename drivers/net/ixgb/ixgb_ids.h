@@ -25,7 +25,6 @@
   Intel Corporation, 5200 N.E. Elam Young Parkway, Hillsboro, OR 97124-6497
 *******************************************************************************/
 
-
 #ifndef _IXGB_IDS_H_
 #define _IXGB_IDS_H_
 
@@ -37,9 +36,9 @@
 #define INTEL_SUBVENDOR_ID      0x8086
 
 #define IXGB_DEVICE_ID_82597EX 	0x1048
-#define IXGB_SUBDEVICE_ID_A11F  0xA11F   /* Adapter-OEM-1310nm-Fiber */
-#define IXGB_SUBDEVICE_ID_A01F	0xA01F   /* Adapter-Retail-1310nm-Fiber */
+#define IXGB_SUBDEVICE_ID_A11F  0xA11F	/* Adapter-OEM-1310nm-Fiber */
+#define IXGB_SUBDEVICE_ID_A01F	0xA01F	/* Adapter-Retail-1310nm-Fiber */
 
-#endif /* #ifndef _IXGB_IDS_H_ */
+#endif				/* #ifndef _IXGB_IDS_H_ */
 
 /* End of File */
