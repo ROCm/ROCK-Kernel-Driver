@@ -34,6 +34,7 @@
 #include <linux/prctl.h>
 #include <linux/ptrace.h>
 #include <linux/kallsyms.h>
+#include <linux/version.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -193,8 +194,8 @@ void show_regs(struct pt_regs * regs)
 
 	printk("NIP: %016lX XER: %016lX LR: %016lX\n",
 	       regs->nip, regs->xer, regs->link);
-	printk("REGS: %p TRAP: %04lx    %s\n",
-	       regs, regs->trap, print_tainted());
+	printk("REGS: %p TRAP: %04lx   %s  (%s)\n",
+	       regs, regs->trap, print_tainted(), UTS_RELEASE);
 	printk("MSR: %016lx EE: %01x PR: %01x FP: %01x ME: %01x IR/DR: %01x%01x\n",
 	       regs->msr, regs->msr&MSR_EE ? 1 : 0, regs->msr&MSR_PR ? 1 : 0,
 	       regs->msr & MSR_FP ? 1 : 0,regs->msr&MSR_ME ? 1 : 0,
