@@ -594,7 +594,7 @@ static void unplug_slaves(mddev_t *mddev)
 				r_queue->unplug_fn(r_queue);
 
 			spin_lock_irqsave(&conf->device_lock, flags);
-			atomic_dec(&rdev->nr_pending);
+			rdev_dec_pending(rdev, mddev);
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);
@@ -1493,7 +1493,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 			for (i=0; i<conf->copies; i++) {
 				int d = r10_bio->devs[i].devnum;
 				if (r10_bio->devs[i].bio->bi_end_io)
-					atomic_dec(&conf->mirrors[d].rdev->nr_pending);
+					rdev_dec_pending(conf->mirrors[d].rdev, mddev);
 			}
 			put_buf(r10_bio);
 			goto giveup;

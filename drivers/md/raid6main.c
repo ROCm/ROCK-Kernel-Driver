@@ -1479,7 +1479,7 @@ static void unplug_slaves(mddev_t *mddev)
 				r_queue->unplug_fn(r_queue);
 
 			spin_lock_irqsave(&conf->device_lock, flags);
-			atomic_dec(&rdev->nr_pending);
+			rdev_dec_pending(rdev, mddev);
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);

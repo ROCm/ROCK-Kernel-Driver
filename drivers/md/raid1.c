@@ -440,7 +440,7 @@ static void unplug_slaves(mddev_t *mddev)
 				r_queue->unplug_fn(r_queue);
 
 			spin_lock_irqsave(&conf->device_lock, flags);
-			atomic_dec(&rdev->nr_pending);
+			rdev_dec_pending(rdev, mddev);
 		}
 	}
 	spin_unlock_irqrestore(&conf->device_lock, flags);
@@ -1086,7 +1086,7 @@ static int sync_request(mddev_t *mddev, sector_t sector_nr, int go_faster)
 		int rv = max_sector - sector_nr;
 		md_done_sync(mddev, rv, 1);
 		put_buf(r1_bio);
-		atomic_dec(&conf->mirrors[disk].rdev->nr_pending);
+		rdev_dec_pending(conf->mirrors[disk].rdev, mddev);
 		return rv;
 	}
 
