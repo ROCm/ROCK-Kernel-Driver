@@ -314,7 +314,7 @@ enum duplex
 #define MIN_PACKET_LEN      46
 #define ETHER_HEAD_LEN      14
 
-/* 
+/*
 ** MDIO constants.
 */
 #define MDIO_START                          0x1
@@ -480,7 +480,7 @@ etrax_ethernet_init(void)
 	if (!dev)
 		return -ENOMEM;
 
-	dev->base_addr = (unsigned int)R_NETWORK_SA_0; /* just to have something to show */	
+	dev->base_addr = (unsigned int)R_NETWORK_SA_0; /* just to have something to show */
 
 	/* now setup our etrax specific stuff */
 
@@ -513,7 +513,7 @@ etrax_ethernet_init(void)
 		RxDescList[i].descr.next   = virt_to_phys(&RxDescList[i + 1]);
 		RxDescList[i].descr.buf    = L1_CACHE_ALIGN(virt_to_phys(RxDescList[i].skb->data));
 		RxDescList[i].descr.status = 0;
-		RxDescList[i].descr.hw_len = 0;             
+		RxDescList[i].descr.hw_len = 0;
 		prepare_rx_descriptor(&RxDescList[i].descr);
 	}
 
@@ -534,7 +534,7 @@ etrax_ethernet_init(void)
 
 	TxDescList[NBR_OF_TX_DESC - 1].descr.ctrl   = d_eol;
 	TxDescList[NBR_OF_TX_DESC - 1].descr.next   = virt_to_phys(&TxDescList[0].descr);
-        
+
 	/* Initialise initial pointers */
 
 	myNextRxDesc  = &RxDescList[0];
@@ -562,12 +562,12 @@ etrax_ethernet_init(void)
 	speed_timer.expires = jiffies + NET_LINK_UP_CHECK_INTERVAL;
         duplex_timer.data = (unsigned long)dev;
 	speed_timer.function = e100_check_speed;
-        
+
 	clear_led_timer.function = e100_clear_network_leds;
-        
+
 	full_duplex = 0;
 	current_duplex = autoneg;
-	duplex_timer.expires = jiffies + NET_DUPLEX_CHECK_INTERVAL;		
+	duplex_timer.expires = jiffies + NET_DUPLEX_CHECK_INTERVAL;
         duplex_timer.data = (unsigned long)dev;
 	duplex_timer.function = e100_check_duplex;
 
@@ -608,7 +608,7 @@ e100_set_mac_address(struct net_device *dev, void *p)
 	 * *R_NETWORK_SA_0 = a0_0 | (a0_1 << 8) | (a0_2 << 16) | (a0_3 << 24);
 	 * *R_NETWORK_SA_1 = a0_4 | (a0_5 << 8);
 	 */
-	
+
 	*R_NETWORK_SA_0 = dev->dev_addr[0] | (dev->dev_addr[1] << 8) |
 		(dev->dev_addr[2] << 16) | (dev->dev_addr[3] << 24);
 	*R_NETWORK_SA_1 = dev->dev_addr[4] | (dev->dev_addr[5] << 8);
@@ -650,7 +650,7 @@ e100_open(struct net_device *dev)
 		IO_STATE(R_IRQ_MASK0_CLR, overrun, clr) |
 		IO_STATE(R_IRQ_MASK0_CLR, underrun, clr) |
 		IO_STATE(R_IRQ_MASK0_CLR, excessive_col, clr);
-	
+
 	/* clear dma0 and 1 eop and descr irq masks */
 	*R_IRQ_MASK2_CLR =
 		IO_STATE(R_IRQ_MASK2_CLR, dma0_descr, clr) |
@@ -751,12 +751,12 @@ e100_open(struct net_device *dev)
 	*R_DMA_CH1_CMD = IO_STATE(R_DMA_CH1_CMD, cmd, start);
 
 	/* Set up transmit DMA channel so it can be restarted later */
-        
+
 	*R_DMA_CH0_FIRST = 0;
 	*R_DMA_CH0_DESCR = virt_to_phys(myLastTxDesc);
 
 	restore_flags(flags);
-	
+
 	/* Probe for transceiver */
 	if (e100_probe_transceiver(dev))
 		goto grace_exit3;
@@ -833,7 +833,7 @@ e100_check_speed(unsigned long priv)
 	} else {
 		transceiver->check_speed(dev);
 	}
-	
+
 	if ((old_speed != current_speed) || !led_initiated) {
 		led_initiated = 1;
 		e100_set_network_leds(NO_NETWORK_ACTIVITY);
@@ -852,7 +852,7 @@ e100_negotiate(struct net_device* dev)
 	/* Discard old speed and duplex settings */
 	data &= ~(ADVERTISE_100HALF | ADVERTISE_100FULL |
 	          ADVERTISE_10HALF | ADVERTISE_10FULL);
-  
+
 	switch (current_speed_selection) {
 		case 10 :
 			if (current_duplex == full)
@@ -960,7 +960,7 @@ intel_check_duplex(struct net_device* dev)
 	full_duplex = (data & MDIO_INT_FULL_DUPLEX_IND) ? 1 : 0;
 }
 
-static void 
+static void
 e100_set_duplex(struct net_device* dev, enum duplex new_duplex)
 {
 	if (new_duplex != current_duplex) {
@@ -1005,15 +1005,15 @@ e100_get_mdio_reg(struct net_device *dev, int phy_id, int location)
 	unsigned short cmd;    /* Data to be sent on MDIO port */
 	int data;   /* Data read from MDIO */
 	int bitCounter;
-	
+
 	/* Start of frame, OP Code, Physical Address, Register Address */
 	cmd = (MDIO_START << 14) | (MDIO_READ << 12) | (phy_id << 7) |
 		(location << 2);
-	
+
 	e100_send_mdio_cmd(cmd, 0);
-	
+
 	data = 0;
-	
+
 	/* Data... */
 	for (bitCounter=15; bitCounter>=0 ; bitCounter--) {
 		data |= (e100_receive_mdio_bit() << bitCounter);
@@ -1045,7 +1045,7 @@ e100_send_mdio_cmd(unsigned short cmd, int write_cmd)
 {
 	int bitCounter;
 	unsigned char data = 0x2;
-	
+
 	/* Preamble */
 	for (bitCounter = 31; bitCounter>= 0; bitCounter--)
 		e100_send_mdio_bit(GET_BIT(bitCounter, MDIO_PREAMBLE));
@@ -1087,7 +1087,7 @@ e100_receive_mdio_bit()
 	return bit;
 }
 
-static void 
+static void
 e100_reset_transceiver(struct net_device* dev)
 {
 	unsigned short cmd;
@@ -1099,9 +1099,9 @@ e100_reset_transceiver(struct net_device* dev)
 	cmd = (MDIO_START << 14) | (MDIO_WRITE << 12) | (mdio_phy_addr << 7) | (MII_BMCR << 2);
 
 	e100_send_mdio_cmd(cmd, 1);
-	
+
 	data |= 0x8000;
-	
+
 	for (bitCounter = 15; bitCounter >= 0 ; bitCounter--) {
 		e100_send_mdio_bit(GET_BIT(bitCounter, data));
 	}
@@ -1121,20 +1121,20 @@ e100_tx_timeout(struct net_device *dev)
 
 	printk(KERN_WARNING "%s: transmit timed out, %s?\n", dev->name,
 	       tx_done(dev) ? "IRQ problem" : "network cable problem");
-	
+
 	/* remember we got an error */
-	
-	np->stats.tx_errors++; 
-	
+
+	np->stats.tx_errors++;
+
 	/* reset the TX DMA in case it has hung on something */
-	
+
 	RESET_DMA(NETWORK_TX_DMA_NBR);
 	WAIT_DMA(NETWORK_TX_DMA_NBR);
-	
+
 	/* Reset the transceiver. */
-	
+
 	e100_reset_transceiver(dev);
-	
+
 	/* and get rid of the packets that never got an interrupt */
 	while (myFirstTxDesc != myNextTxDesc)
 	{
@@ -1145,10 +1145,10 @@ e100_tx_timeout(struct net_device *dev)
 
 	/* Set up transmit DMA channel so it can be restarted later */
 	*R_DMA_CH0_FIRST = 0;
-	*R_DMA_CH0_DESCR = virt_to_phys(myLastTxDesc);	
+	*R_DMA_CH0_DESCR = virt_to_phys(myLastTxDesc);
 
 	/* tell the upper layers we're ok again */
-	
+
 	netif_wake_queue(dev);
 	spin_unlock_irqrestore(&np->lock, flags);
 }
@@ -1166,7 +1166,7 @@ e100_send_packet(struct sk_buff *skb, struct net_device *dev)
 	struct net_local *np = (struct net_local *)dev->priv;
 	unsigned char *buf = skb->data;
 	unsigned long flags;
-	
+
 #ifdef ETHDEBUG
 	printk("send packet len %d\n", length);
 #endif
@@ -1175,7 +1175,7 @@ e100_send_packet(struct sk_buff *skb, struct net_device *dev)
 	myNextTxDesc->skb = skb;
 
 	dev->trans_start = jiffies;
-	
+
 	e100_hardware_send_packet(buf, skb->len);
 
 	myNextTxDesc = phys_to_virt(myNextTxDesc->descr.next);
@@ -1201,7 +1201,7 @@ e100rxtx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct net_local *np = (struct net_local *)dev->priv;
 	unsigned long irqbits = *R_IRQ_MASK2_RD;
- 
+
 	/* Disable RX/TX IRQs to avoid reentrancy */
 	*R_IRQ_MASK2_CLR =
 	  IO_STATE(R_IRQ_MASK2_CLR, dma0_eop, clr) |
@@ -1228,7 +1228,7 @@ e100rxtx_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			*R_DMA_CH1_CLR_INTR =
 				IO_STATE(R_DMA_CH1_CLR_INTR, clr_eop, do) |
 				IO_STATE(R_DMA_CH1_CLR_INTR, clr_descr, do);
-			
+
 			/* now, we might have gotten another packet
 			   so we have to loop back and check if so */
 		}
@@ -1270,7 +1270,7 @@ e100nw_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	unsigned long irqbits = *R_IRQ_MASK0_RD;
 
 	/* check for underrun irq */
-	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, underrun, active)) { 
+	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, underrun, active)) {
 		SETS(network_tr_ctrl_shadow, R_NETWORK_TR_CTRL, clr_error, clr);
 		*R_NETWORK_TR_CTRL = network_tr_ctrl_shadow;
 		SETS(network_tr_ctrl_shadow, R_NETWORK_TR_CTRL, clr_error, nop);
@@ -1279,12 +1279,12 @@ e100nw_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	}
 
 	/* check for overrun irq */
-	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, overrun, active)) { 
+	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, overrun, active)) {
 		update_rx_stats(&np->stats); /* this will ack the irq */
 		D(printk("ethernet receiver overrun!\n"));
 	}
 	/* check for excessive collision irq */
-	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, excessive_col, active)) { 
+	if (irqbits & IO_STATE(R_IRQ_MASK0_RD, excessive_col, active)) {
 		SETS(network_tr_ctrl_shadow, R_NETWORK_TR_CTRL, clr_error, clr);
 		*R_NETWORK_TR_CTRL = network_tr_ctrl_shadow;
 		SETS(network_tr_ctrl_shadow, R_NETWORK_TR_CTRL, clr_error, nop);
@@ -1349,16 +1349,16 @@ e100_rx(struct net_device *dev)
 		  skb->head, skb->data, skb->tail, skb->end);
 		printk("copying packet to 0x%x.\n", skb_data_ptr);
 #endif
-          
+
 		memcpy(skb_data_ptr, phys_to_virt(myNextRxDesc->descr.buf), length);
 	}
 	else {
-		/* Large packet, send directly to upper layers and allocate new 
+		/* Large packet, send directly to upper layers and allocate new
 		 * memory (aligned to cache line boundary to avoid bug).
-		 * Before sending the skb to upper layers we must make sure that 
-		 * skb->data points to the aligned start of the packet. 
+		 * Before sending the skb to upper layers we must make sure that
+		 * skb->data points to the aligned start of the packet.
 		 */
-		int align;  
+		int align;
 		struct sk_buff *new_skb = dev_alloc_skb(MAX_MEDIA_DATA_SIZE + 2 * L1_CACHE_BYTES);
 		if (!new_skb) {
 			np->stats.rx_errors++;
@@ -1366,8 +1366,8 @@ e100_rx(struct net_device *dev)
 			return;
 		}
 		skb = myNextRxDesc->skb;
-		align = (int)phys_to_virt(myNextRxDesc->descr.buf) - (int)skb->data;	
-		skb_put(skb, length + align); 
+		align = (int)phys_to_virt(myNextRxDesc->descr.buf) - (int)skb->data;
+		skb_put(skb, length + align);
 		skb_pull(skb, align); /* Remove alignment bytes */
 		myNextRxDesc->skb = new_skb;
 		myNextRxDesc->descr.buf = L1_CACHE_ALIGN(virt_to_phys(myNextRxDesc->skb->data));
@@ -1410,7 +1410,7 @@ e100_close(struct net_device *dev)
 		IO_STATE(R_IRQ_MASK0_CLR, overrun, clr) |
 		IO_STATE(R_IRQ_MASK0_CLR, underrun, clr) |
 		IO_STATE(R_IRQ_MASK0_CLR, excessive_col, clr);
-	
+
 	*R_IRQ_MASK2_CLR =
 		IO_STATE(R_IRQ_MASK2_CLR, dma0_descr, clr) |
 		IO_STATE(R_IRQ_MASK2_CLR, dma0_eop, clr) |
@@ -1460,7 +1460,7 @@ e100_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 			e100_set_mdio_reg(dev, mdio_phy_addr, data->reg_num, data->val_in);
 			break;
 		/* The ioctls below should be considered obsolete but are */
-		/* still present for compatability with old scripts/apps  */	
+		/* still present for compatability with old scripts/apps  */
 		case SET_ETH_SPEED_10:                  /* 10 Mbps */
 			e100_set_speed(dev, 10);
 			break;
@@ -1573,7 +1573,7 @@ e100_set_config(struct net_device *dev, struct ifmap *map)
 {
 	struct net_local *np = (struct net_local *)dev->priv;
 	spin_lock(&np->lock); /* Preempt protection */
-	
+
 	switch(map->port) {
 		case IF_PORT_UNKNOWN:
 			/* Use autoneg */
@@ -1639,7 +1639,7 @@ e100_get_stats(struct net_device *dev)
 
 	update_rx_stats(&lp->stats);
 	update_tx_stats(&lp->stats);
-	
+
 	spin_unlock_irqrestore(&lp->lock, flags);
 	return &lp->stats;
 }
@@ -1694,7 +1694,7 @@ set_multicast_list(struct net_device *dev)
 		hi_bits = 0x00000000ul;
 		for (i=0; i<num_addr; i++) {
 			/* Calculate the hash index for the GA registers */
-			
+
 			hash_ix = 0;
 			baddr = dmi->dmi_addr;
 			hash_ix ^= (*baddr) & 0x3f;
@@ -1714,9 +1714,9 @@ set_multicast_list(struct net_device *dev)
 			++baddr;
 			hash_ix ^= ((*baddr) << 4) & 0x30;
 			hash_ix ^= ((*baddr) >> 2) & 0x3f;
-			
+
 			hash_ix &= 0x3f;
-			
+
 			if (hash_ix >= 32) {
 				hi_bits |= (1 << (hash_ix-32));
 			}
