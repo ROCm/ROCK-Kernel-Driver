@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,11 +47,11 @@
 
 acpi_status
 acpi_tb_get_table (
-	acpi_pointer            *address,
-	acpi_table_desc         *table_info)
+	struct acpi_pointer             *address,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_status             status;
-	acpi_table_header       header;
+	acpi_status                     status;
+	struct acpi_table_header        header;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_table");
@@ -97,11 +97,11 @@ acpi_tb_get_table (
 
 acpi_status
 acpi_tb_get_table_header (
-	acpi_pointer            *address,
-	acpi_table_header       *return_header)
+	struct acpi_pointer             *address,
+	struct acpi_table_header        *return_header)
 {
-	acpi_status             status = AE_OK;
-	acpi_table_header       *header = NULL;
+	acpi_status                     status = AE_OK;
+	struct acpi_table_header        *header = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_table_header");
@@ -117,7 +117,7 @@ acpi_tb_get_table_header (
 
 		/* Pointer matches processor mode, copy the header */
 
-		ACPI_MEMCPY (return_header, address->pointer.logical, sizeof (acpi_table_header));
+		ACPI_MEMCPY (return_header, address->pointer.logical, sizeof (struct acpi_table_header));
 		break;
 
 
@@ -125,20 +125,20 @@ acpi_tb_get_table_header (
 
 		/* Create a logical address for the physical pointer*/
 
-		status = acpi_os_map_memory (address->pointer.physical, sizeof (acpi_table_header),
+		status = acpi_os_map_memory (address->pointer.physical, sizeof (struct acpi_table_header),
 				  (void **) &header);
 		if (ACPI_FAILURE (status)) {
 			ACPI_REPORT_ERROR (("Could not map memory at %8.8X%8.8X for length %X\n",
 				ACPI_HIDWORD (address->pointer.physical),
 				ACPI_LODWORD (address->pointer.physical),
-				sizeof (acpi_table_header)));
+				sizeof (struct acpi_table_header)));
 			return_ACPI_STATUS (status);
 		}
 
 		/* Copy header and delete mapping */
 
-		ACPI_MEMCPY (return_header, header, sizeof (acpi_table_header));
-		acpi_os_unmap_memory (header, sizeof (acpi_table_header));
+		ACPI_MEMCPY (return_header, header, sizeof (struct acpi_table_header));
+		acpi_os_unmap_memory (header, sizeof (struct acpi_table_header));
 		break;
 
 
@@ -175,11 +175,11 @@ acpi_tb_get_table_header (
 
 acpi_status
 acpi_tb_get_table_body (
-	acpi_pointer            *address,
-	acpi_table_header       *header,
-	acpi_table_desc         *table_info)
+	struct acpi_pointer             *address,
+	struct acpi_table_header        *header,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_table_body");
@@ -222,12 +222,12 @@ acpi_tb_get_table_body (
 
 acpi_status
 acpi_tb_table_override (
-	acpi_table_header       *header,
-	acpi_table_desc         *table_info)
+	struct acpi_table_header        *header,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_table_header       *new_table;
-	acpi_status             status;
-	acpi_pointer            address;
+	struct acpi_table_header        *new_table;
+	acpi_status                     status;
+	struct acpi_pointer             address;
 
 
 	ACPI_FUNCTION_TRACE ("tb_table_override");
@@ -296,13 +296,13 @@ acpi_tb_table_override (
 
 acpi_status
 acpi_tb_get_this_table (
-	acpi_pointer            *address,
-	acpi_table_header       *header,
-	acpi_table_desc         *table_info)
+	struct acpi_pointer             *address,
+	struct acpi_table_header        *header,
+	struct acpi_table_desc          *table_info)
 {
-	acpi_table_header       *full_table = NULL;
-	u8                      allocation;
-	acpi_status             status = AE_OK;
+	struct acpi_table_header        *full_table = NULL;
+	u8                              allocation;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_this_table");
@@ -413,12 +413,12 @@ acpi_tb_get_this_table (
 
 acpi_status
 acpi_tb_get_table_ptr (
-	acpi_table_type         table_type,
-	u32                     instance,
-	acpi_table_header       **table_ptr_loc)
+	acpi_table_type                 table_type,
+	u32                             instance,
+	struct acpi_table_header        **table_ptr_loc)
 {
-	acpi_table_desc         *table_desc;
-	u32                     i;
+	struct acpi_table_desc          *table_desc;
+	u32                             i;
 
 
 	ACPI_FUNCTION_TRACE ("tb_get_table_ptr");

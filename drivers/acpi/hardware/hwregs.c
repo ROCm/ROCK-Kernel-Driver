@@ -7,7 +7,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,9 +47,9 @@
 acpi_status
 acpi_hw_clear_acpi_status (void)
 {
-	acpi_native_uint        i;
-	acpi_native_uint        gpe_block;
-	acpi_status             status;
+	acpi_native_uint                i;
+	acpi_native_uint                gpe_block;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("hw_clear_acpi_status");
@@ -116,12 +116,12 @@ unlock_and_exit:
 
 acpi_status
 acpi_get_sleep_type_data (
-	u8                      sleep_state,
-	u8                      *sleep_type_a,
-	u8                      *sleep_type_b)
+	u8                              sleep_state,
+	u8                              *sleep_type_a,
+	u8                              *sleep_type_b)
 {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *obj_desc;
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_sleep_type_data");
@@ -207,9 +207,9 @@ acpi_get_sleep_type_data (
  *
  ******************************************************************************/
 
-acpi_bit_register_info *
+struct acpi_bit_register_info *
 acpi_hw_get_bit_register_info (
-	u32                     register_id)
+	u32                             register_id)
 {
 	ACPI_FUNCTION_NAME ("hw_get_bit_register_info");
 
@@ -239,13 +239,13 @@ acpi_hw_get_bit_register_info (
 
 acpi_status
 acpi_get_register (
-	u32                     register_id,
-	u32                     *return_value,
-	u32                     flags)
+	u32                             register_id,
+	u32                             *return_value,
+	u32                             flags)
 {
-	u32                     register_value = 0;
-	acpi_bit_register_info  *bit_reg_info;
-	acpi_status             status;
+	u32                             register_value = 0;
+	struct acpi_bit_register_info   *bit_reg_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_register");
@@ -304,13 +304,13 @@ acpi_get_register (
 
 acpi_status
 acpi_set_register (
-	u32                     register_id,
-	u32                     value,
-	u32                     flags)
+	u32                             register_id,
+	u32                             value,
+	u32                             flags)
 {
-	u32                     register_value = 0;
-	acpi_bit_register_info  *bit_reg_info;
-	acpi_status             status;
+	u32                             register_value = 0;
+	struct acpi_bit_register_info   *bit_reg_info;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_U32 ("acpi_set_register", register_id);
@@ -454,14 +454,14 @@ unlock_and_exit:
 
 acpi_status
 acpi_hw_register_read (
-	u8                      use_lock,
-	u32                     register_id,
-	u32                     *return_value)
+	u8                              use_lock,
+	u32                             register_id,
+	u32                             *return_value)
 {
-	u32                     value1 = 0;
-	u32                     value2 = 0;
-	u32                     bank_offset;
-	acpi_status             status;
+	u32                             value1 = 0;
+	u32                             value2 = 0;
+	u32                             bank_offset;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("hw_register_read");
@@ -563,12 +563,12 @@ unlock_and_exit:
 
 acpi_status
 acpi_hw_register_write (
-	u8                      use_lock,
-	u32                     register_id,
-	u32                     value)
+	u8                              use_lock,
+	u32                             register_id,
+	u32                             value)
 {
-	u32                     bank_offset;
-	acpi_status             status;
+	u32                             bank_offset;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("hw_register_write");
@@ -678,16 +678,16 @@ unlock_and_exit:
 
 acpi_status
 acpi_hw_low_level_read (
-	u32                     width,
-	u32                     *value,
-	acpi_generic_address    *reg,
-	u32                     offset)
+	u32                             width,
+	u32                             *value,
+	struct acpi_generic_address     *reg,
+	u32                             offset)
 {
-	acpi_physical_address   mem_address;
-	acpi_io_address         io_address;
-	acpi_pci_id             pci_id;
-	u16                     pci_register;
-	acpi_status             status;
+	acpi_physical_address           mem_address;
+	acpi_io_address                 io_address;
+	struct acpi_pci_id              pci_id;
+	u16                             pci_register;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("hw_low_level_read");
@@ -768,16 +768,16 @@ acpi_hw_low_level_read (
 
 acpi_status
 acpi_hw_low_level_write (
-	u32                     width,
-	u32                     value,
-	acpi_generic_address    *reg,
-	u32                     offset)
+	u32                             width,
+	u32                             value,
+	struct acpi_generic_address     *reg,
+	u32                             offset)
 {
-	acpi_physical_address   mem_address;
-	acpi_io_address         io_address;
-	acpi_pci_id             pci_id;
-	u16                     pci_register;
-	acpi_status             status;
+	acpi_physical_address           mem_address;
+	acpi_io_address                 io_address;
+	struct acpi_pci_id              pci_id;
+	u16                             pci_register;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_NAME ("hw_low_level_write");

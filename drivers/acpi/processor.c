@@ -915,9 +915,9 @@ acpi_processor_get_performance_control (
 {
 	int			result = 0;
 	acpi_status		status = 0;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_object		*pct = NULL;
-	acpi_object		obj = {0};
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	union acpi_object	*pct = NULL;
+	union acpi_object	obj = {0};
 	struct acpi_pct_register *reg = NULL;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_control");
@@ -928,7 +928,7 @@ acpi_processor_get_performance_control (
 		return_VALUE(-ENODEV);
 	}
 
-	pct = (acpi_object *) buffer.pointer;
+	pct = (union acpi_object *) buffer.pointer;
 	if (!pct || (pct->type != ACPI_TYPE_PACKAGE) 
 		|| (pct->package.count != 2)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PCT data\n"));
@@ -1008,10 +1008,10 @@ acpi_processor_get_performance_states (
 {
 	int			result = 0;
 	acpi_status		status = AE_OK;
-	acpi_buffer		buffer = {ACPI_ALLOCATE_BUFFER, NULL};
-	acpi_buffer		format = {sizeof("NNNNNN"), "NNNNNN"};
-	acpi_buffer		state = {0, NULL};
-	acpi_object 		*pss = NULL;
+	struct acpi_buffer	buffer = {ACPI_ALLOCATE_BUFFER, NULL};
+	struct acpi_buffer	format = {sizeof("NNNNNN"), "NNNNNN"};
+	struct acpi_buffer	state = {0, NULL};
+	union acpi_object 	*pss = NULL;
 	int			i = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_performance_states");
@@ -1022,7 +1022,7 @@ acpi_processor_get_performance_states (
 		return_VALUE(-ENODEV);
 	}
 
-	pss = (acpi_object *) buffer.pointer;
+	pss = (union acpi_object *) buffer.pointer;
 	if (!pss || (pss->type != ACPI_TYPE_PACKAGE)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid _PSS data\n"));
 		result = -EFAULT;
@@ -2366,8 +2366,8 @@ acpi_processor_get_info (
 	struct acpi_processor	*pr)
 {
 	acpi_status		status = 0;
-	acpi_object		object = {0};
-	acpi_buffer		buffer = {sizeof(acpi_object), &object};
+	union acpi_object	object = {0};
+	struct acpi_buffer	buffer = {sizeof(union acpi_object), &object};
 	static int		cpu_count = 0;
 
 	ACPI_FUNCTION_TRACE("acpi_processor_get_info");

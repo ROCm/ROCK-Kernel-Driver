@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,18 +51,18 @@
 
 acpi_status
 acpi_install_address_space_handler (
-	acpi_handle             device,
-	acpi_adr_space_type     space_id,
-	acpi_adr_space_handler  handler,
-	acpi_adr_space_setup    setup,
-	void                    *context)
+	acpi_handle                     device,
+	acpi_adr_space_type             space_id,
+	acpi_adr_space_handler          handler,
+	acpi_adr_space_setup            setup,
+	void                            *context)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *handler_obj;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_object_type        type;
-	u16                     flags = 0;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *handler_obj;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	acpi_object_type                type;
+	u16                             flags = 0;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_install_address_space_handler");
@@ -281,16 +281,16 @@ unlock_and_exit:
 
 acpi_status
 acpi_remove_address_space_handler (
-	acpi_handle             device,
-	acpi_adr_space_type     space_id,
-	acpi_adr_space_handler  handler)
+	acpi_handle                     device,
+	acpi_adr_space_type             space_id,
+	acpi_adr_space_handler          handler)
 {
-	acpi_operand_object     *obj_desc;
-	acpi_operand_object     *handler_obj;
-	acpi_operand_object     *region_obj;
-	acpi_operand_object     **last_obj_ptr;
-	acpi_namespace_node     *node;
-	acpi_status             status;
+	union acpi_operand_object       *obj_desc;
+	union acpi_operand_object       *handler_obj;
+	union acpi_operand_object       *region_obj;
+	union acpi_operand_object       **last_obj_ptr;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_remove_address_space_handler");

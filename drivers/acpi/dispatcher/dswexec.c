@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -66,10 +66,10 @@ static ACPI_EXECUTE_OP      acpi_gbl_op_type_dispatch [] = {
 
 acpi_status
 acpi_ds_get_predicate_value (
-	acpi_walk_state         *walk_state,
-	acpi_operand_object     *result_obj) {
-	acpi_status             status = AE_OK;
-	acpi_operand_object     *obj_desc;
+	struct acpi_walk_state          *walk_state,
+	union acpi_operand_object       *result_obj) {
+	acpi_status                     status = AE_OK;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_get_predicate_value", walk_state);
@@ -179,12 +179,12 @@ cleanup:
 
 acpi_status
 acpi_ds_exec_begin_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       **out_op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         **out_op)
 {
-	acpi_parse_object       *op;
-	acpi_status             status = AE_OK;
-	u32                     opcode_class;
+	union acpi_parse_object         *op;
+	acpi_status                     status = AE_OK;
+	u32                             opcode_class;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_exec_begin_op", walk_state);
@@ -320,14 +320,14 @@ acpi_ds_exec_begin_op (
 
 acpi_status
 acpi_ds_exec_end_op (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_parse_object       *op;
-	acpi_status             status = AE_OK;
-	u32                     op_type;
-	u32                     op_class;
-	acpi_parse_object       *next_op;
-	acpi_parse_object       *first_arg;
+	union acpi_parse_object         *op;
+	acpi_status                     status = AE_OK;
+	u32                             op_type;
+	u32                             op_class;
+	union acpi_parse_object         *next_op;
+	union acpi_parse_object         *first_arg;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ds_exec_end_op", walk_state);

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -74,11 +74,11 @@
 
 acpi_status
 acpi_ex_opcode_2A_0T_0R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_namespace_node     *node;
-	acpi_status             status = AE_OK;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	struct acpi_namespace_node      *node;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_0R",
@@ -92,7 +92,7 @@ acpi_ex_opcode_2A_0T_0R (
 
 		/* The first operand is a namespace node */
 
-		node = (acpi_namespace_node *) operand[0];
+		node = (struct acpi_namespace_node *) operand[0];
 
 		/* Notifies allowed on this object? */
 
@@ -142,12 +142,12 @@ acpi_ex_opcode_2A_0T_0R (
 
 acpi_status
 acpi_ex_opcode_2A_2T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc1 = NULL;
-	acpi_operand_object     *return_desc2 = NULL;
-	acpi_status             status;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc1 = NULL;
+	union acpi_operand_object       *return_desc2 = NULL;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_2T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -239,14 +239,14 @@ cleanup:
 
 acpi_status
 acpi_ex_opcode_2A_1T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc = NULL;
-	acpi_operand_object     *temp_desc = NULL;
-	u32                     index;
-	acpi_status             status = AE_OK;
-	acpi_size               length;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc = NULL;
+	union acpi_operand_object       *temp_desc = NULL;
+	u32                             index;
+	acpi_status                     status = AE_OK;
+	acpi_size                       length;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
@@ -499,12 +499,12 @@ cleanup:
 
 acpi_status
 acpi_ex_opcode_2A_0T_1R (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     **operand = &walk_state->operands[0];
-	acpi_operand_object     *return_desc = NULL;
-	acpi_status             status = AE_OK;
-	u8                      logical_result = FALSE;
+	union acpi_operand_object       **operand = &walk_state->operands[0];
+	union acpi_operand_object       *return_desc = NULL;
+	acpi_status                     status = AE_OK;
+	u8                              logical_result = FALSE;
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));

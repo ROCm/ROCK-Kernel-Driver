@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -65,7 +65,7 @@
 acpi_status
 acpi_ex_enter_interpreter (void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 	ACPI_FUNCTION_TRACE ("ex_enter_interpreter");
 
@@ -102,7 +102,7 @@ acpi_ex_enter_interpreter (void)
 void
 acpi_ex_exit_interpreter (void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ex_exit_interpreter");
@@ -132,7 +132,7 @@ acpi_ex_exit_interpreter (void)
 
 void
 acpi_ex_truncate_for32bit_table (
-	acpi_operand_object     *obj_desc)
+	union acpi_operand_object       *obj_desc)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -174,10 +174,10 @@ acpi_ex_truncate_for32bit_table (
 
 u8
 acpi_ex_acquire_global_lock (
-	u32                     field_flags)
+	u32                             field_flags)
 {
-	u8                      locked = FALSE;
-	acpi_status             status;
+	u8                              locked = FALSE;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ex_acquire_global_lock");
@@ -217,9 +217,9 @@ acpi_ex_acquire_global_lock (
 
 void
 acpi_ex_release_global_lock (
-	u8                      locked_by_me)
+	u8                              locked_by_me)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("ex_release_global_lock");
@@ -256,12 +256,12 @@ acpi_ex_release_global_lock (
 
 u32
 acpi_ex_digits_needed (
-	acpi_integer            value,
-	u32                     base)
+	acpi_integer                    value,
+	u32                             base)
 {
-	u32                     num_digits;
-	acpi_integer            current_value;
-	acpi_integer            quotient;
+	u32                             num_digits;
+	acpi_integer                    current_value;
+	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_TRACE ("ex_digits_needed");
@@ -296,10 +296,10 @@ acpi_ex_digits_needed (
 
 void
 acpi_ex_eisa_id_to_string (
-	u32                     numeric_id,
-	char                    *out_string)
+	u32                             numeric_id,
+	char                            *out_string)
 {
-	u32                     eisa_id;
+	u32                             eisa_id;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -333,13 +333,13 @@ acpi_ex_eisa_id_to_string (
 
 void
 acpi_ex_unsigned_integer_to_string (
-	acpi_integer            value,
-	char                    *out_string)
+	acpi_integer                    value,
+	char                            *out_string)
 {
-	u32                     count;
-	u32                     digits_needed;
-	u32                     remainder;
-	acpi_integer            quotient;
+	u32                             count;
+	u32                             digits_needed;
+	u32                             remainder;
+	acpi_integer                    quotient;
 
 
 	ACPI_FUNCTION_ENTRY ();

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -51,8 +51,8 @@
 
 acpi_status
 acpi_ds_init_callbacks (
-	acpi_walk_state         *walk_state,
-	u32                     pass_number)
+	struct acpi_walk_state          *walk_state,
+	u32                             pass_number)
 {
 
 	switch (pass_number) {
@@ -100,15 +100,15 @@ acpi_ds_init_callbacks (
 
 acpi_status
 acpi_ds_load1_begin_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       **out_op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         **out_op)
 {
-	acpi_parse_object       *op;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_object_type        object_type;
-	char                    *path;
-	u32                     flags;
+	union acpi_parse_object         *op;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	acpi_object_type                object_type;
+	char                            *path;
+	u32                             flags;
 
 
 	ACPI_FUNCTION_NAME ("ds_load1_begin_op");
@@ -303,11 +303,11 @@ acpi_ds_load1_begin_op (
 
 acpi_status
 acpi_ds_load1_end_op (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_parse_object       *op;
-	acpi_object_type        object_type;
-	acpi_status             status = AE_OK;
+	union acpi_parse_object         *op;
+	acpi_object_type                object_type;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_NAME ("ds_load1_end_op");
@@ -415,14 +415,14 @@ acpi_ds_load1_end_op (
 
 acpi_status
 acpi_ds_load2_begin_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       **out_op)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         **out_op)
 {
-	acpi_parse_object       *op;
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_object_type        object_type;
-	char                    *buffer_ptr;
+	union acpi_parse_object         *op;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	acpi_object_type                object_type;
+	char                            *buffer_ptr;
 
 
 	ACPI_FUNCTION_TRACE ("ds_load2_begin_op");
@@ -627,16 +627,16 @@ acpi_ds_load2_begin_op (
 
 acpi_status
 acpi_ds_load2_end_op (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_parse_object       *op;
-	acpi_status             status = AE_OK;
-	acpi_object_type        object_type;
-	acpi_namespace_node     *node;
-	acpi_parse_object       *arg;
-	acpi_namespace_node     *new_node;
+	union acpi_parse_object         *op;
+	acpi_status                     status = AE_OK;
+	acpi_object_type                object_type;
+	struct acpi_namespace_node      *node;
+	union acpi_parse_object         *arg;
+	struct acpi_namespace_node      *new_node;
 #ifndef ACPI_NO_METHOD_EXECUTION
-	u32                     i;
+	u32                             i;
 #endif
 
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -67,7 +67,7 @@
  * Full 64-bit address/integer on both 32-bit and 64-bit platforms
  */
 #define ACPI_LODWORD(l)                 ((u32)(u64)(l))
-#define ACPI_HIDWORD(l)                 ((u32)(((*(uint64_struct *)(void *)(&l))).hi))
+#define ACPI_HIDWORD(l)                 ((u32)(((*(struct uint64_struct *)(void *)(&l))).hi))
 
 #define ACPI_GET_ADDRESS(a)             (a)
 #define ACPI_STORE_ADDRESS(a,b)         ((a)=(acpi_physical_address)(b))
@@ -249,19 +249,19 @@
 #define ACPI_REGISTER_INSERT_VALUE(reg, pos, mask, val)  reg = (reg & (~(mask))) | ACPI_REGISTER_PREPARE_BITS(val, pos, mask)
 
 /*
- * An acpi_namespace_node * can appear in some contexts,
- * where a pointer to an acpi_operand_object  can also
+ * An struct acpi_namespace_node * can appear in some contexts,
+ * where a pointer to an union acpi_operand_object    can also
  * appear.  This macro is used to distinguish them.
  *
  * The "Descriptor" field is the first field in both structures.
  */
-#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((acpi_descriptor *)(void *)(d))->descriptor_id)
-#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((acpi_descriptor *)(void *)(d))->descriptor_id = t)
+#define ACPI_GET_DESCRIPTOR_TYPE(d)     (((union acpi_descriptor *)(void *)(d))->descriptor_id)
+#define ACPI_SET_DESCRIPTOR_TYPE(d,t)   (((union acpi_descriptor *)(void *)(d))->descriptor_id = t)
 
 
 /* Macro to test the object type */
 
-#define ACPI_GET_OBJECT_TYPE(d)         (((acpi_operand_object *)(void *)(d))->common.type)
+#define ACPI_GET_OBJECT_TYPE(d)         (((union acpi_operand_object *)(void *)(d))->common.type)
 
 /* Macro to check the table flags for SINGLE or MULTIPLE tables are allowed */
 
@@ -389,7 +389,7 @@
  * as a local string ("_proc_name) so that it can be also used by the function exit macros below.
  */
 
-#define ACPI_FUNCTION_NAME(a)           acpi_debug_print_info _dbg;     \
+#define ACPI_FUNCTION_NAME(a)           struct acpi_debug_print_info _dbg;     \
 										_dbg.component_id = _COMPONENT; \
 										_dbg.proc_name   = a;           \
 										_dbg.module_name = _THIS_MODULE;

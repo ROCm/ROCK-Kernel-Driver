@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -55,10 +55,10 @@
 
 acpi_status
 acpi_get_irq_routing_table (
-	acpi_handle             device_handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     device_handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_irq_routing_table ");
@@ -110,10 +110,10 @@ acpi_get_irq_routing_table (
 
 acpi_status
 acpi_get_current_resources (
-	acpi_handle             device_handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     device_handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_current_resources");
@@ -162,10 +162,10 @@ acpi_get_current_resources (
 
 acpi_status
 acpi_get_possible_resources (
-	acpi_handle             device_handle,
-	acpi_buffer             *ret_buffer)
+	acpi_handle                     device_handle,
+	struct acpi_buffer              *ret_buffer)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_get_possible_resources");
@@ -211,10 +211,10 @@ acpi_get_possible_resources (
 
 acpi_status
 acpi_set_current_resources (
-	acpi_handle             device_handle,
-	acpi_buffer             *in_buffer)
+	acpi_handle                     device_handle,
+	struct acpi_buffer              *in_buffer)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("acpi_set_current_resources");

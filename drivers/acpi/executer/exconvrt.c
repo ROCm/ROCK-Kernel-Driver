@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -48,16 +48,16 @@
 
 acpi_status
 acpi_ex_convert_to_integer (
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **result_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **result_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	u32                     i;
-	acpi_operand_object     *ret_desc;
-	u32                     count;
-	u8                      *pointer;
-	acpi_integer            result;
-	acpi_status             status;
+	u32                             i;
+	union acpi_operand_object       *ret_desc;
+	u32                             count;
+	u8                              *pointer;
+	acpi_integer                    result;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_integer", obj_desc);
@@ -182,13 +182,13 @@ acpi_ex_convert_to_integer (
 
 acpi_status
 acpi_ex_convert_to_buffer (
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **result_desc,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **result_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *ret_desc;
-	u32                     i;
-	u8                      *new_buf;
+	union acpi_operand_object       *ret_desc;
+	u32                             i;
+	u8                              *new_buf;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_buffer", obj_desc);
@@ -283,19 +283,19 @@ acpi_ex_convert_to_buffer (
 
 u32
 acpi_ex_convert_to_ascii (
-	acpi_integer            integer,
-	u32                     base,
-	u8                      *string,
-	u8                      data_width)
+	acpi_integer                    integer,
+	u32                             base,
+	u8                              *string,
+	u8                              data_width)
 {
-	u32                     i;
-	u32                     j;
-	u32                     k = 0;
-	char                    hex_digit;
-	acpi_integer            digit;
-	u32                     remainder;
-	u32                     length;
-	u8                      leading_zero;
+	u32                             i;
+	u32                             j;
+	u32                             k = 0;
+	char                            hex_digit;
+	acpi_integer                    digit;
+	u32                             remainder;
+	u32                             length;
+	u8                              leading_zero;
 
 
 	ACPI_FUNCTION_ENTRY ();
@@ -389,17 +389,17 @@ acpi_ex_convert_to_ascii (
 
 acpi_status
 acpi_ex_convert_to_string (
-	acpi_operand_object     *obj_desc,
-	acpi_operand_object     **result_desc,
-	u32                     base,
-	u32                     max_length,
-	acpi_walk_state         *walk_state)
+	union acpi_operand_object       *obj_desc,
+	union acpi_operand_object       **result_desc,
+	u32                             base,
+	u32                             max_length,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_operand_object     *ret_desc;
-	u32                     i;
-	u32                     string_length;
-	u8                      *new_buf;
-	u8                      *pointer;
+	union acpi_operand_object       *ret_desc;
+	u32                             i;
+	u32                             string_length;
+	u8                              *new_buf;
+	u8                              *pointer;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ex_convert_to_string", obj_desc);
@@ -553,12 +553,12 @@ acpi_ex_convert_to_string (
 
 acpi_status
 acpi_ex_convert_to_target_type (
-	acpi_object_type        destination_type,
-	acpi_operand_object     *source_desc,
-	acpi_operand_object     **result_desc,
-	acpi_walk_state         *walk_state)
+	acpi_object_type                destination_type,
+	union acpi_operand_object       *source_desc,
+	union acpi_operand_object       **result_desc,
+	struct acpi_walk_state          *walk_state)
 {
-	acpi_status             status = AE_OK;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("ex_convert_to_target_type");

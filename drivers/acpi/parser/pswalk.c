@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,14 +47,14 @@
 
 acpi_status
 acpi_ps_get_next_walk_op (
-	acpi_walk_state         *walk_state,
-	acpi_parse_object       *op,
-	acpi_parse_upwards      ascending_callback)
+	struct acpi_walk_state          *walk_state,
+	union acpi_parse_object         *op,
+	acpi_parse_upwards              ascending_callback)
 {
-	acpi_parse_object       *next;
-	acpi_parse_object       *parent;
-	acpi_parse_object       *grand_parent;
-	acpi_status             status;
+	union acpi_parse_object         *next;
+	union acpi_parse_object         *parent;
+	union acpi_parse_object         *grand_parent;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_get_next_walk_op", op);
@@ -208,7 +208,7 @@ acpi_ps_get_next_walk_op (
 
 acpi_status
 acpi_ps_delete_completed_op (
-	acpi_walk_state         *walk_state)
+	struct acpi_walk_state          *walk_state)
 {
 
 	acpi_ps_free_op (walk_state->op);
@@ -230,11 +230,11 @@ acpi_ps_delete_completed_op (
 
 void
 acpi_ps_delete_parse_tree (
-	acpi_parse_object       *subtree_root)
+	union acpi_parse_object         *subtree_root)
 {
-	acpi_walk_state         *walk_state;
-	acpi_thread_state       *thread;
-	acpi_status             status;
+	struct acpi_walk_state          *walk_state;
+	struct acpi_thread_state        *thread;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("ps_delete_parse_tree", subtree_root);
@@ -279,7 +279,7 @@ acpi_ps_delete_parse_tree (
 
 	/* We are done with this walk */
 
-	acpi_ut_delete_generic_state (ACPI_CAST_PTR (acpi_generic_state, thread));
+	acpi_ut_delete_generic_state (ACPI_CAST_PTR (union acpi_generic_state, thread));
 	acpi_ds_delete_walk_state (walk_state);
 
 	return_VOID;

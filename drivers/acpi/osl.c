@@ -138,7 +138,7 @@ acpi_os_free(void *ptr)
 }
 
 acpi_status
-acpi_os_get_root_pointer(u32 flags, acpi_pointer *addr)
+acpi_os_get_root_pointer(u32 flags, struct acpi_pointer *addr)
 {
 #ifdef CONFIG_ACPI_EFI
 	addr->pointer_type = ACPI_PHYSICAL_POINTER;
@@ -204,7 +204,8 @@ acpi_os_get_physical_address(void *virt, acpi_physical_address *phys)
 }
 
 acpi_status
-acpi_os_table_override (acpi_table_header *existing_table, acpi_table_header **new_table)
+acpi_os_table_override (struct acpi_table_header *existing_table,
+			struct acpi_table_header **new_table)
 {
 	if (!existing_table || !new_table)
 		return AE_BAD_PARAMETER;
@@ -418,10 +419,10 @@ acpi_os_write_memory(
 
 acpi_status
 acpi_os_read_pci_configuration (
-	acpi_pci_id             *pci_id,
-	u32                     reg,
-	void                    *value,
-	u32                     width)
+	struct acpi_pci_id	*pci_id,
+	u32			reg,
+	void			*value,
+	u32			width)
 {
 	int			result = 0;
 	int			size = 0;
@@ -454,10 +455,10 @@ acpi_os_read_pci_configuration (
 
 acpi_status
 acpi_os_write_pci_configuration (
-	acpi_pci_id             *pci_id,
-	u32                     reg,
-	acpi_integer            value,
-	u32                     width)
+	struct acpi_pci_id	*pci_id,
+	u32			reg,
+	acpi_integer		value,
+	u32			width)
 {
 	int			result = 0;
 	int			size = 0;
@@ -487,16 +488,16 @@ acpi_os_write_pci_configuration (
 /* TODO: Change code to take advantage of driver model more */
 void
 acpi_os_derive_pci_id (
-	acpi_handle     rhandle,        /* upper bound  */
-	acpi_handle     chandle,        /* current node */
-	acpi_pci_id     **id)
+	acpi_handle		rhandle,        /* upper bound  */
+	acpi_handle		chandle,        /* current node */
+	struct acpi_pci_id	**id)
 {
-	acpi_handle     handle;
-	acpi_pci_id     *pci_id = *id;
-	acpi_status     status;
-	unsigned long   temp;
-	acpi_object_type type;
-	u8              tu8;
+	acpi_handle		handle;
+	struct acpi_pci_id	*pci_id = *id;
+	acpi_status		status;
+	unsigned long		temp;
+	acpi_object_type	type;
+	u8			tu8;
 
 	acpi_get_parent(chandle, &handle);
 	if (handle != rhandle) {

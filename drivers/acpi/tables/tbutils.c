@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -46,11 +46,11 @@
 
 acpi_status
 acpi_tb_handle_to_object (
-	u16                     table_id,
-	acpi_table_desc         **table_desc)
+	u16                             table_id,
+	struct acpi_table_desc          **table_desc)
 {
-	u32                     i;
-	acpi_table_desc         *list_head;
+	u32                             i;
+	struct acpi_table_desc          *list_head;
 
 
 	ACPI_FUNCTION_NAME ("tb_handle_to_object");
@@ -96,9 +96,9 @@ acpi_tb_handle_to_object (
 
 acpi_status
 acpi_tb_validate_table_header (
-	acpi_table_header       *table_header)
+	struct acpi_table_header        *table_header)
 {
-	acpi_name               signature;
+	acpi_name                       signature;
 
 
 	ACPI_FUNCTION_NAME ("tb_validate_table_header");
@@ -106,7 +106,7 @@ acpi_tb_validate_table_header (
 
 	/* Verify that this is a valid address */
 
-	if (!acpi_os_readable (table_header, sizeof (acpi_table_header))) {
+	if (!acpi_os_readable (table_header, sizeof (struct acpi_table_header))) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Cannot read table header at %p\n", table_header));
 		return (AE_BAD_ADDRESS);
@@ -122,20 +122,20 @@ acpi_tb_validate_table_header (
 
 		ACPI_REPORT_WARNING (("Invalid table signature found: [%4.4s]\n",
 			(char *) &signature));
-		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
+		ACPI_DUMP_BUFFER (table_header, sizeof (struct acpi_table_header));
 		return (AE_BAD_SIGNATURE);
 	}
 
 	/* Validate the table length */
 
-	if (table_header->length < sizeof (acpi_table_header)) {
+	if (table_header->length < sizeof (struct acpi_table_header)) {
 		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 			"Invalid length in table header %p name %4.4s\n",
 			table_header, (char *) &signature));
 
 		ACPI_REPORT_WARNING (("Invalid table header length (0x%X) found\n",
 			(u32) table_header->length));
-		ACPI_DUMP_BUFFER (table_header, sizeof (acpi_table_header));
+		ACPI_DUMP_BUFFER (table_header, sizeof (struct acpi_table_header));
 		return (AE_BAD_HEADER);
 	}
 
@@ -158,10 +158,10 @@ acpi_tb_validate_table_header (
 
 acpi_status
 acpi_tb_verify_table_checksum (
-	acpi_table_header       *table_header)
+	struct acpi_table_header        *table_header)
 {
-	u8                      checksum;
-	acpi_status             status = AE_OK;
+	u8                              checksum;
+	acpi_status                     status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE ("tb_verify_table_checksum");
@@ -198,12 +198,12 @@ acpi_tb_verify_table_checksum (
 
 u8
 acpi_tb_checksum (
-	void                    *buffer,
-	u32                     length)
+	void                            *buffer,
+	u32                             length)
 {
-	const u8                *limit;
-	const u8                *rover;
-	u8                      sum = 0;
+	const u8                        *limit;
+	const u8                        *rover;
+	u8                              sum = 0;
 
 
 	if (buffer && length) {

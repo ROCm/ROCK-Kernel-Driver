@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -55,14 +55,14 @@
 
 acpi_status
 acpi_ut_short_divide (
-	acpi_integer            *in_dividend,
-	u32                     divisor,
-	acpi_integer            *out_quotient,
-	u32                     *out_remainder)
+	acpi_integer                    *in_dividend,
+	u32                             divisor,
+	acpi_integer                    *out_quotient,
+	u32                             *out_remainder)
 {
-	uint64_overlay          dividend;
-	uint64_overlay          quotient;
-	u32                     remainder32;
+	union uint64_overlay            dividend;
+	union uint64_overlay            quotient;
+	u32                             remainder32;
 
 
 	ACPI_FUNCTION_TRACE ("ut_short_divide");
@@ -115,20 +115,20 @@ acpi_ut_short_divide (
 
 acpi_status
 acpi_ut_divide (
-	acpi_integer            *in_dividend,
-	acpi_integer            *in_divisor,
-	acpi_integer            *out_quotient,
-	acpi_integer            *out_remainder)
+	acpi_integer                    *in_dividend,
+	acpi_integer                    *in_divisor,
+	acpi_integer                    *out_quotient,
+	acpi_integer                    *out_remainder)
 {
-	uint64_overlay          dividend;
-	uint64_overlay          divisor;
-	uint64_overlay          quotient;
-	uint64_overlay          remainder;
-	uint64_overlay          normalized_dividend;
-	uint64_overlay          normalized_divisor;
-	u32                     partial1;
-	uint64_overlay          partial2;
-	uint64_overlay          partial3;
+	union uint64_overlay            dividend;
+	union uint64_overlay            divisor;
+	union uint64_overlay            quotient;
+	union uint64_overlay            remainder;
+	union uint64_overlay            normalized_dividend;
+	union uint64_overlay            normalized_divisor;
+	u32                             partial1;
+	union uint64_overlay            partial2;
+	union uint64_overlay            partial3;
 
 
 	ACPI_FUNCTION_TRACE ("ut_divide");
@@ -250,10 +250,10 @@ acpi_ut_divide (
 
 acpi_status
 acpi_ut_short_divide (
-	acpi_integer            *in_dividend,
-	u32                     divisor,
-	acpi_integer            *out_quotient,
-	u32                     *out_remainder)
+	acpi_integer                    *in_dividend,
+	u32                             divisor,
+	acpi_integer                    *out_quotient,
+	u32                             *out_remainder)
 {
 
 	ACPI_FUNCTION_TRACE ("ut_short_divide");
@@ -280,10 +280,10 @@ acpi_ut_short_divide (
 
 acpi_status
 acpi_ut_divide (
-	acpi_integer            *in_dividend,
-	acpi_integer            *in_divisor,
-	acpi_integer            *out_quotient,
-	acpi_integer            *out_remainder)
+	acpi_integer                    *in_dividend,
+	acpi_integer                    *in_divisor,
+	acpi_integer                    *out_quotient,
+	acpi_integer                    *out_remainder)
 {
 	ACPI_FUNCTION_TRACE ("ut_divide");
 

@@ -5,7 +5,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -447,7 +447,7 @@
  */
 
 
-const acpi_opcode_info    acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
+const struct acpi_opcode_info     acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
 {
 /*! [Begin] no source code translation */
 /* Index           Name                 Parser Args               Interpreter Args                ObjectType                    Class                      Type                  Flags */
@@ -675,9 +675,9 @@ static const u8 acpi_gbl_long_op_index[NUM_EXTENDED_OPCODE] =
  *
  ******************************************************************************/
 
-const acpi_opcode_info *
+const struct acpi_opcode_info *
 acpi_ps_get_opcode_info (
-	u16                     opcode)
+	u16                             opcode)
 {
 	ACPI_FUNCTION_NAME ("ps_get_opcode_info");
 
@@ -731,11 +731,11 @@ acpi_ps_get_opcode_info (
 
 char *
 acpi_ps_get_opcode_name (
-	u16                     opcode)
+	u16                             opcode)
 {
 #if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUG_OUTPUT)
 
-	const acpi_opcode_info  *op;
+	const struct acpi_opcode_info   *op;
 
 
 	op = acpi_ps_get_opcode_info (opcode);

@@ -6,7 +6,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,16 +58,16 @@
 
 acpi_status
 acpi_ns_evaluate_relative (
-	acpi_namespace_node     *handle,
-	char                    *pathname,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_object)
+	struct acpi_namespace_node      *handle,
+	char                            *pathname,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_object)
 {
-	acpi_namespace_node     *prefix_node;
-	acpi_status             status;
-	acpi_namespace_node     *node = NULL;
-	char                    *internal_path = NULL;
-	acpi_generic_state      scope_info;
+	struct acpi_namespace_node      *prefix_node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node = NULL;
+	char                            *internal_path = NULL;
+	union acpi_generic_state        scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("ns_evaluate_relative");
@@ -157,13 +157,13 @@ cleanup:
 
 acpi_status
 acpi_ns_evaluate_by_name (
-	char                    *pathname,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_object)
+	char                            *pathname,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_object)
 {
-	acpi_status             status;
-	acpi_namespace_node     *node = NULL;
-	char                    *internal_path = NULL;
+	acpi_status                     status;
+	struct acpi_namespace_node      *node = NULL;
+	char                            *internal_path = NULL;
 
 
 	ACPI_FUNCTION_TRACE ("ns_evaluate_by_name");
@@ -241,13 +241,13 @@ cleanup:
 
 acpi_status
 acpi_ns_evaluate_by_handle (
-	acpi_namespace_node     *handle,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_object)
+	struct acpi_namespace_node      *handle,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_object)
 {
-	acpi_namespace_node     *node;
-	acpi_status             status;
-	acpi_operand_object     *local_return_object;
+	struct acpi_namespace_node      *node;
+	acpi_status                     status;
+	union acpi_operand_object       *local_return_object;
 
 
 	ACPI_FUNCTION_TRACE ("ns_evaluate_by_handle");
@@ -361,12 +361,12 @@ acpi_ns_evaluate_by_handle (
 
 acpi_status
 acpi_ns_execute_control_method (
-	acpi_namespace_node     *method_node,
-	acpi_operand_object     **params,
-	acpi_operand_object     **return_obj_desc)
+	struct acpi_namespace_node      *method_node,
+	union acpi_operand_object       **params,
+	union acpi_operand_object       **return_obj_desc)
 {
-	acpi_status             status;
-	acpi_operand_object     *obj_desc;
+	acpi_status                     status;
+	union acpi_operand_object       *obj_desc;
 
 
 	ACPI_FUNCTION_TRACE ("ns_execute_control_method");
@@ -433,11 +433,11 @@ acpi_ns_execute_control_method (
 
 acpi_status
 acpi_ns_get_object_value (
-	acpi_namespace_node     *node,
-	acpi_operand_object     **return_obj_desc)
+	struct acpi_namespace_node      *node,
+	union acpi_operand_object       **return_obj_desc)
 {
-	acpi_status             status = AE_OK;
-	acpi_namespace_node     *resolved_node = node;
+	acpi_status                     status = AE_OK;
+	struct acpi_namespace_node      *resolved_node = node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_get_object_value");
@@ -483,7 +483,7 @@ acpi_ns_get_object_value (
 
 		if (ACPI_SUCCESS (status)) {
 			status = AE_CTRL_RETURN_VALUE;
-			*return_obj_desc = ACPI_CAST_PTR (acpi_operand_object, resolved_node);
+			*return_obj_desc = ACPI_CAST_PTR (union acpi_operand_object, resolved_node);
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Returning object %p [%s]\n",
 				*return_obj_desc, acpi_ut_get_object_type_name (*return_obj_desc)));
 		}

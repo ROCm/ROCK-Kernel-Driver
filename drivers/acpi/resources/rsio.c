@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -53,16 +53,16 @@
 
 acpi_status
 acpi_rs_io_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_io);
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_io);
 
 
 	ACPI_FUNCTION_TRACE ("rs_io_resource");
@@ -151,16 +151,16 @@ acpi_rs_io_resource (
 
 acpi_status
 acpi_rs_fixed_io_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_fixed_io);
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_fixed_io);
 
 
 	ACPI_FUNCTION_TRACE ("rs_fixed_io_resource");
@@ -220,13 +220,13 @@ acpi_rs_fixed_io_resource (
 
 acpi_status
 acpi_rs_io_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
+	u8                              *buffer = *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
 
 
 	ACPI_FUNCTION_TRACE ("rs_io_stream");
@@ -304,13 +304,13 @@ acpi_rs_io_stream (
 
 acpi_status
 acpi_rs_fixed_io_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
+	u8                              *buffer = *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
 
 
 	ACPI_FUNCTION_TRACE ("rs_fixed_io_stream");
@@ -370,17 +370,17 @@ acpi_rs_fixed_io_stream (
 
 acpi_status
 acpi_rs_dma_resource (
-	u8                      *byte_stream_buffer,
-	acpi_size               *bytes_consumed,
-	u8                      **output_buffer,
-	acpi_size               *structure_size)
+	u8                              *byte_stream_buffer,
+	acpi_size                       *bytes_consumed,
+	u8                              **output_buffer,
+	acpi_size                       *structure_size)
 {
-	u8                      *buffer = byte_stream_buffer;
-	acpi_resource           *output_struct = (void *) *output_buffer;
-	u8                      temp8 = 0;
-	u8                      index;
-	u8                      i;
-	acpi_size               struct_size = ACPI_SIZEOF_RESOURCE (acpi_resource_dma);
+	u8                              *buffer = byte_stream_buffer;
+	struct acpi_resource            *output_struct = (void *) *output_buffer;
+	u8                              temp8 = 0;
+	u8                              index;
+	u8                              i;
+	acpi_size                       struct_size = ACPI_SIZEOF_RESOURCE (struct acpi_resource_dma);
 
 
 	ACPI_FUNCTION_TRACE ("rs_dma_resource");
@@ -474,14 +474,14 @@ acpi_rs_dma_resource (
 
 acpi_status
 acpi_rs_dma_stream (
-	acpi_resource           *linked_list,
-	u8                      **output_buffer,
-	acpi_size               *bytes_consumed)
+	struct acpi_resource            *linked_list,
+	u8                              **output_buffer,
+	acpi_size                       *bytes_consumed)
 {
-	u8                      *buffer = *output_buffer;
-	u16                     temp16 = 0;
-	u8                      temp8 = 0;
-	u8                      index;
+	u8                              *buffer = *output_buffer;
+	u16                             temp16 = 0;
+	u8                              temp8 = 0;
+	u8                              index;
 
 
 	ACPI_FUNCTION_TRACE ("rs_dma_stream");

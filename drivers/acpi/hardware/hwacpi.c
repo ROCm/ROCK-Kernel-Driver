@@ -6,7 +6,7 @@
  *****************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -47,7 +47,7 @@ acpi_status
 acpi_hw_initialize (
 	void)
 {
-	acpi_status             status;
+	acpi_status                     status;
 
 
 	ACPI_FUNCTION_TRACE ("hw_initialize");
@@ -86,11 +86,11 @@ acpi_hw_initialize (
 
 acpi_status
 acpi_hw_set_mode (
-	u32                     mode)
+	u32                             mode)
 {
 
-	acpi_status             status;
-	u32                     retry;
+	acpi_status                     status;
+	u32                             retry;
 
 
 	ACPI_FUNCTION_TRACE ("hw_set_mode");
@@ -183,8 +183,8 @@ acpi_hw_set_mode (
 u32
 acpi_hw_get_mode (void)
 {
-	acpi_status             status;
-	u32                     value;
+	acpi_status                     status;
+	u32                             value;
 
 
 	ACPI_FUNCTION_TRACE ("hw_get_mode");

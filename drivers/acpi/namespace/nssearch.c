@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -60,12 +60,12 @@
 
 acpi_status
 acpi_ns_search_node (
-	u32                     target_name,
-	acpi_namespace_node     *node,
-	acpi_object_type        type,
-	acpi_namespace_node     **return_node)
+	u32                             target_name,
+	struct acpi_namespace_node      *node,
+	acpi_object_type                type,
+	struct acpi_namespace_node      **return_node)
 {
-	acpi_namespace_node     *next_node;
+	struct acpi_namespace_node      *next_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_search_node");
@@ -73,7 +73,7 @@ acpi_ns_search_node (
 
 #ifdef ACPI_DEBUG_OUTPUT
 	if (ACPI_LV_NAMES & acpi_dbg_level) {
-		char                *scope_name;
+		char                        *scope_name;
 
 		scope_name = acpi_ns_get_external_pathname (node);
 		if (scope_name) {
@@ -156,13 +156,13 @@ acpi_ns_search_node (
 
 static acpi_status
 acpi_ns_search_parent_tree (
-	u32                     target_name,
-	acpi_namespace_node     *node,
-	acpi_object_type        type,
-	acpi_namespace_node     **return_node)
+	u32                             target_name,
+	struct acpi_namespace_node      *node,
+	acpi_object_type                type,
+	struct acpi_namespace_node      **return_node)
 {
-	acpi_status             status;
-	acpi_namespace_node     *parent_node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *parent_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_search_parent_tree");
@@ -247,16 +247,16 @@ acpi_ns_search_parent_tree (
 
 acpi_status
 acpi_ns_search_and_enter (
-	u32                     target_name,
-	acpi_walk_state         *walk_state,
-	acpi_namespace_node     *node,
-	acpi_interpreter_mode   interpreter_mode,
-	acpi_object_type        type,
-	u32                     flags,
-	acpi_namespace_node     **return_node)
+	u32                             target_name,
+	struct acpi_walk_state          *walk_state,
+	struct acpi_namespace_node      *node,
+	acpi_interpreter_mode           interpreter_mode,
+	acpi_object_type                type,
+	u32                             flags,
+	struct acpi_namespace_node      **return_node)
 {
-	acpi_status             status;
-	acpi_namespace_node     *new_node;
+	acpi_status                     status;
+	struct acpi_namespace_node      *new_node;
 
 
 	ACPI_FUNCTION_TRACE ("ns_search_and_enter");

@@ -5,7 +5,7 @@
  ******************************************************************************/
 
 /*
- *  Copyright (C) 2000 - 2002, R. Byron Moore
+ *  Copyright (C) 2000 - 2003, R. Byron Moore
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@
 
 u8
 acpi_rs_get_resource_type (
-	u8                      resource_start_byte)
+	u8                              resource_start_byte)
 {
 
 	ACPI_FUNCTION_ENTRY ();
@@ -98,18 +98,18 @@ acpi_rs_get_resource_type (
 
 acpi_status
 acpi_rs_byte_stream_to_list (
-	u8                      *byte_stream_buffer,
-	u32                     byte_stream_buffer_length,
-	u8                      *output_buffer)
+	u8                              *byte_stream_buffer,
+	u32                             byte_stream_buffer_length,
+	u8                              *output_buffer)
 {
-	acpi_status             status;
-	acpi_size               bytes_parsed = 0;
-	u8                      resource_type = 0;
-	acpi_size               bytes_consumed = 0;
-	u8                      *buffer = output_buffer;
-	acpi_size               structure_size = 0;
-	u8                      end_tag_processed = FALSE;
-	acpi_resource           *resource;
+	acpi_status                     status;
+	acpi_size                       bytes_parsed = 0;
+	u8                              resource_type = 0;
+	acpi_size                       bytes_consumed = 0;
+	u8                              *buffer = output_buffer;
+	acpi_size                       structure_size = 0;
+	u8                              end_tag_processed = FALSE;
+	struct acpi_resource            *resource;
 
 	ACPI_FUNCTION_TRACE ("rs_byte_stream_to_list");
 
@@ -292,7 +292,7 @@ acpi_rs_byte_stream_to_list (
 		/*
 		 * Set the Buffer to the next structure
 		 */
-		resource = ACPI_CAST_PTR (acpi_resource, buffer);
+		resource = ACPI_CAST_PTR (struct acpi_resource, buffer);
 		resource->length = ACPI_ALIGN_RESOURCE_SIZE(resource->length);
 		buffer += ACPI_ALIGN_RESOURCE_SIZE(structure_size);
 
@@ -332,14 +332,14 @@ acpi_rs_byte_stream_to_list (
 
 acpi_status
 acpi_rs_list_to_byte_stream (
-	acpi_resource           *linked_list,
-	acpi_size               byte_stream_size_needed,
-	u8                      *output_buffer)
+	struct acpi_resource            *linked_list,
+	acpi_size                       byte_stream_size_needed,
+	u8                              *output_buffer)
 {
-	acpi_status             status;
-	u8                      *buffer = output_buffer;
-	acpi_size               bytes_consumed = 0;
-	u8                      done = FALSE;
+	acpi_status                     status;
+	u8                              *buffer = output_buffer;
+	acpi_size                       bytes_consumed = 0;
+	u8                              done = FALSE;
 
 
 	ACPI_FUNCTION_TRACE ("rs_list_to_byte_stream");
@@ -489,7 +489,7 @@ acpi_rs_list_to_byte_stream (
 		/*
 		 * Point to the next object
 		 */
-		linked_list = ACPI_PTR_ADD (acpi_resource,
+		linked_list = ACPI_PTR_ADD (struct acpi_resource,
 				  linked_list, linked_list->length);
 	}
 
