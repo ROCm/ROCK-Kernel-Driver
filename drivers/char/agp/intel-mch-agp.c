@@ -582,6 +582,8 @@ static int agp_intelmch_resume(struct pci_dev *pdev)
 }
 
 static struct pci_device_id agp_intelmch_pci_table[] = {
+#if 0
+	/* seems to to work better with intel-mch.c */
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
@@ -590,6 +592,7 @@ static struct pci_device_id agp_intelmch_pci_table[] = {
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
+#endif
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
