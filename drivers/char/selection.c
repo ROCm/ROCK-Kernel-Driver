@@ -3,10 +3,10 @@
  *
  * This module exports the functions:
  *
- *     'int set_selection(const unsigned long arg)'
+ *     'int set_selection(struct tiocl_selection __user *, struct tty_struct *)'
  *     'void clear_selection(void)'
- *     'int paste_selection(struct tty_struct *tty)'
- *     'int sel_loadlut(const unsigned long arg)'
+ *     'int paste_selection(struct tty_struct *)'
+ *     'int sel_loadlut(char __user *)'
  *
  * Now that /dev/vcs exists, most of this can disappear again.
  */
@@ -95,9 +95,9 @@ static inline int inword(const unsigned char c) {
 }
 
 /* set inwordLut contents. Invoked by ioctl(). */
-int sel_loadlut(const unsigned long arg)
+int sel_loadlut(char __user *p)
 {
-	return copy_from_user(inwordLut, (u32 *)(arg+4), 32) ? -EFAULT : 0;
+	return copy_from_user(inwordLut, (u32 __user *)(p+4), 32) ? -EFAULT : 0;
 }
 
 /* does screen address p correspond to character at LH/RH edge of screen? */
@@ -113,7 +113,7 @@ static inline unsigned short limit(const unsigned short v, const unsigned short 
 }
 
 /* set the current selection. Invoked by ioctl() or by kernel code. */
-int set_selection(const struct tiocl_selection *sel, struct tty_struct *tty, int user)
+int set_selection(const struct tiocl_selection __user *sel, struct tty_struct *tty)
 {
 	int sel_mode, new_sel_start, new_sel_end, spc;
 	char *bp, *obp;
@@ -124,21 +124,13 @@ int set_selection(const struct tiocl_selection *sel, struct tty_struct *tty, int
 
 	{ unsigned short xs, ys, xe, ye;
 
-	  if (user) {
-		  if (verify_area(VERIFY_READ, sel, sizeof(*sel)))
-		  	return -EFAULT;
-		  __get_user(xs, &sel->xs);
-		  __get_user(ys, &sel->ys);
-		  __get_user(xe, &sel->xe);
-		  __get_user(ye, &sel->ye);
-		  __get_user(sel_mode, &sel->sel_mode);
-	  } else {
-		  xs = sel->xs; /* set selection from kernel */
-		  ys = sel->ys;
-		  xe = sel->xe;
-		  ye = sel->ye;
-		  sel_mode = sel->sel_mode;
-	  }
+	  if (verify_area(VERIFY_READ, sel, sizeof(*sel)))
+		return -EFAULT;
+	  __get_user(xs, &sel->xs);
+	  __get_user(ys, &sel->ys);
+	  __get_user(xe, &sel->xe);
+	  __get_user(ye, &sel->ye);
+	  __get_user(sel_mode, &sel->sel_mode);
 	  xs--; ys--; xe--; ye--;
 	  xs = limit(xs, video_num_columns - 1);
 	  ys = limit(ys, video_num_lines - 1);
