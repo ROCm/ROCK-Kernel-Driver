@@ -1612,15 +1612,13 @@ pagebuf_daemon(
 			refrigerator(PF_IOTHREAD);
 
 		if (pbd_active == 1) {
-			del_timer(&pb_daemon_timer);
-			pb_daemon_timer.expires = jiffies +
-					pb_params.p_un.flush_interval;
-			add_timer(&pb_daemon_timer);
+			mod_timer(&pb_daemon_timer,
+				  jiffies + pb_params.p_un.flush_interval);
 			interruptible_sleep_on(&pbd_waitq);
 		}
 
 		if (pbd_active == 0) {
-			del_timer(&pb_daemon_timer);
+			del_timer_sync(&pb_daemon_timer);
 		}
 
 		spin_lock(&pbd_delwrite_lock);
