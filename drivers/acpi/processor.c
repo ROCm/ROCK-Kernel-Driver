@@ -1971,7 +1971,7 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 
 	seq_printf(seq, "active state:            C%d\n"
 			"default state:           C%d\n"
-			"bus master activity:     %08x\n"
+			"bus master activity:     %08x\n",
 			pr->power.state,
 			pr->power.default_state,
 			pr->power.bm_activity);
