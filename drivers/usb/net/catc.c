@@ -278,7 +278,7 @@ static void catc_rx_done(struct urb *urb)
 			atomic_dec(&catc->recq_sz);
 			dbg("getting extra packet");
 			urb->dev = catc->usbdev;
-			if ((status = usb_submit_urb(urb, GFP_KERNEL)) < 0) {
+			if ((status = usb_submit_urb(urb, GFP_ATOMIC)) < 0) {
 				dbg("submit(rx_urb) status %d", status);
 			}
 		} else {
@@ -329,7 +329,7 @@ static void catc_irq_done(struct urb *urb)
 				atomic_inc(&catc->recq_sz);
 		} else {
 			catc->rx_urb->dev = catc->usbdev;
-			if ((status = usb_submit_urb(catc->rx_urb, GFP_KERNEL)) < 0) {
+			if ((status = usb_submit_urb(catc->rx_urb, GFP_ATOMIC)) < 0) {
 				err("submit(rx_urb) status %d", status);
 			}
 		} 
@@ -351,7 +351,7 @@ static void catc_tx_run(struct catc *catc)
 	catc->tx_urb->transfer_buffer = catc->tx_buf[catc->tx_idx];
 	catc->tx_urb->dev = catc->usbdev;
 
-	if ((status = usb_submit_urb(catc->tx_urb, GFP_KERNEL)) < 0)
+	if ((status = usb_submit_urb(catc->tx_urb, GFP_ATOMIC)) < 0)
 		err("submit(tx_urb), status %d", status);
 
 	catc->tx_idx = !catc->tx_idx;
