@@ -16,4 +16,6 @@ extern void numa_add_cpu(int cpu);
 extern void numa_init_array(void);
 extern int numa_off;
 
+#define NUMA_NO_NODE 0xff
+
 #endif

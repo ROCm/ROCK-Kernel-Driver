@@ -744,11 +744,12 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
 	unsigned long flags;
 	unsigned int baud, quot;
 	unsigned int ulcon;
+	unsigned int umcon;
 
 	/*
 	 * We don't support modem control lines.
 	 */
-	termios->c_cflag &= ~(HUPCL | CRTSCTS | CMSPAR);
+	termios->c_cflag &= ~(HUPCL | CMSPAR);
 	termios->c_cflag |= CLOCAL;
 
 	/*
@@ -806,8 +807,10 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
 	if (termios->c_cflag & CSTOPB)
 		ulcon |= S3C2410_LCON_STOPB;
 
+	umcon = (termios->c_cflag & CRTSCTS) ? S3C2410_UMCOM_AFC : 0;
+
 	if (termios->c_cflag & PARENB) {
-		if (!(termios->c_cflag & PARODD))
+		if (termios->c_cflag & PARODD)
 			ulcon |= S3C2410_LCON_PODD;
 		else
 			ulcon |= S3C2410_LCON_PEVEN;
@@ -821,6 +824,7 @@ static void s3c24xx_serial_set_termios(struct uart_port *port,
 
 	wr_regl(port, S3C2410_ULCON, ulcon);
 	wr_regl(port, S3C2410_UBRDIV, quot);
+	wr_regl(port, S3C2410_UMCON, umcon);
 
 	dbg("uart: ulcon = 0x%08x, ucon = 0x%08x, ufcon = 0x%08x\n",
 	    rd_regl(port, S3C2410_ULCON),

@@ -65,12 +65,9 @@ static inline unsigned sz __in##fnsuffix (unsigned int port)		\
 	return (unsigned sz)value;					\
 }
 
-static inline unsigned int __ioaddr (unsigned int port)
+static inline void __iomem *__ioaddr (unsigned int port)
 {
-	if (__PORT_PCIO(port))
-		return (unsigned int)(PCIO_BASE + (port));
-	else
-		return (unsigned int)(0 + (port));
+	return (void __iomem *)(__PORT_PCIO(port) ? PCIO_BASE + port : port);
 }
 
 #define DECLARE_IO(sz,fnsuffix,instr)	\
@@ -170,7 +167,7 @@ DECLARE_IO(int,l,"")
 	result;								\
 })
 
-#define __ioaddrc(port)	(__PORT_PCIO((port)) ? PCIO_BASE + ((port)) : ((port)))
+#define __ioaddrc(port)	((void __iomem *)(__PORT_PCIO(port) ? PCIO_BASE + (port) : (port)))
 
 #define inb(p)		(__builtin_constant_p((p)) ? __inbc(p)	   : __inb(p))
 #define inw(p)		(__builtin_constant_p((p)) ? __inwc(p)	   : __inw(p))

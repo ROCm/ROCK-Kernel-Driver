@@ -26,28 +26,27 @@
 /*
  * Invalid mode handlers
  */
-__pabt_invalid:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - lr}			@ Save XXX r0 - lr
-		ldr	r4, .LCabt
-		mov	r1, #BAD_PREFETCH
+	.macro	inv_entry, sym, reason
+	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
+	stmia	sp, {r0 - lr}			@ Save XXX r0 - lr
+	ldr	r4, .LC\sym
+	mov	r1, #\reason
+	.endm
+
+__pabt_invalid:
+		inv_entry abt, BAD_PREFETCH
 		b	1f
 
-__dabt_invalid:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - lr}			@ Save SVC r0 - lr [lr *should* be intact]
-		ldr	r4, .LCabt
-		mov	r1, #BAD_DATA
+__dabt_invalid:
+		inv_entry abt, BAD_DATA
 		b	1f
 
-__irq_invalid:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate space on stack for frame
-		stmfd	sp, {r0 - lr}			@ Save r0 - lr
-		ldr	r4, .LCirq
-		mov	r1, #BAD_IRQ
+__irq_invalid:
+		inv_entry irq, BAD_IRQ
 		b	1f
 
-__und_invalid:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - lr}
-		ldr	r4, .LCund
-		mov	r1, #BAD_UNDEFINSTR		@ int reason
+__und_invalid:
+		inv_entry und, BAD_UNDEFINSTR
 
 1:		zero_fp
 		ldmia	r4, {r5 - r7}			@ Get XXX pc, cpsr, old_r0
@@ -60,15 +59,20 @@ __und_invalid:	sub	sp, sp, #S_FRAME_SIZE
 /*
  * SVC mode handlers
  */
+	.macro	svc_entry, sym
+	sub	sp, sp, #S_FRAME_SIZE
+	stmia	sp, {r0 - r12}			@ save r0 - r12
+	ldr	r2, .LC\sym
+	add	r0, sp, #S_FRAME_SIZE
+	ldmia	r2, {r2 - r4}			@ get pc, cpsr
+	add	r5, sp, #S_SP
+	mov	r1, lr
+	stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+	.endm
+
 		.align	5
-__dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r2, .LCabt
-		add	r0, sp, #S_FRAME_SIZE
-		ldmia	r2, {r2 - r4}			@ get pc, cpsr
-		add	r5, sp, #S_SP
-		mov	r1, lr
-		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__dabt_svc:
+		svc_entry abt
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
@@ -91,14 +95,8 @@ __dabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 		ldmia	sp, {r0 - pc}^			@ load r0 - pc, cpsr
 
 		.align	5
-__irq_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r7, .LCirq
-		add	r5, sp, #S_FRAME_SIZE
-		ldmia	r7, {r7 - r9}
-		add	r4, sp, #S_SP
-		mov	r6, lr
-		stmia	r4, {r5, r6, r7, r8, r9}	@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__irq_svc:
+		svc_entry irq
 #ifdef CONFIG_PREEMPT
 		get_thread_info r8
 		ldr	r9, [r8, #TI_PREEMPT]		@ get preempt count
@@ -148,16 +146,10 @@ svc_preempt:	teq	r9, #0				@ was preempt count = 0
 #endif
 
 		.align	5
-__und_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r3, .LCund
-		mov	r4, lr
-		ldmia	r3, {r5 - r7}
-		add	r3, sp, #S_FRAME_SIZE
-		add	r2, sp, #S_SP
-		stmia	r2, {r3 - r7}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__und_svc:
+		svc_entry und
 
-		ldr	r0, [r5, #-4]			@ r0 = instruction
+		ldr	r0, [r2, #-4]			@ r0 = instruction
 		adrsvc	al, r9, 1f			@ r9 = normal FP return
 		bl	call_fpe			@ lr = undefined instr return
 
@@ -170,14 +162,8 @@ __und_svc:	sub	sp, sp, #S_FRAME_SIZE
 		ldmia	sp, {r0 - pc}^			@ Restore SVC registers
 
 		.align	5
-__pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r2, .LCabt
-		add	r0, sp, #S_FRAME_SIZE
-		ldmia	r2, {r2 - r4}			@ get pc, cpsr
-		add	r5, sp, #S_SP
-		mov	r1, lr
-		stmia	r5, {r0 - r4}			@ save sp_SVC, lr_SVC, pc, cpsr, old_ro
+__pabt_svc:
+		svc_entry abt
 		mrs	r9, cpsr			@ Enable interrupts if they were
 		tst	r3, #PSR_I_BIT
 		biceq	r9, r9, #PSR_I_BIT		@ previously
@@ -205,15 +191,20 @@ __pabt_svc:	sub	sp, sp, #S_FRAME_SIZE
 /*
  * User mode handlers
  */
+	.macro	usr_entry, sym
+	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
+	stmia	sp, {r0 - r12}			@ save r0 - r12
+	ldr	r7, .LC\sym
+	add	r5, sp, #S_PC
+	ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
+	stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
+	stmdb	r5, {sp, lr}^
+	.endm
+
 		.align	5
-__dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r7, .LCabt
-		add	r5, sp, #S_PC
-		ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
-		stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
-		stmdb	r5, {sp, lr}^
-		alignment_trap r7, r7, __temp_abt
+__dabt_usr:
+		usr_entry abt
+		alignment_trap r7, r0, __temp_abt
 		zero_fp
 #ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r2, r3 to
@@ -228,14 +219,9 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		b	do_DataAbort
 
 		.align	5
-__irq_usr:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r4, .LCirq
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}			@ get saved PC, SPSR
-		stmia	r8, {r5 - r7}			@ save pc, psr, old_r0
-		stmdb	r8, {sp, lr}^
-		alignment_trap r4, r7, __temp_irq
+__irq_usr:
+		usr_entry irq
+		alignment_trap r7, r0, __temp_irq
 		zero_fp
 #ifdef CONFIG_PREEMPT
 		get_thread_info r8
@@ -265,18 +251,13 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 		.ltorg
 
 		.align	5
-__und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ Save r0 - r12
-		ldr	r4, .LCund
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}
-		stmia	r8, {r5 - r7}			@ Save USR pc, cpsr, old_r0
-		stmdb	r8, {sp, lr}^			@ Save user sp, lr
-		alignment_trap r4, r7, __temp_und
+__und_usr:
+		usr_entry und
+		alignment_trap r7, r0, __temp_und
 		zero_fp
-		tst	r6, #PSR_T_BIT			@ Thumb mode?
+		tst	r3, #PSR_T_BIT			@ Thumb mode?
 		bne	fpundefinstr			@ ignore FP
-		sub	r4, r5, #4
+		sub	r4, r2, #4
 1:		ldrt	r0, [r4]			@ r0  = instruction
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
@@ -375,14 +356,9 @@ fpundefinstr:	mov	r0, sp
 		b	do_undefinstr
 
 		.align	5
-__pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ Save r0 - r12
-		ldr	r4, .LCabt
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}			@ Get USR pc, cpsr
-		stmia	r8, {r5 - r7}			@ Save USR pc, cpsr, old_r0
-		stmdb	r8, {sp, lr}^			@ Save sp_usr lr_usr
-		alignment_trap r4, r7, __temp_abt
+__pabt_usr:
+		usr_entry abt
+		alignment_trap r7, r0, __temp_abt
 		zero_fp
 		enable_irq r0				@ Enable interrupts
 		mov	r0, r5				@ address (pc)

@@ -177,9 +177,17 @@ int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 		if (!node_isset(i, nodes_parsed))
 			continue;
 		cutoff_node(i, start, end);
-		if (nodes[i].start == nodes[i].end)
+		if (nodes[i].start == nodes[i].end) { 
+			node_clear(i, nodes_parsed);
 			continue;
+		}
 		setup_node_bootmem(i, nodes[i].start, nodes[i].end);
+	}
+	for (i = 0; i < NR_CPUS; i++) { 
+		if (cpu_to_node[i] == NUMA_NO_NODE)
+			continue;
+		if (!node_isset(cpu_to_node[i], nodes_parsed))
+			cpu_to_node[i] = NUMA_NO_NODE; 
 	}
 	numa_init_array();
 	return 0;
