@@ -61,8 +61,8 @@
 #define PIIX_UDMA_NONE		0x00
 #define PIIX_UDMA_33		0x01
 #define PIIX_UDMA_66		0x02
-#define PIIX_UDMA_V66		0x03
-#define PIIX_UDMA_100		0x04
+#define PIIX_UDMA_100		0x03
+#define PIIX_UDMA_133		0x04
 #define PIIX_NO_SITRE		0x08	/* Chip doesn't have separate slave timing */
 #define PIIX_PINGPONG		0x10	/* Enable ping-pong buffers */
 #define PIIX_VICTORY		0x20	/* Efar Victory66 has a different UDMA setup */
@@ -77,8 +77,10 @@ static struct piix_ide_chip {
 	unsigned short id;
 	unsigned char flags;
 } piix_ide_chips[] = {
+	{ PCI_DEVICE_ID_INTEL_82801DB_9,	PIIX_UDMA_133 | PIIX_PINGPONG },                    /* Intel 82801DB ICH4 */
 	{ PCI_DEVICE_ID_INTEL_82801CA_11,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801CA ICH3 */
 	{ PCI_DEVICE_ID_INTEL_82801CA_10,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801CAM ICH3-M */
+	{ PCI_DEVICE_ID_INTEL_82801E_9,		PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801E C-ICH */
 	{ PCI_DEVICE_ID_INTEL_82801BA_9,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801BA ICH2 */
 	{ PCI_DEVICE_ID_INTEL_82801BA_8,	PIIX_UDMA_100 | PIIX_PINGPONG },                    /* Intel 82801BAM ICH2-M */
 	{ PCI_DEVICE_ID_INTEL_82801AB_1,	PIIX_UDMA_33  | PIIX_PINGPONG },                    /* Intel 82801AB ICH0 */
@@ -88,7 +90,7 @@ static struct piix_ide_chip {
 	{ PCI_DEVICE_ID_INTEL_82371AB,		PIIX_UDMA_33 },                                     /* Intel 82371AB/EB PIIX4/4E */
 	{ PCI_DEVICE_ID_INTEL_82371SB_1,	PIIX_UDMA_NONE },                                   /* Intel 82371SB PIIX3 */
 	{ PCI_DEVICE_ID_INTEL_82371FB_1,	PIIX_UDMA_NONE | PIIX_NO_SITRE | PIIX_CHECK_REV },  /* Intel 82371FB PIIX */
-	{ PCI_DEVICE_ID_EFAR_SLC90E66_1,	PIIX_UDMA_V66 | PIIX_VICTORY },                     /* Efar Victory66 */
+	{ PCI_DEVICE_ID_EFAR_SLC90E66_1,	PIIX_UDMA_66 | PIIX_VICTORY },                      /* Efar Victory66 */
 	{ 0 }
 };
 
@@ -97,7 +99,7 @@ static unsigned char piix_enabled;
 static unsigned int piix_80w;
 static unsigned int piix_clock;
 
-static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA66", "UDMA100" };
+static char *piix_dma[] = { "MWDMA16", "UDMA33", "UDMA66", "UDMA133" };
 
 /*
  * PIIX/ICH /proc entry.
@@ -318,20 +320,19 @@ static int piix_set_drive(ide_drive_t *drive, unsigned char speed)
 {
 	ide_drive_t *peer = drive->channel->drives + (~drive->dn & 1);
 	struct ata_timing t, p;
-	int err, T, UT, umul;
+	int err, T, UT, umul = 1;
 
 	if (speed != XFER_PIO_SLOW && speed != drive->current_speed)
 		if ((err = ide_config_drive_speed(drive, speed)))
 			return err;
 
-	umul =  min((speed > XFER_UDMA_4) ? 4 : ((speed > XFER_UDMA_2) ? 2 : 1),
-		piix_config->flags & PIIX_UDMA);
-
-	if (piix_config->flags & PIIX_VICTORY)
+	if (speed > XFER_UDMA_2 && (piix_config->flags & PIIX_UDMA >= PIIX_UDMA_66))
 		umul = 2;
-
+	if (speed > XFER_UDMA_4 && (piix_config->flags & PIIX_UDMA >= PIIX_UDMA_100))
+		umul = 4;
+	
 	T = 1000000000 / piix_clock;
-	UT = umul ? (T / umul) : 0;
+	UT = T / umul;
 
 	ata_timing_compute(drive, speed, &t, T, UT);
 
@@ -388,7 +389,8 @@ int piix_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			(piix_config->flags & PIIX_NODMA ? 0 : (XFER_SWDMA | XFER_MWDMA |
 			(piix_config->flags & PIIX_UDMA ? XFER_UDMA : 0) |
 			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_66 ? XFER_UDMA_66 : 0) |
-			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 ? XFER_UDMA_100 : 0))));
+			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_100 ? XFER_UDMA_100 : 0) |
+			(w80 && (piix_config->flags & PIIX_UDMA) >= PIIX_UDMA_133 ? XFER_UDMA_133 : 0))));
 
 		piix_set_drive(drive, speed);
 
@@ -458,14 +460,16 @@ unsigned int __init pci_init_piix(struct pci_dev *dev, const char *name)
 	switch (piix_config->flags & PIIX_UDMA) {
 
 		case PIIX_UDMA_66:
+			if (piix->config && PIIX_VICTORY) {
+				pci_read_config_byte(dev, PIIX_IDESTAT, &t);
+				piix_80w = ((t & 2) ? 1 : 0) | ((t & 1) ? 2 : 0);
+				break;
+			}
+
 		case PIIX_UDMA_100:
+		case PIIX_UDMA_133:
 			pci_read_config_dword(dev, PIIX_IDECFG, &u);
 			piix_80w = ((u & 0x30) ? 1 : 0) | ((u & 0xc0) ? 2 : 0);
-			break;
-
-		case PIIX_UDMA_V66:
-			pci_read_config_byte(dev, PIIX_IDESTAT, &t);
-			piix_80w = ((t & 2) ? 1 : 0) | ((t & 1) ? 2 : 0);
 			break;
 	}
 
