@@ -101,11 +101,11 @@ int hfs_cat_create(u32 cnid, struct inode *dir, struct qstr *str, struct inode *
 	if (err != -ENOENT) {
 		if (!err)
 			err = -EEXIST;
-		goto out;
+		goto err2;
 	}
 	err = hfs_brec_insert(&fd, &entry, entry_size);
 	if (err)
-		goto out;
+		goto err2;
 
 	hfs_cat_build_key(fd.search_key, dir->i_ino, str);
 	entry_size = hfs_cat_build_record(&entry, cnid, inode);
@@ -114,16 +114,23 @@ int hfs_cat_create(u32 cnid, struct inode *dir, struct qstr *str, struct inode *
 		/* panic? */
 		if (!err)
 			err = -EEXIST;
-		goto out;
+		goto err1;
 	}
 	err = hfs_brec_insert(&fd, &entry, entry_size);
-	if (!err) {
-		dir->i_size++;
-		mark_inode_dirty(dir);
-	}
-out:
-	hfs_find_exit(&fd);
+	if (err)
+		goto err1;
 
+	dir->i_size++;
+	mark_inode_dirty(dir);
+	hfs_find_exit(&fd);
+	return 0;
+
+err1:
+	hfs_cat_build_key(fd.search_key, cnid, NULL);
+	if (!hfs_brec_find(&fd))
+		hfs_brec_remove(&fd);
+err2:
+	hfs_find_exit(&fd);
 	return err;
 }
 
