@@ -1243,8 +1243,7 @@ static BOOL find_external_attr(const ATTR_TYPES type, const uchar_t *name,
 
 	ni = ctx->ntfs_ino;
 	base_ni = ctx->base_ntfs_ino;
-	ntfs_debug("Entering for inode 0x%Lx, type 0x%x.",
-			(unsigned long long)ni->mft_no, type);
+	ntfs_debug("Entering for inode 0x%lx, type 0x%x.", ni->mft_no, type);
 	if (!base_ni) {
 		/* First call happens with the base mft record. */
 		base_ni = ctx->base_ntfs_ino = ctx->ntfs_ino;

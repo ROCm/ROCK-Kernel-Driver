@@ -50,11 +50,13 @@ typedef enum {
 } ntfs_compression_constants;
 
 /**
- * ntfs_compression_buffer - one buffer for the decompression engine.
+ * ntfs_compression_buffer - one buffer for the decompression engine
  */
 static u8 *ntfs_compression_buffer = NULL;
 
-/* This spinlock which protects it */
+/**
+ * ntfs_cb_lock - spinlock which protects ntfs_compression_buffer
+ */
 static spinlock_t ntfs_cb_lock = SPIN_LOCK_UNLOCKED;
 
 /**
@@ -66,8 +68,6 @@ static spinlock_t ntfs_cb_lock = SPIN_LOCK_UNLOCKED;
  */
 int allocate_compression_buffers(void)
 {
-	int i, j;
-
 	BUG_ON(ntfs_compression_buffer);
 
 	ntfs_compression_buffer = vmalloc(NTFS_MAX_CB_SIZE);
@@ -83,8 +83,6 @@ int allocate_compression_buffers(void)
  */
 void free_compression_buffers(void)
 {
-	int i;
-
 	BUG_ON(!ntfs_compression_buffer);
 	vfree(ntfs_compression_buffer);
 	ntfs_compression_buffer = NULL;
@@ -592,7 +590,8 @@ retry_remap:
 
 	/*
 	 * Get the compression buffer. We must not sleep any more
-	 * until we are finished with it.  */
+	 * until we are finished with it.
+	 */
 	spin_lock(&ntfs_cb_lock);
 	cb = ntfs_compression_buffer;
 
@@ -668,7 +667,10 @@ retry_remap:
 			if (page)
 				memset(page_address(page) + cur_ofs, 0,
 						cb_max_ofs - cur_ofs);
-			cb_pos += cb_max_ofs - cur_ofs;
+			/*
+			 * No need to update cb_pos at this stage:
+			 *	cb_pos += cb_max_ofs - cur_ofs;
+			 */
 			cur_ofs = cb_max_ofs;
 		}
 	} else if (vcn == start_vcn) {
@@ -742,12 +744,13 @@ retry_remap:
 				cb_pos,	cb_size - (cb_pos - cb));
 		/*
 		 * We can sleep from now on, lock already dropped by
-		 * ntfs_decompress.  */
+		 * ntfs_decompress().
+		 */
 		if (err) {
 			ntfs_error(vol->sb, "ntfs_decompress() failed in inode "
-					"0x%Lx with error code %i. Skipping "
+					"0x%lx with error code %i. Skipping "
 					"this compression block.\n",
-					(unsigned long long)ni->mft_no, -err);
+					ni->mft_no, -err);
 			/* Release the unfinished pages. */
 			for (; prev_cur_page < cur_page; prev_cur_page++) {
 				page = pages[prev_cur_page];

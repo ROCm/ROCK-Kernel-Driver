@@ -93,7 +93,7 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 	struct inode *dent_inode;
 	uchar_t *uname;
 	ntfs_name *name = NULL;
-	u64 mref;
+	MFT_REF mref;
 	unsigned long dent_ino;
 	int uname_len;
 
@@ -110,7 +110,7 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 			&name);
 	kmem_cache_free(ntfs_name_cache, uname);
 	if (!IS_ERR_MREF(mref)) {
-		dent_ino = (unsigned long)MREF(mref);
+		dent_ino = MREF(mref);
 		ntfs_debug("Found inode 0x%lx. Calling iget.", dent_ino);
 		dent_inode = iget(vol->sb, dent_ino);
 		if (dent_inode) {
@@ -130,17 +130,15 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent)
 				goto handle_name;
 			}
 			ntfs_error(vol->sb, "Found stale reference to inode "
-					"0x%Lx (reference sequence number = "
+					"0x%lx (reference sequence number = "
 					"0x%x, inode sequence number = 0x%x, "
 					"returning -EACCES. Run chkdsk.",
-					(unsigned long long)MREF(mref),
-					MSEQNO(mref),
+					dent_ino, MSEQNO(mref),
 					NTFS_I(dent_inode)->seq_no);
 			iput(dent_inode);
 		} else
-			ntfs_error(vol->sb, "iget(0x%Lx) failed, returning "
-					"-EACCES.",
-					(unsigned long long)MREF(mref));
+			ntfs_error(vol->sb, "iget(0x%lx) failed, returning "
+					"-EACCES.", dent_ino);
 		if (name)
 			kfree(name);
 		return ERR_PTR(-EACCES);
@@ -235,8 +233,9 @@ handle_name:
 	}
 	nls_name.hash = full_name_hash(nls_name.name, nls_name.len);
 
-	// FIXME: Do we need dcache_lock or dparent_lock here or is the
-	// fact that i_sem is held on the parent inode sufficient? (AIA)
+	/*
+	 * Note: No need for dparent_lock as i_sem is held on the parent inode.
+	 */
 
 	/* Does a dentry matching the nls_name exist already? */
 	real_dent = d_lookup(dent->d_parent, &nls_name);
