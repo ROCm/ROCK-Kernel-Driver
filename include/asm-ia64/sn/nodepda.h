@@ -65,6 +65,8 @@ struct nodepda_s {
 	nodepda_router_info_t	**npda_rip_last;
 
 
+	spinlock_t		bist_lock;
+
 	/*
 	 * The BTEs on this node are shared by the local cpus
 	 */

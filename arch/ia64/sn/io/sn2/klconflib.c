@@ -32,7 +32,6 @@
 #endif /* DEBUG_KLGRAPH */
 
 lboard_t *root_lboard[MAX_COMPACT_NODES];
-u64 klgraph_addr[MAX_COMPACT_NODES];
 static int hasmetarouter;
 
 
