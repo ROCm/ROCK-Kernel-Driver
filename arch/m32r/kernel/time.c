@@ -193,7 +193,7 @@ EXPORT_SYMBOL(do_settimeofday);
  * BUG: This routine does not handle hour overflow properly; it just
  *      sets the minutes. Usually you won't notice until after reboot!
  */
-static __inline__ int set_rtc_mmss(unsigned long nowtime)
+static inline int set_rtc_mmss(unsigned long nowtime)
 {
 	return 0;
 }
@@ -205,11 +205,17 @@ static long last_rtc_update = 0;
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
  */
-static __inline__ void do_timer_interrupt(int irq, void *dev_id,
-	struct pt_regs * regs)
+static inline void
+do_timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
+#ifndef CONFIG_SMP
+	profile_tick(CPU_PROFILING, regs);
+#endif
 	do_timer(regs);
 
+#ifndef CONFIG_SMP
+	update_process_times(user_mode(regs));
+#endif
 	/*
 	 * If we have an externally synchronized Linux clock, then update
 	 * CMOS clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
@@ -240,10 +246,6 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	write_seqlock(&xtime_lock);
 	do_timer_interrupt(irq, NULL, regs);
 	write_sequnlock(&xtime_lock);
-
-#ifndef CONFIG_SMP
-	profile_tick(CPU_PROFILING, regs);
-#endif
 
 	return IRQ_HANDLED;
 }
@@ -314,4 +316,3 @@ unsigned long long sched_clock(void)
 {
 	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
-
