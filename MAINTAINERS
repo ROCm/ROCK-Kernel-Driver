@@ -1568,6 +1568,12 @@ M:	tsbogend@alpha.franken.de
 L:	linux-net@vger.kernel.org
 S:	Maintained
 
+POSIX CLOCKS and TIMERS
+P:	George Anzinger
+M:	george@mvista.com
+L:	linux-net@vger.kernel.org
+S:	Supported
+
 PNP SUPPORT
 P:	Adam Belay
 M:	ambx1@neo.rr.com
