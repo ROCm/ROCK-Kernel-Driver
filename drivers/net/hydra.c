@@ -142,10 +142,6 @@ static int __devinit hydra_init(struct zorro_dev *z)
     ei_status.reg_offset = hydra_offsets;
     dev->open = &hydra_open;
     dev->stop = &hydra_close;
-#ifdef MODULE
-    ei_status.priv = (unsigned long)root_hydra_dev;
-    root_hydra_dev = dev;
-#endif
     NS8390_init(dev, 0);
 
     err = register_netdev(dev);
