@@ -185,39 +185,39 @@
  * (Step 9 can be omitted, but you'll then have no function keys.)
  */
 
-#define USB_VENDOR_ID_AIPTEK                            0x08ca
-#define USB_REQ_GET_REPORT                              0x01
-#define USB_REQ_SET_REPORT                              0x09
+#define USB_VENDOR_ID_AIPTEK				0x08ca
+#define USB_REQ_GET_REPORT				0x01
+#define USB_REQ_SET_REPORT				0x09
 
 	/* PointerMode codes
 	 */
-#define AIPTEK_POINTER_ONLY_MOUSE_MODE                  0
-#define AIPTEK_POINTER_ONLY_STYLUS_MODE                 1
-#define AIPTEK_POINTER_EITHER_MODE                      2
+#define AIPTEK_POINTER_ONLY_MOUSE_MODE			0
+#define AIPTEK_POINTER_ONLY_STYLUS_MODE			1
+#define AIPTEK_POINTER_EITHER_MODE			2
 
-#define AIPTEK_POINTER_ALLOW_MOUSE_MODE(a) \
-        (a == AIPTEK_POINTER_ONLY_MOUSE_MODE || \
-         a == AIPTEK_POINTER_EITHER_MODE)
-#define AIPTEK_POINTER_ALLOW_STYLUS_MODE(a) \
-        (a == AIPTEK_POINTER_ONLY_STYLUS_MODE || \
-         a == AIPTEK_POINTER_EITHER_MODE)
+#define AIPTEK_POINTER_ALLOW_MOUSE_MODE(a)		\
+	(a == AIPTEK_POINTER_ONLY_MOUSE_MODE ||		\
+	 a == AIPTEK_POINTER_EITHER_MODE)
+#define AIPTEK_POINTER_ALLOW_STYLUS_MODE(a)		\
+	(a == AIPTEK_POINTER_ONLY_STYLUS_MODE ||	\
+	 a == AIPTEK_POINTER_EITHER_MODE)
 
 	/* CoordinateMode code
 	 */
-#define AIPTEK_COORDINATE_RELATIVE_MODE                 0
-#define AIPTEK_COORDINATE_ABSOLUTE_MODE                 1
+#define AIPTEK_COORDINATE_RELATIVE_MODE			0
+#define AIPTEK_COORDINATE_ABSOLUTE_MODE			1
 
        /* XTilt and YTilt values
         */
-#define AIPTEK_TILT_MIN                                 (-128)
-#define AIPTEK_TILT_MAX                                 127
-#define AIPTEK_TILT_DISABLE                             (-10101)
+#define AIPTEK_TILT_MIN					(-128)
+#define AIPTEK_TILT_MAX					127
+#define AIPTEK_TILT_DISABLE				(-10101)
 
 	/* Wheel values
 	 */
-#define AIPTEK_WHEEL_MIN                                0
-#define AIPTEK_WHEEL_MAX                                1024
-#define AIPTEK_WHEEL_DISABLE                            (-10101)
+#define AIPTEK_WHEEL_MIN				0
+#define AIPTEK_WHEEL_MAX				1024
+#define AIPTEK_WHEEL_DISABLE				(-10101)
 
 	/* ToolCode values, which BTW are 0x140 .. 0x14f
 	 * We have things set up such that if TOOL_BUTTON_FIRED_BIT is
@@ -226,113 +226,113 @@
 	 * Whenever the user resets the value, TOOL_BUTTON_FIRED_BIT will
 	 * get reset.
 	 */
-#define TOOL_BUTTON(x)                                  ((x) & 0x14f)
-#define TOOL_BUTTON_FIRED(x)                            ((x) & 0x200)
-#define TOOL_BUTTON_FIRED_BIT                           0x200
+#define TOOL_BUTTON(x)					((x) & 0x14f)
+#define TOOL_BUTTON_FIRED(x)				((x) & 0x200)
+#define TOOL_BUTTON_FIRED_BIT				0x200
 	/* toolMode codes
 	 */
-#define AIPTEK_TOOL_BUTTON_PEN_MODE                     BTN_TOOL_PEN
-#define AIPTEK_TOOL_BUTTON_PEN_MODE                     BTN_TOOL_PEN
-#define AIPTEK_TOOL_BUTTON_PENCIL_MODE                  BTN_TOOL_PENCIL
-#define AIPTEK_TOOL_BUTTON_BRUSH_MODE                   BTN_TOOL_BRUSH
-#define AIPTEK_TOOL_BUTTON_AIRBRUSH_MODE                BTN_TOOL_AIRBRUSH
-#define AIPTEK_TOOL_BUTTON_ERASER_MODE                  BTN_TOOL_RUBBER
-#define AIPTEK_TOOL_BUTTON_MOUSE_MODE                   BTN_TOOL_MOUSE
-#define AIPTEK_TOOL_BUTTON_LENS_MODE                    BTN_TOOL_LENS
+#define AIPTEK_TOOL_BUTTON_PEN_MODE			BTN_TOOL_PEN
+#define AIPTEK_TOOL_BUTTON_PEN_MODE			BTN_TOOL_PEN
+#define AIPTEK_TOOL_BUTTON_PENCIL_MODE			BTN_TOOL_PENCIL
+#define AIPTEK_TOOL_BUTTON_BRUSH_MODE			BTN_TOOL_BRUSH
+#define AIPTEK_TOOL_BUTTON_AIRBRUSH_MODE		BTN_TOOL_AIRBRUSH
+#define AIPTEK_TOOL_BUTTON_ERASER_MODE			BTN_TOOL_RUBBER
+#define AIPTEK_TOOL_BUTTON_MOUSE_MODE			BTN_TOOL_MOUSE
+#define AIPTEK_TOOL_BUTTON_LENS_MODE			BTN_TOOL_LENS
 
 	/* Diagnostic message codes
 	 */
-#define AIPTEK_DIAGNOSTIC_NA                            0
-#define AIPTEK_DIAGNOSTIC_SENDING_RELATIVE_IN_ABSOLUTE  1
-#define AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE  2
-#define AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED               3
+#define AIPTEK_DIAGNOSTIC_NA				0
+#define AIPTEK_DIAGNOSTIC_SENDING_RELATIVE_IN_ABSOLUTE	1
+#define AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE	2
+#define AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED		3
 
 	/* Time to wait (in ms) to help mask hand jittering 
 	 * when pressing the stylus buttons.
 	 */
-#define AIPTEK_JITTER_DELAY_DEFAULT                     50
+#define AIPTEK_JITTER_DELAY_DEFAULT			50
 
 	/* Time to wait (in ms) in-between sending the tablet
 	 * a command and beginning the process of reading the return
 	 * sequence from the tablet.
 	 */
-#define AIPTEK_PROGRAMMABLE_DELAY_25        25
-#define AIPTEK_PROGRAMMABLE_DELAY_50        50
-#define AIPTEK_PROGRAMMABLE_DELAY_100      100
-#define AIPTEK_PROGRAMMABLE_DELAY_200      200
-#define AIPTEK_PROGRAMMABLE_DELAY_300      300
-#define AIPTEK_PROGRAMMABLE_DELAY_400      400
-#define AIPTEK_PROGRAMMABLE_DELAY_DEFAULT  AIPTEK_PROGRAMMABLE_DELAY_400
+#define AIPTEK_PROGRAMMABLE_DELAY_25		25
+#define AIPTEK_PROGRAMMABLE_DELAY_50		50
+#define AIPTEK_PROGRAMMABLE_DELAY_100		100
+#define AIPTEK_PROGRAMMABLE_DELAY_200		200
+#define AIPTEK_PROGRAMMABLE_DELAY_300		300
+#define AIPTEK_PROGRAMMABLE_DELAY_400		400
+#define AIPTEK_PROGRAMMABLE_DELAY_DEFAULT	AIPTEK_PROGRAMMABLE_DELAY_400
 
 	/* Mouse button programming
 	 */
-#define AIPTEK_MOUSE_LEFT_BUTTON                        0x01
-#define AIPTEK_MOUSE_RIGHT_BUTTON                       0x02
-#define AIPTEK_MOUSE_MIDDLE_BUTTON                      0x04
+#define AIPTEK_MOUSE_LEFT_BUTTON		0x01
+#define AIPTEK_MOUSE_RIGHT_BUTTON		0x02
+#define AIPTEK_MOUSE_MIDDLE_BUTTON		0x04
 
 	/* Stylus button programming
 	 */
-#define AIPTEK_STYLUS_LOWER_BUTTON                      0x08
-#define AIPTEK_STYLUS_UPPER_BUTTON                      0x10
+#define AIPTEK_STYLUS_LOWER_BUTTON		0x08
+#define AIPTEK_STYLUS_UPPER_BUTTON		0x10
 
 	/* Length of incoming packet from the tablet
 	 */
-#define AIPTEK_PACKET_LENGTH                            8
+#define AIPTEK_PACKET_LENGTH			8
 
 	/* We report in EV_MISC both the proximity and
 	 * whether the report came from the stylus, tablet mouse
 	 * or "unknown" -- Unknown when the tablet is in relative
 	 * mode, because we only get report 1's.
 	 */
-#define AIPTEK_REPORT_TOOL_UNKNOWN                      0x10
-#define AIPTEK_REPORT_TOOL_STYLUS                       0x20
-#define AIPTEK_REPORT_TOOL_MOUSE                        0x40
+#define AIPTEK_REPORT_TOOL_UNKNOWN		0x10
+#define AIPTEK_REPORT_TOOL_STYLUS		0x20
+#define AIPTEK_REPORT_TOOL_MOUSE		0x40
 
 static int programmableDelay = AIPTEK_PROGRAMMABLE_DELAY_DEFAULT;
 static int jitterDelay = AIPTEK_JITTER_DELAY_DEFAULT;
 
 struct aiptek_features {
-	int odmCode;						/* Tablet manufacturer code       */
-	int modelCode;						/* Tablet model code (not unique) */
-	int firmwareCode;					/* prom/eeprom version            */
-	char usbPath[64 + 1];				/* device's physical usb path     */
-	char inputPath[64 + 1];				/* input device path              */
-	char manuName[64 + 1];				/* manufacturer name              */
-	char prodName[64 + 1];				/* product name                   */
+	int odmCode;		/* Tablet manufacturer code       */
+	int modelCode;		/* Tablet model code (not unique) */
+	int firmwareCode;	/* prom/eeprom version            */
+	char usbPath[64 + 1];	/* device's physical usb path     */
+	char inputPath[64 + 1];	/* input device path              */
+	char manuName[64 + 1];	/* manufacturer name              */
+	char prodName[64 + 1];	/* product name                   */
 };
 
 struct aiptek_settings {
-	int pointerMode;					/* stylus-, mouse-only or either */
-	int coordinateMode;					/* absolute/relative coords      */
-	int toolMode;						/* pen, pencil, brush, etc. tool */
-	int xTilt;							/* synthetic xTilt amount        */
-	int yTilt;							/* synthetic yTilt amount        */
-	int wheel;							/* synthetic wheel amount        */
-	int stylusButtonUpper;				/* stylus upper btn delivers...  */
-	int stylusButtonLower;				/* stylus lower btn delivers...  */
-	int mouseButtonLeft;				/* mouse left btn delivers...    */
-	int mouseButtonMiddle;				/* mouse middle btn delivers...  */
-	int mouseButtonRight;				/* mouse right btn delivers...   */
-	int programmableDelay;				/* delay for tablet programming  */
-	int jitterDelay;					/* delay for hand jittering      */
+	int pointerMode;	/* stylus-, mouse-only or either */
+	int coordinateMode;	/* absolute/relative coords      */
+	int toolMode;		/* pen, pencil, brush, etc. tool */
+	int xTilt;		/* synthetic xTilt amount        */
+	int yTilt;		/* synthetic yTilt amount        */
+	int wheel;		/* synthetic wheel amount        */
+	int stylusButtonUpper;	/* stylus upper btn delivers...  */
+	int stylusButtonLower;	/* stylus lower btn delivers...  */
+	int mouseButtonLeft;	/* mouse left btn delivers...    */
+	int mouseButtonMiddle;	/* mouse middle btn delivers...  */
+	int mouseButtonRight;	/* mouse right btn delivers...   */
+	int programmableDelay;	/* delay for tablet programming  */
+	int jitterDelay;	/* delay for hand jittering      */
 };
 
 struct aiptek {
-	struct input_dev inputdev;			/* input device struct           */
-	struct usb_device *usbdev;			/* usb device struct             */
-	struct urb *urb;					/* urb for incoming reports      */
-	dma_addr_t data_dma;				/* our dma stuffage              */
+	struct input_dev inputdev;		/* input device struct           */
+	struct usb_device *usbdev;		/* usb device struct             */
+	struct urb *urb;			/* urb for incoming reports      */
+	dma_addr_t data_dma;			/* our dma stuffage              */
 	struct aiptek_features features;	/* tablet's array of features    */
 	struct aiptek_settings curSetting;	/* tablet's current programmable */
 	struct aiptek_settings newSetting;	/* ... and new param settings    */
-	unsigned int ifnum;					/* interface number for IO       */
-	int openCount;						/* module use counter            */
-	int diagnostic;						/* tablet diagnostic codes       */
-	unsigned long eventCount;			/* event count                   */
-	int inDelay;						/* jitter: in jitter delay?      */
-	unsigned long endDelay;				/* jitter: time when delay ends  */
-	int previousJitterable;				/* jitterable prev value     */
-	unsigned char *data;				/* incoming packet data          */
+	unsigned int ifnum;			/* interface number for IO       */
+	int openCount;				/* module use counter            */
+	int diagnostic;				/* tablet diagnostic codes       */
+	unsigned long eventCount;		/* event count                   */
+	int inDelay;				/* jitter: in jitter delay?      */
+	unsigned long endDelay;			/* jitter: time when delay ends  */
+	int previousJitterable;			/* jitterable prev value     */
+	unsigned char *data;			/* incoming packet data          */
 };
 
 /*
@@ -410,27 +410,21 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 
 	switch (urb->status) {
 	case 0:
-		{
-			/* Success */
-		}
+		/* Success */
 		break;
 
 	case -ECONNRESET:
 	case -ENOENT:
 	case -ESHUTDOWN:
-		{
-			/* This urb is terminated, clean up */
-			dbg("%s - urb shutting down with status: %d",
-			    __FUNCTION__, urb->status);
-			return;
-		}
+		/* This urb is terminated, clean up */
+		dbg("%s - urb shutting down with status: %d",
+		    __FUNCTION__, urb->status);
+		return;
 
 	default:
-		{
-			dbg("%s - nonzero urb status received: %d",
-			    __FUNCTION__, urb->status);
-			goto exit;
-		}
+		dbg("%s - nonzero urb status received: %d",
+		    __FUNCTION__, urb->status);
+		goto exit;
 	}
 
 	/* See if we are in a delay loop -- throw out report if true.
@@ -466,20 +460,16 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 			 */
 			jitterable = data[5] & 0x07;
 
-			left = (data[5] & aiptek->curSetting.
-                 mouseButtonLeft) != 0 ? 1 : 0;
-			right = (data[5] & aiptek->curSetting.
-			     mouseButtonRight) != 0 ? 1 : 0;
-			middle = (data[5] & aiptek->curSetting.
-			     mouseButtonMiddle) != 0 ? 1 : 0;
+			left = (data[5] & aiptek->curSetting.mouseButtonLeft) != 0 ? 1 : 0;
+			right = (data[5] & aiptek->curSetting.mouseButtonRight) != 0 ? 1 : 0;
+			middle = (data[5] & aiptek->curSetting.mouseButtonMiddle) != 0 ? 1 : 0;
 
 			input_report_key(inputdev, BTN_LEFT, left);
 			input_report_key(inputdev, BTN_MIDDLE, middle);
 			input_report_key(inputdev, BTN_RIGHT, right);
 			input_report_rel(inputdev, REL_X, x);
 			input_report_rel(inputdev, REL_Y, y);
-			input_report_rel(inputdev, REL_MISC,
-					 1 | AIPTEK_REPORT_TOOL_UNKNOWN);
+			input_report_rel(inputdev, REL_MISC, 1 | AIPTEK_REPORT_TOOL_UNKNOWN);
 
 			/* Wheel support is in the form of a single-event
 			 * firing.
@@ -496,14 +486,11 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 	 * absolute coordinates.
 	 */
 	else if (data[0] == 2) {
-		if (aiptek->curSetting.coordinateMode ==
-		    AIPTEK_COORDINATE_RELATIVE_MODE) {
-			aiptek->diagnostic =
-			    AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE;
-		} else
-		    if (!AIPTEK_POINTER_ALLOW_STYLUS_MODE
-			(aiptek->curSetting.pointerMode)) {
-			aiptek->diagnostic = AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED;
+		if (aiptek->curSetting.coordinateMode == AIPTEK_COORDINATE_RELATIVE_MODE) {
+			aiptek->diagnostic = AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE;
+		} else if (!AIPTEK_POINTER_ALLOW_STYLUS_MODE
+			    (aiptek->curSetting.pointerMode)) {
+				aiptek->diagnostic = AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED;
 		} else {
 			input_regs(inputdev, regs);
 
@@ -519,10 +506,8 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 			 */
 			jitterable = data[5] & 0x18;
 
-			bs = (data[5] & aiptek->curSetting.
-			      stylusButtonLower) != 0 ? 1 : 0;
-			pck = (data[5] & aiptek->curSetting.
-			     stylusButtonUpper) != 0 ? 1 : 0;
+			bs = (data[5] & aiptek->curSetting.stylusButtonLower) != 0 ? 1 : 0;
+			pck = (data[5] & aiptek->curSetting.stylusButtonUpper) != 0 ? 1 : 0;
 
 			/* dv indicates 'data valid' (e.g., the tablet is in sync
 			 * and has delivered a "correct" report) We will ignore
@@ -536,42 +521,30 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 				if (TOOL_BUTTON_FIRED
 				    (aiptek->curSetting.toolMode) == 0) {
 					input_report_key(inputdev,
-							 TOOL_BUTTON(aiptek->
-								     curSetting.
-								     toolMode),
+							 TOOL_BUTTON(aiptek->curSetting.toolMode),
 							 1);
-					aiptek->curSetting.toolMode |=
-					    TOOL_BUTTON_FIRED_BIT;
+					aiptek->curSetting.toolMode |= TOOL_BUTTON_FIRED_BIT;
 				}
 
 				if (p != 0) {
 					input_report_abs(inputdev, ABS_X, x);
 					input_report_abs(inputdev, ABS_Y, y);
-					input_report_abs(inputdev, ABS_PRESSURE,
-							 z);
+					input_report_abs(inputdev, ABS_PRESSURE, z);
 
-					input_report_key(inputdev, BTN_TOUCH,
-							 tip);
-					input_report_key(inputdev, BTN_STYLUS,
-							 bs);
-					input_report_key(inputdev, BTN_STYLUS2,
-							 pck);
+					input_report_key(inputdev, BTN_TOUCH, tip);
+					input_report_key(inputdev, BTN_STYLUS, bs);
+					input_report_key(inputdev, BTN_STYLUS2, pck);
 
 					if (aiptek->curSetting.xTilt !=
 					    AIPTEK_TILT_DISABLE) {
 						input_report_abs(inputdev,
 								 ABS_TILT_X,
-								 aiptek->
-								 curSetting.
-								 xTilt);
+								 aiptek->curSetting.xTilt);
 					}
-					if (aiptek->curSetting.yTilt !=
-					    AIPTEK_TILT_DISABLE) {
+					if (aiptek->curSetting.yTilt != AIPTEK_TILT_DISABLE) {
 						input_report_abs(inputdev,
 								 ABS_TILT_Y,
-								 aiptek->
-								 curSetting.
-								 yTilt);
+								 aiptek->curSetting.yTilt);
 					}
 
 					/* Wheel support is in the form of a single-event
@@ -581,15 +554,11 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 					    AIPTEK_WHEEL_DISABLE) {
 						input_report_abs(inputdev,
 								 ABS_WHEEL,
-								 aiptek->
-								 curSetting.
-								 wheel);
-						aiptek->curSetting.wheel =
-						    AIPTEK_WHEEL_DISABLE;
+								 aiptek->curSetting.wheel);
+						aiptek->curSetting.wheel = AIPTEK_WHEEL_DISABLE;
 					}
 				}
-				input_report_abs(inputdev, ABS_MISC,
-						 p | AIPTEK_REPORT_TOOL_STYLUS);
+				input_report_abs(inputdev, ABS_MISC, p | AIPTEK_REPORT_TOOL_STYLUS);
 				input_sync(inputdev);
 			}
 		}
@@ -597,12 +566,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 	/* Report 3's come from the mouse in absolute mode.
 	 */
 	else if (data[0] == 3) {
-		if (aiptek->curSetting.coordinateMode ==
-		    AIPTEK_COORDINATE_RELATIVE_MODE) {
-			aiptek->diagnostic =
-			    AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE;
-		} else
-		    if (!AIPTEK_POINTER_ALLOW_MOUSE_MODE
+		if (aiptek->curSetting.coordinateMode == AIPTEK_COORDINATE_RELATIVE_MODE) {
+			aiptek->diagnostic = AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE;
+		} else if (!AIPTEK_POINTER_ALLOW_MOUSE_MODE
 			(aiptek->curSetting.pointerMode)) {
 			aiptek->diagnostic = AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED;
 		} else {
@@ -614,12 +580,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 
 			p = (data[5] & 0x01) != 0 ? 1 : 0;
 			dv = (data[5] & 0x02) != 0 ? 1 : 0;
-			left = (data[5] & aiptek->curSetting.
-                    mouseButtonLeft) != 0 ? 1 : 0;
-			right = (data[5] & aiptek->curSetting.
-			     mouseButtonRight) != 0 ? 1 : 0;
-			middle = (data[5] & aiptek->curSetting.
-			     mouseButtonMiddle) != 0 ? 1 : 0;
+			left = (data[5] & aiptek->curSetting.mouseButtonLeft) != 0 ? 1 : 0;
+			right = (data[5] & aiptek->curSetting.mouseButtonRight) != 0 ? 1 : 0;
+			middle = (data[5] & aiptek->curSetting.mouseButtonMiddle) != 0 ? 1 : 0;
 
 			if (dv != 0) {
 				/* If we've not already sent a tool_button_?? code, do
@@ -629,41 +592,30 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 				if (TOOL_BUTTON_FIRED
 				    (aiptek->curSetting.toolMode) == 0) {
 					input_report_key(inputdev,
-							 TOOL_BUTTON(aiptek->
-								     curSetting.
-								     toolMode),
+							 TOOL_BUTTON(aiptek->curSetting.toolMode),
 							 1);
-					aiptek->curSetting.toolMode |=
-					    TOOL_BUTTON_FIRED_BIT;
+					aiptek->curSetting.toolMode |= TOOL_BUTTON_FIRED_BIT;
 				}
 
 				if (p != 0) {
 					input_report_abs(inputdev, ABS_X, x);
 					input_report_abs(inputdev, ABS_Y, y);
 
-					input_report_key(inputdev, BTN_LEFT,
-							 left);
-					input_report_key(inputdev, BTN_MIDDLE,
-							 middle);
-					input_report_key(inputdev, BTN_RIGHT,
-							 right);
+					input_report_key(inputdev, BTN_LEFT, left);
+					input_report_key(inputdev, BTN_MIDDLE, middle);
+					input_report_key(inputdev, BTN_RIGHT, right);
 
 					/* Wheel support is in the form of a single-event
 					 * firing.
 					 */
-					if (aiptek->curSetting.wheel !=
-					    AIPTEK_WHEEL_DISABLE) {
+					if (aiptek->curSetting.wheel != AIPTEK_WHEEL_DISABLE) {
 						input_report_abs(inputdev,
 								 ABS_WHEEL,
-								 aiptek->
-								 curSetting.
-								 wheel);
-						aiptek->curSetting.wheel =
-						    AIPTEK_WHEEL_DISABLE;
+								 aiptek->curSetting.wheel);
+						aiptek->curSetting.wheel = AIPTEK_WHEEL_DISABLE;
 					}
 				}
-				input_report_rel(inputdev, REL_MISC,
-						 p | AIPTEK_REPORT_TOOL_MOUSE);
+				input_report_rel(inputdev, REL_MISC, p | AIPTEK_REPORT_TOOL_MOUSE);
 				input_sync(inputdev);
 			}
 		}
@@ -676,10 +628,8 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 		p = (data[1] & 0x01) != 0 ? 1 : 0;
 		dv = (data[1] & 0x02) != 0 ? 1 : 0;
 		tip = (data[1] & 0x04) != 0 ? 1 : 0;
-		bs = (data[1] & aiptek->curSetting.stylusButtonLower) !=
-		    0 ? 1 : 0;
-		pck = (data[1] & aiptek->curSetting.stylusButtonUpper) !=
-		    0 ? 1 : 0;
+		bs = (data[1] & aiptek->curSetting.stylusButtonLower) != 0 ? 1 : 0;
+		pck = (data[1] & aiptek->curSetting.stylusButtonUpper) != 0 ? 1 : 0;
 
 		macro = data[3];
 		z = le16_to_cpu(get_unaligned((__u16 *) (data + 4)));
@@ -693,10 +643,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 			 */
 			if (TOOL_BUTTON_FIRED(aiptek->curSetting.toolMode) == 0) {
 				input_report_key(inputdev,
-						 TOOL_BUTTON(aiptek->curSetting.
-							     toolMode), 1);
-				aiptek->curSetting.toolMode |=
-				    TOOL_BUTTON_FIRED_BIT;
+						 TOOL_BUTTON(aiptek->curSetting.toolMode),
+						 1);
+				aiptek->curSetting.toolMode |= TOOL_BUTTON_FIRED_BIT;
 			}
 
 			if (p != 0) {
@@ -730,12 +679,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 
 		p = (data[1] & 0x01) != 0 ? 1 : 0;
 		dv = (data[1] & 0x02) != 0 ? 1 : 0;
-		left = (data[1]& aiptek->curSetting.mouseButtonLeft)
-		    != 0 ? 1 : 0;
-		right = (data[1] & aiptek->curSetting.mouseButtonRight)
-		    != 0 ? 1 : 0;
-		middle = (data[1] & aiptek->curSetting.mouseButtonMiddle)
-		    != 0 ? 1 : 0;
+		left = (data[1]& aiptek->curSetting.mouseButtonLeft) != 0 ? 1 : 0;
+		right = (data[1] & aiptek->curSetting.mouseButtonRight) != 0 ? 1 : 0;
+		middle = (data[1] & aiptek->curSetting.mouseButtonMiddle) != 0 ? 1 : 0;
 		macro = data[3];
 
 		if (dv != 0) {
@@ -747,10 +693,9 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 			 */
 			if (TOOL_BUTTON_FIRED(aiptek->curSetting.toolMode) == 0) {
 				input_report_key(inputdev,
-						 TOOL_BUTTON(aiptek->curSetting.
-							     toolMode), 1);
-				aiptek->curSetting.toolMode |=
-				    TOOL_BUTTON_FIRED_BIT;
+						 TOOL_BUTTON(aiptek->curSetting.toolMode),
+						 1);
+				aiptek->curSetting.toolMode |= TOOL_BUTTON_FIRED_BIT;
 			}
 
 			if (p != 0) {
@@ -835,7 +780,7 @@ static void aiptek_irq(struct urb *urb, struct pt_regs *regs)
 	}
 	aiptek->previousJitterable = jitterable;
 
-      exit:
+exit:
 	retval = usb_submit_urb(urb, GFP_ATOMIC);
 	if (retval != 0) {
 		err("%s - usb_submit_urb failed with result %d",
@@ -937,9 +882,8 @@ aiptek_command(struct aiptek *aiptek, unsigned char command, unsigned char data)
 	u8 *buf;
 
 	buf = kmalloc(sizeof_buf, GFP_KERNEL);
-	if (!buf) {
+	if (!buf)
 		return -ENOMEM;
-	}
 
 	buf[0] = 2;
 	buf[1] = command;
@@ -967,9 +911,8 @@ aiptek_query(struct aiptek *aiptek, unsigned char command, unsigned char data)
 	u8 *buf;
 
 	buf = kmalloc(sizeof_buf, GFP_KERNEL);
-	if (!buf) {
+	if (!buf)
 		return -ENOMEM;
-	}
 
 	buf[0] = 2;
 	buf[1] = command;
@@ -1001,46 +944,39 @@ static int aiptek_program_tablet(struct aiptek *aiptek)
 {
 	int ret;
 	/* Execute Resolution500LPI */
-	if ((ret = aiptek_command(aiptek, 0x18, 0x04)) < 0) {
+	if ((ret = aiptek_command(aiptek, 0x18, 0x04)) < 0)
 		return ret;
-	}
 
 	/* Query getModelCode */
-	if ((ret = aiptek_query(aiptek, 0x02, 0x00)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x02, 0x00)) < 0)
 		return ret;
-	}
 	aiptek->features.modelCode = ret & 0xff;
 
 	/* Query getODMCode */
-	if ((ret = aiptek_query(aiptek, 0x03, 0x00)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x03, 0x00)) < 0)
 		return ret;
-	}
 	aiptek->features.odmCode = ret;
 
 	/* Query getFirmwareCode */
-	if ((ret = aiptek_query(aiptek, 0x04, 0x00)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x04, 0x00)) < 0)
 		return ret;
-	}
 	aiptek->features.firmwareCode = ret;
 
 	/* Query getXextension */
-	if ((ret = aiptek_query(aiptek, 0x01, 0x00)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x01, 0x00)) < 0)
 		return ret;
-	}
 	aiptek->inputdev.absmin[ABS_X] = 0;
 	aiptek->inputdev.absmax[ABS_X] = ret - 1;
 
 	/* Query getYextension */
-	if ((ret = aiptek_query(aiptek, 0x01, 0x01)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x01, 0x01)) < 0)
 		return ret;
-	}
 	aiptek->inputdev.absmin[ABS_Y] = 0;
 	aiptek->inputdev.absmax[ABS_Y] = ret - 1;
 
 	/* Query getPressureLevels */
-	if ((ret = aiptek_query(aiptek, 0x08, 0x00)) < 0) {
+	if ((ret = aiptek_query(aiptek, 0x08, 0x00)) < 0)
 		return ret;
-	}
 	aiptek->inputdev.absmin[ABS_PRESSURE] = 0;
 	aiptek->inputdev.absmax[ABS_PRESSURE] = ret - 1;
 
@@ -1061,20 +997,17 @@ static int aiptek_program_tablet(struct aiptek *aiptek)
 	}
 
 	/* Enable the macro keys */
-	if ((ret = aiptek_command(aiptek, 0x11, 0x02)) < 0) {
+	if ((ret = aiptek_command(aiptek, 0x11, 0x02)) < 0)
 		return ret;
-	}
 #if 0
 	/* Execute FilterOn */
-	if ((ret = aiptek_command(aiptek, 0x17, 0x00)) < 0) {
+	if ((ret = aiptek_command(aiptek, 0x17, 0x00)) < 0)
 		return ret;
-	}
 #endif
 
 	/* Execute AutoGainOn */
-	if ((ret = aiptek_command(aiptek, 0x12, 0xff)) < 0) {
+	if ((ret = aiptek_command(aiptek, 0x12, 0xff)) < 0)
 		return ret;
-	}
 
 	/* Reset the eventCount, so we track events from last (re)programming
 	 */
@@ -1098,9 +1031,8 @@ static ssize_t show_tabletSize(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%dx%d\n",
 			aiptek->inputdev.absmax[ABS_X] + 1,
@@ -1122,9 +1054,8 @@ static ssize_t show_tabletProductId(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n",
 			aiptek->inputdev.id.product);
@@ -1139,9 +1070,8 @@ static ssize_t show_tabletVendorId(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n", aiptek->inputdev.id.vendor);
 }
@@ -1156,9 +1086,8 @@ static ssize_t show_tabletManufacturer(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	int retval;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->features.manuName);
 	return retval;
@@ -1174,9 +1103,8 @@ static ssize_t show_tabletProduct(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	int retval;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->features.prodName);
 	return retval;
@@ -1193,34 +1121,25 @@ static ssize_t show_tabletPointerMode(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.pointerMode) {
 	case AIPTEK_POINTER_ONLY_STYLUS_MODE:
-		{
-			s = "stylus";
-			break;
-		}
+		s = "stylus";
+		break;
 
 	case AIPTEK_POINTER_ONLY_MOUSE_MODE:
-		{
-			s = "mouse";
-			break;
-		}
+		s = "mouse";
+		break;
 
 	case AIPTEK_POINTER_EITHER_MODE:
-		{
-			s = "either";
-			break;
-		}
+		s = "either";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1229,9 +1148,8 @@ static ssize_t
 store_tabletPointerMode(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "stylus") == 0) {
 		aiptek->newSetting.pointerMode =
@@ -1257,28 +1175,21 @@ static ssize_t show_tabletCoordinateMode(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.coordinateMode) {
 	case AIPTEK_COORDINATE_ABSOLUTE_MODE:
-		{
-			s = "absolute";
-			break;
-		}
+		s = "absolute";
+		break;
 
 	case AIPTEK_COORDINATE_RELATIVE_MODE:
-		{
-			s = "relative";
-			break;
-		}
+		s = "relative";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1287,9 +1198,8 @@ static ssize_t
 store_tabletCoordinateMode(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "absolute") == 0) {
 		aiptek->newSetting.pointerMode =
@@ -1314,58 +1224,41 @@ static ssize_t show_tabletToolMode(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (TOOL_BUTTON(aiptek->curSetting.toolMode)) {
 	case AIPTEK_TOOL_BUTTON_MOUSE_MODE:
-		{
-			s = "mouse";
-			break;
-		}
+		s = "mouse";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_ERASER_MODE:
-		{
-			s = "eraser";
-			break;
-		}
+		s = "eraser";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_PENCIL_MODE:
-		{
-			s = "pencil";
-			break;
-		}
+		s = "pencil";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_PEN_MODE:
-		{
-			s = "pen";
-			break;
-		}
+		s = "pen";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_BRUSH_MODE:
-		{
-			s = "brush";
-			break;
-		}
+		s = "brush";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_AIRBRUSH_MODE:
-		{
-			s = "airbrush";
-			break;
-		}
+		s = "airbrush";
+		break;
 
 	case AIPTEK_TOOL_BUTTON_LENS_MODE:
-		{
-			s = "lens";
-			break;
-		}
+		s = "lens";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1374,9 +1267,8 @@ static ssize_t
 store_tabletToolMode(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "mouse") == 0) {
 		aiptek->newSetting.toolMode = AIPTEK_TOOL_BUTTON_MOUSE_MODE;
@@ -1409,9 +1301,8 @@ static ssize_t show_tabletXtilt(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (aiptek->curSetting.xTilt == AIPTEK_TILT_DISABLE) {
 		return snprintf(buf, PAGE_SIZE, "disable\n");
@@ -1426,9 +1317,9 @@ store_tabletXtilt(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	int x;
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "disable") == 0) {
 		aiptek->newSetting.xTilt = AIPTEK_TILT_DISABLE;
@@ -1452,9 +1343,8 @@ static ssize_t show_tabletYtilt(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (aiptek->curSetting.yTilt == AIPTEK_TILT_DISABLE) {
 		return snprintf(buf, PAGE_SIZE, "disable\n");
@@ -1469,9 +1359,9 @@ store_tabletYtilt(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	int y;
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "disable") == 0) {
 		aiptek->newSetting.yTilt = AIPTEK_TILT_DISABLE;
@@ -1495,9 +1385,8 @@ static ssize_t show_tabletJitterDelay(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%d\n", aiptek->curSetting.jitterDelay);
 }
@@ -1506,9 +1395,9 @@ static ssize_t
 store_tabletJitterDelay(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	aiptek->newSetting.jitterDelay = (int)simple_strtol(buf, 0, 10);
 	return count;
@@ -1526,9 +1415,8 @@ static ssize_t show_tabletProgrammableDelay(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%d\n",
 			aiptek->curSetting.programmableDelay);
@@ -1538,9 +1426,9 @@ static ssize_t
 store_tabletProgrammableDelay(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	aiptek->newSetting.programmableDelay = (int)simple_strtol(buf, 0, 10);
 	return count;
@@ -1558,9 +1446,8 @@ static ssize_t show_tabletInputDevice(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "/dev/input/%s\n",
 			aiptek->features.inputPath);
@@ -1576,9 +1463,8 @@ static ssize_t show_tabletEventsReceived(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%ld\n", aiptek->eventCount);
 }
@@ -1593,44 +1479,34 @@ static ssize_t show_tabletDiagnosticMessage(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *retMsg;
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->diagnostic) {
 	case AIPTEK_DIAGNOSTIC_NA:
-		{
-			retMsg = "no errors\n";
-			break;
-		}
+		retMsg = "no errors\n";
+		break;
 
 	case AIPTEK_DIAGNOSTIC_SENDING_RELATIVE_IN_ABSOLUTE:
-		{
-			retMsg = "Error: receiving relative reports\n";
-			break;
-		}
+		retMsg = "Error: receiving relative reports\n";
+		break;
 
 	case AIPTEK_DIAGNOSTIC_SENDING_ABSOLUTE_IN_RELATIVE:
-		{
-			retMsg = "Error: receiving absolute reports\n";
-			break;
-		}
+		retMsg = "Error: receiving absolute reports\n";
+		break;
 
 	case AIPTEK_DIAGNOSTIC_TOOL_DISALLOWED:
-		{
-			if (aiptek->curSetting.pointerMode ==
-			    AIPTEK_POINTER_ONLY_MOUSE_MODE) {
-				retMsg = "Error: receiving stylus reports\n";
-			} else {
-				retMsg = "Error: receiving mouse reports\n";
-			}
-			break;
+		if (aiptek->curSetting.pointerMode ==
+		    AIPTEK_POINTER_ONLY_MOUSE_MODE) {
+			retMsg = "Error: receiving stylus reports\n";
+		} else {
+			retMsg = "Error: receiving mouse reports\n";
 		}
+		break;
 
 	default:
-		{
-			return 0;
-		}
+		return 0;
 	}
 	return snprintf(buf, PAGE_SIZE, retMsg);
 }
@@ -1646,28 +1522,21 @@ static ssize_t show_tabletStylusUpper(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.stylusButtonUpper) {
 	case AIPTEK_STYLUS_UPPER_BUTTON:
-		{
-			s = "upper";
-			break;
-		}
+		s = "upper";
+		break;
 
 	case AIPTEK_STYLUS_LOWER_BUTTON:
-		{
-			s = "lower";
-			break;
-		}
+		s = "lower";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1676,9 +1545,9 @@ static ssize_t
 store_tabletStylusUpper(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "upper") == 0) {
 		aiptek->newSetting.stylusButtonUpper =
@@ -1703,28 +1572,21 @@ static ssize_t show_tabletStylusLower(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.stylusButtonLower) {
 	case AIPTEK_STYLUS_UPPER_BUTTON:
-		{
-			s = "upper";
-			break;
-		}
+		s = "upper";
+		break;
 
 	case AIPTEK_STYLUS_LOWER_BUTTON:
-		{
-			s = "lower";
-			break;
-		}
+		s = "lower";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1733,9 +1595,9 @@ static ssize_t
 store_tabletStylusLower(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "upper") == 0) {
 		aiptek->newSetting.stylusButtonLower =
@@ -1760,34 +1622,25 @@ static ssize_t show_tabletMouseLeft(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.mouseButtonLeft) {
 	case AIPTEK_MOUSE_LEFT_BUTTON:
-		{
-			s = "left";
-			break;
-		}
+		s = "left";
+		break;
 
 	case AIPTEK_MOUSE_MIDDLE_BUTTON:
-		{
-			s = "middle";
-			break;
-		}
+		s = "middle";
+		break;
 
 	case AIPTEK_MOUSE_RIGHT_BUTTON:
-		{
-			s = "right";
-			break;
-		}
+		s = "right";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1796,9 +1649,9 @@ static ssize_t
 store_tabletMouseLeft(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "left") == 0) {
 		aiptek->newSetting.mouseButtonLeft = AIPTEK_MOUSE_LEFT_BUTTON;
@@ -1823,34 +1676,25 @@ static ssize_t show_tabletMouseMiddle(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.mouseButtonMiddle) {
 	case AIPTEK_MOUSE_LEFT_BUTTON:
-		{
-			s = "left";
-			break;
-		}
+		s = "left";
+		break;
 
 	case AIPTEK_MOUSE_MIDDLE_BUTTON:
-		{
-			s = "middle";
-			break;
-		}
+		s = "middle";
+		break;
 
 	case AIPTEK_MOUSE_RIGHT_BUTTON:
-		{
-			s = "right";
-			break;
-		}
+		s = "right";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1859,9 +1703,9 @@ static ssize_t
 store_tabletMouseMiddle(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "left") == 0) {
 		aiptek->newSetting.mouseButtonMiddle = AIPTEK_MOUSE_LEFT_BUTTON;
@@ -1888,34 +1732,25 @@ static ssize_t show_tabletMouseRight(struct device *dev, char *buf)
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 	char *s;
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	switch (aiptek->curSetting.mouseButtonRight) {
 	case AIPTEK_MOUSE_LEFT_BUTTON:
-		{
-			s = "left";
-			break;
-		}
+		s = "left";
+		break;
 
 	case AIPTEK_MOUSE_MIDDLE_BUTTON:
-		{
-			s = "middle";
-			break;
-		}
+		s = "middle";
+		break;
 
 	case AIPTEK_MOUSE_RIGHT_BUTTON:
-		{
-			s = "right";
-			break;
-		}
+		s = "right";
+		break;
 
 	default:
-		{
-			s = "unknown";
-			break;
-		}
+		s = "unknown";
+		break;
 	}
 	return snprintf(buf, PAGE_SIZE, "%s\n", s);
 }
@@ -1924,9 +1759,9 @@ static ssize_t
 store_tabletMouseRight(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (strcmp(buf, "left") == 0) {
 		aiptek->newSetting.mouseButtonRight = AIPTEK_MOUSE_LEFT_BUTTON;
@@ -1950,9 +1785,9 @@ static DEVICE_ATTR(mouse_right,
 static ssize_t show_tabletWheel(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	if (aiptek->curSetting.wheel == AIPTEK_WHEEL_DISABLE) {
 		return snprintf(buf, PAGE_SIZE, "disable\n");
@@ -1966,9 +1801,9 @@ static ssize_t
 store_tabletWheel(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	aiptek->newSetting.wheel = (int)simple_strtol(buf, 0, 10);
 	return count;
@@ -1985,9 +1820,8 @@ static ssize_t show_tabletExecute(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	/* There is nothing useful to display, so a one-line manual
 	 * is in order...
@@ -2000,18 +1834,18 @@ static ssize_t
 store_tabletExecute(struct device *dev, const char *buf, size_t count)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
-	if (aiptek == NULL) {
+
+	if (aiptek == NULL)
 		return 0;
-	}
+
 	/* We do not care what you write to this file. Merely the action
 	 * of writing to this file triggers a tablet reprogramming.
 	 */
 	memcpy(&aiptek->curSetting, &aiptek->newSetting,
 	       sizeof(struct aiptek_settings));
 
-	if (aiptek_program_tablet(aiptek) < 0) {
+	if (aiptek_program_tablet(aiptek) < 0)
 		return -EIO;
-	}
 
 	return count;
 }
@@ -2027,9 +1861,8 @@ static ssize_t show_tabletODMCode(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n", aiptek->features.odmCode);
 }
@@ -2044,9 +1877,8 @@ static ssize_t show_tabletModelCode(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "0x%04x\n", aiptek->features.modelCode);
 }
@@ -2061,9 +1893,8 @@ static ssize_t show_firmwareCode(struct device *dev, char *buf)
 {
 	struct aiptek *aiptek = dev_get_drvdata(dev);
 
-	if (aiptek == NULL) {
+	if (aiptek == NULL)
 		return 0;
-	}
 
 	return snprintf(buf, PAGE_SIZE, "%04x\n",
 			aiptek->features.firmwareCode);
@@ -2175,9 +2006,8 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	 */
 	speeds[0] = programmableDelay;
 
-	if ((aiptek = kmalloc(sizeof(struct aiptek), GFP_KERNEL)) == NULL) {
+	if ((aiptek = kmalloc(sizeof(struct aiptek), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	}
 	memset(aiptek, 0, sizeof(struct aiptek));
 
 	aiptek->data = usb_buffer_alloc(usbdev, AIPTEK_PACKET_LENGTH,
@@ -2255,9 +2085,8 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	/* Programming the tablet macro keys needs to be done with a for loop
 	 * as the keycodes are discontiguous.
 	 */
-	for (i = 0; i < sizeof(macroKeyEvents) / sizeof(macroKeyEvents[0]); ++i) {
+	for (i = 0; i < sizeof(macroKeyEvents) / sizeof(macroKeyEvents[0]); ++i)
 		set_bit(macroKeyEvents[i], aiptek->inputdev.keybit);
-	}
 
 	/* Set up client data, pointers to open and close routines
 	 * for the input device.
@@ -2273,9 +2102,8 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	 * & a tablet, and the inputX number actually will tell
 	 * us something...
 	 */
-	if (usb_make_path(usbdev, path, 64) > 0) {
+	if (usb_make_path(usbdev, path, 64) > 0)
 		sprintf(aiptek->features.usbPath, "%s/input0", path);
-	}
 
 	/* Program the input device coordinate capacities. We do not yet
 	 * know what maximum X, Y, and Z values are, so we're putting fake
@@ -2400,9 +2228,8 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	/* Make sure the evdev module is loaded. Assuming evdev IS a module :-)
 	 */
-	if (request_module("evdev") != 0) {
+	if (request_module("evdev") != 0)
 		info("aiptek: error loading 'evdev' module");
-	}
 
 	return 0;
 }
