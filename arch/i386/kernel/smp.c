@@ -22,7 +22,6 @@
 
 #include <asm/mtrr.h>
 #include <asm/tlbflush.h>
-#include <mach_ipi.h>
 #include <mach_apic.h>
 
 /*
@@ -229,6 +228,8 @@ inline void send_IPI_mask_sequence(cpumask_t mask, int vector)
 	}
 	local_irq_restore(flags);
 }
+
+#include <mach_ipi.h> /* must come after the send_IPI functions above for inlining */
 
 /*
  *	Smarter SMP flushing macros. 
