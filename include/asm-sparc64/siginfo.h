@@ -37,8 +37,10 @@ typedef struct siginfo32 {
 
 		/* POSIX.1b timers */
 		struct {
-			unsigned int _timer1;
-			unsigned int _timer2;
+			timer_t _tid;			/* timer id */
+			int _overrun;			/* overrun count */
+			sigval_t32 _sigval;		/* same as below */
+			int _sys_private;		/* not to be passed to user */
 		} _timer;
 
 		/* POSIX.1b signals */
