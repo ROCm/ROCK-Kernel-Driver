@@ -153,20 +153,23 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask)
 		delta *= (*shrinker->shrinker)(0, gfp_mask);
 		do_div(delta, pages + 1);
 		shrinker->nr += delta;
-		if (shrinker->nr > SHRINK_BATCH) {
-			long nr_to_scan = shrinker->nr;
+		if (shrinker->nr < 0)
+			shrinker->nr = LONG_MAX;	/* It wrapped! */
 
-			shrinker->nr = 0;
-			mod_page_state(slabs_scanned, nr_to_scan);
-			while (nr_to_scan) {
-				long this_scan = nr_to_scan;
+		if (shrinker->nr <= SHRINK_BATCH)
+			continue;
+		while (shrinker->nr) {
+			long this_scan = shrinker->nr;
+			int shrink_ret;
 
-				if (this_scan > 128)
-					this_scan = 128;
-				(*shrinker->shrinker)(this_scan, gfp_mask);
-				nr_to_scan -= this_scan;
-				cond_resched();
-			}
+			if (this_scan > 128)
+				this_scan = 128;
+			shrink_ret = (*shrinker->shrinker)(this_scan, gfp_mask);
+			mod_page_state(slabs_scanned, this_scan);
+			shrinker->nr -= this_scan;
+			if (shrink_ret == -1)
+				break;
+			cond_resched();
 		}
 	}
 	up(&shrinker_sem);
