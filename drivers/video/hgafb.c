@@ -66,9 +66,9 @@ static unsigned long hga_vram_len;		/* Size of video memory */
 #define HGA_TXT			0
 #define HGA_GFX			1
 
-static inline u8* rowaddr(struct fb_info *info, u_int row)
+static inline u8 __iomem * rowaddr(struct fb_info *info, u_int row)
 {
-        return info->screen_base + HGA_ROWADDR(row);
+	return (u8 __iomem *) (fb_readl(info->screen_base + HGA_ROWADDR(row)));
 }
 
 static int hga_mode = -1;			/* 0 = txt, 1 = gfx mode */
@@ -455,7 +455,7 @@ static int hgafb_blank(int blank_mode, struct fb_info *info)
 static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 {
 	u_int rows, y;
-	u8 *dest;
+	u8 __iomem *dest;
 
 	y = rect->dy;
 
@@ -466,7 +466,7 @@ static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 			//fb_memset(dest, rect->color, (rect->width >> 3));
 			break;
 		case ROP_XOR:
-			*dest = ~*dest;
+			fb_writeb(~(fb_readb(dest)), dest);
 			break;
 		}
 	}
@@ -475,7 +475,8 @@ static void hgafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect)
 static void hgafb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 {
 	u_int rows, y1, y2;
-	u8 *src, *dest;
+	u8 __iomem *src;
+	u8 __iomem *dest;
 
 	if (area->dy <= area->sy) {
 		y1 = area->sy;
@@ -504,14 +505,15 @@ static void hgafb_copyarea(struct fb_info *info, const struct fb_copyarea *area)
 
 static void hgafb_imageblit(struct fb_info *info, const struct fb_image *image)
 {
-	u8 *dest, *cdat = (u8 *) image->data;
+	u8 __iomem *dest;
+	u8 *cdat = (u8 *) image->data;
 	u_int rows, y = image->dy;
 	u8 d;
 
 	for (rows = image->height; rows--; y++) {
 		d = *cdat++;
 		dest = rowaddr(info, y) + (image->dx >> 3);
-		*dest = d;
+		fb_writeb(d, dest);
 	}
 }
 #else /* !CONFIG_FB_HGA_ACCEL */
@@ -570,7 +572,7 @@ int __init hgafb_init(void)
 	fb_info.monspecs.vfmax = 10000;
 	fb_info.monspecs.dpms = 0;
 	fb_info.fbops = &hgafb_ops;
-	fb_info.screen_base = (char *)hga_fix.smem_start;
+	fb_info.screen_base = (char __iomem *)hga_fix.smem_start;
 
         if (register_framebuffer(&fb_info) < 0)
                 return -EINVAL;
