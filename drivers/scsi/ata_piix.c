@@ -16,7 +16,7 @@
     May be copied or modified under the terms of the GNU General Public License
 
  */
-#include <linux/config.h>
+
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/pci.h>
