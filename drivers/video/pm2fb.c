@@ -1186,10 +1186,6 @@ static int __init pm2pci_detect(struct pm2fb_info* p) {
 #endif
 
 	memset(pci, 0, sizeof(struct pm2pci_par));
-	if (!pci_present()) {
-		DPRINTK("no PCI bus found.\n");
-		return 0;
-	}
 	DPRINTK("scanning PCI bus for known chipsets...\n");
 
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
