@@ -83,7 +83,7 @@ typedef struct siginfo32 {
 #ifdef __KERNEL__
 
 typedef struct sigevent32 {
-	sigval_t sigev_value;
+	sigval_t32 sigev_value;
 	int sigev_signo;
 	int sigev_notify;
 	union {
