@@ -14,6 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
+
 #include <asm/io.h>
 #include <asm/sn/types.h>
 #include <asm/sn/sn0/addrs.h>
@@ -21,12 +22,14 @@
 #include <asm/sn/sn0/hubio.h>
 #include <asm/sn/klconfig.h>
 #include <asm/sn/ioc3.h>
+#include <asm/time.h>
 #include <asm/mipsregs.h>
 #include <asm/sn/arch.h>
 #include <asm/sn/sn_private.h>
 #include <asm/pci/bridge.h>
 #include <asm/paccess.h>
 #include <asm/sn/sn0/ip27.h>
+#include <asm/traps.h>
 
 /* Check against user dumbness.  */
 #ifdef CONFIG_VT
@@ -40,7 +43,7 @@
 #define DBG(x...)
 #endif
 
-unsigned long mips_io_port_base = IO_BASE;
+extern void ip27_be_init(void) __init;
 
 /*
  * get_nasid() returns the physical node id number of the caller.
@@ -112,7 +115,7 @@ void __init pcibr_setup(cnodeid_t nid)
 {
 	int 			i, start, num;
 	unsigned long		masterwid;
-	bridge_t 		*bridge; 
+	bridge_t 		*bridge;
 	volatile u64 		hubreg;
 	nasid_t	 		nasid, masternasid;
 	xwidget_part_num_t	partnum;
@@ -122,8 +125,8 @@ void __init pcibr_setup(cnodeid_t nid)
 	/*
 	 * If the master is doing this for headless node, nothing to do.
 	 * This is because currently we require at least one of the hubs
-	 * (master hub) connected to the xbow to have at least one enabled 
-	 * cpu to receive intrs. Else we need an array bus_to_intrnasid[] 
+	 * (master hub) connected to the xbow to have at least one enabled
+	 * cpu to receive intrs. Else we need an array bus_to_intrnasid[]
 	 * that bridge_startup() needs to use to target intrs. All dma is
 	 * routed thru the widget of the master hub. The master hub wid
 	 * is selectable by WIDGET_A below.
@@ -174,8 +177,8 @@ void __init pcibr_setup(cnodeid_t nid)
 			else {
 			   /*
 			    * Okay, here's a xbow. Lets arbitrate and find
-			    * out if we should initialize it. Set enabled 
-			    * hub connected at highest or lowest widget as 
+			    * out if we should initialize it. Set enabled
+			    * hub connected at highest or lowest widget as
 			    * master.
 			    */
 #ifdef WIDGET_A
@@ -213,7 +216,7 @@ void __init pcibr_setup(cnodeid_t nid)
 			}
 		} else if (partnum == XXBOW_WIDGET_PART_NUM) {
 			/*
-			 * found xbridge, assume ibrick for now 
+			 * found xbridge, assume ibrick for now
 			 */
 			printk("...is xbridge\n");
         		bus_to_wid[0] = 0xb;
@@ -261,7 +264,7 @@ void __init pcibr_setup(cnodeid_t nid)
 		bridge->b_wid_control |= BRIDGE_CTRL_MEM_SWAP;
 
 		/*
-		 * Hmm...  IRIX sets additional bits in the address which 
+		 * Hmm...  IRIX sets additional bits in the address which
 		 * are documented as reserved in the bridge docs.
 		 */
 		bridge->b_int_mode = 0x0;		/* Don't clear ints */
@@ -275,6 +278,8 @@ void __init pcibr_setup(cnodeid_t nid)
 }
 
 extern void ip27_setup_console(void);
+extern void ip27_time_init(void);
+extern void ip27_reboot_setup(void);
 
 void __init ip27_setup(void)
 {
@@ -282,6 +287,7 @@ void __init ip27_setup(void)
 	hubreg_t p, e;
 
 	ip27_setup_console();
+	ip27_reboot_setup();
 
 	num_bridges = 0;
 	/*
@@ -307,4 +313,7 @@ void __init ip27_setup(void)
 	ioc3_sio_init();
 	ioc3_eth_init();
 	per_cpu_init();
+
+	mips_io_port_base = IO_BASE;
+	board_time_init = ip27_time_init;
 }

@@ -62,7 +62,7 @@ nmi_cpu_eframe_save(nasid_t nasid,
 	numberof_nmi_cpu_regs = sizeof(struct reg_struct) / sizeof(machreg_t);
 
 	/* Get the pointer to the current cpu's register set. */
-	prom_format = 
+	prom_format =
 	    (machreg_t *)(TO_UNCAC(TO_NODE(nasid, IP27_NMI_KREGS_OFFSET)) +
 			  slice * IP27_NMI_KREGS_CPU_SIZE);
 
@@ -70,7 +70,7 @@ nmi_cpu_eframe_save(nasid_t nasid,
 	for (i = 0; i < numberof_nmi_cpu_regs; i++)
 		printk("0x%lx  ", prom_format[i]);
 	printk("\n\n");
-}	
+}
 
 /*
  * Copy the cpu registers which have been saved in the IP27prom format
@@ -91,7 +91,7 @@ nmi_node_eframe_save(cnodeid_t  cnode)
 		return;
 
 	/* Save the registers into eframe for each cpu */
-	for(cpu = 0; cpu < NODE_NUM_CPUS(cnode); cpu++) 
+	for(cpu = 0; cpu < NODE_NUM_CPUS(cnode); cpu++)
 		nmi_cpu_eframe_save(nasid, cpu);
 }
 
@@ -103,7 +103,7 @@ nmi_eframes_save(void)
 {
 	cnodeid_t	cnode;
 
-	for(cnode = 0 ; cnode < numnodes; cnode++) 
+	for(cnode = 0 ; cnode < numnodes; cnode++)
 		nmi_node_eframe_save(cnode);
 }
 
@@ -115,7 +115,7 @@ cont_nmi_dump(void)
 
 	atomic_inc(&nmied_cpus);
 #endif
-	/* 
+	/*
 	 * Use enter_panic_mode to allow only 1 cpu to proceed
 	 */
 	enter_panic_mode();
@@ -129,7 +129,7 @@ cont_nmi_dump(void)
 	 *	- on 512p SN0 system, the MMSC will only send NMIs to
 	 *	  half the cpus. Unfortunately, we don't know which cpus may be
 	 *	  NMIed - it depends on how the site chooses to configure.
-	 * 
+	 *
 	 * Note: it has been measure that it takes the MMSC up to 2.3 secs to
 	 * send NMIs to all cpus on a 256p system.
 	 */
@@ -145,19 +145,19 @@ cont_nmi_dump(void)
 					cpu = CNODE_TO_CPU_BASE(node);
 					for (n=0; n < CNODE_NUM_CPUS(node); cpu++, n++) {
 						CPUMASK_SETB(nmied_cpus, cpu);
-						/* 
+						/*
 						 * cputonasid, cputoslice
 						 * needs kernel cpuid
 						 */
 						SEND_NMI((cputonasid(cpu)), (cputoslice(cpu)));
 					}
 				}
-					
+
 		}
 		udelay(10000);
 	}
 #else
-	while (atomic_read(&nmied_cpus) != smp_num_cpus);
+	while (atomic_read(&nmied_cpus) != num_online_cpus());
 #endif
 
 	/*

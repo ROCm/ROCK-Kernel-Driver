@@ -142,7 +142,7 @@ pfn_t szmem(pfn_t fpage, pfn_t maxpmem)
 		for (slot = 0; slot < numslots; slot++) {
 			slot_psize = slot_psize_compute(node, slot);
 			if (slot == 0) slot0sz = slot_psize;
-			/* 
+			/*
 			 * We need to refine the hack when we have replicated
 			 * kernel text.
 			 */
@@ -158,7 +158,7 @@ pfn_t szmem(pfn_t fpage, pfn_t maxpmem)
 				continue;
 			}
 			num_pages += slot_psize;
-			slot_psize_cache[node][slot] = 
+			slot_psize_cache[node][slot] =
 					(unsigned short) slot_psize;
 			if (slot_psize)
 				slot_lastfilled_cache[node] = slot;
@@ -201,9 +201,9 @@ void __init prom_meminit(void)
 							<< PAGE_SHIFT));
 		NODE_DATA(node)->bdata = plat_node_bdata + node;
 		slot_freepfn += node_datasz;
-	  	bootmap_size = init_bootmem_node(NODE_DATA(node), slot_freepfn, 
+	  	bootmap_size = init_bootmem_node(NODE_DATA(node), slot_freepfn,
 						slot_firstpfn, slot_lastpfn);
-		free_bootmem_node(NODE_DATA(node), slot_firstpfn << PAGE_SHIFT, 
+		free_bootmem_node(NODE_DATA(node), slot_firstpfn << PAGE_SHIFT,
 				(slot_lastpfn - slot_firstpfn) << PAGE_SHIFT);
 		reserve_bootmem_node(NODE_DATA(node), slot_firstpfn << PAGE_SHIFT,
 		  ((slot_freepfn - slot_firstpfn) << PAGE_SHIFT) + bootmap_size);
@@ -224,7 +224,7 @@ prom_free_prom_memory (void)
 
 #ifdef CONFIG_DISCONTIGMEM
 
-static pfn_t pagenr = 0;
+static pfn_t pagenr;
 
 void __init paging_init(void)
 {
@@ -241,10 +241,10 @@ void __init paging_init(void)
 	memset((void *)invalid_pte_table, 0, sizeof(pte_t) * PTRS_PER_PTE);
 
 	/* This is for vmalloc  */
-	memset((void *)kptbl, 0, PAGE_SIZE << KPTBL_PAGE_ORDER);
+	memset((void *)kptbl, 0, PAGE_SIZE << PGD_ORDER);
 	memset((void *)kpmdtbl, 0, PAGE_SIZE);
-	pgd_set(swapper_pg_dir, kpmdtbl);
-	for (i = 0; i < (1 << KPTBL_PAGE_ORDER); pmd++,i++,pte+=PTRS_PER_PTE)
+	set_pgd(swapper_pg_dir, __pgd(kpmdtbl));
+	for (i = 0; i < (1 << PGD_ORDER); pmd++,i++,pte+=PTRS_PER_PTE)
 		pmd_val(*pmd) = (unsigned long)pte;
 
 	for (node = 0; node < numnodes; node++) {
@@ -252,7 +252,7 @@ void __init paging_init(void)
 		pfn_t end_pfn = node_getmaxclick(node);
 
 		zones_size[ZONE_DMA] = end_pfn + 1 - start_pfn;
-		free_area_init_node(node, NODE_DATA(node), 0, zones_size, 
+		free_area_init_node(node, NODE_DATA(node), 0, zones_size,
 						start_pfn, 0);
 	}
 }
@@ -290,7 +290,7 @@ void __init mem_init(void)
 		pg = NODE_DATA(nid)->node_mem_map + slot_getsize(nid, 0);
 		numslots = node_getlastslot(nid);
 		for (slot = 1; slot <= numslots; slot++) {
-			pslot = NODE_DATA(nid)->node_mem_map + 
+			pslot = NODE_DATA(nid)->node_mem_map +
 			   slot_getbasepfn(nid, slot) - slot_getbasepfn(nid, 0);
 
 			/*

@@ -18,7 +18,7 @@
  * In general, the longer software name should be used when available.
  */
 
-/* 
+/*
  * Slightly friendlier names for some common registers.
  * The hardware definitions follow.
  */
@@ -26,7 +26,7 @@
 #define IIO_WIDGET_STAT		IIO_WSTAT    /* Widget status register */
 #define IIO_WIDGET_CTRL		IIO_WCR	     /* Widget control register */
 #define IIO_WIDGET_TOUT		IIO_WRTO     /* Widget request timeout */
-#define IIO_WIDGET_FLUSH	IIO_WTFR     /* Widget target flush */ 
+#define IIO_WIDGET_FLUSH	IIO_WTFR     /* Widget target flush */
 #define IIO_PROTECT		IIO_ILAPR    /* IO interface protection */
 #define IIO_PROTECT_OVRRD	IIO_ILAPO    /* IO protect override */
 #define IIO_OUTWIDGET_ACCESS	IIO_IOWA     /* Outbound widget access */
@@ -67,7 +67,7 @@
 
 /*
  * The following definitions use the names defined in the IO interface
- * document for ease of reference.  When possible, software should 
+ * document for ease of reference.  When possible, software should
  * generally use the longer but clearer names defined above.
  */
 
@@ -169,7 +169,7 @@
 /*
  * The IO LLP control status register and widget control register
  */
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef union hubii_wid_u {
 	u64	wid_reg_value;
@@ -198,7 +198,7 @@ typedef union hubii_wcr_u {
 } hubii_wcr_t;
 
 #define	iwcr_dir_con	wcr_fields_s.wcr_dir_con
-	    
+
 typedef union hubii_wstat_u {
 	u64      reg_value;
 	struct {
@@ -215,13 +215,13 @@ typedef union hubii_wstat_u {
 	} wstat_fields_s;
 } hubii_wstat_t;
 
-		
+
 typedef union hubii_ilcsr_u {
 	u64	icsr_reg_value;
 	struct {
 		u64 	icsr_rsvd: 	22,	/* unused */
                    	icsr_max_burst:	10,	/* max burst */
-                        icsr_rsvd4:	 6,	/* reserved */	          
+                        icsr_rsvd4:	 6,	/* reserved */
                    	icsr_max_retry:	10,	/* max retry */
                         icsr_rsvd3:	 2,	/* reserved */
                         icsr_lnk_stat:	 2,	/* link status */
@@ -285,23 +285,23 @@ typedef union io_perf_sel {
 
 typedef union io_perf_cnt {
 	u64	perf_cnt;
-	struct { 
+	struct {
 		u64	perf_rsvd1 : 32,
   			        perf_rsvd2 : 12,
   			        perf_cnt   : 20;
 	} perf_cnt_bits;
 } io_perf_cnt_t;
 
-#endif
+#endif /* !__ASSEMBLY__ */
 
 
 #define LNK_STAT_WORKING	0x2
 
 #define IIO_LLP_CB_MAX	0xffff
 #define IIO_LLP_SN_MAX	0xffff
-	    
+
 /* IO PRB Entries */
-#define	IIO_NUM_IPRBS	(9)		
+#define	IIO_NUM_IPRBS	(9)
 #define IIO_IOPRB_0	0x400198	/* PRB entry 0 */
 #define IIO_IOPRB_8	0x4001a0	/* PRB entry 8 */
 #define IIO_IOPRB_9	0x4001a8	/* PRB entry 9 */
@@ -320,7 +320,7 @@ typedef union io_perf_cnt {
 #define IIO_IECLR	0x4001f8	/* IO error clear */
 #define IIO_IBCN        0x400200        /* IO BTE CRB count */
 
-/* 
+/*
  * IIO_IMEM Register fields.
  */
 #define IIO_IMEM_W0ESD  0x1             /* Widget 0 shut down due to error */
@@ -366,7 +366,7 @@ typedef union io_perf_cnt {
 #define IIO_ICMR_CLR_RPPD	(1UL << 13)
 #define IIO_ICMR_CLR_RQPD	(1UL << 12)
 
-/* 
+/*
  * IIO PIO Deallocation register field masks : (IIO_IPDR)
  */
 #define	IIO_IPDR_PND	(1 << 4)
@@ -377,7 +377,7 @@ typedef union io_perf_cnt {
 #define	IIO_ICDR_PND	(1 << 4)
 
 /*
- * IIO CRB control register Fields: IIO_ICCR 
+ * IIO CRB control register Fields: IIO_ICCR
  */
 #define	IIO_ICCR_PENDING	(0x10000)
 #define	IIO_ICCR_CMD_MASK	(0xFF)
@@ -385,7 +385,7 @@ typedef union io_perf_cnt {
 #define	IIO_ICCR_CMD_NOP	(0x0)	/* No Op */
 #define	IIO_ICCR_CMD_WAKE	(0x100) /* Reactivate CRB entry and process */
 #define	IIO_ICCR_CMD_TIMEOUT	(0x200)	/* Make CRB timeout & mark invalid */
-#define	IIO_ICCR_CMD_EJECT	(0x400)	/* Contents of entry written to memory 
+#define	IIO_ICCR_CMD_EJECT	(0x400)	/* Contents of entry written to memory
 					 * via a WB
 					 */
 #define	IIO_ICCR_CMD_FLUSH	(0x800)
@@ -423,15 +423,15 @@ typedef union io_perf_cnt {
  *
  * Many of the fields in CRB are status bits used by hardware
  * for implementation of the protocol. It's very dangerous to
- * mess around with the CRB registers. 
- * 
- * It's OK to read the CRB registers and try to make sense out of the
- * fields in CRB. 
+ * mess around with the CRB registers.
  *
- * Updating CRB requires all activities in Hub IIO to be quiesced. 
+ * It's OK to read the CRB registers and try to make sense out of the
+ * fields in CRB.
+ *
+ * Updating CRB requires all activities in Hub IIO to be quiesced.
  * otherwise, a write to CRB could corrupt other CRB entries.
  * CRBs are here only as a back door peek to hub IIO's status.
- * Quiescing implies  no dmas no PIOs 
+ * Quiescing implies  no dmas no PIOs
  * either directly from the cpu or from sn0net.
  * this is not something that can be done easily. So, AVOID updating
  * CRBs.
@@ -440,7 +440,7 @@ typedef union io_perf_cnt {
 /*
  * Fields in CRB Register A
  */
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef union icrba_u {
 	u64	reg_value;
 	struct {
@@ -465,7 +465,7 @@ typedef union icrba_u {
    NI_STATUS_REV_ID register. */
 typedef union h1_icrba_u {
 	u64	reg_value;
-	
+
 	struct {
 		u64 	resvd: 	6,
 			unused:	1,	/* Unused but RW!!	*/
@@ -500,16 +500,16 @@ typedef union h1_icrba_u {
 #define	a_valid		icrba_fields_s.valid
 #define	a_iow		icrba_fields_s.iow
 
-#endif /* LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 #define	IIO_ICRB_ADDR_SHFT	2	/* Shift to get proper address */
 
 /*
- * values for "ecode" field 
+ * values for "ecode" field
  */
 #define	IIO_ICRB_ECODE_DERR	0	/* Directory error due to IIO access */
 #define	IIO_ICRB_ECODE_PERR	1	/* Poison error on IO access */
-#define	IIO_ICRB_ECODE_WERR	2	/* Write error by IIO access 
+#define	IIO_ICRB_ECODE_WERR	2	/* Write error by IIO access
 					 * e.g. WINV to a Read only line.
 					 */
 #define	IIO_ICRB_ECODE_AERR	3	/* Access error caused by IIO access */
@@ -523,7 +523,7 @@ typedef union h1_icrba_u {
 /*
  * Fields in CRB Register B
  */
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef union icrbb_u {
 	u64	reg_value;
 	struct {
@@ -537,15 +537,15 @@ typedef union icrbb_u {
 				 * 3: Reserved.
 				 */
 		srcnode: 9,	/* Source Node ID		*/
-		srcinit: 2,	/* Source Initiator: 
+		srcinit: 2,	/* Source Initiator:
 				 * See below for field values.
 				 */
 		useold:	1,	/* Use OLD command for processing */
 		imsgtype: 2,	/* Incoming message type
-				 * see below for field values 
+				 * see below for field values
 				 */
 		imsg: 	8,	/* Incoming message 	*/
-		initator: 3,	/* Initiator of original request 
+		initator: 3,	/* Initiator of original request
 				 * See below for field values.
 				 */
 		reqtype: 5,	/* Identifies type of request
@@ -579,18 +579,18 @@ typedef union h1_icrbb_u {
 					 * 3: Reserved.
 					 */
 			srcnode: 9,	/* Source Node ID		*/
-			srcinit: 2,	/* Source Initiator: 
+			srcinit: 2,	/* Source Initiator:
 					 * See below for field values.
 					 */
 			useold:	1,	/* Use OLD command for processing */
 			imsgtype: 2,	/* Incoming message type
-					 * see below for field values 
+					 * see below for field values
 					 */
 			imsg: 	8,	/* Incoming message 	*/
-			initator: 3,	/* Initiator of original request 
+			initator: 3,	/* Initiator of original request
 					 * See below for field values.
 					 */
-			rsvd2: 	1,	
+			rsvd2: 	1,
 			pcache: 1,	/* entry belongs to partial cache */
 			reqtype: 5,	/* Identifies type of request
 					 * See below for field values.
@@ -622,7 +622,7 @@ typedef union h1_icrbb_u {
 #define	b_imsg		icrbb_field_s.imsg
 #define	b_initiator	icrbb_field_s.initiator
 
-#endif /* LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /*
  * values for field xtsize
@@ -676,11 +676,11 @@ typedef union h1_icrbb_u {
 #define	IIO_ICRB_REQ_WB		16	/* Request is Write back	*/
 #define	IIO_ICRB_REQ_DEX	17	/* Retained DEX Cache line	*/
 
-/* 
- * Fields in CRB Register C 
+/*
+ * Fields in CRB Register C
  */
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef union icrbc_s {
 	u64	reg_value;
@@ -690,7 +690,7 @@ typedef union icrbc_s {
 			pricnt: 4,	/* Priority count sent with Read req */
 			pripsc: 4,	/* Priority Pre scalar 	*/
 			bteop:	1,	/* BTE Operation 	*/
-			push_be: 34,	/* Push address Byte enable 
+			push_be: 34,	/* Push address Byte enable
 					 * Holds push addr, if CRB is for BTE
 					 * If CRB belongs to Partial cache,
 					 * this contains byte enables bits
@@ -712,20 +712,20 @@ typedef union icrbc_s {
 #define	c_barrop	icrbc_field_s.barrop
 #define	c_doresp	icrbc_field_s.doresp
 #define	c_gbr	icrbc_field_s.gbr
-#endif /* LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /*
  * Fields in CRB Register D
  */
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef union icrbd_s {
 	u64	reg_value;
 	struct {
 	    u64	rsvd:	38,
 		toutvld: 1,	/* Timeout in progress for this CRB */
 		ctxtvld: 1,	/* Context field below is valid	*/
-		rsvd2:	1,	
+		rsvd2:	1,
 		context: 15, 	/* Bit vector:
 				 * Has a bit set for each CRB entry
 				 * which needs to be deallocated
@@ -751,7 +751,7 @@ typedef union hubii_ifdr_u {
 	} hi_ifdr_fields;
 } hubii_ifdr_t;
 
-#endif /* LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /*
  * Hardware designed names for the BTE control registers.
@@ -762,7 +762,7 @@ typedef union hubii_ifdr_u {
 #define IIO_IBCT_0	0x410018	/* BTE control/terminate 0 */
 #define IIO_IBNA_0	0x410020	/* BTE notification address 0 */
 #define IIO_IBNR_0	IIO_IBNA_0
-#define IIO_IBIA_0	0x410028	/* BTE interrupt address 0 */	
+#define IIO_IBIA_0	0x410028	/* BTE interrupt address 0 */
 
 #define IIO_IBLS_1	0x420000	/* BTE length/status 1 */
 #define IIO_IBSA_1	0x420008	/* BTE source address 1 */
@@ -770,7 +770,7 @@ typedef union hubii_ifdr_u {
 #define IIO_IBCT_1	0x420018	/* BTE control/terminate 1 */
 #define IIO_IBNA_1	0x420020	/* BTE notification address 1 */
 #define IIO_IBNR_1	IIO_IBNA_1
-#define IIO_IBIA_1	0x420028	/* BTE interrupt address 1 */	
+#define IIO_IBIA_1	0x420028	/* BTE interrupt address 1 */
 
 /*
  * More miscellaneous registers
@@ -795,10 +795,10 @@ typedef union hubii_ifdr_u {
 #define IECLR_PRB_0		(1 << 0)   /* clear err bit in PRB_0 reg */
 
 /*
- * IO PIO Read Table Entry format 
+ * IO PIO Read Table Entry format
  */
 
-#ifdef	_LANGUAGE_C
+#ifndef __ASSEMBLY__
 
 typedef union iprte_a {
 	u64	entry;
@@ -820,7 +820,7 @@ typedef union iprte_a {
 #define	iprte_init	iprte_fields.initiator
 #define	iprte_addr	iprte_fields.addr
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 #define	IPRTE_ADDRSHFT	3
 
@@ -828,9 +828,9 @@ typedef union iprte_a {
  * Hub IIO PRB Register format.
  */
 
-#ifdef	_LANGUAGE_C
+#ifndef __ASSEMBLY__
 /*
- * Note: Fields bnakctr, anakctr, xtalkctrmode, ovflow fields are 
+ * Note: Fields bnakctr, anakctr, xtalkctrmode, ovflow fields are
  * "Status" fields, and should only be used in case of clean up after errors.
  */
 
@@ -860,7 +860,7 @@ typedef union iprb_u {
 #define	iprb_anakctr	iprb_fields_s.anakctr
 #define	iprb_xtalkctr	iprb_fields_s.xtalkctr
 
-#endif	/* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /*
  * values for mode field in iprb_t.
@@ -875,7 +875,7 @@ typedef union iprb_u {
 /*
  * IO CRB entry C_A to E_A : Partial (cache) CRBS
  */
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef union icrbp_a {
 	u64   ip_reg;	    /* the entire register value	*/
 	struct {
@@ -909,7 +909,7 @@ typedef union icrbp_a {
 	} ip_fmt;
 } icrbp_a_t;
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 /*
  * A couple of defines to go with the above structure.
@@ -917,7 +917,7 @@ typedef union icrbp_a {
 #define ICRBP_A_CERR_SHFT	54
 #define ICRBP_A_ERR_MASK	0x3ff
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef union hubii_idsr {
 	u64 iin_reg;
 	struct {
@@ -931,9 +931,9 @@ typedef union hubii_idsr {
 	            level : 7;
 	} iin_fmt;
 } hubii_idsr_t;
-#endif /* LANGUAGE_C */
-	
-/* 
+#endif /* !__ASSEMBLY__ */
+
+/*
  * IO BTE Length/Status (IIO_IBLS) register bit field definitions
  */
 #define IBLS_BUSY		(0x1 << 20)
@@ -965,18 +965,18 @@ typedef union hubii_idsr {
 #define HUB_WIDGET_ID_MIN	0x8
 #define HUB_WIDGET_ID_MAX	0xf
 
-#define HUB_WIDGET_PART_NUM	0xc101	
+#define HUB_WIDGET_PART_NUM	0xc101
 #define MAX_HUBS_PER_XBOW	2
 
-/* 
- * Get a hub's widget id from widget control register 
+/*
+ * Get a hub's widget id from widget control register
  */
-#define IIO_WCR_WID_GET(nasid)	(REMOTE_HUB_L(nasid, III_WCR) & 0xf) 
+#define IIO_WCR_WID_GET(nasid)	(REMOTE_HUB_L(nasid, III_WCR) & 0xf)
 #define IIO_WST_ERROR_MASK	(UINT64_CAST 1 << 32) /* Widget status error */
 
 /*
  * Number of credits Hub widget has while sending req/response to
- * xbow. 
+ * xbow.
  * Value of 3 is required by Xbow 1.1
  * We may be able to increase this to 4 with Xbow 1.2.
  */

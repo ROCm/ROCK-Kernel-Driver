@@ -13,6 +13,7 @@
 #include <linux/sched.h>
 #include <linux/mmzone.h>	/* for numnodes */
 #include <linux/mm.h>
+#include <asm/cpu.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/sn/types.h>
@@ -28,6 +29,7 @@
 #include <asm/smp.h>
 #include <asm/processor.h>
 #include <asm/mmu_context.h>
+#include <asm/thread_info.h>
 #include <asm/sn/launch.h>
 #include <asm/sn/sn_private.h>
 #include <asm/sn/sn0/ip27.h>
@@ -45,8 +47,8 @@
 #define CNODEMASK_SETB(p, bit)	((p) |= 1ULL << (bit))
 
 cpumask_t	boot_cpumask;
-hubreg_t	region_mask = 0;
-static int	fine_mode = 0;
+hubreg_t	region_mask;
+static int	fine_mode;
 int		maxcpus;
 static spinlock_t hub_mask_lock = SPIN_LOCK_UNLOCKED;
 static cnodemask_t hub_init_mask;
@@ -103,7 +105,7 @@ nasid_t get_actual_nasid(lboard_t *brd)
 /* Tweak this for maximum number of CPUs to activate */
 static int max_cpus = NR_CPUS;
 
-int do_cpumask(cnodeid_t cnode, nasid_t nasid, cpumask_t *boot_cpumask, 
+int do_cpumask(cnodeid_t cnode, nasid_t nasid, cpumask_t *boot_cpumask,
 							int *highest)
 {
 	static int tot_cpus_found = 0;
@@ -130,7 +132,7 @@ int do_cpumask(cnodeid_t cnode, nasid_t nasid, cpumask_t *boot_cpumask,
 				cpus_found++;
 				tot_cpus_found++;
 			}
-			acpu = (klcpu_t *)find_component(brd, (klinfo_t *)acpu, 
+			acpu = (klcpu_t *)find_component(brd, (klinfo_t *)acpu,
 								KLSTRUCT_CPU);
 		}
 		brd = KLCF_NEXT(brd);
@@ -176,17 +178,17 @@ cpuid_t cpu_node_probe(cpumask_t *boot_cpumask, int *numnodes)
 	 * cpus are not numbered.
 	 */
 
-	return(highest + 1);
+	return highest + 1;
 }
 
 int cpu_enabled(cpuid_t cpu)
 {
 	if (cpu == CPU_NONE)
 		return 0;
-	return (CPUMASK_TSTB(boot_cpumask, cpu) != 0);
+	return CPUMASK_TSTB(boot_cpumask, cpu) != 0;
 }
 
-void mlreset (void)
+void mlreset(void)
 {
 	int i;
 	void init_topology_matrix(void);
@@ -257,7 +259,7 @@ void intr_clear_bits(nasid_t nasid, volatile hubreg_t *pend, int base_level,
 			if (bits & (1 << i))
 				LOCAL_HUB_CLR_INTR(base_level + i);
 }
-	
+
 void intr_clear_all(nasid_t nasid)
 {
 	REMOTE_HUB_S(nasid, PI_INT_MASK0_A, 0);
@@ -313,10 +315,10 @@ void per_hub_init(cnodeid_t cnode)
 		REMOTE_HUB_S(nasid, IIO_ICTP, 0x800);
 		REMOTE_HUB_S(nasid, IIO_ICTO, 0xff);
 		hub_rtc_init(cnode);
-		pcibr_setup(cnode); 
+		pcibr_setup(cnode);
 #ifdef CONFIG_REPLICATE_EXHANDLERS
 		/*
-		 * If this is not a headless node initialization, 
+		 * If this is not a headless node initialization,
 		 * copy over the caliased exception handlers.
 		 */
 		if (get_compact_nodeid() == cnode) {
@@ -332,8 +334,7 @@ void per_hub_init(cnodeid_t cnode)
 			memcpy((void *)(KSEG0 + 0x100), (void *) KSEG0, 0x80);
 			memcpy((void *)(KSEG0 + 0x180), &except_vec3_generic,
 								0x100);
-			flush_cache_l1();
-			flush_cache_l2();
+			__flush_cache_all();
 		}
 #endif
 	}
@@ -359,12 +360,11 @@ void per_cpu_init(void)
 	int cpu = smp_processor_id();
 	cnodeid_t cnode = get_compact_nodeid();
 
-	current_cpu_data.asid_cache = ASID_FIRST_VERSION;
 	TLBMISS_HANDLER_SETUP();
 #if 0
 	intr_init();
 #endif
-	set_cp0_status(ST0_IM, 0);
+	clear_c0_status(ST0_IM);
 	per_hub_init(cnode);
 	cpu_time_init();
 	if (smp_processor_id())	/* master can't do this early, no kmalloc */
@@ -374,13 +374,13 @@ void per_cpu_init(void)
 #if 0
 	install_tlbintr(cpu);
 #endif
-	set_cp0_status(SRB_DEV0 | SRB_DEV1, SRB_DEV0 | SRB_DEV1);
+	set_c0_status(SRB_DEV0 | SRB_DEV1);
 	if (is_slave) {
-		set_cp0_status(ST0_BEV, 0);
-		if (mips4_available)
-			set_cp0_status(ST0_XX, ST0_XX);
-		set_cp0_status(ST0_KX|ST0_SX|ST0_UX, ST0_KX|ST0_SX|ST0_UX);
-		sti();
+		clear_c0_status(ST0_BEV);
+		if (current_cpu_data.isa_level == MIPS_CPU_ISA_IV)
+			set_c0_status(ST0_XX);
+		set_c0_status(ST0_KX|ST0_SX|ST0_UX);
+		local_irq_enable();
 		load_mmu();
 		atomic_inc(&numstarted);
 	} else {
@@ -420,47 +420,91 @@ static void alloc_cpupda(cpuid_t cpu, int cpunum)
 	cpu_data[cpunum].p_cpuid = cpu;
 }
 
-void __init smp_callin(void)
+static struct task_struct * __init fork_by_hand(void)
 {
-#if 0
-	calibrate_delay();
-	smp_store_cpu_info(cpuid);
-#endif
+	struct pt_regs regs;
+	/*
+	 * don't care about the eip and regs settings since
+	 * we'll never reschedule the forked task.
+	 */
+	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
 }
 
-int __init start_secondary(void)
+static int __init do_boot_cpu(int cpu, int num_cpus)
 {
-	extern int cpu_idle(void);
-	extern atomic_t smp_commenced;
+	extern void smp_bootstrap(void);
+	cpuid_t mycpuid = getcpuid();
+	struct task_struct *idle;
 
-	smp_callin();
-	while (!atomic_read(&smp_commenced));
-	return cpu_idle();
+	if (cpu == mycpuid) {
+		alloc_cpupda(cpu, num_cpus);
+		return 1;
+	}
+
+	/* Skip holes in CPU space */
+	if (!CPUMASK_TSTB(boot_cpumask, cpu))
+		return 0;
+
+	/*
+	 * The following code is purely to make sure
+	 * Linux can schedule processes on this slave.
+	 */
+	idle = fork_by_hand();
+	if (IS_ERR(idle))
+		panic("failed fork for CPU %d", cpu);
+
+	/*
+	 * We remove it from the pidhash and the runqueue
+	 * once we got the process:
+	 */
+	init_idle(idle, cpu);
+
+	alloc_cpupda(cpu, num_cpus);
+
+	unhash_process(idle);
+
+	/*
+ 	 * Launch a slave into smp_bootstrap().  It doesn't take an
+	 * argument, and we set sp to the kernel stack of the newly
+	 * created idle process, gp to the proc struct so that
+	 * current_thread_info() will work.
+ 	 */
+	LAUNCH_SLAVE(cputonasid(num_cpus),cputoslice(num_cpus),
+		(launch_proc_t)MAPPED_KERN_RW_TO_K0(smp_bootstrap),
+		0, (void *)((unsigned long)idle->thread_info +
+		KERNEL_STACK_SIZE - 32), (void *)idle);
+
+	/*
+	 * Now optimistically set the mapping arrays. We
+	 * need to wait here, verify the cpu booted up, then
+	 * fire up the next cpu.
+	 */
+	__cpu_number_map[cpu] = num_cpus;
+	__cpu_logical_map[num_cpus] = cpu;
+	CPUMASK_SETB(cpu_online_map, cpu);
+
+	/*
+	 * Wait this cpu to start up and initialize its hub,
+	 * and discover the io devices it will control.
+	 *
+	 * XXX: We really want to fire up launch all the CPUs
+	 * at once.  We have to preserve the order of the
+	 * devices on the bridges first though.
+	 */
+	while (atomic_read(&numstarted) != num_cpus);
+
+	return 1;
 }
 
-static volatile cpumask_t boot_barrier;
-
-void cboot(void)
-{
-	CPUMASK_CLRB(boot_barrier, getcpuid());	/* needs atomicity */
-	per_cpu_init();
-#if 0
-	ecc_init();
-	bte_lateinit();
-	init_mfhi_war();
-#endif
-	_flush_tlb_all();
-	flush_cache_l1();
-	flush_cache_l2();
-	start_secondary();
-}
-
-void allowboot(void)
+void __init smp_boot_cpus(void)
 {
 	int		num_cpus = 0;
-	cpuid_t		cpu, mycpuid = getcpuid();
+	cpuid_t		cpu;
 	cnodeid_t	cnode;
-	extern void	bootstrap(void);
+
+	init_new_context(current, &init_mm);
+	current_thread_info()->cpu = 0;
+	smp_tune_scheduling();
 
 	sn_mp_setup();
 	/* Master has already done per_cpu_init() */
@@ -471,70 +515,10 @@ void allowboot(void)
 #endif
 
 	replicate_kernel_text(numnodes);
-	boot_barrier = boot_cpumask;
 	/* Launch slaves. */
 	for (cpu = 0; cpu < maxcpus; cpu++) {
-		if (cpu == mycpuid) {
-			alloc_cpupda(cpu, num_cpus);
-			num_cpus++;
-			/* We're already started, clear our bit */
-			CPUMASK_CLRB(boot_barrier, cpu);
-			continue;
-		}
-
-		/* Skip holes in CPU space */
-		if (CPUMASK_TSTB(boot_cpumask, cpu)) {
-			struct task_struct *p;
-
-			/*
-			 * The following code is purely to make sure
-			 * Linux can schedule processes on this slave.
-			 */
-			kernel_thread(0, NULL, CLONE_IDLETASK);
-			p = prev_task(&init_task);
-			sprintf(p->comm, "%s%d", "Idle", num_cpus);
-			init_tasks[num_cpus] = p;
-			alloc_cpupda(cpu, num_cpus);
-			del_from_runqueue(p);
-			p->processor = num_cpus;
-			p->cpus_runnable = 1 << num_cpus; /* we schedule the first task manually */
-			unhash_process(p);
-			/* Attach to the address space of init_task. */
-			atomic_inc(&init_mm.mm_count);
-			p->active_mm = &init_mm;
-			
-			/*
-		 	 * Launch a slave into bootstrap().
-		 	 * It doesn't take an argument, and we
-			 * set sp to the kernel stack of the newly 
-			 * created idle process, gp to the proc struct
-			 * (so that current-> works).
-		 	 */
-			LAUNCH_SLAVE(cputonasid(num_cpus),cputoslice(num_cpus), 
-				(launch_proc_t)MAPPED_KERN_RW_TO_K0(bootstrap),
-				0, (void *)((unsigned long)p + 
-				KERNEL_STACK_SIZE - 32), (void *)p);
-
-			/*
-			 * Now optimistically set the mapping arrays. We
-			 * need to wait here, verify the cpu booted up, then
-			 * fire up the next cpu.
-			 */
-			__cpu_number_map[cpu] = num_cpus;
-			__cpu_logical_map[num_cpus] = cpu;
-			num_cpus++;
-			/*
-			 * Wait this cpu to start up and initialize its hub,
-			 * and discover the io devices it will control.
-			 * 
-			 * XXX: We really want to fire up launch all the CPUs
-			 * at once.  We have to preserve the order of the
-			 * devices on the bridges first though.
-			 */
-			while(atomic_read(&numstarted) != num_cpus);
-		}
+		num_cpus += do_boot_cpu(cpu, num_cpus);
 	}
-
 
 #ifdef LATER
 	Wait logic goes here.
@@ -551,18 +535,19 @@ void allowboot(void)
 	cpu_io_setup();
 	init_mfhi_war();
 #endif
-	smp_num_cpus = num_cpus;
 }
 
 #else /* CONFIG_SMP */
-void cboot(void) {}
+void __init start_secondary(void)
+{
+	/* XXX Why do we need this empty definition at all?  */
+}
 #endif /* CONFIG_SMP */
 
 
 #define	rou_rflag	rou_flags
 
-void
-router_recurse(klrou_t *router_a, klrou_t *router_b, int depth)
+void router_recurse(klrou_t *router_a, klrou_t *router_b, int depth)
 {
 	klrou_t *router;
 	lboard_t *brd;
@@ -598,8 +583,7 @@ router_recurse(klrou_t *router_a, klrou_t *router_b, int depth)
 	router_a->rou_rflag = 0;
 }
 
-int
-node_distance(nasid_t nasid_a, nasid_t nasid_b)
+int node_distance(nasid_t nasid_a, nasid_t nasid_b)
 {
 	nasid_t nasid;
 	cnodeid_t cnode;
@@ -641,7 +625,7 @@ node_distance(nasid_t nasid_a, nasid_t nasid_b)
 						router_b = router;
 				}
 			}
-			
+
 		} while ( (brd = find_lboard_class(KLCF_NEXT(brd), KLTYPE_ROUTER)) );
 	}
 
@@ -666,8 +650,7 @@ node_distance(nasid_t nasid_a, nasid_t nasid_b)
 	return router_distance;
 }
 
-void
-init_topology_matrix(void)
+void init_topology_matrix(void)
 {
 	nasid_t nasid, nasid2;
 	cnodeid_t row, col;
@@ -685,8 +668,7 @@ init_topology_matrix(void)
 	}
 }
 
-void
-dump_topology(void)
+void dump_topology(void)
 {
 	nasid_t nasid;
 	cnodeid_t cnode;
@@ -742,7 +724,7 @@ dump_topology(void)
 					printk(" r");
 			}
 			printk("\n");
-			
+
 		} while ( (brd = find_lboard_class(KLCF_NEXT(brd), KLTYPE_ROUTER)) );
 	}
 }
@@ -758,7 +740,7 @@ dump_klcfg(void)
 	nasid_t         nasid;
 	lboard_t        *lbptr;
 	gda_t           *gdap;
-	
+
 	gdap = (gda_t *)GDA_ADDR(get_nasid());
 	if (gdap->g_magic != GDA_MAGIC) {
 		printk("dumpklcfg_cmd: Invalid GDA MAGIC\n");
@@ -772,24 +754,24 @@ dump_klcfg(void)
 			continue;
 
 		printk("\nDumpping klconfig Nasid %d:\n", nasid);
-	
+
 		lbptr = KL_CONFIG_INFO(nasid);
 
 		while (lbptr) {
 			printk("    %s, Nasid %d, Module %d, widget 0x%x, partition %d, NIC 0x%x lboard 0x%lx",
 				"board name here", /* BOARD_NAME(lbptr->brd_type), */
-				lbptr->brd_nasid, lbptr->brd_module, 
+				lbptr->brd_nasid, lbptr->brd_module,
 				lbptr->brd_widgetnum,
-				lbptr->brd_partition, 
+				lbptr->brd_partition,
 				(lbptr->brd_nic), lbptr);
 			if (lbptr->brd_flags & DUPLICATE_BOARD)
 				printk(" -D");
 			printk("\n");
 			for (i = 0; i < lbptr->brd_numcompts; i++) {
 				klinfo_t *kli;
-				kli = NODE_OFFSET_TO_KLINFO(NASID_GET(lbptr), lbptr->brd_compts[i]);                       
-				printk("        type %2d, flags 0x%04x, diagval %3d, physid %4d, virtid %2d: %s\n", 
-					kli->struct_type, 
+				kli = NODE_OFFSET_TO_KLINFO(NASID_GET(lbptr), lbptr->brd_compts[i]);
+				printk("        type %2d, flags 0x%04x, diagval %3d, physid %4d, virtid %2d: %s\n",
+					kli->struct_type,
 					kli->flags,
 					kli->diagval,
 					kli->physid,
@@ -814,7 +796,7 @@ dump_klcfg(void)
         	lbptr = KL_CONFIG_INFO(nasid);
 
         	while (lbptr) {
-			
+
 			lbptr = find_lboard_class(lbptr, KLCLASS_ROUTER);
 			if(!lbptr)
 				break;
@@ -837,4 +819,3 @@ dump_klcfg(void)
 	dump_topology();
 }
 #endif
-

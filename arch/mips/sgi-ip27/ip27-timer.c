@@ -2,6 +2,7 @@
  * Copytight (C) 1999, 2000 Ralf Baechle (ralf@gnu.org)
  * Copytight (C) 1999, 2000 Silicon Graphics, Inc.
  */
+#include <linux/bcd.h>
 #include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -11,9 +12,10 @@
 #include <linux/param.h>
 #include <linux/time.h>
 #include <linux/timex.h>
-#include <linux/mm.h>		
-#include <linux/bcd.h>		
+#include <linux/mm.h>
+#include <linux/bcd.h>
 
+#include <asm/time.h>
 #include <asm/pgtable.h>
 #include <asm/sgialib.h>
 #include <asm/sn/ioc3.h>
@@ -27,16 +29,17 @@
 
 /*
  * This is a hack; we really need to figure these values out dynamically
- * 
+ *
  * Since 800 ns works very well with various HUB frequencies, such as
  * 360, 380, 390 and 400 MHZ, we use 800 ns rtc cycle time.
  *
  * Ralf: which clock rate is used to feed the counter?
  */
 #define NSEC_PER_CYCLE		800
-#define NSEC_PER_SEC		1000000000
 #define CYCLES_PER_SEC		(NSEC_PER_SEC/NSEC_PER_CYCLE)
 #define CYCLES_PER_JIFFY	(CYCLES_PER_SEC/HZ)
+
+#define TICK_SIZE (tick_nsec / 1000)
 
 static unsigned long ct_cur[NR_CPUS];	/* What counter should be at next timer irq */
 static long last_rtc_update;		/* Last time the rtc clock got updated */
@@ -52,12 +55,11 @@ static int set_rtc_mmss(unsigned long nowtime)
 	nasid_t nid;
 
 	nid = get_nasid();
-	rtc = (struct m48t35_rtc *)(KL_CONFIG_CH_CONS_INFO(nid)->memory_base + 
+	rtc = (struct m48t35_rtc *)(KL_CONFIG_CH_CONS_INFO(nid)->memory_base +
 							IOC3_BYTEBUS_DEV0);
 
 	rtc->control |= M48T35_RTC_READ;
-	cmos_minutes = rtc->min;
-	BCD_TO_BIN(cmos_minutes);
+	cmos_minutes = BCD2BIN(rtc->min);
 	rtc->control &= ~M48T35_RTC_READ;
 
 	/*
@@ -72,8 +74,8 @@ static int set_rtc_mmss(unsigned long nowtime)
 	real_minutes %= 60;
 
 	if (abs(real_minutes - cmos_minutes) < 30) {
-		BIN_TO_BCD(real_seconds);
-		BIN_TO_BCD(real_minutes);
+		real_seconds = BIN2BCD(real_seconds);
+		real_minutes = BIN2BCD(real_minutes);
 		rtc->control |= M48T35_RTC_SET;
 		rtc->sec = real_seconds;
 		rtc->min = real_minutes;
@@ -92,8 +94,9 @@ void rt_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	int cpuA = ((cputoslice(cpu)) == 0);
-	int irq = 7;				/* XXX Assign number */
+	int irq = 9;				/* XXX Assign number */
 
+	irq_enter();
 	write_seqlock(&xtime_lock);
 
 again:
@@ -110,99 +113,38 @@ again:
 		do_timer(regs);
 
 #ifdef CONFIG_SMP
-	{
-		int user = user_mode(regs);
-
-		/*
-		 * update_process_times() expects us to have done irq_enter().
-		 * Besides, if we don't timer interrupts ignore the global
-		 * interrupt lock, which is the WrongThing (tm) to do.
-		 * Picked from i386 code.
-		 */
-		irq_enter(cpu, 0);
-		update_process_times(user);
-		irq_exit(cpu, 0);
-	}
+	update_process_times(user_mode(regs));
 #endif /* CONFIG_SMP */
-	
+
 	/*
 	 * If we have an externally synchronized Linux clock, then update
 	 * RTC clock accordingly every ~11 minutes. Set_rtc_mmss() has to be
 	 * called as close as possible to when a second starts.
 	 */
 	if ((time_status & STA_UNSYNC) == 0 &&
-	    xtime.tv_sec > last_rtc_update + 660) {
-		if (xtime.tv_usec >= 1000000 - ((unsigned) tick) / 2) {
-			if (set_rtc_mmss(xtime.tv_sec + 1) == 0)
-				last_rtc_update = xtime.tv_sec;
-			else    
-				last_rtc_update = xtime.tv_sec - 600;
-		} else if (xtime.tv_usec <= ((unsigned) tick) / 2) {
-			if (set_rtc_mmss(xtime.tv_sec) == 0)
-				last_rtc_update = xtime.tv_sec;
-			else    
-				last_rtc_update = xtime.tv_sec - 600;
+	    xtime.tv_sec > last_rtc_update + 660 &&
+	    (xtime.tv_nsec / 1000) >= 500000 - ((unsigned) TICK_SIZE) / 2 &&
+	    (xtime.tv_nsec / 1000) <= 500000 + ((unsigned) TICK_SIZE) / 2) {
+		if (rtc_set_time(xtime.tv_sec) == 0) {
+			last_rtc_update = xtime.tv_sec;
+		} else {
+			last_rtc_update = xtime.tv_sec - 600;
+			/* do it again in 60 s */
 		}
-        }
+	}
 
 	write_sequnlock(&xtime_lock);
+	irq_exit();
 
 	if (softirq_pending(cpu))
 		do_softirq();
 }
 
-unsigned long inline do_gettimeoffset(void)
+unsigned long ip27_do_gettimeoffset(void)
 {
 	unsigned long ct_cur1;
 	ct_cur1 = REMOTE_HUB_L(cputonasid(0), PI_RT_COUNT) + CYCLES_PER_JIFFY;
 	return (ct_cur1 - ct_cur[0]) * NSEC_PER_CYCLE / 1000;
-}
-
-void do_gettimeofday(struct timeval *tv)
-{
-	unsigned long flags;
-	unsigned long usec, sec;
-	unsigned long seq;
-
-	do {
-		seq = read_seqbegin_irqsave(&xtime_lock, flags);
-
-		usec = do_gettimeoffset();
-		{
-			unsigned long lost = jiffies - wall_jiffies;
-			if (lost)
-				usec += lost * (1000000 / HZ);
-		}
-		sec = xtime.tv_sec;
-		usec += xtime.tv_usec;
-	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
-
-	while (usec >= 1000000) {
-		usec -= 1000000;
-		sec++;
-	}
-
-	tv->tv_sec = sec;
-	tv->tv_usec = usec;
-}
-
-void do_settimeofday(struct timeval *tv)
-{
-	write_seqlock_irq(&xtime_lock);
-	tv->tv_usec -= do_gettimeoffset();
-	tv->tv_usec -= (jiffies - wall_jiffies) * (1000000 / HZ);
-
-	while (tv->tv_usec < 0) {
-		tv->tv_usec += 1000000;
-		tv->tv_sec--;
-	}
-
-	xtime = *tv;
-	time_adjust = 0;		/* stop active adjtime() */
-	time_status |= STA_UNSYNC;
-	time_maxerror = NTP_PHASE_LIMIT;
-	time_esterror = NTP_PHASE_LIMIT;
-	write_sequnlock_irq(&xtime_lock);
 }
 
 /* Includes for ioc3_init().  */
@@ -219,7 +161,7 @@ static __init unsigned long get_m48t35_time(void)
 	nasid_t nid;
 
 	nid = get_nasid();
-	rtc = (struct m48t35_rtc *)(KL_CONFIG_CH_CONS_INFO(nid)->memory_base + 
+	rtc = (struct m48t35_rtc *)(KL_CONFIG_CH_CONS_INFO(nid)->memory_base +
 							IOC3_BYTEBUS_DEV0);
 
 	rtc->control |= M48T35_RTC_READ;
@@ -231,22 +173,24 @@ static __init unsigned long get_m48t35_time(void)
 	year = rtc->year;
 	rtc->control &= ~M48T35_RTC_READ;
 
-        BCD_TO_BIN(sec);
-        BCD_TO_BIN(min);
-        BCD_TO_BIN(hour);
-        BCD_TO_BIN(date);
-        BCD_TO_BIN(month);
-        BCD_TO_BIN(year);
+        sec = BCD2BIN(sec);
+        min = BCD2BIN(min);
+        hour = BCD2BIN(hour);
+        date = BCD2BIN(date);
+        month = BCD2BIN(month);
+        year = BCD2BIN(year);
 
         year += 1970;
 
         return mktime(year, month, date, hour, min, sec);
 }
 
-void __init time_init(void)
+void __init ip27_time_init(void)
 {
 	xtime.tv_sec = get_m48t35_time();
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
+
+	do_gettimeoffset = ip27_do_gettimeoffset;
 }
 
 void __init cpu_time_init(void)
@@ -267,7 +211,7 @@ void __init cpu_time_init(void)
 
 	printk("CPU %d clock is %dMHz.\n", smp_processor_id(), cpu->cpu_speed);
 
-	set_cp0_status(SRB_TIMOCLK, SRB_TIMOCLK);
+	set_c0_status(SRB_TIMOCLK);
 }
 
 void __init hub_rtc_init(cnodeid_t cnode)

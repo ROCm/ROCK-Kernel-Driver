@@ -9,7 +9,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/param.h>
 #include <linux/timex.h>
-#include <linux/mm.h>		
+#include <linux/mm.h>
 
 #include <asm/sn/klconfig.h>
 #include <asm/sn/arch.h>
@@ -92,7 +92,7 @@ klcpu_t * nasid_slice_to_cpuinfo(nasid_t nasid, int slice)
 	do {
 		if ((acpu->cpu_info.physid) == slice)
 			return acpu;
-	} while ((acpu = (klcpu_t *)find_component(brd, (klinfo_t *)acpu, 
+	} while ((acpu = (klcpu_t *)find_component(brd, (klinfo_t *)acpu,
 								KLSTRUCT_CPU)));
 	return (klcpu_t *)NULL;
 }

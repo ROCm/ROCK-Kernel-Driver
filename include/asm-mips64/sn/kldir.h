@@ -127,14 +127,14 @@
  * 0x0   (0K)              +-----------------------------------------+
  */
 
-#ifdef LANGUAGE_ASSEMBLY
+#ifdef __ASSEMBLY__
 #define KLDIR_OFF_MAGIC			0x00
 #define KLDIR_OFF_OFFSET		0x08
 #define KLDIR_OFF_POINTER		0x10
 #define KLDIR_OFF_SIZE			0x18
 #define KLDIR_OFF_COUNT			0x20
 #define KLDIR_OFF_STRIDE		0x28
-#endif /* LANGUAGE_ASSEMBLY */
+#endif /* __ASSEMBLY__ */
 
 #if !defined(CONFIG_SGI_IO)
 
@@ -199,7 +199,7 @@
 #define IP27_NMI_KREGS_OFFSET		0x11400
 #define IP27_NMI_KREGS_CPU_SIZE		0x200
 /*
- * save area of kernel nmi regs in eframe format 
+ * save area of kernel nmi regs in eframe format
  */
 #define IP27_NMI_EFRAME_OFFSET		0x11800
 #define IP27_NMI_EFRAME_SIZE		0x200
@@ -209,7 +209,7 @@
 
 #endif	/* !CONFIG_SGI_IO */
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 typedef struct kldir_ent_s {
 	u64		magic;		/* Indicates validity of entry      */
 	off_t		offset;		/* Offset from start of node space  */
@@ -225,7 +225,7 @@ typedef struct kldir_ent_s {
 	/* NOTE: These 16 bytes are used in the Partition KLDIR
 	   entry to store partition info. Refer to klpart.h for this. */
 } kldir_ent_t;
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 #if defined(CONFIG_SGI_IO)
 

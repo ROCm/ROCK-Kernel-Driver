@@ -65,7 +65,7 @@ static __init void set_ktext_source(nasid_t client_nasid, nasid_t server_nasid)
 	cnodeid_t client_cnode;
 
 	client_cnode = NASID_TO_COMPACT_NODEID(client_nasid);
-	
+
 	kvp = &(PLAT_NODE_DATA(client_cnode)->kern_vars);
 
 	KERN_VARS_ADDR(client_nasid) = (unsigned long)kvp;
@@ -121,7 +121,7 @@ void __init replicate_kernel_text(int maxnodes)
 
 /*
  * Return pfn of first free page of memory on a node. PROM may allocate
- * data structures on the first couple of pages of the first slot of each 
+ * data structures on the first couple of pages of the first slot of each
  * node. If this is the case, getfirstfree(node) > getslotstart(node, 0).
  */
 pfn_t node_getfirstfree(cnodeid_t cnode)
@@ -137,7 +137,7 @@ pfn_t node_getfirstfree(cnodeid_t cnode)
 	if ((cnode == 0) || (CPUMASK_TSTB(ktext_repmask, cnode)))
 		return (TO_NODE(nasid, offset) >> PAGE_SHIFT);
 	else
-		return (KDM_TO_PHYS(PAGE_ALIGN(SYMMON_STK_ADDR(nasid, 0))) >> 
+		return (KDM_TO_PHYS(PAGE_ALIGN(SYMMON_STK_ADDR(nasid, 0))) >>
 								PAGE_SHIFT);
 }
 

@@ -136,8 +136,8 @@
 #define PI_ERR_INT_PEND		0x000400 /* Error Interrupt Pending	    */
 #define PI_ERR_INT_MASK_A	0x000408 /* Error Interrupt mask for CPU A  */
 #define PI_ERR_INT_MASK_B	0x000410 /* Error Interrupt mask for CPU B  */
-#define PI_ERR_STACK_ADDR_A	0x000418 /* Error stack address for CPU A   */ 
-#define PI_ERR_STACK_ADDR_B	0x000420 /* Error stack address for CPU B   */ 
+#define PI_ERR_STACK_ADDR_A	0x000418 /* Error stack address for CPU A   */
+#define PI_ERR_STACK_ADDR_B	0x000420 /* Error stack address for CPU B   */
 #define PI_ERR_STACK_SIZE	0x000428 /* Error Stack Size 		    */
 #define PI_ERR_STATUS0_A	0x000430 /* Error Status 0A 		    */
 #define PI_ERR_STATUS0_A_RCLR	0x000438 /* Error Status 0A clear on read   */
@@ -193,7 +193,7 @@
 
 
 /*
- * The following three macros define all possible error int pends. 
+ * The following three macros define all possible error int pends.
  */
 
 #define PI_FATAL_ERR_CPU_A	(PI_ERR_SYSSTATE_TAG_A 	| \
@@ -306,7 +306,7 @@
 #define ERR_STACK_SIZE_BYTES(_sz) \
        ((_sz) ? (PI_MIN_STACK_SIZE << ((_sz) - 1)) : 0)
 
-#ifdef _LANGUAGE_C
+#ifndef __ASSEMBLY__
 /*
  * format of error stack and error status registers.
  */
@@ -359,7 +359,7 @@ typedef union pi_err_stat1 {
 
 typedef u64	rtc_time_t;
 
-#endif /* _LANGUAGE_C */
+#endif /* !__ASSEMBLY__ */
 
 
 /* Bits in PI_SYSAD_ERRCHK_EN */
