@@ -85,7 +85,7 @@ static struct usb_device *testdev_to_usbdev (struct usbtest_dev *test)
  * them with non-zero test data (or test for it) when appropriate.
  */
 
-static void simple_callback (struct urb *urb)
+static void simple_callback (struct urb *urb, struct pt_regs *regs)
 {
 	complete ((struct completion *) urb->context);
 }
@@ -550,7 +550,7 @@ static int ch9_postconfig (struct usbtest_dev *dev)
 
 /*-------------------------------------------------------------------------*/
 
-static void unlink1_callback (struct urb *urb)
+static void unlink1_callback (struct urb *urb, struct pt_regs *regs)
 {
 	int	status = urb->status;
 

@@ -9,7 +9,6 @@
  */
 
 typedef void (*mts_scsi_cmnd_callback)(Scsi_Cmnd *);
-typedef void (*mts_usb_urb_callback) (struct urb *);
 
 
 struct mts_transfer_context

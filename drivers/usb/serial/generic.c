@@ -218,7 +218,7 @@ int usb_serial_generic_chars_in_buffer (struct usb_serial_port *port)
 	return (chars);
 }
 
-void usb_serial_generic_read_bulk_callback (struct urb *urb)
+void usb_serial_generic_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
@@ -268,7 +268,7 @@ void usb_serial_generic_read_bulk_callback (struct urb *urb)
 		err("%s - failed resubmitting read urb, error %d", __FUNCTION__, result);
 }
 
-void usb_serial_generic_write_bulk_callback (struct urb *urb)
+void usb_serial_generic_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
 	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);

@@ -145,7 +145,7 @@ struct bulk_cs_wrap {
 
 #define US_CBI_ADSC		0
 
-extern void usb_stor_CBI_irq(struct urb*);
+extern void usb_stor_CBI_irq(struct urb*, struct pt_regs *);
 extern int usb_stor_CBI_transport(Scsi_Cmnd*, struct us_data*);
 
 extern int usb_stor_CB_transport(Scsi_Cmnd*, struct us_data*);
