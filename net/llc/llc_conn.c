@@ -2,7 +2,7 @@
  * llc_conn.c - Driver routines for connection component.
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- *		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -84,7 +84,8 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		goto out_kfree_skb;
 	}
 
-	if (!ev->ind_prim && !ev->cfm_prim) {   /* indicate or confirm not required */
+	if (!ev->ind_prim && !ev->cfm_prim) {
+		/* indicate or confirm not required */
 		if (!skb->list)
 			goto out_kfree_skb;
 		goto out_skb_put;
@@ -625,17 +626,17 @@ static int llc_find_offset(int state, int ev_type)
 	 * init_pf_cycle and I don't know what is it.
 	 */
 	switch (ev_type) {
-		case LLC_CONN_EV_TYPE_PRIM:
-			rc = llc_offset_table[state][0]; break;
-		case LLC_CONN_EV_TYPE_PDU:
-			rc = llc_offset_table[state][4]; break;
-		case LLC_CONN_EV_TYPE_SIMPLE:
-			rc = llc_offset_table[state][1]; break;
-		case LLC_CONN_EV_TYPE_P_TMR:
-		case LLC_CONN_EV_TYPE_ACK_TMR:
-		case LLC_CONN_EV_TYPE_REJ_TMR:
-		case LLC_CONN_EV_TYPE_BUSY_TMR:
-			rc = llc_offset_table[state][3]; break;
+	case LLC_CONN_EV_TYPE_PRIM:
+		rc = llc_offset_table[state][0]; break;
+	case LLC_CONN_EV_TYPE_PDU:
+		rc = llc_offset_table[state][4]; break;
+	case LLC_CONN_EV_TYPE_SIMPLE:
+		rc = llc_offset_table[state][1]; break;
+	case LLC_CONN_EV_TYPE_P_TMR:
+	case LLC_CONN_EV_TYPE_ACK_TMR:
+	case LLC_CONN_EV_TYPE_REJ_TMR:
+	case LLC_CONN_EV_TYPE_BUSY_TMR:
+		rc = llc_offset_table[state][3]; break;
 	}
 	return rc;
 }

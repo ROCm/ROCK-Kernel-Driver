@@ -2,7 +2,7 @@
  * llc_pdu.c - access to PDU internals
  *
  * Copyright (c) 1997 by Procom Technology, Inc.
- *		 2001 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
+ *		 2001-2003 by Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *
  * This program can be redistributed or modified under the terms of the
  * GNU General Public License as published by the Free Software Foundation.
@@ -63,13 +63,13 @@ void llc_pdu_set_pf_bit(struct sk_buff *skb, u8 bit_value)
 	pdu = llc_pdu_sn_hdr(skb);
 	
 	switch (pdu_type) {
-		case LLC_PDU_TYPE_I:
-		case LLC_PDU_TYPE_S:
-			pdu->ctrl_2 = (pdu->ctrl_2 & 0xFE) | bit_value;
-			break;
-		case LLC_PDU_TYPE_U:
-			pdu->ctrl_1 |= (pdu->ctrl_1 & 0xEF) | (bit_value << 4);
-			break;
+	case LLC_PDU_TYPE_I:
+	case LLC_PDU_TYPE_S:
+		pdu->ctrl_2 = (pdu->ctrl_2 & 0xFE) | bit_value;
+		break;
+	case LLC_PDU_TYPE_U:
+		pdu->ctrl_1 |= (pdu->ctrl_1 & 0xEF) | (bit_value << 4);
+		break;
 	}
 }
 
@@ -91,13 +91,13 @@ void llc_pdu_decode_pf_bit(struct sk_buff *skb, u8 *pf_bit)
 	pdu = llc_pdu_sn_hdr(skb);
 
 	switch (pdu_type) {
-		case LLC_PDU_TYPE_I:
-		case LLC_PDU_TYPE_S:
-			*pf_bit = pdu->ctrl_2 & LLC_S_PF_BIT_MASK;
-			break;
-		case LLC_PDU_TYPE_U:
-			*pf_bit = (pdu->ctrl_1 & LLC_U_PF_BIT_MASK) >> 4;
-			break;
+	case LLC_PDU_TYPE_I:
+	case LLC_PDU_TYPE_S:
+		*pf_bit = pdu->ctrl_2 & LLC_S_PF_BIT_MASK;
+		break;
+	case LLC_PDU_TYPE_U:
+		*pf_bit = (pdu->ctrl_1 & LLC_U_PF_BIT_MASK) >> 4;
+		break;
 	}
 }
 
@@ -547,20 +547,20 @@ void llc_decode_pdu_type(struct sk_buff *skb, u8 *dest)
 	if ((pdu->ctrl_1 & LLC_PDU_TYPE_MASK) != LLC_PDU_TYPE_U)
 		goto out;
 	switch (LLC_U_PDU_CMD(pdu)) {
-		case LLC_1_PDU_CMD_XID:
-		case LLC_1_PDU_CMD_UI:
-		case LLC_1_PDU_CMD_TEST:
-			type = LLC_DEST_SAP;
-			break;
-		case LLC_2_PDU_CMD_SABME:
-		case LLC_2_PDU_CMD_DISC:
-		case LLC_2_PDU_RSP_UA:
-		case LLC_2_PDU_RSP_DM:
-		case LLC_2_PDU_RSP_FRMR:
-			break;
-		default:
-			type = LLC_DEST_INVALID;
-			break;
+	case LLC_1_PDU_CMD_XID:
+	case LLC_1_PDU_CMD_UI:
+	case LLC_1_PDU_CMD_TEST:
+		type = LLC_DEST_SAP;
+		break;
+	case LLC_2_PDU_CMD_SABME:
+	case LLC_2_PDU_CMD_DISC:
+	case LLC_2_PDU_RSP_UA:
+	case LLC_2_PDU_RSP_DM:
+	case LLC_2_PDU_RSP_FRMR:
+		break;
+	default:
+		type = LLC_DEST_INVALID;
+		break;
 	}
 out:
 	*dest = type;
@@ -604,13 +604,13 @@ static u8 llc_pdu_get_pf_bit(struct llc_pdu_sn *pdu)
 	} else
 		pdu_type = LLC_PDU_TYPE_I;
 	switch (pdu_type) {
-		case LLC_PDU_TYPE_I:
-		case LLC_PDU_TYPE_S:
-			pf_bit = pdu->ctrl_2 & LLC_S_PF_BIT_MASK;
-			break;
-		case LLC_PDU_TYPE_U:
-			pf_bit = (pdu->ctrl_1 & LLC_U_PF_BIT_MASK) >> 4;
-			break;
+	case LLC_PDU_TYPE_I:
+	case LLC_PDU_TYPE_S:
+		pf_bit = pdu->ctrl_2 & LLC_S_PF_BIT_MASK;
+		break;
+	case LLC_PDU_TYPE_U:
+		pf_bit = (pdu->ctrl_1 & LLC_U_PF_BIT_MASK) >> 4;
+		break;
 	}
 	return pf_bit;
 }
