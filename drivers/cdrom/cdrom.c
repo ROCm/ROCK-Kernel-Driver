@@ -2015,7 +2015,7 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 			cdi->last_sense = s->sense_key;
 		}
 
-		if (blk_rq_unmap_user(rq, ubuf, bio, len))
+		if (blk_rq_unmap_user(rq, bio, len))
 			ret = -EFAULT;
 
 		if (ret)
