@@ -1825,12 +1825,15 @@ discard_and_relse:
 	goto discard_it;
 
 do_time_wait:
-	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb))
-		goto discard_and_relse;
+	if (!xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
+		tcp_tw_put((struct tcp_tw_bucket *) sk);
+		goto discard_it;
+	}
 
 	if (skb->len < (th->doff << 2) || tcp_checksum_complete(skb)) {
 		TCP_INC_STATS_BH(TcpInErrs);
-		goto discard_and_relse;
+		tcp_tw_put((struct tcp_tw_bucket *) sk);
+		goto discard_it;
 	}
 	switch (tcp_timewait_state_process((struct tcp_tw_bucket *)sk,
 					   skb, th, skb->len)) {
