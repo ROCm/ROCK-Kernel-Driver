@@ -58,8 +58,25 @@ static ssize_t pccard_show_type(struct class_device *dev, char *buf)
 }
 static CLASS_DEVICE_ATTR(card_type, 0400, pccard_show_type, NULL);
 
+static ssize_t pccard_show_voltage(struct class_device *dev, char *buf)
+{
+	int val;
+	struct pcmcia_socket *s = to_socket(dev);
+
+        if (!(s->state & SOCKET_PRESENT))
+                return -ENODEV;
+	s->ops->get_status(s, &val);
+	if (val & SS_3VCARD)
+		return sprintf(buf, "3.3V\n");
+	if (val & SS_XVCARD)
+		return sprintf(buf, "X.XV\n");
+	return sprintf(buf, "5.0V\n");
+}
+static CLASS_DEVICE_ATTR(card_voltage, 0400, pccard_show_voltage, NULL);
+
 static struct class_device_attribute *pccard_socket_attributes[] = {
 	&class_device_attr_card_type,
+	&class_device_attr_card_voltage,
 	NULL,
 };
 
