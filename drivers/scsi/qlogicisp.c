@@ -31,6 +31,7 @@
 #include <linux/delay.h>
 #include <linux/unistd.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/byteorder.h>
