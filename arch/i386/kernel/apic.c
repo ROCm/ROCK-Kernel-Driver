@@ -616,9 +616,9 @@ static void apic_pm_activate(void) { }
  */
 /* For SuSE don't enable APIC by default on UP kernels */ 
 #ifndef CONFIG_SMP
-int enable_local_apic __initdata = -1; /* -1=force-disable, +1=force-enable */
+int enable_local_apic = -1; /* -1=force-disable, +1=force-enable */
 #else
-int enable_local_apic __initdata = 0;
+int enable_local_apic = 0;
 #endif
 
 int __init lapic_disable(char *str)
