@@ -1876,9 +1876,7 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 RISCOM8 DRIVER
-P:	Dmitry Gorodchanin
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 RTLINUX  REALTIME  LINUX
 P:	Victor Yodaiken
