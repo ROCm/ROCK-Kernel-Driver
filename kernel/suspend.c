@@ -11,7 +11,7 @@
  * 
  * Pavel Machek <pavel@ucw.cz>:
  * Modifications, defectiveness pointing, being with me at the very beginning,
- * suspend to swap space, stop all tasks.
+ * suspend to swap space, stop all tasks. Port to 2.4.18-ac and 2.5.17.
  *
  * Steve Doddi <dirk@loth.demon.co.uk>: 
  * Support the possibility of hardware state restoring.
@@ -40,8 +40,6 @@
  * - we should launch a kernel_thread to process suspend request, cleaning up
  * bdflush from this task. (check apm.c for something similar).
  */
-
-/* FIXME: try to poison to memory */
 
 #include <linux/module.h>
 #include <linux/mm.h>
@@ -122,7 +120,7 @@ static int pm_suspend_state = 0;
    Warning: this is evil. There are actually two pagedirs at time of
    resume. One is "pagedir_save", which is empty frame allocated at
    time of suspend, that must be freed. Second is "pagedir_nosave", 
-   allocated at time of resume, that travells through memory not to
+   allocated at time of resume, that travels through memory not to
    collide with anything.
  */
 static suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
@@ -143,8 +141,6 @@ union diskpage {
 /*
  * XXX: We try to keep some more pages free so that I/O operations succeed
  * without paging. Might this be more?
- *
- * [If this is not enough, might it corrupt our data silently?]
  */
 #define PAGES_FOR_IO	512
 
@@ -310,7 +306,6 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 
 static void do_suspend_sync(void)
 {
-//	sync_dev(0); FIXME
 	while (1) {
 		run_task_queue(&tq_disk);
 		if (!TQ_ACTIVE(tq_disk))
@@ -640,60 +635,11 @@ static int prepare_suspend_processes(void)
 	MDELAY(1000);
 	if (freeze_processes()) {
 		PRINTS( "Not all processes stopped!\n" );
-//		panic("Some processes survived?\n");
 		thaw_processes();
 		return 1;
 	}
 	do_suspend_sync();
 	return 0;
-}
-
-/*
- *	Free as much memory as possible
- */
-
-static void **eaten_memory;
-
-static void eat_memory(void)
-{
-	int i = 0;
-	void **c= eaten_memory, *m;
-
-	printk("Eating pages ");
-	while ((m = (void *) get_free_page(GFP_HIGHUSER))) {
-		memset(m, 0, PAGE_SIZE);
-		eaten_memory = m;
-		if (!(i%100))
-			printk( ".(%d)", i ); 
-		*eaten_memory = c;
-		c = eaten_memory;
-		i++; 
-#if 1
-	/* 40000 == 160MB */
-	/* 10000 for 64MB */
-	/* 2500 for  16MB */
-		if (i > 40000)
-			break;
-#endif
-	}
-	printk("(%dK)\n", i*4);
-}
-
-static void free_memory(void)
-{
-	int i = 0;
-	void **c = eaten_memory, *f;
-	
-	printk( "Freeing pages " );
-	while (c) {
-		if (!(i%5000))
-		printk( "." ); 
-		f = *c;
-		c = *c;
-		if (f) { free_page( (long) f ); i++; }
-	}
-	printk( "(%dK)\n", i*4 );
-	eaten_memory = NULL;
 }
 
 /*
@@ -703,16 +649,10 @@ static void free_memory(void)
  */
 static void free_some_memory(void)
 {
-#if 1
 	PRINTS("Freeing memory: ");
 	while (try_to_free_pages(&contig_page_data.node_zones[ZONE_HIGHMEM], GFP_KSWAPD, 0))
 		printk(".");
 	printk("\n");
-#else
-	printk("Using memeat\n");
-	eat_memory();
-	free_memory();
-#endif
 }
 
 /* Make disk drivers accept operations, again */
@@ -809,7 +749,6 @@ static int suspend_save_image(void)
 	 *
 	 * Following line enforces not writing to disk until we choose.
 	 */
-	suspend_device = NODEV;					/* We do not want any writes, thanx */
 	drivers_unsuspend();
 	spin_unlock_irq(&suspend_pagedir_lock);
 	PRINTS( "critical section/: done (%d pages copied)\n", nr_copy_pages );
@@ -991,8 +930,7 @@ static void copy_pagedir(suspend_pagedir_t *to, suspend_pagedir_t *from)
 	}
 }
 
-#define does_collide(addr)	\
-		does_collide_order(pagedir_nosave, addr, 0)
+#define does_collide(addr) does_collide_order(pagedir_nosave, addr, 0)
 
 /*
  * Returns true if given address/order collides with any orig_address 
@@ -1015,7 +953,6 @@ static int does_collide_order(suspend_pagedir_t *pagedir, unsigned long addr,
  * We check here that pagedir & pages it points to won't collide with pages
  * where we're going to restore from the loaded pages later
  */
-
 static int check_pagedir(void)
 {
 	int i;
@@ -1036,14 +973,13 @@ static int check_pagedir(void)
 
 static int relocate_pagedir(void)
 {
-	/* This is deep magic
-	   We have to avoid recursion (not to overflow kernel stack), and that's why
-	   code looks pretty cryptic
-	*/
+	/*
+	 * We have to avoid recursion (not to overflow kernel stack),
+	 * and that's why code looks pretty cryptic 
+	 */
 	suspend_pagedir_t *new_pagedir, *old_pagedir = pagedir_nosave;
 	void **eaten_memory = NULL;
 	void **c = eaten_memory, *m, *f;
-
 
 	if(!does_collide_order(old_pagedir, (unsigned long)old_pagedir, pagedir_order)) {
 		printk("not neccessary\n");

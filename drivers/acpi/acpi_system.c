@@ -272,11 +272,9 @@ acpi_system_suspend(
 		break;
 	}
 
-	printk("acpi_restore_register_state...");
 	acpi_restore_register_state();
 	restore_flags(flags);
 
-	printk("acpi returning...");
 	return status;
 }
 
@@ -323,9 +321,7 @@ acpi_suspend (
 	 * no matter what.
 	 */
 	acpi_system_restore_state(state);
-	printk("acpi_leave_sleep_state...");
 	acpi_leave_sleep_state(state);
-	printk("ook\n");
 
 	/* make sure interrupts are enabled */
 	ACPI_ENABLE_IRQS();

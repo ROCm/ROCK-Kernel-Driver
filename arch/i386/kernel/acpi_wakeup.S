@@ -17,11 +17,6 @@ wakeup_code:
 	cli
 	cld
 	  
-# setup video mode
-#	movw	$0x4117, %bx		# 0x4000 for linear framebuffer
-#	movw	$0x4f02, %ax
-#	int	$0x10
-
 	# setup data segment
 	movw	%cs, %ax
 
