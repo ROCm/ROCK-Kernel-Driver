@@ -952,11 +952,8 @@ int filp_close(struct file *filp, fl_owner_t id)
 		return 0;
 	}
 	retval = 0;
-	if (filp->f_op && filp->f_op->flush) {
-		lock_kernel();
+	if (filp->f_op && filp->f_op->flush)
 		retval = filp->f_op->flush(filp);
-		unlock_kernel();
-	}
 	dnotify_flush(filp, id);
 	locks_remove_posix(filp, id);
 	fput(filp);
