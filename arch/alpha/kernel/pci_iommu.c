@@ -58,8 +58,8 @@ size_for_memory(unsigned long max)
 }
 
 struct pci_iommu_arena *
-iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
-		unsigned long window_size, unsigned long align)
+iommu_arena_new_node(int nid, struct pci_controller *hose, dma_addr_t base,
+		     unsigned long window_size, unsigned long align)
 {
 	unsigned long mem_size;
 	struct pci_iommu_arena *arena;
@@ -73,8 +73,35 @@ iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 	if (align < mem_size)
 		align = mem_size;
 
+
+#ifdef CONFIG_DISCONTIGMEM
+
+        if (!NODE_DATA(nid) ||
+            (NULL == (arena = alloc_bootmem_node(NODE_DATA(nid),
+                                                 sizeof(*arena))))) {
+                printk("%s: couldn't allocate arena from node %d\n"
+                       "    falling back to system-wide allocation\n",
+                       __FUNCTION__, nid);
+                arena = alloc_bootmem(sizeof(*arena));
+        }
+
+        if (!NODE_DATA(nid) ||
+            (NULL == (arena->ptes = __alloc_bootmem_node(NODE_DATA(nid),
+                                                         mem_size,
+                                                         align,
+                                                         0)))) {
+                printk("%s: couldn't allocate arena ptes from node %d\n"
+                       "    falling back to system-wide allocation\n",
+                       __FUNCTION__, nid);
+                arena->ptes = __alloc_bootmem(mem_size, align, 0);
+        }
+
+#else /* CONFIG_DISCONTIGMEM */
+
 	arena = alloc_bootmem(sizeof(*arena));
 	arena->ptes = __alloc_bootmem(mem_size, align, 0);
+
+#endif /* CONFIG_DISCONTIGMEM */
 
 	spin_lock_init(&arena->lock);
 	arena->hose = hose;
@@ -87,6 +114,13 @@ iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
 	arena->align_entry = 1;
 
 	return arena;
+}
+
+struct pci_iommu_arena *
+iommu_arena_new(struct pci_controller *hose, dma_addr_t base,
+		unsigned long window_size, unsigned long align)
+{
+	return iommu_arena_new_node(0, hose, base, window_size, align);
 }
 
 /* Must be called with the arena lock held */
