@@ -680,6 +680,8 @@ static int tcp_v6_connect(struct sock *sk, struct sockaddr *uaddr,
 #ifdef CONFIG_IPV6_SUBTREES
 // KK : Whole code looks like null stmt, dst_lookup fixed this for us.
                 ipv6_addr_copy(&fl.fl6_src, saddr);
+
+		dst_release(dst);
                 dst = ip6_route_output(sk, &fl);
 
                 if ((err = dst->error) != 0) {
