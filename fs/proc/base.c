@@ -277,6 +277,39 @@ static int proc_root_link(struct inode *inode, struct dentry **dentry, struct vf
 	return result;
 }
 
+#define MAY_PTRACE(task) \
+	(task == current || \
+	(task->parent == current && \
+	(task->ptrace & PT_PTRACED) &&  task->state == TASK_STOPPED && \
+	 security_ptrace(current,task) == 0))
+
+static int may_ptrace_attach(struct task_struct *task)
+{
+	int retval = 0;
+
+	task_lock(task);
+
+	if (!task->mm)
+		goto out;
+	if (((current->uid != task->euid) ||
+	     (current->uid != task->suid) ||
+	     (current->uid != task->uid) ||
+	     (current->gid != task->egid) ||
+	     (current->gid != task->sgid) ||
+	     (current->gid != task->gid)) && !capable(CAP_SYS_PTRACE))
+		goto out;
+	rmb();
+	if (!task->mm->dumpable && !capable(CAP_SYS_PTRACE))
+		goto out;
+	if (security_ptrace(current, task))
+		goto out;
+
+	retval = 1;
+out:
+	task_unlock(task);
+	return retval;
+}
+
 static int proc_pid_environ(struct task_struct *task, char * buffer)
 {
 	int res = 0;
@@ -286,6 +319,8 @@ static int proc_pid_environ(struct task_struct *task, char * buffer)
 		if (len > PAGE_SIZE)
 			len = PAGE_SIZE;
 		res = access_process_vm(task, mm->env_start, buffer, len, 0);
+		if (!may_ptrace_attach(task))
+			res = -ESRCH;
 		mmput(mm);
 	}
 	return res;
@@ -521,10 +556,6 @@ static struct file_operations proc_info_file_operations = {
 	.read		= proc_info_read,
 };
 
-#define MAY_PTRACE(p) \
-(p==current||(p->parent==current&&(p->ptrace & PT_PTRACED)&&p->state==TASK_STOPPED&&security_ptrace(current,p)==0))
-
-
 static int mem_open(struct inode* inode, struct file* file)
 {
 	file->private_data = (void*)((long)current->self_exec_id);
@@ -540,7 +571,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 	int ret = -ESRCH;
 	struct mm_struct *mm;
 
-	if (!MAY_PTRACE(task))
+	if (!MAY_PTRACE(task) || !may_ptrace_attach(task))
 		goto out;
 
 	ret = -ENOMEM;
@@ -566,7 +597,7 @@ static ssize_t mem_read(struct file * file, char * buf,
 
 		this_len = (count > PAGE_SIZE) ? PAGE_SIZE : count;
 		retval = access_process_vm(task, src, page, this_len, 0);
-		if (!retval) {
+		if (!retval || !MAY_PTRACE(task) || !may_ptrace_attach(task)) {
 			if (!ret)
 				ret = -EIO;
 			break;
@@ -604,7 +635,7 @@ static ssize_t mem_write(struct file * file, const char * buf,
 	struct task_struct *task = proc_task(file->f_dentry->d_inode);
 	unsigned long dst = *ppos;
 
-	if (!MAY_PTRACE(task))
+	if (!MAY_PTRACE(task) || !may_ptrace_attach(task))
 		return -ESRCH;
 
 	page = (char *)__get_free_page(GFP_USER);
