@@ -50,7 +50,9 @@ struct riva_par {
 
 	struct riva_regs initial_state;	/* initial startup video mode */
 	struct riva_regs current_state;
+#ifdef CONFIG_X86
 	struct vgastate state;
+#endif
 	atomic_t ref_count;
 	u32 cursor_data[32 * 32/4];
 	int cursor_reset;
