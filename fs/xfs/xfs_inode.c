@@ -2631,7 +2631,8 @@ xfs_iunpin(
 		if (vp) {
 			struct inode	*inode = LINVFS_GET_IP(vp);
 
-			mark_inode_dirty_sync(inode);
+			if (!(inode->i_state & I_NEW))
+				mark_inode_dirty_sync(inode);
 		}
 
 		wake_up(&ip->i_ipin_wait);
