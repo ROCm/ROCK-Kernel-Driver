@@ -35,6 +35,7 @@
 #include <asm/irq.h>
 #include <asm/ecard.h>
 
+#include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
 #include "arxescsi.h"
 #include "fas216.h"
