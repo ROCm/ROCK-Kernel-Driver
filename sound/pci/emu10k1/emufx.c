@@ -364,12 +364,12 @@ static int snd_emu10k1_gpr_ctl_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value
 		case EMU10K1_GPR_TRANSLATION_TABLE100:
 			snd_emu10k1_ptr_write(emu, emu->gpr_base + ctl->gpr[i], 0, db_table[val]);
 			break;
-		case EMU10K1_GRP_TRANSLATION_BASS:
+		case EMU10K1_GPR_TRANSLATION_BASS:
 			snd_runtime_check((ctl->count % 5) == 0 && (ctl->count / 5) == ctl->vcount, change = -EIO; goto __error);
 			for (j = 0; j < 5; j++)
 				snd_emu10k1_ptr_write(emu, emu->gpr_base + ctl->gpr[j * ctl->vcount + i], 0, bass_table[val][j]);
 			break;
-		case EMU10K1_GRP_TRANSLATION_TREBLE:
+		case EMU10K1_GPR_TRANSLATION_TREBLE:
 			snd_runtime_check((ctl->count % 5) == 0 && (ctl->count / 5) == ctl->vcount, change = -EIO; goto __error);
 			for (j = 0; j < 5; j++)
 				snd_emu10k1_ptr_write(emu, emu->gpr_base + ctl->gpr[j * ctl->vcount + i], 0, treble_table[val][j]);
@@ -1434,7 +1434,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	ctl->min = 0;
 	ctl->max = 40;
 	ctl->value[0] = ctl->value[1] = 20;
-	ctl->translation = EMU10K1_GRP_TRANSLATION_BASS;
+	ctl->translation = EMU10K1_GPR_TRANSLATION_BASS;
 	ctl = &controls[nctl + 1];
 	ctl->id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	strcpy(ctl->id.name, "Tone Control - Treble");
@@ -1443,7 +1443,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	ctl->min = 0;
 	ctl->max = 40;
 	ctl->value[0] = ctl->value[1] = 20;
-	ctl->translation = EMU10K1_GRP_TRANSLATION_TREBLE;
+	ctl->translation = EMU10K1_GPR_TRANSLATION_TREBLE;
 
 #define BASS_GPR	0x8c
 #define TREBLE_GPR	0x96
@@ -1946,7 +1946,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	ctl->min = 0;
 	ctl->max = 40;
 	ctl->value[0] = ctl->value[1] = 20;
-	ctl->translation = EMU10K1_GRP_TRANSLATION_BASS;
+	ctl->translation = EMU10K1_GPR_TRANSLATION_BASS;
 	ctl = &controls[i + 1];
 	ctl->id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	strcpy(ctl->id.name, "Tone Control - Treble");
@@ -1955,7 +1955,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	ctl->min = 0;
 	ctl->max = 40;
 	ctl->value[0] = ctl->value[1] = 20;
-	ctl->translation = EMU10K1_GRP_TRANSLATION_TREBLE;
+	ctl->translation = EMU10K1_GPR_TRANSLATION_TREBLE;
 
 #define BASS_GPR	0x8c
 #define TREBLE_GPR	0x96
