@@ -33,12 +33,12 @@ do {									\
 			"jnz 2f;"					\
 			"1:;"						\
 									\
-			".section .text.lock,\"ax\";"			\
+			LOCK_SECTION_START("")				\
 			"2: pushl %%eax; pushl %%ecx; pushl %%edx;"	\
 			"call %c1;"					\
 			"popl %%edx; popl %%ecx; popl %%eax;"		\
 			"jmp 1b;"					\
-			".previous;"					\
+			LOCK_SECTION_END				\
 									\
 		: /* no output */					\
 		: "r" (ptr), "i" (do_softirq)				\

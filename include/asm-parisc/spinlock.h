@@ -3,10 +3,6 @@
 
 #include <asm/system.h>
 
-/* if you're going to use out-of-line slowpaths, use .section .lock.text,
- * not .text.lock or the -ffunction-sections monster will eat you alive
- */
-
 /* we seem to be the only architecture that uses 0 to mean locked - but we
  * have to.  prumpf */
 

@@ -101,7 +101,7 @@ static inline void __down_read(struct rw_semaphore *sem)
 LOCK_PREFIX	"  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value */
 		"  js        2f\n\t" /* jump if we weren't granted the lock */
 		"1:\n\t"
-		".section .text.lock,\"ax\"\n"
+		LOCK_SECTION_START("")
 		"2:\n\t"
 		"  pushl     %%ecx\n\t"
 		"  pushl     %%edx\n\t"
@@ -109,7 +109,7 @@ LOCK_PREFIX	"  incl      (%%eax)\n\t" /* adds 0x00000001, returns the old value 
 		"  popl      %%edx\n\t"
 		"  popl      %%ecx\n\t"
 		"  jmp       1b\n"
-		".previous"
+		LOCK_SECTION_END
 		"# ending down_read\n\t"
 		: "+m"(sem->count)
 		: "a"(sem)
@@ -130,13 +130,13 @@ LOCK_PREFIX	"  xadd      %0,(%%eax)\n\t" /* subtract 0x0000ffff, returns the old
 		"  testl     %0,%0\n\t" /* was the count 0 before? */
 		"  jnz       2f\n\t" /* jump if we weren't granted the lock */
 		"1:\n\t"
-		".section .text.lock,\"ax\"\n"
+		LOCK_SECTION_START("")
 		"2:\n\t"
 		"  pushl     %%ecx\n\t"
 		"  call      rwsem_down_write_failed\n\t"
 		"  popl      %%ecx\n\t"
 		"  jmp       1b\n"
-		".previous\n"
+		LOCK_SECTION_END
 		"# ending down_write"
 		: "+d"(tmp), "+m"(sem->count)
 		: "a"(sem)
@@ -154,7 +154,7 @@ static inline void __up_read(struct rw_semaphore *sem)
 LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old value */
 		"  js        2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
-		".section .text.lock,\"ax\"\n"
+		LOCK_SECTION_START("")
 		"2:\n\t"
 		"  decw      %%dx\n\t" /* do nothing if still outstanding active readers */
 		"  jnz       1b\n\t"
@@ -162,7 +162,7 @@ LOCK_PREFIX	"  xadd      %%edx,(%%eax)\n\t" /* subtracts 1, returns the old valu
 		"  call      rwsem_wake\n\t"
 		"  popl      %%ecx\n\t"
 		"  jmp       1b\n"
-		".previous\n"
+		LOCK_SECTION_END
 		"# ending __up_read\n"
 		: "+m"(sem->count), "+d"(tmp)
 		: "a"(sem)
@@ -180,7 +180,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 LOCK_PREFIX	"  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
 		"  jnz       2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
-		".section .text.lock,\"ax\"\n"
+		LOCK_SECTION_START("")
 		"2:\n\t"
 		"  decw      %%dx\n\t" /* did the active count reduce to 0? */
 		"  jnz       1b\n\t" /* jump back if not */
@@ -188,7 +188,7 @@ LOCK_PREFIX	"  xaddl     %%edx,(%%eax)\n\t" /* tries to transition 0xffff0001 ->
 		"  call      rwsem_wake\n\t"
 		"  popl      %%ecx\n\t"
 		"  jmp       1b\n"
-		".previous\n"
+		LOCK_SECTION_END
 		"# ending __up_write\n"
 		: "+m"(sem->count)
 		: "a"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS)

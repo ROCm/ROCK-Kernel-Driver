@@ -31,8 +31,10 @@ ifeq ($(CROSS_COMPILE),)
 offsets.h: print_offsets
 	./print_offsets > offsets.h
 
+comma	:= ,
+
 print_offsets: print_offsets.c FORCE_RECOMPILE
-	$(CC) $(CFLAGS) print_offsets.c -o $@
+	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) print_offsets.c -o $@
 
 FORCE_RECOMPILE:
 
@@ -42,7 +44,7 @@ offsets.h: print_offsets.s
 	$(AWK) -f print_offsets.awk $^ > $@
 
 print_offsets.s: print_offsets.c
-	$(CC) $(CFLAGS) -S print_offsets.c -o $@
+	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -S print_offsets.c -o $@
 
 endif
 

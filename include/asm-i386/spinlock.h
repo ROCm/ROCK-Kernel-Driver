@@ -56,13 +56,13 @@ typedef struct {
 	"\n1:\t" \
 	"lock ; decb %0\n\t" \
 	"js 2f\n" \
-	".section .text.lock,\"ax\"\n" \
+	LOCK_SECTION_START("") \
 	"2:\t" \
 	"cmpb $0,%0\n\t" \
 	"rep;nop\n\t" \
 	"jle 2b\n\t" \
 	"jmp 1b\n" \
-	".previous"
+	LOCK_SECTION_END
 
 /*
  * This works. Despite all the confusion.

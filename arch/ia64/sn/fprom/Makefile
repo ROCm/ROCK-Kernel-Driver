@@ -18,10 +18,12 @@ obj-y=fprom
 fprom: $(OBJ)
 	$(LD) -static -Tfprom.lds -o fprom $(OBJ) $(LIB)
 
+comma	:= ,
+
 .S.o:
 	$(CC)  -D__ASSEMBLY__ $(AFLAGS) $(AFLAGS_KERNEL) -c -o $*.o $<
 .c.o:
-	$(CC)  $(CFLAGS) $(CFLAGS_KERNEL) -c -o $*.o $<
+	$(CC)  $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) $(CFLAGS_KERNEL) -c -o $*.o $<
 
 clean:
 	rm -f *.o fprom

@@ -23,7 +23,6 @@ SECTIONS
 	*(.fixup)
 	*(.gnu.warning)
 	} = 0x0009
-  .text.lock : { *(.text.lock) }	/* out-of-line lock text */
   .rodata : { *(.rodata) *(.rodata.*) }
   .kstrtab : { *(.kstrtab) }
 

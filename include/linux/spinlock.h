@@ -35,6 +35,23 @@
 						if (!__r) local_bh_enable();   \
 						__r; })
 
+/* Must define these before including other files, inline functions need them */
+
+#include <linux/stringify.h>
+
+#define LOCK_SECTION_NAME			\
+	".text.lock." __stringify(KBUILD_BASENAME)
+
+#define LOCK_SECTION_START(extra)		\
+	".subsection 1\n\t"			\
+	extra					\
+	".ifndef " LOCK_SECTION_NAME "\n\t"	\
+	LOCK_SECTION_NAME ":\n\t"		\
+	".endif\n\t"
+
+#define LOCK_SECTION_END			\
+	".previous\n\t"
+
 #ifdef CONFIG_SMP
 #include <asm/spinlock.h>
 
