@@ -157,11 +157,8 @@ loop:
 
 	if (journal->j_commit_sequence != journal->j_commit_request) {
 		jbd_debug(1, "OK, requests differ\n");
-		if (journal->j_commit_timer_active) {
-			journal->j_commit_timer_active = 0;
-			del_timer(journal->j_commit_timer);
-		}
 		spin_unlock(&journal->j_state_lock);
+		del_timer_sync(journal->j_commit_timer);
 		journal_commit_transaction(journal);
 		spin_lock(&journal->j_state_lock);
 		goto loop;
@@ -217,12 +214,8 @@ loop:
 	if (!(journal->j_flags & JFS_UNMOUNT))
 		goto loop;
 
-	if (journal->j_commit_timer_active) {
-		journal->j_commit_timer_active = 0;
-		del_timer_sync(journal->j_commit_timer);
-	}
 	spin_unlock(&journal->j_state_lock);
-
+	del_timer_sync(journal->j_commit_timer);
 	journal->j_task = NULL;
 	wake_up(&journal->j_wait_done_commit);
 	jbd_debug(1, "Journal thread exiting.\n");

@@ -55,8 +55,6 @@ get_transaction(journal_t *journal, transaction_t *transaction)
 	spin_lock_init(&transaction->t_jcb_lock);
 
 	/* Set up the commit timer for the new transaction. */
-	J_ASSERT(!journal->j_commit_timer_active);
-	journal->j_commit_timer_active = 1;
 	journal->j_commit_timer->expires = transaction->t_expires;
 	add_timer(journal->j_commit_timer);
 	

@@ -626,7 +626,6 @@ struct transaction_s
  * @j_commit_interval: What is the maximum transaction lifetime before we begin
  *  a commit?
  * @j_commit_timer:  The timer used to wakeup the commit thread
- * @j_commit_timer_active: Timer flag
  * @j_revoke: The revoke table - maintains the list of revoked blocks in the
  *     current transaction.
  */
@@ -802,7 +801,6 @@ struct journal_s
 
 	/* The timer used to wakeup the commit thread: */
 	struct timer_list	*j_commit_timer;
-	int			j_commit_timer_active;	/* [j_state_lock] */
 
 	/*
 	 * The revoke table: maintains the list of revoked blocks in the
