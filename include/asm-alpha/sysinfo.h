@@ -18,6 +18,7 @@
 #define SSI_IEEE_FP_CONTROL		14
 #define SSI_IEEE_STATE_AT_SIGNAL	15
 #define SSI_IEEE_IGNORE_STATE_AT_SIGNAL	16
+#define SSI_IEEE_RAISE_EXCEPTION	1001	/* linux specific */
 
 #define SSIN_UACPROC			6
 
