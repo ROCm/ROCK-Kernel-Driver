@@ -406,6 +406,12 @@ static inline struct list_head *sctp_list_dequeue(struct list_head *list)
 	return result;
 }
 
+/* Tests if the list has one and only one entry. */
+static inline int sctp_list_single_entry(struct list_head *head)
+{
+	return ((head->next != head) && (head->next == head->prev));
+}
+
 /* Calculate the size (in bytes) occupied by the data of an iovec.  */
 static inline size_t get_user_iov_size(struct iovec *iov, int iovlen)
 {
