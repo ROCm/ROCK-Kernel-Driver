@@ -37,6 +37,7 @@
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
 #include <linux/idr.h>
+#include <linux/nodemask.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
