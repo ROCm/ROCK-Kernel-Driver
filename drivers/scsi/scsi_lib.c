@@ -984,10 +984,11 @@ void scsi_request_fn(request_queue_t * q)
 			break;
 
 		if(!req) {
-			/* can happen if the prep fails 
-			 * FIXME: elv_next_request() should be plugging the
-			 * queue */
-			blk_plug_device(q);
+			/* If the device is busy, a returning I/O
+			 * will restart the queue.  Otherwise, we have
+			 * to plug the queue */
+			if(SDpnt->device_busy == 0)
+				blk_plug_device(q);
 			break;
 		}
 
