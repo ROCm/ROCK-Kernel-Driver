@@ -18,6 +18,7 @@
 #include <linux/spinlock.h>
 #include <linux/types.h>
 #include <linux/ioport.h>
+#include <linux/module.h>
 #include <asm/semaphore.h>
 #include <asm/atomic.h>
 
@@ -95,7 +96,7 @@ struct bus_attribute {
 
 #define BUS_ATTR(_name,_mode,_show,_store)	\
 struct bus_attribute bus_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };
@@ -136,7 +137,7 @@ struct driver_attribute {
 
 #define DRIVER_ATTR(_name,_mode,_show,_store)	\
 struct driver_attribute driver_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };
@@ -176,7 +177,7 @@ struct class_attribute {
 
 #define CLASS_ATTR(_name,_mode,_show,_store)			\
 struct class_attribute class_attr_##_name = { 			\
-	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
 	.show	= _show,					\
 	.store	= _store,					\
 };
@@ -226,7 +227,7 @@ struct class_device_attribute {
 
 #define CLASS_DEVICE_ATTR(_name,_mode,_show,_store)		\
 struct class_device_attribute class_device_attr_##_name = { 	\
-	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
 	.show	= _show,					\
 	.store	= _store,					\
 };
@@ -324,7 +325,7 @@ struct device_attribute {
 
 #define DEVICE_ATTR(_name,_mode,_show,_store) \
 struct device_attribute dev_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode },	\
+	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
 	.show	= _show,				\
 	.store	= _store,				\
 };

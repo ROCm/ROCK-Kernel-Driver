@@ -10,9 +10,11 @@
 #define _SYSFS_H_
 
 struct kobject;
+struct module;
 
 struct attribute {
 	char			* name;
+	struct module 		* owner;
 	mode_t			mode;
 };
 
