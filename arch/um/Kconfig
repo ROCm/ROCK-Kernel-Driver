@@ -70,6 +70,16 @@ config MODE_SKAS
 
 source "arch/um/Kconfig_arch"
 
+config LD_SCRIPT_STATIC
+	bool
+	default y
+	depends on MODE_TT || STATIC_LINK
+
+config LD_SCRIPT_DYN
+	bool
+	default y
+	depends on !LD_SCRIPT_STATIC
+
 config NET
 	bool "Networking support"
 	help
