@@ -275,6 +275,17 @@ static void lock_swapdevices(void) /* This is called after saving image so modif
 	swap_list_unlock();
 }
 
+/**
+ *    write_suspend_image - Write entire image to disk.
+ *
+ *    After writing suspend signature to the disk, suspend may no
+ *    longer fail: we have ready-to-run image in swap, and rollback
+ *    would happen on next reboot -- corrupting data.
+ *
+ *    Note: The buffer we allocate to use to write the suspend header is
+ *    not freed; its not needed since system is going down anyway
+ *    (plus it causes oops and I'm lazy^H^H^H^Htoo busy).
+ */
 static int write_suspend_image(void)
 {
 	int i;
@@ -349,7 +360,6 @@ static int write_suspend_image(void)
 	printk( "|\n" );
 
 	MDELAY(1000);
-	free_page((unsigned long) buffer);
 	return 0;
 }
 
