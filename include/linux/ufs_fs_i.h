@@ -18,7 +18,6 @@ struct ufs_inode_info {
 		__u32	i_data[15];
 		__u8	i_symlink[4*15];
 	} i_u1;
-	__u64	i_size;
 	__u32	i_flags;
 	__u32	i_gen;
 	__u32	i_shadow;

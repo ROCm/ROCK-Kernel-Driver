@@ -2428,6 +2428,8 @@ static int __devinit ymf_probe_one(struct pci_dev *pcidev, const struct pci_devi
 		goto out_free;
 	}
 
+	pci_set_master(pcidev);
+
 	printk(KERN_INFO "ymfpci: %s at 0x%lx IRQ %d\n",
 	    (char *)ent->driver_data, pci_resource_start(pcidev, 0), pcidev->irq);
 

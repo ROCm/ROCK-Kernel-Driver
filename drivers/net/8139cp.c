@@ -625,6 +625,10 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		len = skb->len;
 		mapping = pci_map_single(cp->pdev, skb->data, len, PCI_DMA_TODEVICE);
 		eor = (entry == (CP_TX_RING_SIZE - 1)) ? RingEnd : 0;
+		txd->opts2 = 0;
+		txd->addr_lo = cpu_to_le32(mapping);
+		wmb();
+
 #ifdef CP_TX_CHECKSUM
 		txd->opts1 = cpu_to_le32(eor | len | DescOwn | FirstFrag |
 			LastFrag | IPCS | UDPCS | TCPCS);
@@ -632,13 +636,11 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 		txd->opts1 = cpu_to_le32(eor | len | DescOwn | FirstFrag |
 			LastFrag);
 #endif
-		txd->opts2 = 0;
-		txd->addr_lo = cpu_to_le32(mapping);
+		wmb();
 
 		cp->tx_skb[entry].skb = skb;
 		cp->tx_skb[entry].mapping = mapping;
 		cp->tx_skb[entry].frag = 0;
-		wmb();
 		entry = NEXT_TX(entry);
 	} else {
 		struct cp_desc *txd;
@@ -676,24 +678,29 @@ static int cp_start_xmit (struct sk_buff *skb, struct net_device *dev)
 				ctrl |= LastFrag;
 
 			txd = &cp->tx_ring[entry];
-			txd->opts1 = cpu_to_le32(ctrl);
 			txd->opts2 = 0;
 			txd->addr_lo = cpu_to_le32(mapping);
+			wmb();
+
+			txd->opts1 = cpu_to_le32(ctrl);
+			wmb();
 
 			cp->tx_skb[entry].skb = skb;
 			cp->tx_skb[entry].mapping = mapping;
 			cp->tx_skb[entry].frag = frag + 2;
-			wmb();
 			entry = NEXT_TX(entry);
 		}
+
 		txd = &cp->tx_ring[first_entry];
+		txd->opts2 = 0;
+		txd->addr_lo = cpu_to_le32(first_mapping);
+		wmb();
+
 #ifdef CP_TX_CHECKSUM
 		txd->opts1 = cpu_to_le32(first_len | FirstFrag | DescOwn | IPCS | UDPCS | TCPCS);
 #else
 		txd->opts1 = cpu_to_le32(first_len | FirstFrag | DescOwn);
 #endif
-		txd->opts2 = 0;
-		txd->addr_lo = cpu_to_le32(first_mapping);
 		wmb();
 	}
 	cp->tx_head = entry;

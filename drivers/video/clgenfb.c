@@ -31,7 +31,7 @@
  *
  */
 
-#define CLGEN_VERSION "1.9.9"
+#define CLGEN_VERSION "1.9.9.1"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -86,7 +86,6 @@
 /* disable runtime assertions? */
 /* #define CLGEN_NDEBUG */
 
-
 /* debug output */
 #ifdef CLGEN_DEBUG
 #define DPRINTK(fmt, args...) printk(KERN_DEBUG "%s: " fmt, __FUNCTION__ , ## args)
@@ -115,6 +114,7 @@
 #define FALSE 0
 
 #define MB_ (1024*1024)
+#define KB_ (1024)
 
 #define MAX_NUM_BOARDS 7
 
@@ -439,8 +439,20 @@ static const struct {
 		 {0, 8, 0},
 		 {0, 8, 0},
 		 {0, 0, 0},
-	       0, 0, -1, -1, FB_ACCEL_NONE, 40000, 32, 32, 33, 10, 96, 2,
+	       0, 0, -1, -1, FB_ACCEL_NONE, 40000, 48, 16, 32, 8, 96, 4,
      FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	 }
+	},
+
+	{"800x600",		/* 800x600, 48 kHz, 76 Hz, 50 MHz PixClock */
+	 {
+		 800, 600, 800, 600, 0, 0, 8, 0,
+		 {0, 8, 0},
+		 {0, 8, 0},
+		 {0, 8, 0},
+		 {0, 0, 0},
+	       0, 0, -1, -1, FB_ACCEL_NONE, 20000, 128, 16, 24, 2, 96, 6,
+     0, FB_VMODE_NONINTERLACED
 	 }
 	},
 
@@ -455,8 +467,8 @@ static const struct {
 			{0, 8, 0},
 			{0, 8, 0},
 			{0, 0, 0},
-	      0, 0, -1, -1, FB_ACCEL_NONE, 12500, 92, 112, 31, 2, 204, 4,
-     FB_SYNC_HOR_HIGH_ACT | FB_SYNC_VERT_HIGH_ACT, FB_VMODE_NONINTERLACED
+	      0, 0, -1, -1, FB_ACCEL_NONE, 12500, 144, 32, 30, 2, 192, 6,
+     0, FB_VMODE_NONINTERLACED
 		}
 	}
 };
@@ -2404,22 +2416,27 @@ static void __init get_prep_addrs (unsigned long *display, unsigned long *regist
  * seem to have. */
 static unsigned int __init clgen_get_memsize (caddr_t regbase)
 {
-	unsigned long mem = 1 * MB_;
+	unsigned long mem;
 	unsigned char SRF;
 
 	DPRINTK ("ENTER\n");
 
 	SRF = vga_rseq (regbase, CL_SEQRF);
-	if ((SRF & 0x18) == 0x18) {
+	switch ((SRF & 0x18)) {
+	    case 0x08: mem = 512 * 1024; break;
+	    case 0x10: mem = 1024 * 1024; break;
 		/* 64-bit DRAM data bus width; assume 2MB. Also indicates 2MB memory
 		   * on the 5430. */
-		mem *= 2;
+	    case 0x18: mem = 2048 * 1024; break;
+	    default: printk ("CLgenfb: Unknown memory size!\n");
+		mem = 1024 * 1024;
 	}
 	if (SRF & 0x80) {
 		/* If DRAM bank switching is enabled, there must be twice as much
 		   * memory installed. (4MB on the 5434) */
 		mem *= 2;
 	}
+	/* TODO: Handling of GD5446/5480 (see XF86 sources ...) */
 	return mem;
 
 	DPRINTK ("EXIT\n");
@@ -2562,9 +2579,9 @@ static int __init clgen_pci_setup (struct clgenfb_info *info,
 	info->fbmem_phys = board_addr;
 	info->size = board_size;
 
-	printk (" RAM (%lu MB) at 0x%lx, ", info->size / MB_, board_addr);
+	printk (" RAM (%lu kB) at 0x%lx, ", info->size / KB_, board_addr);
 
-	printk (KERN_INFO "Cirrus Logic chipset on PCI bus\n");
+	printk ("Cirrus Logic chipset on PCI bus\n");
 
 	DPRINTK ("EXIT, returning 0\n");
 	return 0;

@@ -1233,13 +1233,12 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 			}
 
 			/* K6 with old style WHCR */
-			if( c->x86_model < 8 ||
-				(c->x86_model== 8 && c->x86_mask < 8))
-			{
+			if (c->x86_model < 8 ||
+			   (c->x86_model== 8 && c->x86_mask < 8)) {
 				/* We can only write allocate on the low 508Mb */
 				if(mbytes>508)
 					mbytes=508;
-					
+
 				rdmsr(MSR_K6_WHCR, l, h);
 				if ((l&0x0000FFFF)==0) {
 					unsigned long flags;
@@ -1250,14 +1249,14 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 					local_irq_restore(flags);
 					printk(KERN_INFO "Enabling old style K6 write allocation for %d Mb\n",
 						mbytes);
-					
 				}
 				break;
 			}
-			if (c->x86_model == 8 || c->x86_model == 9 || c->x86_model == 13)
-			{
+
+			if ((c->x86_model == 8 && c->x86_mask >7) ||
+			     c->x86_model == 9 || c->x86_model == 13) {
 				/* The more serious chips .. */
-				
+
 				if(mbytes>4092)
 					mbytes=4092;
 
@@ -1274,10 +1273,8 @@ static int __init init_amd(struct cpuinfo_x86 *c)
 				}
 
 				/*  Set MTRR capability flag if appropriate */
-				if ( (c->x86_model == 13) ||
-				     (c->x86_model == 9) ||
-				     ((c->x86_model == 8) && 
-				     (c->x86_mask >= 8)) )
+				if (c->x86_model == 13 || c->x86_model == 9 ||
+				   (c->x86_model == 8 && c->x86_mask >= 8))
 					set_bit(X86_FEATURE_K6_MTRR, &c->x86_capability);
 				break;
 			}

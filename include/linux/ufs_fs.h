@@ -96,17 +96,6 @@
 #define UFS_FSBAD     ((char)0xff)
 
 /* From here to next blank line, s_flags for ufs_sb_info */
-/* endianness */
-#define UFS_BYTESEX             0x00000001      /* mask; leave room to 0xF */
-#if defined(__LITTLE_ENDIAN) || defined(__BIG_ENDIAN)
-/* these are for sane architectures */
-#define UFS_NATIVE_ENDIAN	0x00000000
-#define UFS_SWABBED_ENDIAN	0x00000001
-#else
-/* these are for pervert architectures */
-#define UFS_LITTLE_ENDIAN	0x00000000
-#define UFS_BIG_ENDIAN		0x00000001
-#endif
 /* directory entry encoding */
 #define UFS_DE_MASK		0x00000010	/* mask for the following */
 #define UFS_DE_OLD		0x00000000
@@ -417,7 +406,8 @@ struct ufs_super_block {
  * super block lock fs->fs_lock.
  */
 #define	CG_MAGIC	0x090255
-#define ufs_cg_chkmagic(ucg)	(SWAB32((ucg)->cg_magic) == CG_MAGIC)
+#define ufs_cg_chkmagic(sb, ucg) \
+	(fs32_to_cpu((sb), (ucg)->cg_magic) == CG_MAGIC)
 
 /*
  * size of this structure is 172 B

@@ -678,11 +678,11 @@ void prune_icache(int goal)
 		entry = entry->prev;
 		inode = INODE(tmp);
 		if (inode->i_state & (I_FREEING|I_CLEAR|I_LOCK))
-			BUG();
+			continue;
 		if (!CAN_UNUSE(inode))
 			continue;
 		if (atomic_read(&inode->i_count))
-			BUG();
+			continue;
 		list_del(tmp);
 		list_del(&inode->i_hash);
 		INIT_LIST_HEAD(&inode->i_hash);

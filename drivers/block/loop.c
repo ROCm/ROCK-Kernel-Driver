@@ -180,6 +180,7 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 	unsigned size, offset;
 	int len;
 
+	down(&mapping->host->i_sem);
 	index = pos >> PAGE_CACHE_SHIFT;
 	offset = pos & (PAGE_CACHE_SIZE - 1);
 	len = bh->b_size;
@@ -220,12 +221,14 @@ static int lo_send(struct loop_device *lo, struct buffer_head *bh, int bsize,
 		UnlockPage(page);
 		page_cache_release(page);
 	}
+	up(&mapping->host->i_sem);
 	return 0;
 
 unlock:
 	UnlockPage(page);
 	page_cache_release(page);
 fail:
+	up(&mapping->host->i_sem);
 	return -1;
 }
 

@@ -36,8 +36,9 @@ struct ethtool_drvinfo {
 	char	bus_info[ETHTOOL_BUSINFO_LEN];	/* Bus info for this IF. */
 				/* For PCI devices, use pci_dev->slot_name. */
 	char	reserved1[32];
-	char	reserved2[28];
-	u32	regdump_len;	/* Amount of data from ETHTOOL_GREGS (u32s) */
+	char	reserved2[24];
+	u32	eedump_len;	/* Size of data from ETHTOOL_GEEPROM (bytes) */
+	u32	regdump_len;	/* Size of data from ETHTOOL_GREGS (bytes) */
 };
 
 #define SOPASS_MAX	6
@@ -59,10 +60,18 @@ struct ethtool_value {
 struct ethtool_regs {
 	u32	cmd;
 	u32	version; /* driver-specific, indicates different chips/revs */
-	u32	len; /* in u32 increments */
-	u32	data[0];
+	u32	len; /* bytes */
+	u8	data[0];
 };
 
+/* for passing EEPROM chunks */
+struct ethtool_eeprom {
+	u32	cmd;
+	u32	magic;
+	u32	offset; /* in bytes */
+	u32	len; /* in bytes */
+	u8	data[0];
+};
 /* CMDs currently supported */
 #define ETHTOOL_GSET		0x00000001 /* Get settings. */
 #define ETHTOOL_SSET		0x00000002 /* Set settings, privileged. */
@@ -74,6 +83,8 @@ struct ethtool_regs {
 #define ETHTOOL_SMSGLVL		0x00000008 /* Set driver msg level, priv. */
 #define ETHTOOL_NWAY_RST	0x00000009 /* Restart autonegotiation, priv. */
 #define ETHTOOL_GLINK		0x0000000a /* Get link status */
+#define ETHTOOL_GEEPROM		0x0000000b /* Get EEPROM data */
+#define ETHTOOL_SEEPROM		0x0000000c /* Set EEPROM data */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

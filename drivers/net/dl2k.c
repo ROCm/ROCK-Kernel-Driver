@@ -12,34 +12,41 @@
 /*
     Rev		Date		Description
     ==========================================================================
-    0.01	2001/05/03	Create DL2000-based linux driver
-    0.02	2001/05/21	Add VLAN and hardware checksum support.
-    1.00	2001/06/26	Add jumbo frame support.
-    1.01	2001/08/21	Add two parameters, int_count and int_timeout.
+    0.01	2001/05/03	Created DL2000-based linux driver
+    0.02	2001/05/21	Added VLAN and hardware checksum support.
+    1.00	2001/06/26	Added jumbo frame support.
+    1.01	2001/08/21	Added two parameters, int_count and int_timeout.
+    1.02	2001/10/08	Supported fiber media.
+    				Added flow control parameters.
+    1.03	2001/10/12	Changed the default media to 1000mbps_fd for the 
+    				fiber devices.
+    1.04	2001/11/08	Fixed a bug which Tx stop when a very busy case.
 */
 
 #include "dl2k.h"
 
 static char version[] __devinitdata =
-    KERN_INFO "D-Link DL2000-based linux driver v1.01 2001/08/30\n";
+    KERN_INFO "D-Link DL2000-based linux driver v1.04 2001/11/08\n";
 
 #define MAX_UNITS 8
 static int mtu[MAX_UNITS];
 static int vlan[MAX_UNITS];
 static int jumbo[MAX_UNITS];
 static char *media[MAX_UNITS];
+static int tx_flow[MAX_UNITS];
+static int rx_flow[MAX_UNITS];
 static int copy_thresh;
 static int int_count;		/* Rx frame count each interrupt */
 static int int_timeout;		/* Rx DMA wait time in 64ns increments */
 
 MODULE_AUTHOR ("Edward Peng");
 MODULE_DESCRIPTION ("D-Link DL2000-based Gigabit Ethernet Adapter");
-MODULE_LICENSE("GPL");
-
 MODULE_PARM (mtu, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (media, "1-" __MODULE_STRING (MAX_UNITS) "s");
 MODULE_PARM (vlan, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (jumbo, "1-" __MODULE_STRING (MAX_UNITS) "i");
+MODULE_PARM (tx_flow, "1-" __MODULE_STRING (MAX_UNITS) "i");
+MODULE_PARM (rx_flow, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM (copy_thresh, "i");
 MODULE_PARM (int_count, "i");
 MODULE_PARM (int_timeout, "i");
@@ -72,6 +79,8 @@ static unsigned get_crc (unsigned char *p, int len);
 static int mii_wait_link (struct net_device *dev, int wait);
 static int mii_set_media (struct net_device *dev);
 static int mii_get_media (struct net_device *dev);
+static int mii_set_media_pcs (struct net_device *dev);
+static int mii_get_media_pcs (struct net_device *dev);
 static int mii_read (struct net_device *dev, int phy_addr, int reg_num);
 static int mii_write (struct net_device *dev, int phy_addr, int reg_num,
 		      u16 data);
@@ -104,7 +113,6 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out_disable;
 
 	pci_set_master (pdev);
-
 	dev = alloc_etherdev (sizeof (*np));
 	if (!dev) {
 		err = -ENOMEM;
@@ -134,7 +142,11 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (card_idx < MAX_UNITS) {
 		if (media[card_idx] != NULL) {
 			np->an_enable = 0;
-			if (strcmp (media[card_idx], "100mbps_fd") == 0 ||
+			if (strcmp (media[card_idx], "auto") == 0 ||
+			    strcmp (media[card_idx], "autosense") == 0 || 
+			    strcmp (media[card_idx], "0") == 0 ) {
+				np->an_enable = 2; 
+			} else if (strcmp (media[card_idx], "100mbps_fd") == 0 ||
 			    strcmp (media[card_idx], "4") == 0) {
 				np->speed = 100;
 				np->full_duplex = 1;
@@ -150,16 +162,14 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 				   strcmp (media[card_idx], "1") == 0) {
 				np->speed = 10;
 				np->full_duplex = 0;
-			}
-			/* Auto-Negotiation is mandatory for 1000BASE-T,
-			   IEEE 802.3ab Annex 28D page 14 */
-			else if (strcmp (media[card_idx], "1000mbps_fd") == 0 ||
-				 strcmp (media[card_idx], "5") == 0 ||
-				 strcmp (media[card_idx], "1000mbps_hd") == 0 ||
+			} else if (strcmp (media[card_idx], "1000mbps_fd") == 0 ||
+				 strcmp (media[card_idx], "5") == 0) {
+				np->speed=1000;
+				np->full_duplex=1;
+			} else if (strcmp (media[card_idx], "1000mbps_hd") == 0 ||
 				 strcmp (media[card_idx], "6") == 0) {
 				np->speed = 1000;
-				np->full_duplex = 1;
-				np->an_enable = 1;
+				np->full_duplex = 0;
 			} else {
 				np->an_enable = 1;
 			}
@@ -179,6 +189,9 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 			np->int_timeout = int_timeout;
 			np->coalesce = 1;
 		}
+		np->tx_flow = (tx_flow[card_idx]) ? 1 : 0;
+		np->rx_flow = (rx_flow[card_idx]) ? 1 : 0;
+		
 	}
 	dev->open = &rio_open;
 	dev->hard_start_xmit = &start_xmit;
@@ -213,9 +226,27 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 	err = find_miiphy (dev);
 	if (err)
 		goto err_out_unmap_rx;
-
+	
+	/* Fiber device? */
+	np->phy_media = (readw(ioaddr + ASICCtrl) & PhyMedia) ? 1 : 0;
 	/* Set media and reset PHY */
-	mii_set_media (dev);
+	if (np->phy_media) {
+		/* default 1000mbps_fd for fiber deivices */
+		if (np->an_enable == 1) {
+			np->an_enable = 0;
+			np->speed = 1000;
+			np->full_duplex = 1;
+		} else if (np->an_enable == 2) {
+			np->an_enable = 1;
+		}
+		mii_set_media_pcs (dev);
+	} else {
+		/* Auto-Negotiation is mandatory for 1000BASE-T,
+		   IEEE 802.3ab Annex 28D page 14 */
+		if (np->speed == 1000)
+			np->an_enable = 1;
+		mii_set_media (dev);
+	}
 
 	/* Reset all logic functions */
 	writew (GlobalReset | DMAReset | FIFOReset | NetworkReset | HostReset,
@@ -227,7 +258,7 @@ rio_probe1 (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	card_idx++;
 
-	printk (KERN_INFO "%s: %s, %2x:%2x:%2x:%2x:%2x:%2x, IRQ %d\n",
+	printk (KERN_INFO "%s: %s, %02x:%02x:%02x:%02x:%02x:%02x, IRQ %d\n",
 		dev->name, np->name,
 		dev->dev_addr[0], dev->dev_addr[1], dev->dev_addr[2],
 		dev->dev_addr[3], dev->dev_addr[4], dev->dev_addr[5], irq);
@@ -297,7 +328,7 @@ parse_eeprom (struct net_device *dev)
 
 	/* Check CRC */
 	crc = ~get_crc (sromdata, 256 - 4);
-	if (psrom->crc != ~get_crc (sromdata, 256 - 4)) {
+	if (psrom->crc != crc) {
 		printk (KERN_ERR "%s: EEPROM data CRC error.\n", dev->name);
 		return -1;
 	}
@@ -590,7 +621,7 @@ rio_interrupt (int irq, void *dev_instance, struct pt_regs *rgs)
 		if (int_status & RxDMAComplete)
 			receive_packet (dev);
 		/* TxComplete interrupt */
-		if (int_status & TxComplete) {
+		if (int_status & TxComplete || np->tx_full) {
 			int tx_status = readl (ioaddr + TxStatus);
 			if (tx_status & 0x01)
 				tx_error (dev, tx_status);
@@ -715,8 +746,6 @@ tx_error (struct net_device *dev, int tx_status)
 	writel (readw (dev->base_addr + MACCtrl) | TxEnable, ioaddr + MACCtrl);
 }
 
-/* Every interrupts go into here to see if any packet need to process, this
-   ensure Rx rings keep full in a critical cases of Rx rings ran out */
 static int
 receive_packet (struct net_device *dev)
 {
@@ -832,6 +861,7 @@ rio_error (struct net_device *dev, int int_status)
 {
 	long ioaddr = dev->base_addr;
 	struct netdev_private *np = dev->priv;
+	u16 macctrl;
 
 	/* Stop the down counter and recovery the interrupt */
 	if (int_status & IntRequested) {
@@ -845,15 +875,17 @@ rio_error (struct net_device *dev, int int_status)
 	if (int_status & LinkEvent) {
 		if (mii_wait_link (dev, 10) == 0) {
 			printk (KERN_INFO "%s: Link up\n", dev->name);
-			if (np->an_enable) {
-				/* Auto-Negotiation mode */
+			if (np->phy_media)
+				mii_get_media_pcs (dev);
+			else
 				mii_get_media (dev);
-				if (np->full_duplex) {
-					writew (readw (dev->base_addr + MACCtrl)
-						| DuplexSelect,
-						ioaddr + MACCtrl);
-				}
-			}
+			macctrl = 0;
+			macctrl |= (np->full_duplex) ? DuplexSelect : 0;
+			macctrl |= (np->tx_flow) ? 
+				TxFlowControlEnable : 0;
+			macctrl |= (np->rx_flow) ? 
+				RxFlowControlEnable : 0;
+			writew(macctrl,	ioaddr + MACCtrl);
 		} else {
 			printk (KERN_INFO "%s: Link off\n", dev->name);
 		}
@@ -1302,35 +1334,42 @@ mii_get_media (struct net_device *dev)
 			/* Auto-Negotiation not completed */
 			return -1;
 		}
-		negotiate.image = mii_read (dev, phy_addr, MII_ANAR) &
-		    mii_read (dev, phy_addr, MII_ANLPAR);
+		negotiate.image = mii_read (dev, phy_addr, MII_ANAR) & 
+			mii_read (dev, phy_addr, MII_ANLPAR);
 		mscr.image = mii_read (dev, phy_addr, MII_MSCR);
 		mssr.image = mii_read (dev, phy_addr, MII_MSSR);
 		if (mscr.bits.media_1000BT_FD & mssr.bits.lp_1000BT_FD) {
 			np->speed = 1000;
 			np->full_duplex = 1;
-			printk (KERN_INFO "Auto 1000BaseT, Full duplex.\n");
+			printk (KERN_INFO "Auto 1000 Mbps, Full duplex\n");
 		} else if (mscr.bits.media_1000BT_HD & mssr.bits.lp_1000BT_HD) {
 			np->speed = 1000;
 			np->full_duplex = 0;
-			printk (KERN_INFO "Auto 1000BaseT, Half duplex.\n");
+			printk (KERN_INFO "Auto 1000 Mbps, Half duplex\n");
 		} else if (negotiate.bits.media_100BX_FD) {
 			np->speed = 100;
 			np->full_duplex = 1;
-			printk (KERN_INFO "Auto 100BaseT, Full duplex.\n");
+			printk (KERN_INFO "Auto 100 Mbps, Full duplex\n");
 		} else if (negotiate.bits.media_100BX_HD) {
 			np->speed = 100;
 			np->full_duplex = 0;
-			printk (KERN_INFO "Auto 100BaseT, Half duplex.\n");
+			printk (KERN_INFO "Auto 100 Mbps, Half duplex\n");
 		} else if (negotiate.bits.media_10BT_FD) {
 			np->speed = 10;
 			np->full_duplex = 1;
-			printk (KERN_INFO "Auto 10BaseT, Full duplex.\n");
+			printk (KERN_INFO "Auto 10 Mbps, Full duplex\n");
 		} else if (negotiate.bits.media_10BT_HD) {
 			np->speed = 10;
 			np->full_duplex = 0;
-			printk (KERN_INFO "Auto 10BaseT, Half duplex.\n");
+			printk (KERN_INFO "Auto 10 Mbps, Half duplex\n");
 		}
+		if (negotiate.bits.pause) {
+			np->tx_flow = 1;
+			np->rx_flow = 1;
+		} else if (negotiate.bits.asymmetric) {
+			np->rx_flow = 1;
+		}
+		/* else tx_flow, rx_flow = user select  */
 	} else {
 		bmcr.image = mii_read (dev, phy_addr, MII_BMCR);
 		if (bmcr.bits.speed100 == 1 && bmcr.bits.speed1000 == 0) {
@@ -1341,11 +1380,20 @@ mii_get_media (struct net_device *dev)
 			printk (KERN_INFO "Operating at 1000 Mbps, ");
 		}
 		if (bmcr.bits.duplex_mode) {
-			printk ("Full duplex.\n");
+			printk ("Full duplex\n");
 		} else {
-			printk ("Half duplex.\n");
+			printk ("Half duplex\n");
 		}
 	}
+	if (np->tx_flow) 
+		printk(KERN_INFO "Enable Tx Flow Control\n");
+	else	
+		printk(KERN_INFO "Disable Tx Flow Control\n");
+	if (np->rx_flow)
+		printk(KERN_INFO "Enable Rx Flow Control\n");
+	else
+		printk(KERN_INFO "Disable Rx Flow Control\n");
+
 	return 0;
 }
 
@@ -1363,7 +1411,7 @@ mii_set_media (struct net_device *dev)
 
 	/* Does user set speed? */
 	if (np->an_enable) {
-		/* Reset to enable Auto-Negotiation */
+		/* Advertise capabilities */
 		bmsr.image = mii_read (dev, phy_addr, MII_BMSR);
 		anar.image = mii_read (dev, phy_addr, MII_ANAR);
 		anar.bits.media_100BX_FD = bmsr.bits.media_100BX_FD;
@@ -1371,24 +1419,23 @@ mii_set_media (struct net_device *dev)
 		anar.bits.media_100BT4 = bmsr.bits.media_100BT4;
 		anar.bits.media_10BT_FD = bmsr.bits.media_10BT_FD;
 		anar.bits.media_10BT_HD = bmsr.bits.media_10BT_HD;
+		anar.bits.pause = 1;
+		anar.bits.asymmetric = 1;
 		mii_write (dev, phy_addr, MII_ANAR, anar.image);
 
 		/* Enable Auto crossover */
 		pscr.image = mii_read (dev, phy_addr, MII_PHY_SCR);
 		pscr.bits.mdi_crossover_mode = 3;	/* 11'b */
 		mii_write (dev, phy_addr, MII_PHY_SCR, pscr.image);
+		
 		/* Soft reset PHY */
 		mii_write (dev, phy_addr, MII_BMCR, MII_BMCR_RESET);
 		bmcr.image = 0;
 		bmcr.bits.an_enable = 1;
+		bmcr.bits.restart_an = 1;
 		bmcr.bits.reset = 1;
 		mii_write (dev, phy_addr, MII_BMCR, bmcr.image);
-		/* Wait for Link up, link up need a certain time */
-		if (mii_wait_link (dev, 3200) != 0) {
-			printk (KERN_INFO "Link time out\n");
-		}
-		mdelay (1);
-		mii_get_media (dev);
+		mdelay(1);
 	} else {
 		/* Force speed setting */
 		/* 1) Disable Auto crossover */
@@ -1423,10 +1470,10 @@ mii_set_media (struct net_device *dev)
 		}
 		if (np->full_duplex) {
 			bmcr.bits.duplex_mode = 1;
-			printk ("Full duplex. \n");
+			printk ("Full duplex\n");
 		} else {
 			bmcr.bits.duplex_mode = 0;
-			printk ("Half duplex.\n");
+			printk ("Half duplex\n");
 		}
 #if 0
 		/* Set 1000BaseT Master/Slave setting */
@@ -1435,15 +1482,124 @@ mii_set_media (struct net_device *dev)
 		mscr.bits.cfg_value = 0;
 #endif
 		mii_write (dev, phy_addr, MII_BMCR, bmcr.image);
-
-		/* Wait for Link up, link up need a certain time */
-		if (mii_wait_link (dev, 3200) != 0) {
-			printk (KERN_INFO "Link time out\n");
-		}
-		mii_get_media (dev);
+		mdelay(10);
 	}
 	return 0;
 }
+
+static int
+mii_get_media_pcs (struct net_device *dev)
+{
+	ANAR_PCS_t negotiate;
+	BMSR_t bmsr;
+	BMCR_t bmcr;
+	int phy_addr;
+	struct netdev_private *np;
+
+	np = dev->priv;
+	phy_addr = np->phy_addr;
+
+	bmsr.image = mii_read (dev, phy_addr, PCS_BMSR);
+	if (np->an_enable) {
+		if (!bmsr.bits.an_complete) {
+			/* Auto-Negotiation not completed */
+			return -1;
+		}
+		negotiate.image = mii_read (dev, phy_addr, PCS_ANAR) & 
+			mii_read (dev, phy_addr, PCS_ANLPAR);
+		np->speed = 1000;
+		if (negotiate.bits.full_duplex) {
+			printk (KERN_INFO "Auto 1000 Mbps, Full duplex\n");
+			np->full_duplex = 1;
+		} else {
+			printk (KERN_INFO "Auto 1000 Mbps, half duplex\n");
+			np->full_duplex = 0;
+		}
+		if (negotiate.bits.pause) {
+			np->tx_flow = 1;
+			np->rx_flow = 1;
+		} else if (negotiate.bits.asymmetric) {
+			np->rx_flow = 1;
+		}
+		/* else tx_flow, rx_flow = user select  */
+	} else {
+		bmcr.image = mii_read (dev, phy_addr, PCS_BMCR);
+		printk (KERN_INFO "Operating at 1000 Mbps, ");
+		if (bmcr.bits.duplex_mode) {
+			printk ("Full duplex\n");
+		} else {
+			printk ("Half duplex\n");
+		}
+	}
+	if (np->tx_flow) 
+		printk(KERN_INFO "Enable Tx Flow Control\n");
+	else	
+		printk(KERN_INFO "Disable Tx Flow Control\n");
+	if (np->rx_flow)
+		printk(KERN_INFO "Enable Rx Flow Control\n");
+	else
+		printk(KERN_INFO "Disable Rx Flow Control\n");
+
+	return 0;
+}
+
+static int
+mii_set_media_pcs (struct net_device *dev)
+{
+	BMCR_t bmcr;
+	ESR_t esr;
+	ANAR_PCS_t anar;
+	int phy_addr;
+	struct netdev_private *np;
+	np = dev->priv;
+	phy_addr = np->phy_addr;
+
+	/* Auto-Negotiation? */
+	if (np->an_enable) {
+		/* Advertise capabilities */
+		esr.image = mii_read (dev, phy_addr, PCS_ESR);
+		anar.image = mii_read (dev, phy_addr, MII_ANAR);
+		anar.bits.half_duplex = 
+			esr.bits.media_1000BT_HD | esr.bits.media_1000BX_HD;
+		anar.bits.full_duplex = 
+			esr.bits.media_1000BT_FD | esr.bits.media_1000BX_FD;
+		anar.bits.pause = 1;
+		anar.bits.asymmetric = 1;
+		mii_write (dev, phy_addr, MII_ANAR, anar.image);
+
+		/* Soft reset PHY */
+		mii_write (dev, phy_addr, MII_BMCR, MII_BMCR_RESET);
+		bmcr.image = 0;
+		bmcr.bits.an_enable = 1;
+		bmcr.bits.restart_an = 1;
+		bmcr.bits.reset = 1;
+		mii_write (dev, phy_addr, MII_BMCR, bmcr.image);
+		mdelay(1);
+	} else {
+		/* Force speed setting */
+		/* PHY Reset */
+		bmcr.image = 0;
+		bmcr.bits.reset = 1;
+		mii_write (dev, phy_addr, MII_BMCR, bmcr.image);
+		mdelay(10);
+		bmcr.image = 0;
+		bmcr.bits.an_enable = 0;
+		if (np->full_duplex) {
+			bmcr.bits.duplex_mode = 1;
+			printk (KERN_INFO "Manual full duplex\n");
+		} else {
+			bmcr.bits.duplex_mode = 0;
+			printk (KERN_INFO "Manual half duplex\n");
+		}
+		mii_write (dev, phy_addr, MII_BMCR, bmcr.image);
+		mdelay(10);
+
+		/*  Advertise nothing */
+		mii_write (dev, phy_addr, MII_ANAR, 0);
+	}
+	return 0;
+}
+
 
 static int
 rio_close (struct net_device *dev)
@@ -1521,10 +1677,6 @@ static struct pci_driver rio_driver = {
 static int __init
 rio_init (void)
 {
-#ifdef MODULE
-	printk ("%s", version);
-#endif
-
 	return pci_module_init (&rio_driver);
 }
 
@@ -1542,5 +1694,7 @@ module_exit (rio_exit);
 Compile command: 
  
 gcc -D__KERNEL__ -DMODULE -I/usr/src/linux/include -Wall -Wstrict-prototypes -O2 -c dl2x.c
+
+Read Documentation/networking/dl2k.txt for details.
 
 */

@@ -1,3 +1,7 @@
+2001-11-13  David S. Miller  <davem@redhat.com>
+
+	* tulip_core.c (tulip_mwi_config): Kill unused label early_out.
+
 2001-11-06  Richard Mortimer  <richm@oldelvet.netscapeonline.co.uk>
 
 	* tulip_core.c:  Correct set of values to mask out of csr0,

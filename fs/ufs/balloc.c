@@ -44,11 +44,9 @@ void ufs_free_fragments (struct inode * inode, unsigned fragment, unsigned count
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned cgno, bit, end_bit, bbase, blkmap, i, blkno, cylno;
-	unsigned swab;
 	
 	sb = inode->i_sb;
 	uspi = sb->u.ufs_sb.s_uspi;
-	swab = sb->u.ufs_sb.s_swab;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	
 	UFSD(("ENTER, fragment %u, count %u\n", fragment, count))
@@ -69,7 +67,7 @@ void ufs_free_fragments (struct inode * inode, unsigned fragment, unsigned count
 	if (!ucpi) 
 		goto failed;
 	ucg = ubh_get_ucg (UCPI_UBH);
-	if (!ufs_cg_chkmagic (ucg)) {
+	if (!ufs_cg_chkmagic(sb, ucg)) {
 		ufs_panic (sb, "ufs_free_fragments", "internal error, bad magic number on cg %u", cgno);
 		goto failed;
 	}
@@ -86,9 +84,11 @@ void ufs_free_fragments (struct inode * inode, unsigned fragment, unsigned count
 	}
 	
 	DQUOT_FREE_BLOCK (inode, count);
-	ADD_SWAB32(ucg->cg_cs.cs_nffree, count);
-	ADD_SWAB32(usb1->fs_cstotal.cs_nffree, count);
-	ADD_SWAB32(sb->fs_cs(cgno).cs_nffree, count);
+
+	
+	fs32_add(sb, &ucg->cg_cs.cs_nffree, count);
+	fs32_add(sb, &usb1->fs_cstotal.cs_nffree, count);
+	fs32_add(sb, &sb->fs_cs(cgno).cs_nffree, count);
 	blkmap = ubh_blkmap (UCPI_UBH, ucpi->c_freeoff, bbase);
 	ufs_fragacct(sb, blkmap, ucg->cg_frsum, 1);
 
@@ -97,17 +97,17 @@ void ufs_free_fragments (struct inode * inode, unsigned fragment, unsigned count
 	 */
 	blkno = ufs_fragstoblks (bbase);
 	if (ubh_isblockset(UCPI_UBH, ucpi->c_freeoff, blkno)) {
-		SUB_SWAB32(ucg->cg_cs.cs_nffree, uspi->s_fpb);
-		SUB_SWAB32(usb1->fs_cstotal.cs_nffree, uspi->s_fpb);
-		SUB_SWAB32(sb->fs_cs(cgno).cs_nffree, uspi->s_fpb);
+		fs32_sub(sb, &ucg->cg_cs.cs_nffree, uspi->s_fpb);
+		fs32_sub(sb, &usb1->fs_cstotal.cs_nffree, uspi->s_fpb);
+		fs32_sub(sb, &sb->fs_cs(cgno).cs_nffree, uspi->s_fpb);
 		if ((sb->u.ufs_sb.s_flags & UFS_CG_MASK) == UFS_CG_44BSD)
 			ufs_clusteracct (sb, ucpi, blkno, 1);
-		INC_SWAB32(ucg->cg_cs.cs_nbfree);
-		INC_SWAB32(usb1->fs_cstotal.cs_nbfree);
-		INC_SWAB32(sb->fs_cs(cgno).cs_nbfree);
+		fs32_add(sb, &ucg->cg_cs.cs_nbfree, 1);
+		fs32_add(sb, &usb1->fs_cstotal.cs_nbfree, 1);
+		fs32_add(sb, &sb->fs_cs(cgno).cs_nbfree, 1);
 		cylno = ufs_cbtocylno (bbase);
-		INC_SWAB16(ubh_cg_blks (ucpi, cylno, ufs_cbtorpos(bbase)));
-		INC_SWAB32(ubh_cg_blktot (ucpi, cylno));
+		fs16_add(sb, &ubh_cg_blks(ucpi, cylno, ufs_cbtorpos(bbase)), 1);
+		fs32_add(sb, &ubh_cg_blktot(ucpi, cylno), 1);
 	}
 	
 	ubh_mark_buffer_dirty (USPI_UBH);
@@ -138,11 +138,9 @@ void ufs_free_blocks (struct inode * inode, unsigned fragment, unsigned count) {
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned overflow, cgno, bit, end_bit, blkno, i, cylno;
-	unsigned swab;
 	
 	sb = inode->i_sb;
 	uspi = sb->u.ufs_sb.s_uspi;
-	swab = sb->u.ufs_sb.s_swab;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 
 	UFSD(("ENTER, fragment %u, count %u\n", fragment, count))
@@ -174,7 +172,7 @@ do_more:
 	if (!ucpi) 
 		goto failed;
 	ucg = ubh_get_ucg (UCPI_UBH);
-	if (!ufs_cg_chkmagic (ucg)) {
+	if (!ufs_cg_chkmagic(sb, ucg)) {
 		ufs_panic (sb, "ufs_free_blocks", "internal error, bad magic number on cg %u", cgno);
 		goto failed;
 	}
@@ -188,12 +186,13 @@ do_more:
 		if ((sb->u.ufs_sb.s_flags & UFS_CG_MASK) == UFS_CG_44BSD)
 			ufs_clusteracct (sb, ucpi, blkno, 1);
 		DQUOT_FREE_BLOCK(inode, uspi->s_fpb);
-		INC_SWAB32(ucg->cg_cs.cs_nbfree);
-		INC_SWAB32(usb1->fs_cstotal.cs_nbfree);
-		INC_SWAB32(sb->fs_cs(cgno).cs_nbfree);
+
+		fs32_add(sb, &ucg->cg_cs.cs_nbfree, 1);
+		fs32_add(sb, &usb1->fs_cstotal.cs_nbfree, 1);
+		fs32_add(sb, &sb->fs_cs(cgno).cs_nbfree, 1);
 		cylno = ufs_cbtocylno(i);
-		INC_SWAB16(ubh_cg_blks(ucpi, cylno, ufs_cbtorpos(i)));
-		INC_SWAB32(ubh_cg_blktot(ucpi, cylno));
+		fs16_add(sb, &ubh_cg_blks(ucpi, cylno, ufs_cbtorpos(i)), 1);
+		fs32_add(sb, &ubh_cg_blktot(ucpi, cylno), 1);
 	}
 
 	ubh_mark_buffer_dirty (USPI_UBH);
@@ -243,19 +242,17 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	struct ufs_super_block_first * usb1;
 	struct buffer_head * bh;
 	unsigned cgno, oldcount, newcount, tmp, request, i, result;
-	unsigned swab;
 	
 	UFSD(("ENTER, ino %lu, fragment %u, goal %u, count %u\n", inode->i_ino, fragment, goal, count))
 	
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	*err = -ENOSPC;
 
 	lock_super (sb);
 	
-	tmp = SWAB32(*p);
+	tmp = fs32_to_cpu(sb, *p);
 	if (count + ufs_fragnum(fragment) > uspi->s_fpb) {
 		ufs_warning (sb, "ufs_new_fragments", "internal warning"
 			" fragment %u, count %u", fragment, count);
@@ -310,7 +307,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	if (oldcount == 0) {
 		result = ufs_alloc_fragments (inode, cgno, goal, count, err);
 		if (result) {
-			*p = SWAB32(result);
+			*p = cpu_to_fs32(sb, result);
 			*err = 0;
 			inode->i_blocks += count << uspi->s_nspfshift;
 			inode->u.ufs_i.i_lastfrag = max_t(u32, inode->u.ufs_i.i_lastfrag, fragment + count);
@@ -338,23 +335,23 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 	/*
 	 * allocate new block and move data
 	 */
-	switch (SWAB32(usb1->fs_optim)) {
+	switch (fs32_to_cpu(sb, usb1->fs_optim)) {
 	    case UFS_OPTSPACE:
 		request = newcount;
-		if (uspi->s_minfree < 5 || SWAB32(usb1->fs_cstotal.cs_nffree) 
+		if (uspi->s_minfree < 5 || fs32_to_cpu(sb, usb1->fs_cstotal.cs_nffree) 
 		    > uspi->s_dsize * uspi->s_minfree / (2 * 100) )
 			break;
-		usb1->fs_optim = SWAB32(UFS_OPTTIME);
+		usb1->fs_optim = cpu_to_fs32(sb, UFS_OPTTIME);
 		break;
 	    default:
-		usb1->fs_optim = SWAB32(UFS_OPTTIME);
+		usb1->fs_optim = cpu_to_fs32(sb, UFS_OPTTIME);
 	
 	    case UFS_OPTTIME:
 		request = uspi->s_fpb;
-		if (SWAB32(usb1->fs_cstotal.cs_nffree) < uspi->s_dsize *
+		if (fs32_to_cpu(sb, usb1->fs_cstotal.cs_nffree) < uspi->s_dsize *
 		    (uspi->s_minfree - 2) / 100)
 			break;
-		usb1->fs_optim = SWAB32(UFS_OPTSPACE);
+		usb1->fs_optim = cpu_to_fs32(sb, UFS_OPTTIME);
 		break;
 	}
 	result = ufs_alloc_fragments (inode, cgno, goal, request, err);
@@ -378,7 +375,7 @@ unsigned ufs_new_fragments (struct inode * inode, u32 * p, unsigned fragment,
 				return 0;
 			}
 		}
-		*p = SWAB32(result);
+		*p = cpu_to_fs32(sb, result);
 		*err = 0;
 		inode->i_blocks += count << uspi->s_nspfshift;
 		inode->u.ufs_i.i_lastfrag = max_t(u32, inode->u.ufs_i.i_lastfrag, fragment + count);
@@ -405,12 +402,10 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned cgno, fragno, fragoff, count, fragsize, i;
-	unsigned swab;
 	
 	UFSD(("ENTER, fragment %u, oldcount %u, newcount %u\n", fragment, oldcount, newcount))
 	
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first (USPI_UBH);
 	count = newcount - oldcount;
@@ -424,7 +419,7 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 	if (!ucpi)
 		return 0;
 	ucg = ubh_get_ucg (UCPI_UBH);
-	if (!ufs_cg_chkmagic(ucg)) {
+	if (!ufs_cg_chkmagic(sb, ucg)) {
 		ufs_panic (sb, "ufs_add_fragments",
 			"internal error, bad magic number on cg %u", cgno);
 		return 0;
@@ -438,26 +433,27 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 	/*
 	 * Block can be extended
 	 */
-	ucg->cg_time = SWAB32(CURRENT_TIME);
+	ucg->cg_time = cpu_to_fs32(sb, CURRENT_TIME);
 	for (i = newcount; i < (uspi->s_fpb - fragoff); i++)
 		if (ubh_isclr (UCPI_UBH, ucpi->c_freeoff, fragno + i))
 			break;
 	fragsize = i - oldcount;
-	if (!SWAB32(ucg->cg_frsum[fragsize]))
+	if (!fs32_to_cpu(sb, ucg->cg_frsum[fragsize]))
 		ufs_panic (sb, "ufs_add_fragments",
 			"internal error or corrupted bitmap on cg %u", cgno);
-	DEC_SWAB32(ucg->cg_frsum[fragsize]);
+	fs32_sub(sb, &ucg->cg_frsum[fragsize], 1);
 	if (fragsize != count)
-		INC_SWAB32(ucg->cg_frsum[fragsize - count]);
+		fs32_add(sb, &ucg->cg_frsum[fragsize - count], 1);
 	for (i = oldcount; i < newcount; i++)
 		ubh_clrbit (UCPI_UBH, ucpi->c_freeoff, fragno + i);
 	if(DQUOT_ALLOC_BLOCK(inode, count)) {
 		*err = -EDQUOT;
 		return 0;
 	}
-	SUB_SWAB32(ucg->cg_cs.cs_nffree, count);
-	SUB_SWAB32(sb->fs_cs(cgno).cs_nffree, count);
-	SUB_SWAB32(usb1->fs_cstotal.cs_nffree, count);
+
+	fs32_sub(sb, &ucg->cg_cs.cs_nffree, count);
+	fs32_sub(sb, &sb->fs_cs(cgno).cs_nffree, count);
+	fs32_sub(sb, &usb1->fs_cstotal.cs_nffree, count);
 	
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
@@ -474,10 +470,10 @@ unsigned ufs_add_fragments (struct inode * inode, unsigned fragment,
 
 #define UFS_TEST_FREE_SPACE_CG \
 	ucg = (struct ufs_cylinder_group *) sb->u.ufs_sb.s_ucg[cgno]->b_data; \
-	if (SWAB32(ucg->cg_cs.cs_nbfree)) \
+	if (fs32_to_cpu(sb, ucg->cg_cs.cs_nbfree)) \
 		goto cg_found; \
 	for (k = count; k < uspi->s_fpb; k++) \
-		if (SWAB32(ucg->cg_frsum[k])) \
+		if (fs32_to_cpu(sb, ucg->cg_frsum[k])) \
 			goto cg_found; 
 
 unsigned ufs_alloc_fragments (struct inode * inode, unsigned cgno,
@@ -489,12 +485,10 @@ unsigned ufs_alloc_fragments (struct inode * inode, unsigned cgno,
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned oldcg, i, j, k, result, allocsize;
-	unsigned swab;
 	
 	UFSD(("ENTER, ino %lu, cgno %u, goal %u, count %u\n", inode->i_ino, cgno, goal, count))
 
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	oldcg = cgno;
@@ -534,10 +528,10 @@ cg_found:
 	if (!ucpi)
 		return 0;
 	ucg = ubh_get_ucg (UCPI_UBH);
-	if (!ufs_cg_chkmagic(ucg)) 
+	if (!ufs_cg_chkmagic(sb, ucg)) 
 		ufs_panic (sb, "ufs_alloc_fragments",
 			"internal error, bad magic number on cg %u", cgno);
-	ucg->cg_time = SWAB32(CURRENT_TIME);
+	ucg->cg_time = cpu_to_fs32(sb, CURRENT_TIME);
 
 	if (count == uspi->s_fpb) {
 		result = ufs_alloccg_block (inode, ucpi, goal, err);
@@ -547,7 +541,7 @@ cg_found:
 	}
 
 	for (allocsize = count; allocsize < uspi->s_fpb; allocsize++)
-		if (SWAB32(ucg->cg_frsum[allocsize]) != 0)
+		if (fs32_to_cpu(sb, ucg->cg_frsum[allocsize]) != 0)
 			break;
 	
 	if (allocsize == uspi->s_fpb) {
@@ -559,10 +553,11 @@ cg_found:
 			ubh_setbit (UCPI_UBH, ucpi->c_freeoff, goal + i);
 		i = uspi->s_fpb - count;
 		DQUOT_FREE_BLOCK(inode, i);
-		ADD_SWAB32(ucg->cg_cs.cs_nffree, i);
-		ADD_SWAB32(usb1->fs_cstotal.cs_nffree, i);
-		ADD_SWAB32(sb->fs_cs(cgno).cs_nffree, i);
-		INC_SWAB32(ucg->cg_frsum[i]);
+
+		fs32_add(sb, &ucg->cg_cs.cs_nffree, i);
+		fs32_add(sb, &usb1->fs_cstotal.cs_nffree, i);
+		fs32_add(sb, &sb->fs_cs(cgno).cs_nffree, i);
+		fs32_add(sb, &ucg->cg_frsum[i], 1);
 		goto succed;
 	}
 
@@ -575,12 +570,14 @@ cg_found:
 	}
 	for (i = 0; i < count; i++)
 		ubh_clrbit (UCPI_UBH, ucpi->c_freeoff, result + i);
-	SUB_SWAB32(ucg->cg_cs.cs_nffree, count);
-	SUB_SWAB32(usb1->fs_cstotal.cs_nffree, count);
-	SUB_SWAB32(sb->fs_cs(cgno).cs_nffree, count);
-	DEC_SWAB32(ucg->cg_frsum[allocsize]);
+	
+	fs32_sub(sb, &ucg->cg_cs.cs_nffree, count);
+	fs32_sub(sb, &usb1->fs_cstotal.cs_nffree, count);
+	fs32_sub(sb, &sb->fs_cs(cgno).cs_nffree, count);
+	fs32_sub(sb, &ucg->cg_frsum[allocsize], 1);
+
 	if (count != allocsize)
-		INC_SWAB32(ucg->cg_frsum[allocsize - count]);
+		fs32_add(sb, &ucg->cg_frsum[allocsize - count], 1);
 
 succed:
 	ubh_mark_buffer_dirty (USPI_UBH);
@@ -604,12 +601,10 @@ unsigned ufs_alloccg_block (struct inode * inode,
 	struct ufs_super_block_first * usb1;
 	struct ufs_cylinder_group * ucg;
 	unsigned result, cylno, blkno;
-	unsigned swab;
 
 	UFSD(("ENTER, goal %u\n", goal))
 
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	ucg = ubh_get_ucg(UCPI_UBH);
@@ -643,12 +638,13 @@ gotit:
 		*err = -EDQUOT;
 		return (unsigned)-1;
 	}
-	DEC_SWAB32(ucg->cg_cs.cs_nbfree);
-	DEC_SWAB32(usb1->fs_cstotal.cs_nbfree);
-	DEC_SWAB32(sb->fs_cs(ucpi->c_cgx).cs_nbfree);
+
+	fs32_sub(sb, &ucg->cg_cs.cs_nbfree, 1);
+	fs32_sub(sb, &usb1->fs_cstotal.cs_nbfree, 1);
+	fs32_sub(sb, &sb->fs_cs(ucpi->c_cgx).cs_nbfree, 1);
 	cylno = ufs_cbtocylno(result);
-	DEC_SWAB16(ubh_cg_blks(ucpi, cylno, ufs_cbtorpos(result)));
-	DEC_SWAB32(ubh_cg_blktot(ucpi, cylno));
+	fs16_sub(sb, &ubh_cg_blks(ucpi, cylno, ufs_cbtorpos(result)), 1);
+	fs32_sub(sb, &ubh_cg_blktot(ucpi, cylno), 1);
 	
 	UFSD(("EXIT, result %u\n", result))
 
@@ -663,11 +659,9 @@ unsigned ufs_bitmap_search (struct super_block * sb,
 	struct ufs_cylinder_group * ucg;
 	unsigned start, length, location, result;
 	unsigned possition, fragsize, blockmap, mask;
-	unsigned swab;
 	
 	UFSD(("ENTER, cg %u, goal %u, count %u\n", ucpi->c_cgx, goal, count))
 
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first (USPI_UBH);
 	ucg = ubh_get_ucg(UCPI_UBH);
@@ -733,12 +727,8 @@ void ufs_clusteracct(struct super_block * sb,
 {
 	struct ufs_sb_private_info * uspi;
 	int i, start, end, forw, back;
-	unsigned swab;
-	
 	
 	uspi = sb->u.ufs_sb.s_uspi;
-	swab = sb->u.ufs_sb.s_swab;
-	
 	if (uspi->s_contigsumsize <= 0)
 		return;
 
@@ -778,11 +768,11 @@ void ufs_clusteracct(struct super_block * sb,
 	i = back + forw + 1;
 	if (i > uspi->s_contigsumsize)
 		i = uspi->s_contigsumsize;
-	ADD_SWAB32(*((u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (i << 2))), cnt);
+	fs32_add(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (i << 2)), cnt);
 	if (back > 0)
-		SUB_SWAB32(*((u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (back << 2))), cnt);
+		fs32_sub(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (back << 2)), cnt);
 	if (forw > 0)
-		SUB_SWAB32(*((u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (forw << 2))), cnt);
+		fs32_sub(sb, (u32*)ubh_get_addr(UCPI_UBH, ucpi->c_clustersumoff + (forw << 2)), cnt);
 }
 
 

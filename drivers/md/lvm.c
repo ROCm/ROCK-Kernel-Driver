@@ -359,6 +359,7 @@ struct file_operations lvm_chr_fops = {
 /* block device operations structure needed for 2.3.38? and above */
 struct block_device_operations lvm_blk_dops =
 {
+	owner:		THIS_MODULE,
 	open: 		lvm_blk_open,
 	release:	lvm_blk_close,
 	ioctl:		lvm_blk_ioctl,

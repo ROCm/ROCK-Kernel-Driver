@@ -41,10 +41,8 @@ static void ufs_read_cylinder (struct super_block * sb,
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned i, j;
-	unsigned swab;
 
 	UFSD(("ENTER, cgno %u, bitmap_nr %u\n", cgno, bitmap_nr))
-	swab = sb->u.ufs_sb.s_swab;	
 	uspi = sb->u.ufs_sb.s_uspi;
 	ucpi = sb->u.ufs_sb.s_ucpi[bitmap_nr];
 	ucg = (struct ufs_cylinder_group *)sb->u.ufs_sb.s_ucg[cgno]->b_data;
@@ -60,21 +58,21 @@ static void ufs_read_cylinder (struct super_block * sb,
 			goto failed;
 	sb->u.ufs_sb.s_cgno[bitmap_nr] = cgno;
 			
-	ucpi->c_cgx = SWAB32(ucg->cg_cgx);
-	ucpi->c_ncyl = SWAB16(ucg->cg_ncyl);
-	ucpi->c_niblk = SWAB16(ucg->cg_niblk);
-	ucpi->c_ndblk = SWAB32(ucg->cg_ndblk);
-	ucpi->c_rotor = SWAB32(ucg->cg_rotor);
-	ucpi->c_frotor = SWAB32(ucg->cg_frotor);
-	ucpi->c_irotor = SWAB32(ucg->cg_irotor);
-	ucpi->c_btotoff = SWAB32(ucg->cg_btotoff);
-	ucpi->c_boff = SWAB32(ucg->cg_boff);
-	ucpi->c_iusedoff = SWAB32(ucg->cg_iusedoff);
-	ucpi->c_freeoff = SWAB32(ucg->cg_freeoff);
-	ucpi->c_nextfreeoff = SWAB32(ucg->cg_nextfreeoff);
-	ucpi->c_clustersumoff = SWAB32(ucg->cg_u.cg_44.cg_clustersumoff);
-	ucpi->c_clusteroff = SWAB32(ucg->cg_u.cg_44.cg_clusteroff);
-	ucpi->c_nclusterblks = SWAB32(ucg->cg_u.cg_44.cg_nclusterblks);
+	ucpi->c_cgx	= fs32_to_cpu(sb, ucg->cg_cgx);
+	ucpi->c_ncyl	= fs16_to_cpu(sb, ucg->cg_ncyl);
+	ucpi->c_niblk	= fs16_to_cpu(sb, ucg->cg_niblk);
+	ucpi->c_ndblk	= fs32_to_cpu(sb, ucg->cg_ndblk);
+	ucpi->c_rotor	= fs32_to_cpu(sb, ucg->cg_rotor);
+	ucpi->c_frotor	= fs32_to_cpu(sb, ucg->cg_frotor);
+	ucpi->c_irotor	= fs32_to_cpu(sb, ucg->cg_irotor);
+	ucpi->c_btotoff	= fs32_to_cpu(sb, ucg->cg_btotoff);
+	ucpi->c_boff	= fs32_to_cpu(sb, ucg->cg_boff);
+	ucpi->c_iusedoff = fs32_to_cpu(sb, ucg->cg_iusedoff);
+	ucpi->c_freeoff	= fs32_to_cpu(sb, ucg->cg_freeoff);
+	ucpi->c_nextfreeoff = fs32_to_cpu(sb, ucg->cg_nextfreeoff);
+	ucpi->c_clustersumoff = fs32_to_cpu(sb, ucg->cg_u.cg_44.cg_clustersumoff);
+	ucpi->c_clusteroff = fs32_to_cpu(sb, ucg->cg_u.cg_44.cg_clusteroff);
+	ucpi->c_nclusterblks = fs32_to_cpu(sb, ucg->cg_u.cg_44.cg_nclusterblks);
 	UFSD(("EXIT\n"))
 	return;	
 	
@@ -95,11 +93,9 @@ void ufs_put_cylinder (struct super_block * sb, unsigned bitmap_nr)
 	struct ufs_cg_private_info * ucpi;
 	struct ufs_cylinder_group * ucg;
 	unsigned i;
-	unsigned swab;
 
 	UFSD(("ENTER, bitmap_nr %u\n", bitmap_nr))
 
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	if (sb->u.ufs_sb.s_cgno[bitmap_nr] == UFS_CGNO_EMPTY) {
 		UFSD(("EXIT\n"))
@@ -116,9 +112,9 @@ void ufs_put_cylinder (struct super_block * sb, unsigned bitmap_nr)
 	 * rotor is not so important data, so we put it to disk 
 	 * at the end of working with cylinder
 	 */
-	ucg->cg_rotor = SWAB32(ucpi->c_rotor);
-	ucg->cg_frotor = SWAB32(ucpi->c_frotor);
-	ucg->cg_irotor = SWAB32(ucpi->c_irotor);
+	ucg->cg_rotor = cpu_to_fs32(sb, ucpi->c_rotor);
+	ucg->cg_frotor = cpu_to_fs32(sb, ucpi->c_frotor);
+	ucg->cg_irotor = cpu_to_fs32(sb, ucpi->c_irotor);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	for (i = 1; i < UCPI_UBH->count; i++) {
 		brelse (UCPI_UBH->bh[i]);

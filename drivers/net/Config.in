@@ -188,6 +188,7 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
          tristate '    TI ThunderLAN support' CONFIG_TLAN
       fi
       dep_tristate '    VIA Rhine support' CONFIG_VIA_RHINE $CONFIG_PCI
+      dep_mbool '      Use MMIO instead of PIO (EXPERIMENTAL)' CONFIG_VIA_RHINE_MMIO $CONFIG_VIA_RHINE $CONFIG_EXPERIMENTAL
       dep_tristate '    Winbond W89c840 Ethernet support' CONFIG_WINBOND_840 $CONFIG_PCI
       if [ "$CONFIG_OBSOLETE" = "y" ]; then
 	 dep_bool '    Zenith Z-Note support (EXPERIMENTAL)' CONFIG_ZNET $CONFIG_ISA

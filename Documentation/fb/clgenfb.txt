@@ -35,11 +35,18 @@ Default video modes
 At the moment, there are two kernel command line arguments supported:
 
 mode:640x480
+mode:800x600
 	or
 mode:1024x768
 
 Full support for startup video modes (modedb) will be integrated soon.
 
+Version 1.9.9.1
+---------------
+* Fix memory detection for 512kB case
+* 800x600 mode
+* Fixed timings
+* Hint for AXP: Use -accel false -vyres -1 when changing resolution
 
 
 Version 1.9.4.4

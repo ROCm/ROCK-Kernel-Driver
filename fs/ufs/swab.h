@@ -3,6 +3,7 @@
  *
  * Copyright (C) 1997, 1998 Francois-Rene Rideau <fare@tunes.org>
  * Copyright (C) 1998 Jakub Jelinek <jj@ultra.linux.cz>
+ * Copyright (C) 2001 Christoph Hellwig <hch@caldera.de>
  */
 
 #ifndef _UFS_SWAB_H
@@ -14,124 +15,119 @@
  *    in case there are ufs implementations that have strange bytesexes,
  *    you'll need to modify code here as well as in ufs_super.c and ufs_fs.h
  *    to support them.
- *
- *    WE ALSO ASSUME A REMOTELY SANE ARCHITECTURE BYTESEX.
- *    We are not ready to confront insane bytesexual perversions where
- *    conversion to/from little/big-endian is not an involution.
- *    That is, we require that XeYZ_to_cpu(x) == cpu_to_XeYZ(x)
- *
- *    NOTE that swab macros depend on a variable (or macro) swab being in
- *    scope and properly initialized (usually from sb->u.ufs_sb.s_swab).
- *    Its meaning depends on whether the architecture is sane-endian or not.
- *    For sane architectures, it's a flag taking values UFS_NATIVE_ENDIAN (0)
- *    or UFS_SWABBED_ENDIAN (1), indicating whether to swab or not.
- *    For pervert architectures, it's either UFS_LITTLE_ENDIAN or
- *    UFS_BIG_ENDIAN whose meaning you'll have to guess.
- *
- *    It is important to keep these conventions in synch with ufs_fs.h
- *    and super.c. Failure to do so (initializing swab to 0 both for
- *    NATIVE_ENDIAN and LITTLE_ENDIAN) led to nasty crashes on big endian
- *    machines reading little endian UFSes. Search for "swab =" in super.c.
- *
- *    I also suspect the whole UFS code to trust the on-disk structures
- *    much too much, which might lead to losing badly when mounting
- *    inconsistent partitions as UFS filesystems. fsck required (but of
- *    course, no fsck.ufs has yet to be ported from BSD to Linux as of 199808).
  */
 
-#include <linux/ufs_fs.h>
-#include <asm/byteorder.h>
+enum {
+	BYTESEX_LE,
+	BYTESEX_BE
+};
 
-/*
- * These are only valid inside ufs routines,
- * after swab has been initialized to sb->u.ufs_sb.s_swab
- */
-#define SWAB16(x) ufs_swab16(swab,x)
-#define SWAB32(x) ufs_swab32(swab,x)
-#define SWAB64(x) ufs_swab64(swab,x)
+static __inline u64
+fs64_to_cpu(struct super_block *sbp, u64 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return le64_to_cpu(n);
+	else
+		return be64_to_cpu(n);
+}
 
-/*
- * We often use swabing, when we want to increment/decrement some value,
- * so these macros might become handy and increase readability. (Daniel)
- */
-#define INC_SWAB16(x)	((x)=ufs_swab16_add(swab,x,1))
-#define INC_SWAB32(x)	((x)=ufs_swab32_add(swab,x,1))
-#define INC_SWAB64(x)	((x)=ufs_swab64_add(swab,x,1))
-#define DEC_SWAB16(x)	((x)=ufs_swab16_add(swab,x,-1))
-#define DEC_SWAB32(x)	((x)=ufs_swab32_add(swab,x,-1))
-#define DEC_SWAB64(x)	((x)=ufs_swab64_add(swab,x,-1))
-#define ADD_SWAB16(x,y)	((x)=ufs_swab16_add(swab,x,y))
-#define ADD_SWAB32(x,y)	((x)=ufs_swab32_add(swab,x,y))
-#define ADD_SWAB64(x,y)	((x)=ufs_swab64_add(swab,x,y))
-#define SUB_SWAB16(x,y)	((x)=ufs_swab16_add(swab,x,-(y)))
-#define SUB_SWAB32(x,y)	((x)=ufs_swab32_add(swab,x,-(y)))
-#define SUB_SWAB64(x,y)	((x)=ufs_swab64_add(swab,x,-(y)))
+static __inline u64
+cpu_to_fs64(struct super_block *sbp, u64 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return cpu_to_le64(n);
+	else
+		return cpu_to_be64(n);
+}
 
-#if defined(__LITTLE_ENDIAN) || defined(__BIG_ENDIAN) /* sane bytesex */
-extern __inline__ __const__ __u16 ufs_swab16(unsigned swab, __u16 x) {
-	if (swab)
-		return swab16(x);
+static __inline u32
+fs64_add(struct super_block *sbp, u32 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le64(le64_to_cpu(*n)+d);
 	else
-		return x;
+		return *n = cpu_to_be64(be64_to_cpu(*n)+d);
 }
-extern __inline__ __const__ __u32 ufs_swab32(unsigned swab, __u32 x) {
-	if (swab)
-		return swab32(x);
+
+static __inline u32
+fs64_sub(struct super_block *sbp, u32 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le64(le64_to_cpu(*n)-d);
 	else
-		return x;
+		return *n = cpu_to_be64(be64_to_cpu(*n)-d);
 }
-extern __inline__ __const__ __u64 ufs_swab64(unsigned swab, __u64 x) {
-	if (swab)
-		return swab64(x);
+
+static __inline u32
+fs32_to_cpu(struct super_block *sbp, u32 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return le32_to_cpu(n);
 	else
-		return x;
+		return be32_to_cpu(n);
 }
-extern __inline__ __const__ __u16 ufs_swab16_add(unsigned swab, __u16 x, __u16 y) {
-	if (swab)
-		return swab16(swab16(x)+y);
+
+static __inline u32
+cpu_to_fs32(struct super_block *sbp, u32 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return cpu_to_le32(n);
 	else
-		return x + y;
+		return cpu_to_be32(n);
 }
-extern __inline__ __const__ __u32 ufs_swab32_add(unsigned swab, __u32 x, __u32 y) {
-	if (swab)
-		return swab32(swab32(x)+y);
+
+static __inline u32
+fs32_add(struct super_block *sbp, u32 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le32(le32_to_cpu(*n)+d);
 	else
-		return x + y;
+		return *n = cpu_to_be32(be32_to_cpu(*n)+d);
 }
-extern __inline__ __const__ __u64 ufs_swab64_add(unsigned swab, __u64 x, __u64 y) {
-	if (swab)
-		return swab64(swab64(x)+y);
+
+static __inline u32
+fs32_sub(struct super_block *sbp, u32 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le32(le32_to_cpu(*n)-d);
 	else
-		return x + y;
+		return *n = cpu_to_be32(be32_to_cpu(*n)-d);
 }
-#else /* bytesexual perversion -- BEWARE! Read note at top of file! */
-extern __inline__ __const__ __u16 ufs_swab16(unsigned swab, __u16 x) {
-	if (swab == UFS_LITTLE_ENDIAN)
-		return le16_to_cpu(x);
+
+static __inline u16
+fs16_to_cpu(struct super_block *sbp, u16 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return le16_to_cpu(n);
 	else
-		return be16_to_cpu(x);
+		return be16_to_cpu(n);
 }
-extern __inline__ __const__ __u32 ufs_swab32(unsigned swab, __u32 x) {
-	if (swab == UFS_LITTLE_ENDIAN)
-		return le32_to_cpu(x);
+
+static __inline u16
+cpu_to_fs16(struct super_block *sbp, u16 n)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return cpu_to_le16(n);
 	else
-		return be32_to_cpu(x);
+		return cpu_to_be16(n);
 }
-extern __inline__ __const__ __u64 ufs_swab64(unsigned swab, __u64 x) {
-	if (swab == UFS_LITTLE_ENDIAN)
-		return le64_to_cpu(x);
+
+static __inline u16
+fs16_add(struct super_block *sbp, u16 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le16(le16_to_cpu(*n)+d);
 	else
-		return be64_to_cpu(x);
+		return *n = cpu_to_be16(be16_to_cpu(*n)+d);
 }
-extern __inline__ __const__ __u16 ufs_swab16_add(unsigned swab, __u16 x, __u16 y) {
-	return ufs_swab16(swab, ufs_swab16(swab, x) + y);
+
+static __inline u16
+fs16_sub(struct super_block *sbp, u16 *n, int d)
+{
+	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+		return *n = cpu_to_le16(le16_to_cpu(*n)-d);
+	else
+		return *n = cpu_to_be16(be16_to_cpu(*n)-d);
 }
-extern __inline__ __const__ __u32 ufs_swab32_add(unsigned swab, __u32 x, __u32 y) {
-	return ufs_swab32(swab, ufs_swab32(swab, x) + y);
-}
-extern __inline__ __const__ __u64 ufs_swab64_add(unsigned swab, __u64 x, __u64 y) {
-	return ufs_swab64(swab, ufs_swab64(swab, x) + y);
-}
-#endif /* byte sexuality */
 
 #endif /* _UFS_SWAB_H */

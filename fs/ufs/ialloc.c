@@ -66,12 +66,10 @@ void ufs_free_inode (struct inode * inode)
 	struct ufs_cylinder_group * ucg;
 	int is_directory;
 	unsigned ino, cg, bit;
-	unsigned swab;
 	
 	UFSD(("ENTER, ino %lu\n", inode->i_ino))
 
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 	
@@ -93,10 +91,10 @@ void ufs_free_inode (struct inode * inode)
 		return;
 	}
 	ucg = ubh_get_ucg(UCPI_UBH);
-	if (!ufs_cg_chkmagic(ucg))
+	if (!ufs_cg_chkmagic(sb, ucg))
 		ufs_panic (sb, "ufs_free_fragments", "internal error, bad cg magic number");
 
-	ucg->cg_time = SWAB32(CURRENT_TIME);
+	ucg->cg_time = cpu_to_fs32(sb, CURRENT_TIME);
 
 	is_directory = S_ISDIR(inode->i_mode);
 
@@ -111,16 +109,17 @@ void ufs_free_inode (struct inode * inode)
 		ubh_clrbit (UCPI_UBH, ucpi->c_iusedoff, bit);
 		if (ino < ucpi->c_irotor)
 			ucpi->c_irotor = ino;
-		INC_SWAB32(ucg->cg_cs.cs_nifree);
-		INC_SWAB32(usb1->fs_cstotal.cs_nifree);
-		INC_SWAB32(sb->fs_cs(cg).cs_nifree);
+		fs32_add(sb, &ucg->cg_cs.cs_nifree, 1);
+		fs32_add(sb, &usb1->fs_cstotal.cs_nifree, 1);
+		fs32_add(sb, &sb->fs_cs(cg).cs_nifree, 1);
 
 		if (is_directory) {
-			DEC_SWAB32(ucg->cg_cs.cs_ndir);
-			DEC_SWAB32(usb1->fs_cstotal.cs_ndir);
-			DEC_SWAB32(sb->fs_cs(cg).cs_ndir);
+			fs32_sub(sb, &ucg->cg_cs.cs_ndir, 1);
+			fs32_sub(sb, &usb1->fs_cstotal.cs_ndir, 1);
+			fs32_sub(sb, &sb->fs_cs(cg).cs_ndir, 1);
 		}
 	}
+
 	ubh_mark_buffer_dirty (USPI_UBH);
 	ubh_mark_buffer_dirty (UCPI_UBH);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
@@ -152,7 +151,6 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 	struct ufs_cylinder_group * ucg;
 	struct inode * inode;
 	unsigned cg, bit, i, j, start;
-	unsigned swab;
 
 	UFSD(("ENTER\n"))
 	
@@ -163,7 +161,6 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 	inode = new_inode(sb);
 	if (!inode)
 		return ERR_PTR(-ENOMEM);
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	usb1 = ubh_get_usb_first(USPI_UBH);
 
@@ -173,7 +170,7 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 	 * Try to place the inode in its parent directory
 	 */
 	i = ufs_inotocg(dir->i_ino);
-	if (SWAB32(sb->fs_cs(i).cs_nifree)) {
+	if (sb->fs_cs(i).cs_nifree) {
 		cg = i;
 		goto cg_found;
 	}
@@ -185,7 +182,7 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 		i += j;
 		if (i >= uspi->s_ncg)
 			i -= uspi->s_ncg;
-		if (SWAB32(sb->fs_cs(i).cs_nifree)) {
+		if (sb->fs_cs(i).cs_nifree) {
 			cg = i;
 			goto cg_found;
 		}
@@ -199,7 +196,7 @@ struct inode * ufs_new_inode (const struct inode * dir,	int mode)
 		i++;
 		if (i >= uspi->s_ncg)
 			i = 0;
-		if (SWAB32(sb->fs_cs(i).cs_nifree)) {
+		if (sb->fs_cs(i).cs_nifree) {
 			cg = i;
 			goto cg_found;
 		}
@@ -212,7 +209,7 @@ cg_found:
 	if (!ucpi)
 		goto failed;
 	ucg = ubh_get_ucg(UCPI_UBH);
-	if (!ufs_cg_chkmagic(ucg)) 
+	if (!ufs_cg_chkmagic(sb, ucg)) 
 		ufs_panic (sb, "ufs_new_inode", "internal error, bad cg magic number");
 
 	start = ucpi->c_irotor;
@@ -233,14 +230,14 @@ cg_found:
 		goto failed;
 	}
 	
-	DEC_SWAB32(ucg->cg_cs.cs_nifree);
-	DEC_SWAB32(usb1->fs_cstotal.cs_nifree);
-	DEC_SWAB32(sb->fs_cs(cg).cs_nifree);
+	fs32_sub(sb, &ucg->cg_cs.cs_nifree, 1);
+	fs32_sub(sb, &usb1->fs_cstotal.cs_nifree, 1);
+	fs32_sub(sb, &sb->fs_cs(cg).cs_nifree, 1);
 	
 	if (S_ISDIR(mode)) {
-		INC_SWAB32(ucg->cg_cs.cs_ndir);
-		INC_SWAB32(usb1->fs_cstotal.cs_ndir);
-		INC_SWAB32(sb->fs_cs(cg).cs_ndir);
+		fs32_add(sb, &ucg->cg_cs.cs_ndir, 1);
+		fs32_add(sb, &usb1->fs_cstotal.cs_ndir, 1);
+		fs32_add(sb, &sb->fs_cs(cg).cs_ndir, 1);
 	}
 
 	ubh_mark_buffer_dirty (USPI_UBH);

@@ -127,7 +127,4 @@ extern size_t strlen(const char *);
 /* Don't build bcopy at all ...  */
 #define __HAVE_ARCH_BCOPY
 
-#define __HAVE_ARCH_MEMSCAN
-#define memscan memchr
-
 #endif /* __ASM_SH_STRING_H */

@@ -1,7 +1,7 @@
 
     D-Link DL2000-based Gigabit Ethernet Adapter Installation
     for Linux
-    July 5, 2001
+    Nov 12, 2001
 
 Contents
 ========
@@ -14,20 +14,22 @@ Contents
  - Troubleshooting
 
 
-Compatiblity List
+Compatibility List
 =================
 Adapter Support:
 
 D-Link DGE-550T Gigabit Ethernet Adapter.
+D-Link DGE-550SX Gigabit Ethernet Adapter.
 D-Link DL2000-based Gigabit Ethernet Adapter.
 
 
-The driver support Linux kernal 2.4.x later. We had tested it
+The driver support Linux kernel 2.4.7 later. We had tested it
 on the environments below.
 
- . Red Hat v6.2 (update to kernel 2.4.4)
- . Red Hat v7.0 (update to kernel 2.4.4)
- . Red Hat v7.1 (kernel 2.4.2-2)
+ . Red Hat v6.2 (update kernel to 2.4.7)
+ . Red Hat v7.0 (update kernel to 2.4.7)
+ . Red Hat v7.1 (kernel 2.4.7)
+ . Red Hat v7.2 (kernel 2.4.7-10)
 
 
 Quick Install
@@ -35,16 +37,16 @@ Quick Install
 Install linux driver as following command:
 
 1. make all
-2. insmod dl2x.o
+2. insmod dl2k.o
 3. ifconfig eth0 up 10.xxx.xxx.xxx netmask 255.0.0.0
 		    ^^^^^^^^^^^^^^^\	    ^^^^^^^^\
 				    IP		     NETMASK
-Now eth0 bring up, you can test it by "ping" or get more information by
-"ifconfig". If test ok, then continue next step.
+Now eth0 should active, you can test it by "ping" or get more information by
+"ifconfig". If tested ok, continue the next step.
 
-4. cp dl2x.o /lib/modules/`uname -r`/kernel/drivers/net
+4. cp dl2k.o /lib/modules/`uname -r`/kernel/drivers/net
 5. Add the following lines to /etc/modules.conf:
-	alias eth0 dl2x
+	alias eth0 dl2k
 6. Run "netconfig" or "netconf" to create configuration script ifcfg-eth0
    located at /etc/sysconfig/network-scripts or create it manually.
    [see - Configuration Script Sample]
@@ -61,10 +63,10 @@ source instead of relying on a precompiled version. This approach provides
 better reliability since a precompiled driver might depend on libraries or
 kernel features that are not present in a given Linux installation.
 
-The 3 files necessary to build Linux device driver are dl2x.c, dl2x.h and
+The 3 files necessary to build Linux device driver are dl2k.c, dl2k.h and
 Makefile. To compile, the Linux installation must include the gcc compiler,
 the kernel source, and the kernel headers. The Linux driver supports Linux
-Kernels 2.4.x. Copy the files to a directory and enter the following command
+Kernels 2.4.7. Copy the files to a directory and enter the following command
 to compile and link the driver:
 
 CD-ROM drive
@@ -73,21 +75,21 @@ CD-ROM drive
 [root@XXX /] mkdir cdrom
 [root@XXX /] mount -r -t iso9660 -o conv=auto /dev/cdrom /cdrom
 [root@XXX /] cd root
-[root@XXX /root] mkdir dl2x
-[root@XXX /root] cd dl2x
-[root@XXX dl2x] cp /cdrom/linux/dl2x.tgz /root/dl2x
-[root@XXX dl2x] tar xfvz dl2x.tgz
-[root@XXX dl2x] make all
+[root@XXX /root] mkdir dl2k
+[root@XXX /root] cd dl2k
+[root@XXX dl2k] cp /cdrom/linux/dl2k.tgz /root/dl2k
+[root@XXX dl2k] tar xfvz dl2k.tgz
+[root@XXX dl2k] make all
 
 Floppy disc drive
 -----------------
 
 [root@XXX /] cd root
-[root@XXX /root] mkdir dl2x
-[root@XXX /root] cd dl2x
-[root@XXX dl2x] mcopy a:/linux/dl2x.tgz /root/dl2x
-[root@XXX dl2x] tar xfvz dl2x.tgz
-[root@XXX dl2x] make all
+[root@XXX /root] mkdir dl2k
+[root@XXX /root] cd dl2k
+[root@XXX dl2k] mcopy a:/linux/dl2k.tgz /root/dl2k
+[root@XXX dl2k] tar xfvz dl2k.tgz
+[root@XXX dl2k] make all
 
 Installing the Driver
 =====================
@@ -98,17 +100,16 @@ Installing the Driver
   to a protocol stack in order to establish network connectivity. To load a
   module enter the command:
 
-  insmod dl2x.o
-
+  insmod dl2k.o
 
   or
 
-  insmod dl2x.o <optional parameter>	; add parameter
+  insmod dl2k.o <optional parameter>	; add parameter
 
   ===============================================================
-   example: insmod dl2x.o media=100mbps_hd
-   or	    insmod dl2x.o media=3
-   or	    insmod dl2x.o media=3 2	; for 2 cards
+   example: insmod dl2k.o media=100mbps_hd
+   or	    insmod dl2k.o media=3
+   or	    insmod dl2k.o media=3,2	; for 2 cards
   ===============================================================
 
   Please reference the list of the command line parameters supported by
@@ -133,7 +134,7 @@ Installing the Driver
 
   ifdown eth0
   ifconfig eth0 down
-  rmmod dl2x.o
+  rmmod dl2k.o
 
   The following are the commands to list the currently loaded modules and
   to see the current network configuration.
@@ -151,13 +152,13 @@ Installing the Driver
 
   Red Hat v6.x/v7.x
   -----------------
-  1. Copy dl2x.o to the network modules directory, typically
+  1. Copy dl2k.o to the network modules directory, typically
      /lib/modules/2.x.x-xx/net or /lib/modules/2.x.x/kernel/drivers/net.
   2. Locate the boot module configuration file, most commonly modules.conf
      or conf.modules in the /etc directory. Add the following lines:
 
-     alias ethx dl2x
-     options dl2x <optional parameters>
+     alias ethx dl2k
+     options dl2k <optional parameters>
 
      where ethx will be eth0 if the NIC is the only ethernet adapter, eth1 if
      one other ethernet adapter is installed, etc. Refer to the table in the
@@ -187,12 +188,19 @@ media=xxxxxxxxx			- Specifies the media type the NIC operates at.
 				  10mbps_fd	10Mbps full duplex.
 				  100mbps_hd	100Mbps half duplex.
 				  100mbps_fd	100Mbps full duplex.
+				  1000mbps_fd	1000Mbps full duplex.
+				  1000mbps_hd	1000Mbps half duplex.
 				  0		Autosensing active media.
 				  1		10Mbps half duplex.
 				  2		10Mbps full duplex.
 				  3		100Mbps half duplex.
 				  4		100Mbps full duplex.
+				  5          	1000Mbps full duplex.
+				  6          	1000Mbps half duplex.
+
 				  By default, the NIC operates at autosense.
+				  Note that only 1000mbps_fd and 1000mbps_hd
+				  types are available for fiber adapter.
 
 vlan=x				- Specifies the VLAN ID. If vlan=0, the
 				  Virtual Local Area Network (VLAN) function is
@@ -208,9 +216,8 @@ int_count			- Rx frame count each interrupt.
 int_timeout			- Rx DMA wait time for an interrupt. Proper 
 				  values of int_count and int_timeout bring 
 				  a conspicuous performance in the fast machine. 
-				  For P4 1.5GHz systems, a setting of 
-				  int_count=5 and int_timeout=750 is
-				  recommendable.
+				  Ex. int_count=5 and int_timeout=750 
+
 Configuration Script Sample
 ===========================
 Here is a sample of a simple configuration script:

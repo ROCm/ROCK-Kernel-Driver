@@ -41,7 +41,6 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
 	kdev_t dev = 0;
 	int block_size;
 	struct inode *swapf = 0;
-	int wait = 0;
 
 	if (rw == READ) {
 		ClearPageUptodate(page);
@@ -78,14 +77,6 @@ static int rw_swap_page_base(int rw, swp_entry_t entry, struct page *page)
  	 * decrementing the page count, and unlocking the page in the
  	 * swap lock map - in the IO completion handler.
  	 */
- 	if (!wait)
- 		return 1;
-
- 	wait_on_page(page);
-	/* This shouldn't happen, but check to be sure. */
-	if (page_count(page) == 0)
-		printk(KERN_ERR "rw_swap_page: page unused while waiting!\n");
-
 	return 1;
 }
 

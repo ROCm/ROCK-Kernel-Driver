@@ -75,12 +75,10 @@ static int ufs_trunc_direct (struct inode * inode)
 	unsigned frag_to_free, free_count;
 	unsigned i, j, tmp;
 	int retry;
-	unsigned swab;
 	
 	UFSD(("ENTER\n"))
 
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	
 	frag_to_free = 0;
@@ -110,14 +108,14 @@ static int ufs_trunc_direct (struct inode * inode)
 	 * Free first free fragments
 	 */
 	p = inode->u.ufs_i.i_u1.i_data + ufs_fragstoblks (frag1);
-	tmp = SWAB32(*p);
+	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp )
 		ufs_panic (sb, "ufs_trunc_direct", "internal error");
 	frag1 = ufs_fragnum (frag1);
 	frag2 = ufs_fragnum (frag2);
 	for (j = frag1; j < frag2; j++) {
 		bh = get_hash_table (sb->s_dev, tmp + j, uspi->s_fsize);
-		if ((bh && DATA_BUFFER_USED(bh)) || tmp != SWAB32(*p)) {
+		if ((bh && DATA_BUFFER_USED(bh)) || tmp != fs32_to_cpu(sb, *p)) {
 			retry = 1;
 			brelse (bh);
 			goto next1;
@@ -135,19 +133,19 @@ next1:
 	 */
 	for (i = block1 ; i < block2; i++) {
 		p = inode->u.ufs_i.i_u1.i_data + i;
-		tmp = SWAB32(*p);
+		tmp = fs32_to_cpu(sb, *p);
 		if (!tmp)
 			continue;
 		for (j = 0; j < uspi->s_fpb; j++) {
 			bh = get_hash_table (sb->s_dev, tmp + j, uspi->s_fsize);
-			if ((bh && DATA_BUFFER_USED(bh)) || tmp != SWAB32(*p)) {
+			if ((bh && DATA_BUFFER_USED(bh)) || tmp != fs32_to_cpu(sb, *p)) {
 				retry = 1;
 				brelse (bh);
 				goto next2;
 			}
 			bforget (bh);
 		}
-		*p = SWAB32(0);
+		*p = 0;
 		inode->i_blocks -= uspi->s_nspb;
 		mark_inode_dirty(inode);
 		if (free_count == 0) {
@@ -173,20 +171,20 @@ next2:;
 	 * Free last free fragments
 	 */
 	p = inode->u.ufs_i.i_u1.i_data + ufs_fragstoblks (frag3);
-	tmp = SWAB32(*p);
+	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp )
 		ufs_panic(sb, "ufs_truncate_direct", "internal error");
 	frag4 = ufs_fragnum (frag4);
 	for (j = 0; j < frag4; j++) {
 		bh = get_hash_table (sb->s_dev, tmp + j, uspi->s_fsize);
-		if ((bh && DATA_BUFFER_USED(bh)) || tmp != SWAB32(*p)) {
+		if ((bh && DATA_BUFFER_USED(bh)) || tmp != fs32_to_cpu(sb, *p)) {
 			retry = 1;
 			brelse (bh);
 			goto next1;
 		}
 		bforget (bh);
 	}
-	*p = SWAB32(0);
+	*p = 0;
 	inode->i_blocks -= frag4 << uspi->s_nspfshift;
 	mark_inode_dirty(inode);
 	ufs_free_fragments (inode, tmp, frag4);
@@ -207,47 +205,45 @@ static int ufs_trunc_indirect (struct inode * inode, unsigned offset, u32 * p)
 	unsigned indirect_block, i, j, tmp;
 	unsigned frag_to_free, free_count;
 	int retry;
-	unsigned swab;
 
 	UFSD(("ENTER\n"))
 		
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 
 	frag_to_free = 0;
 	free_count = 0;
 	retry = 0;
 	
-	tmp = SWAB32(*p);
+	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp)
 		return 0;
 	ind_ubh = ubh_bread (sb->s_dev, tmp, uspi->s_bsize);
-	if (tmp != SWAB32(*p)) {
+	if (tmp != fs32_to_cpu(sb, *p)) {
 		ubh_brelse (ind_ubh);
 		return 1;
 	}
 	if (!ind_ubh) {
-		*p = SWAB32(0);
+		*p = 0;
 		return 0;
 	}
 
 	indirect_block = (DIRECT_BLOCK > offset) ? (DIRECT_BLOCK - offset) : 0;
 	for (i = indirect_block; i < uspi->s_apb; i++) {
 		ind = ubh_get_addr32 (ind_ubh, i);
-		tmp = SWAB32(*ind);
+		tmp = fs32_to_cpu(sb, *ind);
 		if (!tmp)
 			continue;
 		for (j = 0; j < uspi->s_fpb; j++) {
 			bh = get_hash_table (sb->s_dev, tmp + j, uspi->s_fsize);
-			if ((bh && DATA_BUFFER_USED(bh)) || tmp != SWAB32(*ind)) {
+			if ((bh && DATA_BUFFER_USED(bh)) || tmp != fs32_to_cpu(sb, *ind)) {
 				retry = 1;
 				brelse (bh);
 				goto next;
 			}
 			bforget (bh);
 		}	
-		*ind = SWAB32(0);
+		*ind = 0;
 		ubh_mark_buffer_dirty(ind_ubh);
 		if (free_count == 0) {
 			frag_to_free = tmp;
@@ -268,15 +264,15 @@ next:;
 		ufs_free_blocks (inode, frag_to_free, free_count);
 	}
 	for (i = 0; i < uspi->s_apb; i++)
-		if (SWAB32(*ubh_get_addr32(ind_ubh,i)))
+		if (*ubh_get_addr32(ind_ubh,i))
 			break;
 	if (i >= uspi->s_apb) {
 		if (ubh_max_bcount(ind_ubh) != 1) {
 			retry = 1;
 		}
 		else {
-			tmp = SWAB32(*p);
-			*p = SWAB32(0);
+			tmp = fs32_to_cpu(sb, *p);
+			*p = 0;
 			inode->i_blocks -= uspi->s_nspb;
 			mark_inode_dirty(inode);
 			ufs_free_blocks (inode, tmp, uspi->s_fpb);
@@ -303,34 +299,32 @@ static int ufs_trunc_dindirect (struct inode * inode, unsigned offset, u32 * p)
 	unsigned i, tmp, dindirect_block;
 	u32 * dind;
 	int retry = 0;
-	unsigned swab;
 	
 	UFSD(("ENTER\n"))
 	
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 
 	dindirect_block = (DIRECT_BLOCK > offset) 
 		? ((DIRECT_BLOCK - offset) >> uspi->s_apbshift) : 0;
 	retry = 0;
 	
-	tmp = SWAB32(*p);
+	tmp = fs32_to_cpu(sb, *p);
 	if (!tmp)
 		return 0;
 	dind_bh = ubh_bread (inode->i_dev, tmp, uspi->s_bsize);
-	if (tmp != SWAB32(*p)) {
+	if (tmp != fs32_to_cpu(sb, *p)) {
 		ubh_brelse (dind_bh);
 		return 1;
 	}
 	if (!dind_bh) {
-		*p = SWAB32(0);
+		*p = 0;
 		return 0;
 	}
 
 	for (i = dindirect_block ; i < uspi->s_apb ; i++) {
 		dind = ubh_get_addr32 (dind_bh, i);
-		tmp = SWAB32(*dind);
+		tmp = fs32_to_cpu(sb, *dind);
 		if (!tmp)
 			continue;
 		retry |= ufs_trunc_indirect (inode, offset + (i << uspi->s_apbshift), dind);
@@ -338,14 +332,14 @@ static int ufs_trunc_dindirect (struct inode * inode, unsigned offset, u32 * p)
 	}
 
 	for (i = 0; i < uspi->s_apb; i++)
-		if (SWAB32(*ubh_get_addr32 (dind_bh, i)))
+		if (*ubh_get_addr32 (dind_bh, i))
 			break;
 	if (i >= uspi->s_apb) {
 		if (ubh_max_bcount(dind_bh) != 1)
 			retry = 1;
 		else {
-			tmp = SWAB32(*p);
-			*p = SWAB32(0);
+			tmp = fs32_to_cpu(sb, *p);
+			*p = 0;
 			inode->i_blocks -= uspi->s_nspb;
 			mark_inode_dirty(inode);
 			ufs_free_blocks (inode, tmp, uspi->s_fpb);
@@ -372,27 +366,25 @@ static int ufs_trunc_tindirect (struct inode * inode)
 	unsigned tindirect_block, tmp, i;
 	u32 * tind, * p;
 	int retry;
-	unsigned swab;
 	
 	UFSD(("ENTER\n"))
 
 	sb = inode->i_sb;
-	swab = sb->u.ufs_sb.s_swab;
 	uspi = sb->u.ufs_sb.s_uspi;
 	retry = 0;
 	
 	tindirect_block = (DIRECT_BLOCK > (UFS_NDADDR + uspi->s_apb + uspi->s_2apb))
 		? ((DIRECT_BLOCK - UFS_NDADDR - uspi->s_apb - uspi->s_2apb) >> uspi->s_2apbshift) : 0;
 	p = inode->u.ufs_i.i_u1.i_data + UFS_TIND_BLOCK;
-	if (!(tmp = SWAB32(*p)))
+	if (!(tmp = fs32_to_cpu(sb, *p)))
 		return 0;
 	tind_bh = ubh_bread (sb->s_dev, tmp, uspi->s_bsize);
-	if (tmp != SWAB32(*p)) {
+	if (tmp != fs32_to_cpu(sb, *p)) {
 		ubh_brelse (tind_bh);
 		return 1;
 	}
 	if (!tind_bh) {
-		*p = SWAB32(0);
+		*p = 0;
 		return 0;
 	}
 
@@ -403,14 +395,14 @@ static int ufs_trunc_tindirect (struct inode * inode)
 		ubh_mark_buffer_dirty(tind_bh);
 	}
 	for (i = 0; i < uspi->s_apb; i++)
-		if (SWAB32(*ubh_get_addr32 (tind_bh, i)))
+		if (*ubh_get_addr32 (tind_bh, i))
 			break;
 	if (i >= uspi->s_apb) {
 		if (ubh_max_bcount(tind_bh) != 1)
 			retry = 1;
 		else {
-			tmp = SWAB32(*p);
-			*p = SWAB32(0);
+			tmp = fs32_to_cpu(sb, *p);
+			*p = 0;
 			inode->i_blocks -= uspi->s_nspb;
 			mark_inode_dirty(inode);
 			ufs_free_blocks (inode, tmp, uspi->s_fpb);

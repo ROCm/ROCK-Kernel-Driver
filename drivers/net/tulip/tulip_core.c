@@ -1328,7 +1328,6 @@ static void __devinit tulip_mwi_config (struct pci_dev *pdev,
 	tp->csr0 = csr0;
 	goto out;
 
-early_out:
 	if (csr0 & MWI) {
 		pci_command &= ~PCI_COMMAND_INVALIDATE;
 		pci_write_config_word(pdev, PCI_COMMAND, pci_command);
