@@ -2196,8 +2196,7 @@ void tty_register_device(struct tty_driver *driver, unsigned index,
 	}
 
 	tty_line_name(driver, index, name);
-	devfs_register(NULL, name, 0, MAJOR(dev), MINOR(dev),
-		S_IFCHR | S_IRUSR | S_IWUSR, &tty_fops, NULL);
+	devfs_mk_cdev(dev, S_IFCHR | S_IRUSR | S_IWUSR, name);
 
 	/* stupid console driver devfs names... change vc/X into ttyX */
 	if (driver->type == TTY_DRIVER_TYPE_CONSOLE)
