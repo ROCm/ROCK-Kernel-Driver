@@ -10,6 +10,9 @@
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("debug")
 
+#define ACPI_SYSTEM_FILE_DEBUG_LAYER	"debug_layer"
+#define ACPI_SYSTEM_FILE_DEBUG_LEVEL	"debug_level"
+
 static int
 acpi_system_read_debug (
 	char			*page,

@@ -33,6 +33,16 @@
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("acpi_system")
 
+#define ACPI_SYSTEM_CLASS		"system"
+#define ACPI_SYSTEM_DRIVER_NAME		"ACPI System Driver"
+#define ACPI_SYSTEM_DEVICE_NAME		"System"
+#define ACPI_SYSTEM_FILE_INFO		"info"
+#define ACPI_SYSTEM_FILE_EVENT		"event"
+#define ACPI_SYSTEM_FILE_ALARM		"alarm"
+#define ACPI_SYSTEM_FILE_DSDT		"dsdt"
+#define ACPI_SYSTEM_FILE_FADT		"fadt"
+#define ACPI_SYSTEM_FILE_SLEEP		"sleep"
+
 extern FADT_DESCRIPTOR		acpi_fadt;
 
 /* --------------------------------------------------------------------------

@@ -40,6 +40,14 @@ MODULE_AUTHOR("Paul Diefenbaugh");
 MODULE_DESCRIPTION(ACPI_FAN_DRIVER_NAME);
 MODULE_LICENSE("GPL");
 
+#define ACPI_FAN_COMPONENT		0x00200000
+#define ACPI_FAN_CLASS			"fan"
+#define ACPI_FAN_HID			"PNP0C0B"
+#define ACPI_FAN_DRIVER_NAME		"ACPI Fan Driver"
+#define ACPI_FAN_DEVICE_NAME		"Fan"
+#define ACPI_FAN_FILE_STATE		"state"
+#define ACPI_FAN_NOTIFY_STATUS		0x80
+
 int acpi_fan_add (struct acpi_device *device);
 int acpi_fan_remove (struct acpi_device *device, int type);
 

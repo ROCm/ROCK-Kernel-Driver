@@ -38,6 +38,14 @@
 #define _COMPONENT		ACPI_EC_COMPONENT
 ACPI_MODULE_NAME		("acpi_ec")
 
+#define ACPI_EC_COMPONENT		0x00100000
+#define ACPI_EC_CLASS			"embedded_controller"
+#define ACPI_EC_HID			"PNP0C09"
+#define ACPI_EC_DRIVER_NAME		"ACPI Embedded Controller Driver"
+#define ACPI_EC_DEVICE_NAME		"Embedded Controller"
+#define ACPI_EC_FILE_INFO		"info"
+
+
 #define ACPI_EC_FLAG_OBF	0x01	/* Output buffer full */
 #define ACPI_EC_FLAG_IBF	0x02	/* Input buffer full */
 #define ACPI_EC_FLAG_SCI	0x20	/* EC-SCI occurred */

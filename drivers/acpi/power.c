@@ -36,6 +36,16 @@
 #define _COMPONENT		ACPI_POWER_COMPONENT
 ACPI_MODULE_NAME		("acpi_power")
 
+#define ACPI_POWER_COMPONENT		0x00800000
+#define ACPI_POWER_CLASS		"power_resource"
+#define ACPI_POWER_DRIVER_NAME		"ACPI Power Resource Driver"
+#define ACPI_POWER_DEVICE_NAME		"Power Resource"
+#define ACPI_POWER_FILE_INFO		"info"
+#define ACPI_POWER_FILE_STATUS		"state"
+#define ACPI_POWER_RESOURCE_STATE_OFF	0x00
+#define ACPI_POWER_RESOURCE_STATE_ON	0x01
+#define ACPI_POWER_RESOURCE_STATE_UNKNOWN 0xFF
+
 int acpi_power_add (struct acpi_device *device);
 int acpi_power_remove (struct acpi_device *device, int type);
 
