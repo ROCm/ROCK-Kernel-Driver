@@ -721,7 +721,6 @@ extern int ext3_forget(handle_t *, int, struct inode *, struct buffer_head *, in
 extern struct buffer_head * ext3_getblk (handle_t *, struct inode *, long, int, int *);
 extern struct buffer_head * ext3_bread (handle_t *, struct inode *, int, int, int *);
 
-extern int  ext3_get_inode_loc (struct inode *, struct ext3_iloc *);
 extern void ext3_read_inode (struct inode *);
 extern void ext3_write_inode (struct inode *, int);
 extern int  ext3_setattr (struct dentry *, struct iattr *);

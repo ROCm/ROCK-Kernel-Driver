@@ -2337,26 +2337,114 @@ static unsigned long ext3_get_inode_block(struct super_block *sb,
 }
 
 /* 
- * ext3_get_inode_loc returns with an extra refcount against the
- * inode's underlying buffer_head on success. 
+ * ext3_get_inode_loc returns with an extra refcount against the inode's
+ * underlying buffer_head on success.  If `in_mem' is false then we're purely
+ * trying to determine the inode's location on-disk and no read need be
+ * performed.
  */
-
-int ext3_get_inode_loc (struct inode *inode, struct ext3_iloc *iloc)
+static int ext3_get_inode_loc(struct inode *inode,
+				struct ext3_iloc *iloc, int in_mem)
 {
 	unsigned long block;
+	struct buffer_head *bh;
 
 	block = ext3_get_inode_block(inode->i_sb, inode->i_ino, iloc);
-	if (block) {
-		struct buffer_head *bh = sb_bread(inode->i_sb, block);
-		if (bh) {
-			iloc->bh = bh;
-			return 0;
-		}
+	if (!block)
+		return -EIO;
+
+	bh = sb_getblk(inode->i_sb, block);
+	if (!bh) {
 		ext3_error (inode->i_sb, "ext3_get_inode_loc",
-			    "unable to read inode block - "
-			    "inode=%lu, block=%lu", inode->i_ino, block);
+				"unable to read inode block - "
+				"inode=%lu, block=%lu", inode->i_ino, block);
+		return -EIO;
 	}
-	return -EIO;
+	if (!buffer_uptodate(bh)) {
+		lock_buffer(bh);
+		if (buffer_uptodate(bh)) {
+			/* someone brought it uptodate while we waited */
+			unlock_buffer(bh);
+			goto has_buffer;
+		}
+
+		/* we can't skip I/O if inode is on a disk only */
+		if (in_mem) {
+			struct buffer_head *bitmap_bh;
+			struct ext3_group_desc *desc;
+			int inodes_per_buffer;
+			int inode_offset, i;
+			int block_group;
+			int start;
+
+			/*
+			 * If this is the only valid inode in the block we
+			 * need not read the block.
+			 */
+			block_group = (inode->i_ino - 1) /
+					EXT3_INODES_PER_GROUP(inode->i_sb);
+			inodes_per_buffer = bh->b_size /
+				EXT3_INODE_SIZE(inode->i_sb);
+			inode_offset = ((inode->i_ino - 1) %
+					EXT3_INODES_PER_GROUP(inode->i_sb));
+			start = inode_offset & ~(inodes_per_buffer - 1);
+
+			/* Is the inode bitmap in cache? */
+			desc = ext3_get_group_desc(inode->i_sb,
+						block_group, NULL);
+			if (!desc)
+				goto make_io;
+
+			bitmap_bh = sb_getblk(inode->i_sb,
+					le32_to_cpu(desc->bg_inode_bitmap));
+			if (!bitmap_bh)
+				goto make_io;
+
+			/*
+			 * If the inode bitmap isn't in cache then the
+			 * optimisation may end up performing two reads instead
+			 * of one, so skip it.
+			 */
+			if (!buffer_uptodate(bitmap_bh)) {
+				brelse(bitmap_bh);
+				goto make_io;
+			}
+			for (i = start; i < start + inodes_per_buffer; i++) {
+				if (i == inode_offset)
+					continue;
+				if (ext3_test_bit(i, bitmap_bh->b_data))
+					break;
+			}
+			brelse(bitmap_bh);
+			if (i == start + inodes_per_buffer) {
+				/* all other inodes are free, so skip I/O */
+				memset(bh->b_data, 0, bh->b_size);
+				set_buffer_uptodate(bh);
+				unlock_buffer(bh);
+				goto has_buffer;
+			}
+		}
+
+make_io:
+		/*
+		 * There are another valid inodes in the buffer so we must
+		 * read the block from disk
+		 */
+		get_bh(bh);
+		bh->b_end_io = end_buffer_io_sync;
+		submit_bh(READ, bh);
+		wait_on_buffer(bh);
+		if (!buffer_uptodate(bh)) {
+			ext3_error(inode->i_sb, "ext3_get_inode_loc",
+					"unable to read inode block - "
+					"inode=%lu, block=%lu",
+					inode->i_ino, block);
+			brelse(bh);
+			return -EIO;
+		}
+	}
+has_buffer:
+	iloc->bh = bh;
+	return 0;
 }
 
 void ext3_set_inode_flags(struct inode *inode)
@@ -2376,7 +2464,6 @@ void ext3_set_inode_flags(struct inode *inode)
 		inode->i_flags |= S_DIRSYNC;
 }
 
-
 void ext3_read_inode(struct inode * inode)
 {
 	struct ext3_iloc iloc;
@@ -2389,7 +2476,7 @@ void ext3_read_inode(struct inode * inode)
 	ei->i_acl = EXT3_ACL_NOT_CACHED;
 	ei->i_default_acl = EXT3_ACL_NOT_CACHED;
 #endif
-	if (ext3_get_inode_loc(inode, &iloc))
+	if (ext3_get_inode_loc(inode, &iloc, 0))
 		goto bad_inode;
 	bh = iloc.bh;
 	raw_inode = ext3_raw_inode(&iloc);
@@ -2793,7 +2880,7 @@ ext3_reserve_inode_write(handle_t *handle, struct inode *inode,
 {
 	int err = 0;
 	if (handle) {
-		err = ext3_get_inode_loc(inode, iloc);
+		err = ext3_get_inode_loc(inode, iloc, 1);
 		if (!err) {
 			BUFFER_TRACE(iloc->bh, "get_write_access");
 			err = ext3_journal_get_write_access(handle, iloc->bh);
@@ -2891,7 +2978,7 @@ ext3_pin_inode(handle_t *handle, struct inode *inode)
 
 	int err = 0;
 	if (handle) {
-		err = ext3_get_inode_loc(inode, &iloc);
+		err = ext3_get_inode_loc(inode, &iloc, 1);
 		if (!err) {
 			BUFFER_TRACE(iloc.bh, "get_write_access");
 			err = journal_get_write_access(handle, iloc.bh);
