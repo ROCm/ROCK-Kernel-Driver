@@ -30,6 +30,7 @@
 #include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/delay.h>
+#include <linux/device.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -2194,3 +2195,4 @@ MODULE_PARM_DESC(probe_rsa, "Probe I/O ports for RSA");
 MODULE_PARM(force_rsa, "1-" __MODULE_STRING(PORT_RSA_MAX) "i");
 MODULE_PARM_DESC(force_rsa, "Force I/O ports for RSA");
 #endif
+MODULE_ALIAS_CHARDEV_MAJOR(TTY_MAJOR);
