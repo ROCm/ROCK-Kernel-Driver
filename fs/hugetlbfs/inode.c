@@ -377,6 +377,7 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 
 	inode = new_inode(sb);
 	if (inode) {
+		struct hugetlbfs_inode_info *info;
 		inode->i_mode = mode;
 		inode->i_uid = uid;
 		inode->i_gid = gid;
@@ -385,6 +386,8 @@ static struct inode *hugetlbfs_get_inode(struct super_block *sb, uid_t uid,
 		inode->i_mapping->a_ops = &hugetlbfs_aops;
 		inode->i_mapping->backing_dev_info =&hugetlbfs_backing_dev_info;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+		info = HUGETLBFS_I(inode);
+		mpol_shared_policy_init(&info->policy);
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -512,6 +515,33 @@ static void hugetlbfs_put_super(struct super_block *sb)
 	}
 }
 
+static kmem_cache_t *hugetlbfs_inode_cachep;
+
+static struct inode *hugetlbfs_alloc_inode(struct super_block *sb)
+{
+	struct hugetlbfs_inode_info *p;
+
+	p = kmem_cache_alloc(hugetlbfs_inode_cachep, SLAB_KERNEL);
+	if (!p)
+		return NULL;
+	return &p->vfs_inode;
+}
+
+static void init_once(void *foo, kmem_cache_t *cachep, unsigned long flags)
+{
+	struct hugetlbfs_inode_info *ei = (struct hugetlbfs_inode_info *)foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+
+static void hugetlbfs_destroy_inode(struct inode *inode)
+{
+	mpol_free_shared_policy(&HUGETLBFS_I(inode)->policy);
+	kmem_cache_free(hugetlbfs_inode_cachep, HUGETLBFS_I(inode));
+}
+
 static struct address_space_operations hugetlbfs_aops = {
 	.readpage	= hugetlbfs_readpage,
 	.prepare_write	= hugetlbfs_prepare_write,
@@ -543,6 +573,8 @@ static struct inode_operations hugetlbfs_inode_operations = {
 };
 
 static struct super_operations hugetlbfs_ops = {
+	.alloc_inode    = hugetlbfs_alloc_inode,
+	.destroy_inode  = hugetlbfs_destroy_inode,
 	.statfs		= hugetlbfs_statfs,
 	.drop_inode	= hugetlbfs_drop_inode,
 	.put_super	= hugetlbfs_put_super,
@@ -763,9 +795,16 @@ static int __init init_hugetlbfs_fs(void)
 	int error;
 	struct vfsmount *vfsmount;
 
+	hugetlbfs_inode_cachep = kmem_cache_create("hugetlbfs_inode_cache",
+					sizeof(struct hugetlbfs_inode_info),
+					0, SLAB_RECLAIM_ACCOUNT,
+					init_once, NULL);
+	if (hugetlbfs_inode_cachep == NULL)
+		return -ENOMEM;
+
 	error = register_filesystem(&hugetlbfs_fs_type);
 	if (error)
-		return error;
+		goto out;
 
 	vfsmount = kern_mount(&hugetlbfs_fs_type);
 
@@ -775,11 +814,16 @@ static int __init init_hugetlbfs_fs(void)
 	}
 
 	error = PTR_ERR(vfsmount);
+
+ out:
+	if (error)
+		kmem_cache_destroy(hugetlbfs_inode_cachep);
 	return error;
 }
 
 static void __exit exit_hugetlbfs_fs(void)
 {
+	kmem_cache_destroy(hugetlbfs_inode_cachep);
 	unregister_filesystem(&hugetlbfs_fs_type);
 }
 

@@ -8,6 +8,7 @@
  *		 2002 Red Hat Inc.
  * Copyright (C) 2002-2003 Hugh Dickins.
  * Copyright (C) 2002-2003 VERITAS Software Corporation.
+ * Copyright (C) 2004 Andi Kleen, SuSE Labs
  *
  * This file is released under the GPL.
  */
@@ -37,8 +38,10 @@
 #include <linux/vfs.h>
 #include <linux/blkdev.h>
 #include <linux/security.h>
+#include <linux/swapops.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
+#include <asm/pgtable.h>
 
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC	0x01021994
@@ -783,6 +786,74 @@ redirty:
 	return WRITEPAGE_ACTIVATE;	/* Return with the page locked */
 }
 
+#ifdef CONFIG_NUMA
+static struct page *shmem_swapin_async(struct shared_policy *p,
+				       swp_entry_t entry, unsigned long idx)
+{
+	struct page *page;
+	struct vm_area_struct pvma;
+
+	/* Create a pseudo vma that just contains the policy */
+	memset(&pvma, 0, sizeof(struct vm_area_struct));
+	pvma.vm_end = PAGE_SIZE;
+	pvma.vm_pgoff = idx;
+	pvma.vm_policy = mpol_shared_policy_lookup(p, idx);
+	page = read_swap_cache_async(entry, &pvma, 0);
+	mpol_free(pvma.vm_policy);
+	return page;
+}
+
+struct page *shmem_swapin(struct shmem_inode_info *info, swp_entry_t entry,
+			  unsigned long idx)
+{
+	struct shared_policy *p = &info->policy;
+	int i, num;
+	struct page *page;
+	unsigned long offset;
+
+	num = valid_swaphandles(entry, &offset);
+	for (i = 0; i < num; offset++, i++) {
+		page = shmem_swapin_async(p,
+				swp_entry(swp_type(entry), offset), idx);
+		if (!page)
+			break;
+		page_cache_release(page);
+	}
+	lru_add_drain();	/* Push any new pages onto the LRU now */
+	return shmem_swapin_async(p, entry, idx);
+}
+
+static struct page *
+shmem_alloc_page(unsigned long gfp, struct shmem_inode_info *info,
+		 unsigned long idx)
+{
+	struct vm_area_struct pvma;
+	struct page *page;
+
+	memset(&pvma, 0, sizeof(struct vm_area_struct));
+	pvma.vm_policy = mpol_shared_policy_lookup(&info->policy, idx);
+	pvma.vm_pgoff = idx;
+	pvma.vm_end = PAGE_SIZE;
+	page = alloc_page_vma(gfp, &pvma, 0);
+	mpol_free(pvma.vm_policy);
+	return page;
+}
+#else
+static inline struct page *
+shmem_swapin(struct shmem_inode_info *info,swp_entry_t entry,unsigned long idx)
+{
+	swapin_readahead(entry, 0, NULL);
+	return read_swap_cache_async(entry, NULL, 0);
+}
+
+static inline struct page *
+shmem_alloc_page(unsigned long gfp,struct shmem_inode_info *info,
+				 unsigned long idx)
+{
+	return alloc_page(gfp);
+}
+#endif
+
 /*
  * shmem_getpage - either get the page from swap or allocate a new one
  *
@@ -790,7 +861,8 @@ redirty:
  * vm. If we swap it in we mark it dirty since we also free the swap
  * entry since a page cannot live in both the swap and page cache
  */
-static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **pagep, enum sgp_type sgp, int *type)
+static int shmem_getpage(struct inode *inode, unsigned long idx,
+			struct page **pagep, enum sgp_type sgp, int *type)
 {
 	struct address_space *mapping = inode->i_mapping;
 	struct shmem_inode_info *info = SHMEM_I(inode);
@@ -840,8 +912,7 @@ repeat:
 			if (majmin == VM_FAULT_MINOR && type)
 				inc_page_state(pgmajfault);
 			majmin = VM_FAULT_MAJOR;
-			swapin_readahead(swap);
-			swappage = read_swap_cache_async(swap);
+			swappage = shmem_swapin(info, swap, idx);
 			if (!swappage) {
 				spin_lock(&info->lock);
 				entry = shmem_swp_alloc(info, idx, sgp);
@@ -946,7 +1017,9 @@ repeat:
 
 		if (!filepage) {
 			spin_unlock(&info->lock);
-			filepage = page_cache_alloc(mapping);
+			filepage = shmem_alloc_page(mapping_gfp_mask(mapping),
+						    info,
+						    idx);
 			if (!filepage) {
 				shmem_unacct_blocks(info->flags, 1);
 				shmem_free_block(inode);
@@ -1069,6 +1142,24 @@ static int shmem_populate(struct vm_area_struct *vma,
 	return 0;
 }
 
+#ifdef CONFIG_NUMA
+int shmem_set_policy(struct vm_area_struct *vma, struct mempolicy *new)
+{
+	struct inode *i = vma->vm_file->f_dentry->d_inode;
+	return mpol_set_shared_policy(&SHMEM_I(i)->policy, vma, new);
+}
+
+struct mempolicy *
+shmem_get_policy(struct vm_area_struct *vma, unsigned long addr)
+{
+	struct inode *i = vma->vm_file->f_dentry->d_inode;
+	unsigned long idx;
+
+	idx = ((addr - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
+	return mpol_shared_policy_lookup(&SHMEM_I(i)->policy, idx);
+}
+#endif
+
 void shmem_lock(struct file *file, int lock)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -1117,6 +1208,7 @@ shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 		info = SHMEM_I(inode);
 		memset(info, 0, (char *)inode - (char *)info);
 		spin_lock_init(&info->lock);
+ 		mpol_shared_policy_init(&info->policy);
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -1792,6 +1884,7 @@ static struct inode *shmem_alloc_inode(struct super_block *sb)
 
 static void shmem_destroy_inode(struct inode *inode)
 {
+	mpol_free_shared_policy(&SHMEM_I(inode)->policy);
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
@@ -1876,6 +1969,10 @@ static struct super_operations shmem_ops = {
 static struct vm_operations_struct shmem_vm_ops = {
 	.nopage		= shmem_nopage,
 	.populate	= shmem_populate,
+#ifdef CONFIG_NUMA
+	.set_policy     = shmem_set_policy,
+	.get_policy     = shmem_get_policy,
+#endif
 };
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
