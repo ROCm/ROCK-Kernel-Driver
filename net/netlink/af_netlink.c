@@ -593,7 +593,7 @@ static __inline__ int netlink_broadcast_deliver(struct sock *sk, struct sk_buff 
 		skb_set_owner_r(skb, sk);
 		skb_queue_tail(&sk->sk_receive_queue, skb);
 		sk->sk_data_ready(sk, skb->len);
-		return 0;
+		return atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf;
 	}
 	return -1;
 }
@@ -606,6 +606,8 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 	struct sk_buff *skb2 = NULL;
 	int protocol = ssk->sk_protocol;
 	int failure = 0, delivered = 0;
+	int congested = 0;
+	int val;
 
 	netlink_trim(skb, allocation);
 
@@ -640,9 +642,10 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 			netlink_overrun(sk);
 			/* Clone failed. Notify ALL listeners. */
 			failure = 1;
-		} else if (netlink_broadcast_deliver(sk, skb2)) {
+		} else if ((val = netlink_broadcast_deliver(sk, skb2)) < 0) {
 			netlink_overrun(sk);
 		} else {
+			congested |= val;
 			delivered = 1;
 			skb2 = NULL;
 		}
@@ -655,8 +658,11 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 		kfree_skb(skb2);
 	kfree_skb(skb);
 
-	if (delivered)
+	if (delivered) {
+		if (congested && (allocation & __GFP_WAIT))
+			yield();
 		return 0;
+	}
 	if (failure)
 		return -ENOBUFS;
 	return -ESRCH;
