@@ -54,6 +54,18 @@ int prof_multiplier[NR_CPUS] = { 1, };
 int prof_old_multiplier[NR_CPUS] = { 1, };
 DEFINE_PER_CPU(int, prof_counter) = 1;
 
+void enable_NMI_through_LVT0 (void * dummy)
+{
+	unsigned int v, ver;
+
+	ver = apic_read(APIC_LVR);
+	ver = GET_APIC_VERSION(ver);
+	v = APIC_DM_NMI;			/* unmask and set to NMI */
+	if (!APIC_INTEGRATED(ver))		/* 82489DX */
+		v |= APIC_LVT_LEVEL_TRIGGER;
+	apic_write_around(APIC_LVT0, v);
+}
+
 int get_maxlvt(void)
 {
 	unsigned int v, ver, maxlvt;
