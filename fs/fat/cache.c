@@ -203,7 +203,7 @@ void fat_cache_inval_inode(struct inode *inode)
 	spin_unlock(&MSDOS_I(inode)->cache_lru_lock);
 }
 
-int __fat_access(struct super_block *sb, int nr, int new_value)
+static int __fat_access(struct super_block *sb, int nr, int new_value)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	struct buffer_head *bh, *bh2, *c_bh, *c_bh2;
