@@ -10,34 +10,9 @@
 #include <linux/config.h>
 
 /*
- * Task size: 3GB
- */
-#define TASK_SIZE	(0xbf000000UL)
-#define TASK_SIZE_26	(0x04000000UL)
-
-/*
- * This decides where the kernel will search for a free chunk of vm
- * space during mmap's.
- */
-#define TASK_UNMAPPED_BASE (0x40000000)
-
-/*
- * Page offset: 3GB
- */
-#define PAGE_OFFSET	(0xc0000000UL)
-
-/*
  * Physical DRAM offset is 0xc0000000 on the SA1100
  */
 #define PHYS_OFFSET	(0xc0000000UL)
-
-/*
- * We take advantage of the fact that physical and virtual address can be the
- * same.  The NUMA code is handling the large holes that might exist between
- * all memory banks.
- */
-#define __virt_to_phys(x)	(x)
-#define __phys_to_virt(x)	(x)
 
 /*
  * Virtual view <-> DMA view memory address translations
