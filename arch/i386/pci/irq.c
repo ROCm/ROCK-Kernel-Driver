@@ -472,6 +472,8 @@ static struct irq_router pirq_routers[] = {
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801BA_10, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_0, pirq_piix_get, pirq_piix_set },
 	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801CA_12, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801DB_0, pirq_piix_get, pirq_piix_set },
+	{ "PIIX", PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_82801E_0, pirq_piix_get, pirq_piix_set },
 
 	{ "ALI", PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1533, pirq_ali_get, pirq_ali_set },
 
@@ -491,6 +493,10 @@ static struct irq_router pirq_routers[] = {
 	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_CSB5,
 	  pirq_serverworks_get, pirq_serverworks_set },
 	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
+		pirq_amd756_get, pirq_amd756_set },
+	{ "AMD766", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7413,
+		pirq_amd756_get, pirq_amd756_set },
+	{ "AMD768", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7443,
 		pirq_amd756_get, pirq_amd756_set },
 
 	{ "default", 0, 0, NULL, NULL }
@@ -684,42 +690,7 @@ static int pcibios_lookup_irq(struct pci_dev *dev, int assign)
 	return 1;
 }
 
-static int __init pcibios_irq_init(void)
-{
-	DBG("PCI: IRQ init\n");
-
-	if (pcibios_enable_irq)
-		return 0;
-
-	pirq_table = pirq_find_routing_table();
-
-#ifdef CONFIG_PCI_BIOS
-	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
-		pirq_table = pcibios_get_irq_routing_table();
-#endif
-	if (pirq_table) {
-		pirq_peer_trick();
-		pirq_find_router();
-		if (pirq_table->exclusive_irqs) {
-			int i;
-			for (i=0; i<16; i++)
-				if (!(pirq_table->exclusive_irqs & (1 << i)))
-					pirq_penalty[i] += 100;
-		}
-		/* If we're using the I/O APIC, avoid using the PCI IRQ routing table */
-		if (io_apic_assign_pci_irqs)
-			pirq_table = NULL;
-	}
-
-	pcibios_enable_irq = pirq_enable_irq;
-
-	pcibios_fixup_irqs();
-	return 0;
-}
-
-subsys_initcall(pcibios_irq_init);
-
-void __init pcibios_fixup_irqs(void)
+static void __init pcibios_fixup_irqs(void)
 {
 	struct pci_dev *dev;
 	u8 pin;
@@ -784,6 +755,42 @@ void __init pcibios_fixup_irqs(void)
 			pcibios_lookup_irq(dev, 0);
 	}
 }
+
+static int __init pcibios_irq_init(void)
+{
+	DBG("PCI: IRQ init\n");
+
+	if (pcibios_enable_irq)
+		return 0;
+
+	pirq_table = pirq_find_routing_table();
+
+#ifdef CONFIG_PCI_BIOS
+	if (!pirq_table && (pci_probe & PCI_BIOS_IRQ_SCAN))
+		pirq_table = pcibios_get_irq_routing_table();
+#endif
+	if (pirq_table) {
+		pirq_peer_trick();
+		pirq_find_router();
+		if (pirq_table->exclusive_irqs) {
+			int i;
+			for (i=0; i<16; i++)
+				if (!(pirq_table->exclusive_irqs & (1 << i)))
+					pirq_penalty[i] += 100;
+		}
+		/* If we're using the I/O APIC, avoid using the PCI IRQ routing table */
+		if (io_apic_assign_pci_irqs)
+			pirq_table = NULL;
+	}
+
+	pcibios_enable_irq = pirq_enable_irq;
+
+	pcibios_fixup_irqs();
+	return 0;
+}
+
+subsys_initcall(pcibios_irq_init);
+
 
 void pcibios_penalize_isa_irq(int irq)
 {
