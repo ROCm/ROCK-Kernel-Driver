@@ -73,6 +73,9 @@ ToDo/Notes:
 	- Add fs/ntfs/mft.c::try_map_mft_record() which fails with -EALREADY if
 	  the mft record is already locked and otherwise behaves the same way
 	  as fs/ntfs/mft.c::map_mft_record().
+	- Modify fs/ntfs/mft.c::write_mft_record_nolock() so that it only
+	  writes the mft record if the buffers belonging to it are dirty.
+	  Otherwise we assume that it was written out by other means already.
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
