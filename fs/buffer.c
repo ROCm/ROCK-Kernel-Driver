@@ -347,18 +347,22 @@ asmlinkage long sys_fsync(unsigned int fd)
 		goto out_putf;
 	}
 
-	/* We need to protect against concurrent writers.. */
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+
+	/*
+	 * We need to protect against concurrent writers,
+	 * which could cause livelocks in fsync_buffers_list
+	 */
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 0);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
@@ -383,17 +387,17 @@ asmlinkage long sys_fdatasync(unsigned int fd)
 
 	mapping = file->f_mapping;
 
-	down(&mapping->host->i_sem);
 	current->flags |= PF_SYNCWRITE;
 	ret = filemap_fdatawrite(mapping);
+	down(&mapping->host->i_sem);
 	err = file->f_op->fsync(file, file->f_dentry, 1);
 	if (!ret)
 		ret = err;
+	up(&mapping->host->i_sem);
 	err = filemap_fdatawait(mapping);
 	if (!ret)
 		ret = err;
 	current->flags &= ~PF_SYNCWRITE;
-	up(&mapping->host->i_sem);
 
 out_putf:
 	fput(file);
