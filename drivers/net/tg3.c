@@ -2455,6 +2455,11 @@ static int tg3_rx(struct tg3 *tp, int budget)
 	int received;
 
 	hw_idx = tp->hw_status->idx[0].rx_producer;
+	/*
+	 * We need to order the read of hw_idx and the read of
+	 * the opaque cookie.
+	 */
+	rmb();
 	sw_idx = rx_rcb_ptr % TG3_RX_RCB_RING_SIZE(tp);
 	work_mask = 0;
 	received = 0;
