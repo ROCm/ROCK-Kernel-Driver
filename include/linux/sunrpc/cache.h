@@ -193,8 +193,11 @@ RTN *FNAME ARGS										\
 					t2 = tmp; tmp = new; new = t2;			\
 				}							\
 				if (test_bit(CACHE_NEGATIVE,  &item->MEMBER.flags))	\
-					 set_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
-				else {UPDATE;}						\
+					set_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
+				else {							\
+					UPDATE;						\
+					clear_bit(CACHE_NEGATIVE, &tmp->MEMBER.flags);	\
+				}							\
 			}								\
 			if (set||new) write_unlock(&(DETAIL)->hash_lock);		\
 			else read_unlock(&(DETAIL)->hash_lock);				\
@@ -223,7 +226,7 @@ RTN *FNAME ARGS										\
 	else read_unlock(&(DETAIL)->hash_lock);						\
 	if (new && set)									\
 		cache_fresh(DETAIL, &new->MEMBER, item->MEMBER.expiry_time);		\
-	if (new || !set)			       					\
+	if (new)				       					\
 		return new;								\
 	new = kmalloc(sizeof(*new), GFP_KERNEL);					\
 	if (new) {									\

@@ -390,13 +390,7 @@ svcauth_null_accept(struct svc_rqst *rqstp, u32 *authp)
 			break;
 		default: BUG();
 		}
-	else if (rqstp->rq_proc == 0) {
-		/* We always accept calls to NULL. AIX clients try
-		   a NULL call before mounting, so when we get here
-		   we may not know about the export entry yet. */
-		rv = SVC_OK;
-	} else
-		rv = SVC_DROP;
+	else rv = SVC_DROP;
 
 	if (rqstp->rq_client == NULL && rqstp->rq_proc != 0)
 		*authp = rpc_autherr_badcred;
