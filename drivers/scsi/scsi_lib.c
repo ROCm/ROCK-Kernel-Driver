@@ -917,6 +917,7 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 			req->current_nr_sectors);
 
 	/* release the command and kill it */
+	scsi_release_buffers(cmd);
 	scsi_put_command(cmd);
 	return BLKPREP_KILL;
 }
