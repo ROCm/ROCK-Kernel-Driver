@@ -321,7 +321,7 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_possible(i))
 			continue;
-		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x \n",
+		len += sprintf(buffer+len, "%08x  %08x %08x %08x %08x %08x %08x %08x  %08x %08x %08x %08x %08x %08x %08x %08x %08x \n",
 			       dst_entries,		       
 			       per_cpu_ptr(rt_cache_stat, i)->in_hit,
 			       per_cpu_ptr(rt_cache_stat, i)->in_slow_tot,
@@ -338,7 +338,9 @@ static int rt_cache_stat_get_info(char *buffer, char **start, off_t offset, int 
 			       per_cpu_ptr(rt_cache_stat, i)->gc_total,
 			       per_cpu_ptr(rt_cache_stat, i)->gc_ignored,
 			       per_cpu_ptr(rt_cache_stat, i)->gc_goal_miss,
-			       per_cpu_ptr(rt_cache_stat, i)->gc_dst_overflow
+			       per_cpu_ptr(rt_cache_stat, i)->gc_dst_overflow,
+			       per_cpu_ptr(rt_cache_stat, i)->in_hlist_search,
+			       per_cpu_ptr(rt_cache_stat, i)->out_hlist_search
 
 			);
 	}
@@ -1786,6 +1788,7 @@ int ip_route_input(struct sk_buff *skb, u32 daddr, u32 saddr,
 			skb->dst = (struct dst_entry*)rth;
 			return 0;
 		}
+		RT_CACHE_STAT_INC(in_hlist_search);
 	}
 	rcu_read_unlock();
 
@@ -2153,6 +2156,7 @@ int __ip_route_output_key(struct rtable **rp, const struct flowi *flp)
 			*rp = rth;
 			return 0;
 		}
+		RT_CACHE_STAT_INC(out_hlist_search);
 	}
 	rcu_read_unlock();
 

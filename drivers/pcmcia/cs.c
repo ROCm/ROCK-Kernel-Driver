@@ -44,7 +44,6 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/proc_fs.h>
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/device.h>
@@ -128,11 +127,6 @@ socket_state_t dead_socket = {
 /* List of all sockets, protected by a rwsem */
 LIST_HEAD(pcmcia_socket_list);
 DECLARE_RWSEM(pcmcia_socket_list_rwsem);
-
-
-#ifdef CONFIG_PROC_FS
-struct proc_dir_entry *proc_pccard = NULL;
-#endif
 
 /*====================================================================*/
 
@@ -281,24 +275,7 @@ static int init_socket(struct pcmcia_socket *s)
 	return s->ss_entry->init(s);
 }
 
-/*====================================================================*/
-
-#if defined(CONFIG_PROC_FS) && defined(PCMCIA_DEBUG)
-static int proc_read_clients(char *buf, char **start, off_t pos,
-			     int count, int *eof, void *data)
-{
-    struct pcmcia_socket *s = data;
-    client_handle_t c;
-    char *p = buf;
-
-    for (c = s->clients; c; c = c->next)
-	p += sprintf(p, "fn %x: '%s' [attr 0x%04x] [state 0x%04x]\n",
-		     c->Function, c->dev_info, c->Attributes, c->state);
-    return (p - buf);
-}
-#endif
-
-/*======================================================================
+/*====================================================================
 
     Low-level PC Card interface drivers need to register with Card
     Services using these calls.
@@ -375,7 +352,6 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	spin_lock_init(&socket->lock);
 
 	init_socket(socket);
-	socket->ss_entry->inquire_socket(socket, &socket->cap);
 
 	init_completion(&socket->thread_done);
 	init_waitqueue_head(&socket->thread_wait);
@@ -388,20 +364,6 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	wait_for_completion(&socket->thread_done);
 	BUG_ON(!socket->thread);
 
-#ifdef CONFIG_PROC_FS
-	if (proc_pccard) {
-		char name[3];
-		sprintf(name, "%02d", socket->sock);
-		socket->proc = proc_mkdir(name, proc_pccard);
-		if (socket->proc)
-			socket->ss_entry->proc_setup(socket, socket->proc);
-#ifdef PCMCIA_DEBUG
-		if (socket->proc)
-			create_proc_read_entry("clients", 0, socket->proc,
-					       proc_read_clients, socket);
-#endif
-	}
-#endif
 	return 0;
 }
 
@@ -410,16 +372,6 @@ static void pcmcia_remove_socket(struct class_device *class_dev)
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	client_t *client;
 
-#ifdef CONFIG_PROC_FS
-	if (proc_pccard) {
-		char name[3];
-		sprintf(name, "%02d", socket->sock);
-#ifdef PCMCIA_DEBUG
-		remove_proc_entry("clients", socket->proc);
-#endif
-		remove_proc_entry(name, proc_pccard);
-	}
-#endif
 	if (socket->thread) {
 		init_completion(&socket->thread_done);
 		socket->thread = NULL;
@@ -433,6 +385,12 @@ static void pcmcia_remove_socket(struct class_device *class_dev)
 		kfree(client);
 	}
 	socket->ss_entry = NULL;
+}
+
+static void pcmcia_release_socket(struct class_device *class_dev)
+{
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
+	complete(&socket->socket_released);
 }
 
 
@@ -473,7 +431,7 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	/* set proper values in socket->dev */
 	socket->dev.class_data = socket;
 	socket->dev.class = &pcmcia_socket_class;
-	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u\n", socket->sock);
+	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u", socket->sock);
 
 	/* register with the device core */
 	if (class_device_register(&socket->dev)) {
@@ -498,6 +456,8 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 
 	DEBUG(0, "cs: pcmcia_unregister_socket(0x%p)\n", socket->ss_entry);
 
+	init_completion(&socket->socket_released);
+
 	/* remove from the device core */
 	class_device_unregister(&socket->dev);
 
@@ -505,6 +465,9 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 	down_write(&pcmcia_socket_list_rwsem);
 	list_del(&socket->socket_list);
 	up_write(&pcmcia_socket_list_rwsem);
+
+	/* wait for sysfs to drop all references */
+	wait_for_completion(&socket->socket_released);
 } /* pcmcia_unregister_socket */
 EXPORT_SYMBOL(pcmcia_unregister_socket);
 
@@ -918,8 +881,8 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 	      *base, align);
 	align = 0;
     }
-    if ((s->cap.features & SS_CAP_STATIC_MAP) && s->cap.io_offset) {
-	*base = s->cap.io_offset | (*base & 0x0fff);
+    if ((s->features & SS_CAP_STATIC_MAP) && s->io_offset) {
+	*base = s->io_offset | (*base & 0x0fff);
 	return 0;
     }
     /* Check for an already-allocated window that must conflict with
@@ -966,7 +929,7 @@ static void release_io_space(struct pcmcia_socket *s, ioaddr_t base,
 			     ioaddr_t num)
 {
     int i;
-    if(!(s->cap.features & SS_CAP_STATIC_MAP))
+    if(!(s->features & SS_CAP_STATIC_MAP))
 	release_region(base, num);
     for (i = 0; i < MAX_IO_WIN; i++) {
 	if ((s->io[i].BasePort <= base) &&
@@ -1183,7 +1146,7 @@ int pcmcia_get_configuration_info(client_handle_t handle,
 	config->Function = fn;
 	config->Vcc = s->socket.Vcc;
 	config->Vpp1 = config->Vpp2 = s->socket.Vpp;
-	config->Option = s->cap.cb_dev->subordinate->number;
+	config->Option = s->cb_dev->subordinate->number;
 	if (s->state & SOCKET_CARDBUS_CONFIG) {
 	    config->Attributes = CONF_VALID_CLIENT;
 	    config->IntType = INT_CARDBUS;
@@ -1356,7 +1319,7 @@ struct pci_bus *pcmcia_lookup_bus(client_handle_t handle)
 	if (!(s->state & SOCKET_CARDBUS))
 		return NULL;
 
-	return s->cap.cb_dev->subordinate;
+	return s->cb_dev->subordinate;
 }
 
 EXPORT_SYMBOL(pcmcia_lookup_bus);
@@ -1728,7 +1691,7 @@ int pcmcia_release_irq(client_handle_t handle, irq_req_t *req)
     }
 
 #ifdef CONFIG_PCMCIA_PROBE
-    if (req->AssignedIRQ != s->cap.pci_irq)
+    if (req->AssignedIRQ != s->pci_irq)
 	undo_irq(req->Attributes, req->AssignedIRQ);
 #endif
     
@@ -1753,7 +1716,7 @@ int pcmcia_release_window(window_handle_t win)
     s->state &= ~SOCKET_WIN_REQ(win->index);
 
     /* Release system memory */
-    if(!(s->cap.features & SS_CAP_STATIC_MAP))
+    if(!(s->features & SS_CAP_STATIC_MAP))
 	release_mem_region(win->base, win->size);
     win->handle->state &= ~CLIENT_WIN_REQ(win->index);
 
@@ -1978,22 +1941,22 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	return CS_IN_USE;
     
     /* Short cut: if there are no ISA interrupts, then it is PCI */
-    if (!s->cap.irq_mask) {
-	irq = s->cap.pci_irq;
+    if (!s->irq_mask) {
+	irq = s->pci_irq;
 	ret = (irq) ? 0 : CS_IN_USE;
 #ifdef CONFIG_PCMCIA_PROBE
     } else if (s->irq.AssignedIRQ != 0) {
 	/* If the interrupt is already assigned, it must match */
 	irq = s->irq.AssignedIRQ;
 	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int mask = req->IRQInfo2 & s->cap.irq_mask;
+	    u_int mask = req->IRQInfo2 & s->irq_mask;
 	    ret = ((mask >> irq) & 1) ? 0 : CS_BAD_ARGS;
 	} else
 	    ret = ((req->IRQInfo1&IRQ_MASK) == irq) ? 0 : CS_BAD_ARGS;
     } else {
 	ret = CS_IN_USE;
 	if (req->IRQInfo1 & IRQ_INFO2_VALID) {
-	    u_int try, mask = req->IRQInfo2 & s->cap.irq_mask;
+	    u_int try, mask = req->IRQInfo2 & s->irq_mask;
 	    for (try = 0; try < 2; try++) {
 		for (irq = 0; irq < 32; irq++)
 		    if ((mask >> irq) & 1) {
@@ -2014,7 +1977,7 @@ int pcmcia_request_irq(client_handle_t handle, irq_req_t *req)
 	if (request_irq(irq, req->Handler,
 			    ((req->Attributes & IRQ_TYPE_DYNAMIC_SHARING) || 
 			     (s->functions > 1) ||
-			     (irq == s->cap.pci_irq)) ? SA_SHIRQ : 0,
+			     (irq == s->pci_irq)) ? SA_SHIRQ : 0,
 			    handle->dev_info, req->Instance))
 	    return CS_IN_USE;
     }
@@ -2052,13 +2015,13 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 
     /* Window size defaults to smallest available */
     if (req->Size == 0)
-	req->Size = s->cap.map_size;
-    align = (((s->cap.features & SS_CAP_MEM_ALIGN) ||
+	req->Size = s->map_size;
+    align = (((s->features & SS_CAP_MEM_ALIGN) ||
 	      (req->Attributes & WIN_STRICT_ALIGN)) ?
-	     req->Size : s->cap.map_size);
-    if (req->Size & (s->cap.map_size-1))
+	     req->Size : s->map_size);
+    if (req->Size & (s->map_size-1))
 	return CS_BAD_SIZE;
-    if ((req->Base && (s->cap.features & SS_CAP_STATIC_MAP)) ||
+    if ((req->Base && (s->features & SS_CAP_STATIC_MAP)) ||
 	(req->Base & (align-1)))
 	return CS_BAD_BASE;
     if (req->Base)
@@ -2078,10 +2041,10 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     win->base = req->Base;
     win->size = req->Size;
 
-    if (!(s->cap.features & SS_CAP_STATIC_MAP) &&
+    if (!(s->features & SS_CAP_STATIC_MAP) &&
 	find_mem_region(&win->base, win->size, align,
 			(req->Attributes & WIN_MAP_BELOW_1MB) ||
-			!(s->cap.features & SS_CAP_PAGE_REGS),
+			!(s->features & SS_CAP_PAGE_REGS),
 			(*handle)->dev_info, s))
 	return CS_IN_USE;
     (*handle)->state |= CLIENT_WIN_REQ(w);
@@ -2541,12 +2504,10 @@ EXPORT_SYMBOL(pcmcia_write_memory);
 EXPORT_SYMBOL(dead_socket);
 EXPORT_SYMBOL(CardServices);
 EXPORT_SYMBOL(MTDHelperEntry);
-#ifdef CONFIG_PROC_FS
-EXPORT_SYMBOL(proc_pccard);
-#endif
 
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
+	.release = pcmcia_release_socket,
 };
 EXPORT_SYMBOL(pcmcia_socket_class);
 
@@ -2564,9 +2525,6 @@ static int __init init_pcmcia_cs(void)
     DEBUG(0, "%s\n", version);
     class_register(&pcmcia_socket_class);
     class_interface_register(&pcmcia_socket);
-#ifdef CONFIG_PROC_FS
-    proc_pccard = proc_mkdir("pccard", proc_bus);
-#endif
 
     return 0;
 }
@@ -2574,11 +2532,6 @@ static int __init init_pcmcia_cs(void)
 static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
-#ifdef CONFIG_PROC_FS
-    if (proc_pccard) {
-	remove_proc_entry("pccard", proc_bus);
-    }
-#endif
     release_resource_db();
     class_interface_unregister(&pcmcia_socket);
     class_unregister(&pcmcia_socket_class);

@@ -383,7 +383,7 @@ asmlinkage void __init start_kernel(void)
 {
 	char * command_line;
 	extern char saved_command_line[];
-	extern struct kernel_param __start___param, __stop___param;
+	extern struct kernel_param __start___param[], __stop___param[];
 /*
  * Interrupts are still disabled. Do necessary setups, then
  * enable them
@@ -403,8 +403,8 @@ asmlinkage void __init start_kernel(void)
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);
-	parse_args("Booting kernel", command_line, &__start___param,
-		   &__stop___param - &__start___param,
+	parse_args("Booting kernel", command_line, __start___param,
+		   __stop___param - __start___param,
 		   &unknown_bootoption);
 	trap_init();
 	rcu_init();

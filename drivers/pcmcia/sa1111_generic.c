@@ -12,7 +12,6 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
-#include <linux/proc_fs.h>
 #include <pcmcia/ss.h>
 
 #include <asm/hardware.h>

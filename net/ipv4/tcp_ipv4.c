@@ -1363,7 +1363,7 @@ static inline void syn_flood_warning(struct sk_buff *skb)
 {
 	static unsigned long warntime;
 
-	if (jiffies - warntime > HZ * 60) {
+	if (time_after(jiffies, (warntime + HZ * 60))) {
 		warntime = jiffies;
 		printk(KERN_INFO
 		       "possible SYN flooding on port %d. Sending cookies.\n",

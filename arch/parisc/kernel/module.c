@@ -27,11 +27,38 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 
-#if 1
+#if 0
 #define DEBUGP printk
 #else
 #define DEBUGP(fmt...)
 #endif
+
+#define CHECK_RELOC(val, bits) \
+	if ( ( !((val) & (1<<((bits)-1))) && ((val)>>(bits)) != 0 )  ||	\
+	     ( ((val) & (1<<((bits)-1))) && ((val)>>(bits)) != (((__typeof__(val))(~0))>>((bits)+2)))) { \
+		printk(KERN_ERR "module %s relocation of symbol %s is out of range (0x%lx in %d bits)\n", \
+		me->name, strtab + sym->st_name, (unsigned long)val, bits); \
+		return -ENOEXEC;			\
+	}
+
+/* three functions to determine where in the module core
+ * or init pieces the location is */
+static inline int is_init(struct module *me, void *loc)
+{
+	return (loc >= me->module_init &&
+		loc <= (me->module_init + me->init_size));
+}
+
+static inline int is_core(struct module *me, void *loc)
+{
+	return (loc >= me->module_core &&
+		loc <= (me->module_core + me->core_size));
+}
+
+static inline int is_local(struct module *me, void *loc)
+{
+	return is_init(me, loc) || is_core(me, loc);
+}
 
 
 #ifndef __LP64__
@@ -40,8 +67,8 @@ struct got_entry {
 };
 
 struct fdesc_entry {
-	Elf32_Addr gp;
 	Elf32_Addr addr;
+	Elf32_Addr gp;
 };
 
 struct stub_entry {
@@ -54,8 +81,8 @@ struct got_entry {
 
 struct fdesc_entry {
 	Elf64_Addr dummy[2];
-	Elf64_Addr gp;
 	Elf64_Addr addr;
+	Elf64_Addr gp;
 };
 
 struct stub_entry {
@@ -167,7 +194,7 @@ static inline unsigned long count_gots(const Elf_Rela *rela, unsigned long n)
 
 static inline unsigned long count_fdescs(const Elf_Rela *rela, unsigned long n)
 {
-	unsigned long cnt = 3; /* 3 for finalize */
+	unsigned long cnt = 0;
 
 	for (; n > 0; n--, rela++)
 	{
@@ -211,7 +238,7 @@ int module_frob_arch_sections(CONST Elf_Ehdr *hdr,
 			      CONST char *secstrings,
 			      struct module *me)
 {
-	unsigned long gots = 0, fdescs = 0, stubs = 0;
+	unsigned long gots = 0, fdescs = 0, stubs = 0, init_stubs = 0;
 	unsigned int i;
 
 	for (i = 1; i < hdr->e_shnum; i++) {
@@ -228,7 +255,11 @@ int module_frob_arch_sections(CONST Elf_Ehdr *hdr,
 		 */
 		gots += count_gots(rels, nrels);
 		fdescs += count_fdescs(rels, nrels);
-		stubs += count_stubs(rels, nrels);
+		if(strncmp(secstrings + sechdrs[i].sh_name,
+			   ".rela.init", 10) == 0)
+			init_stubs += count_stubs(rels, nrels);
+		else
+			stubs += count_stubs(rels, nrels);
 	}
 
 	/* align things a bit */
@@ -238,16 +269,26 @@ int module_frob_arch_sections(CONST Elf_Ehdr *hdr,
 
 	me->core_size = ALIGN(me->core_size, 16);
 	me->arch.fdesc_offset = me->core_size;
-	me->core_size += stubs * sizeof(struct fdesc_entry);
+	me->core_size += fdescs * sizeof(struct fdesc_entry);
 
 	me->core_size = ALIGN(me->core_size, 16);
 	me->arch.stub_offset = me->core_size;
 	me->core_size += stubs * sizeof(struct stub_entry);
 
+	me->init_size = ALIGN(me->init_size, 16);
+	me->arch.init_stub_offset = me->init_size;
+	me->init_size += init_stubs * sizeof(struct stub_entry);
+
+	me->arch.got_max = gots;
+	me->arch.fdesc_max = fdescs;
+	me->arch.stub_max = stubs;
+	me->arch.init_stub_max = init_stubs;
+
 	return 0;
 }
 
-static Elf_Addr get_got(struct module *me, unsigned long value, long addend)
+#ifdef __LP64__
+static Elf64_Word get_got(struct module *me, unsigned long value, long addend)
 {
 	unsigned int i;
 	struct got_entry *got;
@@ -261,10 +302,14 @@ static Elf_Addr get_got(struct module *me, unsigned long value, long addend)
 		if (got[i].addr == value)
 			return i * sizeof(struct got_entry);
 
+	BUG_ON(++me->arch.got_count > me->arch.got_max);
+
 	got[i].addr = value;
 	return i * sizeof(struct got_entry);
 }
+#endif /* __LP64__ */
 
+#ifdef __LP64__
 static Elf_Addr get_fdesc(struct module *me, unsigned long value)
 {
 	struct fdesc_entry *fdesc = me->module_core + me->arch.fdesc_offset;
@@ -281,32 +326,46 @@ static Elf_Addr get_fdesc(struct module *me, unsigned long value)
 		fdesc++;
 	}
 
+	BUG_ON(++me->arch.fdesc_count > me->arch.fdesc_max);
+
 	/* Create new one */
 	fdesc->addr = value;
 	fdesc->gp = (Elf_Addr)me->module_core + me->arch.got_offset;
 	return (Elf_Addr)fdesc;
 }
+#endif /* __LP64__ */
 
 static Elf_Addr get_stub(struct module *me, unsigned long value, long addend,
-	int millicode)
+	int millicode, int init_section)
 {
 	unsigned long i;
 	struct stub_entry *stub;
 
-	i = me->arch.stub_count++;
-	stub = me->module_core + me->arch.stub_offset + 
-	       i * sizeof(struct stub_entry);
+	if(init_section) {
+		i = me->arch.init_stub_count++;
+		BUG_ON(me->arch.init_stub_count > me->arch.init_stub_max);
+		stub = me->module_init + me->arch.init_stub_offset + 
+			i * sizeof(struct stub_entry);
+	} else {
+		i = me->arch.stub_count++;
+		BUG_ON(me->arch.stub_count > me->arch.stub_max);
+		stub = me->module_core + me->arch.stub_offset + 
+			i * sizeof(struct stub_entry);
+	}
 
 #ifndef __LP64__
 /* for 32-bit the stub looks like this:
  * 	ldil L'XXX,%r1
  * 	be,n R'XXX(%sr4,%r1)
  */
+	//value = *(unsigned long *)((value + addend) & ~3); /* why? */
+
 	stub->insns[0] = 0x20200000;	/* ldil L'XXX,%r1	*/
 	stub->insns[1] = 0xe0202002;	/* be,n R'XXX(%sr4,%r1)	*/
 
 	stub->insns[0] |= reassemble_21(lrsel(value, addend));
 	stub->insns[1] |= reassemble_17(rrsel(value, addend) / 4);
+
 #else
 /* for 64-bit we have two kinds of stubs:
  * for normal function calls:
@@ -328,7 +387,7 @@ static Elf_Addr get_stub(struct module *me, unsigned long value, long addend,
 		stub->insns[2] = 0xe820d000;	/* bve (%r1)		*/
 		stub->insns[3] = 0x537b0030;	/* ldd 18(%dp),%dp	*/
 
-		stub->insns[0] |= reassemble_21(get_got(me, value, addend));
+		stub->insns[0] |= reassemble_14(rrsel(get_got(me, value, addend),0));
 	}
 	else
 	{
@@ -371,6 +430,7 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 	Elf32_Addr val;
 	Elf32_Sword addend;
 	Elf32_Addr dot;
+	//unsigned long dp = (unsigned long)$global$;
 	register unsigned long dp asm ("r27");
 
 	DEBUGP("Applying relocate section %u to %u\n", relsec,
@@ -387,7 +447,8 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			       me->name, strtab + sym->st_name);
 			return -ENOENT;
 		}
-		dot = (sechdrs[relsec].sh_addr + rel->r_offset) & ~0x03;
+		//dot = (sechdrs[relsec].sh_addr + rel->r_offset) & ~0x03;
+		dot =  (Elf32_Addr)loc & ~0x03;
 
 		val = sym->st_value;
 		addend = rel[i].r_addend;
@@ -422,11 +483,13 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			break;
 		case R_PARISC_DIR21L:
 			/* left 21 bits of effective address */
-			*loc = mask(*loc, 21) | reassemble_21(lrsel(val, addend));
+			val = lrsel(val, addend);
+			*loc = mask(*loc, 21) | reassemble_21(val);
 			break;
 		case R_PARISC_DIR14R:
 			/* right 14 bits of effective address */
-			*loc = mask(*loc, 14) | reassemble_14(rrsel(val, addend));
+			val = rrsel(val, addend);
+			*loc = mask(*loc, 14) | reassemble_14(val);
 			break;
 		case R_PARISC_SEGREL32:
 			/* 32-bit segment relative address */
@@ -435,23 +498,27 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			break;
 		case R_PARISC_DPREL21L:
 			/* left 21 bit of relative address */
-			val -= dp;
-			*loc = mask(*loc, 21) | reassemble_21(lrsel(val, addend) - dp);
+			val = lrsel(val - dp, addend);
+			*loc = mask(*loc, 21) | reassemble_21(val);
 			break;
 		case R_PARISC_DPREL14R:
 			/* right 14 bit of relative address */
-			val -= dp;
-			*loc = mask(*loc, 14) | reassemble_14(rrsel(val, addend) - dp);
+			val = rrsel(val - dp, addend);
+			*loc = mask(*loc, 14) | reassemble_14(val);
 			break;
 		case R_PARISC_PCREL17F:
 			/* 17-bit PC relative address */
-			val = get_stub(me, val, addend, 0) - dot - 8;
-			*loc = (*loc&0x1f1ffd) | reassemble_17(val);
+			val = get_stub(me, val, addend, 0, is_init(me, loc));
+			val = (val - dot - 8)/4;
+			CHECK_RELOC(val, 17)
+			*loc = (*loc & ~0x1f1ffd) | reassemble_17(val);
 			break;
 		case R_PARISC_PCREL22F:
 			/* 22-bit PC relative address; only defined for pa20 */
-			val = get_stub(me, val, addend, 0) - dot - 8;
-			*loc = (*loc&0x3ff1ffd) | reassemble_22(val);
+			val = get_stub(me, val, addend, 0, is_init(me, loc));
+			val = (val - dot - 8)/4;
+			CHECK_RELOC(val, 22);
+			*loc = (*loc & ~0x3ff1ffd) | reassemble_22(val);
 			break;
 
 		default:
@@ -475,6 +542,7 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 	Elf64_Rela *rel = (void *)sechdrs[relsec].sh_addr;
 	Elf64_Sym *sym;
 	Elf64_Word *loc;
+	Elf64_Xword *loc64;
 	Elf64_Addr val;
 	Elf64_Sxword addend;
 	Elf64_Addr dot;
@@ -493,14 +561,16 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			       me->name, strtab + sym->st_name);
 			return -ENOENT;
 		}
-		dot = (sechdrs[relsec].sh_addr + rel->r_offset) & ~0x03;
+		//dot = (sechdrs[relsec].sh_addr + rel->r_offset) & ~0x03;
+		dot = (Elf64_Addr)loc & ~0x03;
+		loc64 = (Elf64_Xword *)loc;
 
 		val = sym->st_value;
 		addend = rel[i].r_addend;
 
-#if 1
+#if 0
 #define r(t) ELF64_R_TYPE(rel[i].r_info)==t ? #t :
-		DEBUGP("Symbol %s loc %p val 0x%Lx addend 0x%Lx: %s\n",
+		printk("Symbol %s loc %p val 0x%Lx addend 0x%Lx: %s\n",
 			strtab + sym->st_name,
 			loc, val, addend,
 			r(R_PARISC_LTOFF14R)
@@ -516,24 +586,56 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 		switch (ELF64_R_TYPE(rel[i].r_info)) {
 		case R_PARISC_LTOFF21L:
 			/* LT-relative; left 21 bits */
-			*loc = mask(*loc, 21) | reassemble_21(get_got(me, val, addend));
+			val = get_got(me, val, addend);
+			DEBUGP("LTOFF21L Symbol %s loc %p val %lx\n",
+			       strtab + sym->st_name,
+			       loc, val);
+			val = lrsel(val, 0);
+			*loc = mask(*loc, 21) | reassemble_21(val);
 			break;
 		case R_PARISC_LTOFF14R:
 			/* L(ltoff(val+addend)) */
 			/* LT-relative; right 14 bits */
-			*loc = mask(*loc, 14) | reassemble_14(get_got(me, val, addend));
+			val = get_got(me, val, addend);
+			val = rrsel(val, 0);
+			DEBUGP("LTOFF14R Symbol %s loc %p val %lx\n",
+			       strtab + sym->st_name,
+			       loc, val);
+			*loc = mask(*loc, 14) | reassemble_14(val);
 			break;
 		case R_PARISC_PCREL22F:
 			/* PC-relative; 22 bits */
-			if (strncmp(strtab + sym->st_name, "$$", 2) == 0)
-				val = get_stub(me, val, addend, 1) - dot - 8;
-			else
-				val = get_stub(me, val, addend, 0) - dot - 8;
-			*loc = (*loc&0x3ff1ffd) | reassemble_22(val);
+			DEBUGP("PCREL22F Symbol %s loc %p val %lx\n",
+			       strtab + sym->st_name,
+			       loc, val);
+			/* can we reach it locally? */
+			if(!is_local(me, (void *)val)) {
+				if (strncmp(strtab + sym->st_name, "$$", 2)
+				    == 0)
+					val = get_stub(me, val, addend, 1,
+						       is_init(me, loc));
+				else
+					val = get_stub(me, val, addend, 0,
+						       is_init(me, loc));
+			}
+			/* FIXME: local symbols work as long as the
+			 * core and init pieces aren't separated too
+			 * far.  If this is ever broken, you will trip
+			 * the check below.  The way to fix it would
+			 * be to generate local stubs to go between init
+			 * and core */
+			if((Elf64_Sxword)(val - dot - 8) > 0x800000 -1 ||
+			   (Elf64_Sxword)(val - dot - 8) < -0x800000) {
+				printk(KERN_ERR "Module %s, symbol %s is out of range for PCREL22F relocation\n",
+				       me->name, strtab + sym->st_name);
+				return -ENOEXEC;
+			}
+			val = (val - dot - 8)/4;
+			*loc = (*loc & ~0x3ff1ffd) | reassemble_22(val);
 			break;
 		case R_PARISC_DIR64:
 			/* 64-bit effective address */
-			*loc = fsel(val, addend);
+			*loc64 = val + addend;
 			break;
 		case R_PARISC_SEGREL32:
 			/* 32-bit segment relative address */
@@ -542,7 +644,17 @@ int apply_relocate_add(Elf_Shdr *sechdrs,
 			break;
 		case R_PARISC_FPTR64:
 			/* 64-bit function address */
-			*loc = get_fdesc(me, val+addend);
+			if(is_local(me, (void *)(val + addend))) {
+				*loc64 = get_fdesc(me, val+addend);
+			} else {
+				/* if the symbol is not local to this
+				 * module then val+addend is a pointer
+				 * to the function descriptor */
+				DEBUGP("Non local FPTR64 Symbol %s loc %p val %lx\n",
+				       strtab + sym->st_name,
+				       loc, val);
+				*loc64 = val + addend;
+			}
 			break;
 
 		default:
@@ -559,13 +671,26 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    const Elf_Shdr *sechdrs,
 		    struct module *me)
 {
-#ifdef __LP64__
-	me->init = (void *)get_fdesc(me, (Elf_Addr)me->init);
-#ifdef CONFIG_MODULE_UNLOAD
-	if (me->exit)
-		me->exit = (void *)get_fdesc(me, (Elf_Addr)me->exit);
+#ifdef DEBUG
+	struct fdesc_entry *entry;
+	u32 *addr;
+
+	entry = (struct fdesc_entry *)me->init;
+	printk("FINALIZE, ->init FPTR is %p, GP %lx ADDR %lx\n", entry,
+	       entry->gp, entry->addr);
+	addr = (u32 *)entry->addr;
+	printk("INSNS: %x %x %x %x\n",
+	       addr[0], addr[1], addr[2], addr[3]);
+	printk("stubs used %ld, stubs max %ld\n"
+	       "init_stubs used %ld, init stubs max %ld\n"
+	       "got entries used %ld, gots max %ld\n"
+	       "fdescs used %ld, fdescs max %ld\n",
+	       me->arch.stub_count, me->arch.stub_max,
+	       me->arch.init_stub_count, me->arch.init_stub_max,
+	       me->arch.got_count, me->arch.got_max,
+	       me->arch.fdesc_count, me->arch.fdesc_max);
 #endif
-#endif
+		
 	return 0;
 }
 

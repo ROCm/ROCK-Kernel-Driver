@@ -24,6 +24,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/major.h>
+#include <linux/tty.h>
 #include <asm/page.h>
 #include <asm/types.h>
 #include <asm/system.h>
@@ -52,12 +53,24 @@ static int pdc_console_setup(struct console *co, char *options)
 	return 0;
 }
 
-#if defined(CONFIG_PDC_CONSOLE) || defined(CONFIG_SERIAL_MUX)
+#if defined(CONFIG_PDC_CONSOLE)
 #define PDC_CONSOLE_DEVICE pdc_console_device
-static kdev_t pdc_console_device (struct console *c)
+static struct tty_driver * pdc_console_device (struct console *c, int *index)
+{
+	extern struct tty_driver console_driver;
+	*index = c->index ? c->index-1 : fg_console;
+	return &console_driver;
+}
+
+#elif defined(CONFIG_SERIAL_MUX)
+#warning CONFIG_SERIAL_MUX
+#define PDC_CONSOLE_DEVICE pdc_console_device
+#warning "FIXME - should be: static struct tty_driver * pdc_console_device (struct console *c, int *index)"
+static kdev_t pdc_console_device (struct console *c, int *index)
 {
         return mk_kdev(MUX_MAJOR, 0);
 }
+
 #else
 #define PDC_CONSOLE_DEVICE NULL
 #endif

@@ -168,14 +168,6 @@ static void sample_queue(unsigned long dummy);
 static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
 #endif
 
-#ifdef CONFIG_HOTPLUG
-static void net_run_sbin_hotplug(struct net_device *dev, int is_register);
-static void net_run_hotplug_todo(void);
-#else
-#define net_run_sbin_hotplug(dev, is_register) do { } while (0)
-#define net_run_hotplug_todo() do { } while (0)
-#endif
-
 /*
  *	Our notifier list
  */
@@ -2537,6 +2529,17 @@ int dev_new_index(void)
 
 static int dev_boot_phase = 1;
 
+/* Delayed registration/unregisteration */
+static spinlock_t net_todo_list_lock = SPIN_LOCK_UNLOCKED;
+static struct list_head net_todo_list = LIST_HEAD_INIT(net_todo_list);
+
+static inline void net_set_todo(struct net_device *dev)
+{
+	spin_lock(&net_todo_list_lock);
+	list_add_tail(&dev->todo_list, &net_todo_list);
+	spin_unlock(&net_todo_list_lock);
+}
+
 /**
  *	register_netdevice	- register a network device
  *	@dev: device to register
@@ -2562,6 +2565,9 @@ int register_netdevice(struct net_device *dev)
 
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
+
+	/* When net_device's are persistent, this will be fatal. */
+	WARN_ON(dev->reg_state != NETREG_UNINITIALIZED);
 
 	spin_lock_init(&dev->queue_lock);
 	spin_lock_init(&dev->xmit_lock);
@@ -2592,9 +2598,6 @@ int register_netdevice(struct net_device *dev)
 			goto out_err;
 	}
 	
-	if ((ret = netdev_register_sysfs(dev)))
-	    goto out_err;
-
 	/* Fix illegal SG+CSUM combinations. */
 	if ((dev->features & NETIF_F_SG) &&
 	    !(dev->features & (NETIF_F_IP_CSUM |
@@ -2625,13 +2628,14 @@ int register_netdevice(struct net_device *dev)
 	write_lock_bh(&dev_base_lock);
 	*dp = dev;
 	dev_hold(dev);
-	dev->deadbeaf = 0;
+	dev->reg_state = NETREG_REGISTERING;
 	write_unlock_bh(&dev_base_lock);
 
 	/* Notify protocols, that a new device appeared. */
 	notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
-	net_run_sbin_hotplug(dev, 1);
+	/* Finish registration after unlock */
+	net_set_todo(dev);
 	ret = 0;
 
 out:
@@ -2654,7 +2658,7 @@ static int netdev_finish_unregister(struct net_device *dev)
 	BUG_TRAP(!dev->ip6_ptr);
 	BUG_TRAP(!dev->dn_ptr);
 
-	if (!dev->deadbeaf) {
+	if (dev->reg_state != NETREG_UNREGISTERED) {
 		printk(KERN_ERR "Freeing alive device %p, %s\n",
 		       dev, dev->name);
 		return 0;
@@ -2731,41 +2735,60 @@ static void netdev_wait_allrefs(struct net_device *dev)
  *	rtnl_unlock();
  *
  * We are invoked by rtnl_unlock() after it drops the semaphore.
- * This allows us to deal with two problems:
- * 1) We can invoke hotplug without deadlocking with linkwatch via
- *    keventd.
+ * This allows us to deal with problems:
+ * 1) We can create/delete sysfs objects which invoke hotplug
+ *    without deadlocking with linkwatch via keventd.
  * 2) Since we run with the RTNL semaphore not held, we can sleep
  *    safely in order to wait for the netdev refcnt to drop to zero.
  */
-static spinlock_t unregister_todo_lock = SPIN_LOCK_UNLOCKED;
-static struct net_device *unregister_todo;
-
+static DECLARE_MUTEX(net_todo_run_mutex);
 void netdev_run_todo(void)
 {
-	struct net_device *dev;
+	struct list_head list = LIST_HEAD_INIT(list);
 
-	net_run_hotplug_todo();
+	/* Safe outside mutex since we only care about entries that
+	 * this cpu put into queue while under RTNL.
+	 */
+	if (list_empty(&net_todo_list))
+		return;
 
-	spin_lock(&unregister_todo_lock);
-	dev = unregister_todo;
-	unregister_todo = NULL;
-	spin_unlock(&unregister_todo_lock);
+	/* Need to guard against multiple cpu's getting out of order. */
+	down(&net_todo_run_mutex);
 
-	while (dev) {
-		struct net_device *next = dev->next;
+	/* Snapshot list, allow later requests */
+	spin_lock(&net_todo_list_lock);
+	list_splice_init(&net_todo_list, &list);
+	spin_unlock(&net_todo_list_lock);
+		
+	while (!list_empty(&list)) {
+		struct net_device *dev
+			= list_entry(list.next, struct net_device, todo_list);
+		list_del(&dev->todo_list);
 
-		dev->next = NULL;
+		switch(dev->reg_state) {
+		case NETREG_REGISTERING:
+			netdev_register_sysfs(dev);
+			dev->reg_state = NETREG_REGISTERED;
+			break;
 
-		netdev_unregister_sysfs(dev);
+		case NETREG_UNREGISTERING:
+			netdev_unregister_sysfs(dev);
+			dev->reg_state = NETREG_UNREGISTERED;
 
-		netdev_wait_allrefs(dev);
+			netdev_wait_allrefs(dev);
+			BUG_ON(atomic_read(&dev->refcnt));
+				
+			netdev_finish_unregister(dev);
+			break;
 
-		BUG_ON(atomic_read(&dev->refcnt));
-
-		netdev_finish_unregister(dev);
-
-		dev = next;
+		default:
+			printk(KERN_ERR "network todo '%s' but state %d\n",
+			       dev->name, dev->reg_state);
+			break;
+		}
 	}
+
+	up(&net_todo_run_mutex);
 }
 
 /* Synchronize with packet receive processing. */
@@ -2795,12 +2818,18 @@ int unregister_netdevice(struct net_device *dev)
 	BUG_ON(dev_boot_phase);
 	ASSERT_RTNL();
 
+	/* Some devices call without registering for initialization unwind. */
+	if (dev->reg_state == NETREG_UNINITIALIZED) {
+		printk(KERN_DEBUG "unregister_netdevice: device %s/%p never "
+				  "was registered\n", dev->name, dev);
+		return -ENODEV;
+	}
+
+	BUG_ON(dev->reg_state != NETREG_REGISTERED);
+
 	/* If device is running, close it first. */
 	if (dev->flags & IFF_UP)
 		dev_close(dev);
-
-	BUG_TRAP(!dev->deadbeaf);
-	dev->deadbeaf = 1;
 
 	/* And unlink it from device chain. */
 	for (dp = &dev_base; (d = *dp) != NULL; dp = &d->next) {
@@ -2812,10 +2841,12 @@ int unregister_netdevice(struct net_device *dev)
 		}
 	}
 	if (!d) {
-		printk(KERN_DEBUG "unregister_netdevice: device %s/%p never "
-				  "was registered\n", dev->name, dev);
+		printk(KERN_ERR "unregister net_device: '%s' not found\n",
+		       dev->name);
 		return -ENODEV;
 	}
+
+	dev->reg_state = NETREG_UNREGISTERING;
 
 	synchronize_net();
 
@@ -2826,7 +2857,6 @@ int unregister_netdevice(struct net_device *dev)
 	/* Shutdown queueing discipline. */
 	dev_shutdown(dev);
 
-	net_run_sbin_hotplug(dev, 0);
 	
 	/* Notify protocols, that we are about to destroy
 	   this device. They should clean all the things.
@@ -2846,10 +2876,8 @@ int unregister_netdevice(struct net_device *dev)
 
 	free_divert_blk(dev);
 
-	spin_lock(&unregister_todo_lock);
-	dev->next = unregister_todo;
-	unregister_todo = dev;
-	spin_unlock(&unregister_todo_lock);
+	/* Finish processing unregister after unlock */
+	net_set_todo(dev);
 
 	dev_put(dev);
 	return 0;
@@ -2955,11 +2983,11 @@ static int __init net_dev_init(void)
 			 * dev_alloc_name can now advance to next suitable
 			 * name that is checked next.
 			 */
-			dev->deadbeaf = 1;
 			dp = &dev->next;
 		} else {
 			dp = &dev->next;
 			dev->ifindex = dev_new_index();
+			dev->reg_state = NETREG_REGISTERED;
 			if (dev->iflink == -1)
 				dev->iflink = dev->ifindex;
 			if (!dev->rebuild_header)
@@ -2974,7 +3002,7 @@ static int __init net_dev_init(void)
 	 */
 	dp = &dev_base;
 	while ((dev = *dp) != NULL) {
-		if (dev->deadbeaf) {
+		if (dev->reg_state != NETREG_REGISTERED) {
 			write_lock_bh(&dev_base_lock);
 			*dp = dev->next;
 			write_unlock_bh(&dev_base_lock);
@@ -3001,96 +3029,3 @@ out:
 }
 
 subsys_initcall(net_dev_init);
-
-#ifdef CONFIG_HOTPLUG
-
-struct net_hotplug_todo {
-	struct list_head	list;
-	char			ifname[IFNAMSIZ];
-	int			is_register;
-};
-static spinlock_t net_hotplug_list_lock = SPIN_LOCK_UNLOCKED;
-static DECLARE_MUTEX(net_hotplug_run);
-static struct list_head net_hotplug_list = LIST_HEAD_INIT(net_hotplug_list);
-
-static inline void net_run_hotplug_one(struct net_hotplug_todo *ent)
-{
-	char *argv[3], *envp[5], ifname[12 + IFNAMSIZ], action_str[32];
-	int i;
-
-	sprintf(ifname, "INTERFACE=%s", ent->ifname);
-	sprintf(action_str, "ACTION=%s",
-		(ent->is_register ? "register" : "unregister"));
-
-        i = 0;
-        argv[i++] = hotplug_path;
-        argv[i++] = "net";
-        argv[i] = 0;
-
-	i = 0;
-	/* minimal command environment */
-	envp [i++] = "HOME=/";
-	envp [i++] = "PATH=/sbin:/bin:/usr/sbin:/usr/bin";
-	envp [i++] = ifname;
-	envp [i++] = action_str;
-	envp [i] = 0;
-
-	call_usermodehelper(argv [0], argv, envp, 0);
-}
-
-/* Run all queued hotplug requests. 
- * Requests are run in FIFO order.
- */
-static void net_run_hotplug_todo(void)
-{
-	struct list_head list = LIST_HEAD_INIT(list);
-
-	/* This is racy but okay since any other requests will get
-	 * processed when the other guy does rtnl_unlock.
-	 */
-	if (list_empty(&net_hotplug_list))
-		return;
-
-	/* Need to guard against multiple cpu's getting out of order. */
-	down(&net_hotplug_run);	
-
-	/* Snapshot list, allow later requests */
-	spin_lock(&net_hotplug_list_lock);
-	list_splice_init(&net_hotplug_list, &list);
-	spin_unlock(&net_hotplug_list_lock);
-
-	while (!list_empty(&list)) {
-		struct net_hotplug_todo *ent;
-
-		ent = list_entry(list.next, struct net_hotplug_todo, list);
-		list_del(&ent->list);
-		net_run_hotplug_one(ent);
-		kfree(ent);
-	}
-
-	up(&net_hotplug_run);
-}
-
-/* Notify userspace when a netdevice event occurs,
- * by running '/sbin/hotplug net' with certain
- * environment variables set.
- */
-
-static void net_run_sbin_hotplug(struct net_device *dev, int is_register)
-{
-	struct net_hotplug_todo *ent = kmalloc(sizeof(*ent), GFP_KERNEL);
-
-	ASSERT_RTNL();
-
-	if (!ent)
-		return;
-
-	INIT_LIST_HEAD(&ent->list);
-	memcpy(ent->ifname, dev->name, IFNAMSIZ);
-	ent->is_register = is_register;
-
-	spin_lock(&net_hotplug_list_lock);
-	list_add(&ent->list, &net_hotplug_list);
-	spin_unlock(&net_hotplug_list_lock);
-}
-#endif

@@ -10,6 +10,7 @@
 
 #include <linux/config.h>
 
+#include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
 #include <linux/delay.h>
@@ -666,6 +667,7 @@ static void __init gateway_init(void)
 		PAGE_SIZE, PAGE_GATEWAY);
 }
 
+#ifdef CONFIG_HPUX
 void
 map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm)
 {
@@ -734,6 +736,8 @@ map_hpux_gateway_page(struct task_struct *tsk, struct mm_struct *mm)
 	pg_table = (pte_t *) __va(pg_table) + start_pte;
 	set_pte(pg_table, __mk_pte(address, PAGE_GATEWAY));
 }
+EXPORT_SYMBOL(map_hpux_gateway_page);
+#endif
 
 extern void flush_tlb_all_local(void);
 

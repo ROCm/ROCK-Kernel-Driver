@@ -102,6 +102,8 @@ struct rt_cache_stat
         unsigned int gc_ignored;
         unsigned int gc_goal_miss;
         unsigned int gc_dst_overflow;
+        unsigned int in_hlist_search;
+        unsigned int out_hlist_search;
 };
 
 extern struct rt_cache_stat *rt_cache_stat;

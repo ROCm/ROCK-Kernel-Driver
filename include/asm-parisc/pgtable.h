@@ -109,7 +109,8 @@ extern  void *vmalloc_start;
 #define PCXL_DMA_MAP_SIZE   (8*1024*1024)
 #define VMALLOC_START   ((unsigned long)vmalloc_start)
 #define VMALLOC_VMADDR(x) ((unsigned long)(x))
-#define VMALLOC_END	(FIXADDR_START)
+/* this is a fixmap remnant, see fixmap.h */
+#define VMALLOC_END	(TMPALIAS_MAP_START)
 #endif
 
 /* NB: The tlb miss handlers make certain assumptions about the order */
@@ -122,6 +123,7 @@ extern  void *vmalloc_start;
 #define _PAGE_GATEWAY_BIT  28   /* (0x008) privilege promotion allowed */
 #define _PAGE_DMB_BIT      27   /* (0x010) Data Memory Break enable (B bit) */
 #define _PAGE_DIRTY_BIT    26   /* (0x020) Page Dirty (D bit) */
+#define _PAGE_FILE_BIT	_PAGE_DIRTY_BIT	/* overload this bit */
 #define _PAGE_REFTRAP_BIT  25   /* (0x040) Page Ref. Trap enable (T bit) */
 #define _PAGE_NO_CACHE_BIT 24   /* (0x080) Uncached Page (U bit) */
 #define _PAGE_ACCESSED_BIT 23   /* (0x100) Software: Page Accessed */
@@ -134,6 +136,17 @@ extern  void *vmalloc_start;
 /*      following macro is ok for both 32 and 64 bit.                */
 
 #define xlate_pabit(x) (31 - x)
+
+/* this defines the shift to the usable bits in the PTE it is set so
+ * that the valid bits _PAGE_PRESENT_BIT and _PAGE_USER_BIT are set
+ * to zero */
+#define PTE_SHIFT	   	xlate_pabit(_PAGE_USER_BIT)
+
+/* this is how many bits may be used by the file functions */
+#define PTE_FILE_MAX_BITS	(BITS_PER_LONG - PTE_SHIFT)
+
+#define pte_to_pgoff(pte) (pte_val(pte) >> PTE_SHIFT)
+#define pgoff_to_pte(off) ((pte_t) { ((off) << PTE_SHIFT) | _PAGE_FILE })
 
 #define _PAGE_READ     (1 << xlate_pabit(_PAGE_READ_BIT))
 #define _PAGE_WRITE    (1 << xlate_pabit(_PAGE_WRITE_BIT))
@@ -148,6 +161,7 @@ extern  void *vmalloc_start;
 #define _PAGE_PRESENT  (1 << xlate_pabit(_PAGE_PRESENT_BIT))
 #define _PAGE_FLUSH    (1 << xlate_pabit(_PAGE_FLUSH_BIT))
 #define _PAGE_USER     (1 << xlate_pabit(_PAGE_USER_BIT))
+#define _PAGE_FILE     (1 << xlate_pabit(_PAGE_FILE_BIT))
 
 #define _PAGE_TABLE	(_PAGE_PRESENT | _PAGE_READ | _PAGE_WRITE |  _PAGE_DIRTY | _PAGE_ACCESSED)
 #define _PAGE_CHG_MASK	(PAGE_MASK | _PAGE_ACCESSED | _PAGE_DIRTY)
@@ -256,6 +270,8 @@ extern inline int pte_read(pte_t pte)		{ return pte_val(pte) & _PAGE_READ; }
 extern inline int pte_dirty(pte_t pte)		{ return pte_val(pte) & _PAGE_DIRTY; }
 extern inline int pte_young(pte_t pte)		{ return pte_val(pte) & _PAGE_ACCESSED; }
 extern inline int pte_write(pte_t pte)		{ return pte_val(pte) & _PAGE_WRITE; }
+extern inline int pte_file(pte_t pte)		{ return pte_val(pte) & _PAGE_FILE; }
+extern inline int pte_user(pte_t pte) 		{ return pte_val(pte) & _PAGE_USER; }
 
 extern inline pte_t pte_rdprotect(pte_t pte)	{ pte_val(pte) &= ~_PAGE_READ; return pte; }
 extern inline pte_t pte_mkclean(pte_t pte)	{ pte_val(pte) &= ~_PAGE_DIRTY; return pte; }

@@ -563,7 +563,7 @@ void tcp_tw_schedule(struct tcp_tw_bucket *tw, int timeo)
 			tcp_twcal_timer.expires = tcp_twcal_jiffie + (slot<<TCP_TW_RECYCLE_TICK);
 			add_timer(&tcp_twcal_timer);
 		} else {
-			if ((long)(tcp_twcal_timer.expires - jiffies) > (slot<<TCP_TW_RECYCLE_TICK))
+			if (time_after(tcp_twcal_timer.expires, jiffies + (slot<<TCP_TW_RECYCLE_TICK)))
 				mod_timer(&tcp_twcal_timer, jiffies + (slot<<TCP_TW_RECYCLE_TICK));
 			slot = (tcp_twcal_hand + slot)&(TCP_TW_RECYCLE_SLOTS-1);
 		}
@@ -596,7 +596,7 @@ void tcp_twcal_tick(unsigned long dummy)
 	j = tcp_twcal_jiffie;
 
 	for (n=0; n<TCP_TW_RECYCLE_SLOTS; n++) {
-		if ((long)(j - now) <= 0) {
+		if (time_before_eq(j, now)) {
 			struct tcp_tw_bucket *tw;
 
 			while((tw = tcp_twcal_row[slot]) != NULL) {

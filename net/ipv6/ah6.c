@@ -36,6 +36,114 @@
 #include <net/xfrm.h>
 #include <asm/scatterlist.h>
 
+static int zero_out_mutable_opts(struct ipv6_opt_hdr *opthdr)
+{
+	u8 *opt = (u8 *)opthdr;
+	int len = ipv6_optlen(opthdr);
+	int off = 0;
+	int optlen = 0;
+
+	off += 2;
+	len -= 2;
+
+	while (len > 0) {
+
+		switch (opt[off]) {
+
+		case IPV6_TLV_PAD0:
+			optlen = 1;
+			break;
+		default:
+			if (len < 2) 
+				goto bad;
+			optlen = opt[off+1]+2;
+			if (len < optlen)
+				goto bad;
+			if (opt[off] & 0x20)
+				memset(&opt[off+2], 0, opt[off+1]);
+			break;
+		}
+
+		off += optlen;
+		len -= optlen;
+	}
+	if (len == 0)
+		return 1;
+
+bad:
+	return 0;
+}
+
+static int ipv6_clear_mutable_options(struct sk_buff *skb, u16 *nh_offset, int dir)
+{
+	u16 offset = sizeof(struct ipv6hdr);
+	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+	unsigned int packet_len = skb->tail - skb->nh.raw;
+	u8 nexthdr = skb->nh.ipv6h->nexthdr;
+	u8 nextnexthdr = 0;
+
+	*nh_offset = ((unsigned char *)&skb->nh.ipv6h->nexthdr) - skb->nh.raw;
+
+	while (offset + 1 <= packet_len) {
+
+		switch (nexthdr) {
+
+		case NEXTHDR_HOP:
+			*nh_offset = offset;
+			offset += ipv6_optlen(exthdr);
+			if (!zero_out_mutable_opts(exthdr)) {
+				if (net_ratelimit())
+					printk(KERN_WARNING "overrun hopopts\n"); 
+				return 0;
+			}
+			nexthdr = exthdr->nexthdr;
+			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+			break;
+
+		case NEXTHDR_ROUTING:
+			*nh_offset = offset;
+			offset += ipv6_optlen(exthdr);
+			((struct ipv6_rt_hdr*)exthdr)->segments_left = 0; 
+			nexthdr = exthdr->nexthdr;
+			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+			break;
+
+		case NEXTHDR_DEST:
+			*nh_offset = offset;
+			offset += ipv6_optlen(exthdr);
+			if (!zero_out_mutable_opts(exthdr))  {
+				if (net_ratelimit())
+					printk(KERN_WARNING "overrun destopt\n"); 
+				return 0;
+			}
+			nexthdr = exthdr->nexthdr;
+			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+			break;
+
+		case NEXTHDR_AUTH:
+			if (dir == XFRM_POLICY_OUT) {
+				memset(((struct ipv6_auth_hdr*)exthdr)->auth_data, 0, 
+				       (((struct ipv6_auth_hdr*)exthdr)->hdrlen - 1) << 2);
+			}
+			if (exthdr->nexthdr == NEXTHDR_DEST) {
+				offset += (((struct ipv6_auth_hdr*)exthdr)->hdrlen + 2) << 2;
+				exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+				nextnexthdr = exthdr->nexthdr;
+				if (!zero_out_mutable_opts(exthdr)) {
+					if (net_ratelimit())
+						printk(KERN_WARNING "overrun destopt\n");
+					return 0;
+				}
+			}
+			return nexthdr;
+		default :
+			return nexthdr;
+		}
+	}
+
+	return nexthdr;
+}
+
 int ah6_output(struct sk_buff *skb)
 {
 	int err;
@@ -80,7 +188,7 @@ int ah6_output(struct sk_buff *skb)
 		memcpy(iph, skb->data, hdr_len);
 		skb->nh.ipv6h = (struct ipv6hdr*)skb_push(skb, x->props.header_len);
 		memcpy(skb->nh.ipv6h, iph, hdr_len);
-		nexthdr = xfrm6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_OUT);
+		nexthdr = ipv6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_OUT);
 		if (nexthdr == 0)
 			goto error;
 
@@ -138,20 +246,46 @@ error_nolock:
 
 int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_buff *skb)
 {
-	int ah_hlen;
-	struct ipv6hdr *iph;
+	/*
+	 * Before process AH
+	 * [IPv6][Ext1][Ext2][AH][Dest][Payload]
+	 * |<-------------->| hdr_len
+	 * |<------------------------>| cleared_hlen
+	 *
+	 * To erase AH:
+	 * Keeping copy of cleared headers. After AH processing,
+	 * Moving the pointer of skb->nh.raw by using skb_pull as long as AH
+	 * header length. Then copy back the copy as long as hdr_len
+	 * If destination header following AH exists, copy it into after [Ext2].
+	 * 
+	 * |<>|[IPv6][Ext1][Ext2][Dest][Payload]
+	 * There is offset of AH before IPv6 header after the process.
+	 */
+
+	struct ipv6hdr *iph = skb->nh.ipv6h;
 	struct ipv6_auth_hdr *ah;
 	struct ah_data *ahp;
 	unsigned char *tmp_hdr = NULL;
-	int hdr_len = skb->h.raw - skb->nh.raw;
+	u16 hdr_len = skb->data - skb->nh.raw;
+	u16 ah_hlen;
+	u16 cleared_hlen = hdr_len;
+	u16 nh_offset = 0;
 	u8 nexthdr = 0;
+	u8 *prevhdr;
 
 	if (!pskb_may_pull(skb, sizeof(struct ip_auth_hdr)))
 		goto out;
 
 	ah = (struct ipv6_auth_hdr*)skb->data;
 	ahp = x->data;
-        ah_hlen = (ah->hdrlen + 2) << 2;
+	nexthdr = ah->nexthdr;
+	ah_hlen = (ah->hdrlen + 2) << 2;
+	cleared_hlen += ah_hlen;
+
+	if (nexthdr == NEXTHDR_DEST) {
+		struct ipv6_opt_hdr *dsthdr = (struct ipv6_opt_hdr*)(skb->data + ah_hlen);
+		cleared_hlen += ipv6_optlen(dsthdr);
+	}
 
         if (ah_hlen != XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + ahp->icv_full_len) &&
             ah_hlen != XFRM_ALIGN8(sizeof(struct ipv6_auth_hdr) + ahp->icv_trunc_len))
@@ -166,12 +300,16 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	    pskb_expand_head(skb, 0, 0, GFP_ATOMIC))
 		goto out;
 
-	tmp_hdr = kmalloc(hdr_len, GFP_ATOMIC);
+	tmp_hdr = kmalloc(cleared_hlen, GFP_ATOMIC);
 	if (!tmp_hdr)
 		goto out;
-	memcpy(tmp_hdr, skb->nh.raw, hdr_len);
-	ah = (struct ipv6_auth_hdr*)skb->data;
-	iph = skb->nh.ipv6h;
+	memcpy(tmp_hdr, skb->nh.raw, cleared_hlen);
+	ipv6_clear_mutable_options(skb, &nh_offset, XFRM_POLICY_IN);
+	iph->priority    = 0;
+	iph->flow_lbl[0] = 0;
+	iph->flow_lbl[1] = 0;
+	iph->flow_lbl[2] = 0;
+	iph->hop_limit   = 0;
 
         {
 		u8 auth_data[ahp->icv_trunc_len];
@@ -187,9 +325,15 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 		}
 	}
 
-	nexthdr = ((struct ipv6hdr*)tmp_hdr)->nexthdr = ah->nexthdr;
-	skb->nh.raw = skb_pull(skb, (ah->hdrlen+2)<<2);
+	skb->nh.raw = skb_pull(skb, ah_hlen);
 	memcpy(skb->nh.raw, tmp_hdr, hdr_len);
+	if (nexthdr == NEXTHDR_DEST) {
+		memcpy(skb->nh.raw + hdr_len,
+		       tmp_hdr + hdr_len + ah_hlen,
+		       cleared_hlen - hdr_len - ah_hlen);
+	}
+	prevhdr = (u8*)(skb->nh.raw + nh_offset);
+	*prevhdr = nexthdr;
 	skb->nh.ipv6h->payload_len = htons(skb->len - sizeof(struct ipv6hdr));
 	skb_pull(skb, hdr_len);
 	skb->h.raw = skb->data;

@@ -37,7 +37,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	 1
-#define SONYPI_DRIVER_MINORVERSION	18
+#define SONYPI_DRIVER_MINORVERSION	20
 
 #define SONYPI_DEVICE_MODEL_TYPE1	1
 #define SONYPI_DEVICE_MODEL_TYPE2	2
@@ -335,6 +335,15 @@ struct sonypi_queue {
 	unsigned char buf[SONYPI_BUF_SIZE];
 };
 
+/* We enable input subsystem event forwarding if the input 
+ * subsystem is compiled in, but only if sonypi is not into the
+ * kernel and input as a module... */
+#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+#if ! (defined(CONFIG_SONYPI) && defined(CONFIG_INPUT_MODULE))
+#define SONYPI_USE_INPUT
+#endif
+#endif
+
 /* The name of the Jog Dial for the input device drivers */
 #define SONYPI_INPUTNAME	"Sony VAIO Jog Dial"
 
@@ -351,7 +360,7 @@ struct sonypi_device {
 	struct sonypi_queue queue;
 	int open_count;
 	int model;
-#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+#ifdef SONYPI_USE_INPUT
 	struct input_dev jog_dev;
 #endif
 #ifdef CONFIG_PM
@@ -370,10 +379,20 @@ struct sonypi_device {
 		printk(KERN_WARNING "sonypi command failed at %s : %s (line %d)\n", __FILE__, __FUNCTION__, __LINE__); \
 }
 
-#ifndef CONFIG_ACPI
+#ifdef CONFIG_ACPI
+extern int acpi_disabled;
+#define SONYPI_ACPI_ACTIVE (!acpi_disabled)
+#else
+#define SONYPI_ACPI_ACTIVE 0
+#endif /* CONFIG_ACPI */
+
 extern int verbose;
 
-static inline int ec_write(u8 addr, u8 value) {
+static inline int sonypi_ec_write(u8 addr, u8 value) {
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_write(addr, value);
+#endif
 	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
 	outb_p(0x81, SONYPI_CST_IOPORT);
 	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
@@ -384,7 +403,11 @@ static inline int ec_write(u8 addr, u8 value) {
 	return 0;
 }
 
-static inline int ec_read(u8 addr, u8 *value) {
+static inline int sonypi_ec_read(u8 addr, u8 *value) {
+#ifdef CONFIG_ACPI_EC
+	if (SONYPI_ACPI_ACTIVE)
+		return ec_read(addr, value);
+#endif
 	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3, ITERATIONS_LONG);
 	outb_p(0x80, SONYPI_CST_IOPORT);
 	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2, ITERATIONS_LONG);
@@ -393,7 +416,6 @@ static inline int ec_read(u8 addr, u8 *value) {
 	*value = inb_p(SONYPI_DATA_IOPORT);
 	return 0;
 }
-#endif /* !CONFIG_ACPI */
 
 #endif /* __KERNEL__ */
 
