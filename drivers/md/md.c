@@ -3160,7 +3160,7 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 {
 	mddev_t *mddev2;
 	unsigned int max_sectors, currspeed = 0,
-		j, window, err, serialize;
+		j, window, err;
 	unsigned long mark[SYNC_MARKS];
 	unsigned long mark_cnt[SYNC_MARKS];
 	int last_mark,m;
@@ -3168,30 +3168,36 @@ int md_do_sync(mddev_t *mddev, mdp_disk_t *spare)
 	unsigned long last_check;
 
 
-recheck:
-	serialize = 0;
-	ITERATE_MDDEV(mddev2,tmp) {
-		if (mddev2 == mddev)
-			continue;
-		if (mddev2->curr_resync && match_mddev_units(mddev,mddev2)) {
-			printk(KERN_INFO "md: delaying resync of md%d until md%d "
-			       "has finished resync (they share one or more physical units)\n",
-			       mdidx(mddev), mdidx(mddev2));
-			serialize = 1;
-			break;
-		}
-	}
-	if (serialize) {
-		interruptible_sleep_on(&resync_wait);
-		if (signal_pending(current)) {
-			flush_curr_signals();
-			err = -EINTR;
-			goto out;
-		}
-		goto recheck;
-	}
+	/* we overload curr_resync somewhat here.
+	 * 0 == not engaged in resync at all
+	 * 2 == checking that there is no conflict with another sync
+	 * 1 == like 2, but have yielded to allow conflicting resync to
+	 *		commense
+	 * other == active in resync - this many blocks
+	 */
+	do {
+		mddev->curr_resync = 2;
 
-	mddev->curr_resync = 1;
+		ITERATE_MDDEV(mddev2,tmp) {
+			if (mddev2 == mddev)
+				continue;
+			if (mddev2->curr_resync && 
+			    match_mddev_units(mddev,mddev2)) {
+				printk(KERN_INFO "md: delaying resync of md%d until md%d "
+				       "has finished resync (they share one or more physical units)\n",
+				       mdidx(mddev), mdidx(mddev2));
+				if (mddev < mddev2) /* arbitrarily yield */
+					mddev->curr_resync = 1;
+				if (wait_event_interruptible(resync_wait,
+							     mddev2->curr_resync < 2)) {
+					flush_curr_signals();
+					err = -EINTR;
+					goto out;
+				}
+			}
+		}
+	} while (mddev->curr_resync < 2);
+
 	max_sectors = mddev->sb->size << 1;
 
 	printk(KERN_INFO "md: syncing RAID array md%d\n", mdidx(mddev));
@@ -3229,7 +3235,7 @@ recheck:
 		}
 		atomic_add(sectors, &mddev->recovery_active);
 		j += sectors;
-		mddev->curr_resync = j;
+		if (j>1) mddev->curr_resync = j;
 
 		if (last_check + window > j)
 			continue;
