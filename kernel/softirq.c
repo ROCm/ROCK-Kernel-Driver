@@ -340,7 +340,10 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 	int hotcpu = (unsigned long)hcpu;
 	struct task_struct *p;
 
-	if (action == CPU_ONLINE) {
+	switch (action) {
+	case CPU_UP_PREPARE:
+		BUG_ON(per_cpu(tasklet_vec, hotcpu).list);
+		BUG_ON(per_cpu(tasklet_hi_vec, hotcpu).list);
 		p = kthread_create(ksoftirqd, hcpu, "ksoftirqd/%d", hotcpu);
 		if (IS_ERR(p)) {
 			printk("ksoftirqd for %i failed\n", hotcpu);
@@ -348,7 +351,11 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 		}
 		per_cpu(ksoftirqd, hotcpu) = p;
 		kthread_bind(p, hotcpu);
-		wake_up_process(p);
+  		per_cpu(ksoftirqd, hotcpu) = p;
+ 		break;
+	case CPU_ONLINE:
+		wake_up_process(per_cpu(ksoftirqd, hotcpu));
+		break;
  	}
 	return NOTIFY_OK;
 }
@@ -359,7 +366,9 @@ static struct notifier_block __devinitdata cpu_nfb = {
 
 __init int spawn_ksoftirqd(void)
 {
-	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)(long)smp_processor_id());
+	void *cpu = (void *)(long)smp_processor_id();
+	cpu_callback(&cpu_nfb, CPU_UP_PREPARE, cpu);
+	cpu_callback(&cpu_nfb, CPU_ONLINE, cpu);
 	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }

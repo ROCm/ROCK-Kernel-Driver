@@ -2806,33 +2806,39 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 	struct task_struct *p;
 
 	switch (action) {
-	case CPU_ONLINE:
+	case CPU_UP_PREPARE:
 		p = kthread_create(migration_thread, hcpu, "migration/%d",cpu);
 		if (IS_ERR(p))
 			return NOTIFY_BAD;
 		kthread_bind(p, cpu);
 		cpu_rq(cpu)->migration_thread = p;
-		wake_up_process(p);
+		break;
+	case CPU_ONLINE:
+		/* Strictly unneccessary, as first user will wake it. */
+		wake_up_process(cpu_rq(cpu)->migration_thread);
 		break;
 	}
 	return NOTIFY_OK;
 }
 
-/* Want this before the other threads, so they can use set_cpus_allowed. */
-static struct notifier_block migration_notifier = {
-	.notifier_call = &migration_call,
-	.priority = 10,
+/*
+ * We want this after the other threads, so they can use set_cpus_allowed
+ * from their CPU_OFFLINE callback
+ */
+static struct notifier_block __devinitdata migration_notifier = {
+	.notifier_call = migration_call,
+	.priority = -10,
 };
 
-__init int migration_init(void)
+int __init migration_init(void)
 {
+	void *cpu = (void *)(long)smp_processor_id();
 	/* Start one for boot CPU. */
-	migration_call(&migration_notifier, CPU_ONLINE,
-		       (void *)(long)smp_processor_id());
+	migration_call(&migration_notifier, CPU_UP_PREPARE, cpu);
+	migration_call(&migration_notifier, CPU_ONLINE, cpu);
 	register_cpu_notifier(&migration_notifier);
 	return 0;
 }
-
 #endif
 
 /*
