@@ -180,10 +180,20 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
  * semaphore held.
  */
 struct net_device *dev_base;
+struct net_device **dev_tail = &dev_base;
 rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
 
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
+
+#define NETDEV_HASHBITS	8
+static struct hlist_head dev_name_head[1<<NETDEV_HASHBITS];
+
+static inline struct hlist_head *dev_name_hash(const char *name)
+{
+	unsigned hash = full_name_hash(name, strnlen(name, IFNAMSIZ));
+	return &dev_name_head[hash & ((1<<NETDEV_HASHBITS)-1)];
+}
 
 /*
  *	Our notifier list
@@ -468,12 +478,15 @@ __setup("netdev=", netdev_boot_setup);
 
 struct net_device *__dev_get_by_name(const char *name)
 {
-	struct net_device *dev;
+	struct hlist_node *p;
 
-	for (dev = dev_base; dev; dev = dev->next)
+	hlist_for_each(p, dev_name_hash(name)) {
+		struct net_device *dev
+			= hlist_entry(p, struct net_device, name_hlist);
 		if (!strncmp(dev->name, name, IFNAMSIZ))
-			break;
-	return dev;
+			return dev;
+	}
+	return NULL;
 }
 
 /**
@@ -753,6 +766,9 @@ int dev_change_name(struct net_device *dev, char *newname)
 		return -EEXIST;
 	else
 		strlcpy(dev->name, newname, IFNAMSIZ);
+
+	hlist_del(&dev->name_hlist);
+	hlist_add_head(&dev->name_hlist, dev_name_hash(dev->name));
 
 	class_device_rename(&dev->class_dev, dev->name);
 	notifier_call_chain(&netdev_chain, NETDEV_CHANGENAME, dev);
@@ -2742,7 +2758,8 @@ static inline void net_set_todo(struct net_device *dev)
 
 int register_netdevice(struct net_device *dev)
 {
-	struct net_device *d, **dp;
+	struct hlist_head *head;
+	struct hlist_node *p;
 	int ret;
 
 	BUG_ON(dev_boot_phase);
@@ -2783,13 +2800,17 @@ int register_netdevice(struct net_device *dev)
 	if (dev->iflink == -1)
 		dev->iflink = dev->ifindex;
 
-	/* Check for existence, and append to tail of chain */
-	ret = -EEXIST;
-	for (dp = &dev_base; (d = *dp) != NULL; dp = &d->next) {
-		if (d == dev || !strcmp(d->name, dev->name))
-			goto out_err;
-	}
-	
+	/* Check for existence of name */
+	head = dev_name_hash(dev->name);
+	hlist_for_each(p, head) {
+		struct net_device *d
+			= hlist_entry(p, struct net_device, name_hlist);
+		if (!strncmp(d->name, dev->name, IFNAMSIZ)) {
+			ret = -EEXIST;
+ 			goto out_err;
+		}
+ 	}
+
 	/* Fix illegal SG+CSUM combinations. */
 	if ((dev->features & NETIF_F_SG) &&
 	    !(dev->features & (NETIF_F_IP_CSUM |
@@ -2818,7 +2839,9 @@ int register_netdevice(struct net_device *dev)
 	dev->next = NULL;
 	dev_init_scheduler(dev);
 	write_lock_bh(&dev_base_lock);
-	*dp = dev;
+	*dev_tail = dev;
+	dev_tail = &dev->next;
+	hlist_add_head(&dev->name_hlist, head);
 	dev_hold(dev);
 	dev->reg_state = NETREG_REGISTERING;
 	write_unlock_bh(&dev_base_lock);
@@ -3040,6 +3063,9 @@ int unregister_netdevice(struct net_device *dev)
 	for (dp = &dev_base; (d = *dp) != NULL; dp = &d->next) {
 		if (d == dev) {
 			write_lock_bh(&dev_base_lock);
+			hlist_del(&dev->name_hlist);
+			if (dev_tail == &dev->next)
+				dev_tail = dp;
 			*dp = d->next;
 			write_unlock_bh(&dev_base_lock);
 			break;
@@ -3115,6 +3141,9 @@ static int __init net_dev_init(void)
 	INIT_LIST_HEAD(&ptype_all);
 	for (i = 0; i < 16; i++) 
 		INIT_LIST_HEAD(&ptype_base[i]);
+
+	for (i = 0; i < ARRAY_SIZE(dev_name_head); i++)
+		INIT_HLIST_HEAD(&dev_name_head[i]);
 
 	/*
 	 *	Initialise the packet receive queues.
