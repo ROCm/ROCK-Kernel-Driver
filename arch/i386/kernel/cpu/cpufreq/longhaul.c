@@ -230,7 +230,8 @@ static int __init longhaul_get_ranges (void)
 	unsigned int j, k = 0;
 	union msr_longhaul longhaul;
 	unsigned long lo, hi;
-	unsigned int eblcr_fsb_table[] = { 66, 133, 100, -1 };
+	unsigned int eblcr_fsb_table_v1[] = { 66, 133, 100, -1 };
+	unsigned int eblcr_fsb_table_v2[] = { 133, 100, -1, 66 };
 
 	switch (longhaul_version) {
 	case 1:
@@ -241,7 +242,7 @@ static int __init longhaul_get_ranges (void)
 		rdmsr (MSR_IA32_EBL_CR_POWERON, lo, hi);
 		invalue = (lo & (1<<18|1<<19)) >>18;
 		if (c->x86_model==6)
-			fsb = eblcr_fsb_table[invalue];
+			fsb = eblcr_fsb_table_v1[invalue];
 		else
 			fsb = guess_fsb(maxmult);
 		break;
@@ -260,16 +261,7 @@ static int __init longhaul_get_ranges (void)
 		else
 			minmult = multipliers[invalue];
 
-		switch (longhaul.bits.MaxMHzFSB) {
-		case 0x0:	fsb=133;
-				break;
-		case 0x1:	fsb=100;
-				break;
-		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
-			return -EINVAL;
-		case 0x3:	fsb=66;
-				break;
-		}
+		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
 
 	case 4:
@@ -289,20 +281,14 @@ static int __init longhaul_get_ranges (void)
 		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
-		dprintk(KERN_INFO PFX " maxmult: %d \n", maxmult);
-
-		switch (longhaul.bits.MaxMHzFSB) {
-		case 0x0:	fsb=133;
-				break;
-		case 0x1:	fsb=100;
-				break;
-		case 0x2:	printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
-			return -EINVAL;
-		case 0x3:	fsb=66;
-				break;
-		}
-
+		dprintk(KERN_INFO PFX "maxmult: %d \n", maxmult);
+		fsb = eblcr_fsb_table_v2[longhaul.bits.MaxMHzFSB];
 		break;
+	}
+
+	if (fsb == -1) {
+		printk (KERN_INFO PFX "Invalid (reserved) FSB!\n");
+		return -EINVAL;
 	}
 
 	dprintk (KERN_INFO PFX "MinMult=%d.%dx MaxMult=%d.%dx\n",
