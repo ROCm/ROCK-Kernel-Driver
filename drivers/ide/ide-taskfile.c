@@ -103,40 +103,12 @@ int taskfile_lib_get_identify (ide_drive_t *drive, u8 *buf)
 
 EXPORT_SYMBOL(taskfile_lib_get_identify);
 
-#ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
-void debug_taskfile (ide_drive_t *drive, ide_task_t *args)
-{
-	printk(KERN_INFO "%s: ", drive->name);
-//	printk("TF.0=x%02x ", args->tfRegister[IDE_DATA_OFFSET]);
-	printk("TF.1=x%02x ", args->tfRegister[IDE_FEATURE_OFFSET]);
-	printk("TF.2=x%02x ", args->tfRegister[IDE_NSECTOR_OFFSET]);
-	printk("TF.3=x%02x ", args->tfRegister[IDE_SECTOR_OFFSET]);
-	printk("TF.4=x%02x ", args->tfRegister[IDE_LCYL_OFFSET]);
-	printk("TF.5=x%02x ", args->tfRegister[IDE_HCYL_OFFSET]);
-	printk("TF.6=x%02x ", args->tfRegister[IDE_SELECT_OFFSET]);
-	printk("TF.7=x%02x\n", args->tfRegister[IDE_COMMAND_OFFSET]);
-	printk(KERN_INFO "%s: ", drive->name);
-//	printk("HTF.0=x%02x ", args->hobRegister[IDE_DATA_OFFSET]);
-	printk("HTF.1=x%02x ", args->hobRegister[IDE_FEATURE_OFFSET]);
-	printk("HTF.2=x%02x ", args->hobRegister[IDE_NSECTOR_OFFSET]);
-	printk("HTF.3=x%02x ", args->hobRegister[IDE_SECTOR_OFFSET]);
-	printk("HTF.4=x%02x ", args->hobRegister[IDE_LCYL_OFFSET]);
-	printk("HTF.5=x%02x ", args->hobRegister[IDE_HCYL_OFFSET]);
-	printk("HTF.6=x%02x ", args->hobRegister[IDE_SELECT_OFFSET]);
-	printk("HTF.7=x%02x\n", args->hobRegister[IDE_CONTROL_OFFSET_HOB]);
-}
-#endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
-
 ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 {
 	ide_hwif_t *hwif	= HWIF(drive);
 	task_struct_t *taskfile	= (task_struct_t *) task->tfRegister;
 	hob_struct_t *hobfile	= (hob_struct_t *) task->hobRegister;
 	u8 HIHI			= (drive->addressing == 1) ? 0xE0 : 0xEF;
-
-#ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
-	void debug_taskfile(drive, task);
-#endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
 	/* ALL Command Block Executions SHALL clear nIEN, unless otherwise */
 	if (IDE_CONTROL_REG) {
@@ -852,11 +824,6 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 #if DEBUG_TASKFILE
 	u8 status;
 #endif
-
-
-#ifdef CONFIG_IDE_TASK_IOCTL_DEBUG
-	void debug_taskfile(drive, task);
-#endif /* CONFIG_IDE_TASK_IOCTL_DEBUG */
 
 	if (task->data_phase == TASKFILE_MULTI_IN ||
 	    task->data_phase == TASKFILE_MULTI_OUT) {

@@ -29,8 +29,6 @@ static u8 aec62xx_proc = 0;
 static struct pci_dev *aec_devs[AEC_MAX_DEVS];
 static int n_aec_devs;
 
-#undef DEBUG_AEC_REGS
-
 static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 {
 	char *p = buffer;
@@ -44,9 +42,6 @@ static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 		struct pci_dev *dev	= aec_devs[i];
 		unsigned long iobase = pci_resource_start(dev, 4);
 		u8 c0 = 0, c1 = 0, art	= 0;
-#ifdef DEBUG_AEC_REGS
-		u8 uart			= 0;
-#endif /* DEBUG_AEC_REGS */
 
 		c0 = inb(iobase + 0x02);
 		c1 = inb(iobase + 0x0a);
@@ -83,24 +78,6 @@ static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 			p += sprintf(p, "           %s(%s)\n",
 				(c1&0x40)?((art&0xc0)?"UDMA":" DMA"):" PIO",
 				(art&0x80)?"2":(art&0x40)?"1":"0");
-#ifdef DEBUG_AEC_REGS
-			(void) pci_read_config_byte(dev, 0x40, &art);
-			p += sprintf(p, "Active:         0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x42, &art);
-			p += sprintf(p, "             0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x44, &art);
-			p += sprintf(p, "            0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x46, &art);
-			p += sprintf(p, "              0x%02x\n", art);
-			(void) pci_read_config_byte(dev, 0x41, &art);
-			p += sprintf(p, "Recovery:       0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x43, &art);
-			p += sprintf(p, "             0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x45, &art);
-			p += sprintf(p, "            0x%02x", art);
-			(void) pci_read_config_byte(dev, 0x47, &art);
-			p += sprintf(p, "              0x%02x\n", art);
-#endif /* DEBUG_AEC_REGS */
 		} else {
 			/*
 			 * case PCI_DEVICE_ID_ARTOP_ATP860:
@@ -146,28 +123,6 @@ static int aec62xx_get_info (char *buffer, char **addr, off_t offset, int count)
 				((art&0x30)==0x30)?"2":
 				((art&0x20)==0x20)?"1":
 				((art&0x10)==0x10)?"0":"?");
-#ifdef DEBUG_AEC_REGS
-			(void) pci_read_config_byte(dev, 0x40, &art);
-			p += sprintf(p, "Active:         0x%02x", HIGH_4(art));
-			(void) pci_read_config_byte(dev, 0x41, &art);
-			p += sprintf(p, "             0x%02x", HIGH_4(art));
-			(void) pci_read_config_byte(dev, 0x42, &art);
-			p += sprintf(p, "            0x%02x", HIGH_4(art));
-			(void) pci_read_config_byte(dev, 0x43, &art);
-			p += sprintf(p, "              0x%02x\n", HIGH_4(art));
-			(void) pci_read_config_byte(dev, 0x40, &art);
-			p += sprintf(p, "Recovery:       0x%02x", LOW_4(art));
-			(void) pci_read_config_byte(dev, 0x41, &art);
-			p += sprintf(p, "             0x%02x", LOW_4(art));
-			(void) pci_read_config_byte(dev, 0x42, &art);
-			p += sprintf(p, "            0x%02x", LOW_4(art));
-			(void) pci_read_config_byte(dev, 0x43, &art);
-			p += sprintf(p, "              0x%02x\n", LOW_4(art));
-			(void) pci_read_config_byte(dev, 0x49, &uart);
-			p += sprintf(p, "reg49h = 0x%02x ", uart);
-			(void) pci_read_config_byte(dev, 0x4a, &uart);
-			p += sprintf(p, "reg4ah = 0x%02x\n", uart);
-#endif /* DEBUG_AEC_REGS */
 		}
 	}
 	/* p - buffer must be less than 4k! */
@@ -240,6 +195,7 @@ static int aec6210_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	unsigned long flags;
 
 	local_irq_save(flags);
+	/* 0x40|(2*drive->dn): Active, 0x41|(2*drive->dn): Recovery */
 	pci_read_config_word(dev, 0x40|(2*drive->dn), &d_conf);
 	tmp0 = pci_bus_clock_list(speed, BUSCLOCK(dev));
 	SPLIT_BYTE(tmp0,tmp1,tmp2);
@@ -268,6 +224,7 @@ static int aec6260_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	unsigned long flags;
 
 	local_irq_save(flags);
+	/* high 4-bits: Active, low 4-bits: Recovery */
 	pci_read_config_byte(dev, 0x40|drive->dn, &drive_conf);
 	drive_conf = pci_bus_clock_list(speed, BUSCLOCK(dev));
 	pci_write_config_byte(dev, 0x40|drive->dn, drive_conf);

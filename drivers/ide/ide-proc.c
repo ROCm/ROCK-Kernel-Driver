@@ -360,27 +360,14 @@ static int proc_ide_read_identify
 	int		err = 0;
 
 	len = sprintf(page, "\n");
-	
-	if (drive)
-	{
-		unsigned short *val = (unsigned short *) page;
-		
-		/*
-		 *	The current code can't handle a driverless
-		 *	identify query taskfile. Now the right fix is
-		 *	to add a 'default' driver but that is a bit
-		 *	more work. 
-		 *
-		 *	FIXME: this has to be fixed for hotswap devices
-		 */
-		 
-		if(DRIVER(drive))
-			err = taskfile_lib_get_identify(drive, page);
-		else	/* This relies on the ID changes */
-			val = (unsigned short *)drive->id;
 
-		if(!err)
-		{						
+	if (drive) {
+		unsigned short *val = (unsigned short *) page;
+
+		BUG_ON(!drive->driver);
+
+		err = taskfile_lib_get_identify(drive, page);
+		if (!err) {
 			char *out = ((char *)page) + (SECTOR_WORDS * 4);
 			page = out;
 			do {
