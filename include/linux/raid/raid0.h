@@ -12,18 +12,14 @@ struct strip_zone
 	mdk_rdev_t *dev[MD_SB_DISKS]; /* Devices attached to the zone */
 };
 
-struct raid0_hash
-{
-	struct strip_zone *zone0, *zone1;
-};
-
 struct raid0_private_data
 {
-	struct raid0_hash *hash_table; /* Dynamically allocated */
-	struct strip_zone *strip_zone; /* This one too */
+	struct strip_zone **hash_table; /* Table of indexes into strip_zone */
+	struct strip_zone *strip_zone;
 	int nr_strip_zones;
-	struct strip_zone *smallest;
-	int nr_zones;
+
+	sector_t hash_spacing;
+	int preshift;			/* shift this before divide by hash_spacing */
 };
 
 typedef struct raid0_private_data raid0_conf_t;
