@@ -99,7 +99,7 @@ static void ipv6_regen_rndid(unsigned long data);
 static int desync_factor = MAX_DESYNC_FACTOR * HZ;
 #endif
 
-int ipv6_count_addresses(struct inet6_dev *idev);
+static int ipv6_count_addresses(struct inet6_dev *idev);
 
 /*
  *	Configured unicast address hash table
