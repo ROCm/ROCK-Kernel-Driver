@@ -167,6 +167,7 @@ struct sock_common {
   *	@sk_socket - Identd and reporting IO signals
   *	@sk_user_data - RPC layer private data
   *	@sk_owner - module that owns this socket
+  *	@sk_write_pending - a write to stream socket waits to start
   *	@sk_state_change - callback to indicate change in the state of the sock
   *	@sk_data_ready - callback to indicate there is data to be processed
   *	@sk_write_space - callback to indicate there is bf sending space available
@@ -247,6 +248,7 @@ struct sock {
 	struct socket		*sk_socket;
 	void			*sk_user_data;
 	struct module		*sk_owner;
+	int			sk_write_pending;
 	void			*sk_security;
 	void			(*sk_state_change)(struct sock *sk);
 	void			(*sk_data_ready)(struct sock *sk, int bytes);
@@ -457,6 +459,8 @@ do {	if (!(__sk)->sk_backlog.tail) {				\
 	lock_sock(__sk);					\
 	rc;							\
 })
+
+extern int sk_stream_wait_connect(struct sock *sk, long *timeo_p);
 
 extern int sk_wait_data(struct sock *sk, long *timeo);
 

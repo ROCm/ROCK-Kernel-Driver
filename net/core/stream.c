@@ -15,6 +15,7 @@
 #include <linux/module.h>
 #include <linux/net.h>
 #include <linux/signal.h>
+#include <linux/tcp.h>
 #include <linux/wait.h>
 #include <net/sock.h>
 
@@ -39,3 +40,39 @@ void sk_stream_write_space(struct sock *sk)
 }
 
 EXPORT_SYMBOL(sk_stream_write_space);
+
+/**
+ * sk_stream_wait_connect - Wait for a socket to get into the connected state
+ * @sk - sock to wait on
+ * @timeo_p - for how long to wait
+ *
+ * Must be called with the socket locked.
+ */
+int sk_stream_wait_connect(struct sock *sk, long *timeo_p)
+{
+	struct task_struct *tsk = current;
+	DEFINE_WAIT(wait);
+
+	while (1) {
+		if (sk->sk_err)
+			return sock_error(sk);
+		if ((1 << sk->sk_state) & ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
+			return -EPIPE;
+		if (!*timeo_p)
+			return -EAGAIN;
+		if (signal_pending(tsk))
+			return sock_intr_errno(*timeo_p);
+
+		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
+		sk->sk_write_pending++;
+		if (sk_wait_event(sk, timeo_p,
+				  !((1 << sk->sk_state) & 
+				    ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))))
+			break;
+		finish_wait(sk->sk_sleep, &wait);
+		sk->sk_write_pending--;
+	}
+	return 0;
+}
+
+EXPORT_SYMBOL(sk_stream_wait_connect);

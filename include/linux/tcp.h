@@ -371,8 +371,6 @@ struct tcp_opt {
 	struct open_request	*accept_queue;
 	struct open_request	*accept_queue_tail;
 
-	int			write_pending;	/* A write to socket waits to start. */
-
 	unsigned int		keepalive_time;	  /* time before keep alive takes place */
 	unsigned int		keepalive_intvl;  /* time interval between keep alive probes */
 	int			linger2;

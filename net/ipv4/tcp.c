@@ -637,45 +637,10 @@ static void tcp_listen_stop (struct sock *sk)
 }
 
 /*
- *	Wait for a socket to get into the connected state
- *
- *	Note: Must be called with the socket locked.
- */
-static int wait_for_tcp_connect(struct sock *sk, int flags, long *timeo_p)
-{
-	struct tcp_opt *tp = tcp_sk(sk);
-	struct task_struct *tsk = current;
-	DEFINE_WAIT(wait);
-
-	while ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT)) {
-		if (sk->sk_err)
-			return sock_error(sk);
-		if ((1 << sk->sk_state) & ~(TCPF_SYN_SENT | TCPF_SYN_RECV))
-			return -EPIPE;
-		if (!*timeo_p)
-			return -EAGAIN;
-		if (signal_pending(tsk))
-			return sock_intr_errno(*timeo_p);
-
-		prepare_to_wait(sk->sk_sleep, &wait, TASK_INTERRUPTIBLE);
-		tp->write_pending++;
-
-		release_sock(sk);
-		*timeo_p = schedule_timeout(*timeo_p);
-		lock_sock(sk);
-
-		finish_wait(sk->sk_sleep, &wait);
-		tp->write_pending--;
-	}
-	return 0;
-}
-
-/*
  *	Wait for more memory for a socket
  */
 static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
 	int err = 0;
 	long vm_wait = 0;
 	long current_timeo = *timeo;
@@ -700,12 +665,12 @@ static int wait_for_tcp_memory(struct sock *sk, long *timeo)
 			break;
 
 		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
-		tp->write_pending++;
+		sk->sk_write_pending++;
 		release_sock(sk);
 		if (!sk_stream_memory_free(sk) || vm_wait)
 			current_timeo = schedule_timeout(current_timeo);
 		lock_sock(sk);
-		tp->write_pending--;
+		sk->sk_write_pending--;
 
 		if (vm_wait) {
 			vm_wait -= current_timeo;
@@ -812,7 +777,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page **pages, int poffse
 
 	/* Wait for a connection to finish. */
 	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
-		if ((err = wait_for_tcp_connect(sk, 0, &timeo)) != 0)
+		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
 			goto out_err;
 
 	clear_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
@@ -965,7 +930,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 
 	/* Wait for a connection to finish. */
 	if ((1 << sk->sk_state) & ~(TCPF_ESTABLISHED | TCPF_CLOSE_WAIT))
-		if ((err = wait_for_tcp_connect(sk, flags, &timeo)) != 0)
+		if ((err = sk_stream_wait_connect(sk, &timeo)) != 0)
 			goto out_err;
 
 	/* This should be in poll */
