@@ -929,6 +929,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	unsigned int residue;
 	int result;
 	int fake_sense = 0;
+	unsigned int cswlen;
 
 	/* set up the command wrapper */
 	bcb->Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -985,7 +986,17 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* get CSW for device status */
 	US_DEBUGP("Attempting to get CSW...\n");
 	result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
-				bcs, US_BULK_CS_WRAP_LEN, NULL);
+				bcs, US_BULK_CS_WRAP_LEN, &cswlen);
+
+	/* Some broken devices add unnecessary zero-length packets to the
+	 * end of their data transfers.  Such packets show up as 0-length
+	 * CSWs.  If we encounter such a thing, try to read the CSW again.
+	 */
+	if (result == USB_STOR_XFER_SHORT && cswlen == 0) {
+		US_DEBUGP("Received 0-length CSW; retrying...\n");
+		result = usb_stor_bulk_transfer_buf(us, us->recv_bulk_pipe,
+				bcs, US_BULK_CS_WRAP_LEN, &cswlen);
+	}
 
 	/* did the attempt to read the CSW fail? */
 	if (result == USB_STOR_XFER_STALLED) {
