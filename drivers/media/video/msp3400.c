@@ -1316,7 +1316,7 @@ static int msp_attach(struct i2c_adapter *adap, int addr, int kind)
 #endif
 	msp3400c_setvolume(c,msp->muted,msp->left,msp->right);
 
-	snprintf(c->name, DEVICE_NAME_SIZE, "MSP34%02d%c-%c%d",
+	snprintf(c->name, I2C_NAME_SIZE, "MSP34%02d%c-%c%d",
 		 (msp->rev2>>8)&0xff, (msp->rev1&0xff)+'@',
 		 ((msp->rev1>>8)&0xff)+'@', msp->rev2&0x1f);
 
