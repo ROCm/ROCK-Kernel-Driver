@@ -14,7 +14,6 @@
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 
 /*
  * Later we can get more picky about what "in core" means precisely.

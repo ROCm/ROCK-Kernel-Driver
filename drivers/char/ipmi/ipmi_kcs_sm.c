@@ -42,7 +42,7 @@
 #include <linux/ipmi_msgdefs.h>		/* for completion codes */
 #include "ipmi_si_sm.h"
 
-#define IPMI_KCS_VERSION "v31"
+#define IPMI_KCS_VERSION "v32"
 
 /* Set this if you want a printout of why the state machine was hosed
    when it gets hosed. */

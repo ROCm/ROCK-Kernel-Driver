@@ -8,7 +8,6 @@
 #include <linux/pci_ids.h>
 
 #include <asm/io.h>
-#include <asm/pgalloc.h>
 #include <asm/arch_hooks.h>
 #include <asm/apic.h>
 #include "cobalt.h"

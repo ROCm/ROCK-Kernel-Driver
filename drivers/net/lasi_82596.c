@@ -87,7 +87,6 @@
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 #include <asm/irq.h>
 #include <asm/pdc.h>
 #include <asm/cache.h>

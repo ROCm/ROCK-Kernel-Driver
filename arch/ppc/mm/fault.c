@@ -99,7 +99,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	int code = SEGV_MAPERR;
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_4xx) || defined (CONFIG_BOOKE)
 	int is_write = error_code & ESR_DST;
 #else
 	int is_write = 0;
@@ -114,20 +114,20 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		error_code &= 0x48200000;
 	else
 		is_write = error_code & 0x02000000;
-#endif /* CONFIG_4xx */
+#endif /* CONFIG_4xx || CONFIG_BOOKE */
 
 #if defined(CONFIG_XMON) || defined(CONFIG_KGDB)
 	if (debugger_fault_handler && TRAP(regs) == 0x300) {
 		debugger_fault_handler(regs);
 		return 0;
 	}
-#if !defined(CONFIG_4xx)
+#if !(defined(CONFIG_4xx) || defined(CONFIG_BOOKE))
 	if (error_code & 0x00400000) {
 		/* DABR match */
 		if (debugger_dabr_match(regs))
 			return 0;
 	}
-#endif /* !CONFIG_4xx */
+#endif /* !(CONFIG_4xx || CONFIG_BOOKE)*/
 #endif /* CONFIG_XMON || CONFIG_KGDB */
 
 	if (in_atomic() || mm == NULL)
@@ -200,8 +200,8 @@ good_area:
 	if (is_write) {
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
-#if defined(CONFIG_4xx)
-	/* an exec  - 4xx allows for per-page execute permission */
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
+	/* an exec  - 4xx/Book-E allows for per-page execute permission */
 	} else if (TRAP(regs) == 0x400) {
 		pte_t *ptep;
 
@@ -214,7 +214,7 @@ good_area:
 			goto bad_area;
 #endif
 
-		/* Since 4xx supports per-page execute permission,
+		/* Since 4xx/Book-E supports per-page execute permission,
 		 * we lazily flush dcache to icache. */
 		ptep = NULL;
 		if (get_pteptr(mm, address, &ptep) && pte_present(*ptep)) {

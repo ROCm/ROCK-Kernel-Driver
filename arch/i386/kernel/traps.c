@@ -47,7 +47,6 @@
 #include <asm/nmi.h>
 
 #include <asm/smp.h>
-#include <asm/pgalloc.h>
 #include <asm/arch_hooks.h>
 
 #include <linux/irq.h>
@@ -163,7 +162,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 			break;
 		printk(" =======================\n");
 	}
-	printk("\n");
 }
 
 void show_stack(struct task_struct *task, unsigned long *esp)

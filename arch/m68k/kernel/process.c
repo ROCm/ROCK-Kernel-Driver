@@ -26,6 +26,7 @@
 #include <linux/a.out.h>
 #include <linux/reboot.h>
 #include <linux/init_task.h>
+#include <linux/mqueue.h>
 
 #include <asm/uaccess.h>
 #include <asm/system.h>

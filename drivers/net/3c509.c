@@ -56,10 +56,6 @@
 		v1.19b 08Nov2002 Marc Zyngier <maz@wild-wind.fr.eu.org>
 		    - Introduce driver model for EISA cards.
 */
-/*
-  FIXES for PC-9800:
-  Shu Iwanaga: 3c569B(PC-9801 C-bus) support
-*/
 
 #define DRV_NAME	"3c509"
 #define DRV_VERSION	"1.19b"
@@ -265,7 +261,7 @@ static struct mca_driver el3_mca_driver = {
 };
 #endif /* CONFIG_MCA */
 
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 static struct isapnp_device_id el3_isapnp_adapters[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5090),
@@ -362,7 +358,7 @@ static void el3_common_remove (struct net_device *dev)
 	if (lp->pmdev)
 		pm_unregister(lp->pmdev);
 #endif
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 	if (lp->type == EL3_PNP)
 		pnp_device_detach(to_pnp_dev(lp->dev));
 #endif
@@ -381,7 +377,7 @@ static int __init el3_probe(int card_idx)
 	u16 phys_addr[3];
 	static int current_tag;
 	int err = -ENODEV;
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 	static int pnp_cards;
 	struct pnp_dev *idev = NULL;
 
@@ -436,9 +432,6 @@ __again:
 no_pnp:
 #endif /* __ISAPNP__ */
 
-#ifdef CONFIG_X86_PC9800
-	id_port = 0x71d0;
-#else
 	/* Select an open I/O location at 0x1*0 to do contention select. */
 	for ( ; id_port < 0x200; id_port += 0x10) {
 		if (!request_region(id_port, 1, "3c509"))
@@ -456,7 +449,7 @@ no_pnp:
 		printk(" WARNING: No I/O port available for 3c509 activation.\n");
 		return -ENODEV;
 	}
-#endif /* CONFIG_X86_PC9800 */
+
 	/* Next check for all ISA bus boards by sending the ID sequence to the
 	   ID_PORT.  We find cards past the first by setting the 'current_tag'
 	   on cards as they are found.  Cards with their tag set will not
@@ -487,7 +480,7 @@ no_pnp:
 		phys_addr[i] = htons(id_read_eeprom(i));
 	}
 
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 	if (nopnp == 0) {
 		/* The ISA PnP 3c509 cards respond to the ID sequence.
 		   This check is needed in order not to register them twice. */
@@ -512,19 +505,9 @@ no_pnp:
 	{
 		unsigned int iobase = id_read_eeprom(8);
 		if_port = iobase >> 14;
-#ifdef CONFIG_X86_PC9800
-		ioaddr = 0x40d0 + ((iobase & 0x1f) << 8);
-#else
 		ioaddr = 0x200 + ((iobase & 0x1f) << 4);
-#endif
 	}
 	irq = id_read_eeprom(9) >> 12;
-#ifdef CONFIG_X86_PC9800
-	if (irq == 7)
-		irq = 6;
-	else if (irq == 15)
-		irq = 13;
-#endif
 
 	dev = alloc_etherdev(sizeof (struct el3_private));
 	if (!dev)
@@ -555,11 +538,7 @@ no_pnp:
 	outb(0xd0 + ++current_tag, id_port);
 
 	/* Activate the adaptor at the EEPROM location. */
-#ifdef CONFIG_X86_PC9800
-	outb((ioaddr >> 8) | 0xe0, id_port);
-#else
 	outb((ioaddr >> 4) | 0xe0, id_port);
-#endif
 
 	EL3WINDOW(0);
 	if (inw(ioaddr) != 0x6d50)
@@ -568,7 +547,7 @@ no_pnp:
 	/* Free the interrupt so that some other card can use it. */
 	outw(0x0f00, ioaddr + WN0_IRQ);
 
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
  found:							/* PNP jumps here... */
 #endif /* __ISAPNP__ */
 
@@ -577,7 +556,7 @@ no_pnp:
 	dev->irq = irq;
 	dev->if_port = if_port;
 	lp = netdev_priv(dev);
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 	lp->dev = &idev->dev;
 #endif
 	err = el3_common_init(dev);
@@ -601,7 +580,7 @@ no_pnp:
 	return 0;
 
 out1:
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 	if (idev)
 		pnp_device_detach(idev);
 #endif
@@ -1461,12 +1440,6 @@ el3_up(struct net_device *dev)
 	outw(0x0001, ioaddr + 4);
 
 	/* Set the IRQ line. */
-#ifdef CONFIG_X86_PC9800
-	if (dev->irq == 6)
-		dev->irq = 7;
-	else if (dev->irq == 13)
-		dev->irq = 15;
-#endif
 	outw((dev->irq << 12) | 0x0f00, ioaddr + WN0_IRQ);
 
 	/* Set the station address in window 2 each time opened. */
@@ -1629,7 +1602,7 @@ MODULE_PARM_DESC(debug, "debug level (0-6)");
 MODULE_PARM_DESC(irq, "IRQ number(s) (assigned)");
 MODULE_PARM_DESC(xcvr,"transceiver(s) (0=internal, 1=external)");
 MODULE_PARM_DESC(max_interrupt_work, "maximum events handled per interrupt");
-#if defined(__ISAPNP__) && !defined(CONFIG_X86_PC9800)
+#if defined(__ISAPNP__)
 MODULE_PARM(nopnp, "i");
 MODULE_PARM_DESC(nopnp, "disable ISA PnP support (0-1)");
 MODULE_DEVICE_TABLE(isapnp, el3_isapnp_adapters);

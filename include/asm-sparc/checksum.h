@@ -91,7 +91,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
   }
   
 static inline unsigned int 
-csum_partial_copy_to_user(const char *src, char *dst, int len, 
+csum_partial_copy_to_user(const char *src, char __user *dst, int len, 
 			  unsigned int sum, int *err)
 {
 	if (!access_ok (VERIFY_WRITE, dst, len)) {

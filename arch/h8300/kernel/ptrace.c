@@ -116,18 +116,36 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		case PTRACE_PEEKUSR: {
 			unsigned long tmp;
 			
-			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user))
-				ret = -EIO;
-			
-			tmp = 0;  /* Default return condition */
-			addr = addr >> 2; /* temporary hack. */
-			if (addr < H8300_REGS_NO)
-				tmp = h8300_get_reg(child, addr);
-			else {
+			if ((addr & 3) || addr < 0 || addr >= sizeof(struct user)) {
 				ret = -EIO;
 				break ;
 			}
-			ret = put_user(tmp,(unsigned long *) data);
+			
+		        ret = 0;  /* Default return condition */
+			addr = addr >> 2; /* temporary hack. */
+
+			if (addr < H8300_REGS_NO)
+				tmp = h8300_get_reg(child, addr);
+			else {
+				switch(addr) {
+				case 49:
+					tmp = child->mm->start_code;
+					break ;
+				case 50:
+					tmp = child->mm->start_data;
+					break ;
+				case 51:
+					tmp = child->mm->end_code;
+					break ;
+				case 52:
+					tmp = child->mm->end_data;
+					break ;
+				default:
+					ret = -EIO;
+				}
+			}
+			if (!ret)
+				ret = put_user(tmp,(unsigned long *) data);
 			break ;
 		}
 

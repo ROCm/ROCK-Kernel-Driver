@@ -37,7 +37,6 @@
 #include <asm/pgtable.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 
 #define EFI_DEBUG	0

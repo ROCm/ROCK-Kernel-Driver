@@ -183,8 +183,8 @@ struct rt_sigframe
 
 /*
  * Save the current user registers on the user stack.
- * We only save the altivec registers if the process has used
- * altivec instructions at some point.
+ * We only save the altivec/spe registers if the process has used
+ * altivec/spe instructions at some point.
  */
 static int
 save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
@@ -197,6 +197,10 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
 #ifdef CONFIG_ALTIVEC
 	if (current->thread.used_vr && (regs->msr & MSR_VEC))
 		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
+#ifdef CONFIG_SPE
+	if (current->thread.used_spe && (regs->msr & MSR_SPE))
+		giveup_spe(current);
 #endif /* CONFIG_ALTIVEC */
 	preempt_enable();
 
@@ -229,6 +233,24 @@ save_user_regs(struct pt_regs *regs, struct mcontext *frame, int sigret)
 		return 1;
 #endif /* CONFIG_ALTIVEC */
 
+#ifdef CONFIG_SPE
+	/* save spe registers */
+	if (current->thread.used_spe) {
+		if (__copy_to_user(&frame->mc_vregs, current->thread.evr,
+				   ELF_NEVRREG * sizeof(u32)))
+			return 1;
+		/* set MSR_SPE in the saved MSR value to indicate that
+		   frame->mc_vregs contains valid data */
+		if (__put_user(regs->msr | MSR_SPE, &frame->mc_gregs[PT_MSR]))
+			return 1;
+	}
+	/* else assert((regs->msr & MSR_SPE) == 0) */
+
+	/* We always copy to/from spefscr */
+	if (__put_user(current->thread.spefscr, (u32 *)&frame->mc_vregs + ELF_NEVRREG))
+		return 1;
+#endif /* CONFIG_SPE */
+
 	if (sigret) {
 		/* Set up the sigreturn trampoline: li r0,sigret; sc */
 		if (__put_user(0x38000000UL + sigret, &frame->tramp[0])
@@ -249,7 +271,7 @@ static int
 restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 {
 	unsigned long save_r2;
-#ifdef CONFIG_ALTIVEC
+#if defined(CONFIG_ALTIVEC) || defined(CONFIG_SPE)
 	unsigned long msr;
 #endif
 
@@ -289,6 +311,23 @@ restore_user_regs(struct pt_regs *regs, struct mcontext __user *sr, int sig)
 	if (__get_user(current->thread.vrsave, (u32 *)&sr->mc_vregs[32]))
 		return 1;
 #endif /* CONFIG_ALTIVEC */
+
+#ifdef CONFIG_SPE
+	/* force the process to reload the spe registers from
+	   current->thread when it next does spe instructions */
+	regs->msr &= ~MSR_SPE;
+	if (!__get_user(msr, &sr->mc_gregs[PT_MSR]) && (msr & MSR_SPE) != 0) {
+		/* restore spe registers from the stack */
+		if (__copy_from_user(current->thread.evr, &sr->mc_vregs,
+				     sizeof(sr->mc_vregs)))
+			return 1;
+	} else if (current->thread.used_spe)
+		memset(&current->thread.evr, 0, ELF_NEVRREG * sizeof(u32));
+
+	/* Always get SPEFSCR back */
+	if (__get_user(current->thread.spefscr, (u32 *)&sr->mc_vregs + ELF_NEVRREG))
+		return 1;
+#endif /* CONFIG_SPE */
 
 	return 0;
 }

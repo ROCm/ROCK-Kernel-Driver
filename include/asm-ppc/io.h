@@ -30,6 +30,8 @@
 #include <asm/mpc8xx.h>
 #elif defined(CONFIG_8260)
 #include <asm/mpc8260.h>
+#elif defined(CONFIG_85xx)
+#include <asm/mpc85xx.h>
 #elif defined(CONFIG_APUS)
 #define _IO_BASE	0
 #define _ISA_MEM_BASE	0

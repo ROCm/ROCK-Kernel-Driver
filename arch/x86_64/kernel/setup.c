@@ -116,9 +116,10 @@ struct resource standard_io_resources[] = {
 #define STANDARD_IO_RESOURCES \
 	(sizeof standard_io_resources / sizeof standard_io_resources[0])
 
-struct resource code_resource = { "Kernel code", 0x100000, 0, IORESOURCE_MEM };
-struct resource data_resource = { "Kernel data", 0, 0, IORESOURCE_MEM };
-struct resource vram_resource = { "Video RAM area", 0xa0000, 0xbffff, IORESOURCE_BUSY | IORESOURCE_MEM };
+#define IORESOURCE_RAM (IORESOURCE_BUSY | IORESOURCE_MEM)
+
+struct resource data_resource = { "Kernel data", 0, 0, IORESOURCE_RAM };
+struct resource code_resource = { "Kernel code", 0, 0, IORESOURCE_RAM };
 
 #define IORESOURCE_ROM (IORESOURCE_BUSY | IORESOURCE_READONLY | IORESOURCE_MEM)
 
@@ -138,10 +139,11 @@ static struct resource adapter_rom_resources[] = {
 	(sizeof adapter_rom_resources / sizeof adapter_rom_resources[0])
 
 static struct resource video_rom_resource = { "Video ROM", 0xc0000, 0xc7fff, IORESOURCE_ROM };
+static struct resource video_ram_resource = { "Video RAM area", 0xa0000, 0xbffff, IORESOURCE_RAM };
 
 #define romsignature(x) (*(unsigned short *)(x) == 0xaa55)
 
-static int __init checksum(unsigned char *rom, unsigned long length)
+static int __init romchecksum(unsigned char *rom, unsigned long length)
 {
 	unsigned char *p, sum = 0;
 
@@ -169,7 +171,7 @@ static void __init probe_roms(void)
 		length = rom[2] * 512;
 
 		/* if checksum okay, trust length byte */
-		if (length && checksum(rom, length))
+		if (length && romchecksum(rom, length))
 			video_rom_resource.end = start + length - 1;
 
 		request_resource(&iomem_resource, &video_rom_resource);
@@ -188,7 +190,7 @@ static void __init probe_roms(void)
 	rom = isa_bus_to_virt(extension_rom_resource.start);
 	if (romsignature(rom)) {
 		length = extension_rom_resource.end - extension_rom_resource.start + 1;
-		if (checksum(rom, length)) {
+		if (romchecksum(rom, length)) {
 			request_resource(&iomem_resource, &extension_rom_resource);
 			upper = extension_rom_resource.start;
 		}
@@ -204,7 +206,7 @@ static void __init probe_roms(void)
 		length = rom[2] * 512;
 
 		/* but accept any length that fits if checksum okay */
-		if (!length || start + length > upper || !checksum(rom, length))
+		if (!length || start + length > upper || !romchecksum(rom, length))
 			continue;
 
 		adapter_rom_resources[i].start = start;
@@ -555,13 +557,13 @@ void __init setup_arch(char **cmdline_p)
 	probe_roms();
 	e820_reserve_resources(); 
 
-	request_resource(&iomem_resource, &vram_resource);
+	request_resource(&iomem_resource, &video_ram_resource);
 
 	{
 	unsigned i;
 	/* request I/O space for devices used on all i[345]86 PCs */
 	for (i = 0; i < STANDARD_IO_RESOURCES; i++)
-		request_resource(&ioport_resource, standard_io_resources+i);
+		request_resource(&ioport_resource, &standard_io_resources[i]);
 	}
 
 	/* Will likely break when you have unassigned resources with more

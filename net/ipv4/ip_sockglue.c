@@ -759,6 +759,7 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char __user *optval, 
 				err = ip_mc_join_group(sk, &mreq);
 				if (err)
 					break;
+				greqs.gsr_interface = mreq.imr_ifindex;
 				omode = MCAST_INCLUDE;
 				add = 1;
 			} else /* MCAST_LEAVE_SOURCE_GROUP */ {

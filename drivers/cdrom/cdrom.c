@@ -508,6 +508,8 @@ int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 	unsigned char buffer[16];
 	int ret;
 
+	*write = 0;
+
 	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
 
 	cgc.cmd[0] = GPCMD_GET_CONFIGURATION;
@@ -521,8 +523,10 @@ int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 	mfd = (struct mrw_feature_desc *)&buffer[sizeof(struct feature_header)];
 	*write = mfd->write;
 
-	if ((ret = cdrom_mrw_probe_pc(cdi)))
+	if ((ret = cdrom_mrw_probe_pc(cdi))) {
+		*write = 0;
 		return ret;
+	}
 
 	return 0;
 }
@@ -822,7 +826,29 @@ static int cdrom_ram_open_write(struct cdrom_device_info *cdi)
  */
 static int cdrom_open_write(struct cdrom_device_info *cdi)
 {
+	int mrw, mrw_write, ram_write;
 	int ret = 1;
+
+	mrw = 0;
+	if (!cdrom_is_mrw(cdi, &mrw_write))
+		mrw = 1;
+
+	(void) cdrom_is_random_writable(cdi, &ram_write);
+
+	if (mrw)
+		cdi->mask &= ~CDC_MRW;
+	else
+		cdi->mask |= CDC_MRW;
+
+	if (mrw_write)
+		cdi->mask &= ~CDC_MRW_W;
+	else
+		cdi->mask |= CDC_MRW_W;
+
+	if (ram_write)
+		cdi->mask &= ~CDC_RAM;
+	else
+		cdi->mask |= CDC_RAM;
 
 	if (CDROM_CAN(CDC_MRW_W))
 		ret = cdrom_mrw_open_write(cdi);
@@ -866,6 +892,9 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS)) {
 		ret = cdi->ops->open(cdi, 1);
 	} else {
+		ret = open_for_data(cdi);
+		if (ret)
+			goto err;
 		if (fp->f_mode & FMODE_WRITE) {
 			ret = -EROFS;
 			if (!CDROM_CAN(CDC_RAM))
@@ -873,7 +902,6 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 			if (cdrom_open_write(cdi))
 				goto err;
 		}
-		ret = open_for_data(cdi);
 	}
 
 	if (ret)

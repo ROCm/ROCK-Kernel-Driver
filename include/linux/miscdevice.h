@@ -33,6 +33,7 @@
 #define SGI_STREAMS_KEYBOARD 150
 /* drivers/sgi/char/usema.c */
 #define SGI_USEMACLONE	     151
+#define	HPET_MINOR	     152
 
 #define TUN_MINOR	     200
 

@@ -41,7 +41,7 @@ static int br_initial_port_cost(struct net_device *dev)
 	int err;
 
 	strncpy(ifr.ifr_name, dev->name, IFNAMSIZ);
-	ifr.ifr_data = (void *) &ecmd;
+	ifr.ifr_data = (void __user *) &ecmd;
 
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);

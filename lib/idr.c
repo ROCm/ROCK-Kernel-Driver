@@ -27,15 +27,6 @@
  * so you don't need to be too concerned about locking and conflicts
  * with the slab allocator.
 
- * A word on reuse.  We reuse empty id slots as soon as we can, always
- * using the lowest one available.  But we also merge a counter in the
- * high bits of the id.  The counter is RESERVED_ID_BITS (8 at this time)
- * long.  This means that if you allocate and release the same id in a 
- * loop we will reuse an id after about 256 times around the loop.  The
- * word about is used here as we will NOT return a valid id of -1 so if
- * you loop on the largest possible id (and that is 24 bits, wow!) we
- * will kick the counter to avoid -1.  (Paranoid?  You bet!)
- *
  * What you need to do is, since we don't keep the counter as part of
  * id / ptr pair, to keep a copy of it in the pointed to structure
  * (or else where) so that when you ask for a ptr you can varify that
@@ -70,14 +61,21 @@
  *   sleep, so must not be called with any spinlocks held.  If the system is
  *   REALLY out of memory this function returns 0, other wise 1.
 
- * int idr_get_new(struct idr *idp, void *ptr);
+ * int idr_get_new(struct idr *idp, void *ptr, int *id);
  
  *   This is the allocate id function.  It should be called with any
  *   required locks.  In fact, in the SMP case, you MUST lock prior to
- *   calling this function to avoid possible out of memory problems.  If
- *   memory is required, it will return a -1, in which case you should
- *   unlock and go back to the idr_pre_get() call.  ptr is the pointer
- *   you want associated with the id.  In other words:
+ *   calling this function to avoid possible out of memory problems.
+ *   If memory is required, it will return -EAGAIN, you should unlock
+ *   and go back to the idr_pre_get() call.  If the idr is full, it
+ *   will return a -ENOSPC.  ptr is the pointer you want associated
+ *   with the id.  The value is returned in the "id" field.  idr_get_new()
+ *   returns a value in the range 0 ... 0x7fffffff
+
+ * int idr_get_new_above(struct idr *idp, void *ptr, int start_id, int *id);
+
+ *   Like idr_get_new(), but the returned id is guaranteed to be at or
+ *   above start_id.
 
  * void *idr_find(struct idr *idp, int id);
  
@@ -91,6 +89,10 @@
 
  *   removes the given id, freeing that slot and any memory that may
  *   now be unused.  See idr_find() for locking restrictions.
+
+ * int idr_full(struct idr *idp);
+
+ *   Returns true if the idr is full and false if not.
 
  */
 
@@ -115,7 +117,7 @@ static struct idr_layer *alloc_layer(struct idr *idp)
 
 	spin_lock(&idp->lock);
 	if (!(p = idp->id_free))
-		BUG();
+		return NULL;
 	idp->id_free = p->ary[0];
 	idp->id_free_cnt--;
 	p->ary[0] = 0;
@@ -181,8 +183,8 @@ static int sub_alloc(struct idr *idp, void *ptr, int *starting_id)
 			sh = IDR_BITS*l;
 			id = ((id >> sh) ^ n ^ m) << sh;
 		}
-		if (id >= MAX_ID_BIT)
-			return -1;
+		if ((id >= MAX_ID_BIT) || (id < 0))
+			return -3;
 		if (l == 0)
 			break;
 		/*
@@ -220,7 +222,7 @@ static int sub_alloc(struct idr *idp, void *ptr, int *starting_id)
 	return(id);
 }
 
-int idr_get_new_above(struct idr *idp, void *ptr, int starting_id)
+static int idr_get_new_above_int(struct idr *idp, void *ptr, int starting_id)
 {
 	struct idr_layer *p, *new;
 	int layers, v, id;
@@ -238,7 +240,7 @@ build_up:
 	 * Add a new layer to the top of the tree if the requested
 	 * id is larger than the currently allocated space.
 	 */
-	while (id >= (1 << (layers*IDR_BITS))) {
+	while ((layers < MAX_LEVEL) && (id >= (1 << (layers*IDR_BITS)))) {
 		layers++;
 		if (!p->count)
 			continue;
@@ -266,22 +268,46 @@ build_up:
 	v = sub_alloc(idp, ptr, &id);
 	if (v == -2)
 		goto build_up;
-	if ( likely(v >= 0 )) {
-		idp->count++;
-		v += (idp->count << MAX_ID_SHIFT);
-		if ( unlikely( v == -1 ))
-		     v += (1L << MAX_ID_SHIFT);
-	}
 	return(v);
+}
+
+int idr_get_new_above(struct idr *idp, void *ptr, int starting_id, int *id)
+{
+	int rv;
+	rv = idr_get_new_above_int(idp, ptr, starting_id);
+	/*
+	 * This is a cheap hack until the IDR code can be fixed to
+	 * return proper error values.
+	 */
+	if (rv < 0) {
+		if (rv == -1)
+			return -EAGAIN;
+		else /* Will be -3 */
+			return -ENOSPC;
+	}
+	*id = rv;
+	return 0;
 }
 EXPORT_SYMBOL(idr_get_new_above);
 
-int idr_get_new(struct idr *idp, void *ptr)
+int idr_get_new(struct idr *idp, void *ptr, int *id)
 {
-	return idr_get_new_above(idp, ptr, 0);
+	int rv;
+	rv = idr_get_new_above_int(idp, ptr, 0);
+	/*
+	 * This is a cheap hack until the IDR code can be fixed to
+	 * return proper error values.
+	 */
+	if (rv < 0) {
+		if (rv == -1)
+			return -EAGAIN;
+		else /* Will be -3 */
+			return -ENOSPC;
+	}
+	*id = rv;
+	return 0;
 }
 EXPORT_SYMBOL(idr_get_new);
-
 
 static void sub_remove(struct idr *idp, int shift, int id)
 {
@@ -311,9 +337,13 @@ static void sub_remove(struct idr *idp, int shift, int id)
 			idp->layers = 0;
 	}
 }
+
 void idr_remove(struct idr *idp, int id)
 {
 	struct idr_layer *p;
+
+	/* Mask off upper bits we don't use for the search. */
+	id &= MAX_ID_MASK;
 
 	sub_remove(idp, (idp->layers - 1) * IDR_BITS, id);
 	if ( idp->top && idp->top->count == 1 && 
@@ -350,6 +380,9 @@ void *idr_find(struct idr *idp, int id)
 	if ( unlikely( (id & ~(~0 << MAX_ID_SHIFT)) >> (n + IDR_BITS)))
 	     return NULL;
 #endif
+	/* Mask off upper bits we don't use for the search. */
+	id &= MAX_ID_MASK;
+
 	while (n > 0 && p) {
 		n -= IDR_BITS;
 		p = p->ary[(id >> n) & IDR_MASK];

@@ -113,7 +113,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 
 	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
 
-	DRM_DEBUG("alloc fb, size = %d, offset = %ld\n", fb.size, req.offset);
+	DRM_DEBUG("alloc fb, size = %d, offset = %d\n", fb.size, req.offset);
 
 	return retval;
 }
@@ -130,7 +130,7 @@ int sis_fb_free( DRM_IOCTL_ARGS )
 
 	if (!del_alloc_set(fb.context, VIDEO_TYPE, fb.free))
 		retval = DRM_ERR(EINVAL);
-	sis_free(fb.free);
+	sis_free((u32)fb.free);
 
 	DRM_DEBUG("free fb, offset = %lu\n", fb.free);
 

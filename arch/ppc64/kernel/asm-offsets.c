@@ -48,6 +48,8 @@ int main(void)
 	DEFINE(THREAD_SHIFT, THREAD_SHIFT);
 	DEFINE(THREAD_SIZE, THREAD_SIZE);
 	DEFINE(TI_FLAGS, offsetof(struct thread_info, flags));
+	DEFINE(TI_PREEMPT, offsetof(struct thread_info, preempt_count));
+	DEFINE(TI_SC_NOERR, offsetof(struct thread_info, syscall_noerror));
 
 	/* task_struct->thread */
 	DEFINE(THREAD, offsetof(struct task_struct, thread));
@@ -99,7 +101,10 @@ int main(void)
 	DEFINE(PACALPPACA, offsetof(struct paca_struct, xLpPaca));
         DEFINE(LPPACA, offsetof(struct paca_struct, xLpPaca));
         DEFINE(PACAREGSAV, offsetof(struct paca_struct, xRegSav));
-        DEFINE(PACAEXC, offsetof(struct paca_struct, exception_stack));
+        DEFINE(PACA_EXGEN, offsetof(struct paca_struct, exgen));
+        DEFINE(PACA_EXMC, offsetof(struct paca_struct, exmc));
+        DEFINE(PACA_EXSLB, offsetof(struct paca_struct, exslb));
+        DEFINE(PACA_EXDSI, offsetof(struct paca_struct, exdsi));
         DEFINE(PACAGUARD, offsetof(struct paca_struct, guard));
         DEFINE(LPPACASRR0, offsetof(struct ItLpPaca, xSavedSrr0));
         DEFINE(LPPACASRR1, offsetof(struct ItLpPaca, xSavedSrr1));
@@ -136,6 +141,10 @@ int main(void)
 	DEFINE(GPR7, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[7]));
 	DEFINE(GPR8, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[8]));
 	DEFINE(GPR9, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[9]));
+	DEFINE(GPR10, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[10]));
+	DEFINE(GPR11, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[11]));
+	DEFINE(GPR12, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[12]));
+	DEFINE(GPR13, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[13]));
 	DEFINE(GPR20, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[20]));
 	DEFINE(GPR21, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[21]));
 	DEFINE(GPR22, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, gpr[22]));
@@ -154,7 +163,7 @@ int main(void)
 	DEFINE(_DSISR, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, dsisr));
 	DEFINE(ORIG_GPR3, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, orig_gpr3));
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
-	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
+	DEFINE(_TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
 	DEFINE(SOFTE, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, softe));
 
 	/* These _only_ to be used with {PROM,RTAS}_FRAME_SIZE!!! */

@@ -97,6 +97,11 @@ static unsigned long rtc_port;
 static int rtc_irq = PCI_IRQ_NONE;
 #endif
 
+#ifdef	CONFIG_HPET_RTC_IRQ
+#undef	RTC_IRQ
+#define	RTC_IRQ	0
+#endif
+
 #ifdef RTC_IRQ
 static int rtc_has_irq = 1;
 #endif

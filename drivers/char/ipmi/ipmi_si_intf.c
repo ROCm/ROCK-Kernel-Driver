@@ -76,7 +76,7 @@ static inline void add_usec_to_timer(struct timer_list *t, long v)
 #include "ipmi_si_sm.h"
 #include <linux/init.h>
 
-#define IPMI_SI_VERSION "v31"
+#define IPMI_SI_VERSION "v32"
 
 /* Measure times between events in the driver. */
 #undef DEBUG_TIMING
@@ -712,6 +712,13 @@ static void set_run_to_completion(void *send_info, int i_run_to_completion)
 	spin_unlock_irqrestore(&(smi_info->si_lock), flags);
 }
 
+static void poll(void *send_info)
+{
+	struct smi_info *smi_info = send_info;
+
+	smi_event_handler(smi_info, 0);
+}
+
 static void request_events(void *send_info)
 {
 	struct smi_info *smi_info = send_info;
@@ -851,7 +858,8 @@ static struct ipmi_smi_handlers handlers =
 	.owner                  = THIS_MODULE,
 	.sender			= sender,
 	.request_events		= request_events,
-	.set_run_to_completion  = set_run_to_completion
+	.set_run_to_completion  = set_run_to_completion,
+	.poll			= poll,
 };
 
 /* There can be 4 IO ports passed in (with or without IRQs), 4 addresses,
@@ -1848,6 +1856,21 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 	atomic_set(&new_smi->req_events, 0);
 	new_smi->run_to_completion = 0;
 
+	new_smi->interrupt_disabled = 0;
+	new_smi->timer_stopped = 0;
+	new_smi->stop_operation = 0;
+
+	/* The ipmi_register_smi() code does some operations to
+	   determine the channel information, so we must be ready to
+	   handle operations before it is called.  This means we have
+	   to stop the timer if we get an error after this point. */
+	init_timer(&(new_smi->si_timer));
+	new_smi->si_timer.data = (long) new_smi;
+	new_smi->si_timer.function = smi_timeout;
+	new_smi->last_timeout_jiffies = jiffies;
+	new_smi->si_timer.expires = jiffies + SI_TIMEOUT_JIFFIES;
+	add_timer(&(new_smi->si_timer));
+
 	rv = ipmi_register_smi(&handlers,
 			       new_smi,
 			       new_smi->ipmi_version_major,
@@ -1857,7 +1880,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 		printk(KERN_ERR
 		       "ipmi_si: Unable to register device: error %d\n",
 		       rv);
-		goto out_err;
+		goto out_err_stop_timer;
 	}
 
 	rv = ipmi_smi_add_proc_entry(new_smi->intf, "type",
@@ -1867,7 +1890,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 		printk(KERN_ERR
 		       "ipmi_si: Unable to create proc entry: %d\n",
 		       rv);
-		goto out_err;
+		goto out_err_stop_timer;
 	}
 
 	rv = ipmi_smi_add_proc_entry(new_smi->intf, "si_stats",
@@ -1877,7 +1900,7 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 		printk(KERN_ERR
 		       "ipmi_si: Unable to create proc entry: %d\n",
 		       rv);
-		goto out_err;
+		goto out_err_stop_timer;
 	}
 
 	start_clear_flags(new_smi);
@@ -1886,34 +1909,40 @@ static int init_one_smi(int intf_num, struct smi_info **smi)
 	if (new_smi->irq)
 		new_smi->si_state = SI_CLEARING_FLAGS_THEN_SET_IRQ;
 
-	new_smi->interrupt_disabled = 0;
-	new_smi->timer_stopped = 0;
-	new_smi->stop_operation = 0;
-
-	init_timer(&(new_smi->si_timer));
-	new_smi->si_timer.data = (long) new_smi;
-	new_smi->si_timer.function = smi_timeout;
-	new_smi->last_timeout_jiffies = jiffies;
-	new_smi->si_timer.expires = jiffies + SI_TIMEOUT_JIFFIES;
-	add_timer(&(new_smi->si_timer));
-
 	*smi = new_smi;
 
 	printk(" IPMI %s interface initialized\n", si_type[intf_num]);
 
 	return 0;
 
+ out_err_stop_timer:
+	new_smi->stop_operation = 1;
+
+	/* Wait for the timer to stop.  This avoids problems with race
+	   conditions removing the timer here. */
+	while (!new_smi->timer_stopped) {
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(1);
+	}
+
  out_err:
 	if (new_smi->intf)
 		ipmi_unregister_smi(new_smi->intf);
 
 	new_smi->irq_cleanup(new_smi);
+
+	/* Wait until we know that we are out of any interrupt
+	   handlers might have been running before we freed the
+	   interrupt. */
+	synchronize_kernel();
+
 	if (new_smi->si_sm) {
 		if (new_smi->handlers)
 			new_smi->handlers->cleanup(new_smi->si_sm);
 		kfree(new_smi->si_sm);
 	}
 	new_smi->io_cleanup(new_smi);
+
 	return rv;
 }
 

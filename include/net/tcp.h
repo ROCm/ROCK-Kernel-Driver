@@ -870,7 +870,6 @@ extern void			tcp_close(struct sock *sk,
 					  long timeout);
 extern struct sock *		tcp_accept(struct sock *sk, int flags, int *err);
 extern unsigned int		tcp_poll(struct file * file, struct socket *sock, struct poll_table_struct *wait);
-extern void			tcp_write_space(struct sock *sk); 
 
 extern int			tcp_getsockopt(struct sock *sk, int level, 
 					       int optname,
@@ -1194,21 +1193,6 @@ struct tcp_skb_cb {
 
 
 #include <net/tcp_ecn.h>
-
-
-/*
- *	Compute minimal free write space needed to queue new packets. 
- */
-static inline int tcp_min_write_space(struct sock *sk)
-{
-	return sk->sk_wmem_queued / 2;
-}
- 
-static inline int tcp_wspace(struct sock *sk)
-{
-	return sk->sk_sndbuf - sk->sk_wmem_queued;
-}
-
 
 /* This determines how many packets are "in the network" to the best
  * of our knowledge.  In many cases it is conservative, but where
@@ -1897,12 +1881,6 @@ static inline void tcp_free_skb(struct sock *sk, struct sk_buff *skb)
 	sk->sk_wmem_queued -= skb->truesize;
 	sk->sk_forward_alloc += skb->truesize;
 	__kfree_skb(skb);
-}
-
-static inline void tcp_charge_skb(struct sock *sk, struct sk_buff *skb)
-{
-	sk->sk_wmem_queued += skb->truesize;
-	sk->sk_forward_alloc -= skb->truesize;
 }
 
 extern void __tcp_mem_reclaim(struct sock *sk);

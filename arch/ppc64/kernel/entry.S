@@ -35,15 +35,9 @@
 #define DO_SOFT_DISABLE
 #endif
 
-#undef SHOW_SYSCALLS
-#undef SHOW_SYSCALLS_TASK
-
-#ifdef SHOW_SYSCALLS_TASK
-	.data
-show_syscalls_task:
-	.long	-1
-#endif
-
+/*
+ * System calls.
+ */
 	.section	".toc","aw"
 .SYS_CALL_TABLE:
 	.tc .sys_call_table[TC],.sys_call_table
@@ -51,107 +45,175 @@ show_syscalls_task:
 .SYS_CALL_TABLE32:
 	.tc .sys_call_table32[TC],.sys_call_table32
 
-	.section	".text"
-	.align 3
+/* This value is used to mark exception frames on the stack. */
+exception_marker:
+	.tc	ID_72656773_68657265[TC],0x7265677368657265
 
-/*
- * Handle a system call.
- */
-_GLOBAL(DoSyscall)
+	.section	".text"
+	.align 7
+
+#undef SHOW_SYSCALLS
+
+	.globl SystemCall_common
+SystemCall_common:
+	andi.	r10,r12,MSR_PR
+	mr	r10,r1
+	addi	r1,r1,-INT_FRAME_SIZE
+	beq-	1f
+	ld	r1,PACAKSAVE(r13)
+1:	std	r10,0(r1)
+	std	r11,_NIP(r1)
+	std	r12,_MSR(r1)
+	std	r0,GPR0(r1)
+	std	r10,GPR1(r1)
+	std	r2,GPR2(r1)
+	std	r3,GPR3(r1)
+	std	r4,GPR4(r1)
+	std	r5,GPR5(r1)
+	std	r6,GPR6(r1)
+	std	r7,GPR7(r1)
+	std	r8,GPR8(r1)
+	li	r11,0
+	std	r11,GPR9(r1)
+	std	r11,GPR10(r1)
+	std	r11,GPR11(r1)
+	std	r11,GPR12(r1)
+	std	r9,GPR13(r1)
+	crclr	so
+	mfcr	r9
+	mflr	r10
+	li	r11,0xc01
+	std	r9,_CCR(r1)
+	std	r10,_LINK(r1)
+	std	r11,_TRAP(r1)
+	mfxer	r9
+	mfctr	r10
+	std	r9,_XER(r1)
+	std	r10,_CTR(r1)
 	std	r3,ORIG_GPR3(r1)
-	ld	r11,_CCR(r1)	/* Clear SO bit in CR */
-	lis	r10,0x1000
-	andc	r11,r11,r10
-	std	r11,_CCR(r1)
-#ifdef SHOW_SYSCALLS
-#ifdef SHOW_SYSCALLS_TASK
-	LOADBASE(r31,show_syscalls_task)
-	ld	r31,show_syscalls_task@l(r31)
-	ld	r10,PACACURRENT(r13)
-	cmp	0,r10,r31
-	bne	1f
+	ld	r2,PACATOC(r13)
+	addi	r9,r1,STACK_FRAME_OVERHEAD
+	ld	r11,exception_marker@toc(r2)
+	std	r11,-16(r9)		/* "regshere" marker */
+#ifdef CONFIG_PPC_ISERIES
+	/* Hack for handling interrupts when soft-enabling on iSeries */
+	cmpdi	cr1,r0,0x5555		/* syscall 0x5555 */
+	andi.	r10,r12,MSR_PR		/* from kernel */
+	crand	4*cr0+eq,4*cr1+eq,4*cr0+eq
+	beq	HardwareInterrupt_entry
+	lbz	r10,PACAPROCENABLED(r13)
+	std	r10,SOFTE(r1)
 #endif
-	LOADADDR(r3,7f)
-	ld	r4,GPR0(r1)
-	ld	r5,GPR3(r1)
-	ld	r6,GPR4(r1)
-	ld	r7,GPR5(r1)
-	ld	r8,GPR6(r1)
-	ld	r9,GPR7(r1)
-	bl	.printk
-	LOADADDR(r3,77f)
-	ld	r4,GPR8(r1)
-	ld	r5,GPR9(r1)
-	ld	r6, PACACURRENT(r13)
-	bl	.printk
-	ld	r0,GPR0(r1)
-	ld	r3,GPR3(r1)
-	ld	r4,GPR4(r1)
-	ld	r5,GPR5(r1)
-	ld	r6,GPR6(r1)
-	ld	r7,GPR7(r1)
-	ld	r8,GPR8(r1)
-1:
-#endif /* SHOW_SYSCALLS */
-	clrrdi	r10,r1,THREAD_SHIFT
-	ld	r10,TI_FLAGS(r10)
+	mfmsr	r11
+	ori	r11,r11,MSR_EE
+	mtmsrd	r11,1
+
+#ifdef SHOW_SYSCALLS
+	bl	.do_show_syscall
+	REST_GPR(0,r1)
+	REST_4GPRS(3,r1)
+	REST_2GPRS(7,r1)
+	addi	r9,r1,STACK_FRAME_OVERHEAD
+#endif
+	clrrdi	r11,r1,THREAD_SHIFT
+	li	r12,0
+	ld	r10,TI_FLAGS(r11)
+	stb	r12,TI_SC_NOERR(r11)
 	andi.	r11,r10,_TIF_SYSCALL_T_OR_A
-	bne-	50f
+	bne-	syscall_dotrace
+syscall_dotrace_cont:
 	cmpli	0,r0,NR_syscalls
-	bge-	66f
+	bge-	syscall_enosys
+
+system_call:			/* label this so stack traces look sane */
 /*
  * Need to vector to 32 Bit or default sys_call_table here,
  * based on caller's run-mode / personality.
  */
-	andi.	r11,r10,_TIF_32BIT
+	ld	r11,.SYS_CALL_TABLE@toc(2)
+	andi.	r10,r10,_TIF_32BIT
 	beq-	15f
-	ld	r10,.SYS_CALL_TABLE32@toc(2)
-/*
- * We now zero extend all six arguments (r3 - r8), the compatibility
- * layer assumes this.
- */
+	ld	r11,.SYS_CALL_TABLE32@toc(2)
 	clrldi	r3,r3,32
 	clrldi	r4,r4,32
 	clrldi	r5,r5,32
 	clrldi	r6,r6,32
 	clrldi	r7,r7,32
 	clrldi	r8,r8,32
-	b	17f
 15:
-	ld	r10,.SYS_CALL_TABLE@toc(2)
-17:	slwi	r0,r0,3
-	ldx	r10,r10,r0	/* Fetch system call handler [ptr] */
+	slwi	r0,r0,3
+	ldx	r10,r11,r0	/* Fetch system call handler [ptr] */
 	mtlr	r10
-	addi	r9,r1,STACK_FRAME_OVERHEAD
 	blrl			/* Call handler */
-_GLOBAL(ret_from_syscall_1)
-	std	r3,RESULT(r1)	/* Save result */
+
+syscall_exit:
 #ifdef SHOW_SYSCALLS
-#ifdef SHOW_SYSCALLS_TASK
-	ld	r10, PACACURRENT(13)
-	cmp	0,r10,r31
-	bne	91f
+	std	r3,GPR3(r1)
+	bl	.do_show_syscall_exit
+	ld	r3,GPR3(r1)
 #endif
-	mr	r4,r3
-	LOADADDR(r3,79f)
-	bl	.printk
-	ld	r3,RESULT(r1)
-91:
-#endif
+	std	r3,RESULT(r1)
+	ld	r5,_CCR(r1)
 	li	r10,-_LAST_ERRNO
-	cmpld	0,r3,r10
-	blt	30f
+	cmpld	r3,r10
+	clrrdi	r12,r1,THREAD_SHIFT
+	bge-	syscall_error
+syscall_error_cont:
+
+	/* check for syscall tracing or audit */
+	ld	r9,TI_FLAGS(r12)
+	andi.	r0,r9,_TIF_SYSCALL_T_OR_A
+	bne-	syscall_exit_trace
+syscall_exit_trace_cont:
+
+	/* disable interrupts so current_thread_info()->flags can't change,
+	   and so that we don't get interrupted after loading SRR0/1. */
+	ld	r8,_MSR(r1)
+	andi.	r10,r8,MSR_RI
+	beq-	unrecov_restore
+	mfmsr	r10
+	rldicl	r10,r10,48,1
+	rotldi	r10,r10,16
+	mtmsrd	r10,1
+	ld	r9,TI_FLAGS(r12)
+	andi.	r0,r9,(_TIF_SYSCALL_T_OR_A|_TIF_SIGPENDING|_TIF_NEED_RESCHED)
+	bne-	syscall_exit_work
+	ld	r7,_NIP(r1)
+	stdcx.	r0,0,r1			/* to clear the reservation */
+	andi.	r6,r8,MSR_PR
+	ld	r4,_LINK(r1)
+	beq	1f			/* only restore r13 if */
+	ld	r13,GPR13(r1)		/* returning to usermode */
+1:	ld	r2,GPR2(r1)
+	ld	r1,GPR1(r1)
+	li	r12,MSR_RI
+	andc	r10,r10,r12
+	mtmsrd	r10,1			/* clear MSR.RI */
+	mtlr	r4
+	mtcr	r5
+	mtspr	SRR0,r7
+	mtspr	SRR1,r8
+	rfid
+
+syscall_enosys:
+	li	r3,-ENOSYS
+	std	r3,RESULT(r1)
+	clrrdi	r12,r1,THREAD_SHIFT
+	ld	r5,_CCR(r1)
+
+syscall_error:
+	lbz	r11,TI_SC_NOERR(r12)
+	cmpi	0,r11,0
+	bne-	syscall_error_cont
 	neg	r3,r3
-22:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
-	oris	r10,r10,0x1000
-	std	r10,_CCR(r1)
-30:	std	r3,GPR3(r1)	/* Update return value */
-	b	.ret_from_except
-66:	li	r3,ENOSYS
-	b	22b
+	oris	r5,r5,0x1000	/* Set SO bit in CR */
+	std	r5,_CCR(r1)
+	b	syscall_error_cont
         
 /* Traced system call support */
-50:	addi	r3,r1,STACK_FRAME_OVERHEAD
+syscall_dotrace:
+	bl	.save_nvgprs
+	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.do_syscall_trace_enter
 	ld	r0,GPR0(r1)	/* Restore original registers */
 	ld	r3,GPR3(r1)
@@ -160,65 +222,82 @@ _GLOBAL(ret_from_syscall_1)
 	ld	r6,GPR6(r1)
 	ld	r7,GPR7(r1)
 	ld	r8,GPR8(r1)
-	/* XXX check this - Anton */
-	ld	r9,GPR9(r1)
-	cmpli	0,r0,NR_syscalls
-	bge-	66f
-/*
- * Need to vector to 32 Bit or default sys_call_table here,
- * based on caller's run-mode / personality.
- */
+	addi	r9,r1,STACK_FRAME_OVERHEAD
 	clrrdi	r10,r1,THREAD_SHIFT
 	ld	r10,TI_FLAGS(r10)
-	andi.	r11,r10,_TIF_32BIT
-	beq-	55f
-	ld	r10,.SYS_CALL_TABLE32@toc(2)
-/*
- * We now zero extend all six arguments (r3 - r8), the compatibility
- * layer assumes this.
- */
-	clrldi	r3,r3,32
-	clrldi	r4,r4,32
-	clrldi	r5,r5,32
-	clrldi	r6,r6,32
-	clrldi	r7,r7,32
-	clrldi	r8,r8,32
-	b	57f
-55:
-	ld	r10,.SYS_CALL_TABLE@toc(2)
-57:
-	slwi	r0,r0,3
-	ldx	r10,r10,r0	/* Fetch system call handler [ptr] */
-	mtlr	r10
-	addi	r9,r1,STACK_FRAME_OVERHEAD
-	blrl			/* Call handler */
-_GLOBAL(ret_from_syscall_2)
-	std	r3,RESULT(r1)	/* Save result */	
-	li	r10,-_LAST_ERRNO
-	cmpld	0,r3,r10
-	blt	60f
-	neg	r3,r3
-57:	ld	r10,_CCR(r1)	/* Set SO bit in CR */
-	oris	r10,r10,0x1000
-	std	r10,_CCR(r1)
-60:	std	r3,GPR3(r1)	/* Update return value */
-	bl	.do_syscall_trace_leave
-	b	.ret_from_except
-66:	li	r3,ENOSYS
-	b	57b
-#ifdef SHOW_SYSCALLS
-7:	.string	"syscall %d(%x, %x, %x, %x, %x, "
-77:	.string	"%x, %x), current=%p\n"
-79:	.string	" -> %x\n"
-	.align	2,0
-#endif
+	b	syscall_dotrace_cont
 
-	
+syscall_exit_trace:
+	std	r3,GPR3(r1)
+	bl	.save_nvgprs
+	bl	.do_syscall_trace_leave
+	REST_NVGPRS(r1)
+	ld	r3,GPR3(r1)
+	ld	r5,_CCR(r1)
+	clrrdi	r12,r1,THREAD_SHIFT
+	b	syscall_exit_trace_cont
+
+/* Stuff to do on exit from a system call. */
+syscall_exit_work:
+	std	r3,GPR3(r1)
+	std	r5,_CCR(r1)
+	b	.ret_from_except_lite
+
+/* Save non-volatile GPRs, if not already saved. */
+_GLOBAL(save_nvgprs)
+	ld	r11,_TRAP(r1)
+	andi.	r0,r11,1
+	beqlr-
+	SAVE_NVGPRS(r1)
+	clrrdi	r0,r11,1
+	std	r0,_TRAP(r1)
+	blr
+
+/*
+ * The sigsuspend and rt_sigsuspend system calls can call do_signal
+ * and thus put the process into the stopped state where we might
+ * want to examine its user state with ptrace.  Therefore we need
+ * to save all the nonvolatile registers (r14 - r31) before calling
+ * the C code.  Similarly, fork, vfork and clone need the full
+ * register state on the stack so that it can be copied to the child.
+ */
+_GLOBAL(ppc32_sigsuspend)
+	bl	.save_nvgprs
+	bl	.sys32_sigsuspend
+	b	syscall_exit
+
+_GLOBAL(ppc64_rt_sigsuspend)
+	bl	.save_nvgprs
+	bl	.sys_rt_sigsuspend
+	b	syscall_exit
+
+_GLOBAL(ppc32_rt_sigsuspend)
+	bl	.save_nvgprs
+	bl	.sys32_rt_sigsuspend
+	b	syscall_exit
+
+_GLOBAL(ppc_fork)
+	bl	.save_nvgprs
+	bl	.sys_fork
+	b	syscall_exit
+
+_GLOBAL(ppc_vfork)
+	bl	.save_nvgprs
+	bl	.sys_vfork
+	b	syscall_exit
+
+_GLOBAL(ppc_clone)
+	bl	.save_nvgprs
+	bl	.sys_clone
+	b	syscall_exit
+
 _GLOBAL(ppc32_swapcontext)
+	bl	.save_nvgprs
 	bl	.sys32_swapcontext
 	b	80f
 	
 _GLOBAL(ppc64_swapcontext)
+	bl	.save_nvgprs
 	bl	.sys_swapcontext
 	b	80f
 
@@ -233,17 +312,20 @@ _GLOBAL(ppc32_rt_sigreturn)
 _GLOBAL(ppc64_rt_sigreturn)
 	bl	.sys_rt_sigreturn
 
-80:	clrrdi	r4,r1,THREAD_SHIFT
+80:	cmpdi	0,r3,0
+	blt	syscall_exit
+	clrrdi	r4,r1,THREAD_SHIFT
 	ld	r4,TI_FLAGS(r4)
 	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
-	bne-	81f
-	cmpi	0,r3,0
-	bge	.ret_from_except
-	b	.ret_from_syscall_1
-81:	cmpi	0,r3,0
-	blt	.ret_from_syscall_2
+	beq+	81f
 	bl	.do_syscall_trace_leave
-	b	.ret_from_except
+81:	b	.ret_from_except
+
+_GLOBAL(ret_from_fork)
+	bl	.schedule_tail
+	REST_NVGPRS(r1)
+	li	r3,0
+	b	syscall_exit
 
 /*
  * This routine switches between two different tasks.  The process
@@ -263,6 +345,7 @@ _GLOBAL(ppc64_rt_sigreturn)
  * The code which creates the new task context is in 'copy_thread'
  * in arch/ppc64/kernel/process.c
  */
+	.align	7
 _GLOBAL(_switch)
 	mflr	r0
 	std	r0,16(r1)
@@ -315,7 +398,10 @@ BEGIN_FTR_SECTION
 2:
 END_FTR_SECTION_IFSET(CPU_FTR_SLB)
 	clrrdi	r7,r8,THREAD_SHIFT	/* base of new stack */
-	addi	r7,r7,THREAD_SIZE-INT_FRAME_SIZE
+	/* Note: this uses SWITCH_FRAME_SIZE rather than INT_FRAME_SIZE
+	   because we don't need to leave the 288-byte ABI gap at the
+	   top of the kernel stack. */
+	addi	r7,r7,THREAD_SIZE-SWITCH_FRAME_SIZE
 
 	mr	r1,r8		/* start using new stack pointer */
 	std	r7,PACAKSAVE(r13)
@@ -350,60 +436,56 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	addi	r1,r1,SWITCH_FRAME_SIZE
 	blr
 
-_GLOBAL(ret_from_fork)
-	bl	.schedule_tail
-	clrrdi	r4,r1,THREAD_SHIFT
-	ld	r4,TI_FLAGS(r4)
-	andi.	r4,r4,_TIF_SYSCALL_T_OR_A
-	beq+	.ret_from_except
-	bl	.do_syscall_trace_leave
-	b	.ret_from_except
-
+	.align	7
 _GLOBAL(ret_from_except)
+	ld	r11,_TRAP(r1)
+	andi.	r0,r11,1
+	bne	.ret_from_except_lite
+	REST_NVGPRS(r1)
+
+_GLOBAL(ret_from_except_lite)
 	/*
 	 * Disable interrupts so that current_thread_info()->flags
 	 * can't change between when we test it and when we return
 	 * from the interrupt.
 	 */
 	mfmsr	r10		/* Get current interrupt state */
-	li	r4,0
-	ori	r4,r4,MSR_EE
-	andc	r9,r10,r4	/* clear MSR_EE */
+	rldicl	r9,r10,48,1	/* clear MSR_EE */
+	rotldi	r9,r9,16
 	mtmsrd	r9,1		/* Update machine state */
 
+#ifdef CONFIG_PREEMPT
+	clrrdi	r9,r1,THREAD_SHIFT	/* current_thread_info() */
+	li	r0,_TIF_NEED_RESCHED	/* bits to check */
+	ld	r3,_MSR(r1)
+	ld	r4,TI_FLAGS(r9)
+	/* Move MSR_PR bit in r3 to _TIF_SIGPENDING position in r0 */
+	rlwimi	r0,r3,32+TIF_SIGPENDING-MSR_PR_LG,_TIF_SIGPENDING
+	and.	r0,r4,r0	/* check NEED_RESCHED and maybe SIGPENDING */
+	bne	do_work
+
+#else /* !CONFIG_PREEMPT */
 	ld	r3,_MSR(r1)	/* Returning to user mode? */
 	andi.	r3,r3,MSR_PR
 	beq	restore		/* if not, just restore regs and return */
 
 	/* Check current_thread_info()->flags */
-	clrrdi	r3,r1,THREAD_SHIFT
-	ld	r3,TI_FLAGS(r3)
-	andi.	r0,r3,_TIF_USER_WORK_MASK
+	clrrdi	r9,r1,THREAD_SHIFT
+	ld	r4,TI_FLAGS(r9)
+	andi.	r0,r4,_TIF_USER_WORK_MASK
 	bne	do_work
-
-	addi	r0,r1,INT_FRAME_SIZE	/* size of frame */
-	ld	r4,PACACURRENT(r13)
-	std	r0,THREAD+KSP(r4)	/* save kernel stack pointer */
-
-	/*
-	 * r13 is our per cpu area, only restore it if we are returning to
-	 * userspace
-	 */
-	REST_GPR(13,r1)
+#endif
 
 restore:
 #ifdef CONFIG_PPC_ISERIES
 	ld	r5,SOFTE(r1)
-	mfspr	r4,SPRG3		/* get paca address */
 	cmpdi	0,r5,0
 	beq	4f
 	/* Check for pending interrupts (iSeries) */
-	/* this is CHECKANYINT except that we already have the paca address */
-	ld	r3,PACALPPACA+LPPACAANYINT(r4)
+	ld	r3,PACALPPACA+LPPACAANYINT(r13)
 	cmpdi	r3,0
 	beq+	4f			/* skip do_IRQ if no interrupts */
 
-	mfspr	r13,SPRG3		/* get paca pointer back */
 	li	r3,0
 	stb	r3,PACAPROCENABLED(r13)	/* ensure we are soft-disabled */
 	mtmsrd	r10			/* hard-enable again */
@@ -411,13 +493,22 @@ restore:
 	bl	.do_IRQ
 	b	.ret_from_except		/* loop back and handle more */
 
-4:	stb	r5,PACAPROCENABLED(r4)
+4:	stb	r5,PACAPROCENABLED(r13)
 #endif
 
 	ld	r3,_MSR(r1)
-	andi.	r3,r3,MSR_RI
+	andi.	r0,r3,MSR_RI
 	beq-	unrecov_restore
 
+	andi.	r0,r3,MSR_PR
+
+	/*
+	 * r13 is our per cpu area, only restore it if we are returning to
+	 * userspace
+	 */
+	beq	1f
+	REST_GPR(13, r1)
+1:
 	ld	r3,_CTR(r1)
 	ld	r0,_LINK(r1)
 	mtctr	r3
@@ -426,8 +517,6 @@ restore:
 	mtspr	XER,r3
 
 	REST_8GPRS(5, r1)
-	REST_10GPRS(14, r1)
-	REST_8GPRS(24, r1)
 
 	stdcx.	r0,0,r1		/* to clear the reservation */
 
@@ -451,26 +540,62 @@ restore:
 	ld	r1,GPR1(r1)
 
 	rfid
+	b	.
 
-/* Note: this must change if we start using the  TIF_NOTIFY_RESUME bit */
+/* Note: this must change if we start using the TIF_NOTIFY_RESUME bit */
 do_work:
+#ifdef CONFIG_PREEMPT
+	andi.	r0,r3,MSR_PR	/* Returning to user mode? */
+	bne	user_work
+	/* Check that preempt_count() == 0 and interrupts are enabled */
+	lwz	r8,TI_PREEMPT(r9)
+	cmpwi	cr1,r8,0
+#ifdef CONFIG_PPC_ISERIES
+	ld	r0,SOFTE(r1)
+	cmpdi	r0,0
+#else
+	andi.	r0,r3,MSR_EE
+#endif
+	crandc	eq,cr1*4+eq,eq
+	bne	restore
+	/* here we are preempting the current task */
+1:	lis	r0,PREEMPT_ACTIVE@h
+	stw	r0,TI_PREEMPT(r9)
+#ifdef CONFIG_PPC_ISERIES
+	li	r0,1
+	stb	r0,PACAPROCENABLED(r13)
+#endif
+	mtmsrd	r10,1		/* reenable interrupts */
+	bl	.schedule
+	mfmsr	r10
+	clrrdi	r9,r1,THREAD_SHIFT
+	rldicl	r10,r10,48,1	/* disable interrupts again */
+	li	r0,0
+	rotldi	r10,r10,16
+	mtmsrd	r10,1
+	ld	r4,TI_FLAGS(r9)
+	andi.	r0,r4,_TIF_NEED_RESCHED
+	bne	1b
+	stw	r0,TI_PREEMPT(r9)
+	b	restore
+
+user_work:
+#endif
 	/* Enable interrupts */
 	mtmsrd	r10,1
 
-	andi.	r0,r3,_TIF_NEED_RESCHED
+	andi.	r0,r4,_TIF_NEED_RESCHED
 	beq	1f
 	bl	.schedule
-	b	.ret_from_except
+	b	.ret_from_except_lite
 
-1:	andi.	r0,r3,_TIF_SIGPENDING
-	beq	.ret_from_except
+1:	bl	.save_nvgprs
 	li	r3,0
 	addi	r4,r1,STACK_FRAME_OVERHEAD
 	bl	.do_signal
 	b	.ret_from_except
 
 unrecov_restore:
-	mfspr   r13,SPRG3
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	bl	.unrecoverable_exception
 	b	unrecov_restore
@@ -488,7 +613,7 @@ _GLOBAL(enter_rtas)
 	mflr	r0
 	std	r0,16(r1)
         stdu	r1,-RTAS_FRAME_SIZE(r1)	/* Save SP and create stack space. */
-	
+
 	/* Because RTAS is running in 32b mode, it clobbers the high order half
 	 * of all registers that it saves.  We therefore save those registers
 	 * RTAS might touch to the stack.  (r0, r3-r13 are caller saved)

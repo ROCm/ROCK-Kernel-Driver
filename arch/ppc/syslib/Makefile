@@ -8,6 +8,9 @@ endif
 ifdef CONFIG_4xx
 EXTRA_AFLAGS		:= -Wa,-m405
 endif
+ifdef CONFIG_E500
+EXTRA_AFLAGS		:= -Wa,-me500
+endif
 
 CFLAGS_prom_init.o      += -fPIC
 CFLAGS_btext.o          += -fPIC
@@ -75,3 +78,7 @@ obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 obj-$(CONFIG_MPC10X_BRIDGE)     += mpc10x_common.o indirect_pci.o
 obj-$(CONFIG_40x)		+= dcr.o
 obj-$(CONFIG_BOOKE)		+= dcr.o
+obj-$(CONFIG_85xx)		+= open_pic.o ppc85xx_common.o ppc85xx_setup.o
+ifeq ($(CONFIG_85xx),y)
+obj-$(CONFIG_PCI)		+= indirect_pci.o pci_auto.o
+endif

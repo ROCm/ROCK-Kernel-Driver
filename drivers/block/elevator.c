@@ -181,6 +181,14 @@ void __elv_add_request(request_queue_t *q, struct request *rq, int where,
 
 	rq->q = q;
 	q->elevator.elevator_add_req_fn(q, rq, where);
+
+	if (blk_queue_plugged(q)) {
+		int nrq = q->rq.count[READ] + q->rq.count[WRITE] - q->in_flight;
+
+		if (nrq == q->unplug_thresh)
+			__generic_unplug_device(q);
+	}
+
 }
 
 void elv_add_request(request_queue_t *q, struct request *rq, int where,

@@ -131,8 +131,7 @@ static long setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 #endif
 	long err = 0;
 
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
+	flush_fp_to_thread(current);
 
 	/* Make sure signal doesn't get spurrious FP exceptions */
 	current->thread.fpscr = 0;
@@ -141,9 +140,8 @@ static long setup_sigcontext(struct sigcontext __user *sc, struct pt_regs *regs,
 	err |= __put_user(v_regs, &sc->v_regs);
 
 	/* save altivec registers */
-	if (current->thread.used_vr) {		
-		if (regs->msr & MSR_VEC)
-			giveup_altivec(current);
+	if (current->thread.used_vr) {
+		flush_altivec_to_thread(current);
 		/* Copy 33 vec registers (vr0..31 and vscr) to the stack */
 		err |= __copy_to_user(v_regs, current->thread.vr, 33 * sizeof(vector128));
 		/* set MSR_VEC in the MSR value in the frame to indicate that sc->v_reg)
@@ -530,13 +528,13 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 		struct k_sigaction *ka = &current->sighand->action[signr-1];
 
 		/* Whee!  Actually deliver the signal.  */
-		if (regs->trap == 0x0C00)
+		if (TRAP(regs) == 0x0C00)
 			syscall_restart(regs, ka);
 		handle_signal(signr, ka, &info, oldset, regs);
 		return 1;
 	}
 
-	if (regs->trap == 0x0C00) {	/* System Call! */
+	if (TRAP(regs) == 0x0C00) {	/* System Call! */
 		if ((int)regs->result == -ERESTARTNOHAND ||
 		    (int)regs->result == -ERESTARTSYS ||
 		    (int)regs->result == -ERESTARTNOINTR) {

@@ -21,7 +21,6 @@
 #include <linux/interrupt.h>
 
 #include <asm/mtrr.h>
-#include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <mach_ipi.h>
 #include <mach_apic.h>

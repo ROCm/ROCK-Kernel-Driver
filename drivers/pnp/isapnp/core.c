@@ -68,13 +68,8 @@ MODULE_PARM(isapnp_verbose, "i");
 MODULE_PARM_DESC(isapnp_verbose, "ISA Plug & Play verbose mode");
 MODULE_LICENSE("GPL");
 
-#ifdef CONFIG_X86_PC9800
-#define _PIDXR		0x259
-#define _PNPWRP		0xa59
-#else
 #define _PIDXR		0x279
 #define _PNPWRP		0xa79
-#endif
 
 /* short tags */
 #define _STAG_PNPVERNO		0x01

@@ -13,6 +13,36 @@
 
 #define FP_SIZE 35
 
+#ifndef __ASSEMBLY__
+
+/*
+ * VFP storage area has:
+ *  - FPEXC, FPSCR, FPINST and FPINST2.
+ *  - 16 double precision data registers
+ *  - an implementation-dependant word of state for FLDMX/FSTMX
+ * 
+ *  FPEXC will always be non-zero once the VFP has been used in this process.
+ */
+
+struct vfp_hard_struct {
+	__u64 fpregs[16];
+	__u32 fpmx_state;
+	__u32 fpexc;
+	__u32 fpscr;
+	/*
+	 * VFP implementation specific state
+	 */
+	__u32 fpinst;
+	__u32 fpinst2;
+};
+
+union vfp_state {
+	struct vfp_hard_struct	hard;
+};
+
+extern void vfp_flush_thread(union vfp_state *);
+extern void vfp_release_thread(union vfp_state *);
+
 struct fp_hard_struct {
 	unsigned int save[FP_SIZE];		/* as yet undefined */
 };
@@ -25,5 +55,7 @@ union fp_state {
 	struct fp_hard_struct	hard;
 	struct fp_soft_struct	soft;
 };
+
+#endif
 
 #endif

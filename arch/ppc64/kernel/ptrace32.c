@@ -136,8 +136,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		if (index < PT_FPR0) {
 			tmp = get_reg(child, index);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			/*
 			 * the user space code considers the floating point
 			 * to be an array of unsigned int (32 bits) - the
@@ -179,8 +178,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 			break;
 
 		if (numReg >= PT_FPR0) {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			tmp = ((unsigned long int *)child->thread.fpr)[numReg - PT_FPR0];
 		} else { /* register within PT_REGS struct */
 			tmp = get_reg(child, numReg);
@@ -244,8 +242,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		if (index < PT_FPR0) {
 			ret = put_reg(child, index, data);
 		} else {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 			/*
 			 * the user space code considers the floating point
 			 * to be an array of unsigned int (32 bits) - the
@@ -283,8 +280,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 				|| ((numReg > PT_CCR) && (numReg < PT_FPR0)))
 			break;
 		if (numReg >= PT_FPR0) {
-			if (child->thread.regs->msr & MSR_FP)
-				giveup_fpu(child);
+			flush_fp_to_thread(child);
 		}
 		if (numReg == PT_MSR)
 			data = (data & MSR_DEBUGCHANGE)
@@ -379,8 +375,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
 		unsigned int __user *tmp = (unsigned int __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = put_user(*reg, tmp);
@@ -397,8 +392,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		unsigned long *reg = &((unsigned long *)child->thread.fpr)[0];
 		unsigned int __user *tmp = (unsigned int __user *)addr;
 
-		if (child->thread.regs->msr & MSR_FP)
-			giveup_fpu(child);
+		flush_fp_to_thread(child);
 
 		for (i = 0; i < 32; i++) {
 			ret = get_user(*reg, tmp);

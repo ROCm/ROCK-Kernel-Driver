@@ -720,7 +720,7 @@ static int dummy_sem_semop (struct sem_array *sma,
 	return 0;
 }
 
-static int dummy_netlink_send (struct sk_buff *skb)
+static int dummy_netlink_send (struct sock *sk, struct sk_buff *skb)
 {
 	if (current->euid == 0)
 		cap_raise (NETLINK_CB (skb).eff_cap, CAP_NET_ADMIN);

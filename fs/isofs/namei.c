@@ -17,6 +17,7 @@
 #include <linux/config.h>	/* Joliet? */
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include <linux/dcache.h>
 
 #include <asm/uaccess.h>
 
@@ -59,12 +60,12 @@ isofs_cmp(struct dentry * dentry, const char * compare, int dlen)
  */
 static unsigned long
 isofs_find_entry(struct inode *dir, struct dentry *dentry,
+	unsigned long *block_rv, unsigned long* offset_rv,
 	char * tmpname, struct iso_directory_record * tmpde)
 {
-	unsigned long inode_number;
 	unsigned long bufsize = ISOFS_BUFFER_SIZE(dir);
 	unsigned char bufbits = ISOFS_BUFFER_BITS(dir);
-	unsigned int block, f_pos, offset;
+	unsigned long block, f_pos, offset, block_saved, offset_saved;
 	struct buffer_head * bh = NULL;
 	struct isofs_sb_info *sbi = ISOFS_SB(dir->i_sb);
 
@@ -87,7 +88,6 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 		}
 
 		de = (struct iso_directory_record *) (bh->b_data + offset);
-		inode_number = (bh->b_blocknr << bufbits) + offset;
 
 		de_len = *(unsigned char *) de;
 		if (!de_len) {
@@ -99,6 +99,8 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 			continue;
 		}
 
+		block_saved = bh->b_blocknr;
+		offset_saved = offset;
 		offset += de_len;
 		f_pos += de_len;
 
@@ -150,8 +152,13 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 			match = (isofs_cmp(dentry,dpnt,dlen) == 0);
 		}
 		if (match) {
+			isofs_normalize_block_and_offset(de,
+							 &block_saved,
+							 &offset_saved);
+                        *block_rv = block_saved;
+                        *offset_rv = offset_saved;
 			if (bh) brelse(bh);
-			return inode_number;
+			return 1;
 		}
 	}
 	if (bh) brelse(bh);
@@ -160,7 +167,8 @@ isofs_find_entry(struct inode *dir, struct dentry *dentry,
 
 struct dentry *isofs_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
-	unsigned long ino;
+	int found;
+	unsigned long block, offset;
 	struct inode *inode;
 	struct page *page;
 
@@ -171,19 +179,23 @@ struct dentry *isofs_lookup(struct inode * dir, struct dentry * dentry, struct n
 		return ERR_PTR(-ENOMEM);
 
 	lock_kernel();
-	ino = isofs_find_entry(dir, dentry, page_address(page),
-			       1024 + page_address(page));
+	found = isofs_find_entry(dir, dentry,
+				 &block, &offset,
+				 page_address(page),
+				 1024 + page_address(page));
 	__free_page(page);
 
 	inode = NULL;
-	if (ino) {
-		inode = iget(dir->i_sb, ino);
+	if (found) {
+		inode = isofs_iget(dir->i_sb, block, offset);
 		if (!inode) {
 			unlock_kernel();
 			return ERR_PTR(-EACCES);
 		}
 	}
 	unlock_kernel();
+	if (inode)
+		return d_splice_alias(inode, dentry);
 	d_add(dentry, inode);
 	return NULL;
 }

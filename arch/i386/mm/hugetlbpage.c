@@ -15,7 +15,6 @@
 #include <linux/err.h>
 #include <linux/sysctl.h>
 #include <asm/mman.h>
-#include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/tlbflush.h>
 
@@ -245,8 +244,15 @@ int hugetlb_prefault(struct address_space *mapping, struct vm_area_struct *vma)
 			ret = -ENOMEM;
 			goto out;
 		}
-		if (!pte_none(*pte))
-			continue;
+
+		if (!pte_none(*pte)) {
+			pmd_t *pmd = (pmd_t *) pte;
+
+			page = pmd_page(*pmd);
+			pmd_clear(pmd);
+			dec_page_state(nr_page_table_pages);
+			page_cache_release(page);
+		}
 
 		idx = ((addr - vma->vm_start) >> HPAGE_SHIFT)
 			+ (vma->vm_pgoff >> (HPAGE_SHIFT - PAGE_SHIFT));

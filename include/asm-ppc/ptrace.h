@@ -131,4 +131,9 @@ do {									      \
 #define PTRACE_GETVRREGS	18
 #define PTRACE_SETVRREGS	19
 
+/* Get/set all the upper 32-bits of the SPE registers, accumulator, and
+ * spefscr, in one go */
+#define PTRACE_GETEVRREGS	20
+#define PTRACE_SETEVRREGS	21
+
 #endif

@@ -29,7 +29,8 @@
 #include <linux/efi.h>
 #include <linux/irq.h>
 #include <linux/module.h>
-#include <asm/pgalloc.h>
+
+#include <asm/pgtable.h>
 #include <asm/io_apic.h>
 #include <asm/apic.h>
 #include <asm/io.h>

@@ -17,6 +17,16 @@ ip_no_pmtu_disc - BOOLEAN
 	Disable Path MTU Discovery.
 	default FALSE
 
+min_pmtu - INTEGER
+	default 562 - minimum discovered Path MTU
+
+mtu_expires - INTEGER
+	Time, in seconds, that cached PMTU information is kept.
+
+min_adv_mss - INTEGER
+	The advertised MSS depends on the first hop route MTU, but will
+	never be lower than this setting.
+
 IP Fragmentation:
 
 ipfrag_high_thresh - INTEGER
@@ -345,6 +355,20 @@ tcp_default_win_scale - INTEGER
 	conections.
 	Default: 7
 
+
+tcp_frto - BOOLEAN
+	Enables F-RTO, an enhanced recovery algorithm for TCP retransmission
+	timeouts.  It is particularly beneficial in wireless environments
+	where packet loss is typically due to random radio interference
+	rather than intermediate router congestion.
+
+somaxconn - INTEGER
+	Limit of socket listen() backlog, known in userspace as SOMAXCONN.
+	Defaults to 128.  See also tcp_max_syn_backlog for additional tuning
+	for TCP sockets.
+
+IP Variables:
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 
@@ -586,6 +610,19 @@ arp_ignore - INTEGER
 	The max value from conf/{all,interface}/arp_ignore is used
 	when ARP request is received on the {interface}
 
+app_solicit - INTEGER
+	The maximum number of probes to send to the user space ARP daemon
+	via netlink before dropping back to multicast probes (see
+	mcast_solicit).  Defaults to 0.
+
+disable_policy - BOOLEAN
+	Disable IPSEC policy (SPD) for this interface
+
+disable_xfrm - BOOLEAN
+	Disable IPSEC encryption on this interface, whatever the policy
+
+
+
 tag - INTEGER
 	Allows you to write a number, which can be used as required.
 	Default value is 0.
@@ -803,5 +840,26 @@ bridge-nf-filter-vlan-tagged - BOOLEAN
 	0 : disable this.
 	Default: 1
 
+
+UNDOCUMENTED:
+
+dev_weight FIXME
+discovery_slots FIXME
+discovery_timeout FIXME
+fast_poll_increase FIXME
+ip6_queue_maxlen FIXME
+lap_keepalive_time FIXME
+lo_cong FIXME
+max_baud_rate FIXME
+max_dgram_qlen FIXME
+max_noreply_time FIXME
+max_tx_data_size FIXME
+max_tx_window FIXME
+min_tx_turn_time FIXME
+mod_cong FIXME
+no_cong FIXME
+no_cong_thresh FIXME
+slot_timeout FIXME
+warn_noreply_time FIXME
 
 $Id: ip-sysctl.txt,v 1.20 2001/12/13 09:00:18 davem Exp $

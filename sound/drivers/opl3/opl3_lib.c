@@ -416,26 +416,6 @@ int snd_opl3_create(snd_card_t * card,
 	case OPL3_HW_OPL3_FM801:
 		opl3->command = &snd_opl3_command;
 		break;
-	case OPL3_HW_OPL3_PC98:
-		opl3->command = &snd_opl3_command;
-
-		/* Initialize? */
-		opl3->command(opl3, OPL3_RIGHT | 0x05, 0x05);
-		opl3->command(opl3, OPL3_RIGHT | 0x08, 0x04);
-		opl3->command(opl3, OPL3_RIGHT | 0x08, 0x00);
-		opl3->command(opl3, OPL3_LEFT | 0xf7, 0x00);
-		opl3->command(opl3, OPL3_LEFT | 0x04, 0x60);
-		opl3->command(opl3, OPL3_LEFT | 0x04, 0x80);
-		inb(opl3->l_port);
-		
-		opl3->command(opl3, OPL3_LEFT | 0x02, 0xff);
-		opl3->command(opl3, OPL3_LEFT | 0x04, 0x21);
-		inb(opl3->l_port);
-		
-		opl3->command(opl3, OPL3_LEFT | 0x04, 0x60);
-		opl3->command(opl3, OPL3_LEFT | 0x04, 0x80);
-
-		break;
 	case OPL3_HW_OPL3_CS4281:
 		opl3->command = &snd_opl3_cs4281_command;
 		break;

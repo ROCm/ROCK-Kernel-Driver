@@ -1251,6 +1251,13 @@ W:	http://www.linuxppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
 S:	Maintained
 
+LINUX FOR POWERPC EMBEDDED PPC4XX
+P:	Matt Porter
+M:	mporter@kernel.crashing.org
+W:	http://www.penguinppc.org/
+L:	linuxppc-embedded@lists.linuxppc.org
+S:	Maintained
+
 LLC (802.2)
 P:	Arnaldo Carvalho de Melo
 M:	acme@conectiva.com.br

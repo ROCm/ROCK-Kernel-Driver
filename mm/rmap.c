@@ -226,7 +226,7 @@ static int page_referenced_one(struct page *page,
 	if (page_to_pfn(page) != pte_pfn(*pte))
 		goto out_unmap;
 
-	if (ptep_test_and_clear_young(pte))
+	if (ptep_clear_flush_young(vma, address, pte))
 		referenced++;
 
 	(*mapcount)--;
@@ -465,7 +465,7 @@ static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma)
 	 * skipped over this mm) then we should reactivate it.
 	 */
 	if ((vma->vm_flags & (VM_LOCKED|VM_RESERVED)) ||
-			ptep_test_and_clear_young(pte)) {
+			ptep_clear_flush_young(vma, address, pte)) {
 		ret = SWAP_FAIL;
 		goto out_unmap;
 	}
@@ -592,7 +592,7 @@ static int try_to_unmap_cluster(unsigned long cursor,
 		if (PageReserved(page))
 			continue;
 
-		if (ptep_test_and_clear_young(pte))
+		if (ptep_clear_flush_young(vma, address, pte))
 			continue;
 
 		/* Nuke the page table entry. */

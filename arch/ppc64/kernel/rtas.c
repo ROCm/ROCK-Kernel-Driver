@@ -68,10 +68,11 @@ char rtas_data_buf[RTAS_DATA_BUF_SIZE]__page_aligned;
 void
 call_rtas_display_status(char c)
 {
-	struct rtas_args *args = &(get_paca()->xRtas);
+	struct rtas_args *args;
 	unsigned long s;
 
 	spin_lock_irqsave(&rtas.lock, s);
+	args = &(get_paca()->xRtas);
 
 	args->token = 10;
 	args->nargs = 1;
@@ -145,7 +146,7 @@ rtas_call(int token, int nargs, int nret,
 	va_list list;
 	int i, logit = 0;
 	unsigned long s;
-	struct rtas_args *rtas_args = &(get_paca()->xRtas);
+	struct rtas_args *rtas_args;
 	long ret;
 
 	PPCDBG(PPCDBG_RTAS, "Entering rtas_call\n");
@@ -158,6 +159,7 @@ rtas_call(int token, int nargs, int nret,
 
 	/* Gotta do something different here, use global lock for now... */
 	spin_lock_irqsave(&rtas.lock, s);
+	rtas_args = &(get_paca()->xRtas);
 
 	rtas_args->token = token;
 	rtas_args->nargs = nargs;

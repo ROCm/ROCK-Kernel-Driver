@@ -617,12 +617,8 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 	error = PTR_ERR(filename);
 	if (IS_ERR(filename))
 		goto out;
-	if (regs->msr & MSR_FP)
-		giveup_fpu(current);
-#ifdef CONFIG_ALTIVEC
-	if (regs->msr & MSR_VEC)
-		giveup_altivec(current);
-#endif /* CONFIG_ALTIVEC */
+	flush_fp_to_thread(current);
+	flush_altivec_to_thread(current);
 
 	error = compat_do_execve(filename, compat_ptr(a1), compat_ptr(a2), regs);
 

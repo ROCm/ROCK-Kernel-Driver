@@ -29,6 +29,155 @@
 /* maximum negotiable packet size */
 #define NCP_PACKET_SIZE_INTERNAL 65536
 
+static int
+ncp_get_fs_info(struct ncp_server* server, struct inode* inode, struct ncp_fs_info* arg)
+{
+	struct ncp_fs_info info;
+
+	if ((permission(inode, MAY_WRITE, NULL) != 0)
+	    && (current->uid != server->m.mounted_uid)) {
+		return -EACCES;
+	}
+	if (copy_from_user(&info, arg, sizeof(info)))
+		return -EFAULT;
+
+	if (info.version != NCP_GET_FS_INFO_VERSION) {
+		DPRINTK("info.version invalid: %d\n", info.version);
+		return -EINVAL;
+	}
+	/* TODO: info.addr = server->m.serv_addr; */
+	SET_UID(info.mounted_uid, server->m.mounted_uid);
+	info.connection		= server->connection;
+	info.buffer_size	= server->buffer_size;
+	info.volume_number	= NCP_FINFO(inode)->volNumber;
+	info.directory_id	= NCP_FINFO(inode)->DosDirNum;
+
+	if (copy_to_user(arg, &info, sizeof(info)))
+		return -EFAULT;
+	return 0;
+}
+
+static int
+ncp_get_fs_info_v2(struct ncp_server* server, struct inode* inode, struct ncp_fs_info_v2* arg)
+{
+	struct ncp_fs_info_v2 info2;
+
+	if ((permission(inode, MAY_WRITE, NULL) != 0)
+	    && (current->uid != server->m.mounted_uid)) {
+		return -EACCES;
+	}
+	if (copy_from_user(&info2, arg, sizeof(info2)))
+		return -EFAULT;
+
+	if (info2.version != NCP_GET_FS_INFO_VERSION_V2) {
+		DPRINTK("info.version invalid: %d\n", info2.version);
+		return -EINVAL;
+	}
+	info2.mounted_uid   = server->m.mounted_uid;
+	info2.connection    = server->connection;
+	info2.buffer_size   = server->buffer_size;
+	info2.volume_number = NCP_FINFO(inode)->volNumber;
+	info2.directory_id  = NCP_FINFO(inode)->DosDirNum;
+	info2.dummy1 = info2.dummy2 = info2.dummy3 = 0;
+
+	if (copy_to_user(arg, &info2, sizeof(info2)))
+		return -EFAULT;
+	return 0;
+}
+
+#ifdef CONFIG_NCPFS_NLS
+/* Here we are select the iocharset and the codepage for NLS.
+ * Thanks Petr Vandrovec for idea and many hints.
+ */
+static int
+ncp_set_charsets(struct ncp_server* server, struct ncp_nls_ioctl* arg)
+{
+	struct ncp_nls_ioctl user;
+	struct nls_table *codepage;
+	struct nls_table *iocharset;
+	struct nls_table *oldset_io;
+	struct nls_table *oldset_cp;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+	if (server->root_setuped)
+		return -EBUSY;
+
+	if (copy_from_user(&user, arg, sizeof(user)))
+		return -EFAULT;
+
+	codepage = NULL;
+	user.codepage[NCP_IOCSNAME_LEN] = 0;
+	if (!user.codepage[0] || !strcmp(user.codepage, "default"))
+		codepage = load_nls_default();
+	else {
+		codepage = load_nls(user.codepage);
+		if (!codepage) {
+			return -EBADRQC;
+		}
+	}
+
+	iocharset = NULL;
+	user.iocharset[NCP_IOCSNAME_LEN] = 0;
+	if (!user.iocharset[0] || !strcmp(user.iocharset, "default")) {
+		iocharset = load_nls_default();
+		NCP_CLR_FLAG(server, NCP_FLAG_UTF8);
+	} else if (!strcmp(user.iocharset, "utf8")) {
+		iocharset = load_nls_default();
+		NCP_SET_FLAG(server, NCP_FLAG_UTF8);
+	} else {
+		iocharset = load_nls(user.iocharset);
+		if (!iocharset) {
+			unload_nls(codepage);
+			return -EBADRQC;
+		}
+		NCP_CLR_FLAG(server, NCP_FLAG_UTF8);
+	}
+
+	oldset_cp = server->nls_vol;
+	server->nls_vol = codepage;
+	oldset_io = server->nls_io;
+	server->nls_io = iocharset;
+
+	if (oldset_cp)
+		unload_nls(oldset_cp);
+	if (oldset_io)
+		unload_nls(oldset_io);
+
+	return 0;
+}
+
+static int
+ncp_get_charsets(struct ncp_server* server, struct ncp_nls_ioctl* arg)
+{
+	struct ncp_nls_ioctl user;
+	int len;
+
+	memset(&user, 0, sizeof(user));
+	if (server->nls_vol && server->nls_vol->charset) {
+		len = strlen(server->nls_vol->charset);
+		if (len > NCP_IOCSNAME_LEN)
+			len = NCP_IOCSNAME_LEN;
+		strncpy(user.codepage, server->nls_vol->charset, len);
+		user.codepage[len] = 0;
+	}
+
+	if (NCP_IS_FLAG(server, NCP_FLAG_UTF8))
+		strcpy(user.iocharset, "utf8");
+	else if (server->nls_io && server->nls_io->charset) {
+		len = strlen(server->nls_io->charset);
+		if (len > NCP_IOCSNAME_LEN)
+			len = NCP_IOCSNAME_LEN;
+		strncpy(user.iocharset,	server->nls_io->charset, len);
+		user.iocharset[len] = 0;
+	}
+
+	if (copy_to_user(arg, &user, sizeof(user)))
+		return -EFAULT;
+	return 0;
+}
+#endif /* CONFIG_NCPFS_NLS */
+
 int ncp_ioctl(struct inode *inode, struct file *filp,
 	      unsigned int cmd, unsigned long arg)
 {
@@ -96,60 +245,10 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 		return ncp_conn_logged_in(inode->i_sb);
 
 	case NCP_IOC_GET_FS_INFO:
-		{
-			struct ncp_fs_info info;
-
-			if ((permission(inode, MAY_WRITE, NULL) != 0)
-			    && (current->uid != server->m.mounted_uid)) {
-				return -EACCES;
-			}
-			if (copy_from_user(&info, (struct ncp_fs_info *) arg, 
-				sizeof(info)))
-				return -EFAULT;
-
-			if (info.version != NCP_GET_FS_INFO_VERSION) {
-				DPRINTK("info.version invalid: %d\n", info.version);
-				return -EINVAL;
-			}
-			/* TODO: info.addr = server->m.serv_addr; */
-			SET_UID(info.mounted_uid, server->m.mounted_uid);
-			info.connection		= server->connection;
-			info.buffer_size	= server->buffer_size;
-			info.volume_number	= NCP_FINFO(inode)->volNumber;
-			info.directory_id	= NCP_FINFO(inode)->DosDirNum;
-
-			if (copy_to_user((struct ncp_fs_info *) arg, &info, 
-				sizeof(info))) return -EFAULT;
-			return 0;
-		}
+		return ncp_get_fs_info(server, inode, (struct ncp_fs_info *)arg);
 
 	case NCP_IOC_GET_FS_INFO_V2:
-		{
-			struct ncp_fs_info_v2 info2;
-
-			if ((permission(inode, MAY_WRITE, NULL) != 0)
-			    && (current->uid != server->m.mounted_uid)) {
-				return -EACCES;
-			}
-			if (copy_from_user(&info2, (struct ncp_fs_info_v2 *) arg, 
-				sizeof(info2)))
-				return -EFAULT;
-
-			if (info2.version != NCP_GET_FS_INFO_VERSION_V2) {
-				DPRINTK("info.version invalid: %d\n", info2.version);
-				return -EINVAL;
-			}
-			info2.mounted_uid   = server->m.mounted_uid;
-			info2.connection    = server->connection;
-			info2.buffer_size   = server->buffer_size;
-			info2.volume_number = NCP_FINFO(inode)->volNumber;
-			info2.directory_id  = NCP_FINFO(inode)->DosDirNum;
-			info2.dummy1 = info2.dummy2 = info2.dummy3 = 0;
-
-			if (copy_to_user((struct ncp_fs_info_v2 *) arg, &info2, 
-				sizeof(info2))) return -EFAULT;
-			return 0;
-		}
+		return ncp_get_fs_info_v2(server, inode, (struct ncp_fs_info_v2 *)arg);
 
 	case NCP_IOC_GETMOUNTUID2:
 		{
@@ -201,7 +300,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 	case NCP_IOC_SETROOT:
 		{
 			struct ncp_setroot_ioctl sr;
-			unsigned int vnum, de, dosde;
+			__u32 vnum, de, dosde;
 			struct dentry* dentry;
 
 			if (!capable(CAP_SYS_ADMIN))
@@ -219,15 +318,10 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 				dosde = 0;
 			} else if (sr.volNumber >= NCP_NUMBER_OF_VOLUMES) {
 				return -EINVAL;
-			} else {
-				struct nw_info_struct ni;
-				
-				if (ncp_mount_subdir(server, &ni, sr.volNumber,
-						sr.namespace, sr.dirEntNum))
-					return -ENOENT;
-				vnum = ni.volNumber;
-				de = ni.dirEntNum;
-				dosde = ni.DosDirNum;
+			} else if (ncp_mount_subdir(server, sr.volNumber,
+						sr.namespace, sr.dirEntNum,
+						&vnum, &de, &dosde)) {
+				return -ENOENT;
 			}
 			
 			dentry = inode->i_sb->s_root;
@@ -508,105 +602,14 @@ outrel:
 		}
 
 #ifdef CONFIG_NCPFS_NLS
-/* Here we are select the iocharset and the codepage for NLS.
- * Thanks Petr Vandrovec for idea and many hints.
- */
 	case NCP_IOC_SETCHARSETS:
-		if (!capable(CAP_SYS_ADMIN))
-			return -EACCES;
-		if (server->root_setuped)
-			return -EBUSY;
-
-		{
-			struct ncp_nls_ioctl user;
-			struct nls_table *codepage;
-			struct nls_table *iocharset;
-			struct nls_table *oldset_io;
-			struct nls_table *oldset_cp;
-			
-			if (copy_from_user(&user, (struct ncp_nls_ioctl*)arg,
-					sizeof(user)))
-				return -EFAULT;
-
-			codepage = NULL;
-			user.codepage[NCP_IOCSNAME_LEN] = 0;
-			if (!user.codepage[0] ||
-					!strcmp(user.codepage, "default"))
-				codepage = load_nls_default();
-			else {
-				codepage = load_nls(user.codepage);
-				if (!codepage) {
-					return -EBADRQC;
-				}
-			}
-
-			iocharset = NULL;
-			user.iocharset[NCP_IOCSNAME_LEN] = 0;
-			if (!user.iocharset[0] ||
-					!strcmp(user.iocharset, "default")) {
-				iocharset = load_nls_default();
-				NCP_CLR_FLAG(server, NCP_FLAG_UTF8);
-			} else {
-				if (!strcmp(user.iocharset, "utf8")) {
-					iocharset = load_nls_default();
-					NCP_SET_FLAG(server, NCP_FLAG_UTF8);
-				} else {
-					iocharset = load_nls(user.iocharset);
-					if (!iocharset) {
-						unload_nls(codepage);
-						return -EBADRQC;
-					}
-					NCP_CLR_FLAG(server, NCP_FLAG_UTF8);
-				}
-			}
-
-			oldset_cp = server->nls_vol;
-			server->nls_vol = codepage;
-			oldset_io = server->nls_io;
-			server->nls_io = iocharset;
-
-			if (oldset_cp)
-				unload_nls(oldset_cp);
-			if (oldset_io)
-				unload_nls(oldset_io);
-
-			return 0;
-		}
+		return ncp_set_charsets(server, (struct ncp_nls_ioctl *)arg);
 		
-	case NCP_IOC_GETCHARSETS: /* not tested */
-		{
-			struct ncp_nls_ioctl user;
-			int len;
+	case NCP_IOC_GETCHARSETS:
+		return ncp_get_charsets(server, (struct ncp_nls_ioctl *)arg);
 
-			memset(&user, 0, sizeof(user));
-			if (server->nls_vol && server->nls_vol->charset) {
-				len = strlen(server->nls_vol->charset);
-				if (len > NCP_IOCSNAME_LEN)
-					len = NCP_IOCSNAME_LEN;
-				strncpy(user.codepage,
-						server->nls_vol->charset, len);
-				user.codepage[len] = 0;
-			}
-
-			if (NCP_IS_FLAG(server, NCP_FLAG_UTF8))
-				strcpy(user.iocharset, "utf8");
-			else
-				if (server->nls_io && server->nls_io->charset) {
-					len = strlen(server->nls_io->charset);
-					if (len > NCP_IOCSNAME_LEN)
-						len = NCP_IOCSNAME_LEN;
-					strncpy(user.iocharset,
-						server->nls_io->charset, len);
-					user.iocharset[len] = 0;
-				}
-
-			if (copy_to_user((struct ncp_nls_ioctl*)arg, &user,
-					sizeof(user)))
-				return -EFAULT;
-
-			return 0;
-		}
 #endif /* CONFIG_NCPFS_NLS */
+
 	case NCP_IOC_SETDENTRYTTL:
 		if ((permission(inode, MAY_WRITE, NULL) != 0) &&
 				 (current->uid != server->m.mounted_uid))

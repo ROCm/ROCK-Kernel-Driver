@@ -16,7 +16,7 @@
 #ifdef CONFIG_SMP
 #define MSI_TARGET_CPU		logical_smp_processor_id()
 #else
-#define MSI_TARGET_CPU		TARGET_CPUS
+#define MSI_TARGET_CPU	cpu_to_logical_apicid(first_cpu(cpu_online_map))
 #endif
 
 #endif /* ASM_MSI_H */

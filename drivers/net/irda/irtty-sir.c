@@ -438,7 +438,6 @@ static int irtty_ioctl(struct tty_struct *tty, struct file *file, unsigned int c
 	struct irtty_info { char name[6]; } info;
 	struct sir_dev *dev;
 	struct sirtty_cb *priv = tty->disc_data;
-	int size = _IOC_SIZE(cmd);
 	int err = 0;
 
 	ASSERT(priv != NULL, return -ENODEV;);
@@ -449,13 +448,6 @@ static int irtty_ioctl(struct tty_struct *tty, struct file *file, unsigned int c
 	dev = priv->dev;
 	ASSERT(dev != NULL, return -1;);
 
-	if (_IOC_DIR(cmd) & _IOC_READ)
-		err = verify_area(VERIFY_WRITE, (void *) arg, size);
-	else if (_IOC_DIR(cmd) & _IOC_WRITE)
-		err = verify_area(VERIFY_READ, (void *) arg, size);
-	if (err)
-		return err;
-	
 	switch (cmd) {
 	case TCGETS:
 	case TCGETA:
@@ -473,7 +465,7 @@ static int irtty_ioctl(struct tty_struct *tty, struct file *file, unsigned int c
 		memset(&info, 0, sizeof(info)); 
 		strncpy(info.name, dev->netdev->name, sizeof(info.name)-1);
 
-		if (copy_to_user((void *)arg, &info, sizeof(info)))
+		if (copy_to_user((void __user *)arg, &info, sizeof(info)))
 			err = -EFAULT;
 		break;
 	default:

@@ -126,7 +126,13 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 		goto out_unlock;
 	}
 
-	id = idr_get_new(&i2c_adapter_idr, NULL);
+	res = idr_get_new(&i2c_adapter_idr, NULL, &id);
+	if (res < 0) {
+		if (res == -EAGAIN)
+			res = -ENOMEM;
+		goto out_unlock;
+	}
+
 	adap->nr =  id & MAX_ID_MASK;
 	init_MUTEX(&adap->bus_lock);
 	init_MUTEX(&adap->clist_lock);
@@ -162,7 +168,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 
 	dev_dbg(&adap->dev, "registered as adapter #%d\n", adap->nr);
 
- out_unlock:
+out_unlock:
 	up(&core_lists);
 	return res;
 }

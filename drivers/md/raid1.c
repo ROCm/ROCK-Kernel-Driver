@@ -376,7 +376,8 @@ static int read_balance(conf_t *conf, struct bio *bio, r1bio_t *r1_bio)
 	 * device if no resync is going on, or below the resync window.
 	 * We take the first readable disk when above the resync window.
 	 */
-	if (!conf->mddev->in_sync && (this_sector + sectors >= conf->next_resync)) {
+	if (conf->mddev->recovery_cp < MaxSector &&
+	    (this_sector + sectors >= conf->next_resync)) {
 		/* make sure that disk is operational */
 		new_disk = 0;
 

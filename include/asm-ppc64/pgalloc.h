@@ -101,33 +101,7 @@ extern void pte_free_submit(struct pte_freelist_batch *batch);
 
 DECLARE_PER_CPU(struct pte_freelist_batch *, pte_freelist_cur);
 
-static inline void __pte_free_tlb(struct mmu_gather *tlb, struct page *ptepage)
-{
-	/* This is safe as we are holding page_table_lock */
-        cpumask_t local_cpumask = cpumask_of_cpu(smp_processor_id());
-	struct pte_freelist_batch **batchp = &__get_cpu_var(pte_freelist_cur);
-
-	if (atomic_read(&tlb->mm->mm_users) < 2 ||
-	    cpus_equal(tlb->mm->cpu_vm_mask, local_cpumask)) {
-		pte_free(ptepage);
-		return;
-	}
-
-	if (*batchp == NULL) {
-		*batchp = (struct pte_freelist_batch *)__get_free_page(GFP_ATOMIC);
-		if (*batchp == NULL) {
-			pte_free_now(ptepage);
-			return;
-		}
-		(*batchp)->index = 0;
-	}
-	(*batchp)->pages[(*batchp)->index++] = ptepage;
-	if ((*batchp)->index == PTE_FREELIST_SIZE) {
-		pte_free_submit(*batchp);
-		*batchp = NULL;
-	}
-}
-
+void __pte_free_tlb(struct mmu_gather *tlb, struct page *ptepage);
 #define __pmd_free_tlb(tlb, pmd)	__pte_free_tlb(tlb, virt_to_page(pmd))
 
 #define check_pgt_cache()	do { } while (0)
