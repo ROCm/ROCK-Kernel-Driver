@@ -222,9 +222,8 @@ static char shortname[] = DRV_NAME;
 /* This driver was written to use PCI memory space, however most versions
    of the Rhine only work correctly with I/O space accesses. */
 #ifdef CONFIG_VIA_RHINE_MMIO
-#define USE_MEM
+#define USE_MMIO
 #else
-#define USE_IO
 #undef readb
 #undef readw
 #undef readl
@@ -380,7 +379,7 @@ enum chip_capability_flags {
 	ReqTxAlign=0x10, HasWOL=0x20,
 };
 
-#ifdef USE_MEM
+#ifdef USE_MMIO
 #define RHINE_IOTYPE (PCI_USES_MEM | PCI_USES_MASTER | PCI_ADDR1)
 #else
 #define RHINE_IOTYPE (PCI_USES_IO  | PCI_USES_MASTER | PCI_ADDR0)
@@ -432,7 +431,7 @@ enum backoff_bits {
 	BackCaptureEffect=0x04, BackRandom=0x08
 };
 
-#ifdef USE_MEM
+#ifdef USE_MMIO
 /* Registers we check that mmio and reg are the same. */
 int mmio_verify_registers[] = {
 	RxConfig, TxConfig, IntrEnable, ConfigA, ConfigB, ConfigC, ConfigD,
@@ -590,7 +589,7 @@ static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 			boguscnt ? "succeeded" : "failed");
 }
 
-#ifdef USE_MEM
+#ifdef USE_MMIO
 static void __devinit enable_mmio(long ioaddr, int chip_id)
 {
 	int n;
@@ -636,7 +635,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	long memaddr;
 	int io_size;
 	int pci_flags;
-#ifdef USE_MEM
+#ifdef USE_MMIO
 	long ioaddr0;
 #endif
 
@@ -687,7 +686,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	if (pci_request_regions(pdev, shortname))
 		goto err_out_free_netdev;
 
-#ifdef USE_MEM
+#ifdef USE_MMIO
 	ioaddr0 = ioaddr;
 	enable_mmio(ioaddr0, chip_id);
 
@@ -710,7 +709,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 			goto err_out_unmap;
 		}
 	}
-#endif
+#endif /* USE_MMIO */
 
 	/* D-Link provided reset code (with comment additions) */
 	if (rhine_chip_info[chip_id].drv_flags & HasWOL) {
@@ -737,14 +736,14 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	wait_for_reset(dev, chip_id, shortname);
 
 	/* Reload the station address from the EEPROM. */
-#ifdef USE_IO
-	reload_eeprom(ioaddr);
-#else
+#ifdef USE_MMIO
 	reload_eeprom(ioaddr0);
 	/* Reloading from eeprom overwrites cfgA-D, so we must re-enable MMIO.
 	   If reload_eeprom() was done first this could be avoided, but it is
 	   not known if that still works with the "win98-reboot" problem. */
 	enable_mmio(ioaddr0, chip_id);
+#else
+	reload_eeprom(ioaddr);
 #endif
 
 	for (i = 0; i < 6; i++)
@@ -880,7 +879,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	return 0;
 
 err_out_unmap:
-#ifdef USE_MEM
+#ifdef USE_MMIO
 	iounmap((void *)ioaddr);
 err_out_free_res:
 #endif
@@ -1933,7 +1932,7 @@ static void __devexit rhine_remove_one(struct pci_dev *pdev)
 
 	pci_release_regions(pdev);
 
-#ifdef USE_MEM
+#ifdef USE_MMIO
 	iounmap((char *)(dev->base_addr));
 #endif
 
