@@ -168,7 +168,6 @@ static inline void clear_page_anon(struct page *page)
 {
 	BUG_ON(!page->mapping);
 	page->mapping = NULL;
-	ClearPageAnon(page);
 }
 
 /*
@@ -246,7 +245,7 @@ out:
 static inline int page_referenced_anon(struct page *page)
 {
 	unsigned int mapcount = page->mapcount;
-	struct anon_vma *anon_vma = (struct anon_vma *) page->mapping;
+	struct anon_vma *anon_vma = (void *) page->mapping - PAGE_MAPPING_ANON;
 	struct vm_area_struct *vma;
 	int referenced = 0;
 
@@ -346,31 +345,18 @@ void page_add_anon_rmap(struct page *page,
 	BUG_ON(PageReserved(page));
 	BUG_ON(!anon_vma);
 
+	anon_vma = (void *) anon_vma + PAGE_MAPPING_ANON;
 	index = (address - vma->vm_start) >> PAGE_SHIFT;
 	index += vma->vm_pgoff;
 	index >>= PAGE_CACHE_SHIFT - PAGE_SHIFT;
 
-	/*
-	 * Setting and clearing PG_anon must always happen inside
-	 * page_map_lock to avoid races between mapping and
-	 * unmapping on different processes of the same
-	 * shared cow swapcache page. And while we take the
-	 * page_map_lock PG_anon cannot change from under us.
-	 * Actually PG_anon cannot change under fork either
-	 * since fork holds a reference on the page so it cannot
-	 * be unmapped under fork and in turn copy_page_range is
-	 * allowed to read PG_anon outside the page_map_lock.
-	 */
 	page_map_lock(page);
 	if (!page->mapcount) {
-		BUG_ON(PageAnon(page));
 		BUG_ON(page->mapping);
-		SetPageAnon(page);
 		page->index = index;
 		page->mapping = (struct address_space *) anon_vma;
 		inc_page_state(nr_mapped);
 	} else {
-		BUG_ON(!PageAnon(page));
 		BUG_ON(page->index != index);
 		BUG_ON(page->mapping != (struct address_space *) anon_vma);
 	}
@@ -629,7 +615,7 @@ out_unlock:
 
 static inline int try_to_unmap_anon(struct page *page)
 {
-	struct anon_vma *anon_vma = (struct anon_vma *) page->mapping;
+	struct anon_vma *anon_vma = (void *) page->mapping - PAGE_MAPPING_ANON;
 	struct vm_area_struct *vma;
 	int ret = SWAP_AGAIN;
 

@@ -211,11 +211,12 @@ struct page {
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
 					 */
-	struct address_space *mapping;	/* If PG_anon clear, points to
+	struct address_space *mapping;	/* If low bit clear, points to
 					 * inode address_space, or NULL.
 					 * If page mapped as anonymous
-					 * memory, PG_anon is set, and
-					 * it points to anon_vma object.
+					 * memory, low bit is set, and
+					 * it points to anon_vma object:
+					 * see PAGE_MAPPING_ANON below.
 					 */
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list
@@ -439,22 +440,30 @@ void page_address_init(void);
 
 /*
  * On an anonymous page mapped into a user virtual memory area,
- * page->mapping points to its anon_vma, not to a struct address_space.
+ * page->mapping points to its anon_vma, not to a struct address_space;
+ * with the PAGE_MAPPING_ANON bit set to distinguish it.
  *
  * Please note that, confusingly, "page_mapping" refers to the inode
  * address_space which maps the page from disk; whereas "page_mapped"
  * refers to user virtual address space into which the page is mapped.
  */
+#define PAGE_MAPPING_ANON	1
+
 extern struct address_space swapper_space;
 static inline struct address_space *page_mapping(struct page *page)
 {
-	struct address_space *mapping = NULL;
+	struct address_space *mapping = page->mapping;
 
 	if (unlikely(PageSwapCache(page)))
 		mapping = &swapper_space;
-	else if (likely(!PageAnon(page)))
-		mapping = page->mapping;
+	else if (unlikely((unsigned long)mapping & PAGE_MAPPING_ANON))
+		mapping = NULL;
 	return mapping;
+}
+
+static inline int PageAnon(struct page *page)
+{
+	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
 }
 
 /*

@@ -88,7 +88,6 @@ static void bad_page(const char *function, struct page *page)
 			1 << PG_active	|
 			1 << PG_dirty	|
 			1 << PG_maplock |
-			1 << PG_anon    |
 			1 << PG_swapcache |
 			1 << PG_writeback);
 	set_page_count(page, 0);
@@ -230,7 +229,6 @@ static inline void free_pages_check(const char *function, struct page *page)
 			1 << PG_reclaim	|
 			1 << PG_slab	|
 			1 << PG_maplock |
-			1 << PG_anon    |
 			1 << PG_swapcache |
 			1 << PG_writeback )))
 		bad_page(function, page);
@@ -353,7 +351,6 @@ static void prep_new_page(struct page *page, int order)
 			1 << PG_dirty	|
 			1 << PG_reclaim	|
 			1 << PG_maplock |
-			1 << PG_anon    |
 			1 << PG_swapcache |
 			1 << PG_writeback )))
 		bad_page(__FUNCTION__, page);
