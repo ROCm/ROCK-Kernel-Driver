@@ -2403,7 +2403,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 
 	err = socket_has_perm(current, sock, SOCKET__BIND);
 	if (err)
-		return err;
+		goto out;
 
 	/*
 	 * If PF_INET, check name_bind permission for the port.
@@ -2415,7 +2415,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 		struct sockaddr_in *addr = (struct sockaddr_in *)address;
 		unsigned short snum = ntohs(addr->sin_port);
 		struct sock *sk = sock->sk;
-		u32 sid;
+		u32 sid, node_perm;
 
 		tsec = current->security;
 		isec = SOCK_INODE(sock)->i_security;
@@ -2425,18 +2425,45 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 			err = security_port_sid(sk->sk_family, sk->sk_type,
 						sk->sk_protocol, snum, &sid);
 			if (err)
-				return err;
+				goto out;
 			AVC_AUDIT_DATA_INIT(&ad,NET);
 			ad.u.net.port = snum;
 			err = avc_has_perm(isec->sid, sid,
 					   isec->sclass,
 					   SOCKET__NAME_BIND, NULL, &ad);
 			if (err)
-				return err;
+				goto out;
 		}
+		
+		switch(sk->sk_protocol) {
+		case IPPROTO_TCP:
+			node_perm = TCP_SOCKET__NODE_BIND;
+			break;
+			
+		case IPPROTO_UDP:
+			node_perm = UDP_SOCKET__NODE_BIND;
+			break;
+			
+		default:
+			node_perm = RAWIP_SOCKET__NODE_BIND;
+			break;
+		}
+		
+		err = security_node_sid(PF_INET, &addr->sin_addr.s_addr,
+		                        sizeof(addr->sin_addr.s_addr), &sid);
+		if (err)
+			goto out;
+		
+		AVC_AUDIT_DATA_INIT(&ad,NET);
+		ad.u.net.port = snum;
+		ad.u.net.saddr = addr->sin_addr.s_addr;
+		err = avc_has_perm(isec->sid, sid,
+		                   isec->sclass, node_perm, NULL, &ad);
+		if (err)
+			goto out;
 	}
-
-	return 0;
+out:
+	return err;
 }
 
 static int selinux_socket_connect(struct socket *sock, struct sockaddr *address, int addrlen)

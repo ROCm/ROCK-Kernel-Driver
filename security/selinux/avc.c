@@ -636,6 +636,11 @@ void avc_audit(u32 ssid, u32 tsid,
 				       NIPQUAD(a->u.net.daddr));
 				if (a->u.net.port)
 					printk(" dest=%d", a->u.net.port);
+			} else if (a->u.net.saddr) {
+				printk(" saddr=%d.%d.%d.%d",
+				       NIPQUAD(a->u.net.saddr));
+				if (a->u.net.port)
+					printk(" src=%d", a->u.net.port);
 			} else if (a->u.net.port)
 				printk(" port=%d", a->u.net.port);
 			if (a->u.net.skb) {

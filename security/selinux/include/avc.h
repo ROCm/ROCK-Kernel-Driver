@@ -67,6 +67,7 @@ struct avc_audit_data {
 			struct sock *sk;
 			u16 port;
 			u32 daddr;
+			u32 saddr;
 		} net;
 		int cap;
 		int ipc_id;

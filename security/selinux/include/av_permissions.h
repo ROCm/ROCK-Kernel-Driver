@@ -249,6 +249,7 @@
 #define TCP_SOCKET__CONNECTTO                     0x00400000UL
 #define TCP_SOCKET__NEWCONN                       0x00800000UL
 #define TCP_SOCKET__ACCEPTFROM                    0x01000000UL
+#define TCP_SOCKET__NODE_BIND                     0x02000000UL
 
 #define UDP_SOCKET__RELABELTO                     0x00000100UL
 #define UDP_SOCKET__RECV_MSG                      0x00080000UL
@@ -272,6 +273,7 @@
 #define UDP_SOCKET__SEND_MSG                      0x00100000UL
 #define UDP_SOCKET__RECVFROM                      0x00020000UL
 #define UDP_SOCKET__GETATTR                       0x00000010UL
+#define UDP_SOCKET__NODE_BIND                     0x00400000UL
 
 #define RAWIP_SOCKET__RELABELTO                   0x00000100UL
 #define RAWIP_SOCKET__RECV_MSG                    0x00080000UL
@@ -295,6 +297,7 @@
 #define RAWIP_SOCKET__SEND_MSG                    0x00100000UL
 #define RAWIP_SOCKET__RECVFROM                    0x00020000UL
 #define RAWIP_SOCKET__GETATTR                     0x00000010UL
+#define RAWIP_SOCKET__NODE_BIND                   0x00400000UL
 
 #define NODE__TCP_RECV                            0x00000001UL
 #define NODE__TCP_SEND                            0x00000002UL
