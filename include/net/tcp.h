@@ -33,6 +33,7 @@
 #include <net/checksum.h>
 #include <net/sock.h>
 #include <net/snmp.h>
+#include <net/ip.h>
 #if defined(CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
 #include <linux/ipv6.h>
 #endif

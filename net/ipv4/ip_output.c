@@ -702,17 +702,6 @@ ip_generic_getfrag(void *from, char *to, int offset, int len, int odd, struct sk
 	return 0;
 }
 
-static inline int
-skb_can_coalesce(struct sk_buff *skb, int i, struct page *page, int off)
-{
-	if (i) {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i-1];
-		return page == frag->page &&
-			off == frag->page_offset+frag->size;
-	}
-	return 0;
-}
-
 static inline unsigned int
 csum_page(struct page *page, int offset, int copy)
 {

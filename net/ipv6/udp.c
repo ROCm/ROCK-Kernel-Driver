@@ -51,7 +51,7 @@
 #include <net/udp.h>
 #include <net/inet_common.h>
 
-#include <net/checksum.h>
+#include <net/ip6_checksum.h>
 #include <net/xfrm.h>
 
 #include <linux/proc_fs.h>
