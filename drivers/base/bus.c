@@ -16,7 +16,7 @@
 #include <linux/string.h>
 #include "base.h"
 
-static LIST_HEAD(bus_driver_list);
+static DECLARE_MUTEX(bus_sem);
 
 #define to_dev(node) container_of(node,struct device,bus_list)
 #define to_drv(node) container_of(node,struct device_driver,bus_list)
@@ -64,8 +64,15 @@ static struct sysfs_ops driver_sysfs_ops = {
 };
 
 
+static void driver_release(struct kobject * kobj)
+{
+	struct device_driver * drv = to_driver(kobj);
+	up(&drv->unload_sem);
+}
+
+
 /*
- * sysfs bindings for drivers
+ * sysfs bindings for buses
  */
 
 
@@ -124,74 +131,14 @@ struct subsystem bus_subsys = {
 	.sysfs_ops	= &bus_sysfs_ops,
 };
 
+
 /**
- * bus_for_each_dev - walk list of devices and do something to each
- * @bus:	bus in question
- * @data:	data for the callback
- * @callback:	caller-defined action to perform on each device
- *
- * Why do we do this? So we can guarantee proper locking and reference
- * counting on devices as we touch each one.
- *
- * Algorithm:
- * Take device_lock and get the first node in the list. 
- * Try and increment the reference count on it. If we can't, it's in the
- * process of being removed, but that process hasn't acquired device_lock.
- * It's still in the list, so we grab the next node and try that one. 
- * We drop the lock to call the callback.
- * We can't decrement the reference count yet, because we need the next
- * node in the list. So, we set @prev to point to the current device.
- * On the next go-round, we decrement the reference count on @prev, so if 
- * it's being removed, it won't affect us.
+ *	attach - add device to driver.
+ *	@dev:	device.
+ *	
+ *	By this point, we know for sure what the driver is, so we 
+ *	do the rest (which ain't that much).
  */
-int bus_for_each_dev(struct bus_type * bus, void * data, 
-		     int (*callback)(struct device * dev, void * data))
-{
-	struct list_head * node;
-	int error = 0;
-
-	bus = get_bus(bus);
-	if (bus) {
-		down_read(&bus->rwsem);
-		list_for_each(node,&bus->devices) {
-			struct device * dev = get_device(to_dev(node));
-			if (dev) {
-				error = callback(dev,data);
-				put_device(dev);
-				if (error)
-					break;
-			}
-		}
-		up_read(&bus->rwsem);
-		put_bus(bus);
-	}
-	return error;
-}
-
-int bus_for_each_drv(struct bus_type * bus, void * data,
-		     int (*callback)(struct device_driver * drv, void * data))
-{
-	struct list_head * node;
-	int error = 0;
-
-	bus = get_bus(bus);
-	if (bus) {
-		down_read(&bus->rwsem);
-		list_for_each(node,&bus->drivers) {
-			struct device_driver * drv = get_driver(to_drv(node));
-			if (drv) {
-				error = callback(drv,data);
-				put_driver(drv);
-				if (error)
-					break;
-			}
-		}
-		up_read(&bus->rwsem);
-		put_bus(bus);
-	}
-	return error;
-}
-
 static void attach(struct device * dev)
 {
 	pr_debug("bound device '%s' to driver '%s'\n",
@@ -200,6 +147,21 @@ static void attach(struct device * dev)
 	sysfs_create_link(&dev->driver->kobj,&dev->kobj,dev->kobj.name);
 }
 
+
+/**
+ *	bus_match - check compatibility between device & driver.
+ *	@dev:	device.
+ *	@drv:	driver.
+ *
+ *	First, we call the bus's match function, which should compare
+ *	the device IDs the driver supports with the device IDs of the 
+ *	device. Note we don't do this ourselves because we don't know 
+ *	the format of the ID structures, nor what is to be considered
+ *	a match and what is not.
+ *	
+ *	If we find a match, we call @drv->probe(@dev) if it exists, and 
+ *	call attach() above.
+ */
 static int bus_match(struct device * dev, struct device_driver * drv)
 {
 	int error = -ENODEV;
@@ -208,14 +170,24 @@ static int bus_match(struct device * dev, struct device_driver * drv)
 		if (drv->probe) {
 			if (!(error = drv->probe(dev)))
 				attach(dev);
-			else
+			else 
 				dev->driver = NULL;
-		} else 
+		} else {
 			attach(dev);
+			error = 0;
+		}
 	}
 	return error;
 }
 
+
+/**
+ *	device_attach - try to attach device to a driver.
+ *	@dev:	device.
+ *
+ *	Walk the list of drivers that the bus has and call bus_match() 
+ *	for each pair. If a compatible pair is found, break out and return.
+ */
 static int device_attach(struct device * dev)
 {
 	struct bus_type * bus = dev->bus;
@@ -232,17 +204,24 @@ static int device_attach(struct device * dev)
 
 	list_for_each(entry,&bus->drivers) {
 		struct device_driver * drv = 
-			get_driver(container_of(entry,struct device_driver,bus_list));
-		if (!drv)
-			continue;
-		error = bus_match(dev,drv);
-		put_driver(drv);
-		if (!error)
+			container_of(entry,struct device_driver,bus_list);
+		if (!(error = bus_match(dev,drv)))
 			break;
 	}
 	return error;
 }
 
+
+/**
+ *	driver_attach - try to bind driver to devices.
+ *	@drv:	driver.
+ *
+ *	Walk the list of devices that the bus has on it and try to match
+ *	the driver with each one.
+ *	If bus_match() returns 0 and the @dev->driver is set, we've found
+ *	a compatible pair, so we call devclass_add_device() to add the 
+ *	device to the class. 
+ */
 static int driver_attach(struct device_driver * drv)
 {
 	struct bus_type * bus = drv->bus;
@@ -254,16 +233,23 @@ static int driver_attach(struct device_driver * drv)
 
 	list_for_each(entry,&bus->devices) {
 		struct device * dev = container_of(entry,struct device,bus_list);
-		if (get_device(dev)) {
-			if (!dev->driver) {
-				if (!bus_match(dev,drv) && dev->driver)
-					devclass_add_device(dev);
-			}
-			put_device(dev);
+		if (!dev->driver) {
+			if (!bus_match(dev,drv) && dev->driver)
+				devclass_add_device(dev);
 		}
 	}
 	return error;
 }
+
+
+/**
+ *	detach - do dirty work of detaching device from its driver.
+ *	@dev:	device.
+ *	@drv:	its driver.
+ *
+ *	Note that calls to this function are serialized by taking the 
+ *	bus's rwsem in both bus_remove_device() and bus_remove_driver().
+ */
 
 static void detach(struct device * dev, struct device_driver * drv)
 {
@@ -277,120 +263,152 @@ static void detach(struct device * dev, struct device_driver * drv)
 	}
 }
 
+
+/**
+ *	device_detach - detach device from its driver.
+ *	@dev:	device.
+ */
+
 static void device_detach(struct device * dev)
 {
 	detach(dev,dev->driver);
 }
+
+
+/**
+ *	driver_detach - detach driver from all devices it controls.
+ *	@drv:	driver.
+ */
 
 static void driver_detach(struct device_driver * drv)
 {
 	struct list_head * entry, * next;
 	list_for_each_safe(entry,next,&drv->devices) {
 		struct device * dev = container_of(entry,struct device,driver_list);
-		if (get_device(dev)) {
-			detach(dev,drv);
-			put_device(dev);
-		}
+		detach(dev,drv);
 	}
 	
 }
 
 /**
- * bus_add_device - add device to bus
- * @dev:	device being added
+ *	bus_add_device - add device to bus
+ *	@dev:	device being added
  *
- * Add the device to its bus's list of devices.
- * Create a symlink in the bus's 'devices' directory to the 
- * device's physical location.
- * Try and bind the device to a driver.
+ *	- Add the device to its bus's list of devices.
+ *	- Try to attach to driver.
+ *	- Create link to device's physical location.
  */
 int bus_add_device(struct device * dev)
 {
 	struct bus_type * bus = get_bus(dev->bus);
 	if (bus) {
-		down_write(&dev->bus->rwsem);
+		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: add device %s\n",bus->name,dev->bus_id);
 		list_add_tail(&dev->bus_list,&dev->bus->devices);
 		device_attach(dev);
-		up_write(&dev->bus->rwsem);
+		up_write(&dev->bus->subsys.rwsem);
 		sysfs_create_link(&bus->devsubsys.kobj,&dev->kobj,dev->bus_id);
 	}
 	return 0;
 }
 
 /**
- * bus_remove_device - remove device from bus
- * @dev:	device to be removed
+ *	bus_remove_device - remove device from bus
+ *	@dev:	device to be removed
  *
- * Remove symlink from bus's directory.
- * Delete device from bus's list.
+ *	- Remove symlink from bus's directory.
+ *	- Delete device from bus's list.
+ *	- Detach from its driver.
+ *	- Drop reference taken in bus_add_device().
  */
 void bus_remove_device(struct device * dev)
 {
 	if (dev->bus) {
 		sysfs_remove_link(&dev->bus->devsubsys.kobj,dev->bus_id);
-		down_write(&dev->bus->rwsem);
+		down_write(&dev->bus->subsys.rwsem);
 		pr_debug("bus %s: remove device %s\n",dev->bus->name,dev->bus_id);
 		device_detach(dev);
 		list_del_init(&dev->bus_list);
-		up_write(&dev->bus->rwsem);
+		up_write(&dev->bus->subsys.rwsem);
 		put_bus(dev->bus);
 	}
 }
 
+
+/**
+ *	bus_add_driver - Add a driver to the bus.
+ *	@drv:	driver.
+ *
+ */
 int bus_add_driver(struct device_driver * drv)
 {
 	struct bus_type * bus = get_bus(drv->bus);
 	if (bus) {
-		down_write(&bus->rwsem);
+		down_write(&bus->subsys.rwsem);
 		pr_debug("bus %s: add driver %s\n",bus->name,drv->name);
+
+		strncpy(drv->kobj.name,drv->name,KOBJ_NAME_LEN);
+		drv->kobj.subsys = &bus->drvsubsys;
+		kobject_register(&drv->kobj);
+
+		devclass_add_driver(drv);
 		list_add_tail(&drv->bus_list,&bus->drivers);
 		driver_attach(drv);
-		up_write(&bus->rwsem);
+		up_write(&bus->subsys.rwsem);
 	}
 	return 0;
 }
 
+
+/**
+ *	bus_remove_driver - delete driver from bus's knowledge.
+ *	@drv:	driver.
+ *
+ *	Detach the driver from the devices it controls, and remove
+ *	it from it's bus's list of drivers. Finally, we drop the reference
+ *	to the bus we took in bus_add_driver().
+ */
+
 void bus_remove_driver(struct device_driver * drv)
 {
 	if (drv->bus) {
-		down_write(&drv->bus->rwsem);
+		down_write(&drv->bus->subsys.rwsem);
 		pr_debug("bus %s: remove driver %s\n",drv->bus->name,drv->name);
 		driver_detach(drv);
 		list_del_init(&drv->bus_list);
-		up_write(&drv->bus->rwsem);
+		devclass_remove_driver(drv);
+		kobject_unregister(&drv->kobj);
+		up_write(&drv->bus->subsys.rwsem);
+		put_bus(drv->bus);
 	}
 }
 
 struct bus_type * get_bus(struct bus_type * bus)
 {
-	struct bus_type * ret = bus;
-	spin_lock(&device_lock);
-	if (bus && bus->present && atomic_read(&bus->refcount))
-		atomic_inc(&bus->refcount);
-	else
-		ret = NULL;
-	spin_unlock(&device_lock);
-	return ret;
+	return bus ? container_of(subsys_get(&bus->subsys),struct bus_type,subsys) : NULL;
 }
 
 void put_bus(struct bus_type * bus)
 {
-	if (!atomic_dec_and_lock(&bus->refcount,&device_lock))
-		return;
-	list_del_init(&bus->node);
-	spin_unlock(&device_lock);
-	WARN_ON(bus->present);
+	subsys_put(&bus->subsys);
 }
 
+/**
+ *	bus_register - register a bus with the system.
+ *	@bus:	bus.
+ *
+ *	We take bus_sem here to protect against the bus being 
+ *	unregistered during the registration process.
+ *	Once we have that, we registered the bus with the kobject
+ *	infrastructure, then register the children subsystems it has:
+ *	the devices and drivers that belong to the bus. 
+ */
 int bus_register(struct bus_type * bus)
 {
-	init_rwsem(&bus->rwsem);
 	INIT_LIST_HEAD(&bus->devices);
 	INIT_LIST_HEAD(&bus->drivers);
-	atomic_set(&bus->refcount,2);
-	bus->present = 1;
 
+	down(&bus_sem);
 	strncpy(bus->subsys.kobj.name,bus->name,KOBJ_NAME_LEN);
 	bus->subsys.parent = &bus_subsys;
 	subsystem_register(&bus->subsys);
@@ -402,28 +420,32 @@ int bus_register(struct bus_type * bus)
 	snprintf(bus->drvsubsys.kobj.name,KOBJ_NAME_LEN,"drivers");
 	bus->drvsubsys.parent = &bus->subsys;
 	bus->drvsubsys.sysfs_ops = &driver_sysfs_ops;
+	bus->drvsubsys.release = driver_release;
 	subsystem_register(&bus->drvsubsys);
 
-	spin_lock(&device_lock);
-	list_add_tail(&bus->node,&bus_driver_list);
-	spin_unlock(&device_lock);
-
 	pr_debug("bus type '%s' registered\n",bus->name);
-	put_bus(bus);
+	up(&bus_sem);
 	return 0;
 }
 
+
+/**
+ *	bus_unregister - remove a bus from the system 
+ *	@bus:	bus.
+ *
+ *	Take bus_sem, in case the bus we're registering hasn't 
+ *	finished registering. Once we have it, unregister the child
+ *	subsystems and the bus itself.
+ *	Finally, we call put_bus() to release the refcount
+ */
 void bus_unregister(struct bus_type * bus)
 {
-	spin_lock(&device_lock);
-	bus->present = 0;
-	spin_unlock(&device_lock);
-
+	down(&bus_sem);
 	pr_debug("bus %s: unregistering\n",bus->name);
 	subsystem_unregister(&bus->drvsubsys);
 	subsystem_unregister(&bus->devsubsys);
 	subsystem_unregister(&bus->subsys);
-	put_bus(bus);
+	up(&bus_sem);
 }
 
 static int __init bus_subsys_init(void)
@@ -433,8 +455,6 @@ static int __init bus_subsys_init(void)
 
 core_initcall(bus_subsys_init);
 
-EXPORT_SYMBOL(bus_for_each_dev);
-EXPORT_SYMBOL(bus_for_each_drv);
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
 EXPORT_SYMBOL(bus_register);

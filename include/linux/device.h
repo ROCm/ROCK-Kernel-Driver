@@ -64,14 +64,10 @@ struct device_class;
 
 struct bus_type {
 	char			* name;
-	struct rw_semaphore	rwsem;
-	atomic_t		refcount;
-	u32			present;
 
 	struct subsystem	subsys;
 	struct subsystem	drvsubsys;
 	struct subsystem	devsubsys;
-	struct list_head	node;
 	struct list_head	devices;
 	struct list_head	drivers;
 
@@ -87,11 +83,6 @@ extern void bus_unregister(struct bus_type * bus);
 
 extern struct bus_type * get_bus(struct bus_type * bus);
 extern void put_bus(struct bus_type * bus);
-
-extern int bus_for_each_dev(struct bus_type * bus, void * data, 
-			    int (*callback)(struct device * dev, void * data));
-extern int bus_for_each_drv(struct bus_type * bus, void * data,
-			    int (*callback)(struct device_driver * drv, void * data));
 
 
 /* driverfs interface for exporting bus attributes */
@@ -117,10 +108,7 @@ struct device_driver {
 	struct bus_type		* bus;
 	struct device_class	* devclass;
 
-	rwlock_t		lock;
-	atomic_t		refcount;
-	u32			present;
-
+	struct semaphore	unload_sem;
 	struct kobject		kobj;
 	struct list_head	bus_list;
 	struct list_head	class_list;
@@ -131,8 +119,6 @@ struct device_driver {
 	void	(*shutdown)	(struct device * dev);
 	int	(*suspend)	(struct device * dev, u32 state, u32 level);
 	int	(*resume)	(struct device * dev, u32 level);
-
-	void	(*release)	(struct device_driver * drv);
 };
 
 
@@ -141,10 +127,6 @@ extern void driver_unregister(struct device_driver * drv);
 
 extern struct device_driver * get_driver(struct device_driver * drv);
 extern void put_driver(struct device_driver * drv);
-extern void remove_driver(struct device_driver * drv);
-
-extern int driver_for_each_dev(struct device_driver * drv, void * data, 
-			       int (*callback)(struct device * dev, void * data));
 
 
 /* driverfs interface for exporting driver attributes */
