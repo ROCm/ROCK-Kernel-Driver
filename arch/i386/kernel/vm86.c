@@ -291,7 +291,7 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 
 	tss = init_tss + smp_processor_id();
 	tss->esp0 = tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
-	disable_sysenter();
+	disable_sysenter(tss);
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)

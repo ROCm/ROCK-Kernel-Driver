@@ -347,7 +347,7 @@ struct tss_struct {
 	unsigned long	esp0;
 	unsigned short	ss0,__ss0h;
 	unsigned long	esp1;
-	unsigned short	ss1,__ss1h;
+	unsigned short	ss1,__ss1h;	/* ss1 is used to cache MSR_IA32_SYSENTER_CS */
 	unsigned long	esp2;
 	unsigned short	ss2,__ss2h;
 	unsigned long	__cr3;
@@ -413,15 +413,20 @@ static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)
 {
 	tss->esp0 = esp0;
 	if (cpu_has_sep) {
-		wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
+		if (tss->ss1 != __KERNEL_CS) {
+			tss->ss1 = __KERNEL_CS;
+			wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
+		}
 		wrmsr(MSR_IA32_SYSENTER_ESP, esp0, 0);
 	}
 }
 
-static inline void disable_sysenter(void)
+static inline void disable_sysenter(struct tss_struct *tss)
 {
-	if (cpu_has_sep)  
+	if (cpu_has_sep)  {
+		tss->ss1 = 0;
 		wrmsr(MSR_IA32_SYSENTER_CS, 0, 0);
+	}
 }
 
 #define start_thread(regs, new_eip, new_esp) do {		\

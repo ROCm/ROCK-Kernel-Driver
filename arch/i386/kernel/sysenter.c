@@ -40,6 +40,7 @@ void enable_sep_cpu(void *info)
 	int cpu = get_cpu();
 	struct tss_struct *tss = init_tss + cpu;
 
+	tss->ss1 = __KERNEL_CS;
 	wrmsr(MSR_IA32_SYSENTER_CS, __KERNEL_CS, 0);
 	wrmsr(MSR_IA32_SYSENTER_ESP, tss->esp0, 0);
 	wrmsr(MSR_IA32_SYSENTER_EIP, (unsigned long) sysenter_entry, 0);
