@@ -413,35 +413,31 @@ static void setup_timer(void)
 	outb(LATCH >> 8 , 0x40);	/* MSB */
 }
 
-static int timer_resume(struct device *dev, u32 level)
+static int timer_resume(struct sys_device *dev)
 {
-	if (level == RESUME_POWER_ON)
-		setup_timer();
+	setup_timer();
 	return 0;
 }
 
-static struct device_driver timer_driver = {
-	.name		= "timer",
-	.bus		= &system_bus_type,
+static struct sysdev_class timer_sysclass = {
+	set_kset_name("timer"),
 	.resume		= timer_resume,
 };
 
 static struct sys_device device_timer = {
-	.name		= "timer",
 	.id		= 0,
-	.dev		= {
-		.name	= "timer",
-		.driver	= &timer_driver,
-	},
+	.cls		&timer_sysclass,
 };
 
-static int __init init_timer_devicefs(void)
+static int __init init_timer_sysfs(void)
 {
-	driver_register(&timer_driver);
-	return sys_device_register(&device_timer);
+	int error = sysdev_class_register(&timer_sysclass);
+	if (!error)
+		error = sys_device_register(&device_timer);
+	return error;
 }
 
-device_initcall(init_timer_devicefs);
+device_initcall(init_timer_sysfs);
 
 void __init init_IRQ(void)
 {
