@@ -56,9 +56,11 @@
 #include <linux/usb.h>
 #include <linux/types.h>
 #include <linux/ethtool.h>
+#include <linux/pci.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/byteorder.h>
+#include <asm/dma-mapping.h>
 
 #define DEBUG
 
@@ -1078,6 +1080,9 @@ static int kaweth_probe(
 	SET_MODULE_OWNER(netdev);
 
 	usb_set_intfdata(intf, kaweth);
+
+	if (dma_supported (&intf->dev, 0xffffffffffffffffULL))
+		kaweth->net->features |= NETIF_F_HIGHDMA;
 
 	if (register_netdev(netdev) != 0) {
 		kaweth_err("Error calling init_etherdev.");
