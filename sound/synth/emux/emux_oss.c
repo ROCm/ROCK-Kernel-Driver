@@ -339,9 +339,11 @@ emuspec_control(snd_emux_t *emu, snd_emux_port_t *port, int cmd,
 	p2 = *(short *) &event[6];
 
 	switch (cmd) {
+#if 0 /* don't do this atomically */
 	case _EMUX_OSS_REMOVE_LAST_SAMPLES:
 		snd_soundfont_remove_unlocked(emu->sflist);
 		break;
+#endif
 	case _EMUX_OSS_SEND_EFFECT:
 		if (chan)
 			snd_emux_send_effect_oss(port, chan, p1, p2);
