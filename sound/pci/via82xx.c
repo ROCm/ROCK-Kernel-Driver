@@ -1547,6 +1547,13 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
+	{
+		.vendor = 0x1106,
+		.device = 0x4161,
+		.codec_id = 0x56494161, /* VT1612A */
+		.name = "Soltek SL-75DRV5",
+		.type = AC97_TUNE_NONE
+	},
 	{	/* FIXME: which codec? */
 		.vendor = 0x1106,
 		.device = 0x4161,
@@ -1606,6 +1613,7 @@ static int __devinit snd_via82xx_mixer_new(via82xx_t *chip, int ac97_quirk)
 		return err;
 	chip->ac97_bus->private_free = snd_via82xx_mixer_free_ac97_bus;
 	chip->ac97_bus->clock = chip->ac97_clock;
+	chip->ac97_bus->shared_type = AC97_SHARED_TYPE_VIA;
 
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
@@ -1633,6 +1641,8 @@ static int snd_via8233_init_misc(via82xx_t *chip, int dev)
 	int i, err, caps;
 	unsigned char val;
 
+	pci_write_config_byte(chip->pci, VIA_FUNC_ENABLE,
+			      chip->old_legacy & ~(VIA_FUNC_ENABLE_SB|VIA_FUNC_ENABLE_FM));
 	caps = chip->chip_type == TYPE_VIA8233A ? 1 : 2;
 	for (i = 0; i < caps; i++) {
 		snd_via8233_capture_source.index = i;
@@ -1669,6 +1679,7 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 	legacy_cfg = chip->old_legacy_cfg;
 	legacy |= VIA_FUNC_MIDI_IRQMASK;	/* FIXME: correct? (disable MIDI) */
 	legacy &= ~VIA_FUNC_ENABLE_GAME;	/* disable joystick */
+	legacy &= ~(VIA_FUNC_ENABLE_SB|VIA_FUNC_ENABLE_FM);	/* diable SB & FM */
 	if (chip->revision >= VIA_REV_686_H) {
 		rev_h = 1;
 		if (mpu_port[dev] >= 0x200) {	/* force MIDI */

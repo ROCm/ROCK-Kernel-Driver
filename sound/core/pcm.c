@@ -1050,6 +1050,9 @@ EXPORT_SYMBOL(snd_pcm_release);
 EXPORT_SYMBOL(snd_pcm_playback_poll);
 EXPORT_SYMBOL(snd_pcm_capture_poll);
 EXPORT_SYMBOL(snd_pcm_mmap_data);
+#if SNDRV_PCM_INFO_MMAP_IOMEM
+EXPORT_SYMBOL(snd_pcm_lib_mmap_iomem);
+#endif
  /* pcm_misc.c */
 EXPORT_SYMBOL(snd_pcm_format_signed);
 EXPORT_SYMBOL(snd_pcm_format_unsigned);

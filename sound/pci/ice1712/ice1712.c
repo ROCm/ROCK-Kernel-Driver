@@ -2308,28 +2308,47 @@ static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice, const char *modelna
 {
 	int dev = 0xa0;		/* EEPROM device address */
 	unsigned int i, size;
+	struct snd_ice1712_card_info **tbl, *c;
 
-	if ((inb(ICEREG(ice, I2C_CTRL)) & ICE1712_I2C_EEPROM) == 0) {
-		snd_printk("ICE1712 has not detected EEPROM\n");
-		return -EIO;
-	}
-	if (modelname && *modelname) {
-		struct snd_ice1712_card_info **tbl, *c;
-		for (tbl = card_tables; *tbl; tbl++) {
-			for (c = *tbl; c->subvendor; c++) {
-				if (c->model && !strcmp(modelname, c->model)) {
-					/* use the given subvendor */
-					printk(KERN_INFO "ice1712: Using board model %s\n", c->name);
-					ice->eeprom.subvendor = c->subvendor;
-					break;
-				}
+	if (! modelname || ! *modelname) {
+		ice->eeprom.subvendor = 0;
+		if ((inb(ICEREG(ice, I2C_CTRL)) & ICE1712_I2C_EEPROM) != 0)
+			ice->eeprom.subvendor = (snd_ice1712_read_i2c(ice, dev, 0x00) << 0) |
+				(snd_ice1712_read_i2c(ice, dev, 0x01) << 8) | 
+				(snd_ice1712_read_i2c(ice, dev, 0x02) << 16) | 
+				(snd_ice1712_read_i2c(ice, dev, 0x03) << 24);
+		if (ice->eeprom.subvendor == 0 || ice->eeprom.subvendor == (unsigned int)-1) {
+			/* invalid subvendor from EEPROM, try the PCI subststem ID instead */
+			u16 vendor, device;
+			pci_read_config_word(ice->pci, PCI_SUBSYSTEM_VENDOR_ID, &vendor);
+			pci_read_config_word(ice->pci, PCI_SUBSYSTEM_ID, &device);
+			ice->eeprom.subvendor = ((unsigned int)swab16(vendor) << 16) | swab16(device);
+			if (ice->eeprom.subvendor == 0 || ice->eeprom.subvendor == (unsigned int)-1) {
+				printk(KERN_ERR "ice1712: No valid ID is found\n");
+				return -ENXIO;
 			}
 		}
-	} else
-		ice->eeprom.subvendor = (snd_ice1712_read_i2c(ice, dev, 0x00) << 0) |
-			(snd_ice1712_read_i2c(ice, dev, 0x01) << 8) | 
-			(snd_ice1712_read_i2c(ice, dev, 0x02) << 16) | 
-			(snd_ice1712_read_i2c(ice, dev, 0x03) << 24);
+	}
+	for (tbl = card_tables; *tbl; tbl++) {
+		for (c = *tbl; c->subvendor; c++) {
+			if (modelname && c->model && ! strcmp(modelname, c->model)) {
+				printk(KERN_INFO "ice1712: Using board model %s\n", c->name);
+				ice->eeprom.subvendor = c->subvendor;
+			} else if (c->subvendor != ice->eeprom.subvendor)
+				continue;
+			if (! c->eeprom_size || ! c->eeprom_data)
+				goto found;
+			/* if the EEPROM is given by the driver, use it */
+			snd_printdd("using the defined eeprom..\n");
+			ice->eeprom.version = 1;
+			ice->eeprom.size = c->eeprom_size + 6;
+			memcpy(ice->eeprom.data, c->eeprom_data, c->eeprom_size);
+			goto read_skipped;
+		}
+	}
+	printk(KERN_WARNING "ice1712: No matching model found for ID 0x%x\n", ice->eeprom.subvendor);
+
+ found:
 	ice->eeprom.size = snd_ice1712_read_i2c(ice, dev, 0x04);
 	if (ice->eeprom.size < 6)
 		ice->eeprom.size = 32; /* FIXME: any cards without the correct size? */
@@ -2346,6 +2365,7 @@ static int __devinit snd_ice1712_read_eeprom(ice1712_t *ice, const char *modelna
 	for (i = 0; i < size; i++)
 		ice->eeprom.data[i] = snd_ice1712_read_i2c(ice, dev, i + 6);
 
+ read_skipped:
 	ice->eeprom.gpiomask = ice->eeprom.data[ICE_EEP1_GPIO_MASK];
 	ice->eeprom.gpiostate = ice->eeprom.data[ICE_EEP1_GPIO_STATE];
 	ice->eeprom.gpiodir = ice->eeprom.data[ICE_EEP1_GPIO_DIR];

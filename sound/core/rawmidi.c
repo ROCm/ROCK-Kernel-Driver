@@ -984,6 +984,8 @@ static ssize_t snd_rawmidi_read(struct file *file, char __user *buf, size_t coun
 		}
 		spin_unlock_irq(&runtime->lock);
 		count1 = snd_rawmidi_kernel_read1(substream, buf, count, 0);
+		if (count1 < 0)
+			return result > 0 ? result : count1;
 		result += count1;
 		buf += count1;
 		count -= count1;
@@ -1216,14 +1218,14 @@ static ssize_t snd_rawmidi_write(struct file *file, const char __user *buf, size
 		spin_unlock_irq(&runtime->lock);
 		count1 = snd_rawmidi_kernel_write1(substream, buf, count, 0);
 		if (count1 < 0)
-			continue;
+			return result > 0 ? result : count1;
 		result += count1;
 		buf += count1;
 		if ((size_t)count1 < count && (file->f_flags & O_NONBLOCK))
 			break;
 		count -= count1;
 	}
-	while (file->f_flags & O_SYNC) {
+	if (file->f_flags & O_SYNC) {
 		spin_lock_irq(&runtime->lock);
 		while (runtime->avail != runtime->buffer_size) {
 			wait_queue_t wait;

@@ -33,13 +33,11 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
-#include <linux/gameport.h>
 #include <linux/moduleparam.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/ac97_codec.h>
 #include <sound/info.h>
-#include <sound/mpu401.h>
 #include <sound/initval.h>
 /* for 440MX workaround */
 #include <asm/pgtable.h>
@@ -64,23 +62,12 @@ MODULE_SUPPORTED_DEVICE("{{Intel,82801AA-ICH},"
 		"{AMD,AMD8111},"
 	        "{ALI,M5455}}");
 
-#if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
-#define SUPPORT_JOYSTICK 1
-#endif
-#define SUPPORT_MIDI 1
-
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 0};
 static int ac97_quirk[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = AC97_TUNE_DEFAULT};
 static int buggy_irq[SNDRV_CARDS];
-#ifdef SUPPORT_JOYSTICK
-static int joystick[SNDRV_CARDS];
-#endif
-#ifdef SUPPORT_MIDI
-static int mpu_port[SNDRV_CARDS]; /* disabled */
-#endif
 static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
@@ -95,14 +82,6 @@ module_param_array(ac97_quirk, int, boot_devs, 0444);
 MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(buggy_irq, bool, boot_devs, 0444);
 MODULE_PARM_DESC(buggy_irq, "Enable workaround for buggy interrupts on some motherboards.");
-#ifdef SUPPORT_JOYSTICK
-module_param_array(joystick, bool, boot_devs, 0444);
-MODULE_PARM_DESC(joystick, "Enable joystick for Intel i8x0 soundcard.");
-#endif
-#ifdef SUPPORT_MIDI
-module_param_array(mpu_port, int, boot_devs, 0444);
-MODULE_PARM_DESC(mpu_port, "MPU401 port # for Intel i8x0 driver.");
-#endif
 
 /*
  *  Direct registers
@@ -420,6 +399,7 @@ struct _snd_intel8x0 {
 
 	int multi4: 1,
 	    multi6: 1,
+	    dra: 1,
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
@@ -429,8 +409,6 @@ struct _snd_intel8x0 {
 	ac97_bus_t *ac97_bus;
 	ac97_t *ac97[3];
 	unsigned int ac97_sdin[3];
-
-	snd_rawmidi_t *rmidi;
 
 	spinlock_t reg_lock;
 	spinlock_t ac97_lock;
@@ -837,6 +815,9 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	unsigned int i;
 
 	status = igetdword(chip, chip->int_sta_reg);
+	if (status == 0xffffffff)	/* we are not yet resumed */
+		return IRQ_NONE;
+
 	if ((status & chip->int_sta_mask) == 0) {
 		if (status) {
 			/* ack */
@@ -951,6 +932,7 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	ichdev_t *ichdev = get_ichdev(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	size_t size = params_buffer_bytes(hw_params);
+	int dbl = params_rate(hw_params) > 48000;
 	int err;
 
 	if (chip->fix_nocache && runtime->dma_area && runtime->dma_bytes < size)
@@ -966,7 +948,7 @@ static int snd_intel8x0_hw_params(snd_pcm_substream_t * substream,
 	}
 	err = snd_ac97_pcm_open(ichdev->pcm, params_rate(hw_params),
 				params_channels(hw_params),
-				ichdev->pcm->r[0].slots);
+				ichdev->pcm->r[dbl].slots);
 	if (err >= 0) {
 		ichdev->pcm_open_flag = 1;
 		/* FIXME: hack to enable spdif support */
@@ -991,43 +973,46 @@ static int snd_intel8x0_hw_free(snd_pcm_substream_t * substream)
 }
 
 static void snd_intel8x0_setup_pcm_out(intel8x0_t *chip,
-				       int channels, int sample_bits)
+				       snd_pcm_runtime_t *runtime)
 {
 	unsigned int cnt;
+	int dbl = runtime->rate > 48000;
 	switch (chip->device_type) {
 	case DEVICE_ALI:
 		cnt = igetdword(chip, ICHREG(ALI_SCR));
 		cnt &= ~ICH_ALI_SC_PCM_246_MASK;
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_ALI_SC_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_ALI_SC_PCM_6;
 		iputdword(chip, ICHREG(ALI_SCR), cnt);
 		break;
 	case DEVICE_SIS:
 		cnt = igetdword(chip, ICHREG(GLOB_CNT));
 		cnt &= ~ICH_SIS_PCM_246_MASK;
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_SIS_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_SIS_PCM_6;
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
 		break;
 	default:
 		cnt = igetdword(chip, ICHREG(GLOB_CNT));
 		cnt &= ~(ICH_PCM_246_MASK | ICH_PCM_20BIT);
-		if (chip->multi4 && channels == 4)
+		if (runtime->channels == 4 || dbl)
 			cnt |= ICH_PCM_4;
-		else if (chip->multi6 && channels == 6)
+		else if (runtime->channels == 6)
 			cnt |= ICH_PCM_6;
 		if (chip->device_type == DEVICE_NFORCE) {
 			/* reset to 2ch once to keep the 6 channel data in alignment,
 			 * to start from Front Left always
 			 */
-			iputdword(chip, ICHREG(GLOB_CNT), (cnt & 0xcfffff));
-			mdelay(50); /* grrr... */
+			if (cnt & ICH_PCM_246_MASK) {
+				iputdword(chip, ICHREG(GLOB_CNT), cnt & ~ICH_PCM_246_MASK);
+				msleep(50); /* grrr... */
+			}
 		} else if (chip->device_type == DEVICE_INTEL_ICH4) {
-			if (sample_bits > 16)
+			if (runtime->sample_bits > 16)
 				cnt |= ICH_PCM_20BIT;
 		}
 		iputdword(chip, ICHREG(GLOB_CNT), cnt);
@@ -1046,8 +1031,7 @@ static int snd_intel8x0_pcm_prepare(snd_pcm_substream_t * substream)
 	ichdev->fragsize = snd_pcm_lib_period_bytes(substream);
 	spin_lock_irq(&chip->reg_lock);
 	if (ichdev->ichd == ICHD_PCMOUT) {
-		snd_intel8x0_setup_pcm_out(chip, runtime->channels,
-					   runtime->sample_bits);
+		snd_intel8x0_setup_pcm_out(chip, runtime);
 		if (chip->device_type == DEVICE_INTEL_ICH4) {
 			ichdev->pos_shift = (runtime->sample_bits > 16) ? 2 : 1;
 		}
@@ -1162,6 +1146,9 @@ static int snd_intel8x0_playback_open(snd_pcm_substream_t * substream)
 	} else if (chip->multi4) {
 		runtime->hw.channels_max = 4;
 		snd_pcm_hw_constraint_list(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS, &hw_constraints_channels4);
+	}
+	if (chip->dra) {
+		snd_ac97_pcm_double_rate_rules(runtime);
 	}
 	if (chip->smp20bit) {
 		runtime->hw.formats |= SNDRV_PCM_FMTBIT_S32_LE;
@@ -1657,6 +1644,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 					 (1 << AC97_SLOT_PCM_SLEFT) |
 					 (1 << AC97_SLOT_PCM_SRIGHT) |
 					 (1 << AC97_SLOT_LFE)
+			},
+			{
+				.slots = (1 << AC97_SLOT_PCM_LEFT) |
+					 (1 << AC97_SLOT_PCM_RIGHT) |
+					 (1 << AC97_SLOT_PCM_LEFT_0) |
+					 (1 << AC97_SLOT_PCM_RIGHT_0)
 			}
 		}
 	},
@@ -1713,6 +1706,12 @@ static struct ac97_pcm ac97_pcm_defs[] __devinitdata = {
 static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x0e11,
+		.device = 0x008a,
+		.name = "Compaq Evo W4000",	/* AD1885 */
+		.type = AC97_TUNE_HP_ONLY
+	},
+	{
+		.vendor = 0x0e11,
 		.device = 0x00b8,
 		.name = "Compaq Evo D510C",
 		.type = AC97_TUNE_HP_ONLY
@@ -1759,11 +1758,23 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "HP xw4200",	/* AD1981B*/
 		.type = AC97_TUNE_HP_ONLY
 	},
+	{
+		.vendor = 0x104d,
+		.device = 0x8197,
+		.name = "Sony S1XP",
+		.type = AC97_TUNE_INV_EAPD
+	},
  	{
 		.vendor = 0x1043,
 		.device = 0x80f3,
 		.name = "ASUS ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
+	},
+	{
+		.vendor = 0x10cf,
+		.device = 0x11c3,
+		.name = "Fujitsu-Siemens E4010",
+		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x10f1,
@@ -1939,6 +1950,7 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 	/* FIXME: my test board doesn't work well with VRA... */
 	if (chip->device_type == DEVICE_ALI)
 		pbus->no_vra = 1;
+	pbus->dra = 1;
 	chip->ac97_bus = pbus;
 
 	ac97.pci = chip->pci;
@@ -1998,6 +2010,9 @@ static int __devinit snd_intel8x0_mixer(intel8x0_t *chip, int ac97_clock, int ac
 		chip->multi4 = 1;
 		if (pbus->pcms[0].r[0].slots & (1 << AC97_SLOT_LFE))
 			chip->multi6 = 1;
+	}
+	if (pbus->pcms[0].r[1].rslots[0]) {
+		chip->dra = 1;
 	}
 	if (chip->device_type == DEVICE_INTEL_ICH4) {
 		if ((igetdword(chip, ICHREG(GLOB_STA)) & ICH_SAMPLE_CAP) == ICH_SAMPLE_16_20)
@@ -2686,16 +2701,6 @@ static int __devinit snd_intel8x0_probe(struct pci_dev *pci,
 		return err;
 	}
 	
-	if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
-		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_INTEL8X0,
-					       mpu_port[dev], 0,
-					       -1, 0, &chip->rmidi)) < 0) {
-			printk(KERN_ERR "intel8x0: no UART401 device at 0x%x, skipping.\n", mpu_port[dev]);
-			mpu_port[dev] = 0;
-		}
-	} else
-		mpu_port[dev] = 0;
-
 	snd_intel8x0_proc_init(chip);
 
 	sprintf(card->longname, "%s at 0x%lx, irq %i",
@@ -2728,129 +2733,18 @@ static struct pci_driver driver = {
 };
 
 
-#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-/*
- * initialize joystick/midi addresses
- */
-
-#ifdef SUPPORT_JOYSTICK
-/* there is only one available device, so we keep it here */
-static struct pci_dev *ich_gameport_pci;
-static struct gameport ich_gameport = { .io = 0x200 };
-#endif
-
-static int __devinit snd_intel8x0_joystick_probe(struct pci_dev *pci,
-						 const struct pci_device_id *id)
-{
-	u16 val;
-	static int dev;
-	if (dev >= SNDRV_CARDS)
-		return -ENODEV;
-	if (!enable[dev]) {
-		dev++;
-		return -ENOENT;
-	}
-
-	pci_read_config_word(pci, 0xe6, &val);
-#ifdef SUPPORT_JOYSTICK
-	val &= ~0x100;
-	if (joystick[dev]) {
-		if (! request_region(ich_gameport.io, 8, "ICH gameport")) {
-			printk(KERN_WARNING "intel8x0: cannot grab gameport 0x%x\n",  ich_gameport.io);
-			joystick[dev] = 0;
-		} else {
-			ich_gameport_pci = pci;
-			gameport_register_port(&ich_gameport);
-			val |= 0x100;
-		}
-	}
-#endif
-#ifdef SUPPORT_MIDI
-	val &= ~0x20;
-	if (mpu_port[dev] > 0) {
-		if (mpu_port[dev] == 0x300 || mpu_port[dev] == 0x330) {
-			u8 b;
-			val |= 0x20;
-			pci_read_config_byte(pci, 0xe2, &b);
-			if (mpu_port[dev] == 0x300)
-				b |= 0x08;
-			else
-				b &= ~0x08;
-			pci_write_config_byte(pci, 0xe2, b);
-		}
-	}
-#endif
-	pci_write_config_word(pci, 0xe6, val);
-	return 0;
-}
-
-static void __devexit snd_intel8x0_joystick_remove(struct pci_dev *pci)
-{
-	u16 val;
-#ifdef SUPPORT_JOYSTICK
-	if (ich_gameport_pci == pci) {
-		gameport_unregister_port(&ich_gameport);
-		release_region(ich_gameport.io, 8);
-		ich_gameport_pci = NULL;
-	}
-#endif
-	/* disable joystick and MIDI */
-	pci_read_config_word(pci, 0xe6, &val);
-	val &= ~0x120;
-	pci_write_config_word(pci, 0xe6, val);
-}
-
-static struct pci_device_id snd_intel8x0_joystick_ids[] = {
-	{ 0x8086, 0x2410, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82801AA */
-	{ 0x8086, 0x2420, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 82901AB */
-	{ 0x8086, 0x2440, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* ICH2 */
-	{ 0x8086, 0x244c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 }, /* ICH2M */
-	{ 0x8086, 0x248c, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* ICH3 */
-	// { 0x8086, 0x7195, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* 440MX */
-	// { 0x1039, 0x7012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* SI7012 */
-	{ 0x10de, 0x01b2, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE */
-	{ 0x10de, 0x006b, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE2 */
-	{ 0x10de, 0x00db, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },	/* NFORCE3 */
-	{ 0, }
-};
-
-static struct pci_driver joystick_driver = {
-	.name = "Intel ICH Joystick",
-	.id_table = snd_intel8x0_joystick_ids,
-	.probe = snd_intel8x0_joystick_probe,
-	.remove = __devexit_p(snd_intel8x0_joystick_remove),
-};
-
-static int have_joystick;
-#endif
-
 static int __init alsa_card_intel8x0_init(void)
 {
 	int err;
 
         if ((err = pci_module_init(&driver)) < 0)
                 return err;
-
-#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	if (pci_module_init(&joystick_driver) < 0) {
-		snd_printdd(KERN_INFO "no joystick found\n");
-		have_joystick = 0;
-	} else {
-		snd_printdd(KERN_INFO "joystick(s) found\n");
-		have_joystick = 1;
-	}
-#endif
         return 0;
-
 }
 
 static void __exit alsa_card_intel8x0_exit(void)
 {
 	pci_unregister_driver(&driver);
-#if defined(SUPPORT_JOYSTICK) || defined(SUPPORT_MIDI)
-	if (have_joystick)
-		pci_unregister_driver(&joystick_driver);
-#endif
 }
 
 module_init(alsa_card_intel8x0_init)

@@ -28,9 +28,6 @@
 #include <sound/driver.h>
 #include <linux/init.h>
 #ifdef CONFIG_ACPI_BUS
-#include <acpi/acpi_bus.h>
-#endif
-#ifdef CONFIG_IA64
 #include <linux/acpi.h>
 #endif
 #include <linux/moduleparam.h>
@@ -94,13 +91,9 @@ static acpi_status __devinit snd_mpu401_acpi_resource(struct acpi_resource *res,
 
 	if (res->id == ACPI_RSTYPE_IRQ) {
 		if (res->data.irq.number_of_interrupts > 0) {
-#ifdef CONFIG_IA64
 			resources->irq = acpi_register_gsi(res->data.irq.interrupts[0],
 							   res->data.irq.edge_level,
 							   res->data.irq.active_high_low);
-#else
-			resources->irq = res->data.irq.interrupts[0];
-#endif
 		}
 	} else if (res->id == ACPI_RSTYPE_IO) {
 		if (res->data.io.range_length >= 2) {
@@ -171,7 +164,7 @@ static int __devinit snd_card_mpu401_probe(int dev, struct acpi_device *device)
 	}
 #ifdef USE_ACPI_PNP
 	if (device) {
-		strcat(card->longname, ", bus id ");
+		strcat(card->longname, ", ACPI id ");
 		strlcat(card->longname, acpi_device_bid(device), sizeof(card->longname));
 	}
 #endif
