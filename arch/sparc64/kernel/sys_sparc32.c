@@ -51,6 +51,7 @@
 #include <linux/sysctl.h>
 #include <linux/binfmts.h>
 #include <linux/dnotify.h>
+#include <linux/security.h>
 
 #include <asm/types.h>
 #include <asm/ipc.h>
@@ -1096,7 +1097,7 @@ out_nofree:
 	/* VERIFY_WRITE actually means a read, as we write to user space */
 	if ((retval + (type == VERIFY_WRITE)) > 0)
 		dnotify_parent(file->f_dentry,
-			(type == VERIFY_WRITE) ? DN_MODIFY : DN_ACCESS);
+			(type == VERIFY_WRITE) ? DN_ACCESS : DN_MODIFY);
 
 	return retval;
 }
