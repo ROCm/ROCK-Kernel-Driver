@@ -17,6 +17,7 @@
 #include <linux/config.h>
 #include <linux/notifier.h>
 #include <linux/threads.h>
+#include <linux/device.h>
 
 
 /*********************************************************************
@@ -57,6 +58,7 @@ struct cpufreq_policy {
 	unsigned int            max;    /* in kHz */
         unsigned int            policy; /* see above */
 	struct cpufreq_cpuinfo  cpuinfo;     /* see above */
+	struct intf_data        intf;   /* interface data */
 };
 
 #define CPUFREQ_ADJUST          (0)

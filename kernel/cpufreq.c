@@ -20,12 +20,16 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/spinlock.h>
+#include <linux/device.h>
+
+#ifdef CONFIG_CPU_FREQ_PROC_INTF
 #include <linux/ctype.h>
 #include <linux/proc_fs.h>
-
 #include <asm/uaccess.h>
+#endif
 
 #ifdef CONFIG_CPU_FREQ_24_API
+#include <linux/proc_fs.h>
 #include <linux/sysctl.h>
 #endif
 
@@ -75,10 +79,254 @@ static unsigned int     cpu_cur_freq[NR_CPUS];
 #endif
 
 
+/*********************************************************************
+ *                          SYSFS INTERFACE                          *
+ *********************************************************************/
+
+/**
+ * cpufreq_parse_governor - parse a governor string
+ */
+static int cpufreq_parse_governor (char *str_governor, unsigned int *governor)
+{
+	if (!strnicmp(str_governor, "performance", 11)) {
+		*governor = CPUFREQ_POLICY_PERFORMANCE;
+		return 0;
+	} else if (!strnicmp(str_governor, "powersave", 9)) {
+		*governor = CPUFREQ_POLICY_POWERSAVE;
+		return 0;
+	} else
+		return -EINVAL;
+}
+
+
+/* forward declarations */
+static int cpufreq_add_dev (struct device * dev);
+static int cpufreq_remove_dev (struct intf_data * dev);
+
+/* drivers/base/cpu.c */
+extern struct device_class cpu_devclass;
+
+static struct device_interface cpufreq_interface = {
+        .name = "cpufreq",
+        .devclass = &cpu_devclass,
+        .add_device = &cpufreq_add_dev,
+        .remove_device = &cpufreq_remove_dev,
+	.kset = { .subsys = &cpu_devclass.subsys, },
+        .devnum = 0,
+};
+
+static inline int to_cpu_nr (struct device *dev)
+{
+	struct sys_device * cpu_sys_dev = container_of(dev, struct sys_device, dev);
+	return (cpu_sys_dev->id);
+}
+
+
+/**
+ * cpufreq_per_cpu_attr_read() / show_##file_name() - print out cpufreq information
+ *
+ * Write out information from cpufreq_driver->policy[cpu]; object must be
+ * "unsigned int".
+ */
+
+#define cpufreq_per_cpu_attr_read(file_name, object) 			\
+static ssize_t show_##file_name 					\
+(struct device *dev, char *buf)						\
+{									\
+	unsigned int value = 0;						\
+									\
+	if (!dev)							\
+		return 0;						\
+									\
+	down(&cpufreq_driver_sem);					\
+	if (cpufreq_driver)						\
+		value = cpufreq_driver->policy[to_cpu_nr(dev)].object;	\
+	up(&cpufreq_driver_sem);					\
+									\
+	return sprintf (buf, "%u\n", value);				\
+}
+
+
+/**
+ * cpufreq_per_cpu_attr_write() / store_##file_name() - sysfs write access
+ */
+#define cpufreq_per_cpu_attr_write(file_name, object)			\
+static ssize_t store_##file_name					\
+(struct device *dev, const char *buf)					\
+{									\
+	unsigned int ret = -EINVAL;					\
+	struct cpufreq_policy policy;					\
+									\
+	if (!dev)							\
+		return 0;						\
+									\
+	ret = cpufreq_get_policy(&policy, to_cpu_nr(dev));		\
+	if (ret)							\
+		return ret;						\
+									\
+	ret = sscanf (buf, "%u", &policy.object);			\
+	if (ret != 1)							\
+		return -EINVAL;						\
+									\
+	ret = cpufreq_set_policy(&policy);				\
+	if (ret)							\
+		return ret;						\
+									\
+	return strlen(buf);						\
+}
+
+
+/**
+ * show_scaling_governor - show the current policy for the specified CPU
+ */
+static ssize_t show_scaling_governor (struct device *dev, char *buf)
+{
+	unsigned int value = 0;
+
+	if (!dev)
+		return 0;
+
+	down(&cpufreq_driver_sem);
+	if (cpufreq_driver)
+		value = cpufreq_driver->policy[to_cpu_nr(dev)].policy;
+	up(&cpufreq_driver_sem);
+
+	switch (value) {
+	case CPUFREQ_POLICY_POWERSAVE:
+		return sprintf(buf, "powersave\n");
+	case CPUFREQ_POLICY_PERFORMANCE:
+		return sprintf(buf, "performance\n");
+	}
+
+	return -EINVAL;
+}
+
+
+/**
+ * store_scaling_governor - store policy for the specified CPU
+ */
+static ssize_t store_scaling_governor (struct device *dev, const char *buf) 
+{
+	unsigned int ret = -EINVAL;
+	char	str_governor[16];
+	struct cpufreq_policy policy;
+
+	if (!dev)
+		return 0;
+
+	ret = cpufreq_get_policy(&policy, to_cpu_nr(dev));
+	if (ret)
+		return ret;
+
+	ret = sscanf (buf, "%15s", str_governor);
+	if (ret != 1)
+		return -EINVAL;
+
+	if (cpufreq_parse_governor(str_governor, &policy.policy))
+		return -EINVAL;
+
+	ret = cpufreq_set_policy(&policy);
+	if (ret)
+		return ret;
+
+	return strlen(buf);
+}
+
+
+/**
+ * cpufreq_per_cpu_attr_ro - read-only cpufreq per-CPU file
+ */
+#define cpufreq_per_cpu_attr_ro(file_name, object)			\
+cpufreq_per_cpu_attr_read(file_name, object) 				\
+static DEVICE_ATTR(file_name, S_IRUGO, show_##file_name, NULL);
+
+
+/**
+ * cpufreq_per_cpu_attr_rw - read-write cpufreq per-CPU file
+ */
+#define cpufreq_per_cpu_attr_rw(file_name, object) 			\
+cpufreq_per_cpu_attr_read(file_name, object) 				\
+cpufreq_per_cpu_attr_write(file_name, object) 				\
+static DEVICE_ATTR(file_name, (S_IRUGO | S_IWUSR), show_##file_name, store_##file_name);
+
+
+/* create the file functions */
+cpufreq_per_cpu_attr_ro(cpuinfo_min_freq, cpuinfo.min_freq);
+cpufreq_per_cpu_attr_ro(cpuinfo_max_freq, cpuinfo.max_freq);
+cpufreq_per_cpu_attr_rw(scaling_min_freq, min);
+cpufreq_per_cpu_attr_rw(scaling_max_freq, max);
+
+static DEVICE_ATTR(scaling_governor, (S_IRUGO | S_IWUSR), show_scaling_governor, store_scaling_governor);
+
+
+/**
+ * cpufreq_add_dev - add a CPU device
+ *
+ * Adds the cpufreq interface for a CPU device. 
+ */
+static int cpufreq_add_dev (struct device * dev)
+{
+	unsigned int cpu = to_cpu_nr(dev);
+	int ret = 0;
+
+	down(&cpufreq_driver_sem);
+	if (!cpufreq_driver) {
+		up(&cpufreq_driver_sem);
+		return -EINVAL;
+	}
+
+	/* prepare interface data */
+	cpufreq_driver->policy[cpu].intf.dev  = dev;
+	cpufreq_driver->policy[cpu].intf.intf = &cpufreq_interface;
+	strncpy(cpufreq_driver->policy[cpu].intf.kobj.name, cpufreq_interface.name, KOBJ_NAME_LEN);
+	cpufreq_driver->policy[cpu].intf.kobj.parent = &(dev->kobj);
+	cpufreq_driver->policy[cpu].intf.kobj.kset = &(cpufreq_interface.kset);
+
+	/* add interface */
+	/* currently commented out due to deadlock */
+	//ret = interface_add_data(&(cpufreq_driver->policy[cpu].intf));
+	if (ret) {
+		up(&cpufreq_driver_sem);
+		return ret;
+	}
+
+	/* create files */
+	device_create_file (dev, &dev_attr_cpuinfo_min_freq);
+	device_create_file (dev, &dev_attr_cpuinfo_max_freq);
+	device_create_file (dev, &dev_attr_scaling_min_freq);
+	device_create_file (dev, &dev_attr_scaling_max_freq);
+	device_create_file (dev, &dev_attr_scaling_governor);
+
+	up(&cpufreq_driver_sem);
+	return ret;
+}
+
+
+/**
+ * cpufreq_remove_dev - remove a CPU device
+ *
+ * Removes the cpufreq interface for a CPU device. Is called with
+ * cpufreq_driver_sem locked.
+ */
+static int cpufreq_remove_dev (struct intf_data *intf)
+{
+	struct device * dev = intf->dev;
+
+	device_remove_file (dev, &dev_attr_cpuinfo_min_freq);
+	device_remove_file (dev, &dev_attr_cpuinfo_max_freq);
+	device_remove_file (dev, &dev_attr_scaling_min_freq);
+	device_remove_file (dev, &dev_attr_scaling_max_freq);
+	device_remove_file (dev, &dev_attr_scaling_governor);
+
+	return 0;
+}
+
 
 /*********************************************************************
- *                              2.6. API                             *
+ *                      /proc/cpufreq INTERFACE                      *
  *********************************************************************/
+
+#ifdef CONFIG_CPU_FREQ_PROC_INTF
 
 /**
  * cpufreq_parse_policy - parse a policy string
@@ -95,10 +343,9 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 	unsigned int            min = 0;
 	unsigned int            max = 0;
 	unsigned int            cpu = 0;
-	char			policy_string[42] = {'\0'};
+	char			str_governor[16];
 	struct cpufreq_policy   current_policy;
 	unsigned int            result = -EFAULT;
-	unsigned int            i = 0;
 
 	if (!policy)
 		return -EINVAL;
@@ -108,7 +355,7 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 	policy->policy = 0;
 	policy->cpu = CPUFREQ_ALL_CPUS;
 
-	if (sscanf(input_string, "%d:%d:%d:%s", &cpu, &min, &max, policy_string) == 4) 
+	if (sscanf(input_string, "%d:%d:%d:%15s", &cpu, &min, &max, str_governor) == 4) 
 	{
 		policy->min = min;
 		policy->max = max;
@@ -116,7 +363,7 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 		result = 0;
 		goto scan_policy;
 	}
-	if (sscanf(input_string, "%d%%%d%%%d%%%s", &cpu, &min, &max, policy_string) == 4)
+	if (sscanf(input_string, "%d%%%d%%%d%%%15s", &cpu, &min, &max, str_governor) == 4)
 	{
 		if (!cpufreq_get_policy(&current_policy, cpu)) {
 			policy->min = (min * current_policy.cpuinfo.max_freq) / 100;
@@ -127,7 +374,7 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 		}
 	}
 
-	if (sscanf(input_string, "%d:%d:%s", &min, &max, policy_string) == 3) 
+	if (sscanf(input_string, "%d:%d:%15s", &min, &max, str_governor) == 3) 
 	{
 		policy->min = min;
 		policy->max = max;
@@ -135,7 +382,7 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 		goto scan_policy;
 	}
 
-	if (sscanf(input_string, "%d%%%d%%%s", &min, &max, policy_string) == 3)
+	if (sscanf(input_string, "%d%%%d%%%15s", &min, &max, str_governor) == 3)
 	{
 		if (!cpufreq_get_policy(&current_policy, cpu)) {
 			policy->min = (min * current_policy.cpuinfo.max_freq) / 100;
@@ -148,36 +395,7 @@ static int cpufreq_parse_policy(char input_string[42], struct cpufreq_policy *po
 	return -EINVAL;
 
 scan_policy:
-
-	for (i=0;i<sizeof(policy_string);i++){
-		if (policy_string[i]=='\0')
-			break;
-		policy_string[i] = tolower(policy_string[i]);
-	}
-
-	if (!strncmp(policy_string, "powersave", 6) ||  
-            !strncmp(policy_string, "eco", 3) ||       
-	    !strncmp(policy_string, "batter", 6) ||
-	    !strncmp(policy_string, "low", 3)) 
-	{
-		result = 0;
-		policy->policy = CPUFREQ_POLICY_POWERSAVE;
-	}
-	else if (!strncmp(policy_string, "performance",6) ||
-	    !strncmp(policy_string, "high",4) ||
-	    !strncmp(policy_string, "full",4))
-	{
-		result = 0;
-		policy->policy = CPUFREQ_POLICY_PERFORMANCE;
-	}
-	else if (!cpufreq_get_policy(&current_policy, policy->cpu))
-	{
-		policy->policy = current_policy.policy;
-	}
-	else
-	{
-		policy->policy = 0;
-	}
+	result = cpufreq_parse_governor(str_governor, &policy->policy);
 
 	return result;
 }
@@ -196,8 +414,6 @@ static int __init cpufreq_setup(char *str)
 }
 __setup("cpufreq=", cpufreq_setup);
 
-
-#ifdef CONFIG_PROC_FS
 
 /**
  * cpufreq_proc_read - read /proc/cpufreq
@@ -345,12 +561,15 @@ static void cpufreq_proc_exit (void)
 	remove_proc_entry("cpufreq", &proc_root);
 	return;
 }
-#endif /* CONFIG_PROC_FS */
+#else
+#define cpufreq_proc_init() do {} while(0)
+#define cpufreq_proc_exit() do {} while(0)
+#endif /* CONFIG_CPU_FREQ_PROC_INTF */
 
 
 
 /*********************************************************************
- *                        2.4. COMPATIBLE API                        *
+ *                      /proc/sys/cpu/ INTERFACE                     *
  *********************************************************************/
 
 #ifdef CONFIG_CPU_FREQ_24_API
@@ -1055,7 +1274,9 @@ int cpufreq_register(struct cpufreq_driver *driver_data)
 	cpufreq_sysctl_init();
 #endif
 
-	return 0;
+	ret = interface_register(&cpufreq_interface);
+
+	return ret;
 }
 EXPORT_SYMBOL_GPL(cpufreq_register);
 
@@ -1077,6 +1298,7 @@ int cpufreq_unregister(void)
 		return -EINVAL;
 	}
 
+	interface_unregister(&cpufreq_interface);
 	cpufreq_driver = NULL;
 
 	up(&cpufreq_driver_sem);

@@ -949,15 +949,27 @@ config CPU_FREQ
 
 	  If in doubt, say N.
 
+config CPU_FREQ_PROC_INTF
+	bool "/proc/cpufreq interface (DEPRECATED)"
+	depends on CPU_FREQ && PROC_FS
+	help
+	  This enables the /proc/cpufreq interface for controlling
+	  CPUFreq. Please note that it is recommended to use the sysfs
+	  interface instead (which is built automatically). 
+	  
+	  For details, take a look at linux/Documentation/cpufreq. 
+	  
+	  If in doubt, say N.
+
 config CPU_FREQ_24_API
 	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
 	depends on CPU_FREQ
 	help
 	  This enables the /proc/sys/cpu/ sysctl interface for controlling
 	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses /proc/cpufreq instead. Please note that some drivers do not 
-	  work well with the 2.4. /proc/sys/cpu sysctl interface, so if in
-	  doubt, say N here.
+	  uses a sysfs interface instead. Please note that some drivers do 
+	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
+	  so if in doubt, say N here.
 
 	  For details, take a look at linux/Documentation/cpufreq. 
 
