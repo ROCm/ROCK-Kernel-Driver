@@ -1,8 +1,6 @@
 #ifndef _AV7110_H_
 #define _AV7110_H_
 
-#define DVB_FIRM_PATH "/lib/DVB/"
-
 #include <linux/interrupt.h>
 #include <linux/socket.h>
 #include <linux/netdevice.h>
@@ -545,6 +543,18 @@ struct av7110 {
         int                 dsp_dev;
 
         u32                 ir_config;
+	
+	/* firmware stuff */
+	unsigned int device_initialized;
+
+	unsigned char *bin_fw;
+	unsigned long size_fw;
+
+	unsigned char *bin_dpram;
+	unsigned long size_dpram;
+
+	unsigned char *bin_root;
+	unsigned long size_root;
 };
 
 
