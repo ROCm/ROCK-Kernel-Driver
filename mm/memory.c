@@ -612,19 +612,15 @@ static void unmap_page_range(struct mmu_gather *tlb,
 	tlb_end_vma(tlb, vma);
 }
 
-/* Dispose of an entire struct mmu_gather per rescheduling point */
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(FREE_PTE_NR * PAGE_SIZE)
-#endif
-
-/* For UP, 256 pages at a time gives nice low latency */
-#if !defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(256 * PAGE_SIZE)
-#endif
-
+#ifdef CONFIG_PREEMPT
+/*
+ * It's not an issue to have a small zap block size - TLB flushes
+ * only happen once normally, due to the tlb->need_flush optimization.
+ */
+# define ZAP_BLOCK_SIZE	(8 * PAGE_SIZE)
+#else
 /* No preempt: go for improved straight-line efficiency */
-#if !defined(CONFIG_PREEMPT)
-#define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
+# define ZAP_BLOCK_SIZE	(1024 * PAGE_SIZE)
 #endif
 
 /**
@@ -699,15 +695,15 @@ int unmap_vmas(struct mmu_gather **tlbp, struct mm_struct *mm,
 
 			start += block;
 			zap_bytes -= block;
-			if ((long)zap_bytes > 0)
-				continue;
-			if (!atomic && need_resched()) {
+			if (!atomic) {
 				int fullmm = tlb_is_full_mm(*tlbp);
 				tlb_finish_mmu(*tlbp, tlb_start, start);
 				cond_resched_lock(&mm->page_table_lock);
 				*tlbp = tlb_gather_mmu(mm, fullmm);
 				tlb_start_valid = 0;
 			}
+			if ((long)zap_bytes > 0)
+				continue;
 			zap_bytes = ZAP_BLOCK_SIZE;
 		}
 	}
