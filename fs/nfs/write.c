@@ -841,10 +841,11 @@ nfs_flush_list(struct list_head *head, int wpages, int how)
  * This function is called when the WRITE call is complete.
  */
 void
-nfs_writeback_done(struct rpc_task *task, int stable,
-		   unsigned int arg_count, unsigned int res_count)
+nfs_writeback_done(struct rpc_task *task)
 {
 	struct nfs_write_data	*data = (struct nfs_write_data *) task->tk_calldata;
+	struct nfs_writeargs	*argp = &data->args;
+	struct nfs_writeres	*resp = &data->res;
 	struct inode		*inode = data->inode;
 	struct nfs_page		*req;
 	struct page		*page;
@@ -853,7 +854,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		task->tk_pid, task->tk_status);
 
 	/* We can't handle that yet but we check for it nevertheless */
-	if (res_count < arg_count && task->tk_status >= 0) {
+	if (resp->count < argp->count && task->tk_status >= 0) {
 		static unsigned long    complain;
 		if (time_before(complain, jiffies)) {
 			printk(KERN_WARNING
@@ -865,7 +866,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		task->tk_status = -EIO;
 	}
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (data->verf.committed < stable && task->tk_status >= 0) {
+	if (data->verf.committed < argp->stable && task->tk_status >= 0) {
 		/* We tried a write call, but the server did not
 		 * commit data to stable storage even though we
 		 * requested it.
@@ -880,7 +881,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 			dprintk("NFS: faulty NFS server %s:"
 				" (committed = %d) != (stable = %d)\n",
 				NFS_SERVER(inode)->hostname,
-				data->verf.committed, stable);
+				data->verf.committed, argp->stable);
 			complain = jiffies + 300 * HZ;
 		}
 	}
@@ -917,7 +918,7 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 		end_page_writeback(page);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-		if (stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
+		if (argp->stable != NFS_UNSTABLE || data->verf.committed == NFS_FILE_SYNC) {
 			nfs_inode_remove_request(req);
 			dprintk(" OK\n");
 			goto next;

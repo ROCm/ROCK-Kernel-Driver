@@ -346,12 +346,6 @@ struct nfs4_close {
 	u32				cl_seqid;          /* request */
 };
 
-struct nfs4_commit {
-	u64				co_start;          /* request */
-	u32				co_len;            /* request */
-	struct nfs_writeverf *		co_verifier;       /* response */
-};
-
 struct nfs4_create {
 	u32				cr_ftype;          /* request */
 	union {                                            /* request */
@@ -467,22 +461,11 @@ struct nfs4_setclientid {
 	struct nfs4_client *		sc_state;	  /* response */
 };
 
-struct nfs4_write {
-	u64				wr_offset;        /* request */
-	u32				wr_stable_how;    /* request */
-	u32				wr_len;           /* request */
-	u32 *				wr_bytes_written; /* response */
-	struct nfs_writeverf *		wr_verf;          /* response */
-	struct page **			wr_pages;   /* zero-copy data */
-	unsigned int			wr_pgbase;  /* zero-copy data */
-};
-
 struct nfs4_op {
 	u32				opnum;
 	union {
 		struct nfs4_access	access;
 		struct nfs4_close	close;
-		struct nfs4_commit	commit;
 		struct nfs4_create	create;
 		struct nfs4_getattr	getattr;
 		struct nfs4_getfh	getfh;
@@ -499,7 +482,6 @@ struct nfs4_op {
 		struct nfs4_setattr	setattr;
 		struct nfs4_setclientid	setclientid;
 		struct nfs4_client *	setclientid_confirm;
-		struct nfs4_write	write;
 	} u;
 };
 
@@ -553,21 +535,11 @@ struct nfs_write_data {
 	struct nfs_writeverf	verf;
 	struct list_head	pages;		/* Coalesced requests we wish to flush */
 	struct page		*pagevec[NFS_WRITE_MAXIOV];
-	union {
-		struct {
-			struct nfs_writeargs	args;		/* argument struct */
-			struct nfs_writeres	res;		/* result struct */
-		} v3;
+	struct nfs_writeargs	args;		/* argument struct */
+	struct nfs_writeres	res;		/* result struct */
 #ifdef CONFIG_NFS_V4
-		struct {
-			struct nfs4_compound  compound;
-			struct nfs4_op        ops[3];
-			u32                   arg_count;
-			u32                   arg_stable;
-			u32                   res_count;
-		} v4;
+	unsigned long		timestamp;	/* For lease renewal */
 #endif
-	} u;
 };
 
 /*

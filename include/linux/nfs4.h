@@ -204,6 +204,8 @@ enum {
 	NFSPROC4_CLNT_NULL = 0,		/* Unused */
 	NFSPROC4_CLNT_COMPOUND,		/* Soon to be unused */
 	NFSPROC4_CLNT_READ,
+	NFSPROC4_CLNT_WRITE,
+	NFSPROC4_CLNT_COMMIT,
 };
 
 #endif

@@ -295,8 +295,7 @@ extern int  nfs_writepage(struct page *page, struct writeback_control *wbc);
 extern int  nfs_writepages(struct address_space *, struct writeback_control *);
 extern int  nfs_flush_incompatible(struct file *file, struct page *page);
 extern int  nfs_updatepage(struct file *, struct page *, unsigned int, unsigned int);
-extern void nfs_writeback_done(struct rpc_task *task, int stable,
-			       unsigned int arg_count, unsigned int res_count);
+extern void nfs_writeback_done(struct rpc_task *task);
 extern void nfs_writedata_release(struct rpc_task *task);
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)

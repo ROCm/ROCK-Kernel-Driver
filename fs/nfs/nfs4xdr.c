@@ -87,6 +87,19 @@ extern int			nfs_stat_to_errno(int);
 #define NFS4_dec_read_sz	compound_decode_hdr_maxsz + \
 				decode_putfh_maxsz + \
 				op_decode_hdr_maxsz + 2
+#define NFS4_enc_write_sz	compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz + 8
+#define NFS4_dec_write_sz	compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 4
+#define NFS4_enc_commit_sz	compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				op_encode_hdr_maxsz + 3
+#define NFS4_dec_commit_sz	compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				op_decode_hdr_maxsz + 2
+
 
 static struct {
 	unsigned int	mode;
@@ -332,14 +345,14 @@ encode_close(struct xdr_stream *xdr, struct nfs4_close *close)
 }
 
 static int
-encode_commit(struct xdr_stream *xdr, struct nfs4_commit *commit)
+encode_commit(struct xdr_stream *xdr, struct nfs_writeargs *args)
 {
 	uint32_t *p;
         
         RESERVE_SPACE(16);
         WRITE32(OP_COMMIT);
-        WRITE64(commit->co_start);
-        WRITE32(commit->co_len);
+        WRITE64(args->offset);
+        WRITE32(args->count);
 
         return 0;
 }
@@ -705,9 +718,8 @@ encode_setclientid_confirm(struct xdr_stream *xdr, struct nfs4_client *client_st
 }
 
 static int
-encode_write(struct xdr_stream *xdr, struct nfs4_write *write, struct rpc_rqst *req)
+encode_write(struct xdr_stream *xdr, struct nfs_writeargs *args)
 {
-	struct xdr_buf *sndbuf = &req->rq_snd_buf;
 	uint32_t *p;
 
 	RESERVE_SPACE(36);
@@ -716,11 +728,11 @@ encode_write(struct xdr_stream *xdr, struct nfs4_write *write, struct rpc_rqst *
 	WRITE32(0xffffffff);
 	WRITE32(0xffffffff);
 	WRITE32(0xffffffff);
-	WRITE64(write->wr_offset);
-	WRITE32(write->wr_stable_how);
-	WRITE32(write->wr_len);
+	WRITE64(args->offset);
+	WRITE32(args->stable);
+	WRITE32(args->count);
 
-	xdr_encode_pages(sndbuf, write->wr_pages, write->wr_pgbase, write->wr_len);
+	xdr_write_pages(xdr, args->pages, args->pgbase, args->count);
 
 	return 0;
 }
@@ -745,9 +757,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_CLOSE:
 			status = encode_close(xdr, &cp->ops[i].u.close);
-			break;
-		case OP_COMMIT:
-			status = encode_commit(xdr, &cp->ops[i].u.commit);
 			break;
 		case OP_CREATE:
 			status = encode_create(xdr, &cp->ops[i].u.create);
@@ -805,9 +814,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_SETCLIENTID_CONFIRM:
 			status = encode_setclientid_confirm(xdr, cp->ops[i].u.setclientid_confirm);
-			break;
-		case OP_WRITE:
-			status = encode_write(xdr, &cp->ops[i].u.write, req);
 			break;
 		default:
 			BUG();
@@ -869,6 +875,49 @@ out:
 	return status;
 }
 
+/*
+ * Encode a WRITE request
+ */
+static int
+nfs4_xdr_enc_write(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_write(&xdr, args);
+out:
+	return status;
+}
+
+/*
+ * Encode a COMMIT request
+ */
+static int
+nfs4_xdr_enc_commit(struct rpc_rqst *req, uint32_t *p, struct nfs_writeargs *args)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops   = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (status)
+		goto out;
+	status = encode_commit(&xdr, args);
+out:
+	return status;
+}
 
 /*
  * START OF "GENERIC" DECODE ROUTINES.
@@ -1022,7 +1071,7 @@ decode_close(struct xdr_stream *xdr, struct nfs4_close *close)
 }
 
 static int
-decode_commit(struct xdr_stream *xdr, struct nfs4_commit *commit)
+decode_commit(struct xdr_stream *xdr, struct nfs_writeres *res)
 {
 	uint32_t *p;
 	int status;
@@ -1031,7 +1080,7 @@ decode_commit(struct xdr_stream *xdr, struct nfs4_commit *commit)
 	if (status)
 		return status;
 	READ_BUF(8);
-	COPYMEM(commit->co_verifier->verifier, 8);
+	COPYMEM(res->verf->verifier, 8);
 	return 0;
 }
 
@@ -1672,7 +1721,7 @@ decode_setclientid_confirm(struct xdr_stream *xdr)
 }
 
 static int
-decode_write(struct xdr_stream *xdr, struct nfs4_write *write)
+decode_write(struct xdr_stream *xdr, struct nfs_writeres *res)
 {
 	uint32_t *p;
 	int status;
@@ -1682,11 +1731,9 @@ decode_write(struct xdr_stream *xdr, struct nfs4_write *write)
 		return status;
 
 	READ_BUF(16);
-	READ32(*write->wr_bytes_written);
-	if (*write->wr_bytes_written > write->wr_len)
-		return -EIO;
-	READ32(write->wr_verf->committed);
-	COPYMEM(write->wr_verf->verifier, 8);
+	READ32(res->count);
+	READ32(res->verf->committed);
+	COPYMEM(res->verf->verifier, 8);
 	return 0;
 }
 
@@ -1725,9 +1772,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_CLOSE:
 			status = decode_close(xdr, &op->u.close);
-			break;
-		case OP_COMMIT:
-			status = decode_commit(xdr, &op->u.commit);
 			break;
 		case OP_CREATE:
 			status = decode_create(xdr, &op->u.create);
@@ -1785,9 +1829,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 			break;
 		case OP_SETCLIENTID_CONFIRM:
 			status = decode_setclientid_confirm(xdr);
-			break;
-		case OP_WRITE:
-			status = decode_write(xdr, &op->u.write);
 			break;
 		default:
 			BUG();
@@ -1848,6 +1889,56 @@ out:
 	return status;
 }
 
+/*
+ * Decode WRITE response
+ */
+static int
+nfs4_xdr_dec_write(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_write(&xdr, res);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+	if (!status)
+		status = res->count;
+out:
+	return status;
+}
+
+/*
+ * Decode COMMIT response
+ */
+static int
+nfs4_xdr_dec_commit(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_writeres *res)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (status)
+		goto out;
+	status = decode_putfh(&xdr);
+	if (status)
+		goto out;
+	status = decode_commit(&xdr, res);
+	if (!status)
+		status = -nfs_stat_to_errno(hdr.status);
+out:
+	return status;
+}
+
 uint32_t *
 nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 {
@@ -1901,6 +1992,8 @@ nfs4_decode_dirent(uint32_t *p, struct nfs_entry *entry, int plus)
 struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMPOUND,	enc_compound,	dec_compound),
   PROC(READ,		enc_read,	dec_read),
+  PROC(WRITE,		enc_write,	dec_write),
+  PROC(COMMIT,		enc_commit,	dec_commit),
 };
 
 struct rpc_version		nfs_version4 = {

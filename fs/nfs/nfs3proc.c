@@ -730,12 +730,9 @@ nfs3_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 static void
 nfs3_write_done(struct rpc_task *task)
 {
-	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
-
 	if (nfs3_async_handle_jukebox(task))
 		return;
-	nfs_writeback_done(task, data->u.v3.args.stable,
-			   data->u.v3.args.count, data->u.v3.res.count);
+	nfs_writeback_done(task);
 }
 
 static void
@@ -748,8 +745,8 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_WRITE],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
@@ -762,15 +759,15 @@ nfs3_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 		stable = NFS_UNSTABLE;
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.count  = count;
-	data->u.v3.args.stable = stable;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.pgbase = req->wb_offset;
+	data->args.count  = count;
+	data->args.stable = stable;
+	data->args.pages  = data->pagevec;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
@@ -800,17 +797,17 @@ nfs3_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs3_procedures[NFS3PROC_COMMIT],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
-	data->u.v3.args.fh     = NFS_FH(data->inode);
-	data->u.v3.args.offset = start;
-	data->u.v3.args.count  = len;
-	data->u.v3.res.count   = len;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(data->inode);
+	data->args.offset = start;
+	data->args.count  = len;
+	data->res.count   = len;
+	data->res.fattr   = &data->fattr;
+	data->res.verf    = &data->verf;
 	
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;

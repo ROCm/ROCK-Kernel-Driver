@@ -557,14 +557,6 @@ nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
 }
 
 static void
-nfs_write_done(struct rpc_task *task)
-{
-	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
-	nfs_writeback_done(task, data->u.v3.args.stable,
-			   data->u.v3.args.count, data->u.v3.res.count);
-}
-
-static void
 nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 {
 	struct rpc_task		*task = &data->task;
@@ -573,29 +565,29 @@ nfs_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	int			flags;
 	struct rpc_message	msg = {
 		.rpc_proc	= &nfs_procedures[NFSPROC_WRITE],
-		.rpc_argp	= &data->u.v3.args,
-		.rpc_resp	= &data->u.v3.res,
+		.rpc_argp	= &data->args,
+		.rpc_resp	= &data->res,
 		.rpc_cred	= data->cred,
 	};
 
 	/* Note: NFSv2 ignores @stable and always uses NFS_FILE_SYNC */
 	
 	req = nfs_list_entry(data->pages.next);
-	data->u.v3.args.fh     = NFS_FH(inode);
-	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
-	data->u.v3.args.pgbase = req->wb_offset;
-	data->u.v3.args.count  = count;
-	data->u.v3.args.stable = NFS_FILE_SYNC;
-	data->u.v3.args.pages  = data->pagevec;
-	data->u.v3.res.fattr   = &data->fattr;
-	data->u.v3.res.count   = count;
-	data->u.v3.res.verf    = &data->verf;
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.pgbase = req->wb_offset;
+	data->args.count  = count;
+	data->args.stable = NFS_FILE_SYNC;
+	data->args.pages  = data->pagevec;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.verf    = &data->verf;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
-	rpc_init_task(task, NFS_CLIENT(inode), nfs_write_done, flags);
+	rpc_init_task(task, NFS_CLIENT(inode), nfs_writeback_done, flags);
 	task->tk_calldata = data;
 	/* Release requests */
 	task->tk_release = nfs_writedata_release;

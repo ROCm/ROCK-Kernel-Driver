@@ -94,19 +94,6 @@ nfs4_setup_close(struct nfs4_compound *cp, nfs4_stateid stateid, u32 seqid)
 }
 
 static void
-nfs4_setup_commit(struct nfs4_compound *cp, u64 start, u32 len, struct nfs_writeverf *verf)
-{
-	struct nfs4_commit *commit = GET_OP(cp, commit);
-
-	commit->co_start = start;
-	commit->co_len = len;
-	commit->co_verifier = verf;
-
-	OPNUM(cp) = OP_COMMIT;
-	cp->req_nops++;
-}
-
-static void
 nfs4_setup_create_dir(struct nfs4_compound *cp, struct qstr *name,
 		      struct iattr *sattr, struct nfs4_change_info *info)
 {
@@ -577,26 +564,6 @@ nfs4_setup_setclientid_confirm(struct nfs4_compound *cp)
 }
 
 static void
-nfs4_setup_write(struct nfs4_compound *cp, u64 offset, u32 length, int stable,
-		 struct page **pages, unsigned int pgbase, u32 *bytes_written,
-		 struct nfs_writeverf *verf)
-{
-	struct nfs4_write *write = GET_OP(cp, write);
-
-	write->wr_offset = offset;
-	write->wr_stable_how = stable;
-	write->wr_len = length;
-	write->wr_bytes_written = bytes_written;
-	write->wr_verf = verf;
-
-	write->wr_pages = pages;
-	write->wr_pgbase = pgbase;
-
-	OPNUM(cp) = OP_WRITE;
-	cp->req_nops++;
-}
-
-static void
 renew_lease(struct nfs_server *server, unsigned long timestamp)
 {
 	spin_lock(&renew_lock);
@@ -1026,23 +993,32 @@ nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
 		unsigned int base, unsigned int count,
 		struct page *page, struct nfs_writeverf *verf)
 {
-	u64			offset = page_offset(page) + base;
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[2];
-	u32			bytes_written;
-	int			stable = (flags & NFS_RW_SYNC) ? NFS_FILE_SYNC : NFS_UNSTABLE;
+	struct nfs_server *server = NFS_SERVER(inode);
+	uint64_t offset = page_offset(page) + base;
+	struct nfs_writeargs arg = {
+		.fh		= NFS_FH(inode),
+		.offset		= offset,
+		.count		= count,
+		.stable		= (flags & NFS_RW_SYNC) ? NFS_FILE_SYNC : NFS_UNSTABLE,
+		.pgbase		= base,
+		.pages		= &page,
+	};
+	struct nfs_writeres res = {
+		.fattr		= fattr,
+		.count		= count,
+		.verf		= verf,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_WRITE],
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+		.rpc_cred	= cred,
+	};
 	int			rpcflags = (flags & NFS_RW_SWAP) ? NFS_RPC_SWAPFLAGS : 0;
-	int			status;
 
+	dprintk("NFS call  write %d @ %Ld\n", count, (long long)offset);
 	fattr->valid = 0;
-	nfs4_setup_compound(&compound, ops, NFS_SERVER(inode), "write [sync]");
-	nfs4_setup_putfh(&compound, NFS_FH(inode));
-	nfs4_setup_write(&compound, offset, count, stable, &page, base, &bytes_written, verf);
-	status = nfs4_call_compound(&compound, cred, rpcflags);
-	
-	if (status >= 0)
-		status = bytes_written;
-	return status;
+	return rpc_call_sync(server->client, &msg, rpcflags);
 }
 
 static int
@@ -1410,20 +1386,20 @@ nfs4_write_done(struct rpc_task *task)
 {
 	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
 	
-	process_lease(&data->u.v4.compound);
-	nfs_writeback_done(task, data->u.v4.arg_stable,
-			   data->u.v4.arg_count, data->u.v4.res_count);
+	if (task->tk_status > 0)
+		renew_lease(NFS_SERVER(data->inode), data->timestamp);
+	/* Call back common NFS writeback processing */
+	nfs_writeback_done(task);
 }
 
 static void
 nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 {
 	struct rpc_task	*task = &data->task;
-	struct nfs4_compound *cp = &data->u.v4.compound;
 	struct rpc_message msg = {
-		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMPOUND],
-		.rpc_argp = cp,
-		.rpc_resp = cp,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_WRITE],
+		.rpc_argp = &data->args,
+		.rpc_resp = &data->res,
 		.rpc_cred = data->cred,
 	};
 	struct inode *inode = data->inode;
@@ -1439,11 +1415,16 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 	} else
 		stable = NFS_UNSTABLE;
 
-	nfs4_setup_compound(cp, data->u.v4.ops, NFS_SERVER(inode), "write [async]");
-	nfs4_setup_putfh(cp, NFS_FH(inode));
-	nfs4_setup_write(cp, req_offset(req) + req->wb_offset,
-			 count, stable, data->pagevec, req->wb_offset,
-			 &data->u.v4.res_count, &data->verf);
+	data->args.fh     = NFS_FH(inode);
+	data->args.offset = req_offset(req) + req->wb_offset;
+	data->args.pgbase = req->wb_offset;
+	data->args.count  = count;
+	data->args.stable = stable;
+	data->args.pages  = data->pagevec;
+	data->res.fattr   = &data->fattr;
+	data->res.count   = count;
+	data->res.verf    = &data->verf;
+	data->timestamp   = jiffies;
 
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
@@ -1458,37 +1439,30 @@ nfs4_proc_write_setup(struct nfs_write_data *data, unsigned int count, int how)
 }
 
 static void
-nfs4_commit_done(struct rpc_task *task)
-{
-	struct nfs_write_data *data = (struct nfs_write_data *) task->tk_calldata;
-	
-	process_lease(&data->u.v4.compound);
-	nfs_commit_done(task);
-}
-
-static void
 nfs4_proc_commit_setup(struct nfs_write_data *data, u64 start, u32 len, int how)
 {
 	struct rpc_task	*task = &data->task;
-	struct nfs4_compound *cp = &data->u.v4.compound;
 	struct rpc_message msg = {
-		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMPOUND],
-		.rpc_argp = cp,
-		.rpc_resp = cp,
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_COMMIT],
+		.rpc_argp = &data->args,
+		.rpc_resp = &data->res,
 		.rpc_cred = data->cred,
 	};	
 	struct inode *inode = data->inode;
 	int flags;
 	
-	nfs4_setup_compound(cp, data->u.v4.ops, NFS_SERVER(inode), "commit [async]");
-	nfs4_setup_putfh(cp, NFS_FH(inode));
-	nfs4_setup_commit(cp, start, len, &data->verf);
+	data->args.fh     = NFS_FH(data->inode);
+	data->args.offset = start;
+	data->args.count  = len;
+	data->res.count   = len;
+	data->res.fattr   = &data->fattr;
+	data->res.verf    = &data->verf;
 	
 	/* Set the initial flags for the task.  */
 	flags = (how & FLUSH_SYNC) ? 0 : RPC_TASK_ASYNC;
 
 	/* Finalize the task. */
-	rpc_init_task(task, NFS_CLIENT(inode), nfs4_commit_done, flags);
+	rpc_init_task(task, NFS_CLIENT(inode), nfs_commit_done, flags);
 	task->tk_calldata = data;
 	/* Release requests */
 	task->tk_release = nfs_commit_release;
