@@ -254,6 +254,7 @@ static int elanfreq_cpu_exit(struct cpufreq_policy *policy)
 static int __init elanfreq_setup(char *str)
 {
 	max_freq = simple_strtoul(str, &str, 0);
+	printk(KERN_WARNING "You're using the deprecated elanfreq command line option. Use elanfreq.max_freq instead, please!\n");
 	return 1;
 }
 __setup("elanfreq=", elanfreq_setup);
@@ -300,7 +301,7 @@ static void __exit elanfreq_exit(void)
 }
 
 
-MODULE_PARM (max_freq, "i");
+module_param (max_freq, int, 0444);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Robert Schwebel <r.schwebel@pengutronix.de>, Sven Geggus <sven@geggus.net>");

@@ -733,10 +733,22 @@ static int powernow_k8_cpu_init_acpi(struct powernow_k8_data *data)
 			continue;
 		}
 
-		/* verify only 1 entry from the lo frequency table */
-		if ((fid < HI_FID_TABLE_BOTTOM) && (cntlofreq++)) {
-			printk(KERN_ERR PFX "Too many lo freq table entries\n");
-			goto err_out_mem;
+ 		if (fid < HI_FID_TABLE_BOTTOM) {
+ 			if (cntlofreq) {
+ 				/* if both entries are the same, ignore this
+ 				 * one... 
+ 				 */
+ 				if ((powernow_table[i].frequency != powernow_table[cntlofreq].frequency) ||
+ 				    (powernow_table[i].index != powernow_table[cntlofreq].index)) {
+ 					printk(KERN_ERR PFX "Too many lo freq table entries\n");
+ 					goto err_out_mem;
+ 				}
+				
+ 				dprintk(KERN_INFO PFX "double low frequency table entry, ignoring it.\n");
+ 				powernow_table[i].frequency = CPUFREQ_ENTRY_INVALID;
+ 				continue;
+ 			} else
+ 				cntlofreq = i;
 		}
 
 		if (powernow_table[i].frequency != (data->acpi_data.states[i].core_frequency * 1000)) {
@@ -857,11 +869,8 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 
 	if (smp_processor_id() != pol->cpu) {
 		printk(KERN_ERR "limiting to cpu %u failed\n", pol->cpu);
-		goto sched_out;
+		goto err_out;
 	}
-
-	/* from this point, do not exit without restoring preempt and cpu */
-	preempt_disable();
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "failing targ, change pending bit set\n");
@@ -900,8 +909,6 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 	ret = 0;
 
 err_out:
-	preempt_enable_no_resched();
-sched_out:
 	set_cpus_allowed(current, oldmask);
 	schedule();
 
