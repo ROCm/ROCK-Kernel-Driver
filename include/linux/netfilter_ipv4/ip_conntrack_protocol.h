@@ -7,9 +7,6 @@ struct seq_file;
 
 struct ip_conntrack_protocol
 {
-	/* Next pointer. */
-	struct list_head list;
-
 	/* Protocol number. */
 	u_int8_t proto;
 
@@ -58,14 +55,23 @@ struct ip_conntrack_protocol
 	struct module *me;
 };
 
+#define MAX_IP_CT_PROTO 256
+extern struct ip_conntrack_protocol *ip_ct_protos[MAX_IP_CT_PROTO];
+
 /* Protocol registration. */
 extern int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto);
 extern void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto);
+
+static inline struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol)
+{
+	return ip_ct_protos[protocol];
+}
 
 /* Existing built-in protocols */
 extern struct ip_conntrack_protocol ip_conntrack_protocol_tcp;
 extern struct ip_conntrack_protocol ip_conntrack_protocol_udp;
 extern struct ip_conntrack_protocol ip_conntrack_protocol_icmp;
+extern struct ip_conntrack_protocol ip_conntrack_generic_protocol;
 extern int ip_conntrack_protocol_tcp_init(void);
 
 /* Log invalid packets */

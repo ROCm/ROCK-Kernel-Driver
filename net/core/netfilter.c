@@ -806,7 +806,7 @@ EXPORT_SYMBOL(nf_log_packet);
    tracking in use: without this, connection may not be in hash table,
    and hence manufactured ICMP or RST packets will not be associated
    with it. */
-void (*ip_ct_attach)(struct sk_buff *, struct nf_ct_info *);
+void (*ip_ct_attach)(struct sk_buff *, struct sk_buff *);
 
 void __init netfilter_init(void)
 {

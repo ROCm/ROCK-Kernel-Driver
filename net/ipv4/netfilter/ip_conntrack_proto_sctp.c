@@ -430,16 +430,16 @@ static int sctp_new(struct ip_conntrack *conntrack,
 	DEBUGP("\n");
 
 	if (skb_copy_bits(skb, skb->nh.iph->ihl * 4, &sctph, sizeof(sctph)) != 0)
-		return -1;
+		return 0;
 
 	if (do_basic_checks(conntrack, skb, map) != 0)
-		return -1;
+		return 0;
 
 	/* If an OOTB packet has any of these chunks discard (Sec 8.4) */
 	if ((test_bit (SCTP_CID_ABORT, (void *)map))
 		|| (test_bit (SCTP_CID_SHUTDOWN_COMPLETE, (void *)map))
 		|| (test_bit (SCTP_CID_COOKIE_ACK, (void *)map))) {
-		return -1;
+		return 0;
 	}
 
 	newconntrack = SCTP_CONNTRACK_MAX;
@@ -461,7 +461,7 @@ static int sctp_new(struct ip_conntrack *conntrack,
 
 				if (skb_copy_bits(skb, offset + sizeof (sctp_chunkhdr_t), 
 					&inithdr, sizeof(inithdr)) != 0) {
-						return -1;
+						return 0;
 				}
 
 				DEBUGP("Setting vtag %x for new conn\n", 
@@ -471,7 +471,7 @@ static int sctp_new(struct ip_conntrack *conntrack,
 								inithdr.init_tag;
 			} else {
 				/* Sec 8.5.1 (A) */
-				return -1;
+				return 0;
 			}
 		}
 		/* If it is a shutdown ack OOTB packet, we expect a return
@@ -496,7 +496,6 @@ static int sctp_exp_matches_pkt(struct ip_conntrack_expect *exp,
 }
 
 struct ip_conntrack_protocol ip_conntrack_protocol_sctp = { 
-	.list 		 = { NULL, NULL }, 
 	.proto 		 = IPPROTO_SCTP, 
 	.name 		 = "sctp",
 	.pkt_to_tuple 	 = sctp_pkt_to_tuple, 

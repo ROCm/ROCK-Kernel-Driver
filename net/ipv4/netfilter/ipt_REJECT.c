@@ -41,14 +41,14 @@ MODULE_DESCRIPTION("iptables REJECT target module");
 /* If the original packet is part of a connection, but the connection
    is not confirmed, our manufactured reply will not be associated
    with it, so we need to do this manually. */
-static void connection_attach(struct sk_buff *new_skb, struct nf_ct_info *nfct)
+static void connection_attach(struct sk_buff *new_skb, struct sk_buff *skb)
 {
-	void (*attach)(struct sk_buff *, struct nf_ct_info *);
+	void (*attach)(struct sk_buff *, struct sk_buff *);
 
 	/* Avoid module unload race with ip_ct_attach being NULLed out */
-	if (nfct && (attach = ip_ct_attach) != NULL) {
+	if (skb->nfct && (attach = ip_ct_attach) != NULL) {
 		mb(); /* Just to be sure: must be read before executing this */
-		attach(new_skb, nfct);
+		attach(new_skb, skb);
 	}
 }
 
@@ -209,7 +209,7 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	if (nskb->len > dst_pmtu(nskb->dst))
 		goto free_nskb;
 
-	connection_attach(nskb, oldskb->nfct);
+	connection_attach(nskb, oldskb);
 
 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
 		ip_finish_output);
@@ -360,7 +360,7 @@ static void send_unreach(struct sk_buff *skb_in, int code)
 	icmph->checksum = ip_compute_csum((unsigned char *)icmph,
 					  length - sizeof(struct iphdr));
 
-	connection_attach(nskb, skb_in->nfct);
+	connection_attach(nskb, skb_in);
 
 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, nskb, NULL, nskb->dst->dev,
 		ip_finish_output);
