@@ -97,7 +97,7 @@ void __init time_init(void)
 	gettimeoffset = sa1100_gettimeoffset;
 	set_rtc = sa1100_set_rtc;
 
-	tv.tv.nsec = 0;
+	tv.tv_nsec = 0;
 	tv.tv_sec = sa1100_get_rtc_time();
 	do_settimeofday(&tv);
 
