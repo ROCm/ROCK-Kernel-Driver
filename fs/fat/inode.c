@@ -177,7 +177,6 @@ void fat_put_super(struct super_block *sb)
 		fat_clusters_flush(sb);
 	}
 	fat_cache_inval_dev(sb);
-	set_blocksize (sb->s_dev,BLOCK_SIZE);
 	if (sbi->nls_disk) {
 		unload_nls(sbi->nls_disk);
 		sbi->nls_disk = NULL;

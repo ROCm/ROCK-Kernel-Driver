@@ -991,7 +991,6 @@ int function2code (hashf_t func)
 //
 static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 {
-    int size;
     struct inode *root_inode;
     int j;
     struct reiserfs_transaction_handle th ;
@@ -1013,9 +1012,6 @@ static int reiserfs_fill_super(struct super_block *s, void *data, int silent)
 	return -EINVAL;
     }	
 
-    size = block_size(s->s_dev);
-    sb_set_blocksize(s, size);
-    
     /* try old format (undistributed bitmap, super block in 8-th 1k block of a device) */
     if (!read_super_block (s, REISERFS_OLD_DISK_OFFSET_IN_BYTES)) 
       old_format = 1;

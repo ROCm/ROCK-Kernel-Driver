@@ -176,9 +176,6 @@ static void hfs_put_super(struct super_block *sb)
 	/* release the MDB's resources */
 	hfs_mdb_put(mdb, sb->s_flags & MS_RDONLY);
 
-	/* restore default blocksize for the device */
-	set_blocksize(sb->s_dev, BLOCK_SIZE);
-
 	kfree(sb->u.generic_sbp);
 	sb->u.generic_sbp = NULL;
 }
@@ -449,7 +446,6 @@ int hfs_fill_super(struct super_block *s, void *data, int silent)
 	struct hfs_sb_info *sbi;
 	struct hfs_mdb *mdb;
 	struct hfs_cat_key key;
-	kdev_t dev = s->s_dev;
 	hfs_s32 part_size, part_start;
 	struct inode *root_inode;
 	int part;
@@ -462,7 +458,7 @@ int hfs_fill_super(struct super_block *s, void *data, int silent)
 
 	if (!parse_options((char *)data, sbi, &part)) {
 		hfs_warn("hfs_fs: unable to parse mount options.\n");
-		goto bail3;
+		goto bail2;
 	}
 
 	/* set the device driver to 512-byte blocks */
@@ -530,8 +526,6 @@ bail_no_root:
 bail1:
 	hfs_mdb_put(mdb, s->s_flags & MS_RDONLY);
 bail2:
-	set_blocksize(dev, BLOCK_SIZE);
-bail3:
 	kfree(sbi);
 	s->u.generic_sbp = NULL;
 	return -EINVAL;	
