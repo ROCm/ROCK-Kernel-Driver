@@ -32,15 +32,6 @@
 #include <asm/regs306x.h>
 #include <asm/errno.h>
 
-#define EXT_IRQ0 12
-#define EXT_IRQ1 13
-#define EXT_IRQ2 14
-#define EXT_IRQ3 15
-#define EXT_IRQ4 16
-#define EXT_IRQ5 17
-#define EXT_IRQ6 18
-#define EXT_IRQ7 19
-
 /*
  * This structure has only 4 elements for speed reasons
  */
@@ -174,7 +165,7 @@ void free_irq(unsigned int irq, void *dev_id)
 		       irq, irq_list[irq]->devname);
 	if (irq >= EXT_IRQ0 && irq <= EXT_IRQ5)
 		*(volatile unsigned char *)IER &= ~(1 << (irq - EXT_IRQ0));
-	if ((irq_list[irq] & 0x80000000) == 0) {
+	if (((unsigned long)irq_list[irq] & 0x80000000) == 0) {
 		kfree(irq_list[irq]);
 		irq_list[irq] = NULL;
 	}
@@ -244,8 +235,9 @@ void init_irq_proc(void)
 {
 }
 
-static void __init enable_kmalloc(void)
+static int __init enable_kmalloc(void)
 {
 	use_kmalloc = 1;
+	return 0;
 }
-__initcall(enable_kmalloc);
+core_initcall(enable_kmalloc);

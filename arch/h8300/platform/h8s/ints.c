@@ -33,23 +33,6 @@
 #include <asm/regs267x.h>
 #include <asm/errno.h>
 
-#define EXT_IRQ0 16
-#define EXT_IRQ1 17
-#define EXT_IRQ2 18
-#define EXT_IRQ3 19
-#define EXT_IRQ4 20
-#define EXT_IRQ5 21
-#define EXT_IRQ6 22
-#define EXT_IRQ7 23
-#define EXT_IRQ8 24
-#define EXT_IRQ9 25
-#define EXT_IRQ10 26
-#define EXT_IRQ11 27
-#define EXT_IRQ12 28
-#define EXT_IRQ13 29
-#define EXT_IRQ14 30
-#define EXT_IRQ15 31
-
 /*
  * This structure has only 4 elements for speed reasons
  */
@@ -310,4 +293,4 @@ static int __init enable_kmalloc(void)
 	use_kmalloc = 1;
 	return 0;
 }
-__initcall(enable_kmalloc);
+core_initcall(enable_kmalloc);
