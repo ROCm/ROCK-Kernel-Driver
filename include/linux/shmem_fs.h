@@ -11,11 +11,11 @@ extern atomic_t shmem_nrpages;
 
 struct shmem_inode_info {
 	spinlock_t		lock;
-	struct semaphore 	sem;
 	unsigned long		next_index;
 	swp_entry_t		i_direct[SHMEM_NR_DIRECT]; /* for the first blocks */
-	void		      **i_indirect; /* indirect blocks */
-	unsigned long		swapped;
+	struct page	       *i_indirect; /* indirect blocks */
+	unsigned long		alloced;    /* data pages allocated to file */
+	unsigned long		swapped;    /* subtotal assigned to swap */
 	unsigned long		flags;
 	struct list_head	list;
 	struct inode		vfs_inode;

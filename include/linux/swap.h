@@ -218,7 +218,7 @@ extern spinlock_t swaplock;
 #define swap_device_lock(p)	spin_lock(&p->sdev_lock)
 #define swap_device_unlock(p)	spin_unlock(&p->sdev_lock)
 
-extern void shmem_unuse(swp_entry_t entry, struct page *page);
+extern int shmem_unuse(swp_entry_t entry, struct page *page);
 
 #endif /* __KERNEL__*/
 

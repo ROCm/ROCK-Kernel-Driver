@@ -56,6 +56,7 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 {
 	struct thread_struct * t = &current->thread;
 	struct tss_struct * tss;
+	unsigned long *bitmap = NULL;
 	int ret = 0;
 
 	if ((from + num <= from) || (from + num > IO_BITMAP_SIZE*32))
@@ -63,15 +64,12 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 	if (turn_on && !capable(CAP_SYS_RAWIO))
 		return -EPERM;
 
-	tss = init_tss + get_cpu();
-
 	/*
 	 * If it's the first ioperm() call in this thread's lifetime, set the
 	 * IO bitmap up. ioperm() is much less timing critical than clone(),
 	 * this is why we delay this operation until now:
 	 */
 	if (!t->ts_io_bitmap) {
-		unsigned long *bitmap;
 		bitmap = kmalloc(IO_BITMAP_BYTES, GFP_KERNEL);
 		if (!bitmap) {
 			ret = -ENOMEM;
@@ -83,20 +81,19 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		 */
 		memset(bitmap, 0xff, IO_BITMAP_BYTES);
 		t->ts_io_bitmap = bitmap;
-		/*
-		 * this activates it in the TSS
-		 */
-		tss->bitmap = IO_BITMAP_OFFSET;
 	}
+
+	tss = init_tss + get_cpu();
+	if (bitmap)
+		tss->bitmap = IO_BITMAP_OFFSET;	/* Activate it in the TSS */
 
 	/*
 	 * do it in the per-thread copy and in the TSS ...
 	 */
 	set_bitmap(t->ts_io_bitmap, from, num, !turn_on);
 	set_bitmap(tss->io_bitmap, from, num, !turn_on);
-
-out:
 	put_cpu();
+out:
 	return ret;
 }
 

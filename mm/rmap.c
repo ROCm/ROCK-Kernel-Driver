@@ -274,11 +274,11 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 		BUG();
 	if (!pfn_valid(page_to_pfn(page)) || PageReserved(page))
 		return;
+	if (!page_mapped(page))
+		return;		/* remap_page_range() from a driver? */
 
 	pte_chain_lock(page);
 
-	BUG_ON(page->pte.direct == 0);
- 
 	if (PageDirect(page)) {
 		if (page->pte.direct == pte_paddr) {
 			page->pte.direct = 0;

@@ -100,7 +100,7 @@ int swap_writepage(struct page *page)
 		ret = -ENOMEM;
 		goto out;
 	}
-	kstat.pswpout++;
+	inc_page_state(pswpout);
 	SetPageWriteback(page);
 	unlock_page(page);
 	submit_bio(WRITE, bio);
@@ -119,7 +119,7 @@ int swap_readpage(struct file *file, struct page *page)
 		ret = -ENOMEM;
 		goto out;
 	}
-	kstat.pswpin++;
+	inc_page_state(pswpin);
 	submit_bio(READ, bio);
 out:
 	return ret;
