@@ -2733,11 +2733,9 @@ EXPORT_SYMBOL_GPL(set_cpus_allowed);
 static void move_task_away(struct task_struct *p, int dest_cpu)
 {
 	runqueue_t *rq_dest;
-	unsigned long flags;
 
 	rq_dest = cpu_rq(dest_cpu);
 
-	local_irq_save(flags);
 	double_rq_lock(this_rq(), rq_dest);
 	if (task_cpu(p) != smp_processor_id())
 		goto out; /* Already moved */
@@ -2753,7 +2751,6 @@ static void move_task_away(struct task_struct *p, int dest_cpu)
 
 out:
 	double_rq_unlock(this_rq(), rq_dest);
-	local_irq_restore(flags);
 }
 
 /*
@@ -2792,10 +2789,11 @@ static int migration_thread(void * data)
 		}
 		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
-		spin_unlock_irq(&rq->lock);
+		spin_unlock(&rq->lock);
 
 		move_task_away(req->task,
 			       any_online_cpu(req->task->cpus_allowed));
+		local_irq_enable();
 		complete(&req->done);
 	}
 	return 0;
