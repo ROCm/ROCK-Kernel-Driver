@@ -85,18 +85,11 @@ static void snd_tea575x_set_freq(tea575x_t *tea)
  * Linux Video interface
  */
 
-static int snd_tea575x_open(struct video_device *dev, int flags)
+static int snd_tea575x_do_ioctl(struct inode *inode, struct file *file,
+			        unsigned int cmd, void *arg)
 {
-	return 0;
-}
-
-static void snd_tea575x_close(struct video_device *dev)
-{
-}
-
-static int snd_tea575x_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
-{
-	tea575x_t *tea = dev->priv;
+	struct video_device *dev = video_devdata(file);
+	tea575x_t *tea = video_get_drvdata(dev);
 	
 	switch(cmd) {
 		case VIDIOCGCAP:
@@ -174,6 +167,12 @@ static int snd_tea575x_ioctl(struct video_device *dev, unsigned int cmd, void *a
 	}
 }
 
+static int snd_tea575x_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	return video_usercopy(inode, file, cmd, arg, snd_tea575x_do_ioctl);
+}
+
 /*
  * initialize all the tea575x chips
  */
@@ -192,10 +191,12 @@ void snd_tea575x_init(tea575x_t *tea)
 	strcpy(tea->vd.name, tea->tea5759 ? "TEA5759 radio" : "TEA5757 radio");
 	tea->vd.type = VID_TYPE_TUNER;
 	tea->vd.hardware = VID_HARDWARE_RTRACK;	/* FIXME: assign new number */
-	tea->vd.open = snd_tea575x_open;
-	tea->vd.close = snd_tea575x_close;
-	tea->vd.ioctl = snd_tea575x_ioctl;
-	tea->vd.priv = tea;
+	video_set_drvdata(&tea->vd, tea);
+	tea->vd.fops = &tea->fops;
+	tea->fops.owner = tea->card->module;
+	tea->fops.open = video_exclusive_open;
+	tea->fops.release = video_exclusive_release;
+	tea->fops.ioctl = snd_tea575x_ioctl;
 	if (video_register_device(&tea->vd, VFL_TYPE_RADIO, tea->dev_nr - 1) < 0) {
 		snd_printk(KERN_ERR "unable to register tea575x tuner\n");
 		return;
