@@ -1441,7 +1441,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if ((server->idmap = nfs_idmap_new(server)) == NULL)
 		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
 
-	err = nfs_sb_init(sb);
+	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
 	rpciod_down();
