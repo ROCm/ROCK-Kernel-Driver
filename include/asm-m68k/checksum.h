@@ -25,11 +25,14 @@ unsigned int csum_partial(const unsigned char * buff, int len, unsigned int sum)
  * better 64-bit) boundary
  */
 
-extern unsigned int csum_partial_copy_from_user(const char *src, char *dst,
-						int len, int sum, int *csum_err);
+extern unsigned int csum_partial_copy_from_user(const unsigned char *src,
+						unsigned char *dst,
+						int len, int sum,
+						int *csum_err);
 
-extern unsigned int csum_partial_copy_nocheck(const char *src, char *dst,
-					      int len, int sum);
+extern unsigned int csum_partial_copy_nocheck(const unsigned char *src,
+					      unsigned char *dst, int len,
+					      int sum);
 
 /*
  *	This is a version of ip_compute_csum() optimized for IP headers,
