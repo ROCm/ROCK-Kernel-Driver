@@ -34,17 +34,13 @@ static struct cpufreq_driver   	*cpufreq_driver;
 static struct cpufreq_policy	*cpufreq_cpu_data[NR_CPUS];
 static spinlock_t		cpufreq_driver_lock = SPIN_LOCK_UNLOCKED;
 
-/* will go away once the locking mess is cleaned up */
-static DECLARE_MUTEX            (cpufreq_driver_sem);
 
 /**
  * Two notifier lists: the "policy" list is involved in the 
  * validation process for a new CPU frequency policy; the 
  * "transition" list for kernel code that needs to handle
  * changes to devices when the CPU clock speed changes.
- * The mutex locks both lists. If both cpufreq_driver_sem
- * and cpufreq_notifier_sem need to be hold, get cpufreq_driver_sem
- * first.
+ * The mutex locks both lists.
  */
 static struct notifier_block    *cpufreq_policy_notifier_list;
 static struct notifier_block    *cpufreq_transition_notifier_list;
@@ -784,8 +780,6 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 
 	up_read(&cpufreq_notifier_rwsem);
 
-	/* from here on we limit it to one limit and/or governor change running at the moment */
-	down(&cpufreq_driver_sem);
 	data->min    = policy->min;
 	data->max    = policy->max;
 
@@ -815,7 +809,6 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 		}
 		__cpufreq_governor(data, CPUFREQ_GOV_LIMITS);
 	}
-	up(&cpufreq_driver_sem);
 
  error_out:
 	up(&data->lock);
@@ -944,14 +937,10 @@ int cpufreq_unregister_driver(struct cpufreq_driver *driver)
 
 	sysdev_driver_unregister(&cpu_sysdev_class, &cpufreq_sysdev_driver);
 
-	down(&cpufreq_driver_sem);
-
 	spin_lock_irqsave(&cpufreq_driver_lock, flags);
 	kfree(cpufreq_driver->policy);
 	cpufreq_driver = NULL;
 	spin_unlock_irqrestore(&cpufreq_driver_lock, flags);
-
-	up(&cpufreq_driver_sem);
 
 	return 0;
 }
