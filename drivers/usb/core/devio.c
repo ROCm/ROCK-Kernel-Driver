@@ -1205,8 +1205,6 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		up_read(&ps->devsem);
 		return -ENODEV;
 	}
-	down(&(ps->dev->serialize));
-
 	switch (cmd) {
 	case USBDEVFS_CONTROL:
 		ret = proc_control(ps, (void __user *)arg);
@@ -1286,7 +1284,6 @@ static int usbdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 		ret = proc_ioctl(ps, (void __user *) arg);
 		break;
 	}
-	up(&(ps->dev->serialize));
 	up_read(&ps->devsem);
 	if (ret >= 0)
 		inode->i_atime = CURRENT_TIME;
