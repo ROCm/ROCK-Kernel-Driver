@@ -52,6 +52,9 @@
 
 #define VM_ACCT(size)    (PAGE_CACHE_ALIGN(size) >> PAGE_SHIFT)
 
+/* info->flags needs a VM_flag to handle swapoff/truncate races efficiently */
+#define SHMEM_PAGEIN	 VM_READ
+
 /* Pretend that each entry is of this size in directory's i_size */
 #define BOGO_DIRENT_SIZE 20
 
@@ -490,6 +493,16 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
+	if (inode->i_mapping->nrpages && (info->flags & SHMEM_PAGEIN)) {
+		/*
+		 * Call truncate_inode_pages again: racing shmem_unuse_inode
+		 * may have swizzled a page in from swap since vmtruncate or
+		 * generic_delete_inode did it, before we lowered next_index.
+		 */
+		spin_unlock(&info->lock);
+		truncate_inode_pages(inode->i_mapping, inode->i_size);
+		spin_lock(&info->lock);
+	}
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -523,6 +536,19 @@ static int shmem_notify_change(struct dentry *dentry, struct iattr *attr)
 				(void) shmem_getpage(inode,
 					attr->ia_size>>PAGE_CACHE_SHIFT,
 						&page, SGP_READ);
+			}
+			/*
+			 * Reset SHMEM_PAGEIN flag so that shmem_truncate can
+			 * detect if any pages might have been added to cache
+			 * after truncate_inode_pages.  But we needn't bother
+			 * if it's being fully truncated to zero-length: the
+			 * nrpages check is efficient enough in that case.
+			 */
+			if (attr->ia_size) {
+				struct shmem_inode_info *info = SHMEM_I(inode);
+				spin_lock(&info->lock);
+				info->flags &= ~SHMEM_PAGEIN;
+				spin_unlock(&info->lock);
 			}
 		}
 	}
@@ -638,14 +664,10 @@ lost2:
 found:
 	idx += offset;
 	inode = &info->vfs_inode;
-
-	/* Racing against delete or truncate? Must leave out of page cache */
-	limit = (inode->i_state & I_FREEING)? 0:
-		(i_size_read(inode) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
-
-	if (idx >= limit ||
-	    move_from_swap_cache(page, idx, inode->i_mapping) == 0)
+	if (move_from_swap_cache(page, idx, inode->i_mapping) == 0) {
+		info->flags |= SHMEM_PAGEIN;
 		shmem_swp_set(info, ptr + offset, 0);
+	}
 	shmem_swp_unmap(ptr);
 	spin_unlock(&info->lock);
 	/*
@@ -653,7 +675,7 @@ found:
 	 * try_to_unuse will skip over mms, then reincrement count.
 	 */
 	swap_free(entry);
-	return idx < limit;
+	return 1;
 }
 
 /*
