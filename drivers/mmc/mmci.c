@@ -31,9 +31,10 @@
 #define DRIVER_NAME "mmci-pl18x"
 
 #ifdef CONFIG_MMC_DEBUG
-#define DBG(x...)	pr_debug(x)
+#define DBG(host,fmt,args...)	\
+	pr_debug("%s: %s: " fmt, host->mmc->host_name, __func__ , args)
 #else
-#define DBG(x...)	do { } while (0)
+#define DBG(host,fmt,args...)	do { } while (0)
 #endif
 
 static unsigned int fmax = 515633;
@@ -63,9 +64,8 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
 	unsigned int datactrl, timeout, irqmask;
 
-	DBG("%s: data: blksz %04x blks %04x flags %08x\n",
-	    host->mmc->host_name, 1 << data->blksz_bits, data->blocks,
-	    data->flags);
+	DBG(host, "blksz %04x blks %04x flags %08x\n",
+	    1 << data->blksz_bits, data->blocks, data->flags);
 
 	host->data = data;
 	host->buffer = data->req->buffer;
@@ -98,8 +98,8 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 static void
 mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 {
-	DBG("%s: cmd: op %02x arg %08x flags %08x\n",
-	    host->mmc->host_name, cmd->opcode, cmd->arg, cmd->flags);
+	DBG(host, "op %02x arg %08x flags %08x\n",
+	    cmd->opcode, cmd->arg, cmd->flags);
 
 	if (readl(host->base + MMCICOMMAND) & MCI_CPSM_ENABLE) {
 		writel(0, host->base + MMCICOMMAND);
@@ -189,7 +189,7 @@ static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 				MCI_TXFIFOEMPTY|MCI_TXFIFOHALFEMPTY)))
 			break;
 
-		DBG("%s: irq1 %08x\n", host->mmc->host_name, status);
+		DBG(host, "irq1 %08x\n", status);
 
 		if (status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL)) {
 			int count = host->size - (readl(host->base + MMCIFIFOCNT) << 2);
@@ -260,7 +260,7 @@ static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 		if (!(status & MCI_IRQMASK))
 			break;
 
-		DBG("%s: irq0 %08x\n", host->mmc->host_name, status);
+		DBG(host, "irq0 %08x\n", status);
 
 		data = host->data;
 		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|
@@ -302,9 +302,8 @@ static void mmci_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	struct mmci_host *host = mmc_priv(mmc);
 	u32 clk = 0, pwr = 0;
 
-	DBG("%s: set_ios: clock %uHz busmode %u powermode %u Vdd %u\n",
-	    mmc->host_name, ios->clock, ios->bus_mode, ios->power_mode,
-	    ios->vdd);
+	DBG(host, "clock %uHz busmode %u powermode %u Vdd %u\n",
+	    ios->clock, ios->bus_mode, ios->power_mode, ios->vdd);
 
 	if (ios->clock) {
 		if (ios->clock >= host->mclk) {
