@@ -12,7 +12,7 @@ config PROC_CONFIG
 	bool
 	default y
 
-config CONFIG_CFGNAME
+config CFGNAME
 	string "Configuration name"
 	default ""
 	help
@@ -21,7 +21,7 @@ config CONFIG_CFGNAME
 	  CONFIG_CFGNAME option to $CFGNAME. The configuration name is
 	  part of the EXTRAVERSION.
 
-config CONFIG_RELEASE
+config RELEASE
 	int "Release number"
 	default 0
 	help
