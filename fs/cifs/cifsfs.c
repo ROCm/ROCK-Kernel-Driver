@@ -47,12 +47,12 @@ extern struct file_system_type cifs_fs_type;
 int cifsFYI = 0;
 int cifsERROR = 1;
 int traceSMB = 0;
-unsigned int oplockEnabled = 0;
+unsigned int oplockEnabled = 1;
 unsigned int lookupCacheEnabled = 1;
 unsigned int multiuser_mount = 0;
 unsigned int extended_security = 0;
 unsigned int ntlmv2_support = 0;
-unsigned int sign_CIFS_PDUs = 0;
+unsigned int sign_CIFS_PDUs = 1;
 unsigned int CIFSMaximumBufferSize = CIFS_MAX_MSGSIZE;
 struct task_struct * oplockThread = NULL;
 
@@ -90,10 +90,10 @@ cifs_read_super(struct super_block *sb, void *data,
 
 	sb->s_magic = CIFS_MAGIC_NUMBER;
 	sb->s_op = &cifs_super_ops;
-	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
-	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE;
-	else
-		sb->s_blocksize = CIFSMaximumBufferSize;
+/*	if(cifs_sb->tcon->ses->server->maxBuf > MAX_CIFS_HDR_SIZE + 512)
+	    sb->s_blocksize = cifs_sb->tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE; */
+
+	sb->s_blocksize = CIFS_MAX_MSGSIZE;
 	sb->s_blocksize_bits = 14;	/* default 2**14 = CIFS_MAX_MSGSIZE */
 	inode = iget(sb, ROOT_I);
 
@@ -201,10 +201,14 @@ cifs_alloc_inode(struct super_block *sb)
 	cifs_inode->cifsAttrs = 0x20;	/* default */
 	atomic_set(&cifs_inode->inUse, 0);
 	cifs_inode->time = 0;
-	if(oplockEnabled) {
-		cifs_inode->clientCanCacheRead = 1;
-		cifs_inode->clientCanCacheAll = 1;
-	}
+	/* Until the file is open and we have gotten oplock
+	info back from the server, can not assume caching of
+	file data or metadata */
+	cifs_inode->clientCanCacheRead = FALSE;
+	cifs_inode->clientCanCacheAll = FALSE;
+	cifs_inode->vfs_inode.i_blksize = CIFS_MAX_MSGSIZE;
+	cifs_inode->vfs_inode.i_blkbits = 14;  /* 2**14 = CIFS_MAX_MSGSIZE */
+
 	INIT_LIST_HEAD(&cifs_inode->openFileList);
 	return &cifs_inode->vfs_inode;
 }
@@ -280,6 +284,27 @@ cifs_get_sb(struct file_system_type *fs_type,
 	sb->s_flags |= MS_ACTIVE;
 	return sb;
 }
+
+ssize_t
+cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
+          loff_t * poffset)
+{
+	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead)
+		return generic_file_read(file,read_data,read_size,poffset);
+	else
+		return cifs_read(file,read_data,read_size,poffset);	
+}
+
+ssize_t
+cifs_write_wrapper(struct file * file, const char *write_data,
+           size_t write_size, loff_t * poffset) 
+{
+	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)    /* check caching for write */
+		return generic_file_write(file,write_data, write_size,poffset);
+	else
+		return cifs_write(file,write_data,write_size,poffset);
+}
+
 
 static struct file_system_type cifs_fs_type = {
 	.owner = THIS_MODULE,
@@ -439,8 +464,9 @@ static int cifs_oplock_thread(void * dummyarg)
 	struct list_head * tmp;
 	struct list_head * tmp1;
 	struct oplock_q_entry * oplock_item;
-	struct file * pfile;
 	struct cifsTconInfo *pTcon;
+	struct inode * inode;
+	__u16  netfid;
 	int rc;
 
 	daemonize("cifsoplockd");
@@ -457,23 +483,20 @@ static int cifs_oplock_thread(void * dummyarg)
 							       qhead);
 			if(oplock_item) {
 				pTcon = oplock_item->tcon;
-				pfile = oplock_item->file_to_flush;
-				cFYI(1,("process item on queue"));/* BB remove */
+				inode = oplock_item->pinode;
+				netfid = oplock_item->netfid;
 				DeleteOplockQEntry(oplock_item);
 				write_unlock(&GlobalMid_Lock);
-				rc = filemap_fdatawrite(pfile->f_dentry->d_inode->i_mapping);
+				rc = filemap_fdatawrite(inode->i_mapping);
 				if(rc)
-					CIFS_I(pfile->f_dentry->d_inode)->write_behind_rc 
+					CIFS_I(inode)->write_behind_rc 
 						= rc;
-				cFYI(1,("Oplock flush file %p rc %d",pfile,rc));
-				if(pfile->private_data) {
-					rc = CIFSSMBLock(0, pTcon, 
-						((struct cifsFileInfo *) pfile->private_data)->netfid,
-						0 /* len */ , 0 /* offset */, 0, 
-						0, LOCKING_ANDX_OPLOCK_RELEASE,
-						0 /* wait flag */);
-					cFYI(1,("Oplock release rc = %d ",rc));
-				}
+				cFYI(1,("Oplock flush inode %p rc %d",inode,rc));
+				rc = CIFSSMBLock(0, pTcon, netfid,
+					0 /* len */ , 0 /* offset */, 0, 
+					0, LOCKING_ANDX_OPLOCK_RELEASE,
+					0 /* wait flag */);
+				cFYI(1,("Oplock release rc = %d ",rc));
 				write_lock(&GlobalMid_Lock);
 			} else
 				break;

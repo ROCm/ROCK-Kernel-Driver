@@ -208,6 +208,7 @@ struct cifsFileInfo {
 	/* BB add lock scope info here if needed */ ;
 	/* lock scope id (0 if none) */
 	struct file * pfile; /* needed for writepage */
+	struct inode * pInode; /* needed for oplock break */
 	int endOfSearch:1;	/* we have reached end of search */
 	int closePend:1;	/* file is marked to close */
 	int emptyDir:1;
@@ -263,8 +264,9 @@ struct mid_q_entry {
 
 struct oplock_q_entry {
 	struct list_head qhead;
-	struct file * file_to_flush;
+	struct inode * pinode;
 	struct cifsTconInfo * tcon; 
+	__u16 netfid;
 };
 
 #define   MID_FREE 0
