@@ -12,6 +12,7 @@ struct pci_sys_data;
 struct pci_bus;
 
 struct hw_pci {
+	struct list_head buses;
 	int		nr_controllers;
 	int		(*setup)(int nr, struct pci_sys_data *);
 	struct pci_bus *(*scan)(int nr, struct pci_sys_data *);
@@ -25,6 +26,7 @@ struct hw_pci {
  * Per-controller structure
  */
 struct pci_sys_data {
+	struct list_head node;
 	int		busnr;		/* primary bus number			*/
 	unsigned long	mem_offset;	/* bus->cpu memory mapping offset	*/
 	unsigned long	io_offset;	/* bus->cpu IO mapping offset		*/
