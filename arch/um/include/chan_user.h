@@ -44,7 +44,6 @@ extern void generic_free(void *data);
 
 extern void register_winch(int fd, void *device_data);
 extern void register_winch_irq(int fd, int tty_fd, int pid, void *line);
-extern void setup_tracer_winch(void);
 
 #define __channel_help(fn, prefix) \
 __uml_help(fn, prefix "[0-9]*=<channel description>\n" \

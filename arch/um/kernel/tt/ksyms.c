@@ -1,21 +1,20 @@
 /* 
- * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
-#ifndef __MEM_H__
-#define __MEM_H__
+#include "linux/module.h"
+#include "asm/uaccess.h"
+#include "mode.h"
 
-struct vm_reserved {
-	struct list_head list;
-	unsigned long start;
-	unsigned long end;
-};
+EXPORT_SYMBOL(__do_copy_from_user);
+EXPORT_SYMBOL(__do_copy_to_user);
+EXPORT_SYMBOL(__do_strncpy_from_user);
+EXPORT_SYMBOL(__do_strnlen_user); 
+EXPORT_SYMBOL(__do_clear_user);
 
-extern void set_usable_vm(unsigned long start, unsigned long end);
-extern void set_kmem_end(unsigned long new);
-
-#endif
+EXPORT_SYMBOL(tracing_pid);
+EXPORT_SYMBOL(honeypot);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

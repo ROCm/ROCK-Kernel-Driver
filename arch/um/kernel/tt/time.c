@@ -1,21 +1,20 @@
 /* 
- * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
  * Licensed under the GPL
  */
 
-#ifndef __MEM_H__
-#define __MEM_H__
+#include <signal.h>
+#include <sys/time.h>
+#include <time_user.h>
+#include "process.h"
+#include "user.h"
 
-struct vm_reserved {
-	struct list_head list;
-	unsigned long start;
-	unsigned long end;
-};
-
-extern void set_usable_vm(unsigned long start, unsigned long end);
-extern void set_kmem_end(unsigned long new);
-
-#endif
+void user_time_init_tt(void)
+{
+	if(signal(SIGVTALRM, (__sighandler_t) alarm_handler) == SIG_ERR)
+		panic("Couldn't set SIGVTALRM handler");
+	set_interval(ITIMER_VIRTUAL);
+}
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

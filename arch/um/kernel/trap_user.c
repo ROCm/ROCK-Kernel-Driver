@@ -96,57 +96,24 @@ struct signal_info sig_info[] = {
 		      is_irq :		0 },
 };
 
-void sig_handler_common(int sig, struct sigcontext *sc)
-{
-	struct uml_pt_regs save_regs, *r;
-	struct signal_info *info;
-	int save_errno = errno, is_user;
-
-	unprotect_kernel_mem();
-
-	r = (struct uml_pt_regs *) TASK_REGS(get_current());
-	save_regs = *r;
-	is_user = user_context(SC_SP(sc));
-	r->is_user = is_user;
-	r->mode.tt = sc;
-	if(sig != SIGUSR2) r->syscall = -1;
-
-	change_sig(SIGUSR1, 1);
-	info = &sig_info[sig];
-	if(!info->is_irq) unblock_signals();
-
-	(*info->handler)(sig, r);
-
-	if(is_user){
-		interrupt_end();
-		block_signals();
-		change_sig(SIGUSR1, 0);
-		set_user_mode(NULL);
-	}
-	*r = save_regs;
-	errno = save_errno;
-	if(is_user) protect_kernel_mem();
-}
-
 void sig_handler(int sig, struct sigcontext sc)
 {
-	sig_handler_common(sig, &sc);
+	CHOOSE_MODE_PROC(sig_handler_common_tt, sig_handler_common_skas,
+			 sig, &sc);
 }
 
 extern int timer_irq_inited, missed_ticks[];
 
 void alarm_handler(int sig, struct sigcontext sc)
 {
-	int user;
-
 	if(!timer_irq_inited) return;
 	missed_ticks[cpu()]++;
-	user = user_context(SC_SP(&sc));
 
 	if(sig == SIGALRM)
 		switch_timers(0);
 
-	sig_handler_common(sig, &sc);
+	CHOOSE_MODE_PROC(sig_handler_common_tt, sig_handler_common_skas,
+			 sig, &sc);
 
 	if(sig == SIGALRM)
 		switch_timers(1);

@@ -71,7 +71,7 @@ int external_pid(void *t)
 {
 	struct task_struct *task = t ? t : current;
 
-	return(task->thread.mode.tt.extern_pid);
+	return(CHOOSE_MODE_PROC(external_pid_tt, external_pid_skas, task));
 }
 
 int pid_to_processor_id(int pid)
@@ -310,6 +310,7 @@ int user_context(unsigned long sp)
 }
 
 extern void remove_umid_dir(void);
+
 __uml_exitcall(remove_umid_dir);
 
 extern exitcall_t __uml_exitcall_begin, __uml_exitcall_end;
@@ -351,11 +352,6 @@ int copy_from_user_proc(void *to, void *from, int size)
 int clear_user_proc(void *buf, int size)
 {
 	return(clear_user(buf, size));
-}
-
-void set_thread_sc(void *sc)
-{
-	current->thread.regs.regs.mode.tt = sc;
 }
 
 int smp_sigio_handler(void)
