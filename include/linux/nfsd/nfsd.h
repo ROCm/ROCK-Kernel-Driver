@@ -69,6 +69,8 @@ int		nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp);
 int		fh_lock_parent(struct svc_fh *, struct dentry *);
 int		nfsd_racache_init(int);
 void		nfsd_racache_shutdown(void);
+int		nfsd_cross_mnt(struct svc_rqst *rqstp, struct dentry **dpp,
+		                struct svc_export **expp);
 int		nfsd_lookup(struct svc_rqst *, struct svc_fh *,
 				const char *, int, struct svc_fh *);
 int		nfsd_setattr(struct svc_rqst *, struct svc_fh *,
