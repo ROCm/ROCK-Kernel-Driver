@@ -476,7 +476,10 @@ void agp_generic_enable(u32 mode)
 		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx + 0x4, &agp_3_0);
 		/* Check to see if we are operating in 3.0 mode */
 		if((agp_3_0 >> 3) & 0x1) {
-			agp_3_0_node_enable(agp_bridge, mode);
+			if (agp_bridge->minor_version >= 5)
+				agp_3_5_enable(agp_bridge, mode);
+			else
+				agp_3_5_enable(agp_bridge, mode);
 			return;
 		} else {
 			printk (KERN_INFO PFX "not in AGP 3.0 mode, falling back to 2.x\n");
