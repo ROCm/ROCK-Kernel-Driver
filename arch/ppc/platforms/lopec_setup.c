@@ -33,7 +33,9 @@
 #include <asm/bootinfo.h>
 #include <asm/mpc10x.h>
 #include <asm/hw_irq.h>
+#include <asm/prep_nvram.h>
 
+extern char saved_command_line[];
 extern void lopec_find_bridges(void);
 
 /*
@@ -332,6 +334,21 @@ lopec_setup_arch(void)
 
 #ifdef CONFIG_DUMMY_CONSOLE
 	conswitchp = &dummy_con;
+#endif
+#ifdef CONFIG_PPCBUG_NVRAM
+	/* Read in NVRAM data */ 
+	init_prep_nvram();
+
+	/* if no bootargs, look in NVRAM */
+	if ( cmd_line[0] == '\0' ) {
+		char *bootargs;
+		 bootargs = prep_nvram_get_var("bootargs");
+		 if (bootargs != NULL) {
+			 strcpy(cmd_line, bootargs);
+			 /* again.. */
+			 strcpy(saved_command_line, cmd_line);
+		}
+	}
 #endif
 }
 

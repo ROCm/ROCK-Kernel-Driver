@@ -35,6 +35,7 @@ obj-$(CONFIG_PCI)		+= pci.o
 ifneq ($(CONFIG_PPC_ISERIES),y)
 obj-$(CONFIG_PCI)		+= pci-dma.o
 endif
+obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
 obj-$(CONFIG_KGDB)		+= ppc-stub.o
 obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_TAU)		+= temp.o
