@@ -152,7 +152,7 @@ static ssize_t show_##file_name 					\
  */
 #define cpufreq_per_cpu_attr_write(file_name, object)			\
 static ssize_t store_##file_name					\
-(struct device *dev, const char *buf)					\
+(struct device *dev, const char *buf, size_t count)			\
 {									\
 	unsigned int ret = -EINVAL;					\
 	struct cpufreq_policy policy;					\
@@ -172,7 +172,7 @@ static ssize_t store_##file_name					\
 	if (ret)							\
 		return ret;						\
 									\
-	return strlen(buf);						\
+	return count;							\
 }
 
 
@@ -205,7 +205,8 @@ static ssize_t show_scaling_governor (struct device *dev, char *buf)
 /**
  * store_scaling_governor - store policy for the specified CPU
  */
-static ssize_t store_scaling_governor (struct device *dev, const char *buf) 
+static ssize_t 
+store_scaling_governor (struct device *dev, const char *buf, size_t count) 
 {
 	unsigned int ret = -EINVAL;
 	char	str_governor[16];
@@ -229,7 +230,7 @@ static ssize_t store_scaling_governor (struct device *dev, const char *buf)
 	if (ret)
 		return ret;
 
-	return strlen(buf);
+	return count;
 }
 
 
