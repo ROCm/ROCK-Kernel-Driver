@@ -1791,7 +1791,7 @@ static int __devinit ns83820_init_one(struct pci_dev *pci_dev, const struct pci_
 	dev->ee.cache = &dev->MEAR_cache;
 	dev->ee.lock = &dev->misc_lock;
 	SET_MODULE_OWNER(dev->net_dev);
-	SET_NETDEV_DEV(dev->net_dev, &pcid->dev);
+	SET_NETDEV_DEV(&dev->net_dev, &pci_dev->dev);
 	dev->net_dev.priv = dev;
 
 	INIT_WORK(&dev->tq_refill, queue_refill, dev);
