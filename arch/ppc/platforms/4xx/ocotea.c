@@ -58,39 +58,21 @@
  */
 #include "../../../../drivers/net/ibm_emac/ibm_emac_phy.h"
 
-extern void abort(void);
 bd_t __res;
 
-static struct ibm44x_clocks clocks;
-
-static int __init
-ocotea_get_dec_freq(void)
-{
-	if (mfspr(SPRN_CCR1) & CCR1_TCS)
-		return OCOTEA_TMR_CLK;
-	else
-		return clocks.cpu;
-}
+static struct ibm44x_clocks clocks __initdata;
 
 static void __init
 ocotea_calibrate_decr(void)
 {
 	unsigned int freq;
 
-	freq = ocotea_get_dec_freq();
+	if (mfspr(SPRN_CCR1) & CCR1_TCS)
+		freq = OCOTEA_TMR_CLK;
+	else
+		freq = clocks.cpu;
 
-	tb_ticks_per_jiffy = freq / HZ;
-	tb_to_us = mulhwu_scale_factor(freq, 1000000);
-
-	/* Set the time base to zero */
-	mtspr(SPRN_TBWL, 0);
-	mtspr(SPRN_TBWU, 0);
-
-	/* Clear any pending timer interrupts */
-	mtspr(SPRN_TSR, TSR_ENW | TSR_WIS | TSR_DIS | TSR_FIS);
-
-	/* Enable decrementer interrupt */
-	mtspr(SPRN_TCR, TCR_DIE);
+	ibm44x_calibrate_decr(freq);
 }
 
 static int
@@ -101,6 +83,7 @@ ocotea_show_cpuinfo(struct seq_file *m)
 
 	return 0;
 }
+
 static inline int
 ocotea_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
@@ -344,135 +327,6 @@ ocotea_setup_arch(void)
 	printk("IBM Ocotea port (MontaVista Software, Inc. <source@mvista.com>)\n");
 }
 
-static void
-ocotea_restart(char *cmd)
-{
-	local_irq_disable();
-	abort();
-}
-
-static void
-ocotea_power_off(void)
-{
-	local_irq_disable();
-	for(;;);
-}
-
-static void
-ocotea_halt(void)
-{
-	local_irq_disable();
-	for(;;);
-}
-
-/*
- * Read the 440GX memory controller to get size of system memory.
- */
-static unsigned long __init
-ocotea_find_end_of_memory(void)
-{
-	u32 i, bank_config;
-	u32 mem_size = 0;
-
-	for (i=0; i<4; i++)
-	{
-		switch (i)
-		{
-			case 0:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B0CR);
-				break;
-			case 1:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B1CR);
-				break;
-			case 2:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B2CR);
-				break;
-			case 3:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B3CR);
-				break;
-		}
-
-		bank_config = mfdcr(DCRN_SDRAM0_CFGDATA);
-
-		if (!(bank_config & SDRAM_CONFIG_BANK_ENABLE))
-			continue;
-		switch (SDRAM_CONFIG_BANK_SIZE(bank_config))
-		{
-			case SDRAM_CONFIG_SIZE_8M:
-				mem_size += PPC44x_MEM_SIZE_8M;
-				break;
-			case SDRAM_CONFIG_SIZE_16M:
-				mem_size += PPC44x_MEM_SIZE_16M;
-				break;
-			case SDRAM_CONFIG_SIZE_32M:
-				mem_size += PPC44x_MEM_SIZE_32M;
-				break;
-			case SDRAM_CONFIG_SIZE_64M:
-				mem_size += PPC44x_MEM_SIZE_64M;
-				break;
-			case SDRAM_CONFIG_SIZE_128M:
-				mem_size += PPC44x_MEM_SIZE_128M;
-				break;
-			case SDRAM_CONFIG_SIZE_256M:
-				mem_size += PPC44x_MEM_SIZE_256M;
-				break;
-			case SDRAM_CONFIG_SIZE_512M:
-				mem_size += PPC44x_MEM_SIZE_512M;
-				break;
-		}
-	}
-	return mem_size;
-}
-
-static void __init
-ocotea_init_irq(void)
-{
-	int i;
-
-	ppc4xx_pic_init();
-
-	for (i = 0; i < NR_IRQS; i++)
-		irq_desc[i].handler = ppc4xx_pic;
-}
-
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-#include <linux/serialP.h>
-#include <linux/serial_reg.h>
-#include <asm/serial.h>
-struct serial_state rs_table[RS_TABLE_SIZE] = {
-	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
-};
-
-static void
-ocotea_progress(char *s, unsigned short hex)
-{
-	volatile char c;
-	volatile unsigned long com_port;
-	u16 shift;
-
-	com_port = (unsigned long)rs_table[0].iomem_base;
-	shift = rs_table[0].iomem_reg_shift;
-
-	while ((c = *s++) != 0) {
-		while ((*((volatile unsigned char *)com_port +
-				(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-			;
-		*(volatile unsigned char *)com_port = c;
-
-	}
-
-	/* Send LF/CR to pretty up output */
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\r';
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\n';
-}
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
-
 void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
@@ -488,16 +342,11 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	/* Disable L2-Cache due to hardware issues */
 	ibm440gx_l2c_disable();
 
+	ibm44x_platform_init();
+
 	ppc_md.setup_arch = ocotea_setup_arch;
 	ppc_md.show_cpuinfo = ocotea_show_cpuinfo;
-	ppc_md.init_IRQ = ocotea_init_irq;
 	ppc_md.get_irq = NULL;		/* Set in ppc4xx_pic_init() */
-
-	ppc_md.find_end_of_memory = ocotea_find_end_of_memory;
-
-	ppc_md.restart = ocotea_restart;
-	ppc_md.power_off = ocotea_power_off;
-	ppc_md.halt = ocotea_halt;
 
 	ppc_md.calibrate_decr = ocotea_calibrate_decr;
 	ppc_md.time_init = todc_time_init;
@@ -507,9 +356,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
 
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-	ppc_md.progress = ocotea_progress;
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
 #ifdef CONFIG_KGDB
 	ppc_md.early_serial_map = ocotea_early_serial_map;
 #endif
