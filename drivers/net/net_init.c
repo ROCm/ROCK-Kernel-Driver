@@ -252,28 +252,6 @@ static int eth_change_mtu(struct net_device *dev, int new_mtu)
 #ifdef CONFIG_FDDI
 
 /**
- * init_fddidev - Register FDDI device
- * @dev: A FDDI device structure to be filled in, or %NULL if a new
- *	struct should be allocated.
- * @sizeof_priv: Size of additional driver-private structure to be allocated
- *	for this ethernet device
- *
- * Fill in the fields of the device structure with FDDI-generic values.
- *
- * If no device structure is passed, a new one is constructed, complete with
- * a private data area of size @sizeof_priv.  A 32-byte (not bit)
- * alignment is enforced for this private data area.
- *
- * If an empty string area is passed as dev->name, or a new structure is made,
- * a new name string is constructed.
- */
-
-struct net_device *init_fddidev(struct net_device *dev, int sizeof_priv)
-{
-	return init_netdev(dev, sizeof_priv, "fddi%d", fddi_setup);
-}
-
-/**
  * alloc_fddidev - Register FDDI device
  * @sizeof_priv: Size of additional driver-private structure to be allocated
  *	for this FDDI device
@@ -290,7 +268,6 @@ struct net_device *alloc_fddidev(int sizeof_priv)
 	return alloc_netdev(sizeof_priv, "fddi%d", fddi_setup);
 }
 
-EXPORT_SYMBOL(init_fddidev);
 EXPORT_SYMBOL(alloc_fddidev);
 
 static int fddi_change_mtu(struct net_device *dev, int new_mtu)
