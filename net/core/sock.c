@@ -825,8 +825,10 @@ static long sock_wait_for_wmem(struct sock * sk, long timeo)
  *	Generic send/receive buffer handlers
  */
 
-struct sk_buff *sock_alloc_send_pskb(struct sock *sk, unsigned long header_len,
-				     unsigned long data_len, int noblock, int *errcode)
+static struct sk_buff *sock_alloc_send_pskb(struct sock *sk,
+					    unsigned long header_len,
+					    unsigned long data_len,
+					    int noblock, int *errcode)
 {
 	struct sk_buff *skb;
 	unsigned int gfp_mask;
@@ -1084,7 +1086,7 @@ ssize_t sock_no_sendpage(struct socket *sock, struct page *page, int offset, siz
  *	Default Socket Callbacks
  */
 
-void sock_def_wakeup(struct sock *sk)
+static void sock_def_wakeup(struct sock *sk)
 {
 	read_lock(&sk->sk_callback_lock);
 	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
@@ -1092,7 +1094,7 @@ void sock_def_wakeup(struct sock *sk)
 	read_unlock(&sk->sk_callback_lock);
 }
 
-void sock_def_error_report(struct sock *sk)
+static void sock_def_error_report(struct sock *sk)
 {
 	read_lock(&sk->sk_callback_lock);
 	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
@@ -1101,7 +1103,7 @@ void sock_def_error_report(struct sock *sk)
 	read_unlock(&sk->sk_callback_lock);
 }
 
-void sock_def_readable(struct sock *sk, int len)
+static void sock_def_readable(struct sock *sk, int len)
 {
 	read_lock(&sk->sk_callback_lock);
 	if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
@@ -1110,7 +1112,7 @@ void sock_def_readable(struct sock *sk, int len)
 	read_unlock(&sk->sk_callback_lock);
 }
 
-void sock_def_write_space(struct sock *sk)
+static void sock_def_write_space(struct sock *sk)
 {
 	read_lock(&sk->sk_callback_lock);
 
@@ -1129,7 +1131,7 @@ void sock_def_write_space(struct sock *sk)
 	read_unlock(&sk->sk_callback_lock);
 }
 
-void sock_def_destruct(struct sock *sk)
+static void sock_def_destruct(struct sock *sk)
 {
 	if (sk->sk_protinfo)
 		kfree(sk->sk_protinfo);
@@ -1368,7 +1370,6 @@ EXPORT_SYMBOL(sk_free_slab);
 EXPORT_SYMBOL(sk_alloc);
 EXPORT_SYMBOL(sk_free);
 EXPORT_SYMBOL(sk_send_sigurg);
-EXPORT_SYMBOL(sock_alloc_send_pskb);
 EXPORT_SYMBOL(sock_alloc_send_skb);
 EXPORT_SYMBOL(sock_init_data);
 EXPORT_SYMBOL(sock_kfree_s);

@@ -264,7 +264,7 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 	return NOTIFY_DONE;
 }
 
-struct notifier_block dst_dev_notifier = {
+static struct notifier_block dst_dev_notifier = {
 	.notifier_call	= dst_dev_event,
 };
 

@@ -17,7 +17,6 @@ struct tcf_walker
 
 extern int register_tcf_proto_ops(struct tcf_proto_ops *ops);
 extern int unregister_tcf_proto_ops(struct tcf_proto_ops *ops);
-extern int ing_filter(struct sk_buff *skb);
 
 static inline unsigned long
 __cls_set_class(unsigned long *clp, unsigned long cl)

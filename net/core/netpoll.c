@@ -39,7 +39,7 @@ static spinlock_t rx_list_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(rx_list);
 
 static atomic_t trapped;
-spinlock_t netpoll_poll_lock = SPIN_LOCK_UNLOCKED;
+static spinlock_t netpoll_poll_lock = SPIN_LOCK_UNLOCKED;
 
 #define NETPOLL_RX_ENABLED  1
 #define NETPOLL_RX_DROP     2
@@ -178,7 +178,7 @@ repeat:
 	return skb;
 }
 
-void netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
+static void netpoll_send_skb(struct netpoll *np, struct sk_buff *skb)
 {
 	int status;
 
@@ -676,6 +676,5 @@ EXPORT_SYMBOL(netpoll_trap);
 EXPORT_SYMBOL(netpoll_parse_options);
 EXPORT_SYMBOL(netpoll_setup);
 EXPORT_SYMBOL(netpoll_cleanup);
-EXPORT_SYMBOL(netpoll_send_skb);
 EXPORT_SYMBOL(netpoll_send_udp);
 EXPORT_SYMBOL(netpoll_poll);

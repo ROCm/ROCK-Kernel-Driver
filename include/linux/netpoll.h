@@ -24,7 +24,6 @@ struct netpoll {
 };
 
 void netpoll_poll(struct netpoll *np);
-void netpoll_send_skb(struct netpoll *np, struct sk_buff *skb);
 void netpoll_send_udp(struct netpoll *np, const char *msg, int len);
 int netpoll_parse_options(struct netpoll *np, char *opt);
 int netpoll_setup(struct netpoll *np);

@@ -173,7 +173,7 @@ static void debug_print_hooks_ip(unsigned int nf_debug)
 	printk("\n");
 }
 
-void nf_dump_skb(int pf, struct sk_buff *skb)
+static void nf_dump_skb(int pf, struct sk_buff *skb)
 {
 	printk("skb: pf=%i %s dev=%s len=%u\n", 
 	       pf,

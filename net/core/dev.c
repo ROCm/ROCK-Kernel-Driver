@@ -183,7 +183,7 @@ static struct timer_list samp_timer = TIMER_INITIALIZER(sample_queue, 0, 0);
  * semaphore held.
  */
 struct net_device *dev_base;
-struct net_device **dev_tail = &dev_base;
+static struct net_device **dev_tail = &dev_base;
 rwlock_t dev_base_lock = RW_LOCK_UNLOCKED;
 
 EXPORT_SYMBOL(dev_base);
@@ -361,7 +361,7 @@ static struct netdev_boot_setup dev_boot_setup[NETDEV_BOOT_SETUP_MAX];
  *	returns 0 on error and 1 on success.  This is a generic routine to
  *	all netdevices.
  */
-int netdev_boot_setup_add(char *name, struct ifmap *map)
+static int netdev_boot_setup_add(char *name, struct ifmap *map)
 {
 	struct netdev_boot_setup *s;
 	int i;
@@ -644,7 +644,7 @@ struct net_device * dev_get_by_flags(unsigned short if_flags, unsigned short mas
  *	Network device names need to be valid file names to
  *	to allow sysfs to work
  */
-int dev_valid_name(const char *name)
+static int dev_valid_name(const char *name)
 {
 	return !(*name == '\0' 
 		 || !strcmp(name, ".")
@@ -1590,7 +1590,7 @@ static __inline__ int handle_bridge(struct sk_buff **pskb,
  * the ingress scheduler, you just cant add policies on ingress.
  *
  */
-int ing_filter(struct sk_buff *skb) 
+static int ing_filter(struct sk_buff *skb) 
 {
 	struct Qdisc *q;
 	struct net_device *dev = skb->dev;
@@ -3345,10 +3345,5 @@ EXPORT_SYMBOL(br_handle_frame_hook);
 #ifdef CONFIG_KMOD
 EXPORT_SYMBOL(dev_load);
 #endif
-
-#ifdef CONFIG_NET_CLS_ACT
-EXPORT_SYMBOL(ing_filter);
-#endif
-
 
 EXPORT_PER_CPU_SYMBOL(softnet_data);
