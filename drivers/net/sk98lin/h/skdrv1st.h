@@ -58,7 +58,6 @@ typedef struct s_AC	SK_AC;
 
 #define SK_ADDR_EQUAL(a1,a2)		(!memcmp(a1,a2,6))
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
