@@ -3908,15 +3908,11 @@ ov51x_do_dealloc(struct usb_ov511 *ov)
 		ov->fbuf = NULL;
 	}
 
-	if (ov->rawfbuf) {
-		vfree(ov->rawfbuf);
-		ov->rawfbuf = NULL;
-	}
+	vfree(ov->rawfbuf);
+	ov->rawfbuf = NULL;
 
-	if (ov->tempfbuf) {
-		vfree(ov->tempfbuf);
-		ov->tempfbuf = NULL;
-	}
+	vfree(ov->tempfbuf);
+	ov->tempfbuf = NULL;
 
 	for (i = 0; i < OV511_NUMSBUF; i++) {
 		if (ov->sbuf[i].data) {
