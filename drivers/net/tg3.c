@@ -1225,6 +1225,27 @@ static int tg3_init_5401phy_dsp(struct tg3 *tp)
 	return err;
 }
 
+static int tg3_copper_is_advertising_all(struct tg3 *tp)
+{
+	u32 adv_reg, all_mask;
+
+	tg3_readphy(tp, MII_ADVERTISE, &adv_reg);
+	all_mask = (ADVERTISE_10HALF | ADVERTISE_10FULL |
+		    ADVERTISE_100HALF | ADVERTISE_100FULL);
+	if ((adv_reg & all_mask) != all_mask)
+		return 0;
+	if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY)) {
+		u32 tg3_ctrl;
+
+		tg3_readphy(tp, MII_TG3_CTRL, &tg3_ctrl);
+		all_mask = (MII_TG3_CTRL_ADV_1000_HALF |
+			    MII_TG3_CTRL_ADV_1000_FULL);
+		if ((tg3_ctrl & all_mask) != all_mask)
+			return 0;
+	}
+	return 1;
+}
+
 static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 {
 	int current_link_up;
@@ -1358,19 +1379,13 @@ static int tg3_setup_copper_phy(struct tg3 *tp, int force_reset)
 
 		if (tp->link_config.autoneg == AUTONEG_ENABLE) {
 			if (bmcr & BMCR_ANENABLE) {
-				u32 gig_ctrl;
-
 				current_link_up = 1;
 
 				/* Force autoneg restart if we are exiting
 				 * low power mode.
 				 */
-				tg3_readphy(tp, MII_TG3_CTRL, &gig_ctrl);
-				if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY) &&
-				    !(gig_ctrl & (MII_TG3_CTRL_ADV_1000_HALF |
-						  MII_TG3_CTRL_ADV_1000_FULL))) {
+				if (!tg3_copper_is_advertising_all(tp))
 					current_link_up = 0;
-				}
 			} else {
 				current_link_up = 0;
 			}
@@ -6538,34 +6553,57 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 		}
 	}
 
-	err = tg3_phy_reset(tp);
-	if (err)
-		return err;
+	if (tp->phy_id != PHY_ID_SERDES &&
+	    !(tp->tg3_flags & TG3_FLAG_ENABLE_ASF)) {
+		u32 bmsr, adv_reg, tg3_ctrl;
 
-	if (tp->pci_chip_rev_id == CHIPREV_ID_5701_A0 ||
-	    tp->pci_chip_rev_id == CHIPREV_ID_5701_B0) {
-		u32 mii_tg3_ctrl;
-		
-		/* These chips, when reset, only advertise 10Mb
-		 * capabilities.  Fix that.
-		 */
-		err  = tg3_writephy(tp, MII_ADVERTISE,
-				    (ADVERTISE_CSMA |
-				     ADVERTISE_PAUSE_CAP |
-				     ADVERTISE_10HALF |
-				     ADVERTISE_10FULL |
-				     ADVERTISE_100HALF |
-				     ADVERTISE_100FULL));
-		mii_tg3_ctrl = (MII_TG3_CTRL_ADV_1000_HALF |
-				MII_TG3_CTRL_ADV_1000_FULL |
-				MII_TG3_CTRL_AS_MASTER |
-				MII_TG3_CTRL_ENABLE_AS_MASTER);
-		if (tp->tg3_flags & TG3_FLAG_10_100_ONLY)
-			mii_tg3_ctrl = 0;
+		tg3_readphy(tp, MII_BMSR, &bmsr);
+		tg3_readphy(tp, MII_BMSR, &bmsr);
 
-		err |= tg3_writephy(tp, MII_TG3_CTRL, mii_tg3_ctrl);
-		err |= tg3_writephy(tp, MII_BMCR,
-				    (BMCR_ANRESTART | BMCR_ANENABLE));
+		if ((bmsr & BMSR_LSTATUS) &&
+		    !(GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+		      GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704 ||
+		      GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705))
+			goto skip_phy_reset;
+		    
+		err = tg3_phy_reset(tp);
+		if (err)
+			return err;
+
+		adv_reg = (ADVERTISE_10HALF | ADVERTISE_10FULL |
+			   ADVERTISE_100HALF | ADVERTISE_100FULL |
+			   ADVERTISE_CSMA | ADVERTISE_PAUSE_CAP);
+		tg3_ctrl = 0;
+		if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY)) {
+			tg3_ctrl = (MII_TG3_CTRL_ADV_1000_HALF |
+				    MII_TG3_CTRL_ADV_1000_FULL);
+			if (tp->pci_chip_rev_id == CHIPREV_ID_5701_A0 ||
+			    tp->pci_chip_rev_id == CHIPREV_ID_5701_B0)
+				tg3_ctrl |= (MII_TG3_CTRL_AS_MASTER |
+					     MII_TG3_CTRL_ENABLE_AS_MASTER);
+		}
+
+		if (!tg3_copper_is_advertising_all(tp)) {
+			tg3_writephy(tp, MII_ADVERTISE, adv_reg);
+
+			if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
+				tg3_writephy(tp, MII_TG3_CTRL, tg3_ctrl);
+
+			tg3_writephy(tp, MII_BMCR,
+				     BMCR_ANENABLE | BMCR_ANRESTART);
+		}
+		tg3_phy_set_wirespeed(tp);
+
+		tg3_writephy(tp, MII_ADVERTISE, adv_reg);
+		if (!(tp->tg3_flags & TG3_FLAG_10_100_ONLY))
+			tg3_writephy(tp, MII_TG3_CTRL, tg3_ctrl);
+	}
+
+skip_phy_reset:
+	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401) {
+		err = tg3_init_5401phy_dsp(tp);
+		if (err)
+			return err;
 	}
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
