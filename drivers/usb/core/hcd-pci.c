@@ -279,15 +279,18 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 {
 	struct usb_hcd		*hcd;
 	int			retval = 0;
+	int			has_pci_pm;
 
 	hcd = pci_get_drvdata(dev);
-	dev_dbg (hcd->self.controller, "suspend D%d --> D%d\n",
-			dev->current_state, state);
 
-	if (pci_find_capability(dev, PCI_CAP_ID_PM)) {
-		dev_dbg(hcd->self.controller, "No PM capability\n");
-		return 0;
-	}
+	/* even when the PCI layer rejects some of the PCI calls
+	 * below, HCs can try global suspend and reduce DMA traffic.
+	 * PM-sensitive HCDs may already have done this.
+	 */
+	has_pci_pm = pci_find_capability(dev, PCI_CAP_ID_PM);
+	if (has_pci_pm)
+		dev_dbg(hcd->self.controller, "suspend D%d --> D%d\n",
+			dev->current_state, state);
 
 	switch (hcd->state) {
 	case USB_STATE_HALT:
@@ -297,23 +300,32 @@ int usb_hcd_pci_suspend (struct pci_dev *dev, u32 state)
 		dev_dbg (hcd->self.controller, "hcd already suspended\n");
 		break;
 	default:
-		/* remote wakeup needs hub->suspend() cooperation */
-		// pci_enable_wake (dev, 3, 1);
-
-		pci_save_state (dev, hcd->pci_state);
-
-		/* driver may want to disable DMA etc */
-		hcd->state = USB_STATE_QUIESCING;
 		retval = hcd->driver->suspend (hcd, state);
 		if (retval)
 			dev_dbg (hcd->self.controller, 
 					"suspend fail, retval %d\n",
 					retval);
-		else
+		else {
 			hcd->state = HCD_STATE_SUSPENDED;
+			pci_save_state (dev, hcd->pci_state);
+#ifdef	CONFIG_USB_SUSPEND
+			pci_enable_wake (dev, state, hcd->remote_wakeup);
+			pci_enable_wake (dev, 4, hcd->remote_wakeup);
+#endif
+			/* no DMA or IRQs except in D0 */
+			pci_disable_device (dev);
+			free_irq (hcd->irq, hcd);
+			
+			if (has_pci_pm)
+				retval = pci_set_power_state (dev, state);
+			if (retval < 0) {
+				dev_dbg (&dev->dev,
+						"PCI suspend fail, %d\n",
+						retval);
+				(void) usb_hcd_pci_resume (dev);
+			}
+		}
 	}
-
- 	pci_set_power_state (dev, state);
 	return retval;
 }
 EXPORT_SYMBOL (usb_hcd_pci_suspend);
@@ -328,10 +340,13 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 {
 	struct usb_hcd		*hcd;
 	int			retval;
+	int			has_pci_pm;
 
 	hcd = pci_get_drvdata(dev);
-	dev_dbg (hcd->self.controller, "resume from state D%d\n",
-			dev->current_state);
+	has_pci_pm = pci_find_capability(dev, PCI_CAP_ID_PM);
+	if (has_pci_pm)
+		dev_dbg(hcd->self.controller, "resume from state D%d\n",
+				dev->current_state);
 
 	if (hcd->state != HCD_STATE_SUSPENDED) {
 		dev_dbg (hcd->self.controller, 
@@ -340,11 +355,21 @@ int usb_hcd_pci_resume (struct pci_dev *dev)
 	}
 	hcd->state = USB_STATE_RESUMING;
 
-	pci_set_power_state (dev, 0);
+	if (has_pci_pm)
+		pci_set_power_state (dev, 0);
+	retval = request_irq (dev->irq, usb_hcd_irq, SA_SHIRQ,
+				hcd->description, hcd);
+	if (retval < 0) {
+		dev_err (hcd->self.controller,
+			"can't restore IRQ after resume!\n");
+		return retval;
+	}
+	pci_set_master (dev);
 	pci_restore_state (dev, hcd->pci_state);
-
-	/* remote wakeup needs hub->suspend() cooperation */
-	// pci_enable_wake (dev, 3, 0);
+#ifdef	CONFIG_USB_SUSPEND
+	pci_enable_wake (dev, dev->current_state, 0);
+	pci_enable_wake (dev, 4, 0);
+#endif
 
 	retval = hcd->driver->resume (hcd);
 	if (!HCD_IS_RUNNING (hcd->state)) {
