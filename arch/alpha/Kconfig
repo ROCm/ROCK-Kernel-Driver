@@ -902,6 +902,7 @@ source "drivers/usb/Kconfig"
 
 source "net/bluetooth/Kconfig"
 
+source "arch/alpha/oprofile/Kconfig"
 
 menu "Kernel hacking"
 
