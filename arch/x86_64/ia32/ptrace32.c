@@ -1,27 +1,29 @@
 /* 
  * 32bit ptrace for x86-64.
  *
- * Copyright 2001 Andi Kleen, SuSE Labs.
- * Some parts copied from arch/i386/kernel/ptrace.c. See that file for 
- * earlier copyright.
+ * Copyright 2001,2002 Andi Kleen, SuSE Labs.
+ * Some parts copied from arch/i386/kernel/ptrace.c. See that file for earlier 
+ * copyright.
  * 
- * This allows to access 64bit processes too but there is no way to see 
- * the extended register contents.
+ * This allows to access 64bit processes too; but there is no way to see the extended 
+ * register contents.
  *
- * $Id: ptrace32.c,v 1.2 2001/08/15 06:41:13 ak Exp $
+ * $Id: ptrace32.c,v 1.12 2002/03/24 13:02:02 ak Exp $
  */ 
 
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
-#include <linux/mm.h>
-#include <linux/ptrace.h>
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 #include <asm/user32.h>
+#include <asm/user.h>
 #include <asm/errno.h>
 #include <asm/debugreg.h>
+#include <asm/i387.h>
+#include <asm/fpu32.h>
+#include <linux/mm.h>
 
 #define R32(l,q) \
 	case offsetof(struct user32, regs.l): stack[offsetof(struct pt_regs, q)/8] = val; break
@@ -139,7 +141,6 @@ static int getreg32(struct task_struct *child, unsigned regno, u32 *val)
 
 #undef R32
 
-
 static struct task_struct *find_target(int request, int pid, int *err)
 { 
 	struct task_struct *child;
@@ -154,23 +155,11 @@ static struct task_struct *find_target(int request, int pid, int *err)
 	if (child)
 		get_task_struct(child);
 	read_unlock(&tasklist_lock);
-	if (child) { 
-		*err = -ESRCH;
-		if (!(child->ptrace & PT_PTRACED))
-			goto out;
-		if (child->state != TASK_STOPPED) {
-			if (request != PTRACE_KILL)
-				goto out;
-		}
-		if (child->p_pptr != current)
-			goto out;
-
+	*err = ptrace_check_attach(child,0);
+	if (*err == 0)
 		return child; 
-	} 
- out:
 	put_task_struct(child);
 	return NULL; 
-	
 } 
 
 extern asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, unsigned long data);
@@ -178,6 +167,7 @@ extern asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, un
 asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 {
 	struct task_struct *child;
+	struct pt_regs *childregs; 
 	int ret;
 	__u32 val;
 
@@ -203,6 +193,8 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_SETREGS:
 	case PTRACE_SETFPREGS:
 	case PTRACE_GETFPREGS:
+	case PTRACE_SETFPXREGS:
+	case PTRACE_GETFPXREGS:
 		break;
 		
 	default:
@@ -213,11 +205,13 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	if (!child)
 		return ret;
 
+	childregs = (struct pt_regs *)(child->thread.rsp0 - sizeof(struct pt_regs)); 
+
 	switch (request) {
 	case PTRACE_PEEKDATA:
 	case PTRACE_PEEKTEXT:
 		ret = 0;
-		if (access_process_vm(child, addr, &val, sizeof(u32), 0) != sizeof(u32))
+		if (access_process_vm(child, addr, &val, sizeof(u32), 0)!=sizeof(u32))
 			ret = -EIO;
 		else
 			ret = put_user(val, (unsigned int *)(u64)data); 
@@ -226,13 +220,13 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_POKEDATA:
 	case PTRACE_POKETEXT:
 		ret = 0;
-		if (access_process_vm(child, addr, &data, sizeof(u32), 1) != sizeof(u32))
+		if (access_process_vm(child, addr, &data, sizeof(u32), 1)!=sizeof(u32))
 			ret = -EIO; 
 		break;
 
 	case PTRACE_PEEKUSR:
 		ret = getreg32(child, addr, &val);
-		if (ret >= 0) 
+		if (ret == 0)
 			ret = put_user(val, (__u32 *)(unsigned long) data);
 		break;
 
@@ -242,7 +236,7 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
 		int i;
-	  	if (!access_ok(VERIFY_WRITE, (unsigned *)(unsigned long)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_WRITE, (unsigned *)(unsigned long)data, 16*4)) {
 			ret = -EIO;
 			break;
 		}
@@ -258,10 +252,11 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
 		int i;
-	  	if (!access_ok(VERIFY_READ, (unsigned *)(unsigned long)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_READ, (unsigned *)(unsigned long)data, 16*4)) {
 			ret = -EIO;
 			break;
 		}
+		empty_fpu(child); 
 		ret = 0; 
 		for ( i = 0; i <= 16*4; i += sizeof(u32) ) {
 			ret |= __get_user(tmp, (u32 *) (unsigned long) data);
@@ -271,35 +266,37 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		break;
 	}
 
-#if 0 /* to be done. */
-	case PTRACE_GETFPREGS: { /* Get the child extended FPU state. */
-		if (!access_ok(VERIFY_WRITE, (unsigned *)data,
-			       sizeof(struct user_i387_struct))) {
-			ret = -EIO;
+	case PTRACE_SETFPREGS:
+		empty_fpu(child); 
+		save_i387_ia32(child, (void *)(u64)data, childregs, 1);
+		ret = 0; 
 			break;
-		}
-		if ( !child->used_math ) {
-			/* Simulate an empty FPU. */
-			set_fpu_cwd(child, 0x037f);
-			set_fpu_swd(child, 0x0000);
-			set_fpu_twd(child, 0xffff);
-			set_fpu_mxcsr(child, 0x1f80);
-		}
-		ret = get_fpregs((struct user_i387_struct *)data, child);
-		break;
-	}
 
-	case PTRACE_SETFPREGS: { /* Set the child extended FPU state. */
-		if (!access_ok(VERIFY_READ, (unsigned *)data,
-			       sizeof(struct user_i387_struct))) {
-			ret = -EIO;
-			break;
-		}
-		child->used_math = 1;
-		ret = set_fpregs(child, (struct user_i387_struct *)data);
+	case PTRACE_GETFPREGS:
+		empty_fpu(child); 
+		restore_i387_ia32(child, (void *)(u64)data, 1);
+		ret = 0;
 		break;
 
-#endif
+	case PTRACE_GETFPXREGS: { 
+		struct user32_fxsr_struct *u = (void *)(u64)data; 
+		empty_fpu(child); 
+		ret = copy_to_user(u, &child->thread.i387.fxsave, sizeof(*u));
+		ret |= __put_user(childregs->cs, &u->fcs);
+		ret |= __put_user(child->thread.ds, &u->fos); 
+		if (ret) 
+			ret = -EFAULT;
+		break; 
+	} 
+	case PTRACE_SETFPXREGS: { 
+		struct user32_fxsr_struct *u = (void *)(u64)data; 
+		empty_fpu(child); 
+		/* no error checking to be bug to bug compatible with i386 */ 
+		copy_from_user(&child->thread.i387.fxsave, u, sizeof(*u));
+	        child->thread.i387.fxsave.mxcsr &= 0xffbf;
+		ret = 0; 
+			break;
+		}
 
 	default:
 		ret = -EINVAL;

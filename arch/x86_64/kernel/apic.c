@@ -33,6 +33,8 @@
 /* Using APIC to generate smp_local_timer_interrupt? */
 int using_apic_timer = 0;
 
+int dont_enable_local_apic __initdata = 0;
+
 int prof_multiplier[NR_CPUS] = { 1, };
 int prof_old_multiplier[NR_CPUS] = { 1, };
 int prof_counter[NR_CPUS] = { 1, };
@@ -51,7 +53,7 @@ int get_maxlvt(void)
 void clear_local_APIC(void)
 {
 	int maxlvt;
-	unsigned long v;
+	unsigned int v;
 
 	maxlvt = get_maxlvt();
 
@@ -90,7 +92,7 @@ void clear_local_APIC(void)
 		apic_write_around(APIC_LVTPC, APIC_LVT_MASKED);
 	v = GET_APIC_VERSION(apic_read(APIC_LVR));
 	if (APIC_INTEGRATED(v)) {	/* !82489DX */
-		if (maxlvt > 3)
+		if (maxlvt > 3)		/* Due to Pentium errata 3AP and 11AP. */
 			apic_write(APIC_ESR, 0);
 		apic_read(APIC_ESR);
 	}
@@ -130,7 +132,7 @@ void disconnect_bsp_APIC(void)
 
 void disable_local_APIC(void)
 {
-	unsigned long value;
+	unsigned int value;
 
 	clear_local_APIC();
 
@@ -223,7 +225,7 @@ extern void __error_in_apic_c (void);
  */
 void __init init_bsp_APIC(void)
 {
-	unsigned long value, ver;
+	unsigned int value, ver;
 
 	/*
 	 * Don't do the setup now if we have a SMP BIOS as the
@@ -262,7 +264,7 @@ void __init init_bsp_APIC(void)
 
 void __init setup_local_APIC (void)
 {
-	unsigned long value, ver, maxlvt;
+	unsigned int value, ver, maxlvt;
 
 	/* Pound the ESR really hard over the head with a big hammer - mbligh */
 	if (esr_disable) {
@@ -395,7 +397,7 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		printk("ESR value before enabling vector: %08lx\n", value);
+		printk("ESR value before enabling vector: %08x\n", value);
 
 		value = ERROR_APIC_VECTOR;      // enables sending errors
 		apic_write_around(APIC_LVTERR, value);
@@ -405,7 +407,7 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		printk("ESR value after enabling vector: %08lx\n", value);
+		printk("ESR value after enabling vector: %08x\n", value);
 	} else {
 		if (esr_disable)	
 			/* 
@@ -449,6 +451,7 @@ static struct {
 	unsigned int apic_lvterr;
 	unsigned int apic_tmict;
 	unsigned int apic_tdcr;
+	unsigned int apic_thmr;
 } apic_pm_state;
 
 static void apic_pm_suspend(void *data)
@@ -470,6 +473,7 @@ static void apic_pm_suspend(void *data)
 	apic_pm_state.apic_lvterr = apic_read(APIC_LVTERR);
 	apic_pm_state.apic_tmict = apic_read(APIC_TMICT);
 	apic_pm_state.apic_tdcr = apic_read(APIC_TDCR);
+	apic_pm_state.apic_thmr = apic_read(APIC_LVTTHMR);
 	__save_flags(flags);
 	__cli();
 	disable_local_APIC();
@@ -498,6 +502,7 @@ static void apic_pm_resume(void *data)
 	apic_write(APIC_SPIV, apic_pm_state.apic_spiv);
 	apic_write(APIC_LVT0, apic_pm_state.apic_lvt0);
 	apic_write(APIC_LVT1, apic_pm_state.apic_lvt1);
+	apic_write(APIC_LVTTHMR, apic_pm_state.apic_thmr);
 	apic_write(APIC_LVTPC, apic_pm_state.apic_lvtpc);
 	apic_write(APIC_LVTT, apic_pm_state.apic_lvtt);
 	apic_write(APIC_TDCR, apic_pm_state.apic_tdcr);
@@ -586,7 +591,6 @@ static inline void apic_pm_init2(void) { }
 static int __init detect_init_APIC (void)
 {
 	u32 h, l, features;
-	int needs_pm = 0;
 	extern void get_cpu_vendor(struct cpuinfo_x86*);
 
 	/* Workaround for us being called before identify_cpu(). */
@@ -619,7 +623,6 @@ static int __init detect_init_APIC (void)
 			l &= ~MSR_IA32_APICBASE_BASE;
 			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
 			wrmsr(MSR_IA32_APICBASE, l, h);
-			needs_pm = 1;
 		}
 	}
 	/*
@@ -631,17 +634,13 @@ static int __init detect_init_APIC (void)
 		printk("Could not enable APIC!\n");
 		return -1;
 	}
-	set_bit(X86_FEATURE_APIC, &boot_cpu_data.x86_capability);
+	set_bit(X86_FEATURE_APIC, boot_cpu_data.x86_capability);
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 	boot_cpu_id = 0;
 	if (nmi_watchdog != NMI_NONE)
 		nmi_watchdog = NMI_LOCAL_APIC;
 
 	printk("Found and enabled local APIC!\n");
-
-	if (needs_pm)
-		apic_pm_init1();
-
 	return 0;
 
 no_apic:
@@ -782,7 +781,7 @@ void __setup_APIC_LVTT(unsigned int clocks)
 
 void setup_APIC_timer(void * data)
 {
-	unsigned long clocks = (unsigned long) data, slice, t0, t1;
+	unsigned int clocks = (unsigned long) data, slice, t0, t1;
 	unsigned long flags;
 	int delta;
 
@@ -799,7 +798,8 @@ void setup_APIC_timer(void * data)
 	 */
 
 	slice = clocks / (smp_num_cpus+1);
-	printk("cpu: %d, clocks: %lu, slice: %lu\n", smp_processor_id(), clocks, slice);
+	printk("cpu: %d, clocks: %d, slice: %d\n",
+		smp_processor_id(), clocks, slice);
 
 	/*
 	 * Wait for IRQ0's slice:
@@ -822,7 +822,8 @@ void setup_APIC_timer(void * data)
 
 	__setup_APIC_LVTT(clocks);
 
-	printk("CPU%d<T0:%lu,T1:%lu,D:%d,S:%lu,C:%lu>\n", smp_processor_id(), t0, t1, delta, slice, clocks);
+	printk("CPU%d<T0:%u,T1:%u,D:%d,S:%u,C:%u>\n",
+			smp_processor_id(), t0, t1, delta, slice, clocks);
 
 	__restore_flags(flags);
 }
@@ -842,9 +843,9 @@ void setup_APIC_timer(void * data)
 
 int __init calibrate_APIC_clock(void)
 {
-	unsigned long long t1 = 0, t2 = 0;
-	long tt1, tt2;
-	long result;
+	unsigned long t1 = 0, t2 = 0;
+	int tt1, tt2;
+	int result;
 	int i;
 	const int LOOPS = HZ/10;
 
@@ -892,19 +893,23 @@ int __init calibrate_APIC_clock(void)
 
 	result = (tt1-tt2)*APIC_DIVISOR/LOOPS;
 
-	if (cpu_has_tsc)
-		printk("..... CPU clock speed is %ld.%04ld MHz.\n",
-			((long)(t2-t1)/LOOPS)/(1000000/HZ),
-			((long)(t2-t1)/LOOPS)%(1000000/HZ));
+	
+	printk("t1 = %ld t2 = %ld tt1 = %d tt2 = %d\n", t1, t2, tt1, tt2);  
 
-	printk("..... host bus clock speed is %ld.%04ld MHz.\n",
+
+	if (cpu_has_tsc)
+		printk("..... CPU clock speed is %d.%04d MHz.\n",
+			((int)(t2-t1)/LOOPS)/(1000000/HZ),
+			((int)(t2-t1)/LOOPS)%(1000000/HZ));
+
+	printk("..... host bus clock speed is %d.%04d MHz.\n",
 		result/(1000000/HZ),
 		result%(1000000/HZ));
 
 	return result;
 }
 
-static unsigned long calibration_result;
+static unsigned int calibration_result;
 
 void __init setup_APIC_clocks (void)
 {
@@ -917,12 +922,12 @@ void __init setup_APIC_clocks (void)
 	/*
 	 * Now set up the timer for real.
 	 */
-	setup_APIC_timer((void *)calibration_result);
+	setup_APIC_timer((void *)(u64)calibration_result);
 
 	__sti();
 
 	/* and update all other cpus */
-	smp_call_function(setup_APIC_timer, (void *)calibration_result, 1, 1);
+	smp_call_function(setup_APIC_timer, (void *)(u64)calibration_result, 1, 1);
 }
 
 void __init disable_APIC_timer(void)
@@ -985,7 +990,7 @@ int setup_profiling_timer(unsigned int multiplier)
  * value into /proc/profile.
  */
 
-inline void smp_local_timer_interrupt(struct pt_regs * regs)
+inline void smp_local_timer_interrupt(struct pt_regs *regs)
 {
 	int user = user_mode(regs);
 	int cpu = smp_processor_id();
@@ -1041,7 +1046,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
  */
 unsigned int apic_timer_irqs [NR_CPUS];
 
-void smp_apic_timer_interrupt(struct pt_regs regs)
+void smp_apic_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
@@ -1061,7 +1066,7 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
 	 * interrupt lock, which is the WrongThing (tm) to do.
 	 */
 	irq_enter(cpu, 0);
-	smp_local_timer_interrupt(&regs);
+	smp_local_timer_interrupt(regs);
 	irq_exit(cpu, 0);
 
 	if (softirq_pending(cpu))
@@ -1073,7 +1078,9 @@ void smp_apic_timer_interrupt(struct pt_regs regs)
  */
 asmlinkage void smp_spurious_interrupt(void)
 {
-	unsigned long v;
+	unsigned int v;
+	static unsigned long last_warning; 
+	static unsigned long skipped; 
 
 	/*
 	 * Check if this really is a spurious interrupt and ACK it
@@ -1085,8 +1092,13 @@ asmlinkage void smp_spurious_interrupt(void)
 		ack_APIC_irq();
 
 	/* see sw-dev-man vol 3, chapter 7.4.13.5 */
-	printk(KERN_INFO "spurious APIC interrupt on CPU#%d, should never happen.\n",
-			smp_processor_id());
+	if (last_warning+30*HZ < jiffies) { 
+		printk(KERN_INFO "spurious APIC interrupt on CPU#%d, %ld skipped.\n",
+		       smp_processor_id(), skipped);
+		last_warning = jiffies; 
+	} else { 
+		skipped++; 
+	} 
 }
 
 /*
@@ -1095,7 +1107,7 @@ asmlinkage void smp_spurious_interrupt(void)
 
 asmlinkage void smp_error_interrupt(void)
 {
-	unsigned long v, v1;
+	unsigned int v, v1;
 
 	/* First tickle the hardware, only then report what went on. -- REW */
 	v = apic_read(APIC_ESR);
@@ -1114,7 +1126,7 @@ asmlinkage void smp_error_interrupt(void)
 	   6: Received illegal vector
 	   7: Illegal register address
 	*/
-	printk (KERN_ERR "APIC error on CPU%d: %02lx(%02lx)\n",
+	printk (KERN_ERR "APIC error on CPU%d: %02x(%02x)\n",
 	        smp_processor_id(), v , v1);
 }
 

@@ -1,12 +1,16 @@
 /*
- * linux/kernel/ldt.c
+ * linux/arch/x86_64/kernel/ldt.c
  *
  * Copyright (C) 1992 Krishna Balasubramanian and Linus Torvalds
  * Copyright (C) 1999 Ingo Molnar <mingo@redhat.com>
+ * Copyright (C) 2002 Andi Kleen
+ * 
+ * This handles calls from both 32bit and 64bit mode.
  */
 
 /* 
- * FIXME: forbid code segment setting for 64bit mode. doesn't work with SYSCALL 
+ * FIXME:
+ * Need to add locking for LAR in load_gs_index.
  */ 
 
 #include <linux/errno.h>
@@ -51,35 +55,28 @@ out:
 
 static int read_default_ldt(void * ptr, unsigned long bytecount)
 {
-	int err;
-	unsigned long size;
-	void *address;
-
-	err = 0;
-	address = &default_ldt[0];
-	size = sizeof(struct desc_struct);
-	if (size > bytecount)
-		size = bytecount;
-
-	err = size;
-	if (copy_to_user(ptr, address, size))
-		err = -EFAULT;
-
-	return err;
+	/* Arbitary number */ 
+	if (bytecount > 128) 
+		bytecount = 128; 	
+	if (clear_user(ptr, bytecount))
+		return -EFAULT;
+	return bytecount; 
 }
 
 static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 {
-	struct mm_struct * mm = current->mm;
+	struct task_struct *me = current;
+	struct mm_struct * mm = me->mm;
 	__u32 entry_1, entry_2, *lp;
 	int error;
 	struct modify_ldt_ldt_s ldt_info;
 
 	error = -EINVAL;
+
 	if (bytecount != sizeof(ldt_info))
 		goto out;
 	error = -EFAULT; 	
-	if (copy_from_user(&ldt_info, ptr, sizeof(ldt_info)))
+	if (copy_from_user(&ldt_info, ptr, bytecount))
 		goto out;
 
 	error = -EINVAL;
@@ -92,8 +89,10 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 			goto out;
 	}
 
-	current->thread.fsindex = 0; 
-	current->thread.gsindex = 0; 
+	me->thread.fsindex = 0; 
+	me->thread.gsindex = 0; 
+	me->thread.gs = 0; 
+	me->thread.fs = 0; 
 
 	/*
 	 * the GDT index of the LDT is allocated dynamically, and is
@@ -122,7 +121,8 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 		     ldt_info.seg_32bit == 0		&&
 		     ldt_info.limit_in_pages == 0	&&
 		     ldt_info.seg_not_present == 1	&&
-		     ldt_info.useable == 0 )) {
+		     ldt_info.useable == 0 && 
+		     ldt_info.lm == 0)) {
 			entry_1 = 0;
 			entry_2 = 0;
 			goto install;
@@ -139,6 +139,7 @@ static int write_ldt(void * ptr, unsigned long bytecount, int oldmode)
 		  ((ldt_info.seg_not_present ^ 1) << 15) |
 		  (ldt_info.seg_32bit << 22) |
 		  (ldt_info.limit_in_pages << 23) |
+		  (ldt_info.lm << 21) |
 		  0x7000;
 	if (!oldmode)
 		entry_2 |= (ldt_info.useable << 20);

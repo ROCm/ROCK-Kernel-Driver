@@ -2,7 +2,7 @@
  * Written by Martin Mares <mj@atrey.karlin.mff.cuni.cz>;
  */
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
-OUTPUT_ARCH(i386)
+OUTPUT_ARCH(i386:x86-64)
 ENTRY(_start)
 SECTIONS
 {
@@ -28,6 +28,10 @@ SECTIONS
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
+
+  __start___kallsyms = .;	/* All kernel symbols */
+  __kallsyms : { *(__kallsyms) }
+  __stop___kallsyms = .;
 
   .data : {			/* Data */
 	*(.data)
@@ -71,6 +75,9 @@ SECTIONS
   . = ALIGN(8192);		/* init_task */
   .data.init_task : { *(.data.init_task) }
 
+  . = ALIGN(4096); 
+  .data.boot_pgt : { *(.data.boot_pgt) }
+
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
   .text.init : { *(.text.init) }
@@ -90,6 +97,11 @@ SECTIONS
 	*(.initcall7.init)
   }
   __initcall_end = .;
+  . = ALIGN(32);
+  __per_cpu_start = .;
+  . = ALIGN(64); 
+  .data.percpu  : { *(.data.percpu) }
+  __per_cpu_end = .;
   . = ALIGN(4096);
   __init_end = .;
 
@@ -101,12 +113,20 @@ SECTIONS
 	*(.exitcall.exit)
 	}
 
-  /* Stabs debugging sections.  */
-  .stab 0 : { *(.stab) }
-  .stabstr 0 : { *(.stabstr) }
-  .stab.excl 0 : { *(.stab.excl) }
-  .stab.exclstr 0 : { *(.stab.exclstr) }
-  .stab.index 0 : { *(.stab.index) }
-  .stab.indexstr 0 : { *(.stab.indexstr) }
+  /* DWARF 2 */
+  .debug_info     0 : { *(.debug_info) }
+  .debug_abbrev   0 : { *(.debug_abbrev) }
+  .debug_line     0 : { *(.debug_line) }
+  .debug_frame    0 : { *(.debug_frame) }
+  .debug_str      0 : { *(.debug_str) }
+  .debug_loc      0 : { *(.debug_loc) }
+  .debug_macinfo  0 : { *(.debug_macinfo) }
+  /* SGI/MIPS DWARF 2 extensions */
+  .debug_weaknames 0 : { *(.debug_weaknames) }
+  .debug_funcnames 0 : { *(.debug_funcnames) }
+  .debug_typenames 0 : { *(.debug_typenames) }
+  .debug_varnames  0 : { *(.debug_varnames) }
+
+
   .comment 0 : { *(.comment) }
 }

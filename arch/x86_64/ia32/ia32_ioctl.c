@@ -1,9 +1,9 @@
-/* $Id: ia32_ioctl.c,v 1.2 2001/07/05 06:28:42 ak Exp $
+/* $Id: ia32_ioctl.c,v 1.11 2002/04/18 14:36:37 ak Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
  * Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
- * Copyright (C) 2001  Andi Kleen, SuSE Labs 
+ * Copyright (C) 2001,2002  Andi Kleen, SuSE Labs 
  *
  * These routines maintain argument size conversion between 32bit and 64bit
  * ioctls.
@@ -51,6 +51,10 @@
 #include <linux/elevator.h>
 #include <linux/rtc.h>
 #include <linux/pci.h>
+#include <linux/rtc.h>
+#include <linux/module.h>
+#include <linux/serial.h>
+#include <linux/reiserfs_fs.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh. This header really is not clean */
 #define min min
@@ -2972,11 +2976,138 @@ static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return rw_long(fd, AUTOFS_IOC_SETTIMEOUT, arg);
 }
 
+/* SuSE extension */ 
+#ifndef TIOCGDEV
+#define TIOCGDEV       _IOR('T',0x32, unsigned int)
+#endif
+static int tiocgdev(unsigned fd, unsigned cmd,  unsigned int *ptr) 
+{ 
+
+	struct file *file = fget(fd);
+	struct tty_struct *real_tty;
+
+	if (!fd)
+		return -EBADF;
+	if (file->f_op->ioctl != tty_ioctl)
+		return -EINVAL; 
+	real_tty = (struct tty_struct *)file->private_data;
+	if (!real_tty) 	
+		return -EINVAL; 
+	return put_user(kdev_t_to_nr(real_tty->device), ptr); 
+} 
+
+
+struct raw32_config_request 
+{
+	int	raw_minor;
+	__u64	block_major;
+	__u64	block_minor;
+} __attribute__((packed));
+
+static int raw_ioctl(unsigned fd, unsigned cmd,  void *ptr) 
+{ 
+	int ret;
+	switch (cmd) { 
+	case RAW_SETBIND:
+	case RAW_GETBIND: {
+		struct raw_config_request req; 
+		struct raw32_config_request *user_req = ptr;
+		mm_segment_t oldfs = get_fs(); 
+
+		if (get_user(req.raw_minor, &user_req->raw_minor) ||
+		    get_user(req.block_major, &user_req->block_major) ||
+		    get_user(req.block_minor, &user_req->block_minor))
+			return -EFAULT;
+		set_fs(KERNEL_DS); 
+		ret = sys_ioctl(fd,cmd,(unsigned long)&req); 
+		set_fs(oldfs); 
+		break;
+	}
+	default:
+		ret = sys_ioctl(fd,cmd,(unsigned long)ptr);
+		break;
+	} 
+	return ret; 		
+} 
+
+struct serial_struct32 {
+	int	type;
+	int	line;
+	unsigned int	port;
+	int	irq;
+	int	flags;
+	int	xmit_fifo_size;
+	int	custom_divisor;
+	int	baud_base;
+	unsigned short	close_delay;
+	char	io_type;
+	char	reserved_char[1];
+	int	hub6;
+	unsigned short	closing_wait; /* time to wait before closing */
+	unsigned short	closing_wait2; /* no longer used... */
+	__u32 iomem_base;
+	unsigned short	iomem_reg_shift;
+	unsigned int	port_high;
+	int	reserved[1];
+};
+
+static int serial_struct_ioctl(unsigned fd, unsigned cmd,  void *ptr) 
+{
+	typedef struct serial_struct SS;
+	struct serial_struct32 *ss32 = ptr; 
+	int err = 0;
+	struct serial_struct ss; 
+	mm_segment_t oldseg = get_fs(); 
+	set_fs(KERNEL_DS);
+	if (cmd == TIOCSSERIAL) { 
+		err = -EFAULT;
+		if (copy_from_user(&ss, ss32, sizeof(struct serial_struct32)))
+			goto out;
+		memmove(&ss.iomem_reg_shift, ((char*)&ss.iomem_base)+4, 
+			sizeof(SS)-offsetof(SS,iomem_reg_shift)); 
+		ss.iomem_base = (void *)((unsigned long)ss.iomem_base & 0xffffffff);
+	}
+	if (!err)
+		err = sys_ioctl(fd,cmd,(unsigned long)(&ss)); 
+	if (cmd == TIOCGSERIAL && err >= 0) { 
+		__u32 base;
+		if (__copy_to_user(ss32,&ss,offsetof(SS,iomem_base)) ||
+		    __copy_to_user(&ss32->iomem_reg_shift,
+				   &ss.iomem_reg_shift,
+				   sizeof(SS) - offsetof(SS, iomem_reg_shift)))
+			err = -EFAULT;
+		if (ss.iomem_base > (unsigned char *)0xffffffff)
+			base = -1; 
+		else
+			base = (unsigned long)ss.iomem_base;
+		err |= __put_user(base, &ss32->iomem_base); 		
+	} 
+ out:
+	set_fs(oldseg);
+	return err;	
+}
+
 struct ioctl_trans {
 	unsigned long cmd;
-	unsigned long handler;
+	int (*handler)(unsigned int, unsigned int, unsigned long, struct file * filp);
 	struct ioctl_trans *next;
 };
+
+/* generic function to change a single long put_user to arg to 32bit */
+static int arg2long(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	int ret; 
+	unsigned long val = 0; 
+	mm_segment_t oldseg = get_fs();
+	set_fs(KERNEL_DS);
+	ret = sys_ioctl(fd, cmd, (unsigned long)&val);  
+	set_fs(oldseg); 
+	if (!ret || val) {
+		if (put_user((int)val, (unsigned int *)arg)) 
+			return -EFAULT; 
+	}
+	return ret; 
+} 
 
 #define REF_SYMBOL(handler) if (0) (void)handler;
 #define HANDLE_IOCTL2(cmd,handler) REF_SYMBOL(handler);  asm volatile(".quad %c0, " #handler ",0"::"i" (cmd)); 
@@ -2986,7 +3117,7 @@ struct ioctl_trans {
 #define IOCTL_TABLE_END  asm volatile("\nioctl_end:"); }
 
 IOCTL_TABLE_START
-/* List here exlicitly which ioctl's are known to have
+/* List here explicitly which ioctl's are known to have
  * compatable types passed or none at all...
  */
 /* Big T */
@@ -3002,6 +3133,7 @@ COMPATIBLE_IOCTL(TCSETS)
 COMPATIBLE_IOCTL(TCSETSW)
 COMPATIBLE_IOCTL(TCSETSF)
 COMPATIBLE_IOCTL(TIOCLINUX)
+HANDLE_IOCTL(TIOCGDEV, tiocgdev)
 /* Little t */
 COMPATIBLE_IOCTL(TIOCGETD)
 COMPATIBLE_IOCTL(TIOCSETD)
@@ -3025,8 +3157,6 @@ COMPATIBLE_IOCTL(TIOCGPGRP)
 COMPATIBLE_IOCTL(TIOCSCTTY)
 COMPATIBLE_IOCTL(TIOCGPTN)
 COMPATIBLE_IOCTL(TIOCSPTLCK)
-COMPATIBLE_IOCTL(TIOCGSERIAL)
-COMPATIBLE_IOCTL(TIOCSSERIAL)
 COMPATIBLE_IOCTL(TIOCSERGETLSR)
 COMPATIBLE_IOCTL(FBIOGET_VSCREENINFO)
 COMPATIBLE_IOCTL(FBIOPUT_VSCREENINFO)
@@ -3082,6 +3212,8 @@ COMPATIBLE_IOCTL(BLKROSET)
 COMPATIBLE_IOCTL(BLKROGET)
 COMPATIBLE_IOCTL(BLKRRPART)
 COMPATIBLE_IOCTL(BLKFLSBUF)
+COMPATIBLE_IOCTL(BLKRASET)
+COMPATIBLE_IOCTL(BLKFRASET)
 COMPATIBLE_IOCTL(BLKSECTSET)
 COMPATIBLE_IOCTL(BLKSSZGET)
 
@@ -3203,7 +3335,7 @@ COMPATIBLE_IOCTL(RTC_RD_TIME)
 COMPATIBLE_IOCTL(RTC_SET_TIME)
 COMPATIBLE_IOCTL(RTC_WKALM_SET)
 COMPATIBLE_IOCTL(RTC_WKALM_RD)
-COMPATIBLE_IOCTL(RTC_IRQP_READ)
+HANDLE_IOCTL(RTC_IRQP_READ,arg2long)
 COMPATIBLE_IOCTL(RTC_IRQP_SET)
 COMPATIBLE_IOCTL(RTC_EPOCH_READ)
 COMPATIBLE_IOCTL(RTC_EPOCH_SET)
@@ -3479,9 +3611,6 @@ COMPATIBLE_IOCTL(DEVFSDIOC_GET_PROTO_REV)
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_EVENT_MASK)
 COMPATIBLE_IOCTL(DEVFSDIOC_RELEASE_EVENT_QUEUE)
 COMPATIBLE_IOCTL(DEVFSDIOC_SET_DEBUG_MASK)
-/* Raw devices */
-COMPATIBLE_IOCTL(RAW_SETBIND)
-COMPATIBLE_IOCTL(RAW_GETBIND)
 /* SMB ioctls which do not need any translations */
 COMPATIBLE_IOCTL(SMB_IOC_NEWCONN)
 /* Little a */
@@ -3543,6 +3672,18 @@ COMPATIBLE_IOCTL(DRM_IOCTL_LOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_UNLOCK)
 COMPATIBLE_IOCTL(DRM_IOCTL_FINISH)
 #endif /* DRM */
+#ifdef CONFIG_AUTOFS_FS
+COMPATIBLE_IOCTL(AUTOFS_IOC_READY);
+COMPATIBLE_IOCTL(AUTOFS_IOC_FAIL);
+COMPATIBLE_IOCTL(AUTOFS_IOC_CATATONIC);
+COMPATIBLE_IOCTL(AUTOFS_IOC_PROTOVER);
+COMPATIBLE_IOCTL(AUTOFS_IOC_SETTIMEOUT);
+COMPATIBLE_IOCTL(AUTOFS_IOC_EXPIRE);
+#endif
+COMPATIBLE_IOCTL(REISERFS_IOC_UNPACK);
+/* serial driver */ 
+HANDLE_IOCTL(TIOCGSERIAL, serial_struct_ioctl);
+HANDLE_IOCTL(TIOCSSERIAL, serial_struct_ioctl);
 /* elevator */
 COMPATIBLE_IOCTL(BLKELVGET)
 COMPATIBLE_IOCTL(BLKELVSET)
@@ -3589,6 +3730,8 @@ HANDLE_IOCTL(SIOCSIFTXQLEN, dev_ifsioc)
 HANDLE_IOCTL(SIOCETHTOOL, ethtool_ioctl)
 HANDLE_IOCTL(SIOCADDRT, routing_ioctl)
 HANDLE_IOCTL(SIOCDELRT, routing_ioctl)
+/* Raw devices */
+HANDLE_IOCTL(RAW_SETBIND, raw_ioctl)
 /* Note SIOCRTMSG is no longer, so this is safe and * the user would have seen just an -EINVAL anyways. */
 HANDLE_IOCTL(SIOCRTMSG, ret_einval)
 HANDLE_IOCTL(SIOCGSTAMP, do_siocgstamp)
@@ -3751,14 +3894,14 @@ static struct ioctl_trans *additional_ioctls;
 
 /* Always call these with kernel lock held! */
 
+
 int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, unsigned int, unsigned long, struct file *))
 {
 	int i;
 	if (!additional_ioctls) {
-		additional_ioctls = module_map(PAGE_SIZE);
+		additional_ioctls = (struct ioctl_trans *)get_zeroed_page(GFP_KERNEL);
 		if (!additional_ioctls)
 			return -ENOMEM;
-		memset(additional_ioctls, 0, PAGE_SIZE);
 	}
 	for (i = 0; i < PAGE_SIZE/sizeof(struct ioctl_trans); i++)
 		if (!additional_ioctls[i].cmd)
@@ -3767,12 +3910,14 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int, u
 		return -ENOMEM;
 	additional_ioctls[i].cmd = cmd;
 	if (!handler)
-		additional_ioctls[i].handler = (u32)(long)sys_ioctl;
+		additional_ioctls[i].handler = 
+	    (int (*)(unsigned,unsigned,unsigned long, struct file *))sys_ioctl;
 	else
-		additional_ioctls[i].handler = (u32)(long)handler;
+		additional_ioctls[i].handler = handler;
 	ioctl32_insert_translation(&additional_ioctls[i]);
 	return 0;
 }
+
 
 int unregister_ioctl32_conversion(unsigned int cmd)
 {
@@ -3799,6 +3944,9 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 	return -EINVAL;
 }
 
+EXPORT_SYMBOL(register_ioctl32_conversion); 
+EXPORT_SYMBOL(unregister_ioctl32_conversion); 
+
 asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 {
 	struct file * filp;
@@ -3820,7 +3968,7 @@ asmlinkage int sys32_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	while (t && t->cmd != cmd)
 		t = (struct ioctl_trans *)(long)t->next;
 	if (t) {
-		handler = (void *)(long)t->handler;
+		handler = t->handler;
 		error = handler(fd, cmd, arg, filp);
 	} else {
 		static int count = 0;

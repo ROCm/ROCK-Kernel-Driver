@@ -12,7 +12,7 @@
 
 #define CLOCK_TICK_RATE	1193180 /* Underlying HZ */
 #define CLOCK_TICK_FACTOR	20	/* Factor of both 1000000 and CLOCK_TICK_RATE */
-#define FINETUNE ((((((long)LATCH * HZ - CLOCK_TICK_RATE) << SHIFT_HZ) * \
+#define FINETUNE ((((((int)LATCH * HZ - CLOCK_TICK_RATE) << SHIFT_HZ) * \
 	(1000000/CLOCK_TICK_FACTOR) / (CLOCK_TICK_RATE/CLOCK_TICK_FACTOR)) \
 		<< (SHIFT_SCALE-SHIFT_HZ)) / HZ)
 
@@ -46,6 +46,6 @@ static inline cycles_t get_cycles (void)
 #endif
 }
 
-extern unsigned long cpu_khz;
+extern unsigned int cpu_khz;
 
 #endif

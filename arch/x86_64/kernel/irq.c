@@ -354,7 +354,7 @@ static inline void get_irqlock(int cpu)
  */
 void __global_cli(void)
 {
-	unsigned int flags;
+	unsigned long flags;
 
 	__save_flags(flags);
 	if (flags & (1 << EFLAGS_IF_SHIFT)) {
@@ -570,11 +570,13 @@ asmlinkage unsigned int do_IRQ(struct pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
-	int irq = regs->orig_rax & 0xff; /* high bits used in ret_from_ code  */
+	unsigned irq = regs->orig_rax & 0xff; /* high bits used in ret_from_ code  */
 	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
+
+	if (irq > 256) BUG();
 
 	kstat.irqs[cpu][irq]++;
 	spin_lock(&desc->lock);
@@ -632,6 +634,7 @@ out:
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
 	 */
+	if (irq > 256) BUG();
 	desc->handler->end(irq);
 	spin_unlock(&desc->lock);
 

@@ -19,6 +19,7 @@
 #include <asm/io_apic.h>
 #endif
 #include <asm/apic.h>
+#include <asm/thread_info.h>
 #endif
 #endif
 
@@ -90,9 +91,22 @@ extern __inline int hard_smp_processor_id(void)
 
 #define NO_PROC_ID		0xFF		/* No processor magic marker */
 
-
-
 #endif
 #define INT_DELIVERY_MODE 1     /* logical delivery */
 #define TARGET_CPUS 1
+
+
+#ifndef CONFIG_SMP
+#define stack_smp_processor_id() 0
+#else
+#include <asm/thread_info.h>
+#define stack_smp_processor_id() \
+({ 								\
+	struct thread_info *ti;					\
+	__asm__("andq %%rsp,%0; ":"=r" (ti) : "0" (~8191UL));	\
+	ti->cpu;						\
+})
 #endif
+
+#endif
+
