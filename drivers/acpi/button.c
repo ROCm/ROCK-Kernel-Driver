@@ -108,6 +108,9 @@ static struct file_operations acpi_button_state_fops = {
    -------------------------------------------------------------------------- */
 
 static struct proc_dir_entry	*acpi_button_dir;
+struct acpi_device 	*fixed_pwr_button;
+struct acpi_device	*fixed_sleep_button;
+
 
 static int acpi_button_info_seq_show(struct seq_file *seq, void *offset)
 {
@@ -526,6 +529,12 @@ static void __exit
 acpi_button_exit (void)
 {
 	ACPI_FUNCTION_TRACE("acpi_button_exit");
+
+	if(fixed_pwr_button) 
+		acpi_button_remove(fixed_pwr_button, ACPI_BUS_TYPE_POWER_BUTTON);
+
+	if(fixed_sleep_button)
+		acpi_button_remove(fixed_sleep_button, ACPI_BUS_TYPE_SLEEP_BUTTON);
 
 	acpi_bus_unregister_driver(&acpi_button_driver);
 
