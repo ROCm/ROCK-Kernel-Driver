@@ -257,6 +257,7 @@ int __init hvc_init(void)
 	memset(&hvc_driver, 0, sizeof(struct tty_driver));
 
 	hvc_driver.magic = TTY_DRIVER_MAGIC;
+	hvc_driver.owner = THIS_MODULE;
 	hvc_driver.driver_name = "hvc";
 	hvc_driver.name = "hvc/";
 	hvc_driver.major = HVC_MAJOR;
