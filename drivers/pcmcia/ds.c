@@ -600,7 +600,7 @@ static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 	p_dev->dev.bus = &pcmcia_bus_type;
 	p_dev->dev.parent = s->parent->dev.dev;
 	p_dev->dev.release = pcmcia_release_dev;
-	sprintf (p_dev->dev.bus_id, "pcmcia%d.%d", p_dev->socket->sock, p_dev->device_no);
+	sprintf (p_dev->dev.bus_id, "%d.%d", p_dev->socket->sock, p_dev->device_no);
 	p_dev->dev.driver = &p_drv->drv;
 
 	/* compat */
