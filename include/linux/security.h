@@ -1255,6 +1255,8 @@ extern int mod_unreg_security	(const char *name, struct security_operations *ops
 /* Condition for invocation of non-default security_op */
 #define COND_SECURITY(seop, def) 	\
 	(unlikely(security_enabled))? security_ops->seop: def
+#define COND_SECURITY_NOT_PRIVATE(inode, seop, def) 	\
+	(unlikely(security_enabled) && likely (!IS_PRIVATE(inode)) )? security_ops->seop: def
 
 #else /* CONFIG_SECURITY */
 static inline int security_init(void)
@@ -1490,13 +1492,13 @@ static inline void security_sb_post_pivotroot (struct nameidata *old_nd,
 
 static inline int security_inode_alloc (struct inode *inode)
 {
-	return COND_SECURITY(inode_alloc_security (inode),
+	return COND_SECURITY_NOT_PRIVATE(inode, inode_alloc_security (inode),
 			 0);
 }
 
 static inline void security_inode_free (struct inode *inode)
 {
-	COND_SECURITY(inode_free_security (inode),
+	COND_SECURITY_NOT_PRIVATE(inode, inode_free_security (inode),
 		  SE_NOP);
 }
 	
@@ -1504,7 +1506,7 @@ static inline int security_inode_create (struct inode *dir,
 					 struct dentry *dentry,
 					 int mode)
 {
-	return COND_SECURITY(inode_create (dir, dentry, mode),
+	return COND_SECURITY_NOT_PRIVATE(dir, inode_create (dir, dentry, mode),
 			 0);
 }
 
@@ -1512,7 +1514,8 @@ static inline void security_inode_post_create (struct inode *dir,
 					       struct dentry *dentry,
 					       int mode)
 {
-	COND_SECURITY(inode_post_create (dir, dentry, mode),
+	COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	          inode_post_create (dir, dentry, mode),
 		  SE_NOP);
 }
 
@@ -1520,7 +1523,8 @@ static inline int security_inode_link (struct dentry *old_dentry,
 				       struct inode *dir,
 				       struct dentry *new_dentry)
 {
-	return COND_SECURITY(inode_link (old_dentry, dir, new_dentry),
+	return COND_SECURITY_NOT_PRIVATE(old_dentry->d_inode,
+	                 inode_link (old_dentry, dir, new_dentry),
 			 0);
 }
 
@@ -1528,14 +1532,16 @@ static inline void security_inode_post_link (struct dentry *old_dentry,
 					     struct inode *dir,
 					     struct dentry *new_dentry)
 {
-	COND_SECURITY(inode_post_link (old_dentry, dir, new_dentry),
+	COND_SECURITY_NOT_PRIVATE(new_dentry->d_inode,
+	          inode_post_link (old_dentry, dir, new_dentry),
 		  SE_NOP);
 }
 
 static inline int security_inode_unlink (struct inode *dir,
 					 struct dentry *dentry)
 {
-	return COND_SECURITY(inode_unlink (dir, dentry),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_unlink (dir, dentry),
 			 0);
 }
 
@@ -1543,7 +1549,8 @@ static inline int security_inode_symlink (struct inode *dir,
 					  struct dentry *dentry,
 					  const char *old_name)
 {
-	return COND_SECURITY(inode_symlink (dir, dentry, old_name),
+	return COND_SECURITY_NOT_PRIVATE(dir,
+	                 inode_symlink (dir, dentry, old_name),
 			 0);
 }
 
@@ -1551,7 +1558,8 @@ static inline void security_inode_post_symlink (struct inode *dir,
 						struct dentry *dentry,
 						const char *old_name)
 {
-	COND_SECURITY(inode_post_symlink (dir, dentry, old_name),
+	COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	          inode_post_symlink (dir, dentry, old_name),
 		  SE_NOP);
 }
 
@@ -1559,7 +1567,7 @@ static inline int security_inode_mkdir (struct inode *dir,
 					struct dentry *dentry,
 					int mode)
 {
-	return COND_SECURITY(inode_mkdir (dir, dentry, mode),
+	return COND_SECURITY_NOT_PRIVATE(dir, inode_mkdir (dir, dentry, mode),
 			 0);
 }
 
@@ -1567,14 +1575,16 @@ static inline void security_inode_post_mkdir (struct inode *dir,
 					      struct dentry *dentry,
 					      int mode)
 {
-	COND_SECURITY(inode_post_mkdir (dir, dentry, mode),
+	COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	          inode_post_mkdir (dir, dentry, mode),
 		  SE_NOP);
 }
 
 static inline int security_inode_rmdir (struct inode *dir,
 					struct dentry *dentry)
 {
-	return COND_SECURITY(inode_rmdir (dir, dentry),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_rmdir (dir, dentry),
 			 0);
 }
 
@@ -1582,7 +1592,8 @@ static inline int security_inode_mknod (struct inode *dir,
 					struct dentry *dentry,
 					int mode, dev_t dev)
 {
-	return COND_SECURITY(inode_mknod (dir, dentry, mode, dev),
+	return COND_SECURITY_NOT_PRIVATE(dir,
+	                 inode_mknod (dir, dentry, mode, dev),
 			 0);
 }
 
@@ -1590,7 +1601,8 @@ static inline void security_inode_post_mknod (struct inode *dir,
 					      struct dentry *dentry,
 					      int mode, dev_t dev)
 {
-	COND_SECURITY(inode_post_mknod (dir, dentry, mode, dev),
+	COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	          inode_post_mknod (dir, dentry, mode, dev),
 		  SE_NOP);
 }
 
@@ -1599,6 +1611,10 @@ static inline int security_inode_rename (struct inode *old_dir,
 					 struct inode *new_dir,
 					 struct dentry *new_dentry)
 {
+	if (unlikely (IS_PRIVATE (old_dentry->d_inode) ||
+	    (new_dentry->d_inode && IS_PRIVATE (new_dentry->d_inode))))
+		return 0;
+
 	return COND_SECURITY(inode_rename (old_dir, old_dentry,
 					   new_dir, new_dentry), 
 			 0);
@@ -1609,6 +1625,10 @@ static inline void security_inode_post_rename (struct inode *old_dir,
 					       struct inode *new_dir,
 					       struct dentry *new_dentry)
 {
+	if (unlikely (IS_PRIVATE (old_dentry->d_inode) ||
+	    (new_dentry->d_inode && IS_PRIVATE (new_dentry->d_inode))))
+		return;
+
 	COND_SECURITY(inode_post_rename (old_dir, old_dentry,
 					 new_dir, new_dentry),
 		  SE_NOP);
@@ -1616,91 +1636,104 @@ static inline void security_inode_post_rename (struct inode *old_dir,
 
 static inline int security_inode_readlink (struct dentry *dentry)
 {
-	return COND_SECURITY(inode_readlink (dentry),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode, 
+	                 inode_readlink (dentry),
 			 0);
 }
 
 static inline int security_inode_follow_link (struct dentry *dentry,
 					      struct nameidata *nd)
 {
-	return COND_SECURITY(inode_follow_link (dentry, nd),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_follow_link (dentry, nd),
 			 0);
 }
 
 static inline int security_inode_permission (struct inode *inode, int mask,
 					     struct nameidata *nd)
 {
-	return COND_SECURITY(inode_permission (inode, mask, nd),
+	return COND_SECURITY_NOT_PRIVATE(inode,
+	                 inode_permission (inode, mask, nd),
 			 0);
 }
 
 static inline int security_inode_setattr (struct dentry *dentry,
 					  struct iattr *attr)
 {
-	return COND_SECURITY(inode_setattr (dentry, attr),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_setattr (dentry, attr),
 			 0);
 }
 
 static inline int security_inode_getattr (struct vfsmount *mnt,
 					  struct dentry *dentry)
 {
-	return COND_SECURITY(inode_getattr (mnt, dentry),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_getattr (mnt, dentry),
 			 0);
 }
 
 static inline void security_inode_delete (struct inode *inode)
 {
-	COND_SECURITY(inode_delete (inode),
+	COND_SECURITY_NOT_PRIVATE(inode, inode_delete (inode),
 		  SE_NOP);
 }
 
 static inline int security_inode_setxattr (struct dentry *dentry, char *name,
 					   void *value, size_t size, int flags)
 {
-	return COND_SECURITY(inode_setxattr (dentry, name, value, size, flags),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_setxattr (dentry, name, value, size, flags),
 			 cap_inode_setxattr (dentry, name, value, size, flags));
 }
 
 static inline void security_inode_post_setxattr (struct dentry *dentry, char *name,
 						void *value, size_t size, int flags)
 {
-	COND_SECURITY(inode_post_setxattr (dentry, name, value, size, flags),
+	COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	          inode_post_setxattr (dentry, name, value, size, flags),
 		  SE_NOP);
 }
 
 static inline int security_inode_getxattr (struct dentry *dentry, char *name)
 {
-	return COND_SECURITY(inode_getxattr (dentry, name),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_getxattr (dentry, name),
 			 0);
 }
 
 static inline int security_inode_listxattr (struct dentry *dentry)
 {
-	return COND_SECURITY(inode_listxattr (dentry),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_listxattr (dentry),
 			 0);
 }
 
 static inline int security_inode_removexattr (struct dentry *dentry, char *name)
 {
-	return COND_SECURITY(inode_removexattr (dentry, name),
+	return COND_SECURITY_NOT_PRIVATE(dentry->d_inode,
+	                 inode_removexattr (dentry, name),
 			 cap_inode_removexattr (dentry, name));
 }
 
 static inline int security_inode_getsecurity(struct inode *inode, const char *name, void *buffer, size_t size)
 {
-	return COND_SECURITY(inode_getsecurity(inode, name, buffer, size),
+	return COND_SECURITY_NOT_PRIVATE(inode,
+	                 inode_getsecurity(inode, name, buffer, size),
 			 -EOPNOTSUPP);
 }
 
 static inline int security_inode_setsecurity(struct inode *inode, const char *name, const void *value, size_t size, int flags)
 {
-	return COND_SECURITY(inode_setsecurity(inode, name, value, size, flags),
+	return COND_SECURITY_NOT_PRIVATE(inode,
+	                 inode_setsecurity(inode, name, value, size, flags),
 			 -EOPNOTSUPP);
 }
 
 static inline int security_inode_listsecurity(struct inode *inode, char *buffer, size_t buffer_size)
 {
-	return COND_SECURITY(inode_listsecurity(inode, buffer, buffer_size),
+	return COND_SECURITY_NOT_PRIVATE(inode,
+	                 inode_listsecurity(inode, buffer, buffer_size),
 			 0);
 }
 
@@ -2026,6 +2059,8 @@ static inline int security_sem_semop (struct sem_array * sma,
 
 static inline void security_d_instantiate (struct dentry *dentry, struct inode *inode)
 {
+	if (unlikely (inode && IS_PRIVATE (inode)))
+		return;
 	COND_SECURITY(d_instantiate (dentry, inode),
 		  SE_NOP);
 }

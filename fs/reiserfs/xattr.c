@@ -181,8 +181,6 @@ open_xa_dir (const struct inode *inode, int flags)
             dput (xadir);
             return ERR_PTR (-ENODATA);
         }
-        /* Newly created object.. Need to mark it private */
-        REISERFS_I(xadir->d_inode)->i_flags |= i_priv_object;
     }
 
     dput (xaroot);
@@ -230,8 +228,6 @@ get_xa_file_dentry (const struct inode *inode, const char *name, int flags)
             dput (xafile);
             goto out;
         }
-        /* Newly created object.. Need to mark it private */
-        REISERFS_I(xafile->d_inode)->i_flags |= i_priv_object;
     }
 
 out:
@@ -1316,7 +1312,7 @@ reiserfs_xattr_init (struct super_block *s, int mount_flags)
 
       if (!err && dentry) {
           s->s_root->d_op = &xattr_lookup_poison_ops;
-          REISERFS_I(dentry->d_inode)->i_flags |= i_priv_object;
+          reiserfs_mark_inode_private (dentry->d_inode);
           REISERFS_SB(s)->priv_root = dentry;
       } else if (!(mount_flags & MS_RDONLY)) { /* xattrs are unavailable */
           /* If we're read-only it just means that the dir hasn't been

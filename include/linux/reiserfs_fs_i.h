@@ -23,9 +23,8 @@ typedef enum {
       space on crash with some files open, but unlinked. */
     i_link_saved_unlink_mask   =  0x0010,
     i_link_saved_truncate_mask =  0x0020,
-    i_priv_object              =  0x0080,
-    i_has_xattr_dir            =  0x0100,
-    i_data_log	               =  0x0200,
+    i_has_xattr_dir            =  0x0040,
+    i_data_log	               =  0x0080,
 } reiserfs_inode_flags;
 
 

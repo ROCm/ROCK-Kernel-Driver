@@ -1843,6 +1843,8 @@ int reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     } else if (inode->i_sb->s_flags & MS_POSIXACL) {
 	reiserfs_warning (inode->i_sb, "ACLs aren't enabled in the fs, "
 			  "but vfs thinks they are!");
+    } else if (is_reiserfs_priv_object (dir)) {
+	reiserfs_mark_inode_private (inode);
     }
 
     insert_inode_hash (inode);
