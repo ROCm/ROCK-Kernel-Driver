@@ -333,7 +333,7 @@ acpi_ds_clear_operands (
 	u32                             i;
 
 
-	ACPI_FUNCTION_TRACE_PTR ("acpi_ds_clear_operands", walk_state);
+	ACPI_FUNCTION_TRACE_PTR ("ds_clear_operands", walk_state);
 
 
 	/*

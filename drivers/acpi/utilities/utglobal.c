@@ -142,11 +142,11 @@ unknown:
  */
 
 /* Debug switch - level and trace mask */
-u32                                 acpi_dbg_level = 0;
+u32                                 acpi_dbg_level = ACPI_DEBUG_DEFAULT;
 
 /* Debug switch - layer (component) mask */
 
-u32                                 acpi_dbg_layer = 0;
+u32                                 acpi_dbg_layer = ACPI_COMPONENT_DEFAULT | ACPI_ALL_DRIVERS;
 u32                                 acpi_gbl_nesting_level = 0;
 
 
@@ -861,6 +861,7 @@ acpi_ut_init_globals (
 
 	acpi_gbl_system_notify.handler      = NULL;
 	acpi_gbl_device_notify.handler      = NULL;
+	acpi_gbl_exception_handler          = NULL;
 	acpi_gbl_init_handler               = NULL;
 
 	/* Global "typed" ACPI table pointers */

@@ -194,6 +194,7 @@
 #define ARGP_STRING_OP                  ARGP_LIST1 (ARGP_CHARLIST)
 #define ARGP_SUBTRACT_OP                ARGP_LIST3 (ARGP_TERMARG,    ARGP_TERMARG,       ARGP_TARGET)
 #define ARGP_THERMAL_ZONE_OP            ARGP_LIST3 (ARGP_PKGLENGTH,  ARGP_NAME,          ARGP_OBJLIST)
+#define ARGP_TIMER_OP                   ARG_NONE
 #define ARGP_TO_BCD_OP                  ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
 #define ARGP_TO_BUFFER_OP               ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
 #define ARGP_TO_DEC_STR_OP              ARGP_LIST2 (ARGP_TERMARG,    ARGP_TARGET)
@@ -317,7 +318,7 @@
 #define ARGI_SHIFT_LEFT_OP              ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
 #define ARGI_SHIFT_RIGHT_OP             ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
 #define ARGI_SIGNAL_OP                  ARGI_LIST1 (ARGI_EVENT)
-#define ARGI_SIZE_OF_OP                 ARGI_LIST1 (ARGI_DATAOBJECT)
+#define ARGI_SIZE_OF_OP                 ARGI_LIST1 (ARGI_REFERENCE) /* Force delay of operand resolution */
 #define ARGI_SLEEP_OP                   ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_STALL_OP                   ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_STATICSTRING_OP            ARGI_INVALID_OPCODE
@@ -325,13 +326,14 @@
 #define ARGI_STRING_OP                  ARGI_INVALID_OPCODE
 #define ARGI_SUBTRACT_OP                ARGI_LIST3 (ARGI_INTEGER,    ARGI_INTEGER,       ARGI_TARGETREF)
 #define ARGI_THERMAL_ZONE_OP            ARGI_INVALID_OPCODE
+#define ARGI_TIMER_OP                   ARG_NONE
 #define ARGI_TO_BCD_OP                  ARGI_LIST2 (ARGI_INTEGER,    ARGI_FIXED_TARGET)
 #define ARGI_TO_BUFFER_OP               ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
 #define ARGI_TO_DEC_STR_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
 #define ARGI_TO_HEX_STR_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
 #define ARGI_TO_INTEGER_OP              ARGI_LIST2 (ARGI_COMPUTEDATA,ARGI_FIXED_TARGET)
 #define ARGI_TO_STRING_OP               ARGI_LIST3 (ARGI_BUFFER,     ARGI_INTEGER,       ARGI_FIXED_TARGET)
-#define ARGI_TYPE_OP                    ARGI_LIST1 (ARGI_ANYTYPE)
+#define ARGI_TYPE_OP                    ARGI_LIST1 (ARGI_REFERENCE) /* Force delay of operand resolution */
 #define ARGI_UNLOAD_OP                  ARGI_LIST1 (ARGI_DDBHANDLE)
 #define ARGI_VAR_PACKAGE_OP             ARGI_LIST1 (ARGI_INTEGER)
 #define ARGI_WAIT_OP                    ARGI_LIST2 (ARGI_EVENT,      ARGI_INTEGER)
@@ -527,8 +529,8 @@ const struct acpi_opcode_info     acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
 /* 35 */ ACPI_OP ("CreateByteField",    ARGP_CREATE_BYTE_FIELD_OP, ARGI_CREATE_BYTE_FIELD_OP,  ACPI_TYPE_BUFFER_FIELD,      AML_CLASS_CREATE,          AML_TYPE_CREATE_FIELD,    AML_HAS_ARGS | AML_NSOBJECT | AML_NSNODE | AML_DEFER | AML_CREATE),
 /* 36 */ ACPI_OP ("CreateBitField",     ARGP_CREATE_BIT_FIELD_OP,  ARGI_CREATE_BIT_FIELD_OP,   ACPI_TYPE_BUFFER_FIELD,      AML_CLASS_CREATE,          AML_TYPE_CREATE_FIELD,    AML_HAS_ARGS | AML_NSOBJECT | AML_NSNODE | AML_DEFER | AML_CREATE),
 /* 37 */ ACPI_OP ("ObjectType",         ARGP_TYPE_OP,              ARGI_TYPE_OP,               ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_1A_0T_1R,   AML_FLAGS_EXEC_1A_0T_1R),
-/* 38 */ ACPI_OP ("LAnd",               ARGP_LAND_OP,              ARGI_LAND_OP,               ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL | AML_CONSTANT),
-/* 39 */ ACPI_OP ("LOr",                ARGP_LOR_OP,               ARGI_LOR_OP,                ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL | AML_CONSTANT),
+/* 38 */ ACPI_OP ("LAnd",               ARGP_LAND_OP,              ARGI_LAND_OP,               ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL_NUMERIC | AML_CONSTANT),
+/* 39 */ ACPI_OP ("LOr",                ARGP_LOR_OP,               ARGI_LOR_OP,                ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL_NUMERIC | AML_CONSTANT),
 /* 3A */ ACPI_OP ("LNot",               ARGP_LNOT_OP,              ARGI_LNOT_OP,               ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_1A_0T_1R,   AML_FLAGS_EXEC_1A_0T_1R | AML_CONSTANT),
 /* 3B */ ACPI_OP ("LEqual",             ARGP_LEQUAL_OP,            ARGI_LEQUAL_OP,             ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL | AML_CONSTANT),
 /* 3C */ ACPI_OP ("LGreater",           ARGP_LGREATER_OP,          ARGI_LGREATER_OP,           ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_2A_0T_1R,   AML_FLAGS_EXEC_2A_0T_1R | AML_LOGICAL | AML_CONSTANT),
@@ -588,7 +590,6 @@ const struct acpi_opcode_info     acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
 /* 6C */ ACPI_OP ("-ASCII_ONLY-",       ARG_NONE,                  ARG_NONE,                   ACPI_TYPE_ANY,               AML_CLASS_ASCII,           AML_TYPE_BOGUS,           AML_HAS_ARGS),
 /* 6D */ ACPI_OP ("-PREFIX_ONLY-",      ARG_NONE,                  ARG_NONE,                   ACPI_TYPE_ANY,               AML_CLASS_PREFIX,          AML_TYPE_BOGUS,           AML_HAS_ARGS),
 
-
 /* ACPI 2.0 opcodes */
 
 /* 6E */ ACPI_OP ("QwordConst",         ARGP_QWORD_OP,             ARGI_QWORD_OP,              ACPI_TYPE_INTEGER,           AML_CLASS_ARGUMENT,        AML_TYPE_LITERAL,         AML_CONSTANT),
@@ -606,7 +607,11 @@ const struct acpi_opcode_info     acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
 /* 7A */ ACPI_OP ("Continue",           ARGP_CONTINUE_OP,          ARGI_CONTINUE_OP,           ACPI_TYPE_ANY,               AML_CLASS_CONTROL,         AML_TYPE_CONTROL,         0),
 /* 7B */ ACPI_OP ("LoadTable",          ARGP_LOAD_TABLE_OP,        ARGI_LOAD_TABLE_OP,         ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_6A_0T_1R,   AML_FLAGS_EXEC_6A_0T_1R),
 /* 7C */ ACPI_OP ("DataTableRegion",    ARGP_DATA_REGION_OP,       ARGI_DATA_REGION_OP,        ACPI_TYPE_REGION,            AML_CLASS_NAMED_OBJECT,    AML_TYPE_NAMED_SIMPLE,    AML_HAS_ARGS | AML_NSOBJECT | AML_NSOPCODE | AML_NSNODE | AML_NAMED),
-/* 7D */ ACPI_OP ("[EvalSubTree]",      ARGP_SCOPE_OP,             ARGI_SCOPE_OP,              ACPI_TYPE_ANY,               AML_CLASS_NAMED_OBJECT,    AML_TYPE_NAMED_NO_OBJ,    AML_HAS_ARGS | AML_NSOBJECT | AML_NSOPCODE | AML_NSNODE)
+/* 7D */ ACPI_OP ("[EvalSubTree]",      ARGP_SCOPE_OP,             ARGI_SCOPE_OP,              ACPI_TYPE_ANY,               AML_CLASS_NAMED_OBJECT,    AML_TYPE_NAMED_NO_OBJ,    AML_HAS_ARGS | AML_NSOBJECT | AML_NSOPCODE | AML_NSNODE),
+
+/* ACPI 3.0 opcodes */
+
+/* 7E */ ACPI_OP ("Timer",              ARGP_TIMER_OP,             ARGI_TIMER_OP,              ACPI_TYPE_ANY,               AML_CLASS_EXECUTE,         AML_TYPE_EXEC_0A_0T_1R,   AML_FLAGS_EXEC_0A_0T_1R)
 
 /*! [End] no source code translation !*/
 };
@@ -615,7 +620,6 @@ const struct acpi_opcode_info     acpi_gbl_aml_op_info[AML_NUM_OPCODES] =
  * This table is directly indexed by the opcodes, and returns an
  * index into the table above
  */
-
 static const u8 acpi_gbl_short_op_index[256] =
 {
 /*              0     1     2     3     4     5     6     7  */
@@ -654,7 +658,10 @@ static const u8 acpi_gbl_short_op_index[256] =
 /* 0xF8 */	_UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, 0x45,
 };
 
-
+/*
+ * This table is indexed by the second opcode of the extended opcode
+ * pair.  It returns an index into the opcode table (acpi_gbl_aml_op_info)
+ */
 static const u8 acpi_gbl_long_op_index[NUM_EXTENDED_OPCODE] =
 {
 /*              0     1     2     3     4     5     6     7  */
@@ -665,7 +672,7 @@ static const u8 acpi_gbl_long_op_index[NUM_EXTENDED_OPCODE] =
 /* 0x18 */	_UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, 0x7B,
 /* 0x20 */	0x4a, 0x4b, 0x4c, 0x4d, 0x4e, 0x4f, 0x50, 0x51,
 /* 0x28 */	0x52, 0x53, 0x54, _UNK, _UNK, _UNK, _UNK, _UNK,
-/* 0x30 */	0x55, 0x56, 0x57, _UNK, _UNK, _UNK, _UNK, _UNK,
+/* 0x30 */	0x55, 0x56, 0x57, 0x7e, _UNK, _UNK, _UNK, _UNK,
 /* 0x38 */	_UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x40 */	_UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
 /* 0x48 */	_UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK, _UNK,
@@ -724,7 +731,7 @@ acpi_ps_get_opcode_info (
 
 	default:
 
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown extended opcode [%X]\n", opcode));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown AML opcode [%4.4X]\n", opcode));
 		break;
 	}
 

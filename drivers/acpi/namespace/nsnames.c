@@ -202,7 +202,11 @@ acpi_ns_get_pathname_length (
 		next_node = acpi_ns_get_parent_node (next_node);
 	}
 
-	return (size + 1);
+	if (!size) {
+		size = 1;       /* Root node case */
+	}
+
+	return (size + 1);  /* +1 for null string terminator */
 }
 
 
@@ -253,7 +257,8 @@ acpi_ns_handle_to_pathname (
 
 	acpi_ns_build_external_path (node, required_size, buffer->pointer);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s [%X] \n", (char *) buffer->pointer, (u32) required_size));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s [%X] \n",
+		(char *) buffer->pointer, (u32) required_size));
 	return_ACPI_STATUS (AE_OK);
 }
 

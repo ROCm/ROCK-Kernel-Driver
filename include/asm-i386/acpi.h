@@ -133,7 +133,6 @@ static inline void disable_acpi(void)
 #define FIX_ACPI_PAGES 4
 
 extern int acpi_gsi_to_irq(u32 gsi, unsigned int *irq);
-extern int (*platform_rename_gsi)(int ioapic, int gsi);
 
 #ifdef CONFIG_X86_IO_APIC
 extern int skip_ioapic_setup;
@@ -160,6 +159,8 @@ static inline void disable_ioapic_setup(void)
 #  define acpi_ioapic 0
 
 #endif
+
+extern int (*platform_rename_gsi)(int ioapic, int gsi);
 
 #ifdef CONFIG_ACPI_PCI
 static inline void acpi_noirq_set(void) { acpi_noirq = 1; }

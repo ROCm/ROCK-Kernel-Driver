@@ -54,6 +54,9 @@ unsigned long kernel_thread_flags = CLONE_VM | CLONE_UNTRACED;
 
 atomic_t hlt_counter = ATOMIC_INIT(0);
 
+unsigned long boot_option_idle_override = 0;
+EXPORT_SYMBOL(boot_option_idle_override);
+
 /*
  * Powermanagement idle function, if any..
  */
@@ -196,6 +199,7 @@ static int __init idle_setup (char *str)
 		pm_idle = poll_idle;
 	}
 
+	boot_option_idle_override = 1;
 	return 1;
 }
 

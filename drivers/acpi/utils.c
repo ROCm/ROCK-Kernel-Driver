@@ -373,7 +373,7 @@ acpi_evaluate_reference (
 	}
 
 	if (package->package.count > ACPI_MAX_HANDLES) {
-		return AE_NO_MEMORY;
+		return_ACPI_STATUS(AE_NO_MEMORY);
 	}
 	list->count = package->package.count;
 

@@ -110,13 +110,13 @@ acpi_pci_link_check_possible (
 
 	switch (resource->id) {
 	case ACPI_RSTYPE_START_DPF:
-		return AE_OK;
+		return_ACPI_STATUS(AE_OK);
 	case ACPI_RSTYPE_IRQ:
 	{
 		struct acpi_resource_irq *p = &resource->data.irq;
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, "Blank IRQ resource\n"));
-			return AE_OK;
+			return_ACPI_STATUS(AE_OK);
 		}
 		for (i = 0; (i<p->number_of_interrupts && i<ACPI_PCI_LINK_MAX_POSSIBLE); i++) {
 			if (!p->interrupts[i]) {
@@ -137,7 +137,7 @@ acpi_pci_link_check_possible (
 		if (!p || !p->number_of_interrupts) {
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN, 
 				"Blank EXT IRQ resource\n"));
-			return AE_OK;
+			return_ACPI_STATUS(AE_OK);
 		}
 		for (i = 0; (i<p->number_of_interrupts && i<ACPI_PCI_LINK_MAX_POSSIBLE); i++) {
 			if (!p->interrupts[i]) {
@@ -155,10 +155,10 @@ acpi_pci_link_check_possible (
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, 
 			"Resource is not an IRQ entry\n"));
-		return AE_OK;
+		return_ACPI_STATUS(AE_OK);
 	}
 
-	return AE_CTRL_TERMINATE;
+	return_ACPI_STATUS(AE_CTRL_TERMINATE);
 }
 
 
@@ -207,7 +207,7 @@ acpi_pci_link_check_current (
 			 */
 			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
 				"Blank IRQ resource\n")); 
-			return AE_OK;
+			return_ACPI_STATUS(AE_OK);
 		}
 		*irq = p->interrupts[0];
 		break;
@@ -222,7 +222,7 @@ acpi_pci_link_check_current (
 			 */
 			ACPI_DEBUG_PRINT((ACPI_DB_WARN,
 				"Blank EXT IRQ resource\n"));
-			return AE_OK;
+			return_ACPI_STATUS(AE_OK);
 		}
 		*irq = p->interrupts[0];
 		break;
@@ -230,9 +230,9 @@ acpi_pci_link_check_current (
 	default:
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR,
 			"Resource isn't an IRQ\n"));
-		return AE_OK;
+		return_ACPI_STATUS(AE_OK);
 	}
-	return AE_CTRL_TERMINATE;
+	return_ACPI_STATUS(AE_CTRL_TERMINATE);
 }
 
 /*
@@ -577,6 +577,11 @@ static int acpi_pci_link_allocate(struct acpi_pci_link* link) {
 	return_VALUE(0);
 }
 
+/*
+ * acpi_pci_link_get_irq
+ * success: return IRQ >= 0
+ * failure: return -1
+ */
 
 int
 acpi_pci_link_get_irq (
@@ -594,27 +599,27 @@ acpi_pci_link_get_irq (
 	result = acpi_bus_get_device(handle, &device);
 	if (result) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid link device\n"));
-		return_VALUE(0);
+		return_VALUE(-1);
 	}
 
 	link = (struct acpi_pci_link *) acpi_driver_data(device);
 	if (!link) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid link context\n"));
-		return_VALUE(0);
+		return_VALUE(-1);
 	}
 
 	/* TBD: Support multiple index (IRQ) entries per Link Device */
 	if (index) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Invalid index %d\n", index));
-		return_VALUE(0);
+		return_VALUE(-1);
 	}
 
 	if (acpi_pci_link_allocate(link))
-		return_VALUE(0);
+		return_VALUE(-1);
 	   
 	if (!link->irq.active) {
 		ACPI_DEBUG_PRINT((ACPI_DB_ERROR, "Link active IRQ is 0!\n"));
-		return_VALUE(0);
+		return_VALUE(-1);
 	}
 
 	if (edge_level) *edge_level = link->irq.edge_level;
@@ -786,6 +791,11 @@ static int __init acpi_irq_penalty_update(char *str, int used)
 	return 1;
 }
 
+void acpi_penalize_isa_irq(int irq)
+{
+	acpi_irq_penalty[irq] += PIRQ_PENALTY_ISA_USED;
+}
+
 /*
  * Over-ride default table to reserve additional IRQs for use by ISA
  * e.g. acpi_irq_isa=5
@@ -811,14 +821,14 @@ __setup("acpi_irq_pci=", acpi_irq_pci);
 static int __init acpi_irq_nobalance_set(char *str)
 {
 	acpi_irq_balance = 0;
-	return(1);
+	return 1;
 }
 __setup("acpi_irq_nobalance", acpi_irq_nobalance_set);
 
 int __init acpi_irq_balance_set(char *str)
 {
 	acpi_irq_balance = 1;
-	return(1);
+	return 1;
 }
 __setup("acpi_irq_balance", acpi_irq_balance_set);
 

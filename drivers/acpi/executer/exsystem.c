@@ -167,7 +167,7 @@ acpi_ex_system_do_stall (
 
 acpi_status
 acpi_ex_system_do_suspend (
-	u32                             how_long)
+	acpi_integer                    how_long)
 {
 	acpi_status                     status;
 
@@ -179,8 +179,7 @@ acpi_ex_system_do_suspend (
 
 	acpi_ex_exit_interpreter ();
 
-	acpi_os_sleep ((u16) (how_long / (u32) 1000),
-			  (u16) (how_long % (u32) 1000));
+	acpi_os_sleep (how_long);
 
 	/* And now we must get the interpreter again */
 

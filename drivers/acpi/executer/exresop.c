@@ -160,7 +160,7 @@ acpi_ex_resolve_operands (
 		return_ACPI_STATUS (AE_AML_INTERNAL);
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] operand_types=%X \n",
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Opcode %X [%s] required_operand_types=%8.8X \n",
 		opcode, op_info->name, arg_types));
 
 	/*
@@ -227,12 +227,13 @@ acpi_ex_resolve_operands (
 				case AML_LOAD_OP:   /* ddb_handle from LOAD_OP or LOAD_TABLE_OP */
 
 					ACPI_DEBUG_ONLY_MEMBERS (ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-						"Reference Opcode: %s\n", op_info->name)));
+						"Operand is a Reference, ref_opcode [%s]\n",
+						(acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name)));
 					break;
 
 				default:
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-						"Unknown Reference Opcode %X [%s]\n",
+						"Operand is a Reference, Unknown Reference Opcode %X [%s]\n",
 						obj_desc->reference.opcode,
 						(acpi_ps_get_opcode_info (obj_desc->reference.opcode))->name));
 
@@ -398,7 +399,7 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a STRING or BUFFER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_integer (obj_desc, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_integer (obj_desc, stack_ptr, 16);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -420,7 +421,7 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a STRING or INTEGER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
+			status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -442,7 +443,8 @@ acpi_ex_resolve_operands (
 			 * But we can implicitly convert from a BUFFER or INTEGER
 			 * Aka - "Implicit Source Operand Conversion"
 			 */
-			status = acpi_ex_convert_to_string (obj_desc, stack_ptr, 16, ACPI_UINT32_MAX, walk_state);
+			status = acpi_ex_convert_to_string (obj_desc, stack_ptr,
+					 ACPI_IMPLICIT_CONVERT_HEX);
 			if (ACPI_FAILURE (status)) {
 				if (status == AE_TYPE) {
 					ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
@@ -494,7 +496,7 @@ acpi_ex_resolve_operands (
 
 				/* Highest priority conversion is to type Buffer */
 
-				status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr, walk_state);
+				status = acpi_ex_convert_to_buffer (obj_desc, stack_ptr);
 				if (ACPI_FAILURE (status)) {
 					return_ACPI_STATUS (status);
 				}

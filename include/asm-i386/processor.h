@@ -19,7 +19,6 @@
 #include <linux/cache.h>
 #include <linux/config.h>
 #include <linux/threads.h>
-#include <asm/percpu.h>
 
 /* flag for disabling the tsc */
 extern int tsc_disable;
@@ -85,8 +84,8 @@ struct cpuinfo_x86 {
 
 extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 new_cpu_data;
+extern struct tss_struct init_tss[NR_CPUS];
 extern struct tss_struct doublefault_tss;
-DECLARE_PER_CPU(struct tss_struct, init_tss);
 
 #ifdef CONFIG_SMP
 extern struct cpuinfo_x86 cpu_data[];
@@ -297,8 +296,6 @@ extern unsigned int mca_pentium_flag;
  */
 #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
-#define HAVE_ARCH_PICK_MMAP_LAYOUT
-
 /*
  * Size of io_bitmap.
  */
@@ -307,7 +304,6 @@ extern unsigned int mca_pentium_flag;
 #define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
-#define INVALID_IO_BITMAP_OFFSET_LAZY 0x9000
 
 struct i387_fsave_struct {
 	long	cwd;
@@ -361,8 +357,6 @@ typedef struct {
 	unsigned long seg;
 } mm_segment_t;
 
-struct thread_struct;
-
 struct tss_struct {
 	unsigned short	back_link,__blh;
 	unsigned long	esp0;
@@ -395,14 +389,9 @@ struct tss_struct {
 	 */
 	unsigned long	io_bitmap[IO_BITMAP_LONGS + 1];
 	/*
-	 * Cache the current maximum and the last task that used the bitmap:
-	 */
-	unsigned long io_bitmap_max;
-	struct thread_struct *io_bitmap_owner;
-	/*
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
-	unsigned long __cacheline_filler[35];
+	unsigned long __cacheline_filler[37];
 	/*
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */
@@ -433,8 +422,6 @@ struct thread_struct {
 	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
 	unsigned long	*io_bitmap_ptr;
-/* max allowed port in the bitmap, in bytes: */
-	unsigned long	io_bitmap_max;
 };
 
 #define INIT_THREAD  {							\
@@ -452,6 +439,7 @@ struct thread_struct {
 #define INIT_TSS  {							\
 	.esp0		= sizeof(init_stack) + (long)&init_stack,	\
 	.ss0		= __KERNEL_DS,					\
+	.esp1		= sizeof(init_tss[0]) + (long)&init_tss[0],	\
 	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
 	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
@@ -656,5 +644,12 @@ extern inline void prefetchw(const void *x)
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
+
+#ifdef CONFIG_SCHED_SMT
+#define ARCH_HAS_SCHED_DOMAIN
+#define ARCH_HAS_SCHED_WAKE_IDLE
+#endif
+
+extern unsigned long boot_option_idle_override;
 
 #endif /* __ASM_I386_PROCESSOR_H */
