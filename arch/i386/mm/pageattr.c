@@ -17,7 +17,7 @@ static spinlock_t cpa_lock = SPIN_LOCK_UNLOCKED;
 static struct list_head df_list = LIST_HEAD_INIT(df_list);
 
 
-static inline pte_t *lookup_address(unsigned long address) 
+pte_t *lookup_address(unsigned long address) 
 { 
 	pgd_t *pgd = pgd_offset_k(address); 
 	pmd_t *pmd;
