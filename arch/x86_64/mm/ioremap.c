@@ -10,6 +10,7 @@
 
 #include <linux/vmalloc.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/fixmap.h>
@@ -157,14 +158,72 @@ void * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flag
 		return NULL;
 	addr = area->addr;
 	if (remap_area_pages(VMALLOC_VMADDR(addr), phys_addr, size, flags)) {
-		vfree(addr);
+		vunmap(addr);
 		return NULL;
 	}
 	return (void *) (offset + (char *)addr);
 }
 
+/**
+ * ioremap_nocache     -   map bus memory into CPU space
+ * @offset:    bus address of the memory
+ * @size:      size of the resource to map
+ *
+ * ioremap_nocache performs a platform specific sequence of operations to
+ * make bus memory CPU accessible via the readb/readw/readl/writeb/
+ * writew/writel functions and the other mmio helpers. The returned
+ * address is not guaranteed to be usable directly as a virtual
+ * address. 
+ *
+ * This version of ioremap ensures that the memory is marked uncachable
+ * on the CPU as well as honouring existing caching rules from things like
+ * the PCI bus. Note that there are other caches and buffers on many 
+ * busses. In particular driver authors should read up on PCI writes
+ *
+ * It's useful if some control registers are in such an area and
+ * write combining or read caching is not desirable:
+ * 
+ * Must be freed with iounmap.
+ */
+
+void *ioremap_nocache (unsigned long phys_addr, unsigned long size)
+{
+	void *p = __ioremap(phys_addr, size, _PAGE_PCD);
+	if (!p) 
+		return p; 
+
+	if (phys_addr + size < virt_to_phys(high_memory)) { 
+		struct page *ppage = virt_to_page(__va(phys_addr));		
+		unsigned long npages = (size + PAGE_SIZE - 1) >> PAGE_SHIFT;
+
+		BUG_ON(phys_addr+size > (unsigned long)high_memory);
+		BUG_ON(phys_addr + size < phys_addr);
+
+		if (change_page_attr(ppage, npages, PAGE_KERNEL_NOCACHE) < 0) { 
+			iounmap(p); 
+			p = NULL;
+		}
+	} 
+
+	return p;					
+}
+
 void iounmap(void *addr)
 {
-	if (addr > high_memory)
-		vfree((void *) (PAGE_MASK & (unsigned long) addr));
+	struct vm_struct *p;
+	if (addr <= high_memory) 
+		return; 
+	p = remove_vm_area((void *)(PAGE_MASK & (unsigned long) addr)); 
+	if (!p) { 
+		printk("__iounmap: bad address %p\n", addr);
+		return;
+	} 
+
+	unmap_vm_area(p);
+	if (p->flags && p->phys_addr < virt_to_phys(high_memory)) { 
+		change_page_attr(virt_to_page(__va(p->phys_addr)),
+				 p->size >> PAGE_SHIFT,
+				 PAGE_KERNEL); 				 
+	} 
+	kfree(p); 
 }

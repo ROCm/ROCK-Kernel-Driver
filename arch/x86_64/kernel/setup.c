@@ -234,7 +234,6 @@ static void __init contig_initmem_init(void)
 
 void __init setup_arch(char **cmdline_p)
 {
-	unsigned long bootmap_size, low_mem_size;
 	int i;
 
  	ROOT_DEV = ORIG_ROOT_DEV;
@@ -284,14 +283,8 @@ void __init setup_arch(char **cmdline_p)
 
 	contig_initmem_init(); 
 
-	/*
-	 * Reserve the bootmem bitmap itself as well. We do this in two
-	 * steps (first step was init_bootmem()) because this catches
-	 * the (very unlikely) case of us accidentally initializing the
-	 * bootmem allocator with an invalid RAM area.
-	 */
-	reserve_bootmem(HIGH_MEMORY, (PFN_PHYS(start_pfn) +
-			 bootmap_size + PAGE_SIZE-1) - (HIGH_MEMORY));
+	/* reserve kernel */
+	reserve_bootmem(HIGH_MEMORY, PFN_PHYS(start_pfn) - HIGH_MEMORY); 
 
 	/*
 	 * reserve physical page 0 - it's a special BIOS page on many boxes,

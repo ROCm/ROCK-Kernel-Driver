@@ -23,6 +23,7 @@
 #include <asm/smp.h>
 #include <asm/mtrr.h>
 #include <asm/mpspec.h>
+#include <asm/nmi.h>
 
 unsigned int nmi_watchdog = NMI_LOCAL_APIC;
 static unsigned int nmi_hz = HZ;
@@ -137,6 +138,18 @@ static int nmi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
 	return 0;
 }
 
+struct pm_dev * set_nmi_pm_callback(pm_callback callback)
+{
+	apic_pm_unregister(nmi_pmdev);
+	return apic_pm_register(PM_SYS_DEV, 0, callback);
+}
+
+void unset_nmi_pm_callback(struct pm_dev * dev)
+{
+	apic_pm_unregister(dev);
+	nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
+}
+
 static void nmi_pm_init(void)
 {
 	if (!nmi_pmdev)
@@ -178,7 +191,7 @@ static void __pminit setup_k7_watchdog(void)
 		| K7_NMI_EVENT;
 
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
-	printk(KERN_INFO "watchdog: setting K7_PERFCTR0 to %08lx\n", -(cpu_khz/nmi_hz*1000));
+	printk(KERN_INFO "watchdog: setting K7_PERFCTR0 to %08x\n", -(cpu_khz/nmi_hz*1000));
 	wrmsr(MSR_K7_PERFCTR0, -(cpu_khz/nmi_hz*1000), -1);
 	apic_write(APIC_LVTPC, APIC_DM_NMI);
 	evntsel |= K7_EVNTSEL_ENABLE;
@@ -274,4 +287,31 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 	}
 	if (nmi_perfctr_msr)
 		wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
+}
+
+static int dummy_nmi_callback(struct pt_regs * regs, int cpu)
+{
+	return 0;
+}
+ 
+static nmi_callback_t nmi_callback = dummy_nmi_callback;
+ 
+asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
+{
+	int cpu = smp_processor_id();
+
+	add_pda(__nmi_count,1);
+
+	if (!nmi_callback(regs, cpu))
+		default_do_nmi(regs);
+}
+
+void set_nmi_callback(nmi_callback_t callback)
+{
+	nmi_callback = callback;
+}
+
+void unset_nmi_callback(void)
+{
+	nmi_callback = dummy_nmi_callback;
 }

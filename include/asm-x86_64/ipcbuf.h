@@ -1,8 +1,8 @@
-#ifndef __i386_IPCBUF_H__
-#define __i386_IPCBUF_H__
+#ifndef __x86_64_IPCBUF_H__
+#define __x86_64_IPCBUF_H__
 
 /*
- * The ipc64_perm structure for i386 architecture.
+ * The ipc64_perm structure for x86_64 architecture.
  * Note extra padding because this structure is passed back and forth
  * between kernel and user space.
  *
@@ -26,4 +26,4 @@ struct ipc64_perm
 	unsigned long		__unused2;
 };
 
-#endif /* __i386_IPCBUF_H__ */
+#endif /* __x86_64_IPCBUF_H__ */

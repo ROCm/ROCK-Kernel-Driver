@@ -646,7 +646,7 @@ int mtrr_add_page (u64 base, u32 size, unsigned int type, char increment)
 	}
 
 	if (base & (size_or_mask>>PAGE_SHIFT)) {
-		printk (KERN_WARNING "mtrr: base(%lx) exceeds the MTRR width(%lx)\n",
+		printk (KERN_WARNING "mtrr: base(%Lx) exceeds the MTRR width(%Lx)\n",
 				(unsigned long) base,
 				(unsigned long) (size_or_mask>>PAGE_SHIFT));
 		return -EINVAL;

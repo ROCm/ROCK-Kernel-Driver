@@ -9,6 +9,8 @@
 #define __local_bh_enable() \
 		do { barrier(); preempt_count() -= SOFTIRQ_OFFSET; } while (0)
 
+void do_softirq(void);
+
 #define local_bh_enable()						\
 do {									\
 	__local_bh_enable();						\

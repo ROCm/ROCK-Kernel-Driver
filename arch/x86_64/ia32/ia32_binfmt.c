@@ -25,7 +25,7 @@ struct elf_phdr;
 
 #define IA32_EMULATOR 1
 
-#define IA32_PAGE_OFFSET 0xE0000000
+#define IA32_PAGE_OFFSET 0xffff0000
 #define IA32_STACK_TOP IA32_PAGE_OFFSET
 #define ELF_ET_DYN_BASE		(IA32_PAGE_OFFSET/3 + 0x1000000)
 
@@ -216,13 +216,15 @@ static void elf32_init(struct pt_regs *regs)
 extern void put_dirty_page(struct task_struct * tsk, struct page *page, unsigned long address);
  
 
-int ia32_setup_arg_pages(struct linux_binprm *bprm)
+int setup_arg_pages(struct linux_binprm *bprm)
 {
 	unsigned long stack_base;
 	struct vm_area_struct *mpnt;
+	struct mm_struct *mm = current->mm;
 	int i;
 
-	stack_base = IA32_STACK_TOP - MAX_ARG_PAGES*PAGE_SIZE;
+	stack_base = IA32_STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
+	mm->arg_start = bprm->p + stack_base;
 
 	bprm->p += stack_base;
 	if (bprm->loader)
@@ -233,9 +235,14 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 	if (!mpnt) 
 		return -ENOMEM; 
 	
-	down_write(&current->mm->mmap_sem);
+	if (!vm_enough_memory((IA32_STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+		kmem_cache_free(vm_area_cachep, mpnt);
+		return -ENOMEM;
+	}
+
+	down_write(&mm->mmap_sem);
 	{
-		mpnt->vm_mm = current->mm;
+		mpnt->vm_mm = mm;
 		mpnt->vm_start = PAGE_MASK & (unsigned long) bprm->p;
 		mpnt->vm_end = IA32_STACK_TOP;
 		mpnt->vm_page_prot = PAGE_COPY;
@@ -243,24 +250,25 @@ int ia32_setup_arg_pages(struct linux_binprm *bprm)
 		mpnt->vm_ops = NULL;
 		mpnt->vm_pgoff = 0;
 		mpnt->vm_file = NULL;
+		INIT_LIST_HEAD(&mpnt->shared);
 		mpnt->vm_private_data = (void *) 0;
-		insert_vm_struct(current->mm, mpnt);
-		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		insert_vm_struct(mm, mpnt);
+		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	} 
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {
 		struct page *page = bprm->page[i];
 		if (page) {
 			bprm->page[i] = NULL;
-			current->mm->rss++;
 			put_dirty_page(current,page,stack_base);
 		}
 		stack_base += PAGE_SIZE;
 	}
-	up_write(&current->mm->mmap_sem);
+	up_write(&mm->mmap_sem);
 	
 	return 0;
 }
+
 static unsigned long
 elf32_map (struct file *filep, unsigned long addr, struct elf_phdr *eppnt, int prot, int type)
 {

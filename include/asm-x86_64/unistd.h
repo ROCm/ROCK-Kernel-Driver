@@ -482,8 +482,10 @@ __SYSCALL(__NR_io_submit, sys_io_submit)
 __SYSCALL(__NR_io_cancel, sys_io_cancel)
 #define __NR_get_thread_area	211
 __SYSCALL(__NR_get_thread_area, sys_get_thread_area)
+#define __NR_lookup_dcookie	212
+__SYSCALL(__NR_lookup_dcookie, sys_lookup_dcookie)
 
-#define __NR_syscall_max __NR_get_thread_area
+#define __NR_syscall_max __NR_lookup_dcookie
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
@@ -503,7 +505,6 @@ do { \
 
 #define __syscall "syscall"
 
-/* XXX - _foo needs to be __foo, while __NR_bar could be _NR_bar. */
 #define _syscall0(type,name) \
 type name(void) \
 { \

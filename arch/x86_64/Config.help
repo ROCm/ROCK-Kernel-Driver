@@ -435,6 +435,14 @@ CONFIG_X86_CPUID
   with major 203 and minors 0 to 31 for /dev/cpu/0/cpuid to
   /dev/cpu/31/cpuid.
 
+CONFIG_NR_CPUS
+  This allows you to specify the maximum number of CPUs which this
+  kernel will support.  The maximum supported value is 32 and the
+  minimum value which makes sense is 2.
+
+  This is purely to save memory - each supported CPU adds
+  approximately eight kilobytes to the kernel image.
+
 CONFIG_PREEMPT
   This option reduces the latency of the kernel when reacting to
   real-time or interactive events by allowing a low priority process to
@@ -487,10 +495,6 @@ CONFIG_CHECKING
   Enables some internal consistency checks for kernel debugging.
   You should normally say N.
 
-CONFIG_SIMNOW
-  Disable some time consuming optional things for slow CPU simulators.
-  Say N unless you're running on a slow simulator like Simics or SimNow. 
-
 CONFIG_EARLY_PRINTK
   Write kernel log output directly into the VGA buffer. This is useful
   for kernel debugging when your machine crashes very early before
@@ -499,13 +503,26 @@ CONFIG_EARLY_PRINTK
   klogd/syslogd or the X server.You should normally N here, unless
   you want to debug such a crash.
   
-CONFIG_X86_MCE_NONFATAL
-  Enabling this feature starts a timer that triggers every 5 seconds which
-  will look at the machine check registers to see if anything happened.
-  Non-fatal problems automatically get corrected (but still logged).
-  Disable this if you don't want to see these messages.
-  Seeing the messages this option prints out may be indicative of dying hardware,
-  or out-of-spec (ie, overclocked) hardware.
-  This option only does something on hardware with Intel P6 style MCE.
-  (Pentium Pro and above, AMD Athlon/Duron)
+CONFIG_KALLSYMS
+  Say Y here to let the kernel print out symbolic crash information and
+  symbolic stack backtraces. This increases the size of the kernel
+  somewhat, as all symbols have to be loaded into the kernel image.
+
+CONFIG_INIT_DEBUG
+  Fill __init and __initdata at the end of boot. This is only for debugging.
+
+CONFIG_IA32_EMULATION
+  Include code to run 32bit programs under an 64bit kernel. You should likely
+  turn this on, unless you're 100% sure that you don't have any 32bit programs
+  left.
+
+CONFIG_GART_IOMMU
+  Support the K8 IOMMU. Needed to run systems with more than 4GB of memory
+  properly with 32bit devices. You should probably turn this on.
+  The iommu can be turned off at runtime with the iommu=off parameter.
+
+CONFIG_DUMMY_IOMMU
+  Don't use IOMMU code. This will cause problems when you have more than 4GB 
+  of memory and any 32bit devices. Don't turn on unless you know what you
+  are doing.
 

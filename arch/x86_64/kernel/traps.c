@@ -559,11 +559,10 @@ static void unknown_nmi_error(unsigned char reason, struct pt_regs * regs)
 	printk("Do you have a strange power saving mode enabled?\n");
 }
 
-asmlinkage void do_nmi(struct pt_regs * regs)
+asmlinkage void default_do_nmi(struct pt_regs * regs)
 {
 	unsigned char reason = inb(0x61);
 
-	add_pda(__nmi_count,1);
 	if (!(reason & 0xc0)) {
 #if CONFIG_X86_LOCAL_APIC
 		/*

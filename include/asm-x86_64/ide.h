@@ -5,7 +5,7 @@
  */
 
 /*
- *  This file contains the i386 architecture specific IDE code.
+ *  This file contains the x86_64 architecture specific IDE code.
  */
 
 #ifndef __ASMx86_64_IDE_H
