@@ -35,11 +35,16 @@
 #include <linux/smp_lock.h>
 #include <linux/major.h>
 #include <linux/fs.h>
+#include <linux/device.h>
+#include <linux/cpu.h>
+#include <linux/notifier.h>
 
 #include <asm/processor.h>
 #include <asm/msr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
+
+static struct class_simple *msr_class;
 
 /* Note: "err" is handled in a funny way below.  Otherwise one version
    of gcc or another breaks. */
@@ -255,20 +260,82 @@ static struct file_operations msr_fops = {
 	.open = msr_open,
 };
 
+static int msr_class_simple_device_add(int i)
+{
+	int err = 0;
+	struct class_device *class_err;
+
+	class_err = class_simple_device_add(msr_class, MKDEV(MSR_MAJOR, i), NULL, "msr%d",i);
+	if (IS_ERR(class_err)) 
+		err = PTR_ERR(class_err);
+	return err;
+}
+
+static int __devinit msr_class_cpu_callback(struct notifier_block *nfb, unsigned long action, void *hcpu)
+{
+	unsigned int cpu = (unsigned long)hcpu;
+
+	switch (action) {
+	case CPU_ONLINE:
+		msr_class_simple_device_add(cpu);
+		break;
+	case CPU_DEAD:
+		class_simple_device_remove(MKDEV(MSR_MAJOR, cpu));	
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block msr_class_cpu_notifier =
+{
+	.notifier_call = msr_class_cpu_callback,
+};
+
 int __init msr_init(void)
 {
+	int i, err = 0;
+	i = 0;
+
 	if (register_chrdev(MSR_MAJOR, "cpu/msr", &msr_fops)) {
 		printk(KERN_ERR "msr: unable to get major %d for msr\n",
 		       MSR_MAJOR);
-		return -EBUSY;
+		err = -EBUSY;
+		goto out;
 	}
+	msr_class = class_simple_create(THIS_MODULE, "msr");
+	if (IS_ERR(msr_class)) {
+		err = PTR_ERR(msr_class);
+		goto out_chrdev;
+	}
+	for_each_online_cpu(i) {
+		err = msr_class_simple_device_add(i);
+		if (err != 0)
+			goto out_class;
+	}
+	register_cpu_notifier(&msr_class_cpu_notifier);
 
-	return 0;
+	err = 0;
+	goto out;
+
+out_class:
+	i = 0;
+	for_each_online_cpu(i)
+		class_simple_device_remove(MKDEV(MSR_MAJOR, i));
+	class_simple_destroy(msr_class);
+out_chrdev:
+	unregister_chrdev(MSR_MAJOR, "cpu/msr");
+out:
+	return err;
 }
 
 void __exit msr_exit(void)
 {
+	int cpu = 0;
+	for_each_online_cpu(cpu)
+		class_simple_device_remove(MKDEV(MSR_MAJOR, cpu));
+	class_simple_destroy(msr_class);
 	unregister_chrdev(MSR_MAJOR, "cpu/msr");
+	unregister_cpu_notifier(&msr_class_cpu_notifier);
 }
 
 module_init(msr_init);

@@ -32,43 +32,70 @@ static struct
 	struct ipt_replace repl;
 	struct ipt_standard entries[2];
 	struct ipt_error term;
-} initial_table __initdata
-= { { "raw", RAW_VALID_HOOKS, 3,
-      sizeof(struct ipt_standard) * 2 + sizeof(struct ipt_error),
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) },
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) },
-      0, NULL, { } },
-    {
-	    /* PRE_ROUTING */
-	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ipt_entry),
-		sizeof(struct ipt_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } },
-	    /* LOCAL_OUT */
-	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-		0,
-		sizeof(struct ipt_entry),
-		sizeof(struct ipt_standard),
-		0, { 0, 0 }, { } },
-	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } }
-    },
-    /* ERROR */
-    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
-	0,
-	sizeof(struct ipt_entry),
-	sizeof(struct ipt_error),
-	0, { 0, 0 }, { } },
-      { { { { IPT_ALIGN(sizeof(struct ipt_error_target)), IPT_ERROR_TARGET } },
-	  { } },
-	"ERROR"
-      }
-    }
+} initial_table __initdata = {
+	.repl = {
+		.name = "raw", 
+		.valid_hooks = RAW_VALID_HOOKS, 
+		.num_entries = 3,
+		.size = sizeof(struct ipt_standard) * 2 + sizeof(struct ipt_error),
+		.hook_entry = { 
+			[NF_IP_PRE_ROUTING] = 0,
+			[NF_IP_LOCAL_OUT] = sizeof(struct ipt_standard) },
+		.underflow = { 
+			[NF_IP_PRE_ROUTING] = 0,
+			[NF_IP_LOCAL_OUT]  = sizeof(struct ipt_standard) },
+	},
+	.entries = {
+	     /* PRE_ROUTING */
+	     { 
+		     .entry = { 
+			     .target_offset = sizeof(struct ipt_entry),
+			     .next_offset = sizeof(struct ipt_standard),
+		     },
+		     .target = { 
+			  .target = { 
+				  .u = {
+					  .target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				  },
+			  },
+			  .verdict = -NF_ACCEPT - 1,
+		     },
+	     },
+
+	     /* LOCAL_OUT */
+	     {
+		     .entry = {
+			     .target_offset = sizeof(struct ipt_entry),
+			     .next_offset = sizeof(struct ipt_standard),
+		     },
+		     .target = {
+			     .target = {
+				     .u = {
+					     .target_size = IPT_ALIGN(sizeof(struct ipt_standard_target)),
+				     },
+			     },
+			     .verdict = -NF_ACCEPT - 1,
+		     },
+	     },
+	},
+	/* ERROR */
+	.term = {
+		.entry = {
+			.target_offset = sizeof(struct ipt_entry),
+			.next_offset = sizeof(struct ipt_error),
+		},
+		.target = {
+			.target = {
+				.u = {
+					.user = {
+						.target_size = IPT_ALIGN(sizeof(struct ipt_error_target)), 
+						.name = IPT_ERROR_TARGET,
+					},
+				},
+			},
+			.errorname = "ERROR",
+		},
+	}
 };
 
 static struct ipt_table packet_raw = { 

@@ -2268,9 +2268,17 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 
 	/*
 	 * Map the BIOS ROM if any and retreive PLL parameters from
-	 * either BIOS or Open Firmware
+	 * the BIOS. We skip that on mobility chips as the real panel
+	 * values we need aren't in the ROM but in the BIOS image in
+	 * memory. This is definitely not the best meacnism though,
+	 * we really need the arch code to tell us which is the "primary"
+	 * video adapter to use the memory image (or better, the arch
+	 * should provide us a copy of the BIOS image to shield us from
+	 * archs who would store that elsewhere and/or could initialize
+	 * more than one adapter during boot).
 	 */
-	radeon_map_ROM(rinfo, pdev);
+	if (!rinfo->is_mobility)
+		radeon_map_ROM(rinfo, pdev);
 
 	/*
 	 * On x86, the primary display on laptop may have it's BIOS
@@ -2282,6 +2290,12 @@ static int radeonfb_pci_register (struct pci_dev *pdev,
 	if (rinfo->bios_seg == NULL)
 		radeon_find_mem_vbios(rinfo);
 #endif /* __i386__ */
+
+	/* If both above failed, try the BIOS ROM again for mobility
+	 * chips
+	 */
+	if (rinfo->bios_seg == NULL && rinfo->is_mobility)
+		radeon_map_ROM(rinfo, pdev);
 
 	/* Get informations about the board's PLL */
 	radeon_get_pllinfo(rinfo);

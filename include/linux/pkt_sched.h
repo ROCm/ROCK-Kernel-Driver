@@ -37,6 +37,13 @@ struct tc_stats
 	__u32	bps;			/* Current flow byte rate */
 	__u32	pps;			/* Current flow packet rate */
 	__u32	qlen;
+#ifdef CONFIG_NET_CLS_ACT
+/* eventually remove the define here; adding this(useful) 
+field at least fixes the 8 byte layout problems we 
+have with MIPS and PPC because we have a u64
+*/
+	__u32	reqs;			/* number of requeues happened */
+#endif
 	__u32	backlog;
 #ifdef __KERNEL__
 	spinlock_t *lock;

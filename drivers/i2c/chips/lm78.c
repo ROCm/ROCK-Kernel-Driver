@@ -281,7 +281,7 @@ static ssize_t							\
 	return show_in(dev, buf, 0x##offset);			\
 }								\
 static DEVICE_ATTR(in##offset##_input, S_IRUGO, 		\
-		show_in##offset, NULL)				\
+		show_in##offset, NULL);				\
 static ssize_t							\
 	show_in##offset##_min (struct device *dev, char *buf)   \
 {								\
@@ -303,9 +303,9 @@ static ssize_t set_in##offset##_max (struct device *dev,	\
 	return set_in_max(dev, buf, count, 0x##offset);		\
 }								\
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR,		\
-		show_in##offset##_min, set_in##offset##_min)    \
+		show_in##offset##_min, set_in##offset##_min);	\
 static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR,		\
-		show_in##offset##_max, set_in##offset##_max)
+		show_in##offset##_max, set_in##offset##_max);
 
 show_in_offset(0);
 show_in_offset(1);
@@ -354,11 +354,11 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf, size_t count)
 	return count;
 }
 
-static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL)
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
 static DEVICE_ATTR(temp1_max, S_IRUGO | S_IWUSR,
-		show_temp_over, set_temp_over)
+		show_temp_over, set_temp_over);
 static DEVICE_ATTR(temp1_max_hyst, S_IRUGO | S_IWUSR,
-		show_temp_hyst, set_temp_hyst)
+		show_temp_hyst, set_temp_hyst);
 
 /* 3 Fans */
 static ssize_t show_fan(struct device *dev, char *buf, int nr)
@@ -439,9 +439,9 @@ static ssize_t set_fan_##offset##_min (struct device *dev,		\
 {									\
 	return set_fan_min(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL);\
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR,		\
-		show_fan_##offset##_min, set_fan_##offset##_min)
+		show_fan_##offset##_min, set_fan_##offset##_min);
 
 static ssize_t set_fan_1_div(struct device *dev, const char *buf,
 		size_t count)
@@ -461,10 +461,10 @@ show_fan_offset(3);
 
 /* Fan 3 divisor is locked in H/W */
 static DEVICE_ATTR(fan1_div, S_IRUGO | S_IWUSR,
-		show_fan_1_div, set_fan_1_div)
+		show_fan_1_div, set_fan_1_div);
 static DEVICE_ATTR(fan2_div, S_IRUGO | S_IWUSR,
-		show_fan_2_div, set_fan_2_div)
-static DEVICE_ATTR(fan3_div, S_IRUGO, show_fan_3_div, NULL)
+		show_fan_2_div, set_fan_2_div);
+static DEVICE_ATTR(fan3_div, S_IRUGO, show_fan_3_div, NULL);
 
 /* VID */
 static ssize_t show_vid(struct device *dev, char *buf)

@@ -1030,7 +1030,7 @@ int pirq_enable_irq(struct pci_dev *dev)
 	/* VIA bridges use interrupt line for apic/pci steering across
 	   the V-Link */
 	else if (interrupt_line_quirk)
-		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq & 15);
 	return 0;
 }
 

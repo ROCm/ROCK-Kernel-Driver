@@ -37,6 +37,7 @@
 
 extern void clps711x_map_io(void);
 extern void clps711x_init_irq(void);
+extern void clps711x_init_time(void);
 
 /*
  * The on-chip registers are given a size of 1MB so that a section can
@@ -65,5 +66,6 @@ MACHINE_START(AUTCPU12, "autronix autcpu12")
 	BOOT_PARAMS(0xc0020000)
 	MAPIO(autcpu12_map_io)
 	INITIRQ(clps711x_init_irq)
+	INITTIME(clp711x_init_time)
 MACHINE_END
 

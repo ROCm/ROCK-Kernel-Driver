@@ -931,6 +931,13 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
+	if (device_is_compatible(sound, "AOAKeylargo")) {
+		/* Seems to support the stock AWACS frequencies, but has
+		   a snapper mixer */
+		chip->model = PMAC_SNAPPER;
+		// chip->can_byte_swap = 0; /* FIXME: check this */
+		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
+	}
 	prop = (unsigned int *)get_property(sound, "device-id", 0);
 	if (prop)
 		chip->device_id = *prop;
