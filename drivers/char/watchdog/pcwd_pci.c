@@ -49,7 +49,7 @@
 
 /* Module and version information */
 #define WATCHDOG_VERSION "1.00"
-#define WATCHDOG_DATE "09/02/2004"
+#define WATCHDOG_DATE "13/03/2004"
 #define WATCHDOG_DRIVER_NAME "PCI-PC Watchdog"
 #define WATCHDOG_NAME "pcwd_pci"
 #define PFX WATCHDOG_NAME ": "
@@ -81,6 +81,9 @@
 #define CMD_GET_FIRMWARE_VERSION	0x08
 #define CMD_READ_WATCHDOG_TIMEOUT	0x18
 #define CMD_WRITE_WATCHDOG_TIMEOUT	0x19
+
+/* We can only use 1 card due to the /dev/watchdog restriction */
+static int cards_found;
 
 /* internal variables */
 static int temp_panic;
@@ -505,7 +508,6 @@ static inline void check_temperature_support(void)
 static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 		const struct pci_device_id *ent)
 {
-	static int cards_found;
 	int ret = -EIO;
 	int got_fw_rev, fw_rev_major, fw_rev_minor;
 	char fw_ver_str[20];
@@ -527,7 +529,8 @@ static int __devinit pcipcwd_card_init(struct pci_dev *pdev,
 
 	if (pci_resource_start(pdev, 0) == 0x0000) {
 		printk(KERN_ERR PFX "No I/O-Address for card detected\n");
-		return -ENODEV;
+		ret = -ENODEV;
+		goto err_out_disable_device;
 	}
 
 	pcipcwd_private.pdev = pdev;
@@ -643,6 +646,7 @@ static void __devexit pcipcwd_card_exit(struct pci_dev *pdev)
 	unregister_reboot_notifier(&pcipcwd_notifier);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
+	cards_found--;
 }
 
 static struct pci_device_id pcipcwd_pci_tbl[] = {
