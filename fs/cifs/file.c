@@ -122,6 +122,12 @@ cifs_open(struct inode *inode, struct file *file)
 	   and calling get_inode_info with returned buf (at least 
 	   helps non-Unix server case */
         buf = kmalloc(sizeof(FILE_ALL_INFO),GFP_KERNEL);
+	if(buf==0) {
+		if (full_path)
+			kfree(full_path);
+		FreeXid(xid);
+		return -ENOMEM;
+	}
 	rc = CIFSSMBOpen(xid, pTcon, full_path, disposition, desiredAccess,
 			CREATE_NOT_DIR, &netfid, &oplock, buf, cifs_sb->local_nls);
 	if (rc) {
@@ -210,7 +216,7 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 	struct list_head *tmp1;
 
 /* list all files open on tree connection */
-	read_lock(&GlobalSMBSeslock);
+	write_lock(&GlobalSMBSeslock); /* BB change to semaphore */
 	list_for_each_safe(tmp, tmp1, &pTcon->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, tlist);
 		if(open_file) {
@@ -223,13 +229,10 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 			kfree(open_file);
 			if(file) {                
 				file->private_data = NULL;
-				read_unlock(&GlobalSMBSeslock);
 				if(file->f_dentry == 0) {
 					cFYI(1,("Null dentry for file %p",file));
-					read_lock(&GlobalSMBSeslock);
 				} else {
 					rc = cifs_open(file->f_dentry->d_inode,file);
-					read_lock(&GlobalSMBSeslock);
 					if(rc) {
 						cFYI(1,("reconnecting file %s failed with %d",
 							file->f_dentry->d_name.name,rc));
@@ -241,7 +244,7 @@ int reopen_files(struct cifsTconInfo * pTcon, struct nls_table * nlsinfo)
 			}
 		}
 	}
-	read_unlock(&GlobalSMBSeslock);
+	write_unlock(&GlobalSMBSeslock);
 	return rc;
 }
 
@@ -447,7 +450,6 @@ cifs_write(struct file * file, const char *write_data,
 				  &bytes_written,
 				  write_data + total_written, long_op);
 		if (rc || (bytes_written == 0)) {
-			FreeXid(xid);
 			if (total_written)
 				break;
 			else {
@@ -501,6 +503,7 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		FreeXid(xid);
 		return -EFAULT;
 	} else if(!mapping->host) {
+		kunmap(page);
 		FreeXid(xid);
 		return -EFAULT;
 	}
@@ -528,24 +531,27 @@ cifs_partialpagewrite(struct page *page,unsigned from, unsigned to)
 		
 
 	cifsInode = CIFS_I(mapping->host);
-	read_lock(&GlobalSMBSeslock);
+	read_lock(&GlobalSMBSeslock); /* BB switch to semaphore */
 	list_for_each_safe(tmp, tmp1, &cifsInode->openFileList) {            
 		open_file = list_entry(tmp,struct cifsFileInfo, flist);
 		/* We check if file is open for writing first */
 		if((open_file->pfile) && 
 		   ((open_file->pfile->f_flags & O_RDWR) || 
 			(open_file->pfile->f_flags & O_WRONLY))) {
-			read_unlock(&GlobalSMBSeslock);
 			bytes_written = cifs_write(open_file->pfile, write_data,
 					to-from, &offset);
-			read_lock(&GlobalSMBSeslock);
 		/* Does mm or vfs already set times? */
 			inode->i_atime = inode->i_mtime = CURRENT_TIME;
 			if ((bytes_written > 0) && (offset)) {
 				rc = 0;
+				break;
 			} else if(bytes_written < 0) {
 				rc = bytes_written;
 			}
+		}
+		if(tmp->next == NULL) {
+			cFYI(1,("File instance %p removed",tmp));
+			break;
 		}
 	}
 	read_unlock(&GlobalSMBSeslock);
