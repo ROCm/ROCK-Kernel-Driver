@@ -886,11 +886,8 @@ static int storage_probe(struct usb_interface *intf,
 	/* set the hostdata to prepare for scanning */
 	us->host->hostdata[0] = (unsigned long)us;
 
-	/* associate this host with our interface */
-	scsi_set_device(us->host, &intf->dev);
-
 	/* now add the host */
-	result = scsi_add_host(us->host, NULL);
+	result = scsi_add_host(us->host, &intf->dev);
 	if (result) {
 		printk(KERN_WARNING USB_STORAGE
 			"Unable to add the scsi host\n");
