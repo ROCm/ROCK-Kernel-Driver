@@ -123,6 +123,7 @@ static int dpc_probe(struct saa7146_dev* dev)
 	/* check if all devices are present */
 	if( 0 == dpc->saa7111a ) {
 		DEB_D(("dpc_v4l2.o: dpc_attach failed for this device.\n"));	
+		i2c_del_adapter(&dpc->i2c_adapter);
 		kfree(dpc);
 		return -ENODEV;
 	}
