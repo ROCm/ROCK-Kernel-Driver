@@ -157,6 +157,16 @@ extern int ccw_device_set_options(struct ccw_device *, unsigned long);
  */
 extern int ccw_device_start(struct ccw_device *, struct ccw1 *,
 			    unsigned long, __u8, unsigned long);
+/*
+ * ccw_device_start_timeout()
+ *
+ * This function notifies the device driver if the channel program has not
+ * completed during the specified time. If a timeout occurs, the channel
+ * program is terminated via xsch(), hsch() or csch().
+ */
+extern int ccw_device_start_timeout(struct ccw_device *, struct ccw1 *,
+				    unsigned long, __u8, unsigned long, int);
+
 extern int ccw_device_resume(struct ccw_device *);
 extern int ccw_device_halt(struct ccw_device *, unsigned long);
 extern int ccw_device_clear(struct ccw_device *, unsigned long);

@@ -27,9 +27,16 @@
 extern inline unsigned long virt_to_phys(volatile void * address)
 {
 	unsigned long real_address;
-	__asm__ ("   lra    %0,0(%1)\n"
+	__asm__ (
+#ifndef __s390x__
+		 "   lra    %0,0(%1)\n"
                  "   jz     0f\n"
                  "   sr     %0,%0\n"
+#else /* __s390x__ */
+		 "   lrag   %0,0(%1)\n"
+                 "   jz     0f\n"
+                 "   slgr   %0,%0\n"
+#endif /* __s390x__ */
                  "0:"
                  : "=a" (real_address) : "a" (address) : "cc" );
         return real_address;

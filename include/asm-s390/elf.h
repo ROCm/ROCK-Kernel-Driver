@@ -23,7 +23,11 @@ typedef s390_regs elf_gregset_t;
 /*
  * These are used to set parameters in the core dumps.
  */
+#ifndef __s390x__
 #define ELF_CLASS	ELFCLASS32
+#else /* __s390x__ */
+#define ELF_CLASS	ELFCLASS64
+#endif /* __s390x__ */
 #define ELF_DATA	ELFDATA2MSB
 #define ELF_ARCH	EM_S390
 
@@ -36,8 +40,16 @@ typedef s390_regs elf_gregset_t;
 
 /* For SVR4/S390 the function pointer to be registered with `atexit` is
    passed in R14. */
+#ifndef __s390x__
 #define ELF_PLAT_INIT(_r, load_addr) \
 	_r->gprs[14] = 0
+#else /* __s390x__ */
+#define ELF_PLAT_INIT(_r, load_addr) \
+	do { \
+	_r->gprs[14] = 0; \
+	clear_thread_flag(TIF_31BIT); \
+	} while(0)
+#endif /* __s390x__ */
 
 #define USE_ELF_CORE_DUMP
 #define ELF_EXEC_PAGESIZE	4096
@@ -47,9 +59,13 @@ typedef s390_regs elf_gregset_t;
    the loader.  We need to make sure that it is out of the way of the program
    that it will "exec", and that there is sufficient room for the brk.  */
 
+#ifndef __s390x__
 #define ELF_ET_DYN_BASE         ((TASK_SIZE & 0x80000000) \
                                 ? TASK_SIZE / 3 * 2 \
                                 : 2 * TASK_SIZE / 3)
+#else /* __s390x__ */
+#define ELF_ET_DYN_BASE         (TASK_SIZE / 3 * 2)
+#endif /* __s390x__ */
 
 /* Wow, the "main" arch needs arch dependent functions too.. :) */
 
@@ -76,7 +92,18 @@ typedef s390_regs elf_gregset_t;
 #define ELF_PLATFORM (NULL)
 
 #ifdef __KERNEL__
+#ifndef __s390x__
 #define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
+#else /* __s390x__ */
+#define SET_PERSONALITY(ex, ibcs2)			\
+do {							\
+	if (ibcs2)					\
+		set_personality(PER_SVR4);		\
+	else if (current->personality != PER_LINUX32)	\
+		set_personality(PER_LINUX);		\
+	clear_thread_flag(TIF_31BIT);			\
+} while (0)
+#endif /* __s390x__ */
 #endif
 
 #endif

@@ -28,7 +28,7 @@ struct mod_arch_specific
 	struct mod_arch_syminfo *syminfo;
 };
 
-#ifdef CONFIG_ARCH_S390X
+#ifdef __s390x__
 #define ElfW(x) Elf64_ ## x
 #define ELFW(x) ELF64_ ## x
 #else
@@ -36,8 +36,11 @@ struct mod_arch_specific
 #define ELFW(x) ELF32_ ## x
 #endif
 
+#define Elf_Addr ElfW(Addr)
+#define Elf_Rela ElfW(Rela)
 #define Elf_Shdr ElfW(Shdr)
 #define Elf_Sym ElfW(Sym)
 #define Elf_Ehdr ElfW(Ehdr)
+#define ELF_R_SYM ELFW(R_SYM)
 #define ELF_R_TYPE ELFW(R_TYPE)
 #endif /* _ASM_S390_MODULE_H */

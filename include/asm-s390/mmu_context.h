@@ -27,12 +27,20 @@ static inline void switch_mm(struct mm_struct *prev, struct mm_struct *next,
         unsigned long pgd;
 
         if (prev != next) {
+#ifndef __s390x__
 	        pgd = (__pa(next->pgd)&PAGE_MASK) | 
                       (_SEGMENT_TABLE|USER_STD_MASK);
                 /* Load page tables */
                 asm volatile("    lctl  7,7,%0\n"   /* secondary space */
                              "    lctl  13,13,%0\n" /* home space */
                              : : "m" (pgd) );
+#else /* __s390x__ */
+                pgd = (__pa(next->pgd)&PAGE_MASK) | (_REGION_TABLE|USER_STD_MASK);
+                /* Load page tables */
+                asm volatile("    lctlg 7,7,%0\n"   /* secondary space */
+                             "    lctlg 13,13,%0\n" /* home space */
+                             : : "m" (pgd) );
+#endif /* __s390x__ */
         }
 	set_bit(cpu, &next->cpu_vm_mask);
 }
