@@ -22,30 +22,35 @@ struct request_list {
 	wait_queue_head_t wait;
 };
 
+/*
+ * try to put the fields that are referenced together in the same cacheline
+ */
 struct request {
 	struct list_head queuelist; /* looking for ->queue? you must _not_
 				     * access it directly, use
 				     * blkdev_dequeue_request! */
-	int ref_count;
+	unsigned long flags;		/* see REQ_ bits below */
+
+	kdev_t rq_dev;
+	sector_t sector;
+	unsigned long nr_sectors;
+	unsigned int current_nr_sectors;
 
 	void *elevator_private;
 
-	unsigned char cmd[16];
-
-	unsigned long flags;		/* see REQ_ bits below */
-
 	int rq_status;	/* should split this into a few status bits */
-	kdev_t rq_dev;
 	struct gendisk *rq_disk;
 	int errors;
-	sector_t sector;
 	unsigned long start_time;
-	unsigned long nr_sectors;
 	sector_t hard_sector;		/* the hard_* are block layer
 					 * internals, no driver should
 					 * touch them
 					 */
 	unsigned long hard_nr_sectors;
+	unsigned int hard_cur_sectors;
+
+	struct bio *bio;
+	struct bio *biotail;
 
 	/* Number of scatter-gather DMA addr+len pairs after
 	 * physical address coalescing is performed.
@@ -59,13 +64,21 @@ struct request {
 	 */
 	unsigned short nr_hw_segments;
 
-	unsigned int current_nr_sectors;
-	unsigned int hard_cur_sectors;
 	int tag;
-	void *special;
 	char *buffer;
 
-	/* For packet commands */
+	int ref_count;
+	request_queue_t *q;
+	struct request_list *rl;
+
+	struct completion *waiting;
+	void *special;
+
+	/*
+	 * when request is used as a packet command carrier
+	 */
+	unsigned char cmd[16];
+
 	unsigned int data_len;
 	void *data;
 
@@ -73,10 +86,6 @@ struct request {
 	void *sense;
 
 	unsigned int timeout;
-	struct completion *waiting;
-	struct bio *bio, *biotail;
-	request_queue_t *q;
-	struct request_list *rl;
 };
 
 /*
