@@ -219,6 +219,7 @@ extern unsigned long irq_affinity [NR_IRQS];
 #define IRQ_ALLOWED(cpu,allowed_mask) \
 		((1 << cpu) & (allowed_mask))
 
+#if CONFIG_SMP
 static unsigned long move(int curr_cpu, unsigned long allowed_mask, unsigned long now, int direction)
 {
 	int search_idle = 1;
@@ -247,7 +248,6 @@ inside:
 
 static inline void balance_irq(int irq)
 {
-#if CONFIG_SMP
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
@@ -263,8 +263,10 @@ static inline void balance_irq(int irq)
 		entry->cpu = move(entry->cpu, allowed_mask, now, random_number);
 		set_ioapic_affinity(irq, 1 << entry->cpu);
 	}
-#endif
 }
+#else /* !SMP */
+static inline void balance_irq(int irq) { }
+#endif
 
 /*
  * support for broken MP BIOSs, enables hand-redirection of PIRQ0-7 to
