@@ -40,6 +40,7 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
+#define MAX_KMALLOC_SIZE	131072
 
 /* Storage size needed for map includes 2 headers and then the
  * specific needs of in or out streams.
@@ -56,11 +57,14 @@ static inline size_t sctp_ssnmap_size(__u16 in, __u16 out)
 struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int gfp)
 {
 	struct sctp_ssnmap *retval;
-	int order;
+	int size;
 
-	order = get_order(sctp_ssnmap_size(in,out));
-	retval = (struct sctp_ssnmap *)__get_free_pages(gfp, order);
-
+	size = sctp_ssnmap_size(in, out);
+	if (size <= MAX_KMALLOC_SIZE)
+		retval = kmalloc(size, gfp);
+	else
+		retval = (struct sctp_ssnmap *)
+			  __get_free_pages(gfp, get_order(size));
 	if (!retval)
 		goto fail;
 
@@ -73,7 +77,10 @@ struct sctp_ssnmap *sctp_ssnmap_new(__u16 in, __u16 out, int gfp)
 	return retval;
 
 fail_map:
-	free_pages((unsigned long)retval, order);
+	if (size <= MAX_KMALLOC_SIZE)
+		kfree(retval);
+	else
+		free_pages((unsigned long)retval, get_order(size));
 fail:
 	return NULL;
 }
@@ -109,9 +116,13 @@ void sctp_ssnmap_clear(struct sctp_ssnmap *map)
 void sctp_ssnmap_free(struct sctp_ssnmap *map)
 {
 	if (map && map->malloced) {
-		free_pages((unsigned long)map,
-			   get_order(sctp_ssnmap_size(map->in.len,
-						      map->out.len)));
+		int size;
+
+		size = sctp_ssnmap_size(map->in.len, map->out.len);
+		if (size <= MAX_KMALLOC_SIZE)
+			kfree(map);
+		else
+			free_pages((unsigned long)map, get_order(size));
 		SCTP_DBG_OBJCNT_DEC(ssnmap);
 	}
 }
