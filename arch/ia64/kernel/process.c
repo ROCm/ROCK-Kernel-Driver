@@ -66,10 +66,7 @@ do_show_stack (struct unw_frame_info *info, void *arg)
 void
 show_trace_task (struct task_struct *task)
 {
-	struct unw_frame_info info;
-
-	unw_init_from_blocked_task(&info, task);
-	do_show_stack(&info, 0);
+	show_stack(task);
 }
 
 void
