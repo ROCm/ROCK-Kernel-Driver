@@ -232,13 +232,21 @@ static char *usb_dump_endpoint_descriptor (
 	return start;
 }
 
-static char *usb_dump_interface_descriptor(char *start, char *end, const struct usb_interface *iface, int setno)
+static char *usb_dump_interface_descriptor(char *start, char *end,
+	const struct usb_interface_cache *intfc,
+	const struct usb_interface *iface,
+	int setno)
 {
-	struct usb_interface_descriptor *desc = &iface->altsetting[setno].desc;
+	const struct usb_interface_descriptor *desc = &intfc->altsetting[setno].desc;
+	char *driver_name = "";
 
 	if (start > end)
 		return start;
 	down_read(&usb_bus_type.subsys.rwsem);
+	if (iface)
+		driver_name = (iface->dev.driver
+				? iface->dev.driver->name
+				: "(none)");
 	start += sprintf(start, format_iface,
 			 desc->bInterfaceNumber,
 			 desc->bAlternateSetting,
@@ -247,9 +255,7 @@ static char *usb_dump_interface_descriptor(char *start, char *end, const struct 
 			 class_decode(desc->bInterfaceClass),
 			 desc->bInterfaceSubClass,
 			 desc->bInterfaceProtocol,
-			 iface->dev.driver
-				? iface->dev.driver->name
-				: "(none)");
+			 driver_name);
 	up_read(&usb_bus_type.subsys.rwsem);
 	return start;
 }
@@ -258,13 +264,14 @@ static char *usb_dump_interface(
 	int speed,
 	char *start,
 	char *end,
+	const struct usb_interface_cache *intfc,
 	const struct usb_interface *iface,
 	int setno
 ) {
-	struct usb_host_interface *desc = &iface->altsetting[setno];
+	const struct usb_host_interface *desc = &intfc->altsetting[setno];
 	int i;
 
-	start = usb_dump_interface_descriptor(start, end, iface, setno);
+	start = usb_dump_interface_descriptor(start, end, intfc, iface, setno);
 	for (i = 0; i < desc->desc.bNumEndpoints; i++) {
 		if (start > end)
 			return start;
@@ -303,6 +310,7 @@ static char *usb_dump_config (
 )
 {
 	int i, j;
+	struct usb_interface_cache *intfc;
 	struct usb_interface *interface;
 
 	if (start > end)
@@ -311,14 +319,13 @@ static char *usb_dump_config (
 		return start + sprintf(start, "(null Cfg. desc.)\n");
 	start = usb_dump_config_descriptor(start, end, &config->desc, active);
 	for (i = 0; i < config->desc.bNumInterfaces; i++) {
+		intfc = config->intf_cache[i];
 		interface = config->interface[i];
-		if (!interface)
-			break;
-		for (j = 0; j < interface->num_altsetting; j++) {
+		for (j = 0; j < intfc->num_altsetting; j++) {
 			if (start > end)
 				return start;
 			start = usb_dump_interface(speed,
-					start, end, interface, j);
+				start, end, intfc, interface, j);
 		}
 	}
 	return start;
@@ -395,7 +402,7 @@ static char *usb_dump_desc(char *start, char *end, struct usb_device *dev)
 		return start;
 	
 	start = usb_dump_device_strings (start, end, dev);
-	
+
 	for (i = 0; i < dev->descriptor.bNumConfigurations; i++) {
 		if (start > end)
 			return start;
@@ -445,6 +452,7 @@ static char *usb_dump_string(char *start, char *end, const struct usb_device *de
  * nbytes - the maximum number of bytes to write
  * skip_bytes - the number of bytes to skip before writing anything
  * file_offset - the offset into the devices file on completion
+ * The caller must own the usbdev->serialize semaphore.
  */
 static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *skip_bytes, loff_t *file_offset,
 				struct usb_device *usbdev, struct usb_bus *bus, int level, int index, int count)
@@ -545,9 +553,13 @@ static ssize_t usb_device_dump(char __user **buffer, size_t *nbytes, loff_t *ski
 	
 	/* Now look at all of this device's children. */
 	for (chix = 0; chix < usbdev->maxchild; chix++) {
-		if (usbdev->children[chix]) {
-			ret = usb_device_dump(buffer, nbytes, skip_bytes, file_offset, usbdev->children[chix],
+		struct usb_device *childdev = usbdev->children[chix];
+
+		if (childdev) {
+			down(&childdev->serialize);
+			ret = usb_device_dump(buffer, nbytes, skip_bytes, file_offset, childdev,
 					bus, level + 1, chix, ++cnt);
+			up(&childdev->serialize);
 			if (ret == -EFAULT)
 				return total_written;
 			total_written += ret;
@@ -575,8 +587,11 @@ static ssize_t usb_device_read(struct file *file, char __user *buf, size_t nbyte
 	for (buslist = usb_bus_list.next; buslist != &usb_bus_list; buslist = buslist->next) {
 		/* print devices for this bus */
 		bus = list_entry(buslist, struct usb_bus, bus_list);
+
 		/* recurse through all children of the root hub */
+		down(&bus->root_hub->serialize);
 		ret = usb_device_dump(&buf, &nbytes, &skip_bytes, ppos, bus->root_hub, bus, 0, 0, 0);
+		up(&bus->root_hub->serialize);
 		if (ret < 0) {
 			up(&usb_bus_list_lock);
 			return ret;

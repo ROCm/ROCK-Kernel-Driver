@@ -2,7 +2,7 @@
  * USB HandSpring Visor, Palm m50x, and Sony Clie driver
  * (supports all of the Palm OS USB devices)
  *
- *	Copyright (C) 1999 - 2003
+ *	Copyright (C) 1999 - 2004
  *	    Greg Kroah-Hartman (greg@kroah.com)
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -151,6 +151,7 @@
 #include <linux/tty_driver.h>
 #include <linux/tty_flip.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
@@ -194,8 +195,8 @@ static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_i
 static int palm_os_4_probe (struct usb_serial *serial, const struct usb_device_id *id);
 
 /* Parameters that may be passed into the module. */
-static int vendor = -1;
-static int product = -1;
+static __u16 vendor;
+static __u16 product;
 
 static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(HANDSPRING_VENDOR_ID, HANDSPRING_VISOR_ID),
@@ -221,6 +222,8 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID),
+		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE31_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID),
 		.driver_info = (kernel_ulong_t)&palm_os_4_probe },
@@ -273,6 +276,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_M130_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_T_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_TUNGSTEN_Z_ID) },
+	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE31_ID) },
 	{ USB_DEVICE(PALM_VENDOR_ID, PALM_ZIRE_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_3_5_ID) },
 	{ USB_DEVICE(SONY_VENDOR_ID, SONY_CLIE_4_0_ID) },
@@ -393,9 +397,6 @@ static int visor_open (struct usb_serial_port *port, struct file *filp)
 	struct usb_serial *serial = port->serial;
 	int result = 0;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	if (!port->read_urb) {
@@ -443,18 +444,10 @@ exit:
 
 static void visor_close (struct usb_serial_port *port, struct file * filp)
 {
-	struct usb_serial *serial;
 	unsigned char *transfer_buffer;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 			 
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
 	/* shutdown our urbs */
 	usb_unlink_urb (port->read_urb);
 	if (port->interrupt_in_urb)
@@ -463,8 +456,8 @@ static void visor_close (struct usb_serial_port *port, struct file * filp)
 	/* Try to send shutdown message, if the device is gone, this will just fail. */
 	transfer_buffer =  kmalloc (0x12, GFP_KERNEL);
 	if (transfer_buffer) {
-		usb_control_msg (serial->dev,
-				 usb_rcvctrlpipe(serial->dev, 0),
+		usb_control_msg (port->serial->dev,
+				 usb_rcvctrlpipe(port->serial->dev, 0),
 				 VISOR_CLOSE_NOTIFICATION, 0xc2,
 				 0x0000, 0x0000, 
 				 transfer_buffer, 0x12, 300);
@@ -568,9 +561,6 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	/* free up the transfer buffer, as usb_free_urb() does not do this */
 	kfree (urb->transfer_buffer);
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status)
@@ -584,21 +574,12 @@ static void visor_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *)urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
 	int i;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - nonzero read bulk status received: %d", __FUNCTION__, urb->status);
@@ -622,9 +603,9 @@ static void visor_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	bytes_in += urb->actual_length;
 
 	/* Continue trying to always read  */
-	usb_fill_bulk_urb (port->read_urb, serial->dev,
-			   usb_rcvbulkpipe (serial->dev,
-					    port->bulk_in_endpointAddress),
+	usb_fill_bulk_urb (port->read_urb, port->serial->dev,
+			   usb_rcvbulkpipe(port->serial->dev,
+					   port->bulk_in_endpointAddress),
 			   port->read_urb->transfer_buffer,
 			   port->read_urb->transfer_buffer_length,
 			   visor_read_bulk_callback, port);
@@ -1099,10 +1080,10 @@ MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
-MODULE_PARM(vendor, "i");
+module_param(vendor, ushort, 0);
 MODULE_PARM_DESC(vendor, "User specified vendor ID");
-MODULE_PARM(product, "i");
+module_param(product, ushort, 0);
 MODULE_PARM_DESC(product, "User specified product ID");

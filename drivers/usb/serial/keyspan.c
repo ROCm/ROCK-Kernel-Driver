@@ -133,9 +133,6 @@
 
 	/* Per device and per port private data */
 struct keyspan_serial_private {
-	/* number of active ports */
-	atomic_t	active_count;
-
 	const struct keyspan_device_details	*device_details;
 
 	struct urb	*instat_urb;
@@ -1144,13 +1141,9 @@ static inline void stop_urb(struct urb *urb)
 static void keyspan_close(struct usb_serial_port *port, struct file *filp)
 {
 	int			i;
-	struct usb_serial	*serial;
+	struct usb_serial	*serial = port->serial;
 	struct keyspan_serial_private 	*s_priv;
 	struct keyspan_port_private 	*p_priv;
-
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
 
 	dbg("%s", __FUNCTION__);
 	s_priv = usb_get_serial_data(serial);

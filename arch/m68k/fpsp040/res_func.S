@@ -8,7 +8,7 @@
 | (Exception vector 55).
 |
 | For packed move out (fmove.p fpm,<ea>) the operation is
-| completed here; data is packed and moved to user memory. 
+| completed here; data is packed and moved to user memory.
 | The stack is restored to the 040 only in the case of a
 | reportable exception in the conversion.
 |
@@ -16,8 +16,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 RES_FUNC:    |idnt    2,1 | Motorola 040 Floating Point Software Package
@@ -48,7 +48,7 @@ dp_bnds:	.short	0x3c01,0x43fe
 	|xref	t_unfl
 
 	.global	res_func
-	.global 	p_move
+	.global	p_move
 
 res_func:
 	clrb	DNRM_FLG(%a6)
@@ -100,7 +100,7 @@ monadic:
 	movew	CMDREG1B(%a6),%d0	|get command register
 	andil	#0x7f,%d0			|strip to only command word
 |
-| At this point, fabs, fneg, fsmove, fdmove, ftst, fsqrt, fssqrt, and 
+| At this point, fabs, fneg, fsmove, fdmove, ftst, fsqrt, fssqrt, and
 | fdsqrt are possible.
 | For cases fabs, fneg, fsmove, and fdmove goto spos (do not normalize)
 | For cases fsqrt, fssqrt, and fdsqrt goto nrm_src (do normalize)
@@ -143,7 +143,7 @@ cu_ntpo:
 	rts
 cu_ntn:
 	orl	#nan_mask,USER_FPSR(%a6)
-	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for 
+	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for
 |						;snan handler
 
 	rts
@@ -206,7 +206,7 @@ cu_nmnr:
 cu_nmrd:
 	movel	#2,%d0			|set up the size for denorm
 	movew	LOCAL_EX(%a0),%d1		|compare exponent to double threshold
-	andw	#0x7fff,%d1	
+	andw	#0x7fff,%d1
 	cmpw	#0x3c01,%d1
 	bls	cu_nunfl
 	bfextu	FPCR_MODE(%a6){#2:#2},%d1	|get rmode
@@ -359,7 +359,7 @@ cu_wreon:
 |				;write the new tag & ete15 to the fstack
 mon_dnrm:
 |
-| At this point, check for the cases in which normalizing the 
+| At this point, check for the cases in which normalizing the
 | denorm produces incorrect results.
 |
 	tstb	DY_MO_FLG(%a6)	|all cases of dyadic instructions would
@@ -374,7 +374,7 @@ mon_dnrm:
 	movew	CMDREG1B(%a6),%d0	|get command register
 	andil	#0x7f,%d0			|strip to only command word
 |
-| At this point, fabs, fneg, fsmove, fdmove, ftst, fsqrt, fssqrt, and 
+| At this point, fabs, fneg, fsmove, fdmove, ftst, fsqrt, fssqrt, and
 | fdsqrt are possible.
 | For cases fabs, fneg, fsmove, and fdmove goto spos (do not normalize)
 | For cases fsqrt, fssqrt, and fdsqrt goto nrm_src (do normalize)
@@ -382,12 +382,12 @@ mon_dnrm:
 	btstl	#0,%d0
 	bnes	nrm_src		|weed out fsqrt instructions
 	st	CU_ONLY(%a6)	|set cu-only inst flag
-	bra	cu_dnrm		|fmove, fabs, fneg, ftst 
+	bra	cu_dnrm		|fmove, fabs, fneg, ftst
 |				;cases go to cu_dnrm
 nrm_src:
 	bclrb	#sign_bit,LOCAL_EX(%a0)
 	sne	LOCAL_SGN(%a0)
-	bsr	nrm_set		|normalize number (exponent will go 
+	bsr	nrm_set		|normalize number (exponent will go
 |				; negative)
 	bclrb	#sign_bit,LOCAL_EX(%a0) |get rid of false sign
 
@@ -413,7 +413,7 @@ fix_stk:
 
 |
 | cu_dnrm handles all cu-only instructions (fmove, fabs, fneg, and
-| ftst) completely in software without an frestore to the 040. 
+| ftst) completely in software without an frestore to the 040.
 |
 cu_dnrm:
 	st	CU_ONLY(%a6)
@@ -446,7 +446,7 @@ cu_dtpo:
 	rts
 cu_dtn:
 	orl	#nan_mask,USER_FPSR(%a6)
-	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for 
+	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for
 |						;snan handler
 	rts
 cu_dtcz:
@@ -525,7 +525,7 @@ cu_dmsn:
 	bra	cu_sndr			|load single neg zero w/lsb
 |
 | The precision is extended, so the result in etemp is correct.
-| Simply set unfl (not inex2 or aunfl) and write the result to 
+| Simply set unfl (not inex2 or aunfl) and write the result to
 | the correct fp register.
 cu_wrexd:
 	orl	#unfl_mask,USER_FPSR(%a6)
@@ -597,7 +597,7 @@ cu_sndr:
 	orl	#neg_mask,USER_FPSR(%a6)
 	orl	#unfinx_mask,USER_FPSR(%a6)
 	bra	wr_etemp
-	
+
 |
 | This code checks for 16-bit overflow conditions on dyadic
 | operations which are not restorable into the floating-point
@@ -613,7 +613,7 @@ cu_sndr:
 |	                  $ff for both ops denormalized
 |
 | The wrap-around condition occurs for add, sub, div, and cmp
-| when 
+| when
 |
 |	abs(dest_exp - src_exp) >= $8000
 |
@@ -627,7 +627,7 @@ cu_sndr:
 | for this condition.  The restore flag (RES_FLG) is left clear.
 | No frestore is done unless an exception is to be reported.
 |
-| For fadd: 
+| For fadd:
 |	if(sign_of(dest) != sign_of(src))
 |		replace exponent of src with $3fff (keep sign)
 |		use fpu to perform dest+new_src (user's rmode and X)
@@ -689,10 +689,10 @@ ck_wrap:
 	cmpiw	#cmpcode,%d0
 	beq	wrap_cmp
 |
-| Inst is fdiv.  
+| Inst is fdiv.
 |
 wrap_div:
-	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm, 
+	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm,
 	beq	fix_stk		 |restore to fpu
 |
 | One of the ops is denormalized.  Test for wrap condition
@@ -722,7 +722,7 @@ ckinf_ns:
 	bra	ck_in_com
 ckinf_nd:
 	moveb	DTAG(%a6),%d0		|check destination tag for inf or nan
-ck_in_com:	
+ck_in_com:
 	andib	#0x60,%d0			|isolate tag bits
 	cmpb	#0x40,%d0			|is it inf?
 	beq	nan_or_inf		|not wrap case
@@ -755,7 +755,7 @@ div_srcd:
 	beqs	force_ovf
 	st	WBTEMP_SGN(%a6)
 |
-| This code handles the case of the instruction resulting in 
+| This code handles the case of the instruction resulting in
 | an overflow condition.
 |
 force_ovf:
@@ -777,7 +777,7 @@ frcovf_fpcr:
 	bfextu	FPCR_MODE(%a6){#0:#2},%d0	|inst not forced - use fpcr prec
 frcovf_rnd:
 
-| The 881/882 does not set inex2 for the following case, so the 
+| The 881/882 does not set inex2 for the following case, so the
 | line is commented out to be compatible with 881/882
 |	tst.b	%d0
 |	beq.b	frcovf_x
@@ -785,7 +785,7 @@ frcovf_rnd:
 
 |frcovf_x:
 	bsrl	ovf_res			|get correct result based on
-|					;round precision/mode.  This 
+|					;round precision/mode.  This
 |					;sets FPSR_CC correctly
 |					;returns in external format
 	bfclr	WBTEMP_SGN(%a6){#0:#8}
@@ -796,7 +796,7 @@ frcovf_rnd:
 | Inst is fadd.
 |
 wrap_add:
-	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm, 
+	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm,
 	beq	fix_stk		 |restore to fpu
 |
 | One of the ops is denormalized.  Test for wrap condition
@@ -964,14 +964,14 @@ add_ckovf:
 | and aovfl, and clr the mantissa (incorrectly set by the
 | round routine.)
 |
-	orl	#inf_mask+ovfl_inx_mask,USER_FPSR(%a6)	
+	orl	#inf_mask+ovfl_inx_mask,USER_FPSR(%a6)
 	clrl	4(%a0)
 	bra	frcfpnr
 |
 | Inst is fsub.
 |
 wrap_sub:
-	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm, 
+	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm,
 	beq	fix_stk		 |restore to fpu
 |
 | One of the ops is denormalized.  Test for wrap condition
@@ -1145,14 +1145,14 @@ sub_ckovf:
 | and aovfl, and clr the mantissa (incorrectly set by the
 | round routine.)
 |
-	orl	#inf_mask+ovfl_inx_mask,USER_FPSR(%a6)	
+	orl	#inf_mask+ovfl_inx_mask,USER_FPSR(%a6)
 	clrl	4(%a0)
 	bra	frcfpnr
 |
 | Inst is fcmp.
 |
 wrap_cmp:
-	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm, 
+	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm,
 	beq	fix_stk		 |restore to fpu
 |
 | One of the ops is denormalized.  Test for wrap condition
@@ -1190,7 +1190,7 @@ cmp_setn:
 | Inst is fmul.
 |
 wrap_mul:
-	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm, 
+	cmpb	#0xff,DNRM_FLG(%a6) |if both ops denorm,
 	beq	force_unf	|force an underflow (really!)
 |
 | One of the ops is denormalized.  Test for wrap condition
@@ -1213,9 +1213,9 @@ mul_srcd:
 	bfexts	ETEMP_EX(%a6){#1:#15},%d1	|get src exp (always neg)
 	addl	%d1,%d0			|subtract src from dest
 	bgt	fix_stk
-	
+
 |
-| This code handles the case of the instruction resulting in 
+| This code handles the case of the instruction resulting in
 | an underflow condition.
 |
 force_unf:
@@ -1245,7 +1245,7 @@ frcunf_fpcr:
 	bfextu	FPCR_MODE(%a6){#0:#2},%d0	|inst not forced - use fpcr prec
 frcunf_rnd:
 	bsrl	unf_sub			|get correct result based on
-|					;round precision/mode.  This 
+|					;round precision/mode.  This
 |					;sets FPSR_CC correctly
 	bfclr	WBTEMP_SGN(%a6){#0:#8}	|convert back to IEEE ext format
 	beqs	frcfpn
@@ -1277,14 +1277,14 @@ frcfpn_rnd:
 	bclrb	#sign_bit,WBTEMP_EX(%a6)
 	sne	WBTEMP_SGN(%a6)
 	bsrl	ovf_res			|get correct result based on
-|					;round precision/mode.  This 
+|					;round precision/mode.  This
 |					;sets FPSR_CC correctly
 	bfclr	WBTEMP_SGN(%a6){#0:#8}	|convert back to IEEE ext format
 	beqs	frcfpn_clr
 	bsetb	#sign_bit,WBTEMP_EX(%a6)
 frcfpn_clr:
 	orl	#ovfinx_mask,USER_FPSR(%a6)
-| 
+|
 | Perform the write.
 |
 frcfpn:
@@ -1301,9 +1301,9 @@ frc0123:
 	cmpib	#0,%d0
 	beqs	frc0_dst
 	cmpib	#1,%d0
-	beqs	frc1_dst 
+	beqs	frc1_dst
 	cmpib	#2,%d0
-	beqs	frc2_dst 
+	beqs	frc2_dst
 frc3_dst:
 	movel	WBTEMP_EX(%a6),USER_FP3(%a6)
 	movel	WBTEMP_HI(%a6),USER_FP3+4(%a6)
@@ -1337,7 +1337,7 @@ wr_etemp:
 	beqs	fmoveinc		|enabled, force restore
 	btstb	#snan_bit,FPCR_ENABLE(%a6) |and don't overwrite
 	beqs	fmoveinc		|the dest
-	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for 
+	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for
 |						;snan handler
 	tstb	ETEMP(%a6)		|check for negative
 	blts	snan_neg
@@ -1361,7 +1361,7 @@ fminc_cnan:
 	cmpib	#0x60,%d0			|check if stag is NaN
 	bnes	fminc_czero
 	orl	#nan_mask,USER_FPSR(%a6) |if nan, nothing yet has set NaN
-	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for 
+	movel	ETEMP_EX(%a6),FPTEMP_EX(%a6)	|set up fptemp sign for
 |						;snan handler
 	tstw	LOCAL_EX(%a0)		|check sign
 	bges	fminc_con
@@ -1389,9 +1389,9 @@ fp0123:
 	cmpib	#0,%d0
 	beqs	fp0_dst
 	cmpib	#1,%d0
-	beqs	fp1_dst 
+	beqs	fp1_dst
 	cmpib	#2,%d0
-	beqs	fp2_dst 
+	beqs	fp2_dst
 fp3_dst:
 	movel	ETEMP_EX(%a6),USER_FP3(%a6)
 	movel	ETEMP_HI(%a6),USER_FP3+4(%a6)
@@ -1421,20 +1421,20 @@ opclass3:
 	beq	pack_out	|else it is norm or denorm
 	bra	mv_out
 
-	
+
 |
 |	MOVE OUT
 |
 
 mv_tbl:
 	.long	li
-	.long 	sgp
-	.long 	xp
-	.long 	mvout_end	|should never be taken
-	.long 	wi
-	.long 	dp
-	.long 	bi
-	.long 	mvout_end	|should never be taken
+	.long	sgp
+	.long	xp
+	.long	mvout_end	|should never be taken
+	.long	wi
+	.long	dp
+	.long	bi
+	.long	mvout_end	|should never be taken
 mv_out:
 	bfextu	CMDREG1B(%a6){#3:#3},%d1	|put source specifier in d1
 	leal	mv_tbl,%a0
@@ -1442,7 +1442,7 @@ mv_out:
 	jmp	(%a0)
 
 |
-| This exit is for move-out to memory.  The aunfl bit is 
+| This exit is for move-out to memory.  The aunfl bit is
 | set if the result is inex and unfl is signalled.
 |
 mvout_end:
@@ -1466,7 +1466,7 @@ no_aufl:
 mvout_con:
 	rts
 |
-| This exit is for move-out to int register.  The aunfl bit is 
+| This exit is for move-out to int register.  The aunfl bit is
 | not set in any case for this move.
 |
 mvouti_end:
@@ -1496,7 +1496,7 @@ li:
 	fmovemx ETEMP(%a6),%fp0-%fp0
 	fcmpd	#0x41dfffffffc00000,%fp0
 | 41dfffffffc00000 in dbl prec = 401d0000fffffffe00000000 in ext prec
-	fbge	lo_plrg	
+	fbge	lo_plrg
 	fcmpd	#0xc1e0000000000000,%fp0
 | c1e0000000000000 in dbl prec = c01e00008000000000000000 in ext prec
 	fble	lo_nlrg
@@ -1541,7 +1541,7 @@ wi:
 	fmovemx ETEMP(%a6),%fp0-%fp0
 	fcmps	#0x46fffe00,%fp0
 | 46fffe00 in sgl prec = 400d0000fffe000000000000 in ext prec
-	fbge	wo_plrg	
+	fbge	wo_plrg
 	fcmps	#0xc7000000,%fp0
 | c7000000 in sgl prec = c00e00008000000000000000 in ext prec
 	fble	wo_nlrg
@@ -1586,7 +1586,7 @@ bi:
 	fmovemx ETEMP(%a6),%fp0-%fp0
 	fcmps	#0x42fe0000,%fp0
 | 42fe0000 in sgl prec = 40050000fe00000000000000 in ext prec
-	fbge	by_plrg	
+	fbge	by_plrg
 	fcmps	#0xc3000000,%fp0
 | c3000000 in sgl prec = c00600008000000000000000 in ext prec
 	fble	by_nlrg
@@ -1629,7 +1629,7 @@ by_nlrg:
 int_dnrm:
 	movel	#0,L_SCR1(%a6)	| initialize result to 0
 	bfextu	FPCR_MODE(%a6){#2:#2},%d1	| d1 is the rounding mode
-	cmpb	#2,%d1		
+	cmpb	#2,%d1
 	bmis	int_inx		| if RN or RZ, done
 	bnes	int_rp		| if RP, continue below
 	tstw	ETEMP(%a6)	| RM: store -1 in L_SCR1 if src is negative
@@ -1642,7 +1642,7 @@ int_rp:
 	bmis	int_inx		| otherwise, result is 0
 	lea	L_SCR1(%a6),%a1	| a1 is address of L_SCR1
 	addal	%d0,%a1		| offset by destination width -1
-	subal	#1,%a1		
+	subal	#1,%a1
 	bsetb	#0,(%a1)		| set low bit at a1 address
 int_inx:
 	oril	#inx2a_mask,USER_FPSR(%a6)
@@ -1656,10 +1656,10 @@ int_operr:
 
 	oril	#opaop_mask,USER_FPSR(%a6)
 |				;fall through to perform int_wrt
-int_wrt: 
+int_wrt:
 	movel	EXC_EA(%a6),%a1	|load destination address
 	tstl	%a1		|check to see if it is a dest register
-	beqs	wrt_dn		|write data register 
+	beqs	wrt_dn		|write data register
 	lea	L_SCR1(%a6),%a0	|point to supervisor source address
 	bsrl	mem_write
 	bra	mvouti_end
@@ -1680,7 +1680,7 @@ sz_long:
 sz_con:
 	movel	%d0,%d1		|reg_dest expects size:reg in d1
 	bsrl	reg_dest	|load proper data register
-	bra	mvouti_end 
+	bra	mvouti_end
 xp:
 	lea	ETEMP(%a6),%a0
 	bclrb	#sign_bit,LOCAL_EX(%a0)
@@ -1718,7 +1718,7 @@ dp:
 	blt	dp_under
 	cmpw	2(%a1),%d0
 	bgt	dp_over
-	
+
 	movel	#2,%d0		|set destination format to double
 |				;fall through to do_fp
 |
@@ -1726,10 +1726,10 @@ do_fp:
 	bfextu	FPCR_MODE(%a6){#2:#2},%d1	|rnd mode in d1
 	swap	%d0			|rnd prec in upper word
 	addl	%d0,%d1			|d1 has PREC/MODE info
-	
-	clrl	%d0			|clear g,r,s 
 
-	bsrl	round			|round 
+	clrl	%d0			|clear g,r,s
+
+	bsrl	round			|round
 
 	movel	%a0,%a1
 	movel	EXC_EA(%a6),%a0
@@ -1764,12 +1764,12 @@ xdnrm:
 	bsrl	dest_ext	|store to memory
 	bsetb	#unfl_bit,FPSR_EXCEPT(%a6)
 	bra	mvout_end
-	
+
 sp_under:
 	bsetb	#etemp15_bit,STAG(%a6)
 
 	cmpw	4(%a1),%d0
-	blts	sp_catas	|catastrophic underflow case	
+	blts	sp_catas	|catastrophic underflow case
 
 	movel	#1,%d0		|load in round precision
 	movel	#sgl_thresh,%d1	|load in single denorm threshold
@@ -1784,9 +1784,9 @@ dp_under:
 
 	cmpw	4(%a1),%d0
 	blts	dp_catas	|catastrophic underflow case
-		
+
 	movel	#dbl_thresh,%d1	|load in double precision threshold
-	movel	#2,%d0		
+	movel	#2,%d0
 	bsrl	dpspdnrm	|expects d1 to have proper
 |				;denorm threshold
 |				;expects d0 to have round precision
@@ -1813,11 +1813,11 @@ sp_catas:
 
 	movel	%a0,%a1		|a1 has the operand input
 	movel	EXC_EA(%a6),%a0	|a0 has the destination pointer
-	
+
 	bsrl	dest_sgl	|store the result
 	oril	#unfinx_mask,USER_FPSR(%a6)
 	bra	mvout_end
-	
+
 dp_catas:
 | Temp fix for z bit set in unf_sub
 	movel	USER_FPSR(%a6),-(%a7)
@@ -1828,12 +1828,12 @@ dp_catas:
 	movel	(%a7)+,USER_FPSR(%a6)
 
 	movel	#1,%d0
-	subw	%d0,LOCAL_EX(%a0) |account for difference between 
+	subw	%d0,LOCAL_EX(%a0) |account for difference between
 |				;denorm/norm bias
 
 	movel	%a0,%a1		|a1 has the operand input
 	movel	EXC_EA(%a6),%a0	|a0 has the destination pointer
-	
+
 	bsrl	dest_dbl	|store the result
 	oril	#unfinx_mask,USER_FPSR(%a6)
 	bra	mvout_end
@@ -1880,7 +1880,7 @@ dp_over:
 	bra	mvout_end
 
 |
-| 	DPSPDNRM
+|	DPSPDNRM
 |
 | This subroutine takes an extended normalized number and denormalizes
 | it to the given round precision. This subroutine also decrements
@@ -1894,7 +1894,7 @@ dp_over:
 |
 | Output: (In the format for dest_sgl or dest_dbl)
 |	 a0   points to the destination
-|   	 a1   points to the operand
+|	 a1   points to the operand
 |
 | Exceptions: Reports inexact 2 exception by setting USER_FPSR bits
 |
@@ -1905,7 +1905,7 @@ dpspdnrm:
 
 	bfextu	FPCR_MODE(%a6){#2:#2},%d1 |get rounding mode
 	swap	%d1
-	movew	2(%a7),%d1	|set rounding precision 
+	movew	2(%a7),%d1	|set rounding precision
 	swap	%d1		|at this point d1 has PREC/MODE info
 	bsrl	round		|round result, sets the inex bit in
 |				;USER_FPSR if needed
@@ -1952,20 +1952,20 @@ p_regd:
 	.long	p_dyd7
 
 pack_out:
- 	leal	p_movet,%a0	|load jmp table address
+	leal	p_movet,%a0	|load jmp table address
 	movew	STAG(%a6),%d0	|get source tag
 	bfextu	%d0{#16:#3},%d0	|isolate source bits
 	movel	(%a0,%d0.w*4),%a0	|load a0 with routine label for tag
 	jmp	(%a0)		|go to the routine
 
 p_write:
-	movel	#0x0c,%d0 	|get byte count
+	movel	#0x0c,%d0	|get byte count
 	movel	EXC_EA(%a6),%a1	|get the destination address
-	bsr 	mem_write	|write the user's destination
+	bsr	mem_write	|write the user's destination
 	moveb	#0,CU_SAVEPC(%a6) |set the cu save pc to all 0's
 
 |
-| Also note that the dtag must be set to norm here - this is because 
+| Also note that the dtag must be set to norm here - this is because
 | the 040 uses the dtag to execute the correct microcode.
 |
         bfclr    DTAG(%a6){#0:#3}  |set dtag to norm

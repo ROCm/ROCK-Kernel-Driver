@@ -50,8 +50,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |STAN	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -213,34 +213,34 @@ TANCONT:
 	blt		NODD
 
 	fmovex		%fp0,%fp1
-	fmulx		%fp1,%fp1	 	| ...S = R*R
+	fmulx		%fp1,%fp1		| ...S = R*R
 
 	fmoved		TANQ4,%fp3
 	fmoved		TANP3,%fp2
 
-	fmulx		%fp1,%fp3	 	| ...SQ4
-	fmulx		%fp1,%fp2	 	| ...SP3
+	fmulx		%fp1,%fp3		| ...SQ4
+	fmulx		%fp1,%fp2		| ...SP3
 
 	faddd		TANQ3,%fp3	| ...Q3+SQ4
 	faddx		TANP2,%fp2	| ...P2+SP3
 
-	fmulx		%fp1,%fp3	 	| ...S(Q3+SQ4)
-	fmulx		%fp1,%fp2	 	| ...S(P2+SP3)
+	fmulx		%fp1,%fp3		| ...S(Q3+SQ4)
+	fmulx		%fp1,%fp2		| ...S(P2+SP3)
 
 	faddx		TANQ2,%fp3	| ...Q2+S(Q3+SQ4)
 	faddx		TANP1,%fp2	| ...P1+S(P2+SP3)
 
-	fmulx		%fp1,%fp3	 	| ...S(Q2+S(Q3+SQ4))
-	fmulx		%fp1,%fp2	 	| ...S(P1+S(P2+SP3))
+	fmulx		%fp1,%fp3		| ...S(Q2+S(Q3+SQ4))
+	fmulx		%fp1,%fp2		| ...S(P1+S(P2+SP3))
 
 	faddx		TANQ1,%fp3	| ...Q1+S(Q2+S(Q3+SQ4))
-	fmulx		%fp0,%fp2	 	| ...RS(P1+S(P2+SP3))
+	fmulx		%fp0,%fp2		| ...RS(P1+S(P2+SP3))
 
-	fmulx		%fp3,%fp1	 	| ...S(Q1+S(Q2+S(Q3+SQ4)))
-	
+	fmulx		%fp3,%fp1		| ...S(Q1+S(Q2+S(Q3+SQ4)))
 
-	faddx		%fp2,%fp0	 	| ...R+RS(P1+S(P2+SP3))
-	
+
+	faddx		%fp2,%fp0		| ...R+RS(P1+S(P2+SP3))
+
 
 	fadds		#0x3F800000,%fp1	| ...1+S(Q1+...)
 
@@ -251,40 +251,40 @@ TANCONT:
 
 NODD:
 	fmovex		%fp0,%fp1
-	fmulx		%fp0,%fp0	 	| ...S = R*R
+	fmulx		%fp0,%fp0		| ...S = R*R
 
 	fmoved		TANQ4,%fp3
 	fmoved		TANP3,%fp2
 
-	fmulx		%fp0,%fp3	 	| ...SQ4
-	fmulx		%fp0,%fp2	 	| ...SP3
+	fmulx		%fp0,%fp3		| ...SQ4
+	fmulx		%fp0,%fp2		| ...SP3
 
 	faddd		TANQ3,%fp3	| ...Q3+SQ4
 	faddx		TANP2,%fp2	| ...P2+SP3
 
-	fmulx		%fp0,%fp3	 	| ...S(Q3+SQ4)
-	fmulx		%fp0,%fp2	 	| ...S(P2+SP3)
+	fmulx		%fp0,%fp3		| ...S(Q3+SQ4)
+	fmulx		%fp0,%fp2		| ...S(P2+SP3)
 
 	faddx		TANQ2,%fp3	| ...Q2+S(Q3+SQ4)
 	faddx		TANP1,%fp2	| ...P1+S(P2+SP3)
 
-	fmulx		%fp0,%fp3	 	| ...S(Q2+S(Q3+SQ4))
-	fmulx		%fp0,%fp2	 	| ...S(P1+S(P2+SP3))
+	fmulx		%fp0,%fp3		| ...S(Q2+S(Q3+SQ4))
+	fmulx		%fp0,%fp2		| ...S(P1+S(P2+SP3))
 
 	faddx		TANQ1,%fp3	| ...Q1+S(Q2+S(Q3+SQ4))
-	fmulx		%fp1,%fp2	 	| ...RS(P1+S(P2+SP3))
+	fmulx		%fp1,%fp2		| ...RS(P1+S(P2+SP3))
 
-	fmulx		%fp3,%fp0	 	| ...S(Q1+S(Q2+S(Q3+SQ4)))
-	
+	fmulx		%fp3,%fp0		| ...S(Q1+S(Q2+S(Q3+SQ4)))
 
-	faddx		%fp2,%fp1	 	| ...R+RS(P1+S(P2+SP3))
+
+	faddx		%fp2,%fp1		| ...R+RS(P1+S(P2+SP3))
 	fadds		#0x3F800000,%fp0	| ...1+S(Q1+...)
-	
+
 
 	fmovex		%fp1,-(%sp)
 	eoril		#0x80000000,(%sp)
 
-	fmovel		%d1,%fpcr	 	|restore users exceptions
+	fmovel		%d1,%fpcr		|restore users exceptions
 	fdivx		(%sp)+,%fp0	|last inst - possible exception set
 
 	bra		t_frcinx
@@ -397,7 +397,7 @@ WORK:
         movew		%d2,FP_SCR2(%a6)
 	clrw           FP_SCR2+2(%a6)
 	movel		#0xC90FDAA2,FP_SCR2+4(%a6)
-	clrl		FP_SCR2+8(%a6)		| ...FP_SCR2 is  2**(L) * Piby2_1	
+	clrl		FP_SCR2+8(%a6)		| ...FP_SCR2 is  2**(L) * Piby2_1
 
 |--FP2 IS READY
 	fsubs		TWOTO63(%a6),%fp2		| ...FP2 is N
@@ -445,7 +445,7 @@ RESTORE:
 	movel		(%a7)+,%d2
 	fmovemx	(%a7)+,%fp2-%fp5
 
-	
+
 	movel		N(%a6),%d0
         rorl		#1,%d0
 

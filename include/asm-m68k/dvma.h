@@ -2,7 +2,7 @@
  * include/asm-m68k/dma.h
  *
  * Copyright 1995 (C) David S. Miller (davem@caip.rutgers.edu)
- * 
+ *
  * Hacked to fit Sun3x needs by Thomas Bogendoerfer
  */
 
@@ -16,15 +16,15 @@
 #define DVMA_PAGE_MASK	(~(DVMA_PAGE_SIZE-1))
 #define DVMA_PAGE_ALIGN(addr)	(((addr)+DVMA_PAGE_SIZE-1)&DVMA_PAGE_MASK)
 
-extern void dvma_init(void);	
-extern int dvma_map_iommu(unsigned long kaddr, unsigned long baddr, 
+extern void dvma_init(void);
+extern int dvma_map_iommu(unsigned long kaddr, unsigned long baddr,
 			  int len);
 
 #define dvma_malloc(x) dvma_malloc_align(x, 0)
 #define dvma_map(x, y) dvma_map_align(x, y, 0)
 #define dvma_map_vme(x, y) (dvma_map(x, y) & 0xfffff)
 #define dvma_map_align_vme(x, y, z) (dvma_map_align (x, y, z) & 0xfffff)
-extern unsigned long dvma_map_align(unsigned long kaddr, int len, 
+extern unsigned long dvma_map_align(unsigned long kaddr, int len,
 			    int align);
 extern void *dvma_malloc_align(unsigned long len, unsigned long align);
 
@@ -44,7 +44,7 @@ extern void dvma_free(void *vaddr);
 #define IOMMU_TOTAL_ENTRIES 128
 #define IOMMU_ENTRIES 120
 
-/* empirical kludge -- dvma regions only seem to work right on 0x10000 
+/* empirical kludge -- dvma regions only seem to work right on 0x10000
    byte boundaries */
 #define DVMA_REGION_SIZE 0x10000
 #define DVMA_ALIGN(addr) (((addr)+DVMA_REGION_SIZE-1) & \
@@ -84,7 +84,7 @@ extern int dvma_map_cpu(unsigned long kaddr, unsigned long vaddr, int len);
 
 
 
-/* everything below this line is specific to dma used for the onboard 
+/* everything below this line is specific to dma used for the onboard
    ESP scsi on sun3x */
 
 /* Structure to describe the current status of DMA registers on the Sparc */

@@ -1303,7 +1303,7 @@ vicam_probe( struct usb_interface *intf, const struct usb_device_id *id)
 
 	printk(KERN_INFO "ViCam based webcam connected\n");
 
-	interface = &intf->altsetting[0];
+	interface = intf->cur_altsetting;
 
 	DBG(KERN_DEBUG "Interface %d. has %u. endpoints!\n",
 	       interface->desc.bInterfaceNumber, (unsigned) (interface->desc.bNumEndpoints));

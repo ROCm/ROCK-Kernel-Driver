@@ -7,7 +7,7 @@
  *    Added setting of time_adj to get a better clock.
  *
  *  5/14/94 Roman Hodek:
- *    gettod() for TT 
+ *    gettod() for TT
  *
  *  5/15/94 Roman Hodek:
  *    hard_reset_now() for Atari (and others?)
@@ -92,7 +92,7 @@ extern void atari_debug_init(void);
  * for posterity.
  *   -- Peter Maydell <pmaydell@chiark.greenend.org.uk>, 05/1998
  */
-  
+
 #if 0
 static int __init
 hwreg_present_bywrite(volatile void *regp, unsigned char val)
@@ -100,7 +100,7 @@ hwreg_present_bywrite(volatile void *regp, unsigned char val)
     int		ret;
     long	save_sp, save_vbr;
     static long tmp_vectors[3] = { [2] = (long)&&after_test };
-	
+
     __asm__ __volatile__
 	(	"movec	%/vbr,%2\n\t"	/* save vbr value            */
                 "movec	%4,%/vbr\n\t"	/* set up temporary vectors  */
@@ -141,14 +141,14 @@ static int __init scc_test( volatile char *ctla )
 
 	*ctla = 2; MFPDELAY();
 	*ctla = 0x40; MFPDELAY();
-	
+
 	*ctla = 2; MFPDELAY();
 	if (*ctla != 0x40) return( 0 );
 	MFPDELAY();
 
 	*ctla = 2; MFPDELAY();
 	*ctla = 0x60; MFPDELAY();
-	
+
 	*ctla = 2; MFPDELAY();
 	if (*ctla != 0x60) return( 0 );
 
@@ -199,7 +199,7 @@ void __init atari_switches_setup( const char *str, unsigned len )
 	    p += 3;
 	    ovsc_shift = ATARI_SWITCH_OVSC_SHIFT;
 	}
-	
+
 	if (strcmp( p, "ikbd" ) == 0) {
 	    /* RTS line of IKBD ACIA */
 	    atari_switches |= ATARI_SWITCH_IKBD << ovsc_shift;
@@ -269,8 +269,8 @@ void __init config_atari(void)
 			   ((atari_switches&ATARI_SWITCH_SND6) ? 0x40 : 0) |
 			   ((atari_switches&ATARI_SWITCH_SND7) ? 0x80 : 0);
     }
-	
-    /* ++bjoern: 
+
+    /* ++bjoern:
      * Determine hardware present
      */
 
@@ -446,7 +446,7 @@ void __init config_atari(void)
 						  : /* no outputs */
 						  : /* no inputs */
 						  : "d0");
-	
+
     /* allocator for memory that must reside in st-ram */
     atari_stram_init ();
 
@@ -507,7 +507,7 @@ static void atari_heartbeat( int on )
 
     if (atari_dont_touch_floppy_select)
 	return;
-    
+
     local_irq_save(flags);
     sound_ym.rd_data_reg_sel = 14; /* Select PSG Port A */
     tmp = sound_ym.rd_data_reg_sel;
@@ -544,7 +544,7 @@ static void atari_heartbeat( int on )
  * address of a C label. No hope to compile this with another compiler
  * than GCC!
  */
-  
+
 /* ++andreas: no need for complicated code, just depend on prefetch */
 
 static void atari_reset (void)
@@ -563,7 +563,7 @@ static void atari_reset (void)
 	acia.key_ctrl = ACIA_RESET;
     if (atari_switches & ATARI_SWITCH_OVSC_MIDI)
 	acia.mid_ctrl = ACIA_RESET;
-    
+
     /* processor independent: turn off interrupts and reset the VBR;
      * the caches must be left enabled, else prefetching the final jump
      * instruction doesn't work. */
@@ -572,7 +572,7 @@ static void atari_reset (void)
 	("moveq	#0,%/d0\n\t"
 	 "movec	%/d0,%/vbr"
 	 : : : "d0" );
-    
+
     if (CPU_IS_040_OR_060) {
         unsigned long jmp_addr040 = virt_to_phys(&&jmp_addr_label040);
 	if (CPU_IS_060) {
@@ -584,7 +584,7 @@ static void atari_reset (void)
 		 ".chip 68k"
 		 : : : "d0" );
 	}
-	    
+
         __asm__ __volatile__
             ("movel    %0,%/d0\n\t"
              "andl     #0xff000000,%/d0\n\t"

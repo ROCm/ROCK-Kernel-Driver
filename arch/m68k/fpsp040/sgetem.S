@@ -1,14 +1,14 @@
 |
 |	sgetem.sa 3.1 12/10/90
 |
-|	The entry point sGETEXP returns the exponent portion 
+|	The entry point sGETEXP returns the exponent portion
 |	of the input argument.  The exponent bias is removed
-|	and the exponent value is returned as an extended 
+|	and the exponent value is returned as an extended
 |	precision number in fp0.  sGETEXPD handles denormalized
 |	numbers.
 |
-|	The entry point sGETMAN extracts the mantissa of the 
-|	input argument.  The mantissa is converted to an 
+|	The entry point sGETMAN extracts the mantissa of the
+|	input argument.  The mantissa is converted to an
 |	extended precision number and returned in fp0.  The
 |	range of the result is [1.0 - 2.0).
 |
@@ -24,8 +24,8 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |SGETEM	idnt	2,1 | Motorola 040 Floating Point Software Package
@@ -81,7 +81,7 @@ sgetman:
 	fmovel	%d0,%fpcr		|this fpcr setting is used by the 882
 	movew	LOCAL_EX(%a0),%d0	|get the exp (really just want sign bit)
 	orw	#0x7fff,%d0	|clear old exp
-	bclrl	#14,%d0	 	|make it the new exp +-3fff
+	bclrl	#14,%d0		|make it the new exp +-3fff
 	movew	%d0,LOCAL_EX(%a0)	|move the sign & exp back to fsave stack
 	fmovex	(%a0),%fp0	|put new value back in fp0
 	rts

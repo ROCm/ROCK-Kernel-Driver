@@ -1,7 +1,7 @@
 /*
  * Prolific PL2303 USB to serial adaptor driver
  *
- * Copyright (C) 2001-2003 Greg Kroah-Hartman (greg@kroah.com)
+ * Copyright (C) 2001-2004 Greg Kroah-Hartman (greg@kroah.com)
  * Copyright (C) 2003 IBM Corp.
  *
  * Original driver for 2.2.x by anonymous
@@ -45,6 +45,7 @@
 #include <linux/tty_flip.h>
 #include <linux/serial.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/spinlock.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
@@ -80,6 +81,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(RADIOSHACK_VENDOR_ID, RADIOSHACK_PRODUCT_ID) },
 	{ USB_DEVICE(DCU10_VENDOR_ID, DCU10_PRODUCT_ID) },
 	{ USB_DEVICE(SITECOM_VENDOR_ID, SITECOM_PRODUCT_ID) },
+	{ USB_DEVICE(ALCATEL_VENDOR_ID, ALCATEL_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
@@ -410,9 +412,6 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 	unsigned char *buf;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return -ENODEV;
-		
 	dbg("%s -  port %d", __FUNCTION__, port->number);
 
 	usb_clear_halt(serial->dev, port->write_urb->pipe);
@@ -473,18 +472,11 @@ static int pl2303_open (struct usb_serial_port *port, struct file *filp)
 
 static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 {
-	struct usb_serial *serial;
 	struct pl2303_private *priv;
 	unsigned long flags;
 	unsigned int c_cflag;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	serial = get_usb_serial (port, __FUNCTION__);
-	if (!serial)
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
 	/* shutdown our urbs */
@@ -661,7 +653,6 @@ static void pl2303_shutdown (struct usb_serial *serial)
 static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned char *data = urb->transfer_buffer;
 	unsigned long flags;
@@ -685,9 +676,6 @@ static void pl2303_read_int_callback (struct urb *urb, struct pt_regs *regs)
 		goto exit;
 	}
 
-	if (!serial) {
-		return;
-	}
 
 	usb_serial_debug_data (__FILE__, __FUNCTION__, urb->actual_length, urb->transfer_buffer);
 
@@ -712,7 +700,6 @@ exit:
 static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 {
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	struct tty_struct *tty;
 	unsigned char *data = urb->transfer_buffer;
@@ -722,15 +709,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	u8 status;
 	char tty_flag;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-
 	dbg("%s - port %d", __FUNCTION__, port->number);
-
-	if (!serial) {
-		dbg("%s - bad serial pointer, exiting", __FUNCTION__);
-		return;
-	}
 
 	if (urb->status) {
 		dbg("%s - urb->status = %d", __FUNCTION__, urb->status);
@@ -742,7 +721,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 			/* PL2303 mysteriously fails with -EPROTO reschedule the read */
 			dbg("%s - caught -EPROTO, resubmitting the urb", __FUNCTION__);
 			urb->status = 0;
-			urb->dev = serial->dev;
+			urb->dev = port->serial->dev;
 			result = usb_submit_urb(urb, GFP_ATOMIC);
 			if (result)
 				dev_err(&urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
@@ -790,7 +769,7 @@ static void pl2303_read_bulk_callback (struct urb *urb, struct pt_regs *regs)
 
 	/* Schedule the next read _if_ we are still open */
 	if (port->open_count) {
-		urb->dev = serial->dev;
+		urb->dev = port->serial->dev;
 		result = usb_submit_urb(urb, GFP_ATOMIC);
 		if (result)
 			dev_err(&urb->dev->dev, "%s - failed resubmitting read urb, error %d\n", __FUNCTION__, result);
@@ -806,16 +785,10 @@ static void pl2303_write_bulk_callback (struct urb *urb, struct pt_regs *regs)
 	struct usb_serial_port *port = (struct usb_serial_port *) urb->context;
 	int result;
 
-	if (port_paranoia_check (port, __FUNCTION__))
-		return;
-	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 	
 	if (urb->status) {
 		/* error in the urb, so we have to resubmit it */
-		if (serial_paranoia_check (port->serial, __FUNCTION__)) {
-			return;
-		}
 		dbg("%s - Overflow in write", __FUNCTION__);
 		dbg("%s - nonzero write bulk status received: %d", __FUNCTION__, urb->status);
 		port->write_urb->transfer_buffer_length = 1;
@@ -862,6 +835,6 @@ module_exit(pl2303_exit);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
+module_param(debug, bool, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 

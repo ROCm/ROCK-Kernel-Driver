@@ -161,6 +161,7 @@ enum {D_PRT, D_PRO, D_UNI, D_MOD, D_SLV, D_DLY};
 #include <linux/slab.h>
 #include <linux/mtio.h>
 #include <linux/pg.h>
+#include <linux/device.h>
 
 #include <asm/uaccess.h>
 
@@ -239,6 +240,8 @@ struct pg devices[PG_UNITS];
 static int pg_identify(struct pg *dev, int log);
 
 static char pg_scratch[512];	/* scratch block buffer */
+
+static struct class_simple *pg_class;
 
 /* kernel glue structures */
 
@@ -658,15 +661,19 @@ static ssize_t pg_read(struct file *filp, char *buf, size_t count, loff_t *ppos)
 
 static int __init pg_init(void)
 {
-	int unit;
+	int unit, err = 0;
 
-	if (disable)
-		return -1;
+	if (disable){
+		err = -1;
+		goto out;
+	}
 
 	pg_init_units();
 
-	if (pg_detect())
-		return -1;
+	if (pg_detect()) {
+		err = -1;
+		goto out;
+	}
 
 	if (register_chrdev(major, name, &pg_fops)) {
 		printk("pg_init: unable to get major number %d\n", major);
@@ -675,18 +682,37 @@ static int __init pg_init(void)
 			if (dev->present)
 				pi_release(dev->pi);
 		}
-		return -1;
+		err = -1;
+		goto out;
+	}
+	pg_class = class_simple_create(THIS_MODULE, "pg");
+	if (IS_ERR(pg_class)) {
+		err = PTR_ERR(pg_class);
+		goto out_chrdev;
 	}
 	devfs_mk_dir("pg");
 	for (unit = 0; unit < PG_UNITS; unit++) {
 		struct pg *dev = &devices[unit];
 		if (dev->present) {
-			devfs_mk_cdev(MKDEV(major, unit),
+			class_simple_device_add(pg_class, MKDEV(major, unit), 
+					NULL, "pg%u", unit);
+			err = devfs_mk_cdev(MKDEV(major, unit),
 				      S_IFCHR | S_IRUSR | S_IWUSR, "pg/%u",
 				      unit);
+			if (err) 
+				goto out_class;
 		}
 	}
-	return 0;
+	err = 0;
+	goto out;
+
+out_class:
+	class_simple_device_remove(MKDEV(major, unit));
+	class_simple_destroy(pg_class);
+out_chrdev:
+	unregister_chrdev(major, "pg");
+out:
+	return err;
 }
 
 static void __exit pg_exit(void)
@@ -695,10 +721,12 @@ static void __exit pg_exit(void)
 
 	for (unit = 0; unit < PG_UNITS; unit++) {
 		struct pg *dev = &devices[unit];
-		if (dev->present)
+		if (dev->present) {
+			class_simple_device_remove(MKDEV(major, unit));
 			devfs_remove("pg/%u", unit);
+		}
 	}
-
+	class_simple_destroy(pg_class);
 	devfs_remove("pg");
 	unregister_chrdev(major, name);
 

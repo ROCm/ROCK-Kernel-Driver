@@ -56,7 +56,7 @@ extern int thread_flag_fixme(void);
  * - pass TIF_xxxx constants to these functions
  */
 
-#define __set_tsk_thread_flag(tsk, flag, val) ({ 	\
+#define __set_tsk_thread_flag(tsk, flag, val) ({	\
 	switch (flag) {					\
 	case TIF_SIGPENDING:				\
 		tsk->thread.work.sigpending = val;	\

@@ -54,14 +54,14 @@
 /*
  * Atari interrupt handling scheme:
  * --------------------------------
- * 
+ *
  * All interrupt source have an internal number (defined in
  * <asm/atariints.h>): Autovector interrupts are 1..7, then follow ST-MFP,
  * TT-MFP, SCC, and finally VME interrupts. Vector numbers for the latter can
  * be allocated by atari_register_vme_int().
  *
  * Each interrupt can be of three types:
- * 
+ *
  *  - SLOW: The handler runs with all interrupts enabled, except the one it
  *    was called by (to avoid reentering). This should be the usual method.
  *    But it is currently possible only for MFP ints, since only the MFP
@@ -179,16 +179,16 @@ __asm__ (__ALIGN_STR "\n"						   \
 "	movew	%%d1,%%sr\n"		/* set IPL = previous value */	   \
 "	addql	#1,%a0\n"						   \
 "	lea	%a1,%%a0\n"						   \
-"	pea 	%%sp@\n"		/* push addr of frame */	   \
+"	pea	%%sp@\n"		/* push addr of frame */	   \
 "	movel	%%a0@(4),%%sp@-\n"	/* push handler data */		   \
-"	pea 	(%c3+8)\n"		/* push int number */		   \
+"	pea	(%c3+8)\n"		/* push int number */		   \
 "	movel	%%a0@,%%a0\n"						   \
 "	jbsr	%%a0@\n"		/* call the handler */		   \
 "	addql	#8,%%sp\n"						   \
 "	addql	#4,%%sp\n"						   \
 "	orw	#0x0600,%%sr\n"						   \
 "	andw	#0xfeff,%%sr\n"		/* set IPL = 6 again */		   \
-"	orb 	#(1<<(%c3&7)),%a4:w\n"	/* now unmask the int again */	   \
+"	orb	#(1<<(%c3&7)),%a4:w\n"	/* now unmask the int again */	   \
 "	jbra	ret_from_interrupt\n"					   \
 	 : : "i" (&kstat_cpu(0).irqs[n+8]), "i" (&irq_handler[n+8]),	   \
 	     "n" (PT_OFF_SR), "n" (n),					   \
@@ -274,7 +274,7 @@ asmlinkage void atari_prio_irq_handler( void );
 void atari_fast_prio_irq_dummy (void) {
 __asm__ (__ALIGN_STR "\n"
 "atari_fast_irq_handler:\n\t"
-	"orw 	#0x700,%%sr\n"		/* disable all interrupts */
+	"orw	#0x700,%%sr\n"		/* disable all interrupts */
 "atari_prio_irq_handler:\n\t"
 	"addl	%3,%2\n\t"		/* preempt_count() += HARDIRQ_OFFSET */
 	SAVE_ALL_INT "\n\t"
@@ -282,13 +282,13 @@ __asm__ (__ALIGN_STR "\n"
 	/* get vector number from stack frame and convert to source */
 	"bfextu	%%sp@(%c1){#4,#10},%%d0\n\t"
 	"subw	#(0x40-8),%%d0\n\t"
-	"jpl 	1f\n\t"
+	"jpl	1f\n\t"
 	"addw	#(0x40-8-0x18),%%d0\n"
     "1:\tlea	%a0,%%a0\n\t"
 	"addql	#1,%%a0@(%%d0:l:4)\n\t"
 	"lea	irq_handler,%%a0\n\t"
 	"lea	%%a0@(%%d0:l:8),%%a0\n\t"
-	"pea 	%%sp@\n\t"		/* push frame address */
+	"pea	%%sp@\n\t"		/* push frame address */
 	"movel	%%a0@(4),%%sp@-\n\t"	/* push handler data */
 	"movel	%%d0,%%sp@-\n\t"	/* push int number */
 	"movel	%%a0@,%%a0\n\t"
@@ -395,7 +395,7 @@ void __init atari_init_IRQ(void)
 		   be in an atasound_init(), that doesn't exist yet. */
 		atari_microwire_cmd(MW_LM1992_PSG_HIGH);
 	}
-	
+
 	stdma_init();
 
 	/* Initialize the PSG: all sounds off, both ports output */
@@ -460,7 +460,7 @@ int atari_request_irq(unsigned int irq, irqreturn_t (*handler)(int, void *, stru
 		        __FUNCTION__, irq, devname);
 		return -EINVAL;
 	}
-		
+
 	if (vectors[vector] == bad_interrupt) {
 		/* int has no handler yet */
 		irq_handler[irq].handler = handler;
@@ -594,7 +594,7 @@ unsigned long atari_register_vme_int(void)
 	for(i = 0; i < 32; i++)
 		if((free_vme_vec_bitmap & (1 << i)) == 0)
 			break;
-	
+
 	if(i == 16)
 		return 0;
 
@@ -641,7 +641,7 @@ int show_atari_interrupts(struct seq_file *p, void *v)
 	}
 	if (num_spurious)
 		seq_printf(p, "spurio.: %10u\n", num_spurious);
-	
+
 	return 0;
 }
 

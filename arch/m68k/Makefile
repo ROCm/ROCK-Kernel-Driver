@@ -56,7 +56,7 @@ ifndef CONFIG_SUN3
 head-y := arch/m68k/kernel/head.o
 else
 head-y := arch/m68k/kernel/sun3-head.o
-endif 
+endif
 
 core-y				+= arch/m68k/kernel/	arch/m68k/mm/
 libs-y				+= arch/m68k/lib/

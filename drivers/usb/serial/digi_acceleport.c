@@ -1396,11 +1396,6 @@ dbg( "digi_write_bulk_callback: TOP, urb->status=%d", urb->status );
 		return;
 	}
 
-	/* further sanity checks */
-	if( port_paranoia_check( port, __FUNCTION__ )
-	|| serial_paranoia_check( serial, __FUNCTION__ ) )
-		return;
-
 	/* try to send any buffered data on this port, if it is open */
 	spin_lock( &priv->dp_port_lock );
 	priv->dp_write_urb_in_use = 0;
@@ -1798,7 +1793,6 @@ dbg( "digi_read_bulk_callback: TOP" );
 		return;
 	}
 	if( port->serial == NULL
-	|| serial_paranoia_check( port->serial, __FUNCTION__ )
 	|| (serial_priv=usb_get_serial_data(port->serial)) == NULL ) {
 		err("%s: serial is bad or serial->private is NULL, status=%d", __FUNCTION__, urb->status );
 		return;
@@ -1850,11 +1844,6 @@ static int digi_read_inb_callback( struct urb *urb )
 	int status = ((unsigned char *)urb->transfer_buffer)[2];
 	unsigned char *data = ((unsigned char *)urb->transfer_buffer)+3;
 	int flag,throttled;
-
-
-	/* sanity check */
-	if( port_paranoia_check( port, __FUNCTION__ ) )
-		return( -1 );
 
 	/* do not process callbacks on closed ports */
 	/* but do continue the read chain */
@@ -1980,9 +1969,8 @@ opcode, line, status, val );
 
 		port = serial->port[line];
 
-		if( port_paranoia_check( port, __FUNCTION__ )
-		|| (priv=usb_get_serial_port_data(port)) == NULL )
-			return( -1 );
+		if ((priv=usb_get_serial_port_data(port)) == NULL )
+			return -1;
 
 		if( opcode == DIGI_CMD_READ_INPUT_SIGNALS ) {
 

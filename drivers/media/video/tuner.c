@@ -1067,8 +1067,8 @@ static int tuner_probe(struct i2c_adapter *adap)
 	}
 	this_adap = 0;
 
-#ifdef I2C_ADAP_CLASS_TV_ANALOG
-	if (adap->class & I2C_ADAP_CLASS_TV_ANALOG)
+#ifdef I2C_CLASS_TV_ANALOG
+	if (adap->class & I2C_CLASS_TV_ANALOG)
 		return i2c_probe(adap, &addr_data, tuner_attach);
 #else
 	switch (adap->id) {

@@ -209,6 +209,8 @@ struct usb_hub {
 	struct semaphore	khubd_sem;
 	struct usb_tt		tt;		/* Transaction Translator */
 
+	u8			power_budget;	/* in 2mA units; or zero */
+
 	unsigned		has_indicators:1;
 	enum hub_led_mode	indicator[USB_MAXCHILDREN];
 	struct work_struct	leds;

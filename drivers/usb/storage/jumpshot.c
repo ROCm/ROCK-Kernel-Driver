@@ -416,7 +416,7 @@ static int jumpshot_handle_mode_sense(struct us_data *us,
 }
 
 
-void jumpshot_info_destructor(void *extra)
+static void jumpshot_info_destructor(void *extra)
 {
 	// this routine is a placeholder...
 	// currently, we don't allocate any extra blocks so we're okay

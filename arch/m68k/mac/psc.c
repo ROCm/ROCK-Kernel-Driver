@@ -20,9 +20,9 @@
 #include <linux/init.h>
 
 #include <asm/traps.h>
-#include <asm/bootinfo.h> 
-#include <asm/macintosh.h> 
-#include <asm/macints.h> 
+#include <asm/bootinfo.h>
+#include <asm/macintosh.h>
+#include <asm/macints.h>
 #include <asm/mac_psc.h>
 
 #define DEBUG_PSC

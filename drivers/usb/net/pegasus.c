@@ -1321,13 +1321,13 @@ static struct usb_driver pegasus_driver = {
 	.id_table = pegasus_ids,
 };
 
-int __init pegasus_init(void)
+static int __init pegasus_init(void)
 {
 	info(DRIVER_VERSION ":" DRIVER_DESC);
 	return usb_register(&pegasus_driver);
 }
 
-void __exit pegasus_exit(void)
+static void __exit pegasus_exit(void)
 {
 	usb_deregister(&pegasus_driver);
 }

@@ -59,6 +59,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/sched.h>
+#include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/ioctl.h>
 #include <linux/parport.h>
@@ -739,6 +740,8 @@ static unsigned int pp_poll (struct file * file, poll_table * wait)
 	return mask;
 }
 
+static struct class_simple *ppdev_class;
+
 static struct file_operations pp_fops = {
 	.owner		= THIS_MODULE,
 	.llseek		= no_llseek,
@@ -750,23 +753,59 @@ static struct file_operations pp_fops = {
 	.release	= pp_release,
 };
 
+static void pp_attach(struct parport *port)
+{
+	class_simple_device_add(ppdev_class, MKDEV(PP_MAJOR, port->number),
+			NULL, "parport%d", port->number);
+}
+
+static void pp_detach(struct parport *port)
+{
+	class_simple_device_remove(MKDEV(PP_MAJOR, port->number));
+}
+
+static struct parport_driver pp_driver = {
+	.name		= CHRDEV,
+	.attach		= pp_attach,
+	.detach		= pp_detach,
+};
+
 static int __init ppdev_init (void)
 {
-	int i;
+	int i, err = 0;
 
 	if (register_chrdev (PP_MAJOR, CHRDEV, &pp_fops)) {
 		printk (KERN_WARNING CHRDEV ": unable to get major %d\n",
 			PP_MAJOR);
 		return -EIO;
 	}
+	ppdev_class = class_simple_create(THIS_MODULE, CHRDEV);
+	if (IS_ERR(ppdev_class)) {
+		err = PTR_ERR(ppdev_class);
+		goto out_chrdev;
+	}
 	devfs_mk_dir("parports");
 	for (i = 0; i < PARPORT_MAX; i++) {
 		devfs_mk_cdev(MKDEV(PP_MAJOR, i),
 				S_IFCHR | S_IRUGO | S_IWUGO, "parports/%d", i);
 	}
+	if (parport_register_driver(&pp_driver)) {
+		printk (KERN_WARNING CHRDEV ": unable to register with parport\n");
+		goto out_class;
+	}
 
 	printk (KERN_INFO PP_VERSION "\n");
-	return 0;
+	goto out;
+
+out_class:
+	for (i = 0; i < PARPORT_MAX; i++)
+		devfs_remove("parports/%d", i);
+	devfs_remove("parports");
+	class_simple_destroy(ppdev_class);
+out_chrdev:
+	unregister_chrdev(PP_MAJOR, CHRDEV);
+out:
+	return err;
 }
 
 static void __exit ppdev_cleanup (void)
@@ -775,7 +814,9 @@ static void __exit ppdev_cleanup (void)
 	/* Clean up all parport stuff */
 	for (i = 0; i < PARPORT_MAX; i++)
 		devfs_remove("parports/%d", i);
+	parport_unregister_driver(&pp_driver);
 	devfs_remove("parports");
+	class_simple_destroy(ppdev_class);
 	unregister_chrdev (PP_MAJOR, CHRDEV);
 }
 

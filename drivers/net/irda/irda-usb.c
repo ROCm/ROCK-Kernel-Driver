@@ -1421,7 +1421,7 @@ static int irda_usb_probe(struct usb_interface *intf,
 	}
 
 	/* Find our endpoints */
-	interface = &intf->altsetting[0];
+	interface = intf->cur_altsetting;
 	if(!irda_usb_parse_endpoints(self, interface->endpoint,
 				     interface->desc.bNumEndpoints)) {
 		ERROR("%s(), Bogus endpoints...\n", __FUNCTION__);

@@ -69,6 +69,7 @@ struct us_unusual_dev {
 /* Flag definitions: these entries are static */
 #define US_FL_SINGLE_LUN      0x00000001 /* allow access to only LUN 0	    */
 #define US_FL_MODE_XLATE      0          /* [no longer used]                */
+#define US_FL_NEED_OVERRIDE   0x00000004 /* unusual_devs entry is necessary */
 #define US_FL_IGNORE_SER      0		 /* [no longer used]		    */
 #define US_FL_SCM_MULT_TARG   0x00000020 /* supports multiple targets	    */
 #define US_FL_FIX_INQUIRY     0x00000040 /* INQUIRY response needs faking   */
@@ -79,8 +80,9 @@ struct us_unusual_dev {
 #define US_FLIDX_SG_ACTIVE	19  /* 0x00080000  current_sg is in use   */
 #define US_FLIDX_ABORTING	20  /* 0x00100000  abort is in progress   */
 #define US_FLIDX_DISCONNECTING	21  /* 0x00200000  disconnect in progress */
-#define DONT_SUBMIT	((1UL << US_FLIDX_ABORTING) | \
-			 (1UL << US_FLIDX_DISCONNECTING))
+#define ABORTING_OR_DISCONNECTING	((1UL << US_FLIDX_ABORTING) | \
+					 (1UL << US_FLIDX_DISCONNECTING))
+#define US_FLIDX_RESETTING	22  /* 0x00400000  device reset in progress */
 
 
 /* processing state machine states */

@@ -198,6 +198,9 @@ void usb_deregister(struct usb_driver *driver)
  * This routine helps device drivers avoid such mistakes.
  * However, you should make sure that you do the right thing with any
  * alternate settings available for this interfaces.
+ *
+ * Don't call this function unless you are bound to one of the interfaces
+ * on this device or you own the dev->serialize semaphore!
  */
 struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 {
@@ -228,6 +231,9 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
  * it would be incorrect to assume that the first altsetting entry in
  * the array corresponds to altsetting zero.  This routine helps device
  * drivers avoid such mistakes.
+ *
+ * Don't call this function unless you are bound to the intf interface
+ * or you own the device's ->serialize semaphore!
  */
 struct usb_host_interface *usb_altnum_to_altsetting(struct usb_interface *intf,
 		unsigned int altnum)
@@ -1064,91 +1070,28 @@ static inline void usb_show_string(struct usb_device *dev, char *id, int index)
 }
 
 /*
- * By the time we get here, we chose a new device address
- * and is in the default state. We need to identify the thing and
- * get the ball rolling..
+ * usb_new_device - perform initial device setup (usbcore-internal)
+ * @dev: newly addressed device (in ADDRESS state)
  *
- * Returns 0 for success, != 0 for error.
+ * This is called with devices which have been enumerated, but not yet
+ * configured.  The device descriptor is available, but not descriptors
+ * for any device configuration.  The caller owns dev->serialize, and
+ * the device is not visible through sysfs or other filesystem code.
+ *
+ * Returns 0 for success (device is configured and listed, with its
+ * interfaces, in sysfs); else a negative errno value.  On error, one
+ * reference count to the device has been dropped.
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
  * Only the hub driver should ever call this; root hub registration
  * uses it only indirectly.
  */
-#define NEW_DEVICE_RETRYS	2
-#define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev)
 {
-	int err = -EINVAL;
+	int err;
 	int i;
-	int j;
 	int config;
-
-	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
-	 * it's fixed size except for full speed devices.
-	 */
-	switch (dev->speed) {
-	case USB_SPEED_HIGH:		/* fixed at 64 */
-		i = 64;
-		break;
-	case USB_SPEED_FULL:		/* 8, 16, 32, or 64 */
-		/* to determine the ep0 maxpacket size, read the first 8
-		 * bytes from the device descriptor to get bMaxPacketSize0;
-		 * then correct our initial (small) guess.
-		 */
-		// FALLTHROUGH
-	case USB_SPEED_LOW:		/* fixed at 8 */
-		i = 8;
-		break;
-	default:
-		goto fail;
-	}
-	dev->epmaxpacketin [0] = i;
-	dev->epmaxpacketout[0] = i;
-
-	for (i = 0; i < NEW_DEVICE_RETRYS; ++i) {
-
-		for (j = 0; j < SET_ADDRESS_RETRYS; ++j) {
-			err = usb_set_address(dev);
-			if (err >= 0)
-				break;
-			wait_ms(200);
-		}
-		if (err < 0) {
-			dev_err(&dev->dev,
-				"device not accepting address %d, error %d\n",
-				dev->devnum, err);
-			goto fail;
-		}
-
-		wait_ms(10);	/* Let the SET_ADDRESS settle */
-
-		/* high and low speed devices don't need this... */
-		err = usb_get_device_descriptor(dev, 8);
-		if (err >= 8)
-			break;
-		wait_ms(100);
-	}
-
-	if (err < 8) {
-		dev_err(&dev->dev, "device descriptor read/8, error %d\n", err);
-		goto fail;
-	}
-	if (dev->speed == USB_SPEED_FULL) {
-		usb_disable_endpoint(dev, 0);
-		usb_endpoint_running(dev, 0, 1);
-		usb_endpoint_running(dev, 0, 0);
-		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
-		dev->epmaxpacketout[0] = dev->descriptor.bMaxPacketSize0;
-	}
-
-	/* USB device state == addressed ... still not usable */
-
-	err = usb_get_device_descriptor(dev, sizeof(dev->descriptor));
-	if (err != (signed)sizeof(dev->descriptor)) {
-		dev_err(&dev->dev, "device descriptor read/all, error %d\n", err);
-		goto fail;
-	}
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
@@ -1170,13 +1113,10 @@ int usb_new_device(struct usb_device *dev)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
-	down(&dev->serialize);
-
 	/* put device-specific files into sysfs */
 	err = device_add (&dev->dev);
 	if (err) {
 		dev_err(&dev->dev, "can't device_add, error %d\n", err);
-		up(&dev->serialize);
 		goto fail;
 	}
 	usb_create_driverfs_dev_files (dev);
@@ -1193,7 +1133,7 @@ int usb_new_device(struct usb_device *dev)
 			/* heuristic:  Linux is more likely to have class
 			 * drivers, so avoid vendor-specific interfaces.
 			 */
-			desc = &dev->config[i].interface[0]
+			desc = &dev->config[i].intf_cache[0]
 					->altsetting->desc;
 			if (desc->bInterfaceClass == USB_CLASS_VENDOR_SPEC)
 				continue;
@@ -1211,7 +1151,6 @@ int usb_new_device(struct usb_device *dev)
 			dev->descriptor.bNumConfigurations);
 	}
 	err = usb_set_configuration(dev, config);
-	up(&dev->serialize);
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
 			config, err);
@@ -1226,9 +1165,10 @@ int usb_new_device(struct usb_device *dev)
 
 	return 0;
 fail:
-	dev->state = USB_STATE_DEFAULT;
+	dev->state = USB_STATE_NOTATTACHED;
 	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 	dev->devnum = -1;
+	usb_put_dev(dev);
 	return err;
 }
 
@@ -1577,20 +1517,40 @@ int usb_disabled(void)
  */
 static int __init usb_init(void)
 {
+	int retval;
 	if (nousb) {
 		pr_info ("%s: USB support disabled\n", usbcore_name);
 		return 0;
 	}
 
-	bus_register(&usb_bus_type);
+	retval = bus_register(&usb_bus_type);
+	if (retval) 
+		goto out;
 	usb_host_init();
-	usb_major_init();
-	usbfs_init();
-	usb_hub_init();
+	retval = usb_major_init();
+	if (retval)
+		goto major_init_failed;
+	retval = usbfs_init();
+	if (retval)
+		goto fs_init_failed;
+	retval = usb_hub_init();
+	if (retval)
+		goto hub_init_failed;
 
-	driver_register(&usb_generic_driver);
+	retval = driver_register(&usb_generic_driver);
+	if (!retval)
+		goto out;
 
-	return 0;
+	usb_hub_cleanup();
+hub_init_failed:
+	usbfs_cleanup();
+fs_init_failed:
+	usb_major_cleanup();	
+major_init_failed:
+	usb_host_cleanup();
+	bus_unregister(&usb_bus_type);
+out:
+	return retval;
 }
 
 /*

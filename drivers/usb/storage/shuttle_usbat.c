@@ -55,11 +55,11 @@
 
 int transferred = 0;
 
-int usbat_read(struct us_data *us,
-	     unsigned char access,
-	     unsigned char reg, 
-	     unsigned char *content) {
-
+static int usbat_read(struct us_data *us,
+		      unsigned char access,
+		      unsigned char reg,
+		      unsigned char *content)
+{
 	int result;
 
 	result = usb_stor_ctrl_transfer(us,
@@ -74,11 +74,11 @@ int usbat_read(struct us_data *us,
 	return result;
 }
 
-int usbat_write(struct us_data *us,
-	     unsigned char access,
-	     unsigned char reg, 
-	     unsigned char content) {
-
+static int usbat_write(struct us_data *us,
+		       unsigned char access,
+		       unsigned char reg,
+		       unsigned char content)
+{
 	int result;
 
 	result = usb_stor_ctrl_transfer(us,
@@ -93,14 +93,14 @@ int usbat_write(struct us_data *us,
 	return result;
 }
 
-int usbat_set_shuttle_features(struct us_data *us,
-	     unsigned char external_trigger,
-	     unsigned char epp_control, 
-	     unsigned char mask_byte, 
-	     unsigned char test_pattern, 
-	     unsigned char subcountH, 
-	     unsigned char subcountL) {
-
+static int usbat_set_shuttle_features(struct us_data *us,
+				      unsigned char external_trigger,
+				      unsigned char epp_control,
+				      unsigned char mask_byte,
+				      unsigned char test_pattern,
+				      unsigned char subcountH,
+				      unsigned char subcountL)
+{
 	int result;
 	unsigned char *command = us->iobuf;
 
@@ -125,13 +125,13 @@ int usbat_set_shuttle_features(struct us_data *us,
 	return result;
 }
 
-int usbat_read_block(struct us_data *us,
-	     unsigned char access,
-	     unsigned char reg, 
-	     unsigned char *content,
-	     unsigned short len,
-	     int use_sg) {
-
+static int usbat_read_block(struct us_data *us,
+			    unsigned char access,
+			    unsigned char reg,
+			    unsigned char *content,
+			    unsigned short len,
+			    int use_sg)
+{
 	int result;
 	unsigned char *command = us->iobuf;
 
@@ -171,8 +171,8 @@ int usbat_read_block(struct us_data *us,
  * an error condition.
  */
 
-int usbat_wait_not_busy(struct us_data *us, int minutes) {
-
+static int usbat_wait_not_busy(struct us_data *us, int minutes)
+{
 	int i;
 	int result;
 	unsigned char *status = us->iobuf;
@@ -216,14 +216,13 @@ int usbat_wait_not_busy(struct us_data *us, int minutes) {
 	return USB_STOR_TRANSPORT_FAILED;
 }
 
-int usbat_write_block(struct us_data *us,
-	     unsigned char access,
-	     unsigned char reg, 
-	     unsigned char *content,
-	     unsigned short len,
-	     int use_sg,
-	     int minutes) {
-
+static int usbat_write_block(struct us_data *us,
+			     unsigned char access, 
+			     unsigned char reg,
+			     unsigned char *content,
+			     unsigned short len,
+			     int use_sg, int minutes)
+{
 	int result;
 	unsigned char *command = us->iobuf;
 
@@ -260,21 +259,21 @@ int usbat_write_block(struct us_data *us,
 	return usbat_wait_not_busy(us, minutes);
 }
 
-int usbat_rw_block_test(struct us_data *us,
-	     unsigned char access,
-	     unsigned char *registers,
-	     unsigned char *data_out,
-	     unsigned short num_registers,
-	     unsigned char data_reg, 
-	     unsigned char status_reg, 
-	     unsigned char timeout, 
-	     unsigned char qualifier, 
-	     int direction,
-	     unsigned char *content,
-	     unsigned short len,
-	     int use_sg,
-	     int minutes) {
-
+static int usbat_rw_block_test(struct us_data *us,
+			       unsigned char access,
+			       unsigned char *registers,
+			       unsigned char *data_out,
+			       unsigned short num_registers,
+			       unsigned char data_reg,
+			       unsigned char status_reg,
+			       unsigned char timeout,
+			       unsigned char qualifier,
+			       int direction,
+			       unsigned char *content,
+			       unsigned short len,
+			       int use_sg,
+			       int minutes)
+{
 	int result;
 	unsigned int pipe = (direction == SCSI_DATA_READ) ?
 			us->recv_bulk_pipe : us->send_bulk_pipe;
@@ -431,12 +430,12 @@ int usbat_rw_block_test(struct us_data *us,
  * transfers of data!
  */
 
-int usbat_multiple_write(struct us_data *us, 
-			unsigned char access,
-			unsigned char *registers,
-			unsigned char *data_out,
-			unsigned short num_registers) {
-
+static int usbat_multiple_write(struct us_data *us,
+				unsigned char access,
+				unsigned char *registers,
+				unsigned char *data_out,
+				unsigned short num_registers)
+{
 	int result;
 	unsigned char *data = us->iobuf;
 	int i;
@@ -479,9 +478,8 @@ int usbat_multiple_write(struct us_data *us,
 	return usbat_wait_not_busy(us, 0);
 }
 
-int usbat_read_user_io(struct us_data *us,
-		unsigned char *data_flags) {
-
+static int usbat_read_user_io(struct us_data *us, unsigned char *data_flags)
+{
 	int result;
 
 	result = usb_stor_ctrl_transfer(us,
@@ -496,10 +494,10 @@ int usbat_read_user_io(struct us_data *us,
 	return result;
 }
 
-int usbat_write_user_io(struct us_data *us,
-		unsigned char enable_flags,
-		unsigned char data_flags) {
-
+static int usbat_write_user_io(struct us_data *us,
+			       unsigned char enable_flags,
+			       unsigned char data_flags)
+{
 	int result;
 
 	result = usb_stor_ctrl_transfer(us,
@@ -519,11 +517,11 @@ int usbat_write_user_io(struct us_data *us,
  * a little ( <= 65535 byte) ATAPI pipe
  */
 
-int usbat_handle_read10(struct us_data *us,
-		unsigned char *registers,
-		unsigned char *data,
-		Scsi_Cmnd *srb) {
-
+static int usbat_handle_read10(struct us_data *us,
+			       unsigned char *registers,
+			       unsigned char *data,
+			       Scsi_Cmnd *srb)
+{
 	int result = USB_STOR_TRANSPORT_GOOD;
 	unsigned char *buffer;
 	unsigned int len;
@@ -630,8 +628,8 @@ int usbat_handle_read10(struct us_data *us,
 	return result;
 }
 
-static int hp_8200e_select_and_test_registers(struct us_data *us) {
-
+static int hp_8200e_select_and_test_registers(struct us_data *us)
+{
 	int selector;
 	unsigned char *status = us->iobuf;
 
@@ -679,8 +677,8 @@ static int hp_8200e_select_and_test_registers(struct us_data *us) {
 	return USB_STOR_TRANSPORT_GOOD;
 }
 
-int init_8200e(struct us_data *us) {
-
+int init_8200e(struct us_data *us)
+{
 	int result;
 	unsigned char *status = us->iobuf;
 

@@ -41,7 +41,7 @@ SECTIONS
   /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .init.text : { 
+  .init.text : {
 	_sinittext = .;
 	*(.init.text)
 	_einittext = .;
@@ -56,12 +56,12 @@ SECTIONS
   __stop___param = .;
   __initcall_start = .;
   .initcall.init : {
-	*(.initcall1.init) 
-	*(.initcall2.init) 
-	*(.initcall3.init) 
-	*(.initcall4.init) 
-	*(.initcall5.init) 
-	*(.initcall6.init) 
+	*(.initcall1.init)
+	*(.initcall2.init)
+	*(.initcall3.init)
+	*(.initcall4.init)
+	*(.initcall5.init)
+	*(.initcall6.init)
 	*(.initcall7.init)
   }
   __initcall_end = .;

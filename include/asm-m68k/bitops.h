@@ -51,7 +51,7 @@ static inline int __generic_test_and_set_bit(int nr,
    __constant_set_bit(nr, vaddr) : \
    __generic_set_bit(nr, vaddr))
 
-#define __set_bit(nr,vaddr) set_bit(nr,vaddr) 
+#define __set_bit(nr,vaddr) set_bit(nr,vaddr)
 
 static inline void __constant_set_bit(int nr, volatile unsigned long *vaddr)
 {

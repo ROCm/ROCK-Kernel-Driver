@@ -94,7 +94,7 @@ static ssize_t write(struct file * file, const char __user * userbuf,
 
 static int open(struct inode * inode, struct file * file)
 {
-	struct kobject * kobj = kobject_get(file->f_dentry->d_parent->d_fsdata);
+	struct kobject *kobj = sysfs_get_kobject(file->f_dentry->d_parent);
 	struct bin_attribute * attr = file->f_dentry->d_fsdata;
 	int error = -EINVAL;
 

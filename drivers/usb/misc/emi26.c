@@ -226,7 +226,7 @@ static void emi26_disconnect(struct usb_interface *intf)
 {
 }
 
-struct usb_driver emi26_driver = {
+static struct usb_driver emi26_driver = {
 	.owner		= THIS_MODULE,
 	.name		= "emi26 - firmware loader",
 	.probe		= emi26_probe,

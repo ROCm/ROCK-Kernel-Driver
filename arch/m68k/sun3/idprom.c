@@ -67,7 +67,7 @@ static void __init display_system_type(unsigned char machtype)
 				prom_getproperty(prom_root_node, "banner-name",
 						 sysname, sizeof(sysname));
 				printk("TYPE: %s\n", sysname);
-#endif				
+#endif
 			}
 			return;
 		}
@@ -83,7 +83,7 @@ void sun3_get_model(unsigned char* model)
 
 	for (i = 0; i < NUM_SUN_MACHINES; i++) {
 		if(Sun_Machines[i].id_machtype == idprom->id_machtype) {
-       		        strcpy(model, Sun_Machines[i].name);
+		        strcpy(model, Sun_Machines[i].name);
 			return;
 		}
 	}

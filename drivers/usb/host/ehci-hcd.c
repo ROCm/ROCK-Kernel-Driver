@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 by David Brownell
+ * Copyright (c) 2000-2004 by David Brownell
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -69,6 +69,7 @@
  *
  * HISTORY:
  *
+ * 2004-05-10 Root hub and PCI suspend/resume support; remote wakeup. (db)
  * 2004-02-24 Replace pci_* with generic dma_* API calls (dsaxena@plexity.net)
  * 2003-12-29 Rewritten high speed iso transfer support (by Michal Sojka,
  *	<sojkam@centrum.cz>, updates by DB).
@@ -96,7 +97,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2003-Dec-29"
+#define DRIVER_VERSION "2004-May-10"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -128,7 +129,7 @@ static int log2_irq_thresh = 0;		// 0 to 6
 module_param (log2_irq_thresh, int, S_IRUGO);
 MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
 
-#define	INTR_MASK (STS_IAA | STS_FATAL | STS_ERR | STS_INT)
+#define	INTR_MASK (STS_IAA | STS_FATAL | STS_PCD | STS_ERR | STS_INT)
 
 /*-------------------------------------------------------------------------*/
 
@@ -201,6 +202,7 @@ static int ehci_reset (struct ehci_hcd *ehci)
 	dbg_cmd (ehci, "reset", command);
 	writel (command, &ehci->regs->command);
 	ehci->hcd.state = USB_STATE_HALT;
+	ehci->next_statechange = jiffies;
 	return handshake (&ehci->regs->command, CMD_RESET, 0, 250 * 1000);
 }
 
@@ -241,14 +243,14 @@ static void ehci_ready (struct ehci_hcd *ehci)
 
 /*-------------------------------------------------------------------------*/
 
+static void ehci_work(struct ehci_hcd *ehci, struct pt_regs *regs);
+
 #include "ehci-hub.c"
 #include "ehci-mem.c"
 #include "ehci-q.c"
 #include "ehci-sched.c"
 
 /*-------------------------------------------------------------------------*/
-
-static void ehci_work(struct ehci_hcd *ehci, struct pt_regs *regs);
 
 static void ehci_watchdog (unsigned long param)
 {
@@ -428,11 +430,16 @@ static int ehci_start (struct usb_hcd *hcd)
 #ifdef	CONFIG_PCI
 	if (hcd->self.controller->bus == &pci_bus_type) {
 		struct pci_dev		*pdev;
+		u16			port_wake;
 
 		pdev = to_pci_dev(hcd->self.controller);
 
 		/* Serial Bus Release Number is at PCI 0x60 offset */
 		pci_read_config_byte(pdev, 0x60, &sbrn);
+
+		/* port wake capability, reported by boot firmware */
+		pci_read_config_word(pdev, 0x62, &port_wake);
+		hcd->can_wakeup = (port_wake & 1) != 0;
 
 		/* help hc dma work well with cachelines */
 		pci_set_mwi (pdev);
@@ -615,41 +622,26 @@ static int ehci_get_frame (struct usb_hcd *hcd)
 
 /* suspend/resume, section 4.3 */
 
+/* These routines rely on PCI to handle powerdown and wakeup, and
+ * transceivers that don't need any software attention to set up
+ * the right sort of wakeup.  
+ */
+
 static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	int			ports;
-	int			i;
 
-	ehci_dbg (ehci, "suspend to %d\n", state);
+	while (time_before (jiffies, ehci->next_statechange))
+		msec_delay (100);
 
-	ports = HCS_N_PORTS (ehci->hcs_params);
+#ifdef	CONFIG_USB_SUSPEND
+	(void) usb_suspend_device (hcd->self.root_hub);
+#else
+	/* FIXME lock root hub */
+	(void) ehci_hub_suspend (hcd);
+#endif
 
-	// FIXME:  This assumes what's probably a D3 level suspend...
-
-	// FIXME:  usb wakeup events on this bus should resume the machine.
-	// pci config register PORTWAKECAP controls which ports can do it;
-	// bios may have initted the register...
-
-	/* suspend each port, then stop the hc */
-	for (i = 0; i < ports; i++) {
-		int	temp = readl (&ehci->regs->port_status [i]);
-
-		if ((temp & PORT_PE) == 0
-				|| (temp & PORT_OWNER) != 0)
-			continue;
-		ehci_dbg (ehci, "suspend port %d", i);
-		temp |= PORT_SUSPEND;
-		writel (temp, &ehci->regs->port_status [i]);
-	}
-
-	if (hcd->state == USB_STATE_RUNNING)
-		ehci_ready (ehci);
-	writel (readl (&ehci->regs->command) & ~CMD_RUN, &ehci->regs->command);
-
-// save pci FLADJ value
-
-	/* who tells PCI to reduce power consumption? */
+	// save (PCI) FLADJ in case of Vaux power loss
 
 	return 0;
 }
@@ -657,40 +649,22 @@ static int ehci_suspend (struct usb_hcd *hcd, u32 state)
 static int ehci_resume (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	int			ports;
-	int			i;
+	int			retval;
 
-	ehci_dbg (ehci, "resume\n");
+	// maybe restore (PCI) FLADJ
 
-	ports = HCS_N_PORTS (ehci->hcs_params);
+	while (time_before (jiffies, ehci->next_statechange))
+		msec_delay (100);
 
-	// FIXME:  if controller didn't retain state,
-	// return and let generic code clean it up
-	// test configured_flag ?
-
-	/* resume HC and each port */
-// restore pci FLADJ value
-	// khubd and drivers will set HC running, if needed;
-	hcd->state = USB_STATE_RUNNING;
-	// FIXME Philips/Intel/... etc don't really have a "READY"
-	// state ... turn on CMD_RUN too
-	for (i = 0; i < ports; i++) {
-		int	temp = readl (&ehci->regs->port_status [i]);
-
-		if ((temp & PORT_PE) == 0
-				|| (temp & PORT_SUSPEND) != 0)
-			continue;
-		ehci_dbg (ehci, "resume port %d", i);
-		temp |= PORT_RESUME;
-		writel (temp, &ehci->regs->port_status [i]);
-		readl (&ehci->regs->command);	/* unblock posted writes */
-
-		wait_ms (20);
-		temp &= ~PORT_RESUME;
-		writel (temp, &ehci->regs->port_status [i]);
-	}
-	readl (&ehci->regs->command);	/* unblock posted writes */
-	return 0;
+#ifdef	CONFIG_USB_SUSPEND
+	retval = usb_resume_device (hcd->self.root_hub);
+#else
+	/* FIXME lock root hub */
+	retval = ehci_hub_resume (hcd);
+#endif
+	if (retval == 0)
+		hcd->self.controller->power.power_state = 0;
+	return retval;
 }
 
 #endif
@@ -752,7 +726,7 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 	bh = 0;
 
 #ifdef	EHCI_VERBOSE_DEBUG
-	/* unrequested/ignored: Port Change Detect, Frame List Rollover */
+	/* unrequested/ignored: Frame List Rollover */
 	dbg_status (ehci, "irq", status);
 #endif
 
@@ -772,6 +746,34 @@ static irqreturn_t ehci_irq (struct usb_hcd *hcd, struct pt_regs *regs)
 		COUNT (ehci->stats.reclaim);
 		ehci->reclaim_ready = 1;
 		bh = 1;
+	}
+
+	/* remote wakeup [4.3.1] */
+	if ((status & STS_PCD) && ehci->hcd.remote_wakeup) {
+		unsigned	i = HCS_N_PORTS (ehci->hcs_params);
+
+		/* resume root hub? */
+		status = readl (&ehci->regs->command);
+		if (!(status & CMD_RUN))
+			writel (status | CMD_RUN, &ehci->regs->command);
+
+		while (i--) {
+			status = readl (&ehci->regs->port_status [i]);
+			if (status & PORT_OWNER)
+				continue;
+			if (!(status & PORT_RESUME)
+					|| ehci->reset_done [i] != 0)
+				continue;
+
+			/* start 20 msec resume signaling from this port,
+			 * and make khubd collect PORT_STAT_C_SUSPEND to
+			 * stop that signaling.
+			 */
+			ehci->reset_done [i] = jiffies + MSEC_TO_JIFFIES (20);
+			mod_timer (&ehci->hcd.rh_timer,
+					ehci->reset_done [i] + 1);
+			ehci_dbg (ehci, "port %d remote wakeup\n", i + 1);
+		}
 	}
 
 	/* PCI errors [4.15.2.4] */
@@ -814,7 +816,6 @@ static int ehci_urb_enqueue (
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
 	struct list_head	qtd_list;
 
-	urb->transfer_flags &= ~EHCI_STATE_UNLINK;
 	INIT_LIST_HEAD (&qtd_list);
 
 	switch (usb_pipetype (urb->pipe)) {
@@ -914,7 +915,6 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 
 		// wait till next completion, do it then.
 		// completion irqs can wait up to 1024 msec,
-		urb->transfer_flags |= EHCI_STATE_UNLINK;
 		break;
 	}
 	spin_unlock_irqrestore (&ehci->lock, flags);
@@ -965,7 +965,7 @@ idle_timeout:
 		goto rescan;
 	case QH_STATE_IDLE:		/* fully unlinked */
 		if (list_empty (&qh->qtd_list)) {
-			qh_put (ehci, qh);
+			qh_put (qh);
 			break;
 		}
 		/* else FALL THROUGH */

@@ -802,6 +802,7 @@ error:
 				switch (status) {
 				case -EINPROGRESS:
 				case -EBUSY:
+				case -EIDRM:
 					continue;
 				default:
 					dbg ("urb unlink --> %d", status);
@@ -1038,8 +1039,6 @@ static void unlink1_callback (struct urb *urb, struct pt_regs *regs)
 	if (!status)
 		status = usb_submit_urb (urb, SLAB_ATOMIC);
 	if (status) {
-		if (status == -ECONNRESET || status == -ENOENT)
-			status = 0;
 		urb->status = status;
 		complete ((struct completion *) urb->context);
 	}
@@ -1077,8 +1076,9 @@ static int unlink1 (struct usbtest_dev *dev, int pipe, int size, int async)
 	wait_ms (jiffies % (2 * INTERRUPT_RATE));
 retry:
 	retval = usb_unlink_urb (urb);
-	if (retval == -EBUSY) {
+	if (retval == -EBUSY || retval == -EIDRM) {
 		/* we can't unlink urbs while they're completing.
+		 * or if they've completed, and we haven't resubmitted.
 		 * "normal" drivers would prevent resubmission, but
 		 * since we're testing unlink paths, we can't.
 		 */

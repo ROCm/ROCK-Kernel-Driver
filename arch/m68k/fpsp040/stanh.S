@@ -49,14 +49,14 @@
 |		Copyright (C) Motorola, Inc. 1990
 |			All Rights Reserved
 |
-|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA 
-|	The copyright notice above does not evidence any  
+|	THIS IS UNPUBLISHED PROPRIETARY SOURCE CODE OF MOTOROLA
+|	The copyright notice above does not evidence any
 |	actual or intended publication of such source code.
 
 |STANH	idnt	2,1 | Motorola 040 Floating Point Software Package
 
 	|section	8
-	
+
 #include "fpsp.h"
 
 	.set	X,FP_SCR5
@@ -106,7 +106,7 @@ stanh:
 	movel		%d1,-(%a7)
 	clrl		%d1
 	fmovemx	%fp0-%fp0,(%a0)
-	bsr		setoxm1	 	| ...FP0 IS Z = EXPM1(Y)
+	bsr		setoxm1		| ...FP0 IS Z = EXPM1(Y)
 	movel		(%a7)+,%d1
 
 	fmovex		%fp0,%fp1
@@ -149,7 +149,7 @@ TANHBORS:
 
 	eorl		#0xC0000000,%d0	| ...-SIGN(X)*2
 	fmoves		%d0,%fp1		| ...-SIGN(X)*2 IN SGL FMT
-	fdivx		%fp0,%fp1	 	| ...-SIGN(X)2 / [EXP(Y)+1 ]
+	fdivx		%fp0,%fp1		| ...-SIGN(X)2 / [EXP(Y)+1 ]
 
 	movel		SGN(%a6),%d0
 	orl		#0x3F800000,%d0	| ...SGN

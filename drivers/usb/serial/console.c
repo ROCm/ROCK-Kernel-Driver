@@ -199,11 +199,12 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 {
 	static struct usbcons_info *info = &usbcons_info;
 	struct usb_serial_port *port = info->port;
-	struct usb_serial *serial = get_usb_serial (port, __FUNCTION__);
+	struct usb_serial *serial;
 	int retval = -ENODEV;
 
-	if (!serial || !port)
+	if (!port)
 		return;
+	serial = port->serial;
 
 	if (count == 0)
 		return;

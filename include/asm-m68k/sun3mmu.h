@@ -144,7 +144,7 @@ static inline unsigned char sun3_get_context(void)
 	SET_SFC(FC_CONTROL);
 	GET_CONTROL_BYTE(AC_CONTEXT, c);
 	SET_SFC(sfc);
-	
+
 	return c;
 }
 
@@ -156,7 +156,7 @@ static inline void sun3_put_context(unsigned char c)
 	SET_DFC(FC_CONTROL);
 	SET_CONTROL_BYTE(AC_CONTEXT, c);
 	SET_DFC(dfc);
-	
+
 	return;
 }
 

@@ -26,7 +26,7 @@
 
 /* does this need to be implemented? */
 unsigned long sun3_gettimeoffset(void)
-{ 
+{
   return 1;
 }
 

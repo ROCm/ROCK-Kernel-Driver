@@ -617,7 +617,17 @@ show_registers (struct class_device *class_dev, char *buf)
 	/* dump driver info, then registers in spec order */
 
 	ohci_dbg_sw (ohci, &next, &size,
-		"%s version " DRIVER_VERSION "\n", hcd_name);
+		"bus %s, device %s\n"
+		"%s version " DRIVER_VERSION "\n",
+		hcd->self.controller->bus->name,
+		hcd->self.controller->bus_id,
+		hcd_name);
+
+	if (bus->controller->power.power_state) {
+		size -= scnprintf (next, size,
+			"SUSPENDED (no register access)\n");
+		goto done;
+	}
 
 	ohci_dump_status(ohci, &next, &size);
 
@@ -657,8 +667,8 @@ show_registers (struct class_device *class_dev, char *buf)
 	/* roothub */
 	ohci_dump_roothub (ohci, 1, &next, &size);
 
+done:
 	spin_unlock_irqrestore (&ohci->lock, flags);
-
 	return PAGE_SIZE - size;
 }
 static CLASS_DEVICE_ATTR (registers, S_IRUGO, show_registers, NULL);

@@ -5,10 +5,10 @@ M68060 Software Package
 Production Release P1.00 -- October 10, 1994
 
 M68060 Software Package Copyright © 1993, 1994 Motorola Inc.  All rights reserved.
- 
+
 THE SOFTWARE is provided on an "AS IS" basis and without warranty.
 To the maximum extent permitted by applicable law,
-MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED, 
+MOTOROLA DISCLAIMS ALL WARRANTIES WHETHER EXPRESS OR IMPLIED,
 INCLUDING IMPLIED WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE
 and any warranty against infringement with regard to the SOFTWARE
 (INCLUDING ANY MODIFIED VERSIONS THEREOF) and any accompanying written materials.
@@ -322,21 +322,21 @@ set immed_bit,		0x7			# immediate data bit
 # Misc. #
 #########
 set BYTE,		1			# len(byte) == 1 byte
-set WORD, 		2			# len(word) == 2 bytes
-set LONG, 		4			# len(longword) == 4 bytes
+set WORD,		2			# len(word) == 2 bytes
+set LONG,		4			# len(longword) == 4 bytes
 
 #########################################################################
 # XDEF ****************************************************************	#
 #	_isp_unimp(): 060ISP entry point for Unimplemented Instruction	#
 #									#
-#	This handler should be the first code executed upon taking the 	#
-# 	"Unimplemented Integer Instruction" exception in an operating	#
+#	This handler should be the first code executed upon taking the	#
+#	"Unimplemented Integer Instruction" exception in an operating	#
 #	system.								#
 #									#
 # XREF ****************************************************************	#
 #	_imem_read_{word,long}() - read instruction word/longword	#
 #	_mul64() - emulate 64-bit multiply				#
-# 	_div64() - emulate 64-bit divide				#
+#	_div64() - emulate 64-bit divide				#
 #	_moveperipheral() - emulate "movep"				#
 #	_compandset() - emulate misaligned "cas"			#
 #	_compandset2() - emulate "cas2"					#
@@ -349,7 +349,7 @@ set LONG, 		4			# len(longword) == 4 bytes
 #									#
 # INPUT ***************************************************************	#
 #	- The system stack contains the Unimp Int Instr stack frame	#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	If Trace exception:						#
 #	- The system stack changed to contain Trace exc stack frame	#
@@ -366,8 +366,8 @@ set LONG, 		4			# len(longword) == 4 bytes
 #	This handler fetches the first instruction longword from	#
 # memory and decodes it to determine which of the unimplemented		#
 # integer instructions caused this exception. This handler then calls	#
-# one of _mul64(), _div64(), _moveperipheral(), _compandset(), 		#
-# _compandset2(), or _chk2_cmp2() as appropriate. 			#
+# one of _mul64(), _div64(), _moveperipheral(), _compandset(),		#
+# _compandset2(), or _chk2_cmp2() as appropriate.			#
 #	Some of these instructions, by their nature, may produce other	#
 # types of exceptions. "div" can produce a divide-by-zero exception,	#
 # and "chk2" can cause a "Chk" exception. In both cases, the current	#
@@ -375,7 +375,7 @@ set LONG, 		4			# len(longword) == 4 bytes
 # of the correct exception type and an exit must be made through	#
 # _real_divbyzero() or _real_chk() as appropriate. In addition, all	#
 # instructions may be executing while Trace is enabled. If so, then	#
-# a Trace exception stack frame must be created and an exit made 	#
+# a Trace exception stack frame must be created and an exit made	#
 # through _real_trace().						#
 #	Meanwhile, if any read or write to memory using the		#
 # _mem_{read,write}() "callout"s returns a failing value, then an	#
@@ -384,19 +384,19 @@ set LONG, 		4			# len(longword) == 4 bytes
 #	If none of these occur, then a normal exit is made through	#
 # _isp_done().								#
 #									#
-#	This handler, upon entry, saves almost all user-visible 	#
+#	This handler, upon entry, saves almost all user-visible		#
 # address and data registers to the stack. Although this may seem to	#
 # cause excess memory traffic, it was found that due to having to	#
 # access these register files for things like data retrieval and <ea>	#
 # calculations, it was more efficient to have them on the stack where	#
-# they could be accessed by indexing rather than to make subroutine 	#
-# calls to retrieve a register of a particular index. 			#
+# they could be accessed by indexing rather than to make subroutine	#
+# calls to retrieve a register of a particular index.			#
 #									#
 #########################################################################
 
 	global		_isp_unimp
 _isp_unimp:
-	link.w 		%a6,&-LOCAL_SIZE	# create room for stack frame
+	link.w		%a6,&-LOCAL_SIZE	# create room for stack frame
 
 	movm.l		&0x3fff,EXC_DREGS(%a6)	# store d0-d7/a0-a5
 	mov.l		(%a6),EXC_A6(%a6)	# store a6
@@ -428,9 +428,9 @@ uieh_cont:
 	bsr.l		_imem_read_long		# fetch opword & extword
 	mov.l		%d0,EXC_OPWORD(%a6)	# store extword on stack
 
-	
+
 #########################################################################
-# muls.l	0100 1100 00 |<ea>|	0*** 1100 0000 0*** 		#
+# muls.l	0100 1100 00 |<ea>|	0*** 1100 0000 0***		#
 # mulu.l	0100 1100 00 |<ea>|	0*** 0100 0000 0***		#
 #									#
 # divs.l	0100 1100 01 |<ea>|	0*** 1100 0000 0***		#
@@ -514,7 +514,7 @@ uieh_div64_a7:
 	tst.b		EXC_ISR(%a6)		# no; is trace enabled?
 	bmi.w		uieh_trace_a7		# yes
 	bra.w		uieh_a7			# no
-	
+
 #
 # now, w/ group2, make movep's decode the fastest since it will
 # most likely be used the most.
@@ -532,7 +532,7 @@ uieh_not_movep:
 	beq.b		uieh_chk2cmp2		# go handle chk2,cmp2
 
 	swap		%d0			# put opword in lo word
-	cmpi.b	 	%d0,&0xfc		# test for cas2
+	cmpi.b		%d0,&0xfc		# test for cas2
 	beq.b		uieh_cas2		# go handle cas2
 
 uieh_cas:
@@ -585,7 +585,7 @@ uieh_done:
 	mov.l		%a0,%usp		# restore it
 
 uieh_finish:
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	btst		&0x7,EXC_ISR(%a6)	# is trace mode on?
 	bne.b		uieh_trace		# yes;go handle trace mode
@@ -596,7 +596,7 @@ uieh_finish:
 	bra.l		_isp_done
 
 #
-# The instruction that was just emulated was also being traced. The trace 
+# The instruction that was just emulated was also being traced. The trace
 # trap for this instruction will be lost unless we jump to the trace handler.
 # So, here we create a Trace Exception format number two exception stack
 # frame from the Unimplemented Integer Intruction Exception stack frame
@@ -607,11 +607,11 @@ uieh_finish:
 #		* 0x0 *  0x0f4	*	*    Current	*
 #		*****************	*      PC	*
 #		*    Current	*	*****************
-#		*      PC 	*	* 0x2 *  0x024	*
+#		*      PC	*	* 0x2 *  0x024	*
 #		*****************	*****************
 #		*      SR	*	*     Next	*
 #		*****************	*      PC	*
-#	      ->*     Old   	*	*****************
+#	      ->*     Old	*	*****************
 #  from link -->*      A6	*	*      SR	*
 #	        *****************	*****************
 #	       /*      A7	*	*      New	* <-- for final unlink
@@ -651,7 +651,7 @@ uieh_trace:
 #
 uieh_chk_trap:
 	mov.b		EXC_CC+1(%a6),EXC_ISR+1(%a6) # insert new ccodes
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	mov.w		EXC_ISR(%a6),(%a6)	# put new SR on stack
 	mov.l		EXC_IPC(%a6),0x8(%a6)	# put "Current PC" on stack
@@ -678,14 +678,14 @@ uieh_chk_trap:
 #				*****************
 #				    (6 words)
 #
-# the divide instruction should take an integer divide by zero trap. so, here 
-# we must create a divbyzero stack frame from an unimplemented integer 
-# instruction exception frame and jump to the user supplied entry point 
+# the divide instruction should take an integer divide by zero trap. so, here
+# we must create a divbyzero stack frame from an unimplemented integer
+# instruction exception frame and jump to the user supplied entry point
 # "_real_divbyzero()".
 #
 uieh_divbyzero:
 	mov.b		EXC_CC+1(%a6),EXC_ISR+1(%a6) # insert new ccodes
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	mov.w		EXC_ISR(%a6),(%a6)	# put new SR on stack
 	mov.l		EXC_IPC(%a6),0x8(%a6)	# put "Current PC" on stack
@@ -712,9 +712,9 @@ uieh_divbyzero:
 #	*****************	*****************
 #	    (4 words)		    (6 words)
 #
-# the divide instruction should take an integer divide by zero trap. so, here 
-# we must create a divbyzero stack frame from an unimplemented integer 
-# instruction exception frame and jump to the user supplied entry point 
+# the divide instruction should take an integer divide by zero trap. so, here
+# we must create a divbyzero stack frame from an unimplemented integer
+# instruction exception frame and jump to the user supplied entry point
 # "_real_divbyzero()".
 #
 # However, we must also deal with the fact that (a7)+ was used from supervisor
@@ -722,7 +722,7 @@ uieh_divbyzero:
 #
 uieh_divbyzero_a7:
 	mov.b		EXC_CC+1(%a6),EXC_ISR+1(%a6) # insert new ccodes
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	mov.l		EXC_IPC(%a6),0xc(%a6)	# put "Current PC" on stack
 	mov.w		&0x2014,0xa(%a6)	# put Vector Offset on stack
@@ -748,8 +748,8 @@ uieh_divbyzero_a7:
 #	*****************	*****************
 #	    (4 words)		    (6 words)
 #
-# 
-# The instruction that was just emulated was also being traced. The trace 
+#
+# The instruction that was just emulated was also being traced. The trace
 # trap for this instruction will be lost unless we jump to the trace handler.
 # So, here we create a Trace Exception format number two exception stack
 # frame from the Unimplemented Integer Intruction Exception stack frame
@@ -760,7 +760,7 @@ uieh_divbyzero_a7:
 #
 uieh_trace_a7:
 	mov.b		EXC_CC+1(%a6),EXC_ISR+1(%a6) # insert new ccodes
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	mov.l		EXC_IPC(%a6),0xc(%a6)	# put "Current PC" on stack
 	mov.w		&0x2024,0xa(%a6)	# put Vector Offset on stack
@@ -772,12 +772,12 @@ uieh_trace_a7:
 	bra.l		_real_trace
 
 #
-#				   UIEH FRAME	
+#				   UIEH FRAME
 #				*****************
 #				* 0x0 * 0x0f4	*
 #	   UIEH FRAME		*****************
 #	*****************	*     Next	*
-#	* 0x0 *  0x0f4	*	*      PC	*	
+#	* 0x0 *  0x0f4	*	*      PC	*
 #	*****************	*****************
 #	*    Current	*	*      SR	*
 #	*      PC	*	*****************
@@ -787,7 +787,7 @@ uieh_trace_a7:
 #	    (4 words)
 uieh_a7:
 	mov.b		EXC_CC+1(%a6),EXC_ISR+1(%a6) # insert new ccodes
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 
 	mov.w		&0x00f4,0xe(%a6)	# put Vector Offset on stack
 	mov.l		EXC_EXTWPTR(%a6),0xa(%a6) # put "Next PC" on stack
@@ -803,11 +803,11 @@ uieh_a7:
 # a0 = failing address
 # d0 = fslw
 isp_dacc:
-	mov.l		%a0,(%a6)		# save address	
+	mov.l		%a0,(%a6)		# save address
 	mov.l		%d0,-0x4(%a6)		# save partial fslw
 
 	lea		-64(%a6),%sp
-	movm.l		(%sp)+,&0x7fff 		# restore d0-d7/a0-a6
+	movm.l		(%sp)+,&0x7fff		# restore d0-d7/a0-a6
 
 	mov.l		0xc(%sp),-(%sp)		# move voff,hi(pc)
 	mov.l		0x4(%sp),0x10(%sp)	# store fslw
@@ -822,11 +822,11 @@ isp_dacc:
 # FSLW:
 #	misaligned = true
 #	read = true
-# 	size = word
-# 	instruction = true
-# 	software emulation error = true
+#	size = word
+#	instruction = true
+#	software emulation error = true
 isp_iacc:
-	movm.l		EXC_DREGS(%a6),&0x3fff 	# restore d0-d7/a0-a5
+	movm.l		EXC_DREGS(%a6),&0x3fff	# restore d0-d7/a0-a5
 	unlk		%a6			# unlink frame
 	sub.w		&0x8,%sp		# make room for acc frame
 	mov.l		0x8(%sp),(%sp)		# store sr,lo(pc)
@@ -840,7 +840,7 @@ isp_acc_exit:
 	beq.b		isp_acc_exit2		# user
 	bset		&0x2,0xd(%sp)		# set supervisor TM bit
 isp_acc_exit2:
-	bra.l		_real_access		
+	bra.l		_real_access
 
 # if the addressing mode was (an)+ or -(an), the address register must
 # be restored to its pre-exception value before entering _real_access.
@@ -858,14 +858,14 @@ isp_restore_done:
 #	_calc_ea(): routine to calculate effective address		#
 #									#
 # XREF ****************************************************************	#
-# 	_imem_read_word() - read instruction word			#
-# 	_imem_read_long() - read instruction longword			#
-# 	_dmem_read_long() - read data longword (for memory indirect)	#
-# 	isp_iacc() - handle instruction access error exception		#
+#	_imem_read_word() - read instruction word			#
+#	_imem_read_long() - read instruction longword			#
+#	_dmem_read_long() - read data longword (for memory indirect)	#
+#	isp_iacc() - handle instruction access error exception		#
 #	isp_dacc() - handle data access error exception			#
 #									#
 # INPUT ***************************************************************	#
-# 	d0 = number of bytes related to effective address (w,l)		#
+#	d0 = number of bytes related to effective address (w,l)		#
 #									#
 # OUTPUT **************************************************************	#
 #	If exiting through isp_dacc...					#
@@ -877,22 +877,22 @@ isp_restore_done:
 #		a0 = effective address					#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	The effective address type is decoded from the opword residing	#
-# on the stack. A jump table is used to vector to a routine for the 	#
+#	The effective address type is decoded from the opword residing	#
+# on the stack. A jump table is used to vector to a routine for the	#
 # appropriate mode. Since none of the emulated integer instructions	#
 # uses byte-sized operands, only handle word and long operations.	#
 #									#
-# 	Dn,An	- shouldn't enter here					#
+#	Dn,An	- shouldn't enter here					#
 #	(An)	- fetch An value from stack				#
-# 	-(An)	- fetch An value from stack; return decr value;		#
+#	-(An)	- fetch An value from stack; return decr value;		#
 #		  place decr value on stack; store old value in case of	#
-#		  future access error; if -(a7), set mda7_flg in 	#
+#		  future access error; if -(a7), set mda7_flg in	#
 #		  SPCOND_FLG						#
 #	(An)+	- fetch An value from stack; return value;		#
 #		  place incr value on stack; store old value in case of	#
 #		  future access error; if (a7)+, set mia7_flg in	#
 #		  SPCOND_FLG						#
-#	(d16,An) - fetch An value from stack; read d16 using 		#
+#	(d16,An) - fetch An value from stack; read d16 using		#
 #		  _imem_read_word(); fetch may fail -> branch to	#
 #		  isp_iacc()						#
 #	(xxx).w,(xxx).l - use _imem_read_{word,long}() to fetch		#
@@ -904,7 +904,7 @@ isp_restore_done:
 #		  isp_iacc()						#
 #	everything else - read needed displacements as appropriate w/	#
 #		  _imem_read_{word,long}(); read may fail; if memory	#
-# 		  indirect, read indirect address using			#
+#		  indirect, read indirect address using			#
 #		  _dmem_read_long() which may also fail			#
 #									#
 #########################################################################
@@ -944,59 +944,59 @@ tbl_ea_mode:
 	short		tbl_ea_mode	-	tbl_ea_mode
 	short		tbl_ea_mode	-	tbl_ea_mode
 
-	short		addr_ind_a0	- 	tbl_ea_mode
-	short		addr_ind_a1	- 	tbl_ea_mode
-	short		addr_ind_a2	- 	tbl_ea_mode
-	short		addr_ind_a3 	- 	tbl_ea_mode
-	short		addr_ind_a4 	- 	tbl_ea_mode
-	short		addr_ind_a5 	- 	tbl_ea_mode
-	short		addr_ind_a6 	- 	tbl_ea_mode
-	short		addr_ind_a7 	- 	tbl_ea_mode
+	short		addr_ind_a0	-	tbl_ea_mode
+	short		addr_ind_a1	-	tbl_ea_mode
+	short		addr_ind_a2	-	tbl_ea_mode
+	short		addr_ind_a3	-	tbl_ea_mode
+	short		addr_ind_a4	-	tbl_ea_mode
+	short		addr_ind_a5	-	tbl_ea_mode
+	short		addr_ind_a6	-	tbl_ea_mode
+	short		addr_ind_a7	-	tbl_ea_mode
 
-	short		addr_ind_p_a0	- 	tbl_ea_mode
-	short		addr_ind_p_a1 	- 	tbl_ea_mode
-	short		addr_ind_p_a2 	- 	tbl_ea_mode
-	short		addr_ind_p_a3 	- 	tbl_ea_mode
-	short		addr_ind_p_a4 	- 	tbl_ea_mode
-	short		addr_ind_p_a5 	- 	tbl_ea_mode
-	short		addr_ind_p_a6 	- 	tbl_ea_mode
-	short		addr_ind_p_a7 	- 	tbl_ea_mode
+	short		addr_ind_p_a0	-	tbl_ea_mode
+	short		addr_ind_p_a1	-	tbl_ea_mode
+	short		addr_ind_p_a2	-	tbl_ea_mode
+	short		addr_ind_p_a3	-	tbl_ea_mode
+	short		addr_ind_p_a4	-	tbl_ea_mode
+	short		addr_ind_p_a5	-	tbl_ea_mode
+	short		addr_ind_p_a6	-	tbl_ea_mode
+	short		addr_ind_p_a7	-	tbl_ea_mode
 
-	short		addr_ind_m_a0 		- 	tbl_ea_mode
-	short		addr_ind_m_a1 		- 	tbl_ea_mode
-	short		addr_ind_m_a2 		- 	tbl_ea_mode
-	short		addr_ind_m_a3 		- 	tbl_ea_mode
-	short		addr_ind_m_a4 		- 	tbl_ea_mode
-	short		addr_ind_m_a5 		- 	tbl_ea_mode
-	short		addr_ind_m_a6 		- 	tbl_ea_mode
-	short		addr_ind_m_a7 		- 	tbl_ea_mode
+	short		addr_ind_m_a0		-	tbl_ea_mode
+	short		addr_ind_m_a1		-	tbl_ea_mode
+	short		addr_ind_m_a2		-	tbl_ea_mode
+	short		addr_ind_m_a3		-	tbl_ea_mode
+	short		addr_ind_m_a4		-	tbl_ea_mode
+	short		addr_ind_m_a5		-	tbl_ea_mode
+	short		addr_ind_m_a6		-	tbl_ea_mode
+	short		addr_ind_m_a7		-	tbl_ea_mode
 
-	short		addr_ind_disp_a0	- 	tbl_ea_mode
-	short		addr_ind_disp_a1 	- 	tbl_ea_mode
-	short		addr_ind_disp_a2 	- 	tbl_ea_mode
-	short		addr_ind_disp_a3 	- 	tbl_ea_mode
-	short		addr_ind_disp_a4 	- 	tbl_ea_mode
-	short		addr_ind_disp_a5 	- 	tbl_ea_mode
-	short		addr_ind_disp_a6 	- 	tbl_ea_mode
+	short		addr_ind_disp_a0	-	tbl_ea_mode
+	short		addr_ind_disp_a1	-	tbl_ea_mode
+	short		addr_ind_disp_a2	-	tbl_ea_mode
+	short		addr_ind_disp_a3	-	tbl_ea_mode
+	short		addr_ind_disp_a4	-	tbl_ea_mode
+	short		addr_ind_disp_a5	-	tbl_ea_mode
+	short		addr_ind_disp_a6	-	tbl_ea_mode
 	short		addr_ind_disp_a7	-	tbl_ea_mode
 
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
-	short		_addr_ind_ext 		- 	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
+	short		_addr_ind_ext		-	tbl_ea_mode
 
-	short		abs_short		- 	tbl_ea_mode
-	short		abs_long		- 	tbl_ea_mode
-	short		pc_ind			- 	tbl_ea_mode
-	short		pc_ind_ext		- 	tbl_ea_mode
-	short		immediate		- 	tbl_ea_mode
-	short		tbl_ea_mode		- 	tbl_ea_mode
-	short		tbl_ea_mode		- 	tbl_ea_mode
-	short		tbl_ea_mode		- 	tbl_ea_mode
+	short		abs_short		-	tbl_ea_mode
+	short		abs_long		-	tbl_ea_mode
+	short		pc_ind			-	tbl_ea_mode
+	short		pc_ind_ext		-	tbl_ea_mode
+	short		immediate		-	tbl_ea_mode
+	short		tbl_ea_mode		-	tbl_ea_mode
+	short		tbl_ea_mode		-	tbl_ea_mode
+	short		tbl_ea_mode		-	tbl_ea_mode
 
 ###################################
 # Address register indirect: (An) #
@@ -1041,7 +1041,7 @@ addr_ind_p_a0:
 	mov.l		EXC_A0(%a6),%a0		# load current value
 	add.l		%a0,%d0			# increment
 	mov.l		%d0,EXC_A0(%a6)		# save incremented value
-	
+
 	mov.l		%a0,EXC_SAVVAL(%a6)	# save in case of access error
 	mov.b		&0x0,EXC_SAVREG(%a6)	# save regno, too
 	mov.b		&restore_flg,SPCOND_FLG(%a6) # set flag
@@ -1339,7 +1339,7 @@ _addr_ind_ext:
 	mov.l		%a0,%d3			# put base in d3
 
 	bra.l		calc_mem_ind		# calc memory indirect
-	
+
 addr_ind_index_8bit:
 	mov.l		%d2,-(%sp)		# save old d2
 
@@ -1370,8 +1370,8 @@ aii8_long:
 # Immediate: #<data> #
 #########################################################################
 # word, long: <ea> of the data is the current extension word		#
-# 	pointer value. new extension word pointer is simply the old	#
-# 	plus the number of bytes in the data type(2 or 4).		#
+#	pointer value. new extension word pointer is simply the old	#
+#	plus the number of bytes in the data type(2 or 4).		#
 #########################################################################
 immediate:
 	mov.b		&immed_flg,SPCOND_FLG(%a6) # set immediate flag
@@ -1455,9 +1455,9 @@ pc_ind_ext:
 	mov.l		%a0,%d3			# put base in d3
 
 	bra.l		calc_mem_ind		# calc memory indirect
-	
+
 pc_ind_index_8bit:
- 	mov.l		%d2,-(%sp)		# create a temp register
+	mov.l		%d2,-(%sp)		# create a temp register
 
 	mov.l		%d0,%d1			# make extword copy
 	rol.w		&0x4,%d1		# rotate reg num into place
@@ -1512,14 +1512,14 @@ base_supp_ck:
 no_base_sup:
 	bfextu		%d5{&26:&2},%d0	# get bd size
 #	beq.l		_error			# if (size == 0) it's reserved
-	cmpi.b	 	%d0,&2
+	cmpi.b		%d0,&2
 	blt.b		no_bd
 	beq.b		get_word_bd
 
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long
-	
+
 	tst.l		%d1			# ifetch error?
 	bne.l		isp_iacc		# yes
 
@@ -1533,16 +1533,16 @@ get_word_bd:
 	bne.l		isp_iacc		# yes
 
 	ext.l		%d0			# sign extend bd
-	
+
 chk_ind:
 	add.l		%d0,%d3			# base += bd
 no_bd:
 	bfextu		%d5{&30:&2},%d0		# is od suppressed?
 	beq.w		aii_bd
-	cmpi.b	 	%d0,&0x2
+	cmpi.b		%d0,&0x2
 	blt.b		null_od
 	beq.b		word_od
-	
+
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
 	addq.l		&0x4,EXC_EXTWPTR(%a6)	# incr instruction ptr
 	bsr.l		_imem_read_long
@@ -1550,7 +1550,7 @@ no_bd:
 	tst.l		%d1			# ifetch error?
 	bne.l		isp_iacc		# yes
 
-	bra.b 		add_them
+	bra.b		add_them
 
 word_od:
 	mov.l		EXC_EXTWPTR(%a6),%a0	# fetch instruction addr
@@ -1604,10 +1604,10 @@ done_ea:
 # must create an access error frame. here, we pass a skeleton fslw
 # and the failing address to the routine that creates the new frame.
 # FSLW:
-# 	read = true
-# 	size = longword
+#	read = true
+#	size = longword
 #	TM = data
-# 	software emulation error = true
+#	software emulation error = true
 calc_ea_err:
 	mov.l		%d3,%a0			# pass failing address
 	mov.l		&0x01010001,%d0		# pass fslw
@@ -1615,7 +1615,7 @@ calc_ea_err:
 
 #########################################################################
 # XDEF **************************************************************** #
-# 	_moveperipheral(): routine to emulate movep instruction		#
+#	_moveperipheral(): routine to emulate movep instruction		#
 #									#
 # XREF **************************************************************** #
 #	_dmem_read_byte() - read byte from memory			#
@@ -1647,7 +1647,7 @@ calc_ea_err:
 # movep.(w,l)	Dx,(d,Ay) #
 # movep.(w,l)	(d,Ay),Dx #
 ###########################
-	global 		_moveperipheral
+	global		_moveperipheral
 _moveperipheral:
 	mov.w		EXC_OPWORD(%a6),%d1	# fetch the opcode word
 
@@ -1793,11 +1793,11 @@ m2rltrans:
 	mov.b		EXC_OPWORD(%a6),%d1
 	lsr.b		&0x1,%d1
 	and.w		&0x7,%d1		# extract Dx from opcode word
-	
+
 	mov.l		%d2,(EXC_DREGS,%a6,%d1.w*4) # store dx
 
 	rts
-	
+
 # a0 = dst addr
 m2rwtrans:
 	mov.l		%a0,%a2			# store addr
@@ -1823,7 +1823,7 @@ m2rwtrans:
 	mov.b		EXC_OPWORD(%a6),%d1
 	lsr.b		&0x1,%d1
 	and.w		&0x7,%d1		# extract Dx from opcode word
-	
+
 	mov.w		%d2,(EXC_DREGS+2,%a6,%d1.w*4) # store dx
 
 	rts
@@ -1832,7 +1832,7 @@ m2rwtrans:
 # must create an access error frame. here, we pass a skeleton fslw
 # and the failing address to the routine that creates the new frame.
 # FSLW:
-# 	write = true
+#	write = true
 #	size = byte
 #	TM = data
 #	software emulation error = true
@@ -1842,7 +1842,7 @@ movp_write_err:
 	bra.l		isp_dacc
 
 # FSLW:
-# 	read = true
+#	read = true
 #	size = byte
 #	TM = data
 #	software emulation error = true
@@ -1853,12 +1853,12 @@ movp_read_err:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	_chk2_cmp2(): routine to emulate chk2/cmp2 instructions		#
+#	_chk2_cmp2(): routine to emulate chk2/cmp2 instructions		#
 #									#
 # XREF ****************************************************************	#
 #	_calc_ea(): calculate effective address				#
 #	_dmem_read_long(): read operands				#
-# 	_dmem_read_word(): read operands				#
+#	_dmem_read_word(): read operands				#
 #	isp_dacc(): handle data access error exception			#
 #									#
 # INPUT ***************************************************************	#
@@ -1869,25 +1869,25 @@ movp_read_err:
 #		a0 = failing address					#
 #		d0 = FSLW						#
 #	else								#
-# 		none							#
+#		none							#
 #									#
 # ALGORITHM ***********************************************************	#
 #	First, calculate the effective address, then fetch the byte,	#
-# word, or longword sized operands. Then, in the interest of 		#
-# simplicity, all operands are converted to longword size whether the 	#
-# operation is byte, word, or long. The bounds are sign extended 	#
-# accordingly. If Rn is a data regsiter, Rn is also sign extended. If 	#
-# Rn is an address register, it need not be sign extended since the 	#
+# word, or longword sized operands. Then, in the interest of		#
+# simplicity, all operands are converted to longword size whether the	#
+# operation is byte, word, or long. The bounds are sign extended	#
+# accordingly. If Rn is a data regsiter, Rn is also sign extended. If	#
+# Rn is an address register, it need not be sign extended since the	#
 # full register is always used.						#
 #	The comparisons are made and the condition codes calculated.	#
 # If the instruction is chk2 and the Rn value is out-of-bounds, set	#
 # the ichk_flg in SPCOND_FLG.						#
-#	If the memory fetch returns a failing value, pass the failing 	#
+#	If the memory fetch returns a failing value, pass the failing	#
 # address and FSLW to the isp_dacc() routine.				#
 #									#
 #########################################################################
 
-	global 		_chk2_cmp2
+	global		_chk2_cmp2
 _chk2_cmp2:
 
 # passing size parameter doesn't matter since chk2 & cmp2 can't do
@@ -1974,7 +1974,7 @@ chk2_cmp2_byte:
 
 #
 # To set the ccodes correctly:
-# 	(1) save 'Z' bit from (Rn - lo)
+#	(1) save 'Z' bit from (Rn - lo)
 #	(2) save 'Z' and 'N' bits from ((hi - lo) - (Rn - hi))
 #	(3) keep 'X', 'N', and 'V' from before instruction
 #	(4) combine ccodes
@@ -1984,7 +1984,7 @@ chk2_cmp2_compare:
 	mov.w		%cc, %d3		# fetch resulting ccodes
 	andi.b		&0x4, %d3		# keep 'Z' bit
 	sub.l		%d0, %d1		# (hi - lo)
-	cmp.l	 	%d1,%d2			# ((hi - lo) - (Rn - hi))
+	cmp.l		%d1,%d2			# ((hi - lo) - (Rn - hi))
 
 	mov.w		%cc, %d4		# fetch resulting ccodes
 	or.b		%d4, %d3		# combine w/ earlier ccodes
@@ -2003,7 +2003,7 @@ chk2_cmp2_compare:
 # this code handles the only difference between chk2 and cmp2. chk2 would
 # have trapped out if the value was out of bounds. we check this by seeing
 # if the 'N' bit was set by the operation.
-chk2_finish:	
+chk2_finish:
 	btst		&0x0, %d4		# is 'N' bit set?
 	bne.b		chk2_trap		# yes;chk2 should trap
 	rts
@@ -2018,7 +2018,7 @@ chk2_trap:
 #	read = true
 #	size = longword
 #	TM = data
-# 	software emulation error = true
+#	software emulation error = true
 chk2_cmp2_err_l:
 	mov.l		%a2,%a0			# pass failing address
 	mov.l		&0x01010001,%d0		# pass fslw
@@ -2028,7 +2028,7 @@ chk2_cmp2_err_l:
 #	read = true
 #	size = word
 #	TM = data
-# 	software emulation error = true
+#	software emulation error = true
 chk2_cmp2_err_w:
 	mov.l		%a2,%a0			# pass failing address
 	mov.l		&0x01410001,%d0		# pass fslw
@@ -2036,12 +2036,12 @@ chk2_cmp2_err_w:
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	_div64(): routine to emulate div{u,s}.l <ea>,Dr:Dq		#
+#	_div64(): routine to emulate div{u,s}.l <ea>,Dr:Dq		#
 #							64/32->32r:32q	#
 #									#
 # XREF ****************************************************************	#
 #	_calc_ea() - calculate effective address			#
-# 	isp_iacc() - handle instruction access error exception		#
+#	isp_iacc() - handle instruction access error exception		#
 #	isp_dacc() - handle data access error exception			#
 #	isp_restore() - restore An on access error w/ -() or ()+	#
 #									#
@@ -2049,24 +2049,24 @@ chk2_cmp2_err_w:
 #	none								#
 #									#
 # OUTPUT **************************************************************	#
-# 	If exiting through isp_dacc...					#
+#	If exiting through isp_dacc...					#
 #		a0 = failing address					#
-# 		d0 = FSLW						#
+#		d0 = FSLW						#
 #	else								#
 #		none							#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	First, decode the operand location. If it's in Dn, fetch from	#
-# the stack. If it's in memory, use _calc_ea() to calculate the 	#
+#	First, decode the operand location. If it's in Dn, fetch from	#
+# the stack. If it's in memory, use _calc_ea() to calculate the		#
 # effective address. Use _dmem_read_long() to fetch at that address.	#
 # Unless the operand is immediate data. Then use _imem_read_long().	#
 # Send failures to isp_dacc() or isp_iacc() as appropriate.		#
-#	If the operands are signed, make them unsigned and save	the 	#
+#	If the operands are signed, make them unsigned and save	the	#
 # sign info for later. Separate out special cases like divide-by-zero	#
 # or 32-bit divides if possible. Else, use a special math algorithm	#
-# to calculate the result. 						#
-#	Restore sign info if signed instruction. Set the condition 	#
-# codes. Set idbyz_flg in SPCOND_FLG if divisor was zero. Store the 	#
+# to calculate the result.						#
+#	Restore sign info if signed instruction. Set the condition	#
+# codes. Set idbyz_flg in SPCOND_FLG if divisor was zero. Store the	#
 # quotient and remainder in the appropriate data registers on the stack.#
 #									#
 #########################################################################
@@ -2131,7 +2131,7 @@ dsgndividend:
 	negx.l		%d5
 
 # extract some special cases:
-# 	- is (dividend == 0) ?
+#	- is (dividend == 0) ?
 #	- is (hi(dividend) == 0 && (divisor <= lo(dividend))) ? (32-bit div)
 dspecialcases:
 	tst.l		%d5			# is (hi(dividend) == 0)
@@ -2140,7 +2140,7 @@ dspecialcases:
 	tst.l		%d6			# is (lo(dividend) == 0), too
 	beq.w		ddone			# yes, so (dividend == 0)
 
-	cmp.l	 	%d7,%d6			# is (divisor <= lo(dividend))
+	cmp.l		%d7,%d6			# is (divisor <= lo(dividend))
 	bls.b		d32bitdivide		# yes, so use 32 bit divide
 
 	exg		%d5,%d6			# q = 0, r = dividend
@@ -2153,7 +2153,7 @@ d32bitdivide:
 
 dnormaldivide:
 # last special case:
-# 	- is hi(dividend) >= divisor ? if yes, then overflow
+#	- is hi(dividend) >= divisor ? if yes, then overflow
 	cmp.l		%d7,%d5
 	bls.b		ddovf			# answer won't fit in 32 bits
 
@@ -2166,7 +2166,7 @@ divfinish:
 	beq.b		ddone			# divu has no processing!!!
 
 # it was a divs.l, so ccode setting is a little more complicated...
-	tst.b		NDIVIDEND(%a6)		# remainder has same sign 
+	tst.b		NDIVIDEND(%a6)		# remainder has same sign
 	beq.b		dcc			# as dividend.
 	neg.l		%d5			# sgn(rem) = sgn(dividend)
 dcc:
@@ -2194,7 +2194,7 @@ ddone:
 	mov.w		%cc, EXC_CC(%a6)
 
 	mov.w		NDRSAVE(%a6), %d0	# get Dr off stack
-	mov.w		NDQSAVE(%a6), %d1	# get Dq off stack	
+	mov.w		NDQSAVE(%a6), %d1	# get Dq off stack
 
 # if the register numbers are the same, only the quotient gets saved.
 # so, if we always save the quotient second, we save ourselves a cmp&beq
@@ -2221,8 +2221,8 @@ div64eq0:
 # For this implementation b=2**16, and the target is U1U2U3U4/V1V2,	#
 # where U,V are words of the quadword dividend and longword divisor,	#
 # and U1, V1 are the most significant words.				#
-# 									#
-# The most sig. longword of the 64 bit dividend must be in %d5, least 	#
+#									#
+# The most sig. longword of the 64 bit dividend must be in %d5, least	#
 # in %d6. The divisor must be in the variable ddivisor, and the		#
 # signed/unsigned flag ddusign must be set (0=unsigned,1=signed).	#
 # The quotient is returned in %d6, remainder in %d5, unless the		#
@@ -2242,7 +2242,7 @@ dclassical:
 # dividing the divisor word into each dividend word. In this case,
 # the first two quotient words must be zero, or overflow would occur.
 # Since we already checked this case above, we can treat the most significant
-# longword of the dividend as (0) remainder (see Knuth) and merely complete 
+# longword of the dividend as (0) remainder (see Knuth) and merely complete
 # the last two divisions to get a quotient longword and word remainder:
 
 	clr.l		%d1
@@ -2278,12 +2278,12 @@ ddknuth:
 	clr.b		DDSECOND(%a6)		# clear flag for quotient digits
 	clr.l		%d1			# %d1 will hold trial quotient
 ddnchk:
-	btst		&31, %d7		# must we normalize? first word of 
+	btst		&31, %d7		# must we normalize? first word of
 	bne.b		ddnormalized		# divisor (V1) must be >= 65536/2
 	addq.l		&0x1, DDNORMAL(%a6)	# count normalization shifts
 	lsl.l		&0x1, %d7		# shift the divisor
 	lsl.l		&0x1, %d6		# shift u4,u3 with overflow to u2
-	roxl.l		&0x1, %d5		# shift u1,u2 
+	roxl.l		&0x1, %d5		# shift u1,u2
 	bra.w		ddnchk
 ddnormalized:
 
@@ -2293,12 +2293,12 @@ ddnormalized:
 	mov.l		%d5, %d2		# dividend mslw
 	swap		%d2
 	swap		%d3
-	cmp.w	 	%d2, %d3		# V1 = U1 ?
+	cmp.w		%d2, %d3		# V1 = U1 ?
 	bne.b		ddqcalc1
 	mov.w		&0xffff, %d1		# use max trial quotient word
 	bra.b		ddadj0
 ddqcalc1:
-	mov.l		%d5, %d1		
+	mov.l		%d5, %d1
 
 	divu.w		%d3, %d1		# use quotient of mslw/msw
 
@@ -2329,7 +2329,7 @@ ddadj1: mov.l		%d7, %d3
 
 #	add.l		%d6, %d4		# (U1U2 - V1q) + U3
 
-	cmp.l	 	%d2, %d4
+	cmp.l		%d2, %d4
 	bls.b		ddadjd1			# is V2q > (U1U2-V1q) + U3 ?
 	subq.l		&0x1, %d1		# yes, decrement and recheck
 	bra.b		ddadj1
@@ -2366,7 +2366,7 @@ dd2nd:
 	tst.b		DDSECOND(%a6)		# both q words done?
 	bne.b		ddremain
 # first quotient digit now correct. store digit and shift the
-# (subtracted) dividend 
+# (subtracted) dividend
 	mov.w		%d1, DDQUOTIENT(%a6)
 	clr.l		%d1
 	swap		%d5
@@ -2377,7 +2377,7 @@ dd2nd:
 	bra.w		ddnormalized
 ddremain:
 # add 2nd word to quotient, get the remainder.
-	mov.w 		%d1, DDQUOTIENT+2(%a6)
+	mov.w		%d1, DDQUOTIENT+2(%a6)
 # shift down one word/digit to renormalize remainder.
 	mov.w		%d5, %d6
 	swap		%d6
@@ -2391,7 +2391,7 @@ ddnlp:
 	dbf		%d7, ddnlp
 ddrn:
 	mov.l		%d6, %d5		# remainder
-	mov.l		DDQUOTIENT(%a6), %d6 	# quotient
+	mov.l		DDQUOTIENT(%a6), %d6	# quotient
 
 	rts
 dmm2:
@@ -2421,7 +2421,7 @@ dmm2:
 	clr.w		%d2			# lsw of two mixed products used,
 	swap		%d5			# now use msws of longwords
 	swap		%d2
-	add.l		%d2, %d5				
+	add.l		%d2, %d5
 	add.l		%d3, %d5		# %d5 now ms 32 bits of final product
 	rts
 
@@ -2463,10 +2463,10 @@ dimmed:
 # also, we call isp_restore in case the effective addressing mode was
 # (an)+ or -(an) in which case the previous "an" value must be restored.
 # FSLW:
-# 	read = true
-# 	size = longword
+#	read = true
+#	size = longword
 #	TM = data
-# 	software emulation error = true
+#	software emulation error = true
 div64_err:
 	bsr.l		isp_restore		# restore addr reg
 	mov.l		%a2,%a0			# pass failing address
@@ -2480,17 +2480,17 @@ div64_err:
 # XREF ****************************************************************	#
 #	_calc_ea() - calculate effective address			#
 #	isp_iacc() - handle instruction access error exception		#
-# 	isp_dacc() - handle data access error exception			#
+#	isp_dacc() - handle data access error exception			#
 #	isp_restore() - restore An on access error w/ -() or ()+	#
 #									#
 # INPUT ***************************************************************	#
 #	none								#
 #									#
 # OUTPUT **************************************************************	#
-# 	If exiting through isp_dacc...					#
+#	If exiting through isp_dacc...					#
 #		a0 = failing address					#
 #		d0 = FSLW						#
-# 	else								#
+#	else								#
 #		none							#
 #									#
 # ALGORITHM ***********************************************************	#
@@ -2499,9 +2499,9 @@ div64_err:
 # effective address. Use _dmem_read_long() to fetch at that address.	#
 # Unless the operand is immediate data. Then use _imem_read_long().	#
 # Send failures to isp_dacc() or isp_iacc() as appropriate.		#
-#	If the operands are signed, make them unsigned and save the 	#
+#	If the operands are signed, make them unsigned and save the	#
 # sign info for later. Perform the multiplication using 16x16->32	#
-# unsigned multiplies and "add" instructions. Store the high and low 	#
+# unsigned multiplies and "add" instructions. Store the high and low	#
 # portions of the result in the appropriate data registers on the	#
 # stack. Calculate the condition codes, also.				#
 #									#
@@ -2554,15 +2554,15 @@ mul64_multiplicand:
 # the result sign is the exclusive or of the operand sign bits.
 mul64_chk_md_sgn:
 	tst.l		%d4			# is multiplicand negative?
-	bge.b		mul64_alg		# no	
+	bge.b		mul64_alg		# no
 	neg.l		%d4			# make multiplicand positive
 	eori.b		&0x1, EXC_TEMP(%a6)	# calculate correct sign
 
 #########################################################################
 #	63			   32				0	#
-# 	----------------------------					#
-# 	| hi(mplier) * hi(mplicand)|					#
-# 	----------------------------					#
+#	----------------------------					#
+#	| hi(mplier) * hi(mplicand)|					#
+#	----------------------------					#
 #		     -----------------------------			#
 #		     | hi(mplier) * lo(mplicand) |			#
 #		     -----------------------------			#
@@ -2639,7 +2639,7 @@ mul64_done:
 	andi.b		&0x8, %d7		# extract 'N' bit
 
 mul64_ccode_set:
-	mov.b		EXC_CC+1(%a6), %d6 	# fetch previous %ccr
+	mov.b		EXC_CC+1(%a6), %d6	# fetch previous %ccr
 	andi.b		&0x10, %d6		# all but 'X' bit changes
 
 	or.b		%d7, %d6		# group 'X' and 'N'
@@ -2698,10 +2698,10 @@ mul64_immed:
 # also, we call isp_restore in case the effective addressing mode was
 # (an)+ or -(an) in which case the previous "an" value must be restored.
 # FSLW:
-# 	read = true
-# 	size = longword
+#	read = true
+#	size = longword
 #	TM = data
-# 	software emulation error = true
+#	software emulation error = true
 mul64_err:
 	bsr.l		isp_restore		# restore addr reg
 	mov.l		%a2,%a0			# pass failing address
@@ -2728,7 +2728,7 @@ mul64_err:
 #									#
 # _isp_cas2_finish():							#
 #	see cas2 core emulation code					#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 # _compandset2():							#
 #	see cas2 core emulation code					#
@@ -2744,7 +2744,7 @@ mul64_err:
 # pages from being paged out. If either _real_lock_page() fails, exit	#
 # through _cas_terminate2(). Don't forget to unlock the 1st locked page	#
 # using _real_unlock_paged() if the 2nd lock-page fails.		#
-# Finally, branch to the core cas2 emulation code by calling the 	#
+# Finally, branch to the core cas2 emulation code by calling the	#
 # "callout" _real_cas2().						#
 #									#
 # _isp_cas2_finish():							#
@@ -2793,7 +2793,7 @@ _compandset2:
 	lsr.w		&0x6,%d1
 	andi.w		&0x7,%d1		# extract Du1
 	mov.l		(EXC_DREGS,%a6,%d1.w*4),%d4 # fetch Update1 Op
-	
+
 	andi.w		&0x7,%d0		# extract Dc1
 	mov.l		(EXC_DREGS,%a6,%d0.w*4),%d2 # fetch Compare1 Op
 	mov.w		%d0,DC1(%a6)
@@ -2827,7 +2827,7 @@ _compandset2:
 
 	bra.l		_real_cas2
 
-# if the 2nd lock attempt fails, then we must still unlock the 
+# if the 2nd lock attempt fails, then we must still unlock the
 # first page(s).
 cas_preterm:
 	mov.l		%d0,-(%sp)		# save FSLW
@@ -2869,7 +2869,7 @@ cas2_finish_w_done:
 	sf		%d1			# pass size
 	mov.l		ADDR1(%a6),%a0		# pass ADDR1
 	bsr.l		_real_unlock_page	# unlock page
-	
+
 	mov.l		%d2,%d0			# pass mode
 	sf		%d1			# pass size
 	mov.l		ADDR2(%a6),%a0		# pass ADDR2
@@ -2900,7 +2900,7 @@ cas2_finish_l_done:
 	st		%d1			# pass size
 	mov.l		ADDR1(%a6),%a0		# pass ADDR1
 	bsr.l		_real_unlock_page	# unlock page
-	
+
 	mov.l		%d2,%d0			# pass mode
 	st		%d1			# pass size
 	mov.l		ADDR2(%a6),%a0		# pass ADDR2
@@ -2928,11 +2928,11 @@ cr_cas2:
 #			    (external to package)			#
 #									#
 # XREF ****************************************************************	#
-# 	_calc_ea(): calculate effective address				#
+#	_calc_ea(): calculate effective address				#
 #									#
 # INPUT ***************************************************************	#
 # compandset():								#
-# 	none								#
+#	none								#
 # _isp_cas_restart():							#
 #	d6 = previous sfc/dfc						#
 # _isp_cas_finish():							#
@@ -2959,10 +2959,10 @@ cr_cas2:
 # ALGORITHM ***********************************************************	#
 #									#
 # compandset():								#
-#	First, calculate the effective address. Then, decode the 	#
+#	First, calculate the effective address. Then, decode the	#
 # instruction word and fetch the "compare" (DC) and "update" (Du)	#
 # operands.								#
-# 	Next, call the external routine _real_lock_page() so that the	#
+#	Next, call the external routine _real_lock_page() so that the	#
 # operating system can keep this page from being paged out while we're	#
 # in this routine. If this call fails, jump to _cas_terminate2().	#
 #	The routine then branches to _real_cas(). This external routine	#
@@ -2971,7 +2971,7 @@ cr_cas2:
 # this purpose.								#
 #									#
 # _isp_cas_finish():							#
-# 	Either way, after emulation, the package is re-entered at	#
+#	Either way, after emulation, the package is re-entered at	#
 # _isp_cas_finish(). This routine re-compares the operands in order to	#
 # set the condition codes. Finally, these routines will call		#
 # _real_unlock_page() in order to unlock the pages that were previously	#
@@ -2984,13 +2984,13 @@ cr_cas2:
 # _isp_cas_terminate():							#
 #	This routine can be entered from an access error handler where	#
 # an emulation operand access failed and the operating system would	#
-# like an access error stack frame created instead of the current 	#
+# like an access error stack frame created instead of the current	#
 # unimplemented integer instruction frame.				#
-# 	Also, the package enters here if a call to _real_lock_page()	#
+#	Also, the package enters here if a call to _real_lock_page()	#
 # fails.								#
 #									#
 # _isp_cas_inrange():							#
-# 	Checks to see whether the instruction address passed to it in	#
+#	Checks to see whether the instruction address passed to it in	#
 # a0 is within the software package cas/cas2 emulation routines. This	#
 # can be helpful for an operating system to determine whether an access	#
 # error during emulation was due to a cas/cas2 emulation access.	#
@@ -3003,18 +3003,18 @@ set ADDR,	EXC_TEMP+0x4
 	global		_compandset
 _compandset:
 	btst		&0x1,EXC_OPWORD(%a6)	# word or long operation?
-	bne.b		compandsetl		# long	
+	bne.b		compandsetl		# long
 
 compandsetw:
 	movq.l		&0x2,%d0		# size = 2 bytes
-	bsr.l		_calc_ea		# a0 = calculated <ea>	
+	bsr.l		_calc_ea		# a0 = calculated <ea>
 	mov.l		%a0,ADDR(%a6)		# save <ea> for possible restart
 	sf		%d7			# clear d7 for word size
 	bra.b		compandsetfetch
 
 compandsetl:
 	movq.l		&0x4,%d0		# size = 4 bytes
-	bsr.l		_calc_ea		# a0 = calculated <ea>	
+	bsr.l		_calc_ea		# a0 = calculated <ea>
 	mov.l		%a0,ADDR(%a6)		# save <ea> for possible restart
 	st		%d7			# set d7 for longword size
 
@@ -3040,7 +3040,7 @@ compandsetfetch:
 	tst.l		%d0			# did error occur?
 	bne.w		_cas_terminate2		# yes, clean up the mess
 	mov.l		%a2,%a0			# pass addr in a0
-	
+
 	bra.l		_real_cas
 
 ########
@@ -3053,7 +3053,7 @@ _isp_cas_finish:
 # from the locked routine...
 cas_finish_w:
 	mov.w		EXC_CC(%a6),%cc		# restore cc
-	cmp.w	 	%d0,%d4			# do word compare
+	cmp.w		%d0,%d4			# do word compare
 	mov.w		%cc,EXC_CC(%a6)		# save cc
 
 	tst.b		%d1			# update compare reg?
@@ -3074,7 +3074,7 @@ cas_finish_w_done:
 # from the locked routine...
 cas_finish_l:
 	mov.w		EXC_CC(%a6),%cc		# restore cc
-	cmp.l	 	%d0,%d4			# do longword compare
+	cmp.l		%d0,%d4			# do longword compare
 	mov.w		%cc,EXC_CC(%a6)		# save cc
 
 	tst.b		%d1			# update compare reg?
@@ -3092,7 +3092,7 @@ cas_finish_l_done:
 	rts
 
 ########
-	
+
 	global		_isp_cas_restart
 _isp_cas_restart:
 	mov.l		%d6,%sfc		# restore previous sfc
@@ -3104,7 +3104,7 @@ cr_cas:
 	mov.l		ADDR(%a6),%a0		# load <ea>
 	btst		&0x1,EXC_OPWORD(%a6)	# word or long operation?
 	sne		%d7			# set d7 accordingly
-	bra.w		compandsetfetch	
+	bra.w		compandsetfetch
 
 ########
 
@@ -3151,7 +3151,7 @@ _isp_cas_inrange:
 	cmp.l		%a0,%a1			# is PC in range?
 	blt.b		cin_no			# no
 	rts					# yes; return d0 = 0
-cin_no:	
+cin_no:
 	mov.l		&-0x1,%d0		# out of range; return d0 = -1
 	rts
 
@@ -3179,28 +3179,28 @@ cin_no:
 #									#
 # XREF ****************************************************************	#
 #	_isp_cas2_finish() - only exit point for this emulation code;	#
-#			     do clean-up; calculate ccodes; store 	#
+#			     do clean-up; calculate ccodes; store	#
 #			     Compare Ops if appropriate.		#
 #									#
 # INPUT ***************************************************************	#
 #	*see chart below*						#
-# 									#
+#									#
 # OUTPUT **************************************************************	#
 #	*see chart below*						#
 #									#
 # ALGORITHM ***********************************************************	#
 #	(1) Make several copies of the effective address.		#
 #	(2) Save current SR; Then mask off all maskable interrupts.	#
-#	(3) Save current SFC/DFC (ASSUMED TO BE EQUAL!!!); Then set 	#
-#	    according to whether exception occurred in user or 		#
+#	(3) Save current SFC/DFC (ASSUMED TO BE EQUAL!!!); Then set	#
+#	    according to whether exception occurred in user or		#
 #	    supervisor mode.						#
 #	(4) Use "plpaw" instruction to pre-load ATC with effective	#
 #	    address pages(s). THIS SHOULD NOT FAULT!!! The relevant	#
 #	    page(s) should have already been made resident prior to	#
-# 	    entering this routine.					#
-#	(5) Push the operand lines from the cache w/ "cpushl". 		#
+#	    entering this routine.					#
+#	(5) Push the operand lines from the cache w/ "cpushl".		#
 #	    In the 68040, this was done within the locked region. In	#
-# 	    the 68060, it is done outside of the locked region.		#
+#	    the 68060, it is done outside of the locked region.		#
 #	(6) Use "plpar" instruction to do a re-load of ATC entries for	#
 #	    ADDR1 since ADDR2 entries may have pushed ADDR1 out of the	#
 #	    ATC.							#
@@ -3214,19 +3214,19 @@ cin_no:
 #	    back to itself (as w/ the '040) so we can gracefully unlock	#
 #	    the bus (and assert LOCKE*) using BUSCR and the final move.	#
 #	(12)Exit.							#
-#	(13)Write update operand to the DST locations. Use BUSCR to 	#
+#	(13)Write update operand to the DST locations. Use BUSCR to	#
 #	    assert LOCKE* for the final write operation.		#
 #	(14)Exit.							#
 #									#
-# 	The algorithm is actually implemented slightly differently	#
-# depending on the size of the operation and the misalignment of the 	#
+#	The algorithm is actually implemented slightly differently	#
+# depending on the size of the operation and the misalignment of the	#
 # operands. A misaligned operand must be written in aligned chunks or	#
 # else the BUSCR register control gets confused.			#
 #									#
 #########################################################################
 
 #################################################################
-# THIS IS THE STATE OF THE INTEGER REGISTER FILE UPON		# 
+# THIS IS THE STATE OF THE INTEGER REGISTER FILE UPON		#
 # ENTERING _isp_cas2().						#
 #								#
 # D0 = xxxxxxxx							#
@@ -3236,7 +3236,7 @@ cin_no:
 # D4 = update oper 1						#
 # D5 = update oper 2						#
 # D6 = 'xxxxxxff if supervisor mode; 'xxxxxx00 if user mode	#
-# D7 = 'xxxxxxff if longword operation; 'xxxxxx00 if word 	#
+# D7 = 'xxxxxxff if longword operation; 'xxxxxx00 if word	#
 # A0 = ADDR1							#
 # A1 = ADDR2							#
 # A2 = xxxxxxxx							#
@@ -3339,22 +3339,22 @@ cas2l:
 # A4 = bus unlock value
 # A5 = xxxxxxxx
 #
-	align 		0x10
+	align		0x10
 CAS2L_START:
 	movc		%a2,%buscr		# assert LOCK*
 	movs.l		(%a1),%d1		# fetch Dest2[31:0]
 	movs.l		(%a0),%d0		# fetch Dest1[31:0]
-	bra.b 		CAS2L_CONT
+	bra.b		CAS2L_CONT
 CAS2L_ENTER:
 	bra.b		~+16
 
 CAS2L_CONT:
-	cmp.l	 	%d0,%d2			# Dest1 - Compare1
+	cmp.l		%d0,%d2			# Dest1 - Compare1
 	bne.b		CAS2L_NOUPDATE
-	cmp.l	 	%d1,%d3			# Dest2 - Compare2
+	cmp.l		%d1,%d3			# Dest2 - Compare2
 	bne.b		CAS2L_NOUPDATE
 	movs.l		%d5,(%a1)		# Update2[31:0] -> DEST2
-	bra.b 		CAS2L_UPDATE
+	bra.b		CAS2L_UPDATE
 	bra.b		~+16
 
 CAS2L_UPDATE:
@@ -3384,7 +3384,7 @@ CAS2L_FILLER:
 ####
 
 #################################################################
-# THIS MUST BE THE STATE OF THE INTEGER REGISTER FILE UPON	# 
+# THIS MUST BE THE STATE OF THE INTEGER REGISTER FILE UPON	#
 # ENTERING _isp_cas2().						#
 #								#
 # D0 = destination[31:0] operand 1				#
@@ -3430,22 +3430,22 @@ cas2l_update_done:
 	bra.l		_isp_cas2_finish
 ####
 
-	align 		0x10
+	align		0x10
 CAS2L2_START:
 	movc		%a2,%buscr		# assert LOCK*
 	movs.l		(%a1),%d1		# fetch Dest2[31:0]
 	movs.l		(%a0),%d0		# fetch Dest1[31:0]
-	bra.b 		CAS2L2_CONT
+	bra.b		CAS2L2_CONT
 CAS2L2_ENTER:
 	bra.b		~+16
 
 CAS2L2_CONT:
-	cmp.l	 	%d0,%d2			# Dest1 - Compare1
+	cmp.l		%d0,%d2			# Dest1 - Compare1
 	bne.b		CAS2L2_NOUPDATE
-	cmp.l	 	%d1,%d3			# Dest2 - Compare2
+	cmp.l		%d1,%d3			# Dest2 - Compare2
 	bne.b		CAS2L2_NOUPDATE
 	movs.l		%d5,(%a1)		# Update2[31:0] -> Dest2
-	bra.b 		CAS2L2_UPDATE
+	bra.b		CAS2L2_UPDATE
 	bra.b		~+16
 
 CAS2L2_UPDATE:
@@ -3490,22 +3490,22 @@ CAS2L2_FILLER:
 
 #################################
 
-	align 		0x10
+	align		0x10
 CAS2L3_START:
 	movc		%a2,%buscr		# assert LOCK*
 	movs.l		(%a1),%d1		# fetch Dest2[31:0]
 	movs.l		(%a0),%d0		# fetch Dest1[31:0]
-	bra.b 		CAS2L3_CONT
+	bra.b		CAS2L3_CONT
 CAS2L3_ENTER:
 	bra.b		~+16
 
 CAS2L3_CONT:
-	cmp.l	 	%d0,%d2			# Dest1 - Compare1
+	cmp.l		%d0,%d2			# Dest1 - Compare1
 	bne.b		CAS2L3_NOUPDATE
-	cmp.l	 	%d1,%d3			# Dest2 - Compare2
+	cmp.l		%d1,%d3			# Dest2 - Compare2
 	bne.b		CAS2L3_NOUPDATE
 	movs.l		%d5,(%a1)		# Update2[31:0] -> DEST2
-	bra.b 		CAS2L3_UPDATE
+	bra.b		CAS2L3_UPDATE
 	bra.b		~+16
 
 CAS2L3_UPDATE:
@@ -3531,7 +3531,7 @@ CAS2L3_UPDATE3:
 	nop
 	nop
 	bra.b		~+16
-	
+
 CAS2L3_NOUPDATE:
 	rol.l		&0x8,%d0		# get Dest1[31:24]
 	movs.b		%d0,(%a0)+		# Dest1[31:24] -> DEST1
@@ -3639,22 +3639,22 @@ cas2w:
 # A4 = bus unlock value
 # A5 = xxxxxxxx
 #
-	align 		0x10
+	align		0x10
 CAS2W_START:
 	movc		%a2,%buscr		# assert LOCK*
 	movs.w		(%a1),%d1		# fetch Dest2[15:0]
 	movs.w		(%a0),%d0		# fetch Dest1[15:0]
-	bra.b 		CAS2W_CONT2
+	bra.b		CAS2W_CONT2
 CAS2W_ENTER:
 	bra.b		~+16
 
 CAS2W_CONT2:
-	cmp.w	 	%d0,%d2			# Dest1 - Compare1
+	cmp.w		%d0,%d2			# Dest1 - Compare1
 	bne.b		CAS2W_NOUPDATE
-	cmp.w	 	%d1,%d3			# Dest2 - Compare2
+	cmp.w		%d1,%d3			# Dest2 - Compare2
 	bne.b		CAS2W_NOUPDATE
 	movs.w		%d5,(%a1)		# Update2[15:0] -> DEST2
-	bra.b 		CAS2W_UPDATE
+	bra.b		CAS2W_UPDATE
 	bra.b		~+16
 
 CAS2W_UPDATE:
@@ -3684,7 +3684,7 @@ CAS2W_FILLER:
 ####
 
 #################################################################
-# THIS MUST BE THE STATE OF THE INTEGER REGISTER FILE UPON	# 
+# THIS MUST BE THE STATE OF THE INTEGER REGISTER FILE UPON	#
 # ENTERING _isp_cas2().						#
 #								#
 # D0 = destination[15:0] operand 1				#
@@ -3730,22 +3730,22 @@ cas2w_update_done:
 	bra.l		_isp_cas2_finish
 ####
 
-	align 		0x10
+	align		0x10
 CAS2W2_START:
 	movc		%a2,%buscr		# assert LOCK*
 	movs.w		(%a1),%d1		# fetch Dest2[15:0]
 	movs.w		(%a0),%d0		# fetch Dest1[15:0]
-	bra.b 		CAS2W2_CONT2
+	bra.b		CAS2W2_CONT2
 CAS2W2_ENTER:
 	bra.b		~+16
 
 CAS2W2_CONT2:
-	cmp.w	 	%d0,%d2			# Dest1 - Compare1
+	cmp.w		%d0,%d2			# Dest1 - Compare1
 	bne.b		CAS2W2_NOUPDATE
-	cmp.w	 	%d1,%d3			# Dest2 - Compare2
+	cmp.w		%d1,%d3			# Dest2 - Compare2
 	bne.b		CAS2W2_NOUPDATE
 	movs.w		%d5,(%a1)		# Update2[15:0] -> DEST2
-	bra.b 		CAS2W2_UPDATE
+	bra.b		CAS2W2_UPDATE
 	bra.b		~+16
 
 CAS2W2_UPDATE:
@@ -3789,34 +3789,34 @@ CAS2W2_FILLER:
 	bra.b		CAS2W2_START
 
 #       ######      ##      ######
-#       #	   #  #     #     
+#       #	   #  #     #
 #	#	  ######    ######
 #	#	  #    #         #
 #       ######    #    #    ######
 
 #########################################################################
 # XDEF ****************************************************************	#
-# 	_isp_cas(): "core" emulation code for the cas instruction	#
+#	_isp_cas(): "core" emulation code for the cas instruction	#
 #									#
 # XREF ****************************************************************	#
 #	_isp_cas_finish() - only exit point for this emulation code;	#
 #			    do clean-up					#
 #									#
 # INPUT ***************************************************************	#
-# 	*see entry chart below*						#
+#	*see entry chart below*						#
 #									#
 # OUTPUT **************************************************************	#
 #	*see exit chart below*						#
 #									#
 # ALGORITHM ***********************************************************	#
-# 	(1) Make several copies of the effective address. 		#
-# 	(2) Save current SR; Then mask off all maskable interrupts.	#
+#	(1) Make several copies of the effective address.		#
+#	(2) Save current SR; Then mask off all maskable interrupts.	#
 #	(3) Save current DFC/SFC (ASSUMED TO BE EQUAL!!!); Then set	#
 #	    SFC/DFC according to whether exception occurred in user or	#
 #	    supervisor mode.						#
 #	(4) Use "plpaw" instruction to pre-load ATC with efective	#
 #	    address page(s). THIS SHOULD NOT FAULT!!! The relevant	#
-# 	    page(s) should have been made resident prior to entering 	#
+#	    page(s) should have been made resident prior to entering	#
 #	    this routine.						#
 #	(5) Push the operand lines from the cache w/ "cpushl".		#
 #	    In the 68040, this was done within the locked region. In	#
@@ -3834,8 +3834,8 @@ CAS2W2_FILLER:
 #	(12)Write update operand to the DST location. Use BUSCR to	#
 #	    assert LOCKE* for the final write operation.		#
 #	(13)Exit.							#
-# 									#
-# 	The algorithm is actually implemented slightly differently	#
+#									#
+#	The algorithm is actually implemented slightly differently	#
 # depending on the size of the operation and the misalignment of the	#
 # operand. A misaligned operand must be written in aligned chunks or	#
 # else the BUSCR register control gets confused.			#
@@ -3934,9 +3934,9 @@ casw:
 CASW_START:
 	movc		%a1,%buscr		# assert LOCK*
 	movs.w		(%a0),%d0		# fetch Dest[15:0]
-	cmp.w	 	%d0,%d4			# Dest - Compare
+	cmp.w		%d0,%d4			# Dest - Compare
 	bne.b		CASW_NOUPDATE
-	bra.b 		CASW_UPDATE
+	bra.b		CASW_UPDATE
 CASW_ENTER:
 	bra.b		~+16
 
@@ -3961,7 +3961,7 @@ CASW_NOUPDATE:
 	movs.b		%d0,(%a0)+		# Dest[15:8] -> DEST
 	movc		%a2,%buscr		# assert LOCKE*
 	rol.l		&0x8,%d0		# get Dest[7:0]
-	bra.b 		CASW_NOUPDATE2
+	bra.b		CASW_NOUPDATE2
 	bra.b		~+16
 
 CASW_NOUPDATE2:
@@ -4090,9 +4090,9 @@ casl:
 CASL_START:
 	movc		%a1,%buscr		# assert LOCK*
 	movs.l		(%a0),%d0		# fetch Dest[31:0]
-	cmp.l	 	%d0,%d4			# Dest - Compare
+	cmp.l		%d0,%d4			# Dest - Compare
 	bne.b		CASL_NOUPDATE
-	bra.b 		CASL_UPDATE
+	bra.b		CASL_UPDATE
 CASL_ENTER:
 	bra.b		~+16
 
@@ -4117,7 +4117,7 @@ CASL_NOUPDATE:
 	movs.w		%d0,(%a0)+		# Dest[31:16] -> DEST
 	swap		%d0			# get Dest[15:0]
 	movc		%a2,%buscr		# assert LOCKE*
-	bra.b 		CASL_NOUPDATE2
+	bra.b		CASL_NOUPDATE2
 	bra.b		~+16
 
 CASL_NOUPDATE2:
@@ -4214,7 +4214,7 @@ casl2:
 	mov.l		&0xa0000000,%a2		# assert LOCKE* buscr value
 	mov.l		&0x00000000,%a3		# buscr unlock value
 
-# pre-load the instruction cache for the following algorithm. 
+# pre-load the instruction cache for the following algorithm.
 # this will minimize the number of cycles that LOCK* will be asserted.
 	bra.b		CASL2_ENTER		# start pre-loading icache
 
@@ -4238,9 +4238,9 @@ casl2:
 CASL2_START:
 	movc		%a1,%buscr		# assert LOCK*
 	movs.l		(%a0),%d0		# fetch Dest[31:0]
-	cmp.l	 	%d0,%d4			# Dest - Compare
+	cmp.l		%d0,%d4			# Dest - Compare
 	bne.b		CASL2_NOUPDATE
-	bra.b 		CASL2_UPDATE
+	bra.b		CASL2_UPDATE
 CASL2_ENTER:
 	bra.b		~+16
 
@@ -4263,14 +4263,14 @@ CASL2_NOUPDATE:
 	movs.b		%d0,(%a0)+		# Dest[31:24] -> DEST
 	swap		%d0			# get Dest[23:8]
 	movs.w		%d0,(%a0)+		# Dest[23:8] -> DEST+0x1
-	bra.b 		CASL2_NOUPDATE2
+	bra.b		CASL2_NOUPDATE2
 	bra.b		~+16
 
 CASL2_NOUPDATE2:
 	rol.l		&0x8,%d0		# get Dest[7:0]
 	movc		%a2,%buscr		# assert LOCKE*
 	movs.b		%d0,(%a0)		# Dest[7:0] -> DEST+0x3
-	bra.b 		CASL2_NOUPDATE3
+	bra.b		CASL2_NOUPDATE3
 	nop
 	bra.b		~+16
 

@@ -2,7 +2,7 @@
 #define __M68K_UNALIGNED_H
 
 /*
- * The m68k can do unaligned accesses itself. 
+ * The m68k can do unaligned accesses itself.
  *
  * The strange macros are there to make sure these can't
  * be misused in a way that makes them not work on other

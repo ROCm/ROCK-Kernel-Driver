@@ -1578,7 +1578,7 @@ static int w9968cf_i2c_init(struct w9968cf_device* cam)
 
 	static struct i2c_adapter adap = {
 		.id =                I2C_ALGO_SMBUS | I2C_HW_SMBUS_W9968CF,
-		.class =             I2C_ADAP_CLASS_CAM_DIGITAL,
+		.class =             I2C_CLASS_CAM_DIGITAL,
 		.owner =             THIS_MODULE,
 		.client_register =   w9968cf_i2c_attach_inform,
 		.client_unregister = w9968cf_i2c_detach_inform,

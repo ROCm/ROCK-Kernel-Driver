@@ -13,6 +13,14 @@
 #include <linux/usb.h>
 #include "hcd.h"
 
+#define to_urb(d) container_of(d, struct urb, kref)
+
+static void urb_destroy(struct kref *kref)
+{
+	struct urb *urb = to_urb(kref);
+	kfree(urb);
+}
+
 /**
  * usb_init_urb - initializes a urb so that it can be used by a USB driver
  * @urb: pointer to the urb to initialize
@@ -31,7 +39,7 @@ void usb_init_urb(struct urb *urb)
 {
 	if (urb) {
 		memset(urb, 0, sizeof(*urb));
-		urb->count = (atomic_t)ATOMIC_INIT(1);
+		kref_init(&urb->kref, urb_destroy);
 		spin_lock_init(&urb->lock);
 	}
 }
@@ -80,8 +88,7 @@ struct urb *usb_alloc_urb(int iso_packets, int mem_flags)
 void usb_free_urb(struct urb *urb)
 {
 	if (urb)
-		if (atomic_dec_and_test(&urb->count))
-			kfree(urb);
+		kref_put(&urb->kref);
 }
 
 /**
@@ -96,11 +103,9 @@ void usb_free_urb(struct urb *urb)
  */
 struct urb * usb_get_urb(struct urb *urb)
 {
-	if (urb) {
-		atomic_inc(&urb->count);
-		return urb;
-	} else
-		return NULL;
+	if (urb)
+		kref_get(&urb->kref);
+	return urb;
 }
 		
 		
@@ -232,6 +237,8 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 	    (dev->state < USB_STATE_DEFAULT) ||
 	    (!dev->bus) || (dev->devnum <= 0))
 		return -ENODEV;
+	if (dev->state == USB_STATE_SUSPENDED)
+		return -EHOSTUNREACH;
 	if (!(op = dev->bus->op) || !op->submit_urb)
 		return -ENODEV;
 
