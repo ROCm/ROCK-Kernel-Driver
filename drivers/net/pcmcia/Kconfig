@@ -77,6 +77,7 @@ config PCMCIA_SMC91C92
 	tristate "SMC 91Cxx PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
 	select CRC32
+	select MII
 	help
 	  Say Y here if you intend to attach an SMC 91Cxx compatible PCMCIA
 	  (PC-card) Ethernet or Fast Ethernet card to your computer.

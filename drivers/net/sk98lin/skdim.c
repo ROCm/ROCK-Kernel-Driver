@@ -318,11 +318,6 @@ GetCurrentSystemLoad(SK_AC *pAC) {
 	unsigned int  TotalTime   = 0;
 	unsigned int  UsedTime    = 0;
 	unsigned int  SystemLoad  = 0;
-#ifdef CONFIG_SMP
-	unsigned int  SKNumCpus   = smp_num_cpus;
-#else
-	unsigned int  SKNumCpus   = 1;
-#endif
 
 	/* unsigned int  NbrCpu      = 0; */
 

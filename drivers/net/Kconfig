@@ -1210,6 +1210,7 @@ config PCNET32
 	tristate "AMD PCnet32 PCI support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  If you have a PCnet32 or PCnetPCI based network (Ethernet) card,
 	  answer Y here and read the Ethernet-HOWTO, available from
@@ -1223,6 +1224,7 @@ config AMD8111_ETH
 	tristate "AMD 8111 (new PCI lance) support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  If you have an AMD 8111-based PCI lance ethernet card,
 	  answer Y here and read the Ethernet-HOWTO, available from
@@ -1236,6 +1238,7 @@ config ADAPTEC_STARFIRE
 	tristate "Adaptec Starfire/DuraLAN support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  Say Y here if you have an Adaptec Starfire (or DuraLAN) PCI network
 	  adapter. The DuraLAN chip is used on the 64 bit PCI boards from
@@ -1330,6 +1333,7 @@ config DGRS
 config EEPRO100
 	tristate "EtherExpressPro/100 support (eepro100, original Becker driver)"
 	depends on NET_PCI && PCI
+	select MII
 	help
 	  If you have an Intel EtherExpress PRO/100 PCI network (Ethernet)
 	  card, say Y and read the Ethernet-HOWTO, available from
@@ -1442,6 +1446,7 @@ config FEALNX
 	tristate "Myson MTD-8xx PCI Ethernet support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  Say Y here to support the Mysom MTD-800 family of PCI-based Ethernet
 	  cards. Specifications and data at
@@ -1509,6 +1514,7 @@ config 8139CP
 	tristate "RealTek RTL-8139 C+ PCI Fast Ethernet Adapter support (EXPERIMENTAL)"
 	depends on NET_PCI && PCI && EXPERIMENTAL
 	select CRC32
+	select MII
 	help
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the RTL8139C+ chips. If you have one of those, say Y and read
@@ -1522,6 +1528,7 @@ config 8139TOO
 	tristate "RealTek RTL-8139 PCI Fast Ethernet Adapter support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	---help---
 	  This is a driver for the Fast Ethernet PCI network cards based on
 	  the RTL8139 chips. If you have one of those, say Y and read
@@ -1594,6 +1601,7 @@ config EPIC100
 	tristate "SMC EtherPower II"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  This driver is for the SMC EtherPower II 9432 PCI Ethernet NIC,
 	  which is based on the SMC83c17x (EPIC/100).
@@ -1604,6 +1612,7 @@ config SUNDANCE
 	tristate "Sundance Alta support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  This driver is for the Sundance "Alta" chip.
 	  More specific information and updates are available from
@@ -1642,6 +1651,7 @@ config VIA_RHINE
 	tristate "VIA Rhine support"
 	depends on NET_PCI && PCI
 	select CRC32
+	select MII
 	help
 	  If you have a VIA "rhine" based network card (Rhine-I (3043) or
 	  Rhine-2 (VT86c100A)), say Y here.
@@ -1896,6 +1906,7 @@ config NS83820
 config HAMACHI
 	tristate "Packet Engines Hamachi GNIC-II support"
 	depends on PCI
+	select MII
 	help
 	  If you have a Gigabit Ethernet card of this type, say Y and read
 	  the Ethernet-HOWTO, available from
@@ -2268,6 +2279,8 @@ config PPP_SYNC_TTY
 config PPP_DEFLATE
 	tristate "PPP Deflate compression"
 	depends on PPP
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
 	---help---
 	  Support for the Deflate compression method for PPP, which uses the
 	  Deflate algorithm (the same algorithm that gzip uses) to compress

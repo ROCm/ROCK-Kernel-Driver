@@ -70,6 +70,7 @@ config USB_KAWETH
 config USB_PEGASUS
 	tristate "USB Pegasus/Pegasus-II based ethernet device support"
 	depends on USB && NET
+	select MII
 	---help---
 	  Say Y here if you know you have Pegasus or Pegasus-II based adapter.
 	  If in doubt then look at linux/drivers/usb/pegasus.h for the complete
@@ -96,6 +97,7 @@ config USB_USBNET
 	tristate "Multi-purpose USB Networking Framework"
 	depends on USB && NET
 	select CRC32
+	select MII
 	---help---
 	  This driver supports several kinds of network links over USB,
 	  with "minidrivers" built around a common network driver core
