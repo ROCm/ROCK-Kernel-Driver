@@ -569,10 +569,6 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 			regs->result = -EINTR;
 			regs->gpr[3] = EINTR;
 			/* note that the cr0.SO bit is already set */
-			/* clear any restart function that was set */
-			if (ret == ERESTART_RESTARTBLOCK)
-				current_thread_info()->restart_block.fn
-					= do_no_restart_syscall;
 		} else {
 			regs->nip -= 4;	/* Back up & retry system call */
 			regs->result = 0;
@@ -586,6 +582,9 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 
 	if (signr == 0)
 		return 0;		/* no signals delivered */
+
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 	if ((ka->sa.sa_flags & SA_ONSTACK) && current->sas_ss_size
 	    && !on_sig_stack(regs->gpr[1]))
