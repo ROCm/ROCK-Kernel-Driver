@@ -217,17 +217,17 @@ static int proc_viopath_show(struct seq_file *m, void *v)
 	if (hvrc != HvLpEvent_Rc_Good)
 		printk(VIOPATH_KERN_WARN "hv error on op %d\n", (int)hvrc);
 
-	vlanMap = HvLpConfig_getVirtualLanIndexMap();
 	down(&Semaphore);
 
-
+	vlanMap = HvLpConfig_getVirtualLanIndexMap();
 	vlanIndex = 0;
 	while (vlanMap != 0){
 		if (vlanMap & 0x8000)
 			vlanIndex++;;
 		vlanMap = vlanMap << 1;
 	}
-	buf[PAGE_SIZE] = '\0';
+
+	buf[PAGE_SIZE-1] = '\0';
 	seq_printf(m, "%s", buf);
 
 	seq_printf(m, "AVAILABLE_VETH=%d\n", vlanIndex );
