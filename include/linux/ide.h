@@ -280,9 +280,6 @@ typedef unsigned char	byte;	/* used everywhere */
 	return ((hwif)->chipset == chipset) ? 1 : 0;		\
 }
 
-#define IDE_DEBUG(lineno) \
-	printk("%s,%s,line=%d\n", __FILE__, __FUNCTION__, (lineno))
-
 /*
  * Check for an interrupt and acknowledge the interrupt status
  */
@@ -302,7 +299,8 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_qd65xx,	ide_umc8672,	ide_ht6560b,
 		ide_pdc4030,	ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
-		ide_pmac,	ide_etrax100,	ide_acorn
+		ide_pmac,	ide_etrax100,	ide_acorn,
+		ide_pc9800
 } hwif_chipset_t;
 
 /*
