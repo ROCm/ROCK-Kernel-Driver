@@ -143,8 +143,8 @@ static int sf_setstate(struct ip_mc_list *pmc);
 static void sf_markstate(struct ip_mc_list *pmc);
 #endif
 static void ip_mc_clear_src(struct ip_mc_list *pmc);
-int ip_mc_add_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
-	int sfcount, __u32 *psfsrc, int delta);
+static int ip_mc_add_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
+			 int sfcount, __u32 *psfsrc, int delta);
 
 static void ip_ma_put(struct ip_mc_list *im)
 {
@@ -1384,8 +1384,8 @@ static int ip_mc_del1_src(struct ip_mc_list *pmc, int sfmode,
 #define igmp_ifc_event(x)	do { } while (0)
 #endif
 
-int ip_mc_del_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
-	int sfcount, __u32 *psfsrc, int delta)
+static int ip_mc_del_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
+			 int sfcount, __u32 *psfsrc, int delta)
 {
 	struct ip_mc_list *pmc;
 	int	changerec = 0;
@@ -1520,8 +1520,8 @@ static int sf_setstate(struct ip_mc_list *pmc)
 /*
  * Add multicast source filter list to the interface list
  */
-int ip_mc_add_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
-	int sfcount, __u32 *psfsrc, int delta)
+static int ip_mc_add_src(struct in_device *in_dev, __u32 *pmca, int sfmode,
+			 int sfcount, __u32 *psfsrc, int delta)
 {
 	struct ip_mc_list *pmc;
 	int	isexclude;
@@ -1667,8 +1667,8 @@ done:
 	return err;
 }
 
-int ip_mc_leave_src(struct sock *sk, struct ip_mc_socklist *iml,
-	struct in_device *in_dev)
+static int ip_mc_leave_src(struct sock *sk, struct ip_mc_socklist *iml,
+			   struct in_device *in_dev)
 {
 	int err;
 

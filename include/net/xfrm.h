@@ -782,7 +782,6 @@ struct xfrm6_tunnel {
 
 extern void xfrm_init(void);
 extern void xfrm4_init(void);
-extern void xfrm4_fini(void);
 extern void xfrm6_init(void);
 extern void xfrm6_fini(void);
 extern void xfrm_state_init(void);

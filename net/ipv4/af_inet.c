@@ -659,7 +659,7 @@ int inet_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 }
 
 
-ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
+static ssize_t inet_sendpage(struct socket *sock, struct page *page, int offset, size_t size, int flags)
 {
 	struct sock *sk = sock->sk;
 
@@ -1011,7 +1011,7 @@ static int __init init_ipv4_mibs(void)
 	return 0;
 }
 
-int ipv4_proc_init(void);
+static int ipv4_proc_init(void);
 extern void ipfrag_init(void);
 
 static int __init inet_init(void)
@@ -1136,7 +1136,7 @@ extern void tcp4_proc_exit(void);
 extern int  udp4_proc_init(void);
 extern void udp4_proc_exit(void);
 
-int __init ipv4_proc_init(void)
+static int __init ipv4_proc_init(void)
 {
 	int rc = 0;
 
@@ -1166,7 +1166,7 @@ out_raw:
 }
 
 #else /* CONFIG_PROC_FS */
-int __init ipv4_proc_init(void)
+static int __init ipv4_proc_init(void)
 {
 	return 0;
 }

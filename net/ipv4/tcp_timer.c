@@ -653,6 +653,3 @@ EXPORT_SYMBOL(tcp_clear_xmit_timers);
 EXPORT_SYMBOL(tcp_delete_keepalive_timer);
 EXPORT_SYMBOL(tcp_init_xmit_timers);
 EXPORT_SYMBOL(tcp_reset_keepalive_timer);
-#ifdef TCP_DEBUG
-EXPORT_SYMBOL(tcp_timer_bug_msg);
-#endif
