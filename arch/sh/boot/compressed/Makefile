@@ -33,7 +33,7 @@ head.o: head.S
 piggy.o:	$(SYSTEM)
 	tmppiggy=_tmp_$$$$piggy; \
 	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
-	$(OBJCOPY) -R .empty_zero_page $(SYSTEM) $$tmppiggy; \
+	$(OBJCOPY) $(OBJCOPYFLAGS) -R .empty_zero_page $(SYSTEM) $$tmppiggy; \
 	gzip -f -9 < $$tmppiggy > $$tmppiggy.gz; \
 	echo "SECTIONS { .data : { input_len = .; LONG(input_data_end - input_data) input_data = .; *(.data) input_data_end = .; }}" > $$tmppiggy.lnk; \
 	$(LD) $(LDFLAGS) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-sh-linux -T $$tmppiggy.lnk; \

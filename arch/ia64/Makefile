@@ -13,6 +13,7 @@ AWK := awk
 
 export AWK
 
+OBJCOPYFLAGS := --strip-all 
 LDFLAGS_vmlinux := -static -T arch/$(ARCH)/vmlinux.lds
 AFLAGS_KERNEL := -mconstant-gp
 EXTRA	=
@@ -100,7 +101,7 @@ arch/$(ARCH)/vmlinux.lds: arch/$(ARCH)/vmlinux.lds.S FORCE
 		-traditional arch/$(ARCH)/vmlinux.lds.S > $@
 
 compressed: vmlinux
-	$(OBJCOPY) --strip-all vmlinux vmlinux-tmp
+	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux-tmp
 	gzip vmlinux-tmp
 	mv vmlinux-tmp.gz vmlinux.gz
 

@@ -35,7 +35,7 @@ LDFLAGS_vmlinux = -T $(LD_SCRIPT).tmp
 
 # objcopy is used to make binary images from the resulting linked file
 
-OBJCOPY := $(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
+OBJCOPYFLAGS := -O binary -R .note -R .comment -S
 
 # -mlinux enables -march=v10, -fno-underscores, -D__linux__ among others
 
@@ -64,7 +64,7 @@ LIBS := $(TOPDIR)/arch/cris/lib/lib.a $(LIBS) $(TOPDIR)/arch/cris/lib/lib.a $(LI
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux.bin: vmlinux
-	$(OBJCOPY) vmlinux vmlinux.bin
+	$(OBJCOPY) $(OBJCOPYFLAGS) vmlinux vmlinux.bin
 
 timage: vmlinux.bin
 	cat vmlinux.bin cramfs.img >timage

@@ -32,11 +32,11 @@ BOOT_INCL =	$(TOPDIR)/include/linux/config.h \
 		$(TOPDIR)/include/asm/boot.h
 
 zImage: bootsect setup compressed/vmlinux tools/build
-	$(OBJCOPY) compressed/vmlinux compressed/vmlinux.out
+	$(OBJCOPY) $(OBJCOPYFLAGS) compressed/vmlinux compressed/vmlinux.out
 	tools/build bootsect setup compressed/vmlinux.out $(ROOT_DEV) > zImage
 
 bzImage: bbootsect bsetup compressed/bvmlinux tools/build
-	$(OBJCOPY) compressed/bvmlinux compressed/bvmlinux.out
+	$(OBJCOPY) $(OBJCOPYFLAGS) compressed/bvmlinux compressed/bvmlinux.out
 	tools/build -b bbootsect bsetup compressed/bvmlinux.out $(ROOT_DEV) > bzImage
 
 compressed/vmlinux: $(TOPDIR)/vmlinux

@@ -36,6 +36,7 @@ BOOTAFLAGS = -D__ASSEMBLY__ $(HOSTCFLAGS)
 
 CFLAGS	= $(CPPFLAGS) -O -fno-builtin -DSTDC_HEADERS
 LD_ARGS = -Ttext 0x00400000 -e _start
+OBJCOPYFLAGS := -S -O binary
 
 OBJS = crt0.o start.o main.o zlib.o image.o imagesize.o
 #LIBS = $(TOPDIR)/lib/lib.a
@@ -109,9 +110,8 @@ zImage.initrd: $(OBJS) initrd.o addnote
 	$(BOOTLD) $(LD_ARGS) -T zImage.lds -o $@ $(OBJS) initrd.o $(LIBS)
 	./addnote $@
 
-
 vmlinux.gz: $(TOPDIR)/vmlinux
-	$(OBJCOPY) -S -O binary $(TOPDIR)/vmlinux vmlinux
+	$(OBJCOPY) $(OBJCOPYFLAGS) $(TOPDIR)/vmlinux vmlinux
 	ls -l vmlinux | awk '{printf "/* generated -- do not edit! */\nint uncompressed_size = %d;\n", $$5}' > imagesize.c
 	$(CROSS_COMPILE)nm -n $(TOPDIR)/vmlinux | tail -1 | awk '{printf "long vmlinux_end = 0x%s;\n", substr($$1,8)}' >> imagesize.c
 	gzip -vf9 vmlinux

@@ -15,7 +15,7 @@
 
 LDFLAGS		:= -m elf64_s390
 CPP=$(CC) -E
-OBJCOPY=$(CROSS_COMPILE)objcopy -O binary -R .note -R .comment -S
+OBJCOPYFLAGS	:= -O binary
 ifeq ($(CONFIG_SHARED_KERNEL),y)
   LINKSCRIPT := arch/s390x/vmlinux-shared.lds
 else
