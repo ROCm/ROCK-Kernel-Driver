@@ -422,7 +422,6 @@ struct _snd_intel8x0 {
 	unsigned int ac97_sdin[3];
 
 	spinlock_t reg_lock;
-	spinlock_t ac97_lock;
 	
 	u32 bdbars_count;
 	struct snd_dma_buffer bdbars;
@@ -590,13 +589,11 @@ static void snd_intel8x0_codec_write(ac97_t *ac97,
 {
 	intel8x0_t *chip = ac97->private_data;
 	
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_codec_semaphore(chip, ac97->num) < 0) {
 		if (! chip->in_ac97_init)
 			snd_printk("codec_write %d: semaphore is not ready for register 0x%x\n", ac97->num, reg);
 	}
 	iaputword(chip, reg + ac97->num * 0x80, val);
-	spin_unlock(&chip->ac97_lock);
 }
 
 static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
@@ -606,7 +603,6 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 	unsigned short res;
 	unsigned int tmp;
 
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_codec_semaphore(chip, ac97->num) < 0) {
 		if (! chip->in_ac97_init)
 			snd_printk("codec_read %d: semaphore is not ready for register 0x%x\n", ac97->num, reg);
@@ -621,7 +617,6 @@ static unsigned short snd_intel8x0_codec_read(ac97_t *ac97,
 			res = 0xffff;
 		}
 	}
-	spin_unlock(&chip->ac97_lock);
 	return res;
 }
 
@@ -629,7 +624,6 @@ static void snd_intel8x0_codec_read_test(intel8x0_t *chip, unsigned int codec)
 {
 	unsigned int tmp;
 
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_codec_semaphore(chip, codec) >= 0) {
 		iagetword(chip, codec * 0x80);
 		if ((tmp = igetdword(chip, ICHREG(GLOB_STA))) & ICH_RCS) {
@@ -637,7 +631,6 @@ static void snd_intel8x0_codec_read_test(intel8x0_t *chip, unsigned int codec)
 			iputdword(chip, ICHREG(GLOB_STA), tmp & ~(ICH_SRI|ICH_PRI|ICH_TRI|ICH_GSCI));
 		}
 	}
-	spin_unlock(&chip->ac97_lock);
 }
 
 /*
@@ -670,7 +663,6 @@ static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short r
 	intel8x0_t *chip = ac97->private_data;
 	unsigned short data = 0xffff;
 
-	spin_lock(&chip->ac97_lock);
 	if (snd_intel8x0_ali_codec_semaphore(chip))
 		goto __err;
 	reg |= ALI_CPR_ADDR_READ;
@@ -681,7 +673,6 @@ static unsigned short snd_intel8x0_ali_codec_read(ac97_t *ac97, unsigned short r
 		goto __err;
 	data = igetword(chip, ICHREG(ALI_SPR));
  __err:
-	spin_unlock(&chip->ac97_lock);
 	return data;
 }
 
@@ -689,17 +680,13 @@ static void snd_intel8x0_ali_codec_write(ac97_t *ac97, unsigned short reg, unsig
 {
 	intel8x0_t *chip = ac97->private_data;
 
-	spin_lock(&chip->ac97_lock);
-	if (snd_intel8x0_ali_codec_semaphore(chip)) {
-		spin_unlock(&chip->ac97_lock);
+	if (snd_intel8x0_ali_codec_semaphore(chip))
 		return;
-	}
 	iputword(chip, ICHREG(ALI_CPR), val);
 	if (ac97->num)
 		reg |= ALI_CPR_ADDR_SECONDARY;
 	iputword(chip, ICHREG(ALI_CPR_ADDR), reg);
 	snd_intel8x0_ali_codec_ready(chip, ALI_CSPSR_WRITE_OK);
-	spin_unlock(&chip->ac97_lock);
 }
 
 
@@ -2546,7 +2533,6 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 	spin_lock_init(&chip->reg_lock);
-	spin_lock_init(&chip->ac97_lock);
 	chip->device_type = device_type;
 	chip->card = card;
 	chip->pci = pci;

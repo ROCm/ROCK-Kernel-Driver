@@ -260,7 +260,6 @@ struct _snd_via82xx_modem {
 	unsigned int ac97_secondary;	/* secondary AC'97 codec is present */
 
 	spinlock_t reg_lock;
-	spinlock_t ac97_lock;
 	snd_info_entry_t *proc_entry;
 };
 
@@ -426,10 +425,8 @@ static void snd_via82xx_codec_write(ac97_t *ac97,
 	xval <<= VIA_REG_AC97_CODEC_ID_SHIFT;
 	xval |= reg << VIA_REG_AC97_CMD_SHIFT;
 	xval |= val << VIA_REG_AC97_DATA_SHIFT;
-	spin_lock(&chip->ac97_lock);
 	snd_via82xx_codec_xwrite(chip, xval);
 	snd_via82xx_codec_ready(chip, ac97->num);
-	spin_unlock(&chip->ac97_lock);
 }
 
 static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
@@ -442,10 +439,8 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 	xval |= ac97->num ? VIA_REG_AC97_SECONDARY_VALID : VIA_REG_AC97_PRIMARY_VALID;
 	xval |= VIA_REG_AC97_READ;
 	xval |= (reg & 0x7f) << VIA_REG_AC97_CMD_SHIFT;
-	spin_lock(&chip->ac97_lock);
       	while (1) {
       		if (again++ > 3) {
-		        spin_unlock(&chip->ac97_lock);
 			snd_printk(KERN_ERR "codec_read: codec %i is not valid [0x%x]\n", ac97->num, snd_via82xx_codec_xread(chip));
 		      	return 0xffff;
 		}
@@ -457,7 +452,6 @@ static unsigned short snd_via82xx_codec_read(ac97_t *ac97, unsigned short reg)
 			break;
 		}
 	}
-	spin_unlock(&chip->ac97_lock);
 	return val & 0xffff;
 }
 
@@ -1124,7 +1118,6 @@ static int __devinit snd_via82xx_create(snd_card_t * card,
 	}
 
 	spin_lock_init(&chip->reg_lock);
-	spin_lock_init(&chip->ac97_lock);
 	chip->card = card;
 	chip->pci = pci;
 	chip->irq = -1;

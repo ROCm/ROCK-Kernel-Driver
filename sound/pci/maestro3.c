@@ -1835,34 +1835,24 @@ static unsigned short
 snd_m3_ac97_read(ac97_t *ac97, unsigned short reg)
 {
 	m3_t *chip = ac97->private_data;
-	unsigned short ret = 0;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	if (snd_m3_ac97_wait(chip))
-		goto __error;
-	snd_m3_outb(chip, 0x80 | (reg & 0x7f), 0x30);
+		return 0xffff;
+	snd_m3_outb(chip, 0x80 | (reg & 0x7f), CODEC_COMMAND);
 	if (snd_m3_ac97_wait(chip))
-		goto __error;
-	ret = snd_m3_inw(chip, 0x32);
-__error:
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
-	return ret;
+		return 0xffff;
+	return snd_m3_inw(chip, CODEC_DATA);
 }
 
 static void
 snd_m3_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short val)
 {
 	m3_t *chip = ac97->private_data;
-	unsigned long flags;
 
-	spin_lock_irqsave(&chip->reg_lock, flags);
 	if (snd_m3_ac97_wait(chip))
-		goto __error;
-	snd_m3_outw(chip, val, 0x32);
-	snd_m3_outb(chip, reg & 0x7f, 0x30);
-__error:
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+		return;
+	snd_m3_outw(chip, val, CODEC_DATA);
+	snd_m3_outb(chip, reg & 0x7f, CODEC_COMMAND);
 }
 
 
