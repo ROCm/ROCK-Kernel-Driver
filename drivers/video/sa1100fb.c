@@ -271,8 +271,7 @@ static struct sa1100fb_mach_info h3800_info __initdata = {
 	sync:		0,		cmap_static:	1,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-//	lccr3:		LCCR3_ACBsCntOff | LCCR3_PixFlEdg | LCCR3_OutEnH,
-	lccr3:		LCCR3_ACBsDiv(2) |
+	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
 			LCCR3_ACBsCntOff,
 };
 #endif
@@ -289,13 +288,8 @@ static struct sa1100fb_mach_info h3600_info __initdata = {
 	sync:		0,		cmap_static:	1,
 
 	lccr0:		LCCR0_Color | LCCR0_Sngl | LCCR0_Act,
-#if 0
-	lccr3:		LCCR3_ACBsCntOff | LCCR3_OutEnH | LCCR3_PixFlEdg,
-#else
-	lccr3:		LCCR3_ACBsDiv(2) |
+	lccr3:		LCCR3_ACBsDiv(2) | LCCR3_PixRsEdg | LCCR3_OutEnH |
 			LCCR3_ACBsCntOff,
-#endif
-
 };
 
 static struct sa1100fb_rgb h3600_rgb_16 = {
