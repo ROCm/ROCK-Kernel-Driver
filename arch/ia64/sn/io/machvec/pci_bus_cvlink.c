@@ -147,42 +147,6 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn)
 	return(device_vertex);
 }
 
-/*
- * For the given device, initialize the addresses for both the Device(x) Flush 
- * Write Buffer register and the Xbow Flush Register for the port the PCI bus 
- * is connected.
- */
-static void
-set_flush_addresses(struct pci_dev *device_dev, 
-	struct sn_device_sysdata *device_sysdata)
-{
-	pciio_info_t pciio_info = pciio_info_get(device_sysdata->vhdl);
-	pciio_slot_t pciio_slot = pciio_info_slot_get(pciio_info);
-	pcibr_soft_t pcibr_soft = (pcibr_soft_t) pciio_info_mfast_get(pciio_info);
-    	bridge_t               *bridge = pcibr_soft->bs_base;
-	nasid_t			nasid;
-
-	/*
-	 * Get the nasid from the bridge.
-	 */
-	nasid = NASID_GET(device_sysdata->dma_buf_sync);
-	device_sysdata->dma_buf_sync = (volatile unsigned int *)
-		&bridge->b_wr_req_buf[pciio_slot].reg;
-	device_sysdata->xbow_buf_sync = (volatile unsigned int *)
-		XBOW_PRIO_LINKREGS_PTR(NODE_SWIN_BASE(nasid, 0),
-		pcibr_soft->bs_xid);
-#ifdef DEBUG
-	printk("set_flush_addresses: dma_buf_sync %p xbow_buf_sync %p\n", 
-		device_sysdata->dma_buf_sync, device_sysdata->xbow_buf_sync);
-
-printk("set_flush_addresses: dma_buf_sync\n");
-	while((volatile unsigned int )*device_sysdata->dma_buf_sync);
-printk("set_flush_addresses: xbow_buf_sync\n");
-	while((volatile unsigned int )*device_sysdata->xbow_buf_sync);
-#endif
-
-}
-
 struct sn_flush_nasid_entry flush_nasid_list[MAX_NASIDS];
 
 /* Initialize the data structures for flushing write buffers after a PIO read.
@@ -401,8 +365,13 @@ sn_pci_fixup(int arg)
  	 * set the root start and end so that drivers calling check_region()
 	 * won't see a conflict
 	 */
-	ioport_resource.start  = 0xc000000000000000;
-	ioport_resource.end =    0xcfffffffffffffff;
+
+#ifdef CONFIG_IA64_SGI_SN_SIM
+	if (! IS_RUNNING_ON_SIMULATOR()) {
+		ioport_resource.start  = 0xc000000000000000;
+		ioport_resource.end =    0xcfffffffffffffff;
+	}
+#endif
 
 	/*
 	 * Set the root start and end for Mem Resource.
@@ -417,6 +386,7 @@ sn_pci_fixup(int arg)
 		unsigned int irq;
 		int idx;
 		u16 cmd;
+		vertex_hdl_t vhdl;
 		unsigned long size;
 		extern int bit_pos_to_irq(int);
 
@@ -431,16 +401,9 @@ sn_pci_fixup(int arg)
 
 		device_sysdata->vhdl = devfn_to_vertex(device_dev->bus->number, device_dev->devfn);
 		device_sysdata->isa64 = 0;
-		device_vertex = device_sysdata->vhdl;
-
 		device_dev->sysdata = (void *) device_sysdata;
 		set_pci_provider(device_sysdata);
 
-		/*
-		 * Set the xbridge Device(X) Write Buffer Flush and Xbow Flush 
-		 * register addresses.
-		 */
-		set_flush_addresses(device_dev, device_sysdata);
 		pci_read_config_word(device_dev, PCI_COMMAND, &cmd);
 
 		/*
@@ -449,22 +412,62 @@ sn_pci_fixup(int arg)
 		 * read from the card and it was set in the card by our
 		 * Infrastructure ..
 		 */
+		vhdl = device_sysdata->vhdl;
+		/* Allocate the IORESOURCE_IO space first */
 		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
-			size = 0;
-			size = device_dev->resource[idx].end -
-				device_dev->resource[idx].start;
-			if (size) {
-				device_dev->resource[idx].start = (unsigned long)pciio_pio_addr(device_vertex, 0, PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
-				device_dev->resource[idx].start |= __IA64_UNCACHED_OFFSET;
-			}
-			else
-				continue;
+			unsigned long start, end, addr;
 
-			device_dev->resource[idx].end = 
-				device_dev->resource[idx].start + size;
+			if (!(device_dev->resource[idx].flags & IORESOURCE_IO))
+				continue; 
+			
+			start = device_dev->resource[idx].start;
+			end = device_dev->resource[idx].end;
+			size = end - start;
+			if (!size)
+				continue; 
+			
+			addr = (unsigned long)pciio_pio_addr(vhdl, 0, 
+					PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
+			if (!addr) {
+				device_dev->resource[idx].start = 0;
+				device_dev->resource[idx].end = 0;
+				printk("sn_pci_fixup(): pio map failure for "
+				    "%s bar%d\n", device_dev->slot_name, idx);
+			} else {
+				addr |= __IA64_UNCACHED_OFFSET;
+				device_dev->resource[idx].start = addr;
+				device_dev->resource[idx].end = addr + size;
+			}	
 
-			if (device_dev->resource[idx].flags & IORESOURCE_IO)
-				cmd |= PCI_COMMAND_IO;
+			if (device_dev->resource[idx].flags & IORESOURCE_IO) 
+				cmd |= PCI_COMMAND_IO; 
+		} 
+
+		/* Allocate the IORESOURCE_MEM space next */
+		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
+			unsigned long start, end, addr;
+
+			if ((device_dev->resource[idx].flags & IORESOURCE_IO))
+				continue; 
+
+			start = device_dev->resource[idx].start;
+			end = device_dev->resource[idx].end;
+			size = end - start;
+			if (!size)
+				continue; 
+
+			addr = (unsigned long)pciio_pio_addr(vhdl, 0, 
+					PCIIO_SPACE_WIN(idx), 0, size, 0, 0);
+			if (!addr) {
+				device_dev->resource[idx].start = 0;
+				device_dev->resource[idx].end = 0;
+				printk("sn_pci_fixup(): pio map failure for "
+				    "%s bar%d\n", device_dev->slot_name, idx);
+			} else {
+				addr |= __IA64_UNCACHED_OFFSET;
+				device_dev->resource[idx].start = addr;
+				device_dev->resource[idx].end = addr + size;
+			}	
 
 			if (device_dev->resource[idx].flags & IORESOURCE_MEM)
 				cmd |= PCI_COMMAND_MEMORY;
