@@ -651,11 +651,6 @@ source "drivers/input/Kconfig"
 
 source "drivers/char/Kconfig"
 
-config KBDMOUSE
-	bool
-	depends on ARCH_ACORN && BUSMOUSE=y && !ARCH_RPC
-	default y
-
 source "drivers/media/Kconfig"
 
 source "fs/Kconfig"
