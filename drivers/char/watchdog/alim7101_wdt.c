@@ -51,7 +51,10 @@
  * char to /dev/watchdog every 30 seconds.
  */
 
-#define WDT_HEARTBEAT (HZ * 30)
+#define WATCHDOG_TIMEOUT 30            /* 30 sec default timeout */
+static int timeout = WATCHDOG_TIMEOUT; /* in seconds, will be multiplied by HZ to get seconds to wait for a ping */
+module_param(timeout, int, 0);
+MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds. (1<=timeout<=3600, default=" __MODULE_STRING(WATCHDOG_TIMEOUT) ")");
 
 static void wdt_timer_ping(unsigned long);
 static struct timer_list timer;
@@ -111,7 +114,7 @@ static void wdt_change(int writeval)
 
 static void wdt_startup(void)
 {
-	next_heartbeat = jiffies + WDT_HEARTBEAT;
+	next_heartbeat = jiffies + (timeout * HZ);
 
 	/* We must enable before we kick off the timer in case the timer
 	   occurs as we ping it */
@@ -132,6 +135,12 @@ static void wdt_turnoff(void)
 	del_timer_sync(&timer);
 	wdt_change(WDT_DISABLE);
 	printk(KERN_INFO PFX "Watchdog timer is now disabled...\n");
+}
+
+static void wdt_keepalive(void)
+{
+	/* user land ping */
+	next_heartbeat = jiffies + (timeout * HZ);
 }
 
 /*
@@ -163,7 +172,7 @@ static ssize_t fop_write(struct file * file, const char * buf, size_t count, lof
 			}
 		}
 		/* someone wrote to us, we should restart timer */
-		next_heartbeat = jiffies + WDT_HEARTBEAT;
+		wdt_keepalive();
 	}
 	return count;
 }
@@ -195,7 +204,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 {
 	static struct watchdog_info ident =
 	{
-		.options = WDIOF_KEEPALIVEPING | WDIOF_MAGICCLOSE,
+		.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity = "ALiM7101",
 	};
@@ -208,7 +217,7 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 		case WDIOC_GETBOOTSTATUS:
 			return put_user(0, (int *)arg);
 		case WDIOC_KEEPALIVE:
-			next_heartbeat = jiffies + WDT_HEARTBEAT;
+			wdt_keepalive();
 			return 0;
 		case WDIOC_SETOPTIONS:
 		{
@@ -229,6 +238,22 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd, u
 
 			return retval;
 		}
+		case WDIOC_SETTIMEOUT:
+		{
+			int new_timeout;
+
+			if(get_user(new_timeout, (int *)arg))
+				return -EFAULT;
+
+			if(new_timeout < 1 || new_timeout > 3600) /* arbitrary upper limit */
+				return -EINVAL;
+
+			timeout = new_timeout;
+			wdt_keepalive();
+			/* Fall through */
+		}
+		case WDIOC_GETTIMEOUT:
+			return put_user(timeout, (int *)arg);
 		default:
 			return -ENOIOCTLCMD;
 	}
@@ -317,6 +342,13 @@ static int __init alim7101_wdt_init(void)
 		return -EBUSY;
 	}
 
+	if(timeout < 1 || timeout > 3600) /* arbitrary upper limit */
+	{
+		timeout = WATCHDOG_TIMEOUT;
+		printk(KERN_INFO PFX "timeout value must be 1<=x<=3600, using %d\n",
+			timeout);
+	}
+
 	init_timer(&timer);
 	timer.function = wdt_timer_ping;
 	timer.data = 1;
@@ -335,8 +367,8 @@ static int __init alim7101_wdt_init(void)
 		goto err_out_miscdev;
 	}
 
-	printk(KERN_INFO PFX "WDT driver for ALi M7101 initialised. (nowayout=%d)\n",
-		nowayout);
+	printk(KERN_INFO PFX "WDT driver for ALi M7101 initialised. timeout=%d sec (nowayout=%d)\n",
+		timeout, nowayout);
 	return 0;
 
 err_out_miscdev:
