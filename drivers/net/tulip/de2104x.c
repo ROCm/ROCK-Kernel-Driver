@@ -2014,6 +2014,7 @@ static int __init de_init_one (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 
 	dev->irq = pdev->irq;
+	init_timer(&de->media_timer);
 
 	de = dev->priv;
 	de->de21040 = ent->driver_data == 0 ? 1 : 0;

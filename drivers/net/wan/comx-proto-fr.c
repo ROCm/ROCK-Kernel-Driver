@@ -214,6 +214,7 @@ static void fr_set_keepalive(struct net_device *dev, int keepa)
 		}
 		fr->keepa_freq = keepa;
 		fr->local_cnt = fr->remote_cnt = 0;
+		init_timer(&fr->keepa_timer);
 		fr->keepa_timer.expires = jiffies + HZ;
 		fr->keepa_timer.function = fr_keepalive_timerfun;
 		fr->keepa_timer.data = (unsigned long)dev;

@@ -168,7 +168,6 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	if (offset >= 0 && offset <= size) {
 		if (offset != file->f_pos) {
 			file->f_pos = offset;
-			file->f_version = ++event;
 		}
 		retval = offset;
 	}

@@ -91,7 +91,8 @@ int sync_start(void)
 	err = profile_event_register(EXEC_UNMAP, &exec_unmap_nb);
 	if (err)
 		goto out3;
- 
+
+	init_timer(&sync_timer);
 	sync_timer.function = timer_ping;
 	sync_timer.expires = jiffies + DEFAULT_EXPIRE;
 	add_timer(&sync_timer);

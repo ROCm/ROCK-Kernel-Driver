@@ -84,7 +84,6 @@ void hpfs_read_inode(struct inode *i)
 	hpfs_inode->i_ea_uid = 0;
 	hpfs_inode->i_ea_gid = 0;
 	hpfs_inode->i_ea_size = 0;
-	i->i_version = ++event;
 
 	hpfs_inode->i_rddir_off = NULL;
 	hpfs_inode->i_dirty = 0;

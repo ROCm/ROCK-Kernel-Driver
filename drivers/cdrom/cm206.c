@@ -451,6 +451,7 @@ void cm206_timeout(unsigned long who)
 int sleep_or_timeout(wait_queue_head_t * wait, int timeout)
 {
 	cd->timed_out = 0;
+	init_timer(&cd->timer);
 	cd->timer.data = (unsigned long) wait;
 	cd->timer.expires = jiffies + timeout;
 	add_timer(&cd->timer);

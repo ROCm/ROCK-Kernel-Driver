@@ -4347,6 +4347,7 @@ int __init floppy_init(void)
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
+		init_timer(&motor_off_timer[drive]);
 		motor_off_timer[drive].data = drive;
 		motor_off_timer[drive].function = motor_off_callback;
 		if (!(allowed_drive_mask & (1 << drive)))

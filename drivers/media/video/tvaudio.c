@@ -1392,6 +1392,7 @@ static int chip_attach(struct i2c_adapter *adap, int addr,
 		/* start async thread */
 		DECLARE_MUTEX_LOCKED(sem);
 		chip->notify = &sem;
+		init_timer(&chip->wt);
 		chip->wt.function = chip_thread_wake;
 		chip->wt.data     = (unsigned long)chip;
 		init_waitqueue_head(&chip->wq);
