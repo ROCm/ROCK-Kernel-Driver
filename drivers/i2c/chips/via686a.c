@@ -36,7 +36,7 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/i2c.h>
-#include <linux/i2c-proc.h>
+#include <linux/i2c-sensor.h>
 #include <linux/init.h>
 #include <asm/io.h>
 

@@ -23,7 +23,7 @@
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-#include <linux/i2c-proc.h>
+#include <linux/i2c-sensor.h>
 
 
 /* Registers */

@@ -1,5 +1,5 @@
 /*
-    i2c-proc.c - Part of lm_sensors, Linux kernel modules for hardware
+    i2c-sensor.c - Part of lm_sensors, Linux kernel modules for hardware
                 monitoring
     Copyright (c) 1998 - 2001 Frodo Looijaard <frodol@dds.nl> and
     Mark D. Studebaker <mdsxyz123@yahoo.com>
@@ -19,10 +19,6 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-/*
-    This driver puts entries in /proc/sys/dev/sensors for each I2C device
-*/
-
 /* #define DEBUG 1 */
 
 #include <linux/module.h>
@@ -30,11 +26,10 @@
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
-#include <linux/proc_fs.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/i2c.h>
-#include <linux/i2c-proc.h>
+#include <linux/i2c-sensor.h>
 #include <asm/uaccess.h>
 
 
@@ -168,20 +163,20 @@ int i2c_detect(struct i2c_adapter *adapter,
 	return 0;
 }
 
-static int __init i2c_proc_init(void)
+static int __init i2c_sensor_init(void)
 {
 	return 0;
 }
 
-static void __exit i2c_proc_exit(void)
+static void __exit i2c_sensor_exit(void)
 {
 }
 
 EXPORT_SYMBOL(i2c_detect);
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
-MODULE_DESCRIPTION("i2c-proc driver");
+MODULE_DESCRIPTION("i2c-sensor driver");
 MODULE_LICENSE("GPL");
 
-module_init(i2c_proc_init);
-module_exit(i2c_proc_exit);
+module_init(i2c_sensor_init);
+module_exit(i2c_sensor_exit);

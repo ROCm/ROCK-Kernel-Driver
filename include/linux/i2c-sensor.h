@@ -1,5 +1,5 @@
 /*
-    i2c-proc.h - Part of the i2c package
+    i2c-sensor.h - Part of the i2c package
     was originally sensors.h - Part of lm_sensors, Linux kernel modules
                                for hardware monitoring
     Copyright (c) 1998, 1999  Frodo Looijaard <frodol@dds.nl>
@@ -19,8 +19,8 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
-#ifndef _LINUX_I2C_PROC_H
-#define _LINUX_I2C_PROC_H
+#ifndef _LINUX_I2C_SENSOR_H
+#define _LINUX_I2C_SENSOR_H
 
 #include <linux/sysctl.h>
 
@@ -369,5 +369,5 @@ struct i2c_chips_data {
 	char name[SENSORS_PREFIX_MAX + 13];
 };
 
-#endif				/* def _LINUX_I2C_PROC_H */
+#endif				/* def _LINUX_I2C_SENSOR_H */
 
