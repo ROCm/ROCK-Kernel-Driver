@@ -45,8 +45,6 @@ contains:
 	id_table	Pointer to table of device ID's the driver is
 			interested in.  Most drivers should export this
 			table using MODULE_DEVICE_TABLE(pci,...).
-			Set to NULL to call probe() function for every
-			PCI device known to the system.
 	probe		Pointer to a probing function which gets called (during
 			execution of pci_register_driver for already existing
 			devices or later if a new device gets inserted) for all
@@ -82,6 +80,28 @@ Each entry consists of:
 	class,		Device class to match. The class_mask tells which bits
 	class_mask	of the class are honored during the comparison.
 	driver_data	Data private to the driver.
+
+Most drivers don't need to use the driver_data field.  Best practice
+for use of driver_data is to use it as an index into a static list of
+equivalant device types, not to use it as a pointer.
+
+Have a table entry {PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID}
+to have probe() called for every PCI device known to the system.
+
+New PCI IDs may be added to a device driver at runtime by writing
+to the file /sys/bus/pci/drivers/{driver}/new_id.  When added, the
+driver will probe for all devices it can support.
+
+echo "vendor device subvendor subdevice class class_mask driver_data" > \
+ /sys/bus/pci/drivers/{driver}/new_id
+where all fields are passed in as hexadecimal values (no leading 0x).
+Users need pass only as many fields as necessary; vendor, device,
+subvendor, and subdevice fields default to PCI_ANY_ID (FFFFFFFF),
+class and classmask fields default to 0, and driver_data defaults to
+0UL.  Device drivers must call
+   pci_dynids_set_use_driver_data(pci_driver *, 1)
+in order for the driver_data field to get passed to the driver.
+Otherwise, only a 0 is passed in that field.
 
 When the driver exits, it just calls pci_unregister_driver() and the PCI layer
 automatically calls the remove hook for all devices handled by the driver.
