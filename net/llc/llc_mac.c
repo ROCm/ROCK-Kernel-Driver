@@ -39,6 +39,19 @@ static int fix_up_incoming_skb(struct sk_buff *skb);
 static void llc_station_rcv(struct sk_buff *skb);
 static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
+static void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
+static void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
+
+/*
+ * Packet handlers for LLC_DEST_SAP and LLC_DEST_CONN.
+ * FIXME: There will be a registration service in next changesets.
+ */
+static void (*llc_type_handlers[2])(struct llc_sap *sap,
+				 struct sk_buff *skb) = {
+	[LLC_DEST_SAP - 1]  = llc_sap_handler,
+	[LLC_DEST_CONN - 1] = llc_conn_handler,
+};
+
 /**
  *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
@@ -83,80 +96,18 @@ int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		        pdu->dsap);
 		goto drop;
 	}
+	/*
+	 * First the upper layer protocols that don't need the full
+	 * LLC functionality
+	 */
+	if (sap->rcv_func) {
+		sap->rcv_func(skb, dev, pt);
+		goto out;
+	}
 	llc_decode_pdu_type(skb, &dest);
-	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		if (sap->rcv_func)
-			sap->rcv_func(skb, dev, pt);
-		else {
-			struct llc_addr laddr;
-			struct sock *sk;
-
-			llc_pdu_decode_da(skb, laddr.mac);
-			llc_pdu_decode_dsap(skb, &laddr.lsap);
-
-			sk = llc_lookup_dgram(sap, &laddr);
-			if (!sk)
-				goto drop;
-			skb->sk = sk;
-			llc_sap_rcv(sap, skb);
-			sock_put(sk);
-		}
-	} else if (dest == LLC_DEST_CONN) {
-		struct llc_addr saddr, daddr;
-		struct sock *sk;
-		int rc;
-
-		llc_pdu_decode_sa(skb, saddr.mac);
-		llc_pdu_decode_ssap(skb, &saddr.lsap);
-		llc_pdu_decode_da(skb, daddr.mac);
-		llc_pdu_decode_dsap(skb, &daddr.lsap);
-
-		sk = llc_lookup_established(sap, &saddr, &daddr);
-		if (!sk) {
-			/*
-			 * Didn't find an active connection; verify if there
-			 * is a listening socket for this llc addr
-			 */
-			struct llc_opt *llc;
-			struct sock *parent;
-			
-			parent = llc_lookup_listener(sap, &daddr);
-
-			if (!parent) {
-				dprintk("llc_lookup_listener failed!\n");
-				goto drop;
-			}
-
-			sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
-			if (!sk) {
-				sock_put(parent);
-				goto drop;
-			}
-			llc = llc_sk(sk);
-			memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
-			memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
-			llc_sap_assign_sock(sap, sk);
-			sock_hold(sk);
-			sock_put(parent);
-			skb->sk = parent;
-		} else
-			skb->sk = sk;
-		bh_lock_sock(sk);
-		if (!sock_owned_by_user(sk)) {
-			/* rc = */ llc_conn_rcv(sk, skb);
-			rc = 0;
-		} else {
-			dprintk("%s: adding to backlog...\n", __FUNCTION__);
-			llc_set_backlog_type(skb, LLC_PACKET);
-			sk_add_backlog(sk, skb);
-			rc = 0;
-		}
-		bh_unlock_sock(sk);
-		sock_put(sk);
-		if (rc)
-			goto drop;
-	} else /* unknown or not supported pdu */
- 		goto drop;
+	if (unlikely(!dest || !llc_type_handlers[dest - 1]))
+		goto drop;
+	llc_type_handlers[dest - 1](sap, skb);
 out:
 	return 0;
 drop:
@@ -299,4 +250,74 @@ u16 lan_hdrs_init(struct sk_buff *skb, u8 *sa, u8 *da)
 		rc = 1;
 	}
 	return rc;
+}
+
+static void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_addr laddr;
+	struct sock *sk;
+
+	llc_pdu_decode_da(skb, laddr.mac);
+	llc_pdu_decode_dsap(skb, &laddr.lsap);
+
+	sk = llc_lookup_dgram(sap, &laddr);
+	if (sk) {
+		skb->sk = sk;
+		llc_sap_rcv(sap, skb);
+		sock_put(sk);
+	} else
+		kfree_skb(skb);
+} 
+
+static void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_addr saddr, daddr;
+	struct sock *sk;
+
+	llc_pdu_decode_sa(skb, saddr.mac);
+	llc_pdu_decode_ssap(skb, &saddr.lsap);
+	llc_pdu_decode_da(skb, daddr.mac);
+	llc_pdu_decode_dsap(skb, &daddr.lsap);
+
+	sk = llc_lookup_established(sap, &saddr, &daddr);
+	if (!sk) {
+		/*
+		 * Didn't find an active connection; verify if there
+		 * is a listening socket for this llc addr
+		 */
+		struct llc_opt *llc;
+		struct sock *parent = llc_lookup_listener(sap, &daddr);
+
+		if (!parent) {
+			dprintk("llc_lookup_listener failed!\n");
+			goto drop;
+		}
+
+		sk = llc_sk_alloc(parent->sk_family, GFP_ATOMIC);
+		if (!sk) {
+			sock_put(parent);
+			goto drop;
+		}
+		llc = llc_sk(sk);
+		memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
+		memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
+		llc_sap_assign_sock(sap, sk);
+		sock_hold(sk);
+		sock_put(parent);
+		skb->sk = parent;
+	} else
+		skb->sk = sk;
+	bh_lock_sock(sk);
+	if (!sock_owned_by_user(sk))
+		llc_conn_rcv(sk, skb);
+	else {
+		dprintk("%s: adding to backlog...\n", __FUNCTION__);
+		llc_set_backlog_type(skb, LLC_PACKET);
+		sk_add_backlog(sk, skb);
+	}
+	bh_unlock_sock(sk);
+	sock_put(sk);
+	return;
+drop:
+	kfree_skb(skb);
 }
