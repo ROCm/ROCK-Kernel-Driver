@@ -299,7 +299,10 @@ destroy_conntrack(struct nf_conntrack *nfct)
 		ip_conntrack_destroyed(ct);
 
 	WRITE_LOCK(&ip_conntrack_lock);
-	/* Make sure don't leave any orphaned expectations lying around */
+	/* Expectations will have been removed in clean_from_lists,
+	 * except TFTP can create an expectation on the first packet,
+	 * before connection is in the list, so we need to clean here,
+	 * too. */
 	if (ct->expecting)
 		remove_expectations(ct, 1);
 
