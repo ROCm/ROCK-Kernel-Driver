@@ -39,6 +39,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/kmod.h>
+#include <linux/seq_file.h>
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -79,6 +80,11 @@ MODULE_PARM_DESC(tzp, "Thermal zone polling frequency, in 1/10 seconds.\n");
 
 static int acpi_thermal_add (struct acpi_device *device);
 static int acpi_thermal_remove (struct acpi_device *device, int type);
+static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file);
+static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file);
 
 static struct acpi_driver acpi_thermal_driver = {
 	.name =		ACPI_THERMAL_DRIVER_NAME,
@@ -157,6 +163,40 @@ struct acpi_thermal {
 	struct timer_list	timer;
 };
 
+static struct file_operations acpi_thermal_state_fops = {
+	.open		= acpi_thermal_state_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_thermal_temp_fops = {
+	.open		= acpi_thermal_temp_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_thermal_trip_fops = {
+	.open		= acpi_thermal_trip_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_thermal_cooling_fops = {
+	.open		= acpi_thermal_cooling_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static struct file_operations acpi_thermal_polling_fops = {
+	.open		= acpi_thermal_polling_open_fs,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 /* --------------------------------------------------------------------------
                              Thermal Zone Management
@@ -720,154 +760,119 @@ acpi_thermal_check (
 
 struct proc_dir_entry		*acpi_thermal_dir = NULL;
 
-
-static int
-acpi_thermal_read_state (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_thermal_state_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_thermal_read_state");
+	ACPI_FUNCTION_TRACE("acpi_thermal_state_seq_show");
 
-	if (!tz || (off != 0))
+	if (!tz)
 		goto end;
 
-	p += sprintf(p, "state:                   ");
+	seq_puts(seq, "state:                   ");
 
 	if (!tz->state.critical && !tz->state.hot && !tz->state.passive && !tz->state.active)
-		p += sprintf(p, "ok\n");
+		seq_puts(seq, "ok\n");
 	else {
 		if (tz->state.critical)
-			p += sprintf(p, "critical ");
+			seq_puts(seq, "critical ");
 		if (tz->state.hot)
-			p += sprintf(p, "hot ");
+			seq_puts(seq, "hot ");
 		if (tz->state.passive)
-			p += sprintf(p, "passive ");
+			seq_puts(seq, "passive ");
 		if (tz->state.active)
-			p += sprintf(p, "active[%d]", tz->state.active_index);
-		p += sprintf(p, "\n");
+			seq_printf(seq, "active[%d]", tz->state.active_index);
+		seq_puts(seq, "\n");
 	}
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
+	return 0;
+}
 
-	return_VALUE(len);
+static int acpi_thermal_state_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_thermal_state_seq_show, PDE(inode)->data);
 }
 
 
-static int
-acpi_thermal_read_temperature (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_thermal_temp_seq_show(struct seq_file *seq, void *offset)
 {
 	int			result = 0;
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_thermal_read_temperature");
+	ACPI_FUNCTION_TRACE("acpi_thermal_temp_seq_show");
 
-	if (!tz || (off != 0))
+	if (!tz)
 		goto end;
 
 	result = acpi_thermal_get_temperature(tz);
 	if (result)
 		goto end;
 
-	p += sprintf(p, "temperature:             %ld C\n", 
+	seq_printf(seq, "temperature:             %ld C\n", 
 		KELVIN_TO_CELSIUS(tz->temperature));
-	
-end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
 
-	return_VALUE(len);
+end:
+	return 0;
+}
+
+static int acpi_thermal_temp_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_thermal_temp_seq_show, PDE(inode)->data);
 }
 
 
-static int
-acpi_thermal_read_trip_points (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_thermal_trip_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)seq->private;
 	int			i = 0;
 	int			j = 0;
 
-	ACPI_FUNCTION_TRACE("acpi_thermal_read_trip_points");
+	ACPI_FUNCTION_TRACE("acpi_thermal_trip_seq_show");
 
-	if (!tz || (off != 0))
+	if (!tz)
 		goto end;
 
 	if (tz->trips.critical.flags.valid)
-		p += sprintf(p, "critical (S5):           %ld C\n",
+		seq_printf(seq, "critical (S5):           %ld C\n",
 			KELVIN_TO_CELSIUS(tz->trips.critical.temperature));
 
 	if (tz->trips.hot.flags.valid)
-		p += sprintf(p, "hot (S4):                %ld C\n",
+		seq_printf(seq, "hot (S4):                %ld C\n",
 			KELVIN_TO_CELSIUS(tz->trips.hot.temperature));
 
 	if (tz->trips.passive.flags.valid) {
-		p += sprintf(p, "passive:                 %ld C: tc1=%lu tc2=%lu tsp=%lu devices=",
+		seq_printf(seq, "passive:                 %ld C: tc1=%lu tc2=%lu tsp=%lu devices=",
 			KELVIN_TO_CELSIUS(tz->trips.passive.temperature),
 			tz->trips.passive.tc1,
 			tz->trips.passive.tc2, 
 			tz->trips.passive.tsp);
 		for (j=0; j<tz->trips.passive.devices.count; j++) {
 
-			p += sprintf(p, "0x%p ", tz->trips.passive.devices.handles[j]);
+			seq_printf(seq, "0x%p ", tz->trips.passive.devices.handles[j]);
 		}
-		p += sprintf(p, "\n");
+		seq_puts(seq, "\n");
 	}
 
-	for (i=0; i<ACPI_THERMAL_MAX_ACTIVE; i++) {
+	for (i = 0; i < ACPI_THERMAL_MAX_ACTIVE; i++) {
 		if (!(tz->trips.active[i].flags.valid))
 			break;
-		p += sprintf(p, "active[%d]:               %ld C: devices=",
+		seq_printf(seq, "active[%d]:               %ld C: devices=",
 			i, KELVIN_TO_CELSIUS(tz->trips.active[i].temperature));
-		for (j=0; j<tz->trips.active[i].devices.count; j++) 
-			p += sprintf(p, "0x%p ",
+		for (j = 0; j < tz->trips.active[i].devices.count; j++) 
+			seq_printf(seq, "0x%p ",
 				tz->trips.active[i].devices.handles[j]);
-		p += sprintf(p, "\n");
+		seq_puts(seq, "\n");
 	}
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_thermal_trip_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_thermal_trip_seq_show, PDE(inode)->data);
+}
 
 static int
 acpi_thermal_write_trip_points (
@@ -909,43 +914,32 @@ acpi_thermal_write_trip_points (
 }
 
 
-static int
-acpi_thermal_read_cooling_mode (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_thermal_cooling_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_thermal_read_cooling_mode");
+	ACPI_FUNCTION_TRACE("acpi_thermal_cooling_seq_show");
 
-	if (!tz || (off != 0))
+	if (!tz)
 		goto end;
 
 	if (!tz->flags.cooling_mode) {
-		p += sprintf(p, "<not supported>\n");
+		seq_puts(seq, "<not supported>\n");
 		goto end;
 	}
 
-	p += sprintf(p, "cooling mode:            %s\n",
+	seq_printf(seq, "cooling mode:            %s\n",
 		tz->cooling_mode?"passive":"active");
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_thermal_cooling_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_thermal_cooling_seq_show,
+							PDE(inode)->data);
+}
 
 static int
 acpi_thermal_write_cooling_mode (
@@ -980,43 +974,32 @@ acpi_thermal_write_cooling_mode (
 }
 
 
-static int
-acpi_thermal_read_polling (
-	char			*page,
-	char			**start,
-	off_t			off,
-	int 			count,
-	int 			*eof,
-	void			*data)
+static int acpi_thermal_polling_seq_show(struct seq_file *seq, void *offset)
 {
-	struct acpi_thermal	*tz = (struct acpi_thermal *) data;
-	char			*p = page;
-	int			len = 0;
+	struct acpi_thermal	*tz = (struct acpi_thermal *)seq->private;
 
-	ACPI_FUNCTION_TRACE("acpi_thermal_read_polling");
+	ACPI_FUNCTION_TRACE("acpi_thermal_polling_seq_show");
 
-	if (!tz || (off != 0))
+	if (!tz)
 		goto end;
 
 	if (!tz->polling_frequency) {
-		p += sprintf(p, "<polling disabled>\n");
+		seq_puts(seq, "<polling disabled>\n");
 		goto end;
 	}
 
-	p += sprintf(p, "polling frequency:       %lu seconds\n",
+	seq_printf(seq, "polling frequency:       %lu seconds\n",
 		(tz->polling_frequency / 10));
 
 end:
-	len = (p - page);
-	if (len <= off+count) *eof = 1;
-	*start = page + off;
-	len -= off;
-	if (len>count) len = count;
-	if (len<0) len = 0;
-
-	return_VALUE(len);
+	return 0;
 }
 
+static int acpi_thermal_polling_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_thermal_polling_seq_show,
+							PDE(inode)->data);
+}
 
 static int
 acpi_thermal_write_polling (
@@ -1075,7 +1058,7 @@ acpi_thermal_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_STATE));
 	else {
-		entry->read_proc = acpi_thermal_read_state;
+		entry->proc_fops = &acpi_thermal_state_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1087,7 +1070,7 @@ acpi_thermal_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_TEMPERATURE));
 	else {
-		entry->read_proc = acpi_thermal_read_temperature;
+		entry->proc_fops = &acpi_thermal_temp_fops;
 		entry->data = acpi_driver_data(device);
 	}
 
@@ -1099,7 +1082,7 @@ acpi_thermal_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_POLLING_FREQ));
 	else {
-		entry->read_proc = acpi_thermal_read_trip_points;
+		entry->proc_fops = &acpi_thermal_trip_fops;
 		entry->write_proc = acpi_thermal_write_trip_points;
 		entry->data = acpi_driver_data(device);
 	}
@@ -1112,7 +1095,7 @@ acpi_thermal_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_COOLING_MODE));
 	else {
-		entry->read_proc = acpi_thermal_read_cooling_mode;
+		entry->proc_fops = &acpi_thermal_cooling_fops;
 		entry->write_proc = acpi_thermal_write_cooling_mode;
 		entry->data = acpi_driver_data(device);
 	}
@@ -1125,7 +1108,7 @@ acpi_thermal_add_fs (
 			"Unable to create '%s' fs entry\n",
 			ACPI_THERMAL_FILE_POLLING_FREQ));
 	else {
-		entry->read_proc = acpi_thermal_read_polling;
+		entry->proc_fops = &acpi_thermal_polling_fops;
 		entry->write_proc = acpi_thermal_write_polling;
 		entry->data = acpi_driver_data(device);
 	}
