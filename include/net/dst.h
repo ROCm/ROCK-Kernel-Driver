@@ -103,19 +103,19 @@ struct dst_ops
 #ifdef __KERNEL__
 
 static inline u32
-dst_metric(struct dst_entry *dst, int metric)
+dst_metric(const struct dst_entry *dst, int metric)
 {
 	return dst->metrics[metric-1];
 }
 
 static inline u32
-dst_path_metric(struct dst_entry *dst, int metric)
+dst_path_metric(const struct dst_entry *dst, int metric)
 {
 	return dst->path->metrics[metric-1];
 }
 
 static inline u32
-dst_pmtu(struct dst_entry *dst)
+dst_pmtu(const struct dst_entry *dst)
 {
 	u32 mtu = dst_path_metric(dst, RTAX_MTU);
 	/* Yes, _exactly_. This is paranoia. */
