@@ -1386,6 +1386,8 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const struct sctp_endpoint *ep,
 	sctp_init_chunk_t *peer_init;
 	struct sctp_ulpevent *ev;
 	struct sctp_chunk *repl;
+	struct sctp_chunk *err;
+	sctp_disposition_t disposition;
 
 	/* new_asoc is a brand-new association, so these are not yet
 	 * side effects--it is safe to run them here.
@@ -1402,6 +1404,29 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const struct sctp_endpoint *ep,
 	 * since you'd have to get inside the cookie.
 	 */
 	if (!sctp_sf_check_restart_addrs(new_asoc, asoc, chunk, commands)) {
+		return SCTP_DISPOSITION_CONSUME;
+	}
+
+	/* If the endpoint is in the SHUTDOWN-ACK-SENT state and recognizes
+	 * the peer has restarted (Action A), it MUST NOT setup a new
+	 * association but instead resend the SHUTDOWN ACK and send an ERROR
+	 * chunk with a "Cookie Received while Shutting Down" error cause to
+	 * its peer.
+	*/
+	if (sctp_state(asoc, SHUTDOWN_ACK_SENT)) {
+		disposition = sctp_sf_do_9_2_reshutack(ep, asoc,
+				SCTP_ST_CHUNK(chunk->chunk_hdr->type),
+				chunk, commands);
+		if (SCTP_DISPOSITION_NOMEM == disposition)
+			goto nomem;
+
+		err = sctp_make_op_error(asoc, chunk,
+					 SCTP_ERROR_COOKIE_IN_SHUTDOWN,
+					 NULL, 0);
+		if (err)
+			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,
+					SCTP_CHUNK(err));
+
 		return SCTP_DISPOSITION_CONSUME;
 	}
 
