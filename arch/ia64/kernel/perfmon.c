@@ -4717,7 +4717,7 @@ pfm_check_task_state(pfm_context_t *ctx, int cmd, unsigned long flags)
 	/*
 	 * context is UNLOADED, MASKED, TERMINATED we are safe to go
 	 */
-	if (state != PFM_CTX_LOADED == 0) return 0;
+	if (state != PFM_CTX_LOADED) return 0;
 
 	if (state == PFM_CTX_ZOMBIE) return -EINVAL;
 
