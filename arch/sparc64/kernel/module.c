@@ -143,6 +143,23 @@ void module_free(struct module *mod, void *module_region)
            table entries. */
 }
 
+/* We don't need anything special. */
+long module_core_size(const Elf64_Ehdr *hdr,
+		      const Elf64_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
+{
+	return module->core_size;
+}
+
+long module_init_size(const Elf64_Ehdr *hdr,
+		      const Elf64_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
+{
+	return module->init_size;
+}
+
 int apply_relocate(Elf64_Shdr *sechdrs,
 		   const char *strtab,
 		   unsigned int symindex,
