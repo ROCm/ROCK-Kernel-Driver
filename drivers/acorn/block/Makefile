@@ -2,8 +2,6 @@
 # Makefile for the Acorn block device drivers.
 #
 
-O_TARGET	:= acorn-block.o
-
 obj-y		:=
 obj-m		:=
 obj-n		:=

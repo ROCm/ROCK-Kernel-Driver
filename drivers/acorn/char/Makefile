@@ -1,24 +1,12 @@
 #
 # Makefile for the kernel character device drivers.
 #
-# Note! Dependencies are done automagically by 'make dep', which also
-# removes any old dependencies. DON'T put your own dependencies here
-# unless it's something special (ie not a .c file).
-#
-# Note 2! The CFLAGS definitions are now inherited from the
-# parent makes..
-#
-
-O_TARGET 	:= acorn-char.o
-
-# Object file lists.
 
 obj-y   	:=
 obj-m		:=
 obj-n		:=
 obj-		:=
 
-# All the objects that export symbols.
 export-objs	:= mouse_rpc.o
 
 obj-arc		:= keyb_arc.o
