@@ -388,10 +388,10 @@ struct _snd_intel8x0 {
 
 	unsigned int mmio;
 	unsigned long addr;
-	unsigned long remap_addr;
+	void __iomem *remap_addr;
 	unsigned int bm_mmio;
 	unsigned long bmaddr;
-	unsigned long remap_bmaddr;
+	void __iomem *remap_bmaddr;
 
 	struct pci_dev *pci;
 	snd_card_t *card;
@@ -406,6 +406,7 @@ struct _snd_intel8x0 {
 	    smp20bit: 1;
 	int in_ac97_init: 1,
 	    in_sdin_init: 1;
+	int in_measurement: 1; /* during ac97 clock measurement */
 	int fix_nocache: 1; /* workaround for 440MX */
 	int buggy_irq: 1; /* workaround for buggy mobos */
 	int xbox: 1;	  /* workaround for Xbox AC'97 detection */
@@ -789,7 +790,8 @@ static inline void snd_intel8x0_update(intel8x0_t *chip, ichdev_t *ichdev)
 	}
 
 	ichdev->position += step * ichdev->fragsize1;
-	ichdev->position %= ichdev->size;
+	if (! chip->in_measurement)
+		ichdev->position %= ichdev->size;
 	ichdev->lvi += step;
 	ichdev->lvi &= ICH_REG_LVI_MASK;
 	iputbyte(chip, port + ICH_REG_OFF_LVI, ichdev->lvi);
@@ -2243,9 +2245,9 @@ static int snd_intel8x0_free(intel8x0_t *chip)
 		snd_dma_free_pages(&chip->bdbars);
 	}
 	if (chip->remap_addr)
-		iounmap((void *) chip->remap_addr);
+		iounmap(chip->remap_addr);
 	if (chip->remap_bmaddr)
-		iounmap((void *) chip->remap_bmaddr);
+		iounmap(chip->remap_bmaddr);
 	pci_release_regions(chip->pci);
 	kfree(chip);
 	return 0;
@@ -2334,6 +2336,7 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	snd_intel8x0_setup_periods(chip, ichdev);
 	port = ichdev->reg_offset;
 	spin_lock_irq(&chip->reg_lock);
+	chip->in_measurement = 1;
 	/* trigger */
 	if (chip->device_type != DEVICE_ALI)
 		iputbyte(chip, port + ICH_REG_OFF_CR, ICH_IOCE | ICH_STARTBM);
@@ -2343,18 +2346,14 @@ static void __devinit intel8x0_measure_ac97_clock(intel8x0_t *chip)
 	}
 	do_gettimeofday(&start_time);
 	spin_unlock_irq(&chip->reg_lock);
-#if 0
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ / 20);
-#else
-	/* FIXME: schedule() can take too long time and overlap the boundary.. */
-	mdelay(50);
-#endif
 	spin_lock_irq(&chip->reg_lock);
 	/* check the position */
 	pos = ichdev->fragsize1;
 	pos -= igetword(chip, ichdev->reg_offset + ichdev->roff_picb) << ichdev->pos_shift;
 	pos += ichdev->position;
+	chip->in_measurement = 0;
 	do_gettimeofday(&stop_time);
 	/* stop */
 	if (chip->device_type == DEVICE_ALI) {
@@ -2518,9 +2517,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 2) & IORESOURCE_MEM) {	/* ICH4 and Nforce */
 		chip->mmio = 1;
 		chip->addr = pci_resource_start(pci, 2);
-		chip->remap_addr = (unsigned long) ioremap_nocache(chip->addr,
-								   pci_resource_len(pci, 2));
-		if (chip->remap_addr == 0) {
+		chip->remap_addr = ioremap_nocache(chip->addr,
+						   pci_resource_len(pci, 2));
+		if (chip->remap_addr == NULL) {
 			snd_printk("AC'97 space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;
@@ -2531,9 +2530,9 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 	if (pci_resource_flags(pci, 3) & IORESOURCE_MEM) {	/* ICH4 */
 		chip->bm_mmio = 1;
 		chip->bmaddr = pci_resource_start(pci, 3);
-		chip->remap_bmaddr = (unsigned long) ioremap_nocache(chip->bmaddr,
-								     pci_resource_len(pci, 3));
-		if (chip->remap_bmaddr == 0) {
+		chip->remap_bmaddr = ioremap_nocache(chip->bmaddr,
+						     pci_resource_len(pci, 3));
+		if (chip->remap_bmaddr == NULL) {
 			snd_printk("Controller space ioremap problem\n");
 			snd_intel8x0_free(chip);
 			return -EIO;

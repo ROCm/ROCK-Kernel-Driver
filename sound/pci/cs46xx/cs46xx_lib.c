@@ -296,7 +296,7 @@ int snd_cs46xx_download(cs46xx_t *chip,
                         unsigned long offset,
                         unsigned long len)
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -324,7 +324,7 @@ int snd_cs46xx_clear_BA1(cs46xx_t *chip,
                          unsigned long offset,
                          unsigned long len) 
 {
-	unsigned long dst;
+	void __iomem *dst;
 	unsigned int bank = offset >> 16;
 	offset = offset & 0xffff;
 
@@ -2892,7 +2892,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 	for (idx = 0; idx < 5; idx++) {
 		snd_cs46xx_region_t *region = &chip->region.idx[idx];
 		if (region->remap_addr)
-			iounmap((void *) region->remap_addr);
+			iounmap(region->remap_addr);
 		if (region->resource) {
 			release_resource(region->resource);
 			kfree_nocheck(region->resource);
@@ -3858,8 +3858,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 			snd_cs46xx_free(chip);
 			return -EBUSY;
 		}
-		region->remap_addr = (unsigned long) ioremap_nocache(region->base, region->size);
-		if (region->remap_addr == 0) {
+		region->remap_addr = ioremap_nocache(region->base, region->size);
+		if (region->remap_addr == NULL) {
 			snd_printk("%s ioremap problem\n", region->name);
 			snd_cs46xx_free(chip);
 			return -ENOMEM;

@@ -1075,7 +1075,7 @@ static int snd_mixart_free(mixart_mgr_t *mgr)
 	/* release the i/o ports */
 	for (i = 0; i < 2; i++) {
 		if (mgr->mem[i].virt)
-			iounmap((void *)mgr->mem[i].virt);
+			iounmap(mgr->mem[i].virt);
 	}
 	pci_release_regions(mgr->pci);
 
@@ -1310,8 +1310,8 @@ static int __devinit snd_mixart_probe(struct pci_dev *pci,
 	}
 	for (i = 0; i < 2; i++) {
 		mgr->mem[i].phys = pci_resource_start(pci, i);
-		mgr->mem[i].virt = (unsigned long)ioremap_nocache(mgr->mem[i].phys,
-								  pci_resource_len(pci, i));
+		mgr->mem[i].virt = ioremap_nocache(mgr->mem[i].phys,
+						   pci_resource_len(pci, i));
 	}
 
 	if (request_irq(pci->irq, snd_mixart_interrupt, SA_INTERRUPT|SA_SHIRQ, CARD_NAME, (void *)mgr)) {

@@ -307,8 +307,8 @@ void snd_hidden_vfree(void *obj);
 #define vfree_nocheck(obj) vfree(obj)
 #endif
 char *snd_kmalloc_strdup(const char *string, int flags);
-int copy_to_user_fromio(void __user *dst, unsigned long src, size_t count);
-int copy_from_user_toio(unsigned long dst, const void __user *src, size_t count);
+int copy_to_user_fromio(void __user *dst, const void __iomem *src, size_t count);
+int copy_from_user_toio(void __iomem *dst, const void __user *src, size_t count);
 
 /* init.c */
 

@@ -471,7 +471,7 @@ struct _hdsp {
 	int                   dev;
 	int                   irq;
 	unsigned long         port;
-        unsigned long         iobase;
+        void __iomem         *iobase;
 	snd_card_t           *card;
 	snd_pcm_t            *pcm;
 	snd_hwdep_t          *hwdep;
@@ -3228,7 +3228,7 @@ snd_hdsp_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 	snd_iprintf(buffer, "Buffers: capture %p playback %p\n",
 		    hdsp->capture_buffer, hdsp->playback_buffer);
 	snd_iprintf(buffer, "IRQ: %d Registers bus: 0x%lx VM: 0x%lx\n",
-		    hdsp->irq, hdsp->port, hdsp->iobase);
+		    hdsp->irq, hdsp->port, (unsigned long)hdsp->iobase);
 	snd_iprintf(buffer, "Control register: 0x%x\n", hdsp->control_register);
 	snd_iprintf(buffer, "Control2 register: 0x%x\n", hdsp->control2_register);
 	snd_iprintf(buffer, "Status register: 0x%x\n", status);
@@ -4458,24 +4458,24 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 						return -EFAULT;
 					if (copy_to_user_fromio((void __user *)peak_rms->output_peaks+i*4, hdsp->iobase+HDSP_9652_peakBase-2*(doublespeed ? 14 : 26)*4-i*4, 4) != 0)
 						return -EFAULT;
-					rms_low = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+i*8) & 0xFFFFFF00;
-					rms_high = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+i*8+4) & 0xFFFFFF00;
+					rms_low = readl(hdsp->iobase+HDSP_9652_rmsBase+i*8) & 0xFFFFFF00;
+					rms_high = readl(hdsp->iobase+HDSP_9652_rmsBase+i*8+4) & 0xFFFFFF00;
 					rms_high += (rms_low >> 24);
 					rms_low <<= 8;
 					if (copy_to_user((void __user *)peak_rms->input_rms+i*8, &rms_low, 4) != 0)
 						return -EFAULT;
 					if (copy_to_user((void __user *)peak_rms->input_rms+i*8+4, &rms_high, 4) != 0)
 						return -EFAULT;					
-					rms_low = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+(doublespeed ? 14 : 26)*8+i*8) & 0xFFFFFF00;
-					rms_high = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+(doublespeed ? 14 : 26)*8+i*8+4) & 0xFFFFFF00;
+					rms_low = readl(hdsp->iobase+HDSP_9652_rmsBase+(doublespeed ? 14 : 26)*8+i*8) & 0xFFFFFF00;
+					rms_high = readl(hdsp->iobase+HDSP_9652_rmsBase+(doublespeed ? 14 : 26)*8+i*8+4) & 0xFFFFFF00;
 					rms_high += (rms_low >> 24);
 					rms_low <<= 8;
 					if (copy_to_user((void __user *)peak_rms->playback_rms+i*8, &rms_low, 4) != 0)
 						return -EFAULT;
 					if (copy_to_user((void __user *)peak_rms->playback_rms+i*8+4, &rms_high, 4) != 0)
 						return -EFAULT;					
-					rms_low = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+2*(doublespeed ? 14 : 26)*8+i*8) & 0xFFFFFF00;
-					rms_high = *(u32 *)(hdsp->iobase+HDSP_9652_rmsBase+2*(doublespeed ? 14 : 26)*8+i*8+4) & 0xFFFFFF00;
+					rms_low = readl(hdsp->iobase+HDSP_9652_rmsBase+2*(doublespeed ? 14 : 26)*8+i*8) & 0xFFFFFF00;
+					rms_high = readl(hdsp->iobase+HDSP_9652_rmsBase+2*(doublespeed ? 14 : 26)*8+i*8+4) & 0xFFFFFF00;
 					rms_high += (rms_low >> 24);
 					rms_low <<= 8;
 					if (copy_to_user((void __user *)peak_rms->output_rms+i*8, &rms_low, 4) != 0)
@@ -4488,30 +4488,30 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 		}
 		if (hdsp->io_type == H9632) {
 			int j;
-			hdsp_9632_meters_t *m;
+			hdsp_9632_meters_t __iomem *m;
 			int doublespeed = 0;
 			if (hdsp_read (hdsp, HDSP_statusRegister) & HDSP_DoubleSpeedStatus)
 				doublespeed = 1;
-			m = (hdsp_9632_meters_t *)(hdsp->iobase+HDSP_9632_metersBase);
+			m = (hdsp_9632_meters_t __iomem *)(hdsp->iobase+HDSP_9632_metersBase);
 			peak_rms = (hdsp_peak_rms_t __user *)arg;
 			for (i = 0, j = 0; i < 16; ++i, ++j) {
-				if (copy_to_user((void __user *)peak_rms->input_peaks+i*4, &(m->input_peak[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->input_peaks+i*4, &(m->input_peak[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->playback_peaks+i*4, &(m->playback_peak[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->playback_peaks+i*4, &(m->playback_peak[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->output_peaks+i*4, &(m->output_peak[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->output_peaks+i*4, &(m->output_peak[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->input_rms+i*8, &(m->input_rms_low[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->input_rms+i*8, &(m->input_rms_low[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->playback_rms+i*8, &(m->playback_rms_low[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->playback_rms+i*8, &(m->playback_rms_low[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->output_rms+i*8, &(m->output_rms_low[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->output_rms+i*8, &(m->output_rms_low[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->input_rms+i*8+4, &(m->input_rms_high[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->input_rms+i*8+4, &(m->input_rms_high[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->playback_rms+i*8+4, &(m->playback_rms_high[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->playback_rms+i*8+4, &(m->playback_rms_high[j]), 4) != 0)
 					return -EFAULT;
-				if (copy_to_user((void __user *)peak_rms->output_rms+i*8+4, &(m->output_rms_high[j]), 4) != 0)
+				if (copy_to_user_fromio((void __user *)peak_rms->output_rms+i*8+4, &(m->output_rms_high[j]), 4) != 0)
 					return -EFAULT;
 				if (doublespeed && i == 3) i += 4;
 			}
@@ -4523,23 +4523,23 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 		}
 		peak_rms = (hdsp_peak_rms_t __user *)arg;
 		for (i = 0; i < 26; ++i) {
-		    if (copy_to_user((void __user *)peak_rms->playback_peaks+i*4, (void *)hdsp->iobase+HDSP_playbackPeakLevel+i*4, 4) != 0)
+		    if (copy_to_user_fromio((void __user *)peak_rms->playback_peaks+i*4, hdsp->iobase+HDSP_playbackPeakLevel+i*4, 4) != 0)
 			    return -EFAULT;
-		    if (copy_to_user((void __user *)peak_rms->input_peaks+i*4, (void *)hdsp->iobase+HDSP_inputPeakLevel+i*4, 4) != 0)
+		    if (copy_to_user_fromio((void __user *)peak_rms->input_peaks+i*4, hdsp->iobase+HDSP_inputPeakLevel+i*4, 4) != 0)
 			    return -EFAULT;
 		}
 		for (i = 0; i < 26; ++i) {
-			if (copy_to_user((void __user *)peak_rms->playback_rms+i*8+4, (void *)hdsp->iobase+HDSP_playbackRmsLevel+i*8, 4) != 0)
+			if (copy_to_user_fromio((void __user *)peak_rms->playback_rms+i*8+4, hdsp->iobase+HDSP_playbackRmsLevel+i*8, 4) != 0)
 				return -EFAULT;
-			if (copy_to_user((void __user *)peak_rms->playback_rms+i*8, (void *)hdsp->iobase+HDSP_playbackRmsLevel+i*8+4, 4) != 0)
+			if (copy_to_user_fromio((void __user *)peak_rms->playback_rms+i*8, hdsp->iobase+HDSP_playbackRmsLevel+i*8+4, 4) != 0)
 				return -EFAULT;
-			if (copy_to_user((void __user *)peak_rms->input_rms+i*8+4, (void *)hdsp->iobase+HDSP_inputRmsLevel+i*8, 4) != 0)
+			if (copy_to_user_fromio((void __user *)peak_rms->input_rms+i*8+4, hdsp->iobase+HDSP_inputRmsLevel+i*8, 4) != 0)
 				return -EFAULT;
-			if (copy_to_user((void __user *)peak_rms->input_rms+i*8, (void *)hdsp->iobase+HDSP_inputRmsLevel+i*8+4, 4) != 0)
+			if (copy_to_user_fromio((void __user *)peak_rms->input_rms+i*8, hdsp->iobase+HDSP_inputRmsLevel+i*8+4, 4) != 0)
 				return -EFAULT;
 		}
 		for (i = 0; i < 28; ++i) {
-		    if (copy_to_user((void __user *)peak_rms->output_peaks+i*4, (void *)hdsp->iobase+HDSP_outputPeakLevel+i*4, 4) != 0)
+		    if (copy_to_user_fromio((void __user *)peak_rms->output_peaks+i*4, hdsp->iobase+HDSP_outputPeakLevel+i*4, 4) != 0)
 			    return -EFAULT;
 		}
 		break;
@@ -4879,7 +4879,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	hdsp->midi[1].output = NULL;
 	spin_lock_init(&hdsp->midi[0].lock);
 	spin_lock_init(&hdsp->midi[1].lock);
-	hdsp->iobase = 0;
+	hdsp->iobase = NULL;
 	hdsp->control_register = 0;
 	hdsp->control2_register = 0;
 	hdsp->io_type = Undefined;
@@ -4937,7 +4937,7 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 	if ((err = pci_request_regions(pci, "hdsp")) < 0)
 		return err;
 	hdsp->port = pci_resource_start(pci, 0);
-	if ((hdsp->iobase = (unsigned long) ioremap_nocache(hdsp->port, HDSP_IO_EXTENT)) == 0) {
+	if ((hdsp->iobase = ioremap_nocache(hdsp->port, HDSP_IO_EXTENT)) == NULL) {
 		snd_printk("unable to remap region 0x%lx-0x%lx\n", hdsp->port, hdsp->port + HDSP_IO_EXTENT - 1);
 		return -EBUSY;
 	}
@@ -5021,7 +5021,7 @@ static int snd_hdsp_free(hdsp_t *hdsp)
 	snd_hdsp_free_buffers(hdsp);
 	
 	if (hdsp->iobase)
-		iounmap((void *) hdsp->iobase);
+		iounmap(hdsp->iobase);
 
 	if (hdsp->port)
 		pci_release_regions(hdsp->pci);
