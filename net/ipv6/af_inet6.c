@@ -74,8 +74,10 @@ MODULE_LICENSE("GPL");
 /* IPv6 procfs goodies... */
 
 #ifdef CONFIG_PROC_FS
+extern int raw6_proc_init(void);
+extern int raw6_proc_exit(void);
+
 extern int anycast6_get_info(char *, char **, off_t, int);
-extern int raw6_get_info(char *, char **, off_t, int);
 extern int tcp6_get_info(char *, char **, off_t, int);
 extern int udp6_get_info(char *, char **, off_t, int);
 extern int afinet6_get_info(char *, char **, off_t, int);
@@ -786,7 +788,7 @@ static int __init inet6_init(void)
 	/* Create /proc/foo6 entries. */
 #ifdef CONFIG_PROC_FS
 	err = -ENOMEM;
-	if (!proc_net_create("raw6", 0, raw6_get_info))
+	if (raw6_proc_init())
 		goto proc_raw6_fail;
 	if (!proc_net_create("tcp6", 0, tcp6_get_info))
 		goto proc_tcp6_fail;
@@ -827,7 +829,7 @@ proc_misc6_fail:
 proc_udp6_fail:
 	proc_net_remove("tcp6");
 proc_tcp6_fail:
-        proc_net_remove("raw6");
+	raw6_proc_exit();
 proc_raw6_fail:
 	igmp6_cleanup();
 #endif
@@ -852,7 +854,7 @@ static void inet6_exit(void)
 	/* First of all disallow new sockets creation. */
 	sock_unregister(PF_INET6);
 #ifdef CONFIG_PROC_FS
-	proc_net_remove("raw6");
+	raw6_proc_exit();
 	proc_net_remove("tcp6");
 	proc_net_remove("udp6");
 	proc_net_remove("sockstat6");
