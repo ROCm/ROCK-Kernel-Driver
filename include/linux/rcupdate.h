@@ -65,7 +65,6 @@ struct rcu_ctrlblk {
 	long	cur;		/* Current batch number.                      */
 	long	completed;	/* Number of the last completed batch         */
 	int	next_pending;	/* Is the next batch already waiting?         */
-	seqcount_t lock;	/* For atomic reads of cur and next_pending.  */
 } ____cacheline_maxaligned_in_smp;
 
 /* Is batch a before batch b ? */
