@@ -3,6 +3,8 @@
 
 #include <linux/capability.h>
 
+struct pt_regs;
+
 /*
  * MAX_ARG_PAGES defines the number of pages allocated for arguments
  * and envelope for the new program. 32 should suffice, this gives
