@@ -73,6 +73,7 @@ static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(ELCOM_VENDOR_ID, ELCOM_PRODUCT_ID) },
 	{ USB_DEVICE(ITEGNO_VENDOR_ID, ITEGNO_PRODUCT_ID) },
 	{ USB_DEVICE(MA620_VENDOR_ID, MA620_PRODUCT_ID) },
+	{ USB_DEVICE(RATOC_VENDOR_ID, RATOC_PRODUCT_ID) },
 	{ }					/* Terminating entry */
 };
 
