@@ -127,8 +127,8 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 			dev_hold(dev);
 			dst_release(&rt->u.dst);
 		} else if (ishost) {
-			sock_kfree_s(sk, pac, sizeof(*pac));
-			return -EADDRNOTAVAIL;
+			err = -EADDRNOTAVAIL;
+			goto out_free_pac;
 		} else {
 			/* router, no matching interface: just pick one */
 
@@ -138,18 +138,17 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 		dev = dev_get_by_index(ifindex);
 
 	if (dev == NULL) {
-		sock_kfree_s(sk, pac, sizeof(*pac));
-		return -ENODEV;
+		err = -ENODEV;
+		goto out_free_pac;
 	}
 
 	idev = in6_dev_get(dev);
 	if (!idev) {
-		sock_kfree_s(sk, pac, sizeof(*pac));
-		dev_put(dev);
 		if (ifindex)
-			return -ENODEV;
+			err = -ENODEV;
 		else
-			return -EADDRNOTAVAIL;
+			err = -EADDRNOTAVAIL;
+		goto out_dev_put;
 	}
 	/* reset ishost, now that we have a specific device */
 	ishost = !idev->cnf.forwarding;
@@ -170,21 +169,17 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 			err = -EADDRNOTAVAIL;
 		else if (!capable(CAP_NET_ADMIN))
 			err = -EPERM;
-		if (err) {
-			sock_kfree_s(sk, pac, sizeof(*pac));
-			dev_put(dev);
-			return err;
-		}
+		if (err)
+			goto out_dev_put;
 	} else if (!(ipv6_addr_type(addr) & IPV6_ADDR_ANYCAST) &&
-		   !capable(CAP_NET_ADMIN))
-		return -EPERM;
+		   !capable(CAP_NET_ADMIN)) {
+		err = -EPERM;
+		goto out_dev_put;
+	}
 
 	err = ipv6_dev_ac_inc(dev, addr);
-	if (err) {
-		sock_kfree_s(sk, pac, sizeof(*pac));
-		dev_put(dev);
-		return err;
-	}
+	if (err)
+		goto out_dev_put;
 
 	write_lock_bh(&ipv6_sk_ac_lock);
 	pac->acl_next = np->ipv6_ac_list;
@@ -194,6 +189,12 @@ int ipv6_sock_ac_join(struct sock *sk, int ifindex, struct in6_addr *addr)
 	dev_put(dev);
 
 	return 0;
+
+out_dev_put:
+	dev_put(dev);
+out_free_pac:
+	sock_kfree_s(sk, pac, sizeof(*pac));
+	return err;
 }
 
 /*

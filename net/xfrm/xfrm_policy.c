@@ -314,7 +314,7 @@ struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete)
 	return pol;
 }
 
-void xfrm_policy_flush()
+void xfrm_policy_flush(void)
 {
 	struct xfrm_policy *xp;
 	int dir;

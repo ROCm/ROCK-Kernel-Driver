@@ -1389,7 +1389,7 @@ static struct file_operations arp_seq_fops = {
 	.open           = arp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= ip_seq_release,
+	.release	= seq_release_private,
 };
 
 static int __init arp_proc_init(void)

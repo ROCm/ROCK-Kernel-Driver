@@ -295,7 +295,6 @@ extern void	ip_icmp_error(struct sock *sk, struct sk_buff *skb, int err,
 extern void	ip_local_error(struct sock *sk, int err, u32 daddr, u16 dport,
 			       u32 info);
 
-extern int ip_seq_release(struct inode *inode, struct file *file);
 extern int ipv4_proc_init(void);
 
 /* sysctl helpers - any sysctl which holds a value that ends up being

@@ -11,24 +11,32 @@
 /* Returns 1 if the mss option is set and matched by the range, 0 otherwise */
 static inline int
 mssoption_match(u_int16_t min, u_int16_t max,
-		const struct tcphdr *tcp,
-		u_int16_t datalen,
+		const struct sk_buff *skb,
 		int invert,
 		int *hotdrop)
 {
-	unsigned int i;
-	const u_int8_t *opt = (u_int8_t *)tcp;
+	struct tcphdr tcph;
+	/* tcp.doff is only 4 bits, ie. max 15 * 4 bytes */
+	u8 opt[15 * 4 - sizeof(tcph)];
+	unsigned int i, optlen;
 
 	/* If we don't have the whole header, drop packet. */
-	if (tcp->doff * 4 > datalen) {
-		*hotdrop = 1;
-		return 0;
-	}
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &tcph, sizeof(tcph)) < 0)
+		goto dropit;
 
-	for (i = sizeof(struct tcphdr); i < tcp->doff * 4; ) {
-		if ((opt[i] == TCPOPT_MSS)
-		    && ((tcp->doff * 4 - i) >= TCPOLEN_MSS)
-		    && (opt[i+1] == TCPOLEN_MSS)) {
+	/* Malformed. */
+	if (tcph.doff*4 < sizeof(tcph))
+		goto dropit;
+
+	optlen = tcph.doff*4 - sizeof(tcph);
+	/* Truncated options. */
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4+sizeof(tcph), opt, optlen)<0)
+		goto dropit;
+
+	for (i = 0; i < optlen; ) {
+		if (opt[i] == TCPOPT_MSS
+		    && (optlen - i) >= TCPOLEN_MSS
+		    && opt[i+1] == TCPOLEN_MSS) {
 			u_int16_t mssval;
 
 			mssval = (opt[i+2] << 8) | opt[i+3];
@@ -38,8 +46,11 @@ mssoption_match(u_int16_t min, u_int16_t max,
 		if (opt[i] < 2) i++;
 		else i += opt[i+1]?:1;
 	}
-
 	return invert;
+
+ dropit:
+	*hotdrop = 1;
+	return 0;
 }
 
 static int
@@ -48,15 +59,11 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
       int *hotdrop)
 {
 	const struct ipt_tcpmss_match_info *info = matchinfo;
-	const struct tcphdr *tcph = (void *)skb->nh.iph + skb->nh.iph->ihl*4;
 
-	return mssoption_match(info->mss_min, info->mss_max, tcph,
-			       skb->len - skb->nh.iph->ihl*4,
+	return mssoption_match(info->mss_min, info->mss_max, skb,
 			       info->invert, hotdrop);
 }
 

@@ -1837,7 +1837,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 }
 
 uint64_t
-ahc_linux_get_memsize()
+ahc_linux_get_memsize(void)
 {
 	struct sysinfo si;
 
@@ -1852,7 +1852,7 @@ ahc_linux_get_memsize()
  * scenario.
  */
 static int
-ahc_linux_next_unit()
+ahc_linux_next_unit(void)
 {
 	struct ahc_softc *ahc;
 	int unit;

@@ -386,7 +386,7 @@ static struct file_operations rt_cache_seq_fops = {
 	.open	 = rt_cache_seq_open,
 	.read	 = seq_read,
 	.llseek	 = seq_lseek,
-	.release = ip_seq_release,
+	.release = seq_release_private,
 };
 
 int __init rt_cache_proc_init(void)

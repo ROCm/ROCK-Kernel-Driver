@@ -2863,9 +2863,6 @@ int unregister_netdevice(struct net_device *dev)
 
 extern void net_device_init(void);
 extern void ip_auto_config(void);
-#ifdef CONFIG_NET_DIVERT
-extern void dv_init(void);
-#endif /* CONFIG_NET_DIVERT */
 
 
 /*
@@ -2888,10 +2885,6 @@ static int __init net_dev_init(void)
 	INIT_LIST_HEAD(&ptype_all);
 	for (i = 0; i < 16; i++) 
 		INIT_LIST_HEAD(&ptype_base[i]);
-
-#ifdef CONFIG_NET_DIVERT
-	dv_init();
-#endif /* CONFIG_NET_DIVERT */
 
 	/*
 	 *	Initialise the packet receive queues.

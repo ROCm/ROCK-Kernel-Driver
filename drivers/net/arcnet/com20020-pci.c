@@ -183,9 +183,6 @@ static struct pci_driver com20020pci_driver = {
 static int __init com20020pci_init(void)
 {
 	BUGLVL(D_NORMAL) printk(VERSION);
-#ifndef MODULE
-	arcnet_init();
-#endif
 	return pci_module_init(&com20020pci_driver);
 }
 

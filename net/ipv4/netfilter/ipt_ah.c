@@ -35,14 +35,16 @@ match(const struct sk_buff *skb,
       const struct net_device *out,
       const void *matchinfo,
       int offset,
-      const void *hdr,
-      u_int16_t datalen,
       int *hotdrop)
 {
-	const struct ahhdr *ah = hdr;
+	struct ahhdr ah;
 	const struct ipt_ah *ahinfo = matchinfo;
 
-	if (offset == 0 && datalen < sizeof(struct ahhdr)) {
+	/* Must not be a fragment. */
+	if (offset)
+		return 0;
+
+	if (skb_copy_bits(skb, skb->nh.iph->ihl*4, &ah, sizeof(ah)) < 0) {
 		/* We've been asked to examine this packet, and we
 		   can't.  Hence, no choice but to drop. */
 		duprintf("Dropping evil AH tinygram.\n");
@@ -50,11 +52,9 @@ match(const struct sk_buff *skb,
 		return 0;
 	}
 
-	/* Must not be a fragment. */
-	return !offset
-		&& spi_match(ahinfo->spis[0], ahinfo->spis[1],
-			      ntohl(ah->spi),
-			      !!(ahinfo->invflags & IPT_AH_INV_SPI));
+	return spi_match(ahinfo->spis[0], ahinfo->spis[1],
+			 ntohl(ah.spi),
+			 !!(ahinfo->invflags & IPT_AH_INV_SPI));
 }
 
 /* Called when user tries to insert an entry of this type. */

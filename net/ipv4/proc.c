@@ -265,11 +265,3 @@ out_netstat:
 	goto out;
 }
 
-int ip_seq_release(struct inode *inode, struct file *file)
-{
-	struct seq_file *seq = (struct seq_file *)file->private_data;
-
-	kfree(seq->private);
-	seq->private = NULL;
-	return seq_release(inode, file);
-}
