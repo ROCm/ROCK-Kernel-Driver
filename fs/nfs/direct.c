@@ -123,7 +123,6 @@ nfs_iov2pagelist(int rw, const struct inode *inode,
 
 		page_count = nfs_get_user_pages(user_addr, bytes, &pages, rw);
 		if (page_count < 0) {
-			nfs_release_list(requests);
 			return page_count;
 		}
 
@@ -201,7 +200,6 @@ do_nfs_direct_IO(int rw, const struct inode *inode,
 			break;
 		}
 		result = nfs_pagein_list(&requests, NFS_SERVER(inode)->rpages);
-		nfs_wait_for_reads(&requests);
 		break;
 	case WRITE:
 		if (IS_SYNC(inode) || (NFS_SERVER(inode)->wsize < PAGE_SIZE))
