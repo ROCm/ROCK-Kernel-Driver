@@ -448,7 +448,6 @@ EXPORT_SYMBOL(ipv4_config);
 EXPORT_SYMBOL(dev_open);
 
 /* Used by other modules */
-EXPORT_SYMBOL(in_ntoa);
 EXPORT_SYMBOL(xrlim_allow);
 
 EXPORT_SYMBOL(ip_rcv);

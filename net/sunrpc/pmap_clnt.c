@@ -87,8 +87,6 @@ bailout:
 }
 
 #ifdef CONFIG_ROOT_NFS
-char *in_ntoa(__u32 in);
-
 int
 rpc_getport_external(struct sockaddr_in *sin, __u32 prog, __u32 vers, int prot)
 {
@@ -100,7 +98,7 @@ rpc_getport_external(struct sockaddr_in *sin, __u32 prog, __u32 vers, int prot)
 	dprintk("RPC:      rpc_getport_external(%u.%u.%u.%u, %d, %d, %d)\n",
 			NIPQUAD(sin->sin_addr.s_addr), prog, vers, prot);
 
-	strcpy(hostname, in_ntoa(sin->sin_addr.s_addr));
+	sprintf(hostname, "%u.%u.%u.%u", NIPQUAD(sin->sin_addr.s_addr));
 	if (!(pmap_clnt = pmap_create(hostname, sin, prot)))
 		return -EACCES;
 

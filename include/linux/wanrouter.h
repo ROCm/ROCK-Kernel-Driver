@@ -475,7 +475,6 @@ typedef struct wanif_conf
 
 #include <linux/fs.h>		/* support for device drivers */
 #include <linux/proc_fs.h>	/* proc filesystem pragmatics */
-#include <linux/inet.h>		/* in_aton(), in_ntoa() prototypes */
 #include <linux/netdevice.h>	/* support for network drivers */
 /*----------------------------------------------------------------------------
  * WAN device data space.

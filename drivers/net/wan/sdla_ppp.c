@@ -102,7 +102,6 @@
 #include <linux/if_arp.h>	/* ARPHRD_* defines */
 #include <asm/byteorder.h>	/* htons(), etc. */
 #include <linux/in.h>		/* sockaddr_in */
-#include <linux/inet.h>		/* in_aton(), in_ntoa() prototypes */
 
 
 /* ---- 2.4.X KERNEL SUPPORT -----------------------*/
@@ -2269,10 +2268,11 @@ static void process_route (sdla_t *card)
 			struct in_device *in_dev = dev->ip_ptr;
 			if (in_dev != NULL ) {
 				struct in_ifaddr *ifa = in_dev->ifa_list;
-				printk(KERN_INFO "%s: Assigned Lcl. Addr: %s\n", 
-					card->devname, in_ntoa(ifa->ifa_local));
-				printk(KERN_INFO "%s: Assigned Rmt. Addr: %s\n", 
-						card->devname, in_ntoa(ifa->ifa_address));
+
+				printk(KERN_INFO "%s: Assigned Lcl. Addr: %u.%u.%u.%u\n", 
+					card->devname, NIPQUAD(ifa->ifa_local));
+				printk(KERN_INFO "%s: Assigned Rmt. Addr: %u.%u.%u.%u\n", 
+						card->devname, NIPQUAD(ifa->ifa_address));
 			}else{
 				printk(KERN_INFO 
 				"%s: Error: Failed to add a route for PPP interface %s\n",
@@ -2294,10 +2294,10 @@ static void process_route (sdla_t *card)
 				"%s: An error occurred in IP assignment.\n", 
 				card->devname);
 		} else {
-			printk(KERN_INFO "%s: Assigned Lcl. Addr: %s\n", 
-					card->devname, in_ntoa(dev->pa_addr));
-			printk(KERN_INFO "%s: Assigned Rmt. Addr: %s\n", 
-					card->devname, in_ntoa(dev->pa_dstaddr));
+			printk(KERN_INFO "%s: Assigned Lcl. Addr: %u.%u.%u.%u\n", 
+					card->devname, NIPQUAD(dev->pa_addr));
+			printk(KERN_INFO "%s: Assigned Rmt. Addr: %u.%u.%u.%U\n", 
+					card->devname, NIPQUAD(dev->pa_dstaddr));
 		}
 	}
 
@@ -2408,16 +2408,8 @@ static int config508(netdevice_t *dev, sdla_t *card)
 			/* Debugging code used to check that IP addresses
                          * obtained from the kernel are correct */
 
-			{
-			char laddr[20];
-			char raddr[20];
-			strcpy(laddr,in_ntoa(cfg.ip_local));
-			strcpy(raddr,in_ntoa(cfg.ip_remote));
-
-                        NEX_PRINTK(KERN_INFO "Local %s Remote %s Name %s\n",
-					laddr,raddr, dev->name);
-			
-			}	
+                        NEX_PRINTK(KERN_INFO "Local %u.%u.%u.%u Remote %u.%u.%u.%u Name %s\n",
+					NIPQUAD(ip_local),NIPQUAD(ip_remote), dev->name);
 			break;
 
 		case WANOPT_PPP_HOST:
@@ -2436,18 +2428,9 @@ static int config508(netdevice_t *dev, sdla_t *card)
 
 			/* Debugging code used to check that IP addresses
                          * obtained from the kernel are correct */
-			{
-			char laddr[20];
-			char raddr[20];
-			strcpy(laddr,in_ntoa(cfg.ip_local));
-			strcpy(raddr,in_ntoa(cfg.ip_remote));
-
-                        NEX_PRINTK (KERN_INFO "Local %s Remote %s Name %s\n",
-					laddr,raddr, dev->name);
+                        NEX_PRINTK (KERN_INFO "Local %u.%u.%u.%u Remote %u.%u.%u.%u Name %s\n",
+					NIPQUAD(ip_local),NIPQUAD(ip_remote), dev->name);
 			
-			}	
-
-
 			break;
 	
 		case WANOPT_PPP_PEER:
@@ -3130,10 +3113,10 @@ static int read_info( sdla_t *card )
 	if (err) {
 		printk (KERN_INFO "%s: Adding of route failed: %i\n",
 			card->devname,err);
-		printk (KERN_INFO "%s:	Local : %s\n",
-			card->devname,in_ntoa(ppp_priv_area->ip_local));
-		printk (KERN_INFO "%s:	Remote: %s\n",
-			card->devname,in_ntoa(ppp_priv_area->ip_remote));
+		printk (KERN_INFO "%s:	Local : %u.%u.%u.%u\n",
+			card->devname,NIPQUAD(ppp_priv_area->ip_local));
+		printk (KERN_INFO "%s:	Remote: %u.%u.%u.%u\n",
+			card->devname,NIPQUAD(ppp_priv_area->ip_remote));
 	}
 	return err;
 }
@@ -3212,8 +3195,8 @@ static void remove_route( sdla_t *card )
 			 card->devname, err);
 		return;
 	}else{
-		printk (KERN_INFO "%s: PPP Deleting dynamic route %s successfuly\n",
-			card->devname, in_ntoa(ip_addr));
+		printk (KERN_INFO "%s: PPP Deleting dynamic route %u.%u.%u.%u successfuly\n",
+			card->devname, NIPQUAD(ip_addr));
 	}
 	return;
 }
