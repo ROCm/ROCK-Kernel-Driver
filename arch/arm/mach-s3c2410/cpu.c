@@ -46,6 +46,7 @@ struct cpu_table {
 	unsigned long	idcode;
 	unsigned long	idmask;
 	void		(*map_io)(struct map_desc *mach_desc, int size);
+	void		(*init_uarts)(struct s3c2410_uartcfg *cfg, int no);
 	int		(*init)(void);
 	const char	*name;
 };
@@ -59,32 +60,36 @@ static const char name_s3c2440a[] = "S3C2440A";
 
 static struct cpu_table cpu_ids[] __initdata = {
 	{
-		.idcode	= 0x32410000,
-		.idmask = 0xffffffff,
-		.map_io = s3c2410_map_io,
-		.init   = s3c2410_init,
-		.name   = name_s3c2410
+		.idcode		= 0x32410000,
+		.idmask		= 0xffffffff,
+		.map_io		= s3c2410_map_io,
+		.init_uarts	= s3c2410_init_uarts,
+		.init		= s3c2410_init,
+		.name		= name_s3c2410
 	},
 	{
-		.idcode	= 0x32410002,
-		.idmask = 0xffffffff,
-		.map_io = s3c2410_map_io,
-		.init   = s3c2410_init,
-		.name   = name_s3c2410a
+		.idcode		= 0x32410002,
+		.idmask		= 0xffffffff,
+		.map_io		= s3c2410_map_io,
+		.init_uarts	= s3c2410_init_uarts,
+		.init		= s3c2410_init,
+		.name		= name_s3c2410a
 	},
 	{
-		.idcode	= 0x32440000,
-		.idmask = 0xffffffff,
-		.map_io = s3c2440_map_io,
-		.init   = s3c2440_init,
-		.name   = name_s3c2440
+		.idcode		= 0x32440000,
+		.idmask		= 0xffffffff,
+		.map_io		= s3c2440_map_io,
+		.init_uarts	= s3c2440_init_uarts,
+		.init		= s3c2440_init,
+		.name		= name_s3c2440
 	},
 	{
-		.idcode	= 0x32440001,
-		.idmask = 0xffffffff,
-		.map_io = s3c2440_map_io,
-		.init   = s3c2440_init,
-		.name   = name_s3c2440a
+		.idcode		= 0x32440001,
+		.idmask		= 0xffffffff,
+		.map_io		= s3c2440_map_io,
+		.init_uarts	= s3c2440_init_uarts,
+		.init		= s3c2440_init,
+		.name		= name_s3c2440a
 	}
 };
 
@@ -160,6 +165,16 @@ void __init s3c24xx_init_io(struct map_desc *mach_desc, int size)
 	(cpu->map_io)(mach_desc, size);
 }
 
+void __init s3c24xx_init_uarts(struct s3c2410_uartcfg *cfg, int no)
+{
+	if (cpu == NULL)
+		return;
+
+	if (cpu->init_uarts == NULL) {
+		printk(KERN_ERR "s3c24xx_init_uarts: cpu has no uart init\n");
+	} else
+		(cpu->init_uarts)(cfg, no);
+}
 static int __init s3c_arch_init(void)
 {
 	int ret;

@@ -91,8 +91,10 @@ nfs_get_user_pages(int rw, unsigned long user_addr, size_t size,
 
 	/* set an arbitrary limit to prevent type overflow */
 	/* XXX: this can probably be as large as INT_MAX */
-	if (size > MAX_DIRECTIO_SIZE)
+	if (size > MAX_DIRECTIO_SIZE) {
+		*pages = NULL;
 		return -EFBIG;
+	}
 
 	page_count = (user_addr + size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	page_count -= user_addr >> PAGE_SHIFT;

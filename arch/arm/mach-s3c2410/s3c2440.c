@@ -59,6 +59,7 @@ static struct map_desc s3c2440_iodesc[] __initdata = {
 	IODESC_ENT(LCD),
 	IODESC_ENT(TIMER),
 	IODESC_ENT(ADC),
+	IODESC_ENT(WATCHDOG),
 };
 
 static struct resource s3c_uart0_resource[] = {
@@ -243,7 +244,7 @@ void __init s3c2440_map_io(struct map_desc *mach_desc, int size)
 	s3c24xx_hclk = s3c24xx_fclk / s3c2440_hdiv;
 	s3c24xx_pclk = s3c24xx_hclk / ((clkdiv & S3C2440_CLKDIVN_PDIVN)? 2:1);
 
-	/* print brieft summary of clocks, etc */
+	/* print brief summary of clocks, etc */
 
 	printk("S3C2440: core %ld.%03ld MHz, memory %ld.%03ld MHz, peripheral %ld.%03ld MHz\n",
 	       print_mhz(s3c24xx_fclk), print_mhz(s3c24xx_hclk),
