@@ -141,6 +141,17 @@ struct udsl_usb_send_data_context {
 	struct udsl_instance_data *instance;
 };
 
+struct udsl_control {
+	struct atm_skb_data atm_data;
+	unsigned int num_cells;
+	unsigned int num_entire;
+	unsigned char cell_header [ATM_CELL_HEADER];
+	unsigned int pdu_padding;
+	unsigned char aal5_trailer [ATM_AAL5_TRAILER];
+};
+
+#define UDSL_SKB(x)		((struct udsl_control *)(x)->cb)
+
 /*
  * UDSL main driver data
  */
@@ -1064,7 +1075,14 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 
 static int __init udsl_usb_init (void)
 {
+	struct sk_buff *skb; /* dummy for sizeof */
+
 	PDEBUG ("udsl_usb_init: driver version " DRIVER_VERSION "\n");
+
+	if (sizeof (struct udsl_control) > sizeof (skb->cb)) {
+		printk (KERN_ERR __FILE__ ": unusable with this kernel!\n");
+		return -EIO;
+	}
 
 	return usb_register (&udsl_usb_driver);
 }
