@@ -79,7 +79,7 @@ ia64_elf32_init (struct pt_regs *regs)
 		vma->vm_start = IA32_GDT_OFFSET;
 		vma->vm_end = vma->vm_start + PAGE_SIZE;
 		vma->vm_page_prot = PAGE_SHARED;
-		vma->vm_flags = VM_READ|VM_MAYREAD;
+		vma->vm_flags = VM_READ|VM_MAYREAD|VM_RESERVED;
 		vma->vm_ops = &ia32_shared_page_vm_ops;
 		down_write(&current->mm->mmap_sem);
 		{
