@@ -47,11 +47,7 @@ static struct security_operations capability_ops = {
 	.vm_enough_memory =             cap_vm_enough_memory,
 };
 
-#if defined(CONFIG_SECURITY_CAPABILITIES_MODULE)
-#define MY_NAME THIS_MODULE->name
-#else
-#define MY_NAME "capability"
-#endif
+#define MY_NAME __stringify(KBUILD_MODNAME)
 
 /* flag to keep track of how we were registered */
 static int secondary;
@@ -61,8 +57,6 @@ static int __init capability_init (void)
 {
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
-		printk (KERN_INFO
-			"Failure registering capabilities with the kernel\n");
 		/* try registering with primary module */
 		if (mod_reg_security (MY_NAME, &capability_ops)) {
 			printk (KERN_INFO "Failure registering capabilities "
@@ -71,7 +65,8 @@ static int __init capability_init (void)
 		}
 		secondary = 1;
 	}
-	printk (KERN_INFO "Capability LSM initialized\n");
+	printk (KERN_INFO "Capability LSM initialized%s\n",
+		secondary ? " as secondary" : "");
 	return 0;
 }
 
