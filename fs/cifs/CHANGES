@@ -1,3 +1,10 @@
+Version 1.04
+------------
+Fix caching data integrity bug when extending file size especially when no
+oplock on file.  Fix spurious logging of valid already parsed mount options
+that are parsed outside of the cifs vfs such as nosuid.
+
+
 Version 1.03
 ------------
 Connect to server when port number override not specified, and tcp port

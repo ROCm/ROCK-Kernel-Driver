@@ -571,7 +571,7 @@ cifs_revalidate(struct dentry *direntry)
 	if(cifsInode == NULL)
 		return -ENOENT;
 
-	/* no sense revalidating inode info on file that only we can write */
+	/* no sense revalidating inode info on file that no one can write */
 	if(CIFS_I(direntry->d_inode)->clientCanCacheRead)
 		return rc;
 
@@ -602,8 +602,13 @@ cifs_revalidate(struct dentry *direntry)
 	local_mtime = direntry->d_inode->i_mtime;
 	local_size  = direntry->d_inode->i_size;
 
-	/* BB we need to write out dirty pages here if any before getting possibly 
+	/* need to write out dirty pages here if any before getting possibly 
 		stale time from server */
+	if(direntry->d_inode->i_mapping) {
+		/* do we need to lock inode until after invalidate completes below? */
+		filemap_fdatawrite(direntry->d_inode->i_mapping);
+		filemap_fdatawrite(direntry->d_inode->i_mapping);
+	}
 	if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
 		rc = cifs_get_inode_info_unix(&direntry->d_inode, full_path,
 					 direntry->d_sb);
@@ -631,7 +636,6 @@ cifs_revalidate(struct dentry *direntry)
 		cFYI(1,("inode unchanged on server"));
 	} else {
 		/* file has changed on server */
-		cFYI(1,("Server copy changed, invalidating remote inode "));
 		invalidate_remote_inode(direntry->d_inode);
 	}
 	
@@ -728,28 +732,6 @@ cifs_truncate_file(struct inode *inode)
 	return;
 }
 
-static int cifs_trunc_page(struct address_space *mapping, loff_t from)
-{
-        pgoff_t index = from >> PAGE_CACHE_SHIFT;
-        unsigned offset = from & (PAGE_CACHE_SIZE-1);
-        struct page *page;
-        char *kaddr;
-        int rc = 0;
-
-        page = grab_cache_page(mapping, index);
-        if (!page)
-                return -ENOMEM;
-
-        kaddr = kmap_atomic(page, KM_USER0);
-        memset(kaddr + offset, 0, PAGE_CACHE_SIZE - offset);
-        flush_dcache_page(page);
-        kunmap_atomic(kaddr, KM_USER0);
-        set_page_dirty(page);
-        unlock_page(page);
-        page_cache_release(page);
-        return rc;
-}
-
 int
 cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 {
@@ -834,8 +816,6 @@ cifs_setattr(struct dentry *direntry, struct iattr *attrs)
 
 		if (rc == 0) {
 			rc = vmtruncate(direntry->d_inode, attrs->ia_size);
-			cifs_trunc_page(direntry->d_inode->i_mapping, direntry->d_inode->i_size); 
-/*          cFYI(1,("truncate_page to 0x%lx \n",direntry->d_inode->i_size)); */
 		}
 	}
 	if (attrs->ia_valid & ATTR_UID) {

@@ -412,6 +412,14 @@ cifs_read_wrapper(struct file * file, char *read_data, size_t read_size,
 	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
 		return generic_file_read(file,read_data,read_size,poffset);
 	} else {
+		/* BB do we need to lock inode from here until after invalidate? */
+		if(file->f_dentry->d_inode->i_mapping) {
+			filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
+			filemap_fdatawait(file->f_dentry->d_inode->i_mapping);
+		}
+		/* force read from the server since we do not have oplock */
+		/* BB we should relax this and do it on a timer and call cifs_revalidate */
+		/* BB we should make timer configurable */
 		invalidate_remote_inode(file->f_dentry->d_inode);
 		return generic_file_read(file,read_data,read_size,poffset);
 	}
@@ -431,19 +439,13 @@ cifs_write_wrapper(struct file * file, const char *write_data,
 		return -EIO;
 
 	/* check whether we can cache writes locally */
-	/* if not then check whether we can use the page cache at all */
-	if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)  {
-		return generic_file_write(file,write_data, write_size,poffset);
-
-	} else {
-		if(CIFS_I(file->f_dentry->d_inode)->clientCanCacheRead) {
-			/* no need to invalidate the local copy */
-		} else
-			invalidate_remote_inode(file->f_dentry->d_inode);
-		written = generic_file_write(file,write_data, write_size,poffset);
-		/* since we can not cache writes, need to sync the data */
-		return written;
+	written = generic_file_write(file,write_data,write_size,poffset);
+	if(!CIFS_I(file->f_dentry->d_inode)->clientCanCacheAll)  {
+		if(file->f_dentry->d_inode->i_mapping) {
+			filemap_fdatawrite(file->f_dentry->d_inode->i_mapping);
+		}
 	}
+	return written;
 }
 
 
