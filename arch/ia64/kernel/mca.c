@@ -55,7 +55,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/smp.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/delay.h>
 #include <asm/machvec.h>
@@ -157,8 +157,6 @@ static int cmc_polling_enabled = 1;
 static int cpe_poll_enabled = 1;
 
 extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size);
-
-static struct tq_struct	cmc_disable_tq, cmc_enable_tq;
 
 /*
  *  ia64_mca_log_sal_error_record
@@ -622,14 +620,11 @@ verify_guid (efi_guid_t *test, efi_guid_t *target)
  *
  * Called via keventd (smp_call_function() is not safe in interrupt context) to
  * disable the cmc interrupt vector.
- *
- * Note: needs preempt_disable() if you apply the preempt patch to 2.4.
  */
 static void
 ia64_mca_cmc_vector_disable_keventd(void *unused)
 {
-	ia64_mca_cmc_vector_disable(NULL);
-	smp_call_function(ia64_mca_cmc_vector_disable, NULL, 1, 0);
+	on_each_cpu(ia64_mca_cmc_vector_disable, NULL, 1, 0);
 }
 
 /*
@@ -637,14 +632,11 @@ ia64_mca_cmc_vector_disable_keventd(void *unused)
  *
  * Called via keventd (smp_call_function() is not safe in interrupt context) to
  * enable the cmc interrupt vector.
- *
- * Note: needs preempt_disable() if you apply the preempt patch to 2.4.
  */
 static void
 ia64_mca_cmc_vector_enable_keventd(void *unused)
 {
-	smp_call_function(ia64_mca_cmc_vector_enable, NULL, 1, 0);
-	ia64_mca_cmc_vector_enable(NULL);
+	on_each_cpu(ia64_mca_cmc_vector_enable, NULL, 1, 0);
 }
 
 /*
@@ -679,9 +671,6 @@ ia64_mca_init(void)
 	u64 timeout = IA64_MCA_RENDEZ_TIMEOUT;	/* platform specific */
 
 	IA64_MCA_DEBUG("ia64_mca_init: begin\n");
-
-	INIT_TQUEUE(&cmc_disable_tq, ia64_mca_cmc_vector_disable_keventd, NULL);
-	INIT_TQUEUE(&cmc_enable_tq, ia64_mca_cmc_vector_enable_keventd, NULL);
 
 	/* initialize recovery success indicator */
 	ia64_os_mca_recovery_successful = 0;
@@ -1055,6 +1044,9 @@ ia64_mca_ucmc_handler(void)
 	ia64_return_to_sal_check();
 }
 
+static DECLARE_WORK(cmc_disable_work, ia64_mca_cmc_vector_disable_keventd, NULL);
+static DECLARE_WORK(cmc_enable_work, ia64_mca_cmc_vector_enable_keventd, NULL);
+
 /*
  * ia64_mca_cmc_int_handler
  *
@@ -1101,7 +1093,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 
 			cmc_polling_enabled = 1;
 			spin_unlock(&cmc_history_lock);
-			schedule_task(&cmc_disable_tq);
+			schedule_work(&cmc_disable_work);
 
 			/*
 			 * Corrected errors will still be corrected, but
@@ -1196,7 +1188,7 @@ ia64_mca_cmc_int_caller(int cpe_irq, void *arg, struct pt_regs *ptregs)
 		if (start_count == IA64_LOG_COUNT(SAL_INFO_TYPE_CMC)) {
 
 			printk(KERN_WARNING "%s: Returning to interrupt driven CMC handler\n", __FUNCTION__);
-			schedule_task(&cmc_enable_tq);
+			schedule_work(&cmc_enable_work);
 			cmc_polling_enabled = 0;
 
 		} else {
