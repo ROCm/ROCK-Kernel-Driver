@@ -1006,20 +1006,23 @@ static void storage_disconnect(struct usb_interface *intf)
  * Initialization and registration
  ***********************************************************************/
 
-int __init usb_stor_init(void)
+static int __init usb_stor_init(void)
 {
+	int retval;
 	printk(KERN_INFO "Initializing USB Mass Storage driver...\n");
 
-	/* register the driver, return -1 if error */
-	if (usb_register(&usb_storage_driver) < 0)
-		return -1;
+	/* register the driver, return usb_register return code if error */
+	retval = usb_register(&usb_storage_driver);
+	if (retval)
+		goto out;
 
 	/* we're all set */
 	printk(KERN_INFO "USB Mass Storage support registered.\n");
-	return 0;
+out:
+	return retval;
 }
 
-void __exit usb_stor_exit(void)
+static void __exit usb_stor_exit(void)
 {
 	US_DEBUGP("usb_stor_exit() called\n");
 
