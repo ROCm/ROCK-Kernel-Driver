@@ -158,12 +158,8 @@ static int pci_add_secondary_bus(struct device_node *dn,
 
 	dn->bussubno = child->number;
 
-	/* ioremap() for child bus */
-	if (remap_bus_range(child)) {
-		printk(KERN_ERR "%s: could not ioremap() child bus\n",
-			__FUNCTION__);
-		return 1;
-	}
+	/* ioremap() for child bus, which may or may not succeed */
+	remap_bus_range(child);
 
 	return 0;
 }
