@@ -534,6 +534,28 @@ static void remove_notification(struct mqueue_inode_info *info)
 	info->notify_owner = 0;
 }
 
+static int mq_attr_ok(struct mq_attr *attr)
+{
+	if (attr->mq_maxmsg <= 0 || attr->mq_msgsize <= 0)
+		return 0;
+	if (capable(CAP_SYS_RESOURCE)) {
+		if (attr->mq_maxmsg > HARD_MSGMAX)
+			return 0;
+	} else {
+		if (attr->mq_maxmsg > msg_max ||
+				attr->mq_msgsize > msgsize_max)
+			return 0;
+	}
+	/* check for overflow */
+	if (attr->mq_msgsize > ULONG_MAX/attr->mq_maxmsg)
+		return 0;
+	if ((unsigned long)(attr->mq_maxmsg * attr->mq_msgsize) +
+	    (attr->mq_maxmsg * sizeof (struct msg_msg *)) <
+	    (unsigned long)(attr->mq_maxmsg * attr->mq_msgsize))
+		return 0;
+	return 1;
+}
+
 /*
  * Invoked when creating a new queue via sys_mq_open
  */
@@ -547,17 +569,8 @@ static struct file *do_create(struct dentry *dir, struct dentry *dentry,
 	if (u_attr != NULL) {
 		if (copy_from_user(&attr, u_attr, sizeof(attr)))
 			return ERR_PTR(-EFAULT);
-
-		if (attr.mq_maxmsg <= 0 || attr.mq_msgsize <= 0)
+		if (!mq_attr_ok(&attr))
 			return ERR_PTR(-EINVAL);
-		if (capable(CAP_SYS_RESOURCE)) {
-			if (attr.mq_maxmsg > HARD_MSGMAX)
-				return ERR_PTR(-EINVAL);
-		} else {
-			if (attr.mq_maxmsg > msg_max ||
-					attr.mq_msgsize > msgsize_max)
-				return ERR_PTR(-EINVAL);
-		}
 		/* store for use during create */
 		dentry->d_fsdata = &attr;
 	}
