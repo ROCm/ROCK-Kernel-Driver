@@ -531,6 +531,14 @@ M:	mike@i-Connect.Net
 L:	linux-eata@i-connect.net, linux-scsi@vger.kernel.org
 S:	Maintained
 
+EBTABLES
+P:	Bart De Schuymer
+M:	bart.de.schuymer@pandora.be
+L:	ebtables-user@lists.sourceforge.net
+L:	ebtables-devel@lists.sourceforge.net
+W:	http://ebtables.sourceforge.net/
+S:	Maintained
+
 EEPRO100 NETWORK DRIVER
 P:	Andrey V. Savochkin
 M:	saw@saw.sw.com.sg
