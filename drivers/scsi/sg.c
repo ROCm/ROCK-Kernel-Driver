@@ -1514,8 +1514,10 @@ init_sg(void)
 	if (rc)
 		return rc;
 	rc = scsi_register_interface(&sg_interface);
-	if (rc)
+	if (rc) {
+		unregister_chrdev(SCSI_GENERIC_MAJOR, "sg");
 		return rc;
+	}
 #ifdef CONFIG_SCSI_PROC_FS
 	sg_proc_init();
 #endif				/* CONFIG_SCSI_PROC_FS */
