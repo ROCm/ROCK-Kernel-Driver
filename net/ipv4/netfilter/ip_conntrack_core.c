@@ -1128,8 +1128,6 @@ int ip_conntrack_alter_reply(struct ip_conntrack *conntrack,
 
 int ip_conntrack_helper_register(struct ip_conntrack_helper *me)
 {
-	MOD_INC_USE_COUNT;
-
 	WRITE_LOCK(&ip_conntrack_lock);
 	list_prepend(&helpers, me);
 	WRITE_UNLOCK(&ip_conntrack_lock);
@@ -1166,8 +1164,6 @@ void ip_conntrack_helper_unregister(struct ip_conntrack_helper *me)
 	/* Someone could be still looking at the helper in a bh. */
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* Refresh conntrack for this many jiffies. */

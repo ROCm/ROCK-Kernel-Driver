@@ -33,7 +33,6 @@
 #define DEBUGP(format, args...)
 #endif
 
-struct module *ip_conntrack_module = THIS_MODULE;
 MODULE_LICENSE("GPL");
 
 static int kill_proto(const struct ip_conntrack *i, void *data)
@@ -310,7 +309,6 @@ int ip_conntrack_protocol_register(struct ip_conntrack_protocol *proto)
 	}
 
 	list_prepend(&protocol_list, proto);
-	MOD_INC_USE_COUNT;
 
  out:
 	WRITE_UNLOCK(&ip_conntrack_lock);
@@ -332,8 +330,6 @@ void ip_conntrack_protocol_unregister(struct ip_conntrack_protocol *proto)
 
 	/* Remove all contrack entries for this protocol */
 	ip_ct_selective_cleanup(kill_proto, &proto->proto);
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int __init init(void)
@@ -349,13 +345,19 @@ static void __exit fini(void)
 module_init(init);
 module_exit(fini);
 
+/* Some modules need us, but don't depend directly on any symbol.
+   They should call this. */
+void need_ip_conntrack(void)
+{
+}
+
 EXPORT_SYMBOL(ip_conntrack_protocol_register);
 EXPORT_SYMBOL(ip_conntrack_protocol_unregister);
 EXPORT_SYMBOL(invert_tuplepr);
 EXPORT_SYMBOL(ip_conntrack_alter_reply);
 EXPORT_SYMBOL(ip_conntrack_destroyed);
 EXPORT_SYMBOL(ip_conntrack_get);
-EXPORT_SYMBOL(ip_conntrack_module);
+EXPORT_SYMBOL(need_ip_conntrack);
 EXPORT_SYMBOL(ip_conntrack_helper_register);
 EXPORT_SYMBOL(ip_conntrack_helper_unregister);
 EXPORT_SYMBOL(ip_ct_selective_cleanup);

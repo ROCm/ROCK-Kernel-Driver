@@ -255,8 +255,6 @@ int ip_nat_protocol_register(struct ip_nat_protocol *proto)
 	}
 
 	list_prepend(&protos, proto);
-	MOD_INC_USE_COUNT;
-
  out:
 	WRITE_UNLOCK(&ip_nat_lock);
 	return ret;
@@ -272,13 +270,13 @@ void ip_nat_protocol_unregister(struct ip_nat_protocol *proto)
 	/* Someone could be still looking at the proto in a bh. */
 	br_write_lock_bh(BR_NETPROTO_LOCK);
 	br_write_unlock_bh(BR_NETPROTO_LOCK);
-
-	MOD_DEC_USE_COUNT;
 }
 
 static int init_or_cleanup(int init)
 {
 	int ret = 0;
+
+	need_ip_conntrack();
 
 	if (!init) goto cleanup;
 
@@ -314,13 +312,9 @@ static int init_or_cleanup(int init)
 		goto cleanup_localoutops;
 	}
 #endif
-	if (ip_conntrack_module)
-		__MOD_INC_USE_COUNT(ip_conntrack_module);
 	return ret;
 
  cleanup:
-	if (ip_conntrack_module)
-		__MOD_DEC_USE_COUNT(ip_conntrack_module);
 #ifdef CONFIG_IP_NF_NAT_LOCAL
 	nf_unregister_hook(&ip_nat_local_in_ops);
  cleanup_localoutops:

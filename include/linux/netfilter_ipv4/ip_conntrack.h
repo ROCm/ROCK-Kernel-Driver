@@ -229,7 +229,8 @@ ip_conntrack_expect_find_get(const struct ip_conntrack_tuple *tuple);
 /* decrement reference count on an expectation */
 void ip_conntrack_expect_put(struct ip_conntrack_expect *exp);
 
-extern struct module *ip_conntrack_module;
+/* call to create an explicit dependency on ip_conntrack. */
+extern void need_ip_conntrack(void);
 
 extern int invert_tuplepr(struct ip_conntrack_tuple *inverse,
 			  const struct ip_conntrack_tuple *orig);
