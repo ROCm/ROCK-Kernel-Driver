@@ -28,10 +28,6 @@ const int frequency_list_bg[] = { 2412, 2417, 2422, 2427, 2432, 2437, 2442,
 	2447, 2452, 2457, 2462, 2467, 2472, 2484
 };
 
-const int frequency_list_a[] = { 5170, 5180, 5190, 5200, 5210, 5220, 5230,
-	5240, 5260, 5280, 5300, 5320
-};
-
 int
 channel_of_freq(int f)
 {
@@ -41,10 +37,8 @@ channel_of_freq(int f)
 		while ((c < 14) && (f != frequency_list_bg[c]))
 			c++;
 		return (c >= 14) ? 0 : ++c;
-	} else if ((f >= (int) 5170) && (f <= (int) 5320)) {
-		while ((c < 12) && (f != frequency_list_a[c]))
-			c++;
-		return (c >= 12) ? 0 : (c + 37);
+	} else if ((f >= (int) 5000) && (f <= (int) 6000)) {
+		return ( (f - 5000) / 5 );
 	} else
 		return 0;
 }
