@@ -460,6 +460,7 @@ static int __devinit agp_serverworks_probe(struct pci_dev *pdev,
 	struct agp_bridge_data *bridge;
 	struct pci_dev *bridge_dev;
 	u32 temp, temp2;
+	u8 cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 
 	/* Everything is on func 1 here so we are hardcoding function one */
 	bridge_dev = pci_find_slot((unsigned int)pdev->bus->number,
@@ -483,6 +484,7 @@ static int __devinit agp_serverworks_probe(struct pci_dev *pdev,
 		break;
 
 	default:
+		if (cap_ptr)
 		printk(KERN_ERR PFX "Unsupported Serverworks chipset "
 				"(device id: %04x)\n", pdev->device);
 		return -ENODEV;
