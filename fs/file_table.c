@@ -52,7 +52,7 @@ struct file * get_empty_filp(void)
 			file_list_unlock();
 			return NULL;
 		}
-		ep_init_file_struct(f);
+		eventpoll_init_file(f);
 		atomic_set(&f->f_count,1);
 		f->f_version = 0;
 		f->f_uid = current->fsuid;
@@ -97,7 +97,7 @@ struct file * get_empty_filp(void)
 int init_private_file(struct file *filp, struct dentry *dentry, int mode)
 {
 	memset(filp, 0, sizeof(*filp));
-	ep_init_file_struct(filp);
+	eventpoll_init_file(filp);
 	filp->f_mode   = mode;
 	atomic_set(&filp->f_count, 1);
 	filp->f_dentry = dentry;
@@ -126,10 +126,10 @@ void __fput(struct file * file)
 	struct inode * inode = dentry->d_inode;
 
 	/*
-	 * The function ep_notify_file_close() should be the first called
+	 * The function eventpoll_release() should be the first called
 	 * in the file cleanup chain.
 	 */
-	ep_notify_file_close(file);
+	eventpoll_release(file);
 	locks_remove_flock(file);
 
 	if (file->f_op && file->f_op->release)
