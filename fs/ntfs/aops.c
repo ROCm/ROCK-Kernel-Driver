@@ -265,9 +265,11 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 		goto unl_err_out;
 	}
 
-	err = get_attr_search_ctx(&ctx, ni, mrec);
-	if (err)
+	ctx = get_attr_search_ctx(ni, mrec);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto unm_unl_err_out;
+	}
 
 	/* Find the data attribute in the mft record. */
 	if (!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx)) {

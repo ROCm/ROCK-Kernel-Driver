@@ -298,9 +298,11 @@ void ntfs_read_inode(struct inode *vi)
 	} else
 		vi->i_mode |= S_IFREG;
 
-	err = get_attr_search_ctx(&ctx, ni, m);
-	if (err)
+	ctx = get_attr_search_ctx(ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto unm_err_out;
+	}
 
 	/*
 	 * Find the standard information attribute in the mft record. At this
@@ -915,9 +917,11 @@ void ntfs_read_inode_mount(struct inode *vi)
 	/* Provides readpage() and sync_page() for map_mft_record(READ). */
 	vi->i_mapping->a_ops = &ntfs_mft_aops;
 
-	err = get_attr_search_ctx(&ctx, ni, m);
-	if (err)
+	ctx = get_attr_search_ctx(ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto err_out;
+	}
 
 	/* Find the attribute list attribute if present. */
 	if (lookup_attr(AT_ATTRIBUTE_LIST, NULL, 0, 0, 0, NULL, 0, ctx)) {

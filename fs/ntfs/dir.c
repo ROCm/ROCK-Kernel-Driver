@@ -61,7 +61,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	u8 *index_end;
 	u64 mref;
 	attr_search_context *ctx;
-	int err, rc;
+	int err = 0, rc;
 	IGNORE_CASE_BOOL ic;
 	VCN vcn, old_vcn;
 	struct address_space *ia_mapping;
@@ -73,9 +73,11 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 	if (IS_ERR(m))
 		goto map_err_out;
 
-	err = get_attr_search_ctx(&ctx, dir_ni, m);
-	if (err)
+	ctx = get_attr_search_ctx(dir_ni, m);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto unm_err_out;
+	}
 
 	/* Find the index root attribute in the mft record. */
 	if (!lookup_attr(AT_INDEX_ROOT, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
@@ -555,9 +557,11 @@ static int ntfs_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		goto err_out;
 	}
 
-	err = get_attr_search_ctx(&ctx, ndir, m);
-	if (err)
+	ctx = get_attr_search_ctx(ndir, m);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto unm_err_out;
+	}
 
 	/*
 	 * Allocate a buffer to store the current name being processed

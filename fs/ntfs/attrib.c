@@ -797,7 +797,7 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	const uchar_t *name;
 	u32 name_len;
 	ATTR_TYPES at;
-	int err;
+	int err = 0;
 	
 	ntfs_debug("Mapping run list part containing vcn 0x%Lx.",
 			(long long)vcn);
@@ -807,9 +807,11 @@ int map_run_list(ntfs_inode *ni, VCN vcn)
 	if (IS_ERR(mrec))
 		return PTR_ERR(mrec);
 
-	err = get_attr_search_ctx(&ctx, ni, mrec);
-	if (err)
+	ctx = get_attr_search_ctx(ni, mrec);
+	if (!ctx) {
+		err = -ENOMEM;
 		goto unm_err_out;
+	}
 
 	/* The attribute type is determined from the inode type. */
 	if (S_ISDIR(VFS_I(ni)->i_mode)) {
@@ -1561,21 +1563,20 @@ void reinit_attr_search_ctx(attr_search_context *ctx)
 
 /**
  * get_attr_search_ctx - allocate and initialize a new attribute search context
- * @ctx:	address of pointer in which to return the new search context
  * @ni:		ntfs inode with which to initialize the search context
  * @mrec:	mft record with which to initialize the search context
  *
  * Allocate a new attribute search context, initialize it with @ni and @mrec,
- * and return it in *@ctx. Return 0 on success or -ENOMEM if allocation failed.
+ * and return it. Return NULL if allocation failed.
  */
-int get_attr_search_ctx(attr_search_context **ctx, ntfs_inode *ni,
-		MFT_RECORD *mrec)
+attr_search_context *get_attr_search_ctx(ntfs_inode *ni, MFT_RECORD *mrec)
 {
-	*ctx = kmem_cache_alloc(ntfs_attr_ctx_cache, SLAB_NOFS);
-	if (unlikely(!*ctx))
-		return -ENOMEM;
-	init_attr_search_ctx(*ctx, ni, mrec);
-	return 0;
+	attr_search_context *ctx;
+
+	ctx = kmem_cache_alloc(ntfs_attr_ctx_cache, SLAB_NOFS);
+	if (ctx)
+		init_attr_search_ctx(ctx, ni, mrec);
+	return NULL;
 }
 
 /**
@@ -1583,7 +1584,7 @@ int get_attr_search_ctx(attr_search_context **ctx, ntfs_inode *ni,
  * @ctx:	attribute search context to free
  *
  * Release the attribute search context @ctx, unmapping an associated extent
- * mft record if prseent.
+ * mft record if present.
  */
 void put_attr_search_ctx(attr_search_context *ctx)
 {

@@ -816,7 +816,7 @@ static BOOL load_system_files(ntfs_volume *vol)
 		ntfs_error(sb, "Failed to map $MFT.");
 		return FALSE;
 	}
-	if (get_attr_search_ctx(&ctx, NTFS_I(vol->mft_ino), m)) {
+	if (!(ctx = get_attr_search_ctx(NTFS_I(vol->mft_ino), m))) {
 		ntfs_error(sb, "Failed to get attribute search context.");
 		goto unmap_err_out;
 	}
@@ -985,7 +985,7 @@ iput_volume_failed:
 		iput(vol->vol_ino);
 		goto volume_failed;
 	}
-	if (get_attr_search_ctx(&ctx, NTFS_I(vol->vol_ino), m)) {
+	if (!(ctx = get_attr_search_ctx(NTFS_I(vol->vol_ino), m))) {
 		ntfs_error(sb, "Failed to get attribute search context.");
 		goto get_ctx_vol_failed;
 	}

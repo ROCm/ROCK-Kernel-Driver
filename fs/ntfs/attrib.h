@@ -98,7 +98,7 @@ static inline s64 attribute_value_length(const ATTR_RECORD *a)
 }
 
 extern void reinit_attr_search_ctx(attr_search_context *ctx);
-extern int get_attr_search_ctx(attr_search_context **ctx, ntfs_inode *ni,
+extern attr_search_context *get_attr_search_ctx(ntfs_inode *ni,
 		MFT_RECORD *mrec);
 extern void put_attr_search_ctx(attr_search_context *ctx);
 

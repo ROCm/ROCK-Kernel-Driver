@@ -32,6 +32,10 @@ ToDo:
 	- Cleanup: rename mst.c::__post_read_mst_fixup to post_write_mst_fixup
 	  and cleanup the code a bit, removing the unused size parameter.
 	- Change default fmask to 0177 and update documentation.
+	- Change attrib.c::get_attr_search_ctx() to return the search context
+	  directly instead of taking the address of a pointer. A return value
+	  of NULL means the allocation failed. Updated all callers
+	  appropriately.
 
 2.0.1 - Minor updates.
 
