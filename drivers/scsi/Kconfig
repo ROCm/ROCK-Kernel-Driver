@@ -1237,6 +1237,13 @@ config SCSI_PSI240I
 	  To compile this driver as a module, choose M here: the
 	  module will be called psi240i.
 
+config SCSI_LPFC
+	tristate "Emulex LightPulse Fibre Channel Support"
+	depends on PCI && SCSI && SCSI_FC_ATTRS
+	help
+          This lpfc driver supports the Emulex LightPulse
+          Family of Fibre Channel PCI host adapters.
+
 config SCSI_QLOGIC_FAS
 	tristate "Qlogic FAS SCSI support"
 	depends on ISA && SCSI
