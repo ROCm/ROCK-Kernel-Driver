@@ -4641,6 +4641,7 @@ qla1280_get_token(char *str)
 
 #if LINUX_VERSION_CODE >= 0x020600
 static struct scsi_host_template qla1280_driver_template = {
+	.module			= THIS_MODULE,
 	.proc_name		= "qla1280",
 	.name			= "Qlogic ISP 1280/12160",
 	.info			= qla1280_info,
