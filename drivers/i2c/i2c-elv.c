@@ -150,7 +150,7 @@ static int __init i2c_bitelv_init(void)
 			return -ENODEV;
 		}
 	} else {
-		bit_elv_ops.data=(void*)base;
+		i2c_set_adapdata(&bit_elv_ops, (void *)base);
 		if (bit_elv_init()==0) {
 			if(i2c_bit_add_bus(&bit_elv_ops) < 0)
 				return -ENODEV;

@@ -289,7 +289,7 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 				char rw, u8 command, int size, 
 				union i2c_smbus_data *data)
 {
-	struct scx200_acb_iface *iface = adapter->data;
+	struct scx200_acb_iface *iface = i2c_get_adapdata(adapter);
 	int len;
 	u8 *buffer;
 	u16 cur_word;
@@ -455,7 +455,7 @@ static int  __init scx200_acb_create(int base, int index)
 
 	memset(iface, 0, sizeof(*iface));
 	adapter = &iface->adapter;
-	adapter->data = iface;
+	i2c_set_adapdata(adapter, iface);
 	snprintf(adapter->dev.name, DEVICE_NAME_SIZE, "SCx200 ACB%d", index);
 	adapter->owner = THIS_MODULE;
 	adapter->id = I2C_ALGO_SMBUS;

@@ -219,12 +219,7 @@ struct i2c_adapter {
 	int (*client_register)(struct i2c_client *);
 	int (*client_unregister)(struct i2c_client *);
 
-	void *data;	/* private data for the adapter			*/
-			/* some data fields that are used by all types	*/
-			/* these data fields are readonly to the public	*/
-			/* and can be set via the i2c_ioctl call	*/
-
-			/* data fields that are valid for all devices	*/
+	/* data fields that are valid for all devices	*/
 	struct semaphore bus;
 	struct semaphore list;  
 	unsigned int flags;/* flags specifying div. data		*/
@@ -241,6 +236,16 @@ struct i2c_adapter {
 #endif /* def CONFIG_PROC_FS */
 };
 #define to_i2c_adapter(d) container_of(d, struct i2c_adapter, dev)
+
+static inline void *i2c_get_adapdata (struct i2c_adapter *dev)
+{
+	return dev_get_drvdata (&dev->dev);
+}
+
+static inline void i2c_set_adapdata (struct i2c_adapter *dev, void *data)
+{
+	return dev_set_drvdata (&dev->dev, data);
+}
 
 /*flags for the driver struct: */
 #define I2C_DF_NOTIFY	0x01		/* notify on bus (de/a)ttaches 	*/
