@@ -198,11 +198,6 @@ void machine_real_restart(unsigned char *code, int length)
 	memcpy (swapper_pg_dir, swapper_pg_dir + USER_PGD_PTRS,
 		sizeof (swapper_pg_dir [0]) * KERNEL_PGD_PTRS);
 
-	/* Make sure the first page is mapped to the start of physical memory.
-	   It is normally not mapped, to trap kernel NULL pointer dereferences. */
-
-	pg0[0] = _PAGE_RW | _PAGE_PRESENT;
-
 	/*
 	 * Use `swapper_pg_dir' as our page directory.
 	 */
