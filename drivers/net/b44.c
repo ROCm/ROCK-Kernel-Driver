@@ -1182,8 +1182,9 @@ static int b44_init_hw(struct b44 *bp)
 	b44_chip_reset(bp);
 	b44_phy_reset(bp);
 	b44_setup_phy(bp);
-	val = br32(B44_MAC_CTRL);
-	bw32(B44_MAC_CTRL, val | MAC_CTRL_CRC32_ENAB);
+
+	/* Enable CRC32, set proper LED modes and power on PHY */
+	bw32(B44_MAC_CTRL, MAC_CTRL_CRC32_ENAB | MAC_CTRL_PHY_LEDCTRL);
 	bw32(B44_RCV_LAZY, (1 << RCV_LAZY_FC_SHIFT));
 
 	/* This sets the MAC address too.  */
@@ -1332,7 +1333,7 @@ static struct net_device_stats *b44_get_stats(struct net_device *dev)
 	return nstat;
 }
 
-static void __b44_load_mcast(struct b44 *bp, struct net_device *dev)
+static int __b44_load_mcast(struct b44 *bp, struct net_device *dev)
 {
 	struct dev_mc_list *mclist;
 	int i, num_ents;
@@ -1342,12 +1343,15 @@ static void __b44_load_mcast(struct b44 *bp, struct net_device *dev)
 	for (i = 0; mclist && i < num_ents; i++, mclist = mclist->next) {
 		__b44_cam_write(bp, mclist->dmi_addr, i + 1);
 	}
+	return i+1;
 }
 
 static void __b44_set_rx_mode(struct net_device *dev)
 {
 	struct b44 *bp = dev->priv;
 	u32 val;
+	int i=0;
+	unsigned char zero[6] = {0,0,0,0,0,0};
 
 	val = br32(B44_RXCONFIG);
 	val &= ~(RXCONFIG_PROMISC | RXCONFIG_ALLMULTI);
@@ -1360,8 +1364,11 @@ static void __b44_set_rx_mode(struct net_device *dev)
 		if (dev->flags & IFF_ALLMULTI)
 			val |= RXCONFIG_ALLMULTI;
 		else
-			__b44_load_mcast(bp, dev);
-
+			i=__b44_load_mcast(bp, dev);
+		
+		for(;i<64;i++) {
+			__b44_cam_write(bp, zero, i);			
+		}
 		bw32(B44_RXCONFIG, val);
         	val = br32(B44_CAM_CTRL);
 	        bw32(B44_CAM_CTRL, val | CAM_CTRL_ENABLE);
