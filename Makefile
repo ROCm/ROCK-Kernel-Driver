@@ -194,7 +194,7 @@ depfile = $(subst $(comma),_,$(@D)/.$(@F).d)
 
 noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    defconfig allyesconfig allnoconfig allmodconfig \
-		    clean mrproper distclean \
+		    clean mrproper distclean rpm \
 		    help tags TAGS cscope sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
@@ -571,34 +571,6 @@ define generate-asm-offsets.h
 	 echo "#endif" )
 endef
 
-# RPM target
-# ---------------------------------------------------------------------------
-
-#	If you do a make spec before packing the tarball you can rpm -ta it
-
-spec:
-	. scripts/mkspec >kernel.spec
-
-#	Build a tar ball, generate an rpm from it and pack the result
-#	There arw two bits of magic here
-#	1) The use of /. to avoid tar packing just the symlink
-#	2) Removing the .dep files as they have source paths in them that
-#	   will become invalid
-
-rpm:	clean spec
-	find . $(RCS_FIND_IGNORE) \
-		\( -size 0 -o -name .depend -o -name .hdepend\) \
-		-type f -print | xargs rm -f
-	set -e; \
-	cd $(TOPDIR)/.. ; \
-	ln -sf $(TOPDIR) $(KERNELPATH) ; \
-	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
-	rm $(KERNELPATH) ; \
-	cd $(TOPDIR) ; \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .version ; \
-	rpm -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
-	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
-
 else # ifdef include_config
 
 ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
@@ -630,7 +602,7 @@ ifeq ($(filter-out $(noconfig_targets),$(MAKECMDGOALS)),)
 # ---------------------------------------------------------------------------
 
 .PHONY: oldconfig xconfig menuconfig config \
-	make_with_config
+	make_with_config rpm
 
 scripts/kconfig/conf scripts/kconfig/mconf scripts/kconfig/qconf: scripts/fixdep FORCE
 	$(Q)$(MAKE) $(build)=scripts/kconfig $@
@@ -762,6 +734,36 @@ TAGS: FORCE
 
 tags: FORCE
 	$(call cmd,tags)
+
+# RPM target
+# ---------------------------------------------------------------------------
+
+#	If you do a make spec before packing the tarball you can rpm -ta it
+
+spec:
+	. scripts/mkspec >kernel.spec
+
+#	Build a tar ball, generate an rpm from it and pack the result
+#	There arw two bits of magic here
+#	1) The use of /. to avoid tar packing just the symlink
+#	2) Removing the .dep files as they have source paths in them that
+#	   will become invalid
+
+rpm:	clean spec
+	find . $(RCS_FIND_IGNORE) \
+		\( -size 0 -o -name .depend -o -name .hdepend \) \
+		-type f -print | xargs rm -f
+	set -e; \
+	cd $(TOPDIR)/.. ; \
+	ln -sf $(TOPDIR) $(KERNELPATH) ; \
+	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
+	rm $(KERNELPATH) ; \
+	cd $(TOPDIR) ; \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .version ; \
+	RPM=`which rpmbuild`; \
+	if [ -z "$$RPM" ]; then RPM=rpm; fi; \
+	$$RPM -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
+	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
 
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------
