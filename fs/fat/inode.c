@@ -639,7 +639,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	int logical_sector_size, fat_clusters, debug, cp, first;
 	unsigned int total_sectors, rootdir_sectors;
 	unsigned char media;
-	long error = -EIO;
+	long error;
 	char buf[50];
 	int i;
 	char cvf_format[21];
@@ -662,6 +662,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	sbi->dir_ops = fs_dir_inode_ops;
 	sbi->cvf_format = &default_cvf;
 
+	error = -EINVAL;
 	if (!parse_options((char *)data, &debug, &sbi->options,
 			   cvf_format, cvf_options))
 		goto out_fail;
@@ -670,6 +671,7 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 	/* set up enough so that it can read an inode */
 	init_MUTEX(&sbi->fat_lock);
 
+	error = -EIO;
 	sb_min_blocksize(sb, 512);
 	bh = sb_bread(sb, 0);
 	if (bh == NULL) {
@@ -848,13 +850,14 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 		goto out_invalid;
 	}
 
+	error = -EINVAL;
 	if (!strcmp(cvf_format, "none"))
 		i = -1;
 	else
 		i = detect_cvf(sb, cvf_format);
 	if (i >= 0) {
 		if (cvf_formats[i]->mount_cvf(sb, cvf_options))
-			goto out_invalid;
+			goto out_fail;
 	}
 
 	cp = sbi->options.codepage ? sbi->options.codepage : 437;
@@ -912,6 +915,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent,
 
 out_invalid:
 	error = -EINVAL;
+	if (!silent)
+		printk(KERN_INFO "VFS: Can't find a valid FAT filesystem"
+		       " on dev %s.\n", sb->s_id);
 
 out_fail:
 	if (root_inode)

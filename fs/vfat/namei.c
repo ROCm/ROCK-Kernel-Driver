@@ -1284,12 +1284,8 @@ int vfat_fill_super(struct super_block *sb, void *data, int silent)
 	struct msdos_sb_info *sbi;
   
 	res = fat_fill_super(sb, data, silent, &vfat_dir_inode_operations, 1);
-	if (res) {
-		if (res == -EINVAL && !silent)
-			printk(KERN_INFO "VFS: Can't find a valid"
-			       " VFAT filesystem on dev %s.\n", sb->s_id);
+	if (res)
 		return res;
-	}
 
 	sbi = MSDOS_SB(sb);
 
