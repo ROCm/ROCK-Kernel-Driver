@@ -416,17 +416,16 @@ void agp_generic_enable(u32 mode)
 	}
 #endif
 
-	if (major < 3) {
-		pci_read_config_dword(agp_bridge->dev,
-			      agp_bridge->capndx + PCI_AGP_STATUS, &command);
+	/* AGP v<3 */
+	pci_read_config_dword(agp_bridge->dev,
+		      agp_bridge->capndx + PCI_AGP_STATUS, &command);
 
-		command = agp_collect_device_status(mode, command);
-		command |= 0x100;
+	command = agp_collect_device_status(mode, command);
+	command |= 0x100;
 
-		pci_write_config_dword(agp_bridge->dev,
-			       agp_bridge->capndx + PCI_AGP_COMMAND, command);
-		agp_device_command(command, 0);
-	}
+	pci_write_config_dword(agp_bridge->dev,
+		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
+	agp_device_command(command, 0);
 }
 
 int agp_generic_create_gatt_table(void)
