@@ -105,7 +105,7 @@ extern const char *print_tainted(void);
 
 extern void dump_stack(void);
 
-#if DEBUG
+#ifdef DEBUG
 #define pr_debug(fmt,arg...) \
 	printk(KERN_DEBUG fmt,##arg)
 #else

@@ -148,23 +148,31 @@ usb_descriptor_attr (bcdDevice, "%04x\n")
 usb_descriptor_attr (bDeviceClass, "%02x\n")
 usb_descriptor_attr (bDeviceSubClass, "%02x\n")
 usb_descriptor_attr (bDeviceProtocol, "%02x\n")
+usb_descriptor_attr (bNumConfigurations, "%d\n")
 
 
 void usb_create_driverfs_dev_files (struct usb_device *udev)
 {
 	struct device *dev = &udev->dev;
 
+	/* current configuration's attributes */
 	device_create_file (dev, &dev_attr_bNumInterfaces);
 	device_create_file (dev, &dev_attr_bConfigurationValue);
 	device_create_file (dev, &dev_attr_bmAttributes);
 	device_create_file (dev, &dev_attr_bMaxPower);
+
+	/* device attributes */
 	device_create_file (dev, &dev_attr_idVendor);
 	device_create_file (dev, &dev_attr_idProduct);
 	device_create_file (dev, &dev_attr_bcdDevice);
 	device_create_file (dev, &dev_attr_bDeviceClass);
 	device_create_file (dev, &dev_attr_bDeviceSubClass);
 	device_create_file (dev, &dev_attr_bDeviceProtocol);
+	device_create_file (dev, &dev_attr_bNumConfigurations);
+
+	/* speed varies depending on how you connect the device */
 	device_create_file (dev, &dev_attr_speed);
+	// FIXME iff there are other speed configs, show how many
 
 	if (udev->descriptor.iManufacturer)
 		device_create_file (dev, &dev_attr_manufacturer);

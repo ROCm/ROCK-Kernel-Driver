@@ -652,6 +652,15 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 			return copy_to_user((char *) arg, hid->name, len) ?
 				-EFAULT : len;
 		}
+
+		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGPHYS(0))) {
+			int len;
+			if (!hid->phys) return 0;
+			len = strlen(hid->phys) + 1;
+			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			return copy_to_user((char *) arg, hid->phys, len) ?
+				-EFAULT : len;
+		}
 	}
 	return -EINVAL;
 }

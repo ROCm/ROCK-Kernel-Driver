@@ -110,10 +110,12 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 {
 	unsigned	i;
 
+#ifdef OHCI_VERBOSE_DEBUG
 	dbg ("%s: link %sed %p branch %d [%dus.], interval %d",
 		ohci->hcd.self.bus_name,
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
+#endif
 
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
 		struct ed	**prev = &ohci->periodic [i];
@@ -244,10 +246,12 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 	}	
 	ohci->hcd.self.bandwidth_allocated -= ed->load / ed->interval;
 
+#ifdef OHCI_VERBOSE_DEBUG
 	dbg ("%s: unlink %sed %p branch %d [%dus.], interval %d",
 		ohci->hcd.self.bus_name,
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
+#endif
 }
 
 /* unlink an ed from one of the HC chains. 
@@ -414,7 +418,6 @@ static struct ed *ed_get (
 			}
 		}
 		ed->hwINFO = info;
-
 	}
 
 done:

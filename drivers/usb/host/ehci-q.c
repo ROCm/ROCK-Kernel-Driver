@@ -85,7 +85,7 @@ qtd_fill (struct ehci_qtd *qtd, dma_addr_t buf, size_t len, int token)
 
 /* update halted (but potentially linked) qh */
 
-static inline void qh_update (struct ehci_qh *qh, struct ehci_qtd *qtd)
+static void qh_update (struct ehci_qh *qh, struct ehci_qtd *qtd)
 {
 	qh->hw_current = 0;
 	qh->hw_qtd_next = QTD_NEXT (qtd->qtd_dma);
@@ -220,17 +220,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 						struct ehci_qtd, qtd_list)) {
 		struct urb	*urb = qtd->urb;
 		u32		token = 0;
-
-		/* hc's on-chip qh overlay cache can overwrite our idea of
-		 * next qtd ptrs, if we appended a qtd while the queue was
-		 * advancing.  (because we don't use dummy qtds.)
-		 */
-		if (cpu_to_le32 (qtd->qtd_dma) == qh->hw_current
-				&& qtd->hw_next != qh->hw_qtd_next) {
-			qh->hw_alt_next = qtd->hw_alt_next;
-			qh->hw_qtd_next = qtd->hw_next;
-			COUNT (ehci->stats.qpatch);
-		}
 
 		/* clean up any state from previous QTD ...*/
 		if (last) {
@@ -495,8 +484,7 @@ qh_urb_transaction (
 	}
 
 	/* by default, enable interrupt on urb completion */
-// ... do it always, unless we switch over to dummy qtds
-//	if (likely (!(urb->transfer_flags & URB_NO_INTERRUPT)))
+	if (likely (!(urb->transfer_flags & URB_NO_INTERRUPT)))
 		qtd->hw_token |= __constant_cpu_to_le32 (QTD_IOC);
 	return head;
 
@@ -661,8 +649,15 @@ ehci_qh_make (
 
 	/* initialize sw and hw queues with these qtds */
 	if (!list_empty (qtd_list)) {
+		struct ehci_qtd		*qtd;
+
+		/* hc's list view ends with dummy td; we might update it */
+		qtd = list_entry (qtd_list->prev, struct ehci_qtd, qtd_list);
+		qtd->hw_next = QTD_NEXT (qh->dummy->qtd_dma);
+
 		list_splice (qtd_list, &qh->qtd_list);
-		qh_update (qh, list_entry (qtd_list->next, struct ehci_qtd, qtd_list));
+		qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
+		qh_update (qh, qtd);
 	} else {
 		qh->hw_qtd_next = qh->hw_alt_next = EHCI_LIST_END;
 	}
@@ -767,39 +762,48 @@ static struct ehci_qh *qh_append_tds (
 
 		/* append to tds already queued to this qh? */
 		if (unlikely (!list_empty (&qh->qtd_list) && qtd)) {
-			struct ehci_qtd		*last_qtd;
-			u32			hw_next;
+			struct ehci_qtd		*dummy;
+			dma_addr_t		dma;
+			u32			token;
 
-			/* update the last qtd's "next" pointer */
-			// dbg_qh ("non-empty qh", ehci, qh);
-			last_qtd = list_entry (qh->qtd_list.prev,
-					struct ehci_qtd, qtd_list);
-			hw_next = QTD_NEXT (qtd->qtd_dma);
-			last_qtd->hw_next = hw_next;
-
-			/* previous urb allows short rx? maybe optimize. */
-			if (!(last_qtd->urb->transfer_flags & URB_SHORT_NOT_OK)
-					&& (epnum & 0x10)) {
-				// only the last QTD for now
-				last_qtd->hw_alt_next = hw_next;
-			}
-
-			/* qh_completions() may need to patch the qh overlay if
-			 * the hc was advancing this queue while we appended.
-			 * we know it can: last_qtd->hw_token has IOC set.
-			 *
-			 * or:  use a dummy td (so the overlay gets the next td
-			 * only when we set its active bit); fewer irqs.
+			/* to avoid racing the HC, use the dummy td instead of
+			 * the first td of our list (becomes new dummy).  both
+			 * tds stay deactivated until we're done, when the
+			 * HC is allowed to fetch the old dummy (4.10.2).
 			 */
+			token = qtd->hw_token;
+			qtd->hw_token = 0;
+			dummy = qh->dummy;
+			// dbg ("swap td %p with dummy %p", qtd, dummy);
+
+			dma = dummy->qtd_dma;
+			*dummy = *qtd;
+			dummy->qtd_dma = dma;
+			list_del (&qtd->qtd_list);
+			list_add (&dummy->qtd_list, qtd_list);
+
+			ehci_qtd_init (qtd, qtd->qtd_dma);
+			qh->dummy = qtd;
+
+			/* hc must see the new dummy at list end */
+			qtd = list_entry (qh->qtd_list.prev,
+					struct ehci_qtd, qtd_list);
+			qtd->hw_next = QTD_NEXT (dma);
+
+			/* let the hc process these next qtds */
 			wmb ();
+			dummy->hw_token = token;
 
 		/* no URB queued */
 		} else {
-			// dbg_qh ("empty qh", ehci, qh);
+			struct ehci_qtd		*last_qtd;
 
-			/* NOTE: we already canceled any queued URBs
-			 * when the endpoint halted.
-			 */
+			/* make sure hc sees current dummy at the end */
+			last_qtd = list_entry (qtd_list->prev,
+					struct ehci_qtd, qtd_list);
+			last_qtd->hw_next = QTD_NEXT (qh->dummy->qtd_dma);
+
+			// dbg_qh ("empty qh", ehci, qh);
 
 			/* usb_clear_halt() means qh data toggle gets reset */
 			if (unlikely (!usb_gettoggle (urb->dev,
