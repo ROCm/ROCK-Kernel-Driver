@@ -45,8 +45,6 @@ struct ip_tunnel
 } while (0)
 
 
-extern int	ipip_init(void);
-extern int	ipgre_init(void);
 extern int	sit_init(void);
 extern void	sit_cleanup(void);
 

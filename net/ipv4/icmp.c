@@ -1115,7 +1115,13 @@ void __init icmp_init(struct net_proto_family *ops)
 			panic("Failed to create the ICMP control socket.\n");
 
 		per_cpu(__icmp_socket, i)->sk->sk_allocation = GFP_ATOMIC;
-		per_cpu(__icmp_socket, i)->sk->sk_sndbuf = SK_WMEM_MAX * 2;
+
+		/* Enough space for 2 64K ICMP packets, including
+		 * sk_buff struct overhead.
+		 */
+		per_cpu(__icmp_socket, i)->sk->sk_sndbuf =
+			(2 * ((64 * 1024) + sizeof(struct sk_buff)));
+
 		inet = inet_sk(per_cpu(__icmp_socket, i)->sk);
 		inet->uc_ttl = -1;
 		inet->pmtudisc = IP_PMTUDISC_DONT;

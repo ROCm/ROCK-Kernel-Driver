@@ -274,9 +274,6 @@ struct sk_buff {
 				*end;
 };
 
-#define SK_WMEM_MAX	65535
-#define SK_RMEM_MAX	65535
-
 #ifdef __KERNEL__
 /*
  *	Handling routines are only of interest to the kernel

@@ -693,7 +693,13 @@ int __init icmpv6_init(struct net_proto_family *ops)
 
 		sk = per_cpu(__icmpv6_socket, i)->sk;
 		sk->sk_allocation = GFP_ATOMIC;
-		sk->sk_sndbuf = SK_WMEM_MAX * 2;
+
+		/* Enough space for 2 64K ICMP packets, including
+		 * sk_buff struct overhead.
+		 */
+		sk->sk_sndbuf =
+			(2 * ((64 * 1024) + sizeof(struct sk_buff)));
+
 		sk->sk_prot->unhash(sk);
 	}
 

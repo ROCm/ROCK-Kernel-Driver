@@ -872,7 +872,7 @@ static struct xfrm_tunnel ipip_handler = {
 static char banner[] __initdata =
 	KERN_INFO "IPv4 over IPv4 tunneling driver\n";
 
-int __init ipip_init(void)
+static int __init ipip_init(void)
 {
 	int err;
 
@@ -911,8 +911,6 @@ static void __exit ipip_fini(void)
 	unregister_netdev(ipip_fb_tunnel_dev);
 }
 
-#ifdef MODULE
 module_init(ipip_init);
-#endif
 module_exit(ipip_fini);
 MODULE_LICENSE("GPL");
