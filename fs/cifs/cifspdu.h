@@ -827,8 +827,8 @@ typedef struct smb_com_rename_rsp {
 
 typedef struct smb_com_delete_file_req {
 	struct smb_hdr hdr;	/* wct = 1 */
-	__u16 SearchAttributes;
-	__u16 ByteCount;
+	__le16 SearchAttributes;
+	__le16 ByteCount;
 	__u8 BufferFormat;	/* 4 = ASCII */
 	unsigned char fileName[1];
 } DELETE_FILE_REQ;
