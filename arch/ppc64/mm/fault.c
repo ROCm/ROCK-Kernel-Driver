@@ -121,16 +121,18 @@ good_area:
 	 */
 	switch (handle_mm_fault(mm, vma, address, is_write)) {
 
-	case 1:
+	case VM_FAULT_MINOR:
 		current->min_flt++;
 		break;
-	case 2:
+	case VM_FAULT_MAJOR:
 		current->maj_flt++;
 		break;
-	case 0:
+	case VM_FAULT_SIGBUS:
 		goto do_sigbus;
-	default:
+	case VM_FAULT_OOM:
 		goto out_of_memory;
+	default:
+		BUG();
 	}
 
 	up_read(&mm->mmap_sem);
