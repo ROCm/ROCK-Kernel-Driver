@@ -1192,7 +1192,8 @@ struct pglist_data contig_page_data = { .bdata = &contig_bootmem_data };
 
 void __init free_area_init(unsigned long *zones_size)
 {
-	free_area_init_node(0, &contig_page_data, NULL, zones_size, 0, NULL);
+	free_area_init_node(0, &contig_page_data, NULL, zones_size,
+			__pa(PAGE_OFFSET) >> PAGE_SHIFT, NULL);
 	mem_map = contig_page_data.node_mem_map;
 }
 #endif
