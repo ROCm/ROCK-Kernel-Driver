@@ -450,11 +450,26 @@ mmc_alloc_card(struct mmc_host *host, u32 *raw_cid, unsigned int *frca)
 }
 
 /*
+ * Tell attached cards to go to IDLE state
+ */
+static void mmc_idle_cards(struct mmc_host *host)
+{
+	struct mmc_command cmd;
+
+	cmd.opcode = MMC_GO_IDLE_STATE;
+	cmd.arg = 0;
+	cmd.flags = MMC_RSP_NONE;
+
+	mmc_wait_for_cmd(host, &cmd, 0);
+
+	mmc_delay(1);
+}
+
+/*
  * Apply power to the MMC stack.
  */
 static void mmc_power_up(struct mmc_host *host)
 {
-	struct mmc_command cmd;
 	int bit = fls(host->ocr_avail) - 1;
 
 	host->ios.vdd = bit;
@@ -469,12 +484,6 @@ static void mmc_power_up(struct mmc_host *host)
 	host->ops->set_ios(host, &host->ios);
 
 	mmc_delay(2);
-
-	cmd.opcode = MMC_GO_IDLE_STATE;
-	cmd.arg = 0;
-	cmd.flags = MMC_RSP_NONE;
-
-	mmc_wait_for_cmd(host, &cmd, 0);
 }
 
 static void mmc_power_off(struct mmc_host *host)
@@ -646,12 +655,22 @@ static void mmc_setup(struct mmc_host *host)
 		u32 ocr;
 
 		mmc_power_up(host);
+		mmc_idle_cards(host);
 
 		err = mmc_send_op_cond(host, 0, &ocr);
 		if (err != MMC_ERR_NONE)
 			return;
 
 		host->ocr = mmc_select_voltage(host, ocr);
+
+		/*
+		 * Since we're changing the OCR value, we seem to
+		 * need to tell some cards to go back to the idle
+		 * state.  We wait 1ms to give cards time to
+		 * respond.
+		 */
+		if (host->ocr)
+			mmc_idle_cards(host);
 	} else {
 		host->ios.bus_mode = MMC_BUSMODE_OPENDRAIN;
 		host->ios.clock = host->f_min;
