@@ -8,4 +8,7 @@
 
 #define	PTREGS_OFF	(STACK_BIAS + REGWIN_SZ)
 
+#define CHEETAH_ID	0x003e0014
+#define CHEETAH_PLUS_ID	0x003e0015
+
 #endif /* !(_SPARC64_HEAD_H) */

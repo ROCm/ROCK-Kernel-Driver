@@ -73,7 +73,7 @@ from_tl1_trap:
 	CREATE_VPTE_OFFSET1(%g4, %g6)			! Create VPTE offset
 	be,pn		%xcc, 3f			! Yep, special processing
 	 CREATE_VPTE_OFFSET2(%g4, %g6)			! Create VPTE offset
-	cmp		%g5, 3				! Last trap level?
+	cmp		%g5, 4				! Last trap level?
 	be,pn		%xcc, longpath			! Yep, cannot risk VPTE miss
 	 nop						! delay slot
 

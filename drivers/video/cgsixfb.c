@@ -673,7 +673,7 @@ static void cg6_reset (struct fb_info_sbusfb *fb)
 static void cg6_margins (struct fb_info_sbusfb *fb, struct display *p, int x_margin, int y_margin)
 {
 	fb->info.screen_base += (y_margin - fb->y_margin) *
-		p->line_length + (x_margin - fb->x_margin);
+		fb->info.fix.line_length + (x_margin - fb->x_margin);
 }
 
 static int __init cg6_rasterimg (struct fb_info *info, int start)

@@ -89,7 +89,8 @@ typedef struct {
 #define ELF_HWCAP	((HWCAP_SPARC_FLUSH | HWCAP_SPARC_STBAR | \
 			  HWCAP_SPARC_SWAP | HWCAP_SPARC_MULDIV | \
 			  HWCAP_SPARC_V9) | \
-			 ((tlb_type == cheetah) ? HWCAP_SPARC_ULTRA3 : 0))
+			 ((tlb_type == cheetah || tlb_type == cheetah_plus) ? \
+			  HWCAP_SPARC_ULTRA3 : 0))
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in

@@ -252,7 +252,7 @@ struct aty_cursor *__init aty_init_cursor(struct fb_info *info)
 	cursor->offset = info->fix.smem_len;
 
 #ifdef __sparc__
-	addr = info->screen_base - 0x800000 + cursor->offset;
+	addr = (unsigned long) info->screen_base - 0x800000 + cursor->offset;
 	cursor->ram = (u8 *) addr;
 #else
 #ifdef __BIG_ENDIAN
