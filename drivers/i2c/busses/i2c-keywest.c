@@ -618,6 +618,8 @@ create_iface(struct device_node *np, struct device *dev)
 		chan->iface = iface;
 		chan->chan_no = i;
 		chan->adapter.id = I2C_ALGO_SMBUS;
+		if (i==1)
+			chan->adapter.class = I2C_CLASS_HWMON;
 		chan->adapter.algo = &keywest_algorithm;
 		chan->adapter.algo_data = NULL;
 		chan->adapter.client_register = NULL;
