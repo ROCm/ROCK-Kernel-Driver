@@ -596,6 +596,11 @@ struct swap_info_struct;
  * 	Set the security attributes in @p->security for a kernel thread that
  * 	is being reparented to the init task.
  *	@p contains the task_struct for the kernel thread.
+ * @task_to_inode:
+ * 	Set the security attributes for an inode based on an associated task's
+ * 	security attributes, e.g. for /proc/pid inodes.
+ *	@p contains the task_struct for the task.
+ *	@inode contains the inode structure for the inode.
  *
  * Security hooks for Netlink messaging.
  *
@@ -1086,6 +1091,7 @@ struct security_operations {
 			   unsigned long arg5);
 	void (*task_kmod_set_label) (void);
 	void (*task_reparent_to_init) (struct task_struct * p);
+	void (*task_to_inode)(struct task_struct *p, struct inode *inode);
 
 	int (*ipc_permission) (struct kern_ipc_perm * ipcp, short flag);
 
@@ -1657,6 +1663,11 @@ static inline void security_task_kmod_set_label (void)
 static inline void security_task_reparent_to_init (struct task_struct *p)
 {
 	security_ops->task_reparent_to_init (p);
+}
+
+static inline void security_task_to_inode(struct task_struct *p, struct inode *inode)
+{
+	security_ops->task_to_inode(p, inode);
 }
 
 static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
@@ -2267,6 +2278,9 @@ static inline void security_task_reparent_to_init (struct task_struct *p)
 {
 	cap_task_reparent_to_init (p);
 }
+
+static inline void security_task_to_inode(struct task_struct *p, struct inode *inode)
+{ }
 
 static inline int security_ipc_permission (struct kern_ipc_perm *ipcp,
 					   short flag)
