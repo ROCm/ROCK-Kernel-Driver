@@ -86,7 +86,7 @@ struct adapter {
 	u32 pid_filter_max;
 	u32 mac_filter_max;
 	u32 irq;
-	unsigned long io_mem;
+	void __iomem *io_mem;
 	unsigned long io_port;
 	u8 mac_addr[8];
 	u32 dw_sram_type;
@@ -1770,11 +1770,10 @@ static void free_adapter_object(struct adapter *adapter)
 
 	free_dma_queue(adapter);
 
-	if (adapter->io_mem != 0)
-		iounmap((void *) adapter->io_mem);
+	if (adapter->io_mem)
+		iounmap(adapter->io_mem);
 
-	if (adapter != 0)
-		kfree(adapter);
+	kfree(adapter);
 }
 
 static struct pci_driver skystar2_pci_driver;
@@ -1805,15 +1804,15 @@ static int claim_adapter(struct adapter *adapter)
 
 	adapter->io_port = pdev->resource[1].start;
 
-	adapter->io_mem = (unsigned long) ioremap(pdev->resource[0].start, 0x800);
+	adapter->io_mem = ioremap(pdev->resource[0].start, 0x800);
 
-	if (adapter->io_mem == 0) {
+	if (!adapter->io_mem) {
 		dprintk("%s: can not map io memory\n", __FUNCTION__);
 
 		return 2;
 	}
 
-	dprintk("%s: io memory maped at %lx\n", __FUNCTION__, adapter->io_mem);
+	dprintk("%s: io memory maped at %p\n", __FUNCTION__, adapter->io_mem);
 
 	return 1;
 }
