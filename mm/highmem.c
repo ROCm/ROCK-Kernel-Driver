@@ -383,7 +383,7 @@ void blk_queue_bounce(request_queue_t *q, struct bio **bio_orig)
 		/*
 		 * is destination page below bounce pfn?
 		 */
-		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_paddr >> PAGE_SHIFT) < pfn)
+		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_pfn) < pfn)
 			continue;
 
 		/*

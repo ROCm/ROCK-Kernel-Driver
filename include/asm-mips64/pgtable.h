@@ -484,8 +484,8 @@ static inline pgprot_t pgprot_noncached(pgprot_t _prot)
 #define PAGE_TO_PA(page)	((page - mem_map) << PAGE_SHIFT)
 #else
 #define PAGE_TO_PA(page) \
-		((((page)-(page)->zone->zone_mem_map) << PAGE_SHIFT) \
-		+ ((page)->zone->zone_start_paddr))
+		(( ((page)-(page)->zone->zone_mem_map) + \
+		   (page)->zone->zone_start_pfn) << PAGE_SHIFT)
 #endif
 #define mk_pte(page, pgprot)						\
 ({									\
