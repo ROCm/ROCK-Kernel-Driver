@@ -790,7 +790,7 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 		case SNDRV_DMA_TYPE_SBUS:
 			{
 				struct sbus_dev *sdev = (struct sbus_dev *)(mem->dev.dev);
-				len += sprintf(page + len, "SBUS [%x]", sbus->slot);
+				len += sprintf(page + len, "SBUS [%x]", sdev->slot);
 			}
 			break;
 #endif
