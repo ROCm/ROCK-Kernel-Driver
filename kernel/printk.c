@@ -25,6 +25,7 @@
 #include <linux/module.h>
 #include <linux/interrupt.h>			/* For in_interrupt() */
 #include <linux/config.h>
+#include <linux/slab.h>
 #include <linux/delay.h>
 
 #include <asm/uaccess.h>
@@ -163,12 +164,15 @@ __setup("console=", console_setup);
  * 	7 -- Enable printk's to console
  *	8 -- Set level of messages printed to console
  *	9 -- Return number of unread characters in the log buffer
+ *     10 -- Printk from userspace.  Includes loglevel.  Returns number of
+ *           chars printed.
  */
 int do_syslog(int type, char * buf, int len)
 {
 	unsigned long i, j, limit, count;
 	int do_clear = 0;
 	char c;
+	char *lbuf = NULL;
 	int error = 0;
 
 	switch (type) {
@@ -283,11 +287,23 @@ int do_syslog(int type, char * buf, int len)
 		error = log_end - log_start;
 		spin_unlock_irq(&logbuf_lock);
 		break;
+	case 10:
+		lbuf = kmalloc(len + 1, GFP_KERNEL);
+		error = -ENOMEM;
+		if (lbuf == NULL)
+			break;
+		error = -EFAULT;
+		if (copy_from_user(lbuf, buf, len))
+			break;
+		lbuf[len] = '\0';
+		error = printk("%s", lbuf);
+		break;
 	default:
 		error = -EINVAL;
 		break;
 	}
 out:
+	kfree(lbuf);
 	return error;
 }
 
