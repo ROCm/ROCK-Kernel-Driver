@@ -31,6 +31,7 @@
 #define PALM_TUNGSTEN_T_ID		0x0060
 #define PALM_TUNGSTEN_Z_ID		0x0031
 #define PALM_ZIRE_ID			0x0070
+#define PALM_M100_ID			0x0080
 
 #define SONY_VENDOR_ID			0x054C
 #define SONY_CLIE_3_5_ID		0x0038
