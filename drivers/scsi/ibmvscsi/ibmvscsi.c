@@ -756,7 +756,12 @@ static void login_rsp(struct srp_event_struct *evt_struct)
 		   evt_struct->evt->srp.login_rsp.request_limit_delta);
 
 	hostdata->host->can_queue =
-	    evt_struct->evt->srp.login_rsp.request_limit_delta;
+	    evt_struct->evt->srp.login_rsp.request_limit_delta - 2;
+
+	if (hostdata->host->can_queue < 1) {
+		printk(KERN_ERR "ibmvscsi: Invalid request_limit_delta\n");
+		return;
+	}
 
 	send_mad_adapter_info(hostdata);
 	return;
@@ -941,6 +946,7 @@ static int ibmvscsi_eh_device_reset_handler(struct scsi_cmnd *cmd)
 			unmap_cmd_data(&tmp_evt->cmd, tmp_evt->hostdata->dev);
 			ibmvscsi_free_event_struct(&tmp_evt->hostdata->pool,
 						   tmp_evt);
+			atomic_inc(&hostdata->request_limit);
 			if (tmp_evt->cmnd_done)
 				tmp_evt->cmnd_done(tmp_evt->cmnd);
 		}
