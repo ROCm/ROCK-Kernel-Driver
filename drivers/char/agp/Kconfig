@@ -130,7 +130,7 @@ config AGP_VIA
 	depends on AGP && X86 && !X86_64
 	help
 	  This option gives you AGP support for the GLX component of
-	  XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
+	  XFree86 4.x on VIA MVP3/Apollo Pro chipsets.
 
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
