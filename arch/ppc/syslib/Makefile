@@ -9,8 +9,8 @@ ifdef CONFIG_4xx
 EXTRA_AFLAGS		:= -Wa,-m405
 endif
 
-CFLAGS_prom_init.o      += -mrelocatable-lib
-CFLAGS_btext.o          += -mrelocatable-lib
+CFLAGS_prom_init.o      += -fPIC
+CFLAGS_btext.o          += -fPIC
 
 obj-$(CONFIG_PPCBUG_NVRAM)	+= prep_nvram.o
 obj-$(CONFIG_PPC_OCP)		+= ocp.o
