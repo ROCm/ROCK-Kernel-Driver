@@ -330,15 +330,7 @@ static int fat_get_short_entry(struct inode *dir, loff_t *pos,
 			       struct buffer_head **bh,
 			       struct msdos_dir_entry **de, loff_t *i_pos)
 {
-	struct super_block *sb = dir->i_sb;
-
 	while (fat_get_entry(dir, pos, bh, de, i_pos) >= 0) {
-		if (*pos >= FAT_MAX_DIR_SIZE) {
-			fat_fs_panic(sb, "Directory %llu: "
-				     "exceeded the maximum size of directory",
-				     MSDOS_I(dir)->i_pos);
-			return -EIO;
-		}
 		/* free entry or long name entry or volume label */
 		if (!IS_FREE((*de)->name) && !((*de)->attr & ATTR_VOLUME))
 			return 0;

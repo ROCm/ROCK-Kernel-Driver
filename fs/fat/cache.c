@@ -332,28 +332,20 @@ int fat_get_cluster(struct inode *inode, int cluster, int *fclus, int *dclus)
 static int fat_bmap_cluster(struct inode *inode, int cluster)
 {
 	struct super_block *sb = inode->i_sb;
-	int nr,count;
+	int ret, fclus, dclus;
 
-	if (!(nr = MSDOS_I(inode)->i_start)) return 0;
-	if (!cluster) return nr;
-	count = 0;
-	for (fat_cache_lookup(inode, cluster, &count, &nr);
-	     count < cluster;
-	     count++) {
-		nr = fat_access(sb, nr, -1);
-		if (nr == FAT_ENT_EOF) {
-			fat_fs_panic(sb, "%s: request beyond EOF (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
-			return -EIO;
-		} else if (nr == FAT_ENT_FREE) {
-			fat_fs_panic(sb, "%s: invalid cluster chain (ino %lu)",
-				     __FUNCTION__, inode->i_ino);
-			return -EIO;
-		} else if (nr < 0)
-			return nr;
+	if (MSDOS_I(inode)->i_start == 0)
+		return 0;
+
+	ret = fat_get_cluster(inode, cluster, &fclus, &dclus);
+	if (ret < 0)
+		return ret;
+	else if (ret == FAT_ENT_EOF) {
+		fat_fs_panic(sb, "%s: request beyond EOF (i_pos %llu)",
+			     __FUNCTION__, MSDOS_I(inode)->i_pos);
+		return -EIO;
 	}
-	fat_cache_add(inode, cluster, nr);
-	return nr;
+	return dclus;
 }
 
 int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys)
