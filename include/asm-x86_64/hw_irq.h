@@ -87,8 +87,6 @@ extern u8 irq_vector[NR_IRQ_VECTORS];
  * Interrupt entry/exit code at both C and assembly level
  */
 
-extern void mask_irq(unsigned int irq);
-extern void unmask_irq(unsigned int irq);
 extern void disable_8259A_irq(unsigned int irq);
 extern void enable_8259A_irq(unsigned int irq);
 extern int i8259A_irq_pending(unsigned int irq);

@@ -61,6 +61,7 @@ static int __initdata smp_b_stepping;
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
+EXPORT_SYMBOL(phys_proc_id);
 
 /* bitmap of online cpus */
 cpumask_t cpu_online_map;

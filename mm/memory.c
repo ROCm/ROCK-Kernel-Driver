@@ -190,10 +190,10 @@ static inline void clear_pgd_range(struct mmu_gather *tlb, pgd_t *pgd, unsigned 
 void clear_page_range(struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	unsigned long addr = start, next;
-	unsigned long i, nr = pgd_index(end + PGDIR_SIZE-1) - pgd_index(start);
 	pgd_t * pgd = pgd_offset(tlb->mm, start);
+	unsigned long i;
 
-	for (i = 0; i < nr; i++) {
+	for (i = pgd_index(start); i <= pgd_index(end-1); i++) {
 		next = (addr + PGDIR_SIZE) & PGDIR_MASK;
 		if (next > end || next <= addr)
 			next = end;

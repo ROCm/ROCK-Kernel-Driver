@@ -19,9 +19,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/interrupt.h>
-#include <linux/kernel_stat.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -40,7 +38,6 @@
 #include <asm/smp.h>
 #include <asm/paca.h>
 #include <asm/time.h>
-#include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/xics.h>
 #include <asm/cputable.h>
@@ -87,11 +84,8 @@ static int query_cpu_stopped(unsigned int pcpu)
 
 #ifdef CONFIG_HOTPLUG_CPU
 
-int __cpu_disable(void)
+int pSeries_cpu_disable(void)
 {
-	/* FIXME: go put this in a header somewhere */
-	extern void xics_migrate_irqs_away(void);
-
 	systemcfg->processorCount--;
 
 	/*fix boot_cpuid here*/
@@ -103,7 +97,7 @@ int __cpu_disable(void)
 	return 0;
 }
 
-void __cpu_die(unsigned int cpu)
+void pSeries_cpu_die(unsigned int cpu)
 {
 	int tries;
 	int cpu_status;
@@ -250,8 +244,6 @@ static void smp_xics_message_pass(int target, int msg)
 	}
 }
 
-extern void xics_request_IPIs(void);
-
 static int __init smp_xics_probe(void)
 {
 	xics_request_IPIs();
@@ -263,6 +255,19 @@ static void __devinit smp_xics_setup_cpu(int cpu)
 {
 	if (cpu != boot_cpuid)
 		xics_setup_cpu();
+
+	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
+		vpa_init(cpu);
+
+#ifdef CONFIG_IRQ_ALL_CPUS
+	/*
+	 * Put the calling processor into the GIQ.  This is really only
+	 * necessary from a secondary thread as the OF start-cpu interface
+	 * performs this function for us on primary threads.
+	 */
+	rtas_set_indicator(GLOBAL_INTERRUPT_QUEUE,
+		(1UL << interrupt_server_size) - 1 - default_distrib_server, 1);
+#endif
 }
 
 static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
@@ -290,26 +295,7 @@ static void __devinit pSeries_take_timebase(void)
 	spin_unlock(&timebase_lock);
 }
 
-static void __devinit pSeries_late_setup_cpu(int cpu)
-{
-	extern unsigned int default_distrib_server;
-
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR) {
-		vpa_init(cpu); 
-	}
-
-#ifdef CONFIG_IRQ_ALL_CPUS
-	/* Put the calling processor into the GIQ.  This is really only
-	 * necessary from a secondary thread as the OF start-cpu interface
-	 * performs this function for us on primary threads.
-	 */
-	/* TODO: 9005 is #defined in rtas-proc.c -- move to a header */
-	rtas_set_indicator(9005, default_distrib_server, 1);
-#endif
-}
-
-
-void __devinit smp_pSeries_kick_cpu(int nr)
+static void __devinit smp_pSeries_kick_cpu(int nr)
 {
 	BUG_ON(nr < 0 || nr >= NR_CPUS);
 
@@ -329,7 +315,6 @@ static struct smp_ops_t pSeries_mpic_smp_ops = {
 	.probe		= smp_mpic_probe,
 	.kick_cpu	= smp_pSeries_kick_cpu,
 	.setup_cpu	= smp_mpic_setup_cpu,
-	.late_setup_cpu	= pSeries_late_setup_cpu,
 };
 
 static struct smp_ops_t pSeries_xics_smp_ops = {
@@ -337,7 +322,6 @@ static struct smp_ops_t pSeries_xics_smp_ops = {
 	.probe		= smp_xics_probe,
 	.kick_cpu	= smp_pSeries_kick_cpu,
 	.setup_cpu	= smp_xics_setup_cpu,
-	.late_setup_cpu	= pSeries_late_setup_cpu,
 };
 
 /* This is called very early */
@@ -351,6 +335,11 @@ void __init smp_init_pSeries(void)
 		smp_ops = &pSeries_mpic_smp_ops;
 	else
 		smp_ops = &pSeries_xics_smp_ops;
+
+#ifdef CONFIG_HOTPLUG_CPU
+	smp_ops->cpu_disable = pSeries_cpu_disable;
+	smp_ops->cpu_die = pSeries_cpu_die;
+#endif
 
 	/* Start secondary threads on SMT systems; primary threads
 	 * are already in the running state.
@@ -366,9 +355,6 @@ void __init smp_init_pSeries(void)
 				  i);
 		}
 	}
-
-	if (cur_cpu_spec->firmware_features & FW_FEATURE_SPLPAR)
-		vpa_init(boot_cpuid);
 
 	/* Non-lpar has additional take/give timebase */
 	if (rtas_token("freeze-time-base") != RTAS_UNKNOWN_SERVICE) {

@@ -20,6 +20,7 @@
 #include <asm/page.h>
 #include <asm/ptrace.h>
 #include <asm/mmu.h>
+#include <asm/cputime.h>
 
 #include <linux/smp.h>
 #include <linux/sem.h>
@@ -120,6 +121,9 @@ extern unsigned long nr_iowait(void);
 #define set_current_state(state_value)		\
 	set_mb(current->state, (state_value))
 
+/* Task command name length */
+#define TASK_COMM_LEN 16
+
 /*
  * Scheduling policies
  */
@@ -168,7 +172,7 @@ long io_schedule_timeout(long timeout);
 extern void cpu_init (void);
 extern void trap_init(void);
 extern void update_process_times(int user);
-extern void scheduler_tick(int user_tick, int system);
+extern void scheduler_tick(void);
 extern unsigned long cache_decay_ticks;
 
 /* Attach to any functions which should be ignored in wchan output. */
@@ -311,7 +315,7 @@ struct signal_struct {
 	 * Live threads maintain their own counters and add to these
 	 * in __exit_signal, except for the group leader.
 	 */
-	unsigned long utime, stime, cutime, cstime;
+	cputime_t utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
 
@@ -589,10 +593,11 @@ struct task_struct {
 	int __user *clear_child_tid;		/* CLONE_CHILD_CLEARTID */
 
 	unsigned long rt_priority;
-	unsigned long it_real_value, it_prof_value, it_virt_value;
-	unsigned long it_real_incr, it_prof_incr, it_virt_incr;
+	unsigned long it_real_value, it_real_incr;
+	cputime_t it_virt_value, it_virt_incr;
+	cputime_t it_prof_value, it_prof_incr;
 	struct timer_list real_timer;
-	unsigned long utime, stime;
+	cputime_t utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
 	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
@@ -610,7 +615,7 @@ struct task_struct {
 	struct key *thread_keyring;	/* keyring private to this thread */
 #endif
 	unsigned short used_math;
-	char comm[16];
+	char comm[TASK_COMM_LEN];
 /* file system info */
 	int link_count, total_link_count;
 /* ipc stuff */

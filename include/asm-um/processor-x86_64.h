@@ -1,16 +1,23 @@
-/* 
- * Copyright (C) 2000, 2001, 2002 Jeff Dike (jdike@karaya.com)
+/*
+ * Copyright 2003 PathScale, Inc.
+ *
  * Licensed under the GPL
  */
 
-#ifndef __PTRACE_TT_H
-#define __PTRACE_TT_H
+#ifndef __UM_PROCESSOR_X86_64_H
+#define __UM_PROCESSOR_X86_64_H
 
-#include "uml-config.h"
+#include "asm/arch/user.h"
 
-#ifdef UML_CONFIG_MODE_TT
-#include "sysdep/sc.h"
-#endif
+struct arch_thread {
+};
+
+#define INIT_ARCH_THREAD { }
+
+#define current_text_addr() \
+	({ void *pc; __asm__("movq $1f,%0\n1:":"=g" (pc)); pc; })
+
+#include "asm/processor-generic.h"
 
 #endif
 

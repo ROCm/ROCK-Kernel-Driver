@@ -270,6 +270,16 @@ static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 		sizeof(fc_host_symbolic_name(shost)));
 	fc_host_supported_speeds(shost) = FC_PORTSPEED_UNKNOWN;
 	fc_host_maxframe_size(shost) = -1;
+	memset(fc_host_hardware_version(shost), 0,
+		sizeof(fc_host_hardware_version(shost)));
+	memset(fc_host_firmware_version(shost), 0,
+		sizeof(fc_host_firmware_version(shost)));
+	memset(fc_host_serial_number(shost), 0,
+		sizeof(fc_host_serial_number(shost)));
+	memset(fc_host_opt_rom_version(shost), 0,
+		sizeof(fc_host_opt_rom_version(shost)));
+	memset(fc_host_driver_version(shost), 0,
+		sizeof(fc_host_driver_version(shost)));
 
 	fc_host_port_id(shost) = -1;
 	fc_host_port_type(shost) = FC_PORTTYPE_UNKNOWN;
@@ -536,6 +546,11 @@ fc_private_host_rd_attr_cast(node_name, "0x%llx\n", 20, unsigned long long);
 fc_private_host_rd_attr_cast(port_name, "0x%llx\n", 20, unsigned long long);
 fc_private_host_rd_attr(symbolic_name, "%s\n", (FC_SYMBOLIC_NAME_SIZE +1));
 fc_private_host_rd_attr(maxframe_size, "%u bytes\n", 20);
+fc_private_host_rd_attr(hardware_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
+fc_private_host_rd_attr(firmware_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
+fc_private_host_rd_attr(serial_number, "%s\n", (FC_SERIAL_NUMBER_SIZE +1));
+fc_private_host_rd_attr(opt_rom_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
+fc_private_host_rd_attr(driver_version, "%s\n", (FC_VERSION_STRING_SIZE +1));
 
 
 /* Dynamic Host Attributes */
@@ -772,6 +787,11 @@ fc_attach_transport(struct fc_function_template *ft)
 	SETUP_HOST_ATTRIBUTE_RD(symbolic_name);
 	SETUP_HOST_ATTRIBUTE_RD(supported_speeds);
 	SETUP_HOST_ATTRIBUTE_RD(maxframe_size);
+	SETUP_HOST_ATTRIBUTE_RD(hardware_version);
+	SETUP_HOST_ATTRIBUTE_RD(firmware_version);
+	SETUP_HOST_ATTRIBUTE_RD(serial_number);
+	SETUP_HOST_ATTRIBUTE_RD(opt_rom_version);
+	SETUP_HOST_ATTRIBUTE_RD(driver_version);
 
 	SETUP_HOST_ATTRIBUTE_RD(port_id);
 	SETUP_HOST_ATTRIBUTE_RD(port_type);
@@ -808,10 +828,9 @@ EXPORT_SYMBOL(fc_release_transport);
  * @dev:	scsi device
  * @data:	unused
  **/
-static int fc_device_block(struct device *dev, void *data)
+static void fc_device_block(struct scsi_device *sdev, void *data)
 {
-	scsi_internal_device_block(to_scsi_device(dev));
-	return 0;
+	scsi_internal_device_block(sdev);
 }
 
 /**
@@ -819,10 +838,9 @@ static int fc_device_block(struct device *dev, void *data)
  * @dev:	scsi device
  * @data:	unused
  **/
-static int fc_device_unblock(struct device *dev, void *data)
+static void fc_device_unblock(struct scsi_device *sdev, void *data)
 {
-	scsi_internal_device_unblock(to_scsi_device(dev));
-	return 0;
+	scsi_internal_device_unblock(sdev);
 }
 
 /**
@@ -842,7 +860,7 @@ static void fc_timeout_blocked_tgt(void  *data)
 	 * unblock this device, then IO errors will probably
 	 * result if the host still isn't ready.
 	 */
-	device_for_each_child(&starget->dev, NULL, fc_device_unblock);
+	starget_for_each_device(starget, NULL, fc_device_unblock);
 }
 
 /**
@@ -870,7 +888,7 @@ fc_target_block(struct scsi_target *starget)
 	if (timeout < 0 || timeout > SCSI_DEVICE_BLOCK_MAX_TIMEOUT)
 		return -EINVAL;
 
-	device_for_each_child(&starget->dev, NULL, fc_device_block);
+	starget_for_each_device(starget, NULL, fc_device_block);
 
 	/* The scsi lld blocks this target for the timeout period only. */
 	schedule_delayed_work(work, timeout * HZ);
@@ -901,7 +919,7 @@ fc_target_unblock(struct scsi_target *starget)
 	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
 		flush_scheduled_work();
 
-	device_for_each_child(&starget->dev, NULL, fc_device_unblock);
+	starget_for_each_device(starget, NULL, fc_device_unblock);
 }
 EXPORT_SYMBOL(fc_target_unblock);
 

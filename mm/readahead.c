@@ -254,7 +254,7 @@ out:
  * do_page_cache_readahead() returns -1 if it encountered request queue
  * congestion.
  */
-static inline int
+static int
 __do_page_cache_readahead(struct address_space *mapping, struct file *filp,
 			unsigned long offset, unsigned long nr_to_read)
 {

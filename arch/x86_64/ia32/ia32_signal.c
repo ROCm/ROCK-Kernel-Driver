@@ -261,6 +261,12 @@ ia32_restore_sigcontext(struct pt_regs *regs, struct sigcontext_ia32 __user *sc,
 			if (verify_area(VERIFY_READ, buf, sizeof(*buf)))
 				goto badframe;
 			err |= restore_i387_ia32(current, buf, 0);
+		} else {
+			struct task_struct *me = current;
+			if (me->used_math) {
+				clear_fpu(me);
+				me->used_math = 0;
+			}
 		}
 	}
 

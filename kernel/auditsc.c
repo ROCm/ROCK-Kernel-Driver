@@ -591,7 +591,7 @@ static void audit_log_exit(struct audit_context *context)
 	if (context->personality != PER_LINUX)
 		audit_log_format(ab, " per=%lx", context->personality);
 	if (context->return_valid)
-		audit_log_format(ab, " exit=%u", context->return_code);
+		audit_log_format(ab, " exit=%d", context->return_code);
 	audit_log_format(ab,
 		  " a0=%lx a1=%lx a2=%lx a3=%lx items=%d"
 		  " pid=%d loginuid=%d uid=%d gid=%d"

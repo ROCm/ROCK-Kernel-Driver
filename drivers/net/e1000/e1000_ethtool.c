@@ -1666,7 +1666,7 @@ struct ethtool_ops e1000_ethtool_ops = {
 	.get_ethtool_stats      = e1000_get_ethtool_stats,
 };
 
-void set_ethtool_ops(struct net_device *netdev)
+void e1000_set_ethtool_ops(struct net_device *netdev)
 {
 	SET_ETHTOOL_OPS(netdev, &e1000_ethtool_ops);
 }

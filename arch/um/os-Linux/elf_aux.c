@@ -26,7 +26,6 @@ unsigned long vsyscall_end;
 
 unsigned long __kernel_vsyscall;
 
-
 __init void scan_elf_aux( char **envp)
 {
 	long page_size = 0;

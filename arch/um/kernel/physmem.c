@@ -309,7 +309,7 @@ struct page *__virt_to_page(const unsigned long virt)
 	return(&mem_map[__pa(virt) >> PAGE_SHIFT]);
 }
 
-unsigned long page_to_phys(struct page *page)
+phys_t page_to_phys(struct page *page)
 {
 	return((page - mem_map) << PAGE_SHIFT);
 }
@@ -318,8 +318,9 @@ pte_t mk_pte(struct page *page, pgprot_t pgprot)
 {
 	pte_t pte;
 
-	pte_val(pte) = page_to_phys(page) + pgprot_val(pgprot);
-	if(pte_present(pte)) pte_mknewprot(pte_mknewpage(pte));
+	pte_set_val(pte, page_to_phys(page), pgprot);
+	if(pte_present(pte))
+		pte_mknewprot(pte_mknewpage(pte));
 	return(pte);
 }
 

@@ -99,6 +99,7 @@ static inline int kprobe_handler(struct pt_regs *regs)
 	p = get_kprobe(addr);
 	if (!p) {
 		unlock_kprobes();
+#if 0
 		if (*addr != BREAKPOINT_INSTRUCTION) {
 			/*
 			 * The breakpoint instruction was removed right
@@ -109,6 +110,7 @@ static inline int kprobe_handler(struct pt_regs *regs)
 			 */
 			ret = 1;
 		}
+#endif
 		/* Not one of ours: let kernel handle it */
 		goto no_kprobe;
 	}

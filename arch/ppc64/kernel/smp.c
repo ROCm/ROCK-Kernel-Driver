@@ -22,9 +22,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/smp.h>
-#include <linux/smp_lock.h>
 #include <linux/interrupt.h>
-#include <linux/kernel_stat.h>
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
@@ -38,12 +36,10 @@
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
 #include <asm/paca.h>
 #include <asm/time.h>
-#include <asm/ppcdebug.h>
 #include <asm/machdep.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
@@ -58,7 +54,6 @@
 #endif
 
 int smp_threads_ready;
-unsigned long cache_decay_ticks;
 
 cpumask_t cpu_possible_map = CPU_MASK_NONE;
 cpumask_t cpu_online_map = CPU_MASK_NONE;
@@ -76,10 +71,6 @@ extern unsigned char stab_array[];
 void smp_call_function_interrupt(void);
 
 int smt_enabled_at_boot = 1;
-
-/* Low level assembly function used to backup CPU 0 state */
-extern void __save_cpu_setup(void);
-
 
 #ifdef CONFIG_PPC_MULTIPLATFORM
 void smp_mpic_message_pass(int target, int msg)
@@ -507,9 +498,6 @@ int __devinit start_secondary(void *unused)
 	if (smp_ops->take_timebase)
 		smp_ops->take_timebase();
 
-	if (smp_ops->late_setup_cpu)
-		smp_ops->late_setup_cpu(cpu);
-
 	spin_lock(&call_lock);
 	cpu_set(cpu, cpu_online_map);
 	spin_unlock(&call_lock);
@@ -551,3 +539,19 @@ void __init smp_cpus_done(unsigned int max_cpus)
 	 */
 	cpu_present_map = cpu_possible_map;
 }
+
+#ifdef CONFIG_HOTPLUG_CPU
+int __cpu_disable(void)
+{
+	if (smp_ops->cpu_disable)
+		return smp_ops->cpu_disable();
+
+	return -ENOSYS;
+}
+
+void __cpu_die(unsigned int cpu)
+{
+	if (smp_ops->cpu_die)
+		smp_ops->cpu_die(cpu);
+}
+#endif

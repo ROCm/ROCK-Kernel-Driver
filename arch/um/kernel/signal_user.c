@@ -41,6 +41,7 @@ void set_handler(int sig, void (*handler)(int), int flags, ...)
 	while((mask = va_arg(ap, int)) != -1){
 		sigaddset(&action.sa_mask, mask);
 	}
+	va_end(ap);
 	action.sa_flags = flags;
 	action.sa_restorer = NULL;
 	if(sigaction(sig, &action, NULL) < 0)

@@ -197,7 +197,6 @@ orinoco_cs_attach(void)
 	dev_list = link;
 
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -454,6 +453,7 @@ orinoco_cs_config(dev_link_t *link)
 
 	/* register_netdev will give us an ethX name */
 	dev->name[0] = '\0';
+	SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 	/* Tell the stack we exist */
 	if (register_netdev(dev) != 0) {
 		printk(KERN_ERR PFX "register_netdev() failed\n");
@@ -653,14 +653,7 @@ static void __exit
 exit_orinoco_cs(void)
 {
 	pcmcia_unregister_driver(&orinoco_driver);
-
-	if (dev_list)
-		DEBUG(0, PFX "Removing leftover devices.\n");
-	while (dev_list != NULL) {
-		if (dev_list->state & DEV_CONFIG)
-			orinoco_cs_release(dev_list);
-		orinoco_cs_detach(dev_list);
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_orinoco_cs);

@@ -622,8 +622,10 @@ static void cfq_requeue_request(request_queue_t *q, struct request *rq)
 			cfq_sort_rr_list(cfqq, 0);
 		}
 
-		crq->accounted = 0;
-		cfqq->cfqd->rq_in_driver--;
+		if (crq->accounted) {
+			crq->accounted = 0;
+			cfqq->cfqd->rq_in_driver--;
+		}
 	}
 	list_add(&rq->queuelist, &q->queue_head);
 }

@@ -98,7 +98,7 @@ typedef struct emac_regs {
 #endif				/* CONFIG_IBM_EMAC4 */
 #define EMAC_M1_BASE			(EMAC_M1_TX_FIFO_2K | \
 					EMAC_M1_APP | \
-					EMAC_M1_TR)
+					EMAC_M1_TR | EMAC_M1_VLE)
 
 /* Transmit Mode Register 0 */
 #define EMAC_TMR0_GNP0			0x80000000

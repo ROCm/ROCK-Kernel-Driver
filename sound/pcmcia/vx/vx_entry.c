@@ -175,7 +175,6 @@ dev_link_t *snd_vxpocket_attach(struct snd_vxp_entry *hw)
 	/* Register with Card Services */
 	memset(&client_reg, 0, sizeof(client_reg));
 	client_reg.dev_info = hw->dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask = 
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL
 #ifdef CONFIG_PM
@@ -263,15 +262,6 @@ void snd_vxpocket_detach(struct snd_vxp_entry *hw, dev_link_t *link)
 	chip->chip_status |= VX_STAT_IS_STALE; /* to be sure */
 	snd_card_disconnect(chip->card);
 	snd_card_free_in_thread(chip->card);
-}
-
-/*
- * snd_vxpocket_detach_all - detach all instances linked to the hw
- */
-void snd_vxpocket_detach_all(struct snd_vxp_entry *hw)
-{
-	while (hw->dev_list != NULL)
-		snd_vxpocket_detach(hw, hw->dev_list);
 }
 
 /*
@@ -397,4 +387,3 @@ static int vxpocket_event(event_t event, int priority, event_callback_args_t *ar
 EXPORT_SYMBOL(snd_vxpocket_ops);
 EXPORT_SYMBOL(snd_vxpocket_attach);
 EXPORT_SYMBOL(snd_vxpocket_detach);
-EXPORT_SYMBOL(snd_vxpocket_detach_all);
