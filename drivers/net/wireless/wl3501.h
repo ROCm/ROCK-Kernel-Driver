@@ -440,9 +440,6 @@ struct wl3501_resync_req {
 	unsigned char	sig_id;
 };
 
-/* For rough constant delay */
-#define WL3501_NOPLOOP(n) { int x = 0; while (x++ < n) slow_down_io(); }
-
 /* Definitions for supporting clone adapters. */
 /* System Interface Registers (SIR space) */
 #define WL3501_NIC_GCR ((u8)0x00)	/* SIR0 - General Conf Register */

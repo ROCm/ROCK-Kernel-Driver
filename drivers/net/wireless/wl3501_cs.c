@@ -63,6 +63,13 @@
 
 #include "wl3501.h"
 
+#ifndef __i386__
+#define slow_down_io()
+#endif
+
+/* For rough constant delay */
+#define WL3501_NOPLOOP(n) { int x = 0; while (x++ < n) slow_down_io(); }
+
 /*
  * All the PCMCIA modules use PCMCIA_DEBUG to control debugging.  If you do not
  * define PCMCIA_DEBUG at all, all the debug code will be left out.  If you
