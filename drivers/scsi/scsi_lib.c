@@ -1141,66 +1141,61 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
  *
  * Lock status: IO request lock assumed to be held when called.
  */
-static void scsi_request_fn(request_queue_t *q)
+static void scsi_request_fn(struct request_queue *q)
 {
 	struct scsi_device *sdev = q->queuedata;
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_cmnd *cmd;
 	struct request *req;
-	unsigned long flags;
 
 	/*
 	 * To start with, we keep looping until the queue is empty, or until
 	 * the host is no longer able to accept any more requests.
 	 */
-	for (;;) {
-		if (blk_queue_plugged(q))
-			goto completed;
-
+	while (!blk_queue_plugged(q)) {
 		/*
 		 * get next queueable request.  We do this early to make sure
 		 * that the request is fully prepared even if we cannot 
 		 * accept it.
 		 */
 		req = elv_next_request(q);
-
-		if (!req)
-			goto completed;
-
-		if (!scsi_dev_queue_ready(q, sdev))
-			goto completed;
+		if (!req || !scsi_dev_queue_ready(q, sdev))
+			break;
 
 		/*
 		 * Remove the request from the request list.
 		 */
-		if (!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
+		if (!(blk_queue_tagged(q) && !blk_queue_start_tag(q, req)))
 			blkdev_dequeue_request(req);
-
 		sdev->device_busy++;
-		spin_unlock_irq(q->queue_lock);
 
-		spin_lock_irqsave(shost->host_lock, flags);
+		spin_unlock(q->queue_lock);
+		spin_lock(shost->host_lock);
+
 		if (!scsi_host_queue_ready(q, shost, sdev))
-			goto host_lock_held;
-
+			goto not_ready;
 		if (sdev->single_lun) {
 			if (sdev->sdev_target->starget_sdev_user &&
-			    (sdev->sdev_target->starget_sdev_user != sdev))
-				goto host_lock_held;
-			else
-				sdev->sdev_target->starget_sdev_user = sdev;
+			    sdev->sdev_target->starget_sdev_user != sdev)
+				goto not_ready;
+			sdev->sdev_target->starget_sdev_user = sdev;
 		}
-
 		shost->host_busy++;
-		spin_unlock_irqrestore(shost->host_lock, flags);
-
-		cmd = req->special;
 
 		/*
-		 * Should be impossible for a correctly prepared request
-		 * please mail the stack trace to linux-scsi@vger.kernel.org
+		 * XXX(hch): This is rather suboptimal, scsi_dispatch_cmd will
+		 *		take the lock again.
 		 */
-		BUG_ON(!cmd);
+		spin_unlock_irq(shost->host_lock);
+
+		cmd = req->special;
+		if (unlikely(cmd == NULL)) {
+			printk(KERN_CRIT "impossible request in %s.\n"
+					 "please mail a stack trace to "
+					 "linux-scsi@vger.kernel.org",
+					 __FUNCTION__);
+			BUG();
+		}
 
 		/*
 		 * Finally, initialize any error handling parameters, and set up
@@ -1212,18 +1207,14 @@ static void scsi_request_fn(request_queue_t *q)
 		 * Dispatch the command to the low-level driver.
 		 */
 		scsi_dispatch_cmd(cmd);
-
-		/*
-		 * Now we need to grab the lock again.  We are about to mess
-		 * with the request queue and try to find another command.
-		 */
 		spin_lock_irq(q->queue_lock);
 	}
-completed:
+
 	return;
 
-host_lock_held:
-	spin_unlock_irqrestore(shost->host_lock, flags);
+ not_ready:
+	spin_unlock_irq(shost->host_lock);
+
 	/*
 	 * lock q, handle tag, requeue req, and decrement device_busy. We
 	 * must return with queue_lock held.
