@@ -193,7 +193,8 @@ ssize_t vfs_read(struct file *file, char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_READ, inode, file, *pos, count);
 	if (!ret) {
-		if (!(ret = security_file_permission (file, MAY_READ))) {
+		ret = security_file_permission (file, MAY_READ);
+		if (!ret) {
 			if (file->f_op->read)
 				ret = file->f_op->read(file, buf, count, pos);
 			else
@@ -232,7 +233,8 @@ ssize_t vfs_write(struct file *file, const char *buf, size_t count, loff_t *pos)
 
 	ret = locks_verify_area(FLOCK_VERIFY_WRITE, inode, file, *pos, count);
 	if (!ret) {
-		if (!(ret = security_file_permission (file, MAY_WRITE))) {
+		ret = security_file_permission (file, MAY_WRITE);
+		if (!ret) {
 			if (file->f_op->write)
 				ret = file->f_op->write(file, buf, count, pos);
 			else
@@ -445,7 +447,7 @@ out:
 		kfree(iov);
 	if ((ret + (type == READ)) > 0)
 		dnotify_parent(file->f_dentry,
-				(type == READ) ? DN_MODIFY : DN_ACCESS);
+				(type == READ) ? DN_ACCESS : DN_MODIFY);
 	return ret;
 }
 

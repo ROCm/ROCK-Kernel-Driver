@@ -269,7 +269,7 @@ int powertecscsi_proc_info(char *buffer, char **start, off_t offset,
 
 	pos += sprintf(buffer+pos, "\nAttached devices:\n");
 
-	for (scd = host->host_queue; scd; scd = scd->next) {
+	list_for_each_entry(scd, &host->my_devices, siblings) {
 		pos += fas216_print_device(&info->info, scd, buffer + pos);
 
 		if (pos + begin < offset) {
@@ -376,7 +376,7 @@ powertecscsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	fas216_init(host);
 
-	ret = scsi_add_host(host);
+	ret = scsi_add_host(host, &ec->dev);
 	if (ret == 0)
 		goto out;
 

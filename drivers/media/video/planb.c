@@ -2020,16 +2020,16 @@ static int planb_mmap(struct vm_area_struct *vma, struct video_device *dev, cons
 
 static struct video_device planb_template=
 {
-	owner:		THIS_MODULE,
-	name:		PLANB_DEVICE_NAME,
-	type:		VID_TYPE_OVERLAY,
-	hardware:	VID_HARDWARE_PLANB,
-	open:		planb_open,
-	close:		planb_close,
-	read:		planb_read,
-	write:		planb_write,
-	ioctl:		planb_ioctl,
-	mmap:		planb_mmap,	/* mmap? */
+	.owner		= THIS_MODULE,
+	.name		= PLANB_DEVICE_NAME,
+	.type		= VID_TYPE_OVERLAY,
+	.hardware	= VID_HARDWARE_PLANB,
+	.open		= planb_open,
+	.close		= planb_close,
+	.read		= planb_read,
+	.write		= planb_write,
+	.ioctl		= planb_ioctl,
+	.mmap		= planb_mmap,	/* mmap? */
 };
 
 static int init_planb(struct planb *pb)

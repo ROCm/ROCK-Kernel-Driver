@@ -112,27 +112,43 @@ static inline void unmask_cpu_irq(void *unused, int irq)
  * 	do_cpu_irq_mask()	index into the matching irq_action array.
  */
 struct irqaction cpu_irq_actions[IRQ_PER_REGION] = {
-	[IRQ_OFFSET(TIMER_IRQ)] { handler: timer_interrupt, name: "timer", },
+	[IRQ_OFFSET(TIMER_IRQ)]	= {
+					.handler = timer_interrupt,
+					.name = "timer",
+				},
 #ifdef CONFIG_SMP
-	[IRQ_OFFSET(IPI_IRQ)]	{ handler: ipi_interrupt,   name: "IPI", },
+	[IRQ_OFFSET(IPI_IRQ)]	= {
+					.handler = ipi_interrupt,
+					.name = "IPI",
+				},
 #endif
 };
 
 struct irq_region_ops cpu_irq_ops = {
-	disable_cpu_irq, enable_cpu_irq, unmask_cpu_irq, unmask_cpu_irq
+	.disable_irq	= disable_cpu_irq,
+	.enable_irq	= enable_cpu_irq,
+	.mask_irq	= unmask_cpu_irq,
+	.unmask_irq	= unmask_cpu_irq
 };
 
 struct irq_region cpu0_irq_region = {
-	ops:	{ disable_cpu_irq, enable_cpu_irq, unmask_cpu_irq, unmask_cpu_irq },
-	data:	{ dev: &cpu_data[0],
-		  name: "PARISC-CPU",
-		  irqbase: IRQ_FROM_REGION(CPU_IRQ_REGION), },
-	action:	cpu_irq_actions,
+	.ops	= {
+			.disable_irq	= disable_cpu_irq,
+			.enable_irq	= enable_cpu_irq,
+			.mask_irq	= unmask_cpu_irq,
+			.unmask_irq	= unmask_cpu_irq
+	},
+	.data	= {
+			.dev		= &cpu_data[0],
+			.name		= "PARISC-CPU",
+			.irqbase 	= IRQ_FROM_REGION(CPU_IRQ_REGION),
+	},
+	.action	= cpu_irq_actions,
 };
 
 struct irq_region *irq_region[NR_IRQ_REGS] = {
-	[ 0 ]              NULL, /* reserved for EISA, else causes data page fault (aka code 15) */
-	[ CPU_IRQ_REGION ] &cpu0_irq_region,
+	[ 0 ]              = NULL, /* reserved for EISA, else causes data page fault (aka code 15) */
+	[ CPU_IRQ_REGION ] = &cpu0_irq_region,
 };
 
 

@@ -2631,7 +2631,7 @@ int fas216_eh_bus_reset(Scsi_Cmnd *SCpnt)
 	 * all command structures.  Leave the running
 	 * command in place.
 	 */
-	for (SDpnt = info->host->host_queue; SDpnt; SDpnt = SDpnt->next) {
+	list_for_each_entry(SDpnt, &info->host->my_devices, siblings) {
 		int i;
 
 		if (SDpnt->soft_reset)

@@ -37,6 +37,9 @@
 #define DEBUGP(fmt , a...)
 #endif
 
+#define symbol_is(literal, string)				\
+	(strcmp(MODULE_SYMBOL_PREFIX literal, (string)) == 0)
+
 /* List of modules, protected by module_mutex */
 static DECLARE_MUTEX(module_mutex);
 LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
@@ -630,10 +633,10 @@ static int grab_private_symbols(Elf_Shdr *sechdrs,
 	unsigned int i;
 
 	for (i = 1; i < sechdrs[symbolsec].sh_size/sizeof(*sym); i++) {
-		if (strcmp("__initfn", strtab + sym[i].st_name) == 0)
+		if (symbol_is("__initfn", strtab + sym[i].st_name))
 			mod->init = (void *)sym[i].st_value;
 #ifdef CONFIG_MODULE_UNLOAD
-		if (strcmp("__exitfn", strtab + sym[i].st_name) == 0)
+		if (symbol_is("__exitfn", strtab + sym[i].st_name))
 			mod->exit = (void *)sym[i].st_value;
 #endif
 	}
@@ -770,7 +773,7 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 						       mod,
 						       &ksg);
 			/* We fake up "__this_module" */
-			if (strcmp(strtab+sym[i].st_name, "__this_module")==0)
+			if (symbol_is("__this_module", strtab+sym[i].st_name))
 				sym[i].st_value = (unsigned long)mod;
 		}
 	}
@@ -864,8 +867,8 @@ static struct module *load_module(void *umod,
 			/* Internal symbols */
 			DEBUGP("Symbol table in section %u\n", i);
 			symindex = i;
-		} else if (strcmp(secstrings+sechdrs[i].sh_name, ".modulename")
-			   == 0) {
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  ".gnu.linkonce.modname") == 0) {
 			/* This module's name */
 			DEBUGP("Module name in section %u\n", i);
 			modnameindex = i;
@@ -892,7 +895,7 @@ static struct module *load_module(void *umod,
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
-		if (sechdrs[i].sh_type == SHT_SYMTAB || i == hdr->e_shstrndx)
+		if (sechdrs[i].sh_type == SHT_SYMTAB || i == strindex)
 			sechdrs[i].sh_flags |= SHF_ALLOC;
 #endif
 #ifndef CONFIG_MODULE_UNLOAD
@@ -1165,7 +1168,14 @@ static const char *get_ksymbol(struct module *mod,
 			       unsigned long *size,
 			       unsigned long *offset)
 {
-	unsigned int i, next = 0, best = 0;
+	unsigned int i, best = 0;
+	unsigned long nextval;
+
+	/* At worse, next value is at end of module */
+	if (inside_core(mod, addr))
+		nextval = (unsigned long)mod->module_core+mod->core_size;
+	else 
+		nextval = (unsigned long)mod->module_init+mod->init_size;
 
 	/* Scan for closest preceeding symbol, and next symbol. (ELF
            starts real symbols at 1). */
@@ -1177,22 +1187,14 @@ static const char *get_ksymbol(struct module *mod,
 		    && mod->symtab[i].st_value > mod->symtab[best].st_value)
 			best = i;
 		if (mod->symtab[i].st_value > addr
-		    && mod->symtab[i].st_value < mod->symtab[next].st_value)
-			next = i;
+		    && mod->symtab[i].st_value < nextval)
+			nextval = mod->symtab[i].st_value;
 	}
 
 	if (!best)
 		return NULL;
 
-	if (!next) {
-		/* Last symbol?  It ends at the end of the module then. */
-		if (inside_core(mod, addr))
-			*size = mod->module_core+mod->core_size - (void*)addr;
-		else
-			*size = mod->module_init+mod->init_size - (void*)addr;
-	} else
-		*size = mod->symtab[next].st_value - addr;
-
+	*size = nextval - mod->symtab[best].st_value;
 	*offset = addr - mod->symtab[best].st_value;
 	return mod->strtab + mod->symtab[best].st_name;
 }

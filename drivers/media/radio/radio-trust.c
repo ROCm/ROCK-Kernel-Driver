@@ -251,20 +251,20 @@ static int tr_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations trust_fops = {
-	owner:		THIS_MODULE,
-	open:           video_exclusive_open,
-	release:        video_exclusive_release,
-	ioctl:		tr_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open           = video_exclusive_open,
+	.release        = video_exclusive_release,
+	.ioctl		= tr_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device trust_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"Trust FM Radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_TRUST,
-	fops:           &trust_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Trust FM Radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_TRUST,
+	.fops           = &trust_fops,
 };
 
 static int __init trust_init(void)

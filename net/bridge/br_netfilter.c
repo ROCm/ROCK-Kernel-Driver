@@ -49,20 +49,20 @@
  * require us to fill additional fields.
  */
 static struct net_device __fake_net_device = {
-	hard_header_len:	ETH_HLEN
+	.hard_header_len	= ETH_HLEN
 };
 
 static struct rtable __fake_rtable = {
-	u: {
-		dst: {
-			__refcnt:		ATOMIC_INIT(1),
-			dev:			&__fake_net_device,
-			path:			&__fake_rtable.u.dst,
-			metrics:		{[RTAX_MTU] 1500},
+	.u = {
+		.dst = {
+			.__refcnt		= ATOMIC_INIT(1),
+			.dev			= &__fake_net_device,
+			.path			= &__fake_rtable.u.dst,
+			.metrics		= {[RTAX_MTU] = 1500},
 		}
 	},
 
-	rt_flags:	0
+	.rt_flags	= 0
 };
 
 

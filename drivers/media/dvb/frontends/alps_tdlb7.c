@@ -73,21 +73,15 @@ static int errno;
 
 static
 struct dvb_frontend_info tdlb7_info = {
-	name: "Alps TDLB7",
-	type: FE_OFDM,
-	frequency_min: 470000000,
-	frequency_max: 860000000,
-	frequency_stepsize: 166666,
-#if 0
-    	frequency_tolerance: ???,
-	symbol_rate_min: ???,
-	symbol_rate_max: ???,
-	symbol_rate_tolerance: ???,
-	notifier_delay: 0,
-#endif
-	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
-	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
-	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64
+	.name			= "Alps TDLB7",
+	.type			= FE_OFDM,
+	.frequency_min		= 470000000,
+	.frequency_max		= 860000000,
+	.frequency_stepsize	= 166666,
+	.caps			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
+				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
+				  FE_CAN_FEC_7_8 | FE_CAN_FEC_AUTO |
+				  FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64
 };
 
 
@@ -95,7 +89,7 @@ static
 int sp8870_writereg (struct dvb_i2c_bus *i2c, u16 reg, u16 data)
 {
         u8 buf [] = { reg >> 8, reg & 0xff, data >> 8, data & 0xff };
-	struct i2c_msg msg = { addr: 0x71, flags: 0, buf: buf, len: 4 };
+	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = buf, .len = 4 };
 	int err;
 
         if ((err = i2c->xfer (i2c, &msg, 1)) != 1) {
@@ -113,8 +107,8 @@ u16 sp8870_readreg (struct dvb_i2c_bus *i2c, u16 reg)
 	int ret;
 	u8 b0 [] = { reg >> 8 , reg & 0xff };
 	u8 b1 [] = { 0, 0 };
-	struct i2c_msg msg [] = { { addr: 0x71, flags: 0, buf: b0, len: 2 },
-			   { addr: 0x71, flags: I2C_M_RD, buf: b1, len: 2 } };
+	struct i2c_msg msg [] = { { .addr = 0x71, .flags = 0, .buf = b0, .len = 2 },
+			   { .addr = 0x71, .flags = I2C_M_RD, .buf = b1, .len = 2 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -129,7 +123,7 @@ static
 int sp5659_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
         int ret;
-        struct i2c_msg msg = { addr: 0x60, flags: 0, buf: data, len: 4 };
+        struct i2c_msg msg = { .addr = 0x60, .flags = 0, .buf = data, .len = 4 };
 
         ret = i2c->xfer (i2c, &msg, 1);
 
@@ -377,7 +371,7 @@ static
 int tdlb7_attach (struct dvb_i2c_bus *i2c)
 {
 
-	struct i2c_msg msg = { addr: 0x71, flags: 0, buf: NULL, len: 0 };
+	struct i2c_msg msg = { .addr = 0x71, .flags = 0, .buf = NULL, .len = 0 };
 
 	dprintk ("%s\n", __FUNCTION__);
 

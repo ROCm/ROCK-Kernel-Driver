@@ -346,7 +346,7 @@ static int keyspan_write(struct usb_serial_port *port, int from_user,
 		if (this_urb->status == -EINPROGRESS) {
 			if (this_urb->transfer_flags & URB_ASYNC_UNLINK)
 				break;
-			if (jiffies - p_priv->tx_start_time[flip] < 10 * HZ)
+			if (time_before(jiffies, p_priv->tx_start_time[flip] + 10 * HZ))
 				break;
 			this_urb->transfer_flags |= URB_ASYNC_UNLINK;
 			usb_unlink_urb(this_urb);

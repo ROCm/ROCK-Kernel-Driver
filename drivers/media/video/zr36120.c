@@ -1490,18 +1490,18 @@ int zoran_mmap(struct vm_area_struct *vma, struct video_device* dev, const char*
 
 static struct video_device zr36120_template=
 {
-	owner:		THIS_MODULE,
-	name:		"UNSET",
-	type:		VID_TYPE_TUNER|VID_TYPE_CAPTURE|VID_TYPE_OVERLAY,
-	hardware:	VID_HARDWARE_ZR36120,
-	open:		zoran_open,
-	close:		zoran_close,
-	read:		zoran_read,
-	write:		zoran_write,
-	poll:		zoran_poll,
-	ioctl:		zoran_ioctl,
-	mmap:		zoran_mmap,
-	minor:		-1,
+	.owner		= THIS_MODULE,
+	.name		= "UNSET",
+	.type		= VID_TYPE_TUNER|VID_TYPE_CAPTURE|VID_TYPE_OVERLAY,
+	.hardware	= VID_HARDWARE_ZR36120,
+	.open		= zoran_open,
+	.close		= zoran_close,
+	.read		= zoran_read,
+	.write		= zoran_write,
+	.poll		= zoran_poll,
+	.ioctl		= zoran_ioctl,
+	.mmap		= zoran_mmap,
+	.minor		= -1,
 };
 
 static
@@ -1826,17 +1826,17 @@ int vbi_ioctl(struct video_device *dev, unsigned int cmd, void *arg)
 
 static struct video_device vbi_template=
 {
-	owner:		THIS_MODULE,
-	name:		"UNSET",
-	type:		VID_TYPE_CAPTURE|VID_TYPE_TELETEXT,
-	hardware:	VID_HARDWARE_ZR36120,
-	open:		vbi_open,
-	close:		vbi_close,
-	read:		vbi_read,
-	write:		zoran_write,
-	poll:		vbi_poll,
-	ioctl:		vbi_ioctl,
-	minor:		-1,
+	.owner		= THIS_MODULE,
+	.name		= "UNSET",
+	.type		= VID_TYPE_CAPTURE|VID_TYPE_TELETEXT,
+	.hardware	= VID_HARDWARE_ZR36120,
+	.open		= vbi_open,
+	.close		= vbi_close,
+	.read		= vbi_read,
+	.write		= zoran_write,
+	.poll		= vbi_poll,
+	.ioctl		= vbi_ioctl,
+	.minor		= -1,
 };
 
 /*

@@ -524,21 +524,21 @@ static int cadet_release(struct inode *inode, struct file *file)
 
 
 static struct file_operations cadet_fops = {
-	owner:		THIS_MODULE,
-	open:		cadet_open,
-	release:       	cadet_release,
-	read:		cadet_read,
-	ioctl:		cadet_ioctl,
-	llseek:         no_llseek,
+	.owner		= THIS_MODULE,
+	.open		= cadet_open,
+	.release       	= cadet_release,
+	.read		= cadet_read,
+	.ioctl		= cadet_ioctl,
+	.llseek         = no_llseek,
 };
 
 static struct video_device cadet_radio=
 {
-	owner:		THIS_MODULE,
-	name:		"Cadet radio",
-	type:		VID_TYPE_TUNER,
-	hardware:	VID_HARDWARE_CADET,
-	fops:           &cadet_fops,
+	.owner		= THIS_MODULE,
+	.name		= "Cadet radio",
+	.type		= VID_TYPE_TUNER,
+	.hardware	= VID_HARDWARE_CADET,
+	.fops           = &cadet_fops,
 };
 
 static int isapnp_cadet_probe(void)

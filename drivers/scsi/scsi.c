@@ -169,30 +169,13 @@ void scsi_build_commandblocks(Scsi_Device * SDpnt);
 /*
  * Function:    scsi_initialize_queue()
  *
- * Purpose:     Selects queue handler function for a device.
+ * Purpose:     Sets up the block queue for a device.
  *
  * Arguments:   SDpnt   - device for which we need a handler function.
  *
  * Returns:     Nothing
  *
  * Lock status: No locking assumed or required.
- *
- * Notes:       Most devices will end up using scsi_request_fn for the
- *              handler function (at least as things are done now).
- *              The "block" feature basically ensures that only one of
- *              the blocked hosts is active at one time, mainly to work around
- *              buggy DMA chipsets where the memory gets starved.
- *              For this case, we have a special handler function, which
- *              does some checks and ultimately calls scsi_request_fn.
- *
- *              The single_lun feature is a similar special case.
- *
- *              We handle these things by stacking the handlers.  The
- *              special case handlers simply check a few conditions,
- *              and return if they are not supposed to do anything.
- *              In the event that things are OK, then they call the next
- *              handler in the list - ultimately they call scsi_request_fn
- *              to do the dirty deed.
  */
 void  scsi_initialize_queue(Scsi_Device * SDpnt, struct Scsi_Host * SHpnt)
 {
@@ -793,7 +776,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 			rtn = host->hostt->queuecommand(SCpnt, scsi_done);
 			spin_unlock_irqrestore(host->host_lock, flags);
 			if (rtn != 0) {
-				scsi_delete_timer(SCpnt);
 				scsi_mlqueue_insert(SCpnt, rtn == SCSI_MLQUEUE_DEVICE_BUSY ? rtn : SCSI_MLQUEUE_HOST_BUSY);
 				SCSI_LOG_MLQUEUE(3,
 				   printk("queuecommand : request rejected\n"));                                
@@ -1895,20 +1877,12 @@ int scsi_attach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list)
-		if (sdt->attach) {
-			/*
-			 * XXX check result when the upper level attach
-			 * return values are fixed, and on failure goto
-			 * fail.
-			 */
-			if(try_module_get(sdt->module)) {
-				(*sdt->attach)(sdev);
-				module_put(sdt->module);
-			} else {
-				printk(KERN_WARNING "SCSI module %s not ready, skipping attach.\n", sdt->name);
-			}
-		}
+	list_for_each_entry(sdt, &scsi_devicelist, list) {
+		if (!try_module_get(sdt->module))
+			continue;
+		(*sdt->attach)(sdev);
+		module_put(sdt->module);
+	}
 	up_read(&scsi_devicelist_mutex);
 	return 0;
 }
@@ -1918,16 +1892,28 @@ void scsi_detach_device(struct scsi_device *sdev)
 	struct Scsi_Device_Template *sdt;
 
 	down_read(&scsi_devicelist_mutex);
-	list_for_each_entry(sdt, &scsi_devicelist, list)
-		if (sdt->detach) {
-			if(try_module_get(sdt->module)) {
-				(*sdt->detach)(sdev);
-				module_put(sdt->module);
-			} else {
-				printk(KERN_WARNING "SCSI module %s not ready, skipping detach.\n", sdt->name);
-			}
-		}
+	list_for_each_entry(sdt, &scsi_devicelist, list) {
+		if (!try_module_get(sdt->module))
+			continue;
+		(*sdt->detach)(sdev);
+		module_put(sdt->module);
+	}
 	up_read(&scsi_devicelist_mutex);
+}
+
+int scsi_device_get(struct scsi_device *sdev)
+{
+	if (!try_module_get(sdev->host->hostt->module))
+		return -ENXIO;
+
+	sdev->access_count++;
+	return 0;
+}
+
+void scsi_device_put(struct scsi_device *sdev)
+{
+	sdev->access_count--;
+	module_put(sdev->host->hostt->module);
 }
 
 /*
@@ -1953,7 +1939,7 @@ int scsi_slave_attach(struct scsi_device *sdev)
 			printk(KERN_ERR "scsi: Allocation failure during"
 			       " attach, some SCSI devices might not be"
 			       " configured\n");
-			return 1;
+			return -ENOMEM;
 		}
 		if (sdev->host->hostt->slave_configure != NULL) {
 			if (sdev->host->hostt->slave_configure(sdev) != 0) {
@@ -1961,7 +1947,7 @@ int scsi_slave_attach(struct scsi_device *sdev)
 				       " attach, some SCSI device might not be"
 				       " configured\n");
 				scsi_release_commandblocks(sdev);
-				return 1;
+				return -ENOMEM;
 			}
 		} else if (sdev->host->cmd_per_lun != 0)
 			scsi_adjust_queue_depth(sdev, 0,
@@ -2019,10 +2005,7 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	list_add_tail(&tpnt->list, &scsi_devicelist);
 	up_write(&scsi_devicelist_mutex);
 
-	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
-	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-
-	driver_register(&tpnt->scsi_driverfs_driver);
+	scsi_upper_driver_register(tpnt);
 
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) 
@@ -2037,7 +2020,6 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	Scsi_Device *SDpnt;
 	struct Scsi_Host *shpnt;
 	
-	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
 	 * Next, detach the devices from the driver.
@@ -2054,6 +2036,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	down_write(&scsi_devicelist_mutex);
 	list_del(&tpnt->list);
 	up_write(&scsi_devicelist_mutex);
+
+	scsi_upper_driver_unregister(tpnt);
 
 	/*
 	 * Final cleanup for the driver is done in the driver sources in the
@@ -2153,34 +2137,6 @@ void scsi_free_sgtable(struct scatterlist *sgl, int index)
 	mempool_free(sgl, sgp->pool);
 }
 
-static int scsi_bus_match(struct device *scsi_driverfs_dev, 
-                          struct device_driver *scsi_driverfs_drv)
-{
-        char *p=0;
-
-        if (!strcmp("sd", scsi_driverfs_drv->name)) {
-                if ((p = strstr(scsi_driverfs_dev->bus_id, ":disc")) || 
-		    (p = strstr(scsi_driverfs_dev->bus_id, ":p"))) { 
-                        return 1;
-                }
-        } else if (!strcmp("sg", scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id, ":gen"))
-                        return 1;
-        } else if (!strcmp("sr",scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id,":cd"))
-                        return 1;
-        } else if (!strcmp("st",scsi_driverfs_drv->name)) {
-                if (strstr(scsi_driverfs_dev->bus_id,":mt"))
-                        return 1;
-        }
-        return 0;
-}
-
-struct bus_type scsi_driverfs_bus_type = {
-        .name	= "scsi",
-        .match	= scsi_bus_match,
-};
-
 static int __init init_scsi(void)
 {
 	int i;
@@ -2207,7 +2163,7 @@ static int __init init_scsi(void)
 	scsi_devfs_handle = devfs_mk_dir(NULL, "scsi", NULL);
 	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
-	bus_register(&scsi_driverfs_bus_type);
+	scsi_sysfs_register();
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
 	return 0;
 }
@@ -2216,7 +2172,7 @@ static void __exit exit_scsi(void)
 {
 	int i;
 
-	bus_unregister(&scsi_driverfs_bus_type);
+	scsi_sysfs_unregister();
 	scsi_dev_info_list_delete();
 	devfs_unregister(scsi_devfs_handle);
 	scsi_exit_procfs();
@@ -2230,5 +2186,5 @@ static void __exit exit_scsi(void)
 	}
 }
 
-module_init(init_scsi);
+subsys_initcall(init_scsi);
 module_exit(exit_scsi);

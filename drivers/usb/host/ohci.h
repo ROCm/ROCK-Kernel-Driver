@@ -111,6 +111,7 @@ struct td {
 	/* rest are purely for the driver's use */
   	__u8		index;
   	struct ed	*ed;
+  	struct td	*td_hash;	/* dma-->td hashtable */
   	struct td	*next_dl_td;
   	struct urb	*urb;
 
@@ -320,23 +321,9 @@ typedef struct urb_priv {
 
 #define URB_DEL 1
 
-
-/* Hash struct used for TD/ED hashing */
-struct hash_t {
-	void		*virt;
-	dma_addr_t	dma;
-	struct hash_t	*next; // chaining for collision cases
-};
-
-/* List of TD/ED hash entries */
-struct hash_list_t {
-	struct hash_t	*head;
-	struct hash_t	*tail;
-};
-
 #define TD_HASH_SIZE    64    /* power'o'two */
-
-#define TD_HASH_FUNC(td_dma) ((td_dma ^ (td_dma >> 5)) % TD_HASH_SIZE)
+// sizeof (struct td) ~= 64 == 2^6 ... 
+#define TD_HASH_FUNC(td_dma) ((td_dma ^ (td_dma >> 6)) % TD_HASH_SIZE)
 
 
 /*
@@ -373,7 +360,7 @@ struct ohci_hcd {
 	 */
 	struct pci_pool		*td_cache;
 	struct pci_pool		*ed_cache;
-	struct hash_list_t	td_hash [TD_HASH_SIZE];
+	struct td		*td_hash [TD_HASH_SIZE];
 
 	/*
 	 * driver state

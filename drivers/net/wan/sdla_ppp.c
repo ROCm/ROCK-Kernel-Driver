@@ -1897,6 +1897,7 @@ static void rx_intr(sdla_t *card)
 #endif
 		    		++ppp_priv_area->rx_intr_stat.rx_intr_bfr_passed_to_stack;	
 				netif_rx(skb);
+				dev->last_rx = jiffies;
 			}
 
 		} else {
@@ -2451,7 +2452,7 @@ static int config508(netdevice_t *dev, sdla_t *card)
 #endif
 
 		default:
-			printk(KERN_INFO "%s: ERROR: Unsuported PPP Mode Selected\n",
+			printk(KERN_INFO "%s: ERROR: Unsupported PPP Mode Selected\n",
 					card->devname);
 			printk(KERN_INFO "%s:        PPP IP Modes: STATIC, PEER or HOST\n",
 					card->devname);	
@@ -2943,6 +2944,7 @@ udp_dflt_cmd:
             		new_skb->dev = dev;
 	    		new_skb->mac.raw  = new_skb->data;
 			netif_rx(new_skb);
+			dev->last_rx = jiffies;
 		
 		} else {
 	    	

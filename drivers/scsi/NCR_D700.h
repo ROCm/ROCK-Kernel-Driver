@@ -22,11 +22,11 @@ static int D700_release(struct Scsi_Host *host);
  * remaining parameters shown below must be filled in.  The 53c700
  * routine NCR_700_detect will fill in all of the missing routines */
 #define NCR_D700_SCSI {						\
-	name:				"NCR Dual 700 MCA",	\
-	proc_name:			"NCR_D700",		\
-	detect: 			D700_detect,		\
-	release:			D700_release,		\
-	this_id:			7,			\
+	.name =				"NCR Dual 700 MCA",	\
+	.proc_name =			"NCR_D700",		\
+	.detect = 			D700_detect,		\
+	.release =			D700_release,		\
+	.this_id =			7,			\
 }
 
 

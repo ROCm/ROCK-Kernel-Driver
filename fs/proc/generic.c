@@ -488,7 +488,11 @@ struct proc_dir_entry *proc_symlink(const char *name,
 		ent->data = kmalloc((ent->size=strlen(dest))+1, GFP_KERNEL);
 		if (ent->data) {
 			strcpy((char*)ent->data,dest);
-			proc_register(parent, ent);
+			if (proc_register(parent, ent) < 0) {
+				kfree(ent->data);
+				kfree(ent);
+				ent = NULL;
+			}
 		} else {
 			kfree(ent);
 			ent = NULL;
@@ -505,7 +509,10 @@ struct proc_dir_entry *proc_mknod(const char *name, mode_t mode,
 	ent = proc_create(&parent,name,mode,1);
 	if (ent) {
 		ent->rdev = rdev;
-		proc_register(parent, ent);
+		if (proc_register(parent, ent) < 0) {
+			kfree(ent);
+			ent = NULL;
+		}
 	}
 	return ent;
 }
@@ -520,7 +527,10 @@ struct proc_dir_entry *proc_mkdir(const char *name, struct proc_dir_entry *paren
 		ent->proc_fops = &proc_dir_operations;
 		ent->proc_iops = &proc_dir_inode_operations;
 
-		proc_register(parent, ent);
+		if (proc_register(parent, ent) < 0) {
+			kfree(ent);
+			ent = NULL;
+		}
 	}
 	return ent;
 }
@@ -549,7 +559,10 @@ struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,
 			ent->proc_fops = &proc_dir_operations;
 			ent->proc_iops = &proc_dir_inode_operations;
 		}
-		proc_register(parent, ent);
+		if (proc_register(parent, ent) < 0) {
+			kfree(ent);
+			ent = NULL;
+		}
 	}
 	return ent;
 }

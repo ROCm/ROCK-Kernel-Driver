@@ -1185,7 +1185,8 @@ int fcntl_setlease(unsigned int fd, struct file *filp, long arg)
 		return -EACCES;
 	if (!S_ISREG(inode->i_mode))
 		return -EINVAL;
-	if ((error = security_file_lock(filp, arg)))
+	error = security_file_lock(filp, arg);
+	if (error)
 		return error;
 
 	lock_kernel();
@@ -1298,7 +1299,8 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	if (error)
 		goto out_putf;
 
-	if ((error = security_file_lock(filp, cmd)))
+	error = security_file_lock(filp, cmd);
+	if (error)
 		goto out_free;
 
 	for (;;) {
@@ -1410,7 +1412,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 
 	inode = filp->f_dentry->d_inode;
 
-#ifdef CONFIG_MMU
 	/* Don't allow mandatory locks on files that may be memory mapped
 	 * and shared.
 	 */
@@ -1423,7 +1424,6 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 			goto out;
 		}
 	}
-#endif
 
 	error = flock_to_posix_lock(filp, file_lock, &flock);
 	if (error)
@@ -1449,7 +1449,8 @@ int fcntl_setlk(struct file *filp, unsigned int cmd, struct flock *l)
 		goto out;
 	}
 
-	if ((error = security_file_lock(filp, file_lock->fl_type)))
+	error = security_file_lock(filp, file_lock->fl_type);
+	if (error)
 		goto out;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
@@ -1588,7 +1589,8 @@ int fcntl_setlk64(struct file *filp, unsigned int cmd, struct flock64 *l)
 		goto out;
 	}
 
-	if ((error = security_file_lock(filp, file_lock->fl_type)))
+	error = security_file_lock(filp, file_lock->fl_type);
+	if (error)
 		goto out;
 
 	if (filp->f_op && filp->f_op->lock != NULL) {
