@@ -335,26 +335,19 @@ void __init pci_addr_cache_build(void)
 
 /**
  * eeh_token_to_phys - convert EEH address token to phys address
- * @token i/o token, should be address in the form 0xA....
- *
- * Converts EEH address tokens into physical addresses.  Note that
- * ths routine does *not* convert I/O BAR addresses (which start
- * with 0xE...) to phys addresses!
+ * @token i/o token, should be address in the form 0xE....
  */
 static inline unsigned long eeh_token_to_phys(unsigned long token)
 {
 	pte_t *ptep;
-	unsigned long pa, vaddr;
+	unsigned long pa;
 
-	if (REGION_ID(token) == EEH_REGION_ID)
-		vaddr = IO_TOKEN_TO_ADDR(token);
-	else
+	ptep = find_linux_pte(ioremap_mm.pgd, token);
+	if (!ptep)
 		return token;
-
-	ptep = find_linux_pte(ioremap_mm.pgd, vaddr);
 	pa = pte_pfn(*ptep) << PAGE_SHIFT;
 
-	return pa | (vaddr & (PAGE_SIZE-1));
+	return pa | (token & (PAGE_SIZE-1));
 }
 
 /**
@@ -473,7 +466,7 @@ unsigned long eeh_check_failure(const volatile void __iomem *token, unsigned lon
 	struct device_node *dn;
 
 	/* Finding the phys addr + pci device; this is pretty quick. */
-	addr = eeh_token_to_phys((unsigned long)token);
+	addr = eeh_token_to_phys((unsigned long __force) token);
 	dev = pci_get_device_by_addr(addr);
 	if (!dev)
 		return val;
@@ -750,15 +743,15 @@ EXPORT_SYMBOL(iowrite32);
  */
 void ioread8_rep(void __iomem *addr, void *dst, unsigned long count)
 {
-	_insb((void *) IO_TOKEN_TO_ADDR(addr), dst, count);
+	_insb((u8 __force *) addr, dst, count);
 }
 void ioread16_rep(void __iomem *addr, void *dst, unsigned long count)
 {
-	_insw_ns((void *) IO_TOKEN_TO_ADDR(addr), dst, count);
+	_insw_ns((u16 __force *) addr, dst, count);
 }
 void ioread32_rep(void __iomem *addr, void *dst, unsigned long count)
 {
-	_insl_ns((void *) IO_TOKEN_TO_ADDR(addr), dst, count);
+	_insl_ns((u32 __force *) addr, dst, count);
 }
 EXPORT_SYMBOL(ioread8_rep);
 EXPORT_SYMBOL(ioread16_rep);
@@ -766,15 +759,15 @@ EXPORT_SYMBOL(ioread32_rep);
 
 void iowrite8_rep(void __iomem *addr, const void *src, unsigned long count)
 {
-	_outsb((void *) IO_TOKEN_TO_ADDR(addr), src, count);
+	_outsb((u8 __force *) addr, src, count);
 }
 void iowrite16_rep(void __iomem *addr, const void *src, unsigned long count)
 {
-	_outsw_ns((void *) IO_TOKEN_TO_ADDR(addr), src, count);
+	_outsw_ns((u16 __force *) addr, src, count);
 }
 void iowrite32_rep(void __iomem *addr, const void *src, unsigned long count)
 {
-	_outsl_ns((void *) IO_TOKEN_TO_ADDR(addr), src, count);
+	_outsl_ns((u32 __force *) addr, src, count);
 }
 EXPORT_SYMBOL(iowrite8_rep);
 EXPORT_SYMBOL(iowrite16_rep);
@@ -784,7 +777,7 @@ void __iomem *ioport_map(unsigned long port, unsigned int len)
 {
 	if (!_IO_IS_VALID(port))
 		return NULL;
-	return (void __iomem *) IO_ADDR_TO_TOKEN(port+pci_io_base);
+	return (void __iomem *) (port+pci_io_base);
 }
 
 void ioport_unmap(void __iomem *addr)
@@ -806,15 +799,8 @@ void __iomem *pci_iomap(struct pci_dev *dev, int bar, unsigned long max)
 		len = max;
 	if (flags & IORESOURCE_IO)
 		return ioport_map(start, len);
-	if (flags & IORESOURCE_MEM) {
-		void __iomem *vaddr = (void __iomem *) start;
-		if (dev  && eeh_subsystem_enabled) {
-			struct device_node *dn = pci_device_to_OF_node(dev);
-			if (dn && !(dn->eeh_mode & EEH_MODE_NOCHECK))
-				return (void __iomem *) IO_ADDR_TO_TOKEN(vaddr);
-		}
-		return vaddr;
-	}
+	if (flags & IORESOURCE_MEM)
+		return (void __iomem *) start;
 	/* What? */
 	return NULL;
 }
@@ -825,39 +811,6 @@ void pci_iounmap(struct pci_dev *dev, void __iomem *addr)
 }
 EXPORT_SYMBOL(pci_iomap);
 EXPORT_SYMBOL(pci_iounmap);
-
-/*
- * If EEH is implemented, find the PCI device using given phys addr
- * and check to see if eeh failure checking is disabled.
- * Remap the addr (trivially) to the EEH region if EEH checking enabled.
- * For addresses not known to PCI the vaddr is simply returned unchanged.
- */
-void __iomem *eeh_ioremap(unsigned long addr, void __iomem *vaddr)
-{
-	struct pci_dev *dev;
-	struct device_node *dn;
-
-	if (!eeh_subsystem_enabled)
-		return vaddr;
-
-	dev = pci_get_device_by_addr(addr);
-	if (!dev)
-		return vaddr;
-
-	dn = pci_device_to_OF_node(dev);
-	if (!dn) {
-		pci_dev_put(dev);
-		return vaddr;
-	}
-
-	if (dn->eeh_mode & EEH_MODE_NOCHECK) {
-		pci_dev_put(dev);
-		return vaddr;
-	}
-
-	pci_dev_put(dev);
-	return (void __iomem *)IO_ADDR_TO_TOKEN(vaddr);
-}
 
 static int proc_eeh_show(struct seq_file *m, void *v)
 {
