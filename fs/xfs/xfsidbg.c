@@ -3033,11 +3033,12 @@ xfs_prdinode_core(xfs_dinode_core_t *dip, int convert)
 		INT_GET(dip->di_format, convert),
 		xfs_fmtformat(
 		    (xfs_dinode_fmt_t)INT_GET(dip->di_format, convert)));
-	kdb_printf("nlink 0x%x uid 0x%x gid 0x%x projid 0x%x\n",
+	kdb_printf("nlink %d uid %d gid %d projid %d flushiter %u\n",
 		INT_GET(dip->di_nlink, convert),
 		INT_GET(dip->di_uid, convert),
 		INT_GET(dip->di_gid, convert),
-		(uint)INT_GET(dip->di_projid, convert));
+		(uint)INT_GET(dip->di_projid, convert),
+		(uint)INT_GET(dip->di_flushiter, convert));
 	kdb_printf("atime 0x%x:%x mtime 0x%x:%x ctime 0x%x:%x\n",
 		INT_GET(dip->di_atime.t_sec, convert),
 		INT_GET(dip->di_atime.t_nsec, convert),
