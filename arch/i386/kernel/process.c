@@ -142,13 +142,21 @@ void cpu_idle (void)
 	/* endless idle loop with no priority at all */
 	while (1) {
 		while (!need_resched()) {
-			void (*idle)(void) = pm_idle;
+			void (*idle)(void);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
 
 			if (!idle)
 				idle = default_idle;
 
 			irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 			idle();
+			rcu_read_unlock();
 		}
 		schedule();
 	}

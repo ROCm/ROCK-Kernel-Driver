@@ -130,11 +130,20 @@ void cpu_idle (void)
 {
 	/* endless idle loop with no priority at all */
 	while (1) {
-		void (*idle)(void) = pm_idle;
-		if (!idle)
-			idle = default_idle;
-		while (!need_resched())
+		while (!need_resched()) {
+			void (*idle)(void);
+			/*
+			 * Mark this as an RCU critical section so that
+			 * synchronize_kernel() in the unload path waits
+			 * for our completion.
+			 */
+			rcu_read_lock();
+			idle = pm_idle;
+			if (!idle)
+				idle = default_idle;
 			idle();
+			rcu_read_unlock();
+		}
 		schedule();
 	}
 }
