@@ -3,8 +3,6 @@
 # Licensed under the GPL
 #
 
-EXTRA_TARGETS	:= unmap_fin.o
-
 obj-y = checksum.o config.o exec_kern.o exitcode.o frame_kern.o frame.o \
 	helper.o init_task.o irq.o irq_user.o ksyms.o mem.o mem_user.o \
 	process.o process_kern.o ptrace.o reboot.o resource.o sigio_user.o \
@@ -30,9 +28,6 @@ USER_OBJS := $(filter %_user.o,$(obj-y))  $(user-objs-y) config.o helper.o \
 	process.o tempfile.o time.o tty_log.o umid.o user_util.o user_syms.o
 USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
-UNMAP_CFLAGS := $(patsubst -pg -DPROFILING,,$(USER_CFLAGS))
-UNMAP_CFLAGS := $(patsubst -fprofile-arcs -ftest-coverage,,$(UNMAP_CFLAGS))
-
 DMODULES-$(CONFIG_MODULES) = -D__CONFIG_MODULES__
 DMODVERSIONS-$(CONFIG_MODVERSIONS) = -D__CONFIG_MODVERSIONS__
 
@@ -48,12 +43,6 @@ CFLAGS_frame.o := $(patsubst -fomit-frame-pointer,,$(USER_CFLAGS))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$@) $(USER_CFLAGS) -c -o $@ $<
-
-$(obj)/unmap.o: $(src)/unmap.c
-	$(CC) $(UNMAP_CFLAGS) -c -o $@ $<
-
-$(obj)/unmap_fin.o : $(src)/unmap.o
-	ld -r -o $@ $< -lc -L/usr/lib
 
 # This has to be separate because it needs be compiled with frame pointers
 # regardless of how the rest of the kernel is built.

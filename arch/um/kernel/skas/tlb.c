@@ -67,7 +67,7 @@ static void fix_range(struct mm_struct *mm, unsigned long start_addr,
 	}
 }
 
-static void flush_kernel_vm_range(unsigned long start, unsigned long end)
+void flush_tlb_kernel_range_skas(unsigned long start, unsigned long end)
 {
 	struct mm_struct *mm;
 	pgd_t *pgd;
@@ -116,19 +116,19 @@ static void flush_kernel_vm_range(unsigned long start, unsigned long end)
 
 void flush_tlb_kernel_vm_skas(void)
 {
-	flush_kernel_vm_range(start_vm, end_vm);
+	flush_tlb_kernel_range_skas(start_vm, end_vm);
 }
 
 void __flush_tlb_one_skas(unsigned long addr)
 {
-	flush_kernel_vm_range(addr, addr + PAGE_SIZE);
+	flush_tlb_kernel_range_skas(addr, addr + PAGE_SIZE);
 }
 
 void flush_tlb_range_skas(struct vm_area_struct *vma, unsigned long start, 
 		     unsigned long end)
 {
 	if(vma->vm_mm == NULL)
-		flush_kernel_vm_range(start, end);
+		flush_tlb_kernel_range_skas(start, end);
 	else fix_range(vma->vm_mm, start, end, 0);
 }
 
