@@ -142,6 +142,7 @@ static struct i2c_driver lm90_driver = {
  */
 
 struct lm90_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid; /* zero until following fields are valid */
 	unsigned long last_updated; /* in jiffies */
@@ -280,17 +281,15 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
 		goto exit;
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-	    sizeof(struct lm90_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm90_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-	       sizeof(struct lm90_data));
+	memset(data, 0, sizeof(struct lm90_data));
 
-	/* The LM90-specific data is placed right after the common I2C
-	 * client data. */
-	data = (struct lm90_data *) (new_client + 1);
+	/* The common I2C client data is placed right before the
+	   LM90-specific data. */
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -390,7 +389,7 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 exit_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -420,7 +419,7 @@ static int lm90_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

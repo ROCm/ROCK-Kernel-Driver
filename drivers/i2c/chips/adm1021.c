@@ -98,13 +98,10 @@ SENSORS_INSMOD_8(adm1021, adm1023, max1617, max1617a, thmc10, lm84, gl523sm, mc1
 they don't quite work like a thermostat the way the LM75 does.  I.e., 
 a lower temp than THYST actually triggers an alarm instead of 
 clearing it.  Weird, ey?   --Phil  */
-#define adm1021_INIT_TOS		60
-#define adm1021_INIT_THYST		20
-#define adm1021_INIT_REMOTE_TOS		60
-#define adm1021_INIT_REMOTE_THYST	20
 
 /* Each client has this additional data */
 struct adm1021_data {
+	struct i2c_client client;
 	enum chips type;
 
 	struct semaphore update_lock;
@@ -151,9 +148,6 @@ static struct i2c_driver adm1021_driver = {
 	.detach_client	= adm1021_detach_client,
 };
 
-/* I choose here for semi-static allocation. Complete dynamic
-   allocation could also be used; the code needed for this would probably
-   take more memory than the datastructure takes now. */
 static int adm1021_id = 0;
 
 #define show(value)	\
@@ -235,16 +229,13 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access adm1021_{read,write}_value. */
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct adm1021_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct adm1021_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto error0;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-				 sizeof(struct adm1021_data));
+	memset(data, 0, sizeof(struct adm1021_data));
 
-	data = (struct adm1021_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -253,8 +244,12 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Now, we do the remaining detection. */
 	if (kind < 0) {
-		if ((adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0x03) != 0x00)
+		if ((adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0x03) != 0x00
+		 || (adm1021_read_value(new_client, ADM1021_REG_CONFIG_R) & 0x3F) != 0x00
+		 || (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) & 0xF8) != 0x00) {
+			err = -ENODEV;
 			goto error1;
+		}
 	}
 
 	/* Determine the chip type. */
@@ -272,11 +267,14 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 		else if ((i == 0x4d) &&
 			 (adm1021_read_value(new_client, ADM1021_REG_DEV_ID) == 0x01))
 			kind = max1617a;
-		/* LM84 Mfr ID in a different place */
-		else if (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) == 0x00)
-			kind = lm84;
 		else if (i == 0x54)
 			kind = mc1066;
+		/* LM84 Mfr ID in a different place, and it has more unused bits */
+		else if (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) == 0x00
+		      && (kind == 0 /* skip extra detection */
+		       || ((adm1021_read_value(new_client, ADM1021_REG_CONFIG_R) & 0x7F) == 0x00
+			&& (adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0xAB) == 0x00)))
+			kind = lm84;
 		else
 			kind = max1617;
 	}
@@ -309,10 +307,11 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
-		goto error3;
+		goto error1;
 
 	/* Initialize the ADM1021 chip */
-	adm1021_init_client(new_client);
+	if (kind != lm84)
+		adm1021_init_client(new_client);
 
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_temp1_max);
@@ -327,26 +326,17 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	return 0;
 
-error3:
 error1:
-	kfree(new_client);
+	kfree(data);
 error0:
 	return err;
 }
 
 static void adm1021_init_client(struct i2c_client *client)
 {
-	/* Initialize the adm1021 chip */
-	adm1021_write_value(client, ADM1021_REG_TOS_W,
-			    adm1021_INIT_TOS);
-	adm1021_write_value(client, ADM1021_REG_THYST_W,
-			    adm1021_INIT_THYST);
-	adm1021_write_value(client, ADM1021_REG_REMOTE_TOS_W,
-			    adm1021_INIT_REMOTE_TOS);
-	adm1021_write_value(client, ADM1021_REG_REMOTE_THYST_W,
-			    adm1021_INIT_REMOTE_THYST);
 	/* Enable ADC and disable suspend mode */
-	adm1021_write_value(client, ADM1021_REG_CONFIG_W, 0);
+	adm1021_write_value(client, ADM1021_REG_CONFIG_W,
+		adm1021_read_value(client, ADM1021_REG_CONFIG_R) & 0xBF);
 	/* Set Conversion rate to 1/sec (this can be tinkered with) */
 	adm1021_write_value(client, ADM1021_REG_CONV_RATE_W, 0x04);
 }
@@ -360,7 +350,7 @@ static int adm1021_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

@@ -905,8 +905,7 @@ static void w9968cf_urb_complete(struct urb *urb, struct pt_regs *regs)
 	spin_unlock(&cam->urb_lock);
 
 	/* Wake up the user process */
-	if (waitqueue_active(&cam->wait_queue))
-		wake_up_interruptible(&cam->wait_queue);
+	wake_up_interruptible(&cam->wait_queue);
 }
 
 
@@ -2690,6 +2689,7 @@ static int w9968cf_open(struct inode* inode, struct file* filp)
 			up(&cam->dev_sem);
 			return -EWOULDBLOCK;
 		}
+retry:
 		up(&cam->dev_sem);
 		err = wait_event_interruptible(cam->open, cam->disconnected ||
 		                               (cam->users == 0));
@@ -2698,6 +2698,9 @@ static int w9968cf_open(struct inode* inode, struct file* filp)
 		if (cam->disconnected)
 			return -ENODEV;
 		down(&cam->dev_sem);
+		/*recheck - there may be several waiters */
+		if (cam->users)
+			goto retry;
 	}
 
 	DBG(5, "Opening '%s', /dev/video%d ...",
@@ -2758,8 +2761,7 @@ static int w9968cf_release(struct inode* inode, struct file* filp)
 	cam->users--;
 	w9968cf_deallocate_memory(cam);
 
-	if (waitqueue_active(&cam->open))
-		wake_up_interruptible(&cam->open);
+	wake_up_interruptible(&cam->open);
 
 	DBG(5, "Video device closed.")
 	up(&cam->dev_sem);
@@ -3371,7 +3373,7 @@ w9968cf_v4l_ioctl(struct inode* inode, struct file* filp,
 		if (copy_from_user(&tuner, arg, sizeof(tuner)))
 			return -EFAULT;
 
-		if (tuner.tuner != 0);
+		if (tuner.tuner != 0)
 			return -EINVAL;
 
 		strcpy(tuner.name, "no_tuner");

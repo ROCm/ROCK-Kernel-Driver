@@ -70,6 +70,7 @@ MODULE_PARM_DESC(polarity, "Output's polarity: 0 = active high, 1 = active low")
 
 /* Each client has this additional data */
 struct ds1621_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid;			/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
@@ -97,11 +98,6 @@ static struct i2c_driver ds1621_driver = {
 
 static int ds1621_id = 0;
 
-static u16 swap_bytes(u16 val)
-{
-	return (val >> 8) | (val << 8);
-}
-
 /* All registers are word-sized, except for the configuration register.
    DS1621 uses a high-byte first convention, which is exactly opposite to
    the usual practice. */
@@ -110,7 +106,7 @@ static int ds1621_read_value(struct i2c_client *client, u8 reg)
 	if (reg == DS1621_REG_CONF)
 		return i2c_smbus_read_byte_data(client, reg);
 	else
-		return swap_bytes(i2c_smbus_read_word_data(client, reg));
+		return swab16(i2c_smbus_read_word_data(client, reg));
 }
 
 /* All registers are word-sized, except for the configuration register.
@@ -121,8 +117,7 @@ static int ds1621_write_value(struct i2c_client *client, u8 reg, u16 value)
 	if (reg == DS1621_REG_CONF)
 		return i2c_smbus_write_byte_data(client, reg, value);
 	else
-		return i2c_smbus_write_word_data(client, reg,
-						 swap_bytes(value));
+		return i2c_smbus_write_word_data(client, reg, swab16(value));
 }
 
 static void ds1621_init_client(struct i2c_client *client)
@@ -202,16 +197,13 @@ int ds1621_detect(struct i2c_adapter *adapter, int address,
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access ds1621_{read,write}_value. */
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct ds1621_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct ds1621_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0, sizeof(struct i2c_client) +
-	       sizeof(struct ds1621_data));
+	memset(data, 0, sizeof(struct ds1621_data));
 	
-	data = (struct ds1621_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -264,7 +256,7 @@ int ds1621_detect(struct i2c_adapter *adapter, int address,
 /* OK, this is not exactly good programming practice, usually. But it is
    very code-efficient in this case. */
       exit_free:
-	kfree(new_client);
+	kfree(data);
       exit:
 	return err;
 }
@@ -274,12 +266,12 @@ static int ds1621_detach_client(struct i2c_client *client)
 	int err;
 
 	if ((err = i2c_detach_client(client))) {
-		dev_err(&client->dev,
-		        "ds1621.o: Client deregistration failed, client not detached.\n");
+		dev_err(&client->dev, "Client deregistration failed, "
+			"client not detached.\n");
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }

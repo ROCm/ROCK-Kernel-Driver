@@ -315,7 +315,7 @@
 
 #elif defined(CONFIG_ARCH_INTEGRATOR)
 
-#include <asm/hardware/serial_amba.h>
+#include <asm/hardware/amba_serial.h>
 
 		.macro	addruart,rx
 		mrc	p15, 0, \rx, c1, c0
@@ -326,7 +326,7 @@
 		.endm
 
 		.macro	senduart,rd,rx
-		strb	\rd, [\rx, #AMBA_UARTDR]
+		strb	\rd, [\rx, #UART01x_DR]
 		.endm
 
 		.macro	waituart,rd,rx

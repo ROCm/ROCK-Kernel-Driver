@@ -27,7 +27,6 @@
 /*
     Supports the Via VT82C686A, VT82C686B south bridges.
     Reports all as a 686A.
-    See doc/chips/via686a for details.
     Warning - only supports a single device.
 */
 
@@ -330,48 +329,11 @@ static inline long TEMP_FROM_REG10(u16 val)
 #define DIV_FROM_REG(val) (1 << (val))
 #define DIV_TO_REG(val) ((val)==8?3:(val)==4?2:(val)==1?0:1)
 
-/* Initial limits */
-#define VIA686A_INIT_IN_0 200
-#define VIA686A_INIT_IN_1 250
-#define VIA686A_INIT_IN_2 330
-#define VIA686A_INIT_IN_3 500
-#define VIA686A_INIT_IN_4 1200
-
-#define VIA686A_INIT_IN_PERCENTAGE 10
-
-#define VIA686A_INIT_IN_MIN_0 (VIA686A_INIT_IN_0 - VIA686A_INIT_IN_0 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MAX_0 (VIA686A_INIT_IN_0 + VIA686A_INIT_IN_0 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MIN_1 (VIA686A_INIT_IN_1 - VIA686A_INIT_IN_1 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MAX_1 (VIA686A_INIT_IN_1 + VIA686A_INIT_IN_1 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MIN_2 (VIA686A_INIT_IN_2 - VIA686A_INIT_IN_2 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MAX_2 (VIA686A_INIT_IN_2 + VIA686A_INIT_IN_2 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MIN_3 (VIA686A_INIT_IN_3 - VIA686A_INIT_IN_3 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MAX_3 (VIA686A_INIT_IN_3 + VIA686A_INIT_IN_3 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MIN_4 (VIA686A_INIT_IN_4 - VIA686A_INIT_IN_4 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-#define VIA686A_INIT_IN_MAX_4 (VIA686A_INIT_IN_4 + VIA686A_INIT_IN_4 \
-        * VIA686A_INIT_IN_PERCENTAGE / 100)
-
-#define VIA686A_INIT_FAN_MIN	3000
-
-#define VIA686A_INIT_TEMP_OVER 600
-#define VIA686A_INIT_TEMP_HYST 500
-
-/* For the VIA686A, we need to keep some data in memory. That
-   data is pointed to by via686a_list[NR]->data. The structure itself is
-   dynamically allocated, at the same time when a new via686a client is
-   allocated. */
+/* For the VIA686A, we need to keep some data in memory.
+   The structure is dynamically allocated, at the same time when a new
+   via686a client is allocated. */
 struct via686a_data {
-	int sysctl_id;
-
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid;		/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
@@ -688,16 +650,13 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 		return -ENODEV;
 	}
 
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-				   sizeof(struct via686a_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct via686a_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(data, 0, sizeof(struct via686a_data));
 
-	memset(new_client,0x00, sizeof(struct i2c_client) +
-				sizeof(struct via686a_data));
-	data = (struct via686a_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -753,9 +712,9 @@ static int via686a_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
       ERROR3:
-	release_region(address, VIA686A_EXTENT);
-	kfree(new_client);
+	kfree(data);
       ERROR0:
+	release_region(address, VIA686A_EXTENT);
 	return err;
 }
 
@@ -770,7 +729,7 @@ static int via686a_detach_client(struct i2c_client *client)
 	}
 
 	release_region(client->addr, VIA686A_EXTENT);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }
@@ -778,53 +737,13 @@ static int via686a_detach_client(struct i2c_client *client)
 /* Called when we have found a new VIA686A. Set limits, etc. */
 static void via686a_init_client(struct i2c_client *client)
 {
-	int i;
-
-	/* Reset the device */
-	via686a_write_value(client, VIA686A_REG_CONFIG, 0x80);
-
-	/* Have to wait for reset to complete or else the following
-	   initializations won't work reliably. The delay was arrived at
-	   empirically, the datasheet doesn't tell you.
-	   Waiting for the reset bit to clear doesn't work, it
-	   clears in about 2-4 udelays and that isn't nearly enough. */
-	udelay(50);
-
-	via686a_write_value(client, VIA686A_REG_IN_MIN(0),
-			    IN_TO_REG(VIA686A_INIT_IN_MIN_0, 0));
-	via686a_write_value(client, VIA686A_REG_IN_MAX(0),
-			    IN_TO_REG(VIA686A_INIT_IN_MAX_0, 0));
-	via686a_write_value(client, VIA686A_REG_IN_MIN(1),
-			    IN_TO_REG(VIA686A_INIT_IN_MIN_1, 1));
-	via686a_write_value(client, VIA686A_REG_IN_MAX(1),
-			    IN_TO_REG(VIA686A_INIT_IN_MAX_1, 1));
-	via686a_write_value(client, VIA686A_REG_IN_MIN(2),
-			    IN_TO_REG(VIA686A_INIT_IN_MIN_2, 2));
-	via686a_write_value(client, VIA686A_REG_IN_MAX(2),
-			    IN_TO_REG(VIA686A_INIT_IN_MAX_2, 2));
-	via686a_write_value(client, VIA686A_REG_IN_MIN(3),
-			    IN_TO_REG(VIA686A_INIT_IN_MIN_3, 3));
-	via686a_write_value(client, VIA686A_REG_IN_MAX(3),
-			    IN_TO_REG(VIA686A_INIT_IN_MAX_3, 3));
-	via686a_write_value(client, VIA686A_REG_IN_MIN(4),
-			    IN_TO_REG(VIA686A_INIT_IN_MIN_4, 4));
-	via686a_write_value(client, VIA686A_REG_IN_MAX(4),
-			    IN_TO_REG(VIA686A_INIT_IN_MAX_4, 4));
-	via686a_write_value(client, VIA686A_REG_FAN_MIN(1),
-			    FAN_TO_REG(VIA686A_INIT_FAN_MIN, 2));
-	via686a_write_value(client, VIA686A_REG_FAN_MIN(2),
-			    FAN_TO_REG(VIA686A_INIT_FAN_MIN, 2));
-	for (i = 0; i <= 2; i++) {
-		via686a_write_value(client, VIA686A_REG_TEMP_OVER(i),
-				    TEMP_TO_REG(VIA686A_INIT_TEMP_OVER));
-		via686a_write_value(client, VIA686A_REG_TEMP_HYST(i),
-				    TEMP_TO_REG(VIA686A_INIT_TEMP_HYST));
-	}
+	u8 reg;
 
 	/* Start monitoring */
-	via686a_write_value(client, VIA686A_REG_CONFIG, 0x01);
+	reg = via686a_read_value(client, VIA686A_REG_CONFIG);
+	via686a_write_value(client, VIA686A_REG_CONFIG, (reg|0x01)&0x7F);
 
-	/* Cofigure temp interrupt mode for continuous-interrupt operation */
+	/* Configure temp interrupt mode for continuous-interrupt operation */
 	via686a_write_value(client, VIA686A_REG_TEMP_MODE, 
 			    via686a_read_value(client, VIA686A_REG_TEMP_MODE) &
 			    !(VIA686A_TEMP_MODE_MASK | VIA686A_TEMP_MODE_CONTINUOUS));

@@ -274,7 +274,7 @@ static int TIPurgeDataSync (struct usb_serial_port *port, __u16 mask)
 /**
  * TIReadDownloadMemory - Read edgeport memory from TI chip
  * @dev: usb device pointer
- * @address: Device CPU address at which to read
+ * @start_address: Device CPU address at which to read
  * @length: Length of above data
  * @address_type: Can read both XDATA and I2C
  * @buffer: pointer to input data buffer

@@ -39,6 +39,9 @@
 #define to_cycles(ns)	((ns)/120)
 #define to_ns(cycles)	((cycles)*120)
 
+static int yenta_probe_cb_irq(struct yenta_socket *socket);
+
+
 /*
  * Generate easy-to-use ways of reading a cardbus sockets
  * regular memory space ("cb_xxx"), configuration space
@@ -768,6 +771,69 @@ static unsigned int yenta_probe_irq(struct yenta_socket *socket, u32 isa_irq_mas
 	return mask;
 }
 
+
+/* interrupt handler, only used during probing */
+static irqreturn_t yenta_probe_handler(int irq, void *dev_id, struct pt_regs *regs)
+{
+	struct yenta_socket *socket = (struct yenta_socket *) dev_id;
+	u8 csc;
+        u32 cb_event;
+
+	/* Clear interrupt status for the event */
+	cb_event = cb_readl(socket, CB_SOCKET_EVENT);
+	cb_writel(socket, CB_SOCKET_EVENT, -1);
+	csc = exca_readb(socket, I365_CSC);
+
+	if (cb_event || csc) {
+		socket->probe_status = 1;
+		return IRQ_HANDLED;
+	}
+
+	return IRQ_NONE;
+}
+
+/* probes the PCI interrupt, use only on override functions */
+static int yenta_probe_cb_irq(struct yenta_socket *socket)
+{
+	u16 bridge_ctrl;
+
+	if (!socket->cb_irq)
+		return -1;
+
+	socket->probe_status = 0;
+
+	/* disable ISA interrupts */
+	bridge_ctrl = config_readw(socket, CB_BRIDGE_CONTROL);
+	bridge_ctrl &= ~CB_BRIDGE_INTR;
+	config_writew(socket, CB_BRIDGE_CONTROL, bridge_ctrl);
+
+	if (request_irq(socket->cb_irq, yenta_probe_handler, SA_SHIRQ, "yenta", socket)) {
+		printk(KERN_WARNING "Yenta: request_irq() in yenta_probe_cb_irq() failed!\n");
+		return -1;
+	}
+
+	/* generate interrupt, wait */
+	exca_writeb(socket, I365_CSCINT, I365_CSC_STSCHG);
+	cb_writel(socket, CB_SOCKET_EVENT, -1);
+	cb_writel(socket, CB_SOCKET_MASK, CB_CSTSMASK);
+	cb_writel(socket, CB_SOCKET_FORCE, CB_FCARDSTS);
+	
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(HZ/10);
+
+	/* disable interrupts */
+	cb_writel(socket, CB_SOCKET_MASK, 0);
+	exca_writeb(socket, I365_CSCINT, 0);
+	cb_writel(socket, CB_SOCKET_EVENT, -1);
+	exca_readb(socket, I365_CSC);
+
+	free_irq(socket->cb_irq, socket);
+
+	return (int) socket->probe_status;
+}
+
+
+
 /*
  * Set static data that doesn't need re-initializing..
  */
@@ -997,7 +1063,6 @@ static struct pci_device_id yenta_table [] = {
 	 * data sheets for these devices. --rmk)
 	 */
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1210, TI),
-	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1251B, TI),
 
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1130, TI113X),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1131, TI113X),
@@ -1007,11 +1072,14 @@ static struct pci_device_id yenta_table [] = {
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1221, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1225, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1251A, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1251B, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1420, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1450, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1451A, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1510, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1520, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4410, TI12XX),
-//	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4450, TI12XX),
+	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4450, TI12XX),
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_4451, TI12XX),
 
 	CB_ID(PCI_VENDOR_ID_TI, PCI_DEVICE_ID_TI_1250, TI1250),

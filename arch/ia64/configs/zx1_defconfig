@@ -1028,7 +1028,6 @@ CONFIG_USB_HIDDEV=y
 # CONFIG_USB_AUERSWALD is not set
 # CONFIG_USB_RIO500 is not set
 # CONFIG_USB_LEGOTOWER is not set
-# CONFIG_USB_BRLVGER is not set
 # CONFIG_USB_LCD is not set
 # CONFIG_USB_LED is not set
 

@@ -628,8 +628,10 @@ show_registers (struct class_device *class_dev, char *buf)
 	/* Capability Registers */
 	i = HC_VERSION(readl (&ehci->caps->hc_capbase));
 	temp = scnprintf (next, size,
-		"PCI device %s\nEHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
-		pci_name(to_pci_dev(hcd->self.controller)),
+		"bus %s device %s\n"
+		"EHCI %x.%02x, hcd state %d (driver " DRIVER_VERSION ")\n",
+		hcd->self.controller->bus->name,
+		hcd->self.controller->bus_id,
 		i >> 8, i & 0x0ff, ehci->hcd.state);
 	size -= temp;
 	next += temp;

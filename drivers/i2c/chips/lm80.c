@@ -44,10 +44,9 @@ SENSORS_INSMOD_1(lm80);
 #define LM80_REG_IN_MIN(nr)		(0x2b + (nr) * 2)
 #define LM80_REG_IN(nr)			(0x20 + (nr))
 
-#define LM80_REG_FAN1_MIN		0x3c
-#define LM80_REG_FAN2_MIN		0x3d
 #define LM80_REG_FAN1			0x28
 #define LM80_REG_FAN2			0x29
+#define LM80_REG_FAN_MIN(nr)		(0x3b + (nr))
 
 #define LM80_REG_TEMP			0x27
 #define LM80_REG_TEMP_HOT_MAX		0x38
@@ -69,7 +68,7 @@ SENSORS_INSMOD_1(lm80);
    these macros are called: arguments may be evaluated more than once.
    Fixing this is just not worth it. */
 
-#define IN_TO_REG(val)		(SENSORS_LIMIT((val)/10,0,255))
+#define IN_TO_REG(val)		(SENSORS_LIMIT(((val)+5)/10,0,255))
 #define IN_FROM_REG(val)	((val)*10)
 
 static inline unsigned char FAN_TO_REG(unsigned rpm, unsigned div)
@@ -111,6 +110,7 @@ static inline long TEMP_FROM_REG(u16 temp)
  */
 
 struct lm80_data {
+	struct i2c_client client;
 	struct semaphore update_lock;
 	char valid;		/* !=0 if following fields are valid */
 	unsigned long last_updated;	/* In jiffies */
@@ -250,8 +250,46 @@ static ssize_t set_fan_##suffix(struct device *dev, const char *buf, \
 	lm80_write_value(client, reg, data->value); \
 	return count; \
 }
-set_fan(min1, fan_min[0], LM80_REG_FAN1_MIN, fan_div[0]);
-set_fan(min2, fan_min[1], LM80_REG_FAN2_MIN, fan_div[1]);
+set_fan(min1, fan_min[0], LM80_REG_FAN_MIN(1), fan_div[0]);
+set_fan(min2, fan_min[1], LM80_REG_FAN_MIN(2), fan_div[1]);
+
+/* Note: we save and restore the fan minimum here, because its value is
+   determined in part by the fan divisor.  This follows the principle of
+   least suprise; the user doesn't expect the fan minimum to change just
+   because the divisor changed. */
+static ssize_t set_fan_div(struct device *dev, const char *buf,
+	size_t count, int nr)
+{
+	struct i2c_client *client = to_i2c_client(dev);
+	struct lm80_data *data = i2c_get_clientdata(client);
+	unsigned long min;
+	u8 reg;
+
+	/* Save fan_min */
+	min = FAN_FROM_REG(data->fan_min[nr],
+			   DIV_FROM_REG(data->fan_div[nr]));
+
+	data->fan_div[nr] = DIV_TO_REG(simple_strtoul(buf, NULL, 10));
+
+	reg = (lm80_read_value(client, LM80_REG_FANDIV) & ~(3 << (2 * (nr + 1))))
+	    | (data->fan_div[nr] << (2 * (nr + 1)));
+	lm80_write_value(client, LM80_REG_FANDIV, reg);
+
+	/* Restore fan_min */
+	data->fan_min[nr] = FAN_TO_REG(min, DIV_FROM_REG(data->fan_div[nr]));
+	lm80_write_value(client, LM80_REG_FAN_MIN(nr + 1), data->fan_min[nr]);
+
+	return count;
+}
+
+#define set_fan_div(number) \
+static ssize_t set_fan_div##number(struct device *dev, const char *buf, \
+	size_t count) \
+{ \
+	return set_fan_div(dev, buf, count, number - 1); \
+}
+set_fan_div(1);
+set_fan_div(2);
 
 static ssize_t show_temp_input1(struct device *dev, char *buf)
 {
@@ -319,8 +357,8 @@ static DEVICE_ATTR(fan2_min, S_IWUSR | S_IRUGO, show_fan_min2,
     set_fan_min2);
 static DEVICE_ATTR(fan1_input, S_IRUGO, show_fan_input1, NULL);
 static DEVICE_ATTR(fan2_input, S_IRUGO, show_fan_input2, NULL);
-static DEVICE_ATTR(fan1_div, S_IRUGO, show_fan_div1, NULL);
-static DEVICE_ATTR(fan2_div, S_IRUGO, show_fan_div2, NULL);
+static DEVICE_ATTR(fan1_div, S_IWUSR | S_IRUGO, show_fan_div1, set_fan_div1);
+static DEVICE_ATTR(fan2_div, S_IWUSR | S_IRUGO, show_fan_div2, set_fan_div2);
 static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
 static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_hot_max,
     set_temp_hot_max);
@@ -357,15 +395,13 @@ int lm80_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* OK. For now, we presume we have a valid client. We now create the
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access lm80_{read,write}_value. */
-	if (!(new_client = kmalloc(sizeof(struct i2c_client) +
-	    sizeof(struct lm80_data), GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm80_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto exit;
 	}
-	memset(new_client, 0x00, sizeof(struct i2c_client) +
-	       sizeof(struct lm80_data));
+	memset(data, 0, sizeof(struct lm80_data));
 
-	data = (struct lm80_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -400,6 +436,10 @@ int lm80_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Initialize the LM80 chip */
 	lm80_init_client(new_client);
+
+	/* A few vars need to be filled upon startup */
+	data->fan_min[0] = lm80_read_value(new_client, LM80_REG_FAN_MIN(1));
+	data->fan_min[1] = lm80_read_value(new_client, LM80_REG_FAN_MIN(2));
 
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in0_min);
@@ -439,7 +479,7 @@ int lm80_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 error_free:
-	kfree(new_client);
+	kfree(data);
 exit:
 	return err;
 }
@@ -454,7 +494,7 @@ static int lm80_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 
@@ -504,10 +544,10 @@ static struct lm80_data *lm80_update_device(struct device *dev)
 		}
 		data->fan[0] = lm80_read_value(client, LM80_REG_FAN1);
 		data->fan_min[0] =
-		    lm80_read_value(client, LM80_REG_FAN1_MIN);
+		    lm80_read_value(client, LM80_REG_FAN_MIN(1));
 		data->fan[1] = lm80_read_value(client, LM80_REG_FAN2);
 		data->fan_min[1] =
-		    lm80_read_value(client, LM80_REG_FAN2_MIN);
+		    lm80_read_value(client, LM80_REG_FAN_MIN(2));
 
 		data->temp =
 		    (lm80_read_value(client, LM80_REG_TEMP) << 8) |

@@ -591,12 +591,13 @@ static __init int ali_router_probe(struct irq_router *r, struct pci_dev *router,
 {
 	switch(device)
 	{
-		case PCI_DEVICE_ID_AL_M1533:
+	case PCI_DEVICE_ID_AL_M1533:
+	case PCI_DEVICE_ID_AL_M1563:
+		printk("PCI: Using ALI IRQ Router\n");
 			r->name = "ALI";
 			r->get = pirq_ali_get;
 			r->set = pirq_ali_set;
 			return 1;
-		/* Should add 156x some day */
 	}
 	return 0;
 }

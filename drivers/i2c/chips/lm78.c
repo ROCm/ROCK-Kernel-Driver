@@ -192,6 +192,7 @@ static inline u8 DIV_TO_REG(int val)
    dynamically allocated, at the same time when a new lm78 client is
    allocated. */
 struct lm78_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -552,16 +553,13 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access lm78_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-				   sizeof(struct lm78_data),
-				   GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm78_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR1;
 	}
-	memset(new_client, 0, sizeof(struct i2c_client) + 
-			      sizeof(struct lm78_data));
+	memset(data, 0, sizeof(struct lm78_data));
 
-	data = (struct lm78_data *) (new_client + 1);
+	new_client = &data->client;
 	if (is_isa)
 		init_MUTEX(&data->lock);
 	i2c_set_clientdata(new_client, data);
@@ -625,6 +623,12 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* Initialize the LM78 chip */
 	lm78_init_client(new_client);
 
+	/* A few vars need to be filled upon startup */
+	for (i = 0; i < 3; i++) {
+		data->fan_min[i] = lm78_read_value(new_client,
+					LM78_REG_FAN_MIN(i));
+	}
+
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_in0_input);
 	device_create_file(&new_client->dev, &dev_attr_in0_min);
@@ -665,7 +669,7 @@ int lm78_detect(struct i2c_adapter *adapter, int address, int kind)
 	return 0;
 
 ERROR2:
-	kfree(new_client);
+	kfree(data);
 ERROR1:
 	if (is_isa)
 		release_region(address, LM78_EXTENT);
@@ -688,7 +692,7 @@ static int lm78_detach_client(struct i2c_client *client)
 		return err;
 	}
 
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 
 	return 0;
 }

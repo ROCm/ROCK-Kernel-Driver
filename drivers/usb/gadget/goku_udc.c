@@ -1562,8 +1562,7 @@ static void ep0_setup(struct goku_udc *dev)
 					if (dev->ep[tmp].is_in)
 						goto stall;
 				}
-				/* endpoint halt */
-				if (ctrl.wValue != 0)
+				if (ctrl.wValue != USB_ENDPOINT_HALT)
 					goto stall;
 				if (tmp)
 					goku_clear_halt(&dev->ep[tmp]);

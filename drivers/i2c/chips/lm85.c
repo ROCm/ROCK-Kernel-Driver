@@ -351,6 +351,7 @@ struct lm85_autofan {
 };
 
 struct lm85_data {
+	struct i2c_client client;
 	struct semaphore lock;
 	enum chips type;
 
@@ -736,16 +737,13 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	   client structure, even though we cannot fill it completely yet.
 	   But it allows us to access lm85_{read,write}_value. */
 
-	if (!(new_client = kmalloc((sizeof(struct i2c_client)) +
-				    sizeof(struct lm85_data),
-				    GFP_KERNEL))) {
+	if (!(data = kmalloc(sizeof(struct lm85_data), GFP_KERNEL))) {
 		err = -ENOMEM;
 		goto ERROR0;
 	}
+	memset(data, 0, sizeof(struct lm85_data));
 
-	memset(new_client, 0, sizeof(struct i2c_client) +
-			      sizeof(struct lm85_data));
-	data = (struct lm85_data *) (new_client + 1);
+	new_client = &data->client;
 	i2c_set_clientdata(new_client, data);
 	new_client->addr = address;
 	new_client->adapter = adapter;
@@ -886,7 +884,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 
 	/* Error out and cleanup code */
     ERROR1:
-	kfree(new_client);
+	kfree(data);
     ERROR0:
 	return err;
 }
@@ -894,7 +892,7 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 int lm85_detach_client(struct i2c_client *client)
 {
 	i2c_detach_client(client);
-	kfree(client);
+	kfree(i2c_get_clientdata(client));
 	return 0;
 }
 

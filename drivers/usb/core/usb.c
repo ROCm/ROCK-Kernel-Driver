@@ -7,8 +7,7 @@
  * (C) Copyright Gregory P. Smith 1999
  * (C) Copyright Deti Fliegl 1999 (new USB architecture)
  * (C) Copyright Randy Dunlap 2000
- * (C) Copyright David Brownell 2000-2001 (kernel hotplug, usb_device_id,
- 	more docs, etc)
+ * (C) Copyright David Brownell 2000-2004
  * (C) Copyright Yggdrasil Computing, Inc. 2000
  *     (usb_device_id matching changes by Adam J. Richter)
  * (C) Copyright Greg Kroah-Hartman 2002-2003
@@ -58,6 +57,8 @@ extern int usb_host_init(void);
 extern void usb_host_cleanup(void);
 
 
+const char *usbcore_name = "usbcore";
+
 int nousb;		/* Disable USB when built into kernel image */
 			/* Not honored on modular build */
 
@@ -93,17 +94,11 @@ int usb_probe_interface(struct device *dev)
 	if (!driver->probe)
 		return error;
 
-	/* driver claim() doesn't yet affect dev->driver... */
-	if (intf->driver)
-		return error;
-
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
 		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
 		error = driver->probe (intf, id);
 	}
-	if (!error)
-		intf->driver = driver;
 
 	return error;
 }
@@ -112,7 +107,7 @@ int usb_probe_interface(struct device *dev)
 int usb_unbind_interface(struct device *dev)
 {
 	struct usb_interface *intf = to_usb_interface(dev);
-	struct usb_driver *driver = intf->driver;
+	struct usb_driver *driver = to_usb_driver(intf->dev.driver);
 
 	/* release all urbs for this interface */
 	usb_disable_interface(interface_to_usbdev(intf), intf);
@@ -125,7 +120,6 @@ int usb_unbind_interface(struct device *dev)
 			intf->altsetting[0].desc.bInterfaceNumber,
 			0);
 	usb_set_intfdata(intf, NULL);
-	intf->driver = NULL;
 
 	return 0;
 }
@@ -158,11 +152,12 @@ int usb_register(struct usb_driver *new_driver)
 	retval = driver_register(&new_driver->driver);
 
 	if (!retval) {
-		info("registered new driver %s", new_driver->name);
+		pr_info("%s: registered new driver %s\n",
+			usbcore_name, new_driver->name);
 		usbfs_update_special();
 	} else {
-		err("problem %d when registering driver %s",
-			retval, new_driver->name);
+		printk(KERN_ERR "%s: error %d registering driver %s\n",
+			usbcore_name, retval, new_driver->name);
 	}
 
 	return retval;
@@ -181,7 +176,7 @@ int usb_register(struct usb_driver *new_driver)
  */
 void usb_deregister(struct usb_driver *driver)
 {
-	info("deregistering driver %s", driver->name);
+	pr_info("%s: deregistering driver %s\n", usbcore_name, driver->name);
 
 	driver_unregister (&driver->driver);
 
@@ -287,7 +282,8 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
 /**
  * usb_driver_claim_interface - bind a driver to an interface
  * @driver: the driver to be bound
- * @iface: the interface to which it will be bound
+ * @iface: the interface to which it will be bound; must be in the
+ *	usb device's active configuration
  * @priv: driver data associated with that interface
  *
  * This is used by usb device drivers that need to claim more than one
@@ -305,75 +301,52 @@ usb_epnum_to_ep_desc(struct usb_device *dev, unsigned epnum)
  */
 int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *iface, void* priv)
 {
-	if (!iface || !driver)
-		return -EINVAL;
+	struct device *dev = &iface->dev;
 
-	if (iface->driver)
+	if (dev->driver)
 		return -EBUSY;
 
-	/* FIXME should device_bind_driver() */
-	iface->driver = driver;
+	dev->driver = &driver->driver;
 	usb_set_intfdata(iface, priv);
+
+	/* if interface was already added, bind now; else let
+	 * the future device_add() bind it, bypassing probe()
+	 */
+	if (!list_empty (&dev->bus_list))
+		device_bind_driver(dev);
+
 	return 0;
 }
-
-/**
- * usb_interface_claimed - returns true iff an interface is claimed
- * @iface: the interface being checked
- *
- * This should be used by drivers to check other interfaces to see if
- * they are available or not.  If another driver has claimed the interface,
- * they may not claim it.  Otherwise it's OK to claim it using
- * usb_driver_claim_interface().
- *
- * Returns true (nonzero) iff the interface is claimed, else false (zero).
- */
-int usb_interface_claimed(struct usb_interface *iface)
-{
-	if (!iface)
-		return 0;
-
-	return (iface->driver != NULL);
-} /* usb_interface_claimed() */
 
 /**
  * usb_driver_release_interface - unbind a driver from an interface
  * @driver: the driver to be unbound
  * @iface: the interface from which it will be unbound
  *
- * In addition to unbinding the driver, this re-initializes the interface
- * by selecting altsetting 0, the default alternate setting.
- * 
  * This can be used by drivers to release an interface without waiting
- * for their disconnect() methods to be called.
- *
- * When the USB subsystem disconnect()s a driver from some interface,
- * it automatically invokes this method for that interface.  That
- * means that even drivers that used usb_driver_claim_interface()
- * usually won't need to call this.
+ * for their disconnect() methods to be called.  In typical cases this
+ * also causes the driver disconnect() method to be called.
  *
  * This call is synchronous, and may not be used in an interrupt context.
- * Callers must own the driver model's usb bus writelock.  So driver
- * disconnect() entries don't need extra locking, but other call contexts
- * may need to explicitly claim that lock.
+ * Callers must own the usb_device serialize semaphore and the driver model's
+ * usb bus writelock.  So driver disconnect() entries don't need extra locking,
+ * but other call contexts may need to explicitly claim those locks.
  */
-void usb_driver_release_interface(struct usb_driver *driver, struct usb_interface *iface)
+void usb_driver_release_interface(struct usb_driver *driver,
+					struct usb_interface *iface)
 {
+	struct device *dev = &iface->dev;
+
 	/* this should never happen, don't release something that's not ours */
-	if (!iface || !iface->driver || iface->driver != driver)
+	if (!dev->driver || dev->driver != &driver->driver)
 		return;
 
-	if (iface->dev.driver) {
-		/* FIXME should be the ONLY case here */
-		device_release_driver(&iface->dev);
-		return;
-	}
+	/* don't disconnect from disconnect(), or before dev_add() */
+	if (!list_empty (&dev->driver_list) && !list_empty (&dev->bus_list))
+		device_release_driver(dev);
 
-	usb_set_interface(interface_to_usbdev(iface),
-			iface->altsetting[0].desc.bInterfaceNumber,
-			0);
+	dev->driver = NULL;
 	usb_set_intfdata(iface, NULL);
-	iface->driver = NULL;
 }
 
 /**
@@ -587,10 +560,11 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	int i = 0;
 	int length = 0;
 
-	dbg ("%s", __FUNCTION__);
-
 	if (!dev)
 		return -ENODEV;
+
+	/* driver is often null here; dev_dbg() would oops */
+	pr_debug ("usb %s: hotplug\n", dev->bus_id);
 
 	/* Must check driver_data here, as on remove driver is always NULL */
 	if ((dev->driver == &usb_generic_driver) || 
@@ -601,11 +575,11 @@ static int usb_hotplug (struct device *dev, char **envp, int num_envp,
 	usb_dev = interface_to_usbdev (intf);
 	
 	if (usb_dev->devnum < 0) {
-		dbg ("device already deleted ??");
+		pr_debug ("usb %s: already deleted?\n", dev->bus_id);
 		return -ENODEV;
 	}
 	if (!usb_dev->bus) {
-		dbg ("bus already removed?");
+		pr_debug ("usb %s: bus removed?\n", dev->bus_id);
 		return -ENODEV;
 	}
 
@@ -794,18 +768,11 @@ usb_alloc_dev(struct usb_device *parent, struct usb_bus *bus, unsigned port)
  *
  * A pointer to the device with the incremented reference counter is returned.
  */
-struct usb_device *usb_get_dev (struct usb_device *dev)
+struct usb_device *usb_get_dev(struct usb_device *dev)
 {
-	struct device *tmp;
-
-	if (!dev)
-		return NULL;
-
-	tmp = get_device(&dev->dev);
-	if (tmp)        
-		return to_usb_device(tmp);
-	else
-		return NULL;
+	if (dev)
+		get_device(&dev->dev);
+	return dev;
 }
 
 /**
@@ -821,20 +788,54 @@ void usb_put_dev(struct usb_device *dev)
 		put_device(&dev->dev);
 }
 
+/**
+ * usb_get_intf - increments the reference count of the usb interface structure
+ * @intf: the interface being referenced
+ *
+ * Each live reference to a interface must be refcounted.
+ *
+ * Drivers for USB interfaces should normally record such references in
+ * their probe() methods, when they bind to an interface, and release
+ * them by calling usb_put_intf(), in their disconnect() methods.
+ *
+ * A pointer to the interface with the incremented reference counter is
+ * returned.
+ */
+struct usb_interface *usb_get_intf(struct usb_interface *intf)
+{
+	if (intf)
+		get_device(&intf->dev);
+	return intf;
+}
+
+/**
+ * usb_put_intf - release a use of the usb interface structure
+ * @intf: interface that's been decremented
+ *
+ * Must be called when a user of an interface is finished with it.  When the
+ * last user of the interface calls this function, the memory of the interface
+ * is freed.
+ */
+void usb_put_intf(struct usb_interface *intf)
+{
+	if (intf)
+		put_device(&intf->dev);
+}
+
 static struct usb_device *match_device(struct usb_device *dev,
 				       u16 vendor_id, u16 product_id)
 {
 	struct usb_device *ret_dev = NULL;
 	int child;
 
-	dbg("looking at vendor %d, product %d",
+	dev_dbg(&dev->dev, "check for vendor %04x, product %04x ...\n",
 	    dev->descriptor.idVendor,
 	    dev->descriptor.idProduct);
 
 	/* see if this device matches */
 	if ((dev->descriptor.idVendor == vendor_id) &&
 	    (dev->descriptor.idProduct == product_id)) {
-		dbg ("found the device!");
+		dev_dbg (&dev->dev, "matched this device!\n");
 		ret_dev = usb_get_dev(dev);
 		goto exit;
 	}
@@ -909,7 +910,8 @@ int usb_get_current_frame_number(struct usb_device *dev)
  * extra field of the interface and endpoint descriptor structs.
  */
 
-int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, void **ptr)
+int __usb_get_extra_descriptor(char *buffer, unsigned size,
+	unsigned char type, void **ptr)
 {
 	struct usb_descriptor_header *header;
 
@@ -917,7 +919,11 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size, unsigned char type, 
 		header = (struct usb_descriptor_header *)buffer;
 
 		if (header->bLength < 2) {
-			err("invalid descriptor length of %d", header->bLength);
+			printk(KERN_ERR
+				"%s: bogus descriptor, type %d length %d\n",
+				usbcore_name,
+				header->bDescriptorType, 
+				header->bLength);
 			return -1;
 		}
 
@@ -1164,10 +1170,13 @@ int usb_new_device(struct usb_device *dev)
 		usb_show_string(dev, "SerialNumber", dev->descriptor.iSerialNumber);
 #endif
 
+	down(&dev->serialize);
+
 	/* put device-specific files into sysfs */
 	err = device_add (&dev->dev);
 	if (err) {
 		dev_err(&dev->dev, "can't device_add, error %d\n", err);
+		up(&dev->serialize);
 		goto fail;
 	}
 	usb_create_driverfs_dev_files (dev);
@@ -1202,6 +1211,7 @@ int usb_new_device(struct usb_device *dev)
 			dev->descriptor.bNumConfigurations);
 	}
 	err = usb_set_configuration(dev, config);
+	up(&dev->serialize);
 	if (err) {
 		dev_err(&dev->dev, "can't set config #%d, error %d\n",
 			config, err);
@@ -1568,7 +1578,7 @@ int usb_disabled(void)
 static int __init usb_init(void)
 {
 	if (nousb) {
-		info("USB support disabled\n");
+		pr_info ("%s: USB support disabled\n", usbcore_name);
 		return 0;
 	}
 
@@ -1620,7 +1630,6 @@ EXPORT_SYMBOL(usb_get_dev);
 EXPORT_SYMBOL(usb_hub_tt_clear_buffer);
 
 EXPORT_SYMBOL(usb_driver_claim_interface);
-EXPORT_SYMBOL(usb_interface_claimed);
 EXPORT_SYMBOL(usb_driver_release_interface);
 EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);

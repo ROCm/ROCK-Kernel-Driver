@@ -35,18 +35,18 @@ devices, future use (say 2.5/2.6) is expected to expand to replace
 most of the existing input system, which is why it lives in
 drivers/input/ instead of drivers/usb/.
 
-  The centre of the input drivers is the input.o module, which must be
+  The centre of the input drivers is the input module, which must be
 loaded before any other of the input modules - it serves as a way of
 communication between two groups of modules:
 
 1.1 Device drivers
 ~~~~~~~~~~~~~~~~~~
   These modules talk to the hardware (for example via USB), and provide
-events (keystrokes, mouse movements) to the input.o module.
+events (keystrokes, mouse movements) to the input module.
 
 1.2 Event handlers
 ~~~~~~~~~~~~~~~~~~
-  These modules get events from input.o and pass them where needed via
+  These modules get events from input and pass them where needed via
 various interfaces - keystrokes to the kernel, mouse movements via a
 simulated PS/2 interface to GPM and X and so on.
 
@@ -56,12 +56,12 @@ simulated PS/2 interface to GPM and X and so on.
 you'll have to load the following modules (or have them built in to the
 kernel):
 
-	input.o
-	mousedev.o
-	keybdev.o
-	usbcore.o
-	usb-uhci.o or usb-ohci.o or uhci.o
-	hid.o
+	input
+	mousedev
+	keybdev
+	usbcore
+	uhci_hcd or ohci_hcd or ehci_hcd
+	usbhid
 
   After this, the USB keyboard will work straight away, and the USB mouse
 will be available as a character device on major 13, minor 63:
@@ -98,9 +98,9 @@ XFree to this device to use it - GPM should be called like:
 however not useful without being handled, so you also will need to use some
 of the modules from section 3.2.
 
-3.1.1 hid.o
-~~~~~~~~~~~
-  hid.o is the largest and most complex driver of the whole suite. It
+3.1.1 usbhid
+~~~~~~~~~~~~
+  usbhid is the largest and most complex driver of the whole suite. It
 handles all HID devices, and because there is a very wide variety of them,
 and because the USB HID specification isn't simple, it needs to be this big.
 
@@ -115,7 +115,7 @@ interface, but for the UPSs and LCDs it doesn't make much sense. For this,
 the hiddev interface was designed. See Documentation/usb/hiddev.txt
 for more information about it.
 
-  The usage of the hid.o module is very simple, it takes no parameters,
+  The usage of the usbhid module is very simple, it takes no parameters,
 detects everything automatically and when a HID device is inserted, it
 detects it appropriately.
 
@@ -123,30 +123,30 @@ detects it appropriately.
 device that doesn't work well. In that case #define DEBUG at the beginning
 of hid-core.c and send me the syslog traces.
 
-3.1.2 usbmouse.o
-~~~~~~~~~~~~~~~~
+3.1.2 usbmouse
+~~~~~~~~~~~~~~
   For embedded systems, for mice with broken HID descriptors and just any
-other use when the big hid.o wouldn't be a good choice, there is the
-usbmouse.c driver. It handles USB mice only. It uses a simpler HIDBP
+other use when the big usbhid wouldn't be a good choice, there is the
+usbmouse driver. It handles USB mice only. It uses a simpler HIDBP
 protocol. This also means the mice must support this simpler protocol. Not
-all do. If you don't have any strong reason to use this module, use hid.o
+all do. If you don't have any strong reason to use this module, use usbhid
 instead.
 
-3.1.3 usbkbd.o
-~~~~~~~~~~~~~~
-  Much like usbmouse.c, this module talks to keyboards with a simplified
+3.1.3 usbkbd
+~~~~~~~~~~~~
+  Much like usbmouse, this module talks to keyboards with a simplified
 HIDBP protocol. It's smaller, but doesn't support any extra special keys.
-Use hid.o instead if there isn't any special reason to use this.
+Use usbhid instead if there isn't any special reason to use this.
 
-3.1.4 wacom.o
-~~~~~~~~~~~~~
+3.1.4 wacom
+~~~~~~~~~~~
   This is a driver for Wacom Graphire and Intuos tablets. Not for Wacom
 PenPartner, that one is handled by the HID driver. Although the Intuos and
 Graphire tablets claim that they are HID tablets as well, they are not and
 thus need this specific driver.
 
-3.1.5 iforce.o
-~~~~~~~~~~~~~~~
+3.1.5 iforce
+~~~~~~~~~~~~
   A driver for I-Force joysticks and wheels, both over USB and RS232. 
 It includes ForceFeedback support now, even though Immersion
 Corp. considers the protocol a trade secret and won't disclose a word
@@ -157,8 +157,8 @@ about it.
   Event handlers distrubite the events from the devices to userland and
 kernel, as needed.
 
-3.2.1 keybdev.o
-~~~~~~~~~~~~~~~
+3.2.1 keybdev
+~~~~~~~~~~~~~
   keybdev is currently a rather ugly hack that translates the input
 events into architecture-specific keyboard raw mode (Xlated AT Set2 on
 x86), and passes them into the handle_scancode function of the
@@ -170,13 +170,13 @@ it.
 best if keyboard.c would itself be an event handler. This is done in
 the input patch, available on the webpage mentioned below. 
 
-3.2.2 mousedev.o
-~~~~~~~~~~~~~~~~
+3.2.2 mousedev
+~~~~~~~~~~~~~~
   mousedev is also a hack to make programs that use mouse input
 work. It takes events from either mice or digitizers/tablets and makes
 a PS/2-style (a la /dev/psaux) mouse device available to the
 userland. Ideally, the programs could use a more reasonable interface,
-for example evdev.o
+for example evdev
 
   Mousedev devices in /dev/input (as shown above) are:
 
@@ -207,8 +207,8 @@ program reading the data wishes. You can set GPM and X to any of
 these. You'll need ImPS/2 if you want to make use of a wheel on a USB
 mouse and ExplorerPS/2 if you want to use extra (up to 5) buttons. 
 
-3.2.3 joydev.o
-~~~~~~~~~~~~~~
+3.2.3 joydev
+~~~~~~~~~~~~
   Joydev implements v0.x and v1.x Linux joystick api, much like
 drivers/char/joystick/joystick.c used to in earlier versions. See
 joystick-api.txt in the Documentation subdirectory for details.  As
@@ -223,8 +223,8 @@ on:
 
 And so on up to js31.
 
-3.2.4 evdev.o
-~~~~~~~~~~~~~
+3.2.4 evdev
+~~~~~~~~~~~
   evdev is the generic input event interface. It passes the events
 generated in the kernel straight to the program, with timestamps. The
 API is still evolving, but should be useable now. It's described in

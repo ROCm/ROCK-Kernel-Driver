@@ -164,6 +164,9 @@ do_bad_area(struct task_struct *tsk, struct mm_struct *mm, unsigned long addr,
 		__do_kernel_fault(mm, addr, fsr, regs);
 }
 
+#define VM_FAULT_BADMAP		(-20)
+#define VM_FAULT_BADACCESS	(-21)
+
 static int
 __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 		struct task_struct *tsk)
@@ -172,7 +175,7 @@ __do_page_fault(struct mm_struct *mm, unsigned long addr, unsigned int fsr,
 	int fault, mask;
 
 	vma = find_vma(mm, addr);
-	fault = -2; /* bad map area */
+	fault = VM_FAULT_BADMAP;
 	if (!vma)
 		goto out;
 	if (vma->vm_start > addr)
@@ -188,7 +191,7 @@ good_area:
 	else
 		mask = VM_WRITE;
 
-	fault = -1; /* bad access type */
+	fault = VM_FAULT_BADACCESS;
 	if (!(vma->vm_flags & mask))
 		goto out;
 
@@ -204,16 +207,15 @@ survive:
 	 * Handle the "normal" cases first - successful and sigbus
 	 */
 	switch (fault) {
-	case 2:
+	case VM_FAULT_MAJOR:
 		tsk->maj_flt++;
 		return fault;
-	case 1:
+	case VM_FAULT_MINOR:
 		tsk->min_flt++;
-	case 0:
+	case VM_FAULT_SIGBUS:
 		return fault;
 	}
 
-	fault = -3; /* out of memory */
 	if (tsk->pid != 1)
 		goto out;
 
@@ -271,7 +273,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 	if (!user_mode(regs))
 		goto no_context;
 
-	if (fault == -3) {
+	if (fault == VM_FAULT_OOM) {
 		/*
 		 * We ran out of memory, or some other thing happened to
 		 * us that made us unable to handle the page fault gracefully.
@@ -279,7 +281,7 @@ int do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
 		printk("VM: killing process %s\n", tsk->comm);
 		do_exit(SIGKILL);
 	} else
-		__do_user_fault(tsk, addr, fsr, fault == -1 ?
+		__do_user_fault(tsk, addr, fsr, fault == VM_FAULT_BADACCESS ?
 				SEGV_ACCERR : SEGV_MAPERR, regs);
 	return 0;
 
