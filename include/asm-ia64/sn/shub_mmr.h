@@ -130,6 +130,19 @@
 #define SH_EVENT_OCCURRED_II_INT1_MASK           0x0000000040000000
 
 /* ==================================================================== */
+/*                         LEDS                                         */
+/* ==================================================================== */
+#define SH1_REAL_JUNK_BUS_LED0			 0x7fed00000UL
+#define SH1_REAL_JUNK_BUS_LED1			 0x7fed10000UL
+#define SH1_REAL_JUNK_BUS_LED2			 0x7fed20000UL
+#define SH1_REAL_JUNK_BUS_LED3			 0x7fed30000UL
+
+#define SH2_REAL_JUNK_BUS_LED0			 0xf0000000UL
+#define SH2_REAL_JUNK_BUS_LED1			 0xf0010000UL
+#define SH2_REAL_JUNK_BUS_LED2			 0xf0020000UL
+#define SH2_REAL_JUNK_BUS_LED3			 0xf0030000UL
+
+/* ==================================================================== */
 /*                         Register "SH1_PTC_0"                         */
 /*       Puge Translation Cache Message Configuration Information       */
 /* ==================================================================== */
@@ -410,6 +423,7 @@
 /* ==================================================================== */
 #define shubmmr(a,b) 		(is_shub2() ? a##2_##b : a##1_##b)
 
+#define SH_REAL_JUNK_BUS_LED0	shubmmr(SH, REAL_JUNK_BUS_LED0)
 #define SH_IPI_INT		shubmmr(SH, IPI_INT)
 #define SH_EVENT_OCCURRED	shubmmr(SH, EVENT_OCCURRED)
 #define SH_EVENT_OCCURRED_ALIAS	shubmmr(SH, EVENT_OCCURRED_ALIAS)

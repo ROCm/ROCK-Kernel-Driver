@@ -40,7 +40,6 @@
 #include <asm/sn/nodepda.h>
 #include <asm/sn/sn_cpuid.h>
 #include <asm/sn/simulator.h>
-#include "shub.h"
 #include <asm/sn/leds.h>
 #include <asm/sn/bte.h>
 #include <asm/sn/shub_mmr.h>
