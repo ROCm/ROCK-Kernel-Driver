@@ -41,6 +41,13 @@ VERSION 1.6LK	<2004/04/14>
 	- Suspend/resume
 	- Endianness
 	- Misc Rx/Tx bugs
+
+VERSION 2.2LK	<2005/01/25>
+
+	- RX csum, TX csum/SG, TSO
+	- VLAN
+	- baby (< 7200) Jumbo frames support
+	- Merge of Realtek's version 2.2 (new phy)
 */
 
 #include <linux/module.h>
@@ -62,7 +69,7 @@ VERSION 1.6LK	<2004/04/14>
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#define RTL8169_VERSION "1.6LK"
+#define RTL8169_VERSION "2.2LK"
 #define MODULENAME "r8169"
 #define PFX MODULENAME ": "
 
@@ -149,6 +156,7 @@ enum phy_version {
 	RTL_GIGA_PHY_VER_E = 0x05, /* PHY Reg 0x03 bit0-3 == 0x0000 */
 	RTL_GIGA_PHY_VER_F = 0x06, /* PHY Reg 0x03 bit0-3 == 0x0001 */
 	RTL_GIGA_PHY_VER_G = 0x07, /* PHY Reg 0x03 bit0-3 == 0x0002 */
+	RTL_GIGA_PHY_VER_H = 0x08, /* PHY Reg 0x03 bit0-3 == 0x0003 */
 };
 
 
@@ -162,7 +170,8 @@ const static struct {
 } rtl_chip_info[] = {
 	_R("RTL8169",		RTL_GIGA_MAC_VER_B, 0xff7e1880),
 	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_D, 0xff7e1880),
-	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_E, 0xff7e1880)
+	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_E, 0xff7e1880),
+	_R("RTL8169s/8110s",	RTL_GIGA_MAC_VER_X, 0xff7e1880),
 };
 #undef _R
 
@@ -208,6 +217,7 @@ enum RTL8169_registers {
 	PHYstatus = 0x6C,
 	RxMaxSize = 0xDA,
 	CPlusCmd = 0xE0,
+	IntrMitigate = 0xE2,
 	RxDescAddrLow = 0xE4,
 	RxDescAddrHigh = 0xE8,
 	EarlyTxThres = 0xEC,
@@ -407,7 +417,7 @@ struct rtl8169_private {
 	struct work_struct task;
 };
 
-MODULE_AUTHOR("Realtek");
+MODULE_AUTHOR("Realtek and the Linux r8169 crew <netdev@oss.sgi.com>");
 MODULE_DESCRIPTION("RealTek RTL-8169 Gigabit Ethernet driver");
 module_param_array(media, int, &num_media, 0);
 module_param(rx_copybreak, int, 0);
@@ -1002,13 +1012,25 @@ static void rtl8169_hw_phy_config(struct net_device *dev)
 
 	if (tp->mac_version <= RTL_GIGA_MAC_VER_B)
 		return;
-	if (tp->phy_version >= RTL_GIGA_PHY_VER_F) 
+	if (tp->phy_version >= RTL_GIGA_PHY_VER_H)
 		return;
 
 	dprintk("MAC version != 0 && PHY version == 0 or 1\n");
 	dprintk("Do final_reg2.cfg\n");
 
 	/* Shazam ! */
+
+	if (tp->mac_version == RTL_GIGA_MAC_VER_X) {
+		mdio_write(ioaddr, 31, 0x0001);
+		mdio_write(ioaddr,  9, 0x273a);
+		mdio_write(ioaddr, 14, 0x7bfb);
+		mdio_write(ioaddr, 27, 0x841e);
+
+		mdio_write(ioaddr, 31, 0x0002);
+		mdio_write(ioaddr,  1, 0x90d0);
+		mdio_write(ioaddr, 31, 0x0000);
+		return;
+	}
 
 	// phy config for RTL8169s mac_version C chip
 	mdio_write(ioaddr, 31, 0x0001);			//w 31 2 0 1
@@ -1038,7 +1060,7 @@ static void rtl8169_phy_timer(unsigned long __opaque)
 	unsigned long timeout = RTL8169_PHY_TIMEOUT;
 
 	assert(tp->mac_version > RTL_GIGA_MAC_VER_B);
-	assert(tp->phy_version < RTL_GIGA_PHY_VER_G);
+	assert(tp->phy_version < RTL_GIGA_PHY_VER_H);
 
 	if (!(tp->phy_1000_ctrl_reg & PHY_Cap_1000_Full))
 		return;
@@ -1073,7 +1095,7 @@ static inline void rtl8169_delete_timer(struct net_device *dev)
 	struct timer_list *timer = &tp->timer;
 
 	if ((tp->mac_version <= RTL_GIGA_MAC_VER_B) ||
-	    (tp->phy_version >= RTL_GIGA_PHY_VER_G))
+	    (tp->phy_version >= RTL_GIGA_PHY_VER_H))
 		return;
 
 	del_timer_sync(timer);
@@ -1085,7 +1107,7 @@ static inline void rtl8169_request_timer(struct net_device *dev)
 	struct timer_list *timer = &tp->timer;
 
 	if ((tp->mac_version <= RTL_GIGA_MAC_VER_B) ||
-	    (tp->phy_version >= RTL_GIGA_PHY_VER_G))
+	    (tp->phy_version >= RTL_GIGA_PHY_VER_H))
 		return;
 
 	init_timer(timer);
@@ -1563,12 +1585,19 @@ rtl8169_hw_start(struct net_device *dev)
 	tp->cp_cmd |= RTL_R16(CPlusCmd);
 	RTL_W16(CPlusCmd, tp->cp_cmd);
 
-	if (tp->mac_version == RTL_GIGA_MAC_VER_D) {
+	if ((tp->mac_version == RTL_GIGA_MAC_VER_D) ||
+	    (tp->mac_version == RTL_GIGA_MAC_VER_E)) {
 		dprintk(KERN_INFO PFX "Set MAC Reg C+CR Offset 0xE0. "
 			"Bit-3 and bit-14 MUST be 1\n");
 		tp->cp_cmd |= (1 << 14) | PCIMulRW;
 		RTL_W16(CPlusCmd, tp->cp_cmd);
 	}
+
+	/*
+	 * Undocumented corner. Supposedly:
+	 * (TxTimer << 12) | (TxPackets << 8) | (RxTimer << 4) | RxPackets
+	 */
+	RTL_W16(IntrMitigate, 0x0000);
 
 	RTL_W32(TxDescStartAddrLow, ((u64) tp->TxPhyAddr & DMA_32BIT_MASK));
 	RTL_W32(TxDescStartAddrHigh, ((u64) tp->TxPhyAddr >> 32));
