@@ -41,6 +41,7 @@
 #include <linux/config.h>
 #include <linux/slab.h>
 #include <linux/nfs_fs.h>
+#include <linux/nfs_idmap.h>
 #include <linux/workqueue.h>
 
 #define OPENOWNER_POOL_SIZE	8
@@ -124,6 +125,7 @@ nfs4_free_client(struct nfs4_client *clp)
 	BUG_ON(!list_empty(&clp->cl_state_owners));
 	if (clp->cl_cred)
 		put_rpccred(clp->cl_cred);
+	nfs_idmap_delete(clp);
 	if (clp->cl_rpcclient)
 		rpc_shutdown_client(clp->cl_rpcclient);
 	kfree(clp);

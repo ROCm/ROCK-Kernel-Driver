@@ -158,11 +158,6 @@ nfs_put_super(struct super_block *sb)
 {
 	struct nfs_server *server = NFS_SB(sb);
 
-#ifdef CONFIG_NFS_V4
-	if (server->idmap != NULL)
-		nfs_idmap_delete(server);
-#endif /* CONFIG_NFS_V4 */
-
 	nfs4_renewd_prepare_shutdown(server);
 
 	if (server->client != NULL)
@@ -1494,6 +1489,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		clp->cl_rpcclient = clnt;
 		clp->cl_cred = rpcauth_lookupcred(clnt->cl_auth, 0);
 		memcpy(clp->cl_ipaddr, server->ip_addr, sizeof(clp->cl_ipaddr));
+		nfs_idmap_new(clp);
 	}
 	if (list_empty(&clp->cl_superblocks))
 		clear_bit(NFS4CLNT_OK, &clp->cl_state);
@@ -1506,6 +1502,10 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if (clnt == NULL) {
 		printk(KERN_WARNING "NFS: cannot create RPC client.\n");
 		goto out_remove_list;
+	}
+	if (server->nfs4_state->cl_idmap == NULL) {
+		printk(KERN_WARNING "NFS: failed to create idmapper.\n");
+		goto out_shutdown;
 	}
 
 	clnt->cl_intr     = (server->flags & NFS4_MOUNT_INTR) ? 1 : 0;
@@ -1525,16 +1525,11 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 		goto out_shutdown;
 	}
 
-	if ((server->idmap = nfs_idmap_new(server)) == NULL)
-		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
-
 	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;
 	rpciod_down();
-	if (server->idmap != NULL)
-		nfs_idmap_delete(server);
 out_shutdown:
 	rpc_shutdown_client(server->client);
 out_remove_list:

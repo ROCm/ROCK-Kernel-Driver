@@ -88,23 +88,27 @@ static struct rpc_pipe_ops idmap_upcall_ops = {
         .destroy_msg    = idmap_pipe_destroy_msg,
 };
 
-void *
-nfs_idmap_new(struct nfs_server *server)
+void
+nfs_idmap_new(struct nfs4_client *clp)
 {
 	struct idmap *idmap;
 
+	if (clp->cl_idmap != NULL)
+		return;
         if ((idmap = kmalloc(sizeof(*idmap), GFP_KERNEL)) == NULL)
-                return (NULL);
+                return;
 
 	memset(idmap, 0, sizeof(*idmap));
 
 	snprintf(idmap->idmap_path, sizeof(idmap->idmap_path),
-	    "%s/idmap", server->client->cl_pathname);
+	    "%s/idmap", clp->cl_rpcclient->cl_pathname);
 
         idmap->idmap_dentry = rpc_mkpipe(idmap->idmap_path,
 	    idmap, &idmap_upcall_ops, 0);
-        if (IS_ERR(idmap->idmap_dentry))
-		goto err_free;
+        if (IS_ERR(idmap->idmap_dentry)) {
+		kfree(idmap);
+		return;
+	}
 
         init_MUTEX(&idmap->idmap_lock);
         init_MUTEX(&idmap->idmap_im_lock);
@@ -112,22 +116,18 @@ nfs_idmap_new(struct nfs_server *server)
 	idmap->idmap_user_hash.h_type = IDMAP_TYPE_USER;
 	idmap->idmap_group_hash.h_type = IDMAP_TYPE_GROUP;
 
-	return (idmap);
-
- err_free:
-	kfree(idmap);
-	return (NULL);
+	clp->cl_idmap = idmap;
 }
 
 void
-nfs_idmap_delete(struct nfs_server *server)
+nfs_idmap_delete(struct nfs4_client *clp)
 {
-	struct idmap *idmap = server->idmap;
+	struct idmap *idmap = clp->cl_idmap;
 
 	if (!idmap)
 		return;
 	rpc_unlink(idmap->idmap_path);
-	server->idmap = NULL;
+	clp->cl_idmap = NULL;
 	kfree(idmap);
 }
 
@@ -468,29 +468,29 @@ static unsigned int fnvhash32(const void *buf, size_t buflen)
 	return (hash);
 }
 
-int nfs_map_name_to_uid(struct nfs_server *server, const char *name, size_t namelen, __u32 *uid)
+int nfs_map_name_to_uid(struct nfs4_client *clp, const char *name, size_t namelen, __u32 *uid)
 {
-	struct idmap *idmap = server->idmap;
+	struct idmap *idmap = clp->cl_idmap;
 
 	return nfs_idmap_id(idmap, &idmap->idmap_user_hash, name, namelen, uid);
 }
 
-int nfs_map_group_to_gid(struct nfs_server *server, const char *name, size_t namelen, __u32 *uid)
+int nfs_map_group_to_gid(struct nfs4_client *clp, const char *name, size_t namelen, __u32 *uid)
 {
-	struct idmap *idmap = server->idmap;
+	struct idmap *idmap = clp->cl_idmap;
 
 	return nfs_idmap_id(idmap, &idmap->idmap_group_hash, name, namelen, uid);
 }
 
-int nfs_map_uid_to_name(struct nfs_server *server, __u32 uid, char *buf)
+int nfs_map_uid_to_name(struct nfs4_client *clp, __u32 uid, char *buf)
 {
-	struct idmap *idmap = server->idmap;
+	struct idmap *idmap = clp->cl_idmap;
 
 	return nfs_idmap_name(idmap, &idmap->idmap_user_hash, uid, buf);
 }
-int nfs_map_gid_to_group(struct nfs_server *server, __u32 uid, char *buf)
+int nfs_map_gid_to_group(struct nfs4_client *clp, __u32 uid, char *buf)
 {
-	struct idmap *idmap = server->idmap;
+	struct idmap *idmap = clp->cl_idmap;
 
 	return nfs_idmap_name(idmap, &idmap->idmap_group_hash, uid, buf);
 }

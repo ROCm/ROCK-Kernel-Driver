@@ -60,13 +60,13 @@ struct idmap_msg {
 };
 
 #ifdef __KERNEL__
-void      *nfs_idmap_new(struct nfs_server *);
-void       nfs_idmap_delete(struct nfs_server *);
+void nfs_idmap_new(struct nfs4_client *);
+void nfs_idmap_delete(struct nfs4_client *);
 
-int nfs_map_name_to_uid(struct nfs_server *, const char *, size_t, __u32 *);
-int nfs_map_group_to_gid(struct nfs_server *, const char *, size_t, __u32 *);
-int nfs_map_uid_to_name(struct nfs_server *, __u32, char *);
-int nfs_map_gid_to_group(struct nfs_server *, __u32, char *);
+int nfs_map_name_to_uid(struct nfs4_client *, const char *, size_t, __u32 *);
+int nfs_map_group_to_gid(struct nfs4_client *, const char *, size_t, __u32 *);
+int nfs_map_uid_to_name(struct nfs4_client *, __u32, char *);
+int nfs_map_gid_to_group(struct nfs4_client *, __u32, char *);
 #endif /* __KERNEL__ */
 
 #endif /* NFS_IDMAP_H */

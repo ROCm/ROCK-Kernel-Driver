@@ -438,6 +438,8 @@ extern void * nfs_root_data(void);
 
 #ifdef CONFIG_NFS_V4
 
+struct idmap;
+
 /*
  * In a seqid-mutating op, this macro controls which error return
  * values trigger incrementation of the seqid.
@@ -505,6 +507,9 @@ struct nfs4_client {
 
 	wait_queue_head_t	cl_waitq;
 	struct rpc_wait_queue	cl_rpcwaitq;
+
+	/* idmapper */
+	struct idmap *		cl_idmap;
 
 	/* Our own IP address, as a null-terminated string.
 	 * This is used to generate the clientid, and the callback address.

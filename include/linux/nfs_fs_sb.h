@@ -38,7 +38,6 @@ struct nfs_server {
 	struct list_head	nfs4_siblings;	/* List of other nfs_server structs
 						 * that share the same clientid
 						 */
-	void                   *idmap;
 #endif
 };
 
