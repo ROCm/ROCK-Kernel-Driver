@@ -365,15 +365,15 @@ static int __sctp_bindx(struct sock *sk, struct sockaddr_storage *addrs,
 
 	SCTP_DEBUG_PRINTK("__sctp_bindx(sk: %p, addrs: %p, addrcnt: %d, "
 			  "flags: %s)\n", sk, addrs, addrcnt,
-			  (BINDX_ADD_ADDR == flags) ? "ADD" :
-			  ((BINDX_REM_ADDR == flags) ? "REM" : "BOGUS"));
+			  (SCTP_BINDX_ADD_ADDR == flags) ? "ADD" :
+			  ((SCTP_BINDX_REM_ADDR == flags) ? "REM" : "BOGUS"));
 
 	switch (flags) {
-	case BINDX_ADD_ADDR:
+	case SCTP_BINDX_ADD_ADDR:
 		retval = sctp_bindx_add(sk, addrs, addrcnt);
 		break;
 
-	case BINDX_REM_ADDR:
+	case SCTP_BINDX_REM_ADDR:
 		retval = sctp_bindx_rem(sk, addrs, addrcnt);
 		break;
 
@@ -1431,7 +1431,7 @@ static int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	return 0;
 }
 
-/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+/* 7.1.13 Peer Address Parameters (SCTP_PEER_ADDR_PARAMS)
  *
  * Applications can enable or disable heartbeats for any peer address of
  * an association, modify an address's heartbeat interval, force a
@@ -1581,24 +1581,25 @@ static int sctp_setsockopt_default_send_param(struct sock *sk,
 	return 0;
 }
 
-/* 7.1.10 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
+/* 7.1.10 Set Peer Primary Address (SCTP_PRIMARY_ADDR)
  *
  * Requests that the local SCTP stack use the enclosed peer address as
  * the association primary.  The enclosed address must be one of the
  * association peer's addresses.
  */
-static int sctp_setsockopt_peer_prim(struct sock *sk, char *optval, int optlen)
+static int sctp_setsockopt_primary_addr(struct sock *sk, char *optval,
+					int optlen)
 {
-	struct sctp_setpeerprim prim;
+	struct sctp_prim prim;
 	struct sctp_transport *trans;
 
-	if (optlen != sizeof(struct sctp_setpeerprim))
+	if (optlen != sizeof(struct sctp_prim))
 		return -EINVAL;
 
-	if (copy_from_user(&prim, optval, sizeof(struct sctp_setpeerprim)))
+	if (copy_from_user(&prim, optval, sizeof(struct sctp_prim)))
 		return -EFAULT;
 
-	trans = sctp_addr_id2transport(sk, &prim.sspp_addr, prim.sspp_assoc_id);
+	trans = sctp_addr_id2transport(sk, &prim.ssp_addr, prim.ssp_assoc_id);
 	if (!trans)
 		return -EINVAL;
 
@@ -1692,8 +1693,8 @@ static int sctp_setsockopt_rtoinfo(struct sock *sk, char *optval, int optlen) {
  * See [SCTP] for more information.
  *
  */
-static int sctp_setsockopt_assocrtx(struct sock *sk, char *optval,
-				int optlen) {
+static int sctp_setsockopt_associnfo(struct sock *sk, char *optval, int optlen)
+{
 
 	struct sctp_assocparams assocparams;
 	struct sctp_association *asoc;
@@ -1804,7 +1805,6 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 				char *optval, int optlen)
 {
 	int retval = 0;
-	char *tmp;
 
 	SCTP_DEBUG_PRINTK("sctp_setsockopt(sk: %p... optname: %d)\n",
 			  sk, optname);
@@ -1824,38 +1824,25 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	sctp_lock_sock(sk);
 
 	switch (optname) {
-	case SCTP_SOCKOPT_DEBUG_NAME:
-		/* BUG! we don't ever seem to free this memory. --jgrimm */
-		if (NULL == (tmp = kmalloc(optlen + 1, GFP_KERNEL))) {
-			retval = -ENOMEM;
-			goto out_unlock;
-		}
-
-		if (copy_from_user(tmp, optval, optlen)) {
-			retval = -EFAULT;
-			goto out_unlock;
-		}
-		tmp[optlen] = '\000';
-		sctp_sk(sk)->ep->debug_name = tmp;
-		break;
-
 	case SCTP_SOCKOPT_BINDX_ADD:
 		/* 'optlen' is the size of the addresses buffer. */
 		retval = sctp_setsockopt_bindx(sk, (struct sockaddr_storage *)
-					       optval, optlen, BINDX_ADD_ADDR);
+					       optval, optlen,
+					       SCTP_BINDX_ADD_ADDR);
 		break;
 
 	case SCTP_SOCKOPT_BINDX_REM:
 		/* 'optlen' is the size of the addresses buffer. */
 		retval = sctp_setsockopt_bindx(sk, (struct sockaddr_storage *)
-					       optval, optlen, BINDX_REM_ADDR);
+					       optval, optlen,
+					       SCTP_BINDX_REM_ADDR);
 		break;
 
 	case SCTP_DISABLE_FRAGMENTS:
 		retval = sctp_setsockopt_disable_fragments(sk, optval, optlen);
 		break;
 
-	case SCTP_SET_EVENTS:
+	case SCTP_EVENTS:
 		retval = sctp_setsockopt_events(sk, optval, optlen);
 		break;
 
@@ -1863,19 +1850,19 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_setsockopt_autoclose(sk, optval, optlen);
 		break;
 
-	case SCTP_SET_PEER_ADDR_PARAMS:
+	case SCTP_PEER_ADDR_PARAMS:
 		retval = sctp_setsockopt_peer_addr_params(sk, optval, optlen);
 		break;
 
 	case SCTP_INITMSG:
 		retval = sctp_setsockopt_initmsg(sk, optval, optlen);
 		break;
-	case SCTP_SET_DEFAULT_SEND_PARAM:
+	case SCTP_DEFAULT_SEND_PARAM:
 		retval = sctp_setsockopt_default_send_param(sk, optval,
 							    optlen);
 		break;
-	case SCTP_SET_PEER_PRIMARY_ADDR:
-		retval = sctp_setsockopt_peer_prim(sk, optval, optlen);
+	case SCTP_PRIMARY_ADDR:
+		retval = sctp_setsockopt_primary_addr(sk, optval, optlen);
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
@@ -1883,8 +1870,8 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 	case SCTP_RTOINFO:
 		retval = sctp_setsockopt_rtoinfo(sk, optval, optlen);
 		break;
-	case SCTP_ASSOCRTXINFO:
-		retval = sctp_setsockopt_assocrtx(sk, optval, optlen);
+	case SCTP_ASSOCINFO:
+		retval = sctp_setsockopt_associnfo(sk, optval, optlen);
 		break;
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 		retval = sctp_setsockopt_mappedv4(sk, optval, optlen);
@@ -1897,7 +1884,6 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	};
 
-out_unlock:
 	sctp_release_sock(sk);
 
 out_nounlock:
@@ -2173,7 +2159,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	}
 
 	/* Default Peer Address Parameters.  These defaults can
-	 * be modified via SCTP_SET_PEER_ADDR_PARAMS
+	 * be modified via SCTP_PEER_ADDR_PARAMS
 	 */
 	sp->paddrparam.spp_hbinterval = (sctp_hb_interval / HZ) * 1000;
 	sp->paddrparam.spp_pathmaxrxt = sctp_max_retrans_path;
@@ -2418,12 +2404,13 @@ static int sctp_getsockopt_disable_fragments(struct sock *sk, int len,
 	return 0;
 }
 
-/* 7.1.15 Set notification and ancillary events (SCTP_SET_EVENTS)
+/* 7.1.15 Set notification and ancillary events (SCTP_EVENTS)
  *
  * This socket option is used to specify various notifications and
  * ancillary data the user wishes to receive.
  */
-static int sctp_getsockopt_set_events(struct sock *sk, int len, char *optval, int *optlen)
+static int sctp_getsockopt_events(struct sock *sk, int len, char *optval,
+				  int *optlen)
 {
 	if (len != sizeof(struct sctp_event_subscribe))
 		return -EINVAL;
@@ -2526,7 +2513,7 @@ out:
 	return retval;
 }
 
-/* 7.1.13 Peer Address Parameters (SCTP_SET_PEER_ADDR_PARAMS)
+/* 7.1.13 Peer Address Parameters (SCTP_PEER_ADDR_PARAMS)
  *
  * Applications can enable or disable heartbeats for any peer address of
  * an association, modify an address's heartbeat interval, force a
@@ -2776,35 +2763,35 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	return 0;
 }
 
-/* 7.1.10 Set Peer Primary Address (SCTP_SET_PEER_PRIMARY_ADDR)
+/* 7.1.10 Set Primary Address (SCTP_PRIMARY_ADDR)
  *
  * Requests that the local SCTP stack use the enclosed peer address as
  * the association primary.  The enclosed address must be one of the
  * association peer's addresses.
  */
-static int sctp_getsockopt_peer_prim(struct sock *sk, int len,
-				char *optval, int *optlen)
+static int sctp_getsockopt_primary_addr(struct sock *sk, int len,
+					char *optval, int *optlen)
 {
-	struct sctp_setpeerprim prim;
+	struct sctp_prim prim;
 	struct sctp_association *asoc;
 
-	if (len != sizeof(struct sctp_setpeerprim))
+	if (len != sizeof(struct sctp_prim))
 		return -EINVAL;
 
-	if (copy_from_user(&prim, optval, sizeof(struct sctp_setpeerprim)))
+	if (copy_from_user(&prim, optval, sizeof(struct sctp_prim)))
 		return -EFAULT;
 
-	asoc = sctp_id2assoc(sk, prim.sspp_assoc_id);
+	asoc = sctp_id2assoc(sk, prim.ssp_assoc_id);
 	if (!asoc)
 		return -EINVAL;
 
 	if (!asoc->peer.primary_path)
 		return -ENOTCONN;
 
-	memcpy(&prim.sspp_addr, &asoc->peer.primary_path->ipaddr,
+	memcpy(&prim.ssp_addr, &asoc->peer.primary_path->ipaddr,
 	       sizeof(union sctp_addr));
 
-	if (copy_to_user(optval, &prim, sizeof(struct sctp_setpeerprim)))
+	if (copy_to_user(optval, &prim, sizeof(struct sctp_prim)))
 		return -EFAULT;
 
 	return 0;
@@ -2952,8 +2939,9 @@ static int sctp_getsockopt_rtoinfo(struct sock *sk, int len, char *optval,
  * See [SCTP] for more information.
  *
  */
-static int sctp_getsockopt_assocrtx(struct sock *sk, int len, char *optval,
-				int *optlen) {
+static int sctp_getsockopt_associnfo(struct sock *sk, int len, char *optval,
+				     int *optlen)
+{
 
 	struct sctp_assocparams assocparams;
 	struct sctp_association *asoc;
@@ -3101,8 +3089,8 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_getsockopt_disable_fragments(sk, len, optval,
 							   optlen);
 		break;
-	case SCTP_SET_EVENTS:
-		retval = sctp_getsockopt_set_events(sk, len, optval, optlen);
+	case SCTP_EVENTS:
+		retval = sctp_getsockopt_events(sk, len, optval, optlen);
 		break;
 	case SCTP_AUTOCLOSE:
 		retval = sctp_getsockopt_autoclose(sk, len, optval, optlen);
@@ -3110,7 +3098,7 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_SOCKOPT_PEELOFF:
 		retval = sctp_getsockopt_peeloff(sk, len, optval, optlen);
 		break;
-	case SCTP_GET_PEER_ADDR_PARAMS:
+	case SCTP_PEER_ADDR_PARAMS:
 		retval = sctp_getsockopt_peer_addr_params(sk, len, optval,
 							  optlen);
 		break;
@@ -3133,12 +3121,12 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_getsockopt_local_addrs(sk, len, optval,
 						     optlen);
 		break;
-	case SCTP_SET_DEFAULT_SEND_PARAM:
+	case SCTP_DEFAULT_SEND_PARAM:
 		retval = sctp_getsockopt_default_send_param(sk, len,
 							    optval, optlen);
 		break;
-	case SCTP_SET_PEER_PRIMARY_ADDR:
-		retval = sctp_getsockopt_peer_prim(sk, len, optval, optlen);
+	case SCTP_PRIMARY_ADDR:
+		retval = sctp_getsockopt_primary_addr(sk, len, optval, optlen);
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_getsockopt_nodelay(sk, len, optval, optlen);
@@ -3146,8 +3134,8 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	case SCTP_RTOINFO:
 		retval = sctp_getsockopt_rtoinfo(sk, len, optval, optlen);
 		break;
-	case SCTP_ASSOCRTXINFO:
-		retval = sctp_getsockopt_assocrtx(sk, len, optval, optlen);
+	case SCTP_ASSOCINFO:
+		retval = sctp_getsockopt_associnfo(sk, len, optval, optlen);
 		break;
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 		retval = sctp_getsockopt_mappedv4(sk, len, optval, optlen);

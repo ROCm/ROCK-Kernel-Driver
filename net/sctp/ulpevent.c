@@ -727,7 +727,7 @@ struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 	const struct sctp_association *asoc, __u32 indication, int gfp)
 {
 	struct sctp_ulpevent *event;
-	struct sctp_rcv_pdapi_event *pd;
+	struct sctp_pdapi_event *pd;
 	struct sk_buff *skb;
 
 	event = sctp_ulpevent_new(sizeof(struct sctp_assoc_change),
@@ -736,8 +736,8 @@ struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 		goto fail;
 
 	skb = sctp_event2skb(event);
-	pd = (struct sctp_rcv_pdapi_event *)
-		skb_put(skb, sizeof(struct sctp_rcv_pdapi_event));
+	pd = (struct sctp_pdapi_event *)
+		skb_put(skb, sizeof(struct sctp_pdapi_event));
 
 	/* pdapi_type
 	 *   It should be SCTP_PARTIAL_DELIVERY_EVENT
@@ -752,9 +752,9 @@ struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
 	 *
 	 * This field is the total length of the notification data, including
 	 * the notification header.  It will generally be sizeof (struct
-	 * sctp_rcv_pdapi_event).
+	 * sctp_pdapi_event).
 	 */
-	pd->pdapi_length = sizeof(struct sctp_rcv_pdapi_event);
+	pd->pdapi_length = sizeof(struct sctp_pdapi_event);
 
         /*  pdapi_indication: 32 bits (unsigned integer)
 	 *
@@ -784,7 +784,7 @@ __u16 sctp_ulpevent_get_notification_type(const struct sctp_ulpevent *event)
 
 	skb = sctp_event2skb((struct sctp_ulpevent *)event);
 	notification = (union sctp_notification *) skb->data;
-	return notification->h.sn_type;
+	return notification->sn_header.sn_type;
 }
 
 /* Copy out the sndrcvinfo into a msghdr.  */

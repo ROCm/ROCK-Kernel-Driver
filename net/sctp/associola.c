@@ -556,12 +556,12 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
 		transport->active = SCTP_ACTIVE;
-		spc_state = ADDRESS_AVAILABLE;
+		spc_state = SCTP_ADDR_REACHABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
 		transport->active = SCTP_INACTIVE;
-		spc_state = ADDRESS_UNREACHABLE;
+		spc_state = SCTP_ADDR_UNREACHABLE;
 		break;
 
 	default:
