@@ -419,6 +419,9 @@ config HPET_TIMER
 
 	  Choose N to continue using the legacy 8254 timer.
 
+config HPET_EMULATE_RTC
+	def_bool HPET_TIMER && RTC=y
+
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---

@@ -137,7 +137,6 @@ static int rtc_ioctl(struct inode *inode, struct file *file,
 static unsigned int rtc_poll(struct file *file, poll_table *wait);
 #endif
 
-void get_rtc_time (struct rtc_time *rtc_tm);
 static void get_rtc_alm_time (struct rtc_time *alm_tm);
 #if RTC_IRQ
 static void rtc_dropped_irq(unsigned long data);
@@ -482,7 +481,7 @@ static int rtc_do_ioctl(unsigned int cmd, unsigned long arg, int kernel)
 	}
 	case RTC_RD_TIME:	/* Read the time/date from RTC	*/
 	{
-		get_rtc_time(&wtime);
+		rtc_get_rtc_time(&wtime);
 		break;
 	}
 	case RTC_SET_TIME:	/* Set the RTC */
@@ -1119,7 +1118,7 @@ static int rtc_proc_output (char *buf)
 
 	p = buf;
 
-	get_rtc_time(&tm);
+	rtc_get_rtc_time(&tm);
 
 	/*
 	 * There is no way to tell if the luser has the RTC set for local
@@ -1206,7 +1205,7 @@ static inline unsigned char rtc_is_updating(void)
 	return uip;
 }
 
-void get_rtc_time(struct rtc_time *rtc_tm)
+void rtc_get_rtc_time(struct rtc_time *rtc_tm)
 {
 	unsigned long uip_watchdog = jiffies;
 	unsigned char ctrl;
