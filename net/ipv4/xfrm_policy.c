@@ -1,16 +1,20 @@
-/* Changes
+/* 
+ * xfrm_policy.c
  *
- *	Mitsuru KANDA @USAGI       : IPv6 Support 
- * 	Kazunori MIYAZAWA @USAGI   :
- * 	Kunihiro Ishiguro          :
+ * Changes:
+ *	Mitsuru KANDA @USAGI
+ * 	Kazunori MIYAZAWA @USAGI
+ * 	Kunihiro Ishiguro
+ * 		IPv6 support
+ * 	Kazunori MIYAZAWA @USAGI
+ * 	YOSHIFUJI Hideaki
+ * 		Split up af-specific portion
  * 	
  */
 
 #include <linux/config.h>
 #include <net/xfrm.h>
 #include <net/ip.h>
-#include <net/ipv6.h>
-#include <net/ip6_route.h>
 
 DECLARE_MUTEX(xfrm_cfg_sem);
 
@@ -19,12 +23,10 @@ static rwlock_t xfrm_policy_lock = RW_LOCK_UNLOCKED;
 
 struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 
-extern struct dst_ops xfrm4_dst_ops;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-extern struct dst_ops xfrm6_dst_ops;
-#endif
+static rwlock_t xfrm_policy_afinfo_lock = RW_LOCK_UNLOCKED;
+static struct xfrm_policy_afinfo *xfrm_policy_afinfo[NPROTO];
 
-static inline int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, unsigned short family);
+kmem_cache_t *xfrm_dst_cache;
 
 /* Limited flow cache. Its function now is to accelerate search for
  * policy rules.
@@ -49,40 +51,8 @@ static kmem_cache_t *flow_cachep;
 
 struct flow_entry **flow_table;
 
-#define FLOWCACHE_HASH_SIZE	1024
-
-static inline u32 flow_hash(struct flowi *fl)
-{
-	u32 hash = fl->fl4_src ^ fl->uli_u.ports.sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl4_dst ^ fl->uli_u.ports.dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (FLOWCACHE_HASH_SIZE-1);
-}
-
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-static inline u32 flow_hash6(struct flowi *fl)
-{
-	u32 hash = fl->fl6_src->s6_addr32[2] ^
-		   fl->fl6_src->s6_addr32[3] ^ 
-		   fl->uli_u.ports.sport;
-
-	hash = ((hash & 0xF0F0F0F0) >> 4) | ((hash & 0x0F0F0F0F) << 4);
-
-	hash ^= fl->fl6_dst->s6_addr32[2] ^
-		fl->fl6_dst->s6_addr32[3] ^ 
-		fl->uli_u.ports.dport;
-	hash ^= (hash >> 10);
-	hash ^= (hash >> 20);
-	return hash & (FLOWCACHE_HASH_SIZE-1);
-}
-#endif
-
-static int flow_lwm = 2*FLOWCACHE_HASH_SIZE;
-static int flow_hwm = 4*FLOWCACHE_HASH_SIZE;
+static int flow_lwm = 2*XFRM_FLOWCACHE_HASH_SIZE;
+static int flow_hwm = 4*XFRM_FLOWCACHE_HASH_SIZE;
 
 static int flow_number[NR_CPUS] __cacheline_aligned;
 
@@ -92,11 +62,11 @@ static void flow_cache_shrink(int cpu)
 {
 	int i;
 	struct flow_entry *fle, **flp;
-	int shrink_to = flow_lwm/FLOWCACHE_HASH_SIZE;
+	int shrink_to = flow_lwm/XFRM_FLOWCACHE_HASH_SIZE;
 
-	for (i=0; i<FLOWCACHE_HASH_SIZE; i++) {
+	for (i=0; i<XFRM_FLOWCACHE_HASH_SIZE; i++) {
 		int k = 0;
-		flp = &flow_table[cpu*FLOWCACHE_HASH_SIZE+i];
+		flp = &flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+i];
 		while ((fle=*flp) != NULL && k<shrink_to) {
 			k++;
 			flp = &fle->next;
@@ -118,23 +88,12 @@ struct xfrm_policy *flow_lookup(int dir, struct flowi *fl,
 	u32 hash;
 	int cpu;
 
-	switch (family) {
-	case AF_INET:
-		hash = flow_hash(fl);
-		break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-	case AF_INET6:
-		hash = flow_hash6(fl);
-		break;
-#endif
-	default:
-		return NULL;
-	}
+	hash = flow_hash(fl, family);
 
 	local_bh_disable();
 	cpu = smp_processor_id();
 
-	for (fle = flow_table[cpu*FLOWCACHE_HASH_SIZE+hash];
+	for (fle = flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash];
 	     fle; fle = fle->next) {
 		if (memcmp(fl, &fle->fl, sizeof(fle->fl)) == 0 &&
 		    fle->dir == dir) {
@@ -172,8 +131,8 @@ struct xfrm_policy *flow_lookup(int dir, struct flowi *fl,
 			fle->pol = pol;
 			if (pol)
 				atomic_inc(&pol->refcnt);
-			fle->next = flow_table[cpu*FLOWCACHE_HASH_SIZE+hash];
-			flow_table[cpu*FLOWCACHE_HASH_SIZE+hash] = fle;
+			fle->next = flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash];
+			flow_table[cpu*XFRM_FLOWCACHE_HASH_SIZE+hash] = fle;
 		}
 	}
 	local_bh_enable();
@@ -193,7 +152,7 @@ void __init flow_cache_init(void)
 		panic("NET: failed to allocate flow cache slab\n");
 
 	for (order = 0;
-	     (PAGE_SIZE<<order) < (NR_CPUS*sizeof(struct flow_entry *)*FLOWCACHE_HASH_SIZE);
+	     (PAGE_SIZE<<order) < (NR_CPUS*sizeof(struct flow_entry *)*XFRM_FLOWCACHE_HASH_SIZE);
 	     order++)
 		/* NOTHING */;
 
@@ -205,129 +164,81 @@ void __init flow_cache_init(void)
 	memset(flow_table, 0, PAGE_SIZE<<order);
 }
 
-static struct xfrm_type *xfrm_type_map[256];
-static rwlock_t xfrm_type_lock = RW_LOCK_UNLOCKED;
-
-int xfrm_register_type(struct xfrm_type *type)
+int xfrm_register_type(struct xfrm_type *type, unsigned short family)
 {
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	struct xfrm_type_map *typemap;
 	int err = 0;
 
-	write_lock(&xfrm_type_lock);
-	if (xfrm_type_map[type->proto] == NULL)
-		xfrm_type_map[type->proto] = type;
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
+	typemap = afinfo->type_map;
+
+	write_lock(&typemap->lock);
+	if (likely(typemap->map[type->proto] == NULL))
+		typemap->map[type->proto] = type;
 	else
 		err = -EEXIST;
-	write_unlock(&xfrm_type_lock);
+	write_unlock(&typemap->lock);
+	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
 
-int xfrm_unregister_type(struct xfrm_type *type)
+int xfrm_unregister_type(struct xfrm_type *type, unsigned short family)
 {
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	struct xfrm_type_map *typemap;
 	int err = 0;
 
-	write_lock(&xfrm_type_lock);
-	if (xfrm_type_map[type->proto] != type)
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
+	typemap = afinfo->type_map;
+
+	write_lock(&typemap->lock);
+	if (unlikely(typemap->map[type->proto] != type))
 		err = -ENOENT;
 	else
-		xfrm_type_map[type->proto] = NULL;
-	write_unlock(&xfrm_type_lock);
+		typemap->map[type->proto] = NULL;
+	write_unlock(&typemap->lock);
+	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
 
-struct xfrm_type *xfrm_get_type(u8 proto)
+struct xfrm_type *xfrm_get_type(u8 proto, unsigned short family)
 {
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	struct xfrm_type_map *typemap;
 	struct xfrm_type *type;
 
-	read_lock(&xfrm_type_lock);
-	type = xfrm_type_map[proto];
-	if (type && !try_module_get(type->owner))
+	if (unlikely(afinfo == NULL))
+		return NULL;
+	typemap = afinfo->type_map;
+
+	read_lock(&typemap->lock);
+	type = typemap->map[proto];
+	if (unlikely(type && !try_module_get(type->owner)))
 		type = NULL;
-	read_unlock(&xfrm_type_lock);
+	read_unlock(&typemap->lock);
+	xfrm_policy_put_afinfo(afinfo);
 	return type;
 }
 
-static  xfrm_dst_lookup_t *__xfrm_dst_lookup[AF_MAX];
-rwlock_t xdl_lock = RW_LOCK_UNLOCKED;
-
-int xfrm_dst_lookup_register(xfrm_dst_lookup_t *dst_lookup, 
-			     unsigned short family)
+int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, 
+		    unsigned short family)
 {
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
 	int err = 0;
 
-	write_lock(&xdl_lock);
-	if (__xfrm_dst_lookup[family])
-		err = -ENOBUFS;
-	else { 
-		__xfrm_dst_lookup[family] = dst_lookup;
-	}
-	write_unlock(&xdl_lock);
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
 
-	return err;
-}
-
-void xfrm_dst_lookup_unregister(unsigned short family)
-{
-	write_lock(&xdl_lock);
-	if (__xfrm_dst_lookup[family])
-		__xfrm_dst_lookup[family] = 0;
-	write_unlock(&xdl_lock);
-}
-
-static inline int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl, 
-				  unsigned short family)
-{
-	int err = 0;
-	read_lock(&xdl_lock);
-	if (__xfrm_dst_lookup[family])
-		err = __xfrm_dst_lookup[family](dst, fl);
+	if (likely(afinfo->dst_lookup != NULL))
+		err = afinfo->dst_lookup(dst, fl);
 	else
 		err = -EINVAL;
-	read_unlock(&xdl_lock);
+	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-static struct xfrm_type *xfrm6_type_map[256];
-static rwlock_t xfrm6_type_lock = RW_LOCK_UNLOCKED;
-
-int xfrm6_register_type(struct xfrm_type *type)
-{
-	int err = 0;
-
-	write_lock(&xfrm6_type_lock);
-	if (xfrm6_type_map[type->proto] == NULL)
-		xfrm6_type_map[type->proto] = type;
-	else
-		err = -EEXIST;
-	write_unlock(&xfrm6_type_lock);
-	return err;
-}
-
-int xfrm6_unregister_type(struct xfrm_type *type)
-{
-	int err = 0;
-
-	write_lock(&xfrm6_type_lock);
-	if (xfrm6_type_map[type->proto] != type)
-		err = -ENOENT;
-	else
-		xfrm6_type_map[type->proto] = NULL;
-	write_unlock(&xfrm6_type_lock);
-	return err;
-}
-
-struct xfrm_type *xfrm6_get_type(u8 proto)
-{
-	struct xfrm_type *type;
-
-	read_lock(&xfrm6_type_lock);
-	type = xfrm6_type_map[proto];
-	if (type && !try_module_get(type->owner))
-		type = NULL;
-	read_unlock(&xfrm6_type_lock);
-	return type;
-}
-#endif /* CONFIG_IPV6 || CONFIG_IPV6_MODULE */
 
 void xfrm_put_type(struct xfrm_type *type)
 {
@@ -608,18 +519,7 @@ struct xfrm_policy *xfrm_policy_lookup(int dir, struct flowi *fl,
 		if (pol->family != family)
 			continue;
 
-		switch (family) {
-		case AF_INET:
-			match = xfrm4_selector_match(sel, fl);
-			break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			match = xfrm6_selector_match(sel, fl);
-			break;
-#endif
-		default:
-			match = 0;
-		}
+		match = xfrm_selector_match(sel, fl, family);
 		if (match) {
 			atomic_inc(&pol->refcnt);
 			break;
@@ -637,18 +537,7 @@ struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi
 	if ((pol = sk->policy[dir]) != NULL) {
 		int match;
 
-		switch (sk->family) {
-		case AF_INET:
-			match = xfrm4_selector_match(&pol->selector, fl);
-			break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			match = xfrm6_selector_match(&pol->selector, fl);
-			break;
-#endif
-		default:
-			match = 0;
-		}
+		match = xfrm_selector_match(&pol->selector, fl, sk->family);
 		if (match)
 			atomic_inc(&pol->refcnt);
 		else
@@ -750,26 +639,27 @@ void __xfrm_sk_free_policy(struct xfrm_policy *pol, int dir)
 /* Resolve list of templates for the flow, given policy. */
 
 static int
-xfrm4_tmpl_resolve(struct xfrm_policy *policy, struct flowi *fl,
-		   struct xfrm_state **xfrm)
+xfrm_tmpl_resolve(struct xfrm_policy *policy, struct flowi *fl,
+		  struct xfrm_state **xfrm,
+		  unsigned short family)
 {
 	int nx;
 	int i, error;
-	u32 daddr = fl->fl4_dst;
-	u32 saddr = fl->fl4_src;
+	xfrm_address_t *daddr = xfrm_flowi_daddr(fl, family);
+	xfrm_address_t *saddr = xfrm_flowi_saddr(fl, family);
 
 	for (nx=0, i = 0; i < policy->xfrm_nr; i++) {
 		struct xfrm_state *x;
-		u32 remote = daddr;
-		u32 local = saddr;
+		xfrm_address_t *remote = daddr;
+		xfrm_address_t *local  = saddr;
 		struct xfrm_tmpl *tmpl = &policy->xfrm_vec[i];
 
 		if (tmpl->mode) {
-			remote = tmpl->id.daddr.xfrm4_addr;
-			local = tmpl->saddr.xfrm4_addr;
+			remote = &tmpl->id.daddr;
+			local = &tmpl->saddr;
 		}
 
-		x = xfrm4_state_find(remote, local, fl, tmpl, policy, &error);
+		x = xfrm_state_find(remote, local, fl, tmpl, policy, &error, family);
 
 		if (x && x->km.state == XFRM_STATE_VALID) {
 			xfrm[nx++] = x;
@@ -793,92 +683,22 @@ fail:
 		xfrm_state_put(xfrm[nx]);
 	return error;
 }
-
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-static int
-xfrm6_tmpl_resolve(struct xfrm_policy *policy, struct flowi *fl,
-		  struct xfrm_state **xfrm)
-{
-	int nx;
-	int i, error;
-	struct in6_addr *daddr = fl->fl6_dst;
-	struct in6_addr *saddr = fl->fl6_src;
-
-	for (nx=0, i = 0; i < policy->xfrm_nr; i++) {
-		struct xfrm_state *x=NULL;
-		struct in6_addr *remote = daddr;
-		struct in6_addr *local = saddr;
-		struct xfrm_tmpl *tmpl = &policy->xfrm_vec[i];
-
-		if (tmpl->mode) {
-			remote = (struct in6_addr*)&tmpl->id.daddr;
-			local = (struct in6_addr*)&tmpl->saddr;
-		}
-
-		x = xfrm6_state_find(remote, local, fl, tmpl, policy, &error);
-
-		if (x && x->km.state == XFRM_STATE_VALID) {
-			xfrm[nx++] = x;
-			daddr = remote;
-			saddr = local;
-			continue;
-		}
-		if (x) {
-			error = (x->km.state == XFRM_STATE_ERROR ?
-				 -EINVAL : -EAGAIN);
-			xfrm_state_put(x);
-		}
-
-		if (!tmpl->optional)
-			goto fail;
-	}
-	return nx;
-
-fail:
-	for (nx--; nx>=0; nx--)
-		xfrm_state_put(xfrm[nx]);
-	return error;
-}
-#endif
 
 /* Check that the bundle accepts the flow and its components are
  * still valid.
  */
 
-static int xfrm_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
+static struct dst_entry *
+xfrm_find_bundle(struct flowi *fl, struct rtable *rt, struct xfrm_policy *policy, unsigned short family)
 {
-	do {
-		if (xdst->u.dst.ops != &xfrm4_dst_ops)
-			return 1;
-
-		if (!xfrm4_selector_match(&xdst->u.dst.xfrm->sel, fl))
-			return 0;
-		if (xdst->u.dst.xfrm->km.state != XFRM_STATE_VALID ||
-		    xdst->u.dst.path->obsolete > 0)
-			return 0;
-		xdst = (struct xfrm_dst*)xdst->u.dst.child;
-	} while (xdst);
-	return 0;
+	struct dst_entry *x;
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	if (unlikely(afinfo == NULL))
+		return ERR_PTR(-EINVAL);
+	x = afinfo->find_bundle(fl, rt, policy);
+	xfrm_policy_put_afinfo(afinfo);
+	return x;
 }
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-static int xfrm6_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
-{
-	do {
-		if (xdst->u.dst.ops != &xfrm6_dst_ops)
-			return 1;
-
-		if (!xfrm6_selector_match(&xdst->u.dst.xfrm->sel, fl))
-			return 0;
-		if (xdst->u.dst.xfrm->km.state != XFRM_STATE_VALID ||
-		    xdst->u.dst.path->obsolete > 0)
-			return 0;
-		xdst = (struct xfrm_dst*)xdst->u.dst.child;
-	} while (xdst);
-	return 0;
-}
-#endif
-
 
 /* Allocate chain of dst_entry's, attach known xfrm's, calculate
  * all the metrics... Shortly, bundle a bundle.
@@ -886,194 +706,17 @@ static int xfrm6_bundle_ok(struct xfrm_dst *xdst, struct flowi *fl)
 
 static int
 xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
-		   struct flowi *fl, struct dst_entry **dst_p)
+		   struct flowi *fl, struct dst_entry **dst_p,
+		   unsigned short family)
 {
-	struct dst_entry *dst, *dst_prev;
-	struct rtable *rt0 = (struct rtable*)(*dst_p);
-	struct rtable *rt = rt0;
-	u32 remote = fl->fl4_dst;
-	u32 local  = fl->fl4_src;
-	int i;
 	int err;
-	int header_len = 0;
-	int trailer_len = 0;
-
-	dst = dst_prev = NULL;
-
-	for (i = 0; i < nx; i++) {
-		struct dst_entry *dst1 = dst_alloc(&xfrm4_dst_ops);
-
-		if (unlikely(dst1 == NULL)) {
-			err = -ENOBUFS;
-			goto error;
-		}
-
-		dst1->xfrm = xfrm[i];
-		if (!dst)
-			dst = dst1;
-		else {
-			dst_prev->child = dst1;
-			dst1->flags |= DST_NOHASH;
-			dst_hold(dst1);
-		}
-		dst_prev = dst1;
-		if (xfrm[i]->props.mode) {
-			remote = xfrm[i]->id.daddr.xfrm4_addr;
-			local  = xfrm[i]->props.saddr.xfrm4_addr;
-		}
-		header_len += xfrm[i]->props.header_len;
-		trailer_len += xfrm[i]->props.trailer_len;
-	}
-
-	if (remote != fl->fl4_dst) {
-		struct flowi fl_tunnel = { .nl_u = { .ip4_u =
-						     { .daddr = remote,
-						       .saddr = local }
-					           }
-				         };
-		err = xfrm_dst_lookup((struct xfrm_dst**)&rt, &fl_tunnel, AF_INET);
-		if (err)
-			goto error;
-	} else {
-		dst_hold(&rt->u.dst);
-	}
-	dst_prev->child = &rt->u.dst;
-	for (dst_prev = dst; dst_prev != &rt->u.dst; dst_prev = dst_prev->child) {
-		struct xfrm_dst *x = (struct xfrm_dst*)dst_prev;
-		x->u.rt.fl = *fl;
-
-		dst_prev->dev = rt->u.dst.dev;
-		if (rt->u.dst.dev)
-			dev_hold(rt->u.dst.dev);
-		dst_prev->obsolete	= -1;
-		dst_prev->flags	       |= DST_HOST;
-		dst_prev->lastuse	= jiffies;
-		dst_prev->header_len	= header_len;
-		dst_prev->trailer_len	= trailer_len;
-		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
-		dst_prev->path		= &rt->u.dst;
-
-		/* Copy neighbout for reachability confirmation */
-		dst_prev->neighbour	= neigh_clone(rt->u.dst.neighbour);
-		dst_prev->input		= rt->u.dst.input;
-		dst_prev->output	= dst_prev->xfrm->type->output;
-		if (rt->peer)
-			atomic_inc(&rt->peer->refcnt);
-		x->u.rt.peer = rt->peer;
-		/* Sheit... I remember I did this right. Apparently,
-		 * it was magically lost, so this code needs audit */
-		x->u.rt.rt_flags = rt0->rt_flags&(RTCF_BROADCAST|RTCF_MULTICAST|RTCF_LOCAL);
-		x->u.rt.rt_type = rt->rt_type;
-		x->u.rt.rt_src = rt0->rt_src;
-		x->u.rt.rt_dst = rt0->rt_dst;
-		x->u.rt.rt_gateway = rt->rt_gateway;
-		x->u.rt.rt_spec_dst = rt0->rt_spec_dst;
-		header_len -= x->u.dst.xfrm->props.header_len;
-		trailer_len -= x->u.dst.xfrm->props.trailer_len;
-	}
-	*dst_p = dst;
-	return 0;
-
-error:
-	if (dst)
-		dst_free(dst);
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+	err = afinfo->bundle_create(policy, xfrm, nx, fl, dst_p);
+	xfrm_policy_put_afinfo(afinfo);
 	return err;
 }
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-static int
-xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
-		   struct flowi *fl, struct dst_entry **dst_p)
-{
-	struct dst_entry *dst, *dst_prev;
-	struct rt6_info *rt0 = (struct rt6_info*)(*dst_p);
-	struct rt6_info *rt  = rt0;
-	struct in6_addr *remote = fl->fl6_dst;
-	struct in6_addr *local  = fl->fl6_src;
-	int i;
-	int err = 0;
-	int header_len = 0;
-	int trailer_len = 0;
-
-	dst = dst_prev = NULL;
-
-	for (i = 0; i < nx; i++) {
-		struct dst_entry *dst1 = dst_alloc(&xfrm6_dst_ops);
-
-		if (unlikely(dst1 == NULL)) {
-			err = -ENOBUFS;
-			goto error;
-		}
-
-		dst1->xfrm = xfrm[i];
-		if (!dst)
-			dst = dst1;
-		else {
-			dst_prev->child = dst1;
-			dst1->flags |= DST_NOHASH;
-			dst_clone(dst1);
-		}
-		dst_prev = dst1;
-		if (xfrm[i]->props.mode) {
-			remote = (struct in6_addr*)&xfrm[i]->id.daddr;
-			local  = (struct in6_addr*)&xfrm[i]->props.saddr;
-		}
-		header_len += xfrm[i]->props.header_len;
-		trailer_len += xfrm[i]->props.trailer_len;
-	}
-
-	if (ipv6_addr_cmp(remote, fl->fl6_dst)) {
-		struct flowi fl_tunnel = { .nl_u = { .ip6_u =
-						     { .daddr = remote,
-						       .saddr = local }
-					           }
-				         };
-		err = xfrm_dst_lookup((struct xfrm_dst**)&dst, &fl_tunnel, AF_INET6);
-		if (err)
-			goto error;
-	} else {
-		dst_clone(&rt->u.dst);
-	}
-	dst_prev->child = &rt->u.dst;
-	for (dst_prev = dst; dst_prev != &rt->u.dst; dst_prev = dst_prev->child) {
-		struct xfrm_dst *x = (struct xfrm_dst*)dst_prev;
-		x->u.rt.fl = *fl;
-
-		dst_prev->dev = rt->u.dst.dev;
-		if (rt->u.dst.dev)
-			dev_hold(rt->u.dst.dev);
-		dst_prev->obsolete	= -1;
-		dst_prev->flags	       |= DST_HOST;
-		dst_prev->lastuse	= jiffies;
-		dst_prev->header_len	= header_len;
-		dst_prev->trailer_len	= trailer_len;
-		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
-		dst_prev->path		= &rt->u.dst;
-
-		/* Copy neighbout for reachability confirmation */
-		dst_prev->neighbour	= neigh_clone(rt->u.dst.neighbour);
-		dst_prev->input		= rt->u.dst.input;
-		dst_prev->output	= dst_prev->xfrm->type->output;
-		/* Sheit... I remember I did this right. Apparently,
-		 * it was magically lost, so this code needs audit */
-		x->u.rt6.rt6i_flags    = rt0->rt6i_flags&(RTCF_BROADCAST|RTCF_MULTICAST|RTCF_LOCAL);
-		x->u.rt6.rt6i_metric   = rt0->rt6i_metric;
-		x->u.rt6.rt6i_node     = rt0->rt6i_node;
-		x->u.rt6.rt6i_hoplimit = rt0->rt6i_hoplimit;
-		x->u.rt6.rt6i_gateway  = rt0->rt6i_gateway;
-		memcpy(&x->u.rt6.rt6i_gateway, &rt0->rt6i_gateway, sizeof(x->u.rt6.rt6i_gateway)); 
-		header_len -= x->u.dst.xfrm->props.header_len;
-		trailer_len -= x->u.dst.xfrm->props.trailer_len;
-	}
-	*dst_p = dst;
-	return 0;
-
-error:
-	if (dst)
-		dst_free(dst);
-	return err;
-}
-#endif
 
 /* Main function: finds/creates a bundle for given flow.
  *
@@ -1141,45 +784,16 @@ restart:
 		 * LATER: help from flow cache. It is optional, this
 		 * is required only for output policy.
 		 */
-		if (family == AF_INET) {
-			read_lock_bh(&policy->lock);
-			for (dst = policy->bundles; dst; dst = dst->next) {
-				struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
-				if (xdst->u.rt.fl.fl4_dst == fl->fl4_dst &&
-				    xdst->u.rt.fl.fl4_src == fl->fl4_src &&
-				    xdst->u.rt.fl.oif == fl->oif &&
-				    xfrm_bundle_ok(xdst, fl)) {
-					dst_clone(dst);
-					break;
-				}
-			}
-			read_unlock_bh(&policy->lock);
-			if (dst)
-				break;
-			nx = xfrm4_tmpl_resolve(policy, fl, xfrm);
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-		} else if (family == AF_INET6) {
-			read_lock_bh(&policy->lock);
-			for (dst = policy->bundles; dst; dst = dst->next) {
-				struct xfrm_dst *xdst = (struct xfrm_dst*)dst;
-				if (!ipv6_addr_cmp(&xdst->u.rt6.rt6i_dst.addr, fl->fl6_dst) &&
-				    !ipv6_addr_cmp(&xdst->u.rt6.rt6i_src.addr, fl->fl6_src) &&
-				    xfrm6_bundle_ok(xdst, fl)) {
-					dst_clone(dst);
-					break;
-				}
-			}
-			read_unlock_bh(&policy->lock);
-			if (dst)
-				break;
-			nx = xfrm6_tmpl_resolve(policy, fl, xfrm);
-#endif
-		} else {
-			return -EINVAL;
+		dst = xfrm_find_bundle(fl, rt, policy, family);
+		if (IS_ERR(dst)) {
+			xfrm_pol_put(policy);
+			return PTR_ERR(dst);
 		}
 
 		if (dst)
 			break;
+
+		nx = xfrm_tmpl_resolve(policy, fl, xfrm, family);
 
 		if (unlikely(nx<0)) {
 			err = nx;
@@ -1191,18 +805,7 @@ restart:
 
 				__set_task_state(tsk, TASK_INTERRUPTIBLE);
 				add_wait_queue(&km_waitq, &wait);
-				switch (family) {
-				case AF_INET:
-					err = xfrm4_tmpl_resolve(policy, fl, xfrm);
-					break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-				case AF_INET6:
-					err = xfrm6_tmpl_resolve(policy, fl, xfrm);
-					break;
-#endif
-				default:
-					err = -EINVAL;
-				}
+				err = xfrm_tmpl_resolve(policy, fl, xfrm, family);
 				if (err == -EAGAIN)
 					schedule();
 				__set_task_state(tsk, TASK_RUNNING);
@@ -1225,19 +828,8 @@ restart:
 		}
 
 		dst = &rt->u.dst;
-		switch (family) {
-		case AF_INET:
-			err = xfrm_bundle_create(policy, xfrm, nx, fl, &dst);
-			break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			err = xfrm6_bundle_create(policy, xfrm, nx, fl, &dst);
-			break;
-#endif
-		default:
-			err = -EINVAL;
-		}
-			
+		err = xfrm_bundle_create(policy, xfrm, nx, fl, &dst, family);
+
 		if (unlikely(err)) {
 			int i;
 			for (i=0; i<nx; i++)
@@ -1282,137 +874,39 @@ error:
  */
 
 static inline int
-xfrm_state_ok(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
+xfrm_state_ok(struct xfrm_tmpl *tmpl, struct xfrm_state *x, 
+	      unsigned short family)
 {
 	return	x->id.proto == tmpl->id.proto &&
 		(x->id.spi == tmpl->id.spi || !tmpl->id.spi) &&
 		x->props.mode == tmpl->mode &&
 		(tmpl->aalgos & (1<<x->props.aalgo)) &&
-		(!x->props.mode || !tmpl->saddr.xfrm4_addr ||
-		 tmpl->saddr.xfrm4_addr == x->props.saddr.xfrm4_addr);
+		!(x->props.mode && xfrm_state_addr_cmp(tmpl, x, family));
 }
 
 static inline int
-xfrm_policy_ok(struct xfrm_tmpl *tmpl, struct sec_path *sp, int idx)
+xfrm_policy_ok(struct xfrm_tmpl *tmpl, struct sec_path *sp, int idx,
+	       unsigned short family)
 {
 	for (; idx < sp->len; idx++) {
-		if (xfrm_state_ok(tmpl, sp->xvec[idx]))
+		if (xfrm_state_ok(tmpl, sp->xvec[idx], family))
 			return ++idx;
 	}
 	return -1;
 }
 
-static void
-_decode_session4(struct sk_buff *skb, struct flowi *fl)
+static int
+_decode_session(struct sk_buff *skb, struct flowi *fl, unsigned short family)
 {
-	struct iphdr *iph = skb->nh.iph;
-	u8 *xprth = skb->nh.raw + iph->ihl*4;
+	struct xfrm_policy_afinfo *afinfo = xfrm_policy_get_afinfo(family);
 
-	if (!(iph->frag_off & htons(IP_MF | IP_OFFSET))) {
-		switch (iph->protocol) {
-		case IPPROTO_UDP:
-		case IPPROTO_TCP:
-		case IPPROTO_SCTP:
-			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
-				u16 *ports = (u16 *)xprth;
+	if (unlikely(afinfo == NULL))
+		return -EAFNOSUPPORT;
 
-				fl->uli_u.ports.sport = ports[0];
-				fl->uli_u.ports.dport = ports[1];
-			}
-			break;
-
-		case IPPROTO_ESP:
-			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
-				u32 *ehdr = (u32 *)xprth;
-
-				fl->uli_u.spi = ehdr[0];
-			}
-			break;
-
-		case IPPROTO_AH:
-			if (pskb_may_pull(skb, xprth + 8 - skb->data)) {
-				u32 *ah_hdr = (u32*)xprth;
-
-				fl->uli_u.spi = ah_hdr[1];
-			}
-			break;
-
-		default:
-			fl->uli_u.spi = 0;
-			break;
-		};
-	} else {
-		memset(fl, 0, sizeof(struct flowi));
-	}
-	fl->proto = iph->protocol;
-	fl->fl4_dst = iph->daddr;
-	fl->fl4_src = iph->saddr;
+	afinfo->decode_session(skb, fl);
+	xfrm_policy_put_afinfo(afinfo);
+	return 0;
 }
-
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-static inline int
-xfrm6_state_ok(struct xfrm_tmpl *tmpl, struct xfrm_state *x)
-{
-	return	x->id.proto == tmpl->id.proto &&
-		(x->id.spi == tmpl->id.spi || !tmpl->id.spi) &&
-		x->props.mode == tmpl->mode &&
-		(tmpl->aalgos & (1<<x->props.aalgo)) &&
-		(!x->props.mode || !ipv6_addr_any((struct in6_addr*)&x->props.saddr) ||
-		 !ipv6_addr_cmp((struct in6_addr *)&tmpl->saddr, (struct in6_addr*)&x->props.saddr));
-}
-
-static inline int
-xfrm6_policy_ok(struct xfrm_tmpl *tmpl, struct sec_path *sp, int idx)
-{
-	for (; idx < sp->len; idx++) {
-		if (xfrm6_state_ok(tmpl, sp->xvec[idx]))
-			return ++idx;
-	}
-	return -1;
-}
-
-static inline void
-_decode_session6(struct sk_buff *skb, struct flowi *fl)
-{
-	u16 offset = sizeof(struct ipv6hdr);
-	struct ipv6hdr *hdr = skb->nh.ipv6h;
-	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
-	u8 nexthdr = skb->nh.ipv6h->nexthdr;
-
-	fl->fl6_dst = &hdr->daddr;
-	fl->fl6_src = &hdr->saddr;
-
-	while (pskb_may_pull(skb, skb->nh.raw + offset + 1 - skb->data)) {
-		switch (nexthdr) {
-		case NEXTHDR_ROUTING:
-		case NEXTHDR_HOP:
-		case NEXTHDR_DEST:
-			offset += ipv6_optlen(exthdr);
-			nexthdr = exthdr->nexthdr;
-			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
-			break;
-
-		case IPPROTO_UDP:
-		case IPPROTO_TCP:
-		case IPPROTO_SCTP:
-			if (pskb_may_pull(skb, skb->nh.raw + offset + 4 - skb->data)) {
-				u16 *ports = (u16 *)exthdr;
-
-				fl->uli_u.ports.sport = ports[0];
-				fl->uli_u.ports.dport = ports[1];
-			}
-			return;
-
-		/* XXX Why are there these headers? */
-		case IPPROTO_AH:
-		case IPPROTO_ESP:
-		default:
-			fl->uli_u.spi = 0;
-			return;
-		};
-	}
-}
-#endif
 
 int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb, 
 			unsigned short family)
@@ -1420,38 +914,15 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 	struct xfrm_policy *pol;
 	struct flowi fl;
 
-	switch (family) {
-	case AF_INET:
-		_decode_session4(skb, &fl);
-		break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-	case AF_INET6:
-		_decode_session6(skb, &fl);
-		break;
-#endif
-	default :
+	if (_decode_session(skb, &fl, family) < 0)
 		return 0;
-	}
 
 	/* First, check used SA against their selectors. */
 	if (skb->sp) {
 		int i;
 
 		for (i=skb->sp->len-1; i>=0; i--) {
-			int match;
-			switch (family) {
-			case AF_INET:
-				match = xfrm4_selector_match(&skb->sp->xvec[i]->sel, &fl);
-				break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-			case AF_INET6:
-				match = xfrm6_selector_match(&skb->sp->xvec[i]->sel, &fl);
-				break;
-#endif
-			default:
-				match = 0;
-			}
-			if (!match)
+			if (!xfrm_selector_match(&skb->sp->xvec[i]->sel, &fl, family))
 				return 0;
 		}
 	}
@@ -1483,20 +954,7 @@ int __xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb,
 			 * are implied between each two transformations.
 			 */
 			for (i = pol->xfrm_nr-1, k = 0; i >= 0; i--) {
-				if (pol->xfrm_vec[i].optional)
-					continue;
-				switch (family) {
-				case AF_INET:
-					k = xfrm_policy_ok(pol->xfrm_vec+i, sp, k);
-					break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-				case AF_INET6:
-					k = xfrm6_policy_ok(pol->xfrm_vec+i, sp, k);
-					break;
-#endif
-				default:
-					k = -1;
-				}
+				k = xfrm_policy_ok(pol->xfrm_vec+i, sp, k, family);
 				if (k < 0)
 					goto reject;
 			}
@@ -1514,18 +972,8 @@ int __xfrm_route_forward(struct sk_buff *skb, unsigned short family)
 {
 	struct flowi fl;
 
-	switch (family) {
-	case AF_INET:
-		_decode_session4(skb, &fl);
-		break;
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-	case AF_INET6:
-		_decode_session6(skb, &fl);
-		break;
-#endif
-	default:
+	if (_decode_session(skb, &fl, family) < 0)
 		return 0;
-	}
 
 	return xfrm_lookup(&skb->dst, &fl, NULL, 0) == 0;
 }
@@ -1603,20 +1051,6 @@ static void __xfrm_garbage_collect(void)
 	}
 }
 
-static inline int xfrm4_garbage_collect(void)
-{
-	__xfrm_garbage_collect();
-	return (atomic_read(&xfrm4_dst_ops.entries) > xfrm4_dst_ops.gc_thresh*2);
-}
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-static inline int xfrm6_garbage_collect(void)
-{
-	__xfrm_garbage_collect();
-	return (atomic_read(&xfrm6_dst_ops.entries) > xfrm6_dst_ops.gc_thresh*2);
-}
-#endif
-
 static int bundle_depends_on(struct dst_entry *dst, struct xfrm_state *x)
 {
 	do {
@@ -1660,29 +1094,6 @@ int xfrm_flush_bundles(struct xfrm_state *x)
 	return 0;
 }
 
- 
-static void xfrm4_update_pmtu(struct dst_entry *dst, u32 mtu)
-{
-	struct dst_entry *path = dst->path;
-
-	if (mtu < 68 + dst->header_len)
-		return;
-
-	path->ops->update_pmtu(path, mtu);
-}
-
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-static void xfrm6_update_pmtu(struct dst_entry *dst, u32 mtu)
-{
-	struct dst_entry *path = dst->path;
-
-	if (mtu >= 1280 && mtu < dst_pmtu(dst))
-		return;
-
-	path->ops->update_pmtu(path, mtu);
-}
-#endif
-
 /* Well... that's _TASK_. We need to scan through transformation
  * list and figure out what mss tcp should generate in order to
  * final datagram fit to mtu. Mama mia... :-)
@@ -1723,52 +1134,99 @@ static int xfrm_get_mss(struct dst_entry *dst, u32 mtu)
 	return res + dst->header_len;
 }
 
-struct dst_ops xfrm4_dst_ops = {
-	.family =		AF_INET,
-	.protocol =		__constant_htons(ETH_P_IP),
-	.gc =			xfrm4_garbage_collect,
-	.check =		xfrm_dst_check,
-	.destroy =		xfrm_dst_destroy,
-	.negative_advice =	xfrm_negative_advice,
-	.link_failure =		xfrm_link_failure,
-	.update_pmtu =		xfrm4_update_pmtu,
-	.get_mss =		xfrm_get_mss,
-	.gc_thresh =		1024,
-	.entry_size =		sizeof(struct xfrm_dst),
-};
+int xfrm_policy_register_afinfo(struct xfrm_policy_afinfo *afinfo)
+{
+	int err = 0;
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+	if (unlikely(afinfo->family >= NPROTO))
+		return -EAFNOSUPPORT;
+	write_lock(&xfrm_policy_afinfo_lock);
+	if (unlikely(xfrm_policy_afinfo[afinfo->family] != NULL))
+		err = -ENOBUFS;
+	else {
+		struct dst_ops *dst_ops = afinfo->dst_ops;
+		if (likely(dst_ops->kmem_cachep == NULL))
+			dst_ops->kmem_cachep = xfrm_dst_cache;
+		if (likely(dst_ops->check == NULL))
+			dst_ops->check = xfrm_dst_check;
+		if (likely(dst_ops->destroy == NULL))
+			dst_ops->destroy = xfrm_dst_destroy;
+		if (likely(dst_ops->negative_advice == NULL))
+			dst_ops->negative_advice = xfrm_negative_advice;
+		if (likely(dst_ops->link_failure == NULL))
+			dst_ops->link_failure = xfrm_link_failure;
+		if (likely(dst_ops->get_mss == NULL))
+			dst_ops->get_mss = xfrm_get_mss;
+		if (likely(afinfo->garbage_collect == NULL))
+			afinfo->garbage_collect = __xfrm_garbage_collect;
+		xfrm_policy_afinfo[afinfo->family] = afinfo;
+	}
+	write_unlock(&xfrm_policy_afinfo_lock);
+	return err;
+}
 
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-struct dst_ops xfrm6_dst_ops = {
-	.family =		AF_INET6,
-	.protocol =		__constant_htons(ETH_P_IPV6),
-	.gc =			xfrm6_garbage_collect,
-	.check =		xfrm_dst_check,
-	.destroy =		xfrm_dst_destroy,
-	.negative_advice =	xfrm_negative_advice,
-	.link_failure =		xfrm_link_failure,
-	.update_pmtu =		xfrm6_update_pmtu,
-	.get_mss =		xfrm_get_mss,
-	.gc_thresh =		1024,
-	.entry_size =		sizeof(struct xfrm_dst),
-};
-#endif /* CONFIG_IPV6 || CONFIG_IPV6_MODULE */
+int xfrm_policy_unregister_afinfo(struct xfrm_policy_afinfo *afinfo)
+{
+	int err = 0;
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+	if (unlikely(afinfo->family >= NPROTO))
+		return -EAFNOSUPPORT;
+	write_lock(&xfrm_policy_afinfo_lock);
+	if (likely(xfrm_policy_afinfo[afinfo->family] != NULL)) {
+		if (unlikely(xfrm_policy_afinfo[afinfo->family] != afinfo))
+			err = -EINVAL;
+		else {
+			struct dst_ops *dst_ops = afinfo->dst_ops;
+			xfrm_policy_afinfo[afinfo->family] = NULL;
+			dst_ops->kmem_cachep = NULL;
+			dst_ops->check = NULL;
+			dst_ops->destroy = NULL;
+			dst_ops->negative_advice = NULL;
+			dst_ops->link_failure = NULL;
+			dst_ops->get_mss = NULL;
+			afinfo->garbage_collect = NULL;
+		}
+	}
+	write_unlock(&xfrm_policy_afinfo_lock);
+	return err;
+}
+
+struct xfrm_policy_afinfo *xfrm_policy_get_afinfo(unsigned short family)
+{
+	struct xfrm_policy_afinfo *afinfo;
+	if (unlikely(family >= NPROTO))
+		return NULL;
+	read_lock(&xfrm_policy_afinfo_lock);
+	afinfo = xfrm_policy_afinfo[family];
+	if (likely(afinfo != NULL))
+		read_lock(&afinfo->lock);
+	read_unlock(&xfrm_policy_afinfo_lock);
+	return afinfo;
+}
+
+void xfrm_policy_put_afinfo(struct xfrm_policy_afinfo *afinfo)
+{
+	if (unlikely(afinfo == NULL))
+		return;
+	read_unlock(&afinfo->lock);
+}
+
+void __init xfrm_policy_init(void)
+{
+	xfrm_dst_cache = kmem_cache_create("xfrm_dst_cache",
+					   sizeof(struct xfrm_dst),
+					   0, SLAB_HWCACHE_ALIGN,
+					   NULL, NULL);
+	if (!xfrm_dst_cache)
+		panic("XFRM: failed to allocate xfrm_dst_cache\n");
+}
 
 void __init xfrm_init(void)
 {
-	xfrm4_dst_ops.kmem_cachep = kmem_cache_create("xfrm4_dst_cache",
-						      sizeof(struct xfrm_dst),
-						      0, SLAB_HWCACHE_ALIGN,
-						      NULL, NULL);
-
-	if (!xfrm4_dst_ops.kmem_cachep)
-		panic("IP: failed to allocate xfrm4_dst_cache\n");
-
-#if defined (CONFIG_IPV6) || defined (CONFIG_IPV6_MODULE)
-	xfrm6_dst_ops.kmem_cachep = xfrm4_dst_ops.kmem_cachep;
-#endif
-
-	flow_cache_init();
 	xfrm_state_init();
-	xfrm_input_init();
+	flow_cache_init();
+	xfrm_policy_init();
 }
 

@@ -354,11 +354,8 @@ static void __exit nicstar_module_exit(void)
 
       card = cards[i];
 
-#ifdef CONFIG_ATM_NICSTAR_USE_IDT77105
-      if (card->max_pcr == ATM_25_PCR) {
-        idt77105_stop(card->atmdev);
-      }
-#endif /* CONFIG_ATM_NICSTAR_USE_IDT77105 */
+      if (card->atmdev->phy && card->atmdev->phy->stop)
+        card->atmdev->phy->stop(card->atmdev);
 
       /* Stop everything */
       writel(0x00000000, card->membase + CFG);
@@ -490,11 +487,6 @@ static int __init ns_init_card(int i, struct pci_dev *pcidev)
    card->atmdev = NULL;
    card->pcidev = pcidev;
    card->membase = pci_resource_start(pcidev, 1);
-#ifdef __powerpc__
-   /* Compensate for different memory map between host CPU and PCI bus.
-      Shouldn't we use a macro for this? */
-   card->membase += KERNELBASE;
-#endif /* __powerpc__ */
    card->membase = (unsigned long) ioremap(card->membase, NS_IOREMAP_SIZE);
    if (card->membase == 0)
    {
@@ -905,22 +897,13 @@ static int __init ns_init_card(int i, struct pci_dev *pcidev)
    card->atmdev->phy = NULL;
 
 #ifdef CONFIG_ATM_NICSTAR_USE_SUNI
-   if (card->max_pcr == ATM_OC3_PCR) {
+   if (card->max_pcr == ATM_OC3_PCR)
       suni_init(card->atmdev);
-
-      MOD_INC_USE_COUNT;
-      /* Can't remove the nicstar driver or the suni driver would oops */
-   }
 #endif /* CONFIG_ATM_NICSTAR_USE_SUNI */
 
 #ifdef CONFIG_ATM_NICSTAR_USE_IDT77105
-   if (card->max_pcr == ATM_25_PCR) {
+   if (card->max_pcr == ATM_25_PCR)
       idt77105_init(card->atmdev);
-      /* Note that for the IDT77105 PHY we don't need the awful
-       * module count hack that the SUNI needs because we can
-       * stop the '105 when the nicstar module is cleaned up.
-       */
-   }
 #endif /* CONFIG_ATM_NICSTAR_USE_IDT77105 */
 
    if (card->atmdev->phy && card->atmdev->phy->start)
@@ -2327,6 +2310,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
          {
             push_rxbufs(card, BUF_SM, (u32) skb, (u32) virt_to_bus(skb->data),
                         0, 0);
+            atomic_inc(&vcc->stats->rx_drop);
          }
          else
 	 {
@@ -2354,6 +2338,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             {
                push_rxbufs(card, BUF_SM, (u32) sb, (u32) virt_to_bus(sb->data),
                            0, 0);
+               atomic_inc(&vcc->stats->rx_drop);
             }
             else
 	    {
@@ -2378,6 +2363,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             {
                push_rxbufs(card, BUF_LG, (u32) skb,
                            (u32) virt_to_bus(skb->data), 0, 0);
+               atomic_inc(&vcc->stats->rx_drop);
             }
             else
             {
@@ -2462,6 +2448,7 @@ static void dequeue_rx(ns_dev *card, ns_rsqe *rsqe)
             }
 	    else
 	       dev_kfree_skb_any(hb);
+	    atomic_inc(&vcc->stats->rx_drop);
          }
          else
 	 {

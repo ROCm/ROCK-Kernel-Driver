@@ -546,8 +546,11 @@ devfs_handle_t input_register_minor(char *name, int minor, int minor_base)
 {
 	char devfs_name[16];
 	sprintf(devfs_name, name, minor);
-	return devfs_register(input_devfs_handle, devfs_name, DEVFS_FL_DEFAULT, INPUT_MAJOR, minor + minor_base,
-		S_IFCHR | S_IRUGO | S_IWUSR, &input_fops, NULL);
+
+	return devfs_register(NULL, devfs_name, 0,
+			INPUT_MAJOR, minor + minor_base,
+			S_IFCHR|S_IRUGO|S_IWUSR,
+			&input_fops, NULL);
 }
 
 void input_unregister_minor(devfs_handle_t handle)

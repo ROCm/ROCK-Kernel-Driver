@@ -125,8 +125,8 @@ static int __init miropcm20_rds_init(void)
 	if (error)
 		return error;
 
-	error = devfs_mk_symlink(NULL, "v4l/rds/radiotext", 0,
-				 "../misc/radiotext", NULL, NULL);
+	error = devfs_mk_symlink("v4l/rds/radiotext",
+				 "../misc/radiotext");
 	if (error)
 		misc_deregister(&rds_miscdev);
 

@@ -251,7 +251,7 @@ static int raw_rcv_skb(struct sock * sk, struct sk_buff * skb)
 
 int raw_rcv(struct sock *sk, struct sk_buff *skb)
 {
-	if (!xfrm_policy_check(sk, XFRM_POLICY_IN, skb)) {
+	if (!xfrm4_policy_check(sk, XFRM_POLICY_IN, skb)) {
 		kfree_skb(skb);
 		return NET_RX_DROP;
 	}

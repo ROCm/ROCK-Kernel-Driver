@@ -422,7 +422,7 @@ release_posix_timer(struct k_itimer *tmr)
 
 /* Create a POSIX.1b interval timer. */
 
-asmlinkage int
+asmlinkage long
 sys_timer_create(clockid_t which_clock,
 		 struct sigevent *timer_event_spec, timer_t * created_timer_id)
 {
@@ -662,7 +662,7 @@ do_timer_gettime(struct k_itimer *timr, struct itimerspec *cur_setting)
 	}
 }
 /* Get the time remaining on a POSIX.1b interval timer. */
-asmlinkage int
+asmlinkage long
 sys_timer_gettime(timer_t timer_id, struct itimerspec *setting)
 {
 	struct k_itimer *timr;
@@ -694,7 +694,7 @@ sys_timer_gettime(timer_t timer_id, struct itimerspec *setting)
 
  */
 
-asmlinkage int
+asmlinkage long
 sys_timer_getoverrun(timer_t timer_id)
 {
 	struct k_itimer *timr;
@@ -847,7 +847,7 @@ do_timer_settime(struct k_itimer *timr, int flags,
 }
 
 /* Set a POSIX.1b interval timer */
-asmlinkage int
+asmlinkage long
 sys_timer_settime(timer_t timer_id, int flags,
 		  const struct itimerspec *new_setting,
 		  struct itimerspec *old_setting)
@@ -921,7 +921,7 @@ do_timer_delete(struct k_itimer *timer)
 }
 
 /* Delete a POSIX.1b interval timer. */
-asmlinkage int
+asmlinkage long
 sys_timer_delete(timer_t timer_id)
 {
 	struct k_itimer *timer;
@@ -1056,7 +1056,7 @@ do_posix_clock_monotonic_settime(struct timespec *tp)
 	return -EINVAL;
 }
 
-asmlinkage int
+asmlinkage long
 sys_clock_settime(clockid_t which_clock, const struct timespec *tp)
 {
 	struct timespec new_tp;
@@ -1071,7 +1071,7 @@ sys_clock_settime(clockid_t which_clock, const struct timespec *tp)
 	new_tp.tv_nsec /= NSEC_PER_USEC;
 	return do_sys_settimeofday((struct timeval *) &new_tp, NULL);
 }
-asmlinkage int
+asmlinkage long
 sys_clock_gettime(clockid_t which_clock, struct timespec *tp)
 {
 	struct timespec rtn_tp;
@@ -1090,7 +1090,7 @@ sys_clock_gettime(clockid_t which_clock, struct timespec *tp)
 	return error;
 
 }
-asmlinkage int
+asmlinkage long
 sys_clock_getres(clockid_t which_clock, struct timespec *tp)
 {
 	struct timespec rtn_tp;

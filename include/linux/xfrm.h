@@ -12,12 +12,7 @@
  */
 typedef union
 {
-	struct {
-		__u32	addr;
-		__u32	mask;	/* Use unused bits to cache mask. */
-	} a4;
-#define xfrm4_addr a4.addr
-#define xfrm4_mask a4.mask
+	__u32		a4;
 	__u32		a6[4];
 } xfrm_address_t;
 

@@ -397,7 +397,7 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 	sprintf(evdev->name, "event%d", minor);
 
 	evdev_table[minor] = evdev;
-	evdev->devfs = input_register_minor("event%d", minor, EVDEV_MINOR_BASE);
+	evdev->devfs = input_register_minor("input/event%d", minor, EVDEV_MINOR_BASE);
 
 	return &evdev->handle;
 }

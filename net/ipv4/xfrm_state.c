@@ -1,15 +1,19 @@
-/* Changes
+/*
+ * xfrm_state.c
  *
- *	Mitsuru KANDA @USAGI       : IPv6 Support 
- * 	Kazunori MIYAZAWA @USAGI   :
- * 	Kunihiro Ishiguro          :
+ * Changes:
+ *	Mitsuru KANDA @USAGI
+ * 	Kazunori MIYAZAWA @USAGI
+ * 	Kunihiro Ishiguro
+ * 		IPv6 support
+ * 	YOSHIFUJI Hideaki @USAGI
+ * 		Split up af-specific functions
  * 	
  */
 
 #include <net/xfrm.h>
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
-#include <net/ipv6.h>
 
 /* Each xfrm_state may be linked to two tables:
 
@@ -19,8 +23,6 @@
  */
 
 static spinlock_t xfrm_state_lock = SPIN_LOCK_UNLOCKED;
-
-#define XFRM_DST_HSIZE		1024
 
 /* Hash table to find appropriate SA towards given target (endpoint
  * of tunnel or destination of transport mode) allowed by selector.
@@ -33,7 +35,8 @@ static struct list_head xfrm_state_byspi[XFRM_DST_HSIZE];
 
 DECLARE_WAIT_QUEUE_HEAD(km_waitq);
 
-#define ACQ_EXPIRES 30
+static rwlock_t xfrm_state_afinfo_lock = RW_LOCK_UNLOCKED;
+static struct xfrm_state_afinfo *xfrm_state_afinfo[NPROTO];
 
 static void __xfrm_state_delete(struct xfrm_state *x);
 
@@ -214,24 +217,37 @@ restart:
 	wake_up(&km_waitq);
 }
 
-struct xfrm_state *
-xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
-		 struct xfrm_policy *pol, int *err)
+static int
+xfrm_init_tempsel(struct xfrm_state *x, struct flowi *fl,
+		  struct xfrm_tmpl *tmpl,
+		  xfrm_address_t *daddr, xfrm_address_t *saddr,
+		  unsigned short family)
 {
-	unsigned h = ntohl(daddr);
+	struct xfrm_state_afinfo *afinfo = xfrm_state_get_afinfo(family);
+	if (!afinfo)
+		return -1;
+	afinfo->init_tempsel(x, fl, tmpl, daddr, saddr);
+	xfrm_state_put_afinfo(afinfo);
+	return 0;
+}
+
+struct xfrm_state *
+xfrm_state_find(xfrm_address_t *daddr, xfrm_address_t *saddr, 
+		struct flowi *fl, struct xfrm_tmpl *tmpl,
+		struct xfrm_policy *pol, int *err,
+		unsigned short family)
+{
+	unsigned h = xfrm_dst_hash(daddr, family);
 	struct xfrm_state *x;
 	int acquire_in_progress = 0;
 	int error = 0;
 	struct xfrm_state *best = NULL;
 
-	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
-
 	spin_lock_bh(&xfrm_state_lock);
 	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
-		if (x->props.family == AF_INET &&
-		    daddr == x->id.daddr.xfrm4_addr &&
+		if (x->props.family == family &&
 		    x->props.reqid == tmpl->reqid &&
-		    (saddr == x->props.saddr.xfrm4_addr || !saddr || !x->props.saddr.xfrm4_addr) &&
+		    xfrm_state_addr_check(x, daddr, saddr, family) &&
 		    tmpl->mode == x->props.mode &&
 		    tmpl->id.proto == x->id.proto) {
 			/* Resolution logic:
@@ -248,7 +264,7 @@ xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 			      selector.
 			 */
 			if (x->km.state == XFRM_STATE_VALID) {
-				if (!xfrm4_selector_match(&x->sel, fl))
+				if (!xfrm_selector_match(&x->sel, fl, family))
 					continue;
 				if (!best ||
 				    best->km.dying > x->km.dying ||
@@ -259,7 +275,7 @@ xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 				acquire_in_progress = 1;
 			} else if (x->km.state == XFRM_STATE_ERROR ||
 				   x->km.state == XFRM_STATE_EXPIRED) {
-				if (xfrm4_selector_match(&x->sel, fl))
+				if (xfrm_selector_match(&x->sel, fl, family))
 					error = 1;
 			}
 		}
@@ -276,43 +292,20 @@ xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 	    ((x = xfrm_state_alloc()) != NULL)) {
 		/* Initialize temporary selector matching only
 		 * to current session. */
-
-		x->sel.daddr.xfrm4_addr = fl->fl4_dst;
-		x->sel.daddr.xfrm4_mask = ~0;
-		x->sel.saddr.xfrm4_addr = fl->fl4_src;
-		x->sel.saddr.xfrm4_mask = ~0;
-		x->sel.dport = fl->uli_u.ports.dport;
-		x->sel.dport_mask = ~0;
-		x->sel.sport = fl->uli_u.ports.sport;
-		x->sel.sport_mask = ~0;
-		x->sel.prefixlen_d = 32;
-		x->sel.prefixlen_s = 32;
-		x->sel.proto = fl->proto;
-		x->sel.ifindex = fl->oif;
-		x->id = tmpl->id;
-		if (x->id.daddr.xfrm4_addr == 0)
-			x->id.daddr.xfrm4_addr = daddr;
-		x->props.family = AF_INET;
-		x->props.saddr = tmpl->saddr;
-		if (x->props.saddr.xfrm4_addr == 0)
-			x->props.saddr.xfrm4_addr = saddr;
-		x->props.mode = tmpl->mode;
-		x->props.reqid = tmpl->reqid;
-		x->props.family = AF_INET;
+		xfrm_init_tempsel(x, fl, tmpl, daddr, saddr, family);
 
 		if (km_query(x, tmpl, pol) == 0) {
 			x->km.state = XFRM_STATE_ACQ;
 			list_add_tail(&x->bydst, xfrm_state_bydst+h);
 			atomic_inc(&x->refcnt);
 			if (x->id.spi) {
-				h = ntohl(x->id.daddr.xfrm4_addr^x->id.spi^x->id.proto);
-				h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+				h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, family);
 				list_add(&x->byspi, xfrm_state_byspi+h);
 				atomic_inc(&x->refcnt);
 			}
-			x->lft.hard_add_expires_seconds = ACQ_EXPIRES;
+			x->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 			atomic_inc(&x->refcnt);
-			mod_timer(&x->timer, ACQ_EXPIRES*HZ);
+			mod_timer(&x->timer, XFRM_ACQ_EXPIRES*HZ);
 		} else {
 			x->km.state = XFRM_STATE_DEAD;
 			xfrm_state_put(x);
@@ -326,146 +319,17 @@ xfrm4_state_find(u32 daddr, u32 saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
 			(error ? -ESRCH : -ENOMEM);
 	return x;
 }
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-struct xfrm_state *
-xfrm6_state_find(struct in6_addr *daddr, struct in6_addr *saddr, struct flowi *fl, struct xfrm_tmpl *tmpl,
-		struct xfrm_policy *pol, int *err)
-{
-	unsigned h = ntohl(daddr->s6_addr32[2]^daddr->s6_addr32[3]);
-	struct xfrm_state *x;
-	int acquire_in_progress = 0;
-	int error = 0;
-	struct xfrm_state *best = NULL;
-
-	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
-
-	spin_lock_bh(&xfrm_state_lock);
-	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
-		if (x->props.family == AF_INET6&&
-		    !ipv6_addr_cmp(daddr, (struct in6_addr *)&x->id.daddr) &&
-		    x->props.reqid == tmpl->reqid &&
-		    (!ipv6_addr_cmp(saddr, (struct in6_addr *)&x->props.saddr)|| ipv6_addr_any(saddr)) &&
-		    tmpl->mode == x->props.mode &&
-		    tmpl->id.proto == x->id.proto) {
-			/* Resolution logic:
-			   1. There is a valid state with matching selector.
-			      Done.
-			   2. Valid state with inappropriate selector. Skip.
-
-			   Entering area of "sysdeps".
-
-			   3. If state is not valid, selector is temporary,
-			      it selects only session which triggered
-			      previous resolution. Key manager will do
-			      something to install a state with proper
-			      selector.
-			 */
-			if (x->km.state == XFRM_STATE_VALID) {
-				if (!xfrm6_selector_match(&x->sel, fl))
-					continue;
-				if (!best ||
-				    best->km.dying > x->km.dying ||
-				    (best->km.dying == x->km.dying &&
-				     best->curlft.add_time < x->curlft.add_time))
-					best = x;
-			} else if (x->km.state == XFRM_STATE_ACQ) {
-				acquire_in_progress = 1;
-			} else if (x->km.state == XFRM_STATE_ERROR ||
-				   x->km.state == XFRM_STATE_EXPIRED) {
-				if (xfrm6_selector_match(&x->sel, fl))
-					error = 1;
-			}
-		}
-	}
-
-	if (best) {
-		atomic_inc(&best->refcnt);
-		spin_unlock_bh(&xfrm_state_lock);
-		return best;
-	}
-	x = NULL;
-	if (!error && !acquire_in_progress &&
-	    ((x = xfrm_state_alloc()) != NULL)) {
-		/* Initialize temporary selector matching only
-		 * to current session. */
-		memcpy(&x->sel.daddr, fl->fl6_dst, sizeof(struct in6_addr));
-		memcpy(&x->sel.saddr, fl->fl6_src, sizeof(struct in6_addr));
-		x->sel.dport = fl->uli_u.ports.dport;
-		x->sel.dport_mask = ~0;
-		x->sel.sport = fl->uli_u.ports.sport;
-		x->sel.sport_mask = ~0;
-		x->sel.prefixlen_d = 128;
-		x->sel.prefixlen_s = 128;
-		x->sel.proto = fl->proto;
-		x->sel.ifindex = fl->oif;
-		x->id = tmpl->id;
-		if (ipv6_addr_any((struct in6_addr*)&x->id.daddr))
-			memcpy(&x->id.daddr, daddr, sizeof(x->sel.daddr));
-		memcpy(&x->props.saddr, &tmpl->saddr, sizeof(x->props.saddr));
-		if (ipv6_addr_any((struct in6_addr*)&x->props.saddr))
-			memcpy(&x->props.saddr, &saddr, sizeof(x->sel.saddr));
-		x->props.mode = tmpl->mode;
-		x->props.reqid = tmpl->reqid;
-		x->props.family = AF_INET6;
-
-		if (km_query(x, tmpl, pol) == 0) {
-			x->km.state = XFRM_STATE_ACQ;
-			list_add_tail(&x->bydst, xfrm_state_bydst+h);
-			atomic_inc(&x->refcnt);
-			if (x->id.spi) {
-				struct in6_addr *addr = (struct in6_addr*)&x->id.daddr;
-				h = ntohl((addr->s6_addr32[2]^addr->s6_addr32[3])^x->id.spi^x->id.proto);
-				h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
-				list_add(&x->byspi, xfrm_state_byspi+h);
-				atomic_inc(&x->refcnt);
-			}
-			x->lft.hard_add_expires_seconds = ACQ_EXPIRES;
-			atomic_inc(&x->refcnt);
-			mod_timer(&x->timer, ACQ_EXPIRES*HZ);
-		} else {
-			x->km.state = XFRM_STATE_DEAD;
-			xfrm_state_put(x);
-			x = NULL;
-			error = 1;
-		}
-	}
-	spin_unlock_bh(&xfrm_state_lock);
-	if (!x)
-		*err = acquire_in_progress ? -EAGAIN :
-			(error ? -ESRCH : -ENOMEM);
-	return x;
-}
-#endif /* CONFIG_IPV6 || CONFIG_IPV6_MODULE */
 
 void xfrm_state_insert(struct xfrm_state *x)
 {
-	unsigned h = 0;
-
-	switch (x->props.family) {
-	case AF_INET:
-		h = ntohl(x->id.daddr.xfrm4_addr);
-		break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-	case AF_INET6:
-		h = ntohl(x->id.daddr.a6[2]^x->id.daddr.a6[3]);
-		break;
-#endif
-	default:
-		return;
-	}
-
-	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
+	unsigned h = xfrm_dst_hash(&x->id.daddr, x->props.family);
 
 	spin_lock_bh(&xfrm_state_lock);
 	list_add(&x->bydst, xfrm_state_bydst+h);
 	atomic_inc(&x->refcnt);
 
-	if (x->props.family == AF_INET)
-		h = ntohl(x->id.daddr.xfrm4_addr^x->id.spi^x->id.proto);
-	else
-		h = ntohl(x->id.daddr.a6[2]^x->id.daddr.a6[3]^x->id.spi^x->id.proto);
-	h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+	h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
+
 	list_add(&x->byspi, xfrm_state_byspi+h);
 	atomic_inc(&x->refcnt);
 
@@ -487,7 +351,7 @@ int xfrm_state_check_expire(struct xfrm_state *x)
 	if (x->curlft.bytes >= x->lft.hard_byte_limit ||
 	    x->curlft.packets >= x->lft.hard_packet_limit) {
 		km_expired(x);
-		if (!mod_timer(&x->timer, jiffies + ACQ_EXPIRES*HZ))
+		if (!mod_timer(&x->timer, jiffies + XFRM_ACQ_EXPIRES*HZ))
 			atomic_inc(&x->refcnt);
 		return -EINVAL;
 	}
@@ -512,158 +376,37 @@ int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb)
 }
 
 struct xfrm_state *
-xfrm4_state_lookup(u32 daddr, u32 spi, u8 proto)
+xfrm_state_lookup(xfrm_address_t *daddr, u32 spi, u8 proto,
+		  unsigned short family)
 {
-	unsigned h = ntohl(daddr^spi^proto);
 	struct xfrm_state *x;
-
-	h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+	struct xfrm_state_afinfo *afinfo = xfrm_state_get_afinfo(family);
+	if (!afinfo)
+		return NULL;
 
 	spin_lock_bh(&xfrm_state_lock);
-	list_for_each_entry(x, xfrm_state_byspi+h, byspi) {
-		if (x->props.family == AF_INET &&
-		    spi == x->id.spi &&
-		    daddr == x->id.daddr.xfrm4_addr &&
-		    proto == x->id.proto) {
-			atomic_inc(&x->refcnt);
-			spin_unlock_bh(&xfrm_state_lock);
-			return x;
-		}
-	}
+	x = afinfo->state_lookup(daddr, spi, proto);
 	spin_unlock_bh(&xfrm_state_lock);
-	return NULL;
+	xfrm_state_put_afinfo(afinfo);
+	return x;
 }
 
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 struct xfrm_state *
-xfrm6_state_lookup(struct in6_addr *daddr, u32 spi, u8 proto)
+xfrm_find_acq(u8 mode, u16 reqid, u8 proto, 
+	      xfrm_address_t *daddr, xfrm_address_t *saddr, 
+	      int create, unsigned short family)
 {
-	unsigned h = ntohl(daddr->s6_addr32[2]^daddr->s6_addr32[3]^spi^proto);
 	struct xfrm_state *x;
-
-	h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
-
-	spin_lock_bh(&xfrm_state_lock);
-	list_for_each_entry(x, xfrm_state_byspi+h, byspi) {
-		if (x->props.family == AF_INET6 &&
-		    spi == x->id.spi &&
-		    !ipv6_addr_cmp(daddr, (struct in6_addr *)x->id.daddr.a6) &&
-		    proto == x->id.proto) {
-			atomic_inc(&x->refcnt);
-			spin_unlock_bh(&xfrm_state_lock);
-			return x;
-		}
-	}
-	spin_unlock_bh(&xfrm_state_lock);
-	return NULL;
-}
-#endif
-
-struct xfrm_state *
-xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr, int create)
-{
-	struct xfrm_state *x, *x0;
-	unsigned h = ntohl(daddr);
-
-	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
-	x0 = NULL;
+	struct xfrm_state_afinfo *afinfo = xfrm_state_get_afinfo(family);
+	if (!afinfo)
+		return NULL;
 
 	spin_lock_bh(&xfrm_state_lock);
-	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
-		if (x->props.family == AF_INET &&
-		    daddr == x->id.daddr.xfrm4_addr &&
-		    mode == x->props.mode &&
-		    proto == x->id.proto &&
-		    saddr == x->props.saddr.xfrm4_addr &&
-		    reqid == x->props.reqid &&
-		    x->km.state == XFRM_STATE_ACQ) {
-			    if (!x0)
-				    x0 = x;
-			    if (x->id.spi)
-				    continue;
-			    x0 = x;
-			    break;
-		    }
-	}
-	if (x0) {
-		atomic_inc(&x0->refcnt);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
-		x0->sel.daddr.xfrm4_addr = daddr;
-		x0->sel.daddr.xfrm4_mask = ~0;
-		x0->sel.saddr.xfrm4_addr = saddr;
-		x0->sel.saddr.xfrm4_mask = ~0;
-		x0->sel.prefixlen_d = 32;
-		x0->sel.prefixlen_s = 32;
-		x0->props.saddr.xfrm4_addr = saddr;
-		x0->km.state = XFRM_STATE_ACQ;
-		x0->id.daddr.xfrm4_addr = daddr;
-		x0->id.proto = proto;
-		x0->props.mode = mode;
-		x0->props.reqid = reqid;
-		x0->props.family = AF_INET;
-		x0->lft.hard_add_expires_seconds = ACQ_EXPIRES;
-		atomic_inc(&x0->refcnt);
-		mod_timer(&x0->timer, jiffies + ACQ_EXPIRES*HZ);
-		atomic_inc(&x0->refcnt);
-		list_add_tail(&x0->bydst, xfrm_state_bydst+h);
-		wake_up(&km_waitq);
-	}
+	x = afinfo->find_acq(mode, reqid, proto, daddr, saddr, create);
 	spin_unlock_bh(&xfrm_state_lock);
-	return x0;
+	xfrm_state_put_afinfo(afinfo);
+	return x;
 }
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-struct xfrm_state *
-xfrm6_find_acq(u8 mode, u16 reqid, u8 proto, struct in6_addr *daddr, struct in6_addr *saddr, int create)
-{
-	struct xfrm_state *x, *x0;
-	unsigned h = ntohl(daddr->s6_addr32[2]^daddr->s6_addr32[3]);
-
-	h = (h ^ (h>>16)) % XFRM_DST_HSIZE;
-	x0 = NULL;
-
-	spin_lock_bh(&xfrm_state_lock);
-	list_for_each_entry(x, xfrm_state_bydst+h, bydst) {
-		if (x->props.family == AF_INET6 &&
-		    !ipv6_addr_cmp(daddr, (struct in6_addr *)x->id.daddr.a6) &&
-		    mode == x->props.mode &&
-		    proto == x->id.proto &&
-		    !ipv6_addr_cmp(saddr, (struct in6_addr *)x->props.saddr.a6) &&
-		    reqid == x->props.reqid &&
-		    x->km.state == XFRM_STATE_ACQ) {
-			    if (!x0)
-				    x0 = x;
-			    if (x->id.spi)
-				    continue;
-			    x0 = x;
-			    break;
-		    }
-	}
-	if (x0) {
-		atomic_inc(&x0->refcnt);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
-		memcpy(x0->sel.daddr.a6, daddr, sizeof(struct in6_addr));
-		memcpy(x0->sel.saddr.a6, saddr, sizeof(struct in6_addr));
-		x0->sel.prefixlen_d = 128;
-		x0->sel.prefixlen_s = 128;
-		memcpy(x0->props.saddr.a6, saddr, sizeof(struct in6_addr));
-		x0->km.state = XFRM_STATE_ACQ;
-		memcpy(x0->id.daddr.a6, daddr, sizeof(struct in6_addr));
-		x0->id.proto = proto;
-		x0->props.family = AF_INET6;
-		x0->props.mode = mode;
-		x0->props.reqid = reqid;
-		x0->lft.hard_add_expires_seconds = ACQ_EXPIRES;
-		atomic_inc(&x0->refcnt);
-		mod_timer(&x0->timer, jiffies + ACQ_EXPIRES*HZ);
-		atomic_inc(&x0->refcnt);
-		list_add_tail(&x0->bydst, xfrm_state_bydst+h);
-		wake_up(&km_waitq);
-	}
-	spin_unlock_bh(&xfrm_state_lock);
-	return x0;
-}
-#endif
 
 /* Silly enough, but I'm lazy to build resolution list */
 
@@ -697,18 +440,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		return;
 
 	if (minspi == maxspi) {
-		switch(x->props.family) {
-		case AF_INET:
-			x0 = xfrm4_state_lookup(x->id.daddr.xfrm4_addr, minspi, x->id.proto);
-			break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			x0 = xfrm6_state_lookup((struct in6_addr*)x->id.daddr.a6, minspi, x->id.proto);
-			break;
-#endif
-		default:
-			x0 = NULL;
-		}
+		x0 = xfrm_state_lookup(&x->id.daddr, minspi, x->id.proto, x->props.family);
 		if (x0) {
 			xfrm_state_put(x0);
 			return;
@@ -720,18 +452,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		maxspi = ntohl(maxspi);
 		for (h=0; h<maxspi-minspi+1; h++) {
 			spi = minspi + net_random()%(maxspi-minspi+1);
-			switch(x->props.family) {
-			case AF_INET:
-				x0 = xfrm4_state_lookup(x->id.daddr.xfrm4_addr, minspi, x->id.proto);
-				break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-			case AF_INET6:
-				x0 = xfrm6_state_lookup((struct in6_addr*)x->id.daddr.a6, minspi, x->id.proto);
-				break;
-#endif
-			default:
-				x0 = NULL;
-			}
+			x0 = xfrm_state_lookup(&x->id.daddr, minspi, x->id.proto, x->props.family);
 			if (x0 == NULL)
 				break;
 			xfrm_state_put(x0);
@@ -740,19 +461,7 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 	}
 	if (x->id.spi) {
 		spin_lock_bh(&xfrm_state_lock);
-		switch(x->props.family) {
-		case AF_INET:
-			h = ntohl(x->id.daddr.xfrm4_addr^x->id.spi^x->id.proto);
-			break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			h = ntohl(x->id.daddr.a6[2]^x->id.daddr.a6[3]^x->id.spi^x->id.proto);
-			break;
-#endif
-		default:
-			h = 0;	/* XXX */
-		}
-		h = (h ^ (h>>10) ^ (h>>20)) % XFRM_DST_HSIZE;
+		h = xfrm_spi_hash(&x->id.daddr, x->id.spi, x->id.proto, x->props.family);
 		list_add(&x->byspi, xfrm_state_byspi+h);
 		atomic_inc(&x->refcnt);
 		spin_unlock_bh(&xfrm_state_lock);
@@ -845,18 +554,7 @@ int xfrm_check_selectors(struct xfrm_state **x, int n, struct flowi *fl)
 
 	for (i=0; i<n; i++) {
 		int match;
-		switch(x[i]->props.family) {
-		case AF_INET:
-			match = xfrm4_selector_match(&x[i]->sel, fl);
-			break;
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-		case AF_INET6:
-			match = xfrm6_selector_match(&x[i]->sel, fl);
-			break;
-#endif
-		default:
-			match = 0;
-		}
+		match = xfrm_selector_match(&x[i]->sel, fl, x[i]->props.family);
 		if (!match)
 			return -EINVAL;
 	}
@@ -956,6 +654,66 @@ int xfrm_unregister_km(struct xfrm_mgr *km)
 	list_del(&km->list);
 	write_unlock_bh(&xfrm_km_lock);
 	return 0;
+}
+
+int xfrm_state_register_afinfo(struct xfrm_state_afinfo *afinfo)
+{
+	int err = 0;
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+	if (unlikely(afinfo->family >= NPROTO))
+		return -EAFNOSUPPORT;
+	write_lock(&xfrm_state_afinfo_lock);
+	if (unlikely(xfrm_state_afinfo[afinfo->family] != NULL))
+		err = -ENOBUFS;
+	else {
+		afinfo->state_bydst = xfrm_state_bydst;
+		afinfo->state_byspi = xfrm_state_byspi;
+		xfrm_state_afinfo[afinfo->family] = afinfo;
+	}
+	write_unlock(&xfrm_state_afinfo_lock);
+	return err;
+}
+
+int xfrm_state_unregister_afinfo(struct xfrm_state_afinfo *afinfo)
+{
+	int err = 0;
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+	if (unlikely(afinfo->family >= NPROTO))
+		return -EAFNOSUPPORT;
+	write_lock(&xfrm_state_afinfo_lock);
+	if (likely(xfrm_state_afinfo[afinfo->family] != NULL)) {
+		if (unlikely(xfrm_state_afinfo[afinfo->family] != afinfo))
+			err = -EINVAL;
+		else {
+			xfrm_state_afinfo[afinfo->family] = NULL;
+			afinfo->state_byspi = NULL;
+			afinfo->state_bydst = NULL;
+		}
+	}
+	write_unlock(&xfrm_state_afinfo_lock);
+	return err;
+}
+
+struct xfrm_state_afinfo *xfrm_state_get_afinfo(unsigned short family)
+{
+	struct xfrm_state_afinfo *afinfo;
+	if (unlikely(family >= NPROTO))
+		return NULL;
+	read_lock(&xfrm_state_afinfo_lock);
+	afinfo = xfrm_state_afinfo[family];
+	if (likely(afinfo != NULL))
+		read_lock(&afinfo->lock);
+	read_unlock(&xfrm_state_afinfo_lock);
+	return afinfo;
+}
+
+void xfrm_state_put_afinfo(struct xfrm_state_afinfo *afinfo)
+{
+	if (unlikely(afinfo == NULL))
+		return;
+	read_unlock(&afinfo->lock);
 }
 
 void __init xfrm_state_init(void)

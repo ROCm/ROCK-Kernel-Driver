@@ -180,5 +180,8 @@ struct in6_flowlabel_req
 #define IPV6_FLOWLABEL_MGR	32
 #define IPV6_FLOWINFO_SEND	33
 
+#define IPV6_IPSEC_POLICY	34
+#define IPV6_XFRM_POLICY	35
+
 
 #endif

@@ -49,6 +49,7 @@ static struct ebt_table broute_table =
 	.valid_hooks	= 1 << NF_BR_BROUTING,
 	.lock		= RW_LOCK_UNLOCKED,
 	.check		= check,
+	.me		= THIS_MODULE,
 };
 
 static int ebt_broute(struct sk_buff **pskb)

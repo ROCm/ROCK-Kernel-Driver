@@ -26,6 +26,7 @@
 #include <linux/bootmem.h>	/* for max_pfn/max_low_pfn */
 #include <linux/completion.h>
 #include <linux/slab.h>
+#include <linux/swap.h>
 
 static void blk_unplug_work(void *data);
 static void blk_unplug_timeout(unsigned long data);

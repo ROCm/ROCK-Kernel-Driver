@@ -472,7 +472,7 @@ struct parport *parport_register_port(unsigned long base, int irq, int dma,
 	portlist_tail = tmp;
 	if (!portlist)
 		portlist = tmp;
-	spin_unlock(&parportlist_lock);
+	spin_unlock_irq(&parportlist_lock);
 
 	for (device = 0; device < 5; device++)
 		/* assume the worst */

@@ -902,7 +902,7 @@ int ide_config_drive_speed (ide_drive_t *drive, u8 speed)
         /*
          * Select the drive, and issue the SETFEATURES command
          */
-	disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
+	disable_irq_nosync(hwif->irq);
 	udelay(1);
 	SELECT_DRIVE(drive);
 	SELECT_MASK(drive, 0);

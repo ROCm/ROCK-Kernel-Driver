@@ -297,7 +297,7 @@ int suni_init(struct atm_dev *dev)
 	mri = GET(MRI); /* reset SUNI */
 	PUT(mri | SUNI_MRI_RESET,MRI);
 	PUT(mri,MRI);
-	PUT(0,MT); /* disable all tests */
+	PUT((GET(MT) & SUNI_MT_DS27_53),MT); /* disable all tests */
 	REG_CHANGE(SUNI_TPOP_APM_S,SUNI_TPOP_APM_S_SHIFT,SUNI_TPOP_S_SONET,
 	    TPOP_APM); /* use SONET */
 	REG_CHANGE(SUNI_TACP_IUCHP_CLP,0,SUNI_TACP_IUCHP_CLP,
@@ -307,24 +307,6 @@ int suni_init(struct atm_dev *dev)
 	return 0;
 }
 
-
 EXPORT_SYMBOL(suni_init);
 
-
 MODULE_LICENSE("GPL");
-
-#ifdef MODULE
-
-
-int init_module(void)
-{
-	return 0;
-}
-
-
-void cleanup_module(void)
-{
-	/* Nay */
-}
-
-#endif

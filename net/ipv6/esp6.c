@@ -377,7 +377,7 @@ void esp6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	    type != ICMPV6_PKT_TOOBIG)
 		return;
 
-	x = xfrm6_state_lookup(&iph->daddr, esph->spi, IPPROTO_ESP);
+	x = xfrm_state_lookup((xfrm_address_t *)&iph->daddr, esph->spi, IPPROTO_ESP, AF_INET6);
 	if (!x)
 		return;
 	printk(KERN_DEBUG "pmtu discvovery on SA ESP/%08x/"
@@ -504,13 +504,13 @@ static struct inet6_protocol esp6_protocol = {
 int __init esp6_init(void)
 {
 	SET_MODULE_OWNER(&esp6_type);
-	if (xfrm6_register_type(&esp6_type) < 0) {
+	if (xfrm_register_type(&esp6_type, AF_INET6) < 0) {
 		printk(KERN_INFO "ipv6 esp init: can't add xfrm type\n");
 		return -EAGAIN;
 	}
 	if (inet6_add_protocol(&esp6_protocol, IPPROTO_ESP) < 0) {
 		printk(KERN_INFO "ipv6 esp init: can't add protocol\n");
-		xfrm6_unregister_type(&esp6_type);
+		xfrm_unregister_type(&esp6_type, AF_INET6);
 		return -EAGAIN;
 	}
 
@@ -521,7 +521,7 @@ static void __exit esp6_fini(void)
 {
 	if (inet6_del_protocol(&esp6_protocol, IPPROTO_ESP) < 0)
 		printk(KERN_INFO "ipv6 esp close: can't remove protocol\n");
-	if (xfrm6_unregister_type(&esp6_type) < 0)
+	if (xfrm_unregister_type(&esp6_type, AF_INET6) < 0)
 		printk(KERN_INFO "ipv6 esp close: can't remove xfrm type\n");
 }
 

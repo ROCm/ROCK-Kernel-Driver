@@ -51,18 +51,18 @@ do {									   \
 } while (0)
 
 /**
- * __strncpy_from_user: - Copy a NULL terminated string from userspace, with less checking.
+ * __strncpy_from_user: - Copy a NUL terminated string from userspace, with less checking.
  * @dst:   Destination address, in kernel space.  This buffer must be at
  *         least @count bytes long.
  * @src:   Source address, in user space.
- * @count: Maximum number of bytes to copy, including the trailing NULL.
+ * @count: Maximum number of bytes to copy, including the trailing NUL.
  * 
- * Copies a NULL-terminated string from userspace to kernel space.
+ * Copies a NUL-terminated string from userspace to kernel space.
  * Caller must check the specified block with access_ok() before calling
  * this function.
  *
  * On success, returns the length of the string (not including the trailing
- * NULL).
+ * NUL).
  *
  * If access to userspace fails, returns -EFAULT (some data may have been
  * copied).
@@ -79,16 +79,16 @@ __strncpy_from_user(char *dst, const char *src, long count)
 }
 
 /**
- * strncpy_from_user: - Copy a NULL terminated string from userspace.
+ * strncpy_from_user: - Copy a NUL terminated string from userspace.
  * @dst:   Destination address, in kernel space.  This buffer must be at
  *         least @count bytes long.
  * @src:   Source address, in user space.
- * @count: Maximum number of bytes to copy, including the trailing NULL.
+ * @count: Maximum number of bytes to copy, including the trailing NUL.
  * 
- * Copies a NULL-terminated string from userspace to kernel space.
+ * Copies a NUL-terminated string from userspace to kernel space.
  *
  * On success, returns the length of the string (not including the trailing
- * NULL).
+ * NUL).
  *
  * If access to userspace fails, returns -EFAULT (some data may have been
  * copied).
@@ -172,9 +172,9 @@ __clear_user(void *to, unsigned long n)
  * @s: The string to measure.
  * @n: The maximum valid length
  *
- * Get the size of a NULL-terminated string in user space.
+ * Get the size of a NUL-terminated string in user space.
  *
- * Returns the size of the string INCLUDING the terminating NULL.
+ * Returns the size of the string INCLUDING the terminating NUL.
  * On exception, returns 0.
  * If the string is too long, returns a value greater than @n.
  */

@@ -15,6 +15,7 @@
 #include <linux/init.h>
 #include <linux/capability.h>
 #include <linux/atm_idt77105.h>
+#include <linux/spinlock.h>
 #include <asm/system.h>
 #include <asm/param.h>
 #include <asm/uaccess.h>
@@ -38,6 +39,7 @@ struct idt77105_priv {
         unsigned char old_mcr;          /* storage of MCR reg while signal lost */
 };
 
+static spinlock_t idt77105_priv_lock = SPIN_LOCK_UNLOCKED;
 
 #define PRIV(dev) ((struct idt77105_priv *) dev->phy_data)
 
@@ -144,12 +146,11 @@ static int fetch_stats(struct atm_dev *dev,struct idt77105_stats *arg,int zero)
 	unsigned long flags;
 	struct idt77105_stats stats;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&idt77105_priv_lock, flags);
 	memcpy(&stats, &PRIV(dev)->stats, sizeof(struct idt77105_stats));
 	if (zero)
 		memset(&PRIV(dev)->stats, 0, sizeof(struct idt77105_stats));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&idt77105_priv_lock, flags);
 	if (arg == NULL)
 		return 0;
 	return copy_to_user(arg, &PRIV(dev)->stats,
@@ -267,11 +268,10 @@ static int idt77105_start(struct atm_dev *dev)
 	if (!(PRIV(dev) = kmalloc(sizeof(struct idt77105_priv),GFP_KERNEL)))
 		return -ENOMEM;
 	PRIV(dev)->dev = dev;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&idt77105_priv_lock, flags);
 	PRIV(dev)->next = idt77105_all;
 	idt77105_all = PRIV(dev);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&idt77105_priv_lock, flags);
 	memset(&PRIV(dev)->stats,0,sizeof(struct idt77105_stats));
         
         /* initialise dev->signal from Good Signal Bit */
@@ -305,11 +305,9 @@ static int idt77105_start(struct atm_dev *dev)
 	idt77105_stats_timer_func(0); /* clear 77105 counters */
 	(void) fetch_stats(dev,NULL,1); /* clear kernel counters */
         
-	cli();
-	if (!start_timer) restore_flags(flags);
-	else {
+	spin_lock_irqsave(&idt77105_priv_lock, flags);
+	if (start_timer) {
 		start_timer = 0;
-		restore_flags(flags);
                 
 		init_timer(&stats_timer);
 		stats_timer.expires = jiffies+IDT77105_STATS_TIMER_PERIOD;
@@ -321,32 +319,11 @@ static int idt77105_start(struct atm_dev *dev)
 		restart_timer.function = idt77105_restart_timer_func;
 		add_timer(&restart_timer);
 	}
+	spin_unlock_irqrestore(&idt77105_priv_lock, flags);
 	return 0;
 }
 
 
-static const struct atmphy_ops idt77105_ops = {
-	idt77105_start,
-	idt77105_ioctl,
-	idt77105_int
-};
-
-
-int __init idt77105_init(struct atm_dev *dev)
-{
-	MOD_INC_USE_COUNT;
-
-	dev->phy = &idt77105_ops;
-	return 0;
-}
-
-
-/*
- * TODO: this function should be called through phy_ops
- * but that will not be possible for some time as there is
- * currently a freeze on modifying that structure
- * -- Greg Banks, 13 Sep 1999
- */
 int idt77105_stop(struct atm_dev *dev)
 {
 	struct idt77105_priv *walk, *prev;
@@ -372,30 +349,33 @@ int idt77105_stop(struct atm_dev *dev)
             }
         }
 
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
 
+static const struct atmphy_ops idt77105_ops = {
+	.start = 	idt77105_start,
+	.ioctl =	idt77105_ioctl,
+	.interrupt =	idt77105_int,
+	.stop =		idt77105_stop,
+};
+
+
+int idt77105_init(struct atm_dev *dev)
+{
+	dev->phy = &idt77105_ops;
+	return 0;
+}
 
 EXPORT_SYMBOL(idt77105_init);
-EXPORT_SYMBOL(idt77105_stop);
 
-MODULE_LICENSE("GPL");
-
-#ifdef MODULE
-
-int init_module(void)
-{
-	return 0;
-}
-
-
-void cleanup_module(void)
+static void __exit idt77105_exit(void)
 {
         /* turn off timers */
         del_timer(&stats_timer);
         del_timer(&restart_timer);
 }
 
-#endif
+module_exit(idt77105_exit);
+
+MODULE_LICENSE("GPL");

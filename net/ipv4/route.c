@@ -2600,13 +2600,6 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 #endif /* CONFIG_PROC_FS */
 #endif /* CONFIG_NET_CLS_ROUTE */
 
-int xfrm_dst_lookup(struct xfrm_dst **dst, struct flowi *fl)
-{
-        int err = 0;
-        err = __ip_route_output_key((struct rtable**)dst, fl);
-        return err;
-}
-
 int __init ip_rt_init(void)
 {
 	int i, order, goal, rc = 0;
@@ -2688,7 +2681,6 @@ int __init ip_rt_init(void)
 					ip_rt_gc_interval;
 	add_timer(&rt_periodic_timer);
 
-	xfrm_dst_lookup_register(xfrm_dst_lookup, AF_INET);
 #ifdef CONFIG_PROC_FS
 	if (rt_cache_proc_init())
 		goto out_enomem;
@@ -2698,6 +2690,7 @@ int __init ip_rt_init(void)
 #endif
 #endif
 	xfrm_init();
+	xfrm4_init();
 out:
 	return rc;
 out_enomem:

@@ -622,7 +622,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	int error, request_id;
 	dma_addr_t dma_handle;
 	unsigned short tw_aen_code;
-	unsigned long before, timeout;
+	unsigned long before;
 	unsigned long flags;
 	unsigned int data_buffer_length = 0;
 	unsigned long data_buffer_length_adjusted = 0;
@@ -635,7 +635,8 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	dprintk(KERN_WARNING "3w-xxxx: tw_chrdev_ioctl()\n");
 
 	/* Only let one of these through at a time */
-	down(&tw_dev->ioctl_sem);
+	if (down_interruptible(&tw_dev->ioctl_sem))
+		return -EINTR;
 
 	/* First copy down the buffer length */
 	error = copy_from_user(&data_buffer_length, (void *)arg, sizeof(unsigned int));
@@ -654,7 +655,7 @@ static int tw_chrdev_ioctl(struct inode *inode, struct file *file, unsigned int 
 	/* Now allocate ioctl buf memory */
 	cpu_addr = pci_alloc_consistent(tw_dev->tw_pci_dev, data_buffer_length_adjusted+sizeof(TW_New_Ioctl) - 1, &dma_handle);
 	if (cpu_addr == NULL) {
-		retval -ENOMEM;
+		retval = -ENOMEM;
 		goto out;
 	}
 
