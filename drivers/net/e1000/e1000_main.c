@@ -530,8 +530,9 @@ e1000_sw_init(struct e1000_adapter *adapter)
 	pci_read_config_word(pdev, PCI_COMMAND, &hw->pci_cmd_word);
 
 	adapter->rx_buffer_len = E1000_RXBUFFER_2048;
-	hw->max_frame_size = netdev->mtu + ENET_HEADER_SIZE + CRC_LENGTH;
-	hw->min_frame_size = MINIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH;
+	hw->max_frame_size = netdev->mtu +
+	                         ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
+	hw->min_frame_size = MINIMUM_ETHERNET_FRAME_SIZE;
 
 	/* identify the MAC */
 
@@ -1509,23 +1510,20 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 {
 	struct e1000_adapter *adapter = netdev->priv;
 	int old_mtu = adapter->rx_buffer_len;
-	int max_frame = new_mtu + ENET_HEADER_SIZE + CRC_LENGTH;
+	int max_frame = new_mtu + ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
 
-	if((max_frame < MINIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH) ||
-	   (max_frame > MAX_JUMBO_FRAME_SIZE + CRC_LENGTH)) {
+	if((max_frame < MINIMUM_ETHERNET_FRAME_SIZE) ||
+	   (max_frame > MAX_JUMBO_FRAME_SIZE)) {
 		E1000_ERR("Invalid MTU setting\n");
 		return -EINVAL;
 	}
 
-	if(max_frame <= MAXIMUM_ETHERNET_PACKET_SIZE + CRC_LENGTH) {
+	if(max_frame <= E1000_RXBUFFER_2048) {
 		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(adapter->hw.mac_type < e1000_82543) {
 		E1000_ERR("Jumbo Frames not supported on 82542\n");
 		return -EINVAL;
-
-	} else if(max_frame <= E1000_RXBUFFER_2048) {
-		adapter->rx_buffer_len = E1000_RXBUFFER_2048;
 
 	} else if(max_frame <= E1000_RXBUFFER_4096) {
 		adapter->rx_buffer_len = E1000_RXBUFFER_4096;
@@ -1540,8 +1538,6 @@ e1000_change_mtu(struct net_device *netdev, int new_mtu)
 	if(old_mtu != adapter->rx_buffer_len && netif_running(netdev)) {
 
 		e1000_down(adapter);
-		e1000_clean_rx_ring(adapter);
-		e1000_clean_tx_ring(adapter);
 		e1000_up(adapter);
 	}
 
