@@ -29,6 +29,7 @@
 #include <linux/ufs_fs.h>
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
+#include "swab.h"	/* will go away - see comment in mknod() */
 
 #undef UFS_NAMEI_DEBUG
 
@@ -118,6 +119,9 @@ static int ufs_mknod (struct inode * dir, struct dentry *dentry, int mode, dev_t
 	int err = PTR_ERR(inode);
 	if (!IS_ERR(inode)) {
 		init_special_inode(inode, mode, rdev);
+		/* NOTE: that'll go when we get wide dev_t */
+		UFS_I(inode)->i_u1.i_data[0] = cpu_to_fs32(inode->i_sb,
+							old_encode_dev(rdev));
 		mark_inode_dirty(inode);
 		lock_kernel();
 		err = ufs_add_nondir(dentry, inode);

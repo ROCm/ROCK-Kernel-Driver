@@ -475,6 +475,7 @@ void ufs_read_inode (struct inode * inode)
 	struct ufs_sb_private_info * uspi;
 	struct ufs_inode * ufs_inode;	
 	struct buffer_head * bh;
+	mode_t mode;
 	unsigned i;
 	unsigned flags;
 	
@@ -500,7 +501,7 @@ void ufs_read_inode (struct inode * inode)
 	/*
 	 * Copy data to the in-core inode.
 	 */
-	inode->i_mode = fs16_to_cpu(sb, ufs_inode->ui_mode);
+	inode->i_mode = mode = fs16_to_cpu(sb, ufs_inode->ui_mode);
 	inode->i_nlink = fs16_to_cpu(sb, ufs_inode->ui_nlink);
 	if (inode->i_nlink == 0)
 		ufs_error (sb, "ufs_read_inode", "inode %lu has zero nlink\n", inode->i_ino);
@@ -527,9 +528,7 @@ void ufs_read_inode (struct inode * inode)
 	ufsi->i_oeftflag = fs32_to_cpu(sb, ufs_inode->ui_u3.ui_sun.ui_oeftflag);
 	ufsi->i_lastfrag = (inode->i_size + uspi->s_fsize - 1) >> uspi->s_fshift;
 	
-	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		;
-	else if (inode->i_blocks) {
+	if (S_ISCHR(mode) || S_ISBLK(mode) || inode->i_blocks) {
 		for (i = 0; i < (UFS_NDADDR + UFS_NINDIR); i++)
 			ufsi->i_u1.i_data[i] = ufs_inode->ui_u2.ui_addr.ui_db[i];
 	}
@@ -555,7 +554,7 @@ void ufs_read_inode (struct inode * inode)
 		}
 	} else
 		init_special_inode(inode, inode->i_mode,
-			fs32_to_cpu(sb, ufs_inode->ui_u2.ui_addr.ui_db[0]));
+			old_decode_dev(fs32_to_cpu(sb, ufsi->i_u1.i_data[0])));
 
 	brelse (bh);
 
@@ -618,9 +617,10 @@ static int ufs_update_inode(struct inode * inode, int do_sync)
 		ufs_inode->ui_u3.ui_sun.ui_oeftflag = cpu_to_fs32(sb, ufsi->i_oeftflag);
 	}
 
-	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		ufs_inode->ui_u2.ui_addr.ui_db[0] = cpu_to_fs32(sb, inode->i_rdev);
-	else if (inode->i_blocks) {
+	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode)) {
+		/* ufs_inode->ui_u2.ui_addr.ui_db[0] = cpu_to_fs32(sb, inode->i_rdev); */
+		ufs_inode->ui_u2.ui_addr.ui_db[0] = ufsi->i_u1.i_data[0];
+	} else if (inode->i_blocks) {
 		for (i = 0; i < (UFS_NDADDR + UFS_NINDIR); i++)
 			ufs_inode->ui_u2.ui_addr.ui_db[i] = ufsi->i_u1.i_data[i];
 	}
