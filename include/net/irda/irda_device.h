@@ -230,7 +230,9 @@ int  irda_device_register_dongle(struct dongle_reg *dongle);
 dongle_t *irda_device_dongle_init(struct net_device *dev, int type);
 int irda_device_dongle_cleanup(dongle_t *dongle);
 
+#ifdef CONFIG_ISA
 void setup_dma(int channel, char *buffer, int count, int mode);
+#endif
 
 void irda_task_delete(struct irda_task *task);
 int  irda_task_kick(struct irda_task *task);
