@@ -32,6 +32,7 @@
 #include <linux/proc_fs.h>
 #include <linux/stringify.h>
 #include <linux/delay.h>
+#include <linux/initrd.h>
 #include <asm/prom.h>
 #include <asm/rtas.h>
 #include <asm/lmb.h>
@@ -137,6 +138,9 @@ phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays = 0;
 char *of_stdout_device = 0;
 
+static int iommu_force_on;
+int ppc64_iommu_off;
+
 extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern struct lmb lmb;
@@ -161,8 +165,6 @@ extern unsigned long reloc_offset(void);
 extern void enter_prom(struct prom_args *args);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
-
-static unsigned long __initdata initrd_start /* = 0 */, initrd_len;
 
 unsigned long dev_tree_size;
 unsigned long _get_PIR(void);
@@ -288,8 +290,8 @@ static int __init prom_next_node(phandle *nodep)
 	}
 }
 
-static unsigned long
-prom_initialize_naca(unsigned long mem)
+
+static void __init prom_initialize_naca(void)
 {
 	phandle node;
 	char type[64];
@@ -504,12 +506,8 @@ prom_initialize_naca(unsigned long mem)
 
 	prom_print(RELOC("prom_initialize_naca: end...\n"));
 #endif
-
-	return mem;
 }
 
-static int iommu_force_on;
-int ppc64_iommu_off;
 
 static void __init early_cmdline_parse(void)
 {
@@ -592,8 +590,7 @@ void prom_dump_lmb(void)
 }
 #endif /* DEBUG_PROM */
 
-static unsigned long __init
-prom_initialize_lmb(unsigned long mem)
+static void __init prom_initialize_lmb(void)
 {
 	phandle node;
 	char type[64];
@@ -655,8 +652,6 @@ prom_initialize_lmb(unsigned long mem)
 #ifdef DEBUG_PROM
 	prom_dump_lmb();
 #endif /* DEBUG_PROM */
-
-	return mem;
 }
 
 static char hypertas_funcs[1024];
@@ -1555,7 +1550,7 @@ static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end
 	if (*mem_start + needed > *mem_end) {
 		if (*mem_end != RELOC(initrd_start))
 			prom_panic(RELOC("No memory for copy_device_tree"));
-		*mem_start = RELOC(initrd_start) + RELOC(initrd_len);
+		*mem_start = RELOC(initrd_end);
 		/* We can't pass huge values to OF, so use 1G. */
 		*mem_end = *mem_start + 1024*1024*1024;
 	}
@@ -1714,22 +1709,52 @@ copy_device_tree(unsigned long mem_start)
 static struct bi_record * __init prom_bi_rec_verify(struct bi_record *bi_recs)
 {
 	struct bi_record *first, *last;
+#ifdef DEBUG_PROM
+	unsigned long offset = reloc_offset();
+
+  	prom_print(RELOC("birec_verify: r6=0x"));
+  	prom_print_hex((unsigned long)bi_recs);
+  	prom_print_nl();
+	if (bi_recs != NULL) {
+		prom_print(RELOC("  tag=0x"));
+		prom_print_hex(bi_recs->tag);
+		prom_print_nl();
+	}
+#endif /* DEBUG_PROM */
 
 	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
 		return NULL;
 
 	last = (struct bi_record *)(long)bi_recs->data[0];
+
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("  last=0x"));
+  	prom_print_hex((unsigned long)last);
+  	prom_print_nl();
+	if (last != NULL) {
+		prom_print(RELOC("  last_tag=0x"));
+		prom_print_hex(last->tag);
+		prom_print_nl();
+	}
+#endif /* DEBUG_PROM */
+
 	if ( last == NULL || last->tag != BI_LAST )
 		return NULL;
 
 	first = (struct bi_record *)(long)last->data[0];
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("  first=0x"));
+  	prom_print_hex((unsigned long)first);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
+
 	if ( first == NULL || first != bi_recs )
 		return NULL;
 
 	return bi_recs;
 }
 
-static unsigned long __init prom_bi_rec_reserve(unsigned long mem)
+static void __init prom_bi_rec_reserve(void)
 {
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
@@ -1740,11 +1765,16 @@ static unsigned long __init prom_bi_rec_reserve(unsigned long mem)
 		for ( rec=_prom->bi_recs;
 		      rec->tag != BI_LAST;
 		      rec=bi_rec_next(rec) ) {
+#ifdef DEBUG_PROM
+			prom_print(RELOC("bi: 0x"));
+			prom_print_hex(rec->tag);
+			prom_print_nl();
+#endif /* DEBUG_PROM */
 			switch (rec->tag) {
 #ifdef CONFIG_BLK_DEV_INITRD
 			case BI_INITRD:
-				RELOC(initrd_start) = rec->data[0];
-				RELOC(initrd_len) = rec->data[1];
+				RELOC(initrd_start) = (unsigned long)(rec->data[0]);
+				RELOC(initrd_end) = RELOC(initrd_start) + rec->data[1];
 				break;
 #endif /* CONFIG_BLK_DEV_INITRD */
 			}
@@ -1755,8 +1785,6 @@ static unsigned long __init prom_bi_rec_reserve(unsigned long mem)
 	 	 */
 		_prom->bi_recs = PTRUNRELOC(_prom->bi_recs);
 	}
-
-	return mem;
 }
 
 /*
@@ -1794,11 +1822,43 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	/* Init prom stdout device */
 	prom_init_stdout();
 
+#ifdef DEBUG_PROM
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(RELOC(klimit));
+  	prom_print_nl();
+  	prom_print(RELOC("offset=0x"));
+  	prom_print_hex(offset);
+  	prom_print_nl();
+  	prom_print(RELOC("->mem=0x"));
+  	prom_print_hex(RELOC(klimit) - offset);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
+
 	/* check out if we have bi_recs */
 	_prom->bi_recs = prom_bi_rec_verify((struct bi_record *)r6);
-	if ( _prom->bi_recs != NULL )
+	if ( _prom->bi_recs != NULL ) {
 		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs +
 					   _prom->bi_recs->data[1]);
+#ifdef DEBUG_PROM
+		prom_print(RELOC("bi_recs=0x"));
+		prom_print_hex((unsigned long)_prom->bi_recs);
+		prom_print_nl();
+		prom_print(RELOC("new mem=0x"));
+		prom_print_hex(RELOC(klimit) - offset);
+		prom_print_nl();
+#endif /* DEBUG_PROM */
+	}
+
+	/* If we don't have birec's or didn't find them, check for an initrd
+	 * using the "yaboot" way
+	 */
+#ifdef CONFIG_BLK_DEV_INITRD
+	if ( _prom->bi_recs == NULL && r3 && r4 && r4 != 0xdeadbeef) {
+		RELOC(initrd_start) = (r3 >= KERNELBASE) ? __pa(r3) : r3;
+		RELOC(initrd_end) = RELOC(initrd_start) + r4;
+		RELOC(initrd_below_start_ok) = 1;
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 	/* Default machine type. */
 	_systemcfg->platform = prom_find_machine_type();
@@ -1870,9 +1930,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
 	early_cmdline_parse();
 
-	mem = prom_initialize_lmb(mem);
+	prom_initialize_lmb();
 
-	mem = prom_bi_rec_reserve(mem);
+	prom_bi_rec_reserve();
 
 	mem = check_display(mem);
 
@@ -1880,7 +1940,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		prom_instantiate_rtas();
 
         /* Initialize some system info into the Naca early... */
-        mem = prom_initialize_naca(mem);
+        prom_initialize_naca();
 
 	smt_setup();
 
@@ -1891,17 +1951,36 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	prom_hold_cpus(mem);
 
 #ifdef DEBUG_PROM
+  	prom_print(RELOC("after basic inits, mem=0x"));
+  	prom_print_hex(mem);
+  	prom_print_nl();
+	prom_print(RELOC("initrd_start=0x"));
+	prom_print_hex(RELOC(initrd_start));
+	prom_print_nl();
+	prom_print(RELOC("initrd_end=0x"));
+	prom_print_hex(RELOC(initrd_end));
+	prom_print_nl();
 	prom_print(RELOC("copying OF device tree...\n"));
-#endif
+#endif /* DEBUG_PROM */
 	mem = copy_device_tree(mem);
 
 	RELOC(klimit) = mem + offset;
+
+#ifdef DEBUG_PROM
+	prom_print(RELOC("new klimit is\n"));
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(RELOC(klimit));
+	prom_print(RELOC(" ->mem=0x\n"));
+  	prom_print(RELOC("klimit=0x"));
+  	prom_print_hex(mem);
+  	prom_print_nl();
+#endif /* DEBUG_PROM */
 
 	lmb_reserve(0, __pa(RELOC(klimit)));
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* If this didn't cover the initrd, do so now */
 	if (mem < RELOC(initrd_start))
-		lmb_reserve(RELOC(initrd_start), RELOC(initrd_len));
+		lmb_reserve(RELOC(initrd_start), RELOC(initrd_end) - RELOC(initrd_start));
 #endif /* CONFIG_BLK_DEV_INITRD */
 
 	if (_systemcfg->platform == PLATFORM_PSERIES)
@@ -1922,6 +2001,14 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	prom_print(RELOC("Calling quiesce ...\n"));
 	call_prom(RELOC("quiesce"), 0, 0);
 	phys = KERNELBASE - offset;
+
+#ifdef CONFIG_BLK_DEV_INITRD
+	/* If we had an initrd, we convert its address to virtual */
+	if (RELOC(initrd_start)) {
+		RELOC(initrd_start) = (unsigned long)__va(RELOC(initrd_start));
+		RELOC(initrd_end) = (unsigned long)__va(RELOC(initrd_end));
+	}
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 	prom_print(RELOC("returning from prom_init\n"));
 	return phys;

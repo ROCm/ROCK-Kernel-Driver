@@ -188,29 +188,31 @@ void setup_system(unsigned long r3, unsigned long r4, unsigned long r5,
 #ifdef CONFIG_PPC_PSERIES
 	case PLATFORM_PSERIES:
 		pSeries_init_early();
-#ifdef CONFIG_BLK_DEV_INITRD
-		initrd_start = initrd_end = 0;
-#endif
 		parse_bootinfo();
 		break;
 
 	case PLATFORM_PSERIES_LPAR:
 		pSeriesLP_init_early();
-#ifdef CONFIG_BLK_DEV_INITRD
-		initrd_start = initrd_end = 0;
-#endif
 		parse_bootinfo();
 		break;
 #endif /* CONFIG_PPC_PSERIES */
 #ifdef CONFIG_PPC_PMAC
 	case PLATFORM_POWERMAC:
 		pmac_init_early();
-#ifdef CONFIG_BLK_DEV_INITRD
-		initrd_start = initrd_end = 0;
-#endif
 		parse_bootinfo();
 #endif /* CONFIG_PPC_PMAC */
 	}
+
+	/* If we were passed an initrd, set the ROOT_DEV properly if the values
+	 * look sensible. If not, clear initrd reference.
+	 */
+#ifdef CONFIG_BLK_DEV_INITRD
+	if (initrd_start >= KERNELBASE && initrd_end >= KERNELBASE &&
+	    initrd_end > initrd_start)
+		ROOT_DEV = Root_RAM0;
+	else
+		initrd_start = initrd_end = 0;
+#endif /* CONFIG_BLK_DEV_INITRD */
 
 #ifdef CONFIG_BOOTX_TEXT
 	map_boot_text();
@@ -425,15 +427,6 @@ struct seq_operations cpuinfo_op = {
 void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 		  unsigned long r6, unsigned long r7)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
-	if ((initrd_start == 0) && r3 && r4 && r4 != 0xdeadbeef) {
-		initrd_start = (r3 >= KERNELBASE) ? r3 : (unsigned long)__va(r3);
-		initrd_end = initrd_start + r4;
-		ROOT_DEV = Root_RAM0;
-		initrd_below_start_ok = 1;
-	}
-#endif
-
 	cmd_line[0] = 0;
 
 #ifdef CONFIG_CMDLINE
@@ -533,8 +526,6 @@ console_initcall(set_preferred_console);
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;
-	extern char *sysmap;
-	extern unsigned long sysmap_size;
 
 	rec = prom.bi_recs;
 
@@ -546,18 +537,6 @@ int parse_bootinfo(void)
 		case BI_CMD_LINE:
 			strlcpy(cmd_line, (void *)rec->data, sizeof(cmd_line));
 			break;
-		case BI_SYSMAP:
-			sysmap = __va(rec->data[0]);
-			sysmap_size = rec->data[1];
-			break;
-#ifdef CONFIG_BLK_DEV_INITRD
-		case BI_INITRD:
-			initrd_start = (unsigned long)__va(rec->data[0]);
-			initrd_end = initrd_start + rec->data[1];
-			ROOT_DEV = Root_RAM0;
-			initrd_below_start_ok = 1;
-			break;
-#endif /* CONFIG_BLK_DEV_INITRD */
 		}
 	}
 

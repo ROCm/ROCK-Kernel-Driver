@@ -31,7 +31,6 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/initrd.h>
 #include <linux/ioport.h>
 #include <linux/console.h>
 #include <linux/pci.h>
@@ -136,15 +135,10 @@ chrp_setup_arch(void)
 	/* init to some ~sane value until calibrate_delay() runs */
 	loops_per_jiffy = 50000000;
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* this is fine for chrp */
-	initrd_below_start_ok = 1;
-	
-	if (initrd_start)
-		ROOT_DEV = Root_RAM0;
-	else
-#endif
-	ROOT_DEV = Root_SDA2;
+	if (ROOT_DEV == 0) {
+		printk("No ramdisk, default root is /dev/sda2\n");
+		ROOT_DEV = Root_SDA2;
+	}
 
 	printk("Boot arguments: %s\n", cmd_line);
 
@@ -239,17 +233,6 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	char * hypertas;
 	unsigned int len;
 
-#if 0 /* PPPBBB remove this later... -Peter */
-#ifdef CONFIG_BLK_DEV_INITRD
-	/* take care of initrd if we have one */
-	if ( r6 )
-	{
-		initrd_start = __va(r6);
-		initrd_end = __va(r6 + r7);
-	}
-#endif /* CONFIG_BLK_DEV_INITRD */
-#endif
-
 	ppc_md.setup_arch     = chrp_setup_arch;
 	ppc_md.get_cpuinfo    = chrp_get_cpuinfo;
 	if (naca->interrupt_controller == IC_OPEN_PIC) {
@@ -280,8 +263,13 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
          * using contents of device-tree/ibm,hypertas-functions.
          * Ultimately this functionality may be moved into prom.c prom_init().
          */
-	dn = of_find_node_by_path("/rtas");
 	cur_cpu_spec->firmware_features = 0;
+	dn = of_find_node_by_path("/rtas");
+	if (dn == NULL) {
+		printk(KERN_ERR "WARNING ! Cannot find RTAS in device-tree !\n");
+		goto no_rtas;
+	}
+
 	hypertas = get_property(dn, "ibm,hypertas-functions", &len);
 	if (hypertas) {
 		while (len > 0){
@@ -303,6 +291,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 
 	of_node_put(dn);
+ no_rtas:
 	printk(KERN_INFO "firmware_features = 0x%lx\n", 
 	       cur_cpu_spec->firmware_features);
 }

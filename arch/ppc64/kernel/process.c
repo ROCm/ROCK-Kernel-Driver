@@ -65,9 +65,6 @@ struct mm_struct ioremap_mm = {
 	.page_table_lock = SPIN_LOCK_UNLOCKED,
 };
 
-char *sysmap = NULL;
-unsigned long sysmap_size = 0;
-
 void enable_kernel_fp(void)
 {
 #ifdef CONFIG_SMP

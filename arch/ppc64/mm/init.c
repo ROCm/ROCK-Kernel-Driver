@@ -621,8 +621,6 @@ module_init(setup_kcore);
 void __init mem_init(void)
 {
 #ifndef CONFIG_DISCONTIGMEM
-	extern char *sysmap; 
-	extern unsigned long sysmap_size;
 	unsigned long addr;
 #endif
 	int codepages = 0;
@@ -656,12 +654,6 @@ void __init mem_init(void)
 
 	totalram_pages += free_all_bootmem();
 
-	if ( sysmap_size )
-		for (addr = (unsigned long)sysmap;
-		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
-		     addr += PAGE_SIZE)
-			SetPageReserved(virt_to_page(addr));
-	
 	for (addr = KERNELBASE; addr <= (unsigned long)__va(lmb_end_of_DRAM());
 	     addr += PAGE_SIZE) {
 		if (!PageReserved(virt_to_page(addr)))
