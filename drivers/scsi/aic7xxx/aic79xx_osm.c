@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#101 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#102 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2487,6 +2487,11 @@ ahd_linux_dv_thread(void *data)
 #endif
 
 	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	/*
 	 * Complete thread creation.
 	 */
 	lock_kernel();
@@ -2495,7 +2500,11 @@ ahd_linux_dv_thread(void *data)
 	unlock_kernel();
 
 	while (1) {
-		down(&ahd->platform_data->dv_sem);
+		/*
+		 * Use down_interruptible() rather than down() to
+		 * avoid inclusion in the load average.
+		 */
+		down_interruptible(&ahd->platform_data->dv_sem);
 
 		/* Check to see if we've been signaled to exit */
 		ahd_lock(ahd, &s);
@@ -2518,7 +2527,7 @@ ahd_linux_dv_thread(void *data)
 		while (LIST_FIRST(&ahd->pending_scbs) != NULL) {
 			ahd->platform_data->flags |= AHD_DV_WAIT_SIMQ_EMPTY;
 			ahd_unlock(ahd, &s);
-			down(&ahd->platform_data->dv_sem);
+			down_interruptible(&ahd->platform_data->dv_sem);
 			ahd_lock(ahd, &s);
 		}
 
@@ -2529,7 +2538,7 @@ ahd_linux_dv_thread(void *data)
 		while (AHD_DV_SIMQ_FROZEN(ahd) == 0) {
 			ahd->platform_data->flags |= AHD_DV_WAIT_SIMQ_RELEASE;
 			ahd_unlock(ahd, &s);
-			down(&ahd->platform_data->dv_sem);
+			down_interruptible(&ahd->platform_data->dv_sem);
 			ahd_lock(ahd, &s);
 		}
 		ahd_unlock(ahd, &s);
@@ -2694,7 +2703,7 @@ ahd_linux_dv_target(struct ahd_softc *ahd, u_int target_offset)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		ahd_unlock(ahd, &s);
 #endif
-		down(&ahd->platform_data->dv_cmd_sem);
+		down_interruptible(&ahd->platform_data->dv_cmd_sem);
 		/*
 		 * Wait for the SIMQ to be released so that DV is the
 		 * only reason the queue is frozen.
@@ -2703,7 +2712,7 @@ ahd_linux_dv_target(struct ahd_softc *ahd, u_int target_offset)
 		while (AHD_DV_SIMQ_FROZEN(ahd) == 0) {
 			ahd->platform_data->flags |= AHD_DV_WAIT_SIMQ_RELEASE;
 			ahd_unlock(ahd, &s);
-			down(&ahd->platform_data->dv_sem);
+			down_interruptible(&ahd->platform_data->dv_sem);
 			ahd_lock(ahd, &s);
 		}
 		ahd_unlock(ahd, &s);

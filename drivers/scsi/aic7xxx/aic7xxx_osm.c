@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#164 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#165 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -2339,6 +2339,11 @@ ahc_linux_dv_thread(void *data)
 #endif
 
 	/*
+	 * Don't care about any signals.
+	 */
+	siginitsetinv(&current->blocked, 0);
+
+	/*
 	 * Complete thread creation.
 	 */
 	lock_kernel();
@@ -2347,7 +2352,11 @@ ahc_linux_dv_thread(void *data)
 	unlock_kernel();
 
 	while (1) {
-		down(&ahc->platform_data->dv_sem);
+		/*
+		 * Use down_interruptible() rather than down() to
+		 * avoid inclusion in the load average.
+		 */
+		down_interruptible(&ahc->platform_data->dv_sem);
 
 		/* Check to see if we've been signaled to exit */
 		ahc_lock(ahc, &s);
@@ -2370,7 +2379,7 @@ ahc_linux_dv_thread(void *data)
 		while (LIST_FIRST(&ahc->pending_scbs) != NULL) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_EMPTY;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 
@@ -2381,7 +2390,7 @@ ahc_linux_dv_thread(void *data)
 		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 		ahc_unlock(ahc, &s);
@@ -2546,7 +2555,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		ahc_unlock(ahc, &s);
 #endif
-		down(&ahc->platform_data->dv_cmd_sem);
+		down_interruptible(&ahc->platform_data->dv_cmd_sem);
 		/*
 		 * Wait for the SIMQ to be released so that DV is the
 		 * only reason the queue is frozen.
@@ -2555,7 +2564,7 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		while (AHC_DV_SIMQ_FROZEN(ahc) == 0) {
 			ahc->platform_data->flags |= AHC_DV_WAIT_SIMQ_RELEASE;
 			ahc_unlock(ahc, &s);
-			down(&ahc->platform_data->dv_sem);
+			down_interruptible(&ahc->platform_data->dv_sem);
 			ahc_lock(ahc, &s);
 		}
 		ahc_unlock(ahc, &s);
