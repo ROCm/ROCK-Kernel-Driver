@@ -1,33 +1,78 @@
 
 menu "TI OMAP Implementations"
 
-choice
-	prompt "OMAP Core Type"
+comment "OMAP Core Type"
+
+config ARCH_OMAP730
 	depends on ARCH_OMAP
-	default ARCH_OMAP1510
+	bool "OMAP730 Based System"
+	select CPU_ARM926T
 
 config ARCH_OMAP1510
-	bool "OMAP-1510 Based System"
+	depends on ARCH_OMAP
+	default y
+	bool "OMAP1510 Based System"
 	select CPU_ARM925T
 	select CPU_DCACHE_WRITETHROUGH
 
 config ARCH_OMAP1610
-	bool "OMAP-1610 Based System"
+	depends on ARCH_OMAP
+	bool "OMAP1610 Based System"
 	select CPU_ARM926T
 
-endchoice
-
-choice
-	prompt "OMAP Board Type"
+config ARCH_OMAP5912
 	depends on ARCH_OMAP
-	default MACH_OMAP_INNOVATOR
+	bool "OMAP5912 Based System"
+	select CPU_ARM926T
+
+comment "OMAP Board Type"
 
 config MACH_OMAP_INNOVATOR
 	bool "TI Innovator"
+	default y
 	depends on ARCH_OMAP1510 || ARCH_OMAP1610
 	help
           TI OMAP 1510 or 1610 Innovator board support. Say Y here if you
           have such a board.
+
+config MACH_OMAP_H2
+	bool "TI H2 Support"
+	depends on ARCH_OMAP1610
+        select MACH_OMAP_INNOVATOR
+    	help
+	  TI OMAP 1610 H2 board support. Say Y here if you have such
+	  a board.
+
+config MACH_OMAP_H3
+	bool "TI H3 Support"
+	depends on ARCH_OMAP1610
+    	help
+	  TI OMAP 1610 H3 board support. Say Y here if you have such
+	  a board.
+
+config MACH_OMAP_H4
+	bool "TI H4 Support"
+	depends on ARCH_OMAP1610
+    	help
+	  TI OMAP 1610 H4 board support. Say Y here if you have such
+	  a board.
+
+config MACH_OMAP_OSK
+	bool "TI OSK Support"
+	depends on ARCH_OMAP5912
+    	help
+	  TI OMAP 5912 OSK (OMAP Starter Kit) board support. Say Y here
+          if you have such a board.
+
+config MACH_OMAP_PERSEUS2
+	bool "TI Perseus2"
+	depends on ARCH_OMAP730
+	select LEDS
+	select LEDS_TIMER
+	select LEDS_CPU
+    	help
+	  Support for TI OMAP 730 Perseus2 board. Say Y here if you have such
+	  a board.
 
 config MACH_OMAP_GENERIC
 	bool "Generic OMAP board"
@@ -38,16 +83,15 @@ config MACH_OMAP_GENERIC
           custom OMAP boards. Say Y here if you have a custom
           board.
 
-endchoice
-
 comment "OMAP Feature Selections"
 
-config MACH_OMAP_H2
-	bool "TI H2 Support"
-	depends on ARCH_OMAP1610 && MACH_OMAP_INNOVATOR
-    	help
-	  TI OMAP 1610 H2 board support. Say Y here if you have such
-	  a board.
+#config OMAP_BOOT_TAG
+#	bool "OMAP bootloader information passing"
+#        depends on ARCH_OMAP
+#        default n
+#        help
+#          Say Y, if you have a bootloader which passes information
+#          about your board and its peripheral configuration.
 
 config OMAP_MUX
 	bool "OMAP multiplexing support"
@@ -67,6 +111,22 @@ config OMAP_MUX_DEBUG
           This is useful if you want to find out the correct values of the
           multiplexing registers.
 
+choice
+	prompt "Low-level debug console UART"
+	depends on ARCH_OMAP
+	default OMAP_LL_DEBUG_UART1
+
+config OMAP_LL_DEBUG_UART1
+	bool "UART1"
+
+config OMAP_LL_DEBUG_UART2
+	bool "UART2"
+
+config OMAP_LL_DEBUG_UART3
+	bool "UART3"
+
+endchoice
+
 config OMAP_ARM_195MHZ
 	bool "OMAP ARM 195 MHz CPU"
 	depends on ARCH_OMAP730
@@ -75,7 +135,7 @@ config OMAP_ARM_195MHZ
 
 config OMAP_ARM_192MHZ
 	bool "OMAP ARM 192 MHz CPU"
-	depends on ARCH_OMAP1610
+	depends on ARCH_OMAP1610 || ARCH_OMAP5912
 	help
           Enable 192MHz clock for OMAP CPU. If unsure, say N.
 
@@ -87,7 +147,7 @@ config OMAP_ARM_182MHZ
 
 config OMAP_ARM_168MHZ
 	bool "OMAP ARM 168 MHz CPU"
-	depends on ARCH_OMAP1510 || ARCH_OMAP1610 || ARCH_OMAP730
+	depends on ARCH_OMAP1510 || ARCH_OMAP1610 || ARCH_OMAP730 || ARCH_OMAP5912
 	help
           Enable 168MHz clock for OMAP CPU. If unsure, say N.
 

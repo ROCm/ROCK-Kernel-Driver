@@ -93,6 +93,8 @@ static struct bus_type omap_bus_types[OMAP_NR_BUSES] = {
  */
 inline int dmadev_uses_omap_lbus(struct device * dev)
 {
+	if (dev == NULL || !cpu_is_omap1510())
+		return 0;
 	return dev->bus == &omap_bus_types[OMAP_BUS_LBUS] ? 1 : 0;
 }
 
@@ -183,6 +185,9 @@ int omap_device_register(struct omap_dev *odev)
 	/* This is needed for USB OHCI to work */
 	if (odev->dma_mask)
 		odev->dev.dma_mask = odev->dma_mask;
+
+	if (odev->coherent_dma_mask)
+		odev->dev.coherent_dma_mask = odev->coherent_dma_mask;
 
 	snprintf(odev->dev.bus_id, BUS_ID_SIZE, "%s%u",
 		 odev->name, odev->devid);

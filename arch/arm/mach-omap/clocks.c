@@ -34,6 +34,7 @@
 #include <asm/errno.h>
 #include <asm/io.h>
 #include <asm/arch/clocks.h>
+#include <asm/arch/board.h>
 
 /* Input clock in MHz */
 static unsigned int source_clock = 12;
@@ -49,10 +50,10 @@ typedef struct {
 	char		*name;
 	__u8		flags;
 	ck_t		parent;
-	volatile __u16	*rate_reg;	/* Clock rate register */
-	volatile __u16	*enbl_reg;	/* Enable register */
-	volatile __u16	*idle_reg;	/* Idle register */
-	volatile __u16	*slct_reg;	/* Select register */
+	unsigned long	rate_reg;	/* Clock rate register */
+	unsigned long	enbl_reg;	/* Enable register */
+	unsigned long	idle_reg;	/* Idle register */
+	unsigned long	slct_reg;	/* Select register */
 	__s8		rate_shift;	/* Clock rate bit shift */
 	__s8		enbl_shift;	/* Clock enable bit shift */
 	__s8		idle_shift;	/* Clock idle bit shift */
@@ -245,7 +246,7 @@ int
 ck_set_input(ck_t ck, ck_t input)
 {
 	int ret = 0, shift;
-	volatile __u16 *reg;
+	unsigned short reg;
 	unsigned long flags;
 
 	if (!CK_IN_RANGE(ck) || !CK_CAN_SWITCH(ck)) {
@@ -253,15 +254,17 @@ ck_set_input(ck_t ck, ck_t input)
 		goto exit;
 	}
 
-	reg = CK_SELECT_REG(ck);
+	reg = omap_readw(CK_SELECT_REG(ck));
 	shift = CK_SELECT_SHIFT(ck);
 
 	spin_lock_irqsave(&clock_lock, flags);
 	if (input == OMAP_CLKIN) {
-		*((volatile __u16 *) reg) &= ~(1 << shift);
+		reg &= ~(1 << shift);
+		omap_writew(reg, CK_SELECT_REG(ck));
 		goto exit;
 	} else if (input == CK_PARENT(ck)) {
-		*((volatile __u16 *) reg) |= (1 << shift);
+		reg |= (1 << shift);
+		omap_writew(reg, CK_SELECT_REG(ck));
 		goto exit;
 	}
 
@@ -285,11 +288,11 @@ ck_get_input(ck_t ck, ck_t * input)
 	spin_lock_irqsave(&clock_lock, flags);
 	if (CK_CAN_SWITCH(ck)) {
 		int shift;
-		volatile __u16 *reg;
+		unsigned short reg;
 
-		reg = CK_SELECT_REG(ck);
+		reg = omap_readw(CK_SELECT_REG(ck));
 		shift = CK_SELECT_SHIFT(ck);
-		if (*reg & (1 << shift)) {
+		if (reg & (1 << shift)) {
 			*input = CK_PARENT(ck);
 			goto exit;
 		}
@@ -305,7 +308,7 @@ ck_get_input(ck_t ck, ck_t * input)
 static int
 __ck_set_pll_rate(ck_t ck, int rate)
 {
-	volatile __u16 *pll;
+	unsigned short pll;
 	unsigned long flags;
 
 	if ((rate < 0) || (rate > CK_MAX_PLL_FREQ))
@@ -322,13 +325,16 @@ __ck_set_pll_rate(ck_t ck, int rate)
 	}
 
 	spin_lock_irqsave(&clock_lock, flags);
-	pll = (volatile __u16 *) CK_RATE_REG(ck);
+	pll = omap_readw(CK_RATE_REG(ck));
 
 	/* Clear the rate bits */
-	*pll &= ~(0x1f << 5);
+	pll &= ~(0x1f << 5);
 
 	/* Set the rate bits */
-	*pll |= (ck_lookup_table[rate - 1] << 5);
+	pll |= (ck_lookup_table[rate - 1] << 5);
+
+	omap_writew(pll, CK_RATE_REG(ck));
+
 	spin_unlock_irqrestore(&clock_lock, flags);
 
 	return 0;
@@ -338,7 +344,7 @@ static int
 __ck_set_clkm_rate(ck_t ck, int rate)
 {
 	int shift, prate, div, ret;
-	volatile __u16 *reg;
+	unsigned short reg;
 	unsigned long flags;
 
 	spin_lock_irqsave(&clock_lock, flags);
@@ -390,10 +396,11 @@ __ck_set_clkm_rate(ck_t ck, int rate)
 	 * At last, we can set the divisor. Clear the old rate bits and
 	 * set the new ones.
 	 */
-	reg = (volatile __u16 *) CK_RATE_REG(ck);
+	reg = omap_readw(CK_RATE_REG(ck));
 	shift = CK_RATE_SHIFT(ck);
-	*reg &= ~(3 << shift);
-	*reg |= (div << shift);
+	reg &= ~(3 << shift);
+	reg |= (div << shift);
+	omap_writew(reg, CK_RATE_REG(ck));
 
 	/* And return the new (actual, after rounding down) rate. */
 	ret = prate;
@@ -432,7 +439,7 @@ __ck_get_pll_rate(ck_t ck)
 {
 	int m, d;
 
-	__u16 pll = *((volatile __u16 *) CK_RATE_REG(ck));
+	unsigned short pll = omap_readw(CK_RATE_REG(ck));
 
 	m = (pll & (0x1f << 7)) >> 7;
 	m = m ? m : 1;
@@ -448,7 +455,7 @@ __ck_get_clkm_rate(ck_t ck)
 	static int bits2div[] = { 1, 2, 4, 8 };
 	int in, bits, reg, shift;
 
-	reg = *(CK_RATE_REG(ck));
+	reg = omap_readw(CK_RATE_REG(ck));
 	shift = CK_RATE_SHIFT(ck);
 
 	in = ck_get_rate(CK_PARENT(ck));
@@ -520,7 +527,7 @@ ck_get_rate(ck_t ck)
 int
 ck_enable(ck_t ck)
 {
-	volatile __u16 *reg;
+	unsigned short reg;
 	int ret = -EINVAL, shift;
 	unsigned long flags;
 
@@ -537,9 +544,10 @@ ck_enable(ck_t ck)
 		goto exit;
 
 	spin_lock_irqsave(&clock_lock, flags);
-	reg = CK_ENABLE_REG(ck);
+	reg = omap_readw(CK_ENABLE_REG(ck));
 	shift = CK_ENABLE_SHIFT(ck);
-	*reg |= (1 << shift);
+	reg |= (1 << shift);
+	omap_writew(reg, CK_ENABLE_REG(ck));
 	spin_unlock_irqrestore(&clock_lock, flags);
 
  exit:
@@ -549,7 +557,7 @@ ck_enable(ck_t ck)
 int
 ck_disable(ck_t ck)
 {
-	volatile __u16 *reg;
+	unsigned short reg;
 	int ret = -EINVAL, shift;
 	unsigned long flags;
 
@@ -568,9 +576,10 @@ ck_disable(ck_t ck)
 		return -EINVAL;
 
 	spin_lock_irqsave(&clock_lock, flags);
-	reg = CK_ENABLE_REG(ck);
+	reg = omap_readw(CK_ENABLE_REG(ck));
 	shift = CK_ENABLE_SHIFT(ck);
-	*reg &= ~(1 << shift);
+	reg &= ~(1 << shift);
+	omap_writew(reg, CK_ENABLE_REG(ck));
 	spin_unlock_irqrestore(&clock_lock, flags);
 
  exit:
@@ -606,54 +615,71 @@ __ck_make_lookup_table(void)
 int __init
 init_ck(void)
 {
+	const struct omap_clock_info *info;
+	int crystal_type = 0; /* Default 12 MHz */
+
 	__ck_make_lookup_table();
+	info = omap_get_per_info(OMAP_TAG_CLOCK, struct omap_clock_info);
+	if (info != NULL) {
+		if (!cpu_is_omap1510())
+			crystal_type = info->system_clock_type;
+	}
 
 	/* We want to be in syncronous scalable mode */
-	*ARM_SYSST = 0x1000;
+	omap_writew(0x1000, ARM_SYSST);
 #if defined(CONFIG_OMAP_ARM_30MHZ)
-	*ARM_CKCTL = 0x1555;
-	*DPLL_CTL_REG = 0x2290;
+	omap_writew(0x1555, ARM_CKCTL);
+	omap_writew(0x2290, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_60MHZ)
-	*ARM_CKCTL = 0x1005;
-	*DPLL_CTL_REG = 0x2290;
+	omap_writew(0x1005, ARM_CKCTL);
+	omap_writew(0x2290, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_96MHZ)
-	*ARM_CKCTL = 0x1005;
-	*DPLL_CTL_REG = 0x2410;
+	omap_writew(0x1005, ARM_CKCTL);
+	omap_writew(0x2410, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_120MHZ)
-	*ARM_CKCTL = 0x110a;
-	*DPLL_CTL_REG = 0x2510;
+	omap_writew(0x110a, ARM_CKCTL);
+	omap_writew(0x2510, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_168MHZ)
-	*ARM_CKCTL = 0x110f;
-	*DPLL_CTL_REG = 0x2710;
+	omap_writew(0x110f, ARM_CKCTL);
+	omap_writew(0x2710, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_182MHZ) && defined(CONFIG_ARCH_OMAP730)
-	*ARM_CKCTL = 0x250E;
-	*DPLL_CTL_REG = 0x2713;
-#elif defined(CONFIG_OMAP_ARM_192MHZ) && defined(CONFIG_ARCH_OMAP1610)
-	*ARM_CKCTL = 0x110f;
+	omap_writew(0x250E, ARM_CKCTL);
+	omap_writew(0x2710, DPLL_CTL_REG);
+#elif defined(CONFIG_OMAP_ARM_192MHZ) && (defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912))
+	omap_writew(0x150f, ARM_CKCTL);
 	if (crystal_type == 2) {
 		source_clock = 13;	/* MHz */
-		*DPLL_CTL_REG = 0x2510;
+		omap_writew(0x2510, DPLL_CTL_REG);
 	} else
-		*DPLL_CTL_REG = 0x2810;
+		omap_writew(0x2810, DPLL_CTL_REG);
 #elif defined(CONFIG_OMAP_ARM_195MHZ) && defined(CONFIG_ARCH_OMAP730)
-	*ARM_CKCTL = 0x250E;
-	*DPLL_CTL_REG = 0x2793;
+	omap_writew(0x250E, ARM_CKCTL);
+	omap_writew(0x2790, DPLL_CTL_REG);
 #else
 #error "OMAP MHZ not set, please run make xconfig"
 #endif
 
+#ifdef CONFIG_MACH_OMAP_PERSEUS2
+	/* Select slicer output as OMAP input clock */
+	omap_writew(omap_readw(OMAP730_PCC_UPLD_CTRL_REG) & ~0x1, OMAP730_PCC_UPLD_CTRL_REG);
+#endif
+
 	/* Turn off some other junk the bootloader might have turned on */
-	*ARM_CKCTL &= 0x0fff;	/* Turn off DSP, ARM_INTHCK, ARM_TIMXO */
-	*ARM_RSTCT1 = 0;	/* Put DSP/MPUI into reset until needed */
-	*ARM_RSTCT2 = 1;
-	*ARM_IDLECT1 = 0x400;
+
+	/* Turn off DSP, ARM_INTHCK, ARM_TIMXO */
+	omap_writew(omap_readw(ARM_CKCTL) & 0x0fff, ARM_CKCTL);
+
+	/* Put DSP/MPUI into reset until needed */
+	omap_writew(0, ARM_RSTCT1);
+	omap_writew(1, ARM_RSTCT2);
+	omap_writew(0x400, ARM_IDLECT1);
 
 	/*
 	 * According to OMAP5910 Erratum SYS_DMA_1, bit DMACK_REQ (bit 8)
 	 * of the ARM_IDLECT2 register must be set to zero. The power-on
 	 * default value of this bit is one.
 	 */
-	*ARM_IDLECT2 = 0x0000;	/* Turn LCD clock off also */
+	omap_writew(0x0000, ARM_IDLECT2);	/* Turn LCD clock off also */
 
 	/*
 	 * Only enable those clocks we will need, let the drivers

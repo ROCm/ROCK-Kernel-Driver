@@ -1,7 +1,7 @@
 /*
  * linux/arch/arm/mach-omap/fpga.c
  *
- * Interrupt handler for OMAP-1510 FPGA
+ * Interrupt handler for OMAP-1510 Innovator FPGA
  *
  * Copyright (C) 2001 RidgeRun, Inc.
  * Author: Greg Lonnon <glonnon@ridgerun.com>

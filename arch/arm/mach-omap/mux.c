@@ -32,14 +32,14 @@
 #define __MUX_C__
 #include <asm/arch/mux.h>
 
-static spinlock_t mux_spin_lock = SPIN_LOCK_UNLOCKED;
-
 /*
  * Sets the Omap MUX and PULL_DWN registers based on the table
  */
 int omap_cfg_reg(const reg_cfg_t reg_cfg)
 {
 #ifdef CONFIG_OMAP_MUX
+	static spinlock_t mux_spin_lock = SPIN_LOCK_UNLOCKED;
+
 	unsigned long flags;
 	reg_cfg_set *cfg;
 	unsigned int reg_orig = 0, reg = 0, pu_pd_orig = 0, pu_pd = 0,
@@ -56,20 +56,20 @@ int omap_cfg_reg(const reg_cfg_t reg_cfg)
 
 	/* Check the mux register in question */
 	if (cfg->mux_reg) {
-		reg_orig = __raw_readl(cfg->mux_reg);
+		reg_orig = omap_readl(cfg->mux_reg);
 
 		/* The mux registers always seem to be 3 bits long */
 		reg = reg_orig & ~(0x7 << cfg->mask_offset);
 
 		reg |= (cfg->mask << cfg->mask_offset);
 
-		__raw_writel(reg, cfg->mux_reg);
+		omap_writel(reg, cfg->mux_reg);
 	}
 
 	/* Check for pull up or pull down selection on 1610 */
 	if (!cpu_is_omap1510()) {
 		if (cfg->pu_pd_reg && cfg->pull_val) {
-			pu_pd_orig = __raw_readl(cfg->pu_pd_reg);
+			pu_pd_orig = omap_readl(cfg->pu_pd_reg);
 			if (cfg->pu_pd_val) {
 				/* Use pull up */
 				pu_pd = pu_pd_orig | (1 << cfg->pull_bit);
@@ -77,13 +77,13 @@ int omap_cfg_reg(const reg_cfg_t reg_cfg)
 				/* Use pull down */
 				pu_pd = pu_pd_orig & ~(1 << cfg->pull_bit);
 			}
-			__raw_writel(pu_pd, cfg->pu_pd_reg);
+			omap_writel(pu_pd, cfg->pu_pd_reg);
 		}
 	}
 
 	/* Check for an associated pull down register */
 	if (cfg->pull_reg) {
-		pull_orig = __raw_readl(cfg->pull_reg);
+		pull_orig = omap_readl(cfg->pull_reg);
 
 		if (cfg->pull_val) {
 			/* Low bit = pull enabled */
@@ -93,7 +93,7 @@ int omap_cfg_reg(const reg_cfg_t reg_cfg)
 			pull = pull_orig | (1 << cfg->pull_bit);
 		}
 
-		__raw_writel(pull, cfg->pull_reg);
+		omap_writel(pull, cfg->pull_reg);
 	}
 
 #ifdef CONFIG_OMAP_MUX_DEBUG
@@ -110,8 +110,9 @@ int omap_cfg_reg(const reg_cfg_t reg_cfg)
 			}
 		}
 
-		printk("      %s (0x%08x) = 0x%08x -> 0x%08x\n",
-		       cfg->pull_name, cfg->pull_reg, pull_orig, pull);
+		if (cfg->pull_reg)
+			printk("      %s (0x%08x) = 0x%08x -> 0x%08x\n",
+			       cfg->pull_name, cfg->pull_reg, pull_orig, pull);
 	}
 #endif
 

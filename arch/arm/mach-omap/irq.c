@@ -1,13 +1,18 @@
 /*
  * linux/arch/arm/mach-omap/irq.c
  *
- * Interrupt handler for OMAP-1510 and 1610
+ * Interrupt handler for all OMAP boards
  *
- * Copyright (C) 2001 RidgeRun, Inc.
- * Author: Greg Lonnon <glonnon@ridgerun.com>
+ * Copyright (C) 2004 Nokia Corporation
+ * Written by Tony Lindgren <tony@atomide.com>
  *
- * Modified for OMAP-1610 by Tony Lindgren <tony.lindgren@nokia.com>
- * GPIO interrupt handler moved to gpio.c for OMAP-1610 by Juha Yrjola
+ * Completely re-written to support various OMAP chips with bank specific
+ * interrupt handlers.
+ *
+ * Some snippets of the code taken from the older OMAP interrupt handler
+ * Copyright (C) 2001 RidgeRun, Inc. Greg Lonnon <glonnon@ridgerun.com>
+ *
+ * GPIO interrupt handler moved to gpio.c by Juha Yrjola
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -25,8 +30,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * You should have received a copy of the GNU General Public License along
- * with this program; if not, write to the Free Software Foundation, Inc.,
+ * You should have received a copy of the  GNU General Public License along
+ * with this program; if not, write  to the Free Software Foundation, Inc.,
  * 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
@@ -44,181 +49,226 @@
 
 #include <asm/io.h>
 
-#define NUM_IRQS	IH_BOARD_BASE
+#include "irq.h"
 
-static void mask_irq(unsigned int irq);
-static void unmask_irq(unsigned int irq);
-static void ack_irq(unsigned int irq);
+static unsigned int banks = 0;
+static struct omap_irq_bank irq_banks[MAX_NR_IRQ_BANKS];
 
-static inline void
-write_ih(int level, int reg, u32 value)
+static inline unsigned int irq_bank_readl(int bank, int offset)
 {
-	if (cpu_is_omap1510()) {
-		__raw_writel(value,
-			(IO_ADDRESS((level ? OMAP_IH2_BASE : OMAP_IH1_BASE) +
-				(reg))));
+	return omap_readl(irq_banks[bank].base_reg + offset);
+}
+
+static inline void irq_bank_writel(unsigned long value, int bank, int offset)
+{
+	omap_writel(value, irq_banks[bank].base_reg + offset);
+}
+
+/*
+ * Ack routine for chips with register offsets of 0x100
+ */
+static void omap_offset_ack_irq(unsigned int irq)
+{
+	if (irq > 31)
+		omap_writel(0x1, OMAP_IH2_BASE + IRQ_CONTROL_REG);
+
+	omap_writel(0x1, OMAP_IH1_BASE + IRQ_CONTROL_REG);
+}
+
+/*
+ * Mask routine for chips with register offsets of 0x100
+ */
+static void omap_offset_mask_irq(unsigned int irq)
+{
+	int bank = IRQ_TO_BANK(irq);
+
+	if (bank) {
+		omap_writel(
+			omap_readl(OMAP_IH2_BASE + BANK_OFFSET(bank) + IRQ_MIR)
+			| (1 << IRQ_BIT(irq)),
+			OMAP_IH2_BASE + BANK_OFFSET(bank) + IRQ_MIR);
 	} else {
-		if (level) {
-			__raw_writel(value,
-				IO_ADDRESS(OMAP_IH2_BASE + ((level - 1) << 8) +
-					reg));
-		} else {
-			__raw_writel(value, IO_ADDRESS(OMAP_IH1_BASE + reg));
+		omap_writel(
+			omap_readl(OMAP_IH1_BASE + IRQ_MIR)
+			| (1 << IRQ_BIT(irq)),
+			OMAP_IH1_BASE  + IRQ_MIR);
+	}
+}
+
+/*
+ * Unmask routine for chips with register offsets of 0x100
+ */
+static void omap_offset_unmask_irq(unsigned int irq)
+{
+	int bank = IRQ_TO_BANK(irq);
+
+	if (bank) {
+		omap_writel(
+			omap_readl(OMAP_IH2_BASE + BANK_OFFSET(bank) + IRQ_MIR)
+			& ~(1 << IRQ_BIT(irq)),
+			OMAP_IH2_BASE + BANK_OFFSET(bank) + IRQ_MIR);
+	} else {
+		omap_writel(
+			omap_readl(OMAP_IH1_BASE + IRQ_MIR)
+			& ~(1 << IRQ_BIT(irq)),
+			OMAP_IH1_BASE  + IRQ_MIR);
+	}
+}
+
+static void omap_offset_mask_ack_irq(unsigned int irq)
+{
+	omap_offset_mask_irq(irq);
+	omap_offset_ack_irq(irq);
+}
+
+/*
+ * Given the irq number returns the bank number
+ */
+signed int irq_get_bank(unsigned int irq)
+{
+	int i;
+
+	for (i = 0; i < banks; i++) {
+		if (irq >= irq_banks[i].start_irq
+		    && irq <= irq_banks[i].start_irq + BANK_NR_IRQS) {
+			return i;
 		}
 	}
+
+	printk(KERN_ERR "No irq handler found for irq %i\n", irq);
+
+	return -ENODEV;
 }
 
-static inline u32
-read_ih(int level, int reg)
+/*
+ * Given the bank and irq number returns the irq bit at the bank register
+ */
+signed int irq_bank_get_bit(int bank, unsigned int irq)
 {
-	if (cpu_is_omap1510()) {
-		return __raw_readl((IO_ADDRESS((level ? OMAP_IH2_BASE : OMAP_IH1_BASE)
-					 + (reg))));
-	} else {
-		if (level) {
-			return __raw_readl(IO_ADDRESS(OMAP_IH2_BASE +
-					((level - 1) << 8) + reg));
-		} else {
-			return __raw_readl(IO_ADDRESS(OMAP_IH1_BASE + reg));
-		}
+	if (irq_banks[bank].start_irq > irq) {
+		printk(KERN_ERR "Incorrect irq %i: bank %i offset %i\n",
+		       irq, bank, irq_banks[bank].start_irq);
+		return -ENODEV;
 	}
+
+	return irq - irq_banks[bank].start_irq;
 }
 
-static inline int
-get_level(int irq)
+/*
+ * Allows tuning the IRQ type and priority
+ *
+ * NOTE: There is currently no OMAP fiq handler for Linux. Read the
+ *	 mailing list threads on FIQ handlers if you are planning to
+ *	 add a FIQ handler for OMAP.
+ */
+void omap_irq_set_cfg(int irq, int fiq, int priority, int irq_level)
 {
-	if (cpu_is_omap1510()) {
-		return (((irq) < IH2_BASE) ? 0 : 1);
-	} else {
-		if (irq < IH2_BASE)
-			return 0;
-		else {
-			return (irq >> 5);
-		}
-	}
+	signed int bank;
+	unsigned int irq_bit;
+	unsigned long val, offset;
+
+
+	bank = irq_get_bank(irq);
+
+	if (bank < 0)
+		return;
+
+	irq_bit = irq_bank_get_bit(bank, irq);
+
+	if (irq_bit < 0)
+		return;
+
+	/* FIQ is only availabe on bank 0 interrupts */
+	fiq = bank ? 0 : (fiq & 0x1);
+
+	val = fiq | ((priority & 0x1f) << 2) | ((irq_level & 0x1) << 1);
+
+	offset = IRQ_ILR0 + irq_bit * 0x4;
+
+	irq_bank_writel(val, bank, offset);
 }
 
-static inline int
-get_irq_num(int irq)
-{
-	if (cpu_is_omap1510()) {
-		return (((irq) < IH2_BASE) ? irq : irq - IH2_BASE);
-	} else {
-		return irq & 0x1f;
-	}
-}
-
-static void
-mask_irq(unsigned int irq)
-{
-	int level = get_level(irq);
-	int irq_num = get_irq_num(irq);
-	u32 mask = read_ih(level, IRQ_MIR) | (1 << irq_num);
-	write_ih(level, IRQ_MIR, mask);
-}
-
-static void
-ack_irq(unsigned int irq)
-{
-	int level = get_level(irq);
-
-	if (level > 1)
-		level = 1;
-	do {
-		write_ih(level, IRQ_CONTROL_REG, 0x1);
-		/*
-		 * REVISIT: So says the TRM:
-		 *	if (level) write_ih(0, ITR, 0);
-		 */
-	} while (level--);
-}
-
-void
-unmask_irq(unsigned int irq)
-{
-	int level = get_level(irq);
-	int irq_num = get_irq_num(irq);
-	u32 mask = read_ih(level, IRQ_MIR) & ~(1 << irq_num);
-
-	write_ih(level, IRQ_MIR, mask);
-}
-
-static void
-mask_ack_irq(unsigned int irq)
-{
-	mask_irq(irq);
-	ack_irq(irq);
-}
-
-static struct irqchip omap_normal_irq = {
-	.ack		= mask_ack_irq,
-	.mask		= mask_irq,
-	.unmask		= unmask_irq,
+static struct omap_irq_desc *irq_bank_desc[] __initdata = {
+	&omap730_bank0_irqs,
+	&omap730_bank1_irqs,
+	&omap730_bank2_irqs,
+	&omap1510_bank0_irqs,
+	&omap1510_bank1_irqs,
+	&omap1610_bank0_irqs,
+	&omap1610_bank1_irqs,
+	&omap1610_bank2_irqs,
+	&omap1610_bank3_irqs,
+	NULL,
 };
 
-static void
-irq_priority(int irq, int fiq, int priority, int trigger)
+void __init omap_init_irq(void)
 {
-	int level, irq_num;
-	unsigned long reg_value, reg_addr;
+	int i,j, board_irq_type = 0, interrupts = 0;
+	struct omap_irq_desc *entry;
 
-	level = get_level(irq);
-	irq_num = get_irq_num(irq);
-	/* FIQ is only available on level 0 interrupts */
-	fiq = level ? 0 : (fiq & 0x1);
-	reg_value = (fiq) | ((priority & 0x1f) << 2) |
-		((trigger & 0x1) << 1);
-	reg_addr = (IRQ_ILR0 + irq_num * 0x4);
-	write_ih(level, reg_addr, reg_value);
-}
-
-void __init
-omap_init_irq(void)
-{
-	int i, irq_count, irq_bank_count = 0;
-	uint *trigger;
-
-	if (cpu_is_omap1510()) {
-		static uint trigger_1510[2] = {
-			0xb3febfff, 0xffbfffed
-		};
-		irq_bank_count = 2;
-		irq_count = 64;
-		trigger = trigger_1510;
-	}
-	if (cpu_is_omap1610()) {
-		static uint trigger_1610[5] = {
-			0xb3fefe8f, 0xfffff7ff, 0xffffffff
-		};
-		irq_bank_count = 5;
-		irq_count = 160;
-		trigger = trigger_1610;
-	}
 	if (cpu_is_omap730()) {
-		static uint trigger_730[] = {
-			0xb3f8e22f, 0xfdb9c1f2, 0x800040f3
-		};
-		irq_bank_count = 3;
-		irq_count = 96;
-		trigger = trigger_730;
+		board_irq_type = OMAP_IRQ_TYPE730;
+	} else if (cpu_is_omap1510()) {
+		board_irq_type = OMAP_IRQ_TYPE1510;
+	} else if (cpu_is_omap1610() || cpu_is_omap5912()) {
+		board_irq_type = OMAP_IRQ_TYPE1610;
 	}
 
-	for (i = 0; i < irq_bank_count; i++) {
-		/* Mask and clear all interrupts */
-		write_ih(i, IRQ_MIR, ~0x0);
-		write_ih(i, IRQ_ITR, 0x0);
+	if (board_irq_type == 0) {
+		printk("Could not detect OMAP type\n");
+		return;
 	}
 
-	/* Clear any pending interrupts */
-	write_ih(1, IRQ_CONTROL_REG, 3);
-	write_ih(0, IRQ_CONTROL_REG, 3);
+	/* Scan through the interrupt bank maps and copy the right data */
+	for (i = 0; (entry = irq_bank_desc[i]) != NULL; i++) {
+		if (entry->cpu_type == board_irq_type) {
+			printk("Type %i IRQs from %3i to %3i base at 0x%lx\n",
+			       board_irq_type, entry->start_irq,
+			       entry->start_irq + BANK_NR_IRQS, entry->base_reg);
 
-	for (i = 0; i < irq_count; i++) {
-		set_irq_chip(i, &omap_normal_irq);
-		set_irq_handler(i, do_level_IRQ);
-		set_irq_flags(i, IRQF_VALID);
+			irq_banks[banks].start_irq = entry->start_irq;
+			irq_banks[banks].level_map = entry->level_map;
+			irq_banks[banks].base_reg = entry->base_reg;
+			irq_banks[banks].mask_reg = entry->mask_reg;
+			irq_banks[banks].ack_reg = entry->ack_reg;
+			irq_banks[banks].handler = entry->handler;
 
-		irq_priority(i, 0, 0, trigger[get_level(i)] >> get_irq_num(i) & 1);
+			interrupts += BANK_NR_IRQS;
+			banks++;
+		}
 	}
-	unmask_irq(INT_IH2_IRQ);
+
+	printk("Found total of %i interrupts in %i interrupt banks\n",
+	       interrupts, banks);
+
+	/* Mask and clear all interrupts */
+	for (i = 0; i < banks; i++) {
+		irq_bank_writel(~0x0, i, IRQ_MIR);
+		irq_bank_writel(0x0, i, IRQ_ITR);
+	}
+
+	/*
+	 * Clear any pending interrupts
+	 */
+	irq_bank_writel(3, 0, IRQ_CONTROL_REG);
+	irq_bank_writel(3, 1, IRQ_CONTROL_REG);
+
+	/* Install the interrupt handlers for each bank */
+	for (i = 0; i < banks; i++) {
+		for (j = irq_banks[i].start_irq;
+		     j <= irq_banks[i].start_irq + BANK_NR_IRQS; j++) {
+			int irq_level;
+			set_irq_chip(j, irq_banks[i].handler);
+			set_irq_handler(j, do_level_IRQ);
+			set_irq_flags(j, IRQF_VALID);
+			irq_level = irq_banks[i].level_map
+				>> (j - irq_banks[i].start_irq) & 1;
+			omap_irq_set_cfg(j, 0, 0, irq_level);
+		}
+	}
+
+	/* Unmask level 2 handler */
+	omap_writel(0, irq_banks[0].mask_reg);
 }
+
+EXPORT_SYMBOL(omap_irq_set_cfg);

@@ -13,8 +13,12 @@
 static int __init
 omap1510_leds_init(void)
 {
-	if (machine_is_innovator())
+	if (machine_is_omap_innovator())
 		leds_event = innovator_leds_event;
+
+	else if (machine_is_omap_perseus2()) {
+		leds_event = perseus2_leds_event;
+	}
 
 	leds_event(led_start);
 	return 0;
