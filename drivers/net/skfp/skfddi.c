@@ -217,7 +217,7 @@ static int skfp_init_one(struct pci_dev *pdev,
 {
 	struct net_device *dev;
 	struct s_smc *smc;	/* board pointer */
-	u32 port, len;
+	unsigned long port, len;
 	int err;
 
 	PRINTK(KERN_INFO "entering skfp_init_one\n");
@@ -240,7 +240,7 @@ static int skfp_init_one(struct pci_dev *pdev,
 	len = pci_resource_len(pdev, 0);
 
 	if (len < 0x4000) {
-		printk(KERN_ERR "skfp: Invalid PCI region size: %d\n", len);
+		printk(KERN_ERR "skfp: Invalid PCI region size: %lu\n", len);
 		err = -EIO;
 		goto err_out1;
 	}
