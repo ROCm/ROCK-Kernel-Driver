@@ -76,6 +76,7 @@ struct scsi_disk {
 	struct scsi_driver *driver;	/* always &sd_template */
 	struct scsi_device *device;
 	struct gendisk	*disk;
+	unsigned int	openers;	/* protected by BKL for now, yuck */
 	sector_t	capacity;	/* size in 512-byte sectors */
 	u32		index;
 	u8		media_present;
@@ -396,9 +397,10 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!sdev->online)
 		goto error_out;
 
-	if (sdev->removable && sdev->access_count == 1)
+	if (!sdkp->openers++ && sdev->removable) {
 		if (scsi_block_when_processing_errors(sdev))
 			scsi_set_medium_removal(sdev, SCSI_REMOVAL_PREVENT);
+	}
 
 	return 0;
 
@@ -421,13 +423,15 @@ error_out:
 static int sd_release(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
-	struct scsi_device *sdev = scsi_disk(disk)->device;
+	struct scsi_disk *sdkp = scsi_disk(disk);
+	struct scsi_device *sdev = sdkp->device;
 
 	SCSI_LOG_HLQUEUE(3, printk("sd_release: disk=%s\n", disk->disk_name));
 
-	if (sdev->removable && sdev->access_count == 1)
+	if (!--sdkp->openers && sdev->removable) {
 		if (scsi_block_when_processing_errors(sdev))
 			scsi_set_medium_removal(sdev, SCSI_REMOVAL_ALLOW);
+	}
 
 	/*
 	 * XXX and what if there are packets in flight and this close()
@@ -1331,6 +1335,7 @@ static int sd_probe(struct device *dev)
 	sdkp->driver = &sd_template;
 	sdkp->disk = gd;
 	sdkp->index = index;
+	sdkp->openers = 0;
 
 	gd->major = sd_major(index >> 4);
 	gd->first_minor = (index & 15) << 4;
