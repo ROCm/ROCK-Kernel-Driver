@@ -102,7 +102,7 @@ sctp_disposition_t sctp_sf_do_4_C(const sctp_endpoint_t *ep,
 				  sctp_cmd_seq_t *commands)
 {
 	sctp_chunk_t *chunk = arg;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 
 	/* RFC 2960 6.10 Bundling
 	 *
@@ -504,7 +504,7 @@ sctp_disposition_t sctp_sf_do_5_1D_ce(const sctp_endpoint_t *ep,
 	sctp_association_t *new_asoc;
 	sctp_init_chunk_t *peer_init;
 	sctp_chunk_t *repl;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 	int error = 0;
 	sctp_chunk_t *err_chk_p;
 
@@ -636,7 +636,7 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const sctp_endpoint_t *ep,
 				      const sctp_subtype_t type, void *arg,
 				      sctp_cmd_seq_t *commands)
 {
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 
 	/* RFC 2960 5.1 Normal Establishment of an Association
 	 *
@@ -1355,7 +1355,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_a(const sctp_endpoint_t *ep,
 					       sctp_association_t *new_asoc)
 {
 	sctp_init_chunk_t *peer_init;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 	sctp_chunk_t *repl;
 
 	/* new_asoc is a brand-new association, so these are not yet
@@ -1421,7 +1421,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_b(const sctp_endpoint_t *ep,
 					       sctp_association_t *new_asoc)
 {
 	sctp_init_chunk_t *peer_init;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 	sctp_chunk_t *repl;
 
 	/* new_asoc is a brand-new association, so these are not yet
@@ -1503,7 +1503,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_d(const sctp_endpoint_t *ep,
 					       sctp_cmd_seq_t *commands,
 					       sctp_association_t *new_asoc)
 {
-	sctp_ulpevent_t *ev = NULL;
+	struct sctp_ulpevent *ev = NULL;
 	sctp_chunk_t *repl;
 
 	/* Clarification from Implementor's Guide:
@@ -2726,7 +2726,7 @@ sctp_disposition_t sctp_sf_operr_notify(const sctp_endpoint_t *ep,
 					sctp_cmd_seq_t *commands)
 {
 	sctp_chunk_t *chunk = arg;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 
 	while (chunk->chunk_end > chunk->skb->data) {
 		ev = sctp_ulpevent_make_remote_error(asoc, chunk, 0,
@@ -2764,7 +2764,7 @@ sctp_disposition_t sctp_sf_do_9_2_final(const sctp_endpoint_t *ep,
 {
 	sctp_chunk_t *chunk = arg;
 	sctp_chunk_t *reply;
-	sctp_ulpevent_t *ev;
+	struct sctp_ulpevent *ev;
 
 	/* 10.2 H) SHUTDOWN COMPLETE notification
 	 *

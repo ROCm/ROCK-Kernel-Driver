@@ -245,7 +245,8 @@ sctp_chunk_t *sctp_make_init_ack(const sctp_association_t *asoc,
 
 	retval = NULL;
 
-	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, priority);
+	addrs = sctp_bind_addrs_to_raw(&asoc->base.bind_addr, &addrs_len, 
+				       priority);
 	if (!addrs.v)
 		goto nomem_rawaddr;
 

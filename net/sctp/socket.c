@@ -1110,7 +1110,7 @@ static struct sk_buff *sctp_skb_recv_datagram(struct sock *, int, int, int *);
 SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			     int len, int noblock, int flags, int *addr_len)
 {
-	sctp_ulpevent_t *event = NULL;
+	struct sctp_ulpevent *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);
 	struct sk_buff *skb;
 	int copied;
@@ -1143,7 +1143,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 
 	err = skb_copy_datagram_iovec(skb, 0, msg->msg_iov, copied);
 
-	event = (sctp_ulpevent_t *) skb->cb;
+	event = sctp_skb2event(skb);
 
 	if (err)
 		goto out_free;
@@ -1777,7 +1777,7 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	sctp_opt_t *oldsp = sctp_sk(oldsk);
 	sctp_opt_t *newsp;
 	struct sk_buff *skb, *tmp;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	int err = 0;
 
 	/* An association cannot be branched off from an already peeled-off
@@ -1811,7 +1811,7 @@ SCTP_STATIC int sctp_do_peeloff(sctp_association_t *assoc, struct socket **newso
 	 * peeled off association to the new socket's receive queue.
 	 */
 	sctp_skb_for_each(skb, &oldsk->receive_queue, tmp) {
-		event = (sctp_ulpevent_t *)skb->cb;
+		event = sctp_skb2event(skb);
 		if (event->asoc == assoc) {
 			__skb_unlink(skb, skb->list);
 			__skb_queue_tail(&newsk->receive_queue, skb);

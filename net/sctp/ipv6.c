@@ -444,7 +444,7 @@ static void sctp_inet6_msgname(char *msgname, int *addr_len)
 }
 
 /* Initialize a PF_INET msgname from a ulpevent. */
-static void sctp_inet6_event_msgname(sctp_ulpevent_t *event, char *msgname,
+static void sctp_inet6_event_msgname(struct sctp_ulpevent *event, char *msgname,
 				     int *addrlen)
 {
 	struct sockaddr_in6 *sin6, *sin6from;

@@ -124,7 +124,6 @@ static void sctp_v4_copy_addrlist(struct list_head *addrlist,
 		/* Add the address to the local list.  */
 		addr = t_new(struct sockaddr_storage_list, GFP_ATOMIC);
 		if (addr) {
-			INIT_LIST_HEAD(&addr->list);
 			addr->a.v4.sin_family = AF_INET;
 			addr->a.v4.sin_port = 0;
 			addr->a.v4.sin_addr.s_addr = ifa->ifa_local;
@@ -557,7 +556,7 @@ static void sctp_inet_msgname(char *msgname, int *addr_len)
 }
 
 /* Copy the primary address of the peer primary address as the msg_name. */
-static void sctp_inet_event_msgname(sctp_ulpevent_t *event, char *msgname,
+static void sctp_inet_event_msgname(struct sctp_ulpevent *event, char *msgname,
 				    int *addr_len)
 {
 	struct sockaddr_in *sin, *sinfrom;

@@ -105,10 +105,10 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 	ep->base.malloced = 1;
 
 	/* Create an input queue.  */
-	sctp_inqueue_init(&ep->base.inqueue);
+	sctp_inq_init(&ep->base.inqueue);
 
 	/* Set its top-half handler */
-	sctp_inqueue_set_th_handler(&ep->base.inqueue,
+	sctp_inq_set_th_handler(&ep->base.inqueue,
 				    (void (*)(void *))sctp_endpoint_bh_rcv,
 				    ep);
 
@@ -198,7 +198,7 @@ void sctp_endpoint_destroy(sctp_endpoint_t *ep)
 	sctp_unhash_endpoint(ep);
 
 	/* Cleanup the inqueue. */
-	sctp_inqueue_free(&ep->base.inqueue);
+	sctp_inq_free(&ep->base.inqueue);
 
 	sctp_bind_addr_free(&ep->base.bind_addr);
 
@@ -333,7 +333,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	struct sock *sk;
 	struct sctp_transport *transport;
 	sctp_chunk_t *chunk;
-	sctp_inqueue_t *inqueue;
+	struct sctp_inq *inqueue;
 	sctp_subtype_t subtype;
 	sctp_state_t state;
 	int error = 0;
@@ -345,7 +345,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	inqueue = &ep->base.inqueue;
 	sk = ep->base.sk;
 
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {		
+	while (NULL != (chunk = sctp_inq_pop(inqueue))) {		
 		subtype.chunk = chunk->chunk_hdr->type;
 
 		/* We might have grown an association since last we

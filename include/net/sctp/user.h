@@ -166,6 +166,7 @@ struct sctp_sndrcvinfo {
 	__u32 sinfo_context;
 	__u32 sinfo_timetolive;
 	__u32 sinfo_tsn;
+	__u32 sinfo_cumtsn;
 	sctp_assoc_t sinfo_assoc_id;
 };
 

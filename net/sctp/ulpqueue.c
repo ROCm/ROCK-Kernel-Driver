@@ -142,7 +142,7 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, sctp_chunk_t *chunk,
 	if (event) {
 		/* Create a temporary list to collect chunks on.  */
 		skb_queue_head_init(&temp);
-		skb_queue_tail(&temp, event->parent);
+		skb_queue_tail(&temp, sctp_event2skb(event));
 
 		event = sctp_ulpq_order(ulpq, event);
 	}
@@ -172,19 +172,20 @@ int sctp_ulpq_tail_event(struct sctp_ulpq *ulpq, struct sctp_ulpevent *event)
 	/* If we are harvesting multiple skbs they will be
 	 * collected on a list.
 	 */
-	if (event->parent->list)
-		sctp_skb_list_tail(event->parent->list, &sk->receive_queue);
+	if (sctp_event2skb(event)->list)
+		sctp_skb_list_tail(sctp_event2skb(event)->list, 
+				   &sk->receive_queue);
 	else
-		skb_queue_tail(&sk->receive_queue, event->parent);
+		skb_queue_tail(&sk->receive_queue, sctp_event2skb(event));
 
 	wake_up_interruptible(sk->sleep);
 	return 1;
 
 out_free:
-	if (event->parent->list)
-		skb_queue_purge(event->parent->list);
+	if (sctp_event2skb(event)->list)
+		skb_queue_purge(sctp_event2skb(event)->list);
 	else
-		kfree_skb(event->parent);
+		kfree_skb(sctp_event2skb(event));
 	return 0;
 }
 
@@ -202,7 +203,7 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 
 	/* Find the right place in this list. We store them by TSN.  */
 	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
-		cevent = (struct sctp_ulpevent *)pos->cb;
+		cevent = sctp_skb2event(pos);
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
 		if (TSN_lt(tsn, ctsn))
@@ -211,9 +212,10 @@ static inline void sctp_ulpq_store_reasm(struct sctp_ulpq *ulpq,
 
 	/* If the queue is empty, we have a different function to call.  */
 	if (skb_peek(&ulpq->reasm))
-		__skb_insert(event->parent, pos->prev, pos, &ulpq->reasm);
+		__skb_insert(sctp_event2skb(event), pos->prev, pos, 
+			     &ulpq->reasm);
 	else
-		__skb_queue_tail(&ulpq->reasm, event->parent);
+		__skb_queue_tail(&ulpq->reasm, sctp_event2skb(event));
 }
 
 /* Helper function to return an event corresponding to the reassembled
@@ -264,7 +266,7 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 		pos = pnext;
 	} while (1);
 
-	event = (sctp_ulpevent_t *) f_frag->cb;
+	event = (struct sctp_ulpevent *) f_frag->cb;
 
 	return event;
 }
@@ -272,13 +274,13 @@ static inline struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *
 /* Helper function to check if an incoming chunk has filled up the last
  * missing fragment in a SCTP datagram and return the corresponding event.
  */
-static inline sctp_ulpevent_t *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *ulpq)
+static inline struct sctp_ulpevent *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *ulpq)
 {
 	struct sk_buff *pos, *tmp;
-	sctp_ulpevent_t *cevent;
+	struct sctp_ulpevent *cevent;
 	struct sk_buff *first_frag = NULL;
 	__u32 ctsn, next_tsn;
-	sctp_ulpevent_t *retval = NULL;
+	struct sctp_ulpevent *retval = NULL;
 
 	/* Initialized to 0 just to avoid compiler warning message. Will
 	 * never be used with this value. It is referenced only after it
@@ -296,10 +298,10 @@ static inline sctp_ulpevent_t *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *
 	 * start the next pass when we find another first fragment.
 	 */
 	sctp_skb_for_each(pos, &ulpq->reasm, tmp) {
-		cevent = (sctp_ulpevent_t *) pos->cb;
+		cevent = (struct sctp_ulpevent *) pos->cb;
 		ctsn = cevent->sndrcvinfo.sinfo_tsn;
 
-		switch (cevent->chunk_flags & SCTP_DATA_FRAG_MASK) {
+		switch (cevent->msg_flags & SCTP_DATA_FRAG_MASK) {
 		case SCTP_DATA_FIRST_FRAG:
 			first_frag = pos;
 			next_tsn = ctsn + 1;
@@ -334,10 +336,10 @@ static inline sctp_ulpevent_t *sctp_ulpq_retrieve_reassembled(struct sctp_ulpq *
 /* Helper function to reassemble chunks. Hold chunks on the reasm queue that
  * need reassembling.
  */
-static inline sctp_ulpevent_t *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
-						   sctp_ulpevent_t *event)
+static inline struct sctp_ulpevent *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
+						   struct sctp_ulpevent *event)
 {
-	sctp_ulpevent_t *retval = NULL;
+	struct sctp_ulpevent *retval = NULL;
 
 	/* FIXME: We should be using some new chunk structure here
 	 * instead of carrying chunk fields in the event structure.
@@ -346,7 +348,7 @@ static inline sctp_ulpevent_t *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
 	 */
 
 	/* Check if this is part of a fragmented message.  */
-	if (SCTP_DATA_NOT_FRAG == (event->chunk_flags & SCTP_DATA_FRAG_MASK))
+	if (SCTP_DATA_NOT_FRAG == (event->msg_flags & SCTP_DATA_FRAG_MASK))
 		return event;
 
 	sctp_ulpq_store_reasm(ulpq, event);
@@ -359,7 +361,7 @@ static inline sctp_ulpevent_t *sctp_ulpq_reasm(struct sctp_ulpq *ulpq,
  * ordered by an an incoming chunk.
  */
 static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
-					      sctp_ulpevent_t *event)
+					      struct sctp_ulpevent *event)
 {
 	struct sk_buff *pos, *tmp;
 	struct sctp_ulpevent *cevent;
@@ -373,7 +375,7 @@ static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
 
 	/* We are holding the chunks by stream, by SSN.  */
 	sctp_skb_for_each(pos, &ulpq->lobby, tmp) {
-		cevent = (sctp_ulpevent_t *) pos->cb;
+		cevent = (struct sctp_ulpevent *) pos->cb;
 		csid = cevent->sndrcvinfo.sinfo_stream;
 		cssn = cevent->sndrcvinfo.sinfo_ssn;
 
@@ -394,16 +396,16 @@ static inline void sctp_ulpq_retrieve_ordered(struct sctp_ulpq *ulpq,
 		__skb_unlink(pos, pos->list);
 
 		/* Attach all gathered skbs to the event.  */
-		__skb_queue_tail(event->parent->list, pos);
+		__skb_queue_tail(sctp_event2skb(event)->list, pos);
 	}
 }
 
 /* Helper function to store chunks needing ordering.  */
 static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
-					   sctp_ulpevent_t *event)
+					   struct sctp_ulpevent *event)
 {
 	struct sk_buff *pos, *tmp;
-	sctp_ulpevent_t *cevent;
+	struct sctp_ulpevent *cevent;
 	__u16 sid, csid;
 	__u16 ssn, cssn;
 
@@ -415,7 +417,7 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 	 * stream ID and then by SSN.
 	 */
 	sctp_skb_for_each(pos, &ulpq->lobby, tmp) {
-		cevent = (sctp_ulpevent_t *) pos->cb;
+		cevent = (struct sctp_ulpevent *) pos->cb;
 		csid = cevent->sndrcvinfo.sinfo_stream;
 		cssn = cevent->sndrcvinfo.sinfo_ssn;
 
@@ -427,13 +429,14 @@ static inline void sctp_ulpq_store_ordered(struct sctp_ulpq *ulpq,
 
 	/* If the queue is empty, we have a different function to call.  */
 	if (skb_peek(&ulpq->lobby))
-		__skb_insert(event->parent, pos->prev, pos, &ulpq->lobby);
+		__skb_insert(sctp_event2skb(event), pos->prev, pos, 
+			     &ulpq->lobby);
 	else
-		__skb_queue_tail(&ulpq->lobby, event->parent);
+		__skb_queue_tail(&ulpq->lobby, sctp_event2skb(event));
 }
 
-static inline sctp_ulpevent_t *sctp_ulpq_order(struct sctp_ulpq *ulpq,
-					       sctp_ulpevent_t *event)
+static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
+					struct sctp_ulpevent *event)
 {
 	__u16 sid, ssn;
 	struct sctp_stream *in;
@@ -445,7 +448,7 @@ static inline sctp_ulpevent_t *sctp_ulpq_order(struct sctp_ulpq *ulpq,
 	 */
 
 	/* Check if this message needs ordering.  */
-	if (SCTP_DATA_UNORDERED & event->chunk_flags)
+	if (SCTP_DATA_UNORDERED & event->msg_flags)
 		return event;
 
 	/* Note: The stream ID must be verified before this routine.  */

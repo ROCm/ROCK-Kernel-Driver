@@ -241,8 +241,8 @@ sctp_association_t *sctp_association_init(sctp_association_t *asoc,
 	asoc->peer.sack_needed = 1;
 
 	/* Create an input queue.  */
-	sctp_inqueue_init(&asoc->base.inqueue);
-	sctp_inqueue_set_th_handler(&asoc->base.inqueue,
+	sctp_inq_init(&asoc->base.inqueue);
+	sctp_inq_set_th_handler(&asoc->base.inqueue,
 				    (void (*)(void *))sctp_assoc_bh_rcv,
 				    asoc);
 
@@ -311,7 +311,7 @@ void sctp_association_free(sctp_association_t *asoc)
 	sctp_ulpq_free(&asoc->ulpq);
 
 	/* Dispose of any pending chunks on the inqueue. */
-	sctp_inqueue_free(&asoc->base.inqueue);
+	sctp_inq_free(&asoc->base.inqueue);
 
 	/* Free ssnmap storage. */
 	sctp_ssnmap_free(asoc->ssnmap);
@@ -505,7 +505,7 @@ void sctp_assoc_control_transport(sctp_association_t *asoc,
 	struct sctp_transport *t = NULL;
 	struct sctp_transport *first;
 	struct sctp_transport *second;
-	sctp_ulpevent_t *event;
+	struct sctp_ulpevent *event;
 	struct list_head *pos;
 	int spc_state = 0;
 
@@ -776,7 +776,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 	sctp_endpoint_t *ep;
 	sctp_chunk_t *chunk;
 	struct sock *sk;
-	sctp_inqueue_t *inqueue;
+	struct sctp_inq *inqueue;
 	int state, subtype;
 	sctp_assoc_t associd = sctp_assoc2id(asoc);
 	int error = 0;
@@ -786,7 +786,7 @@ static void sctp_assoc_bh_rcv(sctp_association_t *asoc)
 	sk = asoc->base.sk;
 
 	inqueue = &asoc->base.inqueue;
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {
+	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		state = asoc->state;
 		subtype = chunk->chunk_hdr->type;
 

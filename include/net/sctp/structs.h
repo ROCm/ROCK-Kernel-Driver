@@ -2,7 +2,7 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
- * Copyright (c) 2001-2002 International Business Machines Corp.
+ * Copyright (c) 2001-2003 International Business Machines Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
  *
@@ -105,26 +105,25 @@ union sctp_addr {
 
 /* Forward declarations for data structures. */
 struct sctp_protocol;
-struct SCTP_endpoint;
-struct SCTP_association;
+struct sctp_endpoint;
+struct sctp_association;
 struct sctp_transport;
-struct SCTP_packet;
-struct SCTP_chunk;
-struct SCTP_inqueue;
+struct sctp_packet;
+struct sctp_chunk;
+struct sctp_inq;
 struct sctp_outq;
-struct SCTP_bind_addr;
+struct sctp_bind_addr;
 struct sctp_ulpq;
 struct sctp_opt;
 struct sctp_endpoint_common;
 struct sctp_ssnmap;
 
 typedef struct sctp_protocol sctp_protocol_t;
-typedef struct SCTP_endpoint sctp_endpoint_t;
-typedef struct SCTP_association sctp_association_t;
-typedef struct SCTP_packet sctp_packet_t;
-typedef struct SCTP_chunk sctp_chunk_t;
-typedef struct SCTP_inqueue sctp_inqueue_t;
-typedef struct SCTP_bind_addr sctp_bind_addr_t;
+typedef struct sctp_endpoint sctp_endpoint_t;
+typedef struct sctp_association sctp_association_t;
+typedef struct sctp_packet sctp_packet_t;
+typedef struct sctp_chunk sctp_chunk_t;
+typedef struct sctp_bind_addr sctp_bind_addr_t;
 typedef struct sctp_opt sctp_opt_t;
 typedef struct sctp_endpoint_common sctp_endpoint_common_t;
 
@@ -289,7 +288,7 @@ int sctp_register_af(struct sctp_af *);
 
 /* Protocol family functions. */
 struct sctp_pf {
-	void (*event_msgname)(sctp_ulpevent_t *, char *, int *);
+	void (*event_msgname)(struct sctp_ulpevent *, char *, int *);
 	void (*skb_msgname)  (struct sk_buff *, char *, int *);
 	int  (*af_supported) (sa_family_t);
 	int  (*cmp_addr) (const union sctp_addr *,
@@ -484,7 +483,7 @@ static inline __u16 sctp_ssn_next(struct sctp_stream *stream, __u16 id)
  * As a matter of convenience, we remember the SCTP common header for
  * each chunk as well as a few other header pointers...
  */
-struct SCTP_chunk {
+struct sctp_chunk {
 	/* These first three elements MUST PRECISELY match the first
 	 * three elements of struct sk_buff.  This allows us to reuse
 	 * all the skb_* queue management functions.
@@ -594,7 +593,7 @@ typedef sctp_chunk_t *(sctp_packet_phandler_t)(sctp_association_t *);
 /* This structure holds lists of chunks as we are assembling for
  * transmission.
  */
-struct SCTP_packet {
+struct sctp_packet {
 	/* These are the SCTP header values (host order) for the packet. */
 	__u16 source_port;
 	__u16 destination_port;
@@ -846,8 +845,8 @@ unsigned long sctp_transport_timeout(struct sctp_transport *);
 /* This is the structure we use to queue packets as they come into
  * SCTP.  We write packets to it and read chunks from it.
  */
-struct SCTP_inqueue {
-	/* This is actually a queue of sctp_chunk_t each
+struct sctp_inq {
+	/* This is actually a queue of sctp_chunk each
 	 * containing a partially decoded packet.
 	 */
 	struct sk_buff_head in;
@@ -864,13 +863,12 @@ struct SCTP_inqueue {
 	int malloced;        /* Is this structure kfree()able?  */
 };
 
-sctp_inqueue_t *sctp_inqueue_new(void);
-void sctp_inqueue_init(sctp_inqueue_t *);
-void sctp_inqueue_free(sctp_inqueue_t *);
-void sctp_push_inqueue(sctp_inqueue_t *, sctp_chunk_t *packet);
-sctp_chunk_t *sctp_pop_inqueue(sctp_inqueue_t *);
-void sctp_inqueue_set_th_handler(sctp_inqueue_t *,
-                                 void (*)(void *), void *);
+struct sctp_inq *sctp_inq_new(void);
+void sctp_inq_init(struct sctp_inq *);
+void sctp_inq_free(struct sctp_inq *);
+void sctp_inq_push(struct sctp_inq *, sctp_chunk_t *packet);
+struct sctp_chunk *sctp_inq_pop(struct sctp_inq *);
+void sctp_inq_set_th_handler(struct sctp_inq *, void (*)(void *), void *);
 
 /* This is the structure we use to hold outbound chunks.  You push
  * chunks in and they automatically pop out the other end as bundled
@@ -954,7 +952,7 @@ void sctp_retransmit_mark(struct sctp_outq *, struct sctp_transport *, __u8);
 
 
 /* These bind address data fields common between endpoints and associations */
-struct SCTP_bind_addr {
+struct sctp_bind_addr {
 
 	/* RFC 2960 12.1 Parameters necessary for the SCTP instance
 	 *
@@ -1043,7 +1041,7 @@ struct sctp_endpoint_common {
 	struct sock *sk;
 
 	/* This is where we receive inbound chunks.  */
-	sctp_inqueue_t   inqueue;
+	struct sctp_inq   inqueue;
 
 	/* This substructure includes the defining parameters of the
 	 * endpoint:
@@ -1076,7 +1074,7 @@ struct sctp_endpoint_common {
  * off one of these.
  */
 
-struct SCTP_endpoint {
+struct sctp_endpoint {
 	/* Common substructure for endpoint and association. */
 	sctp_endpoint_common_t base;
 
@@ -1172,7 +1170,7 @@ __u32 sctp_generate_tsn(const sctp_endpoint_t *ep);
 
 
 /* Here we have information about each individual association. */
-struct SCTP_association {
+struct sctp_association {
 
 	/* A base structure common to endpoint and association.
 	 * In this context, it represents the associations's view

@@ -115,7 +115,7 @@ typedef union {
 	struct sctp_transport *transport;
 	sctp_bind_addr_t  *bp;
 	sctp_init_chunk_t *init;
-	sctp_ulpevent_t *ulpevent;
+	struct sctp_ulpevent *ulpevent;
 	sctp_packet_t *packet;
 	sctp_sackhdr_t *sackh;
 } sctp_arg_t;
@@ -163,7 +163,7 @@ SCTP_ARG_CONSTRUCTOR(ASOC,	sctp_association_t *, asoc)
 SCTP_ARG_CONSTRUCTOR(TRANSPORT,	struct sctp_transport *, transport)
 SCTP_ARG_CONSTRUCTOR(BA,	sctp_bind_addr_t *, bp)
 SCTP_ARG_CONSTRUCTOR(PEER_INIT,	sctp_init_chunk_t *, init)
-SCTP_ARG_CONSTRUCTOR(ULPEVENT,  sctp_ulpevent_t *, ulpevent)
+SCTP_ARG_CONSTRUCTOR(ULPEVENT,  struct sctp_ulpevent *, ulpevent)
 SCTP_ARG_CONSTRUCTOR(PACKET,	sctp_packet_t *, packet)
 SCTP_ARG_CONSTRUCTOR(SACKH,	sctp_sackhdr_t *, sackh)
 
