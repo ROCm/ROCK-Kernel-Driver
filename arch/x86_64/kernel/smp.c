@@ -25,6 +25,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/mach_apic.h>
+#include <asm/proto.h>
 
 /*
  *	Smarter SMP flushing macros. 
@@ -361,6 +362,8 @@ static void smp_really_stop_cpu(void *dummy)
 void smp_send_stop(void)
 {
 	int nolock = 0;
+	if (reboot_force)
+		return;
 	/* Don't deadlock on the call lock in panic */
 	if (!spin_trylock(&call_lock)) {
 		/* ignore locking because we have paniced anyways */

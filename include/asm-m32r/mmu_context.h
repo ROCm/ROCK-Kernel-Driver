@@ -1,7 +1,7 @@
 #ifndef _ASM_M32R_MMU_CONTEXT_H
 #define _ASM_M32R_MMU_CONTEXT_H
 
-/* $Id */
+#ifdef __KERNEL__
 
 #include <linux/config.h>
 
@@ -34,13 +34,13 @@ extern unsigned long mmu_context_cache_dat[];
 #define mm_context(mm)		mm->context[smp_processor_id()]
 #endif /* not CONFIG_SMP */
 
-#define set_tlb_tag(entry, tag)	(*entry = (tag & PAGE_MASK)|get_asid())
+#define set_tlb_tag(entry, tag)		(*entry = (tag & PAGE_MASK)|get_asid())
 #define set_tlb_data(entry, data)	(*entry = (data | _PAGE_PRESENT))
 
 #ifdef CONFIG_MMU
 #define enter_lazy_tlb(mm, tsk)	do { } while (0)
 
-static __inline__ void get_new_mmu_context(struct mm_struct *mm)
+static inline void get_new_mmu_context(struct mm_struct *mm)
 {
 	unsigned long mc = ++mmu_context_cache;
 
@@ -59,7 +59,7 @@ static __inline__ void get_new_mmu_context(struct mm_struct *mm)
 /*
  * Get MMU context if needed.
  */
-static __inline__ void get_mmu_context(struct mm_struct *mm)
+static inline void get_mmu_context(struct mm_struct *mm)
 {
 	if (mm) {
 		unsigned long mc = mmu_context_cache;
@@ -75,7 +75,7 @@ static __inline__ void get_mmu_context(struct mm_struct *mm)
  * Initialize the context related info for a new mm_struct
  * instance.
  */
-static __inline__ int init_new_context(struct task_struct *tsk,
+static inline int init_new_context(struct task_struct *tsk,
 	struct mm_struct *mm)
 {
 #ifndef CONFIG_SMP
@@ -97,12 +97,12 @@ static __inline__ int init_new_context(struct task_struct *tsk,
  */
 #define destroy_context(mm)	do { } while (0)
 
-static __inline__ void set_asid(unsigned long asid)
+static inline void set_asid(unsigned long asid)
 {
 	*(volatile unsigned long *)MASID = (asid & MMU_CONTEXT_ASID_MASK);
 }
 
-static __inline__ unsigned long get_asid(void)
+static inline unsigned long get_asid(void)
 {
 	unsigned long asid;
 
@@ -116,13 +116,13 @@ static __inline__ unsigned long get_asid(void)
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
  */
-static __inline__ void activate_context(struct mm_struct *mm)
+static inline void activate_context(struct mm_struct *mm)
 {
 	get_mmu_context(mm);
 	set_asid(mm_context(mm) & MMU_CONTEXT_ASID_MASK);
 }
 
-static __inline__ void switch_mm(struct mm_struct *prev,
+static inline void switch_mm(struct mm_struct *prev,
 	struct mm_struct *next, struct task_struct *tsk)
 {
 #ifdef CONFIG_SMP
@@ -165,5 +165,6 @@ static __inline__ void switch_mm(struct mm_struct *prev,
 
 #endif /* not __ASSEMBLY__ */
 
-#endif /* _ASM_M32R_MMU_CONTEXT_H */
+#endif /* __KERNEL__ */
 
+#endif /* _ASM_M32R_MMU_CONTEXT_H */

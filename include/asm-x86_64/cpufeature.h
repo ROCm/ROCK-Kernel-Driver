@@ -75,7 +75,7 @@
 
 /* More extended AMD flags: CPUID level 0x80000001, ecx, word 5 */
 #define X86_FEATURE_LAHF_LM	(5*32+ 0) /* LAHF/SAHF in long mode */
-#define X86_FEATURE_HTVALID	(5*32+ 1) /* HyperThreading valid, otherwise CMP */
+#define X86_FEATURE_CMP_LEGACY	(5*32+ 1) /* If yes HyperThreading not valid */
 
 #define cpu_has(c, bit)                test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)      test_bit(bit, boot_cpu_data.x86_capability)

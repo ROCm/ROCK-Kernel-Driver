@@ -330,8 +330,8 @@ void syscall_trace(union uml_pt_regs *regs, int entryexit)
 	tracesysgood = (current->ptrace & PT_TRACESYSGOOD) && !is_singlestep;
 	ptrace_notify(SIGTRAP | (tracesysgood ? 0x80 : 0));
 
-	/* force do_signal() --> is_syscall() */
-	set_thread_flag(TIF_SIGPENDING);
+	if (entryexit) /* force do_signal() --> is_syscall() */
+		set_thread_flag(TIF_SIGPENDING);
 
 	/* this isn't the same as continuing with a signal, but it will do
 	 * for normal use.  strace only continues with a signal if the

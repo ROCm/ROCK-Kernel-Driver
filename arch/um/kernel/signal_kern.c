@@ -230,53 +230,6 @@ long sys_sigaltstack(const stack_t *uss, stack_t *uoss)
 	return(do_sigaltstack(uss, uoss, PT_REGS_SP(&current->thread.regs)));
 }
 
-extern int userspace_pid[];
-
-static int copy_sc_from_user(struct pt_regs *to, void *from, 
-			     struct arch_frame_data *arch)
-{
-	int ret;
-
-	ret = CHOOSE_MODE(copy_sc_from_user_tt(UPT_SC(&to->regs), from, arch),
-			  copy_sc_from_user_skas(userspace_pid[0],
-						 &to->regs, from));
-	return(ret);
-}
-
-long sys_sigreturn(struct pt_regs regs)
-{
-	void __user *sc = sp_to_sc(PT_REGS_SP(&current->thread.regs));
-	void __user *mask = sp_to_mask(PT_REGS_SP(&current->thread.regs));
-	int sig_size = (_NSIG_WORDS - 1) * sizeof(unsigned long);
-
-	spin_lock_irq(&current->sighand->siglock);
-	copy_from_user(&current->blocked.sig[0], sc_sigmask(sc), 
-		       sizeof(current->blocked.sig[0]));
-	copy_from_user(&current->blocked.sig[1], mask, sig_size);
-	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-	copy_sc_from_user(&current->thread.regs, sc, 
-			  &signal_frame_sc.common.arch);
-	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
-}
-
-long sys_rt_sigreturn(struct pt_regs regs)
-{
-	unsigned long sp = PT_REGS_SP(&current->thread.regs);
-	struct ucontext __user *uc = sp_to_uc(sp);
-	int sig_size = _NSIG_WORDS * sizeof(unsigned long);
-
-	spin_lock_irq(&current->sighand->siglock);
-	copy_from_user(&current->blocked, &uc->uc_sigmask, sig_size);
-	sigdelsetmask(&current->blocked, ~_BLOCKABLE);
-	recalc_sigpending();
-	spin_unlock_irq(&current->sighand->siglock);
-	copy_sc_from_user(&current->thread.regs, &uc->uc_mcontext,
-			  &signal_frame_si.common.arch);
-	return(PT_REGS_SYSCALL_RET(&current->thread.regs));
-}
-
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

@@ -2,12 +2,11 @@
  *  linux/arch/m32r/mm/fault.c
  *
  *  Copyright (c) 2001, 2002  Hitoshi Yamamoto, and H. Kondo
+ *  Copyright (c) 2004  Naoto Sugai, NIIBE Yutaka
  *
  *  Some code taken from i386 version.
  *    Copyright (C) 1995  Linus Torvalds
  */
-
-/* $Id$ */
 
 #include <linux/config.h>
 #include <linux/signal.h>
@@ -96,6 +95,11 @@ void bust_spinlocks(int yes)
  *  bit 2 == 0 means kernel, 1 means user-mode
  *  bit 3 == 0 means data, 1 means instruction
  *======================================================================*/
+#define ACE_PROTECTION		1
+#define ACE_WRITE		2
+#define ACE_USERMODE		4
+#define ACE_INSTRUCTION		8
+
 asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
   unsigned long address)
 {
@@ -126,10 +130,10 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * nothing more.
 	 *
 	 * This verifies that the fault happens in kernel space
-	 * (error_code & 4) == 0, and that the fault was not a
-	 * protection error (error_code & 1) == 0.
+	 * (error_code & ACE_USERMODE) == 0, and that the fault was not a
+	 * protection error (error_code & ACE_PROTECTION) == 0.
 	 */
-	if (address >= TASK_SIZE && !(error_code & 4))
+	if (address >= TASK_SIZE && !(error_code & ACE_USERMODE))
 		goto vmalloc_fault;
 
 	mm = tsk->mm;
@@ -157,7 +161,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	 * thus avoiding the deadlock.
 	 */
 	if (!down_read_trylock(&mm->mmap_sem)) {
-		if ((error_code & 4) == 0 &&
+		if ((error_code & ACE_USERMODE) == 0 &&
 		    !search_exception_tables(regs->psw))
 			goto bad_area_nosemaphore;
 		down_read(&mm->mmap_sem);
@@ -171,7 +175,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
 #if 0
-	if (error_code & 4) {
+	if (error_code & ACE_USERMODE) {
 		/*
 		 * accessing the stack below "spu" is always a bug.
 		 * The "+ 4" is there due to the push instruction
@@ -191,19 +195,25 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code,
 good_area:
 	info.si_code = SEGV_ACCERR;
 	write = 0;
-	switch (error_code & 3) {
+	switch (error_code & (ACE_WRITE|ACE_PROTECTION)) {
 		default:	/* 3: write, present */
 			/* fall through */
-		case 2:		/* write, not present */
+		case ACE_WRITE:	/* write, not present */
 			if (!(vma->vm_flags & VM_WRITE))
 				goto bad_area;
 			write++;
 			break;
-		case 1:		/* read, present */
+		case ACE_PROTECTION:	/* read, present */
 		case 0:		/* read, not present */
 			if (!(vma->vm_flags & (VM_READ | VM_EXEC)))
 				goto bad_area;
 	}
+
+	/*
+	 * For instruction access exception, check if the area is executable
+	 */
+	if ((error_code & ACE_INSTRUCTION) && !(vma->vm_flags & VM_EXEC))
+	  goto bad_area;
 
 survive:
 	/*
@@ -211,7 +221,8 @@ survive:
 	 * make sure we exit gracefully rather than endlessly redo
 	 * the fault.
 	 */
-	addr = (address & PAGE_MASK) | (error_code & 8);
+	addr = (address & PAGE_MASK);
+	set_thread_fault_code(error_code);
 	switch (handle_mm_fault(mm, vma, addr, write)) {
 		case VM_FAULT_MINOR:
 			tsk->min_flt++;
@@ -226,7 +237,7 @@ survive:
 		default:
 			BUG();
 	}
-
+	set_thread_fault_code(0);
 	up_read(&mm->mmap_sem);
 	return;
 
@@ -239,7 +250,7 @@ bad_area:
 
 bad_area_nosemaphore:
 	/* User mode accesses just cause a SIGSEGV */
-	if (error_code & 4) {
+	if (error_code & ACE_USERMODE) {
 		tsk->thread.address = address;
 		tsk->thread.error_code = error_code | (address >= TASK_SIZE);
 		tsk->thread.trap_no = 14;
@@ -295,7 +306,7 @@ out_of_memory:
 		goto survive;
 	}
 	printk("VM: killing process %s\n", tsk->comm);
-	if (error_code & 4)
+	if (error_code & ACE_USERMODE)
 		do_exit(SIGKILL);
 	goto no_context;
 
@@ -303,7 +314,7 @@ do_sigbus:
 	up_read(&mm->mmap_sem);
 
 	/* Kernel mode? Handle exception or die */
-	if (!(error_code & 4))
+	if (!(error_code & ACE_USERMODE))
 		goto no_context;
 
 	tsk->thread.address = address;
@@ -352,7 +363,7 @@ vmalloc_fault:
 		if (!pte_present(*pte_k))
 			goto no_context;
 
-		addr = (address & PAGE_MASK) | (error_code & 8);
+		addr = (address & PAGE_MASK) | (error_code & ACE_INSTRUCTION);
 		update_mmu_cache(NULL, addr, *pte_k);
 		return;
 	}
@@ -370,7 +381,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long vaddr,
 	unsigned long *entry1, *entry2;
 	unsigned long pte_data, flags;
 	unsigned int *entry_dat;
-	int inst = vaddr & 8;
+	int inst = get_thread_fault_code() & ACE_INSTRUCTION;
 	int i;
 
 	/* Ptrace may call this routine. */

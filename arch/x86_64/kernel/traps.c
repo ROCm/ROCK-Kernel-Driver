@@ -556,8 +556,9 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 			regs->rip = fixup->fixup;
 			return;
 		}
-		notify_die(DIE_GPF, "general protection fault", regs, error_code,
-			   13, SIGSEGV); 
+		if (notify_die(DIE_GPF, "general protection fault", regs,
+					error_code, 13, SIGSEGV) == NOTIFY_STOP)
+			return;
 		die("general protection fault", regs, error_code);
 	}
 }
@@ -690,7 +691,9 @@ asmlinkage void *do_debug(struct pt_regs * regs, unsigned long error_code)
 	tsk->thread.debugreg6 = condition;
 
 	/* Mask out spurious TF errors due to lazy TF clearing */
-	if (condition & DR_STEP) {
+	if ((condition & DR_STEP) &&
+	    (notify_die(DIE_DEBUGSTEP, "debugstep", regs, condition,
+			1, SIGTRAP) != NOTIFY_STOP)) {
 		/*
 		 * The TF error should be masked out only if the current
 		 * process is not traced and if the TRAP flag has been set
@@ -879,6 +882,10 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs *regs)
 }
 
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs)
+{
+}
+
+asmlinkage void __attribute__((weak)) smp_thermal_interrupt(void)
 {
 }
 

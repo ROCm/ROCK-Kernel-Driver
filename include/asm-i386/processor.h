@@ -126,6 +126,8 @@ extern void dodgy_tsc(void);
 
 /*
  * Generic CPUID function
+ * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
+ * resulting in stale register contents being returned.
  */
 static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 {
@@ -134,7 +136,7 @@ static inline void cpuid(int op, int *eax, int *ebx, int *ecx, int *edx)
 		  "=b" (*ebx),
 		  "=c" (*ecx),
 		  "=d" (*edx)
-		: "0" (op));
+		: "0" (op), "c"(0));
 }
 
 /*
@@ -282,6 +284,9 @@ extern unsigned int machine_id;
 extern unsigned int machine_submodel_id;
 extern unsigned int BIOS_revision;
 extern unsigned int mca_pentium_flag;
+
+/* Boot loader type from the setup header */
+extern int bootloader_type;
 
 /*
  * User space process size: 3GB (default).

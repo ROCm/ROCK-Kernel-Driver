@@ -140,8 +140,6 @@ static inline int dump_task_fpu(struct task_struct *tsk, elf_fpregset_t *fpregs)
 #include <linux/binfmts.h>
 #include <linux/compat.h>
 
-int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack);
-
 #define elf_prstatus elf_prstatus32
 struct elf_prstatus32
 {
@@ -191,7 +189,6 @@ struct elf_prpsinfo32
 
 #undef start_thread
 #define start_thread                    start_thread31 
-#define setup_arg_pages(bprm, exec)     setup_arg_pages32(bprm, exec)
 
 MODULE_DESCRIPTION("Binary format loader for compatibility with 32bit Linux for S390 binaries,"
                    " Copyright 2000 IBM Corporation"); 

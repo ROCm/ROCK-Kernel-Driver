@@ -124,11 +124,12 @@ void
 tty3270_set_timer(struct tty3270 *tp, int expires)
 {
 	if (expires == 0) {
-		if (del_timer(&tp->timer))
+		if (timer_pending(&tp->timer) && del_timer(&tp->timer))
 			raw3270_put_view(&tp->view);
 		return;
 	}
-	if (mod_timer(&tp->timer, jiffies + expires))
+	if (timer_pending(&tp->timer) &&
+	    mod_timer(&tp->timer, jiffies + expires))
 		return;
 	raw3270_get_view(&tp->view);
 	tp->timer.function = (void (*)(unsigned long)) tty3270_update;

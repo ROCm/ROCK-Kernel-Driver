@@ -68,41 +68,21 @@ __setup("nohlt", nohlt_setup);
 __setup("hlt", hlt_setup);
 
 /*
- * The following aren't currently used.
- */
-void (*pm_idle)(void);
-void (*pm_power_off)(void);
-
-/*
  * This is our default idle handler.  We need to disable
  * interrupts here to ensure we don't miss a wakeup call.
- */
-void default_idle(void)
-{
-	local_irq_disable();
-	if (!need_resched() && !hlt_counter)
-	local_irq_enable();
-}
-
-/*
- * The idle thread.  We try to conserve power, while trying to keep
- * overall latency low.  The architecture specific idle is passed
- * a value to indicate the level of "idleness" of the system.
  */
 void cpu_idle(void)
 {
 	/* endless idle loop with no priority at all */
 	preempt_disable();
 	while (1) {
-		void (*idle)(void) = pm_idle;
-		if (!idle)
-			idle = default_idle;
-		leds_event(led_idle_start);
-		while (!need_resched())
-			idle();
-		leds_event(led_idle_end);
-		schedule();
+		while (!need_resched()) {
+			local_irq_disable();
+			if (!need_resched() && !hlt_counter)
+				local_irq_enable();
+		}
 	}
+	schedule();
 }
 
 static char reboot_mode = 'h';
@@ -115,20 +95,15 @@ int __init reboot_setup(char *str)
 
 __setup("reboot=", reboot_setup);
 
+/* ARM26 cant do these but we still need to define them. */
 void machine_halt(void)
 {
-	leds_event(led_halted);
+}
+void machine_power_off(void)
+{
 }
 
 EXPORT_SYMBOL(machine_halt);
-
-void machine_power_off(void)
-{
-	leds_event(led_halted);
-	if (pm_power_off)
-		pm_power_off();
-}
-
 EXPORT_SYMBOL(machine_power_off);
 
 void machine_restart(char * __unused)
@@ -306,7 +281,7 @@ void release_thread(struct task_struct *dead_task)
 asmlinkage void ret_from_fork(void) __asm__("ret_from_fork");
 
 int
-copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
+copy_thread(int nr, unsigned long clone_flags, unsigned long stack_start,
 	    unsigned long unused, struct task_struct *p, struct pt_regs *regs)
 {
 	struct thread_info *thread = p->thread_info;
@@ -315,7 +290,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	childregs = __get_user_regs(thread);
 	*childregs = *regs;
 	childregs->ARM_r0 = 0;
-	childregs->ARM_sp = esp;
+	childregs->ARM_sp = stack_start;
 
 	memset(&thread->cpu_context, 0, sizeof(struct cpu_context_save));
 	thread->cpu_context.sp = (unsigned long)childregs;
@@ -367,35 +342,42 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 }
 
 /*
- * This is the mechanism for creating a new kernel thread.
- *
- * NOTE! Only a kernel-only process(ie the swapper or direct descendants
- * who haven't done an "execve()") should use this: it will work within
- * a system call from a "real" process, but the process memory space will
- * not be free'd until both the parent and the child have exited.
- * FIXME - taken from arm32
+ * Shuffle the argument into the correct register before calling the
+ * thread function.  r1 is the thread argument, r2 is the pointer to
+ * the thread function, and r3 points to the exit function.
+ * FIXME - make sure this is right - the older code used to zero fp
+ * and cause the parent to call sys_exit (do_exit in this version)
+ */
+extern void kernel_thread_helper(void);
+
+asm(    ".section .text\n"
+"       .align\n"
+"       .type   kernel_thread_helper, #function\n"
+"kernel_thread_helper:\n"
+"       mov     r0, r1\n"
+"       mov     lr, r3\n"
+"       mov     pc, r2\n"
+"       .size   kernel_thread_helper, . - kernel_thread_helper\n"
+"       .previous");
+
+/*
+ * Create a kernel thread.
  */
 pid_t kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 {
-        register unsigned int r0 asm("r0") = flags | CLONE_VM | CLONE_UNTRACED;
-        register unsigned int r1 asm("r1") = 0;
-        register pid_t __ret asm("r0");
+        struct pt_regs regs;
 
-        __asm__ __volatile__(
-        __syscall(clone)"       @ kernel_thread sys_clone       \n\
-        movs    %0, r0          @ if we are the child           \n\
-        bne     1f                                              \n\
-        mov     fp, #0          @ ensure that fp is zero        \n\
-        mov     r0, %4                                          \n\
-        mov     lr, pc                                          \n\
-        mov     pc, %3                                          \n\
-        b       sys_exit                                        \n\
-1:      "
-        : "=r" (__ret)
-        : "0" (r0), "r" (r1), "r" (fn), "r" (arg)
-        : "lr");
-        return __ret;
+        memset(&regs, 0, sizeof(regs));
+
+        regs.ARM_r1 = (unsigned long)arg;
+        regs.ARM_r2 = (unsigned long)fn;
+        regs.ARM_r3 = (unsigned long)do_exit;
+        regs.ARM_pc = (unsigned long)kernel_thread_helper | MODE_SVC26;
+
+        return do_fork(flags|CLONE_VM|CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 }
+EXPORT_SYMBOL(kernel_thread);
+
 
 unsigned long get_wchan(struct task_struct *p)
 {

@@ -13,6 +13,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/ptrace.h>
+#include <linux/ptrace.h>
 #include <sys/time.h>
 #include <sys/wait.h>
 #include "user.h"
@@ -25,7 +26,6 @@
 #include "mem_user.h"
 #include "process.h"
 #include "kern_util.h"
-#include "frame.h"
 #include "chan_user.h"
 #include "ptrace_user.h"
 #include "mode.h"
@@ -72,6 +72,8 @@ void attach_process(int pid)
 	   (ptrace(PTRACE_CONT, pid, 0, 0) < 0))
 		tracer_panic("OP_FORK failed to attach pid");
 	wait_for_stop(pid, SIGSTOP, PTRACE_CONT, NULL);
+	if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)PTRACE_O_TRACESYSGOOD) < 0)
+		tracer_panic("OP_FORK: PTRACE_SETOPTIONS failed, errno = %d", errno);
 	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0)
 		tracer_panic("OP_FORK failed to continue process");
 }
@@ -141,7 +143,7 @@ static void sleeping_process_signal(int pid, int sig)
 	 * any more, the trace of those will land here.  So, we need to just 
 	 * PTRACE_SYSCALL it.
 	 */
-	case SIGTRAP:
+	case (SIGTRAP + 0x80):
 		if(ptrace(PTRACE_SYSCALL, pid, 0, 0) < 0)
 			tracer_panic("sleeping_process_signal : Failed to "
 				     "PTRACE_SYSCALL pid %d, errno = %d\n",
@@ -184,9 +186,8 @@ int tracer(int (*init_proc)(void *), void *sp)
 	unsigned long eip = 0;
 	int status, pid = 0, sig = 0, cont_type, tracing = 0, op = 0;
 	int last_index, proc_id = 0, n, err, old_tracing = 0, strace = 0;
-	int pt_syscall_parm, local_using_sysemu;
+	int local_using_sysemu = 0;
 
-	capture_signal_stack();
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
 	tracing_pid = os_getpid();
@@ -196,6 +197,10 @@ int tracer(int (*init_proc)(void *), void *sp)
 	CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 	if(n < 0){
 		printf("waitpid on idle thread failed, errno = %d\n", errno);
+		exit(1);
+	}
+	if (ptrace(PTRACE_SETOPTIONS, pid, 0, (void *)PTRACE_O_TRACESYSGOOD) < 0) {
+		printf("Failed to PTRACE_SETOPTIONS for idle thread, errno = %d\n", errno);
 		exit(1);
 	}
 	if((ptrace(PTRACE_CONT, pid, 0, 0) < 0)){
@@ -298,8 +303,9 @@ int tracer(int (*init_proc)(void *), void *sp)
 			tracing = is_tracing(task);
 			old_tracing = tracing;
 
-			local_using_sysemu = get_using_sysemu();
-			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
+			/* Assume: no syscall, when coming from user */
+			if ( tracing )
+				do_sigtrap(task);
 
 			switch(sig){
 			case SIGUSR1:
@@ -314,7 +320,13 @@ int tracer(int (*init_proc)(void *), void *sp)
 				case OP_HALT:
 					unmap_physmem();
 					kmalloc_ok = 0;
-					ptrace(PTRACE_KILL, pid, 0, 0);
+					os_kill_ptraced_process(pid, 0);
+					/* Now let's reap remaining zombies */
+					errno = 0;
+					do {
+						waitpid(-1, &status,
+							WUNTRACED);
+					} while (errno != ECHILD);
 					return(op == OP_REBOOT);
 				case OP_NONE:
 					printf("Detaching pid %d\n", pid);
@@ -328,14 +340,21 @@ int tracer(int (*init_proc)(void *), void *sp)
 				 */
 				pid = cpu_tasks[proc_id].pid;
 				break;
+			case (SIGTRAP + 0x80):
+				if(!tracing && (debugger_pid != -1)){
+					child_signal(pid, status & 0x7fff);
+					continue;
+				}
+				tracing = 0;
+				do_syscall(task, pid, local_using_sysemu);
+				sig = SIGUSR2;
+				break;
 			case SIGTRAP:
 				if(!tracing && (debugger_pid != -1)){
 					child_signal(pid, status);
 					continue;
 				}
 				tracing = 0;
-				if(do_syscall(task, pid, local_using_sysemu))
-					sig = SIGUSR2;
 				break;
 			case SIGPROF:
 				if(tracing) sig = 0;
@@ -371,16 +390,15 @@ int tracer(int (*init_proc)(void *), void *sp)
 				continue;
 			}
 
-			if(tracing){
-				if(singlestepping(task))
-					cont_type = PTRACE_SINGLESTEP;
-				else cont_type = pt_syscall_parm;
-			}
-			else cont_type = PTRACE_CONT;
+			local_using_sysemu = get_using_sysemu();
 
-			if((cont_type == PTRACE_CONT) && 
-			   (debugger_pid != -1) && strace)
+			if(tracing)
+				cont_type = SELECT_PTRACE_OPERATION(local_using_sysemu,
+				                                    singlestepping(task));
+			else if((debugger_pid != -1) && strace)
 				cont_type = PTRACE_SYSCALL;
+			else
+				cont_type = PTRACE_CONT;
 
 			if(ptrace(cont_type, pid, 0, sig) != 0){
 				tracer_panic("ptrace failed to continue "

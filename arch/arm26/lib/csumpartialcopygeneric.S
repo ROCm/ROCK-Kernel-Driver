@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/csumpartialcopygeneric.S
+ *  linux/arch/arm26/lib/csumpartialcopygeneric.S
  *
  *  Copyright (C) 1995-2001 Russell King
  *

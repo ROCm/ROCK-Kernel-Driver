@@ -97,6 +97,11 @@ config PTE_64BIT
 	depends on 44x
 	default y
 
+config PHYS_64BIT
+	bool
+	depends on 44x
+	default y
+
 config ALTIVEC
 	bool "AltiVec Support"
 	depends on 6xx || POWER4
@@ -500,8 +505,19 @@ config APUS
 	  More information is available at:
 	  <http://linux-apus.sourceforge.net/>.
 
+config KATANA
+	bool "Artesyn-Katana"
+	help
+	  Select KATANA if configuring an Artesyn KATANA 750i or 3750
+	  cPCI board.
+
 config WILLOW
 	bool "Cogent-Willow"
+
+config CPCI690
+	bool "Force-CPCI690"
+	help
+	  Select CPCI690 if configuring a Force CPCI690 cPCI board.
 
 config PCORE
 	bool "Force-PowerCore"
@@ -509,11 +525,20 @@ config PCORE
 config POWERPMC250
 	bool "Force-PowerPMC250"
 
-config EV64260
-	bool "Galileo-EV-64260-BP"
+config CHESTNUT
+	bool "IBM 750FX Eval board or 750GX Eval board"
+	help
+	  Select CHESTNUT if configuring an IBM 750FX Eval Board or a
+	  IBM 750GX Eval board.
 
 config SPRUCE
 	bool "IBM-Spruce"
+
+config EV64260
+	bool "Marvell-EV64260BP"
+	help
+	  Select EV64260 if configuring a Marvell (formerly Galileo)
+	  EV64260BP Evaluation platform.
 
 config LOPEC
 	bool "Motorola-LoPEC"
@@ -679,7 +704,8 @@ config PPC_OF
 config PPC_GEN550
 	bool
 	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || \
-		PRPMC750 || K2 || PRPMC800 || LOPEC
+		PRPMC750 || K2 || PRPMC800 || LOPEC || \
+		(EV64260 && !SERIAL_MPSC) || CHESTNUT
 	default y
 
 config FORCE
@@ -689,8 +715,52 @@ config FORCE
 
 config GT64260
 	bool
-	depends on EV64260
+	depends on EV64260 || CPCI690
 	default y
+
+config MV64360
+	bool
+	depends on KATANA
+	default y
+
+config MV64360
+	bool
+	depends on CHESTNUT
+  	default y
+
+config MV64X60
+	bool
+	depends on (GT64260 || MV64360)
+	default y
+
+menu "Set bridge options"
+	depends on MV64X60
+
+config NOT_COHERENT_CACHE
+	bool "Turn off Cache Coherency"
+	default n
+	help
+	  Some 64x60 bridges lock up when trying to enforce cache coherency.
+	  When this option is selected, cache coherency will be turned off.
+	  Note that this can cause other problems (e.g., stale data being
+	  speculatively loaded via a cached mapping).  Use at your own risk.
+
+config MV64X60_BASE
+	hex "Set bridge base used by firmware"
+	default "0xf1000000"
+	help
+	  A firmware can leave the base address of the bridge's registers at
+	  a non-standard location.  If so, set this value to reflect the
+	  address of that non-standard location.
+
+config MV64X60_NEW_BASE
+	hex "Set bridge base used by kernel"
+	default "0xf1000000"
+	help
+	  If the current base address of the bridge's registers is not where
+	  you want it, set this value to the address that you want it moved to.
+
+endmenu
 
 config NONMONARCH_SUPPORT
 	bool "Enable Non-Monarch Support"

@@ -19,7 +19,6 @@
 #include "os.h"
 #include "user_util.h"
 #include "tlb.h"
-#include "frame.h"
 #include "kern.h"
 #include "mode.h"
 #include "proc_mm.h"
@@ -183,7 +182,6 @@ static int start_kernel_proc(void *unused)
 int start_uml_skas(void)
 {
 	start_userspace(0);
-	capture_signal_stack();
 
 	init_new_thread_signals(1);
 	uml_idle_timer();

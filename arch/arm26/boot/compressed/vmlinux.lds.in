@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/boot/compressed/vmlinux.lds.in
+ *  linux/arch/arm26/boot/compressed/vmlinux.lds.in
  *
  *  Copyright (C) 2000 Russell King
  *

@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.39 $
+ * $Revision: 1.40 $
  */
 
 #include <linux/config.h>
@@ -274,6 +274,7 @@ dasd_diag_check_device(struct dasd_device *device)
 			"No memory to allocate initialization request");
 		return -ENOMEM;
 	}
+	/* try all sizes - needed for ECKD devices */
 	for (bsize = 512; bsize <= PAGE_SIZE; bsize <<= 1) {
 		mdsk_init_io(device, bsize, 0, 64);
 		memset(&bio, 0, sizeof (struct dasd_diag_bio));
@@ -291,8 +292,9 @@ dasd_diag_check_device(struct dasd_device *device)
 			break;
 		mdsk_term_io(device);
 	}
-	if (bsize <= PAGE_SIZE && label[3] == bsize &&
-	    label[0] == 0xc3d4e2f1) {
+	if (bsize <= PAGE_SIZE && label[0] == 0xc3d4e2f1) {
+		/* get formatted blocksize from label block */
+		bsize = (int) label[3];
 		device->blocks = label[7];
 		device->bp_block = bsize;
 		device->s2b_shift = 0;	/* bits to shift 512 to get a block */
@@ -305,8 +307,12 @@ dasd_diag_check_device(struct dasd_device *device)
 			    (device->blocks << device->s2b_shift) >> 1);
 		rc = 0;
 	} else {
-		DEV_MESSAGE(KERN_WARNING, device, "%s",
-			    "volume has incompatible disk layout");
+		if (bsize > PAGE_SIZE)
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
+				    "DIAG access failed");
+		else
+			DEV_MESSAGE(KERN_WARNING, device, "%s",
+				    "volume is not CMS formatted");
 		rc = -EMEDIUMTYPE;
 	}
 	free_page((long) label);

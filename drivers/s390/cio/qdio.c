@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.93 $"
+#define VERSION_QDIO_C "$Revision: 1.94 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -2319,6 +2319,15 @@ qdio_shutdown(struct ccw_device *cdev, int how)
 	}
 	if (rc == -ENODEV) {
 		/* No need to wait for device no longer present. */
+		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
+		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+	} else if (((void *)cdev->handler != (void *)qdio_handler) && rc == 0) {
+		/*
+		 * Whoever put another handler there, has to cope with the
+		 * interrupt theirself. Might happen if qdio_shutdown was
+		 * called on already shutdown queues, but this shouldn't have
+		 * bad side effects.
+		 */
 		qdio_set_state(irq_ptr, QDIO_IRQ_STATE_INACTIVE);
 		spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
 	} else if (rc == 0) {

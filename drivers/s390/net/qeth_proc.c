@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.10 $)
+ * linux/drivers/s390/net/qeth_fs.c ($Revision: 1.13 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  * This file contains code related to procfs.
@@ -21,7 +21,7 @@
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-const char *VERSION_QETH_PROC_C = "$Revision: 1.10 $";
+const char *VERSION_QETH_PROC_C = "$Revision: 1.13 $";
 
 /***** /proc/qeth *****/
 #define QETH_PROCFILE_NAME "qeth"
@@ -133,7 +133,7 @@ qeth_procfile_seq_show(struct seq_file *s, void *it)
 				CARD_WDEV_ID(card),
 				CARD_DDEV_ID(card),
 				card->info.chpid,
-				card->info.if_name,
+				QETH_CARD_IFNAME(card),
 				qeth_get_cardname_short(card),
 				card->info.portno);
 		if (card->lan_online)
@@ -222,7 +222,7 @@ qeth_perf_procfile_seq_show(struct seq_file *s, void *it)
 			CARD_RDEV_ID(card),
 			CARD_WDEV_ID(card),
 			CARD_DDEV_ID(card),
-			card->info.if_name
+			QETH_CARD_IFNAME(card)
 		  );
 	seq_printf(s, "  Skb's/buffers received                 : %li/%i\n"
 		      "  Skb's/buffers sent                     : %li/%i\n\n",

@@ -40,8 +40,8 @@ void ssp_enable(struct ssp_dev *dev);
 void ssp_disable(struct ssp_dev *dev);
 void ssp_save_state(struct ssp_dev *dev, struct ssp_state *ssp);
 void ssp_restore_state(struct ssp_dev *dev, struct ssp_state *ssp);
-int ssp_init(struct ssp_dev *dev, u32 port, u32 mode, u32 flags, u32 psp_flags,
-						u32 speed);
+int ssp_init(struct ssp_dev *dev, u32 port);
+int ssp_config(struct ssp_dev *dev, u32 mode, u32 flags, u32 psp_flags, u32 speed);
 void ssp_exit(struct ssp_dev *dev);
 
 #endif

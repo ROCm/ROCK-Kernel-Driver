@@ -1025,7 +1025,7 @@ out:
 	return ret;
 }
 
-static int
+int
 ext3_journal_dirty_data(handle_t *handle, struct buffer_head *bh)
 {
 	int err = journal_dirty_data(handle, bh);

@@ -41,6 +41,7 @@
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
+#include <asm/perfmon.h>
 
 #ifdef CONFIG_XMON
 void (*debugger)(struct pt_regs *regs) = xmon;
@@ -70,7 +71,6 @@ void (*debugger_fault_handler)(struct pt_regs *regs);
 /*
  * Trap & Exception support
  */
-
 
 spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
@@ -566,7 +566,7 @@ void ProgramCheckException(struct pt_regs *regs)
 
 void SingleStepException(struct pt_regs *regs)
 {
-	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
+	regs->msr &= ~(MSR_SE | MSR_BE);  /* Turn off 'trace' bits */
 	if (debugger_sstep(regs))
 		return;
 	_exception(SIGTRAP, regs, TRAP_TRACE, 0);
@@ -725,6 +725,11 @@ void AltivecAssistException(struct pt_regs *regs)
 	}
 }
 #endif /* CONFIG_ALTIVEC */
+
+void PerformanceMonitorException(struct pt_regs *regs)
+{
+	perf_irq(regs);
+}
 
 #ifdef CONFIG_FSL_BOOKE
 void CacheLockingException(struct pt_regs *regs, unsigned long address,

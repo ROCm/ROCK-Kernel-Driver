@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/lib/ll_char_wr.S
+ *  linux/arch/arm26/lib/ll_char_wr.S
  *
  *  Copyright (C) 1995, 1996 Russell King.
  *

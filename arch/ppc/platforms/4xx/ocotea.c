@@ -347,12 +347,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 	ibm440gx_get_clocks(&clocks, 33333333, 6 * 1843200);
 	ocp_sys_info.opb_bus_freq = clocks.opb;
 
-	/* XXX Fix L2C IRQ triggerring setting (edge-sensitive).
-	 * Firmware (at least PIBS v1.72 OCT/28/2003) sets it incorrectly
-	 * --ebs
-	 */
-	mtdcr(DCRN_UIC_TR(UIC2), mfdcr(DCRN_UIC_TR(UIC2)) | 0x00000100);
-
 	ibm44x_platform_init();
 
 	ppc_md.setup_arch = ocotea_setup_arch;

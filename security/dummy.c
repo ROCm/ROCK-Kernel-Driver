@@ -92,7 +92,7 @@ static int dummy_quotactl (int cmds, int type, int id, struct super_block *sb)
 	return 0;
 }
 
-static int dummy_quota_on (struct file *f)
+static int dummy_quota_on (struct dentry *dentry)
 {
 	return 0;
 }
@@ -159,6 +159,14 @@ static int dummy_vm_enough_memory(long pages)
 	allowed = (totalram_pages - hugetlb_total_pages())
 		* sysctl_overcommit_ratio / 100;
 	allowed += total_swap_pages;
+
+	/* Leave the last 3% for root */
+	if (current->euid)
+		allowed -= allowed / 32;
+
+	/* Don't let a single process grow too big:
+	   leave 3% of the size of this process for other processes */
+	allowed -= current->mm->total_vm / 32;
 
 	if (atomic_read(&vm_committed_space) < allowed)
 		return 0;

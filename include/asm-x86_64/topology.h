@@ -16,6 +16,12 @@ extern unsigned char cpu_to_node[];
 extern cpumask_t     node_to_cpumask[];
 extern cpumask_t pci_bus_to_cpumask[];
 
+#ifdef CONFIG_ACPI_NUMA
+extern int __node_distance(int, int);
+#define node_distance(a,b) __node_distance(a,b)
+/* #else fallback version */
+#endif
+
 #define cpu_to_node(cpu)		(cpu_to_node[cpu])
 #define parent_node(node)		(node)
 #define node_to_first_cpu(node) 	(__ffs(node_to_cpumask[node]))
