@@ -19,4 +19,4 @@ $(obj)/version.o: $(objtree)/include/linux/compile.h
 
 $(objtree)/include/linux/compile.h: FORCE
 	@echo -n '  Generating $@'
-	@../scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
+	@$(srctree)/scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"

@@ -73,7 +73,7 @@ endif
 vmlinux: arch/sh/vmlinux.lds
 
 arch/sh/vmlinux.lds: arch/sh/vmlinux.lds.S FORCE
-	$(CPP) -traditional -C -P -I$(HPATH) -Ush arch/sh/vmlinux.lds.S >arch/sh/vmlinux.lds
+	$(CPP) $(CPPFLAGS) -traditional -C -P -Ush $< > $@
 
 FORCE: ;
 

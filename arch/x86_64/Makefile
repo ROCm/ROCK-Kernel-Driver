@@ -25,9 +25,9 @@
 # early bootup linking needs 32bit. You can either use real 32bit tools
 # here or 64bit tools in 32bit mode.
 #
-IA32_CC := $(CROSS_COMPILE)gcc -m32 -O2 -fomit-frame-pointer -nostdinc -I $(HPATH)
-IA32_LD := $(CROSS_COMPILE)ld -m elf_i386
-IA32_AS := $(CROSS_COMPILE)gcc -m32 -Wa,--32 -D__ASSEMBLY__ -traditional -c -nostdinc -I $(HPATH) 
+IA32_CC := $(CC) $(CPPFLAGS) -m32 -O2 -fomit-frame-pointer
+IA32_LD := $(LD) -m elf_i386
+IA32_AS := $(CC) $(AFLAGS) -m32 -Wa,--32 -traditional -c
 IA32_OBJCOPY := $(CROSS_COMPILE)objcopy
 IA32_CPP := $(CROSS_COMPILE)gcc -m32 -E
 export IA32_CC IA32_LD IA32_AS IA32_OBJCOPY IA32_CPP

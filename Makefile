@@ -43,9 +43,6 @@ CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else echo sh; fi ; fi)
 TOPDIR	:= $(CURDIR)
 
-HPATH   	= $(TOPDIR)/include
-FINDHPATH	= $(HPATH)/asm $(HPATH)/linux $(HPATH)/scsi $(HPATH)/net
-
 HOSTCC  	= gcc
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 
@@ -151,7 +148,7 @@ EXPORT_FLAGS    =
 NOSTDINC_FLAGS  = -nostdinc -iwithprefix include
 
 export	VERSION PATCHLEVEL SUBLEVEL EXTRAVERSION KERNELRELEASE ARCH \
-	CONFIG_SHELL TOPDIR HPATH HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
+	CONFIG_SHELL TOPDIR HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC \
 	CPP AR NM STRIP OBJCOPY OBJDUMP MAKE MAKEFILES GENKSYMS PERL
 
 export CPPFLAGS EXPORT_FLAGS NOSTDINC_FLAGS OBJCOPYFLAGS
@@ -233,7 +230,7 @@ export MODLIB
 # standard CFLAGS
 #
 
-CPPFLAGS := -D__KERNEL__ -I$(HPATH)
+CPPFLAGS := -D__KERNEL__ -I$(objtree)/include
 
 CFLAGS := $(CPPFLAGS) -Wall -Wstrict-prototypes -Wno-trigraphs -O2 \
 	  -fomit-frame-pointer -fno-strict-aliasing -fno-common
@@ -434,7 +431,7 @@ ifdef CONFIG_MODULES
 #	Build modules
 
 ifdef CONFIG_MODVERSIONS
-MODFLAGS += -include $(HPATH)/linux/modversions.h
+MODFLAGS += -include $(objtree)/include/linux/modversions.h
 endif
 
 .PHONY: modules
@@ -571,28 +568,28 @@ xconfig:
 
 menuconfig:
 	@$(MAKE) -C scripts lxdialog
-	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
-	$(CONFIG_SHELL) scripts/Configure arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure arch/$(ARCH)/config.in
 
 oldconfig:
-	$(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
 
 randconfig:
-	$(CONFIG_SHELL) scripts/Configure -r arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure -r arch/$(ARCH)/config.in
 
 allyesconfig:
-	$(CONFIG_SHELL) scripts/Configure -y arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure -y arch/$(ARCH)/config.in
 
 allnoconfig:
-	$(CONFIG_SHELL) scripts/Configure -n arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure -n arch/$(ARCH)/config.in
 
 allmodconfig:
-	$(CONFIG_SHELL) scripts/Configure -m arch/$(ARCH)/config.in
+	$(CONFIG_SHELL) $(src)/scripts/Configure -m arch/$(ARCH)/config.in
 
 defconfig:
-	yes '' | $(CONFIG_SHELL) scripts/Configure -d arch/$(ARCH)/config.in
+	yes '' | $(CONFIG_SHELL) $(src)/scripts/Configure -d arch/$(ARCH)/config.in
 
 # Cleaning up
 # ---------------------------------------------------------------------------

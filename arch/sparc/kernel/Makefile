@@ -30,6 +30,8 @@ endif
 
 include $(TOPDIR)/Rules.make
 
+HPATH := $(objtree)/include
+
 check_asm: FORCE
 	@if [ ! -r $(HPATH)/asm/asm_offsets.h ] ; then \
 	  touch $(HPATH)/asm/asm_offsets.h ; \

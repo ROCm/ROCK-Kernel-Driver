@@ -7,7 +7,6 @@
 #
 
 TOPDIR=../../../..
-HPATH           = $(TOPDIR)/include
 
 LIB     = ../../lib/lib.a
 
