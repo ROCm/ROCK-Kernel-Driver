@@ -233,15 +233,6 @@ static int queue_io(struct mapped_device *md, struct bio *bio)
  *   interests of getting something for people to use I give
  *   you this clearly demarcated crap.
  *---------------------------------------------------------------*/
-static inline sector_t to_sector(unsigned int bytes)
-{
-	return bytes >> SECTOR_SHIFT;
-}
-
-static inline unsigned int to_bytes(sector_t sector)
-{
-	return sector << SECTOR_SHIFT;
-}
 
 /*
  * Decrements the number of outstanding ios that a bio has been
