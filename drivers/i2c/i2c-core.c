@@ -313,42 +313,45 @@ int i2c_check_addr(struct i2c_adapter *adapter, int addr)
 int i2c_attach_client(struct i2c_client *client)
 {
 	struct i2c_adapter *adapter = client->adapter;
-	int res =  -EBUSY, i;
+	int i;
 
 	down(&adapter->list);
-	if (__i2c_check_addr(client->adapter,client->addr))
+	if (__i2c_check_addr(client->adapter, client->addr))
 		goto out_unlock_list;
 
-	for (i = 0; i < I2C_CLIENT_MAX; i++)
-		if (NULL == adapter->clients[i])
-			break;
-	if (I2C_CLIENT_MAX == i) {
-		printk(KERN_WARNING 
-		       " i2c-core.o: attach_client(%s) - enlarge I2C_CLIENT_MAX.\n",
-			client->name);
-		res = -ENOMEM;
-		goto out_unlock_list;
+	for (i = 0; i < I2C_CLIENT_MAX; i++) {
+		if (!adapter->clients[i])
+			goto free_slot;
 	}
 
-	adapter->clients[i] = client;
-	up(&adapter->list);
-	
-	if (adapter->client_register) 
-		if (adapter->client_register(client)) 
-			printk(KERN_DEBUG "i2c-core.o: warning: client_register seems "
-			       "to have failed for client %02x at adapter %s\n",
-			       client->addr,adapter->name);
-	DEB(printk(KERN_DEBUG "i2c-core.o: client [%s] registered to adapter [%s](pos. %d).\n",
-		client->name, adapter->name,i));
-
-	if(client->flags & I2C_CLIENT_ALLOW_USE)
-		client->usage_count = 0;
-	
-	return 0;
+	printk(KERN_WARNING 
+	       " i2c-core.o: attach_client(%s) - enlarge I2C_CLIENT_MAX.\n",
+	       client->name);
 
  out_unlock_list:
 	up(&adapter->list);
-	return res;
+	return -EBUSY;
+
+ free_slot:
+	adapter->clients[i] = client;
+	up(&adapter->list);
+	
+	if (adapter->client_register)  {
+		if (adapter->client_register(client))  {
+			printk(KERN_DEBUG
+			       "i2c-core.o: warning: client_register seems "
+			       "to have failed for client %02x at adapter %s\n",
+			       client->addr, adapter->name);
+		}
+	}
+
+	DEB(printk(KERN_DEBUG
+		   "i2c-core.o: client [%s] registered to adapter [%s] "
+		   "(pos. %d).\n", client->name, adapter->name, i));
+
+	if (client->flags & I2C_CLIENT_ALLOW_USE)
+		client->usage_count = 0;
+	return 0;
 }
 
 
@@ -363,28 +366,30 @@ int i2c_detach_client(struct i2c_client *client)
 	if (adapter->client_unregister)  {
 		res = adapter->client_unregister(client);
 		if (res) {
-			printk(KERN_ERR "i2c-core.o: client_unregister [%s] failed, "
-			       "client not detached",client->name);
-			return res;
+			printk(KERN_ERR
+			       "i2c-core.o: client_unregister [%s] failed, "
+			       "client not detached", client->name);
+			goto out;
 		}
 	}
 
 	down(&adapter->list);
 	for (i = 0; i < I2C_CLIENT_MAX; i++) {
-		if (client == adapter->clients[i])
-			break;
+		if (client == adapter->clients[i]) {
+			adapter->clients[i] = NULL;
+			goto out_unlock;
+		}
 	}
 
-	if (I2C_CLIENT_MAX == i) {
-		printk(KERN_WARNING " i2c-core.o: unregister_client "
-				    "[%s] not found\n",
-			client->name);
-		return -ENODEV;
-	} else
-		adapter->clients[i] = NULL;
-	up(&adapter->list);
+	printk(KERN_WARNING
+	       " i2c-core.o: unregister_client [%s] not found\n",
+	       client->name);
+	res = -ENODEV;
 
-	return 0;
+ out_unlock:
+	up(&adapter->list);
+ out:
+	return res;
 }
 
 static int i2c_inc_use_client(struct i2c_client *client)
@@ -563,7 +568,7 @@ static int i2cproc_register(struct i2c_adapter *adap, int bus)
 		goto fail;
 
 	proc_entry->proc_fops = &i2cproc_operations;
-	proc_entry->owner = THIS_MODULE;
+	proc_entry->owner = adap->owner;
 	adap->inode = proc_entry->low_ino;
 	return 0;
  fail:
