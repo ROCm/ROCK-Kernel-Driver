@@ -762,9 +762,7 @@ static int if_open(struct net_device *dev)
 	/* Start the PPP configuration after 1sec delay.
 	 * This will give the interface initilization time
 	 * to finish its configuration */
-	del_timer(&ppp_priv_area->poll_delay_timer);
-	ppp_priv_area->poll_delay_timer.expires = jiffies+HZ;
-	add_timer(&ppp_priv_area->poll_delay_timer);
+	mod_timer(&ppp_priv_area->poll_delay_timer, jiffies + HZ);
 	return 0;
 }
 

@@ -996,13 +996,11 @@ static int if_open(struct net_device* dev)
 	
 	set_bit(0,&chdlc_priv_area->config_chdlc);
 	chdlc_priv_area->config_chdlc_timeout=jiffies;
-	del_timer(&chdlc_priv_area->poll_delay_timer);
 
 	/* Start the CHDLC configuration after 1sec delay.
 	 * This will give the interface initilization time
 	 * to finish its configuration */
-	chdlc_priv_area->poll_delay_timer.expires=jiffies+HZ;
-	add_timer(&chdlc_priv_area->poll_delay_timer);
+	mod_timer(&chdlc_priv_area->poll_delay_timer, jiffies + HZ);
 	return err;
 }
 

@@ -1235,9 +1235,7 @@ static int if_open(struct net_device* dev)
 			connect(card);
 			S508_S514_unlock(card, &smp_flags);
 
-			del_timer(&card->u.x.x25_timer);
-			card->u.x.x25_timer.expires=jiffies+HZ;
-			add_timer(&card->u.x.x25_timer);
+			mod_timer(&card->u.x.x25_timer, jiffies + HZ);
 		}
 	}
 	/* Device is not up until the we are in connected state */
