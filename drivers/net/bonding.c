@@ -176,6 +176,16 @@
  *              Steve Mead <steve.mead at comdev dot cc>
  *     - Port Gleb Natapov's multicast support patchs from 2.4.12
  *       to 2.4.18 adding support for multicast.
+ *
+ * 2002/06/17 - Tony Cureington <tony.cureington * hp_com>
+ *     - corrected uninitialized pointer (ifr.ifr_data) in bond_check_dev_link;
+ *       actually changed function to use ETHTOOL, then MIIPHY, and finally
+ *       MIIREG to determine the link status
+ *     - fixed bad ifr_data pointer assignments in bond_ioctl
+ *     - corrected mode 1 being reported as active-backup in bond_get_info;
+ *       also added text to distinguish type of load balancing (rr or xor)
+ *     - change arp_ip_target module param from "1-12s" (array of 12 ptrs)
+ *       to "s" (a single ptr)
  */
 
 #include <linux/config.h>
@@ -210,6 +220,9 @@
 #include <linux/smp.h>
 #include <linux/if_ether.h>
 #include <linux/if_arp.h>
+#include <linux/mii.h>
+#include <linux/ethtool.h>
+
 
 /* monitor all links that often (in milliseconds). <=0 disables monitoring */
 #ifndef BOND_LINK_MON_INTERV
@@ -253,7 +266,7 @@ MODULE_PARM_DESC(miimon, "Link check interval in milliseconds");
 MODULE_PARM(mode, "i");
 MODULE_PARM(arp_interval, "i");
 MODULE_PARM_DESC(arp_interval, "arp interval in milliseconds");
-MODULE_PARM(arp_ip_target, "1-12s");
+MODULE_PARM(arp_ip_target, "s");
 MODULE_PARM_DESC(arp_ip_target, "arp target in n.n.n.n form");
 MODULE_PARM_DESC(mode, "Mode of operation : 0 for round robin, 1 for active-backup, 2 for xor");
 MODULE_PARM(updelay, "i");
@@ -386,21 +399,51 @@ static u16 bond_check_dev_link(struct net_device *dev)
 {
 	static int (* ioctl)(struct net_device *, struct ifreq *, int);
 	struct ifreq ifr;
-	u16 *data = (u16 *)&ifr.ifr_data;
-		
-	/* data[0] automagically filled by the ioctl */
-	data[1] = 1; /* MII location 1 reports Link Status */
+	struct mii_ioctl_data mii;
+	struct ethtool_value etool;
 
-	if (((ioctl = dev->do_ioctl) != NULL) &&  /* ioctl to access MII */
-	    (ioctl(dev, &ifr, SIOCGMIIPHY) == 0)) {
-		/* now, data[3] contains info about link status :
-		   - data[3] & 0x04 means link up
-		   - data[3] & 0x20 means end of auto-negociation
-		*/
-		return data[3];
-	} else {
-		return MII_LINK_READY;  /* spoof link up ( we can't check it) */
+	if ((ioctl = dev->do_ioctl) != NULL)  { /* ioctl to access MII */
+		/* TODO: set pointer to correct ioctl on a per team member */
+		/*       bases to make this more efficient. that is, once  */
+		/*       we determine the correct ioctl, we will always    */
+		/*       call it and not the others for that team          */
+		/*       member.                                           */
+
+		/* try SOICETHTOOL ioctl, some drivers cache ETHTOOL_GLINK */
+		/* for a period of time; we need to encourage link status  */
+		/* be reported by network drivers in real time; if the     */
+		/* value is cached, the mmimon module parm may have no     */
+		/* effect...                                               */
+	        etool.cmd = ETHTOOL_GLINK;
+	        ifr.ifr_data = (char*)&etool;
+		if (ioctl(dev, &ifr, SIOCETHTOOL) == 0) {
+			if (etool.data == 1) {
+				return(MII_LINK_READY);
+			} 
+			else { 
+				return(0);
+			} 
+		}
+
+		ifr.ifr_data = (char*)&mii;
+                /* try MIIPHY first then, if that doesn't work, try MIIREG */
+		if (ioctl(dev, &ifr, SIOCGMIIPHY) == 0) {
+			/* now, mii.phy_id contains info about link status :
+			- mii.phy_id & 0x04 means link up
+			- mii.phy_id & 0x20 means end of auto-negociation
+			*/
+			return mii.phy_id;
+		}
+
+		mii.reg_num = 1; /* the MII register we want to read */  
+		if (ioctl(dev, &ifr, SIOCGMIIREG) == 0) {
+			/* mii.val_out contians the same link info as phy_id */
+			/* above                                             */
+			return mii.val_out;
+		}
+
 	}
+	return MII_LINK_READY;  /* spoof link up ( we can't check it) */
 }
 
 static u16 bond_check_mii_link(bonding_t *bond)
@@ -1707,7 +1750,7 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 
 	switch (cmd) {
 	case SIOCGMIIPHY:
-		data = (u16 *)&ifr->ifr_data;
+		data = (u16 *)ifr->ifr_data;
 		if (data == NULL) {
 			return -EINVAL;
 		}
@@ -1718,7 +1761,7 @@ static int bond_ioctl(struct net_device *master_dev, struct ifreq *ifr, int cmd)
 		 * We do this again just in case we were called by SIOCGMIIREG
 		 * instead of SIOCGMIIPHY.
 		 */
-		data = (u16 *)&ifr->ifr_data;
+		data = (u16 *)ifr->ifr_data;
 		if (data == NULL) {
 			return -EINVAL;
 		}
@@ -2035,7 +2078,28 @@ static int bond_get_info(char *buf, char **start, off_t offset, int length)
 		link = bond_check_mii_link(bond);
 
 		len += sprintf(buf + len, "Bonding Mode: ");
-		len += sprintf(buf + len, "%s\n", mode ? "active-backup" : "load balancing");
+
+		switch (mode) {
+			case BOND_MODE_ACTIVEBACKUP:
+				len += sprintf(buf + len, "%s\n", 
+						"active-backup");
+			break;
+
+			case BOND_MODE_ROUNDROBIN:
+				len += sprintf(buf + len, "%s\n", 
+						"load balancing (round-robin)");
+			break;
+
+			case BOND_MODE_XOR:
+				len += sprintf(buf + len, "%s\n", 
+						"load balancing (xor)");
+			break;
+
+			default:
+				len += sprintf(buf + len, "%s\n", 
+						"unknown");
+			break;
+		}
 
 		if (mode == BOND_MODE_ACTIVEBACKUP) {
 			read_lock_irqsave(&bond->lock, flags);
@@ -2282,7 +2346,32 @@ static int __init bonding_init(void)
 	}
 	memset(dev_bonds, 0, max_bonds*sizeof(struct net_device));
 
+	if (updelay < 0) {
+		printk(KERN_WARNING 
+		       "bonding_init(): updelay module parameter (%d), "
+		       "not in range 0-%d, so it was reset to 0\n",
+		       updelay, INT_MAX);
+		updelay = 0;
+	}
+
+	if (downdelay < 0) {
+		printk(KERN_WARNING 
+		       "bonding_init(): downdelay module parameter (%d), "
+		       "not in range 0-%d, so it was reset to 0\n",
+		       downdelay, INT_MAX);
+		downdelay = 0;
+	}
+
+	if (arp_interval < 0) {
+		printk(KERN_WARNING 
+		       "bonding_init(): arp_interval module parameter (%d), "
+		       "not in range 0-%d, so it was reset to %d\n",
+		       arp_interval, INT_MAX, BOND_LINK_ARP_INTERV);
+		arp_interval = BOND_LINK_ARP_INTERV;
+	}
+
 	if (arp_ip_target) {
+		/* TODO: check and log bad ip address */
 		if (my_inet_aton(arp_ip_target, &arp_target) == 0)  {
 			arp_interval = 0;
 		}
