@@ -254,21 +254,6 @@ EXPORT_SYMBOL(ip_setsockopt);
 EXPORT_SYMBOL(ip_getsockopt);
 #endif /* CONFIG_IP_SCTP_MODULE */
 
-EXPORT_SYMBOL(netlink_set_err);
-EXPORT_SYMBOL(netlink_broadcast);
-EXPORT_SYMBOL(netlink_unicast);
-EXPORT_SYMBOL(netlink_kernel_create);
-EXPORT_SYMBOL(netlink_dump_start);
-EXPORT_SYMBOL(netlink_ack);
-EXPORT_SYMBOL(netlink_set_nonroot);
-EXPORT_SYMBOL(netlink_register_notifier);
-EXPORT_SYMBOL(netlink_unregister_notifier);
-#if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-EXPORT_SYMBOL(netlink_attach);
-EXPORT_SYMBOL(netlink_detach);
-EXPORT_SYMBOL(netlink_post);
-#endif
-
 EXPORT_SYMBOL(rtattr_parse);
 EXPORT_SYMBOL(__rta_fill);
 
