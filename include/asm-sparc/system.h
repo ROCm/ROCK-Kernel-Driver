@@ -275,6 +275,15 @@ extern __inline__ unsigned long read_psr_and_cli(void)
 #define local_irq_save(flags)	((flags) = read_psr_and_cli())
 #define local_irq_restore(flags)	setipl((flags))
 
+/* On sparc32 IRQ flags are the PSR register in the PSR_PIL
+ * field.
+ */
+#define irqs_disabled()		\
+({	unsigned long flags;	\
+	local_save_flags(flags);\
+	(flags & PSR_PIL) != 0;	\
+})
+
 #ifdef CONFIG_SMP
 
 extern unsigned char global_irq_holder;
