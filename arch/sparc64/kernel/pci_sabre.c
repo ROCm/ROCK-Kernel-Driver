@@ -262,7 +262,7 @@ static int __sabre_out_of_range(struct pci_pbm_info *pbm,
 static int __sabre_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 				int where, int size, u32 *value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 	u16 tmp16;
@@ -388,7 +388,7 @@ static int sabre_read_pci_cfg(struct pci_bus *bus, unsigned int devfn,
 static int __sabre_write_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 				 int where, int size, u32 value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 
@@ -1010,7 +1010,7 @@ static void __init sabre_resource_adjust(struct pci_dev *pdev,
 					 struct resource *res,
 					 struct resource *root)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct pci_pbm_info *pbm = pdev->bus->sysdata;
 	struct pci_controller_info *p = pbm->parent;
 	unsigned long base;
 
@@ -1150,11 +1150,8 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 	p->pbm_A.is_66mhz_capable = 0;
 	p->pbm_B.is_66mhz_capable = 0;
 
-	/* Unlike for PSYCHO, we can only have one SABRE
-	 * in a system.  Having multiple SABREs is thus
-	 * and error, and as a consequence we do not need
-	 * to do any bus renumbering but we do have to have
-	 * the pci_bus2pbm array setup properly.
+	/* This driver has not been verified to handle
+	 * multiple SABREs yet, so trap this.
 	 *
 	 * Also note that the SABRE host bridge is hardwired
 	 * to live at bus 0.
@@ -1167,7 +1164,6 @@ static void __init sabre_scan_bus(struct pci_controller_info *p)
 
 	cookie = alloc_bridge_cookie(&p->pbm_A);
 
-	/* The pci_bus2pbm table has already been setup in sabre_init. */
 	sabre_bus = pci_scan_bus(p->pci_first_busno,
 				 p->pci_ops,
 				 &p->pbm_A);
@@ -1398,11 +1394,6 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 		pbm->pci_first_slot = 1;
 		pbm->pci_first_busno = busrange[0];
 		pbm->pci_last_busno = busrange[1];
-		for (err = pbm->pci_first_busno;
-		     err <= pbm->pci_last_busno;
-		     err++)
-			pci_bus2pbm[err] = pbm;
-
 
 		prom_getstring(node, "name", pbm->prom_name, sizeof(pbm->prom_name));
 		err = prom_getproperty(node, "ranges",
@@ -1449,10 +1440,6 @@ static void __init sabre_pbm_init(struct pci_controller_info *p, int sabre_node,
 		pbm->prom_node = sabre_node;
 		pbm->pci_first_busno = p->pci_first_busno;
 		pbm->pci_last_busno = p->pci_last_busno;
-		for (err = pbm->pci_first_busno;
-		     err <= pbm->pci_last_busno;
-		     err++)
-			pci_bus2pbm[err] = pbm;
 
 		prom_getstring(sabre_node, "name", pbm->prom_name, sizeof(pbm->prom_name));
 		err = prom_getproperty(sabre_node, "ranges",
@@ -1521,7 +1508,6 @@ void __init sabre_init(int pnode, char *model_name)
 	u32 vdma[2];
 	u32 upa_portid, dma_mask;
 	u64 clear_irq;
-	int bus;
 
 	hummingbird_p = 0;
 	if (!strcmp(model_name, "pci108e,a001"))
@@ -1660,12 +1646,6 @@ void __init sabre_init(int pnode, char *model_name)
 
 	p->pci_first_busno = busrange[0];
 	p->pci_last_busno = busrange[1];
-
-	/*
-	 * Handle config space reads through any Simba on APB.
-	 */
-	for (bus = p->pci_first_busno; bus <= p->pci_last_busno; bus++)
-		pci_bus2pbm[bus] = &p->pbm_A;
 
 	/*
 	 * Look for APB underneath.

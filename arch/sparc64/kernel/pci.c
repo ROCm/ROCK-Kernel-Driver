@@ -46,26 +46,6 @@ struct pci_controller_info *pci_controller_root = NULL;
 /* Each PCI controller found gets a unique index. */
 int pci_num_controllers = 0;
 
-/* Given an 8-bit PCI bus number, this yields the
- * controlling PBM module info.
- *
- * Some explanation is in order here.  The Linux APIs for
- * the PCI subsystem require that the configuration space
- * types are enough to signify PCI configuration space
- * accesses correctly.  This gives us 8-bits for the bus
- * number, however we have multiple PCI controllers on
- * UltraSparc systems.
- *
- * So what we do is give the PCI busses under each controller
- * a unique portion of the 8-bit PCI bus number space.
- * Therefore one can obtain the controller from the bus
- * number.  For example, say PSYCHO PBM-A a subordinate bus
- * space of 0 to 4, and PBM-B has a space of 0 to 2.  PBM-A
- * will use 0 to 4, and PBM-B will use 5 to 7.
- */
-struct pci_pbm_info *pci_bus2pbm[256];
-unsigned char pci_highest_busnum = 0;
-
 /* At boot time the user can give the kernel a command
  * line option which controls if and how PCI devices
  * are reordered at PCI bus probing time.
@@ -383,10 +363,9 @@ void pcibios_fixup_bus(struct pci_bus *pbus)
 	pbus->resource[1] = &pbm->mem_space;
 }
 
-/* NOTE: This can get called before we've fixed up pdev->sysdata. */
 int pci_claim_resource(struct pci_dev *pdev, int resource)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct pci_pbm_info *pbm = pdev->bus->sysdata;
 	struct resource *res = &pdev->resource[resource];
 	struct resource *root;
 
@@ -531,7 +510,7 @@ int pcibios_enable_device(struct pci_dev *pdev, int mask)
 void pcibios_resource_to_bus(struct pci_dev *pdev, struct pci_bus_region *region,
 			     struct resource *res)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct pci_pbm_info *pbm = pdev->bus->sysdata;
 	struct resource zero_res, *root;
 
 	zero_res.start = 0;
@@ -552,7 +531,7 @@ void pcibios_resource_to_bus(struct pci_dev *pdev, struct pci_bus_region *region
 void pcibios_bus_to_resource(struct pci_dev *pdev, struct resource *res,
 			     struct pci_bus_region *region)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[pdev->bus->number];
+	struct pci_pbm_info *pbm = pdev->bus->sysdata;
 	struct resource *root;
 
 	res->start = region->start;

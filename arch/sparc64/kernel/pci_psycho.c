@@ -111,7 +111,7 @@ static int psycho_out_of_range(struct pci_pbm_info *pbm,
 static int psycho_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 			       int where, int size, u32 *value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 	u16 tmp16;
@@ -166,7 +166,7 @@ static int psycho_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 static int psycho_write_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 				int where, int size, u32 value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 
@@ -1103,107 +1103,6 @@ static void __init psycho_base_address_update(struct pci_dev *pdev, int resource
 		pci_write_config_dword(pdev, where + 4, 0);
 }
 
-/* We have to do the config space accesses by hand, thus... */
-#define PBM_BRIDGE_BUS		0x40
-#define PBM_BRIDGE_SUBORDINATE	0x41
-static void __init pbm_renumber(struct pci_pbm_info *pbm, u8 orig_busno)
-{
-	u8 *addr, busno;
-	int nbus;
-
-	busno = pci_highest_busnum;
-	nbus = pbm->pci_last_busno - pbm->pci_first_busno;
-
-	addr = psycho_pci_config_mkaddr(pbm, orig_busno,
-					0, PBM_BRIDGE_BUS);
-	pci_config_write8(addr, busno);
-	addr = psycho_pci_config_mkaddr(pbm, busno,
-					0, PBM_BRIDGE_SUBORDINATE);
-	pci_config_write8(addr, busno + nbus);
-
-	pbm->pci_first_busno = busno;
-	pbm->pci_last_busno = busno + nbus;
-	pci_highest_busnum = busno + nbus + 1;
-
-	do {
-		pci_bus2pbm[busno++] = pbm;
-	} while (nbus--);
-}
-
-/* We have to do the config space accesses by hand here since
- * the pci_bus2pbm array is not ready yet.
- */
-static void __init pbm_pci_bridge_renumber(struct pci_pbm_info *pbm,
-					   u8 busno)
-{
-	u32 devfn, l, class;
-	u8 hdr_type;
-	int is_multi = 0;
-
-	for(devfn = 0; devfn < 0xff; ++devfn) {
-		u32 *dwaddr;
-		u8 *baddr;
-
-		if (PCI_FUNC(devfn) != 0 && is_multi == 0)
-			continue;
-
-		/* Anything there? */
-		dwaddr = psycho_pci_config_mkaddr(pbm, busno, devfn, PCI_VENDOR_ID);
-		l = 0xffffffff;
-		pci_config_read32(dwaddr, &l);
-		if (l == 0xffffffff || l == 0x00000000 ||
-		    l == 0x0000ffff || l == 0xffff0000) {
-			is_multi = 0;
-			continue;
-		}
-
-		baddr = psycho_pci_config_mkaddr(pbm, busno, devfn, PCI_HEADER_TYPE);
-		pci_config_read8(baddr, &hdr_type);
-		if (PCI_FUNC(devfn) == 0)
-			is_multi = hdr_type & 0x80;
-
-		dwaddr = psycho_pci_config_mkaddr(pbm, busno, devfn, PCI_CLASS_REVISION);
-		class = 0xffffffff;
-		pci_config_read32(dwaddr, &class);
-		if ((class >> 16) == PCI_CLASS_BRIDGE_PCI) {
-			u32 buses = 0xffffffff;
-
-			dwaddr = psycho_pci_config_mkaddr(pbm, busno, devfn,
-							  PCI_PRIMARY_BUS);
-			pci_config_read32(dwaddr, &buses);
-			pbm_pci_bridge_renumber(pbm, (buses >> 8) & 0xff);
-			buses &= 0xff000000;
-			pci_config_write32(dwaddr, buses);
-		}
-	}
-}
-
-static void __init pbm_bridge_reconfigure(struct pci_controller_info *p)
-{
-	struct pci_pbm_info *pbm;
-	u8 *addr;
-
-	/* Clear out primary/secondary/subordinate bus numbers on
-	 * all PCI-to-PCI bridges under each PBM.  The generic bus
-	 * probing will fix them up.
-	 */
-	pbm_pci_bridge_renumber(&p->pbm_B, p->pbm_B.pci_first_busno);
-	pbm_pci_bridge_renumber(&p->pbm_A, p->pbm_A.pci_first_busno);
-
-	/* Move PBM A out of the way. */
-	pbm = &p->pbm_A;
-	addr = psycho_pci_config_mkaddr(pbm, pbm->pci_first_busno,
-					0, PBM_BRIDGE_BUS);
-	pci_config_write8(addr, 0xff);
-	addr = psycho_pci_config_mkaddr(pbm, 0xff,
-					0, PBM_BRIDGE_SUBORDINATE);
-	pci_config_write8(addr, 0xff);
-
-	/* Now we can safely renumber both PBMs. */
-	pbm_renumber(&p->pbm_B, p->pbm_B.pci_first_busno);
-	pbm_renumber(&p->pbm_A, 0xff);
-}
-
 static void __init pbm_config_busmastering(struct pci_pbm_info *pbm)
 {
 	u8 *addr;
@@ -1251,7 +1150,6 @@ static void __init pbm_scan_bus(struct pci_controller_info *p,
 
 static void __init psycho_scan_bus(struct pci_controller_info *p)
 {
-	pbm_bridge_reconfigure(p);
 	pbm_config_busmastering(&p->pbm_B);
 	p->pbm_B.is_66mhz_capable = 0;
 	pbm_config_busmastering(&p->pbm_A);

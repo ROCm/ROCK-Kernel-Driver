@@ -124,7 +124,7 @@ static int schizo_out_of_range(struct pci_pbm_info *pbm,
 static int schizo_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 			       int where, int size, u32 *value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 	u16 tmp16;
@@ -171,23 +171,6 @@ static int schizo_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 			return PCIBIOS_SUCCESSFUL;
 		}
 		pci_config_read32(addr, value);
-
-#warning DaveM, reminder, Tomatillo support is hosed.
-#if 0
-		/* Crap how to do this in 2.5.x?  I need the pdev :(
-		 * Actually, just move over to more sane domain
-		 * support to deal with this. -DaveM
-		 */
-		if (where == PCI_PRIMARY_BUS &&
-		    dev->hdr_type == PCI_HEADER_TYPE_BRIDGE &&
-		    *value != 0xffffffff) {
-			u8 *busp = ((u8 *) value) + 1;
-			int i;
-
-			for (i = 0; i < 3; i++)
-				busp[i] += pbm->pci_first_busno;
-		}
-#endif
 		break;
 	}
 	return PCIBIOS_SUCCESSFUL;
@@ -196,7 +179,7 @@ static int schizo_read_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 static int schizo_write_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 				int where, int size, u32 value)
 {
-	struct pci_pbm_info *pbm = pci_bus2pbm[bus_dev->number];
+	struct pci_pbm_info *pbm = bus_dev->sysdata;
 	unsigned char bus = bus_dev->number;
 	u32 *addr;
 
@@ -227,26 +210,6 @@ static int schizo_write_pci_cfg(struct pci_bus *bus_dev, unsigned int devfn,
 			       where);
 			return PCIBIOS_SUCCESSFUL;
 		}
-
-#warning DaveM, reminder, Tomatillo support is hosed.
-#if 0
-		/* Crap how to do this in 2.5.x?  I need the pdev :(
-		 * Actually, just move over to more sane domain
-		 * support to deal with this. -DaveM
-		 */
-		if (where == PCI_PRIMARY_BUS &&
-		    dev->hdr_type == PCI_HEADER_TYPE_BRIDGE) {
-			u8 *busp = ((u8 *) &value) + 1;
-			int i;
-
-			for (i = 0; i < 3; i++) {
-				if (busp[i] >= pbm->pci_first_busno)
-					busp[i] += pbm->pci_first_busno;
-				else
-					busp[i] = 0;
-			}
-		}
-#endif
 
 		pci_config_write32(addr, value);
 	}
@@ -1427,31 +1390,6 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 		     (SCHIZO_SAFIRQCTRL_EN | (BUS_ERROR_UNMAP)));
 }
 
-/* We have to do the config space accesses by hand, thus... */
-static void __init pbm_renumber(struct pci_pbm_info *pbm, u8 orig_busno)
-{
-	u8 busno;
-	int nbus;
-
-	busno = pci_highest_busnum;
-	nbus = pbm->pci_last_busno - pbm->pci_first_busno;
-
-	pbm->pci_first_busno = busno;
-	pbm->pci_last_busno = busno + nbus;
-	pci_highest_busnum = busno + nbus + 1;
-
-	do {
-		pci_bus2pbm[busno++] = pbm;
-	} while (nbus--);
-}
-
-static void __init pbm_bridge_reconfigure(struct pci_controller_info *p)
-{
-	/* Now we can safely renumber both PBMs. */
-	pbm_renumber(&p->pbm_B, p->pbm_B.pci_first_busno);
-	pbm_renumber(&p->pbm_A, 0xff);
-}
-
 static void __init pbm_config_busmastering(struct pci_pbm_info *pbm)
 {
 	u8 *addr;
@@ -1506,7 +1444,6 @@ static void __init __schizo_scan_bus(struct pci_controller_info *p,
 		return;
 	}
 
-	pbm_bridge_reconfigure(p);
 	pbm_config_busmastering(&p->pbm_B);
 	p->pbm_B.is_66mhz_capable =
 		prom_getbool(p->pbm_B.prom_node, "66mhz-capable");
