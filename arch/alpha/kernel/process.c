@@ -42,18 +42,6 @@
 #include "proto.h"
 #include "pci_impl.h"
 
-/*
- * No need to acquire the kernel lock, we're entirely local..
- */
-asmlinkage int
-sys_sethae(unsigned long hae, unsigned long a1, unsigned long a2,
-	   unsigned long a3, unsigned long a4, unsigned long a5,
-	   struct pt_regs regs)
-{
-	(&regs)->hae = hae;
-	return 0;
-}
-
 void default_idle(void)
 {
 	barrier();

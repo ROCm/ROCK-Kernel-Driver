@@ -5,10 +5,10 @@
  */
 
 #include <linux/config.h>
-#include <asm/system.h>
-#include <asm/cache.h>
 #include <asm/asm_offsets.h>
 #include <asm/thread_info.h>
+#include <asm/pal.h>
+#include <asm/errno.h>
 #include <asm/unistd.h>
 
 	.text
@@ -582,7 +582,7 @@ alpha_switch_to:
 	lda	$8, 0x3fff
 	bsr	$1, undo_switch_stack
 	bic	$sp, $8, $8
-	ret	$31, ($26), 1
+	ret
 .end alpha_switch_to
 
 /*
@@ -687,6 +687,7 @@ __kernel_execve:
 	.globl	sys_fork
 	.ent	sys_fork
 sys_fork:
+	.prologue 0
 	mov	$sp, $19
 	bsr	$1, do_switch_stack
 	/* A fork is the same as clone(SIGCHLD, 0);  */
@@ -695,37 +696,40 @@ sys_fork:
 	mov	$31, $18
 	jsr	$26, alpha_clone
 	bsr	$1, undo_switch_stack
-	ret	$31, ($26), 1
+	ret
 .end sys_fork
 
 	.align	4
 	.globl	sys_clone
 	.ent	sys_clone
 sys_clone:
+	.prologue 0
 	mov	$sp, $19
 	bsr	$1, do_switch_stack
 	/* $16, $17, $18, $19 come from the user; $19 is used later
 	   via pt_regs->r19.  */
 	jsr	$26, alpha_clone
 	bsr	$1, undo_switch_stack
-	ret	$31, ($26), 1
+	ret
 .end sys_clone
 
 	.align	4
 	.globl	sys_vfork
 	.ent	sys_vfork
 sys_vfork:
+	.prologue 0
 	bsr	$1, do_switch_stack
 	mov	$sp, $16
 	jsr	$26, alpha_vfork
 	bsr	$1, undo_switch_stack
-	ret	$31, ($26), 1
+	ret
 .end sys_vfork
 
 	.align	4
 	.globl	sys_sigreturn
 	.ent	sys_sigreturn
 sys_sigreturn:
+	.prologue 0
 	mov	$sp, $17
 	lda	$18, -SWITCH_STACK_SIZE($sp)
 	lda	$sp, -SWITCH_STACK_SIZE($sp)
@@ -738,6 +742,7 @@ sys_sigreturn:
 	.globl	sys_rt_sigreturn
 	.ent	sys_rt_sigreturn
 sys_rt_sigreturn:
+	.prologue 0
 	mov	$sp, $17
 	lda	$18, -SWITCH_STACK_SIZE($sp)
 	lda	$sp, -SWITCH_STACK_SIZE($sp)
@@ -750,6 +755,7 @@ sys_rt_sigreturn:
 	.globl	sys_sigsuspend
 	.ent	sys_sigsuspend
 sys_sigsuspend:
+	.prologue 0
 	mov	$sp, $17
 	br	$1, do_switch_stack
 	mov	$sp, $18
@@ -758,13 +764,14 @@ sys_sigsuspend:
 	jsr	$26, do_sigsuspend
 	ldq	$26, 0($sp)
 	lda	$sp, SWITCH_STACK_SIZE+16($sp)
-	ret	$31, ($26), 1
+	ret
 .end sys_sigsuspend
 
 	.align	4
 	.globl	sys_rt_sigsuspend
 	.ent	sys_rt_sigsuspend
 sys_rt_sigsuspend:
+	.prologue 0
 	mov	$sp, $18
 	br	$1, do_switch_stack
 	mov	$sp, $19
@@ -773,5 +780,141 @@ sys_rt_sigsuspend:
 	jsr	$26, do_rt_sigsuspend
 	ldq	$26, 0($sp)
 	lda	$sp, SWITCH_STACK_SIZE+16($sp)
-	ret	$31, ($26), 1
+	ret
 .end sys_rt_sigsuspend
+
+	.align	4
+	.globl	sys_sethae
+	.ent	sys_sethae
+sys_sethae:
+	.prologue 0
+	stq	$16, 152($sp)
+	ret
+.end sys_sethae
+
+	.align	4
+	.globl	osf_getpriority
+	.ent	osf_getpriority
+osf_getpriority:
+	lda	$sp, -16($sp)
+	stq	$26, 0($sp)
+	.prologue 0
+
+	jsr	$26, sys_getpriority
+
+	ldq	$26, 0($sp)
+	blt	$0, 1f
+
+	/* Return value is the unbiased priority, i.e. 20 - prio.
+	   This does result in negative return values, so signal
+	   no error by writing into the R0 slot.  */
+	lda	$1, 20
+	stq	$31, 16($sp)
+	subl	$1, $0, $0
+	unop
+
+1:	lda	$sp, 16($sp)
+	ret
+.end osf_getpriority
+
+	.align	4
+	.globl	sys_getxuid
+	.ent	sys_getxuid
+sys_getxuid:
+	.prologue 0
+	ldq	$2, TI_TASK($8)
+	ldl	$0, TASK_UID($2)
+	ldl	$1, TASK_EUID($2)
+	stq	$1, 80($sp)
+	ret
+.end sys_getxuid
+
+	.align	4
+	.globl	sys_getxgid
+	.ent	sys_getxgid
+sys_getxgid:
+	.prologue 0
+	ldq	$2, TI_TASK($8)
+	ldl	$0, TASK_GID($2)
+	ldl	$1, TASK_EGID($2)
+	stq	$1, 80($sp)
+	ret
+.end sys_getxgid
+
+	.align	4
+	.globl	sys_getxpid
+	.ent	sys_getxpid
+sys_getxpid:
+	.prologue 0
+	ldq	$2, TI_TASK($8)
+
+	/* See linux/kernel/timer.c sys_getppid for discussion
+	   about this loop.  */
+	ldq	$3, TASK_REAL_PARENT($2)
+1:	ldl	$1, TASK_TGID($3)
+#if CONFIG_SMP
+	mov	$3, $4
+	mb
+	ldq	$3, TASK_REAL_PARENT($2)
+	cmpeq	$3, $4, $4
+	beq	$4, 1b
+#endif
+	stq	$1, 80($sp)
+	ldl	$0, TASK_TGID($2)
+	ret
+.end sys_getxpid
+
+	.align	4
+	.globl	sys_pipe
+	.ent	sys_pipe
+sys_pipe:
+	lda	$sp, -16($sp)
+	stq	$26, 0($sp)
+	.prologue 0
+
+	lda	$16, 8($sp)
+	jsr	$26, do_pipe
+
+	ldq	$26, 0($sp)
+	bne	$0, 1f
+
+	/* The return values are in $0 and $20.  */
+	ldl	$1, 12($sp)
+	ldl	$0, 8($sp)
+
+	stq	$1, 80+16($sp)
+1:	lda	$sp, 16($sp)
+	ret
+.end sys_pipe
+
+	.align	4
+	.globl	alpha_create_module
+	.ent	alpha_create_module
+alpha_create_module:
+	.prologue 0
+	mov	$sp, $18
+	jmp	$31, do_alpha_create_module
+.end alpha_create_module
+
+	.align	4
+	.globl	sys_ptrace
+	.ent	sys_ptrace
+sys_ptrace:
+	.prologue 0
+	mov	$sp, $20
+	jmp	$31, do_sys_ptrace
+.end sys_ptrace
+
+	.align	4
+	.globl	alpha_ni_syscall
+	.ent	alpha_ni_syscall
+alpha_ni_syscall:
+	.prologue 0
+	/* Special because it also implements overflow handling via
+	   syscall number 0.  And if you recall, zero is a special
+	   trigger for "not an error".  Store large non-zero there.  */
+	lda	$0, -ENOSYS
+	unop
+	stq	$0, 0($sp)
+	ret
+.end alpha_ni_syscall

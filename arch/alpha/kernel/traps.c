@@ -1078,22 +1078,6 @@ give_sigbus:
 	return;
 }
 
-/*
- * Unimplemented system calls.
- */
-asmlinkage long
-alpha_ni_syscall(unsigned long a0, unsigned long a1, unsigned long a2,
-		 unsigned long a3, unsigned long a4, unsigned long a5,
-		 struct pt_regs regs)
-{
-	/* We only get here for OSF system calls, minus #112;
-	   the rest go to sys_ni_syscall.  */
-#if 0
-	printk("<sc %ld(%lx,%lx,%lx)>", regs.r0, a0, a1, a2);
-#endif
-	return -ENOSYS;
-}
-
 void
 trap_init(void)
 {
