@@ -187,10 +187,10 @@ static int svia_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 			goto err_out_regions;
 		}
 
-	rc = pci_set_dma_mask(pdev, 0xffffffffULL);
+	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
-	rc = pci_set_consistent_dma_mask(pdev, 0xffffffffULL);
+	rc = pci_set_consistent_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
 		goto err_out_regions;
 
