@@ -606,39 +606,36 @@ s390_vary_chpid( __u8 chpid, int on)
  * Files for the channel path entries.
  */
 static ssize_t
-chp_status_show(struct device *dev, char *buf, size_t count, loff_t off)
+chp_status_show(struct device *dev, char *buf)
 {
 	struct sys_device *sdev = container_of(dev, struct sys_device, dev);
 	struct channel_path *chp = container_of(sdev, struct channel_path, sdev);
 
 	if (!chp)
-		return off ? 0 : count;
+		return 0;
 
 	switch(chp->state) {
 	case CHP_OFFLINE:
-		return off ? 0 : snprintf(buf, count, "n/a\n");
+		return snprintf(buf, count, "n/a\n");
 	case CHP_LOGICALLY_OFFLINE:
-		return off ? 0 : snprintf(buf, count, "logically offline\n");
+		return snprintf(buf, count, "logically offline\n");
 	case CHP_STANDBY:
-		return off ? 0 : snprintf(buf, count, "n/a\n");
+		return snprintf(buf, count, "n/a\n");
 	case CHP_ONLINE:
-		return off ? 0 : snprintf(buf, count, "online\n");
+		return snprintf(buf, count, "online\n");
 	default:
-		return off ? 0 : count;
+		return 0;
 	}
 }
 
 static ssize_t
-chp_status_write(struct device *dev, const char *buf, size_t count, loff_t off)
+chp_status_write(struct device *dev, const char *buf, size_t count)
 {
 	struct sys_device *sdev = container_of(dev, struct sys_device, dev);
 	struct channel_path *cp = container_of(sdev, struct channel_path, sdev);
 	char cmd[10];
 	int num_args;
 	int error;
-
-	if (off)
-		return 0;
 
 	num_args = sscanf(buf, "%5s", cmd);
 	if (!num_args)

@@ -69,47 +69,28 @@ struct bus_type mca_bus_type = {
 };
 EXPORT_SYMBOL (mca_bus_type);
 
-static ssize_t mca_show_pos_id(struct device *dev, char *buf, size_t count,
-			       loff_t off)
+static ssize_t mca_show_pos_id(struct device *dev, char *buf)
 {
 	/* four digits, \n and trailing \0 */
-	char mybuf[6];
 	struct mca_device *mca_dev = to_mca_device(dev);
 	int len;
 
 	if(mca_dev->pos_id < MCA_DUMMY_POS_START)
-		len = sprintf(mybuf, "%04x\n", mca_dev->pos_id);
+		len = sprintf(buf, "%04x\n", mca_dev->pos_id);
 	else
-		len = sprintf(mybuf, "none\n");
-
-	len++;
-	if(len > off) {
-		len = min((size_t)(len - off), count);
-		memcpy(buf + off, mybuf + off, len);
-	} else {
-		len = 0;
-	}
+		len = sprintf(buf, "none\n");
 	return len;
 }
-static ssize_t mca_show_pos(struct device *dev, char *buf, size_t count,
-			    loff_t off)
+static ssize_t mca_show_pos(struct device *dev, char *buf)
 {
 	/* enough for 8 two byte hex chars plus space and new line */
-	char mybuf[26];
 	int j, len=0;
 	struct mca_device *mca_dev = to_mca_device(dev);
 
 	for(j=0; j<8; j++)
-		len += sprintf(mybuf+len, "%02x ", mca_dev->pos[j]);
+		len += sprintf(buf+len, "%02x ", mca_dev->pos[j]);
 	/* change last trailing space to new line */
-	mybuf[len-1] = '\n';
-	len++;
-	if(len > off) {
-		len = min((size_t)(len - off), count);
-		memcpy(buf + off, mybuf + off, len);
-	} else {
-		len = 0;
-	}
+	buf[len-1] = '\n';
 	return len;
 }
 

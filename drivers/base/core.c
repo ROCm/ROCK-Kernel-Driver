@@ -47,14 +47,15 @@ dev_attr_show(struct kobject * kobj, struct attribute * attr, char * buf)
 }
 
 static ssize_t
-dev_attr_store(struct kobject * kobj, struct attribute * attr, const char * buf)
+dev_attr_store(struct kobject * kobj, struct attribute * attr, 
+	       const char * buf, size_t count)
 {
 	struct device_attribute * dev_attr = to_dev_attr(attr);
 	struct device * dev = to_dev(kobj);
 	ssize_t ret = 0;
 
 	if (dev_attr->store)
-		ret = dev_attr->store(dev,buf);
+		ret = dev_attr->store(dev,buf,count);
 	return ret;
 }
 
