@@ -37,6 +37,10 @@
 #define TMPFS_MAGIC	0x01021994
 
 #define ENTRIES_PER_PAGE (PAGE_CACHE_SIZE/sizeof(unsigned long))
+#define BLOCKS_PER_PAGE  (PAGE_CACHE_SIZE/512)
+
+#define SHMEM_MAX_INDEX  (SHMEM_NR_DIRECT + ENTRIES_PER_PAGE * (ENTRIES_PER_PAGE/2) * (ENTRIES_PER_PAGE+1))
+#define SHMEM_MAX_BYTES  ((unsigned long long)SHMEM_MAX_INDEX << PAGE_CACHE_SHIFT)
 
 #define VM_ACCT(size)    (((size) + PAGE_CACHE_SIZE - 1) >> PAGE_SHIFT)
 
@@ -57,8 +61,6 @@ static spinlock_t shmem_ilock = SPIN_LOCK_UNLOCKED;
 atomic_t shmem_nrpages = ATOMIC_INIT(0); /* Not used right now */
 
 static struct page *shmem_getpage_locked(struct shmem_inode_info *, struct inode *, unsigned long);
-
-#define BLOCKS_PER_PAGE (PAGE_CACHE_SIZE/512)
 
 /*
  * shmem_recalc_inode - recalculate the size of an inode
@@ -135,9 +137,6 @@ static void shmem_recalc_inode(struct inode * inode)
  * 	      	       +-> 48-51
  * 	      	       +-> 52-55
  */
-
-#define SHMEM_MAX_BLOCKS (SHMEM_NR_DIRECT + ENTRIES_PER_PAGE * ENTRIES_PER_PAGE/2*(ENTRIES_PER_PAGE+1))
-
 static swp_entry_t * shmem_swp_entry (struct shmem_inode_info *info, unsigned long index, unsigned long page) 
 {
 	unsigned long offset;
@@ -190,7 +189,7 @@ static inline swp_entry_t * shmem_alloc_entry (struct shmem_inode_info *info, un
 	unsigned long page = 0;
 	swp_entry_t * res;
 
-	if (index >= SHMEM_MAX_BLOCKS)
+	if (index >= SHMEM_MAX_INDEX)
 		return ERR_PTR(-EFBIG);
 
 	if (info->next_index <= index)
@@ -365,14 +364,14 @@ static void shmem_truncate (struct inode * inode)
 static int shmem_notify_change(struct dentry * dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
+	long change = 0;
 	int error;
 
-	if (attr->ia_valid & ATTR_SIZE) {
+	if ((attr->ia_valid & ATTR_SIZE) && (attr->ia_size <= SHMEM_MAX_BYTES)) {
 		/*
-	 	 * Account swap file usage based on new file size	
+	 	 * Account swap file usage based on new file size,
+		 * but just let vmtruncate fail on out-of-range sizes.
 	 	 */
-		long change;
-
 		change = VM_ACCT(attr->ia_size) - VM_ACCT(inode->i_size);
 		if (change > 0) {
 			if (!vm_enough_memory(change))
@@ -384,7 +383,8 @@ static int shmem_notify_change(struct dentry * dentry, struct iattr *attr)
 	error = inode_change_ok(inode, attr);
 	if (!error)
 		error = inode_setattr(inode, attr);
-
+	if (error)
+		vm_unacct_memory(change);
 	return error;
 }
 
@@ -885,6 +885,8 @@ shmem_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 	maxpos = inode->i_size;
 	if (pos + count > inode->i_size) {
 		maxpos = pos + count;
+		if (maxpos > SHMEM_MAX_BYTES)
+			maxpos = SHMEM_MAX_BYTES;
 		if (!vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
 			err = -ENOMEM;
 			goto out_nc;
@@ -1434,7 +1436,7 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 	sbinfo->free_blocks = blocks;
 	sbinfo->max_inodes = inodes;
 	sbinfo->free_inodes = inodes;
-	sb->s_maxbytes = (unsigned long long) SHMEM_MAX_BLOCKS << PAGE_CACHE_SHIFT;
+	sb->s_maxbytes = SHMEM_MAX_BYTES;
 	sb->s_blocksize = PAGE_CACHE_SIZE;
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = TMPFS_MAGIC;
@@ -1658,7 +1660,7 @@ struct file *shmem_file_setup(char * name, loff_t size)
 	struct dentry *dentry, *root;
 	struct qstr this;
 
-	if (size > (unsigned long long) SHMEM_MAX_BLOCKS << PAGE_CACHE_SHIFT)
+	if (size > SHMEM_MAX_BYTES)
 		return ERR_PTR(-EINVAL);
 
 	if (!vm_enough_memory(VM_ACCT(size)))
