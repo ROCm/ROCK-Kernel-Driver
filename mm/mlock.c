@@ -138,7 +138,6 @@ asmlinkage long sys_munlock(unsigned long start, size_t len)
 
 static int do_mlockall(int flags)
 {
-	int error;
 	unsigned int def_flags;
 	struct vm_area_struct * vma;
 
@@ -149,8 +148,9 @@ static int do_mlockall(int flags)
 	if (flags & MCL_FUTURE)
 		def_flags = VM_LOCKED;
 	current->mm->def_flags = def_flags;
+	if (flags == MCL_FUTURE)
+		goto out;
 
-	error = 0;
 	for (vma = current->mm->mmap; vma ; vma = vma->vm_next) {
 		unsigned int newflags;
 
@@ -161,7 +161,8 @@ static int do_mlockall(int flags)
 		/* Ignore errors */
 		mlock_fixup(vma, vma->vm_start, vma->vm_end, newflags);
 	}
-	return error;
+out:
+	return 0;
 }
 
 asmlinkage long sys_mlockall(int flags)
