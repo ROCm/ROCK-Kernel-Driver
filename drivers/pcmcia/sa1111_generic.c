@@ -178,8 +178,8 @@ static struct sa1111_driver pcmcia_driver = {
 		.bus		= &sa1111_bus_type,
 		.probe		= pcmcia_probe,
 		.remove		= __devexit_p(pcmcia_remove),
-		.suspend 	= pcmcia_socket_dev_suspend,
-		.resume 	= pcmcia_socket_dev_resume,
+/*		.suspend 	= pcmcia_socket_dev_suspend,*/
+/*		.resume 	= pcmcia_socket_dev_resume,*/
 	},
 	.devid			= SA1111_DEVID_PCMCIA,
 };

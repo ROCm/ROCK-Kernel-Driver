@@ -822,6 +822,10 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 	memset(cls, 0, sizeof(struct pcmcia_socket_class_data));
 	cls->ops	= &sa11xx_pcmcia_operations;
 	cls->nsock	= nr;
+	cls->class_dev.class = &pcmcia_socket_class;
+	cls->class_dev.dev = dev;
+	strlcpy(cls->class_dev.class_id, dev->bus_id, BUS_ID_SIZE);
+	class_set_devdata(&cls->class_dev, cls);
 
 	cpu_clock = cpufreq_get(0);
 
@@ -901,7 +905,9 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		add_timer(&skt->poll_timer);
 	}
 
-	dev->class_data = cls;
+	dev_set_drvdata(dev, cls);
+	class_device_register(&cls->class_dev);
+
 	return 0;
 
 	do {
@@ -934,10 +940,11 @@ EXPORT_SYMBOL(sa11xx_drv_pcmcia_probe);
 
 int sa11xx_drv_pcmcia_remove(struct device *dev)
 {
-	struct pcmcia_socket_class_data *cls = dev->class_data;
+	struct pcmcia_socket_class_data *cls = dev_get_drvdata(dev);
 	int i;
 
-	dev->class_data = NULL;
+	class_device_unregister(&cls->class_dev);
+	dev_set_drvdata(dev, NULL);
 
 	for (i = 0; i < cls->nsock; i++) {
 		struct sa1100_pcmcia_socket *skt = PCMCIA_SOCKET(cls->sock_offset + i);
