@@ -1364,6 +1364,10 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			goto out;
 	}
 
+	/*
+	 * OPEN the file, or upgrade an existing OPEN.
+	 * If truncate fails, the OPEN fails.
+	 */
 	if (stp) {
 		/* Stateid was found, this is an OPEN upgrade */
 		status = nfs4_upgrade_open(rqstp, current_fh, stp, open);
@@ -1380,7 +1384,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 			goto out;
 		init_stateid(stp, fp, sop, open);
 	}
-	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n\n",
+	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
 	            stp->st_stateid.si_fileid, stp->st_stateid.si_generation);
 
@@ -1396,6 +1400,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 	open->op_delegate_type = NFS4_OPEN_DELEGATE_NONE;
 	status = nfs_ok;
 out:
+	/* take the opportunity to clean up unused state */
 	if (fp && list_empty(&fp->fi_perfile))
 		release_file(fp);
 
