@@ -82,14 +82,11 @@ static void __init reserve_bootmem_core(bootmem_data_t *bdata, unsigned long add
 							PAGE_SIZE-1)/PAGE_SIZE;
 	unsigned long end = (addr + size + PAGE_SIZE-1)/PAGE_SIZE;
 
-	if (!size) BUG();
+	BUG_ON(!size);
+	BUG_ON(sidx >= eidx);
+	BUG_ON((addr >> PAGE_SHIFT) >= bdata->node_low_pfn);
+	BUG_ON(end > bdata->node_low_pfn);
 
-	if (sidx >= eidx)
-		BUG();
-	if ((addr >> PAGE_SHIFT) >= bdata->node_low_pfn)
-		BUG();
-	if (end > bdata->node_low_pfn)
-		BUG();
 	for (i = sidx; i < eidx; i++)
 		if (test_and_set_bit(i, bdata->node_bootmem_map)) {
 #ifdef CONFIG_DEBUG_BOOTMEM
@@ -110,9 +107,8 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
 	unsigned long eidx = (addr + size - bdata->node_boot_start)/PAGE_SIZE;
 	unsigned long end = (addr + size)/PAGE_SIZE;
 
-	if (!size) BUG();
-	if (end > bdata->node_low_pfn)
-		BUG();
+	BUG_ON(!size);
+	BUG_ON(end > bdata->node_low_pfn);
 
 	if (addr < bdata->last_success)
 		bdata->last_success = addr;
@@ -124,7 +120,7 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
 	sidx = start - (bdata->node_boot_start/PAGE_SIZE);
 
 	for (i = sidx; i < eidx; i++) {
-		if (!test_and_clear_bit(i, bdata->node_bootmem_map))
+		if (unlikely(!test_and_clear_bit(i, bdata->node_bootmem_map)))
 			BUG();
 	}
 }
@@ -140,7 +136,7 @@ static void __init free_bootmem_core(bootmem_data_t *bdata, unsigned long addr, 
  *
  * alignment has to be a power of 2 value.
  *
- * NOTE:  This function is _not_ reenetrant.
+ * NOTE:  This function is _not_ reentrant.
  */
 static void * __init
 __alloc_bootmem_core(struct bootmem_data *bdata, unsigned long size,
@@ -152,7 +148,6 @@ __alloc_bootmem_core(struct bootmem_data *bdata, unsigned long size,
 
 	if(!size) {
 		printk("__alloc_bootmem_core(): zero-sized request\n");
-		dump_stack();
 		BUG();
 	}
 	BUG_ON(align & (align-1));
@@ -260,7 +255,7 @@ static unsigned long __init free_all_bootmem_core(pg_data_t *pgdat)
 	unsigned long idx;
 	unsigned long *map; 
 
-	if (!bdata->node_bootmem_map) BUG();
+	BUG_ON(!bdata->node_bootmem_map);
 
 	count = 0;
 	/* first extant page of the node */
