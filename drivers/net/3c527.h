@@ -27,10 +27,8 @@
 
 #define HOST_RAMPAGE		8
 
-#define RX_HALTED (1<<0)
-#define TX_HALTED (1<<1)  
-#define HALTED (RX_HALTED | TX_HALTED)
-#define RUNNING 0
+#define HALTED 0
+#define RUNNING 1
 
 struct mc32_mailbox
 {
