@@ -1844,13 +1844,10 @@ static int __init atalk_init(void)
 module_init(atalk_init);
 
 /*
- * Note on MOD_{INC,DEC}_USE_COUNT:
- *
- * Use counts are incremented/decremented when
- * sockets are created/deleted.
- *
- * AppleTalk interfaces are not incremented until atalkd is run
- * and are only decremented when they are downed.
+ * No explicit module reference count manipulation is needed in the
+ * protocol. Socket layer sets module reference count for us
+ * and interfaces reference counting is done
+ * by the network device layer.
  *
  * Ergo, before the AppleTalk module can be removed, all AppleTalk
  * sockets be closed from user space.
