@@ -220,9 +220,8 @@ int dvb_register_device(struct dvb_adapter *adap, struct dvb_device **pdvbdev,
 
 	list_add_tail (&dvbdev->list_head, &adap->device_list);
 
-	sprintf(name, "%s%d", dnames[type], id);
-	dvbdev->devfs_handle = devfs_register(adap->devfs_handle, name,
-					      0, DVB_MAJOR,
+	sprintf(name, "dvb/adapter%d%s%d", adap->num, dnames[type], id);
+	dvbdev->devfs_handle = devfs_register(NULL, name, 0, DVB_MAJOR,
 					      nums2minor(adap->num, type, id),
 					      S_IFCHR | S_IRUSR | S_IWUSR,
 					      dvbdev->fops, dvbdev);

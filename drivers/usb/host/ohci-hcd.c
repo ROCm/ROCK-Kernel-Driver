@@ -313,65 +313,56 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
  */
 
 static void
-ohci_free_config (struct usb_hcd *hcd, struct usb_device *udev)
+ohci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
 {
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
-	struct hcd_dev		*dev = (struct hcd_dev *) udev->hcpriv;
-	int			i;
+	int			epnum = ep & USB_ENDPOINT_NUMBER_MASK;
 	unsigned long		flags;
+	struct ed		*ed;
+
+	/* ASSERT:  any requests/urbs are being unlinked */
+	/* ASSERT:  nobody can be submitting urbs for this any more */
+
+	ohci_dbg (ohci, "ep %02x disable\n", ep);
+	epnum <<= 1;
+	if (epnum != 0 && !(ep & USB_DIR_IN))
+		epnum |= 1;
 
 rescan:
-	/* free any eds, and dummy tds, still hanging around */
 	spin_lock_irqsave (&ohci->lock, flags);
-	for (i = 0; i < 32; i++) {
-		struct ed	*ed = dev->ep [i];
+	ed = dev->ep [epnum];
+	if (!ed)
+		goto done;
 
-		if (!ed)
-			continue;
-
-		if (ohci->disabled && ed->state != ED_IDLE)
-			ed->state = ED_IDLE;
-		switch (ed->state) {
-		case ED_UNLINK:		/* wait a frame? */
-			goto do_rescan;
-		case ED_IDLE:		/* fully unlinked */
+	if (!HCD_IS_RUNNING (ohci->hcd.state) || ohci->disabled)
+		ed->state = ED_IDLE;
+	switch (ed->state) {
+	case ED_UNLINK:		/* wait for hw to finish? */
+		spin_unlock_irqrestore (&ohci->lock, flags);
+		set_current_state (TASK_UNINTERRUPTIBLE);
+		schedule_timeout (1);
+		goto rescan;
+	case ED_IDLE:		/* fully unlinked */
+		if (list_empty (&ed->td_list)) {
 			td_free (ohci, ed->dummy);
+			ed_free (ohci, ed);
 			break;
-		default:
-			ohci_err (ohci,
-				"dev %s ep%d-%s linked; disconnect() bug?\n",
-				udev->devpath,
-				(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
-
-			/* ED_OPER: some driver disconnect() is broken,
-			 * it didn't even start its unlinks much less wait
-			 * for their completions.
-			 * OTHERWISE:  hcd bug, ed is garbage
-			 *
-			 * ... we can't recycle this memory in either case,
-			 * so just leak it to avoid oopsing.
-			 */
-			continue;
 		}
-		ed_free (ohci, ed);
+		/* else FALL THROUGH */
+	default:
+		/* caller was supposed to have unlinked any requests;
+		 * that's not our job.  can't recover; must leak ed.
+		 */
+		ohci_err (ohci, "ed %p (#%d) state %d%s\n",
+			ed, epnum, ed->state,
+			list_empty (&ed->td_list) ? "" : "(has tds)");
+		td_free (ohci, ed->dummy);
+		break;
 	}
+	dev->ep [epnum] = 0;
+done:
 	spin_unlock_irqrestore (&ohci->lock, flags);
 	return;
-
-do_rescan:
-#ifdef DEBUG
-	/* a driver->disconnect() returned before its unlinks completed? */
-	if (in_interrupt ()) {
-		ohci_warn (ohci,
-			"driver disconnect() bug %s ep%d-%s\n", 
-			udev->devpath,
-			(i >> 1) & 0x0f, (i & 1) ? "out" : "in");
-	}
-#endif
-
-	spin_unlock_irqrestore (&ohci->lock, flags);
-	wait_ms (1);
-	goto rescan;
 }
 
 static int ohci_get_frame (struct usb_hcd *hcd)

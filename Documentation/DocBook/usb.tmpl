@@ -294,7 +294,7 @@
 	<title>The USB Filesystem (usbfs)</title>
 
 	<para>This chapter presents the Linux <emphasis>usbfs</emphasis>.
-	You may prefer to avoid avoid writing new kernel code for your
+	You may prefer to avoid writing new kernel code for your
 	USB driver; that's the problem that usbfs set out to solve.
 	User mode device drivers are usually packaged as applications
 	or libraries, and may use usbfs through some programming library
@@ -355,7 +355,9 @@
 	    configuration files.</emphasis>
 	    Stable identifiers are available, for user mode applications
 	    that want to use them.  HID and networking devices expose
-	    these IDs.
+	    these stable IDs, so that for example you can be sure that
+	    you told the right UPS to power down its second server.
+	    "usbfs" doesn't (yet) expose those IDs.
 	    </para>
 
 	</sect1>

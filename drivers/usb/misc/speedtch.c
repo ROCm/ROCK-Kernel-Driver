@@ -278,9 +278,10 @@ static struct sk_buff *udsl_decode_rawcell (struct udsl_instance_data *instance,
 
 		/* here should the header CRC check be... */
 
-		if (!(vcc = udsl_find_vcc (instance, vpi, vci)))
+		if (!(vcc = udsl_find_vcc (instance, vpi, vci))) {
 			dbg ("udsl_decode_rawcell: no vcc found for packet on vpi %d, vci %d", vpi, vci);
-		else {
+			__skb_pull (skb, min (skb->len, (unsigned) 53));
+		} else {
 			dbg ("udsl_decode_rawcell found vcc %p for packet on vpi %d, vci %d", vcc, vpi, vci);
 
 			if (skb->len >= 53) {
@@ -323,8 +324,8 @@ static struct sk_buff *udsl_decode_rawcell (struct udsl_instance_data *instance,
 				skb_pull (skb, 53);
 			} else {
 				/* If data is corrupt and skb doesn't hold a whole cell, flush the lot */
-				if (skb_pull (skb, 53) == NULL)
-					return NULL;
+				__skb_pull (skb, skb->len);
+				return NULL;
 			}
 		}
 	}

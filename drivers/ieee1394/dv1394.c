@@ -116,6 +116,7 @@
 
 #include "ieee1394.h"
 #include "ieee1394_types.h"
+#include "ieee1394_hotplug.h"
 #include "hosts.h"
 #include "ieee1394_core.h"
 #include "highlevel.h"	
@@ -140,7 +141,7 @@
        (will cause undeflows if your machine is too slow!)
 */
 
-#define DV1394_DEBUG_LEVEL 1
+#define DV1394_DEBUG_LEVEL 0
 
 /* for debugging use ONLY: allow more than one open() of the device */
 /* #define DV1394_ALLOW_MORE_THAN_ONE_OPEN 1 */
@@ -2469,6 +2470,32 @@ static int dv1394_devfs_add_entry(struct video_card *video)
 }
 #endif /* CONFIG_DEVFS_FS */
 
+
+/*** HOTPLUG STUFF **********************************************************/
+/*
+ * Export information about protocols/devices supported by this driver.
+ */
+static struct ieee1394_device_id dv1394_id_table[] = {
+	{
+		.match_flags	= IEEE1394_MATCH_SPECIFIER_ID | IEEE1394_MATCH_VERSION,
+		.specifier_id	= AVC_UNIT_SPEC_ID_ENTRY & 0xffffff,
+		.version	= AVC_SW_VERSION_ENTRY & 0xffffff
+	},
+	{ }
+};
+
+MODULE_DEVICE_TABLE(ieee1394, dv1394_id_table);
+
+static struct hpsb_protocol_driver dv1394_driver = {
+	.name		= "DV/1394 Driver",
+	.id_table	= dv1394_id_table,
+	.driver         = {
+		.name	= "dv1394",
+		.bus	= &ieee1394_bus_type,
+	},
+};
+
+
 /*** IEEE1394 HPSB CALLBACKS ***********************************************/
 
 static int dv1394_init(struct ti_ohci *ohci, enum pal_or_ntsc format, enum modes mode)
@@ -2897,6 +2924,8 @@ static void __exit dv1394_exit_module(void)
 		printk(KERN_ERR "dv1394: Error unregistering ioctl32 translations\n");
 #endif
 
+	hpsb_unregister_protocol(&dv1394_driver);
+
 	hpsb_unregister_highlevel (hl_handle);
 	ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_DV1394);
 #ifdef CONFIG_DEVFS_FS
@@ -2946,6 +2975,8 @@ static int __init dv1394_init_module(void)
 #endif
 		return -ENOMEM;
 	}
+
+	hpsb_register_protocol(&dv1394_driver);
 
 #ifdef CONFIG_COMPAT
 	/* First compatible ones */

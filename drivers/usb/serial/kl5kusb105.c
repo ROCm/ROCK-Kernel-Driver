@@ -964,8 +964,9 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 	     if (retval)
 			 return(retval);
 
-	     kernel_termios_to_user_termios((struct termios *)arg,  
-					    &priv->termios);
+	     if (kernel_termios_to_user_termios((struct termios *)arg,  
+						&priv->termios))
+		     return -EFAULT;
 	     return(0);
 	     }
 	case TCSETS: {
@@ -980,8 +981,9 @@ static int klsi_105_ioctl (struct usb_serial_port *port, struct file * file,
 		if (retval)
 			    return(retval);
 
-		user_termios_to_kernel_termios(&priv->termios,
-					       (struct termios *)arg);
+		if (user_termios_to_kernel_termios(&priv->termios,
+						  (struct termios *)arg))
+			return -EFAULT;
 		klsi_105_set_termios(port, &priv->termios);
 		return(0);
 	     }

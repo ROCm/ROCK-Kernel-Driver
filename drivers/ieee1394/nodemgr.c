@@ -620,6 +620,10 @@ static struct node_entry *nodemgr_scan_root_directory
 	
 	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
 		return NULL;
+
+	if (CONFIG_ROM_BUS_INFO_LENGTH(quad) == 1)  /* minimal config rom */
+		return NULL;
+
 	address += 4 + CONFIG_ROM_BUS_INFO_LENGTH(quad) * 4;
 
 	if (nodemgr_read_quadlet(host, nodeid, generation, address, &quad))
@@ -1332,6 +1336,13 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 	header_size = buffer[0] >> 24;
 	addr += 4;
 
+	if (header_size == 1) {
+		HPSB_INFO("Node " NODE_BUS_FMT " has a minimal ROM.  "
+			  "Vendor is %08x",
+			  NODE_BUS_ARGS(nodeid), buffer[0] & 0x00ffffff);
+		return -1;
+	}
+
 	if (header_size < 4) {
 		HPSB_INFO("Node " NODE_BUS_FMT " has non-standard ROM "
 			  "format (%d quads), cannot parse",
@@ -1767,6 +1778,7 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 			break;
 		}
 	}
+	spin_unlock_irqrestore (&host_info_lock, flags);
 
 	if (hi) {
 		if (hi->pid >= 0) {
@@ -1779,8 +1791,6 @@ static void nodemgr_remove_host(struct hpsb_host *host)
 	} else
 		HPSB_ERR("NodeMgr: host %s does not exist, cannot remove",
 			 host->driver->name);
-
-	spin_unlock_irqrestore (&host_info_lock, flags);
 
 	return;
 }

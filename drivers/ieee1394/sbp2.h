@@ -93,6 +93,29 @@ struct sbp2_login_response {
 
 #define ORB_SET_LOGIN_ID(value)                 (value & 0xffff)
 
+#define ORB_SET_QUERY_LOGINS_RESP_LENGTH(value) (value & 0xffff)
+
+struct sbp2_query_logins_orb {
+	u32 reserved1;
+	u32 reserved2;
+	u32 query_response_hi;
+	u32 query_response_lo;
+	u32 lun_misc;
+	u32 reserved_resp_length;
+	u32 status_FIFO_hi;
+	u32 status_FIFO_lo;
+};
+
+#define RESPONSE_GET_MAX_LOGINS(value)          (value & 0xffff)
+#define RESPONSE_GET_ACTIVE_LOGINS(value)       ((RESPONSE_GET_LENGTH(value) - 4) / 12)
+
+struct sbp2_query_logins_response {
+	u32 length_max_logins;
+	u32 misc_IDs;
+	u32 initiator_misc_hi;
+	u32 initiator_misc_lo;
+};
+
 struct sbp2_reconnect_orb {
 	u32 reserved1;
 	u32 reserved2;
@@ -340,6 +363,10 @@ struct scsi_id_instance_data {
 	dma_addr_t login_orb_dma;
 	struct sbp2_login_response *login_response;
 	dma_addr_t login_response_dma;
+	struct sbp2_query_logins_orb *query_logins_orb;
+	dma_addr_t query_logins_orb_dma;
+	struct sbp2_query_logins_response *query_logins_response;
+	dma_addr_t query_logins_response_dma;
 	struct sbp2_reconnect_orb *reconnect_orb;
 	dma_addr_t reconnect_orb_dma;
 	struct sbp2_logout_orb *logout_orb;
@@ -365,7 +392,7 @@ struct scsi_id_instance_data {
 	u32 sbp2_firmware_revision;
 
 	/* 
-	 * Variable used for logins, reconnects, logouts 
+	 * Variable used for logins, reconnects, logouts, query logins
 	 */
 	atomic_t sbp2_login_complete;
 
@@ -457,6 +484,7 @@ static int sbp2_handle_physdma_read(struct hpsb_host *host, int nodeid, quadlet_
 /*
  * SBP-2 protocol related prototypes
  */
+static int sbp2_query_logins(struct scsi_id_instance_data *scsi_id);
 static int sbp2_login_device(struct scsi_id_instance_data *scsi_id);
 static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id); 
 static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id); 

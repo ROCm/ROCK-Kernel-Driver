@@ -180,8 +180,7 @@ static int register_with_devfs(struct hash_cell *hc)
 	}
 
 	sprintf(name, DM_DIR "/%s", hc->name);
-	devfs_register(NULL, name, DEVFS_FL_CURRENT_OWNER,
-		       disk->major, disk->first_minor,
+	devfs_register(NULL, name, 0, disk->major, disk->first_minor,
 		       S_IFBLK | S_IRUSR | S_IWUSR | S_IRGRP,
 		       &dm_blk_dops, NULL);
 	kfree(name);

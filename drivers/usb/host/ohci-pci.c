@@ -334,7 +334,7 @@ static const struct hc_driver ohci_pci_hc_driver = {
 	 */
 	.urb_enqueue =		ohci_urb_enqueue,
 	.urb_dequeue =		ohci_urb_dequeue,
-	.free_config =		ohci_free_config,
+	.endpoint_disable =	ohci_endpoint_disable,
 
 	/*
 	 * scheduling support

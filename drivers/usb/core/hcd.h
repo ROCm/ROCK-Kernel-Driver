@@ -153,6 +153,8 @@ struct usb_operations {
 			dma_addr_t *dma);
 	void (*buffer_free)(struct usb_bus *bus, size_t size,
 			void *addr, dma_addr_t dma);
+
+	void (*disable)(struct usb_device *udev, int bEndpointAddress);
 };
 
 /* each driver provides one of these, and hardware init support */
@@ -194,10 +196,9 @@ struct hc_driver {
 					int mem_flags);
 	int	(*urb_dequeue) (struct usb_hcd *hcd, struct urb *urb);
 
-	// frees configuration resources -- allocated as needed during
-	// urb_enqueue, and not freed by urb_dequeue
-	void		(*free_config) (struct usb_hcd *hcd,
-				struct usb_device *dev);
+	/* hw synch, freeing endpoint resources that urb_dequeue can't */
+	void 	(*endpoint_disable)(struct usb_hcd *hcd,
+			struct hcd_dev *dev, int bEndpointAddress);
 
 	/* root hub support */
 	int		(*hub_status_data) (struct usb_hcd *hcd, char *buf);
