@@ -273,6 +273,12 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.16:
+	- Implement access time updates (including mtime and ctime).
+	- Implement fsync(2), fdatasync(2), and msync(2) system calls.
+	- Enable the readv(2) and writev(2) system calls.
+	- Enable access via the asynchronous io (aio) API by adding support for
+	  the aio_read(3) and aio_write(3) functions.
 2.1.15:
 	- Invalidate quotas when (re)mounting read-write.
 	  NOTE:  This now only leave user space journalling on the side.  (See
