@@ -64,15 +64,18 @@ extern struct task_struct *last_task_used_math;
 # define TASK_SIZE		(0x80000000UL)
 # define TASK_UNMAPPED_BASE (current->map_base)
 # define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
-
+# define DEFAULT_TASK_SIZE	(0x80000000UL)
 
 #else /* __s390x__ */
 
-# define TASK_SIZE		(0x40000000000UL)
+# define TASK64_SIZE		(0x40000000000UL)
 # define TASK31_SIZE		(0x80000000UL)
+# define TASK_SIZE		(test_thread_flag(TIF_31BIT) ? \
+					TASK31_SIZE : TASK64_SIZE)
 # define TASK_UNMAPPED_BASE	(test_thread_flag(TIF_31BIT) ? \
-					(TASK31_SIZE / 2) : (TASK_SIZE / 2))
-# define __TASK_UNMAPPED_BASE	(TASK31_SIZE / 2)
+					(current->map_base) : (TASK64_SIZE / 2))
+# define __TASK_UNMAPPED_BASE	(TASK_SIZE / 2)
+# define DEFAULT_TASK_SIZE	TASK64_SIZE
 
 #endif /* __s390x__ */
 
@@ -100,6 +103,8 @@ struct thread_struct {
 };
 
 typedef struct thread_struct thread_struct;
+
+#define ARCH_MIN_TASKALIGN	8
 
 #ifndef __s390x__
 # define __SWAPPER_PG_DIR __pa(&swapper_pg_dir[0]) + _SEGMENT_TABLE

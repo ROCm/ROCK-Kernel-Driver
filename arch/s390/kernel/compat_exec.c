@@ -34,9 +34,6 @@
 #endif
 
 
-#undef STACK_TOP
-#define STACK_TOP TASK31_SIZE
-
 int setup_arg_pages32(struct linux_binprm *bprm, int executable_stack)
 {
 	unsigned long stack_base;
