@@ -66,10 +66,11 @@ static inline void __release_stripe(raid5_conf_t *conf, struct stripe_head *sh)
 			BUG();
 		if (atomic_read(&conf->active_stripes)==0)
 			BUG();
-		if (test_bit(STRIPE_DELAYED, &sh->state))
-			list_add_tail(&sh->lru, &conf->delayed_list);
-		else if (test_bit(STRIPE_HANDLE, &sh->state)) {
-			list_add_tail(&sh->lru, &conf->handle_list);
+		if (test_bit(STRIPE_HANDLE, &sh->state)) {
+			if (test_bit(STRIPE_DELAYED, &sh->state))
+				list_add_tail(&sh->lru, &conf->delayed_list);
+			else
+				list_add_tail(&sh->lru, &conf->handle_list);
 			md_wakeup_thread(conf->thread);
 		} else {
 			if (test_and_clear_bit(STRIPE_PREREAD_ACTIVE, &sh->state)) {
@@ -1167,10 +1168,9 @@ static void raid5_unplug_device(void *data)
 
 	raid5_activate_delayed(conf);
 	
-	if (conf->plugged) {
-		conf->plugged = 0;
-		md_wakeup_thread(conf->thread);
-	}	
+	conf->plugged = 0;
+	md_wakeup_thread(conf->thread);
+
 	spin_unlock_irqrestore(&conf->device_lock, flags);
 }
 

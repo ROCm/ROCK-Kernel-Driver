@@ -543,11 +543,6 @@ need_resched_back:
 
 	release_kernel_lock(prev, this_cpu);
 
-	/* Do "administrative" work here while we don't hold any locks */
-	if (softirq_pending(this_cpu))
-		goto handle_softirq;
-handle_softirq_back:
-
 	/*
 	 * 'sched_data' is protected by the fact that we can run
 	 * only one process per CPU.
@@ -689,13 +684,11 @@ recalculate:
 	goto repeat_schedule;
 
 still_running:
+	if (!(prev->cpus_allowed & (1UL << this_cpu)))
+		goto still_running_back;
 	c = goodness(prev, this_cpu, prev->active_mm);
 	next = prev;
 	goto still_running_back;
-
-handle_softirq:
-	do_softirq();
-	goto handle_softirq_back;
 
 move_rr_last:
 	if (!prev->counter) {

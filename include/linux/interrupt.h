@@ -73,8 +73,9 @@ struct softirq_action
 
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
-
 extern void softirq_init(void);
+extern void FASTCALL(cpu_raise_softirq(unsigned int cpu, unsigned int nr));
+extern void FASTCALL(raise_softirq(unsigned int nr));
 
 
 
@@ -129,7 +130,7 @@ extern struct tasklet_head tasklet_vec[NR_CPUS];
 extern struct tasklet_head tasklet_hi_vec[NR_CPUS];
 
 #define tasklet_trylock(t) (!test_and_set_bit(TASKLET_STATE_RUN, &(t)->state))
-#define tasklet_unlock(t) clear_bit(TASKLET_STATE_RUN, &(t)->state)
+#define tasklet_unlock(t) do { smp_mb__before_clear_bit(); clear_bit(TASKLET_STATE_RUN, &(t)->state); } while(0)
 #define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
 
 extern void tasklet_schedule(struct tasklet_struct *t);

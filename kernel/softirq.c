@@ -47,21 +47,38 @@ irq_cpustat_t irq_stat[NR_CPUS];
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned;
 
+/*
+ * we cannot loop indefinitely here to avoid userspace starvation,
+ * but we also don't want to introduce a worst case 1/HZ latency
+ * to the pending events, so lets the scheduler to balance
+ * the softirq load for us.
+ */
+static inline void wakeup_softirqd(unsigned cpu)
+{
+	struct task_struct * tsk = ksoftirqd_task(cpu);
+
+	if (tsk && tsk->state != TASK_RUNNING)
+		wake_up_process(tsk);
+}
+
 asmlinkage void do_softirq()
 {
 	int cpu = smp_processor_id();
 	__u32 pending;
+	long flags;
+	__u32 mask;
 
 	if (in_interrupt())
 		return;
 
-	local_irq_disable();
+	local_irq_save(flags);
 
 	pending = softirq_pending(cpu);
 
 	if (pending) {
 		struct softirq_action *h;
 
+		mask = ~pending;
 		local_bh_disable();
 restart:
 		/* Reset the pending bitmask before enabling irqs */
@@ -81,14 +98,40 @@ restart:
 		local_irq_disable();
 
 		pending = softirq_pending(cpu);
-		if (pending)
+		if (pending & mask) {
+			mask &= ~pending;
 			goto restart;
+		}
 		__local_bh_enable();
+
+		if (pending)
+			wakeup_softirqd(cpu);
 	}
 
-	local_irq_enable();
+	local_irq_restore(flags);
 }
 
+inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
+{
+	__cpu_raise_softirq(cpu, nr);
+
+	/*
+	 * If we're in an interrupt or bh, we're done
+	 * (this also catches bh-disabled code). We will
+	 * actually run the softirq once we return from
+	 * the irq or bh.
+	 *
+	 * Otherwise we wake up ksoftirqd to make sure we
+	 * schedule the softirq soon.
+	 */
+	if (!(local_irq_count(cpu) | local_bh_count(cpu)))
+		wakeup_softirqd(cpu);
+}
+
+void raise_softirq(unsigned int nr)
+{
+	cpu_raise_softirq(smp_processor_id(), nr);
+}
 
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
@@ -112,11 +155,10 @@ void tasklet_schedule(struct tasklet_struct *t)
 	 * If nobody is running it then add it to this CPU's
 	 * tasklet queue.
 	 */
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state) &&
-						tasklet_trylock(t)) {
+	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
 		t->next = tasklet_vec[cpu].list;
 		tasklet_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+		cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
 		tasklet_unlock(t);
 	}
 	local_irq_restore(flags);
@@ -130,11 +172,10 @@ void tasklet_hi_schedule(struct tasklet_struct *t)
 	cpu = smp_processor_id();
 	local_irq_save(flags);
 
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state) &&
-						tasklet_trylock(t)) {
+	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
 		t->next = tasklet_hi_vec[cpu].list;
 		tasklet_hi_vec[cpu].list = t;
-		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
+		cpu_raise_softirq(cpu, HI_SOFTIRQ);
 		tasklet_unlock(t);
 	}
 	local_irq_restore(flags);
@@ -148,37 +189,30 @@ static void tasklet_action(struct softirq_action *a)
 	local_irq_disable();
 	list = tasklet_vec[cpu].list;
 	tasklet_vec[cpu].list = NULL;
+	local_irq_enable();
 
 	while (list) {
 		struct tasklet_struct *t = list;
 
 		list = list->next;
 
-		/*
-		 * A tasklet is only added to the queue while it's
-		 * locked, so no other CPU can have this tasklet
-		 * pending:
-		 */
 		if (!tasklet_trylock(t))
 			BUG();
-repeat:
-		if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-			BUG();
 		if (!atomic_read(&t->count)) {
-			local_irq_enable();
+			if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+				BUG();
 			t->func(t->data);
-			local_irq_disable();
-			/*
-			 * One more run if the tasklet got reactivated:
-			 */
-			if (test_bit(TASKLET_STATE_SCHED, &t->state))
-				goto repeat;
+			tasklet_unlock(t);
+			continue;
 		}
 		tasklet_unlock(t);
-		if (test_bit(TASKLET_STATE_SCHED, &t->state))
-			tasklet_schedule(t);
+
+		local_irq_disable();
+		t->next = tasklet_vec[cpu].list;
+		tasklet_vec[cpu].list = t;
+		cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
+		local_irq_enable();
 	}
-	local_irq_enable();
 }
 
 
@@ -193,6 +227,7 @@ static void tasklet_hi_action(struct softirq_action *a)
 	local_irq_disable();
 	list = tasklet_hi_vec[cpu].list;
 	tasklet_hi_vec[cpu].list = NULL;
+	local_irq_enable();
 
 	while (list) {
 		struct tasklet_struct *t = list;
@@ -201,21 +236,21 @@ static void tasklet_hi_action(struct softirq_action *a)
 
 		if (!tasklet_trylock(t))
 			BUG();
-repeat:
-		if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-			BUG();
 		if (!atomic_read(&t->count)) {
-			local_irq_enable();
+			if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+				BUG();
 			t->func(t->data);
-			local_irq_disable();
-			if (test_bit(TASKLET_STATE_SCHED, &t->state))
-				goto repeat;
+			tasklet_unlock(t);
+			continue;
 		}
 		tasklet_unlock(t);
-		if (test_bit(TASKLET_STATE_SCHED, &t->state))
-			tasklet_hi_schedule(t);
+
+		local_irq_disable();
+		t->next = tasklet_hi_vec[cpu].list;
+		tasklet_hi_vec[cpu].list = t;
+		cpu_raise_softirq(cpu, HI_SOFTIRQ);
+		local_irq_enable();
 	}
-	local_irq_enable();
 }
 
 
@@ -335,3 +370,61 @@ void __run_task_queue(task_queue *list)
 			f(data);
 	}
 }
+
+static int ksoftirqd(void * __bind_cpu)
+{
+	int bind_cpu = *(int *) __bind_cpu;
+	int cpu = cpu_logical_map(bind_cpu);
+
+	daemonize();
+	current->nice = 19;
+	sigfillset(&current->blocked);
+
+	/* Migrate to the right CPU */
+	current->cpus_allowed = 1UL << cpu;
+	while (smp_processor_id() != cpu)
+		schedule();
+
+	sprintf(current->comm, "ksoftirqd_CPU%d", bind_cpu);
+
+	__set_current_state(TASK_INTERRUPTIBLE);
+	mb();
+
+	ksoftirqd_task(cpu) = current;
+
+	for (;;) {
+		if (!softirq_pending(cpu))
+			schedule();
+
+		__set_current_state(TASK_RUNNING);
+
+		while (softirq_pending(cpu)) {
+			do_softirq();
+			if (current->need_resched)
+				schedule();
+		}
+
+		__set_current_state(TASK_INTERRUPTIBLE);
+	}
+}
+
+static __init int spawn_ksoftirqd(void)
+{
+	int cpu;
+
+	for (cpu = 0; cpu < smp_num_cpus; cpu++) {
+		if (kernel_thread(ksoftirqd, (void *) &cpu,
+				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
+			printk("spawn_ksoftirqd() failed for cpu %d\n", cpu);
+		else {
+			while (!ksoftirqd_task(cpu_logical_map(cpu))) {
+				current->policy |= SCHED_YIELD;
+				schedule();
+			}
+		}
+	}
+
+	return 0;
+}
+
+__initcall(spawn_ksoftirqd);

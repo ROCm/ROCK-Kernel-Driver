@@ -837,11 +837,11 @@ fh_update(struct svc_fh *fhp)
 	dentry = fhp->fh_dentry;
 	if (!dentry->d_inode)
 		goto out_negative;
-	if (fhp->fh_handle.fh_fileid_type != 0)
-		goto out_uptodate;
 	if (fhp->fh_handle.fh_version != 1) {
 		_fh_update_old(dentry, fhp->fh_export, &fhp->fh_handle);
 	} else {
+		if (fhp->fh_handle.fh_fileid_type != 0)
+			goto out_uptodate;
 		datap = fhp->fh_handle.fh_auth+
 			fhp->fh_handle.fh_size/4 -1;
 		fhp->fh_handle.fh_fileid_type =

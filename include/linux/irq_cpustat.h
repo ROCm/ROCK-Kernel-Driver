@@ -30,6 +30,7 @@ extern irq_cpustat_t irq_stat[];			/* defined in asm/hardirq.h */
 #define local_irq_count(cpu)	__IRQ_STAT((cpu), __local_irq_count)
 #define local_bh_count(cpu)	__IRQ_STAT((cpu), __local_bh_count)
 #define syscall_count(cpu)	__IRQ_STAT((cpu), __syscall_count)
+#define ksoftirqd_task(cpu)	__IRQ_STAT((cpu), __ksoftirqd_task)
   /* arch dependent irq_stat fields */
 #define nmi_count(cpu)		__IRQ_STAT((cpu), __nmi_count)		/* i386, ia64 */
 

@@ -12,7 +12,6 @@
 #define local_bh_disable()	cpu_bh_disable(smp_processor_id())
 #define __local_bh_enable()	__cpu_bh_enable(smp_processor_id())
 #define __cpu_raise_softirq(cpu,nr) set_bit((nr), &softirq_pending(cpu))
-#define raise_softirq(nr)	__cpu_raise_softirq(smp_processor_id(), (nr))
 
 #define in_softirq()		(local_bh_count(smp_processor_id()) != 0)
 

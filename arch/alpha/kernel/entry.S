@@ -576,17 +576,6 @@ entSys:
 .align 3
 ret_from_sys_call:
 	cmovne	$26,0,$19		/* $19 = 0 => non-restartable */
-#ifdef CONFIG_SMP
-	ldl	$3,TASK_PROCESSOR($8)
-	sll	$3,L1_CACHE_SHIFT,$3
-#endif
-	lda	$4,irq_stat
-#ifdef CONFIG_SMP
-	addq	$3,$4,$4
-#endif
-	ldq	$4,0($4)		/* __softirq_pending */
-	bne	$4,handle_softirq
-ret_from_softirq:
 	ldq	$0,SP_OFF($30)
 	and	$0,8,$0
 	beq	$0,restore_all
@@ -664,17 +653,6 @@ strace_error:
 	mov	$31,$26		/* tell "ret_from_sys_call" we can restart */
 	br	ret_from_sys_call
 
-	.align 3
-handle_softirq:
-	subq	$30,16,$30
-	stq	$19,0($30)	/* save syscall nr */
-	stq	$20,8($30)	/* and error indication (a3) */
-	jsr	$26,do_softirq
-	ldq	$19,0($30)
-	ldq	$20,8($30)
-	addq	$30,16,$30
-	br	ret_from_softirq
-	
 	.align 3
 syscall_error:
 	/*
