@@ -1,28 +1,22 @@
 /*
  *  drivers/s390/cio/airq.c
- *   S/390 common I/O routines -- special interrupt registration
- *   currently used only by qdio
+ *   S/390 common I/O routines -- support for adapter interruptions
  *
- *   $Revision: 1.3 $
+ *   $Revision: 1.10 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
- *                            IBM Corporation
+ *			      IBM Corporation
  *    Author(s): Ingo Adlung (adlung@de.ibm.com)
- *               Cornelia Huck (cohuck@de.ibm.com) 
+ *		 Cornelia Huck (cohuck@de.ibm.com)
  *		 Arnd Bergmann (arndb@de.ibm.com)
- *    ChangeLog: 11/04/2002 Arnd Bergmann Split s390io.c into multiple files,
- *					  see s390io.c for complete list of
- * 					  changes.
  */
 
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <asm/idals.h>
-#include <asm/debug.h>
 
-#include "airq.h"
 #include "cio_debug.h"
+#include "airq.h"
 
 static spinlock_t adapter_lock = SPIN_LOCK_UNLOCKED;
 static adapter_int_handler_t adapter_handler;
@@ -41,7 +35,7 @@ static adapter_int_handler_t adapter_handler;
 int
 s390_register_adapter_interrupt (adapter_int_handler_t handler)
 {
-	int ret = 0;
+	int ret;
 	char dbf_txt[15];
 
 	CIO_TRACE_EVENT (4, "rgaint");
@@ -52,21 +46,23 @@ s390_register_adapter_interrupt (adapter_int_handler_t handler)
 		ret = -EINVAL;
 	else if (adapter_handler)
 		ret = -EBUSY;
-	else
+	else {
 		adapter_handler = handler;
+		ret = 0;
+	}
 
 	spin_unlock (&adapter_lock);
 
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	return ret;
+	return (ret);
 }
 
 int
 s390_unregister_adapter_interrupt (adapter_int_handler_t handler)
 {
-	int ret = 0;
+	int ret;
 	char dbf_txt[15];
 
 	CIO_TRACE_EVENT (4, "urgaint");
@@ -77,15 +73,17 @@ s390_unregister_adapter_interrupt (adapter_int_handler_t handler)
 		ret = -EINVAL;
 	else if (handler != adapter_handler)
 		ret = -EINVAL;
-	else
+	else {
 		adapter_handler = NULL;
+		ret = 0;
+	}
 
 	spin_unlock (&adapter_lock);
 
 	sprintf (dbf_txt, "ret:%d", ret);
 	CIO_TRACE_EVENT (4, dbf_txt);
 
-	return ret;
+	return (ret);
 }
 
 void

@@ -37,10 +37,6 @@
 #include <asm/io.h>
 #include <asm/bugs.h>
 
-#if defined(CONFIG_ARCH_S390)
-#include <asm/s390mach.h>
-#endif
-
 #ifdef CONFIG_X86_LOCAL_APIC
 #include <asm/smp.h>
 #endif

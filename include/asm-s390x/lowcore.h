@@ -22,8 +22,6 @@
 #define __LC_PGM_NEW_PSW                0x01d0
 #define __LC_MCK_NEW_PSW                0x01e0
 #define __LC_IO_NEW_PSW                 0x01f0
-#define __LC_RETURN_PSW                 0x0200
-#define __LC_SYNC_IO_WORD               0x0210
 #define __LC_EXT_PARAMS                 0x080
 #define __LC_CPU_ADDRESS                0x084
 #define __LC_EXT_INT_CODE               0x086
@@ -38,7 +36,9 @@
 #define __LC_IO_INT_WORD                0x0C0
 #define __LC_MCCK_CODE                  0x0E8
 
-#define __LC_DIAG44_OPCODE		0x214
+#define __LC_RETURN_PSW                 0x200
+#define __LC_IRB			0x210
+#define __LC_DIAG44_OPCODE		0x250
 
 #define __LC_SAVE_AREA                  0xC00
 #define __LC_KERNEL_STACK               0xD40
@@ -121,9 +121,9 @@ struct _lowcore
 	psw_t        mcck_new_psw;             /* 0x1e0 */
 	psw_t        io_new_psw;               /* 0x1f0 */
         psw_t        return_psw;               /* 0x200 */
-	__u32        sync_io_word;             /* 0x210 */
-	__u32        diag44_opcode;            /* 0x214 */
-        __u8         pad8[0xc00-0x218];        /* 0x218 */
+	__u8	     irb[64];		       /* 0x210 */
+	__u32        diag44_opcode;            /* 0x250 */
+        __u8         pad8[0xc00-0x254];        /* 0x254 */
         /* System info area */
 	__u64        save_area[16];            /* 0xc00 */
         __u8         pad9[0xd40-0xc80];        /* 0xc80 */
@@ -133,7 +133,7 @@ struct _lowcore
 	__u8         pad10[0xd80-0xd50];       /* 0xd64 */
 	struct       cpuinfo_S390 cpu_data;    /* 0xd80 */
 	__u32        ipl_device;               /* 0xdb8 */
-	__u32        pad11;                    /* 0xdbc was lsw word of ipl_device until a bug was found DJB */
+	__u32        pad11;                    /* 0xdbc */
 	/* entry.S sensitive area end */
 
         /* SMP info area: defined by DJB */

@@ -35,9 +35,9 @@
 #define __LC_MCCK_CODE                  0x0E8
 #define __LC_AREGS_SAVE_AREA            0x120
 #define __LC_CREGS_SAVE_AREA            0x1C0
-#define __LC_RETURN_PSW                 0x200
 
-#define __LC_SYNC_IO_WORD               0x400
+#define __LC_RETURN_PSW                 0x200
+#define __LC_IRB			0x208
 
 #define __LC_SAVE_AREA                  0xC00
 #define __LC_KERNEL_STACK               0xC40
@@ -115,14 +115,11 @@ struct _lowcore
 	__u32        access_regs_save_area[16];/* 0x120 */
 	__u32        floating_pt_save_area[8]; /* 0x160 */
 	__u32        gpregs_save_area[16];     /* 0x180 */
-	__u32        cregs_save_area[16];      /* 0x240 */	
+	__u32        cregs_save_area[16];      /* 0x1c0 */	
 
         psw_t        return_psw;               /* 0x200 */
-	__u8         pad8[0x400-0x208];        /* 0x208 */
-
-	__u32        sync_io_word;	       /* 0x400 */
-
-        __u8         pad9[0xc00-0x404];        /* 0x404 */
+	__u8	     irb[64];		       /* 0x208 */
+	__u8         pad8[0xc00-0x248];        /* 0x248 */
 
         /* System info area */
 	__u32        save_area[16];            /* 0xc00 */

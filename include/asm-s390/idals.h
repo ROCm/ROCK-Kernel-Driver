@@ -15,9 +15,17 @@
 
 #include <linux/config.h>
 #include <linux/errno.h>
-#include <asm/irq.h>
+#include <linux/err.h>
+#include <linux/types.h>
+#include <linux/slab.h>
+#include <asm/cio.h>
+#include <asm/uaccess.h>
 
+#ifdef CONFIG_ARCH_S390X
+#define IDA_SIZE_LOG 12 /* 11 for 2k , 12 for 4k */
+#else
 #define IDA_SIZE_LOG 11 /* 11 for 2k , 12 for 4k */
+#endif
 #define IDA_BLOCK_SIZE (1L<<IDA_SIZE_LOG)
 
 /*
@@ -76,7 +84,7 @@ idal_create_words(unsigned long *idaws, void *vaddr, unsigned int length)
  * If necessary it allocates an IDAL and sets the appropriate flags.
  */
 static inline int
-set_normalized_cda(ccw1_t * ccw, void *vaddr)
+set_normalized_cda(struct ccw1 * ccw, void *vaddr)
 {
 #if defined (CONFIG_ARCH_S390X)
 	unsigned int nridaws;
@@ -103,7 +111,7 @@ set_normalized_cda(ccw1_t * ccw, void *vaddr)
  * Releases any allocated IDAL related to the CCW.
  */
 static inline void
-clear_normalized_cda(ccw1_t * ccw)
+clear_normalized_cda(struct ccw1 * ccw)
 {
 #if defined(CONFIG_ARCH_S390X)
 	if (ccw->flags & CCW_FLAG_IDA) {

@@ -1,5 +1,5 @@
 /*
- *  arch/s390/kernel/s390mach.h
+ *  drivers/s390/s390mach.h
  *   S/390 data definitions for machine check processing
  *
  *  S390 version
@@ -12,7 +12,7 @@
 
 #include <asm/types.h>
 
-typedef struct _mci {
+struct mci {
 	__u32   sd              :  1; /* 00 system damage */
 	__u32   pd              :  1; /* 01 instruction-processing damage */
 	__u32   sr              :  1; /* 02 system recovery */
@@ -30,22 +30,12 @@ typedef struct _mci {
 	__u32   to_be_defined_4 :  7; /* 25-31 */
 	__u32   ie              :  1; /* 32 indirect storage error */
 	__u32	to_be_defined_5 : 31; /* 33-63 */
-	} mci_t;
+};
 
-//
-// machine-check-interruption code
-//
-typedef struct _mcic {
-   union _mcc {
-      __u64 mcl;	/* machine check int. code - long info */	
-      mci_t mcd;  /* machine check int. code - details   */
-   } mcc;
-} __attribute__ ((packed)) mcic_t;
-
-//
-// Channel Report Word
-//
-typedef struct _crw {
+/*
+ * Channel Report Word
+ */
+struct crw {
 	__u32 res1    :  1;   /* reserved zero */
 	__u32 slct    :  1;   /* solicited */
 	__u32 oflw    :  1;   /* overflow */
@@ -55,7 +45,7 @@ typedef struct _crw {
 	__u32 res2    :  1;   /* reserved zero */
 	__u32 erc     :  6;   /* error-recovery code */
 	__u32 rsid    : 16;   /* reporting-source ID */
-} __attribute__ ((packed)) crw_t;
+} __attribute__ ((packed));
 
 #define CRW_RSC_MONITOR  0x2  /* monitoring facility */
 #define CRW_RSC_SCH      0x3  /* subchannel */
@@ -73,37 +63,11 @@ typedef struct _crw {
 #define CRW_ERC_PERRI    0x07 /* perm. error, facility init */
 #define CRW_ERC_PMOD     0x08 /* installed parameters modified */
 
-#define MAX_CRW_PENDING  1024
-#define MAX_MACH_PENDING 1024
-
-//
-// CRW Entry
-//
-typedef struct _crwe {
-	crw_t   crw;
-	struct _crwe *crwe_next;
-} __attribute__ ((packed)) crwe_t;
-
-typedef struct _mache {
-	spinlock_t     lock;
-	unsigned int   status;
-	mcic_t         mcic;
-	union _mc {
-	   crwe_t     *crwe;		/* CRW if applicable */
-   } mc;
-	struct _mache *next;
-	struct _mache *prev;
-} mache_t;
-
 #define MCHCHK_STATUS_TO_PROCESS    0x00000001
 #define MCHCHK_STATUS_IN_PROGRESS   0x00000002
 #define MCHCHK_STATUS_WAITING       0x00000004
 
-void s390_init_machine_check( void );
-void s390_do_machine_check  ( void );
-void s390_do_crw_pending    ( crwe_t *pcrwe );
-
-extern __inline__ int stcrw( __u32 *pcrw )
+extern __inline__ int stcrw(struct crw *pcrw )
 {
         int ccode;
 

@@ -257,6 +257,11 @@ config TN3215_CONSOLE
 	  Include support for using an IBM 3215 line-mode terminal as a
 	  Linux system console.
 
+config CCW_CONSOLE
+ 	bool
+ 	depends on TN3215_CONSOLE || TN3270_CONSOLE
+ 	default y
+ 
 config SCLP
 	bool "Support for SCLP"
 	help
