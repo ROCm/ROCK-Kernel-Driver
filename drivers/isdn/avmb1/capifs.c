@@ -281,16 +281,11 @@ static int capifs_parse_options(char *options, struct capifs_sb_info *sbi)
 	return 0;
 }
 
-struct super_block *capifs_read_super(struct super_block *s, void *data,
-				      int silent)
+static int capifs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct inode * root_inode;
 	struct dentry * root;
 	struct capifs_sb_info *sbi;
-
-	/* Super block already completed? */
-	if (s->s_root)
-		goto out;
 
 	sbi = (struct capifs_sb_info *) kmalloc(sizeof(struct capifs_sb_info), GFP_KERNEL);
 	if ( !sbi )
@@ -317,7 +312,6 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 	s->s_blocksize_bits = 10;
 	s->s_magic = CAPIFS_SUPER_MAGIC;
 	s->s_op = &capifs_sops;
-	s->s_root = NULL;
 
 	/*
 	 * Get the root inode and dentry, but defer checking for errors.
@@ -332,15 +326,6 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 	} 
 	root = d_alloc_root(root_inode);
 
-	/*
-	 * Check whether somebody else completed the super block.
-	 */
-	if (s->s_root) {
-		if (root) dput(root);
-		else iput(root_inode);
-		goto out;
-	}
-
 	if (!root) {
 		printk("capifs: get root dentry failed\n");
 		/*
@@ -352,15 +337,6 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 		goto fail;
 	}
 
-	/*
-	 * Check whether somebody else completed the super block.
-	 */
-	if (s->s_root)
-		goto out;
-	
-	/*
-	 * Success! Install the root dentry now to indicate completion.
-	 */
 	s->s_root = root;
 
 	sbi->next = mounts;
@@ -368,11 +344,9 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 		SBI(sbi->next)->back = &(sbi->next);
 	sbi->back = &mounts;
 	mounts = s;
-
-out:	/* Success ... somebody else completed the super block for us. */ 
-	return s;
+	return 0;
 fail:
-	return NULL;
+	return -EINVAL;
 }
 
 static int capifs_statfs(struct super_block *sb, struct statfs *buf)
@@ -400,7 +374,17 @@ static struct inode *capifs_new_inode(struct super_block *sb)
 	return inode;
 }
 
-static DECLARE_FSTYPE(capifs_fs_type, "capifs", capifs_read_super, 0);
+static struct super_block *capifs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, capifs_fill_super);
+}
+
+static struct file_system_type capifs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"capifs",
+	get_sb:		capifs_get_sb,
+};
 
 void capifs_new_ncci(char type, unsigned int num, kdev_t device)
 {
