@@ -43,11 +43,11 @@
 #include "pciehprm.h"
 
 /* Global variables */
-int pciehp_debug;
-int pciehp_poll_mode;
-int pciehp_poll_time;
-struct controller *pciehp_ctrl_list;	/* = NULL */
-struct pci_func *pciehp_slot_list[256];
+static int pciehp_debug;
+static int pciehp_poll_mode;
+static int pciehp_poll_time;
+static struct controller *pciehp_ctrl_list;
+static struct pci_func *pciehp_slot_list[256];
 
 #define DRIVER_VERSION	"0.4"
 #define DRIVER_AUTHOR	"Dan Zink <dan.zink@compaq.com>, Greg Kroah-Hartman <greg@kroah.com>, Dely Sy <dely.l.sy@intel.com>"
