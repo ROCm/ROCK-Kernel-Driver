@@ -743,7 +743,7 @@
 	0091  SSA Adapter
 	0095  20H2999 PCI Docking Bridge
 	0096  Chukar chipset SCSI controller
-		1014 0097  iSeries 2778 DASD IOA 
+		1014 0097  iSeries 2778 DASD IOA
 		1014 0098  iSeries 2763 DASD IOA
 		1014 0099  iSeries 2748 DASD IOA
 	009f  PCI 4758 Cryptographic Accelerator
@@ -1819,11 +1819,11 @@
 	0002  DAC960PD
 	0010  DAC960PX
 	0050  AcceleRAID 352/170/160 support Device
-	ba55  eXtremeRAID 1100 support Device
-	ba56  eXtremeRAID 2000/3000 support Device
 	b166  Gemstone chipset SCSI controller
 		1014 0266  Dual Channel PCI-X U320 SCSI Adapter
 		1014 0278  Dual Channel PCI-X U320 SCSI RAID Adapter
+	ba55  eXtremeRAID 1100 support Device
+	ba56  eXtremeRAID 2000/3000 support Device
 106a  Aten Research Inc
 106b  Apple Computer Inc.
 	0001  Bandit PowerPC host bridge

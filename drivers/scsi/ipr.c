@@ -69,11 +69,11 @@
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
 #include <linux/firmware.h>
+#include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/processor.h>
-#include <linux/module.h>
-#include <linux/moduleparam.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 #include <scsi/scsi_tcq.h>
@@ -86,13 +86,13 @@
  *   Global Data
  */
 static struct list_head ipr_ioa_head = LIST_HEAD_INIT(ipr_ioa_head);
-static int ipr_log_level = IPR_DEFAULT_LOG_LEVEL;
-static int ipr_testmode = 1;		/* xxx set to 0 for ship */
-static int ipr_safe_settings = 0;
+static unsigned int ipr_log_level = IPR_DEFAULT_LOG_LEVEL;
+static unsigned int ipr_max_speed = 1;
+static int ipr_testmode = 0;
 static spinlock_t ipr_driver_lock = SPIN_LOCK_UNLOCKED;
 
 /* This table describes the differences between DMA controller chips */
-static const struct ipr_chip_cfg_t ipr_chip_cfg[] = { 
+static const struct ipr_chip_cfg_t ipr_chip_cfg[] = {
 	{ /* Gemstone */
 		.mailbox = 0x0042C,
 		.cache_line_size = 0x20,
@@ -125,11 +125,15 @@ static const struct ipr_chip_cfg_t ipr_chip_cfg[] = {
 	},
 };
 
+static int ipr_max_bus_speeds [] = {
+	IPR_80MBs_SCSI_RATE, IPR_U160_SCSI_RATE, IPR_U320_SCSI_RATE
+};
+
 MODULE_AUTHOR("Brian King <brking@us.ibm.com>");
 MODULE_DESCRIPTION("IBM Power RAID SCSI Adapter Driver");
-module_param_named(safe, ipr_safe_settings, int, 0);
-MODULE_PARM_DESC(safe, "Use safe settings (slow)");
-module_param_named(log_level, ipr_log_level, int, 0);
+module_param_named(max_speed, ipr_max_speed, uint, 0);
+MODULE_PARM_DESC(max_speed, "Maximum bus speed (0-2). Default: 1=U160. Speeds: 0=80 MB/s, 1=U160, 2=U320");
+module_param_named(log_level, ipr_log_level, uint, 0);
 MODULE_PARM_DESC(log_level, "Set to 0 - 4 for increasing verbosity of device driver");
 module_param_named(testmode, ipr_testmode, int, 0);
 MODULE_PARM_DESC(testmode, "DANGEROUS!!! Allows unsupported configurations");
@@ -170,7 +174,7 @@ struct ipr_error_table_t ipr_error_table[] = {
 	{0x005A0000, 0, 0,
 	"Command to be cancelled not found"},
 	{0x00808000, 0, 0,
-	"Qualified success"}, /* xxx? */
+	"Qualified success"},
 	{0x01080000, 1, 1,
 	"FFFE: Soft device bus error recovered by the IOA"},
 	{0x01170600, 0, 1,
@@ -185,8 +189,6 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"FFF7: Media error recovered by IOA rewrite procedures"},
 	{0x01418000, 0, 1,
 	"FF3D: Soft PCI bus error recovered by the IOA"},
-	{0x01430000, 1, 0,
-	"Unsolicited device bus message received"},
 	{0x01440000, 1, 1,
 	"FFF6: Device hardware error recovered by the IOA"},
 	{0x01448100, 0, 1,
@@ -201,12 +203,10 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"FFF6: Failure prediction threshold exceeded"},
 	{0x015D9200, 0, 1,
 	"8009: Impending cache battery pack failure"},
-	{0x02040400, 0, 0, 
+	{0x02040400, 0, 0,
 	"34FF: Disk device format in progress"},
 	{0x023F0000, 0, 0,
 	"Synchronization required"},
-	{0x02448530, 0, 0,
-	"ACA active"},
 	{0x024E0000, 0, 0,
 	"No ready, IOA shutdown"},
 	{0x02670100, 0, 1,
@@ -329,33 +329,33 @@ struct ipr_error_table_t ipr_error_table[] = {
 	"9023: Array member(s) not at required physical locations"},
 	{0x07278800, 0, 1,
 	"9024: Array not functional due to present hardware configuration"},
-	{0x07278900, 0, 1, 
+	{0x07278900, 0, 1,
 	"9026: Array not functional due to present hardware configuration"},
-	{0x07278A00, 0, 1, 
+	{0x07278A00, 0, 1,
 	"9027: Array is missing a device and parity is out of sync"},
-	{0x07278B00, 0, 1, 
+	{0x07278B00, 0, 1,
 	"9028: Maximum number of arrays already exist"},
-	{0x07278C00, 0, 1, 
+	{0x07278C00, 0, 1,
 	"9050: Required cache data cannot be located for a disk unit"},
-	{0x07278D00, 0, 1, 
+	{0x07278D00, 0, 1,
 	"9052: Cache data exists for a device that has been modified"},
-	{0x07278F00, 0, 1, 
+	{0x07278F00, 0, 1,
 	"9054: IOA resources not available due to previous problems"},
-	{0x07279100, 0, 1, 
+	{0x07279100, 0, 1,
 	"9092: Disk unit requires initialization before use"},
-	{0x07279200, 0, 1, 
+	{0x07279200, 0, 1,
 	"9029: Incorrect hardware configuration change has been detected"},
-	{0x07279600, 0, 1, 
+	{0x07279600, 0, 1,
 	"9060: One or more disk pairs are missing from an array"},
-	{0x07279700, 0, 1, 
+	{0x07279700, 0, 1,
 	"9061: One or more disks are missing from an array"},
-	{0x07279800, 0, 1, 
+	{0x07279800, 0, 1,
 	"9062: One or more disks are missing from an array"},
-	{0x07279900, 0, 1, 
+	{0x07279900, 0, 1,
 	"9063: Maximum number of functional arrays has been exceeded"},
-	{0x0B260000, 0, 0, 
+	{0x0B260000, 0, 0,
 	"Aborted command, invalid descriptor."},
-	{0x0B5A0000, 0, 0, 
+	{0x0B5A0000, 0, 0,
 	"Command terminated by host"}
 };
 
@@ -512,7 +512,6 @@ static void ipr_mask_and_clear_all_interrupts(struct ipr_ioa_cfg *ioa_cfg)
 
 	/* Set interrupt mask to stop all new interrupts */
 	writel(~0, ioa_cfg->regs.set_interrupt_mask_reg);
-	int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
 
 	/* Clear any pending interrupts */
 	writel(~0, ioa_cfg->regs.clr_interrupt_reg);
@@ -522,7 +521,7 @@ static void ipr_mask_and_clear_all_interrupts(struct ipr_ioa_cfg *ioa_cfg)
 /**
  * ipr_save_pcix_cmd_reg - Save PCI-X command register
  * @ioa_cfg:	ioa config struct
- * 
+ *
  * Return value:
  * 	0 on success / -EIO on failure
  **/
@@ -548,7 +547,7 @@ static int ipr_save_pcix_cmd_reg(struct ipr_ioa_cfg *ioa_cfg)
 /**
  * ipr_set_pcix_cmd_reg - Setup PCI-X command register
  * @ioa_cfg:	ioa config struct
- * 
+ *
  * Return value:
  * 	0 on success / -EIO on failure
  **/
@@ -776,7 +775,7 @@ static void ipr_init_res_entry(struct ipr_resource_entry *res)
  * ipr_handle_config_change - Handle a config change from the adapter
  * @ioa_cfg:	ioa config struct
  * @hostrcb:	hostrcb
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -876,7 +875,7 @@ static void ipr_log_vpd(struct ipr_std_inq_vpids *vpids, u8 *serial_num)
 
 	memcpy(buffer, serial_num, IPR_SERIAL_NUM_LEN);
 	buffer[IPR_SERIAL_NUM_LEN] = '\0';
-	ipr_err("    Serial Number: %s\n", buffer);	
+	ipr_err("    Serial Number: %s\n", buffer);
 }
 
 /**
@@ -1217,7 +1216,8 @@ static void ipr_timeout(struct ipr_cmnd *ipr_cmd)
 	if (WAIT_FOR_DUMP == ioa_cfg->sdt_state)
 		ioa_cfg->sdt_state = GET_DUMP;
 
-	ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
+	if (!ioa_cfg->in_reset_reload || ioa_cfg->reset_cmd == ipr_cmd)
+		ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	LEAVE;
@@ -1271,7 +1271,7 @@ static int ipr_reset_reload(struct ipr_ioa_cfg *ioa_cfg,
 /**
  * ipr_find_ses_entry - Find matching SES in SES table
  * @res:	resource entry struct of SES
- * 
+ *
  * Return value:
  * 	pointer to SES table entry / NULL on failure
  **/
@@ -1304,7 +1304,7 @@ ipr_find_ses_entry(struct ipr_resource_entry *res)
  * @ioa_cfg:	ioa config struct
  * @bus:		SCSI bus
  * @bus_width:	bus width
- * 
+ *
  * Return value:
  *	SCSI bus speed in units of 100KHz, 1600 is 160 MHz
  *	For a 2-byte wide SCSI bus, the maximum transfer speed is
@@ -1315,7 +1315,7 @@ static u32 ipr_get_max_scsi_speed(struct ipr_ioa_cfg *ioa_cfg, u8 bus, u8 bus_wi
 {
 	struct ipr_resource_entry *res;
 	const struct ipr_ses_table_entry *ste;
-	u32 max_xfer_rate = IPR_DEFAULT_SCSI_RATE;
+	u32 max_xfer_rate = IPR_U320_SCSI_RATE;
 
 	/* Loop through each config table entry in the config table buffer */
 	list_for_each_entry(res, &ioa_cfg->used_res_q, queue) {
@@ -1414,8 +1414,7 @@ static int ipr_get_ldump_data_section(struct ipr_ioa_cfg *ioa_cfg,
 		if (ipr_wait_iodbg_ack(ioa_cfg,
 				       IPR_LDUMP_MAX_SHORT_ACK_DELAY_IN_USEC)) {
 			dev_err(&ioa_cfg->pdev->dev,
-				"IOA dump short data transfer timeout.i=%d, adx=0x%08X\n",
-				i, start_addr); /* xxx */
+				"IOA dump short data transfer timeout\n");
 			return -EIO;
 		}
 
@@ -1480,8 +1479,8 @@ static int ipr_sdt_copy(struct ipr_ioa_cfg *ioa_cfg,
 	unsigned long lock_flags = 0;
 	struct ipr_ioa_dump *ioa_dump = &ioa_cfg->dump->ioa_dump;
 
-	while ((bytes_copied < length) && 
-	       ((ioa_dump->hdr.length + bytes_copied) < IPR_MAX_IOA_DUMP_SIZE)) {
+	while ((bytes_copied < length) &&
+	       ((ioa_dump->hdr.len + bytes_copied) < IPR_MAX_IOA_DUMP_SIZE)) {
 		if ((ioa_dump->page_offset >= PAGE_SIZE) ||
 		    (ioa_dump->page_offset == 0)) {
 			page = (u32 *)__get_free_page(GFP_ATOMIC);
@@ -1519,9 +1518,88 @@ static int ipr_sdt_copy(struct ipr_ioa_cfg *ioa_cfg,
 			ipr_trace;
 			break;
 		}
+		schedule();
 	}
 
 	return bytes_copied;
+}
+
+/**
+ * ipr_init_dump_entry_hdr - Initialize a dump entry header.
+ * @hdr:	dump entry header struct
+ *
+ * Return value:
+ * 	nothing
+ **/
+static void ipr_init_dump_entry_hdr(struct ipr_dump_entry_header *hdr)
+{
+	hdr->eye_catcher = IPR_DUMP_EYE_CATCHER;
+	hdr->num_elems = 1;
+	hdr->offset = sizeof(*hdr);
+	hdr->status = IPR_DUMP_STATUS_SUCCESS;
+}
+
+/**
+ * ipr_dump_version_data - Fill in the driver version in the dump.
+ * @ioa_cfg:	ioa config struct
+ * @driver_dump:	driver dump struct
+ *
+ * Return value:
+ * 	nothing
+ **/
+static void ipr_dump_version_data(struct ipr_ioa_cfg *ioa_cfg,
+				  struct ipr_driver_dump *driver_dump)
+{
+	ipr_init_dump_entry_hdr(&driver_dump->version_entry.hdr);
+	driver_dump->version_entry.hdr.len =
+		sizeof(struct ipr_dump_version_entry) -
+		sizeof(struct ipr_dump_entry_header);
+	driver_dump->version_entry.hdr.data_type = IPR_DUMP_DATA_TYPE_ASCII;
+	driver_dump->version_entry.hdr.id = IPR_DUMP_DRIVER_VERSION_ID;
+	strcpy(driver_dump->version_entry.version, IPR_DRIVER_VERSION);
+	driver_dump->hdr.num_entries++;
+}
+
+/**
+ * ipr_dump_trace_data - Fill in the IOA trace in the dump.
+ * @ioa_cfg:	ioa config struct
+ * @driver_dump:	driver dump struct
+ *
+ * Return value:
+ * 	nothing
+ **/
+static void ipr_dump_trace_data(struct ipr_ioa_cfg *ioa_cfg,
+				   struct ipr_driver_dump *driver_dump)
+{
+	ipr_init_dump_entry_hdr(&driver_dump->trace_entry.hdr);
+	driver_dump->trace_entry.hdr.len =
+		sizeof(struct ipr_dump_trace_entry) -
+		sizeof(struct ipr_dump_entry_header);
+	driver_dump->trace_entry.hdr.data_type = IPR_DUMP_DATA_TYPE_BINARY;
+	driver_dump->trace_entry.hdr.id = IPR_DUMP_TRACE_ID;
+	memcpy(driver_dump->trace_entry.trace, ioa_cfg->trace, IPR_TRACE_SIZE);
+	driver_dump->hdr.num_entries++;
+}
+
+/**
+ * ipr_dump_location_data - Fill in the IOA location in the dump.
+ * @ioa_cfg:	ioa config struct
+ * @driver_dump:	driver dump struct
+ *
+ * Return value:
+ * 	nothing
+ **/
+static void ipr_dump_location_data(struct ipr_ioa_cfg *ioa_cfg,
+				   struct ipr_driver_dump *driver_dump)
+{
+	ipr_init_dump_entry_hdr(&driver_dump->location_entry.hdr);
+	driver_dump->location_entry.hdr.len =
+		sizeof(struct ipr_dump_location_entry) -
+		sizeof(struct ipr_dump_entry_header);
+	driver_dump->location_entry.hdr.data_type = IPR_DUMP_DATA_TYPE_ASCII;
+	driver_dump->location_entry.hdr.id = IPR_DUMP_LOCATION_ID;
+	strcpy(driver_dump->location_entry.location, ioa_cfg->pdev->dev.bus_id);
+	driver_dump->hdr.num_entries++;
 }
 
 /**
@@ -1565,35 +1643,24 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 
 	/* Initialize the overall dump header */
 	driver_dump->hdr.len = sizeof(struct ipr_driver_dump);
-	driver_dump->hdr.num_elems = 1;
+	driver_dump->hdr.num_entries = 1;
 	driver_dump->hdr.first_entry_offset = sizeof(struct ipr_dump_header);
 	driver_dump->hdr.status = IPR_DUMP_STATUS_SUCCESS;
+	driver_dump->hdr.os = IPR_DUMP_OS_LINUX;
+	driver_dump->hdr.driver_name = IPR_DUMP_DRIVER_NAME;
 
-	/* IOA location data */
-	driver_dump->location_entry.hdr.length =
-		sizeof(struct ipr_dump_location_entry) -
-		sizeof(struct ipr_dump_entry_header);
-	driver_dump->location_entry.hdr.id = IPR_DUMP_TEXT_ID;
-
-	strcpy(driver_dump->location_entry.location, ioa_cfg->pdev->dev.bus_id);
-
-	/* Trace table entry */
-	memcpy(driver_dump->trace_entry.trace, ioa_cfg->trace, IPR_TRACE_SIZE);
-
-	driver_dump->hdr.num_elems++;
-
-	driver_dump->trace_entry.hdr.length =
-		sizeof(struct ipr_dump_trace_entry) -
-		sizeof(struct ipr_dump_entry_header);
-	driver_dump->trace_entry.hdr.id = IPR_DUMP_TRACE_ID;
+	ipr_dump_version_data(ioa_cfg, driver_dump);
+	ipr_dump_location_data(ioa_cfg, driver_dump);
+	ipr_dump_trace_data(ioa_cfg, driver_dump);
 
 	/* Update dump_header */
 	driver_dump->hdr.len += sizeof(struct ipr_dump_entry_header);
-	driver_dump->hdr.num_elems++;
 
 	/* IOA Dump entry */
+	ipr_init_dump_entry_hdr(&ioa_dump->hdr);
 	ioa_dump->format = IPR_SDT_FMT2;
-	ioa_dump->hdr.length = 0;
+	ioa_dump->hdr.len = 0;
+	ioa_dump->hdr.data_type = IPR_DUMP_DATA_TYPE_BINARY;
 	ioa_dump->hdr.id = IPR_DUMP_IOA_DUMP_ID;
 
 	/* First entries in sdt are actually a list of dump addresses and
@@ -1624,10 +1691,10 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 
 	for (i = 0; i < num_entries; i++) {
-		if (ioa_dump->hdr.length > IPR_MAX_IOA_DUMP_SIZE)
+		if (ioa_dump->hdr.len > IPR_MAX_IOA_DUMP_SIZE)
 			break;
 
-		if (sdt->entry[i].valid_entry) {
+		if (sdt->entry[i].flags & IPR_SDT_VALID_ENTRY) {
 			sdt_word = be32_to_cpu(sdt->entry[i].bar_str_offset);
 			start_off = sdt_word & IPR_FMT2_MBX_ADDR_MASK;
 			end_off = be32_to_cpu(sdt->entry[i].end_offset);
@@ -1635,7 +1702,7 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 			if (ipr_sdt_is_fmt2(sdt_word) && sdt_word) {
 				bytes_to_copy = end_off - start_off;
 				if (bytes_to_copy > IPR_MAX_IOA_DUMP_SIZE) {
-					sdt->entry[i].valid_entry = 0;
+					sdt->entry[i].flags &= ~IPR_SDT_VALID_ENTRY;
 					continue;
 				}
 
@@ -1643,12 +1710,12 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 				bytes_copied = ipr_sdt_copy(ioa_cfg, sdt_word,
 							    bytes_to_copy);
 
-				ioa_dump->hdr.length += bytes_copied;
+				ioa_dump->hdr.len += bytes_copied;
 
 				if (bytes_copied != bytes_to_copy) {
 					dev_err(&ioa_cfg->pdev->dev, "Dump of IOA completed.\n");
 					driver_dump->hdr.status = IPR_DUMP_STATUS_QUAL_SUCCESS;
-					driver_dump->hdr.len += ioa_dump->hdr.length;
+					driver_dump->hdr.len += ioa_dump->hdr.len;
 					ioa_cfg->sdt_state = DUMP_OBTAINED;
 					return;
 				}
@@ -1659,7 +1726,7 @@ static void ipr_get_ioa_dump(struct ipr_ioa_cfg *ioa_cfg, struct ipr_dump *dump)
 	dev_err(&ioa_cfg->pdev->dev, "Dump of IOA completed.\n");
 
 	/* Update dump_header */
-	driver_dump->hdr.len += ioa_dump->hdr.length;
+	driver_dump->hdr.len += ioa_dump->hdr.len;
 	wmb();
 	ioa_cfg->sdt_state = DUMP_OBTAINED;
 	LEAVE;
@@ -1748,6 +1815,228 @@ restart:
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	LEAVE;
 }
+
+#ifdef CONFIG_SCSI_IPR_TRACE
+/**
+ * ipr_read_trace - Dump the adapter trace
+ * @kobj:		kobject struct
+ * @buf:		buffer
+ * @off:		offset
+ * @count:		buffer size
+ *
+ * Return value:
+ *	number of bytes printed to buffer
+ **/
+static ssize_t ipr_read_trace(struct kobject *kobj, char *buf,
+			      loff_t off, size_t count)
+{
+	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
+	struct Scsi_Host *shost = class_to_shost(cdev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	unsigned long lock_flags = 0;
+	int size = IPR_TRACE_SIZE;
+	char *src = (char *)ioa_cfg->trace;
+
+	if (off > size)
+		return 0;
+	if (off + count > size) {
+		size -= off;
+		count = size;
+	}
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	memcpy(buf, &src[off], count);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	return count;
+}
+
+static struct bin_attribute ipr_trace_attr = {
+	.attr =	{
+		.name = "trace",
+		.mode = S_IRUGO,
+	},
+	.size = 0,
+	.read = ipr_read_trace,
+};
+#endif
+
+/**
+ * ipr_show_fw_version - Show the firmware version
+ * @class_dev:	class device struct
+ * @buf:		buffer
+ *
+ * Return value:
+ *	number of bytes printed to buffer
+ **/
+static ssize_t ipr_show_fw_version(struct class_device *class_dev, char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	struct ipr_inquiry_page3 *ucode_vpd = &ioa_cfg->vpd_cbs->page3_data;
+	unsigned long lock_flags = 0;
+	int len;
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	len = snprintf(buf, PAGE_SIZE, "%02X%02X%02X%02X\n",
+		       ucode_vpd->major_release, ucode_vpd->card_type,
+		       ucode_vpd->minor_release[0],
+		       ucode_vpd->minor_release[1]);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	return len;
+}
+
+static struct class_device_attribute ipr_fw_version_attr = {
+	.attr = {
+		.name =		"fw_version",
+		.mode =		S_IRUGO,
+	},
+	.show = ipr_show_fw_version,
+};
+
+/**
+ * ipr_show_log_level - Show the adapter's error logging level
+ * @class_dev:	class device struct
+ * @buf:		buffer
+ *
+ * Return value:
+ * 	number of bytes printed to buffer
+ **/
+static ssize_t ipr_show_log_level(struct class_device *class_dev, char *buf)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	unsigned long lock_flags = 0;
+	int len;
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	len = snprintf(buf, PAGE_SIZE, "%d\n", ioa_cfg->log_level);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	return len;
+}
+
+/**
+ * ipr_store_log_level - Change the adapter's error logging level
+ * @class_dev:	class device struct
+ * @buf:		buffer
+ *
+ * Return value:
+ * 	number of bytes printed to buffer
+ **/
+static ssize_t ipr_store_log_level(struct class_device *class_dev,
+				   const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	unsigned long lock_flags = 0;
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	ioa_cfg->log_level = simple_strtoul(buf, NULL, 10);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	return strlen(buf);
+}
+
+static struct class_device_attribute ipr_log_level_attr = {
+	.attr = {
+		.name =		"log_level",
+		.mode =		S_IRUGO | S_IWUSR,
+	},
+	.show = ipr_show_log_level,
+	.store = ipr_store_log_level
+};
+
+/**
+ * ipr_store_diagnostics - IOA Diagnostics interface
+ * @class_dev:	class_device struct
+ * @buf:		buffer
+ * @count:		buffer size
+ *
+ * This function will reset the adapter and wait a reasonable
+ * amount of time for any errors that the adapter might log.
+ *
+ * Return value:
+ * 	count on success / other on failure
+ **/
+static ssize_t ipr_store_diagnostics(struct class_device *class_dev,
+				     const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	unsigned long lock_flags = 0;
+	int rc = count;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	ioa_cfg->errors_logged = 0;
+	ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NORMAL);
+
+	if (ioa_cfg->in_reset_reload) {
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+		wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
+
+		/* Wait for a second for any errors to be logged */
+		schedule_timeout(HZ);
+	} else {
+		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+		return -EIO;
+	}
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	if (ioa_cfg->in_reset_reload || ioa_cfg->errors_logged)
+		rc = -EIO;
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+
+	return rc;
+}
+
+static struct class_device_attribute ipr_diagnostics_attr = {
+	.attr = {
+		.name =		"run_diagnostics",
+		.mode =		S_IWUSR,
+	},
+	.store = ipr_store_diagnostics
+};
+
+/**
+ * ipr_store_reset_adapter - Reset the adapter
+ * @class_dev:	class_device struct
+ * @buf:		buffer
+ * @count:		buffer size
+ *
+ * This function will reset the adapter.
+ *
+ * Return value:
+ * 	count on success / other on failure
+ **/
+static ssize_t ipr_store_reset_adapter(struct class_device *class_dev,
+				       const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = class_to_shost(class_dev);
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
+	unsigned long lock_flags;
+	int result = count;
+
+	if (!capable(CAP_SYS_ADMIN))
+		return -EACCES;
+
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	if (!ioa_cfg->in_reset_reload)
+		ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NORMAL);
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
+	wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
+
+	return result;
+}
+
+static struct class_device_attribute ipr_ioa_reset_attr = {
+	.attr = {
+		.name =		"reset_host",
+		.mode =		S_IWUSR,
+	},
+	.store = ipr_store_reset_adapter
+};
 
 /**
  * ipr_alloc_ucode_buffer - Allocates a microcode download buffer
@@ -1911,7 +2200,7 @@ static int ipr_map_ucode_buffer(struct ipr_cmnd *ipr_cmd,
 	ipr_cmd->dma_use_sg = pci_map_sg(ioa_cfg->pdev, scatterlist,
 					 sglist->num_sg, DMA_TO_DEVICE);
 
-	ioarcb->cmd_pkt.write_not_read = 1;
+	ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_WRITE_NOT_READ;
 	ioarcb->write_data_transfer_length = cpu_to_be32(len);
 	ioarcb->write_ioadl_len =
 		cpu_to_be32(sizeof(struct ipr_ioadl_desc) * ipr_cmd->dma_use_sg);
@@ -1935,235 +2224,8 @@ static int ipr_map_ucode_buffer(struct ipr_cmnd *ipr_cmd,
 	return 0;
 }
 
-#ifdef CONFIG_SCSI_IPR_TRACE
 /**
- * ipr_read_trace - Dump the adapter trace
- * @kobj:		kobject struct
- * @buf:		buffer
- * @off:		offset
- * @count:		buffer size
- * 
- * Return value:
- *	number of bytes printed to buffer
- **/
-static ssize_t ipr_read_trace(struct kobject *kobj, char *buf,
-			      loff_t off, size_t count)
-{
-	struct class_device *cdev = container_of(kobj,struct class_device,kobj); 
-	struct Scsi_Host *shost = class_to_shost(cdev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags = 0;
-	int size = IPR_TRACE_SIZE;
-	char *src = (char *)ioa_cfg->trace;
-
-	if (off > size)
-		return 0;
-	if (off + count > size) {
-		size -= off;
-		count = size;
-	}
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	memcpy(buf, &src[off], count);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return count;
-}
-
-static struct bin_attribute ipr_trace_attr = {
-	.attr =	{
-		.name = "trace",
-		.mode = S_IRUGO,
-	},
-	.size = 0,
-	.read = ipr_read_trace,
-};
-#endif
-
-/**
- * ipr_show_fw_version - Show the firmware version
- * @class_dev:	class device struct
- * @buf:		buffer
- * 
- * Return value:
- *	number of bytes printed to buffer
- **/
-static ssize_t ipr_show_fw_version(struct class_device *class_dev, char *buf)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	struct ipr_inquiry_page3 *ucode_vpd = &ioa_cfg->vpd_cbs->page3_data;
-	unsigned long lock_flags = 0;
-	int len;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	len = snprintf(buf, PAGE_SIZE, "%02X%02X%02X%02X\n",
-		       ucode_vpd->major_release, ucode_vpd->card_type,
-		       ucode_vpd->minor_release[0],
-		       ucode_vpd->minor_release[1]);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return len;
-}
-
-static struct class_device_attribute ipr_fw_version_attr = {
-	.attr = {
-		.name =		"fw_version",
-		.mode =		S_IRUGO,
-	},
-	.show = ipr_show_fw_version,
-};
-
-/**
- * ipr_show_log_level - Show the adapter's error logging level
- * @class_dev:	class device struct
- * @buf:		buffer
- * 
- * Return value:
- * 	number of bytes printed to buffer
- **/
-static ssize_t ipr_show_log_level(struct class_device *class_dev, char *buf)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags = 0;
-	int len;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	len = snprintf(buf, PAGE_SIZE, "%d\n", ioa_cfg->log_level);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return len;
-}
-
-/**
- * ipr_store_log_level - Change the adapter's error logging level
- * @class_dev:	class device struct
- * @buf:		buffer
- * 
- * Return value:
- * 	number of bytes printed to buffer
- **/
-static ssize_t ipr_store_log_level(struct class_device *class_dev,
-				   const char *buf, size_t count)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags = 0;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	ioa_cfg->log_level = simple_strtoul(buf, NULL, 10);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return strlen(buf);
-}
-
-static struct class_device_attribute ipr_log_level_attr = {
-	.attr = {
-		.name =		"log_level",
-		.mode =		S_IRUGO | S_IWUSR,
-	},
-	.show = ipr_show_log_level,
-	.store = ipr_store_log_level
-};
-
-/**
- * ipr_store_diagnostics - IOA Diagnostics interface 
- * @class_dev:	class_device struct
- * @buf:		buffer
- * @count:		buffer size
- *
- * This function will reset the adapter and wait a reasonable
- * amount of time for any errors that the adapter might log.
- *
- * Return value:
- * 	count on success / other on failure
- **/
-static ssize_t ipr_store_diagnostics(struct class_device *class_dev,
-				     const char *buf, size_t count)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags = 0;
-	int rc = count;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	ioa_cfg->errors_logged = 0;
-	ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NORMAL);
-
-	if (ioa_cfg->in_reset_reload) {
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
-
-		/* Wait for a second for any errors to be logged */
-		schedule_timeout(HZ);
-	} else {
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		return -EIO;
-	}
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	if (ioa_cfg->in_reset_reload || ioa_cfg->errors_logged)
-		rc = -EIO;
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-
-	return rc;
-}
-
-static struct class_device_attribute ipr_diagnostics_attr = {
-	.attr = {
-		.name =		"run_diagnostics",
-		.mode =		S_IWUSR,
-	},
-	.store = ipr_store_diagnostics
-};
-
-/**
- * ipr_store_reset_adapter - Reset the adapter 
- * @class_dev:	class_device struct
- * @buf:		buffer
- * @count:		buffer size
- *
- * This function will reset the adapter.
- *
- * Return value:
- * 	count on success / other on failure
- **/
-static ssize_t ipr_store_reset_adapter(struct class_device *class_dev,
-				       const char *buf, size_t count)
-{
-	struct Scsi_Host *shost = class_to_shost(class_dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
-	unsigned long lock_flags;
-	int result = count;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EACCES;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-
-	ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NORMAL);
-
-	if (ioa_cfg->in_reset_reload) {
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		wait_event(ioa_cfg->reset_wait_q, !ioa_cfg->in_reset_reload);
-		spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	}
-
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	
-	return result;
-}
-
-static struct class_device_attribute ipr_ioa_reset_attr = {
-	.attr = {
-		.name =		"reset_host",
-		.mode =		S_IWUSR,
-	},
-	.store = ipr_store_reset_adapter
-};
-
-/**
- * ipr_store_update_fw - Update the firmware on the adapter 
+ * ipr_store_update_fw - Update the firmware on the adapter
  * @class_dev:	class_device struct
  * @buf:		buffer
  * @count:		buffer size
@@ -2192,7 +2254,7 @@ static ssize_t ipr_store_update_fw(struct class_device *class_dev,
 	len = snprintf(fname, 99, "%s", buf);
 	fname[len-1] = '\0';
 
-	if(request_firmware(&fw_entry, fname, &ioa_cfg->pdev->dev)!=0) {
+	if(request_firmware(&fw_entry, fname, &ioa_cfg->pdev->dev)) {
 		dev_err(&ioa_cfg->pdev->dev, "Firmware file %s not found\n", fname);
 		return -EIO;
 	}
@@ -2203,7 +2265,7 @@ static ssize_t ipr_store_update_fw(struct class_device *class_dev,
 	    ioa_cfg->vpd_cbs->page3_data.card_type != image_hdr->card_type) {
 		dev_err(&ioa_cfg->pdev->dev, "Invalid microcode buffer\n");
 		release_firmware(fw_entry);
-		return -ENOMEM;
+		return -EINVAL;
 	}
 
 	src = (u8 *)image_hdr + be32_to_cpu(image_hdr->header_length);
@@ -2215,7 +2277,7 @@ static ssize_t ipr_store_update_fw(struct class_device *class_dev,
 		release_firmware(fw_entry);
 		return -ENOMEM;
 	}
-	
+
 	result = ipr_copy_ucode_buffer(sglist, src, dnld_size);
 
 	if (result) {
@@ -2260,6 +2322,15 @@ static struct class_device_attribute ipr_update_fw_attr = {
 	.store = ipr_store_update_fw
 };
 
+static struct class_device_attribute *ipr_ioa_attrs[] = {
+	&ipr_fw_version_attr,
+	&ipr_log_level_attr,
+	&ipr_diagnostics_attr,
+	&ipr_ioa_reset_attr,
+	&ipr_update_fw_attr,
+	NULL,
+};
+
 #ifdef CONFIG_SCSI_IPR_DUMP
 /**
  * ipr_read_dump - Dump the adapter
@@ -2267,14 +2338,14 @@ static struct class_device_attribute ipr_update_fw_attr = {
  * @buf:		buffer
  * @off:		offset
  * @count:		buffer size
- * 
+ *
  * Return value:
  *	number of bytes printed to buffer
  **/
 static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 			      loff_t off, size_t count)
 {
-	struct class_device *cdev = container_of(kobj,struct class_device,kobj); 
+	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	struct ipr_dump *dump;
@@ -2354,7 +2425,7 @@ static ssize_t ipr_read_dump(struct kobject *kobj, char *buf,
 /**
  * ipr_release_dump - Free adapter dump memory
  * @kobj:	kobject struct
- * 
+ *
  * Return value:
  *	nothing
  **/
@@ -2385,7 +2456,7 @@ static struct kobj_type ipr_dump_kobj_type = {
 /**
  * ipr_alloc_dump - Prepare for adapter dump
  * @ioa_cfg:	ioa config struct
- * 
+ *
  * Return value:
  *	0 on success / other on failure
  **/
@@ -2410,10 +2481,9 @@ static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
 	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
 
 	if (INACTIVE != ioa_cfg->sdt_state) {
-		ipr_err("Invalid request, dump already active\n");
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		kfree(dump);
-		return -EIO;
+		return 0;
 	}
 
 	ioa_cfg->dump = dump;
@@ -2431,7 +2501,7 @@ static int ipr_alloc_dump(struct ipr_ioa_cfg *ioa_cfg)
 /**
  * ipr_free_dump - Free adapter dump memory
  * @ioa_cfg:	ioa config struct
- * 
+ *
  * Return value:
  *	0 on success / other on failure
  **/
@@ -2446,7 +2516,7 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
 	dump = ioa_cfg->dump;
 	if (!dump) {
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-		return -EIO;
+		return 0;
 	}
 
 	ioa_cfg->dump = NULL;
@@ -2464,14 +2534,14 @@ static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg)
  * @buf:		buffer
  * @off:		offset
  * @count:		buffer size
- * 
+ *
  * Return value:
  *	number of bytes printed to buffer
  **/
 static ssize_t ipr_write_dump(struct kobject *kobj, char *buf,
 			      loff_t off, size_t count)
 {
-	struct class_device *cdev = container_of(kobj,struct class_device,kobj); 
+	struct class_device *cdev = container_of(kobj,struct class_device,kobj);
 	struct Scsi_Host *shost = class_to_shost(cdev);
 	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)shost->hostdata;
 	int rc;
@@ -2483,10 +2553,10 @@ static ssize_t ipr_write_dump(struct kobject *kobj, char *buf,
 		rc = ipr_alloc_dump(ioa_cfg);
 	else if (buf[0] == '0')
 		rc = ipr_free_dump(ioa_cfg);
-	else 
+	else
 		return -EINVAL;
 
-	if (rc) 
+	if (rc)
 		return rc;
 	else
 		return count;
@@ -2505,44 +2575,11 @@ static struct bin_attribute ipr_dump_attr = {
 static int ipr_free_dump(struct ipr_ioa_cfg *ioa_cfg) { return 0; };
 #endif
 
-static struct class_device_attribute *ipr_ioa_attrs[] = {
-	&ipr_fw_version_attr,
-	&ipr_log_level_attr,
-	&ipr_diagnostics_attr,
-	&ipr_ioa_reset_attr,
-	&ipr_update_fw_attr,
-	NULL,
-};
-
-/**
- * ipr_show_queue_depth - Show the device's queue depth
- * @dev:	device struct
- * @buf:	buffer
- * 
- * Return value:
- * 	number of bytes printed to buffer
- **/
-static ssize_t ipr_show_queue_depth(struct device *dev, char *buf)
-{
-	struct scsi_device *sdev = to_scsi_device(dev);
-	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *)sdev->host->hostdata;
-	struct ipr_resource_entry *res;
-	unsigned long lock_flags = 0;
-	ssize_t len = -ENXIO;
-
-	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-	res = (struct ipr_resource_entry *)sdev->hostdata;
-	if (res)
-		len = snprintf(buf, PAGE_SIZE, "%d\n", res->qdepth);
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-	return len;
-}
-
 /**
  * ipr_store_queue_depth - Change the device's queue depth
  * @dev:	device struct
  * @buf:	buffer
- * 
+ *
  * Return value:
  * 	number of bytes printed to buffer
  **/
@@ -2569,10 +2606,7 @@ static ssize_t ipr_store_queue_depth(struct device *dev,
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-
-	ipr_sdev_info(sdev, "Setting queue depth to %d\n", qdepth);
 	scsi_adjust_queue_depth(sdev, tagged, qdepth);
-
 	return len;
 }
 
@@ -2581,15 +2615,14 @@ static struct device_attribute ipr_queue_depth_attr = {
 		.name = 	"queue_depth",
 		.mode =		S_IRUSR | S_IWUSR,
 	},
-	.store = ipr_store_queue_depth,
-	.show = ipr_show_queue_depth
+	.store = ipr_store_queue_depth
 };
 
 /**
  * ipr_show_tcq_enable - Show if the device is enabled for tcqing
  * @dev:	device struct
  * @buf:	buffer
- * 
+ *
  * Return value:
  * 	number of bytes printed to buffer
  **/
@@ -2613,7 +2646,7 @@ static ssize_t ipr_show_tcq_enable(struct device *dev, char *buf)
  * ipr_store_tcq_enable - Change the device's TCQing state
  * @dev:	device struct
  * @buf:	buffer
- * 
+ *
  * Return value:
  * 	number of bytes printed to buffer
  **/
@@ -2641,21 +2674,16 @@ static ssize_t ipr_store_tcq_enable(struct device *dev,
 			if (tcq_active) {
 				tagged = MSG_ORDERED_TAG;
 				res->tcq_active = 1;
-				ipr_sdev_info(sdev, "Enabling TCQing with queue depth %d\n", qdepth);
-			} else
-				ipr_sdev_info(sdev, "Disabling TCQing with queue depth %d\n", qdepth);
+			}
 
 			len = strlen(buf);
 		} else if (tcq_active) {
-			ipr_sdev_err(sdev, "TCQing not supported to this device\n");
 			len = -EINVAL;
 		}
 	}
 
 	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
-
 	scsi_adjust_queue_depth(sdev, tagged, qdepth);
-
 	return len;
 }
 
@@ -2672,7 +2700,7 @@ static struct device_attribute ipr_tcqing_attr = {
  * ipr_show_adapter_handle - Show the adapter's resource handle for this device
  * @dev:	device struct
  * @buf:	buffer
- * 
+ *
  * Return value:
  * 	number of bytes printed to buffer
  **/
@@ -2712,14 +2740,14 @@ static struct device_attribute *ipr_dev_attrs[] = {
  * @sdev:			scsi device struct
  * @block_device:	block device pointer
  * @capacity:		capacity of the device
- * @parm:			Array containing returned HSC values. 
+ * @parm:			Array containing returned HSC values.
  *
  * This function generates the HSC parms that fdisk uses.
  * We want to make sure we return something that places partitions
  * on 4k boundaries for best performance with the IOA.
  *
  * Return value:
- * 	0 on success 
+ * 	0 on success
  **/
 static int ipr_biosparam(struct scsi_device *sdev,
 			 struct block_device *block_device,
@@ -2745,12 +2773,6 @@ static int ipr_biosparam(struct scsi_device *sdev,
  * ipr_slave_destroy - Unconfigure a SCSI device
  * @sdev:	scsi device struct
  *
- * This function unconfigures a scsi device. If the device is
- * a volume set, we send a STOP_UNIT to the device. This will
- * flush the write cache for the associated disks (VSET
- * resources do not support the flush cache command), and
- * will also finish any outstanding parity updates.
- *
  * Return value:
  * 	nothing
  **/
@@ -2762,44 +2784,46 @@ static void ipr_slave_destroy(struct scsi_device *sdev)
 
 	ioa_cfg = (struct ipr_ioa_cfg *) sdev->host->hostdata;
 
-	if (sdev->hostdata) {
-		spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
-		res = (struct ipr_resource_entry *) sdev->hostdata;
-
-		if (res->del_from_ml) /* xxx remove this flag once we have scsi_set_device_offline */
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	res = (struct ipr_resource_entry *) sdev->hostdata;
+	if (res) {
+		if (res->del_from_ml)
 			list_move_tail(&res->queue, &ioa_cfg->free_res_q);
 
 		sdev->hostdata = NULL;
 		res->sdev = NULL;
-		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	}
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 }
 
 /**
  * ipr_slave_configure - Configure a SCSI device
  * @sdev:	scsi device struct
  *
- * This function configures the specified scsi device for optimal
- * performance.
+ * This function configures the specified scsi device.
  *
  * Return value:
- * 	0 on success 
+ * 	0 on success
  **/
 static int ipr_slave_configure(struct scsi_device *sdev)
 {
-	struct ipr_resource_entry *res = sdev->hostdata;
+	struct ipr_ioa_cfg *ioa_cfg = (struct ipr_ioa_cfg *) sdev->host->hostdata;
+	struct ipr_resource_entry *res;
+	unsigned long lock_flags = 0;
 
+	spin_lock_irqsave(ioa_cfg->host->host_lock, lock_flags);
+	res = sdev->hostdata;
 	if (res) {
 		if (ipr_is_af_dasd_device(res))
 			sdev->type = TYPE_RAID;
 		else if (ipr_is_vset_device(res))
 			sdev->allow_restart = 1;
-		if (ipr_is_af_dasd_device(res) || res->cfgte.is_ioa_resource)
+		if (ipr_is_af_dasd_device(res) || ipr_is_ioa_resource(res))
 			sdev->scsi_level = 4;
 
 		scsi_adjust_queue_depth(sdev, 0, res->qdepth);
 	}
-
+	spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 	return 0;
 }
 
@@ -2813,7 +2837,7 @@ static int ipr_slave_configure(struct scsi_device *sdev)
  * handling new commands.
  *
  * Return value:
- * 	0 on success 
+ * 	0 on success
  **/
 static int ipr_slave_alloc(struct scsi_device *sdev)
 {
@@ -2902,7 +2926,6 @@ static int ipr_eh_dev_reset(struct scsi_cmnd * scsi_cmd)
 	 */
 	if (ioa_cfg->in_reset_reload)
 		return FAILED;
-
 	if (ioa_cfg->ioa_is_dead)
 		return FAILED;
 
@@ -2920,7 +2943,7 @@ static int ipr_eh_dev_reset(struct scsi_cmnd * scsi_cmd)
 	ipr_cmd->ioarcb.res_handle = res->cfgte.res_handle;
 	cmd_pkt = &ipr_cmd->ioarcb.cmd_pkt;
 	cmd_pkt->request_type = IPR_RQTYPE_IOACMD;
-	cmd_pkt->sync_complete = 1;
+	cmd_pkt->flags_hi |= IPR_FLAGS_HI_SYNC_COMPLETE;
 	cmd_pkt->cdb[0] = IPR_RESET_DEVICE;
 	cmd_pkt->cdb[2] = IPR_RESET_TYPE_SELECT | IPR_LUN_RESET | IPR_TARGET_RESET;
 
@@ -2933,7 +2956,7 @@ static int ipr_eh_dev_reset(struct scsi_cmnd * scsi_cmd)
 	list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 
 	LEAVE;
-	return (ioasc ? FAILED : SUCCESS);
+	return (IPR_IOASC_SENSE_KEY(ioasc) ? FAILED : SUCCESS);
 }
 
 /**
@@ -2958,7 +2981,7 @@ static int ipr_cancel_op(struct scsi_cmnd * scsi_cmd)
 	ioa_cfg = (struct ipr_ioa_cfg *)scsi_cmd->device->host->hostdata;
 	res = scsi_cmd->device->hostdata;
 
-	if (!ipr_is_gscsi(res) && !ipr_is_vset_device(res))
+	if (!res || (!ipr_is_gscsi(res) && !ipr_is_vset_device(res)))
 		return FAILED;
 
 	list_for_each_entry(ipr_cmd, &ioa_cfg->pending_q, queue) {
@@ -3012,10 +3035,8 @@ static int ipr_eh_abort(struct scsi_cmnd * scsi_cmd)
 	   reset to complete */
 	if (ioa_cfg->in_reset_reload)
 		return FAILED;
-
 	if (ioa_cfg->ioa_is_dead)
 		return FAILED;
-
 	if (!scsi_cmd->device->hostdata)
 		return FAILED;
 
@@ -3039,7 +3060,6 @@ static irqreturn_t ipr_handle_other_interrupt(struct ipr_ioa_cfg *ioa_cfg,
 	if (int_reg & IPR_PCII_IOA_TRANS_TO_OPER) {
 		/* Mask the interrupt */
 		writel(IPR_PCII_IOA_TRANS_TO_OPER, ioa_cfg->regs.set_interrupt_mask_reg);
-		int_reg = readl(ioa_cfg->regs.sense_interrupt_mask_reg);
 
 		/* Clear the interrupt */
 		writel(IPR_PCII_IOA_TRANS_TO_OPER, ioa_cfg->regs.clr_interrupt_reg);
@@ -3087,7 +3107,6 @@ static irqreturn_t ipr_isr(int irq, void *devp, struct pt_regs *regs)
 
 	/* If interrupts are disabled, ignore the interrupt */
 	if (!ioa_cfg->allow_interrupts) {
-		ipr_trace;
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return IRQ_NONE;
 	}
@@ -3097,7 +3116,6 @@ static irqreturn_t ipr_isr(int irq, void *devp, struct pt_regs *regs)
 
 	/* If an interrupt on the adapter did not occur, ignore it */
 	if (unlikely((int_reg & IPR_PCII_OPER_INTERRUPTS) == 0)) {
-		ipr_trace;
 		spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 		return IRQ_NONE;
 	}
@@ -3119,6 +3137,7 @@ static irqreturn_t ipr_isr(int irq, void *devp, struct pt_regs *regs)
 					ioa_cfg->sdt_state = GET_DUMP;
 
 				ipr_initiate_ioa_reset(ioa_cfg, IPR_SHUTDOWN_NONE);
+				spin_unlock_irqrestore(ioa_cfg->host->host_lock, lock_flags);
 				return IRQ_HANDLED;
 			}
 
@@ -3189,12 +3208,11 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 
 		if (scsi_cmd->sc_data_direction == DMA_TO_DEVICE) {
 			ioadl_flags = IPR_IOADL_FLAGS_WRITE;
-			ioarcb->cmd_pkt.write_not_read = 1;
+			ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_WRITE_NOT_READ;
 			ioarcb->write_data_transfer_length = cpu_to_be32(length);
 			ioarcb->write_ioadl_len =
 				cpu_to_be32(sizeof(struct ipr_ioadl_desc) * ipr_cmd->dma_use_sg);
-		}
-		else if (scsi_cmd->sc_data_direction == DMA_FROM_DEVICE) {
+		} else if (scsi_cmd->sc_data_direction == DMA_FROM_DEVICE) {
 			ioadl_flags = IPR_IOADL_FLAGS_READ;
 			ioarcb->read_data_transfer_length = cpu_to_be32(length);
 			ioarcb->read_ioadl_len =
@@ -3206,7 +3224,6 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 		for (i = 0; i < ipr_cmd->dma_use_sg; i++) {
 			ioadl[i].flags_and_data_len =
 				cpu_to_be32(ioadl_flags | sg_dma_len(&sglist[i]));
-
 			ioadl[i].address =
 				cpu_to_be32(sg_dma_address(&sglist[i]));
 		}
@@ -3214,22 +3231,19 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 		if (likely(ipr_cmd->dma_use_sg)) {
 			ioadl[i-1].flags_and_data_len |=
 				cpu_to_be32(IPR_IOADL_FLAGS_LAST);
-		}
-		else
+			return 0;
+		} else
 			dev_err(&ioa_cfg->pdev->dev, "pci_map_sg failed!\n");
 	} else {
 		if (scsi_cmd->sc_data_direction == DMA_TO_DEVICE) {
 			ioadl_flags = IPR_IOADL_FLAGS_WRITE;
-			ioarcb->cmd_pkt.write_not_read = 1;
+			ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_WRITE_NOT_READ;
 			ioarcb->write_data_transfer_length = cpu_to_be32(length);
-			ioarcb->write_ioadl_len =
-				cpu_to_be32(sizeof(struct ipr_ioadl_desc) * ipr_cmd->dma_use_sg);
-		}
-		else if (scsi_cmd->sc_data_direction == DMA_FROM_DEVICE) {
+			ioarcb->write_ioadl_len = cpu_to_be32(sizeof(struct ipr_ioadl_desc));
+		} else if (scsi_cmd->sc_data_direction == DMA_FROM_DEVICE) {
 			ioadl_flags = IPR_IOADL_FLAGS_READ;
 			ioarcb->read_data_transfer_length = cpu_to_be32(length);
-			ioarcb->read_ioadl_len =
-				cpu_to_be32(sizeof(struct ipr_ioadl_desc) * ipr_cmd->dma_use_sg);
+			ioarcb->read_ioadl_len = cpu_to_be32(sizeof(struct ipr_ioadl_desc));
 		}
 
 		ipr_cmd->dma_handle = pci_map_single(ioa_cfg->pdev,
@@ -3238,17 +3252,13 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 
 		if (likely(!pci_dma_error(ipr_cmd->dma_handle))) {
 			ipr_cmd->dma_use_sg = 1;
-
 			ioadl[0].flags_and_data_len =
 				cpu_to_be32(ioadl_flags | length | IPR_IOADL_FLAGS_LAST);
-
 			ioadl[0].address = cpu_to_be32(ipr_cmd->dma_handle);
+			return 0;
 		} else
 			dev_err(&ioa_cfg->pdev->dev, "pci_map_single failed!\n");
 	}
-
-	if (ipr_cmd->dma_use_sg)
-		return 0;
 
 	return -1;
 }
@@ -3263,18 +3273,18 @@ static int ipr_build_ioadl(struct ipr_ioa_cfg *ioa_cfg,
 static u8 ipr_get_task_attributes(struct scsi_cmnd *scsi_cmd)
 {
 	u8 tag[2];
-	u8 rc = IPR_UNTAGGED_TASK;
+	u8 rc = IPR_FLAGS_LO_UNTAGGED_TASK;
 
 	if (scsi_populate_tag_msg(scsi_cmd, tag)) {
 		switch (tag[0]) {
 		case MSG_SIMPLE_TAG:
-			rc = IPR_SIMPLE_TASK;
+			rc = IPR_FLAGS_LO_SIMPLE_TASK;
 			break;
 		case MSG_HEAD_TAG:
-			rc = IPR_HEAD_OF_Q_TASK;
+			rc = IPR_FLAGS_LO_HEAD_OF_Q_TASK;
 			break;
 		case MSG_ORDERED_TAG:
-			rc = IPR_ORDERED_TASK;
+			rc = IPR_FLAGS_LO_ORDERED_TASK;
 			break;
 		};
 	}
@@ -3287,7 +3297,7 @@ static u8 ipr_get_task_attributes(struct scsi_cmnd *scsi_cmd)
  * @ipr_cmd:		ipr command struct
  *
  * This function copies the sense buffer into the scsi_cmd
- * struct and pushes the scsi_done function. 
+ * struct and pushes the scsi_done function.
  *
  * Return value:
  * 	nothing
@@ -3343,7 +3353,7 @@ static void ipr_reinit_ipr_cmnd_for_erp(struct ipr_cmnd *ipr_cmd)
  * @ipr_cmd:	ipr command struct
  *
  * This function sends a request sense to a device as a result
- * of a check condition. 
+ * of a check condition.
  *
  * Return value:
  * 	nothing
@@ -3351,18 +3361,14 @@ static void ipr_reinit_ipr_cmnd_for_erp(struct ipr_cmnd *ipr_cmd)
 static void ipr_erp_request_sense(struct ipr_cmnd *ipr_cmd)
 {
 	struct ipr_cmd_pkt *cmd_pkt = &ipr_cmd->ioarcb.cmd_pkt;
-	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
-
-	/* xxx remove after testing this. should never happen */
-	BUG_ON(IPR_IOASC_SENSE_KEY(ioasc) > 0);
 
 	ipr_reinit_ipr_cmnd_for_erp(ipr_cmd);
 
 	cmd_pkt->request_type = IPR_RQTYPE_SCSICDB;
 	cmd_pkt->cdb[0] = REQUEST_SENSE;
 	cmd_pkt->cdb[4] = SCSI_SENSE_BUFFERSIZE;
-	cmd_pkt->sync_override = 1;
-	cmd_pkt->no_underlength_checking = 1;
+	cmd_pkt->flags_hi |= IPR_FLAGS_HI_SYNC_OVERRIDE;
+	cmd_pkt->flags_hi |= IPR_FLAGS_HI_NO_ULEN_CHK;
 	cmd_pkt->timeout = cpu_to_be16(IPR_REQUEST_SENSE_TIMEOUT / HZ);
 
 	ipr_cmd->ioadl[0].flags_and_data_len =
@@ -3442,10 +3448,6 @@ static void ipr_dump_ioasa(struct ipr_ioa_cfg *ioa_cfg,
 	error_index = ipr_get_error(ioasc);
 
 	if (ioa_cfg->log_level < IPR_MAX_LOG_LEVEL) {
-		/* Don't dump recovered errors */
-		if (IPR_IOASC_SENSE_KEY(ioasc) < 2)
-			return;
-
 		/* Don't log an error if the IOA already logged one */
 		if (ioasa->ilid != 0)
 			return;
@@ -3485,7 +3487,7 @@ static void ipr_dump_ioasa(struct ipr_ioa_cfg *ioa_cfg,
  * ipr_gen_sense - Generate SCSI sense data from an IOASA
  * @ioasa:		IOASA
  * @sense_buf:	sense data buffer
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -3493,6 +3495,7 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 {
 	u32 failing_lba;
 	u8 *sense_buf = ipr_cmd->scsi_cmd->sense_buffer;
+	struct ipr_resource_entry *res = ipr_cmd->scsi_cmd->device->hostdata;
 	struct ipr_ioasa *ioasa = &ipr_cmd->ioasa;
 	u32 ioasc = be32_to_cpu(ioasa->ioasc);
 
@@ -3503,8 +3506,9 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 
 	ipr_cmd->scsi_cmd->result = SAM_STAT_CHECK_CONDITION;
 
-	if ((ioasc == IPR_IOASC_MED_DO_NOT_REALLOC) &&
-	    (ioasa->vset.failing_lba_hi != 0)) {
+	if (ipr_is_vset_device(res) &&
+	    ioasc == IPR_IOASC_MED_DO_NOT_REALLOC &&
+	    ioasa->vset.failing_lba_hi != 0) {
 		sense_buf[0] = 0x72;
 		sense_buf[1] = IPR_IOASC_SENSE_KEY(ioasc);
 		sense_buf[2] = IPR_IOASC_SENSE_CODE(ioasc);
@@ -3553,7 +3557,10 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
 			     be32_to_cpu(ioasa->ioasc_specific)) & 0xff;
 		} else {
 			if (ioasc == IPR_IOASC_MED_DO_NOT_REALLOC) {
-				failing_lba = be32_to_cpu(ioasa->vset.failing_lba_lo);
+				if (ipr_is_vset_device(res))
+					failing_lba = be32_to_cpu(ioasa->vset.failing_lba_lo);
+				else
+					failing_lba = be32_to_cpu(ioasa->dasd.failing_lba);
 
 				sense_buf[0] |= 0x80;	/* Or in the Valid bit */
 				sense_buf[3] = (failing_lba & 0xff000000) >> 24;
@@ -3573,7 +3580,7 @@ static void ipr_gen_sense(struct ipr_cmnd *ipr_cmd)
  * @ipr_cmd:	ipr command struct
  *
  * This function determines whether or not to initiate ERP
- * on the affected device. 
+ * on the affected device.
  *
  * Return value:
  * 	nothing
@@ -3585,7 +3592,6 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 	struct ipr_resource_entry *res = scsi_cmd->device->hostdata;
 	u32 ioasc = be32_to_cpu(ipr_cmd->ioasa.ioasc);
 
-	/* xxx */
 	if (!res) {
 		ipr_scsi_eh_done(ipr_cmd);
 		return;
@@ -3597,8 +3603,6 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 		ipr_gen_sense(ipr_cmd);
 
 	switch (ioasc & IPR_IOASC_IOASC_MASK) {
-	case IPR_IOASC_NR_ACA_ACTIVE:
-	case IPR_IOASC_RCV_DEV_BUS_MSG_RECEIVED:
 	case IPR_IOASC_ABORTED_CMD_TERM_BY_HOST:
 		scsi_cmd->result |= (DID_ERROR << 16);
 		break;
@@ -3632,10 +3636,12 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
 		res->needs_sync_complete = 1;
 		break;
 	case IPR_IOASC_HW_DEV_BUS_STATUS:
-		ipr_trace;
 		scsi_cmd->result |= IPR_IOASC_SENSE_STATUS(ioasc);
-		ipr_erp_cancel_all(ipr_cmd);
-		return;
+		if (IPR_IOASC_SENSE_STATUS(ioasc) == SAM_STAT_CHECK_CONDITION) {
+			ipr_erp_cancel_all(ipr_cmd);
+			return;
+		}
+		break;
 	case IPR_IOASC_NR_INIT_CMD_REQUIRED:
 		break;
 	default:
@@ -3655,7 +3661,7 @@ static void ipr_erp_start(struct ipr_ioa_cfg *ioa_cfg,
  * @ipr_cmd:	ipr command struct
  *
  * This function is invoked by the interrupt handler for
- * ops generated by the SCSI mid-layer 
+ * ops generated by the SCSI mid-layer
  *
  * Return value:
  * 	none
@@ -3672,7 +3678,7 @@ static void ipr_scsi_done(struct ipr_cmnd *ipr_cmd)
 		ipr_unmap_sglist(ioa_cfg, ipr_cmd);
 		list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 		scsi_cmd->scsi_done(scsi_cmd);
-	} else 
+	} else
 		ipr_erp_start(ioa_cfg, ipr_cmd);
 }
 
@@ -3685,7 +3691,7 @@ static void ipr_scsi_done(struct ipr_cmnd *ipr_cmd)
  * use following an adapter reset.
  *
  * Return value:
- *	0 on success / -ENOMEM on failure
+ *	0 on success / SCSI_MLQUEUE_HOST_BUSY on failure
  **/
 static int ipr_save_ioafp_mode_select(struct ipr_ioa_cfg *ioa_cfg,
 				       struct scsi_cmnd *scsi_cmd)
@@ -3696,7 +3702,7 @@ static int ipr_save_ioafp_mode_select(struct ipr_ioa_cfg *ioa_cfg,
 		if (!ioa_cfg->saved_mode_pages) {
 			dev_err(&ioa_cfg->pdev->dev,
 				"IOA mode select buffer allocation failed\n");
-			return -ENOMEM;
+			return SCSI_MLQUEUE_HOST_BUSY;
 		}
 	}
 
@@ -3733,17 +3739,18 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 	res = scsi_cmd->device->hostdata;
 	scsi_cmd->result = (DID_OK << 16);
 
-	if (unlikely(!ioa_cfg->allow_cmds)) {
-		/*
-		 * We are currently blocking all devices due to a host reset 
-		 * We have told the host to stop giving us new requests, but
-		 * retries on failed ops don't count. xxx may be able to remove
-		 */
-		ipr_trace;
-		return 0;
-	}
+	/*
+	 * We are currently blocking all devices due to a host reset
+	 * We have told the host to stop giving us new requests, but
+	 * ERP ops don't count. FIXME
+	 */
+	if (unlikely(!ioa_cfg->allow_cmds))
+		return SCSI_MLQUEUE_HOST_BUSY;
 
-	/* xxx can I remove some of these checks? */
+	/*
+	 * FIXME - Create scsi_set_device_offline, scsi_set_host_offline
+	 * interfaces and we can remove some of these checks
+	 */
 	if (unlikely(ioa_cfg->ioa_is_dead || !res || res->del_from_ml)) {
 		memset(scsi_cmd->sense_buffer, 0, SCSI_SENSE_BUFFERSIZE);
 		scsi_cmd->result = (DID_NO_CONNECT << 16);
@@ -3761,7 +3768,7 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 
 	/*
 	 * Double the timeout value to use as we will use the adapter
-	 * as the primary timing mechanism
+	 * as the primary timing mechanism. FIXME
 	 */
 	timeout_func = (void (*)(struct scsi_cmnd *)) scsi_cmd->eh_timeout.function;
 	timeout = scsi_cmd->timeout_per_command;
@@ -3779,23 +3786,23 @@ static int ipr_queuecommand(struct scsi_cmnd *scsi_cmd,
 		}
 
 		if (scsi_cmd->underflow == 0)
-			ioarcb->cmd_pkt.no_underlength_checking = 1;
+			ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_NO_ULEN_CHK;
 
 		if (res->needs_sync_complete) {
-			ioarcb->cmd_pkt.sync_complete = 1;
+			ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_SYNC_COMPLETE;
 			res->needs_sync_complete = 0;
 		}
 
-		ioarcb->cmd_pkt.ext_delay_after_reset = 1;
-		ioarcb->cmd_pkt.aligned_client_buffer = 1;
-		ioarcb->cmd_pkt.no_link_descriptors = 1;
-		ioarcb->cmd_pkt.task_attributes = ipr_get_task_attributes(scsi_cmd);
+		ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_NO_LINK_DESC;
+		ioarcb->cmd_pkt.flags_lo |= IPR_FLAGS_LO_DELAY_AFTER_RST;
+		ioarcb->cmd_pkt.flags_lo |= IPR_FLAGS_LO_ALIGNED_BFR;
+		ioarcb->cmd_pkt.flags_lo |= ipr_get_task_attributes(scsi_cmd);
 	}
 
 	if (!ipr_is_gscsi(res) && scsi_cmd->cmnd[0] >= 0xC0)
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
-	if (res->cfgte.is_ioa_resource && scsi_cmd->cmnd[0] == MODE_SELECT)
+	if (ipr_is_ioa_resource(res) && scsi_cmd->cmnd[0] == MODE_SELECT)
 		rc = ipr_save_ioafp_mode_select(ioa_cfg, scsi_cmd);
 
 	if (likely(rc == 0))
@@ -3876,7 +3883,7 @@ static const u16 ipr_blocked_processors[] = {
  * Adapters that use Gemstone revision < 3.1 do not work reliably on
  * certain pSeries hardware. This function determines if the given
  * adapter is in one of these confgurations or not.
- * 
+ *
  * Return value:
  * 	1 if adapter is not supported / 0 if adapter is supported
  **/
@@ -3923,7 +3930,7 @@ static int ipr_ioa_bringdown_done(struct ipr_cmnd *ipr_cmd)
 	wake_up_all(&ioa_cfg->reset_wait_q);
 
 	spin_unlock_irq(ioa_cfg->host->host_lock);
-	scsi_unblock_requests(ioa_cfg->host); 
+	scsi_unblock_requests(ioa_cfg->host);
 	spin_lock_irq(ioa_cfg->host->host_lock);
 	LEAVE;
 
@@ -3946,6 +3953,7 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 	struct ipr_ioa_cfg *ioa_cfg = ipr_cmd->ioa_cfg;
 	struct ipr_resource_entry *res;
 	struct ipr_hostrcb *hostrcb, *temp;
+	int i = 0;
 
 	ENTER;
 	ioa_cfg->in_reset_reload = 0;
@@ -3962,10 +3970,10 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 
 	list_for_each_entry_safe(hostrcb, temp, &ioa_cfg->hostrcb_free_q, queue) {
 		list_del(&hostrcb->queue);
-		if (hostrcb->op_code == IPR_HOST_RCB_OP_CODE_CONFIG_CHANGE)
-			ipr_send_hcam(ioa_cfg, IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE, hostrcb);
-		else
+		if (i++ < IPR_NUM_LOG_HCAMS)
 			ipr_send_hcam(ioa_cfg, IPR_HCAM_CDB_OP_CODE_LOG_DATA, hostrcb);
+		else
+			ipr_send_hcam(ioa_cfg, IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE, hostrcb);
 	}
 
 	dev_info(&ioa_cfg->pdev->dev, "IOA initialized.\n");
@@ -3973,9 +3981,6 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
 	ioa_cfg->reset_retries = 0;
 	list_add_tail(&ipr_cmd->queue, &ioa_cfg->free_q);
 	wake_up_all(&ioa_cfg->reset_wait_q);
-
-	if (ioa_cfg->sdt_state == DUMP_OBTAINED)
-		schedule_work(&ioa_cfg->work_q);
 
 	spin_unlock_irq(ioa_cfg->host->host_lock);
 	scsi_unblock_requests(ioa_cfg->host);
@@ -3992,7 +3997,7 @@ static int ipr_ioa_reset_done(struct ipr_cmnd *ipr_cmd)
  * ipr_set_sup_dev_dflt - Initialize a Set Supported Device buffer
  * @supported_dev:	supported device struct
  * @vpids:			vendor product id struct
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -4012,7 +4017,7 @@ static void ipr_set_sup_dev_dflt(struct ipr_supported_device *supported_dev,
  * @ipr_cmd:	ipr command struct
  *
  * This function send a Set Supported Devices to the adapter
- *  
+ *
  * Return value:
  * 	IPR_RC_JOB_CONTINUE / IPR_RC_JOB_RETURN
  **/
@@ -4034,7 +4039,7 @@ static int ipr_set_supported_devs(struct ipr_cmnd *ipr_cmd)
 		ipr_set_sup_dev_dflt(supp_dev, &res->cfgte.std_inq_data.vpids);
 
 		ioarcb->res_handle = cpu_to_be32(IPR_IOA_RES_HANDLE);
-		ioarcb->cmd_pkt.write_not_read = 1;
+		ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_WRITE_NOT_READ;
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_IOACMD;
 
 		ioarcb->cmd_pkt.cdb[0] = IPR_SET_SUPPORTED_DEVICES;
@@ -4083,7 +4088,7 @@ static void *ipr_get_mode_page(struct ipr_mode_pages *mode_pages,
 		(mode_pages->data + mode_pages->hdr.block_desc_len);
 
 	while (length) {
-		if (mode_hdr->page_code == page_code) {
+		if (IPR_GET_MODE_PAGE_CODE(mode_hdr) == page_code) {
 			if (mode_hdr->page_length >= (len - sizeof(struct ipr_mode_page_hdr)))
 				return mode_hdr;
 			break;
@@ -4104,7 +4109,7 @@ static void *ipr_get_mode_page(struct ipr_mode_pages *mode_pages,
  * @mode_pages:	IOAFP mode pages buffer
  *
  * Check the IOAFP's mode page 28 for term power errors
- * 
+ *
  * Return value:
  * 	nothing
  **/
@@ -4124,7 +4129,7 @@ static void ipr_check_term_power(struct ipr_ioa_cfg *ioa_cfg,
 	bus = mode_page->bus;
 
 	for (i = 0; i < mode_page->num_entries; i++) {
-		if (bus->term_power_absent) {
+		if (bus->flags & IPR_SCSI_ATTR_NO_TERM_PWR) {
 			dev_err(&ioa_cfg->pdev->dev,
 				"Term power is absent on scsi bus %d\n",
 				bus->res_addr.bus);
@@ -4141,7 +4146,7 @@ static void ipr_check_term_power(struct ipr_ioa_cfg *ioa_cfg,
  * Looks through the config table checking for SES devices. If
  * the SES device is in the SES table indicating a maximum SCSI
  * bus speed, the speed is limited for the bus.
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -4165,7 +4170,7 @@ static void ipr_scsi_bus_speed_limit(struct ipr_ioa_cfg *ioa_cfg)
  * @mode_pages:	mode page 28 buffer
  *
  * Updates mode page 28 based on driver configuration
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -4198,9 +4203,9 @@ static void ipr_modify_ioafp_mode_page_28(struct ipr_ioa_cfg *ioa_cfg,
 		bus->bus_width = bus_attr->bus_width;
 		bus->max_xfer_rate = cpu_to_be32(bus_attr->max_xfer_rate);
 		if (bus_attr->qas_enabled)
-			bus->qas_capability = IPR_MODEPAGE28_QAS_CAPABILITY_ENABLE_ALL;
+			bus->flags |= IPR_SCSI_ATTR_ENABLE_QAS;
 		else
-			bus->qas_capability = IPR_MODEPAGE28_QAS_CAPABILITY_DISABLE_ALL;
+			bus->flags |= IPR_SCSI_ATTR_DISABLE_QAS;
 	}
 }
 
@@ -4224,7 +4229,7 @@ static void ipr_build_mode_select(struct ipr_cmnd *ipr_cmd,
 
 	ioarcb->res_handle = res_handle;
 	ioarcb->cmd_pkt.request_type = IPR_RQTYPE_SCSICDB;
-	ioarcb->cmd_pkt.write_not_read = 1;
+	ioarcb->cmd_pkt.flags_hi |= IPR_FLAGS_HI_WRITE_NOT_READ;
 	ioarcb->cmd_pkt.cdb[0] = MODE_SELECT;
 	ioarcb->cmd_pkt.cdb[1] = parm;
 	ioarcb->cmd_pkt.cdb[4] = xfer_len;
@@ -4256,14 +4261,14 @@ static int ipr_ioafp_mode_select_page28(struct ipr_cmnd *ipr_cmd)
 	if (ioa_cfg->saved_mode_pages) {
 		memcpy(mode_pages, ioa_cfg->saved_mode_pages,
 		       ioa_cfg->saved_mode_page_len);
+		length = ioa_cfg->saved_mode_page_len;
 	} else {
 		ipr_scsi_bus_speed_limit(ioa_cfg);
 		ipr_check_term_power(ioa_cfg, mode_pages);
 		ipr_modify_ioafp_mode_page_28(ioa_cfg, mode_pages);
+		length = mode_pages->hdr.length + 1;
+		mode_pages->hdr.length = 0;
 	}
-
-	length = mode_pages->hdr.length + 1;
-	mode_pages->hdr.length = 0;
 
 	ipr_build_mode_select(ipr_cmd, cpu_to_be32(IPR_IOA_RES_HANDLE), 0x11,
 			      ioa_cfg->vpd_cbs_dma + offsetof(struct ipr_misc_cbs, mode_pages),
@@ -4359,7 +4364,7 @@ static int ipr_init_res_table(struct ipr_cmnd *ipr_cmd)
 	LIST_HEAD(old_res);
 
 	ENTER;
-	if (ioa_cfg->cfg_table->hdr.ucode_download_req)
+	if (ioa_cfg->cfg_table->hdr.flags & IPR_UCODE_DOWNLOAD_REQ)
 		dev_err(&ioa_cfg->pdev->dev, "Microcode download required\n");
 
 	list_for_each_entry_safe(res, temp, &ioa_cfg->used_res_q, queue)
@@ -4384,6 +4389,7 @@ static int ipr_init_res_table(struct ipr_cmnd *ipr_cmd)
 				break;
 			}
 
+			found = 1;
 			res = list_entry(ioa_cfg->free_res_q.next,
 					 struct ipr_resource_entry, queue);
 			list_move_tail(&res->queue, &ioa_cfg->used_res_q);
@@ -4394,16 +4400,17 @@ static int ipr_init_res_table(struct ipr_cmnd *ipr_cmd)
 			}
 		}
 
-		memcpy(&res->cfgte, cfgte, sizeof(struct ipr_config_table_entry));
+		if (found)
+			memcpy(&res->cfgte, cfgte, sizeof(struct ipr_config_table_entry));
 	}
 
 	list_for_each_entry_safe(res, temp, &old_res, queue) {
-		if (ioa_cfg->allow_ml_add_del) {
+		if (ioa_cfg->allow_ml_add_del && res->sdev) {
 			ipr_trace;
 			res->del_from_ml = 1;
 			list_move_tail(&res->queue, &ioa_cfg->used_res_q);
 		} else {
-			ipr_trace;
+			list_move_tail(&res->queue, &ioa_cfg->free_res_q);
 		}
 	}
 
@@ -4549,7 +4556,7 @@ static int ipr_ioafp_std_inquiry(struct ipr_cmnd *ipr_cmd)
  * @ipr_cmd:	ipr command struct
  *
  * This function send an Identify Host Request Response Queue
- * command to establish the HRRQ with the adapter. 
+ * command to establish the HRRQ with the adapter.
  *
  * Return value:
  * 	IPR_RC_JOB_RETURN
@@ -4650,8 +4657,6 @@ static void ipr_reset_start_timer(struct ipr_cmnd *ipr_cmd,
  **/
 static void ipr_init_ioa_mem(struct ipr_ioa_cfg *ioa_cfg)
 {
-	struct ipr_hostrcb *hostrcb, *temp;
-
 	memset(ioa_cfg->host_rrq, 0, sizeof(u32) * IPR_NUM_CMD_BLKS);
 
 	/* Initialize Host RRQ pointers */
@@ -4662,13 +4667,6 @@ static void ipr_init_ioa_mem(struct ipr_ioa_cfg *ioa_cfg)
 
 	/* Zero out config table */
 	memset(ioa_cfg->cfg_table, 0, sizeof(struct ipr_config_table));
-
-	/*
-	 * Hostrcbs outstanding to the adapter never come back, so
-	 * we need to place them back on the free queue
-	 */
-	list_for_each_entry_safe(hostrcb, temp, &ioa_cfg->hostrcb_pending_q, queue)
-		list_move_tail(&hostrcb->queue, &ioa_cfg->hostrcb_free_q);
 }
 
 /**
@@ -4676,7 +4674,7 @@ static void ipr_init_ioa_mem(struct ipr_ioa_cfg *ioa_cfg)
  * @ipr_cmd:	ipr command struct
  *
  * This function reinitializes some control blocks and
- * enables destructive diagnostics on the adapter. 
+ * enables destructive diagnostics on the adapter.
  *
  * Return value:
  * 	IPR_RC_JOB_RETURN
@@ -4763,7 +4761,6 @@ static void ipr_get_unit_check_buffer(struct ipr_ioa_cfg *ioa_cfg)
 	struct ipr_hostrcb *hostrcb;
 	struct ipr_uc_sdt sdt;
 	int rc, length;
-	u8 op_code;
 
 	mailbox = readl(ioa_cfg->ioa_mailbox);
 
@@ -4777,7 +4774,7 @@ static void ipr_get_unit_check_buffer(struct ipr_ioa_cfg *ioa_cfg)
 					(sizeof(struct ipr_uc_sdt)) / sizeof(u32));
 
 	if (rc || (be32_to_cpu(sdt.hdr.state) != IPR_FMT2_SDT_READY_TO_USE) ||
-	    (sdt.entry[0].bar_str_offset == 0) || !sdt.entry[0].valid_entry) {
+	    !(sdt.entry[0].flags & IPR_SDT_VALID_ENTRY)) {
 		ipr_unit_check_no_data(ioa_cfg);
 		return;
 	}
@@ -4786,25 +4783,21 @@ static void ipr_get_unit_check_buffer(struct ipr_ioa_cfg *ioa_cfg)
 	length = (be32_to_cpu(sdt.entry[0].end_offset) -
 		  be32_to_cpu(sdt.entry[0].bar_str_offset)) & IPR_FMT2_MBX_ADDR_MASK;
 
-	/* xxx try to remove the reliance on op_code in hostrcb.
-	 Possibly define a structure for the actual hostrcb */
 	hostrcb = list_entry(ioa_cfg->hostrcb_free_q.next,
 			     struct ipr_hostrcb, queue);
 	list_del(&hostrcb->queue);
-	op_code = hostrcb->op_code;
-	memset(hostrcb, 0, 1024);
+	memset(hostrcb, 0, sizeof(*hostrcb));
 
 	rc = ipr_get_ldump_data_section(ioa_cfg,
 					be32_to_cpu(sdt.entry[0].bar_str_offset),
 					(u32 *)hostrcb,
-					min(length, 1024) / sizeof(u32));
+					min(length, (int)(sizeof(*hostrcb) / sizeof(u32))));
 
 	if (!rc)
 		ipr_handle_log_data(ioa_cfg, hostrcb);
 	else
 		ipr_unit_check_no_data(ioa_cfg);
 
-	hostrcb->op_code = op_code;
 	list_add_tail(&hostrcb->queue, &ioa_cfg->hostrcb_free_q);
 }
 
@@ -4897,7 +4890,7 @@ static int ipr_reset_start_bist(struct ipr_cmnd *ipr_cmd)
 /**
  * ipr_reset_allowed - Query whether or not IOA can be reset
  * @ioa_cfg:	ioa config struct
- * 
+ *
  * Return value:
  * 	0 if reset not allowed / non-zero if reset is allowed
  **/
@@ -4941,15 +4934,16 @@ static int ipr_reset_wait_to_start_bist(struct ipr_cmnd *ipr_cmd)
 }
 
 /**
- * ipr_reset_alert - Alert the adapter of a pending reset
+ * ipr_reset_alert_part2 - Alert the adapter of a pending reset
  * @ipr_cmd:	ipr command struct
  *
  * Description: This function alerts the adapter that it will be reset.
  * If memory space is not currently enabled, proceed directly
- * to running BIST on the adapter.
+ * to running BIST on the adapter. The timer must always be started
+ * so we guarantee we do not run BIST from ipr_isr.
  *
  * Return value:
- * 	IPR_RC_JOB_CONTINUE / IPR_RC_JOB_RETURN
+ * 	IPR_RC_JOB_RETURN
  **/
 static int ipr_reset_alert(struct ipr_cmnd *ipr_cmd)
 {
@@ -4963,14 +4957,16 @@ static int ipr_reset_alert(struct ipr_cmnd *ipr_cmd)
 	if ((rc == PCIBIOS_SUCCESSFUL) && (cmd_reg & PCI_COMMAND_MEMORY)) {
 		ipr_mask_and_clear_all_interrupts(ioa_cfg);
 		writel(IPR_UPROCI_RESET_ALERT, ioa_cfg->regs.set_uproc_interrupt_reg);
-		ipr_cmd->time_left = IPR_WAIT_FOR_RESET_TIMEOUT;
 		ipr_cmd->job_step = ipr_reset_wait_to_start_bist;
 	} else {
 		ipr_cmd->job_step = ipr_reset_start_bist;
 	}
 
+	ipr_cmd->time_left = IPR_WAIT_FOR_RESET_TIMEOUT;
+	ipr_reset_start_timer(ipr_cmd, IPR_CHECK_FOR_RESET_TIMEOUT);
+
 	LEAVE;
-	return IPR_RC_JOB_CONTINUE;	
+	return IPR_RC_JOB_RETURN;
 }
 
 /**
@@ -4980,7 +4976,7 @@ static int ipr_reset_alert(struct ipr_cmnd *ipr_cmd)
  * Description: This function unmaps the microcode download buffer.
  *
  * Return value:
- * 	IPR_RC_JOB_CONTINUE / IPR_RC_JOB_RETURN
+ * 	IPR_RC_JOB_CONTINUE
  **/
 static int ipr_reset_ucode_download_done(struct ipr_cmnd *ipr_cmd)
 {
@@ -5066,7 +5062,7 @@ static int ipr_reset_shutdown_ioa(struct ipr_cmnd *ipr_cmd)
 		if (shutdown_type == IPR_SHUTDOWN_ABBREV)
 			timeout = IPR_ABBREV_SHUTDOWN_TIMEOUT;
 		else if (shutdown_type == IPR_SHUTDOWN_PREPARE_FOR_NORMAL)
-			timeout = IPR_SHUTDOWN_TIMEOUT;
+			timeout = IPR_INTERNAL_TIMEOUT;
 		else
 			timeout = IPR_SHUTDOWN_TIMEOUT;
 
@@ -5109,7 +5105,7 @@ static void ipr_reset_ioa_job(struct ipr_cmnd *ipr_cmd)
 		}
 
 		if (ioasc) {
-			dev_err(&ioa_cfg->pdev->dev, /* xxx dev_dbg */
+			dev_dbg(&ioa_cfg->pdev->dev,
 				"0x%02X failed with IOASC: 0x%08X\n",
 				ipr_cmd->ioarcb.cmd_pkt.cdb[0], ioasc);
 
@@ -5416,12 +5412,6 @@ static int __devinit ipr_alloc_mem(struct ipr_ioa_cfg *ioa_cfg)
 
 		memset(ioa_cfg->hostrcb[i], 0, sizeof(struct ipr_hostrcb));
 		ioa_cfg->hostrcb[i]->hostrcb_dma = ioa_cfg->hostrcb_dma[i];
-
-		if (i < IPR_NUM_LOG_HCAMS)
-			ioa_cfg->hostrcb[i]->op_code = IPR_HOST_RCB_OP_CODE_LOG_DATA;
-		else
-			ioa_cfg->hostrcb[i]->op_code = IPR_HOST_RCB_OP_CODE_CONFIG_CHANGE;
-
 		list_add_tail(&ioa_cfg->hostrcb[i]->queue, &ioa_cfg->hostrcb_free_q);
 	}
 
@@ -5433,8 +5423,6 @@ static int __devinit ipr_alloc_mem(struct ipr_ioa_cfg *ioa_cfg)
 
 	memset(ioa_cfg->trace, 0,
 	       sizeof(struct ipr_trace_entry) * IPR_NUM_TRACE_ENTRIES);
-
-	ioa_cfg->trace_index = 0;
 
 	LEAVE;
 	return 0;
@@ -5461,10 +5449,10 @@ static void __devinit ipr_initialize_bus_attr(struct ipr_ioa_cfg *ioa_cfg)
 		ioa_cfg->bus_attr[i].bus = i;
 		ioa_cfg->bus_attr[i].qas_enabled = 0;
 		ioa_cfg->bus_attr[i].bus_width = IPR_DEFAULT_BUS_WIDTH;
-		if (ipr_safe_settings)
-			ioa_cfg->bus_attr[i].max_xfer_rate = IPR_SAFE_SCSI_RATE;
+		if (ipr_max_speed < ARRAY_SIZE(ipr_max_bus_speeds))
+			ioa_cfg->bus_attr[i].max_xfer_rate = ipr_max_bus_speeds[ipr_max_speed];
 		else
-			ioa_cfg->bus_attr[i].max_xfer_rate = IPR_DEFAULT_SCSI_RATE;
+			ioa_cfg->bus_attr[i].max_xfer_rate = IPR_U160_SCSI_RATE;
 	}
 }
 
@@ -5581,7 +5569,7 @@ static int __devinit ipr_probe_ioa(struct pci_dev *pdev,
 		scsi_host_put(host);
 		return -ENOMEM;
 	}
-	
+
 	ioa_cfg->hdw_dma_regs = ipr_regs;
 	ioa_cfg->hdw_dma_regs_pci = ipr_regs_pci;
 	ioa_cfg->ioa_mailbox = ioa_cfg->chip_cfg->mailbox + ipr_regs;
@@ -5700,7 +5688,7 @@ static void ipr_initiate_ioa_bringdown(struct ipr_ioa_cfg *ioa_cfg,
  * @pdev:	pci device struct
  *
  * Adapter hot plug remove entry point.
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -5735,7 +5723,7 @@ static void __ipr_remove(struct pci_dev *pdev)
  * @pdev:	pci device struct
  *
  * Adapter hot plug remove entry point.
- * 
+ *
  * Return value:
  * 	none
  **/
@@ -5768,7 +5756,6 @@ static int __devinit ipr_probe(struct pci_dev *pdev,
 			       const struct pci_device_id *dev_id)
 {
 	struct ipr_ioa_cfg *ioa_cfg;
-	unsigned long host_lock_flags = 0;
 	int rc;
 
 	rc = ipr_probe_ioa(pdev, dev_id);
@@ -5811,10 +5798,7 @@ static int __devinit ipr_probe(struct pci_dev *pdev,
 		return rc;
 	}
 
-	spin_lock_irqsave(ioa_cfg->host->host_lock, host_lock_flags);
 	ioa_cfg->allow_ml_add_del = 1;
-	spin_unlock_irqrestore(ioa_cfg->host->host_lock, host_lock_flags);
-
 	scsi_scan_host(ioa_cfg->host);
 	ipr_scan_vsets(ioa_cfg);
 	scsi_add_device(ioa_cfg->host, IPR_IOA_BUS, IPR_IOA_TARGET, IPR_IOA_LUN);
@@ -5886,7 +5870,7 @@ static int __init ipr_init(void)
  * ipr_exit - Module unload
  *
  * Module unload entry point.
- * 
+ *
  * Return value:
  * 	none
  **/
