@@ -273,5 +273,5 @@ config GCOV
 
 endmenu
 
-source "suse/Kconfig"
+source "rpmify/Kconfig"
 

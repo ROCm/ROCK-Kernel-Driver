@@ -921,5 +921,5 @@ source "security/Kconfig"
 
 source "crypto/Kconfig"
 
-source "suse/Kconfig"
+source "rpmify/Kconfig"
 

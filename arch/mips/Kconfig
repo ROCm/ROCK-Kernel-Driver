@@ -1239,5 +1239,5 @@ source "crypto/Kconfig"
 
 source "lib/Kconfig"
 
-source "suse/Kconfig"
+source "rpmify/Kconfig"
 
