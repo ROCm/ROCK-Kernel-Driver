@@ -216,6 +216,8 @@ extern __inline__ void _raw_write_lock(rwlock_t *rw)
 
 #endif /* CONFIG_DEBUG_SPINLOCK */
 
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
+
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* __SPARC_SPINLOCK_H */

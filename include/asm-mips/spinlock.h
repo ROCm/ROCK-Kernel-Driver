@@ -23,6 +23,7 @@ typedef struct {
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	do { barrier(); } while ((x)->lock)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 /*
  * Simple spin lock operations.  There are two variants, one clears IRQ's

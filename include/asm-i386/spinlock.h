@@ -42,6 +42,7 @@ typedef struct {
 
 #define spin_is_locked(x)	(*(volatile signed char *)(&(x)->lock) <= 0)
 #define spin_unlock_wait(x)	do { barrier(); } while(spin_is_locked(x))
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 #define spin_lock_string \
 	"\n1:\t" \

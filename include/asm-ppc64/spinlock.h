@@ -22,6 +22,7 @@ typedef struct {
 #define SPIN_LOCK_UNLOCKED	(spinlock_t) { 0 }
 
 #define spin_is_locked(x)	((x)->lock != 0)
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 static __inline__ int _raw_spin_trylock(spinlock_t *lock)
 {

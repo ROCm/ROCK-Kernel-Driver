@@ -36,6 +36,7 @@ typedef struct {
 
 #define spin_is_locked(x)	((x)->lock != 0)
 #define spin_unlock_wait(x)	({ do { barrier(); } while ((x)->lock); })
+#define _raw_spin_lock_flags(lock, flags) _raw_spin_lock(lock)
 
 #ifdef CONFIG_DEBUG_SPINLOCK
 extern void _raw_spin_unlock(spinlock_t * lock);
