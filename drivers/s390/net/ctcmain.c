@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.30 2002/12/09 13:56:20 aberg Exp $
+ * $Id: ctcmain.c,v 1.35 2003/01/17 13:46:13 cohuck Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.30 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.35 $
  *
  */
 
@@ -105,10 +105,6 @@ MODULE_LICENSE("GPL");
 
 #define CTC_ID_SIZE             DEVICE_ID_SIZE+3
 
-/**
- * If running on 64 bit, this must be changed. XXX Why? (bird)
- */
-typedef unsigned long intparm_t;
 
 struct ctc_profile {
 	unsigned long maxmulti;
@@ -270,8 +266,6 @@ ctc_test_and_set_busy(struct net_device * dev)
 	return test_and_set_bit(0, &((struct ctc_priv *) dev->priv)->tbusy);
 }
 
-#define SET_DEVICE_START(device, value)
-
 /**
  * Print Banner.
  */
@@ -279,7 +273,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.30 $";
+	char vbuf[] = "$Revision: 1.35 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -882,7 +876,7 @@ ch_action_txdone(fsm_instance * fi, int event, void *arg)
 		fsm_addtimer(&ch->timer, CTC_TIMEOUT_5SEC, CH_EVENT_TIMER, ch);
 		ch->prof.send_stamp = xtime;
 		rc = ccw_device_start(ch->cdev, &ch->ccw[0],
-				      (intparm_t) ch, 0xff, 0);
+				      (unsigned long) ch, 0xff, 0);
 		ch->prof.doios_multi++;
 		if (rc != 0) {
 			privptr->stats.tx_dropped += i;
@@ -985,7 +979,7 @@ ch_action_rx(fsm_instance * fi, int event, void *arg)
 	if (ctc_checkalloc_buffer(ch, 1))
 		return;
 	ch->ccw[1].count = ch->max_bufsize;
-	rc = ccw_device_start(ch->cdev, &ch->ccw[0], (intparm_t) ch, 0xff, 0);
+	rc = ccw_device_start(ch->cdev, &ch->ccw[0], (unsigned long) ch, 0xff, 0);
 	if (rc != 0)
 		ccw_check_return_code(ch, rc);
 }
@@ -1042,7 +1036,7 @@ ch_action_firstio(fsm_instance * fi, int event, void *arg)
 
 	fsm_newstate(fi, (CHANNEL_DIRECTION(ch->flags) == READ)
 		     ? CH_STATE_RXINIT : CH_STATE_TXINIT);
-	rc = ccw_device_start(ch->cdev, &ch->ccw[0], (intparm_t) ch, 0xff, 0);
+	rc = ccw_device_start(ch->cdev, &ch->ccw[0], (unsigned long) ch, 0xff, 0);
 	if (rc != 0) {
 		fsm_deltimer(&ch->timer);
 		fsm_newstate(fi, CH_STATE_SETUPWAIT);
@@ -1089,7 +1083,7 @@ ch_action_rxidle(fsm_instance * fi, int event, void *arg)
 		ch->ccw[1].count = ch->max_bufsize;
 		fsm_newstate(fi, CH_STATE_RXIDLE);
 		rc = ccw_device_start(ch->cdev, &ch->ccw[0],
-				      (intparm_t) ch, 0xff, 0);
+				      (unsigned long) ch, 0xff, 0);
 		if (rc != 0) {
 			fsm_newstate(fi, CH_STATE_RXINIT);
 			ccw_check_return_code(ch, rc);
@@ -1122,7 +1116,7 @@ ch_action_setmode(fsm_instance * fi, int event, void *arg)
 	fsm_newstate(fi, CH_STATE_SETUPWAIT);
 	if (event == CH_EVENT_TIMER)
 		spin_lock_irqsave(get_ccwdev_lock(ch->cdev), saveflags);
-	rc = ccw_device_start(ch->cdev, &ch->ccw[6], (intparm_t) ch, 0xff, 0);
+	rc = ccw_device_start(ch->cdev, &ch->ccw[6], (unsigned long) ch, 0xff, 0);
 	if (event == CH_EVENT_TIMER)
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
@@ -1198,7 +1192,7 @@ ch_action_start(fsm_instance * fi, int event, void *arg)
 	fsm_newstate(fi, CH_STATE_STARTWAIT);
 	fsm_addtimer(&ch->timer, 1000, CH_EVENT_TIMER, ch);
 	spin_lock_irqsave(get_ccwdev_lock(ch->cdev), saveflags);
-	rc = ccw_device_halt(ch->cdev, (intparm_t) ch);
+	rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 	spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
 		fsm_deltimer(&ch->timer);
@@ -1228,7 +1222,7 @@ ch_action_haltio(fsm_instance * fi, int event, void *arg)
 		spin_lock_irqsave(get_ccwdev_lock(ch->cdev), saveflags);
 	oldstate = fsm_getstate(fi);
 	fsm_newstate(fi, CH_STATE_TERM);
-	rc = ccw_device_halt(ch->cdev, (intparm_t) ch);
+	rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 	if (event == CH_EVENT_STOP)
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
@@ -1345,7 +1339,7 @@ ch_action_setuperr(fsm_instance * fi, int event, void *arg)
 		fsm_deltimer(&ch->timer);
 		fsm_addtimer(&ch->timer, CTC_TIMEOUT_5SEC, CH_EVENT_TIMER, ch);
 		if (CHANNEL_DIRECTION(ch->flags) == READ) {
-			int rc = ccw_device_halt(ch->cdev, (intparm_t) ch);
+			int rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 			if (rc != 0)
 				ccw_check_return_code(ch, rc);
 		}
@@ -1392,7 +1386,7 @@ ch_action_restart(fsm_instance * fi, int event, void *arg)
 	fsm_newstate(fi, CH_STATE_STARTWAIT);
 	if (event == CH_EVENT_TIMER)
 		spin_lock_irqsave(get_ccwdev_lock(ch->cdev), saveflags);
-	rc = ccw_device_halt(ch->cdev, (intparm_t) ch);
+	rc = ccw_device_halt(ch->cdev, (unsigned long) ch);
 	if (event == CH_EVENT_TIMER)
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 	if (rc != 0) {
@@ -1480,8 +1474,8 @@ ch_action_rxdisc(fsm_instance * fi, int event, void *arg)
 	ch2 = ((struct ctc_priv *) dev->priv)->channel[WRITE];
 	fsm_newstate(ch2->fsm, CH_STATE_DTERM);
 
-	ccw_device_halt(ch->cdev, (intparm_t) ch);
-	ccw_device_halt(ch2->cdev, (intparm_t) ch2);
+	ccw_device_halt(ch->cdev, (unsigned long) ch);
+	ccw_device_halt(ch2->cdev, (unsigned long) ch2);
 }
 
 /**
@@ -1556,7 +1550,7 @@ ch_action_txretry(fsm_instance * fi, int event, void *arg)
 				spin_lock_irqsave(get_ccwdev_lock(ch->cdev),
 						  saveflags);
 			rc = ccw_device_start(ch->cdev, &ch->ccw[3],
-					      (intparm_t) ch, 0xff, 0);
+					      (unsigned long) ch, 0xff, 0);
 			if (event == CH_EVENT_TIMER)
 				spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev),
 						       saveflags);
@@ -1956,23 +1950,36 @@ ctc_irq_handler(struct ccw_device *cdev, unsigned long intparm, struct irb *irb)
 {
 	struct channel *ch;
 	struct net_device *dev;
+	struct ctc_priv *priv;
+
+	/* Check for unsolicited interrupts. */
+	if (!cdev->dev.driver_data) {
+		printk(KERN_WARNING
+		       "ctc: Got unsolicited irq: %s c-%02x d-%02x\n",
+		       cdev->dev.bus_id, irb->scsw.cstat,
+		       irb->scsw.dstat);
+		return;
+	}
 	
+	priv = cdev->dev.driver_data;
 	ch = (struct channel *) intparm;
-	/**
-	 * Check for unsolicited interrupts.
-	 * If intparm is NULL, try to get channel from ccw_device.
-	 */
-	if (ch == NULL) {
-		ch = container_of(&cdev, struct channel, cdev);
- 		if (ch == NULL) {
-			printk(KERN_WARNING
-			       "ctc: Got unsolicited irq: %s c-%02x d-%02x\n",
-			       cdev->dev.bus_id, irb->scsw.cstat,
-			       irb->scsw.dstat);
+	if ((ch != priv->channel[READ]) && (ch != priv->channel[WRITE]))
+		ch = NULL;
+	
+	if (!ch) {
+		/* Try to extract channel from driver data. */
+		if (priv->channel[READ]->cdev == cdev)
+			ch = priv->channel[READ];
+		else if (priv->channel[WRITE]->cdev == cdev)
+			ch = priv->channel[READ];
+		else {
+			printk(KERN_ERR
+			       "ctc: Can't determine channel for interrupt, "
+			       "device %s\n", cdev->dev.bus_id);
 			return;
 		}
 	}
-
+	
 	dev = (struct net_device *) (ch->netdev);
 	if (dev == NULL) {
 		printk(KERN_CRIT
@@ -2342,7 +2349,7 @@ transmit_skb(struct channel *ch, struct sk_buff *skb)
 		spin_lock_irqsave(get_ccwdev_lock(ch->cdev), saveflags);
 		ch->prof.send_stamp = xtime;
 		rc = ccw_device_start(ch->cdev, &ch->ccw[ccw_idx],
-				      (intparm_t) ch, 0xff, 0);
+				      (unsigned long) ch, 0xff, 0);
 		spin_unlock_irqrestore(get_ccwdev_lock(ch->cdev), saveflags);
 		if (ccw_idx == 3)
 			ch->prof.doios_single++;
@@ -2401,7 +2408,6 @@ ctc_open(struct net_device * dev)
 static int
 ctc_close(struct net_device * dev)
 {
-	SET_DEVICE_START(dev, 0);
 	fsm_event(((struct ctc_priv *) dev->priv)->fsm, DEV_EVENT_STOP, dev);
 	MOD_DEC_USE_COUNT;
 	return 0;
@@ -2533,7 +2539,7 @@ buffer_write(struct device *dev, const char *buf, size_t count)
 	priv = dev->driver_data;
 	if (!priv)
 		return -ENODEV;
-	ndev = container_of((void *) priv, struct net_device, priv);
+	ndev = priv->channel[READ]->netdev;
 	if (!ndev)
 		return -ENODEV;
 	sscanf(buf, "%u", &bs1);
@@ -2755,7 +2761,6 @@ ctc_init_netdevice(struct net_device * dev, int alloc_device,
 	dev->addr_len = 0;
 	dev->type = ARPHRD_SLIP;
 	dev->tx_queue_len = 100;
-	SET_DEVICE_START(dev, 1);
 	dev_init_buffers(dev);
 	dev->flags = IFF_POINTOPOINT | IFF_NOARP;
 	return dev;
@@ -2881,11 +2886,14 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	if (add_channel(cgdev->cdev[1], type))
 		return -ENOMEM;
 
+	ccw_device_set_online(cgdev->cdev[0]);
+	ccw_device_set_online(cgdev->cdev[1]);	
+
 	dev = ctc_init_netdevice(NULL, 1, privptr);
 
 	if (!dev) {
 		printk(KERN_WARNING "ctc_init_netdevice failed\n");
-		return -ENODEV;
+		goto out;
 	}
 
 	if (privptr->protocol == CTC_PROTO_LINUX_TTY)
@@ -2902,7 +2910,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 				channel_free(privptr->channel[READ]);
 
 			ctc_free_netdevice(dev, 1);
-			return -ENODEV;
+			goto out;
 		}
 		privptr->channel[direction]->netdev = dev;
 		privptr->channel[direction]->protocol = privptr->protocol;
@@ -2910,7 +2918,7 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	}
 	if (ctc_netdev_register(dev) != 0) {
 		ctc_free_netdevice(dev, 1);
-		return -ENODEV;
+		goto out;
 	}
 
 	ctc_add_attributes(&cgdev->dev);
@@ -2925,6 +2933,11 @@ ctc_new_device(struct ccwgroup_device *cgdev)
 	       privptr->channel[WRITE]->id, privptr->protocol);
 
 	return 0;
+out:
+	ccw_device_set_offline(cgdev->cdev[1]);
+	ccw_device_set_offline(cgdev->cdev[0]);
+
+	return -ENODEV;
 }
 
 /**
@@ -2944,7 +2957,7 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 	priv = cgdev->dev.driver_data;
 	if (!priv)
 		return -ENODEV;
-	ndev = container_of((void *)priv, struct net_device, priv);
+	ndev = priv->channel[READ]->netdev;
 
 	/* Close the device */
 	ctc_close(ndev);
@@ -2960,6 +2973,9 @@ ctc_shutdown_device(struct ccwgroup_device *cgdev)
 	ctc_free_netdevice(ndev, 1);
 
 	kfree_fsm(priv->fsm);
+
+	ccw_device_set_offline(cgdev->cdev[1]);
+	ccw_device_set_offline(cgdev->cdev[0]);
 
 	channel_remove(priv->channel[READ]);
 	channel_remove(priv->channel[WRITE]);
