@@ -407,12 +407,12 @@ gpio_leds_ioctl(unsigned int cmd, unsigned long arg)
 }
 
 struct file_operations gpio_fops = {
-	owner:       THIS_MODULE,
-	poll:        gpio_poll,
-	ioctl:       gpio_ioctl,
-	write:       gpio_write,
-	open:        gpio_open,
-	release:     gpio_release,
+	.owner       = THIS_MODULE,
+	.poll        = gpio_poll,
+	.ioctl       = gpio_ioctl,
+	.write       = gpio_write,
+	.open        = gpio_open,
+	.release     = gpio_release,
 };
 
 /* main driver initialization routine, called from mem.c */

@@ -151,16 +151,16 @@ static void flash_write32(struct map_info *map, __u32 d, unsigned long adr)
 }
 
 static struct map_info axis_map = {
-	name: "Axis flash",
-	size: WINDOW_SIZE,
-	buswidth: CONFIG_ETRAX_FLASH_BUSWIDTH,
-	read8: flash_read8,
-	read16: flash_read16,
-	read32: flash_read32,
-	copy_from: flash_copy_from,
-	write8: flash_write8,
-	write16: flash_write16,
-	write32: flash_write32,
+	.name = "Axis flash",
+	.size = WINDOW_SIZE,
+	.buswidth = CONFIG_ETRAX_FLASH_BUSWIDTH,
+	.read8 = flash_read8,
+	.read16 = flash_read16,
+	.read32 = flash_read32,
+	.copy_from = flash_copy_from,
+	.write8 = flash_write8,
+	.write16 = flash_write16,
+	.write32 = flash_write32,
 };
 
 /* If no partition-table was found, we use this default-set.
@@ -175,57 +175,57 @@ static struct map_info axis_map = {
  */
 static struct mtd_partition axis_default_partitions[NUM_DEFAULT_PARTITIONS] = {
 	{
-		name: "boot firmware",
-		size: CONFIG_ETRAX_PTABLE_SECTOR,
-		offset: 0
+		.name = "boot firmware",
+		.size = CONFIG_ETRAX_PTABLE_SECTOR,
+		.offset = 0
 	},
 	{
-		name: "kernel",
-		size: 0x200000 - (6 * CONFIG_ETRAX_PTABLE_SECTOR),
-		offset: CONFIG_ETRAX_PTABLE_SECTOR
+		.name = "kernel",
+		.size = 0x200000 - (6 * CONFIG_ETRAX_PTABLE_SECTOR),
+		.offset = CONFIG_ETRAX_PTABLE_SECTOR
 	},
 	{
-		name: "filesystem",
-		size: 5 * CONFIG_ETRAX_PTABLE_SECTOR,
-		offset: 0x200000 - (5 * CONFIG_ETRAX_PTABLE_SECTOR)
+		.name = "filesystem",
+		.size = 5 * CONFIG_ETRAX_PTABLE_SECTOR,
+		.offset = 0x200000 - (5 * CONFIG_ETRAX_PTABLE_SECTOR)
 	}
 };
 
 static struct mtd_partition axis_partitions[MAX_PARTITIONS] = {
 	{
-		name: "part0",
-		size: 0,
-		offset: 0
+		.name = "part0",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part1",
-		size: 0,
-		offset: 0
+		.name = "part1",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part2",
-		size: 0,
-		offset: 0
+		.name = "part2",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part3",
-		size: 0,
-		offset: 0
+		.name = "part3",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part4",
-		size: 0,
-		offset: 0
+		.name = "part4",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part5",
-		size: 0,
-		offset: 0
+		.name = "part5",
+		.size = 0,
+		.offset = 0
 	},
 	{
-		name: "part6",
-		size: 0,
-		offset: 0
+		.name = "part6",
+		.size = 0,
+		.offset = 0
 	},
 };
 
