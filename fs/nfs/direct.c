@@ -466,7 +466,7 @@ nfs_direct_IO(int rw, struct kiocb *iocb, const struct iovec *iov,
  * cache.
  */
 ssize_t
-nfs_file_direct_read(struct kiocb *iocb, char *buf, size_t count, loff_t pos)
+nfs_file_direct_read(struct kiocb *iocb, char __user *buf, size_t count, loff_t pos)
 {
 	ssize_t retval = -EINVAL;
 	loff_t *ppos = &iocb->ki_pos;
@@ -546,7 +546,7 @@ nfs_file_direct_write(struct kiocb *iocb, const char __user *buf, size_t count, 
 	struct address_space *mapping = file->f_mapping;
 	struct inode *inode = mapping->host;
 	struct iovec iov = {
-		.iov_base = buf,
+		.iov_base = (char __user *)buf,
 		.iov_len = count,
 	};
 

@@ -109,7 +109,7 @@ struct address_space_operations udf_adinicb_aops = {
 	.commit_write		= udf_adinicb_commit_write,
 };
 
-static ssize_t udf_file_write(struct file * file, const char * buf,
+static ssize_t udf_file_write(struct file * file, const char __user * buf,
 	size_t count, loff_t *ppos)
 {
 	ssize_t retval;
@@ -204,26 +204,26 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 	switch (cmd)
 	{
 		case UDF_GETVOLIDENT:
-			return copy_to_user((char *)arg,
+			return copy_to_user((char __user *)arg,
 				UDF_SB_VOLIDENT(inode->i_sb), 32) ? -EFAULT : 0;
 		case UDF_RELOCATE_BLOCKS:
 		{
 			long old, new;
 
 			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
-			if (get_user(old, (long *)arg)) return -EFAULT;
+			if (get_user(old, (long __user *)arg)) return -EFAULT;
 			if ((result = udf_relocate_blocks(inode->i_sb,
 					old, &new)) == 0)
-				result = put_user(new, (long *)arg);
+				result = put_user(new, (long __user *)arg);
 
 			return result;
 		}
 		case UDF_GETEASIZE:
-			result = put_user(UDF_I_LENEATTR(inode), (int *)arg);
+			result = put_user(UDF_I_LENEATTR(inode), (int __user *)arg);
 			break;
 
 		case UDF_GETEABLOCK:
-			result = copy_to_user((char *)arg, UDF_I_DATA(inode),
+			result = copy_to_user((char __user *)arg, UDF_I_DATA(inode),
 				UDF_I_LENEATTR(inode)) ? -EFAULT : 0;
 			break;
 	}
