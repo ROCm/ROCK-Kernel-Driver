@@ -32,6 +32,9 @@ struct cpu {
 };
 
 extern int register_cpu(struct cpu *, int, struct node *);
+#ifdef CONFIG_HOTPLUG_CPU
+extern void unregister_cpu(struct cpu *, struct node *);
+#endif
 struct notifier_block;
 
 #ifdef CONFIG_SMP
