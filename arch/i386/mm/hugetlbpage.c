@@ -23,8 +23,6 @@ struct list_head htlbpage_freelist;
 spinlock_t htlbpage_lock = SPIN_LOCK_UNLOCKED;
 extern long htlbpagemem;
 
-void zap_hugetlb_resources(struct vm_area_struct *);
-
 #define MAX_ID 	32
 struct htlbpagekey {
 	struct inode *in;
@@ -143,7 +141,7 @@ int make_hugetlb_pages_present(unsigned long addr, unsigned long end, int flags)
 out_error:		/* Error case, remove the partial lp_resources. */
 	if (addr > vma->vm_start) {
 		vma->vm_end = addr;
-		zap_hugetlb_resources(vma);
+		zap_hugepage_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
 		vma->vm_end = end;
 	}
 	spin_unlock(&mm->page_table_lock);
@@ -296,11 +294,6 @@ void zap_hugepage_range(struct vm_area_struct *vma, unsigned long start, unsigne
 	spin_unlock(&mm->page_table_lock);
 }
 
-void zap_hugetlb_resources(struct vm_area_struct *vma)
-{
-	zap_hugepage_range(vma, vma->vm_start, vma->vm_end);
-}
-
 static void unlink_vma(struct vm_area_struct *mpnt)
 {
 	struct mm_struct *mm = current->mm;
@@ -430,7 +423,7 @@ out:
 		unsigned long raddr;
 		raddr = vma->vm_end;
 		vma->vm_end = addr;
-		zap_hugetlb_resources(vma);
+		zap_hugepage_range(vma, vma->vm_start, vma->vm_end - vma->vm_start);
 		vma->vm_end = raddr;
 	}
 	spin_unlock(&mm->page_table_lock);
