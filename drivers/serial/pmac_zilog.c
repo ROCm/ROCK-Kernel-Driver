@@ -1626,7 +1626,7 @@ static int pmz_resume(struct macio_dev *mdev)
 	struct uart_pmac_port *uap = dev_get_drvdata(&mdev->ofdev.dev);
 	struct uart_state *state;
 	unsigned long flags;
-	int pwr_delay;
+	int pwr_delay = 0;
 
 	if (uap == NULL)
 		return 0;
