@@ -111,6 +111,11 @@ int setup_region(struct mem_region *region, void *entry)
 		offset = 0;
 	}
 
+	if(offset >= region->len){
+		printf("%d bytes of physical memory is insufficient\n",
+		       region->len);
+		exit(1);
+	}
 	loc = mmap(start, region->len - offset, PROT_READ | PROT_WRITE, 
 		   MAP_SHARED | MAP_FIXED, region->fd, offset);
 	if(loc != start){

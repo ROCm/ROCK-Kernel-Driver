@@ -315,7 +315,7 @@ int os_rcv_fd(int fd, int *helper_pid_out)
 	return(new);
 }
 
-int create_unix_socket(char *file, int len)
+int create_unix_socket(char *file, int len, int close_on_exec)
 {
 	struct sockaddr_un addr;
 	int sock, err;
@@ -326,6 +326,10 @@ int create_unix_socket(char *file, int len)
 		       errno);
 		return(-errno);
 	}
+
+	if(close_on_exec && fcntl(sock, F_SETFD, 1) < 0)
+		printk("create_unix_socket : Setting FD_CLOEXEC failed, "
+		       "errno = %d", errno);
 
 	addr.sun_family = AF_UNIX;
 

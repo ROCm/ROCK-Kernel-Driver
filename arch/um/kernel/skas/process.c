@@ -340,7 +340,8 @@ void reboot_skas(void)
 int new_mm(int from)
 {
 	struct proc_mm_op copy;
-	int n, fd = os_open_file("/proc/mm", of_write(OPENFLAGS()), 0);
+	int n, fd = os_open_file("/proc/mm", 
+				 of_cloexec(of_write(OPENFLAGS())), 0);
 
 	if(fd < 0)
 		return(-errno);
@@ -354,6 +355,7 @@ int new_mm(int from)
 			printk("new_mm : /proc/mm copy_segments failed, "
 			       "errno = %d\n", errno);
 	}
+
 	return(fd);
 }
 

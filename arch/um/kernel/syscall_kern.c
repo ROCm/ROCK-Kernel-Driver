@@ -81,7 +81,7 @@ long do_mmap2(struct mm_struct *mm, unsigned long addr, unsigned long len,
 	}
 
 	down_write(&mm->mmap_sem);
-	error = do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
+	error = __do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
 
 	if (file)

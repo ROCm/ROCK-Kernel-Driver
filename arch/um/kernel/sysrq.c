@@ -13,6 +13,10 @@
 
 void show_stack(struct task_struct *task, unsigned long *sp)
 {
+	if(task)
+		show_trace_task(task);
+	else
+		show_trace(sp);
 }
 
 void show_trace(unsigned long * stack)

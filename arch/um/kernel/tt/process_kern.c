@@ -190,6 +190,7 @@ void finish_fork_handler(int sig)
 int fork_tramp(void *stack)
 {
 	local_irq_disable();
+	arch_init_thread();
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	os_usr1_process(os_getpid());

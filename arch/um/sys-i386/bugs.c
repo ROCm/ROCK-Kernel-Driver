@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/signal.h>
+#include <asm/ldt.h>
 #include "kern_util.h"
 #include "user.h"
 #include "sysdep/ptrace.h"
@@ -102,6 +103,25 @@ static int check_cpu_feature(char *feature, int *have_it)
 	else if(*have_it == 1) printk("Yes\n");
 	close(fd);
 	return(1);
+}
+
+static void disable_lcall(void)
+{
+	struct user_desc ldt;
+	int err;
+
+	bzero(&ldt, sizeof(ldt));
+	ldt.entry_number = 7;
+	ldt.base_addr = 0;
+	ldt.limit = 0;
+	err = modify_ldt(1, &ldt, sizeof(ldt));
+	if(err)
+		printk("Failed to disable lcall7 - errno = %d\n", errno);
+}
+
+void arch_init_thread(void)
+{
+	disable_lcall();
 }
 
 void arch_check_bugs(void)

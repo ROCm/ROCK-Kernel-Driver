@@ -238,7 +238,7 @@ sys32_mmap(struct mmap_arg_struct *arg)
 
 	mm = current->mm; 
 	down_write(&mm->mmap_sem); 
-	retval = do_mmap_pgoff(mm, file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
+	retval = do_mmap_pgoff(file, a.addr, a.len, a.prot, a.flags, a.offset>>PAGE_SHIFT);
 	if (file)
 		fput(file);
 
@@ -1451,7 +1451,7 @@ asmlinkage long sys32_mmap2(unsigned long addr, unsigned long len,
 		prot |= vm_force_exec32;
 
 	down_write(&mm->mmap_sem);
-	error = do_mmap_pgoff(mm, file, addr, len, prot, flags, pgoff);
+	error = do_mmap_pgoff(file, addr, len, prot, flags, pgoff);
 	up_write(&mm->mmap_sem);
 
 	if (file)

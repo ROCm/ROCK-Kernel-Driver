@@ -525,9 +525,9 @@ int nregions(void)
 	return(NREGIONS);
 }
 
-void setup_range(int fd, char *driver, unsigned long start, unsigned long pfn,
-		 unsigned long len, int need_vm, struct mem_region *region, 
-		 void *reserved)
+static void setup_range(int fd, char *driver, unsigned long start, 
+			unsigned long pfn, unsigned long len, int need_vm, 
+			struct mem_region *region, void *reserved)
 {
 	int i, cur;
 

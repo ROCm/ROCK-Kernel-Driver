@@ -28,8 +28,8 @@
  */
 #define SC_START_SYSCALL(sc) do SC_EAX(sc) = -ENOSYS; while(0)
 
-/* These are General Protection and Page Fault */
-#define SEGV_IS_FIXABLE(trap) ((trap == 13) || (trap == 14))
+/* This is Page Fault */
+#define SEGV_IS_FIXABLE(trap) (trap == 14)
 
 #define SC_SEGV_IS_FIXABLE(sc) (SEGV_IS_FIXABLE(SC_TRAPNO(sc)))
 

@@ -89,7 +89,8 @@ extern int arch_handle_signal(int sig, union uml_pt_regs *regs);
 extern int arch_fixup(unsigned long address, void *sc_ptr);
 extern void forward_pending_sigio(int target);
 extern int can_do_skas(void);
- 
+extern void arch_init_thread(void);
+
 #endif
 
 /*

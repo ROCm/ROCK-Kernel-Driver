@@ -10,6 +10,7 @@
 #include "linux/major.h"
 #include "linux/mm.h"
 #include "linux/init.h"
+#include "linux/console.h"
 #include "asm/termbits.h"
 #include "asm/irq.h"
 #include "line.h"
@@ -150,6 +151,8 @@ static int ssl_ioctl(struct tty_struct *tty, struct file * file,
 	case TCSETSW:
 	case TCGETA:
 	case TIOCMGET:
+	case TCSBRK:
+	case TCSBRKP:
 		ret = -ENOIOCTLCMD;
 		break;
 	default:
@@ -213,6 +216,37 @@ static struct tty_operations ssl_ops = {
  */
 static int ssl_init_done = 0;
 
+static void ssl_console_write(struct console *c, const char *string, 
+			      unsigned len)
+{
+	struct line *line = &serial_lines[c->index];
+
+	if(ssl_init_done)
+		down(&line->sem);
+	console_write_chan(&line->chan_list, string, len);
+	if(ssl_init_done)
+		up(&line->sem);
+}
+
+static kdev_t ssl_console_device(struct console *c)
+{
+	return mk_kdev(TTY_MAJOR, 64 + c->index);
+}
+
+static int ssl_console_setup(struct console *co, char *options)
+{
+	return(0);
+}
+
+static struct console ssl_cons = {
+	name:		"ttyS",
+	write:		ssl_console_write,
+	device:		ssl_console_device,
+	setup:		ssl_console_setup,
+	flags:		CON_PRINTBUFFER,
+	index:		-1,
+};
+
 int ssl_init(void)
 {
 	char *new_title;
@@ -228,6 +262,7 @@ int ssl_init(void)
 	new_title = add_xterm_umid(opts.xterm_title);
 	if(new_title != NULL) opts.xterm_title = new_title;
 
+//	register_console(&ssl_cons);
 	ssl_init_done = 1;
 	return(0);
 }

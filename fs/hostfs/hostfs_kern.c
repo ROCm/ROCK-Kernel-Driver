@@ -24,6 +24,7 @@
 #include "kern.h"
 #include "user_util.h"
 #include "2_5compat.h"
+#include "init.h"
 
 struct hostfs_inode_info {
 	char *host_filename;
@@ -48,14 +49,52 @@ struct dentry_operations hostfs_dentry_ops = {
 	.d_delete		= hostfs_d_delete,
 };
 
-/* Not changed */
+/* Changed in hostfs_args before the kernel starts running */
 static char *root_ino = "/";
+static int append = 0;
 
 #define HOSTFS_SUPER_MAGIC 0x00c0ffee
 
 static struct inode_operations hostfs_iops;
 static struct inode_operations hostfs_dir_iops;
 static struct address_space_operations hostfs_link_aops;
+
+static int __init hostfs_args(char *options, int *add)
+{
+	char *ptr;
+
+	ptr = strchr(options, ',');
+	if(ptr != NULL)
+		*ptr++ = '\0';
+	if(*options != '\0')
+		root_ino = options;
+
+	options = ptr;
+	while(options){
+		ptr = strchr(options, ',');
+		if(ptr != NULL)
+			*ptr++ = '\0';
+		if(*options != '\0'){
+			if(!strcmp(options, "append"))
+				append = 1;
+			else printf("hostfs_args - unsupported option - %s\n",
+				    options);
+		}
+		options = ptr;
+	}
+	return(0);
+}
+
+__uml_setup("hostfs=", hostfs_args,
+"hostfs=<root dir>,<flags>,...\n"
+"    This is used to set hostfs parameters.  The root directory argument\n"
+"    is used to confine all hostfs mounts to within the specified directory\n"
+"    tree on the host.  If this isn't specified, then a user inside UML can\n"
+"    mount anything on the host that's accessible to the user that's running\n"
+"    it.\n"
+"    The only flag currently supported is 'append', which specifies that all\n"
+"    files opened by hostfs will be opened in append mode.\n\n"
+);
 
 static char *dentry_name(struct dentry *dentry, int extra)
 {
@@ -320,7 +359,7 @@ int hostfs_file_open(struct inode *ino, struct file *file)
 	if(name == NULL) 
 		return(-ENOMEM);
 
-	fd = open_file(name, r, w);
+	fd = open_file(name, r, w, append);
 	kfree(name);
 	if(fd < 0) return(fd);
 	FILE_HOSTFS_I(file)->fd = fd;
@@ -396,6 +435,8 @@ int hostfs_readpage(struct file *file, struct page *page)
 			PAGE_CACHE_SIZE);
 	if(err < 0) goto out;
 
+	memset(&buffer[err], 0, PAGE_CACHE_SIZE - err);
+
 	flush_dcache_page(page);
 	SetPageUptodate(page);
 	if (PageError(page)) ClearPageError(page);
@@ -457,6 +498,7 @@ int hostfs_commit_write(struct file *file, struct page *page, unsigned from,
 static struct address_space_operations hostfs_aops = {
 	.writepage 	= hostfs_writepage,
 	.readpage	= hostfs_readpage,
+/* 	.set_page_dirty = __set_page_dirty_nobuffers, */
 	.prepare_write	= hostfs_prepare_write,
 	.commit_write	= hostfs_commit_write
 };
@@ -512,33 +554,35 @@ int hostfs_create(struct inode *dir, struct dentry *dentry, int mode,
 {
 	struct inode *inode;
 	char *name;
-	int err;
+	int error, fd;
 
-	err = -ENOMEM;
+	error = -ENOMEM;
 	inode = iget(dir->i_sb, 0);
 	if(inode == NULL) goto out;
 
-	err = init_inode(inode, dentry);
-	if(err) 
+	error = init_inode(inode, dentry);
+	if(error) 
 		goto out_put;
 	
-	err = -ENOMEM;
+	error = -ENOMEM;
 	name = dentry_name(dentry, 0);
 	if(name == NULL)
 		goto out_put;
 
-	err = file_create(name, 
-			  mode & S_IRUSR, mode & S_IWUSR, mode & S_IXUSR, 
-			  mode & S_IRGRP, mode & S_IWGRP, mode & S_IXGRP, 
-			  mode & S_IROTH, mode & S_IWOTH, mode & S_IXOTH);
-	if(err)
-		goto out_free;
+	fd = file_create(name, 
+			 mode & S_IRUSR, mode & S_IWUSR, mode & S_IXUSR, 
+			 mode & S_IRGRP, mode & S_IWGRP, mode & S_IXGRP, 
+			 mode & S_IROTH, mode & S_IWOTH, mode & S_IXOTH);
+	if(fd < 0) 
+		error = fd;
+	else error = read_name(inode, name);
 
-	err = read_name(inode, name);
 	kfree(name);
-	if(err)
+	if(error)
 		goto out_put;
 
+	HOSTFS_I(inode)->fd = fd;
+	HOSTFS_I(inode)->mode = FMODE_READ | FMODE_WRITE;
 	d_instantiate(dentry, inode);
 	return(0);
 
@@ -547,7 +591,7 @@ int hostfs_create(struct inode *dir, struct dentry *dentry, int mode,
  out_put:
 	iput(inode);
  out:
-	return(err);
+	return(error);
 }
 
 struct dentry *hostfs_lookup(struct inode *ino, struct dentry *dentry, 
@@ -628,6 +672,9 @@ int hostfs_unlink(struct inode *ino, struct dentry *dentry)
 	int err;
 
 	if((file = inode_dentry_name(ino, dentry)) == NULL) return(-ENOMEM);
+	if(append)
+		return(-EPERM);
+
 	err = unlink_file(file);
 	kfree(file);
 	return(err);
@@ -750,6 +797,9 @@ int hostfs_setattr(struct dentry *dentry, struct iattr *attr)
 	struct hostfs_iattr attrs;
 	char *name;
 	int err;
+	
+	if(append) 
+		attr->ia_valid &= ~ATTR_SIZE;
 
 	attrs.ia_valid = 0;
 	if(attr->ia_valid & ATTR_MODE){

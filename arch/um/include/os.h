@@ -103,7 +103,7 @@ extern int os_accept_connection(int fd);
 extern int os_shutdown_socket(int fd, int r, int w);
 extern void os_close_file(int fd);
 extern int os_rcv_fd(int fd, int *helper_pid_out);
-extern int create_unix_socket(char *file, int len);
+extern int create_unix_socket(char *file, int len, int close_on_exec);
 extern int os_connect_socket(char *name);
 extern int os_file_type(char *file);
 extern int os_file_mode(char *file, struct openflags *mode_out);

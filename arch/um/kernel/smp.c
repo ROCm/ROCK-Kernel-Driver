@@ -142,7 +142,8 @@ static struct task_struct *idle_thread(int cpu)
         current->thread.request.u.thread.arg = (void *) cpu;
 	new_task = copy_process(CLONE_VM | CLONE_IDLETASK, 0, NULL, 0, NULL, 
 				NULL);
-	if(IS_ERR(new_task)) panic("copy_process failed in idle_thread");
+	if(IS_ERR(new_task)) 
+		panic("copy_process failed in idle_thread");
 
 	cpu_tasks[cpu] = ((struct cpu_task) 
 		          { .pid = 	new_task->thread.mode.tt.extern_pid,

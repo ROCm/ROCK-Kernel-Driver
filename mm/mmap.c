@@ -457,7 +457,7 @@ static int vma_merge(struct mm_struct *mm, struct vm_area_struct *prev,
  * The caller must hold down_write(current->mm->mmap_sem).
  */
 
-unsigned long do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
+unsigned long __do_mmap_pgoff(struct mm_struct *mm, struct file * file, 
 			    unsigned long addr, unsigned long len,
 			    unsigned long prot, unsigned long flags,
 			    unsigned long pgoff)

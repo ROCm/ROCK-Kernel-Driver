@@ -90,14 +90,14 @@ void close_tty_log(int fd, void *tty)
 	close(fd);
 }
 
-static int log_chunk(int fd, char *buf, int len)
+static int log_chunk(int fd, const char *buf, int len)
 {
 	int total = 0, try, missed, n;
 	char chunk[64];
 
 	while(len > 0){
 		try = (len > sizeof(chunk)) ? sizeof(chunk) : len;
-		missed = copy_from_user_proc(chunk, buf, try);
+		missed = copy_from_user_proc(chunk, (char *) buf, try);
 		try -= missed;
 		n = write(fd, chunk, try);
 		if(n != try)
@@ -113,7 +113,7 @@ static int log_chunk(int fd, char *buf, int len)
 	return(total);
 }
 
-int write_tty_log(int fd, char *buf, int len, void *tty, int is_read)
+int write_tty_log(int fd, const char *buf, int len, void *tty, int is_read)
 {
 	struct timeval tv;
 	struct tty_log_buf data;
@@ -168,6 +168,19 @@ void log_exec(char **argv, void *tty)
 		log_chunk(tty_log_fd, arg, strlen_user_proc(arg));
 	}
 }
+
+extern void register_tty_logger(int (*opener)(void *, void *),
+				int (*writer)(int, const char *, int, 
+					      void *, int),
+				void (*closer)(int, void *));
+
+static int register_logger(void)
+{
+	register_tty_logger(open_tty_log, write_tty_log, close_tty_log);
+	return(0);
+}
+
+__uml_initcall(register_logger);
 
 static int __init set_tty_log_dir(char *name, int *add)
 {

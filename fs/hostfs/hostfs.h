@@ -37,7 +37,7 @@ extern int stat_file(const char *path, unsigned long long *inode_out,
 		     struct timespec *mtime_out, struct timespec *ctime_out, 
 		     int *blksize_out, unsigned long long *blocks_out);
 extern int access_file(char *path, int r, int w, int x);
-extern int open_file(char *path, int r, int w);
+extern int open_file(char *path, int r, int w, int append);
 extern int file_type(const char *path, int *rdev);
 extern void *open_dir(char *path, int *err_out);
 extern char *read_dir(void *stream, unsigned long long *pos, 

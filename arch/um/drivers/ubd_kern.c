@@ -112,6 +112,7 @@ struct ubd {
 	__u64 size;
 	struct openflags boot_openflags;
 	struct openflags openflags;
+	int no_cow;
 	struct cow cow;
 };
 
@@ -130,6 +131,7 @@ struct ubd {
 	.size =			-1, \
 	.boot_openflags =	OPEN_FLAGS, \
 	.openflags =		OPEN_FLAGS, \
+        .no_cow =               0, \
         .cow =			DEFAULT_COW, \
 }
 
@@ -299,6 +301,11 @@ static int ubd_setup_common(char *str, int *index_out)
 		flags.s = 1;
 		str++;
 	}
+	if (*str == 'd'){
+		dev->no_cow = 1;
+		str++;
+	}
+
 	if(*str++ != '='){
 		printk(KERN_ERR "ubd_setup : Expected '='\n");
 		goto out2;
@@ -307,8 +314,13 @@ static int ubd_setup_common(char *str, int *index_out)
 	err = 0;
 	backing_file = strchr(str, ',');
 	if(backing_file){
-		*backing_file = '\0';
-		backing_file++;
+		if(dev->no_cow)
+			printk(KERN_ERR "Can't specify both 'd' and a "
+			       "cow file\n");
+		else {
+			*backing_file = '\0';
+			backing_file++;
+		}
 	}
 	dev->file = str;
 	dev->cow.file = backing_file;
@@ -450,12 +462,14 @@ static void ubd_close(struct ubd *dev)
 static int ubd_open_dev(struct ubd *dev)
 {
 	struct openflags flags;
+	char **back_ptr;
 	int err, create_cow, *create_ptr;
 
 	dev->openflags = dev->boot_openflags;
 	create_cow = 0;
 	create_ptr = (dev->cow.file != NULL) ? &create_cow : NULL;
-	dev->fd = open_ubd_file(dev->file, &dev->openflags, &dev->cow.file,
+	back_ptr = dev->no_cow ? NULL : &dev->cow.file;
+	dev->fd = open_ubd_file(dev->file, &dev->openflags, back_ptr,
 				&dev->cow.bitmap_offset, &dev->cow.bitmap_len, 
 				&dev->cow.data_offset, create_ptr);
 
@@ -476,7 +490,10 @@ static int ubd_open_dev(struct ubd *dev)
 	if(dev->cow.file != NULL){
 		err = -ENOMEM;
 		dev->cow.bitmap = (void *) vmalloc(dev->cow.bitmap_len);
-		if(dev->cow.bitmap == NULL) goto error;
+		if(dev->cow.bitmap == NULL){
+			printk(KERN_ERR "Failed to vmalloc COW bitmap\n");
+			goto error;
+		}
 		flush_tlb_kernel_vm();
 
 		err = read_cow_bitmap(dev->fd, dev->cow.bitmap, 

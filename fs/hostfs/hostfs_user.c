@@ -83,14 +83,20 @@ int access_file(char *path, int r, int w, int x)
 	else return(0);
 }
 
-int open_file(char *path, int r, int w)
+int open_file(char *path, int r, int w, int append)
 {
 	int mode = 0, fd;
 
-	if(r && !w) mode = O_RDONLY;
-	else if(!r && w) mode = O_WRONLY;
-	else if(r && w) mode = O_RDWR;
+	if(r && !w) 
+		mode = O_RDONLY;
+	else if(!r && w) 
+		mode = O_WRONLY;
+	else if(r && w) 
+		mode = O_RDWR;
 	else panic("Impossible mode in open_file");
+
+	if(append)
+		mode |= O_APPEND;
 	fd = open64(path, mode);
 	if(fd < 0) return(-errno);
 	else return(fd);
@@ -175,10 +181,10 @@ int file_create(char *name, int ur, int uw, int ux, int gr,
 	mode |= or ? S_IROTH : 0;
 	mode |= ow ? S_IWOTH : 0;
 	mode |= ox ? S_IXOTH : 0;
-	fd = open64(name, O_CREAT, mode);
-	if(fd < 0) return(-errno);
-	close(fd);
-	return(0);
+	fd = open64(name, O_CREAT | O_RDWR, mode);
+	if(fd < 0) 
+		return(-errno);
+	return(fd);
 }
 
 int set_attr(const char *file, struct hostfs_iattr *attrs)

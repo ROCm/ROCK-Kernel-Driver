@@ -1,5 +1,5 @@
 # 
-# Copyright (C) 2000, 2002 Jeff Dike (jdike@karaya.com)
+# Copyright (C) 2000, 2002, 2003 Jeff Dike (jdike@karaya.com)
 # Licensed under the GPL
 #
 
@@ -39,6 +39,8 @@ obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
 obj-$(CONFIG_XTERM_CHAN) += xterm.o xterm_kern.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
+obj-$(CONFIG_BLK_DEV_COW) += cow_kern.o
+obj-$(CONFIG_BLK_DEV_COW_COMMON) += cow_user.o
 
 obj-y += stdio_console.o $(CHAN_OBJS)
 

@@ -102,6 +102,19 @@ void mconsole_version(struct mc_request *req)
 	mconsole_reply(req, version, 0, 0);
 }
 
+void mconsole_log(struct mc_request *req)
+{
+	int len;
+	char *ptr = req->request.data;
+	
+	ptr += strlen("log");
+	while(isspace(*ptr)) ptr++;
+
+	len = ptr - req->request.data;
+	printk("%.*s", len, ptr);
+	mconsole_reply(req, "", 0, 0);
+}
+
 #define UML_MCONSOLE_HELPTEXT \
 "Commands: \n\
     version - Get kernel version \n\
@@ -116,6 +129,7 @@ void mconsole_version(struct mc_request *req)
     cad - invoke the Ctl-Alt-Del handler \n\
     stop - pause the UML; it will do nothing until it receives a 'go' \n\
     go - continue the UML after a 'stop' \n\
+    log <string> - make UML enter <string> into the kernel log\n\
 "
 
 void mconsole_help(struct mc_request *req)
@@ -304,7 +318,7 @@ int mconsole_init(void)
 	if(umid_file_name("mconsole", file, sizeof(file))) return(-1);
 	snprintf(mconsole_socket_name, sizeof(file), "%s", file);
 
-	sock = create_unix_socket(file, sizeof(file));
+	sock = create_unix_socket(file, sizeof(file), 1);
 	if (sock < 0){
 		printk("Failed to initialize management console\n");
 		return(1);

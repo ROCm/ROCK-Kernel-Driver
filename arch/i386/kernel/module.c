@@ -53,9 +53,10 @@ int module_frob_arch_sections(Elf_Ehdr *hdr,
 	return 0;
 }
 
-/* from asm-i386/elf.h */
-#define R_386_32        1
-#define R_386_PC32      2
+#ifndef R_386_32
+# define R_386_32        1
+# define R_386_PC32      2
+#endif
 
 int apply_relocate(Elf32_Shdr *sechdrs,
 		   const char *strtab,
@@ -125,9 +126,9 @@ int module_finalize(const Elf_Ehdr *hdr,
 			continue;
 		seg = (void *)s->sh_addr; 
 		apply_alternatives(seg, seg + s->sh_size); 
-	}
-#endif
+	} 	
 	return 0;
+#endif
 }
 
 void module_arch_cleanup(struct module *mod)
