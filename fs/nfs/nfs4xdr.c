@@ -144,6 +144,13 @@ extern int			nfs_stat_to_errno(int);
 #define NFS4_dec_open_confirm_sz        compound_decode_hdr_maxsz + \
                                         decode_putfh_maxsz + \
                                         op_decode_hdr_maxsz + 4
+#define NFS4_enc_close_sz       compound_encode_hdr_maxsz + \
+                                encode_putfh_maxsz + \
+                                op_encode_hdr_maxsz + 5
+#define NFS4_dec_close_sz       compound_decode_hdr_maxsz + \
+                                decode_putfh_maxsz + \
+                                op_decode_hdr_maxsz + 4
+
 
 
 
@@ -378,14 +385,14 @@ encode_access(struct xdr_stream *xdr, struct nfs4_access *access)
 }
 
 static int
-encode_close(struct xdr_stream *xdr, struct nfs4_close *close)
+encode_close(struct xdr_stream *xdr, struct nfs_closeargs *arg)
 {
 	uint32_t *p;
 
 	RESERVE_SPACE(8+sizeof(nfs4_stateid));
 	WRITE32(OP_CLOSE);
-	WRITE32(close->cl_seqid);
-	WRITEMEM(close->cl_stateid, sizeof(nfs4_stateid));
+	WRITE32(arg->seqid);
+	WRITEMEM(arg->stateid, sizeof(nfs4_stateid));
 	
 	return 0;
 }
@@ -858,9 +865,6 @@ encode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_ACCESS:
 			status = encode_access(xdr, &cp->ops[i].u.access);
 			break;
-		case OP_CLOSE:
-			status = encode_close(xdr, &cp->ops[i].u.close);
-			break;
 		case OP_CREATE:
 			status = encode_create(xdr, &cp->ops[i].u.create);
 			break;
@@ -940,6 +944,28 @@ nfs4_xdr_enc_compound(struct rpc_rqst *req, uint32_t *p, struct nfs4_compound *c
 	cp->timestamp = jiffies;
 	return status;
 }
+/*
+ * Encode a CLOSE request
+ */
+static int
+nfs4_xdr_enc_close(struct rpc_rqst *req, uint32_t *p, struct nfs_closeargs *args)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr = {
+                .nops   = 2,
+        };
+        int status;
+
+        xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+        encode_compound_hdr(&xdr, &hdr);
+        status = encode_putfh(&xdr, args->fh);
+        if(status)
+                goto out;
+        status = encode_close(&xdr, args);
+out:
+        return status;
+}
+
 /*
  * Encode an OPEN request
  */
@@ -1229,7 +1255,7 @@ decode_access(struct xdr_stream *xdr, struct nfs4_access *access)
 }
 
 static int
-decode_close(struct xdr_stream *xdr, struct nfs4_close *close)
+decode_close(struct xdr_stream *xdr, struct nfs_closeres *res)
 {
 	uint32_t *p;
 	int status;
@@ -1238,7 +1264,7 @@ decode_close(struct xdr_stream *xdr, struct nfs4_close *close)
 	if (status)
 		return status;
 	READ_BUF(sizeof(nfs4_stateid));
-	COPYMEM(close->cl_stateid, sizeof(nfs4_stateid));
+	COPYMEM(res->stateid, sizeof(nfs4_stateid));
 	return 0;
 }
 
@@ -2076,9 +2102,6 @@ decode_compound(struct xdr_stream *xdr, struct nfs4_compound *cp, struct rpc_rqs
 		case OP_ACCESS:
 			status = decode_access(xdr, &op->u.access);
 			break;
-		case OP_CLOSE:
-			status = decode_close(xdr, &op->u.close);
-			break;
 		case OP_CREATE:
 			status = decode_create(xdr, &op->u.create);
 			break;
@@ -2165,6 +2188,27 @@ out:
 	return status;
 }
 
+/*
+ * Decode CLOSE response
+ */
+static int
+nfs4_xdr_dec_close(struct rpc_rqst *rqstp, uint32_t *p, struct nfs_closeres *res)
+{
+        struct xdr_stream xdr;
+        struct compound_hdr hdr;
+        int status;
+
+        xdr_init_decode(&xdr, &rqstp->rq_rcv_buf, p);
+        status = decode_compound_hdr(&xdr, &hdr);
+        if (status)
+                goto out;
+        status = decode_putfh(&xdr);
+        if (status)
+                goto out;
+        status = decode_close(&xdr, res);
+out:
+        return status;
+}
 
 /*
  * Decode OPEN response
@@ -2374,6 +2418,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(COMMIT,		enc_commit,	dec_commit),
   PROC(OPEN,		enc_open,	dec_open),
   PROC(OPEN_CONFIRM,	enc_open_confirm,	dec_open_confirm),
+  PROC(CLOSE,	enc_close,	dec_close),
 };
 
 struct rpc_version		nfs_version4 = {

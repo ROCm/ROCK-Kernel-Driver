@@ -491,6 +491,7 @@ struct nfs4_shareowner {
 
 /* nfs4proc.c */
 extern int nfs4_proc_renew(struct nfs_server *server);
+extern int nfs4_do_close(struct inode *inode, struct nfs4_shareowner *sp);
 
 /* nfs4renewd.c */
 extern int nfs4_init_renewd(struct nfs_server *server);

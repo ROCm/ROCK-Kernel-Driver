@@ -81,19 +81,6 @@ nfs4_setup_access(struct nfs4_compound *cp, u32 req_access, u32 *resp_supported,
 }
 
 static void
-nfs4_setup_close(struct nfs4_compound *cp, nfs4_stateid stateid, u32 seqid)
-{
-	struct nfs4_close *close = GET_OP(cp, close);
-
-	close->cl_stateid = stateid;
-	close->cl_seqid = seqid;
-
-	OPNUM(cp) = OP_CLOSE;
-	cp->req_nops++;
-	cp->renew_index = cp->req_nops;
-}
-
-static void
 nfs4_setup_create_dir(struct nfs4_compound *cp, struct qstr *name,
 		      struct iattr *sattr, struct nfs4_change_info *info)
 {
@@ -710,16 +697,44 @@ do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 
-static int
-do_close(struct nfs_server *server, struct nfs_fh *fhandle, u32 seqid, char *stateid)
+/* 
+ * It is possible for data to be read/written from a mem-mapped file 
+ * after the sys_close call (which hits the vfs layer as a flush).
+ * This means that we can't safely call nfsv4 close on a file until 
+ * the inode is cleared. This in turn means that we are not good
+ * NFSv4 citizens - we do not indicate to the server to update the file's 
+ * share state even when we are done with one of the three share 
+ * stateid's in the inode.
+ */
+int
+nfs4_do_close(struct inode *inode, struct nfs4_shareowner *sp) 
 {
-	struct nfs4_compound	compound;
-	struct nfs4_op		ops[2];
-	
-	nfs4_setup_compound(&compound, ops, server, "close");
-	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_close(&compound, stateid, seqid);
-	return nfs4_call_compound(&compound, NULL, 0);
+	int status = 0;
+	struct nfs_closeargs arg = {
+		.fh		= NFS_FH(inode),
+	};
+	struct nfs_closeres res = {
+		.status		= 0,
+	};
+	struct rpc_message msg = {
+		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_CLOSE],
+		.rpc_argp	= &arg,
+		.rpc_resp	= &res,
+	};
+
+        memcpy(arg.stateid, sp->so_stateid, sizeof(nfs4_stateid));
+	/* Serialization for the sequence id */
+	down(&sp->so_sema);
+	arg.seqid = sp->so_seqid,
+	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, 0);
+
+        /* hmm. we are done with the inode, and in the process of freeing
+	 * the shareowner. we keep this around to process errors
+	 */
+	nfs4_increment_seqid(status, sp);
+	up(&sp->so_sema);
+
+	return status;
 }
 
 static int
@@ -820,6 +835,12 @@ nfs4_proc_getattr(struct inode *inode, struct nfs_fattr *fattr)
 	return nfs4_call_compound(&compound, NULL, 0);
 }
 
+/* 
+ * The file is not closed if it is opened due to the a request to change
+ * the size of the file. The open call will not be needed once the
+ * VFS layer lookup-intents are implemented.
+ * Close is called when the inode is destroyed.
+ */
 static int
 nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 		  struct iattr *sattr)
@@ -851,15 +872,12 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 		 */
 		if (fattr->fileid != NFS_FILEID(inode)) {
 			printk(KERN_WARNING "nfs: raced in setattr, returning -EIO\n");
-			do_close(NFS_SERVER(inode), NFS_FH(inode), sp->so_seqid, sp->so_stateid);
 			return -EIO;
 		}
 	}
 	
 	status = do_setattr(NFS_SERVER(inode), fattr, NFS_FH(inode), sattr, 
 	                    fake == 1? zero_stateid: sp->so_stateid);
-	if (size_change)
-		do_close(NFS_SERVER(inode), NFS_FH(inode), sp->so_seqid, sp->so_stateid);
 	return status;
 }
 
@@ -1059,8 +1077,7 @@ nfs4_proc_write(struct inode *inode, struct rpc_cred *cred,
  * conditions due to the lookup, create, and open VFS calls from sys_open()
  * placed on the wire.
  *
- * Given the above sorry state of affairs, I'm simply sending an OPEN, a
- * possible SETATTR, and then a CLOSE 
+ * Given the above sorry state of affairs, I'm simply sending an OPEN.
  * The file will be opened again in the subsequent VFS open call
  * (nfs4_proc_file_open).
  *

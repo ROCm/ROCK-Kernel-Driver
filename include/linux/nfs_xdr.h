@@ -131,6 +131,20 @@ struct nfs_open_confirmres {
 	nfs4_stateid            stateid;
 };
 
+/*
+ * Arguments to the close call.
+ */
+struct nfs_closeargs {
+	struct nfs_fh *         fh;
+	nfs4_stateid            stateid;
+	__u32                   seqid;
+};
+
+struct nfs_closeres {
+	__u32                   status;
+	nfs4_stateid            stateid;
+};
+
 
 /*
  * Arguments to the read call.

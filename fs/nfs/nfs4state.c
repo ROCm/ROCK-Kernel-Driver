@@ -124,7 +124,7 @@ nfs4_get_shareowner(struct inode *dir)
 }
 
 /*
- * Called for each inode shareowner in nfs_clear_inode, 
+ * Called for each non-null inode shareowner in nfs_clear_inode, 
  * or if nfs4_do_open fails.
  */
 void
@@ -132,6 +132,8 @@ nfs4_put_shareowner(struct inode *inode, struct nfs4_shareowner *sp)
 {
 	if (!sp)
 		return;
+	if (sp->so_flags & O_ACCMODE)
+		nfs4_do_close(inode, sp);
         kfree(sp);
 }
 
