@@ -1,10 +1,18 @@
+/*
+ * fs/generic_acl.c
+ *
+ * (C) 2005 Andreas Gruenbacher <agruen@suse.de>
+ *
+ * This file is released under the GPL.
+ */
+
 #include <linux/sched.h>
 #include <linux/fs.h>
-#include <linux/mem_acl.h>
+#include <linux/generic_acl.h>
 
 size_t
-mem_acl_list(struct inode *inode, struct mem_acl_operations *ops, int type,
-	     char *list, size_t list_size)
+generic_acl_list(struct inode *inode, struct generic_acl_operations *ops,
+		 int type, char *list, size_t list_size)
 {
 	struct posix_acl *acl;
 	const char *name;
@@ -34,8 +42,8 @@ mem_acl_list(struct inode *inode, struct mem_acl_operations *ops, int type,
 }
 
 int
-mem_acl_get(struct inode *inode, struct mem_acl_operations *ops, int type,
-	    void *buffer, size_t size)
+generic_acl_get(struct inode *inode, struct generic_acl_operations *ops,
+		int type, void *buffer, size_t size)
 {
 	struct posix_acl *acl;
 	int error;
@@ -50,8 +58,8 @@ mem_acl_get(struct inode *inode, struct mem_acl_operations *ops, int type,
 }
 
 int
-mem_acl_set(struct inode *inode, struct mem_acl_operations *ops, int type,
-	    const void *value, size_t size)
+generic_acl_set(struct inode *inode, struct generic_acl_operations *ops,
+		int type, const void *value, size_t size)
 {
 	struct posix_acl *acl = NULL;
 	int error;
@@ -100,8 +108,8 @@ failed:
 }
 
 int
-mem_acl_init(struct inode *inode, struct inode *dir,
-	     struct mem_acl_operations *ops)
+generic_acl_init(struct inode *inode, struct inode *dir,
+		 struct generic_acl_operations *ops)
 {
 	struct posix_acl *acl = NULL;
 	mode_t mode = inode->i_mode;
@@ -142,7 +150,7 @@ cleanup:
 }
 
 int
-mem_acl_chmod(struct inode *inode, struct mem_acl_operations *ops)
+generic_acl_chmod(struct inode *inode, struct generic_acl_operations *ops)
 {
 	struct posix_acl *acl, *clone;
 	int error = 0;

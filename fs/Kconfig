@@ -889,6 +889,19 @@ config DEVPTS_FS_XATTR
 
 	  If unsure, say N.
 
+config DEVPTS_POSIX_ACL
+	bool "/dev/pts POSIX Access Control Lists"
+	depends on DEVPTS_FS_XATTR
+	select GENERIC_ACL
+	help
+	  POSIX Access Control Lists (ACLs) support permissions for users and
+	  groups beyond the owner/group/world scheme.
+
+	  To learn more about Access Control Lists, visit the POSIX ACLs for
+	  Linux website <http://acl.bestbits.at/>.
+
+	  If you don't know what Access Control Lists are, say N.
+
 config DEVPTS_FS_SECURITY
 	bool "/dev/pts Security Labels"
 	depends on DEVPTS_FS_XATTR
@@ -926,7 +939,7 @@ config TMPFS_XATTR
 config TMPFS_POSIX_ACL
 	bool "tmpfs POSIX Access Control Lists"
 	depends on TMPFS_XATTR
-	select MEM_ACL
+	select GENERIC_ACL
 	help
 	  POSIX Access Control Lists (ACLs) support permissions for users and
 	  groups beyond the owner/group/world scheme.
@@ -1845,7 +1858,7 @@ config AFS_FS
 config RXRPC
 	tristate
 
-config MEM_ACL
+config GENERIC_ACL
 	bool
 	select FS_POSIX_ACL
 
