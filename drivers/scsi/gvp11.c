@@ -355,6 +355,13 @@ release:
     return num_gvp11;
 }
 
+static int gvp11_bus_reset(Scsi_Cmnd *cmd)
+{
+	/* FIXME perform bus-specific reset */
+	wd33c93_host_reset(cmd);
+	return SUCCESS;
+}
+
 
 #define HOSTS_C
 
@@ -366,8 +373,9 @@ static Scsi_Host_Template driver_template = {
 	.detect			= gvp11_detect,
 	.release		= gvp11_release,
 	.queuecommand		= wd33c93_queuecommand,
-	.abort			= wd33c93_abort,
-	.reset			= wd33c93_reset,
+	.eh_abort_handler	= wd33c93_abort,
+	.eh_bus_reset_handler	= gvp11_bus_reset,
+	.eh_host_reset_handler	= wd33c93_host_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,

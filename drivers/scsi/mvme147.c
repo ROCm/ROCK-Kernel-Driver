@@ -113,6 +113,13 @@ int mvme147_detect(Scsi_Host_Template *tpnt)
     return 0;
 }
 
+static int mvme147_bus_reset(Scsi_Cmnd *cmd)
+{
+	/* FIXME perform bus-specific reset */
+	wd33c93_host_reset(cmd);
+	return SUCCESS;
+}
+
 #define HOSTS_C
 
 #include "mvme147.h"
@@ -123,8 +130,9 @@ static Scsi_Host_Template driver_template = {
 	.detect			= mvme147_detect,
 	.release		= mvme147_release,
 	.queuecommand		= wd33c93_queuecommand,
-	.abort			= wd33c93_abort,
-	.reset			= wd33c93_reset,
+	.eh_abort_handler	= wd33c93_abort,
+	.eh_bus_reset_handler	= mvme147_bus_reset,
+	.eh_host_reset_handler	= wd33c93_host_reset,
 	.can_queue		= CAN_QUEUE,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,
