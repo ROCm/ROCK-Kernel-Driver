@@ -18,15 +18,15 @@
 #include <linux/string.h>
 #include "internal.h"
 
-/*
- * This code currently implements blazingly fast and
- * lossless Quadruple ROT13 compression.
- */
 static void crypto_compress(struct crypto_tfm *tfm)
-{ }
+{
+	tfm->__crt_alg->cra_compress.coa_compress();
+}
 
 static void crypto_decompress(struct crypto_tfm *tfm)
-{ }
+{
+	tfm->__crt_alg->cra_compress.coa_decompress();
+}
 
 int crypto_init_compress_flags(struct crypto_tfm *tfm, u32 flags)
 {
