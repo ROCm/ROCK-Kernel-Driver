@@ -262,17 +262,16 @@ int simple_rmdir(struct inode *dir, struct dentry *dentry)
 
 int simple_rename(struct inode *old_dir, struct dentry *old_dentry, struct inode *new_dir, struct dentry *new_dentry)
 {
-	struct inode *inode;
+	int they_are_dirs = S_ISDIR(old_dentry->d_inode->i_mode);
 
 	if (!simple_empty(new_dentry))
 		return -ENOTEMPTY;
 
-	inode = new_dentry->d_inode;
-	if (inode) {
-		inode->i_nlink--;
-		dput(new_dentry);
-	}
-	if (S_ISDIR(old_dentry->d_inode->i_mode)) {
+	if (new_dentry->d_inode) {
+		simple_unlink(new_dir, new_dentry);
+		if (they_are_dirs)
+			old_dir->i_nlink--;
+	} else if (they_are_dirs) {
 		old_dir->i_nlink--;
 		new_dir->i_nlink++;
 	}
