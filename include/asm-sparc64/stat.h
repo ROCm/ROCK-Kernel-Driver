@@ -6,7 +6,7 @@
 #include <linux/compat.h>
 #include <linux/time.h>
 
-struct stat32 {
+struct compat_stat {
 	__kernel_dev_t32   st_dev;
 	__kernel_ino_t32   st_ino;
 	__kernel_mode_t32  st_mode;
