@@ -129,6 +129,7 @@ static struct ata_port_operations sil_ops = {
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
 	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
 	.post_set_mode		= sil_post_set_mode,
 	.bmdma_setup            = ata_bmdma_setup,

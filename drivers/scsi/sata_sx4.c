@@ -196,6 +196,7 @@ static struct ata_port_operations pdc_20621_ops = {
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
 	.exec_command		= pdc_exec_command_mmio,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= pdc_20621_phy_reset,
 	.qc_prep		= pdc20621_qc_prep,
 	.qc_issue		= pdc20621_qc_issue_prot,
@@ -533,7 +534,7 @@ static void pdc20621_nodata_prep(struct ata_queued_cmd *qc)
 
 	readl(dimm_mmio);	/* MMIO PCI posting flush */
 
-	VPRINTK("ata pkt buf ofs %u, prd size %u, mmio copied\n", i, sgt_len);
+	VPRINTK("ata pkt buf ofs %u, mmio copied\n", i);
 }
 
 static void pdc20621_qc_prep(struct ata_queued_cmd *qc)

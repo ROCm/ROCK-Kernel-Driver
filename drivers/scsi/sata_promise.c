@@ -110,6 +110,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
 	.exec_command		= pdc_exec_command_mmio,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= pdc_phy_reset,
 	.qc_prep		= pdc_qc_prep,
 	.qc_issue		= pdc_qc_issue_prot,

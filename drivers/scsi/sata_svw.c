@@ -297,6 +297,7 @@ static struct ata_port_operations k2_sata_ops = {
 	.tf_read		= k2_sata_tf_read,
 	.check_status		= k2_stat_check_status,
 	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 	.phy_reset		= sata_phy_reset,
 	.bmdma_setup		= k2_bmdma_setup_mmio,
 	.bmdma_start		= k2_bmdma_start_mmio,

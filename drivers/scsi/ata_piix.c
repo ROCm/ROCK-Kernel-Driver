@@ -129,6 +129,7 @@ static struct ata_port_operations piix_pata_ops = {
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
 	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 
 	.phy_reset		= piix_pata_phy_reset,
 
@@ -153,6 +154,7 @@ static struct ata_port_operations piix_sata_ops = {
 	.tf_read		= ata_tf_read,
 	.check_status		= ata_check_status,
 	.exec_command		= ata_exec_command,
+	.dev_select		= ata_std_dev_select,
 
 	.phy_reset		= piix_sata_phy_reset,
 
