@@ -454,12 +454,6 @@ _GLOBAL(_outsl_ns)
 	sync
 	blr	
 
-_GLOBAL(abs)
-	cmpi	0,r3,0
-	bge	10f
-	neg	r3,r3
-10:	blr
-
 _GLOBAL(_get_PVR)
 	mfspr	r3,PVR
 	blr

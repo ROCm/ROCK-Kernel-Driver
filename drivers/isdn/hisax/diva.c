@@ -1027,7 +1027,7 @@ setup_diva(struct IsdnCard *card)
 			}
 		}
 #endif
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 		cs->subtyp = 0;
 		if ((dev_diva = pci_find_device(PCI_VENDOR_ID_EICON,
 			PCI_DEVICE_ID_EICON_DIVA20, dev_diva))) {

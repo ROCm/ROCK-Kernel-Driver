@@ -41,6 +41,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/bcd.h>
+#include <linux/profile.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -118,8 +119,7 @@ irqreturn_t timer_interrupt(int irq, void *dev, struct pt_regs * regs)
 
 #ifndef CONFIG_SMP
 	/* Not SMP, do kernel PC profiling here.  */
-	if (!user_mode(regs))
-		alpha_do_profile(regs->pc);
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	write_seqlock(&xtime_lock);

@@ -259,7 +259,7 @@ static struct console sercons = {
 void __init 
 init_etrax_debug(void)
 {
-#if CONFIG_ETRAX_DEBUG_PORT_NULL
+#ifdef CONFIG_ETRAX_DEBUG_PORT_NULL
 	return;
 #endif
 

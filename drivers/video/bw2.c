@@ -338,7 +338,7 @@ static void bw2_init_one(struct sbus_dev *sdev)
 	}
 #endif
 	all->info.var.red.length = all->info.var.green.length =
-		all->info.var.blue.length = all_info.var.bits_per_pixel;
+		all->info.var.blue.length = all->info.var.bits_per_pixel;
 	all->info.var.red.offset = all->info.var.green.offset =
 		all->info.var.blue.offset = 0;
 

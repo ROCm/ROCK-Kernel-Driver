@@ -36,6 +36,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
+#include <linux/profile.h>
 #include <linux/rmap.h>
 
 #include <asm/pgtable.h>
@@ -76,11 +77,12 @@ int nr_processes(void)
 static kmem_cache_t *task_struct_cachep;
 #endif
 
-static void free_task(struct task_struct *tsk)
+void free_task(struct task_struct *tsk)
 {
 	free_thread_info(tsk->thread_info);
 	free_task_struct(tsk);
 }
+EXPORT_SYMBOL(free_task);
 
 void __put_task_struct(struct task_struct *tsk)
 {
@@ -93,7 +95,9 @@ void __put_task_struct(struct task_struct *tsk)
 	security_task_free(tsk);
 	free_uid(tsk->user);
 	put_group_info(tsk->group_info);
-	free_task(tsk);
+
+	if (!profile_handoff_task(tsk))
+		free_task(tsk);
 }
 
 void fastcall add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait)
@@ -313,8 +317,11 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	for (mpnt = current->mm->mmap ; mpnt ; mpnt = mpnt->vm_next) {
 		struct file *file;
 
-		if(mpnt->vm_flags & VM_DONTCOPY)
+		if (mpnt->vm_flags & VM_DONTCOPY) {
+			__vm_stat_account(mm, mpnt->vm_flags, mpnt->vm_file,
+							-vma_pages(mpnt));
 			continue;
+		}
 		charge = 0;
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
@@ -1075,7 +1082,7 @@ static task_t *copy_process(unsigned long clone_flags,
 	}
 
 	/* CLONE_PARENT re-uses the old parent */
-	if (clone_flags & CLONE_PARENT)
+	if (clone_flags & (CLONE_PARENT|CLONE_THREAD))
 		p->real_parent = current->real_parent;
 	else
 		p->real_parent = current;

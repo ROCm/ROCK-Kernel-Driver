@@ -243,6 +243,7 @@ void __iget(struct inode * inode)
  */
 void clear_inode(struct inode *inode)
 {
+	might_sleep();
 	invalidate_inode_buffers(inode);
        
 	if (inode->i_data.nrpages)

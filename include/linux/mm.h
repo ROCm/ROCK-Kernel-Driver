@@ -753,6 +753,27 @@ extern struct page * follow_page(struct mm_struct *mm, unsigned long address,
 extern int remap_page_range(struct vm_area_struct *vma, unsigned long from,
 		unsigned long to, unsigned long size, pgprot_t prot);
 
+#ifdef CONFIG_PROC_FS
+void __vm_stat_account(struct mm_struct *, unsigned long, struct file *, long);
+#else
+static inline void __vm_stat_account(struct mm_struct *mm,
+			unsigned long flags, struct file *file, long pages)
+{
+}
+#endif /* CONFIG_PROC_FS */
+
+static inline void vm_stat_account(struct vm_area_struct *vma)
+{
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file,
+							vma_pages(vma));
+}
+
+static inline void vm_stat_unaccount(struct vm_area_struct *vma)
+{
+	__vm_stat_account(vma->vm_mm, vma->vm_flags, vma->vm_file,
+							-vma_pages(vma));
+}
+
 #ifndef CONFIG_DEBUG_PAGEALLOC
 static inline void
 kernel_map_pages(struct page *page, int numpages, int enable)

@@ -299,7 +299,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 #ifdef __BIG_ENDIAN
 #error "not running on big endian machines now"
 #endif

@@ -156,8 +156,6 @@ static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 static const char *panic_later, *panic_param;
 
-__setup("profile=", profile_setup);
-
 static int __init obsolete_checksetup(char *line)
 {
 	struct obs_kernel_param *p;

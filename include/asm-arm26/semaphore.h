@@ -16,22 +16,14 @@ struct semaphore {
 	atomic_t count;
 	int sleepers;
 	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
-	long __magic;
-#endif
 };
 
-#if WAITQUEUE_DEBUG
-# define __SEM_DEBUG_INIT(name) \
-		, (long)&(name).__magic
-#else
-# define __SEM_DEBUG_INIT(name)
-#endif
-
-#define __SEMAPHORE_INIT(name,count)			\
-	{ ATOMIC_INIT(count), 0,			\
-	  __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
-	  __SEM_DEBUG_INIT(name) }
+#define __SEMAPHORE_INIT(name, n)					\
+{									\
+	.count		= ATOMIC_INIT(n),				\
+	.sleepers	= 0,						\
+	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait),	\
+}
 
 #define __MUTEX_INITIALIZER(name) \
 	__SEMAPHORE_INIT(name,1)
@@ -47,9 +39,6 @@ static inline void sema_init(struct semaphore *sem, int val)
 	atomic_set(&sem->count, val);
 	sem->sleepers = 0;
 	init_waitqueue_head(&sem->wait);
-#if WAITQUEUE_DEBUG
-	sem->__magic = (long)&sem->__magic;
-#endif
 }
 
 static inline void init_MUTEX(struct semaphore *sem)
@@ -81,9 +70,6 @@ extern void __up(struct semaphore * sem);
  */
 static inline void down(struct semaphore * sem)
 {
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 	__down_op(sem, __down_failed);
 }
@@ -94,19 +80,12 @@ static inline void down(struct semaphore * sem)
  */
 static inline int down_interruptible (struct semaphore * sem)
 {
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 	return __down_op_ret(sem, __down_interruptible_failed);
 }
 
 static inline int down_trylock(struct semaphore *sem)
 {
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
 	return __down_op_ret(sem, __down_trylock_failed);
 }
 
@@ -118,10 +97,6 @@ static inline int down_trylock(struct semaphore *sem)
  */
 static inline void up(struct semaphore * sem)
 {
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
-
 	__up_op(sem, __up_wakeup);
 }
 

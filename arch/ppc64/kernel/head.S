@@ -322,36 +322,11 @@ label##_Iseries:							\
 	HMT_MEDIUM;							\
 	mtspr	SPRG1,r13;		/* save r13 */			\
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXGEN);				\
-	lbz	r10,PACAPROFENABLED(r13);				\
-	cmpwi	r10,0;							\
-	bne-	label##_Iseries_profile;				\
-label##_Iseries_prof_ret:						\
 	lbz	r10,PACAPROCENABLED(r13);				\
 	cmpwi	0,r10,0;						\
 	beq-	label##_Iseries_masked;					\
 	EXCEPTION_PROLOG_ISERIES_2;					\
 	b	label##_common;						\
-label##_Iseries_profile:						\
-	ld	r12,PACALPPACA+LPPACASRR1(r13);				\
-	andi.	r12,r12,MSR_PR;		/* Test if in kernel */		\
-	bne	label##_Iseries_prof_ret;				\
-	ld	r11,PACALPPACA+LPPACASRR0(r13);				\
-	ld	r12,PACAPROFSTEXT(r13);	/* _stext */			\
-	subf	r11,r12,r11;		/* offset into kernel */	\
-	lwz	r12,PACAPROFSHIFT(r13);					\
-	srd	r11,r11,r12;						\
-	lwz	r12,PACAPROFLEN(r13);	/* profile table length - 1 */	\
-	cmpd	r11,r12;		/* off end? */			\
-	ble	1f;							\
-	mr	r11,r12;		/* force into last entry */	\
-1:	sldi	r11,r11,2;		/* convert to offset */		\
-	ld	r12,PACAPROFBUFFER(r13);/* profile buffer */		\
-	add	r12,r12,r11;						\
-2:	lwarx	r11,0,r12;		/* atomically increment */	\
-	addi	r11,r11,1;						\
-	stwcx.	r11,0,r12;						\
-	bne-	2b;							\
-	b	label##_Iseries_prof_ret
 
 #ifdef DO_SOFT_DISABLE
 #define DISABLE_INTS				\

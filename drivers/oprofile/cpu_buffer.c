@@ -9,7 +9,7 @@
  * Each CPU has a local buffer that stores PC value/event
  * pairs. We also log context switches when we notice them.
  * Eventually each CPU's buffer is processed into the global
- * event buffer by sync_cpu_buffers().
+ * event buffer by sync_buffer().
  *
  * We use a local buffer for two reasons: an NMI or similar
  * interrupt cannot synchronise, and high sampling rates
@@ -22,21 +22,24 @@
 #include <linux/errno.h>
  
 #include "cpu_buffer.h"
+#include "buffer_sync.h"
 #include "oprof.h"
 
 struct oprofile_cpu_buffer cpu_buffer[NR_CPUS] __cacheline_aligned;
+
+static void wq_sync_buffer(void *);
+static void timer_ping(unsigned long data);
+#define DEFAULT_TIMER_EXPIRE (HZ / 2)
+int timers_enabled;
 
 static void __free_cpu_buffers(int num)
 {
 	int i;
  
-	for (i=0; i < num; ++i) {
-		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
- 
-		if (!cpu_possible(i)) 
+	for (i = 0; i < NR_CPUS; ++i) {
+		if (!cpu_online(i))
 			continue;
- 
-		vfree(b->buffer);
+		vfree(cpu_buffer[i].buffer);
 	}
 }
  
@@ -47,12 +50,12 @@ int alloc_cpu_buffers(void)
  
 	unsigned long buffer_size = fs_cpu_buffer_size;
  
-	for (i=0; i < NR_CPUS; ++i) {
+	for (i = 0; i < NR_CPUS; ++i) {
 		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
  
-		if (!cpu_possible(i)) 
+		if (!cpu_online(i))
 			continue;
- 
+
 		b->buffer = vmalloc(sizeof(struct op_sample) * buffer_size);
 		if (!b->buffer)
 			goto fail;
@@ -64,9 +67,15 @@ int alloc_cpu_buffers(void)
 		b->head_pos = 0;
 		b->sample_received = 0;
 		b->sample_lost_overflow = 0;
-		b->sample_lost_task_exit = 0;
+		b->cpu = i;
+		init_timer(&b->timer);
+		b->timer.function = timer_ping;
+		b->timer.data = i;
+		b->timer.expires = jiffies + DEFAULT_TIMER_EXPIRE;
+		INIT_WORK(&b->work, wq_sync_buffer, b);
 	}
 	return 0;
+
 fail:
 	__free_cpu_buffers(i);
 	return -ENOMEM;
@@ -76,6 +85,42 @@ fail:
 void free_cpu_buffers(void)
 {
 	__free_cpu_buffers(NR_CPUS);
+}
+
+
+void start_cpu_timers(void)
+{
+	int i;
+
+	timers_enabled = 1;
+
+	for (i = 0; i < NR_CPUS; ++i) {
+		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
+
+		if (!cpu_online(i))
+			continue;
+
+		add_timer_on(&b->timer, i);
+	}
+}
+
+
+void end_cpu_timers(void)
+{
+	int i;
+
+	timers_enabled = 0;
+
+	for (i = 0; i < NR_CPUS; ++i) {
+		struct oprofile_cpu_buffer * b = &cpu_buffer[i];
+
+		if (!cpu_online(i))
+			continue;
+
+		del_timer_sync(&b->timer);
+	}
+
+	flush_scheduled_work();
 }
 
 
@@ -145,21 +190,9 @@ void oprofile_add_sample(unsigned long eip, unsigned int is_kernel,
 	/* notice a task switch */
 	if (cpu_buf->last_task != task) {
 		cpu_buf->last_task = task;
-		if (!(task->flags & PF_EXITING)) {
-			cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
-			cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
-			increment_head(cpu_buf);
-		}
-	}
- 
-	/* If the task is exiting it's not safe to take a sample
-	 * as the task_struct is about to be freed. We can't just
-	 * notify at release_task() time because of CLONE_DETACHED
-	 * tasks that release_task() themselves.
-	 */
-	if (task->flags & PF_EXITING) {
-		cpu_buf->sample_lost_task_exit++;
-		return;
+		cpu_buf->buffer[cpu_buf->head_pos].eip = ~0UL;
+		cpu_buf->buffer[cpu_buf->head_pos].event = (unsigned long)task;
+		increment_head(cpu_buf);
 	}
  
 	cpu_buf->buffer[cpu_buf->head_pos].eip = eip;
@@ -177,4 +210,37 @@ void cpu_buffer_reset(struct oprofile_cpu_buffer * cpu_buf)
 	 */
 	cpu_buf->last_is_kernel = -1;
 	cpu_buf->last_task = NULL;
+}
+
+
+/* FIXME: not guaranteed to be on our CPU */
+static void wq_sync_buffer(void * data)
+{
+	struct oprofile_cpu_buffer * b = (struct oprofile_cpu_buffer *)data;
+	if (b->cpu != smp_processor_id()) {
+		printk("WQ on CPU%d, prefer CPU%d\n",
+		       smp_processor_id(), b->cpu);
+	}
+	sync_buffer(b->cpu);
+
+	/* don't re-add the timer if we're shutting down */
+	if (timers_enabled) {
+		del_timer_sync(&b->timer);
+		add_timer_on(&b->timer, b->cpu);
+	}
+}
+
+
+/* This serves to avoid cpu buffer overflow, and makes sure
+ * the task mortuary progresses
+ */
+static void timer_ping(unsigned long data)
+{
+	struct oprofile_cpu_buffer * b = &cpu_buffer[data];
+	if (b->cpu != smp_processor_id()) {
+		printk("Timer on CPU%d, prefer CPU%d\n",
+		       smp_processor_id(), b->cpu);
+	}
+	schedule_work(&b->work);
+	/* work will re-enable our timer */
 }

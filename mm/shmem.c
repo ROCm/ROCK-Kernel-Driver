@@ -1332,7 +1332,8 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 			__get_user(dummy, buf + bytes - 1);
 
 			kaddr = kmap_atomic(page, KM_USER0);
-			left = __copy_from_user(kaddr + offset, buf, bytes);
+			left = __copy_from_user_inatomic(kaddr + offset,
+							buf, bytes);
 			kunmap_atomic(kaddr, KM_USER0);
 		}
 		if (left) {

@@ -417,23 +417,8 @@ static long last_rtc_update;
  */
 void local_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	if (!user_mode(regs)) {
-		if (prof_buffer && current->pid) {
-			unsigned long pc = regs->cp0_epc;
-
-			pc -= (unsigned long) _stext;
-			pc >>= prof_shift;
-			/*
-			 * Dont ignore out-of-bounds pc values silently,
-			 * put them into the last histogram slot, so if
-			 * present, they will show up as a sharp peak.
-			 */
-			if (pc > prof_len - 1)
-				pc = prof_len - 1;
-			atomic_inc((atomic_t *)&prof_buffer[pc]);
-		}
-	}
-
+	if (current->pid)
+		profile_tick(CPU_PROFILING, regs);
 #ifdef CONFIG_SMP
 	/* in UP mode, update_process_times() is invoked by do_timer() */
 	update_process_times(user_mode(regs));

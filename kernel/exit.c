@@ -528,10 +528,8 @@ static inline void choose_new_parent(task_t *p, task_t *reaper, task_t *child_re
 	 * Make sure we're not reparenting to ourselves and that
 	 * the parent is not a zombie.
 	 */
-	if (p == reaper || reaper->state >= TASK_ZOMBIE)
-		p->real_parent = child_reaper;
-	else
-		p->real_parent = reaper;
+	BUG_ON(p == reaper || reaper->state >= TASK_ZOMBIE);
+	p->real_parent = reaper;
 	if (p->parent == p->real_parent)
 		BUG();
 }
@@ -599,9 +597,13 @@ static inline void forget_original_parent(struct task_struct * father,
 	struct task_struct *p, *reaper = father;
 	struct list_head *_p, *_n;
 
-	reaper = father->group_leader;
-	if (reaper == father)
-		reaper = child_reaper;
+	do {
+		reaper = next_thread(reaper);
+		if (reaper == father) {
+			reaper = child_reaper;
+			break;
+		}
+	} while (reaper->state >= TASK_ZOMBIE);
 
 	/*
 	 * There are only two places where our children can be:
@@ -754,8 +756,8 @@ static void exit_notify(struct task_struct *tsk)
 	state = TASK_ZOMBIE;
 	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
 		state = TASK_DEAD;
-	else
-		tsk->state = state;
+	tsk->state = state;
+
 	/*
 	 * Clear these here so that update_process_times() won't try to deliver
 	 * itimer, profile or rlimit signals to this task while it is in late exit.
@@ -763,14 +765,6 @@ static void exit_notify(struct task_struct *tsk)
 	tsk->it_virt_value = 0;
 	tsk->it_prof_value = 0;
 	tsk->rlim[RLIMIT_CPU].rlim_cur = RLIM_INFINITY;
-
-	/*
-	 * Get a reference to it so that we can set the state
-	 * as the last step. The state-setting only matters if the
-	 * current task is releasing itself, to trigger the final
-	 * put_task_struct() in finish_task_switch(). (thread self-reap)
-	 */
-	get_task_struct(tsk);
 
 	write_unlock_irq(&tasklist_lock);
 
@@ -781,28 +775,19 @@ static void exit_notify(struct task_struct *tsk)
 	}
 
 	/* If the process is dead, release it - nobody will wait for it */
-	if (state == TASK_DEAD) {
-		lock_cpu_hotplug();
+	if (state == TASK_DEAD)
 		release_task(tsk);
-		write_lock_irq(&tasklist_lock);
-		/*
-		 * No preemption may happen from this point on,
-		 * or CPU hotplug (and task exit) breaks:
-		 */
-		unlock_cpu_hotplug();
-		tsk->state = state;
-		_raw_write_unlock(&tasklist_lock);
-		local_irq_enable();
-	} else
-		preempt_disable();
 
+	/* PF_DEAD causes final put_task_struct after we schedule. */
+	preempt_disable();
 	tsk->flags |= PF_DEAD;
-	put_task_struct(tsk);
 }
 
 asmlinkage NORET_TYPE void do_exit(long code)
 {
 	struct task_struct *tsk = current;
+
+	profile_task_exit(tsk);
 
 	if (unlikely(in_interrupt()))
 		panic("Aiee, killing interrupt handler!");
@@ -820,8 +805,6 @@ asmlinkage NORET_TYPE void do_exit(long code)
 				current->comm, current->pid,
 				preempt_count());
 
-	profile_exit_task(tsk);
- 
 	if (unlikely(current->ptrace & PT_TRACE_EXIT)) {
 		current->ptrace_message = code;
 		ptrace_notify((PTRACE_EVENT_EXIT << 8) | SIGTRAP);

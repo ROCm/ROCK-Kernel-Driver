@@ -233,6 +233,8 @@ void add_timer_on(struct timer_list *timer, int cpu)
 	spin_unlock_irqrestore(&base->lock, flags);
 }
 
+EXPORT_SYMBOL(add_timer_on);
+
 /***
  * mod_timer - modify a timer's timeout
  * @timer: the timer to be modified
@@ -1446,11 +1448,13 @@ is_better_time_interpolator(struct time_interpolator *new)
 void
 register_time_interpolator(struct time_interpolator *ti)
 {
+	unsigned long flags;
+
 	spin_lock(&time_interpolator_lock);
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	if (is_better_time_interpolator(ti))
 		time_interpolator = ti;
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 
 	ti->next = time_interpolator_list;
 	time_interpolator_list = ti;
@@ -1461,6 +1465,7 @@ void
 unregister_time_interpolator(struct time_interpolator *ti)
 {
 	struct time_interpolator *curr, **prev;
+	unsigned long flags;
 
 	spin_lock(&time_interpolator_lock);
 	prev = &time_interpolator_list;
@@ -1472,7 +1477,7 @@ unregister_time_interpolator(struct time_interpolator *ti)
 		prev = &curr->next;
 	}
 
-	write_seqlock_irq(&xtime_lock);
+	write_seqlock_irqsave(&xtime_lock, flags);
 	if (ti == time_interpolator) {
 		/* we lost the best time-interpolator: */
 		time_interpolator = NULL;
@@ -1481,7 +1486,7 @@ unregister_time_interpolator(struct time_interpolator *ti)
 			if (is_better_time_interpolator(curr))
 				time_interpolator = curr;
 	}
-	write_sequnlock_irq(&xtime_lock);
+	write_sequnlock_irqrestore(&xtime_lock, flags);
 	spin_unlock(&time_interpolator_lock);
 }
 #endif /* CONFIG_TIME_INTERPOLATION */

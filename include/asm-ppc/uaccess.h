@@ -331,6 +331,8 @@ copy_to_user(void __user *to, const void *from, unsigned long n)
 	__copy_tofrom_user((void __user *)(to), (from), (size))
 #define __copy_to_user(to, from, size) \
 	__copy_tofrom_user((to), (void __user *)(from), (size))
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 extern unsigned long __clear_user(void __user *addr, unsigned long size);
 

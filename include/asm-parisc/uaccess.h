@@ -279,5 +279,7 @@ extern long lstrnlen_user(const char __user *,long);
 #define __copy_to_user lcopy_to_user
 #define copy_in_user lcopy_in_user
 #define __copy_in_user lcopy_in_user
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 #endif /* __PARISC_UACCESS_H */

@@ -1551,6 +1551,7 @@ __getblk(struct block_device *bdev, sector_t block, int size)
 {
 	struct buffer_head *bh = __find_get_block(bdev, block, size);
 
+	might_sleep();
 	if (bh == NULL)
 		bh = __getblk_slow(bdev, block, size);
 	return bh;
@@ -1775,6 +1776,8 @@ EXPORT_SYMBOL(create_empty_buffers);
 void unmap_underlying_metadata(struct block_device *bdev, sector_t block)
 {
 	struct buffer_head *old_bh;
+
+	might_sleep();
 
 	old_bh = __find_get_block_slow(bdev, block, 0);
 	if (old_bh) {

@@ -24,6 +24,7 @@
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/smp.h>
+#include <linux/profile.h>
 
 #include <asm/processor.h>
 #include <asm/uaccess.h>
@@ -250,36 +251,6 @@ EXPORT_SYMBOL(do_settimeofday);
 /* last time the RTC clock got updated */
 static long last_rtc_update;
 
-/* Profiling definitions */
-extern unsigned long prof_cpu_mask;
-extern unsigned int * prof_buffer;
-extern unsigned long prof_len;
-extern unsigned long prof_shift;
-extern char _stext;
-
-static inline void sh_do_profile(unsigned long pc)
-{
-	/* Don't profile cpu_idle.. */
-	if (!prof_buffer || !current->pid)
-		return;
-
-	if (pc >= 0xa0000000UL && pc < 0xc0000000UL)
-		pc -= 0x20000000;
-
-	pc -= (unsigned long)&_stext;
-	pc >>= prof_shift;
-
-	/*
-	 * Don't ignore out-of-bounds PC values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (pc > prof_len - 1)
-		pc = prof_len - 1;
-
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}
-
 /*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
@@ -287,9 +258,7 @@ static inline void sh_do_profile(unsigned long pc)
 static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	do_timer(regs);
-
-	if (!user_mode(regs))
-		sh_do_profile(regs->pc);
+	profile_tick(CPU_PROFILING, regs);
 
 #ifdef CONFIG_HEARTBEAT
 	if (sh_mv.mv_heartbeat != NULL) 

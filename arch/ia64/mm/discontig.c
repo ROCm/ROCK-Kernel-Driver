@@ -664,6 +664,7 @@ void paging_init(void)
 
 		pfn_offset = mem_data[node].min_pfn;
 
+		NODE_DATA(node)->node_mem_map = vmem_map + pfn_offset;
 		free_area_init_node(node, NODE_DATA(node), zones_size,
 				    pfn_offset, zholes_size);
 	}

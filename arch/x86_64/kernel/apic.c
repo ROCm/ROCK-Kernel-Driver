@@ -836,8 +836,7 @@ void smp_local_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
-	x86_do_profile(regs);
-
+	profile_tick(CPU_PROFILING, regs);
 	if (--per_cpu(prof_counter, cpu) <= 0) {
 		/*
 		 * The multiplier may have changed since the last time we got

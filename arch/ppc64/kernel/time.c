@@ -108,46 +108,6 @@ void ppc_adjtimex(void);
 
 static unsigned adjusting_time = 0;
 
-/*
- * The profiling function is SMP safe. (nothing can mess
- * around with "current", and the profiling counters are
- * updated with atomic operations). This is especially
- * useful with a profiling multiplier != 1
- */
-static inline void ppc64_do_profile(struct pt_regs *regs)
-{
-	unsigned long nip;
-	extern unsigned long prof_cpu_mask;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	nip = instruction_pointer(regs);
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
-		return;
-
-	nip -= (unsigned long)_stext;
-	nip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds EIP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (nip > prof_len-1)
-		nip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[nip]);
-}
-
 static __inline__ void timer_check_rtc(void)
 {
         /*
@@ -278,7 +238,7 @@ int timer_interrupt(struct pt_regs * regs)
 	irq_enter();
 
 #ifndef CONFIG_PPC_ISERIES
-	ppc64_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	lpaca->lppaca.xIntDword.xFields.xDecrInt = 0;

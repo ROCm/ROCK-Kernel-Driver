@@ -24,21 +24,14 @@ struct semaphore {
 	atomic_t count;
 	atomic_t waking;
 	wait_queue_head_t wait;
-#if WAITQUEUE_DEBUG
-	long __magic;
-#endif
 };
 
-#if WAITQUEUE_DEBUG
-# define __SEM_DEBUG_INIT(name)         , (long)&(name).__magic
-#else
-# define __SEM_DEBUG_INIT(name)
-#endif
-
-#define __SEMAPHORE_INITIALIZER(name,count)             \
-        { ATOMIC_INIT(count), ATOMIC_INIT(0),           \
-          __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)    \
-          __SEM_DEBUG_INIT(name) }
+#define __SEMAPHORE_INITIALIZER(name, n)				\
+{									\
+	.count		= ATOMIC_INIT(n),				\
+	.waking		= ATOMIC_INIT(0),				\
+	.wait		= __WAIT_QUEUE_HEAD_INITIALIZER((name).wait)    \
+}
 
 #define __MUTEX_INITIALIZER(name) \
         __SEMAPHORE_INITIALIZER(name,1)
@@ -76,9 +69,6 @@ extern inline void down(struct semaphore * sem)
 	unsigned long flags;
 	int failed;
 
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 
 	/* atomically decrement the semaphores count, and if its negative, we wait */
@@ -102,9 +92,6 @@ extern inline int down_interruptible(struct semaphore * sem)
 	unsigned long flags;
 	int failed;
 
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 	might_sleep();
 
 	/* atomically decrement the semaphores count, and if its negative, we wait */
@@ -121,10 +108,6 @@ extern inline int down_trylock(struct semaphore * sem)
 {
 	unsigned long flags;
 	int failed;
-
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 
 	local_save_flags(flags);
 	local_irq_disable();
@@ -145,10 +128,6 @@ extern inline void up(struct semaphore * sem)
 {  
 	unsigned long flags;
 	int wakeup;
-
-#if WAITQUEUE_DEBUG
-	CHECK_MAGIC(sem->__magic);
-#endif
 
 	/* atomically increment the semaphores count, and if it was negative, we wake people */
 	local_save_flags(flags);

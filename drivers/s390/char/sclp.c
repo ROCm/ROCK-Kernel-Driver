@@ -20,6 +20,7 @@
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/cpumask.h>
+#include <linux/reboot.h>
 #include <asm/s390_ext.h>
 #include <asm/processor.h>
 
@@ -60,6 +61,7 @@ static volatile unsigned long sclp_status = 0;
 #define SCLP_INIT		0
 #define SCLP_RUNNING		1
 #define SCLP_READING		2
+#define SCLP_SHUTDOWN		3
 
 #define SCLP_INIT_POLL_INTERVAL	1
 #define SCLP_BUSY_POLL_INTERVAL	1
@@ -606,10 +608,12 @@ sclp_init_mask(void)
 	sccb->mask_length = sizeof(sccb_mask_t);
 	/* copy in the sccb mask of the registered event types */
 	spin_lock_irqsave(&sclp_lock, flags);
-	list_for_each(l, &sclp_reg_list) {
-		t = list_entry(l, struct sclp_register, list);
-		sccb->receive_mask |= t->receive_mask;
-		sccb->send_mask |= t->send_mask;
+	if (!test_bit(SCLP_SHUTDOWN, &sclp_status)) {
+		list_for_each(l, &sclp_reg_list) {
+			t = list_entry(l, struct sclp_register, list);
+			sccb->receive_mask |= t->receive_mask;
+			sccb->send_mask |= t->send_mask;
+		}
 	}
 	sccb->sclp_receive_mask = 0;
 	sccb->sclp_send_mask = 0;
@@ -647,9 +651,10 @@ sclp_init_mask(void)
 		/* WRITEMASK failed - we cannot rely on receiving a state
 		   change event, so initially, polling is the only alternative
 		   for us to ever become operational. */
-		if (!timer_pending(&retry_timer) ||
-		    !mod_timer(&retry_timer,
-			       jiffies + SCLP_INIT_POLL_INTERVAL*HZ)) {
+		if (!test_bit(SCLP_SHUTDOWN, &sclp_status) &&
+		    (!timer_pending(&retry_timer) ||
+		     !mod_timer(&retry_timer,
+			       jiffies + SCLP_INIT_POLL_INTERVAL*HZ))) {
 			retry_timer.function = sclp_init_mask_retry;
 			retry_timer.data = 0;
 			retry_timer.expires = jiffies +
@@ -671,6 +676,26 @@ sclp_init_mask_retry(unsigned long data)
 	sclp_init_mask();
 }
 
+/* Reboot event handler - reset send and receive mask to prevent pending SCLP
+ * events from interfering with rebooted system. */
+static int
+sclp_reboot_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	unsigned long flags;
+
+	/* Note: need spinlock to maintain atomicity when accessing global
+         * variables. */
+	spin_lock_irqsave(&sclp_lock, flags);
+	set_bit(SCLP_SHUTDOWN, &sclp_status);
+	spin_unlock_irqrestore(&sclp_lock, flags);
+	sclp_init_mask();
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block sclp_reboot_notifier = {
+	.notifier_call = sclp_reboot_event
+};
+
 /*
  * sclp setup function. Called early (no kmalloc!) from sclp_console_init().
  */
@@ -690,6 +715,10 @@ sclp_init(void)
 	INIT_LIST_HEAD(&sclp_reg_list);
 	list_add(&sclp_state_change_event.list, &sclp_reg_list);
 	list_add(&sclp_quiesce_event.list, &sclp_reg_list);
+
+	rc = register_reboot_notifier(&sclp_reboot_notifier);
+	if (rc)
+		return rc;
 
 	/*
 	 * request the 0x2401 external interrupt

@@ -433,7 +433,7 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_flags |= mm->def_flags;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
 		insert_vm_struct(mm, mpnt);
-		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		mm->stack_vm = mm->total_vm = vma_pages(mpnt);
 	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {

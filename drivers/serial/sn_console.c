@@ -81,6 +81,12 @@
 #define DEVICE_MAJOR 204
 #define DEVICE_MINOR 40
 
+#ifdef CONFIG_MAGIC_SYSRQ
+static char sysrq_serial_str[] = "\eSYS";
+static char *sysrq_serial_ptr = sysrq_serial_str;
+static unsigned long sysrq_requested;
+#endif /* CONFIG_MAGIC_SYSRQ */
+
 /*
  * Port definition - this kinda drives it all
  */
@@ -533,13 +539,15 @@ sn_debug_printf(const char *fmt, ...)
  * sn_receive_chars - Grab characters, pass them to tty layer
  * @port: Port to operate on
  * @regs: Saved registers (needed by uart_handle_sysrq_char)
+ * @flags: irq flags
  *
  * Note: If we're not registered with the serial core infrastructure yet,
  * we don't try to send characters to it...
  *
  */
 static void
-sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs)
+sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs,
+		 unsigned long flags)
 {
 	int ch;
 	struct tty_struct *tty;
@@ -570,10 +578,29 @@ sn_receive_chars(struct sn_cons_port *port, struct pt_regs *regs)
 			       "obtaining data from the console (0x%0x)\n", ch);
 			break;
 		}
-#if defined(CONFIG_SERIAL_SGI_L1_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
-		if (uart_handle_sysrq_char(&port->sc_port, ch, regs))
-			continue;
-#endif				/* CONFIG_SERIAL_SGI_L1_CONSOLE && CONFIG_MAGIC_SYSRQ */
+#ifdef CONFIG_MAGIC_SYSRQ
+                if (sysrq_requested) {
+                        unsigned long sysrq_timeout = sysrq_requested + HZ*5;
+
+                        sysrq_requested = 0;
+                        if (ch && time_before(jiffies, sysrq_timeout)) {
+                                spin_unlock_irqrestore(&port->sc_port.lock, flags);
+                                handle_sysrq(ch, regs, NULL);
+                                spin_lock_irqsave(&port->sc_port.lock, flags);
+                                /* ignore actual sysrq command char */
+                                continue;
+                        }
+                }
+                if (ch == *sysrq_serial_ptr) {
+                        if (!(*++sysrq_serial_ptr)) {
+                                sysrq_requested = jiffies;
+                                sysrq_serial_ptr = sysrq_serial_str;
+                        }
+			continue; /* ignore the whole sysrq string */
+                }
+                else
+                        sysrq_serial_ptr = sysrq_serial_str;
+#endif /* CONFIG_MAGIC_SYSRQ */
 
 		/* record the character to pass up to the tty layer */
 		if (tty) {
@@ -696,7 +723,7 @@ sn_sal_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	spin_lock_irqsave(&port->sc_port.lock, flags);
 	if (status & SAL_CONSOLE_INTR_RECV) {
-		sn_receive_chars(port, regs);
+		sn_receive_chars(port, regs, flags);
 	}
 	if (status & SAL_CONSOLE_INTR_XMIT) {
 		sn_transmit_chars(port, TRANSMIT_BUFFERED);
@@ -745,7 +772,7 @@ sn_sal_timer_poll(unsigned long data)
 
 	if (!port->sc_port.irq) {
 		spin_lock_irqsave(&port->sc_port.lock, flags);
-		sn_receive_chars(port, NULL);
+		sn_receive_chars(port, NULL, flags);
 		sn_transmit_chars(port, TRANSMIT_RAW);
 		spin_unlock_irqrestore(&port->sc_port.lock, flags);
 		mod_timer(&port->sc_timer,
@@ -853,7 +880,6 @@ sn_sal_switch_to_interrupts(struct sn_cons_port *port)
  * Kernel console definitions
  */
 
-#ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 static void sn_sal_console_write(struct console *, const char *, unsigned);
 static int __init sn_sal_console_setup(struct console *, char *);
 extern struct uart_driver sal_console_uart;
@@ -869,9 +895,6 @@ static struct console sal_console = {
 };
 
 #define SAL_CONSOLE	&sal_console
-#else
-#define SAL_CONSOLE	0
-#endif				/* CONFIG_SERIAL_SGI_L1_CONSOLE */
 
 static struct uart_driver sal_console_uart = {
 	.owner = THIS_MODULE,
@@ -970,8 +993,6 @@ sn_sal_module_exit(void)
 
 module_init(sn_sal_module_init);
 module_exit(sn_sal_module_exit);
-
-#ifdef CONFIG_SERIAL_SGI_L1_CONSOLE
 
 /**
  * puts_raw_fixed - sn_sal_console_write helper for adding \r's as required
@@ -1194,5 +1215,3 @@ sn_sal_serial_console_init(void)
 }
 
 console_initcall(sn_sal_serial_console_init);
-
-#endif				/* CONFIG_SERIAL_SGI_L1_CONSOLE */

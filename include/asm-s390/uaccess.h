@@ -250,6 +250,9 @@ extern int __put_user_bad(void);
 
 extern int __get_user_bad(void);
 
+#define __put_user_unaligned __put_user
+#define __get_user_unaligned __get_user
+
 extern long __copy_to_user_asm(const void *from, long n, void __user *to);
 
 /**
@@ -271,6 +274,9 @@ __copy_to_user(void __user *to, const void *from, unsigned long n)
 {
 	return __copy_to_user_asm(from, n, to);
 }
+
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
 
 /**
  * copy_to_user: - Copy a block of data into user space.

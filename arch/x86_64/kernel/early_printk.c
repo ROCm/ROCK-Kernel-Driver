@@ -8,7 +8,7 @@
 /* Simple VGA output */
 
 #ifdef __i386__
-#define VGABASE		__pa(__PAGE_OFFSET + 0xb8000UL)
+#define VGABASE		__pa((void *)(__PAGE_OFFSET + 0xb8000UL))
 #else
 #define VGABASE		0xffffffff800b8000UL
 #endif

@@ -90,6 +90,15 @@ struct pt_dspregs {
 #define user_mode(regs) (((regs)->sr & 0x40000000)==0)
 #define instruction_pointer(regs) ((regs)->pc)
 extern void show_regs(struct pt_regs *);
+
+static inline unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+
+	if (pc >= 0xa0000000UL && pc < 0xc0000000UL)
+		pc -= 0x20000000;
+	return pc;
+}
 #endif
 
 #endif /* __ASM_SH_PTRACE_H */

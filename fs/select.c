@@ -118,15 +118,11 @@ void __pollwait(struct file *filp, wait_queue_head_t *wait_address, poll_table *
 	}
 }
 
+#define FDS_IN(fds, n)		(fds->in + n)
+#define FDS_OUT(fds, n)		(fds->out + n)
+#define FDS_EX(fds, n)		(fds->ex + n)
 
-#define __IN(fds, n)		(fds->in + n)
-#define __OUT(fds, n)		(fds->out + n)
-#define __EX(fds, n)		(fds->ex + n)
-#define __RES_IN(fds, n)	(fds->res_in + n)
-#define __RES_OUT(fds, n)	(fds->res_out + n)
-#define __RES_EX(fds, n)	(fds->res_ex + n)
-
-#define BITS(fds, n)		(*__IN(fds, n)|*__OUT(fds, n)|*__EX(fds, n))
+#define BITS(fds, n)	(*FDS_IN(fds, n)|*FDS_OUT(fds, n)|*FDS_EX(fds, n))
 
 static int max_select_fd(unsigned long n, fd_set_bits *fds)
 {
@@ -377,9 +373,10 @@ sys_select(int n, fd_set __user *inp, fd_set __user *outp, fd_set __user *exp, s
 		ret = 0;
 	}
 
-	set_fd_set(n, inp, fds.res_in);
-	set_fd_set(n, outp, fds.res_out);
-	set_fd_set(n, exp, fds.res_ex);
+	if (set_fd_set(n, inp, fds.res_in) ||
+	    set_fd_set(n, outp, fds.res_out) ||
+	    set_fd_set(n, exp, fds.res_ex))
+		ret = -EFAULT;
 
 out:
 	select_bits_free(bits, size);

@@ -661,7 +661,7 @@ void show_stack(struct task_struct *tsk, unsigned long *stack)
 		++count;
 		sp = *(unsigned long *)sp;
 	}
-#if !CONFIG_KALLSYMS
+#ifndef CONFIG_KALLSYMS
 	if (count > 0)
 		printk("\n");
 #endif

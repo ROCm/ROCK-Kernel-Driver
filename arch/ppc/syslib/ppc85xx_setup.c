@@ -277,7 +277,7 @@ mpc85xx_setup_hose(void)
 	hose_a->io_space.start = MPC85XX_PCI1_LOWER_IO;
 	hose_a->io_space.end = MPC85XX_PCI1_UPPER_IO;
 	hose_a->io_base_phys = MPC85XX_PCI1_IO_BASE;
-#if CONFIG_85xx_PCI2
+#ifdef CONFIG_85xx_PCI2
 	isa_io_base =
 		(unsigned long) ioremap(MPC85XX_PCI1_IO_BASE,
 					MPC85XX_PCI1_IO_SIZE +
@@ -304,7 +304,7 @@ mpc85xx_setup_hose(void)
 
 	hose_a->last_busno = pciauto_bus_scan(hose_a, hose_a->first_busno);
 
-#if CONFIG_85xx_PCI2
+#ifdef CONFIG_85xx_PCI2
 	hose_b = pcibios_alloc_controller();
 
 	if (!hose_b)

@@ -129,40 +129,6 @@ __asm__( \
 	"push $" #nr "-256 ; " \
 	"jmp common_interrupt");
 
-static inline void x86_do_profile (struct pt_regs *regs) 
-{
-	unsigned long rip;
-	extern unsigned long prof_cpu_mask;
-	extern char _stext[];
- 
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-	if (!prof_buffer)
-		return;
-
-	rip = regs->rip;
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
-		return;
-
-	rip -= (unsigned long) &_stext;
-	rip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds EIP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (rip > prof_len-1)
-		rip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[rip]);
-}
-
 #if defined(CONFIG_X86_IO_APIC) && defined(CONFIG_SMP)
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 	if (IO_APIC_IRQ(i))

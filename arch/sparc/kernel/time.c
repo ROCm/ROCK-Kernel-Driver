@@ -79,38 +79,24 @@ struct intersil *intersil_clock;
 
 #endif
 
-static spinlock_t ticker_lock = SPIN_LOCK_UNLOCKED;
-
-/* 32-bit Sparc specific profiling function. */
-void sparc_do_profile(unsigned long pc, unsigned long o7)
+unsigned long profile_pc(struct pt_regs *regs)
 {
-	if(prof_buffer && current->pid) {
-		extern int _stext;
-		extern int __copy_user_begin, __copy_user_end;
-		extern int __atomic_begin, __atomic_end;
-		extern int __bzero_begin, __bzero_end;
-		extern int __bitops_begin, __bitops_end;
+	extern int __copy_user_begin, __copy_user_end;
+	extern int __atomic_begin, __atomic_end;
+	extern int __bzero_begin, __bzero_end;
+	extern int __bitops_begin, __bitops_end;
+	unsigned long pc = regs->pc;
 
-		if ((pc >= (unsigned long) &__copy_user_begin &&
-		     pc < (unsigned long) &__copy_user_end) ||
-		    (pc >= (unsigned long) &__atomic_begin &&
-		     pc < (unsigned long) &__atomic_end) ||
-		    (pc >= (unsigned long) &__bzero_begin &&
-		     pc < (unsigned long) &__bzero_end) ||
-		    (pc >= (unsigned long) &__bitops_begin &&
-		     pc < (unsigned long) &__bitops_end))
-			pc = o7;
-
-		pc -= (unsigned long) &_stext;
-		pc >>= prof_shift;
-
-		spin_lock(&ticker_lock);
-		if(pc < prof_len)
-			prof_buffer[pc]++;
-		else
-			prof_buffer[prof_len - 1]++;
-		spin_unlock(&ticker_lock);
-	}
+	if ((pc >= (unsigned long) &__copy_user_begin &&
+	     pc < (unsigned long) &__copy_user_end) ||
+	    (pc >= (unsigned long) &__atomic_begin &&
+	     pc < (unsigned long) &__atomic_end) ||
+	    (pc >= (unsigned long) &__bzero_begin &&
+	     pc < (unsigned long) &__bzero_end) ||
+	    (pc >= (unsigned long) &__bitops_begin &&
+	     pc < (unsigned long) &__bitops_end))
+		pc = regs->u_regs[UREG_RETPC];
+	return pc;
 }
 
 __volatile__ unsigned int *master_l10_counter;
@@ -129,8 +115,7 @@ irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	static long last_rtc_update;
 
 #ifndef CONFIG_SMP
-	if(!user_mode(regs))
-		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
+	profile_tick(CPU_PROFILING, regs);
 #endif
 
 	/* Protect counter clear so that do_gettimeoffset works */

@@ -332,6 +332,7 @@ int journal_revoke(handle_t *handle, unsigned long blocknr,
 	struct block_device *bdev;
 	int err;
 
+	might_sleep();
 	if (bh_in)
 		BUFFER_TRACE(bh_in, "enter");
 
