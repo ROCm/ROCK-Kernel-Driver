@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC7xxx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#227 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.c#228 $
  *
  * Copyright (c) 1994 John Aycock
  *   The University of Calgary Department of Computer Science.
@@ -1725,7 +1725,7 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	struct	 Scsi_Host *host;
 	char	*new_name;
 	u_long	 s;
-	u_int	 target;
+	u_int	 targ_offset;
 
 	template->name = ahc->description;
 	host = scsi_register(template, sizeof(struct ahc_softc *));
@@ -1780,14 +1780,19 @@ ahc_linux_register_host(struct ahc_softc *ahc, Scsi_Host_Template *template)
 	 * negotiation will occur for the first command, and DV
 	 * will comence should that first command be successful.
 	 */
-	for (target = 0;
-	     target < host->max_id * (host->max_channel + 1); target++) {
+	for (targ_offset = 0;
+	     targ_offset < host->max_id * (host->max_channel + 1);
+	     targ_offset++) {
 		u_int channel;
+		u_int target;
 
 		channel = 0;
+		target = targ_offset;
 		if (target > 7
-		 && (ahc->features & AHC_TWIN) != 0)
+		 && (ahc->features & AHC_TWIN) != 0) {
 			channel = 1;
+			target &= 0x7;
+		}
 		/*
 		 * Skip our own ID.  Some Compaq/HP storage devices
 		 * have enclosure management devices that respond to
@@ -2421,8 +2426,10 @@ ahc_linux_dv_target(struct ahc_softc *ahc, u_int target_offset)
 		ahc_unlock(ahc, &s);
 		return;
 	}
-	ahc_compile_devinfo(&devinfo, ahc->our_id, targ->target, /*lun*/0,
-			    targ->channel + 'A', ROLE_INITIATOR);
+	ahc_compile_devinfo(&devinfo,
+			    targ->channel == 0 ? ahc->our_id : ahc->our_id_b,
+			    targ->target, /*lun*/0, targ->channel + 'A',
+			    ROLE_INITIATOR);
 #ifdef AHC_DEBUG
 	if (ahc_debug & AHC_SHOW_DV) {
 		ahc_print_devinfo(ahc, &devinfo);
