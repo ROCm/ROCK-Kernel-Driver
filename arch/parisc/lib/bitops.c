@@ -34,26 +34,26 @@ unsigned long __xchg64(unsigned long x, unsigned long *ptr)
 unsigned long __xchg32(int x, int *ptr)
 {
 	unsigned long flags;
-	unsigned long temp;
+	long temp;
 
 	atomic_spin_lock_irqsave(ATOMIC_HASH(ptr), flags);
-	(long) temp = (long) *ptr;	/* XXX - sign extension wanted? */
+	temp = (long) *ptr;	/* XXX - sign extension wanted? */
 	*ptr = x;
 	atomic_spin_unlock_irqrestore(ATOMIC_HASH(ptr), flags);
-	return temp;
+	return (unsigned long)temp;
 }
 
 
 unsigned long __xchg8(char x, char *ptr)
 {
 	unsigned long flags;
-	unsigned long temp;
+	long temp;
 
 	atomic_spin_lock_irqsave(ATOMIC_HASH(ptr), flags);
-	(long) temp = (long) *ptr;	/* XXX - sign extension wanted? */
+	temp = (long) *ptr;	/* XXX - sign extension wanted? */
 	*ptr = x;
 	atomic_spin_unlock_irqrestore(ATOMIC_HASH(ptr), flags);
-	return temp;
+	return (unsigned long)temp;
 }
 
 

@@ -958,9 +958,9 @@ static inline int close(int fd)
 	return sys_close(fd);
 }
 
-static inline int _exit(int exitcode)
+static inline void _exit(int exitcode)
 {
-	return sys_exit(exitcode);
+	sys_exit(exitcode);
 }
 
 static inline pid_t waitpid(pid_t pid, int *wait_stat, int options)

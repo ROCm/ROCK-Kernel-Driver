@@ -8,18 +8,6 @@
  * understand what is happening here
  */
 
-/*
- * J. David Anglin writes:
- *
- * "You have to adjust the current sp to that at the begining of the function.
- * There can be up to two stack additions to allocate the frame in the
- * prologue.  Similar things happen in the epilogue.  In the presence of
- * interrupts, you have to be concerned about where you are in the function
- * and what stack adjustments have taken place."
- *
- * For now these cases are not handled, but they should be!
- */
-
 #include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -36,8 +24,8 @@
 #define dbg(x...)
 #endif
 
-extern const struct unwind_table_entry __start___unwind[];
-extern const struct unwind_table_entry __stop___unwind[];
+extern struct unwind_table_entry __start___unwind[];
+extern struct unwind_table_entry __stop___unwind[];
 
 static spinlock_t unwind_lock;
 /*
@@ -54,8 +42,6 @@ find_unwind_entry_in_table(const struct unwind_table *table, unsigned long addr)
 {
 	const struct unwind_table_entry *e = 0;
 	unsigned long lo, hi, mid;
-
-	addr -= table->base_addr;
 
 	for (lo = 0, hi = table->length; lo < hi; )
 	{
@@ -97,10 +83,11 @@ find_unwind_entry(unsigned long addr)
 static void
 unwind_table_init(struct unwind_table *table, const char *name,
 		  unsigned long base_addr, unsigned long gp,
-		  const void *table_start, const void *table_end)
+		  void *table_start, void *table_end)
 {
-	const struct unwind_table_entry *start = table_start;
-	const struct unwind_table_entry *end = table_end - 1;
+	struct unwind_table_entry *start = table_start;
+	struct unwind_table_entry *end = 
+		(struct unwind_table_entry *)table_end - 1;
 
 	table->name = name;
 	table->base_addr = base_addr;
@@ -108,14 +95,19 @@ unwind_table_init(struct unwind_table *table, const char *name,
 	table->start = base_addr + start->region_start;
 	table->end = base_addr + end->region_end;
 	table->table = (struct unwind_table_entry *)table_start;
-	table->length = end - start;
+	table->length = end - start + 1;
 	table->next = NULL;
+
+	for (; start <= end; start++) {
+		start->region_start += base_addr;
+		start->region_end += base_addr;
+	}
 }
 
 void *
 unwind_table_add(const char *name, unsigned long base_addr, 
 		 unsigned long gp,
-                 const void *start, const void *end)
+                 void *start, void *end)
 {
 	struct unwind_table *table;
 	unsigned long flags;
@@ -206,6 +198,8 @@ static void unwind_frame_regs(struct unwind_frame_info *info)
 			sp = info->prev_sp;
 		} while (info->prev_ip < (unsigned long)_stext ||
 			 info->prev_ip > (unsigned long)_etext);
+
+		dbg("analyzing func @ %lx with no unwind info, setting prev_sp=%lx prev_ip=%lx\n", info->ip, info->prev_sp, info->prev_ip);
 	} else {
 
 		dbg("e->start = 0x%x, e->end = 0x%x, Save_SP = %d, Save_RP = %d size = %u\n",
@@ -225,42 +219,57 @@ static void unwind_frame_regs(struct unwind_frame_info *info)
 				/* ldo X(sp), sp, or stwm X,D(sp) */
 				frame_size += (insn & 0x1 ? -1 << 13 : 0) | 
 					((insn & 0x3fff) >> 1);
+				dbg("analyzing func @ %lx, insn=%08x @ %lx, frame_size = %ld\n", info->ip, insn, npc, frame_size);
 			} else if ((insn & 0xffe00008) == 0x7ec00008) {
 				/* std,ma X,D(sp) */
 				frame_size += (insn & 0x1 ? -1 << 13 : 0) | 
 					(((insn >> 4) & 0x3ff) << 3);
+				dbg("analyzing func @ %lx, insn=%08x @ %lx, frame_size = %ld\n", info->ip, insn, npc, frame_size);
 			} else if (insn == 0x6bc23fd9) { 
 				/* stw rp,-20(sp) */
 				rpoffset = 20;
 				looking_for_rp = 0;
+				dbg("analyzing func @ %lx, insn=stw rp,-20(sp) @ %lx\n", info->ip, npc);
 			} else if (insn == 0x0fc212c1) {
 				/* std rp,-16(sr0,sp) */
 				rpoffset = 16;
 				looking_for_rp = 0;
+				dbg("analyzing func @ %lx, insn=std rp,-16(sp) @ %lx\n", info->ip, npc);
 			}
 		}
 
 		info->prev_sp = info->sp - frame_size;
 		if (rpoffset)
-			info->prev_ip = *(unsigned long *)(info->prev_sp - rpoffset);
+			info->rp = *(unsigned long *)(info->prev_sp - rpoffset);
+		info->prev_ip = info->rp;
+		info->rp = 0;
+
+		dbg("analyzing func @ %lx, setting prev_sp=%lx prev_ip=%lx\n", info->ip, info->prev_sp, info->prev_ip);
 	}
 }
 
 void unwind_frame_init(struct unwind_frame_info *info, struct task_struct *t, 
-		       struct pt_regs *regs)
+		       unsigned long sp, unsigned long ip, unsigned long rp)
 {
 	memset(info, 0, sizeof(struct unwind_frame_info));
 	info->t = t;
-	info->sp = regs->ksp;
-	info->ip = regs->kpc;
+	info->sp = sp;
+	info->ip = ip;
+	info->rp = rp;
 
-	dbg("(%d) Start unwind from sp=%08lx ip=%08lx\n", (int)t->pid, info->sp, info->ip);
+	dbg("(%d) Start unwind from sp=%08lx ip=%08lx\n", t ? (int)t->pid : 0, info->sp, info->ip);
 }
 
 void unwind_frame_init_from_blocked_task(struct unwind_frame_info *info, struct task_struct *t)
 {
 	struct pt_regs *regs = &t->thread.regs;
-	unwind_frame_init(info, t, regs);
+	unwind_frame_init(info, t, regs->ksp, regs->kpc, 0);
+}
+
+void unwind_frame_init_running(struct unwind_frame_info *info, struct pt_regs *regs)
+{
+	unwind_frame_init(info, current, regs->gr[30], regs->iaoq[0],
+			  regs->gr[2]);
 }
 
 int unwind_once(struct unwind_frame_info *next_frame)

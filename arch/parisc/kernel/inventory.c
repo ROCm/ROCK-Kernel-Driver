@@ -25,7 +25,9 @@
 #include <linux/mm.h>
 #include <asm/hardware.h>
 #include <asm/io.h>
+#include <asm/mmzone.h>
 #include <asm/pdc.h>
+#include <asm/pdcpat.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/parisc-device.h>

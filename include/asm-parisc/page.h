@@ -60,9 +60,14 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #else
 #define pte_flags(x)	((x).flags)
 #endif
-#define pmd_val(x)	((x).pmd)
-#define pgd_val(x)	((x).pgd)
+
+/* These do not work lvalues, so make sure we don't use them as such. */
+#define pmd_val(x)	((x).pmd + 0)
+#define pgd_val(x)	((x).pgd + 0)
 #define pgprot_val(x)	((x).pgprot)
+
+#define __pmd_val_set(x,n) (x).pmd = (n)
+#define __pgd_val_set(x,n) (x).pgd = (n)
 
 #define __pte(x)	((pte_t) { (x) } )
 #define __pmd(x)	((pmd_t) { (x) } )
@@ -82,12 +87,6 @@ extern __inline__ int get_order(unsigned long size)
 	} while (size);
 	return order;
 }
-
-#ifdef __LP64__
-#define MAX_PHYSMEM_RANGES 8 /* Fix the size for now (current known max is 3) */
-#else
-#define MAX_PHYSMEM_RANGES 1 /* First range is only range that fits in 32 bits */
-#endif
 
 typedef struct __physmem_range {
 	unsigned long start_pfn;
@@ -144,15 +143,16 @@ extern int npmem_ranges;
 #define __pa(x)			((unsigned long)(x)-PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long)(x)+PAGE_OFFSET))
 
+#ifndef CONFIG_DISCONTIGMEM
 #define pfn_to_page(pfn)	(mem_map + (pfn))
 #define page_to_pfn(page)	((unsigned long)((page) - mem_map))
 #define pfn_valid(pfn)		((pfn) < max_mapnr)
+#endif /* CONFIG_DISCONTIGMEM */
+
 #define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
 
-#ifndef CONFIG_DISCONTIGMEM
-#define virt_to_page(kaddr)     (mem_map + (__pa(kaddr) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
-#endif  /* !CONFIG_DISCONTIGMEM */
+#define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
+#define virt_to_page(kaddr)     pfn_to_page(__pa(kaddr) >> PAGE_SHIFT)
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
