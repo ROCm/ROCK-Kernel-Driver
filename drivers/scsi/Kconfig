@@ -457,6 +457,14 @@ config SCSI_SATA_PROMISE
 
 	  If unsure, say N.
 
+config SCSI_SATA_QSTOR
+	tristate "Pacific Digital SATA QStor support"
+	depends on SCSI_SATA && PCI
+	help
+	  This option enables support for Pacific Digital Serial ATA QStor.
+
+	  If unsure, say N.
+
 config SCSI_SATA_SX4
 	tristate "Promise SATA SX4 support"
 	depends on SCSI_SATA && PCI && EXPERIMENTAL
