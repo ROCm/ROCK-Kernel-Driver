@@ -58,9 +58,7 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 					return -EBUSY;
 			}
 			/* all seems OK */
-			disk->part[part - 1].start_sect = start;
-			disk->part[part - 1].nr_sects = length;
-			update_partition(disk, part);
+			add_partition(disk, part, start, length);
 			return 0;
 		case BLKPG_DEL_PARTITION:
 			if (disk->part[part - 1].nr_sects == 0)
@@ -79,9 +77,7 @@ static int blkpg_ioctl(struct block_device *bdev, struct blkpg_ioctl_arg *arg)
 			fsync_bdev(bdevp);
 			invalidate_bdev(bdevp, 0);
 
-			disk->part[part].start_sect = 0;
-			disk->part[part].nr_sects = 0;
-			update_partition(disk, part);
+			delete_partition(disk, part);
 			bd_release(bdevp);
 			bdput(bdevp);
 			return 0;

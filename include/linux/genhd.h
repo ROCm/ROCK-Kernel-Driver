@@ -62,7 +62,7 @@ struct hd_struct {
 	sector_t start_sect;
 	sector_t nr_sects;
 	devfs_handle_t de;              /* primary (master) devfs entry  */
-	struct device hd_driverfs_dev;  /* support driverfs hiearchy     */
+	struct device *hd_driverfs_dev;  /* support driverfs hiearchy     */
 };
 
 #define GENHD_FL_REMOVABLE  1
@@ -262,7 +262,8 @@ struct unixware_disklabel {
 char *disk_name (struct gendisk *hd, int part, char *buf);
 
 extern int rescan_partitions(struct gendisk *disk, struct block_device *bdev);
-extern void update_partition(struct gendisk *disk, int part);
+extern void add_partition(struct gendisk *, int, sector_t, sector_t);
+extern void delete_partition(struct gendisk *, int);
 
 extern struct gendisk *alloc_disk(int minors);
 extern void put_disk(struct gendisk *disk);
