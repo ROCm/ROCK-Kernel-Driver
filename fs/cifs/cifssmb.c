@@ -880,6 +880,8 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Fid = netfid;
 	pSMB->OffsetLow = cpu_to_le32(offset & 0xFFFFFFFF);
 	pSMB->OffsetHigh = cpu_to_le32(offset >> 32);
+	pSMB->Reserved = 0xFFFFFFFF;
+	pSMB->WriteMode = 0;
 	pSMB->Remaining = 0;
 	bytes_sent = (tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & ~0xFF;
 	if (bytes_sent > count)

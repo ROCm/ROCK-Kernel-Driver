@@ -163,10 +163,10 @@ cifs_buf_get(void)
 	    (struct smb_hdr *) mempool_alloc(cifs_req_poolp, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
-	/* clear through bcc + 1, making an even 40 bytes */
+	/* clear through bcc + 1, making an even 0x40 bytes */
 
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof(struct smb_hdr) + 3 );
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
 		atomic_inc(&bufAllocCount);
 	}
 
@@ -201,9 +201,9 @@ cifs_small_buf_get(void)
 	    (struct smb_hdr *) mempool_alloc(cifs_sm_req_poolp, SLAB_KERNEL | SLAB_NOFS);
 
 	/* clear the first few header bytes */
-	/* clear through bcc + 1, making an even 40 bytes */
+	/* clear through bcc + 1, making an even 0x40 bytes */
 	if (ret_buf) {
-		memset(ret_buf, 0, sizeof(struct smb_hdr) + 3);
+		memset(ret_buf, 0, sizeof(struct smb_hdr) + 27);
 		atomic_inc(&smBufAllocCount);
 	}
 
