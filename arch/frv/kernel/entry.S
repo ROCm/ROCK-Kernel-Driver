@@ -821,7 +821,6 @@ system_call:
 	ori		gr4,#_TIF_SYSCALL_TRACE,gr4
 	andicc		gr4,#_TIF_SYSCALL_TRACE,gr0,icc0
 	bne		icc0,#0,__syscall_trace_entry
-	bra		__syscall_trace_entry
 
 __syscall_call:
 	slli.p		gr7,#2,gr7
@@ -858,7 +857,6 @@ __syscall_exit:
 	movgs		gr23,psr
 
 	ldi		@(gr15,#TI_FLAGS),gr4
-//	ori		gr4,#_TIF_SYSCALL_TRACE,gr4		/////////////////////////////////
 	sethi.p		%hi(_TIF_ALLWORK_MASK),gr5
 	setlo		%lo(_TIF_ALLWORK_MASK),gr5
 	andcc		gr4,gr5,gr0,icc0
