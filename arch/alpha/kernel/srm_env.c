@@ -116,12 +116,8 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 	unsigned long	ret;
 	srm_env_t	*entry;
 
-	MOD_INC_USE_COUNT;
-
-	if(off != 0) {
-		MOD_DEC_USE_COUNT;
+	if(off != 0)
 		return -EFAULT;
-	}
 
 	entry	= (srm_env_t *) data;
 	ret	= callback_getenv(entry->id, page, count);
@@ -131,8 +127,6 @@ srm_env_read(char *page, char **start, off_t off, int count, int *eof,
 	else
 		nbytes = -EFAULT;
 
-	MOD_DEC_USE_COUNT;
-
 	return nbytes;
 }
 
@@ -141,44 +135,37 @@ static int
 srm_env_write(struct file *file, const char *buffer, unsigned long count,
 		void *data)
 {
-#define BUFLEN	512
-	int		nbytes;
+	int res;
 	srm_env_t	*entry;
-	char		buf[BUFLEN];
+	char		*buf = (char *) __get_free_page(GFP_USER);
 	unsigned long	ret1, ret2;
-
-	MOD_INC_USE_COUNT;
 
 	entry = (srm_env_t *) data;
 
-	nbytes = strlen(buffer) + 1;
-	if(nbytes > BUFLEN) {
-		MOD_DEC_USE_COUNT;
+	if (!buf)
 		return -ENOMEM;
-	}
 
-	/* memcpy(aligned_buffer, buffer, nbytes) */
+	res = -EINVAL;
+	if (count >= PAGE_SIZE)
+		goto out;
 
-	if(copy_from_user(buf, buffer, count)) {
-		MOD_DEC_USE_COUNT;
-		return -EFAULT;
-	}
-	buf[count] = 0x00;
+	res = -EFAULT;
+	if (copy_from_user(buf, buffer, count))
+		goto out;
+	buf[count] = '\0';
 
 	ret1 = callback_setenv(entry->id, buf, count);
-	if((ret1 >> 61) == 0) {
+	if ((ret1 >> 61) == 0) {
 		do 
 			ret2 = callback_save_env();
 		while((ret2 >> 61) == 1);
-		nbytes = (int) ret1;
-	} else
-		nbytes = -EFAULT;
+		res = (int) ret1;
+	}
 
-	MOD_DEC_USE_COUNT;
+	free_page((unsigned long)buf);
 
-	return nbytes;
+	return res;
 }
-
 
 static void
 srm_env_cleanup(void)
