@@ -304,13 +304,25 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_refine_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_refine(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_refine(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
@@ -408,13 +420,25 @@ static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_params_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_params(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_params(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
