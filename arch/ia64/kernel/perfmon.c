@@ -4584,31 +4584,6 @@ pfm_context_unload(pfm_context_t *ctx, void *arg, int count, struct pt_regs *reg
 	return 0;
 }
 
-static void
-pfm_force_cleanup(pfm_context_t *ctx, struct pt_regs *regs)
-{
-	struct task_struct *task = ctx->ctx_task;
-
-	ia64_psr(regs)->up = 0;
-	ia64_psr(regs)->sp = 1;
-
-	if (GET_PMU_OWNER() == task) {
-		DPRINT(("cleared ownership for [%d]\n", ctx->ctx_task->pid));
-		SET_PMU_OWNER(NULL, NULL);
-	}
-
-	/*
-	 * disconnect the task from the context and vice-versa
-	 */
-	PFM_SET_WORK_PENDING(task, 0);
-
-	task->thread.pfm_context  = NULL;
-	task->thread.flags       &= ~IA64_THREAD_PM_VALID;
-
-	DPRINT(("force cleanupf for [%d]\n",  task->pid));
-}
-
-
 
 /*
  * called only from exit_thread(): task == current
@@ -5793,6 +5768,32 @@ pfm_syst_wide_update_task(struct task_struct *task, unsigned long info, int is_c
 }
 
 #ifdef CONFIG_SMP
+
+static void
+pfm_force_cleanup(pfm_context_t *ctx, struct pt_regs *regs)
+{
+	struct task_struct *task = ctx->ctx_task;
+
+	ia64_psr(regs)->up = 0;
+	ia64_psr(regs)->sp = 1;
+
+	if (GET_PMU_OWNER() == task) {
+		DPRINT(("cleared ownership for [%d]\n", ctx->ctx_task->pid));
+		SET_PMU_OWNER(NULL, NULL);
+	}
+
+	/*
+	 * disconnect the task from the context and vice-versa
+	 */
+	PFM_SET_WORK_PENDING(task, 0);
+
+	task->thread.pfm_context  = NULL;
+	task->thread.flags       &= ~IA64_THREAD_PM_VALID;
+
+	DPRINT(("force cleanup for [%d]\n",  task->pid));
+}
+
+
 /*
  * in 2.6, interrupts are masked when we come here and the runqueue lock is held
  */
