@@ -69,11 +69,12 @@ static int __devinit radeon_parse_montype_prop(struct device_node *dp, u8 **out_
 		mt = MT_DFP;
 	else if (!strcmp(pmt, "CRT"))
 		mt = MT_CRT;
-	else if (strcmp(pmt, "NONE")) {
-		printk(KERN_WARNING "radeonfb: Unknown OF display-type: %s\n", pmt);
+	else {
+		if (strcmp(pmt, "NONE") != 0)
+			printk(KERN_WARNING "radeonfb: Unknown OF display-type: %s\n",
+			       pmt);
 		return MT_NONE;
-	} else
-		return MT_NONE;
+	}
 
 	for (i = 0; propnames[i] != NULL; ++i) {
 		pedid = (u8 *)get_property(dp, propnames[i], NULL);
