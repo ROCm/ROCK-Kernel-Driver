@@ -168,11 +168,11 @@ MODULE_LICENSE("GPL");
  * consume in the event that some partial datagrams are never completed.  This
  * should probably change to a sysctl item or the like if possible.
  */
-MODULE_PARM(max_partial_datagrams, "i");
+static int max_partial_datagrams = 25;
+module_param(max_partial_datagrams, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(max_partial_datagrams,
 		 "Maximum number of partially received fragmented datagrams "
 		 "(default = 25).");
-static int max_partial_datagrams = 25;
 
 
 static int ether1394_header(struct sk_buff *skb, struct net_device *dev,
