@@ -110,31 +110,27 @@ int gen_set_cmap(struct fb_cmap *cmap, int kspc, int con,
 int fbgen_pan_display(struct fb_var_screeninfo *var, int con,
 		      struct fb_info *info)
 {
-    struct fb_info_gen *info2 = (struct fb_info_gen *)info;
-    struct fbgen_hwswitch *fbhw = info2->fbhw;
     int xoffset = var->xoffset;
     int yoffset = var->yoffset;
     int err;
 
-    if (xoffset < 0 ||
-	xoffset+fb_display[con].var.xres > fb_display[con].var.xres_virtual ||
-	yoffset < 0 ||
-	yoffset+fb_display[con].var.yres > fb_display[con].var.yres_virtual)
+    if (xoffset < 0 || yoffset < 0 || 
+	xoffset + info->var.xres > info->var.xres_virtual ||
+	yoffset + info->var.yres > info->var.yres_virtual)
 	return -EINVAL;
     if (con == info->currcon) {
-	if (fbhw->pan_display) {
-	    if ((err = fbhw->pan_display(var, info2)))
+	if (info->fbops->fb_pan_display) {
+	    if ((err = info->fbops->fb_pan_display(var, con, info)))
 		return err;
 	} else
 	    return -EINVAL;
     }
-    fb_display[con].var.xoffset = var->xoffset;
-    fb_display[con].var.yoffset = var->yoffset;
+    info->var.xoffset = var->xoffset;
+    info->var.yoffset = var->yoffset;
     if (var->vmode & FB_VMODE_YWRAP)
-	fb_display[con].var.vmode |= FB_VMODE_YWRAP;
+	info->var.vmode |= FB_VMODE_YWRAP;
     else
-	fb_display[con].var.vmode &= ~FB_VMODE_YWRAP;
-
+	info->var.vmode &= ~FB_VMODE_YWRAP;
     return 0;
 }
 
@@ -273,12 +269,10 @@ int gen_switch(int con, struct fb_info *info)
 
 int fbgen_blank(int blank, struct fb_info *info)
 {
-    struct fb_info_gen *info2 = (struct fb_info_gen *)info;
-    struct fbgen_hwswitch *fbhw = info2->fbhw;
-    u16 black[16];
     struct fb_cmap cmap;
-
-    if (fbhw->blank && !fbhw->blank(blank, info2))
+    u16 black[16];
+    
+    if (info->fbops->fb_blank && !info->fbops->fb_blank(blank, info))
 	return 0;
     if (blank) {
 	memset(black, 0, 16*sizeof(u16));

@@ -1748,7 +1748,7 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
 
     board_list = aty128_board_list_add(board_list, info);
 
-    size = (fb_display[con].var.bits_per_pixel <= 8) ? 256 : 32;
+    size = (var.bits_per_pixel <= 8) ? 256 : 32;
     fb_alloc_cmap(info->fb_info.cmap, size, 0);	
 
     if (register_framebuffer(&info->fb_info) < 0)
