@@ -801,7 +801,7 @@ int hvc_instantiate(uint32_t vtermno, int index)
 void hvc_console_print(struct console *co, const char *b, unsigned count)
 {
 	char c[16] __ALIGNED__;
-	unsigned i, n = 0;
+	unsigned i = 0, n = 0;
 	int r, donecr = 0;
 
 	/* Console access attempt outside of acceptable console range. */
