@@ -87,20 +87,14 @@ endif
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o
 
-SUBDIRS += arch/i386/kernel arch/i386/mm arch/i386/lib
+SUBDIRS += arch/i386/lib
 
-CORE_FILES := arch/i386/kernel/kernel.o arch/i386/mm/mm.o $(CORE_FILES)
-LIBS := $(TOPDIR)/arch/i386/lib/lib.a $(LIBS) $(TOPDIR)/arch/i386/lib/lib.a
+LIBS := arch/i386/lib/lib.a $(LIBS) arch/i386/lib/lib.a
 
-ifdef CONFIG_MATH_EMULATION
-SUBDIRS += arch/i386/math-emu
-DRIVERS += arch/i386/math-emu/math.o
-endif
+core-y					+= arch/i386/kernel/ arch/i386/mm/
 
-ifdef CONFIG_PCI
-SUBDIRS	+= arch/i386/pci
-DRIVERS	+= arch/i386/pci/pci.o
-endif
+drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
+drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 
 MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
 

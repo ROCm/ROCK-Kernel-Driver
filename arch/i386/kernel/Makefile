@@ -2,9 +2,7 @@
 # Makefile for the linux kernel.
 #
 
-EXTRA_TARGETS := kernel.o head.o init_task.o
-
-O_TARGET := kernel.o
+EXTRA_TARGETS := head.o init_task.o
 
 export-objs     := mca.o i386_ksyms.o time.o
 

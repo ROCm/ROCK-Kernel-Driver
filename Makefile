@@ -254,7 +254,13 @@ NETWORKS	:= net/network.o
 
 include arch/$(ARCH)/Makefile
 
-export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT ASFLAGS
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(core-y) $(core-m)))
+CORE_FILES	:= $(patsubst %/, %/built-in.o, $(core-y)) $(CORE_FILES)
+
+SUBDIRS		+= $(patsubst %/,%,$(filter %/, $(drivers-y) $(drivers-m)))
+DRIVERS		+= $(patsubst %/, %/built-in.o, $(drivers-y))
+
+export	NETWORKS DRIVERS LIBS HEAD LDFLAGS MAKEBOOT
 
 # boot target
 # ---------------------------------------------------------------------------
