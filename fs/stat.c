@@ -283,7 +283,7 @@ asmlinkage long sys_readlink(const char __user * path, char __user * buf, int bu
 
 
 /* ---------- LFS-64 ----------- */
-#if !defined(__alpha__) && !defined(__ia64__) && !defined(__mips64) && !defined(__x86_64__) && !defined(CONFIG_ARCH_S390X)
+#if !defined(__ia64__) && !defined(__mips64) && !defined(__x86_64__) && !defined(CONFIG_ARCH_S390X)
 
 static long cp_new_stat64(struct kstat *stat, struct stat64 __user *statbuf)
 {

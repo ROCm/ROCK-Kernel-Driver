@@ -227,7 +227,6 @@ static inline int irda_device_txqueue_empty(const struct net_device *dev)
 int  irda_device_set_raw_mode(struct net_device* self, int status);
 int  irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts);
 int  irda_device_change_speed(struct net_device *dev, __u32 speed);
-void irda_device_setup(struct net_device *dev);
 struct net_device *alloc_irdadev(int sizeof_priv);
 
 /* Dongle interface */
@@ -253,28 +252,11 @@ void irda_task_next_state(struct irda_task *task, IRDA_TASK_STATE state);
  *    Utility function for getting the minimum turnaround time out of 
  *    the skb, where it has been hidden in the cb field.
  */
-#define irda_get_mtt(skb) (                                                 \
-        IRDA_MIN(10000,                                                     \
-                  (((struct irda_skb_cb *) skb->cb)->magic == LAP_MAGIC) ?  \
-                          ((struct irda_skb_cb *)(skb->cb))->mtt : 10000    \
-                 )							    \
-)
-
-#if 0
-extern inline __u16 irda_get_mtt(struct sk_buff *skb)
+static inline __u16 irda_get_mtt(const struct sk_buff *skb)
 {
-	__u16 mtt;
-
-	if (((struct irda_skb_cb *)(skb->cb))->magic != LAP_MAGIC)
-		mtt = 10000;
-	else
-		mtt = ((struct irda_skb_cb *)(skb->cb))->mtt;
-
-	ASSERT(mtt <= 10000, return 10000;);
-	
-	return mtt;
+	const struct irda_skb_cb *cb = (const struct irda_skb_cb *) skb->cb;
+	return (cb->magic == LAP_MAGIC) ? cb->mtt : 10000;
 }
-#endif
 
 /*
  * Function irda_get_next_speed (skb)
@@ -283,24 +265,11 @@ extern inline __u16 irda_get_mtt(struct sk_buff *skb)
  *
  * Note : return -1 for user space frames
  */
-#define irda_get_next_speed(skb) (	                                        \
-	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
-                  ((struct irda_skb_cb *)(skb->cb))->next_speed : -1 	\
-)
-
-#if 0
-extern inline __u32 irda_get_next_speed(struct sk_buff *skb)
+static inline __u32 irda_get_next_speed(const struct sk_buff *skb)
 {
-	__u32 speed;
-
-	if (((struct irda_skb_cb *)(skb->cb))->magic != LAP_MAGIC)
-		speed = -1;
-	else
-		speed = ((struct irda_skb_cb *)(skb->cb))->next_speed;
-
-	return speed;
+	const struct irda_skb_cb *cb = (const struct irda_skb_cb *) skb->cb;
+	return (cb->magic == LAP_MAGIC) ? cb->next_speed : -1;
 }
-#endif
 
 /*
  * Function irda_get_next_xbofs (skb)
@@ -309,10 +278,11 @@ extern inline __u32 irda_get_next_speed(struct sk_buff *skb)
  *
  * Note : default to 10 for user space frames
  */
-#define irda_get_xbofs(skb) (	                                        \
-	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
-                  ((struct irda_skb_cb *)(skb->cb))->xbofs : 10 	\
-)
+static inline __u16 irda_get_xbofs(const struct sk_buff *skb)
+{
+	const struct irda_skb_cb *cb = (const struct irda_skb_cb *) skb->cb;
+	return (cb->magic == LAP_MAGIC) ? cb->xbofs : 10;
+}
 
 /*
  * Function irda_get_next_xbofs (skb)
@@ -321,11 +291,11 @@ extern inline __u32 irda_get_next_speed(struct sk_buff *skb)
  *
  * Note : return -1 for user space frames
  */
-#define irda_get_next_xbofs(skb) (	                                        \
-	(((struct irda_skb_cb*) skb->cb)->magic == LAP_MAGIC) ? 	\
-                  ((struct irda_skb_cb *)(skb->cb))->next_xbofs : -1 	\
-)
-
+static inline __u16 irda_get_next_xbofs(const struct sk_buff *skb)
+{
+	const struct irda_skb_cb *cb = (const struct irda_skb_cb *) skb->cb;
+	return (cb->magic == LAP_MAGIC) ? cb->next_xbofs : -1;
+}
 #endif /* IRDA_DEVICE_H */
 
 

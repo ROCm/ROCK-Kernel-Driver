@@ -130,6 +130,7 @@ static interpret_func interpret_macio_props;
 struct prom_t prom;
 
 char *prom_display_paths[FB_MAX] __initdata = { 0, };
+phandle prom_display_nodes[FB_MAX] __initdata;
 unsigned int prom_num_displays = 0;
 char *of_stdout_device = 0;
 
@@ -177,7 +178,7 @@ void prom_dump_lmb(void);
 
 extern unsigned long reloc_offset(void);
 
-extern void enter_prom(void *dummy,...);
+extern void enter_prom(struct prom_args *args);
 extern void copy_and_flush(unsigned long dest, unsigned long src,
 			   unsigned long size, unsigned long offset);
 
@@ -1500,13 +1501,12 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	/* Default machine type. */
 	_systemcfg->platform = prom_find_machine_type();
 
-
 	/* On pSeries, copy the CPU hold code */
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		copy_and_flush(0, KERNELBASE - offset, 0x100, 0);
 
 	/* Start storing things at klimit */
-	mem = RELOC(klimit) - offset; 
+      	mem = RELOC(klimit) - offset; 
 
 	/* Get the full OF pathname of the stdout device */
 	p = (char *) mem;
@@ -1646,10 +1646,10 @@ check_display(unsigned long mem)
 {
 	phandle node;
 	ihandle ih;
-	int i;
+	int i, j;
 	unsigned long offset = reloc_offset();
         struct prom_t *_prom = PTRRELOC(&prom);
-	char type[64], *path;
+	char type[16], *path;
 	static unsigned char default_colors[] = {
 		0x00, 0x00, 0x00,
 		0x00, 0x00, 0xaa,
@@ -1672,6 +1672,12 @@ check_display(unsigned long mem)
 
 	_prom->disp_node = 0;
 
+	prom_print(RELOC("Looking for displays\n"));
+	if (RELOC(of_stdout_device) != 0) {
+		prom_print(RELOC("OF stdout is   : "));
+		prom_print(PTRRELOC(RELOC(of_stdout_device)));
+		prom_print(RELOC("\n"));
+	}
 	for (node = 0; prom_next_node(&node); ) {
 		type[0] = 0;
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("device_type"),
@@ -1682,19 +1688,48 @@ check_display(unsigned long mem)
 		path = (char *) mem;
 		memset(path, 0, 256);
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
-				    node, path, 255) < 0)
+				    node, path, 250) < 0)
 			continue;
-		prom_print(RELOC("opening display "));
+		prom_print(RELOC("found display   : "));
+		prom_print(path);
+		prom_print(RELOC("\n"));
+		
+		/*
+		 * If this display is the device that OF is using for stdout,
+		 * move it to the front of the list.
+		 */
+		mem += strlen(path) + 1;
+		i = RELOC(prom_num_displays);
+		RELOC(prom_num_displays) = i + 1;
+		if (RELOC(of_stdout_device) != 0 && i > 0
+		    && strcmp(PTRRELOC(RELOC(of_stdout_device)), path) == 0) {
+			for (; i > 0; --i) {
+				RELOC(prom_display_paths[i])
+					= RELOC(prom_display_paths[i-1]);
+				RELOC(prom_display_nodes[i])
+					= RELOC(prom_display_nodes[i-1]);
+			}
+			_prom->disp_node = (ihandle)(unsigned long)node;
+		}
+		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
+		RELOC(prom_display_nodes[i]) = node;
+		if (_prom->disp_node == 0)
+			_prom->disp_node = (ihandle)(unsigned long)node;
+		if (RELOC(prom_num_displays) >= FB_MAX)
+			break;
+	}
+	prom_print(RELOC("Opening displays...\n"));
+	for (j = RELOC(prom_num_displays) - 1; j >= 0; j--) {
+		path = PTRRELOC(RELOC(prom_display_paths[j]));
+		prom_print(RELOC("opening display : "));
 		prom_print(path);
 		ih = (ihandle)call_prom(RELOC("open"), 1, 1, path);
 		if (ih == (ihandle)0 || ih == (ihandle)-1) {
 			prom_print(RELOC("... failed\n"));
 			continue;
 		}
-		prom_print(RELOC("... ok\n"));
 
-		if (_prom->disp_node == 0)
-			_prom->disp_node = (ihandle)(unsigned long)node;
+		prom_print(RELOC("... ok\n"));
 
 		/* Setup a useable color table when the appropriate
 		 * method is available. Should update this to set-colors */
@@ -1711,26 +1746,8 @@ check_display(unsigned long mem)
 					   clut[2]) != 0)
 				break;
 #endif /* CONFIG_LOGO_LINUX_CLUT224 */
-
-		/*
-		 * If this display is the device that OF is using for stdout,
-		 * move it to the front of the list.
-		 */
-		mem += strlen(path) + 1;
-		i = RELOC(prom_num_displays)++;
-		if (RELOC(of_stdout_device) != 0 && i > 0
-		    && strcmp(PTRRELOC(RELOC(of_stdout_device)), path) == 0) {
-			for (; i > 0; --i)
-				RELOC(prom_display_paths[i]) = RELOC(prom_display_paths[i-1]);
-		}
-		RELOC(prom_display_paths[i]) = PTRUNRELOC(path);
-		if (RELOC(prom_num_displays) >= FB_MAX)
-			break;
-		/* XXX Temporary workaround: only open the first display so we don't
-		 * lose debug output
-		 */
-		break;
 	}
+	
 	return DOUBLEWORD_ALIGN(mem);
 }
 

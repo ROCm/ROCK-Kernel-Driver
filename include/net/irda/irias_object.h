@@ -101,7 +101,7 @@ struct ias_value *irias_new_octseq_value(__u8 *octseq , int len);
 struct ias_value *irias_new_missing_value(void);
 void irias_delete_value(struct ias_value *value);
 
-extern struct ias_value missing;
+extern struct ias_value irias_missing;
 extern hashbin_t *irias_objects;
 
 #endif

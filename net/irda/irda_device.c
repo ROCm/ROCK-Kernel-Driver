@@ -140,6 +140,8 @@ void irda_device_set_media_busy(struct net_device *dev, int status)
 		irlap_stop_mbusy_timer(self);
 	}
 }
+EXPORT_SYMBOL(irda_device_set_media_busy);
+
 
 int irda_device_set_dtr_rts(struct net_device *dev, int dtr, int rts)
 {
@@ -214,6 +216,7 @@ void irda_task_next_state(struct irda_task *task, IRDA_TASK_STATE state)
 
 	task->state = state;
 }
+EXPORT_SYMBOL(irda_task_next_state);
 
 static void __irda_task_delete(struct irda_task *task)
 {
@@ -320,7 +323,6 @@ struct irda_task *irda_task_execute(void *instance,
 				    struct irda_task *parent, void *param)
 {
 	struct irda_task *task;
-	int ret;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
@@ -342,12 +344,9 @@ struct irda_task *irda_task_execute(void *instance,
 	hashbin_insert(tasks, (irda_queue_t *) task, (long) task, NULL);
 
 	/* No time to waste, so lets get going! */
-	ret = irda_task_kick(task);
-	if (ret)
-		return NULL;
-	else
-		return task;
+	return irda_task_kick(task) ? NULL : task;
 }
+EXPORT_SYMBOL(irda_task_execute);
 
 /*
  * Function irda_task_timer_expired (data)
@@ -395,6 +394,7 @@ struct net_device *alloc_irdadev(int sizeof_priv)
 {
 	return alloc_netdev(sizeof_priv, "irda%d", irda_device_setup);
 }
+EXPORT_SYMBOL(alloc_irdadev);
 
 /*
  * Function irda_device_init_dongle (self, type, qos)
@@ -446,6 +446,7 @@ dongle_t *irda_device_dongle_init(struct net_device *dev, int type)
 	spin_unlock(&dongles->hb_spinlock);
 	return dongle;
 }
+EXPORT_SYMBOL(irda_device_dongle_init);
 
 /*
  * Function irda_device_dongle_cleanup (dongle)
@@ -460,6 +461,7 @@ int irda_device_dongle_cleanup(dongle_t *dongle)
 
 	return 0;
 }
+EXPORT_SYMBOL(irda_device_dongle_cleanup);
 
 /*
  * Function irda_device_register_dongle (dongle)
@@ -479,6 +481,7 @@ int irda_device_register_dongle(struct dongle_reg *new)
 
         return 0;
 }
+EXPORT_SYMBOL(irda_device_register_dongle);
 
 /*
  * Function irda_device_unregister_dongle (dongle)
@@ -496,6 +499,7 @@ void irda_device_unregister_dongle(struct dongle_reg *dongle)
 		ERROR("%s: dongle not found!\n", __FUNCTION__);
 	spin_unlock(&dongles->hb_spinlock);
 }
+EXPORT_SYMBOL(irda_device_unregister_dongle);
 
 /*
  * Function irda_device_set_mode (self, mode)
