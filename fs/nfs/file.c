@@ -339,6 +339,7 @@ static int do_unlk(struct file *filp, int cmd, struct file_lock *fl)
 		status = NFS_PROTO(inode)->lock(filp, cmd, fl);
 	else
 		status = posix_lock_file_wait(filp, fl);
+	unlock_kernel();
 	rpc_clnt_sigunmask(NFS_CLIENT(inode), &oldset);
 	return status;
 }
