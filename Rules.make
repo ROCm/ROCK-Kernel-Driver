@@ -225,7 +225,6 @@ $(multi-used-m) : %.o: $(multi-objs-m) FORCE
 	$(call if_changed,cmd_link_multi)
 
 # Compile programs on the host
-# FIXME: handle dependencies
 # ===========================================================================
 
 host-progs-single     := $(foreach m,$(host-progs),$(if $($(m)-objs),,$(m)))

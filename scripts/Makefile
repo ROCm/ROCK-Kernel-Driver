@@ -44,8 +44,20 @@ doc-progs: docproc
 
 # ---------------------------------------------------------------------------
 
+.PHONY: lxdialog
+
+lxdialog:
+	$(MAKE) -C lxdialog all
+
+# ---------------------------------------------------------------------------
+
 host-progs := fixdep split-include docproc tkparse
 
 tkparse-objs := tkparse.o tkcond.o tkgen.o
+
+# fixdep is needed to compile other host programs
+
+split-include docproc $(tkparse-objs) lxdialog: fixdep
+
 
 include $(TOPDIR)/Rules.make

@@ -307,13 +307,12 @@ void parse_dep_file(void *map, size_t len)
 	clear_config();
 
 	while (m < end) {
-		while (*m == ' ' || *m == '\\' || *m == '\n')
+		while (m < end && (*m == ' ' || *m == '\\' || *m == '\n'))
 			m++;
-
-		p = strchr(m, ' ');
-		if (!p) {
-			p = end;
-			while (!isalpha(*p)) p--;
+		p = m;
+		while (p < end && *p != ' ') p++;
+		if (p == end) {
+			do p--; while (!isalnum(*p));
 			p++;
 		}
 		memcpy(s, m, p-m); s[p-m] = 0;

@@ -279,8 +279,9 @@ include/asm:
 # 	Split autoconf.h into include/linux/config/*
 
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
-	scripts/split-include include/linux/autoconf.h include/config
-	@ touch include/config/MARKER
+	@echo 'Splitting include/linux/autoconf.h -> include/config'
+	@scripts/split-include include/linux/autoconf.h include/config
+	@touch $@
 
 # 	if .config is newer than include/linux/autoconf.h, someone tinkered
 # 	with it and forgot to run make oldconfig
@@ -527,7 +528,7 @@ xconfig:
 	wish -f scripts/kconfig.tk
 
 menuconfig:
-	@$(MAKE) -C scripts/lxdialog all
+	@$(MAKE) -C scripts lxdialog
 	$(CONFIG_SHELL) scripts/Menuconfig arch/$(ARCH)/config.in
 
 config:
