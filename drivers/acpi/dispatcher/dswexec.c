@@ -578,6 +578,13 @@ acpi_ds_exec_end_op (
 				break;
 			}
 
+			/* Done with this result state (Now that operand stack is built) */
+
+			status = acpi_ds_result_stack_pop (walk_state);
+			if (ACPI_FAILURE (status)) {
+				goto cleanup;
+			}
+
 			/*
 			 * If a result object was returned from above, push it on the
 			 * current result stack
