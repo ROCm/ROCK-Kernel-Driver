@@ -76,7 +76,7 @@ struct vm_operations_struct   DRM(vm_sg_ops) = {
  */
 struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 			    unsigned long address,
-			    int write_access)
+			    int *type)
 {
 #if __REALLY_HAVE_AGP
 	drm_file_t *priv  = vma->vm_file->private_data;
@@ -133,6 +133,8 @@ struct page *DRM(vm_nopage)(struct vm_area_struct *vma,
 			  baddr, __va(agpmem->memory->memory[offset]), offset,
 			  atomic_read(&page->count));
 
+		if (type)
+			*type = VM_FAULT_MINOR;
 		return page;
         }
 vm_nopage_error:
@@ -154,7 +156,7 @@ vm_nopage_error:
  */
 struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
-				int write_access)
+				int *type)
 {
 	drm_map_t	 *map	 = (drm_map_t *)vma->vm_private_data;
 	unsigned long	 offset;
@@ -170,6 +172,8 @@ struct page *DRM(vm_shm_nopage)(struct vm_area_struct *vma,
 	if (!page)
 		return NOPAGE_OOM;
 	get_page(page);
+	if (type)
+		*type = VM_FAULT_MINOR;
 
 	DRM_DEBUG("shm_nopage 0x%lx\n", address);
 	return page;
@@ -268,7 +272,7 @@ void DRM(vm_shm_close)(struct vm_area_struct *vma)
  */
 struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 				unsigned long address,
-				int write_access)
+				int *type)
 {
 	drm_file_t	 *priv	 = vma->vm_file->private_data;
 	drm_device_t	 *dev	 = priv->dev;
@@ -287,6 +291,8 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
 			     (offset & (~PAGE_MASK))));
 
 	get_page(page);
+	if (type)
+		*type = VM_FAULT_MINOR;
 
 	DRM_DEBUG("dma_nopage 0x%lx (page %lu)\n", address, page_nr);
 	return page;
@@ -304,7 +310,7 @@ struct page *DRM(vm_dma_nopage)(struct vm_area_struct *vma,
  */
 struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 			       unsigned long address,
-			       int write_access)
+			       int *type)
 {
 	drm_map_t        *map    = (drm_map_t *)vma->vm_private_data;
 	drm_file_t *priv = vma->vm_file->private_data;
@@ -325,6 +331,8 @@ struct page *DRM(vm_sg_nopage)(struct vm_area_struct *vma,
 	page_offset = (offset >> PAGE_SHIFT) + (map_offset >> PAGE_SHIFT);
 	page = entry->pagelist[page_offset];
 	get_page(page);
+	if (type)
+		*type = VM_FAULT_MINOR;
 
 	return page;
 }

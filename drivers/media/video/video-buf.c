@@ -1078,7 +1078,7 @@ videobuf_vm_close(struct vm_area_struct *vma)
  */
 static struct page*
 videobuf_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
-		  int write_access)
+		  int *type)
 {
 	struct page *page;
 
@@ -1090,6 +1090,8 @@ videobuf_vm_nopage(struct vm_area_struct *vma, unsigned long vaddr,
 	if (!page)
 		return NOPAGE_OOM;
 	clear_user_page(page_address(page), vaddr, page);
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return page;
 }
 

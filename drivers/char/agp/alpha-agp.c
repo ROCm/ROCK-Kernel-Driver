@@ -13,7 +13,7 @@
 
 static struct page *alpha_core_agp_vm_nopage(struct vm_area_struct *vma,
 					     unsigned long address,
-					     int write_access)
+					     int *type)
 {
 	alpha_agp_info *agp = agp_bridge->dev_private_data;
 	dma_addr_t dma_addr;
@@ -30,6 +30,8 @@ static struct page *alpha_core_agp_vm_nopage(struct vm_area_struct *vma,
 	 */
 	page = virt_to_page(__va(pa));
 	get_page(page);
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return page;
 }
 

@@ -1118,7 +1118,7 @@ sg_rb_correct4mmap(Sg_scatter_hold * rsv_schp, int startFinish)
 }
 
 static struct page *
-sg_vma_nopage(struct vm_area_struct *vma, unsigned long addr, int unused)
+sg_vma_nopage(struct vm_area_struct *vma, unsigned long addr, int *type)
 {
 	Sg_fd *sfp;
 	struct page *page = NOPAGE_SIGBUS;
@@ -1158,6 +1158,8 @@ sg_vma_nopage(struct vm_area_struct *vma, unsigned long addr, int unused)
 		page = virt_to_page(page_ptr);
 		get_page(page);	/* increment page count */
 	}
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return page;
 }
 

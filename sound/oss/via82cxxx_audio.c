@@ -2116,7 +2116,7 @@ static void via_dsp_cleanup (struct via_info *card)
 
 
 static struct page * via_mm_nopage (struct vm_area_struct * vma,
-				    unsigned long address, int write_access)
+				    unsigned long address, int *type)
 {
 	struct via_info *card = vma->vm_private_data;
 	struct via_channel *chan = &card->ch_out;
@@ -2124,12 +2124,11 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 	unsigned long pgoff;
 	int rd, wr;
 
-	DPRINTK ("ENTER, start %lXh, ofs %lXh, pgoff %ld, addr %lXh, wr %d\n",
+	DPRINTK ("ENTER, start %lXh, ofs %lXh, pgoff %ld, addr %lXh\n",
 		 vma->vm_start,
 		 address - vma->vm_start,
 		 (address - vma->vm_start) >> PAGE_SHIFT,
-		 address,
-		 write_access);
+		 address);
 
         if (address > vma->vm_end) {
 		DPRINTK ("EXIT, returning NOPAGE_SIGBUS\n");
@@ -2167,6 +2166,8 @@ static struct page * via_mm_nopage (struct vm_area_struct * vma,
 	DPRINTK ("EXIT, returning page %p for cpuaddr %lXh\n",
 		 dmapage, (unsigned long) chan->pgtbl[pgoff].cpuaddr);
 	get_page (dmapage);
+	if (type)
+		*type = VM_FAULT_MINOR;
 	return dmapage;
 }
 

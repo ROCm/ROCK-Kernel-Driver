@@ -1400,7 +1400,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t entry;
 	struct pte_chain *pte_chain;
 	int sequence = 0;
-	int ret;
+	int ret = VM_FAULT_MINOR;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
 		return do_anonymous_page(mm, vma, page_table,
@@ -1414,7 +1414,7 @@ do_no_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	}
 	smp_rmb();  /* Prevent CPU from reordering lock-free ->nopage() */
 retry:
-	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
+	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, &ret);
 
 	/* no page was available -- either SIGBUS or OOM */
 	if (new_page == NOPAGE_SIGBUS)
@@ -1483,14 +1483,12 @@ retry:
 		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
-		ret = VM_FAULT_MINOR;
 		goto out;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
 	update_mmu_cache(vma, address, entry);
 	spin_unlock(&mm->page_table_lock);
-	ret = VM_FAULT_MAJOR;
 	goto out;
 oom:
 	ret = VM_FAULT_OOM;

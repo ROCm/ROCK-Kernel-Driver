@@ -143,7 +143,7 @@ extern pgprot_t protection_map[16];
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
 	void (*close)(struct vm_area_struct * area);
-	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int unused);
+	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int *type);
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
 };
 
@@ -407,7 +407,7 @@ static inline int page_mapped(struct page *page)
 extern void show_free_areas(void);
 
 struct page *shmem_nopage(struct vm_area_struct * vma,
-			unsigned long address, int unused);
+			unsigned long address, int *type);
 struct file *shmem_file_setup(char * name, loff_t size, unsigned long flags);
 void shmem_lock(struct file * file, int lock);
 int shmem_zero_setup(struct vm_area_struct *);
@@ -565,7 +565,7 @@ extern unsigned long page_unuse(struct page *);
 extern void truncate_inode_pages(struct address_space *, loff_t);
 
 /* generic vm_area_ops exported for stackable file systems */
-extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
+struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int *);
 
 /* mm/page-writeback.c */
 int write_one_page(struct page *page, int wait);
