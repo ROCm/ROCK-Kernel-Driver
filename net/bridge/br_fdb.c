@@ -217,11 +217,18 @@ struct net_bridge_fdb_entry *br_fdb_get(struct net_bridge *br,
 	return fdb;
 }
 
+static void fdb_rcu_free(struct rcu_head *head)
+{
+	struct net_bridge_fdb_entry *ent
+		= container_of(head, struct net_bridge_fdb_entry, rcu);
+	kmem_cache_free(br_fdb_cache, ent);
+}
 
+/* Set entry up for deletion with RCU  */
 void br_fdb_put(struct net_bridge_fdb_entry *ent)
 {
 	if (atomic_dec_and_test(&ent->use_count))
-		kmem_cache_free(br_fdb_cache, ent);
+		call_rcu(&ent->rcu, fdb_rcu_free);
 }
 
 /*
