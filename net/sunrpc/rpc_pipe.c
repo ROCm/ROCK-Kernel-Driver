@@ -479,7 +479,7 @@ static void
 rpc_depopulate(struct dentry *parent)
 {
 	struct inode *dir = parent->d_inode;
-	LIST_HEAD(head);
+	HLIST_HEAD(head);
 	struct list_head *pos, *next;
 	struct dentry *dentry;
 
@@ -490,12 +490,12 @@ rpc_depopulate(struct dentry *parent)
 		if (!d_unhashed(dentry)) {
 			dget_locked(dentry);
 			__d_drop(dentry);
-			list_add(&dentry->d_hash, &head);
+			hlist_add_head(&dentry->d_hash, &head);
 		}
 	}
 	spin_unlock(&dcache_lock);
-	while (!list_empty(&head)) {
-		dentry = list_entry(head.next, struct dentry, d_hash);
+	while (!hlist_empty(&head)) {
+		dentry = list_entry(head.first, struct dentry, d_hash);
 		/* Private list, so no dcache_lock needed and use __d_drop */
 		__d_drop(dentry);
 		if (dentry->d_inode) {
