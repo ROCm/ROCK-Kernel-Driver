@@ -256,7 +256,7 @@ ia64_mca_log_sal_error_record(int sal_info_type)
 	salinfo_log_wakeup(sal_info_type, buffer, size, irq_safe);
 
 	if (irq_safe)
-		printk(KERN_INFO "CPU %d: SAL log contains %s error record\n",
+		IA64_MCA_DEBUG("CPU %d: SAL log contains %s error record\n",
 			smp_processor_id(),
 			sal_info_type < ARRAY_SIZE(rec_name) ? rec_name[sal_info_type] : "UNKNOWN");
 

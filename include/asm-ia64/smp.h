@@ -123,5 +123,9 @@ extern void smp_send_reschedule (int cpu);
 extern void lock_ipi_calllock(void);
 extern void unlock_ipi_calllock(void);
 
+#else
+
+#define cpu_logical_id(cpuid)		0
+
 #endif /* CONFIG_SMP */
 #endif /* _ASM_IA64_SMP_H */
