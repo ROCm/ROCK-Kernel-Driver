@@ -137,11 +137,11 @@ static inline int scsi_status_is_good(int status)
 	
 	status &= 0xfe;
 
-	return ((status & SAM_STAT_GOOD)
-		|| (status & SAM_STAT_INTERMEDIATE)
-		|| (status & SAM_STAT_INTERMEDIATE_CONDITION_MET)
+	return ((status == SAM_STAT_GOOD)
+		|| (status == SAM_STAT_INTERMEDIATE)
+		|| (status == SAM_STAT_INTERMEDIATE_CONDITION_MET)
 		/* FIXME: this is obsolete in SAM-3 */
-		|| (status & SAM_STAT_COMMAND_TERMINATED));
+		|| (status == SAM_STAT_COMMAND_TERMINATED));
 }
 
 /*
