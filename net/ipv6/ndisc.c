@@ -1004,8 +1004,8 @@ static void ndisc_recv_na(struct sk_buff *skb)
 			     msg->icmph.icmp6_solicited ? NUD_REACHABLE : NUD_STALE,
 			     msg->icmph.icmp6_override, 1);
 		neigh_release(neigh);
-	}
 #endif
+	}
 #ifdef CONFIG_IPV6_NDISC_NEW
 ignore:
 #ifdef CONFIG_ARPD
