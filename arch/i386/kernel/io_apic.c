@@ -35,7 +35,8 @@
 #include <asm/io.h>
 #include <asm/smp.h>
 #include <asm/desc.h>
-#include "mach_apic.h"
+
+#include <mach_apic.h>
 
 #undef APIC_LOCKUP_DEBUG
 
@@ -261,7 +262,7 @@ static inline void balance_irq(int irq)
 	irq_balance_t *entry = irq_balance + irq;
 	unsigned long now = jiffies;
 
-	if (clustered_apic_mode)
+	if (no_balance_irq)
 		return;
 
 	if (unlikely(time_after(now, entry->timestamp + IRQ_BALANCE_INTERVAL))) {
@@ -739,7 +740,6 @@ void __init setup_IO_APIC_irqs(void)
 		if (irq_trigger(idx)) {
 			entry.trigger = 1;
 			entry.mask = 1;
-			entry.dest.logical.logical_dest = TARGET_CPUS;
 		}
 
 		irq = pin_2_irq(idx, apic, pin);
@@ -747,7 +747,7 @@ void __init setup_IO_APIC_irqs(void)
 		 * skip adding the timer int on secondary nodes, which causes
 		 * a small but painful rift in the time-space continuum
 		 */
-		if (clustered_apic_mode && (apic != 0) && (irq == 0))
+		if (multi_timer_check(apic, irq))
 			continue;
 		else
 			add_pin_to_irq(irq, apic, pin);
@@ -1135,7 +1135,7 @@ void disable_IO_APIC(void)
 static void __init setup_ioapic_ids_from_mpc (void)
 {
 	struct IO_APIC_reg_00 reg_00;
-	unsigned long phys_id_present_map = phys_cpu_present_map;
+	unsigned long phys_id_present_map;
 	int apic;
 	int i;
 	unsigned char old_id;
@@ -1145,9 +1145,8 @@ static void __init setup_ioapic_ids_from_mpc (void)
 		/* This gets done during IOAPIC enumeration for ACPI. */
 		return;
 
-	if (clustered_apic_mode)
-		/* We don't have a good way to do this yet - hack */
-		phys_id_present_map = (u_long) 0xf;
+	phys_id_present_map = ioapic_phys_id_map(phys_cpu_present_map);
+
 	/*
 	 * Set the IOAPIC ID to the value stored in the MPC table.
 	 */

@@ -16,7 +16,12 @@
 static inline pte_t *lookup_address(unsigned long address) 
 { 
 	pgd_t *pgd = pgd_offset_k(address); 
-	pmd_t *pmd = pmd_offset(pgd, address); 	       
+	pmd_t *pmd;
+	if (pgd_none(*pgd))
+		return NULL;
+	pmd = pmd_offset(pgd, address); 	       
+	if (pmd_none(*pmd))
+		return NULL;
 	if (pmd_large(*pmd))
 		return (pte_t *)pmd;
         return pte_offset_kernel(pmd, address);
@@ -95,12 +100,13 @@ __change_page_attr(struct page *page, pgprot_t prot, struct page **oldpage)
 	address = (unsigned long)page_address(page);
 
 	kpte = lookup_address(address);
+	if (!kpte)
+		return -EINVAL;
 	kpte_page = virt_to_page(((unsigned long)kpte) & PAGE_MASK);
 	if (pgprot_val(prot) != pgprot_val(PAGE_KERNEL)) { 
 		if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
 			pte_t old = *kpte;
 			pte_t standard = mk_pte(page, PAGE_KERNEL); 
-
 			set_pte_atomic(kpte, mk_pte(page, prot)); 
 			if (pte_same(old,standard))
 				atomic_inc(&kpte_page->count);
@@ -108,6 +114,7 @@ __change_page_attr(struct page *page, pgprot_t prot, struct page **oldpage)
 			struct page *split = split_large_page(address, prot); 
 			if (!split)
 				return -ENOMEM;
+			atomic_inc(&kpte_page->count);
 			set_pmd_pte(kpte,address,mk_pte(split, PAGE_KERNEL));
 		}	
 	} else if ((pte_val(*kpte) & _PAGE_PSE) == 0) { 
