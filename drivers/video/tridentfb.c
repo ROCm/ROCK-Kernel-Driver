@@ -450,7 +450,7 @@ static struct accel_switch accel_image = {
 /*
  * Accel functions called by the upper layers
  */
-
+#ifdef CONFIG_FB_TRIDENT_ACCEL
 static void tridentfb_fillrect(struct fb_info * info, const struct fb_fillrect *fr)
 {
 	int bpp = info->var.bits_per_pixel;
@@ -474,6 +474,11 @@ static void tridentfb_copyarea(struct fb_info *info, const struct fb_copyarea *c
 	acc->copy_rect(ca->sx,ca->sy,ca->dx,ca->dy,ca->width,ca->height);
 	acc->wait_engine();
 }
+#else /* !CONFIG_FB_TRIDENT_ACCEL */
+#define tridentfb_fillrect cfb_fillrect
+#define tridentfb_copyarea cfb_copyarea
+#endif /* CONFIG_FB_TRIDENT_ACCEL */
+
 
 /*
  * Hardware access functions
@@ -1265,10 +1270,8 @@ static struct fb_ops tridentfb_ops = {
 	.fb_blank = tridentfb_blank,
 	.fb_check_var = tridentfb_check_var,
 	.fb_set_par = tridentfb_set_par,
-//	.fb_fillrect = tridentfb_fillrect,
-//	.fb_copyarea= tridentfb_copyarea,
-	.fb_fillrect = cfb_fillrect,
-	.fb_copyarea= cfb_copyarea,
+	.fb_fillrect = tridentfb_fillrect,
+	.fb_copyarea= tridentfb_copyarea,
 	.fb_imageblit = cfb_imageblit,
 	.fb_cursor = soft_cursor,
 };
