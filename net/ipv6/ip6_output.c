@@ -725,6 +725,7 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 {
 	int err = 0;
 
+	*dst = NULL;
 	if (sk) {
 		struct ipv6_pinfo *np = inet6_sk(sk);
 	

@@ -1,6 +1,6 @@
 /* -*- linux-c -*- ------------------------------------------------------- *
  *
- *   Copyright 2002 H. Peter Anvin - All Rights Reserved
+ *   Copyright 2002-2004 H. Peter Anvin - All Rights Reserved
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -21,11 +21,63 @@
 #include "raid6.h"
 
 /*
+ * This is the C data type to use
+ */
+
+/* Change this from BITS_PER_LONG if there is something better... */
+#if BITS_PER_LONG == 64
+# define NBYTES(x) ((x) * 0x0101010101010101UL)
+# define NSIZE  8
+# define NSHIFT 3
+# define NSTRING "64"
+typedef u64 unative_t;
+#else
+# define NBYTES(x) ((x) * 0x01010101U)
+# define NSIZE  4
+# define NSHIFT 2
+# define NSTRING "32"
+typedef u32 unative_t;
+#endif
+
+
+
+/*
  * IA-64 wants insane amounts of unrolling.  On other architectures that
  * is just a waste of space.
  */
+#if ($# <= 8) || defined(__ia64__)
 
-#if ($# <= 8) || defined(_ia64__)
+
+/*
+ * These sub-operations are separate inlines since they can sometimes be
+ * specially optimized using architecture-specific hacks.
+ */
+
+/*
+ * The SHLBYTE() operation shifts each byte left by 1, *not*
+ * rolling over into the next byte
+ */
+static inline __attribute_const__ unative_t SHLBYTE(unative_t v)
+{
+	unative_t vv;
+
+	vv = (v << 1) & NBYTES(0xfe);
+	return vv;
+}
+
+/*
+ * The MASK() operation returns 0xFF in any byte for which the high
+ * bit is 1, 0x00 for any byte for which the high bit is 0.
+ */
+static inline __attribute_const__ unative_t MASK(unative_t v)
+{
+	unative_t vv;
+
+	vv = v & NBYTES(0x80);
+	vv = (vv << 1) - (vv >> 7); /* Overflow on the top bit is OK */
+	return vv;
+}
+
 
 static void raid6_int$#_gen_syndrome(int disks, size_t bytes, void **ptrs)
 {
@@ -44,9 +96,8 @@ static void raid6_int$#_gen_syndrome(int disks, size_t bytes, void **ptrs)
 		for ( z = z0-1 ; z >= 0 ; z-- ) {
 			wd$$ = *(unative_t *)&dptr[z][d+$$*NSIZE];
 			wp$$ ^= wd$$;
-			w2$$ = wq$$ & NBYTES(0x80);
-			w1$$ = (wq$$ << 1) & NBYTES(0xfe);
-			w2$$ = (w2$$ << 1) - (w2$$ >> 7);
+			w2$$ = MASK(wq$$);
+			w1$$ = SHLBYTE(wq$$);
 			w2$$ &= NBYTES(0x1d);
 			w1$$ ^= w2$$;
 			wq$$ = w1$$ ^ wd$$;
