@@ -506,21 +506,27 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 		int error, char * buf) 
 {
 	/* Defined return vales */
-	const char * key_switch[]        = { "Off\t", "Normal\t", "Secure\t", "Mainenance" };
+	const char * key_switch[]        = { "Off\t", "Normal\t", "Secure\t", 
+						"Maintenance" };
 	const char * enclosure_switch[]  = { "Closed", "Open" };
 	const char * lid_status[]        = { " ", "Open", "Closed" };
-	const char * power_source[]      = { "AC\t", "Battery", "AC & Battery" };
+	const char * power_source[]      = { "AC\t", "Battery", 
+		  				"AC & Battery" };
 	const char * battery_remaining[] = { "Very Low", "Low", "Mid", "High" };
 	const char * epow_sensor[]       = { 
 		"EPOW Reset", "Cooling warning", "Power warning",
 		"System shutdown", "System halt", "EPOW main enclosure",
 		"EPOW power off" };
-	const char * battery_cyclestate[]  = { "None", "In progress", "Requested" };
-	const char * battery_charging[]    = { "Charging", "Discharching", "No current flow" };
-	const char * ibm_drconnector[]     = { "Empty", "Present" };
+	const char * battery_cyclestate[]  = { "None", "In progress", 
+						"Requested" };
+	const char * battery_charging[]    = { "Charging", "Discharching", 
+						"No current flow" };
+	const char * ibm_drconnector[]     = { "Empty", "Present", "Unusable", 
+						"Exchange" };
 	const char * ibm_intqueue[]        = { "Disabled", "Enabled" };
 
 	int have_strings = 0;
+	int num_states = 0;
 	int temperature = 0;
 	int unknown = 0;
 	int n = 0;
@@ -530,13 +536,20 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 	switch (s.token) {
 		case KEY_SWITCH:
 			n += sprintf(buf+n, "Key switch:\t");
-			n += sprintf(buf+n, "%s\t", key_switch[state]);
-			have_strings = 1;
+			num_states = sizeof(key_switch) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", key_switch[state]);
+				have_strings = 1;
+			}
 			break;
 		case ENCLOSURE_SWITCH:
 			n += sprintf(buf+n, "Enclosure switch:\t");
-			n += sprintf(buf+n, "%s\t", enclosure_switch[state]);
-			have_strings = 1;
+			num_states = sizeof(enclosure_switch) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						enclosure_switch[state]);
+				have_strings = 1;
+			}
 			break;
 		case THERMAL_SENSOR:
 			n += sprintf(buf+n, "Temp. (°C/°F):\t");
@@ -544,39 +557,63 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 			break;
 		case LID_STATUS:
 			n += sprintf(buf+n, "Lid status:\t");
-			n += sprintf(buf+n, "%s\t", lid_status[state]);
-			have_strings = 1;
+			num_states = sizeof(lid_status) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", lid_status[state]);
+				have_strings = 1;
+			}
 			break;
 		case POWER_SOURCE:
 			n += sprintf(buf+n, "Power source:\t");
-			n += sprintf(buf+n, "%s\t", power_source[state]);
-			have_strings = 1;
+			num_states = sizeof(power_source) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						power_source[state]);
+				have_strings = 1;
+			}
 			break;
 		case BATTERY_VOLTAGE:
 			n += sprintf(buf+n, "Battery voltage:\t");
 			break;
 		case BATTERY_REMAINING:
 			n += sprintf(buf+n, "Battery remaining:\t");
-			n += sprintf(buf+n, "%s\t", battery_remaining[state]);
-			have_strings = 1;
+			num_states = sizeof(battery_remaining) / sizeof(char *);
+			if (state < num_states)
+			{
+				n += sprintf(buf+n, "%s\t", 
+						battery_remaining[state]);
+				have_strings = 1;
+			}
 			break;
 		case BATTERY_PERCENTAGE:
 			n += sprintf(buf+n, "Battery percentage:\t");
 			break;
 		case EPOW_SENSOR:
 			n += sprintf(buf+n, "EPOW Sensor:\t");
-			n += sprintf(buf+n, "%s\t", epow_sensor[state]);
-			have_strings = 1;
+			num_states = sizeof(epow_sensor) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", epow_sensor[state]);
+				have_strings = 1;
+			}
 			break;
 		case BATTERY_CYCLESTATE:
 			n += sprintf(buf+n, "Battery cyclestate:\t");
-			n += sprintf(buf+n, "%s\t", battery_cyclestate[state]);
-			have_strings = 1;
+			num_states = sizeof(battery_cyclestate) / 
+				     	sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						battery_cyclestate[state]);
+				have_strings = 1;
+			}
 			break;
 		case BATTERY_CHARGING:
 			n += sprintf(buf+n, "Battery Charging:\t");
-			n += sprintf(buf+n, "%s\t", battery_charging[state]);
-			have_strings = 1;
+			num_states = sizeof(battery_charging) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						battery_charging[state]);
+				have_strings = 1;
+			}
 			break;
 		case IBM_SURVEILLANCE:
 			n += sprintf(buf+n, "Surveillance:\t");
@@ -589,16 +626,24 @@ int ppc_rtas_process_sensor(struct individual_sensor s, int state,
 			break;
 		case IBM_DRCONNECTOR:
 			n += sprintf(buf+n, "DR connector:\t");
-			n += sprintf(buf+n, "%s\t", ibm_drconnector[state]);
-			have_strings = 1;
+			num_states = sizeof(ibm_drconnector) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						ibm_drconnector[state]);
+				have_strings = 1;
+			}
 			break;
 		case IBM_POWERSUPPLY:
 			n += sprintf(buf+n, "Powersupply:\t");
 			break;
 		case IBM_INTQUEUE:
 			n += sprintf(buf+n, "Interrupt queue:\t");
-			n += sprintf(buf+n, "%s\t", ibm_intqueue[state]);
-			have_strings = 1;
+			num_states = sizeof(ibm_intqueue) / sizeof(char *);
+			if (state < num_states) {
+				n += sprintf(buf+n, "%s\t", 
+						ibm_intqueue[state]);
+				have_strings = 1;
+			}
 			break;
 		default:
 			n += sprintf(buf+n,  "Unkown sensor (type %d), ignoring it\n",
