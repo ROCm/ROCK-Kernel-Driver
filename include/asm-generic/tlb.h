@@ -16,7 +16,6 @@
 #include <linux/config.h>
 #include <asm/tlbflush.h>
 
-#ifdef CONFIG_SMP
 /* aim for something that fits in the L1 cache */
 #define FREE_PTE_NR	508
 
@@ -26,90 +25,100 @@
  * shootdown.
  */
 typedef struct free_pte_ctx {
-	struct vm_area_struct	*vma;
+	struct mm_struct	*mm;
 	unsigned long		nr;	/* set to ~0UL means fast mode */
-	unsigned long	start_addr, end_addr;
+	unsigned long		freed;
+	unsigned long		start_addr, end_addr;
 	pte_t	ptes[FREE_PTE_NR];
 } mmu_gather_t;
 
 /* Users of the generic TLB shootdown code must declare this storage space. */
 extern mmu_gather_t	mmu_gathers[NR_CPUS];
 
+/* Do me later */
+#define tlb_start_vma(tlb, vma) do { } while (0)
+#define tlb_end_vma(tlb, vma) do { } while (0)
+
 /* tlb_gather_mmu
  *	Return a pointer to an initialized mmu_gather_t.
  */
-static inline mmu_gather_t *tlb_gather_mmu(struct vm_area_struct *vma)
+static inline mmu_gather_t *tlb_gather_mmu(struct mm_struct *mm)
 {
 	mmu_gather_t *tlb = &mmu_gathers[smp_processor_id()];
-	struct mm_struct *mm = vma->vm_mm;
 
-	tlb->vma = vma;
+	tlb->mm = mm;
+	tlb->freed = 0;
 	/* Use fast mode if there is only one user of this mm (this process) */
 	tlb->nr = (atomic_read(&(mm)->mm_users) == 1) ? ~0UL : 0UL;
 	return tlb;
 }
+
+static inline void tlb_flush_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
+{
+	unsigned long i, nr;
+
+	/* Handle the fast case first. */
+	if (tlb->nr == ~0UL) {
+		flush_tlb_mm(tlb->mm);
+		return;
+	}
+	nr = tlb->nr;
+	tlb->nr = 0;
+	if (nr)
+		flush_tlb_mm(tlb->mm);
+	for (i=0; i < nr; i++) {
+		pte_t pte = tlb->ptes[i];
+		__free_pte(pte);
+	}
+}
+
+/* tlb_finish_mmu
+ *	Called at the end of the shootdown operation to free up any resources
+ *	that were required.  The page table lock is still held at this point.
+ */
+static inline void tlb_finish_mmu(mmu_gather_t *tlb, unsigned long start, unsigned long end)
+{
+	int freed = tlb->freed;
+	struct mm_struct *mm = tlb->mm;
+	int rss = mm->rss;
+
+	if (rss < freed)
+		freed = rss;
+	mm->rss = rss - freed;
+
+	tlb_flush_mmu(tlb, start, end);
+}
+
 
 /* void tlb_remove_page(mmu_gather_t *tlb, pte_t *ptep, unsigned long addr)
  *	Must perform the equivalent to __free_pte(pte_get_and_clear(ptep)), while
  *	handling the additional races in SMP caused by other CPUs caching valid
  *	mappings in their TLBs.
  */
-#define tlb_remove_page(ctxp, pte, addr) do {\
-		/* Handle the common case fast, first. */\
-		if ((ctxp)->nr == ~0UL) {\
-			__free_pte(*(pte));\
-			pte_clear((pte));\
-			break;\
-		}\
-		if (!(ctxp)->nr) \
-			(ctxp)->start_addr = (addr);\
-		(ctxp)->ptes[(ctxp)->nr++] = ptep_get_and_clear(pte);\
-		(ctxp)->end_addr = (addr) + PAGE_SIZE;\
-		if ((ctxp)->nr >= FREE_PTE_NR)\
-			tlb_finish_mmu((ctxp), 0, 0);\
-	} while (0)
-
-/* tlb_finish_mmu
- *	Called at the end of the shootdown operation to free up any resources
- *	that were required.  The page table lock is still held at this point.
- */
-static inline void tlb_finish_mmu(struct free_pte_ctx *ctx, unsigned long start, unsigned long end)
+static inline void tlb_remove_page(mmu_gather_t *tlb, pte_t *pte, unsigned long addr)
 {
-	unsigned long i, nr;
+	struct page *page;
+	unsigned long pfn = pte_pfn(*pte);
 
-	/* Handle the fast case first. */
-	if (ctx->nr == ~0UL) {
-		flush_tlb_range(ctx->vma, start, end);
+	if (pfn_valid(pfn)) {
+		page = pfn_to_page(pfn);
+		if (!PageReserved(page))
+			tlb->freed++;
+	}
+
+	/* Handle the common case fast, first. */\
+	if (tlb->nr == ~0UL) {
+		__free_pte(*pte);
+		pte_clear(pte);
 		return;
 	}
-	nr = ctx->nr;
-	ctx->nr = 0;
-	if (nr)
-		flush_tlb_range(ctx->vma, ctx->start_addr, ctx->end_addr);
-	for (i=0; i < nr; i++) {
-		pte_t pte = ctx->ptes[i];
-		__free_pte(pte);
-	}
+	if (!tlb->nr)
+		tlb->start_addr = addr;
+	tlb->ptes[tlb->nr++] = ptep_get_and_clear(pte);
+	tlb->end_addr = addr + PAGE_SIZE;
+	if (tlb->nr >= FREE_PTE_NR)
+		tlb_finish_mmu(tlb, 0, 0);
 }
-
-#else
-
-/* The uniprocessor functions are quite simple and are inline macros in an
- * attempt to get gcc to generate optimal code since this code is run on each
- * page in a process at exit.
- */
-typedef struct vm_area_struct mmu_gather_t;
-
-#define tlb_gather_mmu(vma)	(vma)
-#define tlb_finish_mmu(tlb, start, end)	flush_tlb_range(tlb, start, end)
-#define tlb_remove_page(tlb, ptep, addr)	do {\
-		pte_t __pte = *(ptep);\
-		pte_clear(ptep);\
-		__free_pte(__pte);\
-	} while (0)
-
-#endif
-
 
 #endif /* _ASM_GENERIC__TLB_H */
 

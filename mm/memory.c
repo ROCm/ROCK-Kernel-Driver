@@ -133,18 +133,18 @@ static inline void free_one_pgd(pgd_t * dir)
 /*
  * This function clears all user-level page tables of a process - this
  * is needed by execve(), so that old pages aren't in the way.
+ *
+ * Must be called with pagetable lock held.
  */
 void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
 {
 	pgd_t * page_dir = mm->pgd;
 
-	spin_lock(&mm->page_table_lock);
 	page_dir += first;
 	do {
 		free_one_pgd(page_dir);
 		page_dir++;
 	} while (--nr);
-	spin_unlock(&mm->page_table_lock);
 
 	/* keep the page table cache within bounds */
 	check_pgt_cache();
@@ -340,18 +340,17 @@ static inline void forget_pte(pte_t page)
 	}
 }
 
-static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
+static void zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
 {
 	unsigned long offset;
 	pte_t *ptep;
-	int freed = 0;
 
 	if (pmd_none(*pmd))
-		return 0;
+		return;
 	if (pmd_bad(*pmd)) {
 		pmd_ERROR(*pmd);
 		pmd_clear(pmd);
-		return 0;
+		return;
 	}
 	ptep = pte_offset_map(pmd, address);
 	offset = address & ~PMD_MASK;
@@ -363,13 +362,6 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 		if (pte_none(pte))
 			continue;
 		if (pte_present(pte)) {
-			struct page *page;
-			unsigned long pfn = pte_pfn(pte);
-			if (pfn_valid(pfn)) {
-				page = pfn_to_page(pfn);
-				if (!PageReserved(page))
-					freed++;
-			}
 			/* This will eventually call __free_pte on the pte. */
 			tlb_remove_page(tlb, ptep, address + offset);
 		} else {
@@ -378,34 +370,45 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 		}
 	}
 	pte_unmap(ptep-1);
-
-	return freed;
 }
 
-static inline int zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address, unsigned long size)
+static void zap_pmd_range(mmu_gather_t *tlb, pgd_t * dir, unsigned long address, unsigned long size)
 {
 	pmd_t * pmd;
 	unsigned long end;
-	int freed;
 
 	if (pgd_none(*dir))
-		return 0;
+		return;
 	if (pgd_bad(*dir)) {
 		pgd_ERROR(*dir);
 		pgd_clear(dir);
-		return 0;
+		return;
 	}
 	pmd = pmd_offset(dir, address);
 	end = address + size;
 	if (end > ((address + PGDIR_SIZE) & PGDIR_MASK))
 		end = ((address + PGDIR_SIZE) & PGDIR_MASK);
-	freed = 0;
 	do {
-		freed += zap_pte_range(tlb, pmd, address, end - address);
+		zap_pte_range(tlb, pmd, address, end - address);
 		address = (address + PMD_SIZE) & PMD_MASK; 
 		pmd++;
 	} while (address < end);
-	return freed;
+}
+
+void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned long address, unsigned long end)
+{
+	pgd_t * dir;
+
+	if (address >= end)
+		BUG();
+	dir = pgd_offset(vma->vm_mm, address);
+	tlb_start_vma(tlb, vma);
+	do {
+		zap_pmd_range(tlb, dir, address, end - address);
+		address = (address + PGDIR_SIZE) & PGDIR_MASK;
+		dir++;
+	} while (address && (address < end));
+	tlb_end_vma(tlb, vma);
 }
 
 /*
@@ -417,7 +420,6 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	mmu_gather_t *tlb;
 	pgd_t * dir;
 	unsigned long start = address, end = address + size;
-	int freed = 0;
 
 	dir = pgd_offset(mm, address);
 
@@ -432,25 +434,10 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 		BUG();
 	spin_lock(&mm->page_table_lock);
 	flush_cache_range(vma, address, end);
-	tlb = tlb_gather_mmu(vma);
 
-	do {
-		freed += zap_pmd_range(tlb, dir, address, end - address);
-		address = (address + PGDIR_SIZE) & PGDIR_MASK;
-		dir++;
-	} while (address && (address < end));
-
-	/* this will flush any remaining tlb entries */
+	tlb = tlb_gather_mmu(mm);
+	unmap_page_range(tlb, vma, address, end);
 	tlb_finish_mmu(tlb, start, end);
-
-	/*
-	 * Update rss for the mm_struct (not necessarily current->mm)
-	 * Notice that rss is an unsigned long.
-	 */
-	if (mm->rss > freed)
-		mm->rss -= freed;
-	else
-		mm->rss = 0;
 	spin_unlock(&mm->page_table_lock);
 }
 
