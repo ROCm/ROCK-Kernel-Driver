@@ -4471,6 +4471,9 @@ static int tg3_load_tso_firmware(struct tg3 *tp)
 	unsigned long cpu_base, cpu_scratch_base, cpu_scratch_size;
 	int err, i;
 
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5750)
+		return 0;
+
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5705) {
 		info.text_base = TG3_TSO5_FW_TEXT_ADDR;
 		info.text_len = TG3_TSO5_FW_TEXT_LEN;
