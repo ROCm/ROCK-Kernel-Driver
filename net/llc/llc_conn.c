@@ -18,6 +18,7 @@
 #include <net/llc_sap.h>
 #include <net/llc_conn.h>
 #include <net/sock.h>
+#include <linux/tcp.h>
 #include <net/llc_main.h>
 #include <net/llc_c_ev.h>
 #include <net/llc_c_ac.h>
@@ -38,65 +39,149 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
 /* Offset table on connection states transition diagram */
 static int llc_offset_table[NBR_CONN_STATES][NBR_CONN_EV];
 
+static void llc_save_primitive(struct sock *sk, struct sk_buff* skb,
+			       u8 ua, u8 test, u8 xid)
+{
+	struct llc_opt *llc = llc_sk(sk);
+	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
+
+       /* save primitive for use by the user. */
+	addr->sllc_family = sk->family;
+	addr->sllc_arphrd = skb->dev->type;
+	addr->sllc_test   = test;
+	addr->sllc_xid    = xid;
+	addr->sllc_ua     = ua;
+	addr->sllc_dsap   = llc->sap->laddr.lsap;
+	memcpy(addr->sllc_dmac, llc->laddr.mac, IFHWADDRLEN);
+	addr->sllc_ssap	  = llc->daddr.lsap;
+	memcpy(addr->sllc_smac, llc->daddr.mac, IFHWADDRLEN);
+}
+
 /**
- *	llc_conn_send_event - sends event to connection state machine
+ *	llc_conn_state_process - sends event to connection state machine
  *	@sk: connection
  *	@skb: occurred event
  *
- *	Sends an event to connection state machine. after processing event
+ *	Sends an event to connection state machine. After processing event
  *	(executing it's actions and changing state), upper layer will be
  *	indicated or confirmed, if needed. Returns 0 for success, 1 for
  *	failure. The socket lock has to be held before calling this function.
  */
-int llc_conn_send_ev(struct sock *sk, struct sk_buff *skb)
+int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 {
 	/* sending event to state machine */
 	int rc = llc_conn_service(sk, skb);
 	struct llc_opt *llc = llc_sk(sk);
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
 	u8 flag = ev->flag;
+	u8 status = ev->status;
 	struct llc_prim_if_block *ind_prim = ev->ind_prim;
 	struct llc_prim_if_block *cfm_prim = ev->cfm_prim;
 
-	llc_conn_free_ev(skb);
-#ifdef THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY
-	/* check if the connection was freed by the state machine by
-	 * means of llc_conn_disc */
-	if (rc == 2) {
-		printk(KERN_INFO "%s: rc == 2\n", __FUNCTION__);
-		rc = -ECONNABORTED;
-		goto out;
-	}
-#endif	/* THIS_BREAKS_DISCONNECT_NOTIFICATION_BADLY */
+	/*
+	 * FIXME: this will vanish as soon I get rid of the last prim crap
+	 */
+	if (flag != LLC_DATA_PRIM + 1 && flag != LLC_CONN_PRIM + 1 &&
+	    flag != LLC_DISC_PRIM + 1)
+		llc_conn_free_ev(skb);
+	else if (ind_prim && cfm_prim)
+		skb_get(skb);
 	if (!flag)   /* indicate or confirm not required */
 		goto out;
 	rc = 0;
-	if (ind_prim) /* indication required */
-		llc->sap->ind(ind_prim);
+	if (ind_prim) { /* indication required */
+		/*
+		 * FIXME: this will be saner as soon I get rid of the double
+		 *	  sock crap
+		 */
+		switch (flag) {
+		case LLC_DATA_PRIM + 1:
+			llc_save_primitive(sk, skb, 0, 0, 0);
+			if (sock_queue_rcv_skb(sk, skb)) {
+				/*
+				 * FIXME: have to sync the LLC state
+				 *        machine wrt mem usage with
+				 *        sk->{r,w}mem_alloc, will do
+				 *        this soon 8)
+				 */
+				printk(KERN_ERR
+				       "%s: sock_queue_rcv_skb failed!\n",
+				       __FUNCTION__);
+				kfree_skb(skb);
+			}
+			break;
+		case LLC_CONN_PRIM + 1: {
+			struct sock *parent = skb->sk;
+
+			skb->sk = sk;
+			skb_queue_tail(&parent->receive_queue, skb);
+			sk->state_change(parent);
+		}
+			break;
+		case LLC_DISC_PRIM + 1:
+			sock_hold(sk);
+			if (sk->type == SOCK_STREAM && sk->state == TCP_ESTABLISHED) {
+				sk->shutdown       = SHUTDOWN_MASK;
+				sk->socket->state  = SS_UNCONNECTED;
+				sk->state          = TCP_CLOSE;
+				if (!sk->dead) {
+					sk->state_change(sk);
+					sk->dead = 1;
+				}
+			}
+			kfree_skb(skb);
+			sock_put(sk);
+			break;
+		default:
+			llc->sap->ind(ind_prim);
+		}
+	}
 	if (!cfm_prim)  /* confirmation not required */
 		goto out;
-	/* data confirm has preconditions */
-	if (cfm_prim->prim != LLC_DATA_PRIM) {
+	/* FIXME: see FIXMEs above */
+	switch (flag) {
+	case LLC_DATA_PRIM + 1:
+		if (!llc_data_accept_state(llc->state))
+			/* In this state, we can send I pdu */
+			sk->write_space(sk);
+		else
+			rc = llc->failed_data_req = 1;
+		break;
+	case LLC_CONN_PRIM + 1:
+		if (sk->type != SOCK_STREAM || sk->state != TCP_SYN_SENT)
+			goto out_kfree_skb;
+		if (status) {
+			sk->socket->state = SS_UNCONNECTED;
+			sk->state         = TCP_CLOSE;
+		} else {
+			sk->socket->state = SS_CONNECTED;
+			sk->state         = TCP_ESTABLISHED;
+		}
+		sk->state_change(sk);
+		break;
+	case LLC_DISC_PRIM + 1:
+		sock_hold(sk);
+		if (sk->type != SOCK_STREAM || sk->state != TCP_CLOSING) {
+			sock_put(sk);
+			goto out_kfree_skb;
+		}
+		sk->socket->state = SS_UNCONNECTED;
+		sk->state         = TCP_CLOSE;
+		sk->state_change(sk);
+		sock_put(sk);
+		break;
+	default:
 		llc->sap->conf(cfm_prim);
 		goto out;
 	}
-	if (!llc_data_accept_state(llc->state)) {
-		/* In this state, we can send I pdu */
-		/* FIXME: check if we don't need to see if sk->lock.users != 0
-		 * is needed here
-		 */
-		rc = llc->sap->conf(cfm_prim);
-		if (rc) /* confirmation didn't accept by upper layer */
-			llc->failed_data_req = 1;
-	} else
-		llc->failed_data_req = 1;
+out_kfree_skb:
+	kfree_skb(skb);
 out:
 	return rc;
 }
 
 void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
 {
-	llc_sock_assert(sk);
 	/* queue PDU to send to MAC layer */
 	skb_queue_tail(&sk->write_queue, skb);
 	llc_conn_send_pdus(sk);
@@ -109,26 +194,15 @@ void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
  *
  *	Sends received data pdu to upper layer (by using indicate function).
  *	Prepares service parameters (prim and prim_data). calling indication
- *	function will be done in llc_conn_send_ev.
+ *	function will be done in llc_conn_state_process.
  */
 void llc_conn_rtn_pdu(struct sock *sk, struct sk_buff *skb)
 {
 	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-	struct llc_opt *llc = llc_sk(sk);
-	struct llc_sap *sap = llc->sap;
-	struct llc_prim_if_block *prim = &sap->llc_ind_prim;
-	union llc_u_prim_data *prim_data = prim->data;
 
-	prim_data->data.sk   = sk;
-	prim_data->data.pri  = 0;
-	prim_data->data.skb  = skb;
-	prim_data->data.link = llc->link;
-	prim->data	     = prim_data;
-	prim->prim	     = LLC_DATA_PRIM;
-	prim->sap	     = sap;
-	ev->flag	     = 1;
-	/* saving prepd prim in event for future use in llc_conn_send_ev */
-	ev->ind_prim	     = prim;
+	/* FIXME: indicate that we should send this to the upper layer */
+	ev->flag     = LLC_DATA_PRIM + 1;
+	ev->ind_prim = (void *)1;
 }
 
 /**
@@ -369,11 +443,10 @@ static struct llc_conn_state_trans *llc_qualify_conn_ev(struct sock *sk,
  *	llc_exec_conn_trans_actions - executes related actions
  *	@sk: connection
  *	@trans: transition that it's actions must be performed
- *	@skb: happened event
+ *	@skb: event
  *
  *	Executes actions that is related to happened event. Returns 0 for
- *	success, 1 to indicate failure of at least one action or 2 if the
- *	connection was freed (llc_conn_disc was called)
+ *	success, 1 to indicate failure of at least one action.
  */
 static int llc_exec_conn_trans_actions(struct sock *sk,
 				       struct llc_conn_state_trans *trans,
@@ -396,7 +469,7 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
 }
 
 /**
- *	llc_find_sock - Finds connection in sap for the remote/local sap/mac
+ *	llc_lookup_established - Finds connection for the remote/local sap/mac
  *	@sap: SAP
  *	@daddr: address of remote LLC (MAC + SAP)
  *	@laddr: address of local LLC (MAC + SAP)
@@ -405,8 +478,8 @@ static int llc_exec_conn_trans_actions(struct sock *sk,
  *	mac, remote sap, local mac, and local sap. Returns pointer for
  *	connection found, %NULL otherwise.
  */
-struct sock *llc_find_sock(struct llc_sap *sap, struct llc_addr *daddr,
-			   struct llc_addr *laddr)
+struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
+				    struct llc_addr *laddr)
 {
 	struct sock *rc = NULL;
 	struct list_head *entry;
@@ -419,11 +492,44 @@ struct sock *llc_find_sock(struct llc_sap *sap, struct llc_addr *daddr,
 
 		if (llc->laddr.lsap == laddr->lsap &&
 		    llc->daddr.lsap == daddr->lsap &&
-		    !memcmp(llc->laddr.mac, laddr->mac, ETH_ALEN) &&
-		    !memcmp(llc->daddr.mac, daddr->mac, ETH_ALEN)) {
+		    llc_mac_match(llc->laddr.mac, laddr->mac) &&
+		    llc_mac_match(llc->daddr.mac, daddr->mac)) {
 			rc = llc->sk;
 			break;
 		}
+	}
+	if (rc)
+		sock_hold(rc);
+out:
+	spin_unlock_bh(&sap->sk_list.lock);
+	return rc;
+}
+
+/**
+ *	llc_lookup_listener - Finds listener for local MAC + SAP
+ *	@sap: SAP
+ *	@laddr: address of local LLC (MAC + SAP)
+ *
+ *	Search connection list of the SAP and finds connection listening on
+ *	local mac, and local sap. Returns pointer for parent socket found,
+ *	%NULL otherwise.
+ */
+struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
+{
+	struct sock *rc = NULL;
+	struct list_head *entry;
+
+	spin_lock_bh(&sap->sk_list.lock);
+	if (list_empty(&sap->sk_list.list))
+		goto out;
+	list_for_each(entry, &sap->sk_list.list) {
+		struct llc_opt *llc = list_entry(entry, struct llc_opt, node);
+
+		if (llc->sk->type != SOCK_STREAM || llc->sk->state != TCP_LISTEN ||
+		    llc->laddr.lsap != laddr->lsap ||
+		    !llc_mac_match(llc->laddr.mac, laddr->mac))
+			continue;
+		rc = llc->sk;
 	}
 	if (rc)
 		sock_hold(rc);
@@ -440,10 +546,8 @@ out:
  */
 u8 llc_data_accept_state(u8 state)
 {
-	if (state != LLC_CONN_STATE_NORMAL && state != LLC_CONN_STATE_BUSY &&
-	    state != LLC_CONN_STATE_REJ)
-		return 1; /* data_conn_refuse */
-	return 0;
+	return state != LLC_CONN_STATE_NORMAL && state != LLC_CONN_STATE_BUSY &&
+	       state != LLC_CONN_STATE_REJ;
 }
 
 /**

@@ -27,14 +27,17 @@
 #include <net/llc_s_ev.h>
 #include <linux/trdevice.h>
 
-#if 1
+#if 0
 #define dprintk(args...) printk(KERN_DEBUG args)
 #else
 #define dprintk(args...)
 #endif
 
-/* function prototypes */
+u8 llc_mac_null_var[IFHWADDRLEN];
+
 static void fix_up_incoming_skb(struct sk_buff *skb);
+static void llc_station_rcv(struct sk_buff *skb);
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb);
 
 /**
  *	mac_send_pdu - Sends PDU to specific device.
@@ -52,7 +55,7 @@ int mac_send_pdu(struct sk_buff *skb)
 	int pri = GFP_ATOMIC, rc = -1;
 
 	if (!skb->dev) {
-		dprintk(KERN_ERR "%s: skb->dev == NULL!", __FUNCTION__);
+		dprintk("%s: skb->dev == NULL!", __FUNCTION__);
 		goto out;
 	}
 	if (skb->sk)
@@ -67,29 +70,30 @@ out:
 }
 
 /**
- *	mac_indicate - 802.2 entry point from net lower layers
+ *	llc_rcv - 802.2 entry point from net lower layers
  *	@skb: received pdu
  *	@dev: device that receive pdu
  *	@pt: packet type
  *
  *	When the system receives a 802.2 frame this function is called. It
  *	checks SAP and connection of received pdu and passes frame to
- *	llc_pdu_router for sending to proper state machine. If frame is
- *	related to a busy connection (a connection is sending data now),
- *	function queues this frame in connection's backlog.
+ *	llc_{station,sap,conn}_rcv for sending to proper state machine. If
+ *	the frame is related to a busy connection (a connection is sending
+ *	data now), it queues this frame in the connection's backlog.
  */
-int mac_indicate(struct sk_buff *skb, struct net_device *dev,
+int llc_rcv(struct sk_buff *skb, struct net_device *dev,
 		 struct packet_type *pt)
 {
 	struct llc_sap *sap;
 	struct llc_pdu_sn *pdu;
 	u8 dest;
 
-	/* When the interface is in promisc. mode, drop all the crap that it
+	/*
+	 * When the interface is in promisc. mode, drop all the crap that it
 	 * receives, do not try to analyse it.
 	 */
 	if (skb->pkt_type == PACKET_OTHERHOST) {
-		dprintk(KERN_INFO "%s: PACKET_OTHERHOST\n", __FUNCTION__);
+		dprintk("%s: PACKET_OTHERHOST\n", __FUNCTION__);
 		goto drop;
 	}
 	skb = skb_share_check(skb, GFP_ATOMIC);
@@ -98,17 +102,19 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 	fix_up_incoming_skb(skb);
 	pdu = llc_pdu_sn_hdr(skb);
 	if (!pdu->dsap) { /* NULL DSAP, refer to station */
-		if (llc_pdu_router(NULL, NULL, skb, 0))
-			goto drop;
+		dprintk("%s: calling llc_station_rcv!\n", __FUNCTION__);
+		llc_station_rcv(skb);
 		goto out;
 	}
 	sap = llc_sap_find(pdu->dsap);
-	if (!sap) /* unknown SAP */
+	if (!sap) {/* unknown SAP */
+		dprintk("%s: llc_sap_find(%02X) failed!\n", __FUNCTION__, pdu->dsap);
 		goto drop;
+	}
 	llc_decode_pdu_type(skb, &dest);
 	if (dest == LLC_DEST_SAP) { /* type 1 services */
-		if (llc_pdu_router(sap, NULL, skb, LLC_TYPE_1))
-			goto drop;
+		dprintk("%s: calling llc_sap_rcv!\n", __FUNCTION__);
+		llc_sap_rcv(sap, skb);
 	} else if (dest == LLC_DEST_CONN) {
 		struct llc_addr saddr, daddr;
 		struct sock *sk;
@@ -119,34 +125,42 @@ int mac_indicate(struct sk_buff *skb, struct net_device *dev,
 		llc_pdu_decode_da(skb, daddr.mac);
 		llc_pdu_decode_dsap(skb, &daddr.lsap);
 
-		sk = llc_find_sock(sap, &saddr, &daddr);
-		if (!sk) { /* didn't find an active connection; allocate a
-			    * connection to use; associate it with this SAP
-			    */
-			sk = llc_sock_alloc();
-			if (!sk)
+		sk = llc_lookup_established(sap, &saddr, &daddr);
+		if (!sk) {
+			/*
+			 * Didn't find an active connection; verify if there
+			 * is a listening socket for this llc addr
+			 */
+			struct llc_opt *llc;
+			struct sock *parent;
+			
+			parent = llc_lookup_listener(sap, &daddr);
+
+			if (!parent) {
+				dprintk("llc_lookup_listener failed!\n");
 				goto drop;
-			memcpy(&llc_sk(sk)->daddr, &saddr, sizeof(saddr));
+			}
+
+			sk = llc_sk_alloc(parent->family, GFP_ATOMIC);
+			if (!sk) {
+				sock_put(parent);
+				goto drop;
+			}
+			llc = llc_sk(sk);
+			memcpy(&llc->laddr, &daddr, sizeof(llc->laddr));
+			memcpy(&llc->daddr, &saddr, sizeof(llc->daddr));
 			llc_sap_assign_sock(sap, sk);
 			sock_hold(sk);
-		}
+			sock_put(parent);
+			skb->sk = parent;
+		} else
+			skb->sk = sk;
 		bh_lock_sock(sk);
 		if (!sk->lock.users) {
-			/* FIXME: Check this on SMP as it is now calling
-			 * llc_pdu_router _with_ the lock held.
-			 * Old comment:
-			 * With the current code one can't call
-			 * llc_pdu_router with the socket lock held, cause
-			 * it'll route the pdu to the upper layers and it can
-			 * reenter llc and in llc_req_prim will try to grab
-			 * the same lock, maybe we should use spin_trylock_bh
-			 * in the llc_req_prim (llc_data_req_handler, etc) and
-			 * add the request to the backlog, well see...
-			 */
-			rc = llc_pdu_router(llc_sk(sk)->sap, sk, skb,
-					    LLC_TYPE_2);
+			/* rc = */ llc_conn_rcv(sk, skb);
+			rc = 0;
 		} else {
-			dprintk(KERN_INFO "%s: add to backlog\n", __FUNCTION__);
+			dprintk("%s: adding to backlog...\n", __FUNCTION__);
 			llc_set_backlog_type(skb, LLC_PACKET);
 			sk_add_backlog(sk, skb);
 			rc = 0;
@@ -191,53 +205,56 @@ static void fix_up_incoming_skb(struct sk_buff *skb)
 	}
 }
 
-/**
- *	llc_pdu_router - routes received pdus to the upper layers
- *	@sap: current sap component structure.
- *	@sk: current connection structure.
- *	@frame: received frame.
- *	@type: type of received frame, that is LLC_TYPE_1 or LLC_TYPE_2
+/*
+ *	llc_station_rcv - send received pdu to the station state machine
+ *	@skb: received frame.
  *
- *	Queues received PDUs from LLC_MAC PDU receive queue until queue is
- *	empty; examines LLC header to determine the destination of PDU, if DSAP
- *	is NULL then data unit destined for station else frame destined for SAP
- *	or connection; finds a matching open SAP, if one, forwards the packet
- *	to it; if no matching SAP, drops the packet. Returns 0 or the return of
- *	llc_conn_send_ev (that may well result in the connection being
- *	destroyed)
+ *	Sends data unit to station state machine.
  */
-int llc_pdu_router(struct llc_sap *sap, struct sock* sk,
-		   struct sk_buff *skb, u8 type)
+static void llc_station_rcv(struct sk_buff *skb)
 {
-	struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
-	int rc = 0;
+	struct llc_station *station = llc_station_get();
+	struct llc_station_state_ev *ev = llc_station_ev(skb);
 
-	if (!pdu->dsap) {
-		struct llc_station *station = llc_station_get();
-		struct llc_station_state_ev *ev = llc_station_ev(skb);
+	ev->type            = LLC_STATION_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	llc_station_state_process(station, skb);
+}
 
-		ev->type	    = LLC_STATION_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		llc_station_send_ev(station, skb);
-	} else if (type == LLC_TYPE_1) {
-		struct llc_sap_state_ev *ev = llc_sap_ev(skb);
 
-		ev->type	    = LLC_SAP_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		llc_sap_send_ev(sap, skb);
-	} else if (type == LLC_TYPE_2) {
-		struct llc_conn_state_ev *ev = llc_conn_ev(skb);
-		struct llc_opt *llc = llc_sk(sk);
+/**
+ *	llc_conn_rcv - sends received pdus to the connection state machine
+ *	@sk: current connection structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the connection state machine.
+ */
+int llc_conn_rcv(struct sock* sk, struct sk_buff *skb)
+{
+	struct llc_conn_state_ev *ev = llc_conn_ev(skb);
+	struct llc_opt *llc = llc_sk(sk);
 
-		if (!llc->dev)
-			llc->dev = skb->dev;
+	if (!llc->dev)
+		llc->dev = skb->dev;
+	ev->type	    = LLC_CONN_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	return llc_conn_state_process(sk, skb);
+}
 
-		ev->type	    = LLC_CONN_EV_TYPE_PDU;
-		ev->data.pdu.reason = 0;
-		rc = llc_conn_send_ev(sk, skb);
-	} else
-		rc = -EINVAL;
-	return rc;
+/**
+ *	llc_sap_rcv - sends received pdus to the sap state machine
+ *	@sap: current sap component structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the sap state machine.
+ */
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->type	    = LLC_SAP_EV_TYPE_PDU;
+	ev->data.pdu.reason = 0;
+	llc_sap_state_process(sap, skb);
 }
 
 /**
