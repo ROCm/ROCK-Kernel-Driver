@@ -9,6 +9,7 @@ extern ia64_mv_dma_unmap_single		sba_unmap_single;
 extern ia64_mv_dma_map_sg		sba_map_sg;
 extern ia64_mv_dma_unmap_sg		sba_unmap_sg;
 extern ia64_mv_dma_supported		sba_dma_supported;
+extern ia64_mv_dma_mapping_error	sba_dma_mapping_error;
 
 /*
  * This stuff has dual use!
@@ -19,7 +20,7 @@ extern ia64_mv_dma_supported		sba_dma_supported;
  */
 #define platform_name			"hpzx1"
 #define platform_setup			dig_setup
-#define platform_dma_init		((ia64_mv_dma_init *) machvec_noop)
+#define platform_dma_init		machvec_noop
 #define platform_dma_alloc_coherent	sba_alloc_coherent
 #define platform_dma_free_coherent	sba_free_coherent
 #define platform_dma_map_single		sba_map_single
@@ -31,5 +32,6 @@ extern ia64_mv_dma_supported		sba_dma_supported;
 #define platform_dma_sync_single_for_device	machvec_dma_sync_single
 #define platform_dma_sync_sg_for_device		machvec_dma_sync_sg
 #define platform_dma_supported			sba_dma_supported
+#define platform_dma_mapping_error		sba_dma_mapping_error
 
 #endif /* _ASM_IA64_MACHVEC_HPZX1_h */
