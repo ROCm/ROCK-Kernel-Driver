@@ -3239,18 +3239,21 @@ static int get_dec_u16( char *buffer, int *start, int limit ) {
 	return value;
 }
 
+static int airo_config_commit(struct net_device *dev,
+			      struct iw_request_info *info, void *zwrq,
+			      char *extra);
+
 static void proc_config_on_close( struct inode *inode, struct file *file ) {
 	struct proc_data *data = file->private_data;
 	struct proc_dir_entry *dp = PDE(inode);
 	struct net_device *dev = dp->data;
 	struct airo_info *ai = dev->priv;
-	Resp rsp;
 	char *line;
-	int need_reset = 0;
 
 	if ( !data->writelen ) return;
 
 	readConfigRid(ai, 1);
+	ai->need_commit = 1;
 
 	line = data->wbuffer;
 	while( line[0] ) {
@@ -3258,7 +3261,7 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 		if ( !strncmp( line, "Mode: ", 6 ) ) {
 			line += 6;
 			if ((ai->config.rmode & 0xff) >= RXMODE_RFMON)
-					need_reset = 1;
+					ai->need_commit = 2;
 			ai->config.rmode &= 0xfe00;
 			ai->flags &= ~FLAG_802_11;
 			ai->config.opmode &= 0xFF00;
@@ -3436,22 +3439,7 @@ static void proc_config_on_close( struct inode *inode, struct file *file ) {
 		while( line[0] && line[0] != '\n' ) line++;
 		if ( line[0] ) line++;
 	}
-	disable_MAC(ai, 1);
-	if (need_reset) {
-		APListRid APList_rid;
-		SsidRid SSID_rid;
-
-		readAPListRid(ai, &APList_rid);
-		readSsidRid(ai, &SSID_rid);
-		reset_airo_card(dev);
-		disable_MAC(ai, 1);
-		writeSsidRid(ai, &SSID_rid);
-		writeAPListRid(ai, &APList_rid);
-	}
-	writeConfigRid(ai, 1);
-	enable_MAC(ai, &rsp, 1);
-	if (need_reset)
-		airo_set_promisc(ai);
+	airo_config_commit(dev, NULL, NULL, NULL);
 }
 
 static char *get_rmode(u16 mode) {
@@ -4550,28 +4538,47 @@ static int airo_set_mode(struct net_device *dev,
 			 char *extra)
 {
 	struct airo_info *local = dev->priv;
+	int commit = 1;
+
+	if ((local->config.rmode & 0xff) >= RXMODE_RFMON)
+		commit = 2;
 
 	switch(*uwrq) {
 		case IW_MODE_ADHOC:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_IBSS;
+			local->config.rmode &= 0xfe00;
+			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_INFRA:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_STA_ESS;
+			local->config.rmode &= 0xfe00;
+			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_MASTER:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP;
+			local->config.rmode &= 0xfe00;
+			local->flags &= ~FLAG_802_11;
 			break;
 		case IW_MODE_REPEAT:
 			local->config.opmode &= 0xFF00;
 			local->config.opmode |= MODE_AP_RPTR;
+			local->config.rmode &= 0xfe00;
+			local->flags &= ~FLAG_802_11;
+			break;
+		case IW_MODE_MONITOR:
+			local->config.opmode &= 0xFF00;
+			local->config.opmode |= MODE_STA_ESS;
+			local->config.rmode &= 0xfe00;
+			local->config.rmode |= RXMODE_RFMON | RXMODE_DISABLE_802_3_HEADER;
+			local->flags |= FLAG_802_11;
 			break;
 		default:
 			return -EINVAL;
 	}
-	local->need_commit = 1;
+	local->need_commit = commit;
 
 	return -EINPROGRESS;		/* Call commit handler */
 }
@@ -5423,8 +5430,21 @@ static int airo_config_commit(struct net_device *dev,
 	/* Some of the "SET" function may have modified some of the
 	 * parameters. It's now time to commit them in the card */
 	disable_MAC(local, 1);
+	if (local->need_commit > 1) {
+		APListRid APList_rid;
+		SsidRid SSID_rid;
+
+		readAPListRid(local, &APList_rid);
+		readSsidRid(local, &SSID_rid);
+		reset_airo_card(dev);
+		disable_MAC(local, 1);
+		writeSsidRid(local, &SSID_rid);
+		writeAPListRid(local, &APList_rid);
+	}
 	writeConfigRid(local, 1);
 	enable_MAC(local, &rsp, 1);
+	if (local->need_commit > 1)
+		airo_set_promisc(local);
 
 	return 0;
 }
