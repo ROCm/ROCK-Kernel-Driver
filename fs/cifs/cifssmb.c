@@ -234,7 +234,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 
 		/* BB might be helpful to save off the domain of server here */
 
-		if (pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) {
+		if ((pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) && 
+			(server->capabilities & CAP_EXTENDED_SECURITY)) {
 			if (pSMBr->ByteCount < 16)
 				rc = -EIO;
 			else if (pSMBr->ByteCount == 16) {
@@ -3105,7 +3106,7 @@ QAllEAsRetry:
 					rc += temp_fea->name_len;
 				/* account for prefix user. and trailing null */
 					rc = rc + 5 + 1; 
-					if(rc<buf_size) {
+					if(rc<(int)buf_size) {
 						memcpy(EAData,"user.",5);
 						EAData+=5;
 						memcpy(EAData,temp_ptr,temp_fea->name_len);
@@ -3141,7 +3142,7 @@ QAllEAsRetry:
 	if (rc == -EAGAIN)
 		goto QAllEAsRetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
@@ -3255,7 +3256,7 @@ QEARetry:
 						/* found a match */
 						rc = temp_fea->value_len;
 				/* account for prefix user. and trailing null */
-						if(rc<=buf_size) {
+						if(rc<=(int)buf_size) {
 							memcpy(ea_value,
 								temp_fea->name+temp_fea->name_len+1,
 								rc);
@@ -3288,7 +3289,7 @@ QEARetry:
 	if (rc == -EAGAIN)
 		goto QEARetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 int

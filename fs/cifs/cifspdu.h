@@ -1726,6 +1726,7 @@ struct data_blob {
 	void (*free) (struct data_blob * data_blob);
 };
 
+
 #ifdef CONFIG_CIFS_POSIX
 /* 
 	For better POSIX semantics from Linux client, (even better
@@ -1774,9 +1775,9 @@ struct data_blob {
 	
 	COPY (note support for copy across directories) - FUTURE, OPTIONAL
 	setting/getting OS/2 EAs - FUTURE (BB can this handle
-	        setting Linux xattrs perfectly)         - OPTIONAL
-    dnotify                                         - FUTURE, OPTIONAL
-    quota                                           - FUTURE, OPTIONAL
+	setting Linux xattrs perfectly)         - OPTIONAL
+	dnotify                                 - FUTURE, OPTIONAL
+	quota                                   - FUTURE, OPTIONAL
 			
 	Note that various requests implemented for NT interop such as 
 		NT_TRANSACT (IOCTL) QueryReparseInfo
@@ -1801,6 +1802,34 @@ struct data_blob {
 	
 	
  */
+
+/* xsymlink is a symlink format that can be used
+   to save symlink info in a regular file when 
+   mounted to operating systems that do not
+   support the cifs Unix extensions or EAs (for xattr
+   based symlinks).  For such a file to be recognized
+   as containing symlink data: 
+
+   1) file size must be 1067, 
+   2) signature must begin file data,
+   3) length field must be set to ASCII representation
+	of a number which is less than or equal to 1024, 
+   4) md5 must match that of the path data */
+
+struct xsymlink {
+	/* 1067 bytes */
+	char signature[4]; /* XSym */ /* not null terminated */
+	char cr0;         /* \n */
+/* ASCII representation of length (4 bytes decimal) terminated by \n not null */
+	char length[4];
+	char cr1;         /* \n */
+/* md5 of valid subset of path ie path[0] through path[length-1] */
+	__u8 md5[32];    
+	char cr2;        /* \n */
+/* if room left, then end with \n then 0x20s by convention but not required */
+	char path[1024];  
+};
+
 #endif 
 
 #pragma pack()			/* resume default structure packing */
