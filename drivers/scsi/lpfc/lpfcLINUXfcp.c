@@ -37,11 +37,7 @@
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/errno.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#include <linux/blk.h>
-#else
 #include <linux/blkdev.h>
-#endif
 #include <linux/string.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
@@ -57,13 +53,8 @@
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/irq.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 #include <scsi/scsi_device.h>
 #include <asm/pci.h>
-#else
-/* From drivers/scsi */
-#include "sd.h"
-#endif
 #include "hosts.h"
 
 #include "elx_os.h"
@@ -96,6 +87,7 @@
 
 #ifdef powerpc
 #ifndef BITS_PER_LONG
+#error include types.h
 #define BITS_PER_LONG 64
 #endif
 #endif
@@ -124,36 +116,17 @@ char lpfc_os_name_version[256];
 #define FC_EXTEND_TRANS_A 1
 #define ScsiResult(host_code, scsi_code) (((host_code) << 16) | scsi_code)
 
-/* Linux 2.4 compatibility */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-typedef void irqreturn_t;
-#define IRQ_NONE
-#define IRQ_HANDLED
-#endif				/* < 2.6.0 */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-int lpfc_detect(Scsi_Host_Template *);
-int lpfc_DetectInstance(int, struct pci_dev *, uint32_t, Scsi_Host_Template *);
-#endif
 int lpfc_diag_init(void);
 int lpfc_linux_attach(int, Scsi_Host_Template *, struct pci_dev *);
 int lpfc_get_bind_type(elxHBA_t *);
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-int lpfc_release(struct Scsi_Host *host);
-#endif
 int lpfc_diag_uninit(void);
 int lpfc_linux_detach(int);
 
 const char *lpfc_info(struct Scsi_Host *);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-void lpfc_select_queue_depth(struct Scsi_Host *, Scsi_Device *);
-#else
 static int lpfc_slave_configure(Scsi_Device *);
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static int lpfc_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
-#endif
 int lpfc_device_queue_depth(elxHBA_t *, Scsi_Device *);
 irqreturn_t lpfc_intr_handler(int, void *, struct pt_regs *);
 void lpfc_local_timeout(unsigned long);
@@ -178,12 +151,8 @@ extern int elx_idx_dmapool[MAX_ELX_BRDS];
 extern int elx_size_dmapool[MAX_ELX_BRDS];
 extern spinlock_t elx_kmem_lock;
 extern char lpfc_fwrevision[32];
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 extern int elx_biosparam(struct scsi_device *, struct block_device *,
 			 sector_t capacity, int ip[]);
-#else
-extern int elx_biosparam(Disk *, kdev_t, int[]);
-#endif
 extern int elx_pci_getadd(struct pci_dev *, int, unsigned long *);
 extern void elx_scsi_add_timer(Scsi_Cmnd *, int);
 
@@ -196,52 +165,9 @@ int lpfc_mem_poolinit(elxHBA_t *);
 #define LPFC_DRIVER_NAME    "lpfc"
 char *elx_drvr_name = LPFC_DRIVER_NAME;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-#if VARYIO == 20
-#define VARYIO_ENTRY .can_do_varyio = 1,
-#elif VARYIO == 3
-#define VARYIO_ENTRY .vary_io =1,
-#else
-#define VARYIO_ENTRY
-#endif
-
-#if defined CONFIG_HIGHMEM
-#if USE_HIGHMEM_IO ==2		// i386 & Redhat 2.1
-#define HIGHMEM_ENTRY .can_dma_32 = 1,
-#define SINGLE_SG_OK .single_sg_ok = 1,
-#else
-#if USE_HIGHMEM_IO ==3		// Redhat 3.0, Suse
-#define HIGHMEM_ENTRY .highmem_io = 1,
-#define SINGLE_SG_OK
-#else				// any other
-#define HIGHMEM_ENTRY
-#define SINGLE_SG_OK
-#endif
-#endif
-#else				// no highmem config
-#define HIGHMEM_ENTRY
-#define SINGLE_SG_OK
-#endif
-#endif
-
 static Scsi_Host_Template driver_template = {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	.next = NULL,
-	.command = NULL,
-	.slave_attach = NULL,
-	.use_new_eh_code = 1,
-	.proc_info = NULL,
-	.proc_dir = NULL,
-	.detect = lpfc_detect,
-	.release = lpfc_release,
-	VARYIO_ENTRY
-	HIGHMEM_ENTRY
-	SINGLE_SG_OK
-#else
 	.proc_info = lpfc_proc_info,
 	.slave_configure = lpfc_slave_configure,
-#endif
 	.proc_name = LPFC_DRIVER_NAME,
 	.module = THIS_MODULE,
 	.name = LPFC_DRIVER_NAME,
@@ -321,125 +247,8 @@ extern char *lpfc_fcp_bind_DID[];
 /* This is to export entry points needed for IP interface */
 int lpfc_xmit(elxHBA_t *, struct sk_buff *);
 int lpfc_ipioctl(int, void *);
-#ifdef MODVERSIONS
 EXPORT_SYMBOL(lpfc_xmit);
 EXPORT_SYMBOL(lpfc_ipioctl);
-#else
-EXPORT_SYMBOL_NOVERS(lpfc_xmit);
-EXPORT_SYMBOL_NOVERS(lpfc_ipioctl);
-#endif				/* MODVERSIONS */
-
-#if LINUX_VERSION_CODE <  KERNEL_VERSION(2,6,0)
-
-int
-lpfc_detect(Scsi_Host_Template * tmpt)
-{
-	struct pci_dev *pdev = NULL;
-	int instance = 0;
-	int i;
-	/* To add another, add a line before the last element.
-	 * Leave last element 0.
-	 */
-	uint32_t sType[] = {
-		PCI_DEVICE_ID_VIPER,
-		PCI_DEVICE_ID_THOR,
-		PCI_DEVICE_ID_PEGASUS,
-		PCI_DEVICE_ID_CENTAUR,
-		PCI_DEVICE_ID_DRAGONFLY,
-		PCI_DEVICE_ID_SUPERFLY,
-		PCI_DEVICE_ID_RFLY,
-		PCI_DEVICE_ID_PFLY,
-		PCI_DEVICE_ID_TFLY,
-		PCI_DEVICE_ID_LP101,
-		0
-	};
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#if VARYIO == 21
-#ifdef SCSI_HOST_VARYIO
-	SCSI_HOST_VARYIO(tmpt) = 1;
-#endif
-#endif
-#endif
-
-	printk("Emulex LightPulse FC SCSI/IP: %s    Osgt: %s\n",
-	       lpfc_release_version, OSGT_DRIVER_VERSION);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-	/* Release the io_request_lock lock and reenable interrupts allowing
-	 * the driver to sleep if necessary.
-	 */
-	spin_unlock(&io_request_lock);
-#endif
-
-	memset((char *)&elxDRVR, 0, sizeof (elxDRVR_t));
-	memset((char *)&lpfcdrvr, 0, sizeof (LINUX_DRVR_t));
-	elxDRVR.pDrvrOSEnv = &lpfcdrvr;
-	for (i = 0; i < MAX_ELX_BRDS; i++) {
-		lpfc_instance[i] = -1;
-	}
-
-	/* Initialize all per Driver locks */
-	elx_clk_init_lock(0);
-
-	/* Search for all Device IDs supported */
-	i = 0;
-	while (sType[i]) {
-		instance = lpfc_DetectInstance(instance, pdev, sType[i], tmpt);
-		i++;
-	}
-
-	if (instance) {
-		lpfc_diag_init();	/* Initialize diagnostic interface */
-	}
-
-	/* This covers the case where the lpfn driver gets loaded before the
-	 * lpfc driver detect completes.
-	 */
-	if (lpfc_detect_called == 2) {
-		lpfc_detect_called = 1;
-		if (lpfn_probe != NULL)
-			lpfn_probe();
-
-	} else
-		lpfc_detect_called = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-	/* reacquire io_request_lock as the midlayer was holding it when it
-	   called us */
-	spin_lock(&io_request_lock);
-#endif
-	return (instance);
-}
-
-int
-lpfc_DetectInstance(int instance,
-		    struct pci_dev *pdev, uint type, Scsi_Host_Template * tmpt)
-{
-
-	/* PCI_SUBSYSTEM_IDS supported */
-	while ((pdev = pci_find_subsys(PCI_VENDOR_ID_EMULEX, type,
-				       PCI_ANY_ID, PCI_ANY_ID, pdev))) {
-		if (pci_enable_device(pdev)) {
-			continue;
-		}
-		if (pci_request_regions(pdev, LPFC_DRIVER_NAME)) {
-			printk("lpfc pci I/O region is already in use. \n");
-			printk
-			    ("a driver for lpfc is already loaded on this system\n");
-			continue;
-		}
-
-		if (lpfc_linux_attach(instance, tmpt, pdev)) {
-			pci_release_regions(pdev);
-			continue;
-		}
-		instance++;
-	}
-
-	return (instance);
-}
-#endif				/* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
 
 int
 lpfc_diag_init(void)
@@ -455,27 +264,6 @@ lpfc_diag_init(void)
 
 	return (0);
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-int
-lpfc_release(struct Scsi_Host *host)
-{
-	elxHBA_t *phba;
-	int instance;
-	phba = (elxHBA_t *) host->hostdata[0];
-	instance = phba->brd_no;
-
-	/*
-	 * detach the board 
-	 */
-	lpfc_linux_detach(instance);
-
-	lpfc_diag_uninit();
-
-	return (0);
-}
-#endif				/* LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0) */
 
 int
 lpfc_diag_uninit(void)
@@ -730,11 +518,7 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 	/* 
 	 * Register this board
 	 */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	host = scsi_register(tmpt, sizeof (unsigned long));
-#else
 	host = scsi_host_alloc(tmpt, sizeof (unsigned long));
-#endif
 	plxhba->host = host;
 
 	host->can_queue = clp[ELX_CFG_DFT_HBA_Q_DEPTH].a_current;
@@ -790,24 +574,13 @@ lpfc_linux_attach(int instance, Scsi_Host_Template * tmpt, struct pci_dev *pdev)
 	 * Queue depths per lun
 	 */
 	host->cmd_per_lun = 1;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-	host->select_queue_depths = lpfc_select_queue_depth;
-#endif
-
 	/*
 	 * Save a pointer to device control in host and increment board
 	 */
 	host->hostdata[0] = (unsigned long)phba;
-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,4)) && \
-      LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0))
-	scsi_set_pci_device(host, pdev);
-#endif
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,0)
 	pci_set_drvdata(pdev, host);
 	scsi_add_host(host, &pdev->dev);
 	scsi_scan_host(host);
-#endif
 
 	return (0);
 }
@@ -831,12 +604,8 @@ lpfc_linux_detach(int instance)
 	}
 	plxhba = (LINUX_HBA_t *) phba->pHbaOSEnv;
 	psli = &phba->sli;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	scsi_unregister(plxhba->host);
-#else
 	scsi_remove_host(plxhba->host);
 	scsi_host_put(plxhba->host);
-#endif
 
 	ELX_DRVR_LOCK(phba, iflag);
 	elx_sli_hba_down(phba);	/* Bring down the SLI Layer */
@@ -1175,7 +944,6 @@ lpfc_info(struct Scsi_Host *host)
 	return (buf);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION (2,6,0)
 
 static int
 lpfc_proc_info(struct Scsi_Host *host,
@@ -1190,7 +958,6 @@ lpfc_proc_info(struct Scsi_Host *host,
 		return sprintf(buffer, "%s\n", lpfc_info(host));
 	}
 }
-#endif
 
 uint32_t
 lpfc_register_intr(elxHBA_t * arg)
@@ -1366,20 +1133,9 @@ lpfc_reset_bus_handler(Scsi_Cmnd * cmnd)
 	unsigned long iflag;
 	int rc, tgt, lun;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-	/* release io_request_lock */
-	spin_unlock_irq(&io_request_lock);
-#endif
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 	phba = (elxHBA_t *) cmnd->device->host->hostdata[0];
 	tgt = cmnd->device->id;
 	lun = cmnd->device->lun;
-#else
-	phba = (elxHBA_t *) cmnd->host->hostdata[0];
-	tgt = cmnd->target;
-	lun = cmnd->lun;
-#endif
 	ELX_DRVR_LOCK(phba, iflag);
 
 	rc = 0;
@@ -1395,31 +1151,11 @@ lpfc_reset_bus_handler(Scsi_Cmnd * cmnd)
 		       tgt, lun, rc);	/* end varargs */
 
 	ELX_DRVR_UNLOCK(phba, iflag);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-	/* reacquire io_request_lock for midlayer */
-	spin_lock_irq(&io_request_lock);
-#endif
 
 	return (SUCCESS);
 
 }				/* lpfc_reset_bus_handler */
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-
-void
-lpfc_select_queue_depth(struct Scsi_Host *host, Scsi_Device * scsi_devs)
-{
-	Scsi_Device *device;
-	elxHBA_t *phba;
-
-	phba = (elxHBA_t *) host->hostdata[0];
-	for (device = scsi_devs; device != NULL; device = device->next) {
-		if (device->host == host)
-			lpfc_device_queue_depth(phba, device);
-	}
-}
-#else
 int
 lpfc_slave_configure(Scsi_Device * scsi_devs)
 {
@@ -1428,16 +1164,12 @@ lpfc_slave_configure(Scsi_Device * scsi_devs)
 	lpfc_device_queue_depth(phba, scsi_devs);
 	return 0;
 }
-#endif
 
 int
 lpfc_device_queue_depth(elxHBA_t * phba, Scsi_Device * device)
 {
 
 	if (device->tagged_supported) {
-#if LINUX_VERSION_CODE 	< KERNEL_VERSION(2,6,0)
-		device->tagged_queue = 1;
-#endif
 		device->current_tag = 0;
 		device->queue_depth = 32;	/* Substitute configuration parameter */
 	} else {
@@ -1492,24 +1224,16 @@ lpfcdiag_ioctl(struct inode *inode,
 int
 lpfcdiag_open(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	MOD_INC_USE_COUNT;
-#else
 	if (!try_module_get(THIS_MODULE)) {
 		return (-ENODEV);
 	}
-#endif
 	return (0);
 }
 
 int
 lpfcdiag_release(struct inode *inode, struct file *file)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-	MOD_DEC_USE_COUNT;
-#else
 	module_put(THIS_MODULE);
-#endif
 	return (0);
 }
 
@@ -2966,9 +2690,6 @@ lpfc_ipioctl(int cmd, void *s)
 
 					/* New-style flags */
 					dev->flags = IFF_BROADCAST;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-					dev_init_buffers(dev);
-#endif
 					register_netdevice(dev);
 					rtnl_unlock();
 
@@ -9090,7 +8811,6 @@ fc_get_cfg_param(int brd, int param)
 	return (value);
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
 static struct pci_device_id lpfc_id_table[] __devinitdata = {
 	{PCI_VENDOR_ID_EMULEX, PCI_DEVICE_ID_VIPER, PCI_ANY_ID, PCI_ANY_ID, 0,
 	 0, 0UL},
@@ -9208,12 +8928,6 @@ lpfc_exit(void)
 	pci_unregister_driver(&lpfc_driver);
 	lpfc_diag_uninit();
 }
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,0)
-#include "scsi_module.c"
-#else
 module_init(lpfc_init);
 module_exit(lpfc_exit);
-#endif
 MODULE_LICENSE("GPL");
