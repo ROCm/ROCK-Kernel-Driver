@@ -192,7 +192,8 @@ extern int CIFSSMBRead(const int xid, struct cifsTconInfo *tcon,
 extern int CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 			const int netfid, const unsigned int count,
 			const __u64 lseek, unsigned int *nbytes,
-			const char *buf, const int long_op);
+			const char *buf, const char __user *ubuf, 
+			const int long_op);
 extern int CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 			const __u16 netfid, const __u64 len,
 			const __u64 offset, const __u32 numUnlock,

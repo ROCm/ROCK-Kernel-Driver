@@ -856,7 +856,7 @@ int
 CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	     const int netfid, const unsigned int count,
 	     const __u64 offset, unsigned int *nbytes, const char *buf,
-	     const int long_op)
+	     const char __user * ubuf, const int long_op)
 {
 	int rc = -EACCES;
 	WRITE_REQ *pSMB = NULL;
@@ -880,14 +880,26 @@ CIFSSMBWrite(const int xid, struct cifsTconInfo *tcon,
 	pSMB->Reserved = 0xFFFFFFFF;
 	pSMB->WriteMode = 0;
 	pSMB->Remaining = 0;
+	/* BB can relax this if buffer is big enough in some cases - ie we can 
+	send more  if LARGE_WRITE_X capability returned by the server and if
+	our buffer is big enough or if we convert to iovecs on socket writes
+	and eliminate the copy to the CIFS buffer */
 	bytes_sent = (tcon->ses->server->maxBuf - MAX_CIFS_HDR_SIZE) & ~0xFF;
 	if (bytes_sent > count)
 		bytes_sent = count;
 	pSMB->DataLengthHigh = 0;
 	pSMB->DataOffset =
 	    cpu_to_le16(offsetof(struct smb_com_write_req,Data) - 4);
-
-	memcpy(pSMB->Data,buf,bytes_sent);
+    if(buf)
+	    memcpy(pSMB->Data,buf,bytes_sent);
+	else if(ubuf)
+		copy_from_user(pSMB->Data,ubuf,bytes_sent);
+    else {
+		/* No buffer */
+		if(pSMB)
+			cifs_buf_release(pSMB);
+		return -EINVAL;
+	}
 
 	byte_count = bytes_sent + 1 /* pad */ ;
 	pSMB->DataLengthLow = cpu_to_le16(bytes_sent);

@@ -604,6 +604,125 @@ cifs_lock(struct file *file, int cmd, struct file_lock *pfLock)
 }
 
 ssize_t
+cifs_user_write(struct file * file, const char __user * write_data,
+	   size_t write_size, loff_t * poffset)
+{
+	int rc = 0;
+	unsigned int bytes_written = 0;
+	unsigned int total_written;
+	struct cifs_sb_info *cifs_sb;
+	struct cifsTconInfo *pTcon;
+	int xid, long_op;
+	struct cifsFileInfo * open_file;
+
+	if(file->f_dentry == NULL)
+		return -EBADF;
+
+	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+	if(cifs_sb == NULL) {
+		return -EBADF;
+	}
+	pTcon = cifs_sb->tcon;
+
+	/*cFYI(1,
+	   (" write %d bytes to offset %lld of %s", write_size,
+	   *poffset, file->f_dentry->d_name.name)); */
+
+	if (file->private_data == NULL) {
+		return -EBADF;
+	} else {
+		open_file = (struct cifsFileInfo *) file->private_data;
+	}
+	
+	xid = GetXid();
+	if(file->f_dentry->d_inode == NULL) {
+		FreeXid(xid);
+		return -EBADF;
+	}
+
+	if (*poffset > file->f_dentry->d_inode->i_size)
+		long_op = 2;  /* writes past end of file can take a long time */
+	else
+		long_op = 1;
+
+	for (total_written = 0; write_size > total_written;
+	     total_written += bytes_written) {
+		rc = -EAGAIN;
+		while(rc == -EAGAIN) {
+			if(file->private_data == NULL) {
+				/* file has been closed on us */
+				FreeXid(xid);
+			/* if we have gotten here we have written some data
+			and blocked, and the file has been freed on us
+			while we blocked so return what we managed to write */
+				return total_written;
+			} 
+			if(open_file->closePend) {
+				FreeXid(xid);
+				if(total_written)
+					return total_written;
+				else
+					return -EBADF;
+			}
+			if (open_file->invalidHandle) {
+				if((file->f_dentry == NULL) ||
+				   (file->f_dentry->d_inode == NULL)) {
+					FreeXid(xid);
+					return total_written;
+				}
+				/* we could deadlock if we called
+				 filemap_fdatawait from here so tell
+				reopen_file not to flush data to server now */
+				rc = cifs_reopen_file(file->f_dentry->d_inode,
+					file,FALSE);
+				if(rc != 0)
+					break;
+			}
+
+			rc = CIFSSMBWrite(xid, pTcon,
+				  open_file->netfid,
+				  write_size - total_written, *poffset,
+				  &bytes_written,
+				  NULL, write_data + total_written, long_op);
+		}
+		if (rc || (bytes_written == 0)) {
+			if (total_written)
+				break;
+			else {
+				FreeXid(xid);
+				return rc;
+			}
+		} else
+			*poffset += bytes_written;
+		long_op = FALSE; /* subsequent writes fast - 15 seconds is plenty */
+	}
+
+#ifdef CONFIG_CIFS_STATS
+	if(total_written > 0) {
+		atomic_inc(&pTcon->num_writes);
+		spin_lock(&pTcon->stat_lock);
+		pTcon->bytes_written += total_written;
+		spin_unlock(&pTcon->stat_lock);
+	}
+#endif		
+
+	/* since the write may have blocked check these pointers again */
+	if(file->f_dentry) {
+		if(file->f_dentry->d_inode) {
+			file->f_dentry->d_inode->i_ctime = file->f_dentry->d_inode->i_mtime =
+				CURRENT_TIME;
+			if (total_written > 0) {
+				if (*poffset > file->f_dentry->d_inode->i_size)
+					i_size_write(file->f_dentry->d_inode, *poffset);
+			}
+			mark_inode_dirty_sync(file->f_dentry->d_inode);
+		}
+	}
+	FreeXid(xid);
+	return total_written;
+}
+
+static ssize_t
 cifs_write(struct file * file, const char *write_data,
 	   size_t write_size, loff_t * poffset)
 {
@@ -680,10 +799,10 @@ cifs_write(struct file * file, const char *write_data,
 			}
 
 			rc = CIFSSMBWrite(xid, pTcon,
-				   open_file->netfid,
+				  open_file->netfid,
 				  write_size - total_written, *poffset,
 				  &bytes_written,
-				  write_data + total_written, long_op);
+				  write_data + total_written, NULL, long_op);
 		}
 		if (rc || (bytes_written == 0)) {
 			if (total_written)
@@ -1073,7 +1192,7 @@ cifs_user_read(struct file * file, char __user *read_data, size_t read_size,
 	return total_read;
 }
 
-ssize_t
+static ssize_t
 cifs_read(struct file * file, char *read_data, size_t read_size,
 	  loff_t * poffset)
 {

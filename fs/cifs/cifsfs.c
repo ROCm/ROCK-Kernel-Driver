@@ -498,7 +498,7 @@ cifs_write_wrapper(struct file * file, const char __user *write_data,
 		cifs_sb = CIFS_SB(file->f_dentry->d_sb);
 		if(cifs_sb != NULL) {
 			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_DIRECT_IO) {
-				return cifs_write(file,write_data,
+				return cifs_user_write(file,write_data,
 							write_size,poffset);
 			}
 		}

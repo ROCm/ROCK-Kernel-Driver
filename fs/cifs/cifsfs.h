@@ -65,8 +65,8 @@ extern int cifs_close(struct inode *inode, struct file *file);
 extern int cifs_closedir(struct inode *inode, struct file *file);
 extern ssize_t cifs_user_read(struct file *file, char __user *read_data,
 			 size_t read_size, loff_t * poffset);
-extern ssize_t cifs_write(struct file *file, const char *write_data,
-			  size_t write_size, loff_t * poffset);
+extern ssize_t cifs_user_write(struct file *file, const char __user *write_data,
+			 size_t write_size, loff_t * poffset);
 extern int cifs_lock(struct file *, int, struct file_lock *);
 extern int cifs_fsync(struct file *, struct dentry *, int);
 extern int cifs_flush(struct file *);
