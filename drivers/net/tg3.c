@@ -3016,7 +3016,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	local_irq_save(flags);
 	if (!spin_trylock(&tp->tx_lock)) { 
 		local_irq_restore(flags);
-		return -1; 
+		return NETDEV_TX_LOCKED; 
 	} 
 
 	/* This is a hard error, log it. */
@@ -3025,7 +3025,7 @@ static int tg3_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		spin_unlock_irqrestore(&tp->tx_lock, flags);
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
-		return 1;
+		return NETDEV_TX_BUSY;
 	}
 
 	entry = tp->tx_prod;
@@ -3176,7 +3176,7 @@ out_unlock:
 
 	dev->trans_start = jiffies;
 
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 static inline void tg3_set_mtu(struct net_device *dev, struct tg3 *tp,
