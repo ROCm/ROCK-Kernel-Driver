@@ -817,6 +817,38 @@ typedef struct ide_dma_ops_s {
  * 
  * temporarily mapping a (possible) highmem bio for PIO transfer
  */
+#ifndef CONFIG_IDE_TASKFILE_IO
+
+#define ide_rq_offset(rq) \
+	(((rq)->hard_cur_sectors - (rq)->current_nr_sectors) << 9)
+
+/*
+ * taskfiles really should use hard_cur_sectors as well!
+ */
+#define task_rq_offset(rq) \
+	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
+
+static inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
+{
+	/*
+	 * fs request
+	 */
+	if (rq->bio)
+		return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+
+	/*
+	 * task request
+	 */
+	return rq->buffer + task_rq_offset(rq);
+}
+
+static inline void ide_unmap_buffer(struct request *rq, char *buffer, unsigned long *flags)
+{
+	if (rq->bio)
+		bio_kunmap_irq(buffer, flags);
+}
+
+#else /* !CONFIG_IDE_TASKFILE_IO */
 
 static inline void *task_map_rq(struct request *rq, unsigned long *flags)
 {
@@ -837,6 +869,8 @@ static inline void task_unmap_rq(struct request *rq, char *buffer, unsigned long
 	if (rq->cbio)
 		rq_unmap_buffer(buffer, flags);
 }
+
+#endif /* !CONFIG_IDE_TASKFILE_IO */
 
 #define IDE_CHIPSET_PCI_MASK	\
     ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
@@ -1410,6 +1444,8 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
+#ifdef CONFIG_IDE_TASKFILE_IO
+
 #define IDE_PIO_IN	0
 #define IDE_PIO_OUT	1
 
@@ -1434,6 +1470,8 @@ static inline void task_sectors(ide_drive_t *drive, struct request *rq,
 
 	task_unmap_rq(rq, buf, &flags);
 }
+
+#endif /* CONFIG_IDE_TASKFILE_IO */
 
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
