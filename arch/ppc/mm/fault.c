@@ -227,8 +227,7 @@ good_area:
 			struct page *page = pte_page(*ptep);
 
 			if (! test_bit(PG_arch_1, &page->flags)) {
-				unsigned long phys = page_to_pfn(page) << PAGE_SHIFT;
-				__flush_dcache_icache_phys(phys);
+				flush_dcache_icache_page(page);
 				set_bit(PG_arch_1, &page->flags);
 			}
 			pte_update(ptep, 0, _PAGE_HWEXEC);

@@ -41,6 +41,6 @@ do { memcpy(dst, src, len); \
 
 extern void __flush_dcache_icache(void *page_va);
 extern void __flush_dcache_icache_phys(unsigned long physaddr);
-
+extern void flush_dcache_icache_page(struct page *page);
 #endif /* _PPC_CACHEFLUSH_H */
 #endif /* __KERNEL__ */
