@@ -267,9 +267,15 @@ int cpu_architecture(void)
 	return cpu_arch;
 }
 
+/*
+ * These functions re-use the assembly code in head.S, which
+ * already provide the required functionality.
+ */
+extern struct proc_info_list *lookup_processor_type(void);
+extern struct machine_desc *lookup_machine_type(unsigned int);
+
 static void __init setup_processor(void)
 {
-	extern struct proc_info_list __proc_info_begin, __proc_info_end;
 	struct proc_info_list *list;
 
 	/*
@@ -277,15 +283,8 @@ static void __init setup_processor(void)
 	 * types.  The linker builds this table for us from the
 	 * entries in arch/arm/mm/proc-*.S
 	 */
-	for (list = &__proc_info_begin; list < &__proc_info_end ; list++)
-		if ((processor_id & list->cpu_mask) == list->cpu_val)
-			break;
-
-	/*
-	 * If processor type is unrecognised, then we
-	 * can do nothing...
-	 */
-	if (list >= &__proc_info_end) {
+	list = lookup_processor_type();
+	if (!list) {
 		printk("CPU configuration botched (ID %08x), unable "
 		       "to continue.\n", processor_id);
 		while (1);
@@ -321,22 +320,14 @@ static void __init setup_processor(void)
 
 static struct machine_desc * __init setup_machine(unsigned int nr)
 {
-	extern struct machine_desc __arch_info_begin, __arch_info_end;
 	struct machine_desc *list;
 
 	/*
-	 * locate architecture in the list of supported architectures.
+	 * locate machine in the list of supported machines.
 	 */
-	for (list = &__arch_info_begin; list < &__arch_info_end; list++)
-		if (list->nr == nr)
-			break;
-
-	/*
-	 * If the architecture type is not recognised, then we
-	 * can co nothing...
-	 */
-	if (list >= &__arch_info_end) {
-		printk("Architecture configuration botched (nr %d), unable "
+	list = lookup_machine_type(nr);
+	if (!list) {
+		printk("Machine configuration botched (nr %d), unable "
 		       "to continue.\n", nr);
 		while (1);
 	}
