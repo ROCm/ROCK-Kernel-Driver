@@ -156,12 +156,12 @@ teles3_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	}
 	if (count >= MAXCOUNT)
 		printk(KERN_WARNING "Teles3: more than %d loops in teles3_interrupt\n", count);
-	writereg(cs->hw.teles3.hscx[0], HSCX_MASK, 0xFF);
-	writereg(cs->hw.teles3.hscx[1], HSCX_MASK, 0xFF);
-	writereg(cs->hw.teles3.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.teles3.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.teles3.hscx[0], HSCX_MASK, 0x0);
-	writereg(cs->hw.teles3.hscx[1], HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 

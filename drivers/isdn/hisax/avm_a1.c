@@ -138,22 +138,22 @@ avm_a1_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		} else if (cs->debug & L1_DEB_INTSTAT)
 			debugl1(cs, "avm IntStatus %x", sval);
 		if (!(sval & AVM_A1_STAT_HSCX)) {
-			val = readreg(cs->hw.avm.hscx[1], HSCX_ISTA);
+			val = hscx_read(cs, 1, HSCX_ISTA);
 			if (val)
 				hscx_int_main(cs, val);
 		}
 		if (!(sval & AVM_A1_STAT_ISAC)) {
-			val = readreg(cs->hw.avm.isac, ISAC_ISTA);
+			val = isac_read(cs, ISAC_ISTA);
 			if (val)
 				isac_interrupt(cs, val);
 		}
 	}
-	writereg(cs->hw.avm.hscx[0], HSCX_MASK, 0xFF);
-	writereg(cs->hw.avm.hscx[1], HSCX_MASK, 0xFF);
-	writereg(cs->hw.avm.isac, ISAC_MASK, 0xFF);
-	writereg(cs->hw.avm.isac, ISAC_MASK, 0x0);
-	writereg(cs->hw.avm.hscx[0], HSCX_MASK, 0x0);
-	writereg(cs->hw.avm.hscx[1], HSCX_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 

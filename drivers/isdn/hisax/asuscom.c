@@ -207,32 +207,32 @@ asuscom_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u8 val;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs, cs->hw.asus.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs, cs->hw.asus.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
 		goto Start_ISAC;
 	}
-	writereg(cs, cs->hw.asus.hscx, HSCX_MASK, 0xFF);
-	writereg(cs, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs, cs->hw.asus.isac, ISAC_MASK, 0xFF);
-	writereg(cs, cs->hw.asus.isac, ISAC_MASK, 0x0);
-	writereg(cs, cs->hw.asus.hscx, HSCX_MASK, 0x0);
-	writereg(cs, cs->hw.asus.hscx, HSCX_MASK + 0x40, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 
@@ -251,7 +251,7 @@ Start_IPAC:
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs, cs->hw.asus.hscx, HSCX_ISTA + 0x40);
+		val = hscx_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -262,7 +262,7 @@ Start_IPAC:
 			hscx_int_main(cs, val);
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs, cs->hw.asus.isac, ISAC_ISTA | 0x80);
+		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
 		if (val) {
 			isac_interrupt(cs, val);
 		}

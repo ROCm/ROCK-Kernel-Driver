@@ -189,7 +189,7 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 	if (cs->debug & L1_DEB_IPAC)
 		debugl1(cs, "IPAC ISTA %02X", ista);
 	if (ista & 0x0f) {
-		val = readreg(cs, HSCX_ISTA + 0x40);
+		val = hscx_read(cs, 1, HSCX_ISTA);
 		if (ista & 0x01)
 			val |= 0x01;
 		if (ista & 0x04)
@@ -201,7 +201,7 @@ bkm_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 		}
 	}
 	if (ista & 0x20) {
-		val = 0xfe & readreg(cs, ISAC_ISTA | 0x80);
+		val = ipac_dc_read(cs, ISAC_ISTA) & 0xfe;
 		if (val) {
 			isac_interrupt(cs, val);
 		}

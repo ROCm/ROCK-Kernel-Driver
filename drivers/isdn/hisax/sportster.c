@@ -129,7 +129,7 @@ sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u8 val;
 
 	spin_lock(&cs->lock);
-	val = READHSCX(cs, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
@@ -137,7 +137,7 @@ sportster_interrupt(int intno, void *dev_id, struct pt_regs *regs)
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = READHSCX(cs, 1, HSCX_ISTA);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");

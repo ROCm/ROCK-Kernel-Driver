@@ -160,21 +160,21 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u8 val;
 
 	spin_lock(&cs->lock);
-	val = readreg(cs, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
       Start_HSCX:
 	if (val)
 		hscx_int_main(cs, val);
-	val = readreg(cs, cs->hw.saphir.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
       Start_ISAC:
 	if (val)
 		isac_interrupt(cs, val);
-	val = readreg(cs, cs->hw.saphir.hscx, HSCX_ISTA + 0x40);
+	val = hscx_read(cs, 1, HSCX_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_HSCX)
 			debugl1(cs, "HSCX IntStat after IntRoutine");
 		goto Start_HSCX;
 	}
-	val = readreg(cs, cs->hw.saphir.isac, ISAC_ISTA);
+	val = isac_read(cs, ISAC_ISTA);
 	if (val) {
 		if (cs->debug & L1_DEB_ISAC)
 			debugl1(cs, "ISAC IntStat after IntRoutine");
@@ -185,12 +185,13 @@ saphir_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 	else
 		printk(KERN_WARNING "saphir: Spurious timer!\n");
-	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK, 0xFF);
-	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0xFF);
-	writereg(cs, cs->hw.saphir.isac, ISAC_MASK, 0xFF);
-	writereg(cs, cs->hw.saphir.isac, ISAC_MASK, 0);
-	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK, 0);
-	writereg(cs, cs->hw.saphir.hscx, HSCX_MASK + 0x40, 0);
+
+	hscx_write(cs, 0, HSCX_MASK, 0xFF);
+	hscx_write(cs, 1, HSCX_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0xFF);
+	isac_write(cs, ISAC_MASK, 0x0);
+	hscx_write(cs, 0, HSCX_MASK, 0x0);
+	hscx_write(cs, 1, HSCX_MASK, 0x0);
 	spin_unlock(&cs->lock);
 }
 

@@ -318,7 +318,7 @@ gazel_interrupt_ipac(int intno, void *dev_id, struct pt_regs *regs)
 			}
 		}
 		if (ista & 0x20) {
-			val = 0xfe & isac_read(cs, ISAC_ISTA);
+			val = isac_read(cs, ISAC_ISTA) & 0xfe;
 			if (val) {
 				isac_interrupt(cs, val);
 			}
@@ -713,5 +713,5 @@ setup_gazel(struct IsdnCard *card)
 			break;
 	}
 
-	return (1);
+	return 1;
 }
