@@ -820,9 +820,12 @@ int ip6_route_add(struct in6_rtmsg *rtmsg, struct nlmsghdr *nlh, void *_rtattr)
 	 */
 	if ((rtmsg->rtmsg_flags&RTF_REJECT) ||
 	    (dev && (dev->flags&IFF_LOOPBACK) && !(addr_type&IPV6_ADDR_LOOPBACK))) {
-		if (dev && dev != &loopback_dev) {
-			dev_put(dev);
-			in6_dev_put(idev);
+		/* hold loopback dev/idev if we haven't done so. */
+		if (dev != &loopback_dev) {
+			if (dev) {
+				dev_put(dev);
+				in6_dev_put(idev);
+			}
 			dev = &loopback_dev;
 			dev_hold(dev);
 			idev = in6_dev_get(dev);
