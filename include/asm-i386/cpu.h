@@ -13,18 +13,14 @@ struct i386_cpu {
 extern struct i386_cpu cpu_devices[NR_CPUS];
 
 
-#ifdef CONFIG_NUMA
-static inline void arch_register_cpu(int num){
-	int p_node = __cpu_to_node(num);
+static inline int arch_register_cpu(int num){
+	struct node *parent = NULL;
 	
-	if (p_node >= 0 && p_node < NR_CPUS)
-		register_cpu(&cpu_devices[num].cpu, num, 
-			&node_devices[p_node].node);
-}
-#else /* !CONFIG_NUMA */
-static inline void arch_register_cpu(int num){
-	register_cpu(&cpu_devices[num].cpu, num, (struct node *) NULL);
-}
+#ifdef CONFIG_NUMA
+	parent = &node_devices[__cpu_to_node(num)].node;
 #endif /* CONFIG_NUMA */
+
+	return register_cpu(&cpu_devices[num].cpu, num, parent);
+}
 
 #endif /* _ASM_I386_CPU_H_ */

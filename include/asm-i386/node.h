@@ -12,15 +12,14 @@ struct i386_node {
 };
 extern struct i386_node node_devices[MAX_NUMNODES];
 
-static inline void arch_register_node(int num){
+static inline int arch_register_node(int num){
 	int p_node = __parent_node(num);
+	struct node *parent = NULL;
 
 	if (p_node != num)
-		register_node(&node_devices[num].node, num, 
-			&node_devices[p_node].node);
-	else
-		register_node(&node_devices[num].node, num, 
-			(struct node *) NULL);
+		parent = &node_devices[p_node].node;
+
+	return register_node(&node_devices[num].node, num, parent);
 }
 
 #endif /* _ASM_I386_NODE_H_ */

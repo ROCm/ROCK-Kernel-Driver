@@ -33,7 +33,7 @@ struct device_driver cpu_driver = {
  *
  * Initialize and register the CPU device.
  */
-void __init register_cpu(struct cpu *cpu, int num, struct node *root)
+int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 {
 	cpu->node_id = __cpu_to_node(num);
 	cpu->sysdev.name = "cpu";
@@ -42,7 +42,7 @@ void __init register_cpu(struct cpu *cpu, int num, struct node *root)
 		cpu->sysdev.root = &root->sysroot;
 	snprintf(cpu->sysdev.dev.name, DEVICE_NAME_SIZE, "CPU %u", num);
 	cpu->sysdev.dev.driver = &cpu_driver;
-	sys_device_register(&cpu->sysdev);
+	return sys_device_register(&cpu->sysdev);
 }
 
 

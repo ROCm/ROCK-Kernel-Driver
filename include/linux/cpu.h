@@ -27,6 +27,6 @@ struct cpu {
 	struct sys_device sysdev;
 };
 
-extern void register_cpu(struct cpu *, int, struct node *);
+extern int register_cpu(struct cpu *, int, struct node *);
 
 #endif /* _LINUX_CPU_H_ */

@@ -13,12 +13,11 @@ struct i386_memblk {
 };
 extern struct i386_memblk memblk_devices[MAX_NR_MEMBLKS];
 
-static inline void arch_register_memblk(int num){
+static inline int arch_register_memblk(int num){
 	int p_node = __memblk_to_node(num);
 
-	if (p_node >= 0 && p_node < MAX_NR_MEMBLKS)
-		register_memblk(&memblk_devices[num].memblk, num, 
-			&node_devices[p_node].node);
+	return register_memblk(&memblk_devices[num].memblk, num, 
+				&node_devices[p_node].node);
 }
 
 #endif /* _ASM_I386_MEMBLK_H_ */

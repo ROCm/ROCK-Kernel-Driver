@@ -27,6 +27,6 @@ struct memblk {
 	struct sys_device sysdev;
 };
 
-extern void register_memblk(struct memblk *, int, struct node *);
+extern int register_memblk(struct memblk *, int, struct node *);
 
 #endif /* _LINUX_MEMBLK_H_ */

@@ -34,7 +34,7 @@ struct device_driver memblk_driver = {
  *
  * Initialize and register the MemBlk device.
  */
-void __init register_memblk(struct memblk *memblk, int num, struct node *root)
+int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 {
 	memblk->node_id = __memblk_to_node(num);
 	memblk->sysdev.name = "memblk";
@@ -43,7 +43,7 @@ void __init register_memblk(struct memblk *memblk, int num, struct node *root)
 		memblk->sysdev.root = &root->sysroot;
 	snprintf(memblk->sysdev.dev.name, DEVICE_NAME_SIZE, "Memory Block %u", num);
 	memblk->sysdev.dev.driver = &memblk_driver;
-	sys_device_register(&memblk->sysdev);
+	return sys_device_register(&memblk->sysdev);
 }
 
 

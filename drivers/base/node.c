@@ -70,8 +70,10 @@ static DEVICE_ATTR(meminfo,S_IRUGO,node_read_meminfo,NULL);
  *
  * Initialize and register the node device.
  */
-void __init register_node(struct node *node, int num, struct node *parent)
+int __init register_node(struct node *node, int num, struct node *parent)
 {
+	int error;
+
 	node->cpumap = __node_to_cpu_mask(num);
 	node->sysroot.id = num;
 	if (parent)
@@ -80,10 +82,12 @@ void __init register_node(struct node *node, int num, struct node *parent)
 	snprintf(node->sysroot.dev.bus_id, BUS_ID_SIZE, "node%u", num);
 	node->sysroot.dev.driver = &node_driver;
 	node->sysroot.dev.bus = &system_bus_type;
-	if (!sys_register_root(&node->sysroot)){
+	error = sys_register_root(&node->sysroot);
+	if (!error){
 		device_create_file(&node->sysroot.dev, &dev_attr_cpumap);
 		device_create_file(&node->sysroot.dev, &dev_attr_meminfo);
 	}
+	return error;
 }
 
 

@@ -26,7 +26,7 @@ struct node {
 	struct sys_root sysroot;
 };
 
-extern void register_node(struct node *, int, struct node *);
+extern int register_node(struct node *, int, struct node *);
 
 #define to_node(_root) container_of(_root, struct node, sysroot)
 #define to_root(_dev) container_of(_dev, struct sys_root, dev)
