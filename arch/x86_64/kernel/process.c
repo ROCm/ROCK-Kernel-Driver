@@ -256,10 +256,11 @@ void exit_thread(void)
 {
 	struct task_struct *me = current;
 	if (me->thread.io_bitmap_ptr) { 
+		struct tss_struct *tss = init_tss + get_cpu();
 		kfree(me->thread.io_bitmap_ptr); 
 		me->thread.io_bitmap_ptr = NULL;
-		(init_tss + smp_processor_id())->io_bitmap_base = 
-			INVALID_IO_BITMAP_OFFSET;
+		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+		put_cpu();
 	}
 }
 

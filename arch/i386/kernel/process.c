@@ -293,8 +293,12 @@ void exit_thread(void)
 
 	/* The process may have allocated an io port bitmap... nuke it. */
 	if (unlikely(NULL != tsk->thread.io_bitmap_ptr)) {
+		int cpu = get_cpu();
+		struct tss_struct *tss = init_tss + cpu;
 		kfree(tsk->thread.io_bitmap_ptr);
 		tsk->thread.io_bitmap_ptr = NULL;
+		tss->io_bitmap_base = INVALID_IO_BITMAP_OFFSET;
+		put_cpu();
 	}
 }
 
