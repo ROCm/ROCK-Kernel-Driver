@@ -664,6 +664,38 @@ nomem:
 	return SCTP_DISPOSITION_NOMEM;
 }
 
+/* Generate and sendout a heartbeat packet.  */
+sctp_disposition_t sctp_sf_heartbeat(const sctp_endpoint_t *ep,
+				     const sctp_association_t *asoc,
+				     const sctp_subtype_t type,
+				     void *arg,
+				     sctp_cmd_seq_t *commands)
+{
+	sctp_transport_t *transport = (sctp_transport_t *) arg;
+	sctp_chunk_t *reply;
+	sctp_sender_hb_info_t hbinfo;
+	size_t paylen = 0;
+	
+	hbinfo.param_hdr.type = SCTP_PARAM_HEARTBEAT_INFO;
+	hbinfo.param_hdr.length = htons(sizeof(sctp_sender_hb_info_t));
+	hbinfo.daddr = transport->ipaddr;
+	hbinfo.sent_at = jiffies;
+
+	/* Set rto_pending indicating that an RTT measurement
+	 * is started with this heartbeat chunk.
+	 */
+	transport->rto_pending = 1;
+
+	/* Send a heartbeat to our peer.  */
+	paylen = sizeof(sctp_sender_hb_info_t);
+	reply = sctp_make_heartbeat(asoc, transport, &hbinfo, paylen);
+	if (!reply)
+		return SCTP_DISPOSITION_NOMEM;
+
+	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
+	return SCTP_DISPOSITION_CONSUME;
+}
+
 /* Generate a HEARTBEAT packet on the given transport.  */
 sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 					const sctp_association_t *asoc,
@@ -672,9 +704,6 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 					sctp_cmd_seq_t *commands)
 {
 	sctp_transport_t *transport = (sctp_transport_t *) arg;
-	sctp_chunk_t *reply;
-	sctp_sender_hb_info_t hbinfo;
-	size_t paylen = 0;
 
 	if (asoc->overall_error_count >= asoc->overall_error_threshold) {
 		/* CMD_ASSOC_FAILED calls CMD_DELETE_TCB. */
@@ -689,34 +718,21 @@ sctp_disposition_t sctp_sf_sendbeat_8_3(const sctp_endpoint_t *ep,
 	 * HEARTBEAT is sent (see Section 8.3).
 	 */
 
-	hbinfo.param_hdr.type = SCTP_PARAM_HEARTBEAT_INFO;
-	hbinfo.param_hdr.length = htons(sizeof(sctp_sender_hb_info_t));
-	hbinfo.daddr = transport->ipaddr;
-	hbinfo.sent_at = jiffies;
-
-	/* Set rto_pending indicating that an RTT measurement is started
-	 * with this heartbeat chunk.
-	 */
-	transport->rto_pending = 1;
-
-	/* Send a heartbeat to our peer.  */
-	paylen = sizeof(sctp_sender_hb_info_t);
-	reply = sctp_make_heartbeat(asoc, transport, &hbinfo, paylen);
-	if (!reply)
-		goto nomem;
-
-	sctp_add_cmd_sf(commands, SCTP_CMD_REPLY, SCTP_CHUNK(reply));
-
-	/* Set transport error counter and association error counter
-	 * when sending heartbeat.
-	 */
-	sctp_add_cmd_sf(commands, SCTP_CMD_TRANSPORT_RESET,
+	if (transport->hb_allowed) {
+		if (SCTP_DISPOSITION_NOMEM ==
+				sctp_sf_heartbeat(ep, asoc, type, arg,
+						  commands))
+			return SCTP_DISPOSITION_NOMEM;
+		/* Set transport error counter and association error counter
+		 * when sending heartbeat.
+		 */
+		sctp_add_cmd_sf(commands, SCTP_CMD_TRANSPORT_RESET,
+				SCTP_TRANSPORT(transport));
+	}
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_UPDATE,
 			SCTP_TRANSPORT(transport));
-
+	
         return SCTP_DISPOSITION_CONSUME;
-
-nomem:
-	return SCTP_DISPOSITION_NOMEM;
 }
 
 /*
@@ -3654,6 +3670,39 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_prm_abort(
 	 * common function with the SHUTDOWN-SENT state.
 	 */
 	return sctp_sf_shutdown_sent_prm_abort(ep, asoc, type, arg, commands);
+}
+
+/* 
+ * Process the REQUESTHEARTBEAT primitive
+ *
+ * 10.1 ULP-to-SCTP
+ * J) Request Heartbeat
+ *
+ * Format: REQUESTHEARTBEAT(association id, destination transport address)
+ *
+ * -> result
+ *
+ * Instructs the local endpoint to perform a HeartBeat on the specified
+ * destination transport address of the given association. The returned
+ * result should indicate whether the transmission of the HEARTBEAT
+ * chunk to the destination address is successful.
+ *
+ * Mandatory attributes:
+ *
+ * o association id - local handle to the SCTP association
+ *
+ * o destination transport address - the transport address of the
+ *   asociation on which a heartbeat should be issued.
+ */
+sctp_disposition_t sctp_sf_do_prm_requestheartbeat(
+					const sctp_endpoint_t *ep,
+					const sctp_association_t *asoc,
+					const sctp_subtype_t type,
+					void *arg,
+					sctp_cmd_seq_t *commands)
+{
+	return sctp_sf_heartbeat(ep, asoc, type, (sctp_transport_t *)arg,
+				 commands);
 }
 
 /*

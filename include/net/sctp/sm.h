@@ -157,6 +157,7 @@ sctp_state_fn_t sctp_sf_shutdown_ack_sent_prm_abort;
 sctp_state_fn_t sctp_sf_error_closed;
 sctp_state_fn_t sctp_sf_error_shutdown;
 sctp_state_fn_t sctp_sf_ignore_primitive;
+sctp_state_fn_t sctp_sf_do_prm_requestheartbeat;
 
 /* Prototypes for other event state functions.  */
 sctp_state_fn_t sctp_sf_do_9_2_start_shutdown;

@@ -1252,6 +1252,67 @@ static inline int sctp_setsockopt_autoclose(struct sock *sk, char *optval,
 	return 0;
 }
 
+static inline int sctp_setsockopt_set_peer_addr_params(struct sock *sk,
+						       char *optval,
+						       int optlen)
+{
+	struct sctp_paddrparams params;
+	sctp_association_t *asoc;
+	sockaddr_storage_t *addr;
+	sctp_transport_t *trans;
+	int error;
+
+	if (optlen != sizeof(struct sctp_paddrparams))
+		return -EINVAL;
+	if (copy_from_user(&params, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	addr = (sockaddr_storage_t *) &(params.spp_address);
+
+	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	if (!trans)
+		return -ENOENT;
+
+	/* Applications can enable or disable heartbeats for any peer address
+	 * of an association, modify an address's heartbeat interval, force a
+	 * heartbeat to be sent immediately, and adjust the address's maximum
+	 * number of retransmissions sent before an address is considered
+	 * unreachable.
+	 *
+	 * The value of the heartbeat interval, in milliseconds. A value of
+	 * UINT32_MAX (4294967295), when modifying the parameter, specifies
+	 * that a heartbeat should be sent immediately to the peer address,
+	 * and the current interval should remain unchanged.
+	 */
+	if (0xffffffff == params.spp_hbinterval) {
+		error = sctp_primitive_REQUESTHEARTBEAT (asoc, trans);
+		if (error)
+			return error;
+	}
+	else {
+	/* The value of the heartbeat interval, in milliseconds. A value of 0,
+	 * when modifying the parameter, specifies that the heartbeat on this
+	 * address should be disabled.
+	 */
+		if (params.spp_hbinterval) {
+			trans->hb_allowed = 1;
+			trans->hb_interval = params.spp_hbinterval * HZ / 1000;
+		} else
+			trans->hb_allowed = 0;
+	}
+
+	/* spp_pathmaxrxt contains the maximum number of retransmissions
+	 * before this address shall be considered unreachable.
+	 */
+	trans->error_threshold = params.spp_pathmaxrxt;
+
+	return 0;
+}
+
 /* API 6.2 setsockopt(), getsockopt()
  *
  * Applications use setsockopt() and getsockopt() to set or retrieve
@@ -1340,6 +1401,11 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 
 	case SCTP_AUTOCLOSE:
 		retval = sctp_setsockopt_autoclose(sk, optval, optlen);
+		break;
+
+	case SCTP_SET_PEER_ADDR_PARAMS:
+		retval = sctp_setsockopt_set_peer_addr_params(sk, optval,
+							      optlen);
 		break;
 
 	default:
@@ -1503,28 +1569,26 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 
 	if (len != sizeof(status)) {
 		retval = -EINVAL;
-		goto out_nounlock;
+		goto out;
 	}
 
 	if (copy_from_user(&status, optval, sizeof(status))) {
 		retval = -EFAULT;
-		goto out_nounlock;
+		goto out;
 	}
-
-	sctp_lock_sock(sk);
 
 	associd = status.sstat_assoc_id;
 	if ((SCTP_SOCKET_UDP_HIGH_BANDWIDTH != sctp_sk(sk)->type) && associd) {
 		assoc = sctp_id2assoc(sk, associd);
 		if (!assoc) {
 			retval = -EINVAL;
-			goto out_unlock;
+			goto out;
 		}
 	} else {
 		ep = sctp_sk(sk)->ep;
 		if (list_empty(&ep->asocs)) {
 			retval = -EINVAL;
-			goto out_unlock;
+			goto out;
 		}
 
 		assoc = list_entry(ep->asocs.next, sctp_association_t, asocs);
@@ -1543,7 +1607,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_primary.spinfo_assoc_id = sctp_assoc2id(transport->asoc);
 	memcpy(&status.sstat_primary.spinfo_address,
 	       &(transport->ipaddr), sizeof(sockaddr_storage_t));
-	status.sstat_primary.spinfo_state = transport->state.active;
+	status.sstat_primary.spinfo_state = transport->active;
 	status.sstat_primary.spinfo_cwnd = transport->cwnd;
 	status.sstat_primary.spinfo_srtt = transport->srtt;
 	status.sstat_primary.spinfo_rto = transport->rto;
@@ -1551,7 +1615,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 
 	if (put_user(len, optlen)) {
 		retval = -EFAULT;
-		goto out_unlock;
+		goto out;
 	}
 
 	SCTP_DEBUG_PRINTK("sctp_getsockopt_sctp_status(%d): %d %d %p\n",
@@ -1560,13 +1624,10 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 
 	if (copy_to_user(optval, &status, len)) {
 		retval = -EFAULT;
-		goto out_unlock;
+		goto out;
 	}
 
-out_unlock:
-	sctp_release_sock(sk);
-
-out_nounlock:
+out:
 	return (retval);
 }
 
@@ -1684,25 +1745,23 @@ static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval
 	if (copy_from_user(&peeloff, optval, len))
 		return -EFAULT;
 
-	sctp_lock_sock(sk);
-
 	assoc = sctp_id2assoc(sk, peeloff.associd);
 	if (NULL == assoc) {
 		retval = -EINVAL;
-		goto out_unlock;
+		goto out;
 	}
 
 	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p\n", __FUNCTION__, sk, assoc);
 
 	retval = sctp_do_peeloff(assoc, &newsock);
 	if (retval < 0)
-		goto out_unlock;
+		goto out;
 
 	/* Map the socket to an unused fd that can be returned to the user.  */
 	retval = sock_map_fd(newsock);
 	if (retval < 0) {
 		sock_release(newsock);
-		goto out_unlock;
+		goto out;
 	}
 
 	SCTP_DEBUG_PRINTK("%s: sk: %p assoc: %p newsk: %p sd: %d\n",
@@ -1713,9 +1772,52 @@ static inline int sctp_getsockopt_peeloff(struct sock *sk, int len, char *optval
 	if (copy_to_user(optval, &peeloff, len))
 		retval = -EFAULT;
 
-out_unlock:
-	sctp_release_sock(sk);
+out:
 	return retval;
+}
+
+static inline int sctp_getsockopt_get_peer_addr_params(struct sock *sk,
+					int len, char *optval, int *optlen)
+{
+	struct sctp_paddrparams params;
+	sctp_association_t *asoc;
+	sockaddr_storage_t *addr;
+	sctp_transport_t *trans;
+
+	if (len != sizeof(struct sctp_paddrparams))
+		return -EINVAL;
+	if (copy_from_user(&params, optval, *optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, params.spp_assoc_id);
+	if (!asoc)
+		return -EINVAL;
+
+	addr = (sockaddr_storage_t *) &(params.spp_address);
+
+	trans = sctp_assoc_lookup_paddr(asoc, addr);
+	if (!trans)
+		return -ENOENT;
+
+	/* The value of the heartbeat interval, in milliseconds. A value of 0,
+	 * when modifying the parameter, specifies that the heartbeat on this
+	 * address should be disabled.
+	 */
+	if (!trans->hb_allowed)
+		params.spp_hbinterval = 0;
+	else
+		params.spp_hbinterval = trans->hb_interval * 1000 / HZ;
+
+	/* spp_pathmaxrxt contains the maximum number of retransmissions
+	 * before this address shall be considered unreachable.
+	 */
+	params.spp_pathmaxrxt = trans->error_threshold;
+	
+	if (copy_to_user(optval, &params, len))
+		return -EFAULT;
+	*optlen = len;
+
+	return 0;
 }
 
 SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
@@ -1748,6 +1850,8 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 	if (get_user(len, optlen))
 		return -EFAULT;
 
+	sctp_lock_sock(sk);
+
 	switch (optname) {
 	case SCTP_STATUS:
 		retval = sctp_getsockopt_sctp_status(sk, len, optval, optlen);
@@ -1770,11 +1874,17 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		retval = sctp_getsockopt_peeloff(sk, len, optval, optlen);
 		break;
 
+	case SCTP_GET_PEER_ADDR_PARAMS:
+		retval = sctp_getsockopt_get_peer_addr_params(sk, len, optval,
+							      optlen);
+		break;
+
 	default:
 		retval = -ENOPROTOOPT;
 		break;
 	};
 
+	sctp_release_sock(sk);
 	return retval;
 }
 

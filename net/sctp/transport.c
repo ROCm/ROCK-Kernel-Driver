@@ -104,8 +104,8 @@ sctp_transport_t *sctp_transport_init(sctp_transport_t *peer,
 	peer->last_time_used = jiffies;
 	peer->last_time_ecne_reduced = jiffies;
 
-	peer->state.active = 1;
-	peer->state.hb_allowed = 0;
+	peer->active = 1;
+	peer->hb_allowed = 0;
 
 	/* Initialize the default path max_retrans.  */
 	peer->max_retrans = proto->max_retrans_path;
