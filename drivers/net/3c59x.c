@@ -1483,12 +1483,13 @@ vortex_up(struct net_device *dev)
 		mii_reg1 = mdio_read(dev, vp->phys[0], 1);
 		mii_reg5 = mdio_read(dev, vp->phys[0], 5);
 		if (mii_reg5 == 0xffff  ||  mii_reg5 == 0x0000) {
-			;					/* No MII device or no link partner report */
+			netif_carrier_off(dev); /* No MII device or no link partner report */
 		} else {
 			mii_reg5 &= vp->advertising;
 			if ((mii_reg5 & 0x0100) != 0	/* 100baseTx-FD */
 				 || (mii_reg5 & 0x00C0) == 0x0040) /* 10T-FD, but not 100-HD */
 			vp->full_duplex = 1;
+			netif_carrier_on(dev);
 		}
 		vp->partner_flow_ctrl = ((mii_reg5 & 0x0400) != 0);
 		if (vortex_debug > 1)
@@ -1692,13 +1693,16 @@ vortex_timer(unsigned long data)
 	switch (dev->if_port) {
 	case XCVR_10baseT:  case XCVR_100baseTx:  case XCVR_100baseFx:
 		if (media_status & Media_LnkBeat) {
+			netif_carrier_on(dev);
 			ok = 1;
 			if (vortex_debug > 1)
 				printk(KERN_DEBUG "%s: Media %s has link beat, %x.\n",
 					   dev->name, media_tbl[dev->if_port].name, media_status);
-		} else if (vortex_debug > 1)
+		} else if (vortex_debug > 1) {
+			netif_carrier_off(dev);
 			printk(KERN_DEBUG "%s: Media %s has no link beat, %x.\n",
 				   dev->name, media_tbl[dev->if_port].name, media_status);
+		}
 		break;
 	case XCVR_MII: case XCVR_NWAY:
 		{
@@ -1707,7 +1711,7 @@ vortex_timer(unsigned long data)
 			if (vortex_debug > 2)
 				printk(KERN_DEBUG "%s: MII transceiver has status %4.4x.\n",
 					dev->name, mii_status);
-			if (mii_status & 0x0004) {
+			if (mii_status & BMSR_LSTATUS) {
 				int mii_reg5 = mdio_read(dev, vp->phys[0], 5);
 				if (! vp->force_fd  &&  mii_reg5 != 0xffff) {
 					int duplex;
@@ -1731,6 +1735,9 @@ vortex_timer(unsigned long data)
 						/* AKPM: bug: should reset Tx and Rx after setting Duplex.  Page 180 */
 					}
 				}
+				netif_carrier_on(dev);
+			} else {
+				netif_carrier_off(dev);
 			}
 		}
 		break;

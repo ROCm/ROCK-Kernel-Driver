@@ -132,12 +132,14 @@ EXPORT_SYMBOL(irlmp_dup);
 EXPORT_SYMBOL(lmp_reasons);
 
 /* Queue */
-EXPORT_SYMBOL(hashbin_find);
 EXPORT_SYMBOL(hashbin_new);
 EXPORT_SYMBOL(hashbin_insert);
 EXPORT_SYMBOL(hashbin_delete);
 EXPORT_SYMBOL(hashbin_remove);
 EXPORT_SYMBOL(hashbin_remove_this);
+EXPORT_SYMBOL(hashbin_find);
+EXPORT_SYMBOL(hashbin_lock_find);
+EXPORT_SYMBOL(hashbin_find_next);
 EXPORT_SYMBOL(hashbin_get_next);
 EXPORT_SYMBOL(hashbin_get_first);
 
@@ -328,7 +330,8 @@ void __exit irda_cleanup(void)
  * On the other hand, it needs to be initialised *after* the basic
  * networking, the /proc/net filesystem and sysctl module. Those are
  * currently initialised in .../init/main.c (before initcalls).
- * Also, it needs to be initialised *after* the random number generator.
+ * Also, IrDA drivers needs to be initialised *after* the random number
+ * generator (main stack and higher layer init don't need it anymore).
  *
  * Jean II
  */

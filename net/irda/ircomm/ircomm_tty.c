@@ -90,7 +90,7 @@ hashbin_t *ircomm_tty = NULL;
  */
 int __init ircomm_tty_init(void)
 {	
-	ircomm_tty = hashbin_new(HB_LOCAL); 
+	ircomm_tty = hashbin_new(HB_LOCK); 
 	if (ircomm_tty == NULL) {
 		ERROR(__FUNCTION__ "(), can't allocate hashbin!\n");
 		return -ENOMEM;
@@ -308,22 +308,25 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 	IRDA_DEBUG(2, "%s(%d):block_til_ready before block on %s open_count=%d\n",
 	      __FILE__,__LINE__, tty->driver.name, self->open_count );
 
-	save_flags(flags); cli();
+	/* As far as I can see, we protect open_count - Jean II */
+	spin_lock_irqsave(&self->spinlock, flags);
 	if (!tty_hung_up_p(filp)) {
 		extra_count = 1;
 		self->open_count--;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 	self->blocked_open++;
 	
 	while (1) {
 		if (!(self->flags & ASYNC_CALLOUT_ACTIVE) &&
  		    (tty->termios->c_cflag & CBAUD)) {
-			save_flags(flags); cli();
+			/* Here, we use to lock those two guys, but
+			 * as ircomm_param_request() does it itself,
+			 * I don't see the point (and I see the deadlock).
+			 * Jean II */
 			self->settings.dte |= IRCOMM_RTS + IRCOMM_DTR;
 		 	
 			ircomm_param_request(self, IRCOMM_DTE, TRUE);
-			restore_flags(flags);
 		}
 		
 		current->state = TASK_INTERRUPTIBLE;
@@ -361,8 +364,12 @@ static int ircomm_tty_block_til_ready(struct ircomm_tty_cb *self,
 	__set_current_state(TASK_RUNNING);
 	remove_wait_queue(&self->open_wait, &wait);
 	
-	if (extra_count)
+	if (extra_count) {
+		/* ++ is not atomic, so this should be protected - Jean II */
+		spin_lock_irqsave(&self->spinlock, flags);
 		self->open_count++;
+		spin_unlock_irqrestore(&self->spinlock, flags);
+	}
 	self->blocked_open--;
 	
 	IRDA_DEBUG(1, "%s(%d):block_til_ready after blocking on %s open_count=%d\n",
@@ -385,6 +392,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 {
 	struct ircomm_tty_cb *self;
 	unsigned int line;
+	unsigned long	flags;
 	int ret;
 
 	IRDA_DEBUG(2, __FUNCTION__ "()\n");
@@ -397,7 +405,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 	}
 
 	/* Check if instance already exists */
-	self = hashbin_find(ircomm_tty, line, NULL);
+	self = hashbin_lock_find(ircomm_tty, line, NULL);
 	if (!self) {
 		/* No, so make new instance */
 		self = kmalloc(sizeof(struct ircomm_tty_cb), GFP_KERNEL);
@@ -423,6 +431,7 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		init_timer(&self->watchdog_timer);
 		init_waitqueue_head(&self->open_wait);
  		init_waitqueue_head(&self->close_wait);
+		spin_lock_init(&self->spinlock);
 
 		/* 
 		 * Force TTY into raw mode by default which is usually what
@@ -435,10 +444,13 @@ static int ircomm_tty_open(struct tty_struct *tty, struct file *filp)
 		/* Insert into hash */
 		hashbin_insert(ircomm_tty, (irda_queue_t *) self, line, NULL);
 	}
+	/* ++ is not atomic, so this should be protected - Jean II */
+	spin_lock_irqsave(&self->spinlock, flags);
 	self->open_count++;
 
 	tty->driver_data = self;
 	self->tty = tty;
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	IRDA_DEBUG(1, __FUNCTION__"(), %s%d, count = %d\n", tty->driver.name, 
 		   self->line, self->open_count);
@@ -526,12 +538,11 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return;);
 
-	save_flags(flags); 
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	if (tty_hung_up_p(filp)) {
 		MOD_DEC_USE_COUNT;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&self->spinlock, flags);
 
 		IRDA_DEBUG(0, __FUNCTION__ "(), returning 1\n");
 		return;
@@ -559,12 +570,18 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 	}
 	if (self->open_count) {
 		MOD_DEC_USE_COUNT;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&self->spinlock, flags);
 
 		IRDA_DEBUG(0, __FUNCTION__ "(), open count > 0\n");
 		return;
 	}
 	self->flags |= ASYNC_CLOSING;
+
+	/* We need to unlock here (we were unlocking at the end of this
+	 * function), because tty_wait_until_sent() may schedule.
+	 * I don't know if the rest should be locked somehow,
+	 * so someone should check. - Jean II */
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
@@ -597,7 +614,6 @@ static void ircomm_tty_close(struct tty_struct *tty, struct file *filp)
 	wake_up_interruptible(&self->close_wait);
 
 	MOD_DEC_USE_COUNT;
-	restore_flags(flags);
 }
 
 /*
@@ -645,13 +661,12 @@ static void ircomm_tty_do_softint(void *private_)
 		return;
 
 	/* Unlink control buffer */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	ctrl_skb = self->ctrl_skb;
 	self->ctrl_skb = NULL;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/* Flush control buffer if any */
 	if (ctrl_skb && self->flow == FLOW_START)
@@ -661,13 +676,12 @@ static void ircomm_tty_do_softint(void *private_)
 		return;
 
 	/* Unlink transmit buffer */
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 	
 	skb = self->tx_skb;
 	self->tx_skb = NULL;
 
-	restore_flags(flags);	
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/* Flush transmit buffer if any */
 	if (skb)
@@ -720,8 +734,7 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 		return len;
 	}
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	/* Fetch current transmit buffer */
 	skb = self->tx_skb;
@@ -768,7 +781,7 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 			skb = dev_alloc_skb(self->max_data_size+
 					    self->max_header_size);
 			if (!skb) {
-				restore_flags(flags);
+				spin_unlock_irqrestore(&self->spinlock, flags);
 				return -ENOBUFS;
 			}
 			skb_reserve(skb, self->max_header_size);
@@ -785,7 +798,7 @@ static int ircomm_tty_write(struct tty_struct *tty, int from_user,
 		len += size;
 	}
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	/*     
 	 * Schedule a new thread which will transmit the frame as soon
@@ -824,13 +837,12 @@ static int ircomm_tty_write_room(struct tty_struct *tty)
 	    (self->max_header_size == IRCOMM_TTY_HDR_UNITIALISED))
 		ret = 0;
 	else {
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&self->spinlock, flags);
 		if (self->tx_skb)
 			ret = self->max_data_size - self->tx_skb->len;
 		else
 			ret = self->max_data_size;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&self->spinlock, flags);
 	}
 	IRDA_DEBUG(2, __FUNCTION__ "(), ret=%d\n", ret);
 
@@ -946,13 +958,12 @@ static int ircomm_tty_chars_in_buffer(struct tty_struct *tty)
 	ASSERT(self != NULL, return -1;);
 	ASSERT(self->magic == IRCOMM_TTY_MAGIC, return -1;);
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	if (self->tx_skb)
 		len = self->tx_skb->len;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 
 	return len;
 }
@@ -969,8 +980,7 @@ static void ircomm_tty_shutdown(struct ircomm_tty_cb *self)
 	if (!(self->flags & ASYNC_INITIALIZED))
 		return;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->spinlock, flags);
 
 	del_timer(&self->watchdog_timer);
 	
@@ -994,7 +1004,7 @@ static void ircomm_tty_shutdown(struct ircomm_tty_cb *self)
 	}
 	self->flags &= ~ASYNC_INITIALIZED;
 
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->spinlock, flags);
 }
 
 /*
@@ -1007,6 +1017,7 @@ static void ircomm_tty_shutdown(struct ircomm_tty_cb *self)
 static void ircomm_tty_hangup(struct tty_struct *tty)
 {
 	struct ircomm_tty_cb *self = (struct ircomm_tty_cb *) tty->driver_data;
+	unsigned long	flags;
 
 	IRDA_DEBUG(0, __FUNCTION__"()\n");
 
@@ -1019,9 +1030,13 @@ static void ircomm_tty_hangup(struct tty_struct *tty)
 	/* ircomm_tty_flush_buffer(tty); */
 	ircomm_tty_shutdown(self);
 
+	/* I guess we need to lock here - Jean II */
+	spin_lock_irqsave(&self->spinlock, flags);
 	self->flags &= ~(ASYNC_NORMAL_ACTIVE|ASYNC_CALLOUT_ACTIVE);
 	self->tty = 0;
 	self->open_count = 0;
+	spin_unlock_irqrestore(&self->spinlock, flags);
+
 	wake_up_interruptible(&self->open_wait);
 }
 
@@ -1362,11 +1377,14 @@ static int ircomm_tty_read_proc(char *buf, char **start, off_t offset, int len,
 	struct ircomm_tty_cb *self;
         int count = 0, l;
         off_t begin = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&ircomm_tty->hb_spinlock, flags);
 
 	self = (struct ircomm_tty_cb *) hashbin_get_first(ircomm_tty);
 	while ((self != NULL) && (count < 4000)) {
 		if (self->magic != IRCOMM_TTY_MAGIC)
-			return 0;
+			break;
 
                 l = ircomm_tty_line_info(self, buf + count);
                 count += l;
@@ -1381,6 +1399,8 @@ static int ircomm_tty_read_proc(char *buf, char **start, off_t offset, int len,
         }
         *eof = 1;
 done:
+	spin_unlock_irqrestore(&ircomm_tty->hb_spinlock, flags);
+
         if (offset >= count+begin)
                 return 0;
         *start = buf + (offset-begin);

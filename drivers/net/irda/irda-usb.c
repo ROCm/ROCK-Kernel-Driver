@@ -1171,7 +1171,7 @@ static inline int irda_usb_open(struct irda_usb_cb *self)
 	irda_usb_init_qos(self);
 	
 	/* Initialise list of skb beeing curently transmitted */
-	self->tx_list = hashbin_new(HB_GLOBAL);
+	self->tx_list = hashbin_new(HB_NOLOCK);	/* unused */
 
 	/* Allocate the buffer for speed changes */
 	/* Don't change this buffer size and allocation without doing

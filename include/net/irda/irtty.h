@@ -62,6 +62,9 @@ struct irtty_cb {
 	struct qos_info qos;       /* QoS capabilities for this device */
 	dongle_t *dongle;          /* Dongle driver */
 
+
+	spinlock_t lock;           /* For serializing operations */
+
 	__u32 new_speed;
  	__u32 flags;               /* Interface flags */
 

@@ -175,6 +175,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 		return -ENOMEM;
 	}
 	memset(self, 0, sizeof(struct w83977af_ir));
+	spin_lock_init(&self->lock);
    
 	/* Need to store self somewhere */
 	dev_self[i] = self;
@@ -236,7 +237,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	self->rx_buff.data = self->rx_buff.head;
 	
 	if (!(dev = dev_alloc("irda%d", &err))) {
-		ERROR(__FUNCTION__ "(), dev_alloc() failed!\n");
+		ERROR("%s(), dev_alloc() failed!\n", __FUNCTION__);
 		return -ENOMEM;
 	}
 	dev->priv = (void *) self;
@@ -254,7 +255,7 @@ int w83977af_open(int i, unsigned int iobase, unsigned int irq,
 	err = register_netdevice(dev);
 	rtnl_unlock();
 	if (err) {
-		ERROR(__FUNCTION__ "(), register_netdevice() failed!\n");
+		ERROR("%s(), register_netdevice() failed!\n", __FUNCTION__);
 		return -1;
 	}
 	MESSAGE("IrDA: Registered device %s\n", dev->name);
@@ -603,8 +604,7 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	switch_bank(iobase, SET2);
 	outb(ADCR1_D_CHSW|/*ADCR1_DMA_F|*/ADCR1_ADV_SL, iobase+ADCR1);
 #ifdef CONFIG_NETWINDER_TX_DMA_PROBLEMS
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->lock, flags);
 
 	disable_dma(self->io.dma);
 	clear_dma_ff(self->io.dma);
@@ -623,7 +623,7 @@ static void w83977af_dma_write(struct w83977af_ir *self, int iobase)
 	hcr = inb(iobase+HCR);
 	outb(hcr | HCR_EN_DMA, iobase+HCR);
 	enable_dma(self->io.dma);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->lock, flags);
 #else	
 	outb(inb(iobase+HCR) | HCR_EN_DMA | HCR_TX_WT, iobase+HCR);
 #endif
@@ -761,8 +761,7 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 	self->rx_buff.data = self->rx_buff.head;
 
 #ifdef CONFIG_NETWINDER_RX_DMA_PROBLEMS
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&self->lock, flags);
 
 	disable_dma(self->io.dma);
 	clear_dma_ff(self->io.dma);
@@ -788,7 +787,7 @@ int w83977af_dma_receive(struct w83977af_ir *self)
 	hcr = inb(iobase+HCR);
 	outb(hcr | HCR_EN_DMA, iobase+HCR);
 	enable_dma(self->io.dma);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->lock, flags);
 #else	
 	outb(inb(iobase+HCR) | HCR_EN_DMA, iobase+HCR);
 #endif
@@ -892,8 +891,8 @@ int w83977af_dma_receive_complete(struct w83977af_ir *self)
 						
 			skb = dev_alloc_skb(len+1);
 			if (skb == NULL)  {
-				printk(KERN_INFO __FUNCTION__ 
-				       "(), memory squeeze, dropping frame.\n");
+				printk(KERN_INFO
+				       "%s(), memory squeeze, dropping frame.\n", __FUNCTION__);
 				/* Restore set register */
 				outb(set, iobase+SSR);
 
@@ -1334,10 +1333,8 @@ static int w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 	IRDA_DEBUG(2, __FUNCTION__ "(), %s, (cmd=0x%X)\n", dev->name, cmd);
 	
-	/* Disable interrupts & save flags */
-	save_flags(flags);
-	cli();
-	
+	spin_lock_irqsave(&self->lock, flags);
+
 	switch (cmd) {
 	case SIOCSBANDWIDTH: /* Set bandwidth */
 		if (!capable(CAP_NET_ADMIN)) {
@@ -1360,7 +1357,7 @@ static int w83977af_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		ret = -EOPNOTSUPP;
 	}
 out:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&self->lock, flags);
 	return ret;
 }
 

@@ -3,7 +3,7 @@
 # under Linux.
 #
 
-L_TARGET := rexlib.a
+L_TARGET := lib.a
 
 obj-y := init.o memory.o cmdline.o identify.o locore.o
 

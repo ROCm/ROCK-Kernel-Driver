@@ -2,11 +2,8 @@
 # Makefile for the Linux IEEE 1394 implementation
 #
 
-O_TARGET := ieee1394drv.o
-
 export-objs := ieee1394_core.o ohci1394.o cmp.o
 
-list-multi := ieee1394.o
 ieee1394-objs := ieee1394_core.o ieee1394_transactions.o hosts.o \
 		 highlevel.o csr.o nodemgr.o
 
@@ -22,6 +19,3 @@ obj-$(CONFIG_IEEE1394_AMDTP) += amdtp.o
 obj-$(CONFIG_IEEE1394_CMP) += cmp.o
 
 include $(TOPDIR)/Rules.make
-
-ieee1394.o: $(ieee1394-objs)
-	$(LD) $(LDFLAGS) -r -o $@ $(ieee1394-objs)

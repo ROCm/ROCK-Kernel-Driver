@@ -112,7 +112,7 @@ endif
 ifdef CONFIG_DECSTATION
 CORE_FILES    += arch/mips/dec/dec.o
 SUBDIRS       += arch/mips/dec arch/mips/dec/prom
-LIBS          += arch/mips/dec/prom/rexlib.a
+LIBS          += arch/mips/dec/prom/lib.a
 LOADADDR      += 0x80040000
 endif
 
@@ -134,20 +134,20 @@ endif
 ifdef CONFIG_MIPS_JAZZ
 CORE_FILES    += arch/mips/jazz/jazz.o
 SUBDIRS       += arch/mips/jazz arch/mips/arc
-LIBS          += arch/mips/arc/arclib.a
+LIBS          += arch/mips/arc/lib.a
 LOADADDR      += 0x80080000
 endif
 
 ifdef CONFIG_SNI_RM200_PCI
 CORE_FILES    += arch/mips/sni/sni.o
 SUBDIRS       += arch/mips/sni arch/mips/arc
-LIBS          += arch/mips/arc/arclib.a
+LIBS          += arch/mips/arc/lib.a
 LOADADDR      += 0x80080000
 endif
 
 ifdef CONFIG_SGI_IP22
 CORE_FILES    += arch/mips/sgi/kernel/ip22-kern.o
-LIBS          += arch/mips/arc/arclib.a
+LIBS          += arch/mips/arc/lib.a
 SUBDIRS       += arch/mips/sgi/kernel arch/mips/arc
 #
 # Set LOADADDR to >= 0x88069000 if you want to leave space for symmon,
@@ -162,7 +162,7 @@ endif
 #
 ifdef CONFIG_BAGET_MIPS
 SUBDIRS       += arch/mips/baget arch/mips/baget/prom
-LIBS          += arch/mips/baget/baget.a arch/mips/baget/prom/bagetlib.a
+LIBS          += arch/mips/baget/baget.a arch/mips/baget/prom/lib.a
 LOADADDR      += 0x80001000
 endif
 

@@ -2,8 +2,6 @@
 # Makefile for the linux kernel.
 #
 
-O_TARGET := init.o
-
 obj-y    := main.o version.o do_mounts.o
 
 include $(TOPDIR)/Rules.make
