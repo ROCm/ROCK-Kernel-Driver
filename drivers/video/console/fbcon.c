@@ -766,7 +766,7 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 			vc->vc_complement_mask <<= 1;
 	}
 
-	if (!init) {
+	if (logo) {
 		if (vc->vc_cols != nr_cols || vc->vc_rows != nr_rows)
 			vc_resize(vc->vc_num, nr_cols, nr_rows);
 		else if (CON_IS_VISIBLE(vc) &&
@@ -783,9 +783,6 @@ static void fbcon_set_display(struct vc_data *vc, int init, int logo)
 			vc->vc_pos += logo_lines * vc->vc_size_row;
 			kfree(save);
 		}
-	}
-
-	if (logo) {
 		if (logo_lines > vc->vc_bottom) {
 			logo_shown = -1;
 			printk(KERN_INFO
