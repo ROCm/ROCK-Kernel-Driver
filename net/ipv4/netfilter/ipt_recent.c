@@ -959,7 +959,7 @@ static struct ipt_match recent_match = {
 /* Kernel module initialization. */
 static int __init init(void)
 {
-	int count;
+	int err, count;
 
 	printk(version);
 #ifdef CONFIG_PROC_FS
@@ -983,7 +983,10 @@ static int __init init(void)
 	if(debug) printk(KERN_INFO RECENT_NAME ": ip_list_hash_size: %d\n",ip_list_hash_size);
 #endif
 
-	return ipt_register_match(&recent_match);
+	err = ipt_register_match(&recent_match);
+	if (err)
+		remove_proc_entry("ipt_recent", proc_net);
+	return err;
 }
 
 /* Kernel module destruction. */
