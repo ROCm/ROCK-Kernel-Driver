@@ -2248,6 +2248,15 @@ D: Ziatech ZT5550 and generic CompactPCI hotplug drivers
 S: Toronto, Ontario
 S: Canada
 
+N: Zwane Mwaikambo
+E: zwane@linuxpower.ca
+W: http://function.linuxpower.ca
+D: Various driver hacking
+D: Lowlevel x86 kernel hacking
+D: General debugging
+S: (ask for current address)
+S: Tanzania
+
 N: Trond Myklebust
 E: trond.myklebust@fys.uio.no
 D: current NFS client hacker.
@@ -2722,7 +2731,7 @@ S: Finland
 N: Thomas Sailer
 E: t.sailer@alumni.ethz.ch
 E: HB9JNX@HB9W.CHE.EU (packet radio)
-D: hfmodem, Baycom and sound card radio modem driver
+D: Baycom driver
 S: Markusstrasse 18
 S: 8006 Zuerich
 S: Switzerland
@@ -3093,8 +3102,14 @@ S: 97078 Wuerzburg
 S: Germany
 
 N: Greg Ungerer
-E: gerg@moreton.com.au
+E: gerg@snapgear.com
+D: uClinux kernel hacker
+D: Port uClinux to the Motorola ColdFire CPU
 D: Author of Stallion multiport serial drivers
+S: SnapGear Inc.
+S: 825 Stanley St
+S: Woolloongabba. QLD. 4102
+S: Australia
 
 N: Jeffrey A. Uphoff
 E: juphoff@transmeta.com

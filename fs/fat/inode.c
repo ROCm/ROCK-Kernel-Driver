@@ -205,7 +205,7 @@ static int fat_show_options(struct seq_file *m, struct vfsmount *mnt)
 		seq_printf(m, ",uid=%d", opts->fs_uid);
 	if (opts->fs_gid != 0)
 		seq_printf(m, ",gid=%d", opts->fs_gid);
-	seq_printf(m, ",umask=%04o", opts->fs_umask);
+	seq_printf(m, ",fmask=%04o", opts->fs_fmask);
 	seq_printf(m, ",dmask=%04o", opts->fs_dmask);
 	if (sbi->nls_disk)
 		seq_printf(m, ",codepage=%s", sbi->nls_disk->charset);
@@ -267,7 +267,7 @@ static int parse_options(char *options, int is_vfat, int *debug,
 
 	opts->fs_uid = current->uid;
 	opts->fs_gid = current->gid;
-	opts->fs_umask = opts->fs_dmask = current->fs->umask;
+	opts->fs_fmask = opts->fs_dmask = current->fs->umask;
 	opts->codepage = 0;
 	opts->iocharset = NULL;
 	if (is_vfat)
@@ -333,7 +333,15 @@ static int parse_options(char *options, int is_vfat, int *debug,
 		else if (!strcmp(this_char,"umask")) {
 			if (!value || !*value) ret = 0;
 			else {
-				opts->fs_umask = simple_strtoul(value,&value,8);
+				opts->fs_fmask = opts->fs_dmask =
+					simple_strtoul(value,&value,8);
+				if (*value) ret = 0;
+			}
+		}
+		else if (!strcmp(this_char,"fmask")) {
+			if (!value || !*value) ret = 0;
+			else {
+				opts->fs_fmask = simple_strtoul(value,&value,8);
 				if (*value) ret = 0;
 			}
 		}
@@ -1119,7 +1127,7 @@ static int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		    ((sbi->options.showexec &&
 		       !is_exec(de->ext))
 		    	? S_IRUGO|S_IWUGO : S_IRWXUGO)
-		    & ~sbi->options.fs_umask) | S_IFREG;
+		    & ~sbi->options.fs_fmask) | S_IFREG;
 		MSDOS_I(inode)->i_start = CF_LE_W(de->start);
 		if (sbi->fat_bits == 32) {
 			MSDOS_I(inode)->i_start |=
@@ -1253,7 +1261,7 @@ int fat_notify_change(struct dentry * dentry, struct iattr * attr)
 	if (S_ISDIR(inode->i_mode))
 		mask = sbi->options.fs_dmask;
 	else
-		mask = sbi->options.fs_umask;
+		mask = sbi->options.fs_fmask;
 	inode->i_mode &= S_IFMT | (S_IRWXUGO & ~mask);
 out:
 	unlock_kernel();

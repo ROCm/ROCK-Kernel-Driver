@@ -430,7 +430,9 @@ new_dentry->d_parent->d_name.name, new_dentry->d_name.name);
 		 */
 		dir->i_sb->u.msdos_sb.options.fs_uid = data.umsdos_dirent.uid;
 		dir->i_sb->u.msdos_sb.options.fs_gid = data.umsdos_dirent.gid;
-		dir->i_sb->u.msdos_sb.options.fs_umask = data.umsdos_dirent.mode;
+		dir->i_sb->u.msdos_sb.options.fs_fmask =
+			dir->i_sb->u.msdos_sb.options.fs_dmask =
+				data.umsdos_dirent.mode;
 		ret = 0;
 	}
 out:

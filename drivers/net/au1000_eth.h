@@ -39,7 +39,7 @@
 #define ETH_TX_TIMEOUT HZ/4
 #define MAC_MIN_PKT_SIZE 64
 
-#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1500)
+#if defined(CONFIG_MIPS_PB1000) || defined(CONFIG_MIPS_PB1500) || defined(CONFIG_MIPS_PB1100)
 #define PHY_ADDRESS              0
 #define PHY_CONTROL_DEFAULT 0x3000
 #define PHY_CONTROL_REG_ADDR     0
@@ -63,6 +63,7 @@
 #define MII_LSI_CONFIG 0x0011
 #define MII_LSI_STAT   0x0012
 #define MII_AUX_CNTRL  0x0018
+#define MII_INT        0x001A
 
 /* mii registers specific to AMD 79C901 */
 #define	MII_STATUS_SUMMARY = 0x0018
@@ -128,14 +129,15 @@
 
 /* lsi status register */
 
-#define MII_LSI_STAT_FDX	0x0008
-#define MII_LSI_STAT_SPD	0x0010
+#define MII_LSI_STAT_FDX	0x0040
+#define MII_LSI_STAT_SPD	0x0080
 
 /* Auxilliary Control/Status Register */
 #define MII_AUX_FDX      0x0001
 #define MII_AUX_100      0x0002
 #define MII_AUX_F100     0x0004
 #define MII_AUX_ANEG     0x0008
+#define MII_FDX_LED      0x8000
 
 typedef struct mii_phy {
 	struct mii_phy * next;

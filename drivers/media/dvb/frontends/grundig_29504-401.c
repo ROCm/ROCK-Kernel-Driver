@@ -34,18 +34,14 @@ static int debug = 0;
 
 
 struct dvb_frontend_info grundig_29504_401_info = {
-	name: "Grundig 29504-401",
-	type: FE_OFDM,
-/*	frequency_min: ???,*/
-/*	frequency_max: ???,*/
-	frequency_stepsize: 166666,
-/*      frequency_tolerance: ???,*/
-/*      symbol_rate_tolerance: ???,*/
-	notifier_delay: 0,
-	caps: FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 | 
-	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
-	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
-	      FE_CAN_MUTE_TS
+	.name			= "Grundig 29504-401",
+	.type			= FE_OFDM,
+	.frequency_stepsize	= 166666,
+	.caps 			= FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
+				  FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 |
+				  FE_CAN_FEC_7_8 | FE_CAN_QPSK |
+				  FE_CAN_QAM_16 | FE_CAN_QAM_64 |
+				  FE_CAN_MUTE_TS
 };
 
 
@@ -54,7 +50,7 @@ int l64781_writereg (struct dvb_i2c_bus *i2c, u8 reg, u8 data)
 {
 	int ret;
 	u8 buf [] = { reg, data };
-	struct i2c_msg msg = { addr: 0x55, flags: 0, buf: buf, len: 2 };
+	struct i2c_msg msg = { .addr = 0x55, .flags = 0, .buf = buf, .len = 2 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error (reg == %02x) = %02x!\n",
@@ -70,8 +66,8 @@ u8 l64781_readreg (struct dvb_i2c_bus *i2c, u8 reg)
 	int ret;
 	u8 b0 [] = { reg };
 	u8 b1 [] = { 0 };
-	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
-			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
+			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	ret = i2c->xfer (i2c, msg, 2);
 
@@ -86,7 +82,7 @@ static
 int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
 {
 	int ret;
-	struct i2c_msg msg = { addr: 0x61, flags: 0, buf: data, len: 4 };
+	struct i2c_msg msg = { .addr = 0x61, .flags = 0, .buf = data, .len = 4 };
 
 	if ((ret = i2c->xfer (i2c, &msg, 1)) != 1)
 		dprintk ("%s: write_reg error == %02x!\n", __FUNCTION__, ret);
@@ -273,7 +269,7 @@ static
 void reset_and_configure (struct dvb_i2c_bus *i2c)
 {
 	u8 buf [] = { 0x06 };
-	struct i2c_msg msg = { addr: 0x00, flags: 0, buf: buf, len: 1 };
+	struct i2c_msg msg = { .addr = 0x00, .flags = 0, .buf = buf, .len = 1 };
 
 	i2c->xfer (i2c, &msg, 1);
 }
@@ -432,8 +428,8 @@ int l64781_attach (struct dvb_i2c_bus *i2c)
 {
 	u8 b0 [] = { 0x1a };
 	u8 b1 [] = { 0x00 };
-	struct i2c_msg msg [] = { { addr: 0x55, flags: 0, buf: b0, len: 1 },
-			   { addr: 0x55, flags: I2C_M_RD, buf: b1, len: 1 } };
+	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
+			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
 
 	if (i2c->xfer (i2c, msg, 2) == 2)   /*  probably an EEPROM... */
 		return -ENODEV;

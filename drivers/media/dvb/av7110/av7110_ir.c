@@ -54,7 +54,7 @@ void av7110_emit_keyup (unsigned long data)
 
 
 static
-struct timer_list keyup_timer = { function: av7110_emit_keyup };
+struct timer_list keyup_timer = { .function = av7110_emit_keyup };
 
 
 static

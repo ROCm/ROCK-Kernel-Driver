@@ -52,6 +52,8 @@
 #include <linux/ac97_codec.h>
 #include <asm/uaccess.h>
 
+#define CODEC_ID_BUFSZ 14
+
 static int ac97_read_mixer(struct ac97_codec *codec, int oss_channel);
 static void ac97_write_mixer(struct ac97_codec *codec, int oss_channel, 
 			     unsigned int left, unsigned int right);
@@ -113,7 +115,7 @@ static const struct {
 	{0x41445340, "Analog Devices AD1881",	&null_ops},
 	{0x41445348, "Analog Devices AD1881A",	&null_ops},
 	{0x41445360, "Analog Devices AD1885",	&default_ops},
-	{0x41445361, "Analog Devices AD1886",	&default_ops},
+	{0x41445361, "Analog Devices AD1886",	&ad1886_ops},
 	{0x41445460, "Analog Devices AD1885",	&default_ops},
 	{0x41445461, "Analog Devices AD1886",	&ad1886_ops},
 	{0x414B4D00, "Asahi Kasei AK4540",	&null_ops},
@@ -654,6 +656,29 @@ int ac97_read_proc (char *page, char **start, off_t off,
 }
 
 /**
+ *	codec_id	-  Turn id1/id2 into a PnP string
+ *	@id1: Vendor ID1
+ *	@id2: Vendor ID2
+ *	@buf: CODEC_ID_BUFSZ byte buffer
+ *
+ *	Fills buf with a zero terminated PnP ident string for the id1/id2
+ *	pair. For convenience the return is the passed in buffer pointer.
+ */
+ 
+static char *codec_id(u16 id1, u16 id2, char *buf)
+{
+	if(id1&0x8080) {
+		snprintf(buf, CODEC_ID_BUFSZ, "0x%04x:0x%04x", id1, id2);
+	} else {
+		buf[0] = (id1 >> 8);
+		buf[1] = (id1 & 0xFF);
+		buf[2] = (id2 >> 8);
+		snprintf(buf+3, CODEC_ID_BUFSZ - 3, "%d", id2&0xFF);
+	}
+	return buf;
+}
+ 
+/**
  *	ac97_probe_codec - Initialize and setup AC97-compatible codec
  *	@codec: (in/out) Kernel info for a single AC97 codec
  *
@@ -681,6 +706,7 @@ int ac97_probe_codec(struct ac97_codec *codec)
 	u16 id1, id2;
 	u16 audio, modem;
 	int i;
+	char cidbuf[CODEC_ID_BUFSZ];
 
 	/* probing AC97 codec, AC97 2.0 says that bit 15 of register 0x00 (reset) should 
 	 * be read zero.
@@ -698,13 +724,16 @@ int ac97_probe_codec(struct ac97_codec *codec)
 
 	if ((audio = codec->codec_read(codec, AC97_RESET)) & 0x8000) {
 		printk(KERN_ERR "ac97_codec: %s ac97 codec not present\n",
-		       codec->id ? "Secondary" : "Primary");
+		       (codec->id & 0x2) ? (codec->id&1 ? "4th" : "Tertiary") 
+		       : (codec->id&1 ? "Secondary":  "Primary"));
 		return 0;
 	}
 
 	/* probe for Modem Codec */
 	codec->codec_write(codec, AC97_EXTENDED_MODEM_ID, 0L);
-	modem = codec->codec_read(codec, AC97_EXTENDED_MODEM_ID);
+	modem = codec->codec_read(codec, AC97_EXTENDED_MODEM_ID) & 1;
+	modem |= (audio&2);
+	audio &= ~2;
 
 	codec->name = NULL;
 	codec->codec_ops = &null_ops;
@@ -721,9 +750,9 @@ int ac97_probe_codec(struct ac97_codec *codec)
 	}
 	if (codec->name == NULL)
 		codec->name = "Unknown";
-	printk(KERN_INFO "ac97_codec: AC97 %s codec, id: 0x%04x:"
-	       "0x%04x (%s)\n", audio ? "Audio" : (modem ? "Modem" : ""),
-	       id1, id2, codec->name);
+	printk(KERN_INFO "ac97_codec: AC97 %s codec, id: %s (%s)\n", 
+		modem ? "Modem" : (audio ? "Audio" : ""),
+	       codec_id(id1, id2, cidbuf), codec->name);
 
 	return ac97_init_mixer(codec);
 }
@@ -746,10 +775,10 @@ static int ac97_init_mixer(struct ac97_codec *codec)
 
 	/* detect bit resolution */
 	codec->codec_write(codec, AC97_MASTER_VOL_STEREO, 0x2020);
-	if(codec->codec_read(codec, AC97_MASTER_VOL_STEREO) == 0x1f1f)
-		codec->bit_resolution = 5;
-	else
+	if(codec->codec_read(codec, AC97_MASTER_VOL_STEREO) == 0x2020)
 		codec->bit_resolution = 6;
+	else
+		codec->bit_resolution = 5;
 
 	/* generic OSS to AC97 wrapper */
 	codec->read_mixer = ac97_read_mixer;
@@ -917,7 +946,7 @@ static int tritech_maestro_init(struct ac97_codec * codec)
 
 /* 
  *	Presario700 workaround 
- * 	for Jack Sense/SPDIF Register misetting causing
+ * 	for Jack Sense/SPDIF Register mis-setting causing
  *	no audible output
  *	by Santiago Nullo 04/05/2002
  */

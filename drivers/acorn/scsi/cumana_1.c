@@ -299,7 +299,7 @@ cumanascsi1_probe(struct expansion_card *ec, const struct ecard_id *id)
 	NCR5380_print_options(host);
 	printk("\n");
 
-	ret = scsi_add_host(host);
+	ret = scsi_add_host(host, &ec->dev);
 	if (ret == 0)
 		goto out;
 

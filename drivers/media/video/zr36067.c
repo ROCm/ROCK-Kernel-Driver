@@ -4396,18 +4396,18 @@ static int zoran_init_done(struct video_device *dev)
 }
 
 static struct video_device zoran_template = {
-	owner:		THIS_MODULE,
-	name:		ZORAN_NAME,
-	type:		VID_TYPE_CAPTURE | VID_TYPE_OVERLAY | VID_TYPE_CLIPPING |
+	.owner		= THIS_MODULE,
+	.name		= ZORAN_NAME,
+	.type		= VID_TYPE_CAPTURE | VID_TYPE_OVERLAY | VID_TYPE_CLIPPING |
 	    VID_TYPE_FRAMERAM | VID_TYPE_SCALES | VID_TYPE_SUBCAPTURE,
-	hardware:	ZORAN_HARDWARE,
-	open:		zoran_open,
-	close:		zoran_close,
-	read:		zoran_read,
-	write:		zoran_write,
-	ioctl:		zoran_ioctl,
-	mmap:		zoran_mmap,
-	initialize:	zoran_init_done,
+	.hardware	= ZORAN_HARDWARE,
+	.open		= zoran_open,
+	.close		= zoran_close,
+	.read		= zoran_read,
+	.write		= zoran_write,
+	.ioctl		= zoran_ioctl,
+	.mmap		= zoran_mmap,
+	.initialize	= zoran_init_done,
 };
 
 /*

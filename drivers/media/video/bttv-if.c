@@ -262,27 +262,27 @@ void bttv_i2c_call(unsigned int card, unsigned int cmd, void *arg)
 }
 
 static struct i2c_algo_bit_data bttv_i2c_algo_template = {
-	setsda:  bttv_bit_setsda,
-	setscl:  bttv_bit_setscl,
-	getsda:  bttv_bit_getsda,
-	getscl:  bttv_bit_getscl,
-	udelay:  16,
-	mdelay:  10,
-	timeout: 200,
+	.setsda  = bttv_bit_setsda,
+	.setscl  = bttv_bit_setscl,
+	.getsda  = bttv_bit_getsda,
+	.getscl  = bttv_bit_getscl,
+	.udelay  = 16,
+	.mdelay  = 10,
+	.timeout = 200,
 };
 
 static struct i2c_adapter bttv_i2c_adap_template = {
-	name:              "bt848",
-	id:                I2C_HW_B_BT848,
-	inc_use:           bttv_inc_use,
-	dec_use:           bttv_dec_use,
-	client_register:   attach_inform,
-	client_unregister: detach_inform,
+	.name              = "bt848",
+	.id                = I2C_HW_B_BT848,
+	.inc_use           = bttv_inc_use,
+	.dec_use           = bttv_dec_use,
+	.client_register   = attach_inform,
+	.client_unregister = detach_inform,
 };
 
 static struct i2c_client bttv_i2c_client_template = {
-        name: "bttv internal use only",
-        id:   -1,
+        .name = "bttv internal use only",
+        .id   = -1,
 };
 
 

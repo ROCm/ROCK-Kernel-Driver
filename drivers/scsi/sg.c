@@ -122,10 +122,12 @@ static struct Scsi_Device_Template sg_template = {
 	.module = THIS_MODULE,
 	.list = LIST_HEAD_INIT(sg_template.list),
 	.name = "generic",
-	.tag = "sg",
 	.scsi_type = 0xff,
 	.attach = sg_attach,
-	.detach = sg_detach
+	.detach = sg_detach,
+	.scsi_driverfs_driver = {
+		.name = "sg",
+	},
 };
 
 typedef struct sg_scatter_hold { /* holding area for scsi scatter gather info */
@@ -259,9 +261,9 @@ sg_open(struct inode *inode, struct file *filp)
 
 	/* This driver's module count bumped by fops_get in <linux/fs.h> */
 	/* Prevent the device driver from vanishing while we sleep */
-	if (!try_module_get(sdp->device->host->hostt->module))
-		return -ENXIO;
-	sdp->device->access_count++;
+	retval = scsi_device_get(sdp->device);
+	if (retval)
+		return retval;
 
 	if (!((flags & O_NONBLOCK) ||
 	      scsi_block_when_processing_errors(sdp->device))) {
@@ -314,8 +316,7 @@ sg_open(struct inode *inode, struct file *filp)
 	return 0;
 
       error_out:
-	sdp->device->access_count--;
-	module_put(sdp->device->host->hostt->module);
+	scsi_device_put(sdp->device);
 	return retval;
 }
 
@@ -332,8 +333,7 @@ sg_release(struct inode *inode, struct file *filp)
 	sg_fasync(-1, filp, 0);	/* remove filp from async notification list */
 	if (0 == sg_remove_sfp(sdp, sfp)) {	/* Returns 1 when sdp gone */
 		if (!sdp->detached) {
-			sdp->device->access_count--;
-			module_put(sdp->device->host->hostt->module);
+			scsi_device_put(sdp->device);
 		}
 		sdp->exclude = 0;
 		wake_up_interruptible(&sdp->o_excl_wait);
@@ -1296,8 +1296,7 @@ sg_cmd_done(Scsi_Cmnd * SCpnt)
 		if (NULL == sfp->headrp) {
 			SCSI_LOG_TIMEOUT(1, printk("sg...bh: already closed, final cleanup\n"));
 			if (0 == sg_remove_sfp(sdp, sfp)) {	/* device still present */
-				sdp->device->access_count--;
-				module_put(sdp->device->host->hostt->module);
+				scsi_device_put(sdp->device);
 			}
 			sfp = NULL;
 		}
@@ -1372,15 +1371,19 @@ static DEVICE_ATTR(type,S_IRUGO,sg_device_type_read,NULL);
 static int
 sg_attach(Scsi_Device * scsidp)
 {
-	struct gendisk *disk = alloc_disk(1);
+	struct gendisk *disk;
 	Sg_device *sdp = NULL;
 	unsigned long iflags;
-	int k;
+	int k, error;
 
+	disk = alloc_disk(1);
 	if (!disk)
-		return 1;
-	if (scsi_slave_attach(scsidp))
-		return 1;
+		return -ENOMEM;
+
+	error = scsi_slave_attach(scsidp);
+	if (error)
+		goto out_put;
+		
 	write_lock_irqsave(&sg_dev_arr_lock, iflags);
 	if (sg_nr_dev >= sg_dev_max) {	/* try to resize */
 		Sg_device **tmp_da;
@@ -1392,9 +1395,8 @@ sg_attach(Scsi_Device * scsidp)
 		if (NULL == tmp_da) {
 			printk(KERN_ERR
 			       "sg_attach: device array cannot be resized\n");
-			put_disk(disk);
-			scsi_slave_detach(scsidp);
-			return 1;
+			error = -ENOMEM;
+			goto out_detach;
 		}
 		write_lock_irqsave(&sg_dev_arr_lock, iflags);
 		memset(tmp_da, 0, tmp_dev_max * sizeof (Sg_device *));
@@ -1418,9 +1420,8 @@ find_empty_slot:
 		       scsidp->lun, scsidp->type, SG_MAX_DEVS_MASK);
 		if (NULL != sdp)
 			vfree((char *) sdp);
-		put_disk(disk);
-		scsi_slave_detach(scsidp);
-		return 1;
+		error = -ENODEV;
+		goto out_detach;
 	}
 	if (k < sg_dev_max) {
 		if (NULL == sdp) {
@@ -1435,9 +1436,8 @@ find_empty_slot:
 	if (NULL == sdp) {
 		write_unlock_irqrestore(&sg_dev_arr_lock, iflags);
 		printk(KERN_ERR "sg_attach: Sg_device cannot be allocated\n");
-		put_disk(disk);
-		scsi_slave_detach(scsidp);
-		return 1;
+		error = -ENOMEM;
+		goto out_detach;
 	}
 
 	SCSI_LOG_TIMEOUT(3, printk("sg_attach: dev=%d \n", k));
@@ -1462,7 +1462,7 @@ find_empty_slot:
 	sprintf(sdp->sg_driverfs_dev.name, "%sgeneric",
 		scsidp->sdev_driverfs_dev.name);
 	sdp->sg_driverfs_dev.parent = &scsidp->sdev_driverfs_dev;
-	sdp->sg_driverfs_dev.bus = &scsi_driverfs_bus_type;
+	sdp->sg_driverfs_dev.bus = scsidp->sdev_driverfs_dev.bus;
 
 	sg_nr_dev++;
 	sg_dev_arr[k] = sdp;
@@ -1490,6 +1490,12 @@ find_empty_slot:
 		       scsidp->lun, scsidp->type);
 	}
 	return 0;
+
+out_detach:
+	scsi_slave_detach(scsidp);
+out_put:
+	put_disk(disk);
+	return error;
 }
 
 static void
@@ -1521,8 +1527,7 @@ sg_detach(Scsi_Device * scsidp)
 						sg_finish_rem_req(srp);
 				}
 				if (sfp->closed) {
-					sdp->device->access_count--;
-					module_put(sdp->device->host->hostt->module);
+					scsi_device_put(sdp->device);
 					__sg_remove_sfp(sdp, sfp);
 				} else {
 					delay = 1;
@@ -2510,8 +2515,7 @@ sg_remove_sfp(Sg_device * sdp, Sg_fd * sfp)
 		/* MOD_INC's to inhibit unloading sg and associated adapter driver */
 		/* only bump the access_count if we actually succeeded in
 		 * throwing another counter on the host module */
-		if(try_module_get(sdp->device->host->hostt->module))
-			sdp->device->access_count++;
+		scsi_device_get(sdp->device);	/* XXX: retval ignored? */	
 		sfp->closed = 1;	/* flag dirty state on this fd */
 		SCSI_LOG_TIMEOUT(1, printk("sg_remove_sfp: worrisome, %d writes pending\n",
 				  dirty));

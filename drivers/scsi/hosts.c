@@ -36,7 +36,6 @@
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/list.h>
-#include <linux/smp_lock.h>
 
 #define __KERNEL_SYSCALLS__
 
@@ -50,7 +49,6 @@ static LIST_HEAD(scsi_host_list);
 static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
-static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
 static char *scsihosts;
 
 MODULE_PARM(scsihosts, "s");
@@ -173,14 +171,14 @@ int scsi_tp_for_each_host(Scsi_Host_Template *shost_tp, int
 }
 
 /**
- * scsi_host_generic_release - default release function for hosts
+ * scsi_host_legacy_release - default release function for hosts
  * @shost: 
  * 
  * Description:
  * 	This is the default case for the release function.  Its completely
  *	useless for anything but old ISA adapters
  **/
-static void scsi_host_legacy_release(struct Scsi_Host *shost)
+static int scsi_host_legacy_release(struct Scsi_Host *shost)
 {
 	if (shost->irq)
 		free_irq(shost->irq, NULL);
@@ -188,23 +186,17 @@ static void scsi_host_legacy_release(struct Scsi_Host *shost)
 		free_dma(shost->dma_channel);
 	if (shost->io_port && shost->n_io_port)
 		release_region(shost->io_port, shost->n_io_port);
+
+	return 0;
 }
 
 static int scsi_remove_legacy_host(struct Scsi_Host *shost)
 {
-	int error, pcount = scsi_hosts_registered;
+	int error;
 
 	error = scsi_remove_host(shost);
-	if (error)
-		return error;
-
-	if (shost->hostt->release)
+	if (!error)
 		(*shost->hostt->release)(shost);
-	else
-		scsi_host_legacy_release(shost);
-
-	if (pcount == scsi_hosts_registered)
-		scsi_unregister(shost);
 	return 0;
 }
 
@@ -260,7 +252,6 @@ active:
 int scsi_remove_host(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
-	struct list_head *le, *lh;
 
 	/*
 	 * FIXME Do ref counting.  We force all of the devices offline to
@@ -287,20 +278,13 @@ int scsi_remove_host(struct Scsi_Host *shost)
 			       sdev->attached);
 			return 1;
 		}
-		devfs_unregister(sdev->de);
-		device_unregister(&sdev->sdev_driverfs_dev);
 	}
 
-	/* Next we free up the Scsi_Cmnd structures for this host */
-
-	list_for_each_safe(le, lh, &shost->my_devices) {
-		scsi_free_sdev(list_entry(le, Scsi_Device, siblings));
-	}
-
+	scsi_forget_host(shost);
 	return 0;
 }
 
-int scsi_add_host(struct Scsi_Host *shost)
+int __scsi_add_host(struct Scsi_Host *shost)
 {
 	Scsi_Host_Template *sht = shost->hostt;
 	struct scsi_device *sdev;
@@ -309,7 +293,6 @@ int scsi_add_host(struct Scsi_Host *shost)
 	printk(KERN_INFO "scsi%d : %s\n", shost->host_no,
 			sht->info ? sht->info(shost) : sht->name);
 
-	device_register(&shost->host_driverfs_dev);
 	scsi_scan_host(shost);
 			
 	list_for_each_entry (sdev, &shost->my_devices, siblings) {
@@ -319,6 +302,22 @@ int scsi_add_host(struct Scsi_Host *shost)
 	}
 
 	return saved_error;
+}
+
+/**
+ * scsi_add_host - add a scsi host
+ * @shost:	scsi host pointer to add
+ * @dev:	a struct device of type scsi class
+ *
+ * Return value: 
+ * 	0 on success / != 0 for error
+ **/
+int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
+{
+	dev->class_data = shost;
+	shost->host_gendev = dev;
+
+	return __scsi_add_host(shost);
 }
 
 /**
@@ -343,12 +342,10 @@ void scsi_unregister(struct Scsi_Host *shost)
 		shost->eh_notify = NULL;
 	}
 
-	scsi_hosts_registered--;
 	shost->hostt->present--;
 
-	/* Cleanup proc and driverfs */
+	/* Cleanup proc */
 	scsi_proc_host_rm(shost);
-	device_unregister(&shost->host_driverfs_dev);
 
 	kfree(shost);
 }
@@ -395,7 +392,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	memset(shost, 0, sizeof(struct Scsi_Host) + xtr_bytes);
 
 	shost->host_no = scsi_alloc_host_num(shost_tp->proc_name);
-	scsi_hosts_registered++;
 
 	spin_lock_init(&shost->default_lock);
 	scsi_assign_lock(shost, &shost->default_lock);
@@ -462,11 +458,6 @@ found:
 
 	scsi_proc_host_add(shost);
 
-	strncpy(shost->host_driverfs_dev.name, shost_tp->proc_name,
-		DEVICE_NAME_SIZE-1);
-	sprintf(shost->host_driverfs_dev.bus_id, "scsi%d",
-		shost->host_no);
-
 	shost->eh_notify = &sem;
 	kernel_thread((int (*)(void *)) scsi_error_handler, (void *) shost, 0);
 	/*
@@ -491,64 +482,34 @@ found:
 int scsi_register_host(Scsi_Host_Template *shost_tp)
 {
 	struct Scsi_Host *shost;
-	int cur_cnt;
 
-	/*
-	 * Check no detect routine.
-	 */
-	if (!shost_tp->detect)
-		return 1;
+	BUG_ON(!shost_tp->detect);
 
-	/* If max_sectors isn't set, default to max */
-	if (!shost_tp->max_sectors)
+	if (!shost_tp->max_sectors) {
+		printk(KERN_WARNING
+		    "scsi HBA driver %s didn't set max_sectors, "
+		    "please fix the template", shost_tp->name);
 		shost_tp->max_sectors = 1024;
+	}
 
-	cur_cnt = scsi_hosts_registered;
+	if (!shost_tp->release) {
+		printk(KERN_WARNING
+		    "scsi HBA driver %s didn't set a release method, "
+		    "please fix the template", shost_tp->name);
+		shost_tp->release = &scsi_host_legacy_release;
+	}
 
-	/*
-	 * The detect routine must carefully spinunlock/spinlock if it
-	 * enables interrupts, since all interrupt handlers do spinlock as
-	 * well.
-	 */
-
-	/*
-	 * detect should do its own locking
-	 * FIXME present is now set is scsi_register which breaks manual
-	 * registration code below.
-	 */
 	shost_tp->detect(shost_tp);
 	if (!shost_tp->present)
 		return 0;
 
-	if (cur_cnt == scsi_hosts_registered) {
-		if (shost_tp->present > 1) {
-			printk(KERN_ERR "scsi: Failure to register"
-			       "low-level scsi driver");
-			scsi_unregister_host(shost_tp);
-			return 1;
-		}
-
-		/*
-		 * The low-level driver failed to register a driver.
-		 * We can do this now.
-		 *
-	 	 * XXX Who needs manual registration and why???
-		 */
-		if (!scsi_register(shost_tp, 0)) {
-			printk(KERN_ERR "scsi: register failed.\n");
-			scsi_unregister_host(shost_tp);
-			return 1;
-		}
-	}
-
-	
 	/*
 	 * XXX(hch) use scsi_tp_for_each_host() once it propagates
 	 *	    error returns properly.
 	 */
 	list_for_each_entry(shost, &scsi_host_list, sh_list)
 		if (shost->hostt == shost_tp)
-			if (scsi_add_host(shost))
+			if (__scsi_add_host(shost))
 				goto out_of_space;
 
 	return 0;
@@ -575,20 +536,7 @@ out_of_space:
  **/
 int scsi_unregister_host(Scsi_Host_Template *shost_tp)
 {
-	int pcount;
-
-	/* get the big kernel lock, so we don't race with open() */
-	lock_kernel();
-
-	pcount = scsi_hosts_registered;
-
 	scsi_tp_for_each_host(shost_tp, scsi_remove_legacy_host);
-
-	if (pcount != scsi_hosts_registered)
-		printk(KERN_INFO "scsi : %d host%s left.\n", scsi_hosts_registered,
-		       (scsi_hosts_registered == 1) ? "" : "s");
-
-	unlock_kernel();
 	return 0;
 
 }
@@ -668,64 +616,6 @@ void __init scsi_host_init(void)
 	}
 }
 
-/*
- * Function:    scsi_get_host_dev()
- *
- * Purpose:     Create a Scsi_Device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     The Scsi_Device or NULL
- *
- * Notes:
- *	Attach a single Scsi_Device to the Scsi_Host - this should
- *	be made to look like a "pseudo-device" that points to the
- *	HA itself.
- *
- *	Note - this device is not accessible from any high-level
- *	drivers (including generics), which is probably not
- *	optimal.  We can add hooks later to attach 
- */
-struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
-{
-	struct scsi_device *sdev;
-
-	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
-	if (sdev) {
-		scsi_build_commandblocks(sdev);
-		if (sdev->current_queue_depth == 0)
-			goto fail;
-		sdev->borken = 0;
-	}
-
-	return sdev;
-
-fail:
-	kfree(sdev);
-	return NULL;
-}
-
-/*
- * Function:    scsi_free_host_dev()
- *
- * Purpose:     Free a scsi_device that points to the host adapter itself.
- *
- * Arguments:   SHpnt   - Host that needs a Scsi_Device
- *
- * Lock status: None assumed.
- *
- * Returns:     Nothing
- *
- * Notes:
- */
-void scsi_free_host_dev(struct scsi_device *sdev)
-{
-	BUG_ON(sdev->id != sdev->host->this_id);
-	scsi_free_sdev(sdev);
-}
-
 void scsi_host_busy_inc(struct Scsi_Host *shost, Scsi_Device *sdev)
 {
 	unsigned long flags;
@@ -765,22 +655,3 @@ void scsi_host_failed_inc_and_test(struct Scsi_Host *shost)
 	}
 	spin_unlock_irqrestore(shost->host_lock, flags);
 }
-
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 4
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -4
- * c-argdecl-indent: 4
- * c-label-offset: -4
- * c-continued-statement-offset: 4
- * c-continued-brace-offset: 0
- * indent-tabs-mode: nil
- * tab-width: 8
- * End:
- */

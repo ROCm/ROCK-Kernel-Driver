@@ -472,9 +472,9 @@ void video_unregister_device(struct video_device *vfd)
 
 static struct file_operations video_fops=
 {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	open:		video_open,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.open		= video_open,
 };
 
 /*

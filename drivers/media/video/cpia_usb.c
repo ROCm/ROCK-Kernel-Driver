@@ -582,10 +582,10 @@ MODULE_LICENSE("GPL");
 
 
 static struct usb_driver cpia_driver = {
-	name:		"cpia",
-	probe:		cpia_probe,
-	disconnect:	cpia_disconnect,
-	id_table:	cpia_id_table,
+	.name		= "cpia",
+	.probe		= cpia_probe,
+	.disconnect	= cpia_disconnect,
+	.id_table	= cpia_id_table,
 };
 
 /* don't use dev, it may be NULL! (see usb_cpia_cleanup) */
