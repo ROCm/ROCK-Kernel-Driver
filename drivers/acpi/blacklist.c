@@ -80,6 +80,10 @@ static struct acpi_blacklist_item acpi_blacklist[] __initdata =
 	{"INT440", "SYSFexxx", 0x00001001, ACPI_DSDT, less_than_or_equal, "Does not use _REG to protect EC OpRegions", 1},
 	/* IBM 600E - _ADR should return 7, but it returns 1 */
 	{"IBM   ", "TP600E  ", 0x00000105, ACPI_DSDT, less_than_or_equal, "Incorrect _ADR", 1},
+	{"VIA694", "AWRDACPI", 0, ACPI_DSDT, all_versions, "Bogus table", 1},
+	{"ASUS\0\0", "P2B-S   ", 0, ACPI_DSDT, all_versions, "Bogus PCI routing", 1},
+	{"COMPAQ", "DSDT", 0, ACPI_DSDT, all_versions, "Bogus PCI routing", 1},
+
 	{""}
 };
 
