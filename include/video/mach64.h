@@ -68,6 +68,8 @@
 
 #define I2C_CNTL_0		0x003C	/* Dword offset 0_0F */
 
+#define DSTN_CONTROL_LG		0x003C	/* Dword offset 0_0F (LG) */
+
 /* Overscan */
 #define OVR_CLR			0x0040	/* Dword offset 0_10 */
 #define OVR2_CLR		0x0040	/* Dword offset 0_10 */
@@ -101,7 +103,7 @@
 #define CUR_HORZ_VERT_OFF	0x0070	/* Dword offset 0_1C */
 #define CUR2_HORZ_VERT_OFF	0x0070	/* Dword offset 0_1C */
 
-#define CONFIG_PANEL_LG		0x0074	/* Dword offset 0_1D */
+#define CONFIG_PANEL_LG		0x0074	/* Dword offset 0_1D (LG) */
 
 /* General I/O Control */
 #define GP_IO			0x0078	/* Dword offset 0_1E */
@@ -116,7 +118,31 @@
 #define SCRATCH_REG3		0x008C	/* Dword offset 0_23 */
 
 /* Clock Control */
-#define CLOCK_CNTL		0x0090	/* Dword offset 0_24 */
+#define CLOCK_CNTL			0x0090	/* Dword offset 0_24 */
+/* CLOCK_CNTL register constants CT LAYOUT */
+#define CLOCK_SEL			0x0f
+#define CLOCK_SEL_INTERNAL		0x03
+#define CLOCK_SEL_EXTERNAL		0x0c
+#define CLOCK_DIV			0x30
+#define CLOCK_DIV1			0x00
+#define CLOCK_DIV2			0x10
+#define CLOCK_DIV4			0x20
+#define CLOCK_STROBE			0x40
+/*  ?					0x80 */
+/* CLOCK_CNTL register constants GX LAYOUT */
+#define CLOCK_BIT			0x04	/* For ICS2595 */
+#define CLOCK_PULSE			0x08	/* For ICS2595 */
+/*#define CLOCK_STROBE			0x40 dito as CT */
+#define CLOCK_DATA			0x80
+
+/* For internal PLL(CT) start */
+#define CLOCK_CNTL_ADDR			CLOCK_CNTL + 1
+#define PLL_WR_EN			0x02
+#define PLL_ADDR			0xfc
+#define CLOCK_CNTL_DATA			CLOCK_CNTL + 2
+#define PLL_DATA			0xff
+/* For internal PLL(CT) end */
+
 #define CLOCK_SEL_CNTL		0x0090	/* Dword offset 0_24 */
 
 /* Configuration */
@@ -129,6 +155,8 @@
 #define LCD_INDEX		0x00A4	/* Dword offset 0_29 */
 #define LCD_DATA		0x00A8	/* Dword offset 0_2A */
 
+#define HFB_PITCH_ADDR_LG	0x00A8	/* Dword offset 0_2A (LG) */
+
 /* Memory Control */
 #define EXT_MEM_CNTL		0x00AC	/* Dword offset 0_2B */
 #define MEM_CNTL		0x00B0	/* Dword offset 0_2C */
@@ -136,6 +164,8 @@
 #define MEM_VGA_RP_SEL		0x00B8	/* Dword offset 0_2E */
 
 #define I2C_CNTL_1		0x00BC	/* Dword offset 0_2F */
+
+#define LT_GIO_LG		0x00BC	/* Dword offset 0_2F (LG) */
 
 /* DAC Control */
 #define DAC_REGS		0x00C0	/* Dword offset 0_30 */
@@ -147,14 +177,16 @@
 
 #define EXT_DAC_REGS		0x00C8	/* Dword offset 0_32 */
 
+#define HORZ_STRETCHING_LG	0x00C8	/* Dword offset 0_32 (LG) */
+#define VERT_STRETCHING_LG	0x00CC	/* Dword offset 0_33 (LG) */
+
 /* Test and Debug */
 #define GEN_TEST_CNTL		0x00D0	/* Dword offset 0_34 */
 
 /* Custom Macros */
 #define CUSTOM_MACRO_CNTL	0x00D4	/* Dword offset 0_35 */
 
-#define LCD_GEN_CNTL_LG		0x00D4	/* Dword offset 0_35 */
-
+#define LCD_GEN_CNTL_LG		0x00D4	/* Dword offset 0_35 (LG) */
 #define POWER_MANAGEMENT_LG	0x00D8	/* Dword offset 0_36 (LG) */
 
 /* Configuration */
@@ -558,7 +590,7 @@
 #define CRTC_CSYNC_EN		0x00000010
 #define CRTC_PIX_BY_2_EN	0x00000020	/* unused on RAGE */
 #define CRTC_DISPLAY_DIS	0x00000040
-#define CRTC_VGA_XOVERSCAN	0x00000040
+#define CRTC_VGA_XOVERSCAN	0x00000080
 
 #define CRTC_PIX_WIDTH_MASK	0x00000700
 #define CRTC_PIX_WIDTH_4BPP	0x00000100
@@ -572,25 +604,95 @@
 #define CRTC_PIX_ORDER_MSN_LSN	0x00000000
 #define CRTC_PIX_ORDER_LSN_MSN	0x00000800
 
-#define CRTC_FIFO_LWM		0x000f0000
+#define CRTC_VSYNC_INT_EN	0x00001000ul	/* XC/XL */
+#define CRTC_VSYNC_INT		0x00002000ul	/* XC/XL */
+#define CRTC_FIFO_OVERFILL	0x0000c000ul	/* VT/GT */
+#define CRTC2_VSYNC_INT_EN	0x00004000ul	/* XC/XL */
+#define CRTC2_VSYNC_INT		0x00008000ul	/* XC/XL */
 
-#define VGA_128KAP_PAGING	0x00100000
-#define VFC_SYNC_TRISTATE	0x00200000
+#define CRTC_FIFO_LWM		0x000f0000
+#define CRTC_HVSYNC_IO_DRIVE	0x00010000	/* XC/XL */
+#define CRTC2_PIX_WIDTH		0x000e0000	/* LTPro */
+
+#define CRTC_VGA_128KAP_PAGING	0x00100000
+#define CRTC_VFC_SYNC_TRISTATE	0x00200000	/* VTB/GTB/LT */
+#define CRTC2_EN		0x00200000	/* LTPro */
 #define CRTC_LOCK_REGS		0x00400000
 #define CRTC_SYNC_TRISTATE	0x00800000
 
 #define CRTC_EXT_DISP_EN	0x01000000
-#define CRTC_ENABLE		0x02000000
-#define CRTC_DISP_REQ_ENB	0x04000000
-#define VGA_ATI_LINEAR		0x08000000
+#define CRTC_EN			0x02000000
+#define CRTC_DISP_REQ_EN	0x04000000
+#define CRTC_VGA_LINEAR		0x08000000
 #define CRTC_VSYNC_FALL_EDGE	0x10000000
-#define VGA_TEXT_132		0x20000000
-#define VGA_XCRT_CNT_EN		0x40000000
-#define VGA_CUR_B_TEST		0x80000000
+#define CRTC_VGA_TEXT_132	0x20000000
+#define CRTC_CNT_EN		0x40000000
+#define CRTC_CUR_B_TEST		0x80000000
 
 #define CRTC_CRNT_VLINE		0x07f00000
-#define CRTC_VBLANK		0x00000001
 
+#define CRTC_PRESERVED_MASK	0x0001f000
+
+#define CRTC_VBLANK		0x00000001
+#define CRTC_VBLANK_INT_EN	0x00000002
+#define CRTC_VBLANK_INT		0x00000004
+#define CRTC_VBLANK_INT_AK	CRTC_VBLANK_INT
+#define CRTC_VLINE_INT_EN	0x00000008
+#define CRTC_VLINE_INT		0x00000010
+#define CRTC_VLINE_INT_AK	CRTC_VLINE_INT
+#define CRTC_VLINE_SYNC		0x00000020
+#define CRTC_FRAME		0x00000040
+#define SNAPSHOT_INT_EN		0x00000080
+#define SNAPSHOT_INT		0x00000100
+#define SNAPSHOT_INT_AK		SNAPSHOT_INT
+#define I2C_INT_EN		0x00000200
+#define I2C_INT			0x00000400
+#define I2C_INT_AK		I2C_INT
+#define CRTC2_VBLANK		0x00000800
+#define CRTC2_VBLANK_INT_EN	0x00001000
+#define CRTC2_VBLANK_INT	0x00002000
+#define CRTC2_VBLANK_INT_AK	CRTC2_VBLANK_INT
+#define CRTC2_VLINE_INT_EN	0x00004000
+#define CRTC2_VLINE_INT		0x00008000
+#define CRTC2_VLINE_INT_AK	CRTC2_VLINE_INT
+#define CAPBUF0_INT_EN		0x00010000
+#define CAPBUF0_INT		0x00020000
+#define CAPBUF0_INT_AK		CAPBUF0_INT
+#define CAPBUF1_INT_EN		0x00040000
+#define CAPBUF1_INT		0x00080000
+#define CAPBUF1_INT_AK		CAPBUF1_INT
+#define OVERLAY_EOF_INT_EN	0x00100000
+#define OVERLAY_EOF_INT		0x00200000
+#define OVERLAY_EOF_INT_AK	OVERLAY_EOF_INT
+#define ONESHOT_CAP_INT_EN	0x00400000
+#define ONESHOT_CAP_INT		0x00800000
+#define ONESHOT_CAP_INT_AK	ONESHOT_CAP_INT
+#define BUSMASTER_EOL_INT_EN	0x01000000
+#define BUSMASTER_EOL_INT	0x02000000
+#define BUSMASTER_EOL_INT_AK	BUSMASTER_EOL_INT
+#define GP_INT_EN		0x04000000
+#define GP_INT			0x08000000
+#define GP_INT_AK		GP_INT
+#define CRTC2_VLINE_SYNC	0x10000000
+#define SNAPSHOT2_INT_EN	0x20000000
+#define SNAPSHOT2_INT		0x40000000
+#define SNAPSHOT2_INT_AK	SNAPSHOT2_INT
+#define VBLANK_BIT2_INT		0x80000000
+#define VBLANK_BIT2_INT_AK	VBLANK_BIT2_INT
+
+#define CRTC_INT_EN_MASK	(CRTC_VBLANK_INT_EN |	\
+				 CRTC_VLINE_INT_EN |	\
+				 SNAPSHOT_INT_EN |	\
+				 I2C_INT_EN |		\
+				 CRTC2_VBLANK_INT_EN |	\
+				 CRTC2_VLINE_INT_EN |	\
+				 CAPBUF0_INT_EN |	\
+				 CAPBUF1_INT_EN |	\
+				 OVERLAY_EOF_INT_EN |	\
+				 ONESHOT_CAP_INT_EN |	\
+				 BUSMASTER_EOL_INT_EN |	\
+				 GP_INT_EN |		\
+				 SNAPSHOT2_INT_EN)
 
 /* DAC control values */
 
@@ -605,6 +707,24 @@
 #define DAC_BLANK_ADJ_0		0x00000000
 #define DAC_BLANK_ADJ_1		0x00000800
 #define DAC_BLANK_ADJ_2		0x00001000
+
+/* DAC control values (my source XL/XC Register reference) */
+#define DAC_OUTPUT_MASK         0x00000001  /* 0 - PAL, 1 - NTSC */
+#define DAC_MISTERY_BIT         0x00000002  /* PS2 ? RS343 ?, EXTRA_BRIGHT for GT */
+#define DAC_BLANKING            0x00000004
+#define DAC_CMP_DISABLE         0x00000008
+#define DAC1_CLK_SEL            0x00000010
+#define PALETTE_ACCESS_CNTL     0x00000020
+#define PALETTE2_SNOOP_EN       0x00000040
+#define DAC_CMP_OUTPUT          0x00000080 /* read only */
+/* #define DAC_8BIT_EN is ok */
+#define CRT_SENSE               0x00000800 /* read only */
+#define CRT_DETECTION_ON        0x00001000
+#define DAC_VGA_ADR_EN          0x00002000
+#define DAC_FEA_CON_EN          0x00004000
+#define DAC_PDWN                0x00008000
+#define DAC_TYPE_MASK           0x00070000 /* read only */
+
 
 
 /* Mix control values */
@@ -635,6 +755,7 @@
 /* Mach64 engine bit constants - these are typically ORed together */
 
 /* BUS_CNTL register constants */
+#define BUS_APER_REG_DIS	0x00000010
 #define BUS_FIFO_ERR_ACK	0x00200000
 #define BUS_HOST_ERR_ACK	0x00800000
 
@@ -652,29 +773,48 @@
 /* DSP_ON_OFF register constants */
 #define DSP_OFF			0x000007ff
 #define DSP_ON			0x07ff0000
+#define VGA_DSP_OFF		DSP_OFF
+#define VGA_DSP_ON		DSP_ON
+#define VGA_DSP_XCLKS_PER_QW	DSP_XCLKS_PER_QW
 
-/* CLOCK_CNTL register constants */
-#define CLOCK_SEL		0x0f
-#define CLOCK_DIV		0x30
-#define CLOCK_DIV1		0x00
-#define CLOCK_DIV2		0x10
-#define CLOCK_DIV4		0x20
-#define CLOCK_STROBE		0x40
-#define PLL_WR_EN		0x02
-
-/* PLL register indices */
+/* PLL register indices and fields */
 #define MPLL_CNTL		0x00
+#define PLL_PC_GAIN		0x07
+#define PLL_VC_GAIN		0x18
+#define PLL_DUTY_CYC		0xE0
 #define VPLL_CNTL		0x01
 #define PLL_REF_DIV		0x02
 #define PLL_GEN_CNTL		0x03
+#define PLL_OVERRIDE		0x01	/* PLL_SLEEP */
+#define PLL_MCLK_RST		0x02	/* PLL_MRESET */
+#define OSC_EN			0x04
+#define EXT_CLK_EN		0x08
+#define FORCE_DCLK_TRI_STATE	0x08    /* VT4 -> */
+#define MCLK_SRC_SEL		0x70
+#define EXT_CLK_CNTL		0x80
+#define DLL_PWDN		0x80    /* VT4 -> */
 #define MCLK_FB_DIV		0x04
 #define PLL_VCLK_CNTL		0x05
+#define PLL_VCLK_SRC_SEL	0x03
+#define PLL_VCLK_RST		0x04
+#define PLL_VCLK_INVERT		0x08
 #define VCLK_POST_DIV		0x06
+#define VCLK0_POST		0x03
+#define VCLK1_POST		0x0C
+#define VCLK2_POST		0x30
+#define VCLK3_POST		0xC0
 #define VCLK0_FB_DIV		0x07
 #define VCLK1_FB_DIV		0x08
 #define VCLK2_FB_DIV		0x09
 #define VCLK3_FB_DIV		0x0A
 #define PLL_EXT_CNTL		0x0B
+#define PLL_XCLK_MCLK_RATIO	0x03
+#define PLL_XCLK_SRC_SEL	0x07
+#define PLL_MFB_TIMES_4_2B	0x08
+#define PLL_VCLK0_XDIV		0x10
+#define PLL_VCLK1_XDIV		0x20
+#define PLL_VCLK2_XDIV		0x40
+#define PLL_VCLK3_XDIV		0x80
 #define DLL_CNTL		0x0C
 #define DLL1_CNTL		0x0C
 #define VFC_CNTL		0x0D
@@ -690,6 +830,9 @@
 #define SPLL_CNTL2		0x17
 #define APLL_STRAPS		0x18
 #define EXT_VPLL_CNTL		0x19
+#define EXT_VPLL_EN		0x04
+#define EXT_VPLL_VGA_EN		0x08
+#define EXT_VPLL_INSYNC		0x10
 #define EXT_VPLL_REF_DIV	0x1A
 #define EXT_VPLL_FB_DIV		0x1B
 #define EXT_VPLL_MSB		0x1C
@@ -707,24 +850,6 @@
 #define HTOTAL2_CNTL		0x28
 #define PLL_YCLK_CNTL		0x29
 #define PM_DYN_CLK_CNTL		0x2A
-
-/* Fields in PLL registers */
-#define PLL_PC_GAIN		0x07
-#define PLL_VC_GAIN		0x18
-#define PLL_DUTY_CYC		0xE0
-#define PLL_OVERRIDE		0x01
-#define PLL_MCLK_RST		0x02
-#define OSC_EN			0x04
-#define EXT_CLK_EN		0x08
-#define MCLK_SRC_SEL		0x70
-#define EXT_CLK_CNTL		0x80
-#define VCLK_SRC_SEL		0x03
-#define PLL_VCLK_RST		0x04
-#define VCLK_INVERT		0x08
-#define VCLK0_POST		0x03
-#define VCLK1_POST		0x0C
-#define VCLK2_POST		0x30
-#define VCLK3_POST		0xC0
 
 /* CONFIG_CNTL register constants */
 #define APERTURE_4M_ENABLE	1
@@ -811,6 +936,7 @@
 #define MEM_BNDRY_1M		0x00030000
 #define MEM_BNDRY_EN		0x00040000
 
+#define ONE_MB			0x100000
 /* ATI PCI constants */
 #define PCI_ATI_VENDOR_ID	0x1002
 
@@ -849,7 +975,19 @@
 #define LI_CHIP_ID	0x4c49	/* RAGE LT PRO */
 #define LP_CHIP_ID	0x4c50	/* RAGE LT PRO */
 #define LT_CHIP_ID	0x4c54	/* RAGE LT */
-#define XL_CHIP_ID	0x4752	/* RAGE (XL) */
+
+/* mach64CT family / (Rage XL) class */
+#define GR_CHIP_ID	0x4752	/* RAGE XL, BGA, PCI33 */
+#define GS_CHIP_ID	0x4753	/* RAGE XL, PQFP, PCI33 */
+#define GM_CHIP_ID	0x474d	/* RAGE XL, BGA, AGP 1x,2x */
+#define GN_CHIP_ID	0x474e	/* RAGE XL, PQFP,AGP 1x,2x */
+#define GO_CHIP_ID	0x474f	/* RAGE XL, BGA, PCI66 */
+#define GL_CHIP_ID	0x474c	/* RAGE XL, PQFP, PCI66 */
+
+#define IS_XL(id) ((id)==GR_CHIP_ID || (id)==GS_CHIP_ID || \
+		   (id)==GM_CHIP_ID || (id)==GN_CHIP_ID || \
+		   (id)==GO_CHIP_ID || (id)==GL_CHIP_ID)
+
 #define GT_CHIP_ID	0x4754	/* RAGE (GT) */
 #define GU_CHIP_ID	0x4755	/* RAGE II/II+ (GTB) */
 #define GV_CHIP_ID	0x4756	/* RAGE IIC, PCI */
@@ -860,10 +998,14 @@
 #define GI_CHIP_ID	0x4749	/* RAGE PRO, BGA, PCI33 only */
 #define GP_CHIP_ID	0x4750	/* RAGE PRO, PQFP, PCI33, full 3D */
 #define GQ_CHIP_ID	0x4751	/* RAGE PRO, PQFP, PCI33, limited 3D */
-#define LM_CHIP_ID	0x4c4d	/* RAGE Mobility PCI */
+
+#define LM_CHIP_ID	0x4c4d	/* RAGE Mobility AGP, full function */
 #define LN_CHIP_ID	0x4c4e	/* RAGE Mobility AGP */
+#define LR_CHIP_ID	0x4c52	/* RAGE Mobility PCI, full function */
+#define LS_CHIP_ID	0x4c53	/* RAGE Mobility PCI */
 
-
+#define IS_MOBILITY(id) ((id)==LM_CHIP_ID || (id)==LN_CHIP_ID || \
+			(id)==LR_CHIP_ID || (id)==LS_CHIP_ID)
 /* Mach64 major ASIC revisions */
 #define MACH64_ASIC_NEC_VT_A3		0x08
 #define MACH64_ASIC_NEC_VT_A4		0x48
@@ -889,7 +1031,7 @@
 #define MACH64_UNKNOWN		0
 #define MACH64_GX		1
 #define MACH64_CX		2
-#define MACH64_CT		3
+#define MACH64_CT		3Restore
 #define MACH64_ET		4
 #define MACH64_VT		5
 #define MACH64_GT		6
@@ -934,26 +1076,34 @@
 #define DP_CHAIN_32BPP		0x8080
 
 /* DP_PIX_WIDTH register constants */
-#define DST_1BPP		0
-#define DST_4BPP		1
-#define DST_8BPP		2
-#define DST_15BPP		3
-#define DST_16BPP		4
-#define DST_32BPP		6
-#define SRC_1BPP		0
+#define DST_1BPP		0x0
+#define DST_4BPP		0x1
+#define DST_8BPP		0x2
+#define DST_15BPP		0x3
+#define DST_16BPP		0x4
+#define DST_24BPP		0x5
+#define DST_32BPP		0x6
+#define DST_MASK		0xF
+#define SRC_1BPP		0x000
 #define SRC_4BPP		0x100
 #define SRC_8BPP		0x200
 #define SRC_15BPP		0x300
 #define SRC_16BPP		0x400
+#define SRC_24BPP		0x500
 #define SRC_32BPP		0x600
-#define HOST_1BPP		0
+#define SRC_MASK		0xF00
+#define DP_HOST_TRIPLE_EN	0x2000
+#define HOST_1BPP		0x00000
 #define HOST_4BPP		0x10000
 #define HOST_8BPP		0x20000
 #define HOST_15BPP		0x30000
 #define HOST_16BPP		0x40000
+#define HOST_24BPP		0x50000
 #define HOST_32BPP		0x60000
+#define HOST_MASK		0xF0000
 #define BYTE_ORDER_MSB_TO_LSB	0
 #define BYTE_ORDER_LSB_TO_MSB	0x1000000
+#define BYTE_ORDER_MASK		0x1000000
 
 /* DP_MIX register constants */
 #define BKGD_MIX_NOT_D			0
@@ -1027,12 +1177,12 @@
 #define CONTEXT_CMD_DISABLE		0x80000000
 
 /* GUI_STAT register constants */
-#define ENGINE_IDLE		0
-#define ENGINE_BUSY		1
-#define SCISSOR_LEFT_FLAG	0x10
-#define SCISSOR_RIGHT_FLAG	0x20
-#define SCISSOR_TOP_FLAG	0x40
-#define SCISSOR_BOTTOM_FLAG	0x80
+#define ENGINE_IDLE			0
+#define ENGINE_BUSY			1
+#define SCISSOR_LEFT_FLAG		0x10
+#define SCISSOR_RIGHT_FLAG		0x20
+#define SCISSOR_TOP_FLAG		0x40
+#define SCISSOR_BOTTOM_FLAG		0x80
 
 /* ATI VGA Extended Regsiters */
 #define sioATIEXT		0x1ce
@@ -1043,6 +1193,7 @@
 #define ATI36			0xb6
 
 /* VGA Graphics Controller Registers */
+#define R_GENMO			0x3cc
 #define VGAGRA			0x3ce
 #define GRA06			0x06
 
@@ -1103,7 +1254,7 @@
 
 /* LCD register indices */
 #define CONFIG_PANEL		0x00
-#define LCD_GEN_CTRL		0x01
+#define LCD_GEN_CNTL		0x01
 #define DSTN_CONTROL		0x02
 #define HFB_PITCH_ADDR		0x03
 #define HORZ_STRETCHING		0x04
@@ -1148,11 +1299,79 @@
 #define APC_LUT_MN		0x39
 #define APC_LUT_OP		0x3A
 
+/* Values in LCD_GEN_CTRL */
+#define CRT_ON                          0x00000001ul
+#define LCD_ON                          0x00000002ul
+#define HORZ_DIVBY2_EN                  0x00000004ul
+#define DONT_DS_ICON                    0x00000008ul
+#define LOCK_8DOT                       0x00000010ul
+#define ICON_ENABLE                     0x00000020ul
+#define DONT_SHADOW_VPAR                0x00000040ul
+#define V2CLK_PM_EN                     0x00000080ul
+#define RST_FM                          0x00000100ul
+#define DISABLE_PCLK_RESET              0x00000200ul	/* XC/XL */
+#define DIS_HOR_CRT_DIVBY2              0x00000400ul
+#define SCLK_SEL                        0x00000800ul
+#define SCLK_DELAY                      0x0000f000ul
+#define TVCLK_PM_EN                     0x00010000ul
+#define VCLK_DAC_PM_EN                  0x00020000ul
+#define VCLK_LCD_OFF                    0x00040000ul
+#define SELECT_WAIT_4MS                 0x00080000ul
+#define XTALIN_PM_EN                    0x00080000ul	/* XC/XL */
+#define V2CLK_DAC_PM_EN                 0x00100000ul
+#define LVDS_EN                         0x00200000ul
+#define LVDS_PLL_EN                     0x00400000ul
+#define LVDS_PLL_RESET                  0x00800000ul
+#define LVDS_RESERVED_BITS              0x07000000ul
+#define CRTC_RW_SELECT                  0x08000000ul	/* LTPro */
+#define USE_SHADOWED_VEND               0x10000000ul
+#define USE_SHADOWED_ROWCUR             0x20000000ul
+#define SHADOW_EN                       0x40000000ul
+#define SHADOW_RW_EN                  	0x80000000ul
+
+#define LCD_SET_PRIMARY_MASK            0x07FFFBFBul
+
+/* Values in HORZ_STRETCHING */
+#define HORZ_STRETCH_BLEND		0x00000ffful
+#define HORZ_STRETCH_RATIO		0x0000fffful
+#define HORZ_STRETCH_LOOP		0x00070000ul
+#define HORZ_STRETCH_LOOP09		0x00000000ul
+#define HORZ_STRETCH_LOOP11		0x00010000ul
+#define HORZ_STRETCH_LOOP12		0x00020000ul
+#define HORZ_STRETCH_LOOP14		0x00030000ul
+#define HORZ_STRETCH_LOOP15		0x00040000ul
+/*	?				0x00050000ul */
+/*	?				0x00060000ul */
+/*	?				0x00070000ul */
+/*	?				0x00080000ul */
+#define HORZ_PANEL_SIZE			0x0ff00000ul	/* XC/XL */
+/*	?				0x10000000ul */
+#define AUTO_HORZ_RATIO			0x20000000ul	/* XC/XL */
+#define HORZ_STRETCH_MODE		0x40000000ul
+#define HORZ_STRETCH_EN			0x80000000ul
+
+/* Values in VERT_STRETCHING */
+#define VERT_STRETCH_RATIO0		0x000003fful
+#define VERT_STRETCH_RATIO1		0x000ffc00ul
+#define VERT_STRETCH_RATIO2		0x3ff00000ul
+#define VERT_STRETCH_USE0		0x40000000ul
+#define VERT_STRETCH_EN			0x80000000ul
+
+/* Values in EXT_VERT_STRETCH */
+#define VERT_STRETCH_RATIO3		0x000003fful
+#define FORCE_DAC_DATA			0x000000fful
+#define FORCE_DAC_DATA_SEL		0x00000300ul
+#define VERT_STRETCH_MODE		0x00000400ul
+#define VERT_PANEL_SIZE			0x003ff800ul
+#define AUTO_VERT_RATIO			0x00400000ul
+#define USE_AUTO_FP_POS			0x00800000ul
+#define USE_AUTO_LCD_VSYNC		0x01000000ul
+/*	?				0xfe000000ul */
 
 /* Values in LCD_MISC_CNTL */
-#define BIAS_MOD_LEVEL_MASK	0x0000ff00
-#define BIAS_MOD_LEVEL_SHIFT	8
-#define BLMOD_EN		0x00010000
-#define BIASMOD_EN		0x00020000
+#define BIAS_MOD_LEVEL_MASK		0x0000ff00
+#define BIAS_MOD_LEVEL_SHIFT		8
+#define BLMOD_EN			0x00010000
+#define BIASMOD_EN			0x00020000
 
-#endif /* REGMACH64_H */
+#endif				/* REGMACH64_H */

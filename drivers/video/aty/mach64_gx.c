@@ -121,7 +121,7 @@ static int aty_set_dac_514(const struct fb_info *info,
 }
 
 static int aty_var_to_pll_514(const struct fb_info *info, u32 vclk_per,
-			      u8 bpp, union aty_pll *pll)
+			      u32 bpp, union aty_pll *pll)
 {
 	/*
 	 *  FIXME: use real calculations instead of using fixed values from the old
@@ -253,9 +253,9 @@ static int aty_set_dac_ATI68860_B(const struct fb_info *info,
 	temp = aty_ld_8(DAC_CNTL, par);
 	aty_st_8(DAC_CNTL, temp | DAC_EXT_SEL_RS2 | DAC_EXT_SEL_RS3, par);
 
-	if (info->fix.smem_len < MEM_SIZE_1M)
+	if (info->fix.smem_len < ONE_MB)
 		mask = 0x04;
-	else if (info->fix.smem_len == MEM_SIZE_1M)
+	else if (info->fix.smem_len == ONE_MB)
 		mask = 0x08;
 	else
 		mask = 0x0C;
@@ -339,8 +339,8 @@ const struct aty_dac_ops aty_dac_att21c498 = {
      *  ATI 18818 / ICS 2595 Clock Chip
      */
 
-static int aty_var_to_pll_18818(const struct fb_info *info,
-				u32 vclk_per, u8 bpp, union aty_pll *pll)
+static int aty_var_to_pll_18818(const struct fb_info *info, u32 vclk_per,
+				u32 bpp, union aty_pll *pll)
 {
 	u32 MHz100;		/* in 0.01 MHz */
 	u32 program_bits;
@@ -495,8 +495,8 @@ const struct aty_pll_ops aty_pll_ati18818_1 = {
      *  STG 1703 Clock Chip
      */
 
-static int aty_var_to_pll_1703(const struct fb_info *info,
-			       u32 vclk_per, u8 bpp, union aty_pll *pll)
+static int aty_var_to_pll_1703(const struct fb_info *info, u32 vclk_per,
+			       u32 bpp, union aty_pll *pll)
 {
 	u32 mhz100;		/* in 0.01 MHz */
 	u32 program_bits;
@@ -611,8 +611,8 @@ const struct aty_pll_ops aty_pll_stg1703 = {
      *  Chrontel 8398 Clock Chip
      */
 
-static int aty_var_to_pll_8398(const struct fb_info *info,
-			       u32 vclk_per, u8 bpp, union aty_pll *pll)
+static int aty_var_to_pll_8398(const struct fb_info *info, u32 vclk_per,
+			       u32 bpp, union aty_pll *pll)
 {
 	u32 tempA, tempB, fOut, longMHz100, diff, preDiff;
 
@@ -736,7 +736,7 @@ const struct aty_pll_ops aty_pll_ch8398 = {
      */
 
 static int aty_var_to_pll_408(const struct fb_info *info, u32 vclk_per,
-			      u8 bpp, union aty_pll *pll)
+			      u32 bpp, union aty_pll *pll)
 {
 	u32 mhz100;		/* in 0.01 MHz */
 	u32 program_bits;

@@ -750,6 +750,19 @@ config FB_ATY_CT
 	  framebuffer device.  The ATI product support page for these boards
 	  is at <http://support.ati.com/products/pc/mach64/>.
 
+config FB_ATY_GENERIC_LCD
+	bool "Mach64 generic LCD support (EXPERIMENTAL)"
+	depends on FB_ATY_CT
+	help
+	  Say Y if you have a laptop with an ATI Rage LT PRO, Rage Mobility,
+	  Rage XC, or Rage XL chipset.
+
+config FB_ATY_XL_INIT
+	bool "Rage XL No-BIOS Init support"
+	depends on FB_ATY_CT
+	help
+	  Say Y here to support booting a Rage XL without BIOS support.
+
 config FB_ATY_GX
 	bool "Mach64 GX support" if PCI
 	depends on FB_ATY
@@ -760,12 +773,6 @@ config FB_ATY_GX
 	  framebuffer device.  The ATI product support page for these boards
 	  is at
 	  <http://support.ati.com/products/pc/mach64/graphics_xpression.html>.
-
-config FB_ATY_XL_INIT
-	bool "  Rage XL No-BIOS Init support" if FB_ATY_CT
-	depends on FB_ATY
-	help
-	  Say Y here to support booting a Rage XL without BIOS support.
 
 config FB_SIS
 	tristate "SiS acceleration"

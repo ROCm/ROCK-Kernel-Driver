@@ -1,6 +1,7 @@
 /*
  *  ATI Frame Buffer Device Driver Core
  *
+ *	Copyright (C) 2004  Alex Kern <alex.kern@gmx.de>
  *	Copyright (C) 1997-2001  Geert Uytterhoeven
  *	Copyright (C) 1998  Bernd Harries
  *	Copyright (C) 1998  Eddie C. Dost  (ecd@skynet.be)
@@ -24,10 +25,13 @@
  *			   Harry AC Eaton
  *			   Anthony Tong <atong@uiuc.edu>
  *
+ *  Generic LCD support written by Daniel Mantione, ported from 2.4.20 by Alex Kern
+ *  Many Thanks to Ville Syrjälä for patches and fixing nasting 16 bit color bug.
+ *
  *  This file is subject to the terms and conditions of the GNU General Public
  *  License. See the file COPYING in the main directory of this archive for
  *  more details.
- *  
+ *
  *  Many thanks to Nitya from ATI devrel for support and patience !
  */
 
@@ -38,15 +42,16 @@
     - cursor support on all cards and all ramdacs.
     - cursor parameters controlable via ioctl()s.
     - guess PLL and MCLK based on the original PLL register values initialized
-      by the BIOS or Open Firmware (if they are initialized).
+      by Open Firmware (if they are initialized). BIOS is done
 
-						(Anyone to help with this?)
+    (Anyone with Mac to help with this?)
 
 ******************************************************************************/
 
 
 #include <linux/config.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -54,19 +59,20 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/delay.h>
-#include <linux/selection.h>
 #include <linux/console.h>
 #include <linux/fb.h>
 #include <linux/init.h>
 #include <linux/pci.h>
-#include <linux/vt_kern.h>
-#include <linux/kd.h>
+#include <linux/interrupt.h>
+#include <linux/spinlock.h>
+#include <linux/wait.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
 #include <video/mach64.h>
 #include "atyfb.h"
+#include "ati_ids.h"
 
 #ifdef __powerpc__
 #include <asm/prom.h>
@@ -87,23 +93,102 @@
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
 #endif
-
+#ifdef CONFIG_MTRR
+#include <asm/mtrr.h>
+#endif
 
 /*
  * Debug flags.
  */
-#undef DEBUG
+/*#undef DEBUG*/
+#define DEBUG
 
 /* Make sure n * PAGE_SIZE is protected at end of Aperture for GUI-regs */
 /*  - must be large enough to catch all GUI-Regs   */
 /*  - must be aligned to a PAGE boundary           */
 #define GUI_RESERVE	(1 * PAGE_SIZE)
 
-
 /* FIXME: remove the FAIL definition */
-#define FAIL(x) do { printk(x "\n"); return -EINVAL; } while (0)
+#define FAIL(msg) do { printk(KERN_CRIT "atyfb: " msg "\n"); return -EINVAL; } while (0)
+#define FAIL_MAX(msg, x, _max_) do { if(x > _max_) { printk(KERN_CRIT "atyfb: " msg " %x(%x)\n", x, _max_); return -EINVAL; } } while (0)
 
+#ifdef DEBUG
+#define DPRINTK(fmt, args...)	printk(KERN_DEBUG "atyfb: " fmt, ## args)
+#else
+#define DPRINTK(fmt, args...)
+#endif
 
+#define PRINTKI(fmt, args...)	printk(KERN_INFO "atyfb: " fmt, ## args)
+#define PRINTKE(fmt, args...)	 printk(KERN_ERR "atyfb: " fmt, ## args)
+
+#if defined(CONFIG_PM) || defined(CONFIG_PMAC_BACKLIGHT) || defined (CONFIG_FB_ATY_GENERIC_LCD)
+static const u32 lt_lcd_regs[] = {
+	CONFIG_PANEL_LG,
+	LCD_GEN_CNTL_LG,
+	DSTN_CONTROL_LG,
+	HFB_PITCH_ADDR_LG,
+	HORZ_STRETCHING_LG,
+	VERT_STRETCHING_LG,
+	0, /* EXT_VERT_STRETCH */
+	LT_GIO_LG,
+	POWER_MANAGEMENT_LG
+};
+
+void aty_st_lcd(int index, u32 val, const struct atyfb_par *par)
+{
+	if (M64_HAS(LT_LCD_REGS)) {
+		aty_st_le32(lt_lcd_regs[index], val, par);
+	} else {
+		unsigned long temp;
+
+		/* write addr byte */
+		temp = aty_ld_le32(LCD_INDEX, par);
+		aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
+		/* write the register value */
+		aty_st_le32(LCD_DATA, val, par);
+	}
+}
+
+u32 aty_ld_lcd(int index, const struct atyfb_par *par)
+{
+	if (M64_HAS(LT_LCD_REGS)) {
+		return aty_ld_le32(lt_lcd_regs[index], par);
+	} else {
+		unsigned long temp;
+
+		/* write addr byte */
+		temp = aty_ld_le32(LCD_INDEX, par);
+		aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
+		/* read the register value */
+		return aty_ld_le32(LCD_DATA, par);
+	}
+}
+#endif /* defined(CONFIG_PM) || defined(CONFIG_PMAC_BACKLIGHT) || defined (CONFIG_FB_ATY_GENERIC_LCD) */
+
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+/*
+ * ATIReduceRatio --
+ *
+ * Reduce a fraction by factoring out the largest common divider of the
+ * fraction's numerator and denominator.
+ */
+static void ATIReduceRatio(int *Numerator, int *Denominator)
+{
+    int Multiplier, Divider, Remainder;
+
+    Multiplier = *Numerator;
+    Divider = *Denominator;
+
+    while ((Remainder = Multiplier % Divider))
+    {
+        Multiplier = Divider;
+        Divider = Remainder;
+    }
+
+    *Numerator /= Divider;
+    *Denominator /= Divider;
+}
+#endif
     /*
      *  The Hardware parameters for each card
      */
@@ -138,22 +223,19 @@ static struct fb_fix_screeninfo atyfb_fix __initdata = {
 
 static int atyfb_open(struct fb_info *info, int user);
 static int atyfb_release(struct fb_info *info, int user);
-static int atyfb_check_var(struct fb_var_screeninfo *var,
-			   struct fb_info *info);
-static int atyfb_set_par(struct fb_info *info); 
+static int atyfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info);
+static int atyfb_set_par(struct fb_info *info);
 static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			   u_int transp, struct fb_info *info);
-static int atyfb_pan_display(struct fb_var_screeninfo *var,
-			     struct fb_info *info);
+	u_int transp, struct fb_info *info);
+static int atyfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info);
 static int atyfb_blank(int blank, struct fb_info *info);
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-		       u_long arg, struct fb_info *info);
+	u_long arg, struct fb_info *info);
 extern void atyfb_fillrect(struct fb_info *info, const struct fb_fillrect *rect);
 extern void atyfb_copyarea(struct fb_info *info, const struct fb_copyarea *area);
 extern void atyfb_imageblit(struct fb_info *info, const struct fb_image *image);
 #ifdef __sparc__
-static int atyfb_mmap(struct fb_info *info, struct file *file,
-		      struct vm_area_struct *vma);
+static int atyfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
 #endif
 static int atyfb_sync(struct fb_info *info);
 
@@ -166,15 +248,14 @@ static int aty_init(struct fb_info *info, const char *name);
 static int store_video_par(char *videopar, unsigned char m64_num);
 #endif
 
-static void aty_set_crtc(const struct atyfb_par *par,
-			 const struct crtc *crtc);
-static int aty_var_to_crtc(const struct fb_info *info,
-			   const struct fb_var_screeninfo *var,
-			   struct crtc *crtc);
-static int aty_crtc_to_var(const struct crtc *crtc,
-			   struct fb_var_screeninfo *var);
-static void set_off_pitch(struct atyfb_par *par,
-			  const struct fb_info *info);
+static struct crtc saved_crtc;
+static union aty_pll saved_pll;
+static void aty_get_crtc(const struct atyfb_par *par, struct crtc *crtc);
+
+static void aty_set_crtc(const struct atyfb_par *par, const struct crtc *crtc);
+static int aty_var_to_crtc(const struct fb_info *info, const struct fb_var_screeninfo *var, struct crtc *crtc);
+static int aty_crtc_to_var(const struct crtc *crtc, struct fb_var_screeninfo *var);
+static void set_off_pitch(struct atyfb_par *par, const struct fb_info *info);
 #ifdef CONFIG_PPC
 static int read_aty_sense(const struct atyfb_par *par);
 #endif
@@ -184,10 +265,19 @@ static int read_aty_sense(const struct atyfb_par *par);
      *  Interface used by the world
      */
 
-int atyfb_init(void);
-#ifndef MODULE
-int atyfb_setup(char *);
-#endif
+struct fb_var_screeninfo default_var = {
+	/* 640x480, 60 Hz, Non-Interlaced (25.175 MHz dotclock) */
+	640, 480, 640, 480, 0, 0, 8, 0,
+	{0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
+	0, 0, -1, -1, 0, 39722, 48, 16, 33, 10, 96, 2,
+	0, FB_VMODE_NONINTERLACED
+};
+
+static struct fb_videomode defmode = {
+	/* 640x480 @ 60 Hz, 31.5 kHz hsync */
+	NULL, 60, 640, 480, 39721, 40, 24, 32, 11, 96, 2,
+	0, FB_VMODE_NONINTERLACED
+};
 
 static struct fb_ops atyfb_ops = {
 	.owner		= THIS_MODULE,
@@ -202,22 +292,22 @@ static struct fb_ops atyfb_ops = {
 	.fb_fillrect	= atyfb_fillrect,
 	.fb_copyarea	= atyfb_copyarea,
 	.fb_imageblit	= atyfb_imageblit,
-	.fb_cursor	= soft_cursor,
+	.fb_cursor	= atyfb_cursor,
 #ifdef __sparc__
 	.fb_mmap	= atyfb_mmap,
 #endif
 	.fb_sync	= atyfb_sync,
 };
 
-static char curblink __initdata = 1;
-static char noaccel __initdata = 0;
-static u32 default_vram __initdata = 0;
-static int default_pll __initdata = 0;
-static int default_mclk __initdata = 0;
-
-#ifndef MODULE
-static char *mode_option __initdata = NULL;
+static int noaccel;
+#ifdef CONFIG_MTRR
+static int nomtrr;
 #endif
+static int vram;
+static int pll;
+static int mclk;
+static int xclk;
+static char *mode;
 
 #ifdef CONFIG_PPC
 static int default_vmode __initdata = VMODE_CHOOSE;
@@ -231,177 +321,185 @@ static unsigned long phys_size[FB_MAX] __initdata = { 0, };
 static unsigned long phys_guiregbase[FB_MAX] __initdata = { 0, };
 #endif
 
-#ifdef CONFIG_FB_ATY_GX
-static char m64n_gx[] __initdata = "mach64GX (ATI888GX00)";
-static char m64n_cx[] __initdata = "mach64CX (ATI888CX00)";
-#endif /* CONFIG_FB_ATY_GX */
-#ifdef CONFIG_FB_ATY_CT
-static char m64n_ct[] __initdata = "mach64CT (ATI264CT)";
-static char m64n_et[] __initdata = "mach64ET (ATI264ET)";
-static char m64n_vta3[] __initdata = "mach64VTA3 (ATI264VT)";
-static char m64n_vta4[] __initdata = "mach64VTA4 (ATI264VT)";
-static char m64n_vtb[] __initdata = "mach64VTB (ATI264VTB)";
-static char m64n_vt4[] __initdata = "mach64VT4 (ATI264VT4)";
-static char m64n_gt[] __initdata = "3D RAGE (GT)";
-static char m64n_gtb[] __initdata = "3D RAGE II+ (GTB)";
-static char m64n_iic_p[] __initdata = "3D RAGE IIC (PCI)";
-static char m64n_iic_a[] __initdata = "3D RAGE IIC (AGP)";
-static char m64n_lt[] __initdata = "3D RAGE LT";
-static char m64n_ltg[] __initdata = "3D RAGE LT-G";
-static char m64n_gtc_ba[] __initdata = "3D RAGE PRO (BGA, AGP)";
-static char m64n_gtc_ba1[] __initdata = "3D RAGE PRO (BGA, AGP, 1x only)";
-static char m64n_gtc_bp[] __initdata = "3D RAGE PRO (BGA, PCI)";
-static char m64n_gtc_pp[] __initdata = "3D RAGE PRO (PQFP, PCI)";
-static char m64n_gtc_ppl[] __initdata =
-    "3D RAGE PRO (PQFP, PCI, limited 3D)";
-static char m64n_xl[] __initdata = "3D RAGE (XL)";
-static char m64n_ltp_a[] __initdata = "3D RAGE LT PRO (AGP)";
-static char m64n_ltp_p[] __initdata = "3D RAGE LT PRO (PCI)";
-static char m64n_mob_p[] __initdata = "3D RAGE Mobility (PCI)";
-static char m64n_mob_a[] __initdata = "3D RAGE Mobility (AGP)";
-#endif /* CONFIG_FB_ATY_CT */
+/* top -> down is an evolution of mach64 chipset, any corrections? */
+#define ATI_CHIP_88800GX   (M64F_GX)
+#define ATI_CHIP_88800CX   (M64F_GX)
+
+#define ATI_CHIP_264CT     (M64F_CT | M64F_INTEGRATED | M64F_CT_BUS | M64F_MAGIC_FIFO)
+#define ATI_CHIP_264ET     (M64F_CT | M64F_INTEGRATED | M64F_CT_BUS | M64F_MAGIC_FIFO)
+
+#define ATI_CHIP_264VT     (M64F_VT | M64F_INTEGRATED | M64F_VT_BUS | M64F_MAGIC_FIFO)
+#define ATI_CHIP_264GT     (M64F_GT | M64F_INTEGRATED               | M64F_MAGIC_FIFO | M64F_EXTRA_BRIGHT)
+
+#define ATI_CHIP_264VTB    (M64F_VT | M64F_INTEGRATED | M64F_VT_BUS | M64F_GTB_DSP)
+#define ATI_CHIP_264VT3    (M64F_VT | M64F_INTEGRATED | M64F_VT_BUS | M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL)
+#define ATI_CHIP_264VT4    (M64F_VT | M64F_INTEGRATED               | M64F_GTB_DSP)
+
+#define ATI_CHIP_264LT     (M64F_GT | M64F_INTEGRATED               | M64F_GTB_DSP)
+
+/* make sets shorter */
+#define ATI_MODERN_SET     (M64F_GT | M64F_INTEGRATED               | M64F_GTB_DSP | M64F_EXTRA_BRIGHT)
+
+#define ATI_CHIP_264GTB    (ATI_MODERN_SET | M64F_SDRAM_MAGIC_PLL)
+/*#define ATI_CHIP_264GTDVD  ?*/
+#define ATI_CHIP_264LTG    (ATI_MODERN_SET | M64F_SDRAM_MAGIC_PLL)
+
+#define ATI_CHIP_264GT2C   (ATI_MODERN_SET | M64F_SDRAM_MAGIC_PLL | M64F_HW_TRIPLE)
+#define ATI_CHIP_264GTPRO  (ATI_MODERN_SET | M64F_SDRAM_MAGIC_PLL | M64F_HW_TRIPLE | M64F_FIFO_32 | M64F_RESET_3D)
+#define ATI_CHIP_264LTPRO  (ATI_MODERN_SET | M64F_HW_TRIPLE | M64F_FIFO_32 | M64F_RESET_3D)
+
+#define ATI_CHIP_264XL     (ATI_MODERN_SET | M64F_HW_TRIPLE | M64F_FIFO_32 | M64F_RESET_3D | M64F_XL_DLL | M64F_MFB_FORCE_4)
+#define ATI_CHIP_MOBILITY  (ATI_MODERN_SET | M64F_HW_TRIPLE | M64F_FIFO_32 | M64F_RESET_3D | M64F_XL_DLL | M64F_MFB_FORCE_4 | M64F_MOBIL_BUS)
 
 static struct {
-	u16 pci_id, chip_type;
-	u8 rev_mask, rev_val;
+	u16 pci_id;
 	const char *name;
-	int pll, mclk;
+	int pll, mclk, xclk;
 	u32 features;
 } aty_chips[] __initdata = {
 #ifdef CONFIG_FB_ATY_GX
 	/* Mach64 GX */
-	{
-	0x4758, 0x00d7, 0x00, 0x00, m64n_gx, 135, 50, M64F_GX}, {
-	0x4358, 0x0057, 0x00, 0x00, m64n_cx, 135, 50, M64F_GX},
-#endif				/* CONFIG_FB_ATY_GX */
+	{ PCI_CHIP_MACH64GX, "ATI888GX00 (Mach64 GX)", 135, 50, 50, ATI_CHIP_88800GX },
+	{ PCI_CHIP_MACH64CX, "ATI888CX00 (Mach64 CX)", 135, 50, 50, ATI_CHIP_88800CX },
+#endif /* CONFIG_FB_ATY_GX */
+
 #ifdef CONFIG_FB_ATY_CT
-	    /* Mach64 CT */
-	{
-	0x4354, 0x4354, 0x00, 0x00, m64n_ct, 135, 60,
-		    M64F_CT | M64F_INTEGRATED | M64F_CT_BUS |
-		    M64F_MAGIC_FIFO}, {
-	0x4554, 0x4554, 0x00, 0x00, m64n_et, 135, 60,
-		    M64F_CT | M64F_INTEGRATED | M64F_CT_BUS |
-		    M64F_MAGIC_FIFO},
-	    /* Mach64 VT */
-	{
-	0x5654, 0x5654, 0xc7, 0x00, m64n_vta3, 170, 67,
-		    M64F_VT | M64F_INTEGRATED | M64F_VT_BUS |
-		    M64F_MAGIC_FIFO | M64F_FIFO_24}, {
-	0x5654, 0x5654, 0xc7, 0x40, m64n_vta4, 200, 67,
-		    M64F_VT | M64F_INTEGRATED | M64F_VT_BUS |
-		    M64F_MAGIC_FIFO | M64F_FIFO_24 | M64F_MAGIC_POSTDIV}, {
-	0x5654, 0x5654, 0x00, 0x00, m64n_vtb, 200, 67,
-		    M64F_VT | M64F_INTEGRATED | M64F_VT_BUS |
-		    M64F_GTB_DSP | M64F_FIFO_24}, {
-	0x5655, 0x5655, 0x00, 0x00, m64n_vtb, 200, 67,
-		    M64F_VT | M64F_INTEGRATED | M64F_VT_BUS |
-		    M64F_GTB_DSP | M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL}, {
-	0x5656, 0x5656, 0x00, 0x00, m64n_vt4, 230, 83,
-		    M64F_VT | M64F_INTEGRATED | M64F_GTB_DSP},
-	    /* Mach64 GT (3D RAGE) */
-	{
-	0x4754, 0x4754, 0x07, 0x00, m64n_gt, 135, 63,
-		    M64F_GT | M64F_INTEGRATED | M64F_MAGIC_FIFO |
-		    M64F_FIFO_24 | M64F_EXTRA_BRIGHT}, {
-	0x4754, 0x4754, 0x07, 0x01, m64n_gt, 170, 67,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4754, 0x4754, 0x07, 0x02, m64n_gt, 200, 67,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4755, 0x4755, 0x00, 0x00, m64n_gtb, 200, 67,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4756, 0x4756, 0x00, 0x00, m64n_iic_p, 230, 83,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4757, 0x4757, 0x00, 0x00, m64n_iic_a, 230, 83,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x475a, 0x475a, 0x00, 0x00, m64n_iic_a, 230, 83,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_FIFO_24 | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT},
-	    /* Mach64 LT */
-	{
-	0x4c54, 0x4c54, 0x00, 0x00, m64n_lt, 135, 63,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP}, {
-	0x4c47, 0x4c47, 0x00, 0x00, m64n_ltg, 230, 63,
-		    M64F_GT | M64F_INTEGRATED | M64F_GTB_DSP |
-		    M64F_SDRAM_MAGIC_PLL | M64F_EXTRA_BRIGHT |
-		    M64F_LT_SLEEP | M64F_G3_PB_1024x768},
-	    /* Mach64 GTC (3D RAGE PRO) */
-	{
-	0x4742, 0x4742, 0x00, 0x00, m64n_gtc_ba, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4744, 0x4744, 0x00, 0x00, m64n_gtc_ba1, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4749, 0x4749, 0x00, 0x00, m64n_gtc_bp, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT | M64F_MAGIC_VRAM_SIZE}, {
-	0x4750, 0x4750, 0x00, 0x00, m64n_gtc_pp, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT}, {
-	0x4751, 0x4751, 0x00, 0x00, m64n_gtc_ppl, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT},
-	    /* 3D RAGE XL */
-	{
-	0x4752, 0x4752, 0x00, 0x00, m64n_xl, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_SDRAM_MAGIC_PLL |
-		    M64F_EXTRA_BRIGHT | M64F_XL_DLL},
-	    /* Mach64 LT PRO */
-	{
-	0x4c42, 0x4c42, 0x00, 0x00, m64n_ltp_a, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP}, {
-	0x4c44, 0x4c44, 0x00, 0x00, m64n_ltp_p, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP}, {
-	0x4c49, 0x4c49, 0x00, 0x00, m64n_ltp_p, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_EXTRA_BRIGHT |
-		    M64F_G3_PB_1_1 | M64F_G3_PB_1024x768}, {
-	0x4c50, 0x4c50, 0x00, 0x00, m64n_ltp_p, 230, 100,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP},
-	    /* 3D RAGE Mobility */
-	{
-	0x4c4d, 0x4c4d, 0x00, 0x00, m64n_mob_p, 230, 50,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_MOBIL_BUS}, {
-	0x4c4e, 0x4c4e, 0x00, 0x00, m64n_mob_a, 230, 50,
-		    M64F_GT | M64F_INTEGRATED | M64F_RESET_3D |
-		    M64F_GTB_DSP | M64F_MOBIL_BUS},
-#endif				/* CONFIG_FB_ATY_CT */
+	{ PCI_CHIP_MACH64CT, "ATI264CT (Mach64 CT)", 135, 60, 60, ATI_CHIP_264CT },
+	{ PCI_CHIP_MACH64ET, "ATI264ET (Mach64 ET)", 135, 60, 60, ATI_CHIP_264ET },
+	{ PCI_CHIP_MACH64VT, "ATI264VT? (Mach64 VT)", 170, 67, 67, ATI_CHIP_264VT },
+	{ PCI_CHIP_MACH64GT, "3D RAGE (Mach64 GT)", 135, 63, 63, ATI_CHIP_264GT },
+	/* FIXME { ...ATI_264GU, maybe ATI_CHIP_264GTDVD }, */
+	{ PCI_CHIP_MACH64GU, "3D RAGE II+ (Mach64 GTB)", 200, 67, 67, ATI_CHIP_264GTB  },
+	{ PCI_CHIP_MACH64VU, "ATI264VTB (Mach64 VU)", 200, 67, 67, ATI_CHIP_264VT3 },
+
+	{ PCI_CHIP_MACH64LT, "3D RAGE LT (Mach64 LT)", 135, 63, 63, ATI_CHIP_264LT },
+	 /* FIXME chipset maybe ATI_CHIP_264LTPRO ? */
+	{ PCI_CHIP_MACH64LG, "3D RAGE LT-G (Mach64 LG)", 230, 63, 63, ATI_CHIP_264LTG | M64F_LT_LCD_REGS | M64F_G3_PB_1024x768 },
+
+	{ PCI_CHIP_MACH64VV, "ATI264VT4 (Mach64 VV)", 230, 83, 83, ATI_CHIP_264VT4 },
+
+	{ PCI_CHIP_MACH64GV, "3D RAGE IIC (Mach64 GV, PCI)", 230, 83, 83, ATI_CHIP_264GT2C },
+	{ PCI_CHIP_MACH64GW, "3D RAGE IIC (Mach64 GW, AGP)", 230, 83, 83, ATI_CHIP_264GT2C },
+	{ PCI_CHIP_MACH64GY, "3D RAGE IIC (Mach64 GY, PCI)", 230, 83, 83, ATI_CHIP_264GT2C },
+	{ PCI_CHIP_MACH64GZ, "3D RAGE IIC (Mach64 GZ, AGP)", 230, 83, 83, ATI_CHIP_264GT2C },
+
+	{ PCI_CHIP_MACH64GB, "3D RAGE PRO (Mach64 GB, BGA, AGP)", 230, 100, 100, ATI_CHIP_264GTPRO },
+	{ PCI_CHIP_MACH64GD, "3D RAGE PRO (Mach64 GD, BGA, AGP 1x)", 230, 100, 100, ATI_CHIP_264GTPRO },
+	{ PCI_CHIP_MACH64GI, "3D RAGE PRO (Mach64 GI, BGA, PCI)", 230, 100, 100, ATI_CHIP_264GTPRO | M64F_MAGIC_VRAM_SIZE },
+	{ PCI_CHIP_MACH64GP, "3D RAGE PRO (Mach64 GP, PQFP, PCI)", 230, 100, 100, ATI_CHIP_264GTPRO },
+	{ PCI_CHIP_MACH64GQ, "3D RAGE PRO (Mach64 GQ, PQFP, PCI, limited 3D)", 230, 100, 100, ATI_CHIP_264GTPRO },
+
+	{ PCI_CHIP_MACH64LB, "3D RAGE LT PRO (Mach64 LB, AGP)", 236, 75, 100, ATI_CHIP_264LTPRO },
+	{ PCI_CHIP_MACH64LD, "3D RAGE LT PRO (Mach64 LD, AGP)", 230, 100, 100, ATI_CHIP_264LTPRO },
+	{ PCI_CHIP_MACH64LI, "3D RAGE LT PRO (Mach64 LI, PCI)", 230, 100, 100, ATI_CHIP_264LTPRO | M64F_G3_PB_1_1 | M64F_G3_PB_1024x768 },
+	{ PCI_CHIP_MACH64LP, "3D RAGE LT PRO (Mach64 LP, PCI)", 230, 100, 100, ATI_CHIP_264LTPRO },
+	{ PCI_CHIP_MACH64LQ, "3D RAGE LT PRO (Mach64 LQ, PCI)", 230, 100, 100, ATI_CHIP_264LTPRO },
+
+	{ PCI_CHIP_MACH64GM, "3D RAGE XL (Mach64 GM, AGP)", 230, 83, 63, ATI_CHIP_264XL },
+	{ PCI_CHIP_MACH64GN, "3D RAGE XL (Mach64 GN, AGP)", 230, 83, 63, ATI_CHIP_264XL },
+	{ PCI_CHIP_MACH64GO, "3D RAGE XL (Mach64 GO, PCI-66/BGA)", 230, 83, 63, ATI_CHIP_264XL },
+	{ PCI_CHIP_MACH64GR, "3D RAGE XL (Mach64 GR, PCI-33MHz)", 230, 83, 63, ATI_CHIP_264XL },
+	{ PCI_CHIP_MACH64GL, "3D RAGE XL (Mach64 GL, PCI)", 230, 83, 63, ATI_CHIP_264XL },
+	{ PCI_CHIP_MACH64GS, "3D RAGE XL (Mach64 GS, PCI)", 230, 83, 63, ATI_CHIP_264XL },
+
+	{ PCI_CHIP_MACH64LM, "3D RAGE Mobility P/M (Mach64 LM, AGP 2x)", 230, 83, 125, ATI_CHIP_MOBILITY },
+	{ PCI_CHIP_MACH64LN, "3D RAGE Mobility L (Mach64 LN, AGP 2x)", 230, 83, 125, ATI_CHIP_MOBILITY },
+	{ PCI_CHIP_MACH64LR, "3D RAGE Mobility P/M (Mach64 LR, PCI)", 230, 83, 125, ATI_CHIP_MOBILITY },
+	{ PCI_CHIP_MACH64LS, "3D RAGE Mobility L (Mach64 LS, PCI)", 230, 83, 125, ATI_CHIP_MOBILITY },
+#endif /* CONFIG_FB_ATY_CT */
 };
 
+/* can not fail */
+static int __devinit correct_chipset(struct atyfb_par *par)
+{
+	u8 rev;
+	u16 type;
+	u32 chip_id;
+	const char *name;
+	int i;
+
+	for (i = sizeof(aty_chips) / sizeof(*aty_chips) - 1; i >= 0; i--)
+		if (par->pci_id == aty_chips[i].pci_id)
+			break;
+
+	name = aty_chips[i].name;
+	par->pll_limits.pll_max = aty_chips[i].pll;
+	par->pll_limits.mclk = aty_chips[i].mclk;
+	par->pll_limits.xclk = aty_chips[i].xclk;
+	par->features = aty_chips[i].features;
+
+	chip_id = aty_ld_le32(CONFIG_CHIP_ID, par);
+	type = chip_id & CFG_CHIP_TYPE;
+	rev = (chip_id & CFG_CHIP_REV) >> 24;
+
+	switch(par->pci_id) {
+#ifdef CONFIG_FB_ATY_GX
+	case PCI_CHIP_MACH64GX:
+		if(type != 0x00d7);
+			return -ENODEV;
+		break;
+	case PCI_CHIP_MACH64CX:
+		if(type != 0x0057);
+			return -ENODEV;
+		break;
+#endif
+#ifdef CONFIG_FB_ATY_CT
+	case PCI_CHIP_MACH64VT:
+		rev &= 0xc7;
+		if(rev == 0x00) {
+			name = "ATI264VTA3 (Mach64 VT)";
+			par->pll_limits.pll_max = 170;
+			par->pll_limits.mclk = 67;
+			par->pll_limits.xclk = 67;
+			par->features = ATI_CHIP_264VT;
+		} else if(rev == 0x40) {
+			name = "ATI264VTA4 (Mach64 VT)";
+			par->pll_limits.pll_max = 200;
+			par->pll_limits.mclk = 67;
+			par->pll_limits.xclk = 67;
+			par->features = ATI_CHIP_264VT | M64F_MAGIC_POSTDIV;
+		} else {
+			name = "ATI264VTB (Mach64 VT)";
+			par->pll_limits.pll_max = 200;
+			par->pll_limits.mclk = 67;
+			par->pll_limits.xclk = 67;
+			par->features = ATI_CHIP_264VTB;
+		}
+		break;
+	case PCI_CHIP_MACH64GT:
+		rev &= 0x07;
+		if(rev == 0x01) {
+			par->pll_limits.pll_max = 170;
+			par->pll_limits.mclk = 67;
+			par->pll_limits.xclk = 67;
+			par->features = ATI_CHIP_264GTB;
+		} else if(rev == 0x02) {
+			par->pll_limits.pll_max = 200;
+			par->pll_limits.mclk = 67;
+			par->pll_limits.xclk = 67;
+			par->features = ATI_CHIP_264GTB;
+		}
+		break;
+#endif
+	}
+
+	PRINTKI("%s [0x%04x rev 0x%02x]\n", name, type, rev);
+	return 0;
+}
+
 static char ram_dram[] __initdata = "DRAM";
+static char ram_resv[] __initdata = "RESV";
 #ifdef CONFIG_FB_ATY_GX
 static char ram_vram[] __initdata = "VRAM";
 #endif /* CONFIG_FB_ATY_GX */
 #ifdef CONFIG_FB_ATY_CT
 static char ram_edo[] __initdata = "EDO";
-static char ram_sdram[] __initdata = "SDRAM";
-static char ram_sgram[] __initdata = "SGRAM";
-static char ram_wram[] __initdata = "WRAM";
+static char ram_sdram[] __initdata = "SDRAM (1:1)";
+static char ram_sgram[] __initdata = "SGRAM (1:1)";
+static char ram_sdram32[] __initdata = "SDRAM (2:1) (32-bit)";
 static char ram_off[] __initdata = "OFF";
 #endif /* CONFIG_FB_ATY_CT */
-static char ram_resv[] __initdata = "RESV";
+
 
 static u32 pseudo_palette[17];
 
@@ -410,109 +508,226 @@ static char *aty_gx_ram[8] __initdata = {
 	ram_dram, ram_vram, ram_vram, ram_dram,
 	ram_dram, ram_vram, ram_vram, ram_resv
 };
-#endif				/* CONFIG_FB_ATY_GX */
+#endif /* CONFIG_FB_ATY_GX */
 
 #ifdef CONFIG_FB_ATY_CT
 static char *aty_ct_ram[8] __initdata = {
 	ram_off, ram_dram, ram_edo, ram_edo,
-	ram_sdram, ram_sgram, ram_wram, ram_resv
+	ram_sdram, ram_sgram, ram_sdram32, ram_resv
 };
-#endif				/* CONFIG_FB_ATY_CT */
+#endif /* CONFIG_FB_ATY_CT */
 
+static u32 atyfb_get_pixclock(struct fb_var_screeninfo *var, struct atyfb_par *par)
+{
+	u32 pixclock = var->pixclock;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	u32 lcd_on_off;
+	par->pll.ct.xres = 0;
+	if (par->lcd_table != 0) {
+		lcd_on_off = aty_ld_lcd(LCD_GEN_CNTL, par);
+		if(lcd_on_off & LCD_ON) {
+			par->pll.ct.xres = var->xres;
+			pixclock = par->lcd_pixclock;
+		}
+	}
+#endif
+	return pixclock;
+}
 
 #if defined(CONFIG_PPC)
 
-    /*
-     *  Apple monitor sense
-     */
+/*
+ *  Apple monitor sense
+ */
 
 static int __init read_aty_sense(const struct atyfb_par *par)
 {
 	int sense, i;
 
-	aty_st_le32(GP_IO, 0x31003100, par);	/* drive outputs high */
+	aty_st_le32(GP_IO, 0x31003100, par); /* drive outputs high */
 	__delay(200);
-	aty_st_le32(GP_IO, 0, par);	/* turn off outputs */
+	aty_st_le32(GP_IO, 0, par); /* turn off outputs */
 	__delay(2000);
-	i = aty_ld_le32(GP_IO, par);	/* get primary sense value */
+	i = aty_ld_le32(GP_IO, par); /* get primary sense value */
 	sense = ((i & 0x3000) >> 3) | (i & 0x100);
 
 	/* drive each sense line low in turn and collect the other 2 */
-	aty_st_le32(GP_IO, 0x20000000, par);	/* drive A low */
+	aty_st_le32(GP_IO, 0x20000000, par); /* drive A low */
 	__delay(2000);
 	i = aty_ld_le32(GP_IO, par);
 	sense |= ((i & 0x1000) >> 7) | ((i & 0x100) >> 4);
-	aty_st_le32(GP_IO, 0x20002000, par);	/* drive A high again */
+	aty_st_le32(GP_IO, 0x20002000, par); /* drive A high again */
 	__delay(200);
 
-	aty_st_le32(GP_IO, 0x10000000, par);	/* drive B low */
+	aty_st_le32(GP_IO, 0x10000000, par); /* drive B low */
 	__delay(2000);
 	i = aty_ld_le32(GP_IO, par);
 	sense |= ((i & 0x2000) >> 10) | ((i & 0x100) >> 6);
-	aty_st_le32(GP_IO, 0x10001000, par);	/* drive B high again */
+	aty_st_le32(GP_IO, 0x10001000, par); /* drive B high again */
 	__delay(200);
 
-	aty_st_le32(GP_IO, 0x01000000, par);	/* drive C low */
+	aty_st_le32(GP_IO, 0x01000000, par); /* drive C low */
 	__delay(2000);
 	sense |= (aty_ld_le32(GP_IO, par) & 0x3000) >> 12;
-	aty_st_le32(GP_IO, 0, par);	/* turn off outputs */
+	aty_st_le32(GP_IO, 0, par); /* turn off outputs */
 	return sense;
 }
 
-#endif				/* defined(CONFIG_PPC) */
-
-#if defined(CONFIG_PMAC_PBOOK) || defined(CONFIG_PMAC_BACKLIGHT)
-static void aty_st_lcd(int index, u32 val, const struct atyfb_par *par)
-{
-	unsigned long temp;
-
-	/* write addr byte */
-	temp = aty_ld_le32(LCD_INDEX, par);
-	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
-	/* write the register value */
-	aty_st_le32(LCD_DATA, val, par);
-}
-
-static u32 aty_ld_lcd(int index, const struct atyfb_par *par)
-{
-	unsigned long temp;
-
-	/* write addr byte */
-	temp = aty_ld_le32(LCD_INDEX, par);
-	aty_st_le32(LCD_INDEX, (temp & ~LCD_INDEX_MASK) | index, par);
-	/* read the register value */
-	return aty_ld_le32(LCD_DATA, par);
-}
-#endif				/* CONFIG_PMAC_PBOOK || CONFIG_PMAC_BACKLIGHT */
+#endif /* defined(CONFIG_PPC) */
 
 /* ------------------------------------------------------------------------- */
 
-    /*
-     *  CRTC programming
-     */
+/*
+ *  CRTC programming
+ */
 
-static void aty_set_crtc(const struct atyfb_par *par,
-			 const struct crtc *crtc)
+static void aty_get_crtc(const struct atyfb_par *par, struct crtc *crtc)
 {
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		if(!M64_HAS(LT_LCD_REGS)) {
+		    crtc->lcd_index = aty_ld_le32(LCD_INDEX, par);
+		    aty_st_le32(LCD_INDEX, crtc->lcd_index, par);
+		}
+		crtc->lcd_config_panel = aty_ld_lcd(CONFIG_PANEL, par);
+		crtc->lcd_gen_cntl = aty_ld_lcd(LCD_GEN_CNTL, par);
+
+
+		/* switch to non shadow registers */
+		aty_st_lcd(LCD_GEN_CNTL, crtc->lcd_gen_cntl &
+                    ~(CRTC_RW_SELECT | SHADOW_EN | SHADOW_RW_EN), par);
+
+		/* save stretching */
+		crtc->horz_stretching = aty_ld_lcd(HORZ_STRETCHING, par);
+		crtc->vert_stretching = aty_ld_lcd(VERT_STRETCHING, par);
+		if (!M64_HAS(LT_LCD_REGS))
+			crtc->ext_vert_stretch = aty_ld_lcd(EXT_VERT_STRETCH, par);
+	}
+#endif
+	crtc->h_tot_disp = aty_ld_le32(CRTC_H_TOTAL_DISP, par);
+	crtc->h_sync_strt_wid = aty_ld_le32(CRTC_H_SYNC_STRT_WID, par);
+	crtc->v_tot_disp = aty_ld_le32(CRTC_V_TOTAL_DISP, par);
+	crtc->v_sync_strt_wid = aty_ld_le32(CRTC_V_SYNC_STRT_WID, par);
+	crtc->vline_crnt_vline = aty_ld_le32(CRTC_VLINE_CRNT_VLINE, par);
+	crtc->off_pitch = aty_ld_le32(CRTC_OFF_PITCH, par);
+	crtc->gen_cntl = aty_ld_le32(CRTC_GEN_CNTL, par);
+
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		/* switch to shadow registers */
+		aty_st_lcd(LCD_GEN_CNTL, (crtc->lcd_gen_cntl & ~CRTC_RW_SELECT) |
+			SHADOW_EN | SHADOW_RW_EN, par);
+
+		crtc->shadow_h_tot_disp = aty_ld_le32(CRTC_H_TOTAL_DISP, par);
+		crtc->shadow_h_sync_strt_wid = aty_ld_le32(CRTC_H_SYNC_STRT_WID, par);
+		crtc->shadow_v_tot_disp = aty_ld_le32(CRTC_V_TOTAL_DISP, par);
+		crtc->shadow_v_sync_strt_wid = aty_ld_le32(CRTC_V_SYNC_STRT_WID, par);
+
+		aty_st_le32(LCD_GEN_CNTL, crtc->lcd_gen_cntl, par);
+	}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
+}
+
+static void aty_set_crtc(const struct atyfb_par *par, const struct crtc *crtc)
+{
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		/* stop CRTC */
+		aty_st_le32(CRTC_GEN_CNTL, crtc->gen_cntl & ~(CRTC_EXT_DISP_EN | CRTC_EN), par);
+
+		/* update non-shadow registers first */
+		aty_st_lcd(CONFIG_PANEL, crtc->lcd_config_panel, par);
+		aty_st_lcd(LCD_GEN_CNTL, crtc->lcd_gen_cntl &
+			~(CRTC_RW_SELECT | SHADOW_EN | SHADOW_RW_EN), par);
+
+		/* temporarily disable stretching */
+		aty_st_lcd(HORZ_STRETCHING,
+			crtc->horz_stretching &
+			~(HORZ_STRETCH_MODE | HORZ_STRETCH_EN), par);
+		aty_st_lcd(VERT_STRETCHING,
+			crtc->vert_stretching &
+			~(VERT_STRETCH_RATIO1 | VERT_STRETCH_RATIO2 |
+			VERT_STRETCH_USE0 | VERT_STRETCH_EN), par);
+	}
+#endif
+	/* turn off CRT */
+	aty_st_le32(CRTC_GEN_CNTL, crtc->gen_cntl & ~CRTC_EN, par);
+
+	DPRINTK("setting up CRTC\n");
+	PRINTKI("set primary CRT to %ix%i %c%c composite %c\n",
+	    ((((crtc->h_tot_disp>>16) & 0xff) + 1)<<3), (((crtc->v_tot_disp>>16) & 0x7ff) + 1),
+	    (crtc->h_sync_strt_wid & 0x200000)?'N':'P', (crtc->v_sync_strt_wid & 0x200000)?'N':'P',
+	    (crtc->gen_cntl & CRTC_CSYNC_EN)?'P':'N');
+
+	DPRINTK("CRTC_H_TOTAL_DISP: %x\n",crtc->h_tot_disp);
+	DPRINTK("CRTC_H_SYNC_STRT_WID: %x\n",crtc->h_sync_strt_wid);
+	DPRINTK("CRTC_V_TOTAL_DISP: %x\n",crtc->v_tot_disp);
+	DPRINTK("CRTC_V_SYNC_STRT_WID: %x\n",crtc->v_sync_strt_wid);
+	DPRINTK("CRTC_OFF_PITCH: %x\n", crtc->off_pitch);
+	DPRINTK("CRTC_VLINE_CRNT_VLINE: %x\n", crtc->vline_crnt_vline);
+	DPRINTK("CRTC_GEN_CNTL: %x\n",crtc->gen_cntl);
+
 	aty_st_le32(CRTC_H_TOTAL_DISP, crtc->h_tot_disp, par);
 	aty_st_le32(CRTC_H_SYNC_STRT_WID, crtc->h_sync_strt_wid, par);
 	aty_st_le32(CRTC_V_TOTAL_DISP, crtc->v_tot_disp, par);
 	aty_st_le32(CRTC_V_SYNC_STRT_WID, crtc->v_sync_strt_wid, par);
-	aty_st_le32(CRTC_VLINE_CRNT_VLINE, 0, par);
 	aty_st_le32(CRTC_OFF_PITCH, crtc->off_pitch, par);
+	aty_st_le32(CRTC_VLINE_CRNT_VLINE, crtc->vline_crnt_vline, par);
+
 	aty_st_le32(CRTC_GEN_CNTL, crtc->gen_cntl, par);
+#if 0
+	FIXME
+	if (par->accel_flags & FB_ACCELF_TEXT)
+		aty_init_engine(par, info);
+#endif
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	/* after setting the CRTC registers we should set the LCD registers. */
+	if (par->lcd_table != 0) {
+		/* switch to shadow registers */
+		aty_st_lcd(LCD_GEN_CNTL, (crtc->lcd_gen_cntl & ~CRTC_RW_SELECT) |
+			(SHADOW_EN | SHADOW_RW_EN), par);
+
+		PRINTKI("set secondary CRT to %ix%i %c%c\n",
+		    ((((crtc->shadow_h_tot_disp>>16) & 0xff) + 1)<<3), (((crtc->shadow_v_tot_disp>>16) & 0x7ff) + 1),
+		    (crtc->shadow_h_sync_strt_wid & 0x200000)?'N':'P', (crtc->shadow_v_sync_strt_wid & 0x200000)?'N':'P');
+
+		DPRINTK("SHADOW CRTC_H_TOTAL_DISP: %x\n", crtc->shadow_h_tot_disp);
+		DPRINTK("SHADOW CRTC_H_SYNC_STRT_WID: %x\n", crtc->shadow_h_sync_strt_wid);
+		DPRINTK("SHADOW CRTC_V_TOTAL_DISP: %x\n", crtc->shadow_v_tot_disp);
+		DPRINTK("SHADOW CRTC_V_SYNC_STRT_WID: %x\n", crtc->shadow_v_sync_strt_wid);
+
+		aty_st_le32(CRTC_H_TOTAL_DISP, crtc->shadow_h_tot_disp, par);
+		aty_st_le32(CRTC_H_SYNC_STRT_WID, crtc->shadow_h_sync_strt_wid, par);
+		aty_st_le32(CRTC_V_TOTAL_DISP, crtc->shadow_v_tot_disp, par);
+		aty_st_le32(CRTC_V_SYNC_STRT_WID, crtc->shadow_v_sync_strt_wid, par);
+
+		/* restore CRTC selection & shadow state and enable stretching */
+		DPRINTK("LCD_GEN_CNTL: %x\n", crtc->lcd_gen_cntl);
+		DPRINTK("HORZ_STRETCHING: %x\n", crtc->horz_stretching);
+		DPRINTK("VERT_STRETCHING: %x\n", crtc->vert_stretching);
+		if(!M64_HAS(LT_LCD_REGS))
+		    DPRINTK("EXT_VERT_STRETCH: %x\n", crtc->ext_vert_stretch);
+
+		aty_st_lcd(LCD_GEN_CNTL, crtc->lcd_gen_cntl, par);
+		aty_st_lcd(HORZ_STRETCHING, crtc->horz_stretching, par);
+		aty_st_lcd(VERT_STRETCHING, crtc->vert_stretching, par);
+		if(!M64_HAS(LT_LCD_REGS)) {
+		    aty_st_lcd(EXT_VERT_STRETCH, crtc->ext_vert_stretch, par);
+		    aty_ld_le32(LCD_INDEX, par);
+		    aty_st_le32(LCD_INDEX, crtc->lcd_index, par);
+		}
+	}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
 }
 
 static int aty_var_to_crtc(const struct fb_info *info,
-			   const struct fb_var_screeninfo *var,
-			   struct crtc *crtc)
+	const struct fb_var_screeninfo *var, struct crtc *crtc)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u32 xres, yres, vxres, vyres, xoffset, yoffset, bpp;
-	u32 left, right, upper, lower, hslen, vslen, sync, vmode;
-	u32 h_total, h_disp, h_sync_strt, h_sync_dly, h_sync_wid,
-	    h_sync_pol;
-	u32 v_total, v_disp, v_sync_strt, v_sync_wid, v_sync_pol, c_sync;
+	u32 sync, vmode, vdisplay;
+	u32 h_total, h_disp, h_sync_strt, h_sync_end, h_sync_dly, h_sync_wid, h_sync_pol;
+	u32 v_total, v_disp, v_sync_strt, v_sync_end, v_sync_wid, v_sync_pol, c_sync;
 	u32 pix_width, dp_pix_width, dp_chain_mask;
 
 	/* input */
@@ -523,53 +738,19 @@ static int aty_var_to_crtc(const struct fb_info *info,
 	xoffset = var->xoffset;
 	yoffset = var->yoffset;
 	bpp = var->bits_per_pixel;
-	left = var->left_margin;
-	right = var->right_margin;
-	upper = var->upper_margin;
-	lower = var->lower_margin;
-	hslen = var->hsync_len;
-	vslen = var->vsync_len;
+	if (bpp == 16)
+		bpp = (var->green.length == 5) ? 15 : 16;
 	sync = var->sync;
 	vmode = var->vmode;
 
 	/* convert (and round up) and validate */
-	xres = (xres + 7) & ~7;
-	xoffset = (xoffset + 7) & ~7;
-	vxres = (vxres + 7) & ~7;
 	if (vxres < xres + xoffset)
 		vxres = xres + xoffset;
-	h_disp = xres / 8 - 1;
-	if (h_disp > 0xff)
-		FAIL("h_disp too large");
-	h_sync_strt = h_disp + (right / 8);
-	if (h_sync_strt > 0x1ff)
-		FAIL("h_sync_start too large");
-	h_sync_dly = right & 7;
-	h_sync_wid = (hslen + 7) / 8;
-	if (h_sync_wid > 0x1f)
-		FAIL("h_sync_wid too large");
-	h_total = h_sync_strt + h_sync_wid + (h_sync_dly + left + 7) / 8;
-	if (h_total > 0x1ff)
-		FAIL("h_total too large");
-	h_sync_pol = sync & FB_SYNC_HOR_HIGH_ACT ? 0 : 1;
+	h_disp = xres;
 
 	if (vyres < yres + yoffset)
 		vyres = yres + yoffset;
-	v_disp = yres - 1;
-	if (v_disp > 0x7ff)
-		FAIL("v_disp too large");
-	v_sync_strt = v_disp + lower;
-	if (v_sync_strt > 0x7ff)
-		FAIL("v_sync_strt too large");
-	v_sync_wid = vslen;
-	if (v_sync_wid > 0x1f)
-		FAIL("v_sync_wid too large");
-	v_total = v_sync_strt + v_sync_wid + upper;
-	if (v_total > 0x7ff)
-		FAIL("v_total too large");
-	v_sync_pol = sync & FB_SYNC_VERT_HIGH_ACT ? 0 : 1;
-
-	c_sync = sync & FB_SYNC_COMP_HIGH_ACT ? CRTC_CSYNC_EN : 0;
+	v_disp = yres;
 
 	if (bpp <= 8) {
 		bpp = 8;
@@ -577,54 +758,325 @@ static int aty_var_to_crtc(const struct fb_info *info,
 		dp_pix_width =
 		    HOST_8BPP | SRC_8BPP | DST_8BPP |
 		    BYTE_ORDER_LSB_TO_MSB;
-		dp_chain_mask = 0x8080;
-	} else if (bpp <= 16) {
+		dp_chain_mask = DP_CHAIN_8BPP;
+	} else if (bpp <= 15) {
 		bpp = 16;
 		pix_width = CRTC_PIX_WIDTH_15BPP;
 		dp_pix_width = HOST_15BPP | SRC_15BPP | DST_15BPP |
 		    BYTE_ORDER_LSB_TO_MSB;
-		dp_chain_mask = 0x4210;
+		dp_chain_mask = DP_CHAIN_15BPP;
+	} else if (bpp <= 16) {
+		bpp = 16;
+		pix_width = CRTC_PIX_WIDTH_16BPP;
+		dp_pix_width = HOST_16BPP | SRC_16BPP | DST_16BPP |
+		    BYTE_ORDER_LSB_TO_MSB;
+		dp_chain_mask = DP_CHAIN_16BPP;
 	} else if (bpp <= 24 && M64_HAS(INTEGRATED)) {
 		bpp = 24;
 		pix_width = CRTC_PIX_WIDTH_24BPP;
 		dp_pix_width =
 		    HOST_8BPP | SRC_8BPP | DST_8BPP |
 		    BYTE_ORDER_LSB_TO_MSB;
-		dp_chain_mask = 0x8080;
+		dp_chain_mask = DP_CHAIN_24BPP;
 	} else if (bpp <= 32) {
 		bpp = 32;
 		pix_width = CRTC_PIX_WIDTH_32BPP;
 		dp_pix_width = HOST_32BPP | SRC_32BPP | DST_32BPP |
 		    BYTE_ORDER_LSB_TO_MSB;
-		dp_chain_mask = 0x8080;
+		dp_chain_mask = DP_CHAIN_32BPP;
 	} else
 		FAIL("invalid bpp");
 
 	if (vxres * vyres * bpp / 8 > info->fix.smem_len)
 		FAIL("not enough video RAM");
 
-	if ((vmode & FB_VMODE_MASK) != FB_VMODE_NONINTERLACED)
-		FAIL("invalid vmode");
+	h_sync_pol = sync & FB_SYNC_HOR_HIGH_ACT ? 0 : 1;
+	v_sync_pol = sync & FB_SYNC_VERT_HIGH_ACT ? 0 : 1;
+
+	if((xres > 1600) || (yres > 1200)) {
+		FAIL("MACH64 chips are designed for max 1600x1200\n"
+		"select anoter resolution.");
+	}
+	h_sync_strt = h_disp + var->right_margin;
+	h_sync_end = h_sync_strt + var->hsync_len;
+	h_sync_dly  = var->right_margin & 7;
+	h_total = h_sync_end + h_sync_dly + var->left_margin;
+
+	v_sync_strt = v_disp + var->lower_margin;
+	v_sync_end = v_sync_strt + var->vsync_len;
+	v_total = v_sync_end + var->upper_margin;
+
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		if(!M64_HAS(LT_LCD_REGS)) {
+		    u32 lcd_index = aty_ld_le32(LCD_INDEX, par);
+		    crtc->lcd_index = lcd_index &
+			~(LCD_INDEX_MASK | LCD_DISPLAY_DIS | LCD_SRC_SEL | CRTC2_DISPLAY_DIS);
+		    aty_st_le32(LCD_INDEX, lcd_index, par);
+		}
+
+		if (!M64_HAS(MOBIL_BUS))
+			crtc->lcd_index |= CRTC2_DISPLAY_DIS;
+
+		crtc->lcd_config_panel = aty_ld_lcd(CONFIG_PANEL, par) | 0x4000;
+		crtc->lcd_gen_cntl = aty_ld_lcd(LCD_GEN_CNTL, par) & ~CRTC_RW_SELECT;
+
+		crtc->lcd_gen_cntl &=
+			~(HORZ_DIVBY2_EN | DIS_HOR_CRT_DIVBY2 | TVCLK_PM_EN |
+			/*VCLK_DAC_PM_EN | USE_SHADOWED_VEND |*/
+			USE_SHADOWED_ROWCUR | SHADOW_EN | SHADOW_RW_EN);
+		crtc->lcd_gen_cntl |= DONT_SHADOW_VPAR | LOCK_8DOT;
+
+		if((crtc->lcd_gen_cntl & LCD_ON) &&
+			((xres > par->lcd_width) || (yres > par->lcd_height))) {
+			/* We cannot display the mode on the LCD. If the CRT is enabled
+			   we can turn off the LCD.
+			   If the CRT is off, it isn't a good idea to switch it on; we don't
+			   know if one is connected. So it's better to fail then.
+			 */
+			if (crtc->lcd_gen_cntl & CRT_ON) {
+				PRINTKI("Disable lcd panel, because video mode does not fit.\n");
+				crtc->lcd_gen_cntl &= ~LCD_ON;
+				/*aty_st_lcd(LCD_GEN_CNTL, crtc->lcd_gen_cntl, par);*/
+			} else {
+				FAIL("Video mode exceeds size of lcd panel.\nConnect this computer to a conventional monitor if you really need this mode.");
+			}
+		}
+	}
+
+	if ((par->lcd_table != 0) && (crtc->lcd_gen_cntl & LCD_ON)) {
+		int VScan = 1;
+		/* bpp -> bytespp, 1,4 -> 0; 8 -> 2; 15,16 -> 1; 24 -> 6; 32 -> 5
+		const u8 DFP_h_sync_dly_LT[] = { 0, 2, 1, 6, 5 };
+		const u8 ADD_to_strt_wid_and_dly_LT_DAC[] = { 0, 5, 6, 9, 9, 12, 12 };  */
+
+		vmode &= ~(FB_VMODE_DOUBLE | FB_VMODE_INTERLACED);
+
+		/* This is horror! When we simulate, say 640x480 on an 800x600
+		   lcd monitor, the CRTC should be programmed 800x600 values for
+		   the non visible part, but 640x480 for the visible part.
+		   This code has been tested on a laptop with it's 1400x1050 lcd
+		   monitor and a conventional monitor both switched on.
+		   Tested modes: 1280x1024, 1152x864, 1024x768, 800x600,
+		    works with little glitches also with DOUBLESCAN modes
+		 */
+		if (yres < par->lcd_height) {
+			VScan = par->lcd_height / yres;
+			if(VScan > 1) {
+				VScan = 2;
+				vmode |= FB_VMODE_DOUBLE;
+			}
+		}
+
+		h_sync_strt = h_disp + par->lcd_right_margin;
+		h_sync_end = h_sync_strt + par->lcd_hsync_len;
+		h_sync_dly = /*DFP_h_sync_dly[ ( bpp + 1 ) / 3 ]; */par->lcd_hsync_dly;
+		h_total = h_disp + par->lcd_hblank_len;
+
+		v_sync_strt = v_disp + par->lcd_lower_margin / VScan;
+		v_sync_end = v_sync_strt + par->lcd_vsync_len / VScan;
+		v_total = v_disp + par->lcd_vblank_len / VScan;
+	}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
+
+	h_disp = (h_disp >> 3) - 1;
+	h_sync_strt = (h_sync_strt >> 3) - 1;
+	h_sync_end = (h_sync_end >> 3) - 1;
+	h_total = (h_total >> 3) - 1;
+	h_sync_wid = h_sync_end - h_sync_strt;
+
+	FAIL_MAX("h_disp too large", h_disp, 0xff);
+	FAIL_MAX("h_sync_strt too large", h_sync_strt, 0x1ff);
+	/*FAIL_MAX("h_sync_wid too large", h_sync_wid, 0x1f);*/
+	if(h_sync_wid > 0x1f)
+		h_sync_wid = 0x1f;
+	FAIL_MAX("h_total too large", h_total, 0x1ff);
+
+	if (vmode & FB_VMODE_DOUBLE) {
+		v_disp <<= 1;
+		v_sync_strt <<= 1;
+		v_sync_end <<= 1;
+		v_total <<= 1;
+	}
+
+	vdisplay = yres;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if ((par->lcd_table != 0) && (crtc->lcd_gen_cntl & LCD_ON))
+		vdisplay  = par->lcd_height;
+#endif
+
+	if(vdisplay < 400) {
+		h_sync_pol = 1;
+		v_sync_pol = 0;
+	} else if(vdisplay < 480) {
+		h_sync_pol = 0;
+		v_sync_pol = 1;
+	} else if(vdisplay < 768) {
+		h_sync_pol = 0;
+		v_sync_pol = 0;
+	} else {
+		h_sync_pol = 1;
+		v_sync_pol = 1;
+	}
+
+	v_disp--;
+	v_sync_strt--;
+	v_sync_end--;
+	v_total--;
+	v_sync_wid = v_sync_end - v_sync_strt;
+
+	FAIL_MAX("v_disp too large", v_disp, 0x7ff);
+	FAIL_MAX("v_sync_stsrt too large", v_sync_strt, 0x7ff);
+	/*FAIL_MAX("v_sync_wid too large", v_sync_wid, 0x1f);*/
+	if(v_sync_wid > 0x1f)
+		v_sync_wid = 0x1f;
+	FAIL_MAX("v_total too large", v_total, 0x7ff);
+
+	c_sync = sync & FB_SYNC_COMP_HIGH_ACT ? CRTC_CSYNC_EN : 0;
 
 	/* output */
 	crtc->vxres = vxres;
 	crtc->vyres = vyres;
-	crtc->h_tot_disp = h_total | (h_disp << 16);
-	crtc->h_sync_strt_wid = (h_sync_strt & 0xff) | (h_sync_dly << 8) |
-	    ((h_sync_strt & 0x100) << 4) | (h_sync_wid << 16) |
-	    (h_sync_pol << 21);
-	crtc->v_tot_disp = v_total | (v_disp << 16);
-	crtc->v_sync_strt_wid =
-	    v_sync_strt | (v_sync_wid << 16) | (v_sync_pol << 21);
-	crtc->off_pitch =
-	    ((yoffset * vxres + xoffset) * bpp / 64) | (vxres << 19);
-	crtc->gen_cntl =
-	    pix_width | c_sync | CRTC_EXT_DISP_EN | CRTC_ENABLE;
+	crtc->xoffset = xoffset;
+	crtc->yoffset = yoffset;
+	crtc->bpp = bpp;
+	crtc->off_pitch = ((yoffset*vxres+xoffset)*bpp/64) | (vxres<<19);
+	crtc->vline_crnt_vline = 0;
+
+	crtc->h_tot_disp = h_total | (h_disp<<16);
+	crtc->h_sync_strt_wid = (h_sync_strt & 0xff) | (h_sync_dly<<8) |
+		((h_sync_strt & 0x100)<<4) | (h_sync_wid<<16) | (h_sync_pol<<21);
+	crtc->v_tot_disp = v_total | (v_disp<<16);
+	crtc->v_sync_strt_wid = v_sync_strt | (v_sync_wid<<16) | (v_sync_pol<<21);
+
+	/* crtc->gen_cntl = aty_ld_le32(CRTC_GEN_CNTL, par) & CRTC_PRESERVED_MASK; */
+	crtc->gen_cntl = CRTC_EXT_DISP_EN | CRTC_EN | pix_width | c_sync;
+	crtc->gen_cntl |= CRTC_VGA_LINEAR;
+
+	/* Enable doublescan mode if requested */
+	if (vmode & FB_VMODE_DOUBLE)
+		crtc->gen_cntl |= CRTC_DBL_SCAN_EN;
+	/* Enable interlaced mode if requested */
+	if (vmode & FB_VMODE_INTERLACED)
+		crtc->gen_cntl |= CRTC_INTERLACE_EN;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		vdisplay = yres;
+		if(vmode & FB_VMODE_DOUBLE)
+			vdisplay <<= 1;
+		if(vmode & FB_VMODE_INTERLACED) {
+			vdisplay >>= 1;
+
+			/* The prefered mode for the lcd is not interlaced, so disable it if
+			   it was enabled. For doublescan there is no problem, because we can
+			   compensate for it in the hardware stretching (we stretch half as much)
+			 */
+			vmode &= ~FB_VMODE_INTERLACED;
+			/*crtc->gen_cntl &= ~CRTC_INTERLACE_EN;*/
+		}
+		crtc->gen_cntl &= ~(CRTC2_EN | CRTC2_PIX_WIDTH);
+		crtc->lcd_gen_cntl &= ~(HORZ_DIVBY2_EN | DIS_HOR_CRT_DIVBY2 |
+			/*TVCLK_PM_EN | VCLK_DAC_PM_EN |*/
+			USE_SHADOWED_VEND | USE_SHADOWED_ROWCUR | SHADOW_EN | SHADOW_RW_EN);
+		crtc->lcd_gen_cntl |= (DONT_SHADOW_VPAR/* | LOCK_8DOT*/);
+
+		/* MOBILITY M1 tested, FIXME: LT */
+		crtc->horz_stretching = aty_ld_lcd(HORZ_STRETCHING, par);
+		if (!M64_HAS(LT_LCD_REGS))
+			crtc->ext_vert_stretch = aty_ld_lcd(EXT_VERT_STRETCH, par) &
+				~(AUTO_VERT_RATIO | VERT_STRETCH_MODE | VERT_STRETCH_RATIO3);
+
+		crtc->horz_stretching &=
+			~(HORZ_STRETCH_RATIO | HORZ_STRETCH_LOOP | AUTO_HORZ_RATIO |
+			HORZ_STRETCH_MODE | HORZ_STRETCH_EN);
+		if (xres < par->lcd_width) {
+			do {
+				/*
+				* The horizontal blender misbehaves when HDisplay is less than a
+				* a certain threshold (440 for a 1024-wide panel).  It doesn't
+				* stretch such modes enough.  Use pixel replication instead of
+				* blending to stretch modes that can be made to exactly fit the
+				* panel width.  The undocumented "NoLCDBlend" option allows the
+				* pixel-replicated mode to be slightly wider or narrower than the
+				* panel width.  It also causes a mode that is exactly half as wide
+				* as the panel to be pixel-replicated, rather than blended.
+				*/
+				int HDisplay  = xres & ~7;
+				int nStretch  = par->lcd_width / HDisplay;
+				int Remainder = par->lcd_width % HDisplay;
+
+				if ((!Remainder && ((nStretch > 2))) ||
+					(((HDisplay * 16) / par->lcd_width) < 7)) {
+					static const char StretchLoops[] = {10, 12, 13, 15, 16};
+					int horz_stretch_loop = -1, BestRemainder;
+					int Numerator = HDisplay, Denominator = par->lcd_width;
+					int Index = 5;
+					ATIReduceRatio(&Numerator, &Denominator);
+
+					BestRemainder = (Numerator * 16) / Denominator;
+					while (--Index >= 0) {
+						Remainder = ((Denominator - Numerator) * StretchLoops[Index]) %
+							Denominator;
+						if (Remainder < BestRemainder) {
+							horz_stretch_loop = Index;
+							if (!(BestRemainder = Remainder))
+								break;
+						}
+					}
+
+					if ((horz_stretch_loop >= 0) && !BestRemainder) {
+						int horz_stretch_ratio = 0, Accumulator = 0;
+						int reuse_previous = 1;
+
+						Index = StretchLoops[horz_stretch_loop];
+
+						while (--Index >= 0) {
+							if (Accumulator > 0)
+								horz_stretch_ratio |= reuse_previous;
+							else
+								Accumulator += Denominator;
+							Accumulator -= Numerator;
+							reuse_previous <<= 1;
+						}
+
+						crtc->horz_stretching |= (HORZ_STRETCH_EN |
+							((horz_stretch_loop & HORZ_STRETCH_LOOP) << 16) |
+							(horz_stretch_ratio & HORZ_STRETCH_RATIO));
+						break;      /* Out of the do { ... } while (0) */
+					}
+				}
+
+				crtc->horz_stretching |= (HORZ_STRETCH_MODE | HORZ_STRETCH_EN |
+					(((HDisplay * (HORZ_STRETCH_BLEND + 1)) / par->lcd_width) & HORZ_STRETCH_BLEND));
+			} while (0);
+		}
+
+		if (vdisplay < par->lcd_height) {
+			crtc->vert_stretching = (VERT_STRETCH_USE0 | VERT_STRETCH_EN |
+				(((vdisplay * (VERT_STRETCH_RATIO0 + 1)) / par->lcd_height) & VERT_STRETCH_RATIO0));
+
+			if (!M64_HAS(LT_LCD_REGS) &&
+			    xres <= (M64_HAS(MOBIL_BUS)?1024:800))
+				crtc->ext_vert_stretch |= VERT_STRETCH_MODE;
+		} else {
+			/*
+			 * Don't use vertical blending if the mode is too wide or not
+			 * vertically stretched.
+			 */
+			crtc->vert_stretching = 0;
+		}
+		/* copy to shadow crtc */
+		crtc->shadow_h_tot_disp = crtc->h_tot_disp;
+		crtc->shadow_h_sync_strt_wid = crtc->h_sync_strt_wid;
+		crtc->shadow_v_tot_disp = crtc->v_tot_disp;
+		crtc->shadow_v_sync_strt_wid = crtc->v_sync_strt_wid;
+	}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
+
 	if (M64_HAS(MAGIC_FIFO)) {
 		/* Not VTB/GTB */
 		/* FIXME: magic FIFO values */
-		crtc->gen_cntl |=
-		    aty_ld_le32(CRTC_GEN_CNTL, par) & 0x000e0000;
+		crtc->gen_cntl |= (aty_ld_le32(CRTC_GEN_CNTL, par) & CRTC2_PIX_WIDTH);
 	}
 	crtc->dp_pix_width = dp_pix_width;
 	crtc->dp_chain_mask = dp_chain_mask;
@@ -632,21 +1084,19 @@ static int aty_var_to_crtc(const struct fb_info *info,
 	return 0;
 }
 
-
-static int aty_crtc_to_var(const struct crtc *crtc,
-			   struct fb_var_screeninfo *var)
+static int aty_crtc_to_var(const struct crtc *crtc, struct fb_var_screeninfo *var)
 {
 	u32 xres, yres, bpp, left, right, upper, lower, hslen, vslen, sync;
 	u32 h_total, h_disp, h_sync_strt, h_sync_dly, h_sync_wid,
 	    h_sync_pol;
 	u32 v_total, v_disp, v_sync_strt, v_sync_wid, v_sync_pol, c_sync;
 	u32 pix_width;
+	u32 double_scan, interlace;
 
 	/* input */
 	h_total = crtc->h_tot_disp & 0x1ff;
 	h_disp = (crtc->h_tot_disp >> 16) & 0xff;
-	h_sync_strt = (crtc->h_sync_strt_wid & 0xff) |
-	    ((crtc->h_sync_strt_wid >> 4) & 0x100);
+	h_sync_strt = (crtc->h_sync_strt_wid & 0xff) | ((crtc->h_sync_strt_wid >> 4) & 0x100);
 	h_sync_dly = (crtc->h_sync_strt_wid >> 8) & 0x7;
 	h_sync_wid = (crtc->h_sync_strt_wid >> 16) & 0x1f;
 	h_sync_pol = (crtc->h_sync_strt_wid >> 21) & 0x1;
@@ -657,6 +1107,8 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 	v_sync_pol = (crtc->v_sync_strt_wid >> 21) & 0x1;
 	c_sync = crtc->gen_cntl & CRTC_CSYNC_EN ? 1 : 0;
 	pix_width = crtc->gen_cntl & CRTC_PIX_WIDTH_MASK;
+	double_scan = crtc->gen_cntl & CRTC_DBL_SCAN_EN;
+	interlace = crtc->gen_cntl & CRTC_INTERLACE_EN;
 
 	/* convert */
 	xres = (h_disp + 1) * 8;
@@ -707,7 +1159,6 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->transp.offset = 0;
 		var->transp.length = 0;
 		break;
-#if 0
 	case CRTC_PIX_WIDTH_16BPP:	/* RGB 565 */
 		bpp = 16;
 		var->red.offset = 11;
@@ -719,7 +1170,6 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 		var->transp.offset = 0;
 		var->transp.length = 0;
 		break;
-#endif
 	case CRTC_PIX_WIDTH_24BPP:	/* RGB 888 */
 		bpp = 24;
 		var->red.offset = 16;
@@ -760,6 +1210,21 @@ static int aty_crtc_to_var(const struct crtc *crtc,
 	var->vsync_len = vslen;
 	var->sync = sync;
 	var->vmode = FB_VMODE_NONINTERLACED;
+	/* In double scan mode, the vertical parameters are doubled, so we need to
+	   half them to get the right values.
+	   In interlaced mode the values are already correct, so no correction is
+	   necessary.
+	 */
+	if (interlace)
+		var->vmode = FB_VMODE_INTERLACED;
+
+	if (double_scan) {
+		var->vmode = FB_VMODE_DOUBLE;
+		var->yres>>=1;
+		var->upper_margin>>=1;
+		var->lower_margin>>=1;
+		var->vsync_len>>=1;
+	}
 
 	return 0;
 }
@@ -770,58 +1235,116 @@ static int atyfb_set_par(struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	struct fb_var_screeninfo *var = &info->var;
-	u8 tmp;
-	u32 i;
+	u32 tmp, pixclock;
 	int err;
+#ifdef DEBUG
+	struct fb_var_screeninfo debug;
+	u32 pixclock_in_ps;
+#endif
+	if (par->asleep)
+		return 0;
 
-	if ((err = aty_var_to_crtc(info, var, &par->crtc)) ||
-	    (err = par->pll_ops->var_to_pll(info, var->pixclock,
-					var->bits_per_pixel, &par->pll)))
+	if ((err = aty_var_to_crtc(info, var, &par->crtc)))
 		return err;
 
-	par->accel_flags = var->accel_flags;	/* hack */
+	pixclock = atyfb_get_pixclock(var, par);
+
+	if (pixclock == 0) {
+		FAIL("Invalid pixclock");
+	} else {
+		if((err = par->pll_ops->var_to_pll(info, pixclock, var->bits_per_pixel, &par->pll)))
+			return err;
+	}
+
+	par->accel_flags = var->accel_flags; /* hack */
 
 	if (par->blitter_may_be_busy)
 		wait_for_idle(par);
-	tmp = aty_ld_8(CRTC_GEN_CNTL + 3, par);
-	aty_set_crtc(par, &par->crtc);
-	aty_st_8(CLOCK_CNTL + par->clk_wr_offset, 0, par);
-	/* better call aty_StrobeClock ?? */
-	aty_st_8(CLOCK_CNTL + par->clk_wr_offset, CLOCK_STROBE, par);
 
-	par->dac_ops->set_dac(info, &par->pll, var->bits_per_pixel,
-			      par->accel_flags);
+	aty_set_crtc(par, &par->crtc);
+	par->dac_ops->set_dac(info, &par->pll, var->bits_per_pixel, par->accel_flags);
 	par->pll_ops->set_pll(info, &par->pll);
+
+#ifdef DEBUG
+	if(par->pll_ops && par->pll_ops->pll_to_var)
+		pixclock_in_ps = par->pll_ops->pll_to_var(info, &(par->pll));
+	else
+		pixclock_in_ps = 0;
+
+	if(0 == pixclock_in_ps) {
+		PRINTKE("ALERT ops->pll_to_var get 0\n");
+		pixclock_in_ps = pixclock;
+	}
+
+	memset(&debug, 0, sizeof(debug));
+	if(!aty_crtc_to_var(&(par->crtc), &debug)) {
+		u32 hSync, vRefresh;
+		u32 h_disp, h_sync_strt, h_sync_end, h_total;
+		u32 v_disp, v_sync_strt, v_sync_end, v_total;
+
+		h_disp = debug.xres;
+		h_sync_strt = h_disp + debug.right_margin;
+		h_sync_end = h_sync_strt + debug.hsync_len;
+		h_total = h_sync_end + debug.left_margin;
+		v_disp = debug.yres;
+		v_sync_strt = v_disp + debug.lower_margin;
+		v_sync_end = v_sync_strt + debug.vsync_len;
+		v_total = v_sync_end + debug.upper_margin;
+
+		hSync = 1000000000 / (pixclock_in_ps * h_total);
+		vRefresh = (hSync * 1000) / v_total;
+        	if (par->crtc.gen_cntl & CRTC_INTERLACE_EN)
+            	vRefresh *= 2;
+        	if (par->crtc.gen_cntl & CRTC_DBL_SCAN_EN)
+            	vRefresh /= 2;
+
+		DPRINTK("atyfb_set_par\n");
+		DPRINTK(" Set Visible Mode to %ix%i-%i\n", var->xres, var->yres, var->bits_per_pixel);
+		DPRINTK(" Virtual resolution %ix%i, pixclock_in_ps %i (calculated %i)\n",
+			var->xres_virtual, var->yres_virtual, pixclock, pixclock_in_ps);
+		DPRINTK(" Dot clock:           %i MHz\n", 1000000 / pixclock_in_ps);
+		DPRINTK(" Horizontal sync:     %i kHz\n", hSync);
+		DPRINTK(" Vertical refresh:    %i Hz\n", vRefresh);
+		DPRINTK(" x  style: %i.%03i %i %i %i %i   %i %i %i %i\n",
+			1000000 / pixclock_in_ps, 1000000 % pixclock_in_ps,
+			h_disp, h_sync_strt, h_sync_end, h_total,
+			v_disp, v_sync_strt, v_sync_end, v_total);
+		DPRINTK(" fb style: %i  %i %i %i %i %i %i %i %i\n",
+			pixclock_in_ps,
+			debug.left_margin, h_disp, debug.right_margin, debug.hsync_len,
+			debug.upper_margin, v_disp, debug.lower_margin, debug.vsync_len);
+	}
+#endif /* DEBUG */
 
 	if (!M64_HAS(INTEGRATED)) {
 		/* Don't forget MEM_CNTL */
-		i = aty_ld_le32(MEM_CNTL, par) & 0xf0ffffff;
+		tmp = aty_ld_le32(MEM_CNTL, par) & 0xf0ffffff;
 		switch (var->bits_per_pixel) {
 		case 8:
-			i |= 0x02000000;
+			tmp |= 0x02000000;
 			break;
 		case 16:
-			i |= 0x03000000;
+			tmp |= 0x03000000;
 			break;
 		case 32:
-			i |= 0x06000000;
+			tmp |= 0x06000000;
 			break;
 		}
-		aty_st_le32(MEM_CNTL, i, par);
+		aty_st_le32(MEM_CNTL, tmp, par);
 	} else {
-		i = aty_ld_le32(MEM_CNTL, par) & 0xf00fffff;
+		tmp = aty_ld_le32(MEM_CNTL, par) & 0xf00fffff;
 		if (!M64_HAS(MAGIC_POSTDIV))
-			i |= par->mem_refresh_rate << 20;
+			tmp |= par->mem_refresh_rate << 20;
 		switch (var->bits_per_pixel) {
 		case 8:
 		case 24:
-			i |= 0x00000000;
+			tmp |= 0x00000000;
 			break;
 		case 16:
-			i |= 0x04000000;
+			tmp |= 0x04000000;
 			break;
 		case 32:
-			i |= 0x08000000;
+			tmp |= 0x08000000;
 			break;
 		}
 		if (M64_HAS(CT_BUS)) {
@@ -832,16 +1355,14 @@ static int atyfb_set_par(struct fb_info *info)
 			aty_st_le32(BUS_CNTL, 0x680000f9, par);
 		} else if (M64_HAS(MOBIL_BUS)) {
 			aty_st_le32(DAC_CNTL, 0x80010102, par);
-			aty_st_le32(BUS_CNTL, 0x7b33a040, par);
+			aty_st_le32(BUS_CNTL, 0x7b33a040 | (par->aux_start ? BUS_APER_REG_DIS : 0), par);
 		} else {
 			/* GT */
 			aty_st_le32(DAC_CNTL, 0x86010102, par);
-			aty_st_le32(BUS_CNTL, 0x7b23a040, par);
-			aty_st_le32(EXT_MEM_CNTL,
-				    aty_ld_le32(EXT_MEM_CNTL,
-						par) | 0x5000001, par);
+			aty_st_le32(BUS_CNTL, 0x7b23a040 | (par->aux_start ? BUS_APER_REG_DIS : 0), par);
+			aty_st_le32(EXT_MEM_CNTL, aty_ld_le32(EXT_MEM_CNTL, par) | 0x5000001, par);
 		}
-		aty_st_le32(MEM_CNTL, i, par);
+		aty_st_le32(MEM_CNTL, tmp, par);
 	}
 	aty_st_8(DAC_MASK, 0xff, par);
 
@@ -855,29 +1376,98 @@ static int atyfb_set_par(struct fb_info *info)
 
 #ifdef CONFIG_BOOTX_TEXT
 	btext_update_display(info->fix.smem_start,
-			     (((par->crtc.h_tot_disp >> 16) & 0xff) + 1) * 8,
-			     ((par->crtc.v_tot_disp >> 16) & 0x7ff) + 1,
-			     var->bits_per_pixel,
-			     par->crtc.vxres * var->bits_per_pixel / 8);
-#endif				/* CONFIG_BOOTX_TEXT */
+		(((par->crtc.h_tot_disp >> 16) & 0xff) + 1) * 8,
+		((par->crtc.v_tot_disp >> 16) & 0x7ff) + 1,
+		var->bits_per_pixel,
+		par->crtc.vxres * var->bits_per_pixel / 8);
+#endif /* CONFIG_BOOTX_TEXT */
+#if 0
+	/* switch to accelerator mode */
+	if (!(par->crtc.gen_cntl & CRTC_EXT_DISP_EN))
+		aty_st_le32(CRTC_GEN_CNTL, par->crtc.gen_cntl | CRTC_EXT_DISP_EN, par);
+#endif
+#ifdef DEBUG
+{
+	/* dump non shadow CRTC, pll, LCD registers */
+	int i; u32 base;
+
+	/* CRTC registers */
+	base = 0x2000;
+	printk("debug atyfb: Mach64 non-shadow register values:");
+	for (i = 0; i < 256; i = i+4) {
+		if(i%16 == 0) printk("\ndebug atyfb: 0x%04X: ", base + i);
+		printk(" %08X", aty_ld_le32(i, par));
+	}
+	printk("\n\n");
+
+#ifdef CONFIG_FB_ATY_CT
+	/* PLL registers */
+	base = 0x00;
+	printk("debug atyfb: Mach64 PLL register values:");
+	for (i = 0; i < 64; i++) {
+		if(i%16 == 0) printk("\ndebug atyfb: 0x%02X: ", base + i);
+		if(i%4 == 0)  printk(" ");
+		printk("%02X", aty_ld_pll_ct(i, par));
+	}
+	printk("\n\n");
+#endif	/* CONFIG_FB_ATY_CT */
+
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+	if (par->lcd_table != 0) {
+		/* LCD registers */
+		base = 0x00;
+		printk("debug atyfb: LCD register values:");
+		if(M64_HAS(LT_LCD_REGS)) {
+		    for(i = 0; i <= POWER_MANAGEMENT; i++) {
+			if(i == EXT_VERT_STRETCH)
+			    continue;
+			printk("\ndebug atyfb: 0x%04X: ", lt_lcd_regs[i]);
+			printk(" %08X", aty_ld_lcd(i, par));
+		    }
+
+		} else {
+		    for (i = 0; i < 64; i++) {
+			if(i%4 == 0) printk("\ndebug atyfb: 0x%02X: ", base + i);
+			printk(" %08X", aty_ld_lcd(i, par));
+		    }
+		}
+		printk("\n\n");
+	}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
+}
+#endif /* DEBUG */
 	return 0;
 }
 
-static int atyfb_check_var(struct fb_var_screeninfo *var,
-			   struct fb_info *info)
+static int atyfb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	int err;
 	struct crtc crtc;
 	union aty_pll pll;
-	int err;
+	u32 pixclock;
 
-	if ((err = aty_var_to_crtc(info, var, &crtc)) ||
-	    (err = par->pll_ops->var_to_pll(info, var->pixclock,
-					var->bits_per_pixel, &pll)))
+	memcpy(&pll, &(par->pll), sizeof(pll));
+
+	if((err = aty_var_to_crtc(info, var, &crtc)))
 		return err;
 
-#if 0	/* fbmon is not done. uncomment for 2.5.x -brad */
-	if (!fbmon_valid_timings(var->pixclock, htotal, vtotal, info))
+	pixclock = atyfb_get_pixclock(var, par);
+
+	if (pixclock == 0) {
+		FAIL("Invalid pixclock");
+	} else {
+		if((err = par->pll_ops->var_to_pll(info, pixclock, var->bits_per_pixel, &pll)))
+			return err;
+	}
+
+	if (var->accel_flags & FB_ACCELF_TEXT)
+		info->var.accel_flags = FB_ACCELF_TEXT;
+	else
+		info->var.accel_flags = 0;
+
+#if 0 /* fbmon is not done. uncomment for 2.5.x -brad */
+	if (!fbmon_valid_timings(pixclock, htotal, vtotal, info))
 		return -EINVAL;
 #endif
 	aty_crtc_to_var(&crtc, var);
@@ -885,17 +1475,14 @@ static int atyfb_check_var(struct fb_var_screeninfo *var,
 	return 0;
 }
 
-static void set_off_pitch(struct atyfb_par *par,
-			  const struct fb_info *info)
+static void set_off_pitch(struct atyfb_par *par, const struct fb_info *info)
 {
 	u32 xoffset = info->var.xoffset;
 	u32 yoffset = info->var.yoffset;
 	u32 vxres = par->crtc.vxres;
 	u32 bpp = info->var.bits_per_pixel;
 
-	par->crtc.off_pitch =
-	    ((yoffset * vxres + xoffset) * bpp / 64) | (vxres << 19);
-	aty_st_le32(CRTC_OFF_PITCH, par->crtc.off_pitch, par);
+	par->crtc.off_pitch = ((yoffset * vxres + xoffset) * bpp / 64) | (vxres << 19);
 }
 
 
@@ -905,35 +1492,103 @@ static void set_off_pitch(struct atyfb_par *par,
 
 static int atyfb_open(struct fb_info *info, int user)
 {
-#ifdef __sparc__
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
 	if (user) {
 		par->open++;
+#ifdef __sparc__
 		par->mmaped = 0;
-	}
 #endif
+	}
 	return (0);
 }
 
-struct fb_var_screeninfo default_var = {
-	/* 640x480, 60 Hz, Non-Interlaced (25.175 MHz dotclock) */
-	640, 480, 640, 480, 0, 0, 8, 0,
-	{0, 8, 0}, {0, 8, 0}, {0, 8, 0}, {0, 0, 0},
-	0, 0, -1, -1, 0, 39722, 48, 16, 33, 10, 96, 2,
-	0, FB_VMODE_NONINTERLACED
-};
+static irqreturn_t aty_irq(int irq, void *dev_id, struct pt_regs *fp)
+{
+	struct atyfb_par *par = dev_id;
+	int handled = 0;
+	u32 int_cntl;
+
+	spin_lock(&par->int_lock);
+
+	int_cntl = aty_ld_le32(CRTC_INT_CNTL, par);
+
+	if (int_cntl & CRTC_VBLANK_INT) {
+		/* clear interrupt */
+		aty_st_le32(CRTC_INT_CNTL, (int_cntl & CRTC_INT_EN_MASK) | CRTC_VBLANK_INT_AK, par);
+		par->vblank.count++;
+		if (par->vblank.pan_display) {
+			par->vblank.pan_display = 0;
+			aty_st_le32(CRTC_OFF_PITCH, par->crtc.off_pitch, par);
+		}
+		wake_up_interruptible(&par->vblank.wait);
+		handled = 1;
+	}
+
+	spin_unlock(&par->int_lock);
+
+	return IRQ_RETVAL(handled);
+}
+
+static int aty_enable_irq(struct atyfb_par *par, int reenable)
+{
+	u32 int_cntl;
+
+	if (!test_and_set_bit(0, &par->irq_flags)) {
+		if (request_irq(par->irq, aty_irq, SA_SHIRQ, "atyfb", par)) {
+			clear_bit(0, &par->irq_flags);
+			return -EINVAL;
+		}
+		spin_lock_irq(&par->int_lock);
+		int_cntl = aty_ld_le32(CRTC_INT_CNTL, par) & CRTC_INT_EN_MASK;
+		/* clear interrupt */
+		aty_st_le32(CRTC_INT_CNTL, int_cntl | CRTC_VBLANK_INT_AK, par);
+		/* enable interrupt */
+		aty_st_le32(CRTC_INT_CNTL, int_cntl | CRTC_VBLANK_INT_EN, par);
+		spin_unlock_irq(&par->int_lock);
+	} else if (reenable) {
+		spin_lock_irq(&par->int_lock);
+		int_cntl = aty_ld_le32(CRTC_INT_CNTL, par) & CRTC_INT_EN_MASK;
+		if (!(int_cntl & CRTC_VBLANK_INT_EN)) {
+			printk("atyfb: someone disabled IRQ [%08x]\n", int_cntl);
+			/* re-enable interrupt */
+			aty_st_le32(CRTC_INT_CNTL, int_cntl | CRTC_VBLANK_INT_EN, par );
+		}
+		spin_unlock_irq(&par->int_lock);
+	}
+
+	return 0;
+}
+
+static int aty_disable_irq(struct atyfb_par *par)
+{
+	u32 int_cntl;
+
+	if (test_and_clear_bit(0, &par->irq_flags)) {
+		if (par->vblank.pan_display) {
+			par->vblank.pan_display = 0;
+			aty_st_le32(CRTC_OFF_PITCH, par->crtc.off_pitch, par);
+		}
+		spin_lock_irq(&par->int_lock);
+		int_cntl = aty_ld_le32(CRTC_INT_CNTL, par) & CRTC_INT_EN_MASK;
+		/* disable interrupt */
+		aty_st_le32(CRTC_INT_CNTL, int_cntl & ~CRTC_VBLANK_INT_EN, par );
+		spin_unlock_irq(&par->int_lock);
+		free_irq(par->irq, par);
+	}
+
+	return 0;
+}
 
 static int atyfb_release(struct fb_info *info, int user)
 {
-#ifdef __sparc__
-	struct atyfb_par *par = (struct atyfb_par *) info->par;	
-
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	if (user) {
 		par->open--;
 		mdelay(1);
 		wait_for_idle(par);
 		if (!par->open) {
+#ifdef __sparc__
 			int was_mmaped = par->mmaped;
 
 			par->mmaped = 0;
@@ -952,21 +1607,16 @@ static int atyfb_release(struct fb_info *info, int user)
 				else
 					var.accel_flags |= FB_ACCELF_TEXT;
 				if (var.yres == var.yres_virtual) {
-					u32 vram =
-					    (info->fix.smem_len -
-					     (PAGE_SIZE << 2));
-					var.yres_virtual =
-					    ((vram * 8) /
-					     var.bits_per_pixel) /
-					    var.xres_virtual;
+					u32 videoram = (info->fix.smem_len - (PAGE_SIZE << 2));
+					var.yres_virtual = ((videoram * 8) / var.bits_per_pixel) / var.xres_virtual;
 					if (var.yres_virtual < var.yres)
-						var.yres_virtual =
-						    var.yres;
+						var.yres_virtual = var.yres;
 				}
 			}
-		}
-	} 
 #endif
+			aty_disable_irq(par);
+		}
+	}
 	return (0);
 }
 
@@ -976,24 +1626,66 @@ static int atyfb_release(struct fb_info *info, int user)
      *  This call looks only at xoffset, yoffset and the FB_VMODE_YWRAP flag
      */
 
-static int atyfb_pan_display(struct fb_var_screeninfo *var,
-			     struct fb_info *info)
+static int atyfb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u32 xres, yres, xoffset, yoffset;
 
 	xres = (((par->crtc.h_tot_disp >> 16) & 0xff) + 1) * 8;
 	yres = ((par->crtc.v_tot_disp >> 16) & 0x7ff) + 1;
+	if (par->crtc.gen_cntl & CRTC_DBL_SCAN_EN)
+		yres >>= 1;
 	xoffset = (var->xoffset + 7) & ~7;
 	yoffset = var->yoffset;
-	if (xoffset + xres > par->crtc.vxres
-	    || yoffset + yres > par->crtc.vyres)
+	if (xoffset + xres > par->crtc.vxres || yoffset + yres > par->crtc.vyres)
 		return -EINVAL;
 	info->var.xoffset = xoffset;
 	info->var.yoffset = yoffset;
+	if (par->asleep)
+		return 0;
+
 	set_off_pitch(par, info);
+	if ((var->activate & FB_ACTIVATE_VBL) && !aty_enable_irq(par, 0)) {
+		par->vblank.pan_display = 1;
+	} else {
+		par->vblank.pan_display = 0;
+		aty_st_le32(CRTC_OFF_PITCH, par->crtc.off_pitch, par);
+	}
+
 	return 0;
 }
+
+static int aty_waitforvblank(struct atyfb_par *par, u32 crtc)
+{
+	struct aty_interrupt *vbl;
+	unsigned int count;
+	int ret;
+
+	switch (crtc) {
+	case 0:
+		vbl = &par->vblank;
+		break;
+	default:
+		return -ENODEV;
+	}
+
+	ret = aty_enable_irq(par, 0);
+	if (ret)
+		return ret;
+
+	count = vbl->count;
+	ret = wait_event_interruptible_timeout(vbl->wait, count != vbl->count, HZ/10);
+	if (ret < 0) {
+		return ret;
+	}
+	if (ret == 0) {
+		aty_enable_irq(par, 1);
+		return -ETIMEDOUT;
+	}
+
+	return 0;
+}
+
 
 #ifdef DEBUG
 #define ATYIO_CLKR		0x41545900	/* ATY\00 */
@@ -1004,6 +1696,8 @@ struct atyclk {
 	u8 pll_ref_div;
 	u8 mclk_fb_div;
 	u8 mclk_post_div;	/* 1,2,3,4,8 */
+	u8 mclk_fb_mult;	/* 2 or 4 */
+	u8 xclk_post_div;	/* 1,2,3,4,8 */
 	u8 vclk_fb_div;
 	u8 vclk_post_div;	/* 1,2,3,4,6,8,12 */
 	u32 dsp_xclks_per_row;	/* 0-16383 */
@@ -1017,12 +1711,14 @@ struct atyclk {
 #define ATYIO_FEATW		0x41545903	/* ATY\03 */
 #endif
 
+#ifndef FBIO_WAITFORVSYNC
+#define FBIO_WAITFORVSYNC _IOW('F', 0x20, __u32)
+#endif
+
 static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
-		       u_long arg, struct fb_info *info)
+	u_long arg, struct fb_info *info)
 {
-#if defined(__sparc__) || (defined(DEBUG) && defined(CONFIG_FB_ATY_CT))
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
-#endif				/* __sparc__ || DEBUG */
 #ifdef __sparc__
 	struct fbtype fbtyp;
 #endif
@@ -1036,31 +1732,44 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 		fbtyp.fb_depth = info->var.bits_per_pixel;
 		fbtyp.fb_cmsize = info->cmap.len;
 		fbtyp.fb_size = info->fix.smem_len;
-		if (copy_to_user
-		    ((struct fbtype __user *) arg, &fbtyp, sizeof(fbtyp)))
+		if (copy_to_user((struct fbtype __user *) arg, &fbtyp, sizeof(fbtyp)))
 			return -EFAULT;
 		break;
-#endif				/* __sparc__ */
+#endif /* __sparc__ */
+
+	case FBIO_WAITFORVSYNC:
+		{
+			u32 crtc;
+
+			if (get_user(crtc, (__u32 __user *) arg))
+				return -EFAULT;
+
+			return aty_waitforvblank(par, crtc);
+		}
+		break;
+
 #if defined(DEBUG) && defined(CONFIG_FB_ATY_CT)
 	case ATYIO_CLKR:
 		if (M64_HAS(INTEGRATED)) {
 			struct atyclk clk;
-			union aty_pll *pll = par->pll;
+			union aty_pll *pll = &(par->pll);
 			u32 dsp_config = pll->ct.dsp_config;
 			u32 dsp_on_off = pll->ct.dsp_on_off;
 			clk.ref_clk_per = par->ref_clk_per;
 			clk.pll_ref_div = pll->ct.pll_ref_div;
 			clk.mclk_fb_div = pll->ct.mclk_fb_div;
 			clk.mclk_post_div = pll->ct.mclk_post_div_real;
+			clk.mclk_fb_mult = pll->ct.mclk_fb_mult;
+			clk.xclk_post_div = pll->ct.xclk_post_div_real;
 			clk.vclk_fb_div = pll->ct.vclk_fb_div;
 			clk.vclk_post_div = pll->ct.vclk_post_div_real;
 			clk.dsp_xclks_per_row = dsp_config & 0x3fff;
 			clk.dsp_loop_latency = (dsp_config >> 16) & 0xf;
 			clk.dsp_precision = (dsp_config >> 20) & 7;
-			clk.dsp_on = dsp_on_off & 0x7ff;
-			clk.dsp_off = (dsp_on_off >> 16) & 0x7ff;
-			if (copy_to_user
-			    ((struct atyclk *) arg, &clk, sizeof(clk)))
+			clk.dsp_off = dsp_on_off & 0x7ff;
+			clk.dsp_on = (dsp_on_off >> 16) & 0x7ff;
+			if (copy_to_user((struct atyclk __user *) arg, &clk,
+					 sizeof(clk)))
 				return -EFAULT;
 		} else
 			return -EINVAL;
@@ -1068,40 +1777,34 @@ static int atyfb_ioctl(struct inode *inode, struct file *file, u_int cmd,
 	case ATYIO_CLKW:
 		if (M64_HAS(INTEGRATED)) {
 			struct atyclk clk;
-			union aty_pll *pll = par->pll;
-			if (copy_from_user
-			    (&clk, (struct atyclk *) arg, sizeof(clk)))
+			union aty_pll *pll = &(par->pll);
+			if (copy_from_user(&clk, (struct atyclk __user *) arg, sizeof(clk)))
 				return -EFAULT;
 			par->ref_clk_per = clk.ref_clk_per;
 			pll->ct.pll_ref_div = clk.pll_ref_div;
 			pll->ct.mclk_fb_div = clk.mclk_fb_div;
 			pll->ct.mclk_post_div_real = clk.mclk_post_div;
+			pll->ct.mclk_fb_mult = clk.mclk_fb_mult;
+			pll->ct.xclk_post_div_real = clk.xclk_post_div;
 			pll->ct.vclk_fb_div = clk.vclk_fb_div;
 			pll->ct.vclk_post_div_real = clk.vclk_post_div;
-			pll->ct.dsp_config =
-			    (clk.
-			     dsp_xclks_per_row & 0x3fff) | ((clk.
-							     dsp_loop_latency
-							     & 0xf) << 16)
-			    | ((clk.dsp_precision & 7) << 20);
-			pll->ct.dsp_on_off =
-			    (clk.
-			     dsp_on & 0x7ff) | ((clk.
-						 dsp_off & 0x7ff) << 16);
-			aty_calc_pll_ct(info, &pll->ct);
+			pll->ct.dsp_config = (clk.dsp_xclks_per_row & 0x3fff) |
+				((clk.dsp_loop_latency & 0xf)<<16)| ((clk.dsp_precision & 7)<<20);
+			pll->ct.dsp_on_off = (clk.dsp_off & 0x7ff) | ((clk.dsp_on & 0x7ff)<<16);
+			/*aty_calc_pll_ct(info, &pll->ct);*/
 			aty_set_pll_ct(info, pll);
 		} else
 			return -EINVAL;
 		break;
 	case ATYIO_FEATR:
-		if (get_user(par->features, (u32 *) arg))
+		if (get_user(par->features, (u32 __user *) arg))
 			return -EFAULT;
 		break;
 	case ATYIO_FEATW:
-		if (put_user(par->features, (u32 *) arg))
+		if (put_user(par->features, (u32 __user *) arg))
 			return -EFAULT;
 		break;
-#endif				/* DEBUG && CONFIG_FB_ATY_CT */
+#endif /* DEBUG && CONFIG_FB_ATY_CT */
 	default:
 		return -EINVAL;
 	}
@@ -1118,8 +1821,7 @@ static int atyfb_sync(struct fb_info *info)
 }
 
 #ifdef __sparc__
-static int atyfb_mmap(struct fb_info *info, struct file *file,
-		      struct vm_area_struct *vma)
+static int atyfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	unsigned int size, page, map_size = 0;
@@ -1243,83 +1945,22 @@ static void atyfb_palette(int enter)
 				info->var.yoffset = atyfb_save.yoffset;
 				set_off_pitch(par, info);
 			}
+			aty_st_le32(CRTC_OFF_PITCH, par->crtc.off_pitch, par);
 			break;
 		}
 	}
 }
-#endif				/* __sparc__ */
+#endif /* __sparc__ */
 
 
 
-#ifdef CONFIG_PMAC_PBOOK
-
-static struct fb_info *first_display = NULL;
+#if defined(CONFIG_PM) && defined(CONFIG_PCI)
 
 /* Power management routines. Those are used for PowerBook sleep.
- *
- * It appears that Rage LT and Rage LT Pro have different power
- * management registers. There's is some confusion about which
- * chipID is a Rage LT or LT pro :(
  */
-static int aty_power_mgmt_LT(int sleep, struct atyfb_par *par)
+static int aty_power_mgmt(int sleep, struct atyfb_par *par)
 {
-	unsigned int pm;
-	int timeout;
-
-	pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-	pm = (pm & ~PWR_MGT_MODE_MASK) | PWR_MGT_MODE_REG;
-	aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-	pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-
-	timeout = 200000;
-	if (sleep) {
-		/* Sleep */
-		pm &= ~PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-		udelay(10);
-		pm &= ~(PWR_BLON | AUTO_PWR_UP);
-		pm |= SUSPEND_NOW;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-		udelay(10);
-		pm |= PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		do {
-			pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-			udelay(10);
-			if ((--timeout) == 0)
-				break;
-		} while ((pm & PWR_MGT_STATUS_MASK) !=
-			 PWR_MGT_STATUS_SUSPEND);
-	} else {
-		/* Wakeup */
-		pm &= ~PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-		udelay(10);
-		pm |= (PWR_BLON | AUTO_PWR_UP);
-		pm &= ~SUSPEND_NOW;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-		udelay(10);
-		pm |= PWR_MGT_ON;
-		aty_st_le32(POWER_MANAGEMENT_LG, pm, par);
-		do {
-			pm = aty_ld_le32(POWER_MANAGEMENT_LG, par);
-			udelay(10);
-			if ((--timeout) == 0)
-				break;
-		} while ((pm & PWR_MGT_STATUS_MASK) != 0);
-	}
-	mdelay(500);
-
-	return timeout ? PBOOK_SLEEP_OK : PBOOK_SLEEP_REFUSE;
-}
-
-static int aty_power_mgmt_LTPro(int sleep, struct atyfb_par *par)
-{
-	unsigned int pm;
+	u32 pm;
 	int timeout;
 
 	pm = aty_ld_lcd(POWER_MANAGEMENT, par);
@@ -1327,7 +1968,7 @@ static int aty_power_mgmt_LTPro(int sleep, struct atyfb_par *par)
 	aty_st_lcd(POWER_MANAGEMENT, pm, par);
 	pm = aty_ld_lcd(POWER_MANAGEMENT, par);
 
-	timeout = 200;
+	timeout = 2000;
 	if (sleep) {
 		/* Sleep */
 		pm &= ~PWR_MGT_ON;
@@ -1346,8 +1987,7 @@ static int aty_power_mgmt_LTPro(int sleep, struct atyfb_par *par)
 			mdelay(1);
 			if ((--timeout) == 0)
 				break;
-		} while ((pm & PWR_MGT_STATUS_MASK) !=
-			 PWR_MGT_STATUS_SUSPEND);
+		} while ((pm & PWR_MGT_STATUS_MASK) != PWR_MGT_STATUS_SUSPEND);
 	} else {
 		/* Wakeup */
 		pm &= ~PWR_MGT_ON;
@@ -1368,88 +2008,92 @@ static int aty_power_mgmt_LTPro(int sleep, struct atyfb_par *par)
 				break;
 		} while ((pm & PWR_MGT_STATUS_MASK) != 0);
 	}
+	mdelay(500);
 
-	return timeout ? PBOOK_SLEEP_OK : PBOOK_SLEEP_REFUSE;
+	return timeout ? -1 : 0;
 }
 
-static int aty_power_mgmt(int sleep, struct atyfb_par *par)
+static int atyfb_pci_suspend(struct pci_dev *pdev, u32 state)
 {
-	return M64_HAS(LT_SLEEP) ? aty_power_mgmt_LT(sleep, par)
-	    : aty_power_mgmt_LTPro(sleep, par);
-}
+	struct fb_info *info = pci_get_drvdata(pdev);
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
-/*
- * Save the contents of the frame buffer when we go to sleep,
- * and restore it when we wake up again.
- */
-static int aty_sleep_notify(struct pmu_sleep_notifier *self, int when)
-{
-	struct fb_info *info;
-	struct atyfb_par *par; 
-	int result;
+#ifdef CONFIG_PPC_PMAC
+	/* HACK ALERT ! Once I find a proper way to say to each driver
+	 * individually what will happen with it's PCI slot, I'll change
+	 * that. On laptops, the AGP slot is just unclocked, so D2 is
+	 * expected, while on desktops, the card is powered off
+	 */
+	if (state >= 3)
+		state = 2;
+#endif /* CONFIG_PPC_PMAC */
 
-	result = PBOOK_SLEEP_OK;
+	if (state != 2 || state == pdev->dev.power_state)
+		return 0;
 
-	for (info = first_display; info != NULL; info = par->next) {
-		int nb;
+	acquire_console_sem();
 
-		par = (struct atyfb_par *) info->par;
-		nb = info->var.yres * info->fix.line_length;
+	fb_set_suspend(info, 1);
 
-		switch (when) {
-		case PBOOK_SLEEP_REQUEST:
-			par->save_framebuffer = vmalloc(nb);
-			if (par->save_framebuffer == NULL)
-				return PBOOK_SLEEP_REFUSE;
-			break;
-		case PBOOK_SLEEP_REJECT:
-			if (par->save_framebuffer) {
-				vfree(par->save_framebuffer);
-				par->save_framebuffer = NULL;
-			}
-			break;
-		case PBOOK_SLEEP_NOW:
-			if (par->blitter_may_be_busy)
-				wait_for_idle(par);
-			/* Stop accel engine (stop bus mastering) */
-			if (par->accel_flags & FB_ACCELF_TEXT)
-				aty_reset_engine(par);
+	/* Idle & reset engine */
+	wait_for_idle(par);
+	aty_reset_engine(par);
 
-			/* Backup fb content */
-			if (par->save_framebuffer)
-				memcpy_fromio(par->save_framebuffer,
-					      (void *) info->screen_base, nb);
+	/* Blank display and LCD */
+	atyfb_blank(VESA_POWERDOWN + 1, info);
 
-			/* Blank display and LCD */
-			atyfb_blank(VESA_POWERDOWN + 1, info);
+	par->asleep = 1;
+	par->lock_blank = 1;
 
-			/* Set chip to "suspend" mode */
-			result = aty_power_mgmt(1, par);
-			break;
-		case PBOOK_WAKE:
-			/* Wakeup chip */
-			result = aty_power_mgmt(0, par);
-
-			/* Restore fb content */
-			if (par->save_framebuffer) {
-				memcpy_toio((void *) info->screen_base,
-					    par->save_framebuffer, nb);
-				vfree(par->save_framebuffer);
-				par->save_framebuffer = NULL;
-			}
-			/* Restore display */
-			atyfb_set_par(info);
-			atyfb_blank(0, info);
-			break;
-		}
+	/* Set chip to "suspend" mode */
+	if (aty_power_mgmt(1, par)) {
+		par->asleep = 0;
+		par->lock_blank = 0;
+		atyfb_blank(0, info);
+		fb_set_suspend(info, 0);
+		release_console_sem();
+		return -EIO;
 	}
-	return result;
+
+	release_console_sem();
+
+	pdev->dev.power_state = state;
+
+	return 0;
 }
 
-static struct pmu_sleep_notifier aty_sleep_notifier = {
-	aty_sleep_notify, SLEEP_LEVEL_VIDEO,
-};
-#endif				/* CONFIG_PMAC_PBOOK */
+static int atyfb_pci_resume(struct pci_dev *pdev)
+{
+	struct fb_info *info = pci_get_drvdata(pdev);
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
+
+	if (pdev->dev.power_state == 0)
+		return 0;
+
+	acquire_console_sem();
+
+	if (pdev->dev.power_state == 2)
+		aty_power_mgmt(0, par);
+	par->asleep = 0;
+
+	/* Restore display */
+	atyfb_set_par(info);
+
+	/* Refresh */
+	fb_set_suspend(info, 0);
+
+	/* Unblank */
+	par->lock_blank = 0;
+	atyfb_blank(0, info);
+
+	release_console_sem();
+
+	pdev->dev.power_state = 0;
+
+	return 0;
+}
+
+#endif /*  defined(CONFIG_PM) && defined(CONFIG_PCI) */
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 
@@ -1489,9 +2133,34 @@ static struct backlight_controller aty_backlight_controller = {
 	aty_set_backlight_enable,
 	aty_set_backlight_level
 };
-#endif				/* CONFIG_PMAC_BACKLIGHT */
+#endif /* CONFIG_PMAC_BACKLIGHT */
 
+static void __init aty_calc_mem_refresh(struct atyfb_par *par, int xclk)
+{
+	const int ragepro_tbl[] = {
+		44, 50, 55, 66, 75, 80, 100
+	};
+	const int ragexl_tbl[] = {
+		50, 66, 75, 83, 90, 95, 100, 105,
+		110, 115, 120, 125, 133, 143, 166
+	};
+	const int *refresh_tbl;
+	int i, size;
 
+	if (IS_XL(par->pci_id) || IS_MOBILITY(par->pci_id)) {
+		refresh_tbl = ragexl_tbl;
+		size = sizeof(ragexl_tbl)/sizeof(int);
+	} else {
+		refresh_tbl = ragepro_tbl;
+		size = sizeof(ragepro_tbl)/sizeof(int);
+	}
+
+	for (i=0; i < size; i++) {
+		if (xclk < refresh_tbl[i])
+		break;
+	}
+	par->mem_refresh_rate = i;
+}
 
     /*
      *  Initialisation
@@ -1502,37 +2171,36 @@ static struct fb_info *fb_list = NULL;
 static int __init aty_init(struct fb_info *info, const char *name)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
-	const char *chipname = NULL, *ramname = NULL, *xtal;
-	int j, pll, mclk, gtb_memsize;
+	const char *ramname = NULL, *xtal;
+	int gtb_memsize;
 	struct fb_var_screeninfo var;
-	u32 chip_id, i;
-	u16 type;
-	u8 rev;
+	u8 pll_ref_div;
+	u32 i;
 #if defined(CONFIG_PPC)
 	int sense;
 #endif
-	u8 pll_ref_div;
+
+	init_waitqueue_head(&par->vblank.wait);
+	spin_lock_init(&par->int_lock);
 
 	par->aty_cmap_regs =
 	    (struct aty_cmap_regs __iomem *) (par->ati_regbase + 0xc0);
-	chip_id = aty_ld_le32(CONFIG_CHIP_ID, par);
-	type = chip_id & CFG_CHIP_TYPE;
-	rev = (chip_id & CFG_CHIP_REV) >> 24;
-	for (j = 0; j < (sizeof(aty_chips) / sizeof(*aty_chips)); j++)
-		if (type == aty_chips[j].chip_type &&
-		    (rev & aty_chips[j].rev_mask) ==
-		    aty_chips[j].rev_val) {
-			chipname = aty_chips[j].name;
-			pll = aty_chips[j].pll;
-			mclk = aty_chips[j].mclk;
-			par->features = aty_chips[j].features;
-			goto found;
-		}
-	printk("atyfb: Unknown mach64 0x%04x rev 0x%04x\n", type, rev);
-	return 0;
 
-      found:
-	printk("atyfb: %s [0x%04x rev 0x%02x] ", chipname, type, rev);
+	if (pll)
+		par->pll_limits.pll_max = pll;
+	if (mclk)
+		par->pll_limits.mclk = mclk;
+	if (xclk)
+		par->pll_limits.xclk = xclk;
+
+	aty_calc_mem_refresh(par, par->pll_limits.xclk);
+	par->pll_per = 1000000/par->pll_limits.pll_max;
+	par->mclk_per = 1000000/par->pll_limits.mclk;
+	par->xclk_per = 1000000/par->pll_limits.xclk;
+
+	par->ref_clk_per = 1000000000000ULL / 14318180;
+	xtal = "14.31818";
+
 #ifdef CONFIG_FB_ATY_GX
 	if (!M64_HAS(INTEGRATED)) {
 		u32 stat0;
@@ -1549,9 +2217,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		if (dac_type == 0x07)
 			dac_subtype = DAC_ATT20C408;
 		else
-			dac_subtype =
-			    (aty_ld_8(SCRATCH_REG1 + 1, par) & 0xF0) |
-			    dac_type;
+			dac_subtype = (aty_ld_8(SCRATCH_REG1 + 1, par) & 0xF0) | dac_type;
 #else
 		dac_type = DAC_IBMRGB514;
 		dac_subtype = DAC_IBMRGB514;
@@ -1570,8 +2236,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			par->dac_ops = &aty_dac_att21c498;
 			break;
 		default:
-			printk
-			    (" atyfb_set_par: DAC type not implemented yet!\n");
+			PRINTKI("aty_init: DAC type not implemented yet!\n");
 			par->dac_ops = &aty_dac_unsupported;
 			break;
 		}
@@ -1592,33 +2257,30 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			par->pll_ops = &aty_pll_ibm514;
 			break;
 		default:
-			printk
-			    (" atyfb_set_par: CLK type not implemented yet!");
+			PRINTKI("aty_init: CLK type not implemented yet!");
 			par->pll_ops = &aty_pll_unsupported;
 			break;
 		}
 	}
-#endif				/* CONFIG_FB_ATY_GX */
+#endif /* CONFIG_FB_ATY_GX */
 #ifdef CONFIG_FB_ATY_CT
 	if (M64_HAS(INTEGRATED)) {
+		par->dac_ops = &aty_dac_ct;
+		par->pll_ops = &aty_pll_ct;
 		par->bus_type = PCI;
 		par->ram_type = (aty_ld_le32(CONFIG_STAT0, par) & 0x07);
 		ramname = aty_ct_ram[par->ram_type];
-		par->dac_ops = &aty_dac_ct;
-		par->pll_ops = &aty_pll_ct;
-		/* for many chips, the mclk is 67 MHz for SDRAM, 63 MHz otherwise */
-		if (mclk == 67 && par->ram_type < SDRAM)
-			mclk = 63;
-	}
-#endif				/* CONFIG_FB_ATY_CT */
 
-	par->ref_clk_per = 1000000000000ULL / 14318180;
-	xtal = "14.31818";
+		/* for many chips, the mclk is 67 MHz for SDRAM, 63 MHz otherwise */
+		if (par->pll_limits.mclk == 67 && par->ram_type < SDRAM)
+			par->pll_limits.mclk = 63;
+	}
+
 	if (M64_HAS(GTB_DSP)
-	    && (pll_ref_div = aty_ld_pll(PLL_REF_DIV, par))) {
+	    && (pll_ref_div = aty_ld_pll_ct(PLL_REF_DIV, par))) {
 		int diff1, diff2;
-		diff1 = 510 * 14 / pll_ref_div - pll;
-		diff2 = 510 * 29 / pll_ref_div - pll;
+		diff1 = 510 * 14 / pll_ref_div - par->pll_limits.pll_max;
+		diff2 = 510 * 29 / pll_ref_div - par->pll_limits.pll_max;
 		if (diff1 < 0)
 			diff1 = -diff1;
 		if (diff2 < 0)
@@ -1628,6 +2290,12 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			xtal = "29.498928";
 		}
 	}
+#endif /* CONFIG_FB_ATY_CT */
+
+	/* save previous video mode */
+	aty_get_crtc(par, &saved_crtc);
+	if(par->pll_ops->get_pll)
+		par->pll_ops->get_pll(info, &saved_pll);
 
 	i = aty_ld_le32(MEM_CNTL, par);
 	gtb_memsize = M64_HAS(GTB_DSP);
@@ -1682,8 +2350,8 @@ static int __init aty_init(struct fb_info *info, const char *name)
 			info->fix.smem_len += 0x400000;
 	}
 
-	if (default_vram) {
-		info->fix.smem_len = default_vram * 1024;
+	if (vram) {
+		info->fix.smem_len = vram * 1024;
 		i = i & ~(gtb_memsize ? 0xF : MEM_SIZE_ALIAS);
 		if (info->fix.smem_len <= 0x80000)
 			i |= MEM_SIZE_512K;
@@ -1701,7 +2369,7 @@ static int __init aty_init(struct fb_info *info, const char *name)
 	}
 
 	/*
-	 *  Reg Block 0 (CT-compatible block) is at mmio_start 
+	 *  Reg Block 0 (CT-compatible block) is at mmio_start
 	 *  Reg Block 1 (multimedia extensions) is at mmio_start - 0x400
 	 */
 	if (M64_HAS(GX)) {
@@ -1711,78 +2379,74 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		info->fix.mmio_len = 0x400;
 		info->fix.accel = FB_ACCEL_ATI_MACH64CT;
 	} else if (M64_HAS(VT)) {
-		info->fix.mmio_start = -0x400;
+		info->fix.mmio_start -= 0x400;
 		info->fix.mmio_len = 0x800;
 		info->fix.accel = FB_ACCEL_ATI_MACH64VT;
-	} else {		/* if (M64_HAS(GT)) */
-
-		info->fix.mmio_start = -0x400;
+	} else {/* GT */
+		info->fix.mmio_start -= 0x400;
 		info->fix.mmio_len = 0x800;
 		info->fix.accel = FB_ACCEL_ATI_MACH64GT;
 	}
 
-	if (default_pll)
-		pll = default_pll;
-	if (default_mclk)
-		mclk = default_mclk;
+	PRINTKI("%d%c %s, %s MHz XTAL, %d MHz PLL, %d Mhz MCLK, %d MHz XCLK\n",
+	       info->fix.smem_len == 0x80000 ? 512 : (info->fix.smem_len >> 20),
+	       info->fix.smem_len == 0x80000 ? 'K' : 'M', ramname, xtal, par->pll_limits.pll_max,
+	       par->pll_limits.mclk, par->pll_limits.xclk);
 
-	printk("%d%c %s, %s MHz XTAL, %d MHz PLL, %d Mhz MCLK\n",
-	       info->fix.smem_len ==
-	       0x80000 ? 512 : (info->fix.smem_len >> 20),
-	       info->fix.smem_len == 0x80000 ? 'K' : 'M', ramname,
-	       xtal, pll, mclk);
-
-	if (mclk < 44)
-		par->mem_refresh_rate = 0;	/* 000 = 10 Mhz - 43 Mhz */
-	else if (mclk < 50)
-		par->mem_refresh_rate = 1;	/* 001 = 44 Mhz - 49 Mhz */
-	else if (mclk < 55)
-		par->mem_refresh_rate = 2;	/* 010 = 50 Mhz - 54 Mhz */
-	else if (mclk < 66)
-		par->mem_refresh_rate = 3;	/* 011 = 55 Mhz - 65 Mhz */
-	else if (mclk < 75)
-		par->mem_refresh_rate = 4;	/* 100 = 66 Mhz - 74 Mhz */
-	else if (mclk < 80)
-		par->mem_refresh_rate = 5;	/* 101 = 75 Mhz - 79 Mhz */
-	else if (mclk < 100)
-		par->mem_refresh_rate = 6;	/* 110 = 80 Mhz - 100 Mhz */
-	else
-		par->mem_refresh_rate = 7;	/* 111 = 100 Mhz and above */
-	par->pll_per = 1000000 / pll;
-	par->mclk_per = 1000000 / mclk;
-
-#ifdef DEBUG
+#if defined(DEBUG) && defined(CONFIG_ATY_CT)
 	if (M64_HAS(INTEGRATED)) {
 		int i;
-		printk
-		    ("BUS_CNTL DAC_CNTL MEM_CNTL EXT_MEM_CNTL CRTC_GEN_CNTL "
-		     "DSP_CONFIG DSP_ON_OFF\n"
-		     "%08x %08x %08x %08x     %08x      %08x   %08x\n"
-		     "PLL", aty_ld_le32(BUS_CNTL, par),
-		     aty_ld_le32(DAC_CNTL, par), aty_ld_le32(MEM_CNTL,
-							     par),
-		     aty_ld_le32(EXT_MEM_CNTL, par),
-		     aty_ld_le32(CRTC_GEN_CNTL, par),
-		     aty_ld_le32(DSP_CONFIG, par), aty_ld_le32(DSP_ON_OFF,
-							       par));
-		for (i = 0; i < 16; i++)
-			printk(" %02x", aty_ld_pll(i, par));
+		printk("debug atyfb: BUS_CNTL DAC_CNTL MEM_CNTL EXT_MEM_CNTL CRTC_GEN_CNTL "
+		       "DSP_CONFIG DSP_ON_OFF CLOCK_CNTL\n"
+		       "debug atyfb: %08x %08x %08x %08x     %08x      %08x   %08x   %08x\n"
+		       "debug atyfb: PLL",
+			aty_ld_le32(BUS_CNTL, par), aty_ld_le32(DAC_CNTL, par),
+			aty_ld_le32(MEM_CNTL, par), aty_ld_le32(EXT_MEM_CNTL, par),
+			aty_ld_le32(CRTC_GEN_CNTL, par), aty_ld_le32(DSP_CONFIG, par),
+			aty_ld_le32(DSP_ON_OFF, par), aty_ld_le32(CLOCK_CNTL, par));
+		for (i = 0; i < 40; i++)
+			printk(" %02x", aty_ld_pll_ct(i, par));
 		printk("\n");
 	}
 #endif
+	if(par->pll_ops->init_pll)
+		par->pll_ops->init_pll(info, &par->pll);
 
 	/*
 	 *  Last page of 8 MB (4 MB on ISA) aperture is MMIO
 	 *  FIXME: we should use the auxiliary aperture instead so we can access
 	 *  the full 8 MB of video RAM on 8 MB boards
 	 */
-	if (info->fix.smem_len == 0x800000 ||
-	    (par->bus_type == ISA 
-	     && info->fix.smem_len == 0x400000))
+
+	if (!par->aux_start &&
+		(info->fix.smem_len == 0x800000 || (par->bus_type == ISA && info->fix.smem_len == 0x400000)))
 		info->fix.smem_len -= GUI_RESERVE;
 
-	/* Clear the video memory */
-	fb_memset(info->screen_base, 0, info->fix.smem_len);
+	/*
+	 *  Disable register access through the linear aperture
+	 *  if the auxiliary aperture is used so we can access
+	 *  the full 8 MB of video RAM on 8 MB boards.
+	 */
+	if (par->aux_start)
+		aty_st_le32(BUS_CNTL, aty_ld_le32(BUS_CNTL, par) | BUS_APER_REG_DIS, par);
+
+#ifdef CONFIG_MTRR
+	par->mtrr_aper = -1;
+	par->mtrr_reg = -1;
+	if (!nomtrr) {
+		/* Cover the whole resource. */
+		 par->mtrr_aper = mtrr_add(par->res_start, par->res_size, MTRR_TYPE_WRCOMB, 1);
+		 if (par->mtrr_aper >= 0 && !par->aux_start) {
+			/* Make a hole for mmio. */
+			par->mtrr_reg = mtrr_add(par->res_start + 0x800000 - GUI_RESERVE,
+				GUI_RESERVE, MTRR_TYPE_UNCACHABLE, 1);
+			if (par->mtrr_reg < 0) {
+				mtrr_del(par->mtrr_aper, 0, 0);
+				par->mtrr_aper = -1;
+			}
+		 }
+	}
+#endif
 
 	info->fbops = &atyfb_ops;
 	info->pseudo_palette = pseudo_palette;
@@ -1791,18 +2455,12 @@ static int __init aty_init(struct fb_info *info, const char *name)
 #ifdef CONFIG_PMAC_BACKLIGHT
 	if (M64_HAS(G3_PB_1_1) && machine_is_compatible("PowerBook1,1")) {
 		/* these bits let the 101 powerbook wake up from sleep -- paulus */
-		aty_st_lcd(POWER_MANAGEMENT,
-			   aty_ld_lcd(POWER_MANAGEMENT, par)
+		aty_st_lcd(POWER_MANAGEMENT, aty_ld_lcd(POWER_MANAGEMENT, par)
 			   | (USE_F32KHZ | TRISTATE_MEM_EN), par);
-	}
-	if (M64_HAS(MOBIL_BUS))
-		register_backlight_controller(&aty_backlight_controller,
-					      info, "ati");
-#endif				/* CONFIG_PMAC_BACKLIGHT */
+	} else if (M64_HAS(MOBIL_BUS))
+		register_backlight_controller(&aty_backlight_controller, info, "ati");
+#endif /* CONFIG_PMAC_BACKLIGHT */
 
-#ifdef MODULE
-	var = default_var;
-#else				/* !MODULE */
 	memset(&var, 0, sizeof(var));
 #ifdef CONFIG_PPC
 	if (_machine == _MACH_Pmac) {
@@ -1810,9 +2468,8 @@ static int __init aty_init(struct fb_info *info, const char *name)
 		 *  FIXME: The NVRAM stuff should be put in a Mac-specific file, as it
 		 *         applies to all Mac video cards
 		 */
-		if (mode_option) {
-			if (!mac_find_mode
-			    (&var, info, mode_option, 8))
+		if (mode) {
+			if (!mac_find_mode(&var, info, mode, 8))
 				var = default_var;
 		} else {
 			if (default_vmode == VMODE_CHOOSE) {
@@ -1828,485 +2485,950 @@ static int __init aty_init(struct fb_info *info, const char *name)
 				else
 					default_vmode = VMODE_640_480_67;
 				sense = read_aty_sense(par);
-				printk(KERN_INFO
-				       "atyfb: monitor sense=%x, mode %d\n",
-				       sense,
-				       mac_map_monitor_sense(sense));
+				PRINTKI("monitor sense=%x, mode %d\n",
+					sense,  mac_map_monitor_sense(sense));
 			}
-			if (default_vmode <= 0
-			    || default_vmode > VMODE_MAX)
+			if (default_vmode <= 0 || default_vmode > VMODE_MAX)
 				default_vmode = VMODE_640_480_60;
-			if (default_cmode < CMODE_8
-			    || default_cmode > CMODE_32)
+			if (default_cmode < CMODE_8 || default_cmode > CMODE_32)
 				default_cmode = CMODE_8;
-			if (mac_vmode_to_var
-			    (default_vmode, default_cmode, &var))
+			if (mac_vmode_to_var(default_vmode, default_cmode, &var))
 				var = default_var;
 		}
 	} else
-	    if (!fb_find_mode
-		(&var, info, mode_option, NULL, 0, NULL, 8))
+#endif /* !CONFIG_PPC */
+	if (!fb_find_mode(&var, info, mode, NULL, 0, &defmode, 8))
 		var = default_var;
-#else				/* !CONFIG_PPC */
-#ifdef __sparc__
-	if (mode_option) {
-		if (!fb_find_mode
-		    (&var, info, mode_option, NULL, 0, NULL, 8))
-			var = default_var;
-	} else
-		var = default_var;
-#else
-	if (!fb_find_mode
-	    (&var, info, mode_option, NULL, 0, NULL, 8))
-		var = default_var;
-#endif				/* !__sparc__ */
-#endif				/* !CONFIG_PPC */
-#endif				/* !MODULE */
+
 	if (noaccel)
 		var.accel_flags &= ~FB_ACCELF_TEXT;
 	else
 		var.accel_flags |= FB_ACCELF_TEXT;
 
 	if (var.yres == var.yres_virtual) {
-		u32 vram = (info->fix.smem_len - (PAGE_SIZE << 2));
-		var.yres_virtual =
-		    ((vram * 8) / var.bits_per_pixel) / var.xres_virtual;
+		u32 videoram = (info->fix.smem_len - (PAGE_SIZE << 2));
+		var.yres_virtual = ((videoram * 8) / var.bits_per_pixel) / var.xres_virtual;
 		if (var.yres_virtual < var.yres)
 			var.yres_virtual = var.yres;
 	}
 
 	if (atyfb_check_var(&var, info)) {
-		printk("atyfb: can't set default video mode\n");
-		return 0;
+		PRINTKE("can't set default video mode\n");
+		goto aty_init_exit;
 	}
+
 #ifdef __sparc__
 	atyfb_save_palette(par, 0);
 #endif
 
 #ifdef CONFIG_FB_ATY_CT
-	if (curblink && M64_HAS(INTEGRATED))
-		par->cursor = aty_init_cursor(info);
-#endif				/* CONFIG_FB_ATY_CT */
+	if (!noaccel && M64_HAS(INTEGRATED))
+		aty_init_cursor(info);
+#endif /* CONFIG_FB_ATY_CT */
 	info->var = var;
 
 	fb_alloc_cmap(&info->cmap, 256, 0);
 
 	if (register_framebuffer(info) < 0)
-		return 0;
+		goto aty_init_exit;
 
 	fb_list = info;
 
-	printk("fb%d: %s frame buffer device on %s\n",
+	PRINTKI("fb%d: %s frame buffer device on %s\n",
 	       info->node, info->fix.id, name);
-	return 1;
+	return 0;
+
+aty_init_exit:
+	/* restore video mode */
+	aty_set_crtc(par, &saved_crtc);
+	par->pll_ops->set_pll(info, &saved_pll);
+
+#ifdef CONFIG_MTRR
+	if (par->mtrr_reg >= 0) {
+	    mtrr_del(par->mtrr_reg, 0, 0);
+	    par->mtrr_reg = -1;
+	}
+	if (par->mtrr_aper >= 0) {
+	    mtrr_del(par->mtrr_aper, 0, 0);
+	    par->mtrr_aper = -1;
+	}
+#endif
+	return -1;
 }
 
-int __init atyfb_do_init(void)
+#ifdef CONFIG_ATARI
+static int __init store_video_par(char *video_str, unsigned char m64_num)
 {
-#if defined(CONFIG_PCI)
-	unsigned long addr, res_start, res_size;
-	struct atyfb_par *default_par;
-	struct pci_dev *pdev = NULL;
-	struct fb_info *info;
-	int i;
-#ifdef __sparc__
-	extern void (*prom_palette) (int);
-	extern int con_is_present(void);
-	struct pcidev_cookie *pcp;
-	char prop[128];
-	int node, len, j;
-	u32 mem, chip_id;
+	char *p;
+	unsigned long vmembase, size, guiregbase;
+
+	PRINTKI("store_video_par() '%s' \n", video_str);
+
+	if (!(p = strsep(&video_str, ";")) || !*p)
+		goto mach64_invalid;
+	vmembase = simple_strtoul(p, NULL, 0);
+	if (!(p = strsep(&video_str, ";")) || !*p)
+		goto mach64_invalid;
+	size = simple_strtoul(p, NULL, 0);
+	if (!(p = strsep(&video_str, ";")) || !*p)
+		goto mach64_invalid;
+	guiregbase = simple_strtoul(p, NULL, 0);
+
+	phys_vmembase[m64_num] = vmembase;
+	phys_size[m64_num] = size;
+	phys_guiregbase[m64_num] = guiregbase;
+	PRINTKI("stored them all: $%08lX $%08lX $%08lX \n", vmembase, size,
+	       guiregbase);
+	return 0;
+
+      mach64_invalid:
+	phys_vmembase[m64_num] = 0;
+	return -1;
+}
+#endif /* CONFIG_ATARI */
+
+    /*
+     *  Blank the display.
+     */
+
+static int atyfb_blank(int blank, struct fb_info *info)
+{
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	u8 gen_cntl;
+
+	if (par->lock_blank || par->asleep)
+		return 0;
+
+#ifdef CONFIG_PMAC_BACKLIGHT
+	if ((_machine == _MACH_Pmac) && blank)
+		set_backlight_enable(0);
+#elif defined(CONFIG_FB_ATY_GENERIC_LCD)
+	if (par->lcd_table && blank &&
+	    (aty_ld_lcd(LCD_GEN_CNTL, par) & LCD_ON)) {
+		u32 pm = aty_ld_lcd(POWER_MANAGEMENT, par);
+		pm &= ~PWR_BLON;
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+	}
+#endif
+
+	gen_cntl = aty_ld_8(CRTC_GEN_CNTL, par);
+	if (blank > 0)
+		switch (blank - 1) {
+		case VESA_NO_BLANKING:
+			gen_cntl |= 0x40;
+			break;
+		case VESA_VSYNC_SUSPEND:
+			gen_cntl |= 0x8;
+			break;
+		case VESA_HSYNC_SUSPEND:
+			gen_cntl |= 0x4;
+			break;
+		case VESA_POWERDOWN:
+			gen_cntl |= 0x4c;
+			break;
+	} else
+		gen_cntl &= ~(0x4c);
+	aty_st_8(CRTC_GEN_CNTL, gen_cntl, par);
+
+#ifdef CONFIG_PMAC_BACKLIGHT
+	if ((_machine == _MACH_Pmac) && !blank)
+		set_backlight_enable(1);
+#elif defined(CONFIG_FB_ATY_GENERIC_LCD)
+	if (par->lcd_table && !blank &&
+	    (aty_ld_lcd(LCD_GEN_CNTL, par) & LCD_ON)) {
+		u32 pm = aty_ld_lcd(POWER_MANAGEMENT, par);
+		pm |= PWR_BLON;
+		aty_st_lcd(POWER_MANAGEMENT, pm, par);
+	}
+#endif
+
+	return 0;
+}
+
+static void aty_st_pal(u_int regno, u_int red, u_int green, u_int blue,
+		       const struct atyfb_par *par)
+{
+#ifdef CONFIG_ATARI
+	out_8(&par->aty_cmap_regs->windex, regno);
+	out_8(&par->aty_cmap_regs->lut, red);
+	out_8(&par->aty_cmap_regs->lut, green);
+	out_8(&par->aty_cmap_regs->lut, blue);
 #else
-	u16 tmp;
+	writeb(regno, &par->aty_cmap_regs->windex);
+	writeb(red, &par->aty_cmap_regs->lut);
+	writeb(green, &par->aty_cmap_regs->lut);
+	writeb(blue, &par->aty_cmap_regs->lut);
 #endif
+}
 
-#ifdef __sparc__
-	/* Do not attach when we have a serial console. */
-	if (!con_is_present())
-		return -ENXIO;
-#endif
+    /*
+     *  Set a single color register. The values supplied are already
+     *  rounded down to the hardware's capabilities (according to the
+     *  entries in the var structure). Return != 0 for invalid regno.
+     *  !! 4 & 8 =  PSEUDO, > 8 = DIRECTCOLOR
+     */
 
-	while ((pdev =
-		pci_find_device(PCI_VENDOR_ID_ATI, PCI_ANY_ID, pdev))) {
-		if ((pdev->class >> 16) == PCI_BASE_CLASS_DISPLAY) {
-			struct resource *rp;
+static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+	u_int transp, struct fb_info *info)
+{
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
+	int i, depth;
+	u32 *pal = info->pseudo_palette;
 
-			for (i =
-			     sizeof(aty_chips) / sizeof(*aty_chips) - 1;
-			     i >= 0; i--)
-				if (pdev->device == aty_chips[i].pci_id)
-					break;
-			if (i < 0)
-				continue;
+	depth = info->var.bits_per_pixel;
+	if (depth == 16)
+		depth = (info->var.green.length == 5) ? 15 : 16;
 
-			rp = &pdev->resource[0];
-			if (rp->flags & IORESOURCE_IO)
-				rp = &pdev->resource[1];
-			addr = rp->start;
-			if (!addr)
-				continue;
+	if (par->asleep)
+		return 0;
 
-			res_start = rp->start;
-			res_size = rp->end - rp->start + 1;
-			if (!request_mem_region
-			    (res_start, res_size, "atyfb"))
-				continue;
+	if (regno > 255 ||
+	    (depth == 16 && regno > 63) ||
+	    (depth == 15 && regno > 31))
+		return 1;
 
-			info =
-			    kmalloc(sizeof(struct fb_info), GFP_ATOMIC);
-			if (!info) {
-				printk
-				    ("atyfb_init: can't alloc fb_info\n");
-				return -ENXIO;
-			}
-			memset(info, 0, sizeof(struct fb_info));
+	red >>= 8;
+	green >>= 8;
+	blue >>= 8;
 
-			default_par =
-			    kmalloc(sizeof(struct atyfb_par), GFP_ATOMIC);
-			if (!default_par) {
-				printk
-				    ("atyfb_init: can't alloc atyfb_par\n");
-				kfree(info);
-				return -ENXIO;
-			}
-			memset(default_par, 0, sizeof(struct atyfb_par));
+	par->palette[regno].red = red;
+	par->palette[regno].green = green;
+	par->palette[regno].blue = blue;
 
-			info->fix = atyfb_fix;
-			info->par = default_par;
-			info->device = &pdev->dev;
-#ifdef __sparc__
-			/*
-			 * Map memory-mapped registers.
-			 */
-			default_par->ati_regbase = (void __iomem *)
-				(addr + 0x7ffc00UL);
-			info->fix.mmio_start = addr + 0x7ffc00UL;
-
-			/*
-			 * Map in big-endian aperture.
-			 */
-			info->screen_base = (char *) (addr + 0x800000UL);
-			info->fix.smem_start = addr + 0x800000UL;
-
-			/*
-			 * Figure mmap addresses from PCI config space.
-			 * Split Framebuffer in big- and little-endian halfs.
-			 */
-			for (i = 0; i < 6 && pdev->resource[i].start; i++)
-				/* nothing */ ;
-			j = i + 4;
-
-			default_par->mmap_map =
-			    kmalloc(j * sizeof(*default_par->mmap_map),
-				    GFP_ATOMIC);
-			if (!default_par->mmap_map) {
-				printk
-				    ("atyfb_init: can't alloc mmap_map\n");
-				kfree(default_par);
-				kfree(info);
-				release_mem_region(res_start, res_size);
-				return -ENXIO;
-			}
-			memset(default_par->mmap_map, 0,
-			       j * sizeof(*default_par->mmap_map));
-
-			for (i = 0, j = 2;
-			     i < 6 && pdev->resource[i].start; i++) {
-				struct resource *rp = &pdev->resource[i];
-				int io, breg =
-				    PCI_BASE_ADDRESS_0 + (i << 2);
-				unsigned long base;
-				u32 size, pbase;
-
-				base = rp->start;
-
-				io = (rp->flags & IORESOURCE_IO);
-
-				size = rp->end - base + 1;
-
-				pci_read_config_dword(pdev, breg, &pbase);
-
-				if (io)
-					size &= ~1;
-
-				/*
-				 * Map the framebuffer a second time, this time without
-				 * the braindead _PAGE_IE setting. This is used by the
-				 * fixed Xserver, but we need to maintain the old mapping
-				 * to stay compatible with older ones...
-				 */
-				if (base == addr) {
-					default_par->mmap_map[j].voff =
-					    (pbase +
-					     0x10000000) & PAGE_MASK;
-					default_par->mmap_map[j].poff =
-					    base & PAGE_MASK;
-					default_par->mmap_map[j].size =
-					    (size +
-					     ~PAGE_MASK) & PAGE_MASK;
-					default_par->mmap_map[j].prot_mask =
-					    _PAGE_CACHE;
-					default_par->mmap_map[j].prot_flag =
-					    _PAGE_E;
-					j++;
-				}
-
-				/*
-				 * Here comes the old framebuffer mapping with _PAGE_IE
-				 * set for the big endian half of the framebuffer...
-				 */
-				if (base == addr) {
-					default_par->mmap_map[j].voff =
-					    (pbase + 0x800000) & PAGE_MASK;
-					default_par->mmap_map[j].poff =
-					    (base + 0x800000) & PAGE_MASK;
-					default_par->mmap_map[j].size = 0x800000;
-					default_par->mmap_map[j].prot_mask =
-					    _PAGE_CACHE;
-					default_par->mmap_map[j].prot_flag =
-					    _PAGE_E | _PAGE_IE;
-					size -= 0x800000;
-					j++;
-				}
-
-				default_par->mmap_map[j].voff = pbase & PAGE_MASK;
-				default_par->mmap_map[j].poff = base & PAGE_MASK;
-				default_par->mmap_map[j].size =
-				    (size + ~PAGE_MASK) & PAGE_MASK;
-				default_par->mmap_map[j].prot_mask = _PAGE_CACHE;
-				default_par->mmap_map[j].prot_flag = _PAGE_E;
-				j++;
-			}
-
-			if (pdev->device != XL_CHIP_ID) {
-				/*
-				 * Fix PROMs idea of MEM_CNTL settings...
-				 */
-				mem = aty_ld_le32(MEM_CNTL, default_par);
-				chip_id = aty_ld_le32(CONFIG_CHIP_ID, default_par);
-				if (((chip_id & CFG_CHIP_TYPE) == VT_CHIP_ID)
-				    && !((chip_id >> 24) & 1)) {
-					switch (mem & 0x0f) {
-					case 3:
-						mem = (mem & ~(0x0f)) | 2;
-						break;
-					case 7:
-						mem = (mem & ~(0x0f)) | 3;
-						break;
-					case 9:
-						mem = (mem & ~(0x0f)) | 4;
-						break;
-					case 11:
-						mem = (mem & ~(0x0f)) | 5;
-						break;
-					default:
-						break;
-					}
-					if ((aty_ld_le32(CONFIG_STAT0, default_par) & 7) >= SDRAM)
-						mem &= ~(0x00700000);
-				}
-				mem &= ~(0xcf80e000);	/* Turn off all undocumented bits. */
-				aty_st_le32(MEM_CNTL, mem, default_par);
-			}
-
-			/*
-			 * If this is the console device, we will set default video
-			 * settings to what the PROM left us with.
-			 */
-			node = prom_getchild(prom_root_node);
-			node = prom_searchsiblings(node, "aliases");
-			if (node) {
-				len =
-				    prom_getproperty(node, "screen", prop,
-						     sizeof(prop));
-				if (len > 0) {
-					prop[len] = '\0';
-					node = prom_finddevice(prop);
-				} else {
-					node = 0;
-				}
-			}
-
-			pcp = pdev->sysdata;
-			if (node == pcp->prom_node) {
-
-				struct fb_var_screeninfo *var =
-				    &default_var;
-				unsigned int N, P, Q, M, T, R;
-				u32 v_total, h_total;
-				struct crtc crtc;
-				u8 pll_regs[16];
-				u8 clock_cntl;
-
-				crtc.vxres =
-				    prom_getintdefault(node, "width",
-						       1024);
-				crtc.vyres =
-				    prom_getintdefault(node, "height",
-						       768);
-				var->bits_per_pixel =
-				    prom_getintdefault(node, "depth", 8);
-				var->xoffset = var->yoffset = 0;
-				crtc.h_tot_disp =
-				    aty_ld_le32(CRTC_H_TOTAL_DISP, default_par);
-				crtc.h_sync_strt_wid =
-				    aty_ld_le32(CRTC_H_SYNC_STRT_WID,
-						default_par);
-				crtc.v_tot_disp =
-				    aty_ld_le32(CRTC_V_TOTAL_DISP, default_par);
-				crtc.v_sync_strt_wid =
-				    aty_ld_le32(CRTC_V_SYNC_STRT_WID,
-						default_par);
-				crtc.gen_cntl =
-				    aty_ld_le32(CRTC_GEN_CNTL, default_par);
-				aty_crtc_to_var(&crtc, var);
-
-				h_total = var->xres + var->right_margin +
-				    var->hsync_len + var->left_margin;
-				v_total = var->yres + var->lower_margin +
-				    var->vsync_len + var->upper_margin;
-
-				/*
-				 * Read the PLL to figure actual Refresh Rate.
-				 */
-				clock_cntl = aty_ld_8(CLOCK_CNTL, default_par);
-				/* printk("atyfb: CLOCK_CNTL: %02x\n", clock_cntl); */
-				for (i = 0; i < 16; i++)
-					pll_regs[i] = aty_ld_pll(i, default_par);
-
-				/*
-				 * PLL Reference Divider M:
-				 */
-				M = pll_regs[2];
-
-				/*
-				 * PLL Feedback Divider N (Dependant on CLOCK_CNTL):
-				 */
-				N = pll_regs[7 + (clock_cntl & 3)];
-
-				/*
-				 * PLL Post Divider P (Dependant on CLOCK_CNTL):
-				 */
-				P = 1 << (pll_regs[6] >>
-					  ((clock_cntl & 3) << 1));
-
-				/*
-				 * PLL Divider Q:
-				 */
-				Q = N / P;
-
-				/*
-				 * Target Frequency:
-				 *
-				 *      T * M
-				 * Q = -------
-				 *      2 * R
-				 *
-				 * where R is XTALIN (= 14318 or 29498 kHz).
-				 */
-				if (pdev->device == XL_CHIP_ID)
-					R = 29498;
-				else
-					R = 14318;
-
-				T = 2 * Q * R / M;
-
-				default_var.pixclock = 1000000000 / T;
-			}
-#else				/* __sparc__ */
-
-			info->fix.mmio_start = 0x7ff000 + addr;
-			default_par->ati_regbase = 
-			    ioremap(info->fix.mmio_start, 0x1000);
-
-			if (!default_par->ati_regbase) {
-#ifdef __sparc__
-				kfree(default_par->mmap_map);
-#endif
-				kfree(default_par);
-				kfree(info);
-				release_mem_region(res_start, res_size);
-				return -ENOMEM;
-			}
-
-			info->fix.mmio_start += 0xc00;
-			default_par->ati_regbase += 0xc00;
-
-			/*
-			 * Enable memory-space accesses using config-space
-			 * command register.
-			 */
-			pci_read_config_word(pdev, PCI_COMMAND, &tmp);
-			if (!(tmp & PCI_COMMAND_MEMORY)) {
-				tmp |= PCI_COMMAND_MEMORY;
-				pci_write_config_word(pdev, PCI_COMMAND,
-						      tmp);
-			}
-#ifdef __BIG_ENDIAN
-			/* Use the big-endian aperture */
-			addr += 0x800000;
-#endif
-
-			/* Map in frame buffer */
-			info->fix.smem_start = addr;
-			info->screen_base = ioremap(addr, 0x800000);
-
-			if (!info->screen_base) {
-#ifdef __sparc__
-				kfree(default_par->mmap_map);
-#endif
-				kfree(default_par);
-				kfree(info);
-				release_mem_region(res_start, res_size);
-				return -ENXIO;
-			}
-#endif				/* __sparc__ */
-
-			if (!aty_init(info, "PCI")) {
-#ifdef __sparc__	
-				if (default_par->mmap_map)
-					kfree(default_par->mmap_map);
-#endif
-				kfree(default_par);
-				kfree(info);
-				release_mem_region(res_start, res_size);
-				return -ENXIO;
-			}
-#ifdef __sparc__
-			if (!prom_palette)
-				prom_palette = atyfb_palette;
-
-			/*
-			 * Add /dev/fb mmap values.
-			 */
-			default_par->mmap_map[0].voff = 0x8000000000000000UL;
-			default_par->mmap_map[0].poff =
-			    (unsigned long) info->screen_base & PAGE_MASK;
-			default_par->mmap_map[0].size =
-			    info->fix.smem_len;
-			default_par->mmap_map[0].prot_mask = _PAGE_CACHE;
-			default_par->mmap_map[0].prot_flag = _PAGE_E;
-			default_par->mmap_map[1].voff =
-			    default_par->mmap_map[0].voff +
-			    info->fix.smem_len;
-			default_par->mmap_map[1].poff =
-			    ((unsigned long) default_par->ati_regbase &
-			     PAGE_MASK);
-			default_par->mmap_map[1].size = PAGE_SIZE;
-			default_par->mmap_map[1].prot_mask = _PAGE_CACHE;
-			default_par->mmap_map[1].prot_flag = _PAGE_E;
-#endif				/* __sparc__ */
-
-#ifdef CONFIG_PMAC_PBOOK
-			if (first_display == NULL)
-				pmu_register_sleep_notifier(&aty_sleep_notifier);
-			default_par->next = first_display;
-#endif
+	if (regno < 16) {
+		switch (depth) {
+		case 15:
+			pal[regno] = (regno << 10) | (regno << 5) | regno;
+			break;
+		case 16:
+			pal[regno] = (regno << 11) | (regno << 5) | regno;
+			break;
+		case 24:
+			pal[regno] = (regno << 16) | (regno << 8) | regno;
+			break;
+		case 32:
+			i = (regno << 8) | regno;
+			pal[regno] = (i << 16) | i;
+			break;
 		}
 	}
 
-#elif defined(CONFIG_ATARI)
-	struct atyfb_par *default_par;
+	i = aty_ld_8(DAC_CNTL, par) & 0xfc;
+	if (M64_HAS(EXTRA_BRIGHT))
+		i |= 0x2; /* DAC_CNTL | 0x2 turns off the extra brightness for gt */
+	aty_st_8(DAC_CNTL, i, par);
+	aty_st_8(DAC_MASK, 0xff, par);
+
+	if (M64_HAS(INTEGRATED)) {
+		if (depth == 16) {
+			if (regno < 32)
+				aty_st_pal(regno << 3, red,
+					   par->palette[regno<<1].green,
+					   blue, par);
+			red = par->palette[regno>>1].red;
+			blue = par->palette[regno>>1].blue;
+			regno <<= 2;
+		} else if (depth == 15) {
+			regno <<= 3;
+			for(i = 0; i < 8; i++) {
+			    aty_st_pal(regno + i, red, green, blue, par);
+			}
+		}
+	}
+	aty_st_pal(regno, red, green, blue, par);
+
+	return 0;
+}
+
+#ifdef CONFIG_PCI
+
+#ifdef __sparc__
+
+extern void (*prom_palette) (int);
+
+static int __devinit atyfb_setup_sparc(struct pci_dev *pdev,
+			struct fb_info *info, unsigned long addr)
+{
+	extern int con_is_present(void);
+
+	struct atyfb_par *par = info->par;
+	struct pcidev_cookie *pcp;
+	char prop[128];
+	int node, len, i, j, ret;
+	u32 mem, chip_id;
+
+	/* Do not attach when we have a serial console. */
+	if (!con_is_present())
+		return -ENXIO;
+
+	/*
+	 * Map memory-mapped registers.
+	 */
+	par->ati_regbase = (void *)addr + 0x7ffc00UL;
+	info->fix.mmio_start = addr + 0x7ffc00UL;
+
+	/*
+	 * Map in big-endian aperture.
+	 */
+	info->screen_base = (char *) (addr + 0x800000UL);
+	info->fix.smem_start = addr + 0x800000UL;
+
+	/*
+	 * Figure mmap addresses from PCI config space.
+	 * Split Framebuffer in big- and little-endian halfs.
+	 */
+	for (i = 0; i < 6 && pdev->resource[i].start; i++)
+		/* nothing */ ;
+	j = i + 4;
+
+	par->mmap_map = kmalloc(j * sizeof(*par->mmap_map), GFP_ATOMIC);
+	if (!par->mmap_map) {
+		PRINTKE("atyfb_setup_sparc() can't alloc mmap_map\n");
+		return -ENOMEM;
+	}
+	memset(par->mmap_map, 0, j * sizeof(*par->mmap_map));
+
+	for (i = 0, j = 2; i < 6 && pdev->resource[i].start; i++) {
+		struct resource *rp = &pdev->resource[i];
+		int io, breg = PCI_BASE_ADDRESS_0 + (i << 2);
+		unsigned long base;
+		u32 size, pbase;
+
+		base = rp->start;
+
+		io = (rp->flags & IORESOURCE_IO);
+
+		size = rp->end - base + 1;
+
+		pci_read_config_dword(pdev, breg, &pbase);
+
+		if (io)
+			size &= ~1;
+
+		/*
+		 * Map the framebuffer a second time, this time without
+		 * the braindead _PAGE_IE setting. This is used by the
+		 * fixed Xserver, but we need to maintain the old mapping
+		 * to stay compatible with older ones...
+		 */
+		if (base == addr) {
+			par->mmap_map[j].voff = (pbase + 0x10000000) & PAGE_MASK;
+			par->mmap_map[j].poff = base & PAGE_MASK;
+			par->mmap_map[j].size = (size + ~PAGE_MASK) & PAGE_MASK;
+			par->mmap_map[j].prot_mask = _PAGE_CACHE;
+			par->mmap_map[j].prot_flag = _PAGE_E;
+			j++;
+		}
+
+		/*
+		 * Here comes the old framebuffer mapping with _PAGE_IE
+		 * set for the big endian half of the framebuffer...
+		 */
+		if (base == addr) {
+			par->mmap_map[j].voff = (pbase + 0x800000) & PAGE_MASK;
+			par->mmap_map[j].poff = (base + 0x800000) & PAGE_MASK;
+			par->mmap_map[j].size = 0x800000;
+			par->mmap_map[j].prot_mask = _PAGE_CACHE;
+			par->mmap_map[j].prot_flag = _PAGE_E | _PAGE_IE;
+			size -= 0x800000;
+			j++;
+		}
+
+		par->mmap_map[j].voff = pbase & PAGE_MASK;
+		par->mmap_map[j].poff = base & PAGE_MASK;
+		par->mmap_map[j].size = (size + ~PAGE_MASK) & PAGE_MASK;
+		par->mmap_map[j].prot_mask = _PAGE_CACHE;
+		par->mmap_map[j].prot_flag = _PAGE_E;
+		j++;
+	}
+
+	if((ret = correct_chipset(par)))
+		return ret;
+
+	if (IS_XL(pdev->device)) {
+		/*
+		 * Fix PROMs idea of MEM_CNTL settings...
+		 */
+		mem = aty_ld_le32(MEM_CNTL, par);
+		chip_id = aty_ld_le32(CONFIG_CHIP_ID, par);
+		if (((chip_id & CFG_CHIP_TYPE) == VT_CHIP_ID) && !((chip_id >> 24) & 1)) {
+			switch (mem & 0x0f) {
+			case 3:
+				mem = (mem & ~(0x0f)) | 2;
+				break;
+			case 7:
+				mem = (mem & ~(0x0f)) | 3;
+				break;
+			case 9:
+				mem = (mem & ~(0x0f)) | 4;
+				break;
+			case 11:
+				mem = (mem & ~(0x0f)) | 5;
+				break;
+			default:
+				break;
+			}
+			if ((aty_ld_le32(CONFIG_STAT0, par) & 7) >= SDRAM)
+				mem &= ~(0x00700000);
+		}
+		mem &= ~(0xcf80e000);	/* Turn off all undocumented bits. */
+		aty_st_le32(MEM_CNTL, mem, par);
+	}
+
+	/*
+	 * If this is the console device, we will set default video
+	 * settings to what the PROM left us with.
+	 */
+	node = prom_getchild(prom_root_node);
+	node = prom_searchsiblings(node, "aliases");
+	if (node) {
+		len = prom_getproperty(node, "screen", prop, sizeof(prop));
+		if (len > 0) {
+			prop[len] = '\0';
+			node = prom_finddevice(prop);
+		} else
+			node = 0;
+	}
+
+	pcp = pdev->sysdata;
+	if (node == pcp->prom_node) {
+		struct fb_var_screeninfo *var = &default_var;
+		unsigned int N, P, Q, M, T, R;
+		u32 v_total, h_total;
+		struct crtc crtc;
+		u8 pll_regs[16];
+		u8 clock_cntl;
+
+		crtc.vxres = prom_getintdefault(node, "width", 1024);
+		crtc.vyres = prom_getintdefault(node, "height", 768);
+		var->bits_per_pixel = prom_getintdefault(node, "depth", 8);
+		var->xoffset = var->yoffset = 0;
+		crtc.h_tot_disp = aty_ld_le32(CRTC_H_TOTAL_DISP, par);
+		crtc.h_sync_strt_wid = aty_ld_le32(CRTC_H_SYNC_STRT_WID, par);
+		crtc.v_tot_disp = aty_ld_le32(CRTC_V_TOTAL_DISP, par);
+		crtc.v_sync_strt_wid = aty_ld_le32(CRTC_V_SYNC_STRT_WID, par);
+		crtc.gen_cntl = aty_ld_le32(CRTC_GEN_CNTL, par);
+		aty_crtc_to_var(&crtc, var);
+
+		h_total = var->xres + var->right_margin + var->hsync_len + var->left_margin;
+		v_total = var->yres + var->lower_margin + var->vsync_len + var->upper_margin;
+
+		/*
+		 * Read the PLL to figure actual Refresh Rate.
+		 */
+		clock_cntl = aty_ld_8(CLOCK_CNTL, par);
+		/* DPRINTK("CLOCK_CNTL %02x\n", clock_cntl); */
+		for (i = 0; i < 16; i++)
+			pll_regs[i] = aty_ld_pll_ct(i, par);
+
+		/*
+		 * PLL Reference Divider M:
+		 */
+		M = pll_regs[2];
+
+		/*
+		 * PLL Feedback Divider N (Dependant on CLOCK_CNTL):
+		 */
+		N = pll_regs[7 + (clock_cntl & 3)];
+
+		/*
+		 * PLL Post Divider P (Dependant on CLOCK_CNTL):
+		 */
+		P = 1 << (pll_regs[6] >> ((clock_cntl & 3) << 1));
+
+		/*
+		 * PLL Divider Q:
+		 */
+		Q = N / P;
+
+		/*
+		 * Target Frequency:
+		 *
+		 *      T * M
+		 * Q = -------
+		 *      2 * R
+		 *
+		 * where R is XTALIN (= 14318 or 29498 kHz).
+		 */
+		if (IS_XL(pdev->device))
+			R = 29498;
+		else
+			R = 14318;
+
+		T = 2 * Q * R / M;
+
+		default_var.pixclock = 1000000000 / T;
+	}
+
+	return 0;
+}
+
+#else /* __sparc__ */
+
+#ifdef __i386__
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+void aty_init_lcd(struct atyfb_par *par, u32 bios_base)
+{
+	u32 driv_inf_tab, sig;
+	u16 lcd_ofs;
+
+	/* To support an LCD panel, we should know it's dimensions and
+	 *  it's desired pixel clock.
+	 * There are two ways to do it:
+	 *  - Check the startup video mode and calculate the panel
+	 *    size from it. This is unreliable.
+	 *  - Read it from the driver information table in the video BIOS.
+	*/
+	/* Address of driver information table is at offset 0x78. */
+	driv_inf_tab = bios_base + *((u16 *)(bios_base+0x78));
+
+	/* Check for the driver information table signature. */
+	sig = (*(u32 *)driv_inf_tab);
+	if ((sig == 0x54504c24) || /* Rage LT pro */
+		(sig == 0x544d5224) || /* Rage mobility */
+		(sig == 0x54435824) || /* Rage XC */
+		(sig == 0x544c5824)) { /* Rage XL */
+		PRINTKI("BIOS contains driver information table.\n");
+		lcd_ofs = (*(u16 *)(driv_inf_tab + 10));
+		par->lcd_table = 0;
+		if (lcd_ofs != 0) {
+			par->lcd_table = bios_base + lcd_ofs;
+		}
+	}
+
+	if (par->lcd_table != 0) {
+		char model[24];
+		char strbuf[16];
+		char refresh_rates_buf[100];
+		int id, tech, f, i, m, default_refresh_rate;
+		char *txtcolour;
+		char *txtmonitor;
+		char *txtdual;
+		char *txtformat;
+		u16 width, height, panel_type, refresh_rates;
+		u16 *lcdmodeptr;
+		u32 format;
+		u8 lcd_refresh_rates[16] = {50,56,60,67,70,72,75,76,85,90,100,120,140,150,160,200};
+		/* The most important information is the panel size at
+		 * offset 25 and 27, but there's some other nice information
+		 * which we print to the screen.
+		 */
+		id = *(u8 *)par->lcd_table;
+		strncpy(model,(char *)par->lcd_table+1,24);
+		model[23]=0;
+
+		width = par->lcd_width = *(u16 *)(par->lcd_table+25);
+		height = par->lcd_height = *(u16 *)(par->lcd_table+27);
+		panel_type = *(u16 *)(par->lcd_table+29);
+		if (panel_type & 1)
+			txtcolour = "colour";
+		else
+			txtcolour = "monochrome";
+		if (panel_type & 2)
+			txtdual = "dual (split) ";
+		else
+			txtdual = "";
+		tech = (panel_type>>2) & 63;
+		switch (tech) {
+		case 0:
+			txtmonitor = "passive matrix";
+			break;
+		case 1:
+			txtmonitor = "active matrix";
+			break;
+		case 2:
+			txtmonitor = "active addressed STN";
+			break;
+		case 3:
+			txtmonitor = "EL";
+			break;
+		case 4:
+			txtmonitor = "plasma";
+			break;
+		default:
+			txtmonitor = "unknown";
+		}
+		format = *(u32 *)(par->lcd_table+57);
+		if (tech == 0 || tech == 2) {
+			switch (format & 7) {
+			case 0:
+				txtformat = "12 bit interface";
+				break;
+			case 1:
+				txtformat = "16 bit interface";
+				break;
+			case 2:
+				txtformat = "24 bit interface";
+				break;
+			default:
+				txtformat = "unkown format";
+			}
+		} else {
+			switch (format & 7) {
+			case 0:
+				txtformat = "8 colours";
+				break;
+			case 1:
+				txtformat = "512 colours";
+				break;
+			case 2:
+				txtformat = "4096 colours";
+				break;
+			case 4:
+				txtformat = "262144 colours (LT mode)";
+				break;
+			case 5:
+				txtformat = "16777216 colours";
+				break;
+			case 6:
+				txtformat = "262144 colours (FDPI-2 mode)";
+				break;
+			default:
+				txtformat = "unkown format";
+			}
+		}
+		PRINTKI("%s%s %s monitor detected: %s\n",
+			txtdual ,txtcolour, txtmonitor, model);
+		PRINTKI("       id=%d, %dx%d pixels, %s\n",
+			id, width, height, txtformat);
+		refresh_rates_buf[0] = 0;
+		refresh_rates = *(u16 *)(par->lcd_table+62);
+		m = 1;
+		f = 0;
+		for (i=0;i<16;i++) {
+			if (refresh_rates & m) {
+				if (f == 0) {
+					sprintf(strbuf, "%d", lcd_refresh_rates[i]);
+					f++;
+				} else {
+					sprintf(strbuf, ",%d", lcd_refresh_rates[i]);
+				}
+				strcat(refresh_rates_buf,strbuf);
+			}
+			m = m << 1;
+		}
+		default_refresh_rate = (*(u8 *)(par->lcd_table+61) & 0xf0) >> 4;
+		PRINTKI("       supports refresh rates [%s], default %d Hz\n",
+			refresh_rates_buf, lcd_refresh_rates[default_refresh_rate]);
+		par->lcd_refreshrate = lcd_refresh_rates[default_refresh_rate];
+		/* We now need to determine the crtc parameters for the
+		 * lcd monitor. This is tricky, because they are not stored
+		 * individually in the BIOS. Instead, the BIOS contains a
+		 * table of display modes that work for this monitor.
+		 *
+		 * The idea is that we search for a mode of the same dimensions
+		 * as the dimensions of the lcd monitor. Say our lcd monitor
+		 * is 800x600 pixels, we search for a 800x600 monitor.
+		 * The CRTC parameters we find here are the ones that we need
+		 * to use to simulate other resolutions on the lcd screen.
+		 */
+		lcdmodeptr = (u16 *)(par->lcd_table + 64);
+		while (*lcdmodeptr != 0) {
+			u32 modeptr;
+			u16 mwidth, mheight, lcd_hsync_start, lcd_vsync_start;
+			modeptr = bios_base + *lcdmodeptr;
+
+			mwidth = *((u16 *)(modeptr+0));
+			mheight = *((u16 *)(modeptr+2));
+
+			if (mwidth == width && mheight == height) {
+				par->lcd_pixclock = 100000000 / *((u16 *)(modeptr+9));
+				par->lcd_htotal = *((u16 *)(modeptr+17)) & 511;
+				par->lcd_hdisp = *((u16 *)(modeptr+19)) & 511;
+				lcd_hsync_start = *((u16 *)(modeptr+21)) & 511;
+				par->lcd_hsync_dly = (*((u16 *)(modeptr+21)) >> 9) & 7;
+				par->lcd_hsync_len = *((u8 *)(modeptr+23)) & 63;
+
+				par->lcd_vtotal = *((u16 *)(modeptr+24)) & 2047;
+				par->lcd_vdisp = *((u16 *)(modeptr+26)) & 2047;
+				lcd_vsync_start = *((u16 *)(modeptr+28)) & 2047;
+				par->lcd_vsync_len = (*((u16 *)(modeptr+28)) >> 11) & 31;
+
+				par->lcd_htotal = (par->lcd_htotal + 1) * 8;
+				par->lcd_hdisp = (par->lcd_hdisp + 1) * 8;
+				lcd_hsync_start = (lcd_hsync_start + 1) * 8;
+				par->lcd_hsync_len = par->lcd_hsync_len * 8;
+
+				par->lcd_vtotal++;
+				par->lcd_vdisp++;
+				lcd_vsync_start++;
+
+				par->lcd_right_margin = lcd_hsync_start - par->lcd_hdisp;
+				par->lcd_lower_margin = lcd_vsync_start - par->lcd_vdisp;
+				par->lcd_hblank_len = par->lcd_htotal - par->lcd_hdisp;
+				par->lcd_vblank_len = par->lcd_vtotal - par->lcd_vdisp;
+				break;
+			}
+
+			lcdmodeptr++;
+		}
+		if (*lcdmodeptr == 0) {
+			PRINTKE("LCD monitor CRTC parameters not found!!!\n");
+			/* To do: Switch to CRT if possible. */
+		} else {
+			PRINTKI("       LCD CRTC parameters: %d.%d  %d %d %d %d  %d %d %d %d\n",
+				1000000 / par->lcd_pixclock, 1000000 % par->lcd_pixclock,
+				par->lcd_hdisp,
+				par->lcd_hdisp + par->lcd_right_margin,
+				par->lcd_hdisp + par->lcd_right_margin
+					+ par->lcd_hsync_dly + par->lcd_hsync_len,
+				par->lcd_htotal,
+				par->lcd_vdisp,
+				par->lcd_vdisp + par->lcd_lower_margin,
+				par->lcd_vdisp + par->lcd_lower_margin + par->lcd_vsync_len,
+				par->lcd_vtotal);
+			PRINTKI("                          : %d %d %d %d %d %d %d %d %d\n",
+				par->lcd_pixclock,
+				par->lcd_hblank_len - (par->lcd_right_margin +
+					par->lcd_hsync_dly + par->lcd_hsync_len),
+				par->lcd_hdisp,
+				par->lcd_right_margin,
+				par->lcd_hsync_len,
+				par->lcd_vblank_len - (par->lcd_lower_margin + par->lcd_vsync_len),
+				par->lcd_vdisp,
+				par->lcd_lower_margin,
+				par->lcd_vsync_len);
+		}
+	}
+}
+#endif /* CONFIG_FB_ATY_GENERIC_LCD */
+
+static int __devinit init_from_bios(struct atyfb_par *par)
+{
+	u32 bios_base, rom_addr;
+	int ret;
+
+	rom_addr = 0xc0000 + ((aty_ld_le32(SCRATCH_REG1, par) & 0x7f) << 11);
+	bios_base = (unsigned long)ioremap(rom_addr, 0x10000);
+
+	/* The BIOS starts with 0xaa55. */
+	if (*((u16 *)bios_base) == 0xaa55) {
+
+		u8 *bios_ptr;
+		u16 rom_table_offset, freq_table_offset;
+		PLL_BLOCK_MACH64 pll_block;
+
+		PRINTKI("Mach64 BIOS is located at %x, mapped at %x.\n", rom_addr, bios_base);
+
+		/* check for frequncy table */
+		bios_ptr = (u8*)bios_base;
+		rom_table_offset = (u16)(bios_ptr[0x48] | (bios_ptr[0x49] << 8));
+		freq_table_offset = bios_ptr[rom_table_offset + 16] | (bios_ptr[rom_table_offset + 17] << 8);
+		memcpy(&pll_block, bios_ptr + freq_table_offset, sizeof(PLL_BLOCK_MACH64));
+
+		PRINTKI("BIOS frequency table:\n");
+		PRINTKI("PCLK_min_freq %d, PCLK_max_freq %d, ref_freq %d, ref_divider %d\n",
+			pll_block.PCLK_min_freq, pll_block.PCLK_max_freq,
+			pll_block.ref_freq, pll_block.ref_divider);
+		PRINTKI("MCLK_pwd %d, MCLK_max_freq %d, XCLK_max_freq %d, SCLK_freq %d\n",
+			pll_block.MCLK_pwd, pll_block.MCLK_max_freq,
+			pll_block.XCLK_max_freq, pll_block.SCLK_freq);
+
+		par->pll_limits.pll_min = pll_block.PCLK_min_freq/100;
+		par->pll_limits.pll_max = pll_block.PCLK_max_freq/100;
+		par->pll_limits.ref_clk = pll_block.ref_freq/100;
+		par->pll_limits.ref_div = pll_block.ref_divider;
+		par->pll_limits.sclk = pll_block.SCLK_freq/100;
+		par->pll_limits.mclk = pll_block.MCLK_max_freq/100;
+		par->pll_limits.mclk_pm = pll_block.MCLK_pwd/100;
+		par->pll_limits.xclk = pll_block.XCLK_max_freq/100;
+#ifdef CONFIG_FB_ATY_GENERIC_LCD
+		aty_init_lcd(par, bios_base);
+#endif
+		ret = 0;
+	} else {
+		PRINTKE("no BIOS frequency table found, use parameters\n");
+		ret = -ENXIO;
+	}
+	iounmap((void* __iomem )bios_base);
+
+	return ret;
+}
+#endif /* __i386__ */
+
+static int __devinit atyfb_setup_generic(struct pci_dev *pdev, struct fb_info *info, unsigned long addr)
+{
+	struct atyfb_par *par = info->par;
+	u16 tmp;
+	unsigned long raddr;
+	struct resource *rrp;
+	int ret = 0;
+
+	raddr = addr + 0x7ff000UL;
+	rrp = &pdev->resource[2];
+	if ((rrp->flags & IORESOURCE_MEM) && request_mem_region(rrp->start, rrp->end - rrp->start + 1, "atyfb")) {
+		par->aux_start = rrp->start;
+		par->aux_size = rrp->end - rrp->start + 1;
+		raddr = rrp->start;
+		PRINTKI("using auxiliary register aperture\n");
+	}
+
+	info->fix.mmio_start = raddr;
+	par->ati_regbase = ioremap(info->fix.mmio_start, 0x1000);
+	if (par->ati_regbase == 0)
+		return -ENOMEM;
+
+	info->fix.mmio_start += par->aux_start ? 0x400 : 0xc00;
+	par->ati_regbase += par->aux_start ? 0x400 : 0xc00;
+
+	/*
+	 * Enable memory-space accesses using config-space
+	 * command register.
+	 */
+	pci_read_config_word(pdev, PCI_COMMAND, &tmp);
+	if (!(tmp & PCI_COMMAND_MEMORY)) {
+		tmp |= PCI_COMMAND_MEMORY;
+		pci_write_config_word(pdev, PCI_COMMAND, tmp);
+	}
+#ifdef __BIG_ENDIAN
+	/* Use the big-endian aperture */
+	addr += 0x800000;
+#endif
+
+	/* Map in frame buffer */
+	info->fix.smem_start = addr;
+	info->screen_base = ioremap(addr, 0x800000);
+	if (info->screen_base == NULL) {
+		ret = -ENOMEM;
+		goto atyfb_setup_generic_fail;
+	}
+
+	if((ret = correct_chipset(par)))
+		goto atyfb_setup_generic_fail;
+#ifdef __i386__
+	if((ret = init_from_bios(par)))
+		goto atyfb_setup_generic_fail;
+#endif
+	if (!(aty_ld_le32(CRTC_GEN_CNTL, par) & CRTC_EXT_DISP_EN))
+		par->clk_wr_offset = (inb(R_GENMO) & 0x0CU) >> 2;
+	else
+		par->clk_wr_offset = aty_ld_8(CLOCK_CNTL, par) & 0x03U;
+
+	/* according to ATI, we should use clock 3 for acelerated mode */
+	par->clk_wr_offset = 3;
+
+	return 0;
+
+atyfb_setup_generic_fail:
+	iounmap(par->ati_regbase);
+	par->ati_regbase = NULL;
+	return ret;
+}
+
+#endif /* !__sparc__ */
+
+static int __devinit atyfb_pci_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+{
+	unsigned long addr, res_start, res_size;
+	struct fb_info *info;
+	struct resource *rp;
+	struct atyfb_par *par;
+	int i, rc = -ENOMEM;
+
+	for (i = sizeof(aty_chips) / sizeof(*aty_chips) - 1; i >= 0; i--)
+		if (pdev->device == aty_chips[i].pci_id)
+			break;
+
+	if (i < 0)
+		return -ENODEV;
+
+	/* Enable device in PCI config */
+	if (pci_enable_device(pdev)) {
+		PRINTKE("Cannot enable PCI device\n");
+		return -ENXIO;
+	}
+
+	/* Find which resource to use */
+	rp = &pdev->resource[0];
+	if (rp->flags & IORESOURCE_IO)
+		rp = &pdev->resource[1];
+	addr = rp->start;
+	if (!addr)
+		return -ENXIO;
+
+	/* Reserve space */
+	res_start = rp->start;
+	res_size = rp->end - rp->start + 1;
+	if (!request_mem_region (res_start, res_size, "atyfb"))
+		return -EBUSY;
+
+        /* Allocate framebuffer */
+	info = framebuffer_alloc(sizeof(struct atyfb_par), &pdev->dev);
+	if (!info) {
+		PRINTKE("atyfb_pci_probe() can't alloc fb_info\n");
+		return -ENOMEM;
+	}
+	par = info->par;
+	info->fix = atyfb_fix;
+	info->device = &pdev->dev;
+	par->pci_id = aty_chips[i].pci_id;
+	par->res_start = res_start;
+	par->res_size = res_size;
+	par->irq = pdev->irq;
+
+	/* Setup "info" structure */
+#ifdef __sparc__
+	rc = atyfb_setup_sparc(pdev, info, addr);
+#else
+	rc = atyfb_setup_generic(pdev, info, addr);
+#endif
+	if (rc)
+		goto err_release_mem;
+
+	pci_set_drvdata(pdev, info);
+
+	/* Init chip & register framebuffer */
+	if (aty_init(info, "PCI"))
+		goto err_release_io;
+
+#ifdef __sparc__
+	if (!prom_palette)
+		prom_palette = atyfb_palette;
+
+	/*
+	 * Add /dev/fb mmap values.
+	 */
+	par->mmap_map[0].voff = 0x8000000000000000UL;
+	par->mmap_map[0].poff = (unsigned long) info->screen_base & PAGE_MASK;
+	par->mmap_map[0].size = info->fix.smem_len;
+	par->mmap_map[0].prot_mask = _PAGE_CACHE;
+	par->mmap_map[0].prot_flag = _PAGE_E;
+	par->mmap_map[1].voff = par->mmap_map[0].voff + info->fix.smem_len;
+	par->mmap_map[1].poff = (long)par->ati_regbase & PAGE_MASK;
+	par->mmap_map[1].size = PAGE_SIZE;
+	par->mmap_map[1].prot_mask = _PAGE_CACHE;
+	par->mmap_map[1].prot_flag = _PAGE_E;
+#endif /* __sparc__ */
+
+	return 0;
+
+err_release_io:
+#ifdef __sparc__
+	if (par->mmap_map)
+		kfree(par->mmap_map);
+#else
+	if (par->ati_regbase)
+		iounmap(par->ati_regbase);
+	if (info->screen_base)
+		iounmap(info->screen_base);
+#endif
+err_release_mem:
+	if(par->aux_start)
+		release_mem_region(par->aux_start, par->aux_size);
+
+	release_mem_region(par->res_start, par->res_size);
+	framebuffer_release(info);
+
+	return rc;
+}
+
+#endif /* CONFIG_PCI */
+
+#ifdef CONFIG_ATARI
+
+static int __devinit atyfb_atari_probe(void)
+{
+	struct aty_par *par;
 	struct fb_info *info;
 	int m64_num;
 	u32 clock_r;
@@ -2314,85 +3436,136 @@ int __init atyfb_do_init(void)
 	for (m64_num = 0; m64_num < mach64_count; m64_num++) {
 		if (!phys_vmembase[m64_num] || !phys_size[m64_num] ||
 		    !phys_guiregbase[m64_num]) {
-			printk
-			    (" phys_*[%d] parameters not set => returning early. \n",
-			     m64_num);
+		    PRINTKI("phys_*[%d] parameters not set => returning early. \n", m64_num);
 			continue;
 		}
 
-		info = kmalloc(sizeof(struct fb_info), GFP_ATOMIC);
+		info = framebuffer_alloc(sizeof(struct atyfb_par), NULL);
 		if (!info) {
-			printk("atyfb_init: can't alloc fb_info\n");
+			PRINTKE("atyfb_atari_probe() can't alloc fb_info\n");
 			return -ENOMEM;
 		}
-		memset(info, 0, sizeof(struct fb_info));
-
-		default_par = kmalloc(sizeof(struct atyfb_par), GFP_ATOMIC);
-		if (!default_par) {
-			printk
-			    ("atyfb_init: can't alloc atyfb_par\n");
-			kfree(info);
-			return -ENXIO;
-		}
-		memset(default_par, 0, sizeof(struct atyfb_par));
+		par = info->par;
 
 		info->fix = atyfb_fix;
-		info->par = default_par;
+
+		par->irq = (unsigned int) -1; /* something invalid */
 
 		/*
 		 *  Map the video memory (physical address given) to somewhere in the
 		 *  kernel address space.
 		 */
-		info->screen_base = ioremap(phys_vmembase[m64_num],
-					 		   phys_size[m64_num]);	
-		info->fix.smem_start = (unsigned long)info->screen_base;	/* Fake! */
-		default_par->ati_regbase = ioremap(phys_guiregbase[m64_num],
-						   0x10000) + 0xFC00ul;
-		info->fix.mmio_start = (unsigned long)default_par->ati_regbase; /* Fake! */
+		info->screen_base = ioremap(phys_vmembase[m64_num], phys_size[m64_num]);
+		info->fix.smem_start = (unsigned long)info->screen_base; /* Fake! */
+		par->ati_regbase = ioremap(phys_guiregbase[m64_num], 0x10000) +
+						0xFC00ul;
+		info->fix.mmio_start = (unsigned long)par->ati_regbase; /* Fake! */
 
-		aty_st_le32(CLOCK_CNTL, 0x12345678, default_par);
-		clock_r = aty_ld_le32(CLOCK_CNTL, default_par);
+		aty_st_le32(CLOCK_CNTL, 0x12345678, par);
+		clock_r = aty_ld_le32(CLOCK_CNTL, par);
 
 		switch (clock_r & 0x003F) {
 		case 0x12:
-			default_par->clk_wr_offset = 3;	/*  */
+			par->clk_wr_offset = 3; /*  */
 			break;
 		case 0x34:
-			default_par->clk_wr_offset = 2;	/* Medusa ST-IO ISA Adapter etc. */
+			par->clk_wr_offset = 2; /* Medusa ST-IO ISA Adapter etc. */
 			break;
 		case 0x16:
-			default_par->clk_wr_offset = 1;	/*  */
+			par->clk_wr_offset = 1; /*  */
 			break;
 		case 0x38:
-			default_par->clk_wr_offset = 0;	/* Panther 1 ISA Adapter (Gerald) */
+			par->clk_wr_offset = 0; /* Panther 1 ISA Adapter (Gerald) */
 			break;
 		}
 
-		if (!aty_init(info, "ISA bus")) {
-			kfree(default_par);
-			kfree(info);
+		if (aty_init(info, "ISA bus")) {
+			framebuffer_release(info);
 			/* This is insufficient! kernel_map has added two large chunks!! */
 			return -ENXIO;
 		}
 	}
-#endif				/* CONFIG_ATARI */
-	return 0;
 }
 
-int __init atyfb_init(void)
+#endif /* CONFIG_ATARI */
+
+static void __devexit atyfb_remove(struct fb_info *info)
 {
-#ifndef MODULE
-	char *option = NULL;
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
 
-	if (fb_get_options("atyfb", &option))
-		return -ENODEV;
-	atyfb_setup(option);
+	/* restore video mode */
+	aty_set_crtc(par, &saved_crtc);
+	par->pll_ops->set_pll(info, &saved_pll);
+
+	unregister_framebuffer(info);
+
+#ifdef CONFIG_MTRR
+	if (par->mtrr_reg >= 0) {
+	    mtrr_del(par->mtrr_reg, 0, 0);
+	    par->mtrr_reg = -1;
+	}
+	if (par->mtrr_aper >= 0) {
+	    mtrr_del(par->mtrr_aper, 0, 0);
+	    par->mtrr_aper = -1;
+	}
 #endif
-	return atyfb_do_init();
+#ifndef __sparc__
+	if (par->ati_regbase)
+		iounmap(par->ati_regbase);
+	if (info->screen_base)
+		iounmap(info->screen_base);
+#ifdef __BIG_ENDIAN
+	if (info->sprite.addr)
+		iounmap(info->sprite.addr);
+#endif
+#endif
+#ifdef __sparc__
+	if (par->mmap_map)
+		kfree(par->mmap_map);
+#endif
+	if (par->aux_start)
+		release_mem_region(par->aux_start, par->aux_size);
+
+	if (par->res_start)
+		release_mem_region(par->res_start, par->res_size);
+
+	framebuffer_release(info);
 }
 
+#ifdef CONFIG_PCI
 
-#ifndef MODULE
+static void __devexit atyfb_pci_remove(struct pci_dev *pdev)
+{
+	struct fb_info *info = pci_get_drvdata(pdev);
+
+	atyfb_remove(info);
+}
+
+/*
+ * This driver uses its own matching table. That will be more difficult
+ * to fix, so for now, we just match against any ATI ID and let the
+ * probe() function find out what's up. That also mean we don't have
+ * a module ID table though.
+ */
+static struct pci_device_id atyfb_pci_tbl[] = {
+	{ PCI_VENDOR_ID_ATI, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
+	  PCI_BASE_CLASS_DISPLAY << 16, 0xff0000, 0 },
+	{ 0, }
+};
+
+static struct pci_driver atyfb_driver = {
+	.name		= "atyfb",
+	.id_table	= atyfb_pci_tbl,
+	.probe		= atyfb_pci_probe,
+	.remove		= __devexit_p(atyfb_pci_remove),
+#ifdef CONFIG_PM
+	.suspend	= atyfb_pci_suspend,
+	.resume		= atyfb_pci_resume,
+#endif /* CONFIG_PM */
+};
+
+#endif /* CONFIG_PCI */
+
 int __init atyfb_setup(char *options)
 {
 	char *this_opt;
@@ -2401,19 +3574,20 @@ int __init atyfb_setup(char *options)
 		return 0;
 
 	while ((this_opt = strsep(&options, ",")) != NULL) {
-		if (!strncmp(this_opt, "noblink", 7)) {
-			curblink = 0;
-		} else if (!strncmp(this_opt, "noaccel", 7)) {
+		if (!strncmp(this_opt, "noaccel", 7)) {
 			noaccel = 1;
+#ifdef CONFIG_MTRR
+		} else if (!strncmp(this_opt, "nomtrr", 6)) {
+			nomtrr = 1;
+#endif
 		} else if (!strncmp(this_opt, "vram:", 5))
-			default_vram =
-			    simple_strtoul(this_opt + 5, NULL, 0);
+			vram = simple_strtoul(this_opt + 5, NULL, 0);
 		else if (!strncmp(this_opt, "pll:", 4))
-			default_pll =
-			    simple_strtoul(this_opt + 4, NULL, 0);
+			pll = simple_strtoul(this_opt + 4, NULL, 0);
 		else if (!strncmp(this_opt, "mclk:", 5))
-			default_mclk =
-			    simple_strtoul(this_opt + 5, NULL, 0);
+			mclk = simple_strtoul(this_opt + 5, NULL, 0);
+		else if (!strncmp(this_opt, "xclk:", 5))
+			xclk = simple_strtoul(this_opt+5, NULL, 0);
 #ifdef CONFIG_PPC
 		else if (!strncmp(this_opt, "vmode:", 6)) {
 			unsigned int vmode =
@@ -2456,182 +3630,63 @@ int __init atyfb_setup(char *options)
 		}
 #endif
 		else
-			mode_option = this_opt;
+			mode = this_opt;
 	}
 	return 0;
 }
+
+int __init atyfb_init(void)
+{
+#ifndef MODULE
+    char *option = NULL;
+
+    if (fb_get_options("atyfb", &option))
+	return -ENODEV;
+    atyfb_setup(option);
+#endif
+
+#ifdef CONFIG_PCI
+    pci_module_init(&atyfb_driver);
+#endif
+#ifdef CONFIG_ATARI
+    atyfb_atari_probe();
+#endif
+    return 0;
+}
+
+void __exit atyfb_exit(void)
+{
+#ifdef CONFIG_PCI
+	pci_unregister_driver(&atyfb_driver);
+#endif
+}
+
 module_init(atyfb_init);
-#endif				/* !MODULE */
-
-#ifdef CONFIG_ATARI
-static int __init store_video_par(char *video_str, unsigned char m64_num)
-{
-	char *p;
-	unsigned long vmembase, size, guiregbase;
-
-	printk("store_video_par() '%s' \n", video_str);
-
-	if (!(p = strsep(&video_str, ";")) || !*p)
-		goto mach64_invalid;
-	vmembase = simple_strtoul(p, NULL, 0);
-	if (!(p = strsep(&video_str, ";")) || !*p)
-		goto mach64_invalid;
-	size = simple_strtoul(p, NULL, 0);
-	if (!(p = strsep(&video_str, ";")) || !*p)
-		goto mach64_invalid;
-	guiregbase = simple_strtoul(p, NULL, 0);
-
-	phys_vmembase[m64_num] = vmembase;
-	phys_size[m64_num] = size;
-	phys_guiregbase[m64_num] = guiregbase;
-	printk(" stored them all: $%08lX $%08lX $%08lX \n", vmembase, size,
-	       guiregbase);
-	return 0;
-
-      mach64_invalid:
-	phys_vmembase[m64_num] = 0;
-	return -1;
-}
-#endif				/* CONFIG_ATARI */
-
-/*
-#ifdef CONFIG_FB_ATY_CT
-   * Erase HW Cursor *
-    if (par->cursor && (info->currcon >= 0))
-	atyfb_cursor(&fb_display[par->currcon], CM_ERASE,
-		     par->cursor->pos.x, par->cursor->pos.y);
-#endif * CONFIG_FB_ATY_CT *
-
-#ifdef CONFIG_FB_ATY_CT
-    * Install hw cursor *
-    if (par->cursor) {
-	aty_set_cursor_color(info);
-	aty_set_cursor_shape(info);
-    }
-#endif * CONFIG_FB_ATY_CT */
-
-    /*
-     *  Blank the display.
-     */
-
-static int atyfb_blank(int blank, struct fb_info *info)
-{
-	struct atyfb_par *par = (struct atyfb_par *) info->par;
-	u8 gen_cntl;
-
-#ifdef CONFIG_PMAC_BACKLIGHT
-	if ((_machine == _MACH_Pmac) && blank)
-		set_backlight_enable(0);
-#endif				/* CONFIG_PMAC_BACKLIGHT */
-
-	gen_cntl = aty_ld_8(CRTC_GEN_CNTL, par);
-	if (blank > 0)
-		switch (blank - 1) {
-		case VESA_NO_BLANKING:
-			gen_cntl |= 0x40;
-			break;
-		case VESA_VSYNC_SUSPEND:
-			gen_cntl |= 0x8;
-			break;
-		case VESA_HSYNC_SUSPEND:
-			gen_cntl |= 0x4;
-			break;
-		case VESA_POWERDOWN:
-			gen_cntl |= 0x4c;
-			break;
-	} else
-		gen_cntl &= ~(0x4c);
-	aty_st_8(CRTC_GEN_CNTL, gen_cntl, par);
-
-#ifdef CONFIG_PMAC_BACKLIGHT
-	if ((_machine == _MACH_Pmac) && !blank)
-		set_backlight_enable(1);
-#endif				/* CONFIG_PMAC_BACKLIGHT */
-	return 0;
-}
-
-    /*
-     *  Set a single color register. The values supplied are already
-     *  rounded down to the hardware's capabilities (according to the
-     *  entries in the var structure). Return != 0 for invalid regno.
-     */
-
-static int atyfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			   u_int transp, struct fb_info *info)
-{
-	struct atyfb_par *par = (struct atyfb_par *) info->par;
-	int i, scale;
-	u32 *pal = info->pseudo_palette;
-
-	if (regno > 255)
-		return 1;
-	red >>= 8;
-	green >>= 8;
-	blue >>= 8;
-	i = aty_ld_8(DAC_CNTL, par) & 0xfc;
-	if (M64_HAS(EXTRA_BRIGHT))
-		i |= 0x2;	/*DAC_CNTL|0x2 turns off the extra brightness for gt */
-	aty_st_8(DAC_CNTL, i, par);
-	aty_st_8(DAC_MASK, 0xff, par);
-	scale = (M64_HAS(INTEGRATED) && info->var.bits_per_pixel == 16) ? 3 : 0;
-#ifdef CONFIG_ATARI
-	out_8(&par->aty_cmap_regs->windex, regno << scale);
-	out_8(&par->aty_cmap_regs->lut, red);
-	out_8(&par->aty_cmap_regs->lut, green);
-	out_8(&par->aty_cmap_regs->lut, blue);
-#else
-	writeb(regno << scale, &par->aty_cmap_regs->windex);
-	writeb(red, &par->aty_cmap_regs->lut);
-	writeb(green, &par->aty_cmap_regs->lut);
-	writeb(blue, &par->aty_cmap_regs->lut);
-#endif
-	if (regno < 16)
-		switch (info->var.bits_per_pixel) {
-		case 16:
-			pal[regno] = (regno << 10) | (regno << 5) | regno;
-			break;
-		case 24:
-			pal[regno] = (regno << 16) | (regno << 8) | regno;
-			break;
-		case 32:
-			i = (regno << 8) | regno;
-			pal[regno] = (i << 16) | i;
-			break;
-		}
-	return 0;
-}
-
 #ifdef MODULE
-int __init init_module(void)
-{
-	atyfb_init();
-	return fb_list ? 0 : -ENXIO;
-}
+module_exit(atyfb_exit);
+#endif
 
-void cleanup_module(void)
-{
-	struct fb_info *info = fb_list;
-	struct atyfb_par *par = (struct atyfb_par *) info->par;		
-	unregister_framebuffer(info);
-
-#ifndef __sparc__
-	if (par->ati_regbase)
-		iounmap(par->ati_regbase);
-	if (info->screen_base)
-		iounmap(info->screen_base);
-#ifdef __BIG_ENDIAN
-	if (par->cursor && par->cursor->ram)
-		iounmap(par->cursor->ram);
-#endif
-#endif
-	if (par->cursor)
-		kfree(par->cursor);
-#ifdef __sparc__
-	if (par->mmap_map)
-		kfree(par->mmap_map);
-#endif
-	kfree(info);
-}
-
-#endif
+MODULE_DESCRIPTION("FBDev driver for ATI Mach64 cards");
 MODULE_LICENSE("GPL");
+module_param(noaccel, bool, 0);
+MODULE_PARM_DESC(noaccel, "bool: disable acceleration");
+module_param(vram, int, 0);
+MODULE_PARM_DESC(vram, "int: override size of video ram");
+module_param(pll, int, 0);
+MODULE_PARM_DESC(pll, "int: override video clock");
+module_param(mclk, int, 0);
+MODULE_PARM_DESC(mclk, "int: override memory clock");
+module_param(xclk, int, 0);
+MODULE_PARM_DESC(xclk, "int: override accelerated engine clock");
+#ifdef CONFIG_PPC
+module_param(vmode, int, 0);
+MODULE_PARM_DESC(vmode, "int: video mode for mac");
+module_param(cmode, int, 0);
+MODULE_PARM_DESC(cmode, "int: color mode for mac");
+#endif
+module_param(mode, charp, 0);
+MODULE_PARM_DESC(mode, "Specify resolution as \"<xres>x<yres>[-<bpp>][@<refresh>]\" ");
+#ifdef CONFIG_MTRR
+module_param(nomtrr, bool, 0);
+MODULE_PARM_DESC(nomtrr, "bool: disable use of MTRR registers");
+#endif
