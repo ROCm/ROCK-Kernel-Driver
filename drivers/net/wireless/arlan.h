@@ -367,7 +367,7 @@ struct arlan_private {
       volatile long long tx_last_cleared;
       volatile int 	retransmissions;
       volatile int 	interrupt_ack_requested;
-      volatile long	command_lock;
+      spinlock_t lock;
       volatile int	rx_command_needed;
       volatile int	tx_command_needed;
       volatile int 	waiting_command_mask;
