@@ -31,15 +31,12 @@
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
-#include <linux/ioport.h>
 #include <linux/errno.h>
-
 #include <linux/i2c.h>
 #include <linux/i2c-algo-pcf.h>
 #include "i2c-pcf8584.h"
+
 
 /* ----- global defines ----------------------------------------------- */
 #define DEB(x) if (i2c_debug>=1) x

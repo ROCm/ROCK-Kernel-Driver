@@ -267,7 +267,6 @@ static char version[] __initdata = "airport.c 0.13a (Benjamin Herrenschmidt <ben
 MODULE_AUTHOR("Benjamin Herrenschmidt <benh@kernel.crashing.org>");
 MODULE_DESCRIPTION("Driver for the Apple Airport wireless card.");
 MODULE_LICENSE("Dual MPL/GPL");
-EXPORT_NO_SYMBOLS;
 
 static int __init
 init_airport(void)

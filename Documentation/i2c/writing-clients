@@ -448,9 +448,9 @@ For now, you can ignore the `flags' parameter. It is there for future use.
     /* Note that we reserve some space for foo_data too. If you don't
        need it, remove it. We do it here to help to lessen memory
        fragmentation. */
-    if (! (new_client = kmalloc(sizeof(struct i2c_client)) + 
+    if (! (new_client = kmalloc(sizeof(struct i2c_client) + 
                                 sizeof(struct foo_data),
-                                GFP_KERNEL)) {
+                                GFP_KERNEL))) {
       err = -ENOMEM;
       goto ERROR0;
     }

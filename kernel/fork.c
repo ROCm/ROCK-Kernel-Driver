@@ -74,6 +74,9 @@ int nr_processes(void)
 
 void __put_task_struct(struct task_struct *tsk)
 {
+	WARN_ON(!(tsk->state & (TASK_DEAD | TASK_ZOMBIE)));
+	WARN_ON(atomic_read(&tsk->usage));
+
 	if (tsk != current) {
 		free_thread_info(tsk->thread_info);
 		kmem_cache_free(task_struct_cachep,tsk);
@@ -217,7 +220,9 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 	*tsk = *orig;
 	tsk->thread_info = ti;
 	ti->task = tsk;
-	atomic_set(&tsk->usage,1);
+
+	/* One for us, one for whoever does the "release_task()" (usually parent) */
+	atomic_set(&tsk->usage,2);
 	return tsk;
 }
 

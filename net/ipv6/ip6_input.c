@@ -47,7 +47,7 @@ static inline int ip6_rcv_finish( struct sk_buff *skb)
 	if (skb->dst == NULL)
 		ip6_route_input(skb);
 
-	return skb->dst->input(skb);
+	return dst_input(skb);
 }
 
 int ipv6_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
@@ -235,7 +235,7 @@ int ip6_mc_input(struct sk_buff *skb)
 				skb2 = skb;
 			}
 
-			dst->output(skb2);
+			dst_output(skb2);
 		}
 	}
 #endif

@@ -52,10 +52,10 @@ Modified transactions
 We have found some I2C devices that needs the following modifications:
 
   Flag I2C_M_NOSTART: 
-    In a combined transaction, no 'S Addr' is generated at some point.
-    For example, setting I2C_M_NOSTART on the second partial message
+    In a combined transaction, no 'S Addr Wr/Rd [A]' is generated at some
+    point. For example, setting I2C_M_NOSTART on the second partial message
     generates something like:
-      S Addr Rd [A] [Data] NA Wr [A] Data [A] P
+      S Addr Rd [A] [Data] NA Data [A] P
     If you set the I2C_M_NOSTART variable for the first partial message,
     we do not generate Addr, but we do generate the startbit S. This will
     probably confuse all other clients on your bus, so don't try this.
@@ -65,4 +65,12 @@ We have found some I2C devices that needs the following modifications:
     need to emit an Rd instead of a Wr, or vice versa, you set this
     flag. For example:
       S Addr Rd [A] Data [A] Data [A] ... [A] Data [A] P
-                      
+
+  Flags I2C_M_IGNORE_NAK
+    Normally message is interrupted immediately if there is [NA] from the
+    client. Setting this flag treats any [NA] as [A], and all of
+    message is sent.
+    These messages may still fail to SCL lo->hi timeout.
+
+  Flags I2C_M_NO_RD_ACK
+    In a read message, master A/NA bit is skipped.

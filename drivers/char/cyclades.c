@@ -903,18 +903,18 @@ serial_paranoia_check(struct cyclades_port *info,
         "cyc Warning: cyclades_port out of range for (%s) in %s\n";
 
     if (!info) {
-        printk(badinfo, kdevname(device), routine);
+        printk(badinfo, cdevname(device), routine);
         return 1;
     }
 
     if( (long)info < (long)(&cy_port[0])
     || (long)(&cy_port[NR_PORTS]) < (long)info ){
-        printk(badrange, kdevname(device), routine);
+        printk(badrange, cdevname(device), routine);
         return 1;
     }
 
     if (info->magic != CYCLADES_MAGIC) {
-        printk(badmagic, kdevname(device), routine);
+        printk(badmagic, cdevname(device), routine);
         return 1;
     }
 #endif

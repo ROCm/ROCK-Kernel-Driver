@@ -544,5 +544,3 @@ MODULE_DESCRIPTION("Anakin serial driver");
 MODULE_AUTHOR("Tak-Shing Chan <chan@aleph1.co.uk>");
 MODULE_SUPPORTED_DEVICE("ttyAN");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

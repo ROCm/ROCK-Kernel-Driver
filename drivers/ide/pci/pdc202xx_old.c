@@ -955,5 +955,3 @@ module_exit(pdc202xx_ide_exit);
 MODULE_AUTHOR("Andre Hedrick, Frank Tiernan");
 MODULE_DESCRIPTION("PCI driver module for older Promise IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

@@ -718,11 +718,11 @@ static inline int sanity_check(SLMP_INFO *info,
 		"Warning: null synclinkmp_struct for (%s) in %s\n";
 
 	if (!info) {
-		printk(badinfo, kdevname(device), routine);
+		printk(badinfo, cdevname(device), routine);
 		return 1;
 	}
 	if (info->magic != MGSL_MAGIC) {
-		printk(badmagic, kdevname(device), routine);
+		printk(badmagic, cdevname(device), routine);
 		return 1;
 	}
 #endif

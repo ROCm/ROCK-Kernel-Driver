@@ -3,8 +3,8 @@
 #
 
 EXTRA_TARGETS	:= head.o
-
 EXTRA_AFLAGS	:= $(CFLAGS)
+CFLAGS		+= -Werror -Wno-sign-compare
 
 obj-y    := entry.o traps.o process.o init_task.o osf_sys.o irq.o \
 	    irq_alpha.o signal.o setup.o ptrace.o time.o semaphore.o \

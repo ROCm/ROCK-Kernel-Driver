@@ -3,6 +3,8 @@
 #
 
 EXTRA_AFLAGS := $(CFLAGS)
+CFLAGS += -Werror
+
 L_TARGET := lib.a
 
 # Many of these routines have implementations tuned for ev6.

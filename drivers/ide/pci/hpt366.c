@@ -1221,5 +1221,3 @@ module_exit(hpt366_ide_exit);
 MODULE_AUTHOR("Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for Highpoint HPT366 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

@@ -1009,12 +1009,12 @@ init_xfs_fs( void )
 	if (error < 0)
 		return error;
 
+	si_meminfo(&si);
+	xfs_physmem = si.totalram;
+
 	error = pagebuf_init();
 	if (error < 0)
 		goto out;
-
-	si_meminfo(&si);
-	xfs_physmem = si.totalram;
 
 	vn_init();
 	xfs_init();

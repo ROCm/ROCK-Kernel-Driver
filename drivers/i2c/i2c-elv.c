@@ -21,20 +21,18 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-elv.c,v 1.21 2001/11/19 18:45:02 mds Exp $ */
+/* $Id: i2c-elv.c,v 1.27 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/init.h>
-#include <asm/uaccess.h>
 #include <linux/ioport.h>
-#include <asm/io.h>
 #include <linux/errno.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/io.h>
 
 #define DEFAULT_BASE 0x378
 static int base=0;
@@ -120,12 +118,13 @@ fail:
  * This is only done when more than one hardware adapter is supported.
  */
 static struct i2c_algo_bit_data bit_elv_data = {
-	NULL,
-	bit_elv_setsda,
-	bit_elv_setscl,
-	bit_elv_getsda,
-	bit_elv_getscl,
-	80, 80, 100,		/*	waits, timeout */
+	.setsda		= bit_elv_setsda,
+	.setscl		= bit_elv_setscl,
+	.getsda		= bit_elv_getsda,
+	.getscl		= bit_elv_getscl,
+	.udelay		= 80,
+	.mdelay		= 80,
+	.timeout	= HZ
 };
 
 static struct i2c_adapter bit_elv_ops = {

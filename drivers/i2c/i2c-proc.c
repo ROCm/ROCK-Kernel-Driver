@@ -29,10 +29,10 @@
 #include <linux/ctype.h>
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
+#include <linux/init.h>
 #include <linux/ioport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-proc.h>
-#include <linux/init.h>
 #include <asm/uaccess.h>
 
 static int i2c_create_name(char **name, const char *prefix,
@@ -87,7 +87,7 @@ static struct ctl_table_header *i2c_proc_header;
    (for a LM78 chip on the ISA bus at port 0x310), or lm75-i2c-3-4e (for
    a LM75 chip on the third i2c bus at address 0x4e).  
    name is allocated first. */
-int i2c_create_name(char **name, const char *prefix,
+static int i2c_create_name(char **name, const char *prefix,
 			struct i2c_adapter *adapter, int addr)
 {
 	char name_buffer[50];
@@ -200,7 +200,8 @@ void i2c_deregister_entry(int id)
 {
 	ctl_table *table;
 	char *temp;
-	id -= 256;
+
+	id -= 256;	
 	if (i2c_entries[id]) {
 		table = i2c_entries[id]->ctl_table;
 		unregister_sysctl_table(i2c_entries[id]);
@@ -213,7 +214,7 @@ void i2c_deregister_entry(int id)
 	}
 }
 
-int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,
+static int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,
 		       void *buffer, size_t * lenp)
 {
 	char BUF[SENSORS_PREFIX_MAX + 30];
@@ -251,7 +252,7 @@ int i2c_proc_chips(ctl_table * ctl, int write, struct file *filp,
 	return 0;
 }
 
-int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
+static int i2c_sysctl_chips(ctl_table * table, int *name, int nlen,
 			 void *oldval, size_t * oldlenp, void *newval,
 			 size_t newlen, void **context)
 {
@@ -413,7 +414,7 @@ int i2c_sysctl_real(ctl_table * table, int *name, int nlen,
    WARNING! This is tricky code. I have tested it, but there may still be
             hidden bugs in it, even leading to crashes and things!
 */
-int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
+static int i2c_parse_reals(int *nrels, void *buffer, int bufsize,
 			 long *results, int magnitude)
 {
 	int maxels, min, mag;
@@ -822,11 +823,11 @@ static void __exit i2c_proc_exit(void)
 	unregister_sysctl_table(i2c_proc_header);
 }
 
-EXPORT_SYMBOL(i2c_deregister_entry);
-EXPORT_SYMBOL(i2c_detect);
-EXPORT_SYMBOL(i2c_proc_real);
 EXPORT_SYMBOL(i2c_register_entry);
+EXPORT_SYMBOL(i2c_deregister_entry);
+EXPORT_SYMBOL(i2c_proc_real);
 EXPORT_SYMBOL(i2c_sysctl_real);
+EXPORT_SYMBOL(i2c_detect);
 
 MODULE_AUTHOR("Frodo Looijaard <frodol@dds.nl>");
 MODULE_DESCRIPTION("i2c-proc driver");

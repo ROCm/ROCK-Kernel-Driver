@@ -821,5 +821,3 @@ module_exit(piix_ide_exit);
 MODULE_AUTHOR("Andre Hedrick, Andrzej Krzysztofowicz");
 MODULE_DESCRIPTION("PCI driver module for Intel PIIX IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

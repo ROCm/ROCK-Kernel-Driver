@@ -33,8 +33,6 @@
 #include "diva.h"
 
 
-EXPORT_NO_SYMBOLS;
-
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
 extern diva_entity_queue_t adapter_queue;
 extern void divas_get_version(char *);

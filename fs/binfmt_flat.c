@@ -669,7 +669,5 @@ static void __exit exit_flat_binfmt(void)
 	unregister_binfmt(&flat_format);
 }
 
-EXPORT_NO_SYMBOLS;
-
 module_init(init_flat_binfmt);
 module_exit(exit_flat_binfmt);

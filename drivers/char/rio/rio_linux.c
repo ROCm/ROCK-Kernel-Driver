@@ -302,11 +302,11 @@ static inline int rio_paranoia_check(struct rio_port const * port,
     KERN_ERR "rio: Warning: null rio port for device %s in %s\n";
  
   if (!port) {
-    printk (badinfo, kdevname(device), routine);
+    printk (badinfo, cdevname(device), routine);
     return 1;
   }
   if (port->magic != RIO_MAGIC) {
-    printk (badmagic, kdevname(device), routine);
+    printk (badmagic, cdevname(device), routine);
     return 1;
   }
 

@@ -466,5 +466,3 @@ module_exit(cy82c693_ide_exit);
 MODULE_AUTHOR("Andreas Krebs, Andre Hedrick");
 MODULE_DESCRIPTION("PCI driver module for the Cypress CY82C693 IDE");
 MODULE_LICENSE("GPL");
-
-EXPORT_NO_SYMBOLS;

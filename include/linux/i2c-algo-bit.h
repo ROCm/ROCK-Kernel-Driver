@@ -21,12 +21,10 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-algo-bit.h,v 1.7 1999/12/21 23:45:58 frodo Exp $ */
+/* $Id: i2c-algo-bit.h,v 1.10 2003/01/21 08:08:16 kmalkki Exp $ */
 
-#ifndef I2C_ALGO_BIT_H
-#define I2C_ALGO_BIT_H 1
-
-#include <linux/i2c.h>
+#ifndef _LINUX_I2C_ALGO_BIT_H
+#define _LINUX_I2C_ALGO_BIT_H
 
 /* --- Defines for bit-adapters ---------------------------------------	*/
 /*
@@ -53,4 +51,4 @@ struct i2c_algo_bit_data {
 int i2c_bit_add_bus(struct i2c_adapter *);
 int i2c_bit_del_bus(struct i2c_adapter *);
 
-#endif /* I2C_ALGO_BIT_H */
+#endif /* _LINUX_I2C_ALGO_BIT_H */

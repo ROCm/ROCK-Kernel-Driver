@@ -37,6 +37,7 @@ struct mid_q_entry *
 AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 {
 	struct mid_q_entry *temp;
+	int timeout = 10 * HZ;
 
 /* BB add spinlock to protect midq for each session BB */
 	if (ses == NULL) {
@@ -57,13 +58,22 @@ AllocMidQEntry(struct smb_hdr *smb_buffer, struct cifsSesInfo *ses)
 		temp->ses = ses;
 		temp->tsk = current;
 	}
+
+	while ((ses->server->tcpStatus != CifsGood) && (timeout > 0)){ 
+		/* Give the tcp thread up to 10 seconds to reconnect */
+		/* Should we wake up tcp thread first? BB  */
+		timeout = wait_event_interruptible_timeout(ses->server->response_q,
+			(ses->server->tcpStatus == CifsGood), timeout);
+        cFYI(1,("timeout (after reconnection wait) %d",timeout));
+	}
+
 	if (ses->server->tcpStatus == CifsGood) {
 		write_lock(&GlobalMid_Lock);
 		list_add_tail(&temp->qhead, &ses->server->pending_mid_q);
 		atomic_inc(&midCount);
 		temp->midState = MID_REQUEST_ALLOCATED;
 		write_unlock(&GlobalMid_Lock);
-	} else {		/* could add more reconnect code here BB */
+	} else { 
 		cERROR(1,("Need to reconnect after session died to server"));
 		if (temp)
 			kmem_cache_free(cifs_mid_cachep, temp);
@@ -106,16 +116,16 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 	smb_msg.msg_iovlen = 1;
 	smb_msg.msg_control = NULL;
 	smb_msg.msg_controllen = 0;
-	smb_msg.msg_flags = MSG_DONTWAIT + MSG_NOSIGNAL;	/* BB add more flags? */
+	smb_msg.msg_flags = MSG_DONTWAIT + MSG_NOSIGNAL; /* BB add more flags?*/
 
-	/* smb header is converted in header_assemble. bcc and rest of SMB word area, 
-	   and byte area if necessary, is converted to littleendian in cifssmb.c and RFC1001 
-	   len is converted to bigendian in smb_send */
+	/* smb header is converted in header_assemble. bcc and rest of SMB word
+	   area, and byte area if necessary, is converted to littleendian in 
+	   cifssmb.c and RFC1001 len is converted to bigendian in smb_send */
 	if (smb_buf_length > 12)
 		smb_buffer->Flags2 = cpu_to_le16(smb_buffer->Flags2);
 
-    /* if(smb_buffer->Flags2 & SMBFLG2_SECURITY_SIGNATURE)
-        sign_smb(smb_buffer); */ /* BB enable when signing tested more */
+	/* if(smb_buffer->Flags2 & SMBFLG2_SECURITY_SIGNATURE)
+		sign_smb(smb_buffer); */ /* BB enable when signing tested more */
 
 	smb_buffer->smb_buf_length = cpu_to_be32(smb_buffer->smb_buf_length);
 	cFYI(1, ("Sending smb of length %d ", smb_buf_length));
@@ -148,7 +158,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 
 	midQ = AllocMidQEntry(in_buf, ses);
 	if (midQ == NULL)
-		return -EIO;	/* reconnect should be done, if possible, in AllocMidQEntry */
+		return -EIO;
 	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE) {
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
@@ -219,7 +229,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			*pbytes_returned = out_buf->smb_buf_length;
 
 			/* BB special case reconnect tid and reconnect uid here? */
-			rc = map_smb_to_linux_error(out_buf);	/* BB watch endianness here BB */
+			rc = map_smb_to_linux_error(out_buf);
 
 			/* convert ByteCount if necessary */
 			if (receive_len >=

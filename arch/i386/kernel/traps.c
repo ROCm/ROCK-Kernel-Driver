@@ -775,7 +775,7 @@ void __init trap_init_f00f_bug(void)
 }
 #endif
 
-#define _set_gate(gate_addr,type,dpl,addr) \
+#define _set_gate(gate_addr,type,dpl,addr,seg) \
 do { \
   int __d0, __d1; \
   __asm__ __volatile__ ("movw %%dx,%%ax\n\t" \
@@ -785,7 +785,7 @@ do { \
 	:"=m" (*((long *) (gate_addr))), \
 	 "=m" (*(1+(long *) (gate_addr))), "=&a" (__d0), "=&d" (__d1) \
 	:"i" ((short) (0x8000+(dpl<<13)+(type<<8))), \
-	 "3" ((char *) (addr)),"2" (__KERNEL_CS << 16)); \
+	 "3" ((char *) (addr)),"2" ((seg) << 16)); \
 } while (0)
 
 
@@ -797,22 +797,27 @@ do { \
  */
 void set_intr_gate(unsigned int n, void *addr)
 {
-	_set_gate(idt_table+n,14,0,addr);
+	_set_gate(idt_table+n,14,0,addr,__KERNEL_CS);
 }
 
 static void __init set_trap_gate(unsigned int n, void *addr)
 {
-	_set_gate(idt_table+n,15,0,addr);
+	_set_gate(idt_table+n,15,0,addr,__KERNEL_CS);
 }
 
 static void __init set_system_gate(unsigned int n, void *addr)
 {
-	_set_gate(idt_table+n,15,3,addr);
+	_set_gate(idt_table+n,15,3,addr,__KERNEL_CS);
 }
 
 static void __init set_call_gate(void *a, void *addr)
 {
-	_set_gate(a,12,3,addr);
+	_set_gate(a,12,3,addr,__KERNEL_CS);
+}
+
+static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
+{
+	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
 }
 
 
@@ -843,7 +848,7 @@ void __init trap_init(void)
 	set_system_gate(5,&bounds);
 	set_trap_gate(6,&invalid_op);
 	set_trap_gate(7,&device_not_available);
-	set_trap_gate(8,&double_fault);
+	set_task_gate(8,GDT_ENTRY_DOUBLEFAULT_TSS);
 	set_trap_gate(9,&coprocessor_segment_overrun);
 	set_trap_gate(10,&invalid_TSS);
 	set_trap_gate(11,&segment_not_present);

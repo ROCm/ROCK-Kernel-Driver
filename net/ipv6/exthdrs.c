@@ -288,7 +288,7 @@ looped_back:
 	dst_release(xchg(&skb->dst, NULL));
 	ip6_route_input(skb);
 	if (skb->dst->error) {
-		skb->dst->input(skb);
+		dst_input(skb);
 		return -1;
 	}
 	if (skb->dst->dev->flags&IFF_LOOPBACK) {
@@ -302,7 +302,7 @@ looped_back:
 		goto looped_back;
 	}
 
-	skb->dst->input(skb);
+	dst_input(skb);
 	return -1;
 }
 

@@ -885,8 +885,6 @@ static void __exit sa1100_serial_exit(void)
 module_init(sa1100_serial_init);
 module_exit(sa1100_serial_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR("Deep Blue Solutions Ltd");
 MODULE_DESCRIPTION("SA1100 generic serial port driver $Revision: 1.50 $");
 MODULE_LICENSE("GPL");

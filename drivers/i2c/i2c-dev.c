@@ -28,25 +28,22 @@
 /* The devfs code is contributed by Philipp Matthias Hahn 
    <pmhahn@titan.lahn.de> */
 
-/* $Id: i2c-dev.c,v 1.48 2002/10/01 14:10:04 ac9410 Exp $ */
+/* $Id: i2c-dev.c,v 1.53 2003/01/21 08:08:16 kmalkki Exp $ */
 
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/fs.h>
 #include <linux/slab.h>
-#include <linux/version.h>
 #include <linux/smp_lock.h>
 #include <linux/devfs_fs_kernel.h>
-
+#include <linux/init.h>
+#include <linux/i2c.h>
+#include <linux/i2c-dev.h>
+#include <asm/uaccess.h>
 
 /* If you want debugging uncomment: */
 /* #define DEBUG */
 
-#include <linux/init.h>
-#include <asm/uaccess.h>
-#include <linux/i2c.h>
-#include <linux/i2c-dev.h>
 
 /* struct file_operations changed too often in the 2.1 series for nice code */
 
@@ -107,9 +104,9 @@ static ssize_t i2cdev_read (struct file *file, char *buf, size_t count,
 
 	struct i2c_client *client = (struct i2c_client *)file->private_data;
 
-	if(count > 8192)
+	if (count > 8192)
 		count = 8192;
-		
+
 	/* copy user space data to kernel space. */
 	tmp = kmalloc(count,GFP_KERNEL);
 	if (tmp==NULL)

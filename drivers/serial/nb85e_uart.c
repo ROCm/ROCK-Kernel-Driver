@@ -611,8 +611,6 @@ static void __exit nb85e_uart_exit (void)
 module_init (nb85e_uart_init);
 module_exit (nb85e_uart_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_AUTHOR ("Miles Bader");
 MODULE_DESCRIPTION ("NEC " NB85E_UART_CHIP_NAME " on-chip UART");
 MODULE_LICENSE ("GPL");

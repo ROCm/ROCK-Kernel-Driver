@@ -545,7 +545,5 @@ static void __exit serial21285_exit(void)
 module_init(serial21285_init);
 module_exit(serial21285_exit);
 
-EXPORT_NO_SYMBOLS;
-
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Intel Footbridge (21285) serial driver $Revision: 1.37 $");

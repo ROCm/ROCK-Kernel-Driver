@@ -734,5 +734,3 @@ static int aac_procinfo(char *proc_buffer, char **start_ptr,off_t offset,
 	*start_ptr = proc_buffer;
 	return sprintf(proc_buffer, "%s  %d\n", "Raid Controller, scsi hba number", host_no);
 }
-
-EXPORT_NO_SYMBOLS;

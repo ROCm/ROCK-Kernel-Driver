@@ -21,7 +21,7 @@
 /* With some changes from Kyösti Mälkki <kmalkki@cc.hut.fi> and even
    Frodo Looijaard <frodol@dds.nl> */
 
-/* $Id: i2c-philips-par.c,v 1.23 2002/02/06 08:50:58 simon Exp $ */
+/* $Id: i2c-philips-par.c,v 1.29 2003/01/21 08:08:16 kmalkki Exp $ */
 
 #include <linux/kernel.h>
 #include <linux/ioport.h>
@@ -31,10 +31,6 @@
 #include <linux/parport.h>
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
-
-#ifndef __exit
-#define __exit __init
-#endif
 
 static int type;
 
@@ -135,21 +131,22 @@ static int bit_lp_getsda2(void *data)
  */
  
 static struct i2c_algo_bit_data bit_lp_data = {
-	NULL,
-	bit_lp_setsda,
-	bit_lp_setscl,
-	bit_lp_getsda,
-	bit_lp_getscl,
-	80, 80, 100,		/*	waits, timeout */
+	.setsda		= bit_lp_setsda,
+	.setscl		= bit_lp_setscl,
+	.getsda		= bit_lp_getsda,
+	.getscl		= bit_lp_getscl,
+	.udelay		= 80,
+	.mdelay		= 80,
+	.timeout	= HZ
 }; 
 
 static struct i2c_algo_bit_data bit_lp_data2 = {
-	NULL,
-	bit_lp_setsda2,
-	bit_lp_setscl2,
-	bit_lp_getsda2,
-	NULL,
-	80, 80, 100,		/*	waits, timeout */
+	.setsda		= bit_lp_setsda2,
+	.setscl		= bit_lp_setscl2,
+	.getsda		= bit_lp_getsda2,
+	.udelay		= 80,
+	.mdelay		= 80,
+	.timeout	= HZ
 }; 
 
 static struct i2c_adapter bit_lp_ops = {

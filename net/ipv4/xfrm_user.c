@@ -1,6 +1,13 @@
 /* xfrm_user.c: User interface to configure xfrm engine.
  *
  * Copyright (C) 2002 David S. Miller (davem@redhat.com)
+ *
+ * Changes
+ *
+ *	Mitsuru KANDA @USAGI       : IPv6 Support 
+ * 	Kazunori MIYAZAWA @USAGI   :
+ * 	Kunihiro Ishiguro          :
+ * 	
  */
 
 #include <linux/module.h>
@@ -17,6 +24,9 @@
 #include <linux/ipsec.h>
 #include <linux/init.h>
 #include <linux/security.h>
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+#include <linux/in6.h>
+#endif
 #include <net/sock.h>
 #include <net/xfrm.h>
 
@@ -63,10 +73,14 @@ static int verify_newsa_info(struct xfrm_usersa_info *p,
 	case AF_INET:
 		break;
 
-	case AF_INET6: /* XXX */
+	case AF_INET6:
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+		break;
+#else
 		err = -EAFNOSUPPORT;
+		goto out;
+#endif
 
-		/* fallthru */
 	default:
 		goto out;
 	};
@@ -171,7 +185,19 @@ static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
 		goto error;
 
 	err = -ENOENT;
-	x->type = xfrm_get_type(x->id.proto);
+	switch (x->props.family) {
+	case AF_INET:
+		x->type = xfrm_get_type(x->id.proto);
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		x->type = xfrm6_get_type(x->id.proto);
+		break;
+#endif
+	default:
+		x->type = NULL;
+		break;
+	}
 	if (x->type == NULL)
 		goto error;
 
@@ -206,8 +232,21 @@ static int xfrm_add_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	if (!x)
 		return err;
 
-	x1 = xfrm_state_lookup(x->props.saddr.xfrm4_addr,
-			       x->id.spi, x->id.proto);
+	switch (x->props.family) {
+	case AF_INET:
+		x1 = xfrm_state_lookup(x->props.saddr.xfrm4_addr,
+				       x->id.spi, x->id.proto);
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		x1 = xfrm6_state_lookup((struct in6_addr*)x->props.saddr.a6,
+					x->id.spi, x->id.proto);
+		break;
+#endif
+	default:
+		x1 = NULL;
+		break;
+	}
 	if (x1) {
 		xfrm_state_put(x);
 		xfrm_state_put(x1);
@@ -224,7 +263,19 @@ static int xfrm_del_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct xfrm_state *x;
 	struct xfrm_usersa_id *p = NLMSG_DATA(nlh);
 
-	x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+	switch (p->family) {
+	case AF_INET:
+		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		x = xfrm6_state_lookup((struct in6_addr*)p->saddr.a6, p->spi, p->proto);
+		break;
+#endif
+	default:
+		x = NULL;
+		break;
+	}
 	if (x == NULL)
 		return -ESRCH;
 
@@ -342,7 +393,19 @@ static int xfrm_get_sa(struct sk_buff *skb, struct nlmsghdr *nlh, void **xfrma)
 	struct sk_buff *resp_skb;
 	int err;
 
-	x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+	switch (p->family) {
+	case AF_INET:
+		x = xfrm_state_lookup(p->saddr.xfrm4_addr, p->spi, p->proto);
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		x = xfrm6_state_lookup((struct in6_addr*)p->saddr.a6, p->spi, p->proto);
+		break;
+#endif
+	default:
+		x = NULL;
+		break;
+	}
 	err = -ESRCH;
 	if (x == NULL)
 		goto out_noput;
@@ -393,9 +456,23 @@ static int xfrm_alloc_userspi(struct sk_buff *skb, struct nlmsghdr *nlh, void **
 	err = verify_userspi_info(p);
 	if (err)
 		goto out_noput;
-	x = xfrm_find_acq(p->info.mode, p->info.reqid, p->info.id.proto,
-			  p->info.sel.daddr.xfrm4_addr,
-			  p->info.sel.saddr.xfrm4_addr, 1);
+	switch (p->info.family) {
+	case AF_INET:
+		x = xfrm_find_acq(p->info.mode, p->info.reqid, p->info.id.proto,
+				  p->info.sel.daddr.xfrm4_addr,
+				  p->info.sel.saddr.xfrm4_addr, 1);
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		x = xfrm6_find_acq(p->info.mode, p->info.reqid, p->info.id.proto,
+				   (struct in6_addr*)p->info.sel.daddr.a6,
+				   (struct in6_addr*)p->info.sel.saddr.a6, 1);
+		break;
+#endif
+	default:
+		x = NULL;
+		break;
+	}
 	err = -ENOENT;
 	if (x == NULL)
 		goto out_noput;

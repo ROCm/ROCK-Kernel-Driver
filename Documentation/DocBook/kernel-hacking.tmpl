@@ -993,25 +993,6 @@ foo_open (...)
    </para>
   </sect1>
 
-  <sect1 id="sym-exportnosymbols">
-   <title><symbol>EXPORT_NO_SYMBOLS</symbol>
-    <filename class=headerfile>include/linux/module.h</filename></title>
-
-   <para>
-    If a module exports no symbols then you can specify
-    <programlisting>
-EXPORT_NO_SYMBOLS;
-    </programlisting>
-    anywhere in the module.
-    In kernel 2.4 and earlier, if a module contains neither
-    <function>EXPORT_SYMBOL()</function> nor
-    <symbol>EXPORT_NO_SYMBOLS</symbol> then the module defaults to
-    exporting all non-static global symbols.
-    In kernel 2.5 onwards you must explicitly specify whether a module
-    exports symbols or not.
-   </para>
-  </sect1>
-
   <sect1 id="sym-exportsymbols-gpl">
    <title><function>EXPORT_SYMBOL_GPL()</function>
     <filename class=headerfile>include/linux/module.h</filename></title>

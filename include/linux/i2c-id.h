@@ -20,10 +20,11 @@
     Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.		     */
 /* ------------------------------------------------------------------------- */
 
-/* $Id: i2c-id.h,v 1.56 2002/10/13 15:50:02 mds Exp $ */
+/* $Id: i2c-id.h,v 1.63 2003/01/21 08:08:16 kmalkki Exp $ */
 
-#ifndef I2C_ID_H
-#define I2C_ID_H
+#ifndef LINUX_I2C_ID_H
+#define LINUX_I2C_ID_H
+
 /*
  * This file is part of the i2c-bus package and contains the identifier
  * values for drivers, adapters and other folk populating these serial
@@ -95,7 +96,8 @@
 #define I2C_DRIVERID_ADV717x	48     /* ADV 7175/7176 video encoder	*/
 #define I2C_DRIVERID_ZR36067	49     /* Zoran 36067 video encoder	*/
 #define I2C_DRIVERID_ZR36120	50     /* Zoran 36120 video encoder	*/
-#define I2C_DRIVERID_24LC32A	51		/* Microchip 24LC32A 32k EEPROM	*/
+#define I2C_DRIVERID_24LC32A	51	/* Microchip 24LC32A 32k EEPROM	*/
+#define I2C_DRIVERID_STM41T00	52	/* real time clock		*/
 
 
 
@@ -147,6 +149,7 @@
 #define I2C_DRIVERID_SMARTBATT 1035
 #define I2C_DRIVERID_BMCSENSORS 1036
 #define I2C_DRIVERID_FS451 1037
+#define I2C_DRIVERID_W83627HF 1038
 
 /*
  * ---- Adapter types ----------------------------------------------------
@@ -172,6 +175,7 @@
 
 #define I2C_ALGO_MPC8XX 0x110000	/* MPC8xx PowerPC I2C algorithm */
 #define I2C_ALGO_OCP    0x120000	/* IBM or otherwise On-chip I2C algorithm */
+#define I2C_ALGO_BITHS	0x130000	/* enhanced bit style adapters	*/
 
 #define I2C_ALGO_EXP	0x800000	/* experimental			*/
 
@@ -250,4 +254,4 @@
 /* --- IPMB adapter						*/
 #define I2C_HW_IPMB 0x00
 
-#endif /* I2C_ID_H */
+#endif /* LINUX_I2C_ID_H */

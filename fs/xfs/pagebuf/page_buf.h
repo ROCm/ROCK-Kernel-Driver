@@ -215,8 +215,8 @@ typedef struct page_buf_s {
 	unsigned short		pb_error;	/* error code on I/O */
 	unsigned short		pb_page_count;	/* size of page array */
 	unsigned short		pb_offset;	/* page offset in first page */
+	unsigned short		pb_hash_index;	/* hash table index	*/
 	unsigned char		pb_locked;	/* page array is locked */
-	unsigned char		pb_hash_index;	/* hash table index	*/
 	struct page		**pb_pages;	/* array of page pointers */
 	struct page		*pb_page_array[PB_PAGES]; /* inline pages */
 #ifdef PAGEBUF_LOCK_TRACKING
@@ -350,7 +350,6 @@ extern int pagebuf_ispin( page_buf_t *); /* check if pagebuf is pinned	*/
 
 /* Reading and writing pages */
 
-extern void pagebuf_delwri_queue(page_buf_t *, int);
 extern void pagebuf_delwri_dequeue(page_buf_t *);
 
 #define PBDF_WAIT    0x01

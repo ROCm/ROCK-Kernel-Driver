@@ -22,7 +22,6 @@
 #include "io.h"
 #include "endian.h"
 
-EXPORT_NO_SYMBOLS;
 MODULE_DESCRIPTION("BeOS File System (BeFS) driver");
 MODULE_AUTHOR("Will Dyson");
 MODULE_LICENSE("GPL");

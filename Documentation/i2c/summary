@@ -4,7 +4,7 @@ I2C and SMBus
 =============
 
 I2C (pronounce: I squared C) is a protocol developed by Philips. It is a 
-slow two-wire protocol (10-100 kHz), but it suffices for many types of 
+slow two-wire protocol (10-400 kHz), but it suffices for many types of 
 devices.
 
 SMBus (System Management Bus) is a subset of the I2C protocol. Many
@@ -43,15 +43,15 @@ for device drivers.
 
 Included Bus Drivers
 ====================
-Note that not only stable drivers are patched into the kernel by 'mkpatch'.
+Note that only stable drivers are patched into the kernel by 'mkpatch'.
 
 
 Base modules
 ------------
 
-i2c-core: The basic I2C code, including the /proc interface
-i2c-dev:  The /dev interface
-i2c-proc: The /proc interface for device (client) drivers
+i2c-core: The basic I2C code, including the /proc/bus/i2c* interface
+i2c-dev:  The /dev/i2c-* interface
+i2c-proc: The /proc/sys/dev/sensors interface for device (client) drivers
 
 Algorithm drivers
 -----------------
@@ -59,7 +59,7 @@ Algorithm drivers
 i2c-algo-8xx:    An algorithm for CPM's I2C device in Motorola 8xx processors (NOT BUILT BY DEFAULT)
 i2c-algo-bit:    A bit-banging algorithm
 i2c-algo-pcf:    A PCF 8584 style algorithm
-i2c-algo-ibmocp: An algorithm for the I2C device in IBM 4xx processors (NOT BUILT BY DEFAULT)
+i2c-algo-ibm_ocp: An algorithm for the I2C device in IBM 4xx processors (NOT BUILT BY DEFAULT)
 
 Adapter drivers
 ---------------
@@ -68,7 +68,7 @@ i2c-elektor:     Elektor ISA card (uses i2c-algo-pcf)
 i2c-elv:         ELV parallel port adapter (uses i2c-algo-bit)
 i2c-pcf-epp:     PCF8584 on a EPP parallel port (uses i2c-algo-pcf) (NOT mkpatched)
 i2c-philips-par: Philips style parallel port adapter (uses i2c-algo-bit)
-i2c-adap_ibmocp:      IBM 4xx processor I2C device (uses i2c-algo-ibmocp) (NOT BUILT BY DEFAULT)
+i2c-adap-ibm_ocp: IBM 4xx processor I2C device (uses i2c-algo-ibm_ocp) (NOT BUILT BY DEFAULT)
 i2c-pport:       Primitive parallel port adapter (uses i2c-algo-bit)
 i2c-rpx:         RPX board Motorola 8xx I2C device (uses i2c-algo-8xx) (NOT BUILT BY DEFAULT)
 i2c-velleman:    Velleman K9000 parallel port adapter (uses i2c-algo-bit)

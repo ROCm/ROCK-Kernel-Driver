@@ -12,18 +12,14 @@
  * version 2 as published by the Free Software Foundation.
  */
 
-#include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
-
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/delay.h>
-
-#include <asm/hardware.h>
-
 #include <linux/i2c.h>
 #include <linux/i2c-algo-bit.h>
+#include <asm/hardware.h>
+
 
 static void frodo_setsda (void *data,int state)
 {
@@ -58,7 +54,7 @@ static struct i2c_algo_bit_data bit_frodo_data = {
 	.getscl		= frodo_getscl,
 	.udelay		= 80,
 	.mdelay		= 80,
-	.timeout	= 100
+	.timeout	= HZ
 };
 
 static struct i2c_adapter frodo_ops = {

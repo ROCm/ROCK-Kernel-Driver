@@ -136,34 +136,20 @@ config SPARC32
 config ISA
 	bool
 	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, MicroChannel
-	  (MCA) or VESA.  ISA is an older system, now being displaced by PCI;
-	  newer boards don't support it.  If you have ISA, say Y, otherwise N.
+	  ISA is found on Espresso only and is not supported currently.
+	  Say N
 
 config EISA
 	bool
-	---help---
-	  The Extended Industry Standard Architecture (EISA) bus was
-	  developed as an open alternative to the IBM MicroChannel bus.
-
-	  The EISA bus provided some of the features of the IBM MicroChannel
-	  bus while maintaining backward compatibility with cards made for
-	  the older ISA bus.  The EISA bus saw limited use between 1988 and
-	  1995 when it was made obsolete by the PCI bus.
-
-	  Say Y here if you are building a kernel for an EISA-based machine.
-
-	  Otherwise, say N.
+	help
+	  EISA is not supported.
+	  Say N
 
 config MCA
 	bool
 	help
-	  MicroChannel Architecture is found in some IBM PS/2 machines and
-	  laptops.  It is a bus system similar to PCI or ISA. See
-	  <file:Documentation/mca.txt> (and especially the web page given
-	  there) before attempting to build an MCA bus kernel.
+	  EISA is not supported.
+	  Say N
 
 config PCMCIA
 	tristate
@@ -242,8 +228,8 @@ config SUN_PM
 config SUN4
 	bool "Support for SUN4 machines (disables SUN4[CDM] support)"
 	help
-	  Say Y here if, and only if, your machine is a Sun4. Note that
-	  a kernel compiled with this option will run only on Sun4.
+	  Say Y here if, and only if, your machine is a sun4. Note that
+	  a kernel compiled with this option will run only on sun4.
 	  (And the current version will probably work only on sun4/330.)
 
 if !SUN4
@@ -251,15 +237,9 @@ if !SUN4
 config PCI
 	bool "Support for PCI and PS/2 keyboard/mouse"
 	help
-	  Find out whether you have a PCI motherboard. PCI is the name of a
-	  bus system, i.e. the way the CPU talks to the other stuff inside
-	  your box. Other bus systems are ISA, EISA, MicroChannel (MCA) or
-	  VESA. If you have PCI, say Y, otherwise N.
-
-	  The PCI-HOWTO, available from
-	  <http://www.linuxdoc.org/docs.html#howto>, contains valuable
-	  information about which PCI hardware does work under Linux and which
-	  doesn't.
+	  CONFIG_PCI is needed for all JavaStation's (including MrCoffee),
+	  CP-1200, JavaEngine-1, Corona, Red October, and Serengeti SGSC.
+	  All of these platforms are extremely obscure, so say N if unsure.
 
 source "drivers/pci/Kconfig"
 

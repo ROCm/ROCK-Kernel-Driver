@@ -28,8 +28,6 @@
 #include "um_xdi.h"
 #include "um_idi.h"
 
-EXPORT_NO_SYMBOLS;
-
 static char *main_revision = "$Revision: 1.1.2.7 $";
 
 static int major = 242;

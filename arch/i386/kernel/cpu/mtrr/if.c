@@ -1,6 +1,5 @@
 #include <linux/init.h>
 #include <linux/proc_fs.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/ctype.h>
 #include <linux/module.h>
 #include <linux/seq_file.h>
@@ -300,8 +299,6 @@ static struct proc_dir_entry *proc_root_mtrr;
 
 #  endif			/*  CONFIG_PROC_FS  */
 
-static devfs_handle_t devfs_handle;
-
 char * attrib_to_str(int x)
 {
 	return (x <= 6) ? mtrr_strings[x] : "?";
@@ -337,7 +334,6 @@ static int mtrr_seq_show(struct seq_file *seq, void *offset)
 			     attrib_to_str(type), usage_table[i]);
 		}
 	}
-	devfs_set_file_size(devfs_handle, len);	
 	return 0;
 }
 
@@ -350,11 +346,6 @@ static int __init mtrr_if_init(void)
 		proc_root_mtrr->owner = THIS_MODULE;
 		proc_root_mtrr->proc_fops = &mtrr_fops;
 	}
-#endif
-#ifdef USERSPACE_INTERFACE
-	devfs_handle = devfs_register(NULL, "cpu/mtrr", DEVFS_FL_DEFAULT, 0, 0,
-				      S_IFREG | S_IRUGO | S_IWUSR,
-				      &mtrr_fops, NULL);
 #endif
 	return 0;
 }

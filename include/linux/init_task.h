@@ -62,6 +62,7 @@
 {									\
 	.state		= 0,						\
 	.thread_info	= &init_thread_info,				\
+	.usage		= ATOMIC_INIT(2),				\
 	.flags		= 0,						\
 	.lock_depth	= -1,						\
 	.prio		= MAX_PRIO-20,					\
