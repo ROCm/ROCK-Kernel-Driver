@@ -18,24 +18,37 @@
 #include <asm/offsets.h>
 #include <asm/cache.h>
 
-_GLOBAL(__power4_cpu_preinit)
+_GLOBAL(__970_cpu_preinit)
 	/*
-	 * On the PPC970, we have to turn off real-mode cache inhibit
-	 * early, before we first turn the MMU off.
+	 * Deal only with PPC970 and PPC970FX.
 	 */
 	mfspr	r0,SPRN_PVR
 	srwi	r0,r0,16
-	cmpwi	r0,0x39
+	cmpwi	cr0,r0,0x39
+	cmpwi	cr1,r0,0x3c
+	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq
 	bnelr
 
+	/* Make sure HID4:rm_ci is off before MMU is turned off, that large
+	 * pages are enabled with HID4:61 and clear HID5:DCBZ_size and
+	 * HID5:DCBZ32_ill
+	 */
 	li	r0,0
+	mfspr	r11,SPRN_HID4
+	rldimi	r11,r0,40,23	/* clear bit 23 (rm_ci) */
+	rldimi	r11,r0,2,61	/* clear bit 61 (lg_pg_en) */
 	sync
-	mtspr	SPRN_HID4,r0
+	mtspr	SPRN_HID4,r11
 	isync
 	sync
-	mtspr	SPRN_HID5,r0
+	mfspr	r11,SPRN_HID5
+	rldimi	r11,r0,6,56	/* clear bits 56 & 57 (DCBZ*) */
+	sync
+	mtspr	SPRN_HID5,r11
 	isync
+	sync
 
+	/* Setup some basic HID1 features */
 	mfspr	r0,SPRN_HID1
 	li	r11,0x1200		/* enable i-fetch cacheability */
 	sldi	r11,r11,44		/* and prefetch */
@@ -43,6 +56,8 @@ _GLOBAL(__power4_cpu_preinit)
 	mtspr	SPRN_HID1,r0
 	mtspr	SPRN_HID1,r0
 	isync
+
+	/* Clear HIOR */
 	li	r0,0
 	sync
 	mtspr	SPRN_HIOR,0		/* Clear interrupt prefix */

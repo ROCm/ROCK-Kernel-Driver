@@ -153,7 +153,7 @@ __start:
  * like real mode cache inhibit or exception base
  */
 #ifdef CONFIG_POWER4
-	bl	__power4_cpu_preinit
+	bl	__970_cpu_preinit
 #endif /* CONFIG_POWER4 */
 
 #ifdef CONFIG_APUS
