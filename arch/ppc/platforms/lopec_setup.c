@@ -324,7 +324,7 @@ lopec_setup_arch(void)
         	ROOT_DEV = Root_SDA1;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
+#ifdef CONFIG_VT
 	conswitchp = &dummy_con;
 #endif
 #ifdef CONFIG_PPCBUG_NVRAM
