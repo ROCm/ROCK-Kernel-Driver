@@ -1049,14 +1049,14 @@ acpi_processor_get_performance_info (
 	if (!pr || !pr->performance || !pr->handle)
 		return_VALUE(-EINVAL);
 
+	acpi_processor_set_pdc(pr);
+
 	status = acpi_get_handle(pr->handle, "_PCT", &handle);
 	if (ACPI_FAILURE(status)) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, 
 			"ACPI-based processor performance control unavailable\n"));
 		return_VALUE(-ENODEV);
 	}
-
-	acpi_processor_set_pdc(pr);
 
 	result = acpi_processor_get_performance_control(pr);
 	if (result)
