@@ -180,8 +180,7 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 	if (disk->private_data == NULL)
 		goto out;
 	sdkp = scsi_disk(disk);
-	if (!kref_get(&sdkp->kref))
-		goto out_sdkp;
+	kref_get(&sdkp->kref);
 	if (scsi_device_get(sdkp->device))
 		goto out_put;
 	up(&sd_ref_sem);
@@ -189,7 +188,6 @@ static struct scsi_disk *scsi_disk_get(struct gendisk *disk)
 
  out_put:
 	kref_put(&sdkp->kref, scsi_disk_release);
- out_sdkp:
 	sdkp = NULL;
  out:
 	up(&sd_ref_sem);

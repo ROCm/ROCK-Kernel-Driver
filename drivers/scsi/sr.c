@@ -140,15 +140,13 @@ static inline struct scsi_cd *scsi_cd_get(struct gendisk *disk)
 	if (disk->private_data == NULL)
 		goto out;
 	cd = scsi_cd(disk);
-	if (!kref_get(&cd->kref))
-		goto out_null;
+	kref_get(&cd->kref);
 	if (scsi_device_get(cd->device))
 		goto out_put;
 	goto out;
 
  out_put:
 	kref_put(&cd->kref, sr_kref_release);
- out_null:
 	cd = NULL;
  out:
 	up(&sr_ref_sem);

@@ -27,11 +27,10 @@ void kref_init(struct kref *kref)
  * kref_get - increment refcount for object.
  * @kref: object.
  */
-struct kref *kref_get(struct kref *kref)
+void kref_get(struct kref *kref)
 {
 	WARN_ON(!atomic_read(&kref->refcount));
 	atomic_inc(&kref->refcount);
-	return kref;
 }
 
 /**
