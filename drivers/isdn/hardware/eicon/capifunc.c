@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.57 2004/03/20 18:18:03 armin Exp $
+/* $Id: capifunc.c,v 1.59 2004/03/21 17:27:32 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -18,7 +18,6 @@
 #include "divacapi.h"
 #include "divasync.h"
 #include "capifunc.h"
-#include "dlist.h"
 
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
@@ -57,11 +56,6 @@ static char *diva_procinfo(struct capi_ctr *);
 static u16 diva_send_message(struct capi_ctr *,
 			     diva_os_message_buffer_s *);
 extern void diva_os_set_controller_struct(struct capi_ctr *);
-
-/*
- * include queue functions
- */
-#include "dlist.c"
 
 extern void DIVA_DIDD_Read(DESCRIPTOR *, int);
 
@@ -349,7 +343,7 @@ void sendf(APPL * appl, word command, dword Id, word Number, byte * format, ...)
 /*
  * cleanup adapter
  */
-static void clean_adapter(int id, diva_entity_queue_t* free_mem_q)
+static void clean_adapter(int id, struct list_head *free_mem_q)
 {
 	DIVA_CAPI_ADAPTER *a;
 	int i, k;
@@ -358,7 +352,7 @@ static void clean_adapter(int id, diva_entity_queue_t* free_mem_q)
 	k = li_total_channels - a->li_channels;
 	if (k == 0) {
 		if (li_config_table) {
-			diva_q_add_tail(free_mem_q, (diva_entity_link_t*)li_config_table);
+			list_add((struct list_head *)li_config_table, free_mem_q);
 		li_config_table = NULL;
 		}
 	} else {
@@ -383,7 +377,7 @@ static void clean_adapter(int id, diva_entity_queue_t* free_mem_q)
 			adapter[i].li_base -= a->li_channels;
 	}
 	if (a->plci)
-		diva_q_add_tail(free_mem_q, (diva_entity_link_t*)a->plci);
+		list_add((struct list_head *)a->plci, free_mem_q);
 
 	memset(a, 0x00, sizeof(DIVA_CAPI_ADAPTER));
 	while ((max_adapter != 0) && !adapter[max_adapter - 1].request)
@@ -396,13 +390,11 @@ static void clean_adapter(int id, diva_entity_queue_t* free_mem_q)
  */
 static void divacapi_remove_card(DESCRIPTOR * d)
 {
-	struct list_head *tmp;
 	diva_card *card = NULL;
-	diva_entity_queue_t free_mem_q;
-	diva_entity_link_t* link;
 	diva_os_spin_lock_magic_t old_irql;
-
-	diva_q_init (&free_mem_q);
+	LIST_HEAD(free_mem_q);
+	struct list_head *link;
+	struct list_head *tmp;
 
 	/*
 	 * Set "remove in progress flag".
@@ -446,8 +438,8 @@ static void divacapi_remove_card(DESCRIPTOR * d)
 	}
 
 	/* free queued memory areas */
-	while ((link = diva_q_get_head(&free_mem_q))) {
-		diva_q_remove(&free_mem_q, link);
+	list_for_each_safe(link, tmp, &free_mem_q) {
+		list_del(link);
 		diva_os_free(0, link);
 	}
 }

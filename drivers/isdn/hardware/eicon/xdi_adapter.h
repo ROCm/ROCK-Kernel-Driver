@@ -1,4 +1,4 @@
-/* $Id: xdi_adapter.h,v 1.6 2003/12/05 18:45:05 armin Exp $ */
+/* $Id: xdi_adapter.h,v 1.7 2004/03/21 17:26:01 armin Exp $ */
 
 #ifndef __DIVA_OS_XDI_ADAPTER_H__
 #define __DIVA_OS_XDI_ADAPTER_H__
@@ -47,7 +47,7 @@ typedef struct _diva_os_idi_adapter_interface {
 } diva_os_idi_adapter_interface_t;
 
 typedef struct _diva_os_xdi_adapter {
-	diva_entity_link_t link;
+	struct list_head link;
 	int CardIndex;
 	int CardOrdinal;
 	int controller;		/* number of this controller */

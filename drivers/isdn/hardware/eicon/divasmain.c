@@ -1,4 +1,4 @@
-/* $Id: divasmain.c,v 1.51 2004/03/20 20:47:08 armin Exp $
+/* $Id: divasmain.c,v 1.52 2004/03/21 17:26:01 armin Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
@@ -22,6 +22,7 @@
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/list.h>
 #include <linux/poll.h>
 #include <linux/kmod.h>
 
@@ -29,7 +30,6 @@
 #undef ID_MASK
 #undef N_DATA
 #include "pc.h"
-#include "dlist.h"
 #include "di_defs.h"
 #include "divasync.h"
 #include "diva.h"
@@ -41,7 +41,7 @@
 #include "diva_dma.h"
 #include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.51 $";
+static char *main_revision = "$Revision: 1.52 $";
 
 static int major;
 
