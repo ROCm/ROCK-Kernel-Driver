@@ -169,7 +169,7 @@ static inline void mpol_get(struct mempolicy *pol)
 
 static inline struct mempolicy *mpol_copy(struct mempolicy *old)
 {
-	return old;
+	return NULL;
 }
 
 static inline int mpol_first_node(struct vm_area_struct *vma, unsigned long a)
