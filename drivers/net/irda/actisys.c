@@ -165,7 +165,7 @@ static int actisys_change_speed(struct irda_task *task)
 	int ret = 0;
 	int i = 0;
 
-        IRDA_DEBUG(4, __FUNCTION__ "(), speed=%d (was %d)\n", speed, 
+        IRDA_DEBUG(4, "%s(), speed=%d (was %d)\n", __FUNCTION__, speed, 
 		   self->speed);
 
 	/* Go to a known state by reseting the dongle */

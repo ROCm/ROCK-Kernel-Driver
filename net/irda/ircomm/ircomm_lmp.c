@@ -228,7 +228,7 @@ int ircomm_lmp_data_request(struct ircomm_cb *self, struct sk_buff *skb,
         }
 	ret = irlmp_data_request(self->lsap, skb);
 	if (ret) {
-		ERROR(__FUNCTION__ "(), failed\n");
+		ERROR("%s(), failed\n", __FUNCTION__);
 		dev_kfree_skb(skb);
 	}
 

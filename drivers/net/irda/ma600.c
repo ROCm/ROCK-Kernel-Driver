@@ -48,7 +48,7 @@
 	#undef IRDA_DEBUG
 	#define IRDA_DEBUG(n, args...) (printk(KERN_DEBUG args))
 
-	#undef ASSERT(expr, func)
+	#undef ASSERT
 	#define ASSERT(expr, func) \
 	if(!(expr)) { \
 	        printk( "Assertion failed! %s,%s,%s,line=%d\n",\
@@ -86,13 +86,13 @@ static struct dongle_reg dongle = {
 
 int __init ma600_init(void)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 	return irda_device_register_dongle(&dongle);
 }
 
 void __exit ma600_cleanup(void)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 	irda_device_unregister_dongle(&dongle);
 }
 
@@ -105,7 +105,7 @@ void __exit ma600_cleanup(void)
 */
 static void ma600_open(dongle_t *self, struct qos_info *qos)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	qos->baud_rate.bits &= IR_2400|IR_9600|IR_19200|IR_38400
 				|IR_57600|IR_115200;
@@ -123,7 +123,7 @@ static void ma600_open(dongle_t *self, struct qos_info *qos)
 
 static void ma600_close(dongle_t *self)
 {
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	/* Power off dongle */
 	self->set_dtr_rts(self->dev, FALSE, FALSE);
@@ -184,12 +184,12 @@ static int ma600_change_speed(struct irda_task *task)
 	__u8 byte_echo;
 	int ret = 0;
 	
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	ASSERT(task != NULL, return -1;);
 
 	if (self->speed_task && self->speed_task != task) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), busy!\n");
+		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__);
 		return MSECS_TO_JIFFIES(10);
 	} else {
 		self->speed_task = task;
@@ -215,7 +215,7 @@ static int ma600_change_speed(struct irda_task *task)
 		break;
 
 	case IRDA_TASK_CHILD_WAIT:
-		WARNING(__FUNCTION__ "(), resetting dongle timed out!\n");
+		WARNING("%s(), resetting dongle timed out!\n", __FUNCTION__);
 		ret = -1;
 		break;
 
@@ -246,7 +246,7 @@ static int ma600_change_speed(struct irda_task *task)
 
 		if(byte != byte_echo) {
 			/* if control byte != echo, I don't know what to do */
-			printk(KERN_WARNING __FUNCTION__ "() control byte written != read!\n");
+			printk(KERN_WARNING "%s() control byte written != read!\n", __FUNCTION__);
 			printk(KERN_WARNING "control byte = 0x%c%c\n", 
 			       hexTbl[(byte>>4)&0x0f], hexTbl[byte&0x0f]);
 			printk(KERN_WARNING "byte echo = 0x%c%c\n", 
@@ -254,7 +254,7 @@ static int ma600_change_speed(struct irda_task *task)
 			       hexTbl[byte_echo & 0x0f]);
 		#ifndef NDEBUG
 		} else {
-			IRDA_DEBUG(2, __FUNCTION__ "() control byte write read OK\n");
+			IRDA_DEBUG(2, "%s() control byte write read OK\n", __FUNCTION__);
 		#endif
 		}
 
@@ -273,7 +273,7 @@ static int ma600_change_speed(struct irda_task *task)
 		break;
 
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);
 		self->speed_task = NULL;
 		ret = -1;
@@ -298,12 +298,12 @@ int ma600_reset(struct irda_task *task)
 	dongle_t *self = (dongle_t *) task->instance;
 	int ret = 0;
 
-	IRDA_DEBUG(2, __FUNCTION__ "()\n");
+	IRDA_DEBUG(2, "%s()\n", __FUNCTION__);
 
 	ASSERT(task != NULL, return -1;);
 
 	if (self->reset_task && self->reset_task != task) {
-		IRDA_DEBUG(0, __FUNCTION__ "(), busy!\n");
+		IRDA_DEBUG(0, "%s(), busy!\n", __FUNCTION__);
 		return MSECS_TO_JIFFIES(10);
 	} else
 		self->reset_task = task;
@@ -326,7 +326,7 @@ int ma600_reset(struct irda_task *task)
 		self->reset_task = NULL;
 		break;
 	default:
-		ERROR(__FUNCTION__ "(), unknown state %d\n", task->state);
+		ERROR("%s(), unknown state %d\n", __FUNCTION__, task->state);
 		irda_task_next_state(task, IRDA_TASK_DONE);		
 		self->reset_task = NULL;
 		ret = -1;

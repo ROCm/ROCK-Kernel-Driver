@@ -154,7 +154,7 @@ int ircomm_param_request(struct ircomm_tty_cb *self, __u8 pi, int flush)
 	count = irda_param_insert(self, pi, skb->tail, skb_tailroom(skb),
 				  &ircomm_param_info);
 	if (count < 0) {
-		WARNING(__FUNCTION__ "(), no room for parameter!\n");
+		WARNING("%s(), no room for parameter!\n", __FUNCTION__);
 		spin_unlock_irqrestore(&self->spinlock, flags);
 		return -1;
 	}

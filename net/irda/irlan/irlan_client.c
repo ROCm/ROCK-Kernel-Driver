@@ -367,7 +367,7 @@ void irlan_client_parse_response(struct irlan_cb *self, struct sk_buff *skb)
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
 	if (!skb) {
-		ERROR( __FUNCTION__ "(), Got NULL skb!\n");
+		ERROR("%s(), Got NULL skb!\n", __FUNCTION__);
 		return;
 	}
 	frame = skb->data;

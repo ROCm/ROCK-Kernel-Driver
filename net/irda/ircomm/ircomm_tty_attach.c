@@ -601,8 +601,7 @@ static int ircomm_tty_state_idle(struct ircomm_tty_cb *self,
 		self->saddr = info->saddr;
 
 		if (self->iriap) {
-			WARNING(__FUNCTION__ 
-				"(), busy with a previous query\n");
+			WARNING("%s(), busy with a previous query\n", __FUNCTION__);
 			return -EBUSY;
 		}
 
@@ -659,8 +658,7 @@ static int ircomm_tty_state_search(struct ircomm_tty_cb *self,
 		self->saddr = info->saddr;
 
 		if (self->iriap) {
-			WARNING(__FUNCTION__ 
-				"(), busy with a previous query\n");
+			WARNING("%s(), busy with a previous query\n", __FUNCTION__);
 			return -EBUSY;
 		}
 		
@@ -728,8 +726,7 @@ static int ircomm_tty_state_query_parameters(struct ircomm_tty_cb *self,
 	switch (event) {
 	case IRCOMM_TTY_GOT_PARAMETERS:
 		if (self->iriap) {
-			WARNING(__FUNCTION__ 
-				"(), busy with a previous query\n");
+			WARNING("%s(), busy with a previous query\n", __FUNCTION__);
 			return -EBUSY;
 		}
 		
