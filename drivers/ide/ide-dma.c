@@ -82,6 +82,7 @@
 #include <linux/pci.h>
 #include <linux/init.h>
 #include <linux/ide.h>
+#include <linux/delay.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -238,29 +239,33 @@ static int ide_build_sglist(struct ata_channel *hwif, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
-static int ide_raw_build_sglist(struct ata_channel *hwif, struct request *rq)
+/*
+ * FIXME: taskfiles should be a map of pages, not a long virt address... /jens
+ * FIXME: I agree with Jens --mdcki!
+ */
+static int raw_build_sglist(struct ata_channel *ch, struct request *rq)
 {
-	struct scatterlist *sg = hwif->sg_table;
+	struct scatterlist *sg = ch->sg_table;
 	int nents = 0;
-	ide_task_t *args = rq->special;
+	struct ata_taskfile *args = rq->special;
 #if 1
 	unsigned char *virt_addr = rq->buffer;
 	int sector_count = rq->nr_sectors;
 #else
-        nents = blk_rq_map_sg(rq->q, rq, hwif->sg_table);
+        nents = blk_rq_map_sg(rq->q, rq, ch->sg_table);
 
 	if (nents > rq->nr_segments)
 		printk("ide-dma: received %d segments, build %d\n", rq->nr_segments, nents);
 #endif
 
 	if (args->command_type == IDE_DRIVE_TASK_RAW_WRITE)
-		hwif->sg_dma_direction = PCI_DMA_TODEVICE;
+		ch->sg_dma_direction = PCI_DMA_TODEVICE;
 	else
-		hwif->sg_dma_direction = PCI_DMA_FROMDEVICE;
+		ch->sg_dma_direction = PCI_DMA_FROMDEVICE;
 
-#if 1	
 	if (sector_count > 128) {
 		memset(&sg[nents], 0, sizeof(*sg));
+
 		sg[nents].page = virt_to_page(virt_addr);
 		sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
 		sg[nents].length = 128  * SECTOR_SIZE;
@@ -273,9 +278,8 @@ static int ide_raw_build_sglist(struct ata_channel *hwif, struct request *rq)
 	sg[nents].offset = (unsigned long) virt_addr & ~PAGE_MASK;
 	sg[nents].length =  sector_count  * SECTOR_SIZE;
 	nents++;
- #endif
 
-	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
+	return pci_map_sg(ch->pci_dev, sg, nents, ch->sg_dma_direction);
 }
 
 /*
@@ -297,7 +301,7 @@ int ide_build_dmatable (ide_drive_t *drive, ide_dma_action_t func)
 	struct scatterlist *sg;
 
 	if (HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) {
-		hwif->sg_nents = i = ide_raw_build_sglist(hwif, HWGROUP(drive)->rq);
+		hwif->sg_nents = i = raw_build_sglist(hwif, HWGROUP(drive)->rq);
 	} else {
 		hwif->sg_nents = i = ide_build_sglist(hwif, HWGROUP(drive)->rq);
 	}
@@ -593,7 +597,7 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
 			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
 			    (drive->addressing == 1)) {
-				ide_task_t *args = HWGROUP(drive)->rq->special;
+				struct ata_taskfile *args = HWGROUP(drive)->rq->special;
 				OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 			} else if (drive->addressing) {
 				OUT_BYTE(reading ? WIN_READDMA_EXT : WIN_WRITEDMA_EXT, IDE_COMMAND_REG);

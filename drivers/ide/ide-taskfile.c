@@ -291,7 +291,7 @@ void ata_poll_drive_ready(ide_drive_t *drive)
 
 static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *rq)
 {
-	ide_task_t *args = rq->special;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	/*
@@ -303,6 +303,7 @@ static ide_startstop_t pre_task_mulout_intr(ide_drive_t *drive, struct request *
 		return startstop;
 
 	ata_poll_drive_ready(drive);
+
 	return args->handler(drive);
 }
 
@@ -391,18 +392,13 @@ static ide_startstop_t task_mulout_intr (ide_drive_t *drive)
 }
 
 ide_startstop_t ata_taskfile(ide_drive_t *drive,
-		struct hd_drive_task_hdr *taskfile,
-		struct hd_drive_hob_hdr *hobfile,
-		ide_handler_t *handler,
-		ide_pre_handler_t *prehandler,
-		struct request *rq
-		)
+		struct ata_taskfile *args, struct request *rq)
 {
 	struct hd_driveid *id = drive->id;
 	u8 HIHI = (drive->addressing) ? 0xE0 : 0xEF;
 
 	/* (ks/hs): Moved to start, do not use for multiple out commands */
-	if (handler != task_mulout_intr) {
+	if (args->handler != task_mulout_intr) {
 		if (IDE_CONTROL_REG)
 			OUT_BYTE(drive->ctl, IDE_CONTROL_REG);	/* clear nIEN */
 		SELECT_MASK(drive->channel, drive, 0);
@@ -411,35 +407,38 @@ ide_startstop_t ata_taskfile(ide_drive_t *drive,
 	if ((id->command_set_2 & 0x0400) &&
 	    (id->cfs_enable_2 & 0x0400) &&
 	    (drive->addressing == 1)) {
-		OUT_BYTE(hobfile->feature, IDE_FEATURE_REG);
-		OUT_BYTE(hobfile->sector_count, IDE_NSECTOR_REG);
-		OUT_BYTE(hobfile->sector_number, IDE_SECTOR_REG);
-		OUT_BYTE(hobfile->low_cylinder, IDE_LCYL_REG);
-		OUT_BYTE(hobfile->high_cylinder, IDE_HCYL_REG);
+		OUT_BYTE(args->hobfile.feature, IDE_FEATURE_REG);
+		OUT_BYTE(args->hobfile.sector_count, IDE_NSECTOR_REG);
+		OUT_BYTE(args->hobfile.sector_number, IDE_SECTOR_REG);
+		OUT_BYTE(args->hobfile.low_cylinder, IDE_LCYL_REG);
+		OUT_BYTE(args->hobfile.high_cylinder, IDE_HCYL_REG);
 	}
 
-	OUT_BYTE(taskfile->feature, IDE_FEATURE_REG);
-	OUT_BYTE(taskfile->sector_count, IDE_NSECTOR_REG);
+	OUT_BYTE(args->taskfile.feature, IDE_FEATURE_REG);
+	OUT_BYTE(args->taskfile.sector_count, IDE_NSECTOR_REG);
 	/* refers to number of sectors to transfer */
-	OUT_BYTE(taskfile->sector_number, IDE_SECTOR_REG);
+	OUT_BYTE(args->taskfile.sector_number, IDE_SECTOR_REG);
 	/* refers to sector offset or start sector */
-	OUT_BYTE(taskfile->low_cylinder, IDE_LCYL_REG);
-	OUT_BYTE(taskfile->high_cylinder, IDE_HCYL_REG);
+	OUT_BYTE(args->taskfile.low_cylinder, IDE_LCYL_REG);
+	OUT_BYTE(args->taskfile.high_cylinder, IDE_HCYL_REG);
 
-	OUT_BYTE((taskfile->device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
-	if (handler != NULL) {
-		ide_set_handler(drive, handler, WAIT_CMD, NULL);
-		OUT_BYTE(taskfile->command, IDE_COMMAND_REG);
+	OUT_BYTE((args->taskfile.device_head & HIHI) | drive->select.all, IDE_SELECT_REG);
+	if (args->handler != NULL) {
+		ide_set_handler(drive, args->handler, WAIT_CMD, NULL);
+		OUT_BYTE(args->taskfile.command, IDE_COMMAND_REG);
 		/*
 		 * Warning check for race between handler and prehandler for
 		 * writing first block of data.  however since we are well
 		 * inside the boundaries of the seek, we should be okay.
 		 */
-		if (prehandler != NULL)
-			return prehandler(drive, rq);
+		if (args->prehandler != NULL)
+			return args->prehandler(drive, rq);
 	} else {
 		/* for dma commands we down set the handler */
-		if (drive->using_dma && !(drive->channel->dmaproc(((taskfile->command == WIN_WRITEDMA) || (taskfile->command == WIN_WRITEDMA_EXT)) ? ide_dma_write : ide_dma_read, drive)));
+		if (drive->using_dma &&
+		!(drive->channel->dmaproc(((args->taskfile.command == WIN_WRITEDMA)
+					|| (args->taskfile.command == WIN_WRITEDMA_EXT))
+					? ide_dma_write : ide_dma_read, drive)));
 	}
 
 	return ide_started;
@@ -496,7 +495,7 @@ ide_startstop_t recal_intr(ide_drive_t *drive)
  */
 ide_startstop_t task_no_data_intr (ide_drive_t *drive)
 {
-	ide_task_t *args	= HWGROUP(drive)->rq->special;
+	struct ata_taskfile *args = HWGROUP(drive)->rq->special;
 	byte stat		= GET_STAT();
 
 	ide__sti();	/* local CPU only */
@@ -554,9 +553,9 @@ static ide_startstop_t task_in_intr (ide_drive_t *drive)
 	return ide_stopped;
 }
 
-static ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t pre_task_out_intr(ide_drive_t *drive, struct request *rq)
 {
-	ide_task_t *args = rq->special;
+	struct ata_taskfile *args = rq->special;
 	ide_startstop_t startstop;
 
 	if (ide_wait_stat(&startstop, drive, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
@@ -669,7 +668,7 @@ static ide_startstop_t task_mulin_intr(ide_drive_t *drive)
 }
 
 /* Called by ioctl to feature out type of command being called */
-void ide_cmd_type_parser(ide_task_t *args)
+void ide_cmd_type_parser(struct ata_taskfile *args)
 {
 	struct hd_drive_task_hdr *taskfile = &args->taskfile;
 
@@ -877,9 +876,9 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 {
 	struct request rq;
 	/* FIXME: This is on stack! */
-	ide_task_t args;
+	struct ata_taskfile args;
 
-	memset(&args, 0, sizeof(ide_task_t));
+	memset(&args, 0, sizeof(args));
 
 	args.taskfile = *taskfile;
 	args.hobfile = *hobfile;
@@ -897,7 +896,7 @@ int ide_wait_taskfile(ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, st
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-int ide_raw_taskfile(ide_drive_t *drive, ide_task_t *args, byte *buf)
+int ide_raw_taskfile(ide_drive_t *drive, struct ata_taskfile *args, byte *buf)
 {
 	struct request rq;
 	init_taskfile_request(&rq);
@@ -943,7 +942,8 @@ int ide_cmd_ioctl(ide_drive_t *drive, struct inode *inode, struct file *file, un
 	u8 *argbuf = args;
 	byte xfer_rate = 0;
 	int argsize = 4;
-	ide_task_t tfargs;
+	/* FIXME: this should not reside on the stack */
+	struct ata_taskfile tfargs;
 
 	if (NULL == (void *) arg) {
 		struct request rq;

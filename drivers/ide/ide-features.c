@@ -184,7 +184,7 @@ int ide_driveid_update (ide_drive_t *drive)
  * in combination with the device (usually a disk) properly detect
  * and acknowledge each end of the ribbon.
  */
-int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
+int ide_ata66_check (ide_drive_t *drive, struct ata_taskfile *args)
 {
 	if ((args->taskfile.command == WIN_SETFEATURES) &&
 	    (args->taskfile.sector_number > XFER_UDMA_2) &&
@@ -211,7 +211,7 @@ int ide_ata66_check (ide_drive_t *drive, ide_task_t *args)
  * 1 : Safe to update drive->id DMA registers.
  * 0 : OOPs not allowed.
  */
-int set_transfer (ide_drive_t *drive, ide_task_t *args)
+int set_transfer (ide_drive_t *drive, struct ata_taskfile *args)
 {
 	if ((args->taskfile.command == WIN_SETFEATURES) &&
 	    (args->taskfile.sector_number >= XFER_SW_DMA_0) &&

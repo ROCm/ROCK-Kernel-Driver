@@ -154,7 +154,7 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
+	struct ata_taskfile		args;
 	int				sectors;
 
 	unsigned int track	= (block / drive->sect);
@@ -193,19 +193,14 @@ static ide_startstop_t chs_do_request(ide_drive_t *drive, struct request *rq, un
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
-	return ata_taskfile(drive,
-			&args.taskfile,
-			&args.hobfile,
-			args.handler,
-			args.prehandler,
-			rq);
+	return ata_taskfile(drive, &args, rq);
 }
 
 static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, unsigned long block)
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
+	struct ata_taskfile		args;
 	int				sectors;
 
 	sectors = rq->nr_sectors;
@@ -239,12 +234,7 @@ static ide_startstop_t lba28_do_request(ide_drive_t *drive, struct request *rq, 
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
-	return ata_taskfile(drive,
-			&args.taskfile,
-			&args.hobfile,
-			args.handler,
-			args.prehandler,
-			rq);
+	return ata_taskfile(drive, &args, rq);
 }
 
 /*
@@ -257,7 +247,7 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 {
 	struct hd_drive_task_hdr	taskfile;
 	struct hd_drive_hob_hdr		hobfile;
-	ide_task_t			args;
+	struct ata_taskfile		args;
 	int				sectors;
 
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
@@ -302,12 +292,7 @@ static ide_startstop_t lba48_do_request(ide_drive_t *drive, struct request *rq, 
 	ide_cmd_type_parser(&args);
 	rq->special = &args;
 
-	return ata_taskfile(drive,
-			&args.taskfile,
-			&args.hobfile,
-			args.handler,
-			args.prehandler,
-			rq);
+	return ata_taskfile(drive, &args, rq);
 }
 
 /*
@@ -426,7 +411,8 @@ static int idedisk_check_media_change (ide_drive_t *drive)
  */
 static unsigned long idedisk_read_native_max_address(ide_drive_t *drive)
 {
-	ide_task_t args;
+	/* FIXME: This is on stack! */
+	struct ata_taskfile args;
 	unsigned long addr = 0;
 
 	if (!(drive->id->command_set_1 & 0x0400) &&
@@ -434,7 +420,7 @@ static unsigned long idedisk_read_native_max_address(ide_drive_t *drive)
 		return addr;
 
 	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(ide_task_t));
+	memset(&args, 0, sizeof(args));
 	args.taskfile.device_head = 0x40;
 	args.taskfile.command = WIN_READ_NATIVE_MAX;
 	args.handler = task_no_data_intr;
@@ -457,11 +443,11 @@ static unsigned long idedisk_read_native_max_address(ide_drive_t *drive)
 
 static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive)
 {
-	ide_task_t args;
+	struct ata_taskfile args;
 	unsigned long long addr = 0;
 
 	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(ide_task_t));
+	memset(&args, 0, sizeof(args));
 
 	args.taskfile.device_head = 0x40;
 	args.taskfile.command = WIN_READ_NATIVE_MAX_EXT;
@@ -493,12 +479,12 @@ static unsigned long long idedisk_read_native_max_address_ext(ide_drive_t *drive
  */
 static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long addr_req)
 {
-	ide_task_t args;
+	struct ata_taskfile args;
 	unsigned long addr_set = 0;
 
 	addr_req--;
 	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(ide_task_t));
+	memset(&args, 0, sizeof(args));
 
 	args.taskfile.sector_number = (addr_req >> 0);
 	args.taskfile.low_cylinder = (addr_req >> 8);
@@ -522,12 +508,12 @@ static unsigned long idedisk_set_max_address(ide_drive_t *drive, unsigned long a
 
 static unsigned long long idedisk_set_max_address_ext(ide_drive_t *drive, unsigned long long addr_req)
 {
-	ide_task_t args;
+	struct ata_taskfile args;
 	unsigned long long addr_set = 0;
 
 	addr_req--;
 	/* Create IDE/ATA command request structure */
-	memset(&args, 0, sizeof(ide_task_t));
+	memset(&args, 0, sizeof(args));
 
 	args.taskfile.sector_number = (addr_req >>  0);
 	args.taskfile.low_cylinder = (addr_req >>= 8);
@@ -667,47 +653,45 @@ static ide_startstop_t idedisk_special (ide_drive_t *drive)
 	special_t *s = &drive->special;
 
 	if (s->b.set_geometry) {
-		struct hd_drive_task_hdr taskfile;
-		struct hd_drive_hob_hdr hobfile;
-		ide_handler_t *handler = NULL;
-
-		memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-		memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
+		struct ata_taskfile args;
 
 		s->b.set_geometry	= 0;
-		taskfile.sector_number	= drive->sect;
-		taskfile.low_cylinder	= drive->cyl;
-		taskfile.high_cylinder	= drive->cyl>>8;
-		taskfile.device_head	= ((drive->head-1)|drive->select.all)&0xBF;
+
+		memset(&args, 0, sizeof(args));
+		args.taskfile.sector_number	= drive->sect;
+		args.taskfile.low_cylinder	= drive->cyl;
+		args.taskfile.high_cylinder	= drive->cyl>>8;
+		args.taskfile.device_head	= ((drive->head-1)|drive->select.all)&0xBF;
 		if (!IS_PDC4030_DRIVE) {
-			taskfile.sector_count = drive->sect;
-			taskfile.command = WIN_SPECIFY;
-			handler	= set_geometry_intr;;
+			args.taskfile.sector_count = drive->sect;
+			args.taskfile.command = WIN_SPECIFY;
+			args.handler = set_geometry_intr;;
 		}
-		ata_taskfile(drive, &taskfile, &hobfile, handler, NULL, NULL);
+		ata_taskfile(drive, &args, NULL);
 	} else if (s->b.recalibrate) {
 		s->b.recalibrate = 0;
 		if (!IS_PDC4030_DRIVE) {
-			struct hd_drive_task_hdr taskfile;
-			struct hd_drive_hob_hdr hobfile;
-			memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-			taskfile.sector_count	= drive->sect;
-			taskfile.command	= WIN_RESTORE;
-			ata_taskfile(drive, &taskfile, &hobfile, recal_intr, NULL, NULL);
+			struct ata_taskfile args;
+
+			memset(&args, 0, sizeof(args));
+			args.taskfile.sector_count = drive->sect;
+			args.taskfile.command = WIN_RESTORE;
+			args.handler = recal_intr;
+			ata_taskfile(drive, &args, NULL);
 		}
 	} else if (s->b.set_multmode) {
 		s->b.set_multmode = 0;
 		if (drive->id && drive->mult_req > drive->id->max_multsect)
 			drive->mult_req = drive->id->max_multsect;
 		if (!IS_PDC4030_DRIVE) {
-			struct hd_drive_task_hdr taskfile;
-			struct hd_drive_hob_hdr hobfile;
-			memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
-			memset(&hobfile, 0, sizeof(struct hd_drive_hob_hdr));
-			taskfile.sector_count	= drive->mult_req;
-			taskfile.command	= WIN_SETMULT;
-			ata_taskfile(drive, &taskfile, &hobfile, set_multmode_intr, NULL, NULL);
+			struct ata_taskfile args;
+
+			memset(&args, 0, sizeof(args));
+			args.taskfile.sector_count = drive->mult_req;
+			args.taskfile.command = WIN_SETMULT;
+			args.handler = set_multmode_intr;
+
+			ata_taskfile(drive, &args, NULL);
 		}
 	} else if (s->all) {
 		int special = s->all;

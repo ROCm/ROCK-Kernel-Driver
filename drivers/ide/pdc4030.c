@@ -551,7 +551,7 @@ static ide_startstop_t promise_write (ide_drive_t *drive)
  * already set up. It issues a READ or WRITE command to the Promise
  * controller, assuming LBA has been used to set up the block number.
  */
-ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
+ide_startstop_t do_pdc4030_io(ide_drive_t *drive, struct ata_taskfile *task)
 {
 	struct request *rq = HWGROUP(drive)->rq;
 	struct hd_drive_task_hdr *taskfile = &task->taskfile;
@@ -644,7 +644,7 @@ ide_startstop_t do_pdc4030_io (ide_drive_t *drive, ide_task_t *task)
 ide_startstop_t promise_rw_disk (ide_drive_t *drive, struct request *rq, unsigned long block)
 {
 	struct hd_drive_task_hdr taskfile;
-	ide_task_t		 args;
+	struct ata_taskfile args;
 
 	memset(&taskfile, 0, sizeof(struct hd_drive_task_hdr));
 

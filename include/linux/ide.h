@@ -13,7 +13,9 @@
 #include <linux/proc_fs.h>
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/interrupt.h>
 #include <asm/hdreg.h>
+#include <asm/bitops.h>
 
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.
@@ -111,6 +113,7 @@ typedef unsigned char	byte;	/* used everywhere */
 #define GET_ERR()		IN_BYTE(IDE_ERROR_REG)
 #define GET_STAT()		IN_BYTE(IDE_STATUS_REG)
 #define GET_ALTSTAT()		IN_BYTE(IDE_CONTROL_REG)
+#define GET_FEAT()		IN_BYTE(IDE_NSECTOR_REG)
 #define OK_STAT(stat,good,bad)	(((stat)&((good)|(bad)))==(good))
 #define BAD_R_STAT		(BUSY_STAT   | ERR_STAT)
 #define BAD_W_STAT		(BAD_R_STAT  | WRERR_STAT)
@@ -132,6 +135,7 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 #define PRD_BYTES	8
 #define PRD_ENTRIES	(PAGE_SIZE / (2 * PRD_BYTES))
+#define PRD_SEGMENTS	32
 
 /*
  * Some more useful definitions
@@ -275,7 +279,7 @@ typedef struct ide_drive_s {
 	char type; /* distingiush different devices: disk, cdrom, tape, floppy, ... */
 
 	/* NOTE: If we had proper separation between channel and host chip, we
-	 * could move this to the chanell and many sync problems would
+	 * could move this to the channel and many sync problems would
 	 * magically just go away.
 	 */
 	request_queue_t	queue;	/* per device request queue */
@@ -500,16 +504,18 @@ extern int ide_register_hw(hw_regs_t *hw, struct ata_channel **hwifp);
 extern void ide_unregister(struct ata_channel *hwif);
 
 /*
- * Status returned from various ide_ functions
+ * Status returned by various functions.
  */
 typedef enum {
 	ide_stopped,	/* no drive operation was started */
-	ide_started	/* a drive operation was started, and a handler was set */
+	ide_started,	/* a drive operation was started, and a handler was set */
+	ide_released	/* started and released bus */
 } ide_startstop_t;
 
 /*
- *  internal ide interrupt handler type
+ *  Interrupt handler types.
  */
+struct ata_taskfile;
 typedef ide_startstop_t (ide_pre_handler_t)(ide_drive_t *, struct request *);
 typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
 
@@ -519,15 +525,18 @@ typedef ide_startstop_t (ide_handler_t)(ide_drive_t *);
  */
 typedef int (ide_expiry_t)(ide_drive_t *);
 
-#define IDE_BUSY	0
+#define IDE_BUSY	0	/* awaiting an interrupt */
 #define IDE_SLEEP	1
+#define IDE_DMA		2	/* DMA in progress */
 
 typedef struct hwgroup_s {
 	ide_handler_t		*handler;/* irq handler, if active */
 	unsigned long		flags;	/* BUSY, SLEEPING */
 	ide_drive_t		*drive;	/* current drive */
 	struct ata_channel	*hwif;	/* ptr to current hwif in linked-list */
+
 	struct request		*rq;	/* current request */
+
 	struct timer_list	timer;	/* failsafe timer */
 	struct request		wrq;	/* local copy of current write rq */
 	unsigned long		poll_timeout;	/* timeout value during long polls */
@@ -736,7 +745,7 @@ ide_startstop_t restart_request (ide_drive_t *);
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().
  */
-void ide_init_drive_cmd (struct request *rq);
+extern void ide_init_drive_cmd (struct request *rq);
 
 /*
  * "action" parameter type for ide_do_drive_cmd() below.
@@ -760,13 +769,13 @@ extern int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t
  */
 void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err);
 
-typedef struct ide_task_s {
+struct ata_taskfile {
 	struct hd_drive_task_hdr taskfile;
 	struct hd_drive_hob_hdr  hobfile;
 	int			command_type;
 	ide_pre_handler_t	*prehandler;
 	ide_handler_t		*handler;
-} ide_task_t;
+};
 
 void ata_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
 void ata_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
@@ -776,11 +785,7 @@ void taskfile_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 void taskfile_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount);
 
 extern ide_startstop_t ata_taskfile(ide_drive_t *drive,
-		struct hd_drive_task_hdr *taskfile,
-		struct hd_drive_hob_hdr *hobfile,
-		ide_handler_t *handler,
-		ide_pre_handler_t *prehandler,
-		struct request *rq);
+		struct ata_taskfile *args, struct request *rq);
 
 /*
  * Special Flagged Register Validation Caller
@@ -793,10 +798,11 @@ extern ide_startstop_t task_no_data_intr(ide_drive_t *drive);
 
 int ide_wait_taskfile (ide_drive_t *drive, struct hd_drive_task_hdr *taskfile, struct hd_drive_hob_hdr *hobfile, byte *buf);
 
-int ide_raw_taskfile (ide_drive_t *drive, ide_task_t *cmd, byte *buf);
+int ide_raw_taskfile (ide_drive_t *drive, struct ata_taskfile *cmd, byte *buf);
 
-/* Expects args is a full set of TF registers and parses the command type */
-extern void ide_cmd_type_parser(ide_task_t *args);
+/* This is setting up all fields in args, which depend upon the command type.
+ */
+extern void ide_cmd_type_parser(struct ata_taskfile *args);
 
 int ide_cmd_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
 int ide_task_ioctl (ide_drive_t *drive, struct inode *inode, struct file *file, unsigned int cmd, unsigned long arg);
@@ -805,10 +811,10 @@ void ide_delay_50ms (void);
 
 byte ide_auto_reduce_xfer (ide_drive_t *drive);
 int ide_driveid_update (ide_drive_t *drive);
-int ide_ata66_check (ide_drive_t *drive, ide_task_t *args);
+int ide_ata66_check (ide_drive_t *drive, struct ata_taskfile *args);
 int ide_config_drive_speed (ide_drive_t *drive, byte speed);
 byte eighty_ninty_three (ide_drive_t *drive);
-int set_transfer (ide_drive_t *drive, ide_task_t *args);
+int set_transfer (ide_drive_t *drive, struct ata_taskfile *args);
 
 extern int system_bus_speed;
 
@@ -895,6 +901,8 @@ extern void ide_setup_dma(struct ata_channel *hwif,
 #endif
 
 extern spinlock_t ide_lock;
+
+#define DRIVE_LOCK(drive)		((drive)->queue.queue_lock)
 
 extern int drive_is_ready(ide_drive_t *drive);
 extern void revalidate_drives(void);

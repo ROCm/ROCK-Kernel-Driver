@@ -709,7 +709,7 @@ static inline u32 read_24 (ide_drive_t *drive)
 /*
  * Clean up after success/failure of an explicit drive cmd
  */
-void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
+void ide_end_drive_cmd(ide_drive_t *drive, byte stat, byte err)
 {
 	unsigned long flags;
 	struct request *rq;
@@ -738,8 +738,8 @@ void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err)
 			args[6] = IN_BYTE(IDE_SELECT_REG);
 		}
 	} else if (rq->flags & REQ_DRIVE_TASKFILE) {
-		ide_task_t *args = (ide_task_t *) rq->special;
-		rq->errors = !OK_STAT(stat,READY_STAT,BAD_STAT);
+		struct ata_taskfile *args = rq->special;
+		rq->errors = !OK_STAT(stat, READY_STAT, BAD_STAT);
 		if (args) {
 			args->taskfile.feature = err;
 			args->taskfile.sector_count = IN_BYTE(IDE_NSECTOR_REG);
@@ -1023,9 +1023,9 @@ int ide_wait_stat(ide_startstop_t *startstop, ide_drive_t *drive, byte good, byt
 }
 
 /*
- * start_request() initiates handling of a new I/O request
+ * This initiates handling of a new I/O request.
  */
-static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
+static ide_startstop_t start_request(ide_drive_t *drive, struct request *rq)
 {
 	ide_startstop_t startstop;
 	unsigned long block;
@@ -1083,15 +1083,12 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 			 */
 
 			if (rq->flags & REQ_DRIVE_TASKFILE) {
-				ide_task_t *args = rq->special;
+				struct ata_taskfile *args = rq->special;
 
 				if (!(args))
 					goto args_error;
 
-				ata_taskfile(drive,
-						&args->taskfile,
-						&args->hobfile,
-						args->handler, NULL, NULL);
+				ata_taskfile(drive, args, NULL);
 
 				if (((args->command_type == IDE_DRIVE_TASK_RAW_WRITE) ||
 					(args->command_type == IDE_DRIVE_TASK_OUT)) &&
@@ -1185,7 +1182,7 @@ kill_rq:
 	return ide_stopped;
 }
 
-ide_startstop_t restart_request (ide_drive_t *drive)
+ide_startstop_t restart_request(ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
 	unsigned long flags;
@@ -1417,9 +1414,9 @@ void ide_dma_timeout_retry(ide_drive_t *drive)
 }
 
 /*
- * ide_timer_expiry() is our timeout function for all drive operations.
- * But note that it can also be invoked as a result of a "sleep" operation
- * triggered by the mod_timer() call in ide_do_request.
+ * This is our timeout function for all drive operations.  But note that it can
+ * also be invoked as a result of a "sleep" operation triggered by the
+ * mod_timer() call in ide_do_request.
  */
 void ide_timer_expiry(unsigned long data)
 {
@@ -1478,7 +1475,7 @@ void ide_timer_expiry(unsigned long data)
 			disable_irq_nosync(hwif->irq);
 #else
 			disable_irq(hwif->irq);	/* disable_irq_nosync ?? */
-#endif /* DISABLE_IRQ_NOSYNC */
+#endif
 			__cli();	/* local CPU only, as if we were handling an interrupt */
 			if (hwgroup->poll_timeout != 0) {
 				startstop = handler(drive);
@@ -1608,7 +1605,8 @@ void ide_intr(int irq, void *dev_id, struct pt_regs *regs)
 	drive = hwgroup->drive;
 	if (!drive) {
 		/*
-		 * This should NEVER happen, and there isn't much we could do about it here.
+		 * This should NEVER happen, and there isn't much we could do
+		 * about it here.
 		 */
 		goto out_lock;
 	}
@@ -1734,9 +1732,9 @@ int ide_do_drive_cmd(ide_drive_t *drive, struct request *rq, ide_action_t action
 		if (action == ide_preempt)
 			hwgroup->rq = NULL;
 	} else {
-		if (action == ide_wait || action == ide_end) {
+		if (action == ide_wait || action == ide_end)
 			queue_head = queue_head->prev;
-		} else
+		else
 			queue_head = queue_head->next;
 	}
 	q->elevator.elevator_add_req_fn(q, rq, queue_head);
@@ -1848,7 +1846,7 @@ static int ide_open(struct inode * inode, struct file * filp)
 
 	/* Request a particular device type module.
 	 *
-	 * FIXME: The function which should rather requests the drivers is
+	 * FIXME: The function which should rather requests the drivers in
 	 * ide_driver_module(), since it seems illogical and even a bit
 	 * dangerous to delay this until open time!
 	 */
@@ -2088,7 +2086,7 @@ void ide_unregister(struct ata_channel *channel)
 	 * it.
 	 */
 
-	old_hwif		= *channel;
+	old_hwif = *channel;
 	init_hwif_data(channel, channel->index);
 	channel->hwgroup = old_hwif.hwgroup;
 	channel->tuneproc = old_hwif.tuneproc;
