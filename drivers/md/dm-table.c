@@ -776,6 +776,31 @@ void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq)
 	add_wait_queue(&t->eventq, wq);
 }
 
+void dm_table_suspend_targets(struct dm_table *t)
+{
+	int i;
+
+	for (i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = t->targets + i;
+
+		if (ti->type->suspend)
+			ti->type->suspend(ti);
+	}
+}
+
+void dm_table_resume_targets(struct dm_table *t)
+{
+	int i;
+
+	for (i = 0; i < t->num_targets; i++) {
+		struct dm_target *ti = t->targets + i;
+
+		if (ti->type->resume)
+			ti->type->resume(ti);
+	}
+}
+
+
 EXPORT_SYMBOL(dm_get_device);
 EXPORT_SYMBOL(dm_put_device);
 EXPORT_SYMBOL(dm_table_event);

@@ -679,6 +679,7 @@ int dm_create(unsigned int minor, struct dm_table *table,
 		free_dev(md);
 		return r;
 	}
+	dm_table_resume_targets(md->map);
 
 	*result = md;
 	return 0;
@@ -693,6 +694,8 @@ void dm_put(struct mapped_device *md)
 {
 	if (atomic_dec_and_test(&md->holders)) {
 		DMWARN("destroying md");
+		if (!test_bit(DMF_SUSPENDED, &md->flags))
+			dm_table_suspend_targets(md->map);
 		__unbind(md);
 		free_dev(md);
 	}
@@ -782,6 +785,7 @@ int dm_suspend(struct mapped_device *md)
 	down_write(&md->lock);
 	remove_wait_queue(&md->wait, &wait);
 	set_bit(DMF_SUSPENDED, &md->flags);
+	dm_table_suspend_targets(md->map);
 	up_write(&md->lock);
 
 	return 0;
@@ -798,6 +802,7 @@ int dm_resume(struct mapped_device *md)
 		return -EINVAL;
 	}
 
+	dm_table_resume_targets(md->map);
 	clear_bit(DMF_SUSPENDED, &md->flags);
 	clear_bit(DMF_BLOCK_IO, &md->flags);
 	def = md->deferred;

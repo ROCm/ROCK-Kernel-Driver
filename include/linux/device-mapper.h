@@ -33,6 +33,10 @@ typedef void (*dm_dtr_fn) (struct dm_target *ti);
  * > 0: simple remap complete
  */
 typedef int (*dm_map_fn) (struct dm_target *ti, struct bio *bio);
+
+typedef void (*dm_suspend_fn) (struct dm_target *ti);
+typedef void (*dm_resume_fn) (struct dm_target *ti);
+
 typedef int (*dm_status_fn) (struct dm_target *ti, status_type_t status_type,
 			     char *result, unsigned int maxlen);
 
@@ -56,6 +60,8 @@ struct target_type {
 	dm_ctr_fn ctr;
 	dm_dtr_fn dtr;
 	dm_map_fn map;
+	dm_suspend_fn suspend;
+	dm_resume_fn resume;
 	dm_status_fn status;
 };
 

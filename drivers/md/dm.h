@@ -104,6 +104,8 @@ unsigned int dm_table_get_num_targets(struct dm_table *t);
 struct list_head *dm_table_get_devices(struct dm_table *t);
 int dm_table_get_mode(struct dm_table *t);
 void dm_table_add_wait_queue(struct dm_table *t, wait_queue_t *wq);
+void dm_table_suspend_targets(struct dm_table *t);
+void dm_table_resume_targets(struct dm_table *t);
 
 /*-----------------------------------------------------------------
  * A registry of target types.
