@@ -6,7 +6,7 @@ menu "Console display driver support"
 
 config VGA_CONSOLE
 	bool "VGA text console" if EMBEDDED || !X86
-	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC32 && !SPARC64 && !M68K
+	depends on !ARCH_ACORN && !ARCH_EBSA110 && !4xx && !8xx && !SPARC32 && !SPARC64 && !M68K && !PARISC
 	default y
 	help
 	  Saying Y here will allow you to use Linux in text mode through a
@@ -67,7 +67,7 @@ config SGI_NEWPORT_CONSOLE
 #  bool 'IODC console' CONFIG_IODC_CONSOLE
 config STI_CONSOLE
         tristate "STI text console" 
-        depends on PARISC
+        depends on PARISC && FRAMEBUFFER_CONSOLE
         default y
         help
           The STI console is the builtin display/keyboard on HP-PARISC

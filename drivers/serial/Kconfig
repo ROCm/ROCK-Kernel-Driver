@@ -450,7 +450,7 @@ config SERIAL_MUX_CONSOLE
 
 config PDC_CONSOLE
 	bool "PDC software console support"
-	depends on PARISC && !SERIAL_MUX
+	depends on PARISC && !SERIAL_MUX && VT
 	default n
 	help
 	  Saying Y here will enable the software based PDC console to be 
