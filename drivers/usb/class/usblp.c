@@ -298,8 +298,10 @@ static int usblp_check_status(struct usblp *usblp, int err)
 	status = *usblp->statusbuf;
 	if (~status & LP_PERRORP) {
 		newerr = 3;
-		if (status & LP_POUTPA) newerr = 1;
-		if (~status & LP_PSELECD) newerr = 2;
+		if (status & LP_POUTPA)
+			newerr = 1;
+		if (~status & LP_PSELECD)
+			newerr = 2;
 	}
 
 	if (newerr != err)
@@ -926,8 +928,8 @@ abort:
 		if (usblp->readbuf)
 			usb_buffer_free (usblp->dev, USBLP_BUF_SIZE,
 				usblp->readbuf, usblp->writeurb->transfer_dma);
-		if (usblp->statusbuf) kfree(usblp->statusbuf);
-		if (usblp->device_id_string) kfree(usblp->device_id_string);
+		kfree(usblp->statusbuf);
+		kfree(usblp->device_id_string);
 		usb_free_urb(usblp->writeurb);
 		usb_free_urb(usblp->readurb);
 		kfree(usblp);
@@ -987,10 +989,12 @@ static int usblp_select_alts(struct usblp *usblp)
 				continue;
 
 			if (!(epd->bEndpointAddress & USB_ENDPOINT_DIR_MASK)) {
-				if (!epwrite) epwrite=epd;
+				if (!epwrite)
+					epwrite = epd;
 
 			} else {
-				if (!epread) epread=epd;
+				if (!epread)
+					epread = epd;
 			}
 		}
 
@@ -1020,9 +1024,12 @@ static int usblp_select_alts(struct usblp *usblp)
 		return proto_bias;
 
 	/* Ordering is important here. */
-	if (usblp->protocol[2].alt_setting != -1) return 2;
-	if (usblp->protocol[1].alt_setting != -1) return 1;
-	if (usblp->protocol[3].alt_setting != -1) return 3;
+	if (usblp->protocol[2].alt_setting != -1)
+		return 2;
+	if (usblp->protocol[1].alt_setting != -1)
+		return 1;
+	if (usblp->protocol[3].alt_setting != -1)
+		return 3;
 
 	/* If nothing is available, then don't bind to this device. */
 	return -1;
@@ -1036,7 +1043,8 @@ static int usblp_set_protocol(struct usblp *usblp, int protocol)
 		return -EINVAL;
 
 	alts = usblp->protocol[protocol].alt_setting;
-	if (alts < 0) return -EINVAL;
+	if (alts < 0)
+		return -EINVAL;
 	r = usb_set_interface(usblp->dev, usblp->ifnum, alts);
 	if (r < 0) {
 		err("can't set desired altsetting %d on interface %d",

@@ -96,16 +96,19 @@ hiddev_lookup_report(struct hid_device *hid, struct hiddev_report_info *rinfo)
 
 	case HID_REPORT_ID_FIRST:
 		list = report_enum->report_list.next;
-		if (list == &report_enum->report_list) return NULL;
+		if (list == &report_enum->report_list)
+			return NULL;
 		rinfo->report_id = ((struct hid_report *) list)->id;
 		break;
 		
 	case HID_REPORT_ID_NEXT:
 		list = (struct list_head *)
 			report_enum->report_id_hash[rinfo->report_id & HID_REPORT_ID_MASK];
-		if (list == NULL) return NULL;
+		if (list == NULL)
+			return NULL;
 		list = list->next;
-		if (list == &report_enum->report_list) return NULL;
+		if (list == &report_enum->report_list)
+			return NULL;
 		rinfo->report_id = ((struct hid_report *) list)->id;
 		break;
 		
@@ -311,7 +314,8 @@ static ssize_t hiddev_read(struct file * file, char * buffer, size_t count, loff
 	event_size = ((list->flags & HIDDEV_FLAG_UREF) != 0) ?
 		sizeof(struct hiddev_usage_ref) : sizeof(struct hiddev_event);
 
-	if (count < event_size) return 0;
+	if (count < event_size)
+		return 0;
 
 	while (retval == 0) {
 		if (list->head == list->tail) {
@@ -404,7 +408,8 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 	struct hid_field *field;
 	int i;
 
-	if (!hiddev->exist) return -EIO;
+	if (!hiddev->exist)
+		return -EIO;
 
 	switch (cmd) {
 
@@ -646,18 +651,22 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGNAME(0))) {
 			int len;
-			if (!hid->name) return 0;
+			if (!hid->name)
+				return 0;
 			len = strlen(hid->name) + 1;
-			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			if (len > _IOC_SIZE(cmd))
+				 len = _IOC_SIZE(cmd);
 			return copy_to_user((char *) arg, hid->name, len) ?
 				-EFAULT : len;
 		}
 
 		if (_IOC_NR(cmd) == _IOC_NR(HIDIOCGPHYS(0))) {
 			int len;
-			if (!hid->phys) return 0;
+			if (!hid->phys)
+				return 0;
 			len = strlen(hid->phys) + 1;
-			if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+			if (len > _IOC_SIZE(cmd))
+				len = _IOC_SIZE(cmd);
 			return copy_to_user((char *) arg, hid->phys, len) ?
 				-EFAULT : len;
 		}

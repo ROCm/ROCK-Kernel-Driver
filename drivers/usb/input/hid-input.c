@@ -351,7 +351,8 @@ static void hidinput_configure_usage(struct hid_device *device, struct hid_field
 		usage->code = find_next_zero_bit(bit, max + 1, usage->code);
 	}
 
-	if (usage->code > max) return;
+	if (usage->code > max)
+		return;
 
 	if (usage->type == EV_ABS) {
 		int a = field->logical_minimum;
