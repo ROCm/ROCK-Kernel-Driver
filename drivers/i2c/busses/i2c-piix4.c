@@ -28,7 +28,6 @@
    Note: we assume there can only be one device, with one SMBus interface.
 */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/pci.h>
@@ -104,31 +103,18 @@ static int piix4_transaction(void);
 
 static unsigned short piix4_smba = 0;
 
-#ifdef CONFIG_X86
 /*
  * Get DMI information.
  */
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,34)
-void dmi_scan_mach(void);
-#endif
-
-static int __init ibm_dmi_probe(void)
+static int ibm_dmi_probe(void)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,34)
+#ifdef CONFIG_X86
 	extern int is_unsafe_smbus;
 	return is_unsafe_smbus;
 #else
-#define IBM_SIGNATURE		"IBM"
-	dmi_scan_mach();
-	if(dmi_ident[DMI_SYS_VENDOR] == NULL)
-		return 0;
-	if(strncmp(dmi_ident[DMI_SYS_VENDOR], IBM_SIGNATURE,
-	           strlen(IBM_SIGNATURE)) == 0)
-		return 1;
 	return 0;
 #endif
 }
-#endif
 
 static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id)
 {
@@ -141,7 +127,6 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 
 	printk(KERN_INFO "i2c-piix4.o: Found %s device\n", PIIX4_dev->dev.name);
 
-#ifdef CONFIG_X86
 	if(ibm_dmi_probe()) {
 		printk
 		  (KERN_ERR "i2c-piix4.o: IBM Laptop detected; this module may corrupt\n");
@@ -150,7 +135,6 @@ static int piix4_setup(struct pci_dev *PIIX4_dev, const struct pci_device_id *id
 		 error_return = -EPERM;
 		 goto END;
 	}
-#endif
 
 /* Determine the address of the SMBus areas */
 	if (force_addr) {
