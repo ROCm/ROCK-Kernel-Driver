@@ -72,7 +72,7 @@ static int tea6415c_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* fill client structure */
-	sprintf(client->dev.name,"tea6415c (0x%02x)", address);
+	sprintf(client->name,"tea6415c (0x%02x)", address);
 	client->id = tea6415c_id++;
 	client->flags = 0;
 	client->addr = address;
@@ -85,7 +85,7 @@ static int tea6415c_detect(struct i2c_adapter *adapter, int address, int kind)
 		return err;
 	}
 
-	printk("tea6415c.o: detected @ 0x%02x on adapter %s\n",2*address,&client->adapter->dev.name[0]);
+	printk("tea6415c.o: detected @ 0x%02x on adapter %s\n",2*address,&client->adapter->name[0]);
 
 	return 0;
 }
@@ -94,7 +94,7 @@ static int tea6415c_attach(struct i2c_adapter *adapter)
 {
 	/* let's see whether this is a know adapter we can attach to */
 	if( adapter->id != I2C_ALGO_SAA7146 ) {
-		dprintk("tea6415c.o: refusing to probe on unknown adapter [name='%s',id=0x%x]\n",adapter->dev.name,adapter->id);
+		dprintk("tea6415c.o: refusing to probe on unknown adapter [name='%s',id=0x%x]\n",adapter->name,adapter->id);
 		return -ENODEV;
 	}
 

@@ -788,7 +788,7 @@ static void ttusb_iso_irq(struct urb *urb, struct pt_regs *ptregs)
 		}
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-	usb_submit_urb(urb, GFP_KERNEL);
+	usb_submit_urb(urb, GFP_ATOMIC);
 #endif
 }
 

@@ -1116,7 +1116,7 @@ w83781d_detect_subclients(struct i2c_adapter *adapter, int address, int kind,
 		data->lm75[i]->adapter = adapter;
 		data->lm75[i]->driver = &w83781d_driver;
 		data->lm75[i]->flags = 0;
-		strlcpy(data->lm75[i]->dev.name, client_name,
+		strlcpy(data->lm75[i]->name, client_name,
 			DEVICE_NAME_SIZE);
 		if ((err = i2c_attach_client(data->lm75[i]))) {
 			dev_err(&new_client->dev, "Subclient %d "
@@ -1326,7 +1326,7 @@ w83781d_detect(struct i2c_adapter *adapter, int address, int kind)
 	}
 
 	/* Fill in the remaining client fields and put into the global list */
-	strlcpy(new_client->dev.name, client_name, DEVICE_NAME_SIZE);
+	strlcpy(new_client->name, client_name, DEVICE_NAME_SIZE);
 	data->type = kind;
 
 	data->valid = 0;

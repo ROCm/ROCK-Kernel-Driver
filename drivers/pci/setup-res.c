@@ -166,7 +166,7 @@ pdev_sort_resources(struct pci_dev *dev, struct resource_list *head)
 		if (!r_align) {
 			printk(KERN_WARNING "PCI: Ignore bogus resource %d "
 					    "[%lx:%lx] of %s\n",
-					    i, r->start, r->end, dev->dev.name);
+					    i, r->start, r->end, pci_name(dev));
 			continue;
 		}
 		r_align = (i < PCI_BRIDGE_RESOURCES) ? r_align + 1 : r->start;

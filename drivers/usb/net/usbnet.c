@@ -2048,8 +2048,11 @@ static int usbnet_stop (struct net_device *net)
 	dev->wait = 0;
 	remove_wait_queue (&unlink_wakeup, &wait); 
 
-	// deferred work (task, timer, softirq) must also stop
-	flush_scheduled_work ();
+	/* deferred work (task, timer, softirq) must also stop.
+	 * can't flush_scheduled_work() until we drop rtnl (later),
+	 * else workers could deadlock; so make workers a NOP.
+	 */
+	dev->flags = 0;
 	del_timer_sync (&dev->delay);
 	tasklet_kill (&dev->bh);
 
@@ -2487,6 +2490,9 @@ static void usbnet_disconnect (struct usb_interface *intf)
 		dev->driver_info->description);
 	
 	unregister_netdev (dev->net);
+
+	/* we don't hold rtnl here ... */
+	flush_scheduled_work ();
 
 	if (dev->driver_info->unbind)
 		dev->driver_info->unbind (dev, intf);

@@ -116,9 +116,7 @@ static struct i2c_adapter bit_velle_ops = {
 	.owner		= THIS_MODULE,
 	.id		= I2C_HW_B_VELLE,
 	.algo_data	= &bit_velle_data,
-	.dev		= {
-		.name	= "Velleman K8000",
-	},
+	.name		= "Velleman K8000",
 };
 
 static int __init i2c_bitvelle_init(void)
