@@ -34,7 +34,7 @@
 #include <linux/interrupt.h>
 #include <linux/sched.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 #include <asm/io.h>
 #include "sata_promise.h"

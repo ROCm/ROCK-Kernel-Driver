@@ -27,7 +27,7 @@
 #include <linux/spinlock.h>
 #include <scsi/scsi.h>
 #include "scsi.h"
-#include "hosts.h"
+#include <scsi/scsi_host.h>
 #include <linux/libata.h>
 
 #include "libata.h"
