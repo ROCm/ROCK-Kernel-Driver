@@ -1,4 +1,3 @@
-#define MSNFS	/* HACK HACK */
 /*
  *  linux/fs/locks.c
  *
@@ -576,10 +575,8 @@ static int flock_locks_conflict(struct file_lock *caller_fl, struct file_lock *s
 	 */
 	if (!IS_FLOCK(sys_fl) || (caller_fl->fl_file == sys_fl->fl_file))
 		return (0);
-#ifdef MSNFS
 	if ((caller_fl->fl_type & LOCK_MAND) || (sys_fl->fl_type & LOCK_MAND))
 		return 0;
-#endif
 
 	return (locks_conflict(caller_fl, sys_fl));
 }
@@ -1029,10 +1026,8 @@ out_nolock:
 }
 
 static inline int flock_translate_cmd(int cmd) {
-#ifdef MSNFS
 	if (cmd & LOCK_MAND)
 		return cmd & (LOCK_MAND | LOCK_RW);
-#endif
 	switch (cmd &~ LOCK_NB) {
 	case LOCK_SH:
 		return F_RDLCK;
@@ -1325,11 +1320,7 @@ asmlinkage long sys_flock(unsigned int fd, unsigned int cmd)
 	type = error;
 
 	error = -EBADF;
-	if ((type != F_UNLCK)
-#ifdef MSNFS
-		&& !(type & LOCK_MAND)
-#endif
-		&& !(filp->f_mode & 3))
+	if ((type != F_UNLCK) && !(type & LOCK_MAND) && !(filp->f_mode & 3))
 		goto out_putf;
 
 	lock_kernel();
@@ -1718,27 +1709,25 @@ static void lock_get_status(char* out, struct file_lock *fl, int id, char *pfx)
 			      (inode->i_mode & (S_IXGRP | S_ISGID)) == S_ISGID) ?
 			     "MANDATORY" : "ADVISORY ");
 	} else if (IS_FLOCK(fl)) {
-#ifdef MSNFS
 		if (fl->fl_type & LOCK_MAND) {
 			out += sprintf(out, "FLOCK  MSNFS     ");
-		} else
-#endif
+		} else {
 			out += sprintf(out, "FLOCK  ADVISORY  ");
+		}
 	} else if (IS_LEASE(fl)) {
 		out += sprintf(out, "LEASE  MANDATORY ");
 	} else {
 		out += sprintf(out, "UNKNOWN UNKNOWN  ");
 	}
-#ifdef MSNFS
 	if (fl->fl_type & LOCK_MAND) {
 		out += sprintf(out, "%s ",
 			       (fl->fl_type & LOCK_READ)
 			       ? (fl->fl_type & LOCK_WRITE) ? "RW   " : "READ "
 			       : (fl->fl_type & LOCK_WRITE) ? "WRITE" : "NONE ");
-	} else
-#endif
+	} else {
 		out += sprintf(out, "%s ",
 			       (fl->fl_type & F_WRLCK) ? "WRITE" : "READ ");
+	}
 	out += sprintf(out, "%d %s:%ld ",
 		     fl->fl_pid,
 		     inode ? kdevname(inode->i_dev) : "<none>",
@@ -1818,7 +1807,6 @@ done:
 	return length;
 }
 
-#ifdef MSNFS
 /**
  *	lock_may_read - checks that the region is free of locks
  *	@inode: the inode that is being read
@@ -1892,7 +1880,6 @@ int lock_may_write(struct inode *inode, loff_t start, unsigned long len)
 	unlock_kernel();
 	return result;
 }
-#endif
 
 static int __init filelock_init(void)
 {
