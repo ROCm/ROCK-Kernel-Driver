@@ -712,6 +712,7 @@ pfm_restore_ibrs(unsigned long *ibrs, unsigned int nibrs)
 
 	for (i=0; i < nibrs; i++) {
 		ia64_set_ibr(i, ibrs[i]);
+		ia64_dv_serialize_instruction();
 	}
 	ia64_srlz_i();
 }
@@ -723,6 +724,7 @@ pfm_restore_dbrs(unsigned long *dbrs, unsigned int ndbrs)
 
 	for (i=0; i < ndbrs; i++) {
 		ia64_set_dbr(i, dbrs[i]);
+		ia64_dv_serialize_data();
 	}
 	ia64_srlz_d();
 }
@@ -3823,12 +3825,12 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 		DPRINT(("[%d] clearing ibrs, dbrs\n", task->pid));
 		for (i=0; i < pmu_conf->num_ibrs; i++) {
 			ia64_set_ibr(i, 0UL);
-			ia64_srlz_i();
+			ia64_dv_serialize_instruction();
 		}
 		ia64_srlz_i();
 		for (i=0; i < pmu_conf->num_dbrs; i++) {
 			ia64_set_dbr(i, 0UL);
-			ia64_srlz_d();
+			ia64_dv_serialize_data();
 		}
 		ia64_srlz_d();
 	}
@@ -3875,7 +3877,10 @@ pfm_write_ibr_dbr(int mode, pfm_context_t *ctx, void *arg, int count, struct pt_
 		if (mode == PFM_CODE_RR) {
 			CTX_USED_IBR(ctx, rnum);
 
-			if (can_access_pmu) ia64_set_ibr(rnum, dbreg.val);
+			if (can_access_pmu) {
+				ia64_set_ibr(rnum, dbreg.val);
+				ia64_dv_serialize_instruction();
+			}
 
 			ctx->ctx_ibrs[rnum] = dbreg.val;
 
