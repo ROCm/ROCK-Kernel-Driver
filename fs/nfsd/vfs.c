@@ -208,6 +208,7 @@ nfsd_lookup(struct svc_rqst *rqstp, struct svc_fh *fhp, const char *name,
 	err = fh_compose(resfh, exp, dentry, fhp);
 	if (!err && !dentry->d_inode)
 		err = nfserr_noent;
+	dput(dentry);
 out:
 	return err;
 
@@ -859,7 +860,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		char *fname, int flen, struct iattr *iap,
 		int type, dev_t rdev, struct svc_fh *resfhp)
 {
-	struct dentry	*dentry, *dchild;
+	struct dentry	*dentry, *dchild = NULL;
 	struct inode	*dirp;
 	int		err;
 
@@ -965,6 +966,8 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	if (!err)
 		err = fh_update(resfhp);
 out:
+	if (dchild && !IS_ERR(dchild))
+		dput(dchild);
 	return err;
 
 out_nfserr:
@@ -982,7 +985,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		struct svc_fh *resfhp, int createmode, u32 *verifier,
 	        int *truncp)
 {
-	struct dentry	*dentry, *dchild;
+	struct dentry	*dentry, *dchild = NULL;
 	struct inode	*dirp;
 	int		err;
 	__u32		v_mtime=0, v_atime=0;
@@ -1111,6 +1114,8 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 
  out:
 	fh_unlock(fhp);
+	if (dchild && !IS_ERR(dchild))
+		dput(dchild);
  	return err;
  
  out_nfserr:

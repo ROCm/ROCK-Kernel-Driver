@@ -1706,6 +1706,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		nfserr = nfsd4_encode_fattr(NULL, exp,
 				dentry, p, &buflen, cd->rd_bmval,
 				cd->rd_rqstp);
+		dput(dentry);
 		if (!nfserr) {
 			p += buflen;
 			goto out;
