@@ -1,4 +1,6 @@
 /*
+ * $Id: ir-common.h,v 1.6 2004/09/15 16:15:24 kraxel Exp $
+ *
  * some common structs and functions to handle infrared remotes via
  * input layer ...
  *
