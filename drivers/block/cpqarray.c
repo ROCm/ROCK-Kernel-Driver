@@ -134,7 +134,7 @@ static int sendcmd(
 static int ida_open(struct inode *inode, struct file *filep);
 static int ida_release(struct inode *inode, struct file *filep);
 static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, unsigned long arg);
-static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io);
+static int ida_ctlr_ioctl(ctlr_info_t *h, int dsk, ida_ioctl_t *io);
 
 static void do_ida_request(request_queue_t *q);
 static void start_io(ctlr_info_t *h);
@@ -147,7 +147,7 @@ static inline void complete_command(cmdlist_t *cmd, int timeout);
 static irqreturn_t do_ida_intr(int irq, void *dev_id, struct pt_regs * regs);
 static void ida_timer(unsigned long tdata);
 static int ida_revalidate(struct gendisk *disk);
-static int revalidate_allvol(kdev_t dev);
+static int revalidate_allvol(ctlr_info_t *host);
 
 #ifdef CONFIG_PROC_FS
 static void ida_procinit(int i);
@@ -157,6 +157,17 @@ static void ida_procinit(int i) {}
 static int ida_proc_get_info(char *buffer, char **start, off_t offset,
 			     int length, int *eof, void *data) { return 0;}
 #endif
+
+static inline drv_info_t *get_drv(struct gendisk *disk)
+{
+	return disk->private_data;
+}
+
+static inline ctlr_info_t *get_host(struct gendisk *disk)
+{
+	return disk->queue->queuedata;
+}
+
 
 static struct block_device_operations ida_fops  = {
 	.owner		= THIS_MODULE,
@@ -401,7 +412,7 @@ static int __init cpqarray_init(void)
 			disk->major = COMPAQ_SMART2_MAJOR + i;
 			disk->first_minor = j<<NWD_SHIFT;
 			disk->fops = &ida_fops; 
-			if (!drv->nr_blks)
+			if (j && !drv->nr_blks)
 				continue;
 			hba[i]->queue.hardsect_size = drv->blk_size;
 			set_capacity(disk, drv->nr_blks);
@@ -704,27 +715,23 @@ DBGINFO(
  */
 static int ida_open(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	drv_info_t *drv = get_drv(inode->i_bdev->bd_disk);
+	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
 
-	DBGINFO(printk("ida_open %x (%x:%x)\n", inode->i_rdev, ctlr, dsk) );
-	if (ctlr > MAX_CTLR || hba[ctlr] == NULL)
-		return -ENXIO;
-
+	DBGINFO(printk("ida_open %s\n", inode->i_bdev->bd_disk->disk_name));
 	/*
 	 * Root is allowed to open raw volume zero even if it's not configured
 	 * so array config can still work.  I don't think I really like this,
 	 * but I'm already using way to many device nodes to claim another one
 	 * for "raw controller".
 	 */
-	if (!hba[ctlr]->drv[dsk].nr_blks) {
+	if (!drv->nr_blks) {
 		if (!capable(CAP_SYS_RAWIO))
 			return -ENXIO;
-		/* Huh??? */
-		if (capable(CAP_SYS_ADMIN) && minor(inode->i_rdev) != 0)
+		if (!capable(CAP_SYS_ADMIN) && drv != host->drv)
 			return -ENXIO;
 	}
-	hba[ctlr]->usage_count++;
+	host->usage_count++;
 	return 0;
 }
 
@@ -733,8 +740,8 @@ static int ida_open(struct inode *inode, struct file *filep)
  */
 static int ida_release(struct inode *inode, struct file *filep)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
-	hba[ctlr]->usage_count--;
+	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
+	host->usage_count--;
 	return 0;
 }
 
@@ -1015,8 +1022,8 @@ static void ida_timer(unsigned long tdata)
  */
 static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, unsigned long arg)
 {
-	int ctlr = major(inode->i_rdev) - COMPAQ_SMART2_MAJOR;
-	int dsk  = minor(inode->i_rdev) >> NWD_SHIFT;
+	drv_info_t *drv = get_drv(inode->i_bdev->bd_disk);
+	ctlr_info_t *host = get_host(inode->i_bdev->bd_disk);
 	int error;
 	int diskinfo[4];
 	struct hd_geometry *geo = (struct hd_geometry *)arg;
@@ -1025,14 +1032,14 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 
 	switch(cmd) {
 	case HDIO_GETGEO:
-		if (hba[ctlr]->drv[dsk].cylinders) {
-			diskinfo[0] = hba[ctlr]->drv[dsk].heads;
-			diskinfo[1] = hba[ctlr]->drv[dsk].sectors;
-			diskinfo[2] = hba[ctlr]->drv[dsk].cylinders;
+		if (drv->cylinders) {
+			diskinfo[0] = drv->heads;
+			diskinfo[1] = drv->sectors;
+			diskinfo[2] = drv->cylinders;
 		} else {
 			diskinfo[0] = 0xff;
 			diskinfo[1] = 0x3f;
-			diskinfo[2] = hba[ctlr]->drv[dsk].nr_blks / (0xff*0x3f);
+			diskinfo[2] = drv->nr_blks / (0xff*0x3f);
 		}
 		put_user(diskinfo[0], &geo->heads);
 		put_user(diskinfo[1], &geo->sectors);
@@ -1040,23 +1047,24 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 		put_user(get_start_sect(inode->i_bdev), &geo->start);
 		return 0;
 	case IDAGETDRVINFO:
-		if (copy_to_user(&io->c.drv, &hba[ctlr]->drv[dsk],
-				 sizeof(drv_info_t)))
+		if (copy_to_user(&io->c.drv, drv, sizeof(drv_info_t)))
 			return -EFAULT;
 		return 0;
 	case IDAPASSTHRU:
 		if (!capable(CAP_SYS_RAWIO)) return -EPERM;
 		if (copy_from_user(&my_io, io, sizeof(my_io)))
 			return -EFAULT;
-		error = ida_ctlr_ioctl(ctlr, dsk, &my_io);
+		error = ida_ctlr_ioctl(host, drv - host->drv, &my_io);
 		if (error) return error;
 		return copy_to_user(io, &my_io, sizeof(my_io)) ? -EFAULT : 0;
 	case IDAGETCTLRSIG:
 		if (!arg) return -EINVAL;
-		put_user(hba[ctlr]->ctlr_sig, (int*)arg);
+		put_user(host->ctlr_sig, (int*)arg);
 		return 0;
 	case IDAREVALIDATEVOLS:
-		return revalidate_allvol(inode->i_rdev);
+		if (minor(inode->i_rdev) != 0)
+			return -ENXIO;
+		return revalidate_allvol(host);
 	case IDADRIVERVERSION:
 		if (!arg) return -EINVAL;
 		put_user(DRIVER_VERSION, (unsigned long*)arg);
@@ -1067,9 +1075,9 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
 		ida_pci_info_struct pciinfo;
 
 		if (!arg) return -EINVAL;
-		pciinfo.bus = hba[ctlr]->pci_dev->bus->number;
-		pciinfo.dev_fn = hba[ctlr]->pci_dev->devfn;
-		pciinfo.board_id = hba[ctlr]->board_id;
+		pciinfo.bus = host->pci_dev->bus->number;
+		pciinfo.dev_fn = host->pci_dev->devfn;
+		pciinfo.board_id = host->board_id;
 		if(copy_to_user((void *) arg, &pciinfo,  
 			sizeof( ida_pci_info_struct)))
 				return -EFAULT;
@@ -1091,9 +1099,9 @@ static int ida_ioctl(struct inode *inode, struct file *filep, unsigned int cmd, 
  * any serious sanity checking on the arguments.  Doing an IDA_WRITE_MEDIA and
  * putting a 64M buffer in the sglist is probably a *bad* idea.
  */
-static int ida_ctlr_ioctl(int ctlr, int dsk, ida_ioctl_t *io)
+static int ida_ctlr_ioctl(ctlr_info_t *h, int dsk, ida_ioctl_t *io)
 {
-	ctlr_info_t *h = hba[ctlr];
+	int ctlr = h->ctlr;
 	cmdlist_t *c;
 	void *p = NULL;
 	unsigned long flags;
@@ -1387,59 +1395,57 @@ DBG(
  * particualar logical volume (instead of all of them on a particular
  * controller).
  */
-static int revalidate_allvol(kdev_t dev)
+static int revalidate_allvol(ctlr_info_t *host)
 {
-	int ctlr, i;
+	int ctlr = host->ctlr;
+	int i;
 	unsigned long flags;
 
-	if (minor(dev) != 0)
-		return -ENXIO;
-
-	ctlr = major(dev) - COMPAQ_SMART2_MAJOR;
-
 	spin_lock_irqsave(IDA_LOCK(ctlr), flags);
-	if (hba[ctlr]->usage_count > 1) {
+	if (host->usage_count > 1) {
 		spin_unlock_irqrestore(IDA_LOCK(ctlr), flags);
 		printk(KERN_WARNING "cpqarray: Device busy for volume"
-			" revalidation (usage=%d)\n", hba[ctlr]->usage_count);
+			" revalidation (usage=%d)\n", host->usage_count);
 		return -EBUSY;
 	}
-	hba[ctlr]->usage_count++;
+	host->usage_count++;
 	spin_unlock_irqrestore(IDA_LOCK(ctlr), flags);
 
 	/*
 	 * Set the partition and block size structures for all volumes
 	 * on this controller to zero.  We will reread all of this data
 	 */
-	for (i = 0; i < NWD; i++) {
+	set_capacity(ida_gendisk[ctlr][0], 0);
+	for (i = 1; i < NWD; i++) {
 		struct gendisk *disk = ida_gendisk[ctlr][i];
 		if (disk->flags & GENHD_FL_UP)
 			del_gendisk(disk);
 	}
-	memset(hba[ctlr]->drv,            0, sizeof(drv_info_t)*NWD);
+	memset(host->drv, 0, sizeof(drv_info_t)*NWD);
 
 	/*
 	 * Tell the array controller not to give us any interrupts while
 	 * we check the new geometry.  Then turn interrupts back on when
 	 * we're done.
 	 */
-	hba[ctlr]->access.set_intr_mask(hba[ctlr], 0);
+	host->access.set_intr_mask(host, 0);
 	getgeometry(ctlr);
-	hba[ctlr]->access.set_intr_mask(hba[ctlr], FIFO_NOT_EMPTY);
+	host->access.set_intr_mask(host, FIFO_NOT_EMPTY);
 
 	for(i=0; i<NWD; i++) {
 		struct gendisk *disk = ida_gendisk[ctlr][i];
-		drv_info_t *drv = &hba[ctlr]->drv[i];
-		if (!drv->nr_blks)
+		drv_info_t *drv = &host->drv[i];
+		if (i && !drv->nr_blks)
 			continue;
-		hba[ctlr]->queue.hardsect_size = drv->blk_size;
+		host->queue.hardsect_size = drv->blk_size;
 		set_capacity(disk, drv->nr_blks);
-		disk->queue = &hba[ctlr]->queue;
+		disk->queue = &host->queue;
 		disk->private_data = drv;
-		add_disk(disk);
+		if (i)
+			add_disk(disk);
 	}
 
-	hba[ctlr]->usage_count--;
+	host->usage_count--;
 	return 0;
 }
 
