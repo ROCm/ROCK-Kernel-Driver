@@ -517,7 +517,6 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
 	struct fadt_descriptor_rev2 *fadt;
-	u32 sci_irq;
 
 	if (!phys_addr || !size)
 		return -EINVAL;
@@ -531,12 +530,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
 
-	sci_irq = fadt->sci_int;
-
-	if (has_8259 && sci_irq < 16)
-		return 0;	/* legacy, no setup required */
-
-	iosapic_register_intr(sci_irq, IOSAPIC_POL_LOW, IOSAPIC_LEVEL);
+	acpi_register_irq(fadt->sci_int, ACPI_ACTIVE_LOW, ACPI_LEVEL_SENSITIVE);
 	return 0;
 }
 
@@ -686,27 +680,23 @@ acpi_get_interrupt_model (int *type)
 }
 
 int
-acpi_irq_to_vector (u32 irq)
+acpi_irq_to_vector (u32 gsi)
 {
-	if (has_8259 && irq < 16)
-		return isa_irq_to_vector(irq);
+	if (has_8259 && gsi < 16)
+		return isa_irq_to_vector(gsi);
 
-	return gsi_to_vector(irq);
+	return gsi_to_vector(gsi);
 }
 
 int
 acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
 {
-	int vector = 0;
-
-	if (has_8259 && (gsi < 16))
+	if (has_8259 && gsi < 16)
 		return isa_irq_to_vector(gsi);
 
-	/* Turn it on */
-	vector = iosapic_register_intr (gsi,
+	return iosapic_register_intr(gsi,
 			(polarity == ACPI_ACTIVE_HIGH) ? IOSAPIC_POL_HIGH : IOSAPIC_POL_LOW,
 			(trigger == ACPI_EDGE_SENSITIVE) ? IOSAPIC_EDGE : IOSAPIC_LEVEL);
-	return vector;
 }
 
 #endif /* CONFIG_ACPI_BOOT */
