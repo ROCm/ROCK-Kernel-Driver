@@ -453,8 +453,7 @@ HDLC_irq(struct BCState *bcs, u_int stat) {
 				hdlc_fill_fifo(bcs);
 				return;
 			}
-			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			sched_b_event(bcs, B_CMPLREADY);
+			xmit_complete_b(bcs);
 			bcs->hw.hdlc.count = 0;
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {

@@ -315,9 +315,7 @@ hfc_fill_fifo(struct BCState *bcs)
 		if (PACKET_NOACK == bcs->tx_skb->pkt_type)
 			count = -1;
 
-		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		sched_b_event(bcs, B_CMPLREADY);
-		bcs->tx_skb = NULL;
+		xmit_complete_b(bcs);
 		if (bcs->mode != L1_MODE_TRANS) {
 		  WaitForBusy(cs);
 		  WaitNoBusy(cs);

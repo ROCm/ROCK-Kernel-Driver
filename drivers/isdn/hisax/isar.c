@@ -750,8 +750,7 @@ send_frames(struct BCState *bcs)
 			isar_fill_fifo(bcs);
 			return;
 		} else {
-			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			sched_b_event(bcs, B_CMPLREADY);
+			xmit_complete_b(bcs);
 			if (bcs->mode == L1_MODE_FAX) {
 				if (bcs->hw.isar.cmd == PCTRL_CMD_FTH) {
 					if (test_bit(BC_FLG_LASTDATA, &bcs->Flag)) {
@@ -765,7 +764,6 @@ send_frames(struct BCState *bcs)
 				}
 			}
 			bcs->hw.isar.txcnt = 0; 
-			bcs->tx_skb = NULL;
 		}
 	}
 	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {

@@ -1413,3 +1413,11 @@ sched_b_event(struct BCState *bcs, int event)
 	set_bit(event, &bcs->event);
 	schedule_work(&bcs->work);
 }
+
+static inline void
+xmit_complete_b(struct BCState *bcs)
+{
+	skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
+	sched_b_event(bcs, B_CMPLREADY);
+	bcs->tx_skb = NULL;
+}

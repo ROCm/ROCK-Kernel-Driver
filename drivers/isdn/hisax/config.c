@@ -1906,8 +1906,7 @@ static void hisax_b_l1l2(struct hisax_if *ifc, int pr, void *arg)
 	case PH_DATA | CONFIRM:
 		skb = arg;
 		bcs->tx_cnt -= skb->truesize;
-		skb_queue_tail(&bcs->cmpl_queue, skb);
-		sched_b_event(bcs, B_CMPLREADY);
+		xmit_complete_b(bcs);
 		skb = skb_dequeue(&bcs->squeue);
 		if (skb) {
 			B_L2L1(b_if, PH_DATA | REQUEST, skb);

@@ -300,8 +300,7 @@ modem_fill(struct BCState *bcs) {
 			write_modem(bcs);
 			return;
 		}
-		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		sched_b_event(bcs, B_CMPLREADY);
+		xmit_complete_b(bcs);
 	}
 	if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
 		bcs->hw.hscx.count = 0;

@@ -360,9 +360,7 @@ hfc_fill_fifo(struct BCState *bcs)
 		printk(KERN_WARNING "HFC S FIFO channel %d BUSY Error\n", bcs->channel);
 	} else {
 		bcs->tx_cnt -= bcs->tx_skb->len;
-		skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-		sched_b_event(bcs, B_CMPLREADY);
-		bcs->tx_skb = NULL;
+		xmit_complete_b(bcs);
 	}
 	WaitForBusy(cs);
 	cli();

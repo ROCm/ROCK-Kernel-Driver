@@ -591,11 +591,9 @@ hfcsx_fill_fifo(struct BCState *bcs)
 		       (bcs->mode == L1_MODE_TRANS) ? 
 		       HFCSX_BTRANS_THRESHOLD : 0)) {
 
-	  bcs->tx_cnt -= bcs->tx_skb->len;
-	  skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-	  sched_b_event(bcs, B_CMPLREADY);
-	  bcs->tx_skb = NULL;
-	  test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
+		bcs->tx_cnt -= bcs->tx_skb->len;
+		xmit_complete_b(bcs);
+		test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 	}
 
 	cli();

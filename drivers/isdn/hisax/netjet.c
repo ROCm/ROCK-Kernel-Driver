@@ -759,9 +759,7 @@ static void write_raw(struct BCState *bcs, u_int *buf, int cnt) {
 			if (!bcs->tx_skb) {
 				debugl1(bcs->cs,"tiger write_raw: NULL skb s_cnt %d", s_cnt);
 			} else {
-				skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-				sched_b_event(bcs, B_CMPLREADY);
-				bcs->tx_skb = NULL;
+				xmit_complete_b(bcs);
 			}
 			test_and_clear_bit(BC_FLG_BUSY, &bcs->Flag);
 			bcs->hw.tiger.free = cnt - s_cnt;

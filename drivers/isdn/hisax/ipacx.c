@@ -750,8 +750,7 @@ bch_int(struct IsdnCardState *cs, u_char hscx)
 				bch_fill_fifo(bcs);
 				goto afterXPR;
 			}
-			skb_queue_tail(&bcs->cmpl_queue, bcs->tx_skb);
-			sched_b_event(bcs, B_CMPLREADY);
+			xmit_complete_b(bcs);
 			bcs->hw.hscx.count = 0; 
 		}
 		if ((bcs->tx_skb = skb_dequeue(&bcs->squeue))) {
