@@ -114,7 +114,6 @@ int eisa_driver_register (struct eisa_driver *edrv)
 
 void eisa_driver_unregister (struct eisa_driver *edrv)
 {
-	bus_remove_driver (&edrv->driver);
 	driver_unregister (&edrv->driver);
 }
 
