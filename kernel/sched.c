@@ -696,10 +696,9 @@ static int wake_idle(int cpu, task_t *p)
 		return cpu;
 
 	cpus_and(tmp, sd->span, cpu_online_map);
-	for_each_cpu_mask(i, tmp) {
-		if (!cpu_isset(i, p->cpus_allowed))
-			continue;
+	cpus_and(tmp, tmp, p->cpus_allowed);
 
+	for_each_cpu_mask(i, tmp) {
 		if (idle_cpu(i))
 			return i;
 	}
@@ -3335,7 +3334,7 @@ int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	runqueue_t *rq;
 
 	rq = task_rq_lock(p, &flags);
-	if (any_online_cpu(new_mask) == NR_CPUS) {
+	if (!cpus_intersects(new_mask, cpu_online_map)) {
 		ret = -EINVAL;
 		goto out;
 	}
@@ -3510,8 +3509,7 @@ static void migrate_all_tasks(int src_cpu)
 		if (dest_cpu == NR_CPUS)
 			dest_cpu = any_online_cpu(tsk->cpus_allowed);
 		if (dest_cpu == NR_CPUS) {
-			cpus_clear(tsk->cpus_allowed);
-			cpus_complement(tsk->cpus_allowed);
+			cpus_setall(tsk->cpus_allowed);
 			dest_cpu = any_online_cpu(tsk->cpus_allowed);
 
 			/* Don't tell them about moving exiting tasks
@@ -3827,7 +3825,7 @@ void sched_domain_debug(void)
 			int j;
 			char str[NR_CPUS];
 			struct sched_group *group = sd->groups;
-			cpumask_t groupmask, tmp;
+			cpumask_t groupmask;
 
 			cpumask_scnprintf(str, NR_CPUS, sd->span);
 			cpus_clear(groupmask);
@@ -3857,8 +3855,7 @@ void sched_domain_debug(void)
 				if (!cpus_weight(group->cpumask))
 					printk(" ERROR empty group:");
 
-				cpus_and(tmp, groupmask, group->cpumask);
-				if (cpus_weight(tmp) > 0)
+				if (cpus_intersects(groupmask, group->cpumask))
 					printk(" ERROR repeated CPUs:");
 
 				cpus_or(groupmask, groupmask, group->cpumask);
@@ -3877,8 +3874,7 @@ void sched_domain_debug(void)
 			sd = sd->parent;
 
 			if (sd) {
-				cpus_and(tmp, groupmask, sd->span);
-				if (!cpus_equal(tmp, groupmask))
+				if (!cpus_subset(groupmask, sd->span))
 					printk(KERN_DEBUG "ERROR parent span is not a superset of domain->span\n");
 			}
 
