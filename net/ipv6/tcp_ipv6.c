@@ -1642,7 +1642,7 @@ process:
 		goto discard_and_relse;
 
 	if (!xfrm6_policy_check(sk, XFRM_POLICY_IN, skb))
-		goto discard_it;
+		goto discard_and_relse;
 
 	skb->dev = NULL;
 
