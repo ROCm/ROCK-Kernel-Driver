@@ -947,7 +947,7 @@ S:	Maintained
 
 HPUSBSCSI
 P:	Oliver Neukum
-M:	drivers@neukum.org
+M:	oliver@neukum.name
 S:	Maintained
 
 I2C AND SENSORS DRIVERS
@@ -1428,7 +1428,7 @@ S:	Maintained
 
 MICROTEK X6 SCANNER
 P:	Oliver Neukum
-M:	drivers@neukum.org
+M:	oliver@neukum.name
 S:	Maintained
 
 MIPS
@@ -2184,8 +2184,8 @@ W:	http://www.kernel.dk
 S:	Maintained
 
 USB ACM DRIVER
-P:	Vojtech Pavlik
-M:	vojtech@suse.cz
+P:	Oliver Neukum
+M:	oliver@neukum.name
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
@@ -2229,7 +2229,7 @@ S:	Maintained
 
 USB KAWASAKI LSI DRIVER
 P:	Oliver Neukum
-M:	drivers@neukum.org
+M:	oliver@neukum.name
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
