@@ -980,25 +980,28 @@ IEEE 1394 SUBSYSTEM
 P:	Ben Collins
 M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
-W:	http://linux1394.sourceforge.net/
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 OHCI DRIVER
 P:	Ben Collins
 M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 PCILYNX DRIVER
 P:	Andreas Bombe
 M:	andreas.bombe@munich.netsurf.de
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IEEE 1394 RAW I/O DRIVER
-P:	Andreas Bombe
-M:	andreas.bombe@munich.netsurf.de
+P:	Ben Collins
+M:	bcollins@debian.org
 L:	linux1394-devel@lists.sourceforge.net
+W:	http://www.linux1394.org/
 S:	Maintained
 
 IMS TWINTURBO FRAMEBUFFER DRIVER
