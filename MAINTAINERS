@@ -730,8 +730,8 @@ W:	http://www.win.tue.nl/~aeb/partitions/partition_types-1.html
 S:	Maintained
 
 DISKQUOTA:
-P:	Marco van Wieringen
-M:	mvw@planets.elm.net
+P:	Jan Kara
+M:	jack@suse.cz
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
