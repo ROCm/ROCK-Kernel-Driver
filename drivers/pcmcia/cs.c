@@ -48,6 +48,7 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/device.h>
+#include <linux/suspend.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 
@@ -783,6 +784,9 @@ static int pccardd(void *__skt)
 		}
 
 		schedule();
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+
 		if (!skt->thread)
 			break;
 	}
