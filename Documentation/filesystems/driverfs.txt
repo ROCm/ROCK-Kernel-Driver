@@ -165,9 +165,9 @@ Note that there is a struct attribute embedded in the structure. In
 order to relieve pain in declaring attributes, the subsystem should
 also define a macro, like:
 
-#define DEVICE_ATTR(_name,_str,_mode,_show,_store)      \
+#define DEVICE_ATTR(_name,_mode,_show,_store)      \
 struct device_attribute dev_attr_##_name = {            \
-        .attr = {.name  = _str, .mode   = _mode },      \
+        .attr = {.name  = __stringify(_name) , .mode   = _mode },      \
         .show   = _show,                                \
         .store  = _store,                               \
 };
@@ -252,7 +252,7 @@ struct bus_attribute {
 
 Declaring:
 
-BUS_ATTR(_name,_str,_mode,_show,_store)
+BUS_ATTR(_name,_mode,_show,_store)
 
 Creation/Removal:
 
@@ -273,7 +273,7 @@ struct driver_attribute {
 
 Declaring:
 
-DRIVER_ATTR(_name,_str,_mode,_show,_store)
+DRIVER_ATTR(_name,_mode,_show,_store)
 
 Creation/Removal:
 
