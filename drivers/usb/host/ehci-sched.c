@@ -525,6 +525,7 @@ done:
 
 static int intr_submit (
 	struct ehci_hcd		*ehci,
+	struct usb_host_endpoint *ep,
 	struct urb		*urb,
 	struct list_head	*qtd_list,
 	int			mem_flags
@@ -532,23 +533,17 @@ static int intr_submit (
 	unsigned		epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh;
-	struct hcd_dev		*dev;
-	int			is_input;
 	int			status = 0;
 	struct list_head	empty;
 
 	/* get endpoint and transfer/schedule data */
-	epnum = usb_pipeendpoint (urb->pipe);
-	is_input = usb_pipein (urb->pipe);
-	if (is_input)
-		epnum |= 0x10;
+	epnum = ep->desc.bEndpointAddress;
 
 	spin_lock_irqsave (&ehci->lock, flags);
-	dev = (struct hcd_dev *)urb->dev->hcpriv;
 
 	/* get qh and force any scheduling errors */
 	INIT_LIST_HEAD (&empty);
-	qh = qh_append_tds (ehci, urb, &empty, epnum, &dev->ep [epnum]);
+	qh = qh_append_tds (ehci, urb, &empty, epnum, &ep->hcpriv);
 	if (qh == 0) {
 		status = -ENOMEM;
 		goto done;
@@ -559,7 +554,7 @@ static int intr_submit (
 	}
 
 	/* then queue the urb's tds to the qh */
-	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &dev->ep [epnum]);
+	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &ep->hcpriv);
 	BUG_ON (qh == 0);
 
 	/* ... update usbfs periodic stats */
@@ -689,7 +684,6 @@ iso_stream_put(struct ehci_hcd *ehci, struct ehci_iso_stream *stream)
 	 */
 	if (stream->refcount == 1) {
 		int		is_in;
-		struct hcd_dev	*dev = stream->udev->hcpriv;
 
 		// BUG_ON (!list_empty(&stream->td_list));
 
@@ -719,7 +713,7 @@ iso_stream_put(struct ehci_hcd *ehci, struct ehci_iso_stream *stream)
 
 		is_in = (stream->bEndpointAddress & USB_DIR_IN) ? 0x10 : 0;
 		stream->bEndpointAddress &= 0x0f;
-		dev->ep[is_in + stream->bEndpointAddress] = NULL;
+		stream->ep->hcpriv = NULL;
 
 		if (stream->rescheduled) {
 			ehci_info (ehci, "ep%d%s-iso rescheduled "
@@ -746,24 +740,25 @@ static struct ehci_iso_stream *
 iso_stream_find (struct ehci_hcd *ehci, struct urb *urb)
 {
 	unsigned		epnum;
-	struct hcd_dev		*dev;
 	struct ehci_iso_stream	*stream;
+	struct usb_host_endpoint *ep;
 	unsigned long		flags;
 
 	epnum = usb_pipeendpoint (urb->pipe);
 	if (usb_pipein(urb->pipe))
-		epnum += 0x10;
+		ep = urb->dev->ep_in[epnum];
+	else
+		ep = urb->dev->ep_out[epnum];
 
 	spin_lock_irqsave (&ehci->lock, flags);
-
-	dev = (struct hcd_dev *)urb->dev->hcpriv;
-	stream = dev->ep [epnum];
+	stream = ep->hcpriv;
 
 	if (unlikely (stream == 0)) {
 		stream = iso_stream_alloc(GFP_ATOMIC);
 		if (likely (stream != 0)) {
 			/* dev->ep owns the initial refcount */
-			dev->ep[epnum] = stream;
+			ep->hcpriv = stream;
+			stream->ep = ep;
 			iso_stream_init(stream, urb->dev, urb->pipe,
 					urb->interval);
 		}
@@ -771,8 +766,8 @@ iso_stream_find (struct ehci_hcd *ehci, struct urb *urb)
 	/* if dev->ep [epnum] is a QH, info1.maxpacket is nonzero */
 	} else if (unlikely (stream->hw_info1 != 0)) {
 		ehci_dbg (ehci, "dev %s ep%d%s, not iso??\n",
-			urb->dev->devpath, epnum & 0x0f,
-			(epnum & 0x10) ? "in" : "out");
+			urb->dev->devpath, epnum,
+			usb_pipein(urb->pipe) ? "in" : "out");
 		stream = NULL;
 	}
 

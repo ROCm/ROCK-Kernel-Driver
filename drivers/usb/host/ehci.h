@@ -36,7 +36,7 @@ struct ehci_stats {
 
 /* ehci_hcd->lock guards shared data against other CPUs:
  *   ehci_hcd:	async, reclaim, periodic (and shadow), ...
- *   hcd_dev:	ep[]
+ *   usb_host_endpoint: hcpriv
  *   ehci_qh:	qh_next, qtd_list
  *   ehci_qtd:	qtd_list
  *
@@ -430,6 +430,7 @@ struct ehci_iso_stream {
 	struct list_head	td_list;	/* queued itds/sitds */
 	struct list_head	free_list;	/* list of unused itds/sitds */
 	struct usb_device	*udev;
+ 	struct usb_host_endpoint *ep;
 
 	/* output of (re)scheduling */
 	unsigned long		start;		/* jiffies */

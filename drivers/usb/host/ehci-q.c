@@ -832,26 +832,8 @@ static struct ehci_qh *qh_append_tds (
 			qtd = list_entry (qtd_list->next, struct ehci_qtd,
 					qtd_list);
 
-		/* control qh may need patching after enumeration */
+		/* control qh may need patching ... */
 		if (unlikely (epnum == 0)) {
-			/* set_address changes the address */
-			if ((qh->hw_info1 & QH_ADDR_MASK) == 0)
-				qh->hw_info1 |= cpu_to_le32 (
-						usb_pipedevice (urb->pipe));
-
-			/* for full speed, ep0 maxpacket can grow */
-			else if (!(qh->hw_info1
-					& __constant_cpu_to_le32 (0x3 << 12))) {
-				u32	info, max;
-
-				info = le32_to_cpu (qh->hw_info1);
-				max = urb->dev->descriptor.bMaxPacketSize0;
-				if (max > (0x07ff & (info >> 16))) {
-					info &= ~(0x07ff << 16);
-					info |= max << 16;
-					qh->hw_info1 = cpu_to_le32 (info);
-				}
-			}
 
                         /* usb_reset_device() briefly reverts to address 0 */
                         if (usb_pipedevice (urb->pipe) == 0)
@@ -908,33 +890,30 @@ static struct ehci_qh *qh_append_tds (
 static int
 submit_async (
 	struct ehci_hcd		*ehci,
+	struct usb_host_endpoint *ep,
 	struct urb		*urb,
 	struct list_head	*qtd_list,
 	int			mem_flags
 ) {
 	struct ehci_qtd		*qtd;
-	struct hcd_dev		*dev;
 	int			epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh = NULL;
 
 	qtd = list_entry (qtd_list->next, struct ehci_qtd, qtd_list);
-	dev = (struct hcd_dev *)urb->dev->hcpriv;
-	epnum = usb_pipeendpoint (urb->pipe);
-	if (usb_pipein (urb->pipe) && !usb_pipecontrol (urb->pipe))
-		epnum |= 0x10;
+	epnum = ep->desc.bEndpointAddress;
 
 #ifdef EHCI_URB_TRACE
 	ehci_dbg (ehci,
 		"%s %s urb %p ep%d%s len %d, qtd %p [qh %p]\n",
 		__FUNCTION__, urb->dev->devpath, urb,
-		epnum & 0x0f, usb_pipein (urb->pipe) ? "in" : "out",
+		epnum & 0x0f, (epnum & USB_DIR_IN) ? "in" : "out",
 		urb->transfer_buffer_length,
-		qtd, dev ? dev->ep [epnum] : (void *)~0);
+		qtd, ep->hcpriv);
 #endif
 
 	spin_lock_irqsave (&ehci->lock, flags);
-	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &dev->ep [epnum]);
+	qh = qh_append_tds (ehci, urb, qtd_list, epnum, &ep->hcpriv);
 
 	/* Control/bulk operations through TTs don't need scheduling,
 	 * the HC and TT handle it when the TT has a buffer ready.

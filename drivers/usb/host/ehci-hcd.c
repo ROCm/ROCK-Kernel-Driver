@@ -895,6 +895,7 @@ dead:
  */
 static int ehci_urb_enqueue (
 	struct usb_hcd	*hcd,
+	struct usb_host_endpoint *ep,
 	struct urb	*urb,
 	int		mem_flags
 ) {
@@ -909,12 +910,12 @@ static int ehci_urb_enqueue (
 	default:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
 			return -ENOMEM;
-		return submit_async (ehci, urb, &qtd_list, mem_flags);
+		return submit_async (ehci, ep, urb, &qtd_list, mem_flags);
 
 	case PIPE_INTERRUPT:
 		if (!qh_urb_transaction (ehci, urb, &qtd_list, mem_flags))
 			return -ENOMEM;
-		return intr_submit (ehci, urb, &qtd_list, mem_flags);
+		return intr_submit (ehci, ep, urb, &qtd_list, mem_flags);
 
 	case PIPE_ISOCHRONOUS:
 		if (urb->dev->speed == USB_SPEED_HIGH)
@@ -1014,23 +1015,18 @@ static int ehci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 // bulk qh holds the data toggle
 
 static void
-ehci_endpoint_disable (struct usb_hcd *hcd, struct hcd_dev *dev, int ep)
+ehci_endpoint_disable (struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-	int			epnum;
 	unsigned long		flags;
 	struct ehci_qh		*qh, *tmp;
 
 	/* ASSERT:  any requests/urbs are being unlinked */
 	/* ASSERT:  nobody can be submitting urbs for this any more */
 
-	epnum = ep & USB_ENDPOINT_NUMBER_MASK;
-	if (epnum != 0 && (ep & USB_DIR_IN))
-		epnum |= 0x10;
-
 rescan:
 	spin_lock_irqsave (&ehci->lock, flags);
-	qh = (struct ehci_qh *) dev->ep [epnum];
+	qh = ep->hcpriv;
 	if (!qh)
 		goto done;
 
@@ -1072,12 +1068,12 @@ nogood:
 		/* caller was supposed to have unlinked any requests;
 		 * that's not our job.  just leak this memory.
 		 */
-		ehci_err (ehci, "qh %p (#%d) state %d%s\n",
-			qh, epnum, qh->qh_state,
+		ehci_err (ehci, "qh %p (#%02x) state %d%s\n",
+			qh, ep->desc.bEndpointAddress, qh->qh_state,
 			list_empty (&qh->qtd_list) ? "" : "(has tds)");
 		break;
 	}
-	dev->ep[epnum] = NULL;
+	ep->hcpriv = NULL;
 done:
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	return;
