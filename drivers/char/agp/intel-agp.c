@@ -1237,6 +1237,7 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 	struct agp_bridge_data *bridge;
 	char *name = "(unknown)";
 	u8 cap_ptr = 0;
+	struct resource *r;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 
@@ -1377,6 +1378,29 @@ static int __init agp_intel_probe(struct pci_dev *pdev,
 		bridge->dev_private_data = &intel_i830_private;
 
 	printk(KERN_INFO PFX "Detected an Intel %s Chipset.\n", name);
+
+	/*
+	* The following fixes the case where the BIOS has "forgotten" to
+	* provide an address range for the GART.
+	* 20030610 - hamish@zot.org
+	*/
+	r = &pdev->resource[0];
+	if (!r->start && r->end) {
+		if(pci_assign_resource(pdev, 0)) {
+			printk(KERN_ERR PFX "could not assign resource 0\n");
+			return (-ENODEV);
+		}
+	}
+
+	/*
+	* If the device has not been properly setup, the following will catch
+	* the problem and should stop the system from crashing.
+	* 20030610 - hamish@zot.org
+	*/
+	if (pci_enable_device(pdev)) {
+		printk(KERN_ERR PFX "Unable to Enable PCI device\n");
+		return (-ENODEV);
+	}
 
 	/* Fill in the mode register */
 	if (cap_ptr) {
