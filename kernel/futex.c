@@ -478,12 +478,12 @@ static int futex_fd(unsigned long uaddr, int signal)
 	filp->f_dentry = dget(futex_mnt->mnt_root);
 
 	if (signal) {
-		int ret;
-		
-		ret = f_setown(filp, current->tgid, 1);
-		if (ret) {
+		int err;
+		err = f_setown(filp, current->tgid, 1);
+		if (err < 0) {
 			put_unused_fd(ret);
 			put_filp(filp);
+			ret = err;
 			goto out;
 		}
 		filp->f_owner.signum = signal;
