@@ -177,16 +177,12 @@ struct seq_operations partitions_op = {
 extern int blk_dev_init(void);
 extern int soc_probe(void);
 extern int atmdev_init(void);
-extern int i2o_init(void);
 extern int cpqarray_init(void);
 
 int __init device_init(void)
 {
 	rwlock_init(&gendisk_lock);
 	blk_dev_init();
-#ifdef CONFIG_I2O
-	i2o_init();
-#endif
 #ifdef CONFIG_FC4_SOC
 	/* This has to be done before scsi_dev_init */
 	soc_probe();

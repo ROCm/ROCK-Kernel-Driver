@@ -72,6 +72,8 @@ void nkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
 
 	else if (data == 0xe7) /* end of init sequence */
 		printk(KERN_INFO "input: %s on %s\n", nkbd_name, serio->phys);
+
+	input_sync(&nkbd->dev);
 }
 
 void nkbd_connect(struct serio *serio, struct serio_dev *dev)
@@ -110,10 +112,10 @@ void nkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	nkbd->dev.name = nkbd_name;
 	nkbd->dev.phys = nkbd->phys;
-	nkbd->dev.idbus = BUS_RS232;
-	nkbd->dev.idvendor = SERIO_NEWTON;
-	nkbd->dev.idproduct = 0x0001;
-	nkbd->dev.idversion = 0x0100;
+	nkbd->dev.id.bustype = BUS_RS232;
+	nkbd->dev.id.vendor = SERIO_NEWTON;
+	nkbd->dev.id.product = 0x0001;
+	nkbd->dev.id.version = 0x0100;
 
 	input_register_device(&nkbd->dev);
 
@@ -129,9 +131,9 @@ void nkbd_disconnect(struct serio *serio)
 }
 
 struct serio_dev nkbd_dev = {
-	interrupt:	nkbd_interrupt,
-	connect:	nkbd_connect,
-	disconnect:	nkbd_disconnect
+	.interrupt =	nkbd_interrupt,
+	.connect =	nkbd_connect,
+	.disconnect =	nkbd_disconnect
 };
 
 int __init nkbd_init(void)

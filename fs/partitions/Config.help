@@ -46,15 +46,14 @@ CONFIG_LDM_PARTITION
 
   Windows 2000 introduced the concept of Dynamic Disks to get around
   the limitations of the PC's partitioning scheme.  The Logical Disk
-  Manager allows the user to repartion a disk and create spanned,
+  Manager allows the user to repartition a disk and create spanned,
   mirrored, striped or RAID volumes, all without the need for
   rebooting.
 
   Normal partitions are now called Basic Disks under Windows 2000 and
   XP.
 
-  Technical documentation to accompany this driver is available from:
-  <http://linux-ntfs.sf.net/ldm/>.
+  For a fuller description read <file:Documentation/ldm.txt>.
 
   If unsure, say N.
 

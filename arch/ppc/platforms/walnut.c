@@ -45,6 +45,8 @@
 #include <asm/todc.h>
 #endif
 
+#include "walnut.h"
+
 #undef DEBUG
 
 #ifdef DEBUG
@@ -82,9 +84,6 @@ ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 void __init
 board_setup_arch(void)
 {
-#define WALNUT_PS2_BASE		0xF0100000
-#define WALNUT_FPGA_BASE	0xF0300000
-
 	void *fpga_brdc;
 	unsigned char fpga_brdc_data;
 	void *fpga_enable;

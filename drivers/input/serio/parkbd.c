@@ -97,11 +97,11 @@ static void parkbd_close(struct serio *port)
 
 static struct serio parkbd_port =
 {
-	write:	parkbd_write,
-	open:	parkbd_open,
-	close:	parkbd_close,
-	name:	parkbd_name,
-	phys:	parkbd_phys,
+	.write	= parkbd_write,
+	.open	= parkbd_open,
+	.close	= parkbd_close,
+	.name	= parkbd_name,
+	.phys	= parkbd_phys,
 };
 
 static void parkbd_interrupt(int irq, void *dev_id, struct pt_regs *regs)

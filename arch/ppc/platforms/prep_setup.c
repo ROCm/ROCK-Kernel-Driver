@@ -55,7 +55,6 @@
 #include <asm/mk48t59.h>
 #include <asm/prep_nvram.h>
 #include <asm/raven.h>
-#include <asm/keyboard.h>
 #include <asm/vga.h>
 #include <asm/time.h>
 #include <asm/mpc10x.h>

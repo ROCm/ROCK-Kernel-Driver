@@ -25,7 +25,7 @@ if [ "$CONFIG_PARTITION_ADVANCED" = "y" ]; then
       bool '    Solaris (x86) partition table support' CONFIG_SOLARIS_X86_PARTITION
       bool '    Unixware slices support' CONFIG_UNIXWARE_DISKLABEL
    fi
-   dep_bool '  Windows Logical Disk Manager (Dynamic Disk) support (EXPERIMENTAL)' CONFIG_LDM_PARTITION $CONFIG_EXPERIMENTAL
+   dep_bool '  Windows Logical Disk Manager (Dynamic Disk) support' CONFIG_LDM_PARTITION
    if [ "$CONFIG_LDM_PARTITION" = "y" ]; then
       bool '    Windows LDM extra logging' CONFIG_LDM_DEBUG
    fi

@@ -109,6 +109,7 @@ static void action_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	struct input_dev *dev = (struct input_dev *) dev_id;
 
 	input_report_key(dev, KEY_ENTER, down);
+	input_sync(dev);
 }
 
 static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
@@ -122,6 +123,7 @@ static void npower_button_handler(int irq, void *dev_id, struct pt_regs *regs)
 	 */ 	
 	input_report_key(dev, KEY_SUSPEND, 1);
 	input_report_key(dev, KEY_SUSPEND, down); 	
+	input_sync(dev);
 }
 
 #ifdef CONFIG_PM
@@ -267,6 +269,8 @@ static void h3600ts_process_packet(struct h3600_dev *ts)
 			/* Send a non input event elsewhere */
 			break;
         }
+
+	input_sync(dev);
 }
 
 /*
@@ -418,10 +422,10 @@ static void h3600ts_connect(struct serio *serio, struct serio_dev *dev)
 	ts->dev.private = ts;
 	ts->dev.name = h3600_name;
 	ts->dev.phys = ts->phys;
-	ts->dev.idbus = BUS_RS232;
-	ts->dev.idvendor = SERIO_H3600;
-	ts->dev.idproduct = 0x0666;  /* FIXME !!! We can ask the hardware */
-	ts->dev.idversion = 0x0100;
+	ts->dev.id.bustype = BUS_RS232;
+	ts->dev.id.vendor = SERIO_H3600;
+	ts->dev.id.product = 0x0666;  /* FIXME !!! We can ask the hardware */
+	ts->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
         	free_irq(IRQ_GPIO_BITSY_ACTION_BUTTON, ts);
@@ -461,9 +465,9 @@ static void h3600ts_disconnect(struct serio *serio)
  */
 
 static struct serio_dev h3600ts_dev = {
-	interrupt:	h3600ts_interrupt,
-	connect:	h3600ts_connect,
-	disconnect:	h3600ts_disconnect,
+	.interrupt =	h3600ts_interrupt,
+	.connect =	h3600ts_connect,
+	.disconnect =	h3600ts_disconnect,
 };
 
 /*

@@ -72,15 +72,8 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 {
 	struct input_handle *handle = dev->handle;
 
-/*
- * Wake up the device if it is sleeping.
- */
 	if (dev->pm_dev)
 		pm_access(dev->pm_dev);
-
-/*
- * Filter non-events, and bad input values out.
- */
 
 	if (type > EV_MAX || !test_bit(type, dev->evbit))
 		return;
@@ -88,6 +81,19 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	add_mouse_randomness((type << 4) ^ code ^ (code >> 4) ^ value);
 
 	switch (type) {
+
+		case EV_SYN:
+			switch (code) {
+				case SYN_CONFIG:
+					if (dev->event) dev->event(dev, type, code, value);
+					break;
+
+				case SYN_REPORT:
+					if (dev->sync) return;
+					dev->sync = 1;
+					break;
+			}
+			break;
 
 		case EV_KEY:
 
@@ -185,9 +191,8 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 			break;
 	}
 
-/*
- * Distribute the event to handler modules.
- */
+	if (type != EV_SYN) 
+		dev->sync = 0;
 
 	while (handle) {
 		if (handle->open)
@@ -200,6 +205,7 @@ static void input_repeat_key(unsigned long data)
 {
 	struct input_dev *dev = (void *) data;
 	input_event(dev, EV_KEY, dev->repeat_key, 2);
+	input_sync(dev);
 	mod_timer(&dev->timer, jiffies + dev->rep[REP_PERIOD]);
 }
 
@@ -290,19 +296,19 @@ static struct input_device_id *input_match_device(struct input_device_id *id, st
 	for (; id->flags || id->driver_info; id++) {
 
 		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
-			if (id->idbus != dev->idbus)
+			if (id->id.bustype != dev->id.bustype)
 				continue;
 
 		if (id->flags & INPUT_DEVICE_ID_MATCH_VENDOR)
-			if (id->idvendor != dev->idvendor)
+			if (id->id.vendor != dev->id.vendor)
 				continue;
 	
 		if (id->flags & INPUT_DEVICE_ID_MATCH_PRODUCT)
-			if (id->idproduct != dev->idproduct)
+			if (id->id.product != dev->id.product)
 				continue;
 		
 		if (id->flags & INPUT_DEVICE_ID_MATCH_BUS)
-			if (id->idversion != dev->idversion)
+			if (id->id.version != dev->id.version)
 				continue;
 
 		MATCH_BIT(evbit,  EV_MAX);
@@ -395,7 +401,7 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 	envp[i++] = scratch;
 	scratch += sprintf(scratch, "PRODUCT=%x/%x/%x/%x",
-		dev->idbus, dev->idvendor, dev->idproduct, dev->idversion) + 1; 
+		dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version) + 1; 
 	
 	if (dev->name) {
 		envp[i++] = scratch;
@@ -437,6 +443,12 @@ void input_register_device(struct input_dev *dev)
 	struct input_handler *handler = input_handler;
 	struct input_handle *handle;
 	struct input_device_id *id;
+
+/*
+ * Add the EV_SYN capability.
+ */
+
+	set_bit(EV_SYN, dev->evbit);
 
 /*
  * Initialize repeat timer to default values.
@@ -650,8 +662,8 @@ static int input_open_file(struct inode *inode, struct file *file)
 }
 
 static struct file_operations input_fops = {
-	owner: THIS_MODULE,
-	open: input_open_file,
+	.owner = THIS_MODULE,
+	.open = input_open_file,
 };
 
 devfs_handle_t input_register_minor(char *name, int minor, int minor_base)
@@ -710,7 +722,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 	while (dev) {
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
-			dev->idbus, dev->idvendor, dev->idproduct, dev->idversion);
+			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
 
 		len += sprintf(buf + len, "N: Name=\"%s\"\n", dev->name ? dev->name : "");
 		len += sprintf(buf + len, "P: Phys=%s\n", dev->phys ? dev->phys : "");

@@ -7,7 +7,8 @@ CONFIG_INPUT_KEYBOARD
 CONFIG_KEYBOARD_ATKBD
   Say Y here if you want to use the standard AT keyboard. Usually
   you'll need this, unless you have a different type keyboard (USB,
-  ADB or other).
+  ADB or other). This also works for AT keyboards connected over
+  a PS/2 to serial converter.
 
   If unsure, say Y.
 
@@ -24,15 +25,6 @@ CONFIG_KEYBOARD_SUNKBD
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called sunkbd.o. If you want to compile it as a
-  module, say M here and read <file:Documentation/modules.txt>.
-
-CONFIG_KEYBOARD_PS2SERKBD
-  Say Y here if you want to use a PS/2 to Serial converter with a
-  keyboard attached to it.
-
-  This driver is also available as a module ( = code which can be
-  inserted in and removed from the running kernel whenever you want).
-  The module will be called ps2serkbd.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_KEYBOARD_XTKBD

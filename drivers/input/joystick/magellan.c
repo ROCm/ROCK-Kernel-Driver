@@ -107,6 +107,8 @@ static void magellan_process_packet(struct magellan* magellan)
 			for (i = 0; i < 9; i++) input_report_key(dev, magellan_buttons[i], (t >> i) & 1);
 			break;
 	}
+
+	input_sync(dev);
 }
 
 static void magellan_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
@@ -170,10 +172,10 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
 	magellan->dev.private = magellan;
 	magellan->dev.name = magellan_name;
 	magellan->dev.phys = magellan->phys;
-	magellan->dev.idbus = BUS_RS232;
-	magellan->dev.idvendor = SERIO_MAGELLAN;
-	magellan->dev.idproduct = 0x0001;
-	magellan->dev.idversion = 0x0100;
+	magellan->dev.id.bustype = BUS_RS232;
+	magellan->dev.id.vendor = SERIO_MAGELLAN;
+	magellan->dev.id.product = 0x0001;
+	magellan->dev.id.version = 0x0100;
 	
 	serio->private = magellan;
 
@@ -192,9 +194,9 @@ static void magellan_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev magellan_dev = {
-	interrupt:	magellan_interrupt,
-	connect:	magellan_connect,
-	disconnect:	magellan_disconnect,
+	.interrupt =	magellan_interrupt,
+	.connect =	magellan_connect,
+	.disconnect =	magellan_disconnect,
 };
 
 /*

@@ -127,6 +127,8 @@ static void twidjoy_process_packet(struct twidjoy *twidjoy)
 
 		input_report_abs(dev, ABS_X, -abs_x);
 		input_report_abs(dev, ABS_Y, +abs_y);
+
+		input_sync(dev);
 	}
 
 	return;
@@ -198,10 +200,10 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
 
 	twidjoy->dev.name = twidjoy_name;
 	twidjoy->dev.phys = twidjoy->phys;
-	twidjoy->dev.idbus = BUS_RS232;
-	twidjoy->dev.idvendor = SERIO_TWIDJOY;
-	twidjoy->dev.idproduct = 0x0001;
-	twidjoy->dev.idversion = 0x0100;
+	twidjoy->dev.id.bustype = BUS_RS232;
+	twidjoy->dev.id.vendor = SERIO_TWIDJOY;
+	twidjoy->dev.id.product = 0x0001;
+	twidjoy->dev.id.version = 0x0100;
 
 	twidjoy->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
 
@@ -240,9 +242,9 @@ static void twidjoy_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev twidjoy_dev = {
-	interrupt:	twidjoy_interrupt,
-	connect:	twidjoy_connect,
-	disconnect:	twidjoy_disconnect,
+	.interrupt =	twidjoy_interrupt,
+	.connect =	twidjoy_connect,
+	.disconnect =	twidjoy_disconnect,
 };
 
 /*

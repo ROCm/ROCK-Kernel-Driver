@@ -31,11 +31,13 @@ MODULE_PARM(i8042_noaux, "1i");
 MODULE_PARM(i8042_unlock, "1i");
 MODULE_PARM(i8042_reset, "1i");
 MODULE_PARM(i8042_direct, "1i");
+MODULE_PARM(i8042_restore_ctr, "1i");
 
 static int i8042_noaux;
 static int i8042_unlock;
 static int i8042_reset;
 static int i8042_direct;
+static int i8042_restore_ctr;
 
 spinlock_t i8042_lock = SPIN_LOCK_UNLOCKED;
 
@@ -111,8 +113,9 @@ static int i8042_flush(void)
 
 	while ((i8042_read_status() & I8042_STR_OBF) && (i++ < I8042_BUFFER_SIZE))
 #ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (flush) [%d]\n",
-			i8042_read_data(), (int) (jiffies - i8042_start));
+		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (flush, %s) [%d]\n",
+			i8042_read_data(), i8042_read_status() & I8042_STR_AUXDATA ? "aux" : "kbd",
+			(int) (jiffies - i8042_start));
 #else
 		i8042_read_data();
 #endif
@@ -123,11 +126,11 @@ static int i8042_flush(void)
 }
 
 /*
- * i8042_command() executes a command on the i8042. It also sends the input parameter(s)
- * of the commands to it, and receives the output value(s). The parameters are to be
- * stored in the param array, and the output is placed into the same array. The number
- * of the parameters and output values is encoded in bits 8-11 of the command
- * number.
+ * i8042_command() executes a command on the i8042. It also sends the input
+ * parameter(s) of the commands to it, and receives the output value(s). The
+ * parameters are to be stored in the param array, and the output is placed
+ * into the same array. The number of the parameters and output values is
+ * encoded in bits 8-11 of the command number.
  */
 
 static int i8042_command(unsigned char *param, int command)
@@ -182,9 +185,6 @@ static int i8042_command(unsigned char *param, int command)
 
 /*
  * i8042_kbd_write() sends a byte out through the keyboard interface.
- * It also automatically refreshes the CTR value, since some i8042's
- * trash their CTR after attempting to send data to an nonexistent
- * device.
  */
 
 static int i8042_kbd_write(struct serio *port, unsigned char c)
@@ -222,11 +222,12 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 	retval  = i8042_command(&c, I8042_CMD_AUX_SEND);
 
 /*
- * Here we restore the CTR value. I don't know why, but i8042's in half-AT
- * mode tend to trash their CTR when doing the AUX_SEND command.
+ * Here we restore the CTR value if requested. I don't know why, but i8042's in
+ * half-AT mode tend to trash their CTR when doing the AUX_SEND command. 
  */
 
-	retval |= i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR);
+	if (i8042_restore_ctr)
+		retval |= i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR);
 
 /*
  * Make sure the interrupt happens and the character is received even
@@ -240,16 +241,14 @@ static int i8042_aux_write(struct serio *port, unsigned char c)
 
 /*
  * i8042_open() is called when a port is open by the higher layer.
- * It allocates an interrupt and enables the port.
+ * It allocates the interrupt and enables in in the chip.
  */
 
 static int i8042_open(struct serio *port)
 {
 	struct i8042_values *values = port->driver;
 
-/*
- * Allocate the interrupt
- */
+	i8042_flush();
 
 	if (request_irq(values->irq, i8042_interrupt, 0, "i8042", NULL)) {
 		printk(KERN_ERR "i8042.c: Can't get irq %d for %s, unregistering the port.\n", values->irq, values->name);
@@ -258,10 +257,6 @@ static int i8042_open(struct serio *port)
 		return -1;
 	}
 
-/*
- * Enable the interrupt.
- */
-
 	i8042_ctr |= values->irqen;
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
@@ -269,21 +264,20 @@ static int i8042_open(struct serio *port)
 		return -1;
 	}
 
+	i8042_interrupt(0, NULL, NULL);
+
 	return 0;
 }
 
 /*
- * i8042_close() frees the interrupt, and disables the interface when the
- * upper layer doesn't need it anymore.
+ * i8042_close() frees the interrupt, so that it can possibly be used
+ * by another driver. We never know - if the user doesn't have a mouse,
+ * the BIOS could have used the AUX interupt for PCI.
  */
 
 static void i8042_close(struct serio *port)
 {
 	struct i8042_values *values = port->driver;
-
-/*
- * Disable the interrupt.
- */
 
 	i8042_ctr &= ~values->irqen;
 
@@ -292,11 +286,9 @@ static void i8042_close(struct serio *port)
 		return;
 	}
 
-/*
- * Free the interrupt
- */
-
 	free_irq(values->irq, NULL);
+
+	i8042_flush();
 }
 
 /*
@@ -304,41 +296,41 @@ static void i8042_close(struct serio *port)
  */
 
 static struct i8042_values i8042_kbd_values = {
-	irq:		I8042_KBD_IRQ,
-	irqen:		I8042_CTR_KBDINT,
-	disable:	I8042_CTR_KBDDIS,
-	name:		"KBD",
-	exists:		0,
+	.irq =		I8042_KBD_IRQ,
+	.irqen =	I8042_CTR_KBDINT,
+	.disable =	I8042_CTR_KBDDIS,
+	.name =		"KBD",
+	.exists =	0,
 };
 
 static struct serio i8042_kbd_port =
 {
-	type:		SERIO_8042,
-	write:		i8042_kbd_write,
-	open:		i8042_open,
-	close:		i8042_close,
-	driver:		&i8042_kbd_values,
-	name:		"i8042 Kbd Port",
-	phys:		I8042_KBD_PHYS_DESC,
+	.type =		SERIO_8042,
+	.write =	i8042_kbd_write,
+	.open =		i8042_open,
+	.close =	i8042_close,
+	.driver =	&i8042_kbd_values,
+	.name =		"i8042 Kbd Port",
+	.phys =		I8042_KBD_PHYS_DESC,
 };
 
 static struct i8042_values i8042_aux_values = {
-	irq:		I8042_AUX_IRQ,
-	irqen:		I8042_CTR_AUXINT,
-	disable:	I8042_CTR_AUXDIS,
-	name:		"AUX",
-	exists:		0,
+	.irq =		I8042_AUX_IRQ,
+	.irqen =	I8042_CTR_AUXINT,
+	.disable =	I8042_CTR_AUXDIS,
+	.name =		"AUX",
+	.exists =	0,
 };
 
 static struct serio i8042_aux_port =
 {
-	type:		SERIO_8042,
-	write:		i8042_aux_write,
-	open:		i8042_open,
-	close:		i8042_close,
-	driver:		&i8042_aux_values,
-	name:		"i8042 Aux Port",
-	phys:		I8042_AUX_PHYS_DESC,
+	.type =		SERIO_8042,
+	.write =	i8042_aux_write,
+	.open =		i8042_open,
+	.close =	i8042_close,
+	.driver =	&i8042_aux_values,
+	.name =		"i8042 Aux Port",
+	.phys =		I8042_AUX_PHYS_DESC,
 };
 
 /*
@@ -362,7 +354,7 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		      ((str & I8042_STR_TIMEOUT) ? SERIO_TIMEOUT : 0);
 
 #ifdef I8042_DEBUG_IO
-		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (interrupt-%s, %d) [%d]\n",
+		printk(KERN_DEBUG "i8042.c: %02x <- i8042 (interrupt, %s, %d) [%d]\n",
 			data, (str & I8042_STR_AUXDATA) ? "aux" : "kbd", irq, (int) (jiffies - i8042_start));
 #endif
 
@@ -391,21 +383,12 @@ static void i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 /*
  * i8042_controller init initializes the i8042 controller, and,
- * most importantly, sets it into non-xlated mode.
+ * most importantly, sets it into non-xlated mode if that's
+ * desired.
  */
 	
 static int __init i8042_controller_init(void)
 {
-
-/*
- * Check the i/o region before we touch it.
- */
-#if !defined(__i386__) && !defined(__sh__) && !defined(__alpha__) 	
-	if (check_region(I8042_DATA_REG, 16)) {
-		printk(KERN_ERR "i8042.c: %#x port already in use!\n", I8042_DATA_REG);
-		return -1;
-	}
-#endif
 
 /*
  * Test the i8042. We need to know if it thinks it's working correctly
@@ -431,7 +414,7 @@ static int __init i8042_controller_init(void)
 	}
 
 /*
- * Read the CTR.
+ * Save the CTR for restoral on unload / reboot.
  */
 
 	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_RCTR)) {
@@ -439,14 +422,10 @@ static int __init i8042_controller_init(void)
 		return -1;
 	}
 
-/*
- * Save the CTR for restoral on unload / reboot.
- */
-
 	i8042_initial_ctr = i8042_ctr;
 
 /*
- * Disable both interfaces and their interrupts.
+ * Disable the keyboard interface and interrupt. 
  */
 
 	i8042_ctr |= I8042_CTR_KBDDIS;
@@ -625,7 +604,16 @@ static int __init i8042_check_aux(struct i8042_values *values, struct serio *por
 static int __init i8042_port_register(struct i8042_values *values, struct serio *port)
 {
 	values->exists = 1;
+
+	i8042_ctr &= ~values->disable;
+
+	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
+		printk(KERN_WARNING "i8042.c: Can't write CTR while registering.\n");
+		return -1; 
+	}
+
 	serio_register_port(port);
+
 	printk(KERN_INFO "serio: i8042 %s port at %#x,%#x irq %d\n",
 		values->name, I8042_DATA_REG, I8042_COMMAND_REG, values->irq);
 
@@ -638,45 +626,45 @@ static void i8042_timer_func(unsigned long data)
 	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 }
 
-static void __init i8042_start_polling(void)
+#ifndef MODULE
+static int __init i8042_setup_reset(char *str)
 {
-	i8042_ctr &= ~I8042_CTR_KBDDIS;
-	if (i8042_aux_values.exists)
-		i8042_ctr &= ~I8042_CTR_AUXDIS;
-
-	if (i8042_command(&i8042_ctr, I8042_CMD_CTL_WCTR)) {
-		printk(KERN_WARNING "i8042.c: Can't write CTR while starting polling.\n");
-		return; 
-	}
-
-	i8042_timer.function = i8042_timer_func;
-	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
+	i8042_reset = 1;
+	return 1;
+}
+static int __init i8042_setup_noaux(char *str)
+{
+	i8042_noaux = 1;
+	return 1;
+}
+static int __init i8042_setup_unlock(char *str)
+{
+	i8042_unlock = 1;
+	return 1;
+}
+static int __init i8042_setup_direct(char *str)
+{
+	i8042_direct = 1;
+	return 1;
+}
+static int __init i8042_setup_restore_ctr(char *str)
+{
+	i8042_restore_ctr = 1;
+	return 1;
 }
 
-static void __exit i8042_stop_polling(void)
-{
-	del_timer(&i8042_timer);
-}
-	
-/*
- * Module init and cleanup functions.
- */
-
-void __init i8042_setup(char *str, int *ints)
-{
-	if (!strcmp(str, "i8042_reset=1"))
-		i8042_reset = 1;
-	if (!strcmp(str, "i8042_noaux=1"))
-		i8042_noaux = 1;
-	if (!strcmp(str, "i8042_unlock=1"))
-		i8042_unlock = 1;
-	if (!strcmp(str, "i8042_direct=1"))
-		i8042_direct = 1;
-}
+__setup("i8042_reset", i8042_setup_reset);
+__setup("i8042_noaux", i8042_setup_noaux);
+__setup("i8042_unlock", i8042_setup_unlock);
+__setup("i8042_direct", i8042_setup_direct);
+__setup("i8042_restore_ctr", i8042_setup_restore_ctr);
+#endif
 
 /*
- * Reset the 8042 back to original mode.
+ * We need to reset the 8042 back to original mode on system shutdown,
+ * because otherwise BIOSes will be confused.
  */
+
 static int i8042_notify_sys(struct notifier_block *this, unsigned long code,
         		    void *unused)
 {
@@ -698,18 +686,23 @@ int __init i8042_init(void)
 	i8042_start = jiffies;
 #endif
 
+#if !defined(__i386__) && !defined(__x86_64__)
+	i8042_reset = 1;
+#endif
+
 	if (!i8042_platform_init())
 		return -EBUSY;
 
 	if (i8042_controller_init())
 		return -ENODEV;
-
-	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
 		
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values, &i8042_aux_port))
 		i8042_port_register(&i8042_aux_values, &i8042_aux_port);
 
-	i8042_start_polling();
+	i8042_port_register(&i8042_kbd_values, &i8042_kbd_port);
+
+	i8042_timer.function = i8042_timer_func;
+	mod_timer(&i8042_timer, jiffies + I8042_POLL_PERIOD);
 
 	register_reboot_notifier(&i8042_notifier);
 
@@ -720,7 +713,7 @@ void __exit i8042_exit(void)
 {
 	unregister_reboot_notifier(&i8042_notifier);
 
-	i8042_stop_polling();
+	del_timer(&i8042_timer);
 	
 	if (i8042_kbd_values.exists)
 		serio_unregister_port(&i8042_kbd_port);
@@ -735,3 +728,5 @@ void __exit i8042_exit(void)
 
 module_init(i8042_init);
 module_exit(i8042_exit);
+
+

@@ -137,6 +137,8 @@ static void spaceball_process_packet(struct spaceball* spaceball)
 			printk(KERN_ERR "spaceball: Bad command. [%s]\n", spaceball->data + 1);
 			break;
 	}
+
+	input_sync(dev);
 }
 
 /*
@@ -240,10 +242,10 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
 
 	spaceball->dev.name = spaceball_names[id];
 	spaceball->dev.phys = spaceball->phys;
-	spaceball->dev.idbus = BUS_RS232;
-	spaceball->dev.idvendor = SERIO_SPACEBALL;
-	spaceball->dev.idproduct = id;
-	spaceball->dev.idversion = 0x0100;
+	spaceball->dev.id.bustype = BUS_RS232;
+	spaceball->dev.id.vendor = SERIO_SPACEBALL;
+	spaceball->dev.id.product = id;
+	spaceball->dev.id.version = 0x0100;
 	
 	serio->private = spaceball;
 
@@ -263,9 +265,9 @@ static void spaceball_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev spaceball_dev = {
-	interrupt:	spaceball_interrupt,
-	connect:	spaceball_connect,
-	disconnect:	spaceball_disconnect,
+	.interrupt =	spaceball_interrupt,
+	.connect =	spaceball_connect,
+	.disconnect =	spaceball_disconnect,
 };
 
 /*

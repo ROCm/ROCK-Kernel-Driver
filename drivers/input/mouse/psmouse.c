@@ -102,7 +102,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 			case 1: /* Mouse extra info */
 
 				input_report_rel(dev, packet[2] & 0x80 ? REL_HWHEEL : REL_WHEEL,
-					(int) (packet[2] & 7) - (int) (packet[2] & 8));
+					(int) (packet[2] & 8) - (int) (packet[2] & 7));
 				input_report_key(dev, BTN_SIDE, (packet[2] >> 4) & 1);
 				input_report_key(dev, BTN_EXTRA, (packet[2] >> 5) & 1);
 					
@@ -111,7 +111,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 			case 3: /* TouchPad extra info */
 
 				input_report_rel(dev, packet[2] & 0x08 ? REL_HWHEEL : REL_WHEEL,
-					(int) ((packet[2] >> 4) & 7) - (int) ((packet[2] >> 4) & 8));
+					(int) ((packet[2] >> 4) & 8) - (int) ((packet[2] >> 4) & 7));
 				packet[0] = packet[2] | 0x08;
 
 				break;
@@ -135,14 +135,14 @@ static void psmouse_process_packet(struct psmouse *psmouse)
  */
 
 	if (psmouse->type == PSMOUSE_IMPS || psmouse->type == PSMOUSE_GENPS)
-		input_report_rel(dev, REL_WHEEL, (signed char) packet[3]);
+		input_report_rel(dev, REL_WHEEL, -(signed char) packet[3]);
 
 /*
  * Scroll wheel and buttons on IntelliMouse Explorer
  */
 
 	if (psmouse->type == PSMOUSE_IMEX) {
-		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 7) - (int) (packet[2] & 8));
+		input_report_rel(dev, REL_WHEEL, (int) (packet[3] & 8) - (int) (packet[3] & 7));
 		input_report_key(dev, BTN_SIDE, (packet[3] >> 4) & 1);
 		input_report_key(dev, BTN_EXTRA, (packet[3] >> 5) & 1);
 	}
@@ -167,6 +167,7 @@ static void psmouse_process_packet(struct psmouse *psmouse)
 	input_report_rel(dev, REL_X, packet[1] ? (int) packet[1] - (int) ((packet[0] << 4) & 0x100) : 0);
 	input_report_rel(dev, REL_Y, packet[2] ? (int) ((packet[0] << 3) & 0x100) - (int) packet[2] : 0);
 
+	input_sync(dev);
 }
 
 /*
@@ -600,10 +601,10 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	psmouse->dev.name = psmouse->devname;
 	psmouse->dev.phys = psmouse->phys;
-	psmouse->dev.idbus = BUS_I8042;
-	psmouse->dev.idvendor = psmouse->type;
-	psmouse->dev.idproduct = 0x0002;
-	psmouse->dev.idversion = 0x0100;
+	psmouse->dev.id.bustype = BUS_I8042;
+	psmouse->dev.id.vendor = psmouse->type;
+	psmouse->dev.id.product = 0x0002;
+	psmouse->dev.id.version = 0x0100;
 
 	input_register_device(&psmouse->dev);
 	
@@ -613,9 +614,9 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 }
 
 static struct serio_dev psmouse_dev = {
-	interrupt:	psmouse_interrupt,
-	connect:	psmouse_connect,
-	disconnect:	psmouse_disconnect
+	.interrupt =	psmouse_interrupt,
+	.connect =	psmouse_connect,
+	.disconnect =	psmouse_disconnect
 };
 
 int __init psmouse_init(void)

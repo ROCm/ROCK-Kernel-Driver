@@ -136,6 +136,8 @@ static void cobra_timer(unsigned long private)
 			for (j = 0; cobra_btn[j]; j++)
 				input_report_key(dev, cobra_btn[j], data[i] & (0x20 << j));
 
+			input_sync(dev);
+
 		}
 
 	mod_timer(&cobra->timer, jiffies + COBRA_REFRESH_TIME);	
@@ -199,10 +201,10 @@ static void cobra_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 			cobra->dev[i].name = cobra_name;
 			cobra->dev[i].phys = cobra->phys[i];
-			cobra->dev[i].idbus = BUS_GAMEPORT;
-			cobra->dev[i].idvendor = GAMEPORT_ID_VENDOR_CREATIVE;
-			cobra->dev[i].idproduct = 0x0008;
-			cobra->dev[i].idversion = 0x0100;
+			cobra->dev[i].id.bustype = BUS_GAMEPORT;
+			cobra->dev[i].id.vendor = GAMEPORT_ID_VENDOR_CREATIVE;
+			cobra->dev[i].id.product = 0x0008;
+			cobra->dev[i].id.version = 0x0100;
 		
 			cobra->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			cobra->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
@@ -235,8 +237,8 @@ static void cobra_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev cobra_dev = {
-	connect:	cobra_connect,
-	disconnect:	cobra_disconnect,
+	.connect =	cobra_connect,
+	.disconnect =	cobra_disconnect,
 };
 
 int __init cobra_init(void)

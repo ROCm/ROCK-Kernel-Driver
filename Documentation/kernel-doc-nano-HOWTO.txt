@@ -20,18 +20,14 @@ are:
 - scripts/docproc.c
 
   This is a program for converting SGML template files into SGML
-  files.  It invokes kernel-doc, giving it the list of functions that
+  files. When a file is referenced it is searched for symbols
+  exported (EXPORT_SYMBOL), to be able to distingush between internal
+  and external functions.
+  It invokes kernel-doc, giving it the list of functions that
   are to be documented.
-
-- scripts/gen-all-syms
-
-  This is a script that lists the EXPORT_SYMBOL symbols in a list of C
-  files.
-
-- scripts/docgen
-
-  This script invokes docproc, telling it which functions are to be
-  documented (this list comes from gen-all-syms).
+  Additionally it is used to scan the SGML template files to locate
+  all the files referenced herein. This is used to generate dependency
+  information as used by make.
 
 - Makefile
 
@@ -141,6 +137,10 @@ collected from files listed in Documentation/DocBook/Makefile.
 
 !I<filename> is replaced by the documentation for functions that are
 _not_ exported using EXPORT_SYMBOL.
+
+!D<filename> is used to name additional files to search for functions
+exported using EXPORT_SYMBOL. For example many symbols are only exported
+in kernel/ksyms.c, therefore kernel-api.sgml include this file with !D.
 
 !F<filename> <function [functions...]> is replaced by the
 documentation, in <filename>, for the functions listed.

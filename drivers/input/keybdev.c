@@ -72,26 +72,6 @@ static unsigned short x86_keycodes[256] =
 #ifdef CONFIG_MAC_EMUMOUSEBTN
 extern int mac_hid_mouse_emulate_buttons(int, int, int);
 #endif /* CONFIG_MAC_EMUMOUSEBTN */
-#ifdef CONFIG_MAC_ADBKEYCODES
-extern int mac_hid_keyboard_sends_linux_keycodes(void);
-#else
-#define mac_hid_keyboard_sends_linux_keycodes()	0
-#endif /* CONFIG_MAC_ADBKEYCODES */
-#if defined(CONFIG_MAC_ADBKEYCODES) || defined(CONFIG_ADB_KEYBOARD)
-static unsigned char mac_keycodes[256] = {
-	  0, 53, 18, 19, 20, 21, 23, 22, 26, 28, 25, 29, 27, 24, 51, 48,
-	 12, 13, 14, 15, 17, 16, 32, 34, 31, 35, 33, 30, 36, 54,128,  1,
-	  2,  3,  5,  4, 38, 40, 37, 41, 39, 50, 56, 42,  6,  7,  8,  9,
-	 11, 45, 46, 43, 47, 44,123, 67, 58, 49, 57,122,120, 99,118, 96,
-	 97, 98,100,101,109, 71,107, 89, 91, 92, 78, 86, 87, 88, 69, 83,
-	 84, 85, 82, 65, 42,  0, 10,103,111,  0,  0,  0,  0,  0,  0,  0,
-	 76,125, 75,105,124,110,115, 62,116, 59, 60,119, 61,121,114,117,
-	  0,  0,  0,  0,127, 81,  0,113,  0,  0,  0,  0, 95, 55, 55,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
-	  0,  0,  0,  0,  0, 94,  0, 93,  0,  0,  0,  0,  0,  0,104,102 };
-#endif	/* CONFIG_MAC_ADBKEYCODES || CONFIG_ADB_KEYBOARD */
  
 static int emulate_raw(unsigned int keycode, int down)
 {
@@ -99,15 +79,6 @@ static int emulate_raw(unsigned int keycode, int down)
 	if (mac_hid_mouse_emulate_buttons(1, keycode, down))
 		return 0;
 #endif /* CONFIG_MAC_EMUMOUSEBTN */
-#if defined(CONFIG_MAC_ADBKEYCODES) || defined(CONFIG_ADB_KEYBOARD)
-	if (!mac_hid_keyboard_sends_linux_keycodes()) {
-		if (keycode > 255 || !mac_keycodes[keycode])
-			return -1;
-       
-		handle_scancode((mac_keycodes[keycode] & 0x7f), down);
-		return 0;
-	}
-#endif	/* CONFIG_MAC_ADBKEYCODES || CONFIG_ADB_KEYBOARD */
 
 	if (keycode > 255 || !x86_keycodes[keycode])
 		return -1; 
@@ -161,11 +132,10 @@ void keybdev_ledfunc(unsigned int led)
 	struct input_handle *handle;	
 
 	for (handle = keybdev_handler.handle; handle; handle = handle->hnext) {
-
 		input_event(handle->dev, EV_LED, LED_SCROLLL, !!(led & 0x01));
 		input_event(handle->dev, EV_LED, LED_NUML,    !!(led & 0x02));
 		input_event(handle->dev, EV_LED, LED_CAPSL,   !!(led & 0x04));
-
+		input_sync(handle->dev);
 	}
 }
 
@@ -226,8 +196,8 @@ static void keybdev_disconnect(struct input_handle *handle)
 
 static struct input_device_id keybdev_ids[] = {
 	{
-		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
-		evbit: { BIT(EV_KEY) },
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT,
+		.evbit = { BIT(EV_KEY) },
 	},	
 	{ }, 	/* Terminating entry */
 };
@@ -235,11 +205,11 @@ static struct input_device_id keybdev_ids[] = {
 MODULE_DEVICE_TABLE(input, keybdev_ids);
 	
 static struct input_handler keybdev_handler = {
-	event:		keybdev_event,
-	connect:	keybdev_connect,
-	disconnect:	keybdev_disconnect,
-	name:		"keybdev",
-	id_table:	keybdev_ids,
+	.event =	keybdev_event,
+	.connect =	keybdev_connect,
+	.disconnect =	keybdev_disconnect,
+	.name =		"keybdev",
+	.id_table =	keybdev_ids,
 };
 
 static int __init keybdev_init(void)

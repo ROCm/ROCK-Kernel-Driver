@@ -133,8 +133,8 @@ static void __devexit joydump_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev joydump_dev = {
-	connect:	joydump_connect,
-	disconnect:	joydump_disconnect,
+	.connect =	joydump_connect,
+	.disconnect =	joydump_disconnect,
 };
 
 static int __init joydump_init(void)

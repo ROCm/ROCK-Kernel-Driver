@@ -80,11 +80,11 @@ static struct input_device_id evbug_ids[] = {
 MODULE_DEVICE_TABLE(input, evbug_ids);
 	
 static struct input_handler evbug_handler = {
-	event:		evbug_event,
-	connect:	evbug_connect,
-	disconnect:	evbug_disconnect,
-	name:		"evbug",
-	id_table:	evbug_ids,
+	.event =	evbug_event,
+	.connect =	evbug_connect,
+	.disconnect =	evbug_disconnect,
+	.name =		"evbug",
+	.id_table =	evbug_ids,
 };
 
 int __init evbug_init(void)

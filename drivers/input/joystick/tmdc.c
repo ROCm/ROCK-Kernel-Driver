@@ -214,6 +214,8 @@ static void tmdc_timer(unsigned long private)
 						((data[j][tmdc_byte_d[k]] >> (i + tmdc->btno[j][k])) & 1));
 				l += tmdc->btnc[j][k];
 			}
+
+			input_sync(dev);
 	}
 
 	tmdc->bads += bad;
@@ -312,10 +314,10 @@ static void tmdc_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 			tmdc->dev[j].name = tmdc->name[j];
 			tmdc->dev[j].phys = tmdc->phys[j];
-			tmdc->dev[j].idbus = BUS_GAMEPORT;
-			tmdc->dev[j].idvendor = GAMEPORT_ID_VENDOR_THRUSTMASTER;
-			tmdc->dev[j].idproduct = models[m].id;
-			tmdc->dev[j].idversion = 0x0100;
+			tmdc->dev[j].id.bustype = BUS_GAMEPORT;
+			tmdc->dev[j].id.vendor = GAMEPORT_ID_VENDOR_THRUSTMASTER;
+			tmdc->dev[j].id.product = models[m].id;
+			tmdc->dev[j].id.version = 0x0100;
 
 			tmdc->dev[j].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
@@ -361,8 +363,8 @@ static void tmdc_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev tmdc_dev = {
-	connect:	tmdc_connect,
-	disconnect:	tmdc_disconnect,
+	.connect =	tmdc_connect,
+	.disconnect =	tmdc_disconnect,
 };
 
 int __init tmdc_init(void)

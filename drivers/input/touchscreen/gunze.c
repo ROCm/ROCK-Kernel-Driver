@@ -74,6 +74,7 @@ static void gunze_process_packet(struct gunze* gunze)
 	input_report_abs(dev, ABS_X, simple_strtoul(gunze->data + 1, NULL, 10) * 4);
 	input_report_abs(dev, ABS_Y, 3072 - simple_strtoul(gunze->data + 6, NULL, 10) * 3);
 	input_report_key(dev, BTN_TOUCH, gunze->data[0] == 'T');
+	input_sync(dev);
 }
 
 static void gunze_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
@@ -134,10 +135,10 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
 	gunze->dev.private = gunze;
 	gunze->dev.name = gunze_name;
 	gunze->dev.phys = gunze->phys;
-	gunze->dev.idbus = BUS_RS232;
-	gunze->dev.idvendor = SERIO_GUNZE;
-	gunze->dev.idproduct = 0x0051;
-	gunze->dev.idversion = 0x0100;
+	gunze->dev.id.bustype = BUS_RS232;
+	gunze->dev.id.vendor = SERIO_GUNZE;
+	gunze->dev.id.product = 0x0051;
+	gunze->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
 		kfree(gunze);
@@ -154,9 +155,9 @@ static void gunze_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev gunze_dev = {
-	interrupt:	gunze_interrupt,
-	connect:	gunze_connect,
-	disconnect:	gunze_disconnect,
+	.interrupt =	gunze_interrupt,
+	.connect =	gunze_connect,
+	.disconnect =	gunze_disconnect,
 };
 
 /*

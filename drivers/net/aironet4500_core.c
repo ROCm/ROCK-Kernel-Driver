@@ -22,6 +22,7 @@
 #include <linux/init.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/tqueue.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>

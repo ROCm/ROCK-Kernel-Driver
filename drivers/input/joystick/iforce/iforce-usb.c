@@ -206,9 +206,9 @@ static struct usb_device_id iforce_usb_ids [] = {
 MODULE_DEVICE_TABLE (usb, iforce_usb_ids);
 
 struct usb_driver iforce_usb_driver = {
-	owner:		THIS_MODULE,
-	name:		"iforce",
-	probe:		iforce_usb_probe,
-	disconnect:	iforce_usb_disconnect,
-	id_table:	iforce_usb_ids,
+	.owner =	THIS_MODULE,
+	.name =		"iforce",
+	.probe =	iforce_usb_probe,
+	.disconnect =	iforce_usb_disconnect,
+	.id_table =	iforce_usb_ids,
 };

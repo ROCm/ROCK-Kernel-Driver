@@ -328,6 +328,8 @@ static void gc_timer(unsigned long private)
 
 				for (j = 0; j < 10; j++)
 					input_report_key(dev + i, gc_n64_btn[j], s & data[gc_n64_bytes[j]]);
+
+				input_sync(dev + i);
 			}
 		}
 	}
@@ -356,6 +358,8 @@ static void gc_timer(unsigned long private)
 			if (s & gc->pads[GC_SNES])
 				for (j = 0; j < 8; j++)
 					input_report_key(dev + i, gc_snes_btn[j], s & data[gc_snes_bytes[j]]);
+
+			input_sync(dev + i);
 		}
 	}
 
@@ -379,6 +383,8 @@ static void gc_timer(unsigned long private)
 
 			if (s & gc->pads[GC_MULTI2])
 				input_report_key(dev + i, BTN_THUMB, s & data[5]);
+
+			input_sync(dev + i);
 		}
 	}
 
@@ -398,6 +404,7 @@ static void gc_timer(unsigned long private)
 
 				input_report_key(dev + i, BTN_THUMBL, ~data[0] & 0x04);
 				input_report_key(dev + i, BTN_THUMBR, ~data[0] & 0x02);
+				input_sync(dev + i);
 
 			case GC_PSX_NEGCON:
 			case GC_PSX_ANALOG:
@@ -414,6 +421,8 @@ static void gc_timer(unsigned long private)
 				input_report_key(dev + i, BTN_START,  ~data[0] & 0x08);
 				input_report_key(dev + i, BTN_SELECT, ~data[0] & 0x01);
 
+				input_sync(dev + i);
+
 				break;
 
 			case GC_PSX_NORMAL:
@@ -426,6 +435,8 @@ static void gc_timer(unsigned long private)
 
 				input_report_key(dev + i, BTN_START,  ~data[0] & 0x08);
 				input_report_key(dev + i, BTN_SELECT, ~data[0] & 0x01);
+
+				input_sync(dev + i);
 
 				break;
 		}
@@ -593,10 +604,10 @@ static struct gc __init *gc_probe(int *config)
 		
                 gc->dev[i].name = gc_names[config[i + 1]];
 		gc->dev[i].phys = gc->phys[i];
-                gc->dev[i].idbus = BUS_PARPORT;
-                gc->dev[i].idvendor = 0x0001;
-                gc->dev[i].idproduct = config[i + 1];
-                gc->dev[i].idversion = 0x0100;
+                gc->dev[i].id.bustype = BUS_PARPORT;
+                gc->dev[i].id.vendor = 0x0001;
+                gc->dev[i].id.product = config[i + 1];
+                gc->dev[i].id.version = 0x0100;
 	}
 
 	parport_release(gc->pd);
@@ -617,21 +628,21 @@ static struct gc __init *gc_probe(int *config)
 }
 
 #ifndef MODULE
-int __init gc_setup(char *str)
+static int __init gc_setup(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 6; i++) gc[i] = ints[i + 1];
 	return 1;
 }
-int __init gc_setup_2(char *str)
+static int __init gc_setup_2(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 6; i++) gc_2[i] = ints[i + 1];
 	return 1;
 }
-int __init gc_setup_3(char *str)
+static int __init gc_setup_3(char *str)
 {
 	int i, ints[7];
 	get_options(str, ARRAY_SIZE(ints), ints);

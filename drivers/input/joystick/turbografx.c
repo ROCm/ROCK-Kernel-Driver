@@ -101,6 +101,8 @@ static void tgfx_timer(unsigned long private)
 			input_report_key(dev, BTN_THUMB2,  (data2 & TGFX_THUMB2 ));
 			input_report_key(dev, BTN_TOP,     (data2 & TGFX_TOP    ));
 			input_report_key(dev, BTN_TOP2,    (data2 & TGFX_TOP2   ));
+
+			input_sync(dev);
 		}
 
 	mod_timer(&tgfx->timer, jiffies + TGFX_REFRESH_TIME);
@@ -179,10 +181,10 @@ static struct tgfx __init *tgfx_probe(int *config)
 
 			tgfx->dev[i].name = tgfx_name;
 			tgfx->dev[i].phys = tgfx->phys[i];
-			tgfx->dev[i].idbus = BUS_PARPORT;
-			tgfx->dev[i].idvendor = 0x0003;
-			tgfx->dev[i].idproduct = config[i+1];
-			tgfx->dev[i].idversion = 0x0100;
+			tgfx->dev[i].id.bustype = BUS_PARPORT;
+			tgfx->dev[i].id.vendor = 0x0003;
+			tgfx->dev[i].id.product = config[i+1];
+			tgfx->dev[i].id.version = 0x0100;
 
 			tgfx->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 			tgfx->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
@@ -208,21 +210,21 @@ static struct tgfx __init *tgfx_probe(int *config)
 }
 
 #ifndef MODULE
-int __init tgfx_setup(char *str)
+static int __init tgfx_setup(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 8; i++) tgfx[i] = ints[i + 1];
 	return 1;
 }
-int __init tgfx_setup_2(char *str)
+static int __init tgfx_setup_2(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 8; i++) tgfx_2[i] = ints[i + 1];
 	return 1;
 }
-int __init tgfx_setup_3(char *str)
+static int __init tgfx_setup_3(char *str)
 {
 	int i, ints[9];
 	get_options(str, ARRAY_SIZE(ints), ints);

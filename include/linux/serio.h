@@ -94,8 +94,12 @@ static __inline__ void serio_dev_write_wakeup(struct serio *serio)
 		serio->dev->write_wakeup(serio);
 }
 
+/*
+ * bit masks for use in "interrupt" flags (3rd argument)
+ */
 #define SERIO_TIMEOUT	1
 #define SERIO_PARITY	2
+#define SERIO_FRAME	4
 
 #define SERIO_TYPE	0xff000000UL
 #define SERIO_XT	0x00000000UL

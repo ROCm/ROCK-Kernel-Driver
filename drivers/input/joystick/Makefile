@@ -13,6 +13,7 @@ obj-$(CONFIG_JOYSTICK_DB9)		+= db9.o
 obj-$(CONFIG_JOYSTICK_GAMECON)		+= gamecon.o
 obj-$(CONFIG_JOYSTICK_GF2K)		+= gf2k.o
 obj-$(CONFIG_JOYSTICK_GRIP)		+= grip.o
+obj-$(CONFIG_JOYSTICK_GRIP_MP)		+= grip_mp.o
 obj-$(CONFIG_JOYSTICK_GUILLEMOT)	+= guillemot.o
 obj-$(CONFIG_JOYSTICK_INTERACT)		+= interact.o
 obj-$(CONFIG_JOYSTICK_JOYDUMP)		+= joydump.o

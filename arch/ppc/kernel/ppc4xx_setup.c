@@ -345,12 +345,6 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.progress = ppc4xx_progress;
 #endif
 
-#if defined(CONFIG_VT) && defined(CONFIG_PC_KEYBOARD)
-#if defined(CONFIG_REDWOOD_4) && defined(CONFIG_STB_KB)
-	redwood_irkb_init();
-#endif
-#endif
-
 /*
 **   m8xx_setup.c, prep_setup.c use
 **     defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)

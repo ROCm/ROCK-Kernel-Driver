@@ -216,14 +216,14 @@ static void serport_ldisc_write_wakeup(struct tty_struct * tty)
  */
 
 static struct tty_ldisc serport_ldisc = {
-	name:		"input",
-	open:		serport_ldisc_open,
-	close:		serport_ldisc_close,
-	read:		serport_ldisc_read,
-	ioctl:		serport_ldisc_ioctl,
-	receive_buf:	serport_ldisc_receive,
-	receive_room:	serport_ldisc_room,
-	write_wakeup:	serport_ldisc_write_wakeup
+	.name =		"input",
+	.open =		serport_ldisc_open,
+	.close =	serport_ldisc_close,
+	.read =		serport_ldisc_read,
+	.ioctl =	serport_ldisc_ioctl,
+	.receive_buf =	serport_ldisc_receive,
+	.receive_room =	serport_ldisc_room,
+	.write_wakeup =	serport_ldisc_write_wakeup
 };
 
 /*

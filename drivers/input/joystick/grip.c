@@ -276,6 +276,8 @@ static void grip_timer(unsigned long private)
 
 
 		}
+
+		input_sync(dev);
 	}
 
 	mod_timer(&grip->timer, jiffies + GRIP_REFRESH_TIME);
@@ -350,10 +352,10 @@ static void grip_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 			grip->dev[i].name = grip_name[grip->mode[i]];
 			grip->dev[i].phys = grip->phys[i];
-			grip->dev[i].idbus = BUS_GAMEPORT;
-			grip->dev[i].idvendor = GAMEPORT_ID_VENDOR_GRAVIS;
-			grip->dev[i].idproduct = grip->mode[i];
-			grip->dev[i].idversion = 0x0100;
+			grip->dev[i].id.bustype = BUS_GAMEPORT;
+			grip->dev[i].id.vendor = GAMEPORT_ID_VENDOR_GRAVIS;
+			grip->dev[i].id.product = grip->mode[i];
+			grip->dev[i].id.version = 0x0100;
 
 			grip->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
@@ -408,8 +410,8 @@ static void grip_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev grip_dev = {
-	connect:	grip_connect,
-	disconnect:	grip_disconnect,
+	.connect =	grip_connect,
+	.disconnect =	grip_disconnect,
 };
 
 int __init grip_init(void)

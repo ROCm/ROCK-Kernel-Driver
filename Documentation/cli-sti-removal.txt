@@ -96,8 +96,8 @@ released.
 drivers that want to disable local interrupts (interrupts on the
 current CPU), can use the following five macros:
 
-  local_irq_disable(), local_irq_enable(), local_irq_save(flags),
-  local_irq_save_off(flags), local_irq_restore(flags)
+  local_irq_disable(), local_irq_enable(), local_save_flags(flags),
+  local_irq_save(flags), local_irq_restore(flags)
 
 but beware, their meaning and semantics are much simpler, far from
 that of the old cli(), sti(), save_flags(flags) and restore_flags(flags)
@@ -107,11 +107,11 @@ SMP meaning:
 
     local_irq_enable()        => turn local IRQs on
 
-    local_irq_save(flags)     => save the current IRQ state into flags. The
+    local_save_flags(flags)   => save the current IRQ state into flags. The
                                  state can be on or off. (on some
                                  architectures there's even more bits in it.)
 
-    local_irq_save_off(flags) => save the current IRQ state into flags and
+    local_irq_save(flags)     => save the current IRQ state into flags and
                                  disable interrupts.
 
     local_irq_restore(flags)  => restore the IRQ state from flags.

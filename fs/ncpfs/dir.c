@@ -6,6 +6,7 @@
  *  Modified 1997 Peter Waltenberg, Bill Hawes, David Woodhouse for 2.1 dcache
  *  Modified 1998, 1999 Wolfram Pienkoss for NLS
  *  Modified 1999 Wolfram Pienkoss for directory caching
+ *  Modified 2000 Ben Harris, University of Cambridge for NFS NS meta-info
  *
  */
 
@@ -40,8 +41,12 @@ static int ncp_mkdir(struct inode *, struct dentry *, int);
 static int ncp_rmdir(struct inode *, struct dentry *);
 static int ncp_rename(struct inode *, struct dentry *,
 	  	      struct inode *, struct dentry *);
-#ifdef CONFIG_NCPFS_EXTRAS
+static int ncp_mknod(struct inode * dir, struct dentry *dentry,
+		     int mode, int rdev);
+#if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 extern int ncp_symlink(struct inode *, struct dentry *, const char *);
+#else
+#define ncp_symlink NULL
 #endif
 		      
 struct file_operations ncp_dir_operations =
@@ -56,11 +61,10 @@ struct inode_operations ncp_dir_inode_operations =
 	create:		ncp_create,
 	lookup:		ncp_lookup,
 	unlink:		ncp_unlink,
-#ifdef CONFIG_NCPFS_EXTRAS
 	symlink:	ncp_symlink,
-#endif
 	mkdir:		ncp_mkdir,
 	rmdir:		ncp_rmdir,
+	mknod:		ncp_mknod,
 	rename:		ncp_rename,
 	setattr:	ncp_notify_change,
 };
@@ -73,9 +77,16 @@ static int ncp_hash_dentry(struct dentry *, struct qstr *);
 static int ncp_compare_dentry (struct dentry *, struct qstr *, struct qstr *);
 static int ncp_delete_dentry(struct dentry *);
 
-struct dentry_operations ncp_dentry_operations =
+static struct dentry_operations ncp_dentry_operations =
 {
 	d_revalidate:	ncp_lookup_validate,
+	d_hash:		ncp_hash_dentry,
+	d_compare:	ncp_compare_dentry,
+	d_delete:	ncp_delete_dentry,
+};
+
+struct dentry_operations ncp_root_dentry_operations =
+{
 	d_hash:		ncp_hash_dentry,
 	d_compare:	ncp_compare_dentry,
 	d_delete:	ncp_delete_dentry,
@@ -300,6 +311,7 @@ __ncp_lookup_validate(struct dentry * dentry, int flags)
 		if (!res)
 			res = ncp_obtain_info(server, dir, __name, &(finfo.i));
 	}
+	finfo.volume = finfo.i.volNumber;
 	DDPRINTK("ncp_lookup_validate: looked for %s/%s, res=%d\n",
 		dentry->d_parent->d_name.name, __name, res);
 	/*
@@ -663,6 +675,7 @@ ncp_read_volume_list(struct file *filp, void *dirent, filldir_t filldir,
 				info.volume_name);
 			continue;
 		}
+		entry.volume = entry.i.volNumber;
 		if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
 			return;
 	}
@@ -678,6 +691,9 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 	struct nw_search_sequence seq;
 	struct ncp_entry_info entry;
 	int err;
+	void* buf;
+	int more;
+	size_t bufsize;
 
 	DPRINTK("ncp_do_readdir: %s/%s, fpos=%ld\n",
 		dentry->d_parent->d_name.name, dentry->d_name.name,
@@ -691,15 +707,57 @@ ncp_do_readdir(struct file *filp, void *dirent, filldir_t filldir,
 		DPRINTK("ncp_do_readdir: init failed, err=%d\n", err);
 		return;
 	}
+#ifdef USE_OLD_SLOW_DIRECTORY_LISTING
 	for (;;) {
 		err = ncp_search_for_file_or_subdir(server, &seq, &entry.i);
 		if (err) {
 			DPRINTK("ncp_do_readdir: search failed, err=%d\n", err);
-			return;
+			break;
 		}
+		entry.volume = entry.i.volNumber;
 		if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
-			return;
+			break;
 	}
+#else
+	/* We MUST NOT use server->buffer_size handshaked with server if we are
+	   using UDP, as for UDP server uses max. buffer size determined by
+	   MTU, and for TCP server uses hardwired value 65KB (== 66560 bytes). 
+	   So we use 128KB, just to be sure, as there is no way how to know
+	   this value in advance. */
+	bufsize = 131072;
+	buf = vmalloc(bufsize);
+	if (!buf)
+		return;
+	do {
+		int cnt;
+		char* rpl;
+		size_t rpls;
+
+		err = ncp_search_for_fileset(server, &seq, &more, &cnt, buf, bufsize, &rpl, &rpls);
+		if (err)		/* Error */
+			break;
+		if (!cnt)		/* prevent endless loop */
+			break;
+		while (cnt--) {
+			size_t onerpl;
+			
+			if (rpls < offsetof(struct nw_info_struct, entryName))
+				break;	/* short packet */
+			ncp_extract_file_info(rpl, &entry.i);
+			onerpl = offsetof(struct nw_info_struct, entryName) + entry.i.nameLen;
+			if (rpls < onerpl)
+				break;	/* short packet */
+			(void)ncp_obtain_nfs_info(server, &entry.i);
+			rpl += onerpl;
+			rpls -= onerpl;
+			entry.volume = entry.i.volNumber;
+			if (!ncp_fill_cache(filp, dirent, filldir, ctl, &entry))
+				break;
+		}
+	} while (more);
+	vfree(buf);
+#endif
+	return;
 }
 
 int ncp_conn_logged_in(struct super_block *sb)
@@ -781,6 +839,7 @@ static struct dentry *ncp_lookup(struct inode *dir, struct dentry *dentry)
 	 */
 	finfo.opened = 0;
 	finfo.ino = iunique(dir->i_sb, 2);
+	finfo.volume = finfo.i.volNumber;
 	error = -EACCES;
 	inode = ncp_iget(dir->i_sb, &finfo);
 
@@ -824,7 +883,7 @@ out_close:
 }
 
 int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
-		int attributes)
+		   int rdev, int attributes)
 {
 	struct ncp_server *server = NCP_SERVER(dir);
 	struct ncp_entry_info finfo;
@@ -870,6 +929,15 @@ int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
 		opmode = O_WRONLY;
 	}
 	finfo.access = opmode;
+	if (ncp_is_nfs_extras(server, finfo.volume)) {
+		finfo.i.nfs.mode = mode;
+		finfo.i.nfs.rdev = rdev;
+		if (ncp_modify_nfs_info(server, finfo.volume,
+					finfo.i.dirEntNum,
+					mode, rdev) != 0)
+			goto out;
+	}
+
 	error = ncp_instantiate(dir, dentry, &finfo);
 out:
 	unlock_kernel();
@@ -878,7 +946,7 @@ out:
 
 static int ncp_create(struct inode *dir, struct dentry *dentry, int mode)
 {
-	return ncp_create_new(dir, dentry, mode, 0);
+	return ncp_create_new(dir, dentry, mode, 0, 0);
 }
 
 static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
@@ -906,6 +974,15 @@ static int ncp_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 					   OC_MODE_CREATE, aDIR, 0xffff,
 					   &finfo) == 0)
 	{
+		if (ncp_is_nfs_extras(server, finfo.volume)) {
+			mode |= S_IFDIR;
+			finfo.i.nfs.mode = mode;
+			if (ncp_modify_nfs_info(server,
+						finfo.volume,
+						finfo.i.dirEntNum,
+						mode, 0) != 0)
+				goto out;
+		}
 		error = ncp_instantiate(dir, dentry, &finfo);
 	}
 out:
@@ -1089,6 +1166,16 @@ static int ncp_rename(struct inode *old_dir, struct dentry *old_dentry,
 out:
 	unlock_kernel();
 	return error;
+}
+
+static int ncp_mknod(struct inode * dir, struct dentry *dentry,
+		     int mode, int rdev)
+{
+	if (ncp_is_nfs_extras(NCP_SERVER(dir), NCP_FINFO(dir)->volNumber)) {
+		DPRINTK(KERN_DEBUG "ncp_mknod: mode = 0%o\n", mode);
+		return ncp_create_new(dir, dentry, mode, rdev, 0);
+	}
+	return -EPERM; /* Strange, but true */
 }
 
 /* The following routines are taken directly from msdos-fs */

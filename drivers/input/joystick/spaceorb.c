@@ -124,6 +124,8 @@ static void spaceorb_process_packet(struct spaceorb *spaceorb)
 			printk("]\n");
 			break;
 	}
+
+	input_sync(dev);
 }
 
 static void spaceorb_interrupt(struct serio *serio, unsigned char data, unsigned int flags)
@@ -187,10 +189,10 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
 
 	spaceorb->dev.name = spaceorb_name;
 	spaceorb->dev.phys = spaceorb->phys;
-	spaceorb->dev.idbus = BUS_RS232;
-	spaceorb->dev.idvendor = SERIO_SPACEORB;
-	spaceorb->dev.idproduct = 0x0001;
-	spaceorb->dev.idversion = 0x0100;
+	spaceorb->dev.id.bustype = BUS_RS232;
+	spaceorb->dev.id.vendor = SERIO_SPACEORB;
+	spaceorb->dev.id.product = 0x0001;
+	spaceorb->dev.id.version = 0x0100;
 	
 	serio->private = spaceorb;
 
@@ -207,9 +209,9 @@ static void spaceorb_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev spaceorb_dev = {
-	interrupt:	spaceorb_interrupt,
-	connect:	spaceorb_connect,
-	disconnect:	spaceorb_disconnect,
+	.interrupt =	spaceorb_interrupt,
+	.connect =	spaceorb_connect,
+	.disconnect =	spaceorb_disconnect,
 };
 
 /*

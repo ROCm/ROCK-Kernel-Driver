@@ -176,6 +176,8 @@ static void interact_timer(unsigned long private)
 		}
 	}
 
+	input_sync(dev);
+
 	mod_timer(&interact->timer, jiffies + INTERACT_REFRESH_TIME);
 
 }
@@ -254,10 +256,10 @@ static void interact_connect(struct gameport *gameport, struct gameport_dev *dev
 
 	interact->dev.name = interact_type[i].name;
 	interact->dev.phys = interact->phys;
-	interact->dev.idbus = BUS_GAMEPORT;
-	interact->dev.idvendor = GAMEPORT_ID_VENDOR_INTERACT;
-	interact->dev.idproduct = interact_type[i].id;
-	interact->dev.idversion = 0x0100;
+	interact->dev.id.bustype = BUS_GAMEPORT;
+	interact->dev.id.vendor = GAMEPORT_ID_VENDOR_INTERACT;
+	interact->dev.id.product = interact_type[i].id;
+	interact->dev.id.version = 0x0100;
 
 	interact->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
@@ -293,8 +295,8 @@ static void interact_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev interact_dev = {
-	connect:	interact_connect,
-	disconnect:	interact_disconnect,
+	.connect =	interact_connect,
+	.disconnect =	interact_disconnect,
 };
 
 int __init interact_init(void)

@@ -76,6 +76,8 @@ static void dc_scan_kbd(struct dc_kbd *kbd)
 		}
 	}
 
+	input_sync(dev);
+
 	memcpy(kbd->old, kbd->new, 8);
 }
 
@@ -132,7 +134,7 @@ static int dc_kbd_connect(struct maple_device *dev)
 	kbd->dev.event = NULL;
 
 	kbd->dev.name = dev->product_name;
-	kbd->dev.idbus = BUS_MAPLE;
+	kbd->dev.id.bustype = BUS_MAPLE;
 	
 	input_register_device(&kbd->dev);
 
@@ -160,10 +162,10 @@ static void dc_kbd_disconnect(struct maple_device *dev)
 
 
 static struct maple_driver dc_kbd_driver = {
-	function:	MAPLE_FUNC_KEYBOARD,
-	name:		"Dreamcast keyboard",
-	connect:	dc_kbd_connect,
-	disconnect:	dc_kbd_disconnect,
+	.function =	MAPLE_FUNC_KEYBOARD,
+	.name =		"Dreamcast keyboard",
+	.connect =	dc_kbd_connect,
+	.disconnect =	dc_kbd_disconnect,
 };
 
 

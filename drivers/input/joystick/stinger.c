@@ -85,6 +85,8 @@ static void stinger_process_packet(struct stinger *stinger)
 	input_report_abs(dev, ABS_X, (data[1] & 0x3F) - ((data[0] & 0x01) << 6));
 	input_report_abs(dev, ABS_Y, ((data[0] & 0x02) << 5) - (data[2] & 0x3F));
 
+	input_sync(dev);
+
 	return;
 }
 
@@ -152,10 +154,10 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 
 	stinger->dev.name = stinger_name;
 	stinger->dev.phys = stinger->phys;
-	stinger->dev.idbus = BUS_RS232;
-	stinger->dev.idvendor = SERIO_STINGER;
-	stinger->dev.idproduct = 0x0001;
-	stinger->dev.idversion = 0x0100;
+	stinger->dev.id.bustype = BUS_RS232;
+	stinger->dev.id.vendor = SERIO_STINGER;
+	stinger->dev.id.product = 0x0001;
+	stinger->dev.id.version = 0x0100;
 
 	for (i = 0; i < 2; i++) {
 		stinger->dev.absmax[ABS_X+i] =  64;	
@@ -182,9 +184,9 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev stinger_dev = {
-	interrupt:	stinger_interrupt,
-	connect:	stinger_connect,
-	disconnect:	stinger_disconnect,
+	.interrupt =	stinger_interrupt,
+	.connect =	stinger_connect,
+	.disconnect =	stinger_disconnect,
 };
 
 /*

@@ -266,6 +266,8 @@ static void db9_timer(unsigned long private)
 			break;
 		}
 
+	input_sync(dev);
+
 	mod_timer(&db9->timer, jiffies + DB9_REFRESH_TIME);
 }
 
@@ -351,10 +353,10 @@ static struct db9 __init *db9_probe(int *config)
 
 		db9->dev[i].name = db9_name[db9->mode];
 		db9->dev[i].phys = db9->phys[i];
-		db9->dev[i].idbus = BUS_PARPORT;
-		db9->dev[i].idvendor = 0x0002;
-		db9->dev[i].idproduct = config[1];
-		db9->dev[i].idversion = 0x0100;
+		db9->dev[i].id.bustype = BUS_PARPORT;
+		db9->dev[i].id.vendor = 0x0002;
+		db9->dev[i].id.product = config[1];
+		db9->dev[i].id.version = 0x0100;
 
 		db9->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 		db9->dev[i].absbit[0] = BIT(ABS_X) | BIT(ABS_Y);
@@ -373,21 +375,21 @@ static struct db9 __init *db9_probe(int *config)
 }
 
 #ifndef MODULE
-int __init db9_setup(char *str)
+static int __init db9_setup(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 2; i++) db9[i] = ints[i + 1];
 	return 1;
 }
-int __init db9_setup_2(char *str)
+static int __init db9_setup_2(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);
 	for (i = 0; i <= ints[0] && i < 2; i++) db9_2[i] = ints[i + 1];
 	return 1;
 }
-int __init db9_setup_3(char *str)
+static int __init db9_setup_3(char *str)
 {
 	int i, ints[3];
 	get_options(str, ARRAY_SIZE(ints), ints);

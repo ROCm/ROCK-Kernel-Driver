@@ -201,7 +201,7 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 	case NCP_IOC_SETROOT:
 		{
 			struct ncp_setroot_ioctl sr;
-			struct nw_info_struct i;
+			unsigned int vnum, de, dosde;
 			struct dentry* dentry;
 
 			if (!capable(CAP_SYS_ADMIN))
@@ -214,25 +214,31 @@ int ncp_ioctl(struct inode *inode, struct file *filp,
 					   sizeof(sr))) return -EFAULT;
 			if (sr.volNumber < 0) {
 				server->m.mounted_vol[0] = 0;
-				i.volNumber = NCP_NUMBER_OF_VOLUMES + 1;
-				i.dirEntNum = 0;
-				i.DosDirNum = 0;
+				vnum = NCP_NUMBER_OF_VOLUMES;
+				de = 0;
+				dosde = 0;
 			} else if (sr.volNumber >= NCP_NUMBER_OF_VOLUMES) {
 				return -EINVAL;
-			} else
-				if (ncp_mount_subdir(server, &i, sr.volNumber,
+			} else {
+				struct nw_info_struct ni;
+				
+				if (ncp_mount_subdir(server, &ni, sr.volNumber,
 						sr.namespace, sr.dirEntNum))
 					return -ENOENT;
-
+				vnum = ni.volNumber;
+				de = ni.dirEntNum;
+				dosde = ni.DosDirNum;
+			}
+			
 			dentry = inode->i_sb->s_root;
 			server->root_setuped = 1;
 			if (dentry) {
 				struct inode* inode = dentry->d_inode;
 				
 				if (inode) {
-					NCP_FINFO(inode)->volNumber = i.volNumber;
-					NCP_FINFO(inode)->dirEntNum = i.dirEntNum;
-					NCP_FINFO(inode)->DosDirNum = i.DosDirNum;
+					NCP_FINFO(inode)->volNumber = vnum;
+					NCP_FINFO(inode)->dirEntNum = de;
+					NCP_FINFO(inode)->DosDirNum = dosde;
 				} else
 					DPRINTK("ncpfs: s_root->d_inode==NULL\n");
 			} else

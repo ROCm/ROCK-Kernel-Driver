@@ -163,6 +163,8 @@ adbhid_input_keycode(int id, int keycode, int repeat)
 	else
 		printk(KERN_INFO "Unhandled ADB key (scancode %#02x) %s.\n", keycode,
 		       up_flag ? "released" : "pressed");
+
+	input_sync(&adbhid[id]->input);
 }
 
 static void
@@ -259,6 +261,8 @@ adbhid_mouse_input(unsigned char *data, int nb, struct pt_regs *regs, int autopo
 			 ((data[2]&0x7f) < 64 ? (data[2]&0x7f) : (data[2]&0x7f)-128 ));
 	input_report_rel(&adbhid[id]->input, REL_Y,
 			 ((data[1]&0x7f) < 64 ? (data[1]&0x7f) : (data[1]&0x7f)-128 ));
+
+	input_sync(&adbhid[id]->input);
 }
 
 static void
@@ -363,6 +367,8 @@ adbhid_buttons_input(unsigned char *data, int nb, struct pt_regs *regs, int auto
 	  }
 	  break;
 	}
+
+	input_sync(&adbhid[id]->input);
 }
 
 static struct adb_request led_request;
@@ -479,10 +485,10 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	adbhid[id]->input.private = adbhid[id];
 	adbhid[id]->input.name = adbhid[id]->name;
 	adbhid[id]->input.phys = adbhid[id]->phys;
-	adbhid[id]->input.idbus = BUS_ADB;
-	adbhid[id]->input.idvendor = 0x0001;
-	adbhid[id]->input.idproduct = (id << 12) | (default_id << 8) | original_handler_id;
-	adbhid[id]->input.idversion = 0x0100;
+	adbhid[id]->input.id.bustype = BUS_ADB;
+	adbhid[id]->input.id.vendor = 0x0001;
+	adbhid[id]->input.id.product = (id << 12) | (default_id << 8) | original_handler_id;
+	adbhid[id]->input.id.version = 0x0100;
 
 	switch (default_id) {
 	case ADB_KEYBOARD:
@@ -607,7 +613,7 @@ adbhid_input_reregister(int id, int default_id, int org_handler_id,
 			int cur_handler_id, int mk)
 {
 	if (adbhid[id]) {
-		if (adbhid[id]->input.idproduct !=
+		if (adbhid[id]->input.id.product !=
 		    ((id << 12)|(default_id << 8)|org_handler_id)) {
 			adbhid_input_unregister(id);
 			adbhid_input_register(id, default_id, org_handler_id,

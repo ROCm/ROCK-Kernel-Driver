@@ -130,6 +130,8 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 			input_report_key(dev, BTN_LEFT,   data[3] & 2);
 			input_report_key(dev, BTN_MIDDLE, data[3] & 4);
 
+			input_sync(dev);
+
 			a3d->axes[0] = ((signed char)((data[11] << 6) | (data[12] << 3) | (data[13]))) + 128;
 			a3d->axes[1] = ((signed char)((data[14] << 6) | (data[15] << 3) | (data[16]))) + 128;
 			a3d->axes[2] = ((signed char)((data[17] << 6) | (data[18] << 3) | (data[19]))) + 128;
@@ -164,6 +166,8 @@ static void a3d_read(struct a3d *a3d, unsigned char *data)
 			input_report_key(dev, BTN_THUMB,   data[8] & 2);
 			input_report_key(dev, BTN_TOP,     data[8] & 4);
 			input_report_key(dev, BTN_PINKIE,  data[7] & 1);
+
+			input_sync(dev);
 
 			return;
 	}
@@ -336,10 +340,10 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 		a3d->adc.name = a3d_names[a3d->mode];
 		a3d->adc.phys = a3d->adcphys;
-		a3d->adc.idbus = BUS_GAMEPORT;
-		a3d->adc.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
-		a3d->adc.idproduct = a3d->mode;
-		a3d->adc.idversion = 0x0100;
+		a3d->adc.id.bustype = BUS_GAMEPORT;
+		a3d->adc.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
+		a3d->adc.id.product = a3d->mode;
+		a3d->adc.id.version = 0x0100;
 
 		a3d_read(a3d, data);
 
@@ -353,10 +357,10 @@ static void a3d_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	a3d->dev.name = a3d_names[a3d->mode];
 	a3d->dev.phys = a3d->phys;
-	a3d->dev.idbus = BUS_GAMEPORT;
-	a3d->dev.idvendor = GAMEPORT_ID_VENDOR_MADCATZ;
-	a3d->dev.idproduct = a3d->mode;
-	a3d->dev.idversion = 0x0100;
+	a3d->dev.id.bustype = BUS_GAMEPORT;
+	a3d->dev.id.vendor = GAMEPORT_ID_VENDOR_MADCATZ;
+	a3d->dev.id.product = a3d->mode;
+	a3d->dev.id.version = 0x0100;
 
 	input_register_device(&a3d->dev);
 	printk(KERN_INFO "input: %s on %s\n", a3d_names[a3d->mode], a3d->phys);
@@ -378,8 +382,8 @@ static void a3d_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev a3d_dev = {
-	connect:	a3d_connect,
-	disconnect:	a3d_disconnect,
+	.connect =	a3d_connect,
+	.disconnect =	a3d_disconnect,
 };
 
 int __init a3d_init(void)

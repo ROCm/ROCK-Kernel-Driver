@@ -73,14 +73,6 @@ extern void *walnut_rtc_base;
 #define WALNUT_PS2_BASE		0xF0100000
 #define WALNUT_FPGA_BASE	0xF0300000
 
-
-extern void *kb_cs;
-extern void *kb_data;
-#define kbd_read_input()	readb(kb_data)
-#define kbd_read_status()	readb(kb_cs)
-#define kbd_write_output(val)	writeb(val, kb_data)
-#define kbd_write_command(val)	writeb(val, kb_cs)
-
 #define PPC4xx_MACHINE_NAME	"IBM Walnut"
 
 #endif /* !__ASSEMBLY__ */

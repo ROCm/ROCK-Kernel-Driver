@@ -136,6 +136,7 @@ static void wacom_pl_irq(struct urb *urb)
 	}
 	
 	input_event(dev, EV_MSC, MSC_SERIAL, 0);
+	input_sync(dev);
 }
 
 static void wacom_graphire_irq(struct urb *urb)
@@ -189,6 +190,8 @@ static void wacom_graphire_irq(struct urb *urb)
 	input_report_key(dev, BTN_STYLUS2, data[1] & 0x04);
 
 	input_event(dev, EV_MSC, MSC_SERIAL, data[1] & 0x01);
+
+	input_sync(dev);
 }
 
 static void wacom_intuos_irq(struct urb *urb)
@@ -291,6 +294,8 @@ static void wacom_intuos_irq(struct urb *urb)
 	}
 	
 	input_event(dev, EV_MSC, MSC_SERIAL, wacom->serial[idx]);
+
+	input_sync(dev);
 }
 
 #define WACOM_INTUOS_TOOLS	(BIT(BTN_TOOL_BRUSH) | BIT(BTN_TOOL_PENCIL) | BIT(BTN_TOOL_AIRBRUSH) | BIT(BTN_TOOL_LENS))
@@ -400,10 +405,10 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	wacom->dev.name = wacom->features->name;
 	wacom->dev.phys = wacom->phys;
-	wacom->dev.idbus = BUS_USB;
-	wacom->dev.idvendor = dev->descriptor.idVendor;
-	wacom->dev.idproduct = dev->descriptor.idProduct;
-	wacom->dev.idversion = dev->descriptor.bcdDevice;
+	wacom->dev.id.bustype = BUS_USB;
+	wacom->dev.id.vendor = dev->descriptor.idVendor;
+	wacom->dev.id.product = dev->descriptor.idProduct;
+	wacom->dev.id.version = dev->descriptor.bcdDevice;
 	wacom->usbdev = dev;
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;

@@ -76,18 +76,19 @@ static void warrior_process_packet(struct warrior *warrior)
 			input_report_key(dev, BTN_THUMB,   (data[3] >> 1) & 1);
 			input_report_key(dev, BTN_TOP,     (data[3] >> 2) & 1);
 			input_report_key(dev, BTN_TOP2,    (data[3] >> 3) & 1);
-			return;
+			break;
 		case 3:					/* XY-axis info->data */
 			input_report_abs(dev, ABS_X, ((data[0] & 8) << 5) - (data[2] | ((data[0] & 4) << 5)));
 			input_report_abs(dev, ABS_Y, (data[1] | ((data[0] & 1) << 7)) - ((data[0] & 2) << 7));
-			return;
+			break;
 		case 5:					/* Throttle, spinner, hat info->data */
 			input_report_abs(dev, ABS_THROTTLE, (data[1] | ((data[0] & 1) << 7)) - ((data[0] & 2) << 7));
 			input_report_abs(dev, ABS_HAT0X, (data[3] & 2 ? 1 : 0) - (data[3] & 1 ? 1 : 0));
 			input_report_abs(dev, ABS_HAT0Y, (data[3] & 8 ? 1 : 0) - (data[3] & 4 ? 1 : 0));
 			input_report_rel(dev, REL_DIAL,  (data[2] | ((data[0] & 4) << 5)) - ((data[0] & 8) << 5));
-			return;
+			break;
 	}
+	input_sync(dev);
 }
 
 /*
@@ -156,10 +157,10 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
 
 	warrior->dev.name = warrior_name;
 	warrior->dev.phys = warrior->phys;
-	warrior->dev.idbus = BUS_RS232;
-	warrior->dev.idvendor = SERIO_WARRIOR;
-	warrior->dev.idproduct = 0x0001;
-	warrior->dev.idversion = 0x0100;
+	warrior->dev.id.bustype = BUS_RS232;
+	warrior->dev.id.vendor = SERIO_WARRIOR;
+	warrior->dev.id.product = 0x0001;
+	warrior->dev.id.version = 0x0100;
 
 	for (i = 0; i < 2; i++) {
 		warrior->dev.absmax[ABS_X+i] = -64;	
@@ -194,9 +195,9 @@ static void warrior_connect(struct serio *serio, struct serio_dev *dev)
  */
 
 static struct serio_dev warrior_dev = {
-	interrupt:	warrior_interrupt,
-	connect:	warrior_connect,
-	disconnect:	warrior_disconnect,
+	.interrupt =	warrior_interrupt,
+	.connect =	warrior_connect,
+	.disconnect =	warrior_disconnect,
 };
 
 /*

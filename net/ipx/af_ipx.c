@@ -145,6 +145,7 @@ static struct datalink_proto *pSNAP_datalink;
 static struct proto_ops ipx_dgram_ops;
 
 static struct net_proto_family *spx_family_ops;
+static DECLARE_RWSEM(spx_family_ops_lock);
 
 static ipx_route *ipx_routes;
 static rwlock_t ipx_routes_lock = RW_LOCK_UNLOCKED;
@@ -1929,10 +1930,13 @@ static int ipx_create(struct socket *sock, int protocol)
 			 * From this point on SPX sockets are handled
 			 * by af_spx.c and the methods replaced.
 			 */
+			down_read(&spx_family_ops_lock);
 			if (spx_family_ops) {
 				ret = spx_family_ops->create(sock, protocol);
+				up_read(&spx_family_ops_lock);
 				goto decmod;
 			}
+			up_read(&spx_family_ops_lock);
 			/* Fall through if SPX is not loaded */
 		case SOCK_STREAM:       /* Allow higher levels to piggyback */
 		default:
@@ -2463,20 +2467,27 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 int ipx_register_spx(struct proto_ops **p, struct net_proto_family *spx)
 {
-        if (spx_family_ops)
-                return -EBUSY;
-        cli();
-        MOD_INC_USE_COUNT;
-        *p = &ipx_dgram_ops;
-        spx_family_ops = spx;
-        sti();
+	int err;
+
+	err = -EBUSY;
+	down_write(&spx_family_ops_lock);
+        if (!spx_family_ops) {
+	        MOD_INC_USE_COUNT;
+        	*p = &ipx_dgram_ops;
+	        spx_family_ops = spx;
+	}
+        up_write(&spx_family_ops_lock);
         return 0;
 }
 
 int ipx_unregister_spx(void)
 {
-        spx_family_ops = NULL;
-        MOD_DEC_USE_COUNT;
+	down_write(&spx_family_ops_lock);
+	if (spx_family_ops) {
+	        spx_family_ops = NULL;
+        	MOD_DEC_USE_COUNT;
+	}
+	up_write(&spx_family_ops_lock);
         return 0;
 }
 

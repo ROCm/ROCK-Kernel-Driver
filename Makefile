@@ -166,6 +166,15 @@ noconfig_targets := xconfig menuconfig config oldconfig randconfig \
 		    help tags TAGS sgmldocs psdocs pdfdocs htmldocs \
 		    checkconfig checkhelp checkincludes
 
+# Helpers built in scripts/
+# ---------------------------------------------------------------------------
+
+scripts/docproc scripts/fixdep scripts/split-include : scripts ;
+
+.PHONY: scripts
+scripts:
+	@$(MAKE) -C scripts
+
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 
 # Here goes the main Makefile
@@ -356,15 +365,6 @@ include/linux/version.h: Makefile
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
 	) > $@.tmp
 	@$(update-if-changed)
-
-# Helpers built in scripts/
-# ---------------------------------------------------------------------------
-
-scripts/fixdep scripts/split-include : scripts ;
-
-.PHONY: scripts
-scripts:
-	@$(MAKE) -C scripts
 
 # Generate module versions
 # ---------------------------------------------------------------------------
@@ -650,7 +650,7 @@ clean:	archclean
 		-name .\*.tmp -o -name .\*.d \) -type f -print \
 		| grep -v lxdialog/ | xargs rm -f
 	@rm -f $(CLEAN_FILES)
-	@$(MAKE) -C Documentation/DocBook clean
+	@$(MAKE) -f Documentation/DocBook/Makefile clean
 
 mrproper: clean archmrproper
 	@echo 'Making mrproper'
@@ -659,7 +659,7 @@ mrproper: clean archmrproper
 		-type f -print | xargs rm -f
 	@rm -f $(MRPROPER_FILES)
 	@rm -rf $(MRPROPER_DIRS)
-	@$(MAKE) -C Documentation/DocBook mrproper
+	@$(MAKE) -f Documentation/DocBook/Makefile mrproper
 
 distclean: mrproper
 	@echo 'Making distclean'
@@ -732,10 +732,8 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-
-sgmldocs psdocs pdfdocs htmldocs:
-	@$(MAKE) -C Documentation/DocBook $@
-
+sgmldocs psdocs pdfdocs htmldocs: scripts
+	@$(MAKE) -f Documentation/DocBook/Makefile $@
 
 # Scripts to check various things for consistency
 # ---------------------------------------------------------------------------

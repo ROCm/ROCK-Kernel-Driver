@@ -144,7 +144,7 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 	port->gameport.io = io & (-1 << i);
 	port->gameport.phys = port->phys;
 	port->gameport.name = port->name;
-	port->gameport.idbus = BUS_ISA;
+	port->gameport.id.bustype = BUS_ISA;
 
 	sprintf(port->phys, "isa%04x/gameport0", io & (-1 << i));
 	sprintf(port->name, "NS558 ISA");
@@ -163,8 +163,8 @@ static struct ns558* ns558_isa_probe(int io, struct ns558 *next)
 #ifdef __ISAPNP__
 
 #define NS558_DEVICE(a,b,c,d)\
-	card_vendor: ISAPNP_ANY_ID, card_device: ISAPNP_ANY_ID,\
-	vendor: ISAPNP_VENDOR(a,b,c), function: ISAPNP_DEVICE(d)
+	.card_vendor = ISAPNP_ANY_ID, card_device: ISAPNP_ANY_ID,\
+	.vendor = ISAPNP_VENDOR(a,b,c), function: ISAPNP_DEVICE(d)
 
 static struct isapnp_device_id pnp_devids[] = {
 	{ NS558_DEVICE('@','P','@',0x0001) }, /* ALS 100 */
@@ -232,10 +232,10 @@ static struct ns558* ns558_pnp_probe(struct pci_dev *dev, struct ns558 *next)
 	port->gameport.io = ioport;
 	port->gameport.phys = port->phys;
 	port->gameport.name = port->name;
-	port->gameport.idbus = BUS_ISAPNP;
-	port->gameport.idvendor = dev->vendor;
-	port->gameport.idproduct = dev->device;
-	port->gameport.idversion = 0x100;
+	port->gameport.id.bustype = BUS_ISAPNP;
+	port->gameport.id.vendor = dev->vendor;
+	port->gameport.id.product = dev->device;
+	port->gameport.id.version = 0x100;
 
 	sprintf(port->phys, "isapnp%d.%d/gameport0", PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn));
 	sprintf(port->name, "%s", dev->name[0] ? dev->name : "NS558 PnP Gameport");

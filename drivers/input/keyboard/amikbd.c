@@ -88,10 +88,12 @@ static void amikbd_interrupt(int irq, void *dummy, struct pt_regs *fp)
 		if (scancode == KEY_CAPS) {	/* CapsLock is a toggle switch key on Amiga */
 			input_report_key(&amikbd_dev, scancode, 1);
 			input_report_key(&amikbd_dev, scancode, 0);
+			input_sync(&amikbd_dev);
 			return;
 		}
 		
 		input_report_key(&amikbd_dev, scancode, down);
+		input_sync(&amikbd_dev);
 
 		return;
 	}
@@ -121,10 +123,10 @@ static int __init amikbd_init(void)
 
 	amikbd_dev.name = amikbd_name;
 	amikbd_dev.phys = amikbd_phys;
-	amikbd_dev.idbus = BUS_AMIGA;
-	amikbd_dev.idvendor = 0x0001;
-	amikbd_dev.idproduct = 0x0001;
-	amikbd_dev.idversion = 0x0100;
+	amikbd_dev.id.bustype = BUS_AMIGA;
+	amikbd_dev.id.vendor = 0x0001;
+	amikbd_dev.id.product = 0x0001;
+	amikbd_dev.id.version = 0x0100;
 
 	input_register_device(&amikbd_dev);
 

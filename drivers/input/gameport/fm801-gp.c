@@ -105,9 +105,9 @@ static int __devinit fm801_gp_probe(struct pci_dev *pci, const struct pci_device
 
 	gp->gameport.phys = gp->phys;
 	gp->gameport.name = gp->name;
-	gp->gameport.idbus = BUS_PCI;
-	gp->gameport.idvendor = pci->vendor;
-	gp->gameport.idproduct = pci->device;
+	gp->gameport.id.bustype = BUS_PCI;
+	gp->gameport.id.vendor = pci->vendor;
+	gp->gameport.id.product = pci->device;
 
 	pci_set_drvdata(pci, gp);
 
@@ -137,10 +137,10 @@ static struct pci_device_id fm801_gp_id_table[] __devinitdata = {
 };
 
 static struct pci_driver fm801_gp_driver = {
-	name:		"FM801 GP",
-	id_table:	fm801_gp_id_table,
-	probe:		fm801_gp_probe,
-	remove:		fm801_gp_remove,
+	.name =		"FM801 GP",
+	.id_table =	fm801_gp_id_table,
+	.probe =	fm801_gp_probe,
+	.remove =	fm801_gp_remove,
 };
 
 int __init fm801_gp_init(void)

@@ -75,6 +75,7 @@ void xtkbd_interrupt(struct serio *serio, unsigned char data, unsigned int flags
 
 			if (xtkbd->keycode[data & XTKBD_KEY]) {
 				input_report_key(&xtkbd->dev, xtkbd->keycode[data & XTKBD_KEY], !(data & XTKBD_RELEASE));
+				input_sync(&xtkbd->dev);
 			} else {
 				printk(KERN_WARNING "xtkbd.c: Unknown key (scancode %#x) %s.\n",
 					data & XTKBD_KEY, data & XTKBD_RELEASE ? "released" : "pressed");
@@ -118,10 +119,10 @@ void xtkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	xtkbd->dev.name = xtkbd_name;
 	xtkbd->dev.phys = xtkbd->phys;
-	xtkbd->dev.idbus = BUS_XTKBD;
-	xtkbd->dev.idvendor = 0x0001;
-	xtkbd->dev.idproduct = 0x0001;
-	xtkbd->dev.idversion = 0x0100;
+	xtkbd->dev.id.bustype = BUS_XTKBD;
+	xtkbd->dev.id.vendor = 0x0001;
+	xtkbd->dev.id.product = 0x0001;
+	xtkbd->dev.id.version = 0x0100;
 
 	input_register_device(&xtkbd->dev);
 
@@ -137,9 +138,9 @@ void xtkbd_disconnect(struct serio *serio)
 }
 
 struct serio_dev xtkbd_dev = {
-	interrupt:	xtkbd_interrupt,
-	connect:	xtkbd_connect,
-	disconnect:	xtkbd_disconnect
+	.interrupt =	xtkbd_interrupt,
+	.connect =	xtkbd_connect,
+	.disconnect =	xtkbd_disconnect
 };
 
 int __init xtkbd_init(void)

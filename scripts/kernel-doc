@@ -233,8 +233,16 @@ my $man_date = ('January', 'February', 'March', 'April', 'May', 'June',
 # CAVEAT EMPTOR!  Some of the others I localised may not want to be which
 # could cause "use of undefined value" or other bugs.
 my ($function, %function_table,%parametertypes,$declaration_purpose);
-my ($type,$file,$declaration_name,$return_type);
+my ($type,$declaration_name,$return_type);
 my ($newsection,$newcontents,$prototype,$filelist, $brcount, %source_map);
+
+# Generated docbook code is inserted in a template at a point where 
+# docbook v3.1 requires a non-zero sequence of RefEntry's; see:
+# http://www.oasis-open.org/docbook/documentation/reference/html/refentry.html
+# We keep track of number of generated entries and generate a dummy
+# if needs be to ensure the expanded template can be postprocessed
+# into html.
+my $section_counter = 0;
 
 my $lineprefix="";
 
@@ -638,6 +646,7 @@ sub output_struct_sgml(%) {
     print "  <programlisting>\n";
     print $args{'type'}." ".$args{'struct'}." {\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+	defined($args{'parameterdescs'}{$parameter}) || next;
         ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
 	$type = $args{'parametertypes'}{$parameter};
 	if ($type =~ m/([^\(]*\(\*)\s*\)\s*\(([^\)]*)\)/) {
@@ -658,6 +667,7 @@ sub output_struct_sgml(%) {
 
     print "  <variablelist>\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
+      defined($args{'parameterdescs'}{$parameter}) || next;
       ($args{'parameterdescs'}{$parameter} ne $undescribed) || next;
       print "    <varlistentry>";
       print "      <term>$parameter</term>\n";
@@ -870,7 +880,7 @@ sub output_function_man(%) {
     my ($parameter, $section);
     my $count;
 
-    print ".TH \"$args{'module'}\" 9 \"$args{'function'}\" \"$man_date\" \"API Manual\" LINUX\n";
+    print ".TH \"$args{'function'}\" 9 \"$args{'function'}\" \"$man_date\" \"Kernel Hacker's Manual\" LINUX\n";
 
     print ".SH NAME\n";
     print $args{'function'}." \\- ".$args{'purpose'}."\n";
@@ -896,13 +906,13 @@ sub output_function_man(%) {
 	$parenth = "";
     }
 
-    print ".SH Arguments\n";
+    print ".SH ARGUMENTS\n";
     foreach $parameter (@{$args{'parameterlist'}}) {
 	print ".IP \"".$parameter."\" 12\n";
 	output_highlight($args{'parameterdescs'}{$parameter});
     }
     foreach $section (@{$args{'sectionlist'}}) {
-	print ".SH \"$section\"\n";
+	print ".SH \"", uc $section, "\"\n";
 	output_highlight($args{'sections'}{$section});
     }
 }
@@ -1158,6 +1168,7 @@ sub output_declaration {
 	( $function_only == 2 && !defined($function_table{$name})))
     {
         &$func(@_);
+	$section_counter++;
     }
 }
 
@@ -1168,6 +1179,7 @@ sub output_intro {
     no strict 'refs';
     my $func = "output_intro_".$output_mode;
     &$func(@_);
+    $section_counter++;
 }
 
 ##
@@ -1195,7 +1207,7 @@ sub dump_struct($$) {
 	# ignore embedded structs or unions
 	$members =~ s/{.*}//g;
 
-	create_parameterlist($members, ';');
+	create_parameterlist($members, ';', $file);
 
 	output_declaration($declaration_name,
 			   'struct',
@@ -1211,7 +1223,8 @@ sub dump_struct($$) {
 			   });
     }
     else {
-        print STDERR "Cannot parse struct or union!\n";
+        print STDERR "Error(${file}:$.): Cannot parse struct or union!\n";
+	++$errors;
     }
 }
 
@@ -1228,8 +1241,8 @@ sub dump_enum($$) {
 	    push @parameterlist, $arg;
 	    if (!$parameterdescs{$arg}) {
 	        $parameterdescs{$arg} = $undescribed;
-	        print STDERR "Warning($file:$.): Enum value '$arg' ".
-		    "described in enum '$declaration_name'\n";
+	        print STDERR "Warning(${file}:$.): Enum value '$arg' ".
+		    "not described in enum '$declaration_name'\n";
 	    }
 
 	}
@@ -1246,7 +1259,8 @@ sub dump_enum($$) {
 			   });
     }
     else {
-        print STDERR "Cannot parse enum!\n";
+        print STDERR "Error(${file}:$.): Cannot parse enum!\n";
+	++$errors;
     }
 }
 
@@ -1272,13 +1286,15 @@ sub dump_typedef($$) {
 			   });
     }
     else {
-        print STDERR "Cannot parse typedef!\n";
+        print STDERR "Error(${file}:$.): Cannot parse typedef!\n";
+	++$errors;
     }
 }
 
-sub create_parameterlist($$) {
+sub create_parameterlist($$$) {
     my $args = shift;
     my $splitter = shift;
+    my $file = shift;
     my $type;
     my $param;
 
@@ -1332,7 +1348,7 @@ sub create_parameterlist($$) {
 	    $parameterdescs{$param} = $undescribed;
 
 	    if (($type eq 'function') || ($type eq 'enum')) {
-	        print STDERR "Warning($file:$.): Function parameter ".
+	        print STDERR "Warning(${file}:$.): Function parameter ".
 		    "or member '$param' not " .
 		    "described in '$declaration_name'\n";
 	    }
@@ -1392,9 +1408,9 @@ sub dump_function($$) {
 	$declaration_name = $2;
 	my $args = $3;
 
-	create_parameterlist($args, ',');
+	create_parameterlist($args, ',', $file);
     } else {
-	print STDERR "Error($.): cannot understand prototype: '$prototype'\n";
+	print STDERR "Error(${file}:$.): cannot understand prototype: '$prototype'\n";
 	++$errors;
 	return;
     }
@@ -1456,8 +1472,9 @@ sub reset_state {
     $state = 0;
 }
 
-sub process_state3_function($) { 
+sub process_state3_function($$) { 
     my $x = shift;
+    my $file = shift;
 
     if ($x =~ m#\s*/\*\s+MACDOC\s*#io) {
 	# do nothing
@@ -1474,8 +1491,9 @@ sub process_state3_function($) {
     }
 }
 
-sub process_state3_type($) { 
+sub process_state3_type($$) { 
     my $x = shift;
+    my $file = shift;
 
     $x =~ s@/\*.*?\*/@@gos;	# strip comments.
     $x =~ s@[\r\n]+@ @gos; # strip newlines/cr's.
@@ -1504,6 +1522,7 @@ sub process_file($) {
     my ($file) = @_;
     my $identifier;
     my $func;
+    my $initial_section_counter = $section_counter;
 
     if (defined($source_map{$file})) {
 	$file = $source_map{$file};
@@ -1515,6 +1534,7 @@ sub process_file($) {
 	return;
     }
 
+    $section_counter = 0;
     while (<IN>) {
 	if ($state == 0) {
 	    if (/$doc_start/o) {
@@ -1555,10 +1575,10 @@ sub process_file($) {
 		}
 
 		if ($verbose) {
-		    print STDERR "Info($.): Scanning doc for $identifier\n";
+		    print STDERR "Info(${file}:$.): Scanning doc for $identifier\n";
 		}
 	    } else {
-		print STDERR "WARN($.): Cannot understand $_ on line $.",
+		print STDERR "Warning(${file}:$.): Cannot understand $_ on line $.",
 		" - I thought it was a doc line\n";
 		++$errors;
 		$state = 0;
@@ -1612,14 +1632,14 @@ sub process_file($) {
 		}
 	    } else {
 		# i dont know - bad line?  ignore.
-		print STDERR "WARNING($.): bad line: $_"; 
+		print STDERR "Warning(${file}:$.): bad line: $_"; 
 		++$errors;
 	    }
 	} elsif ($state == 3) {	# scanning for function { (end of prototype)
 	    if ($decl_type eq 'function') {
-	        process_state3_function($_);
+	        process_state3_function($_, $file);
 	    } else {
-	        process_state3_type($_);
+	        process_state3_type($_, $file);
 	    }
 	} elsif ($state == 4) {
 		# Documentation block
@@ -1671,5 +1691,35 @@ sub process_file($) {
         	}
           }
     }
+    if ($initial_section_counter == $section_counter) {
+	print STDERR "Warning(${file}): no structured comments found\n";
+	if ($output_mode eq "sgml") {
+	    # The template wants at least one RefEntry here; make one.
+	    print "<refentry>\n";
+	    print " <refnamediv>\n";
+	    print "  <refname>\n";
+	    print "   ${file}\n";
+	    print "  </refname>\n";
+	    print "  <refpurpose>\n";
+	    print "   Document generation inconsistency\n";
+	    print "  </refpurpose>\n";
+	    print " </refnamediv>\n";
+	    print " <refsect1>\n";
+	    print "  <title>\n";
+	    print "   Oops\n";
+	    print "  </title>\n";
+	    print "  <warning>\n";
+	    print "   <para>\n";
+	    print "    The template for this document tried to insert\n";
+	    print "    the structured comment from the file\n";
+	    print "    <filename>${file}</filename> at this point,\n";
+	    print "    but none was found.\n";
+	    print "    This dummy section is inserted to allow\n";
+	    print "    generation to continue.\n";
+	    print "   </para>\n";
+	    print "  </warning>\n";
+	    print " </refsect1>\n";
+	    print "</refentry>\n";
+	}
+    }
 }
-

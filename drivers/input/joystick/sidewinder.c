@@ -323,6 +323,8 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 			input_report_key(dev, BTN_BASE4, !GB(38,1));
 			input_report_key(dev, BTN_BASE5, !GB(37,1));
 
+			input_sync(dev);
+
 			return 0;
 
 		case SW_ID_GP:
@@ -336,6 +338,8 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 
 				for (j = 0; j < 10; j++)
 					input_report_key(dev + i, sw_btn[SW_ID_GP][j], !GB(i*15+j+4,1));
+
+				input_sync(dev + i);
 			}
 
 			return 0;
@@ -355,6 +359,8 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 
 			for (j = 0; j < 9; j++)
 				input_report_key(dev, sw_btn[SW_ID_PP][j], !GB(j,1));
+
+			input_sync(dev);
 
 			return 0;
 
@@ -377,6 +383,8 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 			input_report_key(dev, BTN_MODE,   GB(38,1));
 			input_report_key(dev, BTN_SELECT, GB(39,1));
 
+			input_sync(dev);
+
 			return 0;
 
 		case SW_ID_FFW:
@@ -389,6 +397,8 @@ static int sw_parse(unsigned char *buf, struct sw *sw)
 
 			for (j = 0; j < 8; j++)
 				input_report_key(dev, sw_btn[SW_ID_FFW][j], !GB(j+22,1));
+
+			input_sync(dev);
 
 			return 0;
 	}
@@ -701,10 +711,10 @@ static void sw_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 		sw->dev[i].name = sw->name;
 		sw->dev[i].phys = sw->phys[i];
-		sw->dev[i].idbus = BUS_GAMEPORT;
-		sw->dev[i].idvendor = GAMEPORT_ID_VENDOR_MICROSOFT;
-		sw->dev[i].idproduct = sw->type;
-		sw->dev[i].idversion = 0x0100;
+		sw->dev[i].id.bustype = BUS_GAMEPORT;
+		sw->dev[i].id.vendor = GAMEPORT_ID_VENDOR_MICROSOFT;
+		sw->dev[i].id.product = sw->type;
+		sw->dev[i].id.version = 0x0100;
 
 		sw->dev[i].evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 
@@ -743,8 +753,8 @@ static void sw_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev sw_dev = {
-	connect:	sw_connect,
-	disconnect:	sw_disconnect,
+	.connect =	sw_connect,
+	.disconnect =	sw_disconnect,
 };
 
 int __init sw_init(void)

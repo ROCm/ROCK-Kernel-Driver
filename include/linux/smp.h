@@ -87,7 +87,7 @@ extern volatile int smp_msg_id;
 static inline void smp_send_reschedule(int cpu) { }
 static inline void smp_send_reschedule_all(void) { }
 #define cpu_online_map				1
-#define cpu_online(cpu)				1
+#define cpu_online(cpu)				({ cpu; 1; })
 #define num_online_cpus()			1
 #define __per_cpu_data
 #define per_cpu(var, cpu)			var

@@ -1346,7 +1346,8 @@ static int snd_nm256_free(nm256_t *chip)
 	if (chip->streams[SNDRV_PCM_STREAM_CAPTURE].running)
 		snd_nm256_capture_stop(chip);
 
-	synchronize_irq();
+	if(chip->irq >= 0)
+		synchronize_irq(chip->irq);
 
 	if (chip->cport)
 		iounmap((void *) chip->cport);

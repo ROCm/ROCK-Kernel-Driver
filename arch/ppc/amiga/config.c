@@ -36,7 +36,6 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/irq.h>
-#include <asm/keyboard.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
 
@@ -76,9 +75,6 @@ static char amiga_model_name[13] = "Amiga ";
 extern char m68k_debug_device[];
 
 static void amiga_sched_init(void (*handler)(int, void *, struct pt_regs *));
-/* amiga specific keyboard functions */
-extern int amiga_keyb_init(void);
-extern int amiga_kbdrate (struct kbd_repeat *);
 /* amiga specific irq functions */
 extern void amiga_init_IRQ (void);
 extern void (*amiga_default_handler[]) (int, void *, struct pt_regs *);
@@ -118,18 +114,6 @@ static struct console amiga_console_driver = {
 	flags:		CON_PRINTBUFFER,
 	index:		-1,
 };
-
-#ifdef CONFIG_MAGIC_SYSRQ
-char amiga_sysrq_xlate[128] =
-	"\0001234567890-=\\\000\000"					/* 0x00 - 0x0f */
-	"qwertyuiop[]\000123"							/* 0x10 - 0x1f */
-	"asdfghjkl;'\000\000456"						/* 0x20 - 0x2f */
-	"\000zxcvbnm,./\000+789"						/* 0x30 - 0x3f */
-	" \177\t\r\r\000\177\000\000\000-\000\000\000\000\000"	/* 0x40 - 0x4f */
-	"\000\201\202\203\204\205\206\207\210\211()/*+\000"	/* 0x50 - 0x5f */
-	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"	/* 0x60 - 0x6f */
-	"\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000";	/* 0x70 - 0x7f */
-#endif
 
 extern void (*kd_mksound)(unsigned int, unsigned int);
 
@@ -407,8 +391,6 @@ void __init config_amiga(void)
     request_resource(&iomem_resource, &((struct resource *)&mb_resources)[i]);
 
   mach_sched_init      = amiga_sched_init;
-  mach_keyb_init       = amiga_keyb_init;
-  mach_kbdrate         = amiga_kbdrate;
   mach_init_IRQ        = amiga_init_IRQ;
 #ifndef CONFIG_APUS
   mach_default_handler = &amiga_default_handler;

@@ -218,13 +218,13 @@ static int tsdev_ioctl(struct inode *inode, struct file *file,
 }
 
 struct file_operations tsdev_fops = {
-	owner:		THIS_MODULE,
-	open:		tsdev_open,
-	release:	tsdev_release,
-	read:		tsdev_read,
-	poll:		tsdev_poll,
-	fasync:		tsdev_fasync,
-	ioctl:		tsdev_ioctl,
+	.owner =	THIS_MODULE,
+	.open =		tsdev_open,
+	.release =	tsdev_release,
+	.read =		tsdev_read,
+	.poll =		tsdev_poll,
+	.fasync =	tsdev_fasync,
+	.ioctl =	tsdev_ioctl,
 };
 
 static void tsdev_event(struct input_handle *handle, unsigned int type,
@@ -411,13 +411,13 @@ static struct input_device_id tsdev_ids[] = {
 MODULE_DEVICE_TABLE(input, tsdev_ids);
 
 static struct input_handler tsdev_handler = {
-	event:		tsdev_event,
-	connect:	tsdev_connect,
-	disconnect:	tsdev_disconnect,
-	fops:		&tsdev_fops,
-	minor:		TSDEV_MINOR_BASE,
-	name:		"tsdev",
-	id_table:	tsdev_ids,
+	.event =	tsdev_event,
+	.connect =	tsdev_connect,
+	.disconnect =	tsdev_disconnect,
+	.fops =		&tsdev_fops,
+	.minor =	TSDEV_MINOR_BASE,
+	.name =		"tsdev",
+	.id_table =	tsdev_ids,
 };
 
 static int __init tsdev_init(void)

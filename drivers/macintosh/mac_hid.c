@@ -162,6 +162,7 @@ int mac_hid_mouse_emulate_buttons(int caller, unsigned int keycode, int down)
 			 	input_report_key(&emumousebtn,
 						 keycode == mouse_button2_keycode ? BTN_MIDDLE : BTN_RIGHT,
 						 down);
+				input_sync(&emumousebtn);
 				return 1;
 			}
 			mouse_last_keycode = down ? keycode : 0;
@@ -181,10 +182,10 @@ static void emumousebtn_input_register(void)
 	emumousebtn.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	emumousebtn.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 
-	emumousebtn.idbus = BUS_ADB;
-	emumousebtn.idvendor = 0x0001;
-	emumousebtn.idproduct = 0x0001;
-	emumousebtn.idversion = 0x0100;
+	emumousebtn.id.bustype = BUS_ADB;
+	emumousebtn.id.vendor = 0x0001;
+	emumousebtn.id.product = 0x0001;
+	emumousebtn.id.version = 0x0100;
 
 	input_register_device(&emumousebtn);
 

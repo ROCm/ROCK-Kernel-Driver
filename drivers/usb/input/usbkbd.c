@@ -104,6 +104,8 @@ static void usb_kbd_irq(struct urb *urb)
 		}
 	}
 
+	input_sync(&kbd->dev);
+
 	memcpy(kbd->old, kbd->new, 8);
 }
 
@@ -236,10 +238,10 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	kbd->dev.name = kbd->name;
 	kbd->dev.phys = kbd->phys;	
-	kbd->dev.idbus = BUS_USB;
-	kbd->dev.idvendor = dev->descriptor.idVendor;
-	kbd->dev.idproduct = dev->descriptor.idProduct;
-	kbd->dev.idversion = dev->descriptor.bcdDevice;
+	kbd->dev.id.bustype = BUS_USB;
+	kbd->dev.id.vendor = dev->descriptor.idVendor;
+	kbd->dev.id.product = dev->descriptor.idProduct;
+	kbd->dev.id.version = dev->descriptor.bcdDevice;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		kfree(kbd);
@@ -255,7 +257,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (!strlen(kbd->name))
 		sprintf(kbd->name, "USB HIDBP Keyboard %04x:%04x",
-			kbd->dev.idvendor, kbd->dev.idproduct);
+			kbd->dev.id.vendor, kbd->dev.id.product);
 
 	kfree(buf);
 

@@ -214,10 +214,13 @@ void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data)
 				}
 			}
 
+			input_sync(dev);
+
 			break;
 
 		case 0x02:	/* status report */
 			input_report_key(dev, BTN_DEAD, data[0] & 0x02);
+			input_sync(dev);
 
 			/* Check if an effect was just started or stopped */
 			i = data[1] & 0x7f;

@@ -89,6 +89,8 @@ static void sermouse_process_msc(struct sermouse *sermouse, signed char data)
 			break;
 	}
 
+	input_sync(dev);
+
 	if (++sermouse->count == (5 - ((sermouse->type == SERIO_SUN) << 1)))
 		sermouse->count = 0;
 }
@@ -188,6 +190,8 @@ static void sermouse_process_ms(struct sermouse *sermouse, signed char data)
 			break;
 	}
 
+	input_sync(dev);
+
 	sermouse->count++;
 }
 
@@ -263,10 +267,10 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	sermouse->dev.name = sermouse_protocols[sermouse->type];
 	sermouse->dev.phys = sermouse->phys;
-	sermouse->dev.idbus = BUS_RS232;
-	sermouse->dev.idvendor = sermouse->type;
-	sermouse->dev.idproduct = c;
-	sermouse->dev.idversion = 0x0100;
+	sermouse->dev.id.bustype = BUS_RS232;
+	sermouse->dev.id.vendor = sermouse->type;
+	sermouse->dev.id.product = c;
+	sermouse->dev.id.version = 0x0100;
 
 	if (serio_open(serio, dev)) {
 		kfree(sermouse);
@@ -279,9 +283,9 @@ static void sermouse_connect(struct serio *serio, struct serio_dev *dev)
 }
 
 static struct serio_dev sermouse_dev = {
-	interrupt:	sermouse_interrupt,
-	connect:	sermouse_connect,
-	disconnect:	sermouse_disconnect
+	.interrupt =	sermouse_interrupt,
+	.connect =	sermouse_connect,
+	.disconnect =	sermouse_disconnect
 };
 
 int __init sermouse_init(void)

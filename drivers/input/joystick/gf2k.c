@@ -197,6 +197,8 @@ static void gf2k_read(struct gf2k *gf2k, unsigned char *data)
 
 	for (i = 0; i < gf2k_pads[gf2k->id]; i++)
 		input_report_key(dev, gf2k_btn_pad[i], (t >> i) & 1);
+
+	input_sync(dev);
 }
 
 /*
@@ -295,10 +297,10 @@ static void gf2k_connect(struct gameport *gameport, struct gameport_dev *dev)
 
 	gf2k->dev.name = gf2k_names[gf2k->id];
 	gf2k->dev.phys = gf2k->phys;
-	gf2k->dev.idbus = BUS_GAMEPORT;
-	gf2k->dev.idvendor = GAMEPORT_ID_VENDOR_GENIUS;
-	gf2k->dev.idproduct = gf2k->id;
-	gf2k->dev.idversion = 0x0100;
+	gf2k->dev.id.bustype = BUS_GAMEPORT;
+	gf2k->dev.id.vendor = GAMEPORT_ID_VENDOR_GENIUS;
+	gf2k->dev.id.product = gf2k->id;
+	gf2k->dev.id.version = 0x0100;
 
 	for (i = 0; i < gf2k_axes[gf2k->id]; i++)
 		set_bit(gf2k_abs[i], gf2k->dev.absbit);
@@ -343,8 +345,8 @@ static void gf2k_disconnect(struct gameport *gameport)
 }
 
 static struct gameport_dev gf2k_dev = {
-	connect:	gf2k_connect,
-	disconnect:	gf2k_disconnect,
+	.connect =	gf2k_connect,
+	.disconnect =	gf2k_disconnect,
 };
 
 int __init gf2k_init(void)

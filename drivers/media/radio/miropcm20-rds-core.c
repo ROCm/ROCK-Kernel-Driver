@@ -15,8 +15,9 @@
 
 #define _NO_VERSION_
 
-/* #include <linux/kernel.h> */
 #include <linux/module.h>
+#include <linux/errno.h>
+#include <linux/string.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <asm/semaphore.h>

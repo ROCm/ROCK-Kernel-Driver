@@ -87,9 +87,9 @@ static int __devinit emu_probe(struct pci_dev *pdev, const struct pci_device_id 
 	emu->gameport.io = ioport;
 	emu->gameport.name = pdev->name;
 	emu->gameport.phys = emu->phys;
-	emu->gameport.idbus = BUS_PCI;
-	emu->gameport.idvendor = pdev->vendor;
-	emu->gameport.idproduct = pdev->device;
+	emu->gameport.id.bustype = BUS_PCI;
+	emu->gameport.id.vendor = pdev->vendor;
+	emu->gameport.id.product = pdev->device;
 
 	pci_set_drvdata(pdev, emu);
 
@@ -110,10 +110,10 @@ static void __devexit emu_remove(struct pci_dev *pdev)
 }
 
 static struct pci_driver emu_driver = {
-        name:           "Emu10k1 Gameport",
-        id_table:       emu_tbl,
-        probe:          emu_probe,
-        remove:         __devexit_p(emu_remove),
+        .name =         "Emu10k1 Gameport",
+        .id_table =     emu_tbl,
+        .probe =        emu_probe,
+        .remove =       __devexit_p(emu_remove),
 };
 
 int __init emu_init(void)

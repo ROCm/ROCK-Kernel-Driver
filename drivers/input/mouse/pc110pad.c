@@ -78,6 +78,7 @@ static void pc110pad_interrupt(int irq, void *ptr, struct pt_regs *regs)
 		pc110pad_data[1] | ((pc110pad_data[0] << 3) & 0x80) | ((pc110pad_data[0] << 1) & 0x100));
 	input_report_abs(&pc110pad_dev, ABS_Y,
 		pc110pad_data[2] | ((pc110pad_data[0] << 4) & 0x80));
+	input_sync(&pc110pad_dev);
 
 	pc110pad_count = 0;
 }
@@ -90,19 +91,14 @@ static void pc110pad_close(struct input_dev *dev)
 
 static int pc110pad_open(struct input_dev *dev)
 {
-	unsigned long flags;
-	
 	if (pc110pad_used++)
 		return 0;
 
-	save_flags(flags);
-	cli();
 	pc110pad_interrupt(0,0,0);
 	pc110pad_interrupt(0,0,0);
 	pc110pad_interrupt(0,0,0);
 	outb(PC110PAD_ON, pc110pad_io + 2);
 	pc110pad_count = 0;
-	restore_flags(flags);
 
 	return 0;
 }
@@ -136,10 +132,10 @@ static int __init pc110pad_init(void)
 
 	pc110pad_dev.name = pc110pad_name;
 	pc110pad_dev.phys = pc110pad_phys;
-	pc110pad_dev.idbus = BUS_ISA;
-	pc110pad_dev.idvendor = 0x0003;
-	pc110pad_dev.idproduct = 0x0001;
-	pc110pad_dev.idversion = 0x0100;
+	pc110pad_dev.id.bustype = BUS_ISA;
+	pc110pad_dev.id.vendor = 0x0003;
+	pc110pad_dev.id.product = 0x0001;
+	pc110pad_dev.id.version = 0x0100;
 
 	input_register_device(&pc110pad_dev);	
 

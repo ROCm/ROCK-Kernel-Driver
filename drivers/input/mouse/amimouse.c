@@ -68,6 +68,8 @@ static void amimouse_interrupt(int irq, void *dummy, struct pt_regs *fp)
 	input_report_key(&amimouse_dev, BTN_LEFT,   ciaa.pra & 0x40);
 	input_report_key(&amimouse_dev, BTN_MIDDLE, potgor & 0x0100);
 	input_report_key(&amimouse_dev, BTN_RIGHT,  potgor & 0x0400);
+
+	input_sync(&amimouse_dev);
 }
 
 static int amimouse_open(struct input_dev *dev)
@@ -110,10 +112,10 @@ static int __init amimouse_init(void)
 
 	amimouse_dev.name = amimouse_name;
 	amimouse_dev.phys = amimouse_phys;
-	amimouse_dev.idbus = BUS_AMIGA;
-	amimouse_dev.idvendor = 0x0001;
-	amimouse_dev.idproduct = 0x0002;
-	amimouse_dev.idversion = 0x0100;
+	amimouse_dev.id.bustype = BUS_AMIGA;
+	amimouse_dev.id.vendor = 0x0001;
+	amimouse_dev.id.product = 0x0002;
+	amimouse_dev.id.version = 0x0100;
         
 	input_register_device(&amimouse_dev);
 

@@ -1522,7 +1522,7 @@ de4x5_sw_reset(struct net_device *dev)
     outl(omr|OMR_ST, DE4X5_OMR);
 
     /* Poll for setup frame completion (adapter interrupts are disabled now) */
-    sti();                                       /* Ensure timer interrupts */
+
     for (j=0, i=0;(i<500) && (j==0);i++) {       /* Upto 500ms delay */
 	mdelay(1);
 	if ((s32)le32_to_cpu(lp->tx_ring[lp->tx_new].status) >= 0) j=1;
@@ -1644,7 +1644,7 @@ de4x5_interrupt(int irq, void *dev_id, struct pt_regs *regs)
     if (test_and_set_bit(MASK_INTERRUPTS, (void*) &lp->interrupt))
 	printk("%s: Re-entering the interrupt handler.\n", dev->name);
 
-    synchronize_irq();
+    synchronize_irq(dev->irq);
 	
     for (limit=0; limit<8; limit++) {
 	sts = inl(DE4X5_STS);            /* Read IRQ status */

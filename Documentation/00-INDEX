@@ -118,6 +118,8 @@ kernel-parameters.txt
 	- summary listing of command line / boot prompt args for the kernel.
 kmod.txt
 	- info on the kernel module loader/unloader (kerneld replacement).
+ldm.txt
+	- a brief description of LDM (Windows Dynamic Disks).
 locks.txt
 	- info on file locking implementations, flock() vs. fcntl(), etc.
 logo.gif

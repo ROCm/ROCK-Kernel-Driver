@@ -44,8 +44,13 @@
 int ncp_negotiate_buffersize(struct ncp_server *, int, int *);
 int ncp_negotiate_size_and_options(struct ncp_server *server, int size,
   			  int options, int *ret_size, int *ret_options);
-int ncp_get_volume_info_with_number(struct ncp_server *, int,
-				struct ncp_volume_info *);
+
+int ncp_get_volume_info_with_number(struct ncp_server* server, int n,
+				    struct ncp_volume_info *target);
+
+int ncp_get_directory_info(struct ncp_server* server, __u8 dirhandle,
+			   struct ncp_volume_info* target);
+
 int ncp_close_file(struct ncp_server *, const char *);
 static inline int ncp_read_bounce_size(__u32 size) {
 	return sizeof(struct ncp_reply_header) + 2 + 2 + size + 8;
@@ -61,13 +66,17 @@ static inline void ncp_inode_close(struct inode *inode) {
 	atomic_dec(&NCP_FINFO(inode)->opened);
 }
 
+void ncp_extract_file_info(void* src, struct nw_info_struct* target);
 int ncp_obtain_info(struct ncp_server *server, struct inode *, char *,
 		struct nw_info_struct *target);
+int ncp_obtain_nfs_info(struct ncp_server *server, struct nw_info_struct *target);
 int ncp_lookup_volume(struct ncp_server *, char *, struct nw_info_struct *);
 int ncp_modify_file_or_subdir_dos_info(struct ncp_server *, struct inode *,
 	 __u32, const struct nw_modify_dos_info *info);
 int ncp_modify_file_or_subdir_dos_info_path(struct ncp_server *, struct inode *,
 	 const char* path, __u32, const struct nw_modify_dos_info *info);
+int ncp_modify_nfs_info(struct ncp_server *, __u8 volnum, __u32 dirent,
+			__u32 mode, __u32 rdev);
 
 int ncp_del_file_or_subdir2(struct ncp_server *, struct dentry*);
 int ncp_del_file_or_subdir(struct ncp_server *, struct inode *, char *);
@@ -79,6 +88,11 @@ int ncp_initialize_search(struct ncp_server *, struct inode *,
 int ncp_search_for_file_or_subdir(struct ncp_server *server,
 			      struct nw_search_sequence *seq,
 			      struct nw_info_struct *target);
+int ncp_search_for_fileset(struct ncp_server *server,
+			   struct nw_search_sequence *seq,
+			   int* more, int* cnt,
+			   char* buffer, size_t bufsize,
+			   char** rbuf, size_t* rsize);
 
 int ncp_ren_or_mov_file_or_subdir(struct ncp_server *server,
 			      struct inode *, char *, struct inode *, char *);
@@ -99,6 +113,20 @@ ncp_ClearPhysicalRecord(struct ncp_server *server,
 int
 ncp_mount_subdir(struct ncp_server *, struct nw_info_struct *,
 			__u8, __u8, __u32);
+int ncp_dirhandle_alloc(struct ncp_server *, __u8 vol, __u32 dirent, __u8 *dirhandle);
+int ncp_dirhandle_free(struct ncp_server *, __u8 dirhandle);
+
+int ncp_create_new(struct inode *dir, struct dentry *dentry,
+                          int mode, int rdev, int attributes);
+
+static inline int ncp_is_nfs_extras(struct ncp_server* server, unsigned int volnum) {
+#ifdef CONFIG_NCPFS_NFS_NS
+	return (server->m.flags & NCP_MOUNT_NFS_EXTRAS) &&
+	       (server->name_space[volnum] == NW_NS_NFS);
+#else
+	return 0;
+#endif
+}
 
 #ifdef CONFIG_NCPFS_NLS
 

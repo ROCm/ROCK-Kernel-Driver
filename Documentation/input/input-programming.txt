@@ -23,6 +23,7 @@ pressed or released a BUTTON_IRQ happens. The driver could look like:
 static void button_interrupt(int irq, void *dummy, struct pt_regs *fp)
 {
 	input_report_key(&button_dev, BTN_1, inb(BUTTON_PORT) & 1);
+	input_sync(&button_dev);
 }
 
 static int __init button_init(void)
@@ -86,12 +87,21 @@ While in use, the only used function of the driver is
 which upon every interrupt from the button checks its state and reports it
 via the 
 
-	input_report_btn()
+	input_report_key()
 
 call to the input system. There is no need to check whether the interrupt
 routine isn't reporting two same value events (press, press for example) to
 the input system, because the input_report_* functions check that
 themselves.
+
+Then there is the
+
+	input_sync()
+
+call to tell those who receive the events that we've sent a complete report.
+This doesn't seem important in the one button case, but is quite important
+for for example mouse movement, where you don't want the X and Y values
+to be interpreted separately, because that'd result in a different movement.
 
 1.2 dev->open() and dev->close()
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

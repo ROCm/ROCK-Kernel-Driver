@@ -45,22 +45,3 @@ void __init
 board_init(void)
 {
 }
-
-/* hack; blame me dan. -brad */
-#ifdef CONFIG_INPUT_KEYBDEV
-
-void
-handle_scancode(unsigned char scancode, int down)
-{
-	printk("handle_scancode(scancode=0x%x, down=%d)\n", scancode, down);
-}
-
-static void
-kbd_bh(unsigned long dummy)
-{
-}
-
-DECLARE_TASKLET_DISABLED(keyboard_tasklet, kbd_bh, 0);
-void (*kbd_ledfunc) (unsigned int led);
-
-#endif

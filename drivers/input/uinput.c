@@ -162,10 +162,10 @@ static int uinput_alloc_device(struct file *file, const char *buffer, size_t cou
 
 	strncpy(dev->name, user_dev.name, size);
 	dev->name[size] = '\0';
-	dev->idbus 	= user_dev.idbus;
-	dev->idvendor 	= user_dev.idvendor;
-	dev->idproduct 	= user_dev.idproduct;
-	dev->idversion 	= user_dev.idversion;
+	dev->id.bustype	= user_dev.id.bustype;
+	dev->id.vendor	= user_dev.id.vendor;
+	dev->id.product	= user_dev.id.product;
+	dev->id.version	= user_dev.id.version;
 	dev->ff_effects_max = user_dev.ff_effects_max;
 
 	size = sizeof(unsigned long) * NBITS(ABS_MAX + 1);
@@ -351,34 +351,24 @@ static int uinput_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 }
 
 struct file_operations uinput_fops = {
-	owner:		THIS_MODULE,
-	open:		uinput_open,
-	release:	uinput_close,
-	read:		uinput_read,
-	write:		uinput_write,
-	poll:		uinput_poll,
-//	fasync:		uinput_fasync,
-	ioctl:		uinput_ioctl,
+	.owner =	THIS_MODULE,
+	.open =		uinput_open,
+	.release =	uinput_close,
+	.read =		uinput_read,
+	.write =	uinput_write,
+	.poll =		uinput_poll,
+	.ioctl =	uinput_ioctl,
 };
 
 static struct miscdevice uinput_misc = {
-	fops:		&uinput_fops,
-	minor:		UINPUT_MINOR,
-	name:		UINPUT_NAME,
+	.fops =		&uinput_fops,
+	.minor =	UINPUT_MINOR,
+	.name =		UINPUT_NAME,
 };
 
 static int __init uinput_init(void)
 {
-	int	retval;
-	
-	retval = misc_register(&uinput_misc);
-
-	if (!retval) {
-		printk(KERN_INFO "%s: User level driver support for input subsystem loaded\n", UINPUT_NAME);
-		printk(KERN_INFO "%s: Aristeu Sergio Rozanski Filho <aris@cathedrallabs.org>\n", UINPUT_NAME);
-	}
-
-	return retval;
+	return misc_register(&uinput_misc);
 }
 
 static void __exit uinput_exit(void)

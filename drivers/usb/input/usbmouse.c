@@ -72,6 +72,8 @@ static void usb_mouse_irq(struct urb *urb)
 	input_report_rel(dev, REL_X,     data[1]);
 	input_report_rel(dev, REL_Y,     data[2]);
 	input_report_rel(dev, REL_WHEEL, data[3]);
+
+	input_sync(dev);
 }
 
 static int usb_mouse_open(struct input_dev *dev)
@@ -145,10 +147,10 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 
 	mouse->dev.name = mouse->name;
 	mouse->dev.phys = mouse->phys;
-	mouse->dev.idbus = BUS_USB;
-	mouse->dev.idvendor = dev->descriptor.idVendor;
-	mouse->dev.idproduct = dev->descriptor.idProduct;
-	mouse->dev.idversion = dev->descriptor.bcdDevice;
+	mouse->dev.id.bustype = BUS_USB;
+	mouse->dev.id.vendor = dev->descriptor.idVendor;
+	mouse->dev.id.product = dev->descriptor.idProduct;
+	mouse->dev.id.version = dev->descriptor.bcdDevice;
 
 	if (!(buf = kmalloc(63, GFP_KERNEL))) {
 		kfree(mouse);
@@ -164,7 +166,7 @@ static void *usb_mouse_probe(struct usb_device *dev, unsigned int ifnum,
 
 	if (!strlen(mouse->name))
 		sprintf(mouse->name, "USB HIDBP Mouse %04x:%04x",
-			mouse->dev.idvendor, mouse->dev.idproduct);
+			mouse->dev.id.vendor, mouse->dev.id.product);
 
 	kfree(buf);
 

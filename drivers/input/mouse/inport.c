@@ -108,17 +108,13 @@ static void inport_close(struct input_dev *dev)
 }
 
 static struct input_dev inport_dev = {
-	evbit:		{ BIT(EV_KEY) | BIT(EV_REL) },
-	keybit: 	{ [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
-	relbit:		{ BIT(REL_X) | BIT(REL_Y) },
-	open:		inport_open,
-	close:		inport_close,
-	name:		INPORT_NAME,
-	phys:		"isa023c/input0",
-	idbus:		BUS_ISA,
-	idvendor:	INPORT_VENDOR,
-	idproduct:	0x0001,
-	idversion:	0x0100,
+	.evbit	= { BIT(EV_KEY) | BIT(EV_REL) },
+	.keybit	= { [LONG(BTN_LEFT)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT) },
+	.relbit	= { BIT(REL_X) | BIT(REL_Y) },
+	.open	= inport_open,
+	.close	= inport_close,
+	.name	= INPORT_NAME,
+	.phys	= "isa023c/input0",
 };
 
 static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
@@ -143,6 +139,8 @@ static void inport_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	outb(INPORT_REG_MODE, INPORT_CONTROL_PORT);
 	outb(INPORT_MODE_IRQ | INPORT_MODE_BASE, INPORT_DATA_PORT);
+
+	input_sync(&inport_dev);
 }
 
 #ifndef MODULE
@@ -176,6 +174,11 @@ static int __init inport_init(void)
 	request_region(INPORT_BASE, INPORT_EXTENT, "inport");
 
 	input_register_device(&inport_dev);
+	inport_dev.id.bustype	=BUS_ISA;
+	inport_dev.id.vendor	=INPORT_VENDOR;
+	inport_dev.id.product	=0x0001;
+	inport_dev.id.version	=0x0100;
+
 
 	printk(KERN_INFO "input: " INPORT_NAME " at %#x irq %d\n",
 		INPORT_BASE, inport_irq);

@@ -34,7 +34,6 @@
 #include <asm/pgtable.h>
 #include <asm/dma.h>
 #include <asm/machdep.h>
-#include <asm/keyboard.h>
 #include <asm/time.h>
 
 unsigned long m68k_machtype;
@@ -42,16 +41,9 @@ char debug_device[6] = "";
 
 extern void amiga_init_IRQ(void);
 
-extern int amiga_kbd_translate(unsigned char keycode, unsigned char *keycodep, char raw_mode);
-extern char amiga_sysrq_xlate[128];
-
 extern void apus_setup_pci_ptrs(void);
 
 void (*mach_sched_init) (void (*handler)(int, void *, struct pt_regs *)) __initdata = NULL;
-/* machine dependent keyboard functions */
-int (*mach_keyb_init) (void) __initdata = NULL;
-int (*mach_kbdrate) (struct kbd_repeat *) = NULL;
-void (*mach_kbd_leds) (unsigned int) = NULL;
 /* machine dependent irq functions */
 void (*mach_init_IRQ) (void) __initdata = NULL;
 void (*(*mach_default_handler)[]) (int, void *, struct pt_regs *) = NULL;
@@ -562,32 +554,6 @@ void apus_end_irq(unsigned int irq)
 	APUS_WRITE(APUS_IPL_EMU, IPLEMU_DISABLEINT|ipl_emu);
 }
 
-/****************************************************** keyboard */
-static int apus_kbd_setkeycode(unsigned int scancode, unsigned int keycode)
-{
-	return -EOPNOTSUPP;
-}
-
-static int apus_kbd_getkeycode(unsigned int scancode)
-{
-	return scancode > 127 ? -EINVAL : scancode;
-}
-
-static char apus_kbd_unexpected_up(unsigned char keycode)
-{
-	return 0200;
-}
-
-static void apus_kbd_init_hw(void)
-{
-#ifdef CONFIG_APUS
-	extern int amiga_keyb_init(void);
-
-	amiga_keyb_init();
-#endif
-}
-
-
 /****************************************************** debugging */
 
 /* some serial hardware definitions */
@@ -851,9 +817,4 @@ void platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	ppc_md.find_end_of_memory = apus_find_end_of_memory;
 	ppc_md.setup_io_mappings = apus_map_io;
-
-	/* These should not be used for the APUS yet, since it uses
-	   the M68K keyboard now. */
-	ppc_md.kbd_translate     = amiga_kbd_translate;
-	ppc_md.kbd_unexpected_up = apus_kbd_unexpected_up;
 }

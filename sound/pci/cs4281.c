@@ -1300,7 +1300,8 @@ static int snd_cs4281_free(cs4281_t *chip)
 	}
 #endif
 	snd_cs4281_proc_done(chip);
-	synchronize_irq();
+	if(chip->irq >= 0)
+		synchronize_irq(chip->irq);
 
 	/* Mask interrupts */
 	snd_cs4281_pokeBA0(chip, BA0_HIMR, 0x7fffffff);
@@ -1603,7 +1604,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 					BA0_HISR_DMA(1) |
 					BA0_HISR_DMA(2) |
 					BA0_HISR_DMA(3)));
-	synchronize_irq();
+	synchronize_irq(chip->irq);
 
 	if ((err = snd_device_new(card, SNDRV_DEV_LOWLEVEL, chip, &ops)) < 0) {
 		snd_cs4281_free(chip);

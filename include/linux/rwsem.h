@@ -75,6 +75,16 @@ static inline void up_write(struct rw_semaphore *sem)
 	rwsemtrace(sem,"Leaving up_write");
 }
 
+/*
+ * downgrade write lock to read lock
+ */
+static inline void downgrade_write(struct rw_semaphore *sem)
+{
+	rwsemtrace(sem,"Entering downgrade_write");
+	__downgrade_write(sem);
+	rwsemtrace(sem,"Leaving downgrade_write");
+}
+
 
 #endif /* __KERNEL__ */
 #endif /* _LINUX_RWSEM_H */

@@ -18,6 +18,9 @@
 extern void *kb_cs;
 extern void *kb_data;
 
+#define I8042_COMMAND_REG (*(int *)kb_cs)
+#define I8042_DATA_REG (*(int *)kb_data)
+
 static inline int i8042_read_data(void)
 {
 	return readb(kb_data);
@@ -56,6 +59,9 @@ static inline void i8042_platform_exit(void)
 
 #define I8042_KBD_PHYS_DESC "spruceps2/serio0"
 #define I8042_AUX_PHYS_DESC "spruceps2/serio1"
+
+#define I8042_COMMAND_REG 0xff810000
+#define I8042_DATA_REG 0xff810001
 
 static inline int i8042_read_data(void)
 {
