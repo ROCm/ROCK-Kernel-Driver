@@ -14,6 +14,8 @@
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 
+#error "This code is broken and needs update to match with current ide support"
+
 
 /*
  * Set up a hw structure for a specified data port, control port and IRQ.

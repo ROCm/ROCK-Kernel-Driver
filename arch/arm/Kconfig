@@ -317,7 +317,7 @@ config ISA_DMA
 
 config FIQ
 	bool
-	depends on ARCH_ACORN || ARCH_L7200 || ARCH_LH7A400
+	depends on ARCH_ACORN || ARCH_L7200
 	default y
 
 # Compressed boot loader in ROM.  Yes, we really want to ask about
