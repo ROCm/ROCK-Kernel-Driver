@@ -231,14 +231,21 @@ out:
 static int proc_notify_change(struct dentry *dentry, struct iattr *iattr)
 {
 	struct inode *inode = dentry->d_inode;
-	int error = inode_setattr(inode, iattr);
-	if (!error) {
-		struct proc_dir_entry *de = PDE(inode);
-		de->uid = inode->i_uid;
-		de->gid = inode->i_gid;
-		de->mode = inode->i_mode;
-	}
+	struct proc_dir_entry *de = PDE(inode);
+	int error;
 
+	error = inode_change_ok(inode, iattr);
+	if (error)
+		goto out;
+
+	error = inode_setattr(inode, iattr);
+	if (error)
+		goto out;
+	
+	de->uid = inode->i_uid;
+	de->gid = inode->i_gid;
+	de->mode = inode->i_mode;
+out:
 	return error;
 }
 
