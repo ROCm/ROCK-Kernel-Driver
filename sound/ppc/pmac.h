@@ -199,8 +199,6 @@ typedef struct snd_pmac_keywest {
 
 int snd_pmac_keywest_init(pmac_keywest_t *i2c);
 void snd_pmac_keywest_cleanup(pmac_keywest_t *i2c);
-#define snd_pmac_keywest_write(i2c,cmd,len,data) i2c_smbus_write_block_data((i2c)->client, cmd, len, data)
-#define snd_pmac_keywest_write_byte(i2c,cmd,data) i2c_smbus_write_byte_data((i2c)->client, cmd, data)
 
 /* misc */
 int snd_pmac_boolean_stereo_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo);
