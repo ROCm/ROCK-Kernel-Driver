@@ -116,11 +116,6 @@ static const char * const spaces = "                "; /* 16 of them */
 static unsigned scsi_default_dev_flags;
 LIST_HEAD(scsi_dev_info_list);
 
-/* 
- * Function prototypes.
- */
-extern void scsi_times_out(struct scsi_cmnd *cmd);
-
 MODULE_PARM(scsi_logging_level, "i");
 MODULE_PARM_DESC(scsi_logging_level, "SCSI logging level; should be zero or nonzero");
 

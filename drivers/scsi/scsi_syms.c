@@ -104,8 +104,6 @@ EXPORT_SYMBOL(scsi_calculate_bounce_limit);
 /*
  * Externalize timers so that HBAs can safely start/restart commands.
  */
-extern void scsi_add_timer(Scsi_Cmnd *, int, void ((*) (Scsi_Cmnd *)));
-extern int scsi_delete_timer(Scsi_Cmnd *);
 EXPORT_SYMBOL(scsi_add_timer);
 EXPORT_SYMBOL(scsi_delete_timer);
 
