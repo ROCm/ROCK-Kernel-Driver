@@ -271,7 +271,7 @@ u8 taskfile_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 				hwif->OUTB(0x80, IDE_CONTROL_REG);
 				high = task_read_24(drive);
 				sectors = ((u64)high << 24) | low;
-				printk(", LBAsect=%lld", sectors);
+				printk(", LBAsect=%lld", (long long) sectors);
 			} else {
 				u8 cur  = hwif->INB(IDE_SELECT_REG);
 				u8 low  = hwif->INB(IDE_LCYL_REG);
