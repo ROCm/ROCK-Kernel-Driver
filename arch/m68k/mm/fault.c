@@ -121,7 +121,7 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 		if (address + 256 < rdusp())
 			goto map_err;
 	}
-	if (expand_stack(vma, address))
+	if (expand_stack(vma, address, NULL))
 		goto map_err;
 
 /*

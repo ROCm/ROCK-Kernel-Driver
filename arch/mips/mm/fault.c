@@ -75,7 +75,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long write,
 		goto good_area;
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
-	if (expand_stack(vma, address))
+	if (expand_stack(vma, address, NULL))
 		goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

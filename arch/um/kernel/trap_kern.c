@@ -30,7 +30,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		      int is_write, int is_user, int *code_out)
 {
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma, *prev_vma;
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
@@ -46,8 +46,11 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		goto good_area;
 	else if(!(vma->vm_flags & VM_GROWSDOWN)) 
 		goto out;
-	else if(expand_stack(vma, address)) 
-		goto out;
+	else {
+		find_vma_prev(mm, address, &prev_vma);
+		if(expand_stack(vma, address, prev_vma))
+			goto out;
+	}
 
  good_area:
 	*code_out = SEGV_ACCERR;

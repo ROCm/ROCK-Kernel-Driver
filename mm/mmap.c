@@ -58,6 +58,7 @@ int sysctl_overcommit_memory = 0;	/* default is heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
+int heap_stack_gap = 1;
 
 EXPORT_SYMBOL(sysctl_overcommit_memory);
 EXPORT_SYMBOL(sysctl_overcommit_ratio);
@@ -1069,6 +1070,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
 		/* At this point:  (!vma || addr < vma->vm_end). */
+		unsigned long __heap_stack_gap;
 		if (TASK_SIZE - len < addr) {
 			/*
 			 * Start a new search - just in case we missed
@@ -1080,7 +1082,13 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (!vma)
+			goto got_it;
+		__heap_stack_gap = 0;
+		if (vma->vm_flags & VM_GROWSDOWN)
+			__heap_stack_gap = heap_stack_gap << PAGE_SHIFT;
+		if (addr + len + __heap_stack_gap <= vma->vm_start) {
+		got_it:
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -1315,12 +1323,16 @@ out:
 }
 
 #ifdef CONFIG_STACK_GROWSUP
-/*
- * vma is the first one with address > vma->vm_end.  Have to extend vma.
- */
-int expand_stack(struct vm_area_struct * vma, unsigned long address)
+int expand_stack(struct vm_area_struct * vma, unsigned long address,
+		 struct vm_area_struct * prev_vma)
 {
 	unsigned long grow;
+
+	/*
+	 * If you re-use the heap-stack-gap for a growsup stack you
+	 * should remove this WARN_ON.
+	 */
+	WARN_ON(prev_vma);
 
 	if (!(vma->vm_flags & VM_GROWSUP))
 		return -EFAULT;
@@ -1373,7 +1385,7 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 	vma = find_vma_prev(mm, addr, &prev);
 	if (vma && (vma->vm_start <= addr))
 		return vma;
-	if (!prev || expand_stack(prev, addr))
+	if (!prev || expand_stack(prev, addr, NULL))
 		return NULL;
 	if (prev->vm_flags & VM_LOCKED) {
 		make_pages_present(addr, prev->vm_end);
@@ -1384,7 +1396,8 @@ find_extend_vma(struct mm_struct *mm, unsigned long addr)
 /*
  * vma is the first one with address < vma->vm_start.  Have to extend vma.
  */
-int expand_stack(struct vm_area_struct *vma, unsigned long address)
+int expand_stack(struct vm_area_struct *vma, unsigned long address,
+		 struct vm_area_struct *prev_vma)
 {
 	unsigned long grow;
 
@@ -1402,10 +1415,13 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 	 * anon_vma lock to serialize against concurrent expand_stacks.
 	 */
 	address &= PAGE_MASK;
+	if (prev_vma && unlikely(prev_vma->vm_end + (heap_stack_gap << PAGE_SHIFT) > address))
+		goto out_unlock;
 	grow = (vma->vm_start - address) >> PAGE_SHIFT;
 
 	/* Overcommit.. */
 	if (security_vm_enough_memory(grow)) {
+	out_unlock:
 		anon_vma_unlock(vma);
 		return -ENOMEM;
 	}
@@ -1430,7 +1446,7 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 struct vm_area_struct *
 find_extend_vma(struct mm_struct * mm, unsigned long addr)
 {
-	struct vm_area_struct * vma;
+	struct vm_area_struct * vma, * prev_vma;
 	unsigned long start;
 
 	addr &= PAGE_MASK;
@@ -1442,7 +1458,8 @@ find_extend_vma(struct mm_struct * mm, unsigned long addr)
 	if (!(vma->vm_flags & VM_GROWSDOWN))
 		return NULL;
 	start = vma->vm_start;
-	if (expand_stack(vma, addr))
+	find_vma_prev(mm, addr, &prev_vma);
+	if (expand_stack(vma, addr, prev_vma))
 		return NULL;
 	if (vma->vm_flags & VM_LOCKED) {
 		make_pages_present(addr, start);

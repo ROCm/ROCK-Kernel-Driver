@@ -856,6 +856,14 @@ static ctl_table vm_table[] = {
 		.extra1		= &zero,
 	},
 #endif
+	{
+		.ctl_name	= VM_HEAP_STACK_GAP,
+		.procname	= "heap-stack-gap", 
+		.data		= &heap_stack_gap,
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},
 	{ .ctl_name = 0 }
 };
 

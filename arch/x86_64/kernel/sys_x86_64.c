@@ -119,6 +119,7 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 full_search:
 	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+		unsigned long __heap_stack_gap;
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (end - len < addr) {
 			/*
@@ -131,7 +132,13 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (!vma)
+			goto got_it;
+		__heap_stack_gap = 0;
+		if (vma->vm_flags & VM_GROWSDOWN)
+			__heap_stack_gap = heap_stack_gap << PAGE_SHIFT;
+		if (addr + len + __heap_stack_gap <= vma->vm_start) {
+		got_it:
 			/*
 			 * Remember the place where we stopped the search:
 			 */

@@ -409,7 +409,7 @@ continue_fault:
 				goto bad_area;
 		}
 	}
-	if (expand_stack(vma, address))
+	if (expand_stack(vma, address, NULL))
 		goto bad_area;
 	/*
 	 * Ok, we have a good vm_area for this memory access, so

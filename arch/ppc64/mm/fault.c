@@ -86,7 +86,7 @@ static int store_updates_sp(struct pt_regs *regs)
 int do_page_fault(struct pt_regs *regs, unsigned long address,
 		  unsigned long error_code)
 {
-	struct vm_area_struct * vma;
+	struct vm_area_struct * vma, * prev_vma;
 	struct mm_struct *mm = current->mm;
 	siginfo_t info;
 	unsigned long code = SEGV_MAPERR;
@@ -185,7 +185,8 @@ int do_page_fault(struct pt_regs *regs, unsigned long address,
 			goto bad_area;
 	}
 
-	if (expand_stack(vma, address))
+	find_vma_prev(mm, address, &prev_vma);
+	if (expand_stack(vma, address, prev_vma))
 		goto bad_area;
 
 good_area:

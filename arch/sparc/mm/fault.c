@@ -271,7 +271,7 @@ asmlinkage void do_sparc_fault(struct pt_regs *regs, int text_fault, int write,
 		goto good_area;
 	if(!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
-	if(expand_stack(vma, address))
+	if(expand_stack(vma, address, NULL))
 		goto bad_area;
 	/*
 	 * Ok, we have a good vm_area for this memory access, so
@@ -524,7 +524,7 @@ inline void force_user_fault(unsigned long address, int write)
 		goto good_area;
 	if(!(vma->vm_flags & VM_GROWSDOWN))
 		goto bad_area;
-	if(expand_stack(vma, address))
+	if(expand_stack(vma, address, NULL))
 		goto bad_area;
 good_area:
 	info.si_code = SEGV_ACCERR;

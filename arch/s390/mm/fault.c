@@ -225,7 +225,7 @@ do_exception(struct pt_regs *regs, unsigned long error_code, int is_protection)
                 goto good_area;
         if (!(vma->vm_flags & VM_GROWSDOWN))
                 goto bad_area;
-        if (expand_stack(vma, address))
+        if (expand_stack(vma, address, NULL /* FIXME? */))
                 goto bad_area;
 /*
  * Ok, we have a good vm_area for this memory access, so

@@ -188,7 +188,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long writeaccess,
 #endif
 		goto bad_area;
 	}
-	if (expand_stack(vma, address)) {
+	if (expand_stack(vma, address, NULL)) {
 #ifdef DEBUG_FAULT
 		print_task(tsk);
 		printk("%s:%d fault, address is 0x%08x PC %016Lx textaccess %d writeaccess %d\n",

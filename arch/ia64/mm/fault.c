@@ -164,7 +164,7 @@ ia64_do_page_fault (unsigned long address, unsigned long isr, struct pt_regs *re
 		if (REGION_NUMBER(address) != REGION_NUMBER(vma->vm_start)
 		    || REGION_OFFSET(address) >= RGN_MAP_LIMIT)
 			goto bad_area;
-		if (expand_stack(vma, address))
+		if (expand_stack(vma, address, NULL /* FIXME? */))
 			goto bad_area;
 	} else {
 		vma = prev_vma;

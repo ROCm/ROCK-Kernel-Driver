@@ -742,7 +742,10 @@ void handle_ra_miss(struct address_space *mapping,
 unsigned long max_sane_readahead(unsigned long nr);
 
 /* Do stack extension */
-extern int expand_stack(struct vm_area_struct * vma, unsigned long address);
+#define EXPAND_STACK_HAS_3_ARGS
+extern int heap_stack_gap;
+extern int expand_stack(struct vm_area_struct * vma, unsigned long address,
+			struct vm_area_struct * prev_vma);
 
 /* Look up the first VMA which satisfies  addr < vm_end,  NULL if none. */
 extern struct vm_area_struct * find_vma(struct mm_struct * mm, unsigned long addr);
