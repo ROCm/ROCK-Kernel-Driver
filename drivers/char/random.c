@@ -288,7 +288,7 @@ static int random_write_wakeup_thresh = 128;
 
 static int trickle_thresh = DEFAULT_POOL_SIZE * 7;
 
-static DEFINE_PER_CPU(int, trickle_count) = 0;
+DEFINE_PER_CPU(int, trickle_count) = 0;
 
 /*
  * A pool of size .poolwords is stirred with a primitive polynomial
