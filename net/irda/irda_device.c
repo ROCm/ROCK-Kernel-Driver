@@ -231,7 +231,7 @@ static void __irda_task_delete(struct irda_task *task)
 void irda_task_delete(struct irda_task *task)
 {
 	/* Unregister task */
-	hashbin_remove(tasks, (int) task, NULL);
+	hashbin_remove(tasks, (long) task, NULL);
 
 	__irda_task_delete(task);
 }
@@ -345,7 +345,7 @@ struct irda_task *irda_task_execute(void *instance,
 	init_timer(&task->timer);
 
 	/* Register task */
-	hashbin_insert(tasks, (irda_queue_t *) task, (int) task, NULL);
+	hashbin_insert(tasks, (irda_queue_t *) task, (long) task, NULL);
 
 	/* No time to waste, so lets get going! */
 	ret = irda_task_kick(task);
