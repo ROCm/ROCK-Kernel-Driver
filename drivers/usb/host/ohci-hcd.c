@@ -17,6 +17,8 @@
  *
  * History:
  * 
+ * 2003/02/24 show registers in sysfs (Kevin Brosius)
+ *
  * 2002/09/03 get rid of ed hashtables, rework periodic scheduling and
  * 	bandwidth accounting; if debugging, show schedules in driverfs
  * 2002/07/19 fixes to management of ED and schedule state.
@@ -105,11 +107,10 @@
  * TO DO:
  *
  *	- "disabled" and "sleeping" should be in hcd->state
- *	- bandwidth alloc to generic code
  *	- lots more testing!!
  */
 
-#define DRIVER_VERSION "2002-Sep-17"
+#define DRIVER_VERSION "2003 Feb 24"
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
 
@@ -277,6 +278,7 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 	urb_print (urb, "UNLINK", 1);
 #endif		  
 
+	spin_lock_irqsave (&ohci->lock, flags);
 	if (!ohci->disabled) {
 		urb_priv_t  *urb_priv;
 
@@ -284,21 +286,24 @@ static int ohci_urb_dequeue (struct usb_hcd *hcd, struct urb *urb)
 		 * handed to us, flag it for unlink and giveback, and force
 		 * some upcoming INTR_SF to call finish_unlinks()
 		 */
-		spin_lock_irqsave (&ohci->lock, flags);
 		urb_priv = urb->hcpriv;
 		if (urb_priv) {
 			urb_priv->state = URB_DEL; 
 			if (urb_priv->ed->state == ED_OPER)
 				start_urb_unlink (ohci, urb_priv->ed);
 		}
-		spin_unlock_irqrestore (&ohci->lock, flags);
 	} else {
 		/*
 		 * with HC dead, we won't respect hc queue pointers
 		 * any more ... just clean up every urb's memory.
 		 */
-		finish_urb (ohci, urb, NULL);
+		if (urb->hcpriv) {
+			spin_unlock (&ohci->lock);
+			finish_urb (ohci, urb, NULL);
+			spin_lock (&ohci->lock);
+		}
 	}
+	spin_unlock_irqrestore (&ohci->lock, flags);
 	return 0;
 }
 
@@ -598,7 +603,8 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 	 */
 	spin_lock (&ohci->lock);
 	if (ohci->ed_rm_list)
-		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no), ptregs);
+		finish_unlinks (ohci, le16_to_cpu (ohci->hcca->frame_no),
+				ptregs);
 	if ((ints & OHCI_INTR_SF) != 0 && !ohci->ed_rm_list)
 		writel (OHCI_INTR_SF, &regs->intrdisable);	
 	spin_unlock (&ohci->lock);

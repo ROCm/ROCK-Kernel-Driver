@@ -30,21 +30,20 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 /*
  * URB goes back to driver, and isn't reissued.
  * It's completely gone from HC data structures.
- * PRECONDITION:  no locks held  (Giveback can call into HCD.)
+ * PRECONDITION:  no locks held, irqs blocked  (Giveback can call into HCD.)
  */
-static void finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
+static void
+finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 {
-	unsigned long	flags;
-
 	// ASSERT (urb->hcpriv != 0);
 
 	urb_free_priv (ohci, urb->hcpriv);
 	urb->hcpriv = NULL;
 
-	spin_lock_irqsave (&urb->lock, flags);
+	spin_lock (&urb->lock);
 	if (likely (urb->status == -EINPROGRESS))
 		urb->status = 0;
-	spin_unlock_irqrestore (&urb->lock, flags);
+	spin_unlock (&urb->lock);
 
 	// what lock protects these?
 	switch (usb_pipetype (urb->pipe)) {
@@ -850,7 +849,8 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 #define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
 
 /* there are some urbs/eds to unlink; called in_irq(), with HCD locked */
-static void finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
+static void
+finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
 {
 	struct ed	*ed, **last;
 
@@ -978,7 +978,8 @@ rescan_this:
  * path is finish_unlinks(), which unlinks URBs using ed_rm_list, instead of
  * scanning the (re-reversed) donelist as this does.
  */
-static void dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
+static void
+dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 {
 	unsigned long	flags;
 
@@ -995,9 +996,9 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *
 
 		/* If all this urb's TDs are done, call complete() */
   		if (urb_priv->td_cnt == urb_priv->length) {
-     			spin_unlock_irqrestore (&ohci->lock, flags);
+     			spin_unlock (&ohci->lock);
   			finish_urb (ohci, urb, regs);
-  			spin_lock_irqsave (&ohci->lock, flags);
+  			spin_lock (&ohci->lock);
   		}
 
 		/* clean schedule:  unlink EDs that are no longer busy */

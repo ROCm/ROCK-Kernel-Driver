@@ -214,7 +214,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 
 #ifdef DEBUG
 	/* the registers may look crazy here */
-	ohci_dump_status (ohci);
+	ohci_dump_status (ohci, 0, 0);
 #endif
 
 	/* Re-enable bus mastering */
