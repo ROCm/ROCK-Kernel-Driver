@@ -277,16 +277,6 @@ extern mdp_disk_t *get_spare(mddev_t *mddev);
 #define ITERATE_RDEV_PENDING(rdev,tmp)					\
 	ITERATE_RDEV_GENERIC(pending_raid_disks,pending,rdev,tmp)
 
-/*
- * iterates through all used mddevs in the system.
- */
-#define ITERATE_MDDEV(mddev,tmp)					\
-									\
-	for (tmp = all_mddevs.next;					\
-		mddev = list_entry(tmp, mddev_t, all_mddevs),	\
-			tmp = tmp->next, tmp->prev != &all_mddevs	\
-		; )
-
 #define xchg_values(x,y) do { __typeof__(x) __tmp = x; \
 				x = y; y = __tmp; } while (0)
 
