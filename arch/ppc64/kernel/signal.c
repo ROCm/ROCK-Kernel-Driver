@@ -35,6 +35,7 @@
 #include <asm/pgtable.h>
 #include <asm/ppcdebug.h>
 #include <asm/unistd.h>
+#include <asm/cacheflush.h>
 
 #define DEBUG_SIG 0
 

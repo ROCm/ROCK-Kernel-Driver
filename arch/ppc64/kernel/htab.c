@@ -44,6 +44,7 @@
 #include <asm/machdep.h>
 #include <asm/lmb.h>
 #include <asm/abs_addr.h>
+#include <asm/tlbflush.h>
 #ifdef CONFIG_PPC_EEH
 #include <asm/eeh.h>
 #endif

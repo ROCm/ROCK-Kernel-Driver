@@ -34,9 +34,6 @@
 #include <asm/bitops.h>
 #include <asm/checksum.h>
 #include <asm/pgtable.h>
-#include <linux/adb.h>
-#include <linux/cuda.h>
-#include <linux/pmu.h>
 #include <asm/prom.h>
 #include <asm/system.h>
 #include <asm/pci-bridge.h>
@@ -45,9 +42,8 @@
 #include <asm/machdep.h>
 #include <asm/hw_irq.h>
 #include <asm/abs_addr.h>
-#ifdef CONFIG_SMP
 #include <asm/smplock.h>
-#endif /* CONFIG_SMP */
+#include <asm/cacheflush.h>
 #ifdef CONFIG_PPC_ISERIES
 #include <asm/iSeries/iSeries_pci.h>
 #include <asm/iSeries/iSeries_proc.h>

@@ -32,6 +32,7 @@
 #include <asm/pci_dma.h>
 #include <linux/pci.h>
 #include <asm/Naca.h>
+#include <asm/tlbflush.h>
 
 /* Status return values */
 #define H_Success	0

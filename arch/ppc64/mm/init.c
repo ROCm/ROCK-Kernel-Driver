@@ -262,18 +262,27 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 }
 
 void
-local_flush_tlb_mm(struct mm_struct *mm)
+flush_tlb_all(void)
+{
+	/* Implemented to just flush the vmalloc area.
+	 * vmalloc is the only user of flush_tlb_all.
+	 */
+	__flush_tlb_range(NULL, VMALLOC_START, VMALLOC_END);
+}
+
+void
+flush_tlb_mm(struct mm_struct *mm)
 {
 	if (mm->map_count) {
 		struct vm_area_struct *mp;
 		for (mp = mm->mmap; mp != NULL; mp = mp->vm_next)
-			local_flush_tlb_range(mm, mp->vm_start, mp->vm_end);
+			__flush_tlb_range(mm, mp->vm_start, mp->vm_end);
 	} else {
 		/* MIKEC: It is not clear why this is needed */
 		/* paulus: it is needed to clear out stale HPTEs
 		 * when an address space (represented by an mm_struct)
 		 * is being destroyed. */
-		local_flush_tlb_range(mm, USER_START, USER_END);
+		__flush_tlb_range(mm, USER_START, USER_END);
 	}
 
 	/* XXX are there races with checking cpu_vm_mask? - Anton */
@@ -284,7 +293,7 @@ local_flush_tlb_mm(struct mm_struct *mm)
  * Callers should hold the mm->page_table_lock
  */
 void
-local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
+flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 {
 	unsigned long context = 0;
 	pgd_t *pgd;
@@ -310,7 +319,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 
 		break;
 	default:
-		panic("local_flush_tlb_page: invalid region 0x%016lx", vmaddr);
+		panic("flush_tlb_page: invalid region 0x%016lx", vmaddr);
 	
 	}
 
@@ -330,7 +339,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 struct tlb_batch_data tlb_batch_array[NR_CPUS][MAX_BATCH_FLUSH];
 
 void
-local_flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
+__flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 {
 	pgd_t *pgd;
 	pmd_t *pmd;

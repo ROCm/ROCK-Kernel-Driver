@@ -19,6 +19,7 @@
 #include <asm/mmu.h>
 #include <asm/mmu_context.h>
 #include <asm/pgtable.h>
+#include <asm/tlbflush.h>
 
 /*
  * Create a pte. Used during initialization only.

@@ -339,43 +339,6 @@ static inline void pte_clear(pte_t * ptep)
 	pte_update(ptep, ~_PAGE_HPTEFLAGS, 0);
 }
 
-struct mm_struct;
-struct vm_area_struct;
-extern void local_flush_tlb_all(void);
-extern void local_flush_tlb_mm(struct mm_struct *mm);
-extern void local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
-extern void local_flush_tlb_range(struct mm_struct *mm,
-			    unsigned long start, unsigned long end);
-
-#define flush_tlb_all local_flush_tlb_all
-#define flush_tlb_mm local_flush_tlb_mm
-#define flush_tlb_page local_flush_tlb_page
-#define flush_tlb_range(vma, start, end) local_flush_tlb_range(vma->vm_mm, start, end)
-
-extern inline void flush_tlb_pgtables(struct mm_struct *mm,
-				unsigned long start, unsigned long end)
-{
-	/* PPC has hw page tables. */
-}
-
-/*
- * No cache flushing is required when address mappings are
- * changed, because the caches on PowerPCs are physically
- * addressed.
- */
-#define flush_cache_all()		do { } while (0)
-#define flush_cache_mm(mm)		do { } while (0)
-#define flush_cache_range(vma, a, b)	do { } while (0)
-#define flush_cache_page(vma, p)	do { } while (0)
-#define flush_page_to_ram(page)		do { } while (0)
-
-extern void flush_icache_user_range(struct vm_area_struct *vma,
-			struct page *page, unsigned long addr, int len);
-extern void flush_icache_range(unsigned long, unsigned long);
-extern void __flush_dcache_icache(void *page_va);
-extern void flush_dcache_page(struct page *page);
-extern void flush_icache_page(struct vm_area_struct *vma, struct page *page);
-
 extern unsigned long va_to_phys(unsigned long address);
 extern pte_t *va_to_pte(unsigned long address);
 extern unsigned long ioremap_bot, ioremap_base;
@@ -418,19 +381,6 @@ extern void paging_init(void);
  */
 extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 #endif
-
-extern void flush_hash_segments(unsigned low_vsid, unsigned high_vsid);
-extern void flush_hash_page(unsigned long context, unsigned long ea, pte_t pte,
-			    int local);
-void flush_hash_range(unsigned long context, unsigned long number, int local);
-
-/* TLB flush batching */
-#define MAX_BATCH_FLUSH 128
-struct tlb_batch_data {
-	pte_t pte;
-	unsigned long addr;
-};
-extern struct tlb_batch_data tlb_batch_array[NR_CPUS][MAX_BATCH_FLUSH];
 
 /* Encode and de-code a swap entry */
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0x3f)
