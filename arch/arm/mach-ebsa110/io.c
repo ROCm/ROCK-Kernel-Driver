@@ -67,9 +67,9 @@ u8 __readb(void *addr)
 	u32 ret, a = __isamem_convert_addr(addr);
 
 	if ((int)addr & 1)
-		ret = __raw_getl(a);
+		ret = __raw_readl(a);
 	else
-		ret = __raw_getb(a);
+		ret = __raw_readb(a);
 	return ret;
 }
 
@@ -80,7 +80,7 @@ u16 __readw(void *addr)
 	if ((int)addr & 1)
 		BUG();
 
-	return __raw_getw(a);
+	return __raw_readw(a);
 }
 
 u32 __readl(void *addr)
@@ -90,8 +90,8 @@ u32 __readl(void *addr)
 	if ((int)addr & 3)
 		BUG();
 
-	ret = __raw_getw(a);
-	ret |= __raw_getw(a + 4) << 16;
+	ret = __raw_readw(a);
+	ret |= __raw_readw(a + 4) << 16;
 	return ret;
 }
 
@@ -104,9 +104,9 @@ void __writeb(u8 val, void *addr)
 	u32 a = __isamem_convert_addr(addr);
 
 	if ((int)addr & 1)
-		__raw_putl(val, a);
+		__raw_writel(val, a);
 	else
-		__raw_putb(val, a);
+		__raw_writeb(val, a);
 }
 
 void __writew(u16 val, void *addr)
@@ -116,7 +116,7 @@ void __writew(u16 val, void *addr)
 	if ((int)addr & 1)
 		BUG();
 
-	__raw_putw(val, a);
+	__raw_writew(val, a);
 }
 
 void __writel(u32 val, void *addr)
@@ -126,8 +126,8 @@ void __writel(u32 val, void *addr)
 	if ((int)addr & 3)
 		BUG();
 
-	__raw_putw(val, a);
-	__raw_putw(val >> 16, a + 4);
+	__raw_writew(val, a);
+	__raw_writew(val >> 16, a + 4);
 }
 
 EXPORT_SYMBOL(__writeb);
@@ -147,7 +147,7 @@ u8 __inb(int port)
 	 * The SuperIO registers use sane addressing techniques...
 	 */
 	if (SUPERIO_PORT(port))
-		ret = __raw_getb(ISAIO_BASE + (port << 2));
+		ret = __raw_readb(ISAIO_BASE + (port << 2));
 	else {
 		u32 a = ISAIO_BASE + ((port & ~1) << 1);
 
@@ -155,9 +155,9 @@ u8 __inb(int port)
 		 * Shame nothing else does
 		 */
 		if (port & 1)
-			ret = __raw_getl(a);
+			ret = __raw_readl(a);
 		else
-			ret = __raw_getb(a);
+			ret = __raw_readb(a);
 	}
 	return ret;
 }
@@ -170,7 +170,7 @@ u16 __inw(int port)
 	 * The SuperIO registers use sane addressing techniques...
 	 */
 	if (SUPERIO_PORT(port))
-		ret = __raw_getw(ISAIO_BASE + (port << 2));
+		ret = __raw_readw(ISAIO_BASE + (port << 2));
 	else {
 		u32 a = ISAIO_BASE + ((port & ~1) << 1);
 
@@ -180,7 +180,7 @@ u16 __inw(int port)
 		if (port & 1)
 			BUG();
 
-		ret = __raw_getw(a);
+		ret = __raw_readw(a);
 	}
 	return ret;
 }
@@ -201,7 +201,7 @@ void __outb(u8 val, int port)
 	 * The SuperIO registers use sane addressing techniques...
 	 */
 	if (SUPERIO_PORT(port))
-		__raw_putb(val, ISAIO_BASE + (port << 2));
+		__raw_writeb(val, ISAIO_BASE + (port << 2));
 	else {
 		u32 a = ISAIO_BASE + ((port & ~1) << 1);
 
@@ -209,9 +209,9 @@ void __outb(u8 val, int port)
 		 * Shame nothing else does
 		 */
 		if (port & 1)
-			__raw_putl(val, a);
+			__raw_writel(val, a);
 		else
-			__raw_putb(val, a);
+			__raw_writeb(val, a);
 	}
 }
 
@@ -230,7 +230,7 @@ void __outw(u16 val, int port)
 			BUG();
 
 	}
-	__raw_putw(val, ISAIO_BASE + off);
+	__raw_writew(val, ISAIO_BASE + off);
 }
 
 void __outl(u32 val, int port)
