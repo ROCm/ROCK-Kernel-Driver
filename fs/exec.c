@@ -1162,7 +1162,7 @@ void format_corename(char *corename, const char *pattern, long signr)
 				struct timeval tv;
 				do_gettimeofday(&tv);
 				rc = snprintf(out_ptr, out_end - out_ptr,
-					      "%d", tv.tv_sec);
+					      "%lu", tv.tv_sec);
 				if (rc > out_end - out_ptr)
 					goto out;
 				out_ptr += rc;
