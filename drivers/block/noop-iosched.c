@@ -52,12 +52,10 @@ static void elevator_noop_merge_requests(request_queue_t *q, struct request *req
 static void elevator_noop_add_request(request_queue_t *q, struct request *rq,
 				      int where)
 {
-	struct list_head *insert = q->queue_head.prev;
-
 	if (where == ELEVATOR_INSERT_FRONT)
-		insert = &q->queue_head;
-
-	list_add_tail(&rq->queuelist, &q->queue_head);
+		list_add(&rq->queuelist, &q->queue_head);
+	else
+		list_add_tail(&rq->queuelist, &q->queue_head);
 
 	/*
 	 * new merges must not precede this barrier
