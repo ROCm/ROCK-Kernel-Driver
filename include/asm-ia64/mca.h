@@ -136,8 +136,6 @@ typedef struct ia64_mca_os_to_sal_state_s {
 						 */
 } ia64_mca_os_to_sal_state_t;
 
-typedef int (*prfunc_t)(const char * fmt, ...);
-
 extern void ia64_mca_init(void);
 extern void ia64_os_mca_dispatch(void);
 extern void ia64_os_mca_dispatch_end(void);
@@ -150,18 +148,8 @@ extern irqreturn_t ia64_mca_cmc_int_handler(int,void *,struct pt_regs *);
 extern irqreturn_t ia64_mca_cmc_int_caller(int,void *,struct pt_regs *);
 extern irqreturn_t ia64_mca_cpe_int_handler(int,void *,struct pt_regs *);
 extern irqreturn_t ia64_mca_cpe_int_caller(int,void *,struct pt_regs *);
-extern int  ia64_log_print(int,prfunc_t);
 extern void ia64_mca_cmc_vector_setup(void);
 extern int  ia64_mca_check_errors(void);
-
-#define PLATFORM_CALL(fn, args)	printk("Platform call TBD\n")
-
-#define platform_mem_dev_err_print ia64_log_prt_oem_data
-#define platform_pci_bus_err_print ia64_log_prt_oem_data
-#define platform_pci_comp_err_print ia64_log_prt_oem_data
-#define platform_plat_specific_err_print ia64_log_prt_oem_data
-#define platform_host_ctlr_err_print ia64_log_prt_oem_data
-#define platform_plat_bus_err_print ia64_log_prt_oem_data
 
 #undef	MCA_TEST
 
