@@ -40,6 +40,8 @@ ToDo/Notes:
 	  analagous to the way it is done in __set_page_dirty_buffers().
 	- Ensure the mft record size does not exceed the PAGE_CACHE_SIZE at
 	  mount time as this cannot work with the current implementation.
+	- Check for location of attribute name and improve error handling in
+	  general in fs/ntfs/inode.c::ntfs_read_locked_inode() and friends.
 
 2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
