@@ -380,6 +380,7 @@ void mmput(struct mm_struct *mm)
 		list_del(&mm->mmlist);
 		mmlist_nr--;
 		spin_unlock(&mmlist_lock);
+		exit_aio(mm);
 		exit_mmap(mm);
 		mmdrop(mm);
 	}
