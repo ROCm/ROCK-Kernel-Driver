@@ -28,7 +28,7 @@
  * shift operation instead of having to map the IRQ number to
  * a HW IRQ number.
  */
-#define	IRQ_IXP2000_SWI			0 /* soft interrupt */
+#define	IRQ_IXP2000_SOFT_INT		0 /* soft interrupt */
 #define	IRQ_IXP2000_ERRSUM		1 /* OR of all bits in ErrorStatus reg*/
 #define	IRQ_IXP2000_UART		2
 #define	IRQ_IXP2000_GPIO		3

@@ -352,7 +352,7 @@ void __init ixp2000_init_irq(void)
 	 * we mark the reserved IRQs as invalid. This makes
 	 * our mask/unmask code much simpler.
 	 */
-	for (irq = IRQ_IXP2000_SWI; irq <= IRQ_IXP2000_THDB3; irq++) {
+	for (irq = IRQ_IXP2000_SOFT_INT; irq <= IRQ_IXP2000_THDB3; irq++) {
 		if((1 << irq) & IXP2000_VALID_IRQ_MASK) {
 			set_irq_chip(irq, &ixp2000_irq_chip);
 			set_irq_handler(irq, do_level_IRQ);
