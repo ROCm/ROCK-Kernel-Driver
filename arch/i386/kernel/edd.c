@@ -26,9 +26,6 @@
 
 /*
  * Known issues:
- * - module unload leaves directories around if a symlink was
- *   created in that directory.  Confirmed is a driverfs bug, not
- *   ours.  Seen on kernel 2.5.41.
  * - refcounting of struct device objects could be improved.
  *
  * TODO:
@@ -60,7 +57,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("driverfs interface to BIOS EDD information");
 MODULE_LICENSE("GPL");
 
-#define EDD_VERSION "0.06 2002-Oct-09"
+#define EDD_VERSION "0.07 2002-Oct-24"
 #define EDD_DEVICE_NAME_SIZE 16
 #define REPORT_URL "http://domsch.com/linux/edd30/results.html"
 
@@ -86,6 +83,7 @@ struct edd_attribute {
 	struct attribute attr;
 	ssize_t(*show) (struct edd_device * edev, char *buf, size_t count,
 			loff_t off);
+	int (*test) (struct edd_device * edev);
 };
 
 /* forward declarations */
@@ -95,10 +93,11 @@ static struct scsi_device *edd_find_matching_scsi_device(struct edd_device *edev
 
 static struct edd_device *edd_devices[EDDMAXNR];
 
-#define EDD_DEVICE_ATTR(_name,_mode,_show) \
+#define EDD_DEVICE_ATTR(_name,_mode,_show,_test) \
 struct edd_attribute edd_attr_##_name = { 	\
 	.attr = {.name = __stringify(_name), .mode = _mode },	\
 	.show	= _show,				\
+	.test	= _test,				\
 };
 
 static inline struct edd_info *
@@ -505,17 +504,6 @@ edd_show_sectors(struct edd_device *edev, char *buf, size_t count, loff_t off)
 	return (p - buf);
 }
 
-static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data);
-static EDD_DEVICE_ATTR(version, 0444, edd_show_version);
-static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions);
-static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags);
-static EDD_DEVICE_ATTR(default_cylinders, 0444, edd_show_default_cylinders);
-static EDD_DEVICE_ATTR(default_heads, 0444, edd_show_default_heads);
-static EDD_DEVICE_ATTR(default_sectors_per_track, 0444,
-		       edd_show_default_sectors_per_track);
-static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors);
-static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface);
-static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus);
 
 /*
  * Some device instances may not have all the above attributes,
@@ -525,16 +513,7 @@ static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus);
  * if the default_{cylinders,heads,sectors_per_track} values
  * are zero, the BIOS doesn't provide sane values, don't bother
  * creating files for them either.
- *
- * struct attr_test pairs an attribute and a test,
- * (the default NULL test being true - the attribute exists)
- * and individual existence tests may be written for each
- * attribute.
  */
-struct attr_test {
-	struct edd_attribute *attr;
-	int (*test) (struct edd_device * edev);
-};
 
 static int
 edd_has_default_cylinders(struct edd_device *edev)
@@ -591,23 +570,34 @@ edd_has_edd30(struct edd_device *edev)
 	return 0;
 }
 
-static struct attr_test def_attrs[] = {
-	{.attr = &edd_attr_raw_data},
-	{.attr = &edd_attr_version},
-	{.attr = &edd_attr_extensions},
-	{.attr = &edd_attr_info_flags},
-	{.attr = &edd_attr_sectors},
-	{.attr = &edd_attr_default_cylinders,
-	 .test = &edd_has_default_cylinders},
-	{.attr = &edd_attr_default_heads,
-	 .test = &edd_has_default_heads},
-	{.attr = &edd_attr_default_sectors_per_track,
-	 .test = &edd_has_default_sectors_per_track},
-	{.attr = &edd_attr_interface,
-	 .test = &edd_has_edd30},
-	{.attr = &edd_attr_host_bus,
-	 .test = &edd_has_edd30},
-	{.attr = NULL,.test = NULL},
+static EDD_DEVICE_ATTR(raw_data, 0444, edd_show_raw_data, NULL);
+static EDD_DEVICE_ATTR(version, 0444, edd_show_version, NULL);
+static EDD_DEVICE_ATTR(extensions, 0444, edd_show_extensions, NULL);
+static EDD_DEVICE_ATTR(info_flags, 0444, edd_show_info_flags, NULL);
+static EDD_DEVICE_ATTR(sectors, 0444, edd_show_sectors, NULL);
+static EDD_DEVICE_ATTR(default_cylinders, 0444, edd_show_default_cylinders,
+		       edd_has_default_cylinders);
+static EDD_DEVICE_ATTR(default_heads, 0444, edd_show_default_heads,
+		       edd_has_default_heads);
+static EDD_DEVICE_ATTR(default_sectors_per_track, 0444,
+		       edd_show_default_sectors_per_track,
+		       edd_has_default_sectors_per_track);
+static EDD_DEVICE_ATTR(interface, 0444, edd_show_interface, edd_has_edd30);
+static EDD_DEVICE_ATTR(host_bus, 0444, edd_show_host_bus, edd_has_edd30);
+
+
+static struct edd_attribute * def_attrs[] = {
+	&edd_attr_raw_data,
+	&edd_attr_version,
+	&edd_attr_extensions,
+	&edd_attr_info_flags,
+	&edd_attr_sectors,
+	&edd_attr_default_cylinders,
+	&edd_attr_default_heads,
+	&edd_attr_default_sectors_per_track,
+	&edd_attr_interface,
+	&edd_attr_host_bus,
+	NULL,
 };
 
 /* edd_get_devpath_length(), edd_fill_devpath(), and edd_device_link()
@@ -864,14 +854,13 @@ edd_device_unregister(struct edd_device *edev)
 static int
 edd_populate_dir(struct edd_device *edev)
 {
-	struct attr_test *s;
+	struct edd_attribute *attr;
 	int i;
 	int error = 0;
 
-	for (i = 0; def_attrs[i].attr; i++) {
-		s = &def_attrs[i];
-		if (!s->test || (s->test && !s->test(edev))) {
-			if ((error = edd_create_file(edev, s->attr))) {
+	for (i = 0; (attr=def_attrs[i]); i++) {
+		if (!attr->test || (attr->test && !attr->test(edev))) {
+			if ((error = edd_create_file(edev, attr))) {
 				break;
 			}
 		}
@@ -926,7 +915,7 @@ static int __init
 edd_init(void)
 {
 	unsigned int i;
-	int rc;
+	int rc=0;
 	struct edd_device *edev;
 
 	printk(KERN_INFO "BIOS EDD facility v%s, %d devices found\n",
