@@ -713,13 +713,7 @@ struct sn_flush_device_list {
 
 struct sn_flush_nasid_entry  {
         struct sn_flush_device_list **widget_p;
-        unsigned long        iio_itte1;
-        unsigned long        iio_itte2;
-        unsigned long        iio_itte3;
-        unsigned long        iio_itte4;
-        unsigned long        iio_itte5;
-        unsigned long        iio_itte6;
-        unsigned long        iio_itte7;
+        unsigned long        iio_itte[8];
 };
 
 #endif				/* _ASM_SN_PCI_PCIBR_PRIVATE_H */

@@ -156,30 +156,10 @@ sn_dma_flush(unsigned long addr) {
 
 	if (flush_nasid_list[nasid].widget_p == NULL) return;
 	if (bwin > 0) {
-		bwin--;
-		switch (bwin) {
-			case 0:
-				wid_num = ((flush_nasid_list[nasid].iio_itte1) >> 8) & 0xf;
-				break;
-			case 1:
-				wid_num = ((flush_nasid_list[nasid].iio_itte2) >> 8) & 0xf;
-				break;
-			case 2: 
-				wid_num = ((flush_nasid_list[nasid].iio_itte3) >> 8) & 0xf;
-				break;
-			case 3: 
-				wid_num = ((flush_nasid_list[nasid].iio_itte4) >> 8) & 0xf;
-				break;
-			case 4: 
-				wid_num = ((flush_nasid_list[nasid].iio_itte5) >> 8) & 0xf;
-				break;
-			case 5: 
-				wid_num = ((flush_nasid_list[nasid].iio_itte6) >> 8) & 0xf;
-				break;
-			case 6: 
-				wid_num = ((flush_nasid_list[nasid].iio_itte7) >> 8) & 0xf;
-				break;
-		}
+		unsigned long itte = flush_nasid_list[nasid].iio_itte[bwin];
+
+		wid_num = (itte >> IIO_ITTE_WIDGET_SHIFT) &
+				  IIO_ITTE_WIDGET_MASK;
 	}
 	if (flush_nasid_list[nasid].widget_p == NULL) return;
 	if (flush_nasid_list[nasid].widget_p[wid_num] == NULL) return;

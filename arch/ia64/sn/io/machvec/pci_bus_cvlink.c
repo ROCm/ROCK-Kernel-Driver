@@ -203,71 +203,18 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 		memset(flush_nasid_list[nasid].widget_p, 0, (HUB_WIDGET_ID_MAX+1) * sizeof(struct sn_flush_device_list *));
 	}
 	if (bwin > 0) {
-		bwin--;
-		switch (bwin) {
-			case 0:
-				flush_nasid_list[nasid].iio_itte1 = HUB_L(IIO_ITTE_GET(nasid, 0));
-				wid_num = ((flush_nasid_list[nasid].iio_itte1) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte1 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 1:
-				flush_nasid_list[nasid].iio_itte2 = HUB_L(IIO_ITTE_GET(nasid, 1));
-				wid_num = ((flush_nasid_list[nasid].iio_itte2) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte2 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 2:
-				flush_nasid_list[nasid].iio_itte3 = HUB_L(IIO_ITTE_GET(nasid, 2));
-				wid_num = ((flush_nasid_list[nasid].iio_itte3) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte3 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 3:
-				flush_nasid_list[nasid].iio_itte4 = HUB_L(IIO_ITTE_GET(nasid, 3));
-				wid_num = ((flush_nasid_list[nasid].iio_itte4) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte4 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 4:
-				flush_nasid_list[nasid].iio_itte5 = HUB_L(IIO_ITTE_GET(nasid, 4));
-				wid_num = ((flush_nasid_list[nasid].iio_itte5) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte5 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 5:
-				flush_nasid_list[nasid].iio_itte6 = HUB_L(IIO_ITTE_GET(nasid, 5));
-				wid_num = ((flush_nasid_list[nasid].iio_itte6) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte6 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
-			case 6:
-				flush_nasid_list[nasid].iio_itte7 = HUB_L(IIO_ITTE_GET(nasid, 6));
-				wid_num = ((flush_nasid_list[nasid].iio_itte7) >> 8) & 0xf;
-				bus = flush_nasid_list[nasid].iio_itte7 & 0xf;
-				if (bus == 0x4 || bus == 0x8)
-					bus = 0;
-				else
-					bus = 1;
-				break;
+		int itte_index = bwin - 1;
+		unsigned long itte;
+
+		itte = HUB_L(IIO_ITTE_GET(nasid, itte_index));
+		flush_nasid_list[nasid].iio_itte[bwin] = itte;
+		wid_num = (itte >> IIO_ITTE_WIDGET_SHIFT) & 
+			  IIO_ITTE_WIDGET_MASK;
+		bus = itte & IIO_ITTE_OFFSET_MASK;
+		if (bus == 0x4 || bus == 0x8) {
+			bus = 0;
+		} else {
+			bus = 1;
 		}
 	}
 
