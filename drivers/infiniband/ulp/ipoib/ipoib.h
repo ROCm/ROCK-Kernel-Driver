@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -150,10 +150,12 @@ struct ipoib_dev_priv {
 
 	struct ipoib_buf *rx_ring;
 
-	spinlock_t tx_lock;
+	spinlock_t        tx_lock;
 	struct ipoib_buf *tx_ring;
-	unsigned tx_head;
-	unsigned tx_tail;
+	unsigned          tx_head;
+	unsigned          tx_tail;
+	struct ib_sge     tx_sge;
+	struct ib_send_wr tx_wr;
 
 	struct ib_wc ibwc[IPOIB_NUM_WC];
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -281,28 +281,16 @@ static inline int post_send(struct ipoib_dev_priv *priv,
 			    struct ib_ah *address, u32 qpn,
 			    dma_addr_t addr, int len)
 {
-	struct ib_sge list = {
-		.addr    = addr,
-		.length  = len,
-		.lkey    = priv->mr->lkey,
-	};
-	struct ib_send_wr param = {
-		.wr_id = wr_id,
-		.opcode = IB_WR_SEND,
-		.sg_list = &list,
-		.num_sge = 1,
-		.wr = {
-			.ud = {
-				 .remote_qpn = qpn,
-				 .remote_qkey = priv->qkey,
-				 .ah = address
-			 },
-		},
-		.send_flags = IB_SEND_SIGNALED,
-	};
 	struct ib_send_wr *bad_wr;
 
-	return ib_post_send(priv->qp, &param, &bad_wr);
+	priv->tx_sge.addr             = addr;
+	priv->tx_sge.length           = len;
+
+	priv->tx_wr.wr_id 	      = wr_id;
+	priv->tx_wr.wr.ud.remote_qpn  = qpn;
+	priv->tx_wr.wr.ud.ah 	      = address;
+
+	return ib_post_send(priv->qp, &priv->tx_wr, &bad_wr);
 }
 
 void ipoib_send(struct net_device *dev, struct sk_buff *skb,
