@@ -310,9 +310,7 @@ struct sched_group {
 
 	/*
 	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
-	 * single CPU. This should be read only (except for setup). Although
-	 * it will need to be written to at cpu hot(un)plug time, perhaps the
-	 * cpucontrol semaphore will provide enough exclusion?
+	 * single CPU. This is read only (except for setup, hotplug CPU).
 	 */
 	unsigned long cpu_power;
 };
@@ -4248,7 +4246,8 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
  * in arch code. That defines the number of nearby nodes in a node's top
  * level scheduling domain.
  */
-#if defined(CONFIG_NUMA) && defined(SD_NODES_PER_DOMAIN)
+#ifdef CONFIG_NUMA
+#ifdef SD_NODES_PER_DOMAIN
 /**
  * find_next_best_node - find the next node to include in a sched_domain
  * @node: node whose sched_domain we're building
@@ -4295,7 +4294,7 @@ static int __init find_next_best_node(int node, unsigned long *used_nodes)
  * should be one that prevents unnecessary balancing, but also spreads tasks
  * out optimally.
  */
-cpumask_t __init sched_domain_node_span(int node)
+static cpumask_t __init sched_domain_node_span(int node)
 {
 	int i;
 	cpumask_t span;
@@ -4314,12 +4313,13 @@ cpumask_t __init sched_domain_node_span(int node)
 
 	return span;
 }
-#else /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
-cpumask_t __init sched_domain_node_span(int node)
+#else /* SD_NODES_PER_DOMAIN */
+static cpumask_t __init sched_domain_node_span(int node)
 {
 	return cpu_possible_map;
 }
-#endif /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
+#endif /* SD_NODES_PER_DOMAIN */
+#endif /* CONFIG_NUMA */
 
 #ifdef CONFIG_SCHED_SMT
 static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
