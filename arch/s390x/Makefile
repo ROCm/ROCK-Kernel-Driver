@@ -24,10 +24,9 @@ CFLAGS := $(CFLAGS) $(CFLAGS_PIPE) $(CFLAGS_NSR)
 
 HEAD := arch/s390x/kernel/head.o arch/s390x/kernel/init_task.o
 
-SUBDIRS += arch/s390x/mm arch/s390x/kernel arch/s390x/lib drivers/s390
-CORE_FILES := arch/s390x/mm/mm.o arch/s390x/kernel/kernel.o $(CORE_FILES)
-DRIVERS := $(DRIVERS) drivers/s390/built-in.o
-LIBS := $(TOPDIR)/arch/s390x/lib/lib.a $(LIBS) $(TOPDIR)/arch/s390x/lib/lib.a
+core-y		+= arch/s390x/mm/ arch/s390x/kernel/
+drivers-y	+= drivers/s390/
+libs-y		+= arch/s390/lib/
 
 all: image listing
 

@@ -2,8 +2,6 @@
 # Makefile for the linux s390-specific parts of the memory manager.
 #
 
-O_TARGET := 
-
 EXTRA_AFLAGS := -traditional
 
 include $(TOPDIR)/Rules.make
