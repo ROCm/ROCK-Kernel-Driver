@@ -40,7 +40,7 @@
  * $FreeBSD$
  */
 
-VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#86 $"
+VERSION = "$Id: //depot/aic7xxx/aic7xxx/aic79xx.seq#88 $"
 PATCH_ARG_LIST = "struct ahd_softc *ahd"
 PREFIX = "ahd_"
 
@@ -708,7 +708,7 @@ SET_DST_MODE	M_DFF1;
 	add	NONE, -17, SCB_CDB_LEN;
 	jnc	p_command_embedded;
 p_command_from_host:
-	bmov	HADDR[0], SCB_CDB_PTR, 11;
+	bmov	HADDR[0], SCB_HOST_CDB_PTR, 9;
 	mvi	SG_CACHE_PRE, LAST_SEG;
 	mvi	DFCNTRL, (PRELOADEN|SCSIEN|HDMAEN);
 	jmp	p_command_xfer;
@@ -1693,6 +1693,18 @@ cfg4istat_no_taskmgmt_func:
 	call	pkt_handle_status;
 	or	SEQINTCTL, IRET ret;
 
+cfg4icmd_intr:
+	/*
+	 * In the case of DMAing a CDB from the host, the normal
+	 * CDB buffer is formatted with an 8 byte address followed
+	 * by a 1 byte count.
+	 */
+	bmov	HADDR[0], SCB_HOST_CDB_PTR, 9;
+	mvi	SG_CACHE_PRE, LAST_SEG;
+	mvi	DFCNTRL, (PRELOADEN|SCSIEN|HDMAEN);
+	call	pkt_handle_cdb;
+	or	SEQINTCTL, IRET ret;
+
 /*
  * See if the target has gone on in this context creating an
  * overrun condition.  For the write case, the hardware cannot
@@ -1825,13 +1837,15 @@ BEGIN_CRITICAL;
 	mvi	DFFSXFRCTL, CLRCHN ret;
 END_CRITICAL;
 
-check_status_overrun:
-	test	SHCNT[2], 0xFF jz status_IU_done;
-	SET_SEQINTCODE(STATUS_OVERRUN)
-	jmp	status_IU_done;
+/*
+ * Watch over the status transfer.  Our host sense buffer is
+ * large enough to take the maximum allowed status packet.
+ * None-the-less, we must still catch and report overruns to
+ * the host.
+ */
 pkt_handle_status:
 	call	setjmp_setscb;
-	test	MDFFSTAT, LASTSDONE jnz check_status_overrun;
+	test	SG_CACHE_SHADOW, LAST_SEG_DONE jz check_status_overrun;
 	test	SEQINTSRC, CTXTDONE jz return;
 status_IU_done:
 BEGIN_CRITICAL;
@@ -1843,6 +1857,21 @@ BEGIN_CRITICAL;
 	or	SCB_CONTROL, STATUS_RCVD;
 	jmp	last_pkt_complete;
 END_CRITICAL;
+check_status_overrun:
+	/*
+	 * We've filled the entire sense buffer.
+	 * Wait for either context done or a negative
+	 * shaddow count.  If the context completes without
+	 * causing the shaddow count to go negative, then
+	 * this was a successful transfer up to the status
+	 * limit.  Otherwise we report the error.
+	 */
+	test	SHCNT[2], 0xFF jnz report_status_overrun;
+	test	SEQINTSRC, CTXTDONE jz return;
+	test	SHCNT[2], 0xFF jz status_IU_done;
+report_status_overrun:
+	SET_SEQINTCODE(STATUS_OVERRUN)
+	jmp	status_IU_done;
 
 SET_SRC_MODE	M_DFF0;
 SET_DST_MODE	M_DFF0;
@@ -1855,6 +1884,16 @@ check_fifo:
 	cmp	LONGJMP_SCB[0], A	jne return;
 	stc	ret;
 END_CRITICAL;
+
+/*
+ * Must wait until CDB xfer is over before issuing the
+ * clear channel.
+ */
+pkt_handle_cdb:
+	call	setjmp_setscb;
+	test	SG_CACHE_SHADOW, LAST_SEG_DONE jz return;
+	or	LONGJMP_ADDR[1], INVALID_ADDR;
+	mvi	DFFSXFRCTL, CLRCHN ret;
 
 /*
  * Nonpackreq is a polled status.  It can come true in three situations:
@@ -1925,6 +1964,7 @@ pkt_overrun_end:
 	or	SCB_RESIDUAL_SGPTR, SG_OVERRUN_RESID;
 	test	SEQINTSRC, CTXTDONE jz unexpected_nonpkt_phase;
 	test	SCB_CONTROL, STATUS_RCVD jnz last_pkt_queue_scb;
+	or	LONGJMP_ADDR[1], INVALID_ADDR;
 	mvi	DFFSXFRCTL, CLRCHN ret;
 
 if ((ahd->bugs & AHD_PKT_BITBUCKET_BUG) != 0) {
@@ -1945,5 +1985,3 @@ load_overrun_buf:
 	mvi	HCNT[1], ((PKT_OVERRUN_BUFSIZE >> 8) & 0xFF);
 	clr	HCNT[2] ret;
 }
-
-cfg4icmd_intr:

@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#124 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#128 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -1462,14 +1462,14 @@ done:
 		struct timer_list timer;
 		int ret;
 
-		ahd->platform_data->flags |= AHD_UP_EH_SEMAPHORE;
+		pending_scb->platform_data->flags |= AHD_SCB_UP_EH_SEM;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 		ahd_unlock(ahd, &s);
 #else
 		spin_unlock_irq(ahd->platform_data->host->host_lock);
 #endif
 		init_timer(&timer);
-		timer.data = (u_long)ahd;
+		timer.data = (u_long)pending_scb;
 		timer.expires = jiffies + (5 * HZ);
 		timer.function = ahd_linux_sem_timeout;
 		add_timer(&timer);
@@ -1583,14 +1583,14 @@ ahd_linux_dev_reset(Scsi_Cmnd *cmd)
 	LIST_INSERT_HEAD(&ahd->pending_scbs, scb, pending_links);
 	ahd_queue_scb(ahd, scb);
 
-	ahd->platform_data->flags |= AHD_UP_EH_SEMAPHORE;
+	scb->platform_data->flags |= AHD_SCB_UP_EH_SEM;
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
 	ahd_unlock(ahd, &s);
 #else
 	spin_unlock_irq(ahd->platform_data->host->host_lock);
 #endif
 	init_timer(&timer);
-	timer.data = (u_long)ahd;
+	timer.data = (u_long)scb;
 	timer.expires = jiffies + (5 * HZ);
 	timer.function = ahd_linux_sem_timeout;
 	add_timer(&timer);
@@ -1697,7 +1697,7 @@ Scsi_Host_Template aic79xx_driver_template = {
 	.max_sectors		= 8192,
 #endif
 #if defined CONFIG_HIGHIO || LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,18)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,10)
 /* Assume RedHat Distribution with its different HIGHIO conventions. */
 	.can_dma_32		= 1,
 	.single_sg_okay		= 1,
@@ -3050,6 +3050,7 @@ ahd_linux_dv_target(struct ahd_softc *ahd, u_int target_offset)
 		}
 		case AHD_DV_STATE_TUR:
 		case AHD_DV_STATE_BUSY:
+			timeout = 5 * HZ;
 			ahd_linux_dv_tur(ahd, cmd, &devinfo);
 			break;
 		case AHD_DV_STATE_REBD:
@@ -4776,8 +4777,8 @@ ahd_done(struct ahd_softc *ahd, struct scb *scb)
 		if (ahd_get_transaction_status(scb) == CAM_BDR_SENT
 		 || ahd_get_transaction_status(scb) == CAM_REQ_ABORTED)
 			ahd_set_transaction_status(scb, CAM_CMD_TIMEOUT);
-		if ((ahd->platform_data->flags & AHD_UP_EH_SEMAPHORE) != 0) {
-			ahd->platform_data->flags &= ~AHD_UP_EH_SEMAPHORE;
+		if ((scb->platform_data->flags & AHD_SCB_UP_EH_SEM) != 0) {
+			scb->platform_data->flags &= ~AHD_SCB_UP_EH_SEM;
 			up(&ahd->platform_data->eh_sem);
 		}
 	}
@@ -5279,13 +5280,15 @@ ahd_release_simq(struct ahd_softc *ahd)
 static void
 ahd_linux_sem_timeout(u_long arg)
 {
+	struct	scb *scb;
 	struct	ahd_softc *ahd;
 	u_long	s;
 
-	ahd = (struct ahd_softc *)arg;
+	scb = (struct scb *)arg;
+	ahd = scb->ahd_softc;
 	ahd_lock(ahd, &s);
-	if ((ahd->platform_data->flags & AHD_UP_EH_SEMAPHORE) != 0) {
-		ahd->platform_data->flags &= ~AHD_UP_EH_SEMAPHORE;
+	if ((scb->platform_data->flags & AHD_SCB_UP_EH_SEM) != 0) {
+		scb->platform_data->flags &= ~AHD_SCB_UP_EH_SEM;
 		up(&ahd->platform_data->eh_sem);
 	}
 	ahd_unlock(ahd, &s);

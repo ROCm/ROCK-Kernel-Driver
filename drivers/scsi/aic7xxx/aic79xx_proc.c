@@ -37,7 +37,7 @@
  * String handling code courtesy of Gerard Roudier's <groudier@club-internet.fr>
  * sym driver.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#12 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_proc.c#13 $
  */
 #include "aic79xx_osm.h"
 #include "aic79xx_inline.h"
@@ -124,8 +124,12 @@ ahd_format_transinfo(struct info_str *info, struct ahd_transinfo *tinfo)
 
 		printed_options = 0;
 		copy_info(info, " (%d.%03dMHz", freq / 1000, freq % 1000);
+		if ((tinfo->ppr_options & MSG_EXT_PPR_RD_STRM) != 0) {
+			copy_info(info, " RDSTRM");
+			printed_options++;
+		}
 		if ((tinfo->ppr_options & MSG_EXT_PPR_DT_REQ) != 0) {
-			copy_info(info, " DT");
+			copy_info(info, "%s", printed_options ? "|DT" : " DT");
 			printed_options++;
 		}
 		if ((tinfo->ppr_options & MSG_EXT_PPR_IU_REQ) != 0) {
