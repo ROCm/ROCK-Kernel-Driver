@@ -35,6 +35,7 @@
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
+#include <asm/mmu_context.h>
 
 #if DEBUG > 1
 #define dprintk		printk
@@ -58,6 +59,8 @@ static struct tq_struct	fput_tqueue = {
 
 static spinlock_t	fput_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(fput_head);
+
+static void aio_kick_handler(void *);
 
 /* aio_setup
  *	Creates the slab caches used by the aio routines, panic on
@@ -228,6 +231,7 @@ static struct kioctx *ioctx_alloc(unsigned nr_events)
 	init_waitqueue_head(&ctx->wait);
 
 	INIT_LIST_HEAD(&ctx->active_reqs);
+	INIT_TQUEUE(&ctx->tq, aio_kick_handler, ctx);
 
 	if (aio_setup_ring(ctx) < 0)
 		goto out_freectx;
@@ -385,10 +389,12 @@ static struct kiocb *__aio_get_req(struct kioctx *ctx)
 	if (unlikely(!req))
 		return NULL;
 
+	req->ki_flags = 1 << KIF_LOCKED;
 	req->ki_users = 1;
 	req->ki_key = 0;
 	req->ki_ctx = ctx;
 	req->ki_cancel = NULL;
+	req->ki_retry = NULL;
 	req->ki_user_obj = NULL;
 
 	/* Check if the completion queue has enough free space to
@@ -479,6 +485,7 @@ static inline int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
 		return 0;
 	list_del(&req->ki_list);		/* remove from active_reqs */
 	req->ki_cancel = NULL;
+	req->ki_retry = NULL;
 
 	/* Must be done under the lock to serialise against cancellation.
 	 * Call this aio_fput as it duplicates fput via the fput_tqueue.
@@ -528,6 +535,82 @@ static inline struct kioctx *lookup_ioctx(unsigned long ctx_id)
 	read_unlock(&mm->ioctx_list_lock);
 
 	return ioctx;
+}
+
+static void use_mm(struct mm_struct *mm)
+{
+	struct mm_struct *active_mm = current->active_mm;
+	atomic_inc(&mm->mm_count);
+	current->mm = mm;
+	if (mm != active_mm) {
+		current->active_mm = mm;
+		activate_mm(active_mm, mm);
+	}
+	mmdrop(active_mm);
+}
+
+static void unuse_mm(struct mm_struct *mm)
+{
+	current->mm = NULL;
+	/* active_mm is still 'mm' */
+	enter_lazy_tlb(mm, current, smp_processor_id());
+}
+
+/* Run on kevent's context.  FIXME: needs to be per-cpu and warn if an
+ * operation blocks.
+ */
+static void aio_kick_handler(void *data)
+{
+	struct kioctx *ctx = data;
+
+	use_mm(ctx->mm);
+
+	spin_lock_irq(&ctx->ctx_lock);
+	while (!list_empty(&ctx->run_list)) {
+		struct kiocb *iocb;
+		long ret;
+
+		iocb = list_entry(ctx->run_list.next, struct kiocb,
+				  ki_run_list);
+		list_del(&iocb->ki_run_list);
+		iocb->ki_users ++;
+		spin_unlock_irq(&ctx->ctx_lock);
+
+		kiocbClearKicked(iocb);
+		ret = iocb->ki_retry(iocb);
+		if (-EIOCBQUEUED != ret) {
+			aio_complete(iocb, ret, 0);
+			iocb = NULL;
+		}
+
+		spin_lock_irq(&ctx->ctx_lock);
+		if (NULL != iocb)
+			__aio_put_req(ctx, iocb);
+	}
+	spin_unlock_irq(&ctx->ctx_lock);
+
+	unuse_mm(ctx->mm);
+}
+
+void kick_iocb(struct kiocb *iocb)
+{
+	struct kioctx	*ctx = iocb->ki_ctx;
+
+	/* sync iocbs are easy: they can only ever be executing from a 
+	 * single context. */
+	if (is_sync_kiocb(iocb)) {
+		kiocbSetKicked(iocb);
+		wake_up_process(iocb->ki_user_obj);
+		return;
+	}
+
+	if (kiocbTryKick(iocb)) {
+		long flags;
+		spin_lock_irqsave(&ctx->ctx_lock, flags);
+		list_add_tail(&iocb->ki_run_list, &ctx->run_list);
+		spin_unlock_irqrestore(&ctx->ctx_lock, flags);
+		schedule_task(&ctx->tq);
+	}
 }
 
 /* aio_complete
