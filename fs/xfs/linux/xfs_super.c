@@ -388,7 +388,7 @@ syncd(void *arg)
 		schedule_timeout(xfs_params.sync_interval);
 		if (vfsp->vfs_flag & VFS_UMOUNT)
 			break;
-		if (vfsp->vfs_flag & VFS_RDONLY);
+		if (vfsp->vfs_flag & VFS_RDONLY)
 			continue;
 		VFS_SYNC(vfsp, SYNCD_FLAGS, NULL, error);
 	}
