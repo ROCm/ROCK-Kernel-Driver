@@ -1,6 +1,8 @@
 #ifndef _SCSI_GENERIC_H
 #define _SCSI_GENERIC_H
 
+#include <linux/compiler.h>
+
 /*
    History:
     Started: Aug 9 by Lawrence Foard (entropy@world.std.com), to allow user
