@@ -11,6 +11,7 @@
  */
 
 struct sysv_sb_info {
+	struct super_block *s_sb;	/* VFS superblock */
 	int	       s_type;		/* file system type: FSTYPE_{XENIX|SYSV|COH} */
 	char	       s_bytesex;	/* bytesex (le/be/pdp) */
 	char	       s_truncate;	/* if 1: names > SYSV_NAMELEN chars are truncated */
@@ -51,39 +52,5 @@ struct sysv_sb_info {
 	u16	       s_namelen;       /* max length of dir entry */
 };
 /* The field s_toobig_block is currently unused. */
-
-/* sv_ == u.sysv_sb.s_ */
-#define sv_type					u.sysv_sb.s_type
-#define sv_bytesex				u.sysv_sb.s_bytesex
-#define sv_truncate				u.sysv_sb.s_truncate
-#define sv_link_max				u.sysv_sb.s_link_max
-#define sv_inodes_per_block			u.sysv_sb.s_inodes_per_block
-#define sv_inodes_per_block_1			u.sysv_sb.s_inodes_per_block_1
-#define sv_inodes_per_block_bits		u.sysv_sb.s_inodes_per_block_bits
-#define sv_ind_per_block			u.sysv_sb.s_ind_per_block
-#define sv_ind_per_block_bits			u.sysv_sb.s_ind_per_block_bits
-#define sv_ind_per_block_2			u.sysv_sb.s_ind_per_block_2
-#define sv_toobig_block				u.sysv_sb.s_toobig_block
-#define sv_block_base				u.sysv_sb.s_block_base
-#define sv_fic_size				u.sysv_sb.s_fic_size
-#define sv_flc_size				u.sysv_sb.s_flc_size
-#define sv_bh1					u.sysv_sb.s_bh1
-#define sv_bh2					u.sysv_sb.s_bh2
-#define sv_sbd1					u.sysv_sb.s_sbd1
-#define sv_sbd2					u.sysv_sb.s_sbd2
-#define sv_sb_fic_count				u.sysv_sb.s_sb_fic_count
-#define sv_sb_fic_inodes			u.sysv_sb.s_sb_fic_inodes
-#define sv_sb_total_free_inodes			u.sysv_sb.s_sb_total_free_inodes
-#define sv_bcache_count				u.sysv_sb.s_bcache_count
-#define sv_bcache				u.sysv_sb.s_bcache
-#define sv_free_blocks				u.sysv_sb.s_free_blocks
-#define sv_sb_time				u.sysv_sb.s_sb_time
-#define sv_sb_state				u.sysv_sb.s_sb_state
-#define sv_firstinodezone			u.sysv_sb.s_firstinodezone
-#define sv_firstdatazone			u.sysv_sb.s_firstdatazone
-#define sv_ninodes				u.sysv_sb.s_ninodes
-#define sv_ndatazones				u.sysv_sb.s_ndatazones
-#define sv_nzones				u.sysv_sb.s_nzones
-#define sv_namelen                              u.sysv_sb.s_namelen
 
 #endif

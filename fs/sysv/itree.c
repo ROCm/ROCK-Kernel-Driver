@@ -24,9 +24,10 @@ static inline void dirty_indirect(struct buffer_head *bh, struct inode *inode)
 static int block_to_path(struct inode *inode, long block, int offsets[DEPTH])
 {
 	struct super_block *sb = inode->i_sb;
-	int ptrs_bits = sb->sv_ind_per_block_bits;
-	unsigned long	indirect_blocks = sb->sv_ind_per_block,
-			double_blocks = sb->sv_ind_per_block_2;
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+	int ptrs_bits = sbi->s_ind_per_block_bits;
+	unsigned long	indirect_blocks = sbi->s_ind_per_block,
+			double_blocks = sbi->s_ind_per_block_2;
 	int n = 0;
 
 	if (block < 0) {
@@ -51,9 +52,9 @@ static int block_to_path(struct inode *inode, long block, int offsets[DEPTH])
 	return n;
 }
 
-static inline int block_to_cpu(struct super_block *sb, u32 nr)
+static inline int block_to_cpu(struct sysv_sb_info *sbi, u32 nr)
 {
-	return sb->sv_block_base + fs32_to_cpu(sb, nr);
+	return sbi->s_block_base + fs32_to_cpu(sbi, nr);
 }
 
 typedef struct {
@@ -95,7 +96,7 @@ static Indirect *get_branch(struct inode *inode,
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
-		int block = block_to_cpu(sb, p->key);
+		int block = block_to_cpu(SYSV_SB(sb), p->key);
 		bh = sb_bread(sb, block);
 		if (!bh)
 			goto failure;
@@ -137,7 +138,7 @@ static int alloc_branch(struct inode *inode,
 		 * Get buffer_head for parent block, zero it out and set 
 		 * the pointer to new one, then send parent to disk.
 		 */
-		parent = block_to_cpu(inode->i_sb, branch[n-1].key);
+		parent = block_to_cpu(SYSV_SB(inode->i_sb), branch[n-1].key);
 		bh = sb_getblk(inode->i_sb, parent);
 		lock_buffer(bh);
 		memset(bh->b_data, 0, blocksize);
@@ -211,7 +212,8 @@ reread:
 	/* Simplest case - block found, no allocation needed */
 	if (!partial) {
 got_it:
-		map_bh(bh_result, sb, block_to_cpu(sb, chain[depth-1].key));
+		map_bh(bh_result, sb, block_to_cpu(SYSV_SB(sb),
+					chain[depth-1].key));
 		/* Clean up and exit */
 		partial = chain+depth-1; /* the whole chain */
 		goto cleanup;
@@ -332,7 +334,7 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 			if (!nr)
 				continue;
 			*p = 0;
-			block = block_to_cpu(sb, nr);
+			block = block_to_cpu(SYSV_SB(sb), nr);
 			bh = sb_bread(sb, block);
 			if (!bh)
 				continue;

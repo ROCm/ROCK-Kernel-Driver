@@ -19,16 +19,20 @@
 
 #include <linux/stat.h>		/* declares S_IFLNK etc. */
 #include <linux/sched.h>	/* declares wake_up() */
-#include <linux/sysv_fs_sb.h>	/* defines the sv_... shortcuts */
 
-/* temporary hack. */
+#include <linux/sysv_fs_sb.h>
 #include <linux/sysv_fs_i.h>
+
 static inline struct sysv_inode_info *SYSV_I(struct inode *inode)
 {
-	/* I think list_entry should have a more descriptive name..  --hch */
 	return list_entry(inode, struct sysv_inode_info, vfs_inode);
 }
-/* end temporary hack. */
+
+static inline struct sysv_sb_info *SYSV_SB(struct super_block *sb)
+{
+	return &sb->u.sysv_sb;
+}
+
 
 
 /* Layout on disk */
@@ -346,61 +350,63 @@ extern struct sysv_inode *sysv_raw_inode(struct super_block *, unsigned, struct 
 
 static inline void dirty_sb(struct super_block *sb)
 {
-	mark_buffer_dirty(sb->sv_bh1);
-	if (sb->sv_bh1 != sb->sv_bh2)
-		mark_buffer_dirty(sb->sv_bh2);
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
+
+	mark_buffer_dirty(sbi->s_bh1);
+	if (sbi->s_bh1 != sbi->s_bh2)
+		mark_buffer_dirty(sbi->s_bh2);
 	sb->s_dirt = 1;
 }
 
-static inline u32 fs32_to_cpu(struct super_block *sb, u32 n)
+static inline u32 fs32_to_cpu(struct sysv_sb_info *sbi, u32 n)
 {
-	if (sb->sv_bytesex == BYTESEX_PDP)
+	if (sbi->s_bytesex == BYTESEX_PDP)
 		return PDP_swab(n);
-	else if (sb->sv_bytesex == BYTESEX_LE)
+	else if (sbi->s_bytesex == BYTESEX_LE)
 		return le32_to_cpu(n);
 	else
 		return be32_to_cpu(n);
 }
 
-static inline u32 cpu_to_fs32(struct super_block *sb, u32 n)
+static inline u32 cpu_to_fs32(struct sysv_sb_info *sbi, u32 n)
 {
-	if (sb->sv_bytesex == BYTESEX_PDP)
+	if (sbi->s_bytesex == BYTESEX_PDP)
 		return PDP_swab(n);
-	else if (sb->sv_bytesex == BYTESEX_LE)
+	else if (sbi->s_bytesex == BYTESEX_LE)
 		return cpu_to_le32(n);
 	else
 		return cpu_to_be32(n);
 }
 
-static inline u32 fs32_add(struct super_block *sb, u32 *n, int d)
+static inline u32 fs32_add(struct sysv_sb_info *sbi, u32 *n, int d)
 {
-	if (sb->sv_bytesex == BYTESEX_PDP)
+	if (sbi->s_bytesex == BYTESEX_PDP)
 		return *n = PDP_swab(PDP_swab(*n)+d);
-	else if (sb->sv_bytesex == BYTESEX_LE)
+	else if (sbi->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le32(le32_to_cpu(*n)+d);
 	else
 		return *n = cpu_to_be32(be32_to_cpu(*n)+d);
 }
 
-static inline u16 fs16_to_cpu(struct super_block *sb, u16 n)
+static inline u16 fs16_to_cpu(struct sysv_sb_info *sbi, u16 n)
 {
-	if (sb->sv_bytesex != BYTESEX_BE)
+	if (sbi->s_bytesex != BYTESEX_BE)
 		return le16_to_cpu(n);
 	else
 		return be16_to_cpu(n);
 }
 
-static inline u16 cpu_to_fs16(struct super_block *sb, u16 n)
+static inline u16 cpu_to_fs16(struct sysv_sb_info *sbi, u16 n)
 {
-	if (sb->sv_bytesex != BYTESEX_BE)
+	if (sbi->s_bytesex != BYTESEX_BE)
 		return cpu_to_le16(n);
 	else
 		return cpu_to_be16(n);
 }
 
-static inline u16 fs16_add(struct super_block *sb, u16 *n, int d)
+static inline u16 fs16_add(struct sysv_sb_info *sbi, u16 *n, int d)
 {
-	if (sb->sv_bytesex != BYTESEX_BE)
+	if (sbi->s_bytesex != BYTESEX_BE)
 		return *n = cpu_to_le16(le16_to_cpu(*n)+d);
 	else
 		return *n = cpu_to_be16(be16_to_cpu(*n)+d);

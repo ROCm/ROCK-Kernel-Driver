@@ -44,10 +44,10 @@ enum {
 	JAN_1_1980 = (10*365 + 2) * 24 * 60 * 60
 };
 
-static void detected_xenix(struct super_block *sb)
+static void detected_xenix(struct sysv_sb_info *sbi)
 {
-	struct buffer_head *bh1 = sb->sv_bh1;
-	struct buffer_head *bh2 = sb->sv_bh2;
+	struct buffer_head *bh1 = sbi->s_bh1;
+	struct buffer_head *bh2 = sbi->s_bh2;
 	struct xenix_super_block * sbd1;
 	struct xenix_super_block * sbd2;
 
@@ -59,152 +59,153 @@ static void detected_xenix(struct super_block *sb)
 		sbd2 = (struct xenix_super_block *) (bh2->b_data - 512);
 	}
 
-	sb->sv_link_max = XENIX_LINK_MAX;
-	sb->sv_fic_size = XENIX_NICINOD;
-	sb->sv_flc_size = XENIX_NICFREE;
-	sb->sv_sbd1 = (char *) sbd1;
-	sb->sv_sbd2 = (char *) sbd2;
-	sb->sv_sb_fic_count = &sbd1->s_ninode;
-	sb->sv_sb_fic_inodes = &sbd1->s_inode[0];
-	sb->sv_sb_total_free_inodes = &sbd2->s_tinode;
-	sb->sv_bcache_count = &sbd1->s_nfree;
-	sb->sv_bcache = &sbd1->s_free[0];
-	sb->sv_free_blocks = &sbd2->s_tfree;
-	sb->sv_sb_time = &sbd2->s_time;
-	sb->sv_firstdatazone = fs16_to_cpu(sb, sbd1->s_isize);
-	sb->sv_nzones = fs32_to_cpu(sb, sbd1->s_fsize);
+	sbi->s_link_max = XENIX_LINK_MAX;
+	sbi->s_fic_size = XENIX_NICINOD;
+	sbi->s_flc_size = XENIX_NICFREE;
+	sbi->s_sbd1 = (char *)sbd1;
+	sbi->s_sbd2 = (char *)sbd2;
+	sbi->s_sb_fic_count = &sbd1->s_ninode;
+	sbi->s_sb_fic_inodes = &sbd1->s_inode[0];
+	sbi->s_sb_total_free_inodes = &sbd2->s_tinode;
+	sbi->s_bcache_count = &sbd1->s_nfree;
+	sbi->s_bcache = &sbd1->s_free[0];
+	sbi->s_free_blocks = &sbd2->s_tfree;
+	sbi->s_sb_time = &sbd2->s_time;
+	sbi->s_firstdatazone = fs16_to_cpu(sbi, sbd1->s_isize);
+	sbi->s_nzones = fs32_to_cpu(sbi, sbd1->s_fsize);
 }
 
-static void detected_sysv4(struct super_block *sb)
+static void detected_sysv4(struct sysv_sb_info *sbi)
 {
 	struct sysv4_super_block * sbd;
-	struct buffer_head *bh1 = sb->sv_bh1;
-	struct buffer_head *bh2 = sb->sv_bh2;
+	struct buffer_head *bh1 = sbi->s_bh1;
+	struct buffer_head *bh2 = sbi->s_bh2;
 
 	if (bh1 == bh2)
 		sbd = (struct sysv4_super_block *) (bh1->b_data + BLOCK_SIZE/2);
 	else
 		sbd = (struct sysv4_super_block *) bh2->b_data;
 
-	sb->sv_link_max = SYSV_LINK_MAX;
-	sb->sv_fic_size = SYSV_NICINOD;
-	sb->sv_flc_size = SYSV_NICFREE;
-	sb->sv_sbd1 = (char *) sbd;
-	sb->sv_sbd2 = (char *) sbd;
-	sb->sv_sb_fic_count = &sbd->s_ninode;
-	sb->sv_sb_fic_inodes = &sbd->s_inode[0];
-	sb->sv_sb_total_free_inodes = &sbd->s_tinode;
-	sb->sv_bcache_count = &sbd->s_nfree;
-	sb->sv_bcache = &sbd->s_free[0];
-	sb->sv_free_blocks = &sbd->s_tfree;
-	sb->sv_sb_time = &sbd->s_time;
-	sb->sv_sb_state = &sbd->s_state;
-	sb->sv_firstdatazone = fs16_to_cpu(sb, sbd->s_isize);
-	sb->sv_nzones = fs32_to_cpu(sb, sbd->s_fsize);
+	sbi->s_link_max = SYSV_LINK_MAX;
+	sbi->s_fic_size = SYSV_NICINOD;
+	sbi->s_flc_size = SYSV_NICFREE;
+	sbi->s_sbd1 = (char *)sbd;
+	sbi->s_sbd2 = (char *)sbd;
+	sbi->s_sb_fic_count = &sbd->s_ninode;
+	sbi->s_sb_fic_inodes = &sbd->s_inode[0];
+	sbi->s_sb_total_free_inodes = &sbd->s_tinode;
+	sbi->s_bcache_count = &sbd->s_nfree;
+	sbi->s_bcache = &sbd->s_free[0];
+	sbi->s_free_blocks = &sbd->s_tfree;
+	sbi->s_sb_time = &sbd->s_time;
+	sbi->s_sb_state = &sbd->s_state;
+	sbi->s_firstdatazone = fs16_to_cpu(sbi, sbd->s_isize);
+	sbi->s_nzones = fs32_to_cpu(sbi, sbd->s_fsize);
 }
 
-static void detected_sysv2(struct super_block *sb)
+static void detected_sysv2(struct sysv_sb_info *sbi)
 {
-	struct sysv2_super_block * sbd;
-	struct buffer_head *bh1 = sb->sv_bh1;
-	struct buffer_head *bh2 = sb->sv_bh2;
+	struct sysv2_super_block *sbd;
+	struct buffer_head *bh1 = sbi->s_bh1;
+	struct buffer_head *bh2 = sbi->s_bh2;
 
 	if (bh1 == bh2)
 		sbd = (struct sysv2_super_block *) (bh1->b_data + BLOCK_SIZE/2);
 	else
 		sbd = (struct sysv2_super_block *) bh2->b_data;
 
-	sb->sv_link_max = SYSV_LINK_MAX;
-	sb->sv_fic_size = SYSV_NICINOD;
-	sb->sv_flc_size = SYSV_NICFREE;
-	sb->sv_sbd1 = (char *) sbd;
-	sb->sv_sbd2 = (char *) sbd;
-	sb->sv_sb_fic_count = &sbd->s_ninode;
-	sb->sv_sb_fic_inodes = &sbd->s_inode[0];
-	sb->sv_sb_total_free_inodes = &sbd->s_tinode;
-	sb->sv_bcache_count = &sbd->s_nfree;
-	sb->sv_bcache = &sbd->s_free[0];
-	sb->sv_free_blocks = &sbd->s_tfree;
-	sb->sv_sb_time = &sbd->s_time;
-	sb->sv_sb_state = &sbd->s_state;
-	sb->sv_firstdatazone = fs16_to_cpu(sb, sbd->s_isize);
-	sb->sv_nzones = fs32_to_cpu(sb, sbd->s_fsize);
+	sbi->s_link_max = SYSV_LINK_MAX;
+	sbi->s_fic_size = SYSV_NICINOD;
+	sbi->s_flc_size = SYSV_NICFREE;
+	sbi->s_sbd1 = (char *)sbd;
+	sbi->s_sbd2 = (char *)sbd;
+	sbi->s_sb_fic_count = &sbd->s_ninode;
+	sbi->s_sb_fic_inodes = &sbd->s_inode[0];
+	sbi->s_sb_total_free_inodes = &sbd->s_tinode;
+	sbi->s_bcache_count = &sbd->s_nfree;
+	sbi->s_bcache = &sbd->s_free[0];
+	sbi->s_free_blocks = &sbd->s_tfree;
+	sbi->s_sb_time = &sbd->s_time;
+	sbi->s_sb_state = &sbd->s_state;
+	sbi->s_firstdatazone = fs16_to_cpu(sbi, sbd->s_isize);
+	sbi->s_nzones = fs32_to_cpu(sbi, sbd->s_fsize);
 }
 
-static void detected_coherent(struct super_block *sb)
+static void detected_coherent(struct sysv_sb_info *sbi)
 {
 	struct coh_super_block * sbd;
-	struct buffer_head *bh1 = sb->sv_bh1;
+	struct buffer_head *bh1 = sbi->s_bh1;
 
 	sbd = (struct coh_super_block *) bh1->b_data;
 
-	sb->sv_link_max = COH_LINK_MAX;
-	sb->sv_fic_size = COH_NICINOD;
-	sb->sv_flc_size = COH_NICFREE;
-	sb->sv_sbd1 = (char *) sbd;
-	sb->sv_sbd2 = (char *) sbd;
-	sb->sv_sb_fic_count = &sbd->s_ninode;
-	sb->sv_sb_fic_inodes = &sbd->s_inode[0];
-	sb->sv_sb_total_free_inodes = &sbd->s_tinode;
-	sb->sv_bcache_count = &sbd->s_nfree;
-	sb->sv_bcache = &sbd->s_free[0];
-	sb->sv_free_blocks = &sbd->s_tfree;
-	sb->sv_sb_time = &sbd->s_time;
-	sb->sv_firstdatazone = fs16_to_cpu(sb, sbd->s_isize);
-	sb->sv_nzones = fs32_to_cpu(sb, sbd->s_fsize);
+	sbi->s_link_max = COH_LINK_MAX;
+	sbi->s_fic_size = COH_NICINOD;
+	sbi->s_flc_size = COH_NICFREE;
+	sbi->s_sbd1 = (char *)sbd;
+	sbi->s_sbd2 = (char *)sbd;
+	sbi->s_sb_fic_count = &sbd->s_ninode;
+	sbi->s_sb_fic_inodes = &sbd->s_inode[0];
+	sbi->s_sb_total_free_inodes = &sbd->s_tinode;
+	sbi->s_bcache_count = &sbd->s_nfree;
+	sbi->s_bcache = &sbd->s_free[0];
+	sbi->s_free_blocks = &sbd->s_tfree;
+	sbi->s_sb_time = &sbd->s_time;
+	sbi->s_firstdatazone = fs16_to_cpu(sbi, sbd->s_isize);
+	sbi->s_nzones = fs32_to_cpu(sbi, sbd->s_fsize);
 }
 
-static void detected_v7(struct super_block *sb)
+static void detected_v7(struct sysv_sb_info *sbi)
 {
-	struct buffer_head *bh2 = sb->sv_bh2;
+	struct buffer_head *bh2 = sbi->s_bh2;
 	struct v7_super_block *sbd = (struct v7_super_block *)bh2->b_data;
 
-	sb->sv_link_max = V7_LINK_MAX;
-	sb->sv_fic_size = V7_NICINOD;
-	sb->sv_flc_size = V7_NICFREE;
-	sb->sv_sbd1 = (char *)sbd;
-	sb->sv_sbd2 = (char *)sbd;
-	sb->sv_sb_fic_count = &sbd->s_ninode;
-	sb->sv_sb_fic_inodes = &sbd->s_inode[0];
-	sb->sv_sb_total_free_inodes = &sbd->s_tinode;
-	sb->sv_bcache_count = &sbd->s_nfree;
-	sb->sv_bcache = &sbd->s_free[0];
-	sb->sv_free_blocks = &sbd->s_tfree;
-	sb->sv_sb_time = &sbd->s_time;
-	sb->sv_firstdatazone = fs16_to_cpu(sb, sbd->s_isize);
-	sb->sv_nzones = fs32_to_cpu(sb, sbd->s_fsize);
+	sbi->s_link_max = V7_LINK_MAX;
+	sbi->s_fic_size = V7_NICINOD;
+	sbi->s_flc_size = V7_NICFREE;
+	sbi->s_sbd1 = (char *)sbd;
+	sbi->s_sbd2 = (char *)sbd;
+	sbi->s_sb_fic_count = &sbd->s_ninode;
+	sbi->s_sb_fic_inodes = &sbd->s_inode[0];
+	sbi->s_sb_total_free_inodes = &sbd->s_tinode;
+	sbi->s_bcache_count = &sbd->s_nfree;
+	sbi->s_bcache = &sbd->s_free[0];
+	sbi->s_free_blocks = &sbd->s_tfree;
+	sbi->s_sb_time = &sbd->s_time;
+	sbi->s_firstdatazone = fs16_to_cpu(sbi, sbd->s_isize);
+	sbi->s_nzones = fs32_to_cpu(sbi, sbd->s_fsize);
 }
 
-static int detect_xenix (struct super_block *sb, struct buffer_head *bh)
+static int detect_xenix(struct sysv_sb_info *sbi, struct buffer_head *bh)
 {
-	struct xenix_super_block * sbd = (struct xenix_super_block *)bh->b_data;
+	struct xenix_super_block *sbd = (struct xenix_super_block *)bh->b_data;
 	if (sbd->s_magic == cpu_to_le32(0x2b5544))
-		sb->sv_bytesex = BYTESEX_LE;
+		sbi->s_bytesex = BYTESEX_LE;
 	else if (sbd->s_magic == cpu_to_be32(0x2b5544))
-		sb->sv_bytesex = BYTESEX_BE;
+		sbi->s_bytesex = BYTESEX_BE;
 	else
 		return 0;
 	if (sbd->s_type > 2 || sbd->s_type < 1)
 		return 0;
-	sb->sv_type = FSTYPE_XENIX;
+	sbi->s_type = FSTYPE_XENIX;
 	return sbd->s_type;
 }
 
-static int detect_sysv (struct super_block *sb, struct buffer_head *bh)
+static int detect_sysv(struct sysv_sb_info *sbi, struct buffer_head *bh)
 {
+	struct super_block *sb = sbi->s_sb;
 	/* All relevant fields are at the same offsets in R2 and R4 */
 	struct sysv4_super_block * sbd;
 
 	sbd = (struct sysv4_super_block *) (bh->b_data + BLOCK_SIZE/2);
 	if (sbd->s_magic == cpu_to_le32(0xfd187e20))
-		sb->sv_bytesex = BYTESEX_LE;
+		sbi->s_bytesex = BYTESEX_LE;
 	else if (sbd->s_magic == cpu_to_be32(0xfd187e20))
-		sb->sv_bytesex = BYTESEX_BE;
+		sbi->s_bytesex = BYTESEX_BE;
 	else
 		return 0;
  
- 	if (fs16_to_cpu(sb, sbd->s_nfree) == 0xffff) {
- 		sb->sv_type = FSTYPE_AFS;
+ 	if (fs16_to_cpu(sbi, sbd->s_nfree) == 0xffff) {
+ 		sbi->s_type = FSTYPE_AFS;
  		if (!(sb->s_flags & MS_RDONLY)) {
  			printk("SysV FS: SCO EAFS on %s detected, " 
  				"forcing read-only mode.\n", 
@@ -214,11 +215,11 @@ static int detect_sysv (struct super_block *sb, struct buffer_head *bh)
  		return sbd->s_type;
  	}
  
-	if (fs32_to_cpu(sb, sbd->s_time) < JAN_1_1980) {
+	if (fs32_to_cpu(sbi, sbd->s_time) < JAN_1_1980) {
 		/* this is likely to happen on SystemV2 FS */
 		if (sbd->s_type > 3 || sbd->s_type < 1)
 			return 0;
-		sb->sv_type = FSTYPE_SYSV2;
+		sbi->s_type = FSTYPE_SYSV2;
 		return sbd->s_type;
 	}
 	if ((sbd->s_type > 3 || sbd->s_type < 1) &&
@@ -236,11 +237,11 @@ static int detect_sysv (struct super_block *sb, struct buffer_head *bh)
 		sb->s_flags |= MS_RDONLY;
 	}
 
-	sb->sv_type = FSTYPE_SYSV4;
+	sbi->s_type = FSTYPE_SYSV4;
 	return sbd->s_type >= 0x10 ? (sbd->s_type >> 4) : sbd->s_type;
 }
 
-static int detect_coherent (struct super_block *sb, struct buffer_head *bh)
+static int detect_coherent(struct sysv_sb_info *sbi, struct buffer_head *bh)
 {
 	struct coh_super_block * sbd;
 
@@ -248,21 +249,21 @@ static int detect_coherent (struct super_block *sb, struct buffer_head *bh)
 	if ((memcmp(sbd->s_fname,"noname",6) && memcmp(sbd->s_fname,"xxxxx ",6))
 	    || (memcmp(sbd->s_fpack,"nopack",6) && memcmp(sbd->s_fpack,"xxxxx\n",6)))
 		return 0;
-	sb->sv_bytesex = BYTESEX_PDP;
-	sb->sv_type = FSTYPE_COH;
+	sbi->s_bytesex = BYTESEX_PDP;
+	sbi->s_type = FSTYPE_COH;
 	return 1;
 }
 
-static int detect_sysv_odd(struct super_block *sb, struct buffer_head *bh)
+static int detect_sysv_odd(struct sysv_sb_info *sbi, struct buffer_head *bh)
 {
-	int size = detect_sysv(sb, bh);
+	int size = detect_sysv(sbi, bh);
 
 	return size>2 ? 0 : size;
 }
 
 static struct {
 	int block;
-	int (*test)(struct super_block *, struct buffer_head *);
+	int (*test)(struct sysv_sb_info *, struct buffer_head *);
 } flavours[] = {
 	{1, detect_xenix},
 	{0, detect_sysv},
@@ -281,7 +282,7 @@ static char *flavour_names[] = {
 	[FSTYPE_AFS]	"AFS",
 };
 
-static void (*flavour_setup[])(struct super_block *) = {
+static void (*flavour_setup[])(struct sysv_sb_info *) = {
 	[FSTYPE_XENIX]	detected_xenix,
 	[FSTYPE_SYSV4]	detected_sysv4,
 	[FSTYPE_SYSV2]	detected_sysv2,
@@ -292,34 +293,35 @@ static void (*flavour_setup[])(struct super_block *) = {
 
 static int complete_read_super(struct super_block *sb, int silent, int size)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
 	struct inode *root_inode;
-	char *found = flavour_names[sb->sv_type];
+	char *found = flavour_names[sbi->s_type];
 	u_char n_bits = size+8;
 	int bsize = 1 << n_bits;
 	int bsize_4 = bsize >> 2;
 
-	sb->sv_firstinodezone = 2;
+	sbi->s_firstinodezone = 2;
 
-	flavour_setup[sb->sv_type](sb);
+	flavour_setup[sbi->s_type](sbi);
 	
-	sb->sv_truncate = 1;
-	sb->sv_ndatazones = sb->sv_nzones - sb->sv_firstdatazone;
-	sb->sv_inodes_per_block = bsize >> 6;
-	sb->sv_inodes_per_block_1 = (bsize >> 6)-1;
-	sb->sv_inodes_per_block_bits = n_bits-6;
-	sb->sv_ind_per_block = bsize_4;
-	sb->sv_ind_per_block_2 = bsize_4*bsize_4;
-	sb->sv_toobig_block = 10 + bsize_4 * (1 + bsize_4 * (1 + bsize_4));
-	sb->sv_ind_per_block_bits = n_bits-2;
+	sbi->s_truncate = 1;
+	sbi->s_ndatazones = sbi->s_nzones - sbi->s_firstdatazone;
+	sbi->s_inodes_per_block = bsize >> 6;
+	sbi->s_inodes_per_block_1 = (bsize >> 6)-1;
+	sbi->s_inodes_per_block_bits = n_bits-6;
+	sbi->s_ind_per_block = bsize_4;
+	sbi->s_ind_per_block_2 = bsize_4*bsize_4;
+	sbi->s_toobig_block = 10 + bsize_4 * (1 + bsize_4 * (1 + bsize_4));
+	sbi->s_ind_per_block_bits = n_bits-2;
 
-	sb->sv_ninodes = (sb->sv_firstdatazone - sb->sv_firstinodezone)
-		<< sb->sv_inodes_per_block_bits;
+	sbi->s_ninodes = (sbi->s_firstdatazone - sbi->s_firstinodezone)
+		<< sbi->s_inodes_per_block_bits;
 
 	if (!silent)
 		printk("VFS: Found a %s FS (block size = %ld) on device %s\n",
 		       found, sb->s_blocksize, sb->s_id);
 
-	sb->s_magic = SYSV_MAGIC_BASE + sb->sv_type;
+	sb->s_magic = SYSV_MAGIC_BASE + sbi->s_type;
 	/* set up enough so that it can read an inode */
 	sb->s_op = &sysv_sops;
 	root_inode = iget(sb,SYSV_ROOT_INO);
@@ -333,7 +335,7 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 		printk("SysV FS: get root dentry failed\n");
 		return 0;
 	}
-	if (sb->sv_truncate)
+	if (sbi->s_truncate)
 		sb->s_root->d_op = &sysv_dentry_operations;
 	sb->s_flags |= MS_RDONLY;
 	sb->s_dirt = 1;
@@ -342,6 +344,7 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 
 static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
 	struct buffer_head *bh1;
 	struct buffer_head *bh = NULL;
 	unsigned long blocknr;
@@ -358,14 +361,16 @@ static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 	if (64 != sizeof (struct sysv_inode))
 		panic("sysv fs: bad i-node size");
 	sb_set_blocksize(sb, BLOCK_SIZE);
-	sb->sv_block_base = 0;
+
+	sbi->s_sb = sb;
+	sbi->s_block_base = 0;
 
 	for (i = 0; i < sizeof(flavours)/sizeof(flavours[0]) && !size; i++) {
 		brelse(bh);
 		bh = sb_bread(sb, flavours[i].block);
 		if (!bh)
 			continue;
-		size = flavours[i].test(sb, bh);
+		size = flavours[i].test(SYSV_SB(sb), bh);
 	}
 
 	if (!size)
@@ -393,8 +398,8 @@ static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 	}
 
 	if (bh && bh1) {
-		sb->sv_bh1 = bh1;
-		sb->sv_bh2 = bh;
+		sbi->s_bh1 = bh1;
+		sbi->s_bh2 = bh;
 		if (complete_read_super(sb, silent, size))
 			return 0;
 	}
@@ -422,6 +427,7 @@ Ebadsize:
 
 static int v7_fill_super(struct super_block *sb, void *data, int silent)
 {
+	struct sysv_sb_info *sbi = SYSV_SB(sb);
 	struct buffer_head *bh, *bh2 = NULL;
 	struct v7_super_block *v7sb;
 	struct sysv_inode *v7i;
@@ -431,8 +437,9 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	if (64 != sizeof (struct sysv_inode))
 		panic("sysv fs: bad i-node size");
 
-	sb->sv_type = FSTYPE_V7;
-	sb->sv_bytesex = BYTESEX_PDP;
+	sbi->s_sb = sb;
+	sbi->s_type = FSTYPE_V7;
+	sbi->s_bytesex = BYTESEX_PDP;
 
 	sb_set_blocksize(sb, 512);
 
@@ -445,9 +452,9 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 
 	/* plausibility check on superblock */
 	v7sb = (struct v7_super_block *) bh->b_data;
-	if (fs16_to_cpu(sb,v7sb->s_nfree) > V7_NICFREE ||
-	    fs16_to_cpu(sb,v7sb->s_ninode) > V7_NICINOD ||
-	    fs32_to_cpu(sb,v7sb->s_time) == 0)
+	if (fs16_to_cpu(sbi, v7sb->s_nfree) > V7_NICFREE ||
+	    fs16_to_cpu(sbi, v7sb->s_ninode) > V7_NICINOD ||
+	    fs32_to_cpu(sbi, v7sb->s_time) == 0)
 		goto failed;
 
 	/* plausibility check on root inode: it is a directory,
@@ -455,14 +462,14 @@ static int v7_fill_super(struct super_block *sb, void *data, int silent)
 	if ((bh2 = sb_bread(sb, 2)) == NULL)
 		goto failed;
 	v7i = (struct sysv_inode *)(bh2->b_data + 64);
-	if ((fs16_to_cpu(sb,v7i->i_mode) & ~0777) != S_IFDIR ||
-	    (fs32_to_cpu(sb,v7i->i_size) == 0) ||
-	    (fs32_to_cpu(sb,v7i->i_size) & 017) != 0)
+	if ((fs16_to_cpu(sbi, v7i->i_mode) & ~0777) != S_IFDIR ||
+	    (fs32_to_cpu(sbi, v7i->i_size) == 0) ||
+	    (fs32_to_cpu(sbi, v7i->i_size) & 017) != 0)
 		goto failed;
 	brelse(bh2);
 
-	sb->sv_bh1 = bh;
-	sb->sv_bh2 = bh;
+	sbi->s_bh1 = bh;
+	sbi->s_bh2 = bh;
 	if (complete_read_super(sb, silent, 1))
 		return 0;
 

@@ -104,7 +104,8 @@ static int sysv_readdir(struct file * filp, void * dirent, filldir_t filldir)
 
 			over = filldir(dirent, name, strnlen(name,SYSV_NAMELEN),
 					(n<<PAGE_CACHE_SHIFT) | offset,
-					fs16_to_cpu(sb, de->inode), DT_UNKNOWN);
+					fs16_to_cpu(SYSV_SB(sb), de->inode),
+					DT_UNKNOWN);
 			if (over) {
 				dir_put_page(page);
 				goto done;
@@ -228,7 +229,7 @@ got_it:
 		goto out_unlock;
 	memcpy (de->name, name, namelen);
 	memset (de->name + namelen, 0, SYSV_DIRSIZE - namelen - 2);
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	err = dir_commit_chunk(page, from, to);
 	dir->i_mtime = dir->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(dir);
@@ -280,10 +281,10 @@ int sysv_make_empty(struct inode *inode, struct inode *dir)
 	memset(base, 0, PAGE_CACHE_SIZE);
 
 	de = (struct sysv_dir_entry *) base;
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	strcpy(de->name,".");
 	de++;
-	de->inode = cpu_to_fs16(inode->i_sb, dir->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), dir->i_ino);
 	strcpy(de->name,"..");
 
 	err = dir_commit_chunk(page, 0, 2 * SYSV_DIRSIZE);
@@ -321,7 +322,8 @@ int sysv_empty_dir(struct inode * inode)
 			if (de->name[0] != '.')
 				goto not_empty;
 			if (!de->name[1]) {
-				if (de->inode == cpu_to_fs16(sb, inode->i_ino))
+				if (de->inode == cpu_to_fs16(SYSV_SB(sb),
+							inode->i_ino))
 					continue;
 				goto not_empty;
 			}
@@ -350,7 +352,7 @@ void sysv_set_link(struct sysv_dir_entry *de, struct page *page,
 	err = page->mapping->a_ops->prepare_write(NULL, page, from, to);
 	if (err)
 		BUG();
-	de->inode = cpu_to_fs16(inode->i_sb, inode->i_ino);
+	de->inode = cpu_to_fs16(SYSV_SB(inode->i_sb), inode->i_ino);
 	err = dir_commit_chunk(page, from, to);
 	UnlockPage(page);
 	dir_put_page(page);
@@ -377,7 +379,7 @@ ino_t sysv_inode_by_name(struct dentry *dentry)
 	ino_t res = 0;
 	
 	if (de) {
-		res = fs16_to_cpu(dentry->d_sb, de->inode);
+		res = fs16_to_cpu(SYSV_SB(dentry->d_sb), de->inode);
 		dir_put_page(page);
 	}
 	return res;
