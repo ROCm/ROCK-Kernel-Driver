@@ -197,9 +197,9 @@ static int el3_rx(struct net_device *dev);
 static int el3_close(struct net_device *dev);
 static void set_multicast_list(struct net_device *dev);
 static void el3_tx_timeout (struct net_device *dev);
-static int netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static void el3_down(struct net_device *dev);
 static void el3_up(struct net_device *dev);
+static struct ethtool_ops ethtool_ops;
 #ifdef CONFIG_PM
 static int el3_suspend(struct pm_dev *pdev);
 static int el3_resume(struct pm_dev *pdev);
@@ -321,7 +321,7 @@ static int __init el3_common_init(struct net_device *dev)
 	dev->set_multicast_list = &set_multicast_list;
 	dev->tx_timeout = el3_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
-	dev->do_ioctl = netdev_ioctl;
+	SET_ETHTOOL_OPS(dev, &ethtool_ops);
 
 	err = register_netdev(dev);
 	if (err) {
@@ -1285,122 +1285,63 @@ el3_netdev_set_ecmd(struct net_device *dev, struct ethtool_cmd *ecmd)
 	return 0;
 }
 
-/**
- * netdev_ethtool_ioctl: Handle network interface SIOCETHTOOL ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @useraddr: userspace address to which data is to be read and returned
- *
- * Process the various commands of the SIOCETHTOOL interface.
- */
-
-static int
-netdev_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
+static void el3_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
 {
-	u32 ethcmd;
+	strcpy(info->driver, DRV_NAME);
+	strcpy(info->version, DRV_VERSION);
+}
+
+static int el3_get_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
+{
 	struct el3_private *lp = netdev_priv(dev);
+	int ret;
 
-	/* dev_ioctl() in ../../net/core/dev.c has already checked
-	   capable(CAP_NET_ADMIN), so don't bother with that here.  */
-
-	if (get_user(ethcmd, (u32 __user *)useraddr))
-		return -EFAULT;
-
-	switch (ethcmd) {
-
-	case ETHTOOL_GDRVINFO: {
-		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
-		strcpy (info.driver, DRV_NAME);
-		strcpy (info.version, DRV_VERSION);
-		if (copy_to_user (useraddr, &info, sizeof (info)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get settings */
-	case ETHTOOL_GSET: {
-		int ret;
-		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
-		spin_lock_irq(&lp->lock);
-		ret = el3_netdev_get_ecmd(dev, &ecmd);
-		spin_unlock_irq(&lp->lock);
-		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
-			return -EFAULT;
-		return ret;
-	}
-
-	/* set settings */
-	case ETHTOOL_SSET: {
-		int ret;
-		struct ethtool_cmd ecmd;
-		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
-			return -EFAULT;
-		spin_lock_irq(&lp->lock);
-		ret = el3_netdev_set_ecmd(dev, &ecmd);
-		spin_unlock_irq(&lp->lock);
-		return ret;
-	}
-
-	/* get link status */
-	case ETHTOOL_GLINK: {
-		struct ethtool_value edata = { ETHTOOL_GLINK };
-		spin_lock_irq(&lp->lock);
-		edata.data = el3_link_ok(dev);
-		spin_unlock_irq(&lp->lock);
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-
-	/* get message-level */
-	case ETHTOOL_GMSGLVL: {
-		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
-		edata.data = el3_debug;
-		if (copy_to_user(useraddr, &edata, sizeof(edata)))
-			return -EFAULT;
-		return 0;
-	}
-	/* set message-level */
-	case ETHTOOL_SMSGLVL: {
-		struct ethtool_value edata;
-		if (copy_from_user(&edata, useraddr, sizeof(edata)))
-			return -EFAULT;
-		el3_debug = edata.data;
-		return 0;
-	}
-
-	default:
-		break;
-	}
-
-	return -EOPNOTSUPP;
+	spin_lock_irq(&lp->lock);
+	ret = el3_netdev_get_ecmd(dev, ecmd);
+	spin_unlock_irq(&lp->lock);
+	return ret;
 }
 
-/**
- * netdev_ioctl: Handle network interface ioctls
- * @dev: network interface on which out-of-band action is to be performed
- * @rq: user request data
- * @cmd: command issued by user
- *
- * Process the various out-of-band ioctls passed to this driver.
- */
-
-static int
-netdev_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+static int el3_set_settings(struct net_device *dev, struct ethtool_cmd *ecmd)
 {
-	int rc = 0;
+	struct el3_private *lp = netdev_priv(dev);
+	int ret;
 
-	switch (cmd) {
-	case SIOCETHTOOL:
-		rc = netdev_ethtool_ioctl(dev, rq->ifr_data);
-		break;
-
-	default:
-		rc = -EOPNOTSUPP;
-		break;
-	}
-
-	return rc;
+	spin_lock_irq(&lp->lock);
+	ret = el3_netdev_set_ecmd(dev, ecmd);
+	spin_unlock_irq(&lp->lock);
+	return ret;
 }
+
+static u32 el3_get_link(struct net_device *dev)
+{
+	struct el3_private *lp = netdev_priv(dev);
+	u32 ret;
+
+	spin_lock_irq(&lp->lock);
+	ret = el3_link_ok(dev);
+	spin_unlock_irq(&lp->lock);
+	return ret;
+}
+
+static u32 el3_get_msglevel(struct net_device *dev)
+{
+	return el3_debug;
+}
+
+static void el3_set_msglevel(struct net_device *dev, u32 v)
+{
+	el3_debug = v;
+}
+
+static struct ethtool_ops ethtool_ops = {
+	.get_drvinfo = el3_get_drvinfo,
+	.get_settings = el3_get_settings,
+	.set_settings = el3_set_settings,
+	.get_link = el3_get_link,
+	.get_msglevel = el3_get_msglevel,
+	.set_msglevel = el3_set_msglevel,
+};
 
 static void
 el3_down(struct net_device *dev)
