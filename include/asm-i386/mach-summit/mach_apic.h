@@ -26,12 +26,6 @@ static inline unsigned long calculate_ldr(unsigned long old)
 #define APIC_BROADCAST_ID     (x86_summit ? 0xFF : 0x0F)
 #define check_apicid_used(bitmap, apicid) (0)
 
-static inline void summit_check(char *oem, char *productid)
-{
-	if (!strncmp(oem, "IBM ENSW", 8) && !strncmp(str, "VIGIL SMP", 9))
-		x86_summit = 1;
-}
-
 static inline void clustered_apic_check(void)
 {
 	printk("Enabling APIC mode:  %s.  Using %d I/O APICs\n",

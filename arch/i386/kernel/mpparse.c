@@ -32,6 +32,7 @@
 #include <asm/io_apic.h>
 
 #include <mach_apic.h>
+#include <mach_mpparse.h>
 
 /* Have we found an MP table */
 int smp_found_config;
@@ -191,28 +192,18 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 static void __init MP_bus_info (struct mpc_config_bus *m)
 {
 	char str[7];
-	int quad;
 
 	memcpy(str, m->mpc_bustype, 6);
 	str[6] = 0;
-	
-	if (clustered_apic_mode) {
-		quad = translation_table[mpc_record]->trans_quad;
-		mp_bus_id_to_node[m->mpc_busid] = quad;
-		mp_bus_id_to_local[m->mpc_busid] = translation_table[mpc_record]->trans_local;
-		printk("Bus #%d is %s (node %d)\n", m->mpc_busid, str, quad);
-	} else {
-		Dprintk("Bus #%d is %s\n", m->mpc_busid, str);
-	}
+
+	mpc_oem_bus_info(m, str, translation_table[mpc_record]);
 
 	if (strncmp(str, BUSTYPE_ISA, sizeof(BUSTYPE_ISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_ISA;
 	} else if (strncmp(str, BUSTYPE_EISA, sizeof(BUSTYPE_EISA)-1) == 0) {
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_EISA;
 	} else if (strncmp(str, BUSTYPE_PCI, sizeof(BUSTYPE_PCI)-1) == 0) {
-		if (clustered_apic_mode){
-			quad_local_to_mp_bus_id[quad][translation_table[mpc_record]->trans_local] = m->mpc_busid;
-		}
+		mpc_oem_pci_bus(m, translation_table[mpc_record]);
 		mp_bus_id_to_type[m->mpc_busid] = MP_BUS_PCI;
 		mp_bus_id_to_pci_bus[m->mpc_busid] = mp_current_pci_id;
 		mp_current_pci_id++;
@@ -300,6 +291,7 @@ static void __init smp_read_mpc_oem(struct mp_config_oemtable *oemtable, \
 	int count = sizeof (*oemtable); /* the header size */
 	unsigned char *oemptr = ((unsigned char *)oemtable)+count;
 	
+	mpc_record = 0;
 	printk("Found an OEM MPC table at %8p - parsing it ... \n", oemtable);
 	if (memcmp(oemtable->oem_signature,MPC_OEM_SIGNATURE,4))
 	{
@@ -376,7 +368,7 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	str[12]=0;
 	printk("Product ID: %s ",str);
 
-	summit_check(oem, str);
+	mps_oem_check(mpc, oem, str);
 
 	printk("APIC at: 0x%lX\n",mpc->mpc_lapic);
 
@@ -387,16 +379,10 @@ static int __init smp_read_mpc(struct mp_config_table *mpc)
 	if (!acpi_lapic)
 		mp_lapic_addr = mpc->mpc_lapic;
 
-	if (clustered_apic_mode && mpc->mpc_oemptr) {
-		/* We need to process the oem mpc tables to tell us which quad things are in ... */
-		mpc_record = 0;
-		smp_read_mpc_oem((struct mp_config_oemtable *) mpc->mpc_oemptr, mpc->mpc_oemsize);
-		mpc_record = 0;
-	}
-
 	/*
 	 *	Now process the configuration blocks.
 	 */
+	mpc_record = 0;
 	while (count < mpc->mpc_length) {
 		switch(*mpt) {
 			case MP_PROCESSOR:

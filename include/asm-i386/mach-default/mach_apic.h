@@ -14,10 +14,6 @@
 #define APIC_BROADCAST_ID      0x0F
 #define check_apicid_used(bitmap, apicid) (bitmap & (1 << apicid))
 
-static inline void summit_check(char *oem, char *productid) 
-{
-}
-
 static inline int apic_id_registered(void)
 {
 	return (test_bit(GET_APIC_ID(apic_read(APIC_ID)), 
