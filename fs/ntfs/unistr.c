@@ -276,7 +276,7 @@ int ntfs_nlstoucs(const ntfs_volume *vol, const char *ins,
 				} /* else (wc_len < 0) */
 				goto conversion_err;
 			}
-			ucs[o] = cpu_to_le16('\0');
+			ucs[o] = cpu_to_le16(0);
 			*outs = ucs;
 			return o;
 		} /* else (!ucs) */
@@ -362,7 +362,7 @@ retry:			wc = nls->uni2char(le16_to_cpu(ins[i]), ns + o,
 			} /* wc < 0, real error. */
 			goto conversion_err;
 		}
-		ns[o] = '\0';
+		ns[o] = 0;
 		*outs = ns;
 		return o;
 	} /* else (!ins) */

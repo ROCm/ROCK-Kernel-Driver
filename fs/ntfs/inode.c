@@ -130,7 +130,7 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 		if (!ni->name)
 			return -ENOMEM;
 		memcpy(ni->name, na->name, i);
-		ni->name[i] = cpu_to_le16(L'\0');
+		ni->name[i] = cpu_to_le16(0);
 	}
 	return 0;
 }
@@ -2270,6 +2270,12 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
  *
  * We don't support i_size changes yet.
  *
+ * The kernel guarantees that @vi is a regular file (S_ISREG() is true) and
+ * that the change is allowed.
+ *
+ * This implies for us that @vi is a file inode rather than a directory, index,
+ * or attribute inode as well as that @vi is a base inode.
+ *
  * Called with ->i_sem held.  In all but one case ->i_alloc_sem is held for
  * writing.  The only case where ->i_alloc_sem is not held is
  * mm/filemap.c::generic_file_buffered_write() where vmtruncate() is called
@@ -2279,10 +2285,10 @@ int ntfs_show_options(struct seq_file *sf, struct vfsmount *mnt)
 void ntfs_truncate(struct inode *vi)
 {
 	// TODO: Implement...
-	ntfs_warning(vi->i_sb, "Eeek: i_size may have changed! If you see "
+	ntfs_warning(vi->i_sb, "Eeek: i_size may have changed!  If you see "
 			"this right after a message from "
-			"ntfs_{prepare,commit}_{,nonresident_}write() then "
-			"just ignore it. Otherwise it is bad news.");
+			"ntfs_prepare_{,nonresident_}write() then just ignore "
+			"it.  Otherwise it is bad news.");
 	// TODO: reset i_size now!
 	return;
 }

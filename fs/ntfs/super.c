@@ -145,7 +145,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	ntfs_debug("Entering with mount options string: %s", opt);
 	while ((p = strsep(&opt, ","))) {
 		if ((v = strchr(p, '=')))
-			*v++ = '\0';
+			*v++ = 0;
 		NTFS_GETOPT("uid", uid)
 		else NTFS_GETOPT("gid", gid)
 		else NTFS_GETOPT("umask", fmask = dmask)
