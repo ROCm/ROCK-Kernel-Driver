@@ -4,7 +4,7 @@
  * Copyright (C) 2000  Stuart Menefy
  *
  * Provide real functions which expand to whatever the header file defined.
- * Also definitions of machine independant IO functions.
+ * Also definitions of machine independent IO functions.
  */
 
 #include <asm/io.h>

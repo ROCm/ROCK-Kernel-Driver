@@ -345,10 +345,9 @@ static void scsi_dump_status(int level)
 	i = 0;
 	for (shpnt = scsi_host_get_next(NULL); shpnt;
 	     shpnt = scsi_host_get_next(shpnt)) {
-		printk(KERN_INFO " %d %d %d : %d %d\n",
+		printk(KERN_INFO " %d %d : %d %d\n",
 		       shpnt->host_failed,
 		       shpnt->host_busy,
-		       atomic_read(&shpnt->host_active),
 		       shpnt->host_blocked,
 		       shpnt->host_self_blocked);
 	}

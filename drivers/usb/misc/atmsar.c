@@ -45,7 +45,7 @@
  *		- No more in-buffer rewriting for cloned buffers.
  *		- Removed the PII specific CFLAGS in the Makefile.
  *
- *  0.2.1:	- removed dependancy on alloc_tx. tis presented problems when
+ *  0.2.1:	- removed dependency on alloc_tx. tis presented problems when
  *		using this with the br2684 code.
  *
  *  0.2:	- added AAL0 reassembly

@@ -22,7 +22,7 @@
  * mb() prevents loads and stores being reordered across this point.
  * rmb() prevents loads being reordered across this point.
  * wmb() prevents stores being reordered across this point.
- * read_barrier_depends() prevents data-dependant loads being reordered
+ * read_barrier_depends() prevents data-dependent loads being reordered
  *	across this point (nop on PPC).
  *
  * We can use the eieio instruction for wmb, but since it doesn't

@@ -277,12 +277,40 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 	else
 		child->ptrace &= ~PT_TRACE_EXEC;
 
+	if (data & PTRACE_O_TRACEVFORKDONE)
+		child->ptrace |= PT_TRACE_VFORK_DONE;
+	else
+		child->ptrace &= ~PT_TRACE_VFORK_DONE;
+
+	if (data & PTRACE_O_TRACEEXIT)
+		child->ptrace |= PT_TRACE_EXIT;
+	else
+		child->ptrace &= ~PT_TRACE_EXIT;
+
 	if ((data & (PTRACE_O_TRACESYSGOOD | PTRACE_O_TRACEFORK
 		    | PTRACE_O_TRACEVFORK | PTRACE_O_TRACECLONE
-		    | PTRACE_O_TRACEEXEC))
+		    | PTRACE_O_TRACEEXEC | PTRACE_O_TRACEEXIT
+		    | PTRACE_O_TRACEVFORKDONE))
 	    != data)
 		return -EINVAL;
 
+	return 0;
+}
+
+static int ptrace_getsiginfo(struct task_struct *child, long data)
+{
+	if (child->last_siginfo == NULL)
+		return -EINVAL;
+	return copy_siginfo_to_user ((siginfo_t *) data, child->last_siginfo);
+}
+
+static int ptrace_setsiginfo(struct task_struct *child, long data)
+{
+	if (child->last_siginfo == NULL)
+		return -EINVAL;
+	if (copy_from_user (child->last_siginfo, (siginfo_t *) data,
+			    sizeof (siginfo_t)) != 0)
+		return -EFAULT;
 	return 0;
 }
 
@@ -300,6 +328,12 @@ int ptrace_request(struct task_struct *child, long request,
 		break;
 	case PTRACE_GETEVENTMSG:
 		ret = put_user(child->ptrace_message, (unsigned long *) data);
+		break;
+	case PTRACE_GETSIGINFO:
+		ret = ptrace_getsiginfo(child, data);
+		break;
+	case PTRACE_SETSIGINFO:
+		ret = ptrace_setsiginfo(child, data);
 		break;
 	default:
 		break;

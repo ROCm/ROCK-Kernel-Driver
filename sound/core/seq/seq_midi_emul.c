@@ -506,7 +506,7 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 	len--;
 
 	/* GM on */
-	if (len >= sizeof(gm_on_macro) &&
+	if (len >= (int)sizeof(gm_on_macro) &&
 	    memcmp(buf, gm_on_macro, sizeof(gm_on_macro)) == 0) {
 		if (chset->midi_mode != SNDRV_MIDI_MODE_GS &&
 		    chset->midi_mode != SNDRV_MIDI_MODE_XG) {
@@ -568,7 +568,7 @@ sysex(snd_midi_op_t *ops, void *private, unsigned char *buf, int len, snd_midi_c
 	}
 
 	/* XG on */
-	else if (len >= sizeof(xg_on_macro) &&
+	else if (len >= (int)sizeof(xg_on_macro) &&
 		 memcmp(buf, xg_on_macro, sizeof(xg_on_macro)) == 0) {
 		int i;
 		chset->midi_mode = SNDRV_MIDI_MODE_XG;

@@ -895,7 +895,7 @@ int setup_profiling_timer(unsigned int multiplier)
  * value into /proc/profile.
  */
 
-inline void smp_local_timer_interrupt(struct pt_regs *regs)
+void smp_local_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 

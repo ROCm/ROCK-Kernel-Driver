@@ -105,7 +105,7 @@ static int snd_pcm_control_ioctl(snd_card_t * card,
 			if (subdevice >= pstr->substream_count)
 				return -ENXIO;
 			for (substream = pstr->substream; substream; substream = substream->next)
-				if (substream->number == subdevice)
+				if (substream->number == (int)subdevice)
 					break;
 			if (substream == NULL)
 				return -ENXIO;

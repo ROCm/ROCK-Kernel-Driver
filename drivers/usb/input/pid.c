@@ -176,7 +176,7 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 	struct hid_ff_pid* pid_private  = (struct hid_ff_pid*)(dev->private);
 	int ret;
 	int is_update;
-	int flags=0;
+	unsigned long flags = 0;
 
         dev_dbg(&pid_private->hid->dev->dev, "upload effect called: effect_type=%x\n",effect->type);
 	/* Check this effect type is supported by this device */
@@ -192,7 +192,7 @@ static int hid_pid_upload_effect(struct input_dev *dev,
 		int id=0;
 
 		// Spinlock so we don`t get a race condition when choosing IDs
-		spin_lock_irqsave(&pid_private->lock,flags);
+		spin_lock_irqsave(&pid_private->lock, flags);
 
 		while(id < FF_EFFECTS_MAX)
 			if (!test_and_set_bit(FF_PID_FLAGS_USED, &pid_private->effects[id++].flags)) 

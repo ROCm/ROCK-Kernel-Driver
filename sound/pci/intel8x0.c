@@ -711,7 +711,7 @@ static void snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	intel8x0_t *chip = snd_magic_cast(intel8x0_t, dev_id, return);
 	ichdev_t *ichdev;
 	unsigned int status;
-	int i;
+	unsigned int i;
 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
@@ -1851,7 +1851,8 @@ static int snd_intel8x0_ali_chip_init(intel8x0_t *chip)
 
 static int snd_intel8x0_chip_init(intel8x0_t *chip)
 {
-	int i, err;
+	unsigned int i;
+	int err;
 	
 	if (chip->device_type != DEVICE_ALI)
 		err = snd_intel8x0_ich_chip_init(chip);
@@ -1876,7 +1877,7 @@ static int snd_intel8x0_chip_init(intel8x0_t *chip)
 
 static int snd_intel8x0_free(intel8x0_t *chip)
 {
-	int i;
+	unsigned int i;
 
 	if (chip->irq < 0)
 		goto __hw_end;
@@ -2129,7 +2130,8 @@ static int __devinit snd_intel8x0_create(snd_card_t * card,
 					 intel8x0_t ** r_intel8x0)
 {
 	intel8x0_t *chip;
-	int err, i;
+	int err;
+	unsigned int i;
 	unsigned int int_sta_masks;
 	ichdev_t *ichdev;
 	static snd_device_ops_t ops = {

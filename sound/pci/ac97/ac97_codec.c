@@ -67,6 +67,7 @@ static const ac97_codec_id_t snd_ac97_codec_id_vendors[] = {
 { 0x434d4900, 0xffffff00, "C-Media Electronics", NULL },
 { 0x43525900, 0xffffff00, "Cirrus Logic",	NULL },
 { 0x43585400, 0xffffff00, "Conexant",           NULL },
+{ 0x44543000, 0xffffff00, "Diamond Technology", NULL },
 { 0x454d4300, 0xffffff00, "eMicro",		NULL },
 { 0x45838300, 0xffffff00, "ESS Technology",	NULL },
 { 0x48525300, 0xffffff00, "Intersil",		NULL },
@@ -120,6 +121,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x43525960, 0xfffffff8, "CS4291",		NULL },
 { 0x43585421, 0xffffffff, "HSD11246",		NULL },	// SmartMC II
 { 0x43585428, 0xfffffff8, "Cx20468",		patch_conexant }, // SmartAMC fixme: the mask might be different
+{ 0x44543031, 0xfffffff0, "DT0398",		NULL },
 { 0x454d4328, 0xffffffff, "28028",		NULL },  // same as TR28028?
 { 0x45838308, 0xffffffff, "ESS1988",		NULL },
 { 0x48525300, 0xffffff00, "HMP9701",		NULL },
@@ -849,6 +851,36 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 	return change;
 }
 
+static int snd_ac97_put_spsa(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
+{
+	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
+	int reg = kcontrol->private_value & 0xff;
+	int shift = (kcontrol->private_value >> 8) & 0xff;
+	int mask = (kcontrol->private_value >> 16) & 0xff;
+	// int invert = (kcontrol->private_value >> 24) & 0xff;
+	unsigned short value, old, new;
+
+	value = (ucontrol->value.integer.value[0] & mask);
+
+	mask <<= shift;
+	value <<= shift;
+	spin_lock(&ac97->reg_lock);
+	old = ac97->regs[reg];
+	new = (old & ~mask) | value;
+	spin_unlock(&ac97->reg_lock);
+
+	if (old != new) {
+		int change;
+		unsigned short extst = ac97->regs[AC97_EXTENDED_STATUS];
+		snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, 0); /* turn off */
+		change = snd_ac97_update_bits(ac97, reg, mask, value);
+		if (extst & AC97_EA_SPDIF)
+			snd_ac97_update_bits(ac97, AC97_EXTENDED_STATUS, AC97_EA_SPDIF, AC97_EA_SPDIF); /* turn on again */
+		return change;
+	}
+	return 0;
+}
+
 static const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 	{
 		.access = SNDRV_CTL_ELEM_ACCESS_READ,
@@ -873,7 +905,15 @@ static const snd_kcontrol_new_t snd_ac97_controls_spdif[5] = {
 	},
 
 	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,SWITCH),AC97_EXTENDED_STATUS, 2, 1, 0),
-	AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",AC97_EXTENDED_STATUS, 4, 3, 0)
+	// AC97_SINGLE(SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",AC97_EXTENDED_STATUS, 4, 3, 0)
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = SNDRV_CTL_NAME_IEC958("",PLAYBACK,NONE) "AC97-SPSA",
+		.info = snd_ac97_info_single,
+		.get = snd_ac97_get_single,
+		.put = snd_ac97_put_spsa,
+		.private_value = AC97_EXTENDED_STATUS | (4 << 8) | (3 << 16) | (0 << 24),
+	},
 };
 
 static const snd_kcontrol_new_t snd_ac97_cirrus_controls_spdif[2] = {
@@ -995,9 +1035,6 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	/* 8: reserved */
 	AC97_SINGLE("Line-In As Surround", AC97_ALC650_MULTICH, 9, 1, 0),
 	AC97_SINGLE("Mic As Center/LFE", AC97_ALC650_MULTICH, 10, 1, 0),
-	AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
-	AC97_SINGLE("Analog to IEC958 Output", AC97_ALC650_MULTICH, 12, 1, 0),
-	AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 13, 1, 0),
 #if 0 /* always set in patch_alc650 */
 	AC97_SINGLE("IEC958 Input Clock Enable", AC97_ALC650_CLOCK, 0, 1, 0),
 	AC97_SINGLE("IEC958 Input Pin Enable", AC97_ALC650_CLOCK, 1, 1, 0),
@@ -1006,6 +1043,12 @@ static const snd_kcontrol_new_t snd_ac97_controls_alc650[] = {
 	AC97_SINGLE("Center/LFE DAC Switch", AC97_ALC650_LFE_DAC_VOL, 15, 1, 1),
 	AC97_DOUBLE("Center/LFE DAC Volume", AC97_ALC650_LFE_DAC_VOL, 8, 0, 31, 1),
 #endif
+};
+
+static const snd_kcontrol_new_t snd_ac97_spdif_controls_alc650[] = {
+	AC97_SINGLE("IEC958 Capture Switch", AC97_ALC650_MULTICH, 11, 1, 0),
+	AC97_SINGLE("Analog to IEC958 Output", AC97_ALC650_MULTICH, 12, 1, 0),
+	AC97_SINGLE("IEC958 Input Monitor", AC97_ALC650_MULTICH, 13, 1, 0),
 };
 
 /* The following snd_ac97_ymf753_... items added by David Shust (dshust@shustring.com) */
@@ -1303,7 +1346,8 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 {
 	snd_kcontrol_t *kctl;
 	const snd_kcontrol_new_t *knew;
-	int err, idx;
+	int err;
+	unsigned int idx;
 	unsigned char max;
 
 	/* build master controls */
@@ -1658,6 +1702,11 @@ static int snd_ac97_mixer_build(snd_card_t * card, ac97_t * ac97)
 		for (idx = 0; idx < ARRAY_SIZE(snd_ac97_controls_alc650); idx++)
 			if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_controls_alc650[idx], ac97))) < 0)
 				return err;
+		if (ac97->ext_id & AC97_EI_SPDIF) {
+			for (idx = 0; idx < ARRAY_SIZE(snd_ac97_spdif_controls_alc650); idx++)
+				if ((err = snd_ctl_add(card, snd_ac97_cnew(&snd_ac97_spdif_controls_alc650[idx], ac97))) < 0)
+					return err;
+		}
 		break;
 	case AC97_ID_VT1616:
 		if (snd_ac97_try_bit(ac97, 0x5a, 9))
@@ -1748,6 +1797,39 @@ static void snd_ac97_get_name(ac97_t *ac97, unsigned int id, char *name)
 }
 
 
+/* wait for a while until registers are accessible after RESET
+ * return 0 if ok, negative not ready
+ */
+static int ac97_reset_wait(ac97_t *ac97, int timeout, int with_modem)
+{
+	signed long end_time;
+	end_time = jiffies + timeout;
+	do {
+		unsigned short ext_mid;
+		
+		/* use preliminary reads to settle the communication */
+		snd_ac97_read(ac97, AC97_RESET);
+		snd_ac97_read(ac97, AC97_VENDOR_ID1);
+		snd_ac97_read(ac97, AC97_VENDOR_ID2);
+		/* modem? */
+		if (with_modem) {
+			ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
+			if (ext_mid != 0xffff && (ext_mid & 1) != 0)
+				return 0;
+		}
+		/* because the PCM or MASTER volume registers can be modified,
+		 * the REC_GAIN register is used for tests
+		 */
+		/* test if we can write to the record gain volume register */
+		snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
+		if (snd_ac97_read(ac97, AC97_REC_GAIN) == 0x8a05)
+			return 0;
+		set_current_state(TASK_UNINTERRUPTIBLE);
+		schedule_timeout(HZ/100);
+	} while (time_after_eq(end_time, jiffies));
+	return -ENODEV;
+}
+
 /**
  * snd_ac97_mixer - create an AC97 codec component
  * @card: the card instance
@@ -1803,32 +1885,12 @@ int snd_ac97_mixer(snd_card_t * card, ac97_t * _ac97, ac97_t ** rac97)
 		ac97->wait(ac97);
 	else {
 		udelay(50);
-
-		/* it's necessary to wait awhile until registers are accessible after RESET */
-		/* because the PCM or MASTER volume registers can be modified, */
-		/* the REC_GAIN register is used for tests */
-		end_time = jiffies + HZ;
-		do {
-			unsigned short ext_mid;
-		
-			/* use preliminary reads to settle the communication */
-			snd_ac97_read(ac97, AC97_RESET);
-			snd_ac97_read(ac97, AC97_VENDOR_ID1);
-			snd_ac97_read(ac97, AC97_VENDOR_ID2);
-			/* modem? */
-			ext_mid = snd_ac97_read(ac97, AC97_EXTENDED_MID);
-			if (ext_mid != 0xffff && (ext_mid & 1) != 0)
-				goto __access_ok;
-			/* test if we can write to the record gain volume register */
-			snd_ac97_write_cache(ac97, AC97_REC_GAIN, 0x8a05);
-			if ((err = snd_ac97_read(ac97, AC97_REC_GAIN)) == 0x8a05)
-				goto __access_ok;
-			set_current_state(TASK_UNINTERRUPTIBLE);
-			schedule_timeout(HZ/100);
-		} while (time_after_eq(end_time, jiffies));
-		snd_printk("AC'97 %d:%d does not respond - RESET [REC_GAIN = 0x%x]\n", ac97->num, ac97->addr, err);
-		snd_ac97_free(ac97);
-		return -ENXIO;
+		if (ac97_reset_wait(ac97, HZ/2, 0) < 0 &&
+		    ac97_reset_wait(ac97, HZ/2, 1) < 0) {
+			snd_printk("AC'97 %d:%d does not respond - RESET [REC_GAIN = 0x%x]\n", ac97->num, ac97->addr, err);
+			snd_ac97_free(ac97);
+			return -ENXIO;
+		}
 	}
       __access_ok:
 	ac97->id = snd_ac97_read(ac97, AC97_VENDOR_ID1) << 16;

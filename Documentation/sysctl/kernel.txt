@@ -222,7 +222,7 @@ otherwise the 'doze' mode will be used.
 printk:
 
 The four values in printk denote: console_loglevel,
-default_message_loglevel, minimum_console_level and
+default_message_loglevel, minimum_console_loglevel and
 default_console_loglevel respectively.
 
 These values influence printk() behavior when printing or

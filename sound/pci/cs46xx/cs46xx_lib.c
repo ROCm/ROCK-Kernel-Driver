@@ -698,7 +698,7 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 		size_t hw_to_end = buffer_size - cpcm->hw_data;
 		size_t sw_to_end = cpcm->sw_bufsize - cpcm->sw_data;
 		size_t bytes = buffer_size - cpcm->hw_ready;
-		if (cpcm->sw_ready < bytes)
+		if (cpcm->sw_ready < (int)bytes)
 			bytes = cpcm->sw_ready;
 		if (hw_to_end < bytes)
 			bytes = hw_to_end;
@@ -708,7 +708,7 @@ static int snd_cs46xx_playback_transfer(snd_pcm_substream_t *substream,
 		       runtime->dma_area + cpcm->sw_data,
 		       bytes);
 		cpcm->hw_data += bytes;
-		if (cpcm->hw_data == buffer_size)
+		if ((int)cpcm->hw_data == buffer_size)
 			cpcm->hw_data = 0;
 		cpcm->sw_data += bytes;
 		if (cpcm->sw_data == cpcm->sw_bufsize)
@@ -734,11 +734,11 @@ static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream,
 	chip->capt.sw_ready -= frames << chip->capt.shift;
 	chip->capt.appl_ptr = runtime->control->appl_ptr + frames;
 	while (chip->capt.hw_ready > 0 && 
-	       chip->capt.sw_ready < chip->capt.sw_bufsize) {
+	       chip->capt.sw_ready < (int)chip->capt.sw_bufsize) {
 		size_t hw_to_end = buffer_size - chip->capt.hw_data;
 		size_t sw_to_end = chip->capt.sw_bufsize - chip->capt.sw_data;
 		size_t bytes = chip->capt.sw_bufsize - chip->capt.sw_ready;
-		if (chip->capt.hw_ready < bytes)
+		if (chip->capt.hw_ready < (int)bytes)
 			bytes = chip->capt.hw_ready;
 		if (hw_to_end < bytes)
 			bytes = hw_to_end;
@@ -748,7 +748,7 @@ static int snd_cs46xx_capture_transfer(snd_pcm_substream_t *substream,
 		       chip->capt.hw_area + chip->capt.hw_data,
 		       bytes);
 		chip->capt.hw_data += bytes;
-		if (chip->capt.hw_data == buffer_size)
+		if ((int)chip->capt.hw_data == buffer_size)
 			chip->capt.hw_data = 0;
 		chip->capt.sw_data += bytes;
 		if (chip->capt.sw_data == chip->capt.sw_bufsize)
@@ -993,7 +993,7 @@ static int _cs46xx_adjust_sample_rate (cs46xx_t *chip, cs46xx_pcm_t *cpcm,
 		cpcm->pcm_channel->sample_rate = sample_rate;
 	} else
 	/* if sample rate is changed */
-	if (cpcm->pcm_channel->sample_rate != sample_rate) {
+	if ((int)cpcm->pcm_channel->sample_rate != sample_rate) {
 		int unlinked = cpcm->pcm_channel->unlinked;
 		cs46xx_dsp_destroy_pcm_channel (chip,cpcm->pcm_channel);
 
@@ -2048,7 +2048,7 @@ static int snd_herc_spdif_select_put(snd_kcontrol_t *kcontrol,
 
 	/* checking diff from the EGPIO direction register 
 	   should be enough */
-	return (val1 != snd_cs46xx_peekBA0(chip, BA0_EGPIODR));
+	return (val1 != (int)snd_cs46xx_peekBA0(chip, BA0_EGPIODR));
 }
 
 
@@ -2091,7 +2091,7 @@ static int snd_cs46xx_spdif_default_put(snd_kcontrol_t * kcontrol,
 		(1 << 13) | (1 << 12);
 
 
-	change = ins->spdif_csuv_default != val;
+	change = (unsigned int)ins->spdif_csuv_default != val;
 	ins->spdif_csuv_default = val;
 
 	if ( !(ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) )
@@ -2409,7 +2409,7 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	ac97_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
-	int idx;
+	unsigned int idx;
 
 	/* detect primary codec */
 	chip->nr_ac97_codecs = 0;
@@ -2487,17 +2487,10 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 
  _end:
 
-	/* dosoundcard specific mixer setup */
-	if (chip->mixer_init) {
-		snd_printdd ("calling chip->mixer_init(chip);\n");
-		chip->mixer_init(chip);
-	}
-    
 #endif /* CONFIG_SND_CS46XX_NEW_DSP */
 
 	/* add cs4630 mixer controls */
-	for (idx = 0; idx < sizeof(snd_cs46xx_controls) / 
-		     sizeof(snd_cs46xx_controls[0]); idx++) {
+	for (idx = 0; idx < ARRAY_SIZE(snd_cs46xx_controls); idx++) {
 		snd_kcontrol_t *kctl;
 		kctl = snd_ctl_new1(&snd_cs46xx_controls[idx], chip);
 		if ((err = snd_ctl_add(card, kctl)) < 0)
@@ -2509,6 +2502,17 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	strcpy(id.name, "External Amplifier Power Down");
 	chip->eapd_switch = snd_ctl_find_id(chip->card, &id);
+    
+	/* turn on amplifier */
+	chip->amplifier_ctrl(chip, 1);
+
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+	/* do soundcard specific mixer setup */
+	if (chip->mixer_init) {
+		snd_printdd ("calling chip->mixer_init(chip);\n");
+		chip->mixer_init(chip);
+	}
+#endif
     
 	return 0;
 }
@@ -2793,7 +2797,7 @@ static long snd_cs46xx_io_read(snd_info_entry_t *entry, void *file_private_data,
 	snd_cs46xx_region_t *region = (snd_cs46xx_region_t *)entry->private_data;
 	
 	size = count;
-	if (file->f_pos + size > region->size)
+	if (file->f_pos + (size_t)size > region->size)
 		size = region->size - file->f_pos;
 	if (size > 0) {
 		char *tmp;
@@ -3496,7 +3500,8 @@ static void voyetra_mixer_init (cs46xx_t *chip)
 static void hercules_mixer_init (cs46xx_t *chip)
 {
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	int idx,err;
+	unsigned int idx;
+	int err;
 	snd_card_t *card = chip->card;
 #endif
 
@@ -3506,8 +3511,7 @@ static void hercules_mixer_init (cs46xx_t *chip)
 	snd_printdd ("initializing Hercules mixer\n");
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	for (idx = 0 ; idx < sizeof(snd_hercules_controls) / 
-		     sizeof(snd_hercules_controls[0]) ; idx++) {
+	for (idx = 0 ; idx < ARRAY_SIZE(snd_hercules_controls); idx++) {
 		snd_kcontrol_t *kctl;
 
 		kctl = snd_ctl_new1(&snd_hercules_controls[idx], chip);
@@ -3621,21 +3625,88 @@ struct cs_card_type
 };
 
 static struct cs_card_type __devinitdata cards[] = {
-	{0x1489, 0x7001, "Genius Soundmaker 128 value", NULL, amp_none, NULL, NULL},
-	{0x5053, 0x3357, "Voyetra", NULL, amp_voyetra, NULL, voyetra_mixer_init},
-	{0x1071, 0x6003, "Mitac MI6020/21", NULL, amp_voyetra, NULL, NULL},
-	{0x14AF, 0x0050, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
-	{0x1681, 0x0050, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
-	{0x1681, 0x0051, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
-	{0x1681, 0x0052, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
-	{0x1681, 0x0053, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
-	{0x1681, 0x0054, "Hercules Game Theatre XP", NULL, amp_hercules, NULL, hercules_mixer_init},
+	{
+		.vendor = 0x1489,
+		.id = 0x7001,
+		.name = "Genius Soundmaker 128 value",
+		/* nothing special */
+	},
+	{
+		.vendor = 0x5053,
+		.id = 0x3357,
+		.name = "Voyetra",
+		.amp = amp_voyetra,
+		.mixer_init = voyetra_mixer_init
+	},
+	{
+		.vendor = 0x1071,
+		.id = 0x6003,
+		.name = "Mitac MI6020/21",
+		.amp = amp_voyetra
+	},
+	{
+		.vendor = 0x14AF,
+		.id = 0x0050,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
+	{
+		.vendor = 0x1681,
+		.id = 0x0050,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
+	{
+		.vendor = 0x1681,
+		.id = 0x0051,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
+	{
+		.vendor = 0x1681,
+		.id = 0x0052,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
+	{
+		.vendor = 0x1681,
+		.id = 0x0053,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
+	{
+		.vendor = 0x1681,
+		.id = 0x0054,
+		.name = "Hercules Game Theatre XP",
+		.amp = amp_hercules,
+		.mixer_init = hercules_mixer_init
+	},
 	/* Not sure if the 570 needs the clkrun hack */
-	{PCI_VENDOR_ID_IBM, 0x0132, "Thinkpad 570", clkrun_init, NULL, clkrun_hack, NULL},
-	{PCI_VENDOR_ID_IBM, 0x0153, "Thinkpad 600X/A20/T20", clkrun_init, NULL, clkrun_hack, NULL},
-	{PCI_VENDOR_ID_IBM, 0x1010, "Thinkpad 600E (unsupported)", NULL, NULL, NULL, NULL},
-	{0, 0, "Card without SSID set", NULL, NULL, NULL, NULL },
-	{0, 0, NULL, NULL, NULL, NULL, NULL}
+	{
+		.vendor = PCI_VENDOR_ID_IBM,
+		.id = 0x0132,
+		.name = "Thinkpad 570",
+		.init = clkrun_init,
+		.active = clkrun_hack
+	},
+	{
+		.vendor = PCI_VENDOR_ID_IBM,
+		.id = 0x0153,
+		.name = "Thinkpad 600X/A20/T20",
+		.init = clkrun_init,
+		.active = clkrun_hack
+	},
+	{
+		.vendor = PCI_VENDOR_ID_IBM,
+		.id = 0x1010,
+		.name = "Thinkpad 600E (unsupported)"
+	},
+	{} /* terminator */
 };
 
 
@@ -3758,8 +3829,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	chip->irq = -1;
 	chip->ba0_addr = pci_resource_start(pci, 0);
 	chip->ba1_addr = pci_resource_start(pci, 1);
-	if (chip->ba0_addr == 0 || chip->ba0_addr == ~0 ||
-	    chip->ba1_addr == 0 || chip->ba1_addr == ~0) {
+	if (chip->ba0_addr == 0 || chip->ba0_addr == (unsigned long)~0 ||
+	    chip->ba1_addr == 0 || chip->ba1_addr == (unsigned long)~0) {
 	    	snd_cs46xx_free(chip);
 	    	snd_printk("wrong address(es) - ba0 = 0x%lx, ba1 = 0x%lx\n", chip->ba0_addr, chip->ba1_addr);
 	    	return -ENOMEM;
@@ -3829,20 +3900,20 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	for (idx = 0; idx < 5; idx++) {
 		region = &chip->region.idx[idx];
 		if ((region->resource = request_mem_region(region->base, region->size, region->name)) == NULL) {
-			snd_cs46xx_free(chip);
 			snd_printk("unable to request memory region 0x%lx-0x%lx\n", region->base, region->base + region->size - 1);
+			snd_cs46xx_free(chip);
 			return -EBUSY;
 		}
 		region->remap_addr = (unsigned long) ioremap_nocache(region->base, region->size);
 		if (region->remap_addr == 0) {
-			snd_cs46xx_free(chip);
 			snd_printk("%s ioremap problem\n", region->name);
+			snd_cs46xx_free(chip);
 			return -ENOMEM;
 		}
 	}
 	if (request_irq(pci->irq, snd_cs46xx_interrupt, SA_INTERRUPT|SA_SHIRQ, "CS46XX", (void *) chip)) {
-		snd_cs46xx_free(chip);
 		snd_printk("unable to grab IRQ %d\n", pci->irq);
+		snd_cs46xx_free(chip);
 		return -EBUSY;
 	}
 	chip->irq = pci->irq;
@@ -3873,9 +3944,6 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 		return err;
 	}
 	
-	/* turn on amplifier */
-	chip->amplifier_ctrl(chip, 1);
-
 	chip->active_ctrl(chip, -1); /* disable CLKRUN */
 
 	*rchip = chip;

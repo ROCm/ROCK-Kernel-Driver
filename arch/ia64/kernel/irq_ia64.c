@@ -178,7 +178,7 @@ init_IRQ (void)
 	register_percpu_irq(IA64_IPI_VECTOR, &ipi_irqaction);
 #endif
 #ifdef CONFIG_PERFMON
-	perfmon_init_percpu();
+	pfm_init_percpu();
 #endif
 	platform_irq_init();
 }

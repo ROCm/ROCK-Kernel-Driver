@@ -811,7 +811,7 @@ snd_pcm_sframes_t snd_pcm_plug_read_transfer(snd_pcm_plug_t *plug, snd_pcm_plugi
 			}
 			frames = err;
 			if (!plugin->prev) {
-				if ((err = snd_pcm_plug_capture_disable_useless_channels(plug, dst_channels, dst_channels_final) < 0))
+				if ((err = snd_pcm_plug_capture_disable_useless_channels(plug, dst_channels, dst_channels_final)) < 0)
 					return err;
 			}
 		} else {

@@ -355,13 +355,19 @@ int patch_alc650(ac97_t * ac97)
 {
 	unsigned short val;
 
-	/* enable spdif in */
-	snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
-			     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
+	/* check spdif */
+	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+	if (val & AC97_EA_SPCV) {
+		/* enable spdif in */
+		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,
+				     snd_ac97_read(ac97, AC97_ALC650_CLOCK) | 0x03);
+	} else
+		ac97->ext_id &= ~AC97_EI_SPDIF; /* disable extended-id */
+
 	val = snd_ac97_read(ac97, AC97_ALC650_MULTICH);
 	val &= ~0xc000; /* slot: 3,4,7,8,6,9 */
-	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH,
-			     val | 0x03);
+	snd_ac97_write_cache(ac97, AC97_ALC650_MULTICH, val | 0x03);
+
 	/* full DAC volume */
 	snd_ac97_write_cache(ac97, AC97_ALC650_SURR_DAC_VOL, 0x0808);
 	snd_ac97_write_cache(ac97, AC97_ALC650_LFE_DAC_VOL, 0x0808);

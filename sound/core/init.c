@@ -352,7 +352,7 @@ static void choose_default_id(snd_card_t * card)
 		id++;
 	}
 	id = card->id;
-	while (*spos != '\0' && id - card->id < sizeof(card->id) - 1) {
+	while (*spos != '\0' && (size_t)(id - card->id) < sizeof(card->id) - 1) {
 		if (isalnum(*spos))
 			*id++ = *spos;
 		spos++;
@@ -379,12 +379,12 @@ static void choose_default_id(snd_card_t * card)
 		len = strlen(id);
 		if (idx_flag)
 			id[len-1]++;
-		else if (len <= sizeof(card->id) - 3) {
+		else if ((size_t)len <= sizeof(card->id) - 3) {
 			strcat(id, "_1");
 			idx_flag++;
 		} else {
 			spos = id + len - 2;
-			if (len <= sizeof(card->id) - 2)
+			if ((size_t)len <= sizeof(card->id) - 2)
 				spos++;
 			*spos++ = '_';
 			*spos++ = '1';

@@ -895,7 +895,7 @@ static int eata2x_slave_configure(Scsi_Device *dev) {
       tag_suffix = "";
       }
 
-   if (TLDEV(dev->type) && linked_comm && dev->new_queue_depth > 2)
+   if (TLDEV(dev->type) && linked_comm && dev->queue_depth > 2)
       link_suffix = ", sorted";
    else if (TLDEV(dev->type))
       link_suffix = ", unsorted";
@@ -904,7 +904,7 @@ static int eata2x_slave_configure(Scsi_Device *dev) {
 
    printk("%s: scsi%d, channel %d, id %d, lun %d, cmds/lun %d%s%s.\n",
           BN(j), host->host_no, dev->channel, dev->id, dev->lun,
-          dev->new_queue_depth, link_suffix, tag_suffix);
+          dev->queue_depth, link_suffix, tag_suffix);
 
    return FALSE;
 }
@@ -1699,7 +1699,7 @@ static int eata2x_queuecommand(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *)) {
    /* Map DMA buffers and SG list */
    map_dma(i, j);
 
-   if (linked_comm && SCpnt->device->new_queue_depth > 2
+   if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type)) {
       HD(j)->cp_stat[i] = READY;
       flush_dev(SCpnt->device, SCpnt->request->sector, j, FALSE);
@@ -2207,7 +2207,7 @@ static void ihdlr(int irq, unsigned int j) {
 
    sync_dma(i, j);
 
-   if (linked_comm && SCpnt->device->new_queue_depth > 2
+   if (linked_comm && SCpnt->device->queue_depth > 2
                                      && TLDEV(SCpnt->device->type))
       flush_dev(SCpnt->device, SCpnt->request->sector, j, TRUE);
 

@@ -321,7 +321,7 @@ struct ahd_cmd {
 /*
  * A per probed device structure used to deal with some error recovery
  * scenarios that the Linux mid-layer code just doesn't know how to
- * handle.  The structure allocated for a device only becomes persistant
+ * handle.  The structure allocated for a device only becomes persistent
  * after a successfully completed inquiry command to the target when
  * that inquiry data indicates a lun is present.
  */

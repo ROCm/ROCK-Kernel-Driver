@@ -2298,7 +2298,7 @@ static inline void end_request(struct request *req, int uptodate)
 	if (end_that_request_first(req, uptodate, current_count_sectors))
 		return;
 	add_disk_randomness(req->rq_disk);
-	floppy_off((int)req->rq_disk->private_data);
+	floppy_off((long)req->rq_disk->private_data);
 	blkdev_dequeue_request(req);
 	end_that_request_last(req);
 
@@ -2631,7 +2631,7 @@ static int make_raw_rw_request(void)
 		return 0;
 	}
 
-	set_fdc((int)current_req->rq_disk->private_data);
+	set_fdc((long)current_req->rq_disk->private_data);
 
 	raw_cmd = &default_raw_cmd;
 	raw_cmd->flags = FD_RAW_SPIN | FD_RAW_NEED_DISK | FD_RAW_NEED_DISK |
@@ -2923,7 +2923,7 @@ static void redo_fd_request(void)
 			}
 			current_req = req;
 		}
-		drive = (int)current_req->rq_disk->private_data;
+		drive = (long)current_req->rq_disk->private_data;
 		set_fdc(drive);
 		reschedule_timeout(current_reqD, "redo fd request", 0);
 
@@ -3302,7 +3302,7 @@ static int raw_cmd_ioctl(int cmd, void *param)
 static int invalidate_drive(struct block_device *bdev)
 {
 	/* invalidate the buffer track to force a reread */
-	set_bit((int)bdev->bd_disk->private_data, &fake_change);
+	set_bit((long)bdev->bd_disk->private_data, &fake_change);
 	process_fd_request();
 	check_disk_change(bdev);
 	return 0;
@@ -3797,7 +3797,7 @@ static int floppy_open(struct inode * inode, struct file * filp)
  */
 static int check_floppy_change(struct gendisk *disk)
 {
-	int drive = (int)disk->private_data;
+	int drive = (long)disk->private_data;
 
 	if (UTESTF(FD_DISK_CHANGED) || UTESTF(FD_VERIFY))
 		return 1;
@@ -3900,7 +3900,7 @@ static int floppy_read_block_0(struct gendisk *disk)
  * geometry formats */
 static int floppy_revalidate(struct gendisk *disk)
 {
-	int drive=(int)disk->private_data;
+	int drive=(long)disk->private_data;
 #define NO_GEOM (!current_type[drive] && !ITYPE(UDRS->fd_device))
 	int cf;
 	int res = 0;
@@ -4358,7 +4358,7 @@ int __init floppy_init(void)
 		if (fdc_state[FDC(drive)].version == FDC_NONE)
 			continue;
 		/* to be cleaned up... */
-		disks[drive]->private_data = (void*)drive;
+		disks[drive]->private_data = (void*)(long)drive;
 		disks[drive]->queue = &floppy_queue;
 		add_disk(disks[drive]);
 	}

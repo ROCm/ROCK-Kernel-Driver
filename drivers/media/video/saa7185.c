@@ -186,7 +186,7 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 {
 	int i;
 	struct saa7185 *encoder;
-	struct i2c_client client;
+	struct i2c_client *client;
 
 	client = kmalloc(sizeof(*client), GFP_KERNEL);
 	if (client == NULL)
@@ -194,14 +194,14 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	client_template.adapter = adap;
 	client_template.addr = addr;
 	memcpy(client, &client_template, sizeof(*client));
-	encoder = kmalloc(sizeof(*decoder), GFP_KERNEL);
+	encoder = kmalloc(sizeof(*encoder), GFP_KERNEL);
 	if (encoder == NULL) {
 		kfree(client);
 		return -ENOMEM;
 	}
 
 
-	memset(encoder, 0, sizeof(*decoder));
+	memset(encoder, 0, sizeof(*encoder));
 	strcpy(client->name, "saa7185");
 	encoder->client = client;
 	client->data = encoder;
@@ -221,7 +221,7 @@ static int saa7185_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		printk(KERN_INFO "%s_attach: chip version %d\n",
 		       client->name, i2c_smbus_read_byte(client) >> 5);
 	}
-	init_MUTEX(&decoder->lock);
+	init_MUTEX(&encoder->lock);
 	i2c_attach_client(client);
 	MOD_INC_USE_COUNT;
 	return 0;
@@ -355,6 +355,7 @@ static int saa7185_command(struct i2c_client *client, unsigned int cmd,
 /* ----------------------------------------------------------------------- */
 
 static struct i2c_driver i2c_driver_saa7185 = {
+	.owner 		= THIS_MODULE,
 	.name	 	= "saa7185",		 /* name */
 	.id 		= I2C_DRIVERID_SAA7185B, /* ID */
 	.flags 		= I2C_DF_NOTIFY,

@@ -198,7 +198,7 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 		break;
 	case TIOCSCLPSDELIM:
 		/*
-		 * set special character used for seperating upper and
+		 * set special character used for separating upper and
 		 * lower case, 0x00 disables this feature
 		 */
 		if (get_user(sclp_ioctls.delim, (unsigned char *) arg))
@@ -206,7 +206,7 @@ sclp_tty_ioctl(struct tty_struct *tty, struct file * file,
 		break;
 	case TIOCSCLPGDELIM:
 		/*
-		 * get special character used for seperating upper and
+		 * get special character used for separating upper and
 		 * lower case, 0x00 disables this feature
 		 */
 		if (put_user(sclp_ioctls.delim, (unsigned char *) arg))
@@ -507,7 +507,7 @@ static void sclp_tty_input(unsigned char* buf, unsigned int count)
 
 /*
  * get a EBCDIC string in upper/lower case,
- * find out characters in lower/upper case seperated by a special character,
+ * find out characters in lower/upper case separated by a special character,
  * modifiy original string,
  * returns length of resulting string
  */

@@ -127,9 +127,10 @@ void __wait_on_buffer(struct buffer_head * bh)
 	get_bh(bh);
 	do {
 		prepare_to_wait(wqh, &wait, TASK_UNINTERRUPTIBLE);
-		blk_run_queues();
-		if (buffer_locked(bh))
+		if (buffer_locked(bh)) {
+			blk_run_queues();
 			io_schedule();
+		}
 	} while (buffer_locked(bh));
 	put_bh(bh);
 	finish_wait(wqh, &wait);
@@ -959,8 +960,6 @@ no_grow:
 	 * the reserve list is empty, we're sure there are 
 	 * async buffer heads in use.
 	 */
-	blk_run_queues();
-
 	free_more_memory();
 	goto try_again;
 }

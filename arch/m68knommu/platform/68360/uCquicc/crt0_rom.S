@@ -367,7 +367,7 @@ _ramend:
     .long   0           /* (Unassigned, Reserved)                       - 62. */
     .long   0           /* (Unassigned, Reserved)                       - 63. */
     /*                  The assignment of these vectors to the CPM is         */
-    /*                  dependant on the configuration of the CPM vba         */
+    /*                  dependent on the configuration of the CPM vba         */
     /*                          fields.                                       */
     .long   0           /* (User-Defined Vectors 1) CPM Error           - 64. */
     .long   0           /* (User-Defined Vectors 2) CPM Parallel IO PC11- 65. */

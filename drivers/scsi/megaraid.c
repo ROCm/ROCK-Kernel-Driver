@@ -443,7 +443,7 @@
  * Mon Aug 6 14:59:29 BST 2001 - "Michael Johnson" <johnsom@home.com>
  *
  * Make the HP print formatting and check for buggy firmware runtime not
- * ifdef dependant.
+ * ifdef dependent.
  *
  *
  * Version 1.17d
@@ -4515,7 +4515,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		if(scsicmd == NULL) return -ENOMEM;
 
 		memset(scsicmd, 0, sizeof(Scsi_Cmnd));
-		scsicmd->host = shpnt;
+		scsicmd->device->host = shpnt;
 
 		if( outlen || inlen ) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
@@ -4652,7 +4652,7 @@ static int megadev_ioctl (struct inode *inode, struct file *filep,
 		if(scsicmd == NULL) return -ENOMEM;
 
 		memset(scsicmd, 0, sizeof(Scsi_Cmnd));
-		scsicmd->host = shpnt;
+		scsicmd->device->host = shpnt;
 
 		if (outlen || inlen) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)

@@ -409,7 +409,7 @@ sparc_sigaction (int sig, const struct old_sigaction *act,
 	ret = do_sigaction(sig, act ? &new_ka : NULL, oact ? &old_ka : NULL);
 
 	if (!ret && oact) {
-		/* In the clone() case we could copy half consistant
+		/* In the clone() case we could copy half consistent
 		 * state to the user, however this could sleep and
 		 * deadlock us if we held the signal lock on SMP.  So for
 		 * now I take the easy way out and do no locking.

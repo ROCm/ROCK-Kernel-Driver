@@ -1889,7 +1889,7 @@ C_LABEL(kill_user_windows):
 	wr	%o4, 0x0, %psr			! the uwinmask state
 	WRITE_PAUSE				! burn them cycles
 1:
-	ld	[%g6 + TI_UWINMASK], %o0	! get consistant state
+	ld	[%g6 + TI_UWINMASK], %o0	! get consistent state
 	orcc	%g0, %o0, %g0			! did an interrupt come in?
 	be	4f				! yep, we are done
 	 rd	%wim, %o3			! get current wim

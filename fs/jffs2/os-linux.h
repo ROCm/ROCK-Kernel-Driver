@@ -54,7 +54,7 @@
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40)
 #define current_sig_lock current->sigmask_lock
 #else
-#define current_sig_lock current->sig->siglock
+#define current_sig_lock current->sighand->siglock
 #endif
 
 static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)

@@ -413,7 +413,7 @@ pcibios_init(void)
 			next_busno = hose->last_busno+1;
 	}
 
-	/* Call machine dependant fixup */
+	/* Call machine dependent fixup */
 	if (ppc_md.pcibios_fixup) {
 		ppc_md.pcibios_fixup();
 	}

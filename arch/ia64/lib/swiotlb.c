@@ -113,7 +113,7 @@ swiotlb_init (void)
 	io_tlb_index = 0;
 	io_tlb_orig_addr = alloc_bootmem(io_tlb_nslabs * sizeof(char *));
 
-	printk("Placing software IO TLB between 0x%p - 0x%p\n",
+	printk(KERN_INFO "Placing software IO TLB between 0x%p - 0x%p\n",
 	       (void *) io_tlb_start, (void *) io_tlb_end);
 }
 

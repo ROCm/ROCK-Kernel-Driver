@@ -6,7 +6,7 @@
  * Copyright (C) 1999		Arun Sharma <arun.sharma@intel.com>
  * Copyright (C) 1997,1998	Jakub Jelinek (jj@sunsite.mff.cuni.cz)
  * Copyright (C) 1997		David S. Miller (davem@caip.rutgers.edu)
- * Copyright (C) 2000-2002 Hewlett-Packard Co
+ * Copyright (C) 2000-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * These routines maintain argument size conversion between 32bit and 64bit
@@ -607,61 +607,6 @@ sys32_pipe (int *fd)
 		retval = -EFAULT;
   out:
 	return retval;
-}
-
-static inline int
-put_statfs (struct statfs32 *ubuf, struct statfs *kbuf)
-{
-	int err;
-
-	if (!access_ok(VERIFY_WRITE, ubuf, sizeof(*ubuf)))
-		return -EFAULT;
-
-	err = __put_user(kbuf->f_type, &ubuf->f_type);
-	err |= __put_user(kbuf->f_bsize, &ubuf->f_bsize);
-	err |= __put_user(kbuf->f_blocks, &ubuf->f_blocks);
-	err |= __put_user(kbuf->f_bfree, &ubuf->f_bfree);
-	err |= __put_user(kbuf->f_bavail, &ubuf->f_bavail);
-	err |= __put_user(kbuf->f_files, &ubuf->f_files);
-	err |= __put_user(kbuf->f_ffree, &ubuf->f_ffree);
-	err |= __put_user(kbuf->f_namelen, &ubuf->f_namelen);
-	err |= __put_user(kbuf->f_fsid.val[0], &ubuf->f_fsid.val[0]);
-	err |= __put_user(kbuf->f_fsid.val[1], &ubuf->f_fsid.val[1]);
-	return err;
-}
-
-extern asmlinkage long sys_statfs(const char * path, struct statfs * buf);
-
-asmlinkage long
-sys32_statfs (const char *path, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_statfs(path, &s);
-	set_fs(old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
-}
-
-extern asmlinkage long sys_fstatfs(unsigned int fd, struct statfs * buf);
-
-asmlinkage long
-sys32_fstatfs (unsigned int fd, struct statfs32 *buf)
-{
-	int ret;
-	struct statfs s;
-	mm_segment_t old_fs = get_fs();
-
-	set_fs(KERNEL_DS);
-	ret = sys_fstatfs(fd, &s);
-	set_fs(old_fs);
-	if (put_statfs(buf, &s))
-		return -EFAULT;
-	return ret;
 }
 
 static inline long
@@ -1849,10 +1794,10 @@ struct ipc_perm32 {
 
 struct ipc64_perm32 {
 	key_t key;
-	__kernel_uid32_t32 uid;
-	__kernel_gid32_t32 gid;
-	__kernel_uid32_t32 cuid;
-	__kernel_gid32_t32 cgid;
+	compat_uid32_t uid;
+	compat_gid32_t gid;
+	compat_uid32_t cuid;
+	compat_gid32_t cgid;
 	compat_mode_t mode;
 	unsigned short __pad1;
 	unsigned short seq;
@@ -1895,8 +1840,8 @@ struct msqid_ds32 {
 	unsigned short msg_cbytes;
 	unsigned short msg_qnum;
 	unsigned short msg_qbytes;
-	__kernel_ipc_pid_t32 msg_lspid;
-	__kernel_ipc_pid_t32 msg_lrpid;
+	compat_ipc_pid_t msg_lspid;
+	compat_ipc_pid_t msg_lrpid;
 };
 
 struct msqid64_ds32 {
@@ -1922,8 +1867,8 @@ struct shmid_ds32 {
 	compat_time_t   shm_atime;
 	compat_time_t   shm_dtime;
 	compat_time_t   shm_ctime;
-	__kernel_ipc_pid_t32 shm_cpid;
-	__kernel_ipc_pid_t32 shm_lpid;
+	compat_ipc_pid_t shm_cpid;
+	compat_ipc_pid_t shm_lpid;
 	unsigned short shm_nattch;
 };
 
@@ -2011,6 +1956,10 @@ semctl32 (int first, int second, int third, void *uptr)
 	else
 		fourth.__pad = (void *)A(pad);
 	switch (third) {
+	      default:
+		err = -EINVAL;
+		break;
+
 	      case IPC_INFO:
 	      case IPC_RMID:
 	      case IPC_SET:
@@ -2399,7 +2348,7 @@ shmctl32 (int first, int second, void *uptr)
 
 static long
 semtimedop32(int semid, struct sembuf *tsems, int nsems,
-	     const struct timespec32 *timeout32)
+	     const struct compat_timespec *timeout32)
 {
 	struct timespec t;
 	if (get_user (t.tv_sec, &timeout32->tv_sec) ||
@@ -2422,7 +2371,7 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 		return sys_semtimedop(first, (struct sembuf *)AA(ptr), second, NULL);
 	      case SEMTIMEDOP:
 		return semtimedop32(first, (struct sembuf *)AA(ptr), second,
-				    (const struct timespec32 *)AA(fifth));
+				    (const struct compat_timespec *)AA(fifth));
 	      case SEMGET:
 		return sys_semget(first, second, third);
 	      case SEMCTL:
@@ -3475,12 +3424,6 @@ sys32_fstat64 (unsigned int fd, struct stat64 *statbuf)
 	return ret;
 }
 
-asmlinkage long
-sys32_sigpending (unsigned int *set)
-{
-	return do_sigpending(set, sizeof(*set));
-}
-
 struct sysinfo32 {
 	s32 uptime;
 	u32 loads[3];
@@ -3536,7 +3479,7 @@ sys32_sched_rr_get_interval (pid_t pid, struct compat_timespec *interval)
 	set_fs(KERNEL_DS);
 	ret = sys_sched_rr_get_interval(pid, &t);
 	set_fs(old_fs);
-	if (put_user (t.tv_sec, &interval->tv_sec) || put_user (t.tv_nsec, &interval->tv_nsec))
+	if (put_compat_timespec(&t, interval))
 		return -EFAULT;
 	return ret;
 }

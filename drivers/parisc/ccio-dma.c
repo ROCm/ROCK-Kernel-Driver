@@ -852,7 +852,7 @@ ccio_fill_pdir(struct ioc *ioc, struct scatterlist *startsg, int nents,
 ** in the DMA stream. Allocates PDIR entries but does not fill them.
 ** Returns the number of DMA chunks.
 **
-** Doing the fill seperate from the coalescing/allocation keeps the
+** Doing the fill separate from the coalescing/allocation keeps the
 ** code simpler. Future enhancement could make one pass through
 ** the sglist do both.
 */

@@ -131,23 +131,22 @@ int scsi_delete_timer(Scsi_Cmnd *scmd)
  **/
 void scsi_times_out(Scsi_Cmnd *scmd)
 {
+	struct Scsi_Host *shost = scmd->device->host;
+
 	/* Set the serial_number_at_timeout to the current serial_number */
 	scmd->serial_number_at_timeout = scmd->serial_number;
 
 	scsi_eh_eflags_set(scmd, SCSI_EH_CMD_TIMEOUT | SCSI_EH_CMD_ERR);
 
-	if( scmd->device->host->eh_wait == NULL ) {
+	if (unlikely(shost->eh_wait == NULL)) {
 		panic("Error handler thread not present at %p %p %s %d",
-		      scmd, scmd->device->host, __FILE__, __LINE__);
+		      scmd, shost, __FILE__, __LINE__);
 	}
 
-	scsi_host_failed_inc_and_test(scmd->device->host);
+	scsi_host_failed_inc_and_test(shost);
 
-	SCSI_LOG_TIMEOUT(3, printk("Command timed out active=%d busy=%d "
-				   " failed=%d\n",
-				   atomic_read(&scmd->device->host->host_active),
-				   scmd->device->host->host_busy,
-				   scmd->device->host->host_failed));
+	SCSI_LOG_TIMEOUT(3, printk("Command timed out busy=%d failed=%d\n",
+				   shost->host_busy, shost->host_failed));
 }
 
 /**
@@ -1576,10 +1575,10 @@ void scsi_error_handler(void *data)
 	int rtn;
 	DECLARE_MUTEX_LOCKED(sem);
 
-	spin_lock_irq(&current->sig->siglock);
+	spin_lock_irq(&current->sighand->siglock);
 	sigfillset(&current->blocked);
 	recalc_sigpending();
-	spin_unlock_irq(&current->sig->siglock);
+	spin_unlock_irq(&current->sighand->siglock);
 
 	lock_kernel();
 

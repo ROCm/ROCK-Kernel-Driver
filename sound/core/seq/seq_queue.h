@@ -57,8 +57,6 @@ struct _snd_seq_queue {
 	struct semaphore timer_mutex;
 
 	snd_use_lock_t use_lock;
-
-	struct tasklet_struct taskq;
 };
 
 

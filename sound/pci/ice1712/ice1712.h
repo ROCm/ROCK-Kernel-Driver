@@ -237,8 +237,8 @@ typedef struct {
 } ice1712_eeprom_t;
 
 struct snd_ak4524 {
-	int num_adcs;			/* AK4524 or AK4528 ADCs */
-	int num_dacs;			/* AK4524 or AK4528 DACs */
+	unsigned int num_adcs;		/* AK4524 or AK4528 ADCs */
+	unsigned int num_dacs;		/* AK4524 or AK4528 DACs */
 	unsigned char images[4][16];
 	unsigned char ipga_gain[4][2];
 	/* */
@@ -323,7 +323,7 @@ struct _snd_ice1712 {
 
 	unsigned int pro_volumes[20];
 	int omni: 1;			/* Delta Omni I/O */
-	int num_total_dacs;		/* total DACs */
+	unsigned int num_total_dacs;	/* total DACs */
 	unsigned char hoontech_boxbits[4];
 	unsigned int hoontech_config;
 	unsigned short hoontech_boxconfig[4];

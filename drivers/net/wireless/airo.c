@@ -5144,7 +5144,7 @@ static int airo_set_scan(struct net_device *dev,
 
 /*------------------------------------------------------------------*/
 /*
- * Translate scan data returned from the card to a card independant
+ * Translate scan data returned from the card to a card independent
  * format that the Wireless Tools will understand - Jean II
  */
 static inline char *airo_translate_scan(struct net_device *dev,

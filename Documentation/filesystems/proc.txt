@@ -911,7 +911,7 @@ printk
 The four values in printk denote
 * console_loglevel,
 * default_message_loglevel,
-* minimum_console_level and
+* minimum_console_loglevel and
 * default_console_loglevel
 respectively.
 

@@ -147,7 +147,7 @@ static inline int set_rtc_time(struct rtc_time *time)
 		yrs = 73;
 	}
 #endif
-	/* These limits and adjustments are independant of
+	/* These limits and adjustments are independent of
 	 * whether the chip is in binary mode or not.
 	 */
 	if (yrs > 169) {

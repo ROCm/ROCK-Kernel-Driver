@@ -1,7 +1,7 @@
 #ifndef _ASM_IA64_TLB_H
 #define _ASM_IA64_TLB_H
 /*
- * Copyright (C) 2002 Hewlett-Packard Co
+ * Copyright (C) 2002-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * This file was derived from asm-generic/tlb.h.
@@ -70,8 +70,7 @@ extern struct mmu_gather	mmu_gathers[NR_CPUS];
  * freed pages that where gathered up to this point.
  */
 static inline void
-ia64_tlb_flush_mmu(struct mmu_gather *tlb,
-		unsigned long start, unsigned long end)
+ia64_tlb_flush_mmu (struct mmu_gather *tlb, unsigned long start, unsigned long end)
 {
 	unsigned int nr;
 
@@ -197,8 +196,7 @@ tlb_remove_page (struct mmu_gather *tlb, struct page *page)
  * PTE, not just those pointing to (normal) physical memory.
  */
 static inline void
-__tlb_remove_tlb_entry(struct mmu_gather *tlb,
-			pte_t *ptep, unsigned long address)
+__tlb_remove_tlb_entry (struct mmu_gather *tlb, pte_t *ptep, unsigned long address)
 {
 	if (tlb->start_addr == ~0UL)
 		tlb->start_addr = address;

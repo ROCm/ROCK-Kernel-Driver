@@ -237,7 +237,6 @@ static void background_writeout(unsigned long _min_pages)
 				break;
 		}
 	}
-	blk_run_queues();
 }
 
 /*
@@ -308,7 +307,6 @@ static void wb_kupdate(unsigned long arg)
 		}
 		nr_to_write -= MAX_WRITEBACK_PAGES - wbc.nr_to_write;
 	}
-	blk_run_queues();
 	if (time_before(next_jif, jiffies + HZ))
 		next_jif = jiffies + HZ;
 	mod_timer(&wb_timer, next_jif);

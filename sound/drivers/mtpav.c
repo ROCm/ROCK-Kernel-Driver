@@ -503,7 +503,7 @@ static void snd_mtpav_inmidi_process(mtpav_t *mcrd, u8 inbyte)
 {
 	mtpav_port_t *portp;
 
-	if (mcrd->inmidiport > mcrd->num_ports * 2 + MTPAV_PIDX_BROADCAST)
+	if ((int)mcrd->inmidiport > mcrd->num_ports * 2 + MTPAV_PIDX_BROADCAST)
 		return;
 
 	portp = &mcrd->ports[mcrd->inmidiport];

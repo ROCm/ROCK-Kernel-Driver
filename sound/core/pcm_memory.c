@@ -40,7 +40,7 @@ MODULE_PARM(maximum_substreams, "i");
 MODULE_PARM_DESC(maximum_substreams, "Maximum substreams with preallocated DMA memory.");
 MODULE_PARM_SYNTAX(maximum_substreams, SNDRV_BOOLEAN_TRUE_DESC);
 
-const static int snd_minimum_buffer = 16384;
+const static size_t snd_minimum_buffer = 16384;
 
 
 /*

@@ -99,6 +99,34 @@ int ext3_forget(handle_t *handle, int is_metadata,
 	return err;
 }
 
+/*
+ * Work out how many blocks we need to progress with the next chunk of a
+ * truncate transaction.
+ */
+
+static unsigned long blocks_for_truncate(struct inode *inode) 
+{
+	unsigned long needed;
+	
+	needed = inode->i_blocks >> (inode->i_sb->s_blocksize_bits - 9);
+
+	/* Give ourselves just enough room to cope with inodes in which
+	 * i_blocks is corrupt: we've seen disk corruptions in the past
+	 * which resulted in random data in an inode which looked enough
+	 * like a regular file for ext3 to try to delete it.  Things
+	 * will go a bit crazy if that happens, but at least we should
+	 * try not to panic the whole kernel. */
+	if (needed < 2)
+		needed = 2;
+
+	/* But we need to bound the transaction so we don't overflow the
+	 * journal. */
+	if (needed > EXT3_MAX_TRANS_DATA) 
+		needed = EXT3_MAX_TRANS_DATA;
+
+	return EXT3_DATA_TRANS_BLOCKS + needed;
+}
+	
 /* 
  * Truncate transactions can be complex and absolutely huge.  So we need to
  * be able to restart the transaction at a conventient checkpoint to make
@@ -112,14 +140,9 @@ int ext3_forget(handle_t *handle, int is_metadata,
 
 static handle_t *start_transaction(struct inode *inode) 
 {
-	long needed;
 	handle_t *result;
 	
-	needed = inode->i_blocks;
-	if (needed > EXT3_MAX_TRANS_DATA) 
-		needed = EXT3_MAX_TRANS_DATA;
-	
-	result = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS + needed);
+	result = ext3_journal_start(inode, blocks_for_truncate(inode));
 	if (!IS_ERR(result))
 		return result;
 	
@@ -135,14 +158,9 @@ static handle_t *start_transaction(struct inode *inode)
  */
 static int try_to_extend_transaction(handle_t *handle, struct inode *inode)
 {
-	long needed;
-	
 	if (handle->h_buffer_credits > EXT3_RESERVE_TRANS_BLOCKS)
 		return 0;
-	needed = inode->i_blocks;
-	if (needed > EXT3_MAX_TRANS_DATA) 
-		needed = EXT3_MAX_TRANS_DATA;
-	if (!ext3_journal_extend(handle, EXT3_RESERVE_TRANS_BLOCKS + needed))
+	if (!ext3_journal_extend(handle, blocks_for_truncate(inode)))
 		return 0;
 	return 1;
 }
@@ -154,11 +172,8 @@ static int try_to_extend_transaction(handle_t *handle, struct inode *inode)
  */
 static int ext3_journal_test_restart(handle_t *handle, struct inode *inode)
 {
-	long needed = inode->i_blocks;
-	if (needed > EXT3_MAX_TRANS_DATA) 
-		needed = EXT3_MAX_TRANS_DATA;
 	jbd_debug(2, "restarting handle %p\n", handle);
-	return ext3_journal_restart(handle, EXT3_DATA_TRANS_BLOCKS + needed);
+	return ext3_journal_restart(handle, blocks_for_truncate(inode));
 }
 
 /*

@@ -1,7 +1,7 @@
 /*
  * Simulated SCSI driver.
  *
- * Copyright (C) 1999, 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 1999, 2001-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  *
@@ -87,7 +87,8 @@ simscsi_setup (char *s)
 {
 	/* XXX Fix me we may need to strcpy() ? */
 	if (strlen(s) > MAX_ROOT_LEN) {
-		printk("simscsi_setup: prefix too long---using default %s\n", simscsi_root);
+		printk(KERN_ERR "simscsi_setup: prefix too long---using default %s\n",
+		       simscsi_root);
 	}
 	simscsi_root = s;
 	return 1;
@@ -354,7 +355,7 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 			break;
 
 		      case START_STOP:
-			printk("START_STOP\n");
+			printk(KERN_ERR "START_STOP\n");
 			break;
 
 		      default:
@@ -380,7 +381,7 @@ simscsi_queuecommand (Scsi_Cmnd *sc, void (*done)(Scsi_Cmnd *))
 int
 simscsi_host_reset (Scsi_Cmnd *sc)
 {
-	printk ("simscsi_host_reset: not implemented\n");
+	printk(KERN_ERR "simscsi_host_reset: not implemented\n");
 	return 0;
 }
 

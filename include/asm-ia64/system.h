@@ -7,7 +7,7 @@
  * on information published in the Processor Abstraction Layer
  * and the System Abstraction Layer manual.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
@@ -17,6 +17,7 @@
 #include <asm/kregs.h>
 #include <asm/page.h>
 #include <asm/pal.h>
+#include <asm/percpu.h>
 
 #define KERNEL_START		(PAGE_OFFSET + 68*1024*1024)
 
@@ -26,7 +27,6 @@
 
 #ifndef __ASSEMBLY__
 
-#include <linux/percpu.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 
@@ -117,62 +117,51 @@ ia64_insn_group_barrier (void)
  */
 /* For spinlocks etc */
 
+/* clearing psr.i is implicitly serialized (visible by next insn) */
+/* setting psr.i requires data serialization */
+#define __local_irq_save(x)	__asm__ __volatile__ ("mov %0=psr;;"			\
+						      "rsm psr.i;;"			\
+						      : "=r" (x) :: "memory")
+#define __local_irq_disable()	__asm__ __volatile__ (";; rsm psr.i;;" ::: "memory")
+#define __local_irq_restore(x)	__asm__ __volatile__ ("cmp.ne p6,p7=%0,r0;;"		\
+						      "(p6) ssm psr.i;"			\
+						      "(p7) rsm psr.i;;"		\
+						      "(p6) srlz.d"			\
+						      :: "r" ((x) & IA64_PSR_I)		\
+						      : "p6", "p7", "memory")
+
 #ifdef CONFIG_IA64_DEBUG_IRQ
 
   extern unsigned long last_cli_ip;
 
-# define local_irq_save(x)								\
-do {											\
-	unsigned long ip, psr;								\
-											\
-	__asm__ __volatile__ ("mov %0=psr;; rsm psr.i;;" : "=r" (psr) :: "memory");	\
-	if (psr & (1UL << 14)) {							\
-		__asm__ ("mov %0=ip" : "=r"(ip));					\
-		last_cli_ip = ip;							\
-	}										\
-	(x) = psr;									\
+# define __save_ip()		__asm__ ("mov %0=ip" : "=r" (last_cli_ip))
+
+# define local_irq_save(x)					\
+do {								\
+	unsigned long psr;					\
+								\
+	__local_irq_save(psr);					\
+	if (psr & IA64_PSR_I)					\
+		__save_ip();					\
+	(x) = psr;						\
 } while (0)
 
-# define local_irq_disable()								\
-do {											\
-	unsigned long ip, psr;								\
-											\
-	__asm__ __volatile__ ("mov %0=psr;; rsm psr.i;;" : "=r" (psr) :: "memory");	\
-	if (psr & (1UL << 14)) {							\
-		__asm__ ("mov %0=ip" : "=r"(ip));					\
-		last_cli_ip = ip;							\
-	}										\
-} while (0)
+# define local_irq_disable()	do { unsigned long x; local_irq_save(x); } while (0)
 
-# define local_irq_restore(x)							\
-do {										\
-	unsigned long ip, old_psr, psr = (x);					\
-										\
-	__asm__ __volatile__ ("mov %0=psr;"					\
-			      "cmp.ne p6,p7=%1,r0;;"				\
-			      "(p6) ssm psr.i;"					\
-			      "(p7) rsm psr.i;;"				\
-			      "(p6) srlz.d"					\
-			      : "=r" (old_psr) : "r"((psr) & IA64_PSR_I)	\
-			      : "p6", "p7", "memory");				\
-	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I)) {			\
-		__asm__ ("mov %0=ip" : "=r"(ip));				\
-		last_cli_ip = ip;						\
-	}									\
+# define local_irq_restore(x)					\
+do {								\
+	unsigned long old_psr, psr = (x);			\
+								\
+	local_save_flags(old_psr);				\
+	__local_irq_restore(psr);				\
+	if ((old_psr & IA64_PSR_I) && !(psr & IA64_PSR_I))	\
+		__save_ip();					\
 } while (0)
 
 #else /* !CONFIG_IA64_DEBUG_IRQ */
-  /* clearing of psr.i is implicitly serialized (visible by next insn) */
-# define local_irq_save(x)	__asm__ __volatile__ ("mov %0=psr;; rsm psr.i;;"	\
-						      : "=r" (x) :: "memory")
-# define local_irq_disable()	__asm__ __volatile__ (";; rsm psr.i;;" ::: "memory")
-/* (potentially) setting psr.i requires data serialization: */
-# define local_irq_restore(x)	__asm__ __volatile__ ("cmp.ne p6,p7=%0,r0;;"	\
-						      "(p6) ssm psr.i;"		\
-						      "(p7) rsm psr.i;;"	\
-						      "srlz.d"			\
-						      :: "r"((x) & IA64_PSR_I)	\
-						      : "p6", "p7", "memory")
+# define local_irq_save(x)	__local_irq_save(x)
+# define local_irq_disable()	__local_irq_disable()
+# define local_irq_restore(x)	__local_irq_restore(x)
 #endif /* !CONFIG_IA64_DEBUG_IRQ */
 
 #define local_irq_enable()	__asm__ __volatile__ (";; ssm psr.i;; srlz.d" ::: "memory")
@@ -216,8 +205,8 @@ extern void ia64_save_extra (struct task_struct *task);
 extern void ia64_load_extra (struct task_struct *task);
 
 #ifdef CONFIG_PERFMON
-  DECLARE_PER_CPU(int, pfm_syst_wide);
-# define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_wide) != 0)
+  DECLARE_PER_CPU(unsigned long, pfm_syst_info);
+# define PERFMON_IS_SYSWIDE() (get_cpu_var(pfm_syst_info) & 0x1)
 #else
 # define PERFMON_IS_SYSWIDE() (0)
 #endif

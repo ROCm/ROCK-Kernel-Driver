@@ -36,7 +36,7 @@
 #define _IO_BASE	isa_io_base
 #define _ISA_MEM_BASE	isa_mem_base
 #define PCI_DRAM_OFFSET	pci_dram_offset
-#endif /* Platform-dependant I/O */
+#endif /* Platform-dependent I/O */
 
 extern unsigned long isa_io_base;
 extern unsigned long isa_mem_base;

@@ -35,7 +35,7 @@
  *    callback directly to avoid fragmenting or concatenating
  *    multiple frames into a single receive callback.
  *
- *    The HDLC line discipline queues the receive frames in seperate
+ *    The HDLC line discipline queues the receive frames in separate
  *    buffers so complete receive frames can be returned by the
  *    tty read calls.
  *

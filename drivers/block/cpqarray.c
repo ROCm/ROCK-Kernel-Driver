@@ -607,7 +607,7 @@ static void *remap_pci_mem(ulong base, ulong size)
 #ifndef MODULE
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,13)
 /*
- * Config string is a comma seperated set of i/o addresses of EISA cards.
+ * Config string is a comma separated set of i/o addresses of EISA cards.
  */
 static int cpqarray_setup(char *str)
 {

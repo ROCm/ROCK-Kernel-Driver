@@ -1,6 +1,6 @@
 /*
  * The firmware this driver downloads into the tokenring card is a
- * seperate program and is not GPL'd source code, even though the Linux
+ * separate program and is not GPL'd source code, even though the Linux
  * side driver and the routine that loads this data into the card are.
  *
  * This firmware is licensed to you strictly for use in conjunction

@@ -119,7 +119,7 @@ int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream)
 
 	delta = hw_ptr_interrupt - new_hw_ptr;
 	if (delta > 0) {
-		if (delta < runtime->buffer_size / 2) {
+		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
 			snd_printd("Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
 			return 0;
 		}
@@ -183,7 +183,7 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 
 	delta = old_hw_ptr - new_hw_ptr;
 	if (delta > 0) {
-		if (delta < runtime->buffer_size / 2) {
+		if ((snd_pcm_uframes_t)delta < runtime->buffer_size / 2) {
 			snd_printd("Unexpected hw_pointer value (stream = %i, delta: -%ld, max jitter = %ld): wrong interrupt acknowledge?\n", substream->stream, (long) delta, runtime->buffer_size / 2);
 			return 0;
 		}
@@ -1013,7 +1013,7 @@ static int snd_pcm_hw_rule_msbits(snd_pcm_hw_params_t *params,
 				  snd_pcm_hw_rule_t *rule)
 {
 	unsigned int l = (unsigned long) rule->private;
-	unsigned int width = l & 0xffff;
+	int width = l & 0xffff;
 	unsigned int msbits = l >> 16;
 	snd_interval_t *i = hw_param_interval(params, SNDRV_PCM_HW_PARAM_SAMPLE_BITS);
 	if (snd_interval_single(i) && snd_interval_value(i) == width)
@@ -1830,13 +1830,17 @@ int snd_pcm_capture_ready(snd_pcm_substream_t *substream)
  * snd_pcm_playback_data - check whether any data exists on the playback buffer
  * @substream: the pcm substream instance
  *
- * Checks whether any data exists on the playback buffer.
+ * Checks whether any data exists on the playback buffer. If stop_threshold
+ * is bigger or equal to boundary, then this function returns always non-zero.
  *
  * Returns non-zero if exists, or zero if not.
  */
 int snd_pcm_playback_data(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	
+	if (runtime->stop_threshold >= runtime->boundary)
+		return 1;
 	return snd_pcm_playback_avail(runtime) < runtime->buffer_size;
 }
 
@@ -1901,7 +1905,7 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 		    runtime->silenced_size < runtime->buffer_size) {
 			snd_pcm_sframes_t noise_dist;
 			noise_dist = snd_pcm_playback_hw_avail(runtime) + runtime->silenced_size;
-			snd_assert(noise_dist <= runtime->silence_threshold, );
+			snd_assert(noise_dist <= (snd_pcm_sframes_t)runtime->silence_threshold, );
 			frames = noise_dist - runtime->silence_threshold;
 		}
 		avail = snd_pcm_playback_avail(runtime);
@@ -1910,12 +1914,12 @@ void snd_pcm_tick_prepare(snd_pcm_substream_t *substream)
 	}
 	if (avail < runtime->control->avail_min) {
 		snd_pcm_sframes_t n = runtime->control->avail_min - avail;
-		if (n > 0 && frames > n)
+		if (n > 0 && frames > (snd_pcm_uframes_t)n)
 			frames = n;
 	}
 	if (avail < runtime->buffer_size) {
 		snd_pcm_sframes_t n = runtime->buffer_size - avail;
-		if (n > 0 && frames > n)
+		if (n > 0 && frames > (snd_pcm_uframes_t)n)
 			frames = n;
 	}
 	if (frames == ULONG_MAX) {
@@ -2157,7 +2161,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
 		size -= frames;
 		xfer += frames;
 		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED &&
-		    snd_pcm_playback_hw_avail(runtime) >= runtime->start_threshold) {
+		    snd_pcm_playback_hw_avail(runtime) >= (snd_pcm_sframes_t)runtime->start_threshold) {
 			err = snd_pcm_start(substream);
 			if (err < 0)
 				goto _end_unlock;
@@ -2169,7 +2173,7 @@ static snd_pcm_sframes_t snd_pcm_lib_write1(snd_pcm_substream_t *substream,
  _end_unlock:
 	spin_unlock_irq(&runtime->lock);
  _end:
-	return xfer > 0 ? xfer : err;
+	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }
 
 snd_pcm_sframes_t snd_pcm_lib_write(snd_pcm_substream_t *substream, const void *buf, snd_pcm_uframes_t size)
@@ -2455,7 +2459,7 @@ static snd_pcm_sframes_t snd_pcm_lib_read1(snd_pcm_substream_t *substream, void 
  _end_unlock:
 	spin_unlock_irq(&runtime->lock);
  _end:
-	return xfer > 0 ? xfer : err;
+	return xfer > 0 ? (snd_pcm_sframes_t)xfer : err;
 }
 
 snd_pcm_sframes_t snd_pcm_lib_read(snd_pcm_substream_t *substream, void *buf, snd_pcm_uframes_t size)

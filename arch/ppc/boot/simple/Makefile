@@ -19,7 +19,7 @@
 # ENTRYPOINT which the image should be loaded at.  The optimal setting
 # for ENTRYPOINT is the link address.
 # (4) It is advisable to pass in the memory size using BI_MEMSIZE and
-# get_mem_size(), which is memory controller dependant.  Add in the correct
+# get_mem_size(), which is memory controller dependent.  Add in the correct
 # XXX_memory.o file for this to work, as well as editing the $(MISC) file.
 
 boot: zImage

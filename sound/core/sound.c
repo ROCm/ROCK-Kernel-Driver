@@ -478,7 +478,7 @@ EXPORT_SYMBOL(snd_device_free_all);
 #ifdef CONFIG_ISA
 EXPORT_SYMBOL(snd_dma_program);
 EXPORT_SYMBOL(snd_dma_disable);
-EXPORT_SYMBOL(snd_dma_residue);
+EXPORT_SYMBOL(snd_dma_pointer);
 #endif
   /* info.c */
 #ifdef CONFIG_PROC_FS

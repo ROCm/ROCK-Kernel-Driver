@@ -62,6 +62,7 @@ static void            (*pmi_pal)(void);
 static int vesafb_pan_display(struct fb_var_screeninfo *var,
                               struct fb_info *info)
 {
+#ifdef __i386__
 	int offset;
 
 	if (!ypan)
@@ -83,11 +84,13 @@ static int vesafb_pan_display(struct fb_var_screeninfo *var,
                   "c" (offset),         /* ECX */
                   "d" (offset >> 16),   /* EDX */
                   "D" (&pmi_start));    /* EDI */
+#endif
 	return 0;
 }
 
 static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned blue)
 {
+#ifdef __i386__
 	struct { u_char blue, green, red, pad; } entry;
 
 	if (pmi_setpal) {
@@ -111,6 +114,7 @@ static void vesa_setpalette(int regno, unsigned red, unsigned green, unsigned bl
 		outb_p(green >> 10, dac_val);
 		outb_p(blue  >> 10, dac_val);
 	}
+#endif
 }
 
 static int vesafb_setcolreg(unsigned regno, unsigned red, unsigned green,
@@ -224,6 +228,10 @@ int __init vesafb_init(void)
 	vesafb_fix.smem_len = screen_info.lfb_size * 65536;
 	vesafb_fix.visual   = (vesafb_defined.bits_per_pixel == 8) ?
 		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_TRUECOLOR;
+
+#ifndef __i386__
+	screen_info.vesapm_seg = 0;
+#endif
 
 	if (!request_mem_region(vesafb_fix.smem_start, vesafb_fix.smem_len, "vesafb")) {
 		printk(KERN_WARNING
