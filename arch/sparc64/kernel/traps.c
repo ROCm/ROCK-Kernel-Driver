@@ -37,6 +37,33 @@
 #include <linux/kmod.h>
 #endif
 
+/* When an irrecoverable trap occurs at tl > 0, the trap entry
+ * code logs the trap state registers at every level in the trap
+ * stack.  It is found at (pt_regs + sizeof(pt_regs)) and the layout
+ * is as follows:
+ */
+struct tl1_traplog {
+	struct {
+		unsigned long tstate;
+		unsigned long tpc;
+		unsigned long tnpc;
+	} trapstack[4];
+	unsigned long tl;
+};
+
+static void dump_tl1_traplog(struct tl1_traplog *p)
+{
+	int i;
+
+	printk("TRAPLOG: Error at trap level 0x%lx, dumping track stack.\n",
+	       p->tl);
+	for (i = 0; i < 4; i++) {
+		printk("TRAPLOG: Trap level %d TSTATE[%016lx] TPC[%016lx] TNPC[%016lx]\n",
+		       i + 1,
+		       p->trapstack[i].tstate, p->trapstack[i].tpc, p->trapstack[i].tnpc);
+	}
+}
+
 void bad_trap (struct pt_regs *regs, long lvl)
 {
 	char buffer[32];
@@ -66,8 +93,10 @@ void bad_trap (struct pt_regs *regs, long lvl)
 
 void bad_trap_tl1 (struct pt_regs *regs, long lvl)
 {
-	char buffer[24];
+	char buffer[32];
 	
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
+
 	sprintf (buffer, "Bad trap %lx at tl>0", lvl);
 	die_if_kernel (buffer, regs);
 }
@@ -80,8 +109,8 @@ void do_BUG(const char *file, int line)
 }
 #endif
 
-void instruction_access_exception (struct pt_regs *regs,
-				   unsigned long sfsr, unsigned long sfar)
+void instruction_access_exception(struct pt_regs *regs,
+				  unsigned long sfsr, unsigned long sfar)
 {
 	siginfo_t info;
 
@@ -100,6 +129,13 @@ void instruction_access_exception (struct pt_regs *regs,
 	info.si_addr = (void *)regs->tpc;
 	info.si_trapno = 0;
 	force_sig_info(SIGSEGV, &info, current);
+}
+
+void instruction_access_exception_tl1(struct pt_regs *regs,
+				      unsigned long sfsr, unsigned long sfar)
+{
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
+	instruction_access_exception(regs, sfsr, sfar);
 }
 
 void data_access_exception (struct pt_regs *regs,
@@ -1689,56 +1725,67 @@ void do_cee(struct pt_regs *regs)
 
 void do_cee_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Cache Error Exception", regs);
 }
 
 void do_dae_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Data Access Exception", regs);
 }
 
 void do_iae_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Instruction Access Exception", regs);
 }
 
 void do_div0_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: DIV0 Exception", regs);
 }
 
 void do_fpdis_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU Disabled", regs);
 }
 
 void do_fpieee_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU IEEE Exception", regs);
 }
 
 void do_fpother_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: FPU Other Exception", regs);
 }
 
 void do_ill_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Illegal Instruction Exception", regs);
 }
 
 void do_irq_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: IRQ Exception", regs);
 }
 
 void do_lddfmna_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: LDDF Exception", regs);
 }
 
 void do_stdfmna_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: STDF Exception", regs);
 }
 
@@ -1749,6 +1796,7 @@ void do_paw(struct pt_regs *regs)
 
 void do_paw_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Phys Watchpoint Exception", regs);
 }
 
@@ -1759,11 +1807,13 @@ void do_vaw(struct pt_regs *regs)
 
 void do_vaw_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Virt Watchpoint Exception", regs);
 }
 
 void do_tof_tl1(struct pt_regs *regs)
 {
+	dump_tl1_traplog((struct tl1_traplog *)(regs + 1));
 	die_if_kernel("TL1: Tag Overflow Exception", regs);
 }
 

@@ -774,7 +774,14 @@ __do_instruction_access_exception_tl1:
 	membar		#Sync
 	sethi		%hi(109f), %g7
 	ba,pt		%xcc, etraptl1
-	 or		%g7, %lo(109f), %g7	! Merge in below
+109:	 or		%g7, %lo(109b), %g7
+	mov		%l4, %o1
+	mov		%l5, %o2
+	call		instruction_access_exception_tl1
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
 __do_instruction_access_exception:
 	rdpr		%pstate, %g4
 	wrpr		%g4, PSTATE_MG|PSTATE_AG, %pstate
@@ -1084,6 +1091,15 @@ cheetah_deferred_trap_vector_tl1:
 	.globl		cheetah_plus_dcpe_trap_vector, cheetah_plus_dcpe_trap_vector_tl1
 cheetah_plus_dcpe_trap_vector:
 	membar		#Sync
+	sethi		%hi(do_cheetah_plus_data_parity), %g7
+	jmpl		%g7 + %lo(do_cheetah_plus_data_parity), %g0
+	 nop
+	nop
+	nop
+	nop
+	nop
+
+do_cheetah_plus_data_parity:
 	ba,pt		%xcc, etrap
 	 rd		%pc, %g7
 	mov		0x0, %o0
@@ -1091,6 +1107,7 @@ cheetah_plus_dcpe_trap_vector:
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
 	ba,pt		%xcc, rtrap
 	 clr		%l6
+
 cheetah_plus_dcpe_trap_vector_tl1:
 	membar		#Sync
 	wrpr		PSTATE_IG | PSTATE_PEF | PSTATE_PRIV, %pstate
@@ -1104,6 +1121,15 @@ cheetah_plus_dcpe_trap_vector_tl1:
 	.globl		cheetah_plus_icpe_trap_vector, cheetah_plus_icpe_trap_vector_tl1
 cheetah_plus_icpe_trap_vector:
 	membar		#Sync
+	sethi		%hi(do_cheetah_plus_insn_parity), %g7
+	jmpl		%g7 + %lo(do_cheetah_plus_insn_parity), %g0
+	 nop
+	nop
+	nop
+	nop
+	nop
+
+do_cheetah_plus_insn_parity:
 	ba,pt		%xcc, etrap
 	 rd		%pc, %g7
 	mov		0x1, %o0
@@ -1111,6 +1137,7 @@ cheetah_plus_icpe_trap_vector:
 	 add		%sp, STACK_BIAS + REGWIN_SZ, %o1
 	ba,pt		%xcc, rtrap
 	 clr		%l6
+
 cheetah_plus_icpe_trap_vector_tl1:
 	membar		#Sync
 	wrpr		PSTATE_IG | PSTATE_PEF | PSTATE_PRIV, %pstate
