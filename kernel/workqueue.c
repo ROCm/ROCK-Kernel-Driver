@@ -100,7 +100,7 @@ static void delayed_work_timer_fn(unsigned long __data)
 int queue_delayed_work(struct workqueue_struct *wq, struct work_struct *work, unsigned long delay)
 {
 	int ret = 0, cpu = get_cpu();
-	timer_t *timer = &work->timer;
+	struct timer_list *timer = &work->timer;
 	struct cpu_workqueue_struct *cwq = wq->cpu_wq + cpu;
 
 	if (!test_and_set_bit(0, &work->pending)) {

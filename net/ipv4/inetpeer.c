@@ -98,7 +98,7 @@ spinlock_t inet_peer_unused_lock = SPIN_LOCK_UNLOCKED;
 
 static void peer_check_expire(unsigned long dummy);
 static struct timer_list peer_periodic_timer =
-	{ { NULL, NULL }, 0, 0, &peer_check_expire };
+	{ .function = &peer_check_expire };
 
 /* Exported for sysctl_net_ipv4.  */
 int inet_peer_gc_mintime = 10 * HZ,
