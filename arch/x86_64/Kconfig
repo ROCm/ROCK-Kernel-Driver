@@ -387,6 +387,10 @@ config COMPAT
 	depends on IA32_EMULATION
 	default y
 
+config SYSVIPC_COMPAT
+	bool
+	depends on COMPAT && SYSVIPC
+	default y
 
 config UID16
 	bool
