@@ -4,7 +4,9 @@
  *  Replacement code for mm functions to support CPU's that don't
  *  have any form of memory management unit (thus no virtual memory).
  *
- *  Copyright (c) 2004      David Howells <dhowells@redhat.com>
+ *  See Documentation/nommu-mmap.txt
+ *
+ *  Copyright (c) 2004-2005 David Howells <dhowells@redhat.com>
  *  Copyright (c) 2000-2003 David McCullough <davidm@snapgear.com>
  *  Copyright (c) 2000-2001 D Jeff Dionne <jeff@uClinux.org>
  *  Copyright (c) 2002      Greg Ungerer <gerg@snapgear.com>
