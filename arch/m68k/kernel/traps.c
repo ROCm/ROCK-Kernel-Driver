@@ -1187,6 +1187,7 @@ void die_if_kernel (char *str, struct pt_regs *fp, int nr)
 
 	console_verbose();
 	printk("%s: %08x\n",str,nr);
+	print_modules();
 	printk("PC: [<%08lx>]",fp->pc);
 	print_symbol(" %s\n", fp->pc);
 	printk("\nSR: %04x  SP: %p  a2: %08lx\n",
