@@ -138,7 +138,6 @@ static int drive2[8] = { 0, 0, 0, -1, 0, 1, -1, -1 };
 static int drive3[8] = { 0, 0, 0, -1, 0, 1, -1, -1 };
 
 static int (*drives[4])[8] = {&drive0, &drive1, &drive2, &drive3};
-static int pd_drive_count;
 
 enum {D_PRT, D_PRO, D_UNI, D_MOD, D_GEO, D_SBY, D_DLY, D_SLV};
 
@@ -264,27 +263,6 @@ static char *pd_errs[17] = { "ERR", "INDEX", "ECC", "DRQ", "SEEK", "WRERR",
 	"READY", "BUSY", "AMNF", "TK0NF", "ABRT", "MCR",
 	"IDNF", "MC", "UNC", "???", "TMO"
 };
-
-static void pd_init_units(void)
-{
-	int unit;
-
-	pd_drive_count = 0;
-	for (unit = 0; unit < PD_UNITS; unit++) {
-		int *parm = *drives[unit];
-		struct pd_unit *disk = pd + unit;
-		disk->pi = &disk->pia;
-		disk->access = 0;
-		disk->changed = 1;
-		disk->capacity = 0;
-		disk->drive = parm[D_SLV];
-		snprintf(disk->name, PD_NAMELEN, "%s%c", name, 'a'+unit);
-		disk->alt_geom = parm[D_GEO];
-		disk->standby = parm[D_SBY];
-		if (parm[D_PRT])
-			pd_drive_count++;
-	}
-}
 
 static inline int status_reg(struct pd_unit *disk)
 {
@@ -887,8 +865,23 @@ static void pd_probe_drive(struct pd_unit *disk)
 
 static int pd_detect(void)
 {
-	int found = 0, unit;
+	int found = 0, unit, pd_drive_count = 0;
 	struct pd_unit *disk;
+
+	for (unit = 0; unit < PD_UNITS; unit++) {
+		int *parm = *drives[unit];
+		struct pd_unit *disk = pd + unit;
+		disk->pi = &disk->pia;
+		disk->access = 0;
+		disk->changed = 1;
+		disk->capacity = 0;
+		disk->drive = parm[D_SLV];
+		snprintf(disk->name, PD_NAMELEN, "%s%c", name, 'a'+unit);
+		disk->alt_geom = parm[D_GEO];
+		disk->standby = parm[D_SBY];
+		if (parm[D_PRT])
+			pd_drive_count++;
+	}
 
 	if (pd_drive_count == 0) { /* nothing spec'd - so autoprobe for 1 */
 		disk = pd;
@@ -941,7 +934,6 @@ static int __init pd_init(void)
 
 	printk("%s: %s version %s, major %d, cluster %d, nice %d\n",
 	       name, name, PD_VERSION, major, cluster, nice);
-	pd_init_units();
 	if (!pd_detect())
 		goto out3;
 
