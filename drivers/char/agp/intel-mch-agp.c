@@ -491,10 +491,9 @@ static int __devinit agp_intelmch_probe(struct pci_dev *pdev,
 	char *name = "(unknown)";
 	u8 cap_ptr = 0;
 
-	if (!boot_cpu_has(X86_FEATURE_LM))
-		return -ENODEV;
-
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr) 
+		return -ENODEV;
 
 	bridge = agp_alloc_bridge();
 	if (!bridge)
@@ -590,7 +589,15 @@ static struct pci_device_id agp_intelmch_pci_table[] = {
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
 	.vendor		= PCI_VENDOR_ID_INTEL,
-	.device		= PCI_ANY_ID,
+	.device		= PCI_DEVICE_ID_INTEL_82865_HB,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_INTEL,
+	.device		= PCI_DEVICE_ID_INTEL_82875_HB,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},
