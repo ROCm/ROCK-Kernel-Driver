@@ -24,6 +24,7 @@
 #include <linux/major.h>
 #include <linux/genhd.h>
 #include <linux/rtc.h>
+#include <linux/interrupt.h>
 
 #include <asm/bootinfo.h>
 #include <asm/system.h>
@@ -358,8 +359,7 @@ int bvme6000_set_clock_mmss (unsigned long nowtime)
 		? real_minutes - rtc_minutes
 			: rtc_minutes - real_minutes) < 30)
 	{
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		rtc_tenms = rtc->bcd_tenms;
 		while (rtc_tenms == rtc->bcd_tenms)
 			;
@@ -367,7 +367,7 @@ int bvme6000_set_clock_mmss (unsigned long nowtime)
 			;
 		rtc->bcd_min = bin2bcd(real_minutes);
 		rtc->bcd_sec = bin2bcd(real_seconds);
-		restore_flags(flags);
+		local_irq_restore(flags);
 	}
 	else
 		retval = -1;

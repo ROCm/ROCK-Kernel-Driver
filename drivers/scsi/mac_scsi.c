@@ -370,9 +370,9 @@ void restore_irq(struct pt_regs *regs)
 {
 	unsigned long flags;
 
-	save_flags(flags);
+	local_save_flags(flags);
 	flags = (flags & ~0x0700) | (regs->sr & 0x0700);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -621,10 +621,9 @@ void scsi_mac_debug (void)
 		NCR5380_setup(default_instance);
 		if(NCR5380_read(BUS_AND_STATUS_REG)&BASR_IRQ)
 #endif
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			NCR5380_print_status(default_instance);
-			restore_flags(flags);
+			local_irq_restore(flags);
 	}
 #if 0
 	polled_scsi_on = 1;
@@ -651,10 +650,9 @@ void scsi_mac_polled (void)
 		if(NCR5380_read(BUS_AND_STATUS_REG)&BASR_IRQ)
 		{
 			printk("SCSI poll\n");
-			save_flags(flags);
-			cli();
+			local_irq_save(flags);
 			NCR5380_intr(IRQ_MAC_SCSI, instance, NULL);
-			restore_flags(flags);
+			local_irq_restore(flags);
 		}
 #if 0
 	    }

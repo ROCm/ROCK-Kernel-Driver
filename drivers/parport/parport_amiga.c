@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/parport.h>
 #include <linux/ioport.h>
+#include <linux/interrupt.h>
 #include <asm/setup.h>
 #include <asm/amigahw.h>
 #include <asm/irq.h>

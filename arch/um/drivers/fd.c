@@ -15,6 +15,7 @@ struct fd_chan {
 	int fd;
 	int raw;
 	struct termios tt;
+	char str[sizeof("1234567890\0")];
 };
 
 void *fd_init(char *str, int device, struct chan_opts *opts)
@@ -30,7 +31,7 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 	}
 	str++;
 	n = strtoul(str, &end, 0);
-	if(*end != '\0'){
+	if((*end != '\0') || (end == str)){
 		printk("fd_init : couldn't parse file descriptor '%s'\n", str);
 		return(NULL);
 	}
@@ -40,7 +41,7 @@ void *fd_init(char *str, int device, struct chan_opts *opts)
 	return(data);
 }
 
-int fd_open(int input, int output, int primary, void *d)
+int fd_open(int input, int output, int primary, void *d, char **dev_out)
 {
 	struct fd_chan *data = d;
 
@@ -48,6 +49,8 @@ int fd_open(int input, int output, int primary, void *d)
 		tcgetattr(data->fd, &data->tt);
 		raw(data->fd, 0);
 	}
+	sprintf(data->str, "%d", data->fd);
+	*dev_out = data->str;
 	return(data->fd);
 }
 
@@ -69,6 +72,7 @@ int fd_console_write(int fd, const char *buf, int n, void *d)
 }
 
 struct chan_ops fd_ops = {
+	type:		"fd",
 	init:		fd_init,
 	open:		fd_open,
 	close:		fd_close,

@@ -332,10 +332,9 @@ int __init mac_onboard_sonic_probe(struct net_device* dev)
 		unsigned long flags;
 		int card_present;
 
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		card_present = hwreg_present((void*)ONBOARD_SONIC_REGISTERS);
-		restore_flags(flags);
+		local_irq_restore(flags);
 
 		if (!card_present) {
 			printk("none.\n");

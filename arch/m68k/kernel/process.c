@@ -202,14 +202,15 @@ void flush_thread(void)
 asmlinkage int m68k_fork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(SIGCHLD, rdusp(), regs, 0, NULL);
+	p = do_fork(SIGCHLD, rdusp(), regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
 asmlinkage int m68k_vfork(struct pt_regs *regs)
 {
 	struct task_struct *p;
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, rdusp(), regs, 0, NULL,
+		    NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -218,15 +219,17 @@ asmlinkage int m68k_clone(struct pt_regs *regs)
 	unsigned long clone_flags;
 	unsigned long newsp;
 	struct task_struct *p;
-	int *user_tid;
+	int *parent_tidptr, *child_tidptr;
 
 	/* syscall2 puts clone_flags in d1 and usp in d2 */
 	clone_flags = regs->d1;
 	newsp = regs->d2;
-	user_tid = (int *)regs->d3;
+	parent_tidptr = (int *)regs->d3;
+	child_tidptr = (int *)regs->d4;
 	if (!newsp)
 		newsp = rdusp();
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0,
+		    parent_tidptr, child_tidptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/input.h>
+#include <linux/interrupt.h>
 
 #include <asm/system.h>
 #include <asm/amigahw.h>

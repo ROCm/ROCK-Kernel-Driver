@@ -76,9 +76,9 @@ struct mac_model
 #define MAC_IDE_BABOON		3
 
 #define MAC_SCC_II		1
-#define MAC_SCC_QUADRA		2
-#define MAC_SCC_QUADRA2		3
-#define MAC_SCC_IOP		4
+#define MAC_SCC_IOP		2
+#define MAC_SCC_QUADRA		3
+#define MAC_SCC_PSC		4
 
 #define MAC_ETHER_NONE		0	
 #define MAC_ETHER_SONIC		1
@@ -139,6 +139,7 @@ struct mac_model
 #define MAC_MODEL_P475F		90	/* aka: P475 w/ FPU (no LC040) */
 #define MAC_MODEL_P575		92	/* aka: LC575, P577/P578 */
 #define MAC_MODEL_Q605		94
+#define MAC_MODEL_Q605_ACC	95	/* Q605 accelerated to 33 MHz */
 #define MAC_MODEL_Q630		98	/* aka: LC630, P630/631/635/636/637/638/640 */
 #define MAC_MODEL_P588		99	/* aka: LC580, P580 */
 #define MAC_MODEL_PB280		102

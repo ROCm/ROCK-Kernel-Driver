@@ -45,7 +45,7 @@ int sun3x_hwclk(int set, struct rtc_time *t)
 		(struct mostek_dt *)(SUN3X_EEPROM+M_CONTROL);
 	unsigned long flags;
 
-	save_and_cli(flags);
+	local_irq_save(flags);
 	
 	if(set) {
 		h->csr |= C_WRITE;
@@ -69,7 +69,7 @@ int sun3x_hwclk(int set, struct rtc_time *t)
 		h->csr &= ~C_READ;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 
 	return 0;
 }

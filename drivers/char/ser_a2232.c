@@ -201,10 +201,9 @@ static void a2232_disable_tx_interrupts(void *ptr)
 	stat->OutDisable = -1;
 
 	/* Does this here really have to be? */
-	save_flags(flags);
-	cli(); 
+	local_irq_save(flags);
 	port->gs.flags &= ~GS_TX_INTEN;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void a2232_enable_tx_interrupts(void *ptr)
@@ -218,10 +217,9 @@ static void a2232_enable_tx_interrupts(void *ptr)
 	stat->OutDisable = 0;
 
 	/* Does this here really have to be? */
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	port->gs.flags |= GS_TX_INTEN;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void a2232_disable_rx_interrupts(void *ptr)
@@ -252,8 +250,7 @@ static void a2232_shutdown_port(void *ptr)
 	port = ptr;
 	stat = a2232stat(port->which_a2232, port->which_port_on_a2232);
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	port->gs.flags &= ~GS_ACTIVE;
 	
@@ -266,7 +263,7 @@ static void a2232_shutdown_port(void *ptr)
 		stat->Setup = -1;
 	}
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	
 	/* After analyzing control flow, I think a2232_shutdown_port
 		is actually the last call from the system when at application
@@ -300,15 +297,14 @@ static int  a2232_set_real_termios(void *ptr)
 	baud = port->gs.baud;
 	if (baud == 0) {
 		/* speed == 0 -> drop DTR, do nothing else */
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		// Clear DTR (and RTS... mhhh).
 		status->Command = (	(status->Command & ~A2232CMD_CMask) |
 					A2232CMD_Close );
 		status->OutFlush = -1;
 		status->Setup = -1;
 		
-		restore_flags(flags);
+		local_irq_restore(flags);
 		return 0;
 	}
 	
@@ -387,8 +383,7 @@ static int  a2232_set_real_termios(void *ptr)
 
 
 	/* Now we have all parameters and can go to set them: */
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 
 	status->Param = a2232_param | A2232PARAM_RcvBaud;
 	status->Command = a2232_cmd | A2232CMD_Open |  A2232CMD_Enable;
@@ -396,7 +391,7 @@ static int  a2232_set_real_termios(void *ptr)
 	status->OutDisable = 0;
 	status->Setup = -1;
 
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return 0;
 }
 

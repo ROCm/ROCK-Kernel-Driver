@@ -244,7 +244,7 @@ static __inline__ int constant_test_bit(int nr, const volatile void * addr)
 	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) addr)[nr >> 5])) != 0;
 }
 
-static __inline__ int variable_test_bit(int nr, volatile void * addr)
+static __inline__ int variable_test_bit(int nr, volatile const void * addr)
 {
 	int oldbit;
 

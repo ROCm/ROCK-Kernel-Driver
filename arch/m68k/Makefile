@@ -19,6 +19,7 @@ COMPILE_ARCH = $(shell uname -m)
 # override top level makefile
 AS += -m68020
 LDFLAGS := -m m68kelf
+LDFLAGS_BLOB := --format binary --oformat elf32-m68k
 ifneq ($(COMPILE_ARCH),$(ARCH))
 	# prefix for cross-compiling binaries
 	CROSS_COMPILE = m68k-linux-

@@ -38,6 +38,7 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  . = ALIGN(64);
   __start___ksymtab = .;	/* Kernel symbol table */
   __ksymtab : { *(__ksymtab) }
   __stop___ksymtab = .;
@@ -58,18 +59,27 @@ SECTIONS
   __uml_setup_start = .;
   .uml.setup.init : { *(.uml.setup.init) }
   __uml_setup_end = .;
+	
   __uml_help_start = .;
   .uml.help.init : { *(.uml.help.init) }
   __uml_help_end = .;
+	
   __uml_postsetup_start = .;
   .uml.postsetup.init : { *(.uml.postsetup.init) }
   __uml_postsetup_end = .;
+	
   __setup_start = .;
   .init.setup : { *(.init.setup) }
   __setup_end = .;
+
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
+
   __per_cpu_start = . ; 
   .data.percpu : { *(.data.percpu) }
-  __per_cpu_end = . ; 
+  __per_cpu_end = . ;
+	
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init) 

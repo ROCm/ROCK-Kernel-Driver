@@ -26,6 +26,7 @@
 #include <asm/desc.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
+#include <asm/nmi.h>
 #include <asm/kdebug.h>
 #include <asm/unistd.h>
 
@@ -116,7 +117,11 @@ EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
+#endif
 
+#if defined(CONFIG_X86_LOCAL_APIC) && defined(CONFIG_PM)
+EXPORT_SYMBOL_GPL(set_nmi_pm_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_pm_callback);
 #endif
 
 #ifdef CONFIG_VT
@@ -126,6 +131,11 @@ EXPORT_SYMBOL(screen_info);
 EXPORT_SYMBOL(get_wchan);
 
 EXPORT_SYMBOL(rtc_lock);
+
+EXPORT_SYMBOL_GPL(register_profile_notifier);
+EXPORT_SYMBOL_GPL(unregister_profile_notifier);
+EXPORT_SYMBOL_GPL(set_nmi_callback);
+EXPORT_SYMBOL_GPL(unset_nmi_callback);
 
 /* Export string functions. We normally rely on gcc builtin for most of these,
    but gcc sometimes decides not to inline them. */    

@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/parport.h>
+#include <linux/interrupt.h>
 #include <asm/setup.h>
 #include <asm/atarihw.h>
 #include <asm/irq.h>
@@ -25,11 +26,10 @@ parport_atari_read_data(struct parport *p)
 	unsigned long flags;
 	unsigned char data;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	sound_ym.rd_data_reg_sel = 15;
 	data = sound_ym.rd_data_reg_sel;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return data;
 }
 
@@ -38,11 +38,10 @@ parport_atari_write_data(struct parport *p, unsigned char data)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	sound_ym.rd_data_reg_sel = 15;
 	sound_ym.wd_data = data;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static unsigned char
@@ -51,12 +50,11 @@ parport_atari_read_control(struct parport *p)
 	unsigned long flags;
 	unsigned char control = 0;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	sound_ym.rd_data_reg_sel = 14;
 	if (!(sound_ym.rd_data_reg_sel & (1 << 5)))
 		control = PARPORT_CONTROL_STROBE;
-	restore_flags(flags);
+	local_irq_restore(flags);
 	return control;
 }
 
@@ -65,14 +63,13 @@ parport_atari_write_control(struct parport *p, unsigned char control)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	sound_ym.rd_data_reg_sel = 14;
 	if (control & PARPORT_CONTROL_STROBE)
 		sound_ym.wd_data = sound_ym.rd_data_reg_sel & ~(1 << 5);
 	else
 		sound_ym.wd_data = sound_ym.rd_data_reg_sel | (1 << 5);
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static unsigned char
@@ -129,12 +126,11 @@ parport_atari_data_forward(struct parport *p)
 {
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	/* Soundchip port B as output. */
 	sound_ym.rd_data_reg_sel = 7;
 	sound_ym.wd_data = sound_ym.rd_data_reg_sel | 0x40;
-	restore_flags(flags);
+	local_irq_restore(flags);
 }
 
 static void
@@ -143,12 +139,11 @@ parport_atari_data_reverse(struct parport *p)
 #if 0 /* too dangerous, can kill sound chip */
 	unsigned long flags;
 
-	save_flags(flags);
-	cli();
+	local_irq_save(flags);
 	/* Soundchip port B as input. */
 	sound_ym.rd_data_reg_sel = 7;
 	sound_ym.wd_data = sound_ym.rd_data_reg_sel & ~0x40;
-	restore_flags(flags);
+	local_irq_restore(flags);
 #endif
 }
 
@@ -209,15 +204,14 @@ parport_atari_init(void)
 	unsigned long flags;
 
 	if (MACH_IS_ATARI) {
-		save_flags(flags);
-		cli();
+		local_irq_save(flags);
 		/* Soundchip port A/B as output. */
 		sound_ym.rd_data_reg_sel = 7;
 		sound_ym.wd_data = (sound_ym.rd_data_reg_sel & 0x3f) | 0xc0;
 		/* STROBE high. */
 		sound_ym.rd_data_reg_sel = 14;
 		sound_ym.wd_data = sound_ym.rd_data_reg_sel | (1 << 5);
-		restore_flags(flags);
+		local_irq_restore(flags);
 		/* MFP port I0 as input. */
 		mfp.data_dir &= ~1;
 		/* MFP port I0 interrupt on high->low edge. */

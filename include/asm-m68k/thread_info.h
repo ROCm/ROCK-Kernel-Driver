@@ -10,6 +10,7 @@ struct thread_info {
 	struct exec_domain	*exec_domain;	/* execution domain */
 	__s32			preempt_count; /* 0 => preemptable, <0 => BUG */
 	__u32 cpu; /* should always be 0 on m68k */
+	struct restart_block    restart_block;
 
 	__u8			supervisor_stack[0];
 };
@@ -20,6 +21,9 @@ struct thread_info {
 {						\
 	.task		= &tsk,			\
 	.exec_domain	= &default_exec_domain,	\
+	.restart_block = {			\
+		.fn = do_no_restart_syscall,	\
+	},					\
 }
 
 /* THREAD_SIZE should be 8k, so handle differently for 4k and 8k machines */
