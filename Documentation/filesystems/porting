@@ -152,3 +152,38 @@ settles down a bit.
 s_export_op is now required for exporting a filesystem.
 isofs, ext2, ext3, resierfs, fat
 can be used as examples of very different filesystems.
+
+---
+[mandatory]
+
+iget4() and the read_inode2 callback have been superseded by iget5_locked()
+which has the following prototype,
+
+    struct inode *iget5_locked(struct super_block *sb, unsigned long ino,
+				int (*test)(struct inode *, void *),
+				int (*set)(struct inode *, void *),
+				void *data);
+
+'test' is an additional function that can be used when the inode
+number is not sufficient to identify the actual file object. 'set'
+should be a non-blocking function that initializes those parts of a
+newly created inode to allow the test function to succeed. 'data' is
+passed as an opaque value to both test and set functions.
+
+When the inode has been created by iget5_locked(), it will be returned with
+the I_NEW flag set and will still be locked. read_inode has not been
+called so the file system still has to finalize the initialization. Once
+the inode is initialized it must be unlocked by calling unlock_new_inode().
+
+The filesystem is responsible for setting (and possibly testing) i_ino
+when appropriate. There is also a simpler iget_locked function that
+just takes the superblock and inode number as arguments and does the
+test and set for you.
+
+e.g.
+       inode = iget_locked(sb, ino);
+       if (inode->i_state & I_NEW) {
+               read_inode_from_disk(inode);
+               unlock_new_inode(inode);
+       }
+

@@ -771,13 +771,6 @@ struct super_operations {
 
 	void (*read_inode) (struct inode *);
   
-  	/* reiserfs kludge.  reiserfs needs 64 bits of information to
-    	** find an inode.  We are using the read_inode2 call to get
-   	** that information.  We don't like this, and are waiting on some
-   	** VFS changes for the real solution.
-   	** iget4 calls read_inode2, iff it is defined
-   	*/
-    	void (*read_inode2) (struct inode *, void *) ;
    	void (*dirty_inode) (struct inode *);
 	void (*write_inode) (struct inode *, int);
 	void (*put_inode) (struct inode *);
@@ -801,6 +794,7 @@ struct super_operations {
 #define I_LOCK			8
 #define I_FREEING		16
 #define I_CLEAR			32
+#define I_NEW			64
 
 #define I_DIRTY (I_DIRTY_SYNC | I_DIRTY_DATASYNC | I_DIRTY_PAGES)
 
@@ -1208,19 +1202,33 @@ extern void force_delete(struct inode *);
 extern struct inode * igrab(struct inode *);
 extern ino_t iunique(struct super_block *, ino_t);
 
-typedef int (*find_inode_t)(struct inode *, unsigned long, void *);
-extern struct inode * iget4(struct super_block *, unsigned long, find_inode_t, void *);
+extern struct inode * iget5_locked(struct super_block *, unsigned long, int (*test)(struct inode *, void *), int (*set)(struct inode *, void *), void *);
+extern struct inode * iget_locked(struct super_block *, unsigned long);
+extern void unlock_new_inode(struct inode *);
+
 static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 {
-	return iget4(sb, ino, NULL, NULL);
+	struct inode *inode = iget_locked(sb, ino);
+	
+	if (inode && (inode->i_state & I_NEW)) {
+		sb->s_op->read_inode(inode);
+		unlock_new_inode(inode);
+	}
+
+	return inode;
 }
 
 extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern void remove_suid(struct dentry *);
-extern void insert_inode_hash(struct inode *);
+
+extern void __insert_inode_hash(struct inode *, unsigned long hashval);
 extern void remove_inode_hash(struct inode *);
+static inline void insert_inode_hash(struct inode *inode) {
+	__insert_inode_hash(inode, inode->i_ino);
+}
+
 extern struct file * get_empty_filp(void);
 extern void file_move(struct file *f, struct list_head *list);
 extern void ll_rw_block(int, int, struct buffer_head * bh[]);

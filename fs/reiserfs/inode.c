@@ -33,7 +33,7 @@ void reiserfs_delete_inode (struct inode * inode)
     lock_kernel() ; 
 
     /* The = 0 happens when we abort creating a new inode for some reason like lack of space.. */
-    if (INODE_PKEY(inode)->k_objectid != 0) { /* also handles bad_inode case */
+    if (!(inode->i_state & I_NEW) && INODE_PKEY(inode)->k_objectid != 0) { /* also handles bad_inode case */
 	down (&inode->i_sem); 
 
 	journal_begin(&th, inode->i_sb, jbegin_count) ;
@@ -886,7 +886,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 // item version directly
 //
 
-// called by read_inode
+// called by read_locked_inode
 static void init_inode (struct inode * inode, struct path * path)
 {
     struct buffer_head * bh;
@@ -1117,7 +1117,7 @@ void reiserfs_update_sd (struct reiserfs_transaction_handle *th,
     return;
 }
 
-/* reiserfs_read_inode2 is called to read the inode off disk, and it
+/* reiserfs_read_locked_inode is called to read the inode off disk, and it
 ** does a make_bad_inode when things go wrong.  But, we need to make sure
 ** and clear the key in the private portion of the inode, otherwise a
 ** corresponding iput might try to delete whatever object the inode last
@@ -1128,32 +1128,29 @@ static void reiserfs_make_bad_inode(struct inode *inode) {
     make_bad_inode(inode);
 }
 
-void reiserfs_read_inode(struct inode *inode) {
-    reiserfs_make_bad_inode(inode) ;
-}
-
-
 //
 // initially this function was derived from minix or ext2's analog and
 // evolved as the prototype did
 //
 
+int reiserfs_init_locked_inode (struct inode * inode, void *p)
+{
+    struct reiserfs_iget_args *args = (struct reiserfs_iget_args *)p ;
+    inode->i_ino = args->objectid;
+    INODE_PKEY(inode)->k_dir_id = cpu_to_le32(args->dirid);
+    return 0;
+}
+
 /* looks for stat data in the tree, and fills up the fields of in-core
    inode stat data fields */
-void reiserfs_read_inode2 (struct inode * inode, void *p)
+void reiserfs_read_locked_inode (struct inode * inode, struct reiserfs_iget_args *args)
 {
     INITIALIZE_PATH (path_to_sd);
     struct cpu_key key;
-    struct reiserfs_iget4_args *args = (struct reiserfs_iget4_args *)p ;
     unsigned long dirino;
     int retval;
 
-    if (!p) {
-	reiserfs_make_bad_inode(inode) ;
-	return;
-    }
-
-    dirino = args->objectid ;
+    dirino = args->dirid ;
 
     /* set version 1, version 2 could be used too, because stat data
        key is the same in both versions */
@@ -1166,7 +1163,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
     /* look for the object's stat data */
     retval = search_item (inode->i_sb, &key, &path_to_sd);
     if (retval == IO_ERROR) {
-	reiserfs_warning ("vs-13070: reiserfs_read_inode2: "
+	reiserfs_warning ("vs-13070: reiserfs_read_locked_inode: "
                     "i/o failure occurred trying to find stat data of %K\n",
                     &key);
 	reiserfs_make_bad_inode(inode) ;
@@ -1198,7 +1195,7 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
        during mount (fs/reiserfs/super.c:finish_unfinished()). */
     if( ( inode -> i_nlink == 0 ) && 
 	! REISERFS_SB(inode -> i_sb) -> s_is_unlinked_ok ) {
-	    reiserfs_warning( "vs-13075: reiserfs_read_inode2: "
+	    reiserfs_warning( "vs-13075: reiserfs_read_locked_inode: "
 			      "dead inode read from disk %K. "
 			      "This is likely to be race with knfsd. Ignore\n", 
 			      &key );
@@ -1210,38 +1207,43 @@ void reiserfs_read_inode2 (struct inode * inode, void *p)
 }
 
 /**
- * reiserfs_find_actor() - "find actor" reiserfs supplies to iget4().
+ * reiserfs_find_actor() - "find actor" reiserfs supplies to iget5_locked().
  *
  * @inode:    inode from hash table to check
- * @inode_no: inode number we are looking for
- * @opaque:   "cookie" passed to iget4(). This is &reiserfs_iget4_args.
+ * @opaque:   "cookie" passed to iget5_locked(). This is &reiserfs_iget_args.
  *
- * This function is called by iget4() to distinguish reiserfs inodes
+ * This function is called by iget5_locked() to distinguish reiserfs inodes
  * having the same inode numbers. Such inodes can only exist due to some
  * error condition. One of them should be bad. Inodes with identical
  * inode numbers (objectids) are distinguished by parent directory ids.
  *
  */
-static int reiserfs_find_actor( struct inode *inode, 
-				unsigned long inode_no, void *opaque )
+int reiserfs_find_actor( struct inode *inode, void *opaque )
 {
-    struct reiserfs_iget4_args *args;
+    struct reiserfs_iget_args *args;
 
     args = opaque;
     /* args is already in CPU order */
-    return le32_to_cpu(INODE_PKEY(inode)->k_dir_id) == args -> objectid;
+    return (inode->i_ino == args->objectid) &&
+	(le32_to_cpu(INODE_PKEY(inode)->k_dir_id) == args->dirid);
 }
 
 struct inode * reiserfs_iget (struct super_block * s, const struct cpu_key * key)
 {
     struct inode * inode;
-    struct reiserfs_iget4_args args ;
+    struct reiserfs_iget_args args ;
 
-    args.objectid = key->on_disk_key.k_dir_id ;
-    inode = iget4 (s, key->on_disk_key.k_objectid, 
-		   reiserfs_find_actor, (void *)(&args));
+    args.objectid = key->on_disk_key.k_objectid ;
+    args.dirid = key->on_disk_key.k_dir_id ;
+    inode = iget5_locked (s, key->on_disk_key.k_objectid, 
+		   reiserfs_find_actor, reiserfs_init_locked_inode, (void *)(&args));
     if (!inode) 
 	return ERR_PTR(-ENOMEM) ;
+
+    if (inode->i_state & I_NEW) {
+	reiserfs_read_locked_inode(inode, &args);
+	unlock_new_inode(inode);
+    }
 
     if (comp_short_keys (INODE_PKEY (inode), key) || is_bad_inode (inode)) {
 	/* either due to i/o error or a stale NFS handle */
