@@ -60,7 +60,7 @@
 #define ARPHRD_RAWHDLC	518		/* Raw HDLC			*/
 
 #define ARPHRD_TUNNEL	768		/* IPIP tunnel			*/
-#define ARPHRD_TUNNEL6	769		/* IPIP6 tunnel			*/
+#define ARPHRD_TUNNEL6	769		/* IP6IP6 tunnel       		*/
 #define ARPHRD_FRAD	770             /* Frame Relay Access Device    */
 #define ARPHRD_SKIP	771		/* SKIP vif			*/
 #define ARPHRD_LOOPBACK	772		/* Loopback device		*/

@@ -55,4 +55,12 @@ config INET6_IPCOMP
 
 	  If unsure, say Y.
 
+config IPV6_TUNNEL
+	tristate "IPv6: IPv6-in-IPv6 tunnel"
+	depends on IPV6
+	---help---
+	  Support for IPv6-in-IPv6 tunnels described in RFC 2473.
+
+	  If unsure, say N.
+
 source "net/ipv6/netfilter/Kconfig"
