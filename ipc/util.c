@@ -131,7 +131,13 @@ static int grow_ary(struct ipc_ids* ids, int newsize)
 	}
 	old = ids->entries;
 	i = ids->size;
-	
+
+	/*
+	 * before setting the ids->entries to the new array, there must be a
+	 * wmb() to make sure that the memcpyed contents of the new array are
+	 * visible before the new array becomes visible.
+	 */
+	wmb();
 	ids->entries = new;
 	wmb();
 	ids->size = newsize;
