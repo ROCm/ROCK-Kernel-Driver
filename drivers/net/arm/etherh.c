@@ -58,15 +58,16 @@
 #define DEBUG_INIT 2
 
 #define DRV_NAME	"etherh"
-#define DRV_VERSION	"1.10"
+#define DRV_VERSION	"1.11"
 
 static unsigned int net_debug = NET_DEBUG;
 
 struct etherh_priv {
-	void		*ioc_fast;
-	void		*memc;
+	void __iomem	*ioc_fast;
+	void __iomem	*memc;
+	void __iomem	*dma_base;
 	unsigned int	id;
-	void		*ctrl_port;
+	void __iomem	*ctrl_port;
 	unsigned char	ctrl;
 	u32		supported;
 };
@@ -167,7 +168,8 @@ static void
 etherh_setif(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned long addr, flags;
+	unsigned long flags;
+	void __iomem *addr;
 
 	local_irq_save(flags);
 
@@ -175,7 +177,7 @@ etherh_setif(struct net_device *dev)
 	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
-		addr = dev->base_addr + EN0_RCNTHI;
+		addr = (void *)dev->base_addr + EN0_RCNTHI;
 
 		switch (dev->if_port) {
 		case IF_PORT_10BASE2:
@@ -210,17 +212,19 @@ static int
 etherh_getifstat(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
+	void __iomem *addr;
 	int stat = 0;
 
 	switch (etherh_priv(dev)->id) {
 	case PROD_I3_ETHERLAN600:
 	case PROD_I3_ETHERLAN600A:
+		addr = (void *)dev->base_addr + EN0_RCNTHI;
 		switch (dev->if_port) {
 		case IF_PORT_10BASE2:
 			stat = 1;
 			break;
 		case IF_PORT_10BASET:
-			stat = readb(dev->base_addr+EN0_RCNTHI) & 4;
+			stat = readb(addr) & 4;
 			break;
 		}
 		break;
@@ -277,8 +281,9 @@ static void
 etherh_reset(struct net_device *dev)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
+	void __iomem *addr = (void *)dev->base_addr;
 
-	writeb(E8390_NODMA+E8390_PAGE0+E8390_STOP, dev->base_addr);
+	writeb(E8390_NODMA+E8390_PAGE0+E8390_STOP, addr);
 
 	/*
 	 * See if we need to change the interface type.
@@ -304,8 +309,8 @@ static void
 etherh_block_output (struct net_device *dev, int count, const unsigned char *buf, int start_page)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
 	unsigned long dma_start;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_block_input: "
@@ -322,8 +327,8 @@ etherh_block_output (struct net_device *dev, int count, const unsigned char *buf
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	count = (count + 1) & ~1;
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
@@ -344,9 +349,9 @@ etherh_block_output (struct net_device *dev, int count, const unsigned char *buf
 	writeb (E8390_RWRITE | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16)
-		writesw (dma_addr, buf, count >> 1);
+		writesw (dma_base, buf, count >> 1);
 	else
-		writesb (dma_addr, buf, count);
+		writesb (dma_base, buf, count);
 
 	dma_start = jiffies;
 
@@ -370,8 +375,8 @@ static void
 etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int ring_offset)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
 	unsigned char *buf;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_block_input: "
@@ -382,8 +387,8 @@ etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int 
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	buf = skb->data;
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
@@ -394,11 +399,11 @@ etherh_block_input (struct net_device *dev, int count, struct sk_buff *skb, int 
 	writeb (E8390_RREAD | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16) {
-		readsw (dma_addr, buf, count >> 1);
+		readsw (dma_base, buf, count >> 1);
 		if (count & 1)
-			buf[count - 1] = readb (dma_addr);
+			buf[count - 1] = readb (dma_base);
 	} else
-		readsb (dma_addr, buf, count);
+		readsb (dma_base, buf, count);
 
 	writeb (ENISR_RDC, addr + EN0_ISR);
 	ei_local->dmaing = 0;
@@ -411,7 +416,7 @@ static void
 etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page)
 {
 	struct ei_device *ei_local = netdev_priv(dev);
-	unsigned int addr, dma_addr;
+	void __iomem *dma_base, *addr;
 
 	if (ei_local->dmaing) {
 		printk(KERN_ERR "%s: DMAing conflict in etherh_get_header: "
@@ -422,8 +427,8 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 
 	ei_local->dmaing = 1;
 
-	addr = dev->base_addr;
-	dma_addr = dev->mem_start;
+	addr = (void *)dev->base_addr;
+	dma_base = etherh_priv(dev)->dma_base;
 
 	writeb (E8390_NODMA | E8390_PAGE0 | E8390_START, addr + E8390_CMD);
 	writeb (sizeof (*hdr), addr + EN0_RCNTLO);
@@ -433,9 +438,9 @@ etherh_get_header (struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_p
 	writeb (E8390_RREAD | E8390_START, addr + E8390_CMD);
 
 	if (ei_local->word16)
-		readsw (dma_addr, hdr, sizeof (*hdr) >> 1);
+		readsw (dma_base, hdr, sizeof (*hdr) >> 1);
 	else
-		readsb (dma_addr, hdr, sizeof (*hdr));
+		readsb (dma_base, hdr, sizeof (*hdr));
 
 	writeb (ENISR_RDC, addr + EN0_ISR);
 	ei_local->dmaing = 0;
@@ -692,7 +697,7 @@ etherh_probe(struct expansion_card *ec, const struct ecard_id *id)
 	}
 
 	dev->base_addr = (unsigned long)eh->memc + data->ns8390_offset;
-	dev->mem_start = (unsigned long)eh->memc + data->dataport_offset;
+	eh->dma_base = eh->memc + data->dataport_offset;
 	eh->ctrl_port += data->ctrlport_offset;
 
 	/*
