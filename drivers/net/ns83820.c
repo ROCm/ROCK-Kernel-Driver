@@ -797,23 +797,6 @@ static void ns83820_cleanup_rx(struct ns83820 *dev)
 	}
 }
 
-/* I hate the network stack sometimes */
-#ifdef __i386__
-#define skb_mangle_for_davem(skb,len)	(skb)
-#else
-static inline struct sk_buff *skb_mangle_for_davem(struct sk_buff *skb, int len)
-{
-	tmp = __dev_alloc_skb(len+2, GFP_ATOMIC);
-	if (!tmp)
-		goto done;
-	tmp->dev = &dev->net_dev;
-	skb_reserve(tmp, 2);
-	memcpy(skb_put(tmp, len), skb->data, len);
-	kfree_skb(skb);
-	return tmp;
-}
-#endif
-
 static void FASTCALL(ns83820_rx_kick(struct ns83820 *dev));
 static void ns83820_rx_kick(struct ns83820 *dev)
 {
@@ -883,7 +866,6 @@ static void rx_irq(struct ns83820 *dev)
 		if (likely(CMDSTS_OK & cmdsts)) {
 			int len = cmdsts & 0xffff;
 			skb_put(skb, len);
-			skb = skb_mangle_for_davem(skb, len);
 			if (unlikely(!skb))
 				goto netdev_mangle_me_harder_failed;
 			if (cmdsts & CMDSTS_DEST_MULTI)
