@@ -408,6 +408,8 @@ EXPORT_SYMBOL(secure_ipv6_id);
 
 #endif
 
+EXPORT_SYMBOL(tcp_read_sock);
+
 EXPORT_SYMBOL(netlink_set_err);
 EXPORT_SYMBOL(netlink_broadcast);
 EXPORT_SYMBOL(netlink_unicast);
