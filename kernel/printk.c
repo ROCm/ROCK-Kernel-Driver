@@ -51,6 +51,8 @@ int console_printk[4] = {
 	DEFAULT_CONSOLE_LOGLEVEL,	/* default_console_loglevel */
 };
 
+EXPORT_SYMBOL(console_printk);
+
 int oops_in_progress;
 
 /*

@@ -48,6 +48,8 @@ cpumask_t cpu_online_map;		/* Bitmask of currently online CPUs */
 int __cpu_number_map[NR_CPUS];
 int __cpu_logical_map[NR_CPUS];
 
+EXPORT_SYMBOL(cpu_online_map);
+
 /* These are defined by the board-specific code. */
 
 /*

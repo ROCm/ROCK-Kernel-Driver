@@ -4,6 +4,7 @@
  *  Copyright (C) 1995  Linus Torvalds
  */
 
+#include <linux/module.h>
 #include <linux/time.h>
 #include <linux/mm.h>
 #include <linux/errno.h>
@@ -36,6 +37,8 @@ int vfs_readdir(struct file *file, filldir_t filler, void *buf)
 out:
 	return res;
 }
+
+EXPORT_SYMBOL(vfs_readdir);
 
 /*
  * Traditional linux readdir() handling..

@@ -53,37 +53,22 @@ extern void __bad_gid(void);
 #define low2highuid(uid) ((uid) == (old_uid_t)-1 ? (uid_t)-1 : (uid_t)(uid))
 #define low2highgid(gid) ((gid) == (old_gid_t)-1 ? (gid_t)-1 : (gid_t)(gid))
 
-/* uid/gid input should be always 32bit uid_t */
-#define SET_UID(var, uid)	\
-	do {			\
-	if (sizeof(var) == sizeof(old_uid_t)) (var) = high2lowuid(uid); \
-	else if (sizeof(var) >= sizeof(uid)) (var) = (uid); \
-	else __bad_uid(); \
-	} while(0)
-
-#define SET_GID(var, gid)	\
-	do {			\
-	if (sizeof(var) == sizeof(old_gid_t)) (var) = high2lowgid(gid); \
-	else if (sizeof(var) >= sizeof(gid)) (var) = (gid); \
-	else __bad_gid(); \
-	} while(0)
+#define __convert_uid(size, uid) \
+	(size >= sizeof(uid) ? (uid) : high2lowuid(uid))
+#define __convert_gid(size, gid) \
+	(size >= sizeof(gid) ? (gid) : high2lowgid(gid))
+	
 
 #else
 
-#define SET_UID(var,uid) \
-	do { \
-	if (sizeof(var) < sizeof(uid)) __bad_uid(); \
-	(var) = (uid); \
-	} while (0)
-
-#define SET_GID(var,gid) \
-	do { \
-	if (sizeof(var) < sizeof(gid)) __bad_gid(); \
-	(var) = (gid); \
-	} while (0);
+#define __convert_uid(size, uid) (uid)
+#define __convert_gid(size, gid) (gid)
 
 #endif /* !CONFIG_UID16 */
 
+/* uid/gid input should be always 32bit uid_t */
+#define SET_UID(var, uid) do { (var) = __convert_uid(sizeof(var), (uid)); } while (0)
+#define SET_GID(var, gid) do { (var) = __convert_gid(sizeof(var), (gid)); } while (0)
 
 /*
  * Everything below this line is needed on all architectures, to deal with

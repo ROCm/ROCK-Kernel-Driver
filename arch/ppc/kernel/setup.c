@@ -119,15 +119,21 @@ void machine_restart(char *cmd)
 	ppc_md.restart(cmd);
 }
 
+EXPORT_SYMBOL(machine_restart);
+
 void machine_power_off(void)
 {
 	ppc_md.power_off();
 }
 
+EXPORT_SYMBOL(machine_power_off);
+
 void machine_halt(void)
 {
 	ppc_md.halt();
 }
+
+EXPORT_SYMBOL(machine_halt);
 
 void (*pm_power_off)(void) = machine_power_off;
 

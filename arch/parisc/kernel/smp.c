@@ -26,6 +26,7 @@
 #include <linux/slab.h>
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
@@ -65,11 +66,15 @@ static volatile int cpu_now_booting = 0;      /* track which CPU is booting */
 cpumask_t cpu_online_map = CPU_MASK_NONE;   /* Bitmap of online CPUs */
 #define IS_LOGGED_IN(cpunum) (cpu_isset(cpunum, cpu_online_map))
 
+EXPORT_SYMBOL(cpu_online_map);
+
 int smp_num_cpus = 1;
 int smp_threads_ready = 0;
 unsigned long cache_decay_ticks;
 static int max_cpus = -1;			     /* Command line */
 cpumask_t cpu_present_mask;
+
+EXPORT_SYMBOL(cpu_present_mask);
 
 struct smp_call_struct {
 	void (*func) (void *info);

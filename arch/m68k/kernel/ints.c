@@ -26,6 +26,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
@@ -127,10 +128,14 @@ int request_irq(unsigned int irq,
 	return mach_request_irq(irq, handler, flags, devname, dev_id);
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	mach_free_irq(irq, dev_id);
 }
+
+EXPORT_SYMBOL(free_irq);
 
 int sys_request_irq(unsigned int irq, 
                     irqreturn_t (*handler)(int, void *, struct pt_regs *), 
@@ -195,6 +200,8 @@ unsigned long probe_irq_on (void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off (unsigned long irqs)
 {
 #ifdef CONFIG_Q40
@@ -203,6 +210,8 @@ int probe_irq_off (unsigned long irqs)
 #endif
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 static void dummy_enable_irq(unsigned int irq)
 {

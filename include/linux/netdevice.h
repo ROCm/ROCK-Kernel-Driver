@@ -201,7 +201,7 @@ struct hh_cache
 	(HH_DATA_MOD - ((__len) & (HH_DATA_MOD - 1)))
 #define HH_DATA_ALIGN(__len) \
 	(((__len)+(HH_DATA_MOD-1))&~(HH_DATA_MOD - 1))
-	unsigned long	hh_data[HH_DATA_ALIGN(LL_MAX_HEADER)];
+	unsigned long	hh_data[HH_DATA_ALIGN(LL_MAX_HEADER) / sizeof(long)];
 };
 
 /* Reserve HH_DATA_MOD byte aligned hard_header_len, but at least that much.
@@ -477,15 +477,12 @@ struct net_device
  */
 #define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
-#define PKT_CAN_SHARE_SKB	((void*)1)
-
-struct packet_type 
-{
+struct packet_type {
 	unsigned short		type;	/* This is really htons(ether_type).	*/
 	struct net_device		*dev;	/* NULL is wildcarded here		*/
 	int			(*func) (struct sk_buff *, struct net_device *,
 					 struct packet_type *);
-	void			*data;	/* Private to the packet type		*/
+	void			*af_packet_priv;
 	struct list_head	list;
 };
 

@@ -38,7 +38,6 @@ static char rcsid[] __attribute ((unused)) = "$Id: super.c,v 1.4 2002/10/12 02:1
 #include <linux/sched.h>
 #include <linux/stat.h>
 #include <linux/string.h>
-#include <linux/smp_lock.h>
 #include <linux/blkdev.h>
 #include <linux/init.h>
 #include <linux/devfs_fs_kernel.h>

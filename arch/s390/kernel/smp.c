@@ -55,6 +55,8 @@ cpumask_t cpu_online_map;
 cpumask_t cpu_possible_map;
 unsigned long    cache_decay_ticks = 0;
 
+EXPORT_SYMBOL(cpu_online_map);
+
 /*
  * Reboot, halt and power_off routines for SMP.
  */

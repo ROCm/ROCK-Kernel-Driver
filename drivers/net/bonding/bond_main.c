@@ -955,7 +955,6 @@ static void bond_register_lacpdu(struct bonding *bond)
 	pk_type->type = PKT_TYPE_LACPDU;
 	pk_type->dev = bond->device;
 	pk_type->func = bond_3ad_lacpdu_recv;
-	pk_type->data = PKT_CAN_SHARE_SKB;
 
 	dev_add_pack(pk_type);
 }

@@ -3,7 +3,7 @@
 #
 
 menu "Video For Linux"
-	depends on VIDEO_DEV!=n
+	depends on VIDEO_DEV
 
 comment "Video Adapters"
 
@@ -228,7 +228,8 @@ config VIDEO_SAA7134
 
 config VIDEO_MXB
 	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
-	depends on VIDEO_DEV && PCI && I2C
+	depends on VIDEO_DEV && PCI
+	select VIDEO_SAA7146_VV
 	---help---
 	  This is a video4linux driver for the 'Multimedia eXtension Board'
 	  TV card by Siemens-Nixdorf.
@@ -238,7 +239,8 @@ config VIDEO_MXB
 
 config VIDEO_DPC
 	tristate "Philips-Semiconductors 'dpc7146 demonstration board'"
-	depends on VIDEO_DEV && PCI && I2C
+	depends on VIDEO_DEV && PCI
+	select VIDEO_SAA7146_VV
 	---help---
 	  This is a video4linux driver for the 'dpc7146 demonstration
 	  board' by Philips-Semiconductors. It's the reference design
@@ -251,7 +253,8 @@ config VIDEO_DPC
 
 config VIDEO_HEXIUM_ORION
 	tristate "Hexium HV-PCI6 and Orion frame grabber"
-	depends on VIDEO_DEV && PCI && I2C
+	depends on VIDEO_DEV && PCI
+	select VIDEO_SAA7146_VV
 	---help---
 	  This is a video4linux driver for the Hexium HV-PCI6 and
 	  Orion frame grabber cards by Hexium.
@@ -261,7 +264,8 @@ config VIDEO_HEXIUM_ORION
 
 config VIDEO_HEXIUM_GEMINI
 	tristate "Hexium Gemini frame grabber"
-	depends on VIDEO_DEV && PCI && I2C
+	depends on VIDEO_DEV && PCI
+	select VIDEO_SAA7146_VV
 	---help---
 	  This is a video4linux driver for the Hexium Gemini frame
 	  grabber card by Hexium. Please note that the Gemini Dual

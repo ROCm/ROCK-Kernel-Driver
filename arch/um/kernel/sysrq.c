@@ -43,6 +43,8 @@ void dump_stack(void)
 	show_trace(&stack);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void show_trace_task(struct task_struct *tsk)
 {
 	unsigned long esp = PT_REGS_SP(&tsk->thread.regs);

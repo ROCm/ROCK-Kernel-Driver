@@ -1,4 +1,4 @@
-
+#include <linux/module.h>
 #include <linux/percpu_counter.h>
 #include <linux/sched.h>
 
@@ -17,3 +17,5 @@ void percpu_counter_mod(struct percpu_counter *fbc, long amount)
 	fbc->counters[cpu].count = count;
 	put_cpu();
 }
+
+EXPORT_SYMBOL(percpu_counter_mod);

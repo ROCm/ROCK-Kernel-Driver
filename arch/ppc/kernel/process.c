@@ -498,6 +498,8 @@ void dump_stack(void)
 	show_stack(current, NULL);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void show_stack(struct task_struct *tsk, unsigned long *stack)
 {
 	unsigned long sp, stack_top, prev_sp, ret;

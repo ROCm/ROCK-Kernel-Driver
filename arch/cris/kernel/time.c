@@ -24,12 +24,15 @@
 
 #include <asm/rtc.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 #include <linux/param.h>
 #include <linux/jiffies.h>
 #include <linux/bcd.h>
 #include <linux/timex.h>
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 int have_rtc;  /* used to remember if we have an RTC or not */;
 
@@ -72,6 +75,8 @@ void do_gettimeofday(struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
+EXPORT_SYMBOL(do_gettimeofday);
+
 int do_settimeofday(struct timespec *tv)
 {
 	unsigned long flags;
@@ -105,6 +110,8 @@ int do_settimeofday(struct timespec *tv)
 	local_irq_restore(flags);
 	return 0;
 }
+
+EXPORT_SYMBOL(do_settimeofday);
 
 
 /*

@@ -1140,7 +1140,7 @@ done:
 	}
 
 	err = kernel_thread(kenvctrld, NULL, CLONE_FS | CLONE_FILES);
-	if (err)
+	if (err < 0)
 		goto out_deregister;
 
 	return 0;

@@ -69,11 +69,11 @@ ah_conn_in_get(const struct sk_buff *skb,
 	if (!cp) {
 		/*
 		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
+		 * service, so our conn_schedule hook should return NF_ACCEPT
 		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for outin packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
-			  inverse?"ICMP+":"",
+			  inverse ? "ICMP+" : "",
 			  pp->name,
 			  NIPQUAD(iph->saddr),
 			  NIPQUAD(iph->daddr));
@@ -104,11 +104,6 @@ ah_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
 	}
 
 	if (!cp) {
-		/*
-		 * We are not sure if the packet is from our
-		 * service, so the caller should check skip_nonexisting
-		 * or our conn_schedule hook should return NF_ACCEPT
-		 */
 		IP_VS_DBG(12, "Unknown ISAKMP entry for inout packet "
 			  "%s%s %u.%u.%u.%u->%u.%u.%u.%u\n",
 			  inverse ? "ICMP+" : "",
@@ -167,11 +162,7 @@ static void ah_exit(struct ip_vs_protocol *pp)
 struct ip_vs_protocol ip_vs_protocol_ah = {
 	.name =			"AH",
 	.protocol =		IPPROTO_AH,
-	.minhlen =		0,
-	.minhlen_icmp =		0,
 	.dont_defrag =		1,
-	.skip_nonexisting =	1,
-	.slave =		1,
 	.init =			ah_init,
 	.exit =			ah_exit,
 	.conn_schedule =	ah_conn_schedule,
@@ -179,11 +170,11 @@ struct ip_vs_protocol ip_vs_protocol_ah = {
 	.conn_out_get =		ah_conn_out_get,
 	.snat_handler =		NULL,
 	.dnat_handler =		NULL,
+	.csum_check =		NULL,
 	.state_transition =	NULL,
 	.register_app =		NULL,
 	.unregister_app =	NULL,
 	.app_conn_bind =	NULL,
-	.csum_check =		NULL,
 	.debug_packet =		ah_debug_packet,
 	.timeout_change =	NULL,		/* ISAKMP */
 	.set_state_timeout =	NULL,

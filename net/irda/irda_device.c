@@ -90,6 +90,7 @@ int __init irda_device_init( void)
 		printk(KERN_WARNING "IrDA: Can't allocate dongles hashbin!\n");
 		return -ENOMEM;
 	}
+	spin_lock_init(&dongles->hb_spinlock);
 
 	tasks = hashbin_new(HB_LOCK);
 	if (tasks == NULL) {
@@ -104,14 +105,20 @@ int __init irda_device_init( void)
 	return 0;
 }
 
+static void __exit leftover_dongle(void *arg)
+{
+	struct dongle_reg *reg = arg;
+	printk(KERN_WARNING "IrDA: Dongle type %x not unregistered\n",
+	       reg->type);
+}
+
 void __exit irda_device_cleanup(void)
 {
 	IRDA_DEBUG(4, "%s()\n", __FUNCTION__);
 
 	hashbin_delete(tasks, (FREE_FUNC) __irda_task_delete);
-	spin_lock(&dongles->hb_spinlock);
-	hashbin_delete(dongles, NULL);
-	spin_unlock(&dongles->hb_spinlock);
+
+	hashbin_delete(dongles, leftover_dongle);
 }
 
 /*

@@ -147,6 +147,8 @@ void dump_stack(void)
 	show_stack(0, 0);
 }
 
+EXPORT_SYMBOL(dump_stack);
+
 void show_registers(struct pt_regs *regs)
 {
 	mm_segment_t old_fs;

@@ -17,6 +17,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -430,6 +431,8 @@ void dump_stack(void)
 {
 	show_stack(current, (unsigned long *)_get_SP());
 }
+
+EXPORT_SYMBOL(dump_stack);
 
 void show_trace_task(struct task_struct *tsk)
 {

@@ -35,6 +35,7 @@
 #define NFSDBG_FACILITY		NFSDBG_FILE
 
 static int nfs_file_open(struct inode *, struct file *);
+static int nfs_file_release(struct inode *, struct file *);
 static int  nfs_file_mmap(struct file *, struct vm_area_struct *);
 static ssize_t nfs_file_sendfile(struct file *, loff_t *, size_t, read_actor_t, void *);
 static ssize_t nfs_file_read(struct kiocb *, char *, size_t, loff_t);
@@ -51,7 +52,7 @@ struct file_operations nfs_file_operations = {
 	.mmap		= nfs_file_mmap,
 	.open		= nfs_file_open,
 	.flush		= nfs_file_flush,
-	.release	= nfs_release,
+	.release	= nfs_file_release,
 	.fsync		= nfs_fsync,
 	.lock		= nfs_lock,
 	.sendfile	= nfs_file_sendfile,
@@ -82,11 +83,14 @@ nfs_file_open(struct inode *inode, struct file *filp)
 	/* Do NFSv4 open() call */
 	if ((open = server->rpc_ops->file_open) != NULL)
 		res = open(inode, filp);
-	/* Call generic open code in order to cache credentials */
-	if (!res)
-		res = nfs_open(inode, filp);
 	unlock_kernel();
 	return res;
+}
+
+static int
+nfs_file_release(struct inode *inode, struct file *filp)
+{
+	return NFS_PROTO(inode)->file_release(inode, filp);
 }
 
 /*

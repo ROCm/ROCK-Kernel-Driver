@@ -579,14 +579,14 @@ xprt_complete_rqst(struct rpc_xprt *xprt, struct rpc_rqst *req, int copied)
 
 	/* Adjust congestion window */
 	if (!xprt->nocong) {
+		unsigned timer = task->tk_msg.rpc_proc->p_timer;
 		xprt_adjust_cwnd(xprt, copied);
 		__xprt_put_cong(xprt, req);
-	       	if (req->rq_ntrans == 1) {
-			unsigned timer =
-				task->tk_msg.rpc_proc->p_timer;
-			if (timer)
+		if (timer) {
+			if (req->rq_ntrans == 1)
 				rpc_update_rtt(&clnt->cl_rtt, timer,
 						(long)jiffies - req->rq_xtime);
+			rpc_set_timeo(&clnt->cl_rtt, timer, req->rq_ntrans - 1);
 		}
 	}
 
@@ -1223,8 +1223,9 @@ xprt_transmit(struct rpc_task *task)
 	/* Set the task's receive timeout value */
 	spin_lock_bh(&xprt->sock_lock);
 	if (!xprt->nocong) {
-		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt,
-				task->tk_msg.rpc_proc->p_timer);
+		int timer = task->tk_msg.rpc_proc->p_timer;
+		task->tk_timeout = rpc_calc_rto(&clnt->cl_rtt, timer);
+		task->tk_timeout <<= rpc_ntimeo(&clnt->cl_rtt, timer);
 		task->tk_timeout <<= clnt->cl_timeout.to_retries
 			- req->rq_timeout.to_retries;
 		if (task->tk_timeout > req->rq_timeout.to_maxval)

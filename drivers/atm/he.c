@@ -135,7 +135,7 @@ static char *version = "$Id: he.c,v 1.18 2003/05/06 22:57:15 chas Exp $";
 
 /* declarations */
 
-static int he_open(struct atm_vcc *vcc, short vpi, int vci);
+static int he_open(struct atm_vcc *vcc);
 static void he_close(struct atm_vcc *vcc);
 static int he_send(struct atm_vcc *vcc, struct sk_buff *skb);
 static int he_ioctl(struct atm_dev *dev, unsigned int cmd, void *arg);
@@ -327,6 +327,7 @@ he_readl_internal(struct he_dev *he_dev, unsigned addr, unsigned flags)
 static __inline__ struct atm_vcc*
 __find_vcc(struct he_dev *he_dev, unsigned cid)
 {
+	struct hlist_head *head;
 	struct atm_vcc *vcc;
 	struct hlist_node *node;
 	struct sock *s;
@@ -335,8 +336,9 @@ __find_vcc(struct he_dev *he_dev, unsigned cid)
 
 	vpi = cid >> he_dev->vcibits;
 	vci = cid & ((1 << he_dev->vcibits) - 1);
+	head = &vcc_hash[vci & (VCC_HTABLE_SIZE -1)];
 
-	sk_for_each(s, node, &vcc_sklist) {
+	sk_for_each(s, node, head) {
 		vcc = atm_sk(s);
 		if (vcc->dev == he_dev->atm_dev &&
 		    vcc->vci == vci && vcc->vpi == vpi &&
@@ -2333,23 +2335,18 @@ __enqueue_tpd(struct he_dev *he_dev, struct he_tpd *tpd, unsigned cid)
 }
 
 static int
-he_open(struct atm_vcc *vcc, short vpi, int vci)
+he_open(struct atm_vcc *vcc)
 {
 	unsigned long flags;
 	struct he_dev *he_dev = HE_DEV(vcc->dev);
 	struct he_vcc *he_vcc;
 	int err = 0;
 	unsigned cid, rsr0, rsr1, rsr4, tsr0, tsr0_aal, tsr4, period, reg, clock;
+	short vpi = vcc->vpi;
+	int vci = vcc->vci;
 
-	
-	if ((err = atm_find_ci(vcc, &vpi, &vci))) {
-		HPRINTK("atm_find_ci err = %d\n", err);
-		return err;
-	}
 	if (vci == ATM_VCI_UNSPEC || vpi == ATM_VPI_UNSPEC)
 		return 0;
-	vcc->vpi = vpi;
-	vcc->vci = vci;
 
 	HPRINTK("open vcc %p %d.%d\n", vcc, vpi, vci);
 
@@ -2633,7 +2630,6 @@ he_close(struct atm_vcc *vcc)
 		       (retry < MAX_RETRY)) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			(void) schedule_timeout(sleep);
-			set_current_state(TASK_RUNNING);
 			if (sleep < HZ)
 				sleep = sleep * 2;
 

@@ -468,13 +468,11 @@ out:
 static struct packet_type pppoes_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_SES),
 	.func	= pppoe_rcv,
-	.data   = PKT_CAN_SHARE_SKB,
 };
 
 static struct packet_type pppoed_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_DISC),
 	.func	= pppoe_disc_rcv,
-	.data   = PKT_CAN_SHARE_SKB,
 };
 
 /***********************************************************************

@@ -38,13 +38,16 @@
 #define DPRINTK(format,args...)
 #endif
 
-
-HLIST_HEAD(vcc_sklist);
+struct hlist_head vcc_hash[VCC_HTABLE_SIZE];
 rwlock_t vcc_sklist_lock = RW_LOCK_UNLOCKED;
 
 void __vcc_insert_socket(struct sock *sk)
 {
-	sk_add_node(sk, &vcc_sklist);
+	struct atm_vcc *vcc = atm_sk(sk);
+	struct hlist_head *head = &vcc_hash[vcc->vci &
+					(VCC_HTABLE_SIZE - 1)];
+	sk->sk_hashent = vcc->vci & (VCC_HTABLE_SIZE - 1);
+	sk_add_node(sk, head);
 }
 
 void vcc_insert_socket(struct sock *sk)
@@ -80,7 +83,7 @@ static struct sk_buff *alloc_tx(struct atm_vcc *vcc,unsigned int size)
 }
 
 
-EXPORT_SYMBOL(vcc_sklist);
+EXPORT_SYMBOL(vcc_hash);
 EXPORT_SYMBOL(vcc_sklist_lock);
 EXPORT_SYMBOL(vcc_insert_socket);
 EXPORT_SYMBOL(vcc_remove_socket);
@@ -248,7 +251,80 @@ static int adjust_tp(struct atm_trafprm *tp,unsigned char aal)
 }
 
 
-static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
+static int check_ci(struct atm_vcc *vcc, short vpi, int vci)
+{
+	struct hlist_head *head = &vcc_hash[vci &
+					(VCC_HTABLE_SIZE - 1)];
+	struct hlist_node *node;
+	struct sock *s;
+	struct atm_vcc *walk;
+
+	sk_for_each(s, node, head) {
+		walk = atm_sk(s);
+		if (walk->dev != vcc->dev)
+			continue;
+		if (test_bit(ATM_VF_ADDR, &walk->flags) && walk->vpi == vpi &&
+		    walk->vci == vci && ((walk->qos.txtp.traffic_class !=
+		    ATM_NONE && vcc->qos.txtp.traffic_class != ATM_NONE) ||
+		    (walk->qos.rxtp.traffic_class != ATM_NONE &&
+		    vcc->qos.rxtp.traffic_class != ATM_NONE)))
+			return -EADDRINUSE;
+	}
+
+	/* allow VCCs with same VPI/VCI iff they don't collide on
+	   TX/RX (but we may refuse such sharing for other reasons,
+	   e.g. if protocol requires to have both channels) */
+
+	return 0;
+}
+
+
+static int find_ci(struct atm_vcc *vcc, short *vpi, int *vci)
+{
+	static short p;        /* poor man's per-device cache */
+	static int c;
+	short old_p;
+	int old_c;
+	int err;
+
+	if (*vpi != ATM_VPI_ANY && *vci != ATM_VCI_ANY) {
+		err = check_ci(vcc, *vpi, *vci);
+		return err;
+	}
+	/* last scan may have left values out of bounds for current device */
+	if (*vpi != ATM_VPI_ANY)
+		p = *vpi;
+	else if (p >= 1 << vcc->dev->ci_range.vpi_bits)
+		p = 0;
+	if (*vci != ATM_VCI_ANY)
+		c = *vci;
+	else if (c < ATM_NOT_RSV_VCI || c >= 1 << vcc->dev->ci_range.vci_bits)
+			c = ATM_NOT_RSV_VCI;
+	old_p = p;
+	old_c = c;
+	do {
+		if (!check_ci(vcc, p, c)) {
+			*vpi = p;
+			*vci = c;
+			return 0;
+		}
+		if (*vci == ATM_VCI_ANY) {
+			c++;
+			if (c >= 1 << vcc->dev->ci_range.vci_bits)
+				c = ATM_NOT_RSV_VCI;
+		}
+		if ((c == ATM_NOT_RSV_VCI || *vci != ATM_VCI_ANY) &&
+		    *vpi == ATM_VPI_ANY) {
+			p++;
+			if (p >= 1 << vcc->dev->ci_range.vpi_bits) p = 0;
+		}
+	}
+	while (old_p != p || old_c != c);
+	return -EADDRINUSE;
+}
+
+
+static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, short vpi,
 			 int vci)
 {
 	int error;
@@ -260,8 +336,18 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 	if (vci > 0 && vci < ATM_NOT_RSV_VCI && !capable(CAP_NET_BIND_SERVICE))
 		return -EPERM;
 	error = 0;
+	if (!try_module_get(dev->ops->owner))
+		return -ENODEV;
 	vcc->dev = dev;
-	vcc_insert_socket(vcc->sk);
+	write_lock_irq(&vcc_sklist_lock);
+	if ((error = find_ci(vcc, &vpi, &vci))) {
+		write_unlock_irq(&vcc_sklist_lock);
+		goto fail_module_put;
+	}
+	vcc->vpi = vpi;
+	vcc->vci = vci;
+	__vcc_insert_socket(vcc->sk);
+	write_unlock_irq(&vcc_sklist_lock);
 	switch (vcc->qos.aal) {
 		case ATM_AAL0:
 			error = atm_init_aal0(vcc);
@@ -291,21 +377,17 @@ static int __vcc_connect(struct atm_vcc *vcc, struct atm_dev *dev, int vpi,
 	    vcc->qos.txtp.min_pcr,vcc->qos.txtp.max_pcr,vcc->qos.txtp.max_sdu);
 	DPRINTK("  RX: %d, PCR %d..%d, SDU %d\n",vcc->qos.rxtp.traffic_class,
 	    vcc->qos.rxtp.min_pcr,vcc->qos.rxtp.max_pcr,vcc->qos.rxtp.max_sdu);
-	if (!try_module_get(dev->ops->owner)) {
-		error = -ENODEV;
-		goto fail;
-	}
 
 	if (dev->ops->open) {
-		if ((error = dev->ops->open(vcc,vpi,vci)))
-			goto put_module_fail;
+		if ((error = dev->ops->open(vcc)))
+			goto fail;
 	}
 	return 0;
 
-put_module_fail:
-	module_put(dev->ops->owner);
 fail:
 	vcc_remove_socket(vcc->sk);
+fail_module_put:
+	module_put(dev->ops->owner);
 	/* ensure we get dev module ref count correct */
 	vcc->dev = NULL;
 	return error;

@@ -12,6 +12,7 @@
 
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/profile.h>
 #include <linux/sched.h>
 #include <linux/time.h>
@@ -30,6 +31,8 @@
 extern unsigned long wall_jiffies;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
+
+EXPORT_SYMBOL(jiffies_64);
 
 #define TIME_KEEPER_ID	0	/* smp_processor_id() of time-keeper */
 
@@ -125,6 +128,8 @@ do_settimeofday (struct timespec *tv)
 	return 0;
 }
 
+EXPORT_SYMBOL(do_settimeofday);
+
 void
 do_gettimeofday (struct timeval *tv)
 {
@@ -184,6 +189,8 @@ do_gettimeofday (struct timeval *tv)
 	tv->tv_sec = sec;
 	tv->tv_usec = usec;
 }
+
+EXPORT_SYMBOL(do_gettimeofday);
 
 /*
  * The profiling function is SMP safe. (nothing can mess

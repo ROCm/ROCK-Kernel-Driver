@@ -8,6 +8,9 @@
 #include <linux/netfilter.h>
 #if defined(__KERNEL__) && defined(CONFIG_BRIDGE_NETFILTER)
 #include <asm/atomic.h>
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+#include <linux/if_ether.h>
+#endif
 #endif
 
 /* Bridge Hooks */
@@ -44,6 +47,7 @@ enum nf_br_hook_priorities {
 #define BRNF_BRIDGED_DNAT		0x02
 #define BRNF_DONT_TAKE_PARENT		0x04
 #define BRNF_BRIDGED			0x08
+#define BRNF_NF_BRIDGE_PREROUTING	0x10
 
 static inline
 struct nf_bridge_info *nf_bridge_alloc(struct sk_buff *skb)
@@ -54,9 +58,39 @@ struct nf_bridge_info *nf_bridge_alloc(struct sk_buff *skb)
 		atomic_set(&(*nf_bridge)->use, 1);
 		(*nf_bridge)->mask = 0;
 		(*nf_bridge)->physindev = (*nf_bridge)->physoutdev = NULL;
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+		(*nf_bridge)->netoutdev = NULL;
+#endif
 	}
 
 	return *nf_bridge;
+}
+
+/* Only used in br_forward.c */
+static inline
+void nf_bridge_maybe_copy_header(struct sk_buff *skb)
+{
+	if (skb->nf_bridge) {
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+		if (skb->protocol == __constant_htons(ETH_P_8021Q)) {
+			memcpy(skb->data - 18, skb->nf_bridge->hh, 18);
+			skb_push(skb, 4);
+		} else
+#endif
+			memcpy(skb->data - 16, skb->nf_bridge->hh, 16);
+	}
+}
+
+static inline
+void nf_bridge_save_header(struct sk_buff *skb)
+{
+        int header_size = 16;
+
+#if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
+	if (skb->protocol == __constant_htons(ETH_P_8021Q))
+		header_size = 18;
+#endif
+	memcpy(skb->nf_bridge->hh, skb->data - header_size, header_size);
 }
 
 struct bridge_skb_cb {

@@ -20,6 +20,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <linux/types.h>
 #include <linux/fs.h>
 #include <linux/mm.h>
@@ -1023,3 +1024,5 @@ blockdev_direct_IO(int rw, struct kiocb *iocb, struct inode *inode,
 out:
 	return retval;
 }
+
+EXPORT_SYMBOL(blockdev_direct_IO);

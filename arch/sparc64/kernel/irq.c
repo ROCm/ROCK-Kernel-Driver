@@ -7,6 +7,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/errno.h>
@@ -486,6 +487,8 @@ free_and_enomem:
 	return -ENOMEM;
 }
 
+EXPORT_SYMBOL(request_irq);
+
 void free_irq(unsigned int irq, void *dev_id)
 {
 	struct irqaction *action;
@@ -607,6 +610,8 @@ out:
 	kfree(action);
 	spin_unlock_irqrestore(&irq_action_lock, flags);
 }
+
+EXPORT_SYMBOL(free_irq);
 
 #ifdef CONFIG_SMP
 void synchronize_irq(unsigned int irq)
@@ -959,10 +964,14 @@ unsigned long probe_irq_on(void)
 	return 0;
 }
 
+EXPORT_SYMBOL(probe_irq_on);
+
 int probe_irq_off(unsigned long mask)
 {
 	return 0;
 }
+
+EXPORT_SYMBOL(probe_irq_off);
 
 #ifdef CONFIG_SMP
 static int retarget_one_irq(struct irqaction *p, int goal_cpu)

@@ -115,10 +115,12 @@ static void atmtcp_v_dev_close(struct atm_dev *dev)
 }
 
 
-static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
+static int atmtcp_v_open(struct atm_vcc *vcc)
 {
 	struct atmtcp_control msg;
 	int error;
+	short vpi = vcc->vpi;
+	int vci = vcc->vci;
 
 	memset(&msg,0,sizeof(msg));
 	msg.addr.sap_family = AF_ATMPVC;
@@ -126,8 +128,6 @@ static int atmtcp_v_open(struct atm_vcc *vcc,short vpi,int vci)
 	msg.addr.sap_addr.vpi = vpi;
 	msg.hdr.vci = htons(vci);
 	msg.addr.sap_addr.vci = vci;
-	error = atm_find_ci(vcc,&msg.addr.sap_addr.vpi,&msg.addr.sap_addr.vci);
-	if (error) return error;
 	if (vpi == ATM_VPI_UNSPEC || vci == ATM_VCI_UNSPEC) return 0;
 	msg.type = ATMTCP_CTRL_OPEN;
 	msg.qos = vcc->qos;
@@ -158,6 +158,7 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	struct atm_vcc *vcc;
 	struct hlist_node *node;
 	struct sock *s;
+	int i;
 
 	if (cmd != ATM_SETCIRANGE) return -ENOIOCTLCMD;
 	if (copy_from_user(&ci,(void *) arg,sizeof(ci))) return -EFAULT;
@@ -166,14 +167,18 @@ static int atmtcp_v_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 	if (ci.vpi_bits > MAX_VPI_BITS || ci.vpi_bits < 0 ||
 	    ci.vci_bits > MAX_VCI_BITS || ci.vci_bits < 0) return -EINVAL;
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		vcc = atm_sk(s);
-		if (vcc->dev != dev)
-			continue;
-		if ((vcc->vpi >> ci.vpi_bits) ||
-		    (vcc->vci >> ci.vci_bits)) {
-			read_unlock(&vcc_sklist_lock);
-			return -EBUSY;
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+		struct hlist_head *head = &vcc_hash[i];
+
+		sk_for_each(s, node, head) {
+			vcc = atm_sk(s);
+			if (vcc->dev != dev)
+				continue;
+			if ((vcc->vpi >> ci.vpi_bits) ||
+			    (vcc->vci >> ci.vci_bits)) {
+				read_unlock(&vcc_sklist_lock);
+				return -EBUSY;
+			}
 		}
 	}
 	read_unlock(&vcc_sklist_lock);
@@ -244,6 +249,7 @@ static void atmtcp_c_close(struct atm_vcc *vcc)
 	struct sock *s;
 	struct hlist_node *node;
 	struct atm_vcc *walk;
+	int i;
 
 	atmtcp_dev = (struct atm_dev *) vcc->dev_data;
 	dev_data = PRIV(atmtcp_dev);
@@ -254,11 +260,15 @@ static void atmtcp_c_close(struct atm_vcc *vcc)
 	shutdown_atm_dev(atmtcp_dev);
 	vcc->dev_data = NULL;
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		walk = atm_sk(s);
-		if (walk->dev != atmtcp_dev)
-			continue;
-		wake_up(walk->sk->sk_sleep);
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+		struct hlist_head *head = &vcc_hash[i];
+
+		sk_for_each(s, node, head) {
+			walk = atm_sk(s);
+			if (walk->dev != atmtcp_dev)
+				continue;
+			wake_up(walk->sk->sk_sleep);
+		}
 	}
 	read_unlock(&vcc_sklist_lock);
 }
@@ -272,7 +282,7 @@ static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 	struct hlist_node *node;
 	struct atm_vcc *out_vcc = NULL;
 	struct sk_buff *new_skb;
-	int result = 0;
+	int i, result = 0;
 
 	if (!skb->len) return 0;
 	dev = vcc->dev_data;
@@ -283,14 +293,18 @@ static int atmtcp_c_send(struct atm_vcc *vcc,struct sk_buff *skb)
 		goto done;
 	}
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-		out_vcc = atm_sk(s);
-		if (out_vcc->dev != dev)
-			continue;
-		if (out_vcc->vpi == ntohs(hdr->vpi) &&
-		    out_vcc->vci == ntohs(hdr->vci) &&
-		    out_vcc->qos.rxtp.traffic_class != ATM_NONE)
-			break;
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+		struct hlist_head *head = &vcc_hash[i];
+
+		sk_for_each(s, node, head) {
+			out_vcc = atm_sk(s);
+			if (out_vcc->dev != dev)
+				continue;
+			if (out_vcc->vpi == ntohs(hdr->vpi) &&
+			    out_vcc->vci == ntohs(hdr->vci) &&
+			    out_vcc->qos.rxtp.traffic_class != ATM_NONE)
+				break;
+		}
 	}
 	read_unlock(&vcc_sklist_lock);
 	if (!out_vcc) {

@@ -1071,14 +1071,16 @@ fore200e_find_vcc(struct fore200e* fore200e, struct rpd* rpd)
     struct sock *s;
     struct atm_vcc* vcc;
     struct hlist_node *node;
+    int i;
 
     read_lock(&vcc_sklist_lock);
-    sk_for_each(s, node, &vcc_sklist) {
+
+    sk_for_each(s, node, &vcc_hash[rpd->atm_header.vci & (VCC_HTABLE_SIZE-1)]) {
 	vcc = atm_sk(s);
 	if (vcc->dev != fore200e->atm_dev)
-		continue;
+	    continue;
 	if (vcc->vpi == rpd->atm_header.vpi && vcc->vci == rpd->atm_header.vci) {
-            read_unlock(&vcc_sklist_lock);
+	    read_unlock(&vcc_sklist_lock);
 	    return vcc;
 	}
     }
@@ -1351,56 +1353,6 @@ fore200e_activate_vcin(struct fore200e* fore200e, int activate, struct atm_vcc* 
 }
 
 
-static int
-fore200e_walk_vccs(struct atm_vcc *vcc, short *vpi, int *vci)
-{
-    struct atm_vcc* walk;
-    struct sock *s;
-    struct hlist_node *node;
-
-    /* find a free VPI */
-
-    read_lock(&vcc_sklist_lock);
-
-    if (*vpi == ATM_VPI_ANY) {
-
-	*vpi = 0;
-restart_vpi_search:
-	sk_for_each(s, node, &vcc_sklist) {
-	    walk = atm_sk(s);
-	    if (walk->dev != vcc->dev)
-		continue;
-
-	    if ((walk->vci == *vci) && (walk->vpi == *vpi)) {
-		(*vpi)++;
-		goto restart_vpi_search;
-	    }
-	}
-    }
-
-    /* find a free VCI */
-    if (*vci == ATM_VCI_ANY) {
-	
-	*vci = ATM_NOT_RSV_VCI;
-restart_vci_search:
-	sk_for_each(s, node, &vcc_sklist) {
-	    walk = atm_sk(s);
-	    if (walk->dev != vcc->dev)
-		continue;
-
-	    if ((walk->vpi = *vpi) && (walk->vci == *vci)) {
-		*vci = walk->vci + 1;
-		goto restart_vci_search;
-	    }
-	}
-    }
-
-    read_unlock(&vcc_sklist_lock);
-
-    return 0;
-}
-
-
 #define FORE200E_MAX_BACK2BACK_CELLS 255    /* XXX depends on CDVT */
 
 static void
@@ -1420,17 +1372,13 @@ fore200e_rate_ctrl(struct atm_qos* qos, struct tpd_rate* rate)
 
 
 static int
-fore200e_open(struct atm_vcc *vcc, short vpi, int vci)
+fore200e_open(struct atm_vcc *vcc)
 {
     struct fore200e*     fore200e = FORE200E_DEV(vcc->dev);
     struct fore200e_vcc* fore200e_vcc;
+    short vpi = vcc->vpi;
+    int vci = vcc->vci;
     
-    /* find a free VPI/VCI */
-    fore200e_walk_vccs(vcc, &vpi, &vci);
-
-    vcc->vpi = vpi;
-    vcc->vci = vci;
-
     /* ressource checking only? */
     if (vci == ATM_VCI_UNSPEC || vpi == ATM_VPI_UNSPEC)
 	return 0;
@@ -2660,7 +2608,7 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
     struct sock *s;
     struct hlist_node *node;
     struct fore200e* fore200e  = FORE200E_DEV(dev);
-    int              len, left = *pos;
+    int              i, len, left = *pos;
 
     if (!left--) {
 
@@ -2906,15 +2854,18 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 		      " VCCs:\n  address\tVPI.VCI:AAL\t(min/max tx PDU size) (min/max rx PDU size)\n");
 	
 	read_lock(&vcc_sklist_lock);
-	sk_for_each(s, node, &vcc_sklist) {
-	    vcc = atm_sk(s);
+	for(i = 0; i < VCC_HTABLE_SIZE; ++i) {
+	    struct hlist_head *head = &vcc_hash[i];
 
-	    if (vcc->dev != fore200e->atm_dev)
+	    sk_for_each(s, node, head) {
+		vcc = atm_sk(s);
+
+		if (vcc->dev != fore200e->atm_dev)
 		    continue;
 
-	    fore200e_vcc = FORE200E_VCC(vcc);
+		fore200e_vcc = FORE200E_VCC(vcc);
 	    
-	    len += sprintf(page + len,
+		len += sprintf(page + len,
 			   "  %x\t%d.%d:%d\t\t(%d/%d)\t(%d/%d)\n",
 			   (u32)(unsigned long)vcc,
 			   vcc->vpi, vcc->vci, fore200e_atm2fore_aal(vcc->qos.aal),
@@ -2923,6 +2874,7 @@ fore200e_proc_read(struct atm_dev *dev,loff_t* pos,char* page)
 			   fore200e_vcc->rx_min_pdu > 0xFFFF ? 0 : fore200e_vcc->rx_min_pdu,
 			   fore200e_vcc->rx_max_pdu
 		);
+	    }
 	}
 	read_unlock(&vcc_sklist_lock);
 

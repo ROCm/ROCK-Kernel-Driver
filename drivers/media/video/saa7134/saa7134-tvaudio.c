@@ -2,7 +2,7 @@
  * device driver for philips saa7134 based TV cards
  * tv audio decoder (fm stereo, nicam, ...)
  *
- * (c) 2001,02 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
+ * (c) 2001-03 Gerd Knorr <kraxel@bytesex.org> [SuSE Labs]
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -172,7 +172,7 @@ static void mute_input_7134(struct saa7134_dev *dev)
 {
 	unsigned int mute;
 	struct saa7134_input *in;
-	int reg = 0;
+	int ausel=0, ics=0, ocs=0;
 	int mask;
 
 	/* look what is to do ... */
@@ -200,11 +200,13 @@ static void mute_input_7134(struct saa7134_dev *dev)
 
 	/* switch internal audio mux */
 	switch (in->amux) {
-	case TV:    reg = 0x02; break;
-	case LINE1: reg = 0x00; break;
-	case LINE2: reg = 0x01; break;
+	case TV:    ausel=0xc0; ics=0x00; ocs=0x02; break;
+	case LINE1: ausel=0x80; ics=0x00; ocs=0x00; break;
+	case LINE2: ausel=0x80; ics=0x08; ocs=0x01; break;
 	}
-	saa_andorb(SAA7134_ANALOG_IO_SELECT, 0x07, reg);
+	saa_andorb(SAA7134_AUDIO_FORMAT_CTRL, 0xc0, ausel);
+	saa_andorb(SAA7134_ANALOG_IO_SELECT, 0x08, ics);
+	saa_andorb(SAA7134_ANALOG_IO_SELECT, 0x07, ocs);
 
 	/* switch gpio-connected external audio mux */
 	if (0 == card(dev).gpiomask)
@@ -547,11 +549,19 @@ static int tvaudio_thread(void *data)
 		tvaudio_setstereo(dev,&tvaudio[audio],V4L2_TUNER_MODE_MONO);
 		dev->tvaudio = &tvaudio[audio];
 
-		if (tvaudio_sleep(dev,3*HZ))
-			goto restart;
-		rx = tvaudio_getstereo(dev,&tvaudio[i]);
-		mode = saa7134_tvaudio_rx2mode(rx);
-		tvaudio_setstereo(dev,&tvaudio[audio],mode);
+		for (;;) {
+			if (tvaudio_sleep(dev,3*HZ))
+				goto restart;
+			if (dev->thread.exit || signal_pending(current))
+				break;
+			if (UNSET == dev->thread.mode) {
+				rx = tvaudio_getstereo(dev,&tvaudio[i]);
+				mode = saa7134_tvaudio_rx2mode(rx);
+			} else {
+				mode = dev->thread.mode;
+			}
+			tvaudio_setstereo(dev,&tvaudio[audio],mode);
+		}
 	}
 
  done:
@@ -592,8 +602,8 @@ static char *stdres[0x20] = {
 	[0x1f] = "??? [in progress]",
 };
 
-#define DSP_RETRY 16
-#define DSP_DELAY 16
+#define DSP_RETRY 30
+#define DSP_DELAY 10
 
 static inline int saa_dsp_wait_bit(struct saa7134_dev *dev, int bit)
 {
@@ -838,10 +848,11 @@ int saa7134_tvaudio_getstereo(struct saa7134_dev *dev)
 	return retval;
 }
 
-int saa7134_tvaudio_init(struct saa7134_dev *dev)
+int saa7134_tvaudio_init2(struct saa7134_dev *dev)
 {
 	DECLARE_MUTEX_LOCKED(sem);
 	int (*my_thread)(void *data) = NULL;
+	int rc;
 
 	/* enable I2S audio output */
 	if (saa7134_boards[dev->board].i2s_rate) {
@@ -872,8 +883,12 @@ int saa7134_tvaudio_init(struct saa7134_dev *dev)
 		/* start tvaudio thread */
 		init_waitqueue_head(&dev->thread.wq);
 		dev->thread.notify = &sem;
-		kernel_thread(my_thread,dev,0);
-		down(&sem);
+		rc = kernel_thread(my_thread,dev,0);
+		if (rc < 0)
+			printk(KERN_WARNING "%s: kernel_thread() failed\n",
+			       dev->name);
+		else
+			down(&sem);
 		dev->thread.notify = NULL;
 		wake_up_interruptible(&dev->thread.wq);
 	}
@@ -900,6 +915,7 @@ int saa7134_tvaudio_fini(struct saa7134_dev *dev)
 int saa7134_tvaudio_do_scan(struct saa7134_dev *dev)
 {
 	if (dev->thread.task) {
+		dev->thread.mode = UNSET;
 		dev->thread.scan2++;
 		wake_up_interruptible(&dev->thread.wq);
 	} else {

@@ -33,6 +33,8 @@
 
 #include "bttvp.h"
 
+#define VCR_HACK_LINES 4
+
 /* ---------------------------------------------------------- */
 /* risc code generators                                       */
 
@@ -62,6 +64,9 @@ bttv_risc_packed(struct bttv *btv, struct btcx_riscmem *risc,
 	/* scan lines */
 	sg = sglist;
 	for (line = 0; line < lines; line++) {
+		if ((btv->opt_vcr_hack) &&
+		    (line >= (lines - VCR_HACK_LINES)))
+			continue;
 		while (offset >= sg_dma_len(sg)) {
 			offset -= sg_dma_len(sg);
 			sg++;
@@ -136,6 +141,9 @@ bttv_risc_planar(struct bttv *btv, struct btcx_riscmem *risc,
 	usg = sglist;
 	vsg = sglist;
 	for (line = 0; line < ylines; line++) {
+		if ((btv->opt_vcr_hack) &&
+		    (line >= (ylines - VCR_HACK_LINES)))
+			continue;
 		switch (vshift) {
 		case 0:  chroma = 1;           break;
 		case 1:  chroma = !(line & 1); break;
@@ -219,8 +227,10 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 	instructions  = (ov->nclips + 1) *
 		((skip_even || skip_odd) ? ov->w.height>>1 :  ov->w.height);
 	instructions += 2;
-	if ((rc = btcx_riscmem_alloc(btv->dev,risc,instructions*8)) < 0)
+	if ((rc = btcx_riscmem_alloc(btv->dev,risc,instructions*8)) < 0) {
+		kfree(skips);
 		return rc;
+	}
 
 	/* sync instruction */
 	rp = risc->cpu;
@@ -228,12 +238,18 @@ bttv_risc_overlay(struct bttv *btv, struct btcx_riscmem *risc,
 	*(rp++) = cpu_to_le32(0);
 
 	addr  = (unsigned long)btv->fbuf.base;
-	addr += btv->fbuf.bytesperline * ov->w.top;
-	addr += ((btv->fbuf.depth+7) >> 3) * ov->w.left;
+	addr += btv->fbuf.fmt.bytesperline * ov->w.top;
+	addr += (fmt->depth >> 3)          * ov->w.left;
 
 	/* scan lines */
 	for (maxy = -1, line = 0; line < ov->w.height;
-	     line++, addr += btv->fbuf.bytesperline) {
+	     line++, addr += btv->fbuf.fmt.bytesperline) {
+		if ((btv->opt_vcr_hack) &&
+		     (line >= (ov->w.height - VCR_HACK_LINES)))
+			continue;
+ 		if ((line%2) == 0  &&  skip_even)
+ 			continue;
+ 		if ((line%2) == 1  &&  skip_odd)
 		if ((line%2) == 0  &&  skip_even)
 			continue;
 		if ((line%2) == 1  &&  skip_odd)
