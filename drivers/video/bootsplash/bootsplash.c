@@ -382,7 +382,7 @@ static inline int splash_geti(unsigned char *pos, int off)
            pos[off] | pos[off + 1] << 8 | pos[off + 2] << 16 | pos[off + 3] << 24;
 }
 
-static int splash_getraw(unsigned char *start, unsigned char *end)
+static int splash_getraw(unsigned char *start, unsigned char *end, int *update)
 {
     unsigned char *ndata;
     int version;
@@ -399,14 +399,16 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
     struct fb_info *info;
     struct splash_data *sd;
 
-    printk(KERN_INFO "bootsplash %s: looking for picture...\n", SPLASH_VERSION);
+    if (update)
+	*update = -1;
+
+    if (!update || start[7] < '2' || start[7] > '3' || splash_geti(start, 12) != (int)0xffffffff)
 
     for (ndata = start; ndata < end; ndata++) {
 	if (ndata[0] != 'B' || ndata[1] != 'O' || ndata[2] != 'O' || ndata[3] != 'T')
 	    continue;
 	if (ndata[4] != 'S' || ndata[5] != 'P' || ndata[6] != 'L' || ndata[7] < '1' || ndata[7] > '3')
 	    continue;
-	printk(".");
 	version = ndata[7] - '0';
 	offsets = splash_offsets[version - 1];
 	len = SPLASH_OFF_LEN;
@@ -424,17 +426,45 @@ static int splash_getraw(unsigned char *start, unsigned char *end)
 	height = info->var.yres;
 	splash_size = splash_geti(ndata, SPLASH_OFF_SIZE);
 	if (splash_size == (int)0xffffffff && version > 1) {
-	    printk(KERN_INFO "...found, updating values.\n");
 	    if ((sd = vc->vc_splash_data) != 0) {
+		int up = 0;
 		i = splash_getb(ndata, SPLASH_OFF_STATE);
-		if (i != 255)
+		if (i != 255) {
 		    sd->splash_state = i;
+		    up = -1;
+		}
 		i = splash_getb(ndata, SPLASH_OFF_FGCOL);
-		if (i != 255)
+		if (i != 255) {
 		    sd->splash_fg_color = i;
+		    up = -1;
+		}
 		i = splash_getb(ndata, SPLASH_OFF_COL);
-		if (i != 255)
+		if (i != 255) {
 		    sd->splash_color = i;
+		    up = -1;
+		}
+		boxcnt = sboxcnt = 0;
+		if (ndata + len <= end) {
+		    boxcnt = splash_gets(ndata, SPLASH_OFF_BOXCNT);
+		    sboxcnt = splash_gets(ndata, SPLASH_OFF_SBOXCNT);
+		}
+		if (boxcnt) {
+		    i = splash_gets(ndata, len);
+		    if (boxcnt + i <= sd->splash_boxcount && ndata + len + 2 + boxcnt * 12 <= end) {
+			memcpy(sd->splash_boxes + i * 12, ndata + len + 2, boxcnt * 12);
+			up |= 1;
+		    }
+		    len += boxcnt * 12 + 2;
+		}
+		if (sboxcnt) {
+		    i = splash_gets(ndata, len);
+		    if (sboxcnt + i <= sd->splash_sboxcount && ndata + len + 2 + sboxcnt * 12 <= end) {
+			memcpy(sd->splash_sboxes + i * 12, ndata + len + 2, sboxcnt * 12);
+			up |= 2;
+		    }
+		}
+		if (update)
+		    *update = up;
 	    }
 	    return unit;
 	}
@@ -817,10 +847,19 @@ static int splash_write_proc(struct file *file, const char *buffer,
 	}
 
 	if (!strncmp(buffer, "BOOTSPL", 7)) {
-	    unit = splash_getraw((unsigned char *)buffer, (unsigned char *)buffer + count);
+	    int up = -1;
+	    unit = splash_getraw((unsigned char *)buffer, (unsigned char *)buffer + count, &up);
 	    if (unit >= 0) {
 		vc = vc_cons[unit].d;
-		splash_status(vc);
+		if (up == -1)
+		    splash_status(vc);
+		else {
+		    struct fb_info *info = registered_fb[(int) con2fb_map[vc->vc_num]];
+		    if ((up & 2) != 0 && vc->vc_splash_data->splash_silentjpeg && vc->vc_splash_data->splash_dosilent && info->silent_screen_base)
+			boxit(info->silent_screen_base, info->fix.line_length, vc->vc_splash_data->splash_sboxes, vc->vc_splash_data->splash_sboxcount, vc->vc_splash_data->splash_percent, 1);
+		    if ((up & 1) != 0)
+			    boxit(info->screen_base, info->fix.line_length, vc->vc_splash_data->splash_boxes, vc->vc_splash_data->splash_boxcount, vc->vc_splash_data->splash_percent, 1);
+		}
 	    }
 	    return count;
 	}
@@ -911,7 +950,7 @@ void splash_init(void)
 
 	mem = vmalloc(len);
 	if (mem) {
-		if ((int)sys_read(fd, mem, len) == len && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len) == 0 && vc->vc_splash_data)
+		if ((int)sys_read(fd, mem, len) == len && splash_getraw((unsigned char *)mem, (unsigned char *)mem + len, (int *)0) == 0 && vc->vc_splash_data)
 			vc->vc_splash_data->splash_state = splash_default & 1;
 		vfree(mem);
 	}
