@@ -5,17 +5,11 @@
 # $Id: Makefile,v 1.63 2001/06/13 09:43:07 dwmw2 Exp $
 
 
-obj-y           += chips/chipslink.o maps/mapslink.o \
-			devices/devlink.o nand/nandlink.o
-obj-m           :=
-obj-n           :=
-obj-            :=
+mod-subdirs	:= chips maps devices nand
 
 export-objs	:= mtdcore.o mtdpart.o redboot.o bootldr.o afs.o
 
-mod-subdirs	:= 
-subdir-y	:= chips maps devices nand
-subdir-m	:= $(subdir-y)
+obj-y           += chips/ maps/	devices/ nand/
 
 #                       *** BIG UGLY NOTE ***
 #

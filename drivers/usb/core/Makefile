@@ -2,8 +2,6 @@
 # Makefile for USB Core files and filesystem
 #
 
-O_TARGET	:= core.o
-
 export-objs	:= usb.o hcd.o
 
 usbcore-objs	:= usb.o usb-debug.o hub.o hcd.o

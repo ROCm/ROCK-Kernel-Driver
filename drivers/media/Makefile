@@ -2,9 +2,8 @@
 # Makefile for the kernel multimedia device drivers.
 #
 
-subdir-y     := video radio
 mod-subdirs  := video radio
 
-obj-y        := $(join $(subdir-y),$(subdir-y:%=/%.o))
+obj-y        := video/ radio/
 
 include $(TOPDIR)/Rules.make

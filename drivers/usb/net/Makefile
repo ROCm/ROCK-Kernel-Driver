@@ -2,8 +2,6 @@
 # Makefile for USB Network drivers
 #
 
-O_TARGET	:= net.o
-
 obj-$(CONFIG_USB_CATC)		+= catc.o
 obj-$(CONFIG_USB_CDCETHER)	+= cdc-ether.o
 obj-$(CONFIG_USB_KAWETH)	+= kaweth.o
