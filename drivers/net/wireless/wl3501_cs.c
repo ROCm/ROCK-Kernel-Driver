@@ -599,23 +599,11 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 	wl3501_get_from_wla(this, addr, &signal, sizeof(signal));
 	if (signal.status == WL3501_STATUS_SUCCESS) {
 		dprintk(3, "success");
-		if (this->driver_state == WL3501_SIG_SCAN_REQ) {
-			for (i = 0; i < this->bss_cnt; i++) {
-				if (!memcmp((char *)this->bss_set[i].bssid,
-					    (char *)signal.bssid, ETH_ALEN))
-					break;
-			}
-			if ((i == this->bss_cnt) && i < 20) {
-				memcpy((char *)
-				       &(this->bss_set[i].beacon_period),
-				       (char *)&(signal.beacon_period), 73);
-				this->bss_cnt++;
-			}
-		} else if ((this->net_type == IW_MODE_INFRA &&
-			    (signal.cap_info & WL3501_MGMT_CAPABILITY_ESS)) ||
-			   (this->net_type == IW_MODE_ADHOC &&
-			    (signal.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
-			   this->net_type == IW_MODE_AUTO) {
+		if ((this->net_type == IW_MODE_INFRA &&
+		     (signal.cap_info & WL3501_MGMT_CAPABILITY_ESS)) ||
+		    (this->net_type == IW_MODE_ADHOC &&
+		     (signal.cap_info & WL3501_MGMT_CAPABILITY_IBSS)) ||
+		    this->net_type == IW_MODE_AUTO) {
 			if (!this->essid[1])
 				matchflag = 1;
 			else if (this->essid[1] == 3 &&
@@ -647,8 +635,7 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 				this->rssi = signal.rssi;
 			}
 		}
-	} else if (signal.status == WL3501_STATUS_TIMEOUT &&
-		   this->driver_state != WL3501_SIG_SCAN_REQ) {
+	} else if (signal.status == WL3501_STATUS_TIMEOUT) {
 		dprintk(3, "timeout");
 		this->join_sta_bss = 0;
 		for (i = this->join_sta_bss; i < this->bss_cnt; i++)
@@ -2150,7 +2137,6 @@ static void wl3501_config(dev_link_t *link)
 	this->bss_cnt		= 0;
 	this->join_sta_bss	= 0;
 	this->adhoc_times	= 0;
-	this->driver_state	= 0;
 	this->essid[0]		= 0;
 	this->essid[1]		= 3;
 	this->essid[2]		= 'A';

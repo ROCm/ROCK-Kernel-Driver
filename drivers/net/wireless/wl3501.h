@@ -548,7 +548,6 @@ struct wl3501_card {
 	u16				join_sta_bss;
 	unsigned char			rssi;
 	u8				adhoc_times;
-	u8				driver_state;
 	u8				freq_domain;
 	u8				version[2];
 	struct wl3501_scan_confirm	bss_set[20];
