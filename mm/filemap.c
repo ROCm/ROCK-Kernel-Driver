@@ -550,24 +550,6 @@ grab_cache_page_nowait(struct address_space *mapping, unsigned long index)
 }
 
 /*
- * Mark a page as having seen activity.
- *
- * inactive,unreferenced	->	inactive,referenced
- * inactive,referenced		->	active,unreferenced
- * active,unreferenced		->	active,referenced
- */
-void mark_page_accessed(struct page *page)
-{
-	if (!PageActive(page) && PageReferenced(page)) {
-		activate_page(page);
-		ClearPageReferenced(page);
-		return;
-	} else if (!PageReferenced(page)) {
-		SetPageReferenced(page);
-	}
-}
-
-/*
  * This is a generic file read routine, and uses the
  * inode->i_op->readpage() function for the actual low-level
  * stuff.
