@@ -340,7 +340,7 @@ static int sctp_v4_is_any(const union sctp_addr *addr)
  * Return 0 - If the address is a non-unicast or an illegal address.
  * Return 1 - If the address is a unicast.
  */
-static int sctp_v4_addr_valid(union sctp_addr *addr)
+static int sctp_v4_addr_valid(union sctp_addr *addr, struct sctp_opt *sp)
 {
 	/* Is this a non-unicast address or a unusable SCTP address? */
 	if (IS_IPV4_UNUSABLE_ADDRESS(&addr->v4.sin_addr.s_addr))
@@ -350,7 +350,7 @@ static int sctp_v4_addr_valid(union sctp_addr *addr)
 }
 
 /* Should this be available for binding?   */
-static int sctp_v4_available(const union sctp_addr *addr)
+static int sctp_v4_available(union sctp_addr *addr, struct sctp_opt *sp)
 {
 	int ret = inet_addr_type(addr->v4.sin_addr.s_addr);
 
@@ -580,6 +580,12 @@ out:
 	return newsk;
 }
 
+/* Map address, empty for v4 family */
+static void sctp_v4_addr_v4map(struct sctp_opt *sp, union sctp_addr *addr)
+{
+	/* Empty */
+}
+
 /* Dump the v4 addr to the seq file. */
 static void sctp_v4_seq_dump_addr(struct seq_file *seq, union sctp_addr *addr)
 {
@@ -685,10 +691,13 @@ static void sctp_inet_event_msgname(struct sctp_ulpevent *event, char *msgname,
 	struct sockaddr_in *sin, *sinfrom;
 
 	if (msgname) {
+		struct sctp_association *asoc;
+
+		asoc = event->sndrcvinfo.sinfo_assoc_id;
 		sctp_inet_msgname(msgname, addr_len);
 		sin = (struct sockaddr_in *)msgname;
-		sinfrom = &event->asoc->peer.primary_addr.v4;
-		sin->sin_port = htons(event->asoc->peer.port);
+		sinfrom = &asoc->peer.primary_addr.v4;
+		sin->sin_port = htons(asoc->peer.port);
 		sin->sin_addr.s_addr = sinfrom->sin_addr.s_addr;
 	}
 }
@@ -709,7 +718,7 @@ static void sctp_inet_skb_msgname(struct sk_buff *skb, char *msgname, int *len)
 }
 
 /* Do we support this AF? */
-static int sctp_inet_af_supported(sa_family_t family)
+static int sctp_inet_af_supported(sa_family_t family, struct sctp_opt *sp)
 {
 	/* PF_INET only supports AF_INET addresses. */
 	return (AF_INET == family);
@@ -737,7 +746,7 @@ static int sctp_inet_cmp_addr(const union sctp_addr *addr1,
  */
 static int sctp_inet_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 {
-	return sctp_v4_available(addr);
+	return sctp_v4_available(addr, opt);
 }
 
 /* Verify that sockaddr looks sendable.  Common verification has already
@@ -783,6 +792,7 @@ static struct sctp_pf sctp_pf_inet = {
 	.send_verify   = sctp_inet_send_verify,
 	.supported_addrs = sctp_inet_supported_addrs,
 	.create_accept_sk = sctp_v4_create_accept_sk,
+	.addr_v4map	= sctp_v4_addr_v4map,
 	.af            = &sctp_ipv4_specific,
 };
 

@@ -40,6 +40,7 @@
  *   Jon Grimm             <jgrimm@us.ibm.com>
  *   La Monte H.P. Yarroll <piggy@acm.org>
  *   Karl Knutson          <karl@athena.chicago.il.us>
+ *   Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -53,7 +54,6 @@
  * growing this structure as it is at the maximum limit now.
  */
 struct sctp_ulpevent {
-	struct sctp_association *asoc;
 	struct sctp_sndrcvinfo sndrcvinfo;
 	int msg_flags;
 	int iif;
@@ -72,9 +72,10 @@ static inline struct sctp_ulpevent *sctp_skb2event(struct sk_buff *skb)
 }
 
 struct sctp_ulpevent *sctp_ulpevent_new(int size, int flags, int gfp);
-struct sctp_ulpevent *sctp_ulpevent_init(struct sctp_ulpevent *, int flags);
+void sctp_ulpevent_init(struct sctp_ulpevent *, int flags);
 void sctp_ulpevent_free(struct sctp_ulpevent *);
 int sctp_ulpevent_is_notification(const struct sctp_ulpevent *);
+void sctp_queue_purge_ulpevents(struct sk_buff_head *list);
 
 struct sctp_ulpevent *sctp_ulpevent_make_assoc_change(
 	const struct sctp_association *asoc,

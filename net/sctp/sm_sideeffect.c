@@ -962,7 +962,7 @@ int sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
 			asoc->overall_error_count = 0;
 
 			/* Generate a SHUTDOWN chunk.  */
-			new_obj = sctp_make_shutdown(asoc);
+			new_obj = sctp_make_shutdown(asoc, chunk);
 			if (!new_obj)
 				goto nomem;
 			sctp_add_cmd_sf(commands, SCTP_CMD_REPLY,

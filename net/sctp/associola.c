@@ -556,12 +556,12 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
 		transport->active = SCTP_ACTIVE;
-		spc_state = ADDRESS_AVAILABLE;
+		spc_state = SCTP_ADDR_REACHABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
 		transport->active = SCTP_INACTIVE;
-		spc_state = ADDRESS_UNREACHABLE;
+		spc_state = SCTP_ADDR_UNREACHABLE;
 		break;
 
 	default:
@@ -877,7 +877,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 	/* Delete the association from the old endpoint's list of
 	 * associations.
 	 */
-	list_del(&assoc->asocs);
+	list_del_init(&assoc->asocs);
 
 	/* Decrement the backlog value for a TCP-style socket. */
 	if (sctp_style(oldsk, TCP))

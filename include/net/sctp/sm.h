@@ -231,7 +231,8 @@ struct sctp_chunk *sctp_make_data_empty(struct sctp_association *,
 struct sctp_chunk *sctp_make_ecne(const struct sctp_association *,
 				  const __u32);
 struct sctp_chunk *sctp_make_sack(const struct sctp_association *);
-struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc);
+struct sctp_chunk *sctp_make_shutdown(const struct sctp_association *asoc,
+				      const struct sctp_chunk *chunk);
 struct sctp_chunk *sctp_make_shutdown_ack(const struct sctp_association *asoc,
 					  const struct sctp_chunk *);
 struct sctp_chunk *sctp_make_shutdown_complete(const struct sctp_association *,
