@@ -87,7 +87,7 @@ ifeq ($(CONFIG_SKFP),y)
   obj-y += skfp/skfp.o
 endif
 
-obj-$(CONFIG_VIA_RHINE) += via-rhine.o
+obj-$(CONFIG_VIA_RHINE) += via-rhine.o mii.o
 obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
 
 #

@@ -76,7 +76,16 @@
 
 	LK1.1.12:
 	- Martin Eriksson: Allow Memory-Mapped IO to be enabled.
+
+	LK1.1.13 (jgarzik):
+	- Add ethtool support
+	- Replace some MII-related magic numbers with constants
+	
 */
+
+#define DRV_NAME	"via-rhine"
+#define DRV_VERSION	"1.1.13"
+#define DRV_RELDATE	"Nov-17-2001"
 
 
 /* A few user-configurable values.
@@ -151,18 +160,20 @@ static const int multicast_filter_limit = 32;
 #include <linux/init.h>
 #include <linux/delay.h>
 #include <linux/mii.h>
+#include <linux/ethtool.h>
 #include <linux/crc32.h>
 #include <asm/processor.h>		/* Processor type for cache alignment. */
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+#include <asm/uaccess.h>
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO "via-rhine.c:v1.10-LK1.1.12  03/11/2001  Written by Donald Becker\n"
+KERN_INFO DRV_NAME ".c:v1.10-LK" DRV_VERSION "  " DRV_RELDATE "  Written by Donald Becker\n"
 KERN_INFO "  http://www.scyld.com/network/via-rhine.html\n";
 
-static char shortname[] __devinitdata = "via-rhine";
+static char shortname[] __devinitdata = DRV_NAME;
 
 
 /* This driver was written to use PCI memory space, however most versions
@@ -471,6 +482,7 @@ struct netdev_private {
 	unsigned char phys[MAX_MII_CNT];			/* MII device addresses. */
 	unsigned int mii_cnt;			/* number of MIIs found, but only the first one is used */
 	u16 mii_status;						/* last read MII status */
+	struct mii_if_info mii_if;
 };
 
 static int  mdio_read(struct net_device *dev, int phy_id, int location);
@@ -486,7 +498,7 @@ static void via_rhine_rx(struct net_device *dev);
 static void via_rhine_error(struct net_device *dev, int intr_status);
 static void via_rhine_set_rx_mode(struct net_device *dev);
 static struct net_device_stats *via_rhine_get_stats(struct net_device *dev);
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  via_rhine_close(struct net_device *dev);
 static inline void clear_tally_counters(long ioaddr);
 
@@ -684,6 +696,9 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	np->chip_id = chip_id;
 	np->drv_flags = via_rhine_chip_info[chip_id].drv_flags;
 	np->pdev = pdev;
+	np->mii_if.dev = dev;
+	np->mii_if.mdio_read = mdio_read;
+	np->mii_if.mdio_write = mdio_write;
 
 	if (dev->mem_start)
 		option = dev->mem_start;
@@ -691,16 +706,16 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	/* The lower four bits are the media type. */
 	if (option > 0) {
 		if (option & 0x200)
-			np->full_duplex = 1;
+			np->mii_if.full_duplex = 1;
 		np->default_port = option & 15;
 	}
 	if (card_idx < MAX_UNITS  &&  full_duplex[card_idx] > 0)
-		np->full_duplex = 1;
+		np->mii_if.full_duplex = 1;
 
-	if (np->full_duplex) {
+	if (np->mii_if.full_duplex) {
 		printk(KERN_INFO "%s: Set to forced full duplex, autonegotiation"
 			   " disabled.\n", dev->name);
-		np->duplex_lock = 1;
+		np->mii_if.duplex_lock = 1;
 	}
 
 	/* The chip-specific entries in the device structure. */
@@ -709,7 +724,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->stop = via_rhine_close;
 	dev->get_stats = via_rhine_get_stats;
 	dev->set_multicast_list = via_rhine_set_rx_mode;
-	dev->do_ioctl = mii_ioctl;
+	dev->do_ioctl = via_rhine_ioctl;
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	if (np->drv_flags & ReqTxAlign)
@@ -736,10 +751,10 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 			int mii_status = mdio_read(dev, phy, 1);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				np->phys[phy_idx++] = phy;
-				np->advertising = mdio_read(dev, phy, 4);
+				np->mii_if.advertising = mdio_read(dev, phy, 4);
 				printk(KERN_INFO "%s: MII PHY found at address %d, status "
 					   "0x%4.4x advertising %4.4x Link %4.4x.\n",
-					   dev->name, phy, mii_status, np->advertising,
+					   dev->name, phy, mii_status, np->mii_if.advertising,
 					   mdio_read(dev, phy, 5));
 
 				/* set IFF_RUNNING */
@@ -750,12 +765,13 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 			}
 		}
 		np->mii_cnt = phy_idx;
+		np->mii_if.phy_id = np->phys[0];
 	}
 
 	/* Allow forcing the media type. */
 	if (option > 0) {
 		if (option & 0x220)
-			np->full_duplex = 1;
+			np->mii_if.full_duplex = 1;
 		np->default_port = option & 0x3ff;
 		if (np->default_port & 0x330) {
 			/* FIXME: shouldn't someone check this variable? */
@@ -969,7 +985,7 @@ static void init_registers(struct net_device *dev)
 		   ioaddr + IntrEnable);
 
 	np->chip_cmd = CmdStart|CmdTxOn|CmdRxOn|CmdNoTxPoll;
-	if (np->duplex_lock)
+	if (np->mii_if.duplex_lock)
 		np->chip_cmd |= CmdFDuplex;
 	writew(np->chip_cmd, ioaddr + ChipCmd);
 
@@ -1011,12 +1027,12 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 		switch (regnum) {
 		case 0:							/* Is user forcing speed/duplex? */
 			if (value & 0x9000)			/* Autonegotiation. */
-				np->duplex_lock = 0;
+				np->mii_if.duplex_lock = 0;
 			else
-				np->full_duplex = (value & 0x0100) ? 1 : 0;
+				np->mii_if.full_duplex = (value & 0x0100) ? 1 : 0;
 			break;
 		case 4:
-			np->advertising = value;
+			np->mii_if.advertising = value;
 			break;
 		}
 	}
@@ -1060,7 +1076,7 @@ static int via_rhine_open(struct net_device *dev)
 		printk(KERN_DEBUG "%s: Done via_rhine_open(), status %4.4x "
 			   "MII status: %4.4x.\n",
 			   dev->name, readw(ioaddr + ChipCmd),
-			   mdio_read(dev, np->phys[0], 1));
+			   mdio_read(dev, np->phys[0], MII_BMSR));
 
 	netif_start_queue(dev);
 
@@ -1078,19 +1094,19 @@ static void via_rhine_check_duplex(struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
-	int mii_reg5 = mdio_read(dev, np->phys[0], 5);
-	int negotiated = mii_reg5 & np->advertising;
+	int mii_lpa = mdio_read(dev, np->phys[0], MII_LPA);
+	int negotiated = mii_lpa & np->mii_if.advertising;
 	int duplex;
 
-	if (np->duplex_lock  ||  mii_reg5 == 0xffff)
+	if (np->mii_if.duplex_lock  ||  mii_lpa == 0xffff)
 		return;
 	duplex = (negotiated & 0x0100) || (negotiated & 0x01C0) == 0x0040;
-	if (np->full_duplex != duplex) {
-		np->full_duplex = duplex;
+	if (np->mii_if.full_duplex != duplex) {
+		np->mii_if.full_duplex = duplex;
 		if (debug)
 			printk(KERN_INFO "%s: Setting %s-duplex based on MII #%d link"
 				   " partner capability of %4.4x.\n", dev->name,
-				   duplex ? "full" : "half", np->phys[0], mii_reg5);
+				   duplex ? "full" : "half", np->phys[0], mii_lpa);
 		if (duplex)
 			np->chip_cmd |= CmdFDuplex;
 		else
@@ -1118,7 +1134,7 @@ static void via_rhine_timer(unsigned long data)
 	via_rhine_check_duplex(dev);
 
 	/* make IFF_RUNNING follow the MII status bit "Link established" */
-	mii_status = mdio_read(dev, np->phys[0], 1);
+	mii_status = mdio_read(dev, np->phys[0], MII_BMSR);
 	if ( (mii_status & MIILink) != (np->mii_status & MIILink) ) {
 		if (mii_status & MIILink)
 			netif_carrier_on(dev);
@@ -1142,7 +1158,7 @@ static void via_rhine_tx_timeout (struct net_device *dev)
 	printk (KERN_WARNING "%s: Transmit timed out, status %4.4x, PHY status "
 		"%4.4x, resetting...\n",
 		dev->name, readw (ioaddr + IntrStatus),
-		mdio_read (dev, np->phys[0], 1));
+		mdio_read (dev, np->phys[0], MII_BMSR));
 
 	dev->if_port = 0;
 
@@ -1457,14 +1473,14 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 		if (readb(ioaddr + MIIStatus) & 0x02) {
 			/* Link failed, restart autonegotiation. */
 			if (np->drv_flags & HasDavicomPhy)
-				mdio_write(dev, np->phys[0], 0, 0x3300);
+				mdio_write(dev, np->phys[0], MII_BMCR, 0x3300);
 		} else
 			via_rhine_check_duplex(dev);
 		if (debug)
 			printk(KERN_ERR "%s: MII status changed: Autonegotiation "
 				   "advertising %4.4x  partner %4.4x.\n", dev->name,
-			   mdio_read(dev, np->phys[0], 4),
-			   mdio_read(dev, np->phys[0], 5));
+			   mdio_read(dev, np->phys[0], MII_ADVERTISE),
+			   mdio_read(dev, np->phys[0], MII_LPA));
 	}
 	if (intr_status & IntrStatsMax) {
 		np->stats.rx_crc_errors	+= readw(ioaddr + RxCRCErrs);
@@ -1554,29 +1570,112 @@ static void via_rhine_set_rx_mode(struct net_device *dev)
 	writeb(np->rx_thresh | rx_mode, ioaddr + RxConfig);
 }
 
-static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int via_rhine_ethtool_ioctl (struct net_device *dev, void *useraddr)
+{
+	struct netdev_private *np = dev->priv;
+	u32 ethcmd;
+
+	if (get_user(ethcmd, (u32 *)useraddr))
+		return -EFAULT;
+
+	switch (ethcmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
+		strcpy (info.driver, DRV_NAME);
+		strcpy (info.version, DRV_VERSION);
+		strcpy (info.bus_info, np->pdev->slot_name);
+		if (copy_to_user (useraddr, &info, sizeof (info)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get settings */
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd = { ETHTOOL_GSET };
+		if (!(np->drv_flags & CanHaveMII))
+			break;
+		spin_lock_irq(&np->lock);
+		mii_ethtool_gset(&np->mii_if, &ecmd);
+		spin_unlock_irq(&np->lock);
+		if (copy_to_user(useraddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set settings */
+	case ETHTOOL_SSET: {
+		int r;
+		struct ethtool_cmd ecmd;
+		if (!(np->drv_flags & CanHaveMII))
+			break;
+		if (copy_from_user(&ecmd, useraddr, sizeof(ecmd)))
+			return -EFAULT;
+		spin_lock_irq(&np->lock);
+		r = mii_ethtool_sset(&np->mii_if, &ecmd);
+		spin_unlock_irq(&np->lock);
+		return r;
+	}
+	/* restart autonegotiation */
+	case ETHTOOL_NWAY_RST: {
+		if (!(np->drv_flags & CanHaveMII))
+			break;
+		return mii_nway_restart(&np->mii_if);
+	}
+	/* get link status */
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		if (!(np->drv_flags & CanHaveMII))
+			break;
+		edata.data = mii_link_ok(&np->mii_if);
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get message-level */
+	case ETHTOOL_GMSGLVL: {
+		struct ethtool_value edata = {ETHTOOL_GMSGLVL};
+		edata.data = debug;
+		if (copy_to_user(useraddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	/* set message-level */
+	case ETHTOOL_SMSGLVL: {
+		struct ethtool_value edata;
+		if (copy_from_user(&edata, useraddr, sizeof(edata)))
+			return -EFAULT;
+		debug = edata.data;
+		return 0;
+	}
+	default:
+		break;
+	}
+
+	return -EOPNOTSUPP;
+}
+static int via_rhine_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdev_private *np = dev->priv;
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
 	unsigned long flags;
 	int retval;
 
+	if (cmd == SIOCETHTOOL)
+		return via_rhine_ethtool_ioctl(dev, (void *) rq->ifr_data);
+
 	spin_lock_irqsave(&np->lock, flags);
 	retval = 0;
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = np->phys[0] & 0x1f;
 		/* Fall Through */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		break;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable(CAP_NET_ADMIN)) {
 			retval = -EPERM;
 			break;
