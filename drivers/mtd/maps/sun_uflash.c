@@ -1,4 +1,4 @@
-/* $Id: sun_uflash.c,v 1.7 2003/05/20 20:59:32 dwmw2 Exp $
+/* $Id: sun_uflash.c,v 1.9 2004/07/12 21:59:45 dwmw2 Exp $
  *
  * sun_uflash - Driver implementation for user-programmable flash
  * present on many Sun Microsystems SME boardsets.
@@ -51,7 +51,7 @@ struct uflash_dev {
 struct map_info uflash_map_templ = {
 		.name =		"SUNW,???-????",
 		.size =		UFLASH_WINDOW_SIZE,
-		.buswidth =	UFLASH_BUSWIDTH,
+		.bankwidth =	UFLASH_BUSWIDTH,
 };
 
 int uflash_devinit(struct linux_ebus_device* edev)

@@ -7,7 +7,7 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  *
- *  $Id: pci.c,v 1.5 2003/05/20 20:59:31 dwmw2 Exp $
+ *  $Id: pci.c,v 1.8 2004/07/12 22:38:29 dwmw2 Exp $
  * 
  * Generic PCI memory map driver.  We support the following boards:
  *  - Intel IQ80310 ATU.
@@ -39,6 +39,74 @@ struct map_pci_info {
 	struct pci_dev *dev;
 };	
 
+static map_word mtd_pci_read8(struct map_info *_map, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+	map_word val;
+	val.x[0]= readb(map->base + map->translate(map, ofs));
+//	printk("read8 : %08lx => %02x\n", ofs, val.x[0]);
+	return val;
+}
+
+#if 0
+static map_word mtd_pci_read16(struct map_info *_map, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+	map_word val;
+	val.x[0] = readw(map->base + map->translate(map, ofs));
+//	printk("read16: %08lx => %04x\n", ofs, val.x[0]);
+	return val;
+}
+#endif
+static map_word mtd_pci_read32(struct map_info *_map, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+	map_word val;
+	val.x[0] = readl(map->base + map->translate(map, ofs));
+//	printk("read32: %08lx => %08x\n", ofs, val.x[0]);
+	return val;
+}
+
+static void mtd_pci_copyfrom(struct map_info *_map, void *to, unsigned long from, ssize_t len)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+	memcpy_fromio(to, map->base + map->translate(map, from), len);
+}
+
+static void mtd_pci_write8(struct map_info *_map, map_word val, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+//	printk("write8 : %08lx <= %02x\n", ofs, val.x[0]);
+	writeb(val.x[0], map->base + map->translate(map, ofs));
+}
+
+#if 0
+static void mtd_pci_write16(struct map_info *_map, map_word val, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+//	printk("write16: %08lx <= %04x\n", ofs, val.x[0]);
+	writew(val.x[0], map->base + map->translate(map, ofs));
+}
+#endif
+static void mtd_pci_write32(struct map_info *_map, map_word val, unsigned long ofs)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+//	printk("write32: %08lx <= %08x\n", ofs, val.x[0]);
+	writel(val.x[0], map->base + map->translate(map, ofs));
+}
+
+static void mtd_pci_copyto(struct map_info *_map, unsigned long to, const void *from, ssize_t len)
+{
+	struct map_pci_info *map = (struct map_pci_info *)_map;
+	memcpy_toio(map->base + map->translate(map, to), from, len);
+}
+
+static struct map_info mtd_pci_map = {
+	.phys =		NO_XIP,
+	.copy_from =	mtd_pci_copyfrom,
+	.copy_to =	mtd_pci_copyto,
+};
+
 /*
  * Intel IOP80310 Flash driver
  */
@@ -48,7 +116,10 @@ intel_iq80310_init(struct pci_dev *dev, struct map_pci_info *map)
 {
 	u32 win_base;
 
-	map->map.buswidth = 1;
+	map->map.bankwidth = 1;
+	map->map.read = mtd_pci_read8,
+	map->map.write = mtd_pci_write8,
+
 	map->map.size     = 0x00800000;
 	map->base         = ioremap_nocache(pci_resource_start(dev, 0),
 					    pci_resource_len(dev, 0));
@@ -147,7 +218,9 @@ intel_dc21285_init(struct pci_dev *dev, struct map_pci_info *map)
 	if (!len || !base)
 		return -ENXIO;
 
-	map->map.buswidth = 4;
+	map->map.bankwidth = 4;
+	map->map.read = mtd_pci_read32,
+	map->map.write = mtd_pci_write32,
 	map->map.size     = len;
 	map->base         = ioremap_nocache(base, len);
 
@@ -214,75 +287,6 @@ static struct pci_device_id mtd_pci_ids[] = {
 /*
  * Generic code follows.
  */
-
-static u8 mtd_pci_read8(struct map_info *_map, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-	u8 val = readb(map->base + map->translate(map, ofs));
-//	printk("read8 : %08lx => %02x\n", ofs, val);
-	return val;
-}
-
-static u16 mtd_pci_read16(struct map_info *_map, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-	u16 val = readw(map->base + map->translate(map, ofs));
-//	printk("read16: %08lx => %04x\n", ofs, val);
-	return val;
-}
-
-static u32 mtd_pci_read32(struct map_info *_map, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-	u32 val = readl(map->base + map->translate(map, ofs));
-//	printk("read32: %08lx => %08x\n", ofs, val);
-	return val;
-}
-
-static void mtd_pci_copyfrom(struct map_info *_map, void *to, unsigned long from, ssize_t len)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-	memcpy_fromio(to, map->base + map->translate(map, from), len);
-}
-
-static void mtd_pci_write8(struct map_info *_map, u8 val, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-//	printk("write8 : %08lx <= %02x\n", ofs, val);
-	writeb(val, map->base + map->translate(map, ofs));
-}
-
-static void mtd_pci_write16(struct map_info *_map, u16 val, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-//	printk("write16: %08lx <= %04x\n", ofs, val);
-	writew(val, map->base + map->translate(map, ofs));
-}
-
-static void mtd_pci_write32(struct map_info *_map, u32 val, unsigned long ofs)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-//	printk("write32: %08lx <= %08x\n", ofs, val);
-	writel(val, map->base + map->translate(map, ofs));
-}
-
-static void mtd_pci_copyto(struct map_info *_map, unsigned long to, const void *from, ssize_t len)
-{
-	struct map_pci_info *map = (struct map_pci_info *)_map;
-	memcpy_toio(map->base + map->translate(map, to), from, len);
-}
-
-static struct map_info mtd_pci_map = {
-	.phys =		NO_XIP,
-	.read8 =	mtd_pci_read8,
-	.read16 =	mtd_pci_read16,
-	.read32 =	mtd_pci_read32,
-	.copy_from =	mtd_pci_copyfrom,
-	.write8 =	mtd_pci_write8,
-	.write16 =	mtd_pci_write16,
-	.write32 =	mtd_pci_write32,
-	.copy_to =	mtd_pci_copyto,
-};
 
 static int __devinit
 mtd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)

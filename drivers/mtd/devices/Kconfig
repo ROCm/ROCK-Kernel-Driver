@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.4 2003/05/28 15:18:54 dwmw2 Exp $
+# $Id: Kconfig,v 1.10 2004/07/15 00:34:49 dwmw2 Exp $
 
 menu "Self-contained MTD device drivers"
 	depends on MTD!=n
@@ -9,9 +9,9 @@ config MTD_PMC551
 	depends on MTD && PCI
 	---help---
 	  This provides a MTD device driver for the Ramix PMC551 RAM PCI card
-	  from Ramix Inc. <http://www.ramix.com/products/>. These devices come
-	  in memory configurations from 32M - 1G.  If you have one, you
-	  probably want to enable this.
+	  from Ramix Inc. <http://www.ramix.com/products/memory/pmc551.html>.
+	  These devices come in memory configurations from 32M - 1G.  If you
+	  have one, you probably want to enable this.
 
 	  If this driver is compiled as a module you get the ability to select
 	  the size of the aperture window pointing into the devices memory.
@@ -40,9 +40,12 @@ config MTD_PMC551_DEBUG
 
 config MTD_MS02NV
 	tristate "DEC MS02-NV NVRAM module support"
-	depends on CONFIG_MACH_DECSTATION
+	depends on MTD && MACH_DECSTATION
 	help
-	  Support for NVRAM module on DECstation.
+	  This is an MTD driver for the DEC's MS02-NV (54-20948-01) battery
+	  backed-up NVRAM module.  The module was originally meant as an NFS
+	  accelerator.  Say Y here if you have a DECstation 5000/2x0 or a
+	  DECsystem 5900 equipped with such a module.
 
 config MTD_SLRAM
 	tristate "Uncached system RAM"
@@ -51,6 +54,16 @@ config MTD_SLRAM
 	  If your CPU cannot cache all of the physical memory in your machine,
 	  you can still use it for storage or swap by using this driver to
 	  present it to the system as a Memory Technology Device.
+
+config MTD_PHRAM
+	tristate "Physical system RAM"
+	depends on MTD
+	help
+	  This is a re-implementation of the slram driver above.
+
+	  Use this driver to access physical memory that the kernel proper
+	  doesn't have access to, memory beyond the mem=xxx limit, nvram,
+	  memory on the video card, etc...
 
 config MTD_LART
 	tristate "28F160xx flash driver for LART"
@@ -161,8 +174,15 @@ config MTD_DOC2001PLUS
 
 config MTD_DOCPROBE
 	tristate
-	default m if MTD_DOC2001!=y && MTD_DOC2000!=y && MTD_DOC2001PLUS!=y && (MTD_DOC2001=m || MTD_DOC2000=m || MOD_DOC2001PLUS=m)
+	default m if MTD_DOC2001!=y && MTD_DOC2000!=y && MTD_DOC2001PLUS!=y && (MTD_DOC2001=m || MTD_DOC2000=m || MTD_DOC2001PLUS=m)
 	default y if MTD_DOC2001=y || MTD_DOC2000=y || MTD_DOC2001PLUS=y
+	help
+	  This isn't a real config option, it's derived.
+
+config MTD_DOCECC
+	tristate
+	default m if MTD_DOCPROBE!=y && MTD_NAND_DISKONCHIP!=y && (MTD_DOCPROBE=m || MTD_NAND_DISKONCHIP=m)
+	default y if MTD_DOCPROBE=y || MTD_NAND_DISKONCHIP=y
 	help
 	  This isn't a real config option, it's derived.
 

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: write.c,v 1.75 2003/10/08 11:45:11 dwmw2 Exp $
+ * $Id: write.c,v 1.85 2004/07/13 08:58:25 dwmw2 Exp $
  *
  */
 
@@ -18,6 +18,7 @@
 #include <linux/pagemap.h>
 #include <linux/mtd/mtd.h>
 #include "nodelist.h"
+#include "compr.h"
 
 
 int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint32_t mode, struct jffs2_raw_inode *ri)
@@ -31,7 +32,6 @@ int jffs2_do_new_inode(struct jffs2_sb_info *c, struct jffs2_inode_info *f, uint
 
 	memset(ic, 0, sizeof(*ic));
 
-	init_MUTEX_LOCKED(&f->sem);
 	f->inocache = ic;
 	f->inocache->nlink = 1;
 	f->inocache->nodes = (struct jffs2_raw_node_ref *)f->inocache;
@@ -133,7 +133,7 @@ struct jffs2_full_dnode *jffs2_write_dnode(struct jffs2_sb_info *c, struct jffs2
 	fn->raw = raw;
 
 	raw->flash_offset = flash_ofs;
-	raw->totlen = PAD(sizeof(*ri)+datalen);
+	raw->__totlen = PAD(sizeof(*ri)+datalen);
 	raw->next_phys = NULL;
 
 	ret = jffs2_flash_writev(c, vecs, cnt, flash_ofs, &retlen,
@@ -275,11 +275,11 @@ struct jffs2_full_dirent *jffs2_write_dirent(struct jffs2_sb_info *c, struct jff
 	fd->raw = raw;
 
 	raw->flash_offset = flash_ofs;
-	raw->totlen = PAD(sizeof(*rd)+namelen);
+	raw->__totlen = PAD(sizeof(*rd)+namelen);
 	raw->next_phys = NULL;
 
 	ret = jffs2_flash_writev(c, vecs, 2, flash_ofs, &retlen,
-				 (alloc_mode==ALLOC_GC)?0:fd->ino);
+				 (alloc_mode==ALLOC_GC)?0:je32_to_cpu(rd->pino));
 	if (ret || (retlen != sizeof(*rd) + namelen)) {
 		printk(KERN_NOTICE "Write of %zd bytes at 0x%08x failed. returned %d, retlen %zd\n", 
 			       sizeof(*rd)+namelen, flash_ofs, ret, retlen);
@@ -359,7 +359,7 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 	while(writelen) {
 		struct jffs2_full_dnode *fn;
 		unsigned char *comprbuf = NULL;
-		unsigned char comprtype = JFFS2_COMPR_NONE;
+		uint16_t comprtype = JFFS2_COMPR_NONE;
 		uint32_t phys_ofs, alloclen;
 		uint32_t datalen, cdatalen;
 		int retried = 0;
@@ -373,24 +373,10 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			break;
 		}
 		down(&f->sem);
-		datalen = writelen;
-		cdatalen = min_t(uint32_t, alloclen - sizeof(*ri), writelen);
+		datalen = min_t(uint32_t, writelen, PAGE_CACHE_SIZE - (offset & (PAGE_CACHE_SIZE-1)));
+		cdatalen = min_t(uint32_t, alloclen - sizeof(*ri), datalen);
 
-		comprbuf = kmalloc(cdatalen, GFP_KERNEL);
-		if (comprbuf) {
-			comprtype = jffs2_compress(buf, comprbuf, &datalen, &cdatalen);
-		}
-		if (comprtype == JFFS2_COMPR_NONE) {
-			/* Either compression failed, or the allocation of comprbuf failed */
-			if (comprbuf)
-				kfree(comprbuf);
-			comprbuf = buf;
-			datalen = cdatalen;
-		}
-		/* Now comprbuf points to the data to be written, be it compressed or not.
-		   comprtype holds the compression type, and comprtype == JFFS2_COMPR_NONE means
-		   that the comprbuf doesn't need to be kfree()d. 
-		*/
+		comprtype = jffs2_compress(c, f, buf, &comprbuf, &datalen, &cdatalen);
 
 		ri->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
 		ri->nodetype = cpu_to_je16(JFFS2_NODETYPE_INODE);
@@ -403,14 +389,14 @@ int jffs2_write_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 		ri->offset = cpu_to_je32(offset);
 		ri->csize = cpu_to_je32(cdatalen);
 		ri->dsize = cpu_to_je32(datalen);
-		ri->compr = comprtype;
+		ri->compr = comprtype & 0xff;
+		ri->usercompr = (comprtype >> 8 ) & 0xff;
 		ri->node_crc = cpu_to_je32(crc32(0, ri, sizeof(*ri)-8));
 		ri->data_crc = cpu_to_je32(crc32(0, comprbuf, cdatalen));
 
 		fn = jffs2_write_dnode(c, f, ri, comprbuf, cdatalen, phys_ofs, ALLOC_NORETRY);
 
-		if (comprtype != JFFS2_COMPR_NONE)
-			kfree(comprbuf);
+		jffs2_free_comprbuf(comprbuf, buf);
 
 		if (IS_ERR(fn)) {
 			ret = PTR_ERR(fn);
@@ -559,48 +545,75 @@ int jffs2_do_unlink(struct jffs2_sb_info *c, struct jffs2_inode_info *dir_f,
 	uint32_t alloclen, phys_ofs;
 	int ret;
 
-	rd = jffs2_alloc_raw_dirent();
-	if (!rd)
-		return -ENOMEM;
+	if (1 /* alternative branch needs testing */ || 
+	    !jffs2_can_mark_obsolete(c)) {
+		/* We can't mark stuff obsolete on the medium. We need to write a deletion dirent */
 
-	ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_DELETION);
-	if (ret) {
+		rd = jffs2_alloc_raw_dirent();
+		if (!rd)
+			return -ENOMEM;
+
+		ret = jffs2_reserve_space(c, sizeof(*rd)+namelen, &phys_ofs, &alloclen, ALLOC_DELETION);
+		if (ret) {
+			jffs2_free_raw_dirent(rd);
+			return ret;
+		}
+
+		down(&dir_f->sem);
+
+		/* Build a deletion node */
+		rd->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
+		rd->nodetype = cpu_to_je16(JFFS2_NODETYPE_DIRENT);
+		rd->totlen = cpu_to_je32(sizeof(*rd) + namelen);
+		rd->hdr_crc = cpu_to_je32(crc32(0, rd, sizeof(struct jffs2_unknown_node)-4));
+		
+		rd->pino = cpu_to_je32(dir_f->inocache->ino);
+		rd->version = cpu_to_je32(++dir_f->highest_version);
+		rd->ino = cpu_to_je32(0);
+		rd->mctime = cpu_to_je32(get_seconds());
+		rd->nsize = namelen;
+		rd->type = DT_UNKNOWN;
+		rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
+		rd->name_crc = cpu_to_je32(crc32(0, name, namelen));
+
+		fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, ALLOC_DELETION);
+		
 		jffs2_free_raw_dirent(rd);
-		return ret;
-	}
 
-	down(&dir_f->sem);
+		if (IS_ERR(fd)) {
+			jffs2_complete_reservation(c);
+			up(&dir_f->sem);
+			return PTR_ERR(fd);
+		}
 
-	/* Build a deletion node */
-	rd->magic = cpu_to_je16(JFFS2_MAGIC_BITMASK);
-	rd->nodetype = cpu_to_je16(JFFS2_NODETYPE_DIRENT);
-	rd->totlen = cpu_to_je32(sizeof(*rd) + namelen);
-	rd->hdr_crc = cpu_to_je32(crc32(0, rd, sizeof(struct jffs2_unknown_node)-4));
-
-	rd->pino = cpu_to_je32(dir_f->inocache->ino);
-	rd->version = cpu_to_je32(++dir_f->highest_version);
-	rd->ino = cpu_to_je32(0);
-	rd->mctime = cpu_to_je32(get_seconds());
-	rd->nsize = namelen;
-	rd->type = DT_UNKNOWN;
-	rd->node_crc = cpu_to_je32(crc32(0, rd, sizeof(*rd)-8));
-	rd->name_crc = cpu_to_je32(crc32(0, name, namelen));
-
-	fd = jffs2_write_dirent(c, dir_f, rd, name, namelen, phys_ofs, ALLOC_DELETION);
-	
-	jffs2_free_raw_dirent(rd);
-
-	if (IS_ERR(fd)) {
-		jffs2_complete_reservation(c);
+		/* File it. This will mark the old one obsolete. */
+		jffs2_add_fd_to_list(c, fd, &dir_f->dents);
 		up(&dir_f->sem);
-		return PTR_ERR(fd);
+	} else {
+		struct jffs2_full_dirent **prev = &dir_f->dents;
+		uint32_t nhash = full_name_hash(name, namelen);
+
+		down(&dir_f->sem);
+
+		while ((*prev) && (*prev)->nhash <= nhash) {
+			if ((*prev)->nhash == nhash && 
+			    !memcmp((*prev)->name, name, namelen) &&
+			    !(*prev)->name[namelen]) {
+				struct jffs2_full_dirent *this = *prev;
+
+				D1(printk(KERN_DEBUG "Marking old dirent node (ino #%u) @%08x obsolete\n",
+					  this->ino, ref_offset(this->raw)));
+
+				*prev = this->next;
+				jffs2_mark_node_obsolete(c, (this->raw));
+				jffs2_free_full_dirent(this);
+				break;
+			}
+			prev = &((*prev)->next);
+		}
+		up(&dir_f->sem);
 	}
 
-	/* File it. This will mark the old one obsolete. */
-	jffs2_add_fd_to_list(c, fd, &dir_f->dents);
-
-	up(&dir_f->sem);
-	
 	/* dead_f is NULL if this was a rename not a real unlink */
 	/* Also catch the !f->inocache case, where there was a dirent
 	   pointing to an inode which didn't exist. */

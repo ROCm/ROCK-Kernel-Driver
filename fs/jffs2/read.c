@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: read.c,v 1.34 2003/10/04 08:33:06 dwmw2 Exp $
+ * $Id: read.c,v 1.36 2004/05/25 11:12:32 havasi Exp $
  *
  */
 
@@ -18,8 +18,11 @@
 #include <linux/mtd/mtd.h>
 #include <linux/compiler.h>
 #include "nodelist.h"
+#include "compr.h"
 
-int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsigned char *buf, int ofs, int len)
+int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
+		     struct jffs2_full_dnode *fd, unsigned char *buf,
+		     int ofs, int len)
 {
 	struct jffs2_raw_inode *ri;
 	size_t readlen;
@@ -127,7 +130,7 @@ int jffs2_read_dnode(struct jffs2_sb_info *c, struct jffs2_full_dnode *fd, unsig
 	if (ri->compr != JFFS2_COMPR_NONE) {
 		D2(printk(KERN_DEBUG "Decompress %d bytes from %p to %d bytes at %p\n",
 			  je32_to_cpu(ri->csize), readbuf, je32_to_cpu(ri->dsize), decomprbuf)); 
-		ret = jffs2_decompress(ri->compr, readbuf, decomprbuf, je32_to_cpu(ri->csize), je32_to_cpu(ri->dsize));
+		ret = jffs2_decompress(c, f, ri->compr | (ri->usercompr << 8), readbuf, decomprbuf, je32_to_cpu(ri->csize), je32_to_cpu(ri->dsize));
 		if (ret) {
 			printk(KERN_WARNING "Error: jffs2_decompress returned %d\n", ret);
 			goto out_decomprbuf;
@@ -195,7 +198,7 @@ int jffs2_read_inode_range(struct jffs2_sb_info *c, struct jffs2_inode_info *f,
 			D1(printk(KERN_DEBUG "Reading %d-%d from node at 0x%08x (%d)\n",
 				  frag->ofs+fragofs, frag->ofs+fragofs+readlen,
 				  ref_offset(frag->node->raw), ref_flags(frag->node->raw)));
-			ret = jffs2_read_dnode(c, frag->node, buf, fragofs + frag->ofs - frag->node->ofs, readlen);
+			ret = jffs2_read_dnode(c, f, frag->node, buf, fragofs + frag->ofs - frag->node->ofs, readlen);
 			D2(printk(KERN_DEBUG "node read done\n"));
 			if (ret) {
 				D1(printk(KERN_DEBUG"jffs2_read_inode_range error %d\n",ret));
@@ -231,7 +234,7 @@ char *jffs2_getlink(struct jffs2_sb_info *c, struct jffs2_inode_info *f)
 	}
 	buf[f->metadata->size]=0;
 
-	ret = jffs2_read_dnode(c, f->metadata, buf, 0, f->metadata->size);
+	ret = jffs2_read_dnode(c, f, f->metadata, buf, 0, f->metadata->size);
 
 	up(&f->sem);
 

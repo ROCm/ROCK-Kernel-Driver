@@ -1,7 +1,12 @@
 /*
- * $Id: physmap.c,v 1.29 2003/05/29 09:24:10 dwmw2 Exp $
+ * $Id: physmap.c,v 1.33 2004/07/12 14:37:24 dwmw2 Exp $
  *
  * Normal mappings of chips in physical memory
+ *
+ * Copyright (C) 2003 MontaVista Software Inc.
+ * Author: Jun Sun, jsun@mvista.com or jsun@junsun.net
+ *
+ * 031022 - [jsun] add run-time configure and partition setup
  */
 
 #include <linux/module.h>
@@ -15,62 +20,33 @@
 #include <linux/config.h>
 #include <linux/mtd/partitions.h>
 
-#define WINDOW_ADDR CONFIG_MTD_PHYSMAP_START
-#define WINDOW_SIZE CONFIG_MTD_PHYSMAP_LEN
-#define BUSWIDTH CONFIG_MTD_PHYSMAP_BUSWIDTH
-
 static struct mtd_info *mymtd;
 
-
-struct map_info physmap_map = {
-	.name = "Physically mapped flash",
-	.size = WINDOW_SIZE,
-	.buswidth = BUSWIDTH,
-	.phys = WINDOW_ADDR,
-};
+struct map_info physmap_map = {.name = "phys_mapped_flash"};
 
 #ifdef CONFIG_MTD_PARTITIONS
 static struct mtd_partition *mtd_parts;
 static int                   mtd_parts_nb;
 
-static struct mtd_partition physmap_partitions[] = {
-#if 0
-/* Put your own partition definitions here */
-	{
-		.name =		"bootROM",
-		.size =		0x80000,
-		.offset =	0,
-		.mask_flags =	MTD_WRITEABLE,  /* force read-only */
-	}, {
-		.name =		"zImage",
-		.size =		0x100000,
-		.offset =	MTDPART_OFS_APPEND,
-		.mask_flags =	MTD_WRITEABLE,  /* force read-only */
-	}, {
-		.name =		"ramdisk.gz",
-		.size =		0x300000,
-		.offset =	MTDPART_OFS_APPEND,
-		.mask_flags =	MTD_WRITEABLE,  /* force read-only */
-	}, {
-		.name =		"User FS",
-		.size =		MTDPART_SIZ_FULL,
-		.offset =	MTDPART_OFS_APPEND,
-	}
-#endif
-};
+static int num_physmap_partitions;
+static struct mtd_partition *physmap_partitions;
 
-#define NUM_PARTITIONS	(sizeof(physmap_partitions)/sizeof(struct mtd_partition))
-const char *part_probes[] = {"cmdlinepart", "RedBoot", NULL};
+static const char *part_probes[] __initdata = {"cmdlinepart", "RedBoot", NULL};
 
+void physmap_set_partitions(struct mtd_partition *parts, int num_parts)
+{
+	physmap_partitions=parts;
+	num_physmap_partitions=num_parts;
+}
 #endif /* CONFIG_MTD_PARTITIONS */
 
-int __init init_physmap(void)
+static int __init init_physmap(void)
 {
 	static const char *rom_probe_types[] = { "cfi_probe", "jedec_probe", "map_rom", NULL };
 	const char **type;
 
-       	printk(KERN_NOTICE "physmap flash device: %x at %x\n", WINDOW_SIZE, WINDOW_ADDR);
-	physmap_map.virt = (unsigned long)ioremap(WINDOW_ADDR, WINDOW_SIZE);
+       	printk(KERN_NOTICE "physmap flash device: %lx at %lx\n", physmap_map.size, physmap_map.phys);
+	physmap_map.virt = (unsigned long)ioremap(physmap_map.phys, physmap_map.size);
 
 	if (!physmap_map.virt) {
 		printk("Failed to ioremap\n");
@@ -97,11 +73,11 @@ int __init init_physmap(void)
 			return 0;
 		}
 
-		if (NUM_PARTITIONS != 0) 
+		if (num_physmap_partitions != 0) 
 		{
 			printk(KERN_NOTICE 
 			       "Using physmap partition definition\n");
-			add_mtd_partitions (mymtd, physmap_partitions, NUM_PARTITIONS);
+			add_mtd_partitions (mymtd, physmap_partitions, num_physmap_partitions);
 			return 0;
 		}
 
@@ -121,7 +97,7 @@ static void __exit cleanup_physmap(void)
 	if (mtd_parts_nb) {
 		del_mtd_partitions(mymtd);
 		kfree(mtd_parts);
-	} else if (NUM_PARTITIONS) {
+	} else if (num_physmap_partitions) {
 		del_mtd_partitions(mymtd);
 	} else {
 		del_mtd_device(mymtd);

@@ -8,7 +8,7 @@
  * For licensing information, see the file 'LICENCE' in the 
  * jffs2 directory.
  *
- * $Id: jffs2.h,v 1.31 2003/10/04 08:33:05 dwmw2 Exp $
+ * $Id: jffs2.h,v 1.33 2004/05/25 11:31:55 havasi Exp $
  *
  */
 
@@ -43,6 +43,8 @@
 #define JFFS2_COMPR_COPY	0x04
 #define JFFS2_COMPR_DYNRUBIN	0x05
 #define JFFS2_COMPR_ZLIB	0x06
+#define JFFS2_COMPR_LZO         0x07
+#define JFFS2_COMPR_LZARI       0x08
 /* Compatibility flags. */
 #define JFFS2_COMPAT_MASK 0xc000      /* What do to if an unknown nodetype is found */
 #define JFFS2_NODE_ACCURATE 0x2000
@@ -86,39 +88,6 @@ typedef struct {
 typedef struct {
 	uint16_t v16;
 } __attribute__((packed)) jint16_t;
-
-#define JFFS2_NATIVE_ENDIAN
-
-/* Note we handle mode bits conversion from JFFS2 (i.e. Linux) to/from
-   whatever OS we're actually running on here too. */
-
-#if defined(JFFS2_NATIVE_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){x})
-#define cpu_to_je32(x) ((jint32_t){x})
-#define cpu_to_jemode(x) ((jmode_t){os_to_jffs2_mode(x)})
-
-#define je16_to_cpu(x) ((x).v16)
-#define je32_to_cpu(x) ((x).v32)
-#define jemode_to_cpu(x) (jffs2_to_os_mode((x).m))
-#elif defined(JFFS2_BIG_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){cpu_to_be16(x)})
-#define cpu_to_je32(x) ((jint32_t){cpu_to_be32(x)})
-#define cpu_to_jemode(x) ((jmode_t){cpu_to_be32(os_to_jffs2_mode(x))})
-
-#define je16_to_cpu(x) (be16_to_cpu(x.v16))
-#define je32_to_cpu(x) (be32_to_cpu(x.v32))
-#define jemode_to_cpu(x) (be32_to_cpu(jffs2_to_os_mode((x).m)))
-#elif defined(JFFS2_LITTLE_ENDIAN)
-#define cpu_to_je16(x) ((jint16_t){cpu_to_le16(x)})
-#define cpu_to_je32(x) ((jint32_t){cpu_to_le32(x)})
-#define cpu_to_jemode(x) ((jmode_t){cpu_to_le32(os_to_jffs2_mode(x))})
-
-#define je16_to_cpu(x) (le16_to_cpu(x.v16))
-#define je32_to_cpu(x) (le32_to_cpu(x.v32))
-#define jemode_to_cpu(x) (le32_to_cpu(jffs2_to_os_mode((x).m)))
-#else 
-#error wibble
-#endif
 
 struct jffs2_unknown_node
 {

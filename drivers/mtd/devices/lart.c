@@ -2,7 +2,7 @@
 /*
  * MTD driver for the 28F160F3 Flash Memory (non-CFI) on LART.
  *
- * $Id: lart.c,v 1.5 2003/05/20 21:03:07 dwmw2 Exp $
+ * $Id: lart.c,v 1.6 2004/07/14 17:21:38 dwmw2 Exp $
  *
  * Author: Abraham vd Merwe <abraham@2d3d.co.za>
  *

@@ -1,5 +1,5 @@
 /*
- * $Id: ocelot.c,v 1.12 2003/05/21 12:45:19 dwmw2 Exp $
+ * $Id: ocelot.c,v 1.13 2004/07/12 21:59:44 dwmw2 Exp $
  *
  * Flash on Momenco Ocelot
  */
@@ -49,14 +49,14 @@ static struct mtd_partition *parsed_parts;
 struct map_info ocelot_flash_map = {
 	.name = "Ocelot boot flash",
 	.size = FLASH_WINDOW_SIZE,
-	.buswidth = FLASH_BUSWIDTH,
+	.bankwidth = FLASH_BUSWIDTH,
 	.phys = FLASH_WINDOW_ADDR,
 };
 
 struct map_info ocelot_nvram_map = {
 	.name = "Ocelot NVRAM",
 	.size = NVRAM_WINDOW_SIZE,
-	.buswidth = NVRAM_BUSWIDTH,
+	.bankwidth = NVRAM_BUSWIDTH,
 	.phys = NVRAM_WINDOW_ADDR,
 };
 

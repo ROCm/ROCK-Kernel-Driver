@@ -2,7 +2,7 @@
  * tsunami_flash.c
  *
  * flash chip on alpha ds10...
- * $Id: tsunami_flash.c,v 1.6 2003/05/21 15:15:08 dwmw2 Exp $
+ * $Id: tsunami_flash.c,v 1.9 2004/07/14 09:52:55 dwmw2 Exp $
  */
 #include <asm/io.h>
 #include <asm/core_tsunami.h>
@@ -15,14 +15,16 @@
 #define FLASH_DISABLE_BYTE 0x00
 
 #define MAX_TIG_FLASH_SIZE (12*1024*1024)
-static inline  __u8 tsunami_flash_read8(struct map_info *map, unsigned long offset)
+static inline map_word tsunami_flash_read8(struct map_info *map, unsigned long offset)
 {
-	return tsunami_tig_readb(offset);
+	map_word val;
+	val.x[0] = tsunami_tig_readb(offset);
+	return val;
 }
 
-static void tsunami_flash_write8(struct map_info *map, __u8 value, unsigned long offset)
+static void tsunami_flash_write8(struct map_info *map, map_word value, unsigned long offset)
 {
-	tsunami_tig_writeb(value, offset);
+	tsunami_tig_writeb(value.x[0], offset);
 }
 
 static void tsunami_flash_copy_from(
@@ -61,10 +63,10 @@ static struct map_info tsunami_flash_map = {
 	.name = "flash chip on the Tsunami TIG bus",
 	.size = MAX_TIG_FLASH_SIZE,
 	.phys = NO_XIP;
-	.buswidth = 1,
-	.read8 = tsunami_flash_read8,
+	.bankwidth = 1,
+	.read = tsunami_flash_read8,
 	.copy_from = tsunami_flash_copy_from,
-	.write8 = tsunami_flash_write8,
+	.write = tsunami_flash_write8,
 	.copy_to = tsunami_flash_copy_to,
 };
 
@@ -84,7 +86,7 @@ static void __exit  cleanup_tsunami_flash(void)
 
 static int __init init_tsunami_flash(void)
 {
-	static const char *rom_probe_types[] = { "cfi_probe", "jedec_probe", "map_rom", 0 };
+	static const char *rom_probe_types[] = { "cfi_probe", "jedec_probe", "map_rom", NULL };
 	char **type;
 
 	tsunami_tig_writeb(FLASH_ENABLE_BYTE, FLASH_ENABLE_PORT);

@@ -1097,17 +1097,15 @@ config JFFS_FS_VERBOSE
 
 config JFFS_PROC_FS
 	bool "JFFS stats available in /proc filesystem"
-	depends on JFFS_FS && PROC
+	depends on JFFS_FS && PROC_FS
 	help
 	  Enabling this option will cause statistics from mounted JFFS file systems
 	  to be made available to the user in the /proc/fs/jffs/ directory.
 
 config JFFS2_FS
 	tristate "Journalling Flash File System v2 (JFFS2) support"
-	depends on MTD
 	select CRC32
-	select ZLIB_INFLATE
-	select ZLIB_DEFLATE
+	depends on MTD
 	help
 	  JFFS2 is the second generation of the Journalling Flash File System
 	  for use on diskless embedded devices. It provides improved wear
@@ -1150,6 +1148,73 @@ config JFFS2_FS_NAND
 
 	  Say 'N' unless you have NAND flash and you are willing to test and
 	  develop JFFS2 support for it.
+
+config JFFS2_COMPRESSION_OPTIONS
+	bool "Advanced compression options for JFFS2"
+	default n
+	help
+	  Enabling this option allows you to explicitly choose which
+	  compression modules, if any, are enabled in JFFS2. Removing
+	  compressors and mean you cannot read existing file systems,
+	  and enabling experimental compressors can mean that you
+	  write a file system which cannot be read by a standard kernel.
+
+	  If unsure, you should _definitely_ say 'N'.
+
+config JFFS2_ZLIB
+	bool "JFFS2 ZLIB compression support" if JFFS2_COMPRESSION_OPTIONS
+	select ZLIB_INFLATE
+	select ZLIB_DEFLATE
+	depends on JFFS2_FS
+	default y
+        help
+          Zlib is designed to be a free, general-purpose, legally unencumbered,
+          lossless data-compression library for use on virtually any computer 
+          hardware and operating system. See http://www.gzip.org/zlib/ for
+          further information.
+          
+          Say 'Y' if unsure.
+
+config JFFS2_RTIME
+	bool "JFFS2 RTIME compression support" if JFFS2_COMPRESSION_OPTIONS
+	depends on JFFS2_FS
+	default y
+        help
+          Rtime does manage to recompress already-compressed data. Say 'Y' if unsure.
+
+config JFFS2_RUBIN
+	bool "JFFS2 RUBIN compression support" if JFFS2_COMPRESSION_OPTIONS
+	depends on JFFS2_FS
+	default n
+        help
+          RUBINMIPS and DYNRUBIN compressors. Say 'N' if unsure.
+
+choice
+        prompt "JFFS2 default compression mode" if JFFS2_COMPRESSION_OPTIONS
+        default JFFS2_CMODE_PRIORITY
+        depends on JFFS2_FS
+        help
+          You can set here the default compression mode of JFFS2 from 
+          the avaiable compression modes. Don't touch if unsure.
+
+config JFFS2_CMODE_NONE
+        bool "no compression"
+        help
+          Uses no compression.
+
+config JFFS2_CMODE_PRIORITY
+        bool "priority"
+        help
+          Tries the compressors in a predefinied order and chooses the first 
+          successful one.
+
+config JFFS2_CMODE_SIZE
+        bool "size (EXPERIMENTAL)"
+        help
+          Tries all compressors and chooses the one which has the smallest 
+          result.
+
+endchoice
 
 config CRAMFS
 	tristate "Compressed ROM file system support"

@@ -2,7 +2,7 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
-   $Id: scx200_docflash.c,v 1.5 2003/05/21 12:45:20 dwmw2 Exp $ 
+   $Id: scx200_docflash.c,v 1.6 2004/07/12 21:59:45 dwmw2 Exp $ 
 
    National Semiconductor SCx200 flash mapped with DOCCS
 */
@@ -173,9 +173,9 @@ int __init init_scx200_docflash(void)
 
 	scx200_docflash_map.size = size;
 	if (width == 8)
-		scx200_docflash_map.buswidth = 1;
+		scx200_docflash_map.bankwidth = 1;
 	else
-		scx200_docflash_map.buswidth = 2;
+		scx200_docflash_map.bankwidth = 2;
 
 	simple_map_init(&scx200_docflash_map);
 

@@ -1,5 +1,5 @@
 # drivers/mtd/maps/Kconfig
-# $Id: Kconfig,v 1.12 2003/06/23 07:38:11 dwmw2 Exp $
+# $Id: Kconfig,v 1.29 2004/07/15 15:29:17 dwmw2 Exp $
 
 menu "Mapping drivers for chip access"
 	depends on MTD!=n
@@ -151,11 +151,11 @@ config MTD_AMD76XROM
 
 	  BE VERY CAREFUL.
 
-config MTD_ICH2ROM
-	tristate "BIOS flash chip on Intel Hub Controller 2"
+config MTD_ICHXROM
+	tristate "BIOS flash chip on Intel Controller Hub 2/3/4/5"
 	depends on X86 && MTD_JEDECPROBE && MTD_COMPLEX_MAPPINGS
 	help
-	  Support for treating the BIOS flash chip on ICH2 motherboards
+	  Support for treating the BIOS flash chip on ICHX motherboards
 	  as an MTD device - with this you can reprogram your BIOS.
 
 	  BE VERY CAREFUL.
@@ -177,7 +177,7 @@ config MTD_TSUNAMI
 
 config MTD_LASAT
 	tristate "Flash chips on LASAT board"
-	depends on LASAT && MTD_CFI
+	depends on LASAT
 	help
 	  Support for the flash chips on the Lasat 100 and 200 boards.
 
@@ -210,6 +210,52 @@ config MTD_PB1XXX_USER
 	  You can say 'Y' to both this and 'MTD_PB1XXX_BOOT' above, to use
 	  both banks.
 
+config MTD_PB1550
+	tristate "Flash devices on Alchemy PB1550 board"
+	depends on MIPS && MIPS_PB1550
+	help
+	  Flash memory access on Alchemy Pb1550 board
+
+config MTD_PB1550_BOOT
+	bool "PB1550 boot flash device"
+	depends on MTD_PB1550
+	help
+	  Use the first of the two 64MiB flash banks on Pb1550 board.
+	  You can say 'Y' to both this and 'MTD_PB1550_USER' below, to use
+	  both banks.
+
+config MTD_PB1550_USER
+	bool "PB1550 user flash device"
+	depends on MTD_PB1550
+	default y if MTD_PB1550_BOOT = n
+	help
+	  Use the second of the two 64MiB flash banks on Pb1550 board.
+	  You can say 'Y' to both this and 'MTD_PB1550_BOOT' above, to use
+	  both banks.
+
+config MTD_DB1550
+	tristate "Flash devices on Alchemy DB1550 board"
+	depends on MIPS && MIPS_DB1550
+	help
+	  Flash memory access on Alchemy Db1550 board
+
+config MTD_DB1550_BOOT
+	bool "DB1550 boot flash device"
+	depends on MTD_DB1550
+	help
+	  Use the first of the two 64MiB flash banks on Db1550 board.
+	  You can say 'Y' to both this and 'MTD_DB1550_USER' below, to use
+	  both banks.
+
+config MTD_DB1550_USER
+	bool "DB1550 user flash device"
+	depends on MTD_DB1550
+	default y if MTD_DB1550_BOOT = n
+	help
+	  Use the second of the two 64MiB flash banks on Db1550 board.
+	  You can say 'Y' to both this and 'MTD_DB1550_BOOT' above, to use
+	  both banks.
+
 config MTD_DILNETPC
 	tristate "CFI Flash device mapped on DIL/Net PC"
 	depends on X86 && MTD_CONCAT && MTD_PARTITIONS && MTD_CFI_INTELEXT
@@ -234,6 +280,13 @@ config MTD_L440GX
 	  as an MTD device - with this you can reprogram your BIOS.
 
 	  BE VERY CAREFUL.
+
+config MTD_SBC8240
+	tristate "Flash device on SBC8240"
+	depends on PPC32 && MTD_JEDECPROBE && 6xx && 8260
+	help
+          Flash access on the SBC8240 board from Wind River.  See
+          <http://www.windriver.com/products/sbc8240/>
 
 config MTD_TQM8XXL
 	tristate "CFI Flash device mapped on TQM8XXL"
@@ -265,7 +318,7 @@ config MTD_MBX860
 
 config MTD_DBOX2
 	tristate "CFI Flash device mapped on D-Box2"
-	depends on PPC32 && 8xx && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
+	depends on PPC32 && 8xx && DBOX2 && MTD_CFI_INTELSTD && MTD_CFI_INTELEXT && MTD_CFI_AMDSTD
 	help
 	  This enables access routines for the flash chips on the Nokia/Sagem
 	  D-Box 2 board. If you have one of these boards and would like to use
@@ -457,11 +510,25 @@ config MTD_CEIVA
 	  PhotoMax Digital Picture Frame.
 	  If you have such a device, say 'Y'.
 
+config MTD_NOR_TOTO
+	tristate "NOR Flash device on TOTO board"
+	depends on ARM && ARCH_OMAP && OMAP_TOTO
+	help
+	  This enables access to the NOR flash on the Texas Instruments
+	  TOTO board.
+
 config MTD_H720X
 	tristate "Hynix evaluation board mappings"
 	depends on ARM && MTD_CFI && ( ARCH_H7201 || ARCH_H7202 )
 	help
 	  This enables access to the flash chips on the Hynix evaluation boards.
+	  If you have such a board, say 'Y'.
+
+config MTD_MPC1211
+	tristate "CFI Flash device mapped on Interface MPC-1211"
+	depends on SUPERH && SH_MPC1211 && MTD_CFI
+	help
+	  This enables access to the flash chips on the Interface MPC-1211(CTP/PCI/MPC-SH02).
 	  If you have such a board, say 'Y'.
 
 # This needs CFI or JEDEC, depending on the cards found.
@@ -491,11 +558,26 @@ config MTD_UCLINUX
 
 config MTD_WRSBC8260
 	tristate "Map driver for WindRiver PowerQUICC II MPC82xx board"
-	depends on MTD_PARTITIONS && SBC82xx
+	depends on (SBC82xx || SBC8560)
+	select MTD_PARTITIONS
+	select MTD_MAP_BANK_WIDTH_4
+	select MTD_MAP_BANK_WIDTH_1
+	select MTD_CFI_I1
+	select MTD_CFI_I4
 	help
 	  Map driver for WindRiver PowerQUICC II MPC82xx board. Drives
 	  all three flash regions on CS0, CS1 and CS6 if they are configured
 	  correctly by the boot loader.
+
+config MTD_DMV182
+        tristate "Map driver for Dy-4 SVME/DMV-182 board."
+        depends on DMV182
+        select MTD_PARTITIONS
+	select MTD_MAP_BANK_WIDTH_32
+	select MTD_CFI_I8
+	select MTD_CFI_AMDSTD
+        help
+          Map driver for Dy-4 SVME/DMV-182 board.
 
 endmenu
 

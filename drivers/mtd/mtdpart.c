@@ -5,7 +5,7 @@
  *
  * This code is GPL
  *
- * $Id: mtdpart.c,v 1.41 2003/06/18 14:53:02 dwmw2 Exp $
+ * $Id: mtdpart.c,v 1.46 2004/07/12 13:28:07 dwmw2 Exp $
  *
  * 	02-21-2002	Thomas Gleixner <gleixner@autronix.de>
  *			added support for read_oob, write_oob
@@ -239,12 +239,16 @@ static int part_readv_ecc (struct mtd_info *mtd,  struct kvec *vecs,
 static int part_erase (struct mtd_info *mtd, struct erase_info *instr)
 {
 	struct mtd_part *part = PART(mtd);
+	int ret;
 	if (!(mtd->flags & MTD_WRITEABLE))
 		return -EROFS;
 	if (instr->addr >= mtd->size)
 		return -EINVAL;
 	instr->addr += part->offset;
-	return part->master->erase(part->master, instr);
+	ret = part->master->erase(part->master, instr);
+	if (instr->fail_addr != 0xffffffff)
+		instr->fail_addr -= part->offset;
+	return ret;
 }
 
 static int part_lock (struct mtd_info *mtd, loff_t ofs, size_t len)
@@ -279,6 +283,26 @@ static void part_resume(struct mtd_info *mtd)
 {
 	struct mtd_part *part = PART(mtd);
 	part->master->resume(part->master);
+}
+
+static int part_block_isbad (struct mtd_info *mtd, loff_t ofs)
+{
+	struct mtd_part *part = PART(mtd);
+	if (ofs >= mtd->size)
+		return -EINVAL;
+	ofs += part->offset;
+	return part->master->block_isbad(part->master, ofs);
+}
+
+static int part_block_markbad (struct mtd_info *mtd, loff_t ofs)
+{
+	struct mtd_part *part = PART(mtd);
+	if (!(mtd->flags & MTD_WRITEABLE))
+		return -EROFS;
+	if (ofs >= mtd->size)
+		return -EINVAL;
+	ofs += part->offset;
+	return part->master->block_markbad(part->master, ofs);
 }
 
 /* 
@@ -316,7 +340,7 @@ int del_mtd_partitions(struct mtd_info *master)
  */
 
 int add_mtd_partitions(struct mtd_info *master, 
-		       struct mtd_partition *parts,
+		       const struct mtd_partition *parts,
 		       int nbparts)
 {
 	struct mtd_part *slave;
@@ -391,6 +415,10 @@ int add_mtd_partitions(struct mtd_info *master,
 			slave->mtd.lock = part_lock;
 		if (master->unlock)
 			slave->mtd.unlock = part_unlock;
+		if (master->block_isbad)
+			slave->mtd.block_isbad = part_block_isbad;
+		if (master->block_markbad)
+			slave->mtd.block_markbad = part_block_markbad;
 		slave->mtd.erase = part_erase;
 		slave->master = master;
 		slave->offset = parts[i].offset;
@@ -460,6 +488,9 @@ int add_mtd_partitions(struct mtd_info *master,
 			printk ("mtd: partition \"%s\" doesn't end on an erase block -- force read-only\n",
 				parts[i].name);
 		}
+
+		/* copy oobinfo from master */ 
+		memcpy(&slave->mtd.oobinfo, &master->oobinfo, sizeof(slave->mtd.oobinfo));
 
 		if(parts[i].mtdp)
 		{	/* store the object pointer (caller may or may not register it */
