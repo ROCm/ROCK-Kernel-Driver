@@ -1694,16 +1694,13 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	sbinfo->max_inodes = inodes;
 	sbinfo->free_inodes = inodes;
 	sb->s_maxbytes = SHMEM_MAX_BYTES;
-	sb->s_bdev = bdget(sb->s_dev);
-	if (!sb->s_bdev)
-		goto failed;
-	if (!sb_set_blocksize(sb, PAGE_CACHE_SIZE))
-		BUG();
+	sb->s_blocksize = PAGE_CACHE_SIZE;
+	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = TMPFS_MAGIC;
 	sb->s_op = &shmem_ops;
 	inode = shmem_get_inode(sb, S_IFDIR | mode, 0);
 	if (!inode)
-		goto failed_bdput;
+		goto failed;
 	inode->i_uid = uid;
 	inode->i_gid = gid;
 	root = d_alloc_root(inode);
@@ -1714,9 +1711,6 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 
 failed_iput:
 	iput(inode);
-failed_bdput:
-	bdput(sb->s_bdev);
-	sb->s_bdev = NULL;
 failed:
 	kfree(sbinfo);
 	sb->s_fs_info = NULL;
@@ -1725,8 +1719,6 @@ failed:
 
 static void shmem_put_super(struct super_block *sb)
 {
-	bdput(sb->s_bdev);
-	sb->s_bdev = NULL;
 	kfree(sb->s_fs_info);
 	sb->s_fs_info = NULL;
 }

@@ -43,6 +43,7 @@ struct loop_device {
 
 	struct file *	lo_backing_file;
 	struct block_device *lo_device;
+	unsigned	lo_blocksize;
 	void		*key_data; 
 	char		key_reserved[48]; /* for use by the filter modules */
 

@@ -338,15 +338,10 @@ lo_receive(struct loop_device *lo, struct bio *bio, int bsize, loff_t pos)
 	return ret;
 }
 
-static inline int loop_get_bs(struct loop_device *lo)
-{
-	return block_size(lo->lo_device);
-}
-
 static inline unsigned long loop_get_iv(struct loop_device *lo,
 					unsigned long sector)
 {
-	int bs = loop_get_bs(lo);
+	int bs = lo->lo_blocksize;
 	unsigned long offset, IV;
 
 	IV = sector / (bs >> 9) + lo->lo_offset / bs;
@@ -366,9 +361,9 @@ static int do_bio_filebacked(struct loop_device *lo, struct bio *bio)
 
 	do {
 		if (bio_rw(bio) == WRITE)
-			ret = lo_send(lo, bio, loop_get_bs(lo), pos);
+			ret = lo_send(lo, bio, lo->lo_blocksize, pos);
 		else
-			ret = lo_receive(lo, bio, loop_get_bs(lo), pos);
+			ret = lo_receive(lo, bio, lo->lo_blocksize, pos);
 
 	} while (++bio->bi_idx < bio->bi_vcnt);
 
@@ -650,7 +645,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 {
 	struct file	*file;
 	struct inode	*inode;
-	struct block_device *lo_device;
+	struct block_device *lo_device = NULL;
+	unsigned lo_blocksize;
 	int		lo_flags = 0;
 	int		error;
 
@@ -677,6 +673,9 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 			error = -EBUSY;
 			goto out;
 		}
+		lo_blocksize = block_size(lo_device);
+		if (bdev_read_only(lo_device))
+			lo_flags |= LO_FLAGS_READ_ONLY;
 	} else if (S_ISREG(inode->i_mode)) {
 		struct address_space_operations *aops = inode->i_mapping->a_ops;
 		/*
@@ -689,7 +688,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		if (!aops->prepare_write || !aops->commit_write)
 			lo_flags |= LO_FLAGS_READ_ONLY;
 
-		lo_device = inode->i_sb->s_bdev;
+		lo_blocksize = inode->i_blocksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
 		error = 0;
 	} else
@@ -697,12 +696,12 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	get_file(file);
 
-	if (IS_RDONLY (inode) || bdev_read_only(lo_device)
-	    || !(lo_file->f_mode & FMODE_WRITE))
+	if (!(lo_file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
 	set_device_ro(bdev, (lo_flags & LO_FLAGS_READ_ONLY) != 0);
 
+	lo->lo_blocksize = lo_blocksize;
 	lo->lo_device = lo_device;
 	lo->lo_flags = lo_flags;
 	lo->lo_backing_file = file;
@@ -716,7 +715,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
 	inode->i_mapping->gfp_mask = GFP_NOIO;
 
-	set_blocksize(bdev, block_size(lo_device));
+	set_blocksize(bdev, lo_blocksize);
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 
@@ -899,7 +898,7 @@ static int loop_get_status(struct loop_device *lo, struct loop_info *arg)
 	info.lo_number = lo->lo_number;
 	info.lo_device = stat.dev;
 	info.lo_inode = stat.ino;
-	info.lo_rdevice = lo->lo_device->bd_dev;
+	info.lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
 	info.lo_offset = lo->lo_offset;
 	info.lo_flags = lo->lo_flags;
 	strncpy(info.lo_name, lo->lo_name, LO_NAME_SIZE);
