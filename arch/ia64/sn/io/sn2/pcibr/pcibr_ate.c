@@ -23,6 +23,7 @@ bridge_ate_t	pcibr_flags_to_ate(pcibr_soft_t, unsigned);
 bridge_ate_p	pcibr_ate_addr(pcibr_soft_t, int);
 void		ate_write(pcibr_soft_t, int, int, bridge_ate_t);
 
+int pcibr_invalidate_ate;  /* by default don't invalidate ATE on free */
 
 /*
  * Allocate "count" contiguous Bridge Address Translation Entries
@@ -64,9 +65,11 @@ pcibr_ate_free(pcibr_soft_t pcibr_soft, int index, int count, struct resource *r
     int status = 0;
     unsigned long flags;
 
-    /* For debugging purposes, clear the valid bit in the ATE */
-    ate = *pcibr_ate_addr(pcibr_soft, index);
-    ate_write(pcibr_soft, index, count, ate & ~ATE_V);
+    if (pcibr_invalidate_ate) {
+	/* For debugging purposes, clear the valid bit in the ATE */
+	ate = *pcibr_ate_addr(pcibr_soft, index);
+	ate_write(pcibr_soft, index, count, (ate & ~ATE_V));
+    }
 
     flags = pcibr_lock(pcibr_soft);
     status = release_resource(res);
