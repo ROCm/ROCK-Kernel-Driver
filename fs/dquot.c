@@ -206,9 +206,12 @@ struct dqstats dqstats;
 
 static void dqput(struct dquot *dquot);
 
-static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
+static inline unsigned int
+hashfn(const struct super_block *sb, unsigned int id, int type)
 {
-	unsigned long tmp = (((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type);
+	unsigned long tmp;
+
+	tmp = (((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type);
 	return (tmp + (tmp >> dq_hash_bits)) & dq_hash_mask;
 }
 
