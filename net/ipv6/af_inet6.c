@@ -65,7 +65,7 @@
 #include <asm/system.h>
 
 #if 0 /*def MODULE*/
-static int unloadable = 0; /* XX: Turn to one when all is ok within the
+static int unloadable;     /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
 MODULE_PARM(unloadable, "i");
 #endif

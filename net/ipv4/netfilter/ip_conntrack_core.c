@@ -60,7 +60,7 @@ LIST_HEAD(ip_conntrack_expect_list);
 LIST_HEAD(protocol_list);
 static LIST_HEAD(helpers);
 unsigned int ip_conntrack_htable_size = 0;
-static int ip_conntrack_max = 0;
+static int ip_conntrack_max;
 static atomic_t ip_conntrack_count = ATOMIC_INIT(0);
 struct list_head *ip_conntrack_hash;
 static kmem_cache_t *ip_conntrack_cachep;
@@ -618,7 +618,7 @@ init_conntrack(const struct ip_conntrack_tuple *tuple,
 	size_t hash;
 	struct ip_conntrack_expect *expected;
 	int i;
-	static unsigned int drop_next = 0;
+	static unsigned int drop_next;
 
 	if (!ip_conntrack_hash_rnd_initted) {
 		get_random_bytes(&ip_conntrack_hash_rnd, 4);
@@ -1393,7 +1393,7 @@ void ip_conntrack_cleanup(void)
 	nf_unregister_sockopt(&so_getorigdst);
 }
 
-static int hashsize = 0;
+static int hashsize;
 MODULE_PARM(hashsize, "i");
 
 int __init ip_conntrack_init(void)

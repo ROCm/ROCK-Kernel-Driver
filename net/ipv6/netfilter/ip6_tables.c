@@ -329,7 +329,7 @@ ip6t_do_table(struct sk_buff **pskb,
 	      struct ip6t_table *table,
 	      void *userdata)
 {
-	static const char nulldevname[IFNAMSIZ] = { 0 };
+	static const char nulldevname[IFNAMSIZ];
 	u_int16_t offset = 0;
 	struct ipv6hdr *ipv6;
 	void *protohdr;

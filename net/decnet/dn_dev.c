@@ -1472,7 +1472,7 @@ static struct rtnetlink_link dnet_rtnetlink_table[RTM_MAX-RTM_BASE+1] =
 };
 
 #ifdef MODULE
-static int addr[2] = {0, 0};
+static int addr[2];
 
 MODULE_PARM(addr, "2i");
 MODULE_PARM_DESC(addr, "The DECnet address of this machine: area,node");
