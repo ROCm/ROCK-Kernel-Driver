@@ -2613,14 +2613,14 @@ int journal_mark_freed(struct reiserfs_transaction_handle *th, struct super_bloc
 
 void reiserfs_update_inode_transaction(struct inode *inode) {
   
-  inode->u.reiserfs_i.i_trans_index = SB_JOURNAL_LIST_INDEX(inode->i_sb);
+  REISERFS_I(inode)->i_trans_index = SB_JOURNAL_LIST_INDEX(inode->i_sb);
 
-  inode->u.reiserfs_i.i_trans_id = SB_JOURNAL(inode->i_sb)->j_trans_id ;
+  REISERFS_I(inode)->i_trans_id = SB_JOURNAL(inode->i_sb)->j_trans_id ;
 }
 
 static int reiserfs_inode_in_this_transaction(struct inode *inode) {
-  if (inode->u.reiserfs_i.i_trans_id == SB_JOURNAL(inode->i_sb)->j_trans_id || 
-      inode->u.reiserfs_i.i_trans_id == 0) {
+  if (REISERFS_I(inode)->i_trans_id == SB_JOURNAL(inode->i_sb)->j_trans_id || 
+      REISERFS_I(inode)->i_trans_id == 0) {
     return 1; 
   } 
   return 0 ;
@@ -2631,14 +2631,14 @@ void reiserfs_commit_for_inode(struct inode *inode) {
   struct reiserfs_transaction_handle th ;
   struct super_block *sb = inode->i_sb ;
 
-  jl = SB_JOURNAL_LIST(sb) + inode->u.reiserfs_i.i_trans_index ;
+  jl = SB_JOURNAL_LIST(sb) + REISERFS_I(inode)->i_trans_index ;
 
   /* is it from the current transaction, or from an unknown transaction? */
   if (reiserfs_inode_in_this_transaction(inode)) {
     journal_join(&th, sb, 1) ;
     reiserfs_update_inode_transaction(inode) ;
     journal_end_sync(&th, sb, 1) ;
-  } else if (jl->j_trans_id == inode->u.reiserfs_i.i_trans_id) {
+  } else if (jl->j_trans_id == REISERFS_I(inode)->i_trans_id) {
     flush_commit_list(sb, jl, 1) ;
   }
   /* if the transaction id does not match, this list is long since flushed

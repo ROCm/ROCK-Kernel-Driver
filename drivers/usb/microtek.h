@@ -46,7 +46,7 @@ struct mts_desc {
 
 	struct semaphore lock;
 
-	struct urb urb;
+	struct urb *urb;
 	struct mts_transfer_context context;
 };
 

@@ -937,7 +937,7 @@ int __init tgafb_init(void)
 
     /* setup framebuffer */
 
-    fb_info.gen.info.node = -1;
+    fb_info.gen.info.node = NODEV;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &tgafb_ops;
     fb_info.gen.info.disp = &disp;

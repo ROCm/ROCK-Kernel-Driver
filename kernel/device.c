@@ -51,46 +51,37 @@ int (*platform_notify_remove)(struct device * dev) = NULL;
 
 static spinlock_t device_lock;
 
-static ssize_t device_read_status(char *, size_t, loff_t, void *);
-static ssize_t device_write_status(const char *, size_t, loff_t, void *);
+static ssize_t device_read_status(struct device *, char *, size_t, loff_t);
+static ssize_t device_write_status(struct device *,const char *, size_t, loff_t);
 
-static struct driverfs_operations device_status_ops = {
-	read:	device_read_status,
-	write:	device_write_status,
+static struct driver_file_entry device_status_entry = {
+	name:		"status",
+	mode:		S_IWUSR | S_IRUGO,
+	show:		device_read_status,
+	store:		device_write_status,
 };
 
-static ssize_t device_read_power(char *, size_t, loff_t, void *);
-static ssize_t device_write_power(const char *, size_t, loff_t, void *);
+static ssize_t device_read_power(struct device *, char *, size_t, loff_t);
+static ssize_t device_write_power(struct device *, const char *, size_t, loff_t);
 
-static struct driverfs_operations device_power_ops = {
-	read:	device_read_power,
-	write:	device_write_power,
+static struct driver_file_entry device_power_entry = {
+	name:		"power",
+	mode:		S_IWUSR | S_IRUGO,
+	show:		device_read_power,
+	store:		device_write_power,
 };
-
-static ssize_t iobus_read_status(char *, size_t, loff_t, void *);
-static ssize_t iobus_write_status(const char *, size_t, loff_t, void *);
-
-static struct driverfs_operations iobus_status_ops = {
-	read:	iobus_read_status,
-	write:	iobus_write_status,
-};
-
 
 /**
  * device_create_file - create a driverfs file for a device
  * @dev:	device requesting file
- * @name:	name of file
- * @mode:	permissions of file
- * @ops:	operations for the file
- * @data:	private data for the file
+ * @entry:	entry describing file
  *
- * Create a driverfs entry, then create the actual file the entry describes.
+ * Allocate space for file entry, copy descriptor, and create.
  */
-int device_create_file(struct device * dev, const char * name, mode_t mode,
-		       struct driverfs_operations * ops, void * data)
+int device_create_file(struct device * dev, struct driver_file_entry * entry)
 {
-	int error = -EFAULT;
-	struct driver_file_entry * entry;
+	struct driver_file_entry * new_entry;
+	int error = -ENOMEM;
 
 	if (!dev)
 		return -EINVAL;
@@ -98,10 +89,15 @@ int device_create_file(struct device * dev, const char * name, mode_t mode,
 	if (!valid_device(dev))
 		return -EFAULT;
 
-	entry = driverfs_create_entry(name,mode,ops,data);
-	if (entry)
-		error = driverfs_create_file(entry,dev->dir);
+	new_entry = kmalloc(sizeof(*new_entry),GFP_KERNEL);
+	if (!new_entry)
+		goto done;
 
+	memcpy(new_entry,entry,sizeof(*entry));
+	error = driverfs_create_file(new_entry,&dev->dir);
+	if (error)
+		kfree(new_entry);
+ done:
 	put_device(dev);
 	return error;
 }
@@ -120,7 +116,7 @@ void device_remove_file(struct device * dev, const char * name)
 	if (!valid_device(dev))
 		return;
 
-	driverfs_remove_file(dev->dir,name);
+	driverfs_remove_file(&dev->dir,name);
 
 	put_device(dev);
 }
@@ -131,18 +127,8 @@ void device_remove_file(struct device * dev, const char * name)
  */
 void device_remove_dir(struct device * dev)
 {
-	struct driver_dir_entry * dir;
-
-	if (!dev)
-		return;
-
-	lock_device(dev);
-	dir = dev->dir;
-	dev->dir = NULL;
-	unlock_device(dev);
-
-	if (dir)
-		driverfs_remove_dir(dir);
+	if (dev)
+		driverfs_remove_dir(&dev->dir);
 }
 
 /**
@@ -159,128 +145,52 @@ void device_remove_dir(struct device * dev)
  */
 static int device_make_dir(struct device * dev)
 {
-	struct driver_dir_entry * entry;
+	struct driver_dir_entry * parent = NULL;
 	int error;
 
-	entry = driverfs_create_dir_entry(dev->bus_id,(S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO));
-	if (!entry)
-		return -EFAULT;
+	INIT_LIST_HEAD(&dev->dir.files);
+	dev->dir.mode = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
+	dev->dir.name = dev->bus_id;
 
-	error = driverfs_create_dir(entry,dev->parent->dir);
+	if (dev->parent)
+		parent = &dev->parent->dir;
 
-	if (error) {
-		kfree(entry);
+	error = driverfs_create_dir(&dev->dir,parent);
+
+	if (error)
 		return error;
-	}
 
-	lock_device(dev);
-	dev->dir = entry;
-	unlock_device(dev);
-
-	/* first the status file */
-	error = device_create_file(dev, "status", S_IRUGO | S_IWUSR,
-				   &device_status_ops, (void *) dev);
+	error = device_create_file(dev,&device_status_entry);
 	if (error) {
 		device_remove_dir(dev);
 		goto done;
 	}
-
-	/* now the power file */
-	error = device_create_file(dev,"power",S_IRUGO | S_IWUSR,
-				   &device_power_ops, (void *) dev);
-	if (error)
+	error = device_create_file(dev,&device_power_entry);
+	if (error) 
 		device_remove_dir(dev);
-
  done:
 	return error;
 }
 
-/* iobus interface.
- * For practical purposes, it's exactly the same as the device interface above.
- * Even below, the two are almost identical, only taking different pointer
- * types.
- * I have fantasized about removing struct iobus completely. It would reduce
- * this file by about 30%, and make life much easier. However, it will take some
- * time to really work everything out..
- */
-
-int iobus_create_file(struct iobus * iobus, const char * name, mode_t mode,
-		      struct driverfs_operations * ops, void * data)
-{
-	int error = -EFAULT;
-	struct driver_file_entry * entry;
-
-	if (!iobus)
-		return -EINVAL;
-
-	if (!valid_iobus(iobus))
-		return -EFAULT;
-
-	entry = driverfs_create_entry(name,mode,ops,data);
-	if (entry)
-		error = driverfs_create_file(entry,iobus->dir);
-
-	put_iobus(iobus);
-	return error;
-}
-
-void iobus_remove_file(struct iobus * iobus, const char * name)
-{
-	if (!iobus)
-		return;
-
-	if (!valid_iobus(iobus))
-		return;
-
-	driverfs_remove_file(iobus->dir,name);
-
-	put_iobus(iobus);
-}
-
 void iobus_remove_dir(struct iobus * iobus)
 {
-	struct driver_dir_entry * dir;
-
-	if (!iobus)
-		return;
-
-	lock_iobus(iobus);
-	dir = iobus->dir;
-	iobus->dir = NULL;
-	unlock_iobus(iobus);
-
-	if (dir)
-		driverfs_remove_dir(dir);
+	if (iobus)
+		driverfs_remove_dir(&iobus->dir);
 }
 
 static int iobus_make_dir(struct iobus * iobus)
 {
-	struct driver_dir_entry * entry;
 	struct driver_dir_entry * parent = NULL;
 	int error;
 
-	entry = driverfs_create_dir_entry(iobus->bus_id,(S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO));
-	if (!entry)
-		return -EFAULT;
+	INIT_LIST_HEAD(&iobus->dir.files);
+	iobus->dir.mode = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
+	iobus->dir.name = iobus->bus_id;
 
 	if (iobus->parent)
-		parent = iobus->parent->dir;
+		parent = &iobus->parent->dir;
 
-	error = driverfs_create_dir(entry,parent);
-	if (error) {
-		kfree(entry);
-		return error;
-	}
-
-	lock_iobus(iobus);
-	iobus->dir = entry;
-	unlock_iobus(iobus);
-
-	error = iobus_create_file(iobus, "status", S_IRUGO | S_IWUSR,
-				  &iobus_status_ops, (void *)iobus);
-	if (error)
-		iobus_remove_dir(iobus);
-
+	error = driverfs_create_dir(&iobus->dir,parent);
 	return error;
 }
 
@@ -303,6 +213,9 @@ int device_register(struct device *dev)
 	if (!dev->parent)
 		dev->parent = &device_root;
 	parent = dev->parent;
+
+	DBG("DEV: registering device: ID = '%s', name = %s, parent = %s\n",
+	    dev->bus_id, dev->name, parent->bus_id);
 
 	if (valid_iobus(parent)) {
 		if (!valid_device(dev)) {
@@ -327,14 +240,9 @@ int device_register(struct device *dev)
 	list_add_tail(&dev->node, &parent->devices);
 	unlock_iobus(parent);
 
-	DBG("DEV: registering device: ID = '%s', name = %s, parent = %s\n",
-	    dev->bus_id, dev->name, parent->bus_id);
-
 	/* notify platform of device entry */
 	if (platform_notify)
 		platform_notify(dev);
-
-	return 0;
 
  register_done:
 	put_device(dev);
@@ -429,8 +337,6 @@ int iobus_register(struct iobus *bus)
 	lock_iobus(parent);
 	list_add_tail(&bus->node,&parent->children);
 	unlock_iobus(parent);
-
-	return 0;
 
  register_done_put:
 	put_iobus(bus);
@@ -533,45 +439,6 @@ struct iobus *iobus_alloc(void)
 	return bus;
 }
 
-static int do_device_suspend(struct device * dev, u32 state)
-{
-	int error = 0;
-
-	if (!dev->driver->suspend)
-		return error;
-
-	error = dev->driver->suspend(dev,state,SUSPEND_NOTIFY);
-
-	if (error)
-		return error;
-
-	error = dev->driver->suspend(dev,state,SUSPEND_SAVE_STATE);
-	if (error) {
-		if (dev->driver->resume)
-			dev->driver->resume(dev,RESUME_RESTORE_STATE);
-		return error;
-	}
-	error = dev->driver->suspend(dev,state,SUSPEND_POWER_DOWN);
-	if (error) {
-		if (dev->driver->resume)
-			dev->driver->resume(dev,RESUME_RESTORE_STATE);
-	}
-	return error;
-}
-
-static int do_device_resume(struct device * dev)
-{
-	int error = 0;
-
-	if (!dev->driver->resume)
-		return 0;
-	error = dev->driver->resume(dev,RESUME_POWER_ON);
-	if (error)
-		return error;
-	error = dev->driver->resume(dev,RESUME_RESTORE_STATE);
-	return error;
-}
-
 /**
  * device_read_status - report some device information
  * @page:	page-sized buffer to write into
@@ -582,37 +449,17 @@ static int do_device_resume(struct device * dev)
  * Report some human-readable information about the device.
  * This includes the name, the bus id, and the current power state.
  */
-static ssize_t device_read_status(char * page, size_t count,
-				  loff_t off, void * data)
+static ssize_t device_read_status(struct device * dev, char * page, size_t count, loff_t off)
 {
 	char *str = page;
-	struct device *dev = (struct device*)data;
-	ssize_t len = 0;
-
-	if (!dev)
-		return -EINVAL;
-
-	if (!valid_device(dev))
-		return -EFAULT;
 
 	if (off)
-		goto done;
+		return 0;
 
 	str += sprintf(str,"Name:       %s\n",dev->name);
 	str += sprintf(str,"Bus ID:     %s\n",dev->bus_id);
 
-	len = str - page;
-
-	if (len > count)
-		len = count;
-
-	if (len < 0)
-		len = 0;
-
- done:
-	put_device(dev);
-
-	return len;
+	return (str - page);
 }
 
 /**
@@ -631,31 +478,24 @@ static ssize_t device_read_status(char * page, size_t count,
  * (See Documentation/driver-model.txt for the theory of an n-stage
  * suspend sequence).
  */
-static ssize_t device_write_status(const char* buf, size_t count, loff_t off, void *data)
+static ssize_t device_write_status(struct device * dev, const char* buf, size_t count, loff_t off)
 {
 	char command[20];
-	struct device *dev = (struct device *)data;
 	int num;
 	int arg = 0;
 	int error = 0;
 
-	if (!dev)
-		return 0;
-
-	if (!valid_device(dev))
-		return -EFAULT;
-
 	if (off)
-		goto done_put;
+		return 0;
 
 	/* everything involves dealing with the driver. */
 	if (!dev->driver)
-		goto done_put;
+		return 0;
 
 	num = sscanf(buf,"%10s %d",command,&arg);
 
 	if (!num)
-		goto done_put;
+		return 0;
 
 	if (!strcmp(command,"probe")) {
 		if (dev->driver->probe)
@@ -666,50 +506,25 @@ static ssize_t device_write_status(const char* buf, size_t count, loff_t off, vo
 			error = dev->driver->remove(dev,REMOVE_NOTIFY);
 	} else
 		error = -EFAULT;
-
- done_put:
-	put_device(dev);
 	return error < 0 ? error : count;
 }
 
 static ssize_t
-device_read_power(char * page, size_t count, loff_t off, void * data)
+device_read_power(struct device * dev, char * page, size_t count, loff_t off)
 {
 	char	* str = page;
-	struct	device * dev = (struct device *)data;
-	ssize_t len = 0;
 
-	if (!dev)
-		return 0;
-
-	if (!valid_device(dev))
+	if (off)
 		return 0;
 
 	str += sprintf(str,"State:      %d\n",dev->current_state);
 
-	len = str - page;
-
-	if (off) {
-		if (len < off) {
-			len = 0;
-			goto done;
-		}
-		str += off;
-		len -= off;
-	}
-
-	if (len > count)
-		len = count;
-
- done:
-	put_device(dev);
-	return len;
+	return (str - page);
 }
 
 static ssize_t
-device_write_power(const char * buf, size_t count, loff_t off, void * data)
+device_write_power(struct device * dev, const char * buf, size_t count, loff_t off)
 {
-	struct	device * dev = (struct device *)data;
 	char	str_command[20];
 	char	str_stage[20];
 	int	num_args;
@@ -717,14 +532,9 @@ device_write_power(const char * buf, size_t count, loff_t off, void * data)
 	u32	int_stage;
 	int	error = 0;
 
-	if (!dev)
+	if (off)
 		return 0;
 
-	if (!valid_device(dev))
-		return -EFAULT;
-
-	if (off)
-		goto done;
 	if (!dev->driver)
 		goto done;
 
@@ -772,107 +582,6 @@ device_write_power(const char * buf, size_t count, loff_t off, void * data)
 			error = 0;
 	}
  done:
-	put_device(dev);
-
-	DBG("%s: returning %d\n",__FUNCTION__,error);
-
-	return error < 0 ? error : count;
-}
-
-/**
- * bus_read_status - report human readable information
- * @page:	page-sized buffer to write into
- * @count:	number of bytes requested
- * @off:	offset into buffer to start at
- * @data:	bus-specific data
- */
-static ssize_t iobus_read_status(char *page, size_t count,
-				 loff_t off, void *data)
-{
-	char *str = page;
-	struct iobus *bus = (struct iobus*)data;
-	ssize_t len = 0;
-
-	if (!bus)
-		return -EINVAL;
-
-	if (!valid_iobus(bus))
-		return -EFAULT;
-
-	if (off)
-		goto done;
-
-	str += sprintf(str,"Name:       %s\n",bus->name);
-	str += sprintf(str,"Bus ID:     %s\n",bus->bus_id);
-
-	if (bus->driver)
-		str += sprintf(str,"Type:       %s\n",bus->driver->name);
-
-	len = str - page;
-	if (len < off)
-		len = 0;
-	if (len > count)
-		len = count;
-	if (len < 0)
-		len = 0;
-
- done:
-	put_iobus(bus);
-	return len;
-}
-
-/**
- * bus_write_status - forward a command to a bus
- * @buf:	string encoded command
- * @count:	number of bytes requested
- * @off:	offset into buffer to start at
- * @data:	bus-specific data
- *
- * Like device_write_status, this sends a command to a bus driver.
- * Supported actions are:
- * scan - scan a bus for devices
- * add_device <id> - add a child device
- */
-static ssize_t iobus_write_status(const char *buf, size_t count, loff_t off, void *data)
-{
-	char command[10];
-	char which[15];
-	char id[10];
-	struct iobus *bus = (struct iobus*)data;
-	int num;
-	int error = -EINVAL;
-
-	if (!bus)
-		return -EINVAL;
-
-	if (!valid_iobus(bus))
-		return -EFAULT;
-
-	if (!bus->driver)
-		goto done;
-
-	num = sscanf(buf,"%10s %15s %10s",command,which,id);
-
-	if (!num)
-		goto done;
-
-	if (!strnicmp(command,"scan",4)) {
-		if (bus->driver->scan)
-			error = bus->driver->scan(bus);
-	} else if (!strnicmp(command,"add",3) && num == 2) {
-		error = bus->driver->add_device(bus,id);
-	} else if (!strnicmp(command, "suspend",7)) {
-		u32 state = simple_strtoul(which,NULL,0);
-		if (state > 0)
-			error = do_device_suspend(bus->self,state);
-
-	} else if (!strnicmp(command,"resume",6)) {
-		error = do_device_resume(bus->self);
-
-	}
-
- done:
-	put_iobus(bus);
 	return error < 0 ? error : count;
 }
 
@@ -885,9 +594,7 @@ static int __init device_init_root(void)
 	 * needs to do is create the root directory. Easier
 	 * to just do it here than special case it elsewhere..
 	 */
-	iobus_make_dir(&device_root);
-
-	return (device_root.dir ? 0 : -EFAULT);
+	return iobus_make_dir(&device_root);
 }
 
 int __init device_driver_init(void)
@@ -937,8 +644,5 @@ EXPORT_SYMBOL(device_remove_file);
 EXPORT_SYMBOL(iobus_register);
 EXPORT_SYMBOL(iobus_alloc);
 EXPORT_SYMBOL(iobus_init);
-
-EXPORT_SYMBOL(iobus_create_file);
-EXPORT_SYMBOL(iobus_remove_file);
 
 EXPORT_SYMBOL(device_driver_init);

@@ -145,9 +145,6 @@ do_gettimeofday (struct timeval *tv)
 	tv->tv_usec = usec;
 }
 
-/* XXX there should be a cleaner way for declaring an alias... */
-asm (".global get_fast_time; get_fast_time = do_gettimeofday");
-
 static void
 timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {

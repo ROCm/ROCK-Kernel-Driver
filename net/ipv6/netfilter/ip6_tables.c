@@ -2,6 +2,11 @@
  * Packet matching code.
  *
  * Copyright (C) 1999 Paul `Rusty' Russell & Michael J. Neuling
+ * Copyright (C) 2000-2002 Netfilter core team <coreteam@netfilter.org>
+ *
+ * 19 Jan 2002 Harald Welte <laforge@gnumonks.org>
+ * 	- increase module usage count as soon as we have rules inside
+ * 	  a table
  */
 #include <linux/config.h>
 #include <linux/skbuff.h>
@@ -86,6 +91,8 @@ struct ip6t_table_info
 	unsigned int size;
 	/* Number of entries: FIXME. --RR */
 	unsigned int number;
+	/* Initial number of entries. Needed for module usage count */
+	unsigned int initial_entries;
 
 	/* Entry points and underflows */
 	unsigned int hook_entry[NF_IP6_NUMHOOKS];
@@ -949,6 +956,7 @@ replace_table(struct ip6t_table *table,
 	}
 	oldinfo = table->private;
 	table->private = newinfo;
+	newinfo->initial_entries = oldinfo->initial_entries;
 	write_unlock_bh(&table->lock);
 
 	return oldinfo;
@@ -1147,6 +1155,16 @@ do_replace(void *user, unsigned int len)
 	oldinfo = replace_table(t, tmp.num_counters, newinfo, &ret);
 	if (!oldinfo)
 		goto free_newinfo_counters_untrans_unlock;
+
+	/* Update module usage count based on number of rules */
+	duprintf("do_replace: oldnum=%u, initnum=%u, newnum=%u\n",
+		oldinfo->number, oldinfo->initial_entries, newinfo->number);
+	if (t->me && (oldinfo->number <= oldinfo->initial_entries) &&
+ 	    (newinfo->number > oldinfo->initial_entries))
+		__MOD_INC_USE_COUNT(t->me);
+	else if (t->me && (oldinfo->number > oldinfo->initial_entries) &&
+	 	 (newinfo->number <= oldinfo->initial_entries))
+		__MOD_DEC_USE_COUNT(t->me);
 
 	/* Get the old counters. */
 	get_counters(oldinfo, counters);
@@ -1406,7 +1424,7 @@ int ip6t_register_table(struct ip6t_table *table)
 	int ret;
 	struct ip6t_table_info *newinfo;
 	static struct ip6t_table_info bootstrap
-		= { 0, 0, { 0 }, { 0 }, { }, { } };
+		= { 0, 0, 0, { 0 }, { 0 }, { }, { } };
 
 	MOD_INC_USE_COUNT;
 	newinfo = vmalloc(sizeof(struct ip6t_table_info)
@@ -1783,7 +1801,7 @@ static int __init init(void)
 	}
 #endif
 
-	printk("ip6_tables: (c)2000 Netfilter core team\n");
+	printk("ip6_tables: (C) 2000-2002 Netfilter core team\n");
 	return 0;
 }
 

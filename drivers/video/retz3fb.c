@@ -1422,7 +1422,7 @@ int __init retz3fb_init(void)
 
 		strcpy(fb_info->modename, retz3fb_name);
 		fb_info->changevar = NULL;
-		fb_info->node = -1;
+		fb_info->node = NODEV;
 		fb_info->fbops = &retz3fb_ops;
 		fb_info->disp = &zinfo->disp;
 		fb_info->switch_con = &z3fb_switch;

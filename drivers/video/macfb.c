@@ -1221,7 +1221,7 @@ void __init macfb_init(void)
 		}
 	
 	fb_info.changevar  = NULL;
-	fb_info.node       = -1;
+	fb_info.node       = NODEV;
 	fb_info.fbops      = &macfb_ops;
 	fb_info.disp       = &disp;
 	fb_info.switch_con = &macfb_switch;

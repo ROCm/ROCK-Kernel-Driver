@@ -26,17 +26,14 @@
 #ifndef _DRIVER_FS_H_
 #define _DRIVER_FS_H_
 
-struct driverfs_operations {
-	ssize_t	(*read) (char *, size_t, loff_t, void *);
-	ssize_t (*write)(const char *, size_t, loff_t, void*);
-};
-
 struct driver_dir_entry {
 	char			* name;
 	struct dentry		* dentry;
 	mode_t			mode;
 	struct list_head	files;
 };
+
+struct device;
 
 struct driver_file_entry {
 	struct driver_dir_entry * parent;
@@ -45,21 +42,16 @@ struct driver_file_entry {
 	mode_t			mode;
 	struct dentry		* dentry;
 	void			* data;
-	struct driverfs_operations	* ops;
-};
 
-extern struct driver_dir_entry *
-driverfs_create_dir_entry(const char * name, mode_t mode);
+	ssize_t (*show)(struct device * dev, char * buf, size_t count, loff_t off);
+	ssize_t (*store)(struct device * dev, const char * buf, size_t count, loff_t off);
+};
 
 extern int
 driverfs_create_dir(struct driver_dir_entry *, struct driver_dir_entry *);
 
 extern void
 driverfs_remove_dir(struct driver_dir_entry * entry);
-
-extern struct driver_file_entry *
-driverfs_create_entry (const char * name, mode_t mode,
-		       struct driverfs_operations * ops, void * data);
 
 extern int
 driverfs_create_file(struct driver_file_entry * entry,

@@ -1,4 +1,4 @@
-/* $Id: pcic.c,v 1.22 2001/02/13 01:16:43 davem Exp $
+/* $Id: pcic.c,v 1.23 2002/01/23 14:33:55 davem Exp $
  * pcic.c: Sparc/PCI controller support
  *
  * Copyright (C) 1998 V. Roganov and G. Raiko
@@ -759,7 +759,6 @@ void __init pci_time_init(void)
 	unsigned long v;
 	int timer_irq, irq;
 
-	do_get_fast_time = pci_do_gettimeofday;
 	/* A hack until do_gettimeofday prototype is moved to arch specific headers
 	   and btfixupped. Patch do_gettimeofday with ba pci_do_gettimeofday; nop */
 	((unsigned int *)do_gettimeofday)[0] = 

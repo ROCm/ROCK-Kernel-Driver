@@ -9,6 +9,7 @@ struct minix_inode_info {
 		__u16 i1_data[16];
 		__u32 i2_data[16];
 	} u;
+	struct inode vfs_inode;
 };
 
 #endif

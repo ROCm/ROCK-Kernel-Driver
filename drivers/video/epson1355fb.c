@@ -500,7 +500,7 @@ int __init e1355fb_init(void)
 	fb_info.gen.fbhw->detect();
 	strcpy(fb_info.gen.info.modename, "SED1355");
 	fb_info.gen.info.changevar = NULL;
-	fb_info.gen.info.node = -1;
+	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.fbops = &e1355fb_ops;
 	fb_info.gen.info.disp = &disp;
 	fb_info.gen.parsize = sizeof(struct e1355_par);

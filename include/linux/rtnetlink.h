@@ -586,9 +586,9 @@ extern void rtnl_unlock(void);
 extern void rtnetlink_init(void);
 
 #define ASSERT_RTNL() do { if (down_trylock(&rtnl_sem) == 0)  { up(&rtnl_sem); \
-printk("RTNL: assertion failed at " __FILE__ "(%d):" __FUNCTION__ "\n", __LINE__); } \
+printk("RTNL: assertion failed at " __FILE__ "(%d)\n", __LINE__); } \
 		   } while(0);
-#define BUG_TRAP(x) if (!(x)) { printk("KERNEL: assertion (" #x ") failed at " __FILE__ "(%d):" __FUNCTION__ "\n", __LINE__); }
+#define BUG_TRAP(x) if (!(x)) { printk("KERNEL: assertion (" #x ") failed at " __FILE__ "(%d)\n", __LINE__); }
 
 
 #endif /* __KERNEL__ */

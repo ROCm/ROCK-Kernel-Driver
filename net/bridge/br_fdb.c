@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_fdb.c,v 1.5 2000/11/08 05:16:40 davem Exp $
+ *	$Id: br_fdb.c,v 1.6 2002/01/17 00:57:07 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -292,7 +292,8 @@ void br_fdb_insert(struct net_bridge *br,
 	write_lock_bh(&br->hash_lock);
 	fdb = br->hash[hash];
 	while (fdb != NULL) {
-		if (!memcmp(fdb->addr.addr, addr, ETH_ALEN)) {
+		if (!fdb->is_local &&
+		    !memcmp(fdb->addr.addr, addr, ETH_ALEN)) {
 			__fdb_possibly_replace(fdb, source, is_local);
 			write_unlock_bh(&br->hash_lock);
 			return;

@@ -36,8 +36,54 @@ static void ncp_delete_inode(struct inode *);
 static void ncp_put_super(struct super_block *);
 static int  ncp_statfs(struct super_block *, struct statfs *);
 
+static kmem_cache_t * ncp_inode_cachep;
+
+static struct inode *ncp_alloc_inode(struct super_block *sb)
+{
+	struct ncp_inode_info *ei;
+	ei = (struct ncp_inode_info *)kmem_cache_alloc(ncp_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void ncp_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(ncp_inode_cachep, NCP_FINFO(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct ncp_inode_info *ei = (struct ncp_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		init_MUTEX(&ei->open_sem);
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	ncp_inode_cachep = kmem_cache_create("ncp_inode_cache",
+					     sizeof(struct ncp_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (ncp_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(ncp_inode_cachep))
+		printk(KERN_INFO "ncp_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations ncp_sops =
 {
+	alloc_inode:	ncp_alloc_inode,
+	destroy_inode:	ncp_destroy_inode,
 	put_inode:	force_delete,
 	delete_inode:	ncp_delete_inode,
 	put_super:	ncp_put_super,
@@ -60,6 +106,8 @@ void ncp_update_inode(struct inode *inode, struct ncp_entry_info *nwinfo)
 	NCP_FINFO(inode)->volNumber = nwinfo->i.volNumber;
 
 #ifdef CONFIG_NCPFS_STRONG
+	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
+#else
 	NCP_FINFO(inode)->nwattr = nwinfo->i.attributes;
 #endif
 	NCP_FINFO(inode)->access = nwinfo->access;
@@ -216,7 +264,6 @@ ncp_iget(struct super_block *sb, struct ncp_entry_info *info)
 
 	inode = new_inode(sb);
 	if (inode) {
-		init_MUTEX(&NCP_FINFO(inode)->open_sem);
 		atomic_set(&NCP_FINFO(inode)->opened, info->opened);
 
 		inode->i_ino = info->ino;
@@ -707,19 +754,31 @@ static DECLARE_FSTYPE(ncp_fs_type, "ncpfs", ncp_read_super, 0);
 
 static int __init init_ncp_fs(void)
 {
+	int err;
 	DPRINTK("ncpfs: init_module called\n");
 
 #ifdef DEBUG_NCP_MALLOC
 	ncp_malloced = 0;
 	ncp_current_malloced = 0;
 #endif
-	return register_filesystem(&ncp_fs_type);
+	err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&ncp_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_ncp_fs(void)
 {
 	DPRINTK("ncpfs: cleanup_module called\n");
 	unregister_filesystem(&ncp_fs_type);
+	destroy_inodecache();
 #ifdef DEBUG_NCP_MALLOC
 	PRINTK("ncp_malloced: %d\n", ncp_malloced);
 	PRINTK("ncp_current_malloced: %d\n", ncp_current_malloced);

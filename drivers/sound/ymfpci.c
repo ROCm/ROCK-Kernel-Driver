@@ -832,7 +832,14 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 	u32 lpfK = ymfpci_calc_lpfK(rate);
 	ymfpci_playback_bank_t *bank;
 	int nbank;
-	unsigned le_0x40000000 = cpu_to_le32(0x40000000);
+
+	/*
+	 * The gain is a floating point number. According to the manual,
+	 * bit 31 indicates a sign bit, bit 30 indicates an integer part,
+	 * and bits [29:15] indicate a decimal fraction part. Thus,
+	 * for a gain of 1.0 the constant of 0x40000000 is loaded.
+	 */
+	unsigned default_gain = cpu_to_le32(0x40000000);
 
 	format = (stereo ? 0x00010000 : 0) | (w_16 ? 0 : 0x80000000);
 	if (stereo)
@@ -847,7 +854,7 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 		bank->loop_start = 0;
 		bank->loop_end = cpu_to_le32(end);
 		bank->loop_frac = 0;
-		bank->eg_gain_end = le_0x40000000;
+		bank->eg_gain_end = default_gain;
 		bank->lpfQ = cpu_to_le32(lpfQ);
 		bank->status = 0;
 		bank->num_of_frames = 0;
@@ -858,7 +865,7 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 		bank->delta_end = cpu_to_le32(delta);
 		bank->lpfK =
 		bank->lpfK_end = cpu_to_le32(lpfK);
-		bank->eg_gain = le_0x40000000;
+		bank->eg_gain = default_gain;
 		bank->lpfD1 =
 		bank->lpfD2 = 0;
 
@@ -878,31 +885,31 @@ static void ymf_pcm_init_voice(ymfpci_voice_t *voice, int stereo,
 				bank->left_gain = 
 				bank->right_gain =
 				bank->left_gain_end =
-				bank->right_gain_end = le_0x40000000;
+				bank->right_gain_end = default_gain;
 			} else {
 				bank->eff2_gain =
 				bank->eff2_gain_end =
 				bank->eff3_gain =
-				bank->eff3_gain_end = le_0x40000000;
+				bank->eff3_gain_end = default_gain;
 			}
 		} else {
 			if (!spdif) {
 				if ((voice->number & 1) == 0) {
 					bank->left_gain =
-					bank->left_gain_end = le_0x40000000;
+					bank->left_gain_end = default_gain;
 				} else {
 					bank->format |= cpu_to_le32(1);
 					bank->right_gain =
-					bank->right_gain_end = le_0x40000000;
+					bank->right_gain_end = default_gain;
 				}
 			} else {
 				if ((voice->number & 1) == 0) {
 					bank->eff2_gain =
-					bank->eff2_gain_end = le_0x40000000;
+					bank->eff2_gain_end = default_gain;
 				} else {
 					bank->format |= cpu_to_le32(1);
 					bank->eff3_gain =
-					bank->eff3_gain_end = le_0x40000000;
+					bank->eff3_gain_end = default_gain;
 				}
 			}
 		}

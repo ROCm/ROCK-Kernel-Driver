@@ -2433,6 +2433,14 @@ CONFIG_IP_NF_MATCH_LENGTH
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+AH/ESP match support
+CONFIG_IP_NF_MATCH_AH_ESP
+  These two match extensions (`ah' and `esp') allow you to match a
+  range of SPIs inside AH or ESP headers of IPSec packets.
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 TOS match support
 CONFIG_IP_NF_MATCH_TOS
   TOS matching allows you to match packets based on the Type Of
@@ -2600,6 +2608,19 @@ CONFIG_IP_NF_MATCH_TCPMSS
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
 
+ULOG target support
+CONFIG_IP_NF_TARGET_ULOG
+  This option adds a `ULOG' target, which allows you to create rules in
+  any iptables table. The packet is passed to a userspace logging
+  daemon using netlink multicast sockets; unlike the LOG target
+  which can only be viewed through syslog.
+
+  The apropriate userspace logging daemon (ulogd) may be obtained from
+  http://www.gnumonks.org/projects/ulogd
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt.  If unsure, say `N'.
+
 LOG target support
 CONFIG_IP_NF_TARGET_LOG
   This option adds a `LOG' target, which allows you to create rules in
@@ -2655,6 +2676,23 @@ CONFIG_IP6_NF_MATCH_MULTIPORT
 
   If you want to compile it as a module, say M here and read
   <file:Documentation/modules.txt>.  If unsure, say `N'.
+
+IPV6 queue handler (EXPERIMENTAL)
+CONFIG_IP6_NF_QUEUE
+
+  This option adds a queue handler to the kernel for IPv6
+  packets which lets us to receive the filtered packets
+  with QUEUE target using libiptc as we can do with
+  the IPv4 now.
+
+  (C) Fernando Anton 2001
+  IPv64 Project - Work based in IPv64 draft by Arturo Azcorra.
+  Universidad Carlos III de Madrid
+  Universidad Politecnica de Alcala de Henares
+  email: fanton@it.uc3m.es
+
+  If you want to compile it as a module, say M here and read
+  Documentation/modules.txt. If unsure, say `N'.
 
 Owner match support
 CONFIG_IP6_NF_MATCH_OWNER
@@ -4127,6 +4165,16 @@ Link-Up Systems LCD support
 CONFIG_FB_L7200
   This driver supports the L7200 Color LCD.
   Say Y if you want graphics support.
+
+NeoMagic display support (EXPERIMENTAL)
+CONFIG_FB_NEOMAGIC
+  This driver supports notebooks with NeoMagic PCI chips.
+  Say Y if you have such a graphics card. 
+
+  The driver is also available as a module ( = code which can be
+  inserted and removed from the running kernel whenever you want). The
+  module will be called neofb.o. If you want to compile it as a
+  module, say M here and read Documentation/modules.txt.
 
 PowerMac "control" frame buffer device support
 CONFIG_FB_CONTROL

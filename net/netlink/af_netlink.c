@@ -36,7 +36,7 @@
 #include <asm/uaccess.h>
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
-#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
 #include <linux/proc_fs.h>
 #include <linux/smp_lock.h>
 #include <net/sock.h>
@@ -47,8 +47,6 @@
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
 #define NL_EMULATE_DEV
 #endif
-
-#define BUG_TRAP(x) if (!(x)) { printk("Assertion (" #x ") failed at " __FILE__ "(%d):" __FUNCTION__ "\n", __LINE__); }
 
 struct netlink_opt
 {

@@ -49,6 +49,7 @@ obj-$(CONFIG_FB_Q40)              += q40fb.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
 obj-$(CONFIG_FB_ATY128)           += aty128fb.o
 obj-$(CONFIG_FB_RADEON)		  += radeonfb.o
+obj-$(CONFIG_FB_NEOMAGIC)         += neofb.o
 obj-$(CONFIG_FB_IGA)              += igafb.o
 obj-$(CONFIG_FB_CONTROL)          += controlfb.o
 obj-$(CONFIG_FB_PLATINUM)         += platinumfb.o

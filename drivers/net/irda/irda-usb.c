@@ -427,7 +427,7 @@ static int irda_usb_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 		mtt = irda_get_mtt(skb);
 		if (mtt) {
 			int diff;
-			get_fast_time(&self->now);
+			do_gettimeofday(&self->now);
 			diff = self->now.tv_usec - self->stamp.tv_usec;
 #ifdef IU_USB_MIN_RTT
 			/* Factor in USB delays -> Get rid of udelay() that
@@ -798,7 +798,7 @@ static void irda_usb_receive(struct urb *urb)
 	 * reduce the min turn time a bit since we will know
 	 * how much time we have used for protocol processing
 	 */
-        get_fast_time(&self->stamp);
+        do_gettimeofday(&self->stamp);
 
 	/* Fix skb, and remove USB-IrDA header */
 	skb_put(skb, urb->actual_length);

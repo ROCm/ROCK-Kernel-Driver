@@ -21,6 +21,7 @@ obj-$(CONFIG_IP6_NF_MATCH_OWNER) += ip6t_owner.o
 obj-$(CONFIG_IP6_NF_FILTER) += ip6table_filter.o
 obj-$(CONFIG_IP6_NF_MANGLE) += ip6table_mangle.o
 obj-$(CONFIG_IP6_NF_TARGET_MARK) += ip6t_MARK.o
+obj-$(CONFIG_IP6_NF_QUEUE) += ip6_queue.o
 obj-$(CONFIG_IP6_NF_TARGET_LOG) += ip6t_LOG.o
 
 include $(TOPDIR)/Rules.make

@@ -972,6 +972,13 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 	}
 	memset (scn, 0, sizeof(struct scn_usb_data));
 
+	scn->scn_irq = usb_alloc_urb(0);
+	if (!scn->scn_irq) {
+		kfree(scn);
+		up(&scn_mutex);
+		return NULL;
+	}
+
 	init_MUTEX(&(scn->sem)); /* Initializes to unlocked */
 
 	dbg ("probe_scanner(%d): Address of scn:%p", scn_minor, scn);
@@ -979,13 +986,13 @@ probe_scanner(struct usb_device *dev, unsigned int ifnum,
 /* Ok, if we detected an interrupt EP, setup a handler for it */
 	if (have_intr) {
 		dbg("probe_scanner(%d): Configuring IRQ handler for intr EP:%d", scn_minor, have_intr);
-		FILL_INT_URB(&scn->scn_irq, dev,
+		FILL_INT_URB(scn->scn_irq, dev,
 			     usb_rcvintpipe(dev, have_intr),
 			     &scn->button, 1, irq_scanner, scn,
 			     // endpoint[(int)have_intr].bInterval);
 			     250);
 
-	        if (usb_submit_urb(&scn->scn_irq)) {
+	        if (usb_submit_urb(scn->scn_irq)) {
 			err("probe_scanner(%d): Unable to allocate INT URB.", scn_minor);
                 	kfree(scn);
 			up(&scn_mutex);
@@ -1067,7 +1074,7 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 
 	if(scn->intr_ep) {
 		dbg("disconnect_scanner(%d): Unlinking IRQ URB", scn->scn_minor);
-		usb_unlink_urb(&scn->scn_irq);
+		usb_unlink_urb(scn->scn_irq);
 	}
         usb_driver_release_interface(&scanner_driver,
                 &scn->scn_dev->actconfig->interface[scn->ifnum]);
@@ -1078,6 +1085,7 @@ disconnect_scanner(struct usb_device *dev, void *ptr)
 	dbg("disconnect_scanner: De-allocating minor:%d", scn->scn_minor);
 	devfs_unregister(scn->devfs);
 	p_scn_table[scn->scn_minor] = NULL;
+	usb_free_urb(scn->scn_irq);
 	up (&(scn->sem));
 	kfree (scn);
 	up (&scn_mutex);

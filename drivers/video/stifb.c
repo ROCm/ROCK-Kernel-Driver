@@ -166,7 +166,7 @@ stifb_init(void)
 	if ((fb_info.sti = sti_init_roms()) == NULL)
 		return -ENXIO;
 
-	fb_info.gen.info.node = -1;
+	fb_info.gen.info.node = NODEV;
 	fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.gen.info.fbops = &stifb_ops;
 	fb_info.gen.info.disp = &disp;

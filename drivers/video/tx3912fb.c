@@ -397,7 +397,7 @@ int __init tx3912fb_init(void)
 
 	strcpy(fb_info.modename, TX3912FB_NAME);
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &tx3912fb_ops;
 	fb_info.disp = &global_disp;
 	fb_info.switch_con = &tx3912fbcon_switch;

@@ -1,4 +1,4 @@
-/* $Id: ide.h,v 1.6 2000/05/27 00:49:37 davem Exp $
+/* $Id: ide.h,v 1.7 2002/01/16 20:58:40 davem Exp $
  * ide.h: SPARC PCI specific IDE glue.
  *
  * Copyright (C) 1997  David S. Miller (davem@caip.rutgers.edu)
@@ -91,7 +91,7 @@ typedef union {
 		unsigned int reserved456: 3;
 		unsigned bit3		: 1;	/* ATA-2 thingy */
 		unsigned int SRST	: 1;	/* host soft reset bit */
-		unsigned int nIEN	: 1;	/* device INTRQ to host *
+		unsigned int nIEN	: 1;	/* device INTRQ to host */
 		unsigned int bit0	: 1;
 	} b;
 } control_t;

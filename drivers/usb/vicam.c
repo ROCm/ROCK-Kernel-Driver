@@ -344,7 +344,7 @@ static void params_changed(struct usb_vicam *vicam)
 	synchronize(vicam);
 	mdelay(10);
 	vicam_parameters(vicam);
-	printk("Submiting urb: %d\n", usb_submit_urb(&vicam->readurb));
+	printk("Submiting urb: %d\n", usb_submit_urb(vicam->readurb));
 #endif
 }
 
@@ -841,9 +841,9 @@ static int vicam_init(struct usb_vicam *vicam)
 
 	vicam_parameters(vicam);
 
-	FILL_BULK_URB(&vicam->readurb, vicam->udev, usb_rcvbulkpipe(vicam->udev, 0x81),
+	FILL_BULK_URB(vicam->readurb, vicam->udev, usb_rcvbulkpipe(vicam->udev, 0x81),
 		      buf, 0x1e480, vicam_bulk, vicam);
-	printk("Submiting urb: %d\n", usb_submit_urb(&vicam->readurb));
+	printk("Submiting urb: %d\n", usb_submit_urb(vicam->readurb));
 
 	return 0;
 error:
@@ -877,7 +877,13 @@ static void * __devinit vicam_probe(struct usb_device *udev, unsigned int ifnum,
 		return NULL;
 	}
 	memset(vicam, 0, sizeof(*vicam));
-	
+
+	vicam->readurb = usb_alloc_urb(0);
+	if (!vicam->readurb) {
+		kfree(vicam);
+		return NULL;
+	}
+
 	vicam->udev = udev;
 	vicam->camera_name = camera_name;
 	vicam->win.brightness = 128;
@@ -925,6 +931,7 @@ static void vicam_disconnect(struct usb_device *udev, void *ptr)
 
 	if (!vicam->open_count) {
 		/* Other random junk */
+		usb_free_urb(vicam->readurb);
 		kfree(vicam);
 		vicam = NULL;
 	}

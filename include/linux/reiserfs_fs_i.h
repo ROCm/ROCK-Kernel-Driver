@@ -46,6 +46,7 @@ struct reiserfs_inode_info {
   */
   unsigned long i_trans_id ;
   unsigned long i_trans_index ;
+  struct inode vfs_inode;
 };
 
 

@@ -292,7 +292,7 @@ printk("dn_fb_init\n");
 	fb_info.switch_con=&dnfbcon_switch;
 	fb_info.updatevar=&dnfbcon_updatevar;
 	fb_info.blank=&dnfbcon_blank;	
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
 	
 printk("dn_fb_init: register\n");

@@ -75,7 +75,51 @@ static void minix_put_super(struct super_block *sb)
 	return;
 }
 
+static kmem_cache_t * minix_inode_cachep;
+
+static struct inode *minix_alloc_inode(struct super_block *sb)
+{
+	struct minix_inode_info *ei;
+	ei = (struct minix_inode_info *)kmem_cache_alloc(minix_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void minix_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(minix_inode_cachep, minix_i(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct minix_inode_info *ei = (struct minix_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	minix_inode_cachep = kmem_cache_create("minix_inode_cache",
+					     sizeof(struct minix_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (minix_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(minix_inode_cachep))
+		printk(KERN_INFO "minix_inode_cache: not all structures were freed\n");
+}
+
 static struct super_operations minix_sops = {
+	alloc_inode:	minix_alloc_inode,
+	destroy_inode:	minix_destroy_inode,
 	read_inode:	minix_read_inode,
 	write_inode:	minix_write_inode,
 	delete_inode:	minix_delete_inode,
@@ -344,6 +388,7 @@ static void V1_minix_read_inode(struct inode * inode)
 {
 	struct buffer_head * bh;
 	struct minix_inode * raw_inode;
+	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
@@ -359,7 +404,7 @@ static void V1_minix_read_inode(struct inode * inode)
 	inode->i_mtime = inode->i_atime = inode->i_ctime = raw_inode->i_time;
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 9; i++)
-		inode->u.minix_i.u.i1_data[i] = raw_inode->i_zone[i];
+		minix_inode->u.i1_data[i] = raw_inode->i_zone[i];
 	minix_set_inode(inode, raw_inode->i_zone[0]);
 	brelse(bh);
 }
@@ -371,6 +416,7 @@ static void V2_minix_read_inode(struct inode * inode)
 {
 	struct buffer_head * bh;
 	struct minix2_inode * raw_inode;
+	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
 	raw_inode = minix_V2_raw_inode(inode->i_sb, inode->i_ino, &bh);
@@ -388,7 +434,7 @@ static void V2_minix_read_inode(struct inode * inode)
 	inode->i_ctime = raw_inode->i_ctime;
 	inode->i_blocks = inode->i_blksize = 0;
 	for (i = 0; i < 10; i++)
-		inode->u.minix_i.u.i2_data[i] = raw_inode->i_zone[i];
+		minix_inode->u.i2_data[i] = raw_inode->i_zone[i];
 	minix_set_inode(inode, raw_inode->i_zone[0]);
 	brelse(bh);
 }
@@ -411,6 +457,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 {
 	struct buffer_head * bh;
 	struct minix_inode * raw_inode;
+	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
 	raw_inode = minix_V1_raw_inode(inode->i_sb, inode->i_ino, &bh);
@@ -425,7 +472,7 @@ static struct buffer_head * V1_minix_update_inode(struct inode * inode)
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		raw_inode->i_zone[0] = kdev_t_to_nr(inode->i_rdev);
 	else for (i = 0; i < 9; i++)
-		raw_inode->i_zone[i] = inode->u.minix_i.u.i1_data[i];
+		raw_inode->i_zone[i] = minix_inode->u.i1_data[i];
 	mark_buffer_dirty(bh);
 	return bh;
 }
@@ -437,6 +484,7 @@ static struct buffer_head * V2_minix_update_inode(struct inode * inode)
 {
 	struct buffer_head * bh;
 	struct minix2_inode * raw_inode;
+	struct minix_inode_info *minix_inode = minix_i(inode);
 	int i;
 
 	raw_inode = minix_V2_raw_inode(inode->i_sb, inode->i_ino, &bh);
@@ -453,7 +501,7 @@ static struct buffer_head * V2_minix_update_inode(struct inode * inode)
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
 		raw_inode->i_zone[0] = kdev_t_to_nr(inode->i_rdev);
 	else for (i = 0; i < 10; i++)
-		raw_inode->i_zone[i] = inode->u.minix_i.u.i2_data[i];
+		raw_inode->i_zone[i] = minix_inode->u.i2_data[i];
 	mark_buffer_dirty(bh);
 	return bh;
 }
@@ -514,12 +562,23 @@ static DECLARE_FSTYPE_DEV(minix_fs_type,"minix",minix_read_super);
 
 static int __init init_minix_fs(void)
 {
-        return register_filesystem(&minix_fs_type);
+	int err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&minix_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_minix_fs(void)
 {
         unregister_filesystem(&minix_fs_type);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

@@ -639,7 +639,7 @@ int wakeup_dma_ir_ctx(struct ti_ohci *ohci, struct dma_iso_ctx *d)
 		if (d->ir_prg[i][d->nb_cmd-1].status & 0xFFFF0000) {
 			reset_ir_status(d, i);
 			d->buffer_status[i] = VIDEO1394_BUFFER_READY;
-			get_fast_time(&d->buffer_time[i]);
+			do_gettimeofday(&d->buffer_time[i]);
 		}
 	}
 	spin_unlock(&d->lock);

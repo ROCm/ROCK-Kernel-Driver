@@ -1,4 +1,4 @@
-/* $Id: pci_sabre.c,v 1.41 2001/11/14 13:17:56 davem Exp $
+/* $Id: pci_sabre.c,v 1.42 2002/01/23 11:27:32 davem Exp $
  * pci_sabre.c: Sabre specific PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@caipfs.rutgers.edu)
@@ -582,7 +582,7 @@ static unsigned char sabre_pil_table[] = {
 /*0x2f*/15,		/* Correctable ECC		*/
 /*0x30*/15,		/* PCI Bus A Error		*/
 /*0x31*/15,		/* PCI Bus B Error		*/
-/*0x32*/1,		/* Power Management		*/
+/*0x32*/15,		/* Power Management		*/
 };
 
 static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
@@ -596,7 +596,7 @@ static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 
 	ret = sabre_pil_table[ino];
 	if (ret == 0 && pdev == NULL) {
-		ret = 1;
+		ret = 2;
 	} else if (ret == 0) {
 		switch ((pdev->class >> 16) & 0xff) {
 		case PCI_BASE_CLASS_STORAGE:
@@ -619,7 +619,7 @@ static int __init sabre_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 			break;
 
 		default:
-			ret = 1;
+			ret = 2;
 			break;
 		};
 	}
@@ -651,6 +651,10 @@ static unsigned int __init sabre_irq_build(struct pci_pbm_info *pbm,
 
 	/* Now build the IRQ bucket. */
 	pil = sabre_ino_to_pil(pdev, ino);
+
+	if (PIL_RESERVED(pil))
+		BUG();
+
 	imap = p->controller_regs + imap_off;
 	imap += 4;
 

@@ -379,8 +379,6 @@ time_init(void)
 	/* Startup the timer source. */
 	alpha_mv.init_rtc();
 
-	do_get_fast_time = do_gettimeofday;
-
 	/*
 	 * If we had wanted SRM console printk echoing early, undo it now.
 	 *

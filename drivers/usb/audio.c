@@ -297,12 +297,12 @@ struct usb_audio_state;
 #define FLG_CONNECTED    32
 
 struct my_data_urb {
-	struct urb urb;
+	struct urb *urb;
 	struct usb_iso_packet_descriptor isoframe[DESCFRAMES];
 };
 
 struct my_sync_urb {
-	struct urb urb;
+	struct urb *urb;
 	struct usb_iso_packet_descriptor isoframe[SYNCFRAMES];
 };
 
@@ -648,27 +648,27 @@ static void usbin_stop(struct usb_audiodev *as)
 		spin_unlock_irqrestore(&as->lock, flags);
 		if (notkilled && signal_pending(current)) {
 			if (i & FLG_URB0RUNNING)
-				usb_unlink_urb(&u->durb[0].urb);
+				usb_unlink_urb(u->durb[0].urb);
 			if (i & FLG_URB1RUNNING)
-				usb_unlink_urb(&u->durb[1].urb);
+				usb_unlink_urb(u->durb[1].urb);
 			if (i & FLG_SYNC0RUNNING)
-				usb_unlink_urb(&u->surb[0].urb);
+				usb_unlink_urb(u->surb[0].urb);
 			if (i & FLG_SYNC1RUNNING)
-				usb_unlink_urb(&u->surb[1].urb);
+				usb_unlink_urb(u->surb[1].urb);
 			notkilled = 0;
 		}
 	}
 	set_current_state(TASK_RUNNING);
-	if (u->durb[0].urb.transfer_buffer)
-		kfree(u->durb[0].urb.transfer_buffer);
-	if (u->durb[1].urb.transfer_buffer)
-		kfree(u->durb[1].urb.transfer_buffer);
-	if (u->surb[0].urb.transfer_buffer)
-		kfree(u->surb[0].urb.transfer_buffer);
-	if (u->surb[1].urb.transfer_buffer)
-		kfree(u->surb[1].urb.transfer_buffer);
-	u->durb[0].urb.transfer_buffer = u->durb[1].urb.transfer_buffer = 
-		u->surb[0].urb.transfer_buffer = u->surb[1].urb.transfer_buffer = NULL;
+	if (u->durb[0].urb->transfer_buffer)
+		kfree(u->durb[0].urb->transfer_buffer);
+	if (u->durb[1].urb->transfer_buffer)
+		kfree(u->durb[1].urb->transfer_buffer);
+	if (u->surb[0].urb->transfer_buffer)
+		kfree(u->surb[0].urb->transfer_buffer);
+	if (u->surb[1].urb->transfer_buffer)
+		kfree(u->surb[1].urb->transfer_buffer);
+	u->durb[0].urb->transfer_buffer = u->durb[1].urb->transfer_buffer = 
+		u->surb[0].urb->transfer_buffer = u->surb[1].urb->transfer_buffer = NULL;
 }
 
 static inline void usbin_release(struct usb_audiodev *as)
@@ -904,9 +904,9 @@ static void usbin_completed(struct urb *urb)
 #if 0
 	printk(KERN_DEBUG "usbin_completed: status %d errcnt %d flags 0x%x\n", urb->status, urb->error_count, u->flags);
 #endif
-	if (urb == &u->durb[0].urb)
+	if (urb == u->durb[0].urb)
 		mask = FLG_URB0RUNNING;
-	else if (urb == &u->durb[1].urb)
+	else if (urb == u->durb[1].urb)
 		mask = FLG_URB1RUNNING;
 	else {
 		mask = 0;
@@ -969,9 +969,9 @@ static void usbin_sync_completed(struct urb *urb)
 #if 0
 	printk(KERN_DEBUG "usbin_sync_completed: status %d errcnt %d flags 0x%x\n", urb->status, urb->error_count, u->flags);
 #endif
-	if (urb == &u->surb[0].urb)
+	if (urb == u->surb[0].urb)
 		mask = FLG_SYNC0RUNNING;
-	else if (urb == &u->surb[1].urb)
+	else if (urb == u->surb[1].urb)
 		mask = FLG_SYNC1RUNNING;
 	else {
 		mask = 0;
@@ -1017,26 +1017,26 @@ static int usbin_start(struct usb_audiodev *as)
 		u->phase = 0;
 		maxsze = (u->freqmax + 0x3fff) >> (14 - AFMT_BYTESSHIFT(u->format));
 		bufsz = DESCFRAMES * maxsze;
-		if (u->durb[0].urb.transfer_buffer)
-			kfree(u->durb[0].urb.transfer_buffer);
-		u->durb[0].urb.transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
-		u->durb[0].urb.transfer_buffer_length = bufsz;
-		if (u->durb[1].urb.transfer_buffer)
-			kfree(u->durb[1].urb.transfer_buffer);
-		u->durb[1].urb.transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
-		u->durb[1].urb.transfer_buffer_length = bufsz;
+		if (u->durb[0].urb->transfer_buffer)
+			kfree(u->durb[0].urb->transfer_buffer);
+		u->durb[0].urb->transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
+		u->durb[0].urb->transfer_buffer_length = bufsz;
+		if (u->durb[1].urb->transfer_buffer)
+			kfree(u->durb[1].urb->transfer_buffer);
+		u->durb[1].urb->transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
+		u->durb[1].urb->transfer_buffer_length = bufsz;
 		if (u->syncpipe) {
-			if (u->surb[0].urb.transfer_buffer)
-				kfree(u->surb[0].urb.transfer_buffer);
-			u->surb[0].urb.transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
-			u->surb[0].urb.transfer_buffer_length = 3*SYNCFRAMES;
-			if (u->surb[1].urb.transfer_buffer)
-				kfree(u->surb[1].urb.transfer_buffer);
-			u->surb[1].urb.transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
-			u->surb[1].urb.transfer_buffer_length = 3*SYNCFRAMES;
+			if (u->surb[0].urb->transfer_buffer)
+				kfree(u->surb[0].urb->transfer_buffer);
+			u->surb[0].urb->transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
+			u->surb[0].urb->transfer_buffer_length = 3*SYNCFRAMES;
+			if (u->surb[1].urb->transfer_buffer)
+				kfree(u->surb[1].urb->transfer_buffer);
+			u->surb[1].urb->transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
+			u->surb[1].urb->transfer_buffer_length = 3*SYNCFRAMES;
 		}
-		if (!u->durb[0].urb.transfer_buffer || !u->durb[1].urb.transfer_buffer || 
-		    (u->syncpipe && (!u->surb[0].urb.transfer_buffer || !u->surb[1].urb.transfer_buffer))) {
+		if (!u->durb[0].urb->transfer_buffer || !u->durb[1].urb->transfer_buffer || 
+		    (u->syncpipe && (!u->surb[0].urb->transfer_buffer || !u->surb[1].urb->transfer_buffer))) {
 			printk(KERN_ERR "usbaudio: cannot start playback device %d\n", dev->devnum);
 			return 0;
 		}
@@ -1048,7 +1048,7 @@ static int usbin_start(struct usb_audiodev *as)
 	}
 	u->flags |= FLG_RUNNING;
 	if (!(u->flags & FLG_URB0RUNNING)) {
-		urb = &u->durb[0].urb;
+		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
 		urb->transfer_flags = USB_ISO_ASAP;
@@ -1061,7 +1061,7 @@ static int usbin_start(struct usb_audiodev *as)
 			u->flags &= ~FLG_RUNNING;
 	}
 	if (u->flags & FLG_RUNNING && !(u->flags & FLG_URB1RUNNING)) {
-		urb = &u->durb[1].urb;
+		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
 		urb->transfer_flags = USB_ISO_ASAP;
@@ -1075,7 +1075,7 @@ static int usbin_start(struct usb_audiodev *as)
 	}
 	if (u->syncpipe) {
 		if (u->flags & FLG_RUNNING && !(u->flags & FLG_SYNC0RUNNING)) {
-			urb = &u->surb[0].urb;
+			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
 			urb->transfer_flags = USB_ISO_ASAP;
@@ -1089,7 +1089,7 @@ static int usbin_start(struct usb_audiodev *as)
 				u->flags &= ~FLG_RUNNING;
 		}
 		if (u->flags & FLG_RUNNING && !(u->flags & FLG_SYNC1RUNNING)) {
-			urb = &u->surb[1].urb;
+			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
 			urb->transfer_flags = USB_ISO_ASAP;
@@ -1125,27 +1125,27 @@ static void usbout_stop(struct usb_audiodev *as)
 		spin_unlock_irqrestore(&as->lock, flags);
 		if (notkilled && signal_pending(current)) {
 			if (i & FLG_URB0RUNNING)
-				usb_unlink_urb(&u->durb[0].urb);
+				usb_unlink_urb(u->durb[0].urb);
 			if (i & FLG_URB1RUNNING)
-				usb_unlink_urb(&u->durb[1].urb);
+				usb_unlink_urb(u->durb[1].urb);
 			if (i & FLG_SYNC0RUNNING)
-				usb_unlink_urb(&u->surb[0].urb);
+				usb_unlink_urb(u->surb[0].urb);
 			if (i & FLG_SYNC1RUNNING)
-				usb_unlink_urb(&u->surb[1].urb);
+				usb_unlink_urb(u->surb[1].urb);
 			notkilled = 0;
 		}
 	}
 	set_current_state(TASK_RUNNING);
-	if (u->durb[0].urb.transfer_buffer)
-		kfree(u->durb[0].urb.transfer_buffer);
-	if (u->durb[1].urb.transfer_buffer)
-		kfree(u->durb[1].urb.transfer_buffer);
-	if (u->surb[0].urb.transfer_buffer)
-		kfree(u->surb[0].urb.transfer_buffer);
-	if (u->surb[1].urb.transfer_buffer)
-		kfree(u->surb[1].urb.transfer_buffer);
-	u->durb[0].urb.transfer_buffer = u->durb[1].urb.transfer_buffer = 
-		u->surb[0].urb.transfer_buffer = u->surb[1].urb.transfer_buffer = NULL;
+	if (u->durb[0].urb->transfer_buffer)
+		kfree(u->durb[0].urb->transfer_buffer);
+	if (u->durb[1].urb->transfer_buffer)
+		kfree(u->durb[1].urb->transfer_buffer);
+	if (u->surb[0].urb->transfer_buffer)
+		kfree(u->surb[0].urb->transfer_buffer);
+	if (u->surb[1].urb->transfer_buffer)
+		kfree(u->surb[1].urb->transfer_buffer);
+	u->durb[0].urb->transfer_buffer = u->durb[1].urb->transfer_buffer = 
+		u->surb[0].urb->transfer_buffer = u->surb[1].urb->transfer_buffer = NULL;
 }
 
 static inline void usbout_release(struct usb_audiodev *as)
@@ -1262,9 +1262,9 @@ static void usbout_completed(struct urb *urb)
 #if 0
 	printk(KERN_DEBUG "usbout_completed: status %d errcnt %d flags 0x%x\n", urb->status, urb->error_count, u->flags);
 #endif
-	if (urb == &u->durb[0].urb)
+	if (urb == u->durb[0].urb)
 		mask = FLG_URB0RUNNING;
-	else if (urb == &u->durb[1].urb)
+	else if (urb == u->durb[1].urb)
 		mask = FLG_URB1RUNNING;
 	else {
 		mask = 0;
@@ -1334,9 +1334,9 @@ static void usbout_sync_completed(struct urb *urb)
 #if 0
 	printk(KERN_DEBUG "usbout_sync_completed: status %d errcnt %d flags 0x%x\n", urb->status, urb->error_count, u->flags);
 #endif
-	if (urb == &u->surb[0].urb)
+	if (urb == u->surb[0].urb)
 		mask = FLG_SYNC0RUNNING;
-	else if (urb == &u->surb[1].urb)
+	else if (urb == u->surb[1].urb)
 		mask = FLG_SYNC1RUNNING;
 	else {
 		mask = 0;
@@ -1382,26 +1382,26 @@ static int usbout_start(struct usb_audiodev *as)
 		u->phase = 0;
 		maxsze = (u->freqmax + 0x3fff) >> (14 - AFMT_BYTESSHIFT(u->format));
 		bufsz = DESCFRAMES * maxsze;
-		if (u->durb[0].urb.transfer_buffer)
-			kfree(u->durb[0].urb.transfer_buffer);
-		u->durb[0].urb.transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
-		u->durb[0].urb.transfer_buffer_length = bufsz;
-		if (u->durb[1].urb.transfer_buffer)
-			kfree(u->durb[1].urb.transfer_buffer);
-		u->durb[1].urb.transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
-		u->durb[1].urb.transfer_buffer_length = bufsz;
+		if (u->durb[0].urb->transfer_buffer)
+			kfree(u->durb[0].urb->transfer_buffer);
+		u->durb[0].urb->transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
+		u->durb[0].urb->transfer_buffer_length = bufsz;
+		if (u->durb[1].urb->transfer_buffer)
+			kfree(u->durb[1].urb->transfer_buffer);
+		u->durb[1].urb->transfer_buffer = kmalloc(bufsz, GFP_KERNEL);
+		u->durb[1].urb->transfer_buffer_length = bufsz;
 		if (u->syncpipe) {
-			if (u->surb[0].urb.transfer_buffer)
-				kfree(u->surb[0].urb.transfer_buffer);
-			u->surb[0].urb.transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
-			u->surb[0].urb.transfer_buffer_length = 3*SYNCFRAMES;
-			if (u->surb[1].urb.transfer_buffer)
-				kfree(u->surb[1].urb.transfer_buffer);
-			u->surb[1].urb.transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
-			u->surb[1].urb.transfer_buffer_length = 3*SYNCFRAMES;
+			if (u->surb[0].urb->transfer_buffer)
+				kfree(u->surb[0].urb->transfer_buffer);
+			u->surb[0].urb->transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
+			u->surb[0].urb->transfer_buffer_length = 3*SYNCFRAMES;
+			if (u->surb[1].urb->transfer_buffer)
+				kfree(u->surb[1].urb->transfer_buffer);
+			u->surb[1].urb->transfer_buffer = kmalloc(3*SYNCFRAMES, GFP_KERNEL);
+			u->surb[1].urb->transfer_buffer_length = 3*SYNCFRAMES;
 		}
-		if (!u->durb[0].urb.transfer_buffer || !u->durb[1].urb.transfer_buffer || 
-		    (u->syncpipe && (!u->surb[0].urb.transfer_buffer || !u->surb[1].urb.transfer_buffer))) {
+		if (!u->durb[0].urb->transfer_buffer || !u->durb[1].urb->transfer_buffer || 
+		    (u->syncpipe && (!u->surb[0].urb->transfer_buffer || !u->surb[1].urb->transfer_buffer))) {
 			printk(KERN_ERR "usbaudio: cannot start playback device %d\n", dev->devnum);
 			return 0;
 		}
@@ -1413,7 +1413,7 @@ static int usbout_start(struct usb_audiodev *as)
 	}
        	u->flags |= FLG_RUNNING;
 	if (!(u->flags & FLG_URB0RUNNING)) {
-		urb = &u->durb[0].urb;
+		urb = u->durb[0].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
 		urb->transfer_flags = USB_ISO_ASAP;
@@ -1426,7 +1426,7 @@ static int usbout_start(struct usb_audiodev *as)
 			u->flags &= ~FLG_RUNNING;
 	}
 	if (u->flags & FLG_RUNNING && !(u->flags & FLG_URB1RUNNING)) {
-		urb = &u->durb[1].urb;
+		urb = u->durb[1].urb;
 		urb->dev = dev;
 		urb->pipe = u->datapipe;
 		urb->transfer_flags = USB_ISO_ASAP;
@@ -1440,7 +1440,7 @@ static int usbout_start(struct usb_audiodev *as)
 	}
 	if (u->syncpipe) {
 		if (u->flags & FLG_RUNNING && !(u->flags & FLG_SYNC0RUNNING)) {
-			urb = &u->surb[0].urb;
+			urb = u->surb[0].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
 			urb->transfer_flags = USB_ISO_ASAP;
@@ -1454,7 +1454,7 @@ static int usbout_start(struct usb_audiodev *as)
 				u->flags &= ~FLG_RUNNING;
 		}
 		if (u->flags & FLG_RUNNING && !(u->flags & FLG_SYNC1RUNNING)) {
-			urb = &u->surb[1].urb;
+			urb = u->surb[1].urb;
 			urb->dev = dev;
 			urb->pipe = u->syncpipe;
 			urb->transfer_flags = USB_ISO_ASAP;
@@ -1921,6 +1921,14 @@ static void release(struct usb_audio_state *s)
 		usbout_release(as);
 		dmabuf_release(&as->usbin.dma);
 		dmabuf_release(&as->usbout.dma);
+		usb_free_urb(as->usbin.durb[0].urb);
+		usb_free_urb(as->usbin.durb[1].urb);
+		usb_free_urb(as->usbin.surb[0].urb);
+		usb_free_urb(as->usbin.surb[1].urb);
+		usb_free_urb(as->usbout.durb[0].urb);
+		usb_free_urb(as->usbout.durb[1].urb);
+		usb_free_urb(as->usbout.surb[0].urb);
+		usb_free_urb(as->usbout.surb[1].urb);
 		kfree(as);
 	}
 	while (!list_empty(&s->mixerlist)) {
@@ -2821,14 +2829,33 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 	init_waitqueue_head(&as->usbin.dma.wait);
 	init_waitqueue_head(&as->usbout.dma.wait);
 	spin_lock_init(&as->lock);
-	spin_lock_init(&as->usbin.durb[0].urb.lock);
-	spin_lock_init(&as->usbin.durb[1].urb.lock);
-	spin_lock_init(&as->usbin.surb[0].urb.lock);
-	spin_lock_init(&as->usbin.surb[1].urb.lock);
-	spin_lock_init(&as->usbout.durb[0].urb.lock);
-	spin_lock_init(&as->usbout.durb[1].urb.lock);
-	spin_lock_init(&as->usbout.surb[0].urb.lock);
-	spin_lock_init(&as->usbout.surb[1].urb.lock);
+	as->usbin.durb[0].urb = usb_alloc_urb(0);
+	as->usbin.durb[1].urb = usb_alloc_urb(0);
+	as->usbin.surb[0].urb = usb_alloc_urb(0);
+	as->usbin.surb[1].urb = usb_alloc_urb(0);
+	as->usbout.durb[0].urb = usb_alloc_urb(0);
+	as->usbout.durb[1].urb = usb_alloc_urb(0);
+	as->usbout.surb[0].urb = usb_alloc_urb(0);
+	as->usbout.surb[1].urb = usb_alloc_urb(0);
+	if ((!as->usbin.durb[0].urb) ||
+	    (!as->usbin.durb[1].urb) ||
+	    (!as->usbin.surb[0].urb) ||
+	    (!as->usbin.surb[1].urb) ||
+	    (!as->usbout.durb[0].urb) ||
+	    (!as->usbout.durb[1].urb) ||
+	    (!as->usbout.surb[0].urb) ||
+	    (!as->usbout.surb[1].urb)) {
+		usb_free_urb(as->usbin.durb[0].urb);
+		usb_free_urb(as->usbin.durb[1].urb);
+		usb_free_urb(as->usbin.surb[0].urb);
+		usb_free_urb(as->usbin.surb[1].urb);
+		usb_free_urb(as->usbout.durb[0].urb);
+		usb_free_urb(as->usbout.durb[1].urb);
+		usb_free_urb(as->usbout.surb[0].urb);
+		usb_free_urb(as->usbout.surb[1].urb);
+		kfree(as);
+		return;
+	}
 	as->state = s;
 	as->usbin.interface = asifin;
 	as->usbout.interface = asifout;
@@ -2997,11 +3024,27 @@ static void usb_audio_parsestreaming(struct usb_audio_state *s, unsigned char *b
 		}
 	}
 	if (as->numfmtin == 0 && as->numfmtout == 0) {
+		usb_free_urb(as->usbin.durb[0].urb);
+		usb_free_urb(as->usbin.durb[1].urb);
+		usb_free_urb(as->usbin.surb[0].urb);
+		usb_free_urb(as->usbin.surb[1].urb);
+		usb_free_urb(as->usbout.durb[0].urb);
+		usb_free_urb(as->usbout.durb[1].urb);
+		usb_free_urb(as->usbout.surb[0].urb);
+		usb_free_urb(as->usbout.surb[1].urb);
 		kfree(as);
 		return;
 	}
 	if ((as->dev_audio = register_sound_dsp(&usb_audio_fops, -1)) < 0) {
 		printk(KERN_ERR "usbaudio: cannot register dsp\n");
+		usb_free_urb(as->usbin.durb[0].urb);
+		usb_free_urb(as->usbin.durb[1].urb);
+		usb_free_urb(as->usbin.surb[0].urb);
+		usb_free_urb(as->usbin.surb[1].urb);
+		usb_free_urb(as->usbout.durb[0].urb);
+		usb_free_urb(as->usbout.durb[1].urb);
+		usb_free_urb(as->usbout.surb[0].urb);
+		usb_free_urb(as->usbout.surb[1].urb);
 		kfree(as);
 		return;
 	}

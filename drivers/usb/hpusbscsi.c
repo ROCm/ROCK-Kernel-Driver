@@ -56,8 +56,17 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 		return NULL;
 	DEBUG ("Allocated memory\n");
 	memset (new, 0, sizeof (struct hpusbscsi));
-	spin_lock_init (&new->dataurb.lock);
-	spin_lock_init (&new->controlurb.lock);
+	new->dataurb = usb_alloc_urb(0);
+	if (!new->dataurb) {
+		kfree (new);
+		return NULL;
+	}
+	new->controlurb = usb_alloc_urb(0);
+	if (!new->controlurb) {
+		usb_free_urb (new->dataurb);
+		kfree (new);
+		return NULL;
+	}
 	new->dev = dev;
 	init_waitqueue_head (&new->pending);
 	init_waitqueue_head (&new->deathrow);
@@ -126,6 +135,8 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 	return new;
 
       err_out:
+	usb_free_urb (new->controlurb);
+	usb_free_urb (new->dataurb);
 	kfree (new);
 	return NULL;
 }
@@ -133,7 +144,7 @@ hpusbscsi_usb_probe (struct usb_device *dev, unsigned int interface,
 static void
 hpusbscsi_usb_disconnect (struct usb_device *dev, void *ptr)
 {
-                 usb_unlink_urb(&(((struct hpusbscsi *) ptr)->controlurb));
+                 usb_unlink_urb((((struct hpusbscsi *) ptr)->controlurb));
 	((struct hpusbscsi *) ptr)->dev = NULL;
 }
 
@@ -184,8 +195,10 @@ hpusbscsi_exit (void)
 		old = tmp;
 		tmp = tmp->next;
 		o = (struct hpusbscsi *)old;
-		usb_unlink_urb(&o->controlurb);
+		usb_unlink_urb(o->controlurb);
 		scsi_unregister_host(&o->ctempl);
+		usb_free_urb(o->controlurb);
+		usb_free_urb(o->dataurb);
 		kfree(old);
 	}
 
@@ -222,7 +235,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 	sht->proc_dir = NULL;
 
 	/* build and submit an interrupt URB for status byte handling */
- 	FILL_INT_URB(&desc->controlurb,
+ 	FILL_INT_URB(desc->controlurb,
 			desc->dev,
 			usb_rcvintpipe(desc->dev,desc->ep_int),
 			&desc->scsi_state_byte,
@@ -232,7 +245,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 			desc->interrupt_interval
 	);
 
-	if ( 0  >  usb_submit_urb(&desc->controlurb)) {
+	if ( 0  >  usb_submit_urb(desc->controlurb)) {
 		kfree(sht->proc_name);
 		return 0;
 	}
@@ -241,7 +254,7 @@ hpusbscsi_scsi_detect (struct SHT *sht)
 	desc->host = scsi_register (sht, sizeof (desc));
 	if (desc->host == NULL) {
 		kfree (sht->proc_name);
-		usb_unlink_urb(&desc->controlurb);
+		usb_unlink_urb(desc->controlurb);
 		return 0;
 	}
 	desc->host->hostdata[0] = (unsigned long) desc;
@@ -297,7 +310,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 
 	/* We prepare the urb for writing out the scsi command */
 	FILL_BULK_URB(
-		&hpusbscsi->dataurb,
+		hpusbscsi->dataurb,
 		hpusbscsi->dev,
 		usb_sndbulkpipe(hpusbscsi->dev,hpusbscsi->ep_out),
 		srb->cmnd,
@@ -308,7 +321,7 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	hpusbscsi->scallback = callback;
 	hpusbscsi->srb = srb;
 
-	res = usb_submit_urb(&hpusbscsi->dataurb);
+	res = usb_submit_urb(hpusbscsi->dataurb);
 	if (unlikely(res)) {
 		hpusbscsi->state = HP_STATE_FREE;
 		TRACE_STATE;
@@ -340,8 +353,8 @@ static int hpusbscsi_scsi_abort (Scsi_Cmnd *srb)
 	struct hpusbscsi* hpusbscsi = (struct hpusbscsi*)(srb->host->hostdata[0]);
 	printk(KERN_DEBUG"Requested is canceled.\n");
 
-	usb_unlink_urb(&hpusbscsi->dataurb);
-	usb_unlink_urb(&hpusbscsi->controlurb);
+	usb_unlink_urb(hpusbscsi->dataurb);
+	usb_unlink_urb(hpusbscsi->controlurb);
 	hpusbscsi->state = HP_STATE_FREE;
 
 	return SCSI_ABORT_PENDING;

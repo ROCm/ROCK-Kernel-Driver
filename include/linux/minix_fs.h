@@ -89,6 +89,8 @@ struct minix_dir_entry {
 
 #ifdef __KERNEL__
 
+#include <linux/minix_fs_i.h>
+
 /*
  * change the define below to 0 if you want names > info->s_namelen chars to be
  * truncated. Else they will be disallowed (ENAMETOOLONG).
@@ -128,6 +130,11 @@ extern struct inode_operations minix_dir_inode_operations;
 extern struct file_operations minix_file_operations;
 extern struct file_operations minix_dir_operations;
 extern struct dentry_operations minix_dentry_operations;
+
+static inline struct minix_inode_info *minix_i(struct inode *inode)
+{
+	return list_entry(inode, struct minix_inode_info, vfs_inode);
+}
 
 #endif /* __KERNEL__ */
 

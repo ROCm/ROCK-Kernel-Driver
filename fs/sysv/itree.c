@@ -91,7 +91,7 @@ static Indirect *get_branch(struct inode *inode,
 	struct buffer_head *bh;
 
 	*err = 0;
-	add_chain (chain, NULL, inode->u.sysv_i.i_data + *offsets);
+	add_chain (chain, NULL, SYSV_I(inode)->i_data + *offsets);
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
@@ -348,7 +348,7 @@ static void free_branches(struct inode *inode, u32 *p, u32 *q, int depth)
 
 void sysv_truncate (struct inode * inode)
 {
-	u32 *i_data = inode->u.sysv_i.i_data;
+	u32 *i_data = SYSV_I(inode)->i_data;
 	int offsets[DEPTH];
 	Indirect chain[DEPTH];
 	Indirect *partial;

@@ -125,14 +125,14 @@ static void read_bulk_callback( struct urb *urb )
 
 goon:
 	// Prep the USB to wait for another frame
-	FILL_BULK_URB( &ether_dev->rx_urb, ether_dev->usb,
+	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
 			
 	// Give this to the USB subsystem so it can tell us 
 	// when more data arrives.
-	if ( (res = usb_submit_urb(&ether_dev->rx_urb)) ) {
+	if ( (res = usb_submit_urb(ether_dev->rx_urb)) ) {
 		warn( __FUNCTION__ " failed submint rx_urb %d", res);
 	}
 	
@@ -259,8 +259,8 @@ static void CDCEther_tx_timeout( struct net_device *net )
 	warn("%s: Tx timed out.", net->name);
 	
 	// Tear the waiting frame off the list
-	ether_dev->tx_urb.transfer_flags |= USB_ASYNC_UNLINK;
-	usb_unlink_urb( &ether_dev->tx_urb );
+	ether_dev->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	usb_unlink_urb( ether_dev->tx_urb );
 	
 	// Update statistics
 	ether_dev->stats.tx_errors++;
@@ -293,16 +293,16 @@ static int CDCEther_start_xmit( struct sk_buff *skb, struct net_device *net )
 	memcpy(ether_dev->tx_buff, skb->data, skb->len);
 
 	// Fill in the URB for shipping it out.
-	FILL_BULK_URB( &ether_dev->tx_urb, ether_dev->usb,
+	FILL_BULK_URB( ether_dev->tx_urb, ether_dev->usb,
 			usb_sndbulkpipe(ether_dev->usb, ether_dev->data_ep_out),
 			ether_dev->tx_buff, ether_dev->wMaxSegmentSize, 
 			write_bulk_callback, ether_dev );
 
 	// Tell the URB how much it will be transporting today
-	ether_dev->tx_urb.transfer_buffer_length = count;
+	ether_dev->tx_urb->transfer_buffer_length = count;
 	
 	// Send the URB on its merry way.
-	if ((res = usb_submit_urb(&ether_dev->tx_urb)))  {
+	if ((res = usb_submit_urb(ether_dev->tx_urb)))  {
 		// Hmm...  It didn't go. Tell someone...
 		warn("failed tx_urb %d", res);
 		// update some stats...
@@ -344,13 +344,13 @@ static int CDCEther_open(struct net_device *net)
 	}
 
 	// Prep a receive URB
-	FILL_BULK_URB( &ether_dev->rx_urb, ether_dev->usb,
+	FILL_BULK_URB( ether_dev->rx_urb, ether_dev->usb,
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
 
 	// Put it out there so the device can send us stuff
-	if ( (res = usb_submit_urb(&ether_dev->rx_urb)) )
+	if ( (res = usb_submit_urb(ether_dev->rx_urb)) )
 	{
 		// Hmm...  Okay...
 		warn( __FUNCTION__ " failed rx_urb %d", res );
@@ -383,9 +383,9 @@ static int CDCEther_close( struct net_device *net )
 	}
 
 	// We don't need the URBs anymore.
-	usb_unlink_urb( &ether_dev->rx_urb );
-	usb_unlink_urb( &ether_dev->tx_urb );
-	usb_unlink_urb( &ether_dev->intr_urb );
+	usb_unlink_urb( ether_dev->rx_urb );
+	usb_unlink_urb( ether_dev->tx_urb );
+	usb_unlink_urb( ether_dev->intr_urb );
 	
 	// That's it.  I'm done.
 	return 0;
@@ -1144,6 +1144,25 @@ static void * CDCEther_probe( struct usb_device *usb, unsigned int ifnum,
 	// Zero everything out.
 	memset(ether_dev, 0, sizeof(ether_dev_t));
 
+	ether_dev->rx_urb = usb_alloc_urb(0);
+	if (!ether_dev->rx_urb) {
+		kfree(ether_dev);
+		return NULL;
+	}
+	ether_dev->tx_urb = usb_alloc_urb(0);
+	if (!ether_dev->tx_urb) {
+		usb_free_urb(ether_dev->rx_urb);
+		kfree(ether_dev);
+		return NULL;
+	}
+	ether_dev->intr_urb = usb_alloc_urb(0);
+	if (!ether_dev->intr_urb) {
+		usb_free_urb(ether_dev->tx_urb);
+		usb_free_urb(ether_dev->rx_urb);
+		kfree(ether_dev);
+		return NULL;
+	}
+
 	// Let's see if we can find a configuration we can use.
 	rc = find_valid_configuration( usb, ether_dev );
 	if (rc)	{
@@ -1290,6 +1309,9 @@ static void CDCEther_disconnect( struct usb_device *usb, void *ptr )
 	                              &(usb->config[ether_dev->configuration_num].interface[ether_dev->data_interface]) );
 
 	// No more tied up kernel memory
+	usb_free_urb(ether_dev->intr_urb);
+	usb_free_urb(ether_dev->rx_urb);
+	usb_free_urb(ether_dev->rx_urb);
 	kfree( ether_dev );
 	
 	// This does no good, but it looks nice!

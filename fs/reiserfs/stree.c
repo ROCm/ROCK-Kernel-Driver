@@ -1489,7 +1489,7 @@ static int maybe_indirect_to_direct (struct reiserfs_transaction_handle *th,
     */
     if (atomic_read(&p_s_inode->i_count) > 1 || 
         !tail_has_to_be_packed (p_s_inode) || 
-	!page || p_s_inode->u.reiserfs_i.nopack) {
+	!page || REISERFS_I(p_s_inode)->nopack) {
 	// leave tail in an unformatted node	
 	*p_c_mode = M_SKIP_BALANCING;
 	cut_bytes = n_block_size - (n_new_file_size & (n_block_size - 1));
@@ -1654,7 +1654,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	    /* we delete first part of tail which was stored in direct
                item(s) */
 	    // FIXME: this is to keep 3.5 happy
-	    p_s_inode->u.reiserfs_i.i_first_direct_byte = U32_MAX;
+	    REISERFS_I(p_s_inode)->i_first_direct_byte = U32_MAX;
 	    p_s_inode->i_blocks -= p_s_sb->s_blocksize / 512;
 	}
     }
@@ -1691,7 +1691,7 @@ int reiserfs_cut_from_item (struct reiserfs_transaction_handle *th,
 	** be flushed before the transaction commits, so we don't need to 
 	** deal with it here.
 	*/
-	p_s_inode->u.reiserfs_i.i_pack_on_close = 0 ;
+	REISERFS_I(p_s_inode)->i_pack_on_close = 0 ;
     }
     return n_ret_value;
 }

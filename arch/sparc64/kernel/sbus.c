@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.18 2001/12/17 07:05:09 davem Exp $
+/* $Id: sbus.c,v 1.19 2002/01/23 11:27:32 davem Exp $
  * sbus.c: UltraSparc SBUS controller support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -628,10 +628,10 @@ void sbus_set_sbus64(struct sbus_dev *sdev, int bursts)
 
 /* SBUS SYSIO INO number to Sparc PIL level. */
 static unsigned char sysio_ino_to_pil[] = {
-	0, 1, 2, 7, 5, 7, 8, 9,		/* SBUS slot 0 */
-	0, 1, 2, 7, 5, 7, 8, 9,		/* SBUS slot 1 */
-	0, 1, 2, 7, 5, 7, 8, 9,		/* SBUS slot 2 */
-	0, 1, 2, 7, 5, 7, 8, 9,		/* SBUS slot 3 */
+	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 0 */
+	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 1 */
+	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 2 */
+	0, 2, 2, 7, 5, 7, 8, 9,		/* SBUS slot 3 */
 	3, /* Onboard SCSI */
 	5, /* Onboard Ethernet */
 /*XXX*/	8, /* Onboard BPP */
@@ -754,6 +754,10 @@ unsigned int sbus_build_irq(void *buscookie, unsigned int ino)
 		printk("sbus_irq_build: Bad SYSIO INO[%x]\n", ino);
 		panic("Bad SYSIO IRQ translations...");
 	}
+
+	if (PIL_RESERVED(pil))
+		BUG();
+
 	imap = sysio_irq_offsets[ino];
 	if (imap == ((unsigned long)-1)) {
 		prom_printf("get_irq_translations: Bad SYSIO INO[%x] cpu[%d]\n",

@@ -33,9 +33,9 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
 
     /* fast out for when nothing needs to be done */
     if ((atomic_read(&inode->i_count) > 1 ||
-         !inode->u.reiserfs_i.i_pack_on_close || 
+         REISERFS_I(inode)->i_pack_on_close || 
          !tail_has_to_be_packed(inode))       && 
-	inode->u.reiserfs_i.i_prealloc_count <= 0) {
+	REISERFS_I(inode)->i_prealloc_count <= 0) {
 	return 0;
     }    
     
@@ -50,7 +50,7 @@ static int reiserfs_file_release (struct inode * inode, struct file * filp)
     journal_end(&th, inode->i_sb, JOURNAL_PER_BALANCE_CNT * 3) ;
 
     if (atomic_read(&inode->i_count) <= 1 &&
-	inode->u.reiserfs_i.i_pack_on_close &&
+	REISERFS_I(inode)->i_pack_on_close &&
         tail_has_to_be_packed (inode)) {
 	/* if regular file is released by last holder and it has been
 	   appended (we append by unformatted node only) or its direct

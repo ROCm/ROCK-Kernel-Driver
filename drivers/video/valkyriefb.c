@@ -779,7 +779,7 @@ static void valkyrie_par_to_display(struct fb_par_valkyrie *par,
 static void __init valkyrie_init_info(struct fb_info *info, struct fb_info_valkyrie *p)
 {
 	strcpy(info->modename, p->fix.id);
-	info->node = -1;	/* ??? danj */
+	info->node = NODEV;
 	info->fbops = &valkyriefb_ops;
 	info->disp = &p->disp;
 	strcpy(info->fontname, fontname);

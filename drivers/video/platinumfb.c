@@ -591,7 +591,7 @@ static int __init init_platinum(struct fb_info_platinum *info)
 	disp = &info->disp;
 
 	strcpy(info->fb_info.modename, "platinum");
-	info->fb_info.node = -1;
+	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &platinumfb_ops;
 	info->fb_info.disp = disp;
 	strcpy(info->fb_info.fontname, fontname);

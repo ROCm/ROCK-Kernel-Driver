@@ -271,6 +271,8 @@ EXPORT_SYMBOL(lease_get_mtime);
 EXPORT_SYMBOL(lock_may_read);
 EXPORT_SYMBOL(lock_may_write);
 EXPORT_SYMBOL(dcache_readdir);
+EXPORT_SYMBOL(fd_install);
+EXPORT_SYMBOL(put_unused_fd);
 
 /* for stackable file systems (lofs, wrapfs, cryptfs, etc.) */
 EXPORT_SYMBOL(default_llseek);
@@ -533,9 +535,6 @@ EXPORT_SYMBOL(disk_name);	/* for md.c */
 
 /* binfmt_aout */
 EXPORT_SYMBOL(get_write_access);
-
-/* time */
-EXPORT_SYMBOL(get_fast_time);
 
 /* library functions */
 EXPORT_SYMBOL(strnicmp);

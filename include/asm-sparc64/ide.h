@@ -1,4 +1,4 @@
-/* $Id: ide.h,v 1.21 2001/09/25 20:21:48 kanoj Exp $
+/* $Id: ide.h,v 1.22 2002/01/16 20:58:40 davem Exp $
  * ide.h: Ultra/PCI specific IDE glue.
  *
  * Copyright (C) 1997  David S. Miller (davem@caip.rutgers.edu)
@@ -87,7 +87,7 @@ typedef union {
 		unsigned int reserved456: 3;
 		unsigned bit3		: 1;	/* ATA-2 thingy */
 		unsigned int SRST	: 1;	/* host soft reset bit */
-		unsigned int nIEN	: 1;	/* device INTRQ to host *
+		unsigned int nIEN	: 1;	/* device INTRQ to host */
 		unsigned int bit0	: 1;
 	} b;
 } control_t;

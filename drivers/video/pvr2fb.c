@@ -1034,7 +1034,7 @@ int __init pvr2fb_init(void)
 	
 	strcpy(fb_info.modename, pvr2fb_name);
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &pvr2fb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &pvr2fbcon_switch;

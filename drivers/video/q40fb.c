@@ -331,7 +331,7 @@ int __init q40fb_init(void)
 	fb_info.switch_con=&q40con_switch;
 	fb_info.updatevar=&q40con_updatevar;
 	fb_info.blank=&q40con_blank;	
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &q40fb_ops;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;  /* not as module for now */
 	

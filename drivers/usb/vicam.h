@@ -75,7 +75,7 @@ struct usb_vicam
 	int maxframesize;
 	struct picture_parm win;
 	struct proc_dir_entry *proc_entry;      /* /proc/se401/videoX */
-	struct urb readurb;
+	struct urb *readurb;
 };
 
 #endif

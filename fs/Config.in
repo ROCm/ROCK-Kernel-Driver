@@ -31,7 +31,10 @@ dep_mbool '  JBD (ext3) debugging support' CONFIG_JBD_DEBUG $CONFIG_JBD
 # msdos file systems
 tristate 'DOS FAT fs support' CONFIG_FAT_FS
 dep_tristate '  MSDOS fs support' CONFIG_MSDOS_FS $CONFIG_FAT_FS
-dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
+#dep_tristate '    UMSDOS: Unix-like file system on top of standard MSDOS fs' CONFIG_UMSDOS_FS $CONFIG_MSDOS_FS
+# UMSDOS is temprory broken
+define_bool CONFIG_UMSDOS_FS n
+
 dep_tristate '  VFAT (Windows-95) fs support' CONFIG_VFAT_FS $CONFIG_FAT_FS
 dep_tristate 'EFS file system support (read only) (EXPERIMENTAL)' CONFIG_EFS_FS $CONFIG_EXPERIMENTAL
 dep_tristate 'Journalling Flash File System (JFFS) support' CONFIG_JFFS_FS $CONFIG_MTD

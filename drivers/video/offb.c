@@ -566,7 +566,7 @@ static void __init offb_init_fb(const char *name, const char *full_name,
 
     strcpy(info->info.modename, "OFfb ");
     strncat(info->info.modename, full_name, sizeof(info->info.modename));
-    info->info.node = -1;
+    info->info.node = NODEV;
     info->info.fbops = &offb_ops;
     info->info.disp = disp;
     info->info.fontname[0] = '\0';

@@ -241,7 +241,7 @@ static DECLARE_MUTEX (scn_mutex); /* Initializes to unlocked */
 struct scn_usb_data {
 	struct usb_device *scn_dev;
 	devfs_handle_t devfs;	/* devfs device */
-	struct urb scn_irq;
+	struct urb *scn_irq;
 	unsigned int ifnum;	/* Interface number of the USB device */
 	int scn_minor;		/* Scanner minor - used in disconnect() */
 	unsigned char button;	/* Front panel buffer */

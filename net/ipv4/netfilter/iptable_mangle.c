@@ -2,6 +2,8 @@
  * This is the 1999 rewrite of IP Firewalling, aiming for kernel 2.3.x.
  *
  * Copyright (C) 1999 Paul `Rusty' Russell & Michael J. Neuling
+ *
+ * Extended to all five netfilter hooks by Brad Chapman & Harald Welte
  */
 #include <linux/config.h>
 #include <linux/module.h>
@@ -12,7 +14,11 @@
 #include <net/route.h>
 #include <linux/ip.h>
 
-#define MANGLE_VALID_HOOKS ((1 << NF_IP_PRE_ROUTING) | (1 << NF_IP_LOCAL_OUT))
+#define MANGLE_VALID_HOOKS ((1 << NF_IP_PRE_ROUTING) | \
+			    (1 << NF_IP_LOCAL_IN) | \
+			    (1 << NF_IP_FORWARD) | \
+			    (1 << NF_IP_LOCAL_OUT) | \
+			    (1 << NF_IP_POST_ROUTING))
 
 /* Standard entry. */
 struct ipt_standard
@@ -33,22 +39,45 @@ struct ipt_error
 	struct ipt_error_target target;
 };
 
+/* Ouch - five different hooks? Maybe this should be a config option..... -- BC */
 static struct
 {
 	struct ipt_replace repl;
-	struct ipt_standard entries[2];
+	struct ipt_standard entries[5];
 	struct ipt_error term;
 } initial_table __initdata
-= { { "mangle", MANGLE_VALID_HOOKS, 3,
-      sizeof(struct ipt_standard) * 2 + sizeof(struct ipt_error),
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) },
-      { [NF_IP_PRE_ROUTING] 0,
-	[NF_IP_LOCAL_OUT] sizeof(struct ipt_standard) },
+= { { "mangle", MANGLE_VALID_HOOKS, 6,
+      sizeof(struct ipt_standard) * 5 + sizeof(struct ipt_error),
+      { [NF_IP_PRE_ROUTING] 	0,
+	[NF_IP_LOCAL_IN] 	sizeof(struct ipt_standard),
+	[NF_IP_FORWARD] 	sizeof(struct ipt_standard) * 2,
+	[NF_IP_LOCAL_OUT] 	sizeof(struct ipt_standard) * 3,
+	[NF_IP_POST_ROUTING] 	sizeof(struct ipt_standard) * 4 },
+      { [NF_IP_PRE_ROUTING] 	0,
+	[NF_IP_LOCAL_IN] 	sizeof(struct ipt_standard),
+	[NF_IP_FORWARD] 	sizeof(struct ipt_standard) * 2,
+	[NF_IP_LOCAL_OUT] 	sizeof(struct ipt_standard) * 3,
+	[NF_IP_POST_ROUTING]	sizeof(struct ipt_standard) * 4 },
       0, NULL, { } },
     {
 	    /* PRE_ROUTING */
 	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ipt_entry),
+		sizeof(struct ipt_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
+	    /* LOCAL_IN */
+ 	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ipt_entry),
+		sizeof(struct ipt_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
+	    /* FORWARD */
+ 	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
 		0,
 		sizeof(struct ipt_entry),
 		sizeof(struct ipt_standard),
@@ -62,7 +91,15 @@ static struct
 		sizeof(struct ipt_standard),
 		0, { 0, 0 }, { } },
 	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
-		-NF_ACCEPT - 1 } }
+		-NF_ACCEPT - 1 } },
+	    /* POST_ROUTING */
+	    { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ipt_entry),
+		sizeof(struct ipt_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IPT_ALIGN(sizeof(struct ipt_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
     },
     /* ERROR */
     { { { { 0 }, { 0 }, { 0 }, { 0 }, "", "", { 0 }, { 0 }, 0, 0, 0 },
@@ -79,11 +116,11 @@ static struct
 
 static struct ipt_table packet_mangler
 = { { NULL, NULL }, "mangle", &initial_table.repl,
-    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL };
+    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-ipt_hook(unsigned int hook,
+ipt_route_hook(unsigned int hook,
 	 struct sk_buff **pskb,
 	 const struct net_device *in,
 	 const struct net_device *out,
@@ -121,7 +158,7 @@ route_me_harder(struct sk_buff *skb)
 }
 
 static unsigned int
-ipt_local_out_hook(unsigned int hook,
+ipt_local_hook(unsigned int hook,
 		   struct sk_buff **pskb,
 		   const struct net_device *in,
 		   const struct net_device *out,
@@ -159,9 +196,16 @@ ipt_local_out_hook(unsigned int hook,
 }
 
 static struct nf_hook_ops ipt_ops[]
-= { { { NULL, NULL }, ipt_hook, PF_INET, NF_IP_PRE_ROUTING, NF_IP_PRI_MANGLE },
-    { { NULL, NULL }, ipt_local_out_hook, PF_INET, NF_IP_LOCAL_OUT,
-		NF_IP_PRI_MANGLE }
+= { { { NULL, NULL }, ipt_route_hook, PF_INET, NF_IP_PRE_ROUTING, 
+	NF_IP_PRI_MANGLE },
+    { { NULL, NULL }, ipt_local_hook, PF_INET, NF_IP_LOCAL_IN,
+	NF_IP_PRI_MANGLE },
+    { { NULL, NULL }, ipt_route_hook, PF_INET, NF_IP_FORWARD,
+	NF_IP_PRI_MANGLE },
+    { { NULL, NULL }, ipt_local_hook, PF_INET, NF_IP_LOCAL_OUT,
+	NF_IP_PRI_MANGLE },
+    { { NULL, NULL }, ipt_route_hook, PF_INET, NF_IP_POST_ROUTING,
+	NF_IP_PRI_MANGLE }
 };
 
 static int __init init(void)
@@ -182,8 +226,26 @@ static int __init init(void)
 	if (ret < 0)
 		goto cleanup_hook0;
 
+	ret = nf_register_hook(&ipt_ops[2]);
+	if (ret < 0)
+		goto cleanup_hook1;
+
+	ret = nf_register_hook(&ipt_ops[3]);
+	if (ret < 0)
+		goto cleanup_hook2;
+
+	ret = nf_register_hook(&ipt_ops[4]);
+	if (ret < 0)
+		goto cleanup_hook3;
+
 	return ret;
 
+ cleanup_hook3:
+        nf_unregister_hook(&ipt_ops[3]);
+ cleanup_hook2:
+        nf_unregister_hook(&ipt_ops[2]);
+ cleanup_hook1:
+	nf_unregister_hook(&ipt_ops[1]);
  cleanup_hook0:
 	nf_unregister_hook(&ipt_ops[0]);
  cleanup_table:

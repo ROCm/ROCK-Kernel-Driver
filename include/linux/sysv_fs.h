@@ -21,6 +21,15 @@
 #include <linux/sched.h>	/* declares wake_up() */
 #include <linux/sysv_fs_sb.h>	/* defines the sv_... shortcuts */
 
+/* temporary hack. */
+#include <linux/sysv_fs_i.h>
+static inline struct sysv_inode_info *SYSV_I(struct inode *inode)
+{
+	/* I think list_entry should have a more descriptive name..  --hch */
+	return list_entry(inode, struct sysv_inode_info, vfs_inode);
+}
+/* end temporary hack. */
+
 
 /* Layout on disk */
 /* ============== */

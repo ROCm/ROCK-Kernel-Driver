@@ -12,6 +12,7 @@
 #include <linux/in.h>
 #include <linux/types.h>
 
+#include <linux/ncp_fs_i.h>
 #include <linux/ipx.h>
 #include <linux/ncp_no.h>
 
@@ -192,7 +193,10 @@ struct ncp_entry_info {
 #define NCP_SBP(sb)		(&((sb)->u.ncpfs_sb))
 
 #define NCP_SERVER(inode)	NCP_SBP((inode)->i_sb)
-#define NCP_FINFO(inode)	(&((inode)->u.ncpfs_i))
+static inline struct ncp_inode_info *NCP_FINFO(struct inode *inode)
+{
+	return list_entry(inode, struct ncp_inode_info, vfs_inode);
+}
 
 #ifdef DEBUG_NCP_MALLOC
 

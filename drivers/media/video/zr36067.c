@@ -2608,7 +2608,7 @@ static void zoran_reap_stat_com(struct zoran *zr)
 		}
 		frame = zr->jpg_pend[zr->jpg_dma_tail & BUZ_MASK_FRAME];
 		gbuf = &zr->jpg_gbuf[frame];
-		get_fast_time(&gbuf->bs.timestamp);
+		do_gettimeofday(&gbuf->bs.timestamp);
 
 		if (zr->codec_mode == BUZ_MODE_MOTION_COMPRESS) {
 			gbuf->bs.length = (stat_com & 0x7fffff) >> 1;

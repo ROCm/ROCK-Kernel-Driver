@@ -306,7 +306,7 @@ int __init xxxfb_init(void)
     fb_info.gen.fbhw->detect();
     strcpy(fb_info.gen.info.modename, "XXX");
     fb_info.gen.info.changevar = NULL;
-    fb_info.gen.info.node = -1;
+    fb_info.gen.info.node = NODEV;
     fb_info.gen.info.fbops = &xxxfb_ops;
     fb_info.gen.info.disp = &disp;
     fb_info.gen.info.switch_con = &xxxfb_switch;

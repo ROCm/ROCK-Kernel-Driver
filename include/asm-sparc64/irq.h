@@ -1,4 +1,4 @@
-/* $Id: irq.h,v 1.20 2001/03/09 01:31:40 davem Exp $
+/* $Id: irq.h,v 1.21 2002/01/23 11:27:36 davem Exp $
  * irq.h: IRQ registers on the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -11,10 +11,7 @@
 #include <linux/config.h>
 #include <linux/linkage.h>
 #include <linux/kernel.h>
-
-struct devid_cookie {
-	int dummy;
-};
+#include <asm/pil.h>
 
 /* You should not mess with this directly. That's the job of irq.c.
  *

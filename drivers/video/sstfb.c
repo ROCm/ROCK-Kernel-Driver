@@ -1797,7 +1797,7 @@ int __init sstfb_init(void)
 		f_ddprintk("membase_phys: %#lx\n", fb_info.video.base);
 		f_ddprintk("fbbase_virt: %#lx\n", fb_info.video.vbase);
 
-		fb_info.info.node       = -1 ;
+		fb_info.info.node       = NODEV;
 		fb_info.info.flags      = FBINFO_FLAG_DEFAULT;
 		fb_info.info.fbops      = &sstfb_ops;
 		fb_info.info.disp       = &disp;

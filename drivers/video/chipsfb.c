@@ -578,7 +578,7 @@ static void __init init_chips(struct fb_info_chips *p)
 	p->disp.scrollmode = SCROLL_YREDRAW;
 
 	strcpy(p->info.modename, p->fix.id);
-	p->info.node = -1;
+	p->info.node = NODEV;
 	p->info.fbops = &chipsfb_ops;
 	p->info.disp = &p->disp;
 	p->info.fontname[0] = 0;

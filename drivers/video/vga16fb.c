@@ -926,7 +926,7 @@ int __init vga16fb_init(void)
 	/* name should not depend on EGA/VGA */
 	strcpy(vga16fb.fb_info.modename, "VGA16 VGA");
 	vga16fb.fb_info.changevar = NULL;
-	vga16fb.fb_info.node = -1;
+	vga16fb.fb_info.node = NODEV;
 	vga16fb.fb_info.fbops = &vga16fb_ops;
 	vga16fb.fb_info.disp=&disp;
 	vga16fb.fb_info.switch_con=&vga16fb_switch;

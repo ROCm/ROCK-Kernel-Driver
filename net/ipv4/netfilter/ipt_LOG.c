@@ -217,7 +217,7 @@ static void dump_packet(const struct ipt_log_info *info,
 				printk("[");
 				dump_packet(info,
 					    (struct iphdr *)(icmph + 1),
-					    datalen-sizeof(struct iphdr),
+					    datalen-sizeof(struct icmphdr),
 					    0);
 				printk("] ");
 			}

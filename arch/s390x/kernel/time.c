@@ -255,7 +255,4 @@ void __init time_init(void)
         init_timer_cc -= 0x8126d60e46000000LL -
                          (0x3c26700LL*1000000*4096);
         tod_to_timeval(init_timer_cc, &xtime);
-
-	/* Set do_get_fast_time function pointer.  */
-	do_get_fast_time = do_gettimeofday;
 }

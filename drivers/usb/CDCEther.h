@@ -83,7 +83,7 @@ typedef struct _ether_dev_t {
 	__u16			wNumberMCFilters;
 	__u8			bNumberPowerFilters;
 	int			intr_interval;
-	struct urb		rx_urb, tx_urb, intr_urb;
+	struct urb		*rx_urb, *tx_urb, *intr_urb;
 	unsigned char		ALIGN(rx_buff[CDC_ETHER_MAX_MTU]);
 	unsigned char		ALIGN(tx_buff[CDC_ETHER_MAX_MTU]);
 	unsigned char		ALIGN(intr_buff[8]);

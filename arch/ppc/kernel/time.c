@@ -352,8 +352,6 @@ void __init time_init(void)
         	tz.tz_dsttime = 0;
         	do_sys_settimeofday(NULL, &tz);
         }
-
-       do_get_fast_time = do_gettimeofday;
 }
 
 #define TICK_SIZE tick

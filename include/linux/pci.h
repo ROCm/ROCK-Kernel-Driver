@@ -301,6 +301,7 @@
 #include <linux/ioport.h>
 #include <linux/list.h>
 #include <linux/errno.h>
+#include <linux/device.h>
 
 /* File state for mmap()s on /proc/bus/pci/X/Y */
 enum pci_mmap_state {
@@ -362,6 +363,8 @@ struct pci_dev {
 	u32             current_state;  /* Current operating state. In ACPI-speak,
 					   this is D0-D3, D0 being fully functional,
 					   and D3 being off. */
+
+	struct	device	dev;		/* Generic device interface */
 
 	/* device is compatible with these IDs */
 	unsigned short vendor_compatible[DEVICE_COUNT_COMPATIBLE];
@@ -429,6 +432,8 @@ struct pci_bus {
 	unsigned char	productver;	/* product version */
 	unsigned char	checksum;	/* if zero - checksum passed */
 	unsigned char	pad1;
+
+	struct iobus	iobus;		/* Generic device interface */
 };
 
 #define pci_bus_b(n) list_entry(n, struct pci_bus, node)
@@ -525,7 +530,6 @@ int pcibios_find_device (unsigned short vendor, unsigned short dev_id,
 
 /* Generic PCI functions used internally */
 
-void pci_init(void);
 int pci_bus_exists(const struct list_head *list, int nr);
 struct pci_bus *pci_scan_bus(int bus, struct pci_ops *ops, void *sysdata);
 struct pci_bus *pci_alloc_primary_bus(int bus);

@@ -890,7 +890,7 @@ int __init sgivwfb_init(void)
 
   strcpy(fb_info.modename, sgivwfb_name);
   fb_info.changevar = NULL;
-  fb_info.node = -1;
+  fb_info.node = NODEV;
   fb_info.fbops = &sgivwfb_ops;
   fb_info.disp = &disp;
   fb_info.switch_con = &sgivwfbcon_switch;

@@ -73,6 +73,8 @@ extern int atyfb_init(void);
 extern int atyfb_setup(char*);
 extern int aty128fb_init(void);
 extern int aty128fb_setup(char*);
+extern int neofb_init(void);
+extern int neofb_setup(char*);
 extern int igafb_init(void);
 extern int igafb_setup(char*);
 extern int imsttfb_init(void);
@@ -172,6 +174,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_ATY128
 	{ "aty128fb", aty128fb_init, aty128fb_setup },
+#endif
+#ifdef CONFIG_FB_NEOMAGIC
+	{ "neo", neofb_init, neofb_setup },
 #endif
 #ifdef CONFIG_FB_VIRGE
 	{ "virge", virgefb_init, virgefb_setup },

@@ -328,7 +328,7 @@ int __init hpfb_init_one(unsigned long base)
 	 */
 	strcpy(fb_info.modename, "Topcat");
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &hpfb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &hpfb_switch;

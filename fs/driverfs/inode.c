@@ -31,7 +31,7 @@
 #include <linux/dcache.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/driverfs_fs.h>
+#include <linux/device.h>
 
 #include <asm/uaccess.h>
 
@@ -232,6 +232,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	struct driver_file_entry * entry;
 	unsigned char *page;
 	ssize_t retval = 0;
+	struct device * dev;
 
 	entry = (struct driver_file_entry *)file->private_data;
 	if (!entry) {
@@ -239,10 +240,13 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 		return -ENOENT;
 	}
 
-	if (!entry->ops || !entry->ops->read) {
-		DBG("%s: no read callback\n",__FUNCTION__);
-		return -ENOENT;
-	}
+	dev = list_entry(entry->parent,struct device, dir);
+
+	if (!valid_device(dev))
+		return -EFAULT;
+
+	if (!entry->show)
+		goto done;
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
 	if (!page) {
@@ -253,7 +257,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->ops->read(page,count,*ppos,entry->data);
+		len = entry->show(dev,page,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -274,6 +278,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	free_page((unsigned long)page);
 
  done:
+	put_device(dev);
 	return retval;
 }
 
@@ -294,6 +299,7 @@ static ssize_t
 driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct driver_file_entry * entry;
+	struct device * dev;
 	ssize_t retval = 0;
 
 	entry = (struct driver_file_entry *)file->private_data;
@@ -302,16 +308,18 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 		return -ENOENT;
 	}
 
-	if (!entry->ops || !entry->ops->write) {
-		DBG("%s: no write callback\n",__FUNCTION__);
-		retval = -ENOENT;
+	dev = list_entry(entry->parent,struct device, dir);
+
+	if (!valid_device(dev))
+		return -EFAULT;
+
+	if (!entry->store)
 		goto done;
-	}
 
 	while (count > 0) {
 		ssize_t len;
 
-		len = entry->ops->write(buf,count,*ppos,entry->data);
+		len = entry->store(dev,buf,count,*ppos);
 
 		if (len <= 0) {
 			if (len < 0)
@@ -323,8 +331,8 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 		*ppos += len;
 		buf += len;
 	}
-
  done:
+	put_device(dev);
 	return retval;
 }
 
@@ -378,18 +386,6 @@ static int driverfs_d_delete_file (struct dentry * dentry)
 	return 0;
 }
 
-/* Similar to above - if this dentry goes away, free the
- * driver_dir_entry associated with it..
- */
-static int driverfs_d_delete_dir (struct dentry * dentry)
-{
-	struct driver_dir_entry * entry;
-	entry = (struct driver_dir_entry *)dentry->d_fsdata;
-	if (entry)
-		kfree(entry);
-	return 0;
-}
-
 static struct address_space_operations driverfs_aops = {
 
 };
@@ -423,10 +419,6 @@ static struct inode_operations driverfs_dir_inode_operations = {
 
 static struct dentry_operations driverfs_dentry_file_ops = {
 	d_delete:	driverfs_d_delete_file,
-};
-
-static struct dentry_operations driverfs_dentry_dir_ops = {
-	d_delete:	driverfs_d_delete_dir,
 };
 
 static struct super_operations driverfs_ops = {
@@ -546,33 +538,6 @@ MODULE_DESCRIPTION("The device driver filesystem");
 MODULE_LICENSE("GPL");
 
 /**
- * driverfs_create_dir_entry - allocate and initialise directory entry
- * @name:	name of the directory
- * @mode:	permissions of the dir
- */
-struct driver_dir_entry *
-driverfs_create_dir_entry(const char * name, mode_t mode)
-{
-	struct driver_dir_entry * entry;
-	int size = sizeof(struct driver_dir_entry) + strlen(name) + 1;
-
-
-	entry = kmalloc(size, GFP_KERNEL);
-	if (!entry)
-		return NULL;
-
-	memset(entry, 0, size);
-	strcpy((char *)entry + sizeof(struct driver_dir_entry), name);
-
-	entry->name = (char *)entry + sizeof(struct driver_dir_entry);
-
-	INIT_LIST_HEAD(&entry->files);
-	entry->mode = mode;
-
-	return entry;
-}
-
-/**
  * driverfs_create_dir - create a directory in the filesystem
  * @entry:	directory entry
  * @parent:	parent directory entry
@@ -672,6 +637,7 @@ driverfs_create_file(struct driver_file_entry * entry,
 		dentry->d_inode->u.generic_ip = (void *)entry;
 
 		entry->dentry = dentry;
+		entry->parent = parent;
 
 		list_add_tail(&entry->node,&parent->files);
 	}
@@ -784,39 +750,3 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
  done:
 	put_mount();
 }
-
-/**
- * driverfs_create_entry - allocate and initialise a struct driver_file_entry
- * @name:	name of the file
- * @mode:	permissions of the file
- * @ops:	Operations for the file
- * @data:	data that will be passed back to the callback
- *
- */
-struct driver_file_entry *
-driverfs_create_entry (const char * name, mode_t mode,
-		       struct driverfs_operations * ops, void * data)
-{
-	struct driver_file_entry * entry;
-	int size;
-
-	size = sizeof(struct driver_file_entry) + strlen(name) + 1;
-
-	entry = kmalloc(size,GFP_KERNEL);
-	if (!entry)
-		return NULL;
-
-	memset(entry, 0, size);
-	strcpy((char *)entry + sizeof(struct driver_file_entry), name);
-
-	entry->name = (char *)entry + sizeof(struct driver_file_entry);
-
-	INIT_LIST_HEAD(&entry->node);
-
-	entry->mode = mode;
-	entry->ops = ops;
-	entry->data = data;
-
-	return entry;
-}
-

@@ -218,10 +218,12 @@ void __init smp_callin(void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
+	init_idle();
+
 	while (!smp_threads_ready)
 		membar("#LoadLoad");
 
-	init_idle();
+	idle_startup_done();
 }
 
 void cpu_panic(void)
@@ -873,6 +875,48 @@ void smp_flush_tlb_page(struct mm_struct *mm, unsigned long page)
 	local_flush_and_out:
 		__flush_tlb_page(ctx, page, SECONDARY_CONTEXT);
 	}
+}
+
+/* Process migration IPIs. */
+
+extern unsigned long xcall_migrate_task;
+
+static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
+static task_t *new_task;
+
+void smp_migrate_task(int cpu, task_t *p)
+{
+	unsigned long mask = 1UL << cpu;
+
+	if (cpu == smp_processor_id())
+		return;
+
+	if (smp_processors_ready && (cpu_present_map & mask) != 0) {
+		u64 data0 = (((u64)&xcall_migrate_task) & 0xffffffff);
+
+		spin_lock(&migration_lock);
+		new_task = p;
+
+		if (tlb_type == spitfire)
+			spitfire_xcall_deliver(data0, 0, 0, mask);
+		else
+			cheetah_xcall_deliver(data0, 0, 0, mask);
+	}
+}
+
+/* Called at PIL level 1. */
+asmlinkage void smp_task_migration_interrupt(int irq, struct pt_regs *regs)
+{
+	task_t *p;
+
+	if (irq != PIL_MIGRATE)
+		BUG();
+
+	clear_softint(1 << irq);
+
+	p = new_task;
+	spin_unlock(&migration_lock);
+	sched_task_migrated(p);
 }
 
 /* CPU capture. */

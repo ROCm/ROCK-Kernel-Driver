@@ -1866,7 +1866,7 @@ init_imstt(struct fb_info_imstt *p)
 
 	strcpy(p->info.modename, p->fix.id);
 	strcpy(p->info.fontname, fontname);
-	p->info.node = -1;
+	p->info.node = NODEV;
 	p->info.fbops = &imsttfb_ops;
 	p->info.disp = &p->disp;
 	p->info.changevar = 0;

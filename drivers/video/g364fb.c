@@ -378,7 +378,7 @@ int __init g364fb_init(void)
     disp.dispsw = &fbcon_g364cfb8;
 
     strcpy(fb_info.modename, fb_fix.id);
-    fb_info.node = -1;
+    fb_info.node = NODEV;
     fb_info.fbops = &g364fb_ops;
     fb_info.disp = &disp;
     fb_info.fontname[0] = '\0';

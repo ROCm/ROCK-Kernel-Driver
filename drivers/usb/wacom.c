@@ -100,7 +100,7 @@ struct wacom {
 	signed char data[10];
 	struct input_dev dev;
 	struct usb_device *usbdev;
-	struct urb irq;
+	struct urb *irq;
 	struct wacom_features *features;
 	int tool[2];
 	int open;
@@ -335,8 +335,8 @@ static int wacom_open(struct input_dev *dev)
 	if (wacom->open++)
 		return 0;
 
-	wacom->irq.dev = wacom->usbdev;
-	if (usb_submit_urb(&wacom->irq))
+	wacom->irq->dev = wacom->usbdev;
+	if (usb_submit_urb(wacom->irq))
 		return -EIO;
 
 	return 0;
@@ -347,7 +347,7 @@ static void wacom_close(struct input_dev *dev)
 	struct wacom *wacom = dev->private;
 
 	if (!--wacom->open)
-		usb_unlink_urb(&wacom->irq);
+		usb_unlink_urb(wacom->irq);
 }
 
 static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struct usb_device_id *id)
@@ -357,6 +357,12 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	if (!(wacom = kmalloc(sizeof(struct wacom), GFP_KERNEL))) return NULL;
 	memset(wacom, 0, sizeof(struct wacom));
+
+	wacom->irq = usb_alloc_urb(0);
+	if (!wacom->irq) {
+		kfree(wacom);
+		return NULL;
+	}
 
 	wacom->features = wacom_features + id->driver_info;
 
@@ -397,7 +403,7 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 
 	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
 
-	FILL_INT_URB(&wacom->irq, dev, usb_rcvintpipe(dev, endpoint->bEndpointAddress),
+	FILL_INT_URB(wacom->irq, dev, usb_rcvintpipe(dev, endpoint->bEndpointAddress),
 		     wacom->data, wacom->features->pktlen, wacom->features->irq, wacom, endpoint->bInterval);
 
 	input_register_device(&wacom->dev);
@@ -411,8 +417,9 @@ static void *wacom_probe(struct usb_device *dev, unsigned int ifnum, const struc
 static void wacom_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct wacom *wacom = ptr;
-	usb_unlink_urb(&wacom->irq);
+	usb_unlink_urb(wacom->irq);
 	input_unregister_device(&wacom->dev);
+	usb_free_urb(wacom->irq);
 	kfree(wacom);
 }
 

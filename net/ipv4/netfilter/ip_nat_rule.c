@@ -104,7 +104,7 @@ static struct
 
 static struct ipt_table nat_table
 = { { NULL, NULL }, "nat", &nat_initial_table.repl,
-    NAT_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL };
+    NAT_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
 
 LIST_HEAD(nat_expect_list);
 

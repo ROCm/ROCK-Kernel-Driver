@@ -157,7 +157,7 @@ check_for_demasq(struct sk_buff **pskb)
 		/* Fall thru... */
 	case IPPROTO_TCP:
 	case IPPROTO_UDP:
-		IP_NF_ASSERT((skb->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
+		IP_NF_ASSERT(((*pskb)->nh.iph->frag_off & htons(IP_OFFSET)) == 0);
 
 		if (!get_tuple(iph, (*pskb)->len, &tuple, protocol)) {
 			if (net_ratelimit())

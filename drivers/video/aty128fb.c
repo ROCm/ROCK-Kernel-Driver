@@ -1704,7 +1704,7 @@ aty128_init(struct fb_info_aty128 *info, const char *name)
 
     /* fill in info */
     strcpy(info->fb_info.modename, aty128fb_name);
-    info->fb_info.node  = -1;
+    info->fb_info.node  = NODEV;
     info->fb_info.fbops = &aty128fb_ops;
     info->fb_info.disp  = &info->disp;
     strcpy(info->fb_info.fontname, fontname);

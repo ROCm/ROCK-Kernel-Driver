@@ -1,4 +1,4 @@
-/* $Id: sungem.c,v 1.48 2002/01/15 06:26:37 davem Exp $
+/* $Id: sungem.c,v 1.49 2002/01/23 15:40:45 davem Exp $
  * sungem.c: Sun GEM ethernet driver.
  *
  * Copyright (C) 2000, 2001 David S. Miller (davem@redhat.com)
@@ -10,6 +10,10 @@
  *  - Get rid of all those nasty mdelay's and replace them
  * with schedule_timeout.
  *  - Implement WOL
+ *  - Currently, forced Gb mode is only supported on bcm54xx
+ *    PHY for which I use the SPD2 bit of the control register.
+ *    On m1011 PHY, I can't force as I don't have the specs, but
+ *    I can at least detect gigabit with autoneg.
  */
 
 #include <linux/module.h>
@@ -86,7 +90,7 @@ static u16 link_modes[] __devinitdata = {
 	BMCR_ANENABLE,			/* 0 : autoneg */
 	0,				/* 1 : 10bt half duplex */
 	BMCR_SPEED100,			/* 2 : 100bt half duplex */
-	BMCR_SPD2, /* verify this */	/* 3 : 1000bt half duplex */
+	BMCR_SPD2, /* bcm54xx only */   /* 3 : 1000bt half duplex */
 	BMCR_FULLDPLX,			/* 4 : 10bt full duplex */
 	BMCR_SPEED100|BMCR_FULLDPLX,	/* 5 : 100bt full duplex */
 	BMCR_SPD2|BMCR_FULLDPLX		/* 6 : 1000bt full duplex */
@@ -1004,6 +1008,14 @@ static void gem_read_mii_link_mode(struct gem *gp, int *fd, int *spd, int *pause
 			*fd = 1;
 		if (val & (LPA_100FULL | LPA_100HALF))
 			*spd = 100;
+
+		if (gp->phy_mod == phymod_m1011) {
+			val = phy_read(gp, 0x0a);
+			if (val & 0xc00)
+				*spd = 1000;
+			if (val & 0x800)
+				*fd = 1;
+		}
 	}
 }
 
@@ -1579,6 +1591,11 @@ static void gem_init_phy(struct gem *gp)
 			gem_init_bcm5411_phy(gp);
 			gp->gigabit_capable = 1;
 			break;
+		case 0x1410c60:
+			printk("M1011 (Marvel ?)\n");
+			gp->phy_mod = phymod_m1011;
+			gp->gigabit_capable = 1;
+			break;
 
 		case 0x18074c0:
 			printk("Lucent\n");
@@ -1591,7 +1608,7 @@ static void gem_init_phy(struct gem *gp)
 			break;
 
 		default:
-			printk("Unknown\n");
+			printk("Unknown (Using generic mode)\n");
 			gp->phy_mod = phymod_generic;
 			break;
 		};
@@ -1662,6 +1679,12 @@ static void gem_init_phy(struct gem *gp)
 		writel(val, gp->regs + PCS_SCTRL);
 		gp->gigabit_capable = 1;
 	}
+
+	/* BMCR_SPD2 is a broadcom 54xx specific thing afaik */
+	if (gp->phy_mod != phymod_bcm5400 && gp->phy_mod != phymod_bcm5401 &&
+	    gp->phy_mod != phymod_bcm5411)
+	    	gp->link_cntl &= ~BMCR_SPD2;
+	    
 }
 
 static void gem_init_dma(struct gem *gp)
@@ -1851,9 +1874,8 @@ static int gem_check_invariants(struct gem *gp)
 	u32 mif_cfg;
 
 	/* On Apple's sungem, we can't rely on registers as the chip
-	 * was been powered down by the firmware. We do the PHY lookup
-	 * when the interface is opened and we configure the driver
-	 * with known values.
+	 * was been powered down by the firmware. The PHY is looked
+	 * up later on.
 	 */
 	if (pdev->vendor == PCI_VENDOR_ID_APPLE) {
 		gp->phy_type = phy_mii_mdio0;
@@ -1978,7 +2000,8 @@ static void gem_apple_powerup(struct gem *gp)
 
 	pmac_call_feature(PMAC_FTR_GMAC_ENABLE, gp->of_node, 0, 1);
 
-	udelay(100);
+	current->state = TASK_UNINTERRUPTIBLE;
+	schedule_timeout((21 * HZ) / 1000);
 
 	pci_read_config_word(gp->pdev, PCI_COMMAND, &cmd);
 	cmd |= PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
@@ -2048,7 +2071,8 @@ static void gem_stop_phy(struct gem *gp)
 				  val & ~MII_BCM5201_AUXMODE2_LOWPOWER);
 #endif				
 			phy_write(gp, MII_BCM5201_MULTIPHY, MII_BCM5201_MULTIPHY_SUPERISOLATE);
-		}
+		} else if (gp->phy_mod == phymod_m1011)
+			phy_write(gp, MII_BMCR, BMCR_PDOWN);
 
 		/* According to Apple, we must set the MDIO pins to this begnign
 		 * state or we may 1) eat more current, 2) damage some PHYs

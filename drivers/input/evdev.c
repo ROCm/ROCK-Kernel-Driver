@@ -67,7 +67,7 @@ static void evdev_event(struct input_handle *handle, unsigned int type, unsigned
 
 	while (list) {
 
-		get_fast_time(&list->buffer[list->head].time);
+		do_gettimeofday(&list->buffer[list->head].time);
 		list->buffer[list->head].type = type;
 		list->buffer[list->head].code = code;
 		list->buffer[list->head].value = value;

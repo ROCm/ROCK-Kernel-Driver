@@ -186,7 +186,7 @@ inline int get_last_unformatted_node_blocknr_of_file(  struct key * p_s_key_to_s
 
       copy_key(&unf_key_to_search,p_s_key_to_search);
       unf_key_to_search.k_uniqueness = TYPE_INDIRECT;
-      unf_key_to_search.k_offset = p_s_inode->u.reiserfs_i.i_first_direct_byte - 1;
+      unf_key_to_search.k_offset = REISERFS_I(p_s_inode)->i_first_direct_byte - 1;
 
         /* p_s_key_to_search->k_offset -  MAX_ITEM_LEN(p_s_sb->s_blocksize); */
       if (search_for_position_by_key (p_s_sb, &unf_key_to_search, p_unf_search_path, &n_pos_in_item) == POSITION_FOUND)
@@ -218,16 +218,16 @@ static int get_buffer_near_last_unf ( struct super_block * p_s_sb, struct key * 
   unf_key_to_search.k_uniqueness = TYPE_INDIRECT;
   
   if (
-      (p_s_inode->u.reiserfs_i.i_first_direct_byte > 4095) /* i_first_direct_byte gets used for all sorts of
+      (REISERFS_I(p_s_inode)->i_first_direct_byte > 4095) /* i_first_direct_byte gets used for all sorts of
                                                               crap other than what the name indicates, thus
                                                               testing to see if it is 0 is not enough */
-      && (p_s_inode->u.reiserfs_i.i_first_direct_byte < MAX_KEY_OFFSET) /* if there is no direct item then
+      && (REISERFS_I(p_s_inode)->i_first_direct_byte < MAX_KEY_OFFSET) /* if there is no direct item then
                                                                            i_first_direct_byte = MAX_KEY_OFFSET */
       )
     {
                                 /* actually, we don't want the last unformatted node, we want the last unformatted node
                                    which is before the current file offset */
-      unf_key_to_search.k_offset = ((p_s_inode->u.reiserfs_i.i_first_direct_byte -1) < unf_key_to_search.k_offset) ? p_s_inode->u.reiserfs_i.i_first_direct_byte -1 :  unf_key_to_search.k_offset;
+      unf_key_to_search.k_offset = ((REISERFS_I(p_s_inode)->i_first_direct_byte -1) < unf_key_to_search.k_offset) ? REISERFS_I(p_s_inode)->i_first_direct_byte -1 :  unf_key_to_search.k_offset;
 
       while (unf_key_to_search.k_offset > -1)
         {

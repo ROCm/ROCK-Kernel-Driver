@@ -19,7 +19,7 @@ static inline block_t cpu_to_block(unsigned long n)
 
 static inline block_t *i_data(struct inode *inode)
 {
-	return (block_t *)inode->u.minix_i.u.i2_data;
+	return (block_t *)minix_i(inode)->u.i2_data;
 }
 
 static int block_to_path(struct inode * inode, long block, int offsets[DEPTH])

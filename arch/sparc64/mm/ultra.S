@@ -1,4 +1,4 @@
-/* $Id: ultra.S,v 1.70 2001/11/29 16:42:10 kanoj Exp $
+/* $Id: ultra.S,v 1.71 2002/01/23 11:27:36 davem Exp $
  * ultra.S: Don't expand these all over the place...
  *
  * Copyright (C) 1997, 2000 David S. Miller (davem@redhat.com)
@@ -10,6 +10,7 @@
 #include <asm/page.h>
 #include <asm/spitfire.h>
 #include <asm/mmu_context.h>
+#include <asm/pil.h>
 
 	/* Basically, all this madness has to do with the
 	 * fact that Cheetah does not support IMMU flushes
@@ -690,5 +691,12 @@ xcall_call_function:
 	 nop
 	b,pt		%xcc, rtrap
 	 clr		%l6
+
+	.globl		xcall_migrate_task
+xcall_migrate_task:
+	mov		1, %g2
+	sllx		%g2, (PIL_MIGRATE), %g2
+	wr		%g2, 0x0, %set_softint
+	retry
 
 #endif /* CONFIG_SMP */

@@ -26,6 +26,7 @@
 #include <linux/locks.h>
 #include <linux/smp_lock.h>
 #include <linux/highuid.h>
+#include <linux/slab.h>
 #include <asm/byteorder.h>
 
 /* This is only called on sync() and umount(), when s_dirt=1. */
@@ -144,6 +145,7 @@ static void sysv_read_inode(struct inode *inode)
 	struct super_block * sb = inode->i_sb;
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
+	struct sysv_inode_info * si;
 	unsigned int block, ino;
 	dev_t rdev = 0;
 
@@ -169,13 +171,15 @@ static void sysv_read_inode(struct inode *inode)
 	inode->i_mtime = fs32_to_cpu(sb, raw_inode->i_mtime);
 	inode->i_ctime = fs32_to_cpu(sb, raw_inode->i_ctime);
 	inode->i_blocks = inode->i_blksize = 0;
+
+	si = SYSV_I(inode);
 	for (block = 0; block < 10+1+1+1; block++)
 		read3byte(sb, &raw_inode->i_a.i_addb[3*block],
-			(unsigned char*)&inode->u.sysv_i.i_data[block]);
+			(unsigned char*)&si->i_data[block]);
 	brelse(bh);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		rdev = (u16)fs32_to_cpu(sb, inode->u.sysv_i.i_data[0]);
-	inode->u.sysv_i.i_dir_start_lookup = 0;
+		rdev = (u16)fs32_to_cpu(sb, si->i_data[0]);
+	si->i_dir_start_lookup = 0;
 	sysv_set_inode(inode, rdev);
 	return;
 
@@ -189,6 +193,7 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	struct super_block * sb = inode->i_sb;
 	struct buffer_head * bh;
 	struct sysv_inode * raw_inode;
+	struct sysv_inode_info * si;
 	unsigned int ino, block;
 
 	ino = inode->i_ino;
@@ -211,11 +216,12 @@ static struct buffer_head * sysv_update_inode(struct inode * inode)
 	raw_inode->i_atime = cpu_to_fs32(sb, inode->i_atime);
 	raw_inode->i_mtime = cpu_to_fs32(sb, inode->i_mtime);
 	raw_inode->i_ctime = cpu_to_fs32(sb, inode->i_ctime);
+
+	si = SYSV_I(inode);
 	if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode))
-		inode->u.sysv_i.i_data[0] = 
-			cpu_to_fs32(sb, kdev_t_to_nr(inode->i_rdev));
+		si->i_data[0] = cpu_to_fs32(sb, kdev_t_to_nr(inode->i_rdev));
 	for (block = 0; block < 10+1+1+1; block++)
-		write3byte(sb, (unsigned char*)&inode->u.sysv_i.i_data[block],
+		write3byte(sb, (unsigned char*)&si->i_data[block],
 			&raw_inode->i_a.i_addb[3*block]);
 	mark_buffer_dirty(bh);
 	return bh;
@@ -260,7 +266,35 @@ static void sysv_delete_inode(struct inode *inode)
 	unlock_kernel();
 }
 
+static kmem_cache_t *sysv_inode_cachep;
+
+static struct inode *sysv_alloc_inode(struct super_block *sb)
+{
+	struct sysv_inode_info *si;
+
+	si = kmem_cache_alloc(sysv_inode_cachep, SLAB_KERNEL);
+	if (!si)
+		return NULL;
+	return &si->vfs_inode;
+}
+
+static void sysv_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(sysv_inode_cachep, SYSV_I(inode));
+}
+
+static void init_once(void *p, kmem_cache_t *cachep, unsigned long flags)
+{
+	struct sysv_inode_info *si = (struct sysv_inode_info *)p;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+			SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&si->vfs_inode);
+}
+
 struct super_operations sysv_sops = {
+	alloc_inode:	sysv_alloc_inode,
+	destroy_inode:	sysv_destroy_inode,
 	read_inode:	sysv_read_inode,
 	write_inode:	sysv_write_inode,
 	delete_inode:	sysv_delete_inode,
@@ -268,3 +302,18 @@ struct super_operations sysv_sops = {
 	write_super:	sysv_write_super,
 	statfs:		sysv_statfs,
 };
+
+int __init sysv_init_icache(void)
+{
+	sysv_inode_cachep = kmem_cache_create("sysv_inode_cache",
+			sizeof(struct sysv_inode_info), 0,
+			SLAB_HWCACHE_ALIGN, init_once, NULL);
+	if (!sysv_inode_cachep)
+		return -ENOMEM;
+	return 0;
+}
+
+void sysv_destroy_icache(void)
+{
+	kmem_cache_destroy(sysv_inode_cachep);
+}

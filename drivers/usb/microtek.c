@@ -324,7 +324,7 @@ static inline void mts_urb_abort(struct mts_desc* desc) {
 	MTS_DEBUG_GOT_HERE();
 	mts_debug_dump(desc);
 
-	usb_unlink_urb( &desc->urb );
+	usb_unlink_urb( desc->urb );
 }
 
 static struct mts_desc * mts_list; /* list of active scanners */
@@ -365,6 +365,7 @@ void mts_remove_nolock( struct mts_desc* to_remove )
 	scsi_unregister_host(&to_remove->ctempl);
 	unlock_kernel();
 
+	usb_free_urb(to_remove->urb);
 	kfree( to_remove );
 }
 
@@ -705,7 +706,7 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	}
 
 	
-	FILL_BULK_URB(&desc->urb,
+	FILL_BULK_URB(desc->urb,
 		      desc->usb_dev,
 		      usb_sndbulkpipe(desc->usb_dev,desc->ep_out),
 		      srb->cmnd,
@@ -718,7 +719,7 @@ int mts_scsi_queuecommand( Scsi_Cmnd *srb, mts_scsi_cmnd_callback callback )
 	mts_build_transfer_context( srb, desc );
 	desc->context.final_callback = callback;
 	
-	res=usb_submit_urb(&desc->urb);
+	res=usb_submit_urb(desc->urb);
 
 	if(unlikely(res)){
 		MTS_ERROR("error %d submitting URB\n",(int)res);
@@ -932,10 +933,12 @@ static void * mts_usb_probe (struct usb_device *dev, unsigned int interface,
 		return NULL;
 	}
 
-	/* As done by usb_alloc_urb */
 	memset( new_desc, 0, sizeof(*new_desc) );
-	spin_lock_init(&new_desc->urb.lock);
-	
+	new_desc->urb = usb_alloc_urb(0);
+	if (!new_desc->urb) {
+		kfree(new_desc);
+		return NULL;
+	}
 		
 	/* initialising that descriptor */
 	new_desc->usb_dev = dev;

@@ -358,7 +358,7 @@ int __init maxinefb_init(void)
 	strcpy(fb_info.modename, "Maxine onboard graphics 1024x768x8");
 	/* fb_info.modename: maximum of 39 characters + trailing nullbyte, KM */
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &maxinefb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &maxinefb_switch;

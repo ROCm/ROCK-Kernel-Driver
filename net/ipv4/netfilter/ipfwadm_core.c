@@ -20,7 +20,7 @@
  *	license in recognition of the original copyright.
  *				-- Alan Cox.
  *
- *	$Id: ipfwadm_core.c,v 1.9 2001/09/18 22:29:10 davem Exp $
+ *	$Id: ipfwadm_core.c,v 1.10 2002/01/23 13:20:54 davem Exp $
  *
  *	Ported from BSD to Linux,
  *		Alan Cox 22/Nov/1994.
@@ -104,6 +104,7 @@
 #include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
+#include <linux/module.h>
 
 #include <linux/socket.h>
 #include <linux/sockios.h>
@@ -687,6 +688,7 @@ static void free_fw_chain(struct ip_fw *volatile* chainptr)
 		ftmp = *chainptr;
 		*chainptr = ftmp->fw_next;
 		kfree(ftmp);
+		MOD_DEC_USE_COUNT();
 	}
 	restore_flags(flags);
 }
@@ -730,6 +732,7 @@ static int insert_in_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	ftmp->fw_next = *chainptr;
        	*chainptr=ftmp;
 	restore_flags(flags);
+	MOD_INC_USE_COUNT();
 	return(0);
 }
 
@@ -780,6 +783,7 @@ static int append_to_chain(struct ip_fw *volatile* chainptr, struct ip_fw *frwl,
 	else
         	*chainptr=ftmp;
 	restore_flags(flags);
+	MOD_INC_USE_COUNT();
 	return(0);
 }
 
@@ -853,9 +857,10 @@ static int del_from_chain(struct ip_fw *volatile*chainptr, struct ip_fw *frwl)
 		 }
 	}
 	restore_flags(flags);
-	if (was_found)
+	if (was_found) {
+		MOD_DEC_USE_COUNT();
 		return 0;
-	else
+	} else
 		return(EINVAL);
 }
 

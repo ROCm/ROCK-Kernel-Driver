@@ -2828,7 +2828,7 @@ int __init atafb_init(void)
 
 	strcpy(fb_info.modename, "Atari Builtin ");
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &atafb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &atafb_switch;

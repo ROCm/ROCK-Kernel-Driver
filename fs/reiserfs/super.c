@@ -124,8 +124,54 @@ void reiserfs_put_super (struct super_block * s)
   return;
 }
 
+static kmem_cache_t * reiserfs_inode_cachep;
+
+static struct inode *reiserfs_alloc_inode(struct super_block *sb)
+{
+	struct reiserfs_inode_info *ei;
+	ei = (struct reiserfs_inode_info *)kmem_cache_alloc(reiserfs_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void reiserfs_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(reiserfs_inode_cachep, REISERFS_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct reiserfs_inode_info *ei = (struct reiserfs_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR) {
+		INIT_LIST_HEAD(&ei->i_prealloc_list) ;
+		inode_init_once(&ei->vfs_inode);
+	}
+}
+ 
+static int init_inodecache(void)
+{
+	reiserfs_inode_cachep = kmem_cache_create("reiserfs_inode_cache",
+					     sizeof(struct reiserfs_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (reiserfs_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(reiserfs_inode_cachep))
+		printk(KERN_INFO "reiserfs_inode_cache: not all structures were freed\n");
+}
+
 struct super_operations reiserfs_sops = 
 {
+  alloc_inode: reiserfs_alloc_inode,
+  destroy_inode: reiserfs_destroy_inode,
   read_inode: reiserfs_read_inode,
   read_inode2: reiserfs_read_inode2,
   write_inode: reiserfs_write_inode,
@@ -365,7 +411,7 @@ static int read_super_block (struct super_block * s, int offset)
     bh = sb_bread (s, offset / s->s_blocksize);
     if (!bh) {
       printk ("read_super_block: "
-              "bread failed (dev %s, block %d, size %d)\n",
+              "bread failed (dev %s, block %ld, size %ld)\n",
               s->s_id, offset / s->s_blocksize, s->s_blocksize);
       return 1;
     }
@@ -373,7 +419,7 @@ static int read_super_block (struct super_block * s, int offset)
     rs = (struct reiserfs_super_block *)bh->b_data;
     if (!is_reiserfs_magic_string (rs)) {
       printk ("read_super_block: "
-              "can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
+              "can't find a reiserfs filesystem on (dev %s, block %lu, size %ld)\n",
               s->s_id, bh->b_blocknr, s->s_blocksize);
       brelse (bh);
       return 1;
@@ -389,7 +435,7 @@ static int read_super_block (struct super_block * s, int offset)
     bh = reiserfs_bread (s, offset / s->s_blocksize);
     if (!bh) {
 	printk("read_super_block: "
-                "bread failed (dev %s, block %d, size %d)\n",
+                "bread failed (dev %s, block %ld, size %ld)\n",
                 s->s_id, offset / s->s_blocksize, s->s_blocksize);
 	return 1;
     }
@@ -397,7 +443,7 @@ static int read_super_block (struct super_block * s, int offset)
     rs = (struct reiserfs_super_block *)bh->b_data;
     if (!is_reiserfs_magic_string (rs) || sb_blocksize(rs) != s->s_blocksize) {
 	printk ("read_super_block: "
-		"can't find a reiserfs filesystem on (dev %s, block %lu, size %d)\n",
+		"can't find a reiserfs filesystem on (dev %s, block %lu, size %ld)\n",
 		s->s_id, bh->b_blocknr, s->s_blocksize);
 	brelse (bh);
 	printk ("read_super_block: can't find a reiserfs filesystem on dev %s.\n", s->s_id);
@@ -803,10 +849,22 @@ static DECLARE_FSTYPE_DEV(reiserfs_fs_type,"reiserfs",reiserfs_read_super);
 //
 static int __init init_reiserfs_fs (void)
 {
+	int err = init_inodecache();
+	if (err)
+		goto out1;
 	reiserfs_proc_info_global_init();
 	reiserfs_proc_register_global( "version", 
 				       reiserfs_global_version_in_proc );
-        return register_filesystem(&reiserfs_fs_type);
+        err = register_filesystem(&reiserfs_fs_type);
+	if (err)
+		goto out;
+	return 0;
+out:
+	reiserfs_proc_unregister_global( "version" );
+	reiserfs_proc_info_global_done();
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 MODULE_DESCRIPTION("ReiserFS journaled filesystem");
@@ -822,6 +880,7 @@ static void __exit exit_reiserfs_fs(void)
 	reiserfs_proc_unregister_global( "version" );
 	reiserfs_proc_info_global_done();
         unregister_filesystem(&reiserfs_fs_type);
+	destroy_inodecache();
 }
 
 module_init(init_reiserfs_fs) ;

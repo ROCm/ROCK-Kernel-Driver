@@ -568,7 +568,7 @@ static int __init iga_init(struct fb_info_iga *info)
 	}
 
 	strcpy(info->fb_info.modename, igafb_name);
-	info->fb_info.node = -1;
+	info->fb_info.node = NODEV;
 	info->fb_info.fbops = &igafb_ops;
 	info->fb_info.disp = &info->disp;
 	strcpy(info->fb_info.fontname, fontname);

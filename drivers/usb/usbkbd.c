@@ -73,7 +73,7 @@ struct usb_kbd {
 	struct usb_device *usbdev;
 	unsigned char new[8];
 	unsigned char old[8];
-	struct urb irq, led;
+	struct urb *irq, *led;
 	struct usb_ctrlrequest dr;
 	unsigned char leds, newleds;
 	char name[128];
@@ -121,15 +121,15 @@ int usb_kbd_event(struct input_dev *dev, unsigned int type, unsigned int code, i
 		       (!!test_bit(LED_SCROLLL, dev->led) << 2) | (!!test_bit(LED_CAPSL,   dev->led) << 1) |
 		       (!!test_bit(LED_NUML,    dev->led));
 
-	if (kbd->led.status == -EINPROGRESS)
+	if (kbd->led->status == -EINPROGRESS)
 		return 0;
 
 	if (kbd->leds == kbd->newleds)
 		return 0;
 
 	kbd->leds = kbd->newleds;
-	kbd->led.dev = kbd->usbdev;
-	if (usb_submit_urb(&kbd->led))
+	kbd->led->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->led))
 		err("usb_submit_urb(leds) failed");
 
 	return 0;
@@ -146,8 +146,8 @@ static void usb_kbd_led(struct urb *urb)
 		return;
 
 	kbd->leds = kbd->newleds;
-	kbd->led.dev = kbd->usbdev;
-	if (usb_submit_urb(&kbd->led))
+	kbd->led->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->led))
 		err("usb_submit_urb(leds) failed");
 }
 
@@ -158,8 +158,8 @@ static int usb_kbd_open(struct input_dev *dev)
 	if (kbd->open++)
 		return 0;
 
-	kbd->irq.dev = kbd->usbdev;
-	if (usb_submit_urb(&kbd->irq))
+	kbd->irq->dev = kbd->usbdev;
+	if (usb_submit_urb(kbd->irq))
 		return -EIO;
 
 	return 0;
@@ -170,7 +170,7 @@ static void usb_kbd_close(struct input_dev *dev)
 	struct usb_kbd *kbd = dev->private;
 
 	if (!--kbd->open)
-		usb_unlink_urb(&kbd->irq);
+		usb_unlink_urb(kbd->irq);
 }
 
 static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
@@ -201,6 +201,18 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	if (!(kbd = kmalloc(sizeof(struct usb_kbd), GFP_KERNEL))) return NULL;
 	memset(kbd, 0, sizeof(struct usb_kbd));
 
+	kbd->irq = usb_alloc_urb(0);
+	if (!kbd->irq) {
+		kfree(kbd);
+		return NULL;
+	}
+	kbd->led = usb_alloc_urb(0);
+	if (!kbd->led) {
+		usb_free_urb(kbd->irq);
+		kfree(kbd);
+		return NULL;
+	}
+
 	kbd->usbdev = dev;
 
 	kbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
@@ -215,7 +227,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 	kbd->dev.open = usb_kbd_open;
 	kbd->dev.close = usb_kbd_close;
 
-	FILL_INT_URB(&kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
+	FILL_INT_URB(kbd->irq, dev, pipe, kbd->new, maxp > 8 ? 8 : maxp,
 		usb_kbd_irq, kbd, endpoint->bInterval);
 
 	kbd->dr.bRequestType = USB_TYPE_CLASS | USB_RECIP_INTERFACE;
@@ -248,7 +260,7 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 
 	kfree(buf);
 
-	FILL_CONTROL_URB(&kbd->led, dev, usb_sndctrlpipe(dev, 0),
+	FILL_CONTROL_URB(kbd->led, dev, usb_sndctrlpipe(dev, 0),
 		(void*) &kbd->dr, &kbd->leds, 1, usb_kbd_led, kbd);
 			
 	input_register_device(&kbd->dev);
@@ -262,8 +274,10 @@ static void *usb_kbd_probe(struct usb_device *dev, unsigned int ifnum,
 static void usb_kbd_disconnect(struct usb_device *dev, void *ptr)
 {
 	struct usb_kbd *kbd = ptr;
-	usb_unlink_urb(&kbd->irq);
+	usb_unlink_urb(kbd->irq);
 	input_unregister_device(&kbd->dev);
+	usb_free_urb(kbd->irq);
+	usb_free_urb(kbd->led);
 	kfree(kbd);
 }
 

@@ -90,7 +90,7 @@ static int radio_nr = -1;
 MODULE_PARM(radio_nr, "i");
 
 typedef struct
-{	struct urb readurb,writeurb;
+{
 	struct usb_device *dev;
 	unsigned char transfer_buffer[TB_LEN];
 	int curfreq;

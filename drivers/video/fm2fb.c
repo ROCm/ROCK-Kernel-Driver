@@ -401,7 +401,7 @@ int __init fm2fb_init(void)
 	disp.scrollmode = SCROLL_YREDRAW;
 
 	strcpy(fb_info.modename, fb_fix.id);
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &fm2fb_ops;
 	fb_info.disp = &disp;
 	fb_info.fontname[0] = '\0';

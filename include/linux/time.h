@@ -100,8 +100,6 @@ struct timezone {
 #ifdef __KERNEL__
 extern void do_gettimeofday(struct timeval *tv);
 extern void do_settimeofday(struct timeval *tv);
-extern void get_fast_time(struct timeval *tv);
-extern void (*do_get_fast_time)(struct timeval *);
 #endif
 
 #define FD_SETSIZE		__FD_SETSIZE

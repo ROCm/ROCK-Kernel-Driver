@@ -80,7 +80,7 @@ struct device {
 	atomic_t	refcount;	/* refcount to make sure the device
 					 * persists for the right amount of time */
 
-	struct driver_dir_entry	* dir;
+	struct driver_dir_entry	dir;
 
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
@@ -123,7 +123,7 @@ struct iobus {
 	struct list_head devices;	/* children devices */
 
 	struct device *self;		/* pointer to controlling device */
-	struct driver_dir_entry	* dir;	/* driverfs directory */
+	struct driver_dir_entry	dir;	/* driverfs directory */
 
 	char	name[DEVICE_NAME_SIZE];
 	char	bus_id[BUS_ID_SIZE];
@@ -154,14 +154,8 @@ extern int iobus_register(struct iobus * iobus);
 extern struct iobus * iobus_alloc(void);
 extern void iobus_init(struct iobus * iobus);
 
-extern int device_create_file(struct device *device, const char * name, mode_t mode,
-			      struct driverfs_operations * ops, void * data);
+extern int device_create_file(struct device *device, struct driver_file_entry * entry);
 extern void device_remove_file(struct device * dev, const char * name);
-
-extern int iobus_create_file(struct iobus *bus, const char * name, mode_t mode,
-			     struct driverfs_operations * ops, void * data);
-extern void iobus_remove_file(struct iobus * iobus, const char * name);
-
 
 /*
  * Platform "fixup" functions - allow the platform to have their say

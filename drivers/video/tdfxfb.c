@@ -1975,7 +1975,7 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	strcpy(fb_info.fb_info.modename, "3Dfx "); 
 	strcat(fb_info.fb_info.modename, name);
 	fb_info.fb_info.changevar  = NULL;
-	fb_info.fb_info.node       = -1;
+	fb_info.fb_info.node       = NODEV;
 	fb_info.fb_info.fbops      = &tdfxfb_ops;
 	fb_info.fb_info.disp       = &fb_info.disp;
 	strcpy(fb_info.fb_info.fontname, fontname);

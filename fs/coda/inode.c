@@ -45,6 +45,8 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 {
 	struct coda_inode_info *ei;
 	ei = (struct coda_inode_info *)kmem_cache_alloc(coda_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
 	memset(&ei->c_fid, 0, sizeof(struct ViceFid));
 	ei->c_flags = 0;
 	INIT_LIST_HEAD(&ei->c_cilist);
@@ -52,8 +54,6 @@ static struct inode *coda_alloc_inode(struct super_block *sb)
 	ei->c_contcount = 0;
 	memset(&ei->c_cached_cred, 0, sizeof(struct coda_cred));
 	ei->c_cached_perm = 0;
-	if (!ei)
-		return NULL;
 	return &ei->vfs_inode;
 }
 

@@ -20,6 +20,7 @@
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
+#include <linux/reiserfs_fs_i.h>
 #endif
 
 /*
@@ -204,9 +205,13 @@ struct unfm_nodeinfo {
 */
 #define MIN_PACK_ON_CLOSE		512
 
+static inline struct reiserfs_inode_info *REISERFS_I(struct inode *inode)
+{
+	return list_entry(inode, struct reiserfs_inode_info, vfs_inode);
+}
 // this says about version of all items (but stat data) the object
 // consists of
-#define inode_items_version(inode) ((inode)->u.reiserfs_i.i_version)
+#define inode_items_version(inode) (REISERFS_I(inode)->i_version)
 
 
   /* This is an aggressive tail suppression policy, I am hoping it
@@ -1257,10 +1262,10 @@ struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
 #define UNFM_P_SIZE (sizeof(unp_t))
 
 // in in-core inode key is stored on le form
-#define INODE_PKEY(inode) ((struct key *)((inode)->u.reiserfs_i.i_key))
-//#define mark_tail_converted(inode) (atomic_set(&((inode)->u.reiserfs_i.i_converted),1))
-//#define unmark_tail_converted(inode) (atomic_set(&((inode)->u.reiserfs_i.i_converted), 0))
-//#define is_tail_converted(inode) (atomic_read(&((inode)->u.reiserfs_i.i_converted)))
+#define INODE_PKEY(inode) ((struct key *)(REISERFS_I(inode)->i_key))
+//#define mark_tail_converted(inode) (atomic_set(&(REISERFS_I(inode)->i_converted),1))
+//#define unmark_tail_converted(inode) (REISERFS_I(inode)->i_converted), 0))
+//#define is_tail_converted(inode) (REISERFS_I(inode)->i_converted)))
 
 
 
@@ -1272,7 +1277,7 @@ struct path var = {ILLEGAL_PATH_ELEMENT_OFFSET, }
 
 // reiserfs version 2 has max offset 60 bits. Version 1 - 32 bit offset
 #define U32_MAX (~(__u32)0)
-static inline loff_t max_reiserfs_offset (const struct inode * inode)
+static inline loff_t max_reiserfs_offset (struct inode * inode)
 {
     if (inode_items_version (inode) == ITEM_VERSION_1)
 	return (loff_t)U32_MAX;
@@ -1848,7 +1853,7 @@ void padd_item (char * item, int total_length, int length);
 
 int reiserfs_prepare_write(struct file *, struct page *, unsigned, unsigned) ;
 void reiserfs_truncate_file(struct inode *, int update_timestamps) ;
-void make_cpu_key (struct cpu_key * cpu_key, const struct inode * inode, loff_t offset,
+void make_cpu_key (struct cpu_key * cpu_key, struct inode * inode, loff_t offset,
 		   int type, int key_length);
 void make_le_item_head (struct item_head * ih, const struct cpu_key * key, 
 			int version,
@@ -1873,7 +1878,7 @@ int reiserfs_dentry_to_fh(struct dentry *, __u32 *fh, int *lenp, int need_parent
 void reiserfs_dirty_inode (struct inode * inode) ;
 
 struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th, 
-				   const struct inode * dir, int mode, 
+				   struct inode * dir, int mode, 
 				   const char * symname, int item_len,
 				   struct dentry *dentry, struct inode *inode, int * err);
 int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * inode);

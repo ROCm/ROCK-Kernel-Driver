@@ -957,6 +957,7 @@ int ndisc_rcv(struct sk_buff *skb)
 	struct nd_msg *msg = (struct nd_msg *) skb->h.raw;
 	struct neighbour *neigh;
 	struct inet6_ifaddr *ifp;
+	unsigned int payload_len;
 
 	__skb_push(skb, skb->data-skb->h.raw);
 
@@ -979,10 +980,11 @@ int ndisc_rcv(struct sk_buff *skb)
 	 *	(Some checking in ndisc_find_option)
 	 */
 
+	payload_len = ntohs(skb->nh.ipv6h->payload_len);
 	switch (msg->icmph.icmp6_type) {
 	case NDISC_NEIGHBOUR_SOLICITATION:
 		/* XXX: import nd_neighbor_solicit from glibc netinet/icmp6.h */
-		if (skb->nh.ipv6h->payload_len < 8+16) {
+		if (payload_len < 8+16) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP NS: packet too short\n");
 			return 0;
@@ -1112,7 +1114,7 @@ int ndisc_rcv(struct sk_buff *skb)
 
 	case NDISC_NEIGHBOUR_ADVERTISEMENT:
 		/* XXX: import nd_neighbor_advert from glibc netinet/icmp6.h */
-		if (skb->nh.ipv6h->payload_len < 16+8 ) {
+		if (payload_len < 16+8 ) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP NA: packet too short\n");
 			return 0;
@@ -1174,7 +1176,7 @@ int ndisc_rcv(struct sk_buff *skb)
 
 	case NDISC_ROUTER_ADVERTISEMENT:
 		/* XXX: import nd_router_advert from glibc netinet/icmp6.h */
-		if (skb->nh.ipv6h->payload_len < 8+4+4) {
+		if (payload_len < 8+4+4) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP RA: packet too short\n");
 			return 0;
@@ -1184,7 +1186,7 @@ int ndisc_rcv(struct sk_buff *skb)
 
 	case NDISC_REDIRECT:
 		/* XXX: import nd_redirect from glibc netinet/icmp6.h */
-		if (skb->nh.ipv6h->payload_len < 8+16+16) {
+		if (payload_len < 8+16+16) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP redirect: packet too short\n");
 			return 0;
@@ -1196,7 +1198,7 @@ int ndisc_rcv(struct sk_buff *skb)
 		/* No RS support in the kernel, but we do some required checks */
 
 		/* XXX: import nd_router_solicit from glibc netinet/icmp6.h */
-		if (skb->nh.ipv6h->payload_len < 8) {
+		if (payload_len < 8) {
 			if (net_ratelimit())
 				printk(KERN_WARNING "ICMP RS: packet too short\n");
 			return 0;

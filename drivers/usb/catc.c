@@ -179,7 +179,7 @@ struct catc {
 		void (*callback)(struct catc *catc, struct ctrl_queue *q);
 	} ctrl_queue[CTRL_QUEUE];
 
-	struct urb tx_urb, rx_urb, irq_urb, ctrl_urb;
+	struct urb *tx_urb, *rx_urb, *irq_urb, *ctrl_urb;
 };
 
 /*
@@ -256,8 +256,8 @@ static void catc_irq_done(struct urb *urb)
 	}
 
 	if ((data[1] & 0x80) && !test_and_set_bit(RX_RUNNING, &catc->flags)) {
-		catc->rx_urb.dev = catc->usbdev;
-		if ((status = usb_submit_urb(&catc->rx_urb)) < 0) {
+		catc->rx_urb->dev = catc->usbdev;
+		if ((status = usb_submit_urb(catc->rx_urb)) < 0) {
 			err("submit(rx_urb) status %d", status);
 			return;
 		} 
@@ -282,11 +282,11 @@ static void catc_tx_run(struct catc *catc)
 {
 	int status;
 
-	catc->tx_urb.transfer_buffer_length = catc->tx_ptr;
-	catc->tx_urb.transfer_buffer = catc->tx_buf[catc->tx_idx];
-	catc->tx_urb.dev = catc->usbdev;
+	catc->tx_urb->transfer_buffer_length = catc->tx_ptr;
+	catc->tx_urb->transfer_buffer = catc->tx_buf[catc->tx_idx];
+	catc->tx_urb->dev = catc->usbdev;
 
-	if ((status = usb_submit_urb(&catc->tx_urb)) < 0)
+	if ((status = usb_submit_urb(catc->tx_urb)) < 0)
 		err("submit(tx_urb), status %d", status);
 
 	catc->tx_idx = !catc->tx_idx;
@@ -363,8 +363,8 @@ static void catc_tx_timeout(struct net_device *netdev)
 	struct catc *catc = netdev->priv;
 
 	warn("Transmit timed out.");
-	catc->tx_urb.transfer_flags |= USB_ASYNC_UNLINK;
-	usb_unlink_urb(&catc->tx_urb);
+	catc->tx_urb->transfer_flags |= USB_ASYNC_UNLINK;
+	usb_unlink_urb(catc->tx_urb);
 }
 
 /*
@@ -383,7 +383,7 @@ static void catc_ctrl_run(struct catc *catc)
 {
 	struct ctrl_queue *q = catc->ctrl_queue + catc->ctrl_tail;
 	struct usb_device *usbdev = catc->usbdev;
-	struct urb *urb = &catc->ctrl_urb;
+	struct urb *urb = catc->ctrl_urb;
 	struct usb_ctrlrequest *dr = &catc->ctrl_dr;
 	int status;
 
@@ -402,7 +402,7 @@ static void catc_ctrl_run(struct catc *catc)
 	if (!q->dir && q->buf && q->len)
 		memcpy(catc->ctrl_buf, q->buf, q->len);
 
-	if ((status = usb_submit_urb(&catc->ctrl_urb)))
+	if ((status = usb_submit_urb(catc->ctrl_urb)))
 		err("submit(ctrl_urb) status %d", status);
 }
 
@@ -624,8 +624,8 @@ static int catc_open(struct net_device *netdev)
 	struct catc *catc = netdev->priv;
 	int status;
 
-	catc->irq_urb.dev = catc->usbdev;
-	if ((status = usb_submit_urb(&catc->irq_urb)) < 0) {
+	catc->irq_urb->dev = catc->usbdev;
+	if ((status = usb_submit_urb(catc->irq_urb)) < 0) {
 		err("submit(irq_urb) status %d", status);
 		return -1;
 	}
@@ -645,10 +645,10 @@ static int catc_stop(struct net_device *netdev)
 
 	del_timer_sync(&catc->timer);
 
-	usb_unlink_urb(&catc->rx_urb);
-	usb_unlink_urb(&catc->tx_urb);
-	usb_unlink_urb(&catc->irq_urb);
-	usb_unlink_urb(&catc->ctrl_urb);
+	usb_unlink_urb(catc->rx_urb);
+	usb_unlink_urb(catc->tx_urb);
+	usb_unlink_urb(catc->irq_urb);
+	usb_unlink_urb(catc->ctrl_urb);
 
 	return 0;
 }
@@ -694,16 +694,26 @@ static void *catc_probe(struct usb_device *usbdev, unsigned int ifnum, const str
 	catc->timer.data = (long) catc;
 	catc->timer.function = catc_stats_timer;
 
-	FILL_CONTROL_URB(&catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
+	catc->ctrl_urb = usb_alloc_urb(0);
+	catc->tx_urb = usb_alloc_urb(0);
+	catc->rx_urb = usb_alloc_urb(0);
+	catc->irq_urb = usb_alloc_urb(0);
+	if ((!catc->ctrl_urb) || (!catc->tx_urb) || 
+	    (!catc->rx_urb) || (!catc->irq_urb)) {
+		err("No free urbs available.");
+		return NULL;
+	}
+
+	FILL_CONTROL_URB(catc->ctrl_urb, usbdev, usb_sndctrlpipe(usbdev, 0),
 		NULL, NULL, 0, catc_ctrl_done, catc);
 
-	FILL_BULK_URB(&catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
+	FILL_BULK_URB(catc->tx_urb, usbdev, usb_sndbulkpipe(usbdev, 1),
 		NULL, 0, catc_tx_done, catc);
 
-	FILL_BULK_URB(&catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
+	FILL_BULK_URB(catc->rx_urb, usbdev, usb_rcvbulkpipe(usbdev, 1),
 		catc->rx_buf, RX_MAX_BURST * (PKT_SZ + 2), catc_rx_done, catc);
 
-	FILL_INT_URB(&catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
+	FILL_INT_URB(catc->irq_urb, usbdev, usb_rcvintpipe(usbdev, 2),
                 catc->irq_buf, 2, catc_irq_done, catc, 1);
 
 	dbg("Checking memory size\n");
@@ -772,6 +782,10 @@ static void catc_disconnect(struct usb_device *usbdev, void *dev_ptr)
 {
 	struct catc *catc = dev_ptr;
 	unregister_netdev(catc->netdev);
+	usb_free_urb(catc->ctrl_urb);
+	usb_free_urb(catc->tx_urb);
+	usb_free_urb(catc->rx_urb);
+	usb_free_urb(catc->irq_urb);
 	kfree(catc->netdev);
 	kfree(catc);
 }

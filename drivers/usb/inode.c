@@ -678,6 +678,8 @@ void usbfs_remove_bus(struct usb_bus *bus)
 void usbfs_add_device(struct usb_device *dev)
 {
 	char name[8];
+	int i;
+	int i_size;
 
 	sprintf (name, "%03d", dev->devnum);
 	dev->dentry = fs_create_file (name,
@@ -687,6 +689,17 @@ void usbfs_add_device(struct usb_device *dev)
 				      devuid, devgid);
 	if (dev->dentry == NULL)
 		return;
+
+	/* Set the size of the device's file to be
+	 * equal to the size of the device descriptors. */
+	i_size = sizeof (struct usb_device_descriptor);
+	for (i = 0; i < dev->descriptor.bNumConfigurations; ++i) {
+		struct usb_config_descriptor *config =
+			(struct usb_config_descriptor *)dev->rawdescriptors[i];
+		i_size += le16_to_cpu (config->wTotalLength);
+	}
+	if (dev->dentry->d_inode)
+		dev->dentry->d_inode->i_size = i_size;
 
 	usbfs_update_special();
 	usbdevfs_conn_disc_event();

@@ -3,7 +3,7 @@
 
    Copyright 1995-2000 Kai Makisara.
 
-   Last modified: Sat Apr 22 14:47:02 2000 by makisara@kai.makisara.local
+   Last modified: Tue Jan 22 21:52:34 2002 by makisara
 */
 
 #ifndef _ST_OPTIONS_H
@@ -99,5 +99,7 @@
    The default is BSD semantics. */
 #define ST_SYSV 0
 
+/* Time to wait for the drive to become ready if blocking open */
+#define ST_BLOCK_SECONDS     120
 
 #endif

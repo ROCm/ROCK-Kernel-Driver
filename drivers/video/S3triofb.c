@@ -554,7 +554,7 @@ static void __init s3triofb_of_init(struct device_node *dp)
 
     strcpy(fb_info.modename, "Trio64 ");
     strncat(fb_info.modename, dp->full_name, sizeof(fb_info.modename));
-    fb_info.node = -1;
+    fb_info.node = NODEV;
     fb_info.fbops = &s3trio_ops;
 #if 0
     fb_info.fbvar_num = 1;

@@ -63,7 +63,13 @@ SECTIONS
   	__setup_end = .;
   	.initcall.init : {
 		__initcall_start = .;
-		*(.initcall.init);
+		*(.initcall1.init);
+		*(.initcall2.init);
+		*(.initcall3.init);
+		*(.initcall4.init);
+		*(.initcall5.init);
+		*(.initcall6.init);
+		*(.initcall7.init);
 		__initcall_end = .;
 
 		/* We fill to the next page, so we can discard all init

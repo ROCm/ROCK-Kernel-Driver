@@ -1,4 +1,4 @@
-/* $Id: sungem.h,v 1.11 2002/01/12 07:19:55 davem Exp $
+/* $Id: sungem.h,v 1.12 2002/01/23 15:40:45 davem Exp $
  * sungem.h: Definitions for Sun GEM ethernet driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -941,6 +941,7 @@ enum gem_phy_model {
 	phymod_bcm5400,
 	phymod_bcm5401,
 	phymod_bcm5411,
+	phymod_m1011,
 };
 
 enum link_state {

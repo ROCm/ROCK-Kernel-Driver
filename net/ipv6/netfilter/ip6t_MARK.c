@@ -51,7 +51,7 @@ static struct ip6t_target ip6t_mark_reg
 
 static int __init init(void)
 {
-	printk(KERN_DEBUG "registreing ipv6 mark target\n");
+	printk(KERN_DEBUG "registering ipv6 mark target\n");
 	if (ip6t_register_target(&ip6t_mark_reg))
 		return -EINVAL;
 

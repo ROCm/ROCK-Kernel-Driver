@@ -38,7 +38,7 @@ static inline unsigned long hash(struct vfsmount *mnt, struct dentry *dentry)
 	return tmp & hash_mask;
 }
 
-struct vfsmount *alloc_vfsmnt(void)
+struct vfsmount *alloc_vfsmnt(char *name)
 {
 	struct vfsmount *mnt = kmem_cache_alloc(mnt_cache, GFP_KERNEL); 
 	if (mnt) {
@@ -48,6 +48,14 @@ struct vfsmount *alloc_vfsmnt(void)
 		INIT_LIST_HEAD(&mnt->mnt_child);
 		INIT_LIST_HEAD(&mnt->mnt_mounts);
 		INIT_LIST_HEAD(&mnt->mnt_list);
+		if (name) {
+			int size = strlen(name)+1;
+			char * newname = kmalloc(size, GFP_KERNEL);
+			if (newname) {
+				memcpy(newname, name, size);
+				mnt->mnt_devname = newname;
+			}
+		}
 	}
 	return mnt;
 }
@@ -57,18 +65,6 @@ void free_vfsmnt(struct vfsmount *mnt)
 	if (mnt->mnt_devname)
 		kfree(mnt->mnt_devname);
 	kmem_cache_free(mnt_cache, mnt);
-}
-
-void set_devname(struct vfsmount *mnt, const char *name)
-{
-	if (name) {
-		int size = strlen(name)+1;
-		char * newname = kmalloc(size, GFP_KERNEL);
-		if (newname) {
-			memcpy(newname, name, size);
-			mnt->mnt_devname = newname;
-		}
-	}
 }
 
 struct vfsmount *lookup_mnt(struct vfsmount *mnt, struct dentry *dentry)
@@ -138,11 +134,10 @@ static struct vfsmount *
 clone_mnt(struct vfsmount *old, struct dentry *root)
 {
 	struct super_block *sb = old->mnt_sb;
-	struct vfsmount *mnt = alloc_vfsmnt();
+	struct vfsmount *mnt = alloc_vfsmnt(old->mnt_devname);
 
 	if (mnt) {
 		mnt->mnt_flags = old->mnt_flags;
-		set_devname(mnt, old->mnt_devname);
 		atomic_inc(&sb->s_active);
 		mnt->mnt_sb = sb;
 		mnt->mnt_root = dget(root);

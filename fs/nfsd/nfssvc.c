@@ -99,7 +99,7 @@ nfsd_svc(unsigned short port, int nrservs)
 		if (error < 0)
 			goto failure;
 #endif
-		get_fast_time(&nfssvc_boot);		/* record boot time */
+		do_gettimeofday(&nfssvc_boot);		/* record boot time */
 	} else
 		nfsd_serv->sv_nrthreads++;
 	nrservs -= (nfsd_serv->sv_nrthreads-1);

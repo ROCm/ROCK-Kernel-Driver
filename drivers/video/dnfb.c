@@ -307,7 +307,7 @@ unsigned long __init dnfb_init(unsigned long mem_start) {
 	fb_info.switch_con=&dnfbcon_switch;
 	fb_info.updatevar=&dnfbcon_updatevar;
 	fb_info.blank=&dnfbcon_blank;	
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &dn_fb_ops;
 	
         dn_fb_get_var(&disp[0].var,0, &fb_info);

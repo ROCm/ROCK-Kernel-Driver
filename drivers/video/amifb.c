@@ -1730,7 +1730,7 @@ default_chipset:
 
 	strcpy(fb_info.modename, amifb_name);
 	fb_info.changevar = NULL;
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.fbops = &amifb_ops;
 	fb_info.disp = &disp;
 	fb_info.switch_con = &amifbcon_switch;

@@ -11,6 +11,7 @@ struct sysv_inode_info {
 				 * then 1 triple indirection block.
 				 */
 	u32 i_dir_start_lookup;
+	struct inode  vfs_inode;
 };
 
 #endif

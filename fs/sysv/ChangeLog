@@ -1,3 +1,33 @@
+Mon Jan 21 2001  Alexander Viro  <viro@math.psu.edu>
+	* ialloc.c (sysv_new_inode): zero SYSV_I(inode)->i_data out.
+	* i_vnode renamed to vfs_inode.  Sorry, but let's keep that
+	  consistent.
+
+Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
+
+	* include/linux/sysv_fs.h (SYSV_I): Get fs-private inode data using
+		list_entry() instead of inode->u.
+	* include/linux/sysv_fs_i.h: Add 'struct inode  i_vnode' field to
+		sysv_inode_info structure.
+	* inode.c: Include <linux/slab.h>, implement alloc_inode/destroy_inode
+		sop methods, add infrastructure for per-fs inode slab cache.
+	* super.c (init_sysv_fs): Initialize inode cache, recover properly
+		in the case of failed register_filesystem for V7.
+	(exit_sysv_fs): Destroy inode cache.
+
+Sat Jan 19 2001  Christoph Hellwig  <hch@infradead.org>
+
+	* include/linux/sysv_fs.h: Include <linux/sysv_fs_i.h>, declare SYSV_I().
+	* dir.c (sysv_find_entry): Use SYSV_I() instead of ->u.sysv_i to
+		access fs-private inode data.
+	* ialloc.c (sysv_new_inode): Likewise.
+	* inode.c (sysv_read_inode): Likewise.
+	(sysv_update_inode): Likewise.
+	* itree.c (get_branch): Likewise.
+	(sysv_truncate): Likewise.
+	* symlink.c (sysv_readlink): Likewise.
+	(sysv_follow_link): Likewise.
+
 Fri Jan  4 2001  Alexander Viro  <viro@math.psu.edu>
 
 	* ialloc.c (sysv_free_inode): Use sb->s_id instead of bdevname().

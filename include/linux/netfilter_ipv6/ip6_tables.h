@@ -435,6 +435,9 @@ struct ip6t_table
 
 	/* Man behind the curtain... */
 	struct ip6t_table_info *private;
+
+	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
+	struct module *me;
 };
 
 extern int ip6t_register_table(struct ip6t_table *table);

@@ -945,7 +945,6 @@ __udf_read_inode(struct inode *inode)
 	 *      i_nlink = 1
 	 *      i_op = NULL;
 	 */
-
 	inode->i_blksize = PAGE_SIZE;
 
 	bh = udf_read_ptagged(inode->i_sb, UDF_I_LOCATION(inode), 0, &ident);
@@ -1042,6 +1041,16 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 		UDF_I_STRAT4096(inode) = 1;
 
 	UDF_I_ALLOCTYPE(inode) = le16_to_cpu(fe->icbTag.flags) & ICB_FLAG_ALLOC_MASK;
+	UDF_I_UMTIME(inode) = 0;
+	UDF_I_UCTIME(inode) = 0;
+	UDF_I_CRTIME(inode) = 0;
+	UDF_I_UCRTIME(inode) = 0;
+	UDF_I_UNIQUE(inode) = 0;
+	UDF_I_LENEATTR(inode) = 0;
+	UDF_I_LENEXTENTS(inode) = 0;
+	UDF_I_LENALLOC(inode) = 0;
+	UDF_I_NEXT_ALLOC_BLOCK(inode) = 0;
+	UDF_I_NEXT_ALLOC_GOAL(inode) = 0;
 	if (fe->descTag.tagIdent == TID_EXTENDED_FILE_ENTRY)
 		UDF_I_EXTENDED_FE(inode) = 1;
 	else if (fe->descTag.tagIdent == TID_FILE_ENTRY)
@@ -1069,9 +1078,6 @@ static void udf_fill_inode(struct inode *inode, struct buffer_head *bh)
 
 	inode->i_mode = udf_convert_permissions(fe);
 	inode->i_mode &= ~UDF_SB(inode->i_sb)->s_umask;
-
-	UDF_I_NEXT_ALLOC_BLOCK(inode) = 0;
-	UDF_I_NEXT_ALLOC_GOAL(inode) = 0;
 
 	if (UDF_I_EXTENDED_FE(inode) == 0)
 	{

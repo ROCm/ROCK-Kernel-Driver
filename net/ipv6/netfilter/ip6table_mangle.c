@@ -1,14 +1,18 @@
 /*
  * IPv6 packet mangling table, a port of the IPv4 mangle table to IPv6
  *
- * Copyright (C) 2000 by Harald Welte <laforge@gnumonks.org>
+ * Copyright (C) 2000-2001 by Harald Welte <laforge@gnumonks.org>
  */
 #include <linux/module.h>
 #include <linux/netfilter_ipv6/ip6_tables.h>
 
-#define MANGLE_VALID_HOOKS ((1 << NF_IP6_PRE_ROUTING) | (1 << NF_IP6_LOCAL_OUT))
+#define MANGLE_VALID_HOOKS ((1 << NF_IP6_PRE_ROUTING) | \
+			    (1 << NF_IP6_LOCAL_IN) | \
+			    (1 << NF_IP6_FORWARD) | \
+			    (1 << NF_IP6_LOCAL_OUT) | \
+			    (1 << NF_IP6_POST_ROUTING))
 
-#if 1
+#if 0
 #define DEBUGP(x, args...)	printk(KERN_DEBUG x, ## args)
 #else
 #define DEBUGP(x, args...)
@@ -36,19 +40,41 @@ struct ip6t_error
 static struct
 {
 	struct ip6t_replace repl;
-	struct ip6t_standard entries[2];
+	struct ip6t_standard entries[5];
 	struct ip6t_error term;
 } initial_table __initdata
-= { { "mangle", MANGLE_VALID_HOOKS, 3,
-      sizeof(struct ip6t_standard) * 2 + sizeof(struct ip6t_error),
-      { [NF_IP6_PRE_ROUTING] 0,
-	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) },
-      { [NF_IP6_PRE_ROUTING] 0,
-	[NF_IP6_LOCAL_OUT] sizeof(struct ip6t_standard) },
+= { { "mangle", MANGLE_VALID_HOOKS, 6,
+      sizeof(struct ip6t_standard) * 5 + sizeof(struct ip6t_error),
+      { [NF_IP6_PRE_ROUTING] 	0,
+	[NF_IP6_LOCAL_IN]	sizeof(struct ip6t_standard),
+	[NF_IP6_FORWARD]	sizeof(struct ip6t_standard) * 2,
+	[NF_IP6_LOCAL_OUT] 	sizeof(struct ip6t_standard) * 3,
+	[NF_IP6_POST_ROUTING]	sizeof(struct ip6t_standard) * 4},
+      { [NF_IP6_PRE_ROUTING] 	0,
+	[NF_IP6_LOCAL_IN]	sizeof(struct ip6t_standard),
+	[NF_IP6_FORWARD]	sizeof(struct ip6t_standard) * 2,
+	[NF_IP6_LOCAL_OUT] 	sizeof(struct ip6t_standard) * 3,
+	[NF_IP6_POST_ROUTING]	sizeof(struct ip6t_standard) * 4},
       0, NULL, { } },
     {
 	    /* PRE_ROUTING */
-	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+            { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ip6t_entry),
+		sizeof(struct ip6t_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
+	    /* LOCAL_IN */
+            { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ip6t_entry),
+		sizeof(struct ip6t_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
+	    /* FORWARD */
+            { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
 		0,
 		sizeof(struct ip6t_entry),
 		sizeof(struct ip6t_standard),
@@ -56,6 +82,14 @@ static struct
 	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
 		-NF_ACCEPT - 1 } },
 	    /* LOCAL_OUT */
+            { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
+		0,
+		sizeof(struct ip6t_entry),
+		sizeof(struct ip6t_standard),
+		0, { 0, 0 }, { } },
+	      { { { { IP6T_ALIGN(sizeof(struct ip6t_standard_target)), "" } }, { } },
+		-NF_ACCEPT - 1 } },
+	    /* POST_ROUTING */
 	    { { { { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, { { { 0 } } }, "", "", { 0 }, { 0 }, 0, 0, 0 },
 		0,
 		sizeof(struct ip6t_entry),
@@ -79,11 +113,11 @@ static struct
 
 static struct ip6t_table packet_mangler
 = { { NULL, NULL }, "mangle", &initial_table.repl,
-    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL };
+    MANGLE_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
 
 /* The work comes in here from netfilter.c. */
 static unsigned int
-ip6t_hook(unsigned int hook,
+ip6t_route_hook(unsigned int hook,
 	 struct sk_buff **pskb,
 	 const struct net_device *in,
 	 const struct net_device *out,
@@ -93,7 +127,7 @@ ip6t_hook(unsigned int hook,
 }
 
 static unsigned int
-ip6t_local_out_hook(unsigned int hook,
+ip6t_local_hook(unsigned int hook,
 		   struct sk_buff **pskb,
 		   const struct net_device *in,
 		   const struct net_device *out,
@@ -142,9 +176,11 @@ ip6t_local_out_hook(unsigned int hook,
 }
 
 static struct nf_hook_ops ip6t_ops[]
-= { { { NULL, NULL }, ip6t_hook, PF_INET6, NF_IP6_PRE_ROUTING, NF_IP6_PRI_MANGLE },
-    { { NULL, NULL }, ip6t_local_out_hook, PF_INET6, NF_IP6_LOCAL_OUT,
-		NF_IP6_PRI_MANGLE }
+= { { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_PRE_ROUTING,  NF_IP6_PRI_MANGLE },
+    { { NULL, NULL }, ip6t_local_hook, PF_INET6, NF_IP6_LOCAL_IN,     NF_IP6_PRI_MANGLE },
+    { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_FORWARD,      NF_IP6_PRI_MANGLE },
+    { { NULL, NULL }, ip6t_local_hook, PF_INET6, NF_IP6_LOCAL_OUT,    NF_IP6_PRI_MANGLE },
+    { { NULL, NULL }, ip6t_route_hook, PF_INET6, NF_IP6_POST_ROUTING, NF_IP6_PRI_MANGLE }
 };
 
 static int __init init(void)
@@ -165,8 +201,26 @@ static int __init init(void)
 	if (ret < 0)
 		goto cleanup_hook0;
 
+	ret = nf_register_hook(&ip6t_ops[2]);
+	if (ret < 0)
+		goto cleanup_hook1;
+
+	ret = nf_register_hook(&ip6t_ops[3]);
+	if (ret < 0)
+		goto cleanup_hook2;
+
+	ret = nf_register_hook(&ip6t_ops[4]);
+	if (ret < 0)
+		goto cleanup_hook3;
+
 	return ret;
 
+ cleanup_hook3:
+        nf_unregister_hook(&ip6t_ops[3]);
+ cleanup_hook2:
+	nf_unregister_hook(&ip6t_ops[2]);
+ cleanup_hook1:
+	nf_unregister_hook(&ip6t_ops[1]);
  cleanup_hook0:
 	nf_unregister_hook(&ip6t_ops[0]);
  cleanup_table:

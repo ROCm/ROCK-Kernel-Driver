@@ -26,8 +26,8 @@ struct hpusbscsi
         wait_queue_head_t pending;
         wait_queue_head_t deathrow;
 
-        struct urb dataurb;
-        struct urb controlurb;
+        struct urb *dataurb;
+        struct urb *controlurb;
         int fragment;
 
         int state;

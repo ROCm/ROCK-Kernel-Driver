@@ -74,10 +74,17 @@ redirect_target(struct sk_buff **pskb,
 	/* Local packets: make them go to loopback */
 	if (hooknum == NF_IP_LOCAL_OUT)
 		newdst = htonl(0x7F000001);
-	else
+	else {
+		struct in_device *indev;
+
+		/* Device might not have an associated in_device. */
+		indev = (struct in_device *)(*pskb)->dev->ip_ptr;
+		if (indev == NULL)
+			return NF_DROP;
+
 		/* Grab first address on interface. */
-		newdst = (((struct in_device *)(*pskb)->dev->ip_ptr)
-			  ->ifa_list->ifa_local);
+		newdst = indev->ifa_list->ifa_local;
+	}
 
 	/* Transfer from original range. */
 	newrange = ((struct ip_nat_multi_range)

@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.59 2001/10/30 04:54:21 davem Exp $
+/* $Id: time.c,v 1.60 2002/01/23 14:33:55 davem Exp $
  * linux/arch/sparc/kernel/time.c
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -371,7 +371,6 @@ void __init sbus_time_init(void)
 	struct intersil *iregs;
 #endif
 
-	do_get_fast_time = do_gettimeofday;
 	BTFIXUPSET_CALL(bus_do_settimeofday, sbus_do_settimeofday, BTFIXUPCALL_NORM);
 	btfixup();
 

@@ -838,6 +838,7 @@ static int clear_fw_chain(struct ip_chain *chainptr)
 			i->branch->refcount--;
 		kfree(i);
 		i = tmp;
+		MOD_DEC_USE_COUNT;
 	}
 	return 0;
 }
@@ -875,13 +876,16 @@ static int append_to_chain(struct ip_chain *chainptr, struct ip_fwkernel *rule)
 		 * interrupts is not necessary. */
 		chainptr->chain = rule;
 		if (rule->branch) rule->branch->refcount++;
-		return 0;
+		goto append_successful;
 	}
 
 	/* Find the rule before the end of the chain */
 	for (i = chainptr->chain; i->next; i = i->next);
 	i->next = rule;
 	if (rule->branch) rule->branch->refcount++;
+
+append_successful:
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -900,7 +904,7 @@ static int insert_in_chain(struct ip_chain *chainptr,
 		frwl->next = chainptr->chain;
 		if (frwl->branch) frwl->branch->refcount++;
 		chainptr->chain = frwl;
-		return 0;
+		goto insert_successful;
 	}
 	position--;
 	while (--position && f != NULL) f = f->next;
@@ -910,6 +914,9 @@ static int insert_in_chain(struct ip_chain *chainptr,
 	frwl->next = f->next;
 
 	f->next = frwl;
+
+insert_successful:
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -943,6 +950,8 @@ static int del_num_from_chain(struct ip_chain *chainptr, __u32 rulenum)
 		i->next = i->next->next;
 		kfree(tmp);
 	}
+
+	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1049,6 +1058,7 @@ static int del_rule_from_chain(struct ip_chain *chainptr,
 		else
 			chainptr->chain = ftmp->next;
 		kfree(ftmp);
+		MOD_DEC_USE_COUNT;
 		break;
 	}
 
@@ -1089,6 +1099,8 @@ static int del_chain(ip_chainlabel label)
 
 	tmp->next = tmp2->next;
 	kfree(tmp2);
+
+	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -1141,6 +1153,7 @@ static int create_chain(ip_chainlabel label)
 					      * user defined chain *
 					      * and therefore can be
 					      * deleted */
+	MOD_INC_USE_COUNT;
 	return 0;
 }
 

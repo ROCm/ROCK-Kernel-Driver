@@ -83,7 +83,7 @@ static struct
 
 static struct ipt_table packet_filter
 = { { NULL, NULL }, "filter", &initial_table.repl,
-    FILTER_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL };
+    FILTER_VALID_HOOKS, RW_LOCK_UNLOCKED, NULL, THIS_MODULE };
 
 /* The work comes in here from netfilter.c. */
 static unsigned int

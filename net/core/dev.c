@@ -239,7 +239,7 @@ void dev_add_pack(struct packet_type *pt)
 
 #ifdef CONFIG_NET_FASTROUTE
 	/* Hack to detect packet socket */
-	if (pt->data) {
+	if ((pt->data) && ((int)(pt->data)!=1)) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -876,7 +876,7 @@ int unregister_netdevice_notifier(struct notifier_block *nb)
 void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct packet_type *ptype;
-	get_fast_time(&skb->stamp);
+	do_gettimeofday(&skb->stamp);
 
 	br_read_lock(BR_NETPROTO_LOCK);
 	for (ptype = ptype_all; ptype!=NULL; ptype = ptype->next) 
@@ -1219,7 +1219,7 @@ int netif_rx(struct sk_buff *skb)
 	unsigned long flags;
 
 	if (skb->stamp.tv_sec == 0)
-		get_fast_time(&skb->stamp);
+		do_gettimeofday(&skb->stamp);
 
 	/* The code is rearranged so that the path is the most
 	   short when CPU is congested, but is still operating.

@@ -742,7 +742,7 @@ int __init hgafb_init(void)
 	disp.scrollmode = SCROLL_YREDRAW;
 	
 	strcpy (fb_info.modename, hga_fix.id);
-	fb_info.node = -1;
+	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 /*	fb_info.open = ??? */
 	fb_info.var = hga_default_var;

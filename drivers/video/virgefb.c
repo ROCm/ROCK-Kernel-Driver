@@ -1168,7 +1168,7 @@ int __init virgefb_init(void)
 
 	    strcpy(fb_info.modename, virgefb_name);
 	    fb_info.changevar = NULL;
-	    fb_info.node = -1;
+	    fb_info.node = NODEV;
 	    fb_info.fbops = &virgefb_ops;
 	    fb_info.disp = &disp;
 	    fb_info.switch_con = &Cyberfb_switch;

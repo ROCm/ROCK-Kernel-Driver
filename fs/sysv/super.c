@@ -479,18 +479,37 @@ failed:
 static DECLARE_FSTYPE_DEV(sysv_fs_type, "sysv", sysv_read_super);
 static DECLARE_FSTYPE_DEV(v7_fs_type, "v7", v7_read_super);
 
+extern int sysv_init_icache(void) __init;
+extern void sysv_destroy_icache(void);
+
 static int __init init_sysv_fs(void)
 {
-	int err = register_filesystem(&sysv_fs_type);
-	if (!err)
-		err = register_filesystem(&v7_fs_type);
-	return err;
+	int error;
+
+	error = sysv_init_icache();
+	if (error)
+		goto out;
+	error = register_filesystem(&sysv_fs_type);
+	if (error)
+		goto destroy_icache;
+	error = register_filesystem(&v7_fs_type);
+	if (error)
+		goto unregister;
+	return 0;
+
+unregister:
+	unregister_filesystem(&sysv_fs_type);
+destroy_icache:
+	sysv_destroy_icache();
+out:
+	return error;
 }
 
 static void __exit exit_sysv_fs(void)
 {
 	unregister_filesystem(&sysv_fs_type);
 	unregister_filesystem(&v7_fs_type);
+	sysv_destroy_icache();
 }
 
 EXPORT_NO_SYMBOLS;

@@ -408,9 +408,8 @@ static void remove_super(struct super_block *s)
 		put_anon_dev(dev);
 }
 
-struct vfsmount *alloc_vfsmnt(void);
+struct vfsmount *alloc_vfsmnt(char *name);
 void free_vfsmnt(struct vfsmount *mnt);
-void set_devname(struct vfsmount *mnt, const char *name);
 
 static inline struct super_block * find_super(kdev_t dev)
 {
@@ -790,10 +789,9 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	if (!type)
 		return ERR_PTR(-ENODEV);
 
-	mnt = alloc_vfsmnt();
+	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
-	set_devname(mnt, name);
 	if (type->fs_flags & FS_REQUIRES_DEV)
 		sb = get_sb_bdev(type, flags, name, data);
 	else if (type->fs_flags & FS_SINGLE)

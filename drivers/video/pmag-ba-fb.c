@@ -386,7 +386,7 @@ int __init pmagbafb_init_one(int slot)
 	 */
 	strcpy(ip->info.modename, "PMAG-BA");
 	ip->info.changevar = NULL;
-	ip->info.node = -1;
+	ip->info.node = NODEV;
 	ip->info.fbops = &pmagbafb_ops;
 	ip->info.disp = &disp;
 	ip->info.switch_con = &pmagbafb_switch;

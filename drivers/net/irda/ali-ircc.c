@@ -1496,7 +1496,7 @@ static int ali_ircc_fir_hard_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (mtt) 
 		{
 			/* Check how much time we have used already */
-			get_fast_time(&self->now);
+			do_gettimeofday(&self->now);
 			
 			diff = self->now.tv_usec - self->stamp.tv_usec;
 			/* self->stamp is set from ali_ircc_dma_receive_complete() */
@@ -1913,7 +1913,7 @@ static int  ali_ircc_dma_receive_complete(struct ali_ircc_cb *self)
 			 * reduce the min turn time a bit since we will know
 			 * how much time we have used for protocol processing
 			 */
-			get_fast_time(&self->stamp);
+			do_gettimeofday(&self->stamp);
 
 			skb = dev_alloc_skb(len+1);
 			if (skb == NULL)  

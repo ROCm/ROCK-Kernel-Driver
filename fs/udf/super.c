@@ -98,8 +98,52 @@ static int udf_statfs(struct super_block *, struct statfs *);
 /* UDF filesystem type */
 static DECLARE_FSTYPE_DEV(udf_fstype, "udf", udf_read_super);
 
+static kmem_cache_t * udf_inode_cachep;
+
+static struct inode *udf_alloc_inode(struct super_block *sb)
+{
+	struct udf_inode_info *ei;
+	ei = (struct udf_inode_info *)kmem_cache_alloc(udf_inode_cachep, SLAB_KERNEL);
+	if (!ei)
+		return NULL;
+	return &ei->vfs_inode;
+}
+
+static void udf_destroy_inode(struct inode *inode)
+{
+	kmem_cache_free(udf_inode_cachep, UDF_I(inode));
+}
+
+static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)
+{
+	struct udf_inode_info *ei = (struct udf_inode_info *) foo;
+
+	if ((flags & (SLAB_CTOR_VERIFY|SLAB_CTOR_CONSTRUCTOR)) ==
+	    SLAB_CTOR_CONSTRUCTOR)
+		inode_init_once(&ei->vfs_inode);
+}
+ 
+static int init_inodecache(void)
+{
+	udf_inode_cachep = kmem_cache_create("udf_inode_cache",
+					     sizeof(struct udf_inode_info),
+					     0, SLAB_HWCACHE_ALIGN,
+					     init_once, NULL);
+	if (udf_inode_cachep == NULL)
+		return -ENOMEM;
+	return 0;
+}
+
+static void destroy_inodecache(void)
+{
+	if (kmem_cache_destroy(udf_inode_cachep))
+		printk(KERN_INFO "udf_inode_cache: not all structures were freed\n");
+}
+
 /* Superblock operations */
 static struct super_operations udf_sb_ops = {
+	alloc_inode:		udf_alloc_inode,
+	destroy_inode:		udf_destroy_inode,
 	read_inode:		udf_read_inode,
 	write_inode:		udf_write_inode,
 	put_inode:		udf_put_inode,
@@ -130,14 +174,26 @@ struct udf_options
 
 static int __init init_udf_fs(void)
 {
+	int err;
 	printk(KERN_NOTICE "udf: registering filesystem\n");
-	return register_filesystem(&udf_fstype);
+	err = init_inodecache();
+	if (err)
+		goto out1;
+	err = register_filesystem(&udf_fstype);
+	if (err)
+		goto out;
+	return 0;
+out:
+	destroy_inodecache();
+out1:
+	return err;
 }
 
 static void __exit exit_udf_fs(void)
 {
 	printk(KERN_NOTICE "udf: unregistering filesystem\n");
 	unregister_filesystem(&udf_fstype);
+	destroy_inodecache();
 }
 
 EXPORT_NO_SYMBOLS;

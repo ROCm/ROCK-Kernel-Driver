@@ -681,7 +681,6 @@ void __init time_init(void)
 #ifndef do_gettimeoffset
 			do_gettimeoffset = do_fast_gettimeoffset;
 #endif
-			do_get_fast_time = do_gettimeofday;
 
 			/* report CPU clock rate in Hz.
 			 * The formula is (10^6 * 2^32) / (2^32 * 1 / (clocks/us)) =

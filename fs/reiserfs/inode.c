@@ -69,7 +69,7 @@ static void _make_cpu_key (struct cpu_key * key, int version, __u32 dirid, __u32
 
 /* take base of inode_key (it comes from inode always) (dirid, objectid) and version from an inode, set
    offset and type of key */
-void make_cpu_key (struct cpu_key * key, const struct inode * inode, loff_t offset,
+void make_cpu_key (struct cpu_key * key, struct inode * inode, loff_t offset,
 	      int type, int length )
 {
   _make_cpu_key (key, inode_items_version (inode), le32_to_cpu (INODE_PKEY (inode)->k_dir_id),
@@ -559,7 +559,7 @@ int reiserfs_get_block (struct inode * inode, sector_t block,
 	return ret;
     }
 
-    inode->u.reiserfs_i.i_pack_on_close = 1 ;
+    REISERFS_I(inode)->i_pack_on_close = 1 ;
 
     windex = push_journal_writer("reiserfs_get_block") ;
   
@@ -868,8 +868,6 @@ static void init_inode (struct inode * inode, struct path * path)
     copy_key (INODE_PKEY (inode), &(ih->ih_key));
     inode->i_blksize = PAGE_SIZE;
 
-    INIT_LIST_HEAD(&inode->u.reiserfs_i.i_prealloc_list) ;
-
     if (stat_data_v1 (ih)) {
 	struct stat_data_v1 * sd = (struct stat_data_v1 *)B_I_PITEM (bh, ih);
 	unsigned long blocks;
@@ -898,7 +896,7 @@ static void init_inode (struct inode * inode, struct path * path)
 	}
 
         rdev = sd_v1_rdev(sd);
-	inode->u.reiserfs_i.i_first_direct_byte = sd_v1_first_direct_byte(sd);
+	REISERFS_I(inode)->i_first_direct_byte = sd_v1_first_direct_byte(sd);
     } else {
 	// new stat data found, but object may have old items
 	// (directories and symlinks)
@@ -926,10 +924,15 @@ static void init_inode (struct inode * inode, struct path * path)
 	    inode_items_version (inode) = ITEM_VERSION_1;
 	else
 	    inode_items_version (inode) = ITEM_VERSION_2;
+	REISERFS_I(inode)->i_first_direct_byte = 0;
     }
-
+    REISERFS_I(inode)->i_pack_on_close = 0;
+    REISERFS_I(inode)->i_prealloc_block = 0;
+    REISERFS_I(inode)->i_prealloc_count = 0;
+    REISERFS_I(inode)->i_trans_id = 0;
+    REISERFS_I(inode)->i_trans_index = 0;
     /* nopack = 0, by default */
-    inode->u.reiserfs_i.nopack = 0;
+    REISERFS_I(inode)->nopack = 0;
 
     pathrelse (path);
     if (S_ISREG (inode->i_mode)) {
@@ -993,7 +996,7 @@ static void inode2sd_v1 (void * sd, struct inode * inode)
         set_sd_v1_blocks(sd_v1, inode->i_blocks );
 
     // Sigh. i_first_direct_byte is back
-    set_sd_v1_first_direct_byte(sd_v1, inode->u.reiserfs_i.i_first_direct_byte);
+    set_sd_v1_first_direct_byte(sd_v1, REISERFS_I(inode)->i_first_direct_byte);
 }
 
 
@@ -1331,7 +1334,7 @@ int reiserfs_sync_inode (struct reiserfs_transaction_handle *th, struct inode * 
    containing "." and ".." entries */
 static int reiserfs_new_directory (struct reiserfs_transaction_handle *th, 
 				   struct item_head * ih, struct path * path,
-				   const struct inode * dir)
+				   struct inode * dir)
 {
     struct super_block * sb = th->t_super;
     char empty_dir [EMPTY_DIR_SIZE];
@@ -1419,7 +1422,7 @@ static int reiserfs_new_symlink (struct reiserfs_transaction_handle *th,
    directory) or reiserfs_new_symlink (to insert symlink body if new
    object is symlink) or nothing (if new object is regular file) */
 struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
-				   const struct inode * dir, int mode, 
+				   struct inode * dir, int mode, 
 				   const char * symname, 
 				   int i_size, /* 0 for regular, EMTRY_DIR_SIZE for dirs,
 						  strlen (symname) for symlinks)*/
@@ -1501,10 +1504,15 @@ struct inode * reiserfs_new_inode (struct reiserfs_transaction_handle *th,
     inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
     inode->i_size = i_size;
     inode->i_blocks = (inode->i_size + 511) >> 9;
-    inode->u.reiserfs_i.i_first_direct_byte = S_ISLNK(mode) ? 1 : 
+    REISERFS_I(inode)->i_first_direct_byte = S_ISLNK(mode) ? 1 : 
       U32_MAX/*NO_BYTES_IN_DIRECT_ITEM*/;
 
-    INIT_LIST_HEAD(&inode->u.reiserfs_i.i_prealloc_list) ;
+    REISERFS_I(inode)->i_pack_on_close = 0;
+    REISERFS_I(inode)->i_prealloc_block = 0;
+    REISERFS_I(inode)->i_prealloc_count = 0;
+    REISERFS_I(inode)->nopack = 0;
+    REISERFS_I(inode)->i_trans_id = 0;
+    REISERFS_I(inode)->i_trans_index = 0;
 
     if (old_format_only (sb))
 	inode2sd_v1 (&sd, inode);

@@ -2590,14 +2590,11 @@ int __init irda_proto_init(void)
 	register_netdevice_notifier(&irda_dev_notifier);
 
 	irda_init();
-#ifdef MODULE
- 	irda_device_init();  /* Called by init/main.c when non-modular */
-#endif
+ 	irda_device_init();
 	return 0;
 }
-#ifdef MODULE
-module_init(irda_proto_init);	/* If non-module, called from init/main.c */
-#endif
+
+late_initcall(irda_proto_init);
 
 /*
  * Function irda_proto_cleanup (void)

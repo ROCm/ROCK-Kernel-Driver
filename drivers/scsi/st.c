@@ -9,19 +9,16 @@
    Steve Hirsch, Andreas Koppenh"ofer, Michael Leodolter, Eyal Lebedinsky,
    Michael Schaefer, J"org Weule, and Eric Youngdale.
 
-   Copyright 1992 - 2001 Kai Makisara
+   Copyright 1992 - 2002 Kai Makisara
    email Kai.Makisara@metla.fi
 
-   Last modified: Sat Nov  3 19:30:55 2001 by makisara@kai.makisara.local
+   Last modified: Wed Jan 23 20:22:42 2002 by makisara
    Some small formal changes - aeb, 950809
 
    Last modified: 18-JAN-1998 Richard Gooch <rgooch@atnf.csiro.au> Devfs support
-
-   Reminder: write_lock_irqsave() can be replaced by write_lock() when the old SCSI
-   error handling will be discarded.
  */
 
-static char *verstr = "20011103";
+static char *verstr = "20020123";
 
 #include <linux/module.h>
 
@@ -160,21 +157,19 @@ static void normalize_buffer(ST_buffer *);
 static int append_to_buffer(const char *, ST_buffer *, int);
 static int from_buffer(ST_buffer *, char *, int);
 
-static int st_init(void);
 static int st_attach(Scsi_Device *);
 static int st_detect(Scsi_Device *);
 static void st_detach(Scsi_Device *);
 
-static struct Scsi_Device_Template st_template =
-{
-	name:"tape", 
-	tag:"st", 
-	scsi_type:TYPE_TAPE,
-	major:SCSI_TAPE_MAJOR, 
-	detect:st_detect, 
-	init:st_init,
-	attach:st_attach, 
-	detach:st_detach
+static struct Scsi_Device_Template st_template = {
+	module:		THIS_MODULE,
+	name:		"tape", 
+	tag:		"st", 
+	scsi_type:	TYPE_TAPE,
+	major:		SCSI_TAPE_MAJOR, 
+	detect:		st_detect, 
+	attach:		st_attach, 
+	detach:		st_detach
 };
 
 static int st_compression(Scsi_Tape *, int);
@@ -239,7 +234,7 @@ static int st_chk_result(Scsi_Tape *STp, Scsi_Request * SRpnt)
 		return 0;
 	}
 
-	if (driver_byte(result) & DRIVER_SENSE)
+	if ((driver_byte(result) & DRIVER_MASK) == DRIVER_SENSE)
 		scode = sense[2] & 0x0f;
 	else {
 		sense[0] = 0;
@@ -638,20 +633,96 @@ static int set_mode_densblk(Scsi_Tape * STp, ST_mode * STm)
 	return 0;
 }
 
+/* Test if the drive is ready. Returns either one of the codes below or a negative system
+   error code. */
+#define CHKRES_READY       0
+#define CHKRES_NEW_SESSION 1
+#define CHKRES_NOT_READY   2
+#define CHKRES_NO_TAPE     3
+
+#define MAX_ATTENTIONS    10
+
+static int test_ready(Scsi_Tape *STp, int do_wait)
+{
+	int attentions, waits, max_wait, scode;
+	int retval = CHKRES_READY, new_session = FALSE;
+	unsigned char cmd[MAX_COMMAND_SIZE];
+	Scsi_Request *SRpnt = NULL;
+
+	max_wait = do_wait ? ST_BLOCK_SECONDS : 0;
+
+	for (attentions=waits=0; ; ) {
+		memset((void *) &cmd[0], 0, MAX_COMMAND_SIZE);
+		cmd[0] = TEST_UNIT_READY;
+		SRpnt = st_do_scsi(SRpnt, STp, cmd, 0, SCSI_DATA_NONE,
+				   STp->long_timeout, MAX_READY_RETRIES, TRUE);
+
+		if (!SRpnt) {
+			retval = (STp->buffer)->syscall_result;
+			break;
+		}
+
+		if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70) {
+
+			scode = (SRpnt->sr_sense_buffer[2] & 0x0f);
+
+			if (scode == UNIT_ATTENTION) { /* New media? */
+				new_session = TRUE;
+				if (attentions < MAX_ATTENTIONS) {
+					attentions++;
+					continue;
+				}
+				else {
+					retval = (-EIO);
+					break;
+				}
+			}
+
+			if (scode == NOT_READY) {
+				if (waits < max_wait) {
+					set_current_state(TASK_INTERRUPTIBLE);
+					schedule_timeout(HZ);
+					if (signal_pending(current)) {
+						retval = (-EINTR);
+						break;
+					}
+					waits++;
+					continue;
+				}
+				else {
+					if ((STp->device)->scsi_level >= SCSI_2 &&
+					    SRpnt->sr_sense_buffer[12] == 0x3a)	/* Check ASC */
+						retval = CHKRES_NO_TAPE;
+					else
+						retval = CHKRES_NOT_READY;
+					break;
+				}
+			}
+		}
+
+		retval = (STp->buffer)->syscall_result;
+		if (!retval)
+			retval = new_session ? CHKRES_NEW_SESSION : CHKRES_READY;
+		break;
+	}
+
+	if (SRpnt != NULL)
+		scsi_release_request(SRpnt);
+	return retval;
+}
+
+
 /* See if the drive is ready and gather information about the tape. Return values:
    < 0   negative error code from errno.h
    0     drive ready
    1     drive not ready (possibly no tape)
 */
-#define CHKRES_READY      0
-#define CHKRES_NOT_READY  1
-
 static int check_tape(Scsi_Tape *STp, struct file *filp)
 {
-	int i, retval, new_session = FALSE;
+	int i, retval, new_session = FALSE, do_wait;
 	unsigned char cmd[MAX_COMMAND_SIZE], saved_cleaning;
 	unsigned short st_flags = filp->f_flags;
-	Scsi_Request *SRpnt;
+	Scsi_Request *SRpnt = NULL;
 	ST_mode *STm;
 	ST_partstat *STps;
 	int dev = TAPE_NR(STp->devt);
@@ -668,32 +739,16 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 	}
 	STm = &(STp->modes[STp->current_mode]);
 
-	memset((void *) &cmd[0], 0, MAX_COMMAND_SIZE);
-	cmd[0] = TEST_UNIT_READY;
-
 	saved_cleaning = STp->cleaning_req;
 	STp->cleaning_req = 0;
-	SRpnt = st_do_scsi(NULL, STp, cmd, 0, SCSI_DATA_NONE, STp->long_timeout,
-			   MAX_READY_RETRIES, TRUE);
-	if (!SRpnt) {
-		retval = (STp->buffer)->syscall_result;
-		goto err_out;
-	}
 
-	if ((SRpnt->sr_sense_buffer[0] & 0x70) == 0x70 &&
-	    (SRpnt->sr_sense_buffer[2] & 0x0f) == UNIT_ATTENTION) { /* New media? */
+	do_wait = ((filp->f_flags & O_NONBLOCK) == 0);
+	retval = test_ready(STp, do_wait);
 
-		/* Flush the queued UNIT ATTENTION sense data */
-		for (i=0; i < 10; i++) {
-                        memset((void *) &cmd[0], 0, MAX_COMMAND_SIZE);
-                        cmd[0] = TEST_UNIT_READY;
-                        SRpnt = st_do_scsi(SRpnt, STp, cmd, 0, SCSI_DATA_NONE,
-					   STp->long_timeout, MAX_READY_RETRIES, TRUE);
-                        if ((SRpnt->sr_sense_buffer[0] & 0x70) != 0x70 ||
-                            (SRpnt->sr_sense_buffer[2] & 0x0f) != UNIT_ATTENTION)
-                                break;
-		}
+	if (retval < 0)
+	    goto err_out;
 
+	if (retval == CHKRES_NEW_SESSION) {
 		(STp->device)->was_reset = 0;
 		STp->partition = STp->new_partition = 0;
 		if (STp->can_partitions)
@@ -710,26 +765,23 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 		}
 		new_session = TRUE;
 	}
-	else
+	else {
 		STp->cleaning_req |= saved_cleaning;
 
-	if ((STp->buffer)->syscall_result != 0) {
-		if ((STp->device)->scsi_level >= SCSI_2 &&
-		    (SRpnt->sr_sense_buffer[0] & 0x70) == 0x70 &&
-		    (SRpnt->sr_sense_buffer[2] & 0x0f) == NOT_READY &&
-		    SRpnt->sr_sense_buffer[12] == 0x3a) {	/* Check ASC */
-			STp->ready = ST_NO_TAPE;
-		} else
-			STp->ready = ST_NOT_READY;
-		scsi_release_request(SRpnt);
-		SRpnt = NULL;
-		STp->density = 0;	/* Clear the erroneous "residue" */
-		STp->write_prot = 0;
-		STp->block_size = 0;
-		STp->ps[0].drv_file = STp->ps[0].drv_block = (-1);
-		STp->partition = STp->new_partition = 0;
-		STp->door_locked = ST_UNLOCKED;
-		return CHKRES_NOT_READY;
+		if (retval == CHKRES_NOT_READY || retval == CHKRES_NO_TAPE) {
+			if (retval == CHKRES_NO_TAPE)
+				STp->ready = ST_NO_TAPE;
+			else
+				STp->ready = ST_NOT_READY;
+
+			STp->density = 0;	/* Clear the erroneous "residue" */
+			STp->write_prot = 0;
+			STp->block_size = 0;
+			STp->ps[0].drv_file = STp->ps[0].drv_block = (-1);
+			STp->partition = STp->new_partition = 0;
+			STp->door_locked = ST_UNLOCKED;
+			return CHKRES_NOT_READY;
+		}
 	}
 
 	if (STp->omit_blklims)
@@ -740,6 +792,10 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 
 		SRpnt = st_do_scsi(SRpnt, STp, cmd, 6, SCSI_DATA_READ, STp->timeout,
 				   MAX_READY_RETRIES, TRUE);
+		if (!SRpnt) {
+			retval = (STp->buffer)->syscall_result;
+			goto err_out;
+		}
 
 		if (!SRpnt->sr_result && !SRpnt->sr_sense_buffer[0]) {
 			STp->max_block = ((STp->buffer)->b_data[1] << 16) |
@@ -763,6 +819,10 @@ static int check_tape(Scsi_Tape *STp, struct file *filp)
 
 	SRpnt = st_do_scsi(SRpnt, STp, cmd, 12, SCSI_DATA_READ, STp->timeout,
 			   MAX_READY_RETRIES, TRUE);
+	if (!SRpnt) {
+		retval = (STp->buffer)->syscall_result;
+		goto err_out;
+	}
 
 	if ((STp->buffer)->syscall_result != 0) {
                 DEBC(printk(ST_DEB_MSG "st%d: No Mode Sense.\n", dev));
@@ -862,22 +922,21 @@ static int st_open(struct inode *inode, struct file *filp)
 	Scsi_Tape *STp;
 	ST_partstat *STps;
 	int dev = TAPE_NR(inode->i_rdev);
-	unsigned long flags;
 
-	write_lock_irqsave(&st_dev_arr_lock, flags);
+	write_lock(&st_dev_arr_lock);
 	STp = scsi_tapes[dev];
 	if (dev >= st_template.dev_max || STp == NULL) {
-		write_unlock_irqrestore(&st_dev_arr_lock, flags);
+		write_unlock(&st_dev_arr_lock);
 		return (-ENXIO);
 	}
 
 	if (STp->in_use) {
-		write_unlock_irqrestore(&st_dev_arr_lock, flags);
+		write_unlock(&st_dev_arr_lock);
 		DEB( printk(ST_DEB_MSG "st%d: Device already in use.\n", dev); )
 		return (-EBUSY);
 	}
 	STp->in_use = 1;
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 	STp->rew_at_close = STp->autorew_dev = (minor(inode->i_rdev) & 0x80) == 0;
 
 	if (STp->device->host->hostt->module)
@@ -891,7 +950,7 @@ static int st_open(struct inode *inode, struct file *filp)
 
 	/* Allocate a buffer for this user */
 	need_dma_buffer = STp->restr_dma;
-	write_lock_irqsave(&st_dev_arr_lock, flags);
+	write_lock(&st_dev_arr_lock);
 	for (i = 0; i < st_nbr_buffers; i++)
 		if (!st_buffers[i]->in_use &&
 		    (!need_dma_buffer || st_buffers[i]->dma)) {
@@ -899,7 +958,7 @@ static int st_open(struct inode *inode, struct file *filp)
 			(STp->buffer)->in_use = 1;
 			break;
 		}
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 	if (i >= st_nbr_buffers) {
 		STp->buffer = new_tape_buffer(FALSE, need_dma_buffer, TRUE);
 		if (STp->buffer == NULL) {
@@ -935,6 +994,11 @@ static int st_open(struct inode *inode, struct file *filp)
 	retval = check_tape(STp, filp);
 	if (retval < 0)
 		goto err_out;
+	if ((filp->f_flags & O_NONBLOCK) == 0 &&
+	    retval != CHKRES_READY) {
+		retval = (-EIO);
+		goto err_out;
+	}
 	return 0;
 
  err_out:
@@ -1076,7 +1140,6 @@ static int st_release(struct inode *inode, struct file *filp)
 {
 	int result = 0;
 	Scsi_Tape *STp;
-	unsigned long flags;
 
 	kdev_t devt = inode->i_rdev;
 	int dev;
@@ -1091,16 +1154,16 @@ static int st_release(struct inode *inode, struct file *filp)
 
 	if (STp->buffer != NULL) {
 		normalize_buffer(STp->buffer);
-		write_lock_irqsave(&st_dev_arr_lock, flags);
+		write_lock(&st_dev_arr_lock);
 		(STp->buffer)->in_use = 0;
 		STp->buffer = NULL;
 	}
 	else {
-		write_lock_irqsave(&st_dev_arr_lock, flags);
+		write_lock(&st_dev_arr_lock);
 	}
 
 	STp->in_use = 0;
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 	STp->device->access_count--;
 	if (STp->device->host->hostt->module)
 		__MOD_DEC_USE_COUNT(STp->device->host->hostt->module);
@@ -1944,6 +2007,10 @@ static int st_set_options(Scsi_Tape *STp, long options)
 			STm->default_blksize = value;
 			printk(KERN_INFO "st%d: Default block size set to %d bytes.\n",
 			       dev, STm->default_blksize);
+			if (STp->ready == ST_READY) {
+				STp->blksize_changed = FALSE;
+				set_mode_densblk(STp, STm);
+			}
 		}
 	} else if (code == MT_ST_TIMEOUTS) {
 		value = (options & ~MT_ST_OPTIONS);
@@ -1979,6 +2046,10 @@ static int st_set_options(Scsi_Tape *STp, long options)
 				STm->default_density = value & 0xff;
 				printk(KERN_INFO "st%d: Density default set to %x\n",
 				       dev, STm->default_density);
+				if (STp->ready == ST_READY) {
+					STp->density_changed = FALSE;
+					set_mode_densblk(STp, STm);
+				}
 			}
 		} else if (code == MT_ST_DEF_DRVBUFFER) {
 			if (value == MT_ST_CLEAR_DEFAULT) {
@@ -1990,6 +2061,8 @@ static int st_set_options(Scsi_Tape *STp, long options)
 				printk(KERN_INFO
                                        "st%d: Drive buffer default set to %x\n",
 				       dev, STp->default_drvbuffer);
+				if (STp->ready == ST_READY)
+					st_int_ioctl(STp, MTSETDRVBUFFER, STp->default_drvbuffer);
 			}
 		} else if (code == MT_ST_DEF_COMPRESSION) {
 			if (value == MT_ST_CLEAR_DEFAULT) {
@@ -1997,9 +2070,20 @@ static int st_set_options(Scsi_Tape *STp, long options)
 				printk(KERN_INFO
                                        "st%d: Compression default disabled.\n", dev);
 			} else {
-				STm->default_compression = (value & 1 ? ST_YES : ST_NO);
-				printk(KERN_INFO "st%d: Compression default set to %x\n",
-				       dev, (value & 1));
+				if ((value & 0xff00) != 0) {
+					STp->c_algo = (value & 0xff00) >> 8;
+					printk(KERN_INFO "st%d: Compression algorithm set to 0x%x.\n",
+					       dev, STp->c_algo);
+				}
+				if ((value & 0xff) != 0xff) {
+					STm->default_compression = (value & 1 ? ST_YES : ST_NO);
+					printk(KERN_INFO "st%d: Compression default set to %x\n",
+					       dev, (value & 1));
+					if (STp->ready == ST_READY) {
+						STp->compression_changed = FALSE;
+						st_compression(STp, (STm->default_compression == ST_YES));
+					}
+				}
 			}
 		}
 	} else
@@ -2087,6 +2171,7 @@ static int write_mode_page(Scsi_Tape *STp, int page)
 #define COMPRESSION_PAGE_LENGTH 16
 
 #define CP_OFF_DCE_DCC          2
+#define CP_OFF_C_ALGO           7
 
 #define DCE_MASK  0x80
 #define DCC_MASK  0x40
@@ -2122,16 +2207,22 @@ static int st_compression(Scsi_Tape * STp, int state)
                     (b_data[mpoffs + CP_OFF_DCE_DCC] & DCE_MASK ? 1 : 0)));
 
 	/* Check if compression can be changed */
-	if ((b_data[mpoffs + 2] & DCC_MASK) == 0) {
+	if ((b_data[mpoffs + CP_OFF_DCE_DCC] & DCC_MASK) == 0) {
                 DEBC(printk(ST_DEB_MSG "st%d: Compression not supported.\n", dev));
 		return (-EIO);
 	}
 
 	/* Do the change */
-	if (state)
+	if (state) {
 		b_data[mpoffs + CP_OFF_DCE_DCC] |= DCE_MASK;
-	else
+		if (STp->c_algo != 0)
+			b_data[mpoffs + CP_OFF_C_ALGO] = STp->c_algo;
+	}
+	else {
 		b_data[mpoffs + CP_OFF_DCE_DCC] &= ~DCE_MASK;
+		if (STp->c_algo != 0)
+			b_data[mpoffs + CP_OFF_C_ALGO] = 0; /* no compression */
+	}
 
 	retval = write_mode_page(STp, COMPRESSION_PAGE);
 	if (retval) {
@@ -2171,7 +2262,7 @@ static int do_load_unload(Scsi_Tape *STp, struct file *filp, int load_code)
 	 */
 	if (load_code >= 1 + MT_ST_HPLOADER_OFFSET
 	    && load_code <= 6 + MT_ST_HPLOADER_OFFSET) {
-		DEBC(printk(ST_DEB_MSG "st%d: Enhanced %sload slot %2ld.\n",
+		DEBC(printk(ST_DEB_MSG "st%d: Enhanced %sload slot %2d.\n",
 			    dev, (cmd[4]) ? "" : "un",
 			    load_code - MT_ST_HPLOADER_OFFSET));
 		cmd[3] = load_code - MT_ST_HPLOADER_OFFSET; /* MediaID field of C1553A */
@@ -2202,12 +2293,12 @@ static int do_load_unload(Scsi_Tape *STp, struct file *filp, int load_code)
 
 		if (!load_code)
 			STp->rew_at_close = 0;
-		else
+		else {
 			STp->rew_at_close = STp->autorew_dev;
-
-		retval = check_tape(STp, filp);
-		if (retval > 0)
-			retval = 0;
+			retval = check_tape(STp, filp);
+			if (retval > 0)
+				retval = 0;
+		}
 	}
 	else {
 		STps = &(STp->ps[STp->partition]);
@@ -3286,7 +3377,6 @@ static ST_buffer *
  new_tape_buffer(int from_initialization, int need_dma, int in_use)
 {
 	int i, priority, b_size, order, got = 0, segs = 0;
-	unsigned long flags;
 	ST_buffer *tb;
 
 	read_lock(&st_dev_arr_lock);
@@ -3381,9 +3471,9 @@ static ST_buffer *
 	tb->buffer_size = got;
 	tb->writing = 0;
 
-	write_lock_irqsave(&st_dev_arr_lock, flags);
+	write_lock(&st_dev_arr_lock);
 	st_buffers[st_nbr_buffers++] = tb;
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 
 	return tb;
 }
@@ -3611,7 +3701,6 @@ static int st_attach(Scsi_Device * SDp)
 	ST_mode *STm;
 	ST_partstat *STps;
 	int i, mode, target_nbr, dev_num;
-	unsigned long flags = 0;
 	char *stp;
 
 	if (SDp->type != TYPE_TAPE)
@@ -3624,7 +3713,7 @@ static int st_attach(Scsi_Device * SDp)
 		return 1;
 	}
 
-	write_lock_irqsave(&st_dev_arr_lock, flags);
+	write_lock(&st_dev_arr_lock);
 	if (st_template.nr_dev >= st_template.dev_max) {
 		Scsi_Tape **tmp_da;
 		ST_buffer **tmp_ba;
@@ -3635,7 +3724,7 @@ static int st_attach(Scsi_Device * SDp)
 			tmp_dev_max = ST_MAX_TAPES;
 		if (tmp_dev_max <= st_template.nr_dev) {
 			SDp->attached--;
-			write_unlock_irqrestore(&st_dev_arr_lock, flags);
+			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Too many tape devices (max. %d).\n",
 			       ST_MAX_TAPES);
 			return 1;
@@ -3649,7 +3738,7 @@ static int st_attach(Scsi_Device * SDp)
 			if (tmp_ba != NULL)
 				kfree(tmp_ba);
 			SDp->attached--;
-			write_unlock_irqrestore(&st_dev_arr_lock, flags);
+			write_unlock(&st_dev_arr_lock);
 			printk(KERN_ERR "st: Can't extend device array.\n");
 			return 1;
 		}
@@ -3682,7 +3771,7 @@ static int st_attach(Scsi_Device * SDp)
 	tpnt = kmalloc(sizeof(Scsi_Tape), GFP_ATOMIC);
 	if (tpnt == NULL) {
 		SDp->attached--;
-		write_unlock_irqrestore(&st_dev_arr_lock, flags);
+		write_unlock(&st_dev_arr_lock);
 		printk(KERN_ERR "st: Can't allocate device descriptor.\n");
 		return 1;
 	}
@@ -3770,7 +3859,7 @@ static int st_attach(Scsi_Device * SDp)
 	init_MUTEX(&tpnt->lock);
 
 	st_template.nr_dev++;
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 	printk(KERN_WARNING
 	"Attached scsi tape st%d at scsi%d, channel %d, id %d, lun %d\n",
 	       dev_num, SDp->host->host_no, SDp->channel, SDp->id, SDp->lun);
@@ -3798,45 +3887,12 @@ static int st_detect(Scsi_Device * SDp)
 	return 1;
 }
 
-static int st_registered = 0;
-
-/* Driver initialization (not __init because may be called later) */
-static int st_init()
-{
-	unsigned long flags;
-
-	if (st_template.dev_noticed == 0 || st_registered)
-		return 0;
-
-	printk(KERN_INFO
-	       "st: Version %s, bufsize %d, wrt %d, max init. bufs %d, s/g segs %d\n",
-	       verstr, st_buffer_size, st_write_threshold, st_max_buffers, st_max_sg_segs);
-
-	write_lock_irqsave(&st_dev_arr_lock, flags);
-	if (!st_registered) {
-		if (devfs_register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops)) {
-			write_unlock_irqrestore(&st_dev_arr_lock, flags);
-			printk(KERN_ERR "Unable to get major %d for SCSI tapes\n",
-                               MAJOR_NR);
-			return 1;
-		}
-		st_registered++;
-	}
-
-	st_template.dev_max = 0;
-	st_nbr_buffers = 0;
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
-
-	return 0;
-}
-
 static void st_detach(Scsi_Device * SDp)
 {
 	Scsi_Tape *tpnt;
 	int i, mode;
-	unsigned long flags;
 
-	write_lock_irqsave(&st_dev_arr_lock, flags);
+	write_lock(&st_dev_arr_lock);
 	for (i = 0; i < st_template.dev_max; i++) {
 		tpnt = scsi_tapes[i];
 		if (tpnt != NULL && tpnt->device == SDp) {
@@ -3852,22 +3908,30 @@ static void st_detach(Scsi_Device * SDp)
 			SDp->attached--;
 			st_template.nr_dev--;
 			st_template.dev_noticed--;
-			write_unlock_irqrestore(&st_dev_arr_lock, flags);
+			write_unlock(&st_dev_arr_lock);
 			return;
 		}
 	}
 
-	write_unlock_irqrestore(&st_dev_arr_lock, flags);
+	write_unlock(&st_dev_arr_lock);
 	return;
 }
-
 
 static int __init init_st(void)
 {
 	validate_options();
 
-	st_template.module = THIS_MODULE;
-        return scsi_register_device(&st_template);
+	printk(KERN_INFO
+		"st: Version %s, bufsize %d, wrt %d, "
+		"max init. bufs %d, s/g segs %d\n",
+		verstr, st_buffer_size, st_write_threshold,
+		st_max_buffers, st_max_sg_segs);
+
+	if (devfs_register_chrdev(SCSI_TAPE_MAJOR, "st", &st_fops) >= 0)
+		return scsi_register_device(&st_template);
+
+	printk(KERN_ERR "Unable to get major %d for SCSI tapes\n", MAJOR_NR);
+	return 1;
 }
 
 static void __exit exit_st(void)
@@ -3876,7 +3940,6 @@ static void __exit exit_st(void)
 
 	scsi_unregister_device(&st_template);
 	devfs_unregister_chrdev(SCSI_TAPE_MAJOR, "st");
-	st_registered--;
 	if (scsi_tapes != NULL) {
 		for (i=0; i < st_template.dev_max; ++i)
 			if (scsi_tapes[i])

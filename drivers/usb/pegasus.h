@@ -107,7 +107,7 @@ typedef struct pegasus {
 	unsigned		features;
 	int			dev_index;
 	int			intr_interval;
-	struct urb		ctrl_urb, rx_urb, tx_urb, intr_urb;
+	struct urb		*ctrl_urb, *rx_urb, *tx_urb, *intr_urb;
 	struct usb_ctrlrequest	dr;
 	wait_queue_head_t	ctrl_wait;
 	struct semaphore	ctrl_sem;
@@ -145,6 +145,7 @@ struct usb_eth_dev {
 #define	VENDOR_SMARTBRIDGES	0x08d1
 #define	VENDOR_SMC		0x0707
 #define	VENDOR_SOHOWARE		0x15e8
+#define	VENDOR_SIEMENS		0x067c
 
 
 #else	/* PEGASUS_DEV */
@@ -172,6 +173,8 @@ PEGASUS_DEV( "USB 10/100 Fast Ethernet", VENDOR_ABOCOM, 0xabc1,
 PEGASUS_DEV( "USB 10/100 Fast Ethernet", VENDOR_ABOCOM, 0x200c,
 		DEFAULT_GPIO_RESET | PEGASUS_II ) 	
 PEGASUS_DEV( "Accton USB 10/100 Ethernet Adapter", VENDOR_ACCTON, 0x1046,
+		DEFAULT_GPIO_RESET )
+PEGASUS_DEV( "SpeedStream USB 10/100 Ethernet", VENDOR_ACCTON, 0x5046,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "ADMtek ADM8511 \"Pegasus II\" USB Ethernet",
 		VENDOR_ADMTEK, 0x8511,
@@ -244,6 +247,8 @@ PEGASUS_DEV( "smartNIC 2 PnP Adapter", VENDOR_SMARTBRIDGES, 0x0003,
 PEGASUS_DEV( "SMC 202 USB Ethernet", VENDOR_SMC, 0x0200,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "SOHOware NUB100 Ethernet", VENDOR_SOHOWARE, 0x9100,
+		DEFAULT_GPIO_RESET )
+PEGASUS_DEV( "SpeedStream USB 10/100 Ethernet", VENDOR_SIEMENS, 0x1001,
 		DEFAULT_GPIO_RESET )
 
 

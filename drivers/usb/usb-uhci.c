@@ -16,7 +16,7 @@
  * (C) Copyright 1999 Randy Dunlap
  * (C) Copyright 1999 Gregory P. Smith
  *
- * $Id: usb-uhci.c,v 1.268 2001/08/29 14:08:43 acher Exp $
+ * $Id: usb-uhci.c,v 1.275 2002/01/19 20:57:33 acher Exp $
  */
 
 #include <linux/config.h>
@@ -34,6 +34,7 @@
 #include <linux/init.h>
 #include <linux/version.h>
 #include <linux/pm.h>
+#include <linux/timer.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -52,7 +53,7 @@
 /* This enables an extra UHCI slab for memory debugging */
 #define DEBUG_SLAB
 
-#define VERSTR "$Revision: 1.268 $ time " __TIME__ " " __DATE__
+#define VERSTR "$Revision: 1.275 $ time " __TIME__ " " __DATE__
 
 #include <linux/usb.h>
 #include "usb-uhci.h"
@@ -61,7 +62,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.268"
+#define DRIVER_VERSION "v1.275"
 #define DRIVER_AUTHOR "Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
 
@@ -71,6 +72,9 @@
 #define DEBUG_SYMBOLS
 #ifdef DEBUG_SYMBOLS
 	#define _static
+	#ifndef EXPORT_SYMTAB
+		#define EXPORT_SYMTAB
+	#endif
 #else
 	#define _static static
 #endif
@@ -1182,6 +1186,7 @@ _static int uhci_unlink_urb_sync (uhci_t *s, struct urb *urb)
 		// cleanup the rest
 		switch (usb_pipetype (urb->pipe)) {
 
+		case PIPE_INTERRUPT:
 		case PIPE_ISOCHRONOUS:
 			uhci_wait_ms(1);
 			uhci_clean_iso_step2(s, urb_priv);
@@ -1779,17 +1784,15 @@ _static void uhci_check_timeouts(uhci_t *s)
 		type = usb_pipetype (urb->pipe);
 
 		hcpriv = (urb_priv_t*)urb->hcpriv;
-				
-		if ( urb->timeout && 
-			((hcpriv->started + urb->timeout) < jiffies)) {
+		
+		if ( urb->timeout && time_after(jiffies, hcpriv->started + urb->timeout)) {
 			urb->transfer_flags |= USB_TIMEOUT_KILLED | USB_ASYNC_UNLINK;
 			async_dbg("uhci_check_timeout: timeout for %p",urb);
 			uhci_unlink_urb_async(s, urb, UNLINK_ASYNC_STORE_URB);
 		}
 #ifdef CONFIG_USB_UHCI_HIGH_BANDWIDTH
 		else if (((type == PIPE_BULK) || (type == PIPE_CONTROL)) &&  
-		     (hcpriv->use_loop) &&
-		     ((hcpriv->started + IDLE_TIMEOUT) < jiffies))
+			 (hcpriv->use_loop) && time_after(jiffies, hcpriv->started + IDLE_TIMEOUT))
 			disable_desc_loop(s, urb);
 #endif
 
@@ -2445,7 +2448,7 @@ _static int process_interrupt (uhci_t *s, struct urb *urb)
 			break;
 		}
 
-		if (!desc->hw.td.status & cpu_to_le32(TD_CTRL_IOC)) {
+		if (!(desc->hw.td.status & cpu_to_le32(TD_CTRL_IOC))) {
 			// do not process one-shot TDs, no recycling
 			break;
 		}
@@ -2509,6 +2512,8 @@ _static int process_interrupt (uhci_t *s, struct urb *urb)
 			}
 			else {
 				uhci_unlink_urb_async(s, urb, UNLINK_ASYNC_STORE_URB);
+				// correct toggle after unlink
+				usb_dotoggle (urb->dev, usb_pipeendpoint (urb->pipe), usb_pipeout (urb->pipe));
 				clr_td_ioc(desc); // inactivate TD
 			}
 		}
@@ -2738,7 +2743,7 @@ _static void uhci_interrupt (int irq, void *__uhci, struct pt_regs *regs)
 
 	if (status != 1) {
 		// Avoid too much error messages at a time
-		if ((jiffies - s->last_error_time > ERROR_SUPPRESSION_TIME)) {
+		if (time_after(jiffies, s->last_error_time + ERROR_SUPPRESSION_TIME)) {
 			warn("interrupt, status %x, frame# %i", status, 
 			     UHCI_GET_CURRENT_FRAME(s));
 			s->last_error_time = jiffies;
@@ -2786,7 +2791,7 @@ restart:
 				break;
 		}
 	}
-	if ((jiffies - s->timeout_check) > (HZ/30)) 
+	if (time_after(jiffies, s->timeout_check + (HZ/30)))
 		uhci_check_timeouts(s);
 
 	clean_descs(s, CLEAN_NOT_FORCED);
@@ -2815,7 +2820,7 @@ _static void reset_hc (uhci_t *s)
 _static void start_hc (uhci_t *s)
 {
 	unsigned int io_addr = s->io_addr;
-	int timeout = 1000;
+	int timeout = 10;
 
 	/*
 	 * Reset the HC - this will force us to get a
@@ -2830,6 +2835,7 @@ _static void start_hc (uhci_t *s)
 			err("USBCMD_HCRESET timed out!");
 			break;
 		}
+		udelay(1);
 	}
 
 	/* Turn on all interrupts */
@@ -2845,7 +2851,8 @@ _static void start_hc (uhci_t *s)
 	s->running = 1;
 }
 
-_static void __devexit
+/* No  __devexit, since it maybe called from alloc_uhci() */
+_static void
 uhci_pci_remove (struct pci_dev *dev)
 {
 	uhci_t *s = pci_get_drvdata(dev);
@@ -3130,4 +3137,3 @@ module_exit (uhci_hcd_cleanup);
 MODULE_AUTHOR( DRIVER_AUTHOR );
 MODULE_DESCRIPTION( DRIVER_DESC );
 MODULE_LICENSE("GPL");
-

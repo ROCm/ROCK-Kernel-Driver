@@ -125,7 +125,7 @@ int direct2indirect (struct reiserfs_transaction_handle *th, struct inode * inod
 	memset(page_address(unbh->b_page) + pgoff, 0, n_blk_size - total_tail) ;
     }
 
-    inode->u.reiserfs_i.i_first_direct_byte = U32_MAX;
+    REISERFS_I(inode)->i_first_direct_byte = U32_MAX;
 
     return 0;
 }
@@ -285,7 +285,7 @@ int indirect2direct (struct reiserfs_transaction_handle *th,
 
     /* we store position of first direct item in the in-core inode */
     //mark_file_with_tail (p_s_inode, pos1 + 1);
-    p_s_inode->u.reiserfs_i.i_first_direct_byte = pos1 + 1;
+    REISERFS_I(p_s_inode)->i_first_direct_byte = pos1 + 1;
 
     return n_block_size - round_tail_len;
 }

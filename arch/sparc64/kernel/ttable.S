@@ -1,4 +1,4 @@
-/* $Id: ttable.S,v 1.36 2001/11/28 23:32:16 davem Exp $
+/* $Id: ttable.S,v 1.37 2002/01/23 11:27:32 davem Exp $
  * ttable.S: Sparc V9 Trap Table(s) with SpitFire/Cheetah extensions.
  *
  * Copyright (C) 1996, 2001 David S. Miller (davem@caip.rutgers.edu)
@@ -44,7 +44,12 @@ tl0_stdfmna:	TRAP_NOSAVE(do_stdfmna)
 tl0_privact:	TRAP_NOSAVE(__do_privact)
 tl0_resv038:	BTRAP(0x38) BTRAP(0x39) BTRAP(0x3a) BTRAP(0x3b) BTRAP(0x3c) BTRAP(0x3d)
 tl0_resv03e:	BTRAP(0x3e) BTRAP(0x3f) BTRAP(0x40)
-tl0_irq1:	TRAP_IRQ(handler_irq, 1)  TRAP_IRQ(handler_irq, 2)
+#ifdef CONFIG_SMP
+tl0_irq1:	TRAP_IRQ(smp_task_migration_interrupt, 1)
+#else
+tl0_irq1:	BTRAP(0x41)
+#endif
+tl0_irq2:	TRAP_IRQ(handler_irq, 2)
 tl0_irq3:	TRAP_IRQ(handler_irq, 3)  TRAP_IRQ(handler_irq, 4)
 tl0_irq5:	TRAP_IRQ(handler_irq, 5)  TRAP_IRQ(handler_irq, 6)
 tl0_irq7:	TRAP_IRQ(handler_irq, 7)  TRAP_IRQ(handler_irq, 8)

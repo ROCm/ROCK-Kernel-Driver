@@ -94,6 +94,18 @@
 #define FB_ACCEL_IGS_CYBER5000	35	/* CyberPro 5000		*/
 #define FB_ACCEL_SIS_GLAMOUR    36	/* SiS 300/630/540              */
 
+
+#define FB_ACCEL_NEOMAGIC_NM2070 90	/* NeoMagic NM2070              */
+#define FB_ACCEL_NEOMAGIC_NM2090 91	/* NeoMagic NM2090              */
+#define FB_ACCEL_NEOMAGIC_NM2093 92	/* NeoMagic NM2093              */
+#define FB_ACCEL_NEOMAGIC_NM2097 93	/* NeoMagic NM2097              */
+#define FB_ACCEL_NEOMAGIC_NM2160 94	/* NeoMagic NM2160              */
+#define FB_ACCEL_NEOMAGIC_NM2200 95	/* NeoMagic NM2200              */
+#define FB_ACCEL_NEOMAGIC_NM2230 96	/* NeoMagic NM2230              */
+#define FB_ACCEL_NEOMAGIC_NM2360 97	/* NeoMagic NM2360              */
+#define FB_ACCEL_NEOMAGIC_NM2380 98	/* NeoMagic NM2380              */
+
+
 struct fb_fix_screeninfo {
 	char id[16];			/* identification string eg "TT Builtin" */
 	unsigned long smem_start;	/* Start of frame buffer mem */

@@ -428,6 +428,9 @@ struct ipt_table
 
 	/* Man behind the curtain... */
 	struct ipt_table_info *private;
+
+	/* Set this to THIS_MODULE if you are a module, otherwise NULL */
+	struct module *me;
 };
 
 extern int ipt_register_table(struct ipt_table *table);

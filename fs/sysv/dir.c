@@ -145,7 +145,7 @@ struct sysv_dir_entry *sysv_find_entry(struct dentry *dentry, struct page **res_
 
 	*res_page = NULL;
 
-	start = dir->u.sysv_i.i_dir_start_lookup;
+	start = SYSV_I(dir)->i_dir_start_lookup;
 	if (start >= npages)
 		start = 0;
 	n = start;
@@ -174,7 +174,7 @@ struct sysv_dir_entry *sysv_find_entry(struct dentry *dentry, struct page **res_
 	return NULL;
 
 found:
-	dir->u.sysv_i.i_dir_start_lookup = n;
+	SYSV_I(dir)->i_dir_start_lookup = n;
 	*res_page = page;
 	return de;
 }

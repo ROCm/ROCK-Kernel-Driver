@@ -344,7 +344,7 @@ static struct fb_ops hitfb_ops = {
 int __init hitfb_init(void)
 {
     strcpy(fb_info.gen.info.modename, "Hitachi HD64461");
-    fb_info.gen.info.node = -1;
+    fb_info.gen.info.node = NODEV;
     fb_info.gen.info.flags = FBINFO_FLAG_DEFAULT;
     fb_info.gen.info.fbops = &hitfb_ops;
     fb_info.gen.info.disp = &fb_info.disp;
