@@ -2311,6 +2311,7 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 	return tmp.b_blocknr;
 }
 
+#if 0
 int generic_direct_IO(int rw, struct inode *inode,
 			struct kiobuf *iobuf, unsigned long blocknr,
 			int blocksize, get_block_t *get_block)
@@ -2355,6 +2356,7 @@ int generic_direct_IO(int rw, struct inode *inode,
  out:
 	return retval;
 }
+#endif
 
 /*
  * Start I/O on a physical range of kernel memory, defined by a vector
