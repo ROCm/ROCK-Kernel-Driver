@@ -37,7 +37,6 @@ struct bridge_id
 struct mac_addr
 {
 	unsigned char	addr[6];
-	unsigned char	pad[2];
 };
 
 struct net_bridge_fdb_entry
@@ -48,8 +47,8 @@ struct net_bridge_fdb_entry
 	atomic_t			use_count;
 	unsigned long			ageing_timer;
 	mac_addr			addr;
-	unsigned			is_local:1;
-	unsigned			is_static:1;
+	unsigned char			is_local;
+	unsigned char			is_static;
 };
 
 struct net_bridge_port
@@ -137,10 +136,10 @@ extern int  br_fdb_get_entries(struct net_bridge *br,
 			unsigned char *_buf,
 			int maxnum,
 			int offset);
-extern void br_fdb_insert(struct net_bridge *br,
-			  struct net_bridge_port *source,
-			  const unsigned char *addr,
-			  int is_local);
+extern int br_fdb_insert(struct net_bridge *br,
+			 struct net_bridge_port *source,
+			 const unsigned char *addr,
+			 int is_local);
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,

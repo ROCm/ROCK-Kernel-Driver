@@ -17,6 +17,7 @@
 #include <linux/spinlock.h>
 #include <linux/if_bridge.h>
 #include <linux/times.h>
+#include <linux/etherdevice.h>
 #include <asm/atomic.h>
 #include <asm/uaccess.h>
 #include "br_private.h"
@@ -242,12 +243,16 @@ int br_fdb_get_entries(struct net_bridge *br,
 	return num;
 }
 
-void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
-		   const unsigned char *addr, int is_local)
+int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
+		  const unsigned char *addr, int is_local)
 {
 	struct hlist_node *h;
 	struct net_bridge_fdb_entry *fdb;
 	int hash = br_mac_hash(addr);
+	int ret = 0;
+
+	if (!is_valid_ether_addr(addr))
+		return -EADDRNOTAVAIL;
 
 	write_lock_bh(&br->hash_lock);
 	hlist_for_each(h, &br->hash[hash]) {
@@ -263,6 +268,7 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 					printk(KERN_WARNING "%s: received packet with "
 					       " own address as source address\n",
 					       source->dev->name);
+				ret = -EEXIST;
 				goto out;
 			}
 
@@ -277,8 +283,10 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	}
 
 	fdb = kmalloc(sizeof(*fdb), GFP_ATOMIC);
-	if (fdb == NULL) 
+	if (unlikely(fdb == NULL)) {
+		ret = -ENOMEM;
 		goto out;
+	}
 
 	memcpy(fdb->addr.addr, addr, ETH_ALEN);
 	atomic_set(&fdb->use_count, 1);
@@ -297,4 +305,6 @@ void br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	list_add_tail(&fdb->age_list, &br->age_list);
  out:
 	write_unlock_bh(&br->hash_lock);
+
+	return ret;
 }

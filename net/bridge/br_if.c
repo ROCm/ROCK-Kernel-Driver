@@ -277,13 +277,15 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	else if (IS_ERR(p = new_nbp(br, dev, cost)))
 		err = PTR_ERR(p);
 
+ 	else if ((err = br_fdb_insert(br, p, dev->dev_addr, 1)))
+ 		 destroy_nbp(p);
+ 
 	else {
 		dev_set_promiscuity(dev, 1);
 
 		list_add_rcu(&p->list, &br->port_list);
 
 		br_stp_recalculate_bridge_id(br);
-		br_fdb_insert(br, p, dev->dev_addr, 1);
 		if ((br->dev->flags & IFF_UP) && (dev->flags & IFF_UP))
 			br_stp_enable_port(p);
 
