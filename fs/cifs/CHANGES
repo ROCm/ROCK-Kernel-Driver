@@ -1,3 +1,8 @@
+Version 0.90
+------------
+Fix scheduling while atomic error in getting inode info on newly created file. Fix truncate of existing files
+opened with O_CREAT set but O_TRUNC not set.
+
 Version 0.89
 ------------
 Fix oops on write to dead tcp session. Remove error log write for case when file open

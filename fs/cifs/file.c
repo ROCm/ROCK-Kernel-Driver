@@ -144,6 +144,10 @@ cifs_open(struct inode *inode, struct file *file)
 			list_add(&pCifsFile->tlist,&pTcon->openFileList);
 			pCifsInode = CIFS_I(file->f_dentry->d_inode);
 			if(pCifsInode) {
+				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
+				write_unlock(&GlobalSMBSeslock);
+				write_unlock(&file->f_owner.lock);
+
 		                if (pTcon->ses->capabilities & CAP_UNIX)
 					rc = cifs_get_inode_info_unix(&file->f_dentry->d_inode,
 						full_path, inode->i_sb);
@@ -151,16 +155,16 @@ cifs_open(struct inode *inode, struct file *file)
 					rc = cifs_get_inode_info(&file->f_dentry->d_inode,
 						full_path, buf, inode->i_sb);
 
-				list_add(&pCifsFile->flist,&pCifsInode->openFileList);
 				if(oplock == OPLOCK_EXCLUSIVE) {
 					pCifsInode->clientCanCacheAll = TRUE;
 					pCifsInode->clientCanCacheRead = TRUE;
 					cFYI(1,("Exclusive Oplock granted on inode %p",file->f_dentry->d_inode));
 				} else if(oplock == OPLOCK_READ)
 					pCifsInode->clientCanCacheRead = TRUE;
+			} else {
+				write_unlock(&GlobalSMBSeslock);
+				write_unlock(&file->f_owner.lock);
 			}
-			write_unlock(&GlobalSMBSeslock);
-			write_unlock(&file->f_owner.lock);
 			if(file->f_flags & O_CREAT) {           
 				/* time to set mode which we can not set earlier due
 				 to problems creating new read-only files */
