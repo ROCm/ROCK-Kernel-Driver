@@ -1146,7 +1146,7 @@ isdn_getnum(char **p)
 }
 
 static struct isdn_slot *
-isdn_minor2slot(int minor)
+get_slot_by_minor(int minor)
 {
 	int di, ch;
 	struct isdn_driver *drv;
@@ -1165,30 +1165,13 @@ isdn_minor2slot(int minor)
 	return NULL;
 
  found:
-	put_drv(drv); // FIXME!!!
 	return drv->slots + ch;
 }
 
-static inline int
-isdn_minor2drv(int minor)
+static inline void
+put_slot(struct isdn_slot *slot)
 {
-	struct isdn_slot *slot = isdn_minor2slot(minor);
-
-	if (!slot)
-		return -1;
-
-	return slot->drv->di;
-}
-
-static inline int
-isdn_minor2chan(int minor)
-{
-	struct isdn_slot *slot = isdn_minor2slot(minor);
-
-	if (!slot)
-		return -1;
-
-	return slot - slot->drv->slots;
+	put_drv(slot->drv);
 }
 
 static char *
@@ -1197,60 +1180,77 @@ isdn_statstr(void)
 	static char istatbuf[2048];
 	struct isdn_slot *slot;
 	char *p;
-	int i, di, ch;
+	int i;
 
 	sprintf(istatbuf, "idmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		slot = isdn_minor2slot(i);
-		if (slot)
+		slot = get_slot_by_minor(i);
+		if (slot) {
 			sprintf(p, "%s ", slot->drv->id);
-		else
+			put_slot(slot);
+		} else {
 			sprintf(p, "- ");
+		}
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nchmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		ch = isdn_minor2chan(i);
-		sprintf(p, "%d ", ch);
+		slot = get_slot_by_minor(i);
+		if (slot) {
+			sprintf(p, "%d ", slot->ch);
+			put_slot(slot);
+		} else {
+			sprintf(p, "-1 ");
+		}
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\ndrmap:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		di = isdn_minor2drv(i);
-		sprintf(p, "%d ", di);
-		p = istatbuf + strlen(istatbuf);
+		slot = get_slot_by_minor(i);
+		if (slot) {
+			sprintf(p, "%d ", slot->di);
+			put_slot(slot);
+		} else {
+			sprintf(p, "-1 ");
+		}
 	}
 	sprintf(p, "\nusage:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		slot = isdn_minor2slot(i);
-		if (slot)
+		slot = get_slot_by_minor(i);
+		if (slot) {
 			sprintf(p, "%d ", slot->usage);
-		else
+			put_slot(slot);
+		} else {
 			sprintf(p, "0 ");
+		}
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nflags:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_DRIVERS; i++) {
-		slot = isdn_minor2slot(i);
-		if (slot)
+		slot = get_slot_by_minor(i);
+		if (slot) {
 			sprintf(p, "0 ");
-		else
+			put_slot(slot);
+		} else {
 			sprintf(p, "? ");
+		}
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\nphone:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		slot = isdn_minor2slot(i);
-		if (slot)
+		slot = get_slot_by_minor(i);
+		if (slot) {
 			sprintf(p, "%s ", slot->num);
-		else
+			put_slot(slot);
+		} else {
 			sprintf(p, " ");
+		}
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\n");
@@ -1396,10 +1396,11 @@ isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 					       sizeof(ulong) * ISDN_MAX_CHANNELS * 2)))
 				return ret;
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-				slot = isdn_minor2slot(i);
+				slot = get_slot_by_minor(i);
 				if (slot) {
 					put_user(slot->ibytes, p++);
 					put_user(slot->obytes, p++);
+					put_slot(slot);
 				} else {
 					put_user(zero_ul, p++);
 					put_user(zero_ul, p++);
@@ -1436,29 +1437,27 @@ static int
 isdn_ctrl_open(struct inode *ino, struct file *file)
 {
 	unsigned int minor = minor(ino->i_rdev);
-	int drvidx = isdn_minor2drv(minor - ISDN_MINOR_CTRL);
-	struct isdn_driver *drv;
+	struct isdn_slot *slot = get_slot_by_minor(minor - ISDN_MINOR_CTRL);
 
-	drv = get_drv_by_nr(drvidx);
-	if (!drv)
+	if (!slot)
 		return -ENODEV;
 
-	isdn_lock_driver(drv);
+	isdn_lock_driver(slot->drv);
+	file->private_data = slot;
 
-	file->private_data = drv;
 	return 0;
 }
 
 static int
 isdn_ctrl_release(struct inode *ino, struct file *file)
 {
-	struct isdn_driver *drv = file->private_data;
+	struct isdn_slot *slot = file->private_data;
 
 	if (dev->profd == current)
 		dev->profd = NULL;
 
-	isdn_unlock_driver(drv);
-	put_drv(drv);
+	isdn_unlock_driver(slot->drv);
+	put_slot(slot);
 
 	return 0;
 }
@@ -1466,24 +1465,22 @@ isdn_ctrl_release(struct inode *ino, struct file *file)
 static ssize_t
 isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 {
-	struct isdn_driver *drv = file->private_data;
-	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
+	struct isdn_slot *slot = file->private_data;
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	int len = 0;
 
-
 	if (off != &file->f_pos)
 		return -ESPIPE;
 
-	if (!drv->interface->readstat) {
+	if (!slot->drv->interface->readstat) {
 		isdn_BUG();
 		return 0;
 	}
- 	add_wait_queue(&drv->st_waitq, &wait);
+ 	add_wait_queue(&slot->drv->st_waitq, &wait);
 	for (;;) {
 		spin_lock_irqsave(&stat_lock, flags);
-		len = drv->stavail;
+		len = slot->drv->stavail;
 		spin_unlock_irqrestore(&stat_lock, flags);
 		if (len > 0)
 			break;
@@ -1498,7 +1495,7 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 		schedule();
 	}
 	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(&drv->st_waitq, &wait);
+	remove_wait_queue(&slot->drv->st_waitq, &wait);
 	
 	if (len < 0)
 		return len;
@@ -1506,15 +1503,15 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 	if (count > len)
 		count = len;
 		
-	len = drv->interface->readstat(buf, count, 1, drv->di,
-				       isdn_minor2chan(minor));
+	len = slot->drv->interface->readstat(buf, count, 1, slot->di, 
+					     slot->ch);
 
 	spin_lock_irqsave(&stat_lock, flags);
 	if (len) {
-		drv->stavail -= len;
+		slot->drv->stavail -= len;
 	} else {
 		isdn_BUG();
-		drv->stavail = 0;
+		slot->drv->stavail = 0;
 	}
 	spin_unlock_irqrestore(&stat_lock, flags);
 
@@ -1525,20 +1522,19 @@ isdn_ctrl_read(struct file *file, char *buf, size_t count, loff_t * off)
 static ssize_t
 isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 {
-	struct isdn_driver *drv = file->private_data;
-	unsigned int minor = minor(file->f_dentry->d_inode->i_rdev);
+	struct isdn_slot *slot = file->private_data;
 	int retval;
 
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
-	if (!drv->interface->writecmd) {
+	if (off != &file->f_pos) {
+		retval = -ESPIPE;
+		goto out;
+	}
+	if (!slot->drv->interface->writecmd) {
 		retval = -EINVAL;
 		goto out;
 	}
-	retval = drv->interface->
-		writecmd(buf, count, 1, drv->di, 
-			 isdn_minor2chan(minor - ISDN_MINOR_CTRL));
+	retval = slot->drv->interface->writecmd(buf, count, 1, slot->di, 
+						slot->ch);
 
  out:
 	return retval;
@@ -1547,12 +1543,12 @@ isdn_ctrl_write(struct file *file, const char *buf, size_t count, loff_t *off)
 static unsigned int
 isdn_ctrl_poll(struct file *file, poll_table *wait)
 {
-	struct isdn_driver *drv = file->private_data;
+	struct isdn_slot *slot = file->private_data;
 	unsigned int mask = 0;
 
-	poll_wait(file, &drv->st_waitq, wait);
+	poll_wait(file, &slot->drv->st_waitq, wait);
 	mask = POLLOUT | POLLWRNORM;
-	if (drv->stavail)
+	if (slot->drv->stavail)
 		mask |= POLLIN | POLLRDNORM;
 
 	return mask;
