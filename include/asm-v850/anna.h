@@ -1,8 +1,8 @@
 /*
  * include/asm-v850/anna.h -- Anna V850E2 evaluation cpu chip/board
  *
- *  Copyright (C) 2001,2002  NEC Corporation
- *  Copyright (C) 2001,2002  Miles Bader <miles@gnu.org>
+ *  Copyright (C) 2001,02,03  NEC Electronics Corporation
+ *  Copyright (C) 2001,02,03  Miles Bader <miles@gnu.org>
  *
  * This file is subject to the terms and conditions of the GNU General
  * Public License.  See the file COPYING in the main directory of this
@@ -14,8 +14,9 @@
 #ifndef __V850_ANNA_H__
 #define __V850_ANNA_H__
 
+#include <asm/v850e2.h>		/* Based on V850E2 core.  */
 
-#define CPU_ARCH 	"v850e2"
+
 #define CPU_MODEL	"v850e2/anna"
 #define CPU_MODEL_LONG	"NEC V850E2/Anna"
 #define PLATFORM	"anna"
@@ -48,30 +49,6 @@
 
 
 /* Anna specific control registers.  */
-#define ANNA_CSC_ADDR(n)		(0xFFFFF060 + (n) * 2)
-#define ANNA_CSC(n)			(*(volatile u16 *)ANNA_CSC_ADDR(n))
-#define ANNA_BPC_ADDR			0xFFFFF064
-#define ANNA_BPC			(*(volatile u16 *)ANNA_BPC_ADDR)
-#define ANNA_BSC_ADDR			0xFFFFF066
-#define ANNA_BSC			(*(volatile u16 *)ANNA_BSC_ADDR)
-#define ANNA_BEC_ADDR			0xFFFFF068
-#define ANNA_BEC			(*(volatile u16 *)ANNA_BEC_ADDR)
-#define ANNA_BHC_ADDR			0xFFFFF06A
-#define ANNA_BHC			(*(volatile u16 *)ANNA_BHC_ADDR)
-#define ANNA_BCT_ADDR(n)		(0xFFFFF480 + (n) * 2)
-#define ANNA_BCT(n)			(*(volatile u16 *)ANNA_BCT_ADDR(n))
-#define ANNA_DWC_ADDR(n)		(0xFFFFF484 + (n) * 2)
-#define ANNA_DWC(n)			(*(volatile u16 *)ANNA_DWC_ADDR(n))
-#define ANNA_BCC_ADDR			0xFFFFF488
-#define ANNA_BCC			(*(volatile u16 *)ANNA_BCC_ADDR)
-#define ANNA_ASC_ADDR			0xFFFFF48A
-#define ANNA_ASC			(*(volatile u16 *)ANNA_ASC_ADDR)
-#define ANNA_LBS_ADDR			0xFFFFF48E
-#define ANNA_LBS			(*(volatile u16 *)ANNA_LBS_ADDR)
-#define ANNA_SCR3_ADDR			0xFFFFF4AC
-#define ANNA_SCR3			(*(volatile u16 *)ANNA_SCR3_ADDR)
-#define ANNA_RFS3_ADDR			0xFFFFF4AE
-#define ANNA_RFS3			(*(volatile u16 *)ANNA_RFS3_ADDR)
 #define ANNA_ILBEN_ADDR			0xFFFFF7F2
 #define ANNA_ILBEN			(*(volatile u16 *)ANNA_ILBEN_ADDR)
 
@@ -84,9 +61,6 @@
 #define ANNA_PORT_PM_ADDR(n)		(0xFFFFF410 + (n) * 2)
 #define ANNA_PORT_PM(n)			(*(volatile u8 *)ANNA_PORT_PM_ADDR(n))
 
-
-/* NB85E-style interrupt system.  */
-#include <asm/nb85e_intc.h>
 
 /* Hardware-specific interrupt numbers (in the kernel IRQ namespace).  */
 #define IRQ_INTP(n)	(n)	/* Pnnn (pin) interrupts 0-15 */

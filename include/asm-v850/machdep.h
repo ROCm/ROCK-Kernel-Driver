@@ -51,6 +51,9 @@
 #ifdef CONFIG_V850E2_SIM85E2C
 #include <asm/sim85e2c.h>
 #endif
+#ifdef CONFIG_V850E2_SIM85E2S
+#include <asm/sim85e2s.h>
+#endif
 #ifdef CONFIG_V850E2_FPGA85E2C
 #include <asm/fpga85e2c.h>
 #endif

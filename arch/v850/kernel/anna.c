@@ -41,24 +41,30 @@ static void anna_led_tick (void);
 
 void __init mach_early_init (void)
 {
-	ANNA_ILBEN  = 0;
-	ANNA_CSC(0) = 0x402F;
-	ANNA_CSC(1) = 0x4000;
-	ANNA_BPC    = 0;
-	ANNA_BSC    = 0xAAAA;
-	ANNA_BEC    = 0;
-	ANNA_BHC    = 0xFFFF;	/* icache all memory, dcache all */
-	ANNA_BCT(0) = 0xB088;
-	ANNA_BCT(1) = 0x0008;
-	ANNA_DWC(0) = 0x0027;
-	ANNA_DWC(1) = 0;
-	ANNA_BCC    = 0x0006;
-	ANNA_ASC    = 0;
-	ANNA_LBS    = 0x0089;
-	ANNA_SCR3   = 0x21A9;
-	ANNA_RFS3   = 0x8121;
+	ANNA_ILBEN    = 0;
 
-	nb85e_intc_disable_irqs ();
+	V850E2_CSC(0) = 0x402F;
+	V850E2_CSC(1) = 0x4000;
+	V850E2_BPC    = 0;
+	V850E2_BSC    = 0xAAAA;
+	V850E2_BEC    = 0;
+
+#if 0
+	V850E2_BHC    = 0xFFFF;	/* icache all memory, dcache all */
+#else
+	V850E2_BHC    = 0;	/* cache no memory */
+#endif
+	V850E2_BCT(0) = 0xB088;
+	V850E2_BCT(1) = 0x0008;
+	V850E2_DWC(0) = 0x0027;
+	V850E2_DWC(1) = 0;
+	V850E2_BCC    = 0x0006;
+	V850E2_ASC    = 0;
+	V850E2_LBS    = 0x0089;
+	V850E2_SCR(3) = 0x21A9;
+	V850E2_RFS(3) = 0x8121;
+
+	v850e_intc_disable_irqs ();
 }
 
 void __init mach_setup (char **cmdline)

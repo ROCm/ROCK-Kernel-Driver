@@ -46,7 +46,7 @@ void __init mach_early_init (void)
 
 	/* Set bus sizes: CS0 32-bit, CS1 16-bit, CS7 8-bit,
 	   everything else 32-bit.  */
-	BSC = 0x2AA6;
+	V850E2_BSC = 0x2AA6;
 	for (i = 2; i <= 6; i++)
 		CSDEV(i) = 0;	/* 32 bit */
 
