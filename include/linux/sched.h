@@ -80,6 +80,7 @@ extern unsigned long avenrun[];		/* Load averages */
 extern int nr_threads;
 extern int last_pid;
 extern unsigned long nr_running(void);
+extern unsigned long nr_uninterruptible(void);
 
 #include <linux/time.h>
 #include <linux/param.h>

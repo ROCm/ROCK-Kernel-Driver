@@ -137,6 +137,7 @@ struct runqueue {
 	spinlock_t lock;
 	spinlock_t frozen;
 	unsigned long nr_running, nr_switches, expired_timestamp;
+	signed long nr_uninterruptible;
 	task_t *curr, *idle;
 	prio_array_t *active, *expired, arrays[2];
 	int prev_nr_running[NR_CPUS];
@@ -244,6 +245,8 @@ static inline void activate_task(task_t *p, runqueue_t *rq)
 static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 {
 	rq->nr_running--;
+	if (p->state == TASK_UNINTERRUPTIBLE)
+		rq->nr_uninterruptible++;
 	dequeue_task(p, p->array);
 	p->array = NULL;
 }
@@ -323,11 +326,15 @@ static int try_to_wake_up(task_t * p)
 {
 	unsigned long flags;
 	int success = 0;
+	long old_state;
 	runqueue_t *rq;
 
 	rq = task_rq_lock(p, &flags);
+	old_state = p->state;
 	p->state = TASK_RUNNING;
 	if (!p->array) {
+		if (old_state == TASK_UNINTERRUPTIBLE)
+			rq->nr_uninterruptible--;
 		activate_task(p, rq);
 		if (p->prio < rq->curr->prio)
 			resched_task(rq->curr);
@@ -429,6 +436,16 @@ unsigned long nr_running(void)
 
 	for (i = 0; i < smp_num_cpus; i++)
 		sum += cpu_rq(cpu_logical_map(i))->nr_running;
+
+	return sum;
+}
+
+unsigned long nr_uninterruptible(void)
+{
+	unsigned long i, sum = 0;
+
+	for (i = 0; i < smp_num_cpus; i++)
+		sum += cpu_rq(cpu_logical_map(i))->nr_uninterruptible;
 
 	return sum;
 }
