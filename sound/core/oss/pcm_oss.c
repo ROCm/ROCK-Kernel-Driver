@@ -254,6 +254,7 @@ static int snd_pcm_oss_period_size(snd_pcm_substream_t *substream,
 
 	snd_assert(oss_period_size >= 16, return -EINVAL);
 	runtime->oss.period_bytes = oss_period_size;
+	runtime->oss.period_frames = oss_period_size / oss_frame_size;
 	runtime->oss.periods = oss_periods;
 	return 0;
 }
@@ -2098,7 +2099,7 @@ static int snd_pcm_oss_playback_ready(snd_pcm_substream_t *substream)
 	if (atomic_read(&runtime->mmap_count))
 		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
 	else
-		return snd_pcm_playback_ready(substream);
+		return snd_pcm_playback_avail(runtime) >= runtime->oss.period_frames;
 }
 
 static int snd_pcm_oss_capture_ready(snd_pcm_substream_t *substream)
@@ -2107,7 +2108,7 @@ static int snd_pcm_oss_capture_ready(snd_pcm_substream_t *substream)
 	if (atomic_read(&runtime->mmap_count))
 		return runtime->oss.prev_hw_ptr_interrupt != runtime->hw_ptr_interrupt;
 	else
-		return snd_pcm_capture_ready(substream);
+		return snd_pcm_capture_avail(runtime) >= runtime->oss.period_frames;
 }
 
 static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
