@@ -13,8 +13,8 @@
 #include <linux/etherdevice.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
-#include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -24,8 +24,8 @@
 
 #define DRV_MODULE_NAME		"b44"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"0.1"
-#define DRV_MODULE_RELDATE	"Nov 6, 2002"
+#define DRV_MODULE_VERSION	"0.6"
+#define DRV_MODULE_RELDATE	"Nov 11, 2002"
 
 #define B44_DEF_MSG_ENABLE	  \
 	(NETIF_MSG_DRV		| \
@@ -63,7 +63,6 @@
 	  (BP)->tx_cons - (BP)->tx_prod - TX_RING_GAP(BP))
 #define NEXT_TX(N)		(((N) + 1) & (B44_TX_RING_SIZE - 1))
 
-/* XXX check this */
 #define RX_PKT_BUF_SZ		(1536 + bp->rx_offset + 64)
 
 /* minimum number of free TX descriptors required to wake up TX process */
@@ -97,8 +96,8 @@ static void b44_halt(struct b44 *);
 static void b44_init_rings(struct b44 *);
 static int b44_init_hw(struct b44 *);
 
-static void b44_wait_bit(struct b44 *bp, unsigned long reg,
-			 u32 bit, unsigned long timeout, int clear)
+static int b44_wait_bit(struct b44 *bp, unsigned long reg,
+			u32 bit, unsigned long timeout, const int clear)
 {
 	unsigned long i;
 
@@ -117,7 +116,9 @@ static void b44_wait_bit(struct b44 *bp, unsigned long reg,
 		       bp->dev->name,
 		       bit, reg,
 		       (clear ? "clear" : "set"));
+		return -ENODEV;
 	}
+	return 0;
 }
 
 /* Sonics SiliconBackplane support routines.  ROFL, you should see all the
@@ -302,15 +303,18 @@ static void b44_enable_ints(struct b44 *bp)
 
 static int b44_readphy(struct b44 *bp, int reg, u32 *val)
 {
+	int err;
+
 	bw32(B44_EMAC_ISTAT, EMAC_INT_MII);
 	bw32(B44_MDIO_DATA, (MDIO_DATA_SB_START |
 			     (MDIO_OP_READ << MDIO_DATA_OP_SHIFT) |
 			     (bp->phy_addr << MDIO_DATA_PMD_SHIFT) |
 			     (reg << MDIO_DATA_RA_SHIFT) |
 			     (MDIO_TA_VALID << MDIO_DATA_TA_SHIFT)));
-	b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
+	err = b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
 	*val = br32(B44_MDIO_DATA) & MDIO_DATA_DATA;
-	return 0;
+
+	return err;
 }
 
 static int b44_writephy(struct b44 *bp, int reg, u32 val)
@@ -322,8 +326,7 @@ static int b44_writephy(struct b44 *bp, int reg, u32 val)
 			     (reg << MDIO_DATA_RA_SHIFT) |
 			     (MDIO_TA_VALID << MDIO_DATA_TA_SHIFT) |
 			     (val & MDIO_DATA_DATA)));
-	b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
-	return 0;
+	return b44_wait_bit(bp, B44_EMAC_ISTAT, EMAC_INT_MII, 100, 0);
 }
 
 static int b44_phy_reset(struct b44 *bp)
@@ -576,7 +579,6 @@ static void b44_tx(struct b44 *bp)
 		if (unlikely(skb == NULL))
 			BUG();
 
-
 		pci_unmap_single(bp->pdev,
 				 pci_unmap_addr(rp, mapping),
 				 skb->len,
@@ -593,10 +595,16 @@ static void b44_tx(struct b44 *bp)
 	bw32(B44_GPTIMER, 0);
 }
 
+/* Works like this.  This chip writes a 'struct rx_header" 30 bytes
+ * before the DMA address you give it.  So we allocate 30 more bytes
+ * for the RX buffer, DMA map all of it, skb_reserve the 30 bytes, then
+ * point the chip at 30 bytes past where the rx_header will go.
+ */
 static int b44_alloc_rx_skb(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 {
 	struct dma_desc *dp;
 	struct ring_info *src_map, *map;
+	struct rx_header *rh;
 	struct sk_buff *skb;
 	dma_addr_t mapping;
 	int dest_idx;
@@ -616,6 +624,11 @@ static int b44_alloc_rx_skb(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 				 RX_PKT_BUF_SZ,
 				 PCI_DMA_FROMDEVICE);
 	skb_reserve(skb, bp->rx_offset);
+
+	rh = (struct rx_header *)
+		(skb->data - bp->rx_offset);
+	rh->len = 0;
+	rh->flags = 0;
 
 	map->skb = skb;
 	pci_unmap_addr_set(map, mapping, mapping);
@@ -638,6 +651,7 @@ static void b44_recycle_rx(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 {
 	struct dma_desc *src_desc, *dest_desc;
 	struct ring_info *src_map, *dest_map;
+	struct rx_header *rh;
 	int dest_idx;
 	u32 ctrl;
 
@@ -648,6 +662,10 @@ static void b44_recycle_rx(struct b44 *bp, int src_idx, u32 dest_idx_unmasked)
 	src_map = &bp->rx_buffers[src_idx];
 
 	dest_map->skb = src_map->skb;
+	rh = (struct rx_header *)
+		(src_map->skb->data - bp->rx_offset);
+	rh->len = 0;
+	rh->flags = 0;
 	pci_unmap_addr_set(dest_map, mapping,
 			   pci_unmap_addr(src_map, mapping));
 
@@ -681,13 +699,29 @@ static int b44_rx(struct b44 *bp, int budget)
 				    PCI_DMA_FROMDEVICE);
 		rh = (struct rx_header *) (skb->data - bp->rx_offset);
 		len = cpu_to_le16(rh->len);
-		if (rh->flags & cpu_to_le16(RX_FLAG_ERRORS)) {
+		if ((len > (RX_PKT_BUF_SZ - bp->rx_offset)) ||
+		    (rh->flags & cpu_to_le16(RX_FLAG_ERRORS))) {
 		drop_it:
 			b44_recycle_rx(bp, cons, bp->rx_prod);
 		drop_it_no_recycle:
 			bp->stats.rx_dropped++;
 			goto next_pkt;
 		}
+
+		if (len == 0) {
+			int i = 0;
+
+			do {
+				udelay(2);
+				barrier();
+				len = cpu_to_le16(rh->len);
+			} while (len == 0 && i++ < 5);
+			if (len == 0)
+				goto drop_it;
+		}
+
+		/* Omit CRC. */
+		len -= 4;
 
 		if (len > RX_COPY_THRESHOLD) {
 			int skb_size;
@@ -928,7 +962,7 @@ static void b44_free_rings(struct b44 *bp)
 			continue;
 		pci_unmap_single(bp->pdev,
 				 pci_unmap_addr(rp, mapping),
-				 RX_PKT_BUF_SZ - bp->rx_offset,
+				 RX_PKT_BUF_SZ,
 				 PCI_DMA_FROMDEVICE);
 		dev_kfree_skb_any(rp->skb);
 		rp->skb = NULL;
@@ -1054,7 +1088,10 @@ static void b44_chip_reset(struct b44 *bp)
 		b44_wait_bit(bp, B44_ENET_CTRL, ENET_CTRL_DISABLE, 100, 1);
 		bw32(B44_DMATX_CTRL, 0);
 		bp->tx_prod = bp->tx_cons = 0;
-		b44_wait_bit(bp, B44_DMARX_STAT, DMARX_STAT_SIDLE, 100, 0);
+		if (br32(B44_DMARX_STAT) & DMARX_STAT_EMASK) {
+			b44_wait_bit(bp, B44_DMARX_STAT, DMARX_STAT_SIDLE,
+				     100, 0);
+		}
 		bw32(B44_DMARX_CTRL, 0);
 		bp->rx_prod = bp->rx_cons = 0;
 	} else {
@@ -1233,7 +1270,18 @@ static int b44_close(struct net_device *dev)
 
 	netif_stop_queue(dev);
 
+	del_timer_sync(&bp->timer);
+
 	spin_lock_irq(&bp->lock);
+
+#if 0
+	b44_dump_state(bp);
+#endif
+	b44_halt(bp);
+	b44_free_rings(bp);
+	bp->flags &= ~B44_FLAG_INIT_COMPLETE;
+	netif_carrier_off(bp->dev);
+
 	spin_unlock_irq(&bp->lock);
 
 	free_irq(dev->irq, dev);
@@ -1810,10 +1858,6 @@ static struct pci_driver b44_driver = {
 	.id_table	= b44_pci_tbl,
 	.probe		= b44_init_one,
 	.remove		= __devexit_p(b44_remove_one),
-#if 0
-	.suspend	= b44_suspend,
-	.resume		= b44_resume
-#endif
 };
 
 static int __init b44_init(void)
@@ -1828,3 +1872,4 @@ static void __exit b44_cleanup(void)
 
 module_init(b44_init);
 module_exit(b44_cleanup);
+
