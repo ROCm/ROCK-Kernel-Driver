@@ -1724,7 +1724,7 @@ int __init cyber2000fb_init(void)
 #ifndef MODULE
 	char *option = NULL;
 
-	if (fb_get_options("cyber2000fb", NULL))
+	if (fb_get_options("cyber2000fb", &option))
 		return -ENODEV;
 	cyber2000fb_setup(option);
 #endif
