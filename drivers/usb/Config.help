@@ -578,14 +578,14 @@ CONFIG_USB_MICROTEK
   Support for anything but the X6 is experimental.
   Please report failures and successes.
   The scanner will appear as a scsi generic device to the rest
-  of the system. Scsi support is required for this driver to compile
-  and work. SANE 1.0.4 or newer is needed to make use of your scanner.
-  This driver can be compiled as a module.
+  of the system. Scsi support is required.
+  This driver can be compiled as a module, called microtek.o.
 
 CONFIG_USB_HPUSBSCSI
   Say Y here if you want support for the HP 53xx series of scanners
   and the Minolta Scan Dual. This driver is experimental.
   The scanner will be accessible as a SCSI device.
+  This can be compiled as a module, called hpusbscsi.o.
 
 CONFIG_USB_BLUETOOTH
   Say Y here if you want to connect a USB Bluetooth device to your
