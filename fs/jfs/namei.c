@@ -1360,12 +1360,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, int rdev)
 		goto out1;
 	}
 
-	if (S_ISREG(ip->i_mode)) {
-		ip->i_op = &jfs_file_inode_operations;
-		ip->i_fop = &jfs_file_operations;
-		ip->i_mapping->a_ops = &jfs_aops;
-	} else
-		init_special_inode(ip, ip->i_mode, rdev);
+	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);
 	mark_inode_dirty(ip);
