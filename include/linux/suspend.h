@@ -47,12 +47,6 @@ extern void drain_local_pages(void);
 
 extern unsigned int nr_copy_pages __nosavedata;
 extern suspend_pagedir_t *pagedir_nosave __nosavedata;
-
-/* Communication between acpi and arch/i386/suspend.c */
-
-extern void do_suspend_lowlevel(int resume);
-extern void do_suspend_lowlevel_s4bios(int resume);
-
 #endif /* CONFIG_PM */
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
