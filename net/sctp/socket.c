@@ -4598,7 +4598,7 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 * delivery.   Three cases:
 	 * 1) No partial deliver;  no work.
 	 * 2) Peeling off partial delivery; keep pd_lobby in new pd_lobby.
-	 * 3) Peeling off non-partial delivery; move pd_lobby to recieve_queue.
+	 * 3) Peeling off non-partial delivery; move pd_lobby to receive_queue.
 	 */
 	skb_queue_head_init(&newsp->pd_lobby);
 	sctp_sk(newsk)->pd_mode = assoc->ulpq.pd_mode;

@@ -712,8 +712,8 @@ fail:
  *
  * 5.3.1.7 SCTP_PARTIAL_DELIVERY_EVENT
  *
- *   When a reciever is engaged in a partial delivery of a
- *   message this notification will be used to inidicate
+ *   When a receiver is engaged in a partial delivery of a
+ *   message this notification will be used to indicate
  *   various events.
  */
 struct sctp_ulpevent *sctp_ulpevent_make_pdapi(
