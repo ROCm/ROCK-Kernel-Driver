@@ -274,7 +274,7 @@ void put_bus(struct bus_type * bus)
 		return;
 	list_del_init(&bus->node);
 	spin_unlock(&device_lock);
-	BUG_ON(bus->present);
+	WARN_ON(bus->present);
 	bus_remove_dir(bus);
 }
 
