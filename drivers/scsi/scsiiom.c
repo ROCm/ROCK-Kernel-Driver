@@ -18,6 +18,7 @@ dc390_freetag (struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 static int
 dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
 {
+    struct scsi_device *sdev = pSRB->pcmd->device;
     u8 cmd; u8  disc_allowed, try_sync_nego;
 
     pSRB->ScsiPhase = SCSI_NOP0;
@@ -59,7 +60,7 @@ dc390_StartSCSI( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_sr
 	 * (pSRB->pcmd->cmnd[0] == TEST_UNIT_READY)) && pACB->scan_devices)
 		||*/ (pSRB->SRBFlag & AUTO_REQSENSE) ) 
       disc_allowed = 0;
-    if ( (pDCB->SyncMode & SYNC_ENABLE) && (pDCB->TargetLUN == 0) && (pDCB->Inquiry7 & 0x10) &&
+    if ( (pDCB->SyncMode & SYNC_ENABLE) && (pDCB->TargetLUN == 0) && sdev->sdtr &&
 	( ( ( (pSRB->pcmd->cmnd[0] == REQUEST_SENSE) || (pSRB->SRBFlag & AUTO_REQSENSE) )
 	  && !(pDCB->SyncMode & SYNC_NEGO_DONE) ) || (pSRB->pcmd->cmnd[0] == INQUIRY) ) )
       try_sync_nego = 1;
@@ -1307,20 +1308,13 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 {
     u8  bval, status;
     struct scsi_cmnd *pcmd;
-    PSCSI_INQDATA  ptr;
-    struct scatterlist *ptr2;
 
     pcmd = pSRB->pcmd;
     /* KG: Moved pci_unmap here */
     dc390_pci_unmap(pSRB);
 
     status = pSRB->TargetStatus;
-    if (pcmd->use_sg) {
-	    ptr2 = (struct scatterlist *) (pcmd->request_buffer);
-	    ptr = (PSCSI_INQDATA) (page_address(ptr2->page) + ptr2->offset);
-    } else
-	    ptr = (PSCSI_INQDATA) (pcmd->request_buffer);
-	
+
     DEBUG0(printk (" SRBdone (%02x,%08x), SRB %p, pid %li\n", status, pcmd->result,\
 		pSRB, pcmd->pid));
     if(pSRB->SRBFlag & AUTO_REQSENSE)
@@ -1355,22 +1349,6 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
     {
 	if( status_byte(status) == CHECK_CONDITION )
 	{
-#ifdef DC390_REMOVABLEDEBUG
-	    printk(KERN_INFO "DC390: Check_Condition (Cmd %02x, Id %02x, LUN %02x)\n",
-		   pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN);
-	    if ((pSRB->SGIndex < pSRB->SGcount) && (pSRB->SGcount) && (pSRB->SGToBeXferLen))
-	    {
-		bval = pSRB->SGcount;
-		swlval = 0;
-		ptr2 = pSRB->pSegmentList;
-		for( i=pSRB->SGIndex; i < bval; i++)
-		{
-		    swlval += sg_dma_len(ptr2);
-		    ptr2++;
-		}
-		printk(KERN_INFO "XferredLen=%08x,NotXferLen=%08x\n", (u32) pSRB->TotalXferredLen, (u32) swlval);
-	    }
-#endif
 	    if (dc390_RequestSense(pACB, pDCB, pSRB)) {
 		SET_RES_DID(pcmd->result, DID_ERROR);
 		goto cmd_done;
@@ -1431,13 +1409,6 @@ dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb*
 	    SET_RES_DID(pcmd->result,DID_OK);
 	}
     }
-    if ((pcmd->result & RES_DID) == 0 &&
-	pcmd->cmnd[0] == INQUIRY && 
-	pcmd->cmnd[2] == 0 &&
-	pcmd->request_bufflen >= 8 &&
-	ptr &&
-	(ptr->Vers & 0x07) >= 2)
-	    pDCB->Inquiry7 = ptr->Flags;
 
 cmd_done:
     pcmd->resid = pcmd->request_bufflen - pSRB->TotalXferredLen;

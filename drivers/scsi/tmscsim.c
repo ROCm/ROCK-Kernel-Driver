@@ -710,7 +710,6 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
       
 		pDCB->CtrlR3 = pDCB2->CtrlR3;
 		pDCB->CtrlR4 = pDCB2->CtrlR4;
-		pDCB->Inquiry7 = pDCB2->Inquiry7;
 	} else {
 		u8 index = pACB->AdapterIndex;
 		PEEprom prom = (PEEprom) &dc390_eepromBuf[index][id << 2];
