@@ -33,6 +33,7 @@
 #define __XFS_VFS_H__
 
 #include <linux/vfs.h>
+#include "xfs_fs.h"
 
 struct fid;
 struct cred;
@@ -46,8 +47,8 @@ typedef struct kstatfs xfs_statfs_t;
 
 typedef struct vfs {
 	u_int			vfs_flag;	/* flags */
-	fsid_t			vfs_fsid;	/* file system ID */
-	fsid_t			*vfs_altfsid;	/* An ID fixed for life of FS */
+	xfs_fsid_t		vfs_fsid;	/* file system ID */
+	xfs_fsid_t		*vfs_altfsid;	/* An ID fixed for life of FS */
 	bhv_head_t		vfs_bh;		/* head of vfs behavior chain */
 	struct super_block	*vfs_super;	/* Linux superblock structure */
 	struct task_struct	*vfs_sync_task;
