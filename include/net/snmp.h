@@ -299,8 +299,8 @@ struct linux_mib
 #define DECLARE_SNMP_STAT(type, name)	\
 	extern __typeof__(type) *name[2]
 
-#define SNMP_STAT_USRPTR(name)	(name[0])
-#define SNMP_STAT_BHPTR(name)	(name[1])
+#define SNMP_STAT_BHPTR(name)	(name[0])
+#define SNMP_STAT_USRPTR(name)	(name[1])
 
 #define SNMP_INC_STATS_BH(mib, field) 	\
 	(per_cpu_ptr(mib[0], smp_processor_id())->field++)
