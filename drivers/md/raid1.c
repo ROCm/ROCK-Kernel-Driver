@@ -665,6 +665,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 	mdp_super_t *sb = mddev->sb;
 	mdp_disk_t *failed_desc, *spare_desc, *added_desc;
 	mdk_rdev_t *spare_rdev, *failed_rdev;
+	struct block_device *bdev;
 
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
@@ -850,7 +851,7 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 
 		*d = failed_desc;
 
-		if (kdev_none(sdisk->dev))
+		if (!sdisk->bdev)
 			sdisk->used_slot = 0;
 		/*
 		 * this really activates the spare.
@@ -876,9 +877,12 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 			err = 1;
 			goto abort;
 		}
+		bdev = rdisk->bdev;
 		rdisk->dev = NODEV;
+		rdisk->bdev = NULL;
 		rdisk->used_slot = 0;
 		conf->nr_disks--;
+		bdput(bdev);
 		break;
 
 	case DISKOP_HOT_ADD_DISK:
@@ -894,6 +898,8 @@ static int diskop(mddev_t *mddev, mdp_disk_t **d, int state)
 		adisk->number = added_desc->number;
 		adisk->raid_disk = added_desc->raid_disk;
 		adisk->dev = mk_kdev(added_desc->major, added_desc->minor);
+		/* it will be held open by rdev */
+		adisk->bdev = bdget(kdev_t_to_nr(adisk->dev));
 
 		adisk->operational = 0;
 		adisk->write_only = 0;
@@ -1345,6 +1351,8 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->dev = rdev->dev;
+			disk->bdev = rdev->bdev;
+			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1376,6 +1384,8 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->dev = rdev->dev;
+			disk->bdev = rdev->bdev;
+			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 1;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1390,6 +1400,8 @@ static int run(mddev_t *mddev)
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->dev = rdev->dev;
+			disk->bdev = rdev->bdev;
+			atomic_inc(&rdev->bdev->bd_count);
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 1;
@@ -1419,11 +1431,10 @@ static int run(mddev_t *mddev)
 
 		if (disk_faulty(descriptor) && (disk_idx < conf->raid_disks) &&
 				!disk->used_slot) {
-
 			disk->number = descriptor->number;
 			disk->raid_disk = disk_idx;
 			disk->dev = NODEV;
-
+			disk->bdev = NULL;
 			disk->operational = 0;
 			disk->write_only = 0;
 			disk->spare = 0;
@@ -1499,6 +1510,9 @@ static int run(mddev_t *mddev)
 out_free_conf:
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
+	for (i = 0; i < MD_SB_DISKS; i++)
+		if (conf->mirrors[i].bdev)
+			bdput(conf->mirrors[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 out:
@@ -1542,12 +1556,16 @@ static int restart_resync(mddev_t *mddev)
 static int stop(mddev_t *mddev)
 {
 	conf_t *conf = mddev_to_conf(mddev);
+	int i;
 
 	md_unregister_thread(conf->thread);
 	if (conf->resync_thread)
 		md_unregister_thread(conf->resync_thread);
 	if (conf->r1bio_pool)
 		mempool_destroy(conf->r1bio_pool);
+	for (i = 0; i < MD_SB_DISKS; i++)
+		if (conf->mirrors[i].bdev)
+			bdput(conf->mirrors[i].bdev);
 	kfree(conf);
 	mddev->private = NULL;
 	MOD_DEC_USE_COUNT;
