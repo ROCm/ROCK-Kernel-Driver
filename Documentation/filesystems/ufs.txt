@@ -15,19 +15,24 @@ ufstype=type_of_ufs
 	ufs manually by mount option ufstype. Possible values are:
 
 	old	old format of ufs
-		default value, supported os read-only
+		default value, supported as read-only
 
 	44bsd	used in FreeBSD, NetBSD, OpenBSD
-		supported os read-write
+		supported as read-write
 
-       ufs2    used in FreeBSD 5.x
-               supported os read-only
+	ufs2    used in FreeBSD 5.x
+		supported as read-only
+
+	5xbsd	synonym for ufs2
 
 	sun	used in SunOS (Solaris)
 		supported as read-write
 
 	sunx86	used in SunOS for Intel (Solarisx86)
 		supported as read-write
+
+	hp	used in HP-UX
+		supported as read-only
 
 	nextstep
 		used in NextStep
@@ -46,7 +51,7 @@ POSSIBLE PROBLEMS
 =================
 
 There is still bug in reallocation of fragment, in file fs/ufs/balloc.c, 
-line 364. But it seem working on current buffer cache configuration.
+line 364. But it seems working on current buffer cache configuration.
 
 
 BUG REPORTS
