@@ -386,22 +386,24 @@ struct ehci_qh {
 
 /*-------------------------------------------------------------------------*/
 
-/* description of one iso highspeed transaction (up to 3 KB data) */
-struct ehci_iso_uframe {
+/* description of one iso transaction (up to 3 KB data if highspeed) */
+struct ehci_iso_packet {
 	/* These will be copied to iTD when scheduling */
 	u64			bufp;		/* itd->hw_bufp{,_hi}[pg] |= */
 	u32			transaction;	/* itd->hw_transaction[i] |= */
 	u8			cross;		/* buf crosses pages */
+	/* for full speed OUT splits */
+	u16			buf1;
 };
 
-/* temporary schedule data for highspeed packets from iso urbs
- * each packet is one uframe's usb transactions, in some itd,
+/* temporary schedule data for packets from iso urbs (both speeds)
+ * each packet is one logical usb transaction to the device (not TT),
  * beginning at stream->next_uframe
  */
-struct ehci_itd_sched {
-	struct list_head	itd_list;
+struct ehci_iso_sched {
+	struct list_head	td_list;
 	unsigned		span;
-	struct ehci_iso_uframe	packet [0];
+	struct ehci_iso_packet	packet [0];
 };
 
 /*
@@ -415,9 +417,10 @@ struct ehci_iso_stream {
 
 	u32			refcount;
 	u8			bEndpointAddress;
-	struct list_head	itd_list;	/* queued itds */
-	struct list_head	free_itd_list;	/* list of unused itds */
-	struct hcd_dev		*dev;
+	u8			highspeed;
+	struct list_head	td_list;	/* queued itds/sitds */
+	struct list_head	free_list;	/* list of unused itds/sitds */
+	struct usb_device	*udev;
 
 	/* output of (re)scheduling */
 	unsigned long		start;		/* jiffies */
@@ -460,7 +463,7 @@ struct ehci_itd {
 #define	EHCI_ITD_LENGTH(tok)	(((tok)>>16) & 0x0fff)
 #define	EHCI_ITD_IOC		(1 << 15)	/* interrupt on complete */
 
-#define ISO_ACTIVE	__constant_cpu_to_le32(EHCI_ISOC_ACTIVE)
+#define ITD_ACTIVE	__constant_cpu_to_le32(EHCI_ISOC_ACTIVE)
 
 	u32			hw_bufp [7];	/* see EHCI 3.3.3 */ 
 	u32			hw_bufp_hi [7];	/* Appendix B */
