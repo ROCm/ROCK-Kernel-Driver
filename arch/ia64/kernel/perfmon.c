@@ -3057,7 +3057,7 @@ pfm_write_pmcs(pfm_context_t *ctx, void *arg, int count, struct pt_regs *regs)
 #endif
 		}
 
-		DPRINT(("pmc[%u]=0x%lx ld=%d apmu=%d flags=0x%lx all_pmcs=0x%lx used_pmds=0x%lx eventid=%ld smpl_pmds=0x%lx reset_pmds=0x%lx reloads_pmcs=0x%lx used_monitors=0x%lx ovfl_regs=0x%lx\n",
+		DPRINT(("pmc[%u]=0x%lx ld=%d apmu=%d flags=0x%x all_pmcs=0x%lx used_pmds=0x%lx eventid=%ld smpl_pmds=0x%lx reset_pmds=0x%lx reloads_pmcs=0x%lx used_monitors=0x%lx ovfl_regs=0x%lx\n",
 			  cnum,
 			  value,
 			  is_loaded,
@@ -5057,6 +5057,18 @@ pfm_handle_work(void)
 
 	UNPROTECT_CTX(ctx, flags);
 
+	 /*
+	  * pfm_handle_work() is currently called with interrupts disabled.
+	  * The down_interruptible call may sleep, therefore we
+	  * must re-enable interrupts to avoid deadlocks. It is
+	  * safe to do so because this function is called ONLY
+	  * when returning to user level (PUStk=1), in which case
+	  * there is no risk of kernel stack overflow due to deep
+	  * interrupt nesting.
+	  */                                                                         */
+	BUG_ON(flags & IA64_PSR_I);
+	local_irq_enable();
+
 	DPRINT(("before block sleeping\n"));
 
 	/*
@@ -5066,6 +5078,12 @@ pfm_handle_work(void)
 	ret = down_interruptible(&ctx->ctx_restart_sem);
 
 	DPRINT(("after block sleeping ret=%d\n", ret));
+
+	/*
+	 * disable interrupts to restore state we had upon entering
+	 * this function
+	 */
+	local_irq_disable();
 
 	PROTECT_CTX(ctx, flags);
 
