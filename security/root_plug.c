@@ -13,6 +13,9 @@
  * If you want to turn this into something with a semblance of security,
  * you need to hook the task_* functions also.
  *
+ * See http://www.linuxjournal.com/article.php?sid=6279 for more information
+ * about this code.
+ *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License as
  *	published by the Free Software Foundation, version 2 of the

@@ -2,7 +2,7 @@
  * Security plug functions
  *
  * Copyright (C) 2001 WireX Communications, Inc <chris@wirex.com>
- * Copyright (C) 2001 Greg Kroah-Hartman <greg@kroah.com>
+ * Copyright (C) 2001-2002 Greg Kroah-Hartman <greg@kroah.com>
  * Copyright (C) 2001 Networks Associates Technology, Inc <ssmalley@nai.com>
  *
  *	This program is free software; you can redistribute it and/or modify
@@ -47,6 +47,12 @@ int security_scaffolding_startup (void)
 {
 	printk (KERN_INFO "Security Scaffold v" SECURITY_SCAFFOLD_VERSION
 		" initialized\n");
+
+	if (verify (&dummy_security_ops)) {
+		printk (KERN_ERR "%s could not verify "
+			"dummy_security_ops structure.\n", __FUNCTION__);
+		return -EIO;
+	}
 
 	security_ops = &dummy_security_ops;
 
