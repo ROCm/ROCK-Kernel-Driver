@@ -1555,6 +1555,7 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct
 	struct inode *inode;
 	struct proc_inode *ei;
 	unsigned tgid;
+	int died;
 
 	if (dentry->d_name.len == 4 && !memcmp(dentry->d_name.name,"self",4)) {
 		inode = new_inode(dir->i_sb);
@@ -1598,12 +1599,21 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct
 
 	dentry->d_op = &pid_base_dentry_operations;
 
+	died = 0;
+	d_add(dentry, inode);
 	spin_lock(&task->proc_lock);
 	task->proc_dentry = dentry;
-	d_add(dentry, inode);
+	if (!pid_alive(task)) {
+		dentry = proc_pid_unhash(task);
+		died = 1;
+	}
 	spin_unlock(&task->proc_lock);
 
 	put_task_struct(task);
+	if (died) {
+		proc_pid_flush(dentry);
+		goto out;
+	}
 	return NULL;
 out:
 	return ERR_PTR(-ENOENT);
@@ -1643,10 +1653,7 @@ static struct dentry *proc_task_lookup(struct inode *dir, struct dentry * dentry
 
 	dentry->d_op = &pid_base_dentry_operations;
 
-	spin_lock(&task->proc_lock);
-	task->proc_dentry = dentry;
 	d_add(dentry, inode);
-	spin_unlock(&task->proc_lock);
 
 	put_task_struct(task);
 	return NULL;
