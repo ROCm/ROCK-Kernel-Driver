@@ -139,6 +139,7 @@ sctp_state_fn_t sctp_sf_do_5_2_1_siminit;
 sctp_state_fn_t sctp_sf_do_5_2_2_dupinit;
 sctp_state_fn_t sctp_sf_do_5_2_4_dupcook;
 sctp_state_fn_t sctp_sf_unk_chunk;
+sctp_state_fn_t sctp_sf_do_8_5_1_E_sa;
 
 /* Prototypes for primitive event state functions.  */
 sctp_state_fn_t sctp_sf_do_prm_asoc;
@@ -329,10 +330,10 @@ __u32 sctp_generate_tag(const sctp_endpoint_t *);
 __u32 sctp_generate_tsn(const sctp_endpoint_t *);
 
 /* 4th level prototypes */
-void sctp_param2sockaddr(sockaddr_storage_t *addr, const sctpParam_t param,
+void sctp_param2sockaddr(sockaddr_storage_t *addr, sctp_addr_param_t *,
 			 __u16 port);
 int sctp_addr2sockaddr(const sctpParam_t, sockaddr_storage_t *);
-int sockaddr2sctp_addr(const sockaddr_storage_t *, sctpParam_t);
+int sockaddr2sctp_addr(const sockaddr_storage_t *, sctp_addr_param_t *);
 
 /* Extern declarations for major data structures.  */
 sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t, sctp_state_t);
@@ -430,6 +431,38 @@ static inline void sctp_add_cmd_sf(sctp_cmd_seq_t *seq, sctp_verb_t verb, sctp_a
 {
 	if (unlikely(!sctp_add_cmd(seq, verb, obj)))
 		BUG();
+}
+
+/* Check VTAG of the packet matches the sender's own tag OR its peer's
+ * tag and the T bit is set in the Chunk Flags.
+ */
+static inline int
+sctp_vtag_verify_either(const sctp_chunk_t *chunk,
+			const sctp_association_t *asoc)
+{
+        /* RFC 2960 Section 8.5.1, sctpimpguide-06 Section 2.13.2
+	 *
+	 * B) The receiver of a ABORT shall accept the packet if the
+	 * Verification Tag field of the packet matches its own tag OR it
+	 * is set to its peer's tag and the T bit is set in the Chunk
+	 * Flags. Otherwise, the receiver MUST silently discard the packet
+	 * and take no further action.
+	 *
+	 * (C) The receiver of a SHUTDOWN COMPLETE shall accept the
+	 * packet if the Verification Tag field of the packet
+	 * matches its own tag OR it is set to its peer's tag and
+	 * the T bit is set in the Chunk Flags.  Otherwise, the
+	 * receiver MUST silently discard the packet and take no
+	 * further action....
+	 *
+	 */
+        if ((ntohl(chunk->sctp_hdr->vtag) == asoc->c.my_vtag) ||
+	    (sctp_test_T_bit(chunk) && (ntohl(chunk->sctp_hdr->vtag)
+	    == asoc->c.peer_vtag))) {
+                return 1;
+	}
+
+	return 0;
 }
 
 #endif /* __sctp_sm_h__ */

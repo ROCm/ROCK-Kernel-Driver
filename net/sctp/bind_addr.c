@@ -199,11 +199,10 @@ int sctp_del_bind_addr(sctp_bind_addr_t *bp, sockaddr_storage_t *del_addr)
 sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 				   int priority)
 {
-	sctpParam_t rawaddr;
 	sctpParam_t addrparms;
 	sctpParam_t retval;
 	int addrparms_len;
-	sctpIpAddress_t rawaddr_space;
+	sctp_addr_param_t rawaddr;
 	int len;
 	struct sockaddr_storage_list *addr;
 	struct list_head *pos;
@@ -214,7 +213,7 @@ sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 
 	/* Allocate enough memory at once. */
 	list_for_each(pos, &bp->address_list) {
-		len += sizeof(sctp_ipv6addr_param_t);
+		len += sizeof(sctp_addr_param_t);
 	}
 
 	addrparms.v = kmalloc(len, priority);
@@ -222,12 +221,11 @@ sctpParam_t sctp_bind_addrs_to_raw(const sctp_bind_addr_t *bp, int *addrs_len,
 		goto end_raw;
 
 	retval = addrparms;
-	rawaddr.v4 = &rawaddr_space.v4;
 
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sockaddr_storage_list, list);
-		len = sockaddr2sctp_addr(&addr->a, rawaddr);
-		memcpy(addrparms.v, rawaddr.v, len);
+		len = sockaddr2sctp_addr(&addr->a, &rawaddr);
+		memcpy(addrparms.v, &rawaddr, len);
 		addrparms.v += len;
 		addrparms_len += len;
 	}
@@ -244,33 +242,39 @@ end_raw:
 int sctp_raw_to_bind_addrs(sctp_bind_addr_t *bp, __u8 *raw_addr_list,
 			   int addrs_len, __u16 port, int priority)
 {
-	sctpParam_t rawaddr;
+	sctp_addr_param_t *rawaddr;
+	sctp_paramhdr_t *param;
 	sockaddr_storage_t addr;
 	int retval = 0;
 	int len;
 
 	/* Convert the raw address to standard address format */
 	while (addrs_len) {
-		rawaddr.v = raw_addr_list;
-		if (SCTP_PARAM_IPV4_ADDRESS==rawaddr.p->type
-		    || SCTP_PARAM_IPV6_ADDRESS==rawaddr.p->type) {
+		param = (sctp_paramhdr_t *)raw_addr_list;
+		rawaddr = (sctp_addr_param_t *)raw_addr_list;
+
+		switch (param->type) {
+		case SCTP_PARAM_IPV4_ADDRESS:			
+		case SCTP_PARAM_IPV6_ADDRESS:
 			sctp_param2sockaddr(&addr, rawaddr, port);
 			retval = sctp_add_bind_addr(bp, &addr, priority);
 			if (retval) {
 				/* Can't finish building the list, clean up. */
 				sctp_bind_addr_clean(bp);
-				break;
+				break;;
 			}
-
-			len = ntohs(rawaddr.p->length);
+			len = ntohs(param->length);
 			addrs_len -= len;
 			raw_addr_list += len;
-		} else {
+			break;
+		default:
 			/* Corrupted raw addr list! */
 			retval = -EINVAL;
 			sctp_bind_addr_clean(bp);
 			break;
 		}
+		if (retval)
+			break;
 	}
 
 	return retval;
