@@ -54,7 +54,7 @@ struct smb_vol {
 	char *UNC;
 	char *UNCip;
 	char *iocharset;  /* local code page for mapping to and from Unicode */
-	char *source_rfc1001_name; /* netbios name of client */
+	char source_rfc1001_name[16]; /* netbios name of client */
 	uid_t linux_uid;
 	gid_t linux_gid;
 	mode_t file_mode;
@@ -67,8 +67,8 @@ struct smb_vol {
 	unsigned short int port;
 };
 
-int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
-int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket);
+static int ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket);
+static int ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket);
 
 
 	/* 
@@ -590,6 +590,8 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 				printk(KERN_WARNING "CIFS: invalid domain name\n");
 				return 1;	/* needs_arg; */
 			}
+			/* BB are there cases in which a comma can be valid in
+			a domain name and need special handling? */
 			if (strnlen(value, 65) < 65) {
 				vol->domainname = value;
 				cFYI(1, ("Domain name set"));
@@ -653,9 +655,12 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			}
 		} else if (strnicmp(data, "netbiosname", 4) == 0) {
 			if (!value || !*value) {
-				vol->source_rfc1001_name = NULL;
-			} else if (strnlen(value, 17) < 17) {
-				vol->source_rfc1001_name = value;
+				cFYI(1,("invalid (empty) netbiosname specified"));
+			} else if (strnlen(value, 16) < 16) {
+				/* BB are there cases in which a comma can be 
+				valid in the workstation name (and need special
+				case handling)? */
+				strncpy(vol->source_rfc1001_name,value,16);
 			} else {
 				printk(KERN_WARNING "CIFS: netbiosname too long (more than 15)\n");
 			}
@@ -845,7 +850,22 @@ get_dfs_path(int xid, struct cifsSesInfo *pSesInfo,
 	return rc;
 }
 
-int
+/* See RFC1001 section 14 on representation of Netbios names */
+static void rfc1002mangle(char * target,char * source, unsigned int length)
+{
+	int i,j;
+
+	for(i=0,j=0;i<(length);i++) {
+		/* mask a nibble at a time and encode */
+		target[j] = 'A' + (0x0F & (source[i] >> 4));
+		target[j+1] = 'A' + (0x0F & source[i]);
+		j+=2;
+	}
+
+}
+
+
+static int
 ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 {
 	int rc = 0;
@@ -865,7 +885,6 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 	}
 
 	psin_server->sin_family = AF_INET;
-	
 	if(psin_server->sin_port) { /* user overrode default port */
 		rc = (*csocket)->ops->connect(*csocket,
 				(struct sockaddr *) psin_server,
@@ -912,11 +931,43 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket)
 		the default. sock_setsockopt not used because it expects 
 		user space buffer */
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+
+	/* send RFC1001 sessinit */
+
+	if(psin_server->sin_port == htons(139)) {
+		/* some servers require RFC1001 sessinit before sending
+		negprot - BB check reconnection in case where second 
+		sessinit is sent but no second negprot */
+		struct rfc1002_session_packet * ses_init_buf;
+		struct smb_hdr * smb_buf;
+		ses_init_buf = cifs_kcalloc(36, GFP_KERNEL);
+		if(ses_init_buf) {
+			ses_init_buf->trailer.session_req.called_len = 32;
+			rfc1002mangle(ses_init_buf->trailer.session_req.called_name,
+				DEFAULT_CIFS_CALLED_NAME,16);
+			ses_init_buf->trailer.session_req.calling_len = 32;
+			rfc1002mangle(ses_init_buf->trailer.session_req.calling_name,
+				"LINUX_CIFS_CLNT",16);
+			ses_init_buf->trailer.session_req.scope1 = 0;
+			ses_init_buf->trailer.session_req.scope2 = 0;
+		/* BB fixme ensure calling space padded w/null terminate*/
+			smb_buf = (struct smb_hdr *)ses_init_buf;
+			/* sizeof RFC1002_SESSION_REQUEST with no scope */
+			smb_buf->smb_buf_length = 0x81000044;
+			rc = smb_send(*csocket, smb_buf, 0x44,
+				(struct sockaddr *)psin_server);
+			printk("cifs: rfc1001_send rc = %d\n",rc); /* BB removeme */
+			kfree(ses_init_buf);
+		}
+		/* else the negprot may still work without this 
+		even though malloc failed */
+		
+	}
 		
 	return rc;
 }
 
-int
+static int
 ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
@@ -1000,7 +1051,6 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 /* cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data)); */
 	
 	memset(&volume_info,0,sizeof(struct smb_vol));
-
 	if (cifs_parse_mount_options(mount_data, devname, &volume_info)) {
 		if(volume_info.UNC)
 			kfree(volume_info.UNC);
@@ -1049,6 +1099,12 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	} else if (volume_info.UNCip){
 		/* BB using ip addr as server name connect to the DFS root below */
 		cERROR(1,("Connecting to DFS root not implemented yet"));
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
+		FreeXid(xid);
+		return -EINVAL;
 	} else /* which servers DFS root would we conect to */ {
 		cERROR(1,
 		       ("CIFS mount error: No UNC path (e.g. -o unc=//192.168.1.100/public) specified  "));
@@ -1131,6 +1187,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		cFYI(1, ("Existing smb sess found "));
 		if(volume_info.password)
 			kfree(volume_info.password);
+		/* volume_info.UNC freed at end of function */
 	} else if (!rc) {
 		cFYI(1, ("Existing smb sess not found "));
 		pSesInfo = sesInfoAlloc();
@@ -1142,7 +1199,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 				NIPQUAD(sin_server.sin_addr.s_addr));
 		}
 
-		if (!rc){   
+		if (!rc){
+			/* volume_info.password freed at unmount */   
 			if (volume_info.password)
 				pSesInfo->password = volume_info.password;
 			if (volume_info.username)
@@ -1263,6 +1321,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		if (tcon->ses->capabilities & CAP_UNIX)
 			CIFSSMBQFSUnixInfo(xid, tcon, cifs_sb->local_nls);
 	}
+
+	/* volume_info.password is freed above when existing session found
+	(in which case it is not needed anymore) but when new sesion is created
+	the password ptr is put in the new session structure (in which case the
+	password will be freed at unmount time) */
 	if(volume_info.UNC)
 		kfree(volume_info.UNC);
 	FreeXid(xid);

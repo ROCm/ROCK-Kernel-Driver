@@ -1049,7 +1049,7 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 		} else if (bytes_read > 0) {
 			pSMBr = (struct smb_com_read_rsp *)smb_read_data;
 			cifs_copy_cache_pages(mapping, page_list, bytes_read,
-				smb_read_data + 4 /* RFC1000 hdr */ +
+				smb_read_data + 4 /* RFC1001 hdr */ +
 				le16_to_cpu(pSMBr->DataOffset), &lru_pvec);
 
 			i +=  bytes_read >> PAGE_CACHE_SHIFT;
