@@ -5763,14 +5763,20 @@ static void __tg3_set_rx_mode(struct net_device *dev)
 
 	rx_mode = tp->rx_mode & ~(RX_MODE_PROMISC |
 				  RX_MODE_KEEP_VLAN_TAG);
+
+	/* When ASF is in use, we always keep the RX_MODE_KEEP_VLAN_TAG
+	 * flag clear.
+	 */
 #if TG3_VLAN_TAG_USED
-	if (!tp->vlgrp)
+	if (!tp->vlgrp &&
+	    !(tp->tg3_flags & TG3_FLAG_ENABLE_ASF))
 		rx_mode |= RX_MODE_KEEP_VLAN_TAG;
 #else
 	/* By definition, VLAN is disabled always in this
 	 * case.
 	 */
-	rx_mode |= RX_MODE_KEEP_VLAN_TAG;
+	if (!(tp->tg3_flags & TG3_FLAG_ENABLE_ASF))
+		rx_mode |= RX_MODE_KEEP_VLAN_TAG;
 #endif
 
 	if (dev->flags & IFF_PROMISC) {
