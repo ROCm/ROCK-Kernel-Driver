@@ -16,6 +16,14 @@ if [ "$CONFIG_NET" != "n" ]; then
          source drivers/isdn/i4l/Config.in
       fi
       endmenu
+
+      comment 'CAPI subsystem'
+
+      tristate 'CAPI2.0 support' CONFIG_ISDN_CAPI
+      if [ "$CONFIG_ISDN_CAPI" != "n" ]; then
+         source drivers/isdn/capi/Config.in
+         source drivers/isdn/hardware/Config.in
+      fi
    fi
 fi
 endmenu
