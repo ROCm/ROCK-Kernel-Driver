@@ -395,6 +395,8 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, s
 	return result;
 }
 
+static inline int __vfs_follow_link(struct nameidata *, const char *);
+
 /*
  * This limits recursive symlink follows to 8, while
  * limiting consecutive symlinks to 40.
@@ -405,19 +407,30 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, s
 static inline int do_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	int err = -ELOOP;
-	if (current->link_count >= 5)
+	if (current->link_count >= MAX_NESTED_LINKS)
 		goto loop;
 	if (current->total_link_count >= 40)
 		goto loop;
+	BUG_ON(nd->depth >= MAX_NESTED_LINKS);
 	cond_resched();
 	err = security_inode_follow_link(dentry, nd);
 	if (err)
 		goto loop;
 	current->link_count++;
 	current->total_link_count++;
+	nd->depth++;
 	touch_atime(nd->mnt, dentry);
+	nd_set_link(nd, NULL);
 	err = dentry->d_inode->i_op->follow_link(dentry, nd);
+	if (!err) {
+		char *s = nd_get_link(nd);
+		if (s)
+			err = __vfs_follow_link(nd, s);
+		if (dentry->d_inode->i_op->put_link)
+			dentry->d_inode->i_op->put_link(dentry, nd);
+	}
 	current->link_count--;
+	nd->depth--;
 	return err;
 loop:
 	path_release(nd);
@@ -587,7 +600,7 @@ int fastcall link_path_walk(const char * name, struct nameidata *nd)
 		goto return_reval;
 
 	inode = nd->dentry->d_inode;
-	if (current->link_count)
+	if (nd->depth)
 		lookup_flags = LOOKUP_FOLLOW;
 
 	/* At this point we know we have a real path component. */
@@ -795,6 +808,7 @@ static int __emul_lookup_dentry(const char *name, struct nameidata *nd)
 		 */
 		nd_root.last_type = LAST_ROOT;
 		nd_root.flags = nd->flags;
+		nd_root.depth = 0;
 		memcpy(&nd_root.intent, &nd->intent, sizeof(nd_root.intent));
 		read_lock(&current->fs->lock);
 		nd_root.mnt = mntget(current->fs->rootmnt);
@@ -867,6 +881,7 @@ int fastcall path_lookup(const char *name, unsigned int flags, struct nameidata 
 
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
 	nd->flags = flags;
+	nd->depth = 0;
 
 	read_lock(&current->fs->lock);
 	if (*name=='/') {
@@ -1385,7 +1400,15 @@ do_link:
 	if (error)
 		goto exit_dput;
 	touch_atime(nd->mnt, dentry);
+	nd_set_link(nd, NULL);
 	error = dentry->d_inode->i_op->follow_link(dentry, nd);
+	if (!error) {
+		char *s = nd_get_link(nd);
+		if (s)
+			error = __vfs_follow_link(nd, s);
+		if (dentry->d_inode->i_op->put_link)
+			dentry->d_inode->i_op->put_link(dentry, nd);
+	}
 	dput(dentry);
 	if (error)
 		return error;
@@ -2182,7 +2205,7 @@ __vfs_follow_link(struct nameidata *nd, const char *link)
 	}
 	res = link_path_walk(link, nd);
 out:
-	if (current->link_count || res || nd->last_type!=LAST_NORM)
+	if (nd->depth || res || nd->last_type!=LAST_NORM)
 		return res;
 	/*
 	 * If it is an iterative symlinks resolution in open_namei() we
