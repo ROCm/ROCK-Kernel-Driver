@@ -252,19 +252,31 @@ static void __init phys_pud_init(pud_t *pud, unsigned long address, unsigned lon
 	__flush_tlb();
 } 
 
+static void __init find_early_table_space(unsigned long end)
+{
+	unsigned long puds, pmds, tables;
+
+	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
+	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT;
+	tables = round_up(puds * sizeof(pud_t), PAGE_SIZE) +
+		 round_up(pmds * sizeof(pmd_t), PAGE_SIZE);
+
+	table_start = find_e820_area(0x8000, __pa_symbol(&_text), tables);
+	if (table_start == -1UL)
+		panic("Cannot find space for the kernel page tables");
+
+	table_start >>= PAGE_SHIFT;
+	table_end = table_start;
+}
+
 /* Setup the direct mapping of the physical memory at PAGE_OFFSET.
    This runs before bootmem is initialized and gets pages directly from the 
    physical memory. To access them they are temporarily mapped. */
-void __init init_memory_mapping(void) 
+void __init init_memory_mapping(unsigned long start, unsigned long end)
 { 
-	unsigned long adr;	       
-	unsigned long end;
 	unsigned long next; 
-	unsigned long puds, pmds, tables; 
 
 	Dprintk("init_memory_mapping\n");
-
-	end = end_pfn_map << PAGE_SHIFT;
 
 	/* 
 	 * Find space for the kernel direct mapping tables.
@@ -272,31 +284,23 @@ void __init init_memory_mapping(void)
 	 * mapped.  Unfortunately this is done currently before the nodes are 
 	 * discovered.
 	 */
+	find_early_table_space(end);
 
-	puds = (end + PUD_SIZE - 1) >> PUD_SHIFT;
-	pmds = (end + PMD_SIZE - 1) >> PMD_SHIFT; 
-	tables = round_up(puds*8, PAGE_SIZE) + round_up(pmds * 8, PAGE_SIZE); 
+	start = (unsigned long)__va(start);
+	end = (unsigned long)__va(end);
 
-	table_start = find_e820_area(0x8000, __pa_symbol(&_text), tables); 
-	if (table_start == -1UL) 
-		panic("Cannot find space for the kernel page tables"); 
-
-	table_start >>= PAGE_SHIFT; 
-	table_end = table_start;
-       
-	end += __PAGE_OFFSET; /* turn virtual */  	
-
-	for (adr = PAGE_OFFSET; adr < end; adr = next) { 
+	for (; start < end; start = next) {
 		int map;
 		unsigned long pud_phys; 
 		pud_t *pud = alloc_low_page(&map, &pud_phys);
-		next = adr + PGDIR_SIZE;
+		next = start + PGDIR_SIZE;
 		if (next > end) 
 			next = end; 
-		phys_pud_init(pud, adr-PAGE_OFFSET, next-PAGE_OFFSET); 
-		set_pgd(init_level4_pgt + pgd_index(adr), mk_kernel_pgd(pud_phys));
+		phys_pud_init(pud, __pa(start), __pa(next));
+		set_pgd(pgd_offset_k(start), mk_kernel_pgd(pud_phys));
 		unmap_low_page(map);   
 	} 
+
 	asm volatile("movq %%cr4,%0" : "=r" (mmu_cr4_features));
 	__flush_tlb_all();
 	early_printk("kernel direct mapping tables upto %lx @ %lx-%lx\n", end, 

@@ -493,7 +493,7 @@ void __init setup_arch(char **cmdline_p)
 
 	check_efer();
 
-	init_memory_mapping(); 
+	init_memory_mapping(0, (end_pfn_map << PAGE_SHIFT));
 
 #ifdef CONFIG_ACPI_BOOT
 	/*
