@@ -62,7 +62,7 @@ int smp_num_siblings = 1;
 int phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 
 /* bitmap of online cpus */
-cpumask_t cpu_online_map;
+cpumask_t cpu_online_map = { 1 } ;
 
 static cpumask_t cpu_callin_map;
 cpumask_t cpu_callout_map;
