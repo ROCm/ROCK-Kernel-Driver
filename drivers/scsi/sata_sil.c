@@ -40,6 +40,10 @@
 enum {
 	sil_3112		= 0,
 
+	SIL_SYSCFG		= 0x48,
+	SIL_MASK_IDE0_INT	= (1 << 22),
+	SIL_MASK_IDE1_INT	= (1 << 23),
+
 	SIL_IDE0_TF		= 0x80,
 	SIL_IDE0_CTL		= 0x8A,
 	SIL_IDE0_BMDMA		= 0x00,
@@ -236,6 +240,7 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	unsigned long base;
 	void *mmio_base;
 	int rc;
+	u32 tmp;
 
 	if (!printed_version++)
 		printk(KERN_DEBUG DRV_NAME " version " DRV_VERSION "\n");
@@ -295,6 +300,14 @@ static int sil_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	probe_ent->port[1].bmdma_addr = base + SIL_IDE1_BMDMA;
 	probe_ent->port[1].scr_addr = base + SIL_IDE1_SCR;
 	ata_std_ports(&probe_ent->port[1]);
+
+	/* make sure IDE0/1 interrupts are not masked */
+	tmp = readl(mmio_base + SIL_SYSCFG);
+	if (tmp & (SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT)) {
+		tmp &= ~(SIL_MASK_IDE0_INT | SIL_MASK_IDE1_INT);
+		writel(tmp, mmio_base + SIL_SYSCFG);
+		readl(mmio_base + SIL_SYSCFG);	/* flush */
+	}
 
 	pci_set_master(pdev);
 
