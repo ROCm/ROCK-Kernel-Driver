@@ -353,10 +353,10 @@ extern void update_mmu_cache(struct vm_area_struct *, unsigned long, pte_t);
 #define __swp_entry(type, offset) ((swp_entry_t) { ((type) << 1) | ((offset) << 8) })
 #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) >> PTE_SHIFT })
 #define __swp_entry_to_pte(x)	((pte_t) { (x).val << PTE_SHIFT })
-
 #define pte_to_pgoff(pte)	(pte_val(pte) >> PTE_SHIFT)
 #define pgoff_to_pte(off)	((pte_t) {((off) << PTE_SHIFT)|_PAGE_FILE})
-  
+#define PTE_FILE_MAX_BITS	(BITS_PER_LONG - PTE_SHIFT)
+
 /*
  * kern_addr_valid is intended to indicate whether an address is a valid
  * kernel address.  Most 32-bit archs define it as always true (like this)
