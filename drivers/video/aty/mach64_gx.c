@@ -653,7 +653,7 @@ static int aty_var_to_pll_8398(const struct fb_info *info,
 
 		for (m = MIN_M; m <= MAX_M; m++) {
 			for (n = MIN_N; n <= MAX_N; n++) {
-				tempA = (14.31818 * 65536);
+				tempA = 938356;		/* 14.31818 * 65536 */
 				tempA *= (n + 8);	/* 43..256 */
 				tempB = twoToKth * 256;
 				tempB *= (m + 2);	/* 4..32 */

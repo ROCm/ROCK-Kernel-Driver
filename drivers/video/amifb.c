@@ -2351,7 +2351,7 @@ default_chipset:
 	 */
 
 	{
-	u_long tmp = DIVUL(200E9, amiga_eclock);
+	u_long tmp = DIVUL(200000000000ULL, amiga_eclock);
 
 	pixclock[TAG_SHRES] = (tmp + 4) / 8;	/* SHRES:  35 ns / 28 MHz */
 	pixclock[TAG_HIRES] = (tmp + 2) / 4;	/* HIRES:  70 ns / 14 MHz */
