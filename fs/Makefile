@@ -41,7 +41,7 @@ obj-$(CONFIG_QUOTACTL)		+= quota.o
 
 obj-$(CONFIG_PROC_FS)		+= proc/
 obj-y				+= partitions/
-obj-y				+= driverfs/ sysfs/
+obj-y				+= sysfs/
 obj-y				+= devpts/
 
 obj-$(CONFIG_PROFILING)		+= dcookies.o

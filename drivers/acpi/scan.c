@@ -25,20 +25,52 @@ extern struct acpi_device		*acpi_root;
 static LIST_HEAD(acpi_device_list);
 static spinlock_t acpi_device_lock = SPIN_LOCK_UNLOCKED;
 
-static int
-acpi_device_register (
-	struct acpi_device	*device,
-	struct acpi_device	*parent)
+static void acpi_device_release(struct kobject * kobj)
 {
-	return acpi_create_dir(device);
+	struct acpi_device * dev = container_of(kobj,struct acpi_device,kobj);
+	kfree(dev);
 }
 
+static struct subsystem acpi_namespace_subsys = {
+	.kobj		= { .name = "namespace" },
+	.parent		= &acpi_subsys,
+	.release	= acpi_device_release,
+};
+
+
+static void acpi_device_register(struct acpi_device * device, struct acpi_device * parent)
+{
+	/*
+	 * Linkage
+	 * -------
+	 * Link this device to its parent and siblings.
+	 */
+	INIT_LIST_HEAD(&device->children);
+	INIT_LIST_HEAD(&device->node);
+	INIT_LIST_HEAD(&device->g_list);
+
+	spin_lock(&acpi_device_lock);
+	if (device->parent) {
+		list_add_tail(&device->node, &device->parent->children);
+		list_add_tail(&device->g_list,&device->parent->g_list);
+	} else
+		list_add_tail(&device->g_list,&acpi_device_list);
+	spin_unlock(&acpi_device_lock);
+
+	kobject_init(&device->kobj);
+	strncpy(device->kobj.name,device->pnp.bus_id,KOBJ_NAME_LEN);
+	if (parent)
+		device->kobj.parent = &parent->kobj;
+	device->kobj.subsys = &acpi_namespace_subsys;
+	kobject_register(&device->kobj);
+}
 
 static int
 acpi_device_unregister (
-	struct acpi_device	*device)
+	struct acpi_device	*device, 
+	int			type)
 {
-	acpi_remove_dir(device);
+	kobject_unregister(&device->kobj);
 	return 0;
 }
 
@@ -443,16 +475,6 @@ acpi_bus_get_flags (
 	return_VALUE(0);
 }
 
-static int
-acpi_bus_remove (
-	struct acpi_device	*device, 
-	int			type)
-{
-	acpi_device_unregister(device);
-	kfree(device);
-	return 0;
-}
-
 static void acpi_device_get_busid(struct acpi_device * device, acpi_handle handle, int type)
 {
 	char			bus_id[5] = {'?',0};
@@ -621,28 +643,6 @@ void acpi_device_get_debug_info(struct acpi_device * device, acpi_handle handle,
 #endif /*CONFIG_ACPI_DEBUG*/
 }
 
-static void acpi_device_attach(struct acpi_device * device, struct acpi_device * parent)
-{
-	/*
-	 * Linkage
-	 * -------
-	 * Link this device to its parent and siblings.
-	 */
-	INIT_LIST_HEAD(&device->children);
-	INIT_LIST_HEAD(&device->node);
-	INIT_LIST_HEAD(&device->g_list);
-
-	spin_lock(&acpi_device_lock);
-	if (device->parent) {
-		list_add_tail(&device->node, &device->parent->children);
-		list_add_tail(&device->g_list,&device->parent->g_list);
-	} else
-		list_add_tail(&device->g_list,&acpi_device_list);
-	spin_unlock(&acpi_device_lock);
-
-	acpi_device_register(device, parent);
-}
-
 static int 
 acpi_bus_add (
 	struct acpi_device	**child,
@@ -741,7 +741,7 @@ acpi_bus_add (
 
 	acpi_device_get_debug_info(device,handle,type);
 
-	acpi_device_attach(device,parent);
+	acpi_device_register(device,parent);
 
 	/*
 	 * Bind _ADR-Based Devices
@@ -919,6 +919,8 @@ static int __init acpi_scan_init(void)
 	if (acpi_disabled)
 		return_VALUE(0);
 
+	subsystem_register(&acpi_namespace_subsys);
+
 	/*
 	 * Create the root device in the bus's device tree
 	 */
@@ -935,7 +937,7 @@ static int __init acpi_scan_init(void)
 		result = acpi_bus_scan(acpi_root);
 
 	if (result)
-		acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
+		acpi_device_unregister(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
 
  Done:
 	return_VALUE(result);

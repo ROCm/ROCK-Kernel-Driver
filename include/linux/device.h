@@ -28,7 +28,7 @@
 #include <linux/ioport.h>
 #include <linux/list.h>
 #include <linux/sched.h>
-#include <linux/driverfs_fs.h>
+#include <linux/kobject.h>
 
 #define DEVICE_NAME_SIZE	80
 #define DEVICE_ID_SIZE		32
@@ -65,13 +65,12 @@ struct bus_type {
 	atomic_t		refcount;
 	u32			present;
 
+	struct subsystem	subsys;
+	struct subsystem	drvsubsys;
+	struct subsystem	devsubsys;
 	struct list_head	node;
 	struct list_head	devices;
 	struct list_head	drivers;
-
-	struct driver_dir_entry	dir;
-	struct driver_dir_entry	device_dir;
-	struct driver_dir_entry	driver_dir;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
@@ -119,11 +118,10 @@ struct device_driver {
 	atomic_t		refcount;
 	u32			present;
 
+	struct kobject		kobj;
 	struct list_head	bus_list;
 	struct list_head	class_list;
 	struct list_head	devices;
-
-	struct driver_dir_entry	dir;
 
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev);
@@ -177,13 +175,12 @@ struct device_class {
 
 	u32			devnum;
 
+	struct subsystem	subsys;
+	struct subsystem	devsubsys;
+	struct subsystem	drvsubsys;
 	struct list_head	node;
 	struct list_head	drivers;
 	struct list_head	intf_list;
-
-	struct driver_dir_entry	dir;
-	struct driver_dir_entry	driver_dir;
-	struct driver_dir_entry	device_dir;
 
 	int	(*add_device)(struct device *);
 	void	(*remove_device)(struct device *);
@@ -232,9 +229,9 @@ struct device_interface {
 	char			* name;
 	struct device_class	* devclass;
 
+	struct kobject		kobj;
 	struct list_head	node;
 	struct list_head	devices;
-	struct driver_dir_entry	dir;
 
 	u32			devnum;
 
@@ -275,6 +272,7 @@ struct device {
 	struct list_head intf_list;
 	struct device 	* parent;
 
+	struct kobject kobj;
 	char	name[DEVICE_NAME_SIZE];	/* descriptive ascii string */
 	char	bus_id[BUS_ID_SIZE];	/* position on parent bus */
 
@@ -285,8 +283,6 @@ struct device {
 					 * persists for the right amount of time */
 
 	struct bus_type	* bus;		/* type of bus device is on */
-	struct driver_dir_entry	dir;
-
 	struct device_driver *driver;	/* which driver has allocated this
 					   device */
 	void		*driver_data;	/* data private to the driver */
@@ -437,6 +433,11 @@ extern struct bus_type platform_bus_type;
 extern int device_suspend(u32 state, u32 level);
 extern void device_resume(u32 level);
 extern void device_shutdown(void);
+
+
+/* drivrs/base/firmware.c */
+extern int firmware_register(struct subsystem *);
+extern void firmware_uregister(struct subsystem *);
 
 /* debugging and troubleshooting/diagnostic helpers. */
 #ifdef DEBUG
