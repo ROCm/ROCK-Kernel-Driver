@@ -67,7 +67,7 @@ const ftape_info *zft_status;
 
 /*      Local vars.
  */
-static int busy_flag;
+static unsigned long busy_flag;
 
 static sigset_t orig_sigmask;
 
