@@ -54,6 +54,7 @@ rcfs_register_engine(rbce_eng_callback_t *rcbs)
 		return -EINVAL;
 	}
 	rcfs_eng_callbacks = *rcbs;
+	rcfs_engine_regd++;
 	return 0;
 }
 EXPORT_SYMBOL(rcfs_register_engine);
@@ -69,6 +70,7 @@ rcfs_unregister_engine(rbce_eng_callback_t *rcbs)
 	}
 	rcfs_eng_callbacks.mkdir = NULL;
 	rcfs_eng_callbacks.rmdir = NULL;
+	rcfs_engine_regd--;
 	return 0;
 }
 EXPORT_SYMBOL(rcfs_unregister_engine);

@@ -355,6 +355,15 @@ do {												\
 } while (0)
 
 
+/***************
+ * RCFS related 
+ ***************/
+
+/* vars needed by other modules/core */
+
+extern int rcfs_mounted;
+extern int rcfs_engine_regd;
+
 #endif // CONFIG_CKRM
 
 #endif // __KERNEL__

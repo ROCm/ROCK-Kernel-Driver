@@ -2406,15 +2406,18 @@ static inline void stop_debug(void) { }
 
 extern int rbce_mkdir(struct inode *, struct dentry *, int );
 extern int rbce_rmdir(struct inode *, struct dentry *);
+extern int rbce_create_magic(void);
+extern int rbce_clear_magic(void);
+
 rbce_eng_callback_t rcfs_ecbs = {
 	rbce_mkdir,
-	rbce_rmdir
+	rbce_rmdir,
+	rbce_create_magic,
+	rbce_clear_magic
 };
 
 /* ======================= Module definition Functions ======================== */
 
-extern int rbce_create_magic(void);
-extern int rbce_clear_magic(void);
 
 int
 init_rbce (void)
@@ -2438,8 +2441,10 @@ init_rbce (void)
 	rc = rcfs_register_engine(&rcfs_ecbs);  line=__LINE__;
 	if (rc) goto out_unreg_ckrm;
 
-	rc = rbce_create_magic();  line=__LINE__;
-	if (rc) goto out_unreg_ckrm;
+	if (rcfs_mounted) {
+		rc = rbce_create_magic();  line=__LINE__;
+		if (rc) goto out_unreg_rcfs;
+	}
 
 	start_debug();
 
@@ -2450,8 +2455,10 @@ init_rbce (void)
 
  out_debug:
 	stop_debug();
+
+ out_unreg_rcfs:
+	rcfs_unregister_engine(&rcfs_ecbs);
  out_unreg_ckrm:
-	
 	unregister_classtype_engines();
 	exit_rbce_ext();
  out:
@@ -2480,7 +2487,9 @@ exit_rbce (void)
 			printk("exit_rbce: Rules list for classtype %d is not empty\n", i);
 		}
 	}
-	rbce_clear_magic();
+	
+	if (rcfs_mounted)
+		rbce_clear_magic();
 
 	rcfs_unregister_engine(&rcfs_ecbs);
 	unregister_classtype_engines();

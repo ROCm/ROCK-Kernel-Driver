@@ -93,6 +93,6 @@ int rcfs_rmroot(struct dentry *);
 
 #define RCFS_ROOT "/rcfs"         // Hubertus .. we should use the mount point instead of hardcoded
 extern struct dentry *rcfs_rootde;
-
+extern rbce_eng_callback_t rcfs_eng_callbacks;
 
 #endif /* _LINUX_RCFS_H */ 

@@ -41,7 +41,8 @@
 
 #include <linux/rcfs.h>
 #include <linux/ckrm.h>
-
+#include <linux/ckrm_rc.h>
+#include <linux/ckrm_ce.h>
 
 static kmem_cache_t *rcfs_inode_cachep;
 
@@ -117,8 +118,6 @@ struct dentry *rcfs_rootde; /* redundant since one can also get it from sb */
 static struct inode *rcfs_root;
 static struct rcfs_inode_info *rcfs_rootri;
 
-static int rcfs_mounted;
-
 static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 {
 	struct inode * inode;
@@ -177,6 +176,16 @@ static int rcfs_fill_super(struct super_block * sb, void * data, int silent)
 			continue ;  // could return with an error too 
 	}
 
+	// do post-mount initializations needed by CE
+	// this is distinct from CE registration done on rcfs module load
+	if (rcfs_engine_regd) {
+		if (rcfs_eng_callbacks.mnt) 
+			if ((rc = (*rcfs_eng_callbacks.mnt)())) {
+				printk(KERN_ERR "Error in CE mnt %d\n",rc);
+			}
+	}
+		
+	// above code handles this comment but keep for alternate implementation
 	// register CE's with rcfs 
 	// check if CE loaded
 	// call rcfs_register_engine for each classtype
@@ -218,7 +227,20 @@ rcfs_kill_sb(struct super_block *sb)
 		}
 	}
 	
-	// do not remove comment block until ce directory issue resolved
+
+	// do pre-umount shutdown needed by CE
+	// this is distinct from CE deregistration done on rcfs module unload
+	if (rcfs_engine_regd) {
+		if (rcfs_eng_callbacks.umnt)
+			if ((rc = (*rcfs_eng_callbacks.umnt)())) {
+				printk(KERN_ERR "Error in CE umnt %d\n",rc);
+				// return ; until error handling improves
+			}
+	}
+
+	// Following comment handled by code above; keep nonetheless if it 
+	// can be done better
+	//
 	// deregister CE with rcfs
 	// Check if loaded
 	// if ce is in  one directory /rcfs/ce, 

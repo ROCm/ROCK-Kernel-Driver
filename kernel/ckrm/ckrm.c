@@ -58,6 +58,12 @@ rwlock_t ckrm_class_lock = RW_LOCK_UNLOCKED;  // protect classlists
 struct rcfs_functions rcfs_fn ;
 EXPORT_SYMBOL(rcfs_fn);
 
+// rcfs state needed by another module
+int rcfs_engine_regd;
+EXPORT_SYMBOL(rcfs_engine_regd); 
+
+int rcfs_mounted;
+EXPORT_SYMBOL(rcfs_mounted); 
 
 /**************************************************************************
  *                   Helper Functions                                     *

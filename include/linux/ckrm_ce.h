@@ -65,6 +65,8 @@ struct dentry;
 typedef struct rbce_eng_callback {
 	int (*mkdir)(struct inode *, struct dentry *, int); // mkdir
 	int (*rmdir)(struct inode *, struct dentry *); // rmdir
+	int (*mnt)(void);
+	int (*umnt)(void);
 } rbce_eng_callback_t;
 
 extern int ckrm_register_engine  (const char *name, ckrm_eng_callback_t *);
