@@ -398,14 +398,14 @@ static void scsi_queue_next_request(request_queue_t *q, struct scsi_cmnd *cmd)
 	 * with special case code, then spin off separate versions and
 	 * use function pointers to pick the right one.
 	 */
-	if (sdev->single_lun && blk_queue_empty(q) && sdev->device_busy ==0 &&
-			!shost->host_blocked && !shost->host_self_blocked &&
-			!((shost->can_queue > 0) && (shost->host_busy >=
-				       		     shost->can_queue))) {
+	if (sdev->single_lun && sdev->device_busy == 0 &&
+	    !shost->host_blocked && !shost->host_self_blocked &&
+	    !((shost->can_queue > 0) && (shost->host_busy >= shost->can_queue))
+	    && elv_queue_empty(q)) {
 		list_for_each_entry(sdev2, &sdev->same_target_siblings,
 			       same_target_siblings) {
 			if (!sdev2->device_blocked &&
-			    !blk_queue_empty(sdev2->request_queue)) {
+			    !elv_queue_empty(sdev2->request_queue)) {
 				__blk_run_queue(sdev2->request_queue);
 				break;
 			}

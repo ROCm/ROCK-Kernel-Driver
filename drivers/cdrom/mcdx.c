@@ -582,10 +582,10 @@ void do_mcdx_request(request_queue_t * q)
 
       again:
 
-	if (blk_queue_empty(q))
+	req = elv_next_request(q);
+	if (!req)
 		return;
 
-	req = elv_next_request(q);
 	stuffp = req->rq_disk->private_data;
 
 	if (!stuffp->present) {

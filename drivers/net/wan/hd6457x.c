@@ -1,16 +1,29 @@
 /*
  * Hitachi SCA HD64570 and HD64572 common driver for Linux
  *
- * Copyright (C) 1998-2000 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1998-2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  *
  * Sources of information:
  *    Hitachi HD64570 SCA User's Manual
  *    Hitachi HD64572 SCA-II User's Manual
+ *
+ * We use the following SCA memory map:
+ *
+ * Packet buffer descriptor rings - starting from winbase or win0base:
+ * rx_ring_buffers * sizeof(pkt_desc) = logical channel #0 RX ring
+ * tx_ring_buffers * sizeof(pkt_desc) = logical channel #0 TX ring
+ * rx_ring_buffers * sizeof(pkt_desc) = logical channel #1 RX ring (if used)
+ * tx_ring_buffers * sizeof(pkt_desc) = logical channel #1 TX ring (if used)
+ *
+ * Packet data buffers - starting from winbase + buff_offset:
+ * rx_ring_buffers * HDLC_MAX_MRU     = logical channel #0 RX buffers
+ * tx_ring_buffers * HDLC_MAX_MRU     = logical channel #0 TX buffers
+ * rx_ring_buffers * HDLC_MAX_MRU     = logical channel #0 RX buffers (if used)
+ * tx_ring_buffers * HDLC_MAX_MRU     = logical channel #0 TX buffers (if used)
  */
 
 #include <linux/module.h>
@@ -41,8 +54,6 @@
     (defined (__HD64570_H) && defined (__HD64572_H))
 #error Either hd64570.h or hd64572.h must be included
 #endif
-
-static char sca_version[]="1.09";
 
 #define get_msci(port)	  (phy_node(port) ?   MSCI1_OFFSET :   MSCI0_OFFSET)
 #define get_dmac_rx(port) (phy_node(port) ? DMAC1RX_OFFSET : DMAC0RX_OFFSET)
@@ -116,24 +127,35 @@ static inline port_t* dev_to_port(struct net_device *dev)
 
 
 
-static inline u8 next_desc(port_t *port, u8 desc)
+static inline u16 next_desc(port_t *port, u16 desc, int transmit)
 {
-	return (desc + 1) % port_to_card(port)->ring_buffers;
+	return (desc + 1) % (transmit ? port_to_card(port)->tx_ring_buffers
+			     : port_to_card(port)->rx_ring_buffers);
 }
 
 
 
-static inline u16 desc_offset(port_t *port, u8 desc, u8 transmit)
+static inline u16 desc_abs_number(port_t *port, u16 desc, int transmit)
+{
+	u16 rx_buffs = port_to_card(port)->rx_ring_buffers;
+	u16 tx_buffs = port_to_card(port)->tx_ring_buffers;
+
+	desc %= (transmit ? tx_buffs : rx_buffs); // called with "X + 1" etc.
+	return log_node(port) * (rx_buffs + tx_buffs) +
+		transmit * rx_buffs + desc;
+}
+
+
+
+static inline u16 desc_offset(port_t *port, u16 desc, int transmit)
 {
 	/* Descriptor offset always fits in 16 bytes */
-	u8 buffs = port_to_card(port)->ring_buffers;
-	return ((log_node(port) * 2 + transmit) * buffs + (desc % buffs)) *
-		sizeof(pkt_desc);
+	return desc_abs_number(port, desc, transmit) * sizeof(pkt_desc);
 }
 
 
 
-static inline pkt_desc* desc_address(port_t *port, u8 desc, u8 transmit)
+static inline pkt_desc* desc_address(port_t *port, u16 desc, int transmit)
 {
 #ifdef PAGE0_ALWAYS_MAPPED
 	return (pkt_desc*)(win0base(port_to_card(port))
@@ -146,12 +168,10 @@ static inline pkt_desc* desc_address(port_t *port, u8 desc, u8 transmit)
 
 
 
-static inline u32 buffer_offset(port_t *port, u8 desc, u8 transmit)
+static inline u32 buffer_offset(port_t *port, u16 desc, int transmit)
 {
-	u8 buffs = port_to_card(port)->ring_buffers;
 	return port_to_card(port)->buff_offset +
-		((log_node(port) * 2 + transmit) * buffs + (desc % buffs)) *
-		(u32)HDLC_MAX_MRU;
+		desc_abs_number(port, desc, transmit) * (u32)HDLC_MAX_MRU;
 }
 
 
@@ -159,8 +179,7 @@ static inline u32 buffer_offset(port_t *port, u8 desc, u8 transmit)
 static void sca_init_sync_port(port_t *port)
 {
 	card_t *card = port_to_card(port);
-	u8 transmit, i;
-	u16 dmac, buffs = card->ring_buffers;
+	int transmit, i;
 
 	port->rxin = 0;
 	port->txin = 0;
@@ -171,6 +190,10 @@ static void sca_init_sync_port(port_t *port)
 #endif
 
 	for (transmit = 0; transmit < 2; transmit++) {
+		u16 dmac = transmit ? get_dmac_tx(port) : get_dmac_rx(port);
+		u16 buffs = transmit ? card->tx_ring_buffers
+			: card->rx_ring_buffers;
+
 		for (i = 0; i < buffs; i++) {
 			pkt_desc* desc = desc_address(port, i, transmit);
 			u16 chain_off = desc_offset(port, i + 1, transmit);
@@ -182,7 +205,6 @@ static void sca_init_sync_port(port_t *port)
 			writeb(0, &desc->stat);
 		}
 
-		dmac = transmit ? get_dmac_tx(port) : get_dmac_rx(port);
 		/* DMA disable - to halt state */
 		sca_out(0, transmit ? DSR_TX(phy_node(port)) :
 			DSR_RX(phy_node(port)), card);
@@ -247,7 +269,7 @@ static inline void sca_msci_intr(port_t *port)
 
 
 
-static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u8 rxin)
+static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u16 rxin)
 {
 	struct sk_buff *skb;
 	u16 len;
@@ -294,7 +316,7 @@ static inline void sca_rx(card_t *card, port_t *port, pkt_desc *desc, u8 rxin)
 	skb->mac.raw = skb->data;
 	skb->dev = hdlc_to_dev(&port->hdlc);
 	skb->dev->last_rx = jiffies;
-	skb->protocol = htons(ETH_P_HDLC);
+	skb->protocol = hdlc_type_trans(skb, hdlc_to_dev(&port->hdlc));
 	netif_rx(skb);
 }
 
@@ -341,7 +363,7 @@ static inline void sca_rx_intr(port_t *port)
 
 		/* Set new error descriptor address */
 		sca_outa(desc_off, dmac + EDAL, card);
-		port->rxin = next_desc(port, port->rxin);
+		port->rxin = next_desc(port, port->rxin, 0);
 	}
 
 	/* make sure RX DMA is enabled */
@@ -377,8 +399,7 @@ static inline void sca_tx_intr(port_t *port)
 		port->hdlc.stats.tx_packets++;
 		port->hdlc.stats.tx_bytes += readw(&desc->len);
 		writeb(0, &desc->stat);	/* Free descriptor */
-		port->txlast = (port->txlast + 1) %
-			port_to_card(port)->ring_buffers;
+		port->txlast = next_desc(port, port->txlast, 1);
 	}
 
 	netif_wake_queue(hdlc_to_dev(&port->hdlc));
@@ -390,8 +411,6 @@ static inline void sca_tx_intr(port_t *port)
 static void sca_intr(int irq, void* dev_id, struct pt_regs *regs)
 {
 	card_t *card = dev_id;
-/* Maximum events to handle at each interrupt - should I increase it? */
-	int boguscnt = 4;
 	int i;
 	u8 stat;
 
@@ -412,19 +431,9 @@ static void sca_intr(int irq, void* dev_id, struct pt_regs *regs)
 				if (stat & SCA_INTR_DMAC_TX(i))
 					sca_tx_intr(port);
 			}
-
-			if (--boguscnt < 0) {
-#if 0
-				printk(KERN_ERR "%s: too much work at "
-				       "interrupt\n",
-				       hdlc_to_name(&port->hdlc));
-#endif
-				goto exit;
-			}
 		}
 	}
 
- exit:
 #ifndef ALL_PAGES_ALWAYS_MAPPED
 	openwin(card, page);		/* Restore original page */
 #endif
@@ -435,7 +444,7 @@ static void sca_intr(int irq, void* dev_id, struct pt_regs *regs)
 static void sca_set_port(port_t *port)
 {
 	card_t* card = port_to_card(port);
-	u8 msci = get_msci(port);
+	u16 msci = get_msci(port);
 	u8 md2 = sca_in(msci + MD2, card);
 	unsigned int tmc, br = 10, brv = 1024;
 
@@ -495,7 +504,7 @@ static void sca_open(hdlc_device *hdlc)
 {
 	port_t *port = hdlc_to_port(hdlc);
 	card_t* card = port_to_card(port);
-	u8 msci = get_msci(port);
+	u16 msci = get_msci(port);
 	u8 md0, md2;
 
 	switch(port->encoding) {
@@ -516,7 +525,7 @@ static void sca_open(hdlc_device *hdlc)
 	case PARITY_CRC16_PR0_CCITT: md0 = MD0_HDLC | MD0_CRC_ITU_0; break;
 #else
 	case PARITY_CRC32_PR1_CCITT: md0 = MD0_HDLC | MD0_CRC_ITU32; break;
-#endif	
+#endif
 	case PARITY_CRC16_PR1_CCITT: md0 = MD0_HDLC | MD0_CRC_ITU;   break;
 	default:		     md0 = MD0_HDLC | MD0_CRC_NONE;
 	}
@@ -613,7 +622,7 @@ static int sca_attach(hdlc_device *hdlc, unsigned short encoding,
 	    parity != PARITY_CRC16_PR0_CCITT &&
 #else
 	    parity != PARITY_CRC32_PR1_CCITT &&
-#endif	
+#endif
 	    parity != PARITY_CRC16_PR1_CCITT)
 		return -EINVAL;
 
@@ -639,14 +648,13 @@ static void sca_dump_rings(hdlc_device *hdlc)
 	openwin(card, 0);
 #endif
 
-	printk(KERN_ERR "RX ring: CDA=%u EDA=%u DSR=%02X in=%u "
-	       "%sactive",
+	printk(KERN_ERR "RX ring: CDA=%u EDA=%u DSR=%02X in=%u %sactive",
 	       sca_ina(get_dmac_rx(port) + CDAL, card),
 	       sca_ina(get_dmac_rx(port) + EDAL, card),
 	       sca_in(DSR_RX(phy_node(port)), card),
 	       port->rxin,
 	       sca_in(DSR_RX(phy_node(port)), card) & DSR_DE?"":"in");
-	for (cnt = 0; cnt<port_to_card(port)->ring_buffers; cnt++)
+	for (cnt = 0; cnt < port_to_card(port)->rx_ring_buffers; cnt++)
 		printk(" %02X",
 		       readb(&(desc_address(port, cnt, 0)->stat)));
 
@@ -658,7 +666,7 @@ static void sca_dump_rings(hdlc_device *hdlc)
 	       port->txlast,
 	       sca_in(DSR_TX(phy_node(port)), card) & DSR_DE ? "" : "in");
 
-	for (cnt = 0; cnt<port_to_card(port)->ring_buffers; cnt++)
+	for (cnt = 0; cnt < port_to_card(port)->tx_ring_buffers; cnt++)
 		printk(" %02X",
 		       readb(&(desc_address(port, cnt, 1)->stat)));
 	printk("\n");
@@ -750,7 +758,7 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 	writeb(ST_TX_EOM, &desc->stat);
 	dev->trans_start = jiffies;
 
-	port->txin = next_desc(port, port->txin);
+	port->txin = next_desc(port, port->txin, 1);
 	sca_outa(desc_offset(port, port->txin, 1),
 		 get_dmac_tx(port) + EDAL, card);
 
@@ -767,7 +775,49 @@ static int sca_xmit(struct sk_buff *skb, struct net_device *dev)
 }
 
 
-static void sca_init(card_t *card, int wait_states)
+
+#ifdef NEED_DETECT_RAM
+static u32 __devinit sca_detect_ram(card_t *card, u8 *rambase, u32 ramsize)
+{
+	/* Round RAM size to 32 bits, fill from end to start */
+	u32 i = ramsize &= ~3;
+
+#ifndef ALL_PAGES_ALWAYS_MAPPED
+	u32 size = winsize(card);
+
+	openwin(card, (i - 4) / size); /* select last window */
+#endif
+	do {
+		i -= 4;
+#ifndef ALL_PAGES_ALWAYS_MAPPED
+		if ((i + 4) % size == 0)
+			openwin(card, i / size);
+		writel(i ^ 0x12345678, rambase + i % size);
+#else
+		writel(i ^ 0x12345678, rambase + i);
+#endif
+	}while (i > 0);
+
+	for (i = 0; i < ramsize ; i += 4) {
+#ifndef ALL_PAGES_ALWAYS_MAPPED
+		if (i % size == 0)
+			openwin(card, i / size);
+
+		if (readl(rambase + i % size) != (i ^ 0x12345678))
+			break;
+#else
+		if (readl(rambase + i) != (i ^ 0x12345678))
+			break;
+#endif
+	}
+
+	return i;
+}
+#endif /* NEED_DETECT_RAM */
+
+
+
+static void __devinit sca_init(card_t *card, int wait_states)
 {
 	sca_out(wait_states, WCRL, card); /* Wait Control */
 	sca_out(wait_states, WCRM, card);

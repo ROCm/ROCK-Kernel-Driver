@@ -1698,7 +1698,7 @@ static int __make_request(request_queue_t *q, struct bio *bio)
 again:
 	insert_here = NULL;
 
-	if (blk_queue_empty(q)) {
+	if (elv_queue_empty(q)) {
 		blk_plug_device(q);
 		goto get_rq;
 	}

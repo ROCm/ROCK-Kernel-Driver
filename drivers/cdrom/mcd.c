@@ -125,7 +125,7 @@ static struct request_queue mcd_queue;
 
 static int current_valid(void)
 {
-        return !blk_queue_empty(QUEUE) &&
+        return CURRENT &&
 		CURRENT->cmd == READ &&
 		CURRENT->sector != -1;
 }

@@ -603,6 +603,12 @@ static int __init balanced_irq_init(void)
         c = &boot_cpu_data;
 	if (irqbalance_disabled)
 		return 0;
+	
+	 /* disable irqbalance completely if there is only one processor online */
+	if (num_online_cpus() < 2) {
+		irqbalance_disabled = 1;
+		return 0;
+	}
 	/*
 	 * Enable physical balance only if more than 1 physical processor
 	 * is present
@@ -1110,12 +1116,9 @@ next:
 		goto next;
 
 	if (current_vector > FIRST_SYSTEM_VECTOR) {
-		offset++;
+		offset = (offset + 1) & 7;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
 	}
-
-	if (current_vector == FIRST_SYSTEM_VECTOR)
-		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
 	return current_vector;

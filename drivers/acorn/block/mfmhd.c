@@ -746,7 +746,7 @@ static void request_done(int uptodate)
 		/* No - its the end of the line */
 		/* end_request's should have happened at the end of sector DMAs */
 		/* Turns Drive LEDs off - may slow it down? */
-		if (blk_queue_empty(QUEUE))
+		if (!elv_next_request(QUEUE))
 			issue_command(CMD_CKV, block, 2);
 
 		Busy = 0;
@@ -897,9 +897,9 @@ static void mfm_request(void)
 		DBG("mfm_request: loop start\n");
 		sti();
 
-		DBG("mfm_request: before blk_queue_empty\n");
+		DBG("mfm_request: before !CURRENT\n");
 
-		if (blk_queue_empty(QUEUE)) {
+		if (!CURRENT) {
 			printk("mfm_request: Exiting due to empty queue (pre)\n");
 			do_mfm = NULL;
 			Busy = 0;

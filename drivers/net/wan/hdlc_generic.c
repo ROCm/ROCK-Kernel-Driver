@@ -1,17 +1,13 @@
 /*
  * Generic HDLC support routines for Linux
  *
- * Copyright (C) 1999 - 2001 Krzysztof Halasa <khc@pm.waw.pl>
+ * Copyright (C) 1999 - 2003 Krzysztof Halasa <khc@pm.waw.pl>
  *
  * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or
- * (at your option) any later version.
+ * under the terms of version 2 of the GNU General Public License
+ * as published by the Free Software Foundation.
  *
- * Current status:
- *    - this is work in progress
- *    - not heavily tested on SMP
- *    - currently supported:
+ * Currently supported:
  *	* raw IP-in-HDLC
  *	* Cisco HDLC
  *	* Frame Relay with ANSI or CCITT LMI (both user and network side)
@@ -37,7 +33,7 @@
 #include <linux/hdlc.h>
 
 
-static const char* version = "HDLC support module revision 1.11";
+static const char* version = "HDLC support module revision 1.14";
 
 
 static int hdlc_change_mtu(struct net_device *dev, int new_mtu)
@@ -60,13 +56,23 @@ static struct net_device_stats *hdlc_get_stats(struct net_device *dev)
 static int hdlc_rcv(struct sk_buff *skb, struct net_device *dev,
 		    struct packet_type *p)
 {
-	dev_to_hdlc(dev)->netif_rx(skb);
+	hdlc_device *hdlc = dev_to_hdlc(dev);
+	if (hdlc->netif_rx)
+		hdlc->netif_rx(skb);
+	else {
+		hdlc->stats.rx_dropped++; /* Shouldn't happen */
+		dev_kfree_skb(skb);
+	}
 	return 0;
 }
 
 
 #ifndef CONFIG_HDLC_RAW
 #define hdlc_raw_ioctl(hdlc, ifr)	-ENOSYS
+#endif
+
+#ifndef CONFIG_HDLC_RAW_ETH
+#define hdlc_raw_eth_ioctl(hdlc, ifr)	-ENOSYS
 #endif
 
 #ifndef CONFIG_HDLC_PPP
@@ -96,6 +102,7 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	switch(ifr->ifr_settings.type) {
 	case IF_PROTO_HDLC:
+	case IF_PROTO_HDLC_ETH:
 	case IF_PROTO_PPP:
 	case IF_PROTO_CISCO:
 	case IF_PROTO_FR:
@@ -109,6 +116,7 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 	switch(proto) {
 	case IF_PROTO_HDLC:	return hdlc_raw_ioctl(hdlc, ifr);
+	case IF_PROTO_HDLC_ETH:	return hdlc_raw_eth_ioctl(hdlc, ifr);
 	case IF_PROTO_PPP:	return hdlc_ppp_ioctl(hdlc, ifr);
 	case IF_PROTO_CISCO:	return hdlc_cisco_ioctl(hdlc, ifr);
 	case IF_PROTO_FR:	return hdlc_fr_ioctl(hdlc, ifr);
@@ -144,7 +152,6 @@ int register_hdlc_device(hdlc_device *hdlc)
 	if (result != 0)
 		return -EIO;
 
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -152,17 +159,17 @@ int register_hdlc_device(hdlc_device *hdlc)
 
 void unregister_hdlc_device(hdlc_device *hdlc)
 {
+	rtnl_lock();
 	hdlc_proto_detach(hdlc);
-
-	unregister_netdev(hdlc_to_dev(hdlc));
-	MOD_DEC_USE_COUNT;
+	unregister_netdevice(hdlc_to_dev(hdlc));
+	rtnl_unlock();
 }
 
 
 
 MODULE_AUTHOR("Krzysztof Halasa <khc@pm.waw.pl>");
 MODULE_DESCRIPTION("HDLC support module");
-MODULE_LICENSE("GPL");
+MODULE_LICENSE("GPL v2");
 
 EXPORT_SYMBOL(hdlc_ioctl);
 EXPORT_SYMBOL(register_hdlc_device);

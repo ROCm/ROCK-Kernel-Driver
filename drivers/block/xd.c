@@ -282,11 +282,12 @@ static u_char __init xd_detect (u_char *controller, unsigned int *address)
 /* do_xd_request: handle an incoming request */
 static void do_xd_request (request_queue_t * q)
 {
+	struct request *req;
+
 	if (xdc_busy)
 		return;
 
-	while (!blk_queue_empty(q)) {
-		struct request *req = elv_next_request(q);
+	while ((req = elv_next_request(q)) != NULL) {
 		unsigned block = req->sector;
 		unsigned count = req->nr_sectors;
 		int rw = rq_data_dir(req);

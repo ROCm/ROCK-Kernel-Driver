@@ -1365,7 +1365,7 @@ static void redo_fd_request(void)
 	unsigned long flags;
 
  repeat:
-	if (blk_queue_empty(QUEUE)) {
+	if (!CURRENT) {
 		/* Nothing left to do */
 		return;
 	}
