@@ -94,7 +94,7 @@ qla2100_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	qla2x00_next(ha);
-	ha->last_irq_cpu = smp_processor_id();
+	ha->last_irq_cpu = _smp_processor_id();
 	ha->total_isr_cnt++;
 
 	if (test_bit(MBX_INTR_WAIT, &ha->mbx_cmd_flags) &&
@@ -207,7 +207,7 @@ qla2300_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&ha->hardware_lock, flags);
 
 	qla2x00_next(ha);
-	ha->last_irq_cpu = smp_processor_id();
+	ha->last_irq_cpu = _smp_processor_id();
 	ha->total_isr_cnt++;
 
 	if (test_bit(MBX_INTR_WAIT, &ha->mbx_cmd_flags) &&
