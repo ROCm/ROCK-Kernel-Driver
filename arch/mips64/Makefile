@@ -72,7 +72,7 @@ endif
 # Board-dependent options and extra files
 #
 ifdef CONFIG_SGI_IP22
-LIBS          += arch/mips64/sgi-ip22/ip22.a arch/mips64/arc/arclib.a
+LIBS          += arch/mips64/sgi-ip22/lib.a arch/mips64/arc/lib.a
 SUBDIRS       += arch/mips64/sgi-ip22 arch/mips64/arc
 #
 # Set LOADADDR to >= 0x88069000 if you want to leave space for symmon,
@@ -84,7 +84,7 @@ endif
 
 ifdef CONFIG_SGI_IP27
 CORE_FILES    += arch/mips64/sgi-ip27/ip27.o
-LIBS          += arch/mips64/arc/arclib.a
+LIBS          += arch/mips64/arc/lib.a
 SUBDIRS       += arch/mips64/sgi-ip27 arch/mips64/arc
 #
 # Set LOADADDR to >= 0xc000000000300000 if you want to leave space for
@@ -100,7 +100,7 @@ endif
 endif
 
 ifdef CONFIG_SGI_IP32
-LIBS		+= arch/mips64/sgi-ip32/ip32-kern.a arch/mips64/arc/arclib.a
+LIBS		+= arch/mips64/sgi-ip32/ip32-kern.a arch/mips64/arc/lib.a
 SUBDIRS		+= arch/mips64/sgi-ip32 arch/mips64/arc
 #
 # Set LOADADDR to >= 0x????????? if you want to leave space for symmon,

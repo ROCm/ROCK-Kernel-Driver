@@ -2,7 +2,7 @@
 # Makefile for some libs needed by zImage.
 #
 
-L_TARGET := zlib.a
+L_TARGET := lib.a
 
 obj-y := zlib.o
 
