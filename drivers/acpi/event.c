@@ -42,7 +42,7 @@ out_busy:
 static ssize_t
 acpi_system_read_event (
 	struct file		*file,
-	char			*buffer,
+	char			__user *buffer,
 	size_t			count,
 	loff_t			*ppos)
 {
