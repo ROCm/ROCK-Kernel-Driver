@@ -66,11 +66,11 @@ static int pm_suspend_standby(void)
 		return -EPERM;
 
 	local_irq_save(flags);
-	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
+	if ((error = device_power_down(PM_SUSPEND_STANDBY)))
 		goto Done;
 	error = pm_ops->enter(PM_SUSPEND_STANDBY);
 	local_irq_restore(flags);
-	device_pm_power_up();
+	device_power_up();
  Done:
 	return error;
 }
@@ -92,11 +92,11 @@ static int pm_suspend_mem(void)
 		return -EPERM;
 
 	local_irq_save(flags);
-	if ((error = device_pm_power_down(PM_SUSPEND_STANDBY)))
+	if ((error = device_power_down(PM_SUSPEND_STANDBY)))
 		goto Done;
 	error = pm_ops->enter(PM_SUSPEND_STANDBY);
 	local_irq_restore(flags);
-	device_pm_power_up();
+	device_power_up();
  Done:
 	return error;
 }
@@ -118,12 +118,12 @@ static int power_down(u32 mode)
 	int error = 0;
 
 	local_irq_save(flags);
-	device_pm_power_down(PM_SUSPEND_DISK);
+	device_power_down(PM_SUSPEND_DISK);
 	switch(mode) {
 	case PM_DISK_PLATFORM:
 		error = pm_ops->enter(PM_SUSPEND_DISK);
 		if (error) {
-			device_pm_power_up();
+			device_power_up();
 			local_irq_restore(flags);
 			return error;
 		}
@@ -245,7 +245,7 @@ static int suspend_prepare(u32 state)
 	if (state == PM_SUSPEND_DISK)
 		free_some_memory();
 
-	if ((error = device_pm_suspend(state)))
+	if ((error = device_suspend(state)))
 		goto Finish;
 
 	return 0;
@@ -271,7 +271,7 @@ static int suspend_prepare(u32 state)
 
 static void suspend_finish(u32 state)
 {
-	device_pm_resume();
+	device_resume();
 	if (pm_ops && pm_ops->finish)
 		pm_ops->finish(state);
 	thaw_processes();

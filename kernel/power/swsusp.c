@@ -1,4 +1,4 @@
-/*
+'/*
  * linux/kernel/suspend.c
  *
  * This file is to realize architecture-independent
@@ -492,7 +492,7 @@ static int suspend_save_image(void)
 {
 	int error;
 
-	device_pm_resume();
+	device_resume();
 
 	lock_swapdevices();
 	error = write_suspend_image();

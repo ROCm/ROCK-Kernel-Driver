@@ -54,7 +54,7 @@ int suspend_device(struct device * dev, u32 state)
 
 
 /**
- *	device_pm_suspend - Save state and stop all devices in system.
+ *	device_suspend - Save state and stop all devices in system.
  *	@state:		Power state to put each device in. 
  *
  *	Walk the dpm_active list, call ->suspend() for each device, and move
@@ -63,7 +63,7 @@ int suspend_device(struct device * dev, u32 state)
  *	the device to the dpm_off list. If it returns -EAGAIN, we move it to 
  *	the dpm_off_irq list. If we get a different error, try and back out. 
  *
- *	If we hit a failure with any of the devices, call device_pm_resume()
+ *	If we hit a failure with any of the devices, call device_resume()
  *	above to bring the suspended devices back to life. 
  *
  *	Note this function leaves dpm_sem held to
@@ -71,12 +71,12 @@ int suspend_device(struct device * dev, u32 state)
  *	b) prevent other PM operations from happening after we've begun.
  *	c) make sure we're exclusive when we disable interrupts.
  *
- *	device_pm_resume() will release dpm_sem after restoring state to 
+ *	device_resume() will release dpm_sem after restoring state to 
  *	all devices (as will this on error). You must call it once you've 
- *	called device_pm_suspend().
+ *	called device_suspend().
  */
 
-int device_pm_suspend(u32 state)
+int device_suspend(u32 state)
 {
 	int error = 0;
 
@@ -90,13 +90,15 @@ int device_pm_suspend(u32 state)
  Done:
 	return error;
  Error:
-	device_pm_resume();
+	device_resume();
 	goto Done;
 }
 
+EXPORT_SYMBOL(device_suspend);
+
 
 /**
- *	device_pm_power_down - Shut down special devices.
+ *	device_power_down - Shut down special devices.
  *	@state:		Power state to enter.
  *
  *	Walk the dpm_off_irq list, calling ->power_down() for each device that
@@ -104,7 +106,7 @@ int device_pm_suspend(u32 state)
  *	done, power down system devices. 
  */
 
-int device_pm_power_down(u32 state)
+int device_power_down(u32 state)
 {
 	int error = 0;
 	struct device * dev;
@@ -124,23 +126,5 @@ int device_pm_power_down(u32 state)
 	goto Done;
 }
 
+EXPORT_SYMBOL(device_power_down);
 
-/**
- * device_suspend - suspend all devices on the device ree
- * @state:	state we're entering
- * @level:	Stage of suspend sequence we're in.
- *
- *
- *	This function is deprecated. Calls should be replaced with
- *	appropriate calls to device_pm_suspend() and device_pm_power_down().
- */
-
-int device_suspend(u32 state, u32 level)
-{
-
-	printk("%s Called from:\n",__FUNCTION__);
-	dump_stack();
-	return -EFAULT;
-}
-
-EXPORT_SYMBOL(device_suspend);

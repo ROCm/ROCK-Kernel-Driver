@@ -240,10 +240,10 @@ struct dev_pm_info {
 
 extern void device_pm_set_parent(struct device * dev, struct device * parent);
 
-extern int device_pm_suspend(u32 state);
-extern int device_pm_power_down(u32 state);
-extern void device_pm_power_up(void);
-extern void device_pm_resume(void);
+extern int device_suspend(u32 state);
+extern int device_power_down(u32 state);
+extern void device_power_up(void);
+extern void device_resume(void);
 
 
 #endif /* __KERNEL__ */

@@ -29,12 +29,12 @@ int resume_device(struct device * dev)
 
 
 /**
- *	device_pm_resume - Restore state of each device in system.
+ *	device_resume - Restore state of each device in system.
  *
  *	Restore normal device state and release the dpm_sem.
  */
 
-void device_pm_resume(void)
+void device_resume(void)
 {
 	while(!list_empty(&dpm_off)) {
 		struct list_head * entry = dpm_off.next;
@@ -45,6 +45,8 @@ void device_pm_resume(void)
 	}
 	up(&dpm_sem);
 }
+
+EXPORT_SYMBOL(device_resume);
 
 
 /**
@@ -77,25 +79,12 @@ void dpm_power_up(void)
  *	Called with interrupts disabled.
  */
 
-void device_pm_power_up(void)
+void device_power_up(void)
 {
 	sysdev_resume();
 	dpm_power_up();
 }
 
-/**
- * device_resume - resume all the devices in the system
- * @level:	stage of resume process we're at 
- * 
- *	This function is deprecated, and should be replaced with appropriate
- *	calls to device_pm_power_up() and device_pm_resume() above.
- */
+EXPORT_SYMBOL(device_power_up);
 
-void device_resume(u32 level)
-{
 
-	printk("%s is deprecated. Called from:\n",__FUNCTION__);
-	dump_stack();
-}
-
-EXPORT_SYMBOL(device_resume);
