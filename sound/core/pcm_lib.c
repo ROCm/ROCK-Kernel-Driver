@@ -176,7 +176,7 @@ static inline int snd_pcm_update_hw_ptr_post(snd_pcm_substream_t *substream,
 		runtime->avail_max = avail;
 	if (avail >= runtime->stop_threshold) {
 		if (substream->runtime->status->state == SNDRV_PCM_STATE_DRAINING)
-			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
+			snd_pcm_drain_done(substream);
 		else
 			xrun(substream);
 		return -EPIPE;
