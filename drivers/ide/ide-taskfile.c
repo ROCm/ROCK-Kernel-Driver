@@ -321,10 +321,8 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 		if (stat & (ERR_STAT|DRQ_STAT)) {
 			return DRIVER(drive)->error(drive, "task_in_intr", stat);
 		}
-		if (!(stat & BUSY_STAT)) {
-			ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
-			return ide_started;  
-		}
+		ide_set_handler(drive, &task_in_intr, WAIT_WORSTCASE, NULL);
+		return ide_started;
 	}
 
 	task_buffer_sectors(drive, rq, 1, IDE_PIO_IN);
