@@ -737,13 +737,13 @@ config IBMMCA_SCSI_DEV_RESET
 
 config SCSI_IPS
 	tristate "IBM ServeRAID support"
-	depends on X86 && PCI && SCSI
+	depends on PCI && SCSI
 	---help---
 	  This is support for the IBM ServeRAID hardware RAID controllers.
 	  See <http://www.developer.ibm.com/welcome/netfinity/serveraid.html>
 	  for more information.  If this driver does not work correctly
 	  without modification please contact the author by email at
-	  ipslinux@us.ibm.com.
+	  ipslinux@adaptec.com.
 
 	  You can build this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),

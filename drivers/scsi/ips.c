@@ -199,7 +199,7 @@ MODULE_PARM(ips, "s");
 #define IPS_VERSION_LOW         ".90-BETA"
 
 #if !defined(__i386__) && !defined(__ia64__) && !defined(__x86_64__)
-#error "This driver has only been tested on the x86/ia64/x86_64 platforms"
+#warning "This driver has only been tested on the x86/ia64/x86_64 platforms"
 #endif
 
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,0)
@@ -284,9 +284,9 @@ IPS_DEFINE_COMPAT_TABLE( Compatable );	/* Version Compatability Table      */
 /* This table describes all ServeRAID Adapters */
 static struct  pci_device_id  ips_pci_table[] = {
 	{ 0x1014, 0x002E, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
-        { 0x1014, 0x01BD, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
-        { 0x9005, 0x0250, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
-        { 0, }
+	{ 0x1014, 0x01BD, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
+	{ 0x9005, 0x0250, PCI_ANY_ID, PCI_ANY_ID, 0, 0 },
+	{ 0, }
 };
 
 MODULE_DEVICE_TABLE( pci, ips_pci_table );
@@ -300,7 +300,7 @@ struct pci_driver ips_pci_driver = {
 	.name		= ips_hot_plug_name,
 	.id_table	= ips_pci_table,
 	.probe		= ips_insert_device,
-        .remove		= __devexit_p(ips_remove_device),
+	.remove		= __devexit_p(ips_remove_device),
 };
            
 
