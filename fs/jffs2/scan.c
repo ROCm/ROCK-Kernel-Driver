@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: scan.c,v 1.114 2004/11/16 20:36:12 dwmw2 Exp $
+ * $Id: scan.c,v 1.115 2004/11/17 12:59:08 dedekind Exp $
  *
  */
 #include <linux/kernel.h>
@@ -160,11 +160,8 @@ int jffs2_scan_medium(struct jffs2_sb_info *c)
 
 		case BLK_STATE_PARTDIRTY:
                         /* Some data, but not full. Dirty list. */
-                        /* Except that we want to remember the block with most free space,
-                           and stick it in the 'nextblock' position to start writing to it.
-                           Later when we do snapshots, this must be the most recent block,
-                           not the one with most free space.
-                        */
+                        /* We want to remember the block with most free space
+                           and stick it in the 'nextblock' position to start writing to it. */
                         if (jeb->free_size > min_free(c) && 
 			    (!c->nextblock || c->nextblock->free_size < jeb->free_size)) {
                                 /* Better candidate for the next writes to go to */

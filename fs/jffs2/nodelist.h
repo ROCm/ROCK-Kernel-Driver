@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: nodelist.h,v 1.124 2004/11/17 09:30:02 dedekind Exp $
+ * $Id: nodelist.h,v 1.126 2004/11/19 15:06:29 dedekind Exp $
  *
  */
 
@@ -107,16 +107,6 @@ struct jffs2_raw_node_ref
 #define ref_obsolete(ref)	(((ref)->flash_offset & 3) == REF_OBSOLETE)
 #define mark_ref_normal(ref)    do { (ref)->flash_offset = ref_offset(ref) | REF_NORMAL; } while(0)
 
-/* 
-   Used for keeping track of deletion nodes &c, which can only be marked
-   as obsolete when the node which they mark as deleted has actually been 
-   removed from the flash.
-*/
-struct jffs2_raw_node_ref_list {
-	struct jffs2_raw_node_ref *rew;
-	struct jffs2_raw_node_ref_list *next;
-};
-
 /* For each inode in the filesystem, we need to keep a record of
    nlink, because it would be a PITA to scan the whole directory tree
    at read_inode() time to calculate it, and to keep sufficient information
@@ -156,12 +146,11 @@ struct jffs2_inode_cache {
 struct jffs2_full_dnode
 {
 	struct jffs2_raw_node_ref *raw;
-	uint32_t ofs; /* Don't really need this, but optimisation */
+	uint32_t ofs; /* The offset to which the data of this node belongs */
 	uint32_t size;
 	uint32_t frags; /* Number of fragments which currently refer
 			to this node. When this reaches zero, 
-			the node is obsolete.
-		     */
+			the node is obsolete.  */
 };
 
 /* 
@@ -186,6 +175,7 @@ struct jffs2_full_dirent
 	unsigned char type;
 	unsigned char name[0];
 };
+
 /*
   Fragments - used to build a map of which raw node to obtain 
   data from for each part of the ino
@@ -195,7 +185,7 @@ struct jffs2_node_frag
 	struct rb_node rb;
 	struct jffs2_full_dnode *node; /* NULL for holes */
 	uint32_t size;
-	uint32_t ofs; /* Don't really need this, but optimisation */
+	uint32_t ofs; /* The offset to which this fragment belongs */
 };
 
 struct jffs2_eraseblock
@@ -214,14 +204,6 @@ struct jffs2_eraseblock
 	struct jffs2_raw_node_ref *last_node;
 
 	struct jffs2_raw_node_ref *gc_node;	/* Next node to be garbage collected */
-
-	/* For deletia. When a dirent node in this eraseblock is
-	   deleted by a node elsewhere, that other node can only 
-	   be marked as obsolete when this block is actually erased.
-	   So we keep a list of the nodes to mark as obsolete when
-	   the erase is completed.
-	*/
-	// MAYBE	struct jffs2_raw_node_ref_list *deletia;
 };
 
 #define ACCT_SANITY_CHECK(c, jeb) do { \
