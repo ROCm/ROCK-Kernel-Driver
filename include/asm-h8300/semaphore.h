@@ -101,13 +101,14 @@ static inline void down(struct semaphore * sem)
 		"mov.l er1,%0\n\t"
 		"bpl 1f\n\t"
 		"ldc r3l,ccr\n\t"
+		"mov.l %1,er0\n\t"
 		"jsr @___down\n\t"
 		"bra 2f\n"
 		"1:\n\t"
 		"ldc r3l,ccr\n"
 		"2:"
 		: "+m"(*count)
-		: 
+		: "g"(sem)
 		: "cc",  "er1", "er2", "er3");
 }
 
@@ -129,6 +130,7 @@ static inline int down_interruptible(struct semaphore * sem)
 		"mov.l er2,%1\n\t"
 		"bpl 1f\n\t"
 		"ldc r1l,ccr\n\t"
+		"mov.l %2,er0\n\t"
 		"jsr @___down_interruptible\n\t"
 		"bra 2f\n"
 		"1:\n\t"
@@ -136,7 +138,7 @@ static inline int down_interruptible(struct semaphore * sem)
 		"sub.l %0,%0\n\t"
 		"2:\n\t"
 		: "=r" (count),"+m" (*count)
-		:
+		: "g"(sem)
 		: "cc", "er1", "er2", "er3");
 	return (int)count;
 }
@@ -161,6 +163,7 @@ static inline int down_trylock(struct semaphore * sem)
 		"jmp @3f\n\t"
 		LOCK_SECTION_START(".align 2\n\t")
 		"3:\n\t"
+		"mov.l %2,er0\n\t"
 		"jsr @___down_trylock\n\t"
 		"jmp @2f\n\t"
 		LOCK_SECTION_END
@@ -169,7 +172,7 @@ static inline int down_trylock(struct semaphore * sem)
 		"sub.l %1,%1\n"
 		"2:"
 		: "+m" (*count),"=r"(count)
-		: 
+		: "g"(sem)
 		: "cc", "er1","er2", "er3");
 	return (int)count;
 }
@@ -199,10 +202,11 @@ static inline void up(struct semaphore * sem)
 		"sub.l er2,er2\n\t"
 		"cmp.l er2,er1\n\t"
 		"bgt 1f\n\t"
+		"mov.l %1,er0\n\t"
 		"jsr @___up\n"
 		"1:"
 		: "+m"(*count)
-		: 
+		: "g"(sem)
 		: "cc", "er1", "er2", "er3");
 }
 
