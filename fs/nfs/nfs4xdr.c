@@ -239,10 +239,10 @@ static int
 encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
     struct nfs_server *server)
 {
-	char owner_name[256];
-	char owner_group[256];
-	int owner_namelen = sizeof(owner_name);
-	int owner_grouplen = sizeof(owner_group);
+	char owner_name[IDMAP_NAMESZ];
+	char owner_group[IDMAP_NAMESZ];
+	int owner_namelen = 0;
+	int owner_grouplen = 0;
 	uint32_t *p;
 	uint32_t *q;
 	int len;
@@ -265,9 +265,8 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
 	if (iap->ia_valid & ATTR_MODE)
 		len += 4;
 	if (iap->ia_valid & ATTR_UID) {
-		status = nfs_idmap_name(server, IDMAP_TYPE_USER,
-		    iap->ia_uid, owner_name, &owner_namelen);
-		if (status < 0) {
+		owner_namelen = nfs_map_uid_to_name(server, iap->ia_uid, owner_name);
+		if (owner_namelen < 0) {
 			printk(KERN_WARNING "nfs: couldn't resolve uid %d to string\n",
 			       iap->ia_uid);
 			/* XXX */
@@ -278,9 +277,8 @@ encode_attrs(struct xdr_stream *xdr, struct iattr *iap,
 		len += 4 + (XDR_QUADLEN(owner_namelen) << 2);
 	}
 	if (iap->ia_valid & ATTR_GID) {
-		status = nfs_idmap_name(server, IDMAP_TYPE_GROUP,
-		    iap->ia_gid, owner_group, &owner_grouplen);
-		if (status < 0) {
+		owner_grouplen = nfs_map_gid_to_group(server, iap->ia_gid, owner_group);
+		if (owner_grouplen < 0) {
 			printk(KERN_WARNING "nfs4: couldn't resolve gid %d to string\n",
 			       iap->ia_gid);
 			strcpy(owner_group, "nobody");
@@ -1475,10 +1473,9 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		}
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
-		if ((status = nfs_idmap_id(server, IDMAP_TYPE_USER,
-			 (char *)p, dummy32, &nfp->uid)) == -1) {
-			dprintk("read_attrs: gss_get_num failed!\n");
-			/* goto out; */
+		if ((status = nfs_map_name_to_uid(server, (char *)p, dummy32,
+						&nfp->uid)) < 0) {
+			dprintk("read_attrs: name-to-uid mapping failed!\n");
 			nfp->uid = -2;
 		}
 		dprintk("read_attrs: uid=%d\n", (int)nfp->uid);
@@ -1493,11 +1490,10 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 		}
 		READ_BUF(dummy32);
 		len += (XDR_QUADLEN(dummy32) << 2);
-		if ((status = nfs_idmap_id(server, IDMAP_TYPE_GROUP,
-			 (char *)p, dummy32, &nfp->gid)) == -1) {
-			dprintk("read_attrs: gss_get_num failed!\n");
+		if ((status = nfs_map_group_to_gid(server, (char *)p, dummy32,
+						&nfp->gid)) < 0) {
+			dprintk("read_attrs: group-to-gid mapping failed!\n");
 			nfp->gid = -2;
-			/* goto out; */
 		}
 		dprintk("read_attrs: gid=%d\n", (int)nfp->gid);
         }
