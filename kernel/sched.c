@@ -1325,8 +1325,10 @@ need_resched:
 		}
 	default:
 		deactivate_task(prev, rq);
+		prev->nvcsw++;
+		break;
 	case TASK_RUNNING:
-		;
+		prev->nivcsw++;
 	}
 pick_next_task:
 	if (unlikely(!rq->nr_running)) {
