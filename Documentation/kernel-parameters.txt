@@ -97,9 +97,6 @@ running once the system is up.
 			See header of drivers/scsi/53c7xx.c.
 			See also Documentation/scsi/ncr53c7xx.txt.
 
-	98busmouse.irq=	[HW,MOUSE] PC-9801 Bus Mouse Driver
-			Format: <irq>, default is 13
-
 	acpi=		[HW,ACPI] Advanced Configuration and Power Interface 
 			Format: { force | off | ht | strict }
 			force -- enable ACPI if default was off
