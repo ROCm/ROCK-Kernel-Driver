@@ -917,7 +917,7 @@ no_buffers_err_out:
 	if (!nr_bhs)
 		goto done;
 	/* Apply the mst protection fixups. */
-	kaddr = page_address(page);
+	kaddr = kmap(page);
 	for (i = 0; i < nr_bhs; i++) {
 		if (!(i % bhs_per_rec)) {
 			err = pre_write_mst_fixup((NTFS_RECORD*)(kaddr +
@@ -974,6 +974,7 @@ no_buffers_err_out:
 					bh_offset(bhs[i])));
 	}
 	flush_dcache_page(page);
+	kunmap(page);
 	if (unlikely(err)) {
 		/* I/O error during writing.  This is really bad! */
 		ntfs_error(vol->sb, "I/O error while writing ntfs record "
@@ -996,6 +997,7 @@ mst_cleanup_out:
 			post_write_mst_fixup((NTFS_RECORD*)(kaddr +
 					bh_offset(bhs[i])));
 	}
+	kunmap(page);
 cleanup_out:
 	/* Clean the buffers. */
 	for (i = 0; i < nr_bhs; i++)

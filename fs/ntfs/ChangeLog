@@ -80,6 +80,8 @@ ToDo/Notes:
 	  the bug check from fs/ntfs/aops.c::ntfs_write_mst_block().  It is in
 	  fact required to write outside initialized size when preparing to
 	  extend the initialized size.
+	- Map the page instead of using page_address() before writing to it in
+	  fs/ntfs/aops.c::ntfs_mft_writepage().
 
 2.1.20 - Fix two stupid bugs introduced in 2.1.18 release.
 
