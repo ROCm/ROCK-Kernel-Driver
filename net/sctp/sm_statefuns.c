@@ -472,8 +472,6 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const struct sctp_endpoint *ep,
 	 */
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_INIT));
-	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_RESET,
-			SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_START,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
 	sctp_add_cmd_sf(commands, SCTP_CMD_NEW_STATE,
@@ -673,6 +671,15 @@ sctp_disposition_t sctp_sf_do_5_1E_ca(const struct sctp_endpoint *ep,
 
 	if (!sctp_vtag_verify(chunk, asoc))
 		return sctp_sf_pdiscard(ep, asoc, type, arg, commands);
+
+	/* Reset init error count upon receipt of COOKIE-ACK,
+	 * to avoid problems with the managemement of this
+	 * counter in stale cookie situations when a transition back
+	 * from the COOKIE-ECHOED state to the COOKIE-WAIT
+	 * state is performed.
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_RESET,
+	                SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
 
 	/* RFC 2960 5.1 Normal Establishment of an Association
 	 *
@@ -1872,8 +1879,6 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 	time_t stale;
 	sctp_cookie_preserve_param_t bht;
 	sctp_errhdr_t *err;
-	struct list_head *pos;
-	struct sctp_transport *t;
 	struct sctp_chunk *reply;
 	struct sctp_bind_addr *bp;
 	int attempts;
@@ -1920,19 +1925,26 @@ sctp_disposition_t sctp_sf_do_5_2_6_stale(const struct sctp_endpoint *ep,
 	/* Clear peer's init_tag cached in assoc as we are sending a new INIT */
 	sctp_add_cmd_sf(commands, SCTP_CMD_CLEAR_INIT_TAG, SCTP_NULL());
 
+	/* Stop pending T3-rtx and heartbeat timers */
+	sctp_add_cmd_sf(commands, SCTP_CMD_T3_RTX_TIMERS_STOP, SCTP_NULL());
+	sctp_add_cmd_sf(commands, SCTP_CMD_HB_TIMERS_STOP, SCTP_NULL());
+
+	/* Delete non-primary peer ip addresses since we are transitioning
+	 * back to the COOKIE-WAIT state
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_DEL_NON_PRIMARY, SCTP_NULL());
+
+	/* If we've sent any data bundled with COOKIE-ECHO we will need to 
+	 * resend 
+	 */
+	sctp_add_cmd_sf(commands, SCTP_CMD_RETRAN, 
+			SCTP_TRANSPORT(asoc->peer.primary_path));
+
 	/* Cast away the const modifier, as we want to just
 	 * rerun it through as a sideffect.
 	 */
 	sctp_add_cmd_sf(commands, SCTP_CMD_COUNTER_INC,
 			SCTP_COUNTER(SCTP_COUNTER_INIT_ERROR));
-
-	/* If we've sent any data bundled with COOKIE-ECHO we need to
-	 * resend.
-	 */
-	list_for_each(pos, &asoc->peer.transport_addr_list) {
-		t = list_entry(pos, struct sctp_transport, transports);
-		sctp_add_cmd_sf(commands, SCTP_CMD_RETRAN, SCTP_TRANSPORT(t));
-	}
 
 	sctp_add_cmd_sf(commands, SCTP_CMD_TIMER_STOP,
 			SCTP_TO(SCTP_EVENT_TIMEOUT_T1_COOKIE));
