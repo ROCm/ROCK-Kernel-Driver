@@ -2486,6 +2486,8 @@ int register_netdevice(struct net_device *dev)
 	notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
 	net_run_sbin_hotplug(dev, "register");
+	ret = 0;
+
 out:
 	return ret;
 out_err:
