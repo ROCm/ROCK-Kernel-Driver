@@ -314,7 +314,7 @@ do_it:
 		if (err >= 0) {
 			err = 0;
 			if (wbc->for_reclaim)
-				err = WRITEPAGE_ACTIVATE;
+				nfs_flush_inode(inode, 0, 0, FLUSH_STABLE);
 		}
 	} else {
 		err = nfs_writepage_sync(NULL, inode, page, 0,
@@ -327,8 +327,7 @@ do_it:
 	}
 	unlock_kernel();
 out:
-	if (err != WRITEPAGE_ACTIVATE)
-		unlock_page(page);
+	unlock_page(page);
 	if (inode_referenced)
 		iput(inode);
 	return err; 

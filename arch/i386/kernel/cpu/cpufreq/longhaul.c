@@ -36,6 +36,7 @@
 static unsigned int numscales=16, numvscales;
 static unsigned int fsb;
 static int minvid, maxvid;
+static unsigned int minmult, maxmult;
 static int can_scale_voltage;
 static int vrmrev;
 
@@ -45,11 +46,15 @@ static int debug;
 
 static void dprintk(const char *fmt, ...)
 {
+	char s[256];
 	va_list args;
+
 	if (debug == 0)
 		return;
+
 	va_start(args, fmt);
-	printk(fmt, args);
+	vsprintf(s, fmt, args);
+	printk(s);
 	va_end(args);
 }
 
@@ -65,7 +70,7 @@ static int longhaul_version;
 static struct cpufreq_frequency_table *longhaul_table;
 
 
-static unsigned int calc_speed (int mult, int fsb)
+static unsigned int calc_speed(int mult, int fsb)
 {
 	int khz;
 	khz = (mult/10)*fsb;
@@ -76,7 +81,7 @@ static unsigned int calc_speed (int mult, int fsb)
 }
 
 
-static int longhaul_get_cpu_mult (void)
+static int longhaul_get_cpu_mult(void)
 {
 	unsigned long invalue=0,lo, hi;
 
@@ -97,7 +102,7 @@ static int longhaul_get_cpu_mult (void)
  * Sets a new clock ratio, and -if applicable- a new Front Side Bus
  */
 
-static void longhaul_setstate (unsigned int clock_ratio_index)
+static void longhaul_setstate(unsigned int clock_ratio_index)
 {
 	int speed, mult;
 	struct cpufreq_freqs freqs;
@@ -193,7 +198,7 @@ static void longhaul_setstate (unsigned int clock_ratio_index)
 
 #define ROUNDING	0xf
 
-static int _guess (int guess, int maxmult)
+static int _guess(int guess)
 {
 	int target;
 
@@ -206,7 +211,7 @@ static int _guess (int guess, int maxmult)
 }
 
 
-static int guess_fsb(int maxmult)
+static int guess_fsb(void)
 {
 	int speed = (cpu_khz/1000);
 	int i;
@@ -216,18 +221,17 @@ static int guess_fsb(int maxmult)
 	speed &= ~ROUNDING;
 
 	for (i=0; i<3; i++) {
-		if (_guess(speeds[i],maxmult) == speed)
+		if (_guess(speeds[i]) == speed)
 			return speeds[i];
 	}
 	return 0;
 }
 
 
-static int __init longhaul_get_ranges (void)
+static int __init longhaul_get_ranges(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
-	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
@@ -248,7 +252,7 @@ static int __init longhaul_get_ranges (void)
 		if (c->x86_model==6)
 			fsb = eblcr_fsb_table_v1[invalue];
 		else
-			fsb = guess_fsb(maxmult);
+			fsb = guess_fsb();
 		break;
 
 	case 2:
@@ -398,7 +402,7 @@ static int longhaul_verify(struct cpufreq_policy *policy)
 }
 
 
-static int longhaul_target (struct cpufreq_policy *policy,
+static int longhaul_target(struct cpufreq_policy *policy,
 			    unsigned int target_freq,
 			    unsigned int relation)
 {
@@ -422,7 +426,7 @@ static unsigned int longhaul_get(unsigned int cpu)
 	return (calc_speed (longhaul_get_cpu_mult(), fsb));
 }
 
-static int __init longhaul_cpu_init (struct cpufreq_policy *policy)
+static int __init longhaul_cpu_init(struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	char *cpuname=NULL;
@@ -536,7 +540,7 @@ static struct cpufreq_driver longhaul_driver = {
 	.attr	= longhaul_attr,
 };
 
-static int __init longhaul_init (void)
+static int __init longhaul_init(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 
@@ -553,8 +557,17 @@ static int __init longhaul_init (void)
 	return -ENODEV;
 }
 
-static void __exit longhaul_exit (void)
+static void __exit longhaul_exit(void)
 {
+	int i=0;
+	unsigned int new_clock_ratio;
+
+	while (clock_ratio[i] != maxmult)
+		i++;
+
+	new_clock_ratio = longhaul_table[i].index & 0xFF;
+	longhaul_setstate(new_clock_ratio);
+
 	cpufreq_unregister_driver(&longhaul_driver);
 	kfree(longhaul_table);
 }

@@ -839,7 +839,7 @@ shrink_zone(struct zone *zone, struct scan_control *sc)
 	if (count >= SWAP_CLUSTER_MAX) {
 		atomic_set(&zone->nr_scan_inactive, 0);
 		sc->nr_to_scan = count;
-		return shrink_cache(zone, sc);
+		shrink_cache(zone, sc);
 	}
 }
 
