@@ -170,8 +170,9 @@ struct i2c_client {
 	void *data;			/* for the clients		*/
 	int usage_count;		/* How many accesses currently  */
 					/* to the client		*/
+	struct device dev;		/* the device structure		*/
 };
-
+#define to_i2c_client(d) container_of(d, struct i2c_client, dev)
 
 /*
  * The following structs are for those who like to implement new bus drivers:
