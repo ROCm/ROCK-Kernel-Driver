@@ -293,7 +293,7 @@ struct streamer_private {
 
         struct streamer_private *next;
         struct pci_dev *pci_dev;
-	__u8 *streamer_mmio;
+	__u8 __iomem *streamer_mmio;
         char *streamer_card_name;
  
         spinlock_t streamer_lock;
