@@ -1926,10 +1926,6 @@ struct ct_sns_pkt {
 #define	RFT_ID_SNS_CMD_SIZE	60
 #define	RFT_ID_SNS_DATA_SIZE	16
 
-#define	RFF_ID_SNS_SCMD_LEN	8
-#define	RFF_ID_SNS_CMD_SIZE	32
-#define	RFF_ID_SNS_DATA_SIZE	16
-
 #define	RNN_ID_SNS_SCMD_LEN	10
 #define	RNN_ID_SNS_CMD_SIZE	36
 #define	RNN_ID_SNS_DATA_SIZE	16
@@ -1965,7 +1961,6 @@ struct sns_cmd_pkt {
 		} cmd;
 
 		uint8_t rft_data[RFT_ID_SNS_DATA_SIZE];
-		uint8_t rff_data[RFF_ID_SNS_DATA_SIZE];
 		uint8_t rnn_data[RNN_ID_SNS_DATA_SIZE];
 		uint8_t gan_data[GA_NXT_SNS_DATA_SIZE];
 		uint8_t gid_data[GID_PT_SNS_DATA_SIZE];

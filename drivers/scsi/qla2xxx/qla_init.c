@@ -1022,10 +1022,6 @@ qla2x00_configure_hba(scsi_qla_host_t *ha)
 
 	ha->loop_id = loop_id;
 
-	/* Make sure 2100 only has loop, in case of any firmware bug. */
-	if (IS_QLA2100(ha))
-		topo = 0;
-
 	/* initialize */
 	ha->min_external_loopid = SNS_FIRST_LOOP_ID;
 	ha->operating_mode = LOOP;

@@ -2930,7 +2930,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 		}
 
 		/* Allocate memory for SNS commands */
-		if (IS_QLA2200(ha)) {
+		if (IS_QLA2100(ha) || IS_QLA2200(ha)) {
 			/* Get consistent memory allocated for SNS commands */
 			ha->sns_cmd = pci_alloc_consistent(ha->pdev,
 			    sizeof(struct sns_cmd_pkt), &ha->sns_cmd_dma);
@@ -2946,7 +2946,7 @@ qla2x00_mem_alloc(scsi_qla_host_t *ha)
 				continue;
 			}
 			memset(ha->sns_cmd, 0, sizeof(struct sns_cmd_pkt));
-		} else if (!IS_QLA2100(ha)) {
+		} else {
 			/* Get consistent memory allocated for MS IOCB */
 			ha->ms_iocb = pci_alloc_consistent(ha->pdev,
 			    sizeof(ms_iocb_entry_t), &ha->ms_iocb_dma);
