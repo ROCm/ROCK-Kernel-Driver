@@ -3136,13 +3136,6 @@ out:
 
 #ifdef CONFIG_MODULES
 
-extern asmlinkage unsigned long sys_create_module(const char *name_user, size_t size);
-
-asmlinkage unsigned long sys32_create_module(const char *name_user, __kernel_size_t32 size)
-{
-	return sys_create_module(name_user, (size_t)size);
-}
-
 extern asmlinkage int sys_init_module(const char *name_user, struct module *mod_user);
 
 /* Hey, when you're trying to init module, take time and prepare us a nice 64bit
@@ -3421,102 +3414,12 @@ qm_info(struct module *mod, char *buf, size_t bufsize, __kernel_size_t32 *ret)
 	return error;
 }
 
-asmlinkage int sys32_query_module(char *name_user, int which, char *buf, __kernel_size_t32 bufsize, u32 ret)
-{
-	struct module *mod;
-	int err;
-
-	lock_kernel();
-	if (name_user == 0) {
-		/* This finds "kernel_module" which is not exported. */
-		for(mod = module_list; mod->next != NULL; mod = mod->next)
-			;
-	} else {
-		long namelen;
-		char *name;
-
-		if ((namelen = get_mod_name(name_user, &name)) < 0) {
-			err = namelen;
-			goto out;
-		}
-		err = -ENOENT;
-		if (namelen == 0) {
-			/* This finds "kernel_module" which is not exported. */
-			for(mod = module_list; mod->next != NULL; mod = mod->next)
-				;
-		} else if ((mod = find_module(name)) == NULL) {
-			put_mod_name(name);
-			goto out;
-		}
-		put_mod_name(name);
-	}
-
-	switch (which)
-	{
-	case 0:
-		err = 0;
-		break;
-	case QM_MODULES:
-		err = qm_modules(buf, bufsize, (__kernel_size_t32 *)AA(ret));
-		break;
-	case QM_DEPS:
-		err = qm_deps(mod, buf, bufsize, (__kernel_size_t32 *)AA(ret));
-		break;
-	case QM_REFS:
-		err = qm_refs(mod, buf, bufsize, (__kernel_size_t32 *)AA(ret));
-		break;
-	case QM_SYMBOLS:
-		err = qm_symbols(mod, buf, bufsize, (__kernel_size_t32 *)AA(ret));
-		break;
-	case QM_INFO:
-		err = qm_info(mod, buf, bufsize, (__kernel_size_t32 *)AA(ret));
-		break;
-	default:
-		err = -EINVAL;
-		break;
-	}
-out:
-	unlock_kernel();
-	return err;
-}
-
 struct kernel_sym32 {
 	u32 value;
 	char name[60];
 };
-		 
-extern asmlinkage int sys_get_kernel_syms(struct kernel_sym *table);
-
-asmlinkage int sys32_get_kernel_syms(struct kernel_sym32 *table)
-{
-	int len, i;
-	struct kernel_sym *tbl;
-	mm_segment_t old_fs;
-	
-	len = sys_get_kernel_syms(NULL);
-	if (!table) return len;
-	tbl = kmalloc (len * sizeof (struct kernel_sym), GFP_KERNEL);
-	if (!tbl) return -ENOMEM;
-	old_fs = get_fs();
-	set_fs (KERNEL_DS);
-	sys_get_kernel_syms(tbl);
-	set_fs (old_fs);
-	for (i = 0; i < len; i++, table += sizeof (struct kernel_sym32)) {
-		if (put_user (tbl[i].value, &table->value) ||
-		    copy_to_user (table->name, tbl[i].name, 60))
-			break;
-	}
-	kfree (tbl);
-	return i;
-}
 
 #else /* CONFIG_MODULES */
-
-asmlinkage unsigned long
-sys32_create_module(const char *name_user, size_t size)
-{
-	return -ENOSYS;
-}
 
 asmlinkage int
 sys32_init_module(const char *name_user, struct module *mod_user)
@@ -3526,24 +3429,6 @@ sys32_init_module(const char *name_user, struct module *mod_user)
 
 asmlinkage int
 sys32_delete_module(const char *name_user)
-{
-	return -ENOSYS;
-}
-
-asmlinkage int
-sys32_query_module(const char *name_user, int which, char *buf, size_t bufsize,
-		 size_t *ret)
-{
-	/* Let the program know about the new interface.  Not that
-	   it'll do them much good.  */
-	if (which == 0)
-		return 0;
-
-	return -ENOSYS;
-}
-
-asmlinkage int
-sys32_get_kernel_syms(struct kernel_sym *table)
 {
 	return -ENOSYS;
 }

@@ -564,12 +564,6 @@ sys32_sigprocmask_wrapper:
 	llgtr	%r4,%r4			# old_sigset_emu31 *
 	jg	sys32_sigprocmask		# branch to system call
 
-	.globl  sys32_create_module_wrapper 
-sys32_create_module_wrapper:
-	llgtr	%r2,%r2			# const char *
-	llgfr	%r3,%r3			# size_t
-	jg	sys32_create_module	# branch to system call
-
 	.globl  sys32_init_module_wrapper 
 sys32_init_module_wrapper:
 	llgtr	%r2,%r2			# const char *
@@ -580,11 +574,6 @@ sys32_init_module_wrapper:
 sys32_delete_module_wrapper:
 	llgtr	%r2,%r2			# const char *
 	jg	sys32_delete_module	# branch to system call
-
-	.globl  sys32_get_kernel_syms_wrapper 
-sys32_get_kernel_syms_wrapper:
-	llgtr	%r2,%r2			# struct kernel_sym_emu31 *
-	jg	sys32_get_kernel_syms	# branch to system call
 
 	.globl  sys32_quotactl_wrapper 
 sys32_quotactl_wrapper:
@@ -785,15 +774,6 @@ sys32_getresuid16_wrapper:
 	llgtr	%r3,%r3			# __kernel_old_uid_emu31_t *
 	llgtr	%r4,%r4			# __kernel_old_uid_emu31_t *
 	jg	sys32_getresuid16	# branch to system call
-
-	.globl  sys32_query_module_wrapper 
-sys32_query_module_wrapper:
-	llgtr	%r2,%r2			# const char * 
-	lgfr	%r3,%r3			# int 
-	llgtr	%r4,%r4			# char * 
-	llgfr	%r5,%r5			# size_t 
-	llgtr	%r6,%r6			# size_t * 
-	jg	sys32_query_module	# branch to system call
 
 	.globl  sys32_poll_wrapper 
 sys32_poll_wrapper:

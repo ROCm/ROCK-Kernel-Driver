@@ -503,10 +503,10 @@ sys_call_table:
         .long  SYSCALL(sys_adjtimex,sys32_adjtimex_wrapper)
         .long  SYSCALL(sys_mprotect,sys32_mprotect_wrapper) /* 125 */
         .long  SYSCALL(sys_sigprocmask,sys32_sigprocmask_wrapper)
-        .long  SYSCALL(sys_create_module,sys32_create_module_wrapper)
+        .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old "create module" */
         .long  SYSCALL(sys_init_module,sys32_init_module_wrapper)
         .long  SYSCALL(sys_delete_module,sys32_delete_module_wrapper)
-        .long  SYSCALL(sys_get_kernel_syms,sys32_get_kernel_syms_wrapper) /* 130 */
+        .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* 130: old get_kernel_syms */
         .long  SYSCALL(sys_quotactl,sys32_quotactl_wrapper)
         .long  SYSCALL(sys_getpgid,sys32_getpgid_wrapper)
         .long  SYSCALL(sys_fchdir,sys32_fchdir_wrapper)
@@ -543,7 +543,7 @@ sys_call_table:
         .long  SYSCALL(sys_ni_syscall,sys32_setresuid16_wrapper) /* old setresuid16 syscall */
         .long  SYSCALL(sys_ni_syscall,sys32_getresuid16_wrapper) /* old getresuid16 syscall */
         .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* for vm86 */
-        .long  SYSCALL(sys_query_module,sys32_query_module_wrapper)
+        .long  SYSCALL(sys_ni_syscall,sys_ni_syscall) /* old sys_query_module */
         .long  SYSCALL(sys_poll,sys32_poll_wrapper)
         .long  SYSCALL(sys_nfsservctl,sys32_nfsservctl_wrapper)
         .long  SYSCALL(sys_ni_syscall,sys32_setresgid16_wrapper) /* old setresgid16 syscall */
