@@ -192,13 +192,18 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 			return -EAGAIN;
 		} /* else ok - we are setting up session */
 	}
-
+	/* make sure that we sign in the same order that we send on this socket 
+		and avoid races inside tcp sendmsg code that could cause corruption
+		of smb data */
+	down(&ses->server->tcpSem); 
 	midQ = AllocMidQEntry(in_buf, ses);
 	if (midQ == NULL) {
+		up(&ses->server->tcpSem);
 		return -EIO;
 	}
 
 	if (in_buf->smb_buf_length > CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE - 4) {
+		up(&ses->server->tcpSem);
 		cERROR(1,
 		       ("Illegal length, greater than maximum frame, %d ",
 			in_buf->smb_buf_length));
@@ -214,7 +219,7 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 	midQ->midState = MID_REQUEST_SUBMITTED;
 	rc = smb_send(ses->server->ssocket, in_buf, in_buf->smb_buf_length,
 		      (struct sockaddr *) &(ses->server->sockAddr));
-
+	up(&ses->server->tcpSem);
 	if (long_op == -1)
 		goto cifs_no_response_exit;
 	if (long_op > 1) /* writes past end of file can take looooong time */

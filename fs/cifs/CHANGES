@@ -1,7 +1,10 @@
+
 Version 0.98
 ------------
 Fix hang in commit_write during reconnection of open files under heavy load.
-Fix unload_nls oops in a mount failure path. 
+Fix unload_nls oops in a mount failure path. Serialize writes to same socket
+which also fixes any possible races when cifs signatures are enabled in SMBs
+being sent out of signature sequence number order.    
 
 Version 0.97
 ------------

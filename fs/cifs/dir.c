@@ -220,6 +220,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 				pCifsFile->pInode = newinode;
 				pCifsFile->invalidHandle = FALSE;
 				pCifsFile->closePend     = FALSE;
+				init_MUTEX(&pCifsFile->fh_sem);
 				/* pCifsFile->pfile = file; */ /* put in at open time */
 				write_lock(&GlobalSMBSeslock);
 				list_add(&pCifsFile->tlist,&pTcon->openFileList);

@@ -142,6 +142,7 @@ cifs_open(struct inode *inode, struct file *file)
 			pCifsFile = (struct cifsFileInfo *) file->private_data;
 			pCifsFile->netfid = netfid;
 			pCifsFile->pid = current->pid;
+			init_MUTEX(&pCifsFile->fh_sem);
 			pCifsFile->pfile = file; /* needed for writepage */
 			pCifsFile->pInode = inode;
 			pCifsFile->invalidHandle = FALSE;
@@ -1390,6 +1391,7 @@ cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 				    (struct cifsFileInfo *) file->private_data;
 				cifsFile->netfid = searchHandle;
 				cifsFile->invalidHandle = FALSE;
+				init_MUTEX(&cifsFile->fh_sem);
 			} else {
 				rc = -ENOMEM;
 				break;
