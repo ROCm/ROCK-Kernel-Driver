@@ -1921,6 +1921,8 @@ static int cdrom_read_cdda_old(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 	struct packet_command cgc;
 	int nr, ret;
 
+	cdi->last_sense = 0;
+
 	memset(&cgc, 0, sizeof(cgc));
 
 	/*
@@ -1972,6 +1974,8 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 	if (!q)
 		return -ENXIO;
 
+	cdi->last_sense = 0;
+
 	while (nframes) {
 		nr = nframes;
 		if (cdi->cdda_method == CDDA_BPC_SINGLE)
@@ -2019,6 +2023,7 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 
 		nframes -= nr;
 		lba += nr;
+		ubuf += len;
 	}
 
 	return ret;

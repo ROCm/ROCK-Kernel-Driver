@@ -1215,7 +1215,7 @@ static void dc390_dumpinfo (struct dc390_acb* pACB, struct dc390_dcb* pDCB, stru
     pdev = pACB->pdev;
     pci_read_config_word(pdev, PCI_STATUS, &pstat);
     printk ("DC390: Register dump: PCI Status: %04x\n", pstat);
-    printk ("DC390: In case of driver trouble read linux/Documentation/scsi/tmscsim.txt\n");
+    printk ("DC390: In case of driver trouble read Documentation/scsi/tmscsim.txt\n");
 }
 
 

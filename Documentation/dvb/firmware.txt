@@ -2,7 +2,7 @@ Some DVB cards and many newer frontends require proprietary,
 binary-only firmware.
 
 The DVB drivers will be converted to use the request_firmware()
-hotplug interface (see linux/Documentation/firmware_class/).
+hotplug interface (see Documentation/firmware_class/).
 (CONFIG_FW_LOADER)
 
 The firmware can be loaded automatically via the hotplug manager

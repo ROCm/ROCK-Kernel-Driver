@@ -7,7 +7,7 @@
  *            ------------------
  *
  * You can find a subset of the documentation in 
- * linux/Documentation/networking/z8530drv.txt.
+ * Documentation/networking/z8530drv.txt.
  */
 
 /*

@@ -7,7 +7,7 @@ you should be aware they do exist and can be changed.
 The current list of parameters can be found in the files:
 
 	linux/net/TUNABLE
-	linux/Documentation/networking/ip-sysctl.txt
+	Documentation/networking/ip-sysctl.txt
 
 Some of these are accessible via the sysctl interface, and many more are
 scheduled to be added in this way. For example, some parameters related 

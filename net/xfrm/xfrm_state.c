@@ -400,22 +400,16 @@ int xfrm_state_add(struct xfrm_state *x)
 	spin_lock_bh(&xfrm_state_lock);
 
 	x1 = afinfo->state_lookup(&x->id.daddr, x->id.spi, x->id.proto);
-	if (!x1) {
-		x1 = afinfo->find_acq(
-			x->props.mode, x->props.reqid, x->id.proto,
-			&x->id.daddr, &x->props.saddr, 0);
-		if (x1 && x1->id.spi != x->id.spi && x1->id.spi) {
-			xfrm_state_put(x1);
-			x1 = NULL;
-		}
-	}
-
-	if (x1 && x1->id.spi) {
+	if (x1) {
 		xfrm_state_put(x1);
 		x1 = NULL;
 		err = -EEXIST;
 		goto out;
 	}
+
+	x1 = afinfo->find_acq(
+		x->props.mode, x->props.reqid, x->id.proto,
+		&x->id.daddr, &x->props.saddr, 0);
 
 	__xfrm_state_insert(x);
 	err = 0;
@@ -630,11 +624,12 @@ xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi)
 		for (h=0; h<maxspi-minspi+1; h++) {
 			spi = minspi + net_random()%(maxspi-minspi+1);
 			x0 = xfrm_state_lookup(&x->id.daddr, htonl(spi), x->id.proto, x->props.family);
-			if (x0 == NULL)
+			if (x0 == NULL) {
+				x->id.spi = htonl(spi);
 				break;
+			}
 			xfrm_state_put(x0);
 		}
-		x->id.spi = htonl(spi);
 	}
 	if (x->id.spi) {
 		spin_lock_bh(&xfrm_state_lock);

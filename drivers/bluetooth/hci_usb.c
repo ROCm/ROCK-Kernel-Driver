@@ -65,7 +65,7 @@
 #define URB_ZERO_PACKET 0
 #endif
 
-#define VERSION "2.6"
+#define VERSION "2.7"
 
 static struct usb_driver hci_usb_driver; 
 
@@ -97,6 +97,9 @@ static struct usb_device_id blacklist_ids[] = {
 
 	/* Broadcom BCM2035 */
 	{ USB_DEVICE(0x0a5c, 0x200a), .driver_info = HCI_RESET },
+
+	/* ISSC Bluetooth Adapter v3.1 */
+	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
 	/* Digianswer device */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },

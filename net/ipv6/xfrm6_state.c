@@ -16,7 +16,7 @@
 #include <linux/ipsec.h>
 #include <net/ipv6.h>
 
-extern struct xfrm_state_afinfo xfrm6_state_afinfo;
+static struct xfrm_state_afinfo xfrm6_state_afinfo;
 
 static void
 __xfrm6_init_tempsel(struct xfrm_state *x, struct flowi *fl,
@@ -81,11 +81,8 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 		    proto == x->id.proto &&
 		    !ipv6_addr_cmp((struct in6_addr *)saddr, (struct in6_addr *)x->props.saddr.a6) &&
 		    reqid == x->props.reqid &&
-		    x->km.state == XFRM_STATE_ACQ) {
-			    if (!x0)
-				    x0 = x;
-			    if (x->id.spi)
-				    continue;
+		    x->km.state == XFRM_STATE_ACQ &&
+		    !x->id.spi) {
 			    x0 = x;
 			    break;
 		    }

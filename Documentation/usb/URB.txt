@@ -4,7 +4,7 @@ Again:   2002-Jul-06
     NOTE:
 
     The USB subsystem now has a substantial section in "The Linux Kernel API"
-    guide (in linux/Documentation/DocBook), generated from the current source
+    guide (in Documentation/DocBook), generated from the current source
     code.  This particular documentation file isn't particularly current or
     complete; don't rely on it except for a quick overview.
 

@@ -370,7 +370,7 @@ config CPU_FREQ_INTEGRATOR
 	help
 	  This enables the CPUfreq driver for ARM Integrator CPUs.
 
-	  For details, take a look at linux/Documentation/cpu-freq.
+	  For details, take a look at <file:Documentation/cpu-freq>.
 
 	  If in doubt, say Y.
 

@@ -52,8 +52,8 @@
 #include <asm/rtas.h>
 #include <asm/ppcdebug.h>
 
-static unsigned char log_buf[RTAS_ERROR_LOG_MAX];
-static spinlock_t log_lock = SPIN_LOCK_UNLOCKED;
+static unsigned char ras_log_buf[RTAS_ERROR_LOG_MAX];
+static spinlock_t ras_log_buf_lock = SPIN_LOCK_UNLOCKED;
 
 static int ras_get_sensor_state_token;
 static int ras_check_exception_token;
@@ -155,23 +155,23 @@ ras_epow_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	else
 		critical = 0;
 
-	spin_lock(&log_lock);
+	spin_lock(&ras_log_buf_lock);
 
 	status = rtas_call(ras_check_exception_token, 6, 1, NULL,
 			   RAS_VECTOR_OFFSET,
 			   virt_irq_to_real(irq_offset_down(irq)),
 			   RTAS_EPOW_WARNING | RTAS_POWERMGM_EVENTS,
-			   critical, __pa(&log_buf), RTAS_ERROR_LOG_MAX);
+			   critical, __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
 
 	udbg_printf("EPOW <0x%lx 0x%x 0x%x>\n",
-		    *((unsigned long *)&log_buf), status, state);
+		    *((unsigned long *)&ras_log_buf), status, state);
 	printk(KERN_WARNING "EPOW <0x%lx 0x%x 0x%x>\n",
-	       *((unsigned long *)&log_buf), status, state);
+	       *((unsigned long *)&ras_log_buf), status, state);
 
 	/* format and print the extended information */
-	log_error(log_buf, ERR_TYPE_RTAS_LOG, 0);
+	log_error(ras_log_buf, ERR_TYPE_RTAS_LOG, 0);
 
-	spin_unlock(&log_lock);
+	spin_unlock(&ras_log_buf_lock);
 	return IRQ_HANDLED;
 }
 
@@ -190,15 +190,15 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 	int status = 0xdeadbeef;
 	int fatal;
 
-	spin_lock(&log_lock);
+	spin_lock(&ras_log_buf_lock);
 
 	status = rtas_call(ras_check_exception_token, 6, 1, NULL,
 			   RAS_VECTOR_OFFSET,
 			   virt_irq_to_real(irq_offset_down(irq)),
 			   RTAS_INTERNAL_ERROR, 1 /*Time Critical */,
-			   __pa(&log_buf), RTAS_ERROR_LOG_MAX);
+			   __pa(&ras_log_buf), RTAS_ERROR_LOG_MAX);
 
-	rtas_elog = (struct rtas_error_log *)log_buf;
+	rtas_elog = (struct rtas_error_log *)ras_log_buf;
 
 	if ((status == 0) && (rtas_elog->severity >= SEVERITY_ERROR_SYNC))
 		fatal = 1;
@@ -206,13 +206,13 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		fatal = 0;
 
 	/* format and print the extended information */
-	log_error(log_buf, ERR_TYPE_RTAS_LOG, fatal);
+	log_error(ras_log_buf, ERR_TYPE_RTAS_LOG, fatal);
 
 	if (fatal) {
 		udbg_printf("Fatal HW Error <0x%lx 0x%x>\n",
-			    *((unsigned long *)&log_buf), status);
+			    *((unsigned long *)&ras_log_buf), status);
 		printk(KERN_EMERG "Error: Fatal hardware error <0x%lx 0x%x>\n",
-		       *((unsigned long *)&log_buf), status);
+		       *((unsigned long *)&ras_log_buf), status);
 
 #ifndef DEBUG
 		/* Don't actually power off when debugging so we can test
@@ -223,12 +223,12 @@ ras_error_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 	} else {
 		udbg_printf("Recoverable HW Error <0x%lx 0x%x>\n",
-			    *((unsigned long *)&log_buf), status);
+			    *((unsigned long *)&ras_log_buf), status);
 		printk(KERN_WARNING
 		       "Warning: Recoverable hardware error <0x%lx 0x%x>\n",
-		       *((unsigned long *)&log_buf), status);
+		       *((unsigned long *)&ras_log_buf), status);
 	}
 
-	spin_unlock(&log_lock);
+	spin_unlock(&ras_log_buf_lock);
 	return IRQ_HANDLED;
 }
