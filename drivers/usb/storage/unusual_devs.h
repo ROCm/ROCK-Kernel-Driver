@@ -394,6 +394,12 @@ UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Dimage F300",
 		US_SC_SCSI, US_PR_BULK, NULL, 0 ),
 
+/* Reported by Miguel A. Fosas <amn3s1a@ono.com> */
+UNUSUAL_DEV(  0x0686, 0x4017, 0x0001, 0x0001,
+                "Minolta",
+                "DIMAGE E223",
+                US_SC_SCSI, US_PR_DEVICE, NULL, 0 ),
+
 UNUSUAL_DEV(  0x0693, 0x0002, 0x0100, 0x0100, 
 		"Hagiwara",
 		"FlashGate SmartMedia",
