@@ -34,10 +34,8 @@
 #include <linux/libata.h>
 #include <asm/io.h>
 
-#undef DIRECT_HDMA
-
 #define DRV_NAME	"sata_promise"
-#define DRV_VERSION	"0.86"
+#define DRV_VERSION	"0.87"
 
 
 enum {
@@ -82,6 +80,9 @@ enum {
 
 	PDC_FLAG_20621		= (1 << 30), /* we have a 20621 */
 	PDC_HDMA_RESET		= (1 << 11), /* HDMA reset */
+
+	PDC_MAX_HDMA		= 32,
+	PDC_HDMA_Q_MASK		= (PDC_MAX_HDMA - 1),
 };
 
 
@@ -89,6 +90,15 @@ struct pdc_port_priv {
 	u8			dimm_buf[(ATA_PRD_SZ * ATA_MAX_PRD) + 512];
 	u8			*pkt;
 	dma_addr_t		pkt_dma;
+
+	unsigned int		doing_hdma;
+	unsigned int		hdma_prod;
+	unsigned int		hdma_cons;
+	struct {
+		struct ata_queued_cmd *qc;
+		unsigned int	seq;
+		unsigned long	pkt_ofs;
+	} hdma[32];
 };
 
 
@@ -256,6 +266,7 @@ static int pdc_port_start(struct ata_port *ap)
 		rc = -ENOMEM;
 		goto err_out;
 	}
+	memset(pp, 0, sizeof(*pp));
 
 	pp->pkt = pci_alloc_consistent(pdev, 128, &pp->pkt_dma);
 	if (!pp->pkt) {
@@ -643,42 +654,60 @@ static void pdc20621_fill_sg(struct ata_queued_cmd *qc)
 	VPRINTK("ata pkt buf ofs %u, prd size %u, mmio copied\n", i, sgt_len);
 }
 
-#ifdef DIRECT_HDMA
-static void pdc20621_push_hdma(struct ata_queued_cmd *qc)
+static void __pdc20621_push_hdma(struct ata_queued_cmd *qc,
+				 unsigned int seq,
+				 u32 pkt_ofs)
 {
 	struct ata_port *ap = qc->ap;
 	struct ata_host_set *host_set = ap->host_set;
-	unsigned int port_no = ap->port_no;
 	void *mmio = host_set->mmio_base;
-	unsigned int rw = (qc->flags & ATA_QCFLAG_WRITE);
-	u32 tmp;
-
-	unsigned int host_sg = PDC_20621_DIMM_BASE +
-			       (PDC_DIMM_WINDOW_STEP * port_no) +
-			       PDC_DIMM_HOST_PRD;
-	unsigned int dimm_sg = PDC_20621_DIMM_BASE +
-			       (PDC_DIMM_WINDOW_STEP * port_no) +
-			       PDC_DIMM_HPKT_PRD;
 
 	/* hard-code chip #0 */
 	mmio += PDC_CHIP0_OFS;
 
-	tmp = readl(mmio + PDC_HDMA_CTLSTAT) & 0xffffff00;
-	tmp |= port_no + 1 + 4;		/* seq. ID */
-	if (!rw)
-		tmp |= (1 << 6);	/* hdma data direction */
-	writel(tmp, mmio + PDC_HDMA_CTLSTAT); /* note: stops DMA, if active */
-	readl(mmio + PDC_HDMA_CTLSTAT);	/* flush */
+	writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
+	readl(mmio + PDC_20621_SEQCTL + (seq * 4));	/* flush */
 
-	writel(host_sg, mmio + 0x108);
-	writel(dimm_sg, mmio + 0x10C);
-	writel(0, mmio + 0x128);
-
-	tmp |= (1 << 7);
-	writel(tmp, mmio + PDC_HDMA_CTLSTAT);
-	readl(mmio + PDC_HDMA_CTLSTAT);	/* flush */
+	writel(pkt_ofs, mmio + PDC_HDMA_PKT_SUBMIT);
+	readl(mmio + PDC_HDMA_PKT_SUBMIT);	/* flush */
 }
-#endif
+
+static void pdc20621_push_hdma(struct ata_queued_cmd *qc,
+				unsigned int seq,
+				u32 pkt_ofs)
+{
+	struct ata_port *ap = qc->ap;
+	struct pdc_port_priv *pp = ap->private_data;
+	unsigned int idx = pp->hdma_prod & PDC_HDMA_Q_MASK;
+
+	if (!pp->doing_hdma) {
+		__pdc20621_push_hdma(qc, seq, pkt_ofs);
+		pp->doing_hdma = 1;
+		return;
+	}
+
+	pp->hdma[idx].qc = qc;
+	pp->hdma[idx].seq = seq;
+	pp->hdma[idx].pkt_ofs = pkt_ofs;
+	pp->hdma_prod++;
+}
+
+static void pdc20621_pop_hdma(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	struct pdc_port_priv *pp = ap->private_data;
+	unsigned int idx = pp->hdma_cons & PDC_HDMA_Q_MASK;
+
+	/* if nothing on queue, we're done */
+	if (pp->hdma_prod == pp->hdma_cons) {
+		pp->doing_hdma = 0;
+		return;
+	}
+
+	__pdc20621_push_hdma(pp->hdma[idx].qc, pp->hdma[idx].seq,
+			     pp->hdma[idx].pkt_ofs);
+	pp->hdma_cons++;
+}
 
 #ifdef ATA_VERBOSE_DEBUG
 static void pdc20621_dump_hdma(struct ata_queued_cmd *qc)
@@ -724,23 +753,17 @@ static void pdc20621_dma_start(struct ata_queued_cmd *qc)
 
 	wmb();			/* flush PRD, pkt writes */
 
-	writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
-	readl(mmio + PDC_20621_SEQCTL + (seq * 4));	/* flush */
-
 	if (doing_hdma) {
 		pdc20621_dump_hdma(qc);
-#ifdef DIRECT_HDMA
-		pdc20621_push_hdma(qc);
-#else
-		writel(port_ofs + PDC_DIMM_HOST_PKT,
-		       mmio + PDC_HDMA_PKT_SUBMIT);
-		readl(mmio + PDC_HDMA_PKT_SUBMIT);	/* flush */
-#endif
-		VPRINTK("submitted ofs 0x%x (%u), seq %u\n",
-		port_ofs + PDC_DIMM_HOST_PKT,
-		port_ofs + PDC_DIMM_HOST_PKT,
-		seq);
+		pdc20621_push_hdma(qc, seq, port_ofs + PDC_DIMM_HOST_PKT);
+		VPRINTK("queued ofs 0x%x (%u), seq %u\n",
+			port_ofs + PDC_DIMM_HOST_PKT,
+			port_ofs + PDC_DIMM_HOST_PKT,
+			seq);
 	} else {
+		writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
+		readl(mmio + PDC_20621_SEQCTL + (seq * 4));	/* flush */
+
 		writel(port_ofs + PDC_DIMM_ATA_PKT,
 		       (void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
 		readl((void *) ap->ioaddr.cmd_addr + PDC_PKT_SUBMIT);
@@ -771,6 +794,7 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 			VPRINTK("ata%u: read hdma, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + PDC_HDMA_CTLSTAT));
 			pdc_dma_complete(ap, qc);
+			pdc20621_pop_hdma(qc);
 		}
 
 		/* step one - exec ATA command */
@@ -781,15 +805,8 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 
 			/* submit hdma pkt */
 			pdc20621_dump_hdma(qc);
-			writel(0x00000001, mmio + PDC_20621_SEQCTL + (seq * 4));
-			readl(mmio + PDC_20621_SEQCTL + (seq * 4));
-#ifdef DIRECT_HDMA
-			pdc20621_push_hdma(qc);
-#else
-			writel(port_ofs + PDC_DIMM_HOST_PKT,
-			       mmio + PDC_HDMA_PKT_SUBMIT);
-			readl(mmio + PDC_HDMA_PKT_SUBMIT);
-#endif
+			pdc20621_push_hdma(qc, seq,
+					   port_ofs + PDC_DIMM_HOST_PKT);
 		}
 		handled = 1;
 		break;
@@ -814,6 +831,7 @@ static inline unsigned int pdc20621_host_intr( struct ata_port *ap,
 			VPRINTK("ata%u: write ata, 0x%x 0x%x\n", ap->id,
 				readl(mmio + 0x104), readl(mmio + PDC_HDMA_CTLSTAT));
 			pdc_dma_complete(ap, qc);
+			pdc20621_pop_hdma(qc);
 		}
 		handled = 1;
 		break;
