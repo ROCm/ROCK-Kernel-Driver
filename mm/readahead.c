@@ -338,8 +338,8 @@ void page_cache_readaround(struct file *file, unsigned long offset)
  */
 void handle_ra_thrashing(struct file *file)
 {
-	struct inode *inode = file->f_dentry->d_inode;
-	const unsigned long min = get_min_readahead(inode);
+	struct address_space * mapping = file->f_dentry->d_inode->i_mapping;
+	const unsigned long min = get_min_readahead(mapping->host);
 
 	file->f_ra.next_size -= 3;
 	if (file->f_ra.next_size < min)
