@@ -642,10 +642,9 @@ void ide_unregister (unsigned int index)
 		drive = &hwif->drives[unit];
 		if (!drive->present)
 			continue;
-		if (drive->usage)
+		if (drive->usage || DRIVER(drive)->busy)
 			goto abort;
-		if (DRIVER(drive)->shutdown(drive))
-			goto abort;
+		drive->dead = 1;
 	}
 	hwif->present = 0;
 	
@@ -2170,20 +2169,6 @@ static int default_cleanup (ide_drive_t *drive)
 }
 
 /*
- *	Check if we can unregister the subdriver. Called with the
- *	request lock held.
- */
- 
-static int default_shutdown(ide_drive_t *drive)
-{
-	if (drive->usage || DRIVER(drive)->busy) {
-		return 1;
-	}
-	drive->dead = 1;
-	return 0;
-}
-
-/*
  *	Default function to use for the cache flush operation. This
  *	must be replaced for disk devices (see ATA specification
  *	documents on cache flush and drive suspend rules)
@@ -2259,7 +2244,6 @@ static ide_startstop_t default_start_power_step(ide_drive_t *drive,
 static void setup_driver_defaults (ide_driver_t *d)
 {
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
-	if (d->shutdown == NULL)	d->shutdown = default_shutdown;
 	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
 	if (d->do_request == NULL)	d->do_request = default_do_request;
 	if (d->end_request == NULL)	d->end_request = default_end_request;
