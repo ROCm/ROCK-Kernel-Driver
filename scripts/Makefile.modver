@@ -9,7 +9,7 @@ include scripts/Makefile.lib
 
 #
 
-modules := $(patsubst ./%,%,$(shell cd $(MODVERDIR); find . -name \*.ko))
+modules := $(shell cd $(MODVERDIR); cat *.mod)
 
 __modversions: $(modules)
 	@:

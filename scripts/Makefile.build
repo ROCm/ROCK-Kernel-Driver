@@ -47,7 +47,7 @@ endif
 
 ifdef CONFIG_MODVERSIONS
 modules := $(obj-m)
-touch-module = @mkdir -p $(MODVERDIR)/$(@D); touch $(MODVERDIR)/$(@:.o=.ko)
+touch-module = @echo $(@:.o=.ko) > .tmp_versions/$(@F:.o=.mod)
 else
 modules := $(obj-m:.o=.ko)
 endif
