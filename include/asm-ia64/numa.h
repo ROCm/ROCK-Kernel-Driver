@@ -22,6 +22,8 @@
 # define NR_MEMBLKS   (NR_NODES * 8)
 #endif
 
+extern char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+
 /* Stuff below this line could be architecture independent */
 
 extern int num_memblks;		/* total number of memory chunks */

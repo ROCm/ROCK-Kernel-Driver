@@ -781,6 +781,9 @@ acpi_boot_init (char *cmdline)
 	smp_boot_data.cpu_count = total_cpus;
 
 	smp_build_cpu_map();
+#ifdef CONFIG_NUMA
+	build_cpu_to_node_map();
+#endif
 #endif
 	/* Make boot-up look pretty */
 	printk("%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);

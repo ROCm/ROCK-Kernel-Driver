@@ -16,6 +16,7 @@
 
 #include <linux/config.h>
 
+#include <linux/acpi.h>
 #include <linux/bootmem.h>
 #include <linux/delay.h>
 #include <linux/init.h>
@@ -426,6 +427,32 @@ smp_build_cpu_map (void)
 		cpu++;
 	}
 }
+
+#ifdef CONFIG_NUMA
+char cpu_to_node_map[NR_CPUS] __cacheline_aligned;
+/*
+ * Build cpu to node mapping.
+ */
+void __init
+build_cpu_to_node_map(void)
+{
+	int cpu, i;
+
+	for(cpu=0; cpu<NR_CPUS; cpu++) {
+		/*
+		 * All Itanium NUMA platforms I know use ACPI, so maybe we
+		 * can drop this ifdef completely.                    [EF] 
+		 */
+#ifdef CONFIG_ACPI_NUMA
+		for(i=0; i<NR_CPUS; i++)
+			if (cpu_physical_id(cpu) == node_cpuid[i].phys_id) {
+				cpu_to_node_map[cpu]=node_cpuid[i].nid;
+				break;
+			}
+#endif
+	}
+}
+#endif
 
 /*
  * Cycle through the APs sending Wakeup IPIs to boot each.
